@@ -446,7 +446,7 @@ static int tcpstate(struct conv *c, char *state, int n)
 	s = (Tcpctl *) (c->ptcl);
 
 	return snprintf(state, n,
-					"%s qin %d qout %d srtt %d mdev %d cwin %lud swin %lud>>%d rwin %lud>>%d timer.start %d timer.count %d rerecv %d katimer.start %d katimer.count %d\n",
+					"%s qin %d qout %d srtt %d mdev %d cwin %lu swin %lud>>%d rwin %lud>>%d timer.start %d timer.count %d rerecv %d katimer.start %d katimer.count %d\n",
 					tcpstates[s->state],
 					c->rq ? qlen(c->rq) : 0,
 					c->wq ? qlen(c->wq) : 0,
@@ -569,7 +569,7 @@ static void tcprcvwin(struct conv *s)
 	if (w < 0)
 		w = 0;
 	if (w == 0)
-		netlog(s->p->f, Logtcp, "tcprcvwim: window %lud qlen %d\n", tcb->window,
+		netlog(s->p->f, Logtcp, "tcprcvwim: window %lu qlen %d\n", tcb->window,
 			   qlen(s->rq));
 	tcb->rcv.wnd = w;
 	if (w == 0)
@@ -1786,7 +1786,7 @@ static void update(struct conv *s, Tcp * seg)
 
 		/* this is a pure ack w/o window update */
 		netlog(s->p->f, Logtcprxmt,
-			   "dupack %lud ack %lud sndwnd %lud advwin %lud\n",
+			   "dupack %lu ack %lud sndwnd %lud advwin %lud\n",
 			   tcb->snd.dupacks, seg->ack, tcb->snd.wnd, seg->wnd);
 
 		if (++tcb->snd.dupacks == TCPREXMTTHRESH) {
@@ -1796,7 +1796,7 @@ static void update(struct conv *s, Tcp * seg)
 			 */
 			tcb->snd.recovery = 1;
 			tcb->snd.rxt = tcb->snd.nxt;
-			netlog(s->p->f, Logtcprxmt, "fast rxt %lud, nxt %lud\n",
+			netlog(s->p->f, Logtcprxmt, "fast rxt %lu, nxt %lud\n",
 				   tcb->snd.una, tcb->snd.nxt);
 			tcprxmit(s);
 		} else {
@@ -1832,7 +1832,7 @@ static void update(struct conv *s, Tcp * seg)
 		tcb->snd.dupacks = 0;
 		tcb->snd.recovery = 0;
 	} else
-		netlog(s->p->f, Logtcp, "rxt next %lud, cwin %lud\n", seg->ack,
+		netlog(s->p->f, Logtcp, "rxt next %lu, cwin %lud\n", seg->ack,
 			   tcb->cwind);
 
 	/* Compute the new send window size */
@@ -2144,10 +2144,10 @@ reset:
 	/* Cut the data to fit the receive window */
 	if (tcptrim(tcb, &seg, &bp, &length) == -1) {
 		netlog(f, Logtcp,
-			   "tcptrim, not accept, seq %lud-%lud win %lud-%lud from %I\n",
+			   "tcptrim, not accept, seq %lu-%lud win %lud-%lud from %I\n",
 			   seg.seq, seg.seq + length - 1, tcb->rcv.nxt,
 			   tcb->rcv.nxt + tcb->rcv.wnd - 1, s->raddr);
-		netlog(f, Logtcp, "tcp len < 0, %lud %d\n", seg.seq, length);
+		netlog(f, Logtcp, "tcp len < 0, %lu %d\n", seg.seq, length);
 		update(s, &seg);
 		if (qlen(s->wq) + tcb->flgcnt == 0 && tcb->state == Closing) {
 			tcphalt(tpriv, &tcb->rtt_timer);
@@ -2463,7 +2463,7 @@ static void tcpoutput(struct conv *s)
 		}
 		ssize = sndcnt - sent;
 		if (ssize && usable < 2)
-			netlog(s->p->f, Logtcp, "throttled snd.wnd %lud cwind %lud\n",
+			netlog(s->p->f, Logtcp, "throttled snd.wnd %lu cwind %lud\n",
 				   tcb->snd.wnd, tcb->cwind);
 		if (usable < ssize)
 			ssize = usable;

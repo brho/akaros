@@ -631,7 +631,7 @@ static int procqidwidth(struct chan *c)
 {
 	char buf[32];
 
-	return sprint(buf, "%lud", c->qid.vers);
+	return sprint(buf, "%lu", c->qid.vers);
 }
 
 int procfdprint(struct chan *c, int fd, int w, char *s, int ns)
@@ -1116,7 +1116,7 @@ regread:
 			poperror();
 			qunlock(&p->qwaitr);
 			kref_put(&p->p_kref);
-			n = snprint(va, n, "%d %lud %lud %lud %q",
+			n = snprint(va, n, "%d %lu %lud %lud %q",
 						wq->w.pid,
 						wq->w.time[TUser], wq->w.time[TSys], wq->w.time[TReal],
 						wq->w.msg);

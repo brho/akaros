@@ -577,8 +577,8 @@ int udpstats(struct proto *udp, char *buf, int len)
 	Udppriv *upriv;
 
 	upriv = udp->priv;
-	return snprintf(buf, len, "InDatagrams: %llud\nNoPorts: %lud\n"
-					"InErrors: %lud\nOutDatagrams: %llud\n",
+	return snprintf(buf, len, "InDatagrams: %llud\nNoPorts: %lu\n"
+					"InErrors: %lu\nOutDatagrams: %llud\n",
 					upriv->ustats.udpInDatagrams,
 					upriv->ustats.udpNoPorts,
 					upriv->ustats.udpInErrors, upriv->ustats.udpOutDatagrams);

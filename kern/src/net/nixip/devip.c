@@ -634,7 +634,7 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 			return netlogread(f, a, offset, n);
 		case Qctl:
 			buf = kzmalloc(16, 0);
-			snprintf(buf, 16, "%lud", CONV(ch->qid));
+			snprintf(buf, 16, "%lu", CONV(ch->qid));
 			rv = readstr(offset, p, n, buf);
 			kfree(buf);
 			return rv;

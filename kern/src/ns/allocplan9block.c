@@ -154,5 +154,5 @@ void checkb(struct block *b, char *msg)
 
 void iallocsummary(void)
 {
-	printd("ialloc %lud\n", ialloc.bytes);
+	printd("ialloc %lu\n", ialloc.bytes);
 }
