@@ -182,10 +182,9 @@ static void etherbind(struct ipifc *ifc, int argc, char **argv)
 	cclose(schan);
 	poperror();
 	buf[n] = 0;
-
 	ptr = strstr(buf, "addr: ");
 	if (!ptr)
-		error(Eio);
+		error(/*Eio*/"Can't find mac address in ethermedium");
 	ptr += 6;
 	parsemac(ifc->mac, ptr, 6);
 
