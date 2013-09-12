@@ -420,13 +420,13 @@ atoi(const char* s)
 	return (int)strtol(s,NULL,10);
 }
 
-/* for Plan 8 */
+/* for Plan 9 */
 char *strstr(const char *haystack, const char *needle)
 {
 	int hlen = strlen(haystack);
 	int nlen = strlen(needle);
 	while (hlen > nlen){
-		if (! strcmp(haystack, needle))
+		if (! strncmp(haystack, needle, nlen))
 			return (char *)haystack;
 		haystack++;
 		hlen--;
