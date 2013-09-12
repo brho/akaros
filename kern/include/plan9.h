@@ -6,20 +6,6 @@
 #include <setjmp.h>
 #include <atomic.h>
 #include <apipe.h>
-/*
- * Memory and machine-specific definitions.  Used in C and assembler.
- */
-#define KiB		1024u	/* Kibi 0x0000000000000400 */
-#define MiB		1048576u	/* Mebi 0x0000000000100000 */
-#define GiB		1073741824u	/* Gibi 000000000040000000 */
-#define TiB		1099511627776ull	/* Tebi 0x0000010000000000 */
-#define PiB		1125899906842624ull	/* Pebi 0x0004000000000000 */
-#define EiB		1152921504606846976ull	/* Exbi 0x1000000000000000 */
-
-#define ALIGNED(p, a)	(!(((uintptr)(p)) & ((a)-1)))
-
-/* no such macro in akaros that we have found. */
-#define ARRAY_SIZE(x) (sizeof((x))/sizeof((x)[0]))
 
 /* The lock issue is still undecided. For now, we preserve the lock type
  * and plan to revisit the issue when it makes sense.
@@ -86,23 +72,6 @@ enum {
 #define DEVDOTDOT -1
 #define NUMSIZE 12	/* size of formatted number */
 #define READSTR 4000	/* temporary buffer size for device reads */
-
-#define	MORDER	0x0003	/* mask for bits defining order of mounting */
-#define	MREPL	0x0000	/* mount replaces object */
-#define	MBEFORE	0x0001	/* mount goes before others in union directory */
-#define	MAFTER	0x0002	/* mount goes after others in union directory */
-#define	MCREATE	0x0004	/* permit creation in mounted directory */
-#define	MCACHE	0x0010	/* cache some data */
-#define	MMASK	0x0017	/* all bits on */
-
-#define	OREAD	0	/* open for read */
-#define	OWRITE	1	/* write */
-#define	ORDWR	2	/* read and write */
-#define	OEXEC	3	/* execute, == read but check execute permission */
-#define	OTRUNC	16	/* or'ed in (except for exec), truncate file first */
-#define	OCEXEC	32	/* or'ed in, close on exec */
-#define	ORCLOSE	64	/* or'ed in, remove on close */
-#define OEXCL   0x1000	/* or'ed in, exclusive create */
 
 /*
  * Syscall data structures
@@ -511,13 +480,15 @@ extern char Ecmdargs[];			/* wrong #args in control message */
 extern char Ebadip[];			/* bad ip address syntax */
 extern char Edirseek[];			/* seek in directory */
 
-#define nel(x) (sizeof(x)/sizeof(x[0]))
 /* add 1 in case they forget they need an entry for the passed-in errbuf */
 #define ERRSTACK(x) struct errbuf errstack[(x)+1]; int curindex = 0;
-#define waserror() (errpush(errstack, nel(errstack), &curindex) || setjmp(&(get_cur_errbuf()->jmp_buf)))
-#define error(x) {set_errstr(x); longjmp(&get_cur_errbuf()->jmp_buf, (void *)x);}
-#define nexterror() {errpop(errstack, nel(errstack), &curindex); longjmp(&(get_cur_errbuf())->jmp_buf, (void *)1);}
-#define poperror() {errpop(errstack, nel(errstack), &curindex);}
+#define waserror() (errpush(errstack, ARRAY_SIZE(errstack), &curindex) ||      \
+                    setjmp(&(get_cur_errbuf()->jmp_buf)))
+#define error(x) {set_errstr(x); longjmp(&get_cur_errbuf()->jmp_buf,           \
+                                         (void *)x);}
+#define nexterror() {errpop(errstack, ARRAY_SIZE(errstack), &curindex);        \
+                     longjmp(&(get_cur_errbuf())->jmp_buf, (void *)1);}
+#define poperror() {errpop(errstack, ARRAY_SIZE(errstack), &curindex);}
 
 /* this would be useful at some point ... */
 static inline uintptr_t getcallerpc(void *unused)
