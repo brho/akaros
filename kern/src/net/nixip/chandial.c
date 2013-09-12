@@ -68,7 +68,7 @@ static struct chan *call(char *clone, char *dest, struct ds *ds)
 	n = cchan->dev->read(cchan, name, sizeof(name) - 1, 0);
 	name[n] = 0;
 	for (p = name; *p == ' '; p++) ;
-	snprintf(name, sizeof(name), "%lud", strtol /*strtoul */ (p, 0, 0));
+	snprintf(name, sizeof(name), "%lu", strtoul(p, 0, 0));
 	p = strrchr(clone, '/');
 	*p = 0;
 	if (ds->dir)

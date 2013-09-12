@@ -117,7 +117,7 @@ char *
 strrchr(const char *s, char c)
 {
 	char *end = NULL, *next;
-	for(next = strchr(s, c); next; next = strchr(s, c))
+	for(next = strchr(s, c); next; next = strchr(next+1, c))
 		end = next;
 	return end;
 }

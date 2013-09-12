@@ -1,4 +1,13 @@
 #!/bin/ash
+bind -a '#I' /net
+bind -a '#l0' /net
+cat /9/net/ipifc/clone
+# bind the ether0 to it
+myecho /9/net/ipifc/0/ctl 'bind ether /net/ether0'
+exit
+
+# ifconfig it
+
 export cputype=amd64
 export objtype=$cputype
 export service=cpu
