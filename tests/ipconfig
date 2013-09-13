@@ -24,7 +24,7 @@ export rootsrv=boot
 me=10.0.2.15
 net=10.0.2.0
 vm=10.0.2.1
-rote=10.0.2.0
+route=10.0.2.0
 
 #
 # Post the read-only filesystem in #s/$beetroot
