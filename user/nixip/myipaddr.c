@@ -3,7 +3,7 @@
 #include <parlib.h>
 #include <unistd.h>
 #include <signal.h>
-#include "ip.h"
+#include <nixip.h>
 
 static uint8_t loopbacknet[IPaddrlen] = {
 	0, 0, 0, 0,

@@ -191,3 +191,4 @@ extern uint8_t IPallbits[IPaddrlen];
 #define CLASS(p) ((*(uint8_t*)(p))>>6)
 
 int tokenize(char *s, char **args, int maxargs);
+int getfields(char *str, char **args, int max, int mflag, char *unused_set);

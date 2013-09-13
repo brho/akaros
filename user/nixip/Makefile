@@ -6,7 +6,7 @@ SRCDIR :=
 OBJDIR := $(SRCDIR)obj
 INCDIR = $(SRCDIR)include
 
-INCS = -I. -I$(INCDIR)  
+INCS = -I. -I$(INCDIR)
 FINALLIB = $(OBJDIR)/lib$(LIBNAME).a
 
 uc = $(shell echo $(1) | tr a-z A-Z)
@@ -47,4 +47,4 @@ clean:
 	@echo + clean [$(LIBUCNAME)]
 	$(Q)rm -rf $(FINALLIB)
 	$(Q)rm -rf $(OBJDIR)
-	
+

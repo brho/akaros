@@ -3,7 +3,12 @@
 #include <parlib.h>
 #include <unistd.h>
 #include <signal.h>
-#include "ip.h"
+#include <nixip.h>
+
+static int isascii(int c) {return ((c >=0) && (c <= 128));}
+static int isalnum(int c) {return ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||(c >= '0' && c <= '9'));}
+static int isdigit(int c) {return ((c >= '0' && c <= '9'));}
+static int isxdigit(int c) {return ((c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') ||(c >= '0' && c <= '9'));}
 
 char*
 v4parseip(uint8_t *to, char *from)

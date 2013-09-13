@@ -47,4 +47,4 @@ clean:
 	@echo + clean [$(LIBUCNAME)]
 	$(Q)rm -rf $(FINALLIB)
 	$(Q)rm -rf $(OBJDIR)
-	
+

@@ -3,7 +3,7 @@
 #include <parlib.h>
 #include <unistd.h>
 #include <signal.h>
-#include "ip.h"
+#include <nixip.h>
 
 int
 equivip4(uint8_t *a, uint8_t *b)

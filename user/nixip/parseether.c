@@ -3,7 +3,7 @@
 #include <parlib.h>
 #include <unistd.h>
 #include <signal.h>
-#include "ip.h"
+#include <nixip.h>
 
 int
 parseether(uint8_t *to, char *from)

@@ -3,7 +3,7 @@
 #include <parlib.h>
 #include <unistd.h>
 #include <signal.h>
-#include "ip.h"
+#include <nixip.h>
 
 static	short	endian	= 1;
 static	uint8_t*	aendian	= (uint8_t*)&endian;
