@@ -3,7 +3,7 @@
 #bind -a '#l0' /net
 #cat /9/net/ipifc/clone
 ## bind the ether0 to it
-#myecho /9/net/ipifc/0/ctl 'bind ether /net/ether0'
+#echo 'bind ether /net/ether0' > /9/net/ipifc/0/ctl
 #exit
 
 # ifconfig it
@@ -59,14 +59,14 @@ bind -a '#l0' /net
 cat /9/net/ipifc/clone
 i=0
 # bind the ether0 to it
-myecho  /9/net/ipifc/$i/ctl "bind ether /net/ether0 "
+echo "bind ether /net/ether0 " > /9/net/ipifc/$i/ctl
 # ifconfig it
-myecho  /9/net/ipifc/$i/ctl "add $me $net $vm"
-myecho /9/net/iproute "add 0 0 $route"
+echo "add $me $net $vm" > /9/net/ipifc/$i/ctl
+echo "add 0 0 $route" > /9/net/iproute
 echo I am $me, default route $route
 
 #i=`cat /net/ipifc/clone`
 cat /9/net/ipifc/clone
 i=1
-myecho  /9/net/ipifc/$i/ctl "bind loopback /dev/null "
-myecho  /9/net/ipifc/$i/ctl "add 127.0.0.1 255.0.0.0 127.0.0.0 "
+echo "bind loopback /dev/null " > /9/net/ipifc/$i/ctl
+echo "add 127.0.0.1 255.0.0.0 127.0.0.0 " > /9/net/ipifc/$i/ctl
