@@ -8,7 +8,7 @@ TESTS_DIR = tests
 CFLAGS_TESTS += $(CFLAGS_USER) -g
 TESTS_CXXFLAGS += $(CXXFLAGS_USER) -g
 
-TESTS_LDLIBS := -lpthread -lbenchutil -lm
+TESTS_LDLIBS := -lpthread -lbenchutil -lm -lnixip
 
 TESTS_SRCS_C = $(shell ls $(TESTS_DIR)/*.c)
 TESTS_SRCS_CPP = $(shell ls $(TESTS_DIR)/*.cc)
