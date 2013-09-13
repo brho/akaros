@@ -887,6 +887,33 @@ struct ipifc {
 								   used only if node is router */
 };
 
+/* logical interface associated with a physical one */
+struct iplifc {
+	uint8_t local[IPaddrlen];
+	uint8_t mask[IPaddrlen];
+	uint8_t remote[IPaddrlen];
+	uint8_t net[IPaddrlen];
+	uint8_t tentative;			/* =1 => v6 dup disc on, =0 => confirmed unique */
+	uint8_t onlink;				/* =1 => onlink, =0 offlink. */
+	uint8_t autoflag;			/* v6 autonomous flag */
+	long validlt;				/* v6 valid lifetime */
+	long preflt;				/* v6 preferred lifetime */
+	long origint;				/* time when addr was added */
+	struct Iplink *link;		/* addresses linked to this lifc */
+	struct iplifc *next;
+};
+
+/* binding twixt struct Ipself and struct iplifc */
+struct Iplink {
+	struct Ipself *self;
+	struct iplifc *lifc;
+	struct Iplink *selflink;	/* next link for this local address */
+	struct Iplink *lifclink;	/* next link for this ifc */
+	uint32_t expire;
+	struct Iplink *next;		/* free list */
+	struct kref ref;
+};
+
 /*
  *  one per multicast-lifc pair used by a struct conv
  */

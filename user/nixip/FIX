@@ -1,0 +1,4 @@
+spatch --in-place --sp-file scalar.cocci $1
+spatch --in-place --sp-file typedef.cocci $1
+spatch --in-place --sp-file plan9.cocci $1
+sh fixincludes $1
