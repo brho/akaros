@@ -17,7 +17,10 @@ main(void)
 	//	fmtinstall('I', eipfmt);
 	//	fmtinstall('M', eipfmt);
 
-	list = readipifc("/net", NULL, -1);
+	/* if you pass no arg, argv[1] is NULL, and readipifc will
+	 * start at /net. For now, invoke this with /9/net.
+	 */
+	list = readipifc(argv[1], NULL, -1);
 	for(ifc = list; ifc; ifc = ifc->next){
 		printd("ipifc %s %d\n", ifc->dev, ifc->mtu);
 		for(lifc = ifc->lifc; lifc; lifc = lifc->next)
