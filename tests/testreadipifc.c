@@ -1,8 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <parlib.h>
-#include <unistd.h>
-#include <signal.h>
 #include <nixip.h>
 
 #include <sys/types.h>
@@ -22,8 +20,8 @@ main(int argc, char *argv[])
 	 */
 	list = readipifc(argv[1], NULL, -1);
 	for(ifc = list; ifc; ifc = ifc->next){
-		printd("ipifc %s %d\n", ifc->dev, ifc->mtu);
+		printf("ipifc %s %d\n", ifc->dev, ifc->mtu);
 		for(lifc = ifc->lifc; lifc; lifc = lifc->next)
-			printd("\t%I %M %I\n", lifc->ip, lifc->mask, lifc->net);
+			printf("\t%I %M %I\n", lifc->ip, lifc->mask, lifc->net);
 	}
 }

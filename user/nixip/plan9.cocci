@@ -1,7 +1,7 @@
 @ print@
 @@
 -print(
-+printd(
++printf(
 ...)
 
 @ channel @
