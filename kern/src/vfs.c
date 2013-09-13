@@ -2116,6 +2116,8 @@ void clone_files(struct files_struct *src, struct files_struct *dst)
 			assert(i < dst->max_files && dst->fd[i].fd_file == 0);
 			SET_BITMASK_BIT(dst->open_fds->fds_bits, i);
 			dst->fd[i].fd_file = file;
+			/* hacked in 9ns support - need to copy this FD as well */
+			dst->fd[i].plan9fd = src->fd[i].plan9fd;
 			assert(file);
 			kref_get(&file->f_kref, 1);
 			if (i >= dst->next_fd)
