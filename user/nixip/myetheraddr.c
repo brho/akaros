@@ -17,7 +17,7 @@ myetheraddr(uint8_t *to, char *dev)
 	if(*dev == '/')
 		sprintf(buf, "%s/addr", dev);
 	else
-		sprintf(buf, "/net/%s/addr", dev);
+		sprintf(buf, "/9/net/%s/addr", dev);
 
 	fd = open(buf, O_RDONLY);
 	if(fd < 0)

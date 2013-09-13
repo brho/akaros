@@ -8,7 +8,7 @@
 #include <sys/types.h>
 
 void
-main(void)
+main(int argc, char *argv[])
 {
 	struct ipifc *ifc, *list;
 	struct iplifc *lifc;
