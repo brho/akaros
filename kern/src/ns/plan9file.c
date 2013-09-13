@@ -599,7 +599,8 @@ long sysread(int fd, void *p, size_t n, off_t off)
 
 	if (waserror()) {
 		set_errno(EBADF);
-		nexterror();
+		poperror();
+		return -1;
 	}
 
 	c = fdtochan(fd, OREAD, 1, 1);
@@ -608,7 +609,8 @@ long sysread(int fd, void *p, size_t n, off_t off)
 
 	if (waserror()) {
 		cclose(c);
-		nexterror();
+		poperror();
+		return -1;
 	}
 
 	/*
@@ -761,7 +763,8 @@ int syscreate(char *name, int omode)
 		if (c)
 			cclose(c);
 		printd("syscreate fail 1 mode  %x\n", omode);
-		nexterror();
+		poperror();
+		return -1;
 	}
 
 	openmode(omode);	/* error check only */
@@ -798,7 +801,8 @@ int sysopen(char *name, int omode)
 		printd("error\n");
 		if (c)
 			cclose(c);
-		nexterror();
+		poperror();
+		return -1;
 	}
 	openmode(omode);	/* error check only */
 	c = namec(name, Aopen, omode, 0);
@@ -832,7 +836,8 @@ int sysstat(char *name, uint8_t * statbuf, int len)
 	if (waserror()) {
 		if (c)
 			cclose(c);
-		nexterror();
+		poperror();
+		return -1;
 	}
 
 	c = namec(name, Aaccess, 0, 0);
@@ -862,7 +867,8 @@ int sysfstat(int fd, uint8_t * statbuf, int len)
 	uint8_t data[sizeof(struct dir)];
 
 	if (waserror()) {
-		nexterror();
+		poperror();
+		return -1;
 	}
 
 	c = fdtochan(fd, -1, 0, 1);
@@ -897,7 +903,8 @@ int sysdup(int ofd, int nfd)
 	 */
 	if (waserror()) {
 		set_errno(EBADF);
-		nexterror();
+		poperror();
+		return -1;
 	}
 
 	oc = fdtochan(ofd, -1, 0, 1);
@@ -944,6 +951,7 @@ int plan9setup(struct proc *new_proc, struct proc *parent)
 	ERRSTACK(1);
 	if (waserror()) {
 		printd("plan9setup failed\n");
+		poperror();
 		return -1;
 	}
 	if (!parent) {
@@ -1019,7 +1027,8 @@ bindmount(int ismount,
 
 	if (waserror()){
 		printk("bindmount: %s\n", current_errstr());
-		nexterror();
+		poperror();
+		return -1;
 	}
 
 	if((flag&~MMASK) || (flag&MORDER)==(MBEFORE|MAFTER))
@@ -1116,7 +1125,8 @@ sysunmount(char *name, char *old)
 
 	if (waserror()){
 		printd("unmount went poorly\n");
-		nexterror();
+		poperror();
+		return -1;
 	}
 
 
