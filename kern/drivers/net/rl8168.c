@@ -85,17 +85,17 @@ struct Descriptor
 };
 
 
-uint32_t rl8168_io_base_addr = 0;
-uint32_t rl8168_irq = 0;
+static uint32_t rl8168_io_base_addr = 0;
+static uint32_t rl8168_irq = 0;
 
-struct Descriptor *CT(NUM_RX_DESCRIPTORS) rx_des_kva;
-unsigned long rx_des_pa;
+static struct Descriptor *CT(NUM_RX_DESCRIPTORS) rx_des_kva;
+static unsigned long rx_des_pa;
 
-struct Descriptor *CT(NUM_TX_DESCRIPTORS) tx_des_kva;
-unsigned long tx_des_pa;
+static struct Descriptor *CT(NUM_TX_DESCRIPTORS) tx_des_kva;
+static unsigned long tx_des_pa;
 
-uint32_t rx_des_cur = 0;
-uint32_t tx_des_cur = 0;
+static uint32_t rx_des_cur = 0;
+static uint32_t tx_des_cur = 0;
 
 
 

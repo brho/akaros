@@ -742,7 +742,7 @@ static struct {
 NULL},};
 
 static int irq;
-uint32_t device_id = 0;
+static uint32_t device_id = 0;
 
 static int rtl8139pnp(struct ether *edev)
 {

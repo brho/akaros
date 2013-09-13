@@ -73,11 +73,11 @@
 
 #define SET_PAGE_0() (inb(ne2k_io_base_addr + NE2K_PG0_RW_CR) & 0x3F)
 
-uint32_t ne2k_irq;      // Fix this
-uint32_t ne2k_io_base_addr;
+static uint32_t ne2k_irq;      // Fix this
+static uint32_t ne2k_io_base_addr;
 
-void* base_page;
-uint32_t num_pages = 0;
+static void *base_page;
+static uint32_t num_pages = 0;
 
 void ne2k_init() {
 	

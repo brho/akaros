@@ -41,32 +41,29 @@
 
 
 // Global variables for the device
-uint32_t e1000_mmio_base_addr = 0;
-uint32_t e1000_io_base_addr = 0;
-uint32_t e1000_irq = 0;
-uint32_t e1000_addr_size = 0;
-
-// The device's MAC address (read from the device)
-unsigned char device_mac[6];
+static uint32_t e1000_mmio_base_addr = 0;
+static uint32_t e1000_io_base_addr = 0;
+static uint32_t e1000_irq = 0;
+static uint32_t e1000_addr_size = 0;
 
 // Vars relating to the receive descriptor ring
 // pointer to receive descriptors
-struct e1000_rx_desc *rx_des_kva;
-unsigned long rx_des_pa;
+static struct e1000_rx_desc *rx_des_kva;
+static unsigned long rx_des_pa;
 // current rx index
-uint32_t e1000_rx_index = 0;
+static uint32_t e1000_rx_index = 0;
 
 
 // Vars relating to the transmit descriptor ring
-struct e1000_tx_desc *tx_des_kva;
-unsigned long tx_des_pa;
-uint32_t e1000_tx_index = 0;
+static struct e1000_tx_desc *tx_des_kva;
+static unsigned long tx_des_pa;
+static uint32_t e1000_tx_index = 0;
 
 extern uint8_t eth_up;
 
 // The PCI device ID we detect
 // This is used for quark behavior
-uint16_t device_id = 0;
+static uint16_t device_id = 0;
 
 
 // Hacky variables relating to delivering packets
@@ -75,7 +72,6 @@ extern char* packet_buffers[MAX_PACKET_BUFFERS];
 extern uint32_t packet_buffers_sizes[MAX_PACKET_BUFFERS];
 extern uint32_t packet_buffers_head;
 extern uint32_t packet_buffers_tail;
-spinlock_t packet_buffers_lock;
 
 // Allow us to register our send_frame as the global send_frame
 extern int (*send_frame)(const char *CT(len) data, size_t len);
