@@ -9,6 +9,7 @@ enum
 	/* vihl & vcf[0] values */
 	IP_VER4= 	0x40,
 	IP_VER6=	0x60,
+	NETPATHLEN=	40,
 };
 
 /*
@@ -110,9 +111,26 @@ enum {
 	V6initprobedelay= 5000,
 };
 
+# if 0
+/* in icmp.h? */
+struct ip4hdr
+{
+	uint8_t	vihl;		/* Version and header length */
+	uint8_t	tos;		/* Type of service */
+	uint8_t	length[2];	/* packet length */
+	uint8_t	id[2];		/* ip->identification */
+	uint8_t	frag[2];	/* Fragment information */
+	uint8_t	ttl;      	/* Time to live */
+	uint8_t	proto;		/* Protocol */
+	uint8_t	cksum[2];	/* Header checksum */
+	uint8_t	src[4];		/* IP source */
+	uint8_t	dst[4];		/* IP destination */
+};
+#endif
+
 /* V6 header on the wire */
-typedef struct Ip6hdr Ip6hdr;
-struct Ip6hdr {
+
+struct ip6hdr {
 	uint8_t	vcf[4];		/* version:4, traffic class:8, flow label:20 */
 	uint8_t	ploadlen[2];	/* payload length: packet length - 40 */
 	uint8_t	proto;		/* next header type */
@@ -125,8 +143,8 @@ struct Ip6hdr {
 /*
  *  user-level icmpv6 with control message "headers"
  */
-typedef struct Icmp6hdr Icmp6hdr;
-struct Icmp6hdr {
+
+struct icmp6hdr {
 	uint8_t	_0_[8];
 	uint8_t	laddr[IPaddrlen];	/* local address */
 	uint8_t	raddr[IPaddrlen];	/* remote address */
@@ -140,8 +158,7 @@ enum
 	Udphdrsize=	52,	/* size of a Udphdr */
 };
 
-typedef struct Udphdr Udphdr;
-struct Udphdr
+struct udphdr
 {
 	uint8_t	raddr[IPaddrlen];	/* V6 remote address */
 	uint8_t	laddr[IPaddrlen];	/* V6 local address */
@@ -192,3 +209,5 @@ extern uint8_t IPallbits[IPaddrlen];
 
 int tokenize(char *s, char **args, int maxargs);
 int getfields(char *str, char **args, int max, int mflag, char *unused_set);
+char *netmkaddr(char *linear, char *defnet, char *defsrv);
+int dial(char *dest, char *local, char *dir, int *cfdp);

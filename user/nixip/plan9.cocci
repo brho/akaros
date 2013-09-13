@@ -4,6 +4,29 @@
 +printf(
 ...)
 
+@ fprint@
+expression E;
+@@
+-fprint(E,
++fprintf(stderr,
+...)
+
+@USED@
+@@
+-USED(...);
+
+@NOTED@
+expression E;
+@@
+-noted(E);
++ignore(E);fprintf(stderr, "noted\n"); exit(1);
+
+@exits@
+expression E;
+@@
+-exits(E);
++fprintf(stderr, E); exit(1);
+
 @ channel @
 identifier d;
 @@
@@ -72,7 +95,7 @@ expression E1;
 @@
 
 - smalloc(E1
-+ kzmalloc(E1, 0
++ calloc(E1, 1
    )
 
 @ rulem @
@@ -90,7 +113,7 @@ expression E1;
 @@
 
 - malloc(E1
-+ kzmalloc(E1, 0
++ calloc(E1, 1
    )
 
 @@
@@ -132,3 +155,4 @@ E)
 @@
 +//
 muxclose(...);
+

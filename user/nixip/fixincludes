@@ -6,5 +6,5 @@ sed -i '/^#include/,/^$/c\
 #include <parlib.h>\
 #include <unistd.h>\
 #include <signal.h>\
-#include "ip.h"\
+#include <nixip.h>\
 ' $1
