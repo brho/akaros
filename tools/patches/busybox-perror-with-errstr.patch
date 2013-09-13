@@ -1,0 +1,45 @@
+From 7ee6f1d1101452ab098121e0da7d560037a45fe9 Mon Sep 17 00:00:00 2001
+From: Barret Rhoden <brho@cs.berkeley.edu>
+Date: Thu, 12 Sep 2013 18:57:34 -0700
+Subject: [PATCH] Perror with errstr
+
+---
+ libbb/verror_msg.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/libbb/verror_msg.c b/libbb/verror_msg.c
+index bcf1ee8..e038fd6 100644
+--- a/libbb/verror_msg.c
++++ b/libbb/verror_msg.c
+@@ -12,7 +12,7 @@
+ #endif
+ 
+ smallint logmode = LOGMODE_STDIO;
+-const char *msg_eol = "\n";
++const char *msg_eol = "";	/* was \n */
+ 
+ void FAST_FUNC bb_verror_msg(const char *s, va_list p, const char* strerr)
+ {
+@@ -65,8 +65,17 @@ void FAST_FUNC bb_verror_msg(const char *s, va_list p, const char* strerr)
+ 	}
+ 
+ 	if (logmode & LOGMODE_STDIO) {
+-		fflush_all();
+-		full_write(STDERR_FILENO, msg, used);
++		const char *comma;
++		char *ros_errstr = errstr();
++		/* ros_errstr should never be 0, but just in case. */
++		if (ros_errstr == NULL || *ros_errstr == '\0')
++			ros_errstr = comma = "";
++		else
++			comma = ", ";
++		printf("%s%s%s\n", msg, comma, ros_errstr);
++		/* also changed msg_eol */
++//		fflush_all();
++//		full_write(STDERR_FILENO, msg, used);
+ 	}
+ #if ENABLE_FEATURE_SYSLOG
+ 	if (logmode & LOGMODE_SYSLOG) {
+-- 
+1.8.4
+
