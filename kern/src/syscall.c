@@ -1978,6 +1978,10 @@ void run_local_syscall(struct syscall *sysc)
 	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
 	/* Need to re-load pcpui, in case we migrated */
 	pcpui = &per_cpu_info[core_id()];
+	/* Some 9ns paths set errstr, but not errno.  glibc will ignore errstr.
+	 * this is somewhat hacky, since errno might get set unnecessarily */
+	if ((current_errstr()[0] != 0) && (!sysc->err))
+		sysc->err = EUNSPECIFIED;
 	finish_sysc(sysc, pcpui->cur_proc);
 	/* Can unpin (UMEM) at this point */
 	pcpui->cur_sysc = 0;	/* no longer working on sysc */
