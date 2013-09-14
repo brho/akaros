@@ -85,7 +85,8 @@ dial(char *dest, char *local, char *dir, int *cfdp)
 		strcpy(netdir, net);
 		memmove(net, slp, strlen(slp)+1);
 	} else
-		strcpy(netdir, "/net");
+#warning "FIX ME when we go to a real root (/9/net->/net)"
+		strcpy(netdir, "/9/net");
  
 
 #if 0

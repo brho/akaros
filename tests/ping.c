@@ -326,9 +326,9 @@ rcvr(int fd, int msglen, int interval, int nmsg)
 
 	sum = 0;
 	while(lostmsgs+rcvdmsgs < nmsg){
-		alarm((nmsg-lostmsgs-rcvdmsgs)*interval+waittime);
+		//alarm((nmsg-lostmsgs-rcvdmsgs)*interval+waittime);
 		n = read(fd, buf, sizeof buf);
-		alarm(0);
+		//alarm(0);
 		now = nsec();
 		if(n <= 0){	/* read interrupted - time to go */
 			clean(0, now+MINUTE, NULL);
@@ -486,6 +486,7 @@ isv4name(char *name)
 		return 1;
 	else if (isv6lit(ds.rem))
 		return 0;
+#warning "Fix me when we get /net/cs"
 #if 0
 	/*we don't have cs.*/
 	/* map name to ip and look at its syntax */
@@ -511,11 +512,13 @@ main(int argc, char **argv)
 
 	nsec();		/* make sure time file is already open */
 
+#warning "FIX ME add I and V formats to printf"
 	//fmtinstall('V', eipfmt);
 	//fmtinstall('I', eipfmt);
 
 	msglen = interval = 0;
 	nmsg = MAXMSG;
+#warning "FIX ME when we get varargs"
 #if 0
 	ARGBEGIN {
 	case '6':
@@ -561,6 +564,8 @@ main(int argc, char **argv)
 		usage();
 		break;
 	} ARGEND;
+#else
+	argc--,argv++;
 #endif
 	if(msglen < proto->iphdrsz + ICMP_HDRSIZE)
 		msglen = proto->iphdrsz + ICMP_HDRSIZE;
@@ -579,6 +584,7 @@ main(int argc, char **argv)
 	if (!isv4name(argv[0]))
 		proto = &v6pr;
 	ds = netmkaddr(argv[0], proto->net, "1");
+printf("ping: dial %s\n", ds);
 	fd = dial(ds, 0, 0, 0);
 	if(fd < 0){
 		fprintf(stderr, "%s: couldn't dial %s: %r\n", argv0, ds);
