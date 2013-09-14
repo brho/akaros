@@ -61,6 +61,8 @@ void kthread_init(void);
 void restart_kthread(struct kthread *kthread);
 void kthread_runnable(struct kthread *kthread);
 void kthread_yield(void);
+/* Debugging */
+void check_poison(char *msg);
 
 void sem_init(struct semaphore *sem, int signals);
 void sem_init_irqsave(struct semaphore *sem, int signals);
