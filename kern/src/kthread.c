@@ -147,6 +147,16 @@ void kthread_yield(void)
 	sem_down(sem);
 }
 
+void check_poison(char *msg)
+{
+#ifdef CONFIG_KTHREAD_POISON
+	if (*(uintptr_t*)ROUNDDOWN(get_stack_top() - 1, PGSIZE) != 0xdeadbeef) {
+		printk("\nBad kthread canary, msg: %s\n", msg);
+		panic("");
+	}
+#endif /* CONFIG_KTHREAD_POISON */
+}
+
 /* Semaphores, using kthreads directly */
 void sem_init(struct semaphore *sem, int signals)
 {
