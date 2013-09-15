@@ -13,7 +13,7 @@
 #define SC_UEVENT				0x0004		/* user has an ev_q */
 #define SC_K_LOCK				0x0008		/* kernel locked sysc */
 
-#define MAX_ERRSTR_LEN			32
+#define MAX_ERRSTR_LEN			128
 
 struct syscall {
 	unsigned int				num;
