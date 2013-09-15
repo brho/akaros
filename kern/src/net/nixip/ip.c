@@ -123,7 +123,7 @@ int
 ipoput4(struct fs *f,
 		struct block *bp, int gating, int ttl, int tos, struct conv *c)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct ipifc *ifc;
 	uint8_t *gate;
 	uint32_t fragoff;
@@ -135,6 +135,7 @@ ipoput4(struct fs *f,
 	int rv = 0;
 
 	ip = f->ip;
+I_AM_HERE;
 
 	/* Fill out the ip header */
 	eh = (struct Ip4hdr *)(bp->rp);
@@ -143,6 +144,7 @@ ipoput4(struct fs *f,
 
 	/* Number of uint8_ts in data and ip header to write */
 	len = blocklen(bp);
+I_AM_HERE;
 
 	if (gating) {
 		chunk = nhgets(eh->length);
@@ -160,6 +162,7 @@ ipoput4(struct fs *f,
 		goto free;
 	}
 
+I_AM_HERE;
 	r = v4lookup(f, eh->dst, c);
 	if (r == NULL) {
 		ip->stats[OutNoRoutes]++;
@@ -168,6 +171,7 @@ ipoput4(struct fs *f,
 		goto free;
 	}
 
+I_AM_HERE;
 	ifc = r->routeTree.ifc;
 	if (r->routeTree.type & (Rifc | Runi))
 		gate = eh->dst;
@@ -184,6 +188,7 @@ ipoput4(struct fs *f,
 	eh->ttl = ttl;
 	if (!gating)
 		eh->tos = tos;
+I_AM_HERE;
 
 	if (!canrlock(&ifc->rwlock))
 		goto free;
@@ -203,7 +208,8 @@ ipoput4(struct fs *f,
 		if (!gating) {
 			/* TODO: not sure what you want here.  The only thing we can
 			 * guarantee about the ref you read is that it is > 0. */
-			kref_get(&ip->id4, 1);
+I_AM_HERE;
+			__kref_get(&ip->id4, 1);
 			hnputs(eh->id, kref_refcnt(&ip->id4));
 		}
 		hnputs(eh->length, len);
@@ -247,7 +253,8 @@ ipoput4(struct fs *f,
 	} else {
 		/* TODO: not sure what you want here.  The only thing we can
 		 * guarantee about the ref you read is that it is > 0. */
-		kref_get(&ip->id4, 1);
+I_AM_HERE;
+		__kref_get(&ip->id4, 1);
 		lid = kref_refcnt(&ip->id4);
 	}
 

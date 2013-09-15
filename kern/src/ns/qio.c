@@ -21,7 +21,7 @@ static uint32_t qcopycnt;
 
 static int debugging;
 
-#define QDEBUG	if(0)
+#define QDEBUG	if(1)
 
 enum {
 	Maxatomic = 64 * 1024,
@@ -1070,14 +1070,18 @@ long qbwrite(struct queue *q, struct block *b)
 	int n, dowakeup;
 
 	n = BLEN(b);
+I_AM_HERE;
 
 	if (q->bypass) {
+I_AM_HERE;
 		(*q->bypass) (q->arg, b);
 		return n;
 	}
 
+I_AM_HERE;
 	dowakeup = 0;
 	qlock(&q->wlock);
+I_AM_HERE;
 	if (waserror()) {
 		if (b != NULL)
 			freeb(b);
@@ -1085,14 +1089,17 @@ long qbwrite(struct queue *q, struct block *b)
 		nexterror();
 	}
 
+I_AM_HERE;
 	ilock(&q->lock);
 
+I_AM_HERE;
 	/* give up if the queue is closed */
 	if (q->state & Qclosed) {
 		iunlock(&q->lock);
 		error(q->err);
 	}
 
+I_AM_HERE;
 	/* if nonblocking, don't queue over the limit */
 	if (q->len >= q->limit) {
 		if (q->noblock) {
@@ -1105,13 +1112,16 @@ long qbwrite(struct queue *q, struct block *b)
 		}
 	}
 
+I_AM_HERE;
 	/* queue the block */
 	apipe_write(&q->pipe, &b, 1);
+I_AM_HERE;
 	q->len += BALLOC(b);
 	q->dlen += n;
 	QDEBUG checkb(b, "qbwrite");
 	b = NULL;
 
+I_AM_HERE;
 	/* make sure other end gets awakened */
 	if (q->state & Qstarve) {
 		q->state &= ~Qstarve;
@@ -1120,13 +1130,16 @@ long qbwrite(struct queue *q, struct block *b)
 	}
 	iunlock(&q->lock);
 
+I_AM_HERE;
 	/*  get output going again */
 	if (q->kick && (dowakeup || (q->state & Qkick)))
 		q->kick(q->arg);
 
+I_AM_HERE;
 	/* wakeup anyone consuming at the other end */
 	if (dowakeup) ;	//wakeup(&q->rr);
 
+I_AM_HERE;
 	/*
 	 *  flow control, wait for queue to get below the limit
 	 *  before allowing the process to continue and queue
@@ -1151,8 +1164,10 @@ long qbwrite(struct queue *q, struct block *b)
 		 */
 	}
 
+I_AM_HERE;
 	qunlock(&q->wlock);
 	poperror();
+I_AM_HERE;
 	return n;
 }
 
