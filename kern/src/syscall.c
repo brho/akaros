@@ -102,13 +102,20 @@ void set_errno(int errno)
 		pcpui->cur_sysc->err = errno;
 }
 
-void set_errstr(char *errstr)
+void set_errstr(char *fmt, ...)
 {
+        va_list ap;
+        int rc;
+
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	if (!pcpui->cur_sysc)
 		return;
-	strncpy(pcpui->cur_sysc->errstr, errstr, MAX_ERRSTR_LEN);
-	/* enforce null termination */
+
+        va_start(ap, fmt);
+        rc = vsnprintf(pcpui->cur_sysc->errstr, MAX_ERRSTR_LEN, fmt, ap);
+        va_end(ap);
+
+	/* TODO: likely not needed */
 	pcpui->cur_sysc->errstr[MAX_ERRSTR_LEN - 1] = '\0';
 }
 

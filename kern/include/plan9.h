@@ -484,7 +484,7 @@ extern char Edirseek[];			/* seek in directory */
 #define ERRSTACK(x) struct errbuf errstack[(x)+1]; int curindex = 0;
 #define waserror() (errpush(errstack, ARRAY_SIZE(errstack), &curindex) ||      \
                     setjmp(&(get_cur_errbuf()->jmp_buf)))
-#define error(x) {set_errstr(x); longjmp(&get_cur_errbuf()->jmp_buf,           \
+#define error(x,...) {set_errstr(x, ##__VA_ARGS__); longjmp(&get_cur_errbuf()->jmp_buf,           \
                                          (void *)x);}
 #define nexterror() {errpop(errstack, ARRAY_SIZE(errstack), &curindex);        \
                      longjmp(&(get_cur_errbuf())->jmp_buf, (void *)1);}

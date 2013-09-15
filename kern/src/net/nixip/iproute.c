@@ -840,7 +840,7 @@ long routewrite(struct fs *f, struct chan *c, char *p, int n)
 			}
 	} else if (strcmp(cb->f[0], "remove") == 0) {
 		if (cb->nf < 3)
-			error(Ebadarg);
+			error("%s: remove expects 3 args", Ebadarg);
 		if (parseip(addr, cb->f[1]) == -1)
 			error(Ebadip);
 		parseipmask(mask, cb->f[2]);
@@ -850,7 +850,7 @@ long routewrite(struct fs *f, struct chan *c, char *p, int n)
 			v6delroute(f, addr, mask, 1);
 	} else if (strcmp(cb->f[0], "add") == 0) {
 		if (cb->nf < 4)
-			error(Ebadarg);
+			error("%s: needs 3 args", Ebadarg);
 		if (parseip(addr, cb->f[1]) == -1 || parseip(gate, cb->f[3]) == -1)
 			error(Ebadip);
 		parseipmask(mask, cb->f[2]);
@@ -874,7 +874,7 @@ long routewrite(struct fs *f, struct chan *c, char *p, int n)
 		kfree(a);
 	} else if (strcmp(cb->f[0], "route") == 0) {
 		if (cb->nf < 2)
-			error(Ebadarg);
+			error("%s: needs an arg", Ebadarg);
 		if (parseip(addr, cb->f[1]) == -1)
 			error(Ebadip);
 
