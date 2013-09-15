@@ -11,8 +11,6 @@
 #include <pmap.h>
 #include <smp.h>
 
-#warning " need rendezvous"
-
 static uint32_t padblockcnt;
 static uint32_t concatblockcnt;
 static uint32_t pullupblockcnt;
@@ -217,21 +215,6 @@ struct block *pullupblock(struct block *bp, int n)
 }
 
 /*
- *  make sure the first block has at least n bytes
- */
-struct block *pullupqueue(struct queue *q, int n)
-{
-	struct block *b;
-
-	if (BLEN(q->bfirst) >= n)
-		return q->bfirst;
-	q->bfirst = pullupblock(q->bfirst, n);
-	for (b = q->bfirst; b != NULL && b->next != NULL; b = b->next) ;
-	q->blast = b;
-	return q->bfirst;
-}
-
-/*
  *  trim to len bytes starting at offset
  */
 struct block *trimblock(struct block *bp, int offset, int len)
@@ -375,31 +358,23 @@ struct block *qget(struct queue *q)
 	/* sync with qwrite */
 	ilock(&q->lock);
 
-	b = q->bfirst;
-	if (b == NULL) {
+	if (q->len <= 0){
 		q->state |= Qstarve;
 		iunlock(&q->lock);
 		return NULL;
 	}
-	q->bfirst = b->next;
-	b->next = 0;
+
+	b = qremove(q);
 	q->len -= BALLOC(b);
 	q->dlen -= BLEN(b);
 	QDEBUG checkb(b, "qget");
 
 	/* if writer flow controlled, restart */
+	/* we're hoping, now, that the piperead wakes them up */
 	if ((q->state & Qflow) && q->len < q->limit / 2) {
 		q->state &= ~Qflow;
-		dowakeup = 1;
-	} else
-		dowakeup = 0;
-
+	}
 	iunlock(&q->lock);
-
-	/* how do we do this, guys?
-	   if(dowakeup)
-	   wakeup(&q->wr);
-	 */
 
 	return b;
 }
@@ -414,13 +389,13 @@ int qdiscard(struct queue *q, int len)
 
 	ilock(&q->lock);
 	for (sofar = 0; sofar < len; sofar += n) {
-		b = q->bfirst;
-		if (b == NULL)
+		if (q->len <= 0)
 			break;
 		QDEBUG checkb(b, "qdiscard");
+		b = qhead(q);
 		n = BLEN(b);
 		if (n <= len - sofar) {
-			q->bfirst = b->next;
+			qremove(q);
 			b->next = 0;
 			q->len -= BALLOC(b);
 			q->dlen -= BLEN(b);
@@ -446,17 +421,14 @@ int qdiscard(struct queue *q, int len)
 	 */
 	if ((q->state & Qflow) && q->len < q->limit / 2) {
 		q->state &= ~Qflow;
-		dowakeup = 1;
-	} else
-		dowakeup = 0;
+	}
 
 	iunlock(&q->lock);
 
-	/* how do we do this?
-	   if(dowakeup)
-	   wakeup(&q->wr);
+	/* If the length was zero, above, then no read happened. 
+	 * so how do we wake up the writer? Well ... the 
+	 * act of qremoving at some other place might have done it.
 	 */
-
 	return sofar;
 }
 
@@ -474,25 +446,25 @@ int qconsume(struct queue *q, void *vp, int len)
 	ilock(&q->lock);
 
 	for (;;) {
-		b = q->bfirst;
-		if (b == 0) {
+
+		if (qhead(q) == 0) {
 			q->state |= Qstarve;
 			iunlock(&q->lock);
 			return -1;
 		}
 		QDEBUG checkb(b, "qconsume 1");
-
+		b = qhead(q);
 		n = BLEN(b);
 		if (n > 0)
 			break;
-		q->bfirst = b->next;
+		qremove(q);
 		q->len -= BALLOC(b);
 
 		/* remember to free this */
 		b->next = tofree;
 		tofree = b;
-	};
-
+	}
+	
 	if (n < len)
 		len = n;
 	memmove(p, b->rp, len);
@@ -501,8 +473,9 @@ int qconsume(struct queue *q, void *vp, int len)
 	q->dlen -= len;
 
 	/* discard the block if we're done with it */
+
 	if ((q->state & Qmsg) || len == n) {
-		q->bfirst = b->next;
+		qremove(q);
 		b->next = 0;
 		q->len -= BALLOC(b);
 		q->dlen -= BLEN(b);
@@ -513,18 +486,12 @@ int qconsume(struct queue *q, void *vp, int len)
 	}
 
 	/* if writer flow controlled, restart */
+	/* we hope the read will have done this restart. */
 	if ((q->state & Qflow) && q->len < q->limit / 2) {
 		q->state &= ~Qflow;
-		dowakeup = 1;
-	} else
-		dowakeup = 0;
+	} 
 
 	iunlock(&q->lock);
-
-	/* how do we do this? we consumed stuff, wake up writer. 
-	   if(dowakeup)
-	   wakeup(&q->wr);
-	 */
 
 	if (tofree != NULL)
 		freeblist(tofree);
@@ -534,7 +501,7 @@ int qconsume(struct queue *q, void *vp, int len)
 
 int qpass(struct queue *q, struct block *b)
 {
-	int dlen, len, dowakeup;
+	int dlen = 0, len = 0, dowakeup;
 
 	/* sync with qread */
 	dowakeup = 0;
@@ -552,20 +519,14 @@ int qpass(struct queue *q, struct block *b)
 	}
 
 	/* add buffer to queue */
-	if (q->bfirst)
-		q->blast->next = b;
-	else
-		q->bfirst = b;
-	len = BALLOC(b);
-	dlen = BLEN(b);
 	QDEBUG checkb(b, "qpass");
-	while (b->next) {
-		b = b->next;
+	while (b) {
+		apipe_write(&q->pipe, b, 1);
 		QDEBUG checkb(b, "qpass");
 		len += BALLOC(b);
 		dlen += BLEN(b);
+		b = b->next;
 	}
-	q->blast = b;
 	q->len += len;
 	q->dlen += dlen;
 
@@ -574,21 +535,15 @@ int qpass(struct queue *q, struct block *b)
 
 	if (q->state & Qstarve) {
 		q->state &= ~Qstarve;
-		dowakeup = 1;
 	}
 	iunlock(&q->lock);
-
-	/* how do we do this? 
-	   if(dowakeup)
-	   wakeup(&q->rr);
-	 */
 
 	return len;
 }
 
 int qpassnolim(struct queue *q, struct block *b)
 {
-	int dlen, len, dowakeup;
+	int dlen = 0, len = 0, dowakeup;
 
 	/* sync with qread */
 	dowakeup = 0;
@@ -602,20 +557,13 @@ int qpassnolim(struct queue *q, struct block *b)
 	}
 
 	/* add buffer to queue */
-	if (q->bfirst)
-		q->blast->next = b;
-	else
-		q->bfirst = b;
-	len = BALLOC(b);
-	dlen = BLEN(b);
-	QDEBUG checkb(b, "qpass");
-	while (b->next) {
-		b = b->next;
-		QDEBUG checkb(b, "qpass");
+	while (b) {
+		apipe_write(&q->pipe, b, 1);
+		QDEBUG checkb(b, "qpassnolim");
 		len += BALLOC(b);
 		dlen += BLEN(b);
+		b = b->next;
 	}
-	q->blast = b;
 	q->len += len;
 	q->dlen += dlen;
 
@@ -624,13 +572,7 @@ int qpassnolim(struct queue *q, struct block *b)
 
 	if (q->state & Qstarve) {
 		q->state &= ~Qstarve;
-		dowakeup = 1;
 	}
-	iunlock(&q->lock);
-/*
-	if(dowakeup)
-		wakeup(&q->rr);
-*/
 	return len;
 }
 
@@ -684,29 +626,20 @@ int qproduce(struct queue *q, void *vp, int len)
 	memmove(b->wp, p, len);
 	producecnt += len;
 	b->wp += len;
-	if (q->bfirst)
-		q->blast->next = b;
-	else
-		q->bfirst = b;
-	q->blast = b;
-	/* b->next = 0; done by iallocb() */
+	apipe_write(&q->pipe, b, 1);
+
 	q->len += BALLOC(b);
 	q->dlen += BLEN(b);
 	QDEBUG checkb(b, "qproduce");
 
 	if (q->state & Qstarve) {
 		q->state &= ~Qstarve;
-		dowakeup = 1;
 	}
 
 	if (q->len >= q->limit)
 		q->state |= Qflow;
 	iunlock(&q->lock);
 
-/*
-	if(dowakeup)
-		wakeup(&q->rr);
-*/
 	return len;
 }
 
@@ -725,7 +658,7 @@ struct block *qcopy(struct queue *q, int len, uint32_t offset)
 	ilock(&q->lock);
 
 	/* go to offset */
-	b = q->bfirst;
+	b = qhead(q);
 	for (sofar = 0;; sofar += n) {
 		if (b == NULL) {
 			iunlock(&q->lock);
@@ -738,7 +671,8 @@ struct block *qcopy(struct queue *q, int len, uint32_t offset)
 			break;
 		}
 		QDEBUG checkb(b, "qcopy");
-		b = b->next;
+		qremove(q);
+		b = qhead(q);
 	}
 
 	/* copy bytes from there */
@@ -749,7 +683,8 @@ struct block *qcopy(struct queue *q, int len, uint32_t offset)
 		qcopycnt += n;
 		sofar += n;
 		nb->wp += n;
-		b = b->next;
+		qremove(q);
+		b = qhead(q);
 		if (b == NULL)
 			break;
 		n = BLEN(b);
@@ -773,9 +708,11 @@ struct queue *qopen(int limit, int msg, void (*kick) (void *), void *arg)
 
 	/* TODO: Assuming non-irqsave for now */
 	spinlock_init(&q->lock);
+	/* note: we let the pipes do our locking. 
 	spinlock_init(&q->rlock);
 	spinlock_init(&q->wlock);
-	q->limit = q->iNULLim = limit;
+	*/
+	q->limit = q->inilim = limit;
 	q->kick = kick;
 	q->arg = arg;
 	q->state = msg;
@@ -798,8 +735,10 @@ struct queue *qbypass(void (*bypass) (void *, struct block *), void *arg)
 
 	/* TODO: Assuming non-irqsave for now */
 	spinlock_init(&q->lock);
+	/*
 	spinlock_init(&q->rlock);
 	spinlock_init(&q->wlock);
+	*/
 	q->limit = 0;
 	q->arg = arg;
 	q->bypass = bypass;
@@ -808,12 +747,14 @@ struct queue *qbypass(void (*bypass) (void *, struct block *), void *arg)
 	return q;
 }
 
+#if 0
 static int notempty(void *a)
 {
 	struct queue *q = a;
 
-	return (q->state & Qclosed) || q->bfirst != 0;
+	return (q->state & Qclosed) || qhead(q) != 0;
 }
+#endif
 
 /*
  *  wait for the queue to be non-empty or closed.
@@ -823,7 +764,7 @@ static int qwait(struct queue *q)
 {
 	/* wait for data */
 	for (;;) {
-		if (q->bfirst != NULL)
+		if (qhead(q) != NULL)
 			break;
 
 		if (q->state & Qclosed) {
@@ -845,20 +786,26 @@ static int qwait(struct queue *q)
 }
 
 /*
- * add a block list to a queue
+ * add a block list to a queue. Less efficient than before; 
+ * lots of overhead for these function calls.
  */
 void qaddlist(struct queue *q, struct block *b)
 {
 	/* queue the block */
-	if (q->bfirst)
-		q->blast->next = b;
-	else
-		q->bfirst = b;
-	q->len += blockalloclen(b);
-	q->dlen += blocklen(b);
-	while (b->next)
+	while (b){
+		apipe_write(&q->pipe, b, 1);
+		q->len += blockalloclen(b);
+		q->dlen += blocklen(b);
 		b = b->next;
-	q->blast = b;
+	}
+}
+
+/*
+ *  called with q ilocked?
+ */
+struct block *qhead(struct queue *q)
+{
+	return apipe_head(&q->pipe);
 }
 
 /*
@@ -868,10 +815,9 @@ struct block *qremove(struct queue *q)
 {
 	struct block *b;
 
-	b = q->bfirst;
+	apipe_read(&q->pipe, &b, 1);
 	if (b == NULL)
 		return NULL;
-	q->bfirst = b->next;
 	b->next = NULL;
 	q->dlen -= BLEN(b);
 	q->len -= BALLOC(b);
@@ -940,20 +886,6 @@ struct block *mem2bl(uint8_t * p, int len)
 }
 
 /*
- *  put a block back to the front of the queue
- *  called with q ilocked
- */
-void qputback(struct queue *q, struct block *b)
-{
-	b->next = q->bfirst;
-	if (q->bfirst == NULL)
-		q->blast = b;
-	q->bfirst = b;
-	q->len += BALLOC(b);
-	q->dlen += BLEN(b);
-}
-
-/*
  *  flow control, get producer going again
  *  called with q ilocked
  */
@@ -1008,20 +940,23 @@ struct block *qbread(struct queue *q, int len)
 	}
 
 	/* if we get here, there's at least one block in the queue */
-	b = qremove(q);
+	b = apipe_head(&q->pipe);
+	if (! b)
+		return NULL;
 	n = BLEN(b);
-
+	
 	/* split block if it's too big and this is not a message queue */
 	nb = b;
 	if (n > len) {
 		if ((q->state & Qmsg) == 0) {
 			n -= len;
-			b = allocb(n);
-			memmove(b->wp, nb->rp + len, n);
+			nb = allocb(len);
+			memmove(nb->wp, b->rp, len);
 			b->wp += n;
-			qputback(q, b);
 		}
 		nb->wp = nb->rp + len;
+	} else {
+		nb = qremove(q);
 	}
 
 	/* restart producer */
@@ -1066,7 +1001,7 @@ again:
 	/* if we get here, there's at least one block in the queue */
 	if (q->state & Qcoalesce) {
 		/* when coalescing, 0 length blocks just go away */
-		b = q->bfirst;
+		b = qhead(q);
 		if (BLEN(b) <= 0) {
 			freeb(qremove(q));
 			goto again;
@@ -1084,7 +1019,7 @@ again:
 			l = &b->next;
 			n += blen;
 
-			b = q->bfirst;
+			b = apipe_head(&q->pipe);
 			if (b == NULL)
 				break;
 			blen = BLEN(b);
@@ -1104,10 +1039,9 @@ again:
 	/* take care of any left over partial block */
 	if (b != NULL) {
 		n -= BLEN(b);
-		if (q->state & Qmsg)
-			freeb(b);
-		else
-			qputback(q, b);
+		if (q->state & Qmsg){
+			freeb(qremove(q));
+		}
 	}
 
 	/* restart producer */
@@ -1172,12 +1106,7 @@ long qbwrite(struct queue *q, struct block *b)
 	}
 
 	/* queue the block */
-	if (q->bfirst)
-		q->blast->next = b;
-	else
-		q->bfirst = b;
-	q->blast = b;
-	b->next = 0;
+	apipe_write(&q->pipe, &b, 1);
 	q->len += BALLOC(b);
 	q->dlen += n;
 	QDEBUG checkb(b, "qbwrite");
@@ -1186,6 +1115,7 @@ long qbwrite(struct queue *q, struct block *b)
 	/* make sure other end gets awakened */
 	if (q->state & Qstarve) {
 		q->state &= ~Qstarve;
+		/* the write shold have made that happen. */
 		dowakeup = 1;
 	}
 	iunlock(&q->lock);
@@ -1298,11 +1228,7 @@ int qiwrite(struct queue *q, void *vp, int len)
 		}
 
 		QDEBUG checkb(b, "qiwrite");
-		if (q->bfirst)
-			q->blast->next = b;
-		else
-			q->bfirst = b;
-		q->blast = b;
+		apipe_write(&q->pipe, b, 1);
 		q->len += BALLOC(b);
 		q->dlen += n;
 
@@ -1313,10 +1239,11 @@ int qiwrite(struct queue *q, void *vp, int len)
 
 		iunlock(&q->lock);
 
+
 		if (dowakeup) {
 			if (q->kick)
 				q->kick(q->arg);
-			//  wakeup(&q->rr);
+			/* assumption: the write did all the kicking we need? */
 		}
 
 		sofar += n;
@@ -1341,15 +1268,14 @@ void qclose(struct queue *q)
 	q->state |= Qclosed;
 	q->state &= ~(Qflow | Qstarve);
 	strncpy(q->err, Ehungup, sizeof(q->err));
-	bfirst = q->bfirst;
-	q->bfirst = 0;
 	q->len = 0;
 	q->dlen = 0;
 	q->noblock = 0;
 	iunlock(&q->lock);
 
 	/* free queued blocks */
-	freeblist(bfirst);
+	while (qhead(q))
+		freeb(qremove(q));
 
 	/* wake up readers/writers */
 	//wakeup(&q->rr);
@@ -1403,7 +1329,7 @@ void qreopen(struct queue *q)
 	q->state &= ~Qclosed;
 	q->state |= Qstarve;
 	q->eof = 0;
-	q->limit = q->iNULLim;
+	q->limit = q->inilim;
 	iunlock(&q->lock);
 }
 
@@ -1433,7 +1359,7 @@ int qwindow(struct queue *q)
  */
 int qcanread(struct queue *q)
 {
-	return q->bfirst != 0;
+	return qhead(q) != 0;
 }
 
 /*
@@ -1461,14 +1387,14 @@ void qflush(struct queue *q)
 
 	/* mark it */
 	ilock(&q->lock);
-	bfirst = q->bfirst;
-	q->bfirst = 0;
 	q->len = 0;
 	q->dlen = 0;
 	iunlock(&q->lock);
 
 	/* free queued blocks */
-	freeblist(bfirst);
+	while(qhead(q)){
+		freeb(qremove(q));
+	}
 
 	/* wake up readers/writers */
 	//wakeup(&q->wr);
