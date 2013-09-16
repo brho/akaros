@@ -777,10 +777,13 @@ static int qwait(struct queue *q)
 
 		q->state |= Qstarve;	/* flag requesting producer to wake me */
 		iunlock(&q->lock);
+I_AM_HERE;
 		/* how do we do this? 
 		   sleep(&q->rr, notempty, q);
 		 */
+		schedule();
 		ilock(&q->lock);
+I_AM_HERE;
 	}
 	return 1;
 }
@@ -976,6 +979,7 @@ long qread(struct queue *q, void *vp, int len)
 	ERRSTACK(2);
 	struct block *b, *first, **l;
 	int blen, n;
+I_AM_HERE;
 
 	qlock(&q->rlock);
 	if (waserror()) {
@@ -983,23 +987,29 @@ long qread(struct queue *q, void *vp, int len)
 		nexterror();
 	}
 
+I_AM_HERE;
 	ilock(&q->lock);
+I_AM_HERE;
 again:
 	switch (qwait(q)) {
 		case 0:
+I_AM_HERE;
 			/* queue closed */
 			iunlock(&q->lock);
 			qunlock(&q->rlock);
 			poperror();
 			return 0;
 		case -1:
+I_AM_HERE;
 			/* multiple reads on a closed queue */
 			iunlock(&q->lock);
 			error(q->err);
 	}
 
 	/* if we get here, there's at least one block in the queue */
+I_AM_HERE;
 	if (q->state & Qcoalesce) {
+I_AM_HERE;
 		/* when coalescing, 0 length blocks just go away */
 		b = qhead(q);
 		if (BLEN(b) <= 0) {
@@ -1007,6 +1017,7 @@ again:
 			goto again;
 		}
 
+I_AM_HERE;
 		/*  grab the first block plus as many
 		 *  following blocks as will completely
 		 *  fit in the read.
@@ -1014,28 +1025,34 @@ again:
 		n = 0;
 		l = &first;
 		blen = BLEN(b);
+I_AM_HERE;
 		for (;;) {
 			*l = qremove(q);
 			l = &b->next;
 			n += blen;
 
+I_AM_HERE;
 			b = apipe_head(&q->pipe);
 			if (b == NULL)
 				break;
 			blen = BLEN(b);
 			if (n + blen > len)
 				break;
+I_AM_HERE;
 		}
 	} else {
 		first = qremove(q);
 		n = BLEN(first);
 	}
 
+I_AM_HERE;
 	/* copy to user space outside of the ilock */
 	iunlock(&q->lock);
+I_AM_HERE;
 	b = bl2mem(vp, first, len);
 	ilock(&q->lock);
 
+I_AM_HERE;
 	/* take care of any left over partial block */
 	if (b != NULL) {
 		n -= BLEN(b);
@@ -1049,6 +1066,7 @@ again:
 
 	poperror();
 	qunlock(&q->rlock);
+I_AM_HERE;
 	return n;
 }
 

@@ -595,7 +595,11 @@ printf("ping: dial %s\n", ds);
 	if (!quiet)
 		printf("sending %d %d byte messages %d ms apart to %s\n",
 			nmsg, msglen, interval, ds);
+	sender(fd, msglen, interval, nmsg);
+	rcvr(fd, msglen, interval, nmsg);
+	exit(0);
 
+#if 0
 	switch(fork()) { //rfork(RFPROC|RFMEM|RFFDG)){
 	case -1:
 		fprintf(stderr, "%s: can't fork: %r\n", argv0);
@@ -605,11 +609,13 @@ printf("ping: dial %s\n", ds);
 		exit(0);
 	default:
 		sender(fd, msglen, interval, nmsg);
-		printf("NOT WAITING\n");
+		//printf("NOT WAITING\n");
+		//exit(1);
+		wait();
+		printf(lostmsgs ? "lost messages" : "");
 		exit(1);
-		//wait();
-		//exits(lostmsgs ? "lost messages" : "");
 	}
+#endif
 }
 
 void

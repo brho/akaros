@@ -850,7 +850,7 @@ long routewrite(struct fs *f, struct chan *c, char *p, int n)
 			v6delroute(f, addr, mask, 1);
 	} else if (strcmp(cb->f[0], "add") == 0) {
 		if (cb->nf < 4)
-			error("%s: needs 3 args", Ebadarg);
+			error("%s: needs 3 args, not %d", Ebadarg, cb->nf-1);
 		if (parseip(addr, cb->f[1]) == -1 || parseip(gate, cb->f[3]) == -1)
 			error(Ebadip);
 		parseipmask(mask, cb->f[2]);
