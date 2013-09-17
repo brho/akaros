@@ -69,6 +69,8 @@ struct atomic_pipe {
 void apipe_init(struct atomic_pipe *ap, void *buf, size_t buf_sz,
                 size_t elem_sz);
 int apipe_read(struct atomic_pipe *ap, void *buf, size_t nr_elem);
+int apipe_read_cond(struct atomic_pipe *ap,
+		    int(*f)(struct atomic_pipe *pipe, void *arg), void *arg);
 int apipe_write(struct atomic_pipe *ap, void *buf, size_t nr_elem);
 void *apipe_head(struct atomic_pipe *ap);
 
