@@ -45,7 +45,8 @@ struct semaphore {
 
 struct cond_var {
 	struct semaphore			sem;
-	spinlock_t 					lock;
+	spinlock_t 					*lock;		/* usually points to internal_ */
+	spinlock_t 					internal_lock;
 	unsigned long				nr_waiters;
 	bool						irq_okay;
 };
@@ -73,6 +74,8 @@ bool sem_up_irqsave(struct semaphore *sem, int8_t *irq_state);
 
 void cv_init(struct cond_var *cv);
 void cv_init_irqsave(struct cond_var *cv);
+void cv_init_with_lock(struct cond_var *cv, spinlock_t *lock);
+void cv_init_irqsave_with_lock(struct cond_var *cv, spinlock_t *lock);
 void cv_lock(struct cond_var *cv);
 void cv_unlock(struct cond_var *cv);
 void cv_lock_irqsave(struct cond_var *cv, int8_t *irq_state);

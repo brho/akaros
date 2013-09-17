@@ -347,7 +347,8 @@ bool sem_up_irqsave(struct semaphore *sem, int8_t *irq_state)
 void cv_init(struct cond_var *cv)
 {
 	sem_init(&cv->sem, 0);
-	spinlock_init(&cv->lock);
+	cv->lock = &cv->internal_lock;
+	spinlock_init(cv->lock);
 	cv->nr_waiters = 0;
 	cv->irq_okay = FALSE;
 }
@@ -355,19 +356,36 @@ void cv_init(struct cond_var *cv)
 void cv_init_irqsave(struct cond_var *cv)
 {
 	sem_init_irqsave(&cv->sem, 0);
-	spinlock_init_irqsave(&cv->lock);
+	cv->lock = &cv->internal_lock;
+	spinlock_init_irqsave(cv->lock);
 	cv->nr_waiters = 0;
+	cv->irq_okay = TRUE;
+}
+
+void cv_init_with_lock(struct cond_var *cv, spinlock_t *lock)
+{
+	sem_init(&cv->sem, 0);
+	cv->nr_waiters = 0;
+	cv->lock = lock;
+	cv->irq_okay = FALSE;
+}
+
+void cv_init_irqsave_with_lock(struct cond_var *cv, spinlock_t *lock)
+{
+	sem_init_irqsave(&cv->sem, 0);
+	cv->nr_waiters = 0;
+	cv->lock = lock;
 	cv->irq_okay = TRUE;
 }
 
 void cv_lock(struct cond_var *cv)
 {
-	spin_lock(&cv->lock);
+	spin_lock(cv->lock);
 }
 
 void cv_unlock(struct cond_var *cv)
 {
-	spin_unlock(&cv->lock);
+	spin_unlock(cv->lock);
 }
 
 void cv_lock_irqsave(struct cond_var *cv, int8_t *irq_state)
@@ -398,7 +416,7 @@ void cv_wait_and_unlock(struct cond_var *cv)
 {
 	unsigned long nr_prev_waiters;
 	nr_prev_waiters = cv->nr_waiters++;
-	spin_unlock(&cv->lock);
+	spin_unlock(cv->lock);
 	/* Wait til our turn.  This forces an ordering of all waiters such that the
 	 * order in which they wait is the order in which they down the sem. */
 	while (nr_prev_waiters != nr_sem_waiters(&cv->sem))
@@ -410,10 +428,13 @@ void cv_wait_and_unlock(struct cond_var *cv)
 	sem_down(&cv->sem);
 }
 
-/* Comes in locked.  Note cv_lock does not disable irqs. */
+/* Comes in locked.  Note cv_lock does not disable irqs.   They should still be
+ * disabled from the initial cv_lock_irqsave(). */
 void cv_wait(struct cond_var *cv)
 {
 	cv_wait_and_unlock(cv);
+	if (cv->irq_okay)
+		assert(!irq_is_enabled());
 	cv_lock(cv);
 }
 
@@ -458,16 +479,16 @@ void __cv_broadcast(struct cond_var *cv)
 
 void cv_signal(struct cond_var *cv)
 {
-	spin_lock(&cv->lock);
+	spin_lock(cv->lock);
 	__cv_signal(cv);
-	spin_unlock(&cv->lock);
+	spin_unlock(cv->lock);
 }
 
 void cv_broadcast(struct cond_var *cv)
 {
-	spin_lock(&cv->lock);
+	spin_lock(cv->lock);
 	__cv_broadcast(cv);
-	spin_unlock(&cv->lock);
+	spin_unlock(cv->lock);
 }
 
 void cv_signal_irqsave(struct cond_var *cv, int8_t *irq_state)
