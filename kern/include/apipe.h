@@ -63,7 +63,11 @@ struct atomic_pipe {
 	size_t						ap_wr_off;
 	unsigned int				ap_nr_readers;
 	unsigned int				ap_nr_writers;
-	struct cond_var				ap_cv;
+	spinlock_t					ap_lock;
+	struct cond_var				ap_priority_reader;
+	struct cond_var				ap_general_readers;
+	struct cond_var				ap_writers;
+	bool						ap_has_priority_reader;
 };
 
 void apipe_init(struct atomic_pipe *ap, void *buf, size_t buf_sz,
