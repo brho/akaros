@@ -818,7 +818,7 @@ struct block *qremove(struct queue *q)
 {
 	struct block *b;
 
-	apipe_read(&q->pipe, &b, 1);
+	apipe_read_locked(&q->pipe, &b, 1);
 	if (b == NULL)
 		return NULL;
 	b->next = NULL;
@@ -982,7 +982,7 @@ struct block *qbread(struct queue *q, int len)
 	memset(&bs, 0, sizeof(bs));
 	bs.want = len;
 	if (apipe_read_cond(&q->pipe, readcond, &bs) < 0)
-		error("apipe_read_cond failed");
+		error("qbread: apipe_read_cond failed");
 	return bs.b;
 }
 

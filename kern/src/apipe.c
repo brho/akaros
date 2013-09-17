@@ -167,11 +167,13 @@ int apipe_read_cond(struct atomic_pipe *ap,
 		 * with legacy code. F is supposed to call apipe_read_locked().
 		 */
 		/* at any point, if nr_writers goes to zero, that's bad. */
+#if 0
 		if (!ap->ap_nr_writers) {
 			cv_unlock(&ap->ap_cv);
 			/* return -1 because they're going to have to clean up. */
 			return -1;
 		}
+#endif
 		ret = f(ap, arg);
 		if (ret)
 			break;
