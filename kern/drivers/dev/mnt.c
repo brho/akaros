@@ -719,6 +719,7 @@ mntrdwr(int type, struct chan *c, void *buf, long n, int64_t off)
 	char *uba;
 	int cache;
 	uint32_t cnt, nr, nreq;
+	int got;
 
 	mnt = mntchk(c);
 	uba = buf;
@@ -746,8 +747,9 @@ mntrdwr(int type, struct chan *c, void *buf, long n, int64_t off)
 		if(nr > nreq)
 			nr = nreq;
 
+		got = nr;
 		if(type == Tread)
-			r->b = bl2mem(( uint8_t *)uba, r->b, nr);
+			r->b = bl2mem(( uint8_t *)uba, r->b, &got);
 		//else if(cache)
 		//mfcwrite(c, ( uint8_t *)uba, nr, off);
 

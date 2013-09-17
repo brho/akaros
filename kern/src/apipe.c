@@ -150,7 +150,7 @@ void *apipe_head(struct atomic_pipe *ap)
  * this function. The intent here is to ensure one-reader-at-a-time
  * operation.
  */
-int apipe_read_cond(struct atomic_pipe *ap, void *buf, size_t nr_elem,
+int apipe_read_cond(struct atomic_pipe *ap,
 		    int(*f)(struct atomic_pipe *pipe, void *arg), void *arg)
 {
 	size_t rd_idx;

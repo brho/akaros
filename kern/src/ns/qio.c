@@ -391,8 +391,9 @@ int qdiscard(struct queue *q, int len)
 	for (sofar = 0; sofar < len; sofar += n) {
 		if (q->len <= 0)
 			break;
-		QDEBUG checkb(b, "qdiscard");
+
 		b = qhead(q);
+		QDEBUG checkb(b, "qdiscard");
 		n = BLEN(b);
 		if (n <= len - sofar) {
 			qremove(q);
@@ -452,8 +453,9 @@ int qconsume(struct queue *q, void *vp, int len)
 			iunlock(&q->lock);
 			return -1;
 		}
-		QDEBUG checkb(b, "qconsume 1");
+
 		b = qhead(q);
+		QDEBUG checkb(b, "qconsume 1");
 		n = BLEN(b);
 		if (n > 0)
 			break;
@@ -833,19 +835,23 @@ struct block *qremove(struct queue *q)
  *  memory.  emptied blocks are freed.  return
  *  pointer to first unconsumed block.
  */
-struct block *bl2mem(uint8_t * p, struct block *b, int n)
+struct block *bl2mem(uint8_t * p, struct block *b, int *pn)
 {
 	int i;
 	struct block *next;
+	int n = *pn;
+	*pn = 0;
 
 	for (; b != NULL; b = next) {
 		i = BLEN(b);
 		if (i > n) {
 			memmove(p, b->rp, n);
 			b->rp += n;
+			*pn += n;
 			return b;
 		}
 		memmove(p, b->rp, i);
+		*pn += i;
 		n -= i;
 		p += i;
 		b->rp += i;
@@ -913,60 +919,88 @@ static void qwakeup_iunlock(struct queue *q)
 	}
 }
 
+/* intended to be called by apipe_read_cond. This is the only way
+ * that qio should read due to the length consideration.
+ */
+struct blockstatus {
+	int count;
+	int want;
+	struct block *b, *last;
+	struct queue *q;
+};
+
+/* we will assume pipe is owned by us. */
+int readcond(struct atomic_pipe *p, void *v)
+{
+	struct blockstatus *bs = v;
+	struct block *b, *nb;
+	int n, len;
+	while (apipe_head(p)){
+		/* if we get here, there's at least one block in the queue */
+		b = apipe_head(p);
+		if (!bs->b){
+			bs->b = b;
+			bs->last = b;
+		}
+		n = BLEN(b);
+		len = bs->want-bs->count;
+		/* split block if it's too big and this is not a message queue */
+		nb = b;
+		if (n > len) {
+			if ((bs->q->state & Qmsg) == 0) {
+				n -= len;
+				nb = allocb(len);
+				memmove(nb->wp, b->rp, len);
+				b->wp += n;
+			}
+			nb->wp = nb->rp + len;
+		} else {
+			nb = qremove(bs->q);
+		}
+
+		bs->last->next = nb;
+		bs->last = nb;
+		bs->count += BLEN(nb);
+	}
+
+	if (bs->want >= bs->count)
+		return 1;
+	return 0;
+}
+
 /*
  *  get next block from a queue (up to a limit)
+ *  remove lock management and let the pipes do it.
+ *  If you want this locked, i.e. multi-element read,
+ *  you should be doing the apipe_read_cond. Otherwise
+ *  it's quite unsafe.
  */
 struct block *qbread(struct queue *q, int len)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct block *b, *nb;
 	int n;
 
-	qlock(&q->rlock);
 	if (waserror()) {
-		qunlock(&q->rlock);
 		nexterror();
 	}
 
-	ilock(&q->lock);
 	switch (qwait(q)) {
 		case 0:
 			/* queue closed */
-			iunlock(&q->lock);
-			qunlock(&q->rlock);
 			poperror();
 			return NULL;
 		case -1:
 			/* multiple reads on a closed queue */
-			iunlock(&q->lock);
 			error(q->err);
 	}
 
-	/* if we get here, there's at least one block in the queue */
-	b = apipe_head(&q->pipe);
-	if (! b)
-		return NULL;
-	n = BLEN(b);
-	
-	/* split block if it's too big and this is not a message queue */
-	nb = b;
-	if (n > len) {
-		if ((q->state & Qmsg) == 0) {
-			n -= len;
-			nb = allocb(len);
-			memmove(nb->wp, b->rp, len);
-			b->wp += n;
-		}
-		nb->wp = nb->rp + len;
-	} else {
-		nb = qremove(q);
-	}
-
-	/* restart producer */
-	qwakeup_iunlock(q);
-
+	struct blockstatus bs;
+	memset(&bs, 0, sizeof(bs));
+	bs.want = len;
+	if (apipe_read_cond(&q->pipe, readcond, &bs) < 0)
+		error("apipe_read_cond failed");
 	poperror();
-	qunlock(&q->rlock);
 	return nb;
 }
 
@@ -979,95 +1013,9 @@ long qread(struct queue *q, void *vp, int len)
 	ERRSTACK(2);
 	struct block *b, *first, **l;
 	int blen, n;
-I_AM_HERE;
-
-	qlock(&q->rlock);
-	if (waserror()) {
-		qunlock(&q->rlock);
-		nexterror();
-	}
-
-I_AM_HERE;
-	ilock(&q->lock);
-I_AM_HERE;
-again:
-	switch (qwait(q)) {
-		case 0:
-I_AM_HERE;
-			/* queue closed */
-			iunlock(&q->lock);
-			qunlock(&q->rlock);
-			poperror();
-			return 0;
-		case -1:
-I_AM_HERE;
-			/* multiple reads on a closed queue */
-			iunlock(&q->lock);
-			error(q->err);
-	}
-
-	/* if we get here, there's at least one block in the queue */
-I_AM_HERE;
-	if (q->state & Qcoalesce) {
-I_AM_HERE;
-		/* when coalescing, 0 length blocks just go away */
-		b = qhead(q);
-		if (BLEN(b) <= 0) {
-			freeb(qremove(q));
-			goto again;
-		}
-
-I_AM_HERE;
-		/*  grab the first block plus as many
-		 *  following blocks as will completely
-		 *  fit in the read.
-		 */
-		n = 0;
-		l = &first;
-		blen = BLEN(b);
-I_AM_HERE;
-		for (;;) {
-			*l = qremove(q);
-			l = &b->next;
-			n += blen;
-
-I_AM_HERE;
-			b = apipe_head(&q->pipe);
-			if (b == NULL)
-				break;
-			blen = BLEN(b);
-			if (n + blen > len)
-				break;
-I_AM_HERE;
-		}
-	} else {
-		first = qremove(q);
-		n = BLEN(first);
-	}
-
-I_AM_HERE;
-	/* copy to user space outside of the ilock */
-	iunlock(&q->lock);
-I_AM_HERE;
-	b = bl2mem(vp, first, len);
-	ilock(&q->lock);
-
-I_AM_HERE;
-	/* take care of any left over partial block */
-	if (b != NULL) {
-		n -= BLEN(b);
-		if (q->state & Qmsg){
-			freeb(qremove(q));
-		}
-	}
-
-	/* restart producer */
-	qwakeup_iunlock(q);
-
-	poperror();
-	qunlock(&q->rlock);
-I_AM_HERE;
-	return n;
+	b = qbread(q, len);
+	bl2mem(vp, b, &len);
+	return len;
 }
 
 static int qnotfull(void *a)

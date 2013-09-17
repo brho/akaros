@@ -634,7 +634,7 @@ struct queue *qopen(int limit, int msg, void (*kick) (void *), void *arg);
 struct queue *qbypass(void (*bypass) (void *, struct block *), void *arg);
 void qaddlist(struct queue *q, struct block *b);
 struct block *qremove(struct queue *q);
-struct block *bl2mem(uint8_t * p, struct block *b, int n);
+struct block *bl2mem(uint8_t * p, struct block *b, int *pn);
 struct block *mem2bl(uint8_t * p, int len);
 void qputback(struct queue *q, struct block *b);
 struct block *qbread(struct queue *q, int len);
