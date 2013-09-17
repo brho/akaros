@@ -962,7 +962,7 @@ int readcond(struct atomic_pipe *p, void *v)
 		bs->count += BLEN(nb);
 	}
 
-	if (bs->want >= bs->count)
+	if (bs->count >= bs->want)
 		return 1;
 	return 0;
 }
