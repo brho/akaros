@@ -10,6 +10,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
+#include <trap.h>
 
 enum {
 	Maxtu = 16 * 1024,
@@ -22,7 +23,7 @@ struct LB {
 	struct fs *f;
 };
 
-static void loopbackread(void *a);
+static void loopbackread(uint32_t core, long a0, long a1, long a2);
 
 static void
 loopbackbind(struct ipifc *ifc, int unused_int, char **unused_char_pp_t)
@@ -35,8 +36,8 @@ loopbackbind(struct ipifc *ifc, int unused_int, char **unused_char_pp_t)
 	ifc->arg = lb;
 	ifc->mbps = 1000;
 
-	kproc("loopbackread", loopbackread, ifc);
-
+	send_kernel_message(core_id(), loopbackread, (long)ifc, 0, 0,
+			     KMSG_ROUTINE);
 }
 
 static void loopbackunbind(struct ipifc *ifc)
@@ -66,19 +67,22 @@ loopbackbwrite(struct ipifc *ifc, struct block *bp, int unused_int,
 	ifc->out++;
 }
 
-static void loopbackread(void *a)
+static void loopbackread(uint32_t core, long a0, long a1, long a2)
 {
 	ERRSTACK(1);
+	/* loopback read can only panic ... not exit as in Plan 9 */
 	struct ipifc *ifc;
 	struct block *bp;
 	LB *lb;
 
-	ifc = a;
+printk("loopbackread: %08lx, %08lx, %08lx, %08lx\n", 
+core, a0, a1, a2);
+	ifc = (void *)a0;
 	lb = ifc->arg;
 	lb->readp = current;	/* hide identity under a rock for unbind */
 	if (waserror()) {
 		lb->readp = 0;
-		pexit("hangup", 1);
+		panic("loopbackread:");
 	}
 	for (;;) {
 		bp = qbread(lb->q, Maxtu);
