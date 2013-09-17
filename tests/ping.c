@@ -328,6 +328,10 @@ rcvr(int fd, int msglen, int interval, int nmsg)
 	while(lostmsgs+rcvdmsgs < nmsg){
 		//alarm((nmsg-lostmsgs-rcvdmsgs)*interval+waittime);
 		n = read(fd, buf, sizeof buf);
+		if (n < 0){
+			perror("read");
+			exit(1);
+		}
 		//alarm(0);
 		now = nsec();
 		if(n <= 0){	/* read interrupted - time to go */

@@ -779,13 +779,11 @@ static int qwait(struct queue *q)
 
 		q->state |= Qstarve;	/* flag requesting producer to wake me */
 		iunlock(&q->lock);
-I_AM_HERE;
 		/* how do we do this? 
 		   sleep(&q->rr, notempty, q);
 		 */
 		schedule();
 		ilock(&q->lock);
-I_AM_HERE;
 	}
 	return 1;
 }
@@ -935,6 +933,7 @@ int readcond(struct atomic_pipe *p, void *v)
 	struct blockstatus *bs = v;
 	struct block *b, *nb;
 	int n, len;
+	/* we'll need a way to know if a pipe is at EOF. */
 	while (apipe_head(p)){
 		/* if we get here, there's at least one block in the queue */
 		b = apipe_head(p);
@@ -977,31 +976,14 @@ int readcond(struct atomic_pipe *p, void *v)
  */
 struct block *qbread(struct queue *q, int len)
 {
-	ERRSTACK(1);
 	struct block *b, *nb;
 	int n;
-
-	if (waserror()) {
-		nexterror();
-	}
-
-	switch (qwait(q)) {
-		case 0:
-			/* queue closed */
-			poperror();
-			return NULL;
-		case -1:
-			/* multiple reads on a closed queue */
-			error(q->err);
-	}
-
 	struct blockstatus bs;
 	memset(&bs, 0, sizeof(bs));
 	bs.want = len;
 	if (apipe_read_cond(&q->pipe, readcond, &bs) < 0)
 		error("apipe_read_cond failed");
-	poperror();
-	return nb;
+	return bs.b;
 }
 
 /*
@@ -1010,7 +992,6 @@ struct block *qbread(struct queue *q, int len)
  */
 long qread(struct queue *q, void *vp, int len)
 {
-	ERRSTACK(2);
 	struct block *b, *first, **l;
 	int blen, n;
 	b = qbread(q, len);
