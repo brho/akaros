@@ -3,6 +3,7 @@
 
 #include <ros/common.h>
 #include <stdarg.h>
+#include <kdebug.h>
 
 #ifndef NULL
 #define NULL	((void *) 0)
