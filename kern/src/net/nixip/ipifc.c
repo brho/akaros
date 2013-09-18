@@ -113,7 +113,7 @@ static char *ipifcbind(struct conv *c, char **argv, int argc)
 
 	/* bind the device to the interface */
 	medium = ipfindmedium(argv[1]);
-printk("find type %s\n", argv[1]);
+
 	if (medium == NULL)
 		return "unknown interface type";
 

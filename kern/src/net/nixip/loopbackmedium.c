@@ -67,7 +67,6 @@ loopbackbwrite(struct ipifc *ifc, struct block *bp, int unused_int,
 	LB *lb;
 
 	lb = ifc->arg;
-printk("loopbackbwrite ifc %p q %p bp %p\n", ifc, lb->q, bp);
 	if (qpass(lb->q, bp) < 0)
 		ifc->outerr++;
 	ifc->out++;
@@ -81,10 +80,7 @@ static void loopbackread(uint32_t core, long a0, long a1, long a2)
 	struct block *bp;
 	LB *lb;
 
-printk("loopbackread: %08lx, %08lx, %08lx, %08lx\n", 
-core, a0, a1, a2);
 	ifc = (void *)a0;
-printk("loopbackread: ifc %p\n", ifc);
 	lb = ifc->arg;
 	lb->readp = current;	/* hide identity under a rock for unbind */
 	if (waserror()) {
@@ -92,35 +88,24 @@ printk("loopbackread: ifc %p\n", ifc);
 		panic("loopbackread:");
 	}
 	for (;;) {
-I_AM_HERE;
-printk("loopbackread reads %p\n", lb->q);
 		bp = qbread(lb->q, Maxtu);
-printk("bp %p\n", bp);
-I_AM_HERE;
 		if (bp == NULL)
 			continue;
 		ifc->in++;
-I_AM_HERE;
 		if (!canrlock(&ifc->rwlock)) {
-I_AM_HERE;
 			freeb(bp);
 			continue;
 		}
-I_AM_HERE;
 		if (waserror()) {
-I_AM_HERE;
 			runlock(&ifc->rwlock);
 			nexterror();
 		}
-I_AM_HERE;
 		if (ifc->lifc == NULL)
 			freeb(bp);
 		else
 			ipiput4(lb->f, ifc, bp);
-I_AM_HERE;
 		runlock(&ifc->rwlock);
 		poperror();
-I_AM_HERE;
 	}
 }
 

@@ -523,56 +523,60 @@ main(int argc, char **argv)
 
 	msglen = interval = 0;
 	nmsg = MAXMSG;
-	nmsg = 1;
-#warning "FIX ME when we get varargs"
-#if 0
-	ARGBEGIN {
-	case '6':
-		proto = &v6pr;
-		break;
-	case 'a':
-		addresses = 1;
-		break;
-	case 'd':
-		debug++;
-		break;
-	case 'f':
-		flood = 1;
-		break;
-	case 'i':
-		interval = atoi(EARGF(usage()));
-		if(interval < 0)
+	argc--, argv++;
+	while (**argv == '-'){
+		switch(argv[0][1]){
+		case '6':
+			proto = &v6pr;
+			break;
+		case 'a':
+			addresses = 1;
+			break;
+		case 'd':
+			debug++;
+			break;
+		case 'f':
+			flood = 1;
+			break;
+		case 'i':
+			argc--,argv++;
+			interval = atoi(*argv);
+			if(interval < 0)
+				usage();
+			break;
+		case 'l':
+			lostonly++;
+			break;
+		case 'n':
+			argc--,argv++;
+			nmsg = atoi(*argv);
+			if(nmsg < 0)
+				usage();
+			break;
+		case 'q':
+			quiet = 1;
+			break;
+		case 'r':
+			pingrint = 1;
+			break;
+		case 's':
+			argc--,argv++;
+			msglen = atoi(*argv);
+			break;
+		case 'w':
+			argc--,argv++;
+			waittime = atoi(*argv);
+			if(waittime < 0)
+				usage();
+			break;
+		default:
 			usage();
-		break;
-	case 'l':
-		lostonly++;
-		break;
-	case 'n':
-		nmsg = atoi(EARGF(usage()));
-		if(nmsg < 0)
-			usage();
-		break;
-	case 'q':
-		quiet = 1;
-		break;
-	case 'r':
-		rint = 1;
-		break;
-	case 's':
-		msglen = atoi(EARGF(usage()));
-		break;
-	case 'w':
-		waittime = atoi(EARGF(usage()));
-		if(waittime < 0)
-			usage();
-		break;
-	default:
-		usage();
-		break;
-	} ARGEND;
-#else
-	argc--,argv++;
-#endif
+			break;
+		}
+		
+		argc--,argv++;
+	}
+
 	if(msglen < proto->iphdrsz + ICMP_HDRSIZE)
 		msglen = proto->iphdrsz + ICMP_HDRSIZE;
 	if(msglen < 64)
@@ -590,7 +594,7 @@ main(int argc, char **argv)
 	if (!isv4name(argv[0]))
 		proto = &v6pr;
 	ds = netmkaddr(argv[0], proto->net, "1");
-printf("ping: dial %s\n", ds);
+	printf("ping: dial %s\n", ds);
 	fd = dial(ds, 0, 0, 0);
 	if(fd < 0){
 		fprintf(stderr, "%s: couldn't dial %s: %r\n", argv0, ds);
@@ -608,14 +612,14 @@ printf("ping: dial %s\n", ds);
 		/* fallthrough */
 	case 0:
 		rcvr(fd, msglen, interval, nmsg);
+		printf(lostmsgs ? "lost messages" : "");
 		exit(0);
 	default:
 		sender(fd, msglen, interval, nmsg);
-		//printf("NOT WAITING\n");
-		//exit(1);
-		wait();
-		printf(lostmsgs ? "lost messages" : "");
+		printf("NOT WAITING -- CAN'T\n");
 		exit(1);
+		//wait();
+		//exit(1);
 	}
 }
 
@@ -630,7 +634,7 @@ reply(Req *r, void *v)
 		if(addresses)
 			(*proto->prreply)(r, v);
 		else
-			printf("%ud: rtt %lld µs, avg rtt %lld µs, ttl = %d\n",
+			printf("%d: rtt %lld microseconds, avg rtt %lld microseconds, ttl = %d\n",
 				r->seq - firstseq, r->rtt, sum/rcvdmsgs, r->ttl);
 	r->replied = 1;
 }

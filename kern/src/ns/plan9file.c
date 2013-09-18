@@ -686,7 +686,6 @@ long sysread(int fd, void *p, size_t n, off_t off)
 
 	poperror();
 	cclose(c);
-
 	return nnn;
 }
 

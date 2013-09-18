@@ -937,6 +937,9 @@ struct blockstatus {
 };
 
 /* we will assume pipe is owned by us. */
+/* note: bs->want is a not-to-exceed. But non-zero is considered
+ * to satisfy the read.
+ */
 int readcond(struct atomic_pipe *p, void *v)
 {
 	struct blockstatus *bs = v;
@@ -976,7 +979,7 @@ int readcond(struct atomic_pipe *p, void *v)
 			break;
 	}
 
-	if ((bs->blockcount && blockcount) || (bs->count >= bs->want)){
+	if ((bs->blockcount && blockcount) || (bs->count/* >= bs->want*/)){
 		return 1;
 	}
 	return 0;

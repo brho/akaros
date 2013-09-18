@@ -135,7 +135,6 @@ ipoput4(struct fs *f,
 	int rv = 0;
 
 	ip = f->ip;
-I_AM_HERE;
 
 	/* Fill out the ip header */
 	eh = (struct Ip4hdr *)(bp->rp);
@@ -144,7 +143,6 @@ I_AM_HERE;
 
 	/* Number of uint8_ts in data and ip header to write */
 	len = blocklen(bp);
-I_AM_HERE;
 
 	if (gating) {
 		chunk = nhgets(eh->length);
@@ -162,7 +160,6 @@ I_AM_HERE;
 		goto free;
 	}
 
-I_AM_HERE;
 	r = v4lookup(f, eh->dst, c);
 	if (r == NULL) {
 		ip->stats[OutNoRoutes]++;
@@ -171,7 +168,6 @@ I_AM_HERE;
 		goto free;
 	}
 
-I_AM_HERE;
 	ifc = r->routeTree.ifc;
 	if (r->routeTree.type & (Rifc | Runi))
 		gate = eh->dst;
@@ -188,7 +184,6 @@ I_AM_HERE;
 	eh->ttl = ttl;
 	if (!gating)
 		eh->tos = tos;
-I_AM_HERE;
 
 	if (!canrlock(&ifc->rwlock))
 		goto free;
@@ -208,7 +203,6 @@ I_AM_HERE;
 		if (!gating) {
 			/* TODO: not sure what you want here.  The only thing we can
 			 * guarantee about the ref you read is that it is > 0. */
-I_AM_HERE;
 			__kref_get(&ip->id4, 1);
 			hnputs(eh->id, kref_refcnt(&ip->id4));
 		}
@@ -253,7 +247,6 @@ I_AM_HERE;
 	} else {
 		/* TODO: not sure what you want here.  The only thing we can
 		 * guarantee about the ref you read is that it is > 0. */
-I_AM_HERE;
 		__kref_get(&ip->id4, 1);
 		lid = kref_refcnt(&ip->id4);
 	}
@@ -334,10 +327,7 @@ void ipiput4(struct fs *f, struct ipifc *ifc, struct block *bp)
 	struct IP *ip;
 	struct route *r;
 	struct conv conv;
-printk("ipiput4 f %p ifc %p bp %p\n", f, ifc,bp);
-I_AM_HERE;
 	if (BLKIPVER(bp) != IP_VER4) {
-I_AM_HERE;
 		ipiput6(f, ifc, bp);
 		return;
 	}
@@ -351,7 +341,6 @@ I_AM_HERE;
 	 *  collecting up to the first 64 bytes in the first block.
 	 */
 	if (BLEN(bp) < 64) {
-I_AM_HERE;
 		hl = blocklen(bp);
 		if (hl < IP4HDR)
 			hl = IP4HDR;
@@ -363,11 +352,9 @@ I_AM_HERE;
 	}
 
 	h = (struct Ip4hdr *)(bp->rp);
-I_AM_HERE;
 
 	/* dump anything that whose header doesn't checksum */
 	if ((bp->flag & Bipck) == 0 && ipcsum(&h->vihl)) {
-I_AM_HERE;
 		ip->stats[InHdrErrors]++;
 		netlog(f, Logip, "ip: checksum error %V\n", h->src);
 		freeblist(bp);
@@ -376,10 +363,8 @@ I_AM_HERE;
 	v4tov6(v6dst, h->dst);
 	notforme = ipforme(f, v6dst) == 0;
 
-I_AM_HERE;
 	/* Check header length and version */
 	if ((h->vihl & 0x0F) != IP_HLEN4) {
-I_AM_HERE;
 		hl = (h->vihl & 0xF) << 2;
 		if (hl < (IP_HLEN4 << 2)) {
 			ip->stats[InHdrErrors]++;
@@ -399,10 +384,8 @@ I_AM_HERE;
 		}
 	}
 
-I_AM_HERE;
 	/* route */
 	if (notforme) {
-I_AM_HERE;
 		if (!ip->iprouting) {
 			freeblist(bp);
 			return;
@@ -450,7 +433,6 @@ I_AM_HERE;
 		return;
 	}
 
-I_AM_HERE;
 	frag = nhgets(h->frag);
 	if (frag) {
 		h->tos = 0;
@@ -466,20 +448,15 @@ I_AM_HERE;
 	h->frag[0] = 0;
 	h->frag[1] = 0;
 
-I_AM_HERE;
 	proto = h->proto;
 	p = Fsrcvpcol(f, proto);
-I_AM_HERE;
 	if (p != NULL && p->rcv != NULL) {
 		ip->stats[InDelivers]++;
-I_AM_HERE;
-printk("p->rcv %p\n", p->rcv);
 		(*p->rcv) (p, ifc, bp);
 		return;
 	}
 	ip->stats[InDiscards]++;
 	ip->stats[InUnknownProtos]++;
-I_AM_HERE;
 	freeblist(bp);
 }
 
