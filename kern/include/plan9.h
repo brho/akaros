@@ -630,7 +630,7 @@ int qpassnolim(struct queue *q, struct block *b);
 struct block *packblock(struct block *bp);
 int qproduce(struct queue *q, void *vp, int len);
 struct block *qcopy(struct queue *q, int len, uint32_t offset);
-struct queue *qopen(int limit, int msg, void (*kick) (void *), void *arg);
+struct queue *qopen(int nblock, int msg, void (*kick) (void *), void *arg);
 struct queue *qbypass(void (*bypass) (void *, struct block *), void *arg);
 void qaddlist(struct queue *q, struct block *b);
 struct block *qremove(struct queue *q);

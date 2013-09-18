@@ -334,7 +334,7 @@ void ipiput4(struct fs *f, struct ipifc *ifc, struct block *bp)
 	struct IP *ip;
 	struct route *r;
 	struct conv conv;
-
+I_AM_HERE;
 	if (BLKIPVER(bp) != IP_VER4) {
 		ipiput6(f, ifc, bp);
 		return;

@@ -33,11 +33,16 @@ loopbackbind(struct ipifc *ifc, int unused_int, char **unused_char_pp_t)
 	lb = kzmalloc(sizeof(*lb), 0);
 	lb->f = ifc->conv->p->f;
 	lb->q = qopen(1024 * 1024, Qmsg, NULL, NULL);
+	if (!lb->q)
+		panic("loopbackbind");
 	ifc->arg = lb;
 	ifc->mbps = 1000;
 
 	send_kernel_message(core_id(), loopbackread, (long)ifc, 0, 0,
 			     KMSG_ROUTINE);
+	/*
+	loopbackread(core_id(), (long)ifc, 0, 0);
+ 	*/
 }
 
 static void loopbackunbind(struct ipifc *ifc)
@@ -69,7 +74,7 @@ loopbackbwrite(struct ipifc *ifc, struct block *bp, int unused_int,
 
 static void loopbackread(uint32_t core, long a0, long a1, long a2)
 {
-	ERRSTACK(1);
+	ERRSTACK(2);
 	/* loopback read can only panic ... not exit as in Plan 9 */
 	struct ipifc *ifc;
 	struct block *bp;
@@ -85,24 +90,34 @@ core, a0, a1, a2);
 		panic("loopbackread:");
 	}
 	for (;;) {
+I_AM_HERE;
 		bp = qbread(lb->q, Maxtu);
+printk("bp %p\n", bp);
+I_AM_HERE;
 		if (bp == NULL)
 			continue;
 		ifc->in++;
+I_AM_HERE;
 		if (!canrlock(&ifc->rwlock)) {
+I_AM_HERE;
 			freeb(bp);
 			continue;
 		}
+I_AM_HERE;
 		if (waserror()) {
+I_AM_HERE;
 			runlock(&ifc->rwlock);
 			nexterror();
 		}
+I_AM_HERE;
 		if (ifc->lifc == NULL)
 			freeb(bp);
 		else
 			ipiput4(lb->f, ifc, bp);
+I_AM_HERE;
 		runlock(&ifc->rwlock);
 		poperror();
+I_AM_HERE;
 	}
 }
 

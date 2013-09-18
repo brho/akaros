@@ -21,7 +21,7 @@ static uint32_t qcopycnt;
 
 static int debugging;
 
-#define QDEBUG	if(1)
+#define QDEBUG	if(0)
 
 enum {
 	Maxatomic = 64 * 1024,
@@ -700,11 +700,14 @@ struct block *qcopy(struct queue *q, int len, uint32_t offset)
 /*
  *  called by non-interrupt code
  */
-struct queue *qopen(int limit, int msg, void (*kick) (void *), void *arg)
+struct queue *qopen(int limit,
+	int msg, void (*kick) (void *), void *arg)
 {
 	struct queue *q;
+	uint8_t *buf;
+	int elsize = sizeof(struct block*);
 
-	q = kzmalloc(sizeof(struct queue), 0);
+	q = kzmalloc(sizeof(struct queue), KMALLOC_WAIT);
 	if (q == 0)
 		return 0;
 
@@ -722,6 +725,8 @@ struct queue *qopen(int limit, int msg, void (*kick) (void *), void *arg)
 	q->state |= Qstarve;
 	q->eof = 0;
 	q->noblock = 0;
+	buf = kzmalloc(limit, KMALLOC_WAIT);
+	apipe_init(&q->pipe, buf, limit, elsize);
 
 	return q;
 }
@@ -808,7 +813,11 @@ void qaddlist(struct queue *q, struct block *b)
  */
 struct block *qhead(struct queue *q)
 {
-	return apipe_head(&q->pipe);
+	struct block **bb = apipe_head(&q->pipe);
+	if (! bb)
+		return NULL;
+printk("qhead: head is %p, *head is %p\n", bb, *bb);
+	return *bb;
 }
 
 /*
@@ -819,12 +828,15 @@ struct block *qremove(struct queue *q)
 	struct block *b;
 
 	apipe_read_locked(&q->pipe, &b, 1);
+I_AM_HERE;
+printk("b is %p\n", b);
 	if (b == NULL)
 		return NULL;
 	b->next = NULL;
 	q->dlen -= BLEN(b);
 	q->len -= BALLOC(b);
-	QDEBUG checkb(b, "qremove");
+I_AM_HERE;
+	//QDEBUG checkb(b, "qremove");
 	return b;
 }
 
@@ -921,6 +933,7 @@ static void qwakeup_iunlock(struct queue *q)
  * that qio should read due to the length consideration.
  */
 struct blockstatus {
+	int blockcount;
 	int count;
 	int want;
 	struct block *b, *last;
@@ -932,11 +945,12 @@ int readcond(struct atomic_pipe *p, void *v)
 {
 	struct blockstatus *bs = v;
 	struct block *b, *nb;
+	int blockcount = 0;
 	int n, len;
 	/* we'll need a way to know if a pipe is at EOF. */
-	while (apipe_head(p)){
+	while (qhead(bs->q)){
 		/* if we get here, there's at least one block in the queue */
-		b = apipe_head(p);
+		b = qhead(bs->q);
 		if (!bs->b){
 			bs->b = b;
 			bs->last = b;
@@ -947,6 +961,7 @@ int readcond(struct atomic_pipe *p, void *v)
 		nb = b;
 		if (n > len) {
 			if ((bs->q->state & Qmsg) == 0) {
+printk("split block\n");
 				n -= len;
 				nb = allocb(len);
 				memmove(nb->wp, b->rp, len);
@@ -954,16 +969,24 @@ int readcond(struct atomic_pipe *p, void *v)
 			}
 			nb->wp = nb->rp + len;
 		} else {
+I_AM_HERE;
 			nb = qremove(bs->q);
 		}
 
+I_AM_HERE;
 		bs->last->next = nb;
 		bs->last = nb;
 		bs->count += BLEN(nb);
+		blockcount++;
+		if (bs->blockcount && (blockcount >= bs->blockcount))
+			break;
 	}
 
-	if (bs->count >= bs->want)
+I_AM_HERE;
+	if ((bs->blockcount && blockcount) || (bs->count >= bs->want)){
+I_AM_HERE;
 		return 1;
+	}
 	return 0;
 }
 
@@ -981,6 +1004,9 @@ struct block *qbread(struct queue *q, int len)
 	struct blockstatus bs;
 	memset(&bs, 0, sizeof(bs));
 	bs.want = len;
+	bs.blockcount = 1;
+	bs.q = q;
+I_AM_HERE;
 	if (apipe_read_cond(&q->pipe, readcond, &bs) < 0)
 		error("qbread: apipe_read_cond failed");
 	return bs.b;
@@ -994,8 +1020,13 @@ long qread(struct queue *q, void *vp, int len)
 {
 	struct block *b, *first, **l;
 	int blen, n;
-	b = qbread(q, len);
-	bl2mem(vp, b, &len);
+	struct blockstatus bs;
+	memset(&bs, 0, sizeof(bs));
+	bs.want = len;
+	bs.q = q;
+	if (apipe_read_cond(&q->pipe, readcond, &bs) < 0)
+		error("qbread: apipe_read_cond failed");
+	bl2mem(vp, bs.b, &len);
 	return len;
 }
 
@@ -1061,7 +1092,7 @@ I_AM_HERE;
 
 I_AM_HERE;
 	/* queue the block */
-	apipe_write(&q->pipe, &b, 1);
+	apipe_write(&q->pipe, b, 1);
 I_AM_HERE;
 	q->len += BALLOC(b);
 	q->dlen += n;

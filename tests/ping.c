@@ -522,6 +522,7 @@ main(int argc, char **argv)
 
 	msglen = interval = 0;
 	nmsg = MAXMSG;
+	nmsg = 1;
 #warning "FIX ME when we get varargs"
 #if 0
 	ARGBEGIN {
