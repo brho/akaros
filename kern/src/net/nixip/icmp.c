@@ -260,6 +260,8 @@ static void goticmpkt(struct proto *icmp, struct block *bp)
 	uint8_t dst[IPaddrlen];
 	uint16_t recid;
 
+I_AM_HERE;
+printk("bp %p\n", bp);
 	p = (Icmp *) bp->rp;
 	v4tov6(dst, p->src);
 	recid = nhgets(p->icmpid);
@@ -269,11 +271,14 @@ static void goticmpkt(struct proto *icmp, struct block *bp)
 		if (s->lport == recid)
 			if (ipcmp(s->raddr, dst) == 0) {
 				bp = concatblock(bp);
+I_AM_HERE;
 				if (bp != NULL)
 					qpass(s->rq, bp);
+I_AM_HERE;
 				return;
 			}
 	}
+I_AM_HERE;
 	freeblist(bp);
 }
 
@@ -313,7 +318,7 @@ icmpiput(struct proto *icmp, struct ipifc *unused_ipifc, struct block *bp)
 	char *msg;
 	char m2[128];
 	Icmppriv *ipriv;
-
+I_AM_HERE;
 	ipriv = icmp->priv;
 
 	ipriv->stats[InMsgs]++;
@@ -323,13 +328,17 @@ icmpiput(struct proto *icmp, struct ipifc *unused_ipifc, struct block *bp)
 		   (p->type < ARRAY_SIZE(icmpnames) ? icmpnames[p->type] : ""),
 		   p->type, p->code);
 	n = blocklen(bp);
+I_AM_HERE;
 	if (n < ICMP_IPSIZE + ICMP_HDRSIZE) {
+I_AM_HERE;
 		ipriv->stats[InErrors]++;
 		ipriv->stats[HlenErrs]++;
 		netlog(icmp->f, Logicmp, "icmp hlen %d\n", n);
 		goto raise;
 	}
+I_AM_HERE;
 	iplen = nhgets(p->length);
+I_AM_HERE;
 	if (iplen > n) {
 		ipriv->stats[LenErrs]++;
 		ipriv->stats[InErrors]++;
@@ -337,6 +346,7 @@ icmpiput(struct proto *icmp, struct ipifc *unused_ipifc, struct block *bp)
 		goto raise;
 	}
 	if (ptclcsum(bp, ICMP_IPSIZE, iplen - ICMP_IPSIZE)) {
+I_AM_HERE;
 		ipriv->stats[InErrors]++;
 		ipriv->stats[CsumErrs]++;
 		netlog(icmp->f, Logicmp, "icmp checksum error n %d iplen %d\n",
@@ -346,8 +356,10 @@ icmpiput(struct proto *icmp, struct ipifc *unused_ipifc, struct block *bp)
 	if (p->type <= Maxtype)
 		ipriv->in[p->type]++;
 
+I_AM_HERE;
 	switch (p->type) {
 		case EchoRequest:
+I_AM_HERE;
 			if (iplen < n)
 				bp = trimblock(bp, 0, iplen);
 			r = mkechoreply(bp);
@@ -355,6 +367,7 @@ icmpiput(struct proto *icmp, struct ipifc *unused_ipifc, struct block *bp)
 			ipoput4(icmp->f, r, 0, MAXTTL, DFLTTOS, NULL);
 			break;
 		case Unreachable:
+I_AM_HERE;
 			if (p->code > 5)
 				msg = unreachcode[1];
 			else
@@ -376,6 +389,7 @@ icmpiput(struct proto *icmp, struct ipifc *unused_ipifc, struct block *bp)
 			goticmpkt(icmp, bp);
 			break;
 		case TimeExceed:
+I_AM_HERE;
 			if (p->code == 0) {
 				snprintf(m2, sizeof(m2),
 					"ttl exceeded at %V", p->src);
@@ -397,12 +411,15 @@ icmpiput(struct proto *icmp, struct ipifc *unused_ipifc, struct block *bp)
 			goticmpkt(icmp, bp);
 			break;
 		default:
+I_AM_HERE;
 			goticmpkt(icmp, bp);
 			break;
 	}
+I_AM_HERE;
 	return;
 
 raise:
+I_AM_HERE;
 	freeblist(bp);
 }
 

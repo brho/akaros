@@ -328,6 +328,7 @@ rcvr(int fd, int msglen, int interval, int nmsg)
 	while(lostmsgs+rcvdmsgs < nmsg){
 		//alarm((nmsg-lostmsgs-rcvdmsgs)*interval+waittime);
 		n = read(fd, buf, sizeof buf);
+printf("GOT ONE! %d bytes\n", n);
 		if (n < 0){
 			perror("read");
 			exit(1);
@@ -600,11 +601,7 @@ printf("ping: dial %s\n", ds);
 	if (!quiet)
 		printf("sending %d %d byte messages %d ms apart to %s\n",
 			nmsg, msglen, interval, ds);
-	sender(fd, msglen, interval, nmsg);
-	rcvr(fd, msglen, interval, nmsg);
-	exit(0);
 
-#if 0
 	switch(fork()) { //rfork(RFPROC|RFMEM|RFFDG)){
 	case -1:
 		fprintf(stderr, "%s: can't fork: %r\n", argv0);
@@ -620,7 +617,6 @@ printf("ping: dial %s\n", ds);
 		printf(lostmsgs ? "lost messages" : "");
 		exit(1);
 	}
-#endif
 }
 
 void

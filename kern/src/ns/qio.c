@@ -523,7 +523,7 @@ int qpass(struct queue *q, struct block *b)
 	/* add buffer to queue */
 	QDEBUG checkb(b, "qpass");
 	while (b) {
-		apipe_write(&q->pipe, b, 1);
+		apipe_write(&q->pipe, &b, 1);
 		QDEBUG checkb(b, "qpass");
 		len += BALLOC(b);
 		dlen += BLEN(b);
@@ -560,7 +560,7 @@ int qpassnolim(struct queue *q, struct block *b)
 
 	/* add buffer to queue */
 	while (b) {
-		apipe_write(&q->pipe, b, 1);
+		apipe_write(&q->pipe, &b, 1);
 		QDEBUG checkb(b, "qpassnolim");
 		len += BALLOC(b);
 		dlen += BLEN(b);
@@ -628,7 +628,7 @@ int qproduce(struct queue *q, void *vp, int len)
 	memmove(b->wp, p, len);
 	producecnt += len;
 	b->wp += len;
-	apipe_write(&q->pipe, b, 1);
+	apipe_write(&q->pipe, &b, 1);
 
 	q->len += BALLOC(b);
 	q->dlen += BLEN(b);
@@ -801,7 +801,7 @@ void qaddlist(struct queue *q, struct block *b)
 {
 	/* queue the block */
 	while (b){
-		apipe_write(&q->pipe, b, 1);
+		apipe_write(&q->pipe, &b, 1);
 		q->len += blockalloclen(b);
 		q->dlen += blocklen(b);
 		b = b->next;
@@ -816,7 +816,6 @@ struct block *qhead(struct queue *q)
 	struct block **bb = apipe_head(&q->pipe);
 	if (! bb)
 		return NULL;
-printk("qhead: head is %p, *head is %p\n", bb, *bb);
 	return *bb;
 }
 
@@ -828,14 +827,11 @@ struct block *qremove(struct queue *q)
 	struct block *b;
 
 	apipe_read_locked(&q->pipe, &b, 1);
-I_AM_HERE;
-printk("b is %p\n", b);
 	if (b == NULL)
 		return NULL;
 	b->next = NULL;
 	q->dlen -= BLEN(b);
 	q->len -= BALLOC(b);
-I_AM_HERE;
 	//QDEBUG checkb(b, "qremove");
 	return b;
 }
@@ -961,7 +957,6 @@ int readcond(struct atomic_pipe *p, void *v)
 		nb = b;
 		if (n > len) {
 			if ((bs->q->state & Qmsg) == 0) {
-printk("split block\n");
 				n -= len;
 				nb = allocb(len);
 				memmove(nb->wp, b->rp, len);
@@ -969,22 +964,19 @@ printk("split block\n");
 			}
 			nb->wp = nb->rp + len;
 		} else {
-I_AM_HERE;
 			nb = qremove(bs->q);
 		}
 
-I_AM_HERE;
 		bs->last->next = nb;
 		bs->last = nb;
+		nb->next = NULL;
 		bs->count += BLEN(nb);
 		blockcount++;
 		if (bs->blockcount && (blockcount >= bs->blockcount))
 			break;
 	}
 
-I_AM_HERE;
 	if ((bs->blockcount && blockcount) || (bs->count >= bs->want)){
-I_AM_HERE;
 		return 1;
 	}
 	return 0;
@@ -1006,7 +998,6 @@ struct block *qbread(struct queue *q, int len)
 	bs.want = len;
 	bs.blockcount = 1;
 	bs.q = q;
-I_AM_HERE;
 	if (apipe_read_cond(&q->pipe, readcond, &bs) < 0)
 		error("qbread: apipe_read_cond failed");
 	return bs.b;
@@ -1048,18 +1039,14 @@ long qbwrite(struct queue *q, struct block *b)
 	int n, dowakeup;
 
 	n = BLEN(b);
-I_AM_HERE;
 
 	if (q->bypass) {
-I_AM_HERE;
 		(*q->bypass) (q->arg, b);
 		return n;
 	}
 
-I_AM_HERE;
 	dowakeup = 0;
 	qlock(&q->wlock);
-I_AM_HERE;
 	if (waserror()) {
 		if (b != NULL)
 			freeb(b);
@@ -1067,17 +1054,14 @@ I_AM_HERE;
 		nexterror();
 	}
 
-I_AM_HERE;
 	ilock(&q->lock);
 
-I_AM_HERE;
 	/* give up if the queue is closed */
 	if (q->state & Qclosed) {
 		iunlock(&q->lock);
 		error(q->err);
 	}
 
-I_AM_HERE;
 	/* if nonblocking, don't queue over the limit */
 	if (q->len >= q->limit) {
 		if (q->noblock) {
@@ -1090,16 +1074,13 @@ I_AM_HERE;
 		}
 	}
 
-I_AM_HERE;
 	/* queue the block */
-	apipe_write(&q->pipe, b, 1);
-I_AM_HERE;
+	apipe_write(&q->pipe, &b, 1);
 	q->len += BALLOC(b);
 	q->dlen += n;
 	QDEBUG checkb(b, "qbwrite");
 	b = NULL;
 
-I_AM_HERE;
 	/* make sure other end gets awakened */
 	if (q->state & Qstarve) {
 		q->state &= ~Qstarve;
@@ -1108,16 +1089,13 @@ I_AM_HERE;
 	}
 	iunlock(&q->lock);
 
-I_AM_HERE;
 	/*  get output going again */
 	if (q->kick && (dowakeup || (q->state & Qkick)))
 		q->kick(q->arg);
 
-I_AM_HERE;
 	/* wakeup anyone consuming at the other end */
 	if (dowakeup) ;	//wakeup(&q->rr);
 
-I_AM_HERE;
 	/*
 	 *  flow control, wait for queue to get below the limit
 	 *  before allowing the process to continue and queue
@@ -1142,10 +1120,8 @@ I_AM_HERE;
 		 */
 	}
 
-I_AM_HERE;
 	qunlock(&q->wlock);
 	poperror();
-I_AM_HERE;
 	return n;
 }
 
@@ -1221,7 +1197,7 @@ int qiwrite(struct queue *q, void *vp, int len)
 		}
 
 		QDEBUG checkb(b, "qiwrite");
-		apipe_write(&q->pipe, b, 1);
+		apipe_write(&q->pipe, &b, 1);
 		q->len += BALLOC(b);
 		q->dlen += n;
 

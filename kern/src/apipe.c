@@ -85,27 +85,20 @@ int apipe_read_locked(struct atomic_pipe *ap, void *buf, size_t nr_elem)
 {
 	size_t rd_idx;
 	int nr_copied = 0;
-I_AM_HERE;
 	for (int i = 0; i < nr_elem; i++) {
-printk("buf %p ap %p ne_elem %d\n", buf, ap, nr_elem);
-printk("ab buf %p\n", ap->ap_buf);
 		/* power of 2 elements in the ring buffer, index is the lower n bits */
 		rd_idx = ap->ap_rd_off & (ap->ap_ring_sz - 1);
-printk("memcpy %p %p %d\n", buf, ap->ap_buf + rd_idx * ap->ap_elem_sz, ap->ap_elem_sz);
 		memcpy(buf, ap->ap_buf + rd_idx * ap->ap_elem_sz, ap->ap_elem_sz);
 		ap->ap_rd_off++;
 		buf += ap->ap_elem_sz;
 		nr_copied++;
-printk("nr_copid %d\n", nr_copied);
 		if (__ring_empty(ap->ap_wr_off, ap->ap_rd_off))
 			break;
 	}
-I_AM_HERE;
 	/* We could have multiple writers blocked.  Just broadcast for them all.
 	 * Alternatively, we could signal one, and then it's on the writers to
 	 * signal further writers (see the note at the top of this file). */
 	__cv_broadcast(&ap->ap_writers);
-I_AM_HERE;
 	return nr_copied;
 }
 
@@ -194,16 +187,13 @@ int apipe_read_cond(struct atomic_pipe *ap,
 {
 	size_t rd_idx;
 	int ret;
-printk("ap %p\n", ap);
 	spin_lock(&ap->ap_lock);
 	/* Can only have one priority reader at a time.  Wait our turn. */
 	while (ap->ap_has_priority_reader) {
-I_AM_HERE;
 		cv_wait(&ap->ap_general_readers);
 		cpu_relax();
 	}
 	ap->ap_has_priority_reader = TRUE;
-I_AM_HERE;
 	while (1) {
 		/* Each time there is a need to check the pipe, call
 		 * f. f will maintain its state in arg. It is expected that f
@@ -214,7 +204,6 @@ I_AM_HERE;
 		 * with legacy code. F is supposed to call apipe_read_locked().
 		 */
 		ret = f(ap, arg);
-printk("f returns %d\n", ret);
 		if (ret)
 			break;
 		/* if nr_writers goes to zero, that's bad.  return -1 because they're
@@ -225,12 +214,10 @@ printk("f returns %d\n", ret);
 			ret = -1;
 			goto out;
 		}
-printk("wait on %p\n", &ap->ap_priority_reader);
 		cv_wait(&ap->ap_priority_reader);
 		cpu_relax();
 	}
 out:
-I_AM_HERE;
 	/* All out paths need to wake other readers.  When we were woken up, there
 	 * was no broadcast sent to the other readers.  Plus, there may be other
 	 * potential priority readers. */
