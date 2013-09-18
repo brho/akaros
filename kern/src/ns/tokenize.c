@@ -4,6 +4,7 @@
  */
 
 #include <string.h>
+#include <kdebug.h>
 static char qsep[] = " \t\r\n";
 
 int sep(char *s)

@@ -49,3 +49,46 @@ uintptr_t get_symbol_addr(char *sym)
 	}
 	return 0;
 }
+
+static const char *blacklist[] = {
+	"addnode",
+	"addqueue",
+	"allocroute",
+	"balancetree",
+	"calcd",
+	"freeroute",
+	"genrandom",	/* not noisy, just never returns */
+	"rangecompare",
+	"walkadd",
+};
+
+static bool is_blacklisted(const char *s)
+{
+	for (int i = 0; i < ARRAY_SIZE(blacklist); i++) {
+		if (!strcmp(blacklist[i], s))
+			return TRUE;
+	}
+	return FALSE;
+}
+
+static int tab_depth = 0;
+
+void __print_func_entry(const char *func, const char *file)
+{
+	if (is_blacklisted(func))
+		return;
+	for (int i = 0; i < tab_depth; i++)
+		printk("\t");
+	printk("%s() in %s\n", func, file);
+	tab_depth++;
+}
+
+void __print_func_exit(const char *func, const char *file)
+{
+	if (is_blacklisted(func))
+		return;
+	tab_depth--;
+	for (int i = 0; i < tab_depth; i++)
+		printk("\t");
+	printk("---- %s()\n", func);
+}

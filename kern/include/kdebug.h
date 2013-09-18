@@ -22,4 +22,10 @@ char *get_fn_name(uintptr_t pc);
 /* Returns the address of sym, or 0 if it does not exist */
 uintptr_t get_symbol_addr(char *sym);
 
+/* For a poor-mans function tracer (can add these with spatch) */
+void __print_func_entry(const char *func, const char *file);
+void __print_func_exit(const char *func, const char *file);
+#define print_func_entry() __print_func_entry(__FUNCTION__, __FILE__)
+#define print_func_exit() __print_func_exit(__FUNCTION__, __FILE__)
+
 #endif /* ROS_KERN_KDEBUG_H */
