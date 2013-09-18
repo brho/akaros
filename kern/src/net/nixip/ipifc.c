@@ -106,8 +106,10 @@ static char *ipifcbind(struct conv *c, char **argv, int argc)
 	struct ipifc *ifc;
 	struct medium *medium;
 
-	if (argc < 2)
+	if (argc < 2){
+		printk("ipifcbind: too few args (need 2)\n");
 		return Ebadarg;
+	}
 
 	ifc = (struct ipifc *)c->ptcl;
 
