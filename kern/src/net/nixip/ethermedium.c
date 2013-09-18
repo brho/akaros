@@ -27,8 +27,8 @@ static uint8_t ipbroadcast[IPaddrlen] = {
 
 static uint8_t etherbroadcast[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
-static void etherread4(void *a);
-static void etherread6(void *a);
+static void etherread4(uint32_t core, long a0, long a1, long a2);
+static void etherread6(uint32_t core, long a0, long a1, long a2);
 static void etherbind(struct ipifc *ifc, int argc, char **argv);
 static void etherunbind(struct ipifc *ifc);
 static void etherbwrite(struct ipifc *ifc, struct block *bp, int version,
@@ -40,7 +40,7 @@ static struct block *multicastarp(struct fs *f, struct arpent *a,
 static void sendarp(struct ipifc *ifc, struct arpent *a);
 static void sendgarp(struct ipifc *ifc, uint8_t * unused_uint8_p_t);
 static int multicastea(uint8_t * ea, uint8_t * ip);
-static void recvarpproc(void *);
+static void recvarpproc(uint32_t core, long a0, long a1, long a2);
 static void resolveaddr6(struct ipifc *ifc, struct arpent *a);
 static void etherpref2addr(uint8_t * pref, uint8_t * ea);
 
@@ -227,11 +227,12 @@ static void etherbind(struct ipifc *ifc, int argc, char **argv)
 	kfree(buf);
 	poperror();
 
-	/*
-	   kproc("etherread4", etherread4, ifc);
-	   kproc("recvarpproc", recvarpproc, ifc);
-	   kproc("etherread6", etherread6, ifc);
-	 */
+	send_kernel_message(core_id(), etherread4, (long)ifc, 0, 0,
+			     KMSG_ROUTINE);
+	send_kernel_message(core_id(), recvarpproc, (long)ifc, 0, 0,
+			     KMSG_ROUTINE);
+	send_kernel_message(core_id(), etherread6, (long)ifc, 0, 0,
+			     KMSG_ROUTINE);
 }
 
 /*
@@ -329,14 +330,14 @@ etherbwrite(struct ipifc *ifc, struct block *bp, int version, uint8_t * ip)
 /*
  *  process to read from the ethernet
  */
-static void etherread4(void *a)
+static void etherread4(uint32_t core, long a0, long a1, long a2)
 {
 	ERRSTACK(2);
 	struct ipifc *ifc;
 	struct block *bp;
 	Etherrock *er;
 
-	ifc = a;
+	ifc = (void *)a0;
 	er = ifc->arg;
 	er->read4p = current;	/* hide identity under a rock for unbind */
 	if (waserror()) {
@@ -367,14 +368,14 @@ static void etherread4(void *a)
 /*
  *  process to read from the ethernet, IPv6
  */
-static void etherread6(void *a)
+static void etherread6(uint32_t core, long a0, long a1, long a2)
 {
 	ERRSTACK(2);
 	struct ipifc *ifc;
 	struct block *bp;
 	Etherrock *er;
 
-	ifc = a;
+	ifc = (void *)a0;
 	er = ifc->arg;
 	er->read6p = current;	/* hide identity under a rock for unbind */
 	if (waserror()) {
@@ -668,10 +669,10 @@ static void recvarp(struct ipifc *ifc)
 	freeb(ebp);
 }
 
-static void recvarpproc(void *v)
+static void recvarpproc(uint32_t core, long a0, long a1, long a2)
 {
 	ERRSTACK(2);
-	struct ipifc *ifc = v;
+	struct ipifc *ifc = (void *)a0;
 	Etherrock *er = ifc->arg;
 
 	er->arpp = current;
