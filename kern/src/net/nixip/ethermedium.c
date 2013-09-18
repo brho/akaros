@@ -675,7 +675,7 @@ static void recvarp(struct ipifc *ifc)
 
 static void recvarpproc(uint32_t core, long a0, long a1, long a2)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct ipifc *ifc = (void *)a0;
 	Etherrock *er = ifc->arg;
 

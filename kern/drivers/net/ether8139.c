@@ -19,7 +19,7 @@
 
 #include <etherif.h>
 
-#define BREAK if (0)
+#define BREAK if (1)
 
 enum {							/* registers */
 	Idr0 = 0x0000,				/* MAC address */
@@ -561,7 +561,6 @@ static void rtl8139receive(struct ether *edev)
 	int l, length, status;
 
 I_AM_HERE;
-return;
 	ctlr = edev->ctlr;
 
 	/*
@@ -781,7 +780,22 @@ static int rtl8139pnp(struct ether *edev)
 		device_id = pcidev->dev_id;
 		/* Find the IRQ */
 		irq = pcidev->irqline;
-		register_interrupt_handler(interrupt_handlers, irq, rtl8139interrupt, edev);
+printk("TAKE %d for interrupt\n", irq);
+		register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET+irq, rtl8139interrupt, edev);
+#ifdef CONFIG_ENABLE_MPTABLES
+		NO;
+		/* TODO: this should be for any IOAPIC EOI, not just MPTABLES */
+		ioapic_route_irq(irq, xxxE1000_IRQ_CPU);	
+		printk("ioapic rout\n");
+		
+#else 
+		// This will route the interrupts automatically to CORE 0
+		// Call send_kernel_message if you want to route them somewhere else
+		pic_unmask_irq(irq);
+		unmask_lapic_lvt(LAPIC_LVT_LINT0);
+		enable_irq();
+		printk("picroute\n");
+#endif
 
 		printd("-->IRQ: %u\n", irq);
 		/* Loop over the BARs */
