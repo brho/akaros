@@ -1092,7 +1092,6 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 			return n;
 		case Qndb:
 			return ndbwrite(f, a, offset, n);
-			break;
 		case Qctl:
 			x = f->p[PROTO(ch->qid)];
 			c = x->conv[CONV(ch->qid)];

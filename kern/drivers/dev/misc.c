@@ -245,7 +245,6 @@ consread(struct chan *c, void *buf, long n, int64_t off)
 			return readstr(offset, buf, n, tmp);
 #endif
 			return 0;
-			break;
 		default:
 			printd("consread %#llux\n", c->qid.path);
 			error(Egreg);
