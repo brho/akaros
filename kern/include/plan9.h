@@ -222,7 +222,7 @@ struct dirtab {
 };
 
 struct errbuf {
-	struct jmpbuf jmp_buf;
+	struct jmpbuf jmpbuf;
 };
 
 struct dev {
@@ -481,14 +481,18 @@ extern char Ebadip[];			/* bad ip address syntax */
 extern char Edirseek[];			/* seek in directory */
 
 /* add 1 in case they forget they need an entry for the passed-in errbuf */
-#define ERRSTACK(x) struct errbuf errstack[(x)+1]; int curindex = 0;
-#define waserror() (errpush(errstack, ARRAY_SIZE(errstack), &curindex) ||      \
-                    setjmp(&(get_cur_errbuf()->jmp_buf)))
-#define error(x,...) {set_errstr(x, ##__VA_ARGS__); longjmp(&get_cur_errbuf()->jmp_buf,           \
-                                         (void *)x);}
-#define nexterror() {errpop(errstack, ARRAY_SIZE(errstack), &curindex);        \
-                     longjmp(&(get_cur_errbuf())->jmp_buf, (void *)1);}
-#define poperror() {errpop(errstack, ARRAY_SIZE(errstack), &curindex);}
+#define ERRSTACK(x) struct errbuf *prev_errbuf; struct errbuf errstack[(x)];   \
+                    int curindex = 0;
+#define waserror() (errpush(errstack, ARRAY_SIZE(errstack), &curindex,         \
+                            &prev_errbuf) ||                                   \
+                    setjmp(&(get_cur_errbuf()->jmpbuf)))
+#define error(x,...) {set_errstr(x, ##__VA_ARGS__);                            \
+                      longjmp(&get_cur_errbuf()->jmpbuf, (void *)x);}
+#define nexterror() {errpop(errstack, ARRAY_SIZE(errstack), &curindex,         \
+                            prev_errbuf);                                      \
+                     longjmp(&(get_cur_errbuf())->jmpbuf, (void *)1);}
+#define poperror() {errpop(errstack, ARRAY_SIZE(errstack), &curindex,          \
+                           prev_errbuf);}
 
 /* this would be useful at some point ... */
 static inline uintptr_t getcallerpc(void *unused)
@@ -606,8 +610,10 @@ int readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
 			int size);
 
 /* ker/src/err.c */
-int errpush(struct errbuf *errstack, int stacksize, int *curindex);
-void errpop(struct errbuf *errstack, int stacksize,int *curindex);
+int errpush(struct errbuf *errstack, int stacksize, int *curindex,
+            struct errbuf **prev_errbuf);
+void errpop(struct errbuf *errstack, int stacksize, int *curindex,
+            struct errbuf *prev_errbuf);
 /* kern/src/qio.c */
 void ixsummary(void);
 void freeblist(struct block *b);

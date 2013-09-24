@@ -1956,7 +1956,7 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 	//printd("before syscall errstack base %p\n", get_cur_errbuf());
 	ret = syscall_table[sc_num].call(p, a0, a1, a2, a3, a4, a5);
 	//printd("after syscall errstack base %p\n", get_cur_errbuf());
-	if (get_cur_errbuf() != &errstack[1]) {
+	if (get_cur_errbuf() != &errstack[0]) {
 		coreid = core_id();
 		vcoreid = proc_get_vcoreid(p);
 		printk("[%16llu] Syscall %3d (%12s):(%p, %p, %p, %p, "
