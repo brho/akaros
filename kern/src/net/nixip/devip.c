@@ -1259,12 +1259,18 @@ retry:
 			c = kzmalloc(sizeof(struct conv), 0);
 			if (c == NULL)
 				error(Enomem);
+			/* We will always get this lock, since we just alloc'd c.  Remember,
+			 * we can't sleep in here. */
 			qlock(&c->qlock);
 			c->p = p;
 			c->x = pp - p->conv;
 			if (p->ptclsize != 0) {
 				c->ptcl = kzmalloc(p->ptclsize, 0);
 				if (c->ptcl == NULL) {
+					/* Technically, no one knows about this, so the old code
+					 * didn't bother unlocking - just freeing.  But that could
+					 * break lock checkers and other reuses of the structure. */
+					qunlock(&c->qlock);
 					kfree(c);
 					error(Enomem);
 				}
@@ -1286,6 +1292,9 @@ retry:
 			qunlock(&c->qlock);
 		}
 	}
+	/* if we're here, and we broke from the loop, then we hold the qlock
+	 * this next check is for when we didn't break, and naturally left the foor
+	 * loop (where we don't hold it). */
 	if (pp >= ep) {
 		if (p->gc)
 			printd("Fsprotoclone: garbage collecting Convs\n");

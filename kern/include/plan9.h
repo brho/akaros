@@ -14,16 +14,17 @@
 /* no support for reader/writer locks yet. */
 typedef spinlock_t rwlock_t;
 #define rlock(x) spin_lock(x)
-#define canrlock(x)  (! spin_locked(x))
+#define canrlock(x) spin_trylock(x)
 #define runlock(x) spin_unlock(x)
 #define wlock(x) spin_lock(x)
 #define wunlock(x) spin_unlock(x)
 
 /* qlocks are somewhat special, so leave the calls the same for now. */
+/* TODO: replace these with semaphores */
 typedef spinlock_t qlock_t;
 #define qlock(x) spin_lock(x)
 #define qunlock(x) spin_unlock(x)
-#define canqlock(x)  (! spin_locked(x))
+#define canqlock(x) spin_trylock(x)
 
 /* ilock is a lock that occurs during interrupts. */
 #define ilock(x) spin_lock(x)
