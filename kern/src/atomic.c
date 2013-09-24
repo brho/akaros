@@ -42,6 +42,18 @@ static bool can_trace(spinlock_t *lock)
 	return TRUE;
 }
 
+/* spinlock and trylock call this after locking */
+static void post_lock(spinlock_t *lock, uint32_t coreid)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
+	if ((pcpui->__lock_checking_enabled == 1) && can_trace(lock))
+		pcpui_trace_locks(pcpui, lock);
+	lock->call_site = get_caller_pc();
+	lock->calling_core = coreid;
+	/* TODO consider merging this with __ctx_depth (unused field) */
+	increase_lock_depth(lock->calling_core);
+}
+
 void spin_lock(spinlock_t *lock)
 {
 	uint32_t coreid = core_id_early();
@@ -68,13 +80,19 @@ void spin_lock(spinlock_t *lock)
 	}
 lock:
 	__spin_lock(lock);
-	if (can_trace(lock))
-		pcpui_trace_locks(pcpui, lock);
-	lock->call_site = get_caller_pc();
-	lock->calling_core = coreid;
-	/* TODO consider merging this with __ctx_depth (unused field) */
-	increase_lock_depth(lock->calling_core);
 	/* Memory barriers are handled by the particular arches */
+	post_lock(lock, coreid);
+}
+
+/* Trylock doesn't check for irq/noirq, in case we want to try and lock a
+ * non-irqsave lock from irq context. */
+bool spin_trylock(spinlock_t *lock)
+{
+	uint32_t coreid = core_id_early();
+	bool ret = __spin_trylock(lock);
+	if (ret)
+		post_lock(lock, coreid);
+	return ret;
 }
 
 void spin_unlock(spinlock_t *lock)

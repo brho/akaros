@@ -147,6 +147,13 @@ static inline void __spin_lock(spinlock_t *lock)
 	__spin_lock_raw(&lock->rlock);
 }
 
+static inline bool __spin_trylock(spinlock_t *lock)
+{
+	/* since this is an or, we're not going to clobber the top bytes (if that
+	 * matters) */
+	return __sync_fetch_and_or(&lock->rlock, 1);
+}
+
 static inline void __spin_unlock(spinlock_t *lock)
 {
 	/* Need to prevent the compiler from reordering older stores. */

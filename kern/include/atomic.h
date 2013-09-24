@@ -70,6 +70,7 @@ extern inline void __spin_unlock(spinlock_t *lock);
 #ifdef CONFIG_SPINLOCK_DEBUG
 /* Arch indep, in k/s/atomic.c */
 void spin_lock(spinlock_t *lock);
+bool spin_trylock(spinlock_t *lock);
 void spin_unlock(spinlock_t *lock);
 void spinlock_debug(spinlock_t *lock);
 
@@ -78,6 +79,11 @@ void spinlock_debug(spinlock_t *lock);
 static inline void spin_lock(spinlock_t *lock)
 {
 	__spin_lock(lock);
+}
+
+bool spin_trylock(spinlock_t *lock)
+{
+	return __spin_trylock(lock);
 }
 
 static inline void spin_unlock(spinlock_t *lock)
