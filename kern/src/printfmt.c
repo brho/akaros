@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <kthread.h>
 
 /* Print a number (base <= 16) in reverse order,
  * using specified putch function and associated pointer putdat. */
@@ -237,6 +238,7 @@ void printfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...)
 	va_start(ap, fmt);
 	vprintfmt(putch, putdat, fmt, ap);
 	va_end(ap);
+	check_poison("printfmt");
 }
 
 typedef struct sprintbuf {
@@ -287,7 +289,6 @@ int snprintf(char *buf, int n, const char *fmt, ...)
 	rc = vsnprintf(buf, n, fmt, ap);
 	va_end(ap);
 
+	check_poison("snprintf");
 	return rc;
 }
-
-
