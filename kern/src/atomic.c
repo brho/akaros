@@ -26,6 +26,22 @@ static void decrease_lock_depth(uint32_t coreid)
 }
 
 #ifdef CONFIG_SPINLOCK_DEBUG
+
+/* Put locks you want to ignore here. */
+static uintptr_t blacklist_locks[] = {
+	//0xffffffffc03bd000,
+};
+
+/* Could do this on the output side, though noisly locks will crowd us out */
+static bool can_trace(spinlock_t *lock)
+{
+	for (int i = 0; i < ARRAY_SIZE(blacklist_locks); i++) {
+		if (blacklist_locks[i] == (uintptr_t)lock)
+			return FALSE;
+	}
+	return TRUE;
+}
+
 void spin_lock(spinlock_t *lock)
 {
 	uint32_t coreid = core_id_early();
@@ -50,9 +66,10 @@ void spin_lock(spinlock_t *lock)
 			pcpui->__lock_checking_enabled++;
 		}
 	}
-	pcpui_trace_locks(pcpui, lock);
 lock:
 	__spin_lock(lock);
+	if (can_trace(lock))
+		pcpui_trace_locks(pcpui, lock);
 	lock->call_site = get_caller_pc();
 	lock->calling_core = coreid;
 	/* TODO consider merging this with __ctx_depth (unused field) */
@@ -64,6 +81,7 @@ void spin_unlock(spinlock_t *lock)
 {
 	decrease_lock_depth(lock->calling_core);
 	/* Memory barriers are handled by the particular arches */
+	assert(spin_locked(lock));
 	__spin_unlock(lock);
 }
 
@@ -77,8 +95,9 @@ void spinlock_debug(spinlock_t *lock)
 		return;
 	}
 	func_name = get_fn_name(pc);
-	printk("Lock %p: last locked at [<%p>] in %s on core %d\n", lock, pc,
-	       func_name, lock->calling_core);
+	printk("Lock %p: currently %slocked.  Last locked at [<%p>] in %s on "
+	       "core %d\n", lock, spin_locked(lock) ? "" : "un", pc, func_name,
+	       lock->calling_core);
 	kfree(func_name);
 }
 
