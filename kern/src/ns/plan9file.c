@@ -283,14 +283,18 @@ static long unionread(struct chan *c, void *va, long n)
 	nr = 0;
 	while (mount != NULL) {
 		/* Error causes component of union to be skipped */
-		if (mount->to && !waserror()) {
-			if (c->umc == NULL) {
-				c->umc = cclone(mount->to);
-				c->umc = c->umc->dev->open(c->umc, OREAD);
-			}
+		if (mount->to) {
+			/* Careful, this is a NOT waserror(), we're discarding any errors */
+			if (!waserror()) {
+				if (c->umc == NULL) {
+					c->umc = cclone(mount->to);
+					c->umc = c->umc->dev->open(c->umc, OREAD);
+				}
 
-			nr = c->umc->dev->read(c->umc, va, n, c->umc->offset);
-			c->umc->offset += nr;
+				nr = c->umc->dev->read(c->umc, va, n, c->umc->offset);
+				c->umc->offset += nr;
+			}
+			poperror();
 		}
 		if (nr > 0)
 			break;
@@ -305,7 +309,6 @@ static long unionread(struct chan *c, void *va, long n)
 	}
 	runlock(&mh->lock);
 	spin_unlock(&c->umqlock);
-	poperror();
 	return nr;
 }
 
