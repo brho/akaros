@@ -287,7 +287,6 @@ struct file {
 	spinlock_t lock;
 	/* Plan 9 support. Whether it is plan 9 is a property of the file. */
 	int plan9;
-
 };
 
 struct file_operations {

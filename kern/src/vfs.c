@@ -1916,6 +1916,12 @@ struct file *alloc_file(void)
 		set_errno(ENOMEM);
 		return 0;
 	}
+	/* The VFS doesn't know about the plan9 flag, so users of alloc_file might
+	 * not know to 0 this flag.  And if they don't, the file might get sent to
+	 * the 9ns code.  Note that the slab allocator doesn't 0 things (if we
+	 * wanted that, we could use a constructor! (p.s., those haven't been tested
+	 * in a long time...)). */
+	file->plan9 = 0;
 	/* one for the ref passed out*/
 	kref_init(&file->f_kref, file_release, 1);
 	return file;
@@ -1981,9 +1987,10 @@ void file_release(struct kref *kref)
 	struct file *file = container_of(kref, struct file, f_kref);
 
 	if (file->plan9) {
-		if (file->plan9 != 0xcafebeef)
+		if (file->plan9 != 0xcafebeef) {
 			printk("corruption. file->plan9 is 0x%x, expected 0xcafebeef\n",
 				file->plan9);
+		}
 		file->plan9 = 0;
 		kmem_cache_free(file_kcache, file);
 		return;
