@@ -12,6 +12,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <ip.h>
+#include <kthread.h>
 
 /* to avoid all this inclusion of the universe. */
 extern uint8_t v4prefix[IPaddrlen];
@@ -354,6 +355,7 @@ void printfmt(void (*putch) (int, void **), void **putdat, const char *fmt, ...)
 	va_start(ap, fmt);
 	vprintfmt(putch, putdat, fmt, ap);
 	va_end(ap);
+	check_poison("printfmt");
 }
 
 typedef struct sprintbuf {
@@ -405,6 +407,7 @@ int snprintf(char *buf, int n, const char *fmt, ...)
 	rc = vsnprintf(buf, n, fmt, ap);
 	va_end(ap);
 
+	check_poison("snprintf");
 	return rc;
 }
 
@@ -421,6 +424,7 @@ char *seprintf(char *buf, char *end, const char *fmt, ...)
 	va_start(ap, fmt);
 	rc = vsnprintf(buf, n, fmt, ap);
 	va_end(ap);
+	check_poison("seprintf");
 
 	if (rc >= 0)
 		return buf + rc;

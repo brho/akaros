@@ -109,7 +109,11 @@ netifgen(struct chan *c, char *unused, struct dirtab *vp, int iunused, int i,
 					return 0;
 				q.type = QTDIR;
 				q.path = NETQID(i, N3rdqid);
-				snprintf(current->genbuf, sizeof current->genbuf, "%d", i);
+				/* Want to do this printf, but it runs off the stack... */
+				//snprintf(current->genbuf, sizeof current->genbuf, "%d", i);
+				assert(i <= 9);
+				current->genbuf[0] = '0' + i;
+				current->genbuf[1] = 0;
 				devdir(c, q, current->genbuf, 0, eve, DMDIR | 0555, dp);
 				break;
 		}
