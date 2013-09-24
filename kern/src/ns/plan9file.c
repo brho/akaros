@@ -266,7 +266,7 @@ struct chan *fdtochan(int fd, int mode, int chkmnt, int iref)
 
 static long unionread(struct chan *c, void *va, long n)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int i;
 	long nr;
 	struct mhead *mh;
@@ -498,7 +498,7 @@ static void mountrewind(struct chan *c)
 static long
 mountfix(struct chan *c, uint8_t * op, long n, long maxn)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	char *name;
 	int nbuf;
 	struct chan *nc;
@@ -590,7 +590,7 @@ Norewrite:
 extern struct dev procdevtab, rootdevtab;
 long sysread(int fd, void *p, size_t n, off_t off)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	uint8_t *ep = p;
 	long nn, nnn;
 	struct chan *c;
@@ -691,7 +691,7 @@ long sysread(int fd, void *p, size_t n, off_t off)
 
 long syswrite(int fd, void *p, size_t n, off_t off)
 {
-	ERRSTACK(3);
+	ERRSTACK(1);
 
 	int ispwrite = 1;
 	long r = n;
@@ -748,7 +748,7 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 
 int syscreate(char *name, int omode)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct chan *c = NULL;
 	int fd;
 	/* if it exists, it is truncated. 
@@ -778,7 +778,7 @@ int syscreate(char *name, int omode)
 
 int sysopen(char *name, int omode)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct chan *c = NULL;
 	int fd;
 	int mustdir = 0;
@@ -823,7 +823,7 @@ int sysclose(int fd)
 
 int sysstat(char *name, uint8_t * statbuf, int len)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int r;
 	struct chan *c = NULL;
 	char *aname;
@@ -860,7 +860,7 @@ int sysstat(char *name, uint8_t * statbuf, int len)
 
 int sysfstat(int fd, uint8_t * statbuf, int len)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int r;
 	struct chan *c = NULL;
 	uint8_t data[sizeof(struct dir)];
@@ -890,7 +890,7 @@ int sysfstat(int fd, uint8_t * statbuf, int len)
 
 int sysdup(int ofd, int nfd)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct chan *nc, *oc;
 	struct fgrp *f;
 
@@ -1013,7 +1013,7 @@ bindmount(int ismount,
 	  int flag,
 	  char* spec)
 {
-	ERRSTACK(10);// it's complicated.
+	ERRSTACK(3);	/* it's still complicated. */
 	int i;
 	struct dev *dev;
 	struct chan *c0, *c1, *ac, *bc;
@@ -1159,6 +1159,7 @@ sysunmount(char *name, char *old)
 	cclose(cmount);
 	if(cmounted != NULL)
 		cclose(cmounted);
+	poperror();
 	poperror();
 	return 0;
 }
