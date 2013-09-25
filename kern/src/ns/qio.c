@@ -1001,8 +1001,10 @@ struct block *qbread(struct queue *q, int len)
 	bs.want = len;
 	bs.blockcount = 1;
 	bs.q = q;
+	printk("QBREAD, trying for %d, pid = %d\n", len, current->pid);
 	if (apipe_read_cond(&q->pipe, readcond, &bs) < 0)
 		error("qbread: apipe_read_cond failed");
+	printk("QBREAD, returning %d\n", bs.count);
 	return bs.b;
 }
 
@@ -1043,6 +1045,7 @@ long qbwrite(struct queue *q, struct block *b)
 
 	n = BLEN(b);
 
+	printk("QBWRITE, pushing %d?\n", n);
 	if (q->bypass) {
 		(*q->bypass) (q->arg, b);
 		return n;
