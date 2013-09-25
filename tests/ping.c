@@ -14,6 +14,7 @@ enum {
 
 	SECOND		= 1000000000ULL,
 	MINUTE		= 60*SECOND,
+	BUFSIZE		= 64*1024+512,
 };
 
 typedef struct Req Req;
@@ -256,7 +257,7 @@ sender(int fd, int msglen, int interval, int n)
 {
 	int i, extra;
 	uint16_t seq;
-	char buf[64*1024+512];
+	char *buf = malloc(BUFSIZE);
 	uint8_t me[IPaddrlen], mev4[IPv4addrlen];
 	struct icmphdr *icmp;
 	Req *r;
@@ -320,14 +321,14 @@ rcvr(int fd, int msglen, int interval, int nmsg)
 	int i, n, munged;
 	uint16_t x;
 	int64_t now;
-	uint8_t buf[64*1024+512];
+	uint8_t *buf = malloc(BUFSIZE);
 	struct icmphdr *icmp;
 	Req *r;
 
 	sum = 0;
 	while(lostmsgs+rcvdmsgs < nmsg){
 		//alarm((nmsg-lostmsgs-rcvdmsgs)*interval+waittime);
-		n = read(fd, buf, sizeof buf);
+		n = read(fd, buf, BUFSIZE);
 printf("GOT ONE! %d bytes\n", n);
 		if (n < 0){
 			perror("read");
@@ -514,6 +515,7 @@ main(int argc, char **argv)
 {
 	int fd, msglen, interval, nmsg;
 	char *ds;
+	int pid;
 
 	nsec();		/* make sure time file is already open */
 
@@ -606,7 +608,8 @@ main(int argc, char **argv)
 		printf("sending %d %d byte messages %d ms apart to %s\n",
 			nmsg, msglen, interval, ds);
 
-	switch(fork()) { //rfork(RFPROC|RFMEM|RFFDG)){
+	pid = fork();
+	switch(pid) { //rfork(RFPROC|RFMEM|RFFDG)){
 	case -1:
 		fprintf(stderr, "%s: can't fork: %r\n", argv0);
 		/* fallthrough */
@@ -616,10 +619,8 @@ main(int argc, char **argv)
 		exit(0);
 	default:
 		sender(fd, msglen, interval, nmsg);
-		printf("NOT WAITING -- CAN'T\n");
+		wait();
 		exit(1);
-		//wait();
-		//exit(1);
 	}
 }
 
