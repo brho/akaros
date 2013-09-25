@@ -81,7 +81,7 @@ static inline void spin_lock(spinlock_t *lock)
 	__spin_lock(lock);
 }
 
-bool spin_trylock(spinlock_t *lock)
+static inline bool spin_trylock(spinlock_t *lock)
 {
 	return __spin_trylock(lock);
 }
