@@ -725,7 +725,7 @@ struct queue *qopen(int limit,
 	q->state |= Qstarve;
 	q->eof = 0;
 	q->noblock = 0;
-	buf = kzmalloc(limit, KMALLOC_WAIT);
+	buf = kzmalloc(limit * elsize, KMALLOC_WAIT);
 	apipe_init(&q->pipe, buf, limit, elsize);
 
 	return q;
