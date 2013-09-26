@@ -39,6 +39,7 @@
 #include <ucq.h>
 #include <setjmp.h>
 #include <apipe.h>
+#include <rwlock.h>
 
 #define l1 (available_caches.l1)
 #define l2 (available_caches.l2)
@@ -1445,10 +1446,10 @@ void test_abort_halt(void)
 }
 
 /* Funcs and global vars for test_cv() */
-struct cond_var local_cv;
-atomic_t counter;
-struct cond_var *cv = &local_cv;
-volatile bool state = FALSE;		/* for test 3 */
+static struct cond_var local_cv;
+static atomic_t counter;
+static struct cond_var *cv = &local_cv;
+static volatile bool state = FALSE;		/* for test 3 */
 
 void __test_cv_signal(uint32_t srcid, long a0, long a1, long a2)
 {
@@ -1714,4 +1715,56 @@ void test_apipe(void)
 	/* We could be on core 1 now.  If we were called from core0, our caller
 	 * might expect us to return while being on core 0 (like if we were kfunc'd
 	 * from the monitor.  Be careful if you copy this code. */
+}
+
+static struct rwlock rwlock, *rwl = &rwlock;
+static atomic_t rwlock_counter;
+void test_rwlock(void)
+{
+	bool ret;
+	rwinit(rwl);
+	/* Basic: can i lock twice, recursively? */
+	rlock(rwl);
+	ret = canrlock(rwl);
+	assert(ret);
+	runlock(rwl);
+	runlock(rwl);
+	/* Other simply tests */
+	wlock(rwl);
+	wunlock(rwl);
+
+	/* Just some half-assed different operations */
+	void __test_rwlock(uint32_t srcid, long a0, long a1, long a2)
+	{
+		int rand = read_tsc() & 0xff;
+		for (int i = 0; i < 10000; i++) {
+			switch ((rand * i) % 5) {
+				case 0:
+				case 1:
+					rlock(rwl);
+					runlock(rwl);
+					break;
+				case 2:
+				case 3:
+					if (canrlock(rwl))
+						runlock(rwl);
+					break;
+				case 4:
+					wlock(rwl);
+					wunlock(rwl);
+					break;
+			}
+		}
+		/* signal to allow core 0 to finish */
+		atomic_dec(&rwlock_counter);
+	}
+		
+	/* send 4 messages to each non core 0 */
+	atomic_init(&rwlock_counter, (num_cpus - 1) * 4);
+	for (int i = 1; i < num_cpus; i++)
+		for (int j = 0; j < 4; j++)
+			send_kernel_message(i, __test_rwlock, 0, 0, 0, KMSG_ROUTINE);
+	while (atomic_read(&rwlock_counter))
+		cpu_relax();
+	printk("rwlock test complete\n");
 }

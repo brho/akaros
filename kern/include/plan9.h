@@ -6,18 +6,11 @@
 #include <setjmp.h>
 #include <atomic.h>
 #include <apipe.h>
+#include <rwlock.h>
 
 /* The lock issue is still undecided. For now, we preserve the lock type
  * and plan to revisit the issue when it makes sense.
  */
-
-/* no support for reader/writer locks yet. */
-typedef spinlock_t rwlock_t;
-#define rlock(x) spin_lock(x)
-#define canrlock(x) spin_trylock(x)
-#define runlock(x) spin_unlock(x)
-#define wlock(x) spin_lock(x)
-#define wunlock(x) spin_unlock(x)
 
 /* qlocks are somewhat special, so leave the calls the same for now. */
 /* TODO: replace these with semaphores */
@@ -290,7 +283,7 @@ struct mount {
 
 struct mhead {
 	struct kref ref;
-	spinlock_t lock;
+	rwlock_t lock;
 	struct chan *from;			/* channel mounted upon */
 	struct mount *mount;		/* what's mounted upon it */
 	struct mhead *hash;			/* Hash chain */

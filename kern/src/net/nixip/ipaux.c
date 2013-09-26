@@ -274,10 +274,10 @@ void iphtadd(struct Ipht *ht, struct conv *c)
 	}
 	h->c = c;
 
-	spin_lock(&ht->rwlock);
+	spin_lock(&ht->lock);
 	h->next = ht->tab[hv];
 	ht->tab[hv] = h;
-	spin_unlock(&ht->rwlock);
+	spin_unlock(&ht->lock);
 }
 
 void iphtrem(struct Ipht *ht, struct conv *c)
@@ -286,7 +286,7 @@ void iphtrem(struct Ipht *ht, struct conv *c)
 	struct iphash **l, *h;
 
 	hv = iphash(c->raddr, c->rport, c->laddr, c->lport);
-	spin_lock(&ht->rwlock);
+	spin_lock(&ht->lock);
 	for (l = &ht->tab[hv]; (*l) != NULL; l = &(*l)->next)
 		if ((*l)->c == c) {
 			h = *l;
@@ -294,7 +294,7 @@ void iphtrem(struct Ipht *ht, struct conv *c)
 			kfree(h);
 			break;
 		}
-	spin_unlock(&ht->rwlock);
+	spin_unlock(&ht->lock);
 }
 
 /* look for a matching conversation with the following precedence
@@ -313,14 +313,14 @@ struct conv *iphtlook(struct Ipht *ht, uint8_t * sa, uint16_t sp, uint8_t * da,
 
 	/* exact 4 pair match (connection) */
 	hv = iphash(sa, sp, da, dp);
-	spin_lock(&ht->rwlock);
+	spin_lock(&ht->lock);
 	for (h = ht->tab[hv]; h != NULL; h = h->next) {
 		if (h->match != IPmatchexact)
 			continue;
 		c = h->c;
 		if (sp == c->rport && dp == c->lport
 			&& ipcmp(sa, c->raddr) == 0 && ipcmp(da, c->laddr) == 0) {
-			spin_unlock(&ht->rwlock);
+			spin_unlock(&ht->lock);
 			return c;
 		}
 	}
@@ -332,7 +332,7 @@ struct conv *iphtlook(struct Ipht *ht, uint8_t * sa, uint16_t sp, uint8_t * da,
 			continue;
 		c = h->c;
 		if (dp == c->lport && ipcmp(da, c->laddr) == 0) {
-			spin_unlock(&ht->rwlock);
+			spin_unlock(&ht->lock);
 			return c;
 		}
 	}
@@ -344,7 +344,7 @@ struct conv *iphtlook(struct Ipht *ht, uint8_t * sa, uint16_t sp, uint8_t * da,
 			continue;
 		c = h->c;
 		if (dp == c->lport) {
-			spin_unlock(&ht->rwlock);
+			spin_unlock(&ht->lock);
 			return c;
 		}
 	}
@@ -356,7 +356,7 @@ struct conv *iphtlook(struct Ipht *ht, uint8_t * sa, uint16_t sp, uint8_t * da,
 			continue;
 		c = h->c;
 		if (ipcmp(da, c->laddr) == 0) {
-			spin_unlock(&ht->rwlock);
+			spin_unlock(&ht->lock);
 			return c;
 		}
 	}
@@ -367,9 +367,9 @@ struct conv *iphtlook(struct Ipht *ht, uint8_t * sa, uint16_t sp, uint8_t * da,
 		if (h->match != IPmatchany)
 			continue;
 		c = h->c;
-		spin_unlock(&ht->rwlock);
+		spin_unlock(&ht->lock);
 		return c;
 	}
-	spin_unlock(&ht->rwlock);
+	spin_unlock(&ht->lock);
 	return NULL;
 }
