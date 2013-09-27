@@ -932,6 +932,7 @@ struct blockstatus {
 	int blockcount;
 	int count;
 	int want;
+	int nonblock;
 	struct block *b, *last;
 	struct queue *q;
 };
@@ -979,9 +980,11 @@ int readcond(struct atomic_pipe *p, void *v)
 			break;
 	}
 
-	if ((bs->blockcount && blockcount) || (bs->count/* >= bs->want*/)){
+	if ((bs->nonblock) || (bs->blockcount && blockcount) || (bs->count/* >= bs->want*/)){
 		return 1;
 	}
+	if (blockcount && (bs->q->state & Qmsg))
+		return 1;
 	return 0;
 }
 
@@ -1001,10 +1004,8 @@ struct block *qbread(struct queue *q, int len)
 	bs.want = len;
 	bs.blockcount = 1;
 	bs.q = q;
-	printk("QBREAD, trying for %d, pid = %d\n", len, current->pid);
 	if (apipe_read_cond(&q->pipe, readcond, &bs) < 0)
 		error("qbread: apipe_read_cond failed");
-	printk("QBREAD, returning %d\n", bs.count);
 	return bs.b;
 }
 
@@ -1020,6 +1021,7 @@ long qread(struct queue *q, void *vp, int len)
 	memset(&bs, 0, sizeof(bs));
 	bs.want = len;
 	bs.q = q;
+	bs.nonblock = 1;
 	bs.blockcount = 1;
 	if (apipe_read_cond(&q->pipe, readcond, &bs) < 0)
 		error("qbread: apipe_read_cond failed");

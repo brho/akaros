@@ -179,7 +179,7 @@ clean(uint16_t seq, int64_t now, void *v)
 	last = NULL;
 	for(l = &first; *l; ){
 		r = *l;
-
+printf("r->seq %d seq %d\n", r->seq, seq);
 		if(v && r->seq == seq){
 			r->rtt = now-r->time;
 			r->ttl = ttl;
@@ -329,7 +329,8 @@ rcvr(int fd, int msglen, int interval, int nmsg)
 	while(lostmsgs+rcvdmsgs < nmsg){
 		//alarm((nmsg-lostmsgs-rcvdmsgs)*interval+waittime);
 		n = read(fd, buf, BUFSIZE);
-printf("GOT ONE! %d bytes\n", n);
+printf("GOT ONE! %d bytes lostmsgs %d rcvdmsgs %d nmsg %d\n", n, lostmsgs, rcvdmsgs, nmsg);
+if (n <= 0) exit(1);
 		if (n < 0){
 			perror("read");
 			exit(1);
@@ -358,6 +359,7 @@ printf("GOT ONE! %d bytes\n", n);
 				proto->echoreply, 0, x);
 			continue;
 		}
+printf("GOOD!\n");
 		clean(x, now, buf);
 	}
 
