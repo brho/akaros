@@ -1048,7 +1048,6 @@ long qbwrite(struct queue *q, struct block *b)
 
 	n = BLEN(b);
 
-	printk("QBWRITE, pushing %d?\n", n);
 	if (q->bypass) {
 		(*q->bypass) (q->arg, b);
 		return n;

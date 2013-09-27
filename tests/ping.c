@@ -177,19 +177,16 @@ clean(uint16_t seq, int64_t now, void *v)
 	}
 	lock(&listlock);
 	last = NULL;
-printf("check the list\n");
 	for(l = &first; *l; ){
-printf("clean: check %p\n", l);
 		r = *l;
-printf("----> r->seq %d seq %d\n", r->seq, seq);
 		if(v && r->seq == seq){
-printf("HEY! got!\n");
 			r->rtt = now-r->time;
 			r->ttl = ttl;
 			reply(r, v);
 		}
 
-		if(now-r->time > MINUTE){
+/* skip this. We don't have time yet. */
+		if(0 && now-r->time > MINUTE){
 			*l = r->next;
 			r->rtt = now-r->time;
 			if(v)
@@ -334,8 +331,7 @@ rcvr(int fd, int msglen, int interval, int nmsg)
 	while(lostmsgs+rcvdmsgs < nmsg){
 		//alarm((nmsg-lostmsgs-rcvdmsgs)*interval+waittime);
 		n = read(fd, buf, BUFSIZE);
-printf("GOT ONE! %d bytes lostmsgs %d rcvdmsgs %d nmsg %d\n", n, lostmsgs, rcvdmsgs, nmsg);
-if (n <= 0) exit(1);
+
 		if (n < 0){
 			perror("read");
 			exit(1);
@@ -364,7 +360,6 @@ if (n <= 0) exit(1);
 				proto->echoreply, 0, x);
 			continue;
 		}
-printf("GOOD!\n");
 		clean(x, now, buf);
 	}
 
