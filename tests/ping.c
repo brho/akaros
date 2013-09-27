@@ -177,10 +177,13 @@ clean(uint16_t seq, int64_t now, void *v)
 	}
 	lock(&listlock);
 	last = NULL;
+printf("check the list\n");
 	for(l = &first; *l; ){
+printf("clean: check %p\n", l);
 		r = *l;
-printf("r->seq %d seq %d\n", r->seq, seq);
+printf("----> r->seq %d seq %d\n", r->seq, seq);
 		if(v && r->seq == seq){
+printf("HEY! got!\n");
 			r->rtt = now-r->time;
 			r->ttl = ttl;
 			reply(r, v);
@@ -291,8 +294,10 @@ sender(int fd, int msglen, int interval, int n)
 			sleep(interval + extra);
 		}
 		r = calloc(sizeof *r, 1);
-		if (r == NULL)
-			continue;
+		if (r == NULL){
+			printf("out of memory? \n");
+			break;
+		}
 		hnputs(icmp->seq, seq);
 		r->seq = seq;
 		r->next = NULL;
@@ -610,7 +615,8 @@ main(int argc, char **argv)
 		printf("sending %d %d byte messages %d ms apart to %s\n",
 			nmsg, msglen, interval, ds);
 
-	pid = fork();
+#warning "No shared memory fork; running sender and receiver serially"
+	pid = -1; // no RFMEM; no shared memory. Have to run serially.fork();
 	switch(pid) { //rfork(RFPROC|RFMEM|RFFDG)){
 	case -1:
 		fprintf(stderr, "%s: can't fork: %r\n", argv0);
