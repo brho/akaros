@@ -107,7 +107,7 @@ prlost4(uint16_t seq, void *v)
 {
 	struct ip4hdr *ip4 = v;
 
-	printf("lost %ud: %V -> %V\n", seq, ip4->src, ip4->dst);
+	printf("lost %u: %V -> %V\n", seq, ip4->src, ip4->dst);
 }
 
 static void
@@ -115,7 +115,7 @@ prlost6(uint16_t seq, void *v)
 {
 	struct ip6hdr *ip6 = v;
 
-	printf("lost %ud: %I -> %I\n", seq, ip6->src, ip6->dst);
+	printf("lost %u: %I -> %I\n", seq, ip6->src, ip6->dst);
 }
 
 static void
@@ -123,7 +123,7 @@ prreply4(Req *r, void *v)
 {
 	struct ip4hdr *ip4 = v;
 
-	printf("%ud: %V -> %V rtt %lld µs, avg rtt %lld µs, ttl = %d\n",
+	printf("%u: %V -> %V rtt %lld µs, avg rtt %lld µs, ttl = %d\n",
 		r->seq - firstseq, ip4->src, ip4->dst, r->rtt, sum/rcvdmsgs,
 		r->ttl);
 }
@@ -133,7 +133,7 @@ prreply6(Req *r, void *v)
 {
 	struct ip6hdr *ip6 = v;
 
-	printf("%ud: %I -> %I rtt %lld µs, avg rtt %lld µs, ttl = %d\n",
+	printf("%u: %I -> %I rtt %lld µs, avg rtt %lld µs, ttl = %d\n",
 		r->seq - firstseq, ip6->src, ip6->dst, r->rtt, sum/rcvdmsgs,
 		r->ttl);
 }
@@ -612,7 +612,9 @@ main(int argc, char **argv)
 	switch(pid) { //rfork(RFPROC|RFMEM|RFFDG)){
 	case -1:
 		fprintf(stderr, "%s: can't fork: %r\n", argv0);
-		/* fallthrough */
+		sender(fd, msglen, interval, nmsg);
+		rcvr(fd, msglen, interval, nmsg);
+		exit(0);
 	case 0:
 		rcvr(fd, msglen, interval, nmsg);
 		printf(lostmsgs ? "lost messages" : "");
@@ -647,6 +649,6 @@ lost(Req *r, void *v)
 		if(addresses && v != NULL)
 			(*proto->prlost)(r->seq - firstseq, v);
 		else
-			printf("lost %ud\n", r->seq - firstseq);
+			printf("lost %u\n", r->seq - firstseq);
 	lostmsgs++;
 }

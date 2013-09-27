@@ -1020,6 +1020,7 @@ long qread(struct queue *q, void *vp, int len)
 	memset(&bs, 0, sizeof(bs));
 	bs.want = len;
 	bs.q = q;
+	bs.blockcount = 1;
 	if (apipe_read_cond(&q->pipe, readcond, &bs) < 0)
 		error("qbread: apipe_read_cond failed");
 	bl2mem(vp, bs.b, &len);
