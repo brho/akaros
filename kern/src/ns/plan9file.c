@@ -243,7 +243,7 @@ struct chan *fdtochan(int fd, int mode, int chkmnt, int iref)
 	if (chkmnt && (c->flag & CMSG)) {
 		if (iref)
 			cclose(c);
-		error(Ebadusefd);
+		error("MSG channel&chkmnt set");
 	}
 
 	if (mode < 0 || c->mode == ORDWR)
@@ -252,14 +252,18 @@ struct chan *fdtochan(int fd, int mode, int chkmnt, int iref)
 	if ((mode & OTRUNC) && c->mode == OREAD) {
 		if (iref)
 			cclose(c);
-		error(Ebadusefd);
+		error("mode&OTRUNC and mode==REAED");
 	}
 
+#if 0
+/* seems not to match akaros.
 	if ((mode & ~OTRUNC) != c->mode) {
 		if (iref)
 			cclose(c);
 		error(Ebadusefd);
 	}
+ */
+#endif
 
 	return c;
 }
