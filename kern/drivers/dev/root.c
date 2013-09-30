@@ -15,10 +15,12 @@
 enum
 {
 	Qdir = 0,
-	Qboot = 0x1000,
+	Qbin = 0x1000,
+	Qlib = 0x2000,
 
 	Nrootfiles = 32,
-	Nbootfiles = 32,
+	Nbinfiles = 256,
+	Nlibfiles = 256,
 };
 
 struct dirlist
@@ -32,7 +34,8 @@ struct dirlist
 
 static struct dirtab rootdir[Nrootfiles] = {
 	{"#/",	{Qdir, 0, QTDIR},	0,		DMDIR|0555},
-	{"boot",	{Qboot, 0, QTDIR},	0,		DMDIR|0555},
+	{"bin",	{Qbin, 0, QTDIR},	0,		DMDIR|0555},
+	{"lib",	{Qlib, 0, QTDIR},	0,		DMDIR|0555},
 };
 static uint8_t *rootdata[Nrootfiles];
 static struct dirlist rootlist =
@@ -40,21 +43,34 @@ static struct dirlist rootlist =
 	0,
 	rootdir,
 	rootdata,
-	2,
+	3,
 	Nrootfiles
 };
 
-static struct dirtab bootdir[Nbootfiles] = {
-	{"boot",	{Qboot, 0, QTDIR},	0,		DMDIR|0555},
+static struct dirtab bindir[Nbinfiles] = {
+	{"bin",	{Qbin, 0, QTDIR},	0,		DMDIR|0555},
 };
-static uint8_t *bootdata[Nbootfiles];
-static struct dirlist bootlist =
+static uint8_t *bindata[Nbinfiles];
+static struct dirlist binlist =
 {
-	Qboot,
-	bootdir,
-	bootdata,
+	Qbin,
+	bindir,
+	bindata,
 	1,
-	Nbootfiles
+	Nbinfiles
+};
+
+static struct dirtab libdir[Nlibfiles] = {
+	{"lib",	{Qlib, 0, QTDIR},	0,		DMDIR|0555},
+};
+static uint8_t *libdata[Nlibfiles];
+static struct dirlist liblist =
+{
+	Qlib,
+	libdir,
+	libdata,
+	1,
+	Nlibfiles
 };
 
 /*
@@ -80,12 +96,12 @@ addlist(struct dirlist *l, char *name, uint8_t *contents, uint32_t len, int perm
 }
 
 /*
- *  add a root file
+ *  add a file
  */
 void
-addbootfile(char *name, uint8_t *contents, uint32_t len)
+addfile(struct dirlist *d, char *name, uint8_t *contents, uint32_t len)
 {
-	addlist(&bootlist, name, contents, len, 0555);
+	addlist(d, name, contents, len, 0555);
 }
 
 /*
@@ -100,7 +116,6 @@ addrootdir(char *name)
 static void
 rootreset(void)
 {
-	addrootdir("bin");
 	addrootdir("dev");
 	addrootdir("env");
 	addrootdir("fd");
@@ -110,6 +125,8 @@ rootreset(void)
 	addrootdir("proc");
 	addrootdir("root");
 	addrootdir("srv");
+	addfile(&binlist, "hi", "this is bin", strlen("this is bin"));
+	addfile(&liblist, "hilib", "this is lib", strlen("this is lib"));
 }
 
 static struct chan*
@@ -132,28 +149,40 @@ rootgen(struct chan *c, char *name, struct dirtab*unused_d, int unused_i, int s,
 			return 1;
 		}
 		return devgen(c, name, rootlist.dir, rootlist.ndir, s, dp);
-	case Qboot:
+	case Qbin:
 		if(s == DEVDOTDOT){
 			devdir(c, (struct qid){Qdir, 0, QTDIR}, "#/", 0, eve, 0555, dp);
 			return 1;
 		}
-		return devgen(c, name, bootlist.dir, bootlist.ndir, s, dp);
+		return devgen(c, name, binlist.dir, liblist.ndir, s, dp);
+	case Qlib:
+		if(s == DEVDOTDOT){
+			devdir(c, (struct qid){Qlib, 0, QTDIR}, "#/", 0, eve, 0555, dp);
+			return 1;
+		}
+		return devgen(c, name, liblist.dir, liblist.ndir, s, dp);
 	default:
 		if(s == DEVDOTDOT){
-			if((int)c->qid.path < Qboot)
+			if((int)c->qid.path < Qbin)
+				devdir(c, (struct qid){Qdir, 0, QTDIR}, "#/", 0, eve, 0555, dp);
+			else if((int)c->qid.path < Qlib)
 				devdir(c, (struct qid){Qdir, 0, QTDIR}, "#/", 0, eve, 0555, dp);
 			else
-				devdir(c, (struct qid){Qboot, 0, QTDIR}, "#/", 0, eve, 0555, dp);
+				devdir(c, (struct qid){Qlib, 0, QTDIR}, "#/", 0, eve, 0555, dp);
 			return 1;
 		}
 		if(s != 0)
 			return -1;
-		if((int)c->qid.path < Qboot){
+		if((int)c->qid.path < Qbin){
 			t = c->qid.path-1;
 			l = &rootlist;
-		}else{
-			t = c->qid.path - Qboot - 1;
-			l = &bootlist;
+		}else if((int)c->qid.path < Qlib){
+			t = c->qid.path - Qbin - 1;
+			l = &binlist;
+		
+		}else {
+			t = c->qid.path - Qlib - 1;
+			l = &liblist;
 		}
 		if(t >= l->ndir)
 			return -1;
@@ -206,15 +235,20 @@ rootread(struct chan *c, void *buf, long n, int64_t off)
 	t = c->qid.path;
 	switch(t){
 	case Qdir:
-	case Qboot:
+	case Qbin:
+	case Qlib:
 		return devdirread(c, buf, n, NULL, 0, rootgen);
 	}
 
-	if(t<Qboot)
+	if(t<Qbin)
 		l = &rootlist;
+	else if (t<Qlib){
+		t -= Qbin;
+		l = &binlist;
+	}
 	else{
-		t -= Qboot;
-		l = &bootlist;
+		t -= Qlib;
+		l = &liblist;
 	}
 
 	t--;
