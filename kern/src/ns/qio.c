@@ -365,8 +365,6 @@ struct block *qget(struct queue *q)
 	}
 
 	b = qremove(q);
-	q->len -= BALLOC(b);
-	q->dlen -= BLEN(b);
 	QDEBUG checkb(b, "qget");
 
 	/* if writer flow controlled, restart */
