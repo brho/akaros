@@ -150,21 +150,26 @@ rootgen(struct chan *c, char *name, struct dirtab*unused_d, int unused_i, int s,
 	/* for directories, set c->aux to devlist, for later use in create() */
 	switch((int)c->qid.path){
 	case Qdir:
-		if(s == DEVDOTDOT)
+		if(s == DEVDOTDOT) {
 			devdir(c, (struct qid){Qdir, 0, QTDIR}, "#/", 0, eve, 0555, dp);
 			return 1;
+		}
 		return devgen(c, name, rootlist.dir, rootlist.ndir, s, dp);
 	case Qbin:
-		if(s == DEVDOTDOT)
+		if(s == DEVDOTDOT) {
 			devdir(c, (struct qid){Qdir, 0, QTDIR}, "#/", 0, eve, 0555, dp);
 			return 1;
+		}
 		return devgen(c, name, binlist.dir, liblist.ndir, s, dp);
 	case Qlib:
-		if(s == DEVDOTDOT)
+		if(s == DEVDOTDOT) {
 			devdir(c, (struct qid){Qlib, 0, QTDIR}, "#/", 0, eve, 0555, dp);
+			return 1;
+		}
 		return devgen(c, name, liblist.dir, liblist.ndir, s, dp);
 	default:
 		if(s == DEVDOTDOT){
+			/* doing the same thing here in all cases... is that on purpose? */
 			if((int)c->qid.path < Qbin)
 				devdir(c, (struct qid){Qdir, 0, QTDIR}, "#/", 0, eve, 0555, dp);
 			else if((int)c->qid.path < Qlib)
@@ -188,10 +193,8 @@ rootgen(struct chan *c, char *name, struct dirtab*unused_d, int unused_i, int s,
 		}
 		if(t >= l->ndir)
 			return -1;
-if(t < 0){
-printd("rootgen %#llux %d %d\n", c->qid.path, s, t);
-panic("whoops");
-}
+		/* Old panic of Ron's */
+		assert(t >= 0);
 		d = &l->dir[t];
 		devdir(c, d->qid, d->name, d->length, eve, d->perm, dp);
 		return 1;
@@ -203,8 +206,8 @@ rootwalk(struct chan *c, struct chan *nc, char **name, int nname)
 {
 	struct walkqid * ret;
 	ret = devwalk(c,  nc, name, nname, NULL, 0, rootgen);
-printk("rootwalk c %p c->aux %p binlist %p\n",
- c, c ? c->aux : NULL, &binlist);
+	printd("rootwalk c %p c->aux %p binlist %p\n", c, c ? c->aux : NULL,
+	       &binlist);
 	return ret;
 }
 
