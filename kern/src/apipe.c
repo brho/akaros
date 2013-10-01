@@ -87,14 +87,16 @@ int apipe_read_locked(struct atomic_pipe *ap, void *buf, size_t nr_elem)
 	int nr_copied = 0;
 
 	for (int i = 0; i < nr_elem; i++) {
+		/* readers that call read_locked directly might have failed to check for
+		 * emptiness, so we'll double check early. */
+		if (__ring_empty(ap->ap_wr_off, ap->ap_rd_off))
+			break;
 		/* power of 2 elements in the ring buffer, index is the lower n bits */
 		rd_idx = ap->ap_rd_off & (ap->ap_ring_sz - 1);
 		memcpy(buf, ap->ap_buf + rd_idx * ap->ap_elem_sz, ap->ap_elem_sz);
 		ap->ap_rd_off++;
 		buf += ap->ap_elem_sz;
 		nr_copied++;
-		if (__ring_empty(ap->ap_wr_off, ap->ap_rd_off))
-			break;
 	}
 	/* We could have multiple writers blocked.  Just broadcast for them all.
 	 * Alternatively, we could signal one, and then it's on the writers to
