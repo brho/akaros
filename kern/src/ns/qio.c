@@ -1266,6 +1266,7 @@ void qclose(struct queue *q)
 void qfree(struct queue *q)
 {
 	qclose(q);
+	kfree(q->pipe.ap_buf);
 	kfree(q);
 }
 
