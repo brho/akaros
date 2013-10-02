@@ -160,7 +160,7 @@ rootgen(struct chan *c, char *name, struct dirtab *unused_d, int unused_i,
 				       dp);
 				return 1;
 			}
-			return devgen(c, name, binlist.dir, liblist.ndir, s, dp);
+			return devgen(c, name, binlist.dir, binlist.ndir, s, dp);
 		case Qlib:
 			if (s == DEVDOTDOT) {
 				devdir(c, (struct qid){Qlib, 0, QTDIR}, "#/", 0, eve, 0555,
