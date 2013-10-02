@@ -818,6 +818,7 @@ printk("TAKE %d for interrupt\n", irq);
 				printd("-->BAR%u: %s --> %x\n", k, "MEM", result);
 			}
 		}
+		p = pcidev;
 		break;
 	}
 	if (!device_id){
