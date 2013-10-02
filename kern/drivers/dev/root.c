@@ -94,6 +94,7 @@ addlist(struct dirlist *l, char *name, uint8_t * contents, uint32_t len,
 	if (perm & DMDIR) {
 		d->qid.type |= QTDIR;
 	}
+	printd("Added %s, path %d\n", name, d->qid.path);
 	return d->qid.path;
 }
 
@@ -334,14 +335,16 @@ static long rootwrite(struct chan *c, void *v, long len, int64_t o)
 
 	d = &l->dir[t];
 	data = l->data[t];
+	if (o < 0)
+		o = d->length;
 	if ((o + len) > d->length) {
 		void *newdata = kmalloc(o + len, KMALLOC_WAIT);
 		l->data[t] = newdata;
-		memmove(newdata, v, d->length);
+		memmove(newdata, data, d->length);
 		kfree(data);
 		data = newdata;
 	}
-
+	printd("rootwrite @ %lld, %d bytes\n", o, len);
 	memmove(data + o, v, len);
 	d->length = o + len;
 
