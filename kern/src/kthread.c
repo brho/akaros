@@ -12,6 +12,33 @@
 #include <smp.h>
 #include <schedule.h>
 
+uintptr_t get_kstack(void)
+{
+	uintptr_t stackbot;
+	if (KSTKSIZE == PGSIZE)
+		stackbot = (uintptr_t)kpage_alloc_addr();
+	else
+		stackbot = (uintptr_t)get_cont_pages(KSTKSHIFT >> PGSHIFT, 0);
+	assert(stackbot);
+	return stackbot + KSTKSIZE;
+}
+
+void put_kstack(uintptr_t stacktop)
+{
+	uintptr_t stackbot = stacktop - KSTKSIZE;
+	if (KSTKSIZE == PGSIZE)
+		page_decref(kva2page((void*)stackbot));
+	else
+		free_cont_pages((void*)stackbot, KSTKSHIFT >> PGSHIFT);
+}
+
+uintptr_t *kstack_bottom_addr(uintptr_t stacktop)
+{
+	/* canary at the bottom of the stack */
+	assert(!PGOFF(stacktop));
+	return (uintptr_t*)(stacktop - KSTKSIZE);
+}
+
 struct kmem_cache *kthread_kcache;
 
 void kthread_init(void)
@@ -34,24 +61,19 @@ void restart_kthread(struct kthread *kthread)
 	 * free our current kthread *before* popping it, nor can we free the current
 	 * stack until we pop to the kthread's stack). */
 	if (pcpui->spare) {
-		/* assumes the stack is a page, and that stacktop is somewhere in
-		 * (pg_bottom, pg_bottom + PGSIZE].  Normally, it ought to be pg_bottom
-		 * + PGSIZE (on x86).  kva2page can take any kva, not just a page
-		 * aligned addr. */
-		page_decref(kva2page((void*)pcpui->spare->stacktop - 1));
+		put_kstack(pcpui->spare->stacktop);
 		kmem_cache_free(kthread_kcache, pcpui->spare);
 	}
 	current_stacktop = get_stack_top();
 	/* When a kthread runs, its stack is the default kernel stack */
 	set_stack_top(kthread->stacktop);
 #ifdef CONFIG_KTHREAD_POISON
-	/* TODO: KTHR-STACK */
 	/* Assert and switch to cur stack not in use, kthr stack in use */
 	uintptr_t *cur_stack_poison, *kth_stack_poison;
-	cur_stack_poison = (uintptr_t*)ROUNDDOWN(current_stacktop - 1, PGSIZE);
+	cur_stack_poison = kstack_bottom_addr(current_stacktop);
 	assert(*cur_stack_poison == 0xdeadbeef);
 	*cur_stack_poison = 0;
-	kth_stack_poison = (uintptr_t*)ROUNDDOWN(kthread->stacktop - 1, PGSIZE);
+	kth_stack_poison = kstack_bottom_addr(kthread->stacktop);
 	assert(!*kth_stack_poison);
 	*kth_stack_poison = 0xdeadbeef;
 #endif /* CONFIG_KTHREAD_POISON */
@@ -150,7 +172,7 @@ void kthread_yield(void)
 void check_poison(char *msg)
 {
 #ifdef CONFIG_KTHREAD_POISON
-	if (*(uintptr_t*)ROUNDDOWN(get_stack_top() - 1, PGSIZE) != 0xdeadbeef) {
+	if (*kstack_bottom_addr(get_stack_top()) != 0xdeadbeef) {
 		printk("\nBad kthread canary, msg: %s\n", msg);
 		panic("");
 	}
@@ -181,7 +203,6 @@ void sem_down(struct semaphore *sem)
 {
 	volatile bool blocking = TRUE;	/* signal to short circuit when restarting*/
 	struct kthread *kthread;
-	struct page *page;				/* assumption here that stacks are PGSIZE */
 	register uintptr_t new_stacktop;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
@@ -205,18 +226,16 @@ void sem_down(struct semaphore *sem)
 	 * concurrent modifications). */
 	if (pcpui->spare) {
 		kthread = pcpui->spare;
-		/* we're using the spare, so we use the page the spare held */
+		/* we're using the spare, so we use the stack the spare held */
 		new_stacktop = kthread->stacktop;
 		pcpui->spare = 0;
 	} else {
 		kthread = kmem_cache_alloc(kthread_kcache, 0);
 		assert(kthread);
-		assert(!kpage_alloc(&page));	/* decref'd when the kthread is freed */
+		new_stacktop = get_kstack();
 #ifdef CONFIG_KTHREAD_POISON
-		/* TODO: KTHR-STACK don't poison like this */
-		*(uintptr_t*)page2kva(page) = 0;
+		*kstack_bottom_addr(new_stacktop) = 0;
 #endif /* CONFIG_KTHREAD_POISON */
-		new_stacktop = (uintptr_t)page2kva(page) + PGSIZE;
 	}
 	/* This is the stacktop we are currently on and wish to save */
 	kthread->stacktop = get_stack_top();
@@ -224,12 +243,11 @@ void sem_down(struct semaphore *sem)
 	set_stack_top(new_stacktop);
 #ifdef CONFIG_KTHREAD_POISON
 	/* Mark the new stack as in-use, and unmark the current kthread */
-	/* TODO: KTHR-STACK don't poison like this */
 	uintptr_t *new_stack_poison, *kth_stack_poison;
-	new_stack_poison = (uintptr_t*)ROUNDDOWN(new_stacktop - 1, PGSIZE);
+	new_stack_poison = kstack_bottom_addr(new_stacktop);
 	assert(!*new_stack_poison);
 	*new_stack_poison = 0xdeadbeef;
-	kth_stack_poison = (uintptr_t*)ROUNDDOWN(kthread->stacktop - 1, PGSIZE);
+	kth_stack_poison = kstack_bottom_addr(kthread->stacktop);
 	assert(*kth_stack_poison == 0xdeadbeef);
 	*kth_stack_poison = 0;
 #endif /* CONFIG_KTHREAD_POISON */

@@ -85,6 +85,8 @@ uintptr_t get_stack_top(void)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	uintptr_t stacktop;
 	/* so we can check this in interrupt handlers (before smp_boot()) */
+	/* TODO: These are dangerous - it assumes we're on a one-page stack.  If we
+	 * change it to KSTKSIZE, then we assume stacks are KSTKSIZE-aligned */
 	if (!pcpui->tss)
 		return ROUNDUP(read_sp(), PGSIZE);
 	stacktop = x86_get_stacktop_tss(pcpui->tss);
@@ -136,10 +138,7 @@ void idt_init(void)
 	x86_sysenter_init((uintptr_t)bootstacktop);
 
 #ifdef CONFIG_KTHREAD_POISON
-	/* TODO: KTHR-STACK */
-	uintptr_t *poison = (uintptr_t*)ROUNDDOWN((uintptr_t)bootstacktop - 1,
-	                                          PGSIZE);
-	*poison = 0xdeadbeef;
+	*kstack_bottom_addr((uintptr_t)bootstacktop) = 0xdeadbeef;
 #endif /* CONFIG_KTHREAD_POISON */
 
 	/* Initialize the TSS field of the gdt.  The size of the TSS desc differs

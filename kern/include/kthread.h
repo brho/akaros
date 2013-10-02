@@ -58,6 +58,9 @@ struct semaphore_entry {
 	LIST_ENTRY(semaphore_entry) link;
 };
 
+uintptr_t get_kstack(void);
+void put_kstack(uintptr_t stacktop);
+uintptr_t *kstack_bottom_addr(uintptr_t stacktop);
 void kthread_init(void);
 void restart_kthread(struct kthread *kthread);
 void kthread_runnable(struct kthread *kthread);
