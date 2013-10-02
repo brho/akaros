@@ -236,11 +236,7 @@ uintptr_t smp_main(void)
 	hw_coreid_lookup[my_hw_id] = my_hw_id;
 
 	// Get a per-core kernel stack
-	page_t *my_stack;
-	if (kpage_alloc(&my_stack))
-		panic("Unable to alloc a per-core stack!");
-	memset(page2kva(my_stack), 0, PGSIZE);
-	uintptr_t my_stack_top = (uintptr_t)page2kva(my_stack) + PGSIZE;
+	uintptr_t my_stack_top = get_kstack();
 
 	/* This blob is the GDT, the GDT PD, and the TSS. */
 	unsigned int blob_size = sizeof(segdesc_t) * SEG_COUNT +
@@ -254,7 +250,7 @@ uintptr_t smp_main(void)
 	 * to smp_percpu_init(), but we can't trust our coreid (since they haven't
 	 * been remapped yet (so we can't write it directly to per_cpu_info)).  So
 	 * we use the bottom of the stack page... */
-	*(uintptr_t*)page2kva(my_stack) = (uintptr_t)gdt_etc;
+	*kstack_bottom_addr(my_stack_top) = (uintptr_t)gdt_etc;
 
 	// Build and load the gdt / gdt_pd
 	memcpy(my_gdt, gdt, sizeof(segdesc_t)*SEG_COUNT);
