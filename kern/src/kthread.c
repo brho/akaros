@@ -243,6 +243,13 @@ void sem_down(struct semaphore *sem)
 		new_kthread = pcpui->spare;
 		new_stacktop = new_kthread->stacktop;
 		pcpui->spare = 0;
+		/* Based on how we set is_ktask (in PRKM), we'll usually have a spare
+		 * with is_ktask set, even though the default setting is off.  The
+		 * reason is that the launching of blocked kthreads also uses PRKM, and
+		 * that KMSG (__launch_kthread) doesn't return.  Thus the soon-to-be
+		 * spare kthread, that is launching another, has is_ktask set. */
+		new_kthread->is_ktask = FALSE;
+		new_kthread->proc = 0;
 	} else {
 		new_kthread = __kthread_zalloc();
 		new_stacktop = get_kstack();
@@ -264,13 +271,20 @@ void sem_down(struct semaphore *sem)
 	assert(*kth_stack_poison == 0xdeadbeef);
 	*kth_stack_poison = 0;
 #endif /* CONFIG_KTHREAD_POISON */
-	/* The kthread needs to stay in the process context (if there is one), but
+	/* Kthreads that are ktasks are not related to any process, and do not need
+	 * to work in a process's address space.  They can operate in any address
+	 * space that has the kernel mapped (like boot_pgdir, or any pgdir).
+	 *
+	 * Other kthreads need to stay in the process context (if there is one), but
 	 * we want the core (which could be a vcore) to stay in the context too.  In
 	 * the future, we could check owning_proc. If it isn't set, we could leave
 	 * the process context and transfer the refcnt to kthread->proc. */
-	kthread->proc = current;
-	if (kthread->proc)
+	if (!kthread->is_ktask) {
+		kthread->proc = current;
 		proc_incref(kthread->proc, 1);
+	} else {
+		kthread->proc = 0;
+	} 
 	/* Save the context, toggle blocking for the reactivation */
 	save_kernel_ctx(&kthread->context);
 	if (!blocking)

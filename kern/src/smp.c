@@ -58,6 +58,7 @@ static void __attribute__((noinline, noreturn)) __smp_idle(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	clear_rkmsg(pcpui);
+	pcpui->cur_kthread->is_ktask = FALSE;
 	enable_irq();	/* one-shot change to get any IRQs before we halt later */
 	while (1) {
 		disable_irq();
