@@ -626,7 +626,11 @@ void __proc_run_m(struct proc *p)
  * in current. */
 void __proc_startcore(struct proc *p, struct user_context *ctx)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	assert(!irq_is_enabled());
+	/* Should never have ktask still set.  If we do, future syscalls could try
+	 * to block later and lose track of our address space. */
+	assert(!pcpui->cur_kthread->is_ktask);
 	__set_proc_current(p);
 	/* Clear the current_ctx, since it is no longer used */
 	current_ctx = 0;	/* TODO: might not need this... */

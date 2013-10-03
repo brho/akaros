@@ -33,6 +33,7 @@ struct kthread {
 	void						*errbuf;	/* TODO: avoiding include loops */
 	TAILQ_ENTRY(kthread)		link;
 	/* ID, other shit, etc */
+	bool						is_ktask;	/* default is FALSE */
 };
 
 /* Semaphore for kthreads to sleep on.  0 or less means you need to sleep */
