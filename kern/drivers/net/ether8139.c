@@ -19,8 +19,6 @@
 
 #include <etherif.h>
 
-#define BREAK if (1)
-
 enum {							/* registers */
 	Idr0 = 0x0000,				/* MAC address */
 	Mar0 = 0x0008,	/* Multicast address */
@@ -413,7 +411,6 @@ static void rtl8139init(struct ether *edev)
 	struct ctlr *ctlr;
 	uint8_t *alloc;
 
-I_AM_HERE;
 	ctlr = edev->ctlr;
 	ilock(&ctlr->ilock);
 
@@ -435,8 +432,6 @@ I_AM_HERE;
 	ctlr->rbstart = alloc;
 	alloc += ctlr->rblen + 16;
 	memset(ctlr->rbstart, 0, ctlr->rblen + 16);
-	printk("Setting rbstart %p phys %p into rbstart\n", ctlr->rbstart,
-	       (void *)PADDR(ctlr->rbstart));
 	csr32w(ctlr, Rbstart, PADDR(ctlr->rbstart));
 	ctlr->rcr = Rxfth256 | Rblen | Mrxdmaunlimited | Ab | Am | Apm;
 
@@ -473,14 +468,12 @@ I_AM_HERE;
 	csr32w(ctlr, Mpc, 0);
 
 	iunlock(&ctlr->ilock);
-I_AM_HERE;
 }
 
 static void rtl8139attach(struct ether *edev)
 {
 	struct ctlr *ctlr;
 
-I_AM_HERE;
 	if (edev == NULL) {
 		panic("rtl8139attach: NULL edev\n");
 		return;
@@ -503,7 +496,6 @@ I_AM_HERE;
 		//addclock0link(kickme, 7);
 	}
 	qunlock(&ctlr->alock);
-I_AM_HERE;
 }
 
 static void rtl8139txstart(struct ether *edev)
@@ -513,7 +505,6 @@ static void rtl8139txstart(struct ether *edev)
 	struct block *bp;
 	struct ctlr *ctlr;
 
-I_AM_HERE;
 	ctlr = edev->ctlr;
 	while (ctlr->ntd < Ntd) {
 		bp = qget(edev->netif.oq);
@@ -525,16 +516,14 @@ I_AM_HERE;
 		if (((uintptr_t) bp->rp) & 0x03) {
 			memmove(td->data, bp->rp, size);
 			freeb(bp);
-			BREAK csr32w(ctlr, td->tsad, PADDR(td->data));
+			csr32w(ctlr, td->tsad, PADDR(td->data));
 			ctlr->tunaligned++;
 		} else {
 			td->bp = bp;
-			BREAK csr32w(ctlr, td->tsad, PADDR(bp->rp));
+			csr32w(ctlr, td->tsad, PADDR(bp->rp));
 			ctlr->taligned++;
 		}
-I_AM_HERE;
-		BREAK csr32w(ctlr, td->tsd, (ctlr->etxth << EtxthSHIFT) | size);
-I_AM_HERE;
+		csr32w(ctlr, td->tsd, (ctlr->etxth << EtxthSHIFT) | size);
 
 		ctlr->ntd++;
 		ctlr->tdh = NEXT(ctlr->tdh, Ntd);
@@ -544,12 +533,10 @@ I_AM_HERE;
 static void rtl8139transmit(struct ether *edev)
 {
 	struct ctlr *ctlr;
-I_AM_HERE;
 	ctlr = edev->ctlr;
 	ilock(&ctlr->tlock);
 	rtl8139txstart(edev);
 	iunlock(&ctlr->tlock);
-I_AM_HERE;
 }
 
 static void rtl8139receive(struct ether *edev)
@@ -560,7 +547,6 @@ static void rtl8139receive(struct ether *edev)
 	uint8_t cr, *p;
 	int l, length, status;
 
-I_AM_HERE;
 	ctlr = edev->ctlr;
 
 	/*
@@ -644,10 +630,8 @@ static void rtl8139interrupt(struct hw_trapframe *hw_tf, void *arg)
 	struct ctlr *ctlr;
 	struct ether *edev;
 	int isr, msr, tsd;
-	printk("8139: interupt\n");
 	edev = arg;
 	ctlr = edev->ctlr;
-I_AM_HERE;
 	if (ctlr == NULL) {	/* not attached yet? (shouldn't happen) */
 		printd("rtl8139interrupt: interrupt for unattached struct ether %#p\n",
 			   edev);
@@ -763,6 +747,7 @@ static int rtl8139pnp(struct ether *edev)
 	struct ctlr *ctlr;
 	uint8_t ea[Eaddrlen];
 	uint32_t id = 0;
+	uint16_t port = 0;
 
 	struct pci_device *pcidev;
 	uint32_t result;
@@ -780,7 +765,6 @@ static int rtl8139pnp(struct ether *edev)
 		device_id = pcidev->dev_id;
 		/* Find the IRQ */
 		irq = pcidev->irqline;
-printk("TAKE %d for interrupt\n", irq);
 		register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET+irq, rtl8139interrupt, edev);
 #ifdef CONFIG_ENABLE_MPTABLES
 		NO;
@@ -809,6 +793,7 @@ printk("TAKE %d for interrupt\n", irq);
 
 			if (result == 0)	// (0 denotes no valid data)
 				continue;
+			if (k == 0) port = result & ~3;
 			// Read the bottom bit of the BAR. 
 			if (result & PCI_BAR_IO_MASK) {
 				result = result & PCI_IO_MASK;
@@ -830,6 +815,7 @@ printk("TAKE %d for interrupt\n", irq);
 		panic(Enomem);
 	ctlr->pci = p;
 	ctlr->id = id;
+	ctlr->port = port;
 
 	if (ctlrhead != NULL)
 		ctlrtail->next = ctlr;
