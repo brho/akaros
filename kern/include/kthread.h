@@ -1,4 +1,4 @@
-/* Copyright (c) 2010 The Regents of the University of California
+/* Copyright (c) 2010-13 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
@@ -62,6 +62,7 @@ uintptr_t get_kstack(void);
 void put_kstack(uintptr_t stacktop);
 uintptr_t *kstack_bottom_addr(uintptr_t stacktop);
 void kthread_init(void);
+struct kthread *__kthread_zalloc(void);
 void restart_kthread(struct kthread *kthread);
 void kthread_runnable(struct kthread *kthread);
 void kthread_yield(void);
