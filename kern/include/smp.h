@@ -39,6 +39,7 @@ struct per_cpu_info {
 	int __lock_checking_enabled;/* == 1, enables spinlock depth checking */
 	struct syscall *cur_sysc;	/* ptr is into cur_proc's address space */
 	void *cur_errbuf;			/* ptr to current err stack buffer */
+	struct kthread *cur_kthread;/* tracks the running kernel context */
 	struct kthread *spare;		/* useful when restarting */
 	struct timer_chain tchain;	/* for the per-core alarm */
 	unsigned int lock_depth;

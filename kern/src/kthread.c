@@ -1,4 +1,4 @@
-/* Copyright (c) 2010 The Regents of the University of California
+/* Copyright (c) 2010-13 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
@@ -47,6 +47,16 @@ void kthread_init(void)
 	                                   __alignof__(struct kthread), 0, 0, 0);
 }
 
+/* Used by early init routines (smp_boot, etc) */
+struct kthread *__kthread_zalloc(void)
+{
+	struct kthread *kthread;
+	kthread = kmem_cache_alloc(kthread_kcache, 0);
+	assert(kthread);
+	memset(kthread, 0, sizeof(struct kthread));
+	return kthread;
+}
+
 /* Starts kthread on the calling core.  This does not return, and will handle
  * the details of cleaning up whatever is currently running (freeing its stack,
  * etc).  Pairs with sem_down(). */
@@ -54,19 +64,25 @@ void restart_kthread(struct kthread *kthread)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	uintptr_t current_stacktop;
+	struct kthread *current_kthread;
 	/* Avoid messy complications.  The kthread will enable_irqsave() when it
 	 * comes back up. */
 	disable_irq();
-	/* Free any spare, since we need ours to become the spare (since we can't
-	 * free our current kthread *before* popping it, nor can we free the current
-	 * stack until we pop to the kthread's stack). */
+	/* Free any spare, since we need the current to become the spare.  Without
+	 * the spare, we can't free our current kthread/stack (we could free the
+	 * kthread, but not the stack, since we're still on it).  And we can't free
+	 * anything after popping kthread, since we never return. */
 	if (pcpui->spare) {
 		put_kstack(pcpui->spare->stacktop);
 		kmem_cache_free(kthread_kcache, pcpui->spare);
 	}
-	current_stacktop = get_stack_top();
+	current_kthread = pcpui->cur_kthread;
+	current_stacktop = current_kthread->stacktop;
+	/* Set the spare stuff (current kthread, which includes its stacktop) */
+	pcpui->spare = current_kthread;
 	/* When a kthread runs, its stack is the default kernel stack */
 	set_stack_top(kthread->stacktop);
+	pcpui->cur_kthread = kthread;
 #ifdef CONFIG_KTHREAD_POISON
 	/* Assert and switch to cur stack not in use, kthr stack in use */
 	uintptr_t *cur_stack_poison, *kth_stack_poison;
@@ -77,9 +93,6 @@ void restart_kthread(struct kthread *kthread)
 	assert(!*kth_stack_poison);
 	*kth_stack_poison = 0xdeadbeef;
 #endif /* CONFIG_KTHREAD_POISON */
-	/* Set the spare stuff (current kthread, current (not kthread) stacktop) */
-	pcpui->spare = kthread;
-	kthread->stacktop = current_stacktop;
 	/* Only change current if we need to (the kthread was in process context) */
 	if (kthread->proc) {
 		/* Load our page tables before potentially decreffing cur_proc */
@@ -172,7 +185,9 @@ void kthread_yield(void)
 void check_poison(char *msg)
 {
 #ifdef CONFIG_KTHREAD_POISON
-	if (*kstack_bottom_addr(get_stack_top()) != 0xdeadbeef) {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	assert(pcpui->cur_kthread && pcpui->cur_kthread->stacktop);
+	if (*kstack_bottom_addr(pcpui->cur_kthread->stacktop) != 0xdeadbeef) {
 		printk("\nBad kthread canary, msg: %s\n", msg);
 		panic("");
 	}
@@ -202,13 +217,14 @@ void sem_init_irqsave(struct semaphore *sem, int signals)
 void sem_down(struct semaphore *sem)
 {
 	volatile bool blocking = TRUE;	/* signal to short circuit when restarting*/
-	struct kthread *kthread;
+	struct kthread *kthread, *new_kthread;
 	register uintptr_t new_stacktop;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
 	assert(can_block(pcpui));
 	/* Make sure we aren't holding any locks (only works if SPINLOCK_DEBUG) */
 	assert(!pcpui->lock_depth);
+	assert(pcpui->cur_kthread);
 	/* Try to down the semaphore.  If there is a signal there, we can skip all
 	 * of the sleep prep and just return. */
 	spin_lock(&sem->lock);	/* no need for irqsave, since we disabled ints */
@@ -219,28 +235,28 @@ void sem_down(struct semaphore *sem)
 	}
 	spin_unlock(&sem->lock);
 	/* We're probably going to sleep, so get ready.  We'll check again later. */
-	/* Try to get the spare first.  If there is one, we'll use it (o/w, we'll
-	 * get a fresh kthread.  Why we need this is more clear when we try to
-	 * restart kthreads.  Having them also ought to cut down on contention.
+	kthread = pcpui->cur_kthread;
+	/* We need to have a spare slot for restart, so we also use it when
+	 * sleeping.  Right now, we need a new kthread to take over if/when our
+	 * current kthread sleeps.  Use the spare, and if not, get a new one.
+	 *
 	 * Note we do this with interrupts disabled (which protects us from
 	 * concurrent modifications). */
 	if (pcpui->spare) {
-		kthread = pcpui->spare;
-		/* we're using the spare, so we use the stack the spare held */
-		new_stacktop = kthread->stacktop;
+		new_kthread = pcpui->spare;
+		new_stacktop = new_kthread->stacktop;
 		pcpui->spare = 0;
 	} else {
-		kthread = kmem_cache_alloc(kthread_kcache, 0);
-		assert(kthread);
+		new_kthread = __kthread_zalloc();
 		new_stacktop = get_kstack();
+		new_kthread->stacktop = new_stacktop;
 #ifdef CONFIG_KTHREAD_POISON
 		*kstack_bottom_addr(new_stacktop) = 0;
 #endif /* CONFIG_KTHREAD_POISON */
 	}
-	/* This is the stacktop we are currently on and wish to save */
-	kthread->stacktop = get_stack_top();
-	/* Set the core's new default stack */
+	/* Set the core's new default stack and kthread */
 	set_stack_top(new_stacktop);
+	pcpui->cur_kthread = new_kthread;
 #ifdef CONFIG_KTHREAD_POISON
 	/* Mark the new stack as in-use, and unmark the current kthread */
 	uintptr_t *new_stack_poison, *kth_stack_poison;
@@ -302,13 +318,11 @@ unwind_sleep_prep:
 	if (kthread->proc)
 		proc_decref(kthread->proc);
 	set_stack_top(kthread->stacktop);
+	pcpui->cur_kthread = kthread;
 	/* Save the allocs as the spare */
 	assert(!pcpui->spare);
-	pcpui->spare = kthread;
-	/* save the "freshly alloc'd" stack/page, not the one we came in on */
-	kthread->stacktop = new_stacktop;
+	pcpui->spare = new_kthread;
 #ifdef CONFIG_KTHREAD_POISON
-	/* TODO: KTHR-STACK don't unpoison like this */
 	/* switch back to old stack in use, new one not */
 	*new_stack_poison = 0;
 	*kth_stack_poison = 0xdeadbeef;

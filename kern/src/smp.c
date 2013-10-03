@@ -90,10 +90,15 @@ void smp_percpu_init(void)
 	uint32_t coreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	void *trace_buf;
+	struct kthread *kthread;
 	/* Don't initialize __ctx_depth here, since it is already 1 (at least on
 	 * x86), since this runs in irq context. */
 	/* Do this first */
 	__arch_pcpu_init(coreid);
+	/* init our kthread (tracks our currently running context) */
+	kthread = __kthread_zalloc();
+	kthread->stacktop = get_stack_top();	/* assumes we're on the 1st page */
+	pcpui->cur_kthread = kthread;
 	per_cpu_info[coreid].spare = 0;
 	/* Init relevant lists */
 	spinlock_init_irqsave(&per_cpu_info[coreid].immed_amsg_lock);
@@ -103,9 +108,7 @@ void smp_percpu_init(void)
 	/* Initialize the per-core timer chain */
 	init_timer_chain(&per_cpu_info[coreid].tchain, set_pcpu_alarm_interrupt);
 #ifdef CONFIG_KTHREAD_POISON
-	/* TODO: KTHR-STACK */
-	uintptr_t *poison = (uintptr_t*)ROUNDDOWN(get_stack_top() - 1, PGSIZE);
-	*poison = 0xdeadbeef;
+	*kstack_bottom_addr(kthread->stacktop) = 0xdeadbeef;
 #endif /* CONFIG_KTHREAD_POISON */
 	/* Init generic tracing ring */
 	trace_buf = kpage_alloc_addr();
