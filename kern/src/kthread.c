@@ -78,6 +78,7 @@ void restart_kthread(struct kthread *kthread)
 	}
 	current_kthread = pcpui->cur_kthread;
 	current_stacktop = current_kthread->stacktop;
+	assert(!current_kthread->sysc);	/* catch bugs, prev user should clear */
 	/* Set the spare stuff (current kthread, which includes its stacktop) */
 	pcpui->spare = current_kthread;
 	/* When a kthread runs, its stack is the default kernel stack */
@@ -104,10 +105,6 @@ void restart_kthread(struct kthread *kthread)
 		/* We also transfer our counted ref from kthread->proc to cur_proc */
 		pcpui->cur_proc = kthread->proc;
 	}
-	/* Tell the core which syscall we are running (if any) */
-	assert(!pcpui->cur_sysc);	/* catch bugs, prev user should clear */
-	pcpui->cur_sysc = kthread->sysc;
-	pcpui->cur_errbuf = kthread->errbuf;
 	/* Finally, restart our thread */
 	pop_kernel_ctx(&kthread->context);
 }
@@ -272,11 +269,6 @@ void sem_down(struct semaphore *sem)
 	 * the future, we could check owning_proc. If it isn't set, we could leave
 	 * the process context and transfer the refcnt to kthread->proc. */
 	kthread->proc = current;
-	/* kthread tracks the syscall it is working on, which implies errno */
-	kthread->sysc = pcpui->cur_sysc;
-	kthread->errbuf = pcpui->cur_errbuf;
-	pcpui->cur_sysc = 0;				/* this core no longer works on sysc */
-	pcpui->cur_errbuf = 0;				/* this core no longer has an errbuf */
 	if (kthread->proc)
 		proc_incref(kthread->proc, 1);
 	/* Save the context, toggle blocking for the reactivation */

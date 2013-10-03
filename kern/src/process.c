@@ -690,7 +690,7 @@ void __proc_startcore(struct proc *p, struct user_context *ctx)
 void proc_restartcore(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	assert(!pcpui->cur_sysc);
+	assert(!pcpui->cur_kthread->sysc);
 	/* TODO: can probably remove this enable_irq.  it was an optimization for
 	 * RKMs */
 	/* Try and get any interrupts before we pop back to userspace.  If we didn't
@@ -1675,8 +1675,8 @@ void abandon_core(void)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* Syscalls that don't return will ultimately call abadon_core(), so we need
 	 * to make sure we don't think we are still working on a syscall. */
-	pcpui->cur_sysc = 0;
-	pcpui->cur_errbuf = 0;	/* just in case */
+	pcpui->cur_kthread->sysc = 0;
+	pcpui->cur_kthread->errbuf = 0;	/* just in case */
 	if (pcpui->cur_proc)
 		__abandon_core();
 }

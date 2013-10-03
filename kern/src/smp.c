@@ -35,7 +35,7 @@ static void try_run_proc(void)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* There was a process running here, and we should return to it. */
 	if (pcpui->owning_proc) {
-		assert(!pcpui->cur_sysc);
+		assert(!pcpui->cur_kthread->sysc);
 		assert(pcpui->cur_ctx);
 		__proc_startcore(pcpui->owning_proc, pcpui->cur_ctx);
 		assert(0);
