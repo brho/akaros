@@ -88,9 +88,9 @@ static void finish_sysc(struct syscall *sysc, struct proc *p)
 static void finish_current_sysc(int retval)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	assert(pcpui->cur_sysc);
-	pcpui->cur_sysc->retval = retval;
-	finish_sysc(pcpui->cur_sysc, pcpui->cur_proc);
+	assert(pcpui->cur_kthread->sysc);
+	pcpui->cur_kthread->sysc->retval = retval;
+	finish_sysc(pcpui->cur_kthread->sysc, pcpui->cur_proc);
 }
 
 /* Callable by any function while executing a syscall (or otherwise, actually).
@@ -98,8 +98,8 @@ static void finish_current_sysc(int retval)
 void set_errno(int errno)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	if (pcpui->cur_sysc)
-		pcpui->cur_sysc->err = errno;
+	if (pcpui->cur_kthread && pcpui->cur_kthread->sysc)
+		pcpui->cur_kthread->sysc->err = errno;
 }
 
 void set_errstr(char *fmt, ...)
@@ -107,33 +107,33 @@ void set_errstr(char *fmt, ...)
 	va_list ap;
 	int rc;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	if (!pcpui->cur_sysc)
+	if (!pcpui->cur_kthread || !pcpui->cur_kthread->sysc)
 		return;
 	va_start(ap, fmt);
-	rc = vsnprintf(pcpui->cur_sysc->errstr, MAX_ERRSTR_LEN, fmt, ap);
+	rc = vsnprintf(pcpui->cur_kthread->sysc->errstr, MAX_ERRSTR_LEN, fmt, ap);
 	va_end(ap);
 	/* TODO: likely not needed */
-	pcpui->cur_sysc->errstr[MAX_ERRSTR_LEN - 1] = '\0';
+	pcpui->cur_kthread->sysc->errstr[MAX_ERRSTR_LEN - 1] = '\0';
 }
 
 char *current_errstr(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* no one should call this that doesn't have a sysc */
-	assert(!pcpui->cur_sysc);
-	return pcpui->cur_sysc->errstr;
+	assert(pcpui->cur_kthread->sysc);
+	return pcpui->cur_kthread->sysc->errstr;
 }
 
 struct errbuf *get_cur_errbuf(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	return (struct errbuf*)pcpui->cur_errbuf;
+	return (struct errbuf*)pcpui->cur_kthread->errbuf;
 }
 
 void set_cur_errbuf(struct errbuf *ebuf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	pcpui->cur_errbuf = ebuf;
+	pcpui->cur_kthread->errbuf = ebuf;
 }
 
 /************** Utility Syscalls **************/
@@ -407,8 +407,8 @@ static int sys_proc_yield(struct proc *p, bool being_nice)
 	/* proc_yield() often doesn't return - we need to set the syscall retval
 	 * early.  If it doesn't return, it expects to eat our reference (for now).
 	 */
-	finish_sysc(pcpui->cur_sysc, pcpui->cur_proc);
-	pcpui->cur_sysc = 0;	/* don't touch sysc again */
+	finish_sysc(pcpui->cur_kthread->sysc, pcpui->cur_proc);
+	pcpui->cur_kthread->sysc = 0;	/* don't touch sysc again */
 	proc_incref(p, 1);
 	proc_yield(p, being_nice);
 	proc_decref(p);
@@ -1780,7 +1780,7 @@ void run_local_syscall(struct syscall *sysc)
 	if (!user_mem_check(pcpui->cur_proc, sysc, sizeof(struct syscall),
 	                    sizeof(uintptr_t), PTE_USER_RW))
 		return;
-	pcpui->cur_sysc = sysc;			/* let the core know which sysc it is */
+	pcpui->cur_kthread->sysc = sysc;	/* let the core know which sysc it is */
 	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
 	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
 	/* Need to re-load pcpui, in case we migrated */
@@ -1791,7 +1791,7 @@ void run_local_syscall(struct syscall *sysc)
 		sysc->err = EUNSPECIFIED;
 	finish_sysc(sysc, pcpui->cur_proc);
 	/* Can unpin (UMEM) at this point */
-	pcpui->cur_sysc = 0;	/* no longer working on sysc */
+	pcpui->cur_kthread->sysc = 0;	/* no longer working on sysc */
 }
 
 /* A process can trap and call this function, which will set up the core to
