@@ -22,7 +22,7 @@ struct rb {
 	uint32_t randn;
 } rb;
 
-static void genrandom(uint32_t srcid, long a0, long a1, long a2)
+static void genrandom(void *dummy_arg)
 {
 	unsigned int counter = 0;
 	uint16_t bits = 0;
@@ -60,7 +60,7 @@ void randominit(void)
 {
 	/* Frequency close but not equal to HZ */
 	apipe_init(&rb.ap, rb.buf, sizeof(rb.buf), 1);
-	send_kernel_message(core_id(), genrandom, 0, 0, 0, KMSG_ROUTINE);
+	ktask("genrandom", genrandom, 0);
 }
 
 /*

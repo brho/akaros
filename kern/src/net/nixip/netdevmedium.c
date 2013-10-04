@@ -56,7 +56,7 @@ static void netdevbind(struct ipifc *ifc, int argc, char **argv)
 
 	ifc->arg = er;
 
-	kproc("netdevread", netdevread, ifc);
+	ktask("netdevread", netdevread, ifc);
 }
 
 /*

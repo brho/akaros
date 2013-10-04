@@ -677,7 +677,6 @@ int getfields(char *str, char **args, int max, int mflag, char *unused_set);
 #define iseve() (1)
 
 /* functions we need to do something with someday */
-#define kproc(...)
 #define sleep(...)
 #define tsleep(...)
 #define postnote(...)

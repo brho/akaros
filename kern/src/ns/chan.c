@@ -415,7 +415,7 @@ void ccloseq(struct chan *c)
 	spin_unlock(&(&clunkq.l)->lock);
 
 	if (!wakeup(&clunkq.r))
-		kproc("closeproc", closeproc, NULL);
+		ktask("closeproc", closeproc, NULL);
 }
 
 static int clunkwork(void *)

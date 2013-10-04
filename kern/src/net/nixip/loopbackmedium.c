@@ -23,7 +23,7 @@ struct LB {
 	struct fs *f;
 };
 
-static void loopbackread(uint32_t core, long a0, long a1, long a2);
+static void loopbackread(void *arg_ifc);
 
 static void
 loopbackbind(struct ipifc *ifc, int unused_int, char **unused_char_pp_t)
@@ -38,11 +38,7 @@ loopbackbind(struct ipifc *ifc, int unused_int, char **unused_char_pp_t)
 	ifc->arg = lb;
 	ifc->mbps = 1000;
 
-	send_kernel_message(core_id(), loopbackread, (long)ifc, 0, 0,
-			     KMSG_ROUTINE);
-	/*
-	loopbackread(core_id(), (long)ifc, 0, 0);
- 	*/
+	ktask("loopbackread", loopbackread, ifc);
 }
 
 static void loopbackunbind(struct ipifc *ifc)
@@ -72,15 +68,14 @@ loopbackbwrite(struct ipifc *ifc, struct block *bp, int unused_int,
 	ifc->out++;
 }
 
-static void loopbackread(uint32_t core, long a0, long a1, long a2)
+static void loopbackread(void *arg_ifc)
 {
 	ERRSTACK(2);
 	/* loopback read can only panic ... not exit as in Plan 9 */
-	struct ipifc *ifc;
+	struct ipifc *ifc = (struct ipifc*)arg_ifc;
 	struct block *bp;
 	LB *lb;
 
-	ifc = (void *)a0;
 	lb = ifc->arg;
 	lb->readp = current;	/* hide identity under a rock for unbind */
 	if (waserror()) {
