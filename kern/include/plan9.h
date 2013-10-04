@@ -20,8 +20,8 @@ typedef spinlock_t qlock_t;
 #define canqlock(x) spin_trylock(x)
 
 /* ilock is a lock that occurs during interrupts. */
-#define ilock(x) spin_lock(x)
-#define iunlock(x) spin_unlock(x)
+#define ilock(x) spin_lock_irqsave(x)
+#define iunlock(x) spin_unlock_irqsave(x)
 
 /* command tables for drivers. */
 enum

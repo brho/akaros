@@ -313,7 +313,7 @@ static void notrace(struct proc *, Tevent, int64_t)
 {
 }
 
-static spinlock_t lock tlck;
+static spinlock_t tlck = SPINLOCK_INITIALIZER_IRQSAVE;
 
 static void _proctrace(struct proc *p, Tevent etype, int64_t ts)
 {

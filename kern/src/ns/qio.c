@@ -709,8 +709,7 @@ struct queue *qopen(int limit,
 	if (q == 0)
 		return 0;
 
-	/* TODO: Assuming non-irqsave for now */
-	spinlock_init(&q->lock);
+	spinlock_init_irqsave(&q->lock);
 	/* note: we let the pipes do our locking. 
 	spinlock_init(&q->rlock);
 	spinlock_init(&q->wlock);
