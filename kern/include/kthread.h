@@ -34,6 +34,7 @@ struct kthread {
 	TAILQ_ENTRY(kthread)		link;
 	/* ID, other shit, etc */
 	bool						is_ktask;	/* default is FALSE */
+	char						*name;
 };
 
 /* Semaphore for kthreads to sleep on.  0 or less means you need to sleep */
@@ -67,6 +68,7 @@ struct kthread *__kthread_zalloc(void);
 void restart_kthread(struct kthread *kthread);
 void kthread_runnable(struct kthread *kthread);
 void kthread_yield(void);
+void ktask(char *name, void (*fn)(void*), void *arg);
 /* Debugging */
 void check_poison(char *msg);
 
