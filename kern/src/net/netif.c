@@ -71,10 +71,28 @@ netifgen(struct chan *c, char *unused, struct dirtab *vp, int iunused, int i,
 		return 1;
 	}
 
-	/* second level contains clone plus all the conversations */
+	/* second level contains clone plus all the conversations. 
+	 *
+	 * this ancient comment is from plan9, i think, and both it and nxm have it.
+	 * But they differ in what other than N2ndqid we handle at this level.
+	 *
+	 * The issue is that if we handle things like Nstatqid, then we will never
+	 * pass it down to the third level.  And since we just set the path ==
+	 * Nstatqid, we won't have the NETID muxed in.  If someone isn't trying to
+	 * generate a chan, but instead is looking it up (devwalk generates, devstat
+	 * already has the chan), then they are also looking for a devdir with path
+	 * containing ID << 5.  So if you stat ether0/1/ifstats, devstat is looking
+	 * for path 41, but we return path 9 (41 = 32 + 9).
+	 *
+	 * Anyway, anything in this big if || blob are things that do not exist in
+	 * the subdirs of a netif.  Things like clone make sense here.  I guess addr
+	 * too, though that seems to be added since the original comment.  Things
+	 * like stat and ifstat are broken (though they may work for ether0/0, since
+	 * the ID is 0.).  mtu is a recent development, and looks like it's another
+	 * "l2 only", like clone and addr, so I'll let it stay here.  The way you
+	 * can tell is that there is no mtu in the third level processing. */
 	t = NETTYPE(c->qid.path);
-	if (t == N2ndqid || t == Ncloneqid || t == Naddrqid
-		|| t == Nstatqid || t == Nifstatqid || t == Nmtuqid) {
+	if (t == N2ndqid || t == Ncloneqid || t == Naddrqid || t == Nmtuqid) {
 		switch (i) {
 			case DEVDOTDOT:
 				q.type = QTDIR;

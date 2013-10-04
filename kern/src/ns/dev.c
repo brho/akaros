@@ -1,4 +1,3 @@
-#define DEBUG
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -246,10 +245,14 @@ Notfound:
 				case 0:
 					continue;
 				case 1:
+					printd("DEVWALK looking for %s, found %s, path %p", n,
+					       dir.name, dir.qid.path);
 					if (strcmp(n, dir.name) == 0) {
+						printd(" MATCH!\n");
 						nc->qid = dir.qid;
 						goto Accept;
 					}
+					printd("\n");
 					continue;
 			}
 		}
@@ -308,6 +311,8 @@ devstat(struct chan *c, uint8_t * db, long n, struct dirtab *tab, int ntab,
 			case 0:
 				break;
 			case 1:
+				printd("DEVSTAT gen returns path %p name %s, want path %p\n", 
+				       dir.qid.path, dir.name, c->qid.path);
 				if (c->qid.path == dir.qid.path) {
 					if (c->flag & CMSG)
 						dir.mode |= DMMOUNT;
