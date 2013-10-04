@@ -285,8 +285,9 @@ void print_chain(struct timer_chain *tchain)
 	       tchain->latest_time);
 	TAILQ_FOREACH(i, &tchain->waiters, next) {
 		struct kthread *kthread = TAILQ_FIRST(&i->sem.waiters);
-		printk("\tWaiter %p, time: %llu, kthread: %p (%p)\n", i,
-		       i->wake_up_time, kthread, (kthread ? kthread->proc : 0));
+		printk("\tWaiter %p, time: %llu, kthread: %p (%p) %s\n", i,
+		       i->wake_up_time, kthread, (kthread ? kthread->proc : 0),
+		       (kthread ? kthread->name : 0));
 
 	}
 }

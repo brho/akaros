@@ -179,6 +179,30 @@ void kthread_yield(void)
 	sem_down(sem);
 }
 
+static void __ktask_wrapper(uint32_t srcid, long a0, long a1, long a2)
+{
+	void (*fn)(void*) = (void (*)(void*))a0;
+	void *arg = (void*)a1;
+	char *name = (char*)a2;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	assert(pcpui->cur_kthread->is_ktask);
+	pcpui->cur_kthread->name = name;
+	fn(arg);
+	pcpui->cur_kthread->name = 0;
+	/* if we blocked, when we return, PRKM will smp_idle() */
+}
+
+/* Creates a kernel task, running fn(arg), named "name".  This is just a routine
+ * kernel message that happens to have a name, and is allowed to block.  It
+ * won't be associated with any process.  For lack of a better place, we'll just
+ * start it on the calling core.  Caller (and/or fn) need to deal with the
+ * storage for *name. */
+void ktask(char *name, void (*fn)(void*), void *arg)
+{
+	send_kernel_message(core_id(), __ktask_wrapper, (long)fn, (long)arg,
+	                    (long)name, KMSG_ROUTINE);
+}
+
 void check_poison(char *msg)
 {
 #ifdef CONFIG_KTHREAD_POISON
@@ -250,6 +274,7 @@ void sem_down(struct semaphore *sem)
 		 * spare kthread, that is launching another, has is_ktask set. */
 		new_kthread->is_ktask = FALSE;
 		new_kthread->proc = 0;
+		new_kthread->name = 0;
 	} else {
 		new_kthread = __kthread_zalloc();
 		new_stacktop = get_kstack();
