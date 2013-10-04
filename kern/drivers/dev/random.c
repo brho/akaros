@@ -12,155 +12,87 @@
 #include <pmap.h>
 #include <smp.h>
 #include <schedule.h>
+#include <apipe.h>
 
-struct Rb
-{
-	struct cond_var	producer;
-	struct cond_var	consumer;
-	uint32_t	randomcount;
-	uint8_t	buf[1024];
-	uint8_t	*ep;
-	uint8_t	*rp;
-	uint8_t	*wp;
-	uint8_t	next;
-	uint8_t	wakeme;
-	uint16_t	bits;
-	uint32_t	randn;
+#define RAND_BUF_SZ 1024
+
+struct rb {
+	uint8_t buf[RAND_BUF_SZ];
+	struct atomic_pipe ap;
+	uint32_t randn;
 } rb;
 
-static int
-rbnotfull(void)
+static void genrandom(uint32_t srcid, long a0, long a1, long a2)
 {
-	int i;
-
-	i = rb.rp - rb.wp;
-	return i != 1 && i != (1 - sizeof(rb.buf));
-}
-
-static int
-rbnotempty(void)
-{
-	return rb.wp != rb.rp;
-}
-
-/*
- *  produce random bits in a circular buffer
- */
-static void
-randomclock(void)
-{
-	if(rb.randomcount == 0 || !rbnotfull())
-		return;
-
-	rb.bits = (rb.bits<<2) ^ rb.randomcount;
-	rb.randomcount = 0;
-
-	rb.next++;
-	if(rb.next != 8/2)
-		return;
-	rb.next = 0;
-
-	*rb.wp ^= rb.bits;
-	if(rb.wp+1 == rb.ep)
-		rb.wp = rb.buf;
-	else
-		rb.wp = rb.wp+1;
-
-	if(rb.wakeme){
-		printd("wakeup consumer\n");
-		/* if we link into a clock IRQ, this CV needs to be irqsave */
-		cv_signal(&rb.consumer);
+	unsigned int counter = 0;
+	uint16_t bits = 0;
+	uint32_t where = 0;
+	for (;;) {
+		uint16_t new;
+		/* magic number from ron.  the only thing truly random in here!  Right
+		 * now, all this does is slow down our production of random numbers - we
+		 * don't actually use this timing info for anything. */
+		udelay_sched(772);
+		/* the 1 used to be randomcount.  though it was always 1, here and in
+		 * the old plan9 devrandom */
+		bits = (bits << 2) ^ 1;
+		/* only produce a random byte every four wakeups.  not sure why. */
+		counter++;
+		if (counter != 4)
+			continue;
+		counter = 0;
+		/* where indexes our previous entries pushed in the pipe.  we end up
+		 * looking at the first entry we are about to fill (assuming only one
+		 * producer), which means we'll look at the oldest entry in the pipe
+		 * (RAND_BUF_SZ entries ago, in this case).
+		 *
+		 * we use this old byte for the upper half of the two bytes we produce,
+		 * and use the lower byte of the tsc for the lower half. */
+		new = rb.buf[where++ % RAND_BUF_SZ];
+		new <<= 8;
+		new |= read_tsc() & 0xff;
+		new ^= bits;
+		apipe_write(&rb.ap, &new, 2);
 	}
 }
 
-static void
-genrandom(uint32_t srcid, long a0, long a1, long a2)
-{
-	//up->basepri = PriNormal;
-	//up->priority = up->basepri;
-
-	for(;;){
-		for(;;){
-			udelay_sched(772);
-			randomclock();
-			if(++rb.randomcount > 100000)
-				break;
-		}
-		schedule();
-		if(!rbnotfull()){
-			printd("random producer sleeps\n");
-			/* Syncing with randomread */
-			cv_lock(&rb.producer);
-			cv_wait(&rb.producer);
-			cv_unlock(&rb.producer);
-			printd("random producer is woken\n");
-		}
-	}
-}
-
-void
-randominit(void)
+void randominit(void)
 {
 	/* Frequency close but not equal to HZ */
-	rb.ep = rb.buf + sizeof(rb.buf);
-	rb.rp = rb.wp = rb.buf;
-	cv_init(&rb.producer);
-	cv_init(&rb.consumer);
-	printk("randominit\n");
-	send_kernel_message(core_id(), genrandom, 0, 0, 0,
-	                    KMSG_ROUTINE);
+	apipe_init(&rb.ap, rb.buf, sizeof(rb.buf), 1);
+	send_kernel_message(core_id(), genrandom, 0, 0, 0, KMSG_ROUTINE);
 }
 
 /*
  *  consume random bytes from a circular buffer
  */
-uint32_t
-randomread(void *xp, uint32_t n)
+uint32_t randomread(void *xp, uint32_t n)
 {
 	ERRSTACK(2);
 	uint8_t *e, *p;
 	uint32_t x;
-	
+	int amt;
 	p = xp;
-printk("readrandom\n");
-	if(waserror()){
-		cv_unlock(&rb.consumer);
+	if (waserror()) {
 		nexterror();
 	}
 
-	/* TODO: using the consumer CV lock here, since we'll wait on it later.
-	 * Review all this gen stuff.  Intent is to have one reader at a time. */
-	cv_lock(&rb.consumer);
-	for(e = p + n; p < e; ){
-		if(rb.wp == rb.rp){
-			printd("out of numbers\n");
-			rb.wakeme = 1;
-			printd("Wake the producer\n");
-			cv_signal(&rb.producer);
-			printd("consumer sleeps\n");
-			cv_wait(&rb.consumer);
-			printd("consumer was awoken\n");
-			rb.wakeme = 0;
-			continue;
-		}
-
+	for (e = p + n; p < e;) {
+		amt = apipe_read(&rb.ap, p, 1);
+		if (amt < 0)
+			error("randomread apipe");
+		/* This is all bullshit, and we really don't have any randomness in the
+		 * system.  This is some leftover hacked stuff from plan9. */
 		/*
-		 *  beating clocks will be precictable if
-		 *  they are synchronized.  Use a cheap pseudo
-		 *  random number generator to obscure any cycles.
+		 *  beating clocks will be predictable if they are
+		 *  synchronized.  Use a cheap pseudo random number
+		 *  generator to obscure any cycles.
 		 */
-		x = rb.randn*1103515245 ^ *rb.rp;
+		x = (rb.randn + 1) * 1103515245;
 		*p++ = rb.randn = x;
 
-		if(rb.rp+1 == rb.ep)
-			rb.rp = rb.buf;
-		else
-			rb.rp = rb.rp+1;
 	}
-	cv_unlock(&rb.consumer);
 	poperror();
-
-	cv_signal(&rb.producer);
 
 	return n;
 }
