@@ -227,16 +227,12 @@ static void etherbind(struct ipifc *ifc, int argc, char **argv)
 	kfree(buf);
 	poperror();
 
-/*
 	send_kernel_message(core_id(), etherread4, (long)ifc, 0, 0,
 			     KMSG_ROUTINE);
 	send_kernel_message(core_id(), recvarpproc, (long)ifc, 0, 0,
 			     KMSG_ROUTINE);
-*/
-/*
 	send_kernel_message(core_id(), etherread6, (long)ifc, 0, 0,
 			     KMSG_ROUTINE);
-*/
 }
 
 /*
