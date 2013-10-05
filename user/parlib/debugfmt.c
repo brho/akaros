@@ -120,14 +120,16 @@ void ros_vdebugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, v
 			break;
 
 		// string
+/*
 		case 'r':
 			p = current_errstr();
 			/* oh, barf. Now we look like glibc. */
 			goto putstring;
+*/
 		case 's':
 			if ((p = va_arg(ap, char *NT)) == NULL)
 				p = "(null)";
-putstring:
+//putstring:
 			if (width > 0 && padc != '-')
 				for (width -= strnlen(p, precision); width > 0; width--)
 					putch(padc, putdat);
