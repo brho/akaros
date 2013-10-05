@@ -123,7 +123,7 @@ void ros_vdebugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, v
 /*
 		case 'r':
 			p = current_errstr();
-			/* oh, barf. Now we look like glibc. */
+			/* oh, barf. Now we look like glibc. * /
 			goto putstring;
 */
 		case 's':
