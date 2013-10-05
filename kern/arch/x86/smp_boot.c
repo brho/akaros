@@ -292,7 +292,7 @@ uintptr_t smp_main(void)
  * to call it on too deep of a stack frame. */
 void __arch_pcpu_init(uint32_t coreid)
 {
-	uintptr_t my_stack_bot;
+	uintptr_t *my_stack_bot;
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 
 	/* Flushes any potentially old mappings from smp_boot() (note the page table
@@ -311,9 +311,9 @@ void __arch_pcpu_init(uint32_t coreid)
 		pcpui->tss = &ts;
 		pcpui->gdt = gdt;
 	} else {
-		my_stack_bot = ROUNDDOWN(read_sp(), PGSIZE);
-		pcpui->tss = (taskstate_t*)(*(uintptr_t*)my_stack_bot);
-		pcpui->gdt = (segdesc_t*)(*(uintptr_t*)my_stack_bot +
+		my_stack_bot = kstack_bottom_addr(ROUNDUP(read_sp() - 1, PGSIZE));
+		pcpui->tss = (taskstate_t*)(*my_stack_bot);
+		pcpui->gdt = (segdesc_t*)(*my_stack_bot +
 		                          sizeof(taskstate_t) + sizeof(pseudodesc_t));
 	}
 #ifdef CONFIG_X86_64
