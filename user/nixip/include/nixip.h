@@ -211,3 +211,9 @@ int tokenize(char *s, char **args, int maxargs);
 int getfields(char *str, char **args, int max, int mflag, char *unused_set);
 char *netmkaddr(char *linear, char *defnet, char *defsrv);
 int dial(char *dest, char *local, char *dir, int *cfdp);
+int announce(char *addr, char *dir);
+int listen(char *dir, char *newdir);
+int accept(int ctl, char *dir);
+int reject(int ctl, char *dir, char *cause);
+
+
