@@ -54,6 +54,7 @@ void init_awaiter(struct alarm_waiter *waiter,
 	waiter->func = func;
 	if (!func)
 		sem_init_irqsave(&waiter->sem, 0);
+	waiter->has_fired = FALSE;	/* so we can check this before arming */
 }
 
 /* Give this the absolute time.  For now, abs_time is the TSC time that you want
@@ -107,6 +108,8 @@ static void reset_tchain_interrupt(struct timer_chain *tchain)
  * will wake up.  o/w, it will call the func ptr stored in the awaiter. */
 static void wake_awaiter(struct alarm_waiter *waiter)
 {
+	waiter->has_fired = TRUE;
+	cmb();	/* enforce the has_fired write before the handlers */
 	if (waiter->func)
 		waiter->func(waiter);
 	else
@@ -154,6 +157,8 @@ void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 	/* This will fail if you don't set a time */
 	assert(waiter->wake_up_time != ALARM_POISON_TIME);
 	spin_lock_irqsave(&tchain->lock);
+	/* has_fired tells us if it is on the tchain or not */
+	waiter->has_fired = FALSE;
 	/* Either the list is empty, or not. */
 	if (TAILQ_EMPTY(&tchain->waiters)) {
 		tchain->earliest_time = waiter->wake_up_time;
@@ -195,15 +200,23 @@ no_reset_out:
 	/* TODO: could put some debug stuff here */
 }
 
-/* Removes waiter from the tchain before it goes off. 
- * TODO: handle waiters that already went off. */
-void unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
+/* Removes waiter from the tchain before it goes off.  Returns TRUE if we
+ * disarmed before the alarm went off, FALSE if it already fired. */
+bool unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 {
 	struct alarm_waiter *temp;
 	bool reset_int = FALSE;		/* whether or not to reset the interrupt */
 
 	spin_lock_irqsave(&tchain->lock);
-	warn("Code currently assumes the alarm waiter hasn't triggered yet!");
+	if (waiter->has_fired) {
+		/* the alarm has already gone off.  its not even on this tchain's list,
+		 * though the concurrent change to has_fired (specifically, the setting
+		 * of it to TRUE), happens under the tchain's lock.  As a side note, the
+		 * code that sets it to FALSE is called when the waiter is on no chain,
+		 * so there is no race on that. */
+		spin_unlock_irqsave(&tchain->lock);
+		return FALSE;
+	}
 	/* Need to make sure earliest and latest are set, in case we're mucking with
 	 * the first and/or last element of the chain. */
 	if (TAILQ_FIRST(&tchain->waiters) == waiter) {
@@ -219,6 +232,7 @@ void unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 	if (reset_int)
 		reset_tchain_interrupt(tchain);
 	spin_unlock_irqsave(&tchain->lock);
+	return TRUE;
 }
 
 /* Attempts to sleep on the alarm.  Could fail if you aren't allowed to kthread
