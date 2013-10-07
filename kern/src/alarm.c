@@ -39,6 +39,7 @@ static void reset_tchain_times(struct timer_chain *tchain)
 void init_timer_chain(struct timer_chain *tchain,
                       void (*set_interrupt) (uint64_t, struct timer_chain *))
 {
+	spinlock_init_irqsave(&tchain->lock);
 	TAILQ_INIT(&tchain->waiters);
 	tchain->set_interrupt = set_interrupt;
 	reset_tchain_times(tchain);
@@ -114,13 +115,14 @@ static void wake_awaiter(struct alarm_waiter *waiter)
 }
 
 /* This is called when an interrupt triggers a tchain, and needs to wake up
- * everyone whose time is up. */
+ * everyone whose time is up.  Called from IRQ context. */
 void trigger_tchain(struct timer_chain *tchain)
 {
 	struct alarm_waiter *i, *temp;
 	uint64_t now = read_tsc();
 	bool changed_list = FALSE;
 	assert(!irq_is_enabled());
+	spin_lock(&tchain->lock);
 	TAILQ_FOREACH_SAFE(i, &tchain->waiters, next, temp) {
 		printd("Trying to wake up %p who is due at %llu and now is %llu\n",
 		       i, i->wake_up_time, now);
@@ -141,6 +143,7 @@ void trigger_tchain(struct timer_chain *tchain)
 	}
 	/* Need to reset the interrupt no matter what */
 	reset_tchain_interrupt(tchain);
+	spin_unlock(&tchain->lock);
 }
 
 /* Sets the alarm.  If it is a kthread-style alarm (func == 0), sleep on it
@@ -149,11 +152,9 @@ void trigger_tchain(struct timer_chain *tchain)
 void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 {
 	struct alarm_waiter *i, *temp;
-	int8_t irq_state = 0;
-
 	/* This will fail if you don't set a time */
 	assert(waiter->wake_up_time != ALARM_POISON_TIME);
-	disable_irqsave(&irq_state);
+	spin_lock_irqsave(&tchain->lock);
 	/* Either the list is empty, or not. */
 	if (TAILQ_EMPTY(&tchain->waiters)) {
 		tchain->earliest_time = waiter->wake_up_time;
@@ -191,7 +192,7 @@ void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 reset_out:
 	reset_tchain_interrupt(tchain);
 no_reset_out:
-	enable_irqsave(&irq_state);
+	spin_unlock_irqsave(&tchain->lock);
 	/* TODO: could put some debug stuff here */
 }
 
@@ -201,9 +202,8 @@ void unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 {
 	struct alarm_waiter *temp;
 	bool reset_int = FALSE;		/* whether or not to reset the interrupt */
-	int8_t irq_state = 0;
 
-	disable_irqsave(&irq_state);
+	spin_lock_irqsave(&tchain->lock);
 	warn("Code currently assumes the alarm waiter hasn't triggered yet!");
 	/* Need to make sure earliest and latest are set, in case we're mucking with
 	 * the first and/or last element of the chain. */
@@ -219,7 +219,7 @@ void unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 	TAILQ_REMOVE(&tchain->waiters, waiter, next);
 	if (reset_int)
 		reset_tchain_interrupt(tchain);
-	enable_irqsave(&irq_state);
+	spin_unlock_irqsave(&tchain->lock);
 }
 
 /* Attempts to sleep on the alarm.  Could fail if you aren't allowed to kthread
@@ -248,11 +248,14 @@ int sleep_on_awaiter(struct alarm_waiter *waiter)
  * 	- Make sure the interrupt source can find tchain
  * 	- Make sure the interrupt handler calls trigger_tchain(tchain)
  * 	- Make sure you don't clobber an old tchain here (a bug) 
- * This implies the function knows how to find its timer source/void */
+ * This implies the function knows how to find its timer source/void
+ *
+ * Called with the tchain lock held, and IRQs disabled. */
 void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain)
 {
 	uint64_t rel_usec, now;
 	struct timer_chain *pcpui_tchain = &per_cpu_info[core_id()].tchain;
+	assert(pcpui_tchain == tchain);
 	if (time) {
 		/* Arm the alarm.  For times in the past, we just need to make sure it
 		 * goes off. */
@@ -275,10 +278,10 @@ void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain)
 
 /* Debug helpers */
 
-/* Disable irqs before calling this, or otherwise protect yourself. */
 void print_chain(struct timer_chain *tchain)
 {
 	struct alarm_waiter *i;
+	spin_lock_irqsave(&tchain->lock);
 	printk("Chain %p is%s empty, early: %llu latest: %llu\n", tchain,
 	       TAILQ_EMPTY(&tchain->waiters) ? "" : " not",
 	       tchain->earliest_time,
@@ -290,19 +293,17 @@ void print_chain(struct timer_chain *tchain)
 		       (kthread ? kthread->name : 0));
 
 	}
+	spin_unlock_irqsave(&tchain->lock);
 }
 
 /* Prints all chains, rather verbosely */
 void print_pcpu_chains(void)
 {
 	struct timer_chain *pcpu_chain;
-	int8_t irq_state = 0;
 	printk("PCPU Chains:  It is now %llu\n", read_tsc());
 
-	disable_irqsave(&irq_state);
 	for (int i = 0; i < num_cpus; i++) {
 		pcpu_chain = &per_cpu_info[i].tchain;
 		print_chain(pcpu_chain);
 	}
-	enable_irqsave(&irq_state);
 }

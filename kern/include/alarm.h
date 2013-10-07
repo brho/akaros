@@ -11,9 +11,12 @@
  * Like with most systems, you won't wake up til after the time you specify (for
  * now).  This might change, esp if we tweak things to coalesce alarms.
  *
- * If you're using a global alarm timer_chain, you'll probably need to grab a
- * lock.  The only current user is pcpu tchains, though the code ought be able
- * to handle other uses.
+ * All tchains come with locks.  Originally, I left these out, since the pcpu
+ * tchains didn't need them (disable_irq was sufficient).  However, disabling
+ * alarms remotely (a valid use case) is a real pain without locks, so now
+ * everyone has locks.  As an added benefit, you can submit an alarm to another
+ * core's pcpu tchain (though it probably costs an extra IRQ).  Note there is a
+ * lock ordering, tchains before awaiters (when they are grabbed together).
  *
  * Quick howto, using the pcpu tchains:
  * 	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
@@ -64,10 +67,11 @@ TAILQ_HEAD(awaiters_tailq, alarm_waiter);		/* ideally not a LL */
 
 typedef void (*alarm_handler)(struct alarm_waiter *waiter);
 
-/* One of these per alarm source, such as a per-core timer.  Based on the
- * source, you may need a lock (such as for a global timer).  set_interrupt() is
- * a method for setting the interrupt source. */
+/* One of these per alarm source, such as a per-core timer.  All tchains come
+ * with a lock, even if its rarely needed (like the pcpu tchains).
+ * set_interrupt() is a method for setting the interrupt source. */
 struct timer_chain {
+	spinlock_t					lock;
 	struct awaiters_tailq		waiters;
 	uint64_t					earliest_time;
 	uint64_t					latest_time;
@@ -95,7 +99,7 @@ void trigger_tchain(struct timer_chain *tchain);
 void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain);
 
 /* Debugging */
-#define ALARM_POISON_TIME 12345
+#define ALARM_POISON_TIME 12345				/* could use some work */
 void print_chain(struct timer_chain *tchain);
 void print_pcpu_chains(void);
 
