@@ -107,11 +107,10 @@ static void reset_tchain_interrupt(struct timer_chain *tchain)
  * will wake up.  o/w, it will call the func ptr stored in the awaiter. */
 static void wake_awaiter(struct alarm_waiter *waiter)
 {
-	int8_t irq_state = 0;
 	if (waiter->func)
 		waiter->func(waiter);
 	else
-		sem_up_irqsave(&waiter->sem, &irq_state);
+		sem_up(&waiter->sem); /* IRQs are disabled, can call sem_up directly */
 }
 
 /* This is called when an interrupt triggers a tchain, and needs to wake up
@@ -250,12 +249,25 @@ int sleep_on_awaiter(struct alarm_waiter *waiter)
  * 	- Make sure you don't clobber an old tchain here (a bug) 
  * This implies the function knows how to find its timer source/void
  *
- * Called with the tchain lock held, and IRQs disabled. */
+ * Called with the tchain lock held, and IRQs disabled.  However, we could be
+ * calling this cross-core, and we cannot disable those IRQs (hence the
+ * locking). */
 void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain)
 {
 	uint64_t rel_usec, now;
-	struct timer_chain *pcpui_tchain = &per_cpu_info[core_id()].tchain;
-	assert(pcpui_tchain == tchain);
+	int pcoreid = core_id();
+	struct timer_chain *pcpui_tchain = &per_cpu_info[pcoreid].tchain;
+
+	if (pcpui_tchain != tchain) {
+		/* cross-core call.  we can simply send an alarm IRQ.  the alarm handler
+		 * will reset its pcpu timer, based on its current lists.  they take an
+		 * extra IRQ, but it gets the job done. */
+		/* TODO: using the LAPIC vector is a bit ghetto, since that's x86.  But
+		 * RISCV ignores the vector field, and we don't have a global IRQ vector
+		 * namespace or anything. */
+		send_ipi(pcoreid + (pcpui_tchain - tchain), LAPIC_TIMER_DEFAULT_VECTOR);
+		return;
+	}
 	if (time) {
 		/* Arm the alarm.  For times in the past, we just need to make sure it
 		 * goes off. */
@@ -268,8 +280,6 @@ void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain)
 		printd("Setting alarm for %llu, it is now %llu, rel_time %llu "
 		       "tchain %p\n", time, now, rel_usec, pcpui_tchain);
 		set_core_timer(rel_usec, FALSE);
-		/* Make sure the caller is setting the right tchain */
-		assert(pcpui_tchain == tchain);
 	} else  {
 		/* Disarm */
 		set_core_timer(0, FALSE);
