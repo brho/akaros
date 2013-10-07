@@ -62,6 +62,7 @@ struct alarm_waiter {
 	struct semaphore			sem;			/* kthread will sleep on this */
 	void						*data;
 	TAILQ_ENTRY(alarm_waiter)	next;
+	bool						has_fired;
 };
 TAILQ_HEAD(awaiters_tailq, alarm_waiter);		/* ideally not a LL */
 
@@ -90,7 +91,7 @@ void set_awaiter_rel(struct alarm_waiter *waiter, uint64_t usleep);
 void set_awaiter_inc(struct alarm_waiter *waiter, uint64_t usleep);
 /* Arms/disarms the alarm */
 void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
-void unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
+bool unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
 /* Blocks on the alarm waiter */
 int sleep_on_awaiter(struct alarm_waiter *waiter);
 /* Interrupt handlers needs to call this.  Don't call it directly. */
