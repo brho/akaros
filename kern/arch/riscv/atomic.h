@@ -131,7 +131,7 @@ static inline bool spin_locked(spinlock_t* lock)
 
 static inline bool __spin_trylock(spinlock_t *lock)
 {
-	return __sync_fetch_and_or(&lock->rlock, 1);
+	return !__sync_fetch_and_or(&lock->rlock, 1);
 }
 
 static inline void __spin_lock(spinlock_t *lock)
@@ -140,7 +140,7 @@ static inline void __spin_lock(spinlock_t *lock)
 	{
 		while (lock->rlock)
 			;
-	} while (__spin_trylock(lock));
+	} while (!__spin_trylock(lock));
 	mb();
 }
 
