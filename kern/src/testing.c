@@ -40,6 +40,7 @@
 #include <setjmp.h>
 #include <apipe.h>
 #include <rwlock.h>
+#include <rendez.h>
 
 #define l1 (available_caches.l1)
 #define l2 (available_caches.l2)
@@ -1767,4 +1768,88 @@ void test_rwlock(void)
 	while (atomic_read(&rwlock_counter))
 		cpu_relax();
 	printk("rwlock test complete\n");
+}
+
+/* Funcs and global vars for test_rv() */
+static struct rendez local_rv;
+static struct rendez *rv = &local_rv;
+/* reusing state and counter from test_cv... */
+
+static int __rendez_cond(void *arg)
+{
+	return *(bool*)arg;
+}
+
+void __test_rv_wakeup(uint32_t srcid, long a0, long a1, long a2)
+{
+	if (atomic_read(&counter) % 4)
+		cv_signal(cv);
+	else
+		cv_broadcast(cv);
+	atomic_dec(&counter);
+}
+
+void __test_rv_sleeper(uint32_t srcid, long a0, long a1, long a2)
+{
+	rendez_sleep(rv, __rendez_cond, (void*)&state);
+	atomic_dec(&counter);
+}
+
+void __test_rv_sleeper_timeout(uint32_t srcid, long a0, long a1, long a2)
+{
+	/* half-assed amount of time. */
+	rendez_sleep_timeout(rv, __rendez_cond, (void*)&state, a0);
+	atomic_dec(&counter);
+}
+
+void test_rv(void)
+{
+	int nr_msgs;
+
+	rendez_init(rv);
+	/* Test 0: signal without waiting */
+	rendez_wakeup(rv);
+	kthread_yield();
+	printk("test_rv: wakeup without sleeping complete\n");
+
+	/* Test 1: a few sleepers */
+	nr_msgs = num_cpus - 1; /* not using cpu 0 */
+	atomic_init(&counter, nr_msgs);
+	state = FALSE;
+	for (int i = 1; i < num_cpus; i++)
+		send_kernel_message(i, __test_rv_sleeper, 0, 0, 0, KMSG_ROUTINE);
+	udelay(1000000);
+	cmb();
+	state = TRUE;
+	rendez_wakeup(rv);
+	/* broadcast probably woke up the waiters on our core.  since we want to
+	 * spin on their completion, we need to yield for a bit. */
+	kthread_yield();
+	while (atomic_read(&counter))
+		cpu_relax();
+	printk("test_rv: bulk wakeup complete\n");
+
+	/* Test 2: different types of sleepers / timeouts */
+	state = FALSE;
+	nr_msgs = 0x500;	/* any more than 0x20000 could go OOM */
+	atomic_init(&counter, nr_msgs);
+	for (int i = 0; i < nr_msgs; i++) {
+		int cpu = (i % (num_cpus - 1)) + 1;
+		/* timeouts from 0ms ..5000ms (enough that they should wake via cond */
+		if (atomic_read(&counter) % 5)
+			send_kernel_message(cpu, __test_rv_sleeper_timeout, i * 4, 0, 0,
+			                    KMSG_ROUTINE);
+		else
+			send_kernel_message(cpu, __test_rv_sleeper, 0, 0, 0, KMSG_ROUTINE);
+	}
+	kthread_yield();	/* run whatever messages we sent to ourselves */
+	state = TRUE;
+	while (atomic_read(&counter)) {
+		cpu_relax();
+		rendez_wakeup(rv);
+		udelay(1000000);
+		kthread_yield();	/* run whatever messages we sent to ourselves */
+	}
+	assert(!rv->cv.nr_waiters);
+	printk("test_rv: lots of sleepers/timeouts complete\n");
 }
