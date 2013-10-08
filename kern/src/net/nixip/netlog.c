@@ -31,7 +31,7 @@ struct netlog {
 	int iponlyset;
 
 	qlock_t qlock;
-	int Rendez;					/* put the real thing here. */
+	struct rendez rv;
 };
 
 struct netlogflag {
@@ -74,6 +74,7 @@ struct cmdtab routecmd[] = {
 void netloginit(struct fs *f)
 {
 	f->alog = kzmalloc(sizeof(struct netlog), 0);
+	rendez_init(&f->alog->rv);
 }
 
 void netlogopen(struct fs *f)
@@ -156,7 +157,7 @@ long netlogread(struct fs *f, void *a, uint32_t unused_len, long n)
 		} else
 			spin_unlock(&f->alog->rwlock);
 
-		sleep(f->alog, netlogready, f);
+		rendez_sleep(&f->alog->rv, netlogready, f);
 	}
 
 	qunlock(&f->alog->qlock);
@@ -257,5 +258,5 @@ void netlog(struct fs *f, int mask, char *fmt, ...)
 	}
 	spin_unlock(&f->alog->rwlock);
 
-	wakeup(f->alog);
+	rendez_wakeup(&f->alog->rv);
 }

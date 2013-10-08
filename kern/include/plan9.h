@@ -3,10 +3,12 @@
  * Copyright (c) 1989-2003 by Lucent Technologies, Bell Laboratories.
  */
 #ifndef KERN_INCLUDE_PLAN9_H
+
 #include <setjmp.h>
 #include <atomic.h>
 #include <apipe.h>
 #include <rwlock.h>
+#include <rendez.h>
 
 /* The lock issue is still undecided. For now, we preserve the lock type
  * and plan to revisit the issue when it makes sense.
@@ -677,11 +679,8 @@ int getfields(char *str, char **args, int max, int mflag, char *unused_set);
 #define iseve() (1)
 
 /* functions we need to do something with someday */
-#define sleep(...)
-#define tsleep(...)
 #define postnote(...)
 #define pexit(...)
-#define wakeup(...)
 
 /* kern/drivers/dev/misc.c */
 int nrand(int n);
@@ -800,12 +799,11 @@ struct conv {
 	struct kref snoopers;		/* number of processes with snoop open */
 
 	qlock_t car;
-//#warning "need rendezvous!"
-	//Rendez  cr;
+	struct rendez cr;			/* looks to be unused... */
 	char cerr[ERRMAX];
 
 	qlock_t listenq;
-	/*    Rendez  */int listenr;
+	struct rendez listenr;
 
 	struct Ipmulti *multi;		/* multicast bindings for this interface */
 

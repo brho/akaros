@@ -33,7 +33,7 @@ struct mntrpc
 	struct fcall	request;	/* Outgoing file system protocol message */
 	struct fcall 	reply;		/* Incoming reply */
 	struct mnt*	m;		/* Mount device during rpc */
-	struct cond_var	r;		/* Place to hang out */
+	struct rendez	r;		/* Place to hang out */
 	uint8_t*	rpc;		/* I/O Data buffer */
 	unsigned int	rpclen;		/* len of buffer */
 	struct block	*b;		/* reply blocks */
@@ -842,7 +842,7 @@ mountio(struct mnt *mnt, struct mntrpc *r)
 		if(mnt->rip == 0)
 			break;
 		spin_unlock(&mnt->lock);
-		sleep(&r->r, rpcattn, r);
+		rendez_sleep(&r->r, rpcattn, r);
 		if(r->done){
 			poperror();
 			mntflushfree(mnt, r);
@@ -983,7 +983,7 @@ mountmux(struct mnt *mnt, struct mntrpc *r)
 					mnt->c, q->stime,
 					q->reqlen + r->replen);
 			if(q != r)
-				wakeup(&q->r);
+				rendez_wakeup(&q->r);
 			spin_unlock(&mnt->lock);
 			return;
 		}
@@ -1077,6 +1077,7 @@ mntralloc(struct chan *c, uint32_t msize)
 			spin_unlock(&mntalloc.lock);
 			panic("mount rpc header");
 		}
+		rendez_init(&new->r);
 		/*
 		 * The header is split from the data buffer as
 		 * mountmux may swap the buffer with another header.

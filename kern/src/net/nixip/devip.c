@@ -475,7 +475,7 @@ static struct chan *ipopen(struct chan *c, int omode)
 				}
 
 				/* wait for a connect */
-				sleep(&cv->listenr, incoming, cv);
+				rendez_sleep(&cv->listenr, incoming, cv);
 
 				qlock(&cv->qlock);
 				nc = cv->incall;
@@ -1259,6 +1259,8 @@ retry:
 			c = kzmalloc(sizeof(struct conv), 0);
 			if (c == NULL)
 				error(Enomem);
+			rendez_init(&c->cr);
+			rendez_init(&c->listenr);
 			/* We will always get this lock, since we just alloc'd c.  Remember,
 			 * we can't sleep in here. */
 			qlock(&c->qlock);
@@ -1402,7 +1404,7 @@ struct conv *Fsnewcall(struct conv *c, uint8_t * raddr, uint16_t rport,
 
 	qunlock(&c->qlock);
 
-	wakeup(&c->listenr);
+	rendez_wakeup(&c->listenr);
 
 	return nc;
 }

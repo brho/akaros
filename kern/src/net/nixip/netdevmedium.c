@@ -71,7 +71,7 @@ static void netdevunbind(struct ipifc *ifc)
 
 	/* wait for readers to die */
 	while (er->readp != NULL)
-		tsleep(&up->sleep, return0, 0, 300);
+		udelay_sched(300 * 1000);
 
 	if (er->mchan != NULL)
 		cclose(er->mchan);
