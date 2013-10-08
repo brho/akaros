@@ -74,8 +74,10 @@ void check_poison(char *msg);
 
 void sem_init(struct semaphore *sem, int signals);
 void sem_init_irqsave(struct semaphore *sem, int signals);
+bool sem_trydown(struct semaphore *sem);
 void sem_down(struct semaphore *sem);
 bool sem_up(struct semaphore *sem);
+bool sem_trydown_irqsave(struct semaphore *sem, int8_t *irq_state);
 void sem_down_irqsave(struct semaphore *sem, int8_t *irq_state);
 bool sem_up_irqsave(struct semaphore *sem, int8_t *irq_state);
 

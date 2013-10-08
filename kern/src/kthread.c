@@ -232,6 +232,18 @@ void sem_init_irqsave(struct semaphore *sem, int signals)
 	sem->irq_okay = TRUE;
 }
 
+bool sem_trydown(struct semaphore *sem)
+{
+	bool ret = FALSE;
+	spin_lock(&sem->lock);
+	if (sem->nr_signals > 0) {
+		sem->nr_signals--;
+		ret = TRUE;
+	}
+	spin_unlock(&sem->lock);
+	return ret;
+}
+
 /* This downs the semaphore and suspends the current kernel context on its
  * waitqueue if there are no pending signals.  Note that the case where the
  * signal is already there is not optimized. */
@@ -248,13 +260,8 @@ void sem_down(struct semaphore *sem)
 	assert(pcpui->cur_kthread);
 	/* Try to down the semaphore.  If there is a signal there, we can skip all
 	 * of the sleep prep and just return. */
-	spin_lock(&sem->lock);	/* no need for irqsave, since we disabled ints */
-	if (sem->nr_signals > 0) {
-		sem->nr_signals--;
-		spin_unlock(&sem->lock);
+	if (sem_trydown(sem))
 		goto block_return_path;
-	}
-	spin_unlock(&sem->lock);
 	/* We're probably going to sleep, so get ready.  We'll check again later. */
 	kthread = pcpui->cur_kthread;
 	/* We need to have a spare slot for restart, so we also use it when
@@ -388,6 +395,15 @@ bool sem_up(struct semaphore *sem)
 		return TRUE;
 	}
 	return FALSE;
+}
+
+bool sem_trydown_irqsave(struct semaphore *sem, int8_t *irq_state)
+{
+	bool ret;
+	disable_irqsave(irq_state);
+	ret = sem_trydown(sem);
+	enable_irqsave(irq_state);
+	return ret;
 }
 
 void sem_down_irqsave(struct semaphore *sem, int8_t *irq_state)
