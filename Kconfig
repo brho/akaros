@@ -133,6 +133,14 @@ config SEQLOCK_DEBUG
 		Provides asserts to detect seqlock errors.  This will allow a malicious
 		userspace to trigger a panic in the kernel.
 
+config SEMAPHORE_DEBUG
+	bool "Semaphore debugging"
+	default n
+	help
+		Turns on debugging, which tracks the last time and location that a
+		semaphore was downed, and provides a linked list of all semaphores that
+		have waiters.  This will slow down all semaphore ups and downs.
+
 config RESET_STACKS
 	bool "Reset Stacks"
 	default y

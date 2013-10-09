@@ -18,6 +18,7 @@ struct proc;
 struct kthread;
 struct semaphore;
 TAILQ_HEAD(kthread_tailq, kthread);
+TAILQ_HEAD(semaphore_tailq, semaphore);
 
 /* This captures the essence of a kernel context that we want to suspend.  When
  * a kthread is running, we make sure its stacktop is the default kernel stack,
@@ -40,6 +41,13 @@ struct semaphore {
 	int 						nr_signals;
 	spinlock_t 					lock;
 	bool						irq_okay;
+#ifdef CONFIG_SEMAPHORE_DEBUG
+	TAILQ_ENTRY(semaphore)		link;
+	bool						is_on_list;	/* would like better sys/queue.h */
+	uintptr_t 					bt_pc;		/* program counter of last down */
+	uintptr_t 					bt_fp;		/* frame pointer of last down */
+	uint32_t 					calling_core;
+#endif
 };
 
 struct cond_var {
@@ -70,6 +78,8 @@ bool sem_up(struct semaphore *sem);
 bool sem_trydown_irqsave(struct semaphore *sem, int8_t *irq_state);
 void sem_down_irqsave(struct semaphore *sem, int8_t *irq_state);
 bool sem_up_irqsave(struct semaphore *sem, int8_t *irq_state);
+void print_sem_info(struct semaphore *sem);
+void print_all_sem_info(void);
 
 void cv_init(struct cond_var *cv);
 void cv_init_irqsave(struct cond_var *cv);
