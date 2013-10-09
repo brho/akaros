@@ -216,18 +216,31 @@ void check_poison(char *msg)
 }
 
 /* Semaphores, using kthreads directly */
-void sem_init(struct semaphore *sem, int signals)
+static void debug_downed_sem(struct semaphore *sem);
+static void debug_upped_sem(struct semaphore *sem);
+
+static void sem_init_common(struct semaphore *sem, int signals)
 {
 	TAILQ_INIT(&sem->waiters);
 	sem->nr_signals = signals;
+#ifdef CONFIG_SEMAPHORE_DEBUG
+	sem->is_on_list = FALSE;
+	sem->bt_pc = 0;
+	sem->bt_fp = 0;
+	sem->calling_core = 0;
+#endif
+}
+
+void sem_init(struct semaphore *sem, int signals)
+{
+	sem_init_common(sem, signals);
 	spinlock_init(&sem->lock);
 	sem->irq_okay = FALSE;
 }
 
 void sem_init_irqsave(struct semaphore *sem, int signals)
 {
-	TAILQ_INIT(&sem->waiters);
-	sem->nr_signals = signals;
+	sem_init_common(sem, signals);
 	spinlock_init_irqsave(&sem->lock);
 	sem->irq_okay = TRUE;
 }
@@ -239,6 +252,7 @@ bool sem_trydown(struct semaphore *sem)
 	if (sem->nr_signals > 0) {
 		sem->nr_signals--;
 		ret = TRUE;
+		debug_downed_sem(sem);
 	}
 	spin_unlock(&sem->lock);
 	return ret;
@@ -328,6 +342,7 @@ void sem_down(struct semaphore *sem)
 	spin_lock(&sem->lock);
 	if (sem->nr_signals-- <= 0) {
 		TAILQ_INSERT_TAIL(&sem->waiters, kthread, link);
+		debug_downed_sem(sem);
 		/* At this point, we know we'll sleep and change stacks later.  Once we
 		 * unlock, we could have the kthread restarted (possibly on another
 		 * core), so we need to disable irqs until we are on our new stack.
@@ -336,6 +351,7 @@ void sem_down(struct semaphore *sem)
 		 * allows us to atomically unlock and 'yield'. */
 		disable_irq();
 	} else {							/* we didn't sleep */
+		debug_downed_sem(sem);
 		goto unwind_sleep_prep;
 	}
 	spin_unlock(&sem->lock);
@@ -386,6 +402,7 @@ bool sem_up(struct semaphore *sem)
 	} else {
 		assert(TAILQ_EMPTY(&sem->waiters));
 	}
+	debug_upped_sem(sem);
 	spin_unlock(&sem->lock);
 	/* Note that once we call kthread_runnable(), we cannot touch the sem again.
 	 * Some sems are on stacks.  The caller can touch sem, if it knows about the
@@ -420,6 +437,86 @@ bool sem_up_irqsave(struct semaphore *sem, int8_t *irq_state)
 	retval = sem_up(sem);
 	enable_irqsave(irq_state);
 	return retval;
+}
+
+/* Sem debugging */
+
+#ifdef CONFIG_SEMAPHORE_DEBUG
+struct semaphore_tailq sems_with_waiters =
+                       TAILQ_HEAD_INITIALIZER(sems_with_waiters);
+spinlock_t sems_with_waiters_lock = SPINLOCK_INITIALIZER_IRQSAVE;
+
+/* this gets called any time we downed the sem, regardless of whether or not we
+ * waited */
+static void debug_downed_sem(struct semaphore *sem)
+{
+	sem->bt_pc = read_pc();
+	sem->bt_fp = read_bp();
+	sem->calling_core = core_id();
+	if (TAILQ_EMPTY(&sem->waiters) || sem->is_on_list)
+		return;
+	spin_lock_irqsave(&sems_with_waiters_lock);
+	TAILQ_INSERT_HEAD(&sems_with_waiters, sem, link);
+	spin_unlock_irqsave(&sems_with_waiters_lock);
+	sem->is_on_list = TRUE;
+}
+
+/* Called when a sem is upped.  It may or may not have waiters, and it may or
+ * may not be on the list. (we could up several times past 0). */
+static void debug_upped_sem(struct semaphore *sem)
+{
+	if (TAILQ_EMPTY(&sem->waiters) && sem->is_on_list) {
+		spin_lock_irqsave(&sems_with_waiters_lock);
+		TAILQ_REMOVE(&sems_with_waiters, sem, link);
+		spin_unlock_irqsave(&sems_with_waiters_lock);
+		sem->is_on_list = FALSE;
+	}
+}
+
+#else
+
+static void debug_downed_sem(struct semaphore *sem)
+{
+	/* no debugging */
+}
+
+static void debug_upped_sem(struct semaphore *sem)
+{
+	/* no debugging */
+}
+
+#endif /* CONFIG_SEMAPHORE_DEBUG */
+
+void print_sem_info(struct semaphore *sem)
+{
+	struct kthread *kth_i;
+	/* Always safe to irqsave */
+	spin_lock_irqsave(&sem->lock);
+	printk("Semaphore %p has %d signals (neg = waiters)", sem, sem->nr_signals);
+#ifdef CONFIG_SEMAPHORE_DEBUG
+	printk(", recently downed on core %d with pc/frame %p %p\n",
+	       sem->calling_core, sem->bt_pc, sem->bt_fp);
+#else
+	printk("\n");
+#endif /* CONFIG_SEMAPHORE_DEBUG */
+	TAILQ_FOREACH(kth_i, &sem->waiters, link)
+		printk("\tKthread %p (%s), proc %d (%p), sysc %p\n", kth_i, kth_i->name,
+		       kth_i->proc ? kth_i->proc->pid : 0, kth_i->proc, kth_i->sysc);
+	spin_unlock_irqsave(&sem->lock);
+}
+
+void print_all_sem_info(void)
+{
+#ifdef CONFIG_SEMAPHORE_DEBUG
+	struct semaphore *sem_i;
+	printk("All sems with waiters:\n");
+	spin_lock_irqsave(&sems_with_waiters_lock);
+	TAILQ_FOREACH(sem_i, &sems_with_waiters, link)
+		print_sem_info(sem_i);
+	spin_unlock_irqsave(&sems_with_waiters_lock);
+#else
+	printk("Failed to print all sems: build with CONFIG_SEMAPHORE_DEBUG\n");
+#endif
 }
 
 /* Condition variables, using semaphores and kthreads */
@@ -527,6 +624,7 @@ static void sem_wake_one(struct semaphore *sem)
 	sem->nr_signals++;
 	kthread = TAILQ_FIRST(&sem->waiters);
 	TAILQ_REMOVE(&sem->waiters, kthread, link);
+	debug_upped_sem(sem);
 	spin_unlock(&sem->lock);
 	kthread_runnable(kthread);
 }
