@@ -276,7 +276,7 @@ static long unionread(struct chan *c, void *va, long n)
 	struct mhead *mh;
 	struct mount *mount;
 
-	spin_lock(&c->umqlock);
+	qlock(&c->umqlock);
 	mh = c->umh;
 	rlock(&mh->lock);
 	mount = mh->mount;
@@ -312,19 +312,19 @@ static long unionread(struct chan *c, void *va, long n)
 		mount = mount->next;
 	}
 	runlock(&mh->lock);
-	spin_unlock(&c->umqlock);
+	qunlock(&c->umqlock);
 	return nr;
 }
 
 static void unionrewind(struct chan *c)
 {
-	spin_lock(&c->umqlock);
+	qlock(&c->umqlock);
 	c->uri = 0;
 	if (c->umc) {
 		cclose(c->umc);
 		c->umc = NULL;
 	}
-	spin_unlock(&c->umqlock);
+	qunlock(&c->umqlock);
 }
 
 static char *pathlast(struct path *p)
@@ -432,7 +432,7 @@ static void mountrock(struct chan *c, uint8_t * p, unsigned char **pe)
 	}
 
 	/* save it away */
-	spin_lock(&c->rockqlock);
+	qlock(&c->rockqlock);
 	if (c->nrock + len > c->mrock) {
 		n = ROUNDUP(c->nrock + len, 1024);
 		r = kzmalloc(n, KMALLOC_WAIT);
@@ -443,7 +443,7 @@ static void mountrock(struct chan *c, uint8_t * p, unsigned char **pe)
 	}
 	memmove(c->dirrock + c->nrock, p, len);
 	c->nrock += len;
-	spin_unlock(&c->rockqlock);
+	qunlock(&c->rockqlock);
 
 	/* drop it */
 	*pe = p;
@@ -462,7 +462,7 @@ static int mountrockread(struct chan *c, uint8_t * op, long n, long *nn)
 		return 0;
 
 	/* copy out what we can */
-	spin_lock(&c->rockqlock);
+	qlock(&c->rockqlock);
 	rp = c->dirrock;
 	erp = rp + c->nrock;
 	p = op;
@@ -477,7 +477,7 @@ static int mountrockread(struct chan *c, uint8_t * op, long n, long *nn)
 	}
 
 	if (p == op) {
-		spin_unlock(&c->rockqlock);
+		qunlock(&c->rockqlock);
 		return 0;
 	}
 
@@ -487,7 +487,7 @@ static int mountrockread(struct chan *c, uint8_t * op, long n, long *nn)
 	c->nrock = erp - rp;
 
 	*nn = p - op;
-	spin_unlock(&c->rockqlock);
+	qunlock(&c->rockqlock);
 	return 1;
 }
 

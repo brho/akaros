@@ -9,18 +9,18 @@
 #include <apipe.h>
 #include <rwlock.h>
 #include <rendez.h>
+#include <kthread.h>
 
 /* The lock issue is still undecided. For now, we preserve the lock type
  * and plan to revisit the issue when it makes sense.
  */
 
-/* qlocks are somewhat special, so leave the calls the same for now. */
-/* TODO: replace these with semaphores */
-typedef spinlock_t qlock_t;
-#define qlock_init(x)
-#define qlock(x) spin_lock(x)
-#define qunlock(x) spin_unlock(x)
-#define canqlock(x) spin_trylock(x)
+/* qlocks are plan9's binary sempahore */
+typedef struct semaphore qlock_t;
+#define qlock_init(x) sem_init((x), 1)
+#define qlock(x) sem_down(x)
+#define qunlock(x) sem_up(x)
+#define canqlock(x) sem_trydown(x)
 
 /* ilock is a lock that occurs during interrupts. */
 #define ilock(x) spin_lock_irqsave(x)
