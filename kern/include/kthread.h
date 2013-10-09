@@ -17,10 +17,7 @@
 struct proc;
 struct kthread;
 struct semaphore;
-struct semaphore_entry;
 TAILQ_HEAD(kthread_tailq, kthread);
-LIST_HEAD(semaphore_list, semaphore_entry);
-
 
 /* This captures the essence of a kernel context that we want to suspend.  When
  * a kthread is running, we make sure its stacktop is the default kernel stack,
@@ -51,13 +48,6 @@ struct cond_var {
 	spinlock_t 					internal_lock;
 	unsigned long				nr_waiters;
 	bool						irq_okay;
-};
-
-/* TODO: consider building this into struct semaphore */
-struct semaphore_entry {
-	struct semaphore sem;
-	int fd;
-	LIST_ENTRY(semaphore_entry) link;
 };
 
 uintptr_t get_kstack(void);
