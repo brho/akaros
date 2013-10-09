@@ -16,6 +16,7 @@
  * site.  Returns 0 when we can't jump back any farther. */
 static inline uintptr_t get_caller_pc(void)
 {
+#warning Returning PC instead of caller pc
 	return read_pc();
 }
 

@@ -108,7 +108,7 @@ static inline unsigned long read_flags(void) __attribute__((always_inline));
 static inline void write_eflags(unsigned long eflags)
               __attribute__((always_inline));
 static inline unsigned long read_bp(void) __attribute__((always_inline));
-static inline unsigned long read_ip(void) __attribute__((always_inline));
+static inline unsigned long read_pc(void) __attribute__((always_inline));
 static inline unsigned long read_sp(void) __attribute__((always_inline));
 static inline void cpuid(uint32_t info1, uint32_t info2, uint32_t *eaxp,
                          uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp)
@@ -284,7 +284,7 @@ static inline unsigned long read_bp(void)
 	return bp;
 }
 
-static inline unsigned long read_ip(void)
+static inline unsigned long read_pc(void)
 {
 	unsigned long ip;
 	asm volatile("call 1f; 1: pop %0" : "=r"(ip));
