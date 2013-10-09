@@ -35,6 +35,8 @@
 struct socket;
 struct proc;
 STAILQ_HEAD(socket_tailq, socket);
+struct semaphore_entry;
+LIST_HEAD(sock_semaphore_list, semaphore_entry);
 
 // These are probably defined elsewhere too..
 #ifndef socklen_t
@@ -52,6 +54,13 @@ enum sock_type {
     SOCK_PACKET = 10,
 };
 
+/* TODO: consider building this into struct semaphore */
+struct semaphore_entry {
+	struct semaphore sem;
+	int fd;
+	LIST_ENTRY(semaphore_entry) link;
+};
+
 struct socket{
   //int so_count;       /* (b) reference count */
   short   so_type;        /* (a) generic type, see socket.h */
@@ -67,7 +76,7 @@ struct socket{
 	struct semaphore sem;
 	struct semaphore accept_sem;
 	spinlock_t waiter_lock;
-	struct semaphore_list waiters;   /* semaphone to for a process to sleep on */
+	struct sock_semaphore_list waiters; /* sem for a process to sleep on */
 	struct socket_tailq acceptq;
 	STAILQ_ENTRY(socket) next;
 	//struct  vnet *so_vnet;      /* network stack instance */
