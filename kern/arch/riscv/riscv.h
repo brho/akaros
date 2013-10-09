@@ -23,6 +23,14 @@ read_pc(void)
 	return pc;
 }
 
+static inline uintptr_t
+read_bp(void)
+{
+	/* frame pointer.  yes, read_bp is a shitty name.  i'll change all of them
+	 * to read_fp when you read this and implement the function.  =) */
+	return 0;
+}
+
 static __inline void
 send_ipi(uint32_t who, uint8_t vector)
 {
