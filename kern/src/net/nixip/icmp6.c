@@ -869,6 +869,14 @@ extern char *icmpannounce(struct conv *c, char **argv, int argc);
 extern char *icmpconnect(struct conv *c, char **argv, int argc);
 extern void icmpclose(struct conv *c);
 
+void icmp6newconv(struct proto *icmp6, struct conv *conv)
+{
+	/* Fsprotoclone alloc'd our priv struct and attached it to conv already.
+	 * Now we need to init it */
+	struct Icmpcb6 *icb = (struct Icmpcb6*)conv->ptcl;
+	qlock_init(&icb->qlock);
+}
+
 void icmp6init(struct fs *fs)
 {
 	struct proto *icmp6 = kzmalloc(sizeof(struct proto), 0);
@@ -885,6 +893,7 @@ void icmp6init(struct fs *fs)
 	icmp6->ctl = icmpctl6;
 	icmp6->advise = icmpadvise6;
 	icmp6->gc = NULL;
+	icmp6->newconv = icmp6newconv;
 	icmp6->ipproto = ICMPv6;
 	icmp6->nc = 16;
 	icmp6->ptclsize = sizeof(Icmpcb6);

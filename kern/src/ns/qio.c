@@ -710,10 +710,9 @@ struct queue *qopen(int limit,
 		return 0;
 
 	spinlock_init_irqsave(&q->lock);
-	/* note: we let the pipes do our locking. 
-	spinlock_init(&q->rlock);
-	spinlock_init(&q->wlock);
-	*/
+	/* These qlocks are unused right now */
+	qlock_init(&q->rlock);
+	qlock_init(&q->wlock);
 	q->limit = q->inilim = limit;
 	q->kick = kick;
 	q->arg = arg;
@@ -739,10 +738,9 @@ struct queue *qbypass(void (*bypass) (void *, struct block *), void *arg)
 
 	/* TODO: Assuming non-irqsave for now */
 	spinlock_init(&q->lock);
-	/*
-	spinlock_init(&q->rlock);
-	spinlock_init(&q->wlock);
-	*/
+	/* These qlocks are unused right now */
+	qlock_init(&q->rlock);
+	qlock_init(&q->wlock);
 	q->limit = 0;
 	q->arg = arg;
 	q->bypass = bypass;

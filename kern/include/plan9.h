@@ -17,6 +17,7 @@
 /* qlocks are somewhat special, so leave the calls the same for now. */
 /* TODO: replace these with semaphores */
 typedef spinlock_t qlock_t;
+#define qlock_init(x)
 #define qlock(x) spin_lock(x)
 #define qunlock(x) spin_unlock(x)
 #define canqlock(x) spin_trylock(x)
@@ -972,6 +973,7 @@ struct proto {
 	int (*remote) (struct conv *, char *, int);
 	int (*inuse) (struct conv *);
 	int (*gc) (struct proto *);	/* returns true if any conversations are freed */
+	void (*newconv) (struct proto *, struct conv *);
 
 	struct fs *f;				/* file system this proto is part of */
 	struct conv **conv;			/* array of conversations */

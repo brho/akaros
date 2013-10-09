@@ -352,6 +352,7 @@ static struct ether *etherprobe(int cardno, int ctlrno)
 	ether->netif.minmtu = ETHERMINTU;
 	ether->netif.mtu = ETHERMAXTU;
 	ether->netif.maxmtu = ETHERMAXTU;
+	qlock_init(&ether->netif.qlock);
 
 	if (cardno >= Maxether || cards[cardno].type == NULL) {
 		kfree(ether);

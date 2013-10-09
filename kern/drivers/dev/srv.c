@@ -58,6 +58,7 @@ static void
 srvinit(void)
 {
 	qidpath = 1;
+	qlock_init(&srvlk);
 }
 
 static struct chan*

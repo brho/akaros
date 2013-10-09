@@ -75,6 +75,7 @@ void netloginit(struct fs *f)
 {
 	f->alog = kzmalloc(sizeof(struct netlog), 0);
 	rendez_init(&f->alog->rv);
+	qlock_init(&f->alog->qlock);
 }
 
 void netlogopen(struct fs *f)

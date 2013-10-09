@@ -3174,6 +3174,8 @@ void tcpinit(struct fs *fs)
 	tcp->nc = scalednconv();
 	tcp->ptclsize = sizeof(Tcpctl);
 	tpriv->stats[MaxConn] = tcp->nc;
+	qlock_init(&tpriv->tl);
+	qlock_init(&tpriv->apl);
 
 	Fsproto(fs, tcp);
 }

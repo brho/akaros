@@ -1187,12 +1187,17 @@ static long ipbwrite(struct chan *ch, struct block *bp, int64_t offset)
 	}
 }
 
+static void ipinit(void)
+{
+	qlock_init(&fslock);
+}
+
 struct dev ipdevtab = {
 	'I',
 	"ip",
 
 	ipreset,
-	devinit,
+	ipinit,
 	devshutdown,
 	ipattach,
 	ipwalk,
@@ -1208,8 +1213,10 @@ struct dev ipdevtab = {
 	ipwstat,
 };
 
+/* All protocols call this to finish their alloc and bind to f */
 int Fsproto(struct fs *f, struct proto *p)
 {
+	qlock_init(&p->qlock);
 	if (f->np >= Maxproto)
 		return -1;
 
@@ -1261,12 +1268,17 @@ retry:
 				error(Enomem);
 			rendez_init(&c->cr);
 			rendez_init(&c->listenr);
+			qlock_init(&c->qlock);
+			qlock_init(&c->car);
+			qlock_init(&c->listenq);
 			/* We will always get this lock, since we just alloc'd c.  Remember,
 			 * we can't sleep in here. */
 			qlock(&c->qlock);
 			c->p = p;
 			c->x = pp - p->conv;
 			if (p->ptclsize != 0) {
+				/* man this is shitty - it makes it so you can't do per-proto
+				 * alloc/init on their private structures... */
 				c->ptcl = kzmalloc(p->ptclsize, 0);
 				if (c->ptcl == NULL) {
 					/* Technically, no one knows about this, so the old code
@@ -1276,6 +1288,11 @@ retry:
 					kfree(c);
 					error(Enomem);
 				}
+				/* For now, we'll have an optional proto op to init private
+				 * proto structs.  Prob should put the alloc in here too. (TODO:
+				 * revise this once we stabilize all of our protos). */
+				if (p->newconv)
+					p->newconv(p, c);
 			}
 			*pp = c;
 			p->ac++;

@@ -136,6 +136,8 @@ struct chan *newchan(void)
 	memset(&c->mqid, 0, sizeof(c->mqid));
 	c->path = 0;
 	c->ismtpt = 0;
+	qlock_init(&c->umqlock);
+	qlock_init(&c->rockqlock);
 
 	return c;
 }

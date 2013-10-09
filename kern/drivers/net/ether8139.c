@@ -816,6 +816,7 @@ static int rtl8139pnp(struct ether *edev)
 	ctlr->pci = p;
 	ctlr->id = id;
 	ctlr->port = port;
+	qlock_init(&ctlr->alock);
 	spinlock_init_irqsave(&ctlr->ilock);
 	spinlock_init_irqsave(&ctlr->tlock);
 

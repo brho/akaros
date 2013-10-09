@@ -73,6 +73,7 @@ static struct chan *pipeattach(char *spec)
 	if (p == 0)
 		panic("memory");
 	kref_init(&p->ref, pipe_release, 1);
+	qlock_init(&p->qlock);
 
 	p->q[0] = qopen(Pipeqsize, 0, 0, 0);
 	if (p->q[0] == 0) {

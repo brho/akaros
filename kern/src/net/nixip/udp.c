@@ -584,6 +584,14 @@ int udpstats(struct proto *udp, char *buf, int len)
 					upriv->ustats.udpInErrors, upriv->ustats.udpOutDatagrams);
 }
 
+void udpnewconv(struct proto *udp, struct conv *conv)
+{
+	/* Fsprotoclone alloc'd our priv struct and attached it to conv already.
+	 * Now we need to init it */
+	struct Udpcb *ucb = (struct Udpcb*)conv->ptcl;
+	qlock_init(&ucb->qlock);
+}
+
 void udpinit(struct fs *fs)
 {
 	struct proto *udp;
@@ -600,6 +608,7 @@ void udpinit(struct fs *fs)
 	udp->rcv = udpiput;
 	udp->advise = udpadvise;
 	udp->stats = udpstats;
+	udp->newconv = udpnewconv;
 	udp->ipproto = IP_UDPPROTO;
 	udp->nc = Nchans;
 	udp->ptclsize = sizeof(Udpcb);

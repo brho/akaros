@@ -809,6 +809,8 @@ void ipifcinit(struct fs *f)
 
 	f->ipifc = ipifc;	/* hack for ipifcremroute, findipifc, ... */
 	f->self = kzmalloc(sizeof(struct Ipselftab), 0);	/* hack for ipforme */
+	/* if this gets moved into pctl, we'll need to init it somewhere */
+	qlock_init(&f->self->qlock);
 
 	Fsproto(f, ipifc);
 }
