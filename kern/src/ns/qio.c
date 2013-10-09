@@ -798,6 +798,15 @@ qcopy(struct queue *q, int len, uint32_t offset)
 	return nb;
 }
 
+static void qinit_common(struct queue *q)
+{
+	spinlock_init(&q->lock);
+	qlock_init(&q->rlock);
+	qlock_init(&q->wlock);
+	rendez_init(&q->rr);
+	rendez_init(&q->wr);
+}
+
 /*
  *  called by non-interrupt code
  */
@@ -809,6 +818,7 @@ qopen(int limit, int msg, void (*kick)(void*), void *arg)
 	q = kzmalloc(sizeof(struct queue), 0);
 	if(q == 0)
 		return 0;
+	qinit_common(q);
 
 	q->limit = q->iNULLim = limit;
 	q->kick = kick;
@@ -830,6 +840,7 @@ qbypass(void (*bypass)(void*, struct block*), void *arg)
 	q = kzmalloc(sizeof(struct queue), 0);
 	if(q == 0)
 		return 0;
+	qinit_common(q);
 
 	q->limit = 0;
 	q->arg = arg;

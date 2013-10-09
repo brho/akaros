@@ -155,6 +155,8 @@ newchan(void)
 		c->link = chanalloc.list;
 		chanalloc.list = c;
 		spin_unlock(&(&chanalloc)->lock);
+		spinlock_init(&c->lock);
+		qlock_init(&c->umqlock);
 	}
 
 	/* if you get an error before associating with a dev,

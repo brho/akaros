@@ -56,10 +56,12 @@ newpgrp(void)
 {
 	struct pgrp *p;
 
-	p = kzmalloc(sizeof(struct pgrp), 0);
+	p = kzmalloc(sizeof(struct pgrp), KMALLOC_WAIT);
 	kref_init(&p->ref, freepgrp, 1);
 	p->pgrpid = NEXT_ID(pgrpid);
 	p->progmode = 0644;
+	qlock_init(&p->debug);
+	qlock_init(&p->nsh);
 	return p;
 }
 
@@ -185,6 +187,7 @@ newfgrp(void)
 
 	new = kzmalloc(sizeof(struct fgrp), 0);
 	kref_init(&new->ref, freefgrp, 1);
+	spinlock_init(&new->lock);
 	n = DELTAFD;
 	new->nfd = n;
 	new->fd = kzmalloc(n * sizeof(struct chan *), 0);

@@ -226,6 +226,8 @@ ip_init(struct Fs *f)
 	struct IP *ip;
 
 	ip = kzmalloc(sizeof(struct IP), 0);
+	qlock_init(&ip->fraglock4);
+	qlock_init(&ip->fraglock6);
 	initfrag(ip, 100);
 	f->ip = ip;
 

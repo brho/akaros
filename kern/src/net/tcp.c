@@ -3190,6 +3190,8 @@ tcpinit(struct Fs *fs)
 
 	tcp = kzmalloc(sizeof(struct Proto), 0);
 	tpriv = tcp->priv = kzmalloc(sizeof(struct tcppriv), 0);
+	qlock_init(&tpriv->tl);
+	qlock_init(&tpriv->apl);
 	tcp->name = "tcp";
 	tcp->connect = tcpconnect;
 	tcp->announce = tcpannounce;

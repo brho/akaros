@@ -259,6 +259,7 @@ ipgen(struct chan *c, char *unused_char_p_t, struct dirtab*d, int unused_int, in
 static void
 ipreset(void)
 {
+	qlock_init(&fslock);
 	nullmediumlink();
 	pktmediumlink();
 /* if only
@@ -282,7 +283,9 @@ ipgetfs(int dev)
 
 	qlock(&fslock);
 	if(ipfs[dev] == NULL){
-		f = kzmalloc(sizeof(struct Fs), 0);
+		f = kzmalloc(sizeof(struct Fs), KMALLOC_WAIT);
+		rwinit(&f->rwlock);
+		qlock_init(&f->iprouter.qlock);
 		ip_init(f);
 		arpinit(f);
 		netloginit(f);
@@ -1227,6 +1230,7 @@ Fsproto(struct Fs *f, struct Proto *p)
 	if(f->np >= Maxproto)
 		return -1;
 
+	qlock_init(&p->qlock);
 	p->f = f;
 
 	if(p->ipproto > 0){
@@ -1276,6 +1280,10 @@ retry:
 			c = kzmalloc(sizeof(struct conv), 0);
 			if(c == NULL)
 				error(Enomem);
+			qlock_init(&c->qlock);
+			qlock_init(&c->listenq);
+			rendez_init(&c->cr);
+			rendez_init(&c->listenr);
 			qlock(&c->qlock);
 			c->p = p;
 			c->x = pp - p->conv;

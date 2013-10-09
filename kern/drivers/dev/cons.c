@@ -1246,6 +1246,7 @@ truerand(void)
 	return x;
 }
 
+/* TODO: qlock_init this, if you ever use this */
 qlock_t grandomlk;
 
 void

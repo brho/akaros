@@ -58,7 +58,9 @@ static void 	rxmitproc(void *v);
 void
 arpinit(struct Fs *f)
 {
-	f->arp = kzmalloc(sizeof(struct arp), 0);
+	f->arp = kzmalloc(sizeof(struct arp), KMALLOC_WAIT);
+	qlock_init(&f->arp->qlock);
+	rendez_init(&f->arp->rxmtq);
 	f->arp->f = f;
 	f->arp->rxmt = NULL;
 	f->arp->dropf = f->arp->dropl = NULL;

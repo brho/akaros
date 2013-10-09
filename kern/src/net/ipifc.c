@@ -877,6 +877,7 @@ ipifcinit(struct Fs *f)
 
 	f->ipifc = ipifc;			/* hack for ipifcremroute, findipifc, ... */
 	f->self = kzmalloc(sizeof(struct Ipselftab), 0);	/* hack for ipforme */
+	qlock_init(&f->self->qlock);
 
 	Fsproto(f, ipifc);
 }

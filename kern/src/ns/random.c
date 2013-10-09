@@ -103,6 +103,9 @@ randomclock(void)
 void
 randominit(void)
 {
+	qlock_init(&rb.qlock);
+	rendez_init(&rb.producer);
+	rendez_init(&rb.consumer);
 	/* Frequency close but not equal to HZ */
 	//addclock0link(randomclock, 13);
 	rb.target = 16;
