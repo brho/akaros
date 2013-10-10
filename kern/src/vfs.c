@@ -1810,6 +1810,8 @@ int pipe_release(struct inode *inode, struct file *file)
 	} else {
 		warn("Bad pipe file flags 0x%x\n", file->f_flags);
 	}
+	/* need to wake up any sleeping readers/writers, since we might be done */
+	__cv_broadcast(&pii->p_cv);
 	cv_unlock(&pii->p_cv);
 	return 0;
 }
@@ -1821,6 +1823,19 @@ struct file_operations pipe_f_op = {
 	.release = pipe_release,
 	0
 };
+
+void pipe_debug(struct file *f)
+{
+	struct pipe_inode_info *pii = f->f_dentry->d_inode->i_pipe;
+	assert(pii);
+	printk("PIPE %p\n", pii);
+	printk("\trdoff %p\n", pii->p_rd_off);
+	printk("\twroff %p\n", pii->p_wr_off);
+	printk("\tnr_rds %d\n", pii->p_nr_readers);
+	printk("\tnr_wrs %d\n", pii->p_nr_writers);
+	printk("\tcv waiters %d\n", pii->p_cv.nr_waiters);
+
+}
 
 /* General plan: get a dentry/inode to represent the pipe.  We'll alloc it from
  * the default_ns SB, but won't actually link it anywhere.  It'll only be held
