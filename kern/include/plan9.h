@@ -2,7 +2,9 @@
  * Copyright 2013 Google Inc.
  * Copyright (c) 1989-2003 by Lucent Technologies, Bell Laboratories.
  */
-#ifndef KERN_INCLUDE_PLAN9_H
+
+#ifndef ROS_KERN_PLAN9_H
+#define ROS_KERN_PLAN9_H
 
 #include <setjmp.h>
 #include <atomic.h>
@@ -1396,5 +1398,4 @@ uint16_t ptclbsum(uint8_t *addr, int len);
 /* kern/src/libip/readipifc.c */
 struct ipifc *readipifc(char *net, struct ipifc *ifc, int index);
 
-
-#endif /* KERN_INCLUDE_PLAN9_H */
+#endif /* ROS_KERN_PLAN9_H */
