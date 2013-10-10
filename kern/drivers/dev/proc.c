@@ -1362,6 +1362,7 @@ struct dev procdevtab = {
 	procwstat,
 	devpower,
 	devconfig,
+	devchaninfo,
 };
 
 #if 0

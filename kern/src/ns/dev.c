@@ -468,3 +468,10 @@ int devconfig(int a, char *b, void *v)
 	error(Eperm);
 	return 0;
 }
+
+char *devchaninfo(struct chan *chan, char *ret, size_t ret_l)
+{
+	snprintf(ret, ret_l, "qid.path: %p, qid.type: %02x\n", chan->qid.path,
+	         chan->qid.type);
+	return ret;
+}

@@ -372,4 +372,5 @@ struct dev rootdevtab = {
 	devwstat,
 	devpower,
 	devconfig,
+	devchaninfo,
 };

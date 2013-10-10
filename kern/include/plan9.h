@@ -244,6 +244,7 @@ struct dev {
 	long (*wstat) (struct chan * chan, uint8_t * new, long size);
 	void (*power) (int control);	/* power mgt: power(1) => on, power (0) => off */
 	int (*config) (int opts, char *command, void *conf);	/* returns 0 on error */
+	char *(*chaninfo) (struct chan *chan, char *ret, size_t ret_l);
 };
 enum {
 	NSMAX = 1000,
@@ -585,6 +586,7 @@ void devremove(struct chan *c);
 long devwstat(struct chan *c, uint8_t * a, long b);
 void devpower(int onoff);
 int devconfig(int a, char *b, void *v);
+char *devchaninfo(struct chan *chan, char *ret, size_t ret_l);
 
 /* kern/src/plan9file.c */
 struct chan *fdtochan(int fd, int mode, int chkmnt, int iref);

@@ -1213,6 +1213,7 @@ struct dev ipdevtab = {
 	ipwstat,
 	devpower,
 	devconfig,
+	devchaninfo,
 };
 
 /* All protocols call this to finish their alloc and bind to f */

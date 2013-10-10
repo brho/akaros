@@ -408,4 +408,5 @@ struct dev pipedevtab = {
 	devwstat,
 	devpower,
 	devconfig,
+	devchaninfo,
 };

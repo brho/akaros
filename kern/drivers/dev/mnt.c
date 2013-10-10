@@ -1225,4 +1225,5 @@ struct dev mntdevtab = {
 	mntwstat,
 	devpower,
 	devconfig,
+	devchaninfo,
 };

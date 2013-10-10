@@ -502,4 +502,5 @@ struct dev etherdevtab = {
 	etherwstat,
 	devpower,
 	devconfig,
+	devchaninfo,
 };

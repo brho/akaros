@@ -370,4 +370,5 @@ struct dev srvdevtab = {
 	srvwstat,
 	devpower,
 	devconfig,
+	devchaninfo,
 };

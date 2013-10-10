@@ -364,4 +364,5 @@ struct dev miscdevtab = {
 	devwstat,
 	devpower,
 	devconfig,
+	devchaninfo,
 };

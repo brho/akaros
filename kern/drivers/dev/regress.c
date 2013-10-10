@@ -138,4 +138,5 @@ struct dev regressdevtab = {
 	devwstat,
 	devpower,
 	devconfig,
+	devchaninfo,
 };
