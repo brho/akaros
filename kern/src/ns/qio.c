@@ -1017,7 +1017,7 @@ long qread(struct queue *q, void *vp, int len)
 	memset(&bs, 0, sizeof(bs));
 	bs.want = len;
 	bs.q = q;
-	bs.nonblock = 1;
+	bs.nonblock = 0;
 	bs.blockcount = 1;
 	if (apipe_read_cond(&q->pipe, readcond, &bs) < 0)
 		error("qbread: apipe_read_cond failed");
