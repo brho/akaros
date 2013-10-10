@@ -67,13 +67,21 @@ void main(int argc, char **argv)
 	int fd, msglen, interval, nmsg;
 	char *ds;
 	int pid;
+	char *saddr = "/9/net/tcp!127.0.0.1!2000";
+	char *caddr = "/9/net/tcp!127.0.0.1!2000";
 
+	if (argc > 1)
+		saddr = argv[1];
+	if (argc > 2)
+		saddr = argv[2];
 	pid = fork();
 	if (pid < 0) {
 		perror("fork");
 		exit(1);
 	}
-	if (pid == 0)
-		caller(argv[2]);
-	server(argv[1]);
+	if (pid == 0){
+		sleep(1);
+		caller(caddr);
+	} else
+		server(saddr);
 }

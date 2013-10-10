@@ -39,7 +39,6 @@ call(char *clone, char *dest, int *cfdp, char *dir, char *local)
 		sprintf(name, "connect %.*s %.*s", 2*NAMELEN, dest, NAMELEN, local);
 	else
 		sprintf(name, "connect %.*s", 2*NAMELEN, dest);
-
 	/* connect */
 	if(write(cfd, name, strlen(name)) < 0){
 		close(cfd);
@@ -89,12 +88,10 @@ dial(char *dest, char *local, char *dir, int *cfdp)
 		strcpy(netdir, "/9/net");
  
 
-#if 0
 	/* call the connection server */
 	sprintf(csname, "%s/cs", netdir);
 	fd = open(csname, O_RDWR);
-#endif
-	if(1/*fd < 0*/){
+	if(fd < 0){
 		/* no connection server, don't translate */
 		p = strchr(net, '!');
 		*p++ = 0;
