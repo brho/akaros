@@ -370,4 +370,6 @@ struct dev rootdevtab = {
 	devbwrite,
 	devremove,
 	devwstat,
+	devpower,
+	devconfig,
 };

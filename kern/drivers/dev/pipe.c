@@ -406,4 +406,6 @@ struct dev pipedevtab = {
 	pipebwrite,
 	devremove,
 	devwstat,
+	devpower,
+	devconfig,
 };

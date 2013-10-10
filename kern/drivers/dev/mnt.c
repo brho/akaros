@@ -1223,4 +1223,6 @@ struct dev mntdevtab = {
 	devbwrite,
 	mntremove,
 	mntwstat,
+	devpower,
+	devconfig,
 };

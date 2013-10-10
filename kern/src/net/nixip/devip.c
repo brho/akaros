@@ -1211,6 +1211,8 @@ struct dev ipdevtab = {
 	ipbwrite,
 	ipremove,
 	ipwstat,
+	devpower,
+	devconfig,
 };
 
 /* All protocols call this to finish their alloc and bind to f */

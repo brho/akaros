@@ -1360,6 +1360,8 @@ struct dev procdevtab = {
 	devbwrite,
 	devremove,
 	procwstat,
+	devpower,
+	devconfig,
 };
 
 #if 0

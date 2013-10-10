@@ -500,4 +500,6 @@ struct dev etherdevtab = {
 	etherbwrite,
 	devremove,
 	etherwstat,
+	devpower,
+	devconfig,
 };

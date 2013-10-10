@@ -136,4 +136,6 @@ struct dev regressdevtab = {
 	devbwrite,
 	devremove,
 	devwstat,
+	devpower,
+	devconfig,
 };

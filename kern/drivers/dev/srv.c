@@ -368,4 +368,6 @@ struct dev srvdevtab = {
 	devbwrite,
 	srvremove,
 	srvwstat,
+	devpower,
+	devconfig,
 };

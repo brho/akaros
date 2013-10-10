@@ -362,4 +362,6 @@ struct dev miscdevtab = {
 	devbwrite,
 	devremove,
 	devwstat,
+	devpower,
+	devconfig,
 };
