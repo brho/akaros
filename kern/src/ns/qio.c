@@ -573,6 +573,7 @@ int qpassnolim(struct queue *q, struct block *b)
 	if (q->state & Qstarve) {
 		q->state &= ~Qstarve;
 	}
+	iunlock(&q->lock);
 	return len;
 }
 
