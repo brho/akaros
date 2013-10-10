@@ -714,7 +714,6 @@ static void localclose(struct conv *s, char *reason)
 	Tcpctl *tcb;
 	Reseq *rp, *rp1;
 	struct tcppriv *tpriv;
-
 	tpriv = s->p->priv;
 	tcb = (Tcpctl *) s->ptcl;
 
@@ -3075,6 +3074,8 @@ static char *tcpctl(struct conv *c, char **f, int n)
 		return tcpsetchecksum(c, f, n);
 	if (n >= 1 && strcmp(f[0], "tcpporthogdefense") == 0)
 		return tcpporthogdefensectl(f[1]);
+	printk("tcpctl: %d: %s: unknown control request\n", current ? current->pid : -1, f[0]);
+	/* need a way to return this via error ... */
 	return "unknown control request";
 }
 

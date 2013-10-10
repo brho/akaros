@@ -602,6 +602,7 @@ long sysread(int fd, void *p, size_t n, off_t off)
 	long nn, nnn;
 	struct chan *c;
 	int ispread = 1;
+	printd("%p: ", current->pid);
 	printd("sysread %d %p %d %lld\n", fd, p, n, off);
 
 	if (waserror()) {
@@ -704,6 +705,8 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 	long r = n;
 	struct chan *c;
 
+	printd("%p: ", current->pid);
+	printd("syswrite %d %p %d %d\n", fd, p, n, off);
 	n = 0;
 	if (waserror()) {
 		printk("syswrite %d: '%s'\n", fd, current_errstr());
@@ -791,6 +794,7 @@ int sysopen(char *name, int omode)
 	int mustdir = 0;
 	if (name[0] == '/' && name[1] == '9')
 		name += 2;
+	printd("%p: ", current->pid);
 	printd("sysopen %s mode %o\n", name, omode);
 	if (omode & O_NONBLOCK)	/* what to do? */
 		omode &= ~O_NONBLOCK;
@@ -816,6 +820,7 @@ int sysopen(char *name, int omode)
 	if (fd < 0)
 		error(Enofd);
 	poperror();
+	printd("%p: ", current->pid);
 	printd("sysopen %s returns %d %x\n", name, fd, fd);
 	return fd;
 }
@@ -824,6 +829,7 @@ int sysclose(int fd)
 {
 	fdtochan(fd, -1, 0, 0);
 	fdclose(fd, 0);
+	printd("%p: ", current->pid);
 	printd("sysclose %d\n", fd);
 	return 0;
 }

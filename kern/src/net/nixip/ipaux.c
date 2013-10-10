@@ -243,11 +243,16 @@ int parsemac(uint8_t * to, char *from, int len)
 
 /*
  *  hashing tcp, udp, ... connections
+ *  gcc weirdness: it gave a bogus result until I split the
+ *  %= out.
  */
 uint32_t iphash(uint8_t * sa, uint16_t sp, uint8_t * da, uint16_t dp)
 {
-	return ((sa[IPaddrlen - 1] << 24) ^ (sp << 16) ^ (da[IPaddrlen - 1] << 8) ^
-			dp) % Nhash;
+	uint32_t ret;
+	ret = (sa[IPaddrlen - 1] << 24) ^ (sp << 16) ^ (da[IPaddrlen - 1] << 8) ^
+			dp;
+	ret %= Nhash;
+	return ret;
 }
 
 void iphtadd(struct Ipht *ht, struct conv *c)
@@ -310,7 +315,6 @@ struct conv *iphtlook(struct Ipht *ht, uint8_t * sa, uint16_t sp, uint8_t * da,
 	uint32_t hv;
 	struct iphash *h;
 	struct conv *c;
-
 	/* exact 4 pair match (connection) */
 	hv = iphash(sa, sp, da, dp);
 	spin_lock(&ht->lock);
@@ -324,7 +328,6 @@ struct conv *iphtlook(struct Ipht *ht, uint8_t * sa, uint16_t sp, uint8_t * da,
 			return c;
 		}
 	}
-
 	/* match local address and port */
 	hv = iphash(IPnoaddr, 0, da, dp);
 	for (h = ht->tab[hv]; h != NULL; h = h->next) {
@@ -336,7 +339,6 @@ struct conv *iphtlook(struct Ipht *ht, uint8_t * sa, uint16_t sp, uint8_t * da,
 			return c;
 		}
 	}
-
 	/* match just port */
 	hv = iphash(IPnoaddr, 0, IPnoaddr, dp);
 	for (h = ht->tab[hv]; h != NULL; h = h->next) {
@@ -348,7 +350,6 @@ struct conv *iphtlook(struct Ipht *ht, uint8_t * sa, uint16_t sp, uint8_t * da,
 			return c;
 		}
 	}
-
 	/* match local address */
 	hv = iphash(IPnoaddr, 0, da, 0);
 	for (h = ht->tab[hv]; h != NULL; h = h->next) {
@@ -360,7 +361,6 @@ struct conv *iphtlook(struct Ipht *ht, uint8_t * sa, uint16_t sp, uint8_t * da,
 			return c;
 		}
 	}
-
 	/* look for something that matches anything */
 	hv = iphash(IPnoaddr, 0, IPnoaddr, 0);
 	for (h = ht->tab[hv]; h != NULL; h = h->next) {

@@ -280,7 +280,7 @@ char *icmpctl6(struct conv *c, char **argv, int argc)
 		icb->headers = 6;
 		return NULL;
 	}
-	return "unknown control request";
+	return "unknown control request:icmp6";
 }
 
 static void goticmpkt6(struct proto *icmp, struct block *bp, int muxkey)

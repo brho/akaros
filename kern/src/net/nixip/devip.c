@@ -1104,7 +1104,7 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 				nexterror();
 			}
 			if (cb->nf < 1)
-				error("short control request");
+				error("%s: short control request",a);
 			if (strcmp(cb->f[0], "connect") == 0)
 				connectctlmsg(x, c, cb);
 			else if (strcmp(cb->f[0], "announce") == 0)
@@ -1153,7 +1153,7 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 				if (p != NULL)
 					error(p);
 			} else
-				error("unknown control request");
+				error("%s: not implemented", cb->f[0]);
 			qunlock(&c->qlock);
 			kfree(cb);
 			poperror();
