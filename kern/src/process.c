@@ -350,6 +350,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	p->open_files.max_fdset = NR_FILE_DESC_DEFAULT;
 	p->open_files.fd = p->open_files.fd_array;
 	p->open_files.open_fds = (struct fd_set*)&p->open_files.open_fds_init;
+	/* TODO: init 9ns flags in fd_array */
 	/* Init the ucq hash lock */
 	p->ucq_hashlock = (struct hashlock*)&p->ucq_hl_noref;
 	hashlock_init_irqsave(p->ucq_hashlock, HASHLOCK_DEFAULT_SZ);
@@ -813,6 +814,7 @@ void proc_destroy(struct proc *p)
 	 * closing these might block (can't block while spinning). */
 	/* TODO: might need some sync protection */
 	close_all_files(&p->open_files, FALSE);
+	/* TODO: close all 9ns resources */
 	/* Tell the ksched about our death, and which cores we freed up */
 	__sched_proc_destroy(p, pc_arr, nr_cores_revoked);
 	/* Tell our parent about our state change (to DYING) */
@@ -2232,4 +2234,17 @@ void check_my_owner(void)
 		hash_for_each(pid_hash, shazbot);
 		spin_unlock(&pid_hash_lock);
 	}
+}
+
+/* Use this via kfunc */
+void print_9ns(void)
+{
+	void print_proc_9ns(void *item)
+	{
+		struct proc *p = (struct proc*)item;
+		print_9ns_files(p);
+	}
+	spin_lock(&pid_hash_lock);
+	hash_for_each(pid_hash, print_proc_9ns);
+	spin_unlock(&pid_hash_lock);
 }

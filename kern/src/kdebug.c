@@ -60,6 +60,7 @@ static const char *blacklist[] = {
 	"genrandom",	/* not noisy, just never returns */
 	"rangecompare",
 	"walkadd",
+	"limborexmit",
 };
 
 static bool is_blacklisted(const char *s)

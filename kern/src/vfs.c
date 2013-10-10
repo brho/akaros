@@ -2063,6 +2063,7 @@ struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
 			assert(file_desc < open_files->max_files);
 			file = open_files->fd[file_desc].fd_file;
 			open_files->fd[file_desc].fd_file = 0;
+			open_files->fd[file_desc].plan9fd = -1;
 			assert(file);
 			kref_put(&file->f_kref);
 			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc);
@@ -2115,6 +2116,7 @@ void close_all_files(struct files_struct *open_files, bool cloexec)
 				continue;
 			/* Actually close the file */
 			open_files->fd[i].fd_file = 0;
+			open_files->fd[i].plan9fd = -1;
 			assert(file);
 			kref_put(&file->f_kref);
 			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, i);

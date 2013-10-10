@@ -82,6 +82,7 @@ struct proc {
 	/* Filesystem info */
 	struct namespace			*ns;
 	struct fs_struct			fs_env;
+	/* TODO: Oh shit, this needs init'd, with plan9fd == -1 */
 	struct files_struct			open_files;
 
 	/* Plan 9 namespace. Evil plan: replace three things above. */

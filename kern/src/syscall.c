@@ -1237,7 +1237,7 @@ static intreg_t sys_close(struct proc *p, int fd)
 		/* file will get freed when its last ref releases (should be in
 		 * put_file_from).  sysclose internally does its own EBADF checks. */
 		retval = sysclose(p->open_files.fd[fd].plan9fd);
-		p->open_files.fd[fd].plan9fd = 0;
+		p->open_files.fd[fd].plan9fd = -1;
 	}
 	kref_put(&file->f_kref);	/* Drop the ref from get_file */
 	/* Bail out early if sysclose aborted */
