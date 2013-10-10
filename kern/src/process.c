@@ -29,6 +29,7 @@
 #include <arsc_server.h>
 #include <devfs.h>
 #include <kmalloc.h>
+#include <plan9.h>
 
 struct kmem_cache *proc_cache;
 
@@ -2177,12 +2178,17 @@ void print_proc_info(pid_t pid)
 	struct files_struct *files = &p->open_files;
 	spin_lock(&files->lock);
 	for (int i = 0; i < files->max_files; i++)
-		if (files->fd_array[i].fd_file) {
-			printk("\tFD: %02d, File: %p, File name: %s\n", i,
-			       files->fd_array[i].fd_file,
-			       file_name(files->fd_array[i].fd_file));
+		if (files->fd[i].fd_file) {
+			if (files->fd[i].fd_file->plan9) {
+				printk("\tFD: %02d, File: %p, plan9 fd: %d\n", i,
+				       files->fd[i].fd_file, files->fd[i].plan9fd);
+			} else {
+				printk("\tFD: %02d, File: %p, File name: %s\n", i,
+				       files->fd[i].fd_file, file_name(files->fd[i].fd_file));
+			}
 		}
 	spin_unlock(&files->lock);
+	print_9ns_files(p);
 	printk("Children: (PID (struct proc *))\n");
 	TAILQ_FOREACH(child, &p->children, sibling_link)
 		printk("\t%d (%p)\n", child->pid, child);

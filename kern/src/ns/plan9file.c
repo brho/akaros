@@ -1176,3 +1176,22 @@ sysunmount(char *name, char *old)
 	poperror();
 	return 0;
 }
+
+void print_9ns_files(struct proc *p)
+{
+	char buf[64] = {0};
+	struct fgrp *f = p->fgrp;
+	struct chan *ch;
+	spin_lock(&f->lock);
+	printk("9ns files for proc %d:\n", p->pid);
+	/* maxfd is a legit val, not a +1 */
+	for (int i = 0; i <= f->maxfd; i++) {
+		ch = f->fd[i];
+		if (!ch)
+			continue;
+		printk("\t9fd %d, Chan pathname: %s, Dev: %s, Devinfo: %s\n", i,
+		       ch->path->s, ch->dev->name,
+		       ch->dev->chaninfo(ch, buf, sizeof(buf)));
+	}
+	spin_unlock(&f->lock);
+}
