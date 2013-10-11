@@ -805,6 +805,15 @@ qcopy(struct queue *q, int len, uint32_t offset)
 	return nb;
 }
 
+static void qcommon_init(struct queue *q)
+{
+	spinlock_init_irqsave(&q->lock);
+	rendez_init(&q->rr);
+	rendez_init(&q->wr);
+	qlock_init(&q->rlock);
+	qlock_init(&q->wlock);
+}
+
 /*
  *  called by non-interrupt code
  */
@@ -825,10 +834,7 @@ qopen(int limit, int msg, void (*kick)(void*), void *arg)
 	q->state |= Qstarve;
 	q->eof = 0;
 	q->noblock = 0;
-	rendez_init(&q->rr);
-	rendez_init(&q->wr);
-	qlock_init(&q->rlock);
-	qlock_init(&q->wlock);
+	qcommon_init(q);
 
 	return q;
 }
@@ -847,6 +853,7 @@ qbypass(void (*bypass)(void*, struct block*), void *arg)
 	q->arg = arg;
 	q->bypass = bypass;
 	q->state = 0;
+	qcommon_init(q);
 
 	return q;
 }
