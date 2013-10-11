@@ -749,7 +749,7 @@ mntrdwr(int type, struct chan *c, void *buf, long n, int64_t off)
 
 		got = nr;
 		if(type == Tread)
-			r->b = bl2mem(( uint8_t *)uba, r->b, &got);
+		  r->b = bl2mem(( uint8_t *)uba, r->b, /*&*/got);
 		//else if(cache)
 		//mfcwrite(c, ( uint8_t *)uba, nr, off);
 

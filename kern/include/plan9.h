@@ -366,31 +366,32 @@ struct fgrp {
 /*
  *  IO queues
  */
-#if 0
-struct queue {
+#if 1
+struct queue
+{
 	spinlock_t lock;
 
-	struct block *bfirst;		/* buffer */
-	struct block *blast;
+	struct block*	bfirst;		/* buffer */
+	struct block*	blast;
 
-	int len;					/* bytes allocated to queue */
-	int dlen;					/* data bytes in queue */
-	int limit;					/* max bytes in queue */
-	int inilim;				/* initial limit */
-	int state;
-	int noblock;				/* true if writes return immediately when q full */
-	int eof;					/* number of eofs read by user */
+	int	len;		/* bytes allocated to queue */
+	int	dlen;		/* data bytes in queue */
+	int	limit;		/* max bytes in queue */
+	int	inilim;		/* initial limit */
+	int	state;
+	int	noblock;	/* true if writes return immediately when q full */
+	int	eof;		/* number of eofs read by user */
 
-	void (*kick) (void *);		/* restart output */
-	void (*bypass) (void *, struct block *);	/* bypass queue altogether */
-	void *arg;					/* argument to kick */
+	void	(*kick)(void*);	/* restart output */
+	void	(*bypass)(void*, struct block*);	/* bypass queue altogether */
+	void*	arg;		/* argument to kick */
 
-	qlock_t rlock;				/* mutex for reading processes */
-	/* how do we do this Rendez rr;     / * process waiting to read */
-	qlock_t wlock;				/* mutex for writing processes */
-	/* how do we do this Rendez wr;     / * process waiting to write */
+        qlock_t	rlock;		/* mutex for reading processes */
+	struct rendez rr;		/* process waiting to read */
+	qlock_t	wlock;		/* mutex for writing processes */
+	struct rendez	wr;		/* process waiting to write */
 
-	char err[ERRMAX];
+	char	err[ERRMAX];
 };
 
 #else
@@ -642,7 +643,7 @@ struct queue *qopen(int nblock, int msg, void (*kick) (void *), void *arg);
 struct queue *qbypass(void (*bypass) (void *, struct block *), void *arg);
 void qaddlist(struct queue *q, struct block *b);
 struct block *qremove(struct queue *q);
-struct block *bl2mem(uint8_t * p, struct block *b, int *pn);
+struct block *bl2mem(uint8_t * p, struct block *b, int n);
 struct block *mem2bl(uint8_t * p, int len);
 void qputback(struct queue *q, struct block *b);
 struct block *qbread(struct queue *q, int len);
