@@ -2610,9 +2610,11 @@ static void tcpoutput(struct conv *s)
 			default:
 				panic("tcpoutput2: version %d", version);
 		}
+		/* brho: looks like they are trying to share the core.  this will only
+		 * give time to other kthreads, not to user processes. */
 		if ((msgs % 4) == 1) {
 			qunlock(&s->qlock);
-			schedule();
+			kthread_yield();
 			qlock(&s->qlock);
 		}
 	}
