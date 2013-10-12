@@ -204,7 +204,7 @@ void manager_brho(void)
 			printd("Manager Progress: %d\n", progress);
 			// delay if you want to test rescheduling an MCP that yielded
 			//udelay(15000000);
-			schedule();
+			run_scheduler();
 	}
 	panic("If you see me, then you probably screwed up");
 	monitor(0);
@@ -233,7 +233,7 @@ void manager_klueska()
 		proc_run_s(envs[0]);
 		warn("DEPRECATED");
 	}
-	schedule();
+	run_scheduler();
 
 	panic("DON'T PANIC");
 }

@@ -312,7 +312,7 @@ int mon_bin_run(int argc, char **argv, struct hw_trapframe *hw_tf)
 	kref_put(&program->f_kref);
 	/* Make a scheduling decision.  You might not get the process you created,
 	 * in the event there are others floating around that are runnable */
-	schedule();
+	run_scheduler();
 	/* want to idle, so we un the process we just selected.  this is a bit
 	 * hackish, but so is the monitor. */
 	smp_idle();

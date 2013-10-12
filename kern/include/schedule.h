@@ -60,7 +60,7 @@ void __sched_put_idle_cores(struct proc *p, uint32_t *pc_arr, uint32_t num);
 /************** Decision making **************/
 /* Call the main scheduling algorithm.  Not clear yet if the main kernel will
  * ever call this directly. */
-void schedule(void);
+void run_scheduler(void);
 
 /* Proc p's resource desires changed, or something in general that would lead to
  * a new decision.  The process can directly poke the ksched via a syscall, so
