@@ -1045,7 +1045,7 @@ void test_ucq(void)
 	/* Should never return from schedule (env_pop in there) also note you may
 	 * not get the process you created, in the event there are others floating
 	 * around that are runnable */
-	schedule();
+	run_scheduler();
 	smp_idle();
 	assert(0);
 }

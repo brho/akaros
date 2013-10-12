@@ -100,7 +100,7 @@ static void set_ksched_alarm(void)
 /* Need a kmsg to just run the sched, but not to rearm */
 static void __just_sched(uint32_t srcid, long a0, long a1, long a2)
 {
-	schedule();
+	run_scheduler();
 }
 
 /* Kmsg, to run the scheduler tick (not in interrupt context) and reset the
@@ -110,7 +110,7 @@ static void __just_sched(uint32_t srcid, long a0, long a1, long a2)
 static void __ksched_tick(uint32_t srcid, long a0, long a1, long a2)
 {
 	/* TODO: imagine doing some accounting here */
-	schedule();
+	run_scheduler();
 	/* Set our alarm to go off, incrementing from our last tick (instead of
 	 * setting it relative to now, since some time has passed since the alarm
 	 * first went off.  Note, this may be now or in the past! */
@@ -510,8 +510,11 @@ static void __run_mcp_ksched(void *arg)
 /* Something has changed, and for whatever reason the scheduler should
  * reevaluate things. 
  *
+ * Don't call this if you are processing a syscall or otherwise care about your
+ * kthread variables, cur_proc/owning_proc, etc.
+ *
  * Don't call this from interrupt context (grabs proclocks). */
-void schedule(void)
+void run_scheduler(void)
 {
 	/* MCP scheduling: post work, then poke.  for now, i just want the func to
 	 * run again, so merely a poke is sufficient. */
