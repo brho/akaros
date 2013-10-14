@@ -446,7 +446,7 @@ static int tcpstate(struct conv *c, char *state, int n)
 	s = (Tcpctl *) (c->ptcl);
 
 	return snprintf(state, n,
-					"%s qin %d qout %d srtt %d mdev %d cwin %lu swin %lud>>%d rwin %lud>>%d timer.start %d timer.count %d rerecv %d katimer.start %d katimer.count %d\n",
+					"%s qin %d qout %d srtt %d mdev %d cwin %lu swin %lu>>%d rwin %lu>>%d timer.start %d timer.count %d rerecv %d katimer.start %d katimer.count %d\n",
 					tcpstates[s->state],
 					c->rq ? qlen(c->rq) : 0,
 					c->wq ? qlen(c->wq) : 0,
@@ -1785,7 +1785,7 @@ static void update(struct conv *s, Tcp * seg)
 
 		/* this is a pure ack w/o window update */
 		netlog(s->p->f, Logtcprxmt,
-			   "dupack %lu ack %lud sndwnd %lud advwin %lud\n",
+			   "dupack %lu ack %lu sndwnd %lu advwin %lu\n",
 			   tcb->snd.dupacks, seg->ack, tcb->snd.wnd, seg->wnd);
 
 		if (++tcb->snd.dupacks == TCPREXMTTHRESH) {
@@ -1795,7 +1795,7 @@ static void update(struct conv *s, Tcp * seg)
 			 */
 			tcb->snd.recovery = 1;
 			tcb->snd.rxt = tcb->snd.nxt;
-			netlog(s->p->f, Logtcprxmt, "fast rxt %lu, nxt %lud\n",
+			netlog(s->p->f, Logtcprxmt, "fast rxt %lu, nxt %lu\n",
 				   tcb->snd.una, tcb->snd.nxt);
 			tcprxmit(s);
 		} else {
@@ -1831,7 +1831,7 @@ static void update(struct conv *s, Tcp * seg)
 		tcb->snd.dupacks = 0;
 		tcb->snd.recovery = 0;
 	} else
-		netlog(s->p->f, Logtcp, "rxt next %lu, cwin %lud\n", seg->ack,
+		netlog(s->p->f, Logtcp, "rxt next %lu, cwin %lu\n", seg->ack,
 			   tcb->cwind);
 
 	/* Compute the new send window size */
@@ -2143,7 +2143,7 @@ reset:
 	/* Cut the data to fit the receive window */
 	if (tcptrim(tcb, &seg, &bp, &length) == -1) {
 		netlog(f, Logtcp,
-			   "tcptrim, not accept, seq %lu-%lud win %lud-%lud from %I\n",
+			   "tcptrim, not accept, seq %lu-%lu win %lu-%lu from %I\n",
 			   seg.seq, seg.seq + length - 1, tcb->rcv.nxt,
 			   tcb->rcv.nxt + tcb->rcv.wnd - 1, s->raddr);
 		netlog(f, Logtcp, "tcp len < 0, %lu %d\n", seg.seq, length);
@@ -2462,7 +2462,7 @@ static void tcpoutput(struct conv *s)
 		}
 		ssize = sndcnt - sent;
 		if (ssize && usable < 2)
-			netlog(s->p->f, Logtcp, "throttled snd.wnd %lu cwind %lud\n",
+			netlog(s->p->f, Logtcp, "throttled snd.wnd %lu cwind %lu\n",
 				   tcb->snd.wnd, tcb->cwind);
 		if (usable < ssize)
 			ssize = usable;
@@ -3091,7 +3091,7 @@ static int tcpstats(struct proto *tcp, char *buf, int len)
 	p = buf;
 	e = p + len;
 	for (i = 0; i < Nstats; i++)
-		p = seprintf(p, e, "%s: %llud\n", statnames[i], priv->stats[i]);
+		p = seprintf(p, e, "%s: %llu\n", statnames[i], priv->stats[i]);
 	return p - buf;
 }
 

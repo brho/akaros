@@ -440,10 +440,10 @@ int icmpstats(struct proto *icmp, char *buf, int len)
 		p = seprintf(p, e, "%s: %lu\n", statnames[i], priv->stats[i]);
 	for (i = 0; i <= Maxtype; i++) {
 		if (icmpnames[i])
-			p = seprintf(p, e, "%s: %lu %lud\n", icmpnames[i], priv->in[i],
+			p = seprintf(p, e, "%s: %lu %lu\n", icmpnames[i], priv->in[i],
 						 priv->out[i]);
 		else
-			p = seprintf(p, e, "%d: %lu %lud\n", i, priv->in[i], priv->out[i]);
+			p = seprintf(p, e, "%d: %lu %lu\n", i, priv->in[i], priv->out[i]);
 	}
 	return p - buf;
 }
