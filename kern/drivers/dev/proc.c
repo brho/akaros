@@ -149,8 +149,8 @@ static char *sname[] = { "Text", "Data", "Bss", "Stack", "Shared", "Phys", };
 
 /*
  * struct qids are, in path:
- *	 4 bits of file type (qids above)
- *	23 bits of process slot number + 1
+ *	 5 bits of file type (qids above) (old comment said 4 here)
+ *	23 bits of process slot number + 1 (pid + 1 is stored)
  *	     in vers,
  *	32 bits of pid, for consistency checking
  * If notepg, c->pgrpid.path is pgrp slot, .vers is noteid.
@@ -235,7 +235,12 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 			p = pid2proc(pid);
 			if (!p)
 				return -1;
+			/* Need to update s, so that it's the correct 'index' for our proc
+			 * (aka, the pid).  We use s later when making the qid. */
+			s = pid;
 		} else {
+			/* This is a shitty iterator, and the list isn't guaranteed to give
+			 * you the same ordering twice in a row. (procs come and go). */
 			p = pid_nth(s);
 			if (!p)
 				return -1;
@@ -275,8 +280,10 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 		panic("procgen");
 
 	tab = &procdir[s];
-	path = c->qid.path & ~(((1 << QSHIFT) - 1));	/* slot component */
-	if ((p = pid_nth(SLOT(c->qid))) == NULL)
+	/* path is everything other than the QID part.  Not sure from the orig code
+	 * if they wanted just the pid part (SLOTMASK) or everything above QID */
+	path = c->qid.path & ~QIDMASK;	/* slot component */
+	if ((p = pid2proc(SLOT(c->qid))) == NULL)
 		return -1;
 	perm = 0444 | tab->perm;
 #if 0
@@ -456,7 +463,7 @@ static struct chan *procopen(struct chan *c, int omode)
 		return c;
 #endif
 	}
-	if ((p = pid_nth(SLOT(c->qid))) == NULL)
+	if ((p = pid2proc(SLOT(c->qid))) == NULL)
 		error(Eprocdied);
 	//qlock(&p->debug);
 	if (waserror()) {
@@ -549,6 +556,8 @@ static struct chan *procopen(struct chan *c, int omode)
 		c->qid.vers = p->pid;
 	/* make sure the process slot didn't get reallocated while we were playing */
 	//coherence();
+	/* TODO: think about what we really want here.  In akaros, we wouldn't have
+	 * our pid changed like that. */
 	if (p->pid != pid)
 		error(Eprocdied);
 
@@ -574,7 +583,7 @@ procwstat(struct chan *c, uint8_t * db, long n)
 	if (QID(c->qid) == Qtrace)
 		return devwstat(c, db, n);
 
-	if ((p = pid_nth(SLOT(c->qid))) == NULL)
+	if ((p = pid2proc(SLOT(c->qid))) == NULL)
 		error(Eprocdied);
 	nonone(p);
 	d = NULL;
@@ -848,7 +857,7 @@ procread(struct chan *c, void *va, long n, int64_t off)
 		else
 			return readstr(off, va, n, tpids);
 #endif
-	if ((p = pid_nth(SLOT(c->qid))) == NULL)
+	if ((p = pid2proc(SLOT(c->qid))) == NULL)
 		error(Eprocdied);
 	if (p->pid != PID(c->qid)) {
 		kref_put(&p->p_kref);
@@ -859,6 +868,7 @@ procread(struct chan *c, void *va, long n, int64_t off)
 			kref_put(&p->p_kref);
 			break;
 #if 0
+#warning check refcnting in here
 		case Qargs:
 			qlock(&p->debug);
 			j = procargs(p, current->genbuf, sizeof current->genbuf);
@@ -1238,7 +1248,7 @@ procwrite(struct chan *c, void *va, long n, int64_t off)
 		return n;
 	}
 
-	if ((p = pid_nth(SLOT(c->qid))) == NULL)
+	if ((p = pid2proc(SLOT(c->qid))) == NULL)
 		error(Eprocdied);
 
 	qlock(&p->debug);
@@ -1311,6 +1321,7 @@ procwrite(struct chan *c, void *va, long n, int64_t off)
 				p->noteid = id;
 				break;
 			}
+			/* Careful here, check that you know what the iterator is doing */
 			for (i = 0; (t = pid_nth(i)) != NULL; i++) {
 				if (t->state == Dead || t->noteid != id) {
 					kref_put(&p->p_kref);
