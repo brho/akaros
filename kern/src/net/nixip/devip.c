@@ -996,7 +996,7 @@ static void connectctlmsg(struct proto *x, struct conv *c, struct cmdbuf *cb)
 		qlock(&c->qlock);
 		nexterror();
 	}
-	//sleep(&c->cr, connected, c);
+	rendez_sleep(&c->cr, connected, c);
 	qlock(&c->qlock);
 	poperror();
 
@@ -1048,7 +1048,7 @@ static void announcectlmsg(struct proto *x, struct conv *c, struct cmdbuf *cb)
 		qlock(&c->qlock);
 		nexterror();
 	}
-	//sleep(&c->cr, announced, c);
+	rendez_sleep(&c->cr, announced, c);
 	qlock(&c->qlock);
 	poperror();
 
@@ -1406,7 +1406,7 @@ int Fsconnected(struct conv *c, char *msg)
 			break;
 	}
 
-	//wakeup(&c->cr);
+	rendez_wakeup(&c->cr);
 	return 0;
 }
 

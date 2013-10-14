@@ -39,7 +39,7 @@ struct arp {
 	struct arpent cache[NCACHE];
 	struct arpent *rxmt;
 	struct proc *rxmitp;		/* neib sol re-transmit proc */
-	//Rendez    rxmtq;
+	struct rendez rxmtq;
 	struct block *dropf, *dropl;
 };
 
@@ -59,6 +59,7 @@ void arpinit(struct fs *f)
 	f->arp->rxmt = NULL;
 	f->arp->dropf = f->arp->dropl = NULL;
 	qlock_init(&f->arp->qlock);
+	rendez_init(&f->arp->rxmtq);
 	/* TODO: pending fix of rxmitproc */
 	//ktask("arp rxmitproc", rxmitproc, f->arp);
 }
@@ -105,7 +106,7 @@ static struct arpent *newarp6(struct arp *arp, uint8_t * ip, struct ipifc *ifc,
 			for (next = xp->list; next; next = next->list)
 				xp = next;
 			arp->dropl = xp;
-			//wakeup(&arp->rxmtq);
+			rendez_wakeup(&arp->rxmtq);
 		}
 	}
 
@@ -150,7 +151,8 @@ static struct arpent *newarp6(struct arp *arp, uint8_t * ip, struct ipifc *ifc,
 			l = &f->nextrxt;
 		}
 		*l = a;
-		if (empty) ;	//wakeup(&arp->rxmtq);
+		if (empty)
+			rendez_wakeup(&arp->rxmtq);
 	}
 
 	a->nextrxt = NULL;
@@ -670,11 +672,9 @@ static void rxmitproc(void *v)
 	}
 	for (;;) {
 		wakeupat = rxmitsols(arp);
-/*
 		if(wakeupat == 0)
-			sleep(&arp->rxmtq, rxready, v);
+			rendez_sleep(&arp->rxmtq, rxready, v);
 		else if(wakeupat > ReTransTimer/4)
-			tsleep(&arp->rxmtq, return0, 0, wakeupat);
- */
+			udelay_sched(wakeupat * 1000);
 	}
 }

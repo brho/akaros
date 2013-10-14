@@ -316,7 +316,7 @@ void resrcwait(struct proc *up, char *reason)
 		}
 	}
 
-	tsleep(&up->sleep, return0, 0, 300);
+	udelay_sched(300 * 1000);
 	up->psstate = p;
 }
 #endif

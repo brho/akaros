@@ -1114,7 +1114,7 @@ regread:
 			pid = p->pid;
 			while (p->waitq == 0) {
 				unlock(&p->exl);
-				sleep(&p->waitr, haswaitq, p);
+				rendez_sleep(&p->waitr, haswaitq, p);
 				if (p->pid != pid)
 					error(Eprocdied);
 				lock(&p->exl);
@@ -1427,6 +1427,8 @@ static struct chan *proctext(struct chan *c, struct proc *p)
 	return tc;
 }
 
+/* TODO: this will fail at compile time, since we don't have a proc-wide rendez,
+ * among other things, and we'll need to rewrite this for akaros */
 void procstopwait(struct proc *p, int ctl)
 {
 	ERRSTACK(2);
@@ -1448,7 +1450,7 @@ void procstopwait(struct proc *p, int ctl)
 		qlock(&p->debug);
 		nexterror();
 	}
-	sleep(&current->sleep, procstopped, p);
+	rendez_sleep(&current->sleep, procstopped, p);
 	poperror();
 	qlock(&p->debug);
 	if (p->pid != pid)

@@ -49,7 +49,8 @@ static void loopbackunbind(struct ipifc *ifc)
 		postnote(lb->readp, 1, "unbind", 0);
 
 	/* wait for reader to die */
-	while (lb->readp != 0) ;	//tsleep(&up->sleep, return0, 0, 300);
+	while (lb->readp != 0)
+		udelay_sched(300 * 1000);
 
 	/* clean up */
 	qfree(lb->q);

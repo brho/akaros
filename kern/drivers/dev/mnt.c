@@ -950,8 +950,7 @@ mntgate(struct mnt *mnt)
 	mnt->rip = 0;
 	for(q = mnt->queue; q; q = q->list) {
 		if(q->done == 0)
-			/* TODO: wakedup */
-			if(/*wakeup(&q->r)*/1)
+			if (rendez_wakeup(&q->r))
 				break;
 	}
 	spin_unlock(&mnt->lock);

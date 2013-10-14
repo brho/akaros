@@ -416,7 +416,7 @@ void ccloseq(struct chan *c)
 	clunkq.tail = c;
 	spin_unlock(&(&clunkq.l)->lock);
 
-	if (!wakeup(&clunkq.r))
+	if (!rendez_wakeup(&clunkq.r))
 		ktask("closeproc", closeproc, NULL);
 }
 
@@ -425,6 +425,7 @@ static int clunkwork(void *)
 	return clunkq.head != NULL;
 }
 
+/* TODO: you'll need to init clunkq.r at some point, at the very least. */
 static void closeproc(void *)
 {
 	struct chan *c;
@@ -433,7 +434,7 @@ static void closeproc(void *)
 		qlock(&clunkq.q);
 		if (clunkq.head == NULL) {
 			if (!waserror()) {
-				tsleep(&clunkq.r, clunkwork, NULL, 5000);
+				rendez_sleep_timeout(&clunkq.r, clunkwork, NULL, 5000);
 			}
 			poperror();
 			if (clunkq.head == NULL) {
