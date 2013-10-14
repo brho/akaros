@@ -72,10 +72,17 @@ void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
 	unset_alarm(pcpui_tchain, &awaiter);
 }
 
-void rendez_wakeup(struct rendez *rv)
+/* plan9 rendez returned a pointer to the proc woken up.  we return "true" if we
+ * woke someone up. */
+bool rendez_wakeup(struct rendez *rv)
 {
 	int8_t irq_state = 0;
+	bool ret;
 	/* The plan9 style "one sleeper, one waker" could get by with a signal here.
 	 * But we want to make sure all potential waiters are woken up. */
-	cv_broadcast_irqsave(&rv->cv, &irq_state);
+	cv_lock_irqsave(&rv->cv, &irq_state);
+	ret = rv->cv.nr_waiters ? TRUE : FALSE;
+	__cv_broadcast(&rv->cv);
+	cv_unlock_irqsave(&rv->cv, &irq_state);
+	return ret;
 }
