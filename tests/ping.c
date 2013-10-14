@@ -616,6 +616,7 @@ main(int argc, char **argv)
 	case -1:
 		fprintf(stderr, "%s: can't fork: %r\n", argv0);
 		sender(fd, msglen, interval, nmsg);
+		fprintf(stderr, "Sent\n");
 		rcvr(fd, msglen, interval, nmsg);
 		exit(0);
 	case 0:
