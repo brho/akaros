@@ -23,7 +23,11 @@
  *
  * The main goal of this is to track and advertise (via pcpui) the errbuf that
  * should be jumped to next (when we call error()).  Note that the caller of
- * this (waserror()) will fill the jumpbuf shortly with its context. */
+ * this (waserror()) will fill the jumpbuf shortly with its context.
+ *
+ * When we enter, curindex points to the slot we should use.  First time, it is
+ * 0, and we'll set cur_eb to slot 0.  When we leave, curindex is set to the
+ * next free slot. */
 int errpush(struct errbuf *errstack, int stacksize, int *curindex,
             struct errbuf **prev_errbuf)
 {
@@ -40,17 +44,26 @@ int errpush(struct errbuf *errstack, int stacksize, int *curindex,
 
 /* Undo the work of errpush, and advertise the new errbuf used by error() calls.
  * We only need to be tricky when we reached the beginning of the stack and need
- * to check the prev_errbuf from a previous ERRSTACK/function. */
+ * to check the prev_errbuf from a previous ERRSTACK/function.
+ *
+ * When we enter, curindex is the slot of the next *free* errstack (the one we'd
+ * push into if we were pushing.  When we leave, it will be decreased by one,
+ * and will still point to the next free errstack (the one we are popping).
+ * */
 void errpop(struct errbuf *errstack, int stacksize, int *curindex,
             struct errbuf *prev_errbuf)
 {
 	printd("pope %p %d %d\n", errstack, stacksize, *curindex);
+	/* curindex now points to the slot we are popping*/
 	*curindex = *curindex - 1;
+	/* We still need to advertise the previous slot, which is one back from
+	 * curindex.  If curindex is 0, that means the next free slot is the first
+	 * of our errstack.  In this case, we need to advertise the prev. */
 	if (*curindex < 0)
 		panic("Error stack underflow");
 
 	if (*curindex == 0)
 		set_cur_errbuf(prev_errbuf);
 	else
-		set_cur_errbuf(&errstack[*curindex]);
+		set_cur_errbuf(&errstack[*curindex - 1]);	/* use the prior slot */
 }
