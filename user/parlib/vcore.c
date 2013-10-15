@@ -13,6 +13,7 @@
 #include <uthread.h>
 #include <ucq.h>
 #include <ros/arch/membar.h>
+#include <printf-ext.h>
 
 /* starting with 1 since we alloc vcore0's stacks and TLS in vcore_init(). */
 static size_t _max_vcores_ever_wanted = 1;
@@ -144,6 +145,7 @@ void vcore_reenter(void (*entry_func)(void))
  * go to vcore 0. */
 void vcore_event_init(void)
 {
+	register_printf_specifier('r', printf_errstr, printf_errstr_info);
 	/* set up our thread0 as a uthread */
 	uthread_slim_init();
 	/* TODO: register for other kevents/signals and whatnot (can probably reuse
