@@ -1130,7 +1130,7 @@ static void namelenerror(char *aname, int len, char *err)
 	 */
 	errlen = strlen(err);
 	if (len < ERRMAX / 3 || len + errlen < 2 * ERRMAX / 3)
-		snprintf(current->genbuf, sizeof current->genbuf, "%.*s", len, aname);
+		snprintf(get_cur_genbuf(), GENBUF_SZ, "%.*s", len, aname);
 	else {
 		/*
 		 * Print a suffix of the name, but try to get a little info.
@@ -1156,10 +1156,10 @@ static void namelenerror(char *aname, int len, char *err)
 			for (i = 0; (*name & 0xC0) == 0x80 && i < UTFmax; i++)
 				name++;
 		}
-		snprintf(current->genbuf, sizeof current->genbuf, "...%.*s",
+		snprintf(get_cur_genbuf(), GENBUF_SZ, "...%.*s",
 				 strlen(name), name);
 	}
-	snprintf(current_errstr(), MAX_ERRSTR_LEN, "%#q %s", current->genbuf, err);
+	snprintf(current_errstr(), MAX_ERRSTR_LEN, "%#q %s", get_cur_genbuf(), err);
 }
 
 /*
@@ -1219,14 +1219,14 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 
 		case '#':
 			nomount = 1;
-			current->genbuf[0] = '\0';
+			get_cur_genbuf()[0] = '\0';
 			n = 0;
 			while (*name != '\0' && (*name != '/' || n < 2)) {
-				if (n >= sizeof(current->genbuf) - 1)
+				if (n >= GENBUF_SZ - 1)
 					error(Efilename);
-				current->genbuf[n++] = *name++;
+				get_cur_genbuf()[n++] = *name++;
 			}
-			current->genbuf[n] = '\0';
+			get_cur_genbuf()[n] = '\0';
 			/*
 			 *  noattach is sandboxing.
 			 *
@@ -1240,22 +1240,22 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 			 *     any others left unprotected)
 			 */
 			/* actually / is caught by parsing earlier */
-			if (current->genbuf[1] == 'M')
+			if (get_cur_genbuf()[1] == 'M')
 				error(Enoattach);
 			if (current->pgrp->noattach) {
-				if (current->genbuf[1] != '|' &&
-					current->genbuf[1] != 'e' &&
-					current->genbuf[1] != 'c' && current->genbuf[1] != 'p')
+				if (get_cur_genbuf()[1] != '|' &&
+					get_cur_genbuf()[1] != 'e' &&
+					get_cur_genbuf()[1] != 'c' && get_cur_genbuf()[1] != 'p')
 					error(Enoattach);
 			}
-			dev = devtabget(current->genbuf[1], 1);	//XDYNX
+			dev = devtabget(get_cur_genbuf()[1], 1);	//XDYNX
 			if (dev == NULL)
 				error(Ebadsharp);
 			//if(waserror()){
 			//  devtabdecr(dev);
 			//  nexterror();
 			//}
-			c = dev->attach(current->genbuf + 2);
+			c = dev->attach(get_cur_genbuf() + 2);
 			//poperror();
 			//devtabdecr(dev);
 			break;
@@ -1545,9 +1545,9 @@ Open:
 
 	/* place final element in genbuf for e.g. exec */
 	if (e.nelems > 0)
-		kstrcpy(current->genbuf, e.elems[e.nelems - 1], sizeof current->genbuf);
+		kstrcpy(get_cur_genbuf(), e.elems[e.nelems - 1], GENBUF_SZ);
 	else
-		kstrcpy(current->genbuf, ".", sizeof(current->genbuf));
+		kstrcpy(get_cur_genbuf(), ".", GENBUF_SZ);
 	kfree(e.name);
 	kfree(e.elems);
 	kfree(e.off);	/* e c */

@@ -84,7 +84,8 @@ cmderror(struct cmdbuf *cb, char *s)
 	int i;
 	char *p, *e;
 
-	p = current->genbuf;
+	/* TODO: this seems error prone; figure out what the hell we're doing */
+	p = get_cur_genbuf();
 	e = p+ERRMAX-10;
 	p += cprintf(p, e, "%s \"", s);
 	for(i=0; i<cb->nf; i++){
@@ -92,8 +93,8 @@ cmderror(struct cmdbuf *cb, char *s)
 			p += cprintf(p, e, " ");
 		p += cprintf(p, e, "%q", cb->f[i]);
 	}
-	strncpy(p,  "\"", sizeof(p));
-	error(current->genbuf);
+	strncpy(p, "\"", GENBUF_SZ - (p - get_cur_genbuf()));
+	error(get_cur_genbuf());
 }
 
 /*

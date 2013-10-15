@@ -215,15 +215,15 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 
 	if (c->qid.path == Qdir) {
 		if (s == 0) {
-			strncpy(current->genbuf, "trace", sizeof(current->genbuf));
+			strncpy(get_cur_genbuf(), "trace", GENBUF_SZ);
 			mkqid(&qid, Qtrace, -1, QTFILE);
-			devdir(c, qid, current->genbuf, 0, eve, 0444, dp);
+			devdir(c, qid, get_cur_genbuf(), 0, eve, 0444, dp);
 			return 1;
 		}
 		if (s == 1) {
-			strncpy(current->genbuf, "tracepids", sizeof(current->genbuf));
+			strncpy(get_cur_genbuf(), "tracepids", GENBUF_SZ);
 			mkqid(&qid, Qtracepids, -1, QTFILE);
-			devdir(c, qid, current->genbuf, 0, eve, 0444, dp);
+			devdir(c, qid, get_cur_genbuf(), 0, eve, 0444, dp);
 			return 1;
 		}
 		s -= 2;
@@ -247,31 +247,31 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 			pid = p->pid;
 		}
 
-		snprintf(current->genbuf, sizeof current->genbuf, "%u", pid);
+		snprintf(get_cur_genbuf(), GENBUF_SZ, "%u", pid);
 		/*
 		 * String comparison is done in devwalk so
 		 * name must match its formatted pid.
 		 */
-		if (name != NULL && strcmp(name, current->genbuf) != 0) {
+		if (name != NULL && strcmp(name, get_cur_genbuf()) != 0) {
 			printk("pid-name mismatch, name: %s, pid %d\n", name, pid);
 			kref_put(&p->p_kref);
 			return -1;
 		}
 		mkqid(&qid, (s + 1) << QSHIFT, pid, QTDIR);
-		devdir(c, qid, current->genbuf, 0, p->user, DMDIR | 0555, dp);
+		devdir(c, qid, get_cur_genbuf(), 0, p->user, DMDIR | 0555, dp);
 		kref_put(&p->p_kref);
 		return 1;
 	}
 	if (c->qid.path == Qtrace) {
-		strncpy(current->genbuf, "trace", sizeof(current->genbuf));
+		strncpy(get_cur_genbuf(), "trace", GENBUF_SZ);
 		mkqid(&qid, Qtrace, -1, QTFILE);
-		devdir(c, qid, current->genbuf, 0, eve, 0444, dp);
+		devdir(c, qid, get_cur_genbuf(), 0, eve, 0444, dp);
 		return 1;
 	}
 	if (c->qid.path == Qtracepids) {
-		strncpy(current->genbuf, "tracepids", sizeof(current->genbuf));
+		strncpy(get_cur_genbuf(), "tracepids", GENBUF_SZ);
 		mkqid(&qid, Qtracepids, -1, QTFILE);
-		devdir(c, qid, current->genbuf, 0, eve, 0444, dp);
+		devdir(c, qid, get_cur_genbuf(), 0, eve, 0444, dp);
 		return 1;
 	}
 	if (s >= ARRAY_SIZE(procdir))

@@ -181,9 +181,8 @@ ipgen(struct chan *c, char *unused_char_p_t, struct dirtab *unused_dirtab,
 		case Qtopdir:
 			if (s == DEVDOTDOT) {
 				mkqid(&q, QID(0, 0, Qtopdir), 0, QTDIR);
-				snprintf(current->genbuf, sizeof current->genbuf, "#I%u",
-						 c->devno);
-				devdir(c, q, current->genbuf, 0, network, 0555, dp);
+				snprintf(get_cur_genbuf(), GENBUF_SZ, "#I%u", c->devno);
+				devdir(c, q, get_cur_genbuf(), 0, network, 0555, dp);
 				return 1;
 			}
 			if (s < f->np) {
@@ -204,16 +203,15 @@ ipgen(struct chan *c, char *unused_char_p_t, struct dirtab *unused_dirtab,
 		case Qprotodir:
 			if (s == DEVDOTDOT) {
 				mkqid(&q, QID(0, 0, Qtopdir), 0, QTDIR);
-				snprintf(current->genbuf, sizeof current->genbuf, "#I%u",
-						 c->devno);
-				devdir(c, q, current->genbuf, 0, network, 0555, dp);
+				snprintf(get_cur_genbuf(), GENBUF_SZ, "#I%u", c->devno);
+				devdir(c, q, get_cur_genbuf(), 0, network, 0555, dp);
 				return 1;
 			}
 			if (s < f->p[PROTO(c->qid)]->ac) {
 				cv = f->p[PROTO(c->qid)]->conv[s];
-				snprintf(current->genbuf, sizeof current->genbuf, "%d", s);
+				snprintf(get_cur_genbuf(), GENBUF_SZ, "%d", s);
 				mkqid(&q, QID(PROTO(c->qid), s, Qconvdir), 0, QTDIR);
-				devdir(c, q, current->genbuf, 0, cv->owner, 0555, dp);
+				devdir(c, q, get_cur_genbuf(), 0, cv->owner, 0555, dp);
 				return 1;
 			}
 			s -= f->p[PROTO(c->qid)]->ac;

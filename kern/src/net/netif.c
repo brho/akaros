@@ -62,8 +62,8 @@ netifgen(struct chan *c, char *unused, struct dirtab *vp, int iunused, int i,
 			case 0:
 				q.path = N2ndqid;
 				q.type = QTDIR;
-				strncpy(current->genbuf, nif->name, sizeof(current->genbuf));
-				devdir(c, q, current->genbuf, 0, eve, 0555, dp);
+				strncpy(get_cur_genbuf(), nif->name, GENBUF_SZ);
+				devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
 				break;
 			default:
 				return -1;
@@ -128,11 +128,11 @@ netifgen(struct chan *c, char *unused, struct dirtab *vp, int iunused, int i,
 				q.type = QTDIR;
 				q.path = NETQID(i, N3rdqid);
 				/* Want to do this printf, but it runs off the stack... */
-				//snprintf(current->genbuf, sizeof current->genbuf, "%d", i);
+				//snprintf(get_cur_genbuf(), GENBUF_SZ, "%d", i);
 				assert(i <= 9);
-				current->genbuf[0] = '0' + i;
-				current->genbuf[1] = 0;
-				devdir(c, q, current->genbuf, 0, eve, DMDIR | 0555, dp);
+				get_cur_genbuf()[0] = '0' + i;
+				get_cur_genbuf()[1] = 0;
+				devdir(c, q, get_cur_genbuf(), 0, eve, DMDIR | 0555, dp);
 				break;
 		}
 		return 1;
@@ -153,8 +153,8 @@ netifgen(struct chan *c, char *unused, struct dirtab *vp, int iunused, int i,
 		case DEVDOTDOT:
 			q.type = QTDIR;
 			q.path = N2ndqid;
-			strncpy(current->genbuf, nif->name, sizeof(current->genbuf));
-			devdir(c, q, current->genbuf, 0, eve, DMDIR | 0555, dp);
+			strncpy(get_cur_genbuf(), nif->name, GENBUF_SZ);
+			devdir(c, q, get_cur_genbuf(), 0, eve, DMDIR | 0555, dp);
 			break;
 		case 0:
 			q.path = NETQID(NETID(c->qid.path), Ndataqid);
@@ -289,10 +289,9 @@ netifread(struct netif *nif, struct chan *c, void *a, long n, int64_t off)
 		case Nifstatqid:
 			return 0;
 		case Nmtuqid:
-			snprintf(current->genbuf, sizeof current->genbuf,
-					 "%11.d %11.d %11.d\n", nif->minmtu, nif->mtu,
-					 nif->maxmtu);
-			return readstr(offset, a, n, current->genbuf);
+			snprintf(get_cur_genbuf(), GENBUF_SZ, "%11.d %11.d %11.d\n",
+			         nif->minmtu, nif->mtu, nif->maxmtu);
+			return readstr(offset, a, n, get_cur_genbuf());
 	}
 	error(Ebadarg);
 	return -1;	/* not reached */

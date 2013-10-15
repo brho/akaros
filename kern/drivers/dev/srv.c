@@ -48,8 +48,8 @@ srvgen(struct chan *c, char *unused_char_p_t, struct dirtab*unused_dirtab, int u
 
 	mkqid(&q, sp->path, 0, QTFILE);
 	/* make sure name string continues to exist after we release lock */
-	strncpy(current->genbuf, sp->name,  sizeof current->genbuf);
-	devdir(c, q, current->genbuf, 0, sp->owner, sp->perm, dp);
+	strncpy(get_cur_genbuf(), sp->name, GENBUF_SZ);
+	devdir(c, q, get_cur_genbuf(), 0, sp->owner, sp->perm, dp);
 	qunlock(&srvlk);
 	return 1;
 }

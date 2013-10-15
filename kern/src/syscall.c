@@ -139,6 +139,13 @@ void set_cur_errbuf(struct errbuf *ebuf)
 	pcpui->cur_kthread->errbuf = ebuf;
 }
 
+char *get_cur_genbuf(void)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	assert(pcpui->cur_kthread);
+	return pcpui->cur_kthread->generic_buf;
+}
+
 /************** Utility Syscalls **************/
 
 static int sys_null(void)
