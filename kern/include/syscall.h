@@ -49,6 +49,7 @@ void set_errstr(char *errstr, ...);
 char *current_errstr(void);
 struct errbuf *get_cur_errbuf(void);
 void set_cur_errbuf(struct errbuf *ebuf);
+char *get_cur_genbuf(void);
 void __signal_syscall(struct syscall *sysc, struct proc *p);
 
 /* Tracing functions */

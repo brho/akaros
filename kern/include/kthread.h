@@ -20,6 +20,8 @@ struct semaphore;
 TAILQ_HEAD(kthread_tailq, kthread);
 TAILQ_HEAD(semaphore_tailq, semaphore);
 
+#define GENBUF_SZ 128	/* plan9 uses this as a scratch space, per syscall */
+
 /* This captures the essence of a kernel context that we want to suspend.  When
  * a kthread is running, we make sure its stacktop is the default kernel stack,
  * meaning it will receive the interrupts from userspace. */
@@ -33,6 +35,7 @@ struct kthread {
 	/* ID, other shit, etc */
 	bool						is_ktask;	/* default is FALSE */
 	char						*name;
+	char						generic_buf[GENBUF_SZ];
 };
 
 /* Semaphore for kthreads to sleep on.  0 or less means you need to sleep */
