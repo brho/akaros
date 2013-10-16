@@ -7,21 +7,23 @@
 #include <nixip.h>
 #include <icmp.h>
 #include <ctype.h>
+#include <pthread.h>
+#include <spinlock.h>
+#include <timing.h>
+#include <tsc-compat.h>
+#include <printf-ext.h>
 
-enum {
-	MAXMSG		= 32,
-	SLEEPMS		= 1000,
-
-	SECOND		= 1000000000ULL,
-	MINUTE		= 60*SECOND,
-	BUFSIZE		= 64*1024+512,
-};
+#define MAXMSG				32
+#define SLEEPMS				1000
+#define SECOND				(get_tsc_freq())
+#define MINUTE				(60 * SECOND)
+#define BUFSIZE				(64 * 1024 + 512)
 
 typedef struct Req Req;
 struct Req
 {
 	uint16_t	seq;	/* sequence number */
-	int64_t	time;	/* time sent */
+	uint64_t	tsctime;	/* time sent */
 	int64_t	rtt;
 	int	ttl;
 	int	replied;
@@ -42,9 +44,7 @@ struct proto {
 
 Req	*first;		/* request list */
 Req	*last;		/* ... */
-/* this is a lock, which we will ignore */
-int	listlock;
-uint64_t nsec(void) {return 0;}
+struct spin_pdr_lock listlock = SPINPDR_INITIALIZER;
 
 char *argv0;
 
@@ -72,7 +72,6 @@ usage(void)
 	fprintf(stderr,
 	    "usage: %s [-6alq] [-s msgsize] [-i millisecs] [-n #pings] dest\n",
 		argv0);
-	fprintf(stderr, "usage");
 	exit(1);
 }
 
@@ -107,7 +106,7 @@ prlost4(uint16_t seq, void *v)
 {
 	struct ip4hdr *ip4 = v;
 
-	printf("lost %u: %V -> %V\n", seq, ip4->src, ip4->dst);
+	printf("lost %u: %i -> %i\n", seq, ip4->src, ip4->dst);
 }
 
 static void
@@ -115,7 +114,7 @@ prlost6(uint16_t seq, void *v)
 {
 	struct ip6hdr *ip6 = v;
 
-	printf("lost %u: %I -> %I\n", seq, ip6->src, ip6->dst);
+	printf("lost %u: %i -> %i\n", seq, ip6->src, ip6->dst);
 }
 
 static void
@@ -123,7 +122,7 @@ prreply4(Req *r, void *v)
 {
 	struct ip4hdr *ip4 = v;
 
-	printf("%u: %V -> %V rtt %lld µs, avg rtt %lld µs, ttl = %d\n",
+	printf("%u: %i -> %i rtt %lld µs, avg rtt %lld µs, ttl = %d\n",
 		r->seq - firstseq, ip4->src, ip4->dst, r->rtt, sum/rcvdmsgs,
 		r->ttl);
 }
@@ -133,7 +132,7 @@ prreply6(Req *r, void *v)
 {
 	struct ip6hdr *ip6 = v;
 
-	printf("%u: %I -> %I rtt %lld µs, avg rtt %lld µs, ttl = %d\n",
+	printf("%u: %i -> %i rtt %lld µs, avg rtt %lld µs, ttl = %d\n",
 		r->seq - firstseq, ip6->src, ip6->dst, r->rtt, sum/rcvdmsgs,
 		r->ttl);
 }
@@ -175,20 +174,18 @@ clean(uint16_t seq, int64_t now, void *v)
 		else
 			ttl = ((struct ip6hdr *)v)->ttl;
 	}
-	lock(&listlock);
+	spin_pdr_lock(&listlock);
 	last = NULL;
 	for(l = &first; *l; ){
 		r = *l;
 		if(v && r->seq == seq){
-			r->rtt = now-r->time;
+			r->rtt = ndiff(r->tsctime, now);
 			r->ttl = ttl;
 			reply(r, v);
 		}
-
-/* skip this. We don't have time yet. */
-		if(0 && now-r->time > MINUTE){
+		if(ndiff(r->tsctime, now) > MINUTE){
 			*l = r->next;
-			r->rtt = now-r->time;
+			r->rtt = ndiff(r->tsctime, now);
 			if(v)
 				r->ttl = ttl;
 			if(r->replied == 0)
@@ -199,7 +196,7 @@ clean(uint16_t seq, int64_t now, void *v)
 			l = &r->next;
 		}
 	}
-	unlock(&listlock);
+	spin_pdr_unlock(&listlock);
 }
 
 static uint8_t loopbacknet[IPaddrlen] = {
@@ -279,7 +276,7 @@ sender(int fd, int msglen, int interval, int n)
 	} else
 		ipmove(((struct ip6hdr *)buf)->src, me);
 	if (addresses)
-		printf("\t%I -> %s\n", me, target);
+		printf("\t%i -> %s\n", me, target);
 
 	if(pingrint != 0 && interval <= 0)
 		pingrint = 0;
@@ -299,15 +296,15 @@ sender(int fd, int msglen, int interval, int n)
 		r->seq = seq;
 		r->next = NULL;
 		r->replied = 0;
-		r->time = nsec();	/* avoid early free in reply! */
-		lock(&listlock);
+		r->tsctime = read_tsc();	/* avoid early free in reply! */
+		spin_pdr_lock(&listlock);
 		if(first == NULL)
 			first = r;
 		else
 			last->next = r;
 		last = r;
-		unlock(&listlock);
-		r->time = nsec();
+		spin_pdr_unlock(&listlock);
+		r->tsctime = read_tsc();
 		if(write(fd, buf, msglen) < msglen){
 			fprintf(stderr, "%s: write failed: %r\n", argv0);
 			return;
@@ -337,7 +334,7 @@ rcvr(int fd, int msglen, int interval, int nmsg)
 			exit(1);
 		}
 		//alarm(0);
-		now = nsec();
+		now = read_tsc();
 		if(n <= 0){	/* read interrupted - time to go */
 			clean(0, now+MINUTE, NULL);
 			continue;
@@ -363,11 +360,11 @@ rcvr(int fd, int msglen, int interval, int nmsg)
 		clean(x, now, buf);
 	}
 
-	lock(&listlock);
+	spin_pdr_lock(&listlock);
 	for(r = first; r; r = r->next)
 		if(r->replied == 0)
 			lostmsgs++;
-	unlock(&listlock);
+	spin_pdr_unlock(&listlock);
 
 	if(!quiet && lostmsgs)
 		printf("%d out of %d messages lost\n", lostmsgs,
@@ -512,21 +509,30 @@ isv4name(char *name)
 	return r;
 }
 
-void
-main(int argc, char **argv)
+/* Feel free to put these in a struct or something */
+int fd, msglen, interval, nmsg;
+
+void *rcvr_thread(void* arg)
+{	
+	rcvr(fd, msglen, interval, nmsg);
+	printf(lostmsgs ? "lost messages" : "");
+	return 0;
+}
+
+int main(int argc, char **argv)
 {
-	int fd, msglen, interval, nmsg;
 	char *ds;
 	int pid;
+	pthread_t rcvr;
 
-	nsec();		/* make sure time file is already open */
-
-#warning "FIX ME add I and V formats to printf"
-	//fmtinstall('V', eipfmt);
-	//fmtinstall('I', eipfmt);
+	register_printf_specifier('i', printf_ipaddr, printf_ipaddr_info);
 
 	msglen = interval = 0;
 	nmsg = MAXMSG;
+
+	argv0 = argv[0];
+	if (argc <= 1)
+		usage();
 	argc--, argv++;
 	while (**argv == '-'){
 		switch(argv[0][1]){
@@ -602,7 +608,6 @@ main(int argc, char **argv)
 	fd = dial(ds, 0, 0, 0);
 	if(fd < 0){
 		fprintf(stderr, "%s: couldn't dial %s: %r\n", argv0, ds);
-		perror("dialing");
 		exit(1);
 	}
 
@@ -610,24 +615,16 @@ main(int argc, char **argv)
 		printf("sending %d %d byte messages %d ms apart to %s\n",
 			nmsg, msglen, interval, ds);
 
-#warning "No shared memory fork; running sender and receiver serially"
-	pid = -1; // no RFMEM; no shared memory. Have to run serially.fork();
-	switch(pid) { //rfork(RFPROC|RFMEM|RFFDG)){
-	case -1:
-		fprintf(stderr, "%s: can't fork: %r\n", argv0);
-		sender(fd, msglen, interval, nmsg);
-		fprintf(stderr, "Sent\n");
-		rcvr(fd, msglen, interval, nmsg);
-		exit(0);
-	case 0:
-		rcvr(fd, msglen, interval, nmsg);
-		printf(lostmsgs ? "lost messages" : "");
-		exit(0);
-	default:
-		sender(fd, msglen, interval, nmsg);
-		wait();
-		exit(1);
+	/* Spawning the receiver on a separate thread, possibly separate core */
+	if (pthread_create(&rcvr, NULL, &rcvr_thread, NULL)) {
+		perror("Failed to create recevier");
+		exit(-1);
 	}
+	sender(fd, msglen, interval, nmsg);
+	/* races with prints from the rcvr.  either lock, or live with it! */
+	printd("Sent, now joining\n");
+	pthread_join(rcvr, NULL);
+	return 0;
 }
 
 void
@@ -641,7 +638,7 @@ reply(Req *r, void *v)
 		if(addresses)
 			(*proto->prreply)(r, v);
 		else
-			printf("%d: rtt %lld microseconds, avg rtt %lld microseconds, ttl = %d\n",
+			printf("%3d: rtt %5lld usec, avg rtt %5lld usec, ttl = %d\n",
 				r->seq - firstseq, r->rtt, sum/rcvdmsgs, r->ttl);
 	r->replied = 1;
 }
