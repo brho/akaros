@@ -804,6 +804,10 @@ static int rtl8139pnp(struct ether *edev)
 			}
 		}
 		p = pcidev;
+		/* Turn on PCI bus mastering */
+		pcidev_write32(pcidev, PCI_STAT_CMD_REG,
+		               pcidev_read32(pcidev, PCI_STAT_CMD_REG) |
+		               PCI_CMD_BUS_MAS);
 		break;
 	}
 	if (!device_id){
