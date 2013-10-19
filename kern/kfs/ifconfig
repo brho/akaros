@@ -23,8 +23,8 @@ export rootsrv=boot
 # wrong addresses.
 me=10.0.2.15
 net=10.0.2.0
-vm=10.0.2.1
-route=10.0.2.1
+vm=10.0.2.2
+route=10.0.2.2
 
 #
 # Post the read-only filesystem in #s/$beetroot
