@@ -93,7 +93,6 @@ void main(int argc, char *argv[])
 			if (strcmp(d->d_name, "ipifc") == 0)
 				continue;
 			snprintf(buf, sizeof buf, "%s/%s/0/local", netroot, d->d_name);
-			fprintf(stderr, "Check: %s\n", buf);
 			/* access is bogus for now. */
 			if (1 || access(buf, 0) >= 0)
 				nstat(d->d_name, pip);
