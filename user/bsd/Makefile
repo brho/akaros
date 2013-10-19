@@ -4,7 +4,7 @@ LIBNAME = bsd
 
 SRCDIR := 
 OBJDIR := $(SRCDIR)obj
-INCDIR = 
+INCDIR = .
 
 INCS = -I. -I$(INCDIR)
 FINALLIB = $(OBJDIR)/lib$(LIBNAME).a
