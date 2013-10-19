@@ -22,8 +22,11 @@ export rootsrv=boot
 # (me network server server-addr
 # wrong addresses.
 me=10.0.2.15
-net=10.0.2.0
-vm=10.0.2.2
+mask=255.255.255.0
+# brho: i don't know what exactly 'remote' is supposed to be, but that is the
+# third argument processed by adding to an ipifc.  if we pass nothing, it'll
+# build 'remote' by masking me & mask.
+remote=10.0.2.0
 route=10.0.2.2
 
 #
@@ -57,7 +60,7 @@ i=`cat /9/net/ipifc/clone`
 # bind the ether0 to it
 echo "bind ether /net/ether0 " > /9/net/ipifc/$i/ctl
 # ifconfig it
-echo "add $me $net $vm" > /9/net/ipifc/$i/ctl
+echo "add $me $mask $remote" > /9/net/ipifc/$i/ctl
 echo "add 0 0 $route" > /9/net/iproute
 echo I am $me, default route $route
 
