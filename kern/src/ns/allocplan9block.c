@@ -17,10 +17,7 @@ enum {
 	BLOCKALIGN = 32,	/* known to be good for all systems. */
 };
 
-struct {
-	spinlock_t lock;
-	uint32_t bytes;
-} ialloc;
+static atomic_t ialloc_bytes = 0;
 
 static struct block *_allocb(int size)
 {
@@ -86,9 +83,7 @@ struct block *iallocb(int size)
 	}
 	b->flag = BINTR;
 
-	spin_lock(&ialloc.lock);
-	ialloc.bytes += b->lim - b->base;
-	spin_unlock(&ialloc.lock);
+	atomic_add(&ialloc_bytes, b->lim - b->base);
 
 	return b;
 }
@@ -110,9 +105,8 @@ void freeb(struct block *b)
 		return;
 	}
 	if (b->flag & BINTR) {
-		spin_lock(&ialloc.lock);
-		ialloc.bytes -= b->lim - b->base;
-		spin_unlock(&ialloc.lock);
+		/* subtracting the size of b */
+		atomic_add(&ialloc_bytes, -(b->lim - b->base));
 	}
 
 	p = b->base;
@@ -154,5 +148,5 @@ void checkb(struct block *b, char *msg)
 
 void iallocsummary(void)
 {
-	printd("ialloc %lu\n", ialloc.bytes);
+	printd("ialloc %lu\n", atomic_read(&ialloc_bytes));
 }
