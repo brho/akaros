@@ -1,6 +1,6 @@
 ARCH ?= none	# catch bugs
 CFLAGS_USER += -static -fomit-frame-pointer -g
-LIBNAME = ape_bsd
+LIBNAME = bsd
 
 SRCDIR := 
 OBJDIR := $(SRCDIR)obj
