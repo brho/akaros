@@ -10,6 +10,7 @@
 /* socket extensions */
 #include <sys/uio.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 
 #include "priv.h"
 

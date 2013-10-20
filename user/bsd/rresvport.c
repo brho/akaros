@@ -27,7 +27,7 @@ rresvport(int *p)
 	in.sin_family = AF_INET;
 	in.sin_port = htons(i);
 printf("in.sin_port = %d\n", in.sin_port);
-	if(bind(fd, &in, sizeof(in)) < 0){
+	if(bind(fd, (struct sockaddr *)&in, sizeof(in)) < 0){
 		close(fd);
 		return -1;
 	}

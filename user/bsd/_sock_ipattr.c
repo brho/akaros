@@ -1,5 +1,6 @@
 /* posix */
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <ctype.h>
 
@@ -16,7 +17,7 @@
 int
 _sock_ipattr(const char *name)
 {
-	char *p;
+	const char *p;
 	int dot = 0;
 	int alpha = 0;
 

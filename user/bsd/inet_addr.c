@@ -9,6 +9,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+/* where to define this? only used once? */
+unsigned long nptohl(void *p);
+
 #define CLASS(x)	(x[0]>>6)
 
 unsigned long

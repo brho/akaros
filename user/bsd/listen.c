@@ -74,7 +74,7 @@ listenproc(Rock *r, int fd)
 			_muxsid = getpgrp();
 		} else
 			setpgid(getpid(), _muxsid);
-		_RENDEZVOUS(2, _muxsid);
+		//_RENDEZVOUS(2, _muxsid);
 		break;
 	default:
 		atexit(_killmuxsid);

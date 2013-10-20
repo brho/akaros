@@ -16,7 +16,7 @@ struct hostent *gethostbyaddr (__const void *addr, __socklen_t len,
 {
 	unsigned long a, y;
 	struct in_addr x;
-	unsigned char *p = addr;
+	__const unsigned char *p = addr;
 
 	if(type != AF_INET || len != 4){
 		h_errno = NO_RECOVERY;
