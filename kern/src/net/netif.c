@@ -321,7 +321,7 @@ netifwrite(struct netif *nif, struct chan *c, void *a, long n)
 	qlock(&nif->qlock);
 	f = nif->f[NETID(c->qid.path)];
 	if((p = matchtoken(buf, "connect")) != 0){
-		type = atoi(p);
+		type = strtol(p, 0, 0); /* allows any base, though usually hex */
 		if(typeinuse(nif, type))
 			error(Einuse);
 		f->type = type;
@@ -337,7 +337,7 @@ netifwrite(struct netif *nif, struct chan *c, void *a, long n)
 	} else if((p = matchtoken(buf, "scanbs")) != 0){
 		/* scan for base stations */
 		if(f->scan == 0){
-			type = atoi(p);
+			type = strtol(p, 0, 0); /* allows any base, though usually hex */
 			if(type < 5)
 				type = 5;
 			if(nif->scanbs != NULL)
