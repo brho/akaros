@@ -522,10 +522,11 @@ enum {
 
 char *aformat = "%-6.6s %-8.8s %-40.40I %-32.32s\n";
 
-static void convmac(char *p, uint8_t * mac, int n)
+static void convmac(char *p, int maxlen, uint8_t * mac, int n)
 {
+	char *end = p + maxlen;
 	while (n-- > 0)
-		p += snprintf(p, n, "%2.2ux", *mac++);
+		p = seprintf(p, end, "%2.2x", *mac++);
 }
 
 int arpread(struct arp *arp, char *p, uint32_t offset, int len)
@@ -550,7 +551,7 @@ int arpread(struct arp *arp, char *p, uint32_t offset, int len)
 		}
 		len--;
 		qlock(&arp->qlock);
-		convmac(mac, a->mac, a->type->maclen);
+		convmac(mac, sizeof(mac), a->mac, a->type->maclen);
 		n += snprintf(p + n, len, aformat, a->type->name, arpstate[a->state],
 					  a->ip, mac);
 		qunlock(&arp->qlock);
