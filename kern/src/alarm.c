@@ -149,14 +149,13 @@ void trigger_tchain(struct timer_chain *tchain)
 }
 
 /* Sets the alarm.  If it is a kthread-style alarm (func == 0), sleep on it
- * later.  Hold the lock, if applicable.  If this is a per-core tchain, the
- * interrupt-disabling ought to suffice. */
-void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
+ * later.  This version assumes you have the lock held.  That only makes sense
+ * from alarm handlers, which are called with this lock held from IRQ context */
+void __set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 {
 	struct alarm_waiter *i, *temp;
 	/* This will fail if you don't set a time */
 	assert(waiter->wake_up_time != ALARM_POISON_TIME);
-	spin_lock_irqsave(&tchain->lock);
 	/* has_fired tells us if it is on the tchain or not */
 	waiter->has_fired = FALSE;
 	/* Either the list is empty, or not. */
@@ -196,8 +195,17 @@ void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 reset_out:
 	reset_tchain_interrupt(tchain);
 no_reset_out:
-	spin_unlock_irqsave(&tchain->lock);
+	;
 	/* TODO: could put some debug stuff here */
+}
+
+/* Sets the alarm.  Don't call this from an alarm handler, since you already
+ * have the lock held.  Call __set_alarm() instead. */
+void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
+{
+	spin_lock_irqsave(&tchain->lock);
+	__set_alarm(tchain, waiter);
+	spin_unlock_irqsave(&tchain->lock);
 }
 
 /* Removes waiter from the tchain before it goes off.  Returns TRUE if we

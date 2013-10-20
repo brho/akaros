@@ -33,7 +33,8 @@
  * 	set_alarm(tchain, waiter);
  * If you want the HANDLER to run again, do this at the end of it:
  * 	set_awaiter_rel(waiter, USEC);
- * 	set_alarm(tchain, waiter);
+ * 	__set_alarm(tchain, waiter);
+ * Do not call set_alarm() from within an alarm handler; you'll deadlock.
  * Don't forget to manage your memory at some (safe) point:
  * 	kfree(waiter);
  * In the future, we might have a slab for these.  You can get it from wherever
@@ -90,6 +91,7 @@ void set_awaiter_abs(struct alarm_waiter *waiter, uint64_t abs_time);
 void set_awaiter_rel(struct alarm_waiter *waiter, uint64_t usleep);
 void set_awaiter_inc(struct alarm_waiter *waiter, uint64_t usleep);
 /* Arms/disarms the alarm */
+void __set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
 void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
 bool unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
 /* Blocks on the alarm waiter */
