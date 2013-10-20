@@ -413,9 +413,12 @@ strtoul(const char *s, char **endptr, int base)
 	return (neg ? -val : val);
 }
 
-int
-atoi(const char* s)
+int atoi(const char *s)
 {
+	if (!s)
+		return 0;
+	if (s[0] == '0' && s[1] == 'x')
+		warn("atoi() used on a hex string!");
 	// no overflow detection
 	return (int)strtol(s,NULL,10);
 }

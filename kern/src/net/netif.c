@@ -356,7 +356,7 @@ netifwrite(struct netif *nif, struct chan *c, void *a, long n)
 	f = nif->f[NETID(c->qid.path)];
 	if ((p = matchtoken(buf, "connect")) != 0) {
 		qclose(f->iq);
-		type = atoi(p);
+		type = strtol(p, 0, 0);	/* allow any base, though usually hex */
 		if (typeinuse(nif, type))
 			error(Einuse);
 		f->type = type;
