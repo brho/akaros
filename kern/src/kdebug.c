@@ -8,6 +8,7 @@
 #include <kmalloc.h>
 #include <string.h>
 #include <assert.h>
+#include <smp.h>
 
 struct symtab_entry gbl_symtab[1] __attribute__((weak)) = {{0, 0}};
 
@@ -73,23 +74,48 @@ static bool is_blacklisted(const char *s)
 }
 
 static int tab_depth = 0;
+static bool print = TRUE;
+
+/* Call these via kfunc */
+void reset_print_func_depth(void)
+{
+	tab_depth = 0;
+}
+
+void toggle_print_func(void)
+{
+	print = !print;
+	printk("Func entry/exit printing is now %sabled\n", print ? "en" : "dis");
+}
+
+static spinlock_t lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 void __print_func_entry(const char *func, const char *file)
 {
+	if (!print)
+		return;
 	if (is_blacklisted(func))
 		return;
+	spin_lock_irqsave(&lock);
+	printd("Core %2d", core_id());	/* helps with multicore output */
 	for (int i = 0; i < tab_depth; i++)
 		printk("\t");
 	printk("%s() in %s\n", func, file);
+	spin_unlock_irqsave(&lock);
 	tab_depth++;
 }
 
 void __print_func_exit(const char *func, const char *file)
 {
+	if (!print)
+		return;
 	if (is_blacklisted(func))
 		return;
 	tab_depth--;
+	spin_lock_irqsave(&lock);
+	printd("Core %2d", core_id());
 	for (int i = 0; i < tab_depth; i++)
 		printk("\t");
 	printk("---- %s()\n", func);
+	spin_unlock_irqsave(&lock);
 }
