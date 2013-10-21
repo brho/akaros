@@ -38,7 +38,6 @@ struct arp {
 	struct arpent *hash[NHASH];
 	struct arpent cache[NCACHE];
 	struct arpent *rxmt;
-	struct proc *rxmitp;		/* neib sol re-transmit proc */
 	struct rendez rxmtq;
 	struct block *dropf, *dropl;
 };
@@ -47,8 +46,7 @@ char *Ebadarp = "bad arp";
 
 #define haship(s) ((s)[IPaddrlen-1]%NHASH)
 
-// ??
-/*extern */ int ReTransTimer = RETRANS_TIMER;
+int ReTransTimer = RETRANS_TIMER;	/* in plan9.h, exposed for ethermedium */
 
 static void rxmitproc(void *v);
 
@@ -60,8 +58,7 @@ void arpinit(struct fs *f)
 	f->arp->dropf = f->arp->dropl = NULL;
 	qlock_init(&f->arp->qlock);
 	rendez_init(&f->arp->rxmtq);
-	/* TODO: pending fix of rxmitproc */
-	//ktask("arp rxmitproc", rxmitproc, f->arp);
+	ktask("arp rxmitproc", rxmitproc, f->arp);
 }
 
 /*
@@ -661,21 +658,20 @@ static int rxready(void *v)
 
 static void rxmitproc(void *v)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct arp *arp = v;
 	long wakeupat;
 
-	arp->rxmitp = current;
-	//print("arp rxmitproc started\n");
 	if (waserror()) {
-		arp->rxmitp = 0;
-		pexit("hangup", 1);
+		printk("[kernel] arp rxmitproc exited, probably a bug\n");
+		poperror();
+		return;
 	}
 	for (;;) {
 		wakeupat = rxmitsols(arp);
-		if(wakeupat == 0)
+		if (wakeupat == 0)
 			rendez_sleep(&arp->rxmtq, rxready, v);
-		else if(wakeupat > ReTransTimer/4)
+		else if (wakeupat > ReTransTimer / 4)
 			udelay_sched(wakeupat * 1000);
 	}
 }

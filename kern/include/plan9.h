@@ -688,7 +688,7 @@ int getfields(char *str, char **args, int max, int mflag, char *unused_set);
 
 /* functions we need to do something with someday */
 #define postnote(...)
-#define pexit(...)
+#define pexit(...) panic("pexit not implemented")
 
 /* kern/drivers/dev/misc.c */
 int nrand(int n);
