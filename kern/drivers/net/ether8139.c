@@ -470,6 +470,17 @@ static void rtl8139init(struct ether *edev)
 	iunlock(&ctlr->ilock);
 }
 
+struct alarm_waiter rtl8139_waiter;
+static void __rtl8139alarm(struct alarm_waiter *waiter)
+{
+	kickme();
+	/* Set our alarm to go off, incrementing from our last tick (instead of
+	 * setting it relative to now, since some time has passed since the alarm
+	 * first went off.  Note, this may be now or in the past! */
+	set_awaiter_inc(&rtl8139_waiter, 7000);	/* 7ms, whatever... */
+	__set_alarm(&per_cpu_info[core_id()].tchain, &rtl8139_waiter);
+}
+
 static void rtl8139attach(struct ether *edev)
 {
 	struct ctlr *ctlr;
@@ -493,7 +504,12 @@ static void rtl8139attach(struct ether *edev)
 		}
 		rtl8139init(edev);
 		kickdev = edev;
-		//addclock0link(kickme, 7);
+		/* Every 7ms, trigger a fake IRQ.  Not sure how critical this is; the
+		 * old plan9/nxm code did this.  Presumably we could clear kickdev if we
+		 * want to handle this dynamically. */
+		init_awaiter(&rtl8139_waiter, __rtl8139alarm);
+		set_awaiter_rel(&rtl8139_waiter, 7000);
+		set_alarm(&per_cpu_info[core_id()].tchain, &rtl8139_waiter);
 	}
 	qunlock(&ctlr->alock);
 }
