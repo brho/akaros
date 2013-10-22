@@ -1162,8 +1162,8 @@ extern uint8_t IPnoaddr[IPaddrlen];
 extern uint8_t v4prefix[IPaddrlen];
 extern uint8_t IPallbits[IPaddrlen];
 
-#define	NOW	tsc2msec(read_tsc_serialized())
-#define	seconds() tsc2sec(read_tsc_serialized())
+#define	NOW	tsc2msec(read_tsc())
+#define	seconds() tsc2sec(read_tsc())
 
 /*
  *  media
