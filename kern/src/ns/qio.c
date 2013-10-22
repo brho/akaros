@@ -1324,7 +1324,8 @@ qwrite(struct queue *q, void *vp, int len)
 
 /*
  *  used by print() to write to a queue.  Since we may be splhi or not in
- *  a process, don't qlock.
+ *  a process, don't qlock. (brho: i think this means it might be called from
+ *  IRQ context)
  *
  *  this routine merges adjacent blocks if block n+1 will fit into
  *  the free space of block n.

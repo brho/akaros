@@ -207,8 +207,9 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 static int
 etheroq(struct ether *ether, struct block *bp)
 {
-	int len, loopback, s;
+	int len, loopback;
 	struct etherpkt *pkt;
+	int8_t irq_state = 0;
 
 	ether->netif.outpackets++;
 
@@ -226,9 +227,9 @@ etheroq(struct ether *ether, struct block *bp)
 	loopback = memcmp(pkt->d, ether->ea, sizeof(pkt->d)) == 0;
 	if (loopback || memcmp(pkt->d, ether->netif.bcast, sizeof(pkt->d)) == 0
 		|| ether->netif.prom) {
-		//s = splhi();
+		disable_irqsave(&irq_state);
 		etheriq(ether, bp, 0);
-		//splx(s);
+		enable_irqsave(&irq_state);
 	}
 
 	if (!loopback) {
