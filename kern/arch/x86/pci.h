@@ -129,10 +129,6 @@
 #define PCI_MAX_DEV			32
 #define PCI_MAX_FUNC		8
 
-// Offset used for indexing IRQs. Why isnt this defined elsewhere?
-#define NUM_IRQS			256
-#define KERNEL_IRQ_OFFSET	32
-
 // Run the PCI Code to loop over the PCI BARs. For now we don't use the BARs,
 // dont check em.
 #define CHECK_BARS			0
@@ -171,8 +167,6 @@ struct pci_device {
 STAILQ_HEAD(pcidev_stailq, pci_device);
 SLIST_HEAD(pcidev_slist, pci_device);
 extern struct pcidev_stailq pci_devices;
-/* Mapping of irq -> PCI device (TODO: make this PCI-agnostic) */
-extern struct pci_device *irq_pci_map[NUM_IRQS];
 
 void pci_init(void);
 void pcidev_print_info(struct pci_device *pcidev, int verbosity);
