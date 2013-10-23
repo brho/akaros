@@ -373,16 +373,12 @@ static struct ether *etherprobe(int cardno, int ctlrno)
 		ether->irq = 9;
 	snprintf(name, sizeof(name), "ether%d", ctlrno);
 
-#warning "not enabling interrupts in devether; enabled lower down"
-#if 0
 	/*
 	 * If ether->irq is <0, it is a hack to indicate no interrupt
 	 * used by ethersink.
 	 */
 	if (ether->irq >= 0)
-		printk("NOT ENABLING INTERRUPTS\n");
-	//intrenable(ether->irq, ether->interrupt, ether, ether->tbdf, name);
-#endif
+		register_dev_irq(ether->irq, ether->interrupt, ether);
 
 	i = snprintf(buf, sizeof(buf), "#l%d: %s: %dMbps port %#p irq %d tu %d",
 				 ctlrno, cards[cardno].type, ether->netif.mbps, ether->port,

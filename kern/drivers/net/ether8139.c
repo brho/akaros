@@ -780,26 +780,6 @@ static int rtl8139pnp(struct ether *edev)
 		pcidev_write32(pcidev, PCI_STAT_CMD_REG,
 		               pcidev_read32(pcidev, PCI_STAT_CMD_REG) |
 		               PCI_CMD_BUS_MAS);
-
-
-		/* TODO: helper func or something */
-		register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET+irq, rtl8139interrupt, edev);
-#ifdef CONFIG_ENABLE_MPTABLES
-		NO;
-		/* TODO: this should be for any IOAPIC EOI, not just MPTABLES */
-		ioapic_route_irq(irq, xxxE1000_IRQ_CPU);	
-		printk("ioapic rout\n");
-		
-#else 
-		// This will route the interrupts automatically to CORE 0
-		// Call send_kernel_message if you want to route them somewhere else
-		pic_unmask_irq(irq);
-		unmask_lapic_lvt(LAPIC_LVT_LINT0);
-		enable_irq();
-		printk("picroute\n");
-#endif
-
-
 		goto found_new_dev;
 	}
 	return -1;
