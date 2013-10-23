@@ -638,25 +638,7 @@ void e1000_setup_interrupts() {
 	e1000_irq_enable();
 
 	// Kernel based interrupt stuff
-	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + e1000_irq, e1000_interrupt_handler, 0);
-
-	// Enable irqs for the e1000
-	// TODO: figure out where the interrupts are actually going..
-#ifdef CONFIG_ENABLE_MPTABLES
-	/* TODO: this should be for any IOAPIC EOI, not just MPTABLES */
-	ioapic_route_irq(e1000_irq, E1000_IRQ_CPU);	
-	printk("ioapic rout\n");
-
-#else 
-	// This will route the interrupts automatically to CORE 0
-	// Call send_kernel_message if you want to route them somewhere else
-	pic_unmask_irq(e1000_irq);
-	unmask_lapic_lvt(LAPIC_LVT_LINT0);
-	enable_irq();
-	printk("picroute\n");
-#endif
-
-	return;
+	register_dev_irq(e1000_irq, e1000_interrupt_handler, 0);
 }
 
 // Code that is executed when an interrupt comes in on IRQ e1000_irq

@@ -36,9 +36,6 @@
 
 #include "e1000_hw.h"
 
-// Offset used for indexing IRQs
-#define KERNEL_IRQ_OFFSET	32
-
 // Intel Descriptor Related Sizing
 #define E1000_NUM_TX_DESCRIPTORS	2048
 #define E1000_NUM_RX_DESCRIPTORS	2048

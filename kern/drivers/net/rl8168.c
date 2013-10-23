@@ -311,16 +311,7 @@ void rl8168_setup_interrupts() {
 	outw(rl8168_io_base_addr + RL_IS_REG, RL_INTRRUPT_CLEAR);
 	
 	// Kernel based interrupt stuff
-	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + rl8168_irq, rl8168_interrupt_handler, 0);
-#ifdef CONFIG_ENABLE_MPTABLES
-	ioapic_route_irq(rl8168_irq, 1);	
-#else
-	pic_unmask_irq(rl8168_irq);
-	unmask_lapic_lvt(LAPIC_LVT_LINT0);
-	enable_irq();
-#endif
-	
-	return;
+	register_dev_irq(rl8168_irq, rl8168_interrupt_handler, 0);
 }
 
 // We need to evaluate this routine in terms of concurrency.

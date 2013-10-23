@@ -173,15 +173,7 @@ void ne2k_setup_interrupts() {
 	ne2k_debug("-->Setting interrupts.\n");
 	
 	// Kernel based interrupt stuff
-	register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET + ne2k_irq, ne2k_interrupt_handler, (void *)0);
-	
-#ifdef CONFIG_ENABLE_MPTABLES
-	ioapic_route_irq(ne2k_irq, 0);	
-#else
-	pic_unmask_irq(ne2k_irq);
-	unmask_lapic_lvt(LAPIC_LVT_LINT0);
-	enable_irq();
-#endif
+	register_dev_irq(ne2k_irq, ne2k_interrupt_handler, 0);
 	
 	SET_PAGE_0();
 

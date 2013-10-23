@@ -84,9 +84,6 @@
 #define DES_TX_UDP_CHK_MASK 0x80000000
 #define DES_TX_TCP_CHK_MASK 0x40000000
 
-// Offset used for indexing IRQs
-#define KERNEL_IRQ_OFFSET	32
-
 // Realtek Descriptor Related Sizing
 #define NUM_TX_DESCRIPTORS	1024
 #define NUM_RX_DESCRIPTORS	1024
