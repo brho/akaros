@@ -1,0 +1,39 @@
+MKSHELL=rc
+<$NXM/$objtype/mkfile
+
+LIB=$NXM/$objtype/lib/libndb.a
+OFILES=\
+	csgetval.$O\
+	csipinfo.$O\
+	dnsquery.$O\
+	ipattr.$O\
+	ndbaux.$O\
+	ndbcache.$O\
+	ndbcat.$O\
+	ndbconcatenate.$O\
+	ndbdiscard.$O\
+	ndbfree.$O\
+	ndbgetipaddr.$O\
+	ndbgetval.$O\
+	ndbhash.$O\
+	ndbipinfo.$O\
+	ndblookval.$O\
+	ndbopen.$O\
+	ndbparse.$O\
+	ndbreorder.$O\
+	ndbsubstitute.$O\
+
+HFILES=\
+	$NXM/sys/include/ndb.h\
+	ndbhf.h
+
+UPDATE=\
+	mkfile\
+	$HFILES\
+	${OFILES:%.$O=%.c}\
+	${LIB:$NXM/$objtype/%=/386/%}\
+
+<$NXM/sys/src/cmd/mksyslib
+
+$O.out: testipinfo.$O
+	$LD $prereq
