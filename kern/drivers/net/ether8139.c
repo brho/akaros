@@ -742,45 +742,47 @@ static struct {
 	char *name;
 	uint32_t id;
 } rtl8139pci[] = {
-	{
-	"rtl8139", (0x8139 << 16) | 0x10EC,},	/* generic */
-	{
-	"smc1211", (0x1211 << 16) | 0x1113,},	/* SMC EZ-Card */
-	{
-	"dfe-538tx", (0x1300 << 16) | 0x1186,},	/* D-Link DFE-538TX */
-	{
-	"dfe-560txd", (0x1340 << 16) | 0x1186,},	/* D-Link DFE-560TXD */
-	{
-NULL},};
-
-static int irq;
-static uint32_t device_id = 0;
+	{ "rtl8139", (0x8139 << 16) | 0x10EC,},	/* generic */
+	{ "smc1211", (0x1211 << 16) | 0x1113,},	/* SMC EZ-Card */
+	{ "dfe-538tx", (0x1300 << 16) | 0x1186,},	/* D-Link DFE-538TX */
+	{ "dfe-560txd", (0x1340 << 16) | 0x1186,},	/* D-Link DFE-560TXD */
+	{ NULL},};
 
 static int rtl8139pnp(struct ether *edev)
 {
 	int i;
-	struct pci_device *p = NULL;
 	struct ctlr *ctlr;
 	uint8_t ea[Eaddrlen];
 	uint32_t id = 0;
 	uint16_t port = 0;
-
+	int irq;
 	struct pci_device *pcidev;
-	uint32_t result;
-	printk("Searching for rtl8139 Network device...");
+
+	/* For now, every driver scans every pcidevice */
+	/* The way addethercard/etherprobe work, we only get one one struct ether
+	 * for all of rtl8139, which seems buggy (what if i have two NICs?).  This
+	 * code can handle being called for multiple different rtl NICs (i think) */
 	STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
+		if (pcidev->in_use)
+			continue;
 		id = pcidev->dev_id << 16 | pcidev->ven_id;
 		for (i = 0; i < ARRAY_SIZE(rtl8139pci); i++)
 			if (rtl8139pci[i].id == id)
 				break;
 		if (i == ARRAY_SIZE(rtl8139pci))
 			continue;
-
-		printk(" found on BUS %x DEV %x FUNC %x\n", pcidev->bus, pcidev->dev,
-			   pcidev->func);
-		device_id = pcidev->dev_id;
-		/* Find the IRQ */
+		pcidev->in_use = TRUE;
+		printk("RTL8139 driver found %s at %02x:%02x.%x\n", rtl8139pci[i].name,
+		       pcidev->bus, pcidev->dev, pcidev->func);
 		irq = pcidev->irqline;
+		port = pcidev->bar[0].pio_base;
+		/* Turn on PCI bus mastering */
+		pcidev_write32(pcidev, PCI_STAT_CMD_REG,
+		               pcidev_read32(pcidev, PCI_STAT_CMD_REG) |
+		               PCI_CMD_BUS_MAS);
+
+
+		/* TODO: helper func or something */
 		register_interrupt_handler(interrupt_handlers, KERNEL_IRQ_OFFSET+irq, rtl8139interrupt, edev);
 #ifdef CONFIG_ENABLE_MPTABLES
 		NO;
@@ -797,43 +799,15 @@ static int rtl8139pnp(struct ether *edev)
 		printk("picroute\n");
 #endif
 
-		printd("-->IRQ: %u\n", irq);
-		/* Loop over the BARs */
-		/* TODO: pci layer should scan these things and put them in a pci_dev
-		 * struct */
-		/* SelectBars based on the IORESOURCE_MEM */
-		for (int k = 0; k <= 5; k++) {
-			/* TODO: clarify this magic */
-			int reg = 4 + k;
-			result = pcidev_read32(pcidev, reg << 2);
 
-			if (result == 0)	// (0 denotes no valid data)
-				continue;
-			if (k == 0) port = result & ~3;
-			// Read the bottom bit of the BAR. 
-			if (result & PCI_BAR_IO_MASK) {
-				result = result & PCI_IO_MASK;
-				printd("-->BAR%u: %s --> %x\n", k, "IO", result);
-			} else {
-				result = result & PCI_MEM_MASK;
-				printd("-->BAR%u: %s --> %x\n", k, "MEM", result);
-			}
-		}
-		p = pcidev;
-		/* Turn on PCI bus mastering */
-		pcidev_write32(pcidev, PCI_STAT_CMD_REG,
-		               pcidev_read32(pcidev, PCI_STAT_CMD_REG) |
-		               PCI_CMD_BUS_MAS);
-		break;
+		goto found_new_dev;
 	}
-	if (!device_id){
-		printk(" not found. No device configured.\n");
-		return -1;
-	}
+	return -1;
+found_new_dev:
 	ctlr = kzmalloc(sizeof(struct ctlr), 0);
 	if (ctlr == NULL)
 		panic(Enomem);
-	ctlr->pci = p;
+	ctlr->pci = pcidev;
 	ctlr->id = id;
 	ctlr->port = port;
 	qlock_init(&ctlr->alock);
@@ -848,7 +822,6 @@ static int rtl8139pnp(struct ether *edev)
 
 	edev->ctlr = ctlr;
 	edev->port = ctlr->port;
-	/* how do we set interrupts? */
 	edev->irq = irq;
 	edev->tbdf = MK_CONFIG_ADDR(pcidev->bus, pcidev->dev, pcidev->func, 0);
 

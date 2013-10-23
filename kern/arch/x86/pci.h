@@ -27,8 +27,6 @@
 /* TODO: gut this (when the IOAPIC is fixed) */
 #define INVALID_BUS			0xFFFF
 
-#define PCI_IO_MASK			0xfff8
-#define PCI_MEM_MASK		0xfffffff0
 #define PCI_IRQLINE_MASK	0x000000ff
 #define PCI_IRQPIN_MASK		0x0000ff00
 #define PCI_IRQPIN_SHFT		8
@@ -119,8 +117,9 @@
 #define PCI_ST_PAR_ERR		(1 << 15)
 
 /* BARS: Base Address Registers */
-#define PCI_BAR_IO_MASK		0x1
-#define PCI_BAR_IO PCI_BAR_IO_MASK
+#define PCI_BAR_IO			0x1			/* 1 == IO, 0 == Mem */
+#define PCI_BAR_IO_MASK		0xfffffffc
+#define PCI_BAR_MEM_MASK	0xfffffff0
 #define PCI_MEMBAR_TYPE 	(3 << 1)
 #define PCI_MEMBAR_32BIT 	0x0
 #define PCI_MEMBAR_RESV 	0x2			/* type 0x1 shifted to MEMBAR_TYPE */
@@ -138,10 +137,21 @@
 // dont check em.
 #define CHECK_BARS			0
 
+#define MAX_PCI_BAR			6
+
+struct pci_bar {
+	uint32_t					raw_bar;
+	uint32_t					pio_base;
+	uint32_t					mmio_base32;
+	uint64_t					mmio_base64;
+	uint32_t					mmio_sz;
+};
+
 /* Struct for some meager contents of a PCI device */
 struct pci_device {
 	STAILQ_ENTRY(pci_device)	all_dev;	/* list of all devices */
 	SLIST_ENTRY(pci_device)		irq_dev;	/* list of all devs off an irq */
+	bool						in_use;		/* prevent double discovery */
 	uint8_t						bus;
 	uint8_t						dev;
 	uint8_t						func;
@@ -149,9 +159,12 @@ struct pci_device {
 	uint16_t					ven_id;
 	uint8_t						irqline;
 	uint8_t						irqpin;
+	char						*header_type;
 	uint8_t						class;
 	uint8_t						subclass;
 	uint8_t						progif;
+	uint8_t						nr_bars;
+	struct pci_bar				bar[MAX_PCI_BAR];
 };
 
 /* List of all discovered devices */
@@ -173,8 +186,13 @@ void pci_write32(unsigned short bus, unsigned short dev, unsigned short func,
 uint32_t pcidev_read32(struct pci_device *pcidev, unsigned short offset);
 void pcidev_write32(struct pci_device *pcidev, unsigned short offset,
                     uint32_t value);
+
+/* BAR helpers, some more helpful than others. */
+uint32_t pci_membar_get_sz(struct pci_device *pcidev, int bar);
 uint32_t pci_getbar(struct pci_device *pcidev, unsigned int bar);
 bool pci_is_iobar(uint32_t bar);
+bool pci_is_membar32(uint32_t bar);
+bool pci_is_membar64(uint32_t bar);
 uint32_t pci_getmembar32(uint32_t bar);
 uint32_t pci_getiobar32(uint32_t bar);
 

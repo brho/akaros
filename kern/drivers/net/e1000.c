@@ -138,7 +138,7 @@ void e1000_init() {
  */
 void e1000_handle_bar0(uint32_t addr) {
 
-	if (addr & PCI_BAR_IO_MASK) {
+	if (addr & PCI_BAR_IO) {
 		e1000_debug("-->IO PORT MODE\n");
 		panic("IO PORT MODE NOT SUPPORTED\n");
 	} else {
@@ -149,7 +149,7 @@ void e1000_handle_bar0(uint32_t addr) {
                 // write all 1's denotes the size
 		outl(PCI_CONFIG_DATA, 0xFFFFFFFF);
 		uint32_t result = inl(PCI_CONFIG_DATA);
-		result = result & PCI_MEM_MASK;
+		result = result & PCI_BAR_MEM_MASK;
 		result = (result ^ 0xFFFFFFFF) + 1;
 		e1000_addr_size = result;
 		e1000_debug("-->MMIO Size %x\n", e1000_addr_size);
@@ -213,15 +213,15 @@ int e1000_scan_pci(void)
 			if (result == 0) // (0 denotes no valid data)
 				continue;
 			// Read the bottom bit of the BAR. 
-			if (result & PCI_BAR_IO_MASK) {
-				result = result & PCI_IO_MASK;
+			if (result & PCI_BAR_IO) {
+				result = result & PCI_BAR_IO_MASK;
 				e1000_debug("-->BAR%u: %s --> %x\n", k, "IO", result);
 			} else {
-				result = result & PCI_MEM_MASK;
+				result = result & PCI_BAR_MEM_MASK;
 				e1000_debug("-->BAR%u: %s --> %x\n", k, "MEM", result);
 			}
 			if (k == 0) { // BAR0 denotes the IO Addr for the device
-				if (result & PCI_BAR_IO_MASK) {
+				if (result & PCI_BAR_IO) {
 					e1000_debug("-->IO PORT MODE\n");
 					panic("IO PORT MODE NOT SUPPORTED\n");
 				} else {
