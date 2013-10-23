@@ -20,10 +20,11 @@ typedef struct InterruptHandler {
 extern handler_t interrupt_handlers[];
 
 void idt_init(void);
-void
-register_interrupt_handler(handler_t SSOMELOCK (CT(NUM_INTERRUPT_HANDLERS)table)[],
-                           uint8_t int_num,
-                           poly_isr_t handler, TV(t) data);
+void register_interrupt_handler(handler_t table[],
+                                uint8_t int_num,
+                                poly_isr_t handler, void *data);
+int register_dev_irq(int irq, void (*handler)(struct hw_trapframe *, void *),
+                     void *irq_arg);
 void print_trapframe(struct hw_trapframe *hw_tf);
 void page_fault_handler(struct hw_trapframe *hw_tf);
 /* Generic per-core timer interrupt handler.  set_percore_timer() will fire the

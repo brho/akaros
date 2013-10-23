@@ -12,8 +12,6 @@
 // be careful changing this, esp if you go over 16
 #define NUM_HANDLER_WRAPPERS		5
 
-#define NUM_INTERRUPT_HANDLERS 256
-
 struct HandlerWrapper {
 	checklist_t* cpu_list;
 	uint8_t vector;

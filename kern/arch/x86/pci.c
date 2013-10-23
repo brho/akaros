@@ -6,15 +6,12 @@
 
 #include <arch/x86.h>
 #include <arch/pci.h>
+#include <trap.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include <kmalloc.h>
 #include <arch/pci_defs.h>
-
-/* Which pci devices hang off of which irqs */
-/* TODO: make this an array of SLISTs (pain from ioapic.c, etc...) */
-struct pci_device *irq_pci_map[NUM_IRQS] = {0};
 
 /* List of all discovered devices */
 struct pcidev_stailq pci_devices = STAILQ_HEAD_INITIALIZER(pci_devices);

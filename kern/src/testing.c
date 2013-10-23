@@ -50,7 +50,7 @@
 
 void test_ipi_sending(void)
 {
-	extern handler_t (CT(NUM_INTERRUPT_HANDLERS) RO interrupt_handlers)[];
+	extern handler_t interrupt_handlers[];
 	int8_t state = 0;
 
 	register_interrupt_handler(interrupt_handlers, I_TESTING,

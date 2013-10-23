@@ -5,6 +5,9 @@
 #define MSR_IA32_SYSENTER_ESP 0x175
 #define MSR_IA32_SYSENTER_EIP 0x176
 
+#define NUM_IRQS					256
+#define KERNEL_IRQ_OFFSET			32
+
 // Trap numbers
 // These are processor defined:
 #define T_DIVIDE     0		// divide error
@@ -87,11 +90,14 @@
 #include <ros/common.h>
 #include <arch/mmu.h>
 #include <ros/trapframe.h>
+#include <arch/pci.h>
 
 /* The kernel's interrupt descriptor table */
 extern gatedesc_t idt[];
 extern pseudodesc_t idt_pd;
 extern taskstate_t ts;
+/* Mapping of irq -> PCI device (TODO: make this PCI-agnostic) */
+extern struct pci_device *irq_pci_map[NUM_IRQS];
 extern const char *x86_trapname(int trapno);
 extern void sysenter_handler(void);
 void backtrace_kframe(struct hw_trapframe *hw_tf);

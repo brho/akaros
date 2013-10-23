@@ -31,7 +31,11 @@ pseudodesc_t idt_pd;
 /* global handler table, used by core0 (for now).  allows the registration
  * of functions to be called when servicing an interrupt.  other cores
  * can set up their own later. */
-handler_t interrupt_handlers[NUM_INTERRUPT_HANDLERS];
+handler_t interrupt_handlers[NUM_IRQS];
+
+/* Which pci devices hang off of which irqs */
+/* TODO: make this an array of SLISTs (pain from ioapic.c, etc...) */
+struct pci_device *irq_pci_map[NUM_IRQS] = {0};
 
 const char *x86_trapname(int trapno)
 {
@@ -508,6 +512,26 @@ register_interrupt_handler(handler_t TP(TV(t)) table[],
 {
 	table[int_num].isr = handler;
 	table[int_num].data = data;
+}
+
+int register_dev_irq(int irq, void (*handler)(struct hw_trapframe *, void *),
+                     void *irq_arg)
+{
+	register_interrupt_handler(interrupt_handlers,
+	                           KERNEL_IRQ_OFFSET + irq, handler, irq_arg);
+
+	/* TODO: whenever we sort out the ACPI/IOAPIC business, we'll probably want
+	 * a helper to reroute an irq? */
+#ifdef CONFIG_ENABLE_MPTABLES
+	/* TODO: this should be for any IOAPIC EOI, not just MPTABLES */
+	/* Just sending to core 0 for now */
+	ioapic_route_irq(irq, 0);
+#else
+	pic_unmask_irq(irq);
+	unmask_lapic_lvt(LAPIC_LVT_LINT0);
+	enable_irq();
+#endif
+	return 0;
 }
 
 /* It's a moderate pain in the ass to put these in bit-specific files (header

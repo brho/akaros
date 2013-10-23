@@ -348,3 +348,15 @@ handle_trap(struct hw_trapframe *hw_tf)
 void send_nmi(uint32_t os_coreid)
 {
 }
+
+void register_interrupt_handler(handler_t table[], uint8_t int_num,
+                                poly_isr_t handler, void *data)
+{
+	printk("%s not implemented\n", __FUNCTION);
+}
+
+int register_dev_irq(int irq, void (*handler)(struct hw_trapframe *, void *),
+                     void *irq_arg)
+{
+	printk("%s not implemented\n", __FUNCTION);
+}
