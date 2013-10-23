@@ -119,11 +119,11 @@ int ne2k_scan_pci() {
 			if (result == 0) // (0 denotes no valid data)
 				continue;
 			// Read the bottom bit of the BAR. 
-			if (result & PCI_BAR_IO_MASK) {
-				result = result & PCI_IO_MASK;
+			if (result & PCI_BAR_IO) {
+				result = result & PCI_BAR_IO_MASK;
 				ne2k_debug("-->BAR%u: %s --> %x\n", k, "IO", result);
 			} else {
-				result = result & PCI_MEM_MASK;
+				result = result & PCI_BAR_MEM_MASK;
 				ne2k_debug("-->BAR%u: %s --> %x\n", k, "MEM", result);
 			}
 			// TODO Switch to memory mapped instead of IO?
