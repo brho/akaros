@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <nixip.h>
+#include <dir.h>
 #include <ndb.h>
 #include "ndbhf.h"
 

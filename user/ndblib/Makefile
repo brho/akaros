@@ -39,6 +39,9 @@ $(FINALLIB): $(OBJS)
 
 install: $(FINALLIB)
 	@cp $(FINALLIB) $(XCC_TARGET_ROOT)/lib/
+	@cp -R $(INCDIR)/* $(XCC_TARGET_ROOT)/sys-include/
+	@rm -rf $(XCC_TARGET_ROOT)/sys-include/nixip  
+	@ln -fs . $(XCC_TARGET_ROOT)/sys-include/nixip  
 
 clean: 
 	@echo + clean [$(LIBUCNAME)]

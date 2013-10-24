@@ -4,12 +4,6 @@ enum
 	Ndbvlen=	64,	/* max value length */
 };
 
-struct qid {
-	uint64_t path;
-	unsigned long vers;
-	uint8_t type;
-};
-
 /*
  *  the database
  */
@@ -157,3 +151,5 @@ static inline uintptr_t getcallerpc(void *v){return 0;}
 static inline void setmalloctag(void *v){}
 
 void _ndbcacheflush(struct ndb *db);
+void setnetmtpt(char *net, int n, char *x);
+
