@@ -415,3 +415,9 @@ typedef MiiPhy;
 @@
 -MiiPhy
 +struct miiphy
+
+@@
+typedef Rendez;
+@@
+-Rendez
++struct rendez

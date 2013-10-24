@@ -28,6 +28,8 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
+#include <etherif.h>
+#include <ethermii.h>
 
 enum {
 	i82542		= (0x1000<<16)|0x8086,
@@ -451,10 +453,9 @@ enum {
 	Rbsz		= 2048,
 };
 
-typedef struct Ctlr Ctlr;
-typedef struct Ctlr {
+struct ctlr {
 	int	port;
-	Pcidev*	pcidev;
+	struct pci_device *pci;
 	struct ctlr*	next;
 	struct ether*	edev;
 	int	active;
@@ -473,8 +474,8 @@ typedef struct Ctlr {
 	spinlock_t	imlock;
 	int	im;			/* interrupt mask */
 
-	Mii*	mii;
-	Rendez	lrendez;
+	struct mii*	mii;
+	struct rendez	lrendez;
 	int	lim;
 
 	int	link;
@@ -494,7 +495,7 @@ typedef struct Ctlr {
 	uint8_t	ra[Eaddrlen];		/* receive address */
 	uint32_t	mta[128];		/* multicast table array */
 
-	Rendez	rrendez;
+	struct rendez	rrendez;
 	int	rim;
 	int	rdfree;
 	Rd*	rdba;			/* receive descriptor base address */
@@ -514,7 +515,7 @@ typedef struct Ctlr {
 	int	txcw;
 	int	fcrtl;
 	int	fcrth;
-} Ctlr;
+};
 
 #define csr32r(c, r)	(*((c)->nic+((r)/4)))
 #define csr32w(c, r, v)	(*((c)->nic+((r)/4)) = (v))
@@ -593,7 +594,7 @@ static char* statistics[Nstatistics] = {
 };
 
 static long
-igbeifstat(struct ether* edev, void* a, long n, uint32_t offset)
+igbeifstat(struct ether* edev, void* a, long n, unsigned long offset)
 {
 	struct ctlr *ctlr;
 	char *p, *s;
@@ -601,10 +602,10 @@ igbeifstat(struct ether* edev, void* a, long n, uint32_t offset)
 	uint64_t tuvl, ruvl;
 
 	ctlr = edev->ctlr;
-	qlock(tlr->slock);
+	qlock(&ctlr->slock);
 	p = kzmalloc(READSTR, 0);
 	if(p == NULL) {
-		qunlock(ctlr->slock);
+		qunlock(&ctlr->slock);
 		error(Enomem);
 	}
 	l = 0;
@@ -682,7 +683,7 @@ enum {
 };
 
 static struct cmdtab igbectlmsg[] = {
-	CMrdtr,	"rdtr",	2,
+	{CMrdtr,	"rdtr",	2},
 };
 
 static long
@@ -816,7 +817,7 @@ igbelproc(void* arg)
 {
 	struct ctlr *ctlr;
 	struct ether *edev;
-	MiiPhy *phy;
+	struct miiphy *phy;
 	int ctrl, r;
 
 	edev = arg;
@@ -891,7 +892,7 @@ enable:
 		igbeim(ctlr, Lsc);
 
 		ctlr->lsleep++;
-		sleep(&ctlr->lrendez, igbelim, ctlr);
+		rendez_sleep(&ctlr->lrendez, igbelim, ctlr);
 	}
 }
 
@@ -928,8 +929,8 @@ igbetxinit(struct ctlr* ctlr)
 	csr32w(ctlr, Tipg, (6<<20)|(8<<10)|r);
 	csr32w(ctlr, Ait, 0);
 	csr32w(ctlr, Txdmac, 0);
-
-	csr32w(ctlr, Tdbal, PCIWADDR(ctlr->tdba));
+#warning "warning: hokey address management"
+	csr32w(ctlr, Tdbal, (uintptr_t) (ctlr->tdba));
 	csr32w(ctlr, Tdbah, 0);
 	csr32w(ctlr, Tdlen, ctlr->ntd*sizeof(Td));
 	ctlr->tdh = PREV(0, ctlr->ntd);
@@ -1008,10 +1009,11 @@ igbetransmit(struct ether* edev)
 	 */
 	tdt = ctlr->tdt;
 	while(NEXT(tdt, ctlr->ntd) != tdh){
-		if((bp = qget(edev->oq)) == NULL)
+		if((bp = qget(edev->netif.oq)) == NULL)
 			break;
 		td = &ctlr->tdba[tdt];
-		td->addr[0] = PCIWADDR(bp->rp);
+#warning "hokey address management"
+		td->addr[0] = (uintptr_t)(bp->rp);
 		td->control = ((BLEN(bp) & LenMASK)<<LenSHIFT);
 		td->control |= Dext|Ifcs|Teop|DtypeDD;
 		ctlr->tb[tdt] = bp;
@@ -1044,15 +1046,19 @@ igbereplenish(struct ctlr* ctlr)
 		if(ctlr->rb[rdt] == NULL){
 			bp = igberballoc();
 			if(bp == NULL){
-				iprint("#l%d: igbereplenish: no available buffers\n",
+#warning "Printing at interrupt level"
+				/* needs to be a safe print for interrupt level */
+				printk("#l%d: igbereplenish: no available buffers\n",
 					ctlr->edev->ctlrno);
 				break;
 			}
 			ctlr->rb[rdt] = bp;
-			rd->addr[0] = PCIWADDR(bp->rp);
+#warning "hokey address management"
+			rd->addr[0] = (uintptr_t)(bp->rp);
 			rd->addr[1] = 0;
 		}
-		coherence();
+#warning "memory barrier overkill?"
+		mb();
 		rd->status = 0;
 		rdt = NEXT(rdt, ctlr->nrd);
 		ctlr->rdfree++;
@@ -1069,8 +1075,8 @@ igberxinit(struct ctlr* ctlr)
 
 	/* temporarily keep Mpe on */
 	csr32w(ctlr, Rctl, Dpf|Bsize2048|Bam|RdtmsHALF|Mpe);
-
-	csr32w(ctlr, Rdbal, PCIWADDR(ctlr->rdba));
+#warning "hokey address management"
+	csr32w(ctlr, Rdbal, (uintptr_t)(ctlr->rdba));
 	csr32w(ctlr, Rdbah, 0);
 	csr32w(ctlr, Rdlen, ctlr->nrd*sizeof(Rd));
 	ctlr->rdh = 0;
@@ -1137,7 +1143,7 @@ igberproc(void* arg)
 		ctlr->rim = 0;
 		igbeim(ctlr, Rxt0|Rxo|Rxdmt0|Rxseq);
 		ctlr->rsleep++;
-		sleep(&ctlr->rrendez, igberim, ctlr);
+		rendez_sleep(&ctlr->rrendez, igberim, ctlr);
 
 		rdh = ctlr->rdh;
 		for(;;){
@@ -1187,7 +1193,8 @@ igberproc(void* arg)
 			}
 
 			memset(rd, 0, sizeof(Rd));
-			coherence();
+#warning "mb() overkill?"
+			mb();
 			ctlr->rdfree--;
 			rdh = NEXT(rdh, ctlr->nrd);
 		}
@@ -1208,9 +1215,9 @@ igbeattach(struct ether* edev)
 
 	ctlr = edev->ctlr;
 	ctlr->edev = edev;			/* point back to Ether* */
-	qlock(&(&ctlr->alock)->qlock);
+	qlock(&ctlr->alock);
 	if(ctlr->alloc != NULL){			/* already allocated? */
-		qunlock(&(&ctlr->alock)->qlock);
+		qunlock(&ctlr->alock);
 		return;
 	}
 
@@ -1231,7 +1238,7 @@ igbeattach(struct ether* edev)
 		ctlr->rb = NULL;
 		kfree(ctlr->alloc);
 		ctlr->alloc = NULL;
-		qunlock(&(&ctlr->alock)->qlock);
+		qunlock(&ctlr->alock);
 		nexterror();
 	}
 
@@ -1242,7 +1249,7 @@ igbeattach(struct ether* edev)
 		printd("igbe: can't allocate ctlr->alloc\n");
 		error(Enomem);
 	}
-	ctlr->rdba = (Rd*)ROUNDUP((uintptr_t_t)ctlr->alloc, 128);
+	ctlr->rdba = (Rd*)ROUNDUP((uintptr_t)ctlr->alloc, 128);
 	ctlr->tdba = (Td*)(ctlr->rdba+ctlr->nrd);
 
 	ctlr->rb = kzmalloc(ctlr->nrd * sizeof(struct block *), 0);
@@ -1259,20 +1266,21 @@ igbeattach(struct ether* edev)
 		freeb(bp);
 	}
 
+#warning "fix me kproc"
+#if 0
 	snprintf(name, KNAMELEN, "#l%dlproc", edev->ctlrno);
 	kproc(name, igbelproc, edev);
 
 	snprintf(name, KNAMELEN, "#l%drproc", edev->ctlrno);
 	kproc(name, igberproc, edev);
-
+#endif
 	igbetxinit(ctlr);
 
-	qunlock(&(&ctlr->alock)->qlock);
+	qunlock(&ctlr->alock);
 	poperror();
 }
 
-static void
-igbeinterrupt(Ureg*, void* arg)
+static void igbeinterrupt(struct hw_trapframe *hw_tf, void *arg)
 {
 	struct ctlr *ctlr;
 	struct ether *edev;
@@ -1290,13 +1298,13 @@ igbeinterrupt(Ureg*, void* arg)
 		if(icr & Lsc){
 			im &= ~Lsc;
 			ctlr->lim = icr & Lsc;
-			wakeup(&ctlr->lrendez);
+			rendez_wakeup(&ctlr->lrendez);
 			ctlr->lintr++;
 		}
 		if(icr & (Rxt0|Rxo|Rxdmt0|Rxseq)){
 			im &= ~(Rxt0|Rxo|Rxdmt0|Rxseq);
 			ctlr->rim = icr & (Rxt0|Rxo|Rxdmt0|Rxseq);
-			wakeup(&ctlr->rrendez);
+			rendez_wakeup(&ctlr->rrendez);
 			ctlr->rintr++;
 		}
 		if(icr & Txdw){
@@ -1360,7 +1368,7 @@ i82543mdiow(struct ctlr* ctlr, int bits, int n)
 }
 
 static int
-i82543miimir(Mii* mii, int pa, int ra)
+i82543miimir(struct mii* mii, int pa, int ra)
 {
 	int data;
 	struct ctlr *ctlr;
@@ -1385,7 +1393,7 @@ i82543miimir(Mii* mii, int pa, int ra)
 }
 
 static int
-i82543miimiw(Mii* mii, int pa, int ra, int data)
+i82543miimiw(struct mii* mii, int pa, int ra, int data)
 {
 	struct ctlr *ctlr;
 
@@ -1407,7 +1415,7 @@ i82543miimiw(Mii* mii, int pa, int ra, int data)
 }
 
 static int
-igbemiimir(Mii* mii, int pa, int ra)
+igbemiimir(struct mii* mii, int pa, int ra)
 {
 	struct ctlr *ctlr;
 	int mdic, timo;
@@ -1420,7 +1428,7 @@ igbemiimir(Mii* mii, int pa, int ra)
 		mdic = csr32r(ctlr, Mdic);
 		if(mdic & (MDIe|MDIready))
 			break;
-		microdelay(1);
+		udelay(1);
 	}
 
 	if((mdic & (MDIe|MDIready)) == MDIready)
@@ -1429,7 +1437,7 @@ igbemiimir(Mii* mii, int pa, int ra)
 }
 
 static int
-igbemiimiw(Mii* mii, int pa, int ra, int data)
+igbemiimiw(struct mii* mii, int pa, int ra, int data)
 {
 	struct ctlr *ctlr;
 	int mdic, timo;
@@ -1443,7 +1451,7 @@ igbemiimiw(Mii* mii, int pa, int ra, int data)
 		mdic = csr32r(ctlr, Mdic);
 		if(mdic & (MDIe|MDIready))
 			break;
-		microdelay(1);
+		udelay(1);
 	}
 	if((mdic & (MDIe|MDIready)) == MDIready)
 		return 0;
@@ -1452,7 +1460,7 @@ igbemiimiw(Mii* mii, int pa, int ra, int data)
 
 
 static int
-i82543miirw(Mii* mii, int write, int pa, int ra, int data)
+i82543miirw(struct mii* mii, int write, int pa, int ra, int data)
 {
 	if(write)
 		return i82543miimiw(mii, pa, ra, data);
@@ -1465,12 +1473,12 @@ static int
 igbemii(struct ctlr* ctlr)
 {
 	int ctrl, p, r;
-	int (*rw)(Mii*, int unused_int, int, int, int);
+	int (*rw)(struct mii*, int unused_int, int, int, int);
 
 	r = csr32r(ctlr, Status);
 	if(r & Tbimode)
 		return -1;
-	if((ctlr->mii = kzmalloc(sizeof(Mii), 0)) == NULL)
+	if((ctlr->mii = kzmalloc(sizeof(struct mii), 0)) == NULL)
 		return -1;
 	ctlr->mii->ctlr = ctlr;
 
@@ -1492,15 +1500,15 @@ igbemii(struct ctlr* ctlr)
 		if(!(r & Mdro))
 			return -1;
 		csr32w(ctlr, Ctrlext, r);
-		delay(20);
+		udelay(20*1000000);
 		r = csr32r(ctlr, Ctrlext);
 		r &= ~Mdr;
 		csr32w(ctlr, Ctrlext, r);
-		delay(20);
+		udelay(20*1000000);
 		r = csr32r(ctlr, Ctrlext);
 		r |= Mdr;
 		csr32w(ctlr, Ctrlext, r);
-		delay(20);
+		udelay(20*1000000);
 
 		rw = i82543miirw;
 		break;
@@ -1529,7 +1537,8 @@ igbemii(struct ctlr* ctlr)
 		return -1;
 	}
 
-	if(ctlr->mii = miiattach(ctlr, ~0, rw)){
+	ctlr->mii = miiattach(ctlr, ~0, rw);
+	if(ctlr->mii){
 		kfree(ctlr->mii);
 		ctlr->mii = NULL;
 		return -1;
@@ -1646,7 +1655,7 @@ at93c46io(struct ctlr* ctlr, char* op, int data)
 			break;
 		}
 		csr32w(ctlr, Eecd, eecd);
-		microdelay(50);
+		udelay(50);
 	}
 	if(loop >= 0)
 		return -1;
@@ -1693,7 +1702,7 @@ at93c46r(struct ctlr* ctlr)
 		for(i = 0; i < 1000; i++){
 			if((eecd = csr32r(ctlr, Eecd)) & Agnt)
 				break;
-			microdelay(5);
+			udelay(5);
 		}
 		if(!(eecd & Agnt)){
 			printd("igbe: not granted EEPROM access\n");
@@ -1740,24 +1749,25 @@ igbedetach(struct ctlr* ctlr)
 	csr32w(ctlr, Rctl, 0);
 	csr32w(ctlr, Tctl, 0);
 
-	delay(10);
+	udelay(10*1000000);
 
 	csr32w(ctlr, Ctrl, Devrst);
-	delay(1);
+	udelay(1*1000000);
 	for(timeo = 0; timeo < 1000; timeo++){
 		if(!(csr32r(ctlr, Ctrl) & Devrst))
 			break;
-		delay(1);
+		udelay(1*1000000);
 	}
 	if(csr32r(ctlr, Ctrl) & Devrst)
 		return -1;
 	r = csr32r(ctlr, Ctrlext);
 	csr32w(ctlr, Ctrlext, r|Eerst);
-	delay(1);
+	udelay(1*1000000);
+
 	for(timeo = 0; timeo < 1000; timeo++){
 		if(!(csr32r(ctlr, Ctrlext) & Eerst))
 			break;
-		delay(1);
+		udelay(1*1000000);
 	}
 	if(csr32r(ctlr, Ctrlext) & Eerst)
 		return -1;
@@ -1782,11 +1792,11 @@ igbedetach(struct ctlr* ctlr)
 	}
 
 	csr32w(ctlr, Imc, ~0);
-	delay(1);
+	udelay(1*1000000);
 	for(timeo = 0; timeo < 1000; timeo++){
 		if(!csr32r(ctlr, Icr))
 			break;
-		delay(1);
+		udelay(1*1000000);
 	}
 	if(csr32r(ctlr, Icr))
 		return -1;
@@ -1823,7 +1833,7 @@ igbereset(struct ctlr* ctlr)
 	 * The others are cleared and not marked valid (MS bit of Rah).
 	 */
 	if ((ctlr->id == i82546gb || ctlr->id == i82546eb) &&
-	    BUSFNO(ctlr->pcidev->tbdf) == 1)
+	    MK_CONFIG_ADDR(ctlr->pci->bus,ctlr->pci->dev,0,0) == MK_CONFIG_ADDR(0,1,0,0))
 		ctlr->eeprom[Ea+2] += 0x100;		/* second interface */
 	if(ctlr->id == i82541gi && ctlr->eeprom[Ea] == 0xFFFF)
 		ctlr->eeprom[Ea] = 0xD000;
@@ -1935,8 +1945,10 @@ enum {
 static void
 igbepci(void)
 {
+#warning "FIX ME, barret!"
+#if 0
 	int cls;
-	Pcidev *p;
+	struct pci_device *p;
 	struct ctlr *ctlr;
 	void *mem;
 
@@ -2011,6 +2023,7 @@ igbepci(void)
 			igbectlrhead = ctlr;
 		igbectlrtail = ctlr;
 	}
+#endif
 }
 
 static int
@@ -2038,9 +2051,10 @@ igbepnp(struct ether* edev)
 
 	edev->ctlr = ctlr;
 	edev->port = ctlr->port;
-	edev->irq = ctlr->pcidev->intl;
-	edev->tbdf = ctlr->pcidev->tbdf;
-	edev->mbps = 1000;
+	edev->irq = ctlr->pci->irqline;
+	edev->tbdf = MK_CONFIG_ADDR(0,ctlr->pci->bus,ctlr->pci->dev,
+				    ctlr->pci->func);
+	edev->netif.mbps = 1000;
 	memmove(edev->ea, ctlr->ra, Eaddrlen);
 
 	/*
@@ -2051,11 +2065,11 @@ igbepnp(struct ether* edev)
 	edev->interrupt = igbeinterrupt;
 	edev->ifstat = igbeifstat;
 	edev->ctl = igbectl;
-
-	edev->arg = edev;
-	edev->promiscuous = igbepromiscuous;
 	edev->shutdown = igbeshutdown;
-	edev->multicast = igbemulticast;
+
+	edev->netif.arg = edev;
+	edev->netif.promiscuous = igbepromiscuous;
+	edev->netif.multicast = igbemulticast;
 
 	return 0;
 }
