@@ -403,3 +403,15 @@ typedef Srv;
 @@
 -Srv
 +struct srv
+
+@@
+typedef Mii;
+@@
+-Mii
++struct mii
+
+@@
+typedef MiiPhy;
+@@
+-MiiPhy
++struct miiphy
