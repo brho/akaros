@@ -20,13 +20,15 @@
 
 system_timing_t RO system_timing = {0, 0, 0xffff, 0};
 bool core_id_ready = FALSE;
+spinlock_t piclock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 /* * Remaps the Programmable Interrupt Controller to use IRQs 32-47
  * http://wiki.osdev.org/PIC
  * Check osdev for a more thorough explanation/implementation.
  * http://bochs.sourceforge.net/techspec/PORTS.LST  */
-void pic_remap() 
+void pic_remap(void)
 {
+	spin_lock_irqsave(&piclock);
 	/* start initialization (ICW1) */
 	outb(PIC1_CMD, 0x11);
 	outb(PIC2_CMD, 0x11);
@@ -43,38 +45,51 @@ void pic_remap()
 	/* set masks, defaulting to all masked for now */
 	outb(PIC1_DATA, 0xff);
 	outb(PIC2_DATA, 0xff);
+	spin_unlock_irqsave(&piclock);
 }
 
 void pic_mask_irq(uint8_t irq)
 {
+	spin_lock_irqsave(&piclock);
 	if (irq > 7)
 		outb(PIC2_DATA, inb(PIC2_DATA) | (1 << (irq - 8)));
 	else
 		outb(PIC1_DATA, inb(PIC1_DATA) | (1 << irq));
+	spin_unlock_irqsave(&piclock);
 }
 
 void pic_unmask_irq(uint8_t irq)
 {
+	spin_lock_irqsave(&piclock);
 	if (irq > 7) {
 		outb(PIC2_DATA, inb(PIC2_DATA) & ~(1 << (irq - 8)));
 		outb(PIC1_DATA, inb(PIC1_DATA) & 0xfb); // make sure irq2 is unmasked
 	} else
 		outb(PIC1_DATA, inb(PIC1_DATA) & ~(1 << irq));
+	spin_unlock_irqsave(&piclock);
 }
 
 /* Aka, the IMR.  Simply reading the data port are OCW1s. */
 uint16_t pic_get_mask(void)
 {
-	return (inb(PIC2_DATA) << 8) | inb(PIC1_DATA);
+	uint16_t ret;
+	spin_lock_irqsave(&piclock);
+	ret = (inb(PIC2_DATA) << 8) | inb(PIC1_DATA);
+	spin_unlock_irqsave(&piclock);
+	return ret;
 }
 
 static uint16_t __pic_get_irq_reg(int ocw3)
 {
+	uint16_t ret;
+	spin_lock_irqsave(&piclock);
 	/* OCW3 to PIC CMD to get the register values.  PIC2 is chained, and
 	 * represents IRQs 8-15.  PIC1 is IRQs 0-7, with 2 being the chain */
 	outb(PIC1_CMD, ocw3);
 	outb(PIC2_CMD, ocw3);
-	return (inb(PIC2_CMD) << 8) | inb(PIC1_CMD);
+	ret = (inb(PIC2_CMD) << 8) | inb(PIC1_CMD);
+	spin_unlock_irqsave(&piclock);
+	return ret;
 }
 
 /* Returns the combined value of the cascaded PICs irq request register */
@@ -87,6 +102,16 @@ uint16_t pic_get_irr(void)
 uint16_t pic_get_isr(void)
 {
 	return __pic_get_irq_reg(PIC_READ_ISR);
+}
+
+void pic_send_eoi(uint32_t irq)
+{
+	spin_lock_irqsave(&piclock);
+	// all irqs beyond the first seven need to be chained to the slave
+	if (irq > 7)
+		outb(PIC2_CMD, PIC_EOI);
+	outb(PIC1_CMD, PIC_EOI);
+	spin_unlock_irqsave(&piclock);
 }
 
 /* Debugging helper.  Note the ISR/IRR are 32 bits at a time, spaced every 16

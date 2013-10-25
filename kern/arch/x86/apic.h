@@ -144,6 +144,7 @@ void pic_unmask_irq(uint8_t irq);
 uint16_t pic_get_mask(void);
 uint16_t pic_get_irr(void);
 uint16_t pic_get_isr(void);
+void pic_send_eoi(uint32_t irq);
 bool lapic_get_isr_bit(uint8_t vector);
 bool lapic_get_irr_bit(uint8_t vector);
 void lapic_print_isr(void);
@@ -159,7 +160,6 @@ void udelay_pit(uint64_t usec);
 uint64_t gettimer(void);
 uint64_t getfreq(void);
 
-static inline void pic_send_eoi(uint32_t irq);
 static inline void lapic_send_eoi(void);
 static inline uint32_t lapic_get_version(void);
 static inline uint32_t lapic_get_error(void);
@@ -184,14 +184,6 @@ static inline void __send_nmi(uint8_t hw_coreid);
 	write_mmreg32(entry, read_mmreg32(entry) | LAPIC_LVT_MASK)
 #define unmask_lapic_lvt(entry) \
 	write_mmreg32(entry, read_mmreg32(entry) & ~LAPIC_LVT_MASK)
-
-static inline void pic_send_eoi(uint32_t irq)
-{
-	// all irqs beyond the first seven need to be chained to the slave
-	if (irq > 7)
-		outb(PIC2_CMD, PIC_EOI);
-	outb(PIC1_CMD, PIC_EOI);
-}
 
 static inline void lapic_send_eoi(void)
 {
