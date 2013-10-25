@@ -473,17 +473,13 @@ void irq_handler(struct hw_trapframe *hw_tf)
 	/* Coupled with cpu_halt() and smp_idle() */
 	abort_halt(hw_tf);
 	//if (core_id())
+	if (hw_tf->tf_trapno != LAPIC_TIMER_DEFAULT_VECTOR)	/* timer irq */
+	if (hw_tf->tf_trapno != 255) /* kmsg */
+	if (hw_tf->tf_trapno != 36)	/* serial */
 		printd("Incoming IRQ, ISR: %d on core %d\n", hw_tf->tf_trapno,
 		       core_id());
 	if (check_spurious_irq(hw_tf->tf_trapno))
 		goto out_no_eoi;
-	/* Send the EOI.  This means the PIC/LAPIC can send us the same IRQ vector,
-	 * and we'll handle it as soon as we reenable IRQs.  This does *not* mean
-	 * the hardware device that triggered the IRQ had its IRQ reset.  This does
-	 * mean we shouldn't enable irqs in a handler that isn't reentrant. */
-	assert(hw_tf->tf_trapno >= 32);
-	send_eoi(hw_tf->tf_trapno);
-
 	extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
 	// determine the interrupt handler table to use.  for now, pick the global
 	handler_t *handler_tbl = interrupt_handlers;
@@ -494,6 +490,8 @@ void irq_handler(struct hw_trapframe *hw_tf)
 	if ((I_SMP_CALL0 <= hw_tf->tf_trapno) &&
 	    (hw_tf->tf_trapno <= I_SMP_CALL_LAST))
 		down_checklist(handler_wrappers[hw_tf->tf_trapno & 0x0f].cpu_list);
+	/* Keep in sync with ipi_is_pending */
+	send_eoi(hw_tf->tf_trapno);
 	/* Fall-through */
 out_no_eoi:
 	dec_irq_depth(pcpui);
