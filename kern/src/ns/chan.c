@@ -1278,6 +1278,10 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 		cclose(c);
 		kfree(e.name);
 		kfree(e.elems);
+		/* brho: skipping the namec custom error string business, since it hides
+		 * the underlying failure.  comment out nexterror if you want the old
+		 * stuff.  */
+		nexterror();
 		/*
 		 * Prepare nice error, showing first e.nerror elements of name.
 		 */

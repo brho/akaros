@@ -1197,7 +1197,7 @@ void print_9ns_files(struct proc *p)
 	for (int i = 0; i <= f->maxfd; i++) {
 		if (!f->fd[i])
 			continue;
-		printk("\t9fs %d, ");
+		printk("\t9fs %d, ", i);
 		print_chaninfo(f->fd[i]);
 	}
 	spin_unlock(&f->lock);
