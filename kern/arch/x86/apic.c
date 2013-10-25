@@ -127,12 +127,12 @@ bool lapic_get_irr_bit(uint8_t vector)
  * ExtInts.  To prevent abuse, we'll use it just for IPIs for now (which only
  * come via the APIC).
  *
- * Note that if you call this from an interrupt handler for 'vector' before you
- * EOI, the ISR will show your bit as set.  It is the EOI that clears the bit
- * from the ISR. */
+ * We only check the IRR, due to how we send EOIs.  Since we don't send til
+ * after handlers return, the ISR will show pending for the current IRQ.  It is
+ * the EOI that clears the bit from the ISR. */
 bool ipi_is_pending(uint8_t vector)
 {
-	return lapic_get_isr_bit(vector) || lapic_get_isr_bit(vector);
+	return lapic_get_isr_bit(vector);
 }
 
 /*
