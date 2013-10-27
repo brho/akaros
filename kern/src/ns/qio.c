@@ -27,35 +27,6 @@ static int debugging;
  *  IO queues
  */
 
-#if 0
-struct queue
-{
-	spinlock_t lock;
-
-	struct block*	bfirst;		/* buffer */
-	struct block*	blast;
-
-	int	len;		/* bytes allocated to queue */
-	int	dlen;		/* data bytes in queue */
-	int	limit;		/* max bytes in queue */
-	int	inilim;		/* initial limit */
-	int	state;
-	int	noblock;	/* true if writes return immediately when q full */
-	int	eof;		/* number of eofs read by user */
-
-	void	(*kick)(void*);	/* restart output */
-	void	(*bypass)(void*, Block*);	/* bypass queue altogether */
-	void*	arg;		/* argument to kick */
-
-	QLock	rlock;		/* mutex for reading processes */
-	struct rendez rr;		/* process waiting to read */
-	QLock	wlock;		/* mutex for writing processes */
-	struct rendez	wr;		/* process waiting to write */
-
-	char	err[ERRMAX];
-};
-#endif
-
 enum
 {
 	Maxatomic	= 64*1024,
@@ -435,7 +406,7 @@ qget(struct queue *q)
 	QDEBUG checkb(b, "qget");
 
 	/* if writer flow controlled, restart */
-	if((q->state & Qflow) && q->len < q->limit/2){
+	if((q->state & Qflow) && q->dlen < q->limit/2){
 		q->state &= ~Qflow;
 		dowakeup = 1;
 	} else
@@ -489,8 +460,10 @@ qdiscard(struct queue *q, int len)
 	 *  stalls waiting for the app to produce more data.  - presotto
 	 *
 	 *  changed back from q->len < q->limit for reno tcp. - jmk
+	 *
+	 *  changed from q->len to q->dlen. - brho
 	 */
-	if((q->state & Qflow) && q->len < q->limit/2){
+	if((q->state & Qflow) && q->dlen < q->limit/2){
 		q->state &= ~Qflow;
 		dowakeup = 1;
 	} else
@@ -558,7 +531,7 @@ qconsume(struct queue *q, void *vp, int len)
 	}
 
 	/* if writer flow controlled, restart */
-	if((q->state & Qflow) && q->len < q->limit/2){
+	if((q->state & Qflow) && q->dlen < q->limit/2){
 		q->state &= ~Qflow;
 		dowakeup = 1;
 	} else
@@ -583,7 +556,7 @@ qpass(struct queue *q, struct block *b)
 	/* sync with qread */
 	dowakeup = 0;
 	ilock(&q->lock);
-	if(q->len >= q->limit){
+	if(q->dlen >= q->limit){
 		freeblist(b);
 		iunlock(&q->lock);
 		return -1;
@@ -613,7 +586,7 @@ qpass(struct queue *q, struct block *b)
 	q->len += len;
 	q->dlen += dlen;
 
-	if(q->len >= q->limit/2)
+	if(q->dlen >= q->limit/2)
 		q->state |= Qflow;
 
 	if(q->state & Qstarve){
@@ -662,7 +635,7 @@ qpassnolim(struct queue *q, struct block *b)
 	q->len += len;
 	q->dlen += dlen;
 
-	if(q->len >= q->limit/2)
+	if(q->dlen >= q->limit/2)
 		q->state |= Qflow;
 
 	if(q->state & Qstarve){
@@ -714,7 +687,7 @@ qproduce(struct queue *q, void *vp, int len)
 	ilock(&q->lock);
 
 	/* no waiting receivers, room in buffer? */
-	if(q->len >= q->limit){
+	if(q->dlen >= q->limit){
 		q->state |= Qflow;
 		iunlock(&q->lock);
 		return -1;
@@ -744,7 +717,7 @@ qproduce(struct queue *q, void *vp, int len)
 		dowakeup = 1;
 	}
 
-	if(q->len >= q->limit)
+	if(q->dlen >= q->limit)
 		q->state |= Qflow;
 	iunlock(&q->lock);
 
@@ -1018,7 +991,7 @@ qwakeup_iunlock(struct queue *q)
 	int dowakeup;
 
 	/* if writer flow controlled, restart */
-	if((q->state & Qflow) && q->len < q->limit/2){
+	if((q->state & Qflow) && q->dlen < q->limit/2){
 		q->state &= ~Qflow;
 		dowakeup = 1;
 	}
@@ -1182,7 +1155,7 @@ qnotfull(void *a)
 {
 	struct queue *q = a;
 
-	return q->len < q->limit || (q->state & Qclosed);
+	return q->dlen < q->limit || (q->state & Qclosed);
 }
 
 uint32_t noblockcnt;
@@ -1221,7 +1194,7 @@ qbwrite(struct queue *q, struct block *b)
 	}
 
 	/* if nonblocking, don't queue over the limit */
-	if(q->len >= q->limit){
+	if(q->dlen >= q->limit){
 		if(q->noblock){
 			iunlock(&q->lock);
 			freeb(b);
@@ -1355,6 +1328,8 @@ qiwrite(struct queue *q, void *vp, int len)
 
 		/* we use an artificially high limit for kernel prints since anything
 		 * over the limit gets dropped
+		 * Note: this has always been dlen, even before changing the limit
+		 * checks from len to dlen. (brho)
 		 */
 		if(q->dlen >= 16*1024){
 			iunlock(&q->lock);
@@ -1494,7 +1469,7 @@ qwindow(struct queue *q)
 {
 	int l;
 
-	l = q->limit - q->len;
+	l = q->limit - q->dlen;
 	if(l < 0)
 		l = 0;
 	return l;
