@@ -759,9 +759,6 @@ static int rtl8139pnp(struct ether *edev)
 	struct pci_device *pcidev;
 
 	/* For now, every driver scans every pcidevice */
-	/* The way addethercard/etherprobe work, we only get one one struct ether
-	 * for all of rtl8139, which seems buggy (what if i have two NICs?).  This
-	 * code can handle being called for multiple different rtl NICs (i think) */
 	STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
 		if (pcidev->in_use)
 			continue;
@@ -776,10 +773,7 @@ static int rtl8139pnp(struct ether *edev)
 		       pcidev->bus, pcidev->dev, pcidev->func);
 		irq = pcidev->irqline;
 		port = pcidev->bar[0].pio_base;
-		/* Turn on PCI bus mastering */
-		pcidev_write32(pcidev, PCI_STAT_CMD_REG,
-		               pcidev_read32(pcidev, PCI_STAT_CMD_REG) |
-		               PCI_CMD_BUS_MAS);
+		pci_set_bus_master(pcidev);
 		goto found_new_dev;
 	}
 	return -1;

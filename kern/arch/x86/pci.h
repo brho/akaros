@@ -190,4 +190,7 @@ bool pci_is_membar64(uint32_t bar);
 uint32_t pci_getmembar32(uint32_t bar);
 uint32_t pci_getiobar32(uint32_t bar);
 
+/* Other common PCI functions */
+void pci_set_bus_master(struct pci_device *pcidev);
+
 #endif /* ROS_ARCH_PCI_H */

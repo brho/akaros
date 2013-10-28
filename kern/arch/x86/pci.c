@@ -324,3 +324,10 @@ void pcidev_print_info(struct pci_device *pcidev, int verbosity)
 		}
 	}
 }
+
+void pci_set_bus_master(struct pci_device *pcidev)
+{
+	pcidev_write32(pcidev, PCI_STAT_CMD_REG,
+	               pcidev_read32(pcidev, PCI_STAT_CMD_REG) |
+	               PCI_CMD_BUS_MAS);
+}
