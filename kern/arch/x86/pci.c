@@ -47,6 +47,7 @@ static void pci_handle_bars(struct pci_device *pcidev)
 	/* only handling standards for now */
 	uint32_t bar_val;
 	int max_bars = pcidev->header_type == STD_PCI_DEV ? MAX_PCI_BAR : 0;
+	/* TODO: consider aborting for classes 00, 05 (memory ctlr), 06 (bridge) */
 	for (int i = 0; i < max_bars; i++) {
 		bar_val = pci_getbar(pcidev, i);
 		pcidev->bar[i].raw_bar = bar_val;
@@ -83,15 +84,17 @@ void pci_init(void) {
 	uint32_t result = 0;
 	uint16_t dev_id, ven_id;
 	struct pci_device *pcidev;
-	for (int i = 0; i < PCI_MAX_BUS - 1; i++)	/* phantoms at 0xff */
-		for (int j = 0; j < PCI_MAX_DEV; j++)
-			for (int k = 0; k < PCI_MAX_FUNC; k++) {
+	int max_nr_func;
+	for (int i = 0; i < PCI_MAX_BUS - 1; i++) {	/* phantoms at 0xff */
+		for (int j = 0; j < PCI_MAX_DEV; j++) {
+			max_nr_func = 1;
+			for (int k = 0; k < max_nr_func; k++) {
 				result = pci_read32(i, j, k, PCI_DEV_VEND_REG);
-				dev_id = result >> PCI_DEVICE_OFFSET;
-				ven_id = result & PCI_VENDOR_MASK;
+				dev_id = result >> 16;
+				ven_id = result & 0xffff;
 				/* Skip invalid IDs (not a device) */
 				if (ven_id == INVALID_VENDOR_ID) 
-					continue;
+					break;	/* skip functions too, they won't exist */
 				pcidev = kzmalloc(sizeof(struct pci_device), 0);
 				pcidev->bus = i;
 				pcidev->dev = j;
@@ -99,23 +102,22 @@ void pci_init(void) {
 				pcidev->dev_id = dev_id;
 				pcidev->ven_id = ven_id;
 				/* Get the Class/subclass */
-				result = pcidev_read32(pcidev, PCI_CLASS_REG);
-				pcidev->class = result >> 24;
-				pcidev->subclass = (result >> 16) & 0xff;
-				pcidev->progif = (result >> 8) & 0xff;
+				pcidev->class = pcidev_read8(pcidev, PCI_CLASS_REG);
+				pcidev->subclass = pcidev_read8(pcidev, PCI_SUBCLASS_REG);
+				pcidev->progif = pcidev_read8(pcidev, PCI_PROGIF_REG);
 				/* All device types (0, 1, 2) have the IRQ in the same place */
-				result = pcidev_read32(pcidev, PCI_IRQ_STD);
 				/* This is the PIC IRQ the device is wired to */
-				pcidev->irqline = result & PCI_IRQLINE_MASK;
+				pcidev->irqline = pcidev_read8(pcidev, PCI_IRQLINE_STD);
 				/* This is the interrupt pin the device uses (INTA# - INTD#) */
-				pcidev->irqpin = (result & PCI_IRQPIN_MASK) >> PCI_IRQPIN_SHFT;
+				pcidev->irqpin = pcidev_read8(pcidev, PCI_IRQPIN_STD);
 				if (pcidev->irqpin != PCI_NOINT) {
 					/* TODO: use a list (check for collisions for now) (massive
 					 * collisions on a desktop with bridge IRQs. */
 					//assert(!irq_pci_map[pcidev->irqline]);
 					irq_pci_map[pcidev->irqline] = pcidev;
 				}
-				switch ((pcidev_read32(pcidev, PCI_HEADER_REG) >> 16) & 0xff) {
+				/* bottom 7 bits are header type */
+				switch (pcidev_read8(pcidev, PCI_HEADER_REG) & 0x7c) {
 					case 0x00:
 						pcidev->header_type = STD_PCI_DEV;
 						break;
@@ -135,52 +137,117 @@ void pci_init(void) {
 				#else
 				pcidev_print_info(pcidev, 0);
 				#endif /* CONFIG_PCI_VERBOSE */
+				/* Top bit determines if we have multiple functions on this
+				 * device.  We can't just check for more functions, since
+				 * non-multifunction devices exist that respond to different
+				 * functions with the same underlying device (same bars etc).
+				 * Note that this style allows for devices that only report
+				 * multifunction in the first function's header. */
+				if (pcidev_read8(pcidev, PCI_HEADER_REG) & 0x80)
+					max_nr_func = PCI_MAX_FUNC;
 			}
+		}
+	}
+}
+
+uint32_t pci_config_addr(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg)
+{
+	return (uint32_t)(((uint32_t)bus << 16) |
+	                  ((uint32_t)dev << 11) |
+	                  ((uint32_t)func << 8) |
+	                  (reg & 0xfc) | 0x80000000);
 }
 
 /* Helper to read 32 bits from the config space of B:D:F.  'Offset' is how far
  * into the config space we offset before reading, aka: where we are reading. */
-uint32_t pci_read32(unsigned short bus, unsigned short dev, unsigned short func,
-                    unsigned short offset)
+uint32_t pci_read32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset)
 {
 	/* Send type 1 requests for everything beyond bus 0.  Note this does nothing
 	 * until we configure the PCI bridges (which we don't do yet). */
 	if (bus !=  0)
 		offset |= 0x1;
-	outl(PCI_CONFIG_ADDR, MK_CONFIG_ADDR(bus, dev, func, offset));
+	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
 	return inl(PCI_CONFIG_DATA);
 }
 
 /* Same, but writes (doing 32bit at a time).  Never actually tested (not sure if
  * PCI lets you write back). */
-void pci_write32(unsigned short bus, unsigned short dev, unsigned short func,
-                    unsigned short offset, uint32_t value)
+void pci_write32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset,
+                 uint32_t value)
 {
-	outl(PCI_CONFIG_ADDR, MK_CONFIG_ADDR(bus, dev, func, offset));
+	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
 	outl(PCI_CONFIG_DATA, value);
 }
 
 /* Helper to read from a specific device's config space. */
-uint32_t pcidev_read32(struct pci_device *pcidev, unsigned short offset)
+uint32_t pcidev_read32(struct pci_device *pcidev, uint8_t offset)
 {
 	return pci_read32(pcidev->bus, pcidev->dev, pcidev->func, offset);
 }
 
 /* Helper to write to a specific device */
-void pcidev_write32(struct pci_device *pcidev, unsigned short offset,
-                    uint32_t value)
+void pcidev_write32(struct pci_device *pcidev, uint8_t offset, uint32_t value)
 {
 	pci_write32(pcidev->bus, pcidev->dev, pcidev->func, offset, value);
+}
+
+/* For the 16 and 8 functions, we need to access on 32 bit alignments, then
+ * figure out which byte/word we need to read/write.  & 0xfc will give us the 4
+ * byte aligned offset to access in PCI space.  & 0x3 will give the offset
+ * within the 32 bits (number of bytes).  When writing, we also need to x-out
+ * any existing values (and not just |=). */
+
+/* Returns the 32-bit addr/offset needed to access 'offset'. */
+static inline uint8_t __pci_off32(uint8_t offset)
+{
+	return offset & 0xfc;
+}
+
+/* Returns the number of bits needed to shift to get the offset's spot in a 32
+ * bit config register. */
+static inline uint8_t __pci_shift_for(uint8_t offset)
+{
+	return (offset & 0x3) * 8;
+}
+
+uint16_t pcidev_read16(struct pci_device *pcidev, uint8_t offset)
+{
+	uint32_t retval = pcidev_read32(pcidev, __pci_off32(offset));
+	/* 0x2 would work here, since offset & 0x3 should be 0 or 2 */
+	retval >>= __pci_shift_for(offset);
+	return (uint16_t)(retval & 0xffff);
+}
+
+void pcidev_write16(struct pci_device *pcidev, uint8_t offset, uint16_t value)
+{
+	uint32_t readval = pcidev_read32(pcidev, __pci_off32(offset));
+	uint32_t writeval = (uint32_t)value << __pci_shift_for(offset);
+	readval &= ~(0xffff << __pci_shift_for(offset));
+	pcidev_write32(pcidev, __pci_off32(offset), readval | writeval);
+}
+
+uint8_t pcidev_read8(struct pci_device *pcidev, uint8_t offset)
+{
+	uint32_t retval = pcidev_read32(pcidev, __pci_off32(offset));
+	retval >>= __pci_shift_for(offset);
+	return (uint8_t)(retval & 0xff);
+}
+
+void pcidev_write8(struct pci_device *pcidev, uint8_t offset, uint8_t value)
+{
+	uint32_t readval = pcidev_read32(pcidev, __pci_off32(offset));
+	uint32_t writeval = (uint32_t)value << __pci_shift_for(offset);
+	readval &= ~(0xff << __pci_shift_for(offset));
+	pcidev_write32(pcidev, __pci_off32(offset), readval | writeval);
 }
 
 /* Gets any old raw bar, with some catches based on type. */
 uint32_t pci_getbar(struct pci_device *pcidev, unsigned int bar)
 {
-	uint32_t value, type;
+	uint32_t type;
 	if (bar >= MAX_PCI_BAR)
 		panic("Nonexistant bar requested!");
-	value = pcidev_read32(pcidev, PCI_HEADER_REG);
-	type = (value >> 16) & 0xff;
+	type = pcidev_read8(pcidev, PCI_HEADER_REG);
 	/* Only types 0 and 1 have BARS */
 	if ((type != 0x00) && (type != 0x01))
 		return 0;
@@ -327,7 +394,6 @@ void pcidev_print_info(struct pci_device *pcidev, int verbosity)
 
 void pci_set_bus_master(struct pci_device *pcidev)
 {
-	pcidev_write32(pcidev, PCI_STAT_CMD_REG,
-	               pcidev_read32(pcidev, PCI_STAT_CMD_REG) |
-	               PCI_CMD_BUS_MAS);
+	pcidev_write16(pcidev, PCI_CMD_REG, pcidev_read16(pcidev, PCI_CMD_REG) |
+	                                    PCI_CMD_BUS_MAS);
 }

@@ -12,26 +12,12 @@
 
 #define pci_debug(...)  printk(__VA_ARGS__)  
 
-// Macro for creating the address fed to the PCI config register 
-// TODO: get rid of this, in favor of the helpers
-#define MK_CONFIG_ADDR(BUS, DEV, FUNC, REG) (unsigned long)(((BUS) << 16)   |  \
-                                                            ((DEV) << 11)   |  \
-                                                            ((FUNC) << 8)   |  \
-                                                            ((REG) & 0xfc)  |  \
-                                                            (0x80000000))
-
 #define PCI_CONFIG_ADDR     0xCF8
 #define PCI_CONFIG_DATA     0xCFC
 #define INVALID_VENDOR_ID   0xFFFF
 
 /* TODO: gut this (when the IOAPIC is fixed) */
 #define INVALID_BUS			0xFFFF
-
-#define PCI_IRQLINE_MASK	0x000000ff
-#define PCI_IRQPIN_MASK		0x0000ff00
-#define PCI_IRQPIN_SHFT		8
-#define PCI_VENDOR_MASK		0xffff
-#define PCI_DEVICE_OFFSET	0x10
 
 #define PCI_NOINT 			0x00
 #define PCI_INTA 			0x01
@@ -40,10 +26,19 @@
 #define PCI_INTD			0x04
 
 /* PCI Register Config Space */
-#define PCI_DEV_VEND_REG	0x00
-#define PCI_STAT_CMD_REG	0x04
-#define PCI_CLASS_REG		0x08
-#define PCI_HEADER_REG		0x0c
+#define PCI_DEV_VEND_REG	0x00	/* for the 32 bit read of dev/vend */
+#define PCI_VENDID_REG		0x00
+#define PCI_DEVID_REG		0x02
+#define PCI_CMD_REG			0x04
+#define PCI_STATUS_REG		0x06
+#define PCI_REVID_REG		0x08
+#define PCI_PROGIF_REG		0x09
+#define PCI_SUBCLASS_REG	0x0a
+#define PCI_CLASS_REG		0x0b
+#define PCI_CLSZ_REG		0x0c
+#define PCI_LATTIM_REG		0x0d
+#define PCI_HEADER_REG		0x0e
+#define PCI_BIST_REG		0x0f
 /* Config space for header type 0x00  (Standard) */
 #define PCI_BAR0_STD		0x10
 #define PCI_BAR1_STD		0x14
@@ -53,26 +48,49 @@
 #define PCI_BAR5_STD		0x24
 #define PCI_BAR_OFF			0x04
 #define PCI_CARDBUS_STD		0x28
-#define PCI_SUBSYSTEM_STD	0x2C
+#define PCI_SUBSYSVEN_STD	0x2c
+#define PCI_SUBSYSID_STD	0x2e
 #define PCI_EXPROM_STD		0x30
 #define PCI_CAPAB_STD		0x34
-#define PCI_IRQ_STD			0x3c
+#define PCI_IRQLINE_STD		0x3c
+#define PCI_IRQPIN_STD		0x3d
+#define PCI_MINGRNT_STD		0x3e
+#define PCI_MAXLAT_STD		0x3f
 /* Config space for header type 0x01 (PCI-PCI bridge) */
+/* None of these have been used, so if you use them, check them against
+ * http://wiki.osdev.org/PCI#PCI_Device_Structure */
 #define PCI_BAR0_BR			0x10
 #define PCI_BAR1_BR			0x14
-#define PCI_BUSINFO_BR		0x18
-#define PCI_IOINFO_BR		0x1c
-#define PCI_MEM_BR			0x20
-#define PCI_MEM_PRFC_BR		0x24
-#define PCI_PRFC_BASE_BR	0x28
-#define PCI_PRFC_LIM_BR		0x2C
-#define PCI_IO_LIM_BR		0x30
+#define PCI_BUS1_BR			0x18
+#define PCI_BUS2_BR			0x19
+#define PCI_SUBBUS_BR		0x1a
+#define PCI_LATTIM2_BR		0x1b
+#define PCI_IOBASE_BR		0x1c
+#define PCI_IOLIM_BR		0x1d
+#define PCI_STATUS2_BR		0x1e
+#define PCI_MEMBASE_BR		0x20
+#define PCI_MEMLIM_BR		0x22
+#define PCI_PREMEMBASE_BR	0x24
+#define PCI_PREMEMLIM_BR	0x26
+#define PCI_PREBASEUP32_BR	0x28
+#define PCI_PRELIMUP32_BR	0x2c
+#define PCI_IOBASEUP16_BR	0x30
+#define PCI_IOLIMUP16_BR	0x32
 #define PCI_CAPAB_BR		0x34
-#define PCI_IRQ_BDG_BR		0x3c
+#define PCI_EXPROM_BR		0x38
+#define PCI_IRQLINE_BR		0x3c
+#define PCI_IRQPIN_BR		0x3d
+#define PCI_BDGCTL_BR		0x3e
 /* Config space for header type 0x02 (PCI-Cardbus bridge) */
+/* None of these have been used, so if you use them, check them against
+ * http://wiki.osdev.org/PCI#PCI_Device_Structure */
 #define PCI_SOC_BASE_CB		0x10
-#define PCI_SEC_STAT_CB		0x14
-#define PCI_BUS_INFO_CB		0x18
+#define PCI_OFF_CAP_CB		0x14
+#define PCI_SEC_STAT_CB		0x16
+#define PCI_BUS_NR_CB		0x18
+#define PCI_CARDBUS_NR_CB	0x19
+#define PCI_SUBBUS_NR_CB	0x1a
+#define PCI_CARD_LAT_CB		0x1b
 #define PCI_MEM_BASE0_CB	0x1c
 #define PCI_MEM_LIMIT0_CB	0x20
 #define PCI_MEM_BASE1_CB	0x24
@@ -81,12 +99,12 @@
 #define PCI_IO_LIMIT0_CB	0x30
 #define PCI_IO_BASE1_CB		0x34
 #define PCI_IO_LIMIT1_CB	0x38
-#define PCI_IRQ_CB			0x3c
-#define PCI_SUBSYS_CB		0x40
+#define PCI_IRQLINE_CB		0x3c
+#define PCI_IRQPIN_CB		0x3d
+#define PCI_BDGCTL_CB		0x3e
+#define PCI_SUBDEVID_CB		0x40
+#define PCI_SUBVENID_CB		0x42
 #define PCI_16BIT_CB		0x44
-
-/* Legacy Paul-mapping */
-#define PCI_IRQ_REG			PCI_IRQ_STD
 
 /* Command Register Flags */
 #define PCI_CMD_IO_SPC		(1 << 0)
@@ -170,16 +188,19 @@ extern struct pcidev_stailq pci_devices;
 
 void pci_init(void);
 void pcidev_print_info(struct pci_device *pcidev, int verbosity);
+uint32_t pci_config_addr(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg);
 
 /* Read and write helpers (Eventually, we should have these be statics, since no
  * device should touch PCI config space). */
-uint32_t pci_read32(unsigned short bus, unsigned short dev, unsigned short func,
-                    unsigned short offset);
-void pci_write32(unsigned short bus, unsigned short dev, unsigned short func,
-                    unsigned short offset, uint32_t value);
-uint32_t pcidev_read32(struct pci_device *pcidev, unsigned short offset);
-void pcidev_write32(struct pci_device *pcidev, unsigned short offset,
-                    uint32_t value);
+uint32_t pci_read32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset);
+void pci_write32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset,
+                 uint32_t value);
+uint32_t pcidev_read32(struct pci_device *pcidev, uint8_t offset);
+void pcidev_write32(struct pci_device *pcidev, uint8_t offset, uint32_t value);
+uint16_t pcidev_read16(struct pci_device *pcidev, uint8_t offset);
+void pcidev_write16(struct pci_device *pcidev, uint8_t offset, uint16_t value);
+uint8_t pcidev_read8(struct pci_device *pcidev, uint8_t offset);
+void pcidev_write8(struct pci_device *pcidev, uint8_t offset, uint8_t value);
 
 /* BAR helpers, some more helpful than others. */
 uint32_t pci_membar_get_sz(struct pci_device *pcidev, int bar);
