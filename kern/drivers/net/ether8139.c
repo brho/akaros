@@ -797,7 +797,6 @@ found_new_dev:
 	edev->ctlr = ctlr;
 	edev->port = ctlr->port;
 	edev->irq = irq;
-	edev->tbdf = MK_CONFIG_ADDR(pcidev->bus, pcidev->dev, pcidev->func, 0);
 
 	/*
 	 * Check if the adapter's station address is to be overridden.

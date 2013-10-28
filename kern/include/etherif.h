@@ -15,7 +15,6 @@ struct ether {
 	int port;
 	int irq;
 	int ctlrno;
-	int tbdf;					/* type+busno+devno+funcno */
 	uint8_t ea[Eaddrlen];
 
 	void (*attach) (struct ether *);	/* filled in by reset routine */

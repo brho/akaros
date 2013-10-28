@@ -348,7 +348,6 @@ static struct ether *etherprobe(int cardno, int ctlrno)
 	ether = kzmalloc(sizeof(struct ether), 0);
 	memset(ether, 0, sizeof(struct ether));
 	ether->ctlrno = ctlrno;
-	ether->tbdf = 0;
 	ether->netif.mbps = 10;
 	ether->netif.minmtu = ETHERMINTU;
 	ether->netif.mtu = ETHERMAXTU;

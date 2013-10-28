@@ -1833,7 +1833,8 @@ igbereset(struct ctlr* ctlr)
 	 * The others are cleared and not marked valid (MS bit of Rah).
 	 */
 	if ((ctlr->id == i82546gb || ctlr->id == i82546eb) &&
-	    MK_CONFIG_ADDR(ctlr->pci->bus,ctlr->pci->dev,0,0) == MK_CONFIG_ADDR(0,1,0,0))
+	    (pci_config_addr(ctlr->pci->bus, ctlr->pci->dev, 0, 0) ==
+		 pci_config_addr(0, 1, 0, 0)))
 		ctlr->eeprom[Ea+2] += 0x100;		/* second interface */
 	if(ctlr->id == i82541gi && ctlr->eeprom[Ea] == 0xFFFF)
 		ctlr->eeprom[Ea] = 0xD000;
@@ -2052,8 +2053,6 @@ igbepnp(struct ether* edev)
 	edev->ctlr = ctlr;
 	edev->port = ctlr->port;
 	edev->irq = ctlr->pci->irqline;
-	edev->tbdf = MK_CONFIG_ADDR(0,ctlr->pci->bus,ctlr->pci->dev,
-				    ctlr->pci->func);
 	edev->netif.mbps = 1000;
 	memmove(edev->ea, ctlr->ra, Eaddrlen);
 
