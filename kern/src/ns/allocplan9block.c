@@ -38,7 +38,7 @@ static struct block *_allocb(int size)
 	b->flag = 0;
 
 	/* align base and bounds of data */
-	b->lim = (uint8_t *) ((uint64_t) b & ~(BLOCKALIGN - 1));
+	b->lim = (uint8_t *) ((uintptr_t) b & ~(BLOCKALIGN - 1));
 
 	/* align start of writable data, leaving space below for added headers */
 	b->rp = b->lim - ROUNDUP(size, BLOCKALIGN);
