@@ -40,6 +40,9 @@
 	__m_pa; \
 })
 
+#define paddr_low32(p) ((uint32_t)(uintptr_t)PADDR(p))
+#define paddr_high32(p) ((uint32_t)((uint64_t)PADDR(p) >> 32))
+
 /* This macro takes a physical address and returns the corresponding kernel
  * virtual address.  It warns if you pass an invalid physical address. */
 #define KADDR(pa)						\

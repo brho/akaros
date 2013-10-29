@@ -229,6 +229,16 @@ static struct ctlr *ctlrtail;
 static struct ether *kickdev;
 static void kickme(void);
 
+/* Helper for checking physical memory calculations.  This driver doesn't
+ * support 64 bit DMA, so we can't handle kaddrs that map to pages that are
+ * above the 32 bit phyiscal memory line (4GB) */
+static void paddr_check(void *kaddr)
+{
+	if (paddr_high32(kaddr))
+		panic("rtl8139: attempted to publish paddr > 4GB!.  "
+		      "Try running with less memory.");
+}
+
 static void rtl8139promiscuous(void *arg, int on)
 {
 	struct ether *edev;
@@ -432,7 +442,8 @@ static void rtl8139init(struct ether *edev)
 	ctlr->rbstart = alloc;
 	alloc += ctlr->rblen + 16;
 	memset(ctlr->rbstart, 0, ctlr->rblen + 16);
-	csr32w(ctlr, Rbstart, PADDR(ctlr->rbstart));
+	csr32w(ctlr, Rbstart, paddr_low32(ctlr->rbstart));
+	paddr_check(ctlr->rbstart);
 	ctlr->rcr = Rxfth256 | Rblen | Mrxdmaunlimited | Ab | Am | Apm;
 
 	/*
@@ -532,11 +543,13 @@ static void rtl8139txstart(struct ether *edev)
 		if (((uintptr_t) bp->rp) & 0x03) {
 			memmove(td->data, bp->rp, size);
 			freeb(bp);
-			csr32w(ctlr, td->tsad, PADDR(td->data));
+			csr32w(ctlr, td->tsad, paddr_low32(td->data));
+			paddr_check(td->data);
 			ctlr->tunaligned++;
 		} else {
 			td->bp = bp;
-			csr32w(ctlr, td->tsad, PADDR(bp->rp));
+			csr32w(ctlr, td->tsad, paddr_low32(bp->rp));
+			paddr_check(bp->rp);
 			ctlr->taligned++;
 		}
 		csr32w(ctlr, td->tsd, (ctlr->etxth << EtxthSHIFT) | size);
@@ -599,7 +612,8 @@ static void rtl8139receive(struct ether *edev)
 			 */
 			cr = csr8r(ctlr, Cr);
 			csr8w(ctlr, Cr, cr & ~Re);
-			csr32w(ctlr, Rbstart, PADDR(ctlr->rbstart));
+			csr32w(ctlr, Rbstart, paddr_low32(ctlr->rbstart));
+			paddr_check(ctlr->rbstart);
 			csr8w(ctlr, Cr, cr);
 			csr32w(ctlr, Rcr, ctlr->rcr);
 
