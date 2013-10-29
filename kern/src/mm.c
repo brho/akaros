@@ -819,7 +819,8 @@ uintptr_t get_vmap_segment(unsigned long num_pages)
 uintptr_t put_vmap_segment(uintptr_t vaddr, unsigned long num_pages)
 {
 	/* TODO: use vmem regions for adjustable vmap segments */
-	panic("Unsupported.\n");
+	warn("Not implemented, leaking vmem space.\n");
+	return 0;
 }
 
 /* Map a virtual address chunk to physical addresses.  Make sure you got a vmap
@@ -868,7 +869,7 @@ int map_vmap_segment(uintptr_t vaddr, uintptr_t paddr, unsigned long num_pages,
 int unmap_vmap_segment(uintptr_t vaddr, unsigned long num_pages)
 {
 	/* Not a big deal - won't need this til we do something with kthreads */
-	panic("Incomplete, don't call this yet.");
+	warn("Incomplete, don't call this yet.");
 	spin_lock(&dyn_vmap_lock);
 	/* TODO: For all pgdirs */
 	pte_t *pte;
@@ -882,5 +883,30 @@ int unmap_vmap_segment(uintptr_t vaddr, unsigned long num_pages)
 	 * pgdir, and send tlb shootdowns to those that are active (which we don't
 	 * track yet). */
 	spin_unlock(&dyn_vmap_lock);
+	return 0;
+}
+
+uintptr_t vmap_pmem(uintptr_t paddr, size_t nr_bytes)
+{
+	uintptr_t vaddr;
+	unsigned long nr_pages = ROUNDUP(nr_bytes, PGSIZE) >> PGSHIFT;
+	assert(nr_bytes && paddr);
+	vaddr = get_vmap_segment(nr_pages);
+	if (!vaddr) {
+		warn("Unable to get a vmap segment");	/* probably a bug */
+		return 0;
+	}
+	if (map_vmap_segment(vaddr, paddr, nr_pages, PTE_P | PTE_KERN_RW)) {
+		warn("Unable to map a vmap segment");	/* probably a bug */
+		return 0;
+	}
+	return vaddr;
+}
+
+int vunmap_vmem(uintptr_t vaddr, size_t nr_bytes)
+{
+	unsigned long nr_pages = ROUNDUP(nr_bytes, PGSIZE) >> PGSHIFT;
+	unmap_vmap_segment(vaddr, nr_pages);
+	put_vmap_segment(vaddr, nr_pages);
 	return 0;
 }
