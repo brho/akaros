@@ -432,7 +432,6 @@ void etherreset(void)
 		}
 		etherxx[ctlrno] = ether;
 		ctlrno++;
-		break;
 	}
 }
 
