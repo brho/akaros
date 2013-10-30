@@ -82,17 +82,29 @@ netifgen(struct chan *c, char *unused, struct dirtab *vp, int iunused, int i,
 	 * generate a chan, but instead is looking it up (devwalk generates, devstat
 	 * already has the chan), then they are also looking for a devdir with path
 	 * containing ID << 5.  So if you stat ether0/1/ifstats, devstat is looking
-	 * for path 41, but we return path 9 (41 = 32 + 9).
+	 * for path 41, but we return path 9 (41 = 32 + 9). (these numbers are
+	 * before we tracked NETID + 1).
 	 *
-	 * Anyway, anything in this big if || blob are things that do not exist in
-	 * the subdirs of a netif.  Things like clone make sense here.  I guess addr
-	 * too, though that seems to be added since the original comment.  Things
-	 * like stat and ifstat are broken (though they may work for ether0/0, since
-	 * the ID is 0.).  mtu is a recent development, and looks like it's another
-	 * "l2 only", like clone and addr, so I'll let it stay here.  The way you
-	 * can tell is that there is no mtu in the third level processing. */
-	t = NETTYPE(c->qid.path);
-	if (t == N2ndqid || t == Ncloneqid || t == Naddrqid || t == Nmtuqid) {
+	 * We (akaros and plan9) had a big if here, that would catch things that do
+	 * not exist in the subdirs of a netif.  Things like clone make sense here.
+	 * I guess addr too, though that seems to be added since the original
+	 * comment.  You can see what the 3rd level was expecting to parse by
+	 * looking farther down in the code.
+	 *
+	 * The root of the problem was that the old code couldn't tell the
+	 * difference between no netid and netid 0.  Now, we determine if we're at
+	 * the second level by the lack of a netid, instead of trying to enumerate
+	 * the qid types that the second level could have.  The latter approach
+	 * allowed for something like ether0/1/stats, but we couldn't actually
+	 * devstat ether0/stats directly.  It's worth noting that there is no
+	 * difference to the content of ether0/stats and ether0/x/stats (when you
+	 * read), but they have different chan qids.
+	 *
+	 * Here's the old if block:
+		t = NETTYPE(c->qid.path);
+		if (t == N2ndqid || t == Ncloneqid || t == Naddrqid || t == Nmtuqid) {
+	 */
+	if (NETID(c->qid.path) == -1) {
 		switch (i) {
 			case DEVDOTDOT:
 				q.type = QTDIR;
@@ -137,6 +149,8 @@ netifgen(struct chan *c, char *unused, struct dirtab *vp, int iunused, int i,
 		}
 		return 1;
 	}
+	/* N2ndqid isn't used for anything, just trying for bugs now */
+	assert(NETTYPE(c->qid.path) != N2ndqid);
 
 	/* third level */
 	f = nif->f[NETID(c->qid.path)];
@@ -202,6 +216,7 @@ struct chan *netifopen(struct netif *nif, struct chan *c, int omode)
 			case Ndataqid:
 			case Nctlqid:
 				id = NETID(c->qid.path);
+				assert(id != -1);	/* NETID change might cause a bug here */
 				openfile(nif, id);
 				break;
 			case Ncloneqid:

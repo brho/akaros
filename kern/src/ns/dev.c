@@ -288,6 +288,7 @@ devstat(struct chan *c, uint8_t * db, long n, struct dirtab *tab, int ntab,
 	struct dir dir;
 	char *p, *elem;
 
+	printd("\nFresh Devstat, chan path %p\n", c->qid.path);
 	for (i = 0;; i++) {
 		switch ((*gen) (c, NULL, tab, ntab, i, &dir)) {
 			case -1:
@@ -306,9 +307,9 @@ devstat(struct chan *c, uint8_t * db, long n, struct dirtab *tab, int ntab,
 						error(Ebadarg);
 					return n;
 				}
-
 				error(Enonexist);
 			case 0:
+				printd("DEVSTAT got 0\n");
 				break;
 			case 1:
 				printd("DEVSTAT gen returns path %p name %s, want path %p\n", 
