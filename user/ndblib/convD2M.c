@@ -7,6 +7,7 @@
 #include <nixip.h>
 #include <dir.h>
 #include <ndb.h>
+#include <fcall.h>
 
 unsigned int
 sizeD2M(struct dir *d)

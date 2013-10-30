@@ -7,6 +7,7 @@
 #include <nixip.h>
 #include <dir.h>
 #include <ndb.h>
+#include <fcall.h>
 
 int
 statcheck(uint8_t *buf, unsigned int nbuf)

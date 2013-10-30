@@ -151,5 +151,6 @@ static inline uintptr_t getcallerpc(void *v){return 0;}
 static inline void setmalloctag(void *v){}
 
 void _ndbcacheflush(struct ndb *db);
+/* No implementation for this, dumped into a garbage file */
 void setnetmtpt(char *net, int n, char *x);
 
