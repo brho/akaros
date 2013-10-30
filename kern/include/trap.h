@@ -10,21 +10,17 @@
 #include <arch/trap.h>
 
 // func ptr for interrupt service routines
-typedef void (*poly_isr_t)(struct hw_trapframe *hw_tf, void *data);
 typedef void (*isr_t)(struct hw_trapframe *hw_tf, void *data);
-typedef struct InterruptHandler {
-	poly_isr_t isr;
-	TV(t) data;
-} handler_t;
-
-extern handler_t interrupt_handlers[];
+struct irq_handler {
+	isr_t isr;
+	void *data;
+	struct irq_handler *next;
+};
 
 void idt_init(void);
-void register_interrupt_handler(handler_t table[],
-                                uint8_t int_num,
-                                poly_isr_t handler, void *data);
-int register_dev_irq(int irq, void (*handler)(struct hw_trapframe *, void *),
-                     void *irq_arg);
+void register_raw_irq(unsigned int vector, isr_t handler, void *data);
+void unregister_raw_irq(unsigned int vector, isr_t handler, void *data);
+int register_dev_irq(int irq, isr_t handler, void *irq_arg);
 void print_trapframe(struct hw_trapframe *hw_tf);
 void page_fault_handler(struct hw_trapframe *hw_tf);
 /* Generic per-core timer interrupt handler.  set_percore_timer() will fire the

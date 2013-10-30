@@ -300,8 +300,6 @@ void rl8168_reset() {
 
 void rl8168_setup_interrupts() {
 	
-	extern handler_t interrupt_handlers[];
-	
 	rl8168_debug("-->Setting interrupts.\n");
 	
 	// Enable NIC interrupts

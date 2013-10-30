@@ -619,8 +619,6 @@ void e1000_irq_enable() {
 // Configure and enable interrupts
 void e1000_setup_interrupts() {
 	
-	extern handler_t interrupt_handlers[];
-	
 	e1000_debug("-->Setting interrupts.\n");
 	
 	// Set throttle register

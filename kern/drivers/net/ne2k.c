@@ -168,8 +168,6 @@ void ne2k_configure_nic() {
 
 void ne2k_setup_interrupts() {
 	
-	extern handler_t interrupt_handlers[];
-	
 	ne2k_debug("-->Setting interrupts.\n");
 	
 	// Kernel based interrupt stuff

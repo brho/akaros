@@ -82,13 +82,13 @@ void smp_percpu_init(void); // this must be called by each core individually
 void __arch_pcpu_init(uint32_t coreid);	/* each arch has one of these */
 
 /* SMP utility functions */
-int smp_call_function_self(poly_isr_t handler, TV(t) data,
-                           handler_wrapper_t** wait_wrapper);
-int smp_call_function_all(poly_isr_t handler, TV(t) data,
-                          handler_wrapper_t** wait_wrapper);
-int smp_call_function_single(uint32_t dest, poly_isr_t handler, TV(t) data,
-                             handler_wrapper_t** wait_wrapper);
-int smp_call_wait(handler_wrapper_t*SAFE wrapper);
+int smp_call_function_self(isr_t handler, void *data,
+                           handler_wrapper_t **wait_wrapper);
+int smp_call_function_all(isr_t handler, void *data,
+                          handler_wrapper_t **wait_wrapper);
+int smp_call_function_single(uint32_t dest, isr_t handler, void *data,
+                             handler_wrapper_t **wait_wrapper);
+int smp_call_wait(handler_wrapper_t *wrapper);
 
 /* PCPUI Trace Rings: */
 struct pcpu_trace_event {

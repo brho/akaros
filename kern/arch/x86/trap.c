@@ -28,10 +28,10 @@ taskstate_t RO ts;
 gatedesc_t __attribute__((aligned (16))) idt[256] = { { 0 } };
 pseudodesc_t idt_pd;
 
-/* global handler table, used by core0 (for now).  allows the registration
- * of functions to be called when servicing an interrupt.  other cores
- * can set up their own later. */
-handler_t interrupt_handlers[NUM_IRQS];
+/* interrupt handler table, each element is a linked list of handlers for a
+ * given IRQ.  Modification requires holding the lock (TODO: RCU) */
+struct irq_handler *irq_handlers[NUM_IRQS];
+spinlock_t irq_handler_wlock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 /* Which pci devices hang off of which irqs */
 /* TODO: make this an array of SLISTs (pain from ioapic.c, etc...) */
@@ -169,11 +169,9 @@ void idt_init(void)
 	// and turn it on
 	lapic_enable();
 	/* register the generic timer_interrupt() handler for the per-core timers */
-	register_interrupt_handler(interrupt_handlers, LAPIC_TIMER_DEFAULT_VECTOR,
-	                           timer_interrupt, NULL);
+	register_raw_irq(LAPIC_TIMER_DEFAULT_VECTOR, timer_interrupt, NULL);
 	/* register the kernel message handler */
-	register_interrupt_handler(interrupt_handlers, I_KERNEL_MSG,
-	                           handle_kmsg_ipi, NULL);
+	register_raw_irq(I_KERNEL_MSG, handle_kmsg_ipi, NULL);
 }
 
 static void handle_fperr(struct hw_trapframe *hw_tf)
@@ -463,9 +461,10 @@ static void send_eoi(uint32_t trap_nr)
  *
  * Note that from hardware's perspective (PIC, etc), IRQs start from 0, but they
  * are all mapped up at PIC1_OFFSET for the cpu / irq_handler. */
-void irq_handler(struct hw_trapframe *hw_tf)
+void handle_irq(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct irq_handler *irq_h;
 	/* Copy out the TF for now */
 	if (!in_kernel(hw_tf))
 		set_current_ctx_hw(pcpui, hw_tf);
@@ -480,13 +479,14 @@ void irq_handler(struct hw_trapframe *hw_tf)
 		       core_id());
 	if (check_spurious_irq(hw_tf->tf_trapno))
 		goto out_no_eoi;
-	extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
-	// determine the interrupt handler table to use.  for now, pick the global
-	handler_t *handler_tbl = interrupt_handlers;
-	if (handler_tbl[hw_tf->tf_trapno].isr != 0)
-		handler_tbl[hw_tf->tf_trapno].isr(hw_tf,
-		                                  handler_tbl[hw_tf->tf_trapno].data);
+	/* TODO: RCU read lock */
+	irq_h = irq_handlers[hw_tf->tf_trapno];
+	while (irq_h) {
+		irq_h->isr(hw_tf, irq_h->data);
+		irq_h = irq_h->next;
+	}
 	// if we're a general purpose IPI function call, down the cpu_list
+	extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
 	if ((I_SMP_CALL0 <= hw_tf->tf_trapno) &&
 	    (hw_tf->tf_trapno <= I_SMP_CALL_LAST))
 		down_checklist(handler_wrappers[hw_tf->tf_trapno & 0x0f].cpu_list);
@@ -504,19 +504,29 @@ out_no_eoi:
 	assert(0);
 }
 
-void
-register_interrupt_handler(handler_t TP(TV(t)) table[],
-                           uint8_t int_num, poly_isr_t handler, TV(t) data)
+void register_raw_irq(unsigned int vector, isr_t handler, void *data)
 {
-	table[int_num].isr = handler;
-	table[int_num].data = data;
+	struct irq_handler *irq_h;
+	irq_h = kmalloc(sizeof(struct irq_handler), 0);
+	assert(irq_h);
+	spin_lock_irqsave(&irq_handler_wlock);
+	irq_h->isr = handler;
+	irq_h->data = data;
+	irq_h->next = irq_handlers[vector];
+	wmb();	/* make sure irq_h is done before publishing to readers */
+	irq_handlers[vector] = irq_h;
+	spin_unlock_irqsave(&irq_handler_wlock);
 }
 
-int register_dev_irq(int irq, void (*handler)(struct hw_trapframe *, void *),
-                     void *irq_arg)
+void unregister_raw_irq(unsigned int vector, isr_t handler, void *data)
 {
-	register_interrupt_handler(interrupt_handlers,
-	                           KERNEL_IRQ_OFFSET + irq, handler, irq_arg);
+	/* TODO: RCU */
+	printk("Unregistering not supported\n");
+}
+
+int register_dev_irq(int irq, isr_t handler, void *irq_arg)
+{
+	register_raw_irq(KERNEL_IRQ_OFFSET + irq, handler, irq_arg);
 
 	/* TODO: whenever we sort out the ACPI/IOAPIC business, we'll probably want
 	 * a helper to reroute an irq? */

@@ -30,8 +30,8 @@ int os_coreid_lookup[MAX_NUM_CPUS] = {[0 ... (MAX_NUM_CPUS - 1)] -1};
 // need to be global, since there is no function that will always exist for them
 handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
 
-static int smp_call_function(uint8_t type, uint32_t dest, poly_isr_t handler, TV(t) data,
-                             handler_wrapper_t** wait_wrapper)
+static int smp_call_function(uint8_t type, uint32_t dest, isr_t handler,
+                             void *data, handler_wrapper_t **wait_wrapper)
 {
 	int8_t state = 0;
 	uint32_t wrapper_num;
@@ -116,7 +116,7 @@ static int smp_call_function(uint8_t type, uint32_t dest, poly_isr_t handler, TV
 	}
 
 	// now register our handler to run
-	register_interrupt_handler(interrupt_handlers, wrapper->vector, handler, data);
+	register_raw_irq(wrapper->vector, handler, data);
 	// WRITE MEMORY BARRIER HERE
 	enable_irqsave(&state);
 	// Send the proper type of IPI.  I made up these numbers.
@@ -146,20 +146,20 @@ static int smp_call_function(uint8_t type, uint32_t dest, poly_isr_t handler, TV
 }
 
 // Wrapper functions.  Add more as they are needed.
-int smp_call_function_self(poly_isr_t handler, TV(t) data,
-                           handler_wrapper_t** wait_wrapper)
+int smp_call_function_self(isr_t handler, void *data,
+                           handler_wrapper_t **wait_wrapper)
 {
 	return smp_call_function(1, 0, handler, data, wait_wrapper);
 }
 
-int smp_call_function_all(poly_isr_t handler, TV(t) data,
-                          handler_wrapper_t** wait_wrapper)
+int smp_call_function_all(isr_t handler, void *data,
+                          handler_wrapper_t **wait_wrapper)
 {
 	return smp_call_function(2, 0, handler, data, wait_wrapper);
 }
 
-int smp_call_function_single(uint32_t dest, poly_isr_t handler, TV(t) data,
-                             handler_wrapper_t** wait_wrapper)
+int smp_call_function_single(uint32_t dest, isr_t handler, void *data,
+                             handler_wrapper_t **wait_wrapper)
 {
 	return smp_call_function(4, dest, handler, data, wait_wrapper);
 }
