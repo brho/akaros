@@ -15,7 +15,13 @@
  *	add checksum-offload;
  *	add tuning control via ctl file;
  *	this driver is little-endian specific.
- */
+ *
+ * Modified by brho:
+ * 	ported to Akaros
+ * 	fixed mii bugs (allocation, startup, miirw, etc)
+ * 	fixed CLS bug (continue -> break)
+ * 	made sure igbepci only runs once, even if it fails */
+
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -30,6 +36,7 @@
 #include <smp.h>
 #include <etherif.h>
 #include <ethermii.h>
+#include <arch/pci.h>
 
 enum {
 	i82542		= (0x1000<<16)|0x8086,
@@ -523,7 +530,8 @@ struct ctlr {
 static struct ctlr* igbectlrhead;
 static struct ctlr* igbectlrtail;
 
-static spinlock_t igberblock;		/* free receive Blocks */
+/* lock for igberpool (free receive Blocks) */
+static spinlock_t igberblock = SPINLOCK_INITIALIZER_IRQSAVE;
 static struct block* igberbpool;	/* receive Blocks for all igbe controllers */
 
 static char* statistics[Nstatistics] = {
@@ -823,9 +831,16 @@ igbelproc(void* arg)
 	edev = arg;
 	ctlr = edev->ctlr;
 	for(;;){
-		if(ctlr->mii == NULL || ctlr->mii->curphy == NULL)
-			continue;
-
+		/* plan9 originally had a busy loop here (just called continue).  though
+		 * either you have the mii or you don't.  i don't think it'll magically
+		 * show up later (it should have been initialized during pnp/pci, which
+		 * is before attach, which is before lproc).  -brho */
+		if (ctlr->mii == NULL || ctlr->mii->curphy == NULL) {
+			printk("[kernel] igbelproc can't find a mii/curphy, aborting!\n");
+			/* name alloc'd in attach */
+			kfree(per_cpu_info[core_id()].cur_kthread->name);
+			return;
+		}
 		/*
 		 * To do:
 		 *	logic to manage status change,
@@ -835,7 +850,7 @@ igbelproc(void* arg)
 		 *	MiiPhy.speed, etc. should be in Mii.
 		 */
 		if(miistatus(ctlr->mii) < 0)
-			//continue;
+			//continue; 	/* this comment out was plan9, not brho */
 			goto enable;
 
 		phy = ctlr->mii->curphy;
@@ -929,9 +944,8 @@ igbetxinit(struct ctlr* ctlr)
 	csr32w(ctlr, Tipg, (6<<20)|(8<<10)|r);
 	csr32w(ctlr, Ait, 0);
 	csr32w(ctlr, Txdmac, 0);
-#warning "warning: hokey address management"
-	csr32w(ctlr, Tdbal, (uintptr_t) (ctlr->tdba));
-	csr32w(ctlr, Tdbah, 0);
+	csr32w(ctlr, Tdbal, paddr_low32(ctlr->tdba));
+	csr32w(ctlr, Tdbah, paddr_high32(ctlr->tdba));
 	csr32w(ctlr, Tdlen, ctlr->ntd*sizeof(Td));
 	ctlr->tdh = PREV(0, ctlr->ntd);
 	csr32w(ctlr, Tdh, 0);
@@ -1012,8 +1026,8 @@ igbetransmit(struct ether* edev)
 		if((bp = qget(edev->netif.oq)) == NULL)
 			break;
 		td = &ctlr->tdba[tdt];
-#warning "hokey address management"
-		td->addr[0] = (uintptr_t)(bp->rp);
+		td->addr[0] = paddr_low32(bp->rp);
+		td->addr[1] = paddr_high32(bp->rp);
 		td->control = ((BLEN(bp) & LenMASK)<<LenSHIFT);
 		td->control |= Dext|Ifcs|Teop|DtypeDD;
 		ctlr->tb[tdt] = bp;
@@ -1046,19 +1060,16 @@ igbereplenish(struct ctlr* ctlr)
 		if(ctlr->rb[rdt] == NULL){
 			bp = igberballoc();
 			if(bp == NULL){
-#warning "Printing at interrupt level"
 				/* needs to be a safe print for interrupt level */
 				printk("#l%d: igbereplenish: no available buffers\n",
 					ctlr->edev->ctlrno);
 				break;
 			}
 			ctlr->rb[rdt] = bp;
-#warning "hokey address management"
-			rd->addr[0] = (uintptr_t)(bp->rp);
-			rd->addr[1] = 0;
+			rd->addr[0] = paddr_low32(bp->rp);
+			rd->addr[1] = paddr_high32(bp->rp);
 		}
-#warning "memory barrier overkill?"
-		mb();
+		wmb();	/* ensure prev rd writes come before status = 0. */
 		rd->status = 0;
 		rdt = NEXT(rdt, ctlr->nrd);
 		ctlr->rdfree++;
@@ -1075,9 +1086,8 @@ igberxinit(struct ctlr* ctlr)
 
 	/* temporarily keep Mpe on */
 	csr32w(ctlr, Rctl, Dpf|Bsize2048|Bam|RdtmsHALF|Mpe);
-#warning "hokey address management"
-	csr32w(ctlr, Rdbal, (uintptr_t)(ctlr->rdba));
-	csr32w(ctlr, Rdbah, 0);
+	csr32w(ctlr, Rdbal, paddr_low32(ctlr->rdba));
+	csr32w(ctlr, Rdbah, paddr_high32(ctlr->rdba));
 	csr32w(ctlr, Rdlen, ctlr->nrd*sizeof(Rd));
 	ctlr->rdh = 0;
 	csr32w(ctlr, Rdh, 0);
@@ -1193,8 +1203,7 @@ igberproc(void* arg)
 			}
 
 			memset(rd, 0, sizeof(Rd));
-#warning "mb() overkill?"
-			mb();
+			wmb();	/* make sure the zeroing happens before free (i think) */
 			ctlr->rdfree--;
 			rdh = NEXT(rdh, ctlr->nrd);
 		}
@@ -1208,10 +1217,10 @@ igberproc(void* arg)
 static void
 igbeattach(struct ether* edev)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct block *bp;
 	struct ctlr *ctlr;
-	char name[KNAMELEN];
+	char *name;
 
 	ctlr = edev->ctlr;
 	ctlr->edev = edev;			/* point back to Ether* */
@@ -1266,14 +1275,15 @@ igbeattach(struct ether* edev)
 		freeb(bp);
 	}
 
-#warning "fix me kproc"
-#if 0
+	/* the ktasks should free these names, if they ever exit */
+	name = kmalloc(KNAMELEN, KMALLOC_WAIT);
 	snprintf(name, KNAMELEN, "#l%dlproc", edev->ctlrno);
-	kproc(name, igbelproc, edev);
+	ktask(name, igbelproc, edev);
 
+	name = kmalloc(KNAMELEN, KMALLOC_WAIT);
 	snprintf(name, KNAMELEN, "#l%drproc", edev->ctlrno);
-	kproc(name, igberproc, edev);
-#endif
+	ktask(name, igberproc, edev);
+
 	igbetxinit(ctlr);
 
 	qunlock(&ctlr->alock);
@@ -1458,7 +1468,6 @@ igbemiimiw(struct mii* mii, int pa, int ra, int data)
 	return -1;
 }
 
-
 static int
 i82543miirw(struct mii* mii, int write, int pa, int ra, int data)
 {
@@ -1468,6 +1477,14 @@ i82543miirw(struct mii* mii, int write, int pa, int ra, int data)
 	return i82543miimir(mii, pa, ra);
 }
 
+static int
+igbemiirw(struct mii* mii, int write, int pa, int ra, int data)
+{
+	if(write)
+		return igbemiimiw(mii, pa, ra, data);
+
+	return igbemiimir(mii, pa, ra);
+}
 
 static int
 igbemii(struct ctlr* ctlr)
@@ -1478,9 +1495,6 @@ igbemii(struct ctlr* ctlr)
 	r = csr32r(ctlr, Status);
 	if(r & Tbimode)
 		return -1;
-	if((ctlr->mii = kzmalloc(sizeof(struct mii), 0)) == NULL)
-		return -1;
-	ctlr->mii->ctlr = ctlr;
 
 	ctrl = csr32r(ctlr, Ctrl);
 	ctrl |= Slu;
@@ -1500,15 +1514,15 @@ igbemii(struct ctlr* ctlr)
 		if(!(r & Mdro))
 			return -1;
 		csr32w(ctlr, Ctrlext, r);
-		udelay(20*1000000);
+		udelay(20*1000);
 		r = csr32r(ctlr, Ctrlext);
 		r &= ~Mdr;
 		csr32w(ctlr, Ctrlext, r);
-		udelay(20*1000000);
+		udelay(20*1000);
 		r = csr32r(ctlr, Ctrlext);
 		r |= Mdr;
 		csr32w(ctlr, Ctrlext, r);
-		udelay(20*1000000);
+		udelay(20*1000);
 
 		rw = i82543miirw;
 		break;
@@ -1529,20 +1543,14 @@ igbemii(struct ctlr* ctlr)
 	case i82546eb:
 		ctrl &= ~(Frcdplx|Frcspd);
 		csr32w(ctlr, Ctrl, ctrl);
-		rw = i82543miirw;
+		rw = igbemiirw;
 		break;
 	default:
-		kfree(ctlr->mii);
-		ctlr->mii = NULL;
 		return -1;
 	}
 
-	ctlr->mii = miiattach(ctlr, ~0, rw);
-	if(ctlr->mii){
-		kfree(ctlr->mii);
-		ctlr->mii = NULL;
+	if (!(ctlr->mii = miiattach(ctlr, ~0, rw)))
 		return -1;
-	}
 	// print("oui %X phyno %d\n", phy->oui, phy->phyno);
 
 	/*
@@ -1749,25 +1757,25 @@ igbedetach(struct ctlr* ctlr)
 	csr32w(ctlr, Rctl, 0);
 	csr32w(ctlr, Tctl, 0);
 
-	udelay(10*1000000);
+	udelay(10*1000);
 
 	csr32w(ctlr, Ctrl, Devrst);
-	udelay(1*1000000);
+	udelay(1*1000);
 	for(timeo = 0; timeo < 1000; timeo++){
 		if(!(csr32r(ctlr, Ctrl) & Devrst))
 			break;
-		udelay(1*1000000);
+		udelay(1*1000);
 	}
 	if(csr32r(ctlr, Ctrl) & Devrst)
 		return -1;
 	r = csr32r(ctlr, Ctrlext);
 	csr32w(ctlr, Ctrlext, r|Eerst);
-	udelay(1*1000000);
+	udelay(1*1000);
 
 	for(timeo = 0; timeo < 1000; timeo++){
 		if(!(csr32r(ctlr, Ctrlext) & Eerst))
 			break;
-		udelay(1*1000000);
+		udelay(1*1000);
 	}
 	if(csr32r(ctlr, Ctrlext) & Eerst)
 		return -1;
@@ -1792,11 +1800,11 @@ igbedetach(struct ctlr* ctlr)
 	}
 
 	csr32w(ctlr, Imc, ~0);
-	udelay(1*1000000);
+	udelay(1*1000);
 	for(timeo = 0; timeo < 1000; timeo++){
 		if(!csr32r(ctlr, Icr))
 			break;
-		udelay(1*1000000);
+		udelay(1*1000);
 	}
 	if(csr32r(ctlr, Icr))
 		return -1;
@@ -1933,32 +1941,30 @@ igbereset(struct ctlr* ctlr)
 	csr32w(ctlr, Fcrtl, ctlr->fcrtl);
 	csr32w(ctlr, Fcrth, ctlr->fcrth);
 
-	if(!(csr32r(ctlr, Status) & Tbimode) && igbemii(ctlr) < 0)
+	/* FYI, igbemii checks status right away too. */
+	if(!(csr32r(ctlr, Status) & Tbimode) && igbemii(ctlr) < 0) {
+		printk("igbemii failed!  igbe failing to reset!\n");
 		return -1;
+	}
 
 	return 0;
 }
 
-enum {
-	CACHELINESZ = 32,
-};
-
 static void
 igbepci(void)
 {
-#warning "FIX ME, barret!"
-#if 0
-	int cls;
-	struct pci_device *p;
+	int cls, id;
+	struct pci_device *pcidev;
 	struct ctlr *ctlr;
 	void *mem;
+	uintptr_t mmio_paddr;
 
-	p = NULL;
-	while(p = pcimatch(p, 0, 0)){
-		if(p->ccrb != 0x02 || p->ccru != 0)
+	STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
+		/* This checks that pcidev is a Network Controller for Ethernet */
+		if (pcidev->class != 0x02 || pcidev->subclass != 0x00)
 			continue;
-
-		switch((p->did<<16)|p->vid){
+		id = pcidev->dev_id << 16 | pcidev->ven_id;
+		switch (id) {
 		default:
 			continue;
 		case i82543gc:
@@ -1979,44 +1985,58 @@ igbepci(void)
 		case i82546eb:
 			break;
 		}
+		printk("igbe/e1000 driver found 0x%04x:%04x at %02x:%02x.%x\n",
+		       pcidev->ven_id, pcidev->dev_id,
+		       pcidev->bus, pcidev->dev, pcidev->func);
 
-		mem = vmap(p->mem[0].bar & ~0x0F, p->mem[0].size);
+		mmio_paddr = pcidev->bar[0].mmio_base32 ? pcidev->bar[0].mmio_base32 : 
+		                                          pcidev->bar[0].mmio_base64;
+		mem = (void*)vmap_pmem(mmio_paddr, pcidev->bar[0].mmio_sz);
 		if(mem == NULL){
-			printd("igbe: can't map %8.8luX\n", p->mem[0].bar);
+			printd("igbe: can't map %p\n", pcidev->bar[0].mmio_base32);
 			continue;
 		}
-		cls = pcicfgr8(p, PciCLS);
+		cls = pcidev_read8(pcidev, PCI_CLSZ_REG);
 		switch(cls){
 			default:
 				printd("igbe: unexpected CLS - %d\n", cls*4);
 				break;
 			case 0x00:
 			case 0xFF:
-				/* bogus value; use a sane default */
-				cls = CACHELINESZ/sizeof(long);
-				pcicfgw8(p, PciCLS, cls);
-				continue;
+				/* bogus value; use a sane default.  cls is set in DWORD (u32)
+				 * units. */
+				cls = ARCH_CL_SIZE / sizeof(long);
+				pcidev_write8(pcidev, PCI_CLSZ_REG, cls);
+				break;
 			case 0x08:
 			case 0x10:
 				break;
 		}
 		ctlr = kzmalloc(sizeof(struct ctlr), 0);
 		if(ctlr == NULL) {
-			vunmap(mem, p->mem[0].size);
+			vunmap_vmem((uintptr_t)mem, pcidev->bar[0].mmio_sz);
 			error(Enomem);
 		}
-		ctlr->port = p->mem[0].bar & ~0x0F;
-		ctlr->pcidev = p;
-		ctlr->id = (p->did<<16)|p->vid;
-		ctlr->cls = cls*4;
+		spinlock_init_irqsave(&ctlr->imlock);
+		spinlock_init_irqsave(&ctlr->tlock);
+		qlock_init(&ctlr->alock);
+		qlock_init(&ctlr->slock);
+		rendez_init(&ctlr->lrendez);
+		rendez_init(&ctlr->rrendez);
+		/* port seems to be unused, and only used for some comparison with edev.
+		 * plan9 just used the top of the raw bar, regardless of the type. */
+		ctlr->port = pcidev->bar[0].raw_bar & ~0x0f;
+		ctlr->pci = pcidev;
+		ctlr->id = id;
+		ctlr->cls = cls * sizeof(long);
 		ctlr->nic = mem;
 
 		if(igbereset(ctlr)){
 			kfree(ctlr);
-			vunmap(mem, p->mem[0].size);
+			vunmap_vmem((uintptr_t)mem, pcidev->bar[0].mmio_sz);
 			continue;
 		}
-		pcisetbme(p);
+		pci_set_bus_master(pcidev);
 
 		if(igbectlrhead != NULL)
 			igbectlrtail->next = ctlr;
@@ -2024,7 +2044,6 @@ igbepci(void)
 			igbectlrhead = ctlr;
 		igbectlrtail = ctlr;
 	}
-#endif
 }
 
 static int
@@ -2032,8 +2051,7 @@ igbepnp(struct ether* edev)
 {
 	struct ctlr *ctlr;
 
-	if(igbectlrhead == NULL)
-		igbepci();
+	run_once(igbepci());
 
 	/*
 	 * Any adapter matches if no edev->port is supplied,
