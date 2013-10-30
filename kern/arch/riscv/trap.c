@@ -347,10 +347,15 @@ handle_trap(struct hw_trapframe *hw_tf)
 /* We don't have NMIs now. */
 void send_nmi(uint32_t os_coreid)
 {
+	printk("%s not implemented\n", __FUNCTION);
 }
 
-void register_interrupt_handler(handler_t table[], uint8_t int_num,
-                                poly_isr_t handler, void *data)
+void register_raw_irq(unsigned int vector, isr_t handler, void *data)
+{
+	printk("%s not implemented\n", __FUNCTION);
+}
+
+void unregister_raw_irq(unsigned int vector, isr_t handler, void *data)
 {
 	printk("%s not implemented\n", __FUNCTION);
 }

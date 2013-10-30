@@ -245,7 +245,7 @@ _allirqs:
 	movw %ax, %es
 	pushl %esp
 	movl $0, %ebp			# so we can backtrace to this point
-	call irq_handler
+	call handle_irq
 	popl %esp
 	popal
 	popl %gs

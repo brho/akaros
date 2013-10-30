@@ -58,19 +58,8 @@ static void cons_irq_init(void)
 {
 	struct cons_dev *i;
 	/* Register interrupt handlers for all console devices */
-	SLIST_FOREACH(i, &cdev_list, next) {
-		register_interrupt_handler(interrupt_handlers, i->irq + PIC1_OFFSET,
-		                           irq_console, i);
-		/* Route any console IRQs to core 0 */
-	#ifdef CONFIG_ENABLE_MPTABLES
-		ioapic_route_irq(i->irq, 0);
-	#else
-		pic_unmask_irq(i->irq);
-		unmask_lapic_lvt(LAPIC_LVT_LINT0);
-	#endif /* CONFIG_ENABLE_MPTABLES */
-		printd("Registered handler for IRQ %d (ISR %d)\n", i->irq,
-		       i->irq + PIC1_OFFSET);
-	}
+	SLIST_FOREACH(i, &cdev_list, next)
+		register_dev_irq(i->irq, irq_console, i);
 }
 
 void arch_init()

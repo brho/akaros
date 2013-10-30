@@ -50,11 +50,9 @@
 
 void test_ipi_sending(void)
 {
-	extern handler_t interrupt_handlers[];
 	int8_t state = 0;
 
-	register_interrupt_handler(interrupt_handlers, I_TESTING,
-	                           test_hello_world_handler, NULL);
+	register_raw_irq(I_TESTING, test_hello_world_handler, NULL);
 	enable_irqsave(&state);
 	cprintf("\nCORE 0 sending broadcast\n");
 	send_broadcast_ipi(I_TESTING);
@@ -90,7 +88,7 @@ void test_ipi_sending(void)
 // Note this never returns and will muck with any other timer work
 void test_pic_reception(void)
 {
-	register_interrupt_handler(interrupt_handlers, 0x20, test_hello_world_handler, NULL);
+	register_raw_irq(0x20, test_hello_world_handler, NULL);
 	pit_set_timer(100,TIMER_RATEGEN); // totally arbitrary time
 	pic_unmask_irq(0);
 	cprintf("PIC1 Mask = 0x%04x\n", inb(PIC1_DATA));
@@ -103,7 +101,7 @@ void test_pic_reception(void)
 
 void test_ioapic_pit_reroute(void) 
 {
-	register_interrupt_handler(interrupt_handlers, 0x20, test_hello_world_handler, NULL);
+	register_raw_irq(0x20, test_hello_world_handler, NULL);
 	ioapic_route_irq(0, 3);	
 
 	cprintf("Starting pit on core 3....\n");
@@ -552,8 +550,7 @@ void test_smp_call_functions(void)
 #ifdef CONFIG_X86
 void test_lapic_status_bit(void)
 {
-	register_interrupt_handler(interrupt_handlers, I_TESTING,
-	                           test_incrementer_handler, &a);
+	register_raw_irq(I_TESTING, test_incrementer_handler, &a);
 	#define NUM_IPI 100000
 	atomic_set(&a,0);
 	printk("IPIs received (should be 0): %d\n", a);
@@ -655,8 +652,7 @@ void test_pit(void)
 
 	atomic_t waiting;
 	atomic_init(&waiting, 1);
-	register_interrupt_handler(interrupt_handlers, I_TESTING,
-	                           test_waiting_handler, &waiting);
+	register_raw_irq(I_TESTING, test_waiting_handler, &waiting);
 	while(atomic_read(&waiting))
 		cpu_relax();
 	cprintf("End now\n");
@@ -1431,9 +1427,9 @@ static void __test_try_halt(uint32_t srcid, long a0, long a1, long a2)
 	printk("Returned from halting on core 1\n");
 }
 
-/* x86 test, making sure our cpu_halt() and irq_handler() work.  If you want to
+/* x86 test, making sure our cpu_halt() and handle_irq() work.  If you want to
  * see it fail, you'll probably need to put a nop in the asm for cpu_halt(), and
- * comment out abort_halt() in irq_handler(). */
+ * comment out abort_halt() in handle_irq(). */
 void test_abort_halt(void)
 {
 #ifdef CONFIG_X86

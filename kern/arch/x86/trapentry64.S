@@ -277,7 +277,7 @@ irq_kernel_tf:
 irq_all_tf:
 	movq $0, %rbp			# so we can backtrace to this point
 	movq %rsp, %rdi
-	call irq_handler
+	call handle_irq
 	# the return paths are only used by the kernel
 	addq $0x10, %rsp			# skip fs/gs base
 	popq %rax
