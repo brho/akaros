@@ -520,6 +520,9 @@ endif #ifeq ($(mixed-targets),1)
 
 user-dirs = parlib pthread benchutil nixip bsd ndblib 
 pthread: parlib
+nixip: parlib
+ndblib: nixip
+bsd: nixip
 
 PHONY += install-libs $(user-dirs)
 install-libs: $(user-dirs) symlinks cc-exists
