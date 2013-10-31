@@ -3,6 +3,9 @@
  * Copyright (c) 1989-2003 by Lucent Technologies, Bell Laboratories.
  */
 
+#ifndef ROS_INC_FCALL_H
+#define ROS_INC_FCALL_H
+
 #define	VERSION9P	"9P2000"
 
 #define	MAXWELEM	16
@@ -136,3 +139,5 @@ int	dirfmt(Fmt*);
 int	dirmodefmt(Fmt*);
 */
 int read9pmsg(int, void *, unsigned int);
+
+#endif /* ROS_INC_FCALL_H */

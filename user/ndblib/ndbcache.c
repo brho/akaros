@@ -7,15 +7,6 @@
 #include <nixip.h>
 #include <ndb.h>
 
-struct ndbcache
-{
-	struct ndbcache	*next;
-	char		*attr;
-	char		*val;
-	struct ndbs		s;
-	struct ndbtuple	*t;	
-};
-
 enum
 {
 	Maxcached=	128,

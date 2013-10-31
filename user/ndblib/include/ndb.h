@@ -1,9 +1,15 @@
+#ifndef ROS_INC_NDB_H
+#define ROS_INC_NDB_H
+
+#include <dir.h>
+
 enum
 {
 	Ndbalen=	32,	/* max attribute length */
 	Ndbvlen=	64,	/* max value length */
 };
 
+struct ndbcache;
 /*
  *  the database
  */
@@ -89,6 +95,15 @@ struct ndbs
 	struct ndbtuple *t;	/* last attribute value pair found */
 };
 
+struct ndbcache
+{
+	struct ndbcache	*next;
+	char		*attr;
+	char		*val;
+	struct ndbs		s;
+	struct ndbtuple	*t;
+};
+
 /*
  *  bit defs for pointers in hash files
  */
@@ -154,3 +169,4 @@ void _ndbcacheflush(struct ndb *db);
 /* No implementation for this, dumped into a garbage file */
 void setnetmtpt(char *net, int n, char *x);
 
+#endif /* ROS_INC_NDB_H */

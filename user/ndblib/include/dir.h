@@ -1,3 +1,6 @@
+#ifndef ROS_INC_DIR_H
+#define ROS_INC_DIR_H
+
 /* STATFIXLEN includes leading 16-bit count */
 /* The count, however, excludes itself; total size is BIT16SZ+count */
 #define STATFIXLEN	(BIT16SZ+QIDSZ+5*BIT16SZ+4*BIT32SZ+1*BIT64SZ)	/* amount of fixed length data in a stat buffer */
@@ -25,3 +28,4 @@ struct dir {
 	char	*muid;	/* last modifier name */
 };
 
+#endif /* ROS_INC_DIR_H */
