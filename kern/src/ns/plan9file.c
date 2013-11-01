@@ -1211,3 +1211,44 @@ void print_9ns_files(struct proc *p)
 	}
 	spin_unlock(&f->lock);
 }
+
+int syspipe(int *pfd)
+{
+	ERRSTACK(1);
+	struct chan *c[2];
+	int fd[2];
+	static char *datastr[] = {"data", "data1"};
+
+	/*
+	 * int pipe(int fd[2]);
+	 */
+
+	c[0] = namec("#P", Atodir, 0, 0);
+	c[1] = NULL;
+	fd[0] = -1;
+	fd[1] = -1;
+
+	if(waserror()){
+		cclose(c[0]);
+		if(c[1])
+			cclose(c[1]);
+		nexterror();
+	}
+	c[1] = cclone(c[0]);
+	if(walk(&c[0], datastr+0, 1, 1, NULL) < 0)
+		error(Egreg);
+	if(walk(&c[1], datastr+1, 1, 1, NULL) < 0)
+		error(Egreg);
+	c[0] = c[0]->dev->open(c[0], ORDWR);
+	c[1] = c[1]->dev->open(c[1], ORDWR);
+	if(newfd2(fd, c) < 0)
+		error(Enofd);
+	poperror();
+
+	pfd[0] = fd[0];
+	pfd[1] = fd[1];
+	printd("syspipe returns [%d,%d]\n",
+		fd[0], fd[1]);
+	return 0;
+}
+

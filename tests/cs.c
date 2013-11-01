@@ -339,8 +339,9 @@ mountinit(char *service, char *mntpt)
 	char buf[32];
 	int ret;
 
-	if(_9pipe(p) < 0){
-		error(1, 0, "%s: %r","%r");
+	ret = syscall(SYS_npipe, p);
+	if (ret < 0){
+		error(1, 0, "pipe: %r");
 		exit(1);
 	}
 
@@ -372,7 +373,7 @@ printf("open %s gets %d\n", service, f);
 		close(p[0]);
 		ret = syscall(SYS_nmount, p[1], -1, mntpt, strlen(mntpt), 2, "", 0);
 		if(ret < 0)
-			error(1, 0, "%s: %r","mount failed: %r");
+			error(1, 0, "%s: %r","mount failed");
 		exit(1);
 	}
 

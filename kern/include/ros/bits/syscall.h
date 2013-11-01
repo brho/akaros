@@ -96,6 +96,7 @@
 #define SYS_nbind				145
 #define SYS_nmount				146
 #define SYS_nunmount				147
+#define SYS_npipe				148
 
 /* Syscalls we plan to remove someday */
 #define SYS_cache_buster        200 

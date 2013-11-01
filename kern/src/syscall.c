@@ -1766,6 +1766,54 @@ intreg_t sys_nbind(struct proc *p,
 	return ret;
 }
 
+/* int npipe(int *fd)
+ * the error handling sucks because I keep hoping this whole layer
+ * is going away soon.
+ *
+ */
+intreg_t sys_npipe(struct proc *p, int *retfd)
+
+{
+	struct file *f1, *f2;
+	int fd[2], newfd;
+	int ret;
+	/* TODO: validate addresses */
+	ret = syspipe(fd);
+	/* if we're here, it worked. */
+	f1 = alloc_file();
+	if (!f1) {
+		/* leak */
+		return -1;
+	}
+	f2 = alloc_file();
+	if (!f2) {
+		/* leak */
+		return -1;
+	}
+
+	newfd = insert_file(&p->open_files, f1, 0);	/* stores the ref to file */
+	f1->plan9 = 0xcafebeef;
+	p->open_files.fd[newfd].plan9fd = fd[0];
+	retfd[0] = newfd;
+
+	if (newfd < 0) {
+		warn("f1: File insertion failed");
+	}
+
+	newfd = insert_file(&p->open_files, f2, 0);	/* stores the ref to file */
+	f2->plan9 = 0xcafebeef;
+	p->open_files.fd[newfd].plan9fd = fd[1];
+	retfd[1] = newfd;
+
+	if (newfd < 0) {
+		warn("f2: ile insertion failed");
+	}
+
+	kref_put(&f1->f_kref);
+	kref_put(&f2->f_kref);
+	return 0;
+}
+
 /* int mount(int fd, int afd, char* onto_path, int flag, char* aname); */
 intreg_t sys_nmount(struct proc *p,
                     int fd, int afd,
@@ -1897,6 +1945,7 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_nbind] ={(syscall_t)sys_nbind, "nbind"},
 	[SYS_nmount] ={(syscall_t)sys_nmount, "nmount"},
 	[SYS_nunmount] ={(syscall_t)sys_nunmount, "nunmount"},
+	[SYS_npipe] ={(syscall_t)sys_npipe, "npipe"},
 
 };
 
