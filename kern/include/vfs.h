@@ -380,6 +380,7 @@ struct file_desc {
 /* All open files for a process */
 struct files_struct {
 	spinlock_t					lock;
+	bool						closed;
 	int							max_files;		/* max files ptd to by fd */
 	int							max_fdset;		/* max of the current fd_set */
 	int							next_fd;		/* next number available */

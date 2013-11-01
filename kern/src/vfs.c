@@ -2018,6 +2018,10 @@ struct file *get_file_from_fd(struct files_struct *open_files, int file_desc)
 	if (file_desc < 0)
 		return 0;
 	spin_lock(&open_files->lock);
+	if (open_files->closed) {
+		spin_unlock(&open_files->lock);
+		return 0;
+	}
 	if (file_desc < open_files->max_fdset) {
 		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc)) {
 			/* while max_files and max_fdset might not line up, we should never
@@ -2041,6 +2045,10 @@ struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
 	if (file_desc < 0)
 		return 0;
 	spin_lock(&open_files->lock);
+	if (open_files->closed) {
+		spin_unlock(&open_files->lock);
+		return 0;
+	}
 	if (file_desc < open_files->max_fdset) {
 		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc)) {
 			/* while max_files and max_fdset might not line up, we should never
@@ -2064,6 +2072,10 @@ int insert_file(struct files_struct *open_files, struct file *file, int low_fd)
 	if ((low_fd < 0) || (low_fd > NR_FILE_DESC_MAX))
 		return -EINVAL;
 	spin_lock(&open_files->lock);
+	if (open_files->closed) {
+		spin_unlock(&open_files->lock);
+		return -EINVAL;	/* won't matter, they are dying */
+	}
 	for (int i = low_fd; i < open_files->max_fdset; i++) {
 		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, i))
 			continue;
@@ -2090,6 +2102,12 @@ void close_all_files(struct files_struct *open_files, bool cloexec)
 {
 	struct file *file;
 	spin_lock(&open_files->lock);
+	if (open_files->closed) {
+		spin_unlock(&open_files->lock);
+		return;
+	}
+	if (!cloexec)
+		open_files->closed = TRUE;
 	for (int i = 0; i < open_files->max_fdset; i++) {
 		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, i)) {
 			/* while max_files and max_fdset might not line up, we should never
@@ -2113,7 +2131,17 @@ void clone_files(struct files_struct *src, struct files_struct *dst)
 {
 	struct file *file;
 	spin_lock(&src->lock);
+	if (src->closed) {
+		spin_unlock(&src->lock);
+		return;
+	}
 	spin_lock(&dst->lock);
+	if (dst->closed) {
+		warn("Destination closed before it opened");
+		spin_unlock(&dst->lock);
+		spin_unlock(&src->lock);
+		return;
+	}
 	for (int i = 0; i < src->max_fdset; i++) {
 		if (GET_BITMASK_BIT(src->open_fds->fds_bits, i)) {
 			/* while max_files and max_fdset might not line up, we should never

@@ -360,6 +360,7 @@ static void __proc_free(struct kref *kref)
 	// All parts of the kernel should have decref'd before __proc_free is called
 	assert(kref_refcnt(&p->p_kref) == 0);
 
+	/* close plan9 dot and slash and free fgrp fd and fgrp */
 	kref_put(&p->fs_env.root->d_kref);
 	kref_put(&p->fs_env.pwd->d_kref);
 	destroy_vmrs(p);
@@ -758,12 +759,13 @@ void proc_destroy(struct proc *p)
 	spin_unlock(&p->proc_lock);
 	/* Wake any of our kthreads waiting on children, so they can abort */
 	cv_broadcast(&p->child_wait);
-	/* This prevents processes from accessing their old files while dying, and
-	 * will help if these files (or similar objects in the future) hold
-	 * references to p (preventing a __proc_free()).  Need to unlock before
-	 * doing this - the proclock doesn't protect the files (not proc state), and
-	 * closing these might block (can't block while spinning). */
-	/* TODO: might need some sync protection */
+	/* we need to close files here, and not in free, since we could have a
+	 * refcnt indirectly related to one of our files.  specifically, if we have
+	 * a parent sleeping on our pipe, that parent won't wake up to decref until
+	 * the pipe closes.  And if the parent doesnt decref, we don't free.
+	 * alternatively, we could send a SIGCHILD to the parent, but that would
+	 * require parent's to never ignore that signal (or risk never reaping) */
+	//close_9ns_files(p);
 	close_all_files(&p->open_files, FALSE);
 	/* Tell the ksched about our death, and which cores we freed up */
 	__sched_proc_destroy(p, pc_arr, nr_cores_revoked);
