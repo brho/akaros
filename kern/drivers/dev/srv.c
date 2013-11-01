@@ -1,4 +1,3 @@
-#include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
 #include <kmalloc.h>
@@ -151,7 +150,8 @@ srvcreate(struct chan *c, char *name, int omode, int perm)
 	struct srv *sp;
 	char *sname;
 
-	if(openmode(omode) != OWRITE)
+#warning "fix the OWRITE thing in srv once we are sure it will work"
+	if(0 && openmode(omode) != OWRITE)
 		error(Eperm);
 
 	if(omode & OCEXEC)	/* can't happen */
@@ -212,12 +212,12 @@ srvremove(struct chan *c)
 	}
 	if(sp == 0)
 		error(Enonexist);
-
+#warning "we're ignoring permissions in #s:remove"
 	/*
 	 * Only eve can remove system services.
 	 * No one can remove #s/boot.
 	 */
-	if(strcmp(sp->owner, eve) == 0 && !iseve())
+	if(0&&strcmp(sp->owner, eve) == 0 && !iseve())
 		error(Eperm);
 	if(strcmp(sp->name, "boot") == 0)
 		error(Eperm);
@@ -225,7 +225,7 @@ srvremove(struct chan *c)
 	/*
 	 * No removing personal services.
 	 */
-	if((sp->perm&7) != 7 && strcmp(sp->owner, "eve"/*up->user*/) && !iseve())
+	if(0&&(sp->perm&7) != 7 && strcmp(sp->owner, "eve"/*up->user*/) && !iseve())
 		error(Eperm);
 
 	*l = sp->link;
@@ -323,6 +323,23 @@ srvwrite(struct chan *c, void *va, long n, int64_t unused)
 	memmove(buf, va, n);	/* so we can NUL-terminate */
 	buf[n] = 0;
 	fd = strtoul(buf, 0, 0);
+
+	struct file *file = get_file_from_fd(&current->open_files, fd);
+	if (!file) {
+		error("%s: %d is a bad akaros fd", Ebadfd, fd);
+	}
+	/* if file succeeds, then we're going to accept the race
+	 * condition on open files. This is all temporary scaffolding
+	 * anyway we hope.
+	 */
+	kref_put(&file->f_kref);
+	/* race. */
+	if (!file->plan9){
+		error("%s: %d is ok, but it's not a plan 9 file", Ebadfd, fd);
+	}
+
+	fd = current->open_files.fd[fd].plan9fd;
+	printd("srv: plan 9 fd is %d\n", fd);
 
 	c1 = fdtochan(fd, -1, 0, 1);	/* error check and inc ref */
 

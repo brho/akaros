@@ -556,8 +556,9 @@ $(OBJDIR)/.dont-force-fill-kfs:
 	@touch $(OBJDIR)/.dont-force-fill-kfs
 
 fill-kfs: $(OBJDIR)/.dont-force-fill-kfs install-libs
-	@mkdir -p $(FIRST_KFS_PATH)/lib
+	@mkdir -p $(FIRST_KFS_PATH)/lib/ndb
 	$(Q)cp -uP $(XCC_SO_FILES) $(FIRST_KFS_PATH)/lib
+	$(Q)cp -uP tests/common $(FIRST_KFS_PATH)/lib/ndb
 	@echo "Cross Compiler 'so' files installed to KFS"
 	@$(MAKE) -f tests/Makefile fill-kfs
 

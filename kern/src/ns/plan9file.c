@@ -232,9 +232,17 @@ struct chan *fdtochan(int fd, int mode, int chkmnt, int iref)
 	f = current->fgrp;
 
 	spin_lock(&f->lock);
-	if (fd < 0 || f->nfd <= fd || (c = f->fd[fd]) == 0) {
+	if (fd < 0) {
 		spin_unlock(&f->lock);
-		error(Ebadfd);
+		error("%s: fd < 0", Ebadfd);
+	}
+	if (f->nfd <= fd) {
+		spin_unlock(&f->lock);
+		error("%s: f->nfd %d, fd %d", Ebadfd, f->nfd, fd);
+	}
+	if ((c = f->fd[fd]) == 0) {
+		spin_unlock(&f->lock);
+		error("%s: f->fd[%d] is 0", Ebadfd, fd);
 	}
 	if (iref)
 		kref_get(&c->ref, 1);
@@ -252,7 +260,7 @@ struct chan *fdtochan(int fd, int mode, int chkmnt, int iref)
 	if ((mode & OTRUNC) && c->mode == OREAD) {
 		if (iref)
 			cclose(c);
-		error("mode&OTRUNC and mode==REAED");
+		error("mode&OTRUNC and mode==READ");
 	}
 
 #if 0
@@ -783,6 +791,7 @@ int syscreate(char *name, int omode)
 	if (fd < 0)
 		error(Enofd);
 	poperror();
+	printd("syscreate: return %d\n", fd);
 	return fd;
 }
 

@@ -68,7 +68,7 @@ static struct chan *pipeattach(char *spec)
 	struct chan *c;
 
 	printd("%s\n", __func__);
-	c = devattach('|', spec);
+	c = devattach('P', spec);
 	p = kzmalloc(sizeof(struct pipe), 0);
 	if (p == 0)
 		panic("memory");

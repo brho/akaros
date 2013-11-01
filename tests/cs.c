@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <fcntl.h>
 #include <ctype.h>
+#include <error.h>
 #include <nixip.h>
 #include <dir.h>
 #include <ndb.h>
@@ -93,7 +94,7 @@ int	mfd[2];
 int	debug;
 int	paranoia;
 int	ipv6lookups = 1;
-char	*dbfile;
+char	*dbfile = "lib/ndb/common";
 struct ndb	*db, *netdb;
 
 void	rversion(Job*);
@@ -110,7 +111,6 @@ void	rstat(Job*, Mfile*);
 void	rwstat(Job*, Mfile*);
 void	rauth(Job*);
 void	sendmsg(Job*, char*);
-void	error(char*);
 void	mountinit(char*, char*);
 void	io(void);
 void	ndbinit(void);
@@ -244,7 +244,7 @@ main(int argc, char *argv[])
 	setnetmtpt(mntpt, sizeof(mntpt), NULL);
 	ext[0] = 0;
 	argc--, argv++;
-	while (**argv == '-'){
+	while (argc && **argv == '-'){
 		switch(argv[0][1]){
 	case '4':
 		ipv6lookups = 0;
@@ -310,55 +310,72 @@ setext(char *ext, int n, char *p)
 	ext[i] = 0;
 }
 
+static int _9pipe(int *fd)
+{
+	int ret;
+	ret = syscall(SYS_nbind, "#P", 2, "/bin", 4, 1);
+	if (ret < 0){
+		error(1, 0, "%s: %r","bind %r");
+		exit(1);
+	}
+	fd[0] = open("/bin/data", O_RDWR);
+	if (fd[0] < 0){
+		error(1, 0, "%s: %r","data %r");
+		exit(1);
+	}
+
+	fd[1] = open("/bin/data", O_RDWR);
+	if (fd[1] < 0){
+		error(1, 0, "%s: %r","data1 %r");
+		exit(1);
+	}
+
+}
 void
 mountinit(char *service, char *mntpt)
 {
 	int f;
 	int p[2];
 	char buf[32];
+	int ret;
 
-	if(pipe(p) < 0)
-		error("pipe failed");
+	if(_9pipe(p) < 0){
+		error(1, 0, "%s: %r","%r");
+		exit(1);
+	}
 
 	/*
 	 *  make a /srv/cs
+	 * ORCLOSE means remove on last close. Handy. Not here yet. 
 	 */
-	f = open(service, O_RDWR|O_CREAT/*|ORCLOSE*/, 0666);
+	f = open(service, O_WRONLY|O_CREAT/*|ORCLOSE*/, 0666);
+printf("open %s gets %d\n", service, f);
 	if(f < 0)
-		error(service);
+		error(1, 0, "%s: %r",service);
 	snprintf(buf, sizeof(buf), "%d", p[1]);
 	if(write(f, buf, strlen(buf)) != strlen(buf))
-		error("write /srv/cs");
+		error(1, 0, "Write %s: %r", service);
 	/* using #s: we create a pipe and drop it into #s. 
 	 * then we do the mount with that pipe. 
 	 * #s will route requests to us.
 	 */
-	/* we don't have a clone which lets us shared fds ... */
-	/* pipes in plan 9 are bidi. This will be an issue
-	 * unless we can make akaros do that too. Hmm.
-	 */
-#if 1
-	if(syscall(SYS_nmount, p[1], -1, mntpt, 2, "") < 0)
-		error("mount failed\n");
-
-#else
-	switch(rfork(RFFDG|RFPROC|RFNAMEG)){
+	switch(fork()){
 	case 0:
 		close(p[1]);
-		procsetname("%s", mntpt);
 		break;
 	case -1:
-		error("fork failed\n");
+		error(1, 0, "%s: %r","fork failed\n");
 	default:
 		/*
 		 *  put ourselves into the file system
 		 */
 		close(p[0]);
-		if(mount(p[1], -1, mntpt, MAFTER, "") < 0)
-			error("mount failed\n");
-		_exits(0);
+		ret = syscall(SYS_nmount, p[1], -1, mntpt, strlen(mntpt), 2, "", 0);
+		if(ret < 0)
+			error(1, 0, "%s: %r","mount failed: %r");
+		exit(1);
 	}
-#endif
+
 	mfd[0] = mfd[1] = p[0];
 }
 
@@ -367,7 +384,7 @@ ndbinit(void)
 {
 	db = ndbopen(dbfile);
 	if(db == NULL)
-		error("can't open network database");
+		error(1, 0, "%s: %r","can't open network database");
 
 	netdb = ndbopen(netndb);
 	if(netdb != NULL){
@@ -446,7 +463,7 @@ flushjob(int tag)
 }
 
 void *job_thread(void* arg)
-{	
+{
 	Mfile *mf;
 	Job *job = arg;
 	//lock(&dblock);
@@ -523,10 +540,10 @@ io(void)
 	for(;;){
 		n = read9pmsg(mfd[0], mdata, sizeof mdata);
 		if(n<=0)
-			error("mount read");
+			error(1, 0, "%s: %r","mount read");
 		job = newjob();
 		if(convM2S(mdata, n, &job->request) != n){
-			fprintf(stderr, "format error %ux %ux %ux %ux %ux",
+			error(1, 0, "format error %ux %ux %ux %ux %ux",
 				mdata[0], mdata[1], mdata[2], mdata[3], mdata[4]);
 			freejob(job);
 			continue;
@@ -535,7 +552,7 @@ io(void)
 		 * later if we want to.
 		 */
 		if (pthread_create(&job->thread, NULL, &job_thread, job)) {
-			perror("Failed to create job");
+			error(1, 0, "%s: %r","Failed to create job");
 			continue;
 		}
 
@@ -963,17 +980,10 @@ sendmsg(Job *job, char *err)
 	//lock(&joblock);
 	if(job->flushed == 0)
 		if(write(mfd[1], mdata, n)!=n)
-			error("mount write");
+			error(1, 0, "%s: %r","mount write");
 	//unlock(&joblock);
 	if(debug)
 		fprintf(stderr,  "%F %d", &job->reply, n);
-}
-
-void
-error(char *s)
-{
-	fprintf(stderr, "cs", "%s: %r", s);
-	exit(1);
 }
 
 static int
@@ -1186,7 +1196,7 @@ lookup(Mfile *mf)
 	if(db == 0)
 		ndbinit();
 	if(db == 0)
-		error("can't open mf->network database\n");
+		error(1, 0, "%s: %r","can't open mf->network database\n");
 
 	rv = 0;
 

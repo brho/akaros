@@ -46,7 +46,7 @@ bind '#c' /dev
 #bind '#d' /fd
 #bind -c '#e' /env
 bind '#p' /proc
-bind -c '#s' /srv
+#bind -c '#s' /srv
 
 #
 # Configure the networks.
