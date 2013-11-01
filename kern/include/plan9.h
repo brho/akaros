@@ -353,6 +353,7 @@ struct chan {
 	struct path *path;
 };
 
+/* TODO: consider embedding this in struct proc */
 struct fgrp {
 	spinlock_t lock;
 	int mountid;
@@ -361,6 +362,7 @@ struct fgrp {
 	int nfd;					/* number allocated */
 	int maxfd;					/* highest fd in use */
 	int exceed;					/* debugging */
+	bool closed;
 };
 
 /*
@@ -611,6 +613,7 @@ int plan9setup(struct proc *new_proc, struct proc *parent);
 long readstr(long offset, char *buf, long n, char *str);
 int readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
 			int size);
+void close_9ns_files(struct proc *p);
 void print_chaninfo(struct chan *ch);
 void print_9ns_files(struct proc *p);
 

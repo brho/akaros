@@ -431,6 +431,11 @@ static struct chan *ipopen(struct chan *c, int omode)
 
 			}
 			cv->inuse++;
+			/* this may seem a little odd, since a conv's refcnt is 1 when you
+			 * create it (Fsprotoclone).  it is possible you clone, then close,
+			 * then open again.  consider that clone (opening proto/clone) is
+			 * equivalent to opening proto/conv/ctl (as far as results go), so
+			 * both should set the refcnt to 1. */
 			if (cv->inuse == 1) {
 				kstrdup(&cv->owner, ATTACHER(c));
 				cv->perm = 0660;

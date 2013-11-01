@@ -89,6 +89,10 @@ void fdclose(int fd, int flag)
 
 	f = current->fgrp;
 	spin_lock(&f->lock);
+	if (f->closed) {
+		spin_unlock(&f->lock);
+		return;
+	}
 	c = f->fd[fd];
 	if (c == NULL) {
 		/* can happen for users with shared fd tables */
@@ -186,6 +190,10 @@ int newfd(struct chan *c)
 
 	f = current->fgrp;
 	spin_lock(&f->lock);
+	if (f->closed) {
+		spin_unlock(&f->lock);
+		return -1;
+	}
 	fd = findfreefd(f, 0);
 	if (fd < 0) {
 		unlockfgrp(f);
@@ -204,6 +212,10 @@ static int newfd2(int fd[2], struct chan *c[2])
 
 	f = current->fgrp;
 	spin_lock(&f->lock);
+	if (f->closed) {
+		spin_unlock(&f->lock);
+		return -1;
+	}
 	fd[0] = findfreefd(f, 0);
 	if (fd[0] < 0) {
 		unlockfgrp(f);
@@ -232,6 +244,10 @@ struct chan *fdtochan(int fd, int mode, int chkmnt, int iref)
 	f = current->fgrp;
 
 	spin_lock(&f->lock);
+	if (f->closed) {
+		spin_unlock(&f->lock);
+		error("File group closed");
+	}
 	if (fd < 0) {
 		spin_unlock(&f->lock);
 		error("%s: fd < 0", Ebadfd);
@@ -935,6 +951,10 @@ int sysdup(int ofd, int nfd)
 	if (nfd != -1) {
 		f = current->fgrp;
 		spin_lock(&f->lock);
+		if (f->closed) {
+			spin_unlock(&f->lock);
+			return -1;
+		}
 		if (nfd < 0 || growfd(f, nfd) < 0) {
 			unlockfgrp(f);
 			cclose(oc);
@@ -994,7 +1014,8 @@ int plan9setup(struct proc *new_proc, struct proc *parent)
 		poperror();
 		return 0;
 	}
-	/* Copy semantics */
+	/* Copy semantics: do not change this without revisiting proc_destroy,
+	 * close_9ns_files, and closefgrp. */
 	new_proc->fgrp = dupfgrp(parent->fgrp);
 	/* Shared semantics */
 	kref_get(&parent->pgrp->ref, 1);
@@ -1184,6 +1205,39 @@ sysunmount(char *name, char *old)
 	poperror();
 	poperror();
 	return 0;
+}
+
+/* Notes on concurrency:
+ * - Can't hold spinlocks while we call cclose, since it might sleep eventually.
+ * - We're called from proc_destroy, so we could have concurrent openers trying
+ *   to add to the group (other syscalls), hence the "closed" flag.
+ * - dot and slash chans are dealt with in proc_free.  its difficult to close
+ *   and zero those with concurrent syscalls, since those are a source of krefs.
+ * - the memory is freed in proc_free().  need to wait to do it, since we can
+ *   have concurrent accesses to fgrp before free.
+ * - Once we lock and set closed, no further additions can happen.  To simplify
+ *   our closes, we also allow multiple calls to this func (though that should
+ *   never happen with the current code). */
+void close_9ns_files(struct proc *p)
+{
+	struct fgrp *f = p->fgrp;
+
+	spin_lock(&f->lock);
+	if (f->closed) {
+		spin_unlock(&f->lock);
+		warn("Unexpected double-close");
+		return;
+	}
+	f->closed = TRUE;
+	spin_unlock(&f->lock);
+
+	/* maxfd is a legit val, not a +1 */
+	for (int i = 0; i <= f->maxfd; i++) {
+		if (!f->fd[i])
+			continue;
+		cclose(f->fd[i]);
+		f->fd[i] = 0;
+	}
 }
 
 void print_chaninfo(struct chan *ch)

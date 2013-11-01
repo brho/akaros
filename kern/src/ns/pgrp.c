@@ -175,6 +175,11 @@ struct fgrp *dupfgrp(struct fgrp *f)
 	}
 
 	spin_lock(&f->lock);
+	if (f->closed) {
+		spin_unlock(&f->lock);
+		kfree(new);
+		error("File group closed");
+	}
 	/* Make new fd list shorter if possible, preserving quantization */
 	new->nfd = f->maxfd + 1;
 	i = new->nfd % DELTAFD;
@@ -206,6 +211,15 @@ void closefgrp(struct fgrp *f)
 	int i;
 	struct chan *c;
 
+	/* closefgrp can't be called from proc_destroy, due to races on the fgrp.
+	 * current->fgrp is a kref source, and we'd need some form of external sync
+	 * to remove it, since multiple kthreads could be accessing current->fgrp.
+	 * proc_free is synchronized, for instance.  we could put some sync in the
+	 * fgrp, but that would require splitting the deallocation (which we do
+	 * manually), and would require not having multiple procs per fgrp (which we
+	 * also require).  another option would be to use RCU: clear current->fgrp,
+	 * then closefgrp after a grace period. */
+	warn("Don't call closefgrp()");
 	if (f == 0)
 		return;
 
