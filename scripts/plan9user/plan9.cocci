@@ -196,3 +196,9 @@ E)
 +//
 muxclose(...);
 
+@@
+@@
+-sysfatal(
++error(1, 0, 
+...)
+

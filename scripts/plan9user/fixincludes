@@ -7,6 +7,7 @@ sed -i '/^#include/,/^$/c\
 #include <unistd.h>\
 #include <signal.h>\
 #include <fcntl.h>\
+#include <error.h>
 #include <nixip.h>\
 #include <ndb.h>\
 #include <fcall.h>\
