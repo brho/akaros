@@ -2043,12 +2043,33 @@ struct file *get_file_from_fd(struct files_struct *open_files, int file_desc)
 			 * have a valid fdset higher than files */
 			assert(file_desc < open_files->max_files);
 			retval = open_files->fd[file_desc].fd_file;
-			assert(retval);
-			kref_get(&retval->f_kref, 1);
+			/* 9ns might be using this one, in which case file == 0 */
+			if (retval)
+				kref_get(&retval->f_kref, 1);
 		}
 	}
 	spin_unlock(&open_files->lock);
 	return retval;
+}
+
+/* 9ns: puts back an FD from the VFS-FD-space. */
+int put_fd(struct files_struct *open_files, int file_desc)
+{
+	if (file_desc < 0) {
+		warn("Negative FD!\n");
+		return 0;
+	}
+	spin_lock(&open_files->lock);
+	if (file_desc < open_files->max_fdset) {
+		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc)) {
+			/* while max_files and max_fdset might not line up, we should never
+			 * have a valid fdset higher than files */
+			assert(file_desc < open_files->max_files);
+			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc);
+		}
+	}
+	spin_unlock(&open_files->lock);
+	return 0;
 }
 
 /* Remove FD from the open files, if it was there, and return f.  Currently,
@@ -2060,10 +2081,6 @@ struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
 	if (file_desc < 0)
 		return 0;
 	spin_lock(&open_files->lock);
-	if (open_files->closed) {
-		spin_unlock(&open_files->lock);
-		return 0;
-	}
 	if (file_desc < open_files->max_fdset) {
 		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc)) {
 			/* while max_files and max_fdset might not line up, we should never
@@ -2072,7 +2089,7 @@ struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
 			file = open_files->fd[file_desc].fd_file;
 			open_files->fd[file_desc].fd_file = 0;
 			open_files->fd[file_desc].plan9fd = -1;
-			assert(file);
+			assert(file);	/* 9ns shouldn't call this put */
 			kref_put(&file->f_kref);
 			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc);
 		}
@@ -2080,18 +2097,14 @@ struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
 	spin_unlock(&open_files->lock);
 	return file;
 }
-/* Inserts the file in the files_struct, returning the corresponding new file
- * descriptor, or an error code.  We start looking for open fds from low_fd. */
-int insert_file(struct files_struct *open_files, struct file *file, int low_fd)
+
+static int __get_fd(struct files_struct *open_files, int low_fd)
 {
 	int slot = -1;
 	if ((low_fd < 0) || (low_fd > NR_FILE_DESC_MAX))
 		return -EINVAL;
-	spin_lock(&open_files->lock);
-	if (open_files->closed) {
-		spin_unlock(&open_files->lock);
+	if (open_files->closed)
 		return -EINVAL;	/* won't matter, they are dying */
-	}
 	for (int i = low_fd; i < open_files->max_fdset; i++) {
 		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, i))
 			continue;
@@ -2099,15 +2112,41 @@ int insert_file(struct files_struct *open_files, struct file *file, int low_fd)
 		SET_BITMASK_BIT(open_files->open_fds->fds_bits, slot);
 		assert(slot < open_files->max_files &&
 		       open_files->fd[slot].fd_file == 0);
-		kref_get(&file->f_kref, 1);
-		open_files->fd[slot].fd_file = file;
-		open_files->fd[slot].fd_flags = 0;
 		if (slot >= open_files->next_fd)
 			open_files->next_fd = slot + 1;
 		break;
 	}
 	if (slot == -1)	/* should expand the FD array and fd_set */
 		warn("Ran out of file descriptors, deal with me!");
+	return slot;
+}
+
+/* Gets and claims a free FD, used by 9ns.  < 0 == error. */
+int get_fd(struct files_struct *open_files, int low_fd)
+{
+	int slot;
+	spin_lock(&open_files->lock);
+	slot = __get_fd(open_files, low_fd);
+	spin_unlock(&open_files->lock);
+	return slot;
+}
+
+/* Inserts the file in the files_struct, returning the corresponding new file
+ * descriptor, or an error code.  We start looking for open fds from low_fd. */
+int insert_file(struct files_struct *open_files, struct file *file, int low_fd)
+{
+	int slot;
+	spin_lock(&open_files->lock);
+	slot = __get_fd(open_files, low_fd);
+	if (slot < 0) {
+		spin_unlock(&open_files->lock);
+		return slot;
+	}
+	assert(slot < open_files->max_files &&
+	       open_files->fd[slot].fd_file == 0);
+	kref_get(&file->f_kref, 1);
+	open_files->fd[slot].fd_file = file;
+	open_files->fd[slot].fd_flags = 0;
 	spin_unlock(&open_files->lock);
 	return slot;
 }
@@ -2130,6 +2169,9 @@ void close_all_files(struct files_struct *open_files, bool cloexec)
 			 * have a valid fdset higher than files */
 			assert(i < open_files->max_files);
 			file = open_files->fd[i].fd_file;
+			/* no file == 9ns uses the FD.  they will deal with it */
+			if (!file)
+				continue;
 			if (cloexec && !(open_files->fd[i].fd_flags & O_CLOEXEC))
 				continue;
 			/* Actually close the file */
@@ -2170,8 +2212,9 @@ void clone_files(struct files_struct *src, struct files_struct *dst)
 			dst->fd[i].fd_file = file;
 			/* hacked in 9ns support - need to copy this FD as well */
 			dst->fd[i].plan9fd = src->fd[i].plan9fd;
-			assert(file);
-			kref_get(&file->f_kref, 1);
+			/* no file means 9ns is using it, they clone separately */
+			if (file)
+				kref_get(&file->f_kref, 1);
 			if (i >= dst->next_fd)
 				dst->next_fd = i + 1;
 		}
