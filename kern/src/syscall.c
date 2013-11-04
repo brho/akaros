@@ -1768,6 +1768,29 @@ intreg_t sys_nunmount(struct proc *p, char *name, int name_l, char *old_path, in
 	return ret;
 }
 
+static int sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
+{
+	int ret;
+	struct chan *ch;
+	ERRSTACK(1);
+	/* UMEM: Check the range, can PF later and kill if the page isn't present */
+	if (!is_user_rwaddr(u_buf, len)) {
+		printk("[kernel] bad user addr %p (+%p) in %s (user bug)\n", u_buf,
+		       len, __FUNCTION__);
+		return -1;
+	}
+	/* fdtochan throws */
+	if (waserror()) {
+		poperror();
+		return -1;
+	}
+	ch = fdtochan(fd, -1, FALSE, TRUE);
+	ret = snprintf(u_buf, len, "%s", chanpath(ch));
+	cclose(ch);
+	poperror();
+	return ret;
+}
+
 /************** Syscall Invokation **************/
 
 const static struct sys_table_entry syscall_table[] = {
@@ -1859,6 +1882,7 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_nmount] ={(syscall_t)sys_nmount, "nmount"},
 	[SYS_nunmount] ={(syscall_t)sys_nunmount, "nunmount"},
 	[SYS_npipe] ={(syscall_t)sys_npipe, "npipe"},
+	[SYS_fd2path] ={(syscall_t)sys_fd2path, "fd2path"},
 
 };
 
