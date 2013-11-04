@@ -490,4 +490,7 @@ int ls_dash_r(char *path);
 extern struct inode_operations dummy_i_op;
 extern struct dentry_operations dummy_d_op;
 
+int put_fd(struct files_struct *open_files, int file_desc);
+int get_fd(struct files_struct *open_files, int low_fd);
+
 #endif /* ROS_KERN_VFS_H */
