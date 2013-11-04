@@ -324,23 +324,6 @@ srvwrite(struct chan *c, void *va, long n, int64_t unused)
 	buf[n] = 0;
 	fd = strtoul(buf, 0, 0);
 
-	struct file *file = get_file_from_fd(&current->open_files, fd);
-	if (!file) {
-		error("%s: %d is a bad akaros fd", Ebadfd, fd);
-	}
-	/* if file succeeds, then we're going to accept the race
-	 * condition on open files. This is all temporary scaffolding
-	 * anyway we hope.
-	 */
-	kref_put(&file->f_kref);
-	/* race. */
-	if (!file->plan9){
-		error("%s: %d is ok, but it's not a plan 9 file", Ebadfd, fd);
-	}
-
-	fd = current->open_files.fd[fd].plan9fd;
-	printd("srv: plan 9 fd is %d\n", fd);
-
 	c1 = fdtochan(fd, -1, 0, 1);	/* error check and inc ref */
 
 	qlock(&srvlk);

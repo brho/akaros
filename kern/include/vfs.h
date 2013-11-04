@@ -285,8 +285,6 @@ struct file {
 	int fd; // all it contains is an appserver fd (for pid 0, aka kernel)
 	int refcnt;
 	spinlock_t lock;
-	/* Plan 9 support. Whether it is plan 9 is a property of the file. */
-	int plan9;
 };
 
 struct file_operations {
@@ -380,8 +378,6 @@ struct small_fd_set {
 struct file_desc {
 	struct file					*fd_file;
 	unsigned int				fd_flags;
-	/* since 0 is valid ... */
-	int plan9fd;
 };
 
 /* All open files for a process */

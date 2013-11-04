@@ -1931,12 +1931,6 @@ struct file *alloc_file(void)
 		set_errno(ENOMEM);
 		return 0;
 	}
-	/* The VFS doesn't know about the plan9 flag, so users of alloc_file might
-	 * not know to 0 this flag.  And if they don't, the file might get sent to
-	 * the 9ns code.  Note that the slab allocator doesn't 0 things (if we
-	 * wanted that, we could use a constructor! (p.s., those haven't been tested
-	 * in a long time...)). */
-	file->plan9 = 0;
 	/* one for the ref passed out*/
 	kref_init(&file->f_kref, file_release, 1);
 	return file;
@@ -2001,15 +1995,6 @@ void file_release(struct kref *kref)
 {
 	struct file *file = container_of(kref, struct file, f_kref);
 
-	if (file->plan9) {
-		if (file->plan9 != 0xcafebeef) {
-			printk("corruption. file->plan9 is 0x%x, expected 0xcafebeef\n",
-				file->plan9);
-		}
-		file->plan9 = 0;
-		kmem_cache_free(file_kcache, file);
-		return;
-	}
 	struct super_block *sb = file->f_dentry->d_sb;
 	spin_lock(&sb->s_lock);
 	TAILQ_REMOVE(&sb->s_files, file, f_list);
@@ -2088,7 +2073,6 @@ struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
 			assert(file_desc < open_files->max_files);
 			file = open_files->fd[file_desc].fd_file;
 			open_files->fd[file_desc].fd_file = 0;
-			open_files->fd[file_desc].plan9fd = -1;
 			assert(file);	/* 9ns shouldn't call this put */
 			kref_put(&file->f_kref);
 			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc);
@@ -2176,7 +2160,6 @@ void close_all_files(struct files_struct *open_files, bool cloexec)
 				continue;
 			/* Actually close the file */
 			open_files->fd[i].fd_file = 0;
-			open_files->fd[i].plan9fd = -1;
 			assert(file);
 			kref_put(&file->f_kref);
 			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, i);
@@ -2210,8 +2193,6 @@ void clone_files(struct files_struct *src, struct files_struct *dst)
 			assert(i < dst->max_files && dst->fd[i].fd_file == 0);
 			SET_BITMASK_BIT(dst->open_fds->fds_bits, i);
 			dst->fd[i].fd_file = file;
-			/* hacked in 9ns support - need to copy this FD as well */
-			dst->fd[i].plan9fd = src->fd[i].plan9fd;
 			/* no file means 9ns is using it, they clone separately */
 			if (file)
 				kref_get(&file->f_kref, 1);

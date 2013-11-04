@@ -109,6 +109,8 @@ void fdclose(int fd, int flag)
 	if (fd == f->maxfd)
 		for (i = fd; --i >= 0 && f->fd[i] == 0;)
 			f->maxfd = i;
+	/* hack: give the FD back to VFS */
+	put_fd(&current->open_files, fd);
 
 	spin_unlock(&f->lock);
 	cclose(c);
@@ -175,9 +177,14 @@ int findfreefd(struct fgrp *f, int start)
 {
 	int fd;
 
+	#if 0  /* this is the normal plan9 way */
 	for (fd = start; fd < f->nfd; fd++)
 		if (f->fd[fd] == 0)
 			break;
+	#else /* hack: ask the VFS for a free fd */
+	fd = get_fd(&current->open_files, start);
+	assert(f->fd[fd] == 0);
+	#endif
 	if (fd >= f->nfd && growfd(f, fd) < 0)
 		return -1;
 	return fd;
@@ -949,6 +956,7 @@ int sysdup(int ofd, int nfd)
 	poperror();
 
 	if (nfd != -1) {
+		panic("Need to sync with VFS");
 		f = current->fgrp;
 		spin_lock(&f->lock);
 		if (f->closed) {
@@ -1286,7 +1294,7 @@ int syspipe(int *pfd)
 		cclose(c[0]);
 		if(c[1])
 			cclose(c[1]);
-		nexterror();
+		return -1;
 	}
 	c[1] = cclone(c[0]);
 	if(walk(&c[0], datastr+0, 1, 1, NULL) < 0)

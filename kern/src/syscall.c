@@ -1128,18 +1128,8 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 {
 	ssize_t ret;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
-	if (!file) {
-		set_errno(EBADF);
-		return -1;
-	}
-	/* if file succeeds, then we're going to accept the race
-	 * condition on open files. This is all temporary scaffolding
-	 * anyway we hope.
-	 */
-	if (file->plan9){
-	    ret = sysread(p->open_files.fd[fd].plan9fd, buf, len, ~0LL);
-	    printd("plan 9 read returns %d\n", ret);
-	} else {
+	/* VFS */
+	if (file) {
 		if (!file->f_op->read) {
 			kref_put(&file->f_kref);
 			set_errno(EINVAL);
@@ -1150,8 +1140,11 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 		 * pin the region here, so read doesn't worry about
 		 * it */
 		ret = file->f_op->read(file, buf, len, &file->f_pos);
+		kref_put(&file->f_kref);
+		return ret;
 	}
-	kref_put(&file->f_kref);
+	/* plan9, should also handle errors (EBADF) */
+    ret = sysread(fd, buf, len, ~0LL);
 	return ret;
 }
 
@@ -1159,16 +1152,8 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 {
 	ssize_t ret;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
-
-	if (!file) {
-		set_errno(EBADF);
-		return -1;
-	}
-	if (file->plan9){
-		ret = syswrite(p->open_files.fd[fd].plan9fd, (void*)buf, len, (off_t) -1);
-		printd("plan 9 write returns %d\n", ret);
-	} else {
-		
+	/* VFS */
+	if (file) {
 		if (!file->f_op->write) {
 			kref_put(&file->f_kref);
 			set_errno(EINVAL);
@@ -1176,8 +1161,11 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 		}
 		/* TODO: (UMEM) */
 		ret = file->f_op->write(file, buf, len, &file->f_pos);
+		kref_put(&file->f_kref);
+		return ret;
 	}
-	kref_put(&file->f_kref);
+	/* plan9, should also handle errors */
+	ret = syswrite(fd, (void*)buf, len, (off_t) -1);
 	return ret;
 }
 
@@ -1192,7 +1180,7 @@ static bool is_9path(char *path)
 static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
                          int oflag, int mode)
 {
-	int fd, plan9fd = -1;
+	int fd;
 	struct file *file;
 
 	printd("File %s Open attempt oflag %x mode %x\n", path, oflag, mode);
@@ -1201,31 +1189,17 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 		return -1;
 	mode &= ~p->fs_env.umask;
 	file = do_file_open(t_path, oflag, mode);
-	if (!file && is_9path(t_path)) {
-		plan9fd = sysopen(t_path, oflag);
-		if (plan9fd >= 0) {
-			file = alloc_file();
-			if (!file) {
-				user_memdup_free(p, t_path);
-				return -1;
-			}
-			printd("SYS_OPEN plan 9 open %s %x\n", t_path, plan9fd);
-		}
+	/* VFS */
+	if (file) {
+		fd = insert_file(&p->open_files, file, 0);	/* stores the ref to file */
+		kref_put(&file->f_kref);	/* drop our ref */
+		if (fd < 0)
+			warn("File insertion failed");
+	} else {
+		/* 9ns (checking all, not just the old /9s */
+		fd = sysopen(t_path, oflag);
 	}
 	user_memdup_free(p, t_path);
-	/* check for a file that tracks either a 9ns file or VFS file */
-	if (!file)
-		return -1;
-	fd = insert_file(&p->open_files, file, 0);	/* stores the ref to file */
-	if (plan9fd > -1){
-		file->plan9 = 0xcafebeef;
-		p->open_files.fd[fd].plan9fd = plan9fd;
-	}
-	kref_put(&file->f_kref);
-	if (fd < 0) {
-		warn("File insertion failed");
-		return -1;
-	}
 	printd("File %s Open, fd=%d\n", path, fd);
 	return fd;
 }
@@ -1234,30 +1208,16 @@ static intreg_t sys_close(struct proc *p, int fd)
 {
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	int retval = 0;
-	/* VFS file check */
-	if (!file) {
-		set_errno(EBADF);
-		return -1;
-	}
 	printd("sys_close %d\n", fd);
-	if (file->plan9) {
-		/* file will get freed when its last ref releases (should be in
-		 * put_file_from).  sysclose internally does its own EBADF checks. */
-		retval = sysclose(p->open_files.fd[fd].plan9fd);
-		p->open_files.fd[fd].plan9fd = -1;
+	/* VFS */
+	if (file) {
+		put_file_from_fd(&p->open_files, fd);
+		kref_put(&file->f_kref);	/* Drop the ref from get_file */
+		return 0;
 	}
-	kref_put(&file->f_kref);	/* Drop the ref from get_file */
-	/* Bail out early if sysclose aborted */
-	if (retval)
-		return retval;
-	/* Still need to pull it from the table, for any type */
-	file = put_file_from_fd(&p->open_files, fd);
-	/* Need to check again, slight chance we lost a race */
-	if (!file) {
-		set_errno(EBADF);
-		return -1;
-	}
-	return 0;
+	/* 9ns, should also handle errors (bad FD, etc) */
+	retval = sysclose(fd);
+	return retval;
 }
 
 /* kept around til we remove the last ufe */
@@ -1268,27 +1228,23 @@ static intreg_t sys_close(struct proc *p, int fd)
 static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 {
 	struct kstat *kbuf;
-	
-	struct file *file = get_file_from_fd(&p->open_files, fd);
-	if (!file) {
-	    set_errno(EBADF);
-	    return -1;
-	}
-
+	struct file *file;
 	kbuf = kmalloc(sizeof(struct kstat), 0);
 	if (!kbuf) {
-		kref_put(&file->f_kref);
 		set_errno(ENOMEM);
 		return -1;
 	}
-	if (file->plan9){
-		int r;
-	    r = sysfstat(p->open_files.fd[fd].plan9fd, (uint8_t*)kbuf, sizeof(*kbuf));
-	    printd("sysfstat returns %d\n", r);
-	} else {
+	file = get_file_from_fd(&p->open_files, fd);
+	/* VFS */
+	if (file) {
 		stat_inode(file->f_dentry->d_inode, kbuf);
+		kref_put(&file->f_kref);
+	} else {
+	    if (sysfstat(fd, (uint8_t*)kbuf, sizeof(*kbuf)) < 0) {
+			kfree(kbuf);
+			return -1;
+		}
 	}
-	kref_put(&file->f_kref);
 	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
 	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
 		kfree(kbuf);
@@ -1357,36 +1313,33 @@ static intreg_t sys_lstat(struct proc *p, const char *path, size_t path_l,
 intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 {
 	int retval = 0;
-	int newplan9fd = -1, newfd;
-
+	int newfd;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
-	struct file *newfile;
+
 	if (!file) {
+		/* 9ns hack */
+		switch (cmd) {
+			case (F_DUPFD):
+				return sysdup(fd, -1);
+			case (F_GETFD):
+			case (F_SETFD):
+			case (F_GETFL):
+			case (F_SETFL):
+				return 0;
+			default:
+				warn("Unsupported fcntl cmd %d\n", cmd);
+		}
+		/* not really ever calling this, even for badf, due to the switch */
 		set_errno(EBADF);
 		return -1;
 	}
 
 	switch (cmd) {
 		case (F_DUPFD):
-			if (file->plan9)
-				retval = sysdup(p->open_files.fd[fd].plan9fd, -1);
-			if (retval < 0) {
-				set_errno(-retval);
-				retval = -1;
-			} else
-				newplan9fd = retval;
 			retval = insert_file(&p->open_files, file, arg);
 			if (retval < 0) {
-				if (file->plan9)
-					sysclose(newplan9fd);
 				set_errno(-retval);
 				retval = -1;
-			}
-			if (file->plan9){
-				newfd = retval;
-				p->open_files.fd[newfd].plan9fd = newplan9fd;
-				printd("fcntl dup: set newfd %d -> plan9 fd %d\n",
-					newfd, newplan9fd);
 			}
 			break;
 		case (F_GETFD):
@@ -1766,52 +1719,12 @@ intreg_t sys_nbind(struct proc *p,
 	return ret;
 }
 
-/* int npipe(int *fd)
- * the error handling sucks because I keep hoping this whole layer
- * is going away soon.
- *
- */
+/* int npipe(int *fd) */
 intreg_t sys_npipe(struct proc *p, int *retfd)
 
 {
-	struct file *f1, *f2;
-	int fd[2], newfd;
-	int ret;
-	/* TODO: validate addresses */
-	ret = syspipe(fd);
-	/* if we're here, it worked. */
-	f1 = alloc_file();
-	if (!f1) {
-		/* leak */
-		return -1;
-	}
-	f2 = alloc_file();
-	if (!f2) {
-		/* leak */
-		return -1;
-	}
-
-	newfd = insert_file(&p->open_files, f1, 0);	/* stores the ref to file */
-	f1->plan9 = 0xcafebeef;
-	p->open_files.fd[newfd].plan9fd = fd[0];
-	retfd[0] = newfd;
-
-	if (newfd < 0) {
-		warn("f1: File insertion failed");
-	}
-
-	newfd = insert_file(&p->open_files, f2, 0);	/* stores the ref to file */
-	f2->plan9 = 0xcafebeef;
-	p->open_files.fd[newfd].plan9fd = fd[1];
-	retfd[1] = newfd;
-
-	if (newfd < 0) {
-		warn("f2: ile insertion failed");
-	}
-
-	kref_put(&f1->f_kref);
-	kref_put(&f2->f_kref);
-	return 0;
+	/* TODO: validate addresses of retfd (UMEM) */
+	return syspipe(retfd);
 }
 
 /* int mount(int fd, int afd, char* onto_path, int flag, char* aname); */
