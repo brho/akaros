@@ -102,6 +102,15 @@ void set_errno(int errno)
 		pcpui->cur_kthread->sysc->err = errno;
 }
 
+void unset_errno(void)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	if (!pcpui->cur_kthread || !pcpui->cur_kthread->sysc)
+		return;
+	pcpui->cur_kthread->sysc->err = 0;
+	pcpui->cur_kthread->sysc->errstr[0] = '\0';
+}
+
 void set_errstr(char *fmt, ...)
 {
 	va_list ap;
@@ -317,6 +326,7 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
+	/* TODO: 9ns support */
 	program = do_file_open(t_path, 0, 0);
 	user_memdup_free(p, t_path);
 	if (!program)
@@ -553,6 +563,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	pcpui->cur_ctx = 0;
 	enable_irqsave(&state);
 	/* This could block: */
+	/* TODO: 9ns support */
 	program = do_file_open(t_path, 0, 0);
 	user_memdup_free(p, t_path);
 	if (!program)
@@ -1196,6 +1207,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 		if (fd < 0)
 			warn("File insertion failed");
 	} else {
+		unset_errno();	/* Go can't handle extra errnos */
 		/* 9ns (checking all, not just the old /9s */
 		fd = sysopen(t_path, oflag);
 	}
@@ -1279,6 +1291,7 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 		kref_put(&path_d->d_kref);
 	} else if (is_9path(t_path)) {
 		/* VFS failed, checking 9ns */
+		unset_errno();	/* Go can't handle extra errnos */
 		retval = sysstat(t_path, (uint8_t*)kbuf, sizeof(*kbuf));
 		printd("sysstat returns %d\n", retval);
 		/* both VFS and 9ns failed, bail out */
@@ -1371,6 +1384,7 @@ static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
+	/* TODO: 9ns support */
 	retval = do_access(t_path, mode);
 	user_memdup_free(p, t_path);
 	printd("Access for path: %s retval: %d\n", path, retval);
@@ -1394,6 +1408,7 @@ intreg_t sys_chmod(struct proc *p, const char *path, size_t path_l, int mode)
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
+	/* TODO: 9ns support */
 	retval = do_chmod(t_path, mode);
 	user_memdup_free(p, t_path);
 	if (retval < 0) {
@@ -1453,6 +1468,7 @@ intreg_t sys_unlink(struct proc *p, const char *path, size_t path_l)
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
+	/* TODO: 9ns support */
 	retval = do_unlink(t_path);
 	user_memdup_free(p, t_path);
 	return retval;
@@ -1485,6 +1501,7 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (t_path == NULL)
 		return -1;
+	/* TODO: 9ns support */
 	path_d = lookup_dentry(t_path, 0);
 	user_memdup_free(p, t_path);
 	if (!path_d)
@@ -1506,6 +1523,7 @@ intreg_t sys_chdir(struct proc *p, const char *path, size_t path_l)
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
+	/* TODO: 9ns support */
 	retval = do_chdir(&p->fs_env, t_path);
 	user_memdup_free(p, t_path);
 	if (retval) {
@@ -1536,6 +1554,7 @@ intreg_t sys_mkdir(struct proc *p, const char *path, size_t path_l, int mode)
 	if (!t_path)
 		return -1;
 	mode &= ~p->fs_env.umask;
+	/* TODO: 9ns support */
 	retval = do_mkdir(t_path, mode);
 	user_memdup_free(p, t_path);
 	return retval;
@@ -1547,6 +1566,7 @@ intreg_t sys_rmdir(struct proc *p, const char *path, size_t path_l)
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
+	/* TODO: 9ns support */
 	retval = do_rmdir(t_path);
 	user_memdup_free(p, t_path);
 	return retval;
