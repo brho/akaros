@@ -15,62 +15,32 @@
 
 enum {
 	Qdir = 0,
-	Qbin = 0x1000,
-	Qlib = 0x2000,
 
-	Nrootfiles = 32,
-	Nbinfiles = 256,
-	Nlibfiles = 256,
+	Nfilesperdirtab = 128,
+	Nfiles = 16384,
 };
 
 struct dirlist {
-	unsigned int base;
-	struct dirtab *dir;
-	uint8_t **data;
+	struct dirtab *me, *dot, *dotdot;
 	int ndir;
 	int mdir;
+	uint8_t *data;
 };
 
-static struct dirtab rootdir[Nrootfiles] = {
+static int nextdirent = 1;
+
+static struct dirtab rootdir[Nfilesperdirtab] = {
 	{"#/", {Qdir, 0, QTDIR}, 0, DMDIR | 0555},
-	{"bin", {Qbin, 0, QTDIR}, 0, DMDIR | 0555},
-	{"lib", {Qlib, 0, QTDIR}, 0, DMDIR | 0555},
 };
 
-static uint8_t *rootdata[Nrootfiles];
-static struct dirlist rootlist = {
-	0,
-	rootdir,
-	rootdata,
-	3,
-	Nrootfiles
+/* statically allocate all the dirlist structs.
+ * dynamically allocate dirtabs. Memory is cheap,
+ * let's be cache friendly when we can.
+ */
+static struct dirlist all[Nfiles] = {
+	{&rootdir[0], &rootdir[0], &rootdir[0], 1, Nfilesperdirtab, NULL},
 };
-
-static struct dirtab bindir[Nbinfiles] = {
-	{"bin", {Qbin, 0, QTDIR}, 0, DMDIR | 0555},
-};
-
-static uint8_t *bindata[Nbinfiles];
-static struct dirlist binlist = {
-	Qbin,
-	bindir,
-	bindata,
-	1,
-	Nbinfiles
-};
-
-static struct dirtab libdir[Nlibfiles] = {
-	{"lib", {Qlib, 0, QTDIR}, 0, DMDIR | 0555},
-};
-
-static uint8_t *libdata[Nlibfiles];
-static struct dirlist liblist = {
-	Qlib,
-	libdir,
-	libdata,
-	1,
-	Nlibfiles
-};
+static struct dirlist *rootlist = &all[0];
 
 /*
  *  add a file to the list
@@ -79,23 +49,47 @@ static int
 addlist(struct dirlist *l, char *name, uint8_t * contents, uint32_t len,
 		int perm)
 {
-	struct dirtab *d;
+	struct dirtab *dot = l->dot;
+	struct dirtab *me;
+	struct dirlist *newl;
+	int mydirent;
+	int newtype = 0;
 
+	if (nextdirent >= Nfiles)
+		panic("Too many files; max %d\n", Nfiles);
 	if (l->ndir >= l->mdir)
-		panic("too many root files");
-	l->data[l->ndir] = contents;
-	d = &l->dir[l->ndir];
-	strncpy(d->name, name, sizeof(d->name));
-	d->length = len;
-	d->perm = perm;
-	d->qid.type = 0;
-	d->qid.vers = 0;
-	d->qid.path = ++l->ndir + l->base;
+		return -1;
+	mydirent = nextdirent++;
+	/* TODO: next dirent should be a kref_t */
+	newl = &all[mydirent];
+	newl->data = contents;
+	me = &dot[l->ndir];
 	if (perm & DMDIR) {
-		d->qid.type |= QTDIR;
+		newl->me = kmalloc(sizeof(struct dirtab)*Nfilesperdirtab,KMALLOC_WAIT);
+		newl->dot = newl->me;
+		newl->ndir = 1; /* me */
+		newtype = QTDIR;
+		newl->dot[0].qid.type = QTDIR;
+		newl->dot[0].qid.vers = 0;
+		newl->dot[0].qid.path = mydirent;
+		newl->dot[0].name[0] = '.';
+		perm |= DMDIR;
+		newl->dot[0].perm = perm;
+		newl->mdir = Nfilesperdirtab;
+	} else {
+		newl->dot = l->dot;
+		newl->me = me;
+		newl->dotdot = l->dotdot;
 	}
-	printd("Added %s, path %d\n", name, d->qid.path);
-	return d->qid.path;
+	l->ndir++;
+	strncpy(me->name, name, sizeof(me->name));
+	me->length = len;
+	me->perm = perm;
+	me->qid.type = newtype;
+	me->qid.vers = 0;
+	me->qid.path = mydirent;
+	printd("Added %s, path %d\n", name, me->qid.path);
+	return me->qid.path;
 }
 
 /*
@@ -111,11 +105,13 @@ int addfile(struct dirlist *d, char *name, uint8_t * contents, uint32_t len)
  */
 static int addrootdir(char *name)
 {
-	return addlist(&rootlist, name, NULL, 0, DMDIR | 0555);
+	return addlist(rootlist, name, NULL, 0, DMDIR | 0555);
 }
 
 static void rootreset(void)
 {
+	addrootdir("bin");
+	addrootdir("lib");
 	addrootdir("dev");
 	addrootdir("env");
 	addrootdir("fd");
@@ -125,12 +121,6 @@ static void rootreset(void)
 	addrootdir("proc");
 	addrootdir("root");
 	addrootdir("srv");
-	addfile(&binlist, "hi", (uint8_t *) "this is bin", strlen("this is bin"));
-	addfile(&liblist, "hilib", (uint8_t *) "this is lib",
-			strlen("this is lib"));
-	void *c = kmalloc(32, KMALLOC_WAIT);
-	strncpy(c, "write me", 8);
-	addfile(&liblist, "writeme", c, 32);
 }
 
 static struct chan *rootattach(char *spec)
@@ -144,66 +134,27 @@ rootgen(struct chan *c, char *name, struct dirtab *unused_d, int unused_i,
 {
 	int t;
 	struct dirtab *d;
-	struct dirlist *l;
+	struct dirlist *l = &all[(int)c->qid.path];
+	printd("rootgen: l %p %d\n", l,(int)c->qid.path);
 	/* for directories, set c->aux to devlist, for later use in create() */
-	switch ((int)c->qid.path) {
-		case Qdir:
-			if (s == DEVDOTDOT) {
-				devdir(c, (struct qid){Qdir, 0, QTDIR}, "#/", 0, eve, 0555,
-				       dp);
-				return 1;
-			}
-			return devgen(c, name, rootlist.dir, rootlist.ndir, s, dp);
-		case Qbin:
-			if (s == DEVDOTDOT) {
-				devdir(c, (struct qid){Qdir, 0, QTDIR}, "#/", 0, eve, 0555,
-				       dp);
-				return 1;
-			}
-			return devgen(c, name, binlist.dir, binlist.ndir, s, dp);
-		case Qlib:
-			if (s == DEVDOTDOT) {
-				devdir(c, (struct qid){Qlib, 0, QTDIR}, "#/", 0, eve, 0555,
-				       dp);
-				return 1;
-			}
-			return devgen(c, name, liblist.dir, liblist.ndir, s, dp);
-		default:
-			if (s == DEVDOTDOT) {
-				/* doing the same thing here in all cases... is that right? */
-				if ((int)c->qid.path < Qbin) {
-					devdir(c, (struct qid){Qdir, 0, QTDIR}, "#/", 0, eve, 0555,
-					       dp);
-				} else if ((int)c->qid.path < Qlib) {
-					devdir(c, (struct qid){Qdir, 0, QTDIR}, "#/", 0, eve, 0555,
-					       dp);
-				} else {
-					devdir(c, (struct qid){Qlib, 0, QTDIR}, "#/", 0, eve, 0555,
-					       dp);
-				}
-				return 1;
-			}
-			if (s != 0)
-				return -1;
-			if ((int)c->qid.path < Qbin) {
-				t = c->qid.path - 1;
-				l = &rootlist;
-			} else if ((int)c->qid.path < Qlib) {
-				t = c->qid.path - Qbin - 1;
-				l = &binlist;
-
-			} else {
-				t = c->qid.path - Qlib - 1;
-				l = &liblist;
-			}
-			if (t >= l->ndir)
-				return -1;
-			/* Old panic of Ron's */
-			assert(t >= 0);
-			d = &l->dir[t];
-			devdir(c, d->qid, d->name, d->length, eve, d->perm, dp);
-			return 1;
+	printd("rootgen: s %d, DEVDOTDOT %d\n", s, DEVDOTDOT);
+	if (s == DEVDOTDOT){
+		/* TODO: path */
+		devdir(c, l->dotdot->qid, l->me->name, 0, eve, 0555, dp);
+		return 1;
 	}
+	if (c->qid.type & QTDIR){
+		printd("devgen dir c %p l %p name %s ndir %d\n", c, l, name, l->ndir);
+		return devgen(c, name, l->me, l->ndir, s, dp);
+	}
+
+	t = c->qid.path;
+	printd("rootgen: path %d\n", t);
+
+	d = l->me;
+	printd("rootgen: devdir %s\n", name);
+	devdir(c, d->qid, d->name, d->length, eve, d->perm, dp);
+	return 1;
 }
 
 static struct walkqid *rootwalk(struct chan *c, struct chan *nc, char **name,
@@ -211,8 +162,7 @@ static struct walkqid *rootwalk(struct chan *c, struct chan *nc, char **name,
 {
 	struct walkqid *ret;
 	ret = devwalk(c, nc, name, nname, NULL, 0, rootgen);
-	printd("rootwalk c %p c->aux %p binlist %p\n", c, c ? c->aux : NULL,
-		   &binlist);
+	printd("rootwalk c %p c->aux %p \n", c, c ? c->aux : NULL);
 	return ret;
 }
 
@@ -233,13 +183,8 @@ static void rootcreate(struct chan *c, char *name, int omode, int perm)
 	if (omode & DMDIR)
 		error("no dir creation yet");
 
-	if ((int)c->qid.path < Qbin) {
-		l = &rootlist;
-	} else if ((int)c->qid.path < Qlib) {
-		l = &binlist;
-	} else {
-		l = &liblist;
-	}
+	l = &all[(int)c->qid.path];
+
 	omode = openmode(omode);
 	/* let's hope somebody checked to see if it existed yet. */
 	path = addfile(l, name, NULL, 0);
@@ -272,29 +217,14 @@ static long rootread(struct chan *c, void *buf, long n, int64_t off)
 	uint32_t offset = off;
 
 	t = c->qid.path;
-	switch (t) {
-		case Qdir:
-		case Qbin:
-		case Qlib:
-			return devdirread(c, buf, n, NULL, 0, rootgen);
+	l = &all[t];
+	if (c->qid.type & QTDIR){
+		return devdirread(c, buf, n, NULL, 0, rootgen);
 	}
-
-	if (t < Qbin)
-		l = &rootlist;
-	else if (t < Qlib) {
-		t -= Qbin;
-		l = &binlist;
-	} else {
-		t -= Qlib;
-		l = &liblist;
-	}
-
+	d = l->me;
 	t--;
-	if (t >= l->ndir)
-		error(Egreg);
 
-	d = &l->dir[t];
-	data = l->data[t];
+	data = l->data;
 	if (offset >= d->length)
 		return 0;
 	if (offset + n > d->length)
@@ -311,35 +241,19 @@ static long rootwrite(struct chan *c, void *v, long len, int64_t o)
 	uint8_t *data;
 
 	t = c->qid.path;
-	switch (t) {
-		case Qdir:
-		case Qbin:
-		case Qlib:
-			error(Eisdir);
-			return -1;
+	l = &all[t];
+	if (c->qid.type & QTDIR){
+		error(Eisdir);
+		return -1;
 	}
 
-	if (t < Qbin)
-		l = &rootlist;
-	else if (t < Qlib) {
-		t -= Qbin;
-		l = &binlist;
-	} else {
-		t -= Qlib;
-		l = &liblist;
-	}
-
-	t--;
-	if (t >= l->ndir)
-		error(Egreg);
-
-	d = &l->dir[t];
-	data = l->data[t];
+	d = l->me;
+	data = l->data;
 	if (o < 0)
 		o = d->length;
 	if ((o + len) > d->length) {
 		void *newdata = kmalloc(o + len, KMALLOC_WAIT);
-		l->data[t] = newdata;
+		l->data = newdata;
 		memmove(newdata, data, d->length);
 		kfree(data);
 		data = newdata;

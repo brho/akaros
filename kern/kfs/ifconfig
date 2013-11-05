@@ -42,11 +42,12 @@ route=10.0.2.2
 #/boot/echo -n sys > '#c/hostowner'
 #/boot/paqfs -p -S $beetroot -m /boot -q /boot/$beetroot
 #cd /boot/$cputype/bin
-bind '#c' /dev
+bind -b '#c' /dev
 #bind '#d' /fd
 #bind -c '#e' /env
-bind '#p' /proc
-#bind -c '#s' /srv
+bind -b '#p' /proc
+#bind -b -c '#s' /srv
+bind -b '#s' /srv
 
 #
 # Configure the networks.
