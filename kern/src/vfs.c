@@ -1348,8 +1348,10 @@ struct file *do_file_open(char *path, int flags, int mode)
 open_the_file:
 	/* now open the file (freshly created or if it already existed).  At this
 	 * point, file_d is a refcnt'd dentry, regardless of which branch we took.*/
-	if (flags & O_TRUNC)
-		warn("File truncation not supported yet.");
+	if (flags & O_TRUNC) {
+		file_d->d_inode->i_size = 0;
+		/* TODO: probably should remove the garbage pages from the page map */
+	}
 	file = dentry_open(file_d, flags);				/* sets errno */
 	/* Note the fall through to the exit paths.  File is 0 by default and if
 	 * dentry_open fails. */
