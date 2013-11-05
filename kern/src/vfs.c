@@ -1973,8 +1973,8 @@ struct file *dentry_open(struct dentry *dentry, int flags)
 	kref_get(&inode->i_sb->s_mount->mnt_kref, 1);
 	file->f_vfsmnt = inode->i_sb->s_mount;		/* saving a ref to the vmnt...*/
 	file->f_op = inode->i_fop;
-	/* Don't store open mode or creation flags */
-	file->f_flags = flags & ~(O_ACCMODE | O_CREAT_FLAGS);
+	/* Don't store creation flags */
+	file->f_flags = flags & ~O_CREAT_FLAGS;
 	file->f_pos = 0;
 	file->f_uid = inode->i_uid;
 	file->f_gid = inode->i_gid;
