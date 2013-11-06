@@ -276,7 +276,7 @@ main(int argc, char *argv[])
 
 	snprintf(servefile, sizeof(servefile), "#s/cs%s", ext);
 	snprintf(netndb, sizeof(netndb), "%s/ndb", mntpt);
-	syscall(SYS_nunmount, servefile, mntpt);
+	syscall(SYS_nunmount, (unsigned long)servefile, (unsigned long)mntpt);
 	remove(servefile);
 
 	ndbinit();
@@ -310,27 +310,6 @@ setext(char *ext, int n, char *p)
 	ext[i] = 0;
 }
 
-static int _9pipe(int *fd)
-{
-	int ret;
-	ret = syscall(SYS_nbind, "#P", 2, "/bin", 4, 1);
-	if (ret < 0){
-		error(1, 0, "%s: %r","bind %r");
-		exit(1);
-	}
-	fd[0] = open("/bin/data", O_RDWR);
-	if (fd[0] < 0){
-		error(1, 0, "%s: %r","data %r");
-		exit(1);
-	}
-
-	fd[1] = open("/bin/data", O_RDWR);
-	if (fd[1] < 0){
-		error(1, 0, "%s: %r","data1 %r");
-		exit(1);
-	}
-
-}
 void
 mountinit(char *service, char *mntpt)
 {
@@ -339,7 +318,7 @@ mountinit(char *service, char *mntpt)
 	char buf[32];
 	int ret;
 
-	ret = syscall(SYS_npipe, p);
+	ret = syscall(SYS_npipe, (unsigned long)p);
 	if (ret < 0){
 		error(1, 0, "pipe: %r");
 		exit(1);
@@ -357,25 +336,10 @@ printf("open %s gets %d\n", service, f);
 	if(write(f, buf, strlen(buf)) != strlen(buf))
 		error(1, 0, "Write %s: %r", service);
 	/* using #s: we create a pipe and drop it into #s. 
-	 * then we do the mount with that pipe. 
+	 * we no longer mount. That's up to you.
 	 * #s will route requests to us.
 	 */
-	switch(fork()){
-	case 0:
-		close(p[1]);
-		break;
-	case -1:
-		error(1, 0, "%s: %r","fork failed\n");
-	default:
-		/*
-		 *  put ourselves into the file system
-		 */
-		close(p[0]);
-		ret = syscall(SYS_nmount, p[1], -1, "/net", 4, /*mntpt, strlen(mntpt), */2, "", 0);
-		if(ret < 0)
-			error(1, 0, "%s: %r","mount failed");
-		exit(1);
-	}
+	close(p[1]);
 
 	mfd[0] = mfd[1] = p[0];
 }
@@ -423,6 +387,9 @@ newjob(void)
 	Job *job;
 
 	job = calloc(1, sizeof(Job));
+	if (! job){
+		error(1, 0, "%s: %r","job calloc");
+	}
 #warning "fix lock"
 //	//lock(&joblock);
 	job->next = joblist;
@@ -436,7 +403,7 @@ void
 freejob(Job *job)
 {
 	Job **l;
-
+return;
 	//lock(&joblock);
 	for(l = &joblist; *l; l = &(*l)->next){
 		if((*l) == job){

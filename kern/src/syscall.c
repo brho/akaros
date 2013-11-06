@@ -1749,19 +1749,22 @@ intreg_t sys_npipe(struct proc *p, int *retfd)
 
 /* int mount(int fd, int afd, char* onto_path, int flag, char* aname); */
 intreg_t sys_nmount(struct proc *p,
-                    int fd, int afd,
+                    int fd,
                     char *onto_path, size_t onto_l,
                     unsigned int flag,
+			/* we ignore these */
+			/* no easy way to pass this many args anyway. */
+		    int afd,
                     char *auth, size_t auth_l)
 {
 	int ret;
+
+	afd = -1;
 	char *t_ontopath = user_strdup_errno(p, onto_path, onto_l);
 	if (t_ontopath == NULL)
 		return -1;
-	char *t_auth = user_strdup_errno(p, auth, auth_l);
-	ret = bindmount(1, fd, afd, NULL, t_ontopath, flag, t_auth ? t_auth : "");
+	ret = bindmount(1, fd, afd, NULL, t_ontopath, flag, /* spec or auth */"");
 	user_memdup_free(p, t_ontopath);
-	user_memdup_free(p, t_auth);
 	return ret;
 }
 

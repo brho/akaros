@@ -183,7 +183,7 @@ srvcreate(struct chan *c, char *name, int omode, int perm)
 	poperror();
 
 	kstrdup(&sp->owner, "eve"/*up->user*/);
-	sp->perm = perm&0777;
+	sp->perm = perm&0777 | 0666;
 
 	c->flag |= COPEN;
 	c->mode = OWRITE;
