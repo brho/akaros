@@ -1,5 +1,5 @@
-#ifndef ROS_INC_NDB_H
-#define ROS_INC_NDB_H
+#ifndef ROS_INC_NIXIP_H
+#define ROS_INC_NIXIP_H
 
 #include <ros/common.h>
 
@@ -222,4 +222,4 @@ int accept(int ctl, char *dir);
 int reject(int ctl, char *dir, char *cause);
 
 
-#endif /* ROS_INC_NDB_H */
+#endif /* ROS_INC_NIXIP_H */
