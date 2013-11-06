@@ -371,7 +371,7 @@ printf("open %s gets %d\n", service, f);
 		 *  put ourselves into the file system
 		 */
 		close(p[0]);
-		ret = syscall(SYS_nmount, p[1], -1, mntpt, strlen(mntpt), 2, "", 0);
+		ret = syscall(SYS_nmount, p[1], -1, "/net", 4, /*mntpt, strlen(mntpt), */2, "", 0);
 		if(ret < 0)
 			error(1, 0, "%s: %r","mount failed");
 		exit(1);
@@ -468,10 +468,13 @@ void *job_thread(void* arg)
 	Mfile *mf;
 	Job *job = arg;
 	//lock(&dblock);
+printf("JOB!\n");
 	mf = newfid(job->request.fid);
+
+printf("NEWFID is %p\n", mf);
 	if(debug)
 		fprintf(stderr, "%F", &job->request);
-
+printf("DO %d\n", job->request.type);
 	switch(job->request.type){
 	default:
 		fprintf(stderr, "unknown request type %d", job->request.type);
@@ -552,7 +555,9 @@ io(void)
 		/* stash the thread in the job so we can join them all
 		 * later if we want to.
 		 */
+printf("RUN THAT JOB!\n");
 		if (pthread_create(&job->thread, NULL, &job_thread, job)) {
+printf("ERROR!\n");
 			error(1, 0, "%s: %r","Failed to create job");
 			continue;
 		}

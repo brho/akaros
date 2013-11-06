@@ -1759,11 +1759,7 @@ intreg_t sys_nmount(struct proc *p,
 	if (t_ontopath == NULL)
 		return -1;
 	char *t_auth = user_strdup_errno(p, auth, auth_l);
-	if (t_auth == NULL) {
-		user_memdup_free(p, t_ontopath);
-		return -1;
-	}
-	ret = bindmount(1, fd, afd, NULL, t_ontopath, flag, t_auth);
+	ret = bindmount(1, fd, afd, NULL, t_ontopath, flag, t_auth ? t_auth : "");
 	user_memdup_free(p, t_ontopath);
 	user_memdup_free(p, t_auth);
 	return ret;

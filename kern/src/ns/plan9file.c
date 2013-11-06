@@ -1064,7 +1064,7 @@ bindmount(int ismount,
 	  int flag,
 	  char* spec)
 {
-	ERRSTACK(3);	/* it's still complicated. */
+	ERRSTACK(4);	/* it's still complicated. */
 	int i;
 	struct dev *dev;
 	struct chan *c0, *c1, *ac, *bc;
@@ -1101,7 +1101,6 @@ bindmount(int ismount,
 
 		if(afd >= 0)
 			ac = fdtochan(afd, ORDWR, 0, 1);
-
 		bogus.chan = bc;
 		bogus.authchan = ac;
 
