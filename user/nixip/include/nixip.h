@@ -1,3 +1,8 @@
+#ifndef ROS_INC_NDB_H
+#define ROS_INC_NDB_H
+
+#include <ros/common.h>
+
 enum 
 {
 	IPaddrlen=	16,
@@ -217,3 +222,4 @@ int accept(int ctl, char *dir);
 int reject(int ctl, char *dir, char *cause);
 
 
+#endif /* ROS_INC_NDB_H */

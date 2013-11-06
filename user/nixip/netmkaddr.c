@@ -11,10 +11,14 @@
 
 /*
  *  make an address, add the defaults
+ *
+ *  if you pass in only one ! in linear, this assumes this ! was between the net
+ *  and the host.  if you pass in no !s, we'll build one from defnet/defsrv.
  */
 char *
 netmkaddr(char *linear, char *defnet, char *defsrv)
 {
+	/* TODO: this isn't threadsafe */
 	static char addr[256];
 	char *cp;
 
