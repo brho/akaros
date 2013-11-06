@@ -68,13 +68,10 @@ void main(int argc, char **argv)
 	int fd, msglen, interval, nmsg;
 	char *ds;
 	int pid;
-	char *saddr = "/9/net/tcp!127.0.0.1!2000";
-	char *caddr = "/9/net/tcp!127.0.0.1!2000";
+	char *addr = "/9/net/tcp!127.0.0.1!2000";
 
 	if (argc > 1)
-		saddr = argv[1];
-	if (argc > 2)
-		saddr = argv[2];
+		addr = argv[1];
 	pid = fork();
 	if (pid < 0) {
 		perror("fork");
@@ -84,7 +81,7 @@ void main(int argc, char **argv)
 		/* Attempt to get the caller to dial after the server announces. */
 		for (int i = 0; i < 3; i++)
 			sys_block(1000000);
-		caller(caddr);
+		caller(addr);
 	} else
-		server(saddr);
+		server(addr);
 }
