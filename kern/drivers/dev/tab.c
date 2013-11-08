@@ -81,7 +81,7 @@ struct dev *devtabget(int dc, int user)
 			return devtab[i];
 	}
 
-	printd("devtabget %c\n", dc);
+	printk("devtabget FAILED %c\n", dc);
 	error(Enonexist);
 }
 

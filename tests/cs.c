@@ -522,12 +522,15 @@ io(void)
 		/* stash the thread in the job so we can join them all
 		 * later if we want to.
 		 */
+#if 0
 printf("RUN THAT JOB!\n");
 		if (pthread_create(&job->thread, NULL, &job_thread, job)) {
 printf("ERROR!\n");
 			error(1, 0, "%s: %r","Failed to create job");
 			continue;
 		}
+#endif
+	job_thread(job);
 
 
 	}

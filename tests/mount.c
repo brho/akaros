@@ -37,9 +37,9 @@ void
 main(int argc, char *argv[])
 {
 	char *spec;
-	ulong flag = 0;
+	ulong flag = 1;
 	int qflag = 0;
-	int noauth = 0;
+	int noauth = 1;
 	int fd, rv;
 
 	argv0 = argv[0];
@@ -99,7 +99,7 @@ main(int argc, char *argv[])
 
 
 	if(noauth){
-		rv = syscall(SYS_nmount, fd, -1, argv[1], strlen(argv[1]));
+		rv = syscall(SYS_nmount, fd, argv[1], strlen(argv[1]), flag);
 	}else {
 		printf("auth: not yet\n"); exit(1);
 		//rv = amount0(fd, argv[1], flag, spec, keyspec);
@@ -107,7 +107,7 @@ main(int argc, char *argv[])
 	if(rv < 0){
 		if(qflag)
 			exit(0);
-		fprintf(stderr, "%s: mount %s: %r\n", argv0, argv[1]);
+		fprintf(stderr, "%s: mount %s %r\n", argv0, argv[1]);
 		exit(1);
 	}
 }

@@ -22,7 +22,6 @@
  * and increfs/decrefs mchan to manage references on the server
  * connection.
  */
-
 /* practical data limit: maxioatomic - IOHDRSZ */
 #define MAXRPC (IOHDRSZ+6*8192)
 
@@ -59,6 +58,7 @@ struct mntalloc
 	struct mntrpc*	rpcfree;
 	int	nrpcfree;
 	int	nrpcused;
+#warning "make mntalloc.id a kref"
 	unsigned int	id;
 	uint32_t	tagmask[NMASK];
 }mntalloc;
@@ -89,6 +89,7 @@ void (*mntstats)( int unused_int, struct chan*, uint64_t, uint32_t);
 static void
 mntreset(void)
 {
+	spinlock_init(&mntalloc.lock);
 	mntalloc.id = 1;
 	mntalloc.tagmask[0] = 1;			/* don't allow 0 as a tag */
 	mntalloc.tagmask[NMASK-1] = 0x80000000UL;	/* don't allow NOTAG *//*
@@ -338,7 +339,9 @@ mntattach(char *muxattach)
 			error(Enoversion);
 	}
 
+
 	c = mntchan();
+
 	if(waserror()) {
 		/* Close must not be called since it will
 		 * call mnt recursively
@@ -384,7 +387,8 @@ mntchan(void)
 {
 	struct chan *c;
 
-	c = devattach('M', 0);
+	c = devattach('M', "");
+
 	spin_lock(&mntalloc.lock);
 	c->devno = mntalloc.id++;
 	spin_unlock(&mntalloc.lock);
@@ -791,10 +795,10 @@ mountrpc(struct mnt *mnt, struct mntrpc *r)
 		cn = "?";
 		if(r->c != NULL && r->c->path != NULL)
 			cn = r->c->path->s;
-		printd("mnt: proc %s %d: mismatch from %s %s rep %#p tag %d fid %d T%d R%d rp %d\n",
-			up->text, up->pid, sn, cn,
-			r, r->request.tag, r->request.fid, r->request.type,
-			r->reply.type, r->reply.tag);
+		printk("mnt: proc (name) (pid) : mismatch from %s %s rep %#p tag %d fid %d T%d R%d rp %d\n",
+		       sn, cn,
+		       r, r->request.tag, r->request.fid, r->request.type,
+		       r->reply.type, r->reply.tag);
 		error(Emountrpc);
 	}
 }
@@ -842,23 +846,29 @@ mountio(struct mnt *mnt, struct mntrpc *r)
 		if(mnt->rip == 0)
 			break;
 		spin_unlock(&mnt->lock);
+I_AM_HERE;
 		rendez_sleep(&r->r, rpcattn, r);
+I_AM_HERE;
 		if(r->done){
 			poperror();
 			mntflushfree(mnt, r);
 			return;
 		}
 	}
+I_AM_HERE;
 	mnt->rip = current;
 	spin_unlock(&mnt->lock);
 	while(r->done == 0) {
+I_AM_HERE;
 		if(mntrpcread(mnt, r) < 0)
 			error(Emountrpc);
 		mountmux(mnt, r);
 	}
+I_AM_HERE;
 	mntgate(mnt);
 	poperror();
 	mntflushfree(mnt, r);
+I_AM_HERE;
 }
 
 /* call the device read and fill the queue with blocks from it. */

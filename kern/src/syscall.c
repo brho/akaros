@@ -1751,13 +1751,14 @@ intreg_t sys_npipe(struct proc *p, int *retfd)
 intreg_t sys_nmount(struct proc *p,
                     int fd,
                     char *onto_path, size_t onto_l,
-                    unsigned int flag,
+                    unsigned int flag
 			/* we ignore these */
-			/* no easy way to pass this many args anyway. */
+			/* no easy way to pass this many args anyway. *
 		    int afd,
-                    char *auth, size_t auth_l)
+                    char *auth, size_t auth_l*/)
 {
 	int ret;
+	int afd;
 
 	afd = -1;
 	char *t_ontopath = user_strdup_errno(p, onto_path, onto_l);
