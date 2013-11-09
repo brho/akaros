@@ -10,6 +10,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
+#include <plan9.h>
 #include <fcall.h>
 
 /*
@@ -22,6 +23,7 @@
  * and increfs/decrefs mchan to manage references on the server
  * connection.
  */
+
 /* practical data limit: maxioatomic - IOHDRSZ */
 #define MAXRPC (IOHDRSZ+6*8192)
 
@@ -58,7 +60,6 @@ struct mntalloc
 	struct mntrpc*	rpcfree;
 	int	nrpcfree;
 	int	nrpcused;
-#warning "make mntalloc.id a kref"
 	unsigned int	id;
 	uint32_t	tagmask[NMASK];
 }mntalloc;
@@ -89,26 +90,24 @@ void (*mntstats)( int unused_int, struct chan*, uint64_t, uint32_t);
 static void
 mntreset(void)
 {
-	spinlock_init(&mntalloc.lock);
 	mntalloc.id = 1;
 	mntalloc.tagmask[0] = 1;			/* don't allow 0 as a tag */
-	mntalloc.tagmask[NMASK-1] = 0x80000000UL;	/* don't allow NOTAG *//*
-	fmtinstall('F', fcallfmt);
-	fmtinstall('D', dirfmt);
-									       */
+	mntalloc.tagmask[NMASK-1] = 0x80000000UL;	/* don't allow NOTAG */
+	spinlock_init(&mntalloc.lock);
+	//fmtinstall('F', fcallfmt);
+	//fmtinstall('D', dirfmt);
 /* We can't install %M since eipfmt does and is used in the kernel [sape] */
-/*
+	/* no caching. 
 	if(mfcinit != NULL)
 		mfcinit();
-*/
+	*/
 }
 
 /*
  * Version is not multiplexed: message sent only once per connection.
  */
 unsigned long
-mntversion(struct chan *c, uint32_t msize, char *version,
-	   unsigned long returnlen)
+mntversion(struct chan *c, uint32_t msize, char *version, unsigned long returnlen)
 {
 	ERRSTACK(2);
 	struct fcall f;
@@ -147,7 +146,8 @@ mntversion(struct chan *c, uint32_t msize, char *version,
 		qunlock(&c->umqlock);
 		poperror();
 
-		strncpy(buf, mnt->version, sizeof buf);
+//		strecpy(buf, buf+sizeof buf, mnt->version);
+		strncpy(buf, mnt->version, sizeof(buf));
 		k = strlen(buf);
 		if(strncmp(buf, v, k) != 0){
 			snprintf(buf, sizeof buf, "incompatible 9P versions %s %s", mnt->version, v);
@@ -216,15 +216,15 @@ mntversion(struct chan *c, uint32_t msize, char *version,
 		error("bad 9P version returned from server");
 
 	/* now build Mnt associated with this connection */
-	spin_lock(&mntalloc.lock);
+	spin_lock(&(&mntalloc)->lock);
 	mnt = mntalloc.mntfree;
 	if(mnt != NULL)
 		mntalloc.mntfree = mnt->list;
 	else {
 		mnt = kzmalloc(sizeof(struct mnt), 0);
 		if(mnt == NULL) {
-			spin_unlock(&mntalloc.lock);
-			panic("mount devices");
+			spin_unlock(&(&mntalloc)->lock);
+			panic/*exhausted*/("mount devices");
 		}
 	}
 	mnt->list = mntalloc.list;
@@ -234,7 +234,7 @@ mntversion(struct chan *c, uint32_t msize, char *version,
 	mnt->id = mntalloc.id++;
 	mnt->q = qopen(10*MAXRPC, 0, NULL, NULL);
 	mnt->msize = f.msize;
-	spin_unlock(&mntalloc.lock);
+	spin_unlock(&(&mntalloc)->lock);
 
 	if(returnlen != 0){
 		if(returnlen < k)
@@ -294,7 +294,7 @@ mntauth(struct chan *c, char *spec)
 
 	r->request.type = Tauth;
 	r->request.afid = c->fid;
-	r->request.uname = "eve"; //curretn->user;
+	r->request.uname = "eve";//up->user;
 	r->request.aname = spec;
 	mountrpc(mnt, r);
 
@@ -339,9 +339,7 @@ mntattach(char *muxattach)
 			error(Enoversion);
 	}
 
-
 	c = mntchan();
-
 	if(waserror()) {
 		/* Close must not be called since it will
 		 * call mnt recursively
@@ -376,9 +374,10 @@ mntattach(char *muxattach)
 	mntfree(r);
 
 	poperror();	/* c */
-
-//	if((bogus.flags & MCACHE) && mfcinit != NULL)
-//		c->flag |= CCACHE;
+/*
+	if((bogus.flags & MCACHE) && mfcinit != NULL)
+		c->flag |= CCACHE;
+*/
 	return c;
 }
 
@@ -387,11 +386,10 @@ mntchan(void)
 {
 	struct chan *c;
 
-	c = devattach('M', "");
-
-	spin_lock(&mntalloc.lock);
+	c = devattach('M', 0);
+	spin_lock(&(&mntalloc)->lock);
 	c->devno = mntalloc.id++;
-	spin_unlock(&mntalloc.lock);
+	spin_unlock(&(&mntalloc)->lock);
 
 	if(c->mchan)
 		panic("mntchan non-zero %#p", c->mchan);
@@ -412,8 +410,8 @@ mntwalk(struct chan *c, struct chan *nc, char **name, int nname)
 	if(nname > MAXWELEM)
 		error("devmnt: too many name elements");
 	alloc = 0;
-	wq = kzmalloc(sizeof(struct walkqid) + (nname - 1) *
-		      sizeof(struct qid), 0);
+	wq = kzmalloc(sizeof(struct walkqid) +
+		      (nname - 1) * sizeof(struct qid), 0);
 	if(waserror()){
 		if(alloc && wq->clone!=NULL)
 			cclose(wq->clone);
@@ -549,11 +547,10 @@ mntopencreate(int type, struct chan *c, char *name, int omode, int perm)
 	c->flag |= COPEN;
 	poperror();
 	mntfree(r);
-
-	/* 
+/*
 	if(c->flag & CCACHE)
 		mfcopen(c);
-	*/
+*/
 
 	return c;
 }
@@ -612,7 +609,7 @@ mntpntfree(struct mnt *mnt)
 	struct mnt *f, **l;
 	struct queue *q;
 
-	spin_lock(&mntalloc.lock);
+	spin_lock(&(&mntalloc)->lock);
 	l = &mntalloc.list;
 	for(f = *l; f; f = f->list) {
 		if(f == mnt) {
@@ -624,7 +621,7 @@ mntpntfree(struct mnt *mnt)
 	mnt->list = mntalloc.mntfree;
 	mntalloc.mntfree = mnt;
 	q = mnt->q;
-	spin_unlock(&mntalloc.lock);
+	spin_unlock(&(&mntalloc)->lock);
 
 	qfree(q);
 }
@@ -679,8 +676,9 @@ mntread(struct chan *c, void *buf, long n, int64_t off)
 	}
 
 	p = buf;
+#if 0
 	if(cache) {
-		nc = 0; // mfcread(c, buf, n, off);
+		nc = mfcread(c, buf, n, off);
 		if(nc > 0) {
 			n -= nc;
 			if(n == 0)
@@ -689,10 +687,10 @@ mntread(struct chan *c, void *buf, long n, int64_t off)
 			off += nc;
 		}
 		n = mntrdwr(Tread, c, p, n, off);
-		//mfcupdate(c, p, n, off);
+		mfcupdate(c, p, n, off);
 		return n + nc;
 	}
-
+#endif
 	n = mntrdwr(Tread, c, buf, n, off);
 	if(isdir) {
 		for(e = &p[n]; p+BIT16SZ < e; p += dirlen){
@@ -717,13 +715,12 @@ mntwrite(struct chan *c, void *buf, long n, int64_t off)
 long
 mntrdwr(int type, struct chan *c, void *buf, long n, int64_t off)
 {
-	ERRSTACK(1);
+	ERRSTACK(2);
 	struct mnt *mnt;
  	struct mntrpc *r;
 	char *uba;
 	int cache;
 	uint32_t cnt, nr, nreq;
-	int got;
 
 	mnt = mntchk(c);
 	uba = buf;
@@ -751,11 +748,12 @@ mntrdwr(int type, struct chan *c, void *buf, long n, int64_t off)
 		if(nr > nreq)
 			nr = nreq;
 
-		got = nr;
 		if(type == Tread)
-		  r->b = bl2mem(( uint8_t *)uba, r->b, /*&*/got);
-		//else if(cache)
-		//mfcwrite(c, ( uint8_t *)uba, nr, off);
+			r->b = bl2mem(( uint8_t *)uba, r->b, nr);
+#if 0
+		else if(cache)
+			mfcwrite(c, ( uint8_t *)uba, nr, off);
+#endif
 
 		poperror();
 		mntfree(r);
@@ -763,7 +761,7 @@ mntrdwr(int type, struct chan *c, void *buf, long n, int64_t off)
 		uba += nr;
 		cnt += nr;
 		n -= nr;
-		if(nr != nreq || n == 0 ) // signal pending|| up->nnote)
+		if(nr != nreq || n == 0)// || up->nnote)
 			break;
 	}
 	return cnt;
@@ -795,10 +793,10 @@ mountrpc(struct mnt *mnt, struct mntrpc *r)
 		cn = "?";
 		if(r->c != NULL && r->c->path != NULL)
 			cn = r->c->path->s;
-		printk("mnt: proc (name) (pid) : mismatch from %s %s rep %#p tag %d fid %d T%d R%d rp %d\n",
-		       sn, cn,
-		       r, r->request.tag, r->request.fid, r->request.type,
-		       r->reply.type, r->reply.tag);
+		printd("mnt: proc %s %d: mismatch from %s %s rep %#p tag %d fid %d T%d R%d rp %d\n",
+			up->text, up->pid, sn, cn,
+			r, r->request.tag, r->request.fid, r->request.type,
+			r->reply.type, r->reply.tag);
 		error(Emountrpc);
 	}
 }
@@ -806,16 +804,12 @@ mountrpc(struct mnt *mnt, struct mntrpc *r)
 void
 mountio(struct mnt *mnt, struct mntrpc *r)
 {
-	ERRSTACK(1);
+	ERRSTACK(2);
 	int n;
 
 	while(waserror()) {
 		if(mnt->rip == current)
 			mntgate(mnt);
-		/* TODO: figure out if we had a signal.
-		 * if so, get out of here. For now,
-		 * assume we did.
-		 */
 		if(/*strcmp(up->errstr, Eintr) != 0*/1){
 			mntflushfree(mnt, r);
 			nexterror();
@@ -846,32 +840,25 @@ mountio(struct mnt *mnt, struct mntrpc *r)
 		if(mnt->rip == 0)
 			break;
 		spin_unlock(&mnt->lock);
-I_AM_HERE;
 		rendez_sleep(&r->r, rpcattn, r);
-I_AM_HERE;
 		if(r->done){
 			poperror();
 			mntflushfree(mnt, r);
 			return;
 		}
 	}
-I_AM_HERE;
 	mnt->rip = current;
 	spin_unlock(&mnt->lock);
 	while(r->done == 0) {
-I_AM_HERE;
 		if(mntrpcread(mnt, r) < 0)
 			error(Emountrpc);
 		mountmux(mnt, r);
 	}
-I_AM_HERE;
 	mntgate(mnt);
 	poperror();
 	mntflushfree(mnt, r);
-I_AM_HERE;
 }
 
-/* call the device read and fill the queue with blocks from it. */
 static int
 doread(struct mnt *mnt, int len)
 {
@@ -895,7 +882,6 @@ mntrpcread(struct mnt *mnt, struct mntrpc *r)
 {
 	int i, t, len, hlen;
 	struct block *b, **l, *nb;
-	uint8_t *header;
 
 	r->reply.type = 0;
 	r->reply.tag = 0;
@@ -903,26 +889,19 @@ mntrpcread(struct mnt *mnt, struct mntrpc *r)
 	/* read at least length, type, and tag and pullup to a single block */
 	if(doread(mnt, BIT32SZ+BIT8SZ+BIT16SZ) < 0)
 		return -1;
-	/* size for the worst case. */
-	header = kzmalloc(BIT32SZ + BIT8SZ + BIT16SZ + BIT32SZ, KMALLOC_WAIT);
-	/* but the additional 32 bits is only on read.
-	 * Were it me, I would have made all headers same and had an
-	 * unused field and avoided this extra work. :-)
-	 */
-	if (qread(mnt->q, header, BIT32SZ+BIT8SZ+BIT16SZ) < BIT32SZ+BIT8SZ+BIT16SZ)
-		error("mntrpcread: can't happen 1");
+	nb = pullupqueue(mnt->q, BIT32SZ+BIT8SZ+BIT16SZ);
 
 	/* read in the rest of the message, avoid ridiculous (for now) message sizes */
-	len = GBIT32(header);
+	len = GBIT32(nb->rp);
 	if(len > mnt->msize){
 		qdiscard(mnt->q, qlen(mnt->q));
 		return -1;
 	}
-	if(doread(mnt, len-BIT32SZ+BIT8SZ+BIT16SZ) < 0)
+	if(doread(mnt, len) < 0)
 		return -1;
 
-	/* get the header (i.e. everything except data) */
-	t = header[BIT32SZ];
+	/* pullup the header (i.e. everything except data) */
+	t = nb->rp[BIT32SZ];
 	switch(t){
 	case Rread:
 		hlen = BIT32SZ+BIT8SZ+BIT16SZ+BIT32SZ;
@@ -931,12 +910,9 @@ mntrpcread(struct mnt *mnt, struct mntrpc *r)
 		hlen = len;
 		break;
 	}
-	/* read in the rest of the read request. */
-	if (qread(mnt->q, &header[BIT32SZ+BIT8SZ+BIT16SZ],
-		       BIT32SZ) < BIT32SZ)
-		error("mntrpcread: can't happen 2");
+	nb = pullupqueue(mnt->q, hlen);
 
-	if(convM2S(header, len, &r->reply) <= 0){
+	if(convM2S(nb->rp, len, &r->reply) <= 0){
 		/* bad message, dump it */
 		printd("mntrpcread: convM2S failed\n");
 		qdiscard(mnt->q, len);
@@ -945,8 +921,30 @@ mntrpcread(struct mnt *mnt, struct mntrpc *r)
 
 	/* hang the data off of the fcall struct */
 	l = &r->b;
-	b = qbread(mnt->q,len-hlen);
-	*l = b;
+	*l = NULL;
+	do {
+		b = qremove(mnt->q);
+		if(hlen > 0){
+			b->rp += hlen;
+			len -= hlen;
+			hlen = 0;
+		}
+		i = BLEN(b);
+		if(i <= len){
+			len -= i;
+			*l = b;
+			l = &(b->next);
+		} else {
+			/* split block and put unused bit back */
+			nb = allocb(i-len);
+			memmove(nb->wp, b->rp+len, i-len);
+			b->wp = b->rp+len;
+			nb->wp += i-len;
+			qputback(mnt->q, nb);
+			*l = b;
+			return 0;
+		}
+	}while(len > 0);
 
 	return 0;
 }
@@ -999,7 +997,7 @@ mountmux(struct mnt *mnt, struct mntrpc *r)
 		l = &q->list;
 	}
 	spin_unlock(&mnt->lock);
-	printd("unexpected reply tag %u; type %d\n", r->reply.tag, r->reply.type);
+	printd("unexpected reply tag %ud; type %d\n", r->reply.tag, r->reply.type);
 }
 
 /*
@@ -1078,24 +1076,23 @@ mntralloc(struct chan *c, uint32_t msize)
 {
 	struct mntrpc *new;
 
-	spin_lock(&mntalloc.lock);
+	spin_lock(&(&mntalloc)->lock);
 	new = mntalloc.rpcfree;
 	if(new == NULL){
 		new = kzmalloc(sizeof(struct mntrpc), 0);
 		if(new == NULL) {
-			spin_unlock(&mntalloc.lock);
-			panic("mount rpc header");
+			spin_unlock(&(&mntalloc)->lock);
+			panic/*exhausted*/("mount rpc header");
 		}
-		rendez_init(&new->r);
 		/*
 		 * The header is split from the data buffer as
 		 * mountmux may swap the buffer with another header.
 		 */
-		new->rpc = kzmalloc(msize, 0);
+		new->rpc = kzmalloc(msize, KMALLOC_WAIT);
 		if(new->rpc == NULL){
 			kfree(new);
-			spin_unlock(&mntalloc.lock);
-			panic("mount rpc buffer");
+			spin_unlock(&(&mntalloc)->lock);
+			panic/*exhausted*/("mount rpc buffer");
 		}
 		new->rpclen = msize;
 		new->request.tag = alloctag();
@@ -1109,14 +1106,14 @@ mntralloc(struct chan *c, uint32_t msize)
 			if(new->rpc == NULL){
 				kfree(new);
 				mntalloc.nrpcused--;
-				spin_unlock(&mntalloc.lock);
-				panic("mount rpc buffer");
+				spin_unlock(&(&mntalloc)->lock);
+				panic/*exhausted*/("mount rpc buffer");
 			}
 			new->rpclen = msize;
 		}
 	}
 	mntalloc.nrpcused++;
-	spin_unlock(&mntalloc.lock);
+	spin_unlock(&(&mntalloc)->lock);
 	new->c = c;
 	new->done = 0;
 	new->flushed = NULL;
@@ -1129,7 +1126,7 @@ mntfree(struct mntrpc *r)
 {
 	if(r->b != NULL)
 		freeblist(r->b);
-	spin_lock(&mntalloc.lock);
+	spin_lock(&(&mntalloc)->lock);
 	if(mntalloc.nrpcfree >= 10){
 		kfree(r->rpc);
 		freetag(r->request.tag);
@@ -1141,7 +1138,7 @@ mntfree(struct mntrpc *r)
 		mntalloc.nrpcfree++;
 	}
 	mntalloc.nrpcused--;
-	spin_unlock(&mntalloc.lock);
+	spin_unlock(&(&mntalloc)->lock);
 }
 
 void
@@ -1232,7 +1229,4 @@ struct dev mntdevtab = {
 	devbwrite,
 	mntremove,
 	mntwstat,
-	devpower,
-	devconfig,
-	devchaninfo,
 };
