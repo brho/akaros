@@ -386,7 +386,7 @@ mntchan(void)
 {
 	struct chan *c;
 
-	c = devattach('M', 0);
+	c = devattach('M', "");
 	spin_lock(&(&mntalloc)->lock);
 	c->devno = mntalloc.id++;
 	spin_unlock(&(&mntalloc)->lock);
