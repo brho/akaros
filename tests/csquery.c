@@ -25,6 +25,7 @@ void query(char *addr)
 	char buf[128];
 	int fd, n;
 
+	printf("Open %s\n", server);
 	fd = open(server, O_RDWR);
 	if (fd < 0)
 		error(1, 0, "cannot open %s: %r", server);
@@ -32,7 +33,7 @@ printf("ask %d about :%s:\n", fd, addr);
 	if (write(fd, addr, strlen(addr)) != strlen(addr)) {
 printf("failed to write\n");
 		if (!statusonly)
-			fprintf(stderr, "translating %s: %r\n", addr);
+			fprintf(stderr, "Writing request: translating %s: %r\n", addr);
 		status = "errors";
 		close(fd);
 		return;
