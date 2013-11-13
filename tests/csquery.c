@@ -28,7 +28,9 @@ void query(char *addr)
 	fd = open(server, O_RDWR);
 	if (fd < 0)
 		error(1, 0, "cannot open %s: %r", server);
+printf("ask %d about :%s:\n", fd, addr);
 	if (write(fd, addr, strlen(addr)) != strlen(addr)) {
+printf("failed to write\n");
 		if (!statusonly)
 			fprintf(stderr, "translating %s: %r\n", addr);
 		status = "errors";
@@ -36,12 +38,17 @@ void query(char *addr)
 		return;
 	}
 	if (!statusonly) {
+printf("lseek\n");
 		lseek(fd, 0, 0);
+printf("now read\n");
 		while ((n = read(fd, buf, sizeof(buf) - 1)) > 0) {
+printf("got %d bytes\n", n);
 			buf[n] = 0;
 			printf("%s\n", buf);
 		}
+printf("done reading ... %s\n", buf);
 	}
+printf("close and return\n");
 	close(fd);
 }
 
@@ -77,8 +84,17 @@ void main(int argc, char **argv)
 
 	for (;;) {
 		printf("> ");
-		if (!gets(p))
+		i = 0;
+		while (read(0, &p[i], 1) > 0){
+			if (p[i] == '\n')
+				break;
+			i++;
+		}
+		if (i < 0)
 			break;
-		query(p);
+		p[i] = 0;
+		printf("Got %d bytes:%s:\n", i, p);
+		if (i)
+			query(p);
 	}
 }
