@@ -148,10 +148,10 @@ void trigger_tchain(struct timer_chain *tchain)
 	spin_unlock(&tchain->lock);
 }
 
-/* Sets the alarm.  If it is a kthread-style alarm (func == 0), sleep on it
- * later.  This version assumes you have the lock held.  That only makes sense
- * from alarm handlers, which are called with this lock held from IRQ context */
-void __set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
+/* Helper, inserts the waiter into the tchain, returning TRUE if we still need
+ * to reset the tchain interrupt.  Caller holds the lock. */
+static bool __insert_awaiter(struct timer_chain *tchain,
+                             struct alarm_waiter *waiter)
 {
 	struct alarm_waiter *i, *temp;
 	/* This will fail if you don't set a time */
@@ -164,7 +164,7 @@ void __set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 		tchain->latest_time = waiter->wake_up_time;
 		TAILQ_INSERT_HEAD(&tchain->waiters, waiter, next);
 		/* Need to turn on the timer interrupt later */
-		goto reset_out;
+		return TRUE;
 	}
 	/* If not, either we're first, last, or in the middle.  Reset the interrupt
 	 * and adjust the tchain's times accordingly. */
@@ -172,7 +172,7 @@ void __set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 		tchain->earliest_time = waiter->wake_up_time;
 		TAILQ_INSERT_HEAD(&tchain->waiters, waiter, next);
 		/* Changed the first entry; we'll need to reset the interrupt later */
-		goto reset_out;
+		return TRUE;
 	}
 	/* If there is a tie for last, the newer one will really go last.  We need
 	 * to handle equality here since the loop later won't catch it. */
@@ -180,7 +180,7 @@ void __set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 		tchain->latest_time = waiter->wake_up_time;
 		/* Proactively put it at the end if we know we're last */
 		TAILQ_INSERT_TAIL(&tchain->waiters, waiter, next);
-		goto no_reset_out;
+		return FALSE;
 	}
 	/* Insert before the first one you are earlier than.  This won't scale well
 	 * (TODO) if we have a lot of inserts.  The proactive insert_tail up above
@@ -188,15 +188,19 @@ void __set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 	TAILQ_FOREACH_SAFE(i, &tchain->waiters, next, temp) {
 		if (waiter->wake_up_time < i->wake_up_time) {
 			TAILQ_INSERT_BEFORE(i, waiter, next);
-			goto no_reset_out;
+			return FALSE;
 		}
 	}
 	panic("Could not find a spot for awaiter %p\n", waiter);
-reset_out:
-	reset_tchain_interrupt(tchain);
-no_reset_out:
-	;
-	/* TODO: could put some debug stuff here */
+}
+
+/* Sets the alarm.  If it is a kthread-style alarm (func == 0), sleep on it
+ * later.  This version assumes you have the lock held.  That only makes sense
+ * from alarm handlers, which are called with this lock held from IRQ context */
+void __set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
+{
+	if (__insert_awaiter(tchain, waiter))
+		reset_tchain_interrupt(tchain);
 }
 
 /* Sets the alarm.  Don't call this from an alarm handler, since you already
@@ -208,23 +212,14 @@ void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 	spin_unlock_irqsave(&tchain->lock);
 }
 
-/* Removes waiter from the tchain before it goes off.  Returns TRUE if we
- * disarmed before the alarm went off, FALSE if it already fired. */
-bool unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
+/* Helper, rips the waiter from the tchain, knowing that it is on the list.
+ * Returns TRUE if the tchain interrupt needs to be reset.  Callers hold the
+ * lock. */
+static bool __remove_awaiter(struct timer_chain *tchain,
+                             struct alarm_waiter *waiter)
 {
 	struct alarm_waiter *temp;
 	bool reset_int = FALSE;		/* whether or not to reset the interrupt */
-
-	spin_lock_irqsave(&tchain->lock);
-	if (waiter->has_fired) {
-		/* the alarm has already gone off.  its not even on this tchain's list,
-		 * though the concurrent change to has_fired (specifically, the setting
-		 * of it to TRUE), happens under the tchain's lock.  As a side note, the
-		 * code that sets it to FALSE is called when the waiter is on no chain,
-		 * so there is no race on that. */
-		spin_unlock_irqsave(&tchain->lock);
-		return FALSE;
-	}
 	/* Need to make sure earliest and latest are set, in case we're mucking with
 	 * the first and/or last element of the chain. */
 	if (TAILQ_FIRST(&tchain->waiters) == waiter) {
@@ -237,10 +232,47 @@ bool unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 		tchain->latest_time = (temp) ? temp->wake_up_time : ALARM_POISON_TIME;
 	}
 	TAILQ_REMOVE(&tchain->waiters, waiter, next);
-	if (reset_int)
+	return reset_int;
+}
+
+/* Removes waiter from the tchain before it goes off.  Returns TRUE if we
+ * disarmed before the alarm went off, FALSE if it already fired. */
+bool unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
+{
+	spin_lock_irqsave(&tchain->lock);
+	if (waiter->has_fired) {
+		/* the alarm has already gone off.  its not even on this tchain's list,
+		 * though the concurrent change to has_fired (specifically, the setting
+		 * of it to TRUE), happens under the tchain's lock.  As a side note, the
+		 * code that sets it to FALSE is called when the waiter is on no chain,
+		 * so there is no race on that. */
+		spin_unlock_irqsave(&tchain->lock);
+		return FALSE;
+	}
+	if (__remove_awaiter(tchain, waiter))
 		reset_tchain_interrupt(tchain);
 	spin_unlock_irqsave(&tchain->lock);
 	return TRUE;
+}
+
+/* waiter may be on the tchain, or it might have fired already and be off the
+ * tchain.  Either way, this will put the waiter on the list, set to go off at
+ * abs_time.  If you know the alarm has fired, don't call this.  Just set the
+ * awaiter, and then set_alarm() */
+void reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
+                     uint64_t abs_time)
+{
+	bool reset_int = FALSE;		/* whether or not to reset the interrupt */
+	spin_lock_irqsave(&tchain->lock);
+	/* We only need to remove/unset when the alarm has not fired yet.  If it
+	 * has, it's like a fresh insert */
+	if (!waiter->has_fired)
+		reset_int = __remove_awaiter(tchain, waiter);
+	set_awaiter_abs(waiter, abs_time);
+	/* regardless, we need to be reinserted, which will handle has_fired */
+	if (__insert_awaiter(tchain, waiter) || reset_int)
+		reset_tchain_interrupt(tchain);
+	spin_unlock_irqsave(&tchain->lock);
 }
 
 /* Attempts to sleep on the alarm.  Could fail if you aren't allowed to kthread

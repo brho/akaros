@@ -94,6 +94,8 @@ void set_awaiter_inc(struct alarm_waiter *waiter, uint64_t usleep);
 void __set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
 void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
 bool unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
+void reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
+                     uint64_t abs_time);
 /* Blocks on the alarm waiter */
 int sleep_on_awaiter(struct alarm_waiter *waiter);
 /* Interrupt handlers needs to call this.  Don't call it directly. */
