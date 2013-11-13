@@ -1849,3 +1849,37 @@ void test_rv(void)
 	assert(!rv->cv.nr_waiters);
 	printk("test_rv: lots of sleepers/timeouts complete\n");
 }
+
+/* Cheap test for the alarm internal management */
+void test_alarm(void)
+{
+	uint64_t now = tsc2usec(read_tsc());
+	struct alarm_waiter await1, await2;
+	struct timer_chain *tchain = &per_cpu_info[0].tchain;
+	void shouldnt_run(struct alarm_waiter *awaiter)
+	{
+		printk("Crap, %p ran!\n", awaiter);
+	}
+	void empty_run(struct alarm_waiter *awaiter)
+	{
+		printk("Yay, %p ran (hopefully twice)!\n", awaiter);
+	}
+	/* Test basic insert, move, remove */
+	init_awaiter(&await1, shouldnt_run);
+	set_awaiter_abs(&await1, now + 1000000000);
+	set_alarm(tchain, &await1);
+	reset_alarm_abs(tchain, &await1, now + 1000000000 - 50);
+	reset_alarm_abs(tchain, &await1, now + 1000000000 + 50);
+	unset_alarm(tchain, &await1);
+	/* Test insert of one that fired already */
+	init_awaiter(&await2, empty_run);
+	set_awaiter_rel(&await2, 1);
+	set_alarm(tchain, &await2);
+	enable_irq();
+	udelay(1000);
+	reset_alarm_abs(tchain, &await2, now + 10);
+	udelay(1000);
+	unset_alarm(tchain, &await2);
+
+	printk("%s complete\n", __FUNCTION__);
+}
