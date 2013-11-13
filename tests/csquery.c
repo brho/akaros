@@ -86,7 +86,9 @@ void main(int argc, char **argv)
 		printf("> ");
 		i = 0;
 		while (read(0, &p[i], 1) > 0){
-			if (p[i] == '\n')
+			/* Attempt to echo our input back to stdout */
+			write(1, &p[i], 1);
+			if ((p[i] == '\n') || (p[i] == '\r'))
 				break;
 			i++;
 		}
