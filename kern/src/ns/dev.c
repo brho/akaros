@@ -199,6 +199,7 @@ struct walkqid *devwalk(struct chan *c, struct chan *nc, char **name, int nname,
 		alloc = 1;
 	}
 	wq->clone = nc;
+	dir.qid.path = 0;
 	for (j = 0; j < nname; j++) {
 		if (!(nc->qid.type & QTDIR)) {
 			if (j == 0)
@@ -217,7 +218,7 @@ Accept:
 			 * nc->dev should be NULL here.
 			 */
 			if ((*gen) (nc, NULL, tab, ntab, DEVDOTDOT, &dir) != 1) {
-				printd("devgen walk .. in dev%s %#llux broken\n",
+				printk("devgen walk .. in dev%s %#llux broken\n",
 					   c->dev->name, nc->qid.path);
 				error("broken devgen");
 			}
@@ -234,6 +235,7 @@ Accept:
 		 */
 		if (gen == devgen && nc->qid.path != tab[0].qid.path)
 			goto Notfound;
+		dir.qid.path = 0;
 		for (i = 0;; i++) {
 			switch ((*gen) (nc, n, tab, ntab, i, &dir)) {
 				case -1:
@@ -289,6 +291,7 @@ devstat(struct chan *c, uint8_t * db, long n, struct dirtab *tab, int ntab,
 	char *p, *elem;
 
 	printd("\nFresh Devstat, chan path %p\n", c->qid.path);
+	dir.qid.path = 0;
 	for (i = 0;; i++) {
 		switch ((*gen) (c, NULL, tab, ntab, i, &dir)) {
 			case -1:
@@ -334,6 +337,7 @@ devdirread(struct chan *c, char *d, long n, struct dirtab *tab, int ntab,
 	long m, dsz;
 	struct dir dir;
 
+	dir.qid.path = 0;
 	for (m = 0; m < n; c->dri++) {
 		switch ((*gen) (c, NULL, tab, ntab, c->dri, &dir)) {
 			case -1:
@@ -384,6 +388,7 @@ struct chan *devopen(struct chan *c, int omode, struct dirtab *tab, int ntab,
 	int i;
 	struct dir dir;
 
+	dir.qid.path = 0;
 	for (i = 0;; i++) {
 		switch ((*gen) (c, NULL, tab, ntab, i, &dir)) {
 			case -1:
