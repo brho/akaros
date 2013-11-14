@@ -171,6 +171,7 @@ devwalk(struct chan *c,
 	}
 	wq->clone = nc;
 
+	dir.qid.path = 0;
 	for(j=0; j<nname; j++){
 		if(!(nc->qid.type&QTDIR)){
 			if(j==0)
@@ -198,6 +199,7 @@ devwalk(struct chan *c,
 		 */
 		if(gen==devgen && nc->qid.path!=tab[0].qid.path)
 			goto Notfound;
+		dir.qid.path = 0;
 		for(i=0;; i++) {
 			switch((*gen)(nc, n, tab, ntab, i, &dir)){
 			case -1:
@@ -248,6 +250,7 @@ devstat(struct chan *c, uint8_t *db, int n,
 	struct dir dir;
 	char *p, *elem;
 
+	dir.qid.path = 0;
 	for(i=0;; i++)
 		switch((*gen)(c, NULL, tab, ntab, i, &dir)){
 		case -1:
@@ -298,6 +301,7 @@ devdirread(struct chan *c, char *d, long n,
 	 */
 	struct dir dir[4];
 
+	dir[0].qid.path = 0;
 	for(m=0; m<n; c->dri++) {
 		switch((*gen)(c, NULL, tab, ntab, c->dri, &dir[0])){
 		case -1:
@@ -353,6 +357,7 @@ devopen(struct chan *c, int omode, struct dirtab *tab, int ntab, Devgen *gen)
 	int i;
 	struct dir dir;
 
+	dir.qid.path = 0;
 	for(i=0;; i++) {
 		switch((*gen)(c, NULL, tab, ntab, i, &dir)){
 		case -1:
