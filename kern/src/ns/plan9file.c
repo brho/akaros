@@ -740,7 +740,8 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 	printd("syswrite %d %p %d %d\n", fd, p, n, off);
 	n = 0;
 	if (waserror()) {
-		printk("syswrite %d: '%s'\n", fd, current_errstr());
+		printk("%p: ", current->pid);
+		printk("BADFD: syswrite fd %d: '%s'\n", fd, current_errstr());
 		set_errno(EBADF);
 		poperror();
 		return -1;
@@ -750,7 +751,9 @@ long syswrite(int fd, void *p, size_t n, off_t off)
 
 	poperror();
 	if (waserror()) {
-		printk("syswrite %d: '%s'\n", fd, current_errstr());
+		printk("%p: ", current->pid);
+		printk("IO ERROR:syswrite fd %d: '%s'\n", fd, current_errstr());
+		set_errno(EIO);
 		if (!ispwrite) {
 			spin_lock(&c->lock);
 			c->offset -= n;
