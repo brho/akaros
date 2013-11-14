@@ -15,8 +15,8 @@ int statusonly;
 
 void usage(void)
 {
-	fprintf(stderr, "usage: ndb/csquery [/net/cs [addr...]]\n");
-	fprintf(stderr, "usage");
+	fprintf(stderr, "CSQUERY:usage: ndb/csquery [/net/cs [addr...]]\n");
+	fprintf(stderr, "CSQUERY:usage");
 	exit(1);
 }
 
@@ -24,32 +24,34 @@ void query(char *addr)
 {
 	char buf[128];
 	int fd, n;
+	int amt;
 
-	printf("Open %s\n", server);
+	printf("CSQUERY:Open %s\n", server);
 	fd = open(server, O_RDWR);
 	if (fd < 0)
 		error(1, 0, "cannot open %s: %r", server);
-printf("ask %d about :%s:\n", fd, addr);
-	if (write(fd, addr, strlen(addr)) != strlen(addr)) {
-printf("failed to write\n");
+printf("CSQUERY:ask %d about :%s:\n", fd, addr);
+	amt = write(fd, addr, strlen(addr));
+	if (amt != strlen(addr)) {
+		printf("CSQUERY:Tried to write %d to fd %d, only wrote %d\n", strlen(addr),fd,amt);
 		if (!statusonly)
-			fprintf(stderr, "Writing request: translating %s: %r\n", addr);
+			fprintf(stderr, "CSQUERY:Writing request: translating %s: %r\n", addr);
 		status = "errors";
 		close(fd);
 		return;
 	}
 	if (!statusonly) {
-printf("lseek\n");
+printf("CSQUERY:lseek\n");
 		lseek(fd, 0, 0);
-printf("now read\n");
+printf("CSQUERY:now read\n");
 		while ((n = read(fd, buf, sizeof(buf) - 1)) > 0) {
-printf("got %d bytes\n", n);
+printf("CSQUERY:got %d bytes\n", n);
 			buf[n] = 0;
-			printf("%s\n", buf);
+			printf("CSQUERY:%s\n", buf);
 		}
-printf("done reading ... %s\n", buf);
+printf("CSQUERY:done reading ... %s\n", buf);
 	}
-printf("close and return\n");
+printf("CSQUERY:close and return\n");
 	close(fd);
 }
 
@@ -75,7 +77,7 @@ void main(int argc, char **argv)
 	if (argc > 0)
 		server = argv[0];
 	else
-		server = "/net/cs";
+		server = "/9/net/cs";
 
 	if (argc > 1) {
 		for (i = 1; i < argc; i++)
@@ -84,7 +86,7 @@ void main(int argc, char **argv)
 	}
 
 	for (;;) {
-		printf("> ");
+		printf("CSQUERY:> ");
 		i = 0;
 		while (read(0, &p[i], 1) > 0){
 			/* Attempt to echo our input back to stdout */
@@ -96,7 +98,7 @@ void main(int argc, char **argv)
 		if (i < 0)
 			break;
 		p[i] = 0;
-		printf("Got %d bytes:%s:\n", i, p);
+		printf("CSQUERY:Got %d bytes:%s:\n", i, p);
 		if (i)
 			query(p);
 	}

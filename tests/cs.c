@@ -94,7 +94,7 @@ int	mfd[2];
 int	debug;
 int	paranoia;
 int	ipv6lookups = 1;
-char	*dbfile = "lib/ndb/common";
+char	*dbfile = "lib/ndb/local";
 struct ndb	*db, *netdb;
 
 void	rversion(Job*);
@@ -201,8 +201,8 @@ char *argv0;
 void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-dn] [-f ndb-file] [-x netmtpt]\n", argv0);
-	fprintf(stderr, "usage");
+	fprintf(stderr, "CS:usage: %s [-dn] [-f ndb-file] [-x netmtpt]\n", argv0);
+	fprintf(stderr, "CS:usage");
 	exit(1);
 }
 
@@ -440,11 +440,11 @@ printf("JOB!\n");
 
 printf("NEWFID is %p\n", mf);
 	if(debug)
-		fprintf(stderr, "%F", &job->request);
+		fprintf(stderr, "CS:%F", &job->request);
 printf("DO %d\n", job->request.type);
 	switch(job->request.type){
 	default:
-		fprintf(stderr, "unknown request type %d", job->request.type);
+		fprintf(stderr, "CS:unknown request type %d", job->request.type);
 		break;
 	case Tversion:
 		rversion(job);
@@ -490,7 +490,7 @@ printf("DO %d\n", job->request.type);
 
 	freejob(job);
 
-	fprintf(stderr, "Job done\n");
+	fprintf(stderr, "CS:Job done\n");
 	return 0;
 }
 
@@ -618,6 +618,7 @@ rwalk(Job *job, Mfile *mf)
 	if(nelems > 0){
 		/* walk fid */
 		for(i=0; i<nelems && i<MAXWELEM; i++){
+printf("cs: i %d nelems %d \n", i, nelems);
 			if((qid.type & QTDIR) == 0){
 				err = "not a directory";
 				break;
@@ -633,6 +634,7 @@ rwalk(Job *job, Mfile *mf)
 			if(strcmp(elems[i], "cs") == 0){
 				qid.type = QTFILE;
 				qid.path = Qcs;
+printf("found cs, goto Found\n");
 				goto Found;
 			}
 			err = malloc(4096);
@@ -794,13 +796,13 @@ rwrite(Job *job, Mfile *mf)
 		goto send;
 	}
 	job->request.data[cnt] = 0;
-
+printf("CS: request data is :%s:\n", job->request.data);
 	/*
 	 *  toggle debugging
 	 */
 	if(strncmp(job->request.data, "debug", 5)==0){
 		debug ^= 1;
-		fprintf(stderr, "debug %d", debug);
+		fprintf(stderr, "CS:debug %d", debug);
 		goto send;
 	}
 
@@ -809,7 +811,7 @@ rwrite(Job *job, Mfile *mf)
 	 */
 	if(strncmp(job->request.data, "ipv6", 4)==0){
 		ipv6lookups ^= 1;
-		fprintf(stderr, "ipv6lookups %d", ipv6lookups);
+		fprintf(stderr, "CS:ipv6lookups %d", ipv6lookups);
 		goto send;
 	}
 
@@ -818,7 +820,7 @@ rwrite(Job *job, Mfile *mf)
 	 */
 	if(strncmp(job->request.data, "paranoia", 8)==0){
 		paranoia ^= 1;
-		fprintf(stderr,  "paranoia %d", paranoia);
+		fprintf(stderr,  "CS:paranoia %d", paranoia);
 		goto send;
 	}
 
@@ -853,9 +855,9 @@ rwrite(Job *job, Mfile *mf)
 	}
 
 	if(debug)
-		fprintf(stderr,  "write %s", job->request.data);
+		fprintf(stderr,  "CS:write %s", job->request.data);
 	if(paranoia)
-		fprintf(stderr,  "write %s by %s", job->request.data, mf->user);
+		fprintf(stderr,  "CS:write %s by %s", job->request.data, mf->user);
 
 	/*
 	 *  break up name
@@ -955,7 +957,7 @@ sendmsg(Job *job, char *err)
 	job->reply.tag = job->request.tag;
 	n = convS2M(&job->reply, mdata, sizeof mdata);
 	if(n == 0){
-		fprintf(stderr,  "sendmsg convS2M of %F returns 0", &job->reply);
+		fprintf(stderr,  "CS:sendmsg convS2M of %F returns 0", &job->reply);
 		abort();
 	}
 	//lock(&joblock);
@@ -964,7 +966,7 @@ sendmsg(Job *job, char *err)
 			error(1, 0, "%s: %r","mount write");
 	//unlock(&joblock);
 	if(debug)
-		fprintf(stderr,  "%F %d", &job->reply, n);
+		fprintf(stderr,  "CS:%F %d", &job->reply, n);
 }
 
 static int
@@ -993,7 +995,7 @@ readipinterfaces(void)
 		ipmove(ipa, IPnoaddr);
 	snprintf(ipaddr, sizeof(ipaddr), "%I", ipa);
 	if (debug)
-		fprintf(stderr, "dns", "ipaddr is %s\n", ipaddr);
+		fprintf(stderr, "CS:dns", "ipaddr is %s\n", ipaddr);
 }
 
 /*
@@ -1117,7 +1119,7 @@ netinit(int background)
 	ipid();
 
 	if(debug)
-		fprintf(stderr, logfile, "mysysname %s eaddr %s ipaddr %s ipa %I\n",
+		fprintf(stderr, logfile, "CS:mysysname %s eaddr %s ipaddr %s ipa %I\n",
 			mysysname?mysysname:"???", eaddr, ipaddr, ipa);
 
 }
