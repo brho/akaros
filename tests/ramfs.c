@@ -268,16 +268,6 @@ default:
 	r->name = estrdup(".");
 
 	if (debug) {
-int printf_fcall(FILE *stream, const struct printf_info *info,
-		 const void *const *args);
-int printf_fcall_info(const struct printf_info* info, size_t n, int *argtypes,
-		      int *size);
-int printf_dir(FILE *stream, const struct printf_info *info,
-		 const void *const *args);
-int printf_dir_info(const struct printf_info* info, size_t n, int *argtypes,
-		      int *size);
-
-
 		register_printf_specifier('i', printf_ipaddr, printf_ipaddr_info);
 		register_printf_specifier('F', printf_fcall, printf_fcall_info);
 		register_printf_specifier('M', printf_dir, printf_dir_info);

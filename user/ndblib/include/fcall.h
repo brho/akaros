@@ -6,6 +6,8 @@
 #ifndef ROS_INC_FCALL_H
 #define ROS_INC_FCALL_H
 
+#include <printf-ext.h>
+
 #define	VERSION9P	"9P2000"
 
 #define	MAXWELEM	16
@@ -130,14 +132,15 @@ unsigned int convM2D(uint8_t *, unsigned int, struct dir *, char *);
 unsigned int convD2M(struct dir *, uint8_t *, unsigned int);
 unsigned int sizeD2M(struct dir *);
 
-/*
- * at some point we want the plan 9 print. It's handy for
- * stuff like this.
- *
-int	fcallfmt(Fmt*);
-int	dirfmt(Fmt*);
-int	dirmodefmt(Fmt*);
-*/
+int printf_fcall(FILE *stream, const struct printf_info *info,
+                 const void *const *args);
+int printf_fcall_info(const struct printf_info* info, size_t n, int *argtypes,
+                      int *size);
+int printf_dir(FILE *stream, const struct printf_info *info,
+               const void *const *args);
+int printf_dir_info(const struct printf_info* info, size_t n, int *argtypes,
+                    int *size);
+
 int read9pmsg(int, void *, unsigned int);
 
 #endif /* ROS_INC_FCALL_H */
