@@ -178,16 +178,13 @@ qidtype(char *s, uint8_t t)
 	return s;
 }
 
-#if 0
-int
-dirfmt(Fmt *fmt)
+int printf_dir(FILE *stream, const struct printf_info *info,
+                   const void *const *args)
 {
-	char buf[160];
-
-	fdirconv(buf, buf+sizeof buf, va_arg(fmt->args, struct dir*));
-	return fmtstrcpy(fmt, buf);
+	struct dir *d = *(void**)args[0];
+	fdirconv(stream, d);
+	return 0;
 }
-#endif
 
 static void
 	fdirconv(FILE *stream, struct dir *d)
@@ -251,6 +248,16 @@ later
 }
 
 int printf_fcall_info(const struct printf_info* info, size_t n, int *argtypes,
+                        int *size)
+{
+	if (n > 0) {
+		argtypes[0] = PA_POINTER;
+		size[0] = sizeof(uint8_t*);
+	}
+	return 1;
+}
+
+int printf_dir_info(const struct printf_info* info, size_t n, int *argtypes,
                         int *size)
 {
 	if (n > 0) {
