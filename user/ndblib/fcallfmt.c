@@ -90,7 +90,8 @@ int printf_fcall(FILE *stream, const struct printf_info *info,
 			f->qid.path, f->qid.vers, qidtype(tmp, f->qid.type), f->iounit);
 		break;
 	case Tcreate:	/* 114 */
-		fprintf(stream,"Tcreate tag %ud fid %ud name %s perm %M mode %d", tag, fid, f->name, (uint32_t)f->perm, f->mode);
+		fprintf(stream,"Tcreate tag %ud fid %ud name %s perm %d mode %d", tag,
+		        fid, f->name, (uint32_t)f->perm, f->mode);
 		break;
 	case Rcreate:
 		fprintf(stream,"Rcreate tag %ud qid " QIDFMT " iounit %ud ", tag,
