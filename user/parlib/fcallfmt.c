@@ -203,7 +203,7 @@ static void
 
 /*
  * dump out count (or DUMPL, if count is bigger) bytes from
- * buf to ans, as a string if they are all printable,
+ * buf to stream, as a string if they are all printable,
  * else as a series of hex bytes
  */
 #define DUMPL 64
@@ -211,14 +211,10 @@ static void
 static void
 	dumpsome(FILE *stream, char *buf, long count)
 {
-#if 0
-later
 	int i, printable;
-	char *p;
 
 	if(buf == NULL){
-	fprintf(stream, "<no data>");
-
+		fprintf(stream, "<no data>");
 	}
 	printable = 1;
 	if(count > DUMPL)
@@ -228,23 +224,15 @@ later
 			printable = 0;
 	fprintf(stream,"'");
 	if(printable){
-		if(count > e-p-2)
-			count = e-p-2;
-		//fprintf(stream, "%s", 
+		fprintf(stream, "%s", buf);
 	}else{
-		if(2*count > e-p-2)
-			count = (e-p-2)/2;
 		for(i=0; i<count; i++){
 			if(i>0 && i%4==0)
-				*p++ = ' ';
+				fprintf(stream, " ");
 			fprintf(stream, "%2.2ux", buf[i]);
-			p += 2;
 		}
 	}
-	*p++ = '\'';
-	*p = 0;
-	return p - ans;
-#endif
+	fprintf(stream,"'");
 }
 
 int printf_fcall_info(const struct printf_info* info, size_t n, int *argtypes,
