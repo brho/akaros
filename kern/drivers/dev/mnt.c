@@ -234,6 +234,7 @@ mntversion(struct chan *c, uint32_t msize, char *version, unsigned long returnle
 	mnt->id = mntalloc.id++;
 	mnt->q = qopen(10*MAXRPC, 0, NULL, NULL);
 	mnt->msize = f.msize;
+	spinlock_init(&mnt->lock);
 	spin_unlock(&(&mntalloc)->lock);
 
 	if(returnlen != 0){

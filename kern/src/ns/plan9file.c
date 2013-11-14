@@ -802,15 +802,25 @@ int syscreate(char *name, int omode)
 	 */
 	omode &= ~(O_CREAT | O_TRUNC);
 
-	if (waserror()) {
-		if (c)
-			cclose(c);
-		printd("syscreate fail 1 mode  %x\n", omode);
+	if (waserror()){
+		printd("syscreate: bad mode %x\n", omode);
+		set_errno(EINVAL);
 		poperror();
 		return -1;
 	}
 
 	openmode(omode);	/* error check only */
+
+	poperror();
+
+        if (waserror()) {
+		set_errno(EEXIST);
+		printd("syscreate fails:%s:\n", current_errstr());
+                if (c)
+                        cclose(c);
+                poperror();
+                return -1;
+        }
 
 	c = namec(name, Acreate, omode, 0);
 	fd = newfd(c);
@@ -843,6 +853,7 @@ int sysopen(char *name, int omode)
 		return syscreate(name, omode);
 
 	if (waserror()) {
+		set_errno(ENOENT);
 		printd("error\n");
 		if (c)
 			cclose(c);
@@ -881,6 +892,7 @@ int sysstat(char *name, uint8_t * statbuf, int len)
 	if (name[0] == '/' && name[1] == '9')
 		name += 2;
 	if (waserror()) {
+		set_errno(ENOENT);
 		if (c)
 			cclose(c);
 		poperror();

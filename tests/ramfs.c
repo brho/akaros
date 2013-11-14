@@ -144,7 +144,7 @@ char Ename[] = "illegal name";
 char Eversion[] = "unknown 9P version";
 char Enotempty[] = "directory not empty";
 
-int debug = 1;
+int debug = 0;
 int private;
 
 static int memlim = 1;
@@ -533,7 +533,7 @@ char *rcreate(Fid * f)
 			ret = "no free ram resources";
 			goto bad;
 		}
-	printf("%s: ready to do it\n", __func__);
+
 	r->busy = 1;
 	r->qid.path = ++path;
 	r->qid.vers = 0;
