@@ -13,6 +13,7 @@
 #include <dir.h>
 #include <ndb.h>
 #include <fcall.h>
+#include <printf-ext.h>
 
 #warning "you really need to fix the include directory tree structure!"
 #define DMDIR              0x80000000	/* mode bit for directories */
@@ -265,12 +266,22 @@ default:
 	r->atime = 0;	//time(0);
 	r->mtime = r->atime;
 	r->name = estrdup(".");
-#if 0
+
 	if (debug) {
-		fmtinstall('F', fcallfmt);
-		fmtinstall('M', dirmodefmt);
+int printf_fcall(FILE *stream, const struct printf_info *info,
+		 const void *const *args);
+int printf_fcall_info(const struct printf_info* info, size_t n, int *argtypes,
+		      int *size);
+int printf_dir(FILE *stream, const struct printf_info *info,
+		 const void *const *args);
+int printf_dir_info(const struct printf_info* info, size_t n, int *argtypes,
+		      int *size);
+
+
+		register_printf_specifier('i', printf_ipaddr, printf_ipaddr_info);
+		register_printf_specifier('F', printf_fcall, printf_fcall_info);
+		register_printf_specifier('M', printf_dir, printf_dir_info);
 	}
-#endif
 #if 0
 	switch (rfork(RFFDG | RFPROC | RFNAMEG | RFNOTEG)) {
 		case -1:
