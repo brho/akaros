@@ -46,39 +46,39 @@ validstat(uint8_t *s, unsigned long n)
 		validname(buf, 0);
 }
 
+/* Helper for readnum and readstr.  Given a string with strlen, we'll move n
+ * chars of it to the buffer at offset.
+ *
+ * The old plan9 version of this didn't copy over the \0.  This assumes there is
+ * a \0 at str[strlen], and that we have strlen+1 bytes. */
+static int __readstr(unsigned long offset, char *buf, unsigned long n,
+                     char *str, size_t strlen)
+{
+	if (offset >= strlen + 1)
+		return 0;
+	if (offset + n > strlen + 1)
+		n = strlen + 1 - offset;
+	memmove(buf, str + offset, n);
+	return n;
+}
 
 /* simple functions for common uses. Read a num/string to user mode,
- * accounting for offset.
- */
-int
-readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
-		int size)
+ * accounting for offset.  Not a huge fan of the 'size' parameter (the old plan9
+ * users just picked NUMSIZE (12), though they seem to want to limit it).  */
+int readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
+            int size)
 {
 	char tmp[64];
 	size = MIN(sizeof(tmp), size);
-
 	/* we really need the %* format. */
-	snprintf(tmp, size, "%lu", val);
-	tmp[size - 1] = ' ';
-	if (off >= size)
-		return 0;
-	if (off + n > size)
-		n = size - off;
-	memmove(buf, tmp + off, n);
-	return n;
+	size = snprintf(tmp, size, "%lu", val);
+	/* size is now strlen, so the rest of this is just like readstr. */
+	return __readstr(off, buf, n, tmp, size);
 }
 
 long readstr(long offset, char *buf, long n, char *str)
 {
-	long size;
-
-	size = strlen(str);
-	if (offset >= size)
-		return 0;
-	if (offset + n > size)
-		n = size - offset;
-	memmove(buf, str + offset, n);
-	return n;
+	return __readstr(offset, buf, n, str, strlen(str));
 }
 
 void fdclose(int fd, int flag)

@@ -70,6 +70,8 @@ enum {
 /* stuff which has no equal. */
 #define DEVDOTDOT -1
 #define NUMSIZE 12	/* size of formatted number */
+#define NUMSIZE32 9		/* max size of formatted 32 bit number */
+#define NUMSIZE64 20	/* max size of formatted 64 bit number */
 #define READSTR 4000	/* temporary buffer size for device reads */
 
 /*
