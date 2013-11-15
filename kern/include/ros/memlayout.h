@@ -17,7 +17,7 @@
 #define EXTPHYSMEM	0x100000
 #endif
 
-#define KSTKSHIFT	(PGSHIFT)			/* KSTKSIZE == PGSIZE */
+#define KSTKSHIFT	(PGSHIFT + 1)			/* KSTKSIZE == PGSIZE */
 #define KSTKSIZE	(1 << KSTKSHIFT)	/* size of a static kernel stack */
 
 /* Read-only, per-process shared info structures */
