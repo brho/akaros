@@ -63,7 +63,7 @@ struct alarm_waiter {
 	struct semaphore			sem;			/* kthread will sleep on this */
 	void						*data;
 	TAILQ_ENTRY(alarm_waiter)	next;
-	bool						has_fired;
+	bool						on_tchain;
 };
 TAILQ_HEAD(awaiters_tailq, alarm_waiter);		/* ideally not a LL */
 

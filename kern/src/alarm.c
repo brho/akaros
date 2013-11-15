@@ -54,7 +54,7 @@ void init_awaiter(struct alarm_waiter *waiter,
 	waiter->func = func;
 	if (!func)
 		sem_init_irqsave(&waiter->sem, 0);
-	waiter->has_fired = FALSE;	/* so we can check this before arming */
+	waiter->on_tchain = FALSE;
 }
 
 /* Give this the absolute time.  For now, abs_time is the TSC time that you want
@@ -108,8 +108,8 @@ static void reset_tchain_interrupt(struct timer_chain *tchain)
  * will wake up.  o/w, it will call the func ptr stored in the awaiter. */
 static void wake_awaiter(struct alarm_waiter *waiter)
 {
-	waiter->has_fired = TRUE;
-	cmb();	/* enforce the has_fired write before the handlers */
+	waiter->on_tchain = FALSE;
+	cmb();	/* enforce the on_tchain write before the handlers */
 	if (waiter->func)
 		waiter->func(waiter);
 	else
@@ -156,8 +156,7 @@ static bool __insert_awaiter(struct timer_chain *tchain,
 	struct alarm_waiter *i, *temp;
 	/* This will fail if you don't set a time */
 	assert(waiter->wake_up_time != ALARM_POISON_TIME);
-	/* has_fired tells us if it is on the tchain or not */
-	waiter->has_fired = FALSE;
+	waiter->on_tchain = TRUE;
 	/* Either the list is empty, or not. */
 	if (TAILQ_EMPTY(&tchain->waiters)) {
 		tchain->earliest_time = waiter->wake_up_time;
@@ -240,12 +239,10 @@ static bool __remove_awaiter(struct timer_chain *tchain,
 bool unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 {
 	spin_lock_irqsave(&tchain->lock);
-	if (waiter->has_fired) {
+	if (!waiter->on_tchain) {
 		/* the alarm has already gone off.  its not even on this tchain's list,
-		 * though the concurrent change to has_fired (specifically, the setting
-		 * of it to TRUE), happens under the tchain's lock.  As a side note, the
-		 * code that sets it to FALSE is called when the waiter is on no chain,
-		 * so there is no race on that. */
+		 * though the concurrent change to on_tchain (specifically, the setting
+		 * of it to FALSE), happens under the tchain's lock. */
 		spin_unlock_irqsave(&tchain->lock);
 		return FALSE;
 	}
@@ -264,12 +261,12 @@ void reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
 {
 	bool reset_int = FALSE;		/* whether or not to reset the interrupt */
 	spin_lock_irqsave(&tchain->lock);
-	/* We only need to remove/unset when the alarm has not fired yet.  If it
-	 * has, it's like a fresh insert */
-	if (!waiter->has_fired)
+	/* We only need to remove/unset when the alarm has not fired yet (is still
+	 * on the tchain).  If it has fired, it's like a fresh insert */
+	if (waiter->on_tchain)
 		reset_int = __remove_awaiter(tchain, waiter);
 	set_awaiter_abs(waiter, abs_time);
-	/* regardless, we need to be reinserted, which will handle has_fired */
+	/* regardless, we need to be reinserted */
 	if (__insert_awaiter(tchain, waiter) || reset_int)
 		reset_tchain_interrupt(tchain);
 	spin_unlock_irqsave(&tchain->lock);

@@ -49,7 +49,7 @@ void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
 
 	assert((int)msec > 0);
 	/* The handler will call rendez_wake, but won't mess with the condition
-	 * state.  It's enough to break us out of cv_wait() to see .has_fired. */
+	 * state.  It's enough to break us out of cv_wait() to see .on_tchain. */
 	init_awaiter(&awaiter, rendez_alarm_handler);
 	awaiter.data = rv;
 	set_awaiter_rel(&awaiter, msec);
@@ -62,7 +62,7 @@ void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
 	 * condition (and we should exit), other alarms with different timeouts (and
 	 * we should go back to sleep), etc.  Note it is possible for our alarm to
 	 * fire immediately upon setting it: before we even cv_lock. */
-	while (!cond(arg) && !awaiter.has_fired) {
+	while (!cond(arg) && awaiter.on_tchain) {
 		cv_wait(&rv->cv);
 		cpu_relax();
 	}
