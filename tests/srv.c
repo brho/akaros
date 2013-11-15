@@ -77,10 +77,10 @@ main(int argc, char *argv[])
 	case 1:	/* calculate srv from address */
 		p = strrchr(argv[0], '/');
 		p = p ? p+1 : argv[0];
-		snprintf(srv, 1024, "/srv/%s", p);
+		snprintf(srv, 1024, "#s/%s", p);
 		break;
 	case 2:
-		snprintf(srv, 1024, "/srv/%s", argv[1]);
+		snprintf(srv, 1024, "#s/%s", argv[1]);
 		break;
 	default:
 		srv = mtpt = NULL;
