@@ -49,6 +49,11 @@ static int __serial_get_char(int com, uint8_t *data)
 	if (!(inb(com + COM_LSR) & COM_LSR_DATA))
 		return -1;
 	*data = inb(com + COM_RX);
+	/* serial input sends \r a lot, but we interpret them as \n later on.  this
+	 * will help userspace too, which isn't expecting the \rs.  the right answer
+	 * might involve telling userspace what sort of console this is. */
+	if (*data == '\r')
+		*data = '\n';
 	return 0;
 }
 
