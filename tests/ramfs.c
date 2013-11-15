@@ -914,6 +914,9 @@ void io(void)
 
 int perm(Fid * f, Ram * r, int p)
 {
+	/* No rules! */
+	return 1;
+
 	if ((p * Pother) & r->perm)
 		return 1;
 	if (strcmp(f->user, r->group) == 0 && ((p * Pgroup) & r->perm))
