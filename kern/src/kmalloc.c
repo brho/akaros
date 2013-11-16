@@ -102,6 +102,10 @@ void kfree(void *addr)
 	if(addr == NULL)
 		return;
 	struct kmalloc_tag *tag = (struct kmalloc_tag*)(addr - KMALLOC_OFFSET);
+	if (tag->canary != KMALLOC_CANARY){
+		printk("Canary is bogus: %08lx, expected %08lx\n", tag->canary, KMALLOC_CANARY);
+		hexdump((void *)(addr-128), 256);
+	}
 	assert(tag->canary == KMALLOC_CANARY);
 	if (tag->flags & KMALLOC_TAG_CACHE)
 		kmem_cache_free(tag->my_cache, addr - KMALLOC_OFFSET);
