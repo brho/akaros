@@ -1261,7 +1261,6 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 			break;
 
 		default:
-			error("No current->dot yet");
 			c = current->dot;
 			kref_get(&c->ref, 1);
 			break;
