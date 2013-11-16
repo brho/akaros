@@ -21,6 +21,8 @@ void* (DALLOC(size) kmalloc)(size_t size, int flags);
 void* (DALLOC(size) kzmalloc)(size_t size, int flags);
 void* (DALLOC(size) krealloc)(void* buf, size_t size, int flags);
 void  (DFREE(addr) kfree)(void *addr);
+void kmalloc_canary_check(char *str);
+void *debug_canary;
 
 /* Flags */
 #define KMALLOC_TAG_CACHE 1
