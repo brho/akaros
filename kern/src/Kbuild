@@ -12,6 +12,7 @@ obj-y						+= event.o
 obj-y						+= ext2fs.o
 obj-y						+= frontend.o
 obj-y						+= hashtable.o
+obj-y						+= hexdump.o
 obj-y						+= init.o
 obj-y						+= kdebug.o
 obj-y						+= kfs.o
