@@ -837,8 +837,6 @@ int sysopen(char *name, int omode)
 	struct chan *c = NULL;
 	int fd;
 	int mustdir = 0;
-	if (name[0] == '/' && name[1] == '9')
-		name += 2;
 	printd("%p: ", current->pid);
 	printd("sysopen %s mode %o\n", name, omode);
 	if (omode & O_NONBLOCK)	/* what to do? */
@@ -889,8 +887,6 @@ int sysstat(char *name, uint8_t * statbuf, int len)
 	int fd;
 	uint8_t data[sizeof(struct dir)];
 
-	if (name[0] == '/' && name[1] == '9')
-		name += 2;
 	if (waserror()) {
 		set_errno(ENOENT);
 		if (c)

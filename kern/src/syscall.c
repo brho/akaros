@@ -1180,12 +1180,6 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 	return ret;
 }
 
-static bool is_9path(char *path)
-{
-	bool ret = (path[0] == '#') || (path[0] == '/' && path[1] == '9');
-	return ret;
-}
-
 /* Checks args/reads in the path, opens the file, and inserts it into the
  * process's open file list. */
 static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
@@ -1208,7 +1202,6 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 			warn("File insertion failed");
 	} else {
 		unset_errno();	/* Go can't handle extra errnos */
-		/* 9ns (checking all, not just the old /9s */
 		fd = sysopen(t_path, oflag);
 	}
 	user_memdup_free(p, t_path);
@@ -1289,7 +1282,7 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 	if (path_d) {
 		stat_inode(path_d->d_inode, kbuf);
 		kref_put(&path_d->d_kref);
-	} else if (is_9path(t_path)) {
+	} else {
 		/* VFS failed, checking 9ns */
 		unset_errno();	/* Go can't handle extra errnos */
 		retval = sysstat(t_path, (uint8_t*)kbuf, sizeof(*kbuf));

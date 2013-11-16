@@ -1,9 +1,9 @@
 #!/bin/ash
 #bind -a '#I' /net
 #bind -a '#l0' /net
-#cat /9/net/ipifc/clone
+#cat /net/ipifc/clone
 ## bind the ether0 to it
-#echo 'bind ether /net/ether0' > /9/net/ipifc/0/ctl
+#echo 'bind ether /net/ether0' > /net/ipifc/0/ctl
 #exit
 
 # ifconfig it
@@ -57,14 +57,14 @@ bind -a '#l0' /net
 
 # note: dhcp is possible, just not done yet.
 #get an instance of a network stack
-i=`cat /9/net/ipifc/clone`
+i=`cat /net/ipifc/clone`
 # bind the ether0 to it
-echo "bind ether /net/ether0 " > /9/net/ipifc/$i/ctl
+echo "bind ether /net/ether0 " > /net/ipifc/$i/ctl
 # ifconfig it
-echo "add $me $mask $remote" > /9/net/ipifc/$i/ctl
-echo "add 0 0 $route" > /9/net/iproute
+echo "add $me $mask $remote" > /net/ipifc/$i/ctl
+echo "add 0 0 $route" > /net/iproute
 echo I am $me, default route $route
 
-i=`cat /9/net/ipifc/clone`
-echo "bind loopback /dev/null " > /9/net/ipifc/$i/ctl
-echo "add 127.0.0.1 255.0.0.0 127.0.0.0 " > /9/net/ipifc/$i/ctl
+i=`cat /net/ipifc/clone`
+echo "bind loopback /dev/null " > /net/ipifc/$i/ctl
+echo "add 127.0.0.1 255.0.0.0 127.0.0.0 " > /net/ipifc/$i/ctl
