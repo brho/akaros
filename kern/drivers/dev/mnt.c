@@ -411,8 +411,8 @@ mntwalk(struct chan *c, struct chan *nc, char **name, int nname)
 	if(nname > MAXWELEM)
 		error("devmnt: too many name elements");
 	alloc = 0;
-	wq = kzmalloc(sizeof(struct walkqid) +
-		      (nname - 1) * sizeof(struct qid), 0);
+	wq = kzmalloc(sizeof(struct walkqid) + (nname) * sizeof(struct qid),
+				  KMALLOC_WAIT);
 	if(waserror()){
 		if(alloc && wq->clone!=NULL)
 			cclose(wq->clone);

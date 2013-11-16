@@ -6,7 +6,6 @@
  * Kevin Klues <klueska@cs.berkeley.edu>    
  */
 
-#define DEBUG
 #ifdef __SHARC__
 #pragma nosharc
 #define SINIT(x) x
@@ -116,3 +115,12 @@ void kfree(void *addr)
 		panic("[Italian Accent]: Che Cazzo! BO! Flag in kmalloc!!!");
 }
 
+void kmalloc_canary_check(char *str)
+{
+	if (!debug_canary)
+		return;
+	struct kmalloc_tag *tag = (struct kmalloc_tag*)(debug_canary -
+	                                                KMALLOC_OFFSET);
+	if (tag->canary != KMALLOC_CANARY)
+		panic("\t\t KMALLOC CANARY CHECK FAILED %s\n", str);
+}
