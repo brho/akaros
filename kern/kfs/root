@@ -1,0 +1,6 @@
+#!/bin/ash
+ash ifconfig
+srv 'tcp!10.0.2.2!1025' root
+mount /srv/root /mnt
+ls /9/mnt
+
