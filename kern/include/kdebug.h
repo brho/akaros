@@ -27,5 +27,5 @@ void __print_func_entry(const char *func, const char *file);
 void __print_func_exit(const char *func, const char *file);
 #define print_func_entry() __print_func_entry(__FUNCTION__, __FILE__)
 #define print_func_exit() __print_func_exit(__FUNCTION__, __FILE__)
-
+void hexdump(void *v, int length);
 #endif /* ROS_KERN_KDEBUG_H */
