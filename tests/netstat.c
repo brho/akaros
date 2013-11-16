@@ -63,7 +63,6 @@ void main(int argc, char *argv[])
 	}
 
 	netroot = "/net";
-	netroot = "/9/net";
 	switch (argc) {
 		case 0:
 			break;

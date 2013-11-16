@@ -68,7 +68,7 @@ void main(int argc, char **argv)
 	int fd, msglen, interval, nmsg;
 	char *ds;
 	int pid;
-	char *addr = "/9/net/tcp!127.0.0.1!2000";
+	char *addr = "/net/tcp!127.0.0.1!2000";
 
 	if (argc > 1)
 		addr = argv[1];

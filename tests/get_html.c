@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 	}
 	printf("Trying to access http://%s/%s\n", host, page);
 	/* mkaddr/dial style */
-	addr = netmkaddr(host, "/9/net/tcp", "80");
+	addr = netmkaddr(host, "/net/tcp", "80");
 	dfd = dial(addr, 0, 0, 0);
 	if (dfd < 0) {
 		perror("Bad Data FD");

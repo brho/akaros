@@ -53,7 +53,7 @@ int main(int argc, char **argv)
 	printf("ethaddr %E\n", ethaddr);
 	printf("ethaddr null %E\n", 0);
 
-	ret = open("/9/proc/no/such/file", 0, 0);
+	ret = open("/proc/no/such/file", 0, 0);
 	printf("Open ret %d, errstr: %r\n", ret);
 	printf("%s %i %M %d %s %r %E\n", "testing a few,", v6addr, v6mask, 1337,
 	       "more cowbell", ethaddr);
