@@ -122,6 +122,8 @@ static void __ksched_tick(uint32_t srcid, long a0, long a1, long a2)
  * interrupt context). */
 static void __kalarm(struct alarm_waiter *waiter)
 {
+	/* Not necessary when alarms are running in RKM context (check
+	 * timer_interrupt()) */
 	send_kernel_message(core_id(), __ksched_tick, 0, 0, 0, KMSG_ROUTINE);
 }
 

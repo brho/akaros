@@ -56,8 +56,11 @@ void udelay_sched(uint64_t usec)
  * you want something to happen in the future, set an alarm. */
 void timer_interrupt(struct hw_trapframe *hw_tf, void *data)
 {
-	struct timer_chain *pcpui_tchain = &per_cpu_info[core_id()].tchain;
-	trigger_tchain(pcpui_tchain);
+	int coreid = core_id();
+	/* run the alarms out of RKM context, so that event delivery works nicely
+	 * (keeps the proc lock and ksched lock non-irqsave) */
+	send_kernel_message(coreid, __trigger_tchain,
+	                    (long)&per_cpu_info[coreid].tchain, 0, 0, KMSG_ROUTINE);
 }
 
 /* We can overflow/wraparound when we multiply up, but we have to divide last,

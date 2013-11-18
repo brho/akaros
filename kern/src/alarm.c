@@ -118,8 +118,9 @@ static void wake_awaiter(struct alarm_waiter *waiter)
 
 /* This is called when an interrupt triggers a tchain, and needs to wake up
  * everyone whose time is up.  Called from IRQ context. */
-void trigger_tchain(struct timer_chain *tchain)
+void __trigger_tchain(uint32_t srcid, long a0, long a1, long a2)
 {
+	struct timer_chain *tchain = (struct timer_chain*)a0;
 	struct alarm_waiter *i, *temp;
 	uint64_t now = read_tsc();
 	bool changed_list = FALSE;
@@ -296,7 +297,7 @@ int sleep_on_awaiter(struct alarm_waiter *waiter)
  * if time is 0.   Any function like this needs to do a few things:
  * 	- Make sure the interrupt is on and will go off when we want
  * 	- Make sure the interrupt source can find tchain
- * 	- Make sure the interrupt handler calls trigger_tchain(tchain)
+ * 	- Make sure the interrupt handler sends an RKM to __trigger_tchain(tchain)
  * 	- Make sure you don't clobber an old tchain here (a bug) 
  * This implies the function knows how to find its timer source/void
  *
