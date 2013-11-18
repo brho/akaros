@@ -342,7 +342,10 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 {
 	struct proc *old_proc;
 	struct event_mbox *ev_mbox = 0;
+	assert(!in_irq_ctx(&per_cpu_info[core_id()]));
 	assert(p);
+	if (p->state == PROC_DYING)
+		return;
 	printd("[kernel] sending msg to proc %p, ev_q %p\n", p, ev_q);
 	if (!ev_q) {
 		warn("[kernel] Null ev_q - kernel code should check before sending!");
