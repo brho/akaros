@@ -6,6 +6,7 @@ obj-y						+= proc.o
 obj-y						+= regress.o
 obj-y						+= root.o
 obj-y						+= sd.o
+obj-y						+= sdata.o
 obj-y						+= tab.o
 obj-y						+= random.o
 obj-y						+= srv.o
