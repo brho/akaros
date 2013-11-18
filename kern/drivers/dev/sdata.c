@@ -2169,13 +2169,13 @@ struct sdifc sdataifc = {
 	ataenable,	/* enable */
 	atadisable,	/* disable */
 
-	NULL,	/*scsiverify, *//* verify */
-	NULL,	/*scsionline, *//* online */
+	scsiverify, /* verify */
+	scsionline, /* online */
 	atario,	/* rio */
 	atarctl,	/* rctl */
 	atawctl,	/* wctl */
 
-	NULL,	/*scsibio, *//* bio */
+	scsibio, /* bio */
 	ataprobew,	/* probe */
 	ataclear,	/* clear */
 	atastat,	/* stat */
