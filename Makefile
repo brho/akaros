@@ -518,11 +518,10 @@ endif #ifeq ($(mixed-targets),1)
 # List all userspace directories here, and state any dependencies between them,
 # such as how pthread depends on parlib.
 
-user-dirs = parlib pthread benchutil nixip bsd ndblib 
+user-dirs = parlib pthread benchutil nixip ndblib 
 pthread: parlib
 nixip: parlib
 ndblib: nixip
-bsd: nixip
 
 PHONY += install-libs $(user-dirs)
 install-libs: $(user-dirs) symlinks cc-exists
