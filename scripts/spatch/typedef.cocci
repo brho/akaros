@@ -421,3 +421,41 @@ typedef Rendez;
 @@
 -Rendez
 +struct rendez
+
+@@
+typedef SDunit;
+@@
+-SDunit
++struct sdunit
+
+@@
+typedef SDev;
+@@
+-SDev
++struct sdev
+
+@@
+typedef SDifc;
+@@
+-SDifc
++struct sdifc
+
+@@
+typedef SDpart;
+@@
+-SDpart
++struct sdpart
+
+@@
+typedef SDperm;
+@@
+-SDperm
++struct sdperm
+
+@@
+typedef SDreq;
+@@
+-SDreq
++struct sdreq
+
+

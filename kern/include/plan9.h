@@ -46,7 +46,7 @@ struct cmdtab {
 	int narg;					/* expected #args; 0 ==> variadic */
 };
 
-/* UTF support is removed. 
+/* UTF support is removed.
  */
 enum {
 	UTFmax = 3,					/* maximum bytes per rune */
@@ -173,7 +173,7 @@ struct block {
 /* linux has qstr, plan 9 has path. Path *might* need to go away
  * but there's a lot of fish to try here; maybe qstr should go away
  * instead? Let's not fret just now. The plan 9 one is a tad more
- * capable. 
+ * capable.
  */
 struct path {
 	struct kref ref;
@@ -425,6 +425,25 @@ struct queue {
 	char err[ERRMAX];
 };
 #endif
+
+/* device configuration functions for newer drivers from Inferno */
+
+/*
+ *  hardware info about a device
+ */
+struct devport {
+	unsigned long	port;
+	int	size;
+};
+
+struct DevConf
+{
+	unsigned long	intnum;		/* interrupt number */
+	char	*type;			/* card type, malloced */
+	int	nports;			/* Number of ports */
+	struct devport	*ports;		/* The ports themselves */
+};
+
 extern unsigned int qiomaxatomic;
 
 typedef int devgen_t(struct chan *c, char *name, struct dirtab *dirtab, int,
