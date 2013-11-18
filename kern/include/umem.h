@@ -12,6 +12,8 @@
  * is paged out or even an unmapped region: simply if it is in part of the
  * address space that could be RW user.  Will also check for len bytes. */
 static inline bool is_user_rwaddr(void *addr, size_t len);
+/* Same deal, but read-only */
+static inline bool is_user_raddr(void *addr, size_t len);
 
 /* Can they use the area in the manner of perm? */
 void *user_mem_check(struct proc *p, const void *DANGEROUS va, size_t len,
@@ -49,6 +51,15 @@ uintptr_t uva2kva(struct proc *p, void *uva);
 static inline bool is_user_rwaddr(void *addr, size_t len)
 {
 	if (((uintptr_t)addr < UWLIM) && ((uintptr_t)addr + len <= UWLIM))
+		return TRUE;
+	else
+		return FALSE;
+}
+
+/* ULIM is defined as virtual address below which a process can read */
+static inline bool is_user_raddr(void *addr, size_t len)
+{
+	if (((uintptr_t)addr < ULIM) && ((uintptr_t)addr + len <= ULIM))
 		return TRUE;
 	else
 		return FALSE;
