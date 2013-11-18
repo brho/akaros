@@ -98,8 +98,8 @@ void reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
                      uint64_t abs_time);
 /* Blocks on the alarm waiter */
 int sleep_on_awaiter(struct alarm_waiter *waiter);
-/* Interrupt handlers needs to call this.  Don't call it directly. */
-void trigger_tchain(struct timer_chain *tchain);
+/* Interrupt handlers needs to RKM this.  Don't call it directly. */
+void __trigger_tchain(uint32_t srcid, long a0, long a1, long a2);
 /* How to set a specific alarm: the per-cpu timer interrupt */
 void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain);
 
