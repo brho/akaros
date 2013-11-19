@@ -364,6 +364,15 @@ yield_return_path:
 	printd("[U] Uthread %08p returning from a yield!\n", uthread);
 }
 
+/* We explicitly don't support sleep(), since old callers of it have
+ * expectations of being woken up by signal handlers.  If we need that, we can
+ * build it in to sleep() later.  If you just want to sleep for a while, call
+ * this helper. */
+void uthread_sleep(unsigned int seconds)
+{
+	sys_block(seconds * 1000000);	/* usec sleep */
+}
+
 /* Cleans up the uthread (the stuff we did in uthread_init()).  If you want to
  * destroy a currently running uthread, you'll want something like
  * pthread_exit(), which yields, and calls this from its sched_ops yield. */
