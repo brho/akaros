@@ -851,8 +851,6 @@ int sysopen(char *name, int omode)
 	printd("sysopen %s mode %o\n", name, omode);
 	if (omode & O_NONBLOCK)	/* what to do? */
 		omode &= ~O_NONBLOCK;
-	if (omode & O_CLOEXEC)	/* FIX ME */
-		omode &= ~O_CLOEXEC;
 	if (omode & O_DIRECTORY) {
 		omode &= ~O_DIRECTORY;
 		mustdir = 1;
@@ -1249,7 +1247,7 @@ sysunmount(char *name, char *old)
  * - Once we lock and set closed, no further additions can happen.  To simplify
  *   our closes, we also allow multiple calls to this func (though that should
  *   never happen with the current code). */
-void close_9ns_files(struct proc *p)
+void close_9ns_files(struct proc *p, bool only_cloexec)
 {
 	struct fgrp *f = p->fgrp;
 
@@ -1259,12 +1257,15 @@ void close_9ns_files(struct proc *p)
 		warn("Unexpected double-close");
 		return;
 	}
-	f->closed = TRUE;
+	if (!only_cloexec)
+		f->closed = TRUE;
 	spin_unlock(&f->lock);
 
 	/* maxfd is a legit val, not a +1 */
 	for (int i = 0; i <= f->maxfd; i++) {
 		if (!f->fd[i])
+			continue;
+		if (only_cloexec && !(f->fd[i]->flag & CCEXEC))
 			continue;
 		cclose(f->fd[i]);
 		f->fd[i] = 0;

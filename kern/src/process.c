@@ -819,7 +819,7 @@ void proc_destroy(struct proc *p)
 	 * the pipe closes.  And if the parent doesnt decref, we don't free.
 	 * alternatively, we could send a SIGCHILD to the parent, but that would
 	 * require parent's to never ignore that signal (or risk never reaping) */
-	close_9ns_files(p);
+	close_9ns_files(p, FALSE);
 	close_all_files(&p->open_files, FALSE);
 	/* Tell the ksched about our death, and which cores we freed up */
 	__sched_proc_destroy(p, pc_arr, nr_cores_revoked);

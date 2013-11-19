@@ -581,6 +581,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	p->procdata->ldt = 0;
 	#endif
 	destroy_vmrs(p);
+	close_9ns_files(p, TRUE);
 	close_all_files(&p->open_files, TRUE);
 	env_user_mem_free(p, 0, UMAPTOP);
 	if (load_elf(p, program)) {
