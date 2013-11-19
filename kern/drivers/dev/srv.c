@@ -174,7 +174,7 @@ srvcreate(struct chan *c, char *name, int omode, int perm)
 
 	sp->path = qidpath++;
 	sp->link = srv;
-	strncpy(sname,  name, sizeof(sname));
+	strncpy(sname, name, strlen(name) + 1);
 	sp->name = sname;
 	c->qid.type = QTFILE;
 	c->qid.path = sp->path;
@@ -183,7 +183,8 @@ srvcreate(struct chan *c, char *name, int omode, int perm)
 	poperror();
 
 	kstrdup(&sp->owner, "eve"/*up->user*/);
-	sp->perm = perm&0777 | 0666;
+	sp->perm = perm & 0777;
+	sp->perm |= 0666;	/* hack in free-for-all permissions TODO: secure this */
 
 	c->flag |= COPEN;
 	c->mode = OWRITE;
