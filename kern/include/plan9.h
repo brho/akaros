@@ -85,15 +85,6 @@ enum {
 #define MCACHE	0x0010	/* cache some data */
 #define MMASK	0x0017	/* all bits on */
 
-#define OREAD	0	/* open for read */
-#define OWRITE	1	/* write */
-#define ORDWR	2	/* read and write */
-#define OEXEC	3	/* execute, == read but check execute permission */
-#define OTRUNC	16	/* or'ed in (except for exec), truncate file first */
-#define OCEXEC	32	/* or'ed in, close on exec */
-#define ORCLOSE	64	/* or'ed in, remove on close */
-#define OEXCL   0x1000	/* or'ed in, exclusive create */
-
 #define NCONT	0	/* continue after note */
 #define NDFLT	1	/* terminate after note */
 #define NSAVE	2	/* clear note but hold state */

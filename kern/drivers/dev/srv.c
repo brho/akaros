@@ -130,8 +130,8 @@ srvopen(struct chan *c, int omode)
 	if(sp == 0 || sp->chan == 0)
 		error(Eshutdown);
 
-	if(omode&OTRUNC)
-		error("srv file already exists");
+	/* FYI: plan9 used to bail out for O_TRUNCs here */
+
 	if(openmode(omode)!=sp->chan->mode && sp->chan->mode!=ORDWR)
 		error(Eperm);
 	devpermcheck(sp->owner, sp->perm, omode);

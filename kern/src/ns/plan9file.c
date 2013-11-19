@@ -118,12 +118,23 @@ void fdclose(int fd, int flag)
 
 int openmode(int omode)
 {
+#if 0
+	/* this is the old plan9 style.  i think they want to turn exec into read,
+	 * and strip off anything higher, and just return the RD/WR style bits.  not
+	 * stuff like ORCLOSE.  the lack of OEXCL might be a bug on there part (it's
+	 * the only one of their non-RW-related flags that isn't masked out) */
 	omode &= ~(OTRUNC | OCEXEC | ORCLOSE);
 	if (omode > OEXEC)
 		error(Ebadarg);
 	if (omode == OEXEC)
 		return OREAD;
 	return omode;
+#endif
+	/* no error checking (we have a shitload of flags anyway), and we return the
+	 * basic access modes (RD/WR/ETC) */
+	if (omode == O_EXEC)
+		return O_RDONLY;
+	return omode & O_ACCMODE;
 }
 
 static void unlockfgrp(struct fgrp *f)
@@ -798,7 +809,6 @@ int syscreate(char *name, int omode)
 	/* if it exists, it is truncated. 
 	 * if it does not exists, it's created.
 	 * so we don't need these flags.
-	 * TODO; convert all flags to akaros flags.
 	 */
 	omode &= ~(O_CREAT | O_TRUNC);
 
@@ -847,10 +857,13 @@ int sysopen(char *name, int omode)
 		omode &= ~O_DIRECTORY;
 		mustdir = 1;
 	}
-	if (omode & (O_CREAT | O_TRUNC))
-		return syscreate(name, omode);
-
+	/* TODO: plan9 used to check for both CREATE and TRUNC here, calling create
+	 * regardless.  This will need work as we add in other devices. */
 	if (waserror()) {
+		if (omode & O_CREAT) {
+			poperror();
+			return syscreate(name, omode);
+		}
 		set_errno(ENOENT);
 		printd("error\n");
 		if (c)

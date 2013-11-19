@@ -45,13 +45,15 @@ struct kstat {
 #define dirent kdirent 
 
 /* File access modes for open and fcntl. */
-#define O_RDONLY		0			/* Open read-only */
-#define O_WRONLY		1			/* Open write-only */
-#define O_RDWR			2			/* Open read/write */
-#define O_ACCMODE		3
+#define O_RDONLY		0x00		/* Open read-only */
+#define O_WRONLY		0x01		/* Open write-only */
+#define O_RDWR			0x02		/* Open read/write */
+#define O_EXEC			0x04		/* Open for exec (unsupported) */
+#define O_ACCMODE		0x07
 
 /* Bits OR'd into the second argument to open */
 #define O_CREAT			00000100	/* not fcntl */
+#define O_CREATE		O_CREAT		/* fucking saving space with the 'E'? */
 #define O_EXCL			00000200	/* not fcntl */
 #define O_NOCTTY		00000400	/* not fcntl */
 #define O_TRUNC			00001000	/* not fcntl */
@@ -65,8 +67,19 @@ struct kstat {
 #define O_NOFOLLOW		00400000	/* Do not follow links. */
 #define O_NOATIME		01000000	/* Do not set atime. */
 #define O_CLOEXEC		02000000	/* Set close_on_exec. */
+#define O_REMCLO		04000000	/* Remove on close (unsupported). */
 #define O_CREAT_FLAGS (O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC)
 #define O_FCNTL_FLAGS (O_APPEND | O_ASYNC | O_DIRECT | O_NOATIME | O_NONBLOCK)
+
+/* Plan9 names for these flags */
+#define OREAD			O_RDONLY
+#define OWRITE			O_WRONLY
+#define ORDWR			O_RDWR
+#define OEXEC			O_EXEC
+#define OTRUNC			O_TRUNC
+#define OCEXEC			O_CLOEXEC
+#define OEXCL   		O_EXCL
+#define ORCLOSE			O_REMCLO
 
 /* File creation modes (access controls) */
 #define S_IRWXU 00700	/* user (file owner) has read, write and execute perms */
