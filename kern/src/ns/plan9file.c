@@ -855,6 +855,8 @@ int sysopen(char *name, int omode)
 		omode &= ~O_DIRECTORY;
 		mustdir = 1;
 	}
+	if ((omode & (O_CREATE | O_EXCL)) == (O_CREATE | O_EXCL))
+		return syscreate(name, omode);
 	/* TODO: plan9 used to check for both CREATE and TRUNC here, calling create
 	 * regardless.  This will need work as we add in other devices. */
 	if (waserror()) {

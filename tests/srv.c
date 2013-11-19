@@ -134,7 +134,7 @@ post(char *srv, int fd)
 	char buf[128];
 
 	fprintf(stderr, "post...\n");
-	f = open(srv, O_WRONLY|O_CREAT, 0666);
+	f = open(srv, O_WRONLY | O_CREAT | O_EXCL, 0666);
 	if(f < 0){
 		sprintf(buf, "create(%s)", srv);
 		Error(buf);
