@@ -310,6 +310,8 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 
 	atomic_inc(&num_envs);
 	frontend_proc_init(p);
+	//plan9setup(p, parent);
+	//devalarm_init(p);
 	printd("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
 	} // INIT_STRUCT
 	*pp = p;
@@ -359,6 +361,7 @@ static void __proc_free(struct kref *kref)
 	printd("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
 	// All parts of the kernel should have decref'd before __proc_free is called
 	assert(kref_refcnt(&p->p_kref) == 0);
+	assert(TAILQ_EMPTY(&p->alarmset.list));
 
 	/* close plan9 dot and slash and free fgrp fd and fgrp */
 	kref_put(&p->fs_env.root->d_kref);
