@@ -1,3 +1,4 @@
+obj-y						+= alarm.o
 obj-y						+= ether.o
 obj-y						+= misc.o
 obj-y						+= mnt.o

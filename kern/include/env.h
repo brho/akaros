@@ -21,6 +21,7 @@
 #include <vfs.h>
 #include <schedule.h>
 #include <plan9.h>
+#include <devalarm.h>
 
 TAILQ_HEAD(vcore_tailq, vcore);
 /* 'struct proc_list' declared in sched.h (not ideal...) */
@@ -94,6 +95,8 @@ struct proc {
 	/* UCQ hashlocks */
 	struct hashlock				*ucq_hashlock;
 	struct small_hashlock		ucq_hl_noref;	/* don't reference directly */
+	/* For devalarm */
+	struct proc_alarm_set		alarmset;
 };
 
 /* Til we remove all Env references */

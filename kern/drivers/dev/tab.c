@@ -20,6 +20,7 @@
 //extern struct dev* devtab[];
 // the sooner the better!
 
+extern struct dev alarmdevtab;
 extern struct dev regressdevtab;
 extern struct dev pipedevtab;
 extern struct dev procdevtab;
@@ -30,6 +31,7 @@ extern struct dev ipdevtab;
 extern struct dev mntdevtab;
 extern struct dev srvdevtab;
 struct dev *devtab[] = {
+	&alarmdevtab,
 	&rootdevtab,
 	&miscdevtab,
 	&regressdevtab,
