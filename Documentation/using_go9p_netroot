@@ -1,0 +1,51 @@
+We can serve the root file system for NxM directly from Linux or OS X,
+allowing access to the full Linux namespace during run-time.
+For this, we use go9p. 
+
+You need to have Go installed, e.g.
+
+pacman -S go
+
+apt-get install golang
+
+Set a GOPATH, e.g.
+ $ export GOPATH=~/go
+ $ go get code.google.com/p/go9p/p
+
+This *should* work
+
+ $ go install code.google.com/p/go9p/p
+
+but does not (Why?)
+
+Find the directory, in my case it is:
+
+/home/rminnich/go/src/code.google.com/p/go9p/p/srv/examples/ufs
+
+cd there, type
+
+ $ go build
+
+and you'll see the ufs binary.
+
+You can now run ufs, specifying the appropriate root directory:
+
+ $ sudo ufs -addr=:564 -root=whereever
+
+Here is an example qemu command which some of us use:
+
+A more complex usage (Ron's case) involves serving a root file system
+to an NxM instance being run on an Arch virtual machine guest in
+vmware fusion. That's not near as hard as it sounds. The OSX machine
+is called rminnich-macbookair; the arch Linux guest VM is called arch.
+
+On OSX, we start two commands:
+
+$ ufs -addr:7777
+
+$ ssh -R 564:rminnich-macbookair:7777 root@arch
+
+This ssh command sets up a reverse proxy on the arch linux guest to
+the ufs server running on OSX.  On arch linux, we run the qemu command
+shown above. When we get the root is from prompt, we use the ip
+address 10.0.2.2. That's it.
