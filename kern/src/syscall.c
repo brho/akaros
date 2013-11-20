@@ -580,6 +580,8 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	/* clear this, so the new program knows to get an LDT */
 	p->procdata->ldt = 0;
 	#endif
+	/* When we destroy our memory regions, accessing cur_sysc would PF */
+	pcpui->cur_kthread->sysc = 0;
 	destroy_vmrs(p);
 	close_9ns_files(p, TRUE);
 	close_all_files(&p->open_files, TRUE);
