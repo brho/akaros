@@ -405,11 +405,11 @@ static bool check_spurious_irq(uint32_t trap_nr)
 	 * doesn't show that irq, then it was spurious, and we don't send an eoi.
 	 * Check out http://wiki.osdev.org/8259_PIC#Spurious_IRQs */
 	if ((trap_nr == PIC1_SPURIOUS) && !(pic_get_isr() & (1 << 7))) {
-		printk("Spurious PIC1 irq!\n");	/* want to know if this happens */
+		printd("Spurious PIC1 irq!\n");	/* want to know if this happens */
 		return TRUE;
 	}
 	if ((trap_nr == PIC2_SPURIOUS) && !(pic_get_isr() & (1 << 15))) {
-		printk("Spurious PIC2 irq!\n");	/* want to know if this happens */
+		printd("Spurious PIC2 irq!\n");	/* want to know if this happens */
 		/* for the cascaded PIC, we *do* need to send an EOI to the master's
 		 * cascade irq (2). */
 		pic_send_eoi(2);
