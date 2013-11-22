@@ -72,8 +72,11 @@ void set_alarm(struct alarm_waiter *waiter);
 bool unset_alarm(struct alarm_waiter *waiter);
 void reset_alarm_abs(struct alarm_waiter *waiter, uint64_t abs_time);
 
+/* "parlib" alarm handlers */
+void alarm_abort_sysc(struct alarm_waiter *awaiter);
+
 /* Debugging */
 #define ALARM_POISON_TIME 12345
 void print_chain(struct timer_chain *tchain);
 
-#endif /* ROS_KERN_ALARM_H */
+#endif /* _ALARM_H */

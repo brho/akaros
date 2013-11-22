@@ -393,3 +393,20 @@ void print_chain(struct timer_chain *tchain)
 	       tchain->latest_time);
 	spin_pdr_unlock(&tchain->lock);
 }
+
+/* "parlib" alarm handlers */
+void alarm_abort_sysc(struct alarm_waiter *awaiter)
+{
+	struct uthread *uth = awaiter->data;
+	assert(uth);
+	if (!uth->sysc) {
+		/* It's possible the sysc hasn't blocked yet or is in the process of
+		 * unblocking, or even has returned, but hasn't cancelled the alarm.
+		 * regardless, we request a new alarm (the uthread will cancel us one
+		 * way or another). */
+		set_awaiter_inc(awaiter, 1000000);
+		__set_alarm(awaiter);
+		return;
+	}
+	sys_abort_sysc(uth->sysc);
+}
