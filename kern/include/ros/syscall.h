@@ -12,6 +12,7 @@
 #define SC_PROGRESS				0x0002		/* SC made progress */
 #define SC_UEVENT				0x0004		/* user has an ev_q */
 #define SC_K_LOCK				0x0008		/* kernel locked sysc */
+#define SC_ABORT				0x0010		/* syscall abort attempted */
 
 #define MAX_ERRSTR_LEN			128
 

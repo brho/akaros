@@ -41,6 +41,7 @@
 #define SYS_init_arsc				28
 #define SYS_change_to_m				29
 #define SYS_poke_ksched				30
+#define SYS_abort_sysc				31
 
 /* Socket Syscalls */
 #define SYS_socket					40

@@ -991,6 +991,11 @@ out:
 	return retval;
 }
 
+static int sys_abort_sysc(struct proc *p, struct syscall *sysc)
+{
+	return abort_sysc(p, sysc);
+}
+
 /************** Platform Specific Syscalls **************/
 
 //Read a buffer over the serial port
@@ -1703,6 +1708,7 @@ const static struct sys_table_entry syscall_table[] = {
 #endif
 	[SYS_change_to_m] = {(syscall_t)sys_change_to_m, "change_to_m"},
 	[SYS_poke_ksched] = {(syscall_t)sys_poke_ksched, "poke_ksched"},
+	[SYS_abort_sysc] = {(syscall_t)sys_abort_sysc, "abort_sysc"},
 
 // socket related syscalls
 	[SYS_socket] ={(syscall_t)sys_socket, "socket"},

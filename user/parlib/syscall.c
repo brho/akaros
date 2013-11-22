@@ -191,3 +191,8 @@ int sys_poke_ksched(int pid, unsigned int res_type)
 {
 	return ros_syscall(SYS_poke_ksched, pid, res_type, 0, 0, 0, 0);
 }
+
+int sys_abort_sysc(struct syscall *sysc)
+{
+	return ros_syscall(SYS_abort_sysc, sysc, 0, 0, 0, 0, 0);
+}

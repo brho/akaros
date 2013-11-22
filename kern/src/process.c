@@ -312,6 +312,8 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	frontend_proc_init(p);
 	//plan9setup(p, parent);
 	//devalarm_init(p);
+	TAILQ_INIT(&p->abortable_sleepers);
+	spinlock_init_irqsave(&p->abort_list_lock);
 	printd("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
 	} // INIT_STRUCT
 	*pp = p;

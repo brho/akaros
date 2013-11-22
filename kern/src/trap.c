@@ -223,6 +223,6 @@ void print_kctx_depths(const char *str)
 	
 	if (!str)
 		str = "(none)";
-	printk("%s: Core %d, irq depth %d, ktrap depth %d\n", str, coreid,
-	       irq_depth(pcpui), ktrap_depth(pcpui));
+	printk("%s: Core %d, irq depth %d, ktrap depth %d, irqon %d\n", str, coreid,
+	       irq_depth(pcpui), ktrap_depth(pcpui), irq_is_enabled());
 }

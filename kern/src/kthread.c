@@ -681,3 +681,92 @@ void cv_broadcast_irqsave(struct cond_var *cv, int8_t *irq_state)
 	cv_broadcast(cv);
 	enable_irqsave(irq_state);
 }
+
+/* Attempts to abort p's sysc.  It will only do so if the sysc lookup succeeds,
+ * so we can handle "guesses" for syscalls that might not be sleeping.  This
+ * style of "do it if you know you can" is the best way here - anything else
+ * runs into situations where you don't know if the memory is safe to touch or
+ * not (we're doing a lookup via pointer address, and only dereferencing if that
+ * succeeds).  Even something simple like letting userspace write SC_ABORT is
+ * very hard for them, since they don't know a sysc's state for sure (under the
+ * current system).
+ *
+ * Here are the rules:
+ * - if you're flagged SC_ABORT, you don't sleep
+ * - if you sleep, you're on the list
+ * - if you are on the list or abort_in_progress is set, CV is signallable, and
+ *   all the memory for CLE is safe */
+bool abort_sysc(struct proc *p, struct syscall *sysc)
+{
+	struct cv_lookup_elm *cle;
+	int8_t irq_state = 0;
+	spin_lock_irqsave(&p->abort_list_lock);
+	TAILQ_FOREACH(cle, &p->abortable_sleepers, link) {
+		if (cle->sysc == sysc) {
+			cle->abort_in_progress = TRUE;
+			break;
+		}
+	}
+	spin_unlock_irqsave(&p->abort_list_lock);
+	if (!cle)
+		return FALSE;
+	/* At this point, we have a handle on the syscall that we want to abort (via
+	 * the cle), and we know none of the memory will disappear on us (deregers
+	 * wait on the flag).  So we'll signal ABORT, which rendez will pick up next
+	 * time it is awake.  Then we make sure it is awake with a broadcast. */
+	atomic_or(&cle->sysc->flags, SC_ABORT);
+	cmb();	/* flags write before signal; atomic op provided CPU mb */
+	cv_broadcast_irqsave(cle->cv, &irq_state); 
+	wmb();	/* signal/broadcast writes before clearing the abort flag */
+	cle->abort_in_progress = FALSE;
+	return TRUE;
+}
+
+/* Being on the abortable list means that the CLE, KTH, SYSC, and CV are valid
+ * memory.  The lock ordering is {CV lock, list_lock}.  Callers to this *will*
+ * have CV held.  This is done to avoid excessive locking in places like
+ * rendez_sleep, which want to check the condition before registering. */
+void __reg_abortable_cv(struct cv_lookup_elm *cle, struct cond_var *cv)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	cle->cv = cv;
+	cle->kthread = pcpui->cur_kthread;
+	/* Could be a ktask.  Can build in support for aborting these later */
+	if (cle->kthread->is_ktask) {
+		cle->sysc = 0;
+		return;
+	}
+	cle->sysc = cle->kthread->sysc;
+	assert(cle->sysc);
+	cle->proc = pcpui->cur_proc;
+	cle->abort_in_progress = FALSE;
+	spin_lock_irqsave(&cle->proc->abort_list_lock);
+	TAILQ_INSERT_HEAD(&cle->proc->abortable_sleepers, cle, link);
+	spin_unlock_irqsave(&cle->proc->abort_list_lock);
+}
+
+/* We're racing with the aborter too, who will hold the flag in cle to protect
+ * its ref on our cle.  While the lock ordering is CV, list, callers to this
+ * must *not* have the cv lock held.  The reason is this waits on a successful
+ * abort_sysc, which is trying to cv_{signal,broadcast}, which could wait on the
+ * CV lock.  So if we hold the CV lock, we can deadlock (circular dependency).*/
+void dereg_abortable_cv(struct cv_lookup_elm *cle)
+{
+	if (cle->kthread->is_ktask)
+		return;
+	assert(cle->proc);
+	spin_lock_irqsave(&cle->proc->abort_list_lock);
+	TAILQ_REMOVE(&cle->proc->abortable_sleepers, cle, link);
+	spin_unlock_irqsave(&cle->proc->abort_list_lock);
+	/* If we won the race and yanked it out of the list before abort claimed it,
+	 * this will already be FALSE. */
+	while (cle->abort_in_progress)
+		cpu_relax();
+}
+
+/* Helper to sleepers to know if they should abort or not.  I'll probably extend
+ * this with things for ktasks in the future. */
+bool should_abort(struct cv_lookup_elm *cle)
+{
+	return (cle->sysc && (atomic_read(&cle->sysc->flags) & SC_ABORT));
+}
