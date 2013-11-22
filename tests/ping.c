@@ -12,11 +12,12 @@
 #include <timing.h>
 #include <tsc-compat.h>
 #include <printf-ext.h>
+#include <alarm.h>
 
-#define MAXMSG				32
+#define NR_MSG				4
 #define SLEEPMS				1000
-#define SECOND				(get_tsc_freq())
-#define MINUTE				(60 * SECOND)
+#define SECONDTSC			(get_tsc_freq())
+#define MINUTETSC			(60 * SECONDTSC)
 #define BUFSIZE				(64 * 1024 + 512)
 
 typedef struct Req Req;
@@ -73,32 +74,6 @@ usage(void)
 	    "usage: %s [-6alq] [-s msgsize] [-i millisecs] [-n #pings] dest\n",
 		argv0);
 	exit(1);
-}
-
-#define ignore(x) 
-#define lock(x)
-#define unlock(x)
-
-static void
-catch(void *a, char *msg)
-{
-	if(strstr(msg, "alarm")){
-		
-			ignore(NCONT);
-			fprintf(stderr, "noted\n");
-			exit(1);
-		}
-	else if(strstr(msg, "die")){
-		
-			fprintf(stderr, "errors");
-			exit(1);
-		}
-	else
-		{
-			ignore(NDFLT);
-			fprintf(stderr, "noted\n");
-			exit(1);
-		}
 }
 
 static void
@@ -183,7 +158,7 @@ clean(uint16_t seq, int64_t now, void *v)
 			r->ttl = ttl;
 			reply(r, v);
 		}
-		if(ndiff(r->tsctime, now) > MINUTE){
+		if (now - r->tsctime > MINUTETSC) {
 			*l = r->next;
 			r->rtt = ndiff(r->tsctime, now);
 			if(v)
@@ -285,7 +260,8 @@ sender(int fd, int msglen, int interval, int n)
 		if(i != 0){
 			if(pingrint != 0)
 				extra = rand();
-			sleep(interval + extra);
+			/* uth_sleep takes seconds, interval is in ms */
+			uthread_sleep((interval + extra) / 1000);
 		}
 		r = calloc(sizeof *r, 1);
 		if (r == NULL){
@@ -323,20 +299,27 @@ rcvr(int fd, int msglen, int interval, int nmsg)
 	uint8_t *buf = malloc(BUFSIZE);
 	struct icmphdr *icmp;
 	Req *r;
+	struct alarm_waiter waiter;
+
+	init_awaiter(&waiter, alarm_abort_sysc);
+	waiter.data = current_uthread;
 
 	sum = 0;
 	while(lostmsgs+rcvdmsgs < nmsg){
-		//alarm((nmsg-lostmsgs-rcvdmsgs)*interval+waittime);
+		/* arm to wake ourselves if the read doesn't connect in time */
+		set_awaiter_rel(&waiter, 1000 *
+		                ((nmsg - lostmsgs - rcvdmsgs) * interval + waittime));
+		set_alarm(&waiter);
 		n = read(fd, buf, BUFSIZE);
+		/* cancel immediately, so future syscalls don't get aborted */
+		unset_alarm(&waiter);
 
-		if (n < 0){
-			perror("read");
-			exit(1);
-		}
-		//alarm(0);
 		now = read_tsc();
 		if(n <= 0){	/* read interrupted - time to go */
-			clean(0, now+MINUTE, NULL);
+			/* Faking time being a minute in the future, so clean marks our
+			 * message as lost.  Note this will also end up cancelling any other
+			 * pending replies that would have expired by then.  Whatever. */
+			clean(0, now + MINUTETSC, NULL);
 			continue;
 		}
 		if(n < msglen){
@@ -515,7 +498,7 @@ int fd, msglen, interval, nmsg;
 void *rcvr_thread(void* arg)
 {	
 	rcvr(fd, msglen, interval, nmsg);
-	printf(lostmsgs ? "lost messages" : "");
+	printd(lostmsgs ? "lost messages" : "");
 	return 0;
 }
 
@@ -528,7 +511,7 @@ int main(int argc, char **argv)
 	register_printf_specifier('i', printf_ipaddr, printf_ipaddr_info);
 
 	msglen = interval = 0;
-	nmsg = MAXMSG;
+	nmsg = NR_MSG;
 
 	argv0 = argv[0];
 	if (argc <= 1)
@@ -599,7 +582,7 @@ int main(int argc, char **argv)
 	if(argc < 1)
 		usage();
 
-	fprintf(stderr, "NO SIGNAL HANDLING\n"); //notify(catch);
+	/* TODO: consider catching ctrl-c and other signals. */
 
 	if (!isv4name(argv[0]))
 		proto = &v6pr;
@@ -627,6 +610,11 @@ int main(int argc, char **argv)
 	return 0;
 }
 
+/* Note: this gets called from clean, which happens when we complete a loop and
+ * got a reply in the receiver.  One problem is that we call printf from the
+ * receive loop, blocking all future receivers, so that their times include the
+ * printf time.  This isn't a huge issue, since the sender sleeps between each
+ * one, and hopefully the print is done when the sender fires again. */
 void
 reply(Req *r, void *v)
 {
@@ -650,6 +638,6 @@ lost(Req *r, void *v)
 		if(addresses && v != NULL)
 			(*proto->prlost)(r->seq - firstseq, v);
 		else
-			printf("lost %u\n", r->seq - firstseq);
+			printf("%3d: lost\n", r->seq - firstseq);
 	lostmsgs++;
 }
