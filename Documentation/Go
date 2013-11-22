@@ -1,0 +1,69 @@
+git clone ssh://akaros.cs.berkeley.edu/srv/git/go.git
+
+Idiocy: seem to need +x on local.bash *AND* it needs to be in your path.
+
+After you have downloaded the GO repo, you need to modify
+$GOROOT/src/local.bash to set up your $ROSROOT and $GOBIN directories
+as well as select whether you are building GO for the 386 architecture
+or amd64. After you have set this up, simply run ./akaros.bash from
+the $GOROOT/src/ directory to build and install GO for Akaros.
+
+Assuming you have $GOBIN in your PATH, you should now be able to run
+the command go-akaros-$ARCH, where $ARCH is one of either 386 or
+amd64, depending on which architecture you chose to build for.
+
+In order to build some example programs as well as the full GO test
+suite for Akaros, go to $GOROOT/examples and run the ./examples.bash
+script to see a list of build and install options.  Any example
+programs or tests that are built using this script are installed into
+a $GOROOT/examples/kfs directory, which you can direct Akaros to
+include in its KFS path (see the instructions in the GETTING_STARTED
+document in the Akaros source tree to see how to do this).  When
+installing tests from the GO test suite, a convenience script is
+installed into kfs/bin/gotests.sh so that you can simply launch this
+script to run any installed tests back to back.
+
+
+How Ron built it.
+
+My local.bash
+export ROSROOT="$HOME/akaros"
+export GOBIN="$HOME/go-install"
+export GOOS=akaros
+export GOARCH=amd64
+export TARGETCC=x86_64-ros-gcc
+export TARGETCXX=x86_64-ros-g++
+
+And in my shell:
+export GOPATH=/home/rminnich/install/go-install/
+export GOROOT=/home/rminnich/go
+
+local.bash has to be +x
+chmod +x local.bash
+
+Stupidly, ubuntu bash want files you source in $PATH!
+PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/core_perl:/usr/local/plan9/bin:/usr/local/src/depot_tools/
+:/home/rminnich/install/go-install/
+
+PATH=$PATH:~/ros-gcc-glibc/install-x86_64-ros-gcc/bin/:`pwd`
+sh akaros.bash 
+
+Build tests
+cd ../go-akaros/examples/
+GOROOT=~/go-akaros/
+./examples.bash -t all
+
+How Ron runs it from the 9p mount point. 
+Start go9p on another terminal/host:
+./go9p -addr=:1025 -root=/usr/local/crouton/drinkcat-chroagh-6b888af/chroots/arch/home/rminnich/
+
+Note the root can be anything. I made it my ~ so I have less typing to do.
+The script, when it runs, probably wants things in /; maybe I was missing some environment
+variable, so:
+mkdir /gotests
+cp -r /mnt/go-akaros/examples/kfs/gotests / 
+
+Now you can run the tests.
+ash /mnt/go-akaros/examples/kfs/bin/gotests.sh 
+
+These are running in kfs.
