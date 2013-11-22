@@ -108,8 +108,6 @@ static void reset_tchain_interrupt(struct timer_chain *tchain)
  * will wake up.  o/w, it will call the func ptr stored in the awaiter. */
 static void wake_awaiter(struct alarm_waiter *waiter)
 {
-	waiter->on_tchain = FALSE;
-	cmb();	/* enforce the on_tchain write before the handlers */
 	if (waiter->func)
 		waiter->func(waiter);
 	else
@@ -132,7 +130,9 @@ void __trigger_tchain(uint32_t srcid, long a0, long a1, long a2)
 		/* TODO: Could also do something in cases where we're close to now */
 		if (i->wake_up_time <= now) {
 			changed_list = TRUE;
+			i->on_tchain = FALSE;
 			TAILQ_REMOVE(&tchain->waiters, i, next);
+			cmb();	/* enforce waking after removal */
 			/* Don't touch the waiter after waking it, since it could be in use
 			 * on another core (and the waiter can be clobbered as the kthread
 			 * unwinds its stack).  Or it could be kfreed */
@@ -157,6 +157,7 @@ static bool __insert_awaiter(struct timer_chain *tchain,
 	struct alarm_waiter *i, *temp;
 	/* This will fail if you don't set a time */
 	assert(waiter->wake_up_time != ALARM_POISON_TIME);
+	assert(!waiter->on_tchain);
 	waiter->on_tchain = TRUE;
 	/* Either the list is empty, or not. */
 	if (TAILQ_EMPTY(&tchain->waiters)) {
@@ -232,6 +233,7 @@ static bool __remove_awaiter(struct timer_chain *tchain,
 		tchain->latest_time = (temp) ? temp->wake_up_time : ALARM_POISON_TIME;
 	}
 	TAILQ_REMOVE(&tchain->waiters, waiter, next);
+	waiter->on_tchain = FALSE;
 	return reset_int;
 }
 
