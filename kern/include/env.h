@@ -97,6 +97,8 @@ struct proc {
 	struct small_hashlock		ucq_hl_noref;	/* don't reference directly */
 	/* For devalarm */
 	struct proc_alarm_set		alarmset;
+	struct cv_lookup_tailq		abortable_sleepers;
+	spinlock_t					abort_list_lock;
 };
 
 /* Til we remove all Env references */

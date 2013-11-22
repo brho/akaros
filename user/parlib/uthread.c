@@ -416,7 +416,7 @@ void __ros_mcp_syscall_blockon(struct syscall *sysc)
 	/* double check before doing all this crap */
 	if (atomic_read(&sysc->flags) & (SC_DONE | SC_PROGRESS))
 		return;
-	/* Debugging: so we can match sysc when it tries to wake us up later */
+	/* for both debugging and syscall cancelling */
 	current_uthread->sysc = sysc;
 	/* yield, calling 2ls-blockon(cur_uth, sysc) on the other side */
 	uthread_yield(TRUE, sched_ops->thread_blockon_sysc, sysc);

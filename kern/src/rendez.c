@@ -20,14 +20,32 @@ void rendez_init(struct rendez *rv)
 void rendez_sleep(struct rendez *rv, int (*cond)(void*), void *arg)
 {
 	int8_t irq_state = 0;
+	struct cv_lookup_elm cle;
+	/* Do a quick check before registering and sleeping.  this is the 'check,
+	 * signal, check again' pattern, where the first check is an optimization.
+	 * Many rendezes will already be satisfied, so we want to avoid excessive
+	 * locking associated with reg/dereg. */
 	cv_lock_irqsave(&rv->cv, &irq_state);
+	if (cond(arg)) {
+		cv_unlock_irqsave(&rv->cv, &irq_state);
+		return;
+	}
+	__reg_abortable_cv(&cle, &rv->cv);
 	/* Mesa-style semantics, which is definitely what you want.  See the
 	 * discussion at the end of the URL above. */
 	while (!cond(arg)) {
+		/* it's okay if we miss the ABORT flag; we hold the cv lock, so an
+		 * aborter's broadcast is waiting until we unlock. */
+		if (should_abort(&cle)) {
+			cv_unlock_irqsave(&rv->cv, &irq_state);
+			dereg_abortable_cv(&cle);
+			error("syscall aborted");
+		}
 		cv_wait(&rv->cv);
 		cpu_relax();
 	}
 	cv_unlock_irqsave(&rv->cv, &irq_state);
+	dereg_abortable_cv(&cle);
 }
 
 /* Force a wakeup of all waiters on the rv, including non-timeout users.  For
@@ -45,28 +63,45 @@ void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
 {
 	int8_t irq_state = 0;
 	struct alarm_waiter awaiter;
+	struct cv_lookup_elm cle;
 	struct timer_chain *pcpui_tchain = &per_cpu_info[core_id()].tchain;
 
 	assert((int)msec > 0);
+	/* Doing this cond check early, but then unlocking again.  Mostly just to
+	 * avoid weird issues with the CV lock and the alarm tchain lock. */
+	cv_lock_irqsave(&rv->cv, &irq_state);
+	if (cond(arg)) {
+		cv_unlock_irqsave(&rv->cv, &irq_state);
+		return;
+	}
+	cv_unlock_irqsave(&rv->cv, &irq_state);
 	/* The handler will call rendez_wake, but won't mess with the condition
 	 * state.  It's enough to break us out of cv_wait() to see .on_tchain. */
 	init_awaiter(&awaiter, rendez_alarm_handler);
 	awaiter.data = rv;
-	set_awaiter_rel(&awaiter, msec);
+	set_awaiter_rel(&awaiter, msec * 1000);
 	/* Set our alarm on this cpu's tchain.  Note that when we sleep in cv_wait,
 	 * we could be migrated, and later on we could be unsetting the alarm
 	 * remotely. */
 	set_alarm(pcpui_tchain, &awaiter);
 	cv_lock_irqsave(&rv->cv, &irq_state);
+	__reg_abortable_cv(&cle, &rv->cv);
 	/* We could wake early for a few reasons.  Legit wakeups after a changed
 	 * condition (and we should exit), other alarms with different timeouts (and
 	 * we should go back to sleep), etc.  Note it is possible for our alarm to
 	 * fire immediately upon setting it: before we even cv_lock. */
 	while (!cond(arg) && awaiter.on_tchain) {
+		if (should_abort(&cle)) {
+			cv_unlock_irqsave(&rv->cv, &irq_state);
+			unset_alarm(pcpui_tchain, &awaiter);
+			dereg_abortable_cv(&cle);
+			error("syscall aborted");
+		}
 		cv_wait(&rv->cv);
 		cpu_relax();
 	}
 	cv_unlock_irqsave(&rv->cv, &irq_state);
+	dereg_abortable_cv(&cle);
 	/* Turn off our alarm.  If it already fired, this is a no-op.  Note this
 	 * could be cross-core. */
 	unset_alarm(pcpui_tchain, &awaiter);

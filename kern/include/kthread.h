@@ -61,6 +61,16 @@ struct cond_var {
 	bool						irq_okay;
 };
 
+struct cv_lookup_elm {
+	TAILQ_ENTRY(cv_lookup_elm)	link;
+	struct cond_var				*cv;
+	struct kthread				*kthread;
+	struct syscall				*sysc;
+	struct proc					*proc;
+	bool						abort_in_progress;
+};
+TAILQ_HEAD(cv_lookup_tailq, cv_lookup_elm);
+
 uintptr_t get_kstack(void);
 void put_kstack(uintptr_t stacktop);
 uintptr_t *kstack_bottom_addr(uintptr_t stacktop);
@@ -100,5 +110,10 @@ void cv_signal(struct cond_var *cv);
 void cv_broadcast(struct cond_var *cv);
 void cv_signal_irqsave(struct cond_var *cv, int8_t *irq_state);
 void cv_broadcast_irqsave(struct cond_var *cv, int8_t *irq_state);
+
+bool abort_sysc(struct proc *p, struct syscall *sysc);
+void __reg_abortable_cv(struct cv_lookup_elm *cle, struct cond_var *cv);
+void dereg_abortable_cv(struct cv_lookup_elm *cle);
+bool should_abort(struct cv_lookup_elm *cle);
 
 #endif /* ROS_KERN_KTHREAD_H */
