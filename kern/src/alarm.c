@@ -308,16 +308,19 @@ void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain)
 {
 	uint64_t rel_usec, now;
 	int pcoreid = core_id();
-	struct timer_chain *pcpui_tchain = &per_cpu_info[pcoreid].tchain;
+	struct per_cpu_info *rem_pcpui, *pcpui = &per_cpu_info[pcoreid];
+	struct timer_chain *pcpui_tchain = &pcpui->tchain;
 
 	if (pcpui_tchain != tchain) {
 		/* cross-core call.  we can simply send an alarm IRQ.  the alarm handler
 		 * will reset its pcpu timer, based on its current lists.  they take an
 		 * extra IRQ, but it gets the job done. */
+		rem_pcpui = (struct per_cpu_info*)((uintptr_t)tchain -
+		                    offsetof(struct per_cpu_info, tchain));
 		/* TODO: using the LAPIC vector is a bit ghetto, since that's x86.  But
 		 * RISCV ignores the vector field, and we don't have a global IRQ vector
 		 * namespace or anything. */
-		send_ipi(pcoreid + (pcpui_tchain - tchain), LAPIC_TIMER_DEFAULT_VECTOR);
+		send_ipi(rem_pcpui - &per_cpu_info[0], LAPIC_TIMER_DEFAULT_VECTOR);
 		return;
 	}
 	if (time) {

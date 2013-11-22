@@ -588,7 +588,7 @@ void send_ipi(uint32_t os_coreid, uint8_t vector)
 {
 	int hw_coreid = get_hw_coreid(os_coreid);
 	if (hw_coreid == -1) {
-		warn("Unmapped OS coreid!\n");
+		panic("Unmapped OS coreid (OS %d)!\n", os_coreid);
 		return;
 	}
 	__send_ipi(hw_coreid, vector);
