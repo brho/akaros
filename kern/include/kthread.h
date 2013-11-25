@@ -67,7 +67,7 @@ struct cv_lookup_elm {
 	struct kthread				*kthread;
 	struct syscall				*sysc;
 	struct proc					*proc;
-	bool						abort_in_progress;
+	atomic_t					abort_in_progress;	/* 0 = no */
 };
 TAILQ_HEAD(cv_lookup_tailq, cv_lookup_elm);
 
