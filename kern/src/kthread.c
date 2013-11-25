@@ -703,7 +703,9 @@ bool abort_sysc(struct proc *p, struct syscall *sysc)
 	spin_lock_irqsave(&p->abort_list_lock);
 	TAILQ_FOREACH(cle, &p->abortable_sleepers, link) {
 		if (cle->sysc == sysc) {
-			cle->abort_in_progress = TRUE;
+			/* Note: we could have multiple aborters, so we need to use a
+			 * numeric refcnt instead of a flag. */
+			atomic_inc(&cle->abort_in_progress);
 			break;
 		}
 	}
@@ -717,8 +719,8 @@ bool abort_sysc(struct proc *p, struct syscall *sysc)
 	atomic_or(&cle->sysc->flags, SC_ABORT);
 	cmb();	/* flags write before signal; atomic op provided CPU mb */
 	cv_broadcast_irqsave(cle->cv, &irq_state); 
-	wmb();	/* signal/broadcast writes before clearing the abort flag */
-	cle->abort_in_progress = FALSE;
+	cmb();	/* broadcast writes before abort flag; atomic op provided CPU mb */
+	atomic_dec(&cle->abort_in_progress);
 	return TRUE;
 }
 
@@ -739,7 +741,7 @@ void __reg_abortable_cv(struct cv_lookup_elm *cle, struct cond_var *cv)
 	cle->sysc = cle->kthread->sysc;
 	assert(cle->sysc);
 	cle->proc = pcpui->cur_proc;
-	cle->abort_in_progress = FALSE;
+	atomic_init(&cle->abort_in_progress, 0);
 	spin_lock_irqsave(&cle->proc->abort_list_lock);
 	TAILQ_INSERT_HEAD(&cle->proc->abortable_sleepers, cle, link);
 	spin_unlock_irqsave(&cle->proc->abort_list_lock);
@@ -760,7 +762,7 @@ void dereg_abortable_cv(struct cv_lookup_elm *cle)
 	spin_unlock_irqsave(&cle->proc->abort_list_lock);
 	/* If we won the race and yanked it out of the list before abort claimed it,
 	 * this will already be FALSE. */
-	while (cle->abort_in_progress)
+	while (atomic_read(&cle->abort_in_progress))
 		cpu_relax();
 }
 

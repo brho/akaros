@@ -379,3 +379,167 @@ Note that page faults will still be tricky, but at least now we don't have to
 worry about points of no return.  We just check if there is a current_ctx to
 restart.  The tricky part is communicating that the PF was sorted when there
 wasn't an explicit syscall made.
+
+
+Aborting Syscalls (2013-11-22)
+-------------------------------
+On occasion, userspace would like to abort a syscall, specifically ones that
+are listening on sockets/conversations where no one will ever answer.
+
+We have limited support for aborting syscalls.  Kthreads that are in
+rendez_sleep() (common for anything in the 9ns chunk of the kernel, which
+includes any conversation listens) can be aborted.  They'll return with an
+error string to userspace.
+
+The easier part is the rules for kernel code to be abortable:
+- Restore your invariants with waserror() before calling rendez_sleep().
+- That's really it.
+So if you're holding a qlock, put your qunlock() code and any other unwinding
+(such as a kfree()) in a waserror() catch.  As it happens, it looks like plan9
+already did that (at least for the rendez in listen).  And, as always, you
+can't hold a spinlock when blocking, regardless of aborting calls or anything.
+
+I don't want arbitrary sleeps to be abortable.  For instance, if a kthread is
+waiting on an arbitrary semaphore/qlock, we won't allow an abort.  The
+reasoning is that the kthread will eventually acquire the qlock - we're not
+waiting on external sources to wake up.  That's not 100% true - a kthread
+could be blocked on a qlock, and the qlock holder could be abortable.  In the
+future, we could build some sort of "abort inheritance", usable by root or
+something (danger of aborting another process's kthread).  Alternatively, we
+could make qlocks abortable too, though that would require all qlocking code
+to be unwindable.
+
+The harder part to syscall aborting is safely waking a kthread.  There are
+several layers to go through from uthread or syscall down to the condition
+variable a kthread is sleeping on.  Given a uthread, find its syscall.  Given
+a syscall, find its kthread.  Given the kthread, find the CV.  And during all
+of these, syscalls complete concurrently, kthreads get repurposed for other
+syscalls, CVs could be freed (though that doesn't happen).  Syscalls are often
+on stacks, so when they complete, the memory is both gibberish and potentially
+in use.
+
+Ultimately, I decided on a system of "safe abort attempts", where it is
+harmless to be wrong with an attempt.  Instead of dealing with the races
+associated with memory freeing and syscalls completing, the aborts will only
+work if it is safe to work (using a lookup via pointer, and only dereferencing
+if the lookup succeeds).
+
+As it stands now, all abortable kthreads/sleepers/syscalls are on a per-proc
+list, and we can lookup by struct syscall*.  They are only on the list when
+they are abortable (the CV can be poked), and the invariant is that when they
+are on the list, they are in a state that can be safely aborted: the kthread
+is working on the syscall, it hasn't unwound, it is still in rendez_sleep(),
+the CV is safe, etc.  The details of this protection are sorted out with
+__reg_abortable_cv() and dereg_abortable_cv() (since it's really the condition
+variable that we're trying to find).  So from the kernel side, nothing bad can
+happen if you ask to abort an arbitrary struct syscall*.
+
+The actual abort takes the "write/signal, then wake" method.  The aborter
+tracks down the kthread via the lookup, the success of which guarantees the
+sleeper is in rendez_sleep() (or similar sleep paths), marks "SC_ABORT",
+(barriers), and attempts to wake the kthread (cv_broadcast, since we need to
+be sure we woke the right kthread).
+
+On the user side, we set an alarm to run an event handler that will cancel our
+syscall.  The alarm stuff is fairly standard (runs in vcore context).
+Userspace no longer has the concern of syscalls completing while they abort,
+since the kernel will only abort syscalls that are abortable.  However, it may
+have issues (in theory) with aborting future syscalls.  If the alarm goes off
+when the uthread is in another later syscall (which may happen to use the same
+struct syscall*), then we could accidentally abort the wrong call.  There's an
+aspect of time associated with the first abort alarm handler.  This is
+relatively easy to handle: just turn off the alarm before reusing that syscall
+struct for a syscall.  This relies on a property of the alarms: that when
+deregistering completes, the alarm handler will not be running concurrently.
+Incidentally, there is *another* minor trick here: the uthread when adjusting
+the alarm will issue a syscall, possibly reusing its old sysc*, but that will
+be *after* deregistering its original alarm: the point at which we could have
+potentially accidentally cancelled an arbitrary syscall.  Also note that the
+call to change the kernel alarm wouldn't actually block and become abortable,
+but regardless, we're safe.
+
+There are a couple downsides to the "safe abort attempts" approach.  We can
+only abort syscalls when they are at a certain point - if they aren't
+currently sleeping, the call will fail.  Technically, the abort could take
+effect later on in the life of a syscall (the aborter flags the kthread to
+abort concurrent with the kthread waking up naturally, and then the call
+aborts on the next rendez_sleep that needs to block).  Related to this
+limitation, userspace must keep attempting to cancel a syscall until it
+succeeds.  It may also be told an abort succeeded, even if the call actually
+completes (the aborter flags the kthread, the rendez wakes naturally, and the
+kthread never blocks again).  Ultimately, we can't "fire and forget" our abort
+attempt.  It's not a huge problem though, and is less of a problem than my
+older approaches that didn't have this problem.
+
+For instance, the original idea I had was for userspace to flag the syscall
+(flags |= SC_ABORT).  It could do this at any time.  Whenever the kthread was
+going to block in an abortable location (e.g. rendez_sleep()), it would see
+the flag and abort.  It might already be asleep, so we would also provide a
+syscall that would 'kick' the kthread responsible for some sysc*, to wake it
+up to see the flag and abort.  The first problem was writing to the sysc
+flags.  Unless we know the memory is actually the syscall we want, this could
+result in randomly writing to memory (such as a uthread's stack).  I ran into
+similar issues in the kernel: you can't touch a kthread struct unless you know
+it is the kthread you want.
+
+Once I started dealing with the syscall -> kthread mapping, it became clear
+I'd need a per-proc lookup service in the kernel, which acts as a way to lock
+a reference to the kthread.  I could solve the 'kthread memory safety' problem
+by looking up by reference, similar to how pid2proc works.  Analogously, by
+changing the interface for sys_abort_syscall() to be a "lookup" approach, I
+solve the struct syscall * memory problem.
+
+As a smaller note, I considered registering every kthread with the process
+right away (specifically, when we link the syscall to the kthread->sysc) for
+the sysc->kthread lookup service.  But this would get expensive, since every
+syscall pays the lookup tax (and we'd need to worry about scaling).  We want
+syscalls to be fast, but the infrequent aborts can be expensive.  The obvious
+change was to only save the abortable kthreads.  The tradeoff is that we can't
+flag syscalls for aborting unless they are in an abortable state.  This
+requires multiple pokes by userspace.  In theory, they would have to deal with
+that scenario anyways (in case they attempt to abort before we even register
+in the first place).
+
+As another side note, if userspace ever has a struct syscall allocator, for
+use in async (non-uthread stack-based) syscalls, we'll need to not reuse a
+syscall struct until after the cancel alarm has been disarmed.  Right now we
+do this by not having the uthread issue another syscall til after the disarm,
+since uthread stack-based syscalls are inherently bound to the uthread.  A
+simple solution would be to have a per-uthread syscall struct, which that
+uthread uses preferentially, and the sysc is only freed when the uthread is
+freed.  Not only would this scale better than accessing the sysc allocator for
+every syscall, but also there is no worry of reuse til the uthread disarms and
+exits.
+
+It is a userspace bug for a uthread to set the alarm and not unset it before
+either making a syscall or exiting.  The root issue of that potential bug is
+that someone (alarm handler) holds a pointer to a uthread, with the intent of
+cancelling its syscall, and we need to somehow take back that pointer (cancel
+the alarm) before reusing the syscall or freeing the uthread.  I considered
+not making the alarm guarantee that when the cancel returns, the handler isn't
+running concurrently.  We could handle the races in the alarm handler and in
+the cancel code, but it's an added hassle that isn't clearly needed.  This
+does mean we have to run the alarm handlers serially, while holding the alarm
+lock.  I'm fine with this, for now.  Perhaps if users want more concurrency,
+their handlers can spawn or wake up a uthread.
+
+It is also worth noting that many rendez_sleep() calls actually return right
+away.  This is common if some data is already in the queue (or whatever the
+condition is that we want to conditionally sleep on).  Since registration is a
+little bit heavier than just locking the CV, I use the classic "check, signal,
+check again" style, where we check cond, then register, and then check cond
+for real.  The initial check is the optimization, while the "signal, then
+check" is the true synchronization.  I use this style all over the place
+(check out the event delivery with concurrent vcore yields code).
+
+Because of this optimization, we have a slightly odd interface: __reg is
+called with the CV lock held, and dereg_ is not.  There are some lock ordering
+issues.  Without the optimization, we could simply make the order {list lock,
+CV lock}, so that the aborter can use the list lock to keep a kthread/cv alive
+(one of the struct cv_lookup_elm in the code, to be precise) while it
+cv_broadcasts.  However, the "check first" optimization would need to lock and
+unlock the CV a couple times, which seems excessive.  So we switch the lock
+order to {CV, list lock}, and the aborter doesn't hold the list lock while
+signalling the CV.  Instead, it keeps the cle alive with a flag that dereg_
+spins on.  This spinwait is why dereg can't hold the CV lock: it would create
+a circular dependency.
