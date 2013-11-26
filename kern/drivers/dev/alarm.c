@@ -92,6 +92,7 @@ static void proc_alarm_handler(struct alarm_waiter *a_waiter)
 	}
 	memset(&msg, 0, sizeof(struct event_msg));
 	msg.ev_type = EV_ALARM;
+	msg.ev_arg2 = a->id;
 	send_event(a->proc, ev_q, &msg, 0);
 }
 

@@ -21,7 +21,7 @@
 static void handle_alarm(struct event_msg *ev_msg, unsigned int ev_type)
 {
 	assert(ev_type == EV_ALARM);
-	printf("\tAlarm fired!\n");
+	printf("\tAlarm fired!, id %d\n", ev_msg ? ev_msg->ev_arg2 : 55555);
 }
 
 int main(int argc, char **argv)
@@ -65,8 +65,9 @@ int main(int argc, char **argv)
 	}
 	ev_q->ev_vcore = 0;
 	/* I think this is all the flags we need; gotta write that dissertation
-	 * chapter (and event how-to)! */
-	ev_q->ev_flags = EVENT_IPI | EVENT_NOMSG | EVENT_SPAM_PUBLIC;
+	 * chapter (and event how-to)!  We may get more than one event per alarm, if
+	 * we have concurrent preempts/yields. */
+	ev_q->ev_flags = EVENT_IPI | EVENT_SPAM_PUBLIC;
 	/* Register the ev_q for our alarm */
 	ret = snprintf(path, sizeof(path), "evq %llx", ev_q);
 	ret = write(ctlfd, path, ret);

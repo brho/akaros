@@ -56,6 +56,7 @@ struct timer_chain {
 	uint64_t					latest_time;
 	int							ctlfd;
 	int							timerfd;
+	int							alarmid;
 	struct event_queue			*ev_q;
 };
 
