@@ -803,6 +803,8 @@ void dereg_abortable_cv(struct cv_lookup_elm *cle)
  * this with things for ktasks in the future. */
 bool should_abort(struct cv_lookup_elm *cle)
 {
+	if (cle->kthread->is_ktask)
+		return FALSE;
 	if (cle->proc && (cle->proc->state == PROC_DYING))
 		return TRUE;
 	if (cle->sysc && (atomic_read(&cle->sysc->flags) & SC_ABORT))
