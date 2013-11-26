@@ -92,6 +92,7 @@ static void init_alarm_service(void)
 		return;
 	}
 	buf[ret] = 0;
+	global_tchain.alarmid = atoi(buf);
 	snprintf(path, sizeof(path), "#A/a%s/timer", buf);
 	timerfd = open(path, O_RDWR | O_CLOEXEC);
 	if (timerfd < 0) {
@@ -106,7 +107,10 @@ static void init_alarm_service(void)
 		return;
 	}
 	ev_q->ev_vcore = 0;
-	ev_q->ev_flags = EVENT_IPI | EVENT_NOMSG | EVENT_SPAM_PUBLIC;
+	/* We could get multiple events for a single alarm.  It's okay, since
+	 * __trigger can handle spurious upcalls.  If it ever is not okay, then use
+	 * an INDIR/FALLBACK instead of SPAM_PUBLIC. */
+	ev_q->ev_flags = EVENT_IPI | EVENT_SPAM_PUBLIC;
 	ret = snprintf(path, sizeof(path), "evq %llx", ev_q);
 	ret = write(ctlfd, path, ret);
 	if (ret <= 0) {
@@ -251,7 +255,8 @@ static void __trigger_tchain(struct timer_chain *tchain)
 static void handle_user_alarm(struct event_msg *ev_msg, unsigned int ev_type)
 {
 	assert(ev_type == EV_ALARM);
-	__trigger_tchain(&global_tchain);
+	if (ev_msg && (ev_msg->ev_arg2 == global_tchain.alarmid))
+		__trigger_tchain(&global_tchain);
 }
 
 /* Helper, inserts the waiter into the tchain, returning TRUE if we still need
