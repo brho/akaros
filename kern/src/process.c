@@ -817,6 +817,10 @@ void proc_destroy(struct proc *p)
 	spin_unlock(&p->proc_lock);
 	/* Wake any of our kthreads waiting on children, so they can abort */
 	cv_broadcast(&p->child_wait);
+	/* Abort any abortable syscalls.  This won't catch every sleeper, but future
+	 * abortable sleepers are already prevented via the DYING state.  (signalled
+	 * DYING, no new sleepers will block, and now we wake all old sleepers). */
+	abort_all_sysc(p);
 	/* we need to close files here, and not in free, since we could have a
 	 * refcnt indirectly related to one of our files.  specifically, if we have
 	 * a parent sleeping on our pipe, that parent won't wake up to decref until
