@@ -682,6 +682,21 @@ void cv_broadcast_irqsave(struct cond_var *cv, int8_t *irq_state)
 	enable_irqsave(irq_state);
 }
 
+/* Helper, aborts and releases a CLE.  dereg_ spinwaits on abort_in_progress. */
+static void __abort_and_release_cle(struct cv_lookup_elm *cle)
+{
+	int8_t irq_state = 0;
+	/* At this point, we have a handle on the syscall that we want to abort (via
+	 * the cle), and we know none of the memory will disappear on us (deregers
+	 * wait on the flag).  So we'll signal ABORT, which rendez will pick up next
+	 * time it is awake.  Then we make sure it is awake with a broadcast. */
+	atomic_or(&cle->sysc->flags, SC_ABORT);
+	cmb();	/* flags write before signal; atomic op provided CPU mb */
+	cv_broadcast_irqsave(cle->cv, &irq_state);
+	cmb();	/* broadcast writes before abort flag; atomic op provided CPU mb */
+	atomic_dec(&cle->abort_in_progress);
+}
+
 /* Attempts to abort p's sysc.  It will only do so if the sysc lookup succeeds,
  * so we can handle "guesses" for syscalls that might not be sleeping.  This
  * style of "do it if you know you can" is the best way here - anything else
@@ -712,16 +727,34 @@ bool abort_sysc(struct proc *p, struct syscall *sysc)
 	spin_unlock_irqsave(&p->abort_list_lock);
 	if (!cle)
 		return FALSE;
-	/* At this point, we have a handle on the syscall that we want to abort (via
-	 * the cle), and we know none of the memory will disappear on us (deregers
-	 * wait on the flag).  So we'll signal ABORT, which rendez will pick up next
-	 * time it is awake.  Then we make sure it is awake with a broadcast. */
-	atomic_or(&cle->sysc->flags, SC_ABORT);
-	cmb();	/* flags write before signal; atomic op provided CPU mb */
-	cv_broadcast_irqsave(cle->cv, &irq_state); 
-	cmb();	/* broadcast writes before abort flag; atomic op provided CPU mb */
-	atomic_dec(&cle->abort_in_progress);
+	__abort_and_release_cle(cle);
 	return TRUE;
+}
+
+/* This will abort any abortabls at the time the call was started.  New
+ * abortables could be registered concurrently.  The main caller I see for this
+ * is proc_destroy(), so DYING will be set, and new abortables will quickly
+ * abort and dereg when they see their proc is DYING. */
+void abort_all_sysc(struct proc *p)
+{
+	struct cv_lookup_elm *cle;
+	int8_t irq_state = 0;
+	struct cv_lookup_tailq abortall_list;
+	struct proc *old_proc = switch_to(p);
+	/* Concerns: we need to not remove them from their original list, since
+	 * concurrent wake ups will cause a dereg, which will remove from the list.
+	 * We also can't touch freed memory, so we need a refcnt to keep cles
+	 * around. */
+	TAILQ_INIT(&abortall_list);
+	spin_lock_irqsave(&p->abort_list_lock);
+	TAILQ_FOREACH(cle, &p->abortable_sleepers, link) {
+		atomic_inc(&cle->abort_in_progress);
+		TAILQ_INSERT_HEAD(&abortall_list, cle, abortall_link);
+	}
+	spin_unlock_irqsave(&p->abort_list_lock);
+	TAILQ_FOREACH(cle, &abortall_list, abortall_link)
+		__abort_and_release_cle(cle);
+	switch_back(p, old_proc);
 }
 
 /* Being on the abortable list means that the CLE, KTH, SYSC, and CV are valid
@@ -770,5 +803,9 @@ void dereg_abortable_cv(struct cv_lookup_elm *cle)
  * this with things for ktasks in the future. */
 bool should_abort(struct cv_lookup_elm *cle)
 {
-	return (cle->sysc && (atomic_read(&cle->sysc->flags) & SC_ABORT));
+	if (cle->proc && (cle->proc->state == PROC_DYING))
+		return TRUE;
+	if (cle->sysc && (atomic_read(&cle->sysc->flags) & SC_ABORT))
+		return TRUE;
+	return FALSE;
 }

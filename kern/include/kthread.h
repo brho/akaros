@@ -63,6 +63,7 @@ struct cond_var {
 
 struct cv_lookup_elm {
 	TAILQ_ENTRY(cv_lookup_elm)	link;
+	TAILQ_ENTRY(cv_lookup_elm)	abortall_link;		/* only used in abort_all */
 	struct cond_var				*cv;
 	struct kthread				*kthread;
 	struct syscall				*sysc;
@@ -112,6 +113,7 @@ void cv_signal_irqsave(struct cond_var *cv, int8_t *irq_state);
 void cv_broadcast_irqsave(struct cond_var *cv, int8_t *irq_state);
 
 bool abort_sysc(struct proc *p, struct syscall *sysc);
+void abort_all_sysc(struct proc *p);
 void __reg_abortable_cv(struct cv_lookup_elm *cle, struct cond_var *cv);
 void dereg_abortable_cv(struct cv_lookup_elm *cle);
 bool should_abort(struct cv_lookup_elm *cle);
