@@ -1,6 +1,17 @@
 #!/bin/ash
-ash ifconfig
-srv 'tcp!10.0.2.2!1025' root
+if [ "$#" -eq "1" ]
+then
+	MACHINE=$1
+fi
+
+ash ifconfig $MACHINE
+if [ "x$MACHINE" = "xc89" ]
+then
+	srv 'tcp!169.229.49.175!1025' root
+else
+	# qemu is the default
+	srv 'tcp!10.0.2.2!1025' root
+fi
+
 mount /srv/root /mnt
 ls /mnt
-

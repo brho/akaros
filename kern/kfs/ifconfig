@@ -1,4 +1,10 @@
 #!/bin/ash
+
+if [ "$#" -eq "1" ]
+then
+	MACHINE=$1
+fi
+
 #bind -a '#I' /net
 #bind -a '#l0' /net
 #cat /net/ipifc/clone
@@ -21,13 +27,27 @@ export rootsrv=boot
 # test fsaddr='tcp!135.$xyzip(4)^!564'
 # (me network server server-addr
 # wrong addresses.
-me=10.0.2.15
-mask=255.255.255.0
-# brho: i don't know what exactly 'remote' is supposed to be, but that is the
-# third argument processed by adding to an ipifc.  if we pass nothing, it'll
-# build 'remote' by masking me & mask.
-remote=10.0.2.0
-route=10.0.2.2
+
+if [ "x$MACHINE" = "xc89" ]
+then
+	# c89's config.  use c96 for eth0 (.196).  if you want, we can also use
+	# c97 (.197):
+	# $ cat /9/net/ipifc/clone (get e.g. 2)
+	# $ echo "add 169.229.49.197 255.255.255.0" > /9/net/ipifc/2/ctl
+	me=169.229.49.196
+	mask=255.255.255.0
+	remote=169.229.49.0
+	route=169.229.49.1
+else
+	# qemu is the default
+	me=10.0.2.15
+	mask=255.255.255.0
+	# brho: i don't know what exactly 'remote' is supposed to be, but that is
+	# the third argument processed by adding to an ipifc.  if we pass nothing,
+	# it'll build 'remote' by masking me & mask.
+	remote=10.0.2.0
+	route=10.0.2.2
+fi
 
 #
 # Post the read-only filesystem in #s/$beetroot
