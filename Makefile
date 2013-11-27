@@ -416,8 +416,8 @@ endif
 ext2_bdev_obj = $(OBJDIR)/kern/$(shell basename $(ext2-bdev)).o
 endif
 
-kern_initramfs_files := $(shell mkdir -p $(kfs-paths); \
-                          find $(kfs-paths))
+kern_initramfs_files := $(shell mkdir -p $(FIRST_KFS_PATH); \
+                          find $(FIRST_KFS_PATH))
 
 # Need to make an empty cpio, then append each kfs-path's contents
 $(kern_cpio) initramfs: $(kern_initramfs_files)
@@ -426,10 +426,10 @@ $(kern_cpio) initramfs: $(kern_initramfs_files)
         sh $(CONFIG_KFS_CPIO_BIN); \
     fi
 	@cat /dev/null | cpio --quiet -oH newc -O $(kern_cpio)
-	$(Q)for i in $(kfs-paths); do cd $$i; \
+	$(Q)for i in $(kfs-paths); do stat $$i; pushd $$i; \
         echo "    Adding $$i to initramfs..."; \
         find -L . | cpio --quiet -oAH newc -O $(CURDIR)/$(kern_cpio); \
-        cd $$OLDPWD; \
+        popd; \
     done;
 
 ld_emulation = $(shell $(OBJDUMP) -i | grep -v BFD | grep ^[a-z] |head -n1)
