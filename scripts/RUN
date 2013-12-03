@@ -1,7 +1,9 @@
-sudo qemu-system-x86_64 -s -cpu phenom -smp 2 -m 4096 -nographic  \
--net nic,model=e1000 \
+sudo qemu-system-x86_64 -s -cpu phenom -smp 4 -m 2048 -nographic  \
+-net nic,model=rtl8139 \
 -net user,hostfwd=tcp::5555-:23 \
--kernel mnt/hdd/kernel $*
+-kernel obj/kern/akaros-kernel $*
+
+#-kernel mnt/hdd/kernel $*
 
 # if you need the dump.
 #-net dump,file=/tmp/vm0.pcap \
