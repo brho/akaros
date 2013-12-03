@@ -167,6 +167,11 @@ bool ipi_is_pending(uint8_t vector)
  */
 void __lapic_set_timer(uint32_t ticks, uint8_t vec, bool periodic, uint8_t div)
 {
+#ifdef CONFIG_LOUSY_LAPIC_TIMER
+	/* qemu without kvm seems to delay timer IRQs on occasion, and needs extra
+	 * IRQs from any source to get them delivered.  periodic does the trick. */
+	periodic = TRUE;
+#endif
 	// clears bottom bit and then set divider
 	write_mmreg32(LAPIC_TIMER_DIVIDE, (read_mmreg32(LAPIC_TIMER_DIVIDE) &~0xf) |
 	              (div & 0xf));

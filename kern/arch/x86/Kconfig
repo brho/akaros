@@ -37,6 +37,19 @@ endmenu
 
 menu "x86 Hacks"
 
+config LOUSY_LAPIC_TIMER
+	bool "Lousy Local APIC Timer"
+	default n
+	help
+		This turns our one-shot APIC timer into a periodic timer.  If your
+		system seems to lock up until you hit the keyboard, say 'Y' here and
+		report the results.
+
+		Qemu without KVM had issues firing a one-shot LAPIC timer (the timer IRQ
+		would only go off when some other IRQ fired), but it worked with a
+		periodic tick.  Since we aggressively disarm the timer, this config
+		shouldn't be a performance hit.
+
 config NOMTRRS
 	bool "Disable MTRRs"
 	default n
