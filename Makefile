@@ -416,8 +416,25 @@ endif
 ext2_bdev_obj = $(OBJDIR)/kern/$(shell basename $(ext2-bdev)).o
 endif
 
-kern_initramfs_files := $(shell mkdir -p $(FIRST_KFS_PATH); \
-                          find $(FIRST_KFS_PATH))
+# a bit hacky: we want to make sure the directories exist, and error out
+# otherwise.  we also want to error out before the initramfs target, otherwise
+# we might not get the error (if initramfs files are all up to date).  the
+# trickiest thing here is that kfs-paths-check could be stale and require an
+# oldconfig.  running make twice should suffice.
+kfs-paths-check := $(shell for i in $(kfs-paths); do \
+                               if [ ! -d "$$i" ]; then \
+                                   echo "Can't find KFS directory $$i"; \
+	                               $(MAKE) -f $(srctree)/Makefile \
+								           silentoldconfig > /dev/null; \
+                                   exit -1; \
+                               fi; \
+                           done; echo "ok")
+
+ifneq (ok,$(kfs-paths-check))
+$(error $(kfs-paths-check), try make one more time in case of stale configs)
+endif
+
+kern_initramfs_files := $(shell find $(kfs-paths))
 
 # Need to make an empty cpio, then append each kfs-path's contents
 $(kern_cpio) initramfs: $(kern_initramfs_files)
@@ -426,10 +443,10 @@ $(kern_cpio) initramfs: $(kern_initramfs_files)
         sh $(CONFIG_KFS_CPIO_BIN); \
     fi
 	@cat /dev/null | cpio --quiet -oH newc -O $(kern_cpio)
-	$(Q)for i in $(kfs-paths); do stat $$i; pushd $$i; \
+	$(Q)for i in $(kfs-paths); do cd $$i; \
         echo "    Adding $$i to initramfs..."; \
         find -L . | cpio --quiet -oAH newc -O $(CURDIR)/$(kern_cpio); \
-        popd; \
+        cd $$OLDPWD; \
     done;
 
 ld_emulation = $(shell $(OBJDUMP) -i | grep -v BFD | grep ^[a-z] |head -n1)
