@@ -1,3 +1,4 @@
+// INFERNO
 //#define DEBUG
 #include <vfs.h>
 #include <kfs.h>
