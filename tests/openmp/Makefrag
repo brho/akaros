@@ -4,7 +4,7 @@ OPENMP_TESTS_CFLAGS += $(CFLAGS_TESTS) \
                      -fopenmp \
                      -I$(XCC_TARGET_ROOT)/sys-include/openmp
 
-ALL_OPENMP_TEST_FILES = $(shell ls $(OPENMP_TESTS_DIR)/*.c)
+ALL_OPENMP_TEST_FILES := $(wildcard $(OPENMP_TESTS_DIR)/*.c)
 
 OPENMP_TESTS_LDLIBS := 
 

@@ -10,8 +10,8 @@ TESTS_CXXFLAGS += $(CXXFLAGS_USER) -g
 
 TESTS_LDLIBS := -lpthread -lbenchutil -lm
 
-TESTS_SRCS_C = $(shell ls $(TESTS_DIR)/*.c)
-TESTS_SRCS_CPP = $(shell ls $(TESTS_DIR)/*.cc)
+TESTS_SRCS_C := $(wildcard $(TESTS_DIR)/*.c)
+TESTS_SRCS_CPP := $(wildcard $(TESTS_DIR)/*.cc)
 
 TESTS_LDDEPENDS_C := $(TESTS_DIR)/%.c 
 TESTS_LDDEPENDS_CPP := $(TESTS_DIR)/%.cc
