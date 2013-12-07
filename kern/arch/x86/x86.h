@@ -5,7 +5,9 @@
 #include <arch/mmu.h>
 
 /* Model Specific Registers */
+// TODO: figure out which are intel specific, and name them accordingly
 #define IA32_APIC_BASE				0x1b
+/* These two are intel-only */
 #define IA32_FEATURE_CONTROL 		0x3a
 #define IA32_MISC_ENABLE			0x1a0
 

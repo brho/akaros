@@ -25,7 +25,9 @@ void print_cpuinfo(void)
 	uint32_t model, family;
 	uint64_t msr_val;
 	char vendor_id[13];
+	int max_std_lvl, max_extd_lvl;
 	extern char (SNT RO _start)[];
+	bool is_intel;
 
 	if (sizeof(long) == 8)
 		printk("64 bit Kernel Booting...\n");
@@ -41,9 +43,20 @@ void print_cpuinfo(void)
 
 	vendor_id[12] = '\0';
 	cprintf("Vendor ID: %s\n", vendor_id);
+	/* not a great check - old intel P5s have no vendor id */
+	is_intel = !strcmp(vendor_id, "GenuineIntel");
+	/* intel supports a way to hide the upper leaves of cpuid, beyond 3.  the
+	 * bios might have done this, so we'll make sure it is off. */
+	if (is_intel) {
+		msr_val = read_msr(IA32_MISC_ENABLE);
+		if (msr_val & (1 << 22))
+			write_msr(IA32_MISC_ENABLE, msr_val & ~(1 << 22));
+	}
 	cprintf("Largest Standard Function Number Supported: %d\n", eax);
+	max_std_lvl = eax;
 	cpuid(0x80000000, 0x0, &eax, 0, 0, 0);
 	cprintf("Largest Extended Function Number Supported: 0x%08x\n", eax);
+	max_extd_lvl = eax;
 	cpuid(1, 0x0, &eax, &ebx, &ecx, &edx);
 	family = ((eax & 0x0FF00000) >> 20) + ((eax & 0x00000F00) >> 8);
 	model = ((eax & 0x000F0000) >> 12) + ((eax & 0x000000F0) >> 4);
@@ -74,7 +87,8 @@ void print_cpuinfo(void)
 		cprintf("x2APIC Detected\n");
 	else
 		cprintf("x2APIC Not Detected\n");
-	if (ecx & 0x00000060) {
+	/* Not sure how to detect AMD HW virt yet. */
+	if ((ecx & 0x00000060) && is_intel) {
 		msr_val = read_msr(IA32_FEATURE_CONTROL);
 		printd("64 Bit Feature Control: 0x%08x\n", msr_val);
 		if ((msr_val & 0x5) == 0x5)
@@ -82,7 +96,7 @@ void print_cpuinfo(void)
 		else
 			printk("Hardware virtualization not supported\n");
 	} else { 
-		printk("Hardware virtualization not supported\n");
+		printk("Hardware virtualization not detected.  (AMD?)\n");
 	}
 	/* FP and SSE Checks */
 	if (edx & 0x00000001)
@@ -157,10 +171,6 @@ void print_cpuinfo(void)
 			asm volatile ("hlt");
 	}
 	#endif
-	msr_val = read_msr(IA32_MISC_ENABLE);
-	/* we want this to be not set for cpuid.6h to work. */
-	if (msr_val & (1 << 22))
-		write_msr(IA32_MISC_ENABLE, msr_val & ~(1 << 22));
 	cpuid(0x00000006, 0x0, &eax, 0, 0, 0);
 	if (eax & (1 << 2))
 		printk("Always running APIC detected\n");
