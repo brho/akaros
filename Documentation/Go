@@ -50,6 +50,7 @@ sh akaros.bash
 
 Build tests
 cd ../go-akaros/examples/
+PATH=$PATH:~/go-install/
 GOROOT=~/go-akaros/
 ./examples.bash -t all
 
