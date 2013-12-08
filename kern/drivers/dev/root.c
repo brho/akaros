@@ -121,6 +121,7 @@ static void rootreset(void)
 	addrootdir("proc");
 	addrootdir("root");
 	addrootdir("srv");
+	addrootdir("tmp");
 }
 
 static struct chan *rootattach(char *spec)
