@@ -485,6 +485,16 @@ void handle_irq(struct hw_trapframe *hw_tf)
 		irq_h->isr(hw_tf, irq_h->data);
 		irq_h = irq_h->next;
 	}
+
+	//lapic_print_isr();
+	//printk("LAPIC LINT0: %p\n", read_mmreg32(LAPIC_LVT_LINT0));
+	//printk("COM1, IIR %p\n", inb(0x3f8 + 2));
+	irq_h = irq_handlers[4 + 32];
+	while (irq_h) {
+		irq_h->isr(hw_tf, irq_h->data);
+		irq_h = irq_h->next;
+	}
+
 	// if we're a general purpose IPI function call, down the cpu_list
 	extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
 	if ((I_SMP_CALL0 <= hw_tf->tf_trapno) &&
