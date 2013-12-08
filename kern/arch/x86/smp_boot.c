@@ -62,6 +62,14 @@ static void init_smp_call_function(void)
 
 void smp_final_core_init(void)
 {
+	/* It is possible that the non-0 cores will wake up before the broadcast
+	 * ipi.  this can be due to spurious IRQs or some such.  anyone other than
+	 * core 0 that comes in here will wait til core 0 has set everything up */
+	static bool wait = TRUE;
+	if (get_os_coreid(hw_core_id()) == 0)
+		wait = FALSE;
+	while (wait)
+		cpu_relax();
 #ifdef CONFIG_FAST_COREID
 	/* Need to bootstrap the rdtscp MSR with our OS coreid */
 	int coreid = get_os_coreid(hw_core_id());
