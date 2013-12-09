@@ -1,0 +1,4 @@
+1. ip stack will hang on random number generation for things like local port #, etc.
+   So: don't turn off or slow down devrandom. If you do, don't expect IP stack
+   to work.
+
