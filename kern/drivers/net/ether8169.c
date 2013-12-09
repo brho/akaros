@@ -210,10 +210,9 @@ enum {					/* General Descriptor control */
 enum {					/* Ring sizes  (<= 1024) */
 	Ntd		= 32,		/* Transmit Ring */
 	Nrd		= 128,		/* Receive Ring */
-
-#warning "define ROUNDUP"
-	Mps		= (ETHERMAXTU+4 + 127)/128, //ROUNDUP(ETHERMAXTU+4, 128),
 };
+
+#define Mps ROUNDUP(ETHERMAXTU + 4, 128)
 
 typedef struct Dtcc Dtcc;
 struct Dtcc {
@@ -523,34 +522,34 @@ rtl8169ifstat(struct ether* edev, void* a, long n, unsigned long offset)
 		error(Enomem);
 	e = alloc+READSTR;
 
-	p = seprintf(alloc, e, "TxOk: %llud\n", dtcc->txok);
-	p = seprintf(p, e, "RxOk: %llud\n", dtcc->rxok);
-	p = seprintf(p, e, "TxEr: %llud\n", dtcc->txer);
-	p = seprintf(p, e, "RxEr: %ud\n", dtcc->rxer);
-	p = seprintf(p, e, "MissPkt: %ud\n", dtcc->misspkt);
-	p = seprintf(p, e, "FAE: %ud\n", dtcc->fae);
-	p = seprintf(p, e, "Tx1Col: %ud\n", dtcc->tx1col);
-	p = seprintf(p, e, "TxMCol: %ud\n", dtcc->txmcol);
-	p = seprintf(p, e, "RxOkPh: %llud\n", dtcc->rxokph);
-	p = seprintf(p, e, "RxOkBrd: %llud\n", dtcc->rxokbrd);
-	p = seprintf(p, e, "RxOkMu: %ud\n", dtcc->rxokmu);
-	p = seprintf(p, e, "TxAbt: %ud\n", dtcc->txabt);
-	p = seprintf(p, e, "TxUndrn: %ud\n", dtcc->txundrn);
+	p = seprintf(alloc, e, "TxOk: %llu\n", dtcc->txok);
+	p = seprintf(p, e, "RxOk: %llu\n", dtcc->rxok);
+	p = seprintf(p, e, "TxEr: %llu\n", dtcc->txer);
+	p = seprintf(p, e, "RxEr: %u\n", dtcc->rxer);
+	p = seprintf(p, e, "MissPkt: %u\n", dtcc->misspkt);
+	p = seprintf(p, e, "FAE: %u\n", dtcc->fae);
+	p = seprintf(p, e, "Tx1Col: %u\n", dtcc->tx1col);
+	p = seprintf(p, e, "TxMCol: %u\n", dtcc->txmcol);
+	p = seprintf(p, e, "RxOkPh: %llu\n", dtcc->rxokph);
+	p = seprintf(p, e, "RxOkBrd: %llu\n", dtcc->rxokbrd);
+	p = seprintf(p, e, "RxOkMu: %u\n", dtcc->rxokmu);
+	p = seprintf(p, e, "TxAbt: %u\n", dtcc->txabt);
+	p = seprintf(p, e, "TxUndrn: %u\n", dtcc->txundrn);
 
-	p = seprintf(p, e, "txdu: %ud\n", ctlr->txdu);
-	p = seprintf(p, e, "tcpf: %ud\n", ctlr->tcpf);
-	p = seprintf(p, e, "udpf: %ud\n", ctlr->udpf);
-	p = seprintf(p, e, "ipf: %ud\n", ctlr->ipf);
-	p = seprintf(p, e, "fovf: %ud\n", ctlr->fovf);
-	p = seprintf(p, e, "ierrs: %ud\n", ctlr->ierrs);
-	p = seprintf(p, e, "rer: %ud\n", ctlr->rer);
-	p = seprintf(p, e, "rdu: %ud\n", ctlr->rdu);
-	p = seprintf(p, e, "punlc: %ud\n", ctlr->punlc);
-	p = seprintf(p, e, "fovw: %ud\n", ctlr->fovw);
+	p = seprintf(p, e, "txdu: %u\n", ctlr->txdu);
+	p = seprintf(p, e, "tcpf: %u\n", ctlr->tcpf);
+	p = seprintf(p, e, "udpf: %u\n", ctlr->udpf);
+	p = seprintf(p, e, "ipf: %u\n", ctlr->ipf);
+	p = seprintf(p, e, "fovf: %u\n", ctlr->fovf);
+	p = seprintf(p, e, "ierrs: %u\n", ctlr->ierrs);
+	p = seprintf(p, e, "rer: %u\n", ctlr->rer);
+	p = seprintf(p, e, "rdu: %u\n", ctlr->rdu);
+	p = seprintf(p, e, "punlc: %u\n", ctlr->punlc);
+	p = seprintf(p, e, "fovw: %u\n", ctlr->fovw);
 
-	p = seprintf(p, e, "tcr: %#8.8ux\n", ctlr->tcr);
-	p = seprintf(p, e, "rcr: %#8.8ux\n", ctlr->rcr);
-	p = seprintf(p, e, "multicast: %ud\n", ctlr->mcast);
+	p = seprintf(p, e, "tcr: 0x%#8.8u\n", ctlr->tcr);
+	p = seprintf(p, e, "rcr: 0x%#8.8u\n", ctlr->rcr);
+	p = seprintf(p, e, "multicast: %u\n", ctlr->mcast);
 
 	if(ctlr->mii != NULL && ctlr->mii->curphy != NULL)
 		miidumpphy(ctlr->mii, p, e);
@@ -682,7 +681,7 @@ rtl8169init(struct ether* edev)
 	 * Setting Mulrw in Cplusc disables the Tx/Rx DMA burst
 	 * settings in Tcr/Rcr; the (1<<14) is magic.
 	 */
-	ctlr->mtps = (Mps + 127)/128; //HOWMANY(Mps, 128);
+	ctlr->mtps = HOWMANY(Mps, 128);
 	cplusc = csr16r(ctlr, Cplusc) & ~(1<<14);
 	cplusc |= /*Rxchksum|*/Mulrw;
 	switch(ctlr->macv){
@@ -771,9 +770,9 @@ rtl8169init(struct ether* edev)
 	 */
 	csr32w(ctlr, Mpc, 0);
 	csr8w(ctlr, Mtps, ctlr->mtps);
-	csr32w(ctlr, Tnpds+4, 0);
+	csr32w(ctlr, Tnpds + 4, paddr_high32(ctlr->td));
 	csr32w(ctlr, Tnpds, paddr_low32(ctlr->td));
-	csr32w(ctlr, Rdsar+4, 0);
+	csr32w(ctlr, Rdsar + 4, paddr_high32(ctlr->rd));
 	csr32w(ctlr, Rdsar, paddr_low32(ctlr->rd));
 	csr16w(ctlr, Rms, Mps);
 	r = csr16r(ctlr, Mulint) & 0xF000;
@@ -826,16 +825,25 @@ rtl8169attach(struct ether* edev)
 		/*
 		 * Handle allocation/init errors here.
 		 */
+		//XXX kmalloc_aligned
 #define ALIGNEDFF(x) assert(! (uint8_t)(uint64_t)(x))
-		ctlr->td = kzmalloc(sizeof(D)*Ntd, KMALLOC_WAIT);
+		//ctlr->td = kzmalloc(sizeof(D)*Ntd, KMALLOC_WAIT);
+		assert(sizeof(D)*Ntd < PGSIZE);
+		ctlr->td = kpage_alloc_addr();
 		ALIGNEDFF(ctlr->td);
 		ctlr->tb = kzmalloc(Ntd * sizeof(struct block *), KMALLOC_WAIT);
 		ctlr->ntd = Ntd;
-		ctlr->rd = kzmalloc(sizeof(D)*Nrd, KMALLOC_WAIT);
+		//ctlr->rd = kzmalloc(sizeof(D)*Nrd, KMALLOC_WAIT);
+		assert(sizeof(D)*Nrd < PGSIZE);
+		ctlr->rd = kpage_alloc_addr();
 		ALIGNEDFF(ctlr->rd);
-		ctlr->rb = kzmalloc(Nrd * sizeof(struct block *), KMALLOC_WAIT);
+		//ctlr->rb = kzmalloc(Nrd * sizeof(struct block *), KMALLOC_WAIT);
+		assert(Nrd * sizeof(struct block *) < PGSIZE);
+		ctlr->rb = kpage_alloc_addr();	// this didn't need aligned XXX
 		ctlr->nrd = Nrd;
-		ctlr->dtcc = kzmalloc(sizeof(Dtcc), KMALLOC_WAIT);
+		//ctlr->dtcc = kzmalloc(sizeof(Dtcc), KMALLOC_WAIT);
+		assert(sizeof(Dtcc) < PGSIZE);
+		ctlr->dtcc = kpage_alloc_addr();
 		ALIGNEDFF(ctlr->dtcc);
 		rtl8169init(edev);
 		ctlr->init = 1;
@@ -873,6 +881,7 @@ rtl8169link(struct ether* edev)
 
 	phy = ctlr->mii->curphy;
 	if(miistatus(ctlr->mii) < 0){
+		// TODO : no name here
 		printk("%slink n: speed %d fd %d link %d rfc %d tfc %d\n",
 			edev->netif.name, phy->speed, phy->fd, phy->link,
 			phy->rfc, phy->tfc);
@@ -1081,18 +1090,19 @@ rtl8169interrupt(struct hw_trapframe *hw_tf, void *arg)
 static void
 rtl8169pci(void)
 {
-#if 0
-	struct pci_device *pci;
-	struct ctlr *ctlr;
-	int i, port, pcie;
+	struct pci_device *pcidev;
 
-	p = NULL;
-	while(p = pcimatch(p, 0, 0)){
-		if(p->ccrb != 0x02 || p->ccru != 0)
+	struct ctlr *ctlr;
+	int id, port, pcie;
+
+	STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
+		/* This checks that pcidev is a Network Controller for Ethernet */
+		if (pcidev->class != 0x02 || pcidev->subclass != 0x00)
 			continue;
+		id = pcidev->dev_id << 16 | pcidev->ven_id;
 
 		pcie = 0;
-		switch(i = ((p->did<<16)|p->vid)){
+		switch(id) {
 		default:
 			continue;
 		case Rtl8100e:			/* RTL810[01]E ? */
@@ -1104,35 +1114,42 @@ rtl8169pci(void)
 		case Rtl8169:			/* RTL8169 */
 			break;
 		case (0xC107<<16)|0x1259:	/* Corega CG-LAPCIGT */
-			i = Rtl8169;
+			id = Rtl8169;
 			break;
 		}
+		printk("rtl8169 driver found 0x%04x:%04x at %02x:%02x.%x\n",
+		       pcidev->ven_id, pcidev->dev_id,
+		       pcidev->bus, pcidev->dev, pcidev->func);
 
-		port = p->mem[0].bar & ~0x01;
-		if(ioalloc(port, p->mem[0].size, 0, "rtl8169") < 0){
-			printd("rtl8169: port %#ux in use\n", port);
-			continue;
-		}
+		port = pcidev->bar[0].pio_base;
 
-		ctlr = kzmalloc(sizeof(struct ctlr), 0);
+		ctlr = kzmalloc(sizeof(struct ctlr), KMALLOC_WAIT);
+		spinlock_init_irqsave(&ctlr->ilock);
+		spinlock_init_irqsave(&ctlr->tlock);
+		spinlock_init_irqsave(&ctlr->rlock);
+		qlock_init(&ctlr->alock);
+		qlock_init(&ctlr->slock);
+
 		ctlr->port = port;
-		ctlr->pcidev = p;
-		ctlr->pciv = i;
+		ctlr->pci = pcidev;
+		ctlr->pciv = id;
 		ctlr->pcie = pcie;
 
+		/* pcipms is something related to power mgmt, i think */
+		#if 0
 		if(pcigetpms(p) > 0){
 			pcisetpms(p, 0);
 
-			for(i = 0; i < 6; i++)
+			for(int i = 0; i < 6; i++)
 				pcicfgw32(p, PciBAR0+i*4, p->mem[i].bar);
 			pcicfgw8(p, PciINTL, p->intl);
 			pcicfgw8(p, PciLTR, p->ltr);
 			pcicfgw8(p, PciCLS, p->cls);
 			pcicfgw16(p, PciPCR, p->pcr);
 		}
+		#endif
 
 		if(rtl8169reset(ctlr)){
-			iofree(port);
 			kfree(ctlr);
 			continue;
 		}
@@ -1143,12 +1160,11 @@ rtl8169pci(void)
 		 */
 		ctlr->macv = csr32r(ctlr, Tcr) & HwveridMASK;
 		if((ctlr->mii = rtl8169mii(ctlr)) == NULL){
-			iofree(port);
 			kfree(ctlr);
 			continue;
 		}
 
-		pcisetbme(p);
+		pci_set_bus_master(pcidev);
 
 		if(rtl8169ctlrhead != NULL)
 			rtl8169ctlrtail->next = ctlr;
@@ -1156,7 +1172,6 @@ rtl8169pci(void)
 			rtl8169ctlrhead = ctlr;
 		rtl8169ctlrtail = ctlr;
 	}
-#endif
 }
 
 static int
@@ -1166,8 +1181,7 @@ rtl8169pnp(struct ether* edev)
 	struct ctlr *ctlr;
 	uint8_t ea[Eaddrlen];
 
-	if(rtl8169ctlrhead == NULL)
-		rtl8169pci();
+	run_once(rtl8169pci());
 
 	/*
 	 * Any adapter matches if no edev->port is supplied,
@@ -1186,10 +1200,7 @@ rtl8169pnp(struct ether* edev)
 
 	edev->ctlr = ctlr;
 	edev->port = ctlr->port;
-#warning "pci irq"
-//	edev->irq = ctlr->pcidev->intl;
-#warning "PCI tbdf"
-	//edev->tbdf = ctlr->pcidev->tbdf;
+	edev->irq = ctlr->pci->irqline;
 	edev->netif.mbps = 100;
 
 	/*

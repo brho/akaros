@@ -28,6 +28,15 @@ export rootsrv=boot
 # (me network server server-addr
 # wrong addresses.
 
+# qemu is the default
+me=10.0.2.15
+mask=255.255.255.0
+# brho: i don't know what exactly 'remote' is supposed to be, but that is
+# the third argument processed by adding to an ipifc.  if we pass nothing,
+# it'll build 'remote' by masking me & mask.
+remote=10.0.2.0
+route=10.0.2.2
+
 if [ "x$MACHINE" = "xc89" ]
 then
 	# c89's config.  use c96 for eth0 (.196).  if you want, we can also use
@@ -38,17 +47,16 @@ then
 	mask=255.255.255.0
 	remote=169.229.49.0
 	route=169.229.49.1
-else
-	# qemu is the default
-	me=10.0.2.15
-	mask=255.255.255.0
-	# brho: i don't know what exactly 'remote' is supposed to be, but that is
-	# the third argument processed by adding to an ipifc.  if we pass nothing,
-	# it'll build 'remote' by masking me & mask.
-	remote=10.0.2.0
-	route=10.0.2.2
 fi
 
+if [ "x$MACHINE" = "xhossin" ]
+then
+	# brho's soda hall desktop
+	me=128.32.37.46
+	mask=255.255.255.0
+	remote=128.32.37.0
+	route=128.32.37.1
+fi
 #
 # Post the read-only filesystem in #s/$beetroot
 # and mount it on /boot so the commands in /boot/$cputype/bin
