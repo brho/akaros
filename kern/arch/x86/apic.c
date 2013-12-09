@@ -217,6 +217,8 @@ uint32_t lapic_get_default_id(void)
 
 // timer init calibrates both tsc timer and lapic timer using PIT
 void timer_init(void){
+	/* some boards have this unmasked early on. */
+	pic_mask_irq(0);
 	uint64_t tscval[2];
 	long timercount[2];
 	pit_set_timer(0xffff, TIMER_RATEGEN);
