@@ -262,7 +262,7 @@ static int getpit()
     int high, low;
 	// TODO: need a lock to protect access to PIT
 
-    /* Select timer0 and latch counter value. */
+    /* Select counter 0 and latch counter value. */
     outb(TIMER_MODE, TIMER_SEL0 | TIMER_LATCH);
     
     low = inb(TIMER_CNTR0);
