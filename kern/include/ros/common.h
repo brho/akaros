@@ -34,7 +34,7 @@ typedef unsigned long uintreg_t;
 #define PiB	1125899906842624ull
 #define EiB	1152921504606846976ull
 
-#define ALIGNED(p, a)	(!(((uintptr)(p)) & ((a)-1)))
+#define ALIGNED(p, a)	(!(((uintptr_t)(p)) & ((a)-1)))
 
 #define ARRAY_SIZE(x) (sizeof((x))/sizeof((x)[0]))
 
