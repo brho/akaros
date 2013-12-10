@@ -751,7 +751,7 @@ void test_kmalloc(void)
 	void *bufs[NUM_KMALLOC_CACHES + 1];	
 	size_t size;
 	for (int i = 0; i < NUM_KMALLOC_CACHES + 1; i++){
-		size = (KMALLOC_SMALLEST << i) - KMALLOC_OFFSET;
+		size = (KMALLOC_SMALLEST << i) - sizeof(struct kmalloc_tag);
 		bufs[i] = kmalloc(size, 0);
 		printk("Size %d, Addr = %p\n", size, bufs[i]);
 	}
