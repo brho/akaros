@@ -825,26 +825,13 @@ rtl8169attach(struct ether* edev)
 		/*
 		 * Handle allocation/init errors here.
 		 */
-		//XXX kmalloc_aligned
-#define ALIGNEDFF(x) assert(! (uint8_t)(uint64_t)(x))
-		//ctlr->td = kzmalloc(sizeof(D)*Ntd, KMALLOC_WAIT);
-		assert(sizeof(D)*Ntd < PGSIZE);
-		ctlr->td = kpage_alloc_addr();
-		ALIGNEDFF(ctlr->td);
+		ctlr->td = kzmalloc_align(sizeof(D) * Ntd, KMALLOC_WAIT, 256);
 		ctlr->tb = kzmalloc(Ntd * sizeof(struct block *), KMALLOC_WAIT);
 		ctlr->ntd = Ntd;
-		//ctlr->rd = kzmalloc(sizeof(D)*Nrd, KMALLOC_WAIT);
-		assert(sizeof(D)*Nrd < PGSIZE);
-		ctlr->rd = kpage_alloc_addr();
-		ALIGNEDFF(ctlr->rd);
-		//ctlr->rb = kzmalloc(Nrd * sizeof(struct block *), KMALLOC_WAIT);
-		assert(Nrd * sizeof(struct block *) < PGSIZE);
-		ctlr->rb = kpage_alloc_addr();	// this didn't need aligned XXX
+		ctlr->rd = kzmalloc_align(sizeof(D) * Nrd, KMALLOC_WAIT, 256);
+		ctlr->rb = kzmalloc(Nrd * sizeof(struct block *), KMALLOC_WAIT);
 		ctlr->nrd = Nrd;
-		//ctlr->dtcc = kzmalloc(sizeof(Dtcc), KMALLOC_WAIT);
-		assert(sizeof(Dtcc) < PGSIZE);
-		ctlr->dtcc = kpage_alloc_addr();
-		ALIGNEDFF(ctlr->dtcc);
+		ctlr->dtcc = kzmalloc_align(sizeof(Dtcc), KMALLOC_WAIT, 64);
 		rtl8169init(edev);
 		ctlr->init = 1;
 	}
