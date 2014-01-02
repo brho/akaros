@@ -30,6 +30,7 @@ extern struct dev rootdevtab;
 extern struct dev ipdevtab;
 extern struct dev mntdevtab;
 extern struct dev srvdevtab;
+extern struct dev vmdevtab;
 struct dev *devtab[] = {
 	&alarmdevtab,
 	&rootdevtab,
@@ -41,6 +42,7 @@ struct dev *devtab[] = {
 	&ipdevtab,
 	&mntdevtab,
 	&srvdevtab,
+	&vmdevtab,
 	NULL,
 };
 
