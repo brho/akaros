@@ -124,12 +124,30 @@ void *kzmalloc_align(size_t size, int flags, size_t align)
 
 void *krealloc(void* buf, size_t size, int flags)
 {
-	struct kmalloc_tag *tag = (struct kmalloc_tag*)(buf -
+	void *nbuf;
+	int osize = 0;
+	if (buf){
+		struct kmalloc_tag *tag = (struct kmalloc_tag*)(buf -
 	                                                sizeof(struct kmalloc_tag));
-	if (tag->my_cache->obj_size >= size)
-		return buf;
-	kfree(buf);
-	return kmalloc(size, flags);
+		if (tag->my_cache->obj_size >= size)
+			return buf;
+		osize = tag->my_cache->obj_size;
+	}
+
+	nbuf = kmalloc(size, flags);
+
+	/* would be more interesting to user error(...) here. */
+	/* but in any event, NEVER destroy buf! */
+	if (! nbuf)
+		return NULL;
+
+	if (osize)
+		memmove(nbuf, buf, osize);
+
+	if (buf)
+		kfree(buf);
+
+	return nbuf;
 }
 
 void kfree(void *addr)
