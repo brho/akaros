@@ -46,19 +46,15 @@ validstat(uint8_t *s, unsigned long n)
 		validname(buf, 0);
 }
 
-/* Helper for readnum and readstr.  Given a string with strlen, we'll move n
- * chars of it to the buffer at offset.
- *
- * The old plan9 version of this didn't copy over the \0.  This assumes there is
- * a \0 at str[strlen], and that we have strlen+1 bytes. */
-static int __readstr(unsigned long offset, char *buf, unsigned long n,
-                     char *str, size_t strlen)
+/* read memory to a process. */
+int readmem(unsigned long offset, char *buf, unsigned long n,
+	    void *mem, size_t len)
 {
-	if (offset >= strlen + 1)
+	if (offset >= len)
 		return 0;
-	if (offset + n > strlen + 1)
-		n = strlen + 1 - offset;
-	memmove(buf, str + offset, n);
+	if (offset + n > len)
+		n = len + 1 - offset;
+	memmove(buf, mem + offset, n);
 	return n;
 }
 
@@ -73,12 +69,14 @@ int readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
 	/* we really need the %* format. */
 	size = snprintf(tmp, size, "%lu", val);
 	/* size is now strlen, so the rest of this is just like readstr. */
-	return __readstr(off, buf, n, tmp, size);
+	/* always include the \0 */
+	return readmem(off, buf, n, tmp, size + 1);
 }
 
 long readstr(long offset, char *buf, long n, char *str)
 {
-	return __readstr(offset, buf, n, str, strlen(str));
+	/* always include the \0 */
+	return readmem(offset, buf, n, str, strlen(str) + 1);
 }
 
 void fdclose(int fd, int flag)

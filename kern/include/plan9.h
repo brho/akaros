@@ -622,6 +622,8 @@ int bindmount(int ismount, int fd, int afd,
 int sysunmount(char *name, char *old);
 
 int plan9setup(struct proc *new_proc, struct proc *parent);
+int readmem(unsigned long offset, char *buf, unsigned long n,
+	    void *mem, size_t len);
 long readstr(long offset, char *buf, long n, char *str);
 int readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
 			int size);
