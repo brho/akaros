@@ -46,6 +46,7 @@ enum {
 struct vm {
 	struct vm *next;
 	struct kref					kref;
+	/* should this be an array of pages? Hmm. */
 	void                                           *image;
 	unsigned long                                   imagesize;
 	int                                             id;
@@ -61,8 +62,20 @@ static struct kref vmid[1] = { {(void *)1, fake_release} };
 
 static void vm_release(struct kref *kref)
 {
-	struct vm *a = container_of(kref, struct vm, kref);
-	/* fix me. */
+	struct vm *v = container_of(kref, struct vm, kref);
+	spin_lock(&vmlock);
+	/* cute trick. Save the last element of the array in place of the
+	 * one we're deleting. Reduce nvm. Don't realloc; that way, next
+	 * time we realloc it, the allocator will see there's nothing to
+	 * do and just return.
+	 */
+	if (v != &vms[nvm-1]){
+		/* free the image ... oops */
+		/* get rid of the kref. */
+		*v = vms[nvm-1];
+	}
+	nvm--;
+	spin_unlock(&vmlock);
 }
 
 static int newvmid(void)
