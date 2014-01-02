@@ -1,4 +1,6 @@
-/* Copyright (c) 2013 The Regents of the University of California
+#define DEBUG
+/* Copyright 2014 Google Inc.
+ * Copyright (c) 2013 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
@@ -66,7 +68,7 @@ static void vm_release(struct kref *kref)
 	spin_lock(&vmlock);
 	/* cute trick. Save the last element of the array in place of the
 	 * one we're deleting. Reduce nvm. Don't realloc; that way, next
-	 * time we realloc it, the allocator will see there's nothing to
+
 	 * do and just return.
 	 */
 	if (v != &vms[nvm-1]){
@@ -94,15 +96,17 @@ static int vmgen(struct chan *c, char *entry_name,
 {
 	struct qid q;
 	struct vm *vm_i;
-	struct proc *p = current;
+	DEBUG("GEN s %d\n", s);
 	/* Whether we're in one dir or at the top, .. still takes us to the top. */
 	if (s == DEVDOTDOT) {
 		mkqid(&q, Qtopdir, 0, QTDIR);
 		devdir(c, c->qid, "#V", 0, eve, 0555, dp);
 		return 1;
 	}
+	DEBUG("TYPE %d\n", TYPE(c->qid));
 	switch (TYPE(c->qid)) {
 	case Qtopdir:
+		DEBUG("Qtopdir s %d nvm %d\n", s, nvm);
 		/* Generate elements for the top level dir.  We support a clone and
 		 * vm dirs at the top level */
 		if (s == 0) {
@@ -113,8 +117,9 @@ static int vmgen(struct chan *c, char *entry_name,
 		s--;	/* 1 -> 0th element, 2 -> 1st element, etc */
 		spin_lock(&vmlock);
 		if (s >= nvm){
+			DEBUG("DONE qtopdir\n");
 			spin_unlock(&vmlock);
-			return 0;
+			return -1;
 		}
 		vm_i = &vms[s];
 		snprintf(get_cur_genbuf(), GENBUF_SZ, "vm%d", vm_i->id);
@@ -179,7 +184,7 @@ static struct walkqid *vmwalk(struct chan *c, struct chan *nc, char **name,
 	return devwalk(c, nc, name, nname, 0, 0, vmgen);
 }
 
-static long vmstat(struct chan *c, uint8_t *db, long n)
+static int vmstat(struct chan *c, uint8_t *db, int n)
 {
 	return devstat(c, db, n, 0, 0, vmgen);
 }
@@ -198,7 +203,6 @@ static struct chan *vmopen(struct chan *c, int omode)
 			error(Eisdir);
 		break;
 	case Qclone:
-		/* blindly grow the array. Fix me later. */
 		spin_lock(&vmlock);
 		vms = krealloc(vms, sizeof(vms[0])*(nvm+1),0);
 		v = &vms[nvm];
@@ -213,7 +217,6 @@ static struct chan *vmopen(struct chan *c, int omode)
 	case Qimage:
 		/* the purpose of opening is to hold a kref on the proc_vm */
 		v = c->aux;
-		assert(v);
 		/* this isn't a valid pointer yet, since our chan doesn't have a
 		 * ref.  since the time that walk gave our chan the qid, the chan
 		 * could have been closed, and the vm decref'd and freed.  the
@@ -232,7 +235,7 @@ static struct chan *vmopen(struct chan *c, int omode)
 	return c;
 }
 
-static void vmcreate(struct chan *c, char *name, int omode, int perm)
+static void vmcreate(struct chan *c, char *name, int omode, uint32_t perm)
 {
 	error(Eperm);
 }
@@ -242,7 +245,7 @@ static void vmremove(struct chan *c)
 	error(Eperm);
 }
 
-static long vmwstat(struct chan *c, uint8_t *dp, long n)
+static int vmwstat(struct chan *c, uint8_t *dp, int n)
 {
 	error("No vmwstat");
 	return 0;
@@ -251,7 +254,8 @@ static long vmwstat(struct chan *c, uint8_t *dp, long n)
 static void vmclose(struct chan *c)
 {
 	struct vm *v = c->aux;
-	assert(v);
+	if (!v)
+		return;
 	/* There are more closes than opens.  For instance, sysstat doesn't open,
 	 * but it will close the chan it got from namec.  We only want to clean
 	 * up/decref chans that were actually open. */
@@ -341,6 +345,6 @@ struct dev vmdevtab = {
 	vmremove,
 	vmwstat,
 	devpower,
-	devconfig,
-	devchaninfo,
+//	devconfig,
+//	devchaninfo,
 };
