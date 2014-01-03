@@ -1,4 +1,4 @@
-#define DEBUG
+//#define DEBUG
 /* Copyright 2014 Google Inc.
  * Copyright (c) 2013 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
@@ -96,28 +96,34 @@ static int vmgen(struct chan *c, char *entry_name,
 {
 	struct qid q;
 	struct vm *vm_i;
-	DEBUG("GEN s %d\n", s);
+	printd("GEN s %d\n", s);
 	/* Whether we're in one dir or at the top, .. still takes us to the top. */
 	if (s == DEVDOTDOT) {
 		mkqid(&q, Qtopdir, 0, QTDIR);
 		devdir(c, c->qid, "#V", 0, eve, 0555, dp);
 		return 1;
 	}
-	DEBUG("TYPE %d\n", TYPE(c->qid));
+	printd("TYPE %d\n", TYPE(c->qid));
 	switch (TYPE(c->qid)) {
 	case Qtopdir:
-		DEBUG("Qtopdir s %d nvm %d\n", s, nvm);
-		/* Generate elements for the top level dir.  We support a clone and
+		printd("Qtopdir s %d nvm %d\n", s, nvm);
+		/* Generate elements for the top level dir.  We support clone, stat,
 		 * vm dirs at the top level */
 		if (s == 0) {
 			mkqid(&q, Qclone, 0, QTFILE);
 			devdir(c, q, "clone", 0, eve, 0666, dp);
 			return 1;
 		}
+		s--;
+		if (s == 0) {
+			mkqid(&q, Qstat, 0, QTFILE);
+			devdir(c, q, "stat", 0, eve, 0666, dp);
+			return 1;
+		}
 		s--;	/* 1 -> 0th element, 2 -> 1st element, etc */
 		spin_lock(&vmlock);
 		if (s >= nvm){
-			DEBUG("DONE qtopdir\n");
+			printd("DONE qtopdir\n");
 			spin_unlock(&vmlock);
 			return -1;
 		}
@@ -154,6 +160,9 @@ static int vmgen(struct chan *c, char *entry_name,
 		 * stat output (check the -1 case in devstat). */
 	case Qclone:
 		devdir(c, c->qid, "clone", 0, eve, 0666, dp);
+		return 1;
+	case Qstat:
+		devdir(c, c->qid, "stat", 0, eve, 0444, dp);
 		return 1;
 	case Qctl:
 		devdir(c, c->qid, "ctl", 0, eve, 0666, dp);
@@ -212,6 +221,9 @@ static struct chan *vmopen(struct chan *c, int omode)
 		v->id = newvmid();
 		mkqid(&c->qid, QID(v, Qctl), 0, QTFILE);
 		c->aux = v;
+		printd("New VM id %d\n", v->id);
+		break;
+	case Qstat:
 		break;
 	case Qctl:
 	case Qimage:
@@ -262,7 +274,9 @@ static void vmclose(struct chan *c)
 	if (!(c->flag & COPEN))
 		return;
 	switch (TYPE(c->qid)) {
+		/* for now, leave the VM active even when we close ctl */
 	case Qctl:
+		break;
 	case Qimage:
 		kref_put(&v->kref);
 		break;
@@ -272,13 +286,18 @@ static void vmclose(struct chan *c)
 static long vmread(struct chan *c, void *ubuf, long n, int64_t offset)
 {
 	struct vm *v = c->aux;
+	printd("VMREAD\n");
 	switch (TYPE(c->qid)) {
 	case Qtopdir:
 	case Qvmdir:
 		return devdirread(c, ubuf, n, 0, 0, vmgen);
+	case Qstat:
+		return readnum(offset, ubuf, n, nvm, NUMSIZE32);
 	case Qctl:
+		assert(v);
 		return readnum(offset, ubuf, n, v->id, NUMSIZE32);
  	case Qimage:
+		assert(v);
 		return readmem(offset, ubuf, n,
 			       v->image, v->imagesize);
 	default:
@@ -298,6 +317,7 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 	switch (TYPE(c->qid)) {
 	case Qtopdir:
 	case Qvmdir:
+	case Qstat:
 		error(Eperm);
 	case Qctl:
 		vm = c->aux;
