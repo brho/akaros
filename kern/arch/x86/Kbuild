@@ -3,6 +3,7 @@ obj-y						+= colored_caches.o
 obj-y						+= console.o
 obj-y						+= cpuinfo.o
 obj-y						+= entry$(BITS).o
+obj-y						+= emulate.o
 obj-y						+= frontend.o
 obj-y						+= init.o
 obj-y						+= ioapic.o
