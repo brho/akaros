@@ -32,7 +32,7 @@
 #include <umem.h>
 #include <devalarm.h>
 #include <arch/types.h>
-#include <arch/litevm.h>
+#include <arch/vm.h>
 #include <arch/emulate.h>
 #include <arch/vmdebug.h>
 

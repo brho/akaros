@@ -18,6 +18,9 @@
 #include <syscall.h>
 #include <alarm.h>
 #include <trace.h>
+#ifdef CONFIG_X86_64
+#include <arch/vm.h>
+#endif
 
 #ifdef __SHARC__
 typedef sharC_env_t;
@@ -26,6 +29,9 @@ typedef sharC_env_t;
 struct per_cpu_info {
 #ifdef CONFIG_X86_64
 	uintptr_t stacktop;
+	/* virtual machines */
+	struct vmcs vmxarea;
+	struct vmcs *vmcs;
 #endif
 	spinlock_t lock;
 	/* Process management */

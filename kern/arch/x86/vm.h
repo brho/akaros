@@ -1,5 +1,6 @@
 #ifndef __LITEVM_H
 #define __LITEVM_H
+#include <page_alloc.h>
 #include <sys/queue.h>
 #include "vmx.h"
 
@@ -359,7 +360,7 @@ static inline int memslot_id(struct litevm *litevm, struct litevm_memory_slot *s
 }
 
 /* uh, what? */
-#warning "pfn_to_page is bogus"
+//#warning "pfn_to_page is bogus"
 static inline uintptr_t pfn_to_page(unsigned long pfn)
 {
 	return pfn << PAGE_SHIFT;

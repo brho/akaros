@@ -22,10 +22,8 @@
 #include <event.h>
 #include <umem.h>
 #include <devalarm.h>
-#include <arch/types.h>
-#include <arch/vm.h>
-#include <arch/emulate.h>
-#include <arch/vmdebug.h>
+#incluce <arch/types.h>
+#include <arch/litevm.h>
 
 /* qid path types */
 enum {
@@ -197,7 +195,7 @@ static struct walkqid *vmwalk(struct chan *c, struct chan *nc, char **name,
 	return devwalk(c, nc, name, nname, 0, 0, vmgen);
 }
 
-static int vmstat(struct chan *c, uint8_t *db, int n)
+static long vmstat(struct chan *c, uint8_t *db, long n)
 {
 	return devstat(c, db, n, 0, 0, vmgen);
 }
@@ -251,7 +249,7 @@ static struct chan *vmopen(struct chan *c, int omode)
 	return c;
 }
 
-static void vmcreate(struct chan *c, char *name, int omode, uint32_t perm)
+static void vmcreate(struct chan *c, char *name, int omode, int perm)
 {
 	error(Eperm);
 }
@@ -261,7 +259,7 @@ static void vmremove(struct chan *c)
 	error(Eperm);
 }
 
-static int vmwstat(struct chan *c, uint8_t *dp, int n)
+static long vmwstat(struct chan *c, uint8_t *dp, long n)
 {
 	error("No vmwstat");
 	return 0;
@@ -369,6 +367,6 @@ struct dev vmdevtab = {
 	vmremove,
 	vmwstat,
 	devpower,
-//	devconfig,
-//	devchaninfo,
+	devconfig,
+	devchaninfo,
 };
