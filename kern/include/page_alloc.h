@@ -66,6 +66,7 @@ error_t upage_alloc_specific(struct proc* p, page_t *SAFE *page, size_t ppn);
 error_t kpage_alloc_specific(page_t *SAFE *page, size_t ppn);
 
 void *CT(1 << order) get_cont_pages(size_t order, int flags);
+void *CT(1 << order) get_cont_pages_node(int node, size_t order, int flags);
 void free_cont_pages(void *buf, size_t order);
 
 void page_incref(page_t *SAFE page);

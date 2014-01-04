@@ -215,6 +215,21 @@ void *get_cont_pages(size_t order, int flags)
 	return ppn2kva(first);
 }
 
+/**
+ * @brief Allocated 2^order contiguous physical pages.  Will increment the
+ * reference count for the pages. Get them from NUMA node node.
+ *
+ * @param[in] node which node to allocate from. Unimplemented.
+ * @param[in] order order of the allocation
+ * @param[in] flags memory allocation flags
+ *
+ * @return The KVA of the first page, NULL otherwise.
+ */
+void *get_cont_pages_node(int node, size_t order, int flags)
+{
+	return get_cont_pages(order, flags);
+}
+
 void free_cont_pages(void *buf, size_t order)
 {
 	size_t npages = 1 << order;	
