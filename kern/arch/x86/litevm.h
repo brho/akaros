@@ -386,4 +386,192 @@ static inline struct litevm_mmu_page *page_header(hpa_t shadow_page)
 
 #endif
 
+/* just to get things to build ... include this stuff for now.
+ * at some point, this interface gets nuke to and made more plan 
+ * 9 like.
+ */
+
+/* for LITEVM_CREATE_MEMORY_REGION */
+struct litevm_memory_region {
+	uint32_t slot;
+	uint32_t flags;
+	uint64_t guest_phys_addr;
+	uint64_t memory_size; /* bytes */
+};
+
+/* for litevm_memory_region::flags */
+#define LITEVM_MEM_LOG_DIRTY_PAGES  1UL
+
+
+#define LITEVM_EXIT_TYPE_FAIL_ENTRY 1
+#define LITEVM_EXIT_TYPE_VM_EXIT    2
+
+enum litevm_exit_reason {
+	LITEVM_EXIT_UNKNOWN,
+	LITEVM_EXIT_EXCEPTION,
+	LITEVM_EXIT_IO,
+	LITEVM_EXIT_CPUID,
+	LITEVM_EXIT_DEBUG,
+	LITEVM_EXIT_HLT,
+	LITEVM_EXIT_MMIO,
+};
+
+/* for LITEVM_RUN */
+struct litevm_run {
+	/* in */
+	uint32_t vcpu;
+	uint32_t emulated;  /* skip current instruction */
+	uint32_t mmio_completed; /* mmio request completed */
+
+	/* out */
+	uint32_t exit_type;
+	uint32_t exit_reason;
+	uint32_t instruction_length;
+	union {
+		/* LITEVM_EXIT_UNKNOWN */
+		struct {
+			uint32_t hardware_exit_reason;
+		} hw;
+		/* LITEVM_EXIT_EXCEPTION */
+		struct {
+			uint32_t exception;
+			uint32_t error_code;
+		} ex;
+		/* LITEVM_EXIT_IO */
+		struct {
+#define LITEVM_EXIT_IO_IN  0
+#define LITEVM_EXIT_IO_OUT 1
+			uint8_t direction;
+			uint8_t size; /* bytes */
+			uint8_t string;
+			uint8_t string_down;
+			uint8_t rep;
+			uint8_t pad;
+			uint16_t port;
+			uint64_t count;
+			union {
+				uint64_t address;
+				uint32_t value;
+			};
+		} io;
+		struct {
+		} debug;
+		/* LITEVM_EXIT_MMIO */
+		struct {
+			uint64_t phys_addr;
+			uint8_t  data[8];
+			uint32_t len;
+			uint8_t  is_write;
+		} mmio;
+	};
+};
+
+/* for LITEVM_GET_REGS and LITEVM_SET_REGS */
+struct litevm_regs {
+	/* in */
+	uint32_t vcpu;
+	uint32_t padding;
+
+	/* out (LITEVM_GET_REGS) / in (LITEVM_SET_REGS) */
+	uint64_t rax, rbx, rcx, rdx;
+	uint64_t rsi, rdi, rsp, rbp;
+	uint64_t r8,  r9,  r10, r11;
+	uint64_t r12, r13, r14, r15;
+	uint64_t rip, rflags;
+};
+
+struct litevm_segment {
+	uint64_t base;
+	uint32_t limit;
+	uint16_t selector;
+	uint8_t  type;
+	uint8_t  present, dpl, db, s, l, g, avl;
+	uint8_t  unusable;
+	uint8_t  padding;
+};
+
+struct litevm_dtable {
+	uint64_t base;
+	uint16_t limit;
+	uint16_t padding[3];
+};
+
+/* for LITEVM_GET_SREGS and LITEVM_SET_SREGS */
+struct litevm_sregs {
+	/* in */
+	uint32_t vcpu;
+	uint32_t padding;
+
+	/* out (LITEVM_GET_SREGS) / in (LITEVM_SET_SREGS) */
+	struct litevm_segment cs, ds, es, fs, gs, ss;
+	struct litevm_segment tr, ldt;
+	struct litevm_dtable gdt, idt;
+	uint64_t cr0, cr2, cr3, cr4, cr8;
+	uint64_t efer;
+	uint64_t apic_base;
+
+	/* out (LITEVM_GET_SREGS) */
+	uint32_t pending_int;
+	uint32_t padding2;
+};
+
+/* for LITEVM_TRANSLATE */
+struct litevm_translation {
+	/* in */
+	uint64_t linear_address;
+	uint32_t vcpu;
+	uint32_t padding;
+
+	/* out */
+	uint64_t physical_address;
+	uint8_t  valid;
+	uint8_t  writeable;
+	uint8_t  usermode;
+};
+
+/* for LITEVM_INTERRUPT */
+struct litevm_interrupt {
+	/* in */
+	uint32_t vcpu;
+	uint32_t irq;
+};
+
+struct litevm_breakpoint {
+	uint32_t enabled;
+	uint32_t padding;
+	uint64_t address;
+};
+
+/* for LITEVM_DEBUG_GUEST */
+struct litevm_debug_guest {
+	/* int */
+	uint32_t vcpu;
+	uint32_t enabled;
+	struct litevm_breakpoint breakpoints[4];
+	uint32_t singlestep;
+};
+
+/* for LITEVM_GET_DIRTY_LOG */
+struct litevm_dirty_log {
+	uint32_t slot;
+	uint32_t padding;
+	union {
+		void *dirty_bitmap; /* one bit per page */
+		uint64_t paddingw;
+	};
+};
+
+enum {
+	LITEVM_RUN = 1,
+	LITEVM_GET_REGS,
+	LITEVM_SET_REGS,
+	LITEVM_GET_SREGS,
+	LITEVM_SET_SREGS,
+	LITEVM_TRANSLATE,
+	LITEVM_INTERRUPT,
+	LITEVM_DEBUG_GUEST,
+	LITEVM_SET_MEMORY_REGION,
+	LITEVM_CREATE_VCPU,
+	LITEVM_GET_DIRTY_LOG,
+};
 #endif

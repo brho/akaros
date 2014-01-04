@@ -1,9 +1,7 @@
 #ifndef ROS_KERN_ARCH_TRAP_H
 #define ROS_KERN_ARCH_TRAP_H
 
-#define MSR_IA32_SYSENTER_CS 0x174
-#define MSR_IA32_SYSENTER_ESP 0x175
-#define MSR_IA32_SYSENTER_EIP 0x176
+#include "msr-index.h"
 
 #define NUM_IRQS					256
 #define KERNEL_IRQ_OFFSET			32
