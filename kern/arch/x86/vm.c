@@ -28,7 +28,7 @@
 #include <umem.h>
 #include <devalarm.h>
 #include <arch/types.h>
-#include <arch/litevm.h>
+#include <arch/vm.h>
 #include <arch/emulate.h>
 #include <arch/vmdebug.h>
 #include <arch/msr-index.h>
@@ -251,10 +251,6 @@ static void reload_tss(void)
 #endif
 }
 
-#warning "DEFINE PER CPU "
-//static DEFINE_PER_CPU(struct vmcs *, vmxarea);
-//static DEFINE_PER_CPU(struct vmcs *, current_vmcs);
-
 static struct vmcs_descriptor {
 	int size;
 	int order;
@@ -397,8 +393,7 @@ static struct litevm_vcpu *__vcpu_load(struct litevm_vcpu *vcpu)
 #warning "__pa"
 	uint64_t phys_addr = 0; //__pa(vcpu->vmcs);
 	int cpu;
-#warning "get_cpu"
-	cpu = 0; //get_cpu();
+	cpu = core_id();
 
 	if (vcpu->cpu != cpu) {
 #warning "smp_call_function"
@@ -406,10 +401,10 @@ static struct litevm_vcpu *__vcpu_load(struct litevm_vcpu *vcpu)
 		vcpu->launched = 0;
 	}
 #warning "per cpu"
-	if (0){//per_cpu(current_vmcs, cpu) != vcpu->vmcs) {
+	if (current->vmcs != vcpu->vmcs) {
 		uint8_t error;
 
-		per_cpu(current_vmcs, cpu) = vcpu->vmcs;
+		current->vmcs = vcpu->vmcs;
 		asm volatile ("vmptrld %1; setna %0"
 			       : "=m"(error) : "m"(phys_addr) : "cc" );
 		if (error)
@@ -493,8 +488,8 @@ static void free_litevm_area(void)
 {
 	int cpu;
 
-	for_each_online_cpu(cpu)
-		free_vmcs(per_cpu(vmxarea, cpu));
+//	for_each_online_cpu(cpu)
+//		free_vmcs(per_cpu(vmxarea, cpu));
 }
 
 static __init int alloc_litevm_area(void)

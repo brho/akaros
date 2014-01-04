@@ -22,10 +22,8 @@
 #include <event.h>
 #include <umem.h>
 #include <devalarm.h>
-#include <arch/types.h>
-#include <arch/vm.h>
-#include <arch/emulate.h>
-#include <arch/vmdebug.h>
+#incluce <arch/types.h>
+#include <arch/litevm.h>
 
 /* qid path types */
 enum {
