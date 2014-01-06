@@ -79,7 +79,7 @@ typedef uint64_t            hpa_t;
 typedef unsigned long  hfn_t;
 
 struct litevm_mmu_page {
-	LIST_HEAD(link, litevm_mmu_page) link;
+	LIST_ENTRY(litevm_mmu_page) link;
 	hpa_t page_hpa;
 	unsigned long slot_bitmap; /* One bit set per slot which has memory
 				    * in this shadow page.
@@ -149,7 +149,7 @@ enum {
 struct litevm_vcpu {
 	struct litevm *litevm;
 	struct vmcs *vmcs;
-	qlock_t mutex; //struct mutex mutex;
+	qlock_t mutex;
 	int   cpu;
 	int   launched;
 	unsigned long irq_summary; /* bit vector: 1 per word in irq_pending */
@@ -166,7 +166,7 @@ struct litevm_vcpu {
 	int nmsrs;
 	struct vmx_msr_entry *guest_msrs;
 	struct vmx_msr_entry *host_msrs;
-	LIST_HEAD(free_pages, free_pages) free_pages;
+	LIST_HEAD(free_pages, litevm_mmu_page) link;
 	//struct list_head free_pages;
 	struct litevm_mmu_page page_header_buf[LITEVM_NUM_MMU_PAGES];
 	struct litevm_mmu mmu;
@@ -207,7 +207,7 @@ struct litevm {
 	spinlock_t lock; /* protects everything except vcpus */
 	int nmemslots;
 	struct litevm_memory_slot memslots[LITEVM_MEMORY_SLOTS];
-	LIST_HEAD(active_mmu_pages, active_mmu_pages) active_mmu_pages;
+	LIST_HEAD(active_mmu_pages, litevm_mmu_page) link;
 	//struct list_head active_mmu_pages;
 	struct litevm_vcpu vcpus[LITEVM_MAX_VCPUS];
 	int memory_config_version;

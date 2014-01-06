@@ -357,8 +357,7 @@ static void setup_vmcs_descriptor(void)
 
 static void vmcs_clear(struct vmcs *vmcs)
 {
-#warning "__pa"
-	uint64_t phys_addr = 0;//;__pa(vmcs);
+	uint64_t phys_addr = PADDR(vmcs);
 	uint8_t error;
 
 	asm volatile ("vmclear %1; setna %0"
@@ -391,8 +390,7 @@ static int vcpu_slot(struct litevm_vcpu *vcpu)
  */
 static struct litevm_vcpu *__vcpu_load(struct litevm_vcpu *vcpu)
 {
-#warning "__pa"
-	uint64_t phys_addr = 0; //__pa(vcpu->vmcs);
+	uint64_t phys_addr = PADDR(vcpu->vmcs);
 	int cpu;
 	cpu = core_id();
 
@@ -439,9 +437,9 @@ static struct litevm_vcpu *vcpu_load(struct litevm *litevm, int vcpu_slot)
 {
 	struct litevm_vcpu *vcpu = &litevm->vcpus[vcpu_slot];
 
-	mutex_lock(&vcpu->mutex);
-	if (unlikely(!vcpu->vmcs)) {
-		mutex_unlock(&vcpu->mutex);
+	qlock(&vcpu->mutex);
+	if (!vcpu->vmcs) {
+		qunlock(&vcpu->mutex);
 		return 0;
 	}
 	return __vcpu_load(vcpu);
@@ -450,7 +448,7 @@ static struct litevm_vcpu *vcpu_load(struct litevm *litevm, int vcpu_slot)
 static void vcpu_put(struct litevm_vcpu *vcpu)
 {
 	put_cpu();
-	mutex_unlock(&vcpu->mutex);
+	qunlock(&vcpu->mutex);
 }
 
 
@@ -469,7 +467,7 @@ static struct vmcs *alloc_vmcs_cpu(int cpu)
 
 static struct vmcs *alloc_vmcs(void)
 {
-	return alloc_vmcs_cpu(smp_processor_id());
+	return alloc_vmcs_cpu(core_id());
 }
 
 static void free_vmcs(struct vmcs *vmcs)
@@ -520,21 +518,20 @@ static int vmx_disabled_by_bios(void)
 {
 	uint64_t msr;
 
-	rdmsrl(MSR_IA32_FEATURE_CONTROL, msr);
+	msr = read_msr(MSR_IA32_FEATURE_CONTROL);
 	return (msr & 5) == 1; /* locked but not enabled */
 }
 
 static void litevm_enable(void *garbage)
 {
 	int cpu = raw_smp_processor_id();
-#warning "Need PA of vmxarea"
-	uint64_t phys_addr = NULL; // __pa(per_cpu(vmxarea, cpu));
+	uint64_t phys_addr = PADDR(&currentcpu->vmxarea);
 	uint64_t old;
 
-	rdmsrl(MSR_IA32_FEATURE_CONTROL, old);
+	old = read_msr(MSR_IA32_FEATURE_CONTROL);
 	if ((old & 5) == 0)
 		/* enable and lock */
-		wrmsrl(MSR_IA32_FEATURE_CONTROL, old | 5);
+		write_msr(MSR_IA32_FEATURE_CONTROL, old | 5);
 	write_cr4(read_cr4() | CR4_VMXE); /* FIXME: not cpu hotplug safe */
 	asm volatile ("vmxon %0" : : "m"(phys_addr) : "memory", "cc");
 }
@@ -558,9 +555,10 @@ static int litevm_dev_open(struct inode *inode, struct file *filp)
 	for (i = 0; i < LITEVM_MAX_VCPUS; ++i) {
 		struct litevm_vcpu *vcpu = &litevm->vcpus[i];
 
-		mutex_init(&vcpu->mutex);
+		qlock_init(&vcpu->mutex);
 		vcpu->mmu.root_hpa = INVALID_PAGE;
-		INIT_LIST_HEAD(&vcpu->free_pages);
+#warning "init list head"
+//		INIT_LIST_HEAD(&vcpu->free_pages);
 	}
 #warning "filp->private data -- > c->aux?"
 //	filp->private_data = litevm;
@@ -1372,10 +1370,10 @@ static int litevm_dev_ioctl_create_vcpu(struct litevm *litevm, int n)
 
 	vcpu = &litevm->vcpus[n];
 
-	mutex_lock(&vcpu->mutex);
+	qlock(&vcpu->mutex);
 
 	if (vcpu->vmcs) {
-		mutex_unlock(&vcpu->mutex);
+		qunlock(&vcpu->mutex);
 		return -EEXIST;
 	}
 
@@ -1387,7 +1385,7 @@ static int litevm_dev_ioctl_create_vcpu(struct litevm *litevm, int n)
 	vcpu->litevm = litevm;
 	vmcs = alloc_vmcs();
 	if (!vmcs) {
-		mutex_unlock(&vcpu->mutex);
+		qunlock(&vcpu->mutex);
 		goto out_free_vcpus;
 	}
 	vmcs_clear(vmcs);
@@ -1554,6 +1552,7 @@ out:
 	return r;
 }
 
+#if 0
 /*
  * Get (and clear) the dirty memory log for a memory slot.
  */
@@ -1615,6 +1614,7 @@ out:
 	spin_unlock(&litevm->lock);
 	return r;
 }
+#endif
 
 struct litevm_memory_slot *gfn_to_memslot(struct litevm *litevm, gfn_t gfn)
 {
@@ -3384,8 +3384,8 @@ out:
 
 static void litevm_exit(void)
 {
-	free_litevm_area();
-	__free_page(pfn_to_page(bad_page_address >> PAGE_SHIFT));
+	//free_litevm_area();
+	//__free_page(pfn_to_page(bad_page_address >> PAGE_SHIFT));
 }
 
 
