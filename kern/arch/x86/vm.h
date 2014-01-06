@@ -2,6 +2,7 @@
 #define __LITEVM_H
 #include <page_alloc.h>
 #include <sys/queue.h>
+#include <pmap.h>
 #include "vmx.h"
 
 #define CR0_PE_MASK (1ULL << 0)
@@ -228,7 +229,7 @@ struct litevm_stat {
 
 extern struct litevm_stat litevm_stat;
 
-#define litevm_printf(litevm, fmt ...) printk(KERN_DEBUG fmt)
+#define litevm_printf(litevm, fmt ...) printd(fmt)
 #define vcpu_printf(vcpu, fmt...) litevm_printf(vcpu->litevm, fmt)
 
 void litevm_mmu_destroy(struct litevm_vcpu *vcpu);
@@ -359,15 +360,9 @@ static inline int memslot_id(struct litevm *litevm, struct litevm_memory_slot *s
 	return slot - litevm->memslots;
 }
 
-/* uh, what? */
-//#warning "pfn_to_page is bogus"
-static inline uintptr_t pfn_to_page(unsigned long pfn)
-{
-	return pfn << PAGE_SHIFT;
-}
 static inline struct litevm_mmu_page *page_header(hpa_t shadow_page)
 {
-	struct page *page = (struct page *)pfn_to_page(shadow_page >> PAGE_SHIFT);
+	struct page *page = ppn2page(shadow_page >> PAGE_SHIFT);
 
 	return (struct litevm_mmu_page *)page->pg_private;
 }
