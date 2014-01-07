@@ -175,8 +175,7 @@ static void litevm_mmu_free_page(struct litevm_vcpu *vcpu, hpa_t page_hpa)
 {
 	struct litevm_mmu_page *page_head = page_header(page_hpa);
 
-	//SLIST_REMOVE(&vcpu->free_pages, page_head, 
-	//	     litevm_mmu_page, link);
+	LIST_REMOVE(page_head, link);
 	//list_del(&page_head->link);
 	page_head->page_hpa = page_hpa;
 	//list_add(&page_head->link, &vcpu->free_pages);
@@ -654,10 +653,11 @@ int litevm_mmu_reset_context(struct litevm_vcpu *vcpu)
 
 static void free_mmu_pages(struct litevm_vcpu *vcpu)
 {
+	/* todo: use the right macros */
 	while (!LIST_EMPTY(&vcpu->link)) {
 		struct litevm_mmu_page *page;
 
-		page = LIST_NEXT(&vcpu->link, link);
+		page = LIST_FIRST(&vcpu->link);
 		LIST_REMOVE(page, link);
 		__free_page(ppn2page(page->page_hpa >> PAGE_SHIFT));
 		page->page_hpa = INVALID_PAGE;
@@ -680,7 +680,7 @@ static int alloc_mmu_pages(struct litevm_vcpu *vcpu)
 		INIT_LIST_HEAD(&page_header->link);
 		if ((page = kpage_alloc_addr()) == NULL)
 			goto error_1;
-		page->pg_private = (uintptr_t)page_header;
+		page->pg_private = page_header;
 		page_header->page_hpa = (hpa_t)page2ppn(page) << PAGE_SHIFT;
 		memset(KADDR(page_header->page_hpa), 0, PAGE_SIZE);
 		LIST_INSERT_HEAD(&vcpu->link, page_header, link);
