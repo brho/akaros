@@ -200,7 +200,8 @@ struct litevm_memory_slot {
 	unsigned long npages;
 	unsigned long flags;
 	struct page **phys_mem;
-	unsigned long *dirty_bitmap;
+//#warning "bitmap is u8. "
+	/*unsigned long*/uint8_t *dirty_bitmap;
 };
 
 struct litevm {
@@ -507,8 +508,8 @@ struct litevm_sregs {
 	uint64_t apic_base;
 
 	/* out (LITEVM_GET_SREGS) */
-	uint32_t pending_int;
-	uint32_t padding2;
+	/*uint32_t */ uint8_t *pending_int;
+	/*uint32_t */ uint8_t padding2;
 };
 
 /* for LITEVM_TRANSLATE */

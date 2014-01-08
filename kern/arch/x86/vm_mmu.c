@@ -216,7 +216,7 @@ static void page_header_update_slot(struct litevm *litevm, void *pte, gpa_t gpa)
 	int slot = memslot_id(litevm, gfn_to_memslot(litevm, gpa >> PAGE_SHIFT));
 	struct litevm_mmu_page *page_head = page_header(PADDR(pte));
 
-	__set_bit(slot, &page_head->slot_bitmap);
+	SET_BITMASK_BIT_ATOMIC((uint8_t *)&page_head->slot_bitmap, slot);
 }
 
 hpa_t safe_gpa_to_hpa(struct litevm_vcpu *vcpu, gpa_t gpa)
@@ -655,12 +655,13 @@ static void free_mmu_pages(struct litevm_vcpu *vcpu)
 {
 	/* todo: use the right macros */
 	while (!LIST_EMPTY(&vcpu->link)) {
-		struct litevm_mmu_page *page;
-
-		page = LIST_FIRST(&vcpu->link);
-		LIST_REMOVE(page, link);
-		__free_page(ppn2page(page->page_hpa >> PAGE_SHIFT));
-		page->page_hpa = INVALID_PAGE;
+		struct litevm_mmu_page *vmpage;
+		vmpage = LIST_FIRST(&vcpu->link);
+		LIST_REMOVE(vmpage, link);
+		uintptr_t ppn = vmpage->page_hpa>>PAGE_SHIFT;
+		page_decref(ppn2page(ppn));
+		assert(page_is_free(ppn));
+		vmpage->page_hpa = INVALID_PAGE;
 	}
 }
 
@@ -677,7 +678,6 @@ static int alloc_mmu_pages(struct litevm_vcpu *vcpu)
 		struct page *page;
 		struct litevm_mmu_page *page_header = &vcpu->page_header_buf[i];
 
-		INIT_LIST_HEAD(&page_header->link);
 		if ((page = kpage_alloc_addr()) == NULL)
 			goto error_1;
 		page->pg_private = page_header;
@@ -726,7 +726,7 @@ void litevm_mmu_slot_remove_write_access(struct litevm *litevm, int slot)
 		int i;
 		uint64_t *pt;
 
-		if (!test_bit(slot, &page->slot_bitmap))
+		if (!GET_BITMASK_BIT((uint8_t*)&page->slot_bitmap, slot))
 			continue;
 
 		pt = KADDR(page->page_hpa);
