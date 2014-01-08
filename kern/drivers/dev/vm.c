@@ -186,8 +186,12 @@ static void vminit(void)
 
 static struct chan *vmattach(char *spec)
 {
+	int i;
+	int litevm_init(void);
 	struct chan *c = devattach('V', spec);
 	mkqid(&c->qid, Qtopdir, 0, QTDIR);
+	i = litevm_init();
+	printk("vminit: litevm_init returns %d\n", i);
 	return c;
 }
 

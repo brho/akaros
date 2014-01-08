@@ -3342,12 +3342,11 @@ static int litevm_reboot(struct notifier_block *notifier, unsigned long val,
 
 hpa_t bad_page_address;
 
-static int litevm_init(void)
+int litevm_init(void)
 {
 	static struct page *bad_page;
 	int r = 0;
 
-#if 0
 	if (!cpu_has_litevm_support()) {
 		printk("litevm: no hardware support\n");
 		return -EOPNOTSUPP;
@@ -3356,7 +3355,6 @@ static int litevm_init(void)
 		printk("litevm: disabled by bios\n");
 		return -EOPNOTSUPP;
 	}
-#endif
 
 	setup_vmcs_descriptor();
 	r = alloc_litevm_area();
