@@ -151,8 +151,13 @@ void *boot_alloc(size_t amt, size_t align)
 		boot_alloc_init();
 	boot_freemem = ROUNDUP(boot_freemem, align);
 	retval = boot_freemem;
-	if (boot_freemem + amt > boot_freelimit)
+	if (boot_freemem + amt > boot_freelimit){
+		printk("boot_alloc: boot_freemem is 0x%x\n", boot_freemem);
+		printk("boot_alloc: amt is %d\n", amt);
+		printk("boot_freelimit is 0x%x\n", boot_freelimit);
+		printk("boot_freemem + amt is > boot_freelimit\n");
 		panic("Out of memory in boot alloc, you fool!\n");
+	}
 	boot_freemem += amt;
 	printd("boot alloc from %p to %p\n", retval, boot_freemem);
 	/* multiboot info probably won't ever conflict with our boot alloc */
