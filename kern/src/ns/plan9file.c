@@ -53,7 +53,7 @@ int readmem(unsigned long offset, char *buf, unsigned long n,
 	if (offset >= len)
 		return 0;
 	if (offset + n > len)
-		n = len + 1 - offset;
+		n = len - offset;
 	memmove(buf, mem + offset, n);
 	return n;
 }
