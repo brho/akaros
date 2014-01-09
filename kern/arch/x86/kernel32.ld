@@ -15,6 +15,10 @@ SECTIONS
 		*(.boottext .bootdata)
 	}
 
+	/* Needed this for syslinux, which was sitting around 16MB phys.  This just
+	 * jumps us forward to the 32MB mark, both physically and virtually. */
+	. = 0x02000000;
+
 	/* Link the main kernel for the space after entry + KERNBASE.  We'll still
 	 * load it adjacent in physical memory */
 	. += KERNBASE;
