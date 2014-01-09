@@ -33,15 +33,16 @@ uintptr_t boot_freelimit = 0;
 
 static size_t sizeof_mboot_mmentry(struct multiboot_mmap_entry *entry)
 {
-	/* Careful - addr + len is a uint64 (need to cast down for 32 bit) */
-	return (size_t)(entry->addr + entry->len);
+	/* Careful - len is a uint64 (need to cast down for 32 bit) */
+	return (size_t)(entry->len);
 }
 
 static void adjust_max_pmem(struct multiboot_mmap_entry *entry, void *data)
 {
 	if (entry->type != MULTIBOOT_MEMORY_AVAILABLE)
 		return;
-	max_pmem = MAX(max_pmem, sizeof_mboot_mmentry(entry));
+	/* Careful - addr + len is a uint64 (need to cast down for 32 bit) */
+	max_pmem = MAX(max_pmem, (size_t)(entry->addr + entry->len));
 }
 
 /**
