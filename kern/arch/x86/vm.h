@@ -394,6 +394,7 @@ struct litevm_memory_region {
 	uint32_t flags;
 	uint64_t guest_phys_addr;
 	uint64_t memory_size; /* bytes */
+	void *init_data;
 };
 
 /* for litevm_memory_region::flags */
@@ -508,8 +509,8 @@ struct litevm_sregs {
 	uint64_t apic_base;
 
 	/* out (LITEVM_GET_SREGS) */
-	/*uint32_t */ uint8_t *pending_int;
-	/*uint32_t */ uint8_t padding2;
+	uint32_t pending_int;
+	uint32_t padding2;
 };
 
 /* for LITEVM_TRANSLATE */
@@ -571,4 +572,11 @@ enum {
 	LITEVM_CREATE_VCPU,
 	LITEVM_GET_DIRTY_LOG,
 };
+
+struct litevm *vmx_open(void);
+int vmx_create_vcpu(struct litevm *litevm, int n);
+int vmx_init(void);
+int vm_set_memory_region(struct litevm *litevm,
+			 struct litevm_memory_region *mem);
+
 #endif

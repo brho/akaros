@@ -56,6 +56,7 @@ struct vm {
 	void                                           *image;
 	unsigned long                                   imagesize;
 	int                                             id;
+	struct litevm                                  *archvm;
 };
 
 static spinlock_t vmlock;
@@ -66,15 +67,34 @@ static int nvm = 0;
 static spinlock_t vmidlock[1];
 static struct kref vmid[1] = { {(void *)1, fake_release} };
 
+/* we'll need this somewhere more generic. */
+static void
+readn(struct chan *c, void *vp, long n)
+{
+	char *p;
+	long nn;
+	int total = 0, want = n;
+
+	p = vp;
+	while(n > 0) {
+		nn = devtab[c->type]->read(c, p, n, c->offset);
+		if(nn == 0)
+			error("%s: wanted %d, got %d", Eshort, total, want);
+		c->offset += nn;
+		p += nn;
+		n -= nn;
+		total += nn;
+	}
+}
+
+
 static void vm_release(struct kref *kref)
 {
 	struct vm *v = container_of(kref, struct vm, kref);
 	spin_lock(&vmlock);
 	/* cute trick. Save the last element of the array in place of the
 	 * one we're deleting. Reduce nvm. Don't realloc; that way, next
-
-	 * do and just return.
-	 */
+	 * time we add a vm the allocator will just return. */
 	if (v != &vms[nvm-1]){
 		/* free the image ... oops */
 		/* get rid of the kref. */
@@ -180,18 +200,18 @@ static int vmgen(struct chan *c, char *entry_name,
 
 static void vminit(void)
 {
+	int i;
 	spinlock_init(&vmlock);
 	spinlock_init(vmidlock);
+	i = vmx_init();
+	printk("vminit: litevm_init returns %d\n", i);
+
 }
 
 static struct chan *vmattach(char *spec)
 {
-	int i;
-	int litevm_init(void);
 	struct chan *c = devattach('V', spec);
 	mkqid(&c->qid, Qtopdir, 0, QTDIR);
-	i = litevm_init();
-	printk("vminit: litevm_init returns %d\n", i);
 	return c;
 }
 
@@ -210,7 +230,11 @@ static int vmstat(struct chan *c, uint8_t *db, int n)
  * the open chan into p's fd table, then decref the chan. */
 static struct chan *vmopen(struct chan *c, int omode)
 {
+	ERRSTACK(2);
 	struct vm *v = c->aux;
+	if (waserror()){
+		nexterror();
+	}
 	switch (TYPE(c->qid)) {
 	case Qtopdir:
 	case Qvmdir:
@@ -230,6 +254,11 @@ static struct chan *vmopen(struct chan *c, int omode)
 		mkqid(&c->qid, QID(v, Qctl), 0, QTFILE);
 		c->aux = v;
 		printd("New VM id %d\n", v->id);
+		v->archvm = vmx_open();
+		if (!v->archvm)
+			error("vm_open failed");
+		if (vmx_create_vcpu(v->archvm, 1) < 0)
+			error("vm_create failed");
 		break;
 	case Qstat:
 		break;
@@ -316,10 +345,10 @@ static long vmread(struct chan *c, void *ubuf, long n, int64_t offset)
 
 static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 {
-	ERRSTACK(1);
+	ERRSTACK(3);
 	char buf[32];
 	struct cmdbuf *cb;
-	struct vm *vm;
+	struct litevm *vm;
 	uint64_t hexval;
 
 	switch (TYPE(c->qid)) {
@@ -338,6 +367,55 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 			error("can't run a vm yet");
 		} else if (!strcmp(cb->f[0], "stop")) {
 			error("can't stop a vm yet");
+		} else if (!strcmp(cb->f[0], "fillmem")) {
+			struct chan *file;
+			void *v;
+			vm = c->aux;
+			uint64_t filesize;
+			struct litevm_memory_region vmr;
+			int got;
+
+			if (cb->nf != 6)
+				error("usage: mapmem file slot flags addr size");
+			vmr.slot = strtoul(cb->f[2], NULL, 0);
+			vmr.flags = strtoul(cb->f[3], NULL, 0);
+			vmr.guest_phys_addr = strtoul(cb->f[4], NULL, 0);
+			filesize = strtoul(cb->f[5], NULL, 0);
+			vmr.memory_size = (filesize + 4095) & ~4096ULL;
+			file = namec(cb->f[1], Aopen, OREAD, 0);
+			if (! file)
+				error("%s: can't open", cb->f[1], NULL, 0);
+			if (waserror()){
+				cclose(file);
+			}
+			/* at some point we want to mmap from the kernel
+			 * but we don't have that yet. This all needs
+			 * rethinking but the abstractions of kvm do too.
+			 */
+			v = kmalloc(vmr.memory_size, KMALLOC_WAIT);
+			if (waserror()){
+				kfree(v);
+				nexterror();
+			}
+
+			readn(file, v, filesize);
+			cclose(file);
+			vmr.init_data = v;
+
+			if (vm_set_memory_region(vm, &vmr))
+				error("vm_set_memory_region failed");
+
+		} else if (!strcmp(cb->f[0], "region")) {
+			void *v;
+			struct litevm_memory_region vmr;
+			if (cb->nf != 5)
+				error("usage: mapmem slot flags addr size");
+			vmr.slot = strtoul(cb->f[2], NULL, 0);
+			vmr.flags = strtoul(cb->f[3], NULL, 0);
+			vmr.guest_phys_addr = strtoul(cb->f[4], NULL, 0);
+			vmr.memory_size = strtoul(cb->f[5], NULL, 0);
+			if (vm_set_memory_region(vm, &vmr))
+				error("vm_set_memory_region failed");
 		} else {
 			error("%s: not implemented", cb->f[0]);
 		}

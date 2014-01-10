@@ -13,6 +13,8 @@
  */
 
 #define DEBUG
+#define LITEVM_DEBUG
+
 #include <kmalloc.h>
 #include <string.h>
 #include <stdio.h>
@@ -274,17 +276,6 @@ static struct vmcs_descriptor {
 	uint32_t revision_id;
 } vmcs_descriptor;
 
-#if 0
-#ifdef __x86_64__
-static unsigned long read_msr(unsigned long msr)
-{
-	uint64_t value;
-
-	rdmsrl(msr, value);
-	return value;
-}
-#endif
-#endif
 static inline struct page *_gfn_to_page(struct litevm *litevm, gfn_t gfn)
 {
 	struct litevm_memory_slot *slot = gfn_to_memslot(litevm, gfn);
@@ -406,7 +397,9 @@ static struct litevm_vcpu *__vcpu_load(struct litevm_vcpu *vcpu)
 	cpu = core_id();
 
 	if (vcpu->cpu != cpu) {
-		smp_call_function_single(vcpu->cpu, __vcpu_clear, vcpu, smp_call_wait);
+		handler_wrapper_t *w;
+		smp_call_function_single(vcpu->cpu, __vcpu_clear, vcpu, &w);
+		smp_call_wait(w);
 		vcpu->launched = 0;
 	}
 	if (currentcpu->vmcs != vcpu->vmcs) {
@@ -456,7 +449,7 @@ static struct litevm_vcpu *vcpu_load(struct litevm *litevm, int vcpu_slot)
 
 static void vcpu_put(struct litevm_vcpu *vcpu)
 {
-	put_cpu();
+	//put_cpu();
 	qunlock(&vcpu->mutex);
 }
 
@@ -485,29 +478,6 @@ static int cpu_has_litevm_support(void)
 	return ecx & 5; /* CPUID.1:ECX.VMX[bit 5] -> VT */
 }
 
-static int alloc_litevm_area(void)
-{
-#if 0
-	int cpu;
-	int i;
-
-	/* no longer needed. We put the vmxarea into the cpu info. */
-	/* leave here for now. */
-	for_each_online_cpu(cpu) {
-		struct vmcs *vmcs;
-
-		vmcs = alloc_vmcs_cpu(cpu);
-		if (!vmcs) {
-			free_litevm_area();
-			return -ENOMEM;
-		}
-
-		per_cpu(vmxarea, cpu) = vmcs;
-	}
-#endif
-	return 0;
-}
-
 static int vmx_disabled_by_bios(void)
 {
 	uint64_t msr;
@@ -516,7 +486,7 @@ static int vmx_disabled_by_bios(void)
 	return (msr & 5) == 1; /* locked but not enabled */
 }
 
-static void litevm_enable(struct hw_trapframe *hw_tf, void *garbage)
+static void vm_enable(struct hw_trapframe *hw_tf, void *garbage)
 {
 	int cpu = hw_core_id();
 	uint64_t phys_addr = PADDR(&currentcpu->vmxarea);
@@ -535,13 +505,13 @@ static void litevm_disable(void *garbage)
 	asm volatile ("vmxoff" : : : "cc");
 }
 
-static int litevm_dev_open(struct inode *inode, struct file *filp)
+struct litevm *vmx_open(void)
 {
 	struct litevm *litevm = kzmalloc(sizeof(struct litevm), KMALLOC_WAIT);
 	int i;
 
 	if (!litevm)
-		return -ENOMEM;
+		return 0;
 
 	spinlock_init(&litevm->lock);
 	LIST_INIT(&litevm->link);
@@ -552,9 +522,7 @@ static int litevm_dev_open(struct inode *inode, struct file *filp)
 		vcpu->mmu.root_hpa = INVALID_PAGE;
 		LIST_INIT(&vcpu->link);
 	}
-#warning "filp->private data -- > c->aux?"
-//	filp->private_data = litevm;
-	return 0;
+	return litevm;
 }
 
 /*
@@ -568,9 +536,9 @@ static void litevm_free_physmem_slot(struct litevm_memory_slot *free,
 	if (!dont || free->phys_mem != dont->phys_mem)
 		if (free->phys_mem) {
 			for (i = 0; i < free->npages; ++i){
-				page_t *page = ppn2page(i);
-				page_decref(ppn2page(i));
-				assert(page_is_free(i));
+				page_t *page = free->phys_mem[i];
+				page_decref(page);
+				assert(page_is_free(page2ppn(page)));
 			}
 			kfree(free->phys_mem);
 		}
@@ -594,7 +562,9 @@ static void litevm_free_physmem(struct litevm *litevm)
 static void litevm_free_vmcs(struct litevm_vcpu *vcpu)
 {
 	if (vcpu->vmcs) {
-		smp_call_function_all(__vcpu_clear, vcpu, smp_call_wait);
+		handler_wrapper_t *w;
+		smp_call_function_all(__vcpu_clear, vcpu, &w);
+		smp_call_wait(w);
 		//free_vmcs(vcpu->vmcs);
 		vcpu->vmcs = 0;
 	}
@@ -880,7 +850,7 @@ static int pdptrs_have_reserved_bits_set(struct litevm_vcpu *vcpu,
 	spin_lock(&vcpu->litevm->lock);
 	memslot = gfn_to_memslot(vcpu->litevm, pdpt_gfn);
 	/* FIXME: !memslot - emulate? 0xff? */
-	pdpt = KADDR(gfn_to_page(memslot, pdpt_gfn));
+	pdpt = page2kva(gfn_to_page(memslot, pdpt_gfn));
 
 	for (i = 0; i < 4; ++i) {
 		pdpte = pdpt[offset + i];
@@ -1111,8 +1081,7 @@ static int litevm_vcpu_setup(struct litevm_vcpu *vcpu)
 
 
 	if (!init_rmode_tss(vcpu->litevm)) {
-		ret = 0;
-		goto out;
+		error("vcpu_setup: init_rmode_tss failed");
 	}
 
 	memset(vcpu->regs, 0, sizeof(vcpu->regs));
@@ -1260,10 +1229,10 @@ static int litevm_vcpu_setup(struct litevm_vcpu *vcpu)
 	ret = -ENOMEM;
 	vcpu->guest_msrs = kmalloc(PAGE_SIZE, KMALLOC_WAIT);
 	if (!vcpu->guest_msrs)
-		goto out;
+		error("guest_msrs kmalloc failed");
 	vcpu->host_msrs = kmalloc(PAGE_SIZE, KMALLOC_WAIT);
 	if (!vcpu->host_msrs)
-		goto out_free_guest_msrs;
+		error("vcpu->host_msrs kmalloc failed -- storage leaked");
 
 	for (i = 0; i < NR_VMX_MSR; ++i) {
 		uint32_t index = vmx_msr_index[i];
@@ -1347,15 +1316,16 @@ static void vcpu_put_rsp_rip(struct litevm_vcpu *vcpu)
 /*
  * Creates some virtual cpus.  Good luck creating more than one.
  */
-static int litevm_dev_ioctl_create_vcpu(struct litevm *litevm, int n)
+int vmx_create_vcpu(struct litevm *litevm, int n)
 {
+	ERRSTACK(1);
 	int r;
 	struct litevm_vcpu *vcpu;
 	struct vmcs *vmcs;
+	char *errstring = NULL;
 
-	r = -EINVAL;
 	if (n < 0 || n >= LITEVM_MAX_VCPUS)
-		goto out;
+		error("%d is out of range; LITEVM_MAX_VCPUS is %d", n, LITEVM_MAX_VCPUS);
 
 	vcpu = &litevm->vcpus[n];
 
@@ -1363,7 +1333,7 @@ static int litevm_dev_ioctl_create_vcpu(struct litevm *litevm, int n)
 
 	if (vcpu->vmcs) {
 		qunlock(&vcpu->mutex);
-		return -EEXIST;
+		error("VM already exists");
 	}
 
 	/* I'm a bad person */
@@ -1380,6 +1350,7 @@ static int litevm_dev_ioctl_create_vcpu(struct litevm *litevm, int n)
 	vcpu->litevm = litevm;
 	vmcs = alloc_vmcs();
 	if (!vmcs) {
+		errstring = "vmcs allocate failed";
 		qunlock(&vcpu->mutex);
 		goto out_free_vcpus;
 	}
@@ -1389,17 +1360,25 @@ static int litevm_dev_ioctl_create_vcpu(struct litevm *litevm, int n)
 
 	__vcpu_load(vcpu);
 
+	if (waserror()){
+		/* we really need to fix waserror() */
+		poperror();
+		goto out_free_vcpus;
+	}
+
 	r = litevm_vcpu_setup(vcpu);
 
 	vcpu_put(vcpu);
 
-	if (r < 0)
-		goto out_free_vcpus;
+	if (! r)
+		return 0;
 
-	return 0;
+	errstring = "vcup set failed";
 
 out_free_vcpus:
+	printk("out_free_vcpus: life sucks\n");
 	litevm_free_vcpu(vcpu);
+	error(errstring);
 out:
 	return r;
 }
@@ -1410,7 +1389,7 @@ out:
  *
  * Discontiguous memory is allowed, mostly for framebuffers.
  */
-static int litevm_dev_ioctl_set_memory_region(struct litevm *litevm,
+int vm_set_memory_region(struct litevm *litevm,
 					   struct litevm_memory_region *mem)
 {
 	int r;
@@ -1420,6 +1399,7 @@ static int litevm_dev_ioctl_set_memory_region(struct litevm *litevm,
 	struct litevm_memory_slot *memslot;
 	struct litevm_memory_slot old, new;
 	int memory_config_version;
+	void *init_data = mem->init_data;
 
 	r = -EINVAL;
 	/* General sanity checks */
@@ -1489,9 +1469,14 @@ raced:
 			goto out_free;
 
 		for (i = 0; i < npages; ++i) {
-			new.phys_mem[i] = kpage_zalloc_addr();
-			if (!new.phys_mem[i])
+			int ret;
+			ret = kpage_alloc(&new.phys_mem[i]);
+			if (ret != ESUCCESS)
 				goto out_free;
+			if (init_data){
+				memcpy(page2kva(new.phys_mem[i]), init_data, PAGE_SIZE);
+				init_data += PAGE_SIZE;
+			}
 		}
 	}
 
@@ -1691,7 +1676,7 @@ static int emulator_read_std(unsigned long addr,
 		memslot = gfn_to_memslot(vcpu->litevm, pfn);
 		if (!memslot)
 			return X86EMUL_UNHANDLEABLE;
-		page = KADDR(gfn_to_page(memslot, pfn));
+		page = page2kva(gfn_to_page(memslot, pfn));
 
 		memcpy(data, page + offset, tocopy);
 
@@ -1964,8 +1949,8 @@ static int handle_exception(struct litevm_vcpu *vcpu, struct litevm_run *litevm_
 
 	if (is_external_interrupt(vect_info)) {
 		int irq = vect_info & VECTORING_INFO_VECTOR_MASK;
-		SET_BITMASK_BIT_ATOMIC(vcpu->irq_pending, irq);
-		SET_BITMASK_BIT_ATOMIC(&vcpu->irq_summary, irq / BITS_PER_LONG);
+		SET_BITMASK_BIT_ATOMIC(((uint8_t *)&vcpu->irq_pending), irq);
+		SET_BITMASK_BIT_ATOMIC(((uint8_t *)&vcpu->irq_summary), irq / BITS_PER_LONG);
 	}
 
 	if ((intr_info & INTR_INFO_INTR_TYPE_MASK) == 0x200) { /* nmi */
@@ -2512,15 +2497,16 @@ static void inject_rmode_irq(struct litevm_vcpu *vcpu, int irq)
 
 static void litevm_do_inject_irq(struct litevm_vcpu *vcpu)
 {
-#warning "fix me; needs ffs and talk to barret about bit ops"
-#if 0
 	int word_index = __ffs(vcpu->irq_summary);
 	int bit_index = __ffs(vcpu->irq_pending[word_index]);
 	int irq = word_index * BITS_PER_LONG + bit_index;
 
-	clear_bit(bit_index, &vcpu->irq_pending[word_index]);
+	/* don't have clear_bit and I'm not sure the akaros
+	 * bitops are really going to work.
+	 */
+	vcpu->irq_pending[word_index] &= ~(1 << bit_index);
 	if (!vcpu->irq_pending[word_index])
-		clear_bit(word_index, &vcpu->irq_summary);
+		vcpu->irq_summary &= ~ (1 << word_index);
 
 	if (vcpu->rmode.active) {
 		inject_rmode_irq(vcpu, irq);
@@ -2528,7 +2514,6 @@ static void litevm_do_inject_irq(struct litevm_vcpu *vcpu)
 	}
 	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD,
 			irq | INTR_TYPE_EXT_INTR | INTR_INFO_VALID_MASK);
-#endif
 }
 
 static void litevm_try_inject_irq(struct litevm_vcpu *vcpu)
@@ -2585,7 +2570,7 @@ static void save_msrs(struct vmx_msr_entry *e, int n)
 		e[i].data = read_msr(e[i].index);
 }
 
-static int litevm_dev_ioctl_run(struct litevm *litevm, struct litevm_run *litevm_run)
+int vm_run(struct litevm *litevm, struct litevm_run *litevm_run)
 {
 	struct litevm_vcpu *vcpu;
 	uint8_t fail;
@@ -3151,15 +3136,13 @@ static int litevm_dev_ioctl_debug_guest(struct litevm *litevm,
 #endif
 
 #if 0
-static long litevm_dev_ioctl(struct file *filp,
-			  unsigned int ioctl, unsigned long arg)
+long litevm_control(struct litevm *litevm, int command, unsigned long arg)
 {
-	struct litevm *litevm = filp->private_data;
 	int r = -EINVAL;
 
-	switch (ioctl) {
+	switch (command) {
 	case LITEVM_CREATE_VCPU: {
-		r = litevm_dev_ioctl_create_vcpu(litevm, arg);
+		r = create_vcpu(litevm, arg);
 		if (r)
 			goto out;
 		break;
@@ -3333,7 +3316,9 @@ static int litevm_reboot(struct notifier_block *notifier, unsigned long val,
 		 * in vmx root mode.
 		 */
 		printk("litevm: exiting vmx mode\n");
-		smp_call_function_all(litevm_disable, 0, smp_call_wait);
+		handler_wrapper_t *w;
+		smp_call_function_all(litevm_disable, 0, &w);
+		smp_call_wait(w);
 	}
 	return NOTIFY_OK;
 	return 0;
@@ -3342,9 +3327,9 @@ static int litevm_reboot(struct notifier_block *notifier, unsigned long val,
 
 hpa_t bad_page_address;
 
-int litevm_init(void)
+int vmx_init(void)
 {
-	static struct page *bad_page;
+	handler_wrapper_t *w;
 	int r = 0;
 
 	if (!cpu_has_litevm_support()) {
@@ -3357,24 +3342,15 @@ int litevm_init(void)
 	}
 
 	setup_vmcs_descriptor();
-	r = alloc_litevm_area();
-	if (r)
-		goto out;
-	smp_call_function_all(litevm_enable, 0, smp_call_wait);
-	if ((bad_page = kpage_zalloc_addr()) == NULL) {
-		r = -ENOMEM;
-		goto out_free;
+	smp_call_function_all(vm_enable, 0, &w);
+	if (smp_call_wait(w)){
+		printk("litevm_init. smp_call_wait failed. Expect a panic.\n");
 	}
 
-	bad_page_address = page2ppn(bad_page) << PAGE_SHIFT;
-	memset(ppn2kva(bad_page_address), 0, PAGE_SIZE);
+	if ((bad_page_address = PADDR(kpage_zalloc_addr())) == 0ULL) {
+		r = -ENOMEM;
+	}
 
-	return r;
-
-out_free:
-#warning "no free_litevm_area do we need it"
-//	free_litevm_area();
-out:
 	return r;
 }
 
