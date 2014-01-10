@@ -47,7 +47,7 @@ int pm_insert_page(struct page_map *pm, unsigned long index, struct page *page)
 	error = radix_insert(&pm->pm_tree, index, page);
 	if (!error) {
 		page_incref(page);
-		page->pg_flags |= PG_LOCKED | PG_BUFFER;
+		atomic_or(&page->pg_flags, PG_LOCKED | PG_BUFFER);
 		page->pg_sem.nr_signals = 0;		/* ensure others will block */
 		page->pg_mapping = pm;
 		page->pg_index = index;
@@ -94,7 +94,7 @@ int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp)
 		if (kpage_alloc(&page))
 			return -ENOMEM;
 		/* might want to initialize other things, perhaps in page_alloc() */
-		page->pg_flags = 0;
+		atomic_set(&page->pg_flags, 0);
 		error = pm_insert_page(pm, index, page);
 		switch (error) {
 			case 0:
@@ -122,7 +122,7 @@ int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp)
 	 * us, we skip this since we are the one doing the readpage(). */
 	if (page_was_mapped) {
 		/* is it already here and up to date?  if so, we're done */
-		if (page->pg_flags & PG_UPTODATE)
+		if (atomic_read(&page->pg_flags) & PG_UPTODATE)
 			return 0;
 		/* if not, try to lock the page (could BLOCK) */
 		lock_page(page);
@@ -131,7 +131,7 @@ int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp)
 		if (!page->pg_mapping)
 			panic("Page is not in the mapping!  Haven't implemented this!");
 		/* double check, are we up to date?  if so, we're done */
-		if (page->pg_flags & PG_UPTODATE) {
+		if (atomic_read(&page->pg_flags) & PG_UPTODATE) {
 			unlock_page(page);
 			return 0;
 		}

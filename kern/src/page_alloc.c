@@ -309,7 +309,7 @@ static void page_release(struct kref *kref)
 {
 	struct page *page = container_of(kref, struct page, pg_kref);
 
-	if (page->pg_flags & PG_BUFFER)
+	if (atomic_read(&page->pg_flags) & PG_BUFFER)
 		free_bhs(page);
 	/* Give our page back to the free list.  The protections for this are that
 	 * the list lock is grabbed by page_decref. */
@@ -336,14 +336,14 @@ void lock_page(struct page *page)
 {
 	/* when this returns, we have are the ones to have locked the page */
 	sem_down(&page->pg_sem);
-	assert(!(page->pg_flags & PG_LOCKED));
-	page->pg_flags |= PG_LOCKED;
+	assert(!(atomic_read(&page->pg_flags) & PG_LOCKED));
+	atomic_or(&page->pg_flags, PG_LOCKED);
 }
 
 /* Unlocks the page, and wakes up whoever is waiting on the lock */
 void unlock_page(struct page *page)
 {
-	page->pg_flags &= ~PG_LOCKED;
+	atomic_and(&page->pg_flags, ~PG_LOCKED);
 	if (sem_up(&page->pg_sem)) {
 		printk("Unexpected sleeper on a page!");	/* til we test this */
 	}
@@ -357,12 +357,13 @@ void print_pageinfo(struct page *page)
 		return;
 	}
 	printk("Page %d (%p), Flags: 0x%08x Refcnt: %d\n", page2ppn(page),
-	       page2kva(page), page->pg_flags, kref_refcnt(&page->pg_kref));
+	       page2kva(page), atomic_read(&page->pg_flags),
+	       kref_refcnt(&page->pg_kref));
 	if (page->pg_mapping) {
 		printk("\tMapped into object %p at index %d\n",
 		       page->pg_mapping->pm_host, page->pg_index);
 	}
-	if (page->pg_flags & PG_BUFFER) {
+	if (atomic_read(&page->pg_flags) & PG_BUFFER) {
 		struct buffer_head *bh = (struct buffer_head*)page->pg_private;
 		i = 0;
 		while (bh) {
@@ -372,8 +373,10 @@ void print_pageinfo(struct page *page)
 			bh = bh->bh_next;
 		}
 		printk("\tPage is %sup to date\n",
-		       page->pg_flags & PG_UPTODATE ? "" : "not ");
+		       atomic_read(&page->pg_flags) & PG_UPTODATE ? "" : "not ");
 	}
-	printk("\tPage is %slocked\n", page->pg_flags & PG_LOCKED ? "" : "un");
-	printk("\tPage is %s\n", page->pg_flags & PG_DIRTY ? "dirty" : "clean");
+	printk("\tPage is %slocked\n",
+	       atomic_read(&page->pg_flags) & PG_LOCKED ? "" : "un");
+	printk("\tPage is %s\n",
+	       atomic_read(&page->pg_flags) & PG_DIRTY ? "dirty" : "clean");
 }

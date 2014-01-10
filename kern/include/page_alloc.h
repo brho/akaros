@@ -41,7 +41,7 @@ typedef LIST_ENTRY(page) page_list_entry_t;
 struct page {
 	LIST_ENTRY(page)			pg_link;	/* membership in various lists */
 	struct kref					pg_kref;
-	unsigned int				pg_flags;
+	atomic_t					pg_flags;
 	struct page_map				*pg_mapping;
 	unsigned long				pg_index;
 	void						*pg_private;	/* type depends on page usage */
