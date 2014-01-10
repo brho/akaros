@@ -78,6 +78,7 @@ readn(struct chan *c, void *vp, long n)
 	p = vp;
 	while(n > 0) {
 		nn = devtab[c->type]->read(c, p, n, c->offset);
+		printk("readn: Got %d@%lld\n", nn, c->offset);
 		if(nn == 0)
 			error("%s: wanted %d, got %d", Eshort, total, want);
 		c->offset += nn;
@@ -266,15 +267,6 @@ static struct chan *vmopen(struct chan *c, int omode)
 	case Qimage:
 		/* the purpose of opening is to hold a kref on the proc_vm */
 		v = c->aux;
-		/* this isn't a valid pointer yet, since our chan doesn't have a
-		 * ref.  since the time that walk gave our chan the qid, the chan
-		 * could have been closed, and the vm decref'd and freed.  the
-		 * qid is essentially an uncounted reference, and we need to go to
-		 * the source to attempt to get a real ref.  Unfortunately, this is
-		 * another scan of the list, same as devsrv.  We could speed it up
-		 * by storing an "on_list" bool in the vm_is. */
-		//if (!vm_i)
-		//	error("Unable to open vm, concurrent closing");
 		break;
 	}
 	c->mode = openmode(omode);
@@ -350,7 +342,7 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 	struct cmdbuf *cb;
 	struct litevm *vm;
 	uint64_t hexval;
-
+	printd("vmwrite(%p, %p, %d)\n", c, ubuf, n);
 	switch (TYPE(c->qid)) {
 	case Qtopdir:
 	case Qvmdir:
@@ -381,12 +373,13 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 			vmr.flags = strtoul(cb->f[3], NULL, 0);
 			vmr.guest_phys_addr = strtoul(cb->f[4], NULL, 0);
 			filesize = strtoul(cb->f[5], NULL, 0);
-			vmr.memory_size = (filesize + 4095) & ~4096ULL;
+			vmr.memory_size = (filesize + 4095) & ~4095ULL;
+
 			file = namec(cb->f[1], Aopen, OREAD, 0);
-			if (! file)
-				error("%s: can't open", cb->f[1], NULL, 0);
+			printk("after namec file is %p\n", file);
 			if (waserror()){
 				cclose(file);
+				nexterror();
 			}
 			/* at some point we want to mmap from the kernel
 			 * but we don't have that yet. This all needs
@@ -399,11 +392,14 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 			}
 
 			readn(file, v, filesize);
-			cclose(file);
 			vmr.init_data = v;
 
 			if (vm_set_memory_region(vm, &vmr))
 				error("vm_set_memory_region failed");
+			poperror();
+			poperror();
+			kfree(v);
+			cclose(file);
 
 		} else if (!strcmp(cb->f[0], "region")) {
 			void *v;
