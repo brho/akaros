@@ -135,7 +135,7 @@ user_mem_walk_recursive(env_t* e, uintptr_t start, size_t len,
 			if(pt_callback != NULL && (ret = pt_callback(e, pte, (void*)pgaddr, arg)))
 				goto out;
 		}
-		else if(callback != NULL && !PAGE_UNMAPPED(*pte))
+		else if(callback != NULL)
 			if((ret = callback(e, pte, (void*)pgaddr, arg)))
 				goto out;
 	}
@@ -157,6 +157,8 @@ env_pagetable_free(env_t* e)
 {
 	int pt_free(env_t* e, pte_t* pte, void* va, void* arg)
 	{
+		if (!PAGE_PRESENT(pte))
+			return 0;
 		page_decref(pa2page(PTD_ADDR(*pte)));
 		return 0;
 	}
