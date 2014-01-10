@@ -329,7 +329,7 @@ int unmap_segment(pde_t *pgdir, uintptr_t va, size_t size)
 	{
 		if (!(*pte & PTE_P))
 			return 0;
-		if ((shift == PML1_SHIFT) || (*pte * PTE_PS)) {
+		if ((shift == PML1_SHIFT) || (*pte & PTE_PS)) {
 			*pte = 0;
 			return 0;
 		}
@@ -343,7 +343,7 @@ int unmap_segment(pde_t *pgdir, uintptr_t va, size_t size)
 					return 0;
 			}
 		}
-		page_decref(ppn2page(LA2PPN(pte)));
+		page_decref(ppn2page(LA2PPN(*pte)));
 		*pte = 0;
 		return 0;
 	}
@@ -509,9 +509,9 @@ void env_pagetable_free(struct proc *p)
 	{
 		if (!(*pte & PTE_P))
 			return 0;
-		if ((shift == PML1_SHIFT) || (*pte * PTE_PS))
+		if ((shift == PML1_SHIFT) || (*pte & PTE_PS))
 			return 0;
-		page_decref(ppn2page(LA2PPN(pte)));
+		page_decref(ppn2page(LA2PPN(*pte)));
 		return 0;
 	}
 		
