@@ -262,6 +262,10 @@ static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
 	int copy_page(struct proc *p, pte_t *pte, void *va, void *arg) {
 		struct proc *new_p = (struct proc*)arg;
 		struct page *pp;
+		if (PAGE_UNMAPPED(*pte))
+			return 0;
+		/* pages could be !P, but right now that's only for file backed VMRs
+		 * undergoing page removal, which isn't the caller of copy_pages. */
 		if (PAGE_PRESENT(*pte)) {
 			/* TODO: check for jumbos */
 			if (upage_alloc(new_p, &pp, 0))

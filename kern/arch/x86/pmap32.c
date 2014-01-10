@@ -666,9 +666,8 @@ int env_user_mem_walk(env_t* e, void* start, size_t len,
 		                      PTX(end) : NPTENTRIES );
 		int ret;
 		for (pteno = pteno_start; pteno < pteno_end; pteno++) {
-			if (!PAGE_UNMAPPED(pt[pteno]))
-				if((ret = callback(e, &pt[pteno], PGADDR(pdeno, pteno, 0), arg)))
-					return ret;
+			if((ret = callback(e, &pt[pteno], PGADDR(pdeno, pteno, 0), arg)))
+				return ret;
 		}
 	}
 	return 0;

@@ -137,17 +137,14 @@ void env_user_mem_free(env_t* e, void* start, size_t len)
 	assert((uintptr_t)start + len <= UVPT); //since this keeps fucking happening
 	int user_page_free(env_t* e, pte_t* pte, void* va, void* arg)
 	{
-		if(PAGE_PRESENT(*pte))
-		{
-			page_t* page = ppn2page(PTE2PPN(*pte));
-			*pte = 0;
-			page_decref(page);
-		} else {
-			assert(PAGE_PAGED_OUT(*pte));
-			/* TODO: (SWAP) deal with this */
-			panic("Swapping not supported!");
-			*pte = 0;
-		}
+		if (!PAGE_PRESENT(*pte))
+			return 0;
+		page_t *page = ppn2page(PTE2PPN(*pte));
+		*pte = 0;
+		page_decref(page);
+		/* TODO: consider other states here (like !P, yet still tracking a page,
+		 * for VM tricks, page map stuff, etc.  Should be okay: once we're
+		 * freeing, everything else about this proc is dead. */
 		return 0;
 	}
 

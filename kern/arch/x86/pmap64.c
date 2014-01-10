@@ -256,8 +256,8 @@ void map_segment(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa,
 	__map_segment(pgdir, va, size, pa, perm, pml_shift);
 }
 
-/* For every present PTE in [start, start + len), call callback(pte, shift,
- * etc).  pml_shift is the shift/size of pml.
+/* For every PTE in [start, start + len), call callback(pte, shift,
+ * etc), including the not present PTEs.  pml_shift is the shift/size of pml.
  *
  * This will recurse down into sub PMLs, and perform the CB in a
  * depth-first-search.  The CB will be told which level of the paging it is at,
@@ -288,11 +288,10 @@ static int __pml_for_each(pte_t *pml,  uintptr_t start, size_t len,
 	       start, PMLx(start, pml_shift), start + len - 1,
 	       PMLx(start + len - 1, pml_shift), pml_shift, kva);
 	for (pte_i = pte_s; pte_i <= pte_e; pte_i++, kva += pgsize) {
-		if (!(*pte_i & PTE_P))
-			continue;
 		visited_all_subs = FALSE;
 		/* Complete only on the last level (PML1_SHIFT) or on a jumbo */
-		if (!walk_is_complete(pte_i, pml_shift, PML1_SHIFT)) {
+		if ((*pte_i & PTE_P) &&
+		    (!walk_is_complete(pte_i, pml_shift, PML1_SHIFT))) {
 			/* only pass truncated end points (e.g. start may not be page
 			 * aligned) when we're on the first (or last) item.  For the middle
 			 * entries, we want the subpmls to process the full range they are
@@ -328,8 +327,10 @@ int unmap_segment(pde_t *pgdir, uintptr_t va, size_t size)
 	int pt_free_cb(pte_t *pte, uintptr_t kva, int shift, bool visited_subs,
 	               void *data)
 	{
+		if (!(*pte & PTE_P))
+			return 0;
 		if ((shift == PML1_SHIFT) || (*pte * PTE_PS)) {
-			*pte = 0;	/* helps with debugging */
+			*pte = 0;
 			return 0;
 		}
 		/* If we haven't visited all of our subs, we might still have some
@@ -338,7 +339,7 @@ int unmap_segment(pde_t *pgdir, uintptr_t va, size_t size)
 			pte_t *pte_i = pte2pml(*pte);	/* first pte == pml */
 			/* make sure we have no PTEs in use */
 			for (int i = 0; i < NPTENTRIES; i++, pte_i++) {
-				if (*pte_i & PTE_P)
+				if (*pte_i)
 					return 0;
 			}
 		}
@@ -506,6 +507,8 @@ void env_pagetable_free(struct proc *p)
 	int pt_free_cb(pte_t *pte, uintptr_t kva, int shift, bool visited_subs,
 	               void *data)
 	{
+		if (!(*pte & PTE_P))
+			return 0;
 		if ((shift == PML1_SHIFT) || (*pte * PTE_PS))
 			return 0;
 		page_decref(ppn2page(LA2PPN(pte)));
@@ -534,6 +537,8 @@ void page_check(void)
 static int print_pte(pte_t *pte, uintptr_t kva, int shift, bool visited_subs,
                      void *data)
 {
+	if (!(*pte & PTE_P))
+		return 0;
 	switch (shift) {
 		case (PML1_SHIFT):
 			printk("\t");
