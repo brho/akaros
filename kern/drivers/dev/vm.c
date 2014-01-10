@@ -43,7 +43,7 @@ enum {
  * into the qid, but this works for now.
  */
 #define ADDR_SHIFT 5
-#define QID2VM(q) ((struct proc_alarm*)KADDR(((q).path >> ADDR_SHIFT)))
+#define QID2VM(q) ((struct vm*)KADDR(((q).path >> ADDR_SHIFT)))
 #define TYPE(q) ((q).path & ((1 << ADDR_SHIFT) - 1))
 #define QID(ptr, type) ((PADDR(ptr) << ADDR_SHIFT) | type)
 
@@ -92,10 +92,15 @@ readn(struct chan *c, void *vp, long n)
 static void vm_release(struct kref *kref)
 {
 	struct vm *v = container_of(kref, struct vm, kref);
-	spin_lock(&vmlock);
+	spin_lock_irqsave(&vmlock);
 	/* cute trick. Save the last element of the array in place of the
 	 * one we're deleting. Reduce nvm. Don't realloc; that way, next
-	 * time we add a vm the allocator will just return. */
+	 * time we add a vm the allocator will just return.
+	 * Well, this is stupid, because when we do this, we break
+	 * the QIDs, which have pointers embedded in them.
+	 * darn it, may have to use a linked list. Nope, will probably
+	 * just walk the array until we find a matching id. Still ... yuck.
+	 */
 	if (v != &vms[nvm-1]){
 		/* free the image ... oops */
 		/* get rid of the kref. */
@@ -108,7 +113,7 @@ static void vm_release(struct kref *kref)
 static int newvmid(void)
 {
 	int id;
-	spin_lock(vmidlock);
+	spin_lock_irqsave(vmidlock);
 	id = kref_refcnt(vmid);
 	kref_get(vmid, 1);
 	spin_unlock(vmidlock);
@@ -146,7 +151,7 @@ static int vmgen(struct chan *c, char *entry_name,
 			return 1;
 		}
 		s--;	/* 1 -> 0th element, 2 -> 1st element, etc */
-		spin_lock(&vmlock);
+		spin_lock_irqsave(&vmlock);
 		if (s >= nvm){
 			printd("DONE qtopdir\n");
 			spin_unlock(&vmlock);
@@ -202,8 +207,8 @@ static int vmgen(struct chan *c, char *entry_name,
 static void vminit(void)
 {
 	int i;
-	spinlock_init(&vmlock);
-	spinlock_init(vmidlock);
+	spinlock_init_irqsave(&vmlock);
+	spinlock_init_irqsave(vmidlock);
 	i = vmx_init();
 	printk("vminit: litevm_init returns %d\n", i);
 
@@ -232,7 +237,8 @@ static int vmstat(struct chan *c, uint8_t *db, int n)
 static struct chan *vmopen(struct chan *c, int omode)
 {
 	ERRSTACK(2);
-	struct vm *v = c->aux;
+	struct vm *v = QID2VM(c->qid);
+	printk("vmopen: v is %p\n", v);
 	if (waserror()){
 		nexterror();
 	}
@@ -245,7 +251,7 @@ static struct chan *vmopen(struct chan *c, int omode)
 			error(Eisdir);
 		break;
 	case Qclone:
-		spin_lock(&vmlock);
+		spin_lock_irqsave(&vmlock);
 		vms = krealloc(vms, sizeof(vms[0])*(nvm+1),0);
 		v = &vms[nvm];
 		nvm++;
@@ -265,8 +271,8 @@ static struct chan *vmopen(struct chan *c, int omode)
 		break;
 	case Qctl:
 	case Qimage:
-		/* the purpose of opening is to hold a kref on the proc_vm */
-		v = c->aux;
+		c->aux = QID2VM(c->qid);
+		printk("open qctl: aux is %p\n", c->aux);
 		break;
 	}
 	c->mode = openmode(omode);
@@ -340,7 +346,8 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 	ERRSTACK(3);
 	char buf[32];
 	struct cmdbuf *cb;
-	struct litevm *vm;
+	struct vm *vm;
+	struct litevm *litevm;
 	uint64_t hexval;
 	printd("vmwrite(%p, %p, %d)\n", c, ubuf, n);
 	switch (TYPE(c->qid)) {
@@ -363,6 +370,7 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 			struct chan *file;
 			void *v;
 			vm = c->aux;
+			litevm = vm->archvm;
 			uint64_t filesize;
 			struct litevm_memory_region vmr;
 			int got;
@@ -394,7 +402,7 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 			readn(file, v, filesize);
 			vmr.init_data = v;
 
-			if (vm_set_memory_region(vm, &vmr))
+			if (vm_set_memory_region(litevm, &vmr))
 				error("vm_set_memory_region failed");
 			poperror();
 			poperror();
@@ -404,13 +412,14 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 		} else if (!strcmp(cb->f[0], "region")) {
 			void *v;
 			struct litevm_memory_region vmr;
+			litevm = vm->archvm;
 			if (cb->nf != 5)
 				error("usage: mapmem slot flags addr size");
 			vmr.slot = strtoul(cb->f[2], NULL, 0);
 			vmr.flags = strtoul(cb->f[3], NULL, 0);
 			vmr.guest_phys_addr = strtoul(cb->f[4], NULL, 0);
 			vmr.memory_size = strtoul(cb->f[5], NULL, 0);
-			if (vm_set_memory_region(vm, &vmr))
+			if (vm_set_memory_region(litevm, &vmr))
 				error("vm_set_memory_region failed");
 		} else {
 			error("%s: not implemented", cb->f[0]);

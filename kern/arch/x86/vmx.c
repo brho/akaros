@@ -513,7 +513,7 @@ struct litevm *vmx_open(void)
 	if (!litevm)
 		return 0;
 
-	spinlock_init(&litevm->lock);
+	spinlock_init_irqsave(&litevm->lock);
 	LIST_INIT(&litevm->link);
 	for (i = 0; i < LITEVM_MAX_VCPUS; ++i) {
 		struct litevm_vcpu *vcpu = &litevm->vcpus[i];
@@ -522,6 +522,8 @@ struct litevm *vmx_open(void)
 		vcpu->mmu.root_hpa = INVALID_PAGE;
 		LIST_INIT(&vcpu->link);
 	}
+	printk("vmx_open: busy %d\n", litevm->busy);
+	printk("return %p\n", litevm);
 	return litevm;
 }
 
@@ -847,7 +849,7 @@ static int pdptrs_have_reserved_bits_set(struct litevm_vcpu *vcpu,
 	uint64_t *pdpt;
 	struct litevm_memory_slot *memslot;
 
-	spin_lock(&vcpu->litevm->lock);
+	spin_lock_irqsave(&vcpu->litevm->lock);
 	memslot = gfn_to_memslot(vcpu->litevm, pdpt_gfn);
 	/* FIXME: !memslot - emulate? 0xff? */
 	pdpt = page2kva(gfn_to_page(memslot, pdpt_gfn));
@@ -969,7 +971,7 @@ static void set_cr4(struct litevm_vcpu *vcpu, unsigned long cr4)
 		return;
 	}
 	__set_cr4(vcpu, cr4);
-	spin_lock(&vcpu->litevm->lock);
+	spin_lock_irqsave(&vcpu->litevm->lock);
 	litevm_mmu_reset_context(vcpu);
 	spin_unlock(&vcpu->litevm->lock);
 }
@@ -998,7 +1000,7 @@ static void set_cr3(struct litevm_vcpu *vcpu, unsigned long cr3)
 	}
 
 	vcpu->cr3 = cr3;
-	spin_lock(&vcpu->litevm->lock);
+	spin_lock_irqsave(&vcpu->litevm->lock);
 	vcpu->mmu.new_cr3(vcpu);
 	spin_unlock(&vcpu->litevm->lock);
 }
@@ -1401,7 +1403,18 @@ int vm_set_memory_region(struct litevm *litevm,
 	struct litevm_memory_slot old, new;
 	int memory_config_version;
 	void *init_data = mem->init_data;
+	int pass = 1;
 
+	printk("litevm %p\n", litevm);
+	/* should not happen but ... */
+	if (! litevm)
+		error("NULL litevm in %s", __func__);
+
+	if (!mem)
+		error("NULL mem in %s", __func__);
+
+	if (litevm->busy)
+		error("litevm->busy is set! 0x%x\n", litevm->busy);
 	r = -EINVAL;
 	/* General sanity checks */
 	if (mem->memory_size & (PAGE_SIZE - 1))
@@ -1427,7 +1440,9 @@ int vm_set_memory_region(struct litevm *litevm,
 	 * allocation of a bunch of pages for us.
 	 */
 raced:
-	spin_lock(&litevm->lock);
+	printk("raced: pass %d\n", pass);
+	spin_lock_irqsave(&litevm->lock);
+	printk("locked\n");
 
 	if (waserror()){
 		spin_unlock(&litevm->lock);
@@ -1463,6 +1478,7 @@ raced:
 	 * detect any races.
 	 */
 	spin_unlock(&litevm->lock);
+	printk("unlocked\n");
 	poperror();
 
 	/* Deallocate if slot is being removed */
@@ -1488,6 +1504,8 @@ raced:
 			if (ret != ESUCCESS)
 				goto out_free;
 			if (init_data){
+				printk("init data memcpy(%p,%p,4096);\n",
+				       page2kva(new.phys_mem[i]), init_data);
 				memcpy(page2kva(new.phys_mem[i]), init_data, PAGE_SIZE);
 				init_data += PAGE_SIZE;
 			}
@@ -1500,21 +1518,26 @@ raced:
 		dirty_bytes = (((npages + BITS_PER_LONG-1)/BITS_PER_LONG)*BITS_PER_LONG)/8;
 
 		new.dirty_bitmap = kzmalloc(dirty_bytes, KMALLOC_WAIT);
-		if (!new.dirty_bitmap)
+		if (!new.dirty_bitmap){
+			printk("VM: alloc of %d bytes for map failed\n", dirty_bytes);
 			goto out_free;
+		}
 	}
 
-	spin_lock(&litevm->lock);
-
+	spin_lock_irqsave(&litevm->lock);
+	printk("locked\n");
 	if (memory_config_version != litevm->memory_config_version) {
 		spin_unlock(&litevm->lock);
+		printk("unlocked, try again\n");
 		litevm_free_physmem_slot(&new, &old);
 		goto raced;
 	}
 
 	r = -EAGAIN;
-	if (litevm->busy)
+	if (litevm->busy){
+		printk("BUSY!\n");
 		goto out_unlock;
+	}
 
 	if (mem->slot >= litevm->nmemslots)
 		litevm->nmemslots = mem->slot + 1;
@@ -1523,7 +1546,7 @@ raced:
 	++litevm->memory_config_version;
 
 	spin_unlock(&litevm->lock);
-
+	printk("unlocked\n");
 	for (i = 0; i < LITEVM_MAX_VCPUS; ++i) {
 		struct litevm_vcpu *vcpu;
 
@@ -1540,7 +1563,6 @@ raced:
 out_unlock:
 	spin_unlock(&litevm->lock);
 	printk("out_unlock\n");
-	error("well, something went badly.");
 out_free:
 	printk("out_free\n");
 	litevm_free_physmem_slot(&new, &old);
@@ -1561,7 +1583,7 @@ static int litevm_dev_ioctl_get_dirty_log(struct litevm *litevm,
 	int n;
 	unsigned long any = 0;
 
-	spin_lock(&litevm->lock);
+	spin_lock_irqsave(&litevm->lock);
 
 	/*
 	 * Prevent changes to guest memory configuration even while the lock
@@ -1589,7 +1611,7 @@ static int litevm_dev_ioctl_get_dirty_log(struct litevm *litevm,
 
 
 	if (any) {
-		spin_lock(&litevm->lock);
+		spin_lock_irqsave(&litevm->lock);
 		litevm_mmu_slot_remove_write_access(litevm, log->slot);
 		spin_unlock(&litevm->lock);
 		memset(memslot->dirty_bitmap, 0, n);
@@ -1606,7 +1628,7 @@ static int litevm_dev_ioctl_get_dirty_log(struct litevm *litevm,
 	r = 0;
 
 out:
-	spin_lock(&litevm->lock);
+	spin_lock_irqsave(&litevm->lock);
 	--litevm->busy;
 	spin_unlock(&litevm->lock);
 	return r;
@@ -1982,7 +2004,7 @@ static int handle_exception(struct litevm_vcpu *vcpu, struct litevm_run *litevm_
 	if (is_page_fault(intr_info)) {
 		cr2 = vmcs_readl(EXIT_QUALIFICATION);
 
-		spin_lock(&vcpu->litevm->lock);
+		spin_lock_irqsave(&vcpu->litevm->lock);
 		if (!vcpu->mmu.page_fault(vcpu, cr2, error_code)) {
 			spin_unlock(&vcpu->litevm->lock);
 			return 1;
@@ -2107,7 +2129,7 @@ static int handle_invlpg(struct litevm_vcpu *vcpu, struct litevm_run *litevm_run
 {
 	uint64_t address = vmcs_read64(EXIT_QUALIFICATION);
 	int instruction_length = vmcs_read32(VM_EXIT_INSTRUCTION_LEN);
-	spin_lock(&vcpu->litevm->lock);
+	spin_lock_irqsave(&vcpu->litevm->lock);
 	vcpu->mmu.inval_page(vcpu, address);
 	spin_unlock(&vcpu->litevm->lock);
 	vmcs_writel(GUEST_RIP, vmcs_readl(GUEST_RIP) + instruction_length);
@@ -3063,7 +3085,7 @@ static int litevm_dev_ioctl_translate(struct litevm *litevm, struct litevm_trans
 	vcpu = vcpu_load(litevm, tr->vcpu);
 	if (!vcpu)
 		return -ENOENT;
-	spin_lock(&litevm->lock);
+	spin_lock_irqsave(&litevm->lock);
 	gpa = vcpu->mmu.gva_to_gpa(vcpu, vaddr);
 	tr->physical_address = gpa;
 	tr->valid = gpa != UNMAPPED_GVA;
