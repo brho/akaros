@@ -1392,6 +1392,7 @@ out:
 int vm_set_memory_region(struct litevm *litevm,
 					   struct litevm_memory_region *mem)
 {
+	ERRSTACK(2);
 	int r;
 	gfn_t base_gfn;
 	unsigned long npages;
@@ -1404,13 +1405,14 @@ int vm_set_memory_region(struct litevm *litevm,
 	r = -EINVAL;
 	/* General sanity checks */
 	if (mem->memory_size & (PAGE_SIZE - 1))
-		goto out;
+		error("mem->memory_size %lld is not page-aligned", mem->memory_size);
 	if (mem->guest_phys_addr & (PAGE_SIZE - 1))
-		goto out;
+		error("guest_phys_addr 0x%llx is not page-aligned", mem->guest_phys_addr);
 	if (mem->slot >= LITEVM_MEMORY_SLOTS)
-		goto out;
+		error("Slot %d is >= %d", mem->slot, LITEVM_MEMORY_SLOTS);
 	if (mem->guest_phys_addr + mem->memory_size < mem->guest_phys_addr)
-		goto out;
+		error("0x%x + 0x%x is < 0x%x", 
+		      mem->guest_phys_addr, mem->memory_size, mem->guest_phys_addr);
 
 	memslot = &litevm->memslots[mem->slot];
 	base_gfn = mem->guest_phys_addr >> PAGE_SHIFT;
@@ -1419,9 +1421,19 @@ int vm_set_memory_region(struct litevm *litevm,
 	if (!npages)
 		mem->flags &= ~LITEVM_MEM_LOG_DIRTY_PAGES;
 
+	/* this is actually a very tricky for loop. The use of
+	 * error is a bit dangerous, so we don't use it much.
+	 * consider a rewrite. Would be nice if akaros could do the
+	 * allocation of a bunch of pages for us.
+	 */
 raced:
 	spin_lock(&litevm->lock);
 
+	if (waserror()){
+		spin_unlock(&litevm->lock);
+		nexterror();
+	}
+		
 	memory_config_version = litevm->memory_config_version;
 	new = old = *memslot;
 
@@ -1432,7 +1444,8 @@ raced:
 	/* Disallow changing a memory slot's size. */
 	r = -EINVAL;
 	if (npages && old.npages && npages != old.npages)
-		goto out_unlock;
+		error("npages is %d, old.npages is %d, can't change",
+		      npages, old.npages);
 
 	/* Check for overlaps */
 	r = -EEXIST;
@@ -1443,13 +1456,14 @@ raced:
 			continue;
 		if (!((base_gfn + npages <= s->base_gfn) ||
 		      (base_gfn >= s->base_gfn + s->npages)))
-			goto out_unlock;
+			error("Overlap");
 	}
 	/*
 	 * Do memory allocations outside lock.  memory_config_version will
 	 * detect any races.
 	 */
 	spin_unlock(&litevm->lock);
+	poperror();
 
 	/* Deallocate if slot is being removed */
 	if (!npages)
@@ -1525,9 +1539,13 @@ raced:
 
 out_unlock:
 	spin_unlock(&litevm->lock);
+	printk("out_unlock\n");
+	error("well, something went badly.");
 out_free:
+	printk("out_free\n");
 	litevm_free_physmem_slot(&new, &old);
 out:
+	printk("vm_set_memory_region: return %d\n", r);
 	return r;
 }
 
