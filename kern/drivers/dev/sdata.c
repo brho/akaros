@@ -433,8 +433,7 @@ static int atadebug(int cmdport, int ctlport, char *fmt, ...)
 						  inb(ctlport + As));
 		n += snprintf(buf + n, PRINTSIZE - n, "\n");
 	}
-#warning "copy to user?"
-	//putstrn(buf, n);
+	printk(buf);
 
 	return n;
 }
