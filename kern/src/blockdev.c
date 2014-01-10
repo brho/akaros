@@ -69,7 +69,7 @@ struct block_device *get_bdev(char *path)
 void free_bhs(struct page *page)
 {
 	struct buffer_head *bh, *next;
-	assert(page->pg_flags & PG_BUFFER);
+	assert(atomic_read(&page->pg_flags) & PG_BUFFER);
 	bh = (struct buffer_head*)page->pg_private;
 	while (bh) {
 		next = bh->bh_next;
@@ -156,7 +156,7 @@ void sleep_on_breq(struct block_request *breq)
  * readpage, we read them in when a specific block is there */
 int block_readpage(struct page_map *pm, struct page *page)
 {
-	page->pg_flags |= PG_UPTODATE;
+	atomic_or(&page->pg_flags, PG_UPTODATE);
 	return 0;
 }
 
@@ -191,7 +191,7 @@ struct buffer_head *bdev_get_buffer(struct block_device *bdev,
 	if (error)
 		panic("Failed to load page! (%d)", error);
 	my_buf = page2kva(page) + blk_offset;
-	assert(page->pg_flags & PG_BUFFER);		/* Should be part of a page map */
+	assert(atomic_read(&page->pg_flags) & PG_BUFFER);
 retry:
 	bh = (struct buffer_head*)page->pg_private;
 	prev = 0;
@@ -268,7 +268,7 @@ void bdev_dirty_buffer(struct buffer_head *bh)
 	struct page *page = bh->bh_page;
 	/* TODO: race on flag modification */
 	bh->bh_flags |= BH_DIRTY;
-	page->pg_flags |= PG_DIRTY;
+	atomic_or(&page->pg_flags, PG_DIRTY);
 }
 
 /* Decrefs the buffer from bdev_get_buffer().  Call this when you no longer

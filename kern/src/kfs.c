@@ -151,7 +151,7 @@ int kfs_readpage(struct page_map *pm, struct page *page)
 	/* This is supposed to be done in the IO system when the operation is
 	 * complete.  Since we aren't doing a real IO request, and it is already
 	 * done, we can do it here. */
-	page->pg_flags |= PG_UPTODATE;
+	atomic_or(&page->pg_flags, PG_UPTODATE);
 	return 0;
 }
 

@@ -704,7 +704,7 @@ int ext2_readpage(struct page_map *pm, struct page *page)
 	struct block_request *breq;
 	void *eobh;
 
-	assert(page->pg_flags & PG_BUFFER);
+	assert(atomic_read(&page->pg_flags) & PG_BUFFER);
 	retval = ext2_mappage(pm, page);
 	if (retval)
 		return retval;
@@ -731,7 +731,7 @@ int ext2_readpage(struct page_map *pm, struct page *page)
 		} else {
 			memset(bh->bh_buffer, 0, pm->pm_host->i_sb->s_blocksize);
 			bh->bh_flags |= BH_DIRTY;
-			bh->bh_page->pg_flags |= PG_DIRTY;
+			atomic_or(&bh->bh_page->pg_flags, PG_DIRTY);
 		}
 	}
 	retval = bdev_submit_request(bdev, breq);
@@ -748,7 +748,7 @@ int ext2_readpage(struct page_map *pm, struct page *page)
 	if (eof_off)
 		memset(eof_off + page2kva(page), 0, PGSIZE - eof_off);
 	/* Now the page is up to date */
-	page->pg_flags |= PG_UPTODATE;
+	atomic_or(&page->pg_flags, PG_UPTODATE);
 	/* Useful debugging.  Put one higher up if the page is not getting mapped */
 	//print_pageinfo(page);
 	return 0;
