@@ -106,9 +106,10 @@ ssize_t dev_stdout_write(struct file *file, const char *buf, size_t count,
 	 * would try to print it (which it can't do yet).  The hack is even dirtier
 	 * in that we only detect it if it is the first char, and we ignore
 	 * everything else. */
-	if (t_buf[0] == '\033') /* 0x1b */
-		return count;
-	cputbuf(t_buf, count);
+	if (t_buf[0] != '\033') /* 0x1b */
+		cputbuf(t_buf, count);
+	if (p)
+		user_memdup_free(p, t_buf);
 	return count;
 }
 
