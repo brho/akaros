@@ -1078,7 +1078,7 @@ namec(char *aname, int amode, int omode, uint32_t perm)
 	if(walk(&c, e.elems, e.ARRAY_SIZEs, nomount, &npath) < 0){
 		if(npath < 0 || npath > e.ARRAY_SIZEs){
 			printd("namec %s walk error npath=%d\n", aname, npath);
-			nexterror();
+			error("walk failed");
 		}
 #warning "fix this mess with errstr and walking"
 #if 0
@@ -1094,7 +1094,6 @@ namec(char *aname, int amode, int omode, uint32_t perm)
 		snprintf(current->errstr, ERRMAX, "%#q %s", get_cur_genbuf(), tmperrbuf);
 #endif
 		error("some kinda name error");
-		nexterror();
 	}
 
 	if(e.mustbedir && !(c->qid.type&QTDIR)){
