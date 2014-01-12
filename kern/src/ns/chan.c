@@ -1326,7 +1326,7 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 			printd("namec %s walk error nerror=%d\n", aname, e.nerror);
 			e.nerror = 0;
 		}
-		nexterror();
+		error("walk failed");
 	}
 
 	if (e.mustbedir && !(c->qid.type & QTDIR))
