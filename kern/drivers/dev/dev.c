@@ -142,7 +142,8 @@ devwalk(struct chan *c,
 	struct dirtab *tab, int ntab, Devgen *gen)
 {
 	ERRSTACK(2);
-	int i, j, alloc;
+	int i, j;
+	volatile int alloc; /* to keep waserror from optimizing this out */
 	struct walkqid *wq;
 	char *n;
 	struct dir dir;
