@@ -174,7 +174,8 @@ struct walkqid *devwalk(struct chan *c, struct chan *nc, char **name, int nname,
 						struct dirtab *tab, int ntab, devgen_t * gen)
 {
 	ERRSTACK(2);
-	int i, j, alloc;
+	int i, j;
+	volatile int alloc;	/* to keep waserror from optimizing this out */
 	struct walkqid *wq;
 	char *n;
 	struct dir dir;
