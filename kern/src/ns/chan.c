@@ -1277,6 +1277,7 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 		cclose(c);
 		kfree(e.name);
 		kfree(e.elems);
+		kfree(e.off);
 		/* brho: skipping the namec custom error string business, since it hides
 		 * the underlying failure.  comment out nexterror if you want the old
 		 * stuff.  */
@@ -1296,7 +1297,6 @@ struct chan *namec(char *aname, int amode, int omode, int perm)
 				   e.nelems, aname, e.off[0], e.off[1]);
 		}
 		len = e.prefix + e.off[e.nerror];
-		kfree(e.off);
 		namelenerror(aname, len, tmperrbuf);
 		nexterror();
 	}
