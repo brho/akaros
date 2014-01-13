@@ -66,7 +66,8 @@ struct proc {
 	// Address space
 	pde_t *COUNT(NPDENTRIES) env_pgdir;			// Kernel virtual address of page dir
 	physaddr_t env_cr3;			// Physical address of page dir
-	spinlock_t mm_lock;		/* Protects page tables and VMRs (mem mgmt) */
+	spinlock_t vmr_lock;		/* Protects VMR tree (mem mgmt) */
+	spinlock_t pte_lock;		/* Protects page tables (mem mgmt) */
 	struct vmr_tailq vm_regions;
 
 	// Per process info and data pages

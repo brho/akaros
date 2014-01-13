@@ -251,7 +251,7 @@ ultimate_fallback:
 	 * empty and the process is simply WAITING (yielded all of its vcores and is
 	 * waiting on an event).  Time for the ultimate fallback: locking.  Note
 	 * that when we __alert_vcore(), there is a chance we need to mmap, which
-	 * grabs the mm_lock. */
+	 * grabs the vmr_lock and pte_lock. */
 	spin_lock(&p->proc_lock);
 	if (p->state != PROC_WAITING) {
 		/* We need to check the online and bulk_preempt lists again, now that we are

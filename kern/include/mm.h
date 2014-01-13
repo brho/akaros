@@ -17,14 +17,6 @@
 struct file;
 struct proc;								/* preprocessor games */
 
-/* This might turn into a per-process mem management structure.  For now, we're
- * using the proc struct.  This would have things like the vmr list/tree, cr3,
- * mem usage stats, something with private memory, etc.  Not sure if we'll ever
- * need this. */
-struct mm {
-	spinlock_t mm_lock;
-};
-
 /* Basic structure defining a region of a process's virtual memory.  Note we
  * don't refcnt these.  Either they are in the TAILQ/tree, or they should be
  * freed.  There should be no other references floating around.  We still need
@@ -33,7 +25,6 @@ struct mm {
 struct vm_region {
 	TAILQ_ENTRY(vm_region)		vm_link;
 	struct proc					*vm_proc;	/* owning process, for now */
-	//struct mm 					*vm_mm;		/* owning address space */
 	uintptr_t					vm_base;
 	uintptr_t					vm_end;
 	int							vm_prot;	
