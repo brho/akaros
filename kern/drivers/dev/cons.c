@@ -842,6 +842,24 @@ consclose(struct chan *c)
 	}
 }
 
+/* we do it this way to avoid the many fun deadlock opportunities
+ * we keep hitting. And, if you don't suck it
+ * out soon enough, you lost it. No real effort to ensure goodness
+ * here as it can get called anywhere. Barret will fix it.
+ */
+static uint8_t logbuffer[1<<20];
+static int index = 0;
+static struct queue *logqueue = NULL;
+static int reading_kmesg = 0;
+void logbuf(int c)
+{
+	if (reading_kmesg)
+		return;
+	if (index > 1<<20)
+		return;
+	logbuffer[index++] = c;
+}
+
 static long
 consread(struct chan *c, void *buf, long n, int64_t offset)
 {
@@ -971,10 +989,23 @@ consread(struct chan *c, void *buf, long n, int64_t offset)
 		kfree(p);
 		poperror();
 		return n;
-#if 0
 	case Qklog:
-		return qread(klogq, buf, n);
-
+		//return qread(klogq, buf, n);	
+		/* the queue gives us some elasticity for log reading. */
+		if (! logqueue)
+			logqueue = qopen(1<<20, 0, 0, 0);
+		if (logqueue){
+			int ret;
+			/* atomic sets/gets are not that important in this case. */
+			reading_kmesg = 1;
+			qwrite(logqueue, logbuffer, index);
+			index = 0;
+			ret = qread(logqueue, buf, n);
+			reading_kmesg = 0;
+			return ret;
+		}
+		break;
+#if 0
 	case Qkprint:
 		rlock(&(&kprintq)->rwlock);
 		if(waserror()){
