@@ -58,7 +58,7 @@ void destroy_vmr(struct vm_region *vmr);
 struct vm_region *find_vmr(struct proc *p, uintptr_t va);
 struct vm_region *find_first_vmr(struct proc *p, uintptr_t va);
 void isolate_vmrs(struct proc *p, uintptr_t va, size_t len);
-void destroy_vmrs(struct proc *p);
+void unmap_and_destroy_vmrs(struct proc *p);
 int duplicate_vmrs(struct proc *p, struct proc *new_p);
 void print_vmrs(struct proc *p);
 

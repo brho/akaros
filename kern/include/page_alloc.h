@@ -32,6 +32,7 @@ typedef LIST_ENTRY(page) page_list_entry_t;
 #define PG_UPTODATE		0x002	/* page map, filled with file data */
 #define PG_DIRTY		0x004	/* page map, data is dirty */
 #define PG_BUFFER		0x008	/* is a buffer page, has BHs */
+#define PG_PAGEMAP		0x010	/* belongs to a page map */
 
 /* TODO: this struct is not protected from concurrent operations in some
  * functions.  If you want to lock on it, use the spinlock in the semaphore.

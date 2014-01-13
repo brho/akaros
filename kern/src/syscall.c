@@ -578,7 +578,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	#endif
 	/* When we destroy our memory regions, accessing cur_sysc would PF */
 	pcpui->cur_kthread->sysc = 0;
-	destroy_vmrs(p);
+	unmap_and_destroy_vmrs(p);
 	close_all_files(&p->open_files, TRUE);
 	env_user_mem_free(p, 0, UMAPTOP);
 	if (load_elf(p, program)) {

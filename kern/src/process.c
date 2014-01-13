@@ -352,6 +352,12 @@ struct proc *proc_create(struct file *prog, char **argv, char **envp)
 	return p;
 }
 
+static int __cb_assert_no_pg(struct proc *p, pte_t *pte, void *va, void *arg)
+{
+	assert(!*pte);
+	return 0;
+}
+
 /* This is called by kref_put(), once the last reference to the process is
  * gone.  Don't call this otherwise (it will panic).  It will clean up the
  * address space and deallocate any other used memory. */
@@ -368,7 +374,8 @@ static void __proc_free(struct kref *kref)
 	/* close plan9 dot and slash and free fgrp fd and fgrp */
 	kref_put(&p->fs_env.root->d_kref);
 	kref_put(&p->fs_env.pwd->d_kref);
-	destroy_vmrs(p);
+	/* now we'll finally decref files for the file-backed vmrs */
+	unmap_and_destroy_vmrs(p);
 	frontend_proc_free(p);	/* TODO: please remove me one day */
 	/* Free any colors allocated to this process */
 	if (p->cache_colors_map != global_cache_colors_map) {
@@ -382,9 +389,11 @@ static void __proc_free(struct kref *kref)
 		panic("Proc not in the pid table in %s", __FUNCTION__);
 	spin_unlock(&pid_hash_lock);
 	put_free_pid(p->pid);
-	/* Flush all mapped pages in the user portion of the address space */
-	env_user_mem_free(p, 0, UVPT);
-	/* These need to be free again, since they were allocated with a refcnt. */
+	/* all memory below UMAPTOP should have been freed via the VMRs.  the stuff
+	 * above is the global page and procinfo/procdata */
+	env_user_mem_free(p, (void*)UMAPTOP, UVPT - UMAPTOP); /* 3rd arg = len... */
+	env_user_mem_walk(p, 0, UMAPTOP, __cb_assert_no_pg, 0);
+	/* These need to be freed again, since they were allocated with a refcnt. */
 	free_cont_pages(p->procinfo, LOG2_UP(PROCINFO_NUM_PAGES));
 	free_cont_pages(p->procdata, LOG2_UP(PROCDATA_NUM_PAGES));
 
@@ -773,8 +782,11 @@ void proc_destroy(struct proc *p)
 	 * a parent sleeping on our pipe, that parent won't wake up to decref until
 	 * the pipe closes.  And if the parent doesnt decref, we don't free.
 	 * alternatively, we could send a SIGCHILD to the parent, but that would
-	 * require parent's to never ignore that signal (or risk never reaping) */
-	//close_9ns_files(p);
+	 * require parent's to never ignore that signal (or risk never reaping).
+	 *
+	 * Also note that any mmap'd files will still be mmapped.  You can close the
+	 * file after mmapping, with no effect. */
+	//close_9ns_files(p, FALSE);
 	close_all_files(&p->open_files, FALSE);
 	/* Tell the ksched about our death, and which cores we freed up */
 	__sched_proc_destroy(p, pc_arr, nr_cores_revoked);

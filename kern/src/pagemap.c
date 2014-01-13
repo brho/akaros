@@ -26,7 +26,7 @@ void pm_init(struct page_map *pm, struct page_map_operations *op, void *host)
 
 /* Looks up the index'th page in the page map, returning an incref'd reference,
  * or 0 if it was not in the map. */
-struct page *pm_find_page(struct page_map *pm, unsigned long index)
+static struct page *pm_find_page(struct page_map *pm, unsigned long index)
 {
 	spin_lock(&pm->pm_tree_lock);
 	struct page *page = (struct page*)radix_lookup(&pm->pm_tree, index);
@@ -40,14 +40,16 @@ struct page *pm_find_page(struct page_map *pm, unsigned long index)
  * error code if there was one already (EEXIST) or we ran out of memory
  * (ENOMEM).  On success, this will preemptively lock the page, and will also
  * store a reference to the page in the pm. */
-int pm_insert_page(struct page_map *pm, unsigned long index, struct page *page)
+static int pm_insert_page(struct page_map *pm, unsigned long index,
+                          struct page *page)
 {
 	int error = 0;
 	spin_lock(&pm->pm_tree_lock);
 	error = radix_insert(&pm->pm_tree, index, page);
 	if (!error) {
 		page_incref(page);
-		atomic_or(&page->pg_flags, PG_LOCKED | PG_BUFFER);
+		/* setting PG_BUF since we know it'll be used for IO later... */
+		atomic_or(&page->pg_flags, PG_LOCKED | PG_BUFFER | PG_PAGEMAP);
 		page->pg_sem.nr_signals = 0;		/* ensure others will block */
 		page->pg_mapping = pm;
 		page->pg_index = index;
@@ -57,25 +59,9 @@ int pm_insert_page(struct page_map *pm, unsigned long index, struct page *page)
 	return error;
 }
 
-/* Removes the page, including its reference.  Not sure yet what interface we
- * want to this (pm and index or page), and this has never been used.  There are
- * also issues with when you want to call this, since a page in the cache may be
- * mmap'd by someone else. */
-int pm_remove_page(struct page_map *pm, struct page *page)
+void pm_put_page(struct page *page)
 {
-	void *retval;
-	warn("pm_remove_page() hasn't been thought through or tested.");
-	/* TODO: check for dirty pages, don't let them be removed right away.  Need
-	 * to schedule them for writeback, and then remove them later (callback).
-	 * Also, need to be careful - anyone holding a reference to a page can dirty
-	 * it concurrently. */
-	spin_lock(&pm->pm_tree_lock);
-	retval = radix_delete(&pm->pm_tree, page->pg_index);
-	spin_unlock(&pm->pm_tree_lock);
-	assert(retval == (void*)page);
 	page_decref(page);
-	pm->pm_num_pages--;
-	return 0;
 }
 
 /* Makes sure the index'th page of the mapped object is loaded in the page cache
@@ -143,6 +129,6 @@ int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp)
 	assert(!error);
 	/* Unlock, since we're done with the page and it is up to date */
 	unlock_page(page);
-	assert(page->pg_flags & PG_UPTODATE);
+	assert(atomic_read(&page->pg_flags) & PG_UPTODATE);
 	return 0;
 }
