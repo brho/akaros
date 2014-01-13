@@ -316,7 +316,8 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	p->env_flags = 0;
 	p->env_entry = 0; // cheating.  this really gets set later
 	p->heap_top = 0;
-	spinlock_init(&p->mm_lock);
+	spinlock_init(&p->vmr_lock);
+	spinlock_init(&p->pte_lock);
 	TAILQ_INIT(&p->vm_regions); /* could init this in the slab */
 	/* Initialize the vcore lists, we'll build the inactive list so that it
 	 * includes all vcores when we initialize procinfo.  Do this before initing

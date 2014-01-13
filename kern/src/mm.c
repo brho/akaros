@@ -7,8 +7,8 @@
  *
  * In general, error checking / bounds checks are done in the main function
  * (e.g. mmap()), and the work is done in a do_ function (e.g. do_mmap()).
- * Versions of those functions that are called when the memory lock (mm_lock) is
- * already held begin with __ (e.g. __do_munmap()).
+ * Versions of those functions that are called when the vmr lock is already held
+ * begin with __ (e.g. __do_munmap()).
  *
  * Note that if we were called from kern/src/syscall.c, we probably don't have
  * an edible reference to p. */
@@ -239,13 +239,21 @@ void isolate_vmrs(struct proc *p, uintptr_t va, size_t len)
 void unmap_and_destroy_vmrs(struct proc *p)
 {
 	struct vm_region *vmr_i, *vmr_temp;
-	/* need the safe style, since destroy_vmr modifies the list */
-	TAILQ_FOREACH_SAFE(vmr_i, &p->vm_regions, vm_link, vmr_temp) {
+	/* this only gets called from __proc_free, so there should be no sync
+	 * concerns.  still, better safe than sorry. */
+	spin_lock(&p->vmr_lock);
+	spin_lock(&p->pte_lock);
+	TAILQ_FOREACH(vmr_i, &p->vm_regions, vm_link) {
 		/* note this CB sets the PTE = 0, regardless of if it was P or not */
 		env_user_mem_walk(p, (void*)vmr_i->vm_base,
 		                  vmr_i->vm_end - vmr_i->vm_base, __vmr_free_pgs, 0);
-		destroy_vmr(vmr_i);
 	}
+	spin_unlock(&p->pte_lock);
+	/* need the safe style, since destroy_vmr modifies the list.  also, we want
+	 * to do this outside the pte lock, since it grabs the pm lock. */
+	TAILQ_FOREACH_SAFE(vmr_i, &p->vm_regions, vm_link, vmr_temp)
+		destroy_vmr(vmr_i);
+	spin_unlock(&p->vmr_lock);
 }
 
 /* Helper: copies the contents of pages from p to new p.  For pages that aren't
@@ -401,9 +409,10 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
               struct file *file, size_t offset)
 {
-	spin_lock(&p->mm_lock);
+	/* read/write vmr lock (will change the tree) */
+	spin_lock(&p->vmr_lock);
 	void *ret = __do_mmap(p, addr, len, prot, flags, file, offset);
-	spin_unlock(&p->mm_lock);
+	spin_unlock(&p->vmr_lock);
 	return ret;
 }
 
@@ -558,9 +567,10 @@ int mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 		set_errno(ENOMEM);
 		return -1;
 	}
-	spin_lock(&p->mm_lock);
+	/* read/write lock, will probably change the tree and settings */
+	spin_lock(&p->vmr_lock);
 	int ret = __do_mprotect(p, addr, len, prot);
-	spin_unlock(&p->mm_lock);
+	spin_unlock(&p->vmr_lock);
 	return ret;
 }
 
@@ -587,6 +597,8 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 			return -1;
 		}
 		vmr->vm_prot = prot;
+		spin_lock(&p->pte_lock);	/* walking and changing PTEs */
+		/* TODO: use a memwalk */
 		for (uintptr_t va = vmr->vm_base; va < vmr->vm_end; va += PGSIZE) { 
 			pte = pgdir_walk(p->env_pgdir, (void*)va, 0);
 			if (pte && PAGE_PRESENT(*pte)) {
@@ -594,6 +606,7 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 				shootdown_needed = TRUE;
 			}
 		}
+		spin_unlock(&p->pte_lock);
 		next_vmr = TAILQ_NEXT(vmr, vm_link);
 		vmr = next_vmr;
 	}
@@ -616,9 +629,10 @@ int munmap(struct proc *p, uintptr_t addr, size_t len)
 		set_errno(EINVAL);
 		return -1;
 	}
-	spin_lock(&p->mm_lock);
+	/* read/write: changing the vmrs (trees, properties, and whatnot) */
+	spin_lock(&p->vmr_lock);
 	int ret = __do_munmap(p, addr, len);
-	spin_unlock(&p->mm_lock);
+	spin_unlock(&p->vmr_lock);
 	return ret;
 }
 
@@ -672,11 +686,13 @@ int __do_munmap(struct proc *p, uintptr_t addr, size_t len)
 	isolate_vmrs(p, addr, len);
 	first_vmr = find_first_vmr(p, addr);
 	vmr = first_vmr;
+	spin_lock(&p->pte_lock);	/* changing PTEs */
 	while (vmr && vmr->vm_base < addr + len) {
 		env_user_mem_walk(p, (void*)vmr->vm_base, vmr->vm_end - vmr->vm_base,
 		                  __munmap_mark_not_present, &shootdown_needed);
 		vmr = TAILQ_NEXT(vmr, vm_link);
 	}
+	spin_unlock(&p->pte_lock);
 	/* we haven't freed the pages yet; still using the PTEs to store the them.
 	 * There should be no races with inserts/faults, since we still hold the mm
 	 * lock since the previous CB. */
@@ -684,8 +700,12 @@ int __do_munmap(struct proc *p, uintptr_t addr, size_t len)
 		proc_tlbshootdown(p, addr, addr + len);
 	vmr = first_vmr;
 	while (vmr && vmr->vm_base < addr + len) {
+		/* there is rarely more than one VMR in this loop.  o/w, we'll need to
+		 * gather up the vmrs and destroy outside the pte_lock. */
+		spin_lock(&p->pte_lock);	/* changing PTEs */
 		env_user_mem_walk(p, (void*)vmr->vm_base, vmr->vm_end - vmr->vm_base,
 			              __vmr_free_pgs, 0);
+		spin_unlock(&p->pte_lock);
 		next_vmr = TAILQ_NEXT(vmr, vm_link);
 		destroy_vmr(vmr);
 		vmr = next_vmr;
@@ -699,14 +719,15 @@ int handle_page_fault(struct proc* p, uintptr_t va, int prot)
 
 	if (prot != PROT_READ && prot != PROT_WRITE && prot != PROT_EXEC)
 		panic("bad prot!");
-	spin_lock(&p->mm_lock);
+	/* read access to the VMRs TODO: RCU */
+	spin_lock(&p->vmr_lock);
 	int ret = __handle_page_fault(p, va, prot);
-	spin_unlock(&p->mm_lock);
+	spin_unlock(&p->vmr_lock);
 	return ret;
 }
 
 /* Returns 0 on success, or an appropriate -error code.  Assumes you hold the
- * mm_lock.
+ * vmr_lock.
  *
  * Notes: if your TLB caches negative results, you'll need to flush the
  * appropriate tlb entry.  Also, you could have a weird race where a present PTE
@@ -720,6 +741,7 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 	struct page *a_page;
 	unsigned int f_idx;	/* index of the missing page in the file */
 	int retval;
+	pte_t *pte;
 
 	/* Check the vmr's protection */
 	vmr = find_vmr(p, va);
@@ -727,21 +749,6 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 		return -EFAULT;
 	if (!(vmr->vm_prot & prot))			/* wrong prots for this vmr */
 		return -EPERM;
-	/* find offending PTE (prob don't read this in).  This might alloc an
-	 * intermediate page table page. */
-	pte_t *pte = pgdir_walk(p->env_pgdir, (void*)va, 1);
-	if (!pte)
-		return -ENOMEM;
-	/* a spurious, valid PF is possible due to a legit race: the page might have
-	 * been faulted in by another core already (and raced on the memory lock),
-	 * in which case we should just return. */
-	if (PAGE_PRESENT(*pte)) {
-		return 0;
-	} else if (PAGE_PAGED_OUT(*pte)) {
-		/* TODO: (SWAP) bring in the paged out frame. (BLK) */
-		panic("Swapping not supported!");
-		return -1;
-	}
 	if (!vmr->vm_file) {
 		/* No file - just want anonymous memory */
 		if (upage_alloc(p, &a_page, TRUE))
@@ -799,8 +806,32 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 	 * separately (file, no file) */
 	int pte_prot = (vmr->vm_prot & PROT_WRITE) ? PTE_USER_RW :
 	               (vmr->vm_prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
+	spin_lock(&p->pte_lock);	/* walking and changing PTEs */
+	/* find offending PTE (prob don't read this in).  This might alloc an
+	 * intermediate page table page. */
+	pte = pgdir_walk(p->env_pgdir, (void*)va, 1);
+	if (!pte) {
+		spin_unlock(&p->pte_lock);
+		pm_put_page(a_page);
+		return -ENOMEM;
+	}
+	/* a spurious, valid PF is possible due to a legit race: the page might have
+	 * been faulted in by another core already (and raced on the memory lock),
+	 * in which case we should just return. */
+	if (PAGE_PRESENT(*pte)) {
+		spin_unlock(&p->pte_lock);
+		pm_put_page(a_page);
+		return 0;
+	} else if (PAGE_PAGED_OUT(*pte)) {
+		/* TODO: (SWAP) bring in the paged out frame. (BLK) */
+		panic("Swapping not supported!");
+		spin_unlock(&p->pte_lock);
+		pm_put_page(a_page);
+		return -1;
+	}
 	/* We have a ref to a_page, which we are storing in the PTE */
 	*pte = PTE(page2ppn(a_page), PTE_P | pte_prot);
+	spin_unlock(&p->pte_lock);
 	return 0;
 }
 
