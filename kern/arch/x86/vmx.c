@@ -408,9 +408,12 @@ static struct litevm_vcpu *__vcpu_load(struct litevm_vcpu *vcpu)
 		currentcpu->vmcs = vcpu->vmcs;
 		asm volatile ("vmptrld %1; setna %0"
 			       : "=m"(error) : "m"(phys_addr) : "cc" );
-		if (error)
+		if (error){
 			printk("litevm: vmptrld %p/%llx fail\n",
 			       vcpu->vmcs, phys_addr);
+			error("litevm: vmptrld %p/%llx fail\n",
+			       vcpu->vmcs, phys_addr);
+		}
 	}
 
 	if (vcpu->cpu != cpu) {
@@ -442,7 +445,7 @@ static struct litevm_vcpu *vcpu_load(struct litevm *litevm, int vcpu_slot)
 	qlock(&vcpu->mutex);
 	if (!vcpu->vmcs) {
 		qunlock(&vcpu->mutex);
-		return 0;
+		error("vcpu->vmcs is NULL");
 	}
 	return __vcpu_load(vcpu);
 }
@@ -2618,11 +2621,12 @@ int vm_run(struct litevm *litevm, struct litevm_run *litevm_run)
 	int fs_gs_ldt_reload_needed;
 
 	if (litevm_run->vcpu < 0 || litevm_run->vcpu >= LITEVM_MAX_VCPUS)
-		return -EINVAL;
+		error("vcpu is %d but must be in the range %d..%d\n",
+		      litevm_run->vcpu, LITEVM_MAX_VCPUS);
 
 	vcpu = vcpu_load(litevm, litevm_run->vcpu);
 	if (!vcpu)
-		return -ENOENT;
+		error("vcpu_load failed");
 
 	if (litevm_run->emulated) {
 		skip_emulated_instruction(vcpu);
@@ -2791,7 +2795,7 @@ again:
 	      : "cc", "memory" );
 
 	++litevm_stat.exits;
-
+	printk("vm_run exits");
 	save_msrs(vcpu->guest_msrs, NR_BAD_MSRS);
 	load_msrs(vcpu->host_msrs, NR_BAD_MSRS);
 
@@ -2843,6 +2847,7 @@ again:
 	}
 
 	vcpu_put(vcpu);
+	printk("vm_run returns\n");
 	return 0;
 }
 

@@ -578,5 +578,5 @@ int vmx_create_vcpu(struct litevm *litevm, int n);
 int vmx_init(void);
 int vm_set_memory_region(struct litevm *litevm,
 			 struct litevm_memory_region *mem);
-
+int vm_run(struct litevm *litevm, struct litevm_run *litevm_run);
 #endif

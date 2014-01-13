@@ -362,8 +362,18 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 			kfree(cb);
 			nexterror();
 		}
-		if (!strcmp(cb->f[0], "start")) {
-			error("can't run a vm yet");
+		if (!strcmp(cb->f[0], "run")) {
+			int ret;
+			if (cb->nf != 4)
+				error("usage: run vcpu emulated mmio_completed");
+			litevm = vm->archvm;
+			struct litevm_run vmr;
+			vmr.vcpu = strtoul(cb->f[1], NULL, 0);
+			vmr.emulated = strtoul(cb->f[2], NULL, 0);
+			vmr.mmio_completed = strtoul(cb->f[3], NULL, 0);
+			ret = vm_run(litevm, &vmr);
+			printk("vm_run returns %d\n", ret);
+			return ret;
 		} else if (!strcmp(cb->f[0], "stop")) {
 			error("can't stop a vm yet");
 		} else if (!strcmp(cb->f[0], "fillmem")) {
