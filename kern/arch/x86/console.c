@@ -645,6 +645,7 @@ int cons_get_any_char(void)
 /* output a character to all console outputs (monitor and all serials) */
 void cons_putc(int c)
 {
+	void logbuf(int c);
 	#ifdef CONFIG_TRACE_LOCKS
 	int8_t irq_state = 0;
 	disable_irqsave(&irq_state);
@@ -658,6 +659,7 @@ void cons_putc(int c)
 	#endif
 	//lpt_putc(c); 	/* very slow on the nehalem */
 	cga_putc(c);
+	logbuf(c);
 
 	#ifdef CONFIG_TRACE_LOCKS
 	__spin_unlock(&console_lock);

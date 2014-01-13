@@ -49,6 +49,7 @@ static struct dirtab consdir[] = {
 	{"drivers", {Qdrivers}, 0, 0444},
 	//  {"hostdomain",  {Qhostdomain},  DOMLEN,     0664},
 	{"hostowner", {Qhostowner}, 0, 0664},
+	{"kmesg",	{Qkmesg},	0,		0444,},
 	{"null", {Qnull}, 0, 0666},
 	{"osversion", {Qosversion}, 0, 0444},
 	{"pgrpid", {Qpgrpid}, NUMSIZE, 0444},
@@ -128,6 +129,24 @@ static void consclose(struct chan *c)
 {
 }
 
+/* we do it this way to avoid the many fun deadlock opportunities
+ * we keep hitting. And, if you don't suck it
+ * out soon enough, you lost it. No real effort to ensure goodness
+ * here as it can get called anywhere. Barret will fix it.
+ */
+static uint8_t logbuffer[1<<20];
+static int index = 0;
+static struct queue *logqueue = NULL;
+static int reading_kmesg = 0;
+void logbuf(int c)
+{
+	if (reading_kmesg)
+		return;
+	if (index > 1<<20)
+		return;
+	logbuffer[index++] = c;
+}
+
 static long
 consread(struct chan *c, void *buf, long n, int64_t off)
 {
@@ -167,23 +186,20 @@ consread(struct chan *c, void *buf, long n, int64_t off)
 			return n;
 
 		case Qkmesg:
-			error("not never?");
-#if 0
-			/*
-			 * This is unlocked to avoid tying up a process
-			 * that's writing to the buffer.  kmesg.n never
-			 * gets smaller, so worst case the reader will
-			 * see a slurred buffer.
-			 */
-			if (off >= kmesg.n)
-				n = 0;
-			else {
-				if (off + n > kmesg.n)
-					n = kmesg.n - off;
-				memmove(buf, kmesg.buf + off, n);
+			/* the queue gives us some elasticity for log reading. */
+			if (! logqueue)
+				logqueue = qopen(1<<20, 0, 0, 0);
+			if (logqueue){
+				int ret;
+				/* atomic sets/gets are not that important in this case. */
+				reading_kmesg = 1;
+				qwrite(logqueue, logbuffer, index);
+				index = 0;
+				ret = qread(logqueue, buf, n);
+				reading_kmesg = 0;
+				return ret;
 			}
-			return n;
-#endif
+			break;
 #if 0
 		case Qkprint:
 			return qread(kprintoq, buf, n);
