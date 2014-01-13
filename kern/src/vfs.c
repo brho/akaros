@@ -1168,7 +1168,7 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
 		}
 		buf += copy_amt;
 		page_off = 0;
-		page_decref(page);	/* it's still in the cache, we just don't need it */
+		pm_put_page(page);	/* it's still in the cache, we just don't need it */
 	}
 	assert(buf == buf_end);
 	*offset += count;
@@ -1218,7 +1218,8 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
 		}
 		buf += copy_amt;
 		page_off = 0;
-		page_decref(page);	/* it's still in the cache, we just don't need it */
+		atomic_or(&page->pg_flags, PG_DIRTY);
+		pm_put_page(page);	/* it's still in the cache, we just don't need it */
 	}
 	assert(buf == buf_end);
 	*offset += count;

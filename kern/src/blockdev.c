@@ -276,7 +276,7 @@ void bdev_dirty_buffer(struct buffer_head *bh)
  * reclaiming will be in page sized chunks from the page cache. */
 void bdev_put_buffer(struct buffer_head *bh)
 {
-	page_decref(bh->bh_page);
+	pm_put_page(bh->bh_page);
 }
 
 /* Block device page map ops: */

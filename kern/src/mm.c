@@ -25,6 +25,8 @@
 #include <vfs.h>
 #include <smp.h>
 
+static int __vmr_free_pgs(struct proc *p, pte_t *pte, void *va, void *arg);
+
 struct kmem_cache *vmr_kcache;
 
 void vmr_init(void)
@@ -234,13 +236,16 @@ void isolate_vmrs(struct proc *p, uintptr_t va, size_t len)
 		split_vmr(vmr, va + len);
 }
 
-/* Destroys all vmrs of a process - important for when files are mmap()d and
- * probably later when we share memory regions */
-void destroy_vmrs(struct proc *p)
+void unmap_and_destroy_vmrs(struct proc *p)
 {
-	struct vm_region *vm_i;
-	TAILQ_FOREACH(vm_i, &p->vm_regions, vm_link)
-		destroy_vmr(vm_i);
+	struct vm_region *vmr_i, *vmr_temp;
+	/* need the safe style, since destroy_vmr modifies the list */
+	TAILQ_FOREACH_SAFE(vmr_i, &p->vm_regions, vm_link, vmr_temp) {
+		/* note this CB sets the PTE = 0, regardless of if it was P or not */
+		env_user_mem_walk(p, (void*)vmr_i->vm_base,
+		                  vmr_i->vm_end - vmr_i->vm_base, __vmr_free_pgs, 0);
+		destroy_vmr(vmr_i);
+	}
 }
 
 /* Helper: copies the contents of pages from p to new p.  For pages that aren't
@@ -288,37 +293,6 @@ static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
 	}
 	return env_user_mem_walk(p, (void*)va_start, va_end - va_start, &copy_page,
 	                         new_p);
-	/* here's how to do it without the env_user_mem_walk */
-#if 0
-	pte_t *old_pte;
-	struct page *pp;
-	/* For each page, check the old PTE and copy present pages over */
-	for (uintptr_t va_i = va_start; va_i < va_end; va_i += PGSIZE) {
-		old_pte = pgdir_walk(p->env_pgdir, (void*)va_i, 0);
-		if (!old_pte)
-			continue;
-		if (PAGE_PRESENT(*old_pte)) {
-			/* TODO: check for jumbos */
-			if (upage_alloc(new_p, &pp, 0))
-				return -ENOMEM;
-			if (page_insert(new_p->env_pgdir, pp, (void*)va_i,
-			                *old_pte & PTE_PERM)) {
-				page_decref(pp);
-				return -ENOMEM;
-			}
-			pagecopy(page2kva(pp), ppn2kva(PTE2PPN(*old_pte)));
-			page_decref(pp);
-		} else if (PAGE_PAGED_OUT(*old_pte)) {
-			/* TODO: (SWAP) will need to either make a copy or CoW/refcnt the
-			 * backend store.  For now, this PTE will be the same as the
-			 * original PTE */
-			panic("Swapping not supported!");
-		} else {
-			panic("Weird PTE %p in %s!", *old_pte, __FUNCTION__);
-		}
-	}
-	return 0;
-#endif
 }
 
 /* This will make new_p have the same VMRs as p, and it will make sure all
@@ -648,43 +622,74 @@ int munmap(struct proc *p, uintptr_t addr, size_t len)
 	return ret;
 }
 
+static int __munmap_mark_not_present(struct proc *p, pte_t *pte, void *va,
+                                     void *arg)
+{
+	bool *shootdown_needed = (bool*)arg;
+	struct page *page;
+	/* could put in some checks here for !P and also !0 */
+	if (!PAGE_PRESENT(*pte))	/* unmapped (== 0) *ptes are also not PTE_P */
+		return 0;
+	page = ppn2page(PTE2PPN(*pte));
+	*pte &= ~PTE_P;
+	*shootdown_needed = TRUE;
+	return 0;
+}
+
+/* If our page is actually in the PM, we don't do anything.  All a page map
+ * really needs is for our VMR to no longer track it (vmr being in the pm's
+ * list) and to not point at its pages (mark it 0, dude).
+ *
+ * But private mappings mess with that a bit.  Luckily, we can tell by looking
+ * at a page whether the specific page is in the PM or not.  If it isn't, we
+ * still need to free our "VMR local" copy.
+ *
+ * For pages in a PM, we're racing with PM removers.  Both of us sync with the
+ * mm lock, so once we hold the lock, it's a matter of whether or not the PTE is
+ * 0 or not.  If it isn't, then we're still okay to look at the page.  Consider
+ * the PTE a weak ref on the page.  So long as you hold the mm lock, you can
+ * look at the PTE and know the page isn't being freed. */
+static int __vmr_free_pgs(struct proc *p, pte_t *pte, void *va, void *arg)
+{
+	struct page *page;
+	if (!*pte)
+		return 0;
+	page = ppn2page(PTE2PPN(*pte));
+	*pte = 0;
+	if (!(atomic_read(&page->pg_flags) & PG_PAGEMAP))
+		page_decref(page);
+	return 0;
+}
+
 int __do_munmap(struct proc *p, uintptr_t addr, size_t len)
 {
-	struct vm_region *vmr, *next_vmr;
+	struct vm_region *vmr, *next_vmr, *first_vmr;
 	pte_t *pte;
 	bool shootdown_needed = FALSE;
 
 	/* TODO: this will be a bit slow, since we end up doing three linear
 	 * searches (two in isolate, one in find_first). */
 	isolate_vmrs(p, addr, len);
-	vmr = find_first_vmr(p, addr);
+	first_vmr = find_first_vmr(p, addr);
+	vmr = first_vmr;
 	while (vmr && vmr->vm_base < addr + len) {
-		for (uintptr_t va = vmr->vm_base; va < vmr->vm_end; va += PGSIZE) { 
-			pte = pgdir_walk(p->env_pgdir, (void*)va, 0);
-			if (!pte)
-				continue;
-			if (PAGE_PRESENT(*pte)) {
-				/* TODO: (TLB) race here, where the page can be given out before
-				 * the shootdown happened.  Need to put it on a temp list. */
-				page_t *page = ppn2page(PTE2PPN(*pte));
-				*pte = 0;
-				page_decref(page);
-				shootdown_needed = TRUE;
-			} else if (PAGE_PAGED_OUT(*pte)) {
-				/* TODO: (SWAP) mark free in the swapfile or whatever.  For now,
-				 * PAGED_OUT is also being used to mean "hasn't been mapped
-				 * yet".  Note we now allow PAGE_UNMAPPED, unlike older
-				 * versions of mmap(). */
-				panic("Swapping not supported!");
-				*pte = 0;
-			}
-		}
+		env_user_mem_walk(p, (void*)vmr->vm_base, vmr->vm_end - vmr->vm_base,
+		                  __munmap_mark_not_present, &shootdown_needed);
+		vmr = TAILQ_NEXT(vmr, vm_link);
+	}
+	/* we haven't freed the pages yet; still using the PTEs to store the them.
+	 * There should be no races with inserts/faults, since we still hold the mm
+	 * lock since the previous CB. */
+	if (shootdown_needed)
+		proc_tlbshootdown(p, addr, addr + len);
+	vmr = first_vmr;
+	while (vmr && vmr->vm_base < addr + len) {
+		env_user_mem_walk(p, (void*)vmr->vm_base, vmr->vm_end - vmr->vm_base,
+			              __vmr_free_pgs, 0);
 		next_vmr = TAILQ_NEXT(vmr, vm_link);
 		destroy_vmr(vmr);
 		vmr = next_vmr;
 	}
-	if (shootdown_needed)
-		proc_tlbshootdown(p, addr, addr + len);
 	return 0;
 }
 

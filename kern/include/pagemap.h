@@ -55,9 +55,7 @@ struct page_map_operations {
 
 /* Page cache functions */
 void pm_init(struct page_map *pm, struct page_map_operations *op, void *host);
-struct page *pm_find_page(struct page_map *pm, unsigned long index);
-int pm_insert_page(struct page_map *pm, unsigned long index, struct page *page);
-int pm_remove_page(struct page_map *pm, struct page *page);
 int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp);
+void pm_put_page(struct page *page);
 
 #endif /* ROS_KERN_PAGEMAP_H */
