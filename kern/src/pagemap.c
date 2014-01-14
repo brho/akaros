@@ -12,6 +12,23 @@
 #include <assert.h>
 #include <stdio.h>
 
+void pm_add_vmr(struct page_map *pm, struct vm_region *vmr)
+{
+	/* note that the VMR being reverse-mapped by the PM is protected by the PM's
+	 * lock.  so later when removal holds this, it delays munmaps and keeps the
+	 * VMR connected. */
+	spin_lock(&pm->pm_lock);
+	TAILQ_INSERT_TAIL(&pm->pm_vmrs, vmr, vm_pm_link);
+	spin_unlock(&pm->pm_lock);
+}
+
+void pm_remove_vmr(struct page_map *pm, struct vm_region *vmr)
+{
+	spin_lock(&pm->pm_lock);
+	TAILQ_REMOVE(&pm->pm_vmrs, vmr, vm_pm_link);
+	spin_unlock(&pm->pm_lock);
+}
+
 /* Initializes a PM.  Host should be an *inode or a *bdev (doesn't matter).  The
  * reference this stores is uncounted. */
 void pm_init(struct page_map *pm, struct page_map_operations *op, void *host)
@@ -22,6 +39,8 @@ void pm_init(struct page_map *pm, struct page_map_operations *op, void *host)
 	pm->pm_num_pages = 0;					/* no pages in a new pm */
 	pm->pm_op = op;
 	pm->pm_flags = 0;
+	spinlock_init(&pm->pm_lock);
+	TAILQ_INIT(&pm->pm_vmrs);
 }
 
 /* Looks up the index'th page in the page map, returning an incref'd reference,
@@ -131,4 +150,18 @@ int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp)
 	unlock_page(page);
 	assert(atomic_read(&page->pg_flags) & PG_UPTODATE);
 	return 0;
+}
+
+void print_page_map_info(struct page_map *pm)
+{
+	struct vm_region *vmr_i;
+	printk("Page Map %p\n", pm);
+	printk("\tNum pages: %lu\n", pm->pm_num_pages);
+	spin_lock(&pm->pm_lock);
+	TAILQ_FOREACH(vmr_i, &pm->pm_vmrs, vm_pm_link) {
+		printk("\tVMR proc %d: (%p - %p): 0x%08x, 0x%08x, %p, %p\n",
+		       vmr_i->vm_proc->pid, vmr_i->vm_base, vmr_i->vm_end,
+		       vmr_i->vm_prot, vmr_i->vm_flags, vmr_i->vm_file, vmr_i->vm_foff);
+	}
+	spin_unlock(&pm->pm_lock);
 }

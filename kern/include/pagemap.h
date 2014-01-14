@@ -12,6 +12,7 @@
 
 #include <radix.h>
 #include <atomic.h>
+#include <mm.h>
 
 /* Need to be careful, due to some ghetto circular references */
 struct page;
@@ -33,6 +34,8 @@ struct page_map {
 	struct page_map_operations	*pm_op;
 	unsigned int				pm_flags;
 	/*... and private lists, backing block dev info, other mappings, etc. */
+	spinlock_t					pm_lock;
+	struct vmr_tailq			pm_vmrs;
 };
 
 /* Operations performed on a page_map.  These are usually FS specific, which
@@ -57,5 +60,8 @@ struct page_map_operations {
 void pm_init(struct page_map *pm, struct page_map_operations *op, void *host);
 int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp);
 void pm_put_page(struct page *page);
+void pm_add_vmr(struct page_map *pm, struct vm_region *vmr);
+void pm_remove_vmr(struct page_map *pm, struct vm_region *vmr);
+void print_page_map_info(struct page_map *pm);
 
 #endif /* ROS_KERN_PAGEMAP_H */
