@@ -229,6 +229,7 @@ static int vmgen(struct chan *c, char *entry_name,
 
 static void vminit(void)
 {
+	return;
 	print_func_entry();
 	int i;
 	spinlock_init_irqsave(&vmlock);
