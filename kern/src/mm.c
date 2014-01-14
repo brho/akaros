@@ -25,9 +25,14 @@
 #include <vfs.h>
 #include <smp.h>
 
-static int __vmr_free_pgs(struct proc *p, pte_t *pte, void *va, void *arg);
-
 struct kmem_cache *vmr_kcache;
+
+static int __vmr_free_pgs(struct proc *p, pte_t *pte, void *va, void *arg);
+/* minor helper, will ease the file->chan transition */
+static struct page_map *file2pm(struct file *file)
+{
+	return file->f_mapping;
+}
 
 void vmr_init(void)
 {
@@ -118,6 +123,7 @@ struct vm_region *split_vmr(struct vm_region *old_vmr, uintptr_t va)
 		new_vmr->vm_file = old_vmr->vm_file;
 		new_vmr->vm_foff = old_vmr->vm_foff +
 		                      old_vmr->vm_end - old_vmr->vm_base;
+		pm_add_vmr(file2pm(old_vmr->vm_file), new_vmr);
 	} else {
 		new_vmr->vm_file = 0;
 		new_vmr->vm_foff = 0;
@@ -190,8 +196,10 @@ int shrink_vmr(struct vm_region *vmr, uintptr_t va)
  * out the page table entries. */
 void destroy_vmr(struct vm_region *vmr)
 {
-	if (vmr->vm_file)
+	if (vmr->vm_file) {
+		pm_remove_vmr(file2pm(vmr->vm_file), vmr);
 		kref_put(&vmr->vm_file->f_kref);
+	}
 	TAILQ_REMOVE(&vmr->vm_proc->vm_regions, vmr, vm_link);
 	kmem_cache_free(vmr_kcache, vmr);
 }
@@ -322,10 +330,12 @@ int duplicate_vmrs(struct proc *p, struct proc *new_p)
 		vmr->vm_end = vm_i->vm_end;
 		vmr->vm_prot = vm_i->vm_prot;	
 		vmr->vm_flags = vm_i->vm_flags;	
-		if (vm_i->vm_file)
-			kref_get(&vm_i->vm_file->f_kref, 1);
 		vmr->vm_file = vm_i->vm_file;
 		vmr->vm_foff = vm_i->vm_foff;
+		if (vm_i->vm_file) {
+			kref_get(&vm_i->vm_file->f_kref, 1);
+			pm_add_vmr(file2pm(vm_i->vm_file), vmr);
+		}
 		if (!vmr->vm_file || vmr->vm_flags & MAP_PRIVATE) {
 			assert(!(vmr->vm_flags & MAP_SHARED));
 			/* Copy over the memory from one VMR to the other */
@@ -499,6 +509,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	vmr->vm_flags = flags;
 	if (file) {
 		if (!check_file_perms(vmr, file, prot)) {
+			assert(!vmr->vm_file);
 			destroy_vmr(vmr);
 			set_errno(EACCES);
 			return MAP_FAILED;
@@ -514,17 +525,20 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 			 * immediately mprotect it to PROT_NONE. */
 			flags &= ~MAP_POPULATE;
 		}
+		/* Prep the FS to make sure it can mmap the file.  Slightly weird
+		 * semantics: if we fail and had munmapped the space, they will have a
+		 * hole in their VM now. */
+		if (file->f_op->mmap(file, vmr)) {
+			assert(!vmr->vm_file);
+			destroy_vmr(vmr);
+			set_errno(EACCES);	/* not quite */
+			return MAP_FAILED;
+		}
 		kref_get(&file->f_kref, 1);
+		pm_add_vmr(file2pm(file), vmr);
 	}
 	vmr->vm_file = file;
 	vmr->vm_foff = offset;
-	/* Prep the FS to make sure it can mmap the file.  Slightly weird semantics:
-	 * they will have a hole in their VM now. */
-	if (file && file->f_op->mmap(file, vmr)) {
-		destroy_vmr(vmr);
-		set_errno(EACCES);	/* not quite */
-		return MAP_FAILED;
-	}
 	addr = vmr->vm_base;		/* so we know which pages to populate later */
 	vmr = merge_me(vmr);		/* attempts to merge with neighbors */
 	/* Fault in pages now if MAP_POPULATE.  We want to populate the region

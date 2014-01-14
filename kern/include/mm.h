@@ -24,6 +24,7 @@ struct proc;								/* preprocessor games */
  * VMRs. */
 struct vm_region {
 	TAILQ_ENTRY(vm_region)		vm_link;
+	TAILQ_ENTRY(vm_region)		vm_pm_link;
 	struct proc					*vm_proc;	/* owning process, for now */
 	uintptr_t					vm_base;
 	uintptr_t					vm_end;
@@ -33,8 +34,6 @@ struct vm_region {
 	size_t						vm_foff;
 };
 TAILQ_HEAD(vmr_tailq, vm_region);			/* Declares 'struct vmr_tailq' */
-
-#include <process.h>						/* preprocessor games */
 
 /* VM Region Management Functions.  For now, these just maintain themselves -
  * anything related to mapping needs to be done by the caller. */
