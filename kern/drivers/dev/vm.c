@@ -71,6 +71,7 @@ static struct kref vmid[1] = { {(void *)1, fake_release} };
 static void
 readn(struct chan *c, void *vp, long n)
 {
+	print_func_entry();
 	char *p;
 	long nn;
 	int total = 0, want = n;
@@ -86,11 +87,13 @@ readn(struct chan *c, void *vp, long n)
 		n -= nn;
 		total += nn;
 	}
+	print_func_exit();
 }
 
 
 static void vm_release(struct kref *kref)
 {
+	print_func_entry();
 	struct vm *v = container_of(kref, struct vm, kref);
 	spin_lock_irqsave(&vmlock);
 	/* cute trick. Save the last element of the array in place of the
@@ -108,22 +111,29 @@ static void vm_release(struct kref *kref)
 	}
 	nvm--;
 	spin_unlock(&vmlock);
+	print_func_exit();
 }
 
+/* VM ids run in the range 1..infinity. But vmx.c wants them
+ * 0-based.
+ */
 static int newvmid(void)
 {
+	print_func_entry();
 	int id;
 	spin_lock_irqsave(vmidlock);
 	id = kref_refcnt(vmid);
 	kref_get(vmid, 1);
 	spin_unlock(vmidlock);
-	return id;
+	print_func_exit();
+	return id-1;
 }
 
 static int vmgen(struct chan *c, char *entry_name,
 		 struct dirtab *unused, int unused_nr_dirtab,
 		 int s, struct dir *dp)
 {
+	print_func_entry();
 	struct qid q;
 	struct vm *vm_i;
 	printd("GEN s %d\n", s);
@@ -131,6 +141,7 @@ static int vmgen(struct chan *c, char *entry_name,
 	if (s == DEVDOTDOT) {
 		mkqid(&q, Qtopdir, 0, QTDIR);
 		devdir(c, c->qid, "#V", 0, eve, 0555, dp);
+		print_func_exit();
 		return 1;
 	}
 	printd("TYPE %d\n", TYPE(c->qid));
@@ -142,12 +153,14 @@ static int vmgen(struct chan *c, char *entry_name,
 		if (s == 0) {
 			mkqid(&q, Qclone, 0, QTFILE);
 			devdir(c, q, "clone", 0, eve, 0666, dp);
+			print_func_exit();
 			return 1;
 		}
 		s--;
 		if (s == 0) {
 			mkqid(&q, Qstat, 0, QTFILE);
 			devdir(c, q, "stat", 0, eve, 0666, dp);
+			print_func_exit();
 			return 1;
 		}
 		s--;	/* 1 -> 0th element, 2 -> 1st element, etc */
@@ -155,6 +168,7 @@ static int vmgen(struct chan *c, char *entry_name,
 		if (s >= nvm){
 			printd("DONE qtopdir\n");
 			spin_unlock(&vmlock);
+			print_func_exit();
 			return -1;
 		}
 		vm_i = &vms[s];
@@ -162,6 +176,7 @@ static int vmgen(struct chan *c, char *entry_name,
 		spin_unlock(&vmlock);
 		mkqid(&q, QID(vm_i, Qvmdir), 0, QTDIR);
 		devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
+		print_func_exit();
 		return 1;
 	case Qvmdir:
 		/* Gen the contents of the vm dirs */
@@ -170,12 +185,15 @@ static int vmgen(struct chan *c, char *entry_name,
 		case Qctl:
 			mkqid(&q, QID(QID2VM(c->qid), Qctl), 0, QTFILE);
 			devdir(c, q, "ctl", 0, eve, 0666, dp);
+			print_func_exit();
 			return 1;
 		case Qimage:
 			mkqid(&q, QID(QID2VM(c->qid), Qimage), 0, QTFILE);
 			devdir(c, q, "image", 0, eve, 0666, dp);
+			print_func_exit();
 			return 1;
 		}
+		print_func_exit();
 		return -1;
 		/* Need to also provide a direct hit for Qclone and all other files (at
 		 * all levels of the hierarchy).  Every file is both
@@ -190,45 +208,58 @@ static int vmgen(struct chan *c, char *entry_name,
 		 * stat output (check the -1 case in devstat). */
 	case Qclone:
 		devdir(c, c->qid, "clone", 0, eve, 0666, dp);
+		print_func_exit();
 		return 1;
 	case Qstat:
 		devdir(c, c->qid, "stat", 0, eve, 0444, dp);
+		print_func_exit();
 		return 1;
 	case Qctl:
 		devdir(c, c->qid, "ctl", 0, eve, 0666, dp);
+		print_func_exit();
 		return 1;
 	case Qimage:
 		devdir(c, c->qid, "image", 0, eve, 0666, dp);
+		print_func_exit();
 		return 1;
 	}
+	print_func_exit();
 	return -1;
 }
 
 static void vminit(void)
 {
+	print_func_entry();
 	int i;
 	spinlock_init_irqsave(&vmlock);
 	spinlock_init_irqsave(vmidlock);
 	i = vmx_init();
 	printk("vminit: litevm_init returns %d\n", i);
 
+	print_func_exit();
 }
 
 static struct chan *vmattach(char *spec)
 {
+	print_func_entry();
 	struct chan *c = devattach('V', spec);
 	mkqid(&c->qid, Qtopdir, 0, QTDIR);
+	print_func_exit();
 	return c;
 }
 
 static struct walkqid *vmwalk(struct chan *c, struct chan *nc, char **name,
 			      int nname)
 {
+	print_func_entry();
+	print_func_exit();
 	return devwalk(c, nc, name, nname, 0, 0, vmgen);
 }
 
 static long vmstat(struct chan *c, uint8_t *db, long n)
 {
+	print_func_entry();
+	print_func_exit();
 	return devstat(c, db, n, 0, 0, vmgen);
 }
 
@@ -236,6 +267,7 @@ static long vmstat(struct chan *c, uint8_t *db, long n)
  * the open chan into p's fd table, then decref the chan. */
 static struct chan *vmopen(struct chan *c, int omode)
 {
+	print_func_entry();
 	ERRSTACK(2);
 	struct vm *v = QID2VM(c->qid);
 	printk("vmopen: v is %p\n", v);
@@ -262,10 +294,14 @@ static struct chan *vmopen(struct chan *c, int omode)
 		c->aux = v;
 		printd("New VM id %d\n", v->id);
 		v->archvm = vmx_open();
-		if (!v->archvm)
+		if (!v->archvm){
+			printk("vm_open failed\n");
 			error("vm_open failed");
-		if (vmx_create_vcpu(v->archvm, 1) < 0)
+		}
+		if (vmx_create_vcpu(v->archvm, v->id) < 0){
+			printk("vm_create failed");
 			error("vm_create failed");
+		}
 		break;
 	case Qstat:
 		break;
@@ -279,35 +315,47 @@ static struct chan *vmopen(struct chan *c, int omode)
 	/* Assumes c is unique (can't be closed concurrently */
 	c->flag |= COPEN;
 	c->offset = 0;
+	print_func_exit();
 	return c;
 }
 
 static void vmcreate(struct chan *c, char *name, int omode, int perm)
 {
+	print_func_entry();
 	error(Eperm);
+	print_func_exit();
 }
 
 static void vmremove(struct chan *c)
 {
+	print_func_entry();
 	error(Eperm);
+	print_func_exit();
 }
 
 static long vmwstat(struct chan *c, uint8_t *dp, long n)
 {
+	print_func_entry();
 	error("No vmwstat");
+	print_func_exit();
 	return 0;
 }
 
 static void vmclose(struct chan *c)
 {
+	print_func_entry();
 	struct vm *v = c->aux;
-	if (!v)
+	if (!v) {
+		print_func_exit();
 		return;
+	}
 	/* There are more closes than opens.  For instance, sysstat doesn't open,
 	 * but it will close the chan it got from namec.  We only want to clean
 	 * up/decref chans that were actually open. */
-	if (!(c->flag & COPEN))
+	if (!(c->flag & COPEN)) {
+		print_func_exit();
 		return;
+	}
 	switch (TYPE(c->qid)) {
 		/* for now, leave the VM active even when we close ctl */
 	case Qctl:
@@ -316,33 +364,41 @@ static void vmclose(struct chan *c)
 		kref_put(&v->kref);
 		break;
 	}
+	print_func_exit();
 }
 
 static long vmread(struct chan *c, void *ubuf, long n, int64_t offset)
 {
+	print_func_entry();
 	struct vm *v = c->aux;
 	printd("VMREAD\n");
 	switch (TYPE(c->qid)) {
 	case Qtopdir:
 	case Qvmdir:
+		print_func_exit();
 		return devdirread(c, ubuf, n, 0, 0, vmgen);
 	case Qstat:
+		print_func_exit();
 		return readnum(offset, ubuf, n, nvm, NUMSIZE32);
 	case Qctl:
 		assert(v);
+		print_func_exit();
 		return readnum(offset, ubuf, n, v->id, NUMSIZE32);
  	case Qimage:
 		assert(v);
+		print_func_exit();
 		return readmem(offset, ubuf, n,
 			       v->image, v->imagesize);
 	default:
 		panic("Bad QID %p in devvm", c->qid.path);
 	}
+	print_func_exit();
 	return 0;
 }
 
 static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 {
+	print_func_entry();
 	ERRSTACK(3);
 	char buf[32];
 	struct cmdbuf *cb;
@@ -373,6 +429,7 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 			vmr.mmio_completed = strtoul(cb->f[3], NULL, 0);
 			ret = vm_run(litevm, &vmr);
 			printk("vm_run returns %d\n", ret);
+			print_func_exit();
 			return ret;
 		} else if (!strcmp(cb->f[0], "stop")) {
 			error("can't stop a vm yet");
@@ -443,6 +500,7 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 	default:
 		panic("Bad QID %p in devvm", c->qid.path);
 	}
+	print_func_exit();
 	return n;
 }
 

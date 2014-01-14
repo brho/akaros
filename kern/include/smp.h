@@ -30,7 +30,10 @@ struct per_cpu_info {
 #ifdef CONFIG_X86_64
 	uintptr_t stacktop;
 	/* virtual machines */
-	struct vmcs vmxarea;
+	/* this is all kind of gross, but so it goes. Kmalloc
+	 * the vmxarea. It varies in size depending on the architecture.
+	 */
+	struct vmcs *vmxarea;
 	struct vmcs *vmcs;
 #endif
 	spinlock_t lock;
