@@ -447,7 +447,7 @@ static struct litevm_vcpu *__vcpu_load(struct litevm_vcpu *vcpu)
 	uint64_t phys_addr = PADDR(vcpu->vmcs);
 	int cpu;
 	cpu = core_id();
-
+	printk("%d: __vcpu_load phys_addr %p\n", cpu, phys_addr);
 	if (vcpu->cpu != cpu) {
 		handler_wrapper_t *w;
 		smp_call_function_single(vcpu->cpu, __vcpu_clear, vcpu, &w);
@@ -493,18 +493,20 @@ static struct litevm_vcpu *__vcpu_load(struct litevm_vcpu *vcpu)
  */
 static struct litevm_vcpu *vcpu_load(struct litevm *litevm, int vcpu_slot)
 {
+	int ret;
 	print_func_entry();
 	struct litevm_vcpu *vcpu = &litevm->vcpus[vcpu_slot];
 
 	printk("vcpu_slot %d vcpu %p\n", vcpu_slot, vcpu);
 
 	qlock(&vcpu->mutex);
+	printk("after qlock\n");
 	if (!vcpu->vmcs) {
 		qunlock(&vcpu->mutex);
 		error("vcpu->vmcs is NULL");
 	}
+	ret = __vcpu_load(vcpu);
 	print_func_exit();
-	return __vcpu_load(vcpu);
 }
 
 static void vcpu_put(struct litevm_vcpu *vcpu)
