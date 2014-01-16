@@ -8,6 +8,7 @@ obj-y						+= console.o
 obj-y						+= devfs.o
 obj-y						+= elf.o
 obj-y						+= env.o
+obj-y						+= err.o
 obj-y						+= event.o
 obj-y						+= ext2fs.o
 obj-y						+= frontend.o
