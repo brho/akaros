@@ -25,7 +25,7 @@ nullunbind(struct ipifc *unused_ipifc)
 }
 
 static void
-nullbwrite(struct ipifc *unused_ipifc, struct block*, int unused_int, uint8_t *unused_uint8_p_t)
+nullbwrite(struct ipifc *unused_ipifc, struct block*b, int unused_int, uint8_t *unused_uint8_p_t)
 {
 	error("nullbwrite");
 }
