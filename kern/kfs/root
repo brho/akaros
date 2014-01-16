@@ -1,0 +1,39 @@
+#!/bin/ash
+#
+# root [[REMOTE_NAME] [SRVNAME]]
+#
+# remote name, selects the UFS server from the else-if below
+# srv name: the name of the chan in #s
+#
+# when run with no args, this will also ifconfig and mount ufs for qemu
+
+REMOTE=qemu
+if [ "$#" -ge "1" ]
+then
+	REMOTE=$1
+fi
+
+SRVNAME=$REMOTE-ufs
+if [ "$#" -ge "2" ]
+then
+	SRVNAME=$2
+fi
+
+if [ "x$REMOTE" = "xc75" ]
+then
+	srv 'tcp!169.229.49.175!1025' $SRVNAME
+elif [ "x$REMOTE" = "xs141" ]
+then
+	srv 'tcp!169.229.48.51!1025' $SRVNAME
+elif [ "x$REMOTE" = "xqemu" ]
+then
+	# so this works like usual for the qemu users
+	ash ifconfig
+	srv 'tcp!10.0.2.2!1025' $SRVNAME
+else
+	echo "Unknown remote: $REMOTE!"
+	exit
+fi
+
+mount /srv/$SRVNAME /mnt
+ls /mnt
