@@ -27,6 +27,17 @@ typedef unsigned long uintreg_t;
 #define FALSE	0
 #endif
 
+#define KiB	1024u
+#define MiB	1048576u
+#define GiB	1073741824u
+#define TiB	1099511627776ull
+#define PiB	1125899906842624ull
+#define EiB	1152921504606846976ull
+
+#define ALIGNED(p, a)	(!(((uintptr)(p)) & ((a)-1)))
+
+#define ARRAY_SIZE(x) (sizeof((x))/sizeof((x)[0]))
+
 #define CHECK_FLAG(flags,bit)   ((flags) & (1 << (bit)))
 
 #define FOR_CIRC_BUFFER(next, size, var) \
