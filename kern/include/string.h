@@ -28,6 +28,7 @@ void * memchr(void* mem, int chr, int len);
 void *BND(s,s+len)	memfind(const void *COUNT(len) s, int c, size_t len);
 
 long	strtol(const char *NTS s, char **endptr, int base);
+unsigned long strtoul(const char *s, char **endptr, int base);
 int	atoi(const char*NTS s);
 
 #endif /* not ROS_INC_STRING_H */
