@@ -118,4 +118,11 @@ void __reg_abortable_cv(struct cv_lookup_elm *cle, struct cond_var *cv);
 void dereg_abortable_cv(struct cv_lookup_elm *cle);
 bool should_abort(struct cv_lookup_elm *cle);
 
+/* qlocks are plan9's binary sempahore, which are wrappers around our sems */
+typedef struct semaphore qlock_t;
+#define qlock_init(x) sem_init((x), 1)
+#define qlock(x) sem_down(x)
+#define qunlock(x) sem_up(x)
+#define canqlock(x) sem_trydown(x)
+
 #endif /* ROS_KERN_KTHREAD_H */
