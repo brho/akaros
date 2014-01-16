@@ -1,0 +1,2 @@
+tail -c10000 -f /tmp/vm0.pcap | tcpdump -n -r -
+

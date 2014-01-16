@@ -1,0 +1,9 @@
+#!/bin/bash
+
+ed $1 << EOF
+1i
+// INFERNO
+.
+w
+q
+EOF

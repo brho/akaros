@@ -1,0 +1,48 @@
+#!/bin/sh
+set -e
+#Plan 9 source can be converted for akaros via a set of scripts.
+#This is a WIP. 
+# At this point, we take it just so far and do the rest
+# by hand. Cocci has its issues, and we're not here to debug
+# and fix them all. Also, we may create some post-conversion
+# scripts as well. We'll see.
+#
+#We preserve the waserror/poperror style, which adds complications
+#but leaves the source relatively clean.
+#
+#To convert plan 9 source, we have to do several things.
+#We use spatch, the semantic patch tool. BUT, that tool can be
+#painful for some stuff, so we also use sed. And in some cases
+#we clean up things that we do with spatch with a sed pass.
+#Ugly but effective. Some scripts are idempotent, so we mark
+#them as such. 
+#
+# waserror/poperror fixing, via script/spatch/waserror.cocci
+# N.B. Need r18 or later.
+spatch --sp-file scripts/spatch/waserror.cocci --in-place $1
+# General Plan 9 fixing, via script/spatch/waserror.cocci
+spatch --sp-file scripts/spatch/plan9.cocci --in-place $1
+spatch --sp-file scripts/spatch/scalar.cocci --in-place $1
+spatch --sp-file scripts/spatch/typedef.cocci --in-place $1
+spatch --sp-file scripts/spatch/locks.cocci --in-place $1
+# include fixing. Idempotent. 
+sh scripts/fixincludes $1
+# Scalars. Idempotent.
+sh scripts/scalar $1
+# Stuff we might want to think about later. Idempotent
+sh scripts/temporary_hack $1
+# malloc. Idempotent.
+spatch --sp-file scripts/spatch/malloc.cocci --in-place $1
+# type names, via scripts/plan9. NOT idempotent.
+# in fact, we almost certainly don't want it.
+sh scripts/plan9 $1
+# kref. Idempotent.
+spatch --sp-file scripts/spatch/kref.cocci --in-place $1
+ed $1 << EOF
+1i
+// INFERNO
+.
+w
+q
+EOF
+

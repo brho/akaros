@@ -1,0 +1,8 @@
+spatch --in-place --sp-file ~/akaros/scripts/plan9user/scalar.cocci $1
+spatch --in-place --sp-file ~/akaros/scripts/plan9user/typedef.cocci $1
+spatch --in-place --sp-file ~/akaros/scripts/plan9user/plan9.cocci $1
+sh ~/akaros/scripts/plan9user/fixincludes $1
+sed -i 's/= nil/= NULL/' $1
+sed -i 's/ OREAD/ O_RDONLY/' $1
+sed -i 's/ ORDWR/ O_RDWR/' $1
+sed -i 's/return nil/return NULL/' $1

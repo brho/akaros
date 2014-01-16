@@ -1,0 +1,26 @@
+# GNU global stuff
+
+# optional aliases
+alias gl="~/scripts/global-subd.sh"
+alias gtu="~/scripts/gtags-update.sh"
+
+# for global autocomplete
+_global_subd_comp()
+{
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    # bail if it is an option (-x, -l, etc)
+    if [[ $cur == -* ]]
+    then
+        return 0
+    fi
+    local DIRS=`compgen -S/ -d $cur`
+    # if our tab complete matches a directory (not null) , go with that
+    if [[ -n "$DIRS" ]]
+    then
+        COMPREPLY=( $DIRS )
+        return 0
+    fi
+    # otherwise, use global's autocomplete
+    COMPREPLY=(`global -c $cur`)
+}
+complete -o nospace -F _global_subd_comp gl
