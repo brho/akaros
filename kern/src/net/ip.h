@@ -140,7 +140,7 @@ struct Medium
 	void	(*remmulti)(Ipifc *ifc, uchar *a, uchar *ia);
 
 	/* process packets written to 'data' */
-	void	(*pktin)(Fs *f, Ipifc *ifc, Block *bp);
+	void	(*pktin)(struct Fs *f, Ipifc *ifc, Block *bp);
 
 	/* routes for router boards */
 	void	(*addroute)(Ipifc *ifc, int, uchar*, uchar*, uchar*, int);
@@ -152,7 +152,7 @@ struct Medium
 	void	(*leavemulti)(Ipifc *ifc, uchar *a, uchar *ia);
 
 	/* address resolution */
-	void	(*ares)(Fs*, int, uchar*, uchar*, int, int);	/* resolve */
+	void	(*ares)(struct Fs*, int, uchar*, uchar*, int, int);	/* resolve */
 	void	(*areg)(Ipifc*, uchar*);			/* register */
 
 	/* v6 address generation */
@@ -381,11 +381,11 @@ struct V6params
 int	Fsconnected(Conv*, char*);
 Conv*	Fsnewcall(Conv*, uchar*, ushort, uchar*, ushort, uchar);
 int	Fspcolstats(char*, int);
-int	Fsproto(Fs*, Proto*);
-int	Fsbuiltinproto(Fs*, uchar);
+int	Fsproto(struct Fs*, Proto*);
+int	Fsbuiltinproto(struct Fs*, uchar);
 Conv*	Fsprotoclone(Proto*, char*);
-Proto*	Fsrcvpcol(Fs*, uchar);
-Proto*	Fsrcvpcolx(Fs*, uchar);
+Proto*	Fsrcvpcol(struct Fs*, uchar);
+Proto*	Fsrcvpcolx(struct Fs*, uchar);
 char*	Fsstdconnect(Conv*, char**, int);
 char*	Fsstdannounce(Conv*, char**, int);
 char*	Fsstdbind(Conv*, char**, int);
@@ -416,17 +416,17 @@ enum
 	Logtcpwin=	1<<18,
 };
 
-void	netloginit(Fs*);
-void	netlogopen(Fs*);
-void	netlogclose(Fs*);
-void	netlogctl(Fs*, char*, int);
-long	netlogread(Fs*, void*, ulong, long);
-void	netlog(Fs*, int, char*, ...);
-void	ifcloginit(Fs*);
-long	ifclogread(Fs*, Chan *,void*, ulong, long);
-void	ifclog(Fs*, uchar *, int);
-void	ifclogopen(Fs*, Chan*);
-void	ifclogclose(Fs*, Chan*);
+void	netloginit(struct Fs*);
+void	netlogopen(struct Fs*);
+void	netlogclose(struct Fs*);
+void	netlogctl(struct Fs*, char*, int);
+long	netlogread(struct Fs*, void*, ulong, long);
+void	netlog(struct Fs*, int, char*, ...);
+void	ifcloginit(struct Fs*);
+long	ifclogread(struct Fs*, Chan *,void*, ulong, long);
+void	ifclog(struct Fs*, uchar *, int);
+void	ifclogopen(struct Fs*, Chan*);
+void	ifclogclose(struct Fs*, Chan*);
 
 /*
  *  iproute.c
@@ -495,16 +495,16 @@ struct Route
 		V4route v4;
 	};
 };
-extern void	v4addroute(Fs *f, char *tag, uchar *a, uchar *mask, uchar *gate, int type);
-extern void	v6addroute(Fs *f, char *tag, uchar *a, uchar *mask, uchar *gate, int type);
-extern void	v4delroute(Fs *f, uchar *a, uchar *mask, int dolock);
-extern void	v6delroute(Fs *f, uchar *a, uchar *mask, int dolock);
-extern Route*	v4lookup(Fs *f, uchar *a, Conv *c);
-extern Route*	v6lookup(Fs *f, uchar *a, Conv *c);
-extern long	routeread(Fs *f, char*, ulong, int);
-extern long	routewrite(Fs *f, Chan*, char*, int);
+extern void	v4addroute(struct Fs *f, char *tag, uchar *a, uchar *mask, uchar *gate, int type);
+extern void	v6addroute(struct Fs *f, char *tag, uchar *a, uchar *mask, uchar *gate, int type);
+extern void	v4delroute(struct Fs *f, uchar *a, uchar *mask, int dolock);
+extern void	v6delroute(struct Fs *f, uchar *a, uchar *mask, int dolock);
+extern Route*	v4lookup(struct Fs *f, uchar *a, Conv *c);
+extern Route*	v6lookup(struct Fs *f, uchar *a, Conv *c);
+extern long	routeread(struct Fs *f, char*, ulong, int);
+extern long	routewrite(struct Fs *f, Chan*, char*, int);
 extern void	routetype(int, char*);
-extern void	ipwalkroutes(Fs*, Routewalk*);
+extern void	ipwalkroutes(struct Fs*, Routewalk*);
 extern void	convroute(Route*, uchar*, uchar*, uchar*, char*, int*);
 
 /*
@@ -544,13 +544,13 @@ struct Arpent
 	uchar	ifcid;			/* must match ifc->id */
 };
 
-extern void	arpinit(Fs*);
+extern void	arpinit(struct Fs*);
 extern int	arpread(Arp*, char*, ulong, int);
-extern int	arpwrite(Fs*, char*, int);
+extern int	arpwrite(struct Fs*, char*, int);
 extern Arpent*	arpget(Arp*, Block *bp, int version, Ipifc *ifc, uchar *ip, uchar *h);
 extern void	arprelease(Arp*, Arpent *a);
 extern Block*	arpresolve(Arp*, Arpent *a, Medium *type, uchar *mac);
-extern void	arpenter(Fs*, int version, uchar *ip, uchar *mac, int len, int norefresh);
+extern void	arpenter(struct Fs*, int version, uchar *ip, uchar *mac, int len, int norefresh);
 
 /*
  * ipaux.c
@@ -594,49 +594,49 @@ extern Medium	tripmedium;
  */
 extern Medium*	ipfindmedium(char *name);
 extern void	addipmedium(Medium *med);
-extern int	ipforme(Fs*, uchar *addr);
-extern int	iptentative(Fs*, uchar *addr);
+extern int	ipforme(struct Fs*, uchar *addr);
+extern int	iptentative(struct Fs*, uchar *addr);
 extern int	ipisbm(uchar *);
 extern int	ipismulticast(uchar *);
-extern Ipifc*	findipifc(Fs*, uchar *remote, int type);
-extern void	findprimaryip(Fs*, uchar*);
-extern void	findlocalip(Fs*, uchar *local, uchar *remote);
+extern Ipifc*	findipifc(struct Fs*, uchar *remote, int type);
+extern void	findprimaryip(struct Fs*, uchar*);
+extern void	findlocalip(struct Fs*, uchar *local, uchar *remote);
 extern int	ipv4local(Ipifc *ifc, uchar *addr);
 extern int	ipv6local(Ipifc *ifc, uchar *addr);
 extern int	ipv6anylocal(Ipifc *ifc, uchar *addr);
 extern Iplifc*	iplocalonifc(Ipifc *ifc, uchar *ip);
-extern int	ipproxyifc(Fs *f, Ipifc *ifc, uchar *ip);
+extern int	ipproxyifc(struct Fs *f, Ipifc *ifc, uchar *ip);
 extern int	ipismulticast(uchar *ip);
 extern int	ipisbooting(void);
 extern int	ipifccheckin(Ipifc *ifc, Medium *med);
 extern void	ipifccheckout(Ipifc *ifc);
 extern int	ipifcgrab(Ipifc *ifc);
-extern void	ipifcaddroute(Fs*, int, uchar*, uchar*, uchar*, int);
-extern void	ipifcremroute(Fs*, int, uchar*, uchar*);
+extern void	ipifcaddroute(struct Fs*, int, uchar*, uchar*, uchar*, int);
+extern void	ipifcremroute(struct Fs*, int, uchar*, uchar*);
 extern void	ipifcremmulti(Conv *c, uchar *ma, uchar *ia);
 extern void	ipifcaddmulti(Conv *c, uchar *ma, uchar *ia);
 extern char*	ipifcrem(Ipifc *ifc, char **argv, int argc);
 extern char*	ipifcadd(Ipifc *ifc, char **argv, int argc, int tentative, Iplifc *lifcp);
-extern long	ipselftabread(Fs*, char *a, ulong offset, int n);
+extern long	ipselftabread(struct Fs*, char *a, ulong offset, int n);
 extern char*	ipifcaddpref6(Ipifc *ifc, char**argv, int argc);
-extern void	ipsendra6(Fs *f, int on);
+extern void	ipsendra6(struct Fs *f, int on);
 
 /*
  *  ip.c
  */
-extern void	iprouting(Fs*, int);
-extern void	icmpnoconv(Fs*, Block*);
-extern void	icmpcantfrag(Fs*, Block*, int);
-extern void	icmpttlexceeded(Fs*, uchar*, Block*);
+extern void	iprouting(struct Fs*, int);
+extern void	icmpnoconv(struct Fs*, Block*);
+extern void	icmpcantfrag(struct Fs*, Block*, int);
+extern void	icmpttlexceeded(struct Fs*, uchar*, Block*);
 extern ushort	ipcsum(uchar*);
-extern void	ipiput4(Fs*, Ipifc*, Block*);
-extern void	ipiput6(Fs*, Ipifc*, Block*);
-extern int	ipoput4(Fs*, Block*, int, int, int, Conv*);
-extern int	ipoput6(Fs*, Block*, int, int, int, Conv*);
-extern int	ipstats(Fs*, char*, int);
+extern void	ipiput4(struct Fs*, Ipifc*, Block*);
+extern void	ipiput6(struct Fs*, Ipifc*, Block*);
+extern int	ipoput4(struct Fs*, Block*, int, int, int, Conv*);
+extern int	ipoput6(struct Fs*, Block*, int, int, int, Conv*);
+extern int	ipstats(struct Fs*, char*, int);
 extern ushort	ptclbsum(uchar*, int);
 extern ushort	ptclcsum(Block*, int, int);
-extern void	ip_init(Fs*);
+extern void	ip_init(struct Fs*);
 extern void	update_mtucache(uchar*, ulong);
 extern ulong	restrict_mtu(uchar*, ulong);
 
@@ -649,10 +649,10 @@ int	(*bootpread)(char*, ulong, int);
 /*
  *  iprouter.c
  */
-void	useriprouter(Fs*, Ipifc*, Block*);
-void	iprouteropen(Fs*);
-void	iprouterclose(Fs*);
-long	iprouterread(Fs*, void*, int);
+void	useriprouter(struct Fs*, Ipifc*, Block*);
+void	iprouteropen(struct Fs*);
+void	iprouterclose(struct Fs*);
+long	iprouterread(struct Fs*, void*, int);
 
 /*
  *  resolving inferno/plan9 differences
