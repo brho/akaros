@@ -6,6 +6,16 @@ expression E;
 -E
 +&E->lock
  )
+
+@@
+expression E;
+@@
+-ilock(
++spin_lock_irqsave(
+-E
++&E->lock
+ )
+
 @@
 expression E;
 @@
