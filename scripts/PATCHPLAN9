@@ -29,6 +29,8 @@ spatch --sp-file scripts/spatch/locks.cocci --in-place $1
 sh scripts/fixincludes $1
 # Scalars. Idempotent.
 sh scripts/scalar $1
+# remove pragmas. Idempotent.
+sed -i '/^#pragma/d' $1
 # Stuff we might want to think about later. Idempotent
 sh scripts/temporary_hack $1
 # malloc. Idempotent.

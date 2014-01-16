@@ -21,6 +21,7 @@
 #include <vfs.h>
 #include <schedule.h>
 #include <devalarm.h>
+#include <ns.h>
 
 TAILQ_HEAD(vcore_tailq, vcore);
 /* 'struct proc_list' declared in sched.h (not ideal...) */
@@ -83,6 +84,7 @@ struct proc {
 	struct namespace			*ns;
 	struct fs_struct			fs_env;
 	struct files_struct			open_files;
+	struct pgrp                             *pgrp;
 
 	/* UCQ hashlocks */
 	struct hashlock				*ucq_hashlock;

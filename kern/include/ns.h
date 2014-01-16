@@ -1,72 +1,220 @@
-//INFERNO
-#pragma src "/usr/inferno/lib9"
-#pragma	lib	"libc.a"
+// INFERNO
+
+/* error stacks, as defined by us. These are a new implementation. */
+/* add 1 in case they forget they need an entry for the passed-in errbuf */
+#include <setjmp.h>
+struct errbuf *get_cur_errbuf(void);
+void set_cur_errbuf(struct errbuf *ebuf);
+
+struct errbuf {
+	struct jmpbuf jmpbuf;
+};
+
+#define ERRSTACK(x) struct errbuf *prev_errbuf; struct errbuf errstack[(x)];   \
+                    int curindex = 0;
+#define waserror() (errpush(errstack, ARRAY_SIZE(errstack), &curindex,         \
+                            &prev_errbuf) ||                                   \
+                    setjmp(&(get_cur_errbuf()->jmpbuf)))
+#define error(x,...) {set_errstr(x, ##__VA_ARGS__);                            \
+                      longjmp(&get_cur_errbuf()->jmpbuf, (void *)x);}
+#define nexterror() {errpop(errstack, ARRAY_SIZE(errstack), &curindex,         \
+                            prev_errbuf);                                      \
+                     longjmp(&(get_cur_errbuf())->jmpbuf, (void *)1);}
+#define poperror() {errpop(errstack, ARRAY_SIZE(errstack), &curindex,          \
+                           prev_errbuf);}
+
+
+/*
+ * functions (possibly) linked in, complete, from libc.
+ */
+#define ARRAY_SIZE(x)	(sizeof(x)/sizeof((x)[0]))
+
+enum
+{
+	UTFmax		= 4,		/* maximum bytes per rune */
+	Runesync	= 0x80,		/* cannot represent part of a UTF sequence (<) */
+	Runeself	= 0x80,		/* rune and UTF sequences are the same (<) */
+	Runeerror	= 0xFFFD,	/* decoding error in UTF */
+	Runemax		= 0x10FFFF,	/* 21-bit rune */
+	Runemask	= 0x1FFFFF,	/* bits used by runes (see grep) */
+};
+
+extern	int	abs(int);
+
+/*
+ * math
+ */
+extern int	isNaN(double);
+extern int	isInf(double, int);
+extern double	floor(double);
+extern double	frexp(double, int*);
+extern double	pow10(int);
+
+/*
+ * one-of-a-kind
+ */
+extern	char*	cleanname( char *unused_char_p_t);
+extern	uint32_t	getcallerpc(void*);
+
+extern	char	etext[];
+extern	char	edata[];
+extern	char	end[];
+extern	int	getfields( char *unused_char_p_t, char **unused_char_pp_t, int unused_int, int, char*);
+extern	int	tokenize( char *unused_char_p_t, char **unused_char_pp_t, int);
+extern	int	dec64( uint8_t *unused_uint8_p_t, int unused_int, char *unused_char_p_t, int);
+extern	void	qsort(void*, long, long, int (*)(void*, void*));
+
+extern	int	toupper(int);
+extern	char*	netmkaddr( char *unused_char_p_t, char*, char*);
+extern	int	myetheraddr( uint8_t *unused_uint8_p_t, char *unused_char_p_t);
+extern	int	parseether( uint8_t *unused_uint8_p_t, char *unused_char_p_t);
+
+/*
+ * network dialling
+ */
+#define	NETPATHLEN	40
+
+/*
+ * Syscall data structures
+ */
+#define	MORDER	0x0003	/* mask for bits defining order of mounting */
+#define	MREPL	0x0000	/* mount replaces object */
+#define	MBEFORE	0x0001	/* mount goes before others in union directory */
+#define	MAFTER	0x0002	/* mount goes after others in union directory */
+#define	MCREATE	0x0004	/* permit creation in mounted directory */
+#define	MCACHE	0x0010	/* cache some data */
+#define	MMASK	0x0017	/* all bits on */
+
+#define	OREAD	0	/* open for read */
+#define	OWRITE	1	/* write */
+#define	ORDWR	2	/* read and write */
+#define	OEXEC	3	/* execute, == read but check execute permission */
+#define	OTRUNC	16	/* or'ed in (except for exec), truncate file first */
+#define	OCEXEC	32	/* or'ed in, close on exec */
+#define	ORCLOSE	64	/* or'ed in, remove on close */
+#define OEXCL   0x1000	/* or'ed in, exclusive create */
+
+#define	NCONT	0	/* continue after note */
+#define	NDFLT	1	/* terminate after note */
+#define	NSAVE	2	/* clear note but hold state */
+#define	NRSTR	3	/* restore saved state */
+
+#define	STATMAX	65535U	/* max length of machine-independent stat structure */
+#define	ERRMAX			128	/* max length of error string */
+#define	KNAMELEN		28	/* max length of name held in kernel */
+
+/* bits in Qid.type */
+#define QTDIR		0x80		/* type bit for directories */
+#define QTAPPEND	0x40		/* type bit for append only files */
+#define QTEXCL		0x20		/* type bit for exclusive use files */
+#define QTMOUNT		0x10		/* type bit for mounted channel */
+#define QTAUTH		0x08		/* type bit for authentication file */
+#define QTFILE		0x00		/* plain file */
+
+/* bits in Dir.mode */
+#define DMDIR		0x80000000	/* mode bit for directories */
+#define DMAPPEND	0x40000000	/* mode bit for append only files */
+#define DMEXCL		0x20000000	/* mode bit for exclusive use files */
+#define DMMOUNT		0x10000000	/* mode bit for mounted channel */
+#define DMREAD		0x4		/* mode bit for read permission */
+#define DMWRITE		0x2		/* mode bit for write permission */
+#define DMEXEC		0x1		/* mode bit for execute permission */
+
+struct qid
+{
+	uint64_t	path;
+	uint32_t	vers;
+	uint8_t	type;
+};
+
+struct dir {
+	/* system-modified data */
+	uint16_t	type;	/* server type */
+	unsigned int	dev;	/* server subtype */
+	/* file data */
+	struct qid	qid;	/* unique id from server */
+	uint32_t	mode;	/* permissions */
+	uint32_t	atime;	/* last read time */
+	uint32_t	mtime;	/* last write time */
+	int64_t	length;	/* file length: see <u.h> */
+	char	*name;	/* last element of path */
+	char	*uid;	/* owner name */
+	char	*gid;	/* group name */
+	char	*muid;	/* last modifier name */
+};
+
+struct waitmsg
+{
+	int	pid;	/* of loved one */
+	uint32_t	time[3];	/* of loved one and descendants */
+	char	msg[ERRMAX];	/* actually variable-size in user mode */
+};
 
 #define	VERSION9P	"9P2000"
 
 #define	MAXWELEM	16
 
 typedef
-struct	Fcall
+struct	fcall
 {
-	uchar	type;
-	u32int	fid;
-	ushort	tag;
+	uint8_t	type;
+	uint32_t	fid;
+	uint16_t	tag;
 	/* union { */
 		/* struct { */
-			u32int	msize;		/* Tversion, Rversion */
+			uint32_t	msize;		/* Tversion, Rversion */
 			char	*version;	/* Tversion, Rversion */
 		/* }; */
 		/* struct { */
-			ushort	oldtag;		/* Tflush */
+			uint16_t	oldtag;		/* Tflush */
 		/* }; */
 		/* struct { */
 			char	*ename;		/* Rerror */
 		/* }; */
 		/* struct { */
-			Qid	qid;		/* Rattach, Ropen, Rcreate */
-			u32int	iounit;		/* Ropen, Rcreate */
+			struct qid	qid;		/* Rattach, Ropen, Rcreate */
+			uint32_t	iounit;		/* Ropen, Rcreate */
 		/* }; */
 		/* struct { */
-			Qid	aqid;		/* Rauth */
+			struct qid	aqid;		/* Rauth */
 		/* }; */
 		/* struct { */
-			u32int	afid;		/* Tauth, Tattach */
+			uint32_t	afid;		/* Tauth, Tattach */
 			char	*uname;		/* Tauth, Tattach */
 			char	*aname;		/* Tauth, Tattach */
 		/* }; */
 		/* struct { */
-			u32int	perm;		/* Tcreate */ 
+			uint32_t	perm;		/* Tcreate */ 
 			char	*name;		/* Tcreate */
-			uchar	mode;		/* Tcreate, Topen */
+			uint8_t	mode;		/* Tcreate, Topen */
 		/* }; */
 		/* struct { */
-			u32int	newfid;		/* Twalk */
-			ushort	nwname;		/* Twalk */
+			uint32_t	newfid;		/* Twalk */
+			uint16_t	nwname;		/* Twalk */
 			char	*wname[MAXWELEM];	/* Twalk */
 		/* }; */
 		/* struct { */
-			ushort	nwqid;		/* Rwalk */
-			Qid	wqid[MAXWELEM];		/* Rwalk */
+			uint16_t	nwqid;		/* Rwalk */
+			struct qid	wqid[MAXWELEM];		/* Rwalk */
 		/* }; */
 		/* struct { */
-			vlong	offset;		/* Tread, Twrite */
-			u32int	count;		/* Tread, Twrite, Rread */
+			int64_t	offset;		/* Tread, Twrite */
+			uint32_t	count;		/* Tread, Twrite, Rread */
 			char	*data;		/* Twrite, Rread */
 		/* }; */
 		/* struct { */
-			ushort	nstat;		/* Twstat, Rstat */
-			uchar	*stat;		/* Twstat, Rstat */
+			uint16_t	nstat;		/* Twstat, Rstat */
+			uint8_t	*stat;		/* Twstat, Rstat */
 		/* }; */
 	/* }; */
-} Fcall;
+} fcall;
 
 
 #define	GBIT8(p)	((p)[0])
 #define	GBIT16(p)	((p)[0]|((p)[1]<<8))
-#define	GBIT32(p)	((u32int)((p)[0]|((p)[1]<<8)|((p)[2]<<16)|((p)[3]<<24)))
-#define	GBIT64(p)	((u32int)((p)[0]|((p)[1]<<8)|((p)[2]<<16)|((p)[3]<<24)) |\
-				((vlong)((p)[4]|((p)[5]<<8)|((p)[6]<<16)|((p)[7]<<24)) << 32))
+#define	GBIT32(p)	((uint32_t)((p)[0]|((p)[1]<<8)|((p)[2]<<16)|((p)[3]<<24)))
+#define	GBIT64(p)	((uint32_t)((p)[0]|((p)[1]<<8)|((p)[2]<<16)|((p)[3]<<24)) |\
+				((int64_t)((p)[4]|((p)[5]<<8)|((p)[6]<<16)|((p)[7]<<24)) << 32))
 
 #define	PBIT8(p,v)	(p)[0]=(v)
 #define	PBIT16(p,v)	(p)[0]=(v);(p)[1]=(v)>>8
@@ -84,8 +232,8 @@ struct	Fcall
 /* The count, however, excludes itself; total size is BIT16SZ+count */
 #define STATFIXLEN	(BIT16SZ+QIDSZ+5*BIT16SZ+4*BIT32SZ+1*BIT64SZ)	/* amount of fixed length data in a stat buffer */
 
-#define	NOTAG		(ushort)~0U	/* Dummy tag */
-#define	NOFID		(u32int)~0U	/* Dummy fid */
+#define	NOTAG		(uint16_t)~0U	/* Dummy tag */
+#define	NOFID		(uint32_t)~0U	/* Dummy fid */
 #define	IOHDRSZ		24	/* ample room for Twrite/Rread header (iounit) */
 
 enum
@@ -121,96 +269,33 @@ enum
 	Tmax,
 };
 
-uint	convM2S(uchar*, uint, Fcall*);
-uint	convS2M(Fcall*, uchar*, uint);
-uint	sizeS2M(Fcall*);
+unsigned int	convM2S( uint8_t *unused_uint8_p_t, unsigned int unused_int, struct fcall*);
+unsigned int	convS2M(struct fcall*, uint8_t *unused_uint8_p_t, unsigned int);
+unsigned int	sizeS2M(struct fcall*);
 
-int	statcheck(uchar *abuf, uint nbuf);
-uint	convM2D(uchar*, uint, Dir*, char*);
-uint	convD2M(Dir*, uchar*, uint);
-uint	sizeD2M(Dir*);
+int	statcheck(uint8_t *abuf, unsigned int nbuf);
+unsigned int	convM2D( uint8_t *unused_uint8_p_t, unsigned int unused_int, struct dir*, char *unused_char_p_t);
+unsigned int	convD2M(struct dir*, uint8_t *unused_uint8_p_t, unsigned int);
+unsigned int	sizeD2M(struct dir*);
 
-int	fcallfmt(Fmt*);
-int	dirfmt(Fmt*);
-int	dirmodefmt(Fmt*);
+int	read9pmsg( int unused_int, void*, unsigned int);
 
-int	read9pmsg(int, void*, uint);
-
-#pragma	varargck	type	"F"	Fcall*
-#pragma	varargck	type	"M"	ulong
-#pragma	varargck	type	"D"	Dir*
-
-typedef struct Alarms	Alarms;
-typedef struct Block	Block;
-typedef struct Bkpt Bkpt;
-typedef struct BkptCond BkptCond;
-typedef struct Chan	Chan;
-typedef struct Cmdbuf	Cmdbuf;
-typedef struct Cmdtab	Cmdtab;
-typedef struct Cname	Cname;
-typedef struct Crypt	Crypt;
-typedef struct Dev	Dev;
-typedef struct DevConf	DevConf;
-typedef struct Dirtab	Dirtab;
-typedef struct Edf	Edf;
-typedef struct Egrp	Egrp;
-typedef struct Evalue	Evalue;
-typedef struct Fgrp	Fgrp;
-typedef struct List	List;
-typedef struct Log	Log;
-typedef struct Logflag	Logflag;
-typedef struct Mntcache Mntcache;
-typedef struct Mntparam Mntparam;
-typedef struct Mount	Mount;
-typedef struct Mntrpc	Mntrpc;
-typedef struct Mntwalk	Mntwalk;
-typedef struct Mnt	Mnt;
-typedef struct Mhead	Mhead;
-typedef struct Osenv	Osenv;
-typedef struct Pgrp	Pgrp;
-typedef struct Proc	Proc;
-typedef struct QLock	QLock;
-typedef struct Queue	Queue;
-typedef struct Ref	Ref;
-typedef struct Rendez	Rendez;
-typedef struct Rept	Rept;
-typedef struct Rootdata	Rootdata;
-typedef struct RWlock	RWlock;
-typedef struct Signerkey Signerkey;
-typedef struct Skeyset	Skeyset;
-typedef struct Talarm	Talarm;
-typedef struct Timer	Timer;
-typedef struct Timers	Timers;
-typedef struct Uart	Uart;
-typedef struct Walkqid	Walkqid;
-typedef int    Devgen(Chan*, char*, Dirtab*, int, int, Dir*);
-
-#pragma incomplete DevConf
-#pragma incomplete Edf
-#pragma incomplete Mntcache
-#pragma incomplete Mntrpc
-#pragma incomplete Queue
-#pragma incomplete Timers
-
-#include "fcall.h"
-#include <pool.h>
-
-struct Ref
+struct ref
 {
-	Lock	l;
+	spinlock_t	l;
 	long	ref;
 };
 
-struct Rendez
+struct rendez
 {
-	Lock;
-	Proc	*p;
+	spinlock_t lock;
+	struct proc	*p;
 };
 
-struct Rept
+struct rept
 {
-	Lock	l;
-	Rendez	r;
+	spinlock_t	l;
+	struct rendez	r;
 	void	*o;
 	int	t;
 	int	(*active)(void*);
@@ -218,60 +303,40 @@ struct Rept
 	void	(*f)(void*);	/* called with VM acquire()'d */
 };
 
-struct Osenv
-{
-	char	*syserrstr;	/* last error from a system call, errbuf0 or 1 */
-	char	*errstr;	/* reason we're unwinding the error stack, errbuf1 or 0 */
-	char	errbuf0[ERRMAX];
-	char	errbuf1[ERRMAX];
-	Pgrp*	pgrp;		/* Ref to namespace, working dir and root */
-	Fgrp*	fgrp;		/* Ref to file descriptors */
-	Egrp*	egrp;	/* Environment vars */
-	Skeyset*	sigs;		/* Signed module keys */
-	Rendez*	rend;		/* Synchro point */
-	Queue*	waitq;		/* Info about dead children */
-	Queue*	childq;		/* Info about children for debuggers */
-	void*	debug;		/* Debugging master */
-	int	uid;		/* Numeric user id for system */
-	int	gid;		/* Numeric group id for system */
-	char*	user;		/* Inferno user name */
-	FPenv	fpu;		/* Floating point thread state */
-};
-
 enum
 {
 	Nopin =	-1
 };
 
-struct QLock
+typedef struct qlock
 {
-	Lock	use;			/* to access Qlock structure */
-	Proc	*head;			/* next process waiting for object */
-	Proc	*tail;			/* last process waiting for object */
+	spinlock_t	use;			/* to access Qlock structure */
+	struct proc	*head;			/* next process waiting for object */
+	struct proc	*tail;			/* last process waiting for object */
 	int	locked;			/* flag */
-};
+}qlock_t ;
 
-struct RWlock
+typedef struct rwlock
 {
-	Lock;				/* Lock modify lock */
-	QLock	x;			/* Mutual exclusion lock */
-	QLock	k;			/* Lock for waiting writers */
+	spinlock_t rwlock;				/* Lock modify lock */
+	struct qlock	x;			/* Mutual exclusion lock */
+	struct qlock	k;			/* Lock for waiting writers */
 	int	readers;		/* Count of readers in lock */
-};
+} rwlock_t;
 
-struct Talarm
+struct talarm
 {
-	Lock;
-	Proc*	list;
+	spinlock_t lock;
+	struct proc*	list;
 };
 
-struct Alarms
+struct alarms
 {
-	QLock;
-	Proc*	head;
+	struct qlock qlock;
+	struct proc*	head;
 };
 
-struct Rootdata
+struct rootdata
 {
 	int	dotdot;
 	void	*ptr;
@@ -310,61 +375,61 @@ enum
 	Bpktck	=	(1<<5),		/* packet checksum */
 };
 
-struct Block
+struct block
 {
-	Block*	next;
-	Block*	list;
-	uchar*	rp;			/* first unconsumed byte */
-	uchar*	wp;			/* first empty byte */
-	uchar*	lim;			/* 1 past the end of the buffer */
-	uchar*	base;			/* start of the buffer */
-	void	(*free)(Block*);
-	ushort	flag;
-	ushort	checksum;		/* IP checksum of complete packet (minus media header) */
+	struct block*	next;
+	struct block*	list;
+	uint8_t*	rp;			/* first unconsumed byte */
+	uint8_t*	wp;			/* first empty byte */
+	uint8_t*	lim;			/* 1 past the end of the buffer */
+	uint8_t*	base;			/* start of the buffer */
+	void	(*free)(struct block*);
+	uint16_t	flag;
+	uint16_t	checksum;		/* IP checksum of complete packet (minus media header) */
 };
 #define BLEN(s)	((s)->wp - (s)->rp)
 #define BALLOC(s) ((s)->lim - (s)->base)
 
-struct Chan
+struct chan
 {
-	Lock;
-	Ref;
-	Chan*	next;			/* allocation */
-	Chan*	link;
-	vlong	offset;			/* in file */
-	ushort	type;
-	ulong	dev;
-	ushort	mode;			/* read/write */
-	ushort	flag;
-	Qid	qid;
+	spinlock_t lock;
+	struct kref ref;
+	struct chan*	next;			/* allocation */
+	struct chan*	link;
+	int64_t	offset;			/* in file */
+	uint16_t	type;
+	uint32_t	dev;
+	uint16_t	mode;			/* read/write */
+	uint16_t	flag;
+	struct qid	qid;
 	int	fid;			/* for devmnt */
-	ulong	iounit;	/* chunk size for i/o; 0==default */
-	Mhead*	umh;			/* mount point that derived Chan; used in unionread */
-	Chan*	umc;			/* channel in union; held for union read */
-	QLock	umqlock;		/* serialize unionreads */
+	uint32_t	iounit;	/* chunk size for i/o; 0==default */
+	struct mhead*	umh;			/* mount point that derived Chan; used in unionread */
+	struct chan*	umc;			/* channel in union; held for union read */
+	struct qlock	umqlock;		/* serialize unionreads */
 	int	uri;			/* union read index */
 	int	dri;			/* devdirread index */
-	ulong	mountid;
-	Mntcache *mcp;			/* Mount cache pointer */
-	Mnt		*mux;		/* Mnt for clients using me for messages */
+	uint32_t	mountid;
+	struct mntcache *mcp;			/* Mount cache pointer */
+	struct mnt		*mux;		/* Mnt for clients using me for messages */
 	union {
 		void*	aux;
 		char	tag[4];		/* for iproute */
 	};
-	Chan*	mchan;			/* channel to mounted server */
-	Qid	mqid;			/* qid of root of mount point */
-	Cname	*name;
+	struct chan*	mchan;			/* channel to mounted server */
+	struct qid	mqid;			/* qid of root of mount point */
+	struct cname	*name;
 };
 
-struct Cname
+struct cname
 {
-	Ref;
+	struct kref ref;
 	int	alen;			/* allocated length */
 	int	len;			/* strlen(s) */
 	char	*s;
 };
 
-struct Dev
+struct dev
 {
 	int	dc;
 	char*	name;
@@ -372,35 +437,35 @@ struct Dev
 	void	(*reset)(void);
 	void	(*init)(void);
 	void	(*shutdown)(void);
-	Chan*	(*attach)(char*);
-	Walkqid*	(*walk)(Chan*, Chan*, char**, int);
-	int	(*stat)(Chan*, uchar*, int);
-	Chan*	(*open)(Chan*, int);
-	void	(*create)(Chan*, char*, int, ulong);
-	void	(*close)(Chan*);
-	long	(*read)(Chan*, void*, long, vlong);
-	Block*	(*bread)(Chan*, long, ulong);
-	long	(*write)(Chan*, void*, long, vlong);
-	long	(*bwrite)(Chan*, Block*, ulong);
-	void	(*remove)(Chan*);
-	int	(*wstat)(Chan*, uchar*, int);
+	struct chan*	(*attach)( char *unused_char_p_t);
+	struct walkqid*	(*walk)(struct chan*, struct chan*, char **unused_char_pp_t, int);
+	int	(*stat)(struct chan*, uint8_t *unused_uint8_p_t, int);
+	struct chan*	(*open)(struct chan*, int);
+	void	(*create)(struct chan*, char *unused_char_p_t, int unused_int, uint32_t);
+	void	(*close)(struct chan*);
+	long	(*read)(struct chan*, void*, long, int64_t);
+	struct block*	(*bread)(struct chan*, long, uint32_t);
+	long	(*write)(struct chan*, void*, long, int64_t);
+	long	(*bwrite)(struct chan*, struct block*, uint32_t);
+	void	(*remove)(struct chan*);
+	int	(*wstat)(struct chan*, uint8_t *unused_uint8_p_t, int);
 	void	(*power)(int);	/* power mgt: power(1) → on, power (0) → off */
-	int	(*config)(int, char*, DevConf*);
+//	int	(*config)( int unused_int, char *unused_char_p_t, DevConf*);
 };
 
-struct Dirtab
+struct dirtab
 {
 	char	name[KNAMELEN];
-	Qid	qid;
-	vlong	length;
+	struct qid	qid;
+	int64_t	length;
 	long	perm;
 };
 
-struct Walkqid
+struct walkqid
 {
-	Chan	*clone;
+	struct chan	*clone;
 	int	nqid;
-	Qid	qid[1];
+	struct qid	qid[1];
 };
 
 enum
@@ -410,48 +475,48 @@ enum
 	NSCACHE	=	(1<<NSLOG),
 };
 
-struct Mntwalk				/* state for /proc/#/ns */
+struct mntwalk				/* state for /proc/#/ns */
 {
 	int		cddone;
-	ulong	id;
-	Mhead*	mh;
-	Mount*	cm;
+	uint32_t	id;
+	struct mhead*	mh;
+	struct mount*	cm;
 };
 
-struct Mount
+struct mount
 {
-	ulong	mountid;
-	Mount*	next;
-	Mhead*	head;
-	Mount*	copy;
-	Mount*	order;
-	Chan*	to;			/* channel replacing channel */
+	uint32_t	mountid;
+	struct mount*	next;
+	struct mhead*	head;
+	struct mount*	copy;
+	struct mount*	order;
+	struct chan*	to;			/* channel replacing channel */
 	int	mflag;
 	char	*spec;
 };
 
-struct Mhead
+struct mhead
 {
-	Ref;
-	RWlock	lock;
-	Chan*	from;			/* channel mounted upon */
-	Mount*	mount;			/* what's mounted upon it */
-	Mhead*	hash;			/* Hash chain */
+	struct kref ref;
+	struct rwlock	lock;
+	struct chan*	from;			/* channel mounted upon */
+	struct mount*	mount;			/* what's mounted upon it */
+	struct mhead*	hash;			/* Hash chain */
 };
 
-struct Mnt
+struct mnt
 {
-	Lock;
+	spinlock_t lock;
 	/* references are counted using c->ref; channels on this mount point incref(c->mchan) == Mnt.c */
-	Chan	*c;		/* Channel to file service */
-	Proc	*rip;		/* Reader in progress */
-	Mntrpc	*queue;		/* Queue of pending requests on this channel */
-	ulong	id;		/* Multiplexer id for channel check */
-	Mnt	*list;		/* Free list */
+	struct chan	*c;		/* Channel to file service */
+	struct proc	*rip;		/* Reader in progress */
+	struct mntrpc	*queue;		/* Queue of pending requests on this channel */
+	uint32_t	id;		/* Multiplexer id for channel check */
+	struct mnt	*list;		/* Free list */
 	int	flags;		/* cache */
 	int	msize;		/* data + IOHDRSZ */
 	char	*version;			/* 9P version */
-	Queue	*q;		/* input queue */
+	struct queue	*q;		/* input queue */
 };
 
 enum
@@ -466,75 +531,75 @@ enum
 };
 #define MOUNTH(p,qid)	((p)->mnthash[(qid).path&((1<<MNTLOG)-1)])
 
-struct Mntparam {
-	Chan*	chan;
-	Chan*	authchan;
+struct mntparam {
+	struct chan*	chan;
+	struct chan*	authchan;
 	char*	spec;
 	int	flags;
 };
 
-struct Pgrp
+struct pgrp
 {
-	Ref;				/* also used as a lock when mounting */
-	ulong	pgrpid;
-	QLock	debug;			/* single access via devproc.c */
-	RWlock	ns;			/* Namespace n read/one write lock */
-	QLock	nsh;
-	Mhead*	mnthash[MNTHASH];
+	struct kref ref;				/* also used as a lock when mounting */
+	uint32_t	pgrpid;
+	struct qlock	debug;			/* single access via devproc.c */
+	struct rwlock	ns;			/* Namespace n read/one write lock */
+	struct qlock	nsh;
+	struct mhead*	mnthash[MNTHASH];
 	int	progmode;
-	Chan*	dot;
-	Chan*	slash;
+	struct chan*	dot;
+	struct chan*	slash;
 	int	nodevs;
 	int	pin;
 };
 
-struct Fgrp
+struct fgrp
 {
-	Lock;
-	Ref;
-	Chan**	fd;
+	spinlock_t lock;
+	struct kref ref;
+	struct chan**	fd;
 	int	nfd;			/* number of fd slots */
 	int	maxfd;			/* highest fd in use */
 	int	minfd;			/* lower bound on free fd */
 };
 
-struct Evalue
+struct evalue
 {
 	char	*var;
 	char	*val;
 	int	len;
-	Qid	qid;
-	Evalue	*next;
+	struct qid	qid;
+	struct evalue	*next;
 };
 
-struct Egrp
+struct egrp
 {
-	Ref;
-	QLock;
-	Evalue	*entries;
-	ulong	path;	/* qid.path of next Evalue to be allocated */
-	ulong	vers;	/* of Egrp */
+	struct kref ref;
+	struct qlock qlock;
+	struct evalue	*entries;
+	uint32_t	path;	/* qid.path of next Evalue to be allocated */
+	uint32_t	vers;	/* of Egrp */
 };
 
-struct Signerkey
+struct signerkey
 {
-	Ref;
+	struct kref ref;
 	char*	owner;
-	ushort	footprint;
-	ulong	expires;
+	uint16_t	footprint;
+	uint32_t	expires;
 	void*	alg;
 	void*	pk;
 	void	(*pkfree)(void*);
 };
 
-struct Skeyset
+struct skeyset
 {
-	Ref;
-	QLock;
-	ulong	flags;
+	struct kref ref;
+	struct qlock qlock;
+	uint32_t	flags;
 	char*	devs;
 	int	nkey;
-	Signerkey	*keys[MAXKEY];
+	struct signerkey	*keys[MAXKEY];
 };
 
 /*
@@ -547,144 +612,6 @@ enum {
 	Tperiodic,	/* periodic timer, period in ns */
 };
 
-struct Timer
-{
-	/* Public interface */
-	int	tmode;		/* See above */
-	vlong	tns;		/* meaning defined by mode */
-	void	(*tf)(Ureg*, Timer*);
-	void	*ta;
-	/* Internal */
-	Lock;
-	Timers	*tt;		/* Timers queue this timer runs on */
-	vlong	twhen;		/* ns represented in fastticks */
-	Timer	*tnext;
-};
-
-enum
-{
-	Dead = 0,		/* Process states */
-	Moribund,
-	Ready,
-	Scheding,
-	Running,
-	Queueing,
-	Wakeme,
-	Broken,
-	Stopped,
-	Rendezvous,
-	Waitrelease,
-
-	Proc_stopme = 1, 	/* devproc requests */
-	Proc_exitme,
-	Proc_traceme,
-	Proc_exitbig,
-
-	NERR		= 30,
-
-	Unknown		= 0,
-	IdleGC,
-	Interp,
-	BusyGC,
-
-	PriLock		= 0,	/* Holding Spin lock */
-	PriEdf,	/* active edf processes */
-	PriRelease,	/* released edf processes */
-	PriRealtime,		/* Video telephony */
-	PriHicodec,		/* MPEG codec */
-	PriLocodec,		/* Audio codec */
-	PriHi,			/* Important task */
-	PriNormal,
-	PriLo,
-	PriBackground,
-	PriExtra,	/* edf processes we don't care about */
-	Nrq
-};
-
-struct Proc
-{
-	Label		sched;		/* known to l.s */
-	char*		kstack;		/* known to l.s */
-	Mach*		mach;		/* machine running this proc */
-	char		text[KNAMELEN];
-	Proc*		rnext;		/* next process in run queue */
-	Proc*		qnext;		/* next process on queue for a QLock */
-	QLock*		qlock;		/* addrof qlock being queued for DEBUG */
-	int		state;
-	int		type;
-	void*		prog;		/* Dummy Prog for interp release */
-	void*		iprog;
-	Osenv*		env;
-	Osenv		defenv;
-	int		swipend;	/* software interrupt pending for Prog */
-	Lock		sysio;		/* note handler lock */
-	char*		psstate;	/* What /proc/#/status reports */
-	ulong		pid;
-	int		fpstate;
-	int		procctl;	/* Control for /proc debugging */
-	ulong		pc;		/* DEBUG only */
-	Lock	rlock;	/* sync between sleep/swiproc for r */
-	Rendez*		r;		/* rendezvous point slept on */
-	Rendez		sleep;		/* place for syssleep/debug */
-	int		killed;		/* by swiproc */
-	int		kp;		/* true if a kernel process */
-	ulong		alarm;		/* Time of call */
-	int		pri;		/* scheduler priority */
-	ulong		twhen;
-	Rendez*		trend;
-	Proc*		tlink;
-	int		(*tfn)(void*);
-	void		(*kpfun)(void*);
-	void*		arg;
-	FPU		fpsave;
-	int		scallnr;
-	int		nerrlab;
-	Label		errlab[NERR];
-	char	genbuf[128];	/* buffer used e.g. for last name element from namec */
-	Mach*		mp;		/* machine this process last ran on */
-	Mach*		wired;
-	ulong		movetime;	/* next time process should switch processors */
-	ulong		delaysched;
-	int			preempted;	/* process yielding in interrupt */
-	ulong		qpc;		/* last call that blocked in qlock */
-	void*		dbgreg;		/* User registers for devproc */
- 	int		dbgstop;		/* don't run this kproc */
-	Edf*	edf;	/* if non-null, real-time proc, edf contains scheduling params */
-};
-
-enum
-{
-	/* kproc flags */
-	KPDUPPG		= (1<<0),
-	KPDUPFDG	= (1<<1),
-	KPDUPENVG	= (1<<2),
-	KPDUP = KPDUPPG | KPDUPFDG | KPDUPENVG
-};
-
-enum {
-	BrkSched,
-	BrkNoSched,
-};
-
-struct BkptCond
-{
-	uchar op;
-	ulong val;
-	BkptCond *next;
-};
-
-struct Bkpt
-{
-	int id;
-	ulong addr;
-	BkptCond *conditions;
-	Instr instr;
-	void (*handler)(Bkpt*);
-	void *aux;
-	Bkpt *next;
-	Bkpt *link;
-};
-
 enum
 {
 	PRINTSIZE =	256,
@@ -693,68 +620,20 @@ enum
 	READSTR =	1000,		/* temporary buffer size for device reads */
 };
 
-extern	Conf	conf;
-extern	char*	conffile;
-extern	int	consoleprint;
-extern	Dev*	devtab[];
-extern	char*	eve;
-extern	int	hwcurs;
-extern	FPU	initfp;
-extern  Queue	*kbdq;
-extern  Queue	*kscanq;
-extern  Ref	noteidalloc;
-extern  Queue	*printq;
-extern	uint	qiomaxatomic;
-extern	char*	statename[];
-extern	char*	sysname;
-extern	Talarm	talarm;
-
-/*
- *  action log
- */
-struct Log {
-	Lock;
-	int	opens;
-	char*	buf;
-	char	*end;
-	char	*rptr;
-	int	len;
-	int	nlog;
-	int	minread;
-
-	int	logmask;	/* mask of things to debug */
-
-	QLock	readq;
-	Rendez	readr;
-};
-
-struct Logflag {
-	char*	name;
-	int	mask;
-};
-
-struct Cmdbuf
+extern	struct dev*	devtab[];
+struct cmdbuf
 {
 	char	*buf;
 	char	**f;
 	int	nf;
 };
 
-struct Cmdtab
+struct cmdtab
 {
 	int	index;	/* used by client to switch on result */
 	char	*cmd;	/* command name */
 	int	narg;	/* expected #args; 0 ==> variadic */
 };
-
-enum
-{
-	MAXPOOL		= 8,
-};
-
-extern Pool*	mainmem;
-extern Pool*	heapmem;
-extern Pool*	imagmem;
 
 /* queue state bits,  Qmsg, Qcoalesce, and Qkick can be set in qopen */
 enum
@@ -770,43 +649,373 @@ enum
 
 #define DEVDOTDOT -1
 
-#pragma	varargck	argpos	print	1
-#pragma	varargck	argpos	snprint	3
-#pragma	varargck	argpos	seprint	3
-#pragma	varargck	argpos	sprint	2
-#pragma	varargck	argpos	fprint	2
-#pragma	varargck	argpos	iprint	1
-#pragma	varargck	argpos	panic	1
-#pragma	varargck	argpos	kwerrstr	1
-#pragma	varargck	argpos	kprint	1
 
-#pragma	varargck	type	"lld"	vlong
-#pragma	varargck	type	"llx"	vlong
-#pragma	varargck	type	"lld"	uvlong
-#pragma	varargck	type	"llx"	uvlong
-#pragma	varargck	type	"lx"	void*
-#pragma	varargck	type	"ld"	long
-#pragma	varargck	type	"lx"	long
-#pragma	varargck	type	"ld"	ulong
-#pragma	varargck	type	"lx"	ulong
-#pragma	varargck	type	"d"	int
-#pragma	varargck	type	"x"	int
-#pragma	varargck	type	"c"	int
-#pragma	varargck	type	"C"	int
-#pragma	varargck	type	"d"	uint
-#pragma	varargck	type	"x"	uint
-#pragma	varargck	type	"c"	uint
-#pragma	varargck	type	"C"	uint
-#pragma	varargck	type	"f"	double
-#pragma	varargck	type	"e"	double
-#pragma	varargck	type	"g"	double
-#pragma	varargck	type	"s"	char*
-#pragma	varargck	type	"S"	Rune*
-#pragma	varargck	type	"r"	void
-#pragma	varargck	type	"%"	void
-#pragma	varargck	type	"I"	uchar*
-#pragma	varargck	type	"V"	uchar*
-#pragma	varargck	type	"E"	uchar*
-#pragma	varargck	type	"M"	uchar*
-#pragma	varargck	type	"p"	void*
-#pragma	varargck	type	"q"	char*
+typedef int    Devgen(struct chan*, char *unused_char_p_t, struct dirtab*, int unused_int, int,
+		      struct dir*);
+
+/* inferno portfns.h. Not all these are needed. */
+// INFERNO
+#define		FPinit() fpinit() /* remove this if math lib is linked */
+void		FPrestore(void*);
+void		FPsave(void*);
+struct cname*		addelem(struct cname*, char *unused_char_p_t);
+void		addprog(struct proc*);
+void		addrootfile( char *unused_char_p_t, uint8_t *unused_uint8_p_t, uint32_t);
+struct block*		adjustblock(struct block*, int);
+struct block*		allocb(int);
+int	anyhigher(void);
+int	anyready(void);
+void	_assert( char *unused_char_p_t);
+struct block*		bl2mem( uint8_t *unused_uint8_p_t, struct block*, int);
+int		blocklen(struct block*);
+char*		channame(struct chan*);
+int		canlock(spinlock_t*);
+int		canqlock(qlock_t*);
+void		cclose(struct chan*);
+int		canrlock(rwlock_t*);
+void		chandevinit(void);
+void		chandevreset(void);
+void		chandevshutdown(void);
+struct dir*		chandirstat(struct chan*);
+void		chanfree(struct chan*);
+void		chanrec(struct mnt*);
+void		checkalarms(void);
+void		checkb(struct block*, char *unused_char_p_t);
+void		cinit(void);
+struct chan*		cclone(struct chan*);
+void		cclose(struct chan*);
+void		closeegrp(struct egrp*);
+void		closefgrp(struct fgrp*);
+void		closemount(struct mount*);
+void		closepgrp(struct pgrp*);
+void		closesigs(struct skeyset*);
+void		cmderror(struct cmdbuf*, char *unused_char_p_t);
+int		cmount(struct chan*, struct chan*, int unused_int, char *unused_char_p_t);
+void		cnameclose(struct cname*);
+struct block*		concatblock(struct block*);
+void		confinit(void);
+void		copen(struct chan*);
+struct block*		copyblock(struct block*, int);
+int		cread(struct chan*, uint8_t *unused_uint8_p_t, int unused_int, int64_t);
+struct chan*	cunique(struct chan*);
+struct chan*		createdir(struct chan*, struct mhead*);
+void		cunmount(struct chan*, struct chan*);
+void		cupdate(struct chan*, uint8_t *unused_uint8_p_t, int unused_int, int64_t);
+void		cursorenable(void);
+void		cursordisable(void);
+int		cursoron(int);
+void		cursoroff(int);
+void		cwrite(struct chan*, uint8_t *unused_uint8_p_t, int unused_int, int64_t);
+struct chan*		devattach( int unused_int, char *unused_char_p_t);
+struct block*		devbread(struct chan*, long, uint32_t);
+long		devbwrite(struct chan*, struct block*, uint32_t);
+struct chan*		devclone(struct chan*);
+void		devcreate(struct chan*, char *unused_char_p_t, int unused_int, uint32_t);
+void		devdir(struct chan*, struct qid, char *unused_char_p_t, int64_t, char*, long,
+			   struct dir*);
+long		devdirread(struct chan*, char *unused_char_p_t, long,
+			       struct dirtab*, int unused_int, Devgen*);
+Devgen		devgen;
+void		devinit(void);
+int		devno( int unused_int, int);
+void	devpower(int);
+struct dev*	devbyname( char *unused_char_p_t);
+struct chan*		devopen(struct chan*, int unused_int,
+				    struct dirtab*, int unused_int2, Devgen*);
+void		devpermcheck( char *unused_char_p_t, uint32_t, int);
+void		devremove(struct chan*);
+void		devreset(void);
+void		devshutdown(void);
+int		devstat(struct chan*, uint8_t *unused_uint8_p_t, int unused_int,
+			   struct dirtab*, int unused_int2, Devgen*);
+struct walkqid*	devwalk(struct chan*,
+			struct chan*, char **unused_char_pp_t, int unused_int,
+			struct dirtab*, int unused_intw, Devgen*);
+int		devwstat(struct chan*, uint8_t *unused_uint8_p_t, int);
+void		disinit(void*);
+void		disfault(void*, char *unused_char_p_t);
+int		domount(struct chan**, struct mhead**);
+void		drawactive(int);
+void		drawcmap(void);
+void		dumpstack(void);
+struct fgrp*		dupfgrp(struct fgrp*);
+void		egrpcpy(struct egrp*, struct egrp*);
+int		emptystr( char *unused_char_p_t);
+int		eqchan(struct chan*, struct chan*, int);
+int		eqqid(struct qid, struct qid);
+
+void		errorf( char *unused_char_p_t, ...);
+void		errstr( char *unused_char_p_t, int);
+void		excinit(void);
+void		exhausted( char *unused_char_p_t);
+void		exit(int);
+void		reboot(void);
+void		halt(void);
+int		export( int unused_int, char *unused_char_p_t, int);
+uint64_t		fastticks(uint64_t*);
+uint64_t		fastticks2ns(uint64_t);
+void		fdclose(struct fgrp*, int);
+struct chan*		fdtochan(struct fgrp*, int unused_int, int, int, int);
+int		findmount(struct chan**,
+			     struct mhead**, int unused_int, int, struct qid);
+void		free(void*);
+void		freeb(struct block*);
+void		freeblist(struct block*);
+void		freeskey(struct signerkey*);
+void		getcolor(uint32_t, uint32_t*, uint32_t*, uint32_t*);
+uint32_t	getmalloctag(void*);
+uint32_t	getrealloctag(void*);
+void		hnputl(void*, uint32_t);
+void		hnputs(void*, uint16_t);
+struct block*		iallocb(int);
+void		iallocsummary(void);
+void		ilock(spinlock_t*);
+int		incref(struct kref*);
+int		iprint( char *unused_char_p_t, ...);
+void		isdir(struct chan*);
+int		iseve(void);
+int		islo(void);
+void		iunlock(spinlock_t*);
+void		ixsummary(void);
+void		kbdclock(void);
+int		kbdcr2nl(struct queue*, int);
+int		kbdputc(struct queue*, int);
+void		kbdrepeat(int);
+void		kproc( char *unused_char_p_t, void(*)(void*), void*, int);
+int		kfgrpclose(struct fgrp*, int);
+void		kprocchild(struct proc*, void (*)(void*), void*);
+int		kprint( char *unused_char_p_t, ...);
+void	(*kproftick)(uint32_t);
+void		ksetenv( char *unused_char_p_t, char*, int);
+//void		kstrncpy( char *unused_char_p_t, char*, int unused_int, sizeof(char*, char*));
+void		kstrdup( char **unused_char_pp_t, char *unused_char_p_t);
+void		lock(spinlock_t*);
+
+struct cmdtab*		lookupcmd(struct cmdbuf*, struct cmdtab*, int);
+void*		malloc(uint32_t);
+void*		mallocz(uint32_t, int);
+struct block*		mem2bl( uint8_t *unused_uint8_p_t, int);
+int			memusehigh(void);
+void		microdelay(int);
+uint64_t		mk64fract(uint64_t, uint64_t);
+void		mkqid(struct qid*, int64_t, uint32_t, int);
+void		modinit(void);
+struct chan*		mntauth(struct chan*, char *unused_char_p_t);
+long		mntversion(struct chan*, char *unused_char_p_t, int unused_int, int);
+void		mountfree(struct mount*);
+void		mousetrack( int unused_int, int, int, int);
+uint64_t		ms2fastticks(uint32_t);
+uint32_t		msize(void*);
+void		mul64fract(uint64_t*, uint64_t, uint64_t);
+void		muxclose(struct mnt*);
+struct chan*		namec( char *unused_char_p_t, int unused_int, int, uint32_t);
+struct chan*		newchan(void);
+struct egrp*		newegrp(void);
+struct fgrp*		newfgrp(struct fgrp*);
+struct mount*		newmount(struct mhead*, struct chan*, int unused_int, char *unused_char_p_t);
+struct pgrp*		newpgrp(void);
+struct proc*		newproc(void);
+char*		nextelem( char *unused_char_p_t, char*);
+
+struct cname*		newcname( char *unused_char_p_t);
+void	notkilled(void);
+int		nrand(int);
+uint64_t		ns2fastticks(uint64_t);
+int		okaddr(uint32_t, uint32_t, int);
+int		openmode(uint32_t);
+struct block*		packblock(struct block*);
+struct block*		padblock(struct block*, int);
+
+struct cmdbuf*		parsecmd( char *unused_char_p_t, int);
+
+void		pgrpcpy(struct pgrp*, struct pgrp*);
+
+int		progfdprint(struct chan*, int unused_int, int, char *unused_char_p_t, int i);
+int		pullblock(struct block**, int);
+struct block*		pullupblock(struct block*, int);
+struct block*		pullupqueue(struct queue*, int);
+void		putmhead(struct mhead*);
+void		putstrn( char *unused_char_p_t, int);
+void		qaddlist(struct queue*, struct block*);
+struct block*		qbread(struct queue*, int);
+long		qbwrite(struct queue*, struct block*);
+struct queue*	qbypass(void (*)(void*, struct block*), void*);
+int		qcanread(struct queue*);
+void		qclose(struct queue*);
+int		qconsume(struct queue*, void*, int);
+struct block*		qcopy(struct queue*, int unused_int, uint32_t);
+int		qdiscard(struct queue*, int);
+void		qflush(struct queue*);
+void		qfree(struct queue*);
+int		qfull(struct queue*);
+struct block*		qget(struct queue*);
+void		qhangup(struct queue*, char *unused_char_p_t);
+int		qisclosed(struct queue*);
+int		qiwrite(struct queue*, void*, int);
+int		qlen(struct queue*);
+void		qlock(qlock_t*);
+void		qnoblock(struct queue*, int);
+struct queue*		qopen( int unused_int, int, void (*)(void*), void*);
+int		qpass(struct queue*, struct block*);
+int		qpassnolim(struct queue*, struct block*);
+int		qproduce(struct queue*, void*, int);
+void		qputback(struct queue*, struct block*);
+long		qread(struct queue*, void*, int);
+struct block*		qremove(struct queue*);
+void		qreopen(struct queue*);
+void		qsetlimit(struct queue*, int);
+void		qunlock(qlock_t*);
+int		qwindow(struct queue*);
+int		qwrite(struct queue*, void*, int);
+void		randominit(void);
+uint32_t	randomread(void*, uint32_t);
+void*	realloc(void*, uint32_t);
+int		readnum(uint32_t, char *unused_char_p_t, uint32_t, uint32_t, int);
+int		readnum_int64_t(uint32_t, char *unused_char_p_t, uint32_t, int64_t, int);
+int		readstr(uint32_t, char *unused_char_p_t, uint32_t, char*);
+void		ready(struct proc*);
+void		renameproguser( char *unused_char_p_t, char*);
+void		renameuser( char *unused_char_p_t, char*);
+void		resrcwait( char *unused_char_p_t);
+int		return0(void*);
+void		rlock(rwlock_t*);
+void		runlock(rwlock_t*);
+struct proc*		runproc(void);
+void		sched(void);
+void		schedinit(void);
+long		seconds(void);
+void		(*serwrite)( char *unused_char_p_t, int);
+int		setcolor(uint32_t, uint32_t, uint32_t, uint32_t);
+
+void		setmalloctag(void*, uint32_t);
+int		setpri(int);
+void		setrealloctag(void*, uint32_t);
+char*		skipslash( char *unused_char_p_t);
+void		sleep(struct rendez*, int(*)(void*), void*);
+void*		smalloc(uint32_t);
+int		splhi(void);
+int		spllo(void);
+void		splx(int);
+void	splxpc(int);
+void		swiproc(struct proc*, int);
+uint32_t		_tas(uint32_t*);
+uint32_t	tk2ms(uint32_t);
+#define		TK2MS(x) ((x)*(1000/HZ))
+uint64_t		tod2fastticks(int64_t);
+int64_t		todget(int64_t*);
+void		todfix(void);
+void		todsetfreq(int64_t);
+void		todinit(void);
+void		todset(int64_t, int64_t, int);
+int		tready(void*);
+struct block*		trimblock(struct block*, int unused_int, int);
+void		tsleep(struct rendez*, int (*)(void*), void*, int);
+int		uartgetc(void);
+void		uartputc(int);
+void		uartputs( char *unused_char_p_t, int);
+long		unionread(struct chan*, void*, long);
+void		unlock(spinlock_t*);
+void		userinit(void);
+uint32_t		userpc(void);
+void		validname( char *unused_char_p_t, int);
+void		validstat( uint8_t *unused_uint8_p_t, int);
+void		validwstatname( char *unused_char_p_t);
+int		wakeup(struct rendez*);
+int		walk(struct chan**, char **unused_char_pp_t, int unused_int, int, int*);
+void		werrstr( char *unused_char_p_t, ...);
+void		wlock(rwlock_t*);
+void		wunlock(rwlock_t*);
+void*		xalloc(uint32_t);
+void*		xallocz(uint32_t, int);
+void		xfree(void*);
+void		xhole(uint32_t, uint32_t);
+void		xinit(void);
+int		xmerge(void*, void*);
+void*		xspanalloc(uint32_t, int unused_int, uint32_t);
+void		xsummary(void);
+ 
+void		validaddr(void*, uint32_t, int);
+void*	vmemchr(void*, int unused_int, int);
+void		hnputv(void*, int64_t);
+void		hnputl(void*, uint32_t);
+void		hnputs(void*, uint16_t);
+int64_t		nhgetv(void*);
+uint32_t		nhgetl(void*);
+uint16_t		nhgets(void*);
+
+/* error messages, from inferno emu error.h */
+extern char Enoerror[];		/* no error */
+extern char Emount[];		/* inconsistent mount */
+extern char Eunmount[];		/* not mounted */
+extern char Eunion[];		/* not in union */
+extern char Emountrpc[];	/* mount rpc error */
+extern char Eshutdown[];	/* mounted device shut down */
+extern char Eowner[];		/* not owner */
+extern char Eunknown[];		/* unknown user or group id */
+extern char Enocreate[];	/* mounted directory forbids creation */
+extern char Enonexist[];	/* file does not exist */
+extern char Eexist[];		/* file already exists */
+extern char Ebadsharp[];	/* unknown device in # filename */
+extern char Enotdir[];		/* not a directory */
+extern char Eisdir[];		/* file is a directory */
+extern char Ebadchar[];		/* bad character in file name */
+extern char Efilename[];	/* file name syntax */
+extern char Eperm[];		/* permission denied */
+extern char Ebadusefd[];	/* inappropriate use of fd */
+extern char Ebadarg[];		/* bad arg in system call */
+extern char Einuse[];		/* device or object already in use */
+extern char Eio[];		/* i/o error */
+extern char Etoobig[];		/* read or write too large */
+extern char Etoosmall[];	/* read or write too small */
+extern char Enetaddr[];		/* bad network address */
+extern char Emsgsize[];		/* message is too big for protocol */
+extern char Enetbusy[];		/* network device is busy or allocated */
+extern char Enoproto[];		/* network protocol not supported */
+extern char Enoport[];		/* network port not available */
+extern char Enoifc[];		/* bad interface or no free interface slots */
+extern char Enolisten[];	/* not announced */
+extern char Ehungup[];		/* i/o on hungup channel */
+extern char Ebadctl[];		/* bad process or channel control request */
+extern char Enodev[];		/* no free devices */
+extern char Enoenv[];		/* no free environment resources */
+extern char Ethread[];		/* thread exited */
+extern char Enochild[];		/* no living children */
+extern char Eioload[];		/* i/o error in demand load */
+extern char Enovmem[];		/* out of memory: virtual memory */
+extern char Ebadld[];		/* illegal line discipline */
+extern char Ebadfd[];		/* fd out of range or not open */
+extern char Eisstream[];	/* seek on a stream */
+extern char Ebadexec[];		/* exec header invalid */
+extern char Etimedout[];	/* connection timed out */
+extern char Econrefused[];	/* connection refused */
+extern char Econinuse[];	/* connection in use */
+extern char Enetunreach[];	/* network unreachable */
+extern char Eintr[];		/* interrupted */
+extern char Enomem[];		/* out of memory: kernel */
+extern char Esfnotcached[];	/* subfont not cached */
+extern char Esoverlap[];	/* segments overlap */
+extern char Emouseset[];	/* mouse type already set */
+extern char Eshort[];		/* i/o count too small */
+extern char Enobitstore[];	/* out of screen memory */
+extern char Egreg[];		/* jim'll fix it */
+extern char Ebadspec[];		/* bad attach specifier */
+extern char Estopped[];		/* thread must be stopped */
+extern char Enoattach[];	/* mount/attach disallowed */
+extern char Eshortstat[];	/* stat buffer too small */
+extern char Enegoff[];	/* negative i/o offset */
+extern char Ebadstat[];	/* malformed stat buffer */
+extern char Ecmdargs[];		/* wrong #args in control message */
+extern char	Enofd[];	/* no free file descriptors */
+extern char Enoctl[];	/* unknown control request */
+
+
+/* kern/src/err.c */
+int errpush(struct errbuf *errstack, int stacksize, int *curindex,
+            struct errbuf **prev_errbuf);
+void errpop(struct errbuf *errstack, int stacksize, int *curindex,
+            struct errbuf *prev_errbuf);
+/* */
+char *get_cur_genbuf(void);
+
+/* stuff we really ought to have ... */
+char *index(char *s, int c);

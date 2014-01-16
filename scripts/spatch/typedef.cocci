@@ -1,4 +1,16 @@
 @@
+typedef Cname;
+@@
+-Cname
++struct cname
+
+@@
+typedef Fmt;
+@@
+-Fmt
++struct fmt
+
+@@
 typedef Ipifc;
 @@
 -Ipifc

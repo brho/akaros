@@ -50,3 +50,4 @@ obj-y						+= trap.o
 obj-y						+= ucq.o
 obj-y						+= umem.o
 obj-y						+= vfs.o
+obj-y						+= ns/
