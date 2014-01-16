@@ -1,1 +1,2 @@
 obj-y						+= chan.o
+obj-y						+= error.o
