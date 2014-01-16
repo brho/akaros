@@ -1,5 +1,5 @@
 menu "Drivers"
 
-source "kern/drivers/net/Kconfig"
+#source "kern/drivers/net/Kconfig"
 
 endmenu
