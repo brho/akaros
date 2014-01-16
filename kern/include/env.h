@@ -32,6 +32,7 @@ struct proc {
 	TAILQ_ENTRY(proc) sibling_link;
 	spinlock_t proc_lock;
 	struct user_context scp_ctx; 	/* context for an SCP.  TODO: move to vc0 */
+	char user[64]; /* user name */
 	pid_t pid;
 	/* Tempting to add a struct proc *parent, but we'd need to protect the use
 	 * of that reference from concurrent parent-death (letting init inherit

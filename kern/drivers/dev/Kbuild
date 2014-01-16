@@ -1,2 +1,3 @@
 obj-y						+= alarm.o
+obj-y						+= dev.o
 obj-y						+= tab.o
