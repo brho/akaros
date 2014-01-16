@@ -13,6 +13,8 @@ enum
 	Runeerror	= 0xFFFD,	/* decoding error in UTF */
 	Runemax		= 0x10FFFF,	/* 21-bit rune */
 	Runemask	= 0x1FFFFF,	/* bits used by runes (see grep) */
+	NUMSIZE32       = 9,            /* max size of formatted 32 bit number */
+	NUMSIZE64       = 20,           /* max size of formatted 64 bit number */
 };
 
 extern	int	abs(int);
