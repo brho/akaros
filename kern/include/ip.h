@@ -1,39 +1,4 @@
 // INFERNO
-//INFERNO
-
-typedef struct	Conv	Conv;
-typedef struct	Fs	Fs;
-typedef union	Hwaddr	Hwaddr;
-typedef struct	IP	IP;
-typedef struct	IPaux	IPaux;
-typedef struct	Ipself	Ipself;
-typedef struct	Ipselftab	Ipselftab;
-typedef struct	Iplink	Iplink;
-typedef struct	Iplifc	Iplifc;
-typedef struct	Ipmulti	Ipmulti;
-typedef struct	IProuter IProuter;
-typedef struct	Ipifc	Ipifc;
-typedef struct	Iphash	Iphash;
-typedef struct	Ipht	Ipht;
-typedef struct	Netlog	Netlog;
-typedef struct	Ifclog	Ifclog;
-typedef struct	Medium	Medium;
-typedef struct	Proto	Proto;
-typedef struct	Arpent	Arpent;
-typedef struct	Arp Arp;
-typedef struct	Route	Route;
-
-typedef struct	Routerparams	Routerparams;
-typedef struct 	Hostparams	Hostparams;
-typedef struct 	V6router	V6router;
-typedef struct	V6params	V6params;
-
-#pragma incomplete Arp
-#pragma	incomplete Ifclog
-#pragma incomplete Ipself
-#pragma incomplete Ipselftab
-#pragma incomplete IP
-#pragma incomplete Netlog
 
 enum
 {
@@ -76,16 +41,16 @@ enum
 /*
  *  one per conversation directory
  */
-struct Conv
+struct conv
 {
 	qlock_t qlock;
 
 	int	x;			/* conversation index */
-	Proto*	p;
+	struct proto*	p;
 
 	int	restricted;		/* remote port is restricted */
-	uint	ttl;			/* max time to live */
-	uint	tos;			/* type of service */
+	uint32_t	ttl;			/* max time to live */
+	uint32_t	tos;			/* type of service */
 	int	ignoreadvice;		/* don't terminate connection on icmp errors */
 
 	uint8_t	ipversion;
@@ -104,62 +69,65 @@ struct Conv
 	int	headers;		/* data src/dst headers in udp */
 	int	reliable;		/* true if reliable udp */
 
-	Conv*	incall;			/* calls waiting to be listened for */
-	Conv*	next;
+	struct conv*	incall;			/* calls waiting to be listened for */
+	struct conv*	next;
 
-	Queue*	rq;			/* queued data waiting to be read */
-	Queue*	wq;			/* queued data waiting to be written */
-	Queue*	eq;			/* returned error packets */
-	Queue*	sq;			/* snooping queue */
-	Ref	snoopers;		/* number of processes with snoop open */
+	struct queue*	rq;			/* queued data waiting to be read */
+	struct queue*	wq;			/* queued data waiting to be written */
+	struct queue*	eq;			/* returned error packets */
+	struct queue*	sq;			/* snooping queue */
+	struct kref	snoopers;		/* number of processes with snoop open */
 
-	Rendez	cr;
+	struct rendez	cr;
 	char	cerr[ERRMAX];
 
-	QLock	listenq;
-	Rendez	listenr;
+	qlock_t	listenq;
+	struct rendez	listenr;
 
-	Ipmulti	*multi;			/* multicast bindings for this interface */
+	struct ipmulti	*multi;			/* multicast bindings for this interface */
 
 	void*	ptcl;			/* protocol specific stuff */
 
-	Route	*r;			/* last route used */
+	struct route	*r;			/* last route used */
 	uint32_t	rgen;			/* routetable generation for *r */
 };
 
-struct Medium
+struct Ipifc;
+struct Fs;
+
+struct medium
 {
 	char	*name;
 	int	hsize;		/* medium header size */
 	int	mintu;		/* default min mtu */
 	int	maxtu;		/* default max mtu */
 	int	maclen;		/* mac address length  */
-	void	(*bind)(struct ipifc *unused_ipifc, int unused_int, char **unused_char_pp_t);
-	void	(*unbind)(struct ipifc *unused_ipifc);
-	void	(*bwrite)(struct ipifc *ifc,
+	void	(*bind)(struct Ipifc *unused_Ipifc, int unused_int, char **unused_char_pp_t);
+	void	(*unbind)(struct Ipifc *unused_Ipifc);
+	void	(*bwrite)(struct Ipifc *ifc,
 			      struct block *b, int version, uint8_t *ip);
 
 	/* for arming interfaces to receive multicast */
-	void	(*addmulti)(struct ipifc *ifc, uint8_t *a, uint8_t *ia);
-	void	(*remmulti)(struct ipifc *ifc, uint8_t *a, uint8_t *ia);
+	void	(*addmulti)(struct Ipifc *ifc, uint8_t *a, uint8_t *ia);
+	void	(*remmulti)(struct Ipifc *ifc, uint8_t *a, uint8_t *ia);
 
 	/* process packets written to 'data' */
-	void	(*pktin)(struct fs *f, struct ipifc *ifc,
+	void	(*pktin)(struct Fs *f, struct Ipifc *ifc,
 			     struct block *bp);
 
 	/* routes for router boards */
-	void	(*addroute)(struct ipifc *ifc, int unused_int, uint8_t *unused_uint8_p_t, uint8_t*,
+	void	(*addroute)(struct Ipifc *ifc, int unused_int, uint8_t *unused_uint8_p_t, uint8_t*,
 				 uint8_t *unused_uint8_p_t, int);
-	void	(*remroute)(struct ipifc *ifc, int unused_int, uint8_t *unused_uint8_p_t, uint8_t *unused_uint8_p_t);
-	void	(*flushroutes)(struct ipifc *ifc);
+	void	(*remroute)(struct Ipifc *ifc, int unused_int, uint8_t *unused_uint8_p_t, uint8_t *unused_uint8_p_t);
+	void	(*flushroutes)(struct Ipifc *ifc);
 
 	/* for routing multicast groups */
-	void	(*joinmulti)(struct ipifc *ifc, uint8_t *a, uint8_t *ia);
-	void	(*leavemulti)(struct ipifc *ifc, uint8_t *a, uint8_t *ia);
+	void	(*joinmulti)(struct Ipifc *ifc, uint8_t *a, uint8_t *ia);
+	void	(*leavemulti)(struct Ipifc *ifc, uint8_t *a, uint8_t *ia);
 
 	/* address resolution */
-	void	(*ares)(struct fs*, int unused_int, uint8_t *unused_uint8_p_t, uint8_t*, int, int);	/* resolve */
-	void	(*areg)(struct ipifc *unused_ipifc, uint8_t *unused_uint8_p_t);			/* register */
+	void	(*ares)(struct Fs*, int unused_int, uint8_t *unused_uint8_p_t, uint8_t*, int, int);	/* resolve */
+	void	(*areg)(struct Ipifc *unused_Ipifc, uint8_t *unused_uint8_p_t);			/* register */
 
 	/* v6 address generation */
 	void	(*pref2addr)(uint8_t *pref, uint8_t *ea);
@@ -217,9 +185,9 @@ struct Hostparams {
 
 struct Ipifc
 {
-	RWlock;
+	rwlock_t rwlock;
 	
-	Conv	*conv;		/* link to its conversation structure */
+	struct conv	*conv;		/* link to its conversation structure */
 	char	dev[64];	/* device we're attached to */
 	Medium	*m;		/* Media pointer */
 	int	maxtu;		/* Maximum transfer unit */
@@ -231,7 +199,7 @@ struct Ipifc
 	/* these are used so that we can unbind on the fly */
 	Lock	idlock;
 	uint8_t	ifcid;		/* incremented each 'bind/unbind/add/remove' */
-	int	ref;		/* number of proc's using this ipifc */
+	int	ref;		/* number of proc's using this Ipifc */
 	Rendez	wait;		/* where unbinder waits for ref == 0 */
 	int	unbinding;
 
@@ -249,7 +217,7 @@ struct Ipifc
 };
 
 /*
- *  one per multicast-lifc pair used by a Conv
+ *  one per multicast-lifc pair used by a struct conv
  */
 struct Ipmulti
 {
@@ -296,27 +264,27 @@ struct Proto
 	int		x;		/* protocol index */
 	int		ipproto;	/* ip protocol type */
 
-	char*		(*connect)(Conv*, char **unused_char_pp_t, int);
-	char*		(*announce)(Conv*, char **unused_char_pp_t, int);
-	char*		(*bind)(Conv*, char **unused_char_pp_t, int);
-	int		(*state)(Conv*, char *unused_char_p_t, int);
-	void		(*create)(Conv*);
-	void		(*close)(Conv*);
-	void		(*rcv)(Proto*, Ipifc*, Block*);
-	char*		(*ctl)(Conv*, char **unused_char_pp_t, int);
-	void		(*advise)(Proto*, Block*, char *unused_char_p_t);
-	int		(*stats)(Proto*, char *unused_char_p_t, int);
-	int		(*local)(Conv*, char *unused_char_p_t, int);
-	int		(*remote)(Conv*, char *unused_char_p_t, int);
-	int		(*inuse)(Conv*);
-	int		(*gc)(Proto*);	/* returns true if any conversations are freed */
+	char*		(*connect)(struct conv*, char **unused_char_pp_t, int);
+	char*		(*announce)(struct conv*, char **unused_char_pp_t, int);
+	char*		(*bind)(struct conv*, char **unused_char_pp_t, int);
+	int		(*state)(struct conv*, char *unused_char_p_t, int);
+	void		(*create)(struct conv*);
+	void		(*close)(struct conv*);
+	void		(*rcv)(struct proto*, Ipifc*, Block*);
+	char*		(*ctl)(struct conv*, char **unused_char_pp_t, int);
+	void		(*advise)(struct proto*, Block*, char *unused_char_p_t);
+	int		(*stats)(struct proto*, char *unused_char_p_t, int);
+	int		(*local)(struct conv*, char *unused_char_p_t, int);
+	int		(*remote)(struct conv*, char *unused_char_p_t, int);
+	int		(*inuse)(struct conv*);
+	int		(*gc)(struct proto*);	/* returns true if any conversations are freed */
 
 	Fs		*f;		/* file system this proto is part of */
-	Conv		**conv;		/* array of conversations */
+	struct conv		**conv;		/* array of conversations */
 	int		ptclsize;	/* size of per protocol ctl block */
 	int		nc;		/* number of conversations */
 	int		ac;
-	Qid		qid;		/* qid for protocol directory */
+	struct qid		qid;		/* qid for protocol directory */
 	uint16_t		nextport;
 	uint16_t		nextrport;
 
@@ -329,7 +297,7 @@ struct Proto
 struct IProuter {
 	qlock_t qlock;
 	int	opens;
-	Queue	*q;
+	struct queue	*q;
 };
 
 /*
@@ -337,24 +305,24 @@ struct IProuter {
  */
 struct Fs
 {
-	RWlock;
+	rwlock_t rwlock;
 	int	dev;
 
 	int	np;
-	Proto*	p[Maxproto+1];		/* list of supported protocols */
-	Proto*	t2p[256];		/* vector of all protocols */
-	Proto*	ipifc;			/* kludge for ipifcremroute & ipifcaddroute */
-	Proto*	ipmux;			/* kludge for finding an ip multiplexor */
+	struct proto*	p[Maxproto+1];		/* list of supported protocols */
+	struct proto*	t2p[256];		/* vector of all protocols */
+	struct proto*	ipifc;			/* kludge for ipifcremroute & ipifcaddroute */
+	struct proto*	ipmux;			/* kludge for finding an ip multiplexor */
 
 	IP	*ip;
 	Ipselftab	*self;
-	Arp	*arp;
+	struct arp	*arp;
 	V6params	*v6p;
 	IProuter iprouter;
 
-	Route	*v4root[1<<Lroot];	/* v4 routing forest */
-	Route	*v6root[1<<Lroot];	/* v6 routing forest */
-	Route	*queue;			/* used as temp when reinjecting routes */
+	struct route	*v4root[1<<Lroot];	/* v4 routing forest */
+	struct route	*v6root[1<<Lroot];	/* v6 routing forest */
+	struct route	*queue;			/* used as temp when reinjecting routes */
 
 	Netlog	*alog;
 	Ifclog	*ilog;
@@ -437,10 +405,6 @@ void	ifclogclose(struct fs*, struct chan*);
 /*
  *  iproute.c
  */
-typedef	struct RouteTree RouteTree;
-typedef struct Routewalk Routewalk;
-typedef struct V4route V4route;
-typedef struct V6route V6route;
 
 enum
 {
@@ -455,7 +419,7 @@ enum
 	Rproxy=		(1<<6),		/* this route should be proxied */
 };
 
-struct Routewalk
+struct routewalk
 {
 	int	o;
 	int	h;
@@ -492,7 +456,7 @@ struct V6route
 	uint8_t	gate[IPaddrlen];
 };
 
-struct Route
+struct route
 {
 	struct RouteTree;
 
@@ -535,7 +499,7 @@ extern struct IPaux*	newipaux( char *unused_char_p_t, char*);
 /*
  *  arp.c
  */
-struct Arpent
+struct arpent
 {
 	uint8_t	ip[IPaddrlen];
 	uint8_t	mac[MAClen];
@@ -679,7 +643,7 @@ char*		commonerror(void);
 /*
  * chandial.c
  */
-extern struct chan*	chandial( char *unused_char_p_t, char*, char*, struct chan**);
+extern struct chan*	chandial( char *u1, char*u2, char*u3, struct chan**c);
 
 /*
  *  global to all of the stack

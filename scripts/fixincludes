@@ -13,5 +13,5 @@ sed -i '/^#include/,/^$/c\
 #include <cpio.h>\
 #include <pmap.h>\
 #include <smp.h>\
-#include <ns.h>\
+#include <ip.h>\
 ' $1
