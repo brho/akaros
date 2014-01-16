@@ -23,7 +23,8 @@ struct timeval {
 };
 
 void train_timing();
-void udelay(uint64_t usec);
+void udelay(uint64_t usec);	/* done in arch-specific files */
+void udelay_sched(uint64_t usec);
 uint64_t tsc2sec(uint64_t tsc_time);
 uint64_t tsc2msec(uint64_t tsc_time);
 uint64_t tsc2usec(uint64_t tsc_time);
