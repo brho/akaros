@@ -1,34 +1,10 @@
 // INFERNO
-
-/* error stacks, as defined by us. These are a new implementation. */
-/* add 1 in case they forget they need an entry for the passed-in errbuf */
-#include <setjmp.h>
-struct errbuf *get_cur_errbuf(void);
-void set_cur_errbuf(struct errbuf *ebuf);
-
-struct errbuf {
-	struct jmpbuf jmpbuf;
-};
-
-#define ERRSTACK(x) struct errbuf *prev_errbuf; struct errbuf errstack[(x)];   \
-                    int curindex = 0;
-#define waserror() (errpush(errstack, ARRAY_SIZE(errstack), &curindex,         \
-                            &prev_errbuf) ||                                   \
-                    setjmp(&(get_cur_errbuf()->jmpbuf)))
-#define error(x,...) {set_errstr(x, ##__VA_ARGS__);                            \
-                      longjmp(&get_cur_errbuf()->jmpbuf, (void *)x);}
-#define nexterror() {errpop(errstack, ARRAY_SIZE(errstack), &curindex,         \
-                            prev_errbuf);                                      \
-                     longjmp(&(get_cur_errbuf())->jmpbuf, (void *)1);}
-#define poperror() {errpop(errstack, ARRAY_SIZE(errstack), &curindex,          \
-                           prev_errbuf);}
-
-
+#include <err.h>
+#include <rendez.h>
+#include <rwlock.h>
 /*
  * functions (possibly) linked in, complete, from libc.
  */
-#define ARRAY_SIZE(x)	(sizeof(x)/sizeof((x)[0]))
-
 enum
 {
 	UTFmax		= 4,		/* maximum bytes per rune */
@@ -84,15 +60,6 @@ extern	int	parseether( uint8_t *unused_uint8_p_t, char *unused_char_p_t);
 #define	MCREATE	0x0004	/* permit creation in mounted directory */
 #define	MCACHE	0x0010	/* cache some data */
 #define	MMASK	0x0017	/* all bits on */
-
-#define	OREAD	0	/* open for read */
-#define	OWRITE	1	/* write */
-#define	ORDWR	2	/* read and write */
-#define	OEXEC	3	/* execute, == read but check execute permission */
-#define	OTRUNC	16	/* or'ed in (except for exec), truncate file first */
-#define	OCEXEC	32	/* or'ed in, close on exec */
-#define	ORCLOSE	64	/* or'ed in, remove on close */
-#define OEXCL   0x1000	/* or'ed in, exclusive create */
 
 #define	NCONT	0	/* continue after note */
 #define	NDFLT	1	/* terminate after note */
@@ -286,12 +253,6 @@ struct ref
 	long	ref;
 };
 
-struct rendez
-{
-	spinlock_t lock;
-	struct proc	*p;
-};
-
 struct rept
 {
 	spinlock_t	l;
@@ -308,22 +269,6 @@ enum
 	Nopin =	-1
 };
 
-typedef struct qlock
-{
-	spinlock_t	use;			/* to access Qlock structure */
-	struct proc	*head;			/* next process waiting for object */
-	struct proc	*tail;			/* last process waiting for object */
-	int	locked;			/* flag */
-}qlock_t ;
-
-typedef struct rwlock
-{
-	spinlock_t rwlock;				/* Lock modify lock */
-	struct qlock	x;			/* Mutual exclusion lock */
-	struct qlock	k;			/* Lock for waiting writers */
-	int	readers;		/* Count of readers in lock */
-} rwlock_t;
-
 struct talarm
 {
 	spinlock_t lock;
@@ -332,7 +277,7 @@ struct talarm
 
 struct alarms
 {
-	struct qlock qlock;
+	qlock_t qlock;
 	struct proc*	head;
 };
 
@@ -406,7 +351,7 @@ struct chan
 	uint32_t	iounit;	/* chunk size for i/o; 0==default */
 	struct mhead*	umh;			/* mount point that derived Chan; used in unionread */
 	struct chan*	umc;			/* channel in union; held for union read */
-	struct qlock	umqlock;		/* serialize unionreads */
+	qlock_t	umqlock;		/* serialize unionreads */
 	int	uri;			/* union read index */
 	int	dri;			/* devdirread index */
 	uint32_t	mountid;
@@ -542,9 +487,9 @@ struct pgrp
 {
 	struct kref ref;				/* also used as a lock when mounting */
 	uint32_t	pgrpid;
-	struct qlock	debug;			/* single access via devproc.c */
+	qlock_t	debug;			/* single access via devproc.c */
 	struct rwlock	ns;			/* Namespace n read/one write lock */
-	struct qlock	nsh;
+	qlock_t	nsh;
 	struct mhead*	mnthash[MNTHASH];
 	int	progmode;
 	struct chan*	dot;
@@ -575,7 +520,7 @@ struct evalue
 struct egrp
 {
 	struct kref ref;
-	struct qlock qlock;
+	qlock_t qlock;
 	struct evalue	*entries;
 	uint32_t	path;	/* qid.path of next Evalue to be allocated */
 	uint32_t	vers;	/* of Egrp */
@@ -595,7 +540,7 @@ struct signerkey
 struct skeyset
 {
 	struct kref ref;
-	struct qlock qlock;
+	qlock_t qlock;
 	uint32_t	flags;
 	char*	devs;
 	int	nkey;
@@ -669,10 +614,7 @@ void	_assert( char *unused_char_p_t);
 struct block*		bl2mem( uint8_t *unused_uint8_p_t, struct block*, int);
 int		blocklen(struct block*);
 char*		channame(struct chan*);
-int		canlock(spinlock_t*);
-int		canqlock(qlock_t*);
 void		cclose(struct chan*);
-int		canrlock(rwlock_t*);
 void		chandevinit(void);
 void		chandevreset(void);
 void		chandevshutdown(void);
@@ -789,7 +731,6 @@ void	(*kproftick)(uint32_t);
 void		ksetenv( char *unused_char_p_t, char*, int);
 //void		kstrncpy( char *unused_char_p_t, char*, int unused_int, sizeof(char*, char*));
 void		kstrdup( char **unused_char_pp_t, char *unused_char_p_t);
-void		lock(spinlock_t*);
 
 struct cmdtab*		lookupcmd(struct cmdbuf*, struct cmdtab*, int);
 void*		malloc(uint32_t);
@@ -864,7 +805,6 @@ long		qread(struct queue*, void*, int);
 struct block*		qremove(struct queue*);
 void		qreopen(struct queue*);
 void		qsetlimit(struct queue*, int);
-void		qunlock(qlock_t*);
 int		qwindow(struct queue*);
 int		qwrite(struct queue*, void*, int);
 void		randominit(void);
@@ -878,8 +818,6 @@ void		renameproguser( char *unused_char_p_t, char*);
 void		renameuser( char *unused_char_p_t, char*);
 void		resrcwait( char *unused_char_p_t);
 int		return0(void*);
-void		rlock(rwlock_t*);
-void		runlock(rwlock_t*);
 struct proc*		runproc(void);
 void		sched(void);
 void		schedinit(void);
@@ -923,8 +861,6 @@ void		validwstatname( char *unused_char_p_t);
 int		wakeup(struct rendez*);
 int		walk(struct chan**, char **unused_char_pp_t, int unused_int, int, int*);
 void		werrstr( char *unused_char_p_t, ...);
-void		wlock(rwlock_t*);
-void		wunlock(rwlock_t*);
 void*		xalloc(uint32_t);
 void*		xallocz(uint32_t, int);
 void		xfree(void*);

@@ -6,6 +6,6 @@
 #include <arch/setjmp.h>
 
 int setjmp(struct jmpbuf *env) __attribute__((returns_twice));
-void longjmp(struct jmpbuf *env, void * val) __attribute__((noreturn));
+void longjmp(struct jmpbuf *env, int val) __attribute__((noreturn));
 
 #endif /* !ROS_SETJMP_H */
