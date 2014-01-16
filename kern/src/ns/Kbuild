@@ -1,2 +1,3 @@
 obj-y						+= chan.o
 obj-y						+= error.o
+obj-y						+= qio.o

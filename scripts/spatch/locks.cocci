@@ -28,6 +28,15 @@ expression E;
 @@
 expression E;
 @@
+-iunlock(
++spin_unlock_irqsave(
+-E
++&E->lock
+ )
+
+@@
+expression E;
+@@
 wlock(
 -E
 +&E->rwlock
