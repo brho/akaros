@@ -1,5 +1,6 @@
 obj-y						+= nullmedium.o
 obj-y						+= loopbackmedium.o
 obj-y						+= netdevmedium.o
+obj-y						+= ptclbsum.o
 obj-y						+= pktmedium.o
 
