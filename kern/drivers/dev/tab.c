@@ -2,18 +2,18 @@
  * Stub.
  */
 //#define DEBUG
-#include <vfs.h>
-#include <kfs.h>
-#include <slab.h>
 #include <kmalloc.h>
-#include <kref.h>
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
 #include <error.h>
-#include <cpio.h>
 #include <pmap.h>
+#include <sys/queue.h>
 #include <smp.h>
+#include <kref.h>
+#include <atomic.h>
+#include <alarm.h>
+#include <event.h>
 #include <umem.h>
 
 /* at some point this will be done via ldscript Hackes. */
@@ -21,7 +21,7 @@
 // the sooner the better!
 
 extern struct dev alarmdevtab;
-extern struct dev regressdevtab;
+/*extern struct dev regressdevtab;
 extern struct dev pipedevtab;
 extern struct dev procdevtab;
 extern struct dev miscdevtab;
@@ -30,9 +30,10 @@ extern struct dev rootdevtab;
 extern struct dev ipdevtab;
 extern struct dev mntdevtab;
 extern struct dev srvdevtab;
-extern struct dev vmdevtab;
+extern struct dev vmdevtab;*/
 struct dev *devtab[] = {
 	&alarmdevtab,
+/*
 	&rootdevtab,
 	&miscdevtab,
 	&regressdevtab,
@@ -42,7 +43,7 @@ struct dev *devtab[] = {
 	&ipdevtab,
 	&mntdevtab,
 	&srvdevtab,
-	&vmdevtab,
+	&vmdevtab,*/
 	NULL,
 };
 
@@ -52,7 +53,7 @@ void devtabreset()
 	printk("devtabresets\n");
 
 	for (i = 0; devtab[i] != NULL; i++)
-		devtab[i]->reset(current);
+		devtab[i]->reset();
 }
 
 void devtabinit()
@@ -61,7 +62,7 @@ void devtabinit()
 
 	printk("devtabinit\n");
 	for (i = 0; devtab[i] != NULL; i++)
-		devtab[i]->init(current);
+		devtab[i]->init();
 }
 
 void devtabshutdown()
@@ -73,7 +74,7 @@ void devtabshutdown()
 	 */
 	for (i = 0; devtab[i] != NULL; i++) ;
 	for (i--; i >= 0; i--)
-		devtab[i]->shutdown(current);
+		devtab[i]->shutdown();
 }
 
 struct dev *devtabget(int dc, int user)

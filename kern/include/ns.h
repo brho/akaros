@@ -955,3 +955,6 @@ char *get_cur_genbuf(void);
 
 /* stuff we really ought to have ... */
 char *index(char *s, int c);
+
+/* hack for now. */
+#define eve "eve"

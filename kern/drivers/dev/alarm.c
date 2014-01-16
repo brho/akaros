@@ -222,7 +222,7 @@ static struct walkqid *alarmwalk(struct chan *c, struct chan *nc, char **name,
 	return devwalk(c, nc, name, nname, 0, 0, alarmgen);
 }
 
-static long alarmstat(struct chan *c, uint8_t *db, long n)
+static int alarmstat(struct chan *c, uint8_t *db, int n)
 {
 	return devstat(c, db, n, 0, 0, alarmgen);
 }
@@ -289,7 +289,7 @@ static struct chan *alarmopen(struct chan *c, int omode)
 	return c;
 }
 
-static void alarmcreate(struct chan *c, char *name, int omode, int perm)
+static void alarmcreate(struct chan *c, char *name, int omode, uint32_t perm)
 {
 	error(Eperm);
 }
@@ -299,7 +299,7 @@ static void alarmremove(struct chan *c)
 	error(Eperm);
 }
 
-static long alarmwstat(struct chan *c, uint8_t *dp, long n)
+static int alarmwstat(struct chan *c, uint8_t *dp, int n)
 {
 	error("No alarmwstat");
 	return 0;
@@ -421,6 +421,6 @@ struct dev alarmdevtab = {
 	alarmremove,
 	alarmwstat,
 	devpower,
-	devconfig,
-	devchaninfo,
+	//devconfig,
+	//devchaninfo,
 };

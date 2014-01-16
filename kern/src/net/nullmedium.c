@@ -14,18 +14,18 @@
 #include <ip.h>
 
 static void
-nullbind(struct ipifc *unused_ipifc, int unused_int, char **unused_char_pp_t)
+nullbind(struct Ipifc *unused_ipifc, int unused_int, char **unused_char_pp_t)
 {
 	error("cannot bind null device");
 }
 
 static void
-nullunbind(struct ipifc *unused_ipifc)
+nullunbind(struct Ipifc *unused_ipifc)
 {
 }
 
 static void
-nullbwrite(struct ipifc *unused_ipifc, struct block*b, int unused_int, uint8_t *unused_uint8_p_t)
+nullbwrite(struct Ipifc *unused_ipifc, struct block*b, int unused_int, uint8_t *unused_uint8_p_t)
 {
 	error("nullbwrite");
 }
