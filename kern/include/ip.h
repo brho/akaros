@@ -41,12 +41,13 @@ enum
 /*
  *  one per conversation directory
  */
+struct Proto;
 struct conv
 {
 	qlock_t qlock;
 
 	int	x;			/* conversation index */
-	struct proto*	p;
+	struct Proto*	p;
 
 	int	restricted;		/* remote port is restricted */
 	uint32_t	ttl;			/* max time to live */
@@ -86,7 +87,7 @@ struct conv
 
 	struct ipmulti	*multi;			/* multicast bindings for this interface */
 
-	void*	ptcl;			/* protocol specific stuff */
+	void*	ptcl;			/* Protocol specific stuff */
 
 	struct route	*r;			/* last route used */
 	uint32_t	rgen;			/* routetable generation for *r */
@@ -253,7 +254,7 @@ void iphtrem(struct Ipht*, struct conv*);
 struct conv* iphtlook(struct Ipht *ht, uint8_t *sa, uint16_t sp, uint8_t *da, uint16_t dp);
 
 /*
- *  one per multiplexed protocol
+ *  one per multiplexed Protocol
  */
 struct Proto
 {
@@ -268,14 +269,14 @@ struct Proto
 	int		(*state)(struct conv*, char *unused_char_p_t, int);
 	void		(*create)(struct conv*);
 	void		(*close)(struct conv*);
-	void		(*rcv)(struct proto*, struct Ipifc*, struct block*);
+	void		(*rcv)(struct Proto*, struct Ipifc*, struct block*);
 	char*		(*ctl)(struct conv*, char **unused_char_pp_t, int);
-	void		(*advise)(struct proto*, struct block*, char *unused_char_p_t);
-	int		(*stats)(struct proto*, char *unused_char_p_t, int);
+	void		(*advise)(struct Proto*, struct block*, char *unused_char_p_t);
+	int		(*stats)(struct Proto*, char *unused_char_p_t, int);
 	int		(*local)(struct conv*, char *unused_char_p_t, int);
 	int		(*remote)(struct conv*, char *unused_char_p_t, int);
 	int		(*inuse)(struct conv*);
-	int		(*gc)(struct proto*);	/* returns true if any conversations are freed */
+	int		(*gc)(struct Proto*);	/* returns true if any conversations are freed */
 
 	struct Fs		*f;		/* file system this proto is part of */
 	struct conv		**conv;		/* array of conversations */
@@ -307,10 +308,10 @@ struct Fs
 	int	dev;
 
 	int	np;
-	struct proto*	p[Maxproto+1];		/* list of supported protocols */
-	struct proto*	t2p[256];		/* vector of all protocols */
-	struct proto*	ipifc;			/* kludge for ipifcremroute & ipifcaddroute */
-	struct proto*	ipmux;			/* kludge for finding an ip multiplexor */
+	struct Proto*	p[Maxproto+1];		/* list of supported protocols */
+	struct Proto*	t2p[256];		/* vector of all protocols */
+	struct Proto*	ipifc;			/* kludge for ipifcremroute & ipifcaddroute */
+	struct Proto*	ipmux;			/* kludge for finding an ip multiplexor */
 
 	struct IP	*ip;
 	struct Ipselftab	*self;
@@ -359,9 +360,9 @@ struct conv*	Fsnewcall(struct conv*, uint8_t *unused_uint8_p_t, uint16_t, uint8_
 int	Fspcolstats( char *unused_char_p_t, int);
 int	Fsproto(struct Fs*, struct Proto*);
 int	Fsbuiltinproto(struct Fs*, uint8_t unused_uint8_t);
-struct conv*	Fsprotoclone(struct proto*, char *unused_char_p_t);
-struct proto*	Fsrcvpcol(struct Fs*, uint8_t unused_uint8_t);
-struct proto*	Fsrcvpcolx(struct Fs*, uint8_t unused_uint8_t);
+struct conv*	Fsprotoclone(struct Proto*, char *unused_char_p_t);
+struct Proto*	Fsrcvpcol(struct Fs*, uint8_t unused_uint8_t);
+struct Proto*	Fsrcvpcolx(struct Fs*, uint8_t unused_uint8_t);
 char*	Fsstdconnect(struct conv*, char **unused_char_pp_t, int);
 char*	Fsstdannounce(struct conv*, char **unused_char_pp_t, int);
 char*	Fsstdbind(struct conv*, char **unused_char_pp_t, int);

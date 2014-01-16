@@ -1,2 +1,3 @@
 obj-y						+= nullmedium.o
+obj-y						+= loopbackmedium.o
 

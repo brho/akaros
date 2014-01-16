@@ -14,7 +14,7 @@ typedef Fmt;
 typedef Ipifc;
 @@
 -Ipifc
-+struct ipifc
++struct Ipifc
 
 @@
 typedef Iplifc;
@@ -74,7 +74,7 @@ typedef Fraghdr6;
 typedef Fs;
 @@
 -Fs
-+struct fs
++struct Fs
 
 @@
 typedef Hwaddr;
