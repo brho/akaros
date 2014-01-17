@@ -12,34 +12,32 @@
 #include <pmap.h>
 #include <smp.h>
 #include <ip.h>
+#include <process.h>
 
 enum
 {
 	Hdrspc		= 64,		/* leave room for high-level headers */
 	Bdead		= 0x51494F42,	/* "QIOB" */
-	BY2V            = 32,		/* best practice learned the hard way */
+	BLOCKALIGN  = 32,		/* was the old BY2V in inferno, which was 8 */
 };
 
-struct
-{
-	spinlock_t lock;
-	uint32_t	bytes;
-} ialloc;
+static atomic_t ialloc_bytes = 0;
 
 /*
  *  allocate blocks (round data base address to 64 bit boundary).
  *  if mallocz gives us more than we asked for, leave room at the front
  *  for header.
  */
-struct block*
-_allocb(int size)
+struct block *_allocb(int size)
 {
 	struct block *b;
 	uintptr_t addr;
 	int n;
 
-	b = kzmalloc(sizeof(struct block)+size+Hdrspc+(BY2V-1), 0);
-	if(b == NULL)
+	/* TODO: verify we end up with properly aligned blocks */
+	b = kzmalloc(sizeof(struct block) + size + Hdrspc + (BLOCKALIGN - 1),
+	             KMALLOC_WAIT);
+	if (b == NULL)
 		return NULL;
 
 	b->next = NULL;
@@ -48,26 +46,25 @@ _allocb(int size)
 	b->flag = 0;
 
 	addr = (uintptr_t)b;
-	addr = ROUNDUP(addr + sizeof(struct block), BY2V);
-	b->base = ( uint8_t *)addr;
-	b->lim = (( uint8_t *)b) + msize(b);
+	addr = ROUNDUP(addr + sizeof(struct block), BLOCKALIGN);
+	b->base = (uint8_t*)addr;
+	b->lim = ((uint8_t*)b) + msize(b);
 	b->rp = b->base;
 	n = b->lim - b->base - size;
-	b->rp += n & ~(BY2V-1);
+	b->rp += n & ~(BLOCKALIGN - 1);
 	b->wp = b->rp;
 
 	return b;
 }
 
-struct block*
-allocb(int size)
+struct block *allocb(int size)
 {
 	struct block *b;
 
-	if(0 && current == NULL)
+	if (!current)
 		panic("allocb outside process: %8.8lux", getcallerpc(&size));
 	b = _allocb(size);
-	if(b == 0)
+	if (b == 0)
 		exhausted("Blocks");
 	return b;
 }
@@ -75,53 +72,49 @@ allocb(int size)
 /*
  *  interrupt time allocation
  */
-struct block*
-iallocb(int size)
+struct block *iallocb(int size)
 {
 	struct block *b;
 
-#if 0
-	/* if we ever want to limit bytes allocated in interrupts */
-	if(ialloc.bytes > conf.ialloc){
-		//print("iallocb: limited %lud/%lud\n", ialloc.bytes, conf.ialloc);
+	#if 0 /* conf is some inferno global config */
+	if (atomic_read(&ialloc_bytes) > conf.ialloc) {
+		//printk("iallocb: limited %lud/%lud\n", atomic_read(&ialloc_bytes),
+		//       conf.ialloc);
 		return NULL;
 	}
-#endif
+	#endif
 
 	b = _allocb(size);
-	if(b == NULL){
-		//print("iallocb: no memory %lud/%lud\n", ialloc.bytes, conf.ialloc);
+	if (b == NULL) {
+		//printk("iallocb: no memory %lud/%lud\n", atomic_read(&ialloc_bytes),
+		//       conf.ialloc);
 		return NULL;
 	}
 	b->flag = BINTR;
 
-	spin_lock_irqsave(&ialloc.lock);
-	ialloc.bytes += b->lim - b->base;
-	spin_unlock_irqsave(&ialloc.lock);
+	atomic_add(&ialloc_bytes, b->lim - b->base);
 
 	return b;
 }
 
-void
-freeb(struct block *b)
+void freeb(struct block *b)
 {
-	void *dead = (void*)Bdead;
+	void *dead = (void *)Bdead;
 
-	if(b == NULL)
+	if (b == NULL)
 		return;
 
 	/*
 	 * drivers which perform non cache coherent DMA manage their own buffer
 	 * pool of uncached buffers and provide their own free routine.
 	 */
-	if(b->free) {
+	if (b->free) {
 		b->free(b);
 		return;
 	}
-	if(b->flag & BINTR) {
-		spin_lock_irqsave(&ialloc.lock);
-		ialloc.bytes -= b->lim - b->base;
-		spin_unlock_irqsave(&ialloc.lock);
+	if (b->flag & BINTR) {
+		/* subtracting the size of b */
+		atomic_add(&ialloc_bytes, -(b->lim - b->base));
 	}
 
 	/* poison the block in case someone is still holding onto it */
@@ -134,36 +127,34 @@ freeb(struct block *b)
 	kfree(b);
 }
 
-void
-checkb(struct block *b, char *msg)
+void checkb(struct block *b, char *msg)
 {
-	void *dead = (void*)Bdead;
+	void *dead = (void *)Bdead;
 
-	if(b == dead)
+	if (b == dead)
 		panic("checkb b %s %lux", msg, b);
-	if(b->base == dead || b->lim == dead || b->next == dead
-	  || b->rp == dead || b->wp == dead){
+	if (b->base == dead || b->lim == dead || b->next == dead
+		|| b->rp == dead || b->wp == dead) {
 		printd("checkb: base 0x%8.8luX lim 0x%8.8luX next 0x%8.8luX\n",
-			b->base, b->lim, b->next);
+			   b->base, b->lim, b->next);
 		printd("checkb: rp 0x%8.8luX wp 0x%8.8luX\n", b->rp, b->wp);
 		panic("checkb dead: %s\n", msg);
 	}
 
-	if(b->base > b->lim)
+	if (b->base > b->lim)
 		panic("checkb 0 %s %lux %lux", msg, b->base, b->lim);
-	if(b->rp < b->base)
+	if (b->rp < b->base)
 		panic("checkb 1 %s %lux %lux", msg, b->base, b->rp);
-	if(b->wp < b->base)
+	if (b->wp < b->base)
 		panic("checkb 2 %s %lux %lux", msg, b->base, b->wp);
-	if(b->rp > b->lim)
+	if (b->rp > b->lim)
 		panic("checkb 3 %s %lux %lux", msg, b->rp, b->lim);
-	if(b->wp > b->lim)
+	if (b->wp > b->lim)
 		panic("checkb 4 %s %lux %lux", msg, b->wp, b->lim);
 
 }
 
-void
-iallocsummary(void)
+void iallocsummary(void)
 {
-	printd("ialloc %lud/%lud\n", ialloc.bytes, conf.ialloc);
+	printd("ialloc %lud/%lud\n", atomic_read(&ialloc_bytes), 0 /*conf.ialloc*/);
 }
