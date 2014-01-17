@@ -198,7 +198,7 @@ fgrpclose(struct fgrp *f, int fd)
 int
 sysclose(int fd)
 {
-	return kfgrpclose(current->fgrp, fd);
+	return fgrpclose(current->fgrp, fd);
 }
 
 int

@@ -172,7 +172,7 @@ etherbind(struct Ipifc *ifc, int argc, char **argv)
 	snprintf(addr, sizeof(addr), "%s!0x800", argv[2]);
 	fd = kdial(addr, NULL, dir, &cfd);
 	if(fd < 0)
-		errorf("dial 0x800 failed: %s", get_cur_errbuf());
+		error("dial 0x800 failed: %s", get_cur_errbuf());
 	mchan4 = commonfdtochan(fd, ORDWR, 0, 1);
 	cchan4 = commonfdtochan(cfd, ORDWR, 0, 1);
 	sysclose(fd);
@@ -189,7 +189,7 @@ etherbind(struct Ipifc *ifc, int argc, char **argv)
 	snprintf(addr, sizeof(addr), "%s/stats", dir);
 	fd = sysopen(addr, OREAD);
 	if(fd < 0)
-		errorf("can't open ether stats: %s", get_cur_errbuf());
+		error("can't open ether stats: %s", get_cur_errbuf());
 
 	buf = kzmalloc(512, 0);
 	n = sysread(fd, buf, 511);
