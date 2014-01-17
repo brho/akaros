@@ -148,6 +148,12 @@ struct file_operations dev_f_op_stdout = {
 	kfs_check_flags,
 };
 
+ssize_t dev_null_read(struct file *file, char *buf, size_t count,
+                      off64_t *offset)
+{
+	return 0;
+}
+
 /* /dev/null: just take whatever was given and pretend it was written */
 ssize_t dev_null_write(struct file *file, const char *buf, size_t count,
                        off64_t *offset)
@@ -157,7 +163,7 @@ ssize_t dev_null_write(struct file *file, const char *buf, size_t count,
 
 struct file_operations dev_f_op_null = {
 	dev_c_llseek,
-	0,	/* read - can't read null */
+	dev_null_read,
 	dev_null_write,
 	kfs_readdir,	/* this will fail gracefully */
 	dev_mmap,
