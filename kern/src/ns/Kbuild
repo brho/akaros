@@ -7,4 +7,5 @@ obj-y						+= convS2M.o
 obj-y						+= error.o
 obj-y						+= parse.o
 obj-y						+= qio.o
+obj-y						+= sysfile.o
 obj-y						+= util.o

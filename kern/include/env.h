@@ -86,6 +86,7 @@ struct proc {
 	struct fs_struct			fs_env;
 	struct files_struct			open_files;
 	struct pgrp                             *pgrp;
+	struct fgrp                             *fgrp;
 
 	/* UCQ hashlocks */
 	struct hashlock				*ucq_hashlock;

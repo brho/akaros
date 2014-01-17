@@ -192,7 +192,7 @@ etherbind(struct Ipifc *ifc, int argc, char **argv)
 		errorf("can't open ether stats: %s", get_cur_errbuf());
 
 	buf = kzmalloc(512, 0);
-	n = sysread(fd, buf, 511, 0ULL);
+	n = sysread(fd, buf, 511);
 	sysclose(fd);
 	if(n <= 0)
 		error(Eio);

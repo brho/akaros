@@ -393,6 +393,12 @@ typedef Mnt;
 +struct mnt
 
 @@
+typedef Mntparam;
+@@
+-Mntparam
++struct mntparam
+
+@@
 typedef Mntwalk;
 @@
 -Mntwalk

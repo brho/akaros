@@ -969,14 +969,49 @@ char *index(char *s, int c);
 #define	NOW	tsc2msec(read_tsc())
 #define	seconds() tsc2sec(read_tsc())
 
-/* system calls */
-int sysclose(int fd);
-int sysopen(char *name, int omode);
-long sysread(int fd, void *p, size_t n, off_t off);
-
 /* kern/src/ns/parse.c */
 struct cmdbuf *parsecmd(char *p, int n);
 void cmderror(struct cmdbuf *cb, char *s);
 struct cmdtab *lookupcmd(struct cmdbuf *cb, struct cmdtab *ctab, int nctab);
+
+/* kern/src/ns/sysfile.c */
+int newfd(struct chan *c);
+struct chan *fdtochan(struct fgrp *f, int fd, int mode, int chkmnt, int iref);
+long kchanio(void *vc, void *buf, int n, int mode);
+int openmode(uint32_t o);
+void fdclose(struct fgrp *f, int fd);
+int syschdir(char *path);
+int fgrpclose(struct fgrp *f, int fd);
+int sysclose(int fd);
+int syscreate(char *path, int mode, uint32_t perm);
+int sysdup(int old, int new);
+int sysfstat(int fd, uint8_t *buf, int n);
+char *sysfd2path(int fd);
+int sysfauth(int fd, char *aname);
+int sysfversion(int fd, unsigned int msize, char *vers, unsigned int arglen);
+int syspipe(int fd[2]);
+int sysfwstat(int fd, uint8_t *buf, int n);
+long bindmount(struct chan *c, char *old, int flag, char *spec);
+int sysbind(char *new, char *old, int flags);
+int sysmount(int fd, int afd, char *old, int flags, char *spec);
+int sysunmount(char *old, char *new);
+int sysopen(char *path, int mode);
+long unionread(struct chan *c, void *va, long n);
+long sysread(int fd, void *va, long n);
+long syspread(int fd, void *va, long n, int64_t off);
+int sysremove(char *path);
+int64_t sysseek(int fd, int64_t off, int whence);
+void validstat(uint8_t *s, int n);
+int sysstat(char *path, uint8_t *buf, int n);
+long syswrite(int fd, void *va, long n);
+long syspwrite(int fd, void *va, long n, int64_t off);
+int syswstat(char *path, uint8_t *buf, int n);
+struct dir *chandirstat(struct chan *c);
+struct dir *sysdirstat(char *name);
+struct dir *sysdirfstat(int fd);
+int sysdirwstat(char *name, struct dir *dir);
+int sysdirfwstat(int fd, struct dir *dir);
+long sysdirread(int fd, struct dir **d);
+int sysiounit(int fd);
 
 #endif /* ROS_KERN_NS_H */
