@@ -1,56 +1,63 @@
-#include	"u.h"
-#include	"../port/lib.h"
-#include	"mem.h"
-#include	"dat.h"
-#include	"fns.h"
-#include	"../port/error.h"
-#include	"../ip/ip.h"
+// INFERNO
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
+#include <ip.h>
 
-IProuter iprouter;
+struct IProuter iprouter;
 
 /*
  *  User level routing.  Ip packets we don't know what to do with
  *  come here.
  */
 void
-useriprouter(Fs *f, Ipifc *ifc, Block *bp)
+useriprouter(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 {
-	qlock(&f->iprouter);
-	if(f->iprouter.q != nil){
+	qlock(&(&f->iprouter)->qlock);
+	if(f->iprouter.q != NULL){
 		bp = padblock(bp, IPaddrlen);
-		if(bp == nil)
+		if(bp == NULL)
 			return;
 		ipmove(bp->rp, ifc->lifc->local);
 		qpass(f->iprouter.q, bp);
 	}else
 		freeb(bp);
-	qunlock(&f->iprouter);
+	qunlock(&(&f->iprouter)->qlock);
 }
 
 void
-iprouteropen(Fs *f)
+iprouteropen(struct Fs *f)
 {
-	qlock(&f->iprouter);
+	qlock(&(&f->iprouter)->qlock);
 	f->iprouter.opens++;
-	if(f->iprouter.q == nil)
+	if(f->iprouter.q == NULL)
 		f->iprouter.q = qopen(64*1024, 0, 0, 0);
 	else if(f->iprouter.opens == 1)
 		qreopen(f->iprouter.q);
-	qunlock(&f->iprouter);
+	qunlock(&(&f->iprouter)->qlock);
 }
 
 void
-iprouterclose(Fs *f)
+iprouterclose(struct Fs *f)
 {
-	qlock(&f->iprouter);
+	qlock(&(&f->iprouter)->qlock);
 	f->iprouter.opens--;
 	if(f->iprouter.opens == 0)
 		qclose(f->iprouter.q);
-	qunlock(&f->iprouter);
+	qunlock(&(&f->iprouter)->qlock);
 }
 
 long
-iprouterread(Fs *f, void *a, int n)
+iprouterread(struct Fs *f, void *a, int n)
 {
 	return qread(f->iprouter.q, a, n);
 }

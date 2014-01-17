@@ -8,6 +8,7 @@ obj-y						+= ip.o
 obj-y						+= ipv6.o
 obj-y						+= ipaux.o
 obj-y						+= iproute.o
+obj-y						+= iprouter.o
 obj-y						+= ipifc.o
 obj-y						+= loopbackmedium.o
 obj-y						+= netaux.o
