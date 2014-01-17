@@ -40,6 +40,7 @@ enum
 
 #define IPV6CLASS(hdr) ((hdr->vcf[0]&0x0F)<<2 | (hdr->vcf[1]&0xF0)>>2)
 #define BLKIPVER(xp)	(((struct ip6hdr*)((xp)->rp))->vcf[0]&0xF0)
+#define NEXT_ID(x) (__sync_add_and_fetch(&(x), 1))
 /*
  * This sleazy macro is stolen shamelessly from ip.c, see comment there.
  */
@@ -137,12 +138,12 @@ struct IP
 	qlock_t		fraglock4;
 	struct fragment4*	flisthead4;
 	struct fragment4*	fragfree4;
-	struct kref		id4;
+	int		id4;
 
 	qlock_t		fraglock6;
 	struct fragment6*	flisthead6;
 	struct fragment6*	fragfree6;
-	struct kref		id6;
+	int		id6;
 
 	int		iprouting;	/* true if we route like a gateway */
 };
@@ -282,7 +283,7 @@ ipoput6(struct Fs *f,
 		goto raise;
 	}
 
-	lid = kref_next(&ip->id6);
+	lid = NEXT_ID(ip->id6);
 	fraghdr.nexthdr = nexthdr;
 	fraghdr.res = 0;
 	hnputl(fraghdr.id, lid);

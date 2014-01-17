@@ -45,6 +45,7 @@ enum
 };
 
 #define BLKIPVER(xp)	(((struct Ip4hdr*)((xp)->rp))->vihl&0xF0)
+#define NEXT_ID(x) (__sync_add_and_fetch(&(x), 1))
 
 struct Ip4hdr
 {
@@ -120,12 +121,12 @@ struct IP
 	qlock_t		fraglock4;
 	struct fragment4*	flisthead4;
 	struct fragment4*	fragfree4;
-	struct kref		id4;
+	int		id4;
 
 	qlock_t		fraglock6;
 	struct fragment6*	flisthead6;
 	struct fragment6*	fragfree6;
-	struct kref		id6;
+	int		id6;
 
 	int		iprouting;	/* true if we route like a gateway */
 };
@@ -322,7 +323,7 @@ ipoput4(struct Fs *f,
 	medialen = ifc->maxtu - ifc->m->hsize;
 	if(len <= medialen) {
 		if(!gating)
-			hnputs(eh->id, kref_next(&ip->id4));
+			hnputs(eh->id, NEXT_ID(ip->id4));
 		hnputs(eh->length, len);
 		if(!gating){
 			eh->frag[0] = 0;
@@ -360,7 +361,7 @@ if((eh->frag[0] & (IP_DF>>8)) && !gating) printd("%V: DF set\n", eh->dst);
 	if(gating)
 		lid = nhgets(eh->id);
 	else
-		lid = kref_next(&ip->id4);
+		lid = NEXT_ID(ip->id4);
 
 	offset = IP4HDR;
 	while(xp != NULL && offset && offset >= BLEN(xp)) {
