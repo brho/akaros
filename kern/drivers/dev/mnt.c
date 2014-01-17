@@ -825,7 +825,7 @@ mountio(struct mnt *m, struct mntrpc *r)
 		if(m->rip == 0)
 			break;
 		spin_unlock(&m->lock);
-		Sleep(&r->r, rpcattn, r);
+		sleep(&r->r, rpcattn, r);
 		if(r->done){
 			poperror();
 			mntflushfree(m, r);
@@ -943,7 +943,7 @@ mntgate(struct mnt *m)
 	m->rip = 0;
 	for(q = m->queue; q; q = q->list) {
 		if(q->done == 0)
-		if(Wakeup(&q->r))
+		if(wakeup(&q->r))
 			break;
 	}
 	spin_unlock(&m->lock);
@@ -976,7 +976,7 @@ mountmux(struct mnt *m, struct mntrpc *r)
 					m->c, q->stime,
 					q->reqlen + r->replen);
 			if(q != r)
-				Wakeup(&q->r);
+				wakeup(&q->r);
 			return;
 		}
 		l = &q->list;

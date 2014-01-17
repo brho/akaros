@@ -9,6 +9,8 @@ void ( _panic)(const char* NTS, int, const char* NTS, ...)
 
 #define warn(...) _warn(__FILE__, __LINE__, __VA_ARGS__)
 #define panic(...) _panic(__FILE__, __LINE__, __VA_ARGS__)
+#define exhausted(...) _panic(__FILE__, __LINE__, __VA_ARGS__)
+
 
 #define check(x)		\
 	do { if (!(x)) warn("warning failed: %s", #x); } while (0)

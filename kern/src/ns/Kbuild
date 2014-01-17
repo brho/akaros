@@ -1,4 +1,5 @@
 obj-y						+= allocb.o
+obj-y						+= cache.o
 obj-y						+= chan.o
 obj-y						+= convD2M.o
 obj-y						+= convM2D.o

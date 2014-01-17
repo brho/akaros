@@ -695,7 +695,6 @@ int		eqqid(struct qid, struct qid);
 void		errorf( char *unused_char_p_t, ...);
 void		errstr( char *unused_char_p_t, int);
 void		excinit(void);
-void		exhausted( char *unused_char_p_t);
 void		exit(int);
 void		reboot(void);
 void		halt(void);
