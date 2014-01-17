@@ -10,14 +10,15 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
+#include <ip.h>
 
 /* normally automatically generated on plan 9. Move to ldscripts soon. */
-extern void tcpinit(struct fs*);
-extern void udpinit(struct fs*);
-extern void ipifcinit(struct fs*);
-extern void icmpinit(struct fs*);
-extern void icmp6init(struct fs*);
-void (*ipprotoinit[])(struct fs*) = {
+extern void tcpinit(struct Fs*);
+extern void udpinit(struct Fs*);
+extern void ipifcinit(struct Fs*);
+extern void icmpinit(struct Fs*);
+extern void icmp6init(struct Fs*);
+void (*ipprotoinit[])(struct Fs*) = {
 	tcpinit,
 	udpinit,
 	ipifcinit,

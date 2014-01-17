@@ -747,7 +747,6 @@ long		mntversion(struct chan*, char *unused_char_p_t, int unused_int, int);
 void		mountfree(struct mount*);
 void		mousetrack( int unused_int, int, int, int);
 uint64_t		ms2fastticks(uint32_t);
-uint32_t		msize(void*);
 void		mul64fract(uint64_t*, uint64_t, uint64_t);
 void		muxclose(struct mnt*);
 struct chan*		namec( char *unused_char_p_t, int unused_int, int, uint32_t);
@@ -822,8 +821,6 @@ void		renameproguser( char *unused_char_p_t, char*);
 void		renameuser( char *unused_char_p_t, char*);
 void		resrcwait( char *unused_char_p_t);
 struct proc*		runproc(void);
-void		sched(void);
-void		schedinit(void);
 long		seconds(void);
 void		(*serwrite)( char *unused_char_p_t, int);
 int		setcolor(uint32_t, uint32_t, uint32_t, uint32_t);
@@ -954,7 +951,6 @@ void errpop(struct errbuf *errstack, int stacksize, int *curindex,
 char *get_cur_genbuf(void);
 
 /* hack for now. */
-#define eve "eve"
 #define	NOW	tsc2msec(read_tsc())
 #define	seconds() tsc2sec(read_tsc())
 
@@ -1003,10 +999,7 @@ int sysdirfwstat(int fd, struct dir *dir);
 long sysdirread(int fd, struct dir **d);
 int sysiounit(int fd);
 
-static inline int iseve(void)
-{
-	return 1;
-}
+int iseve(void);
 
 static inline int abs(int a)
 {
@@ -1015,4 +1008,5 @@ static inline int abs(int a)
 	return a;
 }
 
+extern char *eve;
 #endif /* ROS_KERN_NS_H */

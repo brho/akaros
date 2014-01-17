@@ -48,7 +48,12 @@ struct block *_allocb(int size)
 	addr = (uintptr_t)b;
 	addr = ROUNDUP(addr + sizeof(struct block), BLOCKALIGN);
 	b->base = (uint8_t*)addr;
+	/* interesting. We can ask the allocator, after allocating,
+	 * the *real* size of the block we got. Very nice.
+	 * Not on akaros yet.
 	b->lim = ((uint8_t*)b) + msize(b);
+	 */
+	b->lim = ((uint8_t*)b) + sizeof(struct block) + size + Hdrspc + (BLOCKALIGN - 1);
 	b->rp = b->base;
 	n = b->lim - b->base - size;
 	b->rp += n & ~(BLOCKALIGN - 1);

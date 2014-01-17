@@ -14,6 +14,7 @@
 #include <ip.h>
 
 extern uint32_t	kerndate;
+extern char *eve;
 
 void
 mkqid(struct qid *q, int64_t path, uint32_t vers, int type)

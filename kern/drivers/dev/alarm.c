@@ -66,6 +66,7 @@
 #define QID2A(q) ((struct proc_alarm*)KADDR(((q).path >> ADDR_SHIFT)))
 #define TYPE(q) ((q).path & ((1 << ADDR_SHIFT) - 1))
 #define QID(ptr, type) ((PADDR(ptr) << ADDR_SHIFT) | type)
+extern char *eve;
 
 static void alarm_release(struct kref *kref)
 {

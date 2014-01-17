@@ -2627,7 +2627,7 @@ tcpoutput(struct conv *s)
 		}
 		if((msgs%4) == 1){
 			qunlock(&s->qlock);
-			sched();
+			kthread_yield();
 			qlock(&s->qlock);
 		}
 	}

@@ -1,4 +1,5 @@
 obj-y						+= alarm.o
+obj-y						+= cons.o
 obj-y						+= dev.o
 obj-y						+= mnt.o
 obj-y						+= tab.o

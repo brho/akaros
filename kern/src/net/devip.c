@@ -64,6 +64,7 @@ struct queue	*qlog;
 
 extern	void nullmediumlink(void);
 extern	void pktmediumlink(void);
+extern char *eve;
 static	long ndbwrite(struct Fs*, char *unused_char_p_t, uint32_t, int);
 static	void	closeconv(struct conv*);
 
