@@ -1,46 +1,52 @@
-#include	"u.h"
-#include	"../port/lib.h"
-#include	"mem.h"
-#include	"dat.h"
-#include	"fns.h"
-#include	"../port/error.h"
-#include	"ip.h"
-#include  "ipv6.h"
+// INFERNO
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
+#include <ip.h>
 
 /*
  *  well known IP addresses
  */
-uchar IPv4bcast[IPaddrlen] = {
+uint8_t IPv4bcast[IPaddrlen] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0xff, 0xff,
 	0xff, 0xff, 0xff, 0xff
 };
-uchar IPv4allsys[IPaddrlen] = {
+uint8_t IPv4allsys[IPaddrlen] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0xff, 0xff,
 	0xe0, 0, 0, 0x01
 };
-uchar IPv4allrouter[IPaddrlen] = {
+uint8_t IPv4allrouter[IPaddrlen] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0xff, 0xff,
 	0xe0, 0, 0, 0x02
 };
-uchar IPallbits[IPaddrlen] = {
+uint8_t IPallbits[IPaddrlen] = {
 	0xff, 0xff, 0xff, 0xff,
 	0xff, 0xff, 0xff, 0xff,
 	0xff, 0xff, 0xff, 0xff,
 	0xff, 0xff, 0xff, 0xff
 };
 
-uchar IPnoaddr[IPaddrlen];
+uint8_t IPnoaddr[IPaddrlen];
 
 /*
  *  prefix of all v4 addresses
  */
-uchar v4prefix[IPaddrlen] = {
+uint8_t v4prefix[IPaddrlen] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0xff, 0xff,
@@ -75,114 +81,114 @@ char *v6hdrtypes[Maxhdrtype] =
 /*
  *  well known IPv6 addresses
  */
-uchar v6Unspecified[IPaddrlen] = {
+uint8_t v6Unspecified[IPaddrlen] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0
 };
-uchar v6loopback[IPaddrlen] = {
+uint8_t v6loopback[IPaddrlen] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0x01
 };
-uchar v6linklocal[IPaddrlen] = {
+uint8_t v6linklocal[IPaddrlen] = {
 	0xfe, 0x80, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0
 };
-uchar v6linklocalmask[IPaddrlen] = {
+uint8_t v6linklocalmask[IPaddrlen] = {
 	0xff, 0xff, 0xff, 0xff,
 	0xff, 0xff, 0xff, 0xff,
 	0, 0, 0, 0,
 	0, 0, 0, 0
 };
 int v6llpreflen = 8;	// link-local prefix length
-uchar v6sitelocal[IPaddrlen] = {
+uint8_t v6sitelocal[IPaddrlen] = {
 	0xfe, 0xc0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0
 };
-uchar v6sitelocalmask[IPaddrlen] = {
+uint8_t v6sitelocalmask[IPaddrlen] = {
 	0xff, 0xff, 0xff, 0xff,
 	0xff, 0xff, 0xff, 0xff,
 	0, 0, 0, 0,
 	0, 0, 0, 0
 };
 int v6slpreflen = 6;	// site-local prefix length
-uchar v6glunicast[IPaddrlen] = {
+uint8_t v6glunicast[IPaddrlen] = {
 	0x08, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0
 };
-uchar v6multicast[IPaddrlen] = {
+uint8_t v6multicast[IPaddrlen] = {
 	0xff, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0
 };
-uchar v6multicastmask[IPaddrlen] = {
+uint8_t v6multicastmask[IPaddrlen] = {
 	0xff, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0
 };
 int v6mcpreflen = 1;	// multicast prefix length
-uchar v6allnodesN[IPaddrlen] = {
+uint8_t v6allnodesN[IPaddrlen] = {
 	0xff, 0x01, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0x01
 };
-uchar v6allnodesNmask[IPaddrlen] = {
+uint8_t v6allnodesNmask[IPaddrlen] = {
 	0xff, 0xff, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0
 };
 int v6aNpreflen = 2;	// all nodes (N) prefix
-uchar v6allnodesL[IPaddrlen] = {
+uint8_t v6allnodesL[IPaddrlen] = {
 	0xff, 0x02, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0x01
 };
-uchar v6allnodesLmask[IPaddrlen] = {
+uint8_t v6allnodesLmask[IPaddrlen] = {
 	0xff, 0xff, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0
 };
 int v6aLpreflen = 2;	// all nodes (L) prefix
-uchar v6allroutersN[IPaddrlen] = {
+uint8_t v6allroutersN[IPaddrlen] = {
 	0xff, 0x01, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0x02
 };
-uchar v6allroutersL[IPaddrlen] = {
+uint8_t v6allroutersL[IPaddrlen] = {
 	0xff, 0x02, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0x02
 };
-uchar v6allroutersS[IPaddrlen] = {
+uint8_t v6allroutersS[IPaddrlen] = {
 	0xff, 0x05, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0x02
 };
-uchar v6solicitednode[IPaddrlen] = {
+uint8_t v6solicitednode[IPaddrlen] = {
 	0xff, 0x02, 0, 0,
 	0, 0, 0, 0,
 	0, 0, 0, 0x01,
 	0xff, 0, 0, 0
 };
-uchar v6solicitednodemask[IPaddrlen] = {
+uint8_t v6solicitednodemask[IPaddrlen] = {
 	0xff, 0xff, 0xff, 0xff,
 	0xff, 0xff, 0xff, 0xff,
 	0xff, 0xff, 0xff, 0xff,
@@ -193,26 +199,26 @@ int v6snpreflen = 13;
 
 
 
-ushort
-ptclcsum(Block *bp, int offset, int len)
+uint16_t
+ptclcsum(struct block *bp, int offset, int len)
 {
-	uchar *addr;
-	ulong losum, hisum;
-	ushort csum;
+	uint8_t *addr;
+	uint32_t losum, hisum;
+	uint16_t csum;
 	int odd, blocklen, x;
 
 	/* Correct to front of data area */
-	while(bp != nil && offset && offset >= BLEN(bp)) {
+	while(bp != NULL && offset && offset >= BLEN(bp)) {
 		offset -= BLEN(bp);
 		bp = bp->next;
 	}
-	if(bp == nil)
+	if(bp == NULL)
 		return 0;
 
 	addr = bp->rp + offset;
 	blocklen = BLEN(bp) - offset;
 
-	if(bp->next == nil) {
+	if(bp->next == NULL) {
 		if(blocklen < len)
 			len = blocklen;
 		return ~ptclbsum(addr, len) & 0xffff;
@@ -236,7 +242,7 @@ ptclcsum(Block *bp, int offset, int len)
 		len -= x;
 
 		bp = bp->next;
-		if(bp == nil)
+		if(bp == NULL)
 			break;
 		blocklen = BLEN(bp);
 		addr = bp->rp;
@@ -255,7 +261,7 @@ enum
 	Isprefix= 16,
 };
 
-static uchar prefixvals[256] =
+static uint8_t prefixvals[256] =
 {
 [0x00] 0 | Isprefix,
 [0x80] 1 | Isprefix,
@@ -268,25 +274,29 @@ static uchar prefixvals[256] =
 [0xFF] 8 | Isprefix,
 };
 
+#warning "what did we do about eipfmt?"
+
 int
-eipfmt(Fmt *f)
+eipfmt(void)
 {
+	return 0;
+#if 0
 	char buf[5*8];
 	static char *efmt = "%.2lux%.2lux%.2lux%.2lux%.2lux%.2lux";
 	static char *ifmt = "%d.%d.%d.%d";
-	uchar *p, ip[16];
-	ulong *lp;
-	ushort s;
+	uint8_t *p, ip[16];
+	uint32_t *lp;
+	uint16_t s;
 	int i, j, n, eln, eli;
 
 	switch(f->r) {
 	case 'E':		/* Ethernet address */
-		p = va_arg(f->args, uchar*);
+		p = va_arg(f->args, uint8_t *unused_uint8_p_t);
 		return fmtprint(f, efmt, p[0], p[1], p[2], p[3], p[4], p[5]);
-		return fmtstrcpy(f, buf);
+		return fmtstrncpy(f,  buf, sizeof(f));
 
 	case 'I':		/* Ip address */
-		p = va_arg(f->args, uchar*);
+		p = va_arg(f->args, uint8_t *unused_uint8_p_t);
 common:
 		if(memcmp(p, v4prefix, 12) == 0)
 			return fmtprint(f, ifmt, p[12], p[13], p[14], p[15]);
@@ -316,21 +326,21 @@ common:
 			s = (p[i]<<8) + p[i+1];
 			n += sprint(buf+n, "%ux", s);
 		}
-		return fmtstrcpy(f, buf);
+		return fmtstrncpy(f,  buf, sizeof(f));
 
 	case 'i':		/* v6 address as 4 longs */
-		lp = va_arg(f->args, ulong*);
+		lp = va_arg(f->args, uint32_t*);
 		for(i = 0; i < 4; i++)
 			hnputl(ip+4*i, *lp++);
 		p = ip;
 		goto common;
 
 	case 'V':		/* v4 ip address */
-		p = va_arg(f->args, uchar*);
+		p = va_arg(f->args, uint8_t *unused_uint8_p_t);
 		return fmtprint(f, ifmt, p[0], p[1], p[2], p[3]);
 
 	case 'M':		/* ip mask */
-		p = va_arg(f->args, uchar*);
+		p = va_arg(f->args, uint8_t *unused_uint8_p_t);
 
 		/* look for a prefix mask */
 		for(i = 0; i < 16; i++)
@@ -349,13 +359,14 @@ common:
 		/* got one, use /xx format */
 		return fmtprint(f, "/%d", n);
 	}
-	return fmtstrcpy(f, "(eipfmt)");
+	return fmtstrncpy(f,  "(eipfmt)", sizeof(f));
+#endif
 }
 
-#define CLASS(p) ((*(uchar*)(p))>>6)
+#define CLASS(p) ((*( uint8_t *)(p))>>6)
 
 extern char*
-v4parseip(uchar *to, char *from)
+v4parseip(uint8_t *to, char *from)
 {
 	int i;
 	char *p;
@@ -367,7 +378,7 @@ v4parseip(uchar *to, char *from)
 			p++;
 	}
 	switch(CLASS(to)){
-	case 0:	/* class A - 1 uchar net */
+	case 0:	/* class A - 1 uint8_t net */
 	case 1:
 		if(i == 3){
 			to[3] = to[2];
@@ -378,7 +389,7 @@ v4parseip(uchar *to, char *from)
 			to[1] = 0;
 		}
 		break;
-	case 2:	/* class B - 2 uchar net */
+	case 2:	/* class B - 2 uint8_t net */
 		if(i == 3){
 			to[3] = to[2];
 			to[2] = 0;
@@ -389,7 +400,7 @@ v4parseip(uchar *to, char *from)
 }
 
 int
-isv4(uchar *ip)
+isv4(uint8_t *ip)
 {
 	return memcmp(ip, v4prefix, IPv4off) == 0;
 }
@@ -400,7 +411,7 @@ isv4(uchar *ip)
  *  up the usual case
  */
 void
-v4tov6(uchar *v6, uchar *v4)
+v4tov6(uint8_t *v6, uint8_t *v4)
 {
 	v6[0] = 0;
 	v6[1] = 0;
@@ -421,7 +432,7 @@ v4tov6(uchar *v6, uchar *v4)
 }
 
 int
-v6tov4(uchar *v4, uchar *v6)
+v6tov4(uint8_t *v4, uint8_t *v6)
 {
 	if(v6[0] == 0
 	&& v6[1] == 0
@@ -447,11 +458,11 @@ v6tov4(uchar *v4, uchar *v6)
 	}
 }
 
-ulong
-parseip(uchar *to, char *from)
+uint32_t
+parseip(uint8_t *to, char *from)
 {
 	int i, elipsis = 0, v4 = 1;
-	ulong x;
+	uint32_t x;
 	char *p, *op;
 
 	memset(to, 0, IPaddrlen);
@@ -490,12 +501,12 @@ parseip(uchar *to, char *from)
  *  hack to allow ip v4 masks to be entered in the old
  *  style
  */
-ulong
-parseipmask(uchar *to, char *from)
+uint32_t
+parseipmask(uint8_t *to, char *from)
 {
-	ulong x;
+	uint32_t x;
 	int i;
-	uchar *p;
+	uint8_t *p;
 
 	if(*from == '/'){
 		/* as a number of prefix bits */
@@ -520,7 +531,7 @@ parseipmask(uchar *to, char *from)
 }
 
 void
-maskip(uchar *from, uchar *mask, uchar *to)
+maskip(uint8_t *from, uint8_t *mask, uint8_t *to)
 {
 	int i;
 
@@ -528,15 +539,16 @@ maskip(uchar *from, uchar *mask, uchar *to)
 		to[i] = from[i] & mask[i];
 }
 
-uchar classmask[4][16] = {
-	0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0x00,0x00,0x00,
-	0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0x00,0x00,0x00,
-	0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0xff,0x00,0x00,
-	0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0x00,
+uint8_t classmask[4][16] = {
+	{0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0x00,0x00,0x00},
+	{0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0x00,0x00,0x00},
+	{0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0xff,0x00,0x00},
+	
+	{0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0x00},
 };
 
-uchar*
-defmask(uchar *ip)
+uint8_t*
+defmask(uint8_t *ip)
 {
 	if(isv4(ip))
 		return classmask[ip[IPv4off]>>6];
@@ -556,7 +568,7 @@ defmask(uchar *ip)
 }
 
 void
-ipv62smcast(uchar *smcast, uchar *a)
+ipv62smcast(uint8_t *smcast, uint8_t *a)
 {
 	assert(IPaddrlen == 16);
 	memmove(smcast, v6solicitednode, IPaddrlen);
@@ -570,7 +582,7 @@ ipv62smcast(uchar *smcast, uchar *a)
  *  parse a hex mac address
  */
 int
-parsemac(uchar *to, char *from, int len)
+parsemac(uint8_t *to, char *from, int len)
 {
 	char nip[4];
 	char *p;
@@ -597,20 +609,20 @@ parsemac(uchar *to, char *from, int len)
 /*
  *  hashing tcp, udp, ... connections
  */
-ulong
-iphash(uchar *sa, ushort sp, uchar *da, ushort dp)
+uint32_t
+iphash(uint8_t *sa, uint16_t sp, uint8_t *da, uint16_t dp)
 {
 	return ((sa[IPaddrlen-1]<<24) ^ (sp << 16) ^ (da[IPaddrlen-1]<<8) ^ dp ) % Nhash;
 }
 
 void
-iphtadd(Ipht *ht, Conv *c)
+iphtadd(struct Ipht *ht, struct conv *c)
 {
-	ulong hv;
-	Iphash *h;
+	uint32_t hv;
+	struct Iphash *h;
 
 	hv = iphash(c->raddr, c->rport, c->laddr, c->lport);
-	h = smalloc(sizeof(*h));
+	h = kzmalloc(sizeof(*h), 0);
 	if(ipcmp(c->raddr, IPnoaddr) != 0)
 		h->match = IPmatchexact;
 	else {
@@ -628,28 +640,28 @@ iphtadd(Ipht *ht, Conv *c)
 	}
 	h->c = c;
 
-	lock(ht);
+	spin_lock(&ht->lock);
 	h->next = ht->tab[hv];
 	ht->tab[hv] = h;
-	unlock(ht);
+	spin_unlock(&ht->lock);
 }
 
 void
-iphtrem(Ipht *ht, Conv *c)
+iphtrem(struct Ipht *ht, struct conv *c)
 {
-	ulong hv;
-	Iphash **l, *h;
+	uint32_t hv;
+	struct Iphash **l, *h;
 
 	hv = iphash(c->raddr, c->rport, c->laddr, c->lport);
-	lock(ht);
-	for(l = &ht->tab[hv]; (*l) != nil; l = &(*l)->next)
+	spin_lock(&ht->lock);
+	for(l = &ht->tab[hv]; (*l) != NULL; l = &(*l)->next)
 		if((*l)->c == c){
 			h = *l;
 			(*l) = h->next;
-			free(h);
+			kfree(h);
 			break;
 		}
-	unlock(ht);
+	spin_unlock(&ht->lock);
 }
 
 /* look for a matching conversation with the following precedence
@@ -659,72 +671,72 @@ iphtrem(Ipht *ht, Conv *c)
  *	announced && laddr,*
  *	announced && *,*
  */
-Conv*
-iphtlook(Ipht *ht, uchar *sa, ushort sp, uchar *da, ushort dp)
+struct conv*
+iphtlook(struct Ipht *ht, uint8_t *sa, uint16_t sp, uint8_t *da, uint16_t dp)
 {
-	ulong hv;
-	Iphash *h;
-	Conv *c;
+	uint32_t hv;
+	struct Iphash *h;
+	struct conv *c;
 
 	/* exact 4 pair match (connection) */
 	hv = iphash(sa, sp, da, dp);
-	lock(ht);
-	for(h = ht->tab[hv]; h != nil; h = h->next){
+	spin_lock(&ht->lock);
+	for(h = ht->tab[hv]; h != NULL; h = h->next){
 		if(h->match != IPmatchexact)
 			continue;
 		c = h->c;
 		if(sp == c->rport && dp == c->lport
 		&& ipcmp(sa, c->raddr) == 0 && ipcmp(da, c->laddr) == 0){
-			unlock(ht);
+			spin_unlock(&ht->lock);
 			return c;
 		}
 	}
 	
 	/* match local address and port */
 	hv = iphash(IPnoaddr, 0, da, dp);
-	for(h = ht->tab[hv]; h != nil; h = h->next){
+	for(h = ht->tab[hv]; h != NULL; h = h->next){
 		if(h->match != IPmatchpa)
 			continue;
 		c = h->c;
 		if(dp == c->lport && ipcmp(da, c->laddr) == 0){
-			unlock(ht);
+			spin_unlock(&ht->lock);
 			return c;
 		}
 	}
 	
 	/* match just port */
 	hv = iphash(IPnoaddr, 0, IPnoaddr, dp);
-	for(h = ht->tab[hv]; h != nil; h = h->next){
+	for(h = ht->tab[hv]; h != NULL; h = h->next){
 		if(h->match != IPmatchport)
 			continue;
 		c = h->c;
 		if(dp == c->lport){
-			unlock(ht);
+			spin_unlock(&ht->lock);
 			return c;
 		}
 	}
 	
 	/* match local address */
 	hv = iphash(IPnoaddr, 0, da, 0);
-	for(h = ht->tab[hv]; h != nil; h = h->next){
+	for(h = ht->tab[hv]; h != NULL; h = h->next){
 		if(h->match != IPmatchaddr)
 			continue;
 		c = h->c;
 		if(ipcmp(da, c->laddr) == 0){
-			unlock(ht);
+			spin_unlock(&ht->lock);
 			return c;
 		}
 	}
 	
 	/* look for something that matches anything */
 	hv = iphash(IPnoaddr, 0, IPnoaddr, 0);
-	for(h = ht->tab[hv]; h != nil; h = h->next){
+	for(h = ht->tab[hv]; h != NULL; h = h->next){
 		if(h->match != IPmatchany)
 			continue;
 		c = h->c;
-		unlock(ht);
+		spin_unlock(&ht->lock);
 		return c;
 	}
-	unlock(ht);
-	return nil;
+	spin_unlock(&ht->lock);
+	return NULL;
 }

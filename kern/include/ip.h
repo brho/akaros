@@ -238,7 +238,7 @@ enum
 };
 struct Iphash
 {
-	struct iphash	*next;
+	struct Iphash	*next;
 	struct conv	*c;
 	int	match;
 };

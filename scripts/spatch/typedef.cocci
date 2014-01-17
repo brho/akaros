@@ -134,7 +134,7 @@ typedef Ipmulti;
 typedef Iphash;
 @@
 -Iphash
-+struct iphash
++struct Iphash
 
 @@
 typedef Ipht;
