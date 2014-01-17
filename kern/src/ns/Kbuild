@@ -1,6 +1,7 @@
 obj-y						+= allocb.o
 obj-y						+= cache.o
 obj-y						+= chan.o
+obj-y						+= cleanname.o
 obj-y						+= convD2M.o
 obj-y						+= convM2D.o
 obj-y						+= convM2S.o
