@@ -1533,6 +1533,6 @@ void
 qdump(struct queue *q)
 {
 	if(q)
-	kprint("q=%p bfirst=%p blast=%p len=%d dlen=%d limit=%d state=#%x\n",
+	printk("q=%p bfirst=%p blast=%p len=%d dlen=%d limit=%d state=#%x\n",
 		q, q->bfirst, q->blast, q->len, q->dlen, q->limit, q->state);
 }

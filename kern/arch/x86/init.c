@@ -16,6 +16,7 @@
 #include <monitor.h>
 
 struct ancillary_state x86_default_fpu;
+uint32_t kerndate;
 
 #define capchar2ctl(x) ((x) - '@')
 

@@ -732,7 +732,6 @@ void		kbdrepeat(int);
 void		kproc( char *unused_char_p_t, void(*)(void*), void*, int);
 int		kfgrpclose(struct fgrp*, int);
 void		kprocchild(struct proc*, void (*)(void*), void*);
-int		kprint( char *unused_char_p_t, ...);
 void	(*kproftick)(uint32_t);
 void		ksetenv( char *unused_char_p_t, char*, int);
 //void		kstrncpy( char *unused_char_p_t, char*, int unused_int, sizeof(char*, char*));
