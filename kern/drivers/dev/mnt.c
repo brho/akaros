@@ -825,7 +825,7 @@ mountio(struct mnt *m, struct mntrpc *r)
 		if(m->rip == 0)
 			break;
 		spin_unlock(&m->lock);
-		sleep(&r->r, rpcattn, r);
+		rendez_sleep(&r->r, rpcattn, r);
 		if(r->done){
 			poperror();
 			mntflushfree(m, r);
@@ -943,8 +943,8 @@ mntgate(struct mnt *m)
 	m->rip = 0;
 	for(q = m->queue; q; q = q->list) {
 		if(q->done == 0)
-		if(wakeup(&q->r))
-			break;
+			if (rendez_wakeup(&q->r))
+				break;
 	}
 	spin_unlock(&m->lock);
 }
@@ -976,7 +976,7 @@ mountmux(struct mnt *m, struct mntrpc *r)
 					m->c, q->stime,
 					q->reqlen + r->replen);
 			if(q != r)
-				wakeup(&q->r);
+				rendez_wakeup(&q->r);
 			return;
 		}
 		l = &q->list;
@@ -1208,7 +1208,9 @@ struct dev mntdevtab = {
 	'M',
 	"mnt",
 
+	devreset,
 	mntinit,
+	devshutdown,
 	mntattach,
 	mntwalk,
 	mntstat,
