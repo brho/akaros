@@ -122,6 +122,21 @@ chandevshutdown(void)
 		devtab[i]->shutdown();
 }
 
+static void chan_release(struct kref *kref)
+{
+	struct chan *c = container_of(kref, struct chan, ref);
+	ERRSTACK(1);
+	/* this style discards the error from close().  picture it as
+	 * if (waserror()) { } else { close(); } chanfree_no_matter_what();  */
+	if (!waserror()) {
+		devtab[c->type]->close(c);
+	}
+	/* need to poperror regardless of whether we error'd or not */
+	poperror();
+	/* and chan free no matter what */
+	chanfree(c);
+}
+
 struct chan*
 newchan(void)
 {
@@ -146,7 +161,7 @@ newchan(void)
 	   close calls rootclose, a nop */
 	c->type = 0;
 	c->flag = 0;
-	kref_init(&c->ref, fake_release, 1);
+	kref_init(&c->ref, chan_release, 1);
 	c->dev = 0;
 	c->offset = 0;
 	c->iounit = 0;
@@ -164,7 +179,12 @@ newchan(void)
 	return c;
 }
 
-static struct kref ncname;
+static void __cname_release(struct kref *kref)
+{
+	struct cname *n = container_of(kref, struct cname, ref);
+	kfree(n->s);
+	kfree(n);
+}
 
 struct cname*
 newcname(char *s)
@@ -178,8 +198,7 @@ newcname(char *s)
 	n->alen = i+CNAMESLOP;
 	n->s = kzmalloc(n->alen, 0);
 	memmove(n->s, s, i+1);
-	kref_init(&n->ref, fake_release, 1);
-	kref_get(&n->ref, 1);
+	kref_init(&n->ref, __cname_release, 1);
 	return n;
 }
 
@@ -188,11 +207,7 @@ cnameclose(struct cname *n)
 {
 	if(n == NULL)
 		return;
-	if(kref_put(&n->ref))
-		return;
 	kref_put(&n->ref);
-	kfree(n->s);
-	kfree(n);
 }
 
 struct cname*
@@ -264,21 +279,13 @@ chanfree(struct chan *c)
 void
 cclose(struct chan *c)
 {
-	ERRSTACK(2);
 	if(c == 0)
 		return;
 
 	if(c->flag&CFREE)
 		panic("cclose %lux", getcallerpc(&c));
 
-	if(kref_put(&c->ref))
-		return;
-
-	if(!waserror()){
-		devtab[c->type]->close(c);
-		poperror();
-	}
-	chanfree(c);
+	kref_put(&c->ref);
 }
 
 /*
@@ -332,13 +339,20 @@ eqchantdqid(struct chan *a, int type, int dev, struct qid qid, int pathonly)
 	return 1;
 }
 
+static void mh_release(struct kref *kref)
+{
+	struct mhead *mh = container_of(kref, struct mhead, ref);
+	mh->mount = (struct mount*)0xCafeBeef;
+	kfree(mh);
+}
+
 struct mhead*
 newmhead(struct chan *from)
 {
 	struct mhead *mh;
 
 	mh = kzmalloc(sizeof(struct mhead), 0);
-	kref_init(&mh->ref, fake_release, 1);
+	kref_init(&mh->ref, mh_release, 1);
 	mh->from = from;
 	kref_get(&from->ref, 1);
 
@@ -1395,8 +1409,6 @@ isdir(struct chan *c)
 void
 putmhead(struct mhead *m)
 {
-	if(m && kref_put(&m->ref) == 0){
-		m->mount = (struct mount*)0xCafeBeef;
-		kfree(m);
-	}
+	if (m)
+		kref_put(&m->ref);
 }
