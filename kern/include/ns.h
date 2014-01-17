@@ -816,9 +816,12 @@ int		qwrite(struct queue*, void*, int);
 void		randominit(void);
 uint32_t	randomread(void*, uint32_t);
 void*	realloc(void*, uint32_t);
-int		readnum(uint32_t, char *unused_char_p_t, uint32_t, uint32_t, int);
+int readmem(unsigned long offset, char *buf, unsigned long n,
+            void *mem, size_t mem_len);
+int readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
+            size_t size);
+int readstr(unsigned long offset, char *buf, unsigned long n, char *str);
 int		readnum_int64_t(uint32_t, char *unused_char_p_t, uint32_t, int64_t, int);
-int		readstr(uint32_t, char *unused_char_p_t, uint32_t, char*);
 void		ready(struct proc*);
 void		renameproguser( char *unused_char_p_t, char*);
 void		renameuser( char *unused_char_p_t, char*);
