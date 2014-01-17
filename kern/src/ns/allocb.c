@@ -17,7 +17,7 @@ enum
 {
 	Hdrspc		= 64,		/* leave room for high-level headers */
 	Bdead		= 0x51494F42,	/* "QIOB" */
-	BY2V            = sizeof(uint64_t),
+	BY2V            = 32,		/* best practice learned the hard way */
 };
 
 struct
