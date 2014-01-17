@@ -461,7 +461,7 @@ struct V6route
 
 struct route
 {
-	struct RouteTree RouteTree;;
+	struct RouteTree rt;
 
 	union {
 		struct V6route	v6;

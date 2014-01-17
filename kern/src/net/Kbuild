@@ -1,3 +1,4 @@
+obj-y						+= arp.o
 obj-y						+= nullmedium.o
 obj-y						+= loopbackmedium.o
 obj-y						+= netdevmedium.o
