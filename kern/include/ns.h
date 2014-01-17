@@ -36,7 +36,11 @@ extern double	pow10(int);
  * one-of-a-kind
  */
 extern	char*	cleanname( char *unused_char_p_t);
-extern	uint32_t	getcallerpc(void*);
+//extern	uint32_t	getcallerpc(void*);
+static inline uint32_t getcallerpc(void*v)
+{
+	return 0;
+}
 
 extern	char	etext[];
 extern	char	edata[];
