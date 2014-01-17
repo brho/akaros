@@ -671,7 +671,7 @@ typedef struct Opthdr     Opthdr;
 typedef struct Routinghdr Routinghdr;
 typedef struct Fraghdr6    Fraghdr6;
 
-struct Ip6hdr {
+struct ip6hdr {
 	uint8_t vcf[4];       	// version:4, traffic class:8, flow label:20
 	uint8_t ploadlen[2];  	// payload length: packet length - 40
 	uint8_t proto;		// next header type
@@ -692,7 +692,7 @@ struct Routinghdr {
 	uint8_t segrem;
 };
 
-struct Fraghdr6 {
+struct fraghdr6 {
 	uint8_t nexthdr;
 	uint8_t res;
 	uint8_t offsetRM[2];	// Offset, Res, M flag
