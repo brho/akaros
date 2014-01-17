@@ -13,11 +13,6 @@
 #include <smp.h>
 #include <ip.h>
 
-typedef struct ICMPpkt ICMPpkt;
-typedef struct IPICMP IPICMP;
-typedef struct Ndpkt Ndpkt;
-typedef struct NdiscC NdiscC;
-
 struct ICMPpkt {
 	uint8_t	type;
 	uint8_t	code;
@@ -26,20 +21,69 @@ struct ICMPpkt {
 	uint8_t	seq[2];
 };
 
+/* plan 9 uses anon struct members.
+ * We have been naming the struct
+ * members and just using the extra level of deref
+ * e.g. i->x becomes i->i6->x.
+ * I'm going to use insert the structs into
+ * this because it's just a lot easier, and
+ * maybe someday gcc will grow up and me more
+ * like Plan 9 C.
+ */
 struct IPICMP {
+/*
 	Ip6hdr;
 	ICMPpkt;
+*/
+	uint8_t vcf[4];       	// version:4, traffic class:8, flow label:20
+	uint8_t ploadlen[2];  	// payload length: packet length - 40
+	uint8_t proto;		// next header type
+	uint8_t ttl;          	// hop limit
+	uint8_t src[IPaddrlen];
+	uint8_t dst[IPaddrlen];
+	uint8_t	type;
+	uint8_t	code;
+	uint8_t	cksum[2];
+	uint8_t	icmpid[2];
+	uint8_t	seq[2];
+
 };
 
 struct NdiscC
 {
-	IPICMP;
+	//IPICMP;
+	uint8_t vcf[4];       	// version:4, traffic class:8, flow label:20
+	uint8_t ploadlen[2];  	// payload length: packet length - 40
+	uint8_t proto;		// next header type
+	uint8_t ttl;          	// hop limit
+	uint8_t src[IPaddrlen];
+	uint8_t dst[IPaddrlen];
+	uint8_t	type;
+	uint8_t	code;
+	uint8_t	cksum[2];
+	uint8_t	icmpid[2];
+	uint8_t	seq[2];
+
 	uint8_t target[IPaddrlen];
 };
 
 struct Ndpkt
 {
-	NdiscC;
+	//NdiscC;
+	uint8_t vcf[4];       	// version:4, traffic class:8, flow label:20
+	uint8_t ploadlen[2];  	// payload length: packet length - 40
+	uint8_t proto;		// next header type
+	uint8_t ttl;          	// hop limit
+	uint8_t src[IPaddrlen];
+	uint8_t dst[IPaddrlen];
+	uint8_t	type;
+	uint8_t	code;
+	uint8_t	cksum[2];
+	uint8_t	icmpid[2];
+	uint8_t	seq[2];
+
+	uint8_t target[IPaddrlen];
+
 	uint8_t otype;
 	uint8_t olen;	// length in units of 8 octets(incl type, code),
 				// 1 for IEEE 802 addresses
@@ -190,7 +234,7 @@ icmpcreate6(struct conv *c)
 static void
 set_cksum(struct block *bp)
 {
-	IPICMP *p = (IPICMP *)(bp->rp);
+	struct IPICMP *p = (struct IPICMP *)(bp->rp);
 
 	hnputl(p->vcf, 0);  // borrow IP header as pseudoheader
 	hnputs(p->ploadlen, blocklen(bp)-IPV6HDR_LEN);
@@ -215,10 +259,10 @@ void
 icmpadvise6(struct Proto *icmp, struct block *bp, char *msg)
 {
 	struct conv	**c, *s;
-	IPICMP	*p;
+	struct IPICMP	*p;
 	uint16_t	recid;
 
-	p = (IPICMP *) bp->rp;
+	p = (struct IPICMP *) bp->rp;
 	recid = nhgets(p->icmpid);
 
 	for(c = icmp->conv; *c; c++) {
@@ -237,10 +281,10 @@ static void
 icmpkick6(void *x, struct block *bp)
 {
 	struct conv *c = x;
-	IPICMP *p;
+	struct IPICMP *p;
 	uint8_t laddr[IPaddrlen], raddr[IPaddrlen];
 	Icmppriv6 *ipriv = c->p->priv;
-	Icmpcb6 *icb = (Icmpcb6*)c->ptcl;
+	Icmpcb6 *icb = (struct Icmpcb6*)c->ptcl;
 
 	if(bp == NULL)
 		return;
@@ -258,11 +302,11 @@ icmpkick6(void *x, struct block *bp)
 		bp = padblock(bp, sizeof(struct ip6hdr));
 	}
 
-	if(blocklen(bp) < sizeof(IPICMP)){
+	if(blocklen(bp) < sizeof(struct IPICMP)){
 		freeblist(bp);
 		return;
 	}
-	p = (IPICMP *)(bp->rp);
+	p = (struct IPICMP *)(bp->rp);
 	if(icb->headers == 6) {
 		ipmove(p->dst, raddr);
 		ipmove(p->src, laddr);
@@ -299,7 +343,7 @@ static void
 goticmpkt6(struct Proto *icmp, struct block *bp, int muxkey)
 {
 	struct conv	**c, *s;
-	IPICMP	*p = (IPICMP *)bp->rp;
+	struct IPICMP	*p = (struct IPICMP *)bp->rp;
 	uint16_t	recid; 
 	uint8_t 	*addr;
 
@@ -328,7 +372,7 @@ goticmpkt6(struct Proto *icmp, struct block *bp, int muxkey)
 static struct block *
 mkechoreply6(struct block *bp)
 {
-	IPICMP *p = (IPICMP *)(bp->rp);
+	struct IPICMP *p = (struct IPICMP *)(bp->rp);
 	uint8_t	addr[IPaddrlen];
 
 	ipmove(addr, p->src);
@@ -350,13 +394,13 @@ extern void
 icmpns(struct Fs *f, uint8_t* src, int suni, uint8_t* targ, int tuni, uint8_t* mac)
 {
 	struct block	*nbp;
-	Ndpkt *np;
+	struct Ndpkt *np;
 	struct Proto *icmp = f->t2p[ICMPv6];
-	Icmppriv6 *ipriv = icmp->priv;
+	struct Icmppriv6 *ipriv = icmp->priv;
 
 
-	nbp = newIPICMP(sizeof(Ndpkt));
-	np = (Ndpkt*) nbp->rp;
+	nbp = newIPICMP(sizeof(struct Ndpkt));
+	np = (struct Ndpkt*) nbp->rp;
 
 
 	if(suni == SRC_UNSPEC) 
@@ -378,12 +422,12 @@ icmpns(struct Fs *f, uint8_t* src, int suni, uint8_t* targ, int tuni, uint8_t* m
 		memmove(np->lnaddr, mac, sizeof(np->lnaddr));
 	}
 	else {
-		int r = sizeof(Ndpkt)-sizeof(NdiscC);
+		int r = sizeof(struct Ndpkt)-sizeof(struct NdiscC);
 		nbp->wp -= r;
 	}
 
 	set_cksum(nbp);
-	np = (Ndpkt*) nbp->rp;
+	np = (struct Ndpkt*) nbp->rp;
 	np->ttl = HOP_LIMIT;
 	np->vcf[0] = 0x06 << 4;
 	ipriv->out[NbrSolicit]++;
@@ -399,12 +443,12 @@ icmpna(struct Fs *f, uint8_t* src, uint8_t* dst, uint8_t* targ, uint8_t* mac,
        uint8_t flags)
 {
 	struct block	*nbp;
-	Ndpkt *np;
+	struct Ndpkt *np;
 	struct Proto *icmp = f->t2p[ICMPv6];
 	Icmppriv6 *ipriv = icmp->priv;
 
-	nbp = newIPICMP(sizeof(Ndpkt));
-	np = (Ndpkt*) nbp->rp;
+	nbp = newIPICMP(sizeof(struct Ndpkt));
+	np = (struct Ndpkt*) nbp->rp;
 
 	memmove(np->src, src, IPaddrlen);
 	memmove(np->dst, dst, IPaddrlen);
@@ -419,7 +463,7 @@ icmpna(struct Fs *f, uint8_t* src, uint8_t* dst, uint8_t* targ, uint8_t* mac,
 	memmove(np->lnaddr, mac, sizeof(np->lnaddr));
 
 	set_cksum(nbp);
-	np = (Ndpkt*) nbp->rp;
+	np = (struct Ndpkt*) nbp->rp;
 	np->ttl = HOP_LIMIT;
 	np->vcf[0] = 0x06 << 4;
 	ipriv->out[NbrAdvert]++;
@@ -432,10 +476,10 @@ icmphostunr(struct Fs *f, struct Ipifc *ifc,
 	    struct block *bp, int code, int free)
 {
 	struct block *nbp;
-	IPICMP *np;
+	struct IPICMP *np;
 	struct ip6hdr	*p;
 	int osz = BLEN(bp);
-	int sz = MIN(sizeof(IPICMP) + osz, v6MINTU);
+	int sz = MIN(sizeof(struct IPICMP) + osz, v6MINTU);
 	struct Proto	*icmp = f->t2p[ICMPv6];
 	Icmppriv6 *ipriv = icmp->priv;
 
@@ -445,7 +489,7 @@ icmphostunr(struct Fs *f, struct Ipifc *ifc,
 		goto clean;
 
 	nbp = newIPICMP(sz);
-	np = (IPICMP *) nbp->rp;
+	np = (struct IPICMP *) nbp->rp;
 
 	rlock(&ifc->rwlock);
 	if(ipv6anylocal(ifc, np->src)) {
@@ -463,7 +507,7 @@ icmphostunr(struct Fs *f, struct Ipifc *ifc,
 	memmove(np->dst, p->src, IPaddrlen);
 	np->type = UnreachableV6;
 	np->code = code;
-	memmove(nbp->rp + sizeof(IPICMP), bp->rp, sz - sizeof(IPICMP));
+	memmove(nbp->rp + sizeof(struct IPICMP), bp->rp, sz - sizeof(struct IPICMP));
 	set_cksum(nbp);
 	np->ttl = HOP_LIMIT;
 	np->vcf[0] = 0x06 << 4;
@@ -485,10 +529,10 @@ extern void
 icmpttlexceeded6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 {
 	struct block *nbp;
-	IPICMP *np;
+	struct IPICMP *np;
 	struct ip6hdr	*p;
 	int osz = BLEN(bp);
-	int sz = MIN(sizeof(IPICMP) + osz, v6MINTU);
+	int sz = MIN(sizeof(struct IPICMP) + osz, v6MINTU);
 	struct Proto	*icmp = f->t2p[ICMPv6];
 	Icmppriv6 *ipriv = icmp->priv;
 
@@ -498,7 +542,7 @@ icmpttlexceeded6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 		return;
 
 	nbp = newIPICMP(sz);
-	np = (IPICMP *) nbp->rp;
+	np = (struct IPICMP *) nbp->rp;
 
 	if(ipv6anylocal(ifc, np->src)) {
 		netlog(f, Logicmp, "send icmpttlexceeded6 -> s%I d%I\n", p->src, p->dst);
@@ -511,7 +555,7 @@ icmpttlexceeded6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 	memmove(np->dst, p->src, IPaddrlen);
 	np->type = TimeExceedV6;
 	np->code = 0;
-	memmove(nbp->rp + sizeof(IPICMP), bp->rp, sz - sizeof(IPICMP));
+	memmove(nbp->rp + sizeof(struct IPICMP), bp->rp, sz - sizeof(struct IPICMP));
 	set_cksum(nbp);
 	np->ttl = HOP_LIMIT;
 	np->vcf[0] = 0x06 << 4;
@@ -523,10 +567,10 @@ extern void
 icmppkttoobig6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 {
 	struct block *nbp;
-	IPICMP *np;
+	struct IPICMP *np;
 	struct ip6hdr	*p;
 	int osz = BLEN(bp);
-	int sz = MIN(sizeof(IPICMP) + osz, v6MINTU);
+	int sz = MIN(sizeof(struct IPICMP) + osz, v6MINTU);
 	struct Proto	*icmp = f->t2p[ICMPv6];
 	Icmppriv6 *ipriv = icmp->priv;
 
@@ -536,7 +580,7 @@ icmppkttoobig6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 		return;
 
 	nbp = newIPICMP(sz);
-	np = (IPICMP *) nbp->rp;
+	np = (struct IPICMP *) nbp->rp;
 
 	if(ipv6anylocal(ifc, np->src)) {
 		netlog(f, Logicmp, "send icmppkttoobig6 -> s%I d%I\n", p->src, p->dst);
@@ -550,7 +594,7 @@ icmppkttoobig6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 	np->type = PacketTooBigV6;
 	np->code = 0;
 	hnputl(np->icmpid, ifc->maxtu - ifc->m->hsize);
-	memmove(nbp->rp + sizeof(IPICMP), bp->rp, sz - sizeof(IPICMP));
+	memmove(nbp->rp + sizeof(struct IPICMP), bp->rp, sz - sizeof(struct IPICMP));
 	set_cksum(nbp);
 	np->ttl = HOP_LIMIT;
 	np->vcf[0] = 0x06 << 4;
@@ -567,11 +611,11 @@ valid(struct Proto *icmp, struct Ipifc *ifc,
 	int 	sz, osz, unsp, n, ttl, iplen;
 	int 	pktsz = BLEN(bp);
 	uint8_t	*packet = bp->rp;
-	IPICMP	*p = (IPICMP *) packet;
-	Ndpkt	*np;
+	struct IPICMP	*p = (struct IPICMP *) packet;
+	struct Ndpkt	*np;
 
 	n = blocklen(bp);
-	if(n < sizeof(IPICMP)) {
+	if(n < sizeof(struct IPICMP)) {
 		ipriv->stats[HlenErrs6]++;
 		netlog(icmp->f, Logicmp, "icmp hlen %d\n", n);
 		goto err;
@@ -621,7 +665,7 @@ valid(struct Proto *icmp, struct Ipifc *ifc,
 		switch (p->type) {
 		case NbrSolicit:
 		case NbrAdvert:
-			np = (Ndpkt*) p;
+			np = (struct Ndpkt*) p;
 			if(isv6mcast(np->target)) {
 				ipriv->stats[TargetErrs6]++; 
 				goto err; 
@@ -657,7 +701,7 @@ valid(struct Proto *icmp, struct Ipifc *ifc,
 				ipriv->stats[RouterAddrErrs6]++; 
 				goto err; 
 			}
-			sz = sizeof(IPICMP) + 8;
+			sz = sizeof(struct IPICMP) + 8;
 			while ((sz+1) < pktsz) {
 				osz = *(packet+sz+1);
 				if(osz <= 0) {
@@ -674,7 +718,7 @@ valid(struct Proto *icmp, struct Ipifc *ifc,
 				goto err; 
 			}
 			unsp = (ipcmp(p->src, v6Unspecified) == 0);
-			sz = sizeof(IPICMP) + 8;
+			sz = sizeof(struct IPICMP) + 8;
 			while ((sz+1) < pktsz) {
 				osz = *(packet+sz+1);
 				if((osz <= 0) ||
@@ -730,12 +774,12 @@ static void
 icmpiput6(struct Proto *icmp, struct Ipifc *ipifc, struct block *bp)
 {
 	uint8_t	*packet = bp->rp;
-	IPICMP	*p = (IPICMP *)packet;
+	struct IPICMP	*p = (struct IPICMP *)packet;
 	Icmppriv6 *ipriv = icmp->priv;
 	struct block	*r;
 	struct Proto	*pr;
 	char	*msg, m2[128];
-	Ndpkt* np;
+	struct Ndpkt* np;
 	uint8_t pktflags;
 	uint8_t lsrc[IPaddrlen];
 	int refresh = 1;
@@ -762,38 +806,38 @@ icmpiput6(struct Proto *icmp, struct Ipifc *ipifc, struct block *bp)
 		else
 			msg = unreachcode[p->code];
 
-		bp->rp += sizeof(IPICMP);
+		bp->rp += sizeof(struct IPICMP);
 		if(blocklen(bp) < 8){
 			ipriv->stats[LenErrs6]++;
 			goto raise;
 		}
-		p = (IPICMP *)bp->rp;
+		p = (struct IPICMP *)bp->rp;
 		pr = Fsrcvpcolx(icmp->f, p->proto);
 		if(pr != NULL && pr->advise != NULL) {
 			(*pr->advise)(pr, bp, msg);
 			return;
 		}
 
-		bp->rp -= sizeof(IPICMP);
+		bp->rp -= sizeof(struct IPICMP);
 		goticmpkt6(icmp, bp, 0);
 		break;
 
 	case TimeExceedV6:
 		if(p->code == 0){
-			sprint(m2, "ttl exceeded at %I", p->src);
+			snprintf(m2, sizeof(m2), "ttl exceeded at %I", p->src);
 
-			bp->rp += sizeof(IPICMP);
+			bp->rp += sizeof(struct IPICMP);
 			if(blocklen(bp) < 8){
 				ipriv->stats[LenErrs6]++;
 				goto raise;
 			}
-			p = (IPICMP *)bp->rp;
+			p = (struct IPICMP *)bp->rp;
 			pr = Fsrcvpcolx(icmp->f, p->proto);
 			if(pr != NULL && pr->advise != NULL) {
 				(*pr->advise)(pr, bp, m2);
 				return;
 			}
-			bp->rp -= sizeof(IPICMP);
+			bp->rp -= sizeof(struct IPICMP);
 		}
 
 		goticmpkt6(icmp, bp, 0);
@@ -810,7 +854,7 @@ icmpiput6(struct Proto *icmp, struct Ipifc *ipifc, struct block *bp)
 		break;
 
 	case NbrSolicit:
-		np = (Ndpkt*) p;
+		np = (struct Ndpkt*) p;
 		pktflags = 0;
 		switch (targettype(icmp->f, ipifc, np->target)) {
 		case t_unirany:
@@ -842,7 +886,7 @@ icmpiput6(struct Proto *icmp, struct Ipifc *ipifc, struct block *bp)
 		break;
 
 	case NbrAdvert:
-		np = (Ndpkt*) p;
+		np = (struct Ndpkt*) p;
 
 		/* if the target address matches one of the local interface 
 		 * address and the local interface address has tentative bit set, 
