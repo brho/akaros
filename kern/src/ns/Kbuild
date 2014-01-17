@@ -5,5 +5,6 @@ obj-y						+= convM2D.o
 obj-y						+= convM2S.o
 obj-y						+= convS2M.o
 obj-y						+= error.o
+obj-y						+= parse.o
 obj-y						+= qio.o
 obj-y						+= util.o

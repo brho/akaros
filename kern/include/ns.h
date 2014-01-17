@@ -975,4 +975,9 @@ int sysclose(int fd);
 int sysopen(char *name, int omode);
 long sysread(int fd, void *p, size_t n, off_t off);
 
+/* kern/src/ns/parse.c */
+struct cmdbuf *parsecmd(char *p, int n);
+void cmderror(struct cmdbuf *cb, char *s);
+struct cmdtab *lookupcmd(struct cmdbuf *cb, struct cmdtab *ctab, int nctab);
+
 #endif /* ROS_KERN_NS_H */
