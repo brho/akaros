@@ -64,7 +64,7 @@ allocroute(int type)
 	memset(r, 0, n);
 	r->rt.type = type;
 	r->rt.ifc = NULL;
-	kref_init(&r->rt.ref, fake_release, 1);
+	kref_init(&r->rt.kref, fake_release, 1);
 
 	return r;
 }
@@ -280,7 +280,7 @@ addnode(struct Fs *f, struct route **cur, struct route *new)
 			p->rt.ifcid = -1;
 			copygate(p, new);
 		} else if(new->rt.type & Rifc)
-			p->rt.ref++;
+			kref_get(&p->rt.kref, 1);
 		freeroute(new);
 		break;
 	case Rcontained:
@@ -424,7 +424,8 @@ v4delroute(struct Fs *f, uint8_t *a, uint8_t *mask, int dolock)
 		r = looknode(&f->v4root[h], &rt);
 		if(r) {
 			p = *r;
-			if(--(p->ref) == 0){
+			/* TODO: use a release method. put returns TRUE for the last ref. */
+			if (kref_put(&p->rt.kref)) {
 				*r = 0;
 				addqueue(&f->queue, p->rt.left);
 				addqueue(&f->queue, p->rt.mid);
@@ -468,7 +469,8 @@ v6delroute(struct Fs *f, uint8_t *a, uint8_t *mask, int dolock)
 		r = looknode(&f->v6root[h], &rt);
 		if(r) {
 			p = *r;
-			if(--(p->ref) == 0){
+			/* TODO: use a release method. put returns TRUE for the last ref. */
+			if (kref_put(&p->rt.kref)) {
 				*r = 0;
 				addqueue(&f->queue, p->rt.left);
 				addqueue(&f->queue, p->rt.mid);
