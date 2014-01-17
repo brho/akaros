@@ -8,6 +8,7 @@ obj-y						+= icmp6.o
 obj-y						+= ip.o
 obj-y						+= ipv6.o
 obj-y						+= ipaux.o
+obj-y						+= ipprotoinit.o
 obj-y						+= iproute.o
 obj-y						+= iprouter.o
 obj-y						+= ipifc.o
@@ -19,4 +20,5 @@ obj-y						+= nullmedium.o
 obj-y						+= plan9.o
 obj-y						+= ptclbsum.o
 obj-y						+= pktmedium.o
+obj-y						+= tcp.o
 
