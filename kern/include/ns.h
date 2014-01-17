@@ -21,8 +21,6 @@ enum
 	NUMSIZE64       = 20,           /* max size of formatted 64 bit number */
 };
 
-extern	int	abs(int);
-
 /*
  * math
  */
@@ -1008,6 +1006,13 @@ int sysiounit(int fd);
 static inline int iseve(void)
 {
 	return 1;
+}
+
+static inline int abs(int a)
+{
+	if (a < 0)
+		return -a;
+	return a;
 }
 
 #endif /* ROS_KERN_NS_H */
