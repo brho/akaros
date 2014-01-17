@@ -1,6 +1,7 @@
 obj-y						+= arp.o
 #obj-y						+= compress.o
 obj-y						+= devip.o
+obj-y						+= dial.o
 obj-y						+= ethermedium.o
 obj-y						+= icmp.o
 obj-y						+= icmp6.o
@@ -13,6 +14,7 @@ obj-y						+= ipifc.o
 obj-y						+= loopbackmedium.o
 obj-y						+= netaux.o
 obj-y						+= netdevmedium.o
+obj-y						+= netlog.o
 obj-y						+= nullmedium.o
 obj-y						+= plan9.o
 obj-y						+= ptclbsum.o

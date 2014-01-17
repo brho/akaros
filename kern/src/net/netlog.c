@@ -1,10 +1,17 @@
-#include	"u.h"
-#include	"../port/lib.h"
-#include	"mem.h"
-#include	"dat.h"
-#include	"fns.h"
-#include	"../port/error.h"
-#include	"../ip/ip.h"
+// INFERNO
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
+#include <ip.h>
 
 enum {
 	Nlog		= 4*1024,
@@ -14,7 +21,7 @@ enum {
  *  action log
  */
 struct Netlog {
-	Lock;
+	spinlock_t lock;
 	int	opens;
 	char*	buf;
 	char	*end;
@@ -22,11 +29,11 @@ struct Netlog {
 	int	len;
 
 	int	logmask;			/* mask of things to debug */
-	uchar	iponly[IPaddrlen];		/* ip address to print debugging for */
+	uint8_t	iponly[IPaddrlen];		/* ip address to print debugging for */
 	int	iponlyset;
 
-	QLock;
-	Rendez;
+	qlock_t qlock;
+	struct rendez r;
 };
 
 typedef struct Netlogflag {
@@ -51,7 +58,7 @@ static Netlogflag flags[] =
 	{ "udpmsg",	Logudp|Logudpmsg, },
 	{ "ipmsg",	Logip|Logipmsg, },
 	{ "esp",	Logesp, },
-	{ nil,		0, },
+	{ NULL,		0, },
 };
 
 char Ebadnetctl[] = "too few arguments for netlog control message";
@@ -64,76 +71,79 @@ enum
 };
 
 static
-Cmdtab routecmd[] = {
-	CMset,		"set",		0,
-	CMclear,	"clear",	0,
-	CMonly,		"only",		0,
+struct cmdtab routecmd[] = {
+	{CMset,		"set",		0},
+	{CMclear,	"clear",	0},
+	{CMonly,		"only",		0},
 };
 
 void
-netloginit(Fs *f)
+netloginit(struct Fs *f)
 {
-	f->alog = smalloc(sizeof(Netlog));
+	f->alog = kzmalloc(sizeof(struct Netlog), 0);
 }
 
 void
-netlogopen(Fs *f)
+netlogopen(struct Fs *f)
 {
-	lock(f->alog);
+	ERRSTACK(2);
+	spin_lock(&f->alog->lock);
 	if(waserror()){
-		unlock(f->alog);
+		spin_unlock(&f->alog->lock);
 		nexterror();
 	}
 	if(f->alog->opens == 0){
-		if(f->alog->buf == nil)
-			f->alog->buf = malloc(Nlog);
+		if(f->alog->buf == NULL)
+			f->alog->buf = kzmalloc(Nlog, 0);
 		f->alog->rptr = f->alog->buf;
 		f->alog->end = f->alog->buf + Nlog;
 	}
 	f->alog->opens++;
-	unlock(f->alog);
+	spin_unlock(&f->alog->lock);
 	poperror();
 }
 
 void
-netlogclose(Fs *f)
+netlogclose(struct Fs *f)
 {
-	lock(f->alog);
+	ERRSTACK(2);
+	spin_lock(&f->alog->lock);
 	if(waserror()){
-		unlock(f->alog);
+		spin_unlock(&f->alog->lock);
 		nexterror();
 	}
 	f->alog->opens--;
 	if(f->alog->opens == 0){
-		free(f->alog->buf);
-		f->alog->buf = nil;
+		kfree(f->alog->buf);
+		f->alog->buf = NULL;
 	}
-	unlock(f->alog);
+	spin_unlock(&f->alog->lock);
 	poperror();
 }
 
 static int
 netlogready(void *a)
 {
-	Fs *f = a;
+	struct Fs *f = a;
 
 	return f->alog->len;
 }
 
 long
-netlogread(Fs *f, void *a, ulong, long n)
+netlogread(struct Fs *f, void *a, uint32_t unused, long n)
 {
+	ERRSTACK(2);
 	int i, d;
 	char *p, *rptr;
 
-	qlock(f->alog);
+	qlock(&f->alog->qlock);
 	if(waserror()){
-		qunlock(f->alog);
+		qunlock(&f->alog->qlock);
 		nexterror();
 	}
 
 	for(;;){
-		lock(f->alog);
+		spin_lock(&f->alog->lock);
 		if(f->alog->len){
 			if(n > f->alog->len)
 				n = f->alog->len;
@@ -145,7 +155,7 @@ netlogread(Fs *f, void *a, ulong, long n)
 				f->alog->rptr = f->alog->buf + d;
 			}
 			f->alog->len -= n;
-			unlock(f->alog);
+			spin_unlock(&f->alog->lock);
 
 			i = n-d;
 			p = a;
@@ -154,37 +164,36 @@ netlogread(Fs *f, void *a, ulong, long n)
 			break;
 		}
 		else
-			unlock(f->alog);
+			spin_unlock(&f->alog->lock);
 
-		rendez_sleep(f->alog, netlogready, f);
+		rendez_sleep(&f->alog->r, netlogready, f);
 	}
 
-	qunlock(f->alog);
+	qunlock(&f->alog->qlock);
 	poperror();
 
 	return n;
 }
 
 void
-netlogctl(Fs *f, char* s, int n)
+netlogctl(struct Fs *f, char* s, int n)
 {
-	int i, set;
+	ERRSTACK(2);
+	int i, set = 0;
 	Netlogflag *fp;
-	Cmdbuf *cb;
-	Cmdtab *ct;
+	struct cmdbuf *cb;
+	struct cmdtab *ct;
 
 	cb = parsecmd(s, n);
 	if(waserror()){
-		free(cb);
+		kfree(cb);
 		nexterror();
 	}
 
 	if(cb->nf < 2)
 		error(Ebadnetctl);
 
-	ct = lookupcmd(cb, routecmd, nelem(routecmd));
-
-	SET(set);
+	ct = lookupcmd(cb, routecmd, ARRAY_SIZE(routecmd));
 
 	switch(ct->index){
 	case CMset:
@@ -201,7 +210,7 @@ netlogctl(Fs *f, char* s, int n)
 			f->alog->iponlyset = 0;
 		else
 			f->alog->iponlyset = 1;
-		free(cb);
+		kfree(cb);
 		return;
 
 	default:
@@ -212,7 +221,7 @@ netlogctl(Fs *f, char* s, int n)
 		for(fp = flags; fp->name; fp++)
 			if(strcmp(fp->name, cb->f[i]) == 0)
 				break;
-		if(fp->name == nil)
+		if(fp->name == NULL)
 			continue;
 		if(set)
 			f->alog->logmask |= fp->mask;
@@ -220,12 +229,12 @@ netlogctl(Fs *f, char* s, int n)
 			f->alog->logmask &= ~fp->mask;
 	}
 
-	free(cb);
+	kfree(cb);
 	poperror();
 }
 
 void
-netlog(Fs *f, int mask, char *fmt, ...)
+netlog(struct Fs *f, int mask, char *fmt, ...)
 {
 	char buf[128], *t, *fp;
 	int i, n;
@@ -238,10 +247,10 @@ netlog(Fs *f, int mask, char *fmt, ...)
 		return;
 
 	va_start(arg, fmt);
-	n = vseprint(buf, buf+sizeof(buf), fmt, arg) - buf;
+	n = snprintf(buf, sizeof(buf), fmt, arg);
 	va_end(arg);
 
-	lock(f->alog);
+	spin_lock(&f->alog->lock);
 	i = f->alog->len + n - Nlog;
 	if(i > 0){
 		f->alog->len -= i;
@@ -257,7 +266,7 @@ netlog(Fs *f, int mask, char *fmt, ...)
 			t = f->alog->buf + (t - f->alog->end);
 		*t++ = *fp++;
 	}
-	unlock(f->alog);
+	spin_unlock(&f->alog->lock);
 
-	rendez_wakeup(f->alog);
+	rendez_wakeup(&f->alog->r);
 }

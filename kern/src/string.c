@@ -109,6 +109,19 @@ strchr(const char *s, char c)
 	return 0;
 }
 
+// Return a pointer to the last occurrence of 'c' in 's',
+// or a null pointer if the string has no 'c'.
+char *
+strrchr(const char *s, char c)
+{
+	char *lastc = NULL;
+	for (; *s; s++)
+		if (*s == c){
+			lastc = s;
+		}
+	return lastc;
+}
+
 void *
 memchr(void* mem, int chr, int len)
 {

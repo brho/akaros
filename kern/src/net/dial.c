@@ -15,7 +15,7 @@
 
 typedef struct DS DS;
 
-static int	call( char *cp, char*cp, DS*DS);
+static int	call( char *cp, char*cp1, DS*DS);
 static int	csdial(DS*DS);
 static void	_dial_string_parse( char *cp, DS*DS);
 static int	nettrans( char *cp, char*cp1, int na, char*cp2, int i);
@@ -23,7 +23,6 @@ static int	nettrans( char *cp, char*cp1, int na, char*cp2, int i);
 enum
 {
 	Maxstring=	128,
-	Maxpath=	100
 };
 
 struct DS
@@ -36,6 +35,12 @@ struct DS
 	char	*dir;
 	int	*cfdp;
 };
+
+/* only used here for now. */
+static void kerrstr(void *err, int len)
+{
+	strncpy(err, current_errstr(), len);
+}
 
 /*
  *  the dialstring is of the form '[/net/]proto!dest'
@@ -61,9 +66,8 @@ kdial(char *dest, char *local, char *dir, int *cfdp)
 		return rv;
 
 	err[0] = 0;
-	kerrstr(err, sizeof err);
+	strncpy(err, current_errstr(), sizeof err);
 	if(strstr(err, "refused") != 0){
-		kerrstr(err, sizeof err);
 		return rv;
 	}
 
@@ -102,11 +106,11 @@ csdial(DS *ds)
 	/*
 	 *  ask connection server to translate
 	 */
-	sprint(buf, "%s!%s", ds->proto, ds->rem);
-	if(kwrite(fd, buf, strlen(buf)) < 0){
+	snprintf(buf, sizeof(buf), "%s!%s", ds->proto, ds->rem);
+	if(syswrite(fd, buf, strlen(buf)) < 0){
 		kerrstr(err, sizeof err);
 		sysclose(fd);
-		kwerrstr("%s (%s)", err, buf);
+		set_errstr("%s (%s)", err, buf);
 		return -1;
 	}
 
@@ -117,7 +121,7 @@ csdial(DS *ds)
 	*besterr = 0;
 	strncpy(err,  Egreg, sizeof(err));
 	rv = -1;
-	kseek(fd, 0, 0);
+	sysseek(fd, 0, 0);
 	while((n = sysread(fd, buf, sizeof(buf) - 1)) > 0){
 		buf[n] = 0;
 		p = strchr(buf, ' ');
@@ -150,7 +154,7 @@ call(char *clone, char *dest, DS *ds)
 	cfd = sysopen(clone, ORDWR);
 	if(cfd < 0){
 		kerrstr(err, sizeof err);
-		kwerrstr("%s (%s)", err, clone);
+		set_errstr("%s (%s)", err, clone);
 		return -1;
 	}
 
@@ -159,13 +163,13 @@ call(char *clone, char *dest, DS *ds)
 	if(n < 0){
 		kerrstr(err, sizeof err);
 		sysclose(cfd);
-		kwerrstr("read %s: %s", clone, err);
+		set_errstr("read %s: %s", clone, err);
 		return -1;
 	}
 	name[n] = 0;
 	for(p = name; *p == ' '; p++)
 		;
-	sprint(name, "%ld", strtoul(p, 0, 0));
+	snprintf(name, sizeof(name), "%ld", strtoul(p, 0, 0));
 	p = strrchr(clone, '/');
 	*p = 0;
 	if(ds->dir)
@@ -177,11 +181,11 @@ call(char *clone, char *dest, DS *ds)
 		snprintf(name, sizeof(name), "connect %s %s", dest, ds->local);
 	else
 		snprintf(name, sizeof(name), "connect %s", dest);
-	if(kwrite(cfd, name, strlen(name)) < 0){
+	if(syswrite(cfd, name, strlen(name)) < 0){
 		err[0] = 0;
 		kerrstr(err, sizeof err);
 		sysclose(cfd);
-		kwerrstr("%s (%s)", err, name);
+		set_errstr("%s (%s)", err, name);
 		return -1;
 	}
 
@@ -190,7 +194,7 @@ call(char *clone, char *dest, DS *ds)
 	if(fd < 0){
 		err[0] = 0;
 		kerrstr(err, sizeof err);
-		kwerrstr("%s (%s)", err, data);
+		set_errstr("%s (%s)", err, data);
 		sysclose(cfd);
 		return -1;
 	}
@@ -265,7 +269,7 @@ kannounce(char *addr, char *dir)
 	/*
 	 *  find out which line we have
 	 */
-	n = sprint(buf, "%.*s/", sizeof buf, netdir);
+	n = snprintf(buf, sizeof(buf), "%.*s/", sizeof buf, netdir);
 	m = sysread(ctl, &buf[n], sizeof(buf)-n-1);
 	if(m <= 0){
 		sysclose(ctl);
@@ -277,7 +281,7 @@ kannounce(char *addr, char *dir)
 	 *  make the call
 	 */
 	n = snprintf(buf2, sizeof buf2, "announce %s", naddr);
-	if(kwrite(ctl, buf2, n)!=n){
+	if(syswrite(ctl, buf2, n)!=n){
 		sysclose(ctl);
 		return -1;
 	}
@@ -372,7 +376,7 @@ nettrans(char *addr, char *naddr, int na, char *file, int nf)
 	 */
 	p = strchr(addr, '!');
 	if(p == 0){
-		kwerrstr("bad dial string: %s", addr);
+		set_errstr("bad dial string: %s", addr);
 		return -1;
 	}
 	if(*addr != '/'){
@@ -382,7 +386,7 @@ nettrans(char *addr, char *naddr, int na, char *file, int nf)
 			;
 		i = p2 - addr;
 		if(i == 0 || i >= sizeof(netdir)){
-			kwerrstr("bad dial string: %s", addr);
+			set_errstr("bad dial string: %s", addr);
 			return -1;
 		}
 		strncpy(netdir, addr, i);
@@ -393,15 +397,15 @@ nettrans(char *addr, char *naddr, int na, char *file, int nf)
 	/*
 	 *  ask the connection server
 	 */
-	sprint(buf, "%s/cs", netdir);
+	snprintf(buf, sizeof(buf), "%s/cs", netdir);
 	fd = sysopen(buf, ORDWR);
 	if(fd < 0)
 		return identtrans(netdir, addr, naddr, na, file, nf);
-	if(kwrite(fd, addr, strlen(addr)) < 0){
+	if(syswrite(fd, addr, strlen(addr)) < 0){
 		sysclose(fd);
 		return -1;
 	}
-	kseek(fd, 0, 0);
+	sysseek(fd, 0, 0);
 	n = sysread(fd, buf, sizeof(buf)-1);
 	sysclose(fd);
 	if(n <= 0)

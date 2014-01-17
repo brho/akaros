@@ -326,7 +326,7 @@ struct Fs
 	struct route	*v6root[1<<Lroot];	/* v6 routing forest */
 	struct route	*queue;			/* used as temp when reinjecting routes */
 
-	//Netlog	*alog;
+	struct Netlog	*alog;
 	struct Ifclog	*ilog;
 
 	char	ndb[1024];		/* an ndb entry for this interface */
@@ -845,11 +845,5 @@ extern int v6aLpreflen;
 extern int ReTransTimer;
 
 int kdial(char *dest, char *local, char *dir, int *cfdp);
-
-#define netlog(f, mask, ...)\
-{\
-	printk("netlog: f %p, mask %d: ", f, mask);\
-	_warn(__FILE__, __LINE__, __VA_ARGS__);\
-}
 
 #endif /* ROS_KERN_IP_H */

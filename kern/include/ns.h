@@ -723,7 +723,6 @@ void		iallocsummary(void);
 void		ilock(spinlock_t*);
 int		iprint( char *unused_char_p_t, ...);
 void		isdir(struct chan*);
-int		iseve(void);
 int		islo(void);
 void		iunlock(spinlock_t*);
 void		ixsummary(void);
@@ -1006,5 +1005,10 @@ int sysdirwstat(char *name, struct dir *dir);
 int sysdirfwstat(int fd, struct dir *dir);
 long sysdirread(int fd, struct dir **d);
 int sysiounit(int fd);
+
+static inline int iseve(void)
+{
+	return 1;
+}
 
 #endif /* ROS_KERN_NS_H */
