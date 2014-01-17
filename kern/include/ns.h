@@ -1,4 +1,8 @@
 // INFERNO
+
+#ifndef ROS_KERN_NS_H
+#define ROS_KERN_NS_H
+
 #include <err.h>
 #include <rendez.h>
 #include <rwlock.h>
@@ -967,3 +971,5 @@ char *index(char *s, int c);
 int sysclose(int fd);
 int sysopen(char *name, int omode);
 long sysread(int fd, void *p, size_t n, off_t off);
+
+#endif /* ROS_KERN_NS_H */

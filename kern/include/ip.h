@@ -1,5 +1,8 @@
 // INFERNO
 
+#ifndef ROS_KERN_IP_H
+#define ROS_KERN_IP_H
+
 enum
 {
 	Addrlen=	64,
@@ -842,3 +845,5 @@ extern int v6aLpreflen;
 extern int ReTransTimer;
 
 int kdial(char *dest, char *local, char *dir, int *cfdp);
+
+#endif /* ROS_KERN_IP_H */
