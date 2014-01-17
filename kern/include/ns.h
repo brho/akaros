@@ -737,8 +737,6 @@ void		ksetenv( char *unused_char_p_t, char*, int);
 void		kstrdup( char **unused_char_pp_t, char *unused_char_p_t);
 
 struct cmdtab*		lookupcmd(struct cmdbuf*, struct cmdtab*, int);
-void*		malloc(uint32_t);
-void*		mallocz(uint32_t, int);
 struct block*		mem2bl( uint8_t *unused_uint8_p_t, int);
 int			memusehigh(void);
 void		microdelay(int);
@@ -955,9 +953,6 @@ void errpop(struct errbuf *errstack, int stacksize, int *curindex,
             struct errbuf *prev_errbuf);
 /* */
 char *get_cur_genbuf(void);
-
-/* stuff we really ought to have ... */
-char *index(char *s, int c);
 
 /* hack for now. */
 #define eve "eve"

@@ -47,3 +47,9 @@ expression E1;
 -free(
 +kfree(
 ...);
+
+@@
+@@
+-mallocz(
++kzmalloc(
+...);

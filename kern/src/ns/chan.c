@@ -912,7 +912,7 @@ parsename(char *name, Elemlist *e)
 		/* we may want to do this again some day
 		slash = utfrune(name, '/');
 		*/
-		slash = index(name, '/');
+		slash = strchr(name, '/');
 		if(slash == NULL){
 			e->off[e->ARRAY_SIZEs] = name+strlen(name) - e->name;
 			e->mustbedir = 0;
@@ -1009,7 +1009,7 @@ namec(char *aname, int amode, int omode, uint32_t perm)
 		 */
 		if(current->pgrp->nodevs &&
 		   //		   (utfrune("|esDa", r) == NULL
-		   ((index("|esDa", get_cur_genbuf()[1]) == NULL)
+		   ((strchr("|esDa", get_cur_genbuf()[1]) == NULL)
 		    || (get_cur_genbuf()[1] == 's' // || r == 's'
 			&& get_cur_genbuf()[n]!='\0')))
 			error(Enoattach);

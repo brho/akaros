@@ -1077,7 +1077,7 @@ mntralloc(struct chan *c, uint32_t msize)
 		 * The header is split from the data buffer as
 		 * mountmux may swap the buffer with another header.
 		 */
-		new->rpc = mallocz(msize, 0);
+		new->rpc = kzmalloc(msize, KMALLOC_WAIT);
 		if(new->rpc == NULL){
 			kfree(new);
 			spin_unlock(&mntalloc.l);
@@ -1096,7 +1096,7 @@ mntralloc(struct chan *c, uint32_t msize)
 		mntalloc.nrpcfree--;
 		if(new->rpclen < msize){
 			kfree(new->rpc);
-			new->rpc = mallocz(msize, 0);
+			new->rpc = kzmalloc(msize, KMALLOC_WAIT);
 			if(new->rpc == NULL){
 				kfree(new);
 				mntalloc.nrpcused--;
