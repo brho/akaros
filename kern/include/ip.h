@@ -846,4 +846,10 @@ extern int ReTransTimer;
 
 int kdial(char *dest, char *local, char *dir, int *cfdp);
 
+#define netlog(f, mask, ...)\
+{\
+	printk("netlog: f %p, mask %d: ", f, mask);\
+	_warn(__FILE__, __LINE__, __VA_ARGS__);\
+}
+
 #endif /* ROS_KERN_IP_H */

@@ -81,4 +81,9 @@ static void fake_release(struct kref *kref)
 	panic("Cleaning up this object is not supported!\n");
 }
 
+static long kref_next(struct kref *kref)
+{
+	kref_get(kref, 1);
+	return atomic_read(&kref->refcount);
+}
 #endif /* ROS_KERN_KREF_H */
