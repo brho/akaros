@@ -1003,7 +1003,7 @@ int sysiounit(int fd);
 void close_9ns_files(struct proc *p, bool only_cloexec);
 void print_chaninfo(struct chan *ch);
 void print_9ns_files(struct proc *p);
-
+int plan9setup(struct proc *new_proc, struct proc *parent);
 int iseve(void);
 
 static inline int abs(int a)

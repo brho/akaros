@@ -33,6 +33,7 @@ struct proc {
 	spinlock_t proc_lock;
 	struct user_context scp_ctx; 	/* context for an SCP.  TODO: move to vc0 */
 	char user[64]; /* user name */
+
 	pid_t pid;
 	/* Tempting to add a struct proc *parent, but we'd need to protect the use
 	 * of that reference from concurrent parent-death (letting init inherit
@@ -88,6 +89,10 @@ struct proc {
 	struct files_struct			open_files;
 	struct pgrp                             *pgrp;
 	struct fgrp                             *fgrp;
+	struct fgrp                             *closingfgrp;
+	struct chan                             *slash;
+	struct chan                             *dot;
+
 
 	/* UCQ hashlocks */
 	struct hashlock				*ucq_hashlock;
