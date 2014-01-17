@@ -21,4 +21,4 @@ obj-y						+= plan9.o
 obj-y						+= ptclbsum.o
 obj-y						+= pktmedium.o
 obj-y						+= tcp.o
-
+obj-y						+= udp.o
