@@ -51,4 +51,5 @@ int	vfprintf(int fd, const char *NTS fmt, va_list);
 // lib/readline.c
 int readline(char *buf, size_t buf_l, const char *prompt, ...);
 
+char *seprintf(char *buf, char *end, const char *fmt, ...);
 #endif /* !ROS_INC_STDIO_H */
