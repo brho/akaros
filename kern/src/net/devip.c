@@ -415,7 +415,7 @@ ipopen(struct chan* c, int omode)
 		cv = p->conv[CONV(c->qid)];
 		if(strcmp(ATTACHER(c), cv->owner) != 0 && !iseve())
 			error(Eperm);
-		kref_get(&cv->snoopers, 1);
+		atomic_inc(&cv->snoopers);
 		break;
 	case Qclone:
 		p = f->p[PROTO(c->qid)];
@@ -617,7 +617,7 @@ ipclose(struct chan* c)
 		break;
 	case Qsnoop:
 		if(c->flag & COPEN)
-			kref_put(&f->p[PROTO(c->qid)]->conv[CONV(c->qid)]->snoopers);
+			atomic_dec(&f->p[PROTO(c->qid)]->conv[CONV(c->qid)]->snoopers);
 		break;
 	}
 	kfree(((struct IPaux*)c->aux)->owner);

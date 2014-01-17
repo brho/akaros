@@ -57,7 +57,7 @@ pktbwrite(struct Ipifc *ifc, struct block *bp, int unused_int, uint8_t *unused_u
 {
 	/* enqueue onto the conversation's rq */
 	bp = concatblock(bp);
-	if(kref_refcnt(&ifc->conv->snoopers) > 0)
+	if (atomic_read(&ifc->conv->snoopers) > 0)
 		qpass(ifc->conv->sq, copyblock(bp, BLEN(bp)));
 	qpass(ifc->conv->rq, bp);
 }
@@ -71,7 +71,7 @@ pktin(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 	if(ifc->lifc == NULL)
 		freeb(bp);
 	else {
-		if(kref_refcnt(&ifc->conv->snoopers) > 0)
+		if (atomic_read(&ifc->conv->snoopers) > 0)
 			qpass(ifc->conv->sq, copyblock(bp, BLEN(bp)));
 		ipiput4(f, ifc, bp);
 	}

@@ -80,7 +80,7 @@ struct conv
 	struct queue*	wq;			/* queued data waiting to be written */
 	struct queue*	eq;			/* returned error packets */
 	struct queue*	sq;			/* snooping queue */
-	struct kref	snoopers;		/* number of processes with snoop open */
+	atomic_t	snoopers;		/* number of processes with snoop open */
 
 	struct rendez	cr;
 	char	cerr[ERRMAX];
