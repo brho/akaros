@@ -23,7 +23,8 @@ struct route*	v6freelist;
 rwlock_t	routelock;
 uint32_t	v4routegeneration, v6routegeneration;
 
-static void freeroute(struct route *r)
+static void
+freeroute(struct route *r)
 {
 	struct route **l;
 
@@ -36,15 +37,6 @@ static void freeroute(struct route *r)
 	r->rt.mid = *l;
 	*l = r;
 }
-
-static void
-freeroute_from_ref(struct kref *ref)
-{
-	struct RouteTree *rt = container_of(ref, struct RouteTree, kref);
-	struct route *r = container_of(rt, struct route, rt);
-	freeroute(r);
-}
-
 
 static struct route*
 allocroute(int type)
@@ -72,7 +64,7 @@ allocroute(int type)
 	memset(r, 0, n);
 	r->rt.type = type;
 	r->rt.ifc = NULL;
-	kref_init(&r->rt.kref, freeroute_from_ref, 1);
+	kref_init(&r->rt.kref, fake_release, 1);
 
 	return r;
 }
@@ -432,16 +424,19 @@ v4delroute(struct Fs *f, uint8_t *a, uint8_t *mask, int dolock)
 		r = looknode(&f->v4root[h], &rt);
 		if(r) {
 			p = *r;
-			if(kref_refcnt(&p->rt.kref) == 1){
+			/* TODO: bad usage of kref (maybe use a release).  I didn't change
+			 * this one, since it looks like the if code is when we want to
+			 * release.  btw, use better code reuse btw v4 and v6... */
+			if (kref_put(&p->rt.kref)) {
 				*r = 0;
 				addqueue(&f->queue, p->rt.left);
 				addqueue(&f->queue, p->rt.mid);
 				addqueue(&f->queue, p->rt.right);
-				kref_put(&p->rt.kref);
+				freeroute(p);
 				while((p = f->queue)) {
 					f->queue = p->rt.mid;
 					walkadd(f, &f->v4root[h], p->rt.left);
-					kref_put(&p->rt.kref);
+					freeroute(p);
 				}
 			}
 		}
@@ -476,12 +471,14 @@ v6delroute(struct Fs *f, uint8_t *a, uint8_t *mask, int dolock)
 		r = looknode(&f->v6root[h], &rt);
 		if(r) {
 			p = *r;
-			if(kref_refcnt(&p->rt.kref) == 1){
+			/* TODO: bad usage of kref (maybe use a release).  I didn't change
+			 * this one, since it looks like the if code is when we want to
+			 * release.  btw, use better code reuse btw v4 and v6... */
+			if (kref_put(&p->rt.kref)) {
 				*r = 0;
 				addqueue(&f->queue, p->rt.left);
 				addqueue(&f->queue, p->rt.mid);
 				addqueue(&f->queue, p->rt.right);
-
 				freeroute(p);
 				while((p = f->queue)) {
 					f->queue = p->rt.mid;
