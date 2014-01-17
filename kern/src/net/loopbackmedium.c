@@ -49,14 +49,15 @@ loopbackunbind(struct Ipifc *ifc)
 {
 	LB *lb = ifc->arg;
 
+	printk("%s is messed up, shouldn't track procs\n", __FUNCTION__);
+
 	/*if(lb->readp)
 	  postnote(lb->readp, 1, "unbind", 0);
 	*/
 
 	/* wait for reader to die */
-#warning "how to sleep 5 minutes"
-//	while(lb->readp != 0)
-//		tsleep(&current->sleep, return0, 0, 300);
+	while(lb->readp != 0)
+		udelay_sched(300 * 1000);
 
 	/* clean up */
 	qfree(lb->q);

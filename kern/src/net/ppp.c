@@ -1040,7 +1040,7 @@ ppptimer(void *arg)
 		pexit("hangup", 1);
 	}
 	for(;;){
-		tsleep(&up->sleep, return0, nil, Period);
+		udelay_sched(Period * 1000);
 		if(ppp->pppup){
 			qlock(ppp);
 

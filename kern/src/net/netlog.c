@@ -156,7 +156,7 @@ netlogread(Fs *f, void *a, ulong, long n)
 		else
 			unlock(f->alog);
 
-		sleep(f->alog, netlogready, f);
+		rendez_sleep(f->alog, netlogready, f);
 	}
 
 	qunlock(f->alog);
@@ -259,5 +259,5 @@ netlog(Fs *f, int mask, char *fmt, ...)
 	}
 	unlock(f->alog);
 
-	wakeup(f->alog);
+	rendez_wakeup(f->alog);
 }

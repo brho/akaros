@@ -75,9 +75,10 @@ netdevunbind(struct Ipifc *ifc)
 	if(er->readp != NULL)
 		postnote(er->readp, 1, "unbind", 0);
 */
-	/* wait for readers to die *
+	printk("%s is messed up, shouldn't track procs\n", __FUNCTION__);
+	/* wait for readers to die */
 	while(er->readp != NULL)
-	tsleep(&up->sleep, return0, 0, 300);*/
+		udelay_sched(300 * 1000);
 
 	if(er->mchan != NULL)
 		cclose(er->mchan);

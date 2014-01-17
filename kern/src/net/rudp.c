@@ -470,7 +470,7 @@ rudpkick(void *x)
 	qlock(&r->lock);
 	if(UNACKED(r) > Maxunacked){
 		r->blocked = 1;
-		sleep(&r->vous, flow, r);
+		rendez_sleep(&r->vous, flow, r);
 		r->blocked = 0;
 	}
 
@@ -764,7 +764,7 @@ relackproc(void *a)
 	rudp = (Proto *)a;
 
 loop:
-	tsleep(&up->sleep, return0, 0, Rudptickms);
+	udelay_sched(Rudptickms * 1000);
 
 	for(s = rudp->conv; *s; s++) {
 		c = *s;
@@ -937,7 +937,7 @@ reliput(Conv *c, Block *bp, uchar *addr, ushort port)
 
 		/* flow control */
 		if(UNACKED(r) < Maxunacked/8 && r->blocked)
-			wakeup(&r->vous);
+			rendez_wakeup(&r->vous);
 
 		/*
 		 *  retransmit next packet if the acked packet
@@ -1057,7 +1057,7 @@ relhangup(Conv *c, Reliable *r)
 	r->ackrcvd = 0;
 	r->xmits = 0;
 	r->timeout = 0;
-	wakeup(&r->vous);
+	rendez_wakeup(&r->vous);
 }
 
 /*

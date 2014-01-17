@@ -434,7 +434,7 @@ qget(struct queue *q)
 	spin_unlock_irqsave(&q->lock);
 
 	if(dowakeup)
-		wakeup(&q->wr);
+		rendez_wakeup(&q->wr);
 
 	return b;
 }
@@ -488,7 +488,7 @@ qdiscard(struct queue *q, int len)
 	spin_unlock_irqsave(&q->lock);
 
 	if(dowakeup)
-		wakeup(&q->wr);
+		rendez_wakeup(&q->wr);
 
 	return sofar;
 }
@@ -556,7 +556,7 @@ qconsume(struct queue *q, void *vp, int len)
 	spin_unlock_irqsave(&q->lock);
 
 	if(dowakeup)
-		wakeup(&q->wr);
+		rendez_wakeup(&q->wr);
 
 	if(tofree != NULL)
 		freeblist(tofree);
@@ -612,7 +612,7 @@ qpass(struct queue *q, struct block *b)
 	spin_unlock_irqsave(&q->lock);
 
 	if(dowakeup)
-		wakeup(&q->rr);
+		rendez_wakeup(&q->rr);
 
 	return len;
 }
@@ -660,7 +660,7 @@ qpassnolim(struct queue *q, struct block *b)
 	spin_unlock_irqsave(&q->lock);
 
 	if(dowakeup)
-		wakeup(&q->rr);
+		rendez_wakeup(&q->rr);
 
 	return len;
 }
@@ -742,7 +742,7 @@ qproduce(struct queue *q, void *vp, int len)
 	spin_unlock_irqsave(&q->lock);
 
 	if(dowakeup)
-		wakeup(&q->rr);
+		rendez_wakeup(&q->rr);
 
 	return len;
 }
@@ -869,7 +869,7 @@ qwait(struct queue *q)
 
 		q->state |= Qstarve;	/* flag requesting producer to wake me */
 		spin_unlock_irqsave(&q->lock);
-		sleep(&q->rr, notempty, q);
+		rendez_sleep(&q->rr, notempty, q);
 		spin_lock_irqsave(&q->lock);
 	}
 	return 1;
@@ -1010,7 +1010,7 @@ qwakeup_iunlock(struct queue *q)
 	if(dowakeup){
 		if(q->kick)
 			q->kick(q->arg);
-		wakeup(&q->wr);
+		rendez_wakeup(&q->wr);
 	}
 }
 
@@ -1236,7 +1236,7 @@ qbwrite(struct queue *q, struct block *b)
 
 	/* wakeup anyone consuming at the other end */
 	if(dowakeup)
-		wakeup(&q->rr);
+		rendez_wakeup(&q->rr);
 
 	/*
 	 *  flow control, wait for queue to get below the limit
@@ -1257,7 +1257,7 @@ qbwrite(struct queue *q, struct block *b)
 		spin_lock_irqsave(&q->lock);
 		q->state |= Qflow;
 		spin_unlock_irqsave(&q->lock);
-		sleep(&q->wr, qnotfull, q);
+		rendez_sleep(&q->wr, qnotfull, q);
 	}
 
 	qunlock(&q->wlock);
@@ -1348,7 +1348,7 @@ qiwrite(struct queue *q, void *vp, int len)
 		if(dowakeup){
 			if(q->kick)
 				q->kick(q->arg);
-			wakeup(&q->rr);
+			rendez_wakeup(&q->rr);
 		}
 
 		sofar += n;
@@ -1396,8 +1396,8 @@ qclose(struct queue *q)
 	freeblist(bfirst);
 
 	/* wake up readers/writers */
-	wakeup(&q->rr);
-	wakeup(&q->wr);
+	rendez_wakeup(&q->rr);
+	rendez_wakeup(&q->wr);
 }
 
 /*
@@ -1417,8 +1417,8 @@ qhangup(struct queue *q, char *msg)
 	spin_unlock_irqsave(&q->lock);
 
 	/* wake up readers/writers */
-	wakeup(&q->rr);
-	wakeup(&q->wr);
+	rendez_wakeup(&q->rr);
+	rendez_wakeup(&q->wr);
 }
 
 /*
@@ -1514,7 +1514,7 @@ qflush(struct queue *q)
 	freeblist(bfirst);
 
 	/* wake up readers/writers */
-	wakeup(&q->wr);
+	rendez_wakeup(&q->wr);
 }
 
 int

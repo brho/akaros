@@ -117,7 +117,7 @@ igmpproc(void *a)
 	USED(a);
 
 	for(;;){
-		sleep(&igmpalloc.r, isreport, 0);
+		rendez_sleep(&igmpalloc.r, isreport, 0);
 		for(;;){
 			lock(&igmpalloc);
 
@@ -158,7 +158,7 @@ igmpproc(void *a)
 				continue;
 			}
 
-			tsleep(&up->sleep, return0, 0, MSPTICK);
+			udelay_sched(MSPTICK * 1000);
 		}
 		unlock(&igmpalloc);
 	}
@@ -222,7 +222,7 @@ igmpiput(Media *m, Ipifc *, Block *bp)
 		rp->next = igmpalloc.reports;
 		igmpalloc.reports = rp;
 
-		wakeup(&igmpalloc.r);
+		rendez_wakeup(&igmpalloc.r);
 
 		break;
 	case IGMPreport:

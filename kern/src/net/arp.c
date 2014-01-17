@@ -109,7 +109,7 @@ newarp6(struct arp *arp, uint8_t *ip, struct Ipifc *ifc, int addrxt)
 			for(next = xp->list; next; next = next->list)
 				xp = next;
 			arp->dropl = xp;
-			wakeup(&arp->rxmtq);
+			rendez_wakeup(&arp->rxmtq);
 		}
 	}
 
@@ -155,7 +155,7 @@ newarp6(struct arp *arp, uint8_t *ip, struct Ipifc *ifc, int addrxt)
 		}
 		*l = a;
 		if(empty) 
-			wakeup(&arp->rxmtq);
+			rendez_wakeup(&arp->rxmtq);
 	}
 
 	a->nextrxt = NULL;
@@ -691,9 +691,9 @@ rxmitproc(void *v)
 	for(;;){
 		wakeupat = rxmitsols(arp);
 		if(wakeupat == 0) 
-			sleep(&arp->rxmtq, rxready, v); 
+			rendez_sleep(&arp->rxmtq, rxready, v); 
 		else if(wakeupat > ReTransTimer/4) 
-			tsleep(&arp->rxmtq, return0, 0, wakeupat); 
+			udelay_sched(wakeupat * 1000); 
 	}
 }
 

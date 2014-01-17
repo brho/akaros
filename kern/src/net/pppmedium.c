@@ -146,7 +146,7 @@ pppunbind(Ipifc *ifc)
 
 	/* wait for kprocs to die */
 	while(ppp->readp != 0 || ppp->timep != 0)
-		tsleep(&up->sleep, return0, 0, 300);
+		udelay_sched(300 * 1000);
 
 	pppclose(ppp);
 	qclose(ifc->conv->eq);

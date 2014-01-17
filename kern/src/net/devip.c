@@ -495,7 +495,7 @@ ipopen(struct chan* c, int omode)
 			}
 
 			/* wait for a connect */
-			sleep(&cv->listenr, incoming, cv);
+			rendez_sleep(&cv->listenr, incoming, cv);
 
 			qlock(&cv->qlock);
 			nc = cv->incall;
@@ -970,7 +970,7 @@ connectctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 		qlock(&c->qlock);
 		nexterror();
 	}
-	sleep(&c->cr, connected, c);
+	rendez_sleep(&c->cr, connected, c);
 	qlock(&c->qlock);
 	poperror();
 
@@ -1023,7 +1023,7 @@ announcectlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 		qlock(&c->qlock);
 		nexterror();
 	}
-	sleep(&c->cr, announced, c);
+	rendez_sleep(&c->cr, announced, c);
 	qlock(&c->qlock);
 	poperror();
 
@@ -1346,7 +1346,7 @@ Fsconnected(struct conv* c, char* msg)
 		break;
 	}
 
-	wakeup(&c->cr);
+	rendez_wakeup(&c->cr);
 	return 0;
 }
 
@@ -1402,7 +1402,7 @@ Fsnewcall(struct conv *c, uint8_t *raddr, uint16_t rport, uint8_t *laddr,
 
 	qunlock(&c->qlock);
 
-	wakeup(&c->listenr);
+	rendez_wakeup(&c->listenr);
 
 	return nc;
 }

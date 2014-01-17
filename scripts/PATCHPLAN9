@@ -25,6 +25,7 @@ spatch --sp-file scripts/spatch/plan9.cocci --in-place $1
 spatch --sp-file scripts/spatch/scalar.cocci --in-place $1
 spatch --sp-file scripts/spatch/typedef.cocci --in-place $1
 spatch --sp-file scripts/spatch/locks.cocci --in-place $1
+spatch --sp-file scripts/spatch/rendez.cocci --in-place $1
 # include fixing. Idempotent. 
 sh scripts/fixincludes $1
 # Scalars. Idempotent.

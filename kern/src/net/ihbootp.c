@@ -193,7 +193,7 @@ rcvbootp(void *a)
 	rcvprocp = nil;
 
 	recv = 1;
-	wakeup(&bootpr);
+	rendez_wakeup(&bootpr);
 	pexit("", 0);
 }
 
@@ -255,7 +255,7 @@ rbootp(Ipifc *ifc)
 		if(kwrite(dfd, &req, sizeof(req)) < 0)
 			print("bootp: write: %r");
 
-		tsleep(&bootpr, return0, 0, 1000);
+		udelay_sched(1000 * 1000);
 		if(++tries > 10) {
 			print("bootp: timed out\n");
 			break;

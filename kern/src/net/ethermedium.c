@@ -278,8 +278,7 @@ etherunbind(struct Ipifc *ifc)
 	/* wait for readers to die */
 	while(er->arpp != 0 || er->read4p != 0 || er->read6p != 0)
 		;
-#warning tsleep
-	//	tsleep(&up->sleep, return0, 0, 300);
+	udelay_sched(300 * 1000);
 
 	if(er->mchan4 != NULL)
 		cclose(er->mchan4);

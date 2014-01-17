@@ -230,7 +230,7 @@ rcvbootp(void *a)
 			if(dhcpmsgtype < dhcp){
 				dhcpmsgtype=dhcp;
 				recv = 1;
-				wakeup(&bootpr);
+				rendez_wakeup(&bootpr);
 				if(dhcp==0 || dhcp ==5 || dhcp == 6 )
 					break;
 			}
@@ -315,7 +315,7 @@ rbootp(Ipifc *ifc)
 			if(kwrite(dfd, &req, sizeof(req))<0)	/* SEND DHCPDISCOVER */
 				print("DHCPDISCOVER: %r");
 		
-			tsleep(&bootpr, return0, 0, 1000);	/* wait DHCPOFFER */
+			udelay_sched(1000 * 1000);	/* wait DHCPOFFER */
 			if(debug)
 				print("[DHCP] DISCOVER: msgtype = %d\n", dhcpmsgtype);
 
@@ -360,7 +360,7 @@ rbootp(Ipifc *ifc)
 			print("DHCPREQUEST: %r");
 			continue;
 		}
-		tsleep(&bootpr, return0, 0, 2000);
+		udelay_sched(2000 * 1000);
 		if(dhcpmsgtype==5)		/* wait for DHCPACK */
 			break;
 		else
