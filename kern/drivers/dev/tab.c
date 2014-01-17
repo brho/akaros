@@ -21,10 +21,10 @@
 // the sooner the better!
 
 extern struct dev alarmdevtab;
+extern struct dev consdevtab;
 /*extern struct dev regressdevtab;
 extern struct dev pipedevtab;
 extern struct dev procdevtab;
-extern struct dev miscdevtab;
 extern struct dev etherdevtab;
 extern struct dev rootdevtab;
 extern struct dev ipdevtab;
@@ -33,9 +33,9 @@ extern struct dev srvdevtab;
 extern struct dev vmdevtab;*/
 struct dev *devtab[] = {
 	&alarmdevtab,
+	&consdevtab,
 /*
 	&rootdevtab,
-	&miscdevtab,
 	&regressdevtab,
 	&pipedevtab,
 	&procdevtab,

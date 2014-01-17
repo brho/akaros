@@ -86,6 +86,23 @@ void kernel_init(multiboot_info_t *mboot_info)
 	arch_init();
 	block_init();
 	enable_irq();
+/*
+	void ether8139link(void);
+	ether8139link();
+	void ether8169link(void);
+	ether8169link();
+	void etherigbelink(void);
+	etherigbelink();
+*/
+	ethermediumlink();
+	loopbackmediumlink();
+void devtabinit(void);
+	devtabinit();
+/*
+void devtabreset(void);
+	devtabreset();
+*/
+
 #ifdef CONFIG_EXT2FS
 	mount_fs(&ext2_fs_type, "/dev/ramdisk", "/mnt", 0);
 #endif /* CONFIG_EXT2FS */
