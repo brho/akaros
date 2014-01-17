@@ -346,8 +346,7 @@ static void mh_release(struct kref *kref)
 	kfree(mh);
 }
 
-struct mhead*
-newmhead(struct chan *from)
+struct mhead *newmhead(struct chan *from)
 {
 	struct mhead *mh;
 

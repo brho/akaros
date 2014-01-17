@@ -13,8 +13,10 @@
 #include <smp.h>
 #include <ip.h>
 
-static struct kref pgrpid;
-static struct kref mountid;
+/* TODO: (ID) need a unique ID service.  These will loop around... */
+static int pgrpid;
+static int mountid;
+#define NEXT_ID(x) (__sync_add_and_fetch(&(x), 1))
 
 void
 closepgrp(struct pgrp *p)
@@ -56,8 +58,7 @@ newpgrp(void)
 
 	p = kzmalloc(sizeof(struct pgrp), 0);
 	kref_init(&p->ref, freepgrp, 1);
-	kref_get(&pgrpid, 1);
-	p->pgrpid = kref_refcnt(&pgrpid);
+	p->pgrpid = NEXT_ID(pgrpid);
 	p->progmode = 0644;
 	return p;
 }
@@ -109,12 +110,9 @@ pgrpcpy(struct pgrp *to, struct pgrp *from)
 				runlock(&f->lock);
 				nexterror();
 			}
-			mh = kzmalloc(sizeof(struct mhead), 0);
-			if(mh == NULL)
+			mh = newmhead(f->from);
+			if (!mh)
 				error(Enomem);
-			mh->from = f->from;
-			kref_init(&mh->ref, fake_release, 1);
-			kref_get(&mh->from->ref, 1);
 			*l = mh;
 			l = &mh->hash;
 			link = &mh->mount;
@@ -134,8 +132,7 @@ pgrpcpy(struct pgrp *to, struct pgrp *from)
 	 */
 	/* should probably protect with a spinlock and be done with it */
 	for(m = order; m; m = m->order){
-		kref_get(&mountid, 1);
-		m->copy->mountid = kref_refcnt(&mountid);
+		m->copy->mountid = NEXT_ID(mountid);
 	}
 
 	to->progmode = from->progmode;
@@ -150,25 +147,34 @@ pgrpcpy(struct pgrp *to, struct pgrp *from)
 void
 closefgrp(struct fgrp *f)
 {
-	int i;
-	struct chan *c;
+	/* TODO: look at this more carefully.  sharing fgrps might be unnecessary,
+	 * due to our parallelism style. */
+	/* closefgrp can't be called from proc_destroy, due to races on the fgrp.
+	 * current->fgrp is a kref source, and we'd need some form of external sync
+	 * to remove it, since multiple kthreads could be accessing current->fgrp.
+	 * proc_free is synchronized, for instance.  we could put some sync in the
+	 * fgrp, but that would require splitting the deallocation (which we do
+	 * manually), and would require not having multiple procs per fgrp (which we
+	 * also require).  another option would be to use RCU: clear current->fgrp,
+	 * then closefgrp after a grace period. */
+	warn("Don't call closefgrp()");
 
-	if(f == NULL || kref_put(&f->ref) != 0)
+	if (!f)
 		return;
-
-	for(i = 0; i <= f->maxfd; i++)
-		if((c = f->fd[i]))
-			cclose(c);
-
-	kfree(f->fd);
-	kfree(f);
+	kref_put(&f->ref);
 }
 
 static void
 freefgrp(struct kref *k)
 {
 	struct fgrp *f = container_of(k, struct fgrp, ref);
-	closefgrp(f);
+	struct chan *c;
+	for(int i = 0; i <= f->maxfd; i++)
+		if((c = f->fd[i]))
+			cclose(c);
+
+	kfree(f->fd);
+	kfree(f);
 }
 
 struct fgrp*
@@ -235,8 +241,7 @@ newmount(struct mhead *mh, struct chan *to, int flag, char *spec)
 	m->to = to;
 	m->head = mh;
 	kref_get(&to->ref, 1);
-	kref_get(&mountid, 1);
-	m->mountid = kref_refcnt(&mountid);
+	m->mountid = NEXT_ID(mountid);
 	m->mflag = flag;
 	if(spec != 0)
 		kstrdup(&m->spec, spec);
@@ -280,24 +285,37 @@ resrcwait(char *reason)
 }
 #endif
 
-void
-closesigs(struct skeyset *s)
+/* TODO: We don't have any alloc / initializer methods for skeyset or signerkey
+ * yet.  When we do, use these releases for their kref_init. */
+static void __sigs_release(struct kref *kref)
 {
+	struct skeyset *s = container_of(kref, struct skeyset, ref);
 	int i;
-
-	if(s == NULL || kref_put(&s->ref) != 0)
-		return;
-	for(i=0; i<s->nkey; i++)
+	for (i = 0; i < s->nkey; i++)
 		freeskey(s->keys[i]);
 	kfree(s);
 }
 
 void
-freeskey(struct signerkey *key)
+closesigs(struct skeyset *s)
 {
-	if(key == NULL || kref_put(&key->ref) != 0)
+	if (!s)
 		return;
+	kref_put(&s->ref);
+}
+
+static void __key_release(struct kref *kref)
+{
+	struct signerkey *key = container_of(kref, struct signerkey, ref);
 	kfree(key->owner);
 	(*key->pkfree)(key->pk);
 	kfree(key);
+}
+
+void
+freeskey(struct signerkey *key)
+{
+	if (!key)
+		return;
+	kref_put(&key->ref);
 }
