@@ -4,6 +4,7 @@ obj-y						+= devip.o
 obj-y						+= ethermedium.o
 #obj-y						+= icmp6.o
 obj-y						+= ipaux.o
+obj-y						+= iproute.o
 obj-y						+= ipifc.o
 obj-y						+= loopbackmedium.o
 obj-y						+= netdevmedium.o
