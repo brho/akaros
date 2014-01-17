@@ -1,10 +1,17 @@
-#include	"u.h"
-#include	"../port/lib.h"
-#include	"mem.h"
-#include	"dat.h"
-#include	"fns.h"
-#include	"../port/error.h"
-#include	"ip.h"
+// INFERNO
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
+#include <ip.h>
 
 /*
  *  some hacks for commonality twixt inferno and plan9
@@ -13,24 +20,24 @@
 char*
 commonuser(void)
 {
-	return up->env->user;
+	return current->user;
 }
 
-Chan*
+struct chan*
 commonfdtochan(int fd, int mode, int a, int b)
 {
-	return fdtochan(up->env->fgrp, fd, mode, a, b);
+	return fdtochan(current->fgrp, fd, mode, a, b);
 }
 
 char*
 commonerror(void)
 {
-	return up->env->errstr;
+	return current_errstr();
 }
 
 int
-postnote(Proc *p, int, char *, int)
+postnote(struct proc *p, int unused_int, char *note, int val)
 {
-	swiproc(p, 0);
+	panic("postnote");
 	return 0;
 }
