@@ -85,7 +85,7 @@ struct conv
 	qlock_t	listenq;
 	struct rendez	listenr;
 
-	struct ipmulti	*multi;			/* multicast bindings for this interface */
+	struct Ipmulti	*multi;			/* multicast bindings for this interface */
 
 	void*	ptcl;			/* Protocol specific stuff */
 
@@ -150,19 +150,19 @@ struct Iplifc
 	long 	preflt;		/* v6 preferred lifetime */
 	long	origint;	/* time when addr was added */
 	struct Iplink	*link;		/* addresses linked to this lifc */
-	struct iplifc	*next;
+	struct Iplifc	*next;
 };
 
 /* binding twixt Ipself and Iplifc */
 struct Iplink
 {
 	struct Ipself	*self;
-	struct iplifc	*lifc;
+	struct Iplifc	*lifc;
 	struct Iplink	*selflink;	/* next link for this local address */
 	struct Iplink	*lifclink;	/* next link for this ifc */
 	uint32_t	expire;
 	struct Iplink	*next;		/* free list */
-	int	ref;
+	struct kref	ref;
 };
 
 /* rfc 2461, pp.40--43. */
@@ -464,7 +464,7 @@ struct route
 	struct RouteTree rt;
 
 	union {
-		struct V6route	v6;
+		struct V6route v6;
 		struct V4route v4;
 	};
 };
@@ -558,8 +558,6 @@ extern uint8_t IPnoaddr[IPaddrlen];
 extern uint8_t v4prefix[IPaddrlen];
 extern uint8_t IPallbits[IPaddrlen];
 
-#define	NOW	TK2MS(MACHP(0)->ticks)
-
 /*
  *  media
  */
@@ -583,7 +581,7 @@ extern void	findlocalip(struct Fs*, uint8_t *local, uint8_t *remote);
 extern int	ipv4local(struct Ipifc *ifc, uint8_t *addr);
 extern int	ipv6local(struct Ipifc *ifc, uint8_t *addr);
 extern int	ipv6anylocal(struct Ipifc *ifc, uint8_t *addr);
-extern struct iplifc*	iplocalonifc(struct Ipifc *ifc, uint8_t *ip);
+extern struct Iplifc*	iplocalonifc(struct Ipifc *ifc, uint8_t *ip);
 extern int	ipproxyifc(struct Fs *f, struct Ipifc *ifc, uint8_t *ip);
 extern int	ipismulticast(uint8_t *ip);
 extern int	ipisbooting(void);
@@ -596,7 +594,7 @@ extern void	ipifcremmulti(struct conv *c, uint8_t *ma, uint8_t *ia);
 extern void	ipifcaddmulti(struct conv *c, uint8_t *ma, uint8_t *ia);
 extern char*	ipifcrem(struct Ipifc *ifc, char **argv, int argc);
 extern char*	ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
-			     struct iplifc *lifcp);
+			     struct Iplifc *lifcp);
 extern long	ipselftabread(struct Fs*, char *a, uint32_t offset, int n);
 extern char*	ipifcaddpref6(struct Ipifc *ifc, char**argv, int argc);
 extern void	ipsendra6(struct Fs *f, int on);
@@ -842,3 +840,5 @@ extern int v6aNpreflen;
 extern int v6aLpreflen;
 
 extern int ReTransTimer;
+
+int kdial(char *dest, char *local, char *dir, int *cfdp);

@@ -960,3 +960,10 @@ char *index(char *s, int c);
 
 /* hack for now. */
 #define eve "eve"
+#define	NOW	tsc2msec(read_tsc())
+#define	seconds() tsc2sec(read_tsc())
+
+/* system calls */
+int sysclose(int fd);
+int sysopen(char *name, int omode);
+long sysread(int fd, void *p, size_t n, off_t off);

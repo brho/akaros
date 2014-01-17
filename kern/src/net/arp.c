@@ -129,11 +129,11 @@ newarp6(struct arp *arp, uint8_t *ip, struct Ipifc *ifc, int addrxt)
 	*l = a;
 
 	memmove(a->ip, ip, sizeof(a->ip));
-	//a->utime = NOW;
+	a->utime = NOW;
 	a->ctime = 0;
 	a->type = m;
 
-	//a->rtime = NOW + ReTransTimer;
+	a->rtime = NOW + ReTransTimer;
 	a->rxtsrem = MAX_MULTICAST_SOLICIT;
 	a->ifc = ifc;
 	a->ifcid = ifc->ifcid;
@@ -233,8 +233,7 @@ arpget(struct arp *arp, struct block *bp, int version, struct Ipifc *ifc, uint8_
 		a = newarp6(arp, ip, ifc, (version != V4));
 		a->state = AWAIT;
 	}
-#warning "utime, NOW, rtime, etc."
-	//a->utime = NOW;
+	a->utime = NOW;
 	if(a->state == AWAIT){
 		if(bp != NULL){
 			if(a->hold)
@@ -250,8 +249,8 @@ arpget(struct arp *arp, struct block *bp, int version, struct Ipifc *ifc, uint8_
 	memmove(mac, a->mac, a->type->maclen);
 
 	/* remove old entries */
-	//if(NOW - a->ctime > 15*60*1000)
-	//	cleanarpent(arp, a);
+	if(NOW - a->ctime > 15*60*1000)
+		cleanarpent(arp, a);
 
 	qunlock(&arp->qlock);
 	return NULL;
@@ -292,7 +291,7 @@ arpresolve(struct arp *arp, struct arpent *a, struct medium *type, uint8_t *mac)
 	memmove(a->mac, mac, type->maclen);
 	a->type = type;
 	a->state = AOK;
-	//a->utime = NOW;
+	a->utime = NOW;
 	bp = a->hold;
 	a->hold = NULL;
 	qunlock(&arp->qlock);
@@ -368,7 +367,7 @@ arpenter(struct Fs *fs, int version, uint8_t *ip, uint8_t *mac, int n, int refre
 			a->hold = NULL;
 			if(version == V4)
 				ip += IPv4off;
-			//a->utime = NOW;
+			a->utime = NOW;
 			a->ctime = a->utime;
 			qunlock(&arp->qlock);
 
@@ -398,7 +397,7 @@ arpenter(struct Fs *fs, int version, uint8_t *ip, uint8_t *mac, int n, int refre
 		a = newarp6(arp, ip, ifc, 0);
 		a->state = AOK;
 		a->type = type;
-		//a->ctime = NOW;
+		a->ctime = NOW;
 		memmove(a->mac, mac, type->maclen);
 	}
 
@@ -592,9 +591,7 @@ rxmitsols(struct arp *arp)
 		nrxt = 0;
 		goto dodrops; 		//return nrxt;
 	}
-	//nrxt = a->rtime - NOW;
-#warning "NOW"
-	nrxt = 0;
+	nrxt = a->rtime - NOW;
 	if(nrxt > 3*ReTransTimer/4) 
 		goto dodrops; 		//return nrxt;
 
@@ -643,13 +640,13 @@ rxmitsols(struct arp *arp)
 	*l = a;
 	a->rxtsrem--;
 	a->nextrxt = NULL;
-	//a->rtime = NOW + ReTransTimer;
+	a->rtime = NOW + ReTransTimer;
 
 	a = arp->rxmt;
 	if(a==NULL)
 		nrxt = 0;
 	else 
-		nrxt = 1; //a->rtime - NOW;
+		nrxt = a->rtime - NOW;
 
 dodrops:
 	xp = arp->dropf;
@@ -688,7 +685,7 @@ rxmitproc(void *v)
 	//print("arp rxmitproc started\n");
 	if(waserror()){
 		arp->rxmitp = 0;
-#warning "pexti"
+#warning "pexit"
 		//pexit("hangup", 1);
 	}
 	for(;;){

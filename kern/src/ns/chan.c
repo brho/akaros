@@ -1291,14 +1291,12 @@ if(c->umh != NULL){
 	}
 
 	poperror();
-#warning "how big is genbuf?"
-	/* place final element in genbuf for e.g. exec */
-#if 0
+
 	if(e.ARRAY_SIZEs > 0)
-		kstrncpy(get_cur_genbuf(), e.elems[e.ARRAY_SIZEs-1],  sizeof current->genbuf, sizeof(current->genbuf, e.elems[e.ARRAY_SIZEs-1]));
+		strncpy(get_cur_genbuf(), e.elems[e.ARRAY_SIZEs-1], GENBUF_SZ);
 	else
-		kstrncpy(get_cur_genbuf(), ".",  sizeof current->genbuf, sizeof(current->genbuf, "."));
-#endif
+		strncpy(get_cur_genbuf(), ".", GENBUF_SZ);
+
 	kfree(e.name);
 	kfree(e.elems);
 	kfree(e.off);

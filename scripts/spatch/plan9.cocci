@@ -4,6 +4,24 @@
 +printd(
 ...)
 
+@ kopen@
+@@
+-kopen(
++sysopen(
+...)
+
+@ kclose @
+@@
+-kclose(
++sysclose(
+...)
+
+@ kread@
+@@
+-kread(
++sysread(
+...)
+
 @ channel @
 identifier d;
 @@

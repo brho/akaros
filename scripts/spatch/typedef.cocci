@@ -20,7 +20,7 @@ typedef Ipifc;
 typedef Iplifc;
 @@
 -Iplifc
-+struct iplifc
++struct Iplifc
 
 @@
 typedef Ipv6rp;
@@ -158,7 +158,7 @@ typedef Medium;
 typedef Proto;
 @@
 -Proto
-+struct proto
++struct Proto
 
 @@
 typedef Arpent;

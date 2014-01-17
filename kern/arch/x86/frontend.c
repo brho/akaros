@@ -7,6 +7,6 @@
 
 int handle_appserver_packet(const char* p, size_t size)
 {
-#warning "need to rewrite this for the new ip stack"
+
 	panic("bad appserver packet!");
 }
