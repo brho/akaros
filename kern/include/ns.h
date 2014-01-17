@@ -721,7 +721,6 @@ void		hnputs(void*, uint16_t);
 struct block*		iallocb(int);
 void		iallocsummary(void);
 void		ilock(spinlock_t*);
-int		incref(struct kref*);
 int		iprint( char *unused_char_p_t, ...);
 void		isdir(struct chan*);
 int		iseve(void);

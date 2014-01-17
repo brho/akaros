@@ -456,7 +456,7 @@ mntwalk(struct chan *c, struct chan *nc, char **name, int nname)
 		if(wq->clone != c){
 			wq->clone->type = c->type;
 			wq->clone->mchan = c->mchan;
-			incref(&c->mchan->ref);
+			kref_get(&c->mchan->ref, 1);
 		}
 		if(r->reply.nwqid > 0)
 			wq->clone->qid = r->reply.wqid[r->reply.nwqid-1];
