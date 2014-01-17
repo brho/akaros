@@ -514,6 +514,7 @@ struct fgrp
 	int	nfd;			/* number of fd slots */
 	int	maxfd;			/* highest fd in use */
 	int	minfd;			/* lower bound on free fd */
+	int     closed;
 };
 
 struct evalue
@@ -998,6 +999,9 @@ int sysdirwstat(char *name, struct dir *dir);
 int sysdirfwstat(int fd, struct dir *dir);
 long sysdirread(int fd, struct dir **d);
 int sysiounit(int fd);
+void close_9ns_files(struct proc *p, bool only_cloexec);
+void print_chaninfo(struct chan *ch);
+void print_9ns_files(struct proc *p);
 
 int iseve(void);
 

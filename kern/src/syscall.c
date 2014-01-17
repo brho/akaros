@@ -1163,7 +1163,7 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 		return ret;
 	}
 	/* plan9, should also handle errors (EBADF) */
-    ret = sysread(fd, buf, len, ~0LL);
+    ret = syspread(fd, buf, len, ~0LL);
 	return ret;
 }
 
@@ -1184,7 +1184,7 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 		return ret;
 	}
 	/* plan9, should also handle errors */
-	ret = syswrite(fd, (void*)buf, len, (off_t) -1);
+	ret = syspwrite(fd, (void*)buf, len, (off_t) -1);
 	return ret;
 }
 
@@ -1734,7 +1734,7 @@ intreg_t sys_nbind(struct proc *p,
 		return -1;
 	}
 	printd("sys_nbind: %s -> %s flag %d\n", t_srcpath, t_ontopath, flag);
-	ret = bindmount(0, -1, -1, t_srcpath, t_ontopath, flag, NULL);
+	ret = sysbind(t_srcpath, t_ontopath, flag);
 	user_memdup_free(p, t_srcpath);
 	user_memdup_free(p, t_ontopath);
 	return ret;
@@ -1765,7 +1765,7 @@ intreg_t sys_nmount(struct proc *p,
 	char *t_ontopath = user_strdup_errno(p, onto_path, onto_l);
 	if (t_ontopath == NULL)
 		return -1;
-	ret = bindmount(1, fd, afd, NULL, t_ontopath, flag, /* spec or auth */"");
+	ret = sysmount(fd, afd, t_ontopath, flag, /* spec or auth */"");
 	user_memdup_free(p, t_ontopath);
 	return ret;
 }
@@ -1805,8 +1805,8 @@ static int sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
 		poperror();
 		return -1;
 	}
-	ch = fdtochan(fd, -1, FALSE, TRUE);
-	ret = snprintf(u_buf, len, "%s", chanpath(ch));
+	ch = fdtochan(current->fgrp, fd, -1, FALSE, TRUE);
+	ret = snprintf(u_buf, len, "%s", "chanpath(ch)");
 	cclose(ch);
 	poperror();
 	return ret;
@@ -1859,19 +1859,6 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_change_to_m] = {(syscall_t)sys_change_to_m, "change_to_m"},
 	[SYS_poke_ksched] = {(syscall_t)sys_poke_ksched, "poke_ksched"},
 	[SYS_abort_sysc] = {(syscall_t)sys_abort_sysc, "abort_sysc"},
-
-// socket related syscalls
-	[SYS_socket] ={(syscall_t)sys_socket, "socket"},
-	[SYS_sendto] ={(syscall_t)sys_sendto, "sendto"},
-	[SYS_recvfrom] ={(syscall_t)sys_recvfrom, "recvfrom"},
-	[SYS_select] ={(syscall_t)sys_select, "select"},
-	[SYS_connect] = {(syscall_t)sys_connect, "connect"},
-	[SYS_send] ={(syscall_t)sys_send, "send"},
-	[SYS_recv] ={(syscall_t)sys_recv, "recvfrom"},
-	[SYS_bind] ={(syscall_t)sys_bind, "bind"},
-	[SYS_accept] ={(syscall_t)sys_accept, "accept"},
-	[SYS_listen] ={(syscall_t)sys_listen, "listen"},
-
 
 	[SYS_read] = {(syscall_t)sys_read, "read"},
 	[SYS_write] = {(syscall_t)sys_write, "write"},

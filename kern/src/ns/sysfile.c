@@ -1159,3 +1159,69 @@ sysiounit(int fd)
 	cclose(c);
 	return n;
 }
+
+/* Notes on concurrency:
+ * - Can't hold spinlocks while we call cclose, since it might sleep eventually.
+ * - We're called from proc_destroy, so we could have concurrent openers trying
+ *   to add to the group (other syscalls), hence the "closed" flag.
+ * - dot and slash chans are dealt with in proc_free.  its difficult to close
+ *   and zero those with concurrent syscalls, since those are a source of krefs.
+ * - the memory is freed in proc_free().  need to wait to do it, since we can
+ *   have concurrent accesses to fgrp before free.
+ * - Once we lock and set closed, no further additions can happen.  To simplify
+ *   our closes, we also allow multiple calls to this func (though that should
+ *   never happen with the current code). */
+void close_9ns_files(struct proc *p, bool only_cloexec)
+{
+	struct fgrp *f = p->fgrp;
+
+	spin_lock(&f->lock);
+	if (f->closed) {
+		spin_unlock(&f->lock);
+		warn("Unexpected double-close");
+		return;
+	}
+	if (!only_cloexec)
+		f->closed = TRUE;
+	spin_unlock(&f->lock);
+
+	/* maxfd is a legit val, not a +1 */
+	for (int i = 0; i <= f->maxfd; i++) {
+		if (!f->fd[i])
+			continue;
+		if (only_cloexec && !(f->fd[i]->flag & CCEXEC))
+			continue;
+		cclose(f->fd[i]);
+		f->fd[i] = 0;
+	}
+}
+
+void print_chaninfo(struct chan *ch)
+{
+	char buf[64] = {0};
+#if 0
+FIXME
+	printk("Chan pathname: %s, Dev: %s, Devinfo: %s\n",
+	       "ch->path ? ch->path->s : \"no path",
+	       ch->dev ? ch->dev->name: "no dev",
+		   ch->dev ? ch->dev->chaninfo(ch, buf, sizeof(buf)) : "no info");
+	if (!ch->dev)
+		printk("No dev: intermediate chan? qid.path: %p\n", ch->qid.path);
+#endif
+}
+
+void print_9ns_files(struct proc *p)
+{
+	struct fgrp *f = p->fgrp;
+	spin_lock(&f->lock);
+	printk("9ns files for proc %d:\n", p->pid);
+	/* maxfd is a legit val, not a +1 */
+	for (int i = 0; i <= f->maxfd; i++) {
+		if (!f->fd[i])
+			continue;
+		printk("\t9fs %d, ", i);
+		print_chaninfo(f->fd[i]);
+	}
+	spin_unlock(&f->lock);
+}
+
