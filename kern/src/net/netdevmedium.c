@@ -61,7 +61,7 @@ netdevbind(struct Ipifc *ifc, int argc, char **argv)
 
 	ifc->arg = er;
 
-	kproc("netdevread", netdevread, ifc, 0);
+	ktask("netdevread", netdevread, ifc);
 }
 
 /*

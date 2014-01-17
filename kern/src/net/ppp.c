@@ -116,7 +116,7 @@ init(PPP* ppp)
 		ppp->ipcp->proto = Pipcp;
 		ppp->ipcp->state = Sclosed;
 
-		kproc("ppptimer", ppptimer, ppp, KPDUPPG|KPDUPFDG);
+		ktask("ppptimer", ppptimer, ppp);
 	}
 
 	pinit(ppp, ppp->lcp);

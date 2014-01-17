@@ -289,7 +289,7 @@ rbootp(Ipifc *ifc)
 /* DHCPDISCOVER*/
 		done = 0;
 		recv = 0;
-		kproc("rcvbootp", rcvbootp, (void*)dfd, KPDUPFDG);
+		ktask("rcvbootp", rcvbootp, (void *)dfd);
 		/* Prepare DHCPDISCOVER */	
 		memset(&req, 0, sizeof(req));
 		ipmove(req.raddr, IPv4bcast);

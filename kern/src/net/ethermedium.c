@@ -253,9 +253,9 @@ etherbind(struct Ipifc *ifc, int argc, char **argv)
 	kfree(buf);
 	poperror();
 
-	kproc("etherread4", etherread4, ifc, 0);
-	kproc("recvarpproc", recvarpproc, ifc, 0);
-	kproc("etherread6", etherread6, ifc, 0);
+	ktask("etherread4", etherread4, ifc);
+	ktask("recvarpproc", recvarpproc, ifc);
+	ktask("etherread6", etherread6, ifc);
 }
 
 /*

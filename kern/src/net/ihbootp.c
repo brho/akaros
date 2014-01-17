@@ -244,7 +244,7 @@ rbootp(Ipifc *ifc)
 	done = 0;
 	recv = 0;
 
-	kproc("rcvbootp", rcvbootp, (void*)dfd, KPDUPFDG);
+	ktask("rcvbootp", rcvbootp, (void *)dfd);
 
 	/*
 	 * broadcast bootp's till we get a reply,

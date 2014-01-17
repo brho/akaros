@@ -285,7 +285,7 @@ igmpinit(Fs *fs)
 	igmp.ptclsize = 0;
 
 	igmpreportfn = igmpsendreport;
-	kproc("igmpproc", igmpproc, 0, 0);
+	ktask("igmpproc", igmpproc, 0);
 
 	Fsproto(fs, &igmp);
 }

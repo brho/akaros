@@ -40,7 +40,7 @@ loopbackbind(struct Ipifc *ifc, int unused_int, char **unused_char_pp_t)
 	ifc->arg = lb;
 	ifc->mbps = 1000;
 
-	kproc("loopbackread", loopbackread, ifc, 0);
+	ktask("loopbackread", loopbackread, ifc);
 
 }
 

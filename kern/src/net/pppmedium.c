@@ -85,7 +85,7 @@ pppbind(Ipifc *ifc, int argc, char **argv)
 	if(pppopen(ppp, argv[2], ipaddr, remip, mtu, framing, chapname, secret) == nil)
 		error("ppp open failed");
 	poperror();
-	kproc("pppreader", pppreader, ifc, KPDUPPG|KPDUPFDG);
+	ktask("pppreader", pppreader, ifc);
 }
 
 static void

@@ -62,7 +62,7 @@ arpinit(struct Fs *f)
 	f->arp->f = f;
 	f->arp->rxmt = NULL;
 	f->arp->dropf = f->arp->dropl = NULL;
-	kproc("rxmitproc", rxmitproc, f->arp, 0);
+	ktask("rxmitproc", rxmitproc, f->arp);
 }
 
 /*

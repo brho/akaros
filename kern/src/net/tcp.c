@@ -866,7 +866,7 @@ tcpstart(Conv *s, int mode)
 		qlock(&tpriv->apl);
 		if(tpriv->ackprocstarted == 0){
 			sprint(kpname, "#I%dtcpack", s->p->f->dev);
-			kproc(kpname, tcpackproc, s->p, 0);
+			ktask(kpname, tcpackproc, s->p);
 			tpriv->ackprocstarted = 1;
 		}
 		qunlock(&tpriv->apl);
