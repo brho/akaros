@@ -7,6 +7,7 @@ obj-y						+= ipaux.o
 obj-y						+= iproute.o
 obj-y						+= ipifc.o
 obj-y						+= loopbackmedium.o
+obj-y						+= netaux.o
 obj-y						+= netdevmedium.o
 obj-y						+= nullmedium.o
 obj-y						+= ptclbsum.o

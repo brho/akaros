@@ -388,11 +388,11 @@ struct dev
 	void	(*reset)(void);
 	void	(*init)(void);
 	void	(*shutdown)(void);
-	struct chan*	(*attach)( char *unused_char_p_t);
-	struct walkqid*	(*walk)(struct chan*, struct chan*, char **unused_char_pp_t, int);
-	int	(*stat)(struct chan*, uint8_t *unused_uint8_p_t, int);
+	struct chan*	(*attach)( char *muxattach);
+	struct walkqid*	(*walk)(struct chan*, struct chan*, char **name, int);
+	int	(*stat)(struct chan*, uint8_t *, int);
 	struct chan*	(*open)(struct chan*, int);
-	void	(*create)(struct chan*, char *unused_char_p_t, int unused_int, uint32_t);
+	void	(*create)(struct chan*, char *, int , uint32_t);
 	void	(*close)(struct chan*);
 	long	(*read)(struct chan*, void*, long, int64_t);
 	struct block*	(*bread)(struct chan*, long, uint32_t);
