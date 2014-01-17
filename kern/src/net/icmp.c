@@ -1,29 +1,49 @@
-#include "u.h"
-#include "../port/lib.h"
-#include "mem.h"
-#include "dat.h"
-#include "fns.h"
-#include "../port/error.h"
+// INFERNO
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
+#include <ip.h>
 
-#include "ip.h"
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
+#include <ip.h>
 
 typedef struct Icmp {
-	uchar	vihl;		/* Version and header length */
-	uchar	tos;		/* Type of service */
-	uchar	length[2];	/* packet length */
-	uchar	id[2];		/* Identification */
-	uchar	frag[2];	/* Fragment information */
-	uchar	ttl;		/* Time to live */
-	uchar	proto;		/* Protocol */
-	uchar	ipcksum[2];	/* Header checksum */
-	uchar	src[4];		/* Ip source */
-	uchar	dst[4];		/* Ip destination */
-	uchar	type;
-	uchar	code;
-	uchar	cksum[2];
-	uchar	icmpid[2];
-	uchar	seq[2];
-	uchar	data[1];
+	uint8_t	vihl;		/* Version and header length */
+	uint8_t	tos;		/* Type of service */
+	uint8_t	length[2];	/* packet length */
+	uint8_t	id[2];		/* Identification */
+	uint8_t	frag[2];	/* Fragment information */
+	uint8_t	ttl;		/* Time to live */
+	uint8_t	proto;		/* Protocol */
+	uint8_t	ipcksum[2];	/* Header checksum */
+	uint8_t	src[4];		/* Ip source */
+	uint8_t	dst[4];		/* Ip destination */
+	uint8_t	type;
+	uint8_t	code;
+	uint8_t	cksum[2];
+	uint8_t	icmpid[2];
+	uint8_t	seq[2];
+	uint8_t	data[1];
 } Icmp;
 
 enum {			/* Packet Types */
@@ -97,40 +117,39 @@ static char *statnames[Nstats] =
 typedef struct Icmppriv Icmppriv;
 struct Icmppriv
 {
-	ulong	stats[Nstats];
+	uint32_t	stats[Nstats];
 
 	/* message counts */
-	ulong	in[Maxtype+1];
-	ulong	out[Maxtype+1];
+	uint32_t	in[Maxtype+1];
+	uint32_t	out[Maxtype+1];
 };
 
-static void icmpkick(void *x, Block*);
+static void icmpkick(void *x, struct block*);
 
 static void
-icmpcreate(Conv *c)
+icmpcreate(struct conv *c)
 {
 	c->rq = qopen(64*1024, Qmsg, 0, c);
 	c->wq = qbypass(icmpkick, c);
 }
 
 extern char*
-icmpconnect(Conv *c, char **argv, int argc)
+icmpconnect(struct conv *c, char **argv, int argc)
 {
 	char *e;
 
 	e = Fsstdconnect(c, argv, argc);
-	if(e != nil)
+	if(e != NULL)
 		return e;
 	Fsconnected(c, e);
 
-	return nil;
+	return NULL;
 }
 
 extern int
-icmpstate(Conv *c, char *state, int n)
+icmpstate(struct conv *c, char *state, int n)
 {
-	USED(c);
-	return snprint(state, n, "%s qin %d qout %d",
+	return snprintf(state, n, "%s qin %d qout %d",
 		"Datagram",
 		c->rq ? qlen(c->rq) : 0,
 		c->wq ? qlen(c->wq) : 0
@@ -138,20 +157,20 @@ icmpstate(Conv *c, char *state, int n)
 }
 
 extern char*
-icmpannounce(Conv *c, char **argv, int argc)
+icmpannounce(struct conv *c, char **argv, int argc)
 {
 	char *e;
 
 	e = Fsstdannounce(c, argv, argc);
-	if(e != nil)
+	if(e != NULL)
 		return e;
-	Fsconnected(c, nil);
+	Fsconnected(c, NULL);
 
-	return nil;
+	return NULL;
 }
 
 extern void
-icmpclose(Conv *c)
+icmpclose(struct conv *c)
 {
 	qclose(c->rq);
 	qclose(c->wq);
@@ -161,13 +180,13 @@ icmpclose(Conv *c)
 }
 
 static void
-icmpkick(void *x, Block *bp)
+icmpkick(void *x, struct block *bp)
 {
-	Conv *c = x;
+	struct conv *c = x;
 	Icmp *p;
 	Icmppriv *ipriv;
 
-	if(bp == nil)
+	if(bp == NULL)
 		return;
 
 	if(blocklen(bp) < ICMP_IPSIZE + ICMP_HDRSIZE){
@@ -187,13 +206,13 @@ icmpkick(void *x, Block *bp)
 	memset(p->cksum, 0, sizeof(p->cksum));
 	hnputs(p->cksum, ptclcsum(bp, ICMP_IPSIZE, blocklen(bp) - ICMP_IPSIZE));
 	ipriv->stats[OutMsgs]++;
-	ipoput4(c->p->f, bp, 0, c->ttl, c->tos, nil);
+	ipoput4(c->p->f, bp, 0, c->ttl, c->tos, NULL);
 }
 
 extern void
-icmpttlexceeded(Fs *f, uchar *ia, Block *bp)
+icmpttlexceeded(struct Fs *f, uint8_t *ia, struct block *bp)
 {
-	Block	*nbp;
+	struct block	*nbp;
 	Icmp	*p, *np;
 
 	p = (Icmp *)bp->rp;
@@ -213,17 +232,17 @@ icmpttlexceeded(Fs *f, uchar *ia, Block *bp)
 	hnputs(np->seq, 0);
 	memset(np->cksum, 0, sizeof(np->cksum));
 	hnputs(np->cksum, ptclcsum(nbp, ICMP_IPSIZE, blocklen(nbp) - ICMP_IPSIZE));
-	ipoput4(f, nbp, 0, MAXTTL, DFLTTOS, nil);
+	ipoput4(f, nbp, 0, MAXTTL, DFLTTOS, NULL);
 
 }
 
 static void
-icmpunreachable(Fs *f, Block *bp, int code, int seq)
+icmpunreachable(struct Fs *f, struct block *bp, int code, int seq)
 {
-	Block	*nbp;
+	struct block	*nbp;
 	Icmp	*p, *np;
 	int	i;
-	uchar	addr[IPaddrlen];
+	uint8_t	addr[IPaddrlen];
 
 	p = (Icmp *)bp->rp;
 
@@ -252,28 +271,28 @@ icmpunreachable(Fs *f, Block *bp, int code, int seq)
 	hnputs(np->seq, seq);
 	memset(np->cksum, 0, sizeof(np->cksum));
 	hnputs(np->cksum, ptclcsum(nbp, ICMP_IPSIZE, blocklen(nbp) - ICMP_IPSIZE));
-	ipoput4(f, nbp, 0, MAXTTL, DFLTTOS, nil);
+	ipoput4(f, nbp, 0, MAXTTL, DFLTTOS, NULL);
 }
 
 extern void
-icmpnoconv(Fs *f, Block *bp)
+icmpnoconv(struct Fs *f, struct block *bp)
 {
 	icmpunreachable(f, bp, 3, 0);
 }
 
 extern void
-icmpcantfrag(Fs *f, Block *bp, int mtu)
+icmpcantfrag(struct Fs *f, struct block *bp, int mtu)
 {
 	icmpunreachable(f, bp, 4, mtu);
 }
 
 static void
-goticmpkt(Proto *icmp, Block *bp)
+goticmpkt(struct Proto *icmp, struct block *bp)
 {
-	Conv	**c, *s;
+	struct conv	**c, *s;
 	Icmp	*p;
-	uchar	dst[IPaddrlen];
-	ushort	recid;
+	uint8_t	dst[IPaddrlen];
+	uint16_t	recid;
 
 	p = (Icmp *) bp->rp;
 	v4tov6(dst, p->src);
@@ -284,7 +303,7 @@ goticmpkt(Proto *icmp, Block *bp)
 		if(s->lport == recid)
 		if(ipcmp(s->raddr, dst) == 0){
 			bp = concatblock(bp);
-			if(bp != nil)
+			if(bp != NULL)
 				qpass(s->rq, bp);
 			return;
 		}
@@ -292,11 +311,11 @@ goticmpkt(Proto *icmp, Block *bp)
 	freeblist(bp);
 }
 
-static Block *
-mkechoreply(Block *bp)
+static struct block *
+mkechoreply(struct block *bp)
 {
 	Icmp	*q;
-	uchar	ip[4];
+	uint8_t	ip[4];
 
 	q = (Icmp *)bp->rp;
 	q->vihl = IP_VER4;
@@ -321,12 +340,12 @@ static char *unreachcode[] =
 };
 
 static void
-icmpiput(Proto *icmp, Ipifc*, Block *bp)
+icmpiput(struct Proto *icmp, struct Ipifc*unused, struct block *bp)
 {
 	int	n, iplen;
 	Icmp	*p;
-	Block	*r;
-	Proto	*pr;
+	struct block	*r;
+	struct Proto	*pr;
 	char	*msg;
 	char	m2[128];
 	Icmppriv *ipriv;
@@ -366,7 +385,7 @@ icmpiput(Proto *icmp, Ipifc*, Block *bp)
 			bp = trimblock(bp, 0, iplen);
 		r = mkechoreply(bp);
 		ipriv->out[EchoReply]++;
-		ipoput4(icmp->f, r, 0, MAXTTL, DFLTTOS, nil);
+		ipoput4(icmp->f, r, 0, MAXTTL, DFLTTOS, NULL);
 		break;
 	case Unreachable:
 		if(p->code > 5)
@@ -381,7 +400,7 @@ icmpiput(Proto *icmp, Ipifc*, Block *bp)
 		}
 		p = (Icmp *)bp->rp;
 		pr = Fsrcvpcolx(icmp->f, p->proto);
-		if(pr != nil && pr->advise != nil) {
+		if(pr != NULL && pr->advise != NULL) {
 			(*pr->advise)(pr, bp, msg);
 			return;
 		}
@@ -391,7 +410,7 @@ icmpiput(Proto *icmp, Ipifc*, Block *bp)
 		break;
 	case TimeExceed:
 		if(p->code == 0){
-			sprint(m2, "ttl exceeded at %V", p->src);
+			snprintf(m2, sizeof(m2), "ttl exceeded at %V", p->src);
 
 			bp->rp += ICMP_IPSIZE+ICMP_HDRSIZE;
 			if(blocklen(bp) < MinAdvise){
@@ -400,7 +419,7 @@ icmpiput(Proto *icmp, Ipifc*, Block *bp)
 			}
 			p = (Icmp *)bp->rp;
 			pr = Fsrcvpcolx(icmp->f, p->proto);
-			if(pr != nil && pr->advise != nil) {
+			if(pr != NULL && pr->advise != NULL) {
 				(*pr->advise)(pr, bp, m2);
 				return;
 			}
@@ -420,12 +439,12 @@ raise:
 }
 
 void
-icmpadvise(Proto *icmp, Block *bp, char *msg)
+icmpadvise(struct Proto *icmp, struct block *bp, char *msg)
 {
-	Conv	**c, *s;
+	struct conv	**c, *s;
 	Icmp	*p;
-	uchar	dst[IPaddrlen];
-	ushort	recid;
+	uint8_t	dst[IPaddrlen];
+	uint16_t	recid;
 
 	p = (Icmp *) bp->rp;
 	v4tov6(dst, p->dst);
@@ -444,7 +463,7 @@ icmpadvise(Proto *icmp, Block *bp, char *msg)
 }
 
 int
-icmpstats(Proto *icmp, char *buf, int len)
+icmpstats(struct Proto *icmp, char *buf, int len)
 {
 	Icmppriv *priv;
 	char *p, *e;
@@ -454,23 +473,23 @@ icmpstats(Proto *icmp, char *buf, int len)
 	p = buf;
 	e = p+len;
 	for(i = 0; i < Nstats; i++)
-		p = seprint(p, e, "%s: %lud\n", statnames[i], priv->stats[i]);
+		p = seprintf(p, e, "%s: %lud\n", statnames[i], priv->stats[i]);
 	for(i = 0; i <= Maxtype; i++){
 		if(icmpnames[i])
-			p = seprint(p, e, "%s: %lud %lud\n", icmpnames[i], priv->in[i], priv->out[i]);
+			p = seprintf(p, e, "%s: %lud %lud\n", icmpnames[i], priv->in[i], priv->out[i]);
 		else
-			p = seprint(p, e, "%d: %lud %lud\n", i, priv->in[i], priv->out[i]);
+			p = seprintf(p, e, "%d: %lud %lud\n", i, priv->in[i], priv->out[i]);
 	}
 	return p - buf;
 }
 	
 void
-icmpinit(Fs *fs)
+icmpinit(struct Fs *fs)
 {
-	Proto *icmp;
+	struct Proto *icmp;
 
-	icmp = smalloc(sizeof(Proto));
-	icmp->priv = smalloc(sizeof(Icmppriv));
+	icmp = kzmalloc(sizeof(struct Proto), 0);
+	icmp->priv = kzmalloc(sizeof(Icmppriv), 0);
 	icmp->name = "icmp";
 	icmp->connect = icmpconnect;
 	icmp->announce = icmpannounce;
@@ -479,9 +498,9 @@ icmpinit(Fs *fs)
 	icmp->close = icmpclose;
 	icmp->rcv = icmpiput;
 	icmp->stats = icmpstats;
-	icmp->ctl = nil;
+	icmp->ctl = NULL;
 	icmp->advise = icmpadvise;
-	icmp->gc = nil;
+	icmp->gc = NULL;
 	icmp->ipproto = IP_ICMPPROTO;
 	icmp->nc = 128;
 	icmp->ptclsize = 0;
