@@ -4,6 +4,7 @@
 #pragma nosharc
 #endif
 
+//#define DEBUG
 #include <ros/common.h>
 #include <arch/types.h>
 #include <arch/arch.h>
@@ -36,7 +37,6 @@
 #include <termios.h>
 #include <socket.h>
 
-
 #ifdef CONFIG_NETWORKING
 #include <net/nic_common.h>
 extern int (*send_frame)(const char *CT(len) data, size_t len);
@@ -68,7 +68,7 @@ static void finish_sysc(struct syscall *sysc, struct proc *p)
 	 * CASing with userspace.  We need the atomics since we're racing with
 	 * userspace for the event_queue registration.  The 'lock' tells userspace
 	 * to not muck with the flags while we're signalling. */
-	atomic_or(&sysc->flags, SC_K_LOCK | SC_DONE); 
+	atomic_or(&sysc->flags, SC_K_LOCK | SC_DONE);
 	__signal_syscall(sysc, p);
 	atomic_and(&sysc->flags, ~SC_K_LOCK); 
 }
@@ -115,12 +115,15 @@ void set_errstr(char *fmt, ...)
 {
 	va_list ap;
 	int rc;
+
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	if (!pcpui->cur_kthread || !pcpui->cur_kthread->sysc)
 		return;
+
 	va_start(ap, fmt);
 	rc = vsnprintf(pcpui->cur_kthread->sysc->errstr, MAX_ERRSTR_LEN, fmt, ap);
 	va_end(ap);
+
 	/* TODO: likely not needed */
 	pcpui->cur_kthread->sysc->errstr[MAX_ERRSTR_LEN - 1] = '\0';
 }
@@ -181,7 +184,7 @@ static int sys_block(struct proc *p, unsigned int usec)
 // lines, to simulate doing something useful.
 static int sys_cache_buster(struct proc *p, uint32_t num_writes,
                              uint32_t num_pages, uint32_t flags)
-{ TRUSTEDBLOCK /* zra: this is not really part of the kernel */
+{
 	#define BUSTER_ADDR		0xd0000000L  // around 512 MB deep
 	#define MAX_WRITES		1048576*8
 	#define MAX_PAGES		32
@@ -446,6 +449,7 @@ static ssize_t sys_fork(env_t* e)
 {
 	struct proc *temp;
 	int8_t state = 0;
+
 	// TODO: right now we only support fork for single-core processes
 	if (e->state != PROC_RUNNING_S) {
 		set_errno(EINVAL);
@@ -579,6 +583,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	/* When we destroy our memory regions, accessing cur_sysc would PF */
 	pcpui->cur_kthread->sysc = 0;
 	unmap_and_destroy_vmrs(p);
+	close_9ns_files(p, TRUE);
 	close_all_files(&p->open_files, TRUE);
 	env_user_mem_free(p, 0, UMAPTOP);
 	if (load_elf(p, program)) {
@@ -1142,20 +1147,23 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 {
 	ssize_t ret;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
-	if (!file) {
-		set_errno(EBADF);
-		return -1;
-	}
-	if (!file->f_op->read) {
+	/* VFS */
+	if (file) {
+		if (!file->f_op->read) {
+			kref_put(&file->f_kref);
+			set_errno(EINVAL);
+			return -1;
+		}
+		/* TODO: (UMEM) currently, read() handles user memcpy
+		 * issues, but we probably should user_mem_check and
+		 * pin the region here, so read doesn't worry about
+		 * it */
+		ret = file->f_op->read(file, buf, len, &file->f_pos);
 		kref_put(&file->f_kref);
-		set_errno(EINVAL);
-		return -1;
+		return ret;
 	}
-	/* TODO: (UMEM) currently, read() handles user memcpy issues, but we
-	 * probably should user_mem_check and pin the region here, so read doesn't
-	 * worry about it */
-	ret = file->f_op->read(file, buf, len, &file->f_pos);
-	kref_put(&file->f_kref);
+	/* plan9, should also handle errors (EBADF) */
+    ret = sysread(fd, buf, len, ~0LL);
 	return ret;
 }
 
@@ -1163,58 +1171,66 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 {
 	ssize_t ret;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
-	if (!file) {
-		set_errno(EBADF);
-		return -1;
-	}
-	if (!file->f_op->write) {
+	/* VFS */
+	if (file) {
+		if (!file->f_op->write) {
+			kref_put(&file->f_kref);
+			set_errno(EINVAL);
+			return -1;
+		}
+		/* TODO: (UMEM) */
+		ret = file->f_op->write(file, buf, len, &file->f_pos);
 		kref_put(&file->f_kref);
-		set_errno(EINVAL);
-		return -1;
+		return ret;
 	}
-	/* TODO: (UMEM) */
-	ret = file->f_op->write(file, buf, len, &file->f_pos);
-	kref_put(&file->f_kref);
+	/* plan9, should also handle errors */
+	ret = syswrite(fd, (void*)buf, len, (off_t) -1);
 	return ret;
 }
 
 /* Checks args/reads in the path, opens the file, and inserts it into the
- * process's open file list. 
- *
- * TODO: take the path length */
+ * process's open file list. */
 static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
                          int oflag, int mode)
 {
-	int fd = 0;
+	int fd;
 	struct file *file;
 
-	printd("File %s Open attempt\n", path);
+	printd("File %s Open attempt oflag %x mode %x\n", path, oflag, mode);
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
 	mode &= ~p->fs_env.umask;
 	file = do_file_open(t_path, oflag, mode);
-	user_memdup_free(p, t_path);
-	if (!file)
-		return -1;
-	fd = insert_file(&p->open_files, file, 0);	/* stores the ref to file */
-	kref_put(&file->f_kref);
-	if (fd < 0) {
-		warn("File insertion failed");
-		return -1;
+	/* VFS */
+	if (file) {
+		fd = insert_file(&p->open_files, file, 0);	/* stores the ref to file */
+		kref_put(&file->f_kref);	/* drop our ref */
+		if (fd < 0)
+			warn("File insertion failed");
+	} else {
+		unset_errno();	/* Go can't handle extra errnos */
+		fd = sysopen(t_path, oflag);
 	}
-	printd("File %s Open, res=%d\n", path, fd);
+	user_memdup_free(p, t_path);
+	printd("File %s Open, fd=%d\n", path, fd);
 	return fd;
 }
 
 static intreg_t sys_close(struct proc *p, int fd)
 {
-	struct file *file = put_file_from_fd(&p->open_files, fd);
-	if (!file) {
-		set_errno(EBADF);
-		return -1;
+	struct file *file = get_file_from_fd(&p->open_files, fd);
+	int retval = 0;
+	printd("sys_close %d\n", fd);
+	/* VFS */
+	if (file) {
+		put_file_from_fd(&p->open_files, fd);
+		kref_put(&file->f_kref);	/* Drop the ref from get_file */
+		return 0;
 	}
-	return 0;
+	/* 9ns, should also handle errors (bad FD, etc) */
+	retval = sysclose(fd);
+	return retval;
 }
 
 /* kept around til we remove the last ufe */
@@ -1225,19 +1241,23 @@ static intreg_t sys_close(struct proc *p, int fd)
 static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 {
 	struct kstat *kbuf;
-	struct file *file = get_file_from_fd(&p->open_files, fd);
-	if (!file) {
-		set_errno(EBADF);
-		return -1;
-	}
+	struct file *file;
 	kbuf = kmalloc(sizeof(struct kstat), 0);
 	if (!kbuf) {
-		kref_put(&file->f_kref);
 		set_errno(ENOMEM);
 		return -1;
 	}
-	stat_inode(file->f_dentry->d_inode, kbuf);
-	kref_put(&file->f_kref);
+	file = get_file_from_fd(&p->open_files, fd);
+	/* VFS */
+	if (file) {
+		stat_inode(file->f_dentry->d_inode, kbuf);
+		kref_put(&file->f_kref);
+	} else {
+	    if (sysfstat(fd, (uint8_t*)kbuf, sizeof(*kbuf)) < 0) {
+			kfree(kbuf);
+			return -1;
+		}
+	}
 	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
 	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
 		kfree(kbuf);
@@ -1256,27 +1276,38 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 	struct kstat *kbuf;
 	struct dentry *path_d;
 	char *t_path = user_strdup_errno(p, path, path_l);
+	int retval = 0;
 	if (!t_path)
-		return -1;
-	path_d = lookup_dentry(t_path, flags);
-	user_memdup_free(p, t_path);
-	if (!path_d)
 		return -1;
 	kbuf = kmalloc(sizeof(struct kstat), 0);
 	if (!kbuf) {
 		set_errno(ENOMEM);
+		retval = -1;
+		goto out_with_path;
+	}
+	/* Check VFS for path */
+	path_d = lookup_dentry(t_path, flags);
+	if (path_d) {
+		stat_inode(path_d->d_inode, kbuf);
 		kref_put(&path_d->d_kref);
-		return -1;
+	} else {
+		/* VFS failed, checking 9ns */
+		unset_errno();	/* Go can't handle extra errnos */
+		retval = sysstat(t_path, (uint8_t*)kbuf, sizeof(*kbuf));
+		printd("sysstat returns %d\n", retval);
+		/* both VFS and 9ns failed, bail out */
+		if (retval < 0)
+			goto out_with_kbuf;
 	}
-	stat_inode(path_d->d_inode, kbuf);
-	kref_put(&path_d->d_kref);
 	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
-	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
-		kfree(kbuf);
-		return -1;
-	}
+	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat)))
+		retval = -1;
+	/* Fall-through */
+out_with_kbuf:
 	kfree(kbuf);
-	return 0;
+out_with_path:
+	user_memdup_free(p, t_path);
+	return retval;
 }
 
 /* Follow a final symlink */
@@ -1296,11 +1327,27 @@ static intreg_t sys_lstat(struct proc *p, const char *path, size_t path_l,
 intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 {
 	int retval = 0;
+	int newfd;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
+
 	if (!file) {
+		/* 9ns hack */
+		switch (cmd) {
+			case (F_DUPFD):
+				return sysdup(fd, -1);
+			case (F_GETFD):
+			case (F_SETFD):
+			case (F_GETFL):
+			case (F_SETFL):
+				return 0;
+			default:
+				warn("Unsupported fcntl cmd %d\n", cmd);
+		}
+		/* not really ever calling this, even for badf, due to the switch */
 		set_errno(EBADF);
 		return -1;
 	}
+
 	switch (cmd) {
 		case (F_DUPFD):
 			retval = insert_file(&p->open_files, file, arg);
@@ -1578,7 +1625,7 @@ intreg_t sys_gettimeofday(struct proc *p, int *buf)
 #else
 	// Nanwan's birthday, bitches!!
 	t0 = 1242129600;
-#endif 
+#endif
 	spin_unlock(&gtod_lock);
 
 	long long dt = read_tsc();
@@ -1662,6 +1709,109 @@ intreg_t sys_setgid(struct proc *p, gid_t gid)
 	return 0;
 }
 
+/* long bind(char* src_path, char* onto_path, int flag);
+ *
+ * The naming for the args in bind is messy historically.  We do:
+ * 		bind src_path onto_path
+ * plan9 says bind NEW OLD, where new is *src*, and old is *onto*.
+ * Linux says mount --bind OLD NEW, where OLD is *src* and NEW is *onto*. */
+intreg_t sys_nbind(struct proc *p,
+                   char *src_path, size_t src_l,
+                   char *onto_path, size_t onto_l,
+                   unsigned int flag)
+
+{
+	int ret;
+	char *t_srcpath = user_strdup_errno(p, src_path, src_l);
+	if (t_srcpath == NULL) {
+		printd("srcpath dup failed ptr %p size %d\n", src_path, src_l);
+		return -1;
+	}
+	char *t_ontopath = user_strdup_errno(p, onto_path, onto_l);
+	if (t_ontopath == NULL) {
+		user_memdup_free(p, t_srcpath);
+		printd("ontopath dup failed ptr %p size %d\n", onto_path, onto_l);
+		return -1;
+	}
+	printd("sys_nbind: %s -> %s flag %d\n", t_srcpath, t_ontopath, flag);
+	ret = bindmount(0, -1, -1, t_srcpath, t_ontopath, flag, NULL);
+	user_memdup_free(p, t_srcpath);
+	user_memdup_free(p, t_ontopath);
+	return ret;
+}
+
+/* int npipe(int *fd) */
+intreg_t sys_npipe(struct proc *p, int *retfd)
+
+{
+	/* TODO: validate addresses of retfd (UMEM) */
+	return syspipe(retfd);
+}
+
+/* int mount(int fd, int afd, char* onto_path, int flag, char* aname); */
+intreg_t sys_nmount(struct proc *p,
+                    int fd,
+                    char *onto_path, size_t onto_l,
+                    unsigned int flag
+			/* we ignore these */
+			/* no easy way to pass this many args anyway. *
+		    int afd,
+                    char *auth, size_t auth_l*/)
+{
+	int ret;
+	int afd;
+
+	afd = -1;
+	char *t_ontopath = user_strdup_errno(p, onto_path, onto_l);
+	if (t_ontopath == NULL)
+		return -1;
+	ret = bindmount(1, fd, afd, NULL, t_ontopath, flag, /* spec or auth */"");
+	user_memdup_free(p, t_ontopath);
+	return ret;
+}
+
+/* int mount(int fd, int afd, char* old, int flag, char* aname); */
+intreg_t sys_nunmount(struct proc *p, char *name, int name_l, char *old_path, int old_l)
+{
+	int ret;
+	char *t_oldpath = user_strdup_errno(p, old_path, old_l);
+	if (t_oldpath == NULL)
+		return -1;
+	char *t_name = user_strdup_errno(p, name, name_l);
+	if (t_name == NULL) {
+		user_memdup_free(p, t_oldpath);
+		return -1;
+	}
+	ret = sysunmount(t_name, t_oldpath);
+	printd("go do it\n");
+	user_memdup_free(p, t_oldpath);
+	user_memdup_free(p, t_name);
+	return ret;
+}
+
+static int sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
+{
+	int ret;
+	struct chan *ch;
+	ERRSTACK(1);
+	/* UMEM: Check the range, can PF later and kill if the page isn't present */
+	if (!is_user_rwaddr(u_buf, len)) {
+		printk("[kernel] bad user addr %p (+%p) in %s (user bug)\n", u_buf,
+		       len, __FUNCTION__);
+		return -1;
+	}
+	/* fdtochan throws */
+	if (waserror()) {
+		poperror();
+		return -1;
+	}
+	ch = fdtochan(fd, -1, FALSE, TRUE);
+	ret = snprintf(u_buf, len, "%s", chanpath(ch));
+	cclose(ch);
+	poperror();
+	return ret;
+}
+
 /************** Syscall Invokation **************/
 
 const static struct sys_table_entry syscall_table[] = {
@@ -1710,6 +1860,19 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_poke_ksched] = {(syscall_t)sys_poke_ksched, "poke_ksched"},
 	[SYS_abort_sysc] = {(syscall_t)sys_abort_sysc, "abort_sysc"},
 
+// socket related syscalls
+	[SYS_socket] ={(syscall_t)sys_socket, "socket"},
+	[SYS_sendto] ={(syscall_t)sys_sendto, "sendto"},
+	[SYS_recvfrom] ={(syscall_t)sys_recvfrom, "recvfrom"},
+	[SYS_select] ={(syscall_t)sys_select, "select"},
+	[SYS_connect] = {(syscall_t)sys_connect, "connect"},
+	[SYS_send] ={(syscall_t)sys_send, "send"},
+	[SYS_recv] ={(syscall_t)sys_recv, "recvfrom"},
+	[SYS_bind] ={(syscall_t)sys_bind, "bind"},
+	[SYS_accept] ={(syscall_t)sys_accept, "accept"},
+	[SYS_listen] ={(syscall_t)sys_listen, "listen"},
+
+
 	[SYS_read] = {(syscall_t)sys_read, "read"},
 	[SYS_write] = {(syscall_t)sys_write, "write"},
 	[SYS_open] = {(syscall_t)sys_open, "open"},
@@ -1735,7 +1898,14 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_tcgetattr] = {(syscall_t)sys_tcgetattr, "tcgetattr"},
 	[SYS_tcsetattr] = {(syscall_t)sys_tcsetattr, "tcsetattr"},
 	[SYS_setuid] = {(syscall_t)sys_setuid, "setuid"},
-	[SYS_setgid] = {(syscall_t)sys_setgid, "setgid"}
+	[SYS_setgid] = {(syscall_t)sys_setgid, "setgid"},
+	/* special! */
+	[SYS_nbind] ={(syscall_t)sys_nbind, "nbind"},
+	[SYS_nmount] ={(syscall_t)sys_nmount, "nmount"},
+	[SYS_nunmount] ={(syscall_t)sys_nunmount, "nunmount"},
+	[SYS_npipe] ={(syscall_t)sys_npipe, "npipe"},
+	[SYS_fd2path] ={(syscall_t)sys_fd2path, "fd2path"},
+
 };
 
 /* Executes the given syscall.
@@ -1743,12 +1913,14 @@ const static struct sys_table_entry syscall_table[] = {
  * Note tf is passed in, which points to the tf of the context on the kernel
  * stack.  If any syscall needs to block, it needs to save this info, as well as
  * any silly state.
- * 
+ *
  * This syscall function is used by both local syscall and arsc, and should
  * remain oblivious of the caller. */
 intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
                  uintreg_t a2, uintreg_t a3, uintreg_t a4, uintreg_t a5)
 {
+	intreg_t ret = -1;
+	ERRSTACK(1);
 	const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
 
 	uint32_t coreid, vcoreid;
@@ -1786,7 +1958,30 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 	if (sc_num > max_syscall || syscall_table[sc_num].call == NULL)
 		panic("Invalid syscall number %d for proc %x!", sc_num, p);
 
-	return syscall_table[sc_num].call(p, a0, a1, a2, a3, a4, a5);
+	/* N.B. This is going away. */
+	if (waserror()){
+		printk("Plan 9 system call returned via waserror()\n");
+		printk("String: '%s'\n", current_errstr());
+		/* if we got here, then the errbuf was right.
+		 * no need to check!
+		 */
+		return -1;
+	}
+	//printd("before syscall errstack %p\n", errstack);
+	//printd("before syscall errstack base %p\n", get_cur_errbuf());
+	ret = syscall_table[sc_num].call(p, a0, a1, a2, a3, a4, a5);
+	//printd("after syscall errstack base %p\n", get_cur_errbuf());
+	if (get_cur_errbuf() != &errstack[0]) {
+		coreid = core_id();
+		vcoreid = proc_get_vcoreid(p);
+		printk("[%16llu] Syscall %3d (%12s):(%p, %p, %p, %p, "
+		       "%p, %p) proc: %d core: %d vcore: %d\n", read_tsc(),
+		       sc_num, syscall_table[sc_num].name, a0, a1, a2, a3,
+		       a4, a5, p->pid, coreid, vcoreid);
+		if (sc_num != SYS_fork)
+			printk("YOU SHOULD PANIC: errstack mismatch");
+	}
+	return ret;
 }
 
 /* Execute the syscall on the local core */
@@ -1833,7 +2028,7 @@ void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_syscs)
 
 /* Call this when something happens on the syscall where userspace might want to
  * get signaled.  Passing p, since the caller should know who the syscall
- * belongs to (probably is current). 
+ * belongs to (probably is current).
  *
  * You need to have SC_K_LOCK set when you call this. */
 void __signal_syscall(struct syscall *sysc, struct proc *p)
@@ -1874,7 +2069,7 @@ void systrace_start(bool silent)
 		__init_systrace();
 		init = TRUE;
 	}
-	systrace_flags = silent ? SYSTRACE_ON : SYSTRACE_ON | SYSTRACE_LOUD; 
+	systrace_flags = silent ? SYSTRACE_ON : SYSTRACE_ON | SYSTRACE_LOUD;
 	spin_unlock_irqsave(&systrace_lock);
 }
 
