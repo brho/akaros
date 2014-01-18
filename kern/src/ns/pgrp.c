@@ -207,8 +207,14 @@ dupfgrp(struct fgrp *f)
 	int n;
 
 	new = kzmalloc(sizeof(struct fgrp), 0);
+	assert(new);
 	kref_init(&new->ref, freefgrp, 1);
 	spin_lock(&f->lock);
+	if (f->closed) {
+		spin_unlock(&f->lock);
+		kfree(new);
+		error("File group closed");
+	}
 	n = DELTAFD;
 	if(f->maxfd >= n)
 		n = (f->maxfd+1 + DELTAFD-1)/DELTAFD * DELTAFD;

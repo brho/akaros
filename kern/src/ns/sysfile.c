@@ -44,6 +44,15 @@ newfd(struct chan *c)
 	struct fgrp *f = current->fgrp;
 
 	spin_lock(&f->lock);
+	if (f->closed) {
+		spin_unlock(&f->lock);
+		return -1;
+	}
+	/* VFS hack */
+	i = get_fd(&current->open_files, f->minfd);
+	assert(f->fd[i] == 0);
+	#if 0 // 9ns style
+	/* TODO: use a unique integer allocator */
 	for(i=f->minfd; i<f->nfd; i++)
 		if(f->fd[i] == 0)
 			break;
@@ -52,6 +61,7 @@ newfd(struct chan *c)
 		exhausted("file descriptors");
 		return -1;
 	}
+	#endif
 	f->minfd = i + 1;
 	if(i > f->maxfd)
 		f->maxfd = i;
@@ -68,6 +78,10 @@ fdtochan(struct fgrp *f, int fd, int mode, int chkmnt, int iref)
 	c = 0;
 
 	spin_lock(&f->lock);
+	if (f->closed) {
+		spin_unlock(&f->lock);
+		error("File group closed");
+	}
 	if(fd<0 || f->maxfd<fd || (c = f->fd[fd])==0) {
 		spin_unlock(&f->lock);
 		error(Ebadfd);
@@ -143,6 +157,10 @@ fdclose(struct fgrp *f, int fd)
 	struct chan *c;
 
 	spin_lock(&f->lock);
+	if (f->closed) {
+		spin_unlock(&f->lock);
+		return;
+	}
 	c = f->fd[fd];
 	if(c == 0){
 		/* can happen for users with shared fd tables */
@@ -155,6 +173,8 @@ fdclose(struct fgrp *f, int fd)
 			f->maxfd = i;
 	if(fd < f->minfd)
 		f->minfd = fd;
+	/* VFS hack: give the FD back to VFS */
+	put_fd(&current->open_files, fd);
 	spin_unlock(&f->lock);
 	cclose(c);
 }
@@ -242,7 +262,13 @@ sysdup(int old, int new)
 		error(Eperm);
 	fd = new;
 	if(fd != -1){
+		/* ideally we'll be done with the VFS before we fix this */
+		panic("Need to sync with the VFS");
 		spin_lock(&f->lock);
+		if (f->closed) {
+			spin_unlock(&f->lock);
+			return -1;
+		}
 		if(fd<0 || growfd(f, fd) < 0) {
 			spin_unlock(&f->lock);
 			cclose(c);
@@ -403,10 +429,16 @@ syspipe(int fd[2])
 			cclose(c[0]);
 		if(c[1] != 0)
 			cclose(c[1]);
-		if(fd[0] >= 0)
+		if(fd[0] >= 0) {
+			/* VFS hack */
+			put_fd(&current->open_files, fd[0]);
 			f->fd[fd[0]]=0;
-		if(fd[1] >= 0)
+		}
+		if(fd[1] >= 0) {
+			/* VFS hack */
+			put_fd(&current->open_files, fd[1]);
 			f->fd[fd[1]]=0;
+		}
 		return -1;
 	}
 	c[1] = cclone(c[0]);
