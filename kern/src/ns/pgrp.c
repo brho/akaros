@@ -178,7 +178,7 @@ freefgrp(struct kref *k)
 }
 
 struct fgrp*
-newfgrp(struct fgrp *old)
+newfgrp(void)
 {
 	struct fgrp *new;
 	int n;
@@ -186,13 +186,6 @@ newfgrp(struct fgrp *old)
 	new = kzmalloc(sizeof(struct fgrp), 0);
 	kref_init(&new->ref, freefgrp, 1);
 	n = DELTAFD;
-	if(old != NULL){
-		spin_lock(&old->lock);
-		if(old->maxfd >= n)
-			n = (old->maxfd+1 + DELTAFD-1)/DELTAFD * DELTAFD;
-		new->maxfd = old->maxfd;
-		spin_unlock(&old->lock);
-	}
 	new->nfd = n;
 	new->fd = kzmalloc(n * sizeof(struct chan *), 0);
 	return new;
@@ -206,8 +199,7 @@ dupfgrp(struct fgrp *f)
 	struct fgrp *new;
 	int n;
 
-	new = kzmalloc(sizeof(struct fgrp), 0);
-	assert(new);
+	new = kzmalloc(sizeof(struct fgrp), KMALLOC_WAIT);
 	kref_init(&new->ref, freefgrp, 1);
 	spin_lock(&f->lock);
 	if (f->closed) {

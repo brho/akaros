@@ -1276,7 +1276,7 @@ int plan9setup(struct proc *new_proc, struct proc *parent)
 		 * TODO: One problem is namec wants a current set for things like
 		 * genbuf.  So we'll use new_proc for this bootstrapping.  Note
 		 * switch_to() also loads the cr3. */
-		new_proc->fgrp = dupfgrp(NULL);
+		new_proc->fgrp = newfgrp();
 		new_proc->pgrp = newpgrp();
 		old_current = switch_to(new_proc);
 		new_proc->slash = namec("#r", Atodir, 0, 0);

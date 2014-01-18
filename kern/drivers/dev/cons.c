@@ -352,6 +352,7 @@ pprint(char *fmt, ...)
 		printd("%s", buf);
 		return 0;
 	}
+	/* TODO: this is probably wrong (VFS hack) */
 	c = o->fgrp->fd[2];
 	if(c==0 || (c->mode!=OWRITE && c->mode!=ORDWR)) {
 		printd("%s", buf);

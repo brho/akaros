@@ -754,7 +754,7 @@ void		muxclose(struct mnt*);
 struct chan*		namec( char *unused_char_p_t, int unused_int, int, uint32_t);
 struct chan*		newchan(void);
 struct egrp*		newegrp(void);
-struct fgrp*		newfgrp(struct fgrp*);
+struct fgrp*		newfgrp(void);
 struct mount*		newmount(struct mhead*, struct chan*, int unused_int, char *unused_char_p_t);
 struct pgrp*		newpgrp(void);
 struct proc*		newproc(void);
