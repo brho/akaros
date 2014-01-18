@@ -1166,7 +1166,7 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 		return ret;
 	}
 	/* plan9, should also handle errors (EBADF) */
-    ret = syspread(fd, buf, len, ~0LL);
+    ret = sysread(fd, buf, len);
 	return ret;
 }
 
@@ -1187,7 +1187,7 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 		return ret;
 	}
 	/* plan9, should also handle errors */
-	ret = syspwrite(fd, (void*)buf, len, (off_t) -1);
+	ret = syswrite(fd, (void*)buf, len);
 	return ret;
 }
 
