@@ -33,7 +33,7 @@ devno(int c, int user)
 		if(devtab[i]->dc == c)
 			return i;
 	}
-	if(user == 0)
+	if (user == 0)
 		panic("devno %C 0x%ux", c, c);
 
 	return -1;

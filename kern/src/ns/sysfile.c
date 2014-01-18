@@ -1265,7 +1265,7 @@ int plan9setup(struct proc *new_proc, struct proc *parent)
 	struct kref *new_dot_ref;
 	ERRSTACK(1);
 	if (waserror()) {
-		printd("plan9setup failed\n");
+		printk("plan9setup failed, %s\n", current_errstr());
 		poperror();
 		return -1;
 	}

@@ -61,7 +61,7 @@ rootattach(char *spec)
 			roottab[i].length = len;
 		}
 	}
-	return devattach('/', spec);
+	return devattach('r', spec);
 }
 
 static int
@@ -75,7 +75,7 @@ rootgen(struct chan *c, char *name,
 		p = rootdata[c->qid.path].dotdot;
 		c->qid.path = p;
 		c->qid.type = QTDIR;
-		name = "#/";
+		name = "#r";
 		if(p != 0){
 			for(i = 0; i < rootmaxq; i++)
 				if(roottab[i].qid.path == c->qid.path){
@@ -168,7 +168,7 @@ rootwrite(struct chan *c, void *a, long n, int64_t off)
 }
 
 struct dev rootdevtab = {
-	'/',
+	'r',
 	"root",
 	devreset,
 	devinit,

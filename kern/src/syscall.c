@@ -131,8 +131,8 @@ void set_errstr(char *fmt, ...)
 char *current_errstr(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	/* no one should call this that doesn't have a sysc */
-	assert(pcpui->cur_kthread->sysc);
+	if (!pcpui->cur_kthread || !pcpui->cur_kthread->sysc)
+		return "no errstr";
 	return pcpui->cur_kthread->sysc->errstr;
 }
 
