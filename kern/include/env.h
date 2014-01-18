@@ -87,11 +87,10 @@ struct proc {
 	struct namespace			*ns;
 	struct fs_struct			fs_env;
 	struct files_struct			open_files;
-	struct pgrp                             *pgrp;
-	struct fgrp                             *fgrp;
-	struct fgrp                             *closingfgrp;
-	struct chan                             *slash;
-	struct chan                             *dot;
+	struct pgrp					*pgrp;
+	struct fgrp					*fgrp;
+	struct chan					*slash;
+	struct chan					*dot;
 
 
 	/* UCQ hashlocks */

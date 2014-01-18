@@ -2076,7 +2076,7 @@ struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
 			assert(file_desc < open_files->max_files);
 			file = open_files->fd[file_desc].fd_file;
 			open_files->fd[file_desc].fd_file = 0;
-			assert(file);
+			assert(file);	/* 9ns shouldn't call this put */
 			kref_put(&file->f_kref);
 			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc);
 		}
@@ -2196,8 +2196,9 @@ void clone_files(struct files_struct *src, struct files_struct *dst)
 			assert(i < dst->max_files && dst->fd[i].fd_file == 0);
 			SET_BITMASK_BIT(dst->open_fds->fds_bits, i);
 			dst->fd[i].fd_file = file;
-			assert(file);
-			kref_get(&file->f_kref, 1);
+			/* no file means 9ns is using it, they clone separately */
+			if (file)
+				kref_get(&file->f_kref, 1);
 			if (i >= dst->next_fd)
 				dst->next_fd = i + 1;
 		}

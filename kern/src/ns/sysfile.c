@@ -1250,8 +1250,8 @@ int plan9setup(struct proc *new_proc, struct proc *parent)
 		new_proc->slash = namec("#r", Atodir, 0, 0);
 		switch_back(new_proc, old_current);
 		/* Want the name to be "/" instead of "#r" */
-		pathclose(new_proc->slash->path);
-		new_proc->slash->path = newpath("/");
+		cnameclose(new_proc->slash->name);
+		new_proc->slash->name = newcname("/");
 		new_proc->dot = cclone(new_proc->slash);
 		poperror();
 		return 0;

@@ -356,8 +356,8 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 
 	atomic_inc(&num_envs);
 	frontend_proc_init(p);
-	//plan9setup(p, parent);
-	//devalarm_init(p);
+	plan9setup(p, parent);
+	devalarm_init(p);
 	TAILQ_INIT(&p->abortable_sleepers);
 	spinlock_init_irqsave(&p->abort_list_lock);
 	printd("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
@@ -417,7 +417,12 @@ static void __proc_free(struct kref *kref)
 	assert(kref_refcnt(&p->p_kref) == 0);
 	assert(TAILQ_EMPTY(&p->alarmset.list));
 
-	/* close plan9 dot and slash and free fgrp fd and fgrp */
+	cclose(p->dot);
+	cclose(p->slash);
+	p->dot = p->slash = 0; /* catch bugs */
+	/* can safely free the fgrp, now that no one is accessing it */
+	kfree(p->fgrp->fd);
+	kfree(p->fgrp);
 	kref_put(&p->fs_env.root->d_kref);
 	kref_put(&p->fs_env.pwd->d_kref);
 	/* now we'll finally decref files for the file-backed vmrs */
@@ -832,7 +837,7 @@ void proc_destroy(struct proc *p)
 	 *
 	 * Also note that any mmap'd files will still be mmapped.  You can close the
 	 * file after mmapping, with no effect. */
-	//close_9ns_files(p, FALSE);
+	close_9ns_files(p, FALSE);
 	close_all_files(&p->open_files, FALSE);
 	/* Tell the ksched about our death, and which cores we freed up */
 	__sched_proc_destroy(p, pc_arr, nr_cores_revoked);
@@ -2199,12 +2204,12 @@ void print_proc_info(pid_t pid)
 	struct files_struct *files = &p->open_files;
 	spin_lock(&files->lock);
 	for (int i = 0; i < files->max_files; i++)
-		if (files->fd_array[i].fd_file) {
+		if (files->fd[i].fd_file) {
 			printk("\tFD: %02d, File: %p, File name: %s\n", i,
-			       files->fd_array[i].fd_file,
-			       file_name(files->fd_array[i].fd_file));
+			       files->fd[i].fd_file, file_name(files->fd[i].fd_file));
 		}
 	spin_unlock(&files->lock);
+	print_9ns_files(p);
 	printk("Children: (PID (struct proc *))\n");
 	TAILQ_FOREACH(child, &p->children, sibling_link)
 		printk("\t%d (%p)\n", child->pid, child);
@@ -2248,4 +2253,17 @@ void check_my_owner(void)
 		hash_for_each(pid_hash, shazbot);
 		spin_unlock(&pid_hash_lock);
 	}
+}
+
+/* Use this via kfunc */
+void print_9ns(void)
+{
+	void print_proc_9ns(void *item)
+	{
+		struct proc *p = (struct proc*)item;
+		print_9ns_files(p);
+	}
+	spin_lock(&pid_hash_lock);
+	hash_for_each(pid_hash, print_proc_9ns);
+	spin_unlock(&pid_hash_lock);
 }
