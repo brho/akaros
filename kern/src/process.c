@@ -302,6 +302,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	p->exitcode = 1337;	/* so we can see processes killed by the kernel */
 	if (parent) {
 		p->ppid = parent->pid;
+		proc_incref(p, 1);	/* storing a ref in the parent */
 		/* using the CV's lock to protect anything related to child waiting */
 		cv_lock(&parent->child_wait);
 		TAILQ_INSERT_TAIL(&parent->children, p, sibling_link);
@@ -875,7 +876,7 @@ int __proc_disown_child(struct proc *parent, struct proc *child)
 	/* After this, the child won't be able to get more refs to us, but it may
 	 * still have some references in running code. */
 	child->ppid = 0;
-	proc_decref(child);	/* ref that was keeping the child alive after dying */
+	proc_decref(child);	/* ref that was keeping the child alive on the list */
 	return 0;
 }
 

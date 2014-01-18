@@ -449,6 +449,7 @@ static ssize_t sys_fork(env_t* e)
 {
 	struct proc *temp;
 	int8_t state = 0;
+	int ret;
 
 	// TODO: right now we only support fork for single-core processes
 	if (e->state != PROC_RUNNING_S) {
@@ -513,7 +514,9 @@ static ssize_t sys_fork(env_t* e)
 	// when the parent dies, or at least decref it
 
 	printd("[PID %d] fork PID %d\n", e->pid, env->pid);
-	return env->pid;
+	ret = env->pid;
+	proc_decref(env);	/* give up the reference created in proc_alloc() */
+	return ret;
 }
 
 /* Load the binary "path" into the current process, and start executing it.
