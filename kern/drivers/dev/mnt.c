@@ -106,7 +106,7 @@ mntinit(void)
 long
 mntversion(struct chan *c, char *version, int msize, int returnlen)
 {
-	ERRSTACK(4);
+	ERRSTACK(2);
 	struct fcall f;
 	uint8_t *msg;
 	struct mnt *m;
@@ -410,6 +410,7 @@ mntwalk(struct chan *c, struct chan *nc, char **name, int nname)
 		if(alloc && wq->clone!=NULL)
 			cclose(wq->clone);
 		kfree(wq);
+		poperror();
 		return NULL;
 	}
 
@@ -476,7 +477,7 @@ mntwalk(struct chan *c, struct chan *nc, char **name, int nname)
 static int
 mntstat(struct chan *c, uint8_t *dp, int n)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct mnt *m;
 	struct mntrpc *r;
 
@@ -510,7 +511,7 @@ mntstat(struct chan *c, uint8_t *dp, int n)
 static struct chan*
 mntopencreate(int type, struct chan *c, char *name, int omode, uint32_t perm)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct mnt *m;
 	struct mntrpc *r;
 
@@ -560,7 +561,7 @@ mntcreate(struct chan *c, char *name, int omode, uint32_t perm)
 static void
 mntclunk(struct chan *c, int t)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct mnt *m;
 	struct mntrpc *r;
 
@@ -631,7 +632,7 @@ mntremove(struct chan *c)
 static int
 mntwstat(struct chan *c, uint8_t *dp, int n)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct mnt *m;
 	struct mntrpc *r;
 
@@ -703,7 +704,7 @@ mntwrite(struct chan *c, void *buf, long n, int64_t off)
 long
 mntrdwr(int type, struct chan *c, void *buf, long n, int64_t off)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct mnt *m;
  	struct mntrpc *r;	/* TO DO: volatile struct { Mntrpc *r; } r; */
 	char *uba;
@@ -790,7 +791,7 @@ mountrpc(struct mnt *m, struct mntrpc *r)
 void
 mountio(struct mnt *m, struct mntrpc *r)
 {
-	ERRSTACK(4);
+	ERRSTACK(1);
 	int n;
 
 	while(waserror()) {
@@ -801,6 +802,8 @@ mountio(struct mnt *m, struct mntrpc *r)
 			nexterror();
 		}
 		r = mntflushalloc(r, m->msize);
+		/* need one for every waserror call (so this plus one outside) */
+		poperror();
 	}
 
 	spin_lock(&m->lock);

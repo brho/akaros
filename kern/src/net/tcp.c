@@ -547,7 +547,7 @@ tcpclose(struct conv *c)
 void
 tcpkick(void *x)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct conv *s = x;
 	Tcpctl *tcb;
 
@@ -597,7 +597,7 @@ tcprcvwin(struct conv *s)				/* Call with tcb locked */
 void
 tcpacktimer(void *v)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	Tcpctl *tcb;
 	struct conv *s;
 
@@ -660,7 +660,7 @@ timerstate(struct tcppriv *priv, Tcptimer *t, int newstate)
 void
 tcpackproc(void *a)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	Tcptimer *t, *tp, *timeo;
 	struct Proto *tcp;
 	struct tcppriv *priv;
@@ -694,8 +694,10 @@ tcpackproc(void *a)
 		for(t = timeo; t != NULL; t = t->readynext) {
 			if(loop++ > 10000)
 				panic("tcpackproc2");
-			if(t->state == TcptimerDONE && t->func != NULL && !waserror()){
-				(*t->func)(t->arg);
+			if(t->state == TcptimerDONE && t->func != NULL) {
+				/* discard error style */
+				if (!waserror())
+					(*t->func)(t->arg);
 				poperror();
 			}
 		}
@@ -1340,9 +1342,12 @@ tcphangup(struct conv *s)
 	struct block *hbp;
 
 	tcb = (Tcpctl*)s->ptcl;
-	if(waserror())
+	if(waserror()) {
+		poperror();
 		return commonerror();
+	}
 	if(s->raddr != 0) {
+		/* discard error style, poperror regardless */
 		if(!waserror()){
 			seg.flags = RST | ACK;
 			seg.ack = tcb->rcv.nxt;
@@ -1366,8 +1371,8 @@ tcphangup(struct conv *s)
 			default:
 				panic("tcphangup: version %d", s->ipversion);
 			}
-			poperror();
 		}
+		poperror();
 	}
 	localclose(s, NULL);
 	poperror();
@@ -1936,7 +1941,7 @@ done:
 void
 tcpiput(struct Proto *tcp, struct Ipifc*unused, struct block *bp)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	Tcp seg;
 	Tcp4hdr *h4;
 	Tcp6hdr *h6;
@@ -2706,7 +2711,7 @@ tcpsetkacounter(Tcpctl *tcb)
 void
 tcpkeepalive(void *v)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	Tcpctl *tcb;
 	struct conv *s;
 
@@ -2792,7 +2797,7 @@ tcprxmit(struct conv *s)
 void
 tcptimeout(void *arg)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct conv *s;
 	Tcpctl *tcb;
 	int maxback;

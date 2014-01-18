@@ -799,7 +799,7 @@ routeflush(struct Fs *f, struct route *r, char *tag)
 long
 routewrite(struct Fs *f, struct chan *c, char *p, int n)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int h, changed;
 	char *tag;
 	struct cmdbuf *cb;

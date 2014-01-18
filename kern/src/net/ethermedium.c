@@ -133,7 +133,7 @@ static char *nbmsg = "nonblocking";
 static void
 etherbind(struct Ipifc *ifc, int argc, char **argv)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct chan *mchan4, *cchan4, *achan, *mchan6, *cchan6;
 	char addr[Maxpath];	//char addr[2*KNAMELEN];
 	char dir[Maxpath];	//char dir[2*KNAMELEN];
@@ -371,8 +371,9 @@ etherread4(void *a)
 	er->read4p = current;	/* hide identity under a rock for unbind */
 	if(waserror()){
 		er->read4p = 0;
-#warning "pexit"
-		//	pexit("hangup", 1);
+		poperror();
+		warn("etherread4 returns, probably unexpectedly\n");
+		return;
 	}
 	for(;;){
 		bp = devtab[er->mchan4->type]->bread(er->mchan4, ifc->maxtu, 0);
@@ -393,6 +394,7 @@ etherread4(void *a)
 		runlock(&ifc->rwlock);
 		poperror();
 	}
+	poperror();
 }
 
 
@@ -412,7 +414,9 @@ etherread6(void *a)
 	er->read6p = current;	/* hide identity under a rock for unbind */
 	if(waserror()){
 		er->read6p = 0;
-		//	pexit("hangup", 1);
+		warn("etherread6 returns, probably unexpectedly\n");
+		poperror();
+		return;
 	}
 	for(;;){
 		bp = devtab[er->mchan6->type]->bread(er->mchan6, ifc->maxtu, 0);
@@ -433,6 +437,7 @@ etherread6(void *a)
 		runlock(&ifc->rwlock);
 		poperror();
 	}
+	poperror();
 }
 
 static void
@@ -715,17 +720,20 @@ recvarp(struct Ipifc *ifc)
 static void
 recvarpproc(void *v)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct Ipifc *ifc = v;
 	Etherrock *er = ifc->arg;
 
 	er->arpp = current;
 	if(waserror()){
 		er->arpp = 0;
-		//	pexit("hangup", 1);
+		warn("recvarpproc returns, probably unexpectedly\n");
+		poperror();
+		return;
 	}
 	for(;;)
 		recvarp(ifc);
+	poperror();
 }
 
 static int

@@ -1566,6 +1566,7 @@ int vmx_create_vcpu(struct litevm *litevm, int n)
 	__vcpu_load(vcpu);
 
 	printk("PAST vcpu_load\n");
+	#warning unmatched waserror!
 	if (waserror()){
 		/* we really need to fix waserror() */
 		poperror();

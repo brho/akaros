@@ -269,7 +269,7 @@ static int vmstat(struct chan *c, uint8_t *db, int n)
 static struct chan *vmopen(struct chan *c, int omode)
 {
 	print_func_entry();
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct vm *v = QID2VM(c->qid);
 	printk("vmopen: v is %p\n", v);
 	if (waserror()){
@@ -316,6 +316,7 @@ static struct chan *vmopen(struct chan *c, int omode)
 	/* Assumes c is unique (can't be closed concurrently */
 	c->flag |= COPEN;
 	c->offset = 0;
+	poperror();
 	print_func_exit();
 	return c;
 }

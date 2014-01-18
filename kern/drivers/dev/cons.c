@@ -133,6 +133,7 @@ putstrn0(char *str, int n, int usewrite)
 	int m;
 	char *t;
 	char buf[PRINTSIZE+2];
+	ERRSTACK(1);
 
 	/*
 	 *  if kprint is open, put the message there, otherwise
@@ -335,7 +336,7 @@ sysfatal(char *fmt, ...)
 int
 pprint(char *fmt, ...)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int n;
 	struct chan *c;
 	Osenv *o;
@@ -361,6 +362,7 @@ pprint(char *fmt, ...)
 
 	if(waserror()) {
 		printd("%s", buf);
+		poperror();
 		return 0;
 	}
 	devtab[c->type]->write(c, buf, n, c->offset);
@@ -864,7 +866,7 @@ void logbuf(int c)
 static long
 consread(struct chan *c, void *buf, long n, int64_t offset)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int l;
 
 	int ch, eol, i;
@@ -1028,6 +1030,7 @@ consread(struct chan *c, void *buf, long n, int64_t offset)
 static long
 conswrite(struct chan *c, void *va, long n, int64_t offset)
 {
+	ERRSTACK(1);
 	int64_t t;
 	long l, bp;
 	char *a = va;

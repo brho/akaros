@@ -116,7 +116,7 @@ randominit(void)
 uint32_t
 randomread(void *xp, uint32_t n)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int i, sofar;
 	uint8_t *e, *p;
 

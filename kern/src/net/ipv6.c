@@ -152,7 +152,7 @@ int
 ipoput6(struct Fs *f,
 	struct block *bp, int gating, int ttl, int tos, struct conv *c)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int tentative;
 	struct Ipifc *ifc;
 	uint8_t *gate, nexthdr;

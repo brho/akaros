@@ -113,7 +113,7 @@ ipfindmedium(char *name)
 static char*
 ipifcbind(struct conv *c, char **argv, int argc)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct Ipifc *ifc;
 	struct medium *m;
 
@@ -184,7 +184,7 @@ ipifcbind(struct conv *c, char **argv, int argc)
 static char*
 ipifcunbind(struct Ipifc *ifc)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	char *err;
 
 	if(waserror()){
@@ -295,7 +295,7 @@ ipifcinuse(struct conv *c)
 static void
 ipifckick(void *x)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct conv *c = x;
 	struct block *bp;
 	struct Ipifc *ifc;
@@ -692,7 +692,7 @@ ipifcremroute(struct Fs *f, int vers, uint8_t *addr, uint8_t *mask)
 static char*
 ipifcconnect(struct conv* c, char **argv, int argc)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	char *err;
 	struct Ipifc *ifc;
 
@@ -1483,7 +1483,7 @@ ipisbm(uint8_t *ip)
 void
 ipifcaddmulti(struct conv *c, uint8_t *ma, uint8_t *ia)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct Ipifc *ifc;
 	struct Iplifc *lifc;
 	struct conv **p;
@@ -1526,7 +1526,7 @@ ipifcaddmulti(struct conv *c, uint8_t *ma, uint8_t *ia)
 void
 ipifcremmulti(struct conv *c, uint8_t *ma, uint8_t *ia)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct Ipmulti *multi, **l;
 	struct Iplifc *lifc;
 	struct conv **p;

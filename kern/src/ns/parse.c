@@ -44,7 +44,7 @@ ncmdfield(char *p, int n)
 struct cmdbuf*
 parsecmd(char *p, int n)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct cmdbuf *volatile cb;
 	int nf;
 	char *sp;

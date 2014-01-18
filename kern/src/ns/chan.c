@@ -368,7 +368,7 @@ struct mhead *newmhead(struct chan *from)
 int
 cmount(struct chan *new, struct chan *old, int flag, char *spec)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct pgrp *pg;
 	int order, flg;
 	struct mhead *m, **l, *mh;
@@ -618,7 +618,7 @@ domount(struct chan **cp, struct mhead **mp)
 struct chan*
 undomount(struct chan *c, struct cname *name)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct chan *nc;
 	struct pgrp *pg;
 	struct mount *t;
@@ -827,7 +827,7 @@ walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror)
 struct chan*
 createdir(struct chan *c, struct mhead *m)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct chan *nc;
 	struct mount *f;
 
@@ -846,6 +846,7 @@ createdir(struct chan *c, struct mhead *m)
 		}
 	}
 	error(Enocreate);
+	poperror();
 	return 0;
 }
 
@@ -968,13 +969,13 @@ memrchr(void *va, int c, long n)
 struct chan*
 namec(char *aname, int amode, int omode, uint32_t perm)
 {
-	ERRSTACK(4);
+	ERRSTACK(2);
 	int n, prefix, len, t, nomount, npath;
 	struct chan *c, *cnew;
 	struct cname *cname;
 	Elemlist e;
 	struct mhead *m;
-	char *createerr, tmperrbuf[ERRMAX];
+	char tmperrbuf[ERRMAX];
 	char *name;
 	// Rune r;
 
@@ -1083,12 +1084,12 @@ namec(char *aname, int amode, int omode, uint32_t perm)
 			printd("namec %s walk error npath=%d\n", aname, npath);
 			error("walk failed");
 		}
-#warning "fix this mess with errstr and walking"
+	NameError:
+		error("some kinda name error");
+		/* brho: skipping the namec custom error string business, since it hides
+		 * the underlying failure.  implement this if you want the old stuff. */
 #if 0
 		strncpy(tmperrbuf,  current->errstr, sizeof(tmperrbuf));
-#endif
-	NameError:
-#if 0
 		len = prefix+e.off[npath];
 		if(len < ERRMAX/3 || (name=memrchr(aname, '/', len))==NULL || name==aname)
 			snprintf(get_cur_genbuf(), sizeof current->genbuf, "%.*s", len, aname);
@@ -1096,7 +1097,6 @@ namec(char *aname, int amode, int omode, uint32_t perm)
 			snprintf(get_cur_genbuf(), sizeof current->genbuf, "...%.*s", (int)(len-(name-aname)), name);
 		snprintf(current->errstr, ERRMAX, "%#q %s", get_cur_genbuf(), tmperrbuf);
 #endif
-		error("some kinda name error");
 	}
 
 	if(e.mustbedir && !(c->qid.type&QTDIR)){
@@ -1247,6 +1247,7 @@ if(c->umh != NULL){
 		 */
 		m = NULL;
 		cnew = NULL;	/* is this assignment necessary? */
+		/* discard error */
 		if(!waserror()){	/* try create */
 			if(!nomount && findmount(&cnew, &m, c->type, c->dev, c->qid))
 				cnew = createdir(cnew, m);
@@ -1285,20 +1286,16 @@ if(c->umh != NULL){
 		if(m)
 			putmhead(m);
 		if(omode & OEXCL)
-			nexterror();
-		/* save error */
-#warning "more mess with errstr"
-#if 0
-		createerr = current->errstr;
-		current->errstr = tmperrbuf;
-#endif
+			nexterror();	/* safe since we're in a waserror() */
+		poperror(); 		/* matching the if(!waserror) */
+
+		/* save error, so walk doesn't clobber our existing errstr */         
+		strncpy(tmperrbuf, current_errstr(), MAX_ERRSTR_LEN);                 
 		/* note: we depend that walk does not error */
-		if(walk(&c, e.elems+e.ARRAY_SIZEs-1, 1, nomount, NULL) < 0){
-			error(createerr);	/* report true error */
+		if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, nomount, NULL) < 0) {
+			error(tmperrbuf);   /* report the error we had originally */      
 		}
-#if 0
-		set_errstr(createerr);
-#endif
+		strncpy(current_errstr(), tmperrbuf, MAX_ERRSTR_LEN); 
 		omode |= OTRUNC;
 		goto Open;
 

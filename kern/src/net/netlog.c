@@ -86,7 +86,7 @@ netloginit(struct Fs *f)
 void
 netlogopen(struct Fs *f)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	spin_lock(&f->alog->lock);
 	if(waserror()){
 		spin_unlock(&f->alog->lock);
@@ -106,7 +106,7 @@ netlogopen(struct Fs *f)
 void
 netlogclose(struct Fs *f)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	spin_lock(&f->alog->lock);
 	if(waserror()){
 		spin_unlock(&f->alog->lock);
@@ -132,7 +132,7 @@ netlogready(void *a)
 long
 netlogread(struct Fs *f, void *a, uint32_t unused, long n)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int i, d;
 	char *p, *rptr;
 
@@ -178,7 +178,7 @@ netlogread(struct Fs *f, void *a, uint32_t unused, long n)
 void
 netlogctl(struct Fs *f, char* s, int n)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int i, set = 0;
 	Netlogflag *fp;
 	struct cmdbuf *cb;
@@ -211,6 +211,7 @@ netlogctl(struct Fs *f, char* s, int n)
 		else
 			f->alog->iponlyset = 1;
 		kfree(cb);
+		poperror();
 		return;
 
 	default:

@@ -88,9 +88,9 @@ loopbackread(void *a)
 	lb->readp = current;	/* hide identity under a rock for unbind */
 	if(waserror()){
 		lb->readp = 0;
-		/* kill the proc. */
-#warning "pexit"
-//		pexit("hangup", 1);
+		warn("loopbackread exits unexpectedly");
+		return;
+		poperror();
 	}
 	for(;;){
 		bp = qbread(lb->q, Maxtu);
@@ -112,6 +112,7 @@ loopbackread(void *a)
 		runlock(&ifc->rwlock);
 		poperror();
 	}
+	poperror();
 }
 
 struct medium loopbackmedium =

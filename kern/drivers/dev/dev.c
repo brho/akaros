@@ -142,7 +142,7 @@ devwalk(struct chan *c,
 	struct chan *nc, char **name, int nname,
 	struct dirtab *tab, int ntab, Devgen *gen)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int i, j;
 	volatile int alloc; /* to keep waserror from optimizing this out */
 	struct walkqid *wq;
@@ -159,6 +159,7 @@ devwalk(struct chan *c,
 		if(alloc && wq->clone!=NULL)
 			cclose(wq->clone);
 		kfree(wq);
+		poperror();
 		return NULL;
 	}
 	if(nc == NULL){
@@ -372,7 +373,7 @@ devcreate(struct chan*c, char *unused_char_p_t, int unused_int, uint32_t u)
 struct block*
 devbread(struct chan *c, long n, uint32_t offset)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct block *bp;
 
 	bp = allocb(n);
@@ -390,7 +391,7 @@ devbread(struct chan *c, long n, uint32_t offset)
 long
 devbwrite(struct chan *c, struct block *bp, uint32_t offset)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	long n;
 
 	if(waserror()) {

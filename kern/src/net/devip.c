@@ -953,7 +953,7 @@ connected(void* a)
 static void
 connectctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	char *p;
 
 	if(c->state != 0)
@@ -1006,7 +1006,7 @@ announced(void* a)
 static void
 announcectlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	char *p;
 
 	if(c->state != 0)
@@ -1080,7 +1080,7 @@ ttlctlmsg(struct conv *c, struct cmdbuf *cb)
 static long
 ipwrite(struct chan* ch, void *v, long n, int64_t off)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct conv *c;
 	struct Proto *x;
 	char *p;

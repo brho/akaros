@@ -685,8 +685,9 @@ rxmitproc(void *v)
 	//print("arp rxmitproc started\n");
 	if(waserror()){
 		arp->rxmitp = 0;
-#warning "pexit"
-		//pexit("hangup", 1);
+		poperror();
+		warn("arp rxmit ktask exited");
+		return;
 	}
 	for(;;){
 		wakeupat = rxmitsols(arp);
@@ -695,5 +696,6 @@ rxmitproc(void *v)
 		else if(wakeupat > ReTransTimer/4) 
 			udelay_sched(wakeupat * 1000); 
 	}
+	poperror();
 }
 

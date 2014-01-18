@@ -120,7 +120,9 @@ netdevread(void *a)
 	er->readp = current;	/* hide identity under a rock for unbind */
 	if(waserror()){
 		er->readp = NULL;
-		//	pexit("hangup", 1);
+		warn("netdevread returns unexpectedly");
+		poperror();
+		return;
 	}
 	for(;;){
 		bp = devtab[er->mchan->type]->bread(er->mchan, ifc->maxtu, 0);
@@ -128,14 +130,16 @@ netdevread(void *a)
 			/*
 			 * get here if mchan is a pipe and other side hangs up
 			 * clean up this interface & get out
-ZZZ is this a good idea?
+ZZZ is this a good idea?  (watch your errors btw)
 			 */
 			poperror();
 			er->readp = NULL;
 			argv[0] = "unbind";
 			if(!waserror())
 				ifc->conv->p->ctl(ifc->conv, argv, 1);
-			//		pexit("hangup", 1);
+			poperror();
+			warn("netdevread returns unexpectedly");
+			return;
 		}
 		if(!canrlock(&ifc->rwlock)){
 			freeb(bp);
@@ -153,6 +157,7 @@ ZZZ is this a good idea?
 		runlock(&ifc->rwlock);
 		poperror();
 	}
+	poperror();
 }
 
 void

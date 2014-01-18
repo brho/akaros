@@ -117,13 +117,15 @@ fdtochan(struct fgrp *f, int fd, int mode, int chkmnt, int iref)
 long
 kchanio(void *vc, void *buf, int n, int mode)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int r;
 	struct chan *c;
 
 	c = vc;
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 
 	if(mode == OREAD)
 		r = devtab[c->type]->read(c, buf, n, c->offset);
@@ -182,12 +184,14 @@ fdclose(struct fgrp *f, int fd)
 int
 syschdir(char *path)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct chan *c;
 	struct pgrp *pg;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 
 	c = namec(path, Atodir, 0, 0);
 	pg = current->pgrp;
@@ -200,9 +204,11 @@ syschdir(char *path)
 int
 fgrpclose(struct fgrp *f, int fd)
 {
-	ERRSTACK(2);
-	if(waserror())
+	ERRSTACK(1);
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 
 	/*
 	 * Take no reference on the chan because we don't really need the
@@ -228,8 +234,10 @@ syscreate(char *path, int mode, uint32_t perm)
 	int fd;
 	struct chan *c;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 
 	openmode(mode&~OEXCL);	/* error check only; OEXCL okay here */
 	c = namec(path, Acreate, mode, perm);
@@ -254,8 +262,10 @@ sysdup(int old, int new)
 	struct chan *c, *oc;
 	struct fgrp *f = current->fgrp;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 
 	c = fdtochan(current->fgrp, old, -1, 0, 1);
 	if(c->qid.type & QTAUTH)
@@ -301,8 +311,10 @@ sysfstat(int fd, uint8_t *buf, int n)
 	ERRSTACK(2);
 	struct chan *c;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 
 	c = fdtochan(current->fgrp, fd, -1, 0, 1);
 	if(waserror()) {
@@ -321,12 +333,14 @@ sysfstat(int fd, uint8_t *buf, int n)
 char*
 sysfd2path(int fd)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct chan *c;
 	char *s;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return NULL;
+	}
 	c = fdtochan(current->fgrp, fd, -1, 0, 1);
 	s = NULL;
 	if(c->name != NULL){
@@ -348,8 +362,10 @@ sysfauth(int fd, char *aname)
 	ERRSTACK(2);
 	struct chan *c, *ac;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 
 	validname(aname, 0);
 	c = fdtochan(current->fgrp, fd, ORDWR, 0, 1);
@@ -386,8 +402,10 @@ sysfversion(int fd, unsigned int msize, char *vers, unsigned int arglen)
 	int m;
 	struct chan *c;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 
 	/* check there's a NUL in the version string */
 	if(arglen==0 || memchr(vers, 0, arglen)==0)
@@ -411,7 +429,7 @@ sysfversion(int fd, unsigned int msize, char *vers, unsigned int arglen)
 int
 syspipe(int fd[2])
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct dev *d;
 	struct fgrp *f;
 	struct chan *c[2];
@@ -439,6 +457,7 @@ syspipe(int fd[2])
 			put_fd(&current->open_files, fd[1]);
 			f->fd[fd[1]]=0;
 		}
+		poperror();
 		return -1;
 	}
 	c[1] = cclone(c[0]);
@@ -464,8 +483,10 @@ sysfwstat(int fd, uint8_t *buf, int n)
 	ERRSTACK(2);
 	struct chan *c;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 
 	validstat(buf, n);
 	c = fdtochan(current->fgrp, fd, -1, 1, 1);
@@ -484,7 +505,7 @@ sysfwstat(int fd, uint8_t *buf, int n)
 long
 bindmount(struct chan *c, char *old, int flag, char *spec)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int ret;
 	struct chan *c1;
 
@@ -510,8 +531,10 @@ sysbind(char *new, char *old, int flags)
 	long r;
 	struct chan *c0;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 
 	c0 = namec(new, Abind, 0, 0);
 	if(waserror()) {
@@ -529,7 +552,7 @@ sysbind(char *new, char *old, int flags)
 int
 sysmount(int fd, int afd, char *old, int flags, char *spec)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	long r;
 	volatile struct { struct chan *c; } c0;
 	volatile struct { struct chan *c; } bc;
@@ -543,6 +566,7 @@ sysmount(int fd, int afd, char *old, int flags, char *spec)
 		cclose(ac.c);
 		cclose(bc.c);
 		cclose(c0.c);
+		poperror();
 		return -1;
 	}
 	bc.c = fdtochan(current->fgrp, fd, ORDWR, 0, 1);
@@ -566,7 +590,7 @@ sysmount(int fd, int afd, char *old, int flags, char *spec)
 int
 sysunmount(char *old, char *new)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	volatile struct { struct chan *c; } cmount;
 	volatile struct { struct chan *c; } cmounted;
 
@@ -575,6 +599,7 @@ sysunmount(char *old, char *new)
 	if(waserror()) {
 		cclose(cmount.c);
 		cclose(cmounted.c);
+		poperror();
 		return -1;
 	}
 
@@ -603,8 +628,10 @@ sysopen(char *path, int mode)
 	int fd;
 	struct chan *c;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 
 	openmode(mode);                         /* error check only */
 	c = namec(path, Aopen, mode, 0);
@@ -624,7 +651,7 @@ sysopen(char *path, int mode)
 long
 unionread(struct chan *c, void *va, long n)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int i;
 	long nr;
 	struct mhead *m;
@@ -641,17 +668,19 @@ unionread(struct chan *c, void *va, long n)
 	nr = 0;
 	while(mount != NULL) {
 		/* Error causes component of union to be skipped */
-		if(mount->to && !waserror()) {
-			if(c->umc == NULL){
-				c->umc = cclone(mount->to);
-				c->umc = devtab[c->umc->type]->open(c->umc, OREAD);
-			}
+		if(mount->to) {
+			if (!waserror()) { /* discard style */
+				if(c->umc == NULL){
+					c->umc = cclone(mount->to);
+					c->umc = devtab[c->umc->type]->open(c->umc, OREAD);
+				}
 	
-			nr = devtab[c->umc->type]->read(c->umc, va, n, c->umc->offset);
-			if(nr < 0)
-				nr = 0;	/* dev.c can return -1 */
-			c->umc->offset += nr;
-			poperror();
+				nr = devtab[c->umc->type]->read(c->umc, va, n, c->umc->offset);
+				if(nr < 0)
+					nr = 0;	/* dev.c can return -1 */
+				c->umc->offset += nr;
+			}
+			poperror(); /* pop regardless */
 		}
 		if(nr > 0)
 			break;
@@ -689,8 +718,10 @@ rread(int fd, void *va, long n, int64_t *offp)
 	struct chan *c;
 	int64_t off;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 
 	c = fdtochan(current->fgrp, fd, OREAD, 1, 1);
 	if(waserror()) {
@@ -753,8 +784,10 @@ sysremove(char *path)
 	ERRSTACK(2);
 	struct chan *c;
 
-	if(waserror())
-		return -1;
+	if (waserror()) {
+		poperror();
+	 	return -1; 
+	}
 
 	c = namec(path, Aremove, 0, 0);
 	if(waserror()) {
@@ -782,8 +815,10 @@ sysseek(int fd, int64_t off, int whence)
 	struct dir *dir;
 	struct chan *c;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 
 	c = fdtochan(current->fgrp, fd, -1, 1, 1);
 	if(waserror()) {
@@ -879,8 +914,10 @@ sysstat(char *path, uint8_t *buf, int n)
 	ERRSTACK(2);
 	struct chan *c;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 
 	c = namec(path, Aaccess, 0, 0);
 	if(waserror()){
@@ -898,13 +935,15 @@ sysstat(char *path, uint8_t *buf, int n)
 static long
 rwrite(int fd, void *va, long n, int64_t *offp)
 {
-	ERRSTACK(2);
+	ERRSTACK(3);
 	struct chan *c;
 	int64_t off;
 	long m;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 	c = fdtochan(current->fgrp, fd, OWRITE, 1, 1);
 	if(waserror()) {
 		cclose(c);
@@ -968,8 +1007,10 @@ syswstat(char *path, uint8_t *buf, int n)
 	ERRSTACK(2);
 	struct chan *c;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 
 	validstat(buf, n);
 	c = namec(path, Aaccess, 0, 0);
@@ -994,7 +1035,7 @@ enum
 struct dir*
 chandirstat(struct chan *c)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct dir *d;
 	uint8_t *buf;
 	int n, nd, i;
@@ -1005,6 +1046,7 @@ chandirstat(struct chan *c)
 		buf = ( uint8_t *)&d[1];
 		if(waserror()){
 			kfree(d);
+			poperror();
 			return NULL;
 		}
 		n = devtab[c->type]->stat(c, buf, nd);
@@ -1032,8 +1074,10 @@ sysdirstat(char *name)
 	struct chan *c;
 	struct dir *d;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return NULL;
+	}
 
 	c = namec(name, Aaccess, 0, 0);
 	if(waserror()){
@@ -1055,8 +1099,10 @@ sysdirfstat(int fd)
 	struct chan *c;
 	struct dir *d;
 
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return NULL;
+	}
 
 	c = fdtochan(current->fgrp, fd, -1, 0, 1);
 	if(waserror()) {
@@ -1156,8 +1202,10 @@ sysdirread(int fd, struct dir **d)
 	long ts;
 
 	*d = NULL;
-	if(waserror())
+	if (waserror()) {
+		poperror();
 		return -1;
+	}
 	buf = kzmalloc(DIRREADLIM, 0);
 	if(buf == NULL)
 		error(Enomem);
@@ -1177,13 +1225,14 @@ sysdirread(int fd, struct dir **d)
 int
 sysiounit(int fd)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct chan *c;
 	int n;
 
 	c = fdtochan(current->fgrp, fd, -1, 0, 1);
 	if(waserror()){
 		cclose(c);
+		poperror();
 		return 0;	/* n.b. */
 	}
 	n = c->iounit;

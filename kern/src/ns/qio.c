@@ -947,7 +947,7 @@ bl2mem(uint8_t *p, struct block *b, int n)
 struct block*
 mem2bl(uint8_t *p, int len)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int n;
 	struct block *b, *first, **l;
 
@@ -1020,7 +1020,7 @@ qwakeup_iunlock(struct queue *q)
 struct block*
 qbread(struct queue *q, int len)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct block *b, *nb;
 	int n;
 
@@ -1076,7 +1076,7 @@ qbread(struct queue *q, int len)
 long
 qread(struct queue *q, void *vp, int len)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct block *b, *first, **l;
 	int m, n;
 
@@ -1172,7 +1172,7 @@ uint32_t noblockcnt;
 long
 qbwrite(struct queue *q, struct block *b)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int n, dowakeup;
 
 	n = BLEN(b);
@@ -1271,7 +1271,7 @@ qbwrite(struct queue *q, struct block *b)
 int
 qwrite(struct queue *q, void *vp, int len)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int n, sofar;
 	struct block *b;
 	uint8_t *p = vp;
