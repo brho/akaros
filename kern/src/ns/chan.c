@@ -991,7 +991,9 @@ namec(char *aname, int amode, int omode, uint32_t perm)
 	nomount = 0;
 	switch(name[0]){
 	case '/':
-		c = current->pgrp->slash;
+		c = current->slash;
+		if (! c)
+			panic("no slash!");
 		kref_get(&c->ref, 1);
 		break;
 	
@@ -1033,7 +1035,9 @@ namec(char *aname, int amode, int omode, uint32_t perm)
 		break;
 
 	default:
-		c = current->pgrp->dot;
+		c = current->dot;
+		if (! c)
+			panic("no dot!");
 		kref_get(&c->ref, 1);
 		break;
 	}
