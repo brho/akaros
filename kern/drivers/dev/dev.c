@@ -152,7 +152,8 @@ devwalk(struct chan *c,
 		isdir(c);
 
 	alloc = 0;
-	wq = kzmalloc(sizeof(struct walkqid) + (nname - 1) * sizeof(struct qid), 0);
+	wq = kzmalloc(sizeof(struct walkqid) + nname * sizeof(struct qid),
+	              KMALLOC_WAIT);
 	if(waserror()){
 		if(alloc && wq->clone!=NULL)
 			cclose(wq->clone);
