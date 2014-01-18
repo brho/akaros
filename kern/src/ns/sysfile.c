@@ -1280,6 +1280,8 @@ int plan9setup(struct proc *new_proc, struct proc *parent)
 		new_proc->pgrp = newpgrp();
 		old_current = switch_to(new_proc);
 		new_proc->slash = namec("#r", Atodir, 0, 0);
+		if (!new_proc->slash)
+			panic("no root device");
 		switch_back(new_proc, old_current);
 		/* Want the name to be "/" instead of "#r" */
 		cnameclose(new_proc->slash->name);
