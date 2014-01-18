@@ -34,7 +34,7 @@ devno(int c, int user)
 			return i;
 	}
 	if (user == 0)
-		panic("devno %C 0x%ux", c, c);
+		panic("devno %c 0x%ux", c, c);
 
 	return -1;
 }
@@ -105,8 +105,9 @@ devattach(int tc, char *spec)
 	c->type = devno(tc, 0);
 	if(spec == NULL)
 		spec = "";
-	buf = kzmalloc(4 + strlen(spec) + 1, 0);
-	snprintf(buf, sizeof(buf), "#%C%s", tc, spec);
+	/* 2 for #c, 1 for \0 */
+	buf = kzmalloc(2 + strlen(spec) + 1, KMALLOC_WAIT);
+	snprintf(buf, sizeof(buf), "#%c%s", tc, spec);
 	c->name = newcname(buf);
 	kfree(buf);
 	return c;
@@ -119,7 +120,7 @@ devclone(struct chan *c)
 	struct chan *nc;
 
 	if(c->flag & COPEN)
-		panic("clone of open file type %C\n", devtab[c->type]->dc);
+		panic("clone of open file type %c\n", devtab[c->type]->dc);
 
 	nc = newchan();
 
@@ -257,7 +258,7 @@ devstat(struct chan *c, uint8_t *db, int n,
 					error(Ebadarg);
 				return n;
 			}
-			printd("%s %s: devstat %C %llux\n",
+			printd("%s %s: devstat %c %llux\n",
 				up->text, up->env->user,
 				devtab[c->type]->dc, c->qid.path);
 

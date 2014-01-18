@@ -981,7 +981,7 @@ consread(struct chan *c, void *buf, long n, int64_t offset)
 			error(Enomem);
 		l = 0;
 		for(i = 0; devtab[i] != NULL; i++)
-			l += snprintf(p+l, READSTR-l, "#%C %s\n", devtab[i]->dc,  devtab[i]->name);
+			l += snprintf(p+l, READSTR-l, "#%c %s\n", devtab[i]->dc,  devtab[i]->name);
 		if(waserror()){
 			kfree(p);
 			nexterror();
