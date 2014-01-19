@@ -99,7 +99,7 @@ fdtochan(struct fgrp *f, int fd, int mode, int chkmnt, int iref)
 	if(mode<0 || c->mode==ORDWR)
 		return c;
 
-	if((mode&OTRUNC) && c->mode==OREAD) {
+	if((mode&OTRUNC) && (c->mode & OREAD) == OREAD) {
 		if(iref)
 			cclose(c);
 		error(Ebadusefd);
@@ -127,7 +127,7 @@ kchanio(void *vc, void *buf, int n, int mode)
 		return -1;
 	}
 
-	if(mode == OREAD)
+	if ((mode & OREAD) == OREAD)
 		r = devtab[c->type]->read(c, buf, n, c->offset);
 	else
 		r = devtab[c->type]->write(c, buf, n, c->offset);
@@ -139,9 +139,14 @@ kchanio(void *vc, void *buf, int n, int mode)
 	return r;
 }
 
-int
-openmode(uint32_t o)
+
+int openmode(uint32_t omode)
 {
+#if 0
+    /* this is the old plan9 style.  i think they want to turn exec into read,
+     * and strip off anything higher, and just return the RD/WR style bits.  not
+     * stuff like ORCLOSE.  the lack of OEXCL might be a bug on their part (it's
+     * the only one of their non-RW-related flags that isn't masked out) */
 	if(o >= (OTRUNC|OCEXEC|ORCLOSE|OEXEC))
 		error(Ebadarg);
 	o &= ~(OTRUNC|OCEXEC|ORCLOSE);
@@ -150,6 +155,12 @@ openmode(uint32_t o)
 	if(o == OEXEC)
 		return OREAD;
 	return o;
+#endif
+    /* no error checking (we have a shitload of flags anyway), and we return the
+     * basic access modes (RD/WR/ETC) */
+    if (omode == O_EXEC)
+        return O_RDONLY;
+    return omode & O_ACCMODE;
 }
 
 void
@@ -624,7 +635,7 @@ sysunmount(char *old, char *new)
 }
 
 int
-sysopen(char *path, int mode)
+sysopen(char *path, int vfs_flags)
 {
 	ERRSTACK(2);
 	int fd;
@@ -635,8 +646,8 @@ sysopen(char *path, int mode)
 		return -1;
 	}
 
-	openmode(mode);                         /* error check only */
-	c = namec(path, Aopen, mode, 0);
+	openmode(vfs_flags);                         /* error check only */
+	c = namec(path, Aopen, vfs_flags, 0);
 	if(waserror()){
 		cclose(c);
 		nexterror();

@@ -280,7 +280,7 @@ static struct chan *vmopen(struct chan *c, int omode)
 	case Qvmdir:
 		if (omode & ORCLOSE)
 			error(Eperm);
-		if (omode != OREAD)
+		if ((omode & OREAD) != OREAD)
 			error(Eisdir);
 		break;
 	case Qclone:

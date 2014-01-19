@@ -357,8 +357,8 @@ devopen(struct chan *c, int omode, struct dirtab *tab, int ntab, Devgen *gen)
 	}
 Return:
 	c->offset = 0;
-	if((c->qid.type&QTDIR) && omode!=OREAD)
-		error(Eperm);
+	if ((c->qid.type & QTDIR) && ((omode & OREAD) != OREAD))
+		error("Tried opening dir with non-read-only mode %o", omode);
 	c->mode = openmode(omode);
 	c->flag |= COPEN;
 	return c;
