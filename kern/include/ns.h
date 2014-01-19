@@ -248,6 +248,10 @@ unsigned int	convM2S( uint8_t *unused_uint8_p_t, unsigned int unused_int, struct
 unsigned int	convS2M(struct fcall*, uint8_t *unused_uint8_p_t, unsigned int);
 unsigned int	sizeS2M(struct fcall*);
 
+unsigned int convM2kdirent(uint8_t * buf, unsigned int nbuf, struct kdirent *kd);
+unsigned int convM2kstat(uint8_t * buf, unsigned int nbuf, struct kstat *ks);
+
+
 int	statcheck(uint8_t *abuf, unsigned int nbuf);
 unsigned int	convM2D( uint8_t *unused_uint8_p_t, unsigned int unused_int, struct dir*, char *unused_char_p_t);
 unsigned int	convD2M(struct dir*, uint8_t *unused_uint8_p_t, unsigned int);
