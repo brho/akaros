@@ -731,7 +731,13 @@ rread(int fd, void *va, long n, int64_t *offp)
 	struct chan *c;
 	int64_t off;
 
+	/* dirty dirent hack */
+	void *real_va = va;
+	void *buf_for_M = 0;
+	long real_n = n;
+
 	if (waserror()) {
+		kfree(buf_for_M);
 		poperror();
 		return -1;
 	}
@@ -746,6 +752,25 @@ rread(int fd, void *va, long n, int64_t *offp)
 		error(Etoosmall);
 
 	dir = c->qid.type & QTDIR;
+
+	/* dirty kdirent hack: userspace is expecting kdirents, but all of 9ns
+	 * produces Ms.  i'm assuming we're only being asked to read a single
+	 * dirent, which is usually the case for calls like readdir() (which just
+	 * calls read for a single dirent).
+	 *
+	 * another thing: the chan's offset moves forward by an amount such that a
+	 * future read of the chan will give the next dirent.  we also return n,
+	 * the amount of reading from the 9ns system.  this is fine, since it is
+	 * where we'll pick up next time (off += n, from userspace).  we might need
+	 * to put that info in d_off, but it seems to work (and no one wants to
+	 * mess with glibc code) */
+	if (dir) {
+		assert(n >= sizeof(struct kdirent));
+		buf_for_M = kmalloc(sizeof(struct dir), KMALLOC_WAIT);
+		va = buf_for_M;
+		n = sizeof(struct dir);
+	}
+
 	if(dir && c->umh)
 		n = unionread(c, va, n);
 	else{
@@ -770,6 +795,12 @@ rread(int fd, void *va, long n, int64_t *offp)
 		spin_lock(&c->lock);
 		c->offset += n;
 		spin_unlock(&c->lock);
+	}
+
+	/* dirty kdirent hack */
+	if (dir) {
+		convM2kdirent(buf_for_M, sizeof(struct dir), real_va, 0);
+		kfree(buf_for_M);
 	}
 
 	poperror();
