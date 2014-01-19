@@ -259,14 +259,14 @@ devstat(struct chan *c, uint8_t *db, int n,
 					error(Ebadarg);
 				return n;
 			}
-			printd("%s %s: devstat %c %llux\n",
-				up->text, up->env->user,
-				devtab[c->type]->dc, c->qid.path);
-
+			printd("DEVSTAT fails:%c %llu\n", devtab[c->type]->dc, c->qid.path);
 			error(Enonexist);
 		case 0:
+			printd("DEVSTAT got 0\n");
 			break;
 		case 1:
+			printd("DEVSTAT gen returns path %p name %s, want path %p\n",
+			       dir.qid.path, dir.name, c->qid.path);
 			if(c->qid.path == dir.qid.path) {
 				if(c->flag&CMSG)
 					dir.mode |= DMMOUNT;

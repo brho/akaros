@@ -310,6 +310,7 @@ sysfstat(int fd, uint8_t *buf, int n)
 {
 	ERRSTACK(2);
 	struct chan *c;
+	struct dir dir9ns;
 
 	if (waserror()) {
 		poperror();
@@ -321,12 +322,13 @@ sysfstat(int fd, uint8_t *buf, int n)
 		cclose(c);
 		nexterror();
 	}
-	devtab[c->type]->stat(c, buf, n);
+	devtab[c->type]->stat(c, (void*)&dir9ns, sizeof(struct dir));
 
 	poperror();
 	cclose(c);
 
 	poperror();
+	convM2kstat((void*)&dir9ns, sizeof(struct dir), (struct kstat*)buf);
 	return n;
 }
 
@@ -913,6 +915,7 @@ sysstat(char *path, uint8_t *buf, int n)
 {
 	ERRSTACK(2);
 	struct chan *c;
+	struct dir dir9ns;
 
 	if (waserror()) {
 		poperror();
@@ -924,11 +927,12 @@ sysstat(char *path, uint8_t *buf, int n)
 		cclose(c);
 		nexterror();
 	}
-	devtab[c->type]->stat(c, buf, n);
+	devtab[c->type]->stat(c, (void*)&dir9ns, sizeof(struct dir));
 	poperror();
 	cclose(c);
 
 	poperror();
+	convM2kstat((void*)&dir9ns, sizeof(struct dir), (struct kstat*)buf);
 	return 0;
 }
 

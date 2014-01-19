@@ -1256,6 +1256,7 @@ static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 		stat_inode(file->f_dentry->d_inode, kbuf);
 		kref_put(&file->f_kref);
 	} else {
+		unset_errno();	/* Go can't handle extra errnos */
 	    if (sysfstat(fd, (uint8_t*)kbuf, sizeof(*kbuf)) < 0) {
 			kfree(kbuf);
 			return -1;

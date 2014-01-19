@@ -486,6 +486,7 @@ int do_chdir(struct fs_struct *fs_env, char *path);
 char *do_getcwd(struct fs_struct *fs_env, char **kfree_this, size_t cwd_l);
 
 /* Debugging */
+void print_kstat(struct kstat *kstat);
 int ls_dash_r(char *path);
 extern struct inode_operations dummy_i_op;
 extern struct dentry_operations dummy_d_op;

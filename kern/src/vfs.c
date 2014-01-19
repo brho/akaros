@@ -1084,6 +1084,24 @@ void stat_inode(struct inode *inode, struct kstat *kstat)
 	kstat->st_ctime = inode->i_ctime;
 }
 
+void print_kstat(struct kstat *kstat)
+{
+	printk("kstat info for %p:\n", kstat);
+	printk("\tst_dev    : %p\n", kstat->st_dev);
+	printk("\tst_ino    : %p\n", kstat->st_ino);
+	printk("\tst_mode   : %p\n", kstat->st_mode);
+	printk("\tst_nlink  : %p\n", kstat->st_nlink);
+	printk("\tst_uid    : %p\n", kstat->st_uid);
+	printk("\tst_gid    : %p\n", kstat->st_gid);
+	printk("\tst_rdev   : %p\n", kstat->st_rdev);
+	printk("\tst_size   : %p\n", kstat->st_size);
+	printk("\tst_blksize: %p\n", kstat->st_blksize);
+	printk("\tst_blocks : %p\n", kstat->st_blocks);
+	printk("\tst_atime  : %p\n", kstat->st_atime);
+	printk("\tst_mtime  : %p\n", kstat->st_mtime);
+	printk("\tst_ctime  : %p\n", kstat->st_ctime);
+}
+
 /* Inode Cache management.  In general, search on the ino, get a refcnt'd value
  * back.  Remove does not give you a reference back - it should only be called
  * in inode_release(). */
