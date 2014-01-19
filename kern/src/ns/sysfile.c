@@ -1146,10 +1146,10 @@ sysdirfwstat(int fd, struct dir *dir)
 }
 
 static long
-dirpackage(uint8_t *buf, long ts, struct dir **d)
+dirpackage(uint8_t *buf, long ts, struct kdirent **d)
 {
 	char *s;
-	long ss, i, n, nn, m;
+	long ss, i, n, nn, m = 0;
 
 	*d = NULL;
 	if(ts <= 0)
@@ -1171,18 +1171,18 @@ dirpackage(uint8_t *buf, long ts, struct dir **d)
 	if(i != ts)
 		error("bad directory format");
 
-	*d = kzmalloc(n * sizeof(struct dir) + ss, 0);
+	*d = kzmalloc(n * sizeof(**d) + ss, 0);
 	if(*d == NULL)
 		error(Enomem);
 
 	/*
 	 * then convert all buffers
 	 */
-	s = ( char *)*d + n * sizeof(struct dir);
+	s = ( char *)*d + n * sizeof(**d);
 	nn = 0;
 	for(i = 0; i < ts; i += m){
 		m = BIT16SZ + GBIT16(( uint8_t *)&buf[i]);
-		if(nn >= n || convM2D(&buf[i], m, *d + nn, s) != m){
+		if(nn >= n || /*convM2D*/convM2kdirent(&buf[i], m, *d + nn, s) != m){
 			kfree(*d);
 			*d = NULL;
 			error("bad directory entry");
@@ -1195,7 +1195,7 @@ dirpackage(uint8_t *buf, long ts, struct dir **d)
 }
 
 long
-sysdirread(int fd, struct dir **d)
+sysdirread(int fd, struct kdirent **d)
 {
 	ERRSTACK(2);
 	uint8_t *buf;

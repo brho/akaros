@@ -31,7 +31,7 @@ struct kdirent {
 
 #endif
 
-unsigned int convM2kdirent(uint8_t * buf, unsigned int nbuf, struct kdirent *kd)
+unsigned int convM2kdirent(uint8_t * buf, unsigned int nbuf, struct kdirent *kd, char *strs)
 {
 	uint8_t *p, *ebuf;
 	char *sv[4];
@@ -76,6 +76,12 @@ unsigned int convM2kdirent(uint8_t * buf, unsigned int nbuf, struct kdirent *kd)
 		p += BIT16SZ;
 		if (p + ns > ebuf)
 			return 0;
+		if(strs){
+			sv[i] = strs;
+			memmove(strs, p, ns);
+			strs += ns;
+			*strs++ = '\0';
+		}
 		if (i == 0) {
 			kd->d_reclen = ns;
 			printd("memmove %p %p %d\n", kd->d_name, p, ns);

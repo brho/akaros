@@ -248,7 +248,7 @@ unsigned int	convM2S( uint8_t *unused_uint8_p_t, unsigned int unused_int, struct
 unsigned int	convS2M(struct fcall*, uint8_t *unused_uint8_p_t, unsigned int);
 unsigned int	sizeS2M(struct fcall*);
 
-unsigned int convM2kdirent(uint8_t * buf, unsigned int nbuf, struct kdirent *kd);
+unsigned int convM2kdirent(uint8_t * buf, unsigned int nbuf, struct kdirent *kd, char *strs);
 unsigned int convM2kstat(uint8_t * buf, unsigned int nbuf, struct kstat *ks);
 
 
@@ -1001,7 +1001,7 @@ struct dir *sysdirstat(char *name);
 struct dir *sysdirfstat(int fd);
 int sysdirwstat(char *name, struct dir *dir);
 int sysdirfwstat(int fd, struct dir *dir);
-long sysdirread(int fd, struct dir **d);
+long sysdirread(int fd, struct kdirent **d);
 int sysiounit(int fd);
 void close_9ns_files(struct proc *p, bool only_cloexec);
 void print_chaninfo(struct chan *ch);
