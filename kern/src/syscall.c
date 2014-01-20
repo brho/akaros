@@ -1214,6 +1214,18 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	} else {
 		unset_errno();	/* Go can't handle extra errnos */
 		fd = sysopen(t_path, oflag);
+		/* successful lookup with CREATE and EXCL is an error */
+		if (fd != -1) {
+			if ((oflag & O_CREATE) && (oflag & O_EXCL)) {
+				set_errno(EEXIST);
+				sysclose(fd);
+				user_memdup_free(p, t_path);
+				return -1;
+			}
+		} else {
+			if (oflag & O_CREATE)
+				fd = syscreate(t_path, oflag, mode);
+		}
 	}
 	user_memdup_free(p, t_path);
 	printd("File %s Open, fd=%d\n", path, fd);
