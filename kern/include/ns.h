@@ -1018,4 +1018,10 @@ static inline int abs(int a)
 }
 
 extern char *eve;
+
+/* special sections */
+#define __devtab  __attribute__((__section__(".devtab")))
+#define __ether  __attribute__((__section__(".ether")))
+#define __media  __attribute__((__section__(".media")))
+
 #endif /* ROS_KERN_NS_H */
