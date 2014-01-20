@@ -1,0 +1,13 @@
+--- a/shell/ash.c	2014-01-19 16:10:06.228270755 -0800
++++ b/shell/ash.c	2014-01-19 16:12:46.388266769 -0800
+@@ -1151,7 +1151,9 @@
+ 	if (e == ENOENT || e == ENOTDIR) {
+ 		return em;
+ 	}
+-	return strerror(e);
++	if (errstr()[0] == 0)
++		return strerror(e);
++	return errstr();
+ }
+ 
+ 
