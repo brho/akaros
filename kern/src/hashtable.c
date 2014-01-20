@@ -96,7 +96,7 @@ create_hashtable(size_t minsize,
 }
 
 /*****************************************************************************/
-size_t
+static size_t
 hash(hashtable_t *h, void *k)
 {
     /* Aim to protect against poor hash functions by adding logic here

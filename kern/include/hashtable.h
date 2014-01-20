@@ -40,7 +40,6 @@ typedef struct hashtable {
     ssize_t (*eqfn) (void *k1, void *k2);
 } hashtable_t;
 
-size_t hash(struct hashtable *h, void *k);
 static inline size_t indexFor(unsigned int tablelength, unsigned int hashvalue)
 {
 	return (hashvalue % tablelength);
