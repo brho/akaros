@@ -63,8 +63,8 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp, int unused_in
 		case 0:
 			q.path = N2ndqid;
 			q.type = QTDIR;
-			strncpy(up->genbuf,  nif->name, sizeof(up->genbuf));
-			devdir(c, q, up->genbuf, 0, eve, 0555, dp);
+			strncpy(get_cur_genbuf(),  nif->name, GENBUF_SZ);
+			devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
 			break;
 		default:
 			return -1;
@@ -105,8 +105,8 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp, int unused_in
 				return 0;
 			q.type = QTDIR;
 			q.path = NETQID(i, N3rdqid);
-			sprint(up->genbuf, "%d", i);
-			devdir(c, q, up->genbuf, 0, eve, DMDIR|0555, dp);
+			snprintf(get_cur_genbuf(), GENBUF_SZ, "%d", i);
+			devdir(c, q, get_cur_genbuf(), 0, eve, DMDIR|0555, dp);
 			break;
 		}
 		return 1;
@@ -127,8 +127,9 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp, int unused_in
 	case DEVDOTDOT:
 		q.type = QTDIR;
 		q.path = N2ndqid;
-		strncpy(up->genbuf,  nif->name, sizeof(up->genbuf));
-		devdir(c, q, up->genbuf, 0, eve, DMDIR|0555, dp);
+		strncpy(get_cur_genbuf(), 
+			nif->name, GENBUF_SZ);
+		devdir(c, q, get_cur_genbuf(), 0, eve, DMDIR|0555, dp);
 		break;
 	case 0:
 		q.path = NETQID(NETID(c->qid.path), Ndataqid);
@@ -165,6 +166,7 @@ netifwalk(struct netif *nif, struct chan *c, struct chan *nc, char **name, int n
 struct chan*
 netifopen(struct netif *nif, struct chan *c, int omode)
 {
+	extern int qiomaxatomic;
 	int id;
 	struct netfile *f;
 
@@ -191,7 +193,7 @@ netifopen(struct netif *nif, struct chan *c, int omode)
 		case Ndataqid:
 		case Nctlqid:
 			f = nif->f[id];
-			if(netown(f, up->env->user, omode&7) < 0)
+			if(netown(f, current->user, omode&7) < 0)
 				error(Eperm);
 			break;
 		}
@@ -378,11 +380,11 @@ netifwstat(struct netif *nif, struct chan *c, uint8_t *db, int n)
 	if(f == 0)
 		error(Enonexist);
 
-	if(netown(f, up->env->user, OWRITE) < 0)
+	if(netown(f, current->user, OWRITE) < 0)
 		error(Eperm);
 
 	dir = kzmalloc(sizeof(struct dir) + n, 0);
-	m = convM2D(db, n, &dir[0], ( char *unused_char_p_t)&dir[1]);
+	m = convM2D(db, n, &dir[0], ( char *)&dir[1]);
 	if(m == 0){
 		kfree(dir);
 		error(Eshortstat);
@@ -466,7 +468,7 @@ netown(struct netfile *p, char *o, int omode)
 	int mode;
 	int t;
 
-	spin_lock(&(&netlock)->lock);
+	spin_lock(&netlock);
 	if(*p->owner){
 		if(strncmp(o, p->owner, KNAMELEN) == 0)	/* User */
 			mode = p->mode;
@@ -477,16 +479,16 @@ netown(struct netfile *p, char *o, int omode)
 
 		t = access[omode&3];
 		if((t & mode) == t){
-			spin_unlock(&(&netlock)->lock);
+			spin_unlock(&netlock);
 			return 0;
 		} else {
-			spin_unlock(&(&netlock)->lock);
+			spin_unlock(&netlock);
 			return -1;
 		}
 	}
 	strncpy(p->owner, o, KNAMELEN);
 	p->mode = 0660;
-	spin_unlock(&(&netlock)->lock);
+	spin_unlock(&netlock);
 	return 0;
 }
 
@@ -539,7 +541,7 @@ openfile(struct netif *nif, int id)
 		}
 		f->inuse = 1;
 		qreopen(f->in);
-		netown(f, up->env->user, 0);
+		netown(f, current->user, 0);
 		qunlock(&f->qlock);
 		qunlock(&nif->qlock);
 		poperror();
@@ -572,7 +574,7 @@ matchtoken(char *p, char *token)
 }
 
 static uint32_t
-hash(uint8_t *a, int len)
+netifhash(uint8_t *a, int len)
 {
 	uint32_t sum = 0;
 
@@ -586,9 +588,9 @@ activemulti(struct netif *nif, uint8_t *addr, int alen)
 {
 	struct netaddr *hp;
 
-	for(hp = nif->mhash[hash(addr, alen)]; hp; hp = hp->hnext)
+	for(hp = nif->mhash[netifhash(addr, alen)]; hp; hp = hp->hnext)
 		if(memcmp(addr, hp->addr, alen) == 0){
-			if(hp->ref)
+			if(kref_refcnt(&hp->ref) > 1)
 				return 1;
 			else
 				break;
@@ -647,13 +649,13 @@ netmulti(struct netif *nif, struct netfile *f, uint8_t *addr, int add)
 			memmove(ap->addr, addr, nif->alen);
 			ap->next = 0;
 			kref_init(&ap->ref, fake_release, 1);
-			h = hash(addr, nif->alen);
+			h = netifhash(addr, nif->alen);
 			ap->hnext = nif->mhash[h];
 			nif->mhash[h] = ap;
 		} else {
-			ap->ref++;
+			kref_get(&ap->ref, 1);
 		}
-		if(ap->ref == 1){
+		if(kref_refcnt(&ap->ref) == 1){
 			nif->nmaddr++;
 			nif->multicast(nif->arg, addr, 1);
 		}
@@ -663,10 +665,11 @@ netmulti(struct netif *nif, struct netfile *f, uint8_t *addr, int add)
 			f->maddr[i/8] |= 1<<(i%8);
 		}
 	} else {
-		if(ap == 0 || ap->ref == 0)
+		if((ap == 0) || (kref_refcnt(&ap->ref) == 1))
 			return 0;
-		ap->ref--;
-		if(ap->ref == 0){
+#warning "this will fail"
+		kref_put(&ap->ref);
+		if(kref_refcnt(&ap->ref) == 1){
 			nif->nmaddr--;
 			nif->multicast(nif->arg, addr, 0);
 		}

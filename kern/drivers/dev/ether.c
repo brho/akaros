@@ -385,9 +385,10 @@ etheroq(struct ether* ether, struct block* bp)
 	len = BLEN(bp);
 	loopback = memcmp(pkt->d, ether->ea, sizeof(pkt->d)) == 0;
 	if(loopback || memcmp(pkt->d, ether->netif.bcast, sizeof(pkt->d)) == 0 || ether->netif.prom){
-		s = splhi();
+#warning "splhi"
+		//s = splhi();
 		etheriq(ether, bp, 0);
-		splx(s);
+		//splx(s);
 	}
 
 	if(!loopback){
@@ -747,11 +748,9 @@ etherpower(int on)
 				ether->power(ether, on);
 			wunlock(&ether->rwlock);
 		}else{
-#warning "what is this eraders stuff? (rwlock FIX ME )"
-/*
-			if(ether->readers)
+			if(ether->rwlock.nr_readers)
 				continue;
-*/
+
 			wlock(&ether->rwlock);
 			if(ether->power != NULL)
 				ether->power(ether, on);

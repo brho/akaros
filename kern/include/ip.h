@@ -903,7 +903,7 @@ struct netaddr
 	struct netaddr	*next;		/* allocation chain */
 	struct netaddr	*hnext;
 	uint8_t	addr[Nmaxaddr];
-	int	ref;
+	struct kref ref;
 };
 
 /*
