@@ -156,4 +156,27 @@ void _warn(const char *file, int line, const char *fmt,...)
 	va_end(ap);
 }
 
+/* You need to reference PROVIDE symbols somewhere, or they won't be included.
+ * Only really a problem for debugging. */
+void debug_linker_tables(void)
+{
+	extern char __devtabstart[];
+	extern char __devtabend[];
+	extern char __devlinkstart[];
+	extern char __devlinkend[];
+	extern char __etherlinkstart[];
+	extern char __etherlinkend[];
+	extern char __mediastart[];
+	extern char __mediaend[];
+	printk("devtab %p %p\ndevlink %p %p\netherlink %p %p\nmedia %p %p\n", 
+	       __devtabstart,
+	       __devtabend,
+	       __devlinkstart,
+	       __devlinkend,
+	       __etherlinkstart,
+	       __etherlinkend,
+	       __mediastart,
+	       __mediaend);
+}
+
 #endif //Everything For Free

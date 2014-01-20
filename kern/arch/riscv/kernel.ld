@@ -14,6 +14,8 @@ SECTIONS
 
 	PROVIDE(etext = .);	/* Define the 'etext' symbol to this value */
 
+	INCLUDE kern/linker_tables.ld
+
 	.rodata : {
 		*(.rodata .rodata.* .gnu.linkonce.r.*)
 	}
