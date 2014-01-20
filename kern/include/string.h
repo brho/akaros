@@ -18,6 +18,7 @@ STRING	strncpy(STRBUF(size) dst, const STRING src, size_t size);
 size_t	strlcpy(STRBUF(size-1) dst, const STRING src, size_t size);
 int	strcmp(const STRING s1, const STRING s2);
 int	strncmp(const STRING s1, const STRING s2, size_t size);
+int cistrcmp(char *s1, char *s2);
 STRING	strchr(const STRING s, char c);
 STRING	strrchr(const STRING s, char c);
 STRING	strfind(const STRING s, char c);

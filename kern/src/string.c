@@ -117,7 +117,7 @@ strrchr(const char *s, char c)
 	char *lastc = NULL;
 	for (; *s; s++)
 		if (*s == c){
-			lastc = s;
+			lastc = (char*)s;
 		}
 	return lastc;
 }
