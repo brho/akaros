@@ -4,7 +4,6 @@ obj-y						+= dev.o
 obj-y						+= ether.o
 #obj-y						+= ether8139.o
 obj-y						+= mnt.o
-obj-y						+= netif.o
 obj-y						+= root.o
 obj-y						+= tab.o
 obj-y						+= vm.o

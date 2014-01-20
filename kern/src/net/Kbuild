@@ -15,6 +15,7 @@ obj-y						+= ipifc.o
 obj-y						+= loopbackmedium.o
 obj-y						+= netaux.o
 obj-y						+= netdevmedium.o
+obj-y						+= netif.o
 obj-y						+= netlog.o
 obj-y						+= nullmedium.o
 obj-y						+= plan9.o
