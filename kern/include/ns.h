@@ -958,6 +958,7 @@ char *get_cur_genbuf(void);
 /* hack for now. */
 #define	NOW	tsc2msec(read_tsc())
 #define	seconds() tsc2sec(read_tsc())
+#define	milliseconds() tsc2msec(read_tsc())
 
 /* kern/src/ns/parse.c */
 struct cmdbuf *parsecmd(char *p, int n);

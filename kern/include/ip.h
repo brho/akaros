@@ -847,4 +847,180 @@ extern int ReTransTimer;
 
 int kdial(char *dest, char *local, char *dir, int *cfdp);
 
+/* network interfaces and ethernet */
+// INFERNO
+
+enum
+{
+	Nmaxaddr=	64,
+	Nmhash=		31,
+
+	Ncloneqid=	1,
+	Naddrqid,
+	N2ndqid,
+	N3rdqid,
+	Ndataqid,
+	Nctlqid,
+	Nstatqid,
+	Ntypeqid,
+	Nifstatqid,
+};
+
+/*
+ *  Macros to manage Qid's used for multiplexed devices
+ */
+#define NETTYPE(x)	(((uint32_t)x)&0x1f)
+#define NETID(x)	((((uint32_t)x))>>5)
+#define NETQID(i,t)	((((uint32_t)i)<<5)|(t))
+
+/*
+ *  one per multiplexed connection
+ */
+struct netfile
+{
+	qlock_t qlock;
+
+	int	inuse;
+	uint32_t	mode;
+	char	owner[KNAMELEN];
+
+	int	type;			/* multiplexor type */
+	int	prom;			/* promiscuous mode */
+	int	scan;			/* base station scanning interval */
+	int	bridge;			/* bridge mode */
+	int	headersonly;		/* headers only - no data */
+	uint8_t	maddr[8];		/* bitmask of multicast addresses requested */
+	int	nmaddr;			/* number of multicast addresses */
+
+	struct queue	*in;			/* input buffer */
+};
+
+/*
+ *  a network address
+ */
+struct netaddr
+{
+	struct netaddr	*next;		/* allocation chain */
+	struct netaddr	*hnext;
+	uint8_t	addr[Nmaxaddr];
+	int	ref;
+};
+
+/*
+ *  a network interface
+ */
+struct netif
+{
+	qlock_t qlock;
+
+	/* multiplexing */
+	char	name[KNAMELEN];		/* for top level directory */
+	int	nfile;			/* max number of Netfiles */
+	struct netfile	**f;
+
+	/* about net */
+	int	limit;			/* flow control */
+	int	alen;			/* address length */
+	int	mbps;			/* megabits per sec */
+	int	link;			/* link status */
+	uint8_t	addr[Nmaxaddr];
+	uint8_t	bcast[Nmaxaddr];
+	struct netaddr	*maddr;			/* known multicast addresses */
+	int	nmaddr;			/* number of known multicast addresses */
+	struct netaddr *mhash[Nmhash];		/* hash table of multicast addresses */
+	int	prom;			/* number of promiscuous opens */
+	int	scan;			/* number of base station scanners */
+	int	all;			/* number of -1 multiplexors */
+
+	/* statistics */
+	int	misses;
+	int	inpackets;
+	int	outpackets;
+	int	crcs;		/* input crc errors */
+	int	oerrs;		/* output errors */
+	int	frames;		/* framing errors */
+	int	overflows;	/* packet overflows */
+	int	buffs;		/* buffering errors */
+	int	soverflows;	/* software overflow */
+
+	/* routines for touching the hardware */
+	void	*arg;
+	void	(*promiscuous)(void*, int);
+	void	(*multicast)(void*, uint8_t *unused_uint8_p_t, int);
+	void	(*scanbs)(void*, unsigned nt);	/* scan for base stations */
+};
+
+void	netifinit(struct netif*, char *, int , uint32_t);
+struct walkqid*	netifwalk(struct netif*, struct chan*, struct chan*, char **, int);
+struct chan*	netifopen(struct netif*, struct chan*, int);
+void	netifclose(struct netif*, struct chan*);
+long	netifread(struct netif*, struct chan*, void*, long, uint32_t);
+struct block*	netifbread(struct netif*, struct chan*, long, uint32_t);
+long	netifwrite(struct netif*, struct chan*, void*, long);
+int	netifwstat(struct netif*, struct chan*, uint8_t *, int);
+int	netifstat(struct netif*, struct chan*, uint8_t *, int);
+int	activemulti(struct netif*, uint8_t *, int);
+
+/*
+ *  Ethernet specific
+ */
+enum
+{
+	Eaddrlen=	6,
+	ETHERMINTU =	60,		/* minimum transmit size */
+	ETHERMAXTU =	1514,		/* maximum transmit size */
+	ETHERHDRSIZE =	14,		/* size of an ethernet header */
+};
+
+struct etherpkt
+{
+	uint8_t	d[Eaddrlen];
+	uint8_t	s[Eaddrlen];
+	uint8_t	type[2];
+	uint8_t	data[1500];
+};
+// INFERNO
+enum {
+	MaxEther	= 4,
+	MaxFID=	16,
+	Ntypes		= 8,
+};
+
+struct ether {
+	rwlock_t rwlock;
+	int	ctlrno;
+	int	tbdf;			/* type+busno+devno+funcno */
+	int	minmtu;
+	int	maxmtu;
+	uint8_t	ea[Eaddrlen];
+	int	encry;
+
+	void	(*attach)(struct ether*);	/* filled in by reset routine */
+	void	(*closed)(struct ether*);
+	void	(*detach)(struct ether*);
+	void	(*transmit)(struct ether*);
+	void	(*interrupt)(struct hw_trapframe*, void*);
+	long	(*ifstat)(struct ether*, void*, long, uint32_t);
+	long	(*ctl)(struct ether*, void*, long); /* custom ctl messages */
+	void	(*power)(struct ether*, int);	/* power on/off */
+	void	(*shutdown)(struct ether*);	/* shutdown hardware before reboot */
+	void	*ctlr;
+	int	pcmslot;		/* PCMCIA */
+	int	fullduplex;	/* non-zero if full duplex */
+	int	vlanid;	/* non-zero if vlan */
+
+	struct queue*	oq;
+
+	qlock_t vlq;	/* array change */
+	int	nvlan;
+	struct ether*	vlans[MaxFID];
+
+	/* another case where we wish we had anon struct members. */
+	struct netif netif;
+};
+
+extern struct block* etheriq(struct ether*, struct block*, int);
+extern void addethercard( char *unused_char_p_t, int(*)(struct ether*));
+extern int archether( int unused_int, struct ether*);
+
 #endif /* ROS_KERN_IP_H */
