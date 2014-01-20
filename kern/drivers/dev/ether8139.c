@@ -755,7 +755,7 @@ rtl8139pnp(struct ether* edev)
 	return 0;
 }
 
-void
+void __etherlink
 ether8139link(void)
 {
 	addethercard("rtl8139", rtl8139pnp);

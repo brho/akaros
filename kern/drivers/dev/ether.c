@@ -779,7 +779,7 @@ ethercrc(uint8_t *p, int len)
 	return crc;
 }
 
-struct dev etherdevtab = {
+struct dev etherdevtab __devtab = {
 	'l',
 	"ether",
 

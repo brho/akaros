@@ -1021,7 +1021,8 @@ extern char *eve;
 
 /* special sections */
 #define __devtab  __attribute__((__section__(".devtab")))
-#define __ether  __attribute__((__section__(".ether")))
+#define __devlink  __attribute__((__section__(".devlink")))
+#define __etherlink  __attribute__((__section__(".etherlink")))
 #define __media  __attribute__((__section__(".media")))
 
 #endif /* ROS_KERN_NS_H */
