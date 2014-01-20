@@ -58,6 +58,13 @@ SECTIONS
 		*(COMMON)
 	}
 
+	. = ALIGN(4);
+	PROVIDE(devstabstart = .);
+	.devtab : {
+		*(.devtab)
+	}
+	PROVIDE(devtabend = .);
+
 	PROVIDE(end = .);
 
 	/DISCARD/ : {
