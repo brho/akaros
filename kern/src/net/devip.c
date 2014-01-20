@@ -257,7 +257,7 @@ ipgen(struct chan *c, char *unused_char_p_t, struct dirtab*d, int unused_int, in
 }
 
 static void
-ipreset(void)
+ipinit(void)
 {
 	qlock_init(&fslock);
 	nullmediumlink();
@@ -269,6 +269,11 @@ ipreset(void)
 	fmtinstall('V', eipfmt);
 	fmtinstall('M', eipfmt);
 */
+}
+
+static void
+ipreset(void)
+{
 }
 
 static struct Fs*
@@ -1208,7 +1213,7 @@ struct dev ipdevtab = {
 	"ip",
 
 	ipreset,
-	devinit,
+	ipinit,
 	devshutdown,
 	ipattach,
 	ipwalk,
