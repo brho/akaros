@@ -1018,6 +1018,7 @@ static inline int abs(int a)
 }
 
 extern char *eve;
+extern unsigned int	qiomaxatomic;
 
 /* special sections */
 #define __devtab  __attribute__((__section__(".devtab")))

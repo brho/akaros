@@ -903,7 +903,7 @@ struct netaddr
 	struct netaddr	*next;		/* allocation chain */
 	struct netaddr	*hnext;
 	uint8_t	addr[Nmaxaddr];
-	struct kref ref;
+	int	ref;	/* leaving this as an int, not a kref.  no reaping, yet. */
 };
 
 /*
@@ -989,6 +989,9 @@ enum {
 struct ether {
 	rwlock_t rwlock;
 	int	ctlrno;
+	char *type;
+	int	irq;
+	int port;
 	int	tbdf;			/* type+busno+devno+funcno */
 	int	minmtu;
 	int	maxmtu;

@@ -38,7 +38,7 @@ static void	vlanoq(struct ether*, struct block*);
 struct chan*
 etherattach(char* spec)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	uint32_t ctlrno;
 	char *p;
 	struct chan *chan;
@@ -50,7 +50,9 @@ etherattach(char* spec)
 	if(spec && *spec){
 		ctlrno = strtoul(spec, &p, 0);
 		/* somebody interpret this for me. */
-		if((ctlrno == 0) && (p == spec) || (ctlrno >= MaxEther) || (*p) && (*p != '.'))
+		if (((ctlrno == 0) && (p == spec)) ||
+		    (ctlrno >= MaxEther) ||
+		    ((*p) && (*p != '.')))
 			error(Ebadarg);
 		if(*p == '.'){	/* vlan */
 			vlanid = strtoul(p+1, &p, 0);
@@ -102,7 +104,7 @@ ethershutdown(void)
 static struct walkqid*
 etherwalk(struct chan* chan, struct chan *nchan, char **name, int nname)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct walkqid *wq;
 	struct ether *ether;
 
@@ -123,7 +125,7 @@ etherwalk(struct chan* chan, struct chan *nchan, char **name, int nname)
 static int
 etherstat(struct chan* chan, uint8_t* dp, int n)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int s;
 	struct ether *ether;
 
@@ -142,7 +144,7 @@ etherstat(struct chan* chan, uint8_t* dp, int n)
 static struct chan*
 etheropen(struct chan* chan, int omode)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct chan *c;
 	struct ether *ether;
 
@@ -161,7 +163,7 @@ etheropen(struct chan* chan, int omode)
 static void
 etherclose(struct chan* chan)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct ether *ether;
 
 	ether = chan->aux;
@@ -178,7 +180,7 @@ etherclose(struct chan* chan)
 static long
 etherread(struct chan* chan, void* buf, long n, int64_t off)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct ether *ether;
 	uint32_t offset = off;
 	long r;
@@ -211,7 +213,7 @@ out:
 static struct block*
 etherbread(struct chan* chan, long n, uint32_t offset)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct block *b;
 	struct ether *ether;
 
@@ -230,7 +232,7 @@ etherbread(struct chan* chan, long n, uint32_t offset)
 static int
 etherwstat(struct chan* chan, uint8_t* dp, int n)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct ether *ether;
 	int r;
 
@@ -367,8 +369,9 @@ etheriq(struct ether* ether, struct block* bp, int fromwire)
 static int
 etheroq(struct ether* ether, struct block* bp)
 {
-	int len, loopback, s;
+	int len, loopback;
 	struct etherpkt *pkt;
+	int8_t irq_state = 0;
 
 	ether->netif.outpackets++;
 
@@ -385,10 +388,9 @@ etheroq(struct ether* ether, struct block* bp)
 	len = BLEN(bp);
 	loopback = memcmp(pkt->d, ether->ea, sizeof(pkt->d)) == 0;
 	if(loopback || memcmp(pkt->d, ether->netif.bcast, sizeof(pkt->d)) == 0 || ether->netif.prom){
-#warning "splhi"
-		//s = splhi();
+		disable_irqsave(&irq_state);
 		etheriq(ether, bp, 0);
-		//splx(s);
+		enable_irqsave(&irq_state);
 	}
 
 	if(!loopback){
@@ -472,7 +474,7 @@ out:
 static long
 etherbwrite(struct chan* chan, struct block* bp, uint32_t unused)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct ether *ether;
 	long n;
 
@@ -550,7 +552,7 @@ vlanctl(struct ether *ether, void *buf, long n)
 static struct ether*
 vlanalloc(struct ether *ether, int id)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	struct ether *vlan;
 	int i, fid;
 	char name[KNAMELEN];
@@ -579,34 +581,33 @@ vlanalloc(struct ether *ether, int id)
 		vlan = kzmalloc(sizeof(struct ether), 1);
 		if(vlan == NULL)
 			error(Enovmem);
+		rwinit(&vlan->rwlock);
+		qlock_init(&vlan->vlq);
 		netifinit(&vlan->netif, name, Ntypes, ether->netif.limit);
 		ether->vlans[fid] = vlan;	/* id is still zero, can't be matched */
 		ether->nvlan++;
 	}else
 		memmove(vlan->netif.name, name, KNAMELEN-1);
-#warning "fix me setting up vlans"
-#if 0
 	vlan->attach = nop;
 	vlan->transmit = NULL;
 	vlan->ctl = vlanctl;
 	vlan->irq = -1;
-//	vlan->promiscuous = ether->promiscuous;
-//	vlan->multicast = ether->multicast;
-	vlan->arg = vlan;
-	vlan->mbps = ether->mbps;
+	vlan->netif.promiscuous = ether->netif.promiscuous;
+	vlan->netif.multicast = ether->netif.multicast;
+	vlan->netif.arg = vlan;
+	vlan->netif.mbps = ether->netif.mbps;
 	vlan->fullduplex = ether->fullduplex;
 	vlan->encry = ether->encry;
 	vlan->minmtu = ether->minmtu;
 	vlan->maxmtu = ether->maxmtu;
 	vlan->ctlrno = ether->ctlrno;
 	vlan->vlanid = id;
-	vlan->alen = Eaddrlen;
-	memmove(vlan->addr, ether->addr, sizeof(vlan->addr));
-	memmove(vlan->bcast, ether->bcast, sizeof(ether->bcast));
+	vlan->netif.alen = Eaddrlen;
+	memmove(vlan->netif.addr, ether->netif.addr, sizeof(vlan->netif.addr));
+	memmove(vlan->netif.bcast, ether->netif.bcast, sizeof(ether->netif.bcast));
 	vlan->oq = NULL;
 	vlan->ctlr = ether;
 	vlan->vlanid = id;
-#endif
 	poperror();
 	qunlock(&ether->vlq);
 	return vlan;
@@ -655,8 +656,6 @@ parseether(uint8_t *to, char *from)
 static void
 etherreset(void)
 {
-#warning "fix me etherreset"
-#if 0
 	struct ether *ether;
 	int i, n, ctlrno;
 	char name[KNAMELEN], buf[128];
@@ -665,16 +664,24 @@ etherreset(void)
 		if(ether == 0)
 			ether = kzmalloc(sizeof(struct ether), 0);
 		memset(ether, 0, sizeof(struct ether));
+		rwinit(&ether->rwlock);
+		qlock_init(&ether->vlq);
 		ether->ctlrno = ctlrno;
 		ether->netif.mbps = 10;
 		ether->minmtu = ETHERMINTU;
 		ether->maxmtu = ETHERMAXTU;
-		ether->netif.itype = -1;
+		/* looked like irq type, we don't have these yet */
+		//ether->netif.itype = -1;
 
-		if(archether(ctlrno, ether) <= 0)
-			continue;
+		/* TODO: looks like they expected some init to be done here.  at the
+		 * very least, ether->type is 0 right now, and needs to be set.  looking
+		 * around online, it seems to find out ether config settings, so that we
+		 * can set some flags in the opt parseing below. */
+		//if(archether(ctlrno, ether) <= 0)
+		//	continue;
 
 		for(n = 0; cards[n].type; n++){
+			#if 0
 			if(cistrcmp(cards[n].type, ether->type))
 				continue;
 			for(i = 0; i < ether->nopt; i++){
@@ -687,40 +694,52 @@ etherreset(void)
 				else if(cistrcmp(ether->opt[i], "100BASE-TXFD") == 0)
 					ether->mbps = 100;
 			}
+			#endif
 			if(cards[n].reset(ether))
 				break;
+			/* might be fucked a bit - reset() doesn't know the type.  might not
+			 * even matter, except for debugging. */
+			ether->type = cards[n].type;
 			snprintf(name, sizeof(name), "ether%d", ctlrno);
 
 			if(ether->interrupt != NULL)
-				intrenable(ether->itype, ether->irq, ether->interrupt, ether, name);
+				register_dev_irq(ether->irq, ether->interrupt, ether);
 
-			i = sprint(buf, "#l%d: %s: %dMbps port 0x%luX irq %lud",
-				ctlrno, ether->type, ether->mbps, ether->port, ether->irq);
+			i = snprintf(buf, sizeof(buf),
+			             "#l%d: %s: %dMbps port 0x%lx irq %lu", ctlrno,
+			             ether->type, ether->netif.mbps, ether->port,
+			             ether->irq);
+			/* Looks like this is for printing MMIO addrs */
+			#if 0
 			if(ether->mem)
-				i += sprint(buf+i, " addr 0x%luX", PADDR(ether->mem));
+				i += snprintf(buf + i, sizeof(buf) - i, " addr 0x%lx",
+				              PADDR(ether->mem));
 			if(ether->size)
-				i += sprint(buf+i, " size 0x%luX", ether->size);
-			i += sprint(buf+i, ": %2.2uX%2.2uX%2.2uX%2.2uX%2.2uX%2.2uX",
-				ether->ea[0], ether->ea[1], ether->ea[2],
-				ether->ea[3], ether->ea[4], ether->ea[5]);
-			sprint(buf+i, "\n");
-			iprint(buf);
+				i += snprintf(buf + i, sizeof(buf) - i, " size 0x%lx",
+				              ether->size);
+			#endif
+			i += snprintf(buf + i, sizeof(buf) - i,
+			              ": %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x",
+			              ether->ea[0], ether->ea[1], ether->ea[2],
+			              ether->ea[3], ether->ea[4], ether->ea[5]);
+			snprintf(buf + i, sizeof(buf) - i, "\n");
+			printk(buf);
 
-			if(ether->mbps == 100){
-				netifinit(ether, name, Ntypes, 256*1024);
+			if(ether->netif.mbps == 100){
+				netifinit(&ether->netif, name, Ntypes, 256*1024);
 				if(ether->oq == 0)
 					ether->oq = qopen(256*1024, Qmsg, 0, 0);
 			}
 			else{
-				netifinit(ether, name, Ntypes, 64*1024);
+				netifinit(&ether->netif, name, Ntypes, 64*1024);
 				if(ether->oq == 0)
 					ether->oq = qopen(64*1024, Qmsg, 0, 0);
 			}
 			if(ether->oq == 0)
 				panic("etherreset %s", name);
-			ether->alen = Eaddrlen;
-			memmove(ether->addr, ether->ea, Eaddrlen);
-			memset(ether->bcast, 0xFF, Eaddrlen);
+			ether->netif.alen = Eaddrlen;
+			memmove(ether->netif.addr, ether->ea, Eaddrlen);
+			memset(ether->netif.bcast, 0xFF, Eaddrlen);
 
 			etherxx[ctlrno] = ether;
 			ether = 0;
@@ -729,7 +748,6 @@ etherreset(void)
 	}
 	if(ether)
 		kfree(ether);
-#endif
 }
 
 static void
@@ -738,19 +756,29 @@ etherpower(int on)
 	int i;
 	struct ether *ether;
 
+	/* TODO: fix etherpower.  locking and ether->readers are broken. */
+	warn("%s needs attention.  had a rough porting from inferno", __FUNCTION__);
 	for(i = 0; i < MaxEther; i++){
 		if((ether = etherxx[i]) == NULL || ether->power == NULL)
 			continue;
 		if(on){
-			if(canrlock(&ether->rwlock))
+			/* brho: not sure what they are doing.  there seem to be certain
+			 * assumptions about calling etherpower.  i think they are using
+			 * canrlock to see if the lock is currently writelocked.  and if it
+			 * was not lockable, they would assume they had the write lock and
+			 * could unlock.  this is super fucked up. */
+			if(canrlock(&ether->rwlock)) {
+				runlock(&ether->rwlock);	// brho added this
 				continue;
+			}
 			if(ether->power != NULL)
 				ether->power(ether, on);
 			wunlock(&ether->rwlock);
 		}else{
-			if(ether->rwlock.nr_readers)
+			/* readers isn't in the ether struct...
+			if(ether->readers)
 				continue;
-
+			*/
 			wlock(&ether->rwlock);
 			if(ether->power != NULL)
 				ether->power(ether, on);
