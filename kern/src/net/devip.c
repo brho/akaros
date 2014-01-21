@@ -414,11 +414,11 @@ ipopen(struct chan* c, int omode)
 	case Qstats:
 	case Qbootp:
 	case Qipselftab:
-		if((omode & OREAD) != OREAD)
+		if (!IS_RDONLY(omode))
 			error(Eperm);
 		break;
 	case Qsnoop:
-		if((omode & OREAD) != OREAD)
+		if (!IS_RDONLY(omode))
 			error(Eperm);
 		p = f->p[PROTO(c->qid)];
 		cv = p->conv[CONV(c->qid)];

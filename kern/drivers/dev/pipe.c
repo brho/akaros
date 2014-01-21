@@ -222,7 +222,7 @@ pipeopen(struct chan *c, int omode)
 	Pipe *p;
 
 	if(c->qid.type & QTDIR){
-		if ((omode & OREAD) != OREAD)
+		if (!IS_RDONLY(omode))
 			error("Can only open directories OREAD, mode is %o oct", omode);
 		c->mode = openmode(omode);
 		c->flag |= COPEN;

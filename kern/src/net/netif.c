@@ -171,7 +171,7 @@ netifopen(struct netif *nif, struct chan *c, int omode)
 
 	id = 0;
 	if(c->qid.type & QTDIR){
-		if(omode != OREAD)
+		if (!IS_RDONLY(omode))
 			error(Eperm);
 	} else {
 		switch(NETTYPE(c->qid.path)){
@@ -185,7 +185,7 @@ netifopen(struct netif *nif, struct chan *c, int omode)
 			c->qid.path = NETQID(id, Nctlqid);
 			break;
 		default:
-			if(omode != OREAD)
+			if (!IS_RDONLY(omode))
 				error(Ebadarg);
 		}
 		switch(NETTYPE(c->qid.path)){

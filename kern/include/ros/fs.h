@@ -50,6 +50,8 @@ struct kstat {
 #define O_RDWR			0x02		/* Open read/write */
 #define O_EXEC			0x04		/* Open for exec (unsupported) */
 #define O_ACCMODE		0x07
+/* Thanks to read-only being 0, we can't just check the flag... */
+#define IS_RDONLY(x) (!((x) & (O_WRONLY | O_RDWR)))
 
 /* Bits OR'd into the second argument to open */
 #define O_CREAT			00000100	/* not fcntl */

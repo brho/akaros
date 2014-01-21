@@ -102,13 +102,15 @@ fdtochan(struct fgrp *f, int fd, int mode, int chkmnt, int iref)
 	if(mode<0 || c->mode==ORDWR)
 		return c;
 
-	if((mode&OTRUNC) && (c->mode & OREAD) == OREAD) {
+	if ((mode & OTRUNC) && IS_RDONLY(c->mode)) {
 		if(iref)
 			cclose(c);
 		error(Ebadusefd);
 	}
 
+	/* TODO: this is probably wrong */
 	if((mode&~OTRUNC) != c->mode) {
+		warn("Trunc mode issue, check this crap out");
 		if(iref)
 			cclose(c);
 		error(Ebadusefd);
@@ -130,7 +132,7 @@ kchanio(void *vc, void *buf, int n, int mode)
 		return -1;
 	}
 
-	if ((mode & OREAD) == OREAD)
+	if (IS_RDONLY(mode))
 		r = devtab[c->type].read(c, buf, n, c->offset);
 	else
 		r = devtab[c->type].write(c, buf, n, c->offset);
