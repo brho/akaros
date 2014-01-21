@@ -24,8 +24,8 @@ extern struct dev alarmdevtab;
 extern struct dev consdevtab;
 extern struct dev rootdevtab;
 extern struct dev ipdevtab;
-/*extern struct dev regressdevtab;
 extern struct dev pipedevtab;
+/*extern struct dev regressdevtab;
 extern struct dev procdevtab;
 extern struct dev etherdevtab;
 extern struct dev mntdevtab;
@@ -36,9 +36,9 @@ struct dev *devtab[] = {
 	&consdevtab,
 	&rootdevtab,
 	&ipdevtab,
+	&pipedevtab,
 /*
 	&regressdevtab,
-	&pipedevtab,
 	&procdevtab,
 	&etherdevtab,
 	&mntdevtab,
