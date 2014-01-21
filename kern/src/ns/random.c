@@ -12,6 +12,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <ip.h>
+#include <alarm.h>
 
 static struct
 {
@@ -28,7 +29,6 @@ static struct
 	uint8_t	wakeme;
 	uint8_t	filled;
 	int	target;
-	int	kprocstarted;
 	uint32_t	randn;
 } rb;
 
@@ -52,7 +52,7 @@ rbnotempty(void*unused)
 static void
 genrandom(void*unused)
 {
-#warning "priority?"
+	/* TODO: set this to low priority, if we ever have something like that */
 	//setpri(PriBackground);
 
 	for(;;) {
@@ -60,7 +60,7 @@ genrandom(void*unused)
 			if(++rb.randomcount > 100000)
 				break;
 		//if(anyhigher())
-		//	sched();
+			kthread_yield();
 		if(rb.filled || !rbnotfull(0))
 			rendez_sleep(&rb.producer, rbnotfull, 0);
 	}
@@ -100,17 +100,33 @@ randomclock(void)
 		rendez_wakeup(&rb.consumer);
 }
 
+struct alarm_waiter random_waiter;
+static void __random_alarm(struct alarm_waiter *waiter)
+{
+	randomclock();
+	/* Set our alarm to go off, incrementing from our last tick (instead of
+	 * setting it relative to now, since some time has passed since the alarm
+	 * first went off.  Note, this may be now or in the past! */
+	set_awaiter_inc(&random_waiter, 13000);
+	__set_alarm(&per_cpu_info[core_id()].tchain, &random_waiter);
+}
+
 void
 randominit(void)
 {
 	qlock_init(&rb.qlock);
 	rendez_init(&rb.producer);
 	rendez_init(&rb.consumer);
-	/* Frequency close but not equal to HZ */
-	//addclock0link(randomclock, 13);
 	rb.target = 16;
 	rb.ep = rb.buf + sizeof(rb.buf);
 	rb.rp = rb.wp = rb.buf;
+	/* Run randomclock every 13 ms */
+	/* Frequency close but not equal to HZ */
+	init_awaiter(&random_waiter, __random_alarm);
+	set_awaiter_rel(&random_waiter, 13000);
+	set_alarm(&per_cpu_info[core_id()].tchain, &random_waiter);
+	/* instead of waiting for randomread to kick it off */
+	ktask("genrand", genrandom, NULL);
 }
 
 /*
@@ -129,10 +145,6 @@ randomread(void *xp, uint32_t n)
 	if(waserror()){
 		qunlock(&(&rb)->qlock);
 		nexterror();
-	}
-	if(!rb.kprocstarted){
-		rb.kprocstarted = 1;
-		ktask("genrand", genrandom, NULL);
 	}
 
 	for(sofar = 0; sofar < n; sofar += i){
