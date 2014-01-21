@@ -1443,11 +1443,11 @@ intreg_t sys_rmdir(struct proc *p, const char *path, size_t path_l)
 intreg_t sys_pipe(struct proc *p, int *u_pipefd, int flags)
 {
 	int pipefd[2] = {0};
+	int retval = syspipe(pipefd);
 	int fd;
-	int retval = 0;
 	struct file *pipe_files[2] = {0};
 
-	if (do_pipe(pipe_files, flags))
+	if (retval)
 		return -1;
 	fd = insert_file(&p->open_files, pipe_files[0], 0);
 	if (!fd) {
