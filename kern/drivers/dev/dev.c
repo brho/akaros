@@ -164,7 +164,9 @@ devwalk(struct chan *c,
 	}
 	if(nc == NULL){
 		nc = devclone(c);
-		nc->type = 0;	/* device doesn't know about this channel yet */
+		/* inferno was setting this to 0, assuming it was devroot.  lining up
+		 * with chanrelease and newchan */
+		nc->type = -1;	/* device doesn't know about this channel yet */
 		alloc = 1;
 	}
 	wq->clone = nc;

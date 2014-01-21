@@ -129,7 +129,10 @@ static void chan_release(struct kref *kref)
 	/* this style discards the error from close().  picture it as
 	 * if (waserror()) { } else { close(); } chanfree_no_matter_what();  */
 	if (!waserror()) {
-		devtab[c->type]->close(c);
+		printd("releasing chan %p, type %d\n", c, c->type);
+		/* -1 means there is no dev yet.  wants a noop for close() */
+		if (c->type != -1)
+			devtab[c->type].close(c);
 	}
 	/* need to poperror regardless of whether we error'd or not */
 	poperror();
@@ -159,9 +162,9 @@ newchan(void)
 		qlock_init(&c->umqlock);
 	}
 
-	/* if you get an error before associating with a dev,
-	   close calls rootclose, a nop */
-	c->type = 0;
+	/* if you get an error before associating with a dev, cclose skips calling
+	 * the dev's close */
+	c->type = -1;
 	c->flag = 0;
 	kref_init(&c->ref, chan_release, 1);
 	c->dev = 0;

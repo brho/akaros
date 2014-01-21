@@ -354,7 +354,7 @@ struct chan
 	struct chan*	next;			/* allocation */
 	struct chan*	link;
 	int64_t	offset;			/* in file */
-	uint16_t	type;
+	int	type;
 	uint32_t	dev;
 	uint16_t	mode;			/* read/write */
 	uint16_t	flag;
