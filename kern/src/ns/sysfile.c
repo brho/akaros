@@ -128,9 +128,9 @@ kchanio(void *vc, void *buf, int n, int mode)
 	}
 
 	if ((mode & OREAD) == OREAD)
-		r = devtab[c->type]->read(c, buf, n, c->offset);
+		r = devtab[c->type].read(c, buf, n, c->offset);
 	else
-		r = devtab[c->type]->write(c, buf, n, c->offset);
+		r = devtab[c->type].write(c, buf, n, c->offset);
 
 	spin_lock(&c->lock);
 	c->offset += r;
@@ -333,7 +333,7 @@ sysfstat(int fd, uint8_t *buf, int n)
 		cclose(c);
 		nexterror();
 	}
-	devtab[c->type]->stat(c, (void*)&dir9ns, sizeof(struct dir));
+	devtab[c->type].stat(c, (void*)&dir9ns, sizeof(struct dir));
 
 	poperror();
 	cclose(c);
@@ -450,7 +450,7 @@ syspipe(int fd[2])
 
 	f = current->fgrp;
 
-	d = devtab[devno('|', 0)];
+	d = &devtab[devno('|', 0)];
 	c[0] = namec("#|", Atodir, 0, 0);
 	c[1] = 0;
 	fd[0] = -1;
@@ -507,7 +507,7 @@ sysfwstat(int fd, uint8_t *buf, int n)
 		cclose(c);
 		nexterror();
 	}
-	n = devtab[c->type]->wstat(c, buf, n);
+	n = devtab[c->type].wstat(c, buf, n);
 	poperror();
 	cclose(c);
 
@@ -589,7 +589,7 @@ sysmount(int fd, int afd, char *old, int flags, char *spec)
 	mntparam.authchan = ac.c;
 	mntparam.spec = spec;
 	mntparam.flags = flags;
-	c0.c = devtab[devno('M', 0)]->attach(( char *)&mntparam);
+	c0.c = devtab[devno('M', 0)].attach(( char *)&mntparam);
 
 	r = bindmount(c0.c, old, flags, spec);
 	poperror();
@@ -685,10 +685,10 @@ unionread(struct chan *c, void *va, long n)
 			if (!waserror()) { /* discard style */
 				if(c->umc == NULL){
 					c->umc = cclone(mount->to);
-					c->umc = devtab[c->umc->type]->open(c->umc, OREAD);
+					c->umc = devtab[c->umc->type].open(c->umc, OREAD);
 				}
 	
-				nr = devtab[c->umc->type]->read(c->umc, va, n, c->umc->offset);
+				nr = devtab[c->umc->type].read(c->umc, va, n, c->umc->offset);
 				if(nr < 0)
 					nr = 0;	/* dev.c can return -1 */
 				c->umc->offset += nr;
@@ -791,7 +791,7 @@ rread(int fd, void *va, long n, int64_t *offp)
 			}
 			unionrewind(c);
 		}
-		n = devtab[c->type]->read(c, va, n, off);
+		n = devtab[c->type].read(c, va, n, off);
 		spin_lock(&c->lock);
 		c->offset += n;
 		spin_unlock(&c->lock);
@@ -839,7 +839,7 @@ sysremove(char *path)
 		cclose(c);
 		nexterror();
 	}
-	devtab[c->type]->remove(c);
+	devtab[c->type].remove(c);
 	/*
 	 * Remove clunks the fid, but we need to recover the Chan
 	 * so fake it up.  rootclose() is known to be a nop.
@@ -870,7 +870,7 @@ sysseek(int fd, int64_t off, int whence)
 		nexterror();
 	}
 
-	if(devtab[c->type]->dc == '|')
+	if(devtab[c->type].dc == '|')
 		error(Eisstream);
 
 	switch(whence) {
@@ -969,7 +969,7 @@ sysstat(char *path, uint8_t *buf, int n)
 		cclose(c);
 		nexterror();
 	}
-	devtab[c->type]->stat(c, (void*)&dir9ns, sizeof(struct dir));
+	devtab[c->type].stat(c, (void*)&dir9ns, sizeof(struct dir));
 	poperror();
 	cclose(c);
 
@@ -1019,7 +1019,7 @@ rwrite(int fd, void *va, long n, int64_t *offp)
 	}
 	if(off < 0)
 		error(Enegoff);
-	m = devtab[c->type]->write(c, va, n, off);
+	m = devtab[c->type].write(c, va, n, off);
 	poperror();
 
 	if(offp == NULL && m < n){
@@ -1064,7 +1064,7 @@ syswstat(char *path, uint8_t *buf, int n)
 		cclose(c);
 		nexterror();
 	}
-	n = devtab[c->type]->wstat(c, buf, n);
+	n = devtab[c->type].wstat(c, buf, n);
 	poperror();
 	cclose(c);
 
@@ -1095,7 +1095,7 @@ chandirstat(struct chan *c)
 			poperror();
 			return NULL;
 		}
-		n = devtab[c->type]->stat(c, buf, nd);
+		n = devtab[c->type].stat(c, buf, nd);
 		poperror();
 		if(n < BIT16SZ){
 			kfree(d);

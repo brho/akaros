@@ -458,7 +458,7 @@ pipewstat(struct chan *c, uint8_t *dp, int n)
 	return n;
 }
 
-struct dev pipedevtab = {
+struct dev pipedevtab __devtab = {
 	'|',
 	"pipe",
 

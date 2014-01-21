@@ -97,8 +97,8 @@ chandevreset(void)
 {
 	int i;
 
-	for(i=0; devtab[i] != NULL; i++)
-		devtab[i]->reset();
+	for(i=0; &devtab[i] < __devtabend; i++)
+		devtab[i].reset();
 }
 
 void
@@ -106,8 +106,8 @@ chandevinit(void)
 {
 	int i;
 
-	for(i=0; devtab[i] != NULL; i++)
-		devtab[i]->init();
+	for(i=0; &devtab[i] < __devtabend; i++)
+		devtab[i].init();
 }
 
 void
@@ -116,10 +116,10 @@ chandevshutdown(void)
 	int i;
 	
 	/* shutdown in reverse order */
-	for(i=0; devtab[i] != NULL; i++)
+	for(i=0; &devtab[i] < __devtabend; i++)
 		;
 	for(i--; i >= 0; i--)
-		devtab[i]->shutdown();
+		devtab[i].shutdown();
 }
 
 static void chan_release(struct kref *kref)
@@ -565,7 +565,7 @@ cclone(struct chan *c)
 	struct chan *nc;
 	struct walkqid *wq;
 
-	wq = devtab[c->type]->walk(c, NULL, NULL, 0);
+	wq = devtab[c->type].walk(c, NULL, NULL, 0);
 	if(wq == NULL)
 		error("clone failed");
 	nc = wq->clone;
@@ -728,7 +728,7 @@ walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror)
 		type = c->type;
 		dev = c->dev;
 
-		if((wq = devtab[type]->walk(c, NULL, names+nhave, ntry)) == NULL){
+		if((wq = devtab[type].walk(c, NULL, names+nhave, ntry)) == NULL){
 			/* try a union mount, if any */
 			if(mh && !nomount){
 				/*
@@ -736,7 +736,7 @@ walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror)
 				 */
 				rlock(&mh->lock);
 				for(f = mh->mount->next; f; f = f->next)
-					if((wq = devtab[f->to->type]->walk(f->to, NULL, names+nhave, ntry)) != NULL)
+					if((wq = devtab[f->to->type].walk(f->to, NULL, names+nhave, ntry)) != NULL)
 						break;
 				runlock(&mh->lock);
 				if(f != NULL){
@@ -962,7 +962,7 @@ memrchr(void *va, int c, long n)
  * Opening with amode Aopen, Acreate, or Aremove guarantees
  * that the result will be the only reference to that particular fid.
  * This is necessary since we might pass the result to
- * devtab[]->remove().
+ * devtab[].remove().
  *
  * Opening Atodir, Amount, or Aaccess does not guarantee this.
  *
@@ -1037,7 +1037,7 @@ namec(char *aname, int amode, int omode, uint32_t perm)
 		t = devno(/*r*/get_cur_genbuf()[1], 1);
 		if(t == -1)
 			error(Ebadsharp);
-		c = devtab[t]->attach(get_cur_genbuf()+n);
+		c = devtab[t].attach(get_cur_genbuf()+n);
 		break;
 
 	default:
@@ -1169,7 +1169,7 @@ if(c->umh != NULL){
 			if(omode == OEXEC)
 				c->flag &= ~CCACHE;
 
-			c = devtab[c->type]->open(c, omode&~OCEXEC);
+			c = devtab[c->type].open(c, omode&~OCEXEC);
 
 			if(omode & OCEXEC)
 				c->flag |= CCEXEC;
@@ -1272,7 +1272,7 @@ if(c->umh != NULL){
 			cnew->name = c->name;
 			kref_get(&cnew->name->ref, 1);
 
-			devtab[cnew->type]->create(cnew, e.elems[e.ARRAY_SIZEs-1], omode&~(OEXCL|OCEXEC), perm);
+			devtab[cnew->type].create(cnew, e.elems[e.ARRAY_SIZEs-1], omode&~(OEXCL|OCEXEC), perm);
 			poperror();
 			if(omode & OCEXEC)
 				cnew->flag |= CCEXEC;

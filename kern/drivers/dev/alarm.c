@@ -402,7 +402,7 @@ static long alarmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 	return n;
 }
 
-struct dev alarmdevtab = {
+struct dev alarmdevtab __devtab = {
 	'A',
 	"alarm",
 

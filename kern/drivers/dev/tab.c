@@ -16,53 +16,23 @@
 #include <event.h>
 #include <umem.h>
 
-/* at some point this will be done via ldscript Hackes. */
-//extern struct dev* devtab[];
-// the sooner the better!
-
-extern struct dev alarmdevtab;
-extern struct dev consdevtab;
-extern struct dev rootdevtab;
-extern struct dev ipdevtab;
-extern struct dev pipedevtab;
-/*extern struct dev regressdevtab;
-extern struct dev procdevtab;
-extern struct dev etherdevtab;
-extern struct dev mntdevtab;
-extern struct dev srvdevtab;
-extern struct dev vmdevtab;*/
-struct dev *devtab[] = {
-	&alarmdevtab,
-	&consdevtab,
-	&rootdevtab,
-	&ipdevtab,
-	&pipedevtab,
-/*
-	&regressdevtab,
-	&procdevtab,
-	&etherdevtab,
-	&mntdevtab,
-	&srvdevtab,
-	&vmdevtab,*/
-	NULL,
-};
-
 void devtabreset()
 {
 	int i;
-	printk("devtabresets\n");
 
-	for (i = 0; devtab[i] != NULL; i++)
-		devtab[i]->reset();
+	for (i = 0; &devtab[i] < __devtabend; i++)
+		devtab[i].reset();
 }
 
 void devtabinit()
 {
 	int i;
 
-	printk("devtabinit\n");
-	for (i = 0; devtab[i] != NULL; i++)
-		devtab[i]->init();
+	for (i = 0; &devtab[i] < __devtabend; i++) {
+		/* if we have errors, check the align of struct dev and objdump */
+		printd("i %d, dev %p, init %p\n", i, &devtab[i], devtab[i].init);
+		devtab[i].init();
+	}
 }
 
 void devtabshutdown()
@@ -72,18 +42,18 @@ void devtabshutdown()
 	/*
 	 * Shutdown in reverse order.
 	 */
-	for (i = 0; devtab[i] != NULL; i++) ;
+	for (i = 0; &devtab[i] < __devtabend; i++) ;
 	for (i--; i >= 0; i--)
-		devtab[i]->shutdown();
+		devtab[i].shutdown();
 }
 
 struct dev *devtabget(int dc, int user)
 {
 	int i;
 
-	for (i = 0; devtab[i] != NULL; i++) {
-		if (devtab[i]->dc == dc)
-			return devtab[i];
+	for (i = 0; &devtab[i] < __devtabend; i++) {
+		if (devtab[i].dc == dc)
+			return &devtab[i];
 	}
 
 	printk("devtabget FAILED %c\n", dc);
@@ -105,8 +75,8 @@ devtabread(struct chan *c, void *buf, long n, int64_t off)
 
 	p = alloc;
 	e = p + READSTR;
-	for (i = 0; devtab[i] != NULL; i++) {
-		dev = devtab[i];
+	for (i = 0; &devtab[i] < __devtabend; i++) {
+		dev = &devtab[i];
 		printd("p %p e %p e-p %d\n", p, e, e - p);
 		printd("do %d %c %s\n", i, dev->dc, dev->name);
 		p += snprintf(p, e - p, "#%c %s\n", dev->dc, dev->name);

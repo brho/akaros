@@ -176,7 +176,7 @@ mntversion(struct chan *c, char *version, int msize, int returnlen)
 	c->offset += k;
 	spin_unlock(&c->lock);
 
-	l = devtab[c->type]->write(c, msg, k, oo);
+	l = devtab[c->type].write(c, msg, k, oo);
 
 	if(l < k){
 		spin_lock(&c->lock);
@@ -186,7 +186,7 @@ mntversion(struct chan *c, char *version, int msize, int returnlen)
 	}
 
 	/* message sent; receive and decode reply */
-	k = devtab[c->type]->read(c, msg, 8192+IOHDRSZ, c->offset);
+	k = devtab[c->type].read(c, msg, 8192+IOHDRSZ, c->offset);
 	if(k <= 0)
 		error("EOF receiving fversion reply");
 
@@ -818,7 +818,7 @@ mountio(struct mnt *m, struct mntrpc *r)
 	n = convS2M(&r->request, r->rpc, m->msize);
 	if(n < 0)
 		panic("bad message type in mountio");
-	if(devtab[m->c->type]->write(m->c, r->rpc, n, 0) != n)
+	if(devtab[m->c->type].write(m->c, r->rpc, n, 0) != n)
 		error(Emountrpc);
 /*	r->stime = fastticks(NULL); */
 	r->reqlen = n;
@@ -854,7 +854,7 @@ doread(struct mnt *m, int len)
 	struct block *b;
 
 	while(qlen(m->q) < len){
-		b = devtab[m->c->type]->bread(m->c, m->msize, 0);
+		b = devtab[m->c->type].bread(m->c, m->msize, 0);
 		if(b == NULL)
 			return -1;
 		if(blocklen(b) == 0){
@@ -1192,7 +1192,7 @@ mntdirfix(uint8_t *dirbuf, struct chan *c)
 {
 	unsigned int r;
 
-	r = devtab[c->type]->dc;
+	r = devtab[c->type].dc;
 	dirbuf += BIT16SZ;	/* skip count */
 	PBIT16(dirbuf, r);
 	dirbuf += BIT16SZ;
@@ -1208,7 +1208,7 @@ rpcattn(void *v)
 	return r->done || r->m->rip == 0;
 }
 
-struct dev mntdevtab = {
+struct dev mntdevtab __devtab = {
 	'M',
 	"mnt",
 

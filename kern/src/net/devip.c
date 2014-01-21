@@ -1208,7 +1208,7 @@ ipbwrite(struct chan* ch, struct block* bp, uint32_t offset)
 	}
 }
 
-struct dev ipdevtab = {
+struct dev ipdevtab __devtab = {
 	'I',
 	"ip",
 

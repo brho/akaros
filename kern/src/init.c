@@ -160,8 +160,8 @@ void _warn(const char *file, int line, const char *fmt,...)
  * Only really a problem for debugging. */
 void debug_linker_tables(void)
 {
-	extern char __devtabstart[];
-	extern char __devtabend[];
+	extern struct dev __devtabstart[];
+	extern struct dev __devtabend[];
 	extern char __devlinkstart[];
 	extern char __devlinkend[];
 	extern char __etherlinkstart[];

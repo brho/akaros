@@ -167,7 +167,7 @@ rootwrite(struct chan *c, void *a, long n, int64_t off)
 	return 0;
 }
 
-struct dev rootdevtab = {
+struct dev rootdevtab __devtab = {
 	'r',
 	"root",
 	devreset,

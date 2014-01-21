@@ -408,7 +408,8 @@ struct dev
 	int	(*wstat)(struct chan*, uint8_t *unused_uint8_p_t, int);
 	void	(*power)(int);	/* power mgt: power(1) → on, power (0) → off */
 //	int	(*config)( int unused_int, char *unused_char_p_t, DevConf*);
-};
+	/* we need to be aligned, i think to 32 bytes, for the linker tables. */
+} __attribute__ ((aligned(32)));;
 
 struct dirtab
 {
@@ -578,7 +579,9 @@ enum
 	READSTR =	1000,		/* temporary buffer size for device reads */
 };
 
-extern	struct dev*	devtab[];
+extern	struct dev	devtab[];
+extern	struct dev	__devtabend[];
+
 struct cmdbuf
 {
 	char	*buf;

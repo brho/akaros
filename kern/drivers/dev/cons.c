@@ -365,7 +365,7 @@ pprint(char *fmt, ...)
 		poperror();
 		return 0;
 	}
-	devtab[c->type]->write(c, buf, n, c->offset);
+	devtab[c->type].write(c, buf, n, c->offset);
 	poperror();
 
 	spin_lock(&c->lock);
@@ -982,8 +982,8 @@ consread(struct chan *c, void *buf, long n, int64_t offset)
 		if(p == NULL)
 			error(Enomem);
 		l = 0;
-		for(i = 0; devtab[i] != NULL; i++)
-			l += snprintf(p+l, READSTR-l, "#%c %s\n", devtab[i]->dc,  devtab[i]->name);
+		for(i = 0; &devtab[i] < __devtabend; i++)
+			l += snprintf(p+l, READSTR-l, "#%c %s\n", devtab[i].dc,  devtab[i].name);
 		if(waserror()){
 			kfree(p);
 			nexterror();
@@ -1192,7 +1192,7 @@ conswrite(struct chan *c, void *va, long n, int64_t offset)
 	return n;
 }
 
-struct dev consdevtab = {
+struct dev consdevtab __devtab = {
 	'c',
 	"cons",
 

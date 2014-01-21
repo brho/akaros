@@ -181,7 +181,7 @@ etherbind(struct Ipifc *ifc, int argc, char **argv)
 	/*
 	 *  make it non-blocking
 	 */
-	devtab[cchan4->type]->write(cchan4, nbmsg, strlen(nbmsg), 0);
+	devtab[cchan4->type].write(cchan4, nbmsg, strlen(nbmsg), 0);
 
 	/*
 	 *  get mac address and speed
@@ -239,7 +239,7 @@ etherbind(struct Ipifc *ifc, int argc, char **argv)
 	/*
 	 *  make it non-blocking
 	 */
-	devtab[cchan6->type]->write(cchan6, nbmsg, strlen(nbmsg), 0);
+	devtab[cchan6->type].write(cchan6, nbmsg, strlen(nbmsg), 0);
 
 	er = kzmalloc(sizeof(*er), 0);
 	er->mchan4 = mchan4;
@@ -341,12 +341,12 @@ etherbwrite(struct Ipifc *ifc, struct block *bp, int version, uint8_t *ip)
 	case V4:
 		eh->t[0] = 0x08;
 		eh->t[1] = 0x00;
-		devtab[er->mchan4->type]->bwrite(er->mchan4, bp, 0);
+		devtab[er->mchan4->type].bwrite(er->mchan4, bp, 0);
 		break;
 	case V6:
 		eh->t[0] = 0x86;
 		eh->t[1] = 0xDD;
-		devtab[er->mchan6->type]->bwrite(er->mchan6, bp, 0);
+		devtab[er->mchan6->type].bwrite(er->mchan6, bp, 0);
 		break;
 	default:
 		panic("etherbwrite2: version %d", version);
@@ -376,7 +376,7 @@ etherread4(void *a)
 		return;
 	}
 	for(;;){
-		bp = devtab[er->mchan4->type]->bread(er->mchan4, ifc->maxtu, 0);
+		bp = devtab[er->mchan4->type].bread(er->mchan4, ifc->maxtu, 0);
 		if(!canrlock(&ifc->rwlock)){
 			freeb(bp);
 			continue;
@@ -419,7 +419,7 @@ etherread6(void *a)
 		return;
 	}
 	for(;;){
-		bp = devtab[er->mchan6->type]->bread(er->mchan6, ifc->maxtu, 0);
+		bp = devtab[er->mchan6->type].bread(er->mchan6, ifc->maxtu, 0);
 		if(!canrlock(&ifc->rwlock)){
 			freeb(bp);
 			continue;
@@ -452,10 +452,10 @@ etheraddmulti(struct Ipifc *ifc, uint8_t *a, uint8_t *unused)
 	snprintf(buf, sizeof(buf), "addmulti %E", mac);
 	switch(version){
 	case V4:
-		devtab[er->cchan4->type]->write(er->cchan4, buf, strlen(buf), 0);
+		devtab[er->cchan4->type].write(er->cchan4, buf, strlen(buf), 0);
 		break;
 	case V6:
-		devtab[er->cchan6->type]->write(er->cchan6, buf, strlen(buf), 0);
+		devtab[er->cchan6->type].write(er->cchan6, buf, strlen(buf), 0);
 		break;
 	default:
 		panic("etheraddmulti: version %d", version);
@@ -474,10 +474,10 @@ etherremmulti(struct Ipifc *ifc, uint8_t *a, uint8_t *unused)
 	snprintf(buf, sizeof(buf), "remmulti %E", mac);
 	switch(version){
 	case V4:
-		devtab[er->cchan4->type]->write(er->cchan4, buf, strlen(buf), 0);
+		devtab[er->cchan4->type].write(er->cchan4, buf, strlen(buf), 0);
 		break;
 	case V6:
-		devtab[er->cchan6->type]->write(er->cchan6, buf, strlen(buf), 0);
+		devtab[er->cchan6->type].write(er->cchan6, buf, strlen(buf), 0);
 		break;
 	default:
 		panic("etherremmulti: version %d", version);
@@ -534,7 +534,7 @@ sendarp(struct Ipifc *ifc, struct arpent *a)
 	hnputs(e->op, ARPREQUEST);
 	bp->wp += n;
 
-	n = devtab[er->achan->type]->bwrite(er->achan, bp, 0);
+	n = devtab[er->achan->type].bwrite(er->achan, bp, 0);
 	if(n < 0)
 		printd("arp: send: %r\n");
 }
@@ -611,7 +611,7 @@ sendgarp(struct Ipifc *ifc, uint8_t *ip)
 	hnputs(e->op, ARPREQUEST);
 	bp->wp += n;
 
-	n = devtab[er->achan->type]->bwrite(er->achan, bp, 0);
+	n = devtab[er->achan->type].bwrite(er->achan, bp, 0);
 	if(n < 0)
 		printd("garp: send: %r\n");
 }
@@ -626,7 +626,7 @@ recvarp(struct Ipifc *ifc)
 	static uint8_t eprinted[4];
 	Etherrock *er = ifc->arg;
 
-	ebp = devtab[er->achan->type]->bread(er->achan, ifc->maxtu, 0);
+	ebp = devtab[er->achan->type].bread(er->achan, ifc->maxtu, 0);
 	if(ebp == NULL) {
 		printd("arp: rcv: %r\n");
 		return;
@@ -710,7 +710,7 @@ recvarp(struct Ipifc *ifc)
 		memmove(r->s, ifc->mac, sizeof(r->s));
 		rbp->wp += n;
 
-		n = devtab[er->achan->type]->bwrite(er->achan, rbp, 0);
+		n = devtab[er->achan->type].bwrite(er->achan, rbp, 0);
 		if(n < 0)
 			printd("arp: write: %r\n");
 	}

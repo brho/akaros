@@ -7,6 +7,7 @@
 	/* We shouldn't have to use PROVIDE, but if we don't, we get the wrong
 	 * value for '.'.  And items with empty tables get the KLA (basically 0) */
 	PROVIDE(__devtabstart = .);
+	PROVIDE(devtab = .);
 	.devtab : {
 		*(.devtab)
 	}

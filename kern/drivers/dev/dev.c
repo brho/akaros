@@ -29,8 +29,8 @@ devno(int c, int user)
 {
 	int i;
 
-	for(i = 0; devtab[i] != NULL; i++) {
-		if(devtab[i]->dc == c)
+	for(i = 0; &devtab[i] < __devtabend; i++) {
+		if(devtab[i].dc == c)
 			return i;
 	}
 	if (user == 0)
@@ -47,7 +47,7 @@ devdir(struct chan *c, struct qid qid, char *n,
 	if(c->flag&CMSG)
 		qid.type |= QTMOUNT;
 	db->qid = qid;
-	db->type = devtab[c->type]->dc;
+	db->type = devtab[c->type].dc;
 	db->dev = c->dev;
 	db->mode = perm;
 	db->mode |= qid.type << 24;
@@ -120,7 +120,7 @@ devclone(struct chan *c)
 	struct chan *nc;
 
 	if(c->flag & COPEN)
-		panic("clone of open file type %c\n", devtab[c->type]->dc);
+		panic("clone of open file type %c\n", devtab[c->type].dc);
 
 	nc = newchan();
 
@@ -261,7 +261,7 @@ devstat(struct chan *c, uint8_t *db, int n,
 					error(Ebadarg);
 				return n;
 			}
-			printd("DEVSTAT fails:%c %llu\n", devtab[c->type]->dc, c->qid.path);
+			printd("DEVSTAT fails:%c %llu\n", devtab[c->type].dc, c->qid.path);
 			error(Enonexist);
 		case 0:
 			printd("DEVSTAT got 0\n");
@@ -385,7 +385,7 @@ devbread(struct chan *c, long n, uint32_t offset)
 		freeb(bp);
 		nexterror();
 	}
-	bp->wp += devtab[c->type]->read(c, bp->wp, n, offset);
+	bp->wp += devtab[c->type].read(c, bp->wp, n, offset);
 	poperror();
 	return bp;
 }
@@ -400,7 +400,7 @@ devbwrite(struct chan *c, struct block *bp, uint32_t offset)
 		freeb(bp);
 		nexterror();
 	}
-	n = devtab[c->type]->write(c, bp->rp, BLEN(bp), offset);
+	n = devtab[c->type].write(c, bp->rp, BLEN(bp), offset);
 	poperror();
 	freeb(bp);
 
@@ -450,9 +450,9 @@ devbyname(char *name)
 {
 	int i;
 
-	for(i = 0; devtab[i] != NULL; i++)
-		if(strcmp(devtab[i]->name, name) == 0)
-			return devtab[i];
+	for(i = 0; &devtab[i] < __devtabend; i++)
+		if(strcmp(devtab[i].name, name) == 0)
+			return &devtab[i];
 	return NULL;
 }
 

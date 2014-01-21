@@ -78,7 +78,7 @@ readn(struct chan *c, void *vp, long n)
 
 	p = vp;
 	while(n > 0) {
-		nn = devtab[c->type]->read(c, p, n, c->offset);
+		nn = devtab[c->type].read(c, p, n, c->offset);
 		printk("readn: Got %d@%lld\n", nn, c->offset);
 		if(nn == 0)
 			error("%s: wanted %d, got %d", Eshort, total, want);
@@ -506,7 +506,7 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 	return n;
 }
 
-struct dev vmdevtab = {
+struct dev vmdevtab __devtab = {
 	'V',
 	"vm",
 

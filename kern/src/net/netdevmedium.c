@@ -99,7 +99,7 @@ netdevbwrite(struct Ipifc *ifc, struct block *bp, int unused_int, uint8_t *unuse
 	if(BLEN(bp) < ifc->mintu)
 		bp = adjustblock(bp, ifc->mintu);
 
-	devtab[er->mchan->type]->bwrite(er->mchan, bp, 0);
+	devtab[er->mchan->type].bwrite(er->mchan, bp, 0);
 	ifc->out++;
 }
 
@@ -125,7 +125,7 @@ netdevread(void *a)
 		return;
 	}
 	for(;;){
-		bp = devtab[er->mchan->type]->bread(er->mchan, ifc->maxtu, 0);
+		bp = devtab[er->mchan->type].bread(er->mchan, ifc->maxtu, 0);
 		if(bp == NULL){
 			/*
 			 * get here if mchan is a pipe and other side hangs up
