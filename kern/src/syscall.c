@@ -1444,39 +1444,16 @@ intreg_t sys_pipe(struct proc *p, int *u_pipefd, int flags)
 {
 	int pipefd[2] = {0};
 	int retval = syspipe(pipefd);
-	int fd;
-	struct file *pipe_files[2] = {0};
 
 	if (retval)
 		return -1;
-	fd = insert_file(&p->open_files, pipe_files[0], 0);
-	if (!fd) {
-		set_errno(ENFILE);
-		goto failed_first;
-	}
-	pipefd[0] = fd;
-	fd = insert_file(&p->open_files, pipe_files[1], 0);
-	if (!fd) {
-		set_errno(ENFILE);
-		goto failed_second;
-	}
-	pipefd[1] = fd;
 	if (memcpy_to_user_errno(p, u_pipefd, pipefd, sizeof(pipefd))) {
+		sysclose(pipefd[0]);
+		sysclose(pipefd[1]);
 		set_errno(EFAULT);
-		goto failed_memcpy;
+		return -1;
 	}
-	goto all_out;
-
-failed_memcpy:
-	put_file_from_fd(&p->open_files, pipefd[1]);
-failed_second:
-	put_file_from_fd(&p->open_files, pipefd[0]);
-failed_first:
-	retval = -1;
-all_out:
-	kref_put(&pipe_files[0]->f_kref);
-	kref_put(&pipe_files[1]->f_kref);
-	return retval;
+	return 0;
 }
 
 intreg_t sys_gettimeofday(struct proc *p, int *buf)
@@ -1605,14 +1582,6 @@ intreg_t sys_nbind(struct proc *p,
 	user_memdup_free(p, t_srcpath);
 	user_memdup_free(p, t_ontopath);
 	return ret;
-}
-
-/* int npipe(int *fd) */
-intreg_t sys_npipe(struct proc *p, int *retfd)
-
-{
-	/* TODO: validate addresses of retfd (UMEM) */
-	return syspipe(retfd);
 }
 
 /* int mount(int fd, int afd, char* onto_path, int flag, char* aname); */
@@ -1747,7 +1716,6 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_nbind] ={(syscall_t)sys_nbind, "nbind"},
 	[SYS_nmount] ={(syscall_t)sys_nmount, "nmount"},
 	[SYS_nunmount] ={(syscall_t)sys_nunmount, "nunmount"},
-	[SYS_npipe] ={(syscall_t)sys_npipe, "npipe"},
 	[SYS_fd2path] ={(syscall_t)sys_fd2path, "fd2path"},
 
 };
