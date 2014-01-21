@@ -187,7 +187,9 @@ static void __ktask_wrapper(uint32_t srcid, long a0, long a1, long a2)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	assert(pcpui->cur_kthread->is_ktask);
 	pcpui->cur_kthread->name = name;
+	enable_irq();
 	fn(arg);
+	disable_irq();
 	pcpui->cur_kthread->name = 0;
 	/* if we blocked, when we return, PRKM will smp_idle() */
 }
