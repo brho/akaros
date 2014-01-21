@@ -466,7 +466,7 @@ espstats(Proto *esp, char *buf, int len)
 	Esppriv *upriv;
 
 	upriv = esp->priv;
-	return snprint(buf, len, "%lud %lud\n",
+	return snprint(buf, len, "%lu %lu\n",
 		upriv->in,
 		upriv->inerrors);
 }
@@ -479,7 +479,7 @@ esplocal(Conv *c, char *buf, int len)
 
 	qlock(c);
 	if(ecb->incoming)
-		n = snprint(buf, len, "%I!%uld\n", c->laddr, ecb->spi);
+		n = snprint(buf, len, "%I!%lu\n", c->laddr, ecb->spi);
 	else
 		n = snprint(buf, len, "%I\n", c->laddr);
 	qunlock(c);

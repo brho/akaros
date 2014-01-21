@@ -282,7 +282,7 @@ eipfmt(void)
 	return 0;
 #if 0
 	char buf[5*8];
-	static char *efmt = "%.2lux%.2lux%.2lux%.2lux%.2lux%.2lux";
+	static char *efmt = "0x%.2lx0x%.2lx0x%.2lx0x%.2lx0x%.2lx0x%.2lx";
 	static char *ifmt = "%d.%d.%d.%d";
 	uint8_t *p, ip[16];
 	uint32_t *lp;
@@ -324,7 +324,7 @@ common:
 			} else if(i != 0)
 				n += sprint(buf+n, ":");
 			s = (p[i]<<8) + p[i+1];
-			n += sprint(buf+n, "%ux", s);
+			n += sprint(buf+n, "0x%x", s);
 		}
 		return fmtstrncpy(f,  buf, sizeof(f));
 

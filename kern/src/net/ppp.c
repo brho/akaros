@@ -207,7 +207,7 @@ pinit(PPP *ppp, Pstate *p)
 static void
 newstate(PPP *ppp, Pstate *p, int state)
 {
-	netlog(ppp->f, Logppp, "%ux %ux %s->%s ctlmap %lux/%lux flags %ux mtu %d mru %d\n", ppp, p->proto,
+	netlog(ppp->f, Logppp, "0x%x 0x%x %s->%s ctlmap 0x%lx/0x%lx flags 0x%x mtu %d mru %d\n", ppp, p->proto,
 		snames[p->state], snames[state], ppp->rctlmap, ppp->xctlmap, p->flags,
 		ppp->mtu, ppp->mru);
 
@@ -268,7 +268,7 @@ dumpblock(Block *b)
 	int i;
 
 	for(i = 0; i < (sizeof(x)-1)/3 && b->rp+i < b->wp; i++)
-		sprint(&x[3*i], "%2.2ux ", b->rp[i]);
+		sprint(&x[3*i], "0x%2.2x ", b->rp[i]);
 	print("%s\n", x);
 }
 
@@ -346,7 +346,7 @@ break2:
 		} else if(BLEN(b) > 0){
 			ppp->ifc->inerr++;
 			ppp->in.discards++;
-			netlog(ppp->f, Logppp, "len %d/%d cksum %ux (%ux %ux %ux %ux)\n",
+			netlog(ppp->f, Logppp, "len %d/%d cksum 0x%x (0x%x 0x%x 0x%x 0x%x)\n",
 				BLEN(b), BLEN(buf), fcs, b->rp[0],
 				b->rp[1], b->rp[2], b->rp[3]);
 		}
@@ -373,7 +373,7 @@ putframe(PPP *ppp, int proto, Block *b)
 		errlog(ppp, Ehungup);
 		return b;
 	}
-	netlog(ppp->f, Logppp, "putframe %ux %d %d (%d bytes)\n", proto, b->rp[0], b->rp[1], BLEN(b));
+	netlog(ppp->f, Logppp, "putframe 0x%x %d %d (%d bytes)\n", proto, b->rp[0], b->rp[1], BLEN(b));
 
 	ppp->out.packets++;
 
@@ -620,7 +620,7 @@ getopts(PPP *ppp, Pstate *p, Block *b)
 		o = (Lcpopt*)cp;
 		if(cp + o->len > b->wp || o->len == 0){
 			freeblist(repb);
-			netlog(ppp->f, Logppp, "ppp %s: bad option length %ux\n", ppp->ifc->dev,
+			netlog(ppp->f, Logppp, "ppp %s: bad option length 0x%x\n", ppp->ifc->dev,
 				o->type);
 			return -1;
 		}
@@ -708,7 +708,7 @@ getopts(PPP *ppp, Pstate *p, Block *b)
 			repb->wp = repm->data;
 			repm->code = Lconfrej;
 		}
-		netlog(ppp->f, Logppp, "ppp %s: bad %ux option %d\n", ppp->ifc->dev, p->proto, o->type);
+		netlog(ppp->f, Logppp, "ppp %s: bad 0x%x option %d\n", ppp->ifc->dev, p->proto, o->type);
 		memmove(repb->wp, o, o->len);
 		repb->wp += o->len;
 	}
@@ -717,7 +717,7 @@ getopts(PPP *ppp, Pstate *p, Block *b)
 	if(!rejecting && !nacking){
 		switch(p->proto){
 		case Plcp:
-			netlog(ppp->f, Logppp, "Plcp: mtu: %d %d x:%lux/r:%lux %lux\n", mtu, ppp->mtu, ppp->xctlmap, ppp->rctlmap, ctlmap);
+			netlog(ppp->f, Logppp, "Plcp: mtu: %d %d x:0x%lx/r:0x%lx 0x%lx\n", mtu, ppp->mtu, ppp->xctlmap, ppp->rctlmap, ctlmap);
 			ppp->period = period;
 			ppp->xctlmap = ctlmap;
 			if(mtu > Maxmtu)
@@ -756,7 +756,7 @@ rejopts(PPP *ppp, Pstate *p, Block *b, int code)
 	for(b->rp = m->data; b->rp < b->wp; b->rp += o->len){
 		o = (Lcpopt*)b->rp;
 		if(b->rp + o->len > b->wp || o->len == 0){
-			netlog(ppp->f, Logppp, "ppp %s: bad roption length %ux\n", ppp->ifc->dev,
+			netlog(ppp->f, Logppp, "ppp %s: bad roption length 0x%x\n", ppp->ifc->dev,
 				o->type);
 			return;
 		}
@@ -768,7 +768,7 @@ rejopts(PPP *ppp, Pstate *p, Block *b, int code)
 				ppp->usedns &= ~1;
 			else if(o->type == Oipdns2)
 				ppp->usedns &= ~2;
-			netlog(ppp->f, Logppp, "ppp %s: %ux rejecting %d\n", ppp->ifc->dev, p->proto,
+			netlog(ppp->f, Logppp, "ppp %s: 0x%x rejecting %d\n", ppp->ifc->dev, p->proto,
 				o->type);
 			continue;
 		}
@@ -837,7 +837,7 @@ rcv(PPP *ppp, Pstate *p, Block *b)
 		return;
 	}
 
-	netlog(ppp->f, Logppp, "ppp: %ux rcv %d len %d id %d/%d/%d\n",
+	netlog(ppp->f, Logppp, "ppp: 0x%x rcv %d len %d id %d/%d/%d\n",
 		p->proto, m->code, len, m->id, p->confid, p->id);
 
 	if(p->proto != Plcp && ppp->lcp->state != Sopened){
@@ -970,7 +970,7 @@ rcv(PPP *ppp, Pstate *p, Block *b)
 		netlog(ppp->f, Logppp, "ppp %s: code reject %d\n", ppp->ifc->dev, m->data[0]);
 		break;
 	case Lprotorej:
-		netlog(ppp->f, Logppp, "ppp %s: proto reject %lux\n", ppp->ifc->dev, nhgets(m->data));
+		netlog(ppp->f, Logppp, "ppp %s: proto reject 0x%lx\n", ppp->ifc->dev, nhgets(m->data));
 		break;
 	case Lechoreq:
 		m->code = Lechoack;
@@ -1220,7 +1220,7 @@ pppread(PPP *ppp)
 			freeblist(b);
 			break;
 		default:
-			netlog(ppp->f, Logppp, "unknown proto %ux\n", proto);
+			netlog(ppp->f, Logppp, "unknown proto 0x%x\n", proto);
 			if(ppp->lcp->state == Sopened){
 				/* reject the protocol */
 				b->rp -= 6;
@@ -1496,7 +1496,7 @@ printopts(PPP *ppp, Pstate *p, Block *b, int send)
 	for(cp = m->data; cp < b->wp; cp += o->len){
 		o = (Lcpopt*)cp;
 		if(cp + o->len > b->wp || o->len == 0){
-			netlog(ppp->f, Logppp, "\tbad option length %ux\n", o->type);
+			netlog(ppp->f, Logppp, "\tbad option length 0x%x\n", o->type);
 			return;
 		}
 
@@ -1510,7 +1510,7 @@ printopts(PPP *ppp, Pstate *p, Block *b, int send)
 				netlog(ppp->f, Logppp, "\tmtu = %d\n", nhgets(o->data));
 				break;
 			case Octlmap:
-				netlog(ppp->f, Logppp, "\tctlmap = %ux\n", nhgetl(o->data));
+				netlog(ppp->f, Logppp, "\tctlmap = 0x%x\n", nhgetl(o->data));
 				break;
 			case Oauth:
 				netlog(ppp->f, Logppp, "\tauth = ", nhgetl(o->data));
@@ -1523,7 +1523,7 @@ printopts(PPP *ppp, Pstate *p, Block *b, int send)
 					netlog(ppp->f, Logppp, "password\n");
 					break;
 				case Pchap:
-					netlog(ppp->f, Logppp, "chap %ux\n", o->data[2]);
+					netlog(ppp->f, Logppp, "chap 0x%x\n", o->data[2]);
 					break;
 				}
 				break;
@@ -1540,7 +1540,7 @@ printopts(PPP *ppp, Pstate *p, Block *b, int send)
 					break;
 				}
 			case Omagic:
-				netlog(ppp->f, Logppp, "\tmagic = %ux\n", nhgetl(o->data));
+				netlog(ppp->f, Logppp, "\tmagic = 0x%x\n", nhgetl(o->data));
 				break;
 			case Opc:
 				netlog(ppp->f, Logppp, "\tprotocol compress\n");
@@ -1562,7 +1562,7 @@ printopts(PPP *ppp, Pstate *p, Block *b, int send)
 				netlog(ppp->f, Logppp, "\tstac LZS\n");
 				break;
 			case Ocmppc:	
-				netlog(ppp->f, Logppp, "\tMicrosoft PPC len=%d %ux\n", o->len, nhgetl(o->data));
+				netlog(ppp->f, Logppp, "\tMicrosoft PPC len=%d 0x%x\n", o->len, nhgetl(o->data));
 				break;
 			}
 			break;

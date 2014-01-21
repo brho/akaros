@@ -235,7 +235,7 @@ grestats(Proto *gre, char *buf, int len)
 
 	gpriv = gre->priv;
 
-	return snprint(buf, len, "gre: len %lud\n", gpriv->lenerr);
+	return snprint(buf, len, "gre: len %lu\n", gpriv->lenerr);
 }
 
 char*

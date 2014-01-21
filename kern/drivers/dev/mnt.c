@@ -780,7 +780,7 @@ mountrpc(struct mnt *m, struct mntrpc *r)
 		cn = "?";
 		if(r->c != NULL && r->c->name != NULL)
 			cn = r->c->name->s;
-		printd("mnt: proc %s %lud: mismatch from %s %s rep 0x%p tag %d fid %d T%d R%d rp %d\n",
+		printd("mnt: proc %s %lu: mismatch from %s %s rep 0x%p tag %d fid %d T%d R%d rp %d\n",
 		       "current->text", "current->pid", sn, cn,
 			r, r->request.tag, r->request.fid, r->request.type,
 			r->reply.type, r->reply.tag);
@@ -987,9 +987,9 @@ mountmux(struct mnt *m, struct mntrpc *r)
 	}
 	spin_unlock(&m->lock);
 	if(r->reply.type == Rerror){
-		printd("unexpected reply tag %ud; type %d (error %q)\n", r->reply.tag, r->reply.type, r->reply.ename);
+		printd("unexpected reply tag %u; type %d (error %q)\n", r->reply.tag, r->reply.type, r->reply.ename);
 	}else{
-		printd("unexpected reply tag %ud; type %d\n", r->reply.tag, r->reply.type);
+		printd("unexpected reply tag %u; type %d\n", r->reply.tag, r->reply.type);
 	}
 }
 

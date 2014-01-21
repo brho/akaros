@@ -1021,7 +1021,7 @@ consread(struct chan *c, void *buf, long n, int64_t offset)
 		return n;
 #endif
 	default:
-		printd("consread %llud\n", c->qid.path);
+		printd("consread %llu\n", c->qid.path);
 		error(Egreg);
 	}
 	return -1;		/* never reached */
@@ -1186,7 +1186,7 @@ conswrite(struct chan *c, void *va, long n, int64_t offset)
 		break;
 #endif
 	default:
-		printd("conswrite: %llud\n", c->qid.path);
+		printd("conswrite: %llu\n", c->qid.path);
 		error(Egreg);
 	}
 	return n;

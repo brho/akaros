@@ -288,7 +288,7 @@ cclose(struct chan *c)
 		return;
 
 	if(c->flag&CFREE)
-		panic("cclose %lux", getcallerpc(&c));
+		panic("cclose %p", getcallerpc(&c));
 
 	kref_put(&c->ref);
 }

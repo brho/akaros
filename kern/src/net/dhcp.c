@@ -420,7 +420,7 @@ rbootpread(char *bp, ulong offset, int len)
 	n += snprint(buf + n, READSTR-n, "ipmask %15V\n", a);
 	hnputl(a, ipaddr);
 	n += snprint(buf + n, READSTR-n, "ipaddr %15V\n", a);
-	n += snprint(buf+n, READSTR-n, "expired %lud\n", iplease);
+	n += snprint(buf+n, READSTR-n, "expired %lu\n", iplease);
 
 	n += snprint(buf + n, READSTR-n, "dns");
 	if(dns2ip){

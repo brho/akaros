@@ -67,7 +67,7 @@ struct block *allocb(int size)
 	struct block *b;
 
 	if (!current)
-		panic("allocb outside process: %8.8lux", getcallerpc(&size));
+		panic("allocb outside process: %p", getcallerpc(&size));
 	b = _allocb(size);
 	if (b == 0)
 		exhausted("Blocks");
@@ -83,7 +83,7 @@ struct block *iallocb(int size)
 
 	#if 0 /* conf is some inferno global config */
 	if (atomic_read(&ialloc_bytes) > conf.ialloc) {
-		//printk("iallocb: limited %lud/%lud\n", atomic_read(&ialloc_bytes),
+		//printk("iallocb: limited %lu/%lu\n", atomic_read(&ialloc_bytes),
 		//       conf.ialloc);
 		return NULL;
 	}
@@ -91,7 +91,7 @@ struct block *iallocb(int size)
 
 	b = _allocb(size);
 	if (b == NULL) {
-		//printk("iallocb: no memory %lud/%lud\n", atomic_read(&ialloc_bytes),
+		//printk("iallocb: no memory %lu/%lu\n", atomic_read(&ialloc_bytes),
 		//       conf.ialloc);
 		return NULL;
 	}
@@ -137,29 +137,29 @@ void checkb(struct block *b, char *msg)
 	void *dead = (void *)Bdead;
 
 	if (b == dead)
-		panic("checkb b %s %lux", msg, b);
+		panic("checkb b %s 0x%lx", msg, b);
 	if (b->base == dead || b->lim == dead || b->next == dead
 		|| b->rp == dead || b->wp == dead) {
-		printd("checkb: base 0x%8.8luX lim 0x%8.8luX next 0x%8.8luX\n",
+		printd("checkb: base 0x%8.8lx lim 0x%8.8lx next 0x%8.8lx\n",
 			   b->base, b->lim, b->next);
-		printd("checkb: rp 0x%8.8luX wp 0x%8.8luX\n", b->rp, b->wp);
+		printd("checkb: rp 0x%8.8lx wp 0x%8.8lx\n", b->rp, b->wp);
 		panic("checkb dead: %s\n", msg);
 	}
 
 	if (b->base > b->lim)
-		panic("checkb 0 %s %lux %lux", msg, b->base, b->lim);
+		panic("checkb 0 %s 0x%lx 0x%lx", msg, b->base, b->lim);
 	if (b->rp < b->base)
-		panic("checkb 1 %s %lux %lux", msg, b->base, b->rp);
+		panic("checkb 1 %s 0x%lx 0x%lx", msg, b->base, b->rp);
 	if (b->wp < b->base)
-		panic("checkb 2 %s %lux %lux", msg, b->base, b->wp);
+		panic("checkb 2 %s 0x%lx 0x%lx", msg, b->base, b->wp);
 	if (b->rp > b->lim)
-		panic("checkb 3 %s %lux %lux", msg, b->rp, b->lim);
+		panic("checkb 3 %s 0x%lx 0x%lx", msg, b->rp, b->lim);
 	if (b->wp > b->lim)
-		panic("checkb 4 %s %lux %lux", msg, b->wp, b->lim);
+		panic("checkb 4 %s 0x%lx 0x%lx", msg, b->wp, b->lim);
 
 }
 
 void iallocsummary(void)
 {
-	printd("ialloc %lud/%lud\n", atomic_read(&ialloc_bytes), 0 /*conf.ialloc*/);
+	printd("ialloc %lu/%lu\n", atomic_read(&ialloc_bytes), 0 /*conf.ialloc*/);
 }

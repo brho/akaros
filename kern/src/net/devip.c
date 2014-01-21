@@ -195,7 +195,7 @@ ipgen(struct chan *c, char *unused_char_p_t, struct dirtab*d, int unused_int, in
 	case Qtopdir:
 		if(s == DEVDOTDOT){
 			mkqid(&q, QID(0, 0, Qtopdir), 0, QTDIR);
-			snprintf(get_cur_genbuf(), GENBUF_SZ, "#I%lud", c->dev);
+			snprintf(get_cur_genbuf(), GENBUF_SZ, "#I%lu", c->dev);
 			devdir(c, q, get_cur_genbuf(), 0, network, 0555, dp);
 			return 1;
 		}
@@ -219,7 +219,7 @@ ipgen(struct chan *c, char *unused_char_p_t, struct dirtab*d, int unused_int, in
 	case Qprotodir:
 		if(s == DEVDOTDOT){
 			mkqid(&q, QID(0, 0, Qtopdir), 0, QTDIR);
-			snprintf(get_cur_genbuf(), GENBUF_SZ, "#I%lud", c->dev);
+			snprintf(get_cur_genbuf(), GENBUF_SZ, "#I%lu", c->dev);
 			devdir(c, q, get_cur_genbuf(), 0, network, 0555, dp);
 			return 1;
 		}
@@ -673,7 +673,7 @@ ipread(struct chan *ch, void *a, long n, int64_t off)
 	case Qlog:
 		return netlogread(f, a, offset, n);
 	case Qctl:
-		snprintf(get_cur_genbuf(), GENBUF_SZ, "%lud", CONV(ch->qid));
+		snprintf(get_cur_genbuf(), GENBUF_SZ, "%lu", CONV(ch->qid));
 		return readstr(offset, p, n, get_cur_genbuf());
 	case Qremote:
 		buf = kzmalloc(Statelen, 0);

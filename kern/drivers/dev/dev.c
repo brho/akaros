@@ -34,7 +34,7 @@ devno(int c, int user)
 			return i;
 	}
 	if (user == 0)
-		panic("devno %c 0x%ux", c, c);
+		panic("devno %c 0x%u", c, c);
 
 	return -1;
 }

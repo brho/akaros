@@ -467,7 +467,7 @@ tcpstate(struct conv *c, char *state, int n)
 	s = (Tcpctl*)(c->ptcl);
 
 	return snprintf(state, n,
-		"%s qin %d qout %d srtt %d mdev %d cwin %lud swin %lud>>%d rwin %lud>>%d timer.start %d timer.count %d rerecv %d katimer.start %d katimer.count %d\n",
+		"%s qin %d qout %d srtt %d mdev %d cwin %lu swin %lu>>%d rwin %lu>>%d timer.start %d timer.count %d rerecv %d katimer.start %d katimer.count %d\n",
 		tcpstates[s->state],
 		c->rq ? qlen(c->rq) : 0,
 		c->wq ? qlen(c->wq) : 0,
@@ -1625,7 +1625,7 @@ tcpincoming(struct conv *s, Tcp *segp, uint8_t *src, uint8_t *dst, uint8_t versi
 	/* find a call in limbo */
 	h = hashipa(src, segp->source);
 	for(l = &tpriv->lht[h]; (lp = *l) != NULL; l = &lp->next){
-		netlog(s->p->f, Logtcp, "tcpincoming s %I,%ux/%I,%ux d %I,%ux/%I,%ux v %d/%d",
+		netlog(s->p->f, Logtcp, "tcpincoming s %I,0x%x/%I,0x%x d %I,0x%x/%I,0x%x v %d/%d",
 			src, segp->source, lp->raddr, lp->rport,
 			dst, segp->dest, lp->laddr, lp->lport,
 			version, lp->version
@@ -1640,7 +1640,7 @@ tcpincoming(struct conv *s, Tcp *segp, uint8_t *src, uint8_t *dst, uint8_t versi
 
 		/* we're assuming no data with the initial SYN */
 		if(segp->seq != lp->irs+1 || segp->ack != lp->iss+1){
-			netlog(s->p->f, Logtcp, "tcpincoming s %lux/%lux a %lux %lux",
+			netlog(s->p->f, Logtcp, "tcpincoming s 0x%lx/0x%lx a 0x%lx 0x%lx",
 				segp->seq, lp->irs+1, segp->ack, lp->iss+1);
 			lp = NULL;
 		} else {
@@ -1814,7 +1814,7 @@ update(struct conv *s, Tcp *seg)
 	&& seg->wnd == tcb->snd.wnd) {
 
 		/* this is a pure ack w/o window update */
-		netlog(s->p->f, Logtcprxmt, "dupack %lud ack %lud sndwnd %d advwin %d\n",
+		netlog(s->p->f, Logtcprxmt, "dupack %lu ack %lu sndwnd %d advwin %d\n",
 			tcb->snd.dupacks, seg->ack, tcb->snd.wnd, seg->wnd);
 
 		if(++tcb->snd.dupacks == TCPREXMTTHRESH) {
@@ -1824,7 +1824,7 @@ update(struct conv *s, Tcp *seg)
 			 */
 			tcb->snd.recovery = 1;
 			tcb->snd.rxt = tcb->snd.nxt;
-			netlog(s->p->f, Logtcprxmt, "fast rxt %lud, nxt %lud\n", tcb->snd.una, tcb->snd.nxt);
+			netlog(s->p->f, Logtcprxmt, "fast rxt %lu, nxt %lu\n", tcb->snd.una, tcb->snd.nxt);
 			tcprxmit(s);
 		} else {
 			/* do reno tcp here. */
@@ -1859,7 +1859,7 @@ update(struct conv *s, Tcp *seg)
 		tcb->snd.dupacks = 0;
 		tcb->snd.recovery = 0;
 	} else
-		netlog(s->p->f, Logtcp, "rxt next %lud, cwin %ud\n", seg->ack, tcb->cwind);
+		netlog(s->p->f, Logtcp, "rxt next %lu, cwin %u\n", seg->ack, tcb->cwind);
 
 	/* Compute the new send window size */
 	acked = seg->ack - tcb->snd.una;
@@ -2158,7 +2158,7 @@ reset:
 	if(tcb->state != Syn_received && (seg.flags & RST) == 0){
 		if(tcpporthogdefense
 		&& seq_within(seg.ack, tcb->snd.una-(1<<31), tcb->snd.una-(1<<29))){
-			printd("stateless hog %I.%d->%I.%d f %ux %lux - %lux - %lux\n",
+			printd("stateless hog %I.%d->%I.%d f 0x%x 0x%lx - 0x%lx - 0x%lx\n",
 				source, seg.source, dest, seg.dest, seg.flags,
 				tcb->snd.una-(1<<31), seg.ack, tcb->snd.una-(1<<29));
 			localclose(s, "stateless hog");
@@ -2167,7 +2167,7 @@ reset:
 
 	/* Cut the data to fit the receive window */
 	if(tcptrim(tcb, &seg, &bp, &length) == -1) {
-		netlog(f, Logtcp, "tcp len < 0, %lud %d\n", seg.seq, length);
+		netlog(f, Logtcp, "tcp len < 0, %lu %d\n", seg.seq, length);
 		update(s, &seg);
 		if(qlen(s->wq)+tcb->flgcnt == 0 && tcb->state == Closing) {
 			tcphalt(tpriv, &tcb->rtt_timer);
@@ -2213,7 +2213,7 @@ reset:
 			if(tcb->state == Established) {
 				tpriv->stats[EstabResets]++;
 				if(tcb->rcv.nxt != seg.seq)
-					printd("out of order RST rcvd: %I.%d -> %I.%d, rcv.nxt %lux seq %lux\n", s->raddr, s->rport, s->laddr, s->lport, tcb->rcv.nxt, seg.seq);
+					printd("out of order RST rcvd: %I.%d -> %I.%d, rcv.nxt 0x%lx seq 0x%lx\n", s->raddr, s->rport, s->laddr, s->lport, tcb->rcv.nxt, seg.seq);
 			}
 			localclose(s, Econrefused);
 			goto raise;
@@ -2483,7 +2483,7 @@ tcpoutput(struct conv *s)
 		}
 		ssize = sndcnt-sent;
 		if(ssize && usable < 2)
-			netlog(s->p->f, Logtcp, "throttled snd.wnd %lud cwind %lud\n",
+			netlog(s->p->f, Logtcp, "throttled snd.wnd %lu cwind %lu\n",
 				tcb->snd.wnd, tcb->cwind);
 		if(usable < ssize)
 			ssize = usable;
@@ -2555,7 +2555,7 @@ tcpoutput(struct conv *s)
 			if(ssize < n)
 				n = ssize;
 			tcb->resent += n;
-			netlog(f, Logtcp, "rexmit: %I.%d -> %I.%d ptr %lux nxt %lux\n",
+			netlog(f, Logtcp, "rexmit: %I.%d -> %I.%d ptr 0x%lx nxt 0x%lx\n",
 				s->raddr, s->rport, s->laddr, s->lport, tcb->snd.ptr, tcb->snd.nxt);
 			tpriv->stats[RetransSegs]++;
 		}
@@ -2824,7 +2824,7 @@ tcptimeout(void *arg)
 			localclose(s, Etimedout);
 			break;
 		}
-		netlog(s->p->f, Logtcprxmt, "timeout rexmit 0x%lux %d/%d\n", tcb->snd.una, tcb->timer.start, NOW);
+		netlog(s->p->f, Logtcprxmt, "timeout rexmit 0x%lx %d/%d\n", tcb->snd.una, tcb->timer.start, NOW);
 		tcpsettimer(tcb);
 		tcprxmit(s);
 		tpriv->stats[RetransTimeouts]++;
@@ -2914,7 +2914,7 @@ addreseq(Tcpctl *tcb, struct tcppriv *tpriv, Tcp *seg,
 		printd("resequence queue > window: %d > %d\n", rqlen, qmax);
 		i = 0;
 	  	for(rp1 = tcb->reseq; rp1 != NULL; rp1 = rp1->next){
-	  		printd("%#lux %#lux %#ux\n", rp1->seg.seq,
+	  		printd("0x%#lx 0x%#lx 0x%#x\n", rp1->seg.seq,
 	  			rp1->seg.ack, rp1->seg.flags);
 			if(i++ > 10){
 				printd("...\n");
@@ -3116,7 +3116,7 @@ tcpstats(struct Proto *tcp, char *buf, int len)
 	p = buf;
 	e = p+len;
 	for(i = 0; i < Nstats; i++)
-		p = seprintf(p, e, "%s: %lud\n", statnames[i], priv->stats[i]);
+		p = seprintf(p, e, "%s: %lu\n", statnames[i], priv->stats[i]);
 	return p - buf;
 }
 

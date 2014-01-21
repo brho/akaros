@@ -68,9 +68,9 @@ ixsummary(void)
 {
 	debugging ^= 1;
 	iallocsummary();
-	printd("pad %lud, concat %lud, pullup %lud, copy %lud\n",
+	printd("pad %lu, concat %lu, pullup %lu, copy %lu\n",
 		padblockcnt, concatblockcnt, pullupblockcnt, copyblockcnt);
-	printd("consume %lud, produce %lud, qcopy %lud\n",
+	printd("consume %lu, produce %lu, qcopy %lu\n",
 		consumecnt, producecnt, qcopycnt);
 }
 
@@ -106,7 +106,7 @@ padblock(struct block *bp, int size)
 		}
 
 		if(bp->next)
-			panic("padblock 0x%luX", getcallerpc(&bp));
+			panic("padblock %p", getcallerpc(&bp));
 		n = BLEN(bp);
 		padblockcnt++;
 		nbp = allocb(size+n);
@@ -120,7 +120,7 @@ padblock(struct block *bp, int size)
 		size = -size;
 
 		if(bp->next)
-			panic("padblock 0x%luX", getcallerpc(&bp));
+			panic("padblock %p", getcallerpc(&bp));
 
 		if(bp->lim - bp->wp >= size)
 			return bp;
@@ -1288,7 +1288,7 @@ qwrite(struct queue *q, void *vp, int len)
 	uint8_t *p = vp;
 
 	QDEBUG if(!islo())
-		printd("qwrite hi %lux\n", getcallerpc(&q));
+		printd("qwrite hi %p\n", getcallerpc(&q));
 
 	sofar = 0;
 	do {

@@ -484,7 +484,7 @@ ipiput4(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 		hl = (h->vihl&0xF)<<2;
 		if(hl < (IP_HLEN4<<2)) {
 			ip->stats[InHdrErrors]++;
-			netlog(f, Logip, "ip: %V bad hivl %ux\n", h->src, h->vihl);
+			netlog(f, Logip, "ip: %V bad hivl 0x%x\n", h->src, h->vihl);
 			freeblist(bp);
 			return;
 		}
@@ -589,7 +589,7 @@ ipstats(struct Fs *f, char *buf, int len)
 	p = buf;
 	e = p+len;
 	for(i = 0; i < Nstats; i++)
-		p = seprintf(p, e, "%s: %lud\n", statnames[i], ip->stats[i]);
+		p = seprintf(p, e, "%s: %lu\n", statnames[i], ip->stats[i]);
 	return p - buf;
 }
 

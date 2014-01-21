@@ -399,7 +399,7 @@ ipiput6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 	/* Check header version */
 	if(BLKIPVER(bp) != IP_VER6) {
 		ip->stats[InHdrErrors]++;
-		netlog(f, Logip, "ip: bad version %ux\n", (h->vcf[0]&0xF0)>>2);
+		netlog(f, Logip, "ip: bad version 0x%x\n", (h->vcf[0]&0xF0)>>2);
 		freeblist(bp);
 		return;
 	}

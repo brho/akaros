@@ -532,7 +532,7 @@ convmac(char *p, uint8_t *mac, int n)
 {
 	int left = n;
 	while(n-- > 0){
-		p += snprintf(p, left, "%2.2ux", *mac++);
+		p += snprintf(p, left, "0x%2.2x", *mac++);
 		left -= n;
 	}
 }

@@ -473,12 +473,12 @@ icmpstats(struct Proto *icmp, char *buf, int len)
 	p = buf;
 	e = p+len;
 	for(i = 0; i < Nstats; i++)
-		p = seprintf(p, e, "%s: %lud\n", statnames[i], priv->stats[i]);
+		p = seprintf(p, e, "%s: %lu\n", statnames[i], priv->stats[i]);
 	for(i = 0; i <= Maxtype; i++){
 		if(icmpnames[i])
-			p = seprintf(p, e, "%s: %lud %lud\n", icmpnames[i], priv->in[i], priv->out[i]);
+			p = seprintf(p, e, "%s: %lu %lu\n", icmpnames[i], priv->in[i], priv->out[i]);
 		else
-			p = seprintf(p, e, "%d: %lud %lud\n", i, priv->in[i], priv->out[i]);
+			p = seprintf(p, e, "%d: %lu %lu\n", i, priv->in[i], priv->out[i]);
 	}
 	return p - buf;
 }
