@@ -49,7 +49,10 @@ newfd(struct chan *c)
 		return -1;
 	}
 	/* VFS hack */
-	i = get_fd(&current->open_files, f->minfd);
+	/* We'd like to ask it to start at f->minfd, but that would require us to
+	 * know if we closed anything.  Since we share the FD numbers with the VFS,
+	 * there is no way to know that. */
+	i = get_fd(&current->open_files, 0);
 	assert(f->fd[i] == 0);
 	#if 0 // 9ns style
 	/* TODO: use a unique integer allocator */
@@ -1323,18 +1326,19 @@ void close_9ns_files(struct proc *p, bool only_cloexec)
 	}
 }
 
-void print_chaninfo(struct chan *ch)
+void print_chaninfo(struct chan *c)
 {
 	char buf[64] = {0};
-#if 0
-FIXME
+	bool has_dev = c->type != -1;
 	printk("Chan pathname: %s, Dev: %s, Devinfo: %s\n",
-	       "ch->path ? ch->path->s : \"no path",
-	       ch->dev ? ch->dev->name: "no dev",
-		   ch->dev ? ch->dev->chaninfo(ch, buf, sizeof(buf)) : "no info");
-	if (!ch->dev)
-		printk("No dev: intermediate chan? qid.path: %p\n", ch->qid.path);
-#endif
+	       c->name ? c->name->s : "no cname",
+	       has_dev ? devtab[c->type].name : "no dev",
+		   /* TODO: chaninfo op */
+	       //has_dev ? devtab[c->type].chaninfo(c, buf, sizeof(buf)) :
+		               "no info");
+	if (!has_dev)
+		printk("No dev: intermediate chan? qid.path: %p\n", c->qid.path);
+	printk("\n");
 }
 
 void print_9ns_files(struct proc *p)
