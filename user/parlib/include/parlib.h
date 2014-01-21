@@ -30,10 +30,6 @@ extern "C" {
 ssize_t     sys_cputs(const uint8_t *s, size_t len);
 uint16_t    sys_cgetc(void);
 int         sys_null(void);
-ssize_t     sys_serial_write(void* buf, size_t len); 
-ssize_t     sys_serial_read(void* buf, size_t len);
-ssize_t     sys_eth_write(void *COUNT(len) buf, size_t len); 
-ssize_t     sys_eth_read(void *COUNT(len) buf, size_t len);
 size_t      sys_getpcoreid(void);
 /* Process Management */
 int         sys_getpid(void);

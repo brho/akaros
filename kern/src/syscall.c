@@ -35,13 +35,6 @@
 #include <arsc_server.h>
 #include <event.h>
 #include <termios.h>
-#include <socket.h>
-
-#ifdef CONFIG_NETWORKING
-#include <net/nic_common.h>
-extern int (*send_frame)(const char *CT(len) data, size_t len);
-extern unsigned char device_mac[6];
-#endif
 
 /* Tracing Globals */
 int systrace_flags = 0;
@@ -1004,148 +997,6 @@ static int sys_abort_sysc(struct proc *p, struct syscall *sysc)
 	return abort_sysc(p, sysc);
 }
 
-/************** Platform Specific Syscalls **************/
-
-//Read a buffer over the serial port
-static ssize_t sys_serial_read(env_t* e, char *DANGEROUS _buf, size_t len)
-{
-	printk("[kernel] serial reading is deprecated.\n");
-	if (len == 0)
-		return 0;
-
-	#ifdef CONFIG_SERIAL_IO
-	    char *COUNT(len) buf = user_mem_assert(e, _buf, len, 1, PTE_USER_RO);
-		size_t bytes_read = 0;
-		int c;
-		while((c = serial_read_byte()) != -1) {
-			buf[bytes_read++] = (uint8_t)c;
-			if(bytes_read == len) break;
-		}
-		return (ssize_t)bytes_read;
-	#else
-		return -EINVAL;
-	#endif
-}
-
-//Write a buffer over the serial port
-static ssize_t sys_serial_write(env_t* e, const char *DANGEROUS buf, size_t len)
-{
-	printk("[kernel] serial writing is deprecated.\n");
-	if (len == 0)
-		return 0;
-	#ifdef CONFIG_SERIAL_IO
-		char *COUNT(len) _buf = user_mem_assert(e, buf, len, 1, PTE_USER_RO);
-		for(int i =0; i<len; i++)
-			serial_send_byte(buf[i]);
-		return (ssize_t)len;
-	#else
-		return -EINVAL;
-	#endif
-}
-
-#ifdef CONFIG_NETWORKING
-// This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
-static ssize_t sys_eth_read(env_t* e, char *DANGEROUS buf)
-{
-	if (eth_up) {
-
-		uint32_t len;
-		char *ptr;
-
-		spin_lock(&packet_buffers_lock);
-
-		if (num_packet_buffers == 0) {
-			spin_unlock(&packet_buffers_lock);
-			return 0;
-		}
-
-		ptr = packet_buffers[packet_buffers_head];
-		len = packet_buffers_sizes[packet_buffers_head];
-
-		num_packet_buffers--;
-		packet_buffers_head = (packet_buffers_head + 1) % MAX_PACKET_BUFFERS;
-
-		spin_unlock(&packet_buffers_lock);
-
-		char* _buf = user_mem_assert(e, buf, len, 1, PTE_U);
-
-		memcpy(_buf, ptr, len);
-
-		kfree(ptr);
-
-		return len;
-	}
-	else
-		return -EINVAL;
-}
-
-// This is not a syscall we want. Its hacky. Here just for syscall stuff until get a stack.
-static ssize_t sys_eth_write(env_t* e, const char *DANGEROUS buf, size_t len)
-{
-	if (eth_up) {
-
-		if (len == 0)
-			return 0;
-
-		// HACK TO BYPASS HACK
-		int just_sent = send_frame(buf, len);
-
-		if (just_sent < 0) {
-			printk("Packet send fail\n");
-			return 0;
-		}
-
-		return just_sent;
-
-		// END OF RECURSIVE HACK
-/*
-		char *COUNT(len) _buf = user_mem_assert(e, buf, len, PTE_U);
-		int total_sent = 0;
-		int just_sent = 0;
-		int cur_packet_len = 0;
-		while (total_sent != len) {
-			cur_packet_len = ((len - total_sent) > MTU) ? MTU : (len - total_sent);
-			char dest_mac[6] = APPSERVER_MAC_ADDRESS;
-			char* wrap_buffer = eth_wrap(_buf + total_sent, cur_packet_len, device_mac, dest_mac, APPSERVER_PORT);
-			just_sent = send_frame(wrap_buffer, cur_packet_len + sizeof(struct ETH_Header));
-
-			if (just_sent < 0)
-				return 0; // This should be an error code of its own
-
-			if (wrap_buffer)
-				kfree(wrap_buffer);
-
-			total_sent += cur_packet_len;
-		}
-
-		return (ssize_t)len;
-*/
-	}
-	else
-		return -EINVAL;
-}
-
-static ssize_t sys_eth_get_mac_addr(env_t* e, char *DANGEROUS buf) 
-{
-	if (eth_up) {
-		for (int i = 0; i < 6; i++)
-			buf[i] = device_mac[i];
-		return 0;
-	}
-	else
-		return -EINVAL;
-}
-
-static int sys_eth_recv_check(env_t* e) 
-{
-	if (num_packet_buffers != 0) 
-		return 1;
-	else
-		return 0;
-}
-
-#endif // Network
-
 static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 {
 	ssize_t ret;
@@ -1859,16 +1710,6 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_self_notify] = {(syscall_t)sys_self_notify, "self_notify"},
 	[SYS_vc_entry] = {(syscall_t)sys_vc_entry, "vc_entry"},
 	[SYS_halt_core] = {(syscall_t)sys_halt_core, "halt_core"},
-#ifdef CONFIG_SERIAL_IO
-	[SYS_serial_read] = {(syscall_t)sys_serial_read, "ser_read"},
-	[SYS_serial_write] = {(syscall_t)sys_serial_write, "ser_write"},
-#endif
-#ifdef CONFIG_NETWORKING
-	[SYS_eth_read] = {(syscall_t)sys_eth_read, "eth_read"},
-	[SYS_eth_write] = {(syscall_t)sys_eth_write, "eth_write"},
-	[SYS_eth_get_mac_addr] = {(syscall_t)sys_eth_get_mac_addr, "get_mac"},
-	[SYS_eth_recv_check] = {(syscall_t)sys_eth_recv_check, "recv_check"},
-#endif
 #ifdef CONFIG_ARSC_SERVER
 	[SYS_init_arsc] = {(syscall_t)sys_init_arsc, "init_arsc"},
 #endif

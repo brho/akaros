@@ -42,9 +42,6 @@
 #include <blockdev.h>
 #include <ext2fs.h>
 #include <kthread.h>
-#include <net.h>
-#include <socket.h>
-#include <eth_audio.h>
 #include <console.h>
 
 // zra: flag for Ivy

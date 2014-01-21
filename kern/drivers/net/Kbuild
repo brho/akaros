@@ -1,3 +1,4 @@
+# need at least one obj file to build for Kbuild
+obj-y							+= dummy.o
+# here's how to do conditional builds:
 #obj-$(CONFIG_E1000)			+= e1000.o
-obj-$(CONFIG_NE2K)			+= ne2k.o
-#obj-$(CONFIG_RL8168)		+= rl8168.o

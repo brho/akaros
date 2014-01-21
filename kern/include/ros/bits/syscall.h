@@ -43,26 +43,6 @@
 #define SYS_poke_ksched				30
 #define SYS_abort_sysc				31
 
-/* Socket Syscalls */
-#define SYS_socket					40
-#define SYS_sendto					41
-#define SYS_recvfrom				42
-#define SYS_select					43
-#define SYS_connect					44
-#define SYS_send					45
-#define SYS_recv					46
-#define SYS_bind					47
-#define SYS_accept					48
-#define SYS_listen					49
-
-/* Platform specific syscalls */
-#define SYS_serial_read				75
-#define SYS_serial_write			76
-#define SYS_eth_read				77
-#define SYS_eth_write				78
-#define SYS_eth_get_mac_addr		79
-#define SYS_eth_recv_check			80
-
 /* FS Syscalls */
 #define SYS_read				100
 #define SYS_write				101

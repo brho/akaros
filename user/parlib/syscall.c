@@ -46,36 +46,6 @@ ssize_t sys_shared_page_free(void* addr, pid_t p2)
 	return ros_syscall(SYS_shared_page_free, addr, p2, 0, 0, 0, 0);
 }
 
-//Write a buffer over the serial port
-ssize_t sys_serial_write(void* buf, size_t len) 
-{
-	return ros_syscall(SYS_serial_write, buf, len, 0, 0, 0, 0);
-}
-
-//Read a buffer over the serial port
-ssize_t sys_serial_read(void* buf, size_t len) 
-{
-	return ros_syscall(SYS_serial_read, buf, len, 0, 0, 0, 0);
-}
-
-//Write a buffer over ethernet
-ssize_t sys_eth_write(void* buf, size_t len) 
-{
-	if (len == 0)
-		return 0;
-	
-	return ros_syscall(SYS_eth_write, buf, len, 0, 0, 0, 0);
-}
-
-//Read a buffer via ethernet
-ssize_t sys_eth_read(void* buf, size_t len) 
-{
-	if (len == 0)
-		return 0;
-		
-	return ros_syscall(SYS_eth_read, buf, len, 0, 0, 0, 0);
-}
-
 void sys_reboot(void)
 {
 	ros_syscall(SYS_reboot, 0, 0, 0, 0, 0, 0);

@@ -1,7 +1,7 @@
 #include <multiboot.h>
 #include <arch/frontend.h>
-#include <net/nic_common.h>
 #include <kmalloc.h>
+#include <assert.h>
 
 #define debug(...) printk(__VA_ARGS__)
 

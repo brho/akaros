@@ -2,7 +2,8 @@ menuconfig NETWORKING
 	bool "Networking Support"
 	default y
 	help
-		Basic networking (TCP, UDP, IP, etc).
+		This is a placeholder for networking related option.  Right now,
+		CONFIG_NETWORKING does not change the build in any way.
 
 if NETWORKING
 
