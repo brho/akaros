@@ -11,172 +11,86 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
-#include <alarm.h>
+#include <apipe.h>
 
-static struct
-{
-	qlock_t qlock;
-	struct rendez	producer;
-	struct rendez consumer;
-	uint32_t	randomcount;
-	uint8_t	buf[1024];
-	uint8_t	*ep;
-	uint8_t	*rp;
-	uint8_t	*wp;
-	uint8_t	next;
-	uint8_t	bits;
-	uint8_t	wakeme;
-	uint8_t	filled;
-	int	target;
-	uint32_t	randn;
+#define RAND_BUF_SZ 1024
+
+static struct rb {
+	uint8_t buf[RAND_BUF_SZ];
+	struct atomic_pipe ap;
 } rb;
 
-static int
-rbnotfull(void*unused)
+/* The old style seemed to have genrandom incrementing a shared mem variable,
+ * randomcount, while randomclock, sort of an interrupt handler, would use this
+ * variable to generate random numbers.  They needed to run concurrently to get
+ * some sort of randonmess.  To do so, randomclock wouldn't run if genrandom
+ * wasn't in the process of incrementing the variable.  So we'd need genrandom
+ * working (in the background, but that doesn't work so well for us), when the
+ * randomclock alarm fired.  Then we could get 2 bits.  We'd do that 4 times
+ * to make our random byte.
+ *
+ * In akaros, genrandom would spin to 100,000 every time, without interruption,
+ * since the randomcount's alarm wouldn't interrupt: they are both routine
+ * kernel messages.  So we might as well just call kthread yield each time.
+ * Even then, it was still really slow.  This was because we only got 2 bits of
+ * randomness every 13ms (randomcount would make 2 bits per run, it would run
+ * once every 13ms, unless I screwed up the math on that.  It was supposed to
+ * run with a "Frequency close but not equal to HZ").
+ *
+ * We'd also use the old random values in the ring buffer to muck with the
+ * randomness. */
+static void genrandom(void *unused)
 {
-	int i;
-
-	i = rb.wp - rb.rp;
-	if(i < 0)
-		i += sizeof(rb.buf);
-	return i < rb.target;
-}
-
-static int
-rbnotempty(void*unused)
-{
-	return rb.wp != rb.rp;
-}
-
-static void
-genrandom(void*unused)
-{
-	/* TODO: set this to low priority, if we ever have something like that */
+	uint8_t rand_two_bits, rp_byte, wp_byte;
+	uint8_t rand_byte = 0;
+	unsigned int mod_four = 0;
 	//setpri(PriBackground);
 
 	for(;;) {
-		for(;;)
-			if(++rb.randomcount > 100000)
-				break;
-		//if(anyhigher())
-			kthread_yield();
-		if(rb.filled || !rbnotfull(0))
-			rendez_sleep(&rb.producer, rbnotfull, 0);
-	}
-}
+		/* this seems just as good (or bad) as the old genrandom incrementing a
+		 * shared memory variable concurrently */
+		rand_two_bits = read_tsc() & 0x3;
+		rand_byte = (rand_byte << 2) ^ rand_two_bits;
 
-/*
- *  produce random bits in a circular buffer
- */
-static void
-randomclock(void)
-{
-	uint8_t *p;
+		/* put in a kthread_yield or something here, if we want to replicate the
+		 * way randomclock would return, waiting til its next tick to get two
+		 * more bits. */
 
-	if(rb.randomcount == 0)
-		return;
-
-	if(!rbnotfull(0)) {
-		rb.filled = 1;
-		return;
-	}
-
-	rb.bits = (rb.bits<<2) ^ (rb.randomcount&3);
-	rb.randomcount = 0;
-
-	rb.next += 2;
-	if(rb.next != 8)
-		return;
-
-	rb.next = 0;
-	*rb.wp ^= rb.bits ^ *rb.rp;
-	p = rb.wp+1;
-	if(p == rb.ep)
-		p = rb.buf;
-	rb.wp = p;
-
-	if(rb.wakeme)
-		rendez_wakeup(&rb.consumer);
-}
-
-struct alarm_waiter random_waiter;
-static void __random_alarm(struct alarm_waiter *waiter)
-{
-	randomclock();
-	/* Set our alarm to go off, incrementing from our last tick (instead of
-	 * setting it relative to now, since some time has passed since the alarm
-	 * first went off.  Note, this may be now or in the past! */
-	set_awaiter_inc(&random_waiter, 13000);
-	__set_alarm(&per_cpu_info[core_id()].tchain, &random_waiter);
-}
-
-void
-randominit(void)
-{
-	qlock_init(&rb.qlock);
-	rendez_init(&rb.producer);
-	rendez_init(&rb.consumer);
-	rb.target = 16;
-	rb.ep = rb.buf + sizeof(rb.buf);
-	rb.rp = rb.wp = rb.buf;
-	/* Run randomclock every 13 ms */
-	/* Frequency close but not equal to HZ */
-	init_awaiter(&random_waiter, __random_alarm);
-	set_awaiter_rel(&random_waiter, 13000);
-	set_alarm(&per_cpu_info[core_id()].tchain, &random_waiter);
-	/* instead of waiting for randomread to kick it off */
-	ktask("genrand", genrandom, NULL);
-}
-
-/*
- *  consume random bytes from a circular buffer
- */
-uint32_t
-randomread(void *xp, uint32_t n)
-{
-	ERRSTACK(1);
-	int i, sofar;
-	uint8_t *e, *p;
-
-	p = xp;
-
-	qlock(&(&rb)->qlock);
-	if(waserror()){
-		qunlock(&(&rb)->qlock);
-		nexterror();
-	}
-
-	for(sofar = 0; sofar < n; sofar += i){
-		i = rb.wp - rb.rp;
-		if(i == 0){
-			rb.wakeme = 1;
-			rendez_wakeup(&rb.producer);
-			rendez_sleep(&rb.consumer, rbnotempty, 0);
-			rb.wakeme = 0;
+		/* every four times, we built a full random byte */
+		if (++mod_four % 4 == 0)
 			continue;
-		}
-		if(i < 0)
-			i = rb.ep - rb.rp;
-		if((i+sofar) > n)
-			i = n - sofar;
-		memmove(p + sofar, rb.rp, i);
-		e = rb.rp + i;
-		if(e == rb.ep)
-			e = rb.buf;
-		rb.rp = e;
-	}
-	if(rb.filled && rb.wp == rb.rp){
-		i = 2*rb.target;
-		if(i > sizeof(rb.buf) - 1)
-			i = sizeof(rb.buf) - 1;
-		rb.target = i;
-		rb.filled = 0;
-	}
-	poperror();
-	qunlock(&(&rb)->qlock);
 
-	rendez_wakeup(&rb.producer);
+		/* the old plan9 generator would xor our rand_byte with both the value
+		 * of the read pointer and the write pointer:
+		 * 		*rb.wp ^= rb.bits ^ *rb.rp;
+		 * we'll peak into the apipe to do the same */
+		rp_byte = rb.buf[rb.ap.ap_rd_off & (RAND_BUF_SZ - 1)];
+		wp_byte = rb.buf[rb.ap.ap_wr_off & (RAND_BUF_SZ - 1)];
+		rand_byte ^= rp_byte ^ wp_byte;
+		apipe_write(&rb.ap, &rand_byte, 1);
+	}
+}
 
-	return n;
+void randominit(void)
+{
+	apipe_init(&rb.ap, rb.buf, sizeof(rb.buf), 1);
+	ktask("genrandom", genrandom, 0);
+}
+
+uint32_t randomread(void *buf, uint32_t n)
+{
+	int amt;
+	uint32_t ret = 0;
+
+	for (int i = 0; i < n; i++) {
+		/* read the random byte directly into the (user) buffer */
+		amt = apipe_read(&rb.ap, buf, 1);
+		if (amt < 0)
+			error("randomread apipe");
+		if (amt != 1)
+			warn("Odd amount read from random apipe");
+		buf++;
+		ret += amt;
+	}
+	return ret;
 }
