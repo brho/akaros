@@ -97,6 +97,7 @@ pipeattach(char *spec)
 	memmove(p->pipedir, pipedir, sizeof(pipedir));
 	kstrdup(&p->user, current->user);
 	kref_init(&p->ref, pipe_release, 1);
+	qlock_init(&p->qlock);
 
 	p->q[0] = qopen(pipealloc.pipeqsize, 0, 0, 0);
 	if(p->q[0] == 0)
@@ -221,9 +222,10 @@ pipeopen(struct chan *c, int omode)
 	Pipe *p;
 
 	if(c->qid.type & QTDIR){
+		/* let it go however */
 		if(omode != OREAD)
-			error(Ebadarg);
-		c->mode = omode;
+			printk/*error*/("Can only open directories OREAD, mode is %d", omode);
+		c->mode = OREAD; //omode;
 		c->flag |= COPEN;
 		c->offset = 0;
 		return c;

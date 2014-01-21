@@ -334,7 +334,7 @@ devpermcheck(char *fileuid, uint32_t perm, int omode)
 
 	t = access[omode&3];
 	if((t&perm) != t)
-		error(Eperm);
+		error("%s: devpermcheck(%s,0x%x,0x%x) failed", Eperm, fileuid, perm, omode);
 }
 
 struct chan*
