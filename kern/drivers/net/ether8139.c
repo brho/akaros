@@ -18,20 +18,6 @@
 #include <smp.h>
 #include <ip.h>
 
-#include <vfs.h>
-#include <kfs.h>
-#include <slab.h>
-#include <kmalloc.h>
-#include <kref.h>
-#include <string.h>
-#include <stdio.h>
-#include <assert.h>
-#include <error.h>
-#include <cpio.h>
-#include <pmap.h>
-#include <smp.h>
-#include <ip.h>
-
 enum {							/* registers */
 	Idr0 = 0x0000,				/* MAC address */
 	Mar0 = 0x0008,	/* Multicast address */
@@ -190,20 +176,19 @@ enum {							/* Tsd0 */
 enum {
 	Rblen = Rblen64K,			/* Receive Buffer Length */
 	Ntd = 4,	/* Number of Transmit Descriptors */
-	Tdbsz = ROUNDUP(sizeof(Etherpkt), 4),
 };
+#define 	Tdbsz		ROUNDUP(sizeof(struct etherpkt), 4)
 
-typedef struct Ctlr Ctlr;
-typedef struct Ctlr {
+typedef struct ctlr {
 	int port;
-	Pcidev *pcidev;
+	struct pci_device *pcidev;
 	struct ctlr *next;
 	int active;
 	int id;
 
 	qlock_t alock;				/* attach */
 	spinlock_t ilock;			/* init */
-	void *alloc;				/* base of per-Ctlr allocated data */
+	void *alloc;				/* base of per-ctlr allocated data */
 
 	int rcr;					/* receive configuration register */
 	uint8_t *rbstart;			/* receive buffer */
@@ -222,17 +207,27 @@ typedef struct Ctlr {
 	int dis;					/* disconnect counter */
 	int fcsc;					/* false carrier sense counter */
 	int rec;					/* RX_ER counter */
-} Ctlr;
+} ctlr;
 
 static struct ctlr *ctlrhead;
 static struct ctlr *ctlrtail;
 
 #define csr8r(c, r)	(inb((c)->port+(r)))
-#define csr16r(c, r)	(ins((c)->port+(r)))
+#define csr16r(c, r)	(inw((c)->port+(r)))
 #define csr32r(c, r)	(inl((c)->port+(r)))
 #define csr8w(c, r, b)	(outb((c)->port+(r), (int)(b)))
-#define csr16w(c, r, w)	(outs((c)->port+(r), (uint16_t)(w)))
+#define csr16w(c, r, w)	(outw((c)->port+(r), (uint16_t)(w)))
 #define csr32w(c, r, l)	(outl((c)->port+(r), (uint32_t)(l)))
+
+/* Helper for checking physical memory calculations.  This driver doesn't
+ * support 64 bit DMA, so we can't handle kaddrs that map to pages that are
+ * above the 32 bit phyiscal memory line (4GB) */
+static void paddr_check(void *kaddr)
+{
+	if (paddr_high32(kaddr))
+		panic("rtl8139: attempted to publish paddr > 4GB!.  "
+		      "Try running with less memory.");
+}
 
 static void rtl8139promiscuous(void *arg, int on)
 {
@@ -241,14 +236,14 @@ static void rtl8139promiscuous(void *arg, int on)
 
 	edev = arg;
 	ctlr = edev->ctlr;
-	spin_lock_irqsave(&(&ctlr->ilock)->lock);
+	spin_lock_irqsave(&ctlr->ilock);
 
 	if (on)
 		ctlr->rcr |= Aap;
 	else
 		ctlr->rcr &= ~Aap;
 	csr32w(ctlr, Rcr, ctlr->rcr);
-	spin_unlock_irqsave(&(&ctlr->ilock)->lock);
+	spin_unlock_irqsave(&ctlr->ilock);
 }
 
 static long rtl8139ifstat(struct ether *edev, void *a, long n, uint32_t offset)
@@ -306,7 +301,7 @@ static int rtl8139reset(struct ctlr *ctlr)
 	for (timeo = 0; timeo < 1000; timeo++) {
 		if (!(csr8r(ctlr, Cr) & Rst))
 			return 0;
-		delay(1);
+		udelay(1000);
 	}
 
 	return -1;
@@ -336,7 +331,7 @@ static void rtl8139init(struct ether *edev)
 	uint8_t *alloc;
 
 	ctlr = edev->ctlr;
-	spin_lock_irqsave(&(&ctlr->ilock)->lock);
+	spin_lock_irqsave(&ctlr->ilock);
 
 	rtl8139halt(ctlr);
 
@@ -352,14 +347,13 @@ static void rtl8139init(struct ether *edev)
 	/*
 	 * Receiver
 	 */
-	alloc =
-		mmucacheinhib((char *unused_char_p_t)
-					  ROUNDUP((uint32_t) ctlr->alloc, CACHELINESZ),
-					  ctlr->rblen + 16 + Ntd * Tdbsz);
+	// inferno had mmucacheinhib here
+	alloc = (uint8_t*)ROUNDUP((uintptr_t)ctlr->alloc, ARCH_CL_SIZE);
 	ctlr->rbstart = alloc;
 	alloc += ctlr->rblen + 16;
 	memset(ctlr->rbstart, 0, ctlr->rblen + 16);
-	csr32w(ctlr, Rbstart, PCIWADDR(ctlr->rbstart));
+	csr32w(ctlr, Rbstart, paddr_low32(ctlr->rbstart));
+	paddr_check(ctlr->rbstart);
 	ctlr->rcr = Rxfth256 | Rblen | Mrxdmaunlimited | Ab | Apm;
 
 	/*
@@ -391,7 +385,7 @@ static void rtl8139init(struct ether *edev)
 	csr32w(ctlr, Tcr, Mtxdma2048);
 	csr32w(ctlr, Rcr, ctlr->rcr);
 
-	spin_unlock_irqsave(&(&ctlr->ilock)->lock);
+	spin_unlock_irqsave(&ctlr->ilock);
 }
 
 static void rtl8139attach(struct ether *edev)
@@ -399,13 +393,14 @@ static void rtl8139attach(struct ether *edev)
 	struct ctlr *ctlr;
 
 	ctlr = edev->ctlr;
-	qlock(&(&ctlr->alock)->qlock);
+	qlock(&ctlr->alock);
 	if (ctlr->alloc == NULL) {
 		ctlr->rblen = 1 << ((Rblen >> RblenSHIFT) + 13);
-		ctlr->alloc = mallocz(ctlr->rblen + 16 + Ntd * Tdbsz + CACHELINESZ, 0);
+		ctlr->alloc = kzmalloc(ctlr->rblen + 16 + Ntd * Tdbsz + ARCH_CL_SIZE,
+		                       KMALLOC_WAIT);
 		rtl8139init(edev);
 	}
-	qunlock(&(&ctlr->alock)->qlock);
+	qunlock(&ctlr->alock);
 }
 
 static void rtl8139txstart(struct ether *edev)
@@ -423,22 +418,26 @@ static void rtl8139txstart(struct ether *edev)
 		size = BLEN(bp);
 
 		td = &ctlr->td[ctlr->tdh];
-		if (((int)bp->rp) & 0x03) {
+		if (((uintptr_t)bp->rp) & 0x03) {
 			memmove(td->data, bp->rp, size);
-			dcflush(td->data, size);
+			/* flushing the data cache? */
+			//dcflush(td->data, size);
 			freeb(bp);
-			csr32w(ctlr, td->tsad, PCIWADDR(td->data));
+			csr32w(ctlr, td->tsad, paddr_low32(td->data));
+			paddr_check(td->data);
 			ctlr->tunaligned++;
 		} else {
 			td->bp = bp;
-			csr32w(ctlr, td->tsad, PCIWADDR(bp->rp));
-			dcflush(bp->rp, size);
+			csr32w(ctlr, td->tsad, paddr_low32(bp->rp));
+			/* flushing the data cache? */
+			//dcflush(bp->rp, size);
+			paddr_check(bp->rp);
 			ctlr->taligned++;
 		}
 		csr32w(ctlr, td->tsd, (ctlr->etxth << EtxthSHIFT) | size);
 
 		ctlr->ntd++;
-		ctlr->tdh = NEXT(ctlr->tdh, Ntd);
+		ctlr->tdh = NEXT_RING(ctlr->tdh, Ntd);
 	}
 }
 
@@ -447,9 +446,9 @@ static void rtl8139transmit(struct ether *edev)
 	struct ctlr *ctlr;
 
 	ctlr = edev->ctlr;
-	spin_lock_irqsave(&(&ctlr->tlock)->lock);
+	spin_lock_irqsave(&ctlr->tlock);
 	rtl8139txstart(edev);
-	spin_unlock_irqsave(&(&ctlr->tlock)->lock);
+	spin_unlock_irqsave(&ctlr->tlock);
 }
 
 static void rtl8139receive(struct ether *edev)
@@ -480,11 +479,11 @@ static void rtl8139receive(struct ether *edev)
 		status = (*(p + 1) << 8) | *p;
 		if (!(status & Rcok)) {
 			if (status & (Ise | Fae))
-				edev->frames++;
+				edev->netif.frames++;
 			if (status & Crc)
-				edev->crcs++;
+				edev->netif.crcs++;
 			if (status & (Runt | Long))
-				edev->buffs++;
+				edev->netif.buffs++;
 
 			/*
 			 * Reset the receiver.
@@ -493,7 +492,8 @@ static void rtl8139receive(struct ether *edev)
 			 */
 			cr = csr8r(ctlr, Cr);
 			csr8w(ctlr, Cr, cr & ~Re);
-			csr32w(ctlr, Rbstart, PCIWADDR(ctlr->rbstart));
+			csr32w(ctlr, Rbstart, paddr_low32(ctlr->rbstart));
+			paddr_check(ctlr->rbstart);
 			csr8w(ctlr, Cr, cr);
 			csr32w(ctlr, Rcr, ctlr->rcr);
 
@@ -532,7 +532,7 @@ static void rtl8139receive(struct ether *edev)
 	}
 }
 
-static void rtl8139interrupt(Ureg *, void *arg)
+static void rtl8139interrupt(struct hw_trapframe *tf, void *arg)
 {
 	Td *td;
 	struct ctlr *ctlr;
@@ -552,7 +552,7 @@ static void rtl8139interrupt(Ureg *, void *arg)
 		}
 
 		if (isr & (Ter | Tok)) {
-			spin_lock_irqsave(&(&ctlr->tlock)->lock);
+			spin_lock_irqsave(&ctlr->tlock);
 			while (ctlr->ntd) {
 				td = &ctlr->td[ctlr->tdi];
 				tsd = csr32r(ctlr, td->tsd);
@@ -564,7 +564,7 @@ static void rtl8139interrupt(Ureg *, void *arg)
 						if (ctlr->etxth < ETHERMAXTU / 32)
 							ctlr->etxth++;
 					}
-					edev->oerrs++;
+					edev->netif.oerrs++;
 				}
 
 				if (td->bp != NULL) {
@@ -573,10 +573,10 @@ static void rtl8139interrupt(Ureg *, void *arg)
 				}
 
 				ctlr->ntd--;
-				ctlr->tdi = NEXT(ctlr->tdi, Ntd);
+				ctlr->tdi = NEXT_RING(ctlr->tdi, Ntd);
 			}
 			rtl8139txstart(edev);
-			spin_unlock_irqsave(&(&ctlr->tlock)->lock);
+			spin_unlock_irqsave(&ctlr->tlock);
 			isr &= ~(Ter | Tok);
 		}
 
@@ -586,11 +586,11 @@ static void rtl8139interrupt(Ureg *, void *arg)
 			 */
 			msr = csr8r(ctlr, Msr);
 			if (!(msr & Linkb)) {
-				if (!(msr & Speed10) && edev->mbps != 100) {
-					edev->mbps = 100;
+				if (!(msr & Speed10) && edev->netif.mbps != 100) {
+					edev->netif.mbps = 100;
 					qsetlimit(edev->oq, 256 * 1024);
-				} else if ((msr & Speed10) && edev->mbps != 10) {
-					edev->mbps = 10;
+				} else if ((msr & Speed10) && edev->netif.mbps != 10) {
+					edev->netif.mbps = 10;
 					qsetlimit(edev->oq, 65 * 1024);
 				}
 			}
@@ -605,7 +605,7 @@ static void rtl8139interrupt(Ureg *, void *arg)
 		 * other than try to reinitialise the chip?
 		 */
 		if (isr != 0) {
-			iprint("rtl8139interrupt: imr 0x%4.4x isr 0x%4.4x\n",
+			printk("rtl8139interrupt: imr 0x%4.4x isr 0x%4.4x\n",
 				   csr16r(ctlr, Imr), isr);
 			if (isr & Timerbit)
 				csr32w(ctlr, TimerInt, 0);
@@ -618,7 +618,7 @@ static void rtl8139interrupt(Ureg *, void *arg)
 static struct ctlr *rtl8139match(struct ether *edev, int id)
 {
 	int port;
-	Pcidev *p;
+	struct pci_device *pcidev;
 	struct ctlr *ctlr;
 
 	/*
@@ -628,22 +628,26 @@ static struct ctlr *rtl8139match(struct ether *edev, int id)
 	for (ctlr = ctlrhead; ctlr != NULL; ctlr = ctlr->next) {
 		if (ctlr->active)
 			continue;
-		p = ctlr->pcidev;
-		if (((p->did << 16) | p->vid) != id)
+		pcidev = ctlr->pcidev;
+		if (((pcidev->dev_id << 16) | pcidev->ven_id) != id)
 			continue;
-		port = p->mem[0].bar & ~0x01;
+		port = pcidev->bar[0].pio_base;
 		if (edev->port != 0 && edev->port != port)
 			continue;
 
-		if (ioalloc(port, p->mem[0].size, 0, "rtl8139") < 0) {
+		#if 0
+		/* trying to alloc PIO ports (.size of them?).  for now, we just assume
+		 * they are free */
+		if (ioalloc(port, pcidev->mem[0].size, 0, "rtl8139") < 0) {
 			printd("rtl8139: port 0x%x in use\n", port);
 			continue;
 		}
+		#endif
 
 		ctlr->port = port;
 		if (rtl8139reset(ctlr))
 			continue;
-		pcisetbme(p);
+		pci_set_bus_master(pcidev);
 
 		ctlr->active = 1;
 		return ctlr;
@@ -669,22 +673,26 @@ NULL},};
 static int rtl8139pnp(struct ether *edev)
 {
 	int i, id;
-	Pcidev *p;
+	struct pci_device *pcidev;
 	struct ctlr *ctlr;
 	uint8_t ea[Eaddrlen];
 
-	/*
-	 * Make a list of all ethernet controllers
-	 * if not already done.
-	 */
+	/* Make a list of all ethernet controllers if not already done.
+	 *
+	 * brho: this style is a bit weird - we have ctlr structs for every NIC,
+	 * including non-rtl NICs. */
 	if (ctlrhead == NULL) {
-		p = NULL;
-		while (p = pcimatch(p, 0, 0)) {
-			if (p->ccrb != 0x02 || p->ccru != 0)
+		STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
+			/* this skips over non-ethernet devices. */
+			if (pcidev->class != 0x02|| pcidev->subclass != 0)
 				continue;
-			ctlr = kzmalloc(sizeof(struct ctlr), 0);
-			ctlr->pcidev = p;
-			ctlr->id = (p->did << 16) | p->vid;
+
+			ctlr = kzmalloc(sizeof(struct ctlr), KMALLOC_WAIT);
+			qlock_init(&ctlr->alock);
+			spinlock_init_irqsave(&ctlr->ilock);
+			spinlock_init_irqsave(&ctlr->tlock);
+			ctlr->pcidev = pcidev;
+			ctlr->id = (pcidev->dev_id << 16) | pcidev->ven_id;
 
 			if (ctlrhead != NULL)
 				ctlrtail->next = ctlr;
@@ -702,10 +710,12 @@ static int rtl8139pnp(struct ether *edev)
 	 * specific controller only.
 	 */
 	id = 0;
+	#if 0 // No struct ether options yet (goes with archenter, i think)
 	for (i = 0; i < edev->nopt; i++) {
 		if (cistrncmp(edev->opt[i], "id=", 3) == 0)
 			id = strtol(&edev->opt[i][3], NULL, 0);
 	}
+	#endif
 
 	ctlr = NULL;
 	if (id != 0)
@@ -718,10 +728,11 @@ static int rtl8139pnp(struct ether *edev)
 	if (ctlr == NULL)
 		return -1;
 
+	printd("RTL8139 driver found %s at %02x:%02x.%x\n", rtl8139pci[i].name,
+	       ctlr->pcidev->bus, ctlr->pcidev->dev, ctlr->pcidev->func);
 	edev->ctlr = ctlr;
 	edev->port = ctlr->port;
-	edev->irq = ctlr->pcidev->intl;
-	edev->tbdf = ctlr->pcidev->tbdf;
+	edev->irq = ctlr->pcidev->irqline;
 
 	/*
 	 * Check if the adapter's station address is to be overridden.
@@ -743,14 +754,14 @@ static int rtl8139pnp(struct ether *edev)
 	edev->interrupt = rtl8139interrupt;
 	edev->ifstat = rtl8139ifstat;
 
-	edev->arg = edev;
-	edev->promiscuous = rtl8139promiscuous;
+	edev->netif.arg = edev;
+	edev->netif.promiscuous = rtl8139promiscuous;
 
 	/*
 	 * This should be much more dynamic but will do for now.
 	 */
 	if ((csr8r(ctlr, Msr) & (Speed10 | Linkb)) == 0)
-		edev->mbps = 100;
+		edev->netif.mbps = 100;
 
 	return 0;
 }

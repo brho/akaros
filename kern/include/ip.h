@@ -992,7 +992,6 @@ struct ether {
 	char *type;
 	int	irq;
 	int port;
-	int	tbdf;			/* type+busno+devno+funcno */
 	int	minmtu;
 	int	maxmtu;
 	uint8_t	ea[Eaddrlen];
@@ -1025,5 +1024,8 @@ struct ether {
 extern struct block* etheriq(struct ether*, struct block*, int);
 extern void addethercard( char *unused_char_p_t, int(*)(struct ether*));
 extern int archether( int unused_int, struct ether*);
+
+#define NEXT_RING(x, len) (((x) + 1) % (len))
+#define PREV_RING(x, len) (((x) == 0) ? (len) - 1: (x) - 1)
 
 #endif /* ROS_KERN_IP_H */

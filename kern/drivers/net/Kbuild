@@ -1,5 +1,5 @@
 # need at least one obj file to build for Kbuild
 obj-y							+= dummy.o
-#obj-y						+= ether8139.o
+obj-y							+= ether8139.o
 # here's how to do conditional builds:
 #obj-$(CONFIG_E1000)			+= e1000.o
