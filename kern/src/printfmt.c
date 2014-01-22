@@ -58,6 +58,8 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 	unsigned long long num;
 	int base, lflag, width, precision, altflag;
 	char padc;
+	uint8_t *mac, *ip, *mask;
+	int i;
 
 	while (1) {
 		while ((ch = *(unsigned char *) fmt) != '%') {
@@ -82,7 +84,7 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 		case '-':
 			padc = '-';
 			goto reswitch;
-			
+
 		// flag to pad with 0's instead of spaces
 		case '0':
 			padc = '0';
@@ -145,6 +147,24 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 				printfmt(putch, putdat, "%s", error_string[err]);
 			break;
 
+		case 'E': // ENET MAC
+			if ((mac = va_arg(ap, uint8_t *)) == NULL){
+				char *s = "00:00:00:00:00:00";
+				while(*s)
+					putch(*s++, putdat);
+			}
+			printemac(putch, putdat, mac);
+			break;
+		case 'I':
+			/* what to do if they screw up? */
+			if ((ip = va_arg(ap, uint8_t *)) != NULL)
+				printip(putch, putdat, ip);
+			break;
+		case 'M':
+			/* what to do if they screw up? */
+			if ((mask = va_arg(ap, uint8_t *)) != NULL)
+				printipmask(putch, putdat, mask);
+			break;
 		// string
 		case 's':
 			if ((p = va_arg(ap, char *)) == NULL)
@@ -215,7 +235,7 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 		case '%':
 			putch(ch, putdat);
 			break;
-			
+
 		// unrecognized escape sequence - just print it literally
 		default:
 			putch('%', putdat);

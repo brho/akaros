@@ -53,7 +53,6 @@ uint8_t v4prefix[IPaddrlen] = {
 	0, 0, 0, 0
 };
 
-
 char *v6hdrtypes[Maxhdrtype] =
 {
 	[HBH]		"HopbyHop",
@@ -273,95 +272,6 @@ static uint8_t prefixvals[256] =
 [0xFE] 7 | Isprefix,
 [0xFF] 8 | Isprefix,
 };
-
-#warning "what did we do about eipfmt?"
-
-int
-eipfmt(void)
-{
-	return 0;
-#if 0
-	char buf[5*8];
-	static char *efmt = "0x%.2lx0x%.2lx0x%.2lx0x%.2lx0x%.2lx0x%.2lx";
-	static char *ifmt = "%d.%d.%d.%d";
-	uint8_t *p, ip[16];
-	uint32_t *lp;
-	uint16_t s;
-	int i, j, n, eln, eli;
-
-	switch(f->r) {
-	case 'E':		/* Ethernet address */
-		p = va_arg(f->args, uint8_t *unused_uint8_p_t);
-		return fmtprint(f, efmt, p[0], p[1], p[2], p[3], p[4], p[5]);
-		return fmtstrncpy(f,  buf, sizeof(f));
-
-	case 'I':		/* Ip address */
-		p = va_arg(f->args, uint8_t *unused_uint8_p_t);
-common:
-		if(memcmp(p, v4prefix, 12) == 0)
-			return fmtprint(f, ifmt, p[12], p[13], p[14], p[15]);
-
-		/* find longest elision */
-		eln = eli = -1;
-		for(i = 0; i < 16; i += 2){
-			for(j = i; j < 16; j += 2)
-				if(p[j] != 0 || p[j+1] != 0)
-					break;
-			if(j > i && j - i > eln){
-				eli = i;
-				eln = j - i;
-			}
-		}
-
-		/* print with possible elision */
-		n = 0;
-		for(i = 0; i < 16; i += 2){
-			if(i == eli){
-				n += sprint(buf+n, "::");
-				i += eln;
-				if(i >= 16)
-					break;
-			} else if(i != 0)
-				n += sprint(buf+n, ":");
-			s = (p[i]<<8) + p[i+1];
-			n += sprint(buf+n, "0x%x", s);
-		}
-		return fmtstrncpy(f,  buf, sizeof(f));
-
-	case 'i':		/* v6 address as 4 longs */
-		lp = va_arg(f->args, uint32_t*);
-		for(i = 0; i < 4; i++)
-			hnputl(ip+4*i, *lp++);
-		p = ip;
-		goto common;
-
-	case 'V':		/* v4 ip address */
-		p = va_arg(f->args, uint8_t *unused_uint8_p_t);
-		return fmtprint(f, ifmt, p[0], p[1], p[2], p[3]);
-
-	case 'M':		/* ip mask */
-		p = va_arg(f->args, uint8_t *unused_uint8_p_t);
-
-		/* look for a prefix mask */
-		for(i = 0; i < 16; i++)
-			if(p[i] != 0xff)
-				break;
-		if(i < 16){
-			if((prefixvals[p[i]] & Isprefix) == 0)
-				goto common;
-			for(j = i+1; j < 16; j++)
-				if(p[j] != 0)
-					goto common;
-			n = 8*i + (prefixvals[p[i]] & ~Isprefix);
-		} else
-			n = 8*16;
-
-		/* got one, use /xx format */
-		return fmtprint(f, "/%d", n);
-	}
-	return fmtstrncpy(f,  "(eipfmt)", sizeof(f));
-#endif
-}
 
 #define CLASS(p) ((*( uint8_t *)(p))>>6)
 

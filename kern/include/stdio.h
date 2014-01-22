@@ -52,4 +52,10 @@ int	vfprintf(int fd, const char *NTS fmt, va_list);
 int readline(char *buf, size_t buf_l, const char *prompt, ...);
 
 char *seprintf(char *buf, char *end, const char *fmt, ...);
+
+// kern/src/net/eipconv.c
+void printemac(void (*putch)(int, void**), void **putdat, uint8_t *mac);
+void printip(void (*putch)(int, void**), void **putdat, uint8_t *ip);
+void printipmask(void (*putch)(int, void**), void **putdat, uint8_t *ip);
+
 #endif /* !ROS_INC_STDIO_H */
