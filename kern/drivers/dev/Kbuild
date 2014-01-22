@@ -2,7 +2,6 @@ obj-y						+= alarm.o
 obj-y						+= cons.o
 obj-y						+= dev.o
 obj-y						+= ether.o
-#obj-y						+= ether8139.o
 obj-y						+= mnt.o
 obj-y						+= pipe.o
 obj-y						+= root.o
