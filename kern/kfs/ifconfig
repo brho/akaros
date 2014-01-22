@@ -89,10 +89,10 @@ i=`cat /net/ipifc/clone`
 # bind the ether0 to it
 echo "bind ether /net/ether0 " > /net/ipifc/$i/ctl
 # ifconfig it
-#echo "add $me $mask $remote" > /net/ipifc/$i/ctl
-#echo "add 0 0 $route" > /net/iproute
-#echo I am $me, default route $route
+echo "add $me $mask $remote" > /net/ipifc/$i/ctl
+echo "add 0 0 $route" > /net/iproute
+echo I am $me, default route $route
 
 i=`cat /net/ipifc/clone`
-echo "bind loopback /dev/null " > /net/ipifc/1/ctl
-echo "add 127.0.0.1 255.0.0.0 127.0.0.0 " > /net/ipifc/1/ctl
+echo "bind loopback /dev/null " > /net/ipifc/$i/ctl
+echo "add 127.0.0.1 255.0.0.0 127.0.0.0 " > /net/ipifc/$i/ctl
