@@ -93,12 +93,8 @@ void kernel_init(multiboot_info_t *mboot_info)
 */
 	ethermediumlink();
 	loopbackmediumlink();
-void devtabinit(void);
-	devtabinit();
-/*
-void devtabreset(void);
 	devtabreset();
-*/
+	devtabinit();
 
 #ifdef CONFIG_EXT2FS
 	mount_fs(&ext2_fs_type, "/dev/ramdisk", "/mnt", 0);

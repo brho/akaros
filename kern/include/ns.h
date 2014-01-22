@@ -963,6 +963,10 @@ char *get_cur_genbuf(void);
 #define	seconds() tsc2sec(read_tsc())
 #define	milliseconds() tsc2msec(read_tsc())
 
+/* kern/drivers/dev/tab.c */
+void devtabinit();
+void devtabreset();
+
 /* kern/src/ns/parse.c */
 struct cmdbuf *parsecmd(char *p, int n);
 void cmderror(struct cmdbuf *cb, char *s);
