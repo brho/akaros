@@ -800,7 +800,7 @@ qcopy(struct queue *q, int len, uint32_t offset)
 
 static void qinit_common(struct queue *q)
 {
-	spinlock_init(&q->lock);
+	spinlock_init_irqsave(&q->lock);
 	qlock_init(&q->rlock);
 	qlock_init(&q->wlock);
 	rendez_init(&q->rr);
