@@ -766,7 +766,7 @@ static int rtl8139pnp(struct ether *edev)
 	return 0;
 }
 
-void __etherlink ether8139link(void)
+linker_func_3(ether8139link)
 {
 	addethercard("rtl8139", rtl8139pnp);
 }

@@ -793,8 +793,7 @@ multicastarp(struct Fs *f,
 	return NULL;
 }
 
-void
-ethermediumlink(void)
+linker_func_4(ethermediumlink)
 {
 	addipmedium(&ethermedium);
 	addipmedium(&gbemedium);

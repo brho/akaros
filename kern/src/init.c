@@ -86,17 +86,9 @@ void kernel_init(multiboot_info_t *mboot_info)
 	arch_init();
 	block_init();
 	enable_irq();
-	void ether8139link(void);
-	ether8139link();
 	run_linker_funcs();
-/*
-	void ether8169link(void);
-	ether8169link();
-	void etherigbelink(void);
-	etherigbelink();
-*/
-	ethermediumlink();
-	loopbackmediumlink();
+	/* reset/init devtab after linker funcs 3 and 4.  these run NIC and medium
+	 * pre-inits, which need to happen before devether. */
 	devtabreset();
 	devtabinit();
 
