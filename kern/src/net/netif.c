@@ -237,7 +237,7 @@ netifread(struct netif *nif, struct chan *c, void *a, long n, uint32_t offset)
 		j += snprintf(p+j, READSTR-j, "mbps: %d\n", nif->mbps);
 		j += snprintf(p+j, READSTR-j, "addr: ");
 		for(i = 0; i < nif->alen; i++)
-			j += snprintf(p+j, READSTR-j, "%2.2u", nif->addr[i]);
+			j += snprintf(p+j, READSTR-j, "%02.2x", nif->addr[i]);
 		snprintf(p+j, READSTR-j, "\n");
 		n = readstr(offset, a, n, p);
 		kfree(p);
@@ -248,7 +248,7 @@ netifread(struct netif *nif, struct chan *c, void *a, long n, uint32_t offset)
 			return 0;
 		j = 0;
 		for(i = 0; i < nif->alen; i++)
-			j += snprintf(p+j, READSTR-j, "%2.2u", nif->addr[i]);
+			j += snprintf(p+j, READSTR-j, "%02.2x", nif->addr[i]);
 		n = readstr(offset, a, n, p);
 		kfree(p);
 		return n;

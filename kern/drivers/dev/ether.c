@@ -706,7 +706,7 @@ etherreset(void)
 				register_dev_irq(ether->irq, ether->interrupt, ether);
 
 			i = snprintf(buf, sizeof(buf),
-			             "#l%d: %s: %dMbps port 0x%lx irq %lu", ctlrno,
+			             "#l%d: %s: %dMbps port 0x%x irq %u", ctlrno,
 			             ether->type, ether->netif.mbps, ether->port,
 			             ether->irq);
 			/* Looks like this is for printing MMIO addrs */
@@ -719,7 +719,7 @@ etherreset(void)
 				              ether->size);
 			#endif
 			i += snprintf(buf + i, sizeof(buf) - i,
-			              ": %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x",
+			              ": %02.2x:%02.2x:%02.2x:%02.2x:%02.2x:%02.2x",
 			              ether->ea[0], ether->ea[1], ether->ea[2],
 			              ether->ea[3], ether->ea[4], ether->ea[5]);
 			snprintf(buf + i, sizeof(buf) - i, "\n");
