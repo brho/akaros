@@ -43,9 +43,12 @@
 #include <ext2fs.h>
 #include <kthread.h>
 #include <console.h>
+#include <linker_func.h>
 
 // zra: flag for Ivy
 int booting = 1;
+
+static void run_linker_funcs(void);
 
 void kernel_init(multiboot_info_t *mboot_info)
 {
@@ -85,6 +88,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	enable_irq();
 	void ether8139link(void);
 	ether8139link();
+	run_linker_funcs();
 /*
 	void ether8169link(void);
 	ether8169link();
@@ -149,27 +153,43 @@ void _warn(const char *file, int line, const char *fmt,...)
 	va_end(ap);
 }
 
+static void run_links(linker_func_t *linkstart, linker_func_t *linkend)
+{
+	/* Unlike with devtab, our linker sections for the function pointers are
+	 * 8 byte aligned (4 on 32 bit) (done by the linker/compiler), so we don't
+	 * have to worry about that.  */
+	printd("linkstart %p, linkend %p\n", linkstart, linkend);
+	for (int i = 0; &linkstart[i] < linkend; i++) {
+		printd("i %d, linkfunc %p\n", i, linkstart[i]);
+		linkstart[i]();
+	}
+}
+
+static void run_linker_funcs(void)
+{
+	run_links(__linkerfunc1start, __linkerfunc1end);
+	run_links(__linkerfunc2start, __linkerfunc2end);
+	run_links(__linkerfunc3start, __linkerfunc3end);
+	run_links(__linkerfunc4start, __linkerfunc4end);
+}
+
 /* You need to reference PROVIDE symbols somewhere, or they won't be included.
  * Only really a problem for debugging. */
 void debug_linker_tables(void)
 {
 	extern struct dev __devtabstart[];
 	extern struct dev __devtabend[];
-	extern char __devlinkstart[];
-	extern char __devlinkend[];
-	extern char __etherlinkstart[];
-	extern char __etherlinkend[];
-	extern char __mediastart[];
-	extern char __mediaend[];
-	printk("devtab %p %p\ndevlink %p %p\netherlink %p %p\nmedia %p %p\n", 
+	printk("devtab %p %p\nlink1 %p %p\nlink2 %p %p\nlink3 %p %p\nlink4 %p %p\n",
 	       __devtabstart,
 	       __devtabend,
-	       __devlinkstart,
-	       __devlinkend,
-	       __etherlinkstart,
-	       __etherlinkend,
-	       __mediastart,
-	       __mediaend);
+		   __linkerfunc1start,
+		   __linkerfunc1end,
+		   __linkerfunc2start,
+		   __linkerfunc2end,
+		   __linkerfunc3start,
+		   __linkerfunc3end,
+		   __linkerfunc4start,
+		   __linkerfunc4end);
 }
 
 #endif //Everything For Free

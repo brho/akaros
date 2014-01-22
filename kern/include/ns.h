@@ -6,6 +6,8 @@
 #include <err.h>
 #include <rendez.h>
 #include <rwlock.h>
+#include <linker_func.h>
+
 /*
  * functions (possibly) linked in, complete, from libc.
  */
@@ -1029,8 +1031,5 @@ extern unsigned int	qiomaxatomic;
 
 /* special sections */
 #define __devtab  __attribute__((__section__(".devtab")))
-#define __devlink  __attribute__((__section__(".devlink")))
-#define __etherlink  __attribute__((__section__(".etherlink")))
-#define __media  __attribute__((__section__(".media")))
 
 #endif /* ROS_KERN_NS_H */
