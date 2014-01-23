@@ -76,20 +76,10 @@ void printip(void (*putch)(int, void**), void **putdat, uint8_t *ip)
 	}
 }
 
-/* what format to use? */
-#if 0
-case 'i':	/* v6 address as 4 longs */
-			lp = va_arg(ap, uint32_t *);
-			for (i = 0; i < 4; i++)
-				hnputl(ip + 4 * i, *lp++);
-			p = ip;
-			goto common;
-
-		case 'V':	/* v4 ip address */
-			p = va_arg(ap, uint8_t *);
-			printfmt(putch, putdat, ifmt, p[0], p[1], p[2], p[3]);
-			break;
-#endif
+void printipv4(void (*putch)(int, void**), void **putdat, uint8_t *p)
+{
+	printfmt(putch, putdat, ifmt, p[0], p[1], p[2], p[3]);
+}
 
 void printipmask(void (*putch)(int, void**), void **putdat, uint8_t *ip)
 {

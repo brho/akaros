@@ -60,6 +60,7 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 	char padc;
 	uint8_t *mac, *ip, *mask;
 	int i;
+	uint32_t *lp;
 
 	while (1) {
 		while ((ch = *(unsigned char *) fmt) != '%') {
@@ -155,6 +156,16 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 			}
 			printemac(putch, putdat, mac);
 			break;
+		case 'i':
+			/* what to do if they screw up? */
+			if ((lp = va_arg(ap, uint32_t *)) != NULL){
+				uint32_t hostfmt;
+				for(i = 0; i < 4; i++){
+					hnputl(&lp[i], &hostfmt);
+					printfmt(putch, putdat, "%08lx", hostfmt);
+				}
+			}
+			break;
 		case 'I':
 			/* what to do if they screw up? */
 			if ((ip = va_arg(ap, uint8_t *)) != NULL)
@@ -165,6 +176,12 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 			if ((mask = va_arg(ap, uint8_t *)) != NULL)
 				printipmask(putch, putdat, mask);
 			break;
+		case 'V':
+			/* what to do if they screw up? */
+			if ((ip = va_arg(ap, uint8_t *)) != NULL)
+				printipv4(putch, putdat, ip);
+			break;
+
 		// string
 		case 's':
 			if ((p = va_arg(ap, char *)) == NULL)
