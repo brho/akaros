@@ -3,24 +3,18 @@
 #include <string.h>
 #include <unistd.h>
 #include <assert.h>
-//#include <nixip.h>
+#include <net.h>
 
-int main()
-{
-	printf("Commented out, pending inferno stack\n");
-	return 0;
-}
-
-#if 0
 /* simple test, gets a single web page.  no url parsing, no timeout detection,
  * etc.  pass it the IP addr and page to fetch.
  *
  * check out http://www.d.umn.edu/~gshute/net/http-script.html for some info. */
 int main(int argc, char *argv[])
 {
-	char *host, *page, *addr;
+	char *host, *page;
 	int dfd, ret;
 	char buf[128];
+	char addr[256];
 	if (argc != 3) {
 		printf("Usage: %s HOST PAGE\n", argv[0]);
 		host = "128.32.37.180";
@@ -30,8 +24,12 @@ int main(int argc, char *argv[])
 		page = argv[2];
 	}
 	printf("Trying to access http://%s/%s\n", host, page);
-	/* mkaddr/dial style */
-	addr = netmkaddr(host, "/9/net/tcp", "80");
+	/* manually making our own addr (no mkaddr, which was racy anyway) */
+	ret = snprintf(addr, sizeof(addr), "tcp!%s!%s", host, "80");
+	if (snprintf_overflow(ret, addr, sizeof(addr))) {
+		perror("Addr string too long");
+		exit(-1);
+	}
 	dfd = dial(addr, 0, 0, 0);
 	if (dfd < 0) {
 		perror("Bad Data FD");
@@ -52,4 +50,3 @@ int main(int argc, char *argv[])
 		printf("%s", buf);
 	}
 }
-#endif
