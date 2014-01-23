@@ -518,11 +518,15 @@ parsemac(uint8_t *to, char *from, int len)
 
 /*
  *  hashing tcp, udp, ... connections
+ *  gcc weirdness: it gave a bogus result until ron split the %= out.
  */
-uint32_t
-iphash(uint8_t *sa, uint16_t sp, uint8_t *da, uint16_t dp)
+uint32_t iphash(uint8_t * sa, uint16_t sp, uint8_t * da, uint16_t dp)
 {
-	return ((sa[IPaddrlen-1]<<24) ^ (sp << 16) ^ (da[IPaddrlen-1]<<8) ^ dp ) % Nhash;
+	uint32_t ret;
+	ret = (sa[IPaddrlen - 1] << 24) ^ (sp << 16) ^ (da[IPaddrlen - 1] << 8)
+	      ^ dp;
+	ret %= Nhash;
+	return ret;
 }
 
 void

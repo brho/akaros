@@ -66,8 +66,6 @@ struct block *allocb(int size)
 {
 	struct block *b;
 
-	if (!current)
-		panic("allocb outside process: %p", getcallerpc(&size));
 	b = _allocb(size);
 	if (b == 0)
 		exhausted("Blocks");
