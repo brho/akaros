@@ -14,8 +14,8 @@
 #include <ip.h>
 
 /* courtesy of the inferno mkroot script. */
-int rootmaxq = 12;
-struct dirtab roottab[12] = {
+int rootmaxq = 13;
+struct dirtab roottab[13] = {
 	{"",	{0, 0, QTDIR},	 0,	0555},
 	{"chan",	{1, 0, QTDIR},	 0,	0555},
 	{"dev",	{2, 0, QTDIR},	 0,	0555},
@@ -28,9 +28,12 @@ struct dirtab roottab[12] = {
 	{"env",	{9, 0, QTDIR},	 0,	0555},
 	{"root",	{10, 0, QTDIR},	 0,	0555},
 	{"srv",	{11, 0, QTDIR},	 0,	0555},
+	/* not courtesy of mkroot */
+	{"mnt",	{12, 0, QTDIR},	 0,	0555},
 };
-struct rootdata rootdata[12] = {
-	{0,	 &roottab[1],	 11,	NULL},
+struct rootdata rootdata[13] = {
+	{0,	 &roottab[1],	 12,	NULL},
+	{0,	 NULL,	 0,	 NULL},
 	{0,	 NULL,	 0,	 NULL},
 	{0,	 NULL,	 0,	 NULL},
 	{0,	 NULL,	 0,	 NULL},
