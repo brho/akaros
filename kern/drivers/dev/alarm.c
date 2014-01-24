@@ -116,7 +116,7 @@ static int alarmgen(struct chan *c, char *entry_name,
 	/* Whether we're in one dir or at the top, .. still takes us to the top. */
 	if (s == DEVDOTDOT) {
 		mkqid(&q, Qtopdir, 0, QTDIR);
-		devdir(c, c->qid, "#A", 0, eve, 0555, dp);
+		devdir(c, q, "#A", 0, eve, 0555, dp);
 		return 1;
 	}
 	switch (TYPE(c->qid)) {
@@ -259,7 +259,6 @@ static struct chan *alarmopen(struct chan *c, int omode)
 			/* the purpose of opening is to hold a kref on the proc_alarm */
 			a = QID2A(c->qid);
 			assert(a);
-			assert(a->proc == current);
 			/* this isn't a valid pointer yet, since our chan doesn't have a
 			 * ref.  since the time that walk gave our chan the qid, the chan
 			 * could have been closed, and the alarm decref'd and freed.  the
@@ -270,6 +269,7 @@ static struct chan *alarmopen(struct chan *c, int omode)
 			spin_lock(&p->alarmset.lock);
 			TAILQ_FOREACH(a_i, &p->alarmset.list, link) {
 				if (a_i == a) {
+					assert(a->proc == current);
 					/* it's still possible we're not getting the ref, racing
 					 * with the release method */
 					if (!kref_get_not_zero(&a->kref, 1)) {
