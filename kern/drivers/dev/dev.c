@@ -201,14 +201,18 @@ devwalk(struct chan *c,
 		for(i=0;; i++) {
 			switch((*gen)(nc, n, tab, ntab, i, &dir)){
 			case -1:
+				printd("DEVWALK -1, i was %d, want path %p\n", i, c->qid.path);
 			Notfound:
 				if(j == 0)
 					error(Enonexist);
 				set_errstr(Enonexist);
 				goto Done;
 			case 0:
+				printd("DEVWALK continue, i was %d\n", i);
 				continue;
 			case 1:
+				printd("DEVWALK gen returns path %p name %s, want path %p\n",
+				       dir.qid.path, dir.name, c->qid.path);
 				if(strcmp(n, dir.name) == 0){
 					nc->qid = dir.qid;
 					goto Accept;
@@ -247,6 +251,7 @@ devstat(struct chan *c, uint8_t *db, int n,
 		switch((*gen)(c, NULL, tab, ntab, i, &dir)){
 		case -1:
 			if(c->qid.type & QTDIR){
+				printd("DEVSTAT got a dir: %llu\n", c->qid.path);
 				if(c->name == NULL)
 					elem = "???";
 				else if(strcmp(c->name->s, "/") == 0)
@@ -294,12 +299,15 @@ devdirread(struct chan *c, char *d, long n,
 	for(m=0; m<n; c->dri++) {
 		switch((*gen)(c, NULL, tab, ntab, c->dri, &dir[0])){
 		case -1:
+			printd("DEVDIRREAD got -1, asked for s = %d\n", c->dri);
 			return m;
 
 		case 0:
+			printd("DEVDIRREAD got 0, asked for s = %d\n", c->dri);
 			break;
 
 		case 1:
+			printd("DEVDIRREAD got 1, asked for s = %d\n", c->dri);
 			dsz = convD2M(&dir[0], ( uint8_t *)d, n-m);
 			if(dsz <= BIT16SZ){	/* <= not < because this isn't stat; read is stuck */
 				if(m == 0)

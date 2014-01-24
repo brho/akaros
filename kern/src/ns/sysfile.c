@@ -108,9 +108,12 @@ fdtochan(struct fgrp *f, int fd, int mode, int chkmnt, int iref)
 		error(Ebadusefd);
 	}
 
-	/* TODO: this is probably wrong */
+	/* TODO: this is probably wrong.  if you get this from a dev, in the dev's
+	 * open, you are probably saving mode directly, without passing it through
+	 * openmode. */
 	if((mode&~OTRUNC) != c->mode) {
-		warn("Trunc mode issue, check this crap out");
+		warn("Trunc mode issue: mode %o, mode minus trunc %o, chan mode %o\n",
+		     mode, mode & ~OTRUNC, c->mode);
 		if(iref)
 			cclose(c);
 		error(Ebadusefd);
