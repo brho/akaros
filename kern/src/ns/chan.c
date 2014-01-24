@@ -1090,7 +1090,12 @@ namec(char *aname, int amode, int omode, uint32_t perm)
 			error("walk failed");
 		}
 	NameError:
-		error("some kinda name error");
+		if (current_errstr()[0]) {
+			/* errstr is set, we'll just stick with it and error out */
+			longjmp(&get_cur_errbuf()->jmpbuf, 1);
+		} else {
+			error("Name to chan lookup failed");
+		}
 		/* brho: skipping the namec custom error string business, since it hides
 		 * the underlying failure.  implement this if you want the old stuff. */
 #if 0
