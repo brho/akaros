@@ -419,11 +419,10 @@ mntwalk(struct chan *c, struct chan *nc, char **name, int nname)
 	r = mntralloc(c, m->msize);
 	if(nc == NULL){
 		nc = devclone(c);
-		/*
-		 * Until the other side accepts this fid, we can't mntclose it.
-		 * Therefore set type to 0 for now; rootclose is known to be safe.
-		 */
-		nc->type = 0;
+		/* Until the other side accepts this fid, we can't mntclose it.
+		 * Therefore set type to -1 for now.  inferno was setting this to 0,
+		 * assuming it was devroot.  lining up with chanrelease and newchan */
+		nc->type = -1;
 		alloc = 1;
 	}
 	wq->clone = nc;
