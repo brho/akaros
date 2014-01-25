@@ -203,6 +203,7 @@ devwalk(struct chan *c,
 			case -1:
 				printd("DEVWALK -1, i was %d, want path %p\n", i, c->qid.path);
 			Notfound:
+				set_errno(ENOENT);
 				if(j == 0)
 					error(Enonexist);
 				set_errstr(Enonexist);
@@ -267,6 +268,7 @@ devstat(struct chan *c, uint8_t *db, int n,
 				return n;
 			}
 			printd("DEVSTAT fails:%c %llu\n", devtab[c->type].dc, c->qid.path);
+			set_errno(ENOENT);
 			error(Enonexist);
 		case 0:
 			printd("DEVSTAT got 0\n");

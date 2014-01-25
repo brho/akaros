@@ -57,6 +57,7 @@ struct dev *devtabget(int dc, int user)
 	}
 
 	printk("devtabget FAILED %c\n", dc);
+	set_errno(ENOENT);
 	error(Enonexist);
 }
 

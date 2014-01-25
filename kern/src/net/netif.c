@@ -376,8 +376,10 @@ netifwstat(struct netif *nif, struct chan *c, uint8_t *db, int n)
 	int m;
 
 	f = nif->f[NETID(c->qid.path)];
-	if(f == 0)
+	if(f == 0) {
+		set_errno(ENOENT);
 		error(Enonexist);
+	}
 
 	if(netown(f, current->user, OWRITE) < 0)
 		error(Eperm);
