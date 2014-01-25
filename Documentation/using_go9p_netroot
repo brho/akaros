@@ -8,29 +8,25 @@ pacman -S go
 
 apt-get install golang
 
+You should now have things set up in /usr/lib/go.
+To install new things, as a non-priveleged user,
+you need a local place to build packages.
+
 Set a GOPATH, e.g.
- $ export GOPATH=~/go
- $ go get code.google.com/p/go9p/p
+ $ export GOPATH=~/go:/usr/lib/go
+ $ go get github.com/rminnich/go9p/ufs # fetches dependencies
 
 This *should* work
 
- $ go install code.google.com/p/go9p/p
+ $ go install github.com/rminnich/go9p/ufs
 
-but does not (Why?)
+ufs ends up in:
 
-Find the directory, in my case it is:
-
-/home/rminnich/go/src/code.google.com/p/go9p/p/srv/examples/ufs
-
-cd there, type
-
- $ go build
-
-and you'll see the ufs binary.
+/home/rminnich/go/bin/ufs
 
 You can now run ufs, specifying the appropriate root directory:
 
- $ sudo ufs -addr=:564 -root=whereever
+ $ sudo ~/go/bin/ufs -addr=:564 -root=whereever
 
 Here is an example qemu command which some of us use:
 
