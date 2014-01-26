@@ -696,7 +696,7 @@ etherreset(void)
 			}
 			#endif
 			if(cards[n].reset(ether))
-				break;
+				continue;
 			/* might be fucked a bit - reset() doesn't know the type.  might not
 			 * even matter, except for debugging. */
 			ether->type = cards[n].type;
