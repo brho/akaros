@@ -42,6 +42,8 @@
 #include <pmap.h>
 #include <smp.h>
 #include <ip.h>
+#include "e1000_osdep.h"
+#include "e1000_regs.h"
 #include "e1000_defines.h"
 
 struct e1000_hw;
@@ -494,19 +496,10 @@ struct e1000_host_mng_command_info {
 	uint8_t command_data[E1000_HI_MAX_MNG_DATA_LENGTH];
 };
 
-#include <vfs.h>
-#include <kfs.h>
-#include <slab.h>
-#include <kmalloc.h>
-#include <kref.h>
-#include <string.h>
-#include <stdio.h>
-#include <assert.h>
-#include <error.h>
-#include <cpio.h>
-#include <pmap.h>
-#include <smp.h>
-#include <ip.h>
+#include "e1000_mac.h"
+#include "e1000_phy.h"
+#include "e1000_nvm.h"
+#include "e1000_manage.h"
 
 struct e1000_mac_operations {
 	/* Function pointers for the MAC. */

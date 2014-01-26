@@ -65,7 +65,7 @@
 #define E1000_WRITE_REG(a, reg, value) \
     outl((int)((a)->hw_addr + E1000_REGISTER(a, reg)), (value))
 
-#define E1000_READ_REG(a, reg) (inl((a)->hw_addr + E1000_REGISTER(a, reg)))
+#define E1000_READ_REG(a, reg) (inl((int)((a)->hw_addr + E1000_REGISTER(a, reg))))
 
 #define E1000_WRITE_REG_ARRAY(a, reg, offset, value) \
     outl((int)((a)->hw_addr + E1000_REGISTER(a, reg) + ((offset) << 2)), (value))

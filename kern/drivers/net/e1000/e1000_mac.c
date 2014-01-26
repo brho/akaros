@@ -293,7 +293,7 @@ static void e1000_set_lan_id_multi_port_pcie(struct e1000_hw *hw)
 	 * The status register reports the correct function number
 	 * for the device regardless of function swap state.
 	 */
-	reg = E1000_READ_REG(hw, E1000_STATUS);
+	reg = E1000_READ_REG((int)hw, E1000_STATUS);
 	bus->func = (reg & E1000_STATUS_FUNC_MASK) >> E1000_STATUS_FUNC_SHIFT;
 }
 
@@ -311,7 +311,7 @@ void e1000_set_lan_id_multi_port_pci(struct e1000_hw *hw)
 
 	e1000_read_pci_cfg(hw, PCI_HEADER_TYPE_REGISTER, &pci_header_type);
 	if (pci_header_type & PCI_HEADER_TYPE_MULTIFUNC) {
-		status = E1000_READ_REG(hw, E1000_STATUS);
+		status = E1000_READ_REG((int)hw, E1000_STATUS);
 		bus->func = (status & E1000_STATUS_FUNC_MASK)
 		            >> E1000_STATUS_FUNC_SHIFT;
 	} else {
