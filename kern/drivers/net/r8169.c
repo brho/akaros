@@ -2236,6 +2236,12 @@ struct pci_driver rtl8169_driver __pci_driver = {
   .remove = rtl8169_remove,
 };
 #endif
+
+linker_func_3(ether8169link)
+{
+	addethercard("rtl8169", rtl8169pnp);
+}
+
 /*
  * Local variables:
  *  c-basic-offset: 8
