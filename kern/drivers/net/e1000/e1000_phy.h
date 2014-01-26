@@ -26,16 +26,15 @@
 
 *******************************************************************************/
 
-FILE_LICENCE ( GPL2_OR_LATER );
 
 #ifndef _E1000_PHY_H_
 #define _E1000_PHY_H_
 
 void e1000_init_phy_ops_generic(struct e1000_hw *hw);
-s32  e1000_null_read_reg(struct e1000_hw *hw, u32 offset, u16 *data);
+s32  e1000_null_read_reg(struct e1000_hw *hw, uint32_t offset, uint16_t *data);
 void e1000_null_phy_generic(struct e1000_hw *hw);
 s32  e1000_null_lplu_state(struct e1000_hw *hw, bool active);
-s32  e1000_null_write_reg(struct e1000_hw *hw, u32 offset, u16 data);
+s32  e1000_null_write_reg(struct e1000_hw *hw, uint32_t offset, uint16_t data);
 s32  e1000_check_downshift_generic(struct e1000_hw *hw);
 s32  e1000_check_polarity_m88(struct e1000_hw *hw);
 s32  e1000_check_polarity_igp(struct e1000_hw *hw);
@@ -64,25 +63,33 @@ void e1000_phy_force_speed_duplex_setup(struct e1000_hw *hw, u16 *phy_ctrl);
 s32  e1000_phy_hw_reset_generic(struct e1000_hw *hw);
 s32  e1000_phy_reset_dsp_generic(struct e1000_hw *hw);
 s32  e1000_phy_setup_autoneg(struct e1000_hw *hw);
-s32  e1000_read_kmrn_reg_generic(struct e1000_hw *hw, u32 offset, u16 *data);
-s32  e1000_read_phy_reg_igp(struct e1000_hw *hw, u32 offset, u16 *data);
-s32  e1000_read_phy_reg_m88(struct e1000_hw *hw, u32 offset, u16 *data);
+s32  e1000_read_kmrn_reg_generic(struct e1000_hw *hw, uint32_t offset,
+				 uint16_t *data);
+s32  e1000_read_phy_reg_igp(struct e1000_hw *hw,
+			    uint32_t offset, uint16_t *data);
+s32  e1000_read_phy_reg_m88(struct e1000_hw *hw,
+			    uint32_t offset, uint16_t *data);
 s32  e1000_set_d3_lplu_state_generic(struct e1000_hw *hw, bool active);
 s32  e1000_setup_copper_link_generic(struct e1000_hw *hw);
 s32  e1000_wait_autoneg_generic(struct e1000_hw *hw);
-s32  e1000_write_kmrn_reg_generic(struct e1000_hw *hw, u32 offset, u16 data);
-s32  e1000_write_phy_reg_igp(struct e1000_hw *hw, u32 offset, u16 data);
-s32  e1000_write_phy_reg_m88(struct e1000_hw *hw, u32 offset, u16 data);
+s32  e1000_write_kmrn_reg_generic(struct e1000_hw *hw, uint32_t offset,
+				  uint16_t data);
+s32  e1000_write_phy_reg_igp(struct e1000_hw *hw,
+			     uint32_t offset, uint16_t data);
+s32  e1000_write_phy_reg_m88(struct e1000_hw *hw,
+			     uint32_t offset, uint16_t data);
 s32  e1000_phy_reset_dsp(struct e1000_hw *hw);
-s32  e1000_phy_has_link_generic(struct e1000_hw *hw, u32 iterations,
-                                u32 usec_interval, bool *success);
+s32  e1000_phy_has_link_generic(struct e1000_hw *hw, uint32_t iterations,
+                                uint32_t usec_interval, bool *success);
 s32  e1000_phy_init_script_igp3(struct e1000_hw *hw);
-enum e1000_phy_type e1000_get_phy_type_from_id(u32 phy_id);
+enum e1000_phy_type e1000_get_phy_type_from_id(uint32_t phy_id);
 s32  e1000_determine_phy_address(struct e1000_hw *hw);
 void e1000_power_up_phy_copper(struct e1000_hw *hw);
 void e1000_power_down_phy_copper(struct e1000_hw *hw);
-s32  e1000_read_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 *data);
-s32  e1000_write_phy_reg_mdic(struct e1000_hw *hw, u32 offset, u16 data);
+s32  e1000_read_phy_reg_mdic(struct e1000_hw *hw,
+			     uint32_t offset, uint16_t *data);
+s32  e1000_write_phy_reg_mdic(struct e1000_hw *hw,
+			      uint32_t offset, uint16_t data);
 
 #define E1000_MAX_PHY_ADDR                4
 

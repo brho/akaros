@@ -26,8 +26,6 @@
 
 *******************************************************************************/
 
-FILE_LICENCE ( GPL2_OR_LATER );
-
 /* glue for the OS-dependent part of e1000
  * includes register access macros
  */
@@ -35,9 +33,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #ifndef _E1000_OSDEP_H_
 #define _E1000_OSDEP_H_
 
-#define u8         unsigned char
-#define bool       boolean_t
-#define dma_addr_t unsigned long
 #define __le16     uint16_t
 #define __le32     uint32_t
 #define __le64     uint64_t
@@ -45,12 +40,6 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define __iomem
 
 #define ETH_FCS_LEN 4
-
-typedef int spinlock_t;
-typedef enum {
-    false = 0,
-    true = 1
-} boolean_t;
 
 #define usec_delay(x) udelay(x)
 #define msec_delay(x) mdelay(x)
@@ -74,30 +63,25 @@ typedef enum {
                                : e1000_translate_register_82542(reg))
 
 #define E1000_WRITE_REG(a, reg, value) \
-    writel((value), ((a)->hw_addr + E1000_REGISTER(a, reg)))
+    outl((int)((a)->hw_addr + E1000_REGISTER(a, reg)), (value))
 
-#define E1000_READ_REG(a, reg) (readl((a)->hw_addr + E1000_REGISTER(a, reg)))
+#define E1000_READ_REG(a, reg) (inl((a)->hw_addr + E1000_REGISTER(a, reg)))
 
 #define E1000_WRITE_REG_ARRAY(a, reg, offset, value) \
-    writel((value), ((a)->hw_addr + E1000_REGISTER(a, reg) + ((offset) << 2)))
+    outl((int)((a)->hw_addr + E1000_REGISTER(a, reg) + ((offset) << 2)), (value))
 
-#define E1000_READ_REG_ARRAY(a, reg, offset) ( \
-    readl((a)->hw_addr + E1000_REGISTER(a, reg) + ((offset) << 2)))
+#define E1000_READ_REG_ARRAY(a, reg, offset) (inl((a)->hw_addr + E1000_REGISTER(a, reg) + ((offset) << 2)))
 
 #define E1000_READ_REG_ARRAY_DWORD E1000_READ_REG_ARRAY
 #define E1000_WRITE_REG_ARRAY_DWORD E1000_WRITE_REG_ARRAY
 
-#define E1000_WRITE_REG_ARRAY_WORD(a, reg, offset, value) ( \
-    writew((value), ((a)->hw_addr + E1000_REGISTER(a, reg) + ((offset) << 1))))
+#define E1000_WRITE_REG_ARRAY_WORD(a, reg, offset, value) (outw((value), ((a)->hw_addr + E1000_REGISTER(a, reg) + ((offset) << 1))))
 
-#define E1000_READ_REG_ARRAY_WORD(a, reg, offset) ( \
-    readw((a)->hw_addr + E1000_REGISTER(a, reg) + ((offset) << 1)))
+#define E1000_READ_REG_ARRAY_WORD(a, reg, offset) (inw((a)->hw_addr + E1000_REGISTER(a, reg) + ((offset) << 1)))
 
-#define E1000_WRITE_REG_ARRAY_BYTE(a, reg, offset, value) ( \
-    writeb((value), ((a)->hw_addr + E1000_REGISTER(a, reg) + (offset))))
+#define E1000_WRITE_REG_ARRAY_BYTE(a, reg, offset, value) (outb((value), ((a)->hw_addr + E1000_REGISTER(a, reg) + (offset))))
 
-#define E1000_READ_REG_ARRAY_BYTE(a, reg, offset) ( \
-    readb((a)->hw_addr + E1000_REGISTER(a, reg) + (offset)))
+#define E1000_READ_REG_ARRAY_BYTE(a, reg, offset) (inb((a)->hw_addr + E1000_REGISTER(a, reg) + (offset)))
 
 #define E1000_WRITE_REG_IO(a, reg, offset) do { \
     outl(reg, ((a)->io_base));                  \
@@ -105,14 +89,12 @@ typedef enum {
 
 #define E1000_WRITE_FLUSH(a) E1000_READ_REG(a, E1000_STATUS)
 
-#define E1000_WRITE_FLASH_REG(a, reg, value) ( \
-    writel((value), ((a)->flash_address + reg)))
+#define E1000_WRITE_FLASH_REG(a, reg, value) (outl((value), ((a)->flash_address + reg)))
 
-#define E1000_WRITE_FLASH_REG16(a, reg, value) ( \
-    writew((value), ((a)->flash_address + reg)))
+#define E1000_WRITE_FLASH_REG16(a, reg, value) (outw((value), ((a)->flash_address + reg)))
 
-#define E1000_READ_FLASH_REG(a, reg) (readl((a)->flash_address + reg))
+#define E1000_READ_FLASH_REG(a, reg) (inl((a)->flash_address + reg))
 
-#define E1000_READ_FLASH_REG16(a, reg) (readw((a)->flash_address + reg))
+#define E1000_READ_FLASH_REG16(a, reg) (inw((a)->flash_address + reg))
 
 #endif /* _E1000_OSDEP_H_ */

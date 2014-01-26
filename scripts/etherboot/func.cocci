@@ -1,5 +1,11 @@
 @@
 @@
+-DEBUGFUNC(
++printd(
+ ...)
+
+@@
+@@
 -DBGP(
 +printd(
  ...)

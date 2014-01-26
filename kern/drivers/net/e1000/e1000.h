@@ -26,7 +26,6 @@
 
 *******************************************************************************/
 
-FILE_LICENCE ( GPL2_ONLY );
 
 /* Linux PRO/1000 Ethernet Driver main header file */
 
@@ -103,8 +102,8 @@ struct e1000_buffer {
 	struct sk_buff *skb;
 	dma_addr_t dma;
 	unsigned long time_stamp;
-	u16 length;
-	u16 next_to_watch;
+	uint16_t length;
+	uint16_t next_to_watch;
 };
 
 struct e1000_rx_buffer {
@@ -132,8 +131,8 @@ struct e1000_tx_ring {
 	struct e1000_buffer *buffer_info;
 
 	spinlock_t tx_lock;
-	u16 tdh;
-	u16 tdt;
+	uint16_t tdh;
+	uint16_t tdt;
 
 	/* TXDdescriptor index increment to be used when advancing
 	* to the next descriptor. This is normally one, but on some
@@ -167,8 +166,8 @@ struct e1000_rx_ring {
 	/* cpu for rx queue */
 	int cpu;
 
-	u16 rdh;
-	u16 rdt;
+	uint16_t rdh;
+	uint16_t rdt;
 };
 
 
@@ -193,23 +192,23 @@ struct e1000_rx_ring {
 /* board specific private data structure */
 
 struct e1000_adapter {
-	u32 bd_number;
-	u32 rx_buffer_len;
-	u32 wol;
-	u32 smartspeed;
-	u32 en_mng_pt;
-	u16 link_speed;
-	u16 link_duplex;
+	uint32_t bd_number;
+	uint32_t rx_buffer_len;
+	uint32_t wol;
+	uint32_t smartspeed;
+	uint32_t en_mng_pt;
+	uint16_t link_speed;
+	uint16_t link_duplex;
 	spinlock_t stats_lock;
 	unsigned int total_tx_bytes;
 	unsigned int total_tx_packets;
 	unsigned int total_rx_bytes;
 	unsigned int total_rx_packets;
 	/* Interrupt Throttle Rate */
-	u32 itr;
-	u32 itr_setting;
-	u16 tx_itr;
-	u16 rx_itr;
+	uint32_t itr;
+	uint32_t itr_setting;
+	uint16_t tx_itr;
+	uint16_t rx_itr;
 
 	bool fc_autoneg;
 
@@ -217,18 +216,18 @@ struct e1000_adapter {
 	struct e1000_tx_ring *tx_ring;
 	unsigned int restart_queue;
 	unsigned long tx_queue_len;
-	u32 txd_cmd;
-	u32 tx_int_delay;
-	u32 tx_abs_int_delay;
-	u32 gotc;
+	uint32_t txd_cmd;
+	uint32_t tx_int_delay;
+	uint32_t tx_abs_int_delay;
+	uint32_t gotc;
 	u64 gotc_old;
 	u64 tpt_old;
 	u64 colc_old;
-	u32 tx_timeout_count;
-	u32 tx_fifo_head;
-	u32 tx_head_addr;
-	u32 tx_fifo_size;
-	u8 tx_timeout_factor;
+	uint32_t tx_timeout_count;
+	uint32_t tx_fifo_head;
+	uint32_t tx_head_addr;
+	uint32_t tx_fifo_size;
+	uint8_t tx_timeout_factor;
 	bool pcix_82544;
 	bool detect_tx_hung;
 
@@ -242,14 +241,14 @@ struct e1000_adapter {
 
 	u64 hw_csum_err;
 	u64 hw_csum_good;
-	u32 alloc_rx_buff_failed;
-	u32 rx_int_delay;
-	u32 rx_abs_int_delay;
+	uint32_t alloc_rx_buff_failed;
+	uint32_t rx_int_delay;
+	uint32_t rx_abs_int_delay;
 	bool rx_csum;
-	u32 gorc;
+	uint32_t gorc;
 	u64 gorc_old;
-	u32 max_frame_size;
-	u32 min_frame_size;
+	uint32_t max_frame_size;
+	uint32_t min_frame_size;
 
 
 	/* OS defined structs */
@@ -266,15 +265,15 @@ struct e1000_adapter {
 	int msg_enable;
 	/* to not mess up cache alignment, always add to the bottom */
 	unsigned long state;
-	u32 eeprom_wol;
+	uint32_t eeprom_wol;
 
-	u32 *config_space;
+	uint32_t *config_space;
 
 	/* hardware capability, feature, and workaround flags */
 	unsigned int flags;
 
 	/* upper limit parameter for tx desc size */
-	u32 tx_desc_pwr;
+	uint32_t tx_desc_pwr;
 
 #define NUM_TX_DESC	8
 #define NUM_RX_DESC	8
@@ -316,7 +315,7 @@ extern int e1000_up(struct e1000_adapter *adapter);
 extern void e1000_down(struct e1000_adapter *adapter);
 extern void e1000_reinit_locked(struct e1000_adapter *adapter);
 extern void e1000_reset(struct e1000_adapter *adapter);
-extern int e1000_set_spd_dplx(struct e1000_adapter *adapter, u16 spddplx);
+extern int e1000_set_spd_dplx(struct e1000_adapter *adapter, uint16_t spddplx);
 extern int e1000_setup_all_rx_resources(struct e1000_adapter *adapter);
 extern int e1000_setup_all_tx_resources(struct e1000_adapter *adapter);
 extern void e1000_free_all_rx_resources(struct e1000_adapter *adapter);

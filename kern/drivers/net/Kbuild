@@ -3,5 +3,4 @@ obj-y							+= dummy.o
 obj-y							+= ether8139.o
 obj-y							+= mii.o
 obj-y							+= r8169.o
-# here's how to do conditional builds:
-#obj-$(CONFIG_E1000)			+= e1000.o
+obj-y							+= e1000/

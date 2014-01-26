@@ -2239,7 +2239,7 @@ struct pci_driver rtl8169_driver __pci_driver = {
 
 linker_func_3(ether8169link)
 {
-	addethercard("rtl8169", rtl8169pnp);
+	//addethercard("rtl8169", rtl8169pnp);
 }
 
 /*
