@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+# idempotent unless marked otherwise
+spatch --sp-file scripts/etherboot/scalar.cocci --in-place $1
+spatch --sp-file scripts/etherboot/func.cocci --in-place $1
+spatch --sp-file scripts/etherboot/io.cocci --in-place $1
+sed -i '/FILE_LICENCE/d' $1
+

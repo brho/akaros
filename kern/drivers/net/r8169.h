@@ -24,12 +24,9 @@
  *
  */
 
-FILE_LICENCE ( GPL2_OR_LATER );
 
 #ifndef _R8169_H_
 #define _R8169_H_
-
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 /** FIXME: include/linux/pci_regs.h has these PCI regs, maybe
 	   we need such a file in gPXE?
@@ -88,12 +85,12 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define RTL_EEPROM_SIG_ADDR	0x0000
 
 /* write/read MMIO register */
-#define RTL_W8(reg, val8)	writeb ((val8), ioaddr + (reg))
-#define RTL_W16(reg, val16)	writew ((val16), ioaddr + (reg))
-#define RTL_W32(reg, val32)	writel ((val32), ioaddr + (reg))
-#define RTL_R8(reg)		readb (ioaddr + (reg))
-#define RTL_R16(reg)		readw (ioaddr + (reg))
-#define RTL_R32(reg)		((unsigned long) readl (ioaddr + (reg)))
+#define RTL_W8(reg, val8)	outb((int)(ioaddr + (reg)), (val8))
+#define RTL_W16(reg, val16)	outw((int)(ioaddr + (reg)), (val16))
+#define RTL_W32(reg, val32)	outl((int)(ioaddr + (reg)), (val32))
+#define RTL_R8(reg)		inb((int)(ioaddr + (reg)))
+#define RTL_R16(reg)		inw((int)(ioaddr + (reg)))
+#define RTL_R32(reg)		((unsigned long) inl((int)(ioaddr + (reg))))
 
 enum mac_version {
 	RTL_GIGA_MAC_VER_01 = 0x01, // 8169
@@ -128,8 +125,8 @@ enum mac_version {
 
 static const struct {
 	const char *name;
-	u8 mac_version;
-	u32 RxConfigMask;	/* Clears the bits supported by this chip */
+	uint8_t mac_version;
+	uint32_t RxConfigMask;	/* Clears the bits supported by this chip */
 } rtl_chip_info[] = {
 	_R("RTL8169",		RTL_GIGA_MAC_VER_01, 0xff7e1880), // 8169
 	_R("RTL8169s",		RTL_GIGA_MAC_VER_02, 0xff7e1880), // 8169S
@@ -310,7 +307,7 @@ enum rtl_register_content {
 	Speed_down	= (1 << 4),
 	MEMMAP		= (1 << 3),
 	IOMAP		= (1 << 2),
-	VPD		= (1 << 1),
+	VPD8169		= (1 << 1),
 	PMEnable	= (1 << 0),	/* Power Management Enable */
 
 	/* Config2 register p. 25 */
@@ -426,24 +423,20 @@ enum features {
 	RTL_FEATURE_GMII	= (1 << 2),
 };
 
-static void rtl_hw_start_8169(struct net_device *);
-static void rtl_hw_start_8168(struct net_device *);
-static void rtl_hw_start_8101(struct net_device *);
-
 struct rtl8169_private {
 
-	struct pci_device *pci_dev;
-	struct net_device *netdev;
+	//struct pci_device *pci_dev;
+	//struct net_device *netdev;
 	uint8_t *hw_addr;
 	void *mmio_addr;
 	uint32_t irqno;
 
 	int chipset;
 	int mac_version;
-	u16 intr_event;
+	uint16_t intr_event;
 
-	struct io_buffer *tx_iobuf[NUM_TX_DESC];
-	struct io_buffer *rx_iobuf[NUM_RX_DESC];
+	//struct io_buffer *tx_iobuf[NUM_TX_DESC];
+	//struct io_buffer *rx_iobuf[NUM_RX_DESC];
 
 	struct TxDesc *tx_base;
 	struct RxDesc *rx_base;
@@ -455,18 +448,20 @@ struct rtl8169_private {
 
 	uint32_t tx_fill_ctr;
 
-	u16 cp_cmd;
+	uint16_t cp_cmd;
 
 	int phy_auto_nego_reg;
 	int phy_1000_ctrl_reg;
 
-	int ( *set_speed ) (struct net_device *, u8 autoneg, u16 speed, u8 duplex );
-	void ( *phy_reset_enable ) ( void *ioaddr );
+#if 0
+	int ( *set_speed ) (struct net_device *, uint8_t autoneg, uint16_t speed,
+			    uint8_t duplex );
 	void ( *hw_start ) ( struct net_device * );
+#endif
+	void ( *phy_reset_enable ) ( void *ioaddr );
 	unsigned int ( *phy_reset_pending ) ( void *ioaddr );
 	unsigned int ( *link_ok ) ( void *ioaddr );
-
-	int pcie_cap;
+	uint32_t pcie_cap;
 
 	unsigned features;
 
