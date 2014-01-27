@@ -1336,7 +1336,11 @@ intreg_t sys_unlink(struct proc *p, const char *path, size_t path_l)
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
-	retval = sysremove(t_path);
+	retval = do_unlink(t_path);
+	if (retval) {
+		unset_errno();
+		retval = sysremove(t_path);
+	}
 	user_memdup_free(p, t_path);
 	return retval;
 }
@@ -1421,8 +1425,11 @@ intreg_t sys_mkdir(struct proc *p, const char *path, size_t path_l, int mode)
 	if (!t_path)
 		return -1;
 	mode &= ~p->fs_env.umask;
-	/* TODO: 9ns support */
-	retval = syscreate(t_path, DMDIR, mode);
+	retval = do_mkdir(t_path, mode);
+	if (retval) {
+		unset_errno();
+		retval = syscreate(t_path, DMDIR, mode);
+	}
 	user_memdup_free(p, t_path);
 	return retval;
 }
