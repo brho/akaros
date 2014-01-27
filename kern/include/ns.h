@@ -295,14 +295,6 @@ struct alarms
 	struct proc*	head;
 };
 
-struct rootdata
-{
-	int	dotdot;
-	void	*ptr;
-	int	size;
-	int	*sizep;
-};
-
 /*
  * Access types in namec & channel flags
  */
@@ -584,7 +576,8 @@ enum
 	READSTR =	1000,		/* temporary buffer size for device reads */
 };
 
-extern	struct dev	devtab[];
+extern	struct dev	devtab
+[];
 extern	struct dev	__devtabend[];
 
 struct cmdbuf
@@ -674,11 +667,11 @@ struct chan*		devattach( int unused_int, char *unused_char_p_t);
 struct block*		devbread(struct chan*, long, uint32_t);
 long		devbwrite(struct chan*, struct block*, uint32_t);
 struct chan*		devclone(struct chan*);
-void		devcreate(struct chan*, char *unused_char_p_t, int unused_int, uint32_t);
-void		devdir(struct chan*, struct qid, char *unused_char_p_t, int64_t, char*, long,
+void		devcreate(struct chan*, char *name, int mode, uint32_t perm);
+void		devdir(struct chan*, struct qid, char *, int64_t, char*, long,
 			   struct dir*);
-long		devdirread(struct chan*, char *unused_char_p_t, long,
-			       struct dirtab*, int unused_int, Devgen*);
+long		devdirread(struct chan*, char *, long,
+			       struct dirtab*, int , Devgen*);
 Devgen		devgen;
 void		devinit(void);
 int		devno( int unused_int, int);
