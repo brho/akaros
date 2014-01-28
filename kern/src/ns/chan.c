@@ -1175,7 +1175,10 @@ if(c->umh != NULL){
 				c->flag &= ~CCACHE;
 
 			c = devtab[c->type].open(c, omode&~OCEXEC);
-
+			/* here is where convert omode/vfs flags to c->flags */
+			if (omode & O_APPEND)
+				c->flag |= CAPPEND;
+			// CEXEC should be in the FD, not the chan, right?
 			if(omode & OCEXEC)
 				c->flag |= CCEXEC;
 			if(omode & ORCLOSE)
@@ -1279,6 +1282,8 @@ if(c->umh != NULL){
 
 			devtab[cnew->type].create(cnew, e.elems[e.ARRAY_SIZEs-1], omode&~(OEXCL|OCEXEC), perm);
 			poperror();
+			if (omode & O_APPEND)
+				cnew->flag |= CAPPEND;
 			if(omode & OCEXEC)
 				cnew->flag |= CCEXEC;
 			if(omode & ORCLOSE)

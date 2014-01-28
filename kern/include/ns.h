@@ -322,6 +322,8 @@ enum
 	CFREE	= 0x0010,		/* not in use */
 	CRCLOSE	= 0x0020,		/* remove on close */
 	CCACHE	= 0x0080,		/* client cache */
+	/* file/chan status flags, affected by setfl and reported in getfl */
+	CAPPEND	= 0x0100,		/* append on write */
 };
 
 enum
@@ -1018,6 +1020,8 @@ void print_chaninfo(struct chan *ch);
 void print_9ns_files(struct proc *p);
 int plan9setup(struct proc *new_proc, struct proc *parent);
 int iseve(void);
+int fd_getfl(int fd);
+int fd_setfl(int fd, int flags);
 
 static inline int abs(int a)
 {

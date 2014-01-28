@@ -1440,3 +1440,72 @@ int plan9setup(struct proc *new_proc, struct proc *parent)
 	return 0;
 }
 
+/* Open flags, create modes, access types, file flags, and all that...
+ *
+ * there are a bunch of things here:
+ * 		1) file creation flags (e.g. O_TRUNC)
+ * 		2) file status flags (e.g. O_APPEND)
+ * 		3) file open modes (e.g. O_RDWR)
+ * 		4) file descriptor flags (e.g. CLOEXEC)
+ * 		5) file creation mode (e.g. S_IRWXU)
+ * the 1-4 are passed in via open's vfs_flags, and the 5 via mode only when
+ * O_CREATE is set.
+ *
+ * file creation flags (1) only matter when creating, but aren't permanent.
+ * O_EXCL, O_DIRECTORY, O_TRUNC, etc.
+ *
+ * file status flags (2) are per struct file/chan.  stuff like O_APPEND,
+ * O_ASYNC, etc.  we convert those to an internal flag bit and store in c->flags
+ *
+ * the open mode (3) matters for a given FD/chan (chan->mode), and should be
+ * stored in the chan. (c->mode) stuff like O_RDONLY.
+ *
+ * the file descriptor flags (4) clearly are in the FD.  note that the same
+ * file/chan can be opened by two different FDs, with different flags.  the only
+ * one anyone uses is CLOEXEC.  while exec may not last long in akaros, i can
+ * imagine similar "never pass to children" flags/meanings.
+ *
+ * the file creation mode (5) matters for the device's permissions; given this,
+ * it should be stored in the device/inode.  ACLs fall under this category.
+ *
+ * finally, only certain categories can be edited afterwards: file status flags
+ * (2), FD flags (4), and file permissions (5).	*/
+int fd_getfl(int fd)
+{
+	ERRSTACK(1);
+	struct chan *c;
+	int ret;
+
+	if (waserror()) {
+		poperror();
+		return -1;
+	}
+	c = fdtochan(current->fgrp, fd, -1, 0, 1);
+
+	ret = c->mode;
+	if (c->flag & CAPPEND)
+		ret |= O_APPEND;
+
+	cclose(c);
+	poperror();
+	return ret;
+}
+
+int fd_setfl(int fd, int flags)
+{
+	ERRSTACK(1);
+	struct chan *c;
+
+	if (waserror()) {
+		poperror();
+		return -1;
+	}
+	c = fdtochan(current->fgrp, fd, -1, 0, 1);
+
+	if (flags & O_APPEND)
+		c->flag |= CAPPEND;
+
+	cclose(c);
+	poperror();
+	return 0;
+}

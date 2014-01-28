@@ -1204,9 +1204,11 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 				return sysdup(fd, -1);
 			case (F_GETFD):
 			case (F_SETFD):
-			case (F_GETFL):
-			case (F_SETFL):
 				return 0;
+			case (F_GETFL):
+				return fd_getfl(fd);
+			case (F_SETFL):
+				return fd_setfl(fd, arg);
 			default:
 				warn("Unsupported fcntl cmd %d\n", cmd);
 		}
