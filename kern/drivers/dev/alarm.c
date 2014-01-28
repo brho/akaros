@@ -264,8 +264,7 @@ static struct chan *alarmopen(struct chan *c, int omode)
 			 * could have been closed, and the alarm decref'd and freed.  the
 			 * qid is essentially an uncounted reference, and we need to go to
 			 * the source to attempt to get a real ref.  Unfortunately, this is
-			 * another scan of the list, same as devsrv.  We could speed it up
-			 * by storing an "on_list" bool in the a_is. */
+			 * another scan of the list, same as devsrv. */
 			spin_lock(&p->alarmset.lock);
 			TAILQ_FOREACH(a_i, &p->alarmset.list, link) {
 				if (a_i == a) {
