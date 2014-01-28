@@ -690,7 +690,16 @@ unionread(struct chan *c, void *va, long n)
 	while(mount != NULL) {
 		/* Error causes component of union to be skipped */
 		if(mount->to) {
-			if (!waserror()) { /* discard style */
+			/* normally we want to discard the error, but for our ghetto kdirent
+			 * hack, we need to repeat unionread if we saw a Eshort */
+			if (waserror()) {
+				if (!strcmp(current_errstr(), Eshort)) {
+					runlock(&m->lock);
+					qunlock(&c->umqlock);
+					nexterror();
+				}
+				/* poperror done below for either branch */
+			} else {
 				if(c->umc == NULL){
 					c->umc = cclone(mount->to);
 					c->umc = devtab[c->umc->type].open(c->umc, OREAD);
@@ -734,14 +743,16 @@ unionrewind(struct chan *c)
 static long
 rread(int fd, void *va, long n, int64_t *offp)
 {
-	ERRSTACK(2);
+	ERRSTACK(3);
 	int dir;
 	struct chan *c;
 	int64_t off;
 
 	/* dirty dirent hack */
+	#define MIN_M_BUF_SZ 58 /* TODO: 59 is the smallest i've seen */
 	void *real_va = va;
 	void *buf_for_M = 0;
+	size_t buf_sz = 0;
 	long real_n = n;
 
 	if (waserror()) {
@@ -764,21 +775,33 @@ rread(int fd, void *va, long n, int64_t *offp)
 	/* dirty kdirent hack: userspace is expecting kdirents, but all of 9ns
 	 * produces Ms.  i'm assuming we're only being asked to read a single
 	 * dirent, which is usually the case for calls like readdir() (which just
-	 * calls read for a single dirent).
-	 *
-	 * another thing: the chan's offset moves forward by an amount such that a
-	 * future read of the chan will give the next dirent.  we also return n,
-	 * the amount of reading from the 9ns system.  this is fine, since it is
-	 * where we'll pick up next time (off += n, from userspace).  we might need
-	 * to put that info in d_off, but it seems to work (and no one wants to
-	 * mess with glibc code) */
-	if (dir) {
+	 * calls read for a single dirent). */
+	if (dir)
 		assert(n >= sizeof(struct kdirent));
-		buf_for_M = kmalloc(sizeof(struct dir), KMALLOC_WAIT);
+	buf_sz = 2 * MIN_M_BUF_SZ - 1;
+	/* We need to read exactly one dirent and avoid reading too much from the
+	 * underlying dev, so that subsequent reads don't miss any dirents.  So we
+	 * start small, and if our buffer is too small (e.g. for long named
+	 * dirents), we increase by a minumum amount.  This way, we'll succeed on
+	 * the next invocation, but we won't have enough room for more than one
+	 * entry. */
+	while (waserror()) {
+		/* FYI: this scheme doesn't work with mounts */
+		if (!dir || strcmp(current_errstr(), Eshort))
+			nexterror();
+		buf_sz += MIN_M_BUF_SZ;
+		poperror();
+	}
+	if (dir) {
+		if (!buf_for_M)
+			buf_for_M = kmalloc(buf_sz, KMALLOC_WAIT);
+		else
+			buf_for_M = krealloc(buf_for_M, buf_sz, KMALLOC_WAIT);
 		va = buf_for_M;
-		n = sizeof(struct dir);
+		n = buf_sz;
 	}
 
+	/* this is the normal plan9 read */
 	if(dir && c->umh)
 		n = unionread(c, va, n);
 	else{
@@ -807,9 +830,10 @@ rread(int fd, void *va, long n, int64_t *offp)
 
 	/* dirty kdirent hack */
 	if (dir) {
-		convM2kdirent(buf_for_M, sizeof(struct dir), real_va, 0);
+		convM2kdirent(buf_for_M, buf_sz, real_va, 0);
 		kfree(buf_for_M);
 	}
+	poperror();	/* matching our while(waserror) */
 
 	poperror();
 	cclose(c);
