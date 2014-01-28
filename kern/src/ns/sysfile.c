@@ -1015,6 +1015,7 @@ rwrite(int fd, void *va, long n, int64_t *offp)
 {
 	ERRSTACK(3);
 	struct chan *c;
+	struct dir *dir;
 	int64_t off;
 	long m;
 
@@ -1034,6 +1035,17 @@ rwrite(int fd, void *va, long n, int64_t *offp)
 		error(Etoosmall);
 
 	if(offp == NULL){
+		/* append changes the offset to the end, and even if we fail later, this
+		 * change will persist */
+		if (c->flag & CAPPEND) {
+			dir = chandirstat(c);
+			if (!dir)
+				error("internal error: stat error in append write");
+			spin_lock(&c->lock);	/* legacy lock for int64 assignment */
+			c->offset = dir->length;
+			spin_unlock(&c->lock);
+			kfree(dir);
+		}
 		spin_lock(&c->lock);
 		off = c->offset;
 		c->offset += n;
