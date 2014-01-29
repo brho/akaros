@@ -35,5 +35,5 @@ else
 	exit
 fi
 
-mount /srv/$SRVNAME /mnt
+mount -c /srv/$SRVNAME /mnt
 ls /mnt
