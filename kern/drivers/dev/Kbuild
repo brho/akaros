@@ -1,10 +1,8 @@
 obj-y						+= alarm.o
 obj-y						+= cons.o
-obj-y						+= dev.o
 obj-y						+= ether.o
 obj-y						+= mnt.o
 obj-y						+= pipe.o
 obj-y						+= root.o
 obj-y						+= srv.o
-obj-y						+= tab.o
 obj-y						+= vm.o
