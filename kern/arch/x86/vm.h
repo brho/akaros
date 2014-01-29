@@ -70,21 +70,21 @@
  *  hfn - host frame number
  */
 
-typedef unsigned long  gva_t;
-typedef uint64_t            gpa_t;
-typedef unsigned long  gfn_t;
+typedef unsigned long gva_t;
+typedef uint64_t gpa_t;
+typedef unsigned long gfn_t;
 
-typedef unsigned long  hva_t;
-typedef uint64_t            hpa_t;
-typedef unsigned long  hfn_t;
+typedef unsigned long hva_t;
+typedef uint64_t hpa_t;
+typedef unsigned long hfn_t;
 
 struct litevm_mmu_page {
 	LIST_ENTRY(litevm_mmu_page) link;
 	hpa_t page_hpa;
-	unsigned long slot_bitmap; /* One bit set per slot which has memory
-				    * in this shadow page.
-				    */
-	int global;              /* Set if all ptes in this page are global */
+	unsigned long slot_bitmap;	/* One bit set per slot which has memory
+								 * in this shadow page.
+								 */
+	int global;					/* Set if all ptes in this page are global */
 	uint64_t *parent_pte;
 };
 
@@ -108,11 +108,11 @@ struct litevm_vcpu;
  * mode.
  */
 struct litevm_mmu {
-	void (*new_cr3)(struct litevm_vcpu *vcpu);
-	int (*page_fault)(struct litevm_vcpu *vcpu, gva_t gva, uint32_t err);
-	void (*inval_page)(struct litevm_vcpu *vcpu, gva_t gva);
-	void (*free)(struct litevm_vcpu *vcpu);
-	gpa_t (*gva_to_gpa)(struct litevm_vcpu *vcpu, gva_t gva);
+	void (*new_cr3) (struct litevm_vcpu * vcpu);
+	int (*page_fault) (struct litevm_vcpu * vcpu, gva_t gva, uint32_t err);
+	void (*inval_page) (struct litevm_vcpu * vcpu, gva_t gva);
+	void (*free) (struct litevm_vcpu * vcpu);
+	 gpa_t(*gva_to_gpa) (struct litevm_vcpu * vcpu, gva_t gva);
 	hpa_t root_hpa;
 	int root_level;
 	int shadow_root_level;
@@ -150,13 +150,13 @@ struct litevm_vcpu {
 	struct litevm *litevm;
 	struct vmcs *vmcs;
 	qlock_t mutex;
-	int   cpu;
-	int   launched;
-	unsigned long irq_summary; /* bit vector: 1 per word in irq_pending */
+	int cpu;
+	int launched;
+	unsigned long irq_summary;	/* bit vector: 1 per word in irq_pending */
 #define NR_IRQ_WORDS (256 / BITS_PER_LONG)
 	unsigned long irq_pending[NR_IRQ_WORDS];
-	unsigned long regs[NR_VCPU_REGS]; /* for rsp: vcpu_load_rsp_rip() */
-	unsigned long rip;      /* needs vcpu_load_rsp_rip() */
+	unsigned long regs[NR_VCPU_REGS];	/* for rsp: vcpu_load_rsp_rip() */
+	unsigned long rip;			/* needs vcpu_load_rsp_rip() */
 
 	unsigned long cr2;
 	unsigned long cr3;
@@ -166,7 +166,7 @@ struct litevm_vcpu {
 	int nmsrs;
 	struct vmx_msr_entry *guest_msrs;
 	struct vmx_msr_entry *host_msrs;
-	LIST_HEAD(free_pages, litevm_mmu_page) link;
+	 LIST_HEAD(free_pages, litevm_mmu_page) link;
 	//struct list_head free_pages;
 	struct litevm_mmu_page page_header_buf[LITEVM_NUM_MMU_PAGES];
 	struct litevm_mmu mmu;
@@ -184,7 +184,7 @@ struct litevm_vcpu {
 	unsigned char mmio_data[8];
 	gpa_t mmio_phys_addr;
 
-	struct{
+	struct {
 		int active;
 		uint8_t save_iopl;
 		struct {
@@ -201,14 +201,14 @@ struct litevm_memory_slot {
 	unsigned long flags;
 	struct page **phys_mem;
 //#warning "bitmap is u8. "
-	/*unsigned long*/uint8_t *dirty_bitmap;
+	/*unsigned long */ uint8_t *dirty_bitmap;
 };
 
 struct litevm {
-	spinlock_t lock; /* protects everything except vcpus */
+	spinlock_t lock;			/* protects everything except vcpus */
 	int nmemslots;
 	struct litevm_memory_slot memslots[LITEVM_MEMORY_SLOTS];
-	LIST_HEAD(active_mmu_pages, litevm_mmu_page) link;
+	 LIST_HEAD(active_mmu_pages, litevm_mmu_page) link;
 	//struct list_head active_mmu_pages;
 	struct litevm_vcpu vcpus[LITEVM_MAX_VCPUS];
 	int memory_config_version;
@@ -242,12 +242,17 @@ void litevm_mmu_slot_remove_write_access(struct litevm *litevm, int slot);
 hpa_t gpa_to_hpa(struct litevm_vcpu *vcpu, gpa_t gpa);
 #define HPA_MSB ((sizeof(hpa_t) * 8) - 1)
 #define HPA_ERR_MASK ((hpa_t)1 << HPA_MSB)
-static inline int is_error_hpa(hpa_t hpa) { return hpa >> HPA_MSB; }
-hpa_t gva_to_hpa(struct litevm_vcpu *vcpu, gva_t gva);
+static inline int is_error_hpa(hpa_t hpa)
+{
+	return hpa >> HPA_MSB;
+}
+
+hpa_t gva_to_hpa(struct litevm_vcpu * vcpu, gva_t gva);
 
 extern hpa_t bad_page_address;
 
-static inline struct page *gfn_to_page(struct litevm_memory_slot *slot, gfn_t gfn)
+static inline struct page *gfn_to_page(struct litevm_memory_slot *slot,
+									   gfn_t gfn)
 {
 	return slot->phys_mem[gfn - slot->base_gfn];
 }
@@ -255,24 +260,22 @@ static inline struct page *gfn_to_page(struct litevm_memory_slot *slot, gfn_t gf
 struct litevm_memory_slot *gfn_to_memslot(struct litevm *litevm, gfn_t gfn);
 void mark_page_dirty(struct litevm *litevm, gfn_t gfn);
 
-void realmode_lgdt(struct litevm_vcpu *vcpu, uint16_t size, unsigned long address);
-void realmode_lidt(struct litevm_vcpu *vcpu, uint16_t size, unsigned long address);
+void realmode_lgdt(struct litevm_vcpu *vcpu, uint16_t size,
+				   unsigned long address);
+void realmode_lidt(struct litevm_vcpu *vcpu, uint16_t size,
+				   unsigned long address);
 void realmode_lmsw(struct litevm_vcpu *vcpu, unsigned long msw,
-		   unsigned long *rflags);
+				   unsigned long *rflags);
 
 unsigned long realmode_get_cr(struct litevm_vcpu *vcpu, int cr);
 void realmode_set_cr(struct litevm_vcpu *vcpu, int cr, unsigned long value,
-		     unsigned long *rflags);
+					 unsigned long *rflags);
 
 int litevm_read_guest(struct litevm_vcpu *vcpu,
-	       gva_t addr,
-	       unsigned long size,
-	       void *dest);
+					  gva_t addr, unsigned long size, void *dest);
 
 int litevm_write_guest(struct litevm_vcpu *vcpu,
-		gva_t addr,
-		unsigned long size,
-		void *data);
+					   gva_t addr, unsigned long size, void *data);
 
 void vmcs_writel(unsigned long field, unsigned long value);
 unsigned long vmcs_readl(unsigned long field);
@@ -292,7 +295,7 @@ static inline uint64_t vmcs_read64(unsigned long field)
 #ifdef __x86_64__
 	return vmcs_readl(field);
 #else
-	return vmcs_readl(field) | ((uint64_t)vmcs_readl(field+1) << 32);
+	return vmcs_readl(field) | ((uint64_t) vmcs_readl(field + 1) << 32);
 #endif
 }
 
@@ -341,7 +344,7 @@ static inline int is_paging(void)
 static inline int is_page_fault(uint32_t intr_info)
 {
 	return (intr_info & (INTR_INFO_INTR_TYPE_MASK | INTR_INFO_VECTOR_MASK |
-			     INTR_INFO_VALID_MASK)) ==
+						 INTR_INFO_VALID_MASK)) ==
 		(INTR_TYPE_EXCEPTION | PF_VECTOR | INTR_INFO_VALID_MASK);
 }
 
@@ -356,7 +359,8 @@ static inline void flush_guest_tlb(struct litevm_vcpu *vcpu)
 	vmcs_writel(GUEST_CR3, vmcs_readl(GUEST_CR3));
 }
 
-static inline int memslot_id(struct litevm *litevm, struct litevm_memory_slot *slot)
+static inline int memslot_id(struct litevm *litevm,
+							 struct litevm_memory_slot *slot)
 {
 	return slot - litevm->memslots;
 }
@@ -393,13 +397,12 @@ struct litevm_memory_region {
 	uint32_t slot;
 	uint32_t flags;
 	uint64_t guest_phys_addr;
-	uint64_t memory_size; /* bytes */
+	uint64_t memory_size;		/* bytes */
 	void *init_data;
 };
 
 /* for litevm_memory_region::flags */
 #define LITEVM_MEM_LOG_DIRTY_PAGES  1UL
-
 
 #define LITEVM_EXIT_TYPE_FAIL_ENTRY 1
 #define LITEVM_EXIT_TYPE_VM_EXIT    2
@@ -418,8 +421,8 @@ enum litevm_exit_reason {
 struct litevm_run {
 	/* in */
 	uint32_t vcpu;
-	uint32_t emulated;  /* skip current instruction */
-	uint32_t mmio_completed; /* mmio request completed */
+	uint32_t emulated;			/* skip current instruction */
+	uint32_t mmio_completed;	/* mmio request completed */
 
 	/* out */
 	uint32_t exit_type;
@@ -440,7 +443,7 @@ struct litevm_run {
 #define LITEVM_EXIT_IO_IN  0
 #define LITEVM_EXIT_IO_OUT 1
 			uint8_t direction;
-			uint8_t size; /* bytes */
+			uint8_t size;		/* bytes */
 			uint8_t string;
 			uint8_t string_down;
 			uint8_t rep;
@@ -457,9 +460,9 @@ struct litevm_run {
 		/* LITEVM_EXIT_MMIO */
 		struct {
 			uint64_t phys_addr;
-			uint8_t  data[8];
+			uint8_t data[8];
 			uint32_t len;
-			uint8_t  is_write;
+			uint8_t is_write;
 		} mmio;
 	};
 };
@@ -473,7 +476,7 @@ struct litevm_regs {
 	/* out (LITEVM_GET_REGS) / in (LITEVM_SET_REGS) */
 	uint64_t rax, rbx, rcx, rdx;
 	uint64_t rsi, rdi, rsp, rbp;
-	uint64_t r8,  r9,  r10, r11;
+	uint64_t r8, r9, r10, r11;
 	uint64_t r12, r13, r14, r15;
 	uint64_t rip, rflags;
 };
@@ -482,10 +485,10 @@ struct litevm_segment {
 	uint64_t base;
 	uint32_t limit;
 	uint16_t selector;
-	uint8_t  type;
-	uint8_t  present, dpl, db, s, l, g, avl;
-	uint8_t  unusable;
-	uint8_t  padding;
+	uint8_t type;
+	uint8_t present, dpl, db, s, l, g, avl;
+	uint8_t unusable;
+	uint8_t padding;
 };
 
 struct litevm_dtable {
@@ -522,9 +525,9 @@ struct litevm_translation {
 
 	/* out */
 	uint64_t physical_address;
-	uint8_t  valid;
-	uint8_t  writeable;
-	uint8_t  usermode;
+	uint8_t valid;
+	uint8_t writeable;
+	uint8_t usermode;
 };
 
 /* for LITEVM_INTERRUPT */
@@ -554,7 +557,7 @@ struct litevm_dirty_log {
 	uint32_t slot;
 	uint32_t padding;
 	union {
-		void *dirty_bitmap; /* one bit per page */
+		void *dirty_bitmap;		/* one bit per page */
 		uint64_t paddingw;
 	};
 };
@@ -577,6 +580,6 @@ struct litevm *vmx_open(void);
 int vmx_create_vcpu(struct litevm *litevm, int n);
 int vmx_init(void);
 int vm_set_memory_region(struct litevm *litevm,
-			 struct litevm_memory_region *mem);
+						 struct litevm_memory_region *mem);
 int vm_run(struct litevm *litevm, struct litevm_run *litevm_run);
 #endif

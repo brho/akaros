@@ -26,7 +26,7 @@
 
 *******************************************************************************/
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE(GPL2_OR_LATER);
 
 /*
  * 82541EI Gigabit Ethernet Controller
@@ -39,41 +39,44 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include "e1000_api.h"
 
-static s32  e1000_init_phy_params_82541(struct e1000_hw *hw);
-static s32  e1000_init_nvm_params_82541(struct e1000_hw *hw);
-static s32  e1000_init_mac_params_82541(struct e1000_hw *hw);
-static s32  e1000_reset_hw_82541(struct e1000_hw *hw);
-static s32  e1000_init_hw_82541(struct e1000_hw *hw);
-static s32  e1000_get_link_up_info_82541(struct e1000_hw *hw, u16 *speed,
-                                         u16 *duplex);
-static s32  e1000_phy_hw_reset_82541(struct e1000_hw *hw);
-static s32  e1000_setup_copper_link_82541(struct e1000_hw *hw);
-static s32  e1000_check_for_link_82541(struct e1000_hw *hw);
+static s32 e1000_init_phy_params_82541(struct e1000_hw *hw);
+static s32 e1000_init_nvm_params_82541(struct e1000_hw *hw);
+static s32 e1000_init_mac_params_82541(struct e1000_hw *hw);
+static s32 e1000_reset_hw_82541(struct e1000_hw *hw);
+static s32 e1000_init_hw_82541(struct e1000_hw *hw);
+static s32 e1000_get_link_up_info_82541(struct e1000_hw *hw, u16 * speed,
+										u16 * duplex);
+static s32 e1000_phy_hw_reset_82541(struct e1000_hw *hw);
+static s32 e1000_setup_copper_link_82541(struct e1000_hw *hw);
+static s32 e1000_check_for_link_82541(struct e1000_hw *hw);
 #if 0
-static s32  e1000_get_cable_length_igp_82541(struct e1000_hw *hw);
+static s32 e1000_get_cable_length_igp_82541(struct e1000_hw *hw);
 #endif
-static s32  e1000_set_d3_lplu_state_82541(struct e1000_hw *hw,
-                                          bool active);
-static s32  e1000_setup_led_82541(struct e1000_hw *hw);
-static s32  e1000_cleanup_led_82541(struct e1000_hw *hw);
+static s32 e1000_set_d3_lplu_state_82541(struct e1000_hw *hw, bool active);
+static s32 e1000_setup_led_82541(struct e1000_hw *hw);
+static s32 e1000_cleanup_led_82541(struct e1000_hw *hw);
 static void e1000_clear_hw_cntrs_82541(struct e1000_hw *hw);
 #if 0
-static s32  e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
-                                                     bool link_up);
+static s32 e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
+													bool link_up);
 #endif
-static s32  e1000_phy_init_script_82541(struct e1000_hw *hw);
+static s32 e1000_phy_init_script_82541(struct e1000_hw *hw);
 static void e1000_power_down_phy_copper_82541(struct e1000_hw *hw);
 
 #if 0
 static const u16 e1000_igp_cable_length_table[] =
-    { 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-      5, 10, 10, 10, 10, 10, 10, 10, 20, 20, 20, 20, 20, 25, 25, 25,
-      25, 25, 25, 25, 30, 30, 30, 30, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 50, 50, 50, 50, 50, 50, 50, 60, 60, 60, 60, 60, 60, 60, 60,
-      60, 70, 70, 70, 70, 70, 70, 80, 80, 80, 80, 80, 80, 90, 90, 90,
-      90, 90, 90, 90, 90, 90, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
-      100, 100, 100, 100, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110,
-      110, 110, 110, 110, 110, 110, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120};
+	{ 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+	5, 10, 10, 10, 10, 10, 10, 10, 20, 20, 20, 20, 20, 25, 25, 25,
+	25, 25, 25, 25, 30, 30, 30, 30, 40, 40, 40, 40, 40, 40, 40, 40,
+	40, 50, 50, 50, 50, 50, 50, 50, 60, 60, 60, 60, 60, 60, 60, 60,
+	60, 70, 70, 70, 70, 70, 70, 80, 80, 80, 80, 80, 80, 90, 90, 90,
+	90, 90, 90, 90, 90, 90, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+	100, 100, 100, 100, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110,
+		110,
+	110, 110, 110, 110, 110, 110, 120, 120, 120, 120, 120, 120, 120, 120, 120,
+		120
+};
+
 #define IGP01E1000_AGC_LENGTH_TABLE_SIZE \
                 (sizeof(e1000_igp_cable_length_table) / \
                  sizeof(e1000_igp_cable_length_table[0]))
@@ -89,27 +92,27 @@ static s32 e1000_init_phy_params_82541(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_init_phy_params_82541");
 
-	phy->addr                      = 1;
-	phy->autoneg_mask              = AUTONEG_ADVERTISE_SPEED_DEFAULT;
-	phy->reset_delay_us            = 10000;
-	phy->type                      = e1000_phy_igp;
+	phy->addr = 1;
+	phy->autoneg_mask = AUTONEG_ADVERTISE_SPEED_DEFAULT;
+	phy->reset_delay_us = 10000;
+	phy->type = e1000_phy_igp;
 
 	/* Function Pointers */
-	phy->ops.check_polarity        = e1000_check_polarity_igp;
+	phy->ops.check_polarity = e1000_check_polarity_igp;
 #if 0
-	phy->ops.force_speed_duplex    = e1000_phy_force_speed_duplex_igp;
+	phy->ops.force_speed_duplex = e1000_phy_force_speed_duplex_igp;
 #endif
 #if 0
-	phy->ops.get_cable_length      = e1000_get_cable_length_igp_82541;
+	phy->ops.get_cable_length = e1000_get_cable_length_igp_82541;
 #endif
-	phy->ops.get_cfg_done          = e1000_get_cfg_done_generic;
-	phy->ops.get_info              = e1000_get_phy_info_igp;
-	phy->ops.read_reg              = e1000_read_phy_reg_igp;
-	phy->ops.reset                 = e1000_phy_hw_reset_82541;
-	phy->ops.set_d3_lplu_state     = e1000_set_d3_lplu_state_82541;
-	phy->ops.write_reg             = e1000_write_phy_reg_igp;
-	phy->ops.power_up              = e1000_power_up_phy_copper;
-	phy->ops.power_down            = e1000_power_down_phy_copper_82541;
+	phy->ops.get_cfg_done = e1000_get_cfg_done_generic;
+	phy->ops.get_info = e1000_get_phy_info_igp;
+	phy->ops.read_reg = e1000_read_phy_reg_igp;
+	phy->ops.reset = e1000_phy_hw_reset_82541;
+	phy->ops.set_d3_lplu_state = e1000_set_d3_lplu_state_82541;
+	phy->ops.write_reg = e1000_write_phy_reg_igp;
+	phy->ops.power_up = e1000_power_up_phy_copper;
+	phy->ops.power_down = e1000_power_down_phy_copper_82541;
 
 	ret_val = e1000_get_phy_id(hw);
 	if (ret_val)
@@ -131,53 +134,52 @@ out:
  **/
 static s32 e1000_init_nvm_params_82541(struct e1000_hw *hw)
 {
-	struct   e1000_nvm_info *nvm = &hw->nvm;
-	s32  ret_val = E1000_SUCCESS;
+	struct e1000_nvm_info *nvm = &hw->nvm;
+	s32 ret_val = E1000_SUCCESS;
 	u32 eecd = E1000_READ_REG(hw, E1000_EECD);
 	u16 size;
 
 	DEBUGFUNC("e1000_init_nvm_params_82541");
 
 	switch (nvm->override) {
-	case e1000_nvm_override_spi_large:
-		nvm->type = e1000_nvm_eeprom_spi;
-		eecd |= E1000_EECD_ADDR_BITS;
-		break;
-	case e1000_nvm_override_spi_small:
-		nvm->type = e1000_nvm_eeprom_spi;
-		eecd &= ~E1000_EECD_ADDR_BITS;
-		break;
-	case e1000_nvm_override_microwire_large:
-		nvm->type = e1000_nvm_eeprom_microwire;
-		eecd |= E1000_EECD_SIZE;
-		break;
-	case e1000_nvm_override_microwire_small:
-		nvm->type = e1000_nvm_eeprom_microwire;
-		eecd &= ~E1000_EECD_SIZE;
-		break;
-	default:
-		nvm->type = eecd & E1000_EECD_TYPE
-		            ? e1000_nvm_eeprom_spi
-		            : e1000_nvm_eeprom_microwire;
-		break;
+		case e1000_nvm_override_spi_large:
+			nvm->type = e1000_nvm_eeprom_spi;
+			eecd |= E1000_EECD_ADDR_BITS;
+			break;
+		case e1000_nvm_override_spi_small:
+			nvm->type = e1000_nvm_eeprom_spi;
+			eecd &= ~E1000_EECD_ADDR_BITS;
+			break;
+		case e1000_nvm_override_microwire_large:
+			nvm->type = e1000_nvm_eeprom_microwire;
+			eecd |= E1000_EECD_SIZE;
+			break;
+		case e1000_nvm_override_microwire_small:
+			nvm->type = e1000_nvm_eeprom_microwire;
+			eecd &= ~E1000_EECD_SIZE;
+			break;
+		default:
+			nvm->type = eecd & E1000_EECD_TYPE
+				? e1000_nvm_eeprom_spi : e1000_nvm_eeprom_microwire;
+			break;
 	}
 
 	if (nvm->type == e1000_nvm_eeprom_spi) {
-		nvm->address_bits       = (eecd & E1000_EECD_ADDR_BITS)
-		                          ? 16 : 8;
-		nvm->delay_usec         = 1;
-		nvm->opcode_bits        = 8;
-		nvm->page_size          = (eecd & E1000_EECD_ADDR_BITS)
-		                          ? 32 : 8;
+		nvm->address_bits = (eecd & E1000_EECD_ADDR_BITS)
+			? 16 : 8;
+		nvm->delay_usec = 1;
+		nvm->opcode_bits = 8;
+		nvm->page_size = (eecd & E1000_EECD_ADDR_BITS)
+			? 32 : 8;
 
 		/* Function Pointers */
-		nvm->ops.acquire        = e1000_acquire_nvm_generic;
-		nvm->ops.read           = e1000_read_nvm_spi;
-		nvm->ops.release        = e1000_release_nvm_generic;
-		nvm->ops.update         = e1000_update_nvm_checksum_generic;
+		nvm->ops.acquire = e1000_acquire_nvm_generic;
+		nvm->ops.read = e1000_read_nvm_spi;
+		nvm->ops.release = e1000_release_nvm_generic;
+		nvm->ops.update = e1000_update_nvm_checksum_generic;
 		nvm->ops.valid_led_default = e1000_valid_led_default_generic;
-		nvm->ops.validate       = e1000_validate_nvm_checksum_generic;
-		nvm->ops.write          = e1000_write_nvm_spi;
+		nvm->ops.validate = e1000_validate_nvm_checksum_generic;
+		nvm->ops.write = e1000_write_nvm_spi;
 
 		/*
 		 * nvm->word_size must be discovered after the pointers
@@ -200,21 +202,21 @@ static s32 e1000_init_nvm_params_82541(struct e1000_hw *hw)
 			nvm->word_size = 1 << size;
 		}
 	} else {
-		nvm->address_bits       = (eecd & E1000_EECD_ADDR_BITS)
-		                          ? 8 : 6;
-		nvm->delay_usec         = 50;
-		nvm->opcode_bits        = 3;
-		nvm->word_size          = (eecd & E1000_EECD_ADDR_BITS)
-		                          ? 256 : 64;
+		nvm->address_bits = (eecd & E1000_EECD_ADDR_BITS)
+			? 8 : 6;
+		nvm->delay_usec = 50;
+		nvm->opcode_bits = 3;
+		nvm->word_size = (eecd & E1000_EECD_ADDR_BITS)
+			? 256 : 64;
 
 		/* Function Pointers */
-		nvm->ops.acquire        = e1000_acquire_nvm_generic;
-		nvm->ops.read           = e1000_read_nvm_microwire;
-		nvm->ops.release        = e1000_release_nvm_generic;
-		nvm->ops.update         = e1000_update_nvm_checksum_generic;
+		nvm->ops.acquire = e1000_acquire_nvm_generic;
+		nvm->ops.read = e1000_read_nvm_microwire;
+		nvm->ops.release = e1000_release_nvm_generic;
+		nvm->ops.update = e1000_update_nvm_checksum_generic;
 		nvm->ops.valid_led_default = e1000_valid_led_default_generic;
-		nvm->ops.validate       = e1000_validate_nvm_checksum_generic;
-		nvm->ops.write          = e1000_write_nvm_microwire;
+		nvm->ops.validate = e1000_validate_nvm_checksum_generic;
+		nvm->ops.write = e1000_write_nvm_microwire;
 	}
 
 out:
@@ -331,18 +333,18 @@ static s32 e1000_reset_hw_82541(struct e1000_hw *hw)
 
 	DEBUGOUT("Issuing a global reset to 82541/82547 MAC\n");
 	switch (hw->mac.type) {
-	case e1000_82541:
-	case e1000_82541_rev_2:
-		/*
-		 * These controllers can't ack the 64-bit write when
-		 * issuing the reset, so we use IO-mapping as a
-		 * workaround to issue the reset.
-		 */
-		E1000_WRITE_REG_IO(hw, E1000_CTRL, ctrl | E1000_CTRL_RST);
-		break;
-	default:
-		E1000_WRITE_REG(hw, E1000_CTRL, ctrl | E1000_CTRL_RST);
-		break;
+		case e1000_82541:
+		case e1000_82541_rev_2:
+			/*
+			 * These controllers can't ack the 64-bit write when
+			 * issuing the reset, so we use IO-mapping as a
+			 * workaround to issue the reset.
+			 */
+			E1000_WRITE_REG_IO(hw, E1000_CTRL, ctrl | E1000_CTRL_RST);
+			break;
+		default:
+			E1000_WRITE_REG(hw, E1000_CTRL, ctrl | E1000_CTRL_RST);
+			break;
 	}
 
 	/* Wait for NVM reload */
@@ -397,8 +399,8 @@ static s32 e1000_init_hw_82541(struct e1000_hw *hw)
 
 	/* Storing the Speed Power Down  value for later use */
 	ret_val = hw->phy.ops.read_reg(hw,
-	                               IGP01E1000_GMII_FIFO,
-	                               &dev_spec->spd_default);
+								   IGP01E1000_GMII_FIFO,
+								   &dev_spec->spd_default);
 	if (ret_val)
 		goto out;
 
@@ -426,8 +428,7 @@ static s32 e1000_init_hw_82541(struct e1000_hw *hw)
 	ret_val = mac->ops.setup_link(hw);
 
 	txdctl = E1000_READ_REG(hw, E1000_TXDCTL(0));
-	txdctl = (txdctl & ~E1000_TXDCTL_WTHRESH) |
-	         E1000_TXDCTL_FULL_TX_DESC_WB;
+	txdctl = (txdctl & ~E1000_TXDCTL_WTHRESH) | E1000_TXDCTL_FULL_TX_DESC_WB;
 	E1000_WRITE_REG(hw, E1000_TXDCTL(0), txdctl);
 
 	/*
@@ -450,8 +451,8 @@ out:
  *
  * Retrieve the current speed and duplex configuration.
  **/
-static s32 e1000_get_link_up_info_82541(struct e1000_hw *hw, u16 *speed,
-                                        u16 *duplex)
+static s32 e1000_get_link_up_info_82541(struct e1000_hw *hw, u16 * speed,
+										u16 * duplex)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val;
@@ -543,7 +544,7 @@ static s32 e1000_setup_copper_link_82541(struct e1000_hw *hw)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	struct e1000_dev_spec_82541 *dev_spec = &hw->dev_spec._82541;
-	s32  ret_val;
+	s32 ret_val;
 	u32 ctrl, ledctl;
 
 	DEBUGFUNC("e1000_setup_copper_link_82541");
@@ -624,7 +625,7 @@ static s32 e1000_check_for_link_82541(struct e1000_hw *hw)
 #if 0
 		ret_val = e1000_config_dsp_after_link_change_82541(hw, false);
 #endif
-		goto out; /* No link detected */
+		goto out;	/* No link detected */
 	}
 
 	mac->get_link_status = false;
@@ -643,7 +644,6 @@ static s32 e1000_check_for_link_82541(struct e1000_hw *hw)
 		ret_val = -E1000_ERR_CONFIG;
 		goto out;
 	}
-
 #if 0
 	ret_val = e1000_config_dsp_after_link_change_82541(hw, true);
 #endif
@@ -683,7 +683,7 @@ out:
  *  gigabit link is achieved to improve link quality.
  **/
 static s32 e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
-                                                    bool link_up)
+													bool link_up)
 {
 	struct e1000_phy_info *phy = &hw->phy;
 	struct e1000_dev_spec_82541 *dev_spec = &hw->dev_spec._82541;
@@ -692,10 +692,11 @@ static s32 e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 	u16 phy_data, phy_saved_data, speed, duplex, i;
 	u16 ffe_idle_err_timeout = FFE_IDLE_ERR_COUNT_TIMEOUT_20;
 	u16 dsp_reg_array[IGP01E1000_PHY_CHANNEL_NUM] =
-	                                           {IGP01E1000_PHY_AGC_PARAM_A,
-	                                            IGP01E1000_PHY_AGC_PARAM_B,
-	                                            IGP01E1000_PHY_AGC_PARAM_C,
-	                                            IGP01E1000_PHY_AGC_PARAM_D};
+		{ IGP01E1000_PHY_AGC_PARAM_A,
+		IGP01E1000_PHY_AGC_PARAM_B,
+		IGP01E1000_PHY_AGC_PARAM_C,
+		IGP01E1000_PHY_AGC_PARAM_D
+	};
 
 	DEBUGFUNC("e1000_config_dsp_after_link_change_82541");
 
@@ -710,7 +711,6 @@ static s32 e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 			ret_val = E1000_SUCCESS;
 			goto out;
 		}
-
 #if 0
 		ret_val = phy->ops.get_cable_length(hw);
 #endif
@@ -719,20 +719,16 @@ static s32 e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 			goto out;
 
 		if ((dev_spec->dsp_config == e1000_dsp_config_enabled) &&
-		    phy->min_cable_length >= 50) {
+			phy->min_cable_length >= 50) {
 
 			for (i = 0; i < IGP01E1000_PHY_CHANNEL_NUM; i++) {
-				ret_val = phy->ops.read_reg(hw,
-				                            dsp_reg_array[i],
-				                            &phy_data);
+				ret_val = phy->ops.read_reg(hw, dsp_reg_array[i], &phy_data);
 				if (ret_val)
 					goto out;
 
 				phy_data &= ~IGP01E1000_PHY_EDAC_MU_INDEX;
 
-				ret_val = phy->ops.write_reg(hw,
-				                             dsp_reg_array[i],
-				                             phy_data);
+				ret_val = phy->ops.write_reg(hw, dsp_reg_array[i], phy_data);
 				if (ret_val)
 					goto out;
 			}
@@ -740,7 +736,7 @@ static s32 e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 		}
 
 		if ((dev_spec->ffe_config != e1000_ffe_config_enabled) ||
-		    (phy->min_cable_length >= 50)) {
+			(phy->min_cable_length >= 50)) {
 			ret_val = E1000_SUCCESS;
 			goto out;
 		}
@@ -752,9 +748,7 @@ static s32 e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 
 		for (i = 0; i < ffe_idle_err_timeout; i++) {
 			usec_delay(1000);
-			ret_val = phy->ops.read_reg(hw,
-			                            PHY_1000T_STATUS,
-			                            &phy_data);
+			ret_val = phy->ops.read_reg(hw, PHY_1000T_STATUS, &phy_data);
 			if (ret_val)
 				goto out;
 
@@ -763,16 +757,15 @@ static s32 e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 				dev_spec->ffe_config = e1000_ffe_config_active;
 
 				ret_val = phy->ops.write_reg(hw,
-				                  IGP01E1000_PHY_DSP_FFE,
-				                  IGP01E1000_PHY_DSP_FFE_CM_CP);
+											 IGP01E1000_PHY_DSP_FFE,
+											 IGP01E1000_PHY_DSP_FFE_CM_CP);
 				if (ret_val)
 					goto out;
 				break;
 			}
 
 			if (idle_errs)
-				ffe_idle_err_timeout =
-				                 FFE_IDLE_ERR_COUNT_TIMEOUT_100;
+				ffe_idle_err_timeout = FFE_IDLE_ERR_COUNT_TIMEOUT_100;
 		}
 	} else {
 		if (dev_spec->dsp_config == e1000_dsp_config_activated) {
@@ -780,9 +773,7 @@ static s32 e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 			 * Save off the current value of register 0x2F5B
 			 * to be restored at the end of the routines.
 			 */
-			ret_val = phy->ops.read_reg(hw,
-			                            0x2F5B,
-			                            &phy_saved_data);
+			ret_val = phy->ops.read_reg(hw, 0x2F5B, &phy_saved_data);
 			if (ret_val)
 				goto out;
 
@@ -793,40 +784,32 @@ static s32 e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 
 			msec_delay_irq(20);
 
-			ret_val = phy->ops.write_reg(hw,
-			                             0x0000,
-			                             IGP01E1000_IEEE_FORCE_GIG);
+			ret_val = phy->ops.write_reg(hw, 0x0000, IGP01E1000_IEEE_FORCE_GIG);
 			if (ret_val)
 				goto out;
 			for (i = 0; i < IGP01E1000_PHY_CHANNEL_NUM; i++) {
-				ret_val = phy->ops.read_reg(hw,
-				                            dsp_reg_array[i],
-				                            &phy_data);
+				ret_val = phy->ops.read_reg(hw, dsp_reg_array[i], &phy_data);
 				if (ret_val)
 					goto out;
 
 				phy_data &= ~IGP01E1000_PHY_EDAC_MU_INDEX;
 				phy_data |= IGP01E1000_PHY_EDAC_SIGN_EXT_9_BITS;
 
-				ret_val = phy->ops.write_reg(hw,
-				                             dsp_reg_array[i],
-				                             phy_data);
+				ret_val = phy->ops.write_reg(hw, dsp_reg_array[i], phy_data);
 				if (ret_val)
 					goto out;
 			}
 
 			ret_val = phy->ops.write_reg(hw,
-			                       0x0000,
-			                       IGP01E1000_IEEE_RESTART_AUTONEG);
+										 0x0000,
+										 IGP01E1000_IEEE_RESTART_AUTONEG);
 			if (ret_val)
 				goto out;
 
 			msec_delay_irq(20);
 
 			/* Now enable the transmitter */
-			ret_val = phy->ops.write_reg(hw,
-			                             0x2F5B,
-			                             phy_saved_data);
+			ret_val = phy->ops.write_reg(hw, 0x2F5B, phy_saved_data);
 			if (ret_val)
 				goto out;
 
@@ -853,21 +836,18 @@ static s32 e1000_config_dsp_after_link_change_82541(struct e1000_hw *hw,
 
 		msec_delay_irq(20);
 
-		ret_val = phy->ops.write_reg(hw,
-		                             0x0000,
-		                             IGP01E1000_IEEE_FORCE_GIG);
+		ret_val = phy->ops.write_reg(hw, 0x0000, IGP01E1000_IEEE_FORCE_GIG);
 		if (ret_val)
 			goto out;
 
 		ret_val = phy->ops.write_reg(hw,
-		                             IGP01E1000_PHY_DSP_FFE,
-		                             IGP01E1000_PHY_DSP_FFE_DEFAULT);
+									 IGP01E1000_PHY_DSP_FFE,
+									 IGP01E1000_PHY_DSP_FFE_DEFAULT);
 		if (ret_val)
 			goto out;
 
 		ret_val = phy->ops.write_reg(hw,
-		                             0x0000,
-		                             IGP01E1000_IEEE_RESTART_AUTONEG);
+									 0x0000, IGP01E1000_IEEE_RESTART_AUTONEG);
 		if (ret_val)
 			goto out;
 
@@ -906,11 +886,11 @@ static s32 e1000_get_cable_length_igp_82541(struct e1000_hw *hw)
 	u16 i, data;
 	u16 cur_agc_value, agc_value = 0;
 	u16 min_agc_value = IGP01E1000_AGC_LENGTH_TABLE_SIZE;
-	u16 agc_reg_array[IGP01E1000_PHY_CHANNEL_NUM] =
-	                                                 {IGP01E1000_PHY_AGC_A,
-	                                                  IGP01E1000_PHY_AGC_B,
-	                                                  IGP01E1000_PHY_AGC_C,
-	                                                  IGP01E1000_PHY_AGC_D};
+	u16 agc_reg_array[IGP01E1000_PHY_CHANNEL_NUM] = { IGP01E1000_PHY_AGC_A,
+		IGP01E1000_PHY_AGC_B,
+		IGP01E1000_PHY_AGC_C,
+		IGP01E1000_PHY_AGC_D
+	};
 
 	DEBUGFUNC("e1000_get_cable_length_igp_82541");
 
@@ -924,7 +904,7 @@ static s32 e1000_get_cable_length_igp_82541(struct e1000_hw *hw)
 
 		/* Bounds checking */
 		if ((cur_agc_value >= IGP01E1000_AGC_LENGTH_TABLE_SIZE - 1) ||
-		    (cur_agc_value == 0)) {
+			(cur_agc_value == 0)) {
 			ret_val = -E1000_ERR_PHY;
 			goto out;
 		}
@@ -946,12 +926,11 @@ static s32 e1000_get_cable_length_igp_82541(struct e1000_hw *hw)
 	}
 
 	phy->min_cable_length = (e1000_igp_cable_length_table[agc_value] >
-	                         IGP01E1000_AGC_RANGE)
-	                        ? (e1000_igp_cable_length_table[agc_value] -
-	                           IGP01E1000_AGC_RANGE)
-	                        : 0;
+							 IGP01E1000_AGC_RANGE)
+		? (e1000_igp_cable_length_table[agc_value] - IGP01E1000_AGC_RANGE)
+		: 0;
 	phy->max_cable_length = e1000_igp_cable_length_table[agc_value] +
-	                        IGP01E1000_AGC_RANGE;
+		IGP01E1000_AGC_RANGE;
 
 	phy->cable_length = (phy->min_cable_length + phy->max_cable_length) / 2;
 
@@ -983,13 +962,13 @@ static s32 e1000_set_d3_lplu_state_82541(struct e1000_hw *hw, bool active)
 	DEBUGFUNC("e1000_set_d3_lplu_state_82541");
 
 	switch (hw->mac.type) {
-	case e1000_82541_rev_2:
-	case e1000_82547_rev_2:
-		break;
-	default:
-		ret_val = e1000_set_d3_lplu_state_generic(hw, active);
-		goto out;
-		break;
+		case e1000_82541_rev_2:
+		case e1000_82547_rev_2:
+			break;
+		default:
+			ret_val = e1000_set_d3_lplu_state_generic(hw, active);
+			goto out;
+			break;
 	}
 
 	ret_val = phy->ops.read_reg(hw, IGP01E1000_GMII_FIFO, &data);
@@ -1009,51 +988,39 @@ static s32 e1000_set_d3_lplu_state_82541(struct e1000_hw *hw, bool active)
 		 * SmartSpeed, so performance is maintained.
 		 */
 		if (phy->smart_speed == e1000_smart_speed_on) {
-			ret_val = phy->ops.read_reg(hw,
-			                            IGP01E1000_PHY_PORT_CONFIG,
-			                            &data);
+			ret_val = phy->ops.read_reg(hw, IGP01E1000_PHY_PORT_CONFIG, &data);
 			if (ret_val)
 				goto out;
 
 			data |= IGP01E1000_PSCFR_SMART_SPEED;
-			ret_val = phy->ops.write_reg(hw,
-			                             IGP01E1000_PHY_PORT_CONFIG,
-			                             data);
+			ret_val = phy->ops.write_reg(hw, IGP01E1000_PHY_PORT_CONFIG, data);
 			if (ret_val)
 				goto out;
 		} else if (phy->smart_speed == e1000_smart_speed_off) {
-			ret_val = phy->ops.read_reg(hw,
-			                            IGP01E1000_PHY_PORT_CONFIG,
-			                            &data);
+			ret_val = phy->ops.read_reg(hw, IGP01E1000_PHY_PORT_CONFIG, &data);
 			if (ret_val)
 				goto out;
 
 			data &= ~IGP01E1000_PSCFR_SMART_SPEED;
-			ret_val = phy->ops.write_reg(hw,
-			                             IGP01E1000_PHY_PORT_CONFIG,
-			                             data);
+			ret_val = phy->ops.write_reg(hw, IGP01E1000_PHY_PORT_CONFIG, data);
 			if (ret_val)
 				goto out;
 		}
 	} else if ((phy->autoneg_advertised == E1000_ALL_SPEED_DUPLEX) ||
-	           (phy->autoneg_advertised == E1000_ALL_NOT_GIG) ||
-	           (phy->autoneg_advertised == E1000_ALL_10_SPEED)) {
+			   (phy->autoneg_advertised == E1000_ALL_NOT_GIG) ||
+			   (phy->autoneg_advertised == E1000_ALL_10_SPEED)) {
 		data |= IGP01E1000_GMII_FLEX_SPD;
 		ret_val = phy->ops.write_reg(hw, IGP01E1000_GMII_FIFO, data);
 		if (ret_val)
 			goto out;
 
 		/* When LPLU is enabled, we should disable SmartSpeed */
-		ret_val = phy->ops.read_reg(hw,
-		                            IGP01E1000_PHY_PORT_CONFIG,
-		                            &data);
+		ret_val = phy->ops.read_reg(hw, IGP01E1000_PHY_PORT_CONFIG, &data);
 		if (ret_val)
 			goto out;
 
 		data &= ~IGP01E1000_PSCFR_SMART_SPEED;
-		ret_val = phy->ops.write_reg(hw,
-		                             IGP01E1000_PHY_PORT_CONFIG,
-		                             data);
+		ret_val = phy->ops.write_reg(hw, IGP01E1000_PHY_PORT_CONFIG, data);
 	}
 
 out:
@@ -1076,15 +1043,15 @@ static s32 e1000_setup_led_82541(struct e1000_hw *hw __unused)
 	DEBUGFUNC("e1000_setup_led_82541");
 
 	ret_val = hw->phy.ops.read_reg(hw,
-	                               IGP01E1000_GMII_FIFO,
-	                               &dev_spec->spd_default);
+								   IGP01E1000_GMII_FIFO,
+								   &dev_spec->spd_default);
 	if (ret_val)
 		goto out;
 
 	ret_val = hw->phy.ops.write_reg(hw,
-	                                IGP01E1000_GMII_FIFO,
-	                                (u16)(dev_spec->spd_default &
-	                                        ~IGP01E1000_GMII_SPD));
+									IGP01E1000_GMII_FIFO,
+									(u16) (dev_spec->spd_default &
+										   ~IGP01E1000_GMII_SPD));
 	if (ret_val)
 		goto out;
 
@@ -1093,7 +1060,7 @@ static s32 e1000_setup_led_82541(struct e1000_hw *hw __unused)
 out:
 	return ret_val;
 #endif
-        return 0;
+	return 0;
 }
 
 /**
@@ -1112,8 +1079,8 @@ static s32 e1000_cleanup_led_82541(struct e1000_hw *hw __unused)
 	DEBUGFUNC("e1000_cleanup_led_82541");
 
 	ret_val = hw->phy.ops.write_reg(hw,
-	                                IGP01E1000_GMII_FIFO,
-	                                dev_spec->spd_default);
+									IGP01E1000_GMII_FIFO,
+									dev_spec->spd_default);
 	if (ret_val)
 		goto out;
 
@@ -1122,7 +1089,7 @@ static s32 e1000_cleanup_led_82541(struct e1000_hw *hw __unused)
 out:
 	return ret_val;
 #endif
-        return 0;
+	return 0;
 }
 
 /**
@@ -1163,32 +1130,32 @@ static s32 e1000_phy_init_script_82541(struct e1000_hw *hw)
 	msec_delay(5);
 
 	switch (hw->mac.type) {
-	case e1000_82541:
-	case e1000_82547:
-		hw->phy.ops.write_reg(hw, 0x1F95, 0x0001);
+		case e1000_82541:
+		case e1000_82547:
+			hw->phy.ops.write_reg(hw, 0x1F95, 0x0001);
 
-		hw->phy.ops.write_reg(hw, 0x1F71, 0xBD21);
+			hw->phy.ops.write_reg(hw, 0x1F71, 0xBD21);
 
-		hw->phy.ops.write_reg(hw, 0x1F79, 0x0018);
+			hw->phy.ops.write_reg(hw, 0x1F79, 0x0018);
 
-		hw->phy.ops.write_reg(hw, 0x1F30, 0x1600);
+			hw->phy.ops.write_reg(hw, 0x1F30, 0x1600);
 
-		hw->phy.ops.write_reg(hw, 0x1F31, 0x0014);
+			hw->phy.ops.write_reg(hw, 0x1F31, 0x0014);
 
-		hw->phy.ops.write_reg(hw, 0x1F32, 0x161C);
+			hw->phy.ops.write_reg(hw, 0x1F32, 0x161C);
 
-		hw->phy.ops.write_reg(hw, 0x1F94, 0x0003);
+			hw->phy.ops.write_reg(hw, 0x1F94, 0x0003);
 
-		hw->phy.ops.write_reg(hw, 0x1F96, 0x003F);
+			hw->phy.ops.write_reg(hw, 0x1F96, 0x003F);
 
-		hw->phy.ops.write_reg(hw, 0x2010, 0x0008);
-		break;
-	case e1000_82541_rev_2:
-	case e1000_82547_rev_2:
-		hw->phy.ops.write_reg(hw, 0x1F73, 0x0099);
-		break;
-	default:
-		break;
+			hw->phy.ops.write_reg(hw, 0x2010, 0x0008);
+			break;
+		case e1000_82541_rev_2:
+		case e1000_82547_rev_2:
+			hw->phy.ops.write_reg(hw, 0x1F73, 0x0099);
+			break;
+		default:
+			break;
 	}
 
 	hw->phy.ops.write_reg(hw, 0x0000, 0x3300);
@@ -1202,14 +1169,10 @@ static s32 e1000_phy_init_script_82541(struct e1000_hw *hw)
 		u16 fused, fine, coarse;
 
 		/* Move to analog registers page */
-		hw->phy.ops.read_reg(hw,
-		                  IGP01E1000_ANALOG_SPARE_FUSE_STATUS,
-		                  &fused);
+		hw->phy.ops.read_reg(hw, IGP01E1000_ANALOG_SPARE_FUSE_STATUS, &fused);
 
 		if (!(fused & IGP01E1000_ANALOG_SPARE_FUSE_ENABLED)) {
-			hw->phy.ops.read_reg(hw,
-			                  IGP01E1000_ANALOG_FUSE_STATUS,
-			                  &fused);
+			hw->phy.ops.read_reg(hw, IGP01E1000_ANALOG_FUSE_STATUS, &fused);
 
 			fine = fused & IGP01E1000_ANALOG_FUSE_FINE_MASK;
 			coarse = fused & IGP01E1000_ANALOG_FUSE_COARSE_MASK;
@@ -1217,20 +1180,17 @@ static s32 e1000_phy_init_script_82541(struct e1000_hw *hw)
 			if (coarse > IGP01E1000_ANALOG_FUSE_COARSE_THRESH) {
 				coarse -= IGP01E1000_ANALOG_FUSE_COARSE_10;
 				fine -= IGP01E1000_ANALOG_FUSE_FINE_1;
-			} else if (coarse ==
-			           IGP01E1000_ANALOG_FUSE_COARSE_THRESH)
+			} else if (coarse == IGP01E1000_ANALOG_FUSE_COARSE_THRESH)
 				fine -= IGP01E1000_ANALOG_FUSE_FINE_10;
 
 			fused = (fused & IGP01E1000_ANALOG_FUSE_POLY_MASK) |
-			        (fine & IGP01E1000_ANALOG_FUSE_FINE_MASK) |
-			        (coarse & IGP01E1000_ANALOG_FUSE_COARSE_MASK);
+				(fine & IGP01E1000_ANALOG_FUSE_FINE_MASK) |
+				(coarse & IGP01E1000_ANALOG_FUSE_COARSE_MASK);
 
+			hw->phy.ops.write_reg(hw, IGP01E1000_ANALOG_FUSE_CONTROL, fused);
 			hw->phy.ops.write_reg(hw,
-			                   IGP01E1000_ANALOG_FUSE_CONTROL,
-			                   fused);
-			hw->phy.ops.write_reg(hw,
-			              IGP01E1000_ANALOG_FUSE_BYPASS,
-			              IGP01E1000_ANALOG_FUSE_ENABLE_SW_CONTROL);
+								  IGP01E1000_ANALOG_FUSE_BYPASS,
+								  IGP01E1000_ANALOG_FUSE_ENABLE_SW_CONTROL);
 		}
 	}
 
@@ -1294,21 +1254,31 @@ static void e1000_clear_hw_cntrs_82541(struct e1000_hw *hw)
 }
 
 static struct pci_device_id e1000_82541_nics[] = {
-     PCI_ROM(0x8086, 0x1013, "E1000_DEV_ID_82541EI", "E1000_DEV_ID_82541EI", e1000_82541),
-     PCI_ROM(0x8086, 0x1014, "E1000_DEV_ID_82541ER_LOM", "E1000_DEV_ID_82541ER_LOM", e1000_82541),
-     PCI_ROM(0x8086, 0x1018, "E1000_DEV_ID_82541EI_MOBILE", "E1000_DEV_ID_82541EI_MOBILE", e1000_82541),
-     PCI_ROM(0x8086, 0x1019, "E1000_DEV_ID_82547EI", "E1000_DEV_ID_82547EI", e1000_82547),
-     PCI_ROM(0x8086, 0x101A, "E1000_DEV_ID_82547EI_MOBILE", "E1000_DEV_ID_82547EI_MOBILE", e1000_82547),
-     PCI_ROM(0x8086, 0x1075, "E1000_DEV_ID_82547GI", "E1000_DEV_ID_82547GI", e1000_82547_rev_2),
-     PCI_ROM(0x8086, 0x1076, "E1000_DEV_ID_82541GI", "E1000_DEV_ID_82541GI", e1000_82541_rev_2),
-     PCI_ROM(0x8086, 0x1077, "E1000_DEV_ID_82541GI_MOBILE", "E1000_DEV_ID_82541GI_MOBILE", e1000_82541_rev_2),
-     PCI_ROM(0x8086, 0x1078, "E1000_DEV_ID_82541ER", "E1000_DEV_ID_82541ER", e1000_82541_rev_2),
-     PCI_ROM(0x8086, 0x107C, "E1000_DEV_ID_82541GI_LF", "E1000_DEV_ID_82541GI_LF", e1000_82541_rev_2),
+	PCI_ROM(0x8086, 0x1013, "E1000_DEV_ID_82541EI", "E1000_DEV_ID_82541EI",
+			e1000_82541),
+	PCI_ROM(0x8086, 0x1014, "E1000_DEV_ID_82541ER_LOM",
+			"E1000_DEV_ID_82541ER_LOM", e1000_82541),
+	PCI_ROM(0x8086, 0x1018, "E1000_DEV_ID_82541EI_MOBILE",
+			"E1000_DEV_ID_82541EI_MOBILE", e1000_82541),
+	PCI_ROM(0x8086, 0x1019, "E1000_DEV_ID_82547EI", "E1000_DEV_ID_82547EI",
+			e1000_82547),
+	PCI_ROM(0x8086, 0x101A, "E1000_DEV_ID_82547EI_MOBILE",
+			"E1000_DEV_ID_82547EI_MOBILE", e1000_82547),
+	PCI_ROM(0x8086, 0x1075, "E1000_DEV_ID_82547GI", "E1000_DEV_ID_82547GI",
+			e1000_82547_rev_2),
+	PCI_ROM(0x8086, 0x1076, "E1000_DEV_ID_82541GI", "E1000_DEV_ID_82541GI",
+			e1000_82541_rev_2),
+	PCI_ROM(0x8086, 0x1077, "E1000_DEV_ID_82541GI_MOBILE",
+			"E1000_DEV_ID_82541GI_MOBILE", e1000_82541_rev_2),
+	PCI_ROM(0x8086, 0x1078, "E1000_DEV_ID_82541ER", "E1000_DEV_ID_82541ER",
+			e1000_82541_rev_2),
+	PCI_ROM(0x8086, 0x107C, "E1000_DEV_ID_82541GI_LF",
+			"E1000_DEV_ID_82541GI_LF", e1000_82541_rev_2),
 };
 
 struct pci_driver e1000_82541_driver __pci_driver = {
 	.ids = e1000_82541_nics,
-	.id_count = (sizeof (e1000_82541_nics) / sizeof (e1000_82541_nics[0])),
+	.id_count = (sizeof(e1000_82541_nics) / sizeof(e1000_82541_nics[0])),
 	.probe = e1000_probe,
 	.remove = e1000_remove,
 };

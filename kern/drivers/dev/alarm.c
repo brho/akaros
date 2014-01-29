@@ -107,8 +107,8 @@ void devalarm_init(struct proc *p)
 }
 
 static int alarmgen(struct chan *c, char *entry_name,
-                    struct dirtab *unused, int unused_nr_dirtab,
-                    int s, struct dir *dp)
+					struct dirtab *unused, int unused_nr_dirtab,
+					int s, struct dir *dp)
 {
 	struct qid q;
 	struct proc_alarm *a_i;
@@ -137,7 +137,7 @@ static int alarmgen(struct chan *c, char *entry_name,
 			 * get the next item.  I'd like to do something like:
 			 *
 			 * if (dp->qid.path >> ADDR_SHIFT)
-			 * 		a_i = TAILQ_NEXT(QID2A(dp->qid), link);
+			 *      a_i = TAILQ_NEXT(QID2A(dp->qid), link);
 			 *
 			 * Dev would give us a 0'd dp path on the first run, so if we have a
 			 * path, we know we're on an iterative run.  However, the problem is
@@ -182,17 +182,17 @@ static int alarmgen(struct chan *c, char *entry_name,
 					return 1;
 			}
 			return -1;
-		/* Need to also provide a direct hit for Qclone and all other files (at
-		 * all levels of the hierarchy).  Every file is both
-		 * generated (via the s increments in their respective directories) and
-		 * directly gen-able.  devstat() will call gen with a specific path in
-		 * the qid.  In these cases, we make a dir for whatever they are asking
-		 * for.  Note the qid stays the same.  I think this is what the old
-		 * plan9 comments above devgen were talking about for (ii).
-		 *
-		 * We don't need to do this for the directories - devstat will look for
-		 * the a directory by path and fail.  Then it will manually build the
-		 * stat output (check the -1 case in devstat). */
+			/* Need to also provide a direct hit for Qclone and all other files (at
+			 * all levels of the hierarchy).  Every file is both
+			 * generated (via the s increments in their respective directories) and
+			 * directly gen-able.  devstat() will call gen with a specific path in
+			 * the qid.  In these cases, we make a dir for whatever they are asking
+			 * for.  Note the qid stays the same.  I think this is what the old
+			 * plan9 comments above devgen were talking about for (ii).
+			 *
+			 * We don't need to do this for the directories - devstat will look for
+			 * the a directory by path and fail.  Then it will manually build the
+			 * stat output (check the -1 case in devstat). */
 		case Qclone:
 			devdir(c, c->qid, "clone", 0, eve, 0666, dp);
 			return 1;
@@ -218,12 +218,12 @@ static struct chan *alarmattach(char *spec)
 }
 
 static struct walkqid *alarmwalk(struct chan *c, struct chan *nc, char **name,
-                                 int nname)
+								 int nname)
 {
 	return devwalk(c, nc, name, nname, 0, 0, alarmgen);
 }
 
-static int alarmstat(struct chan *c, uint8_t *db, int n)
+static int alarmstat(struct chan *c, uint8_t * db, int n)
 {
 	return devstat(c, db, n, 0, 0, alarmgen);
 }
@@ -299,7 +299,7 @@ static void alarmremove(struct chan *c)
 	error(Eperm);
 }
 
-static int alarmwstat(struct chan *c, uint8_t *dp, int n)
+static int alarmwstat(struct chan *c, uint8_t * dp, int n)
 {
 	error("No alarmwstat");
 	return 0;
@@ -333,7 +333,7 @@ static long alarmread(struct chan *c, void *ubuf, long n, int64_t offset)
 		case Qtimer:
 			p_alarm = QID2A(c->qid);
 			return readnum(offset, ubuf, n, p_alarm->a_waiter.wake_up_time,
-			               NUMSIZE64);
+						   NUMSIZE64);
 		default:
 			panic("Bad QID %p in devalarm", c->qid.path);
 	}
@@ -370,9 +370,9 @@ static long alarmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 				 * memory, and space or 0 terminated */
 				hexval = strtoul(cb->f[1], 0, 16);
 				/* This is just to help userspace - event code can handle it */
-				if (!is_user_rwaddr((void*)hexval, sizeof(struct event_queue)))
+				if (!is_user_rwaddr((void *)hexval, sizeof(struct event_queue)))
 					error("Non-user ev_q pointer");
-				p_alarm->ev_q = (struct event_queue*)hexval;
+				p_alarm->ev_q = (struct event_queue *)hexval;
 			} else if (!strcmp(cb->f[0], "cancel")) {
 				unset_alarm(p_alarm->proc->alarmset.tchain, &p_alarm->a_waiter);
 			} else {
@@ -393,7 +393,7 @@ static long alarmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 			/* if you don't know if it was running or not, resetting will turn
 			 * it on regardless. */
 			reset_alarm_abs(p_alarm->proc->alarmset.tchain, &p_alarm->a_waiter,
-			                hexval);
+							hexval);
 			break;
 		default:
 			panic("Bad QID %p in devalarm", c->qid.path);

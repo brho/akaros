@@ -7,42 +7,40 @@
 #include "kernel.h"
 #include "ip.h"
 
-static	ulong	fsip;
-static	ulong	auip;
-static	ulong	gwip;
-static	ulong	ipmask;
-static	ulong	ipaddr;
-static	ulong	dnsip;
+static ulong fsip;
+static ulong auip;
+static ulong gwip;
+static ulong ipmask;
+static ulong ipaddr;
+static ulong dnsip;
 
-enum
-{
+enum {
 	Bootrequest = 1,
-	Bootreply   = 2,
+	Bootreply = 2,
 };
 
-typedef struct Bootp
-{
+typedef struct Bootp {
 	/* udp.c oldheader */
-	uchar	raddr[IPaddrlen];
-	uchar	laddr[IPaddrlen];
-	uchar	rport[2];
-	uchar	lport[2];
+	uchar raddr[IPaddrlen];
+	uchar laddr[IPaddrlen];
+	uchar rport[2];
+	uchar lport[2];
 	/* bootp itself */
-	uchar	op;		/* opcode */
-	uchar	htype;		/* hardware type */
-	uchar	hlen;		/* hardware address len */
-	uchar	hops;		/* hops */
-	uchar	xid[4];		/* a random number */
-	uchar	secs[2];	/* elapsed snce client started booting */
-	uchar	pad[2];
-	uchar	ciaddr[4];	/* client IP address (client tells server) */
-	uchar	yiaddr[4];	/* client IP address (server tells client) */
-	uchar	siaddr[4];	/* server IP address */
-	uchar	giaddr[4];	/* gateway IP address */
-	uchar	chaddr[16];	/* client hardware address */
-	uchar	sname[64];	/* server host name (optional) */
-	uchar	file[128];	/* boot file name */
-	uchar	vend[128];	/* vendor-specific goo */
+	uchar op;					/* opcode */
+	uchar htype;				/* hardware type */
+	uchar hlen;					/* hardware address len */
+	uchar hops;					/* hops */
+	uchar xid[4];				/* a random number */
+	uchar secs[2];				/* elapsed snce client started booting */
+	uchar pad[2];
+	uchar ciaddr[4];			/* client IP address (client tells server) */
+	uchar yiaddr[4];			/* client IP address (server tells client) */
+	uchar siaddr[4];			/* server IP address */
+	uchar giaddr[4];			/* gateway IP address */
+	uchar chaddr[16];			/* client hardware address */
+	uchar sname[64];			/* server host name (optional) */
+	uchar file[128];			/* boot file name */
+	uchar vend[128];			/* vendor-specific goo */
 } Bootp;
 
 /*
@@ -59,13 +57,13 @@ typedef struct Bootp
  * address is followed by a newline.
  */
 
-static	Bootp	req;
-static	Proc*	rcvprocp;
-static	int	recv;
-static	int	done;
-static	Rendez	bootpr;
-static	char	rcvbuf[512];
-static	int	bootpdebug;
+static Bootp req;
+static Proc *rcvprocp;
+static int recv;
+static int done;
+static Rendez bootpr;
+static char rcvbuf[512];
+static int bootpdebug;
 
 /*
  * Parse the vendor specific fields according to RFC 1084.
@@ -77,14 +75,14 @@ static	int	bootpdebug;
  * will begin with the four bytes 99.130.83.99 and end with
  * an 0xFF byte.
  */
-static void
-parsevend(uchar* vend)
+static void parsevend(uchar * vend)
 {
 	/* The field must start with 99.130.83.99 to be compliant */
 	if ((vend[0] != 99) || (vend[1] != 130) ||
-	    (vend[2] != 83) || (vend[3] != 99)){
-		if(bootpdebug)
-			print("bad bootp vendor field: %.2x%.2x%.2x%.2x", vend[0], vend[1], vend[2], vend[3]);
+		(vend[2] != 83) || (vend[3] != 99)) {
+		if (bootpdebug)
+			print("bad bootp vendor field: %.2x%.2x%.2x%.2x", vend[0], vend[1],
+				  vend[2], vend[3]);
 		return;
 	}
 
@@ -92,71 +90,61 @@ parsevend(uchar* vend)
 	vend += 4;
 
 	while ((vend[0] != 0) && (vend[0] != 0xFF)) {
-		if(bootpdebug){
+		if (bootpdebug) {
 			int i;
 			print("vend %d [%d]", vend[0], vend[1]);
-			for(i=0; i<vend[1]; i++)
+			for (i = 0; i < vend[1]; i++)
 				print(" %2.2x", vend[i]);
 			print("\n");
 		}
 		switch (vend[0]) {
-		case 1:	/* Subnet mask field */
-			/* There must be only one subnet mask */
-			if (vend[1] != 4)
-				return;
+			case 1:	/* Subnet mask field */
+				/* There must be only one subnet mask */
+				if (vend[1] != 4)
+					return;
 
-			ipmask = (vend[2]<<24)|
-				 (vend[3]<<16)|
-				 (vend[4]<<8)|
-				  vend[5];
-			break;
-
-		case 3:	/* Gateway/router field */
-			/* We are only concerned with first address */
-			if (vend[1] < 4)
+				ipmask = (vend[2] << 24) |
+					(vend[3] << 16) | (vend[4] << 8) | vend[5];
 				break;
 
-			gwip =	(vend[2]<<24)|
-				(vend[3]<<16)|
-				(vend[4]<<8)|
-				 vend[5];
-			break;
+			case 3:	/* Gateway/router field */
+				/* We are only concerned with first address */
+				if (vend[1] < 4)
+					break;
 
-		case 6:	/* DNS server */
-			/* We are only concerned with first address */
-			if (vend[1] < 4)
+				gwip = (vend[2] << 24) |
+					(vend[3] << 16) | (vend[4] << 8) | vend[5];
 				break;
 
-			dnsip =	(vend[2]<<24)|
-				(vend[3]<<16)|
-				(vend[4]<<8)|
-				 vend[5];
-			break;
+			case 6:	/* DNS server */
+				/* We are only concerned with first address */
+				if (vend[1] < 4)
+					break;
 
-		case 8:	/* "Cookie server" (auth server) field */
-			/* We are only concerned with first address */
-			if (vend[1] < 4)
+				dnsip = (vend[2] << 24) |
+					(vend[3] << 16) | (vend[4] << 8) | vend[5];
 				break;
 
-			auip =	(vend[2]<<24)|
-				(vend[3]<<16)|
-				(vend[4]<<8)|
-				 vend[5];
-			break;
+			case 8:	/* "Cookie server" (auth server) field */
+				/* We are only concerned with first address */
+				if (vend[1] < 4)
+					break;
 
-		case 11:	/* "Resource loc server" (file server) field */
-			/* We are only concerned with first address */
-			if (vend[1] < 4)
+				auip = (vend[2] << 24) |
+					(vend[3] << 16) | (vend[4] << 8) | vend[5];
 				break;
 
-			fsip =	(vend[2]<<24)|
-				(vend[3]<<16)|
-				(vend[4]<<8)|
-				 vend[5];
-			break;
+			case 11:	/* "Resource loc server" (file server) field */
+				/* We are only concerned with first address */
+				if (vend[1] < 4)
+					break;
 
-		default:	/* Ignore everything else */
-			break;
+				fsip = (vend[2] << 24) |
+					(vend[3] << 16) | (vend[4] << 8) | vend[5];
+				break;
+
+			default:	/* Ignore everything else */
+				break;
 		}
 
 		/* Skip over the field */
@@ -164,27 +152,24 @@ parsevend(uchar* vend)
 	}
 }
 
-static void
-rcvbootp(void *a)
+static void rcvbootp(void *a)
 {
 	int n, fd;
 	Bootp *rp;
 
-	if(waserror())
+	if (waserror())
 		pexit("", 0);
 	rcvprocp = up;	/* store for postnote below */
 	fd = (int)a;
-	while(done == 0) {
+	while (done == 0) {
 		n = kread(fd, rcvbuf, sizeof(rcvbuf));
-		if(n <= 0)
+		if (n <= 0)
 			break;
-		rp = (Bootp*)rcvbuf;
+		rp = (Bootp *) rcvbuf;
 		if (memcmp(req.chaddr, rp->chaddr, 6) == 0 &&
-		   rp->htype == 1 && rp->hlen == 6) {
-			ipaddr = (rp->yiaddr[0]<<24)|
-				 (rp->yiaddr[1]<<16)|
-				 (rp->yiaddr[2]<<8)|
-				  rp->yiaddr[3];
+			rp->htype == 1 && rp->hlen == 6) {
+			ipaddr = (rp->yiaddr[0] << 24) |
+				(rp->yiaddr[1] << 16) | (rp->yiaddr[2] << 8) | rp->yiaddr[3];
 			parsevend(rp->vend);
 			break;
 		}
@@ -197,11 +182,10 @@ rcvbootp(void *a)
 	pexit("", 0);
 }
 
-static char*
-rbootp(Ipifc *ifc)
+static char *rbootp(Ipifc * ifc)
 {
 	int cfd, dfd, tries, n;
-	char ia[5+3*16], im[16], *av[3];
+	char ia[5 + 3 * 16], im[16], *av[3];
 	uchar nipaddr[4], ngwip[4], nipmask[4];
 	char dir[Maxpath];
 	static uchar vend_rfc1048[] = { 99, 130, 83, 99 };
@@ -211,16 +195,16 @@ rbootp(Ipifc *ifc)
 	ipifcadd(ifc, av, 3, 0, nil);
 
 	cfd = kannounce("udp!*!68", dir);
-	if(cfd < 0)
+	if (cfd < 0)
 		return "bootp announce failed";
 	strcat(dir, "/data");
-	if(kwrite(cfd, "headers", 7) < 0){
+	if (kwrite(cfd, "headers", 7) < 0) {
 		kclose(cfd);
 		return "bootp ctl headers failed";
 	}
 	kwrite(cfd, "oldheaders", 10);
 	dfd = kopen(dir, ORDWR);
-	if(dfd < 0){
+	if (dfd < 0) {
 		kclose(cfd);
 		return "bootp open data failed";
 	}
@@ -231,8 +215,8 @@ rbootp(Ipifc *ifc)
 	ipmove(req.raddr, IPv4bcast);
 	hnputs(req.rport, 67);
 	req.op = Bootrequest;
-	req.htype = 1;			/* ethernet (all we know) */
-	req.hlen = 6;			/* ethernet (all we know) */
+	req.htype = 1;	/* ethernet (all we know) */
+	req.hlen = 6;	/* ethernet (all we know) */
 
 	/* Hardware MAC address */
 	memmove(req.chaddr, ifc->mac, 6);
@@ -251,19 +235,19 @@ rbootp(Ipifc *ifc)
 	 * or fixed number of tries
 	 */
 	tries = 0;
-	while(recv == 0) {
-		if(kwrite(dfd, &req, sizeof(req)) < 0)
+	while (recv == 0) {
+		if (kwrite(dfd, &req, sizeof(req)) < 0)
 			print("bootp: write: %r");
 
 		udelay_sched(1000 * 1000);
-		if(++tries > 10) {
+		if (++tries > 10) {
 			print("bootp: timed out\n");
 			break;
 		}
 	}
 	kclose(dfd);
 	done = 1;
-	if(rcvprocp != nil){
+	if (rcvprocp != nil) {
 		postnote(rcvprocp, 1, "timeout", 0);
 		rcvprocp = nil;
 	}
@@ -280,7 +264,7 @@ rbootp(Ipifc *ifc)
 	av[2] = im;
 	ipifcadd(ifc, av, 3, 0, nil);
 
-	if(gwip != 0) {
+	if (gwip != 0) {
 		hnputl(ngwip, gwip);
 		n = sprint(ia, "add 0.0.0.0 0.0.0.0 %V", ngwip);
 		routewrite(ifc->conv->p->f, nil, ia, n);
@@ -288,30 +272,29 @@ rbootp(Ipifc *ifc)
 	return nil;
 }
 
-static int
-rbootpread(char *bp, ulong offset, int len)
+static int rbootpread(char *bp, ulong offset, int len)
 {
 	int n;
 	char *buf;
 	uchar a[4];
 
 	buf = smalloc(READSTR);
-	if(waserror()){
+	if (waserror()) {
 		free(buf);
 		nexterror();
 	}
 	hnputl(a, fsip);
 	n = snprint(buf, READSTR, "fsip %15V\n", a);
 	hnputl(a, auip);
-	n += snprint(buf + n, READSTR-n, "auip %15V\n", a);
+	n += snprint(buf + n, READSTR - n, "auip %15V\n", a);
 	hnputl(a, gwip);
-	n += snprint(buf + n, READSTR-n, "gwip %15V\n", a);
+	n += snprint(buf + n, READSTR - n, "gwip %15V\n", a);
 	hnputl(a, ipmask);
-	n += snprint(buf + n, READSTR-n, "ipmask %15V\n", a);
+	n += snprint(buf + n, READSTR - n, "ipmask %15V\n", a);
 	hnputl(a, ipaddr);
-	n += snprint(buf + n, READSTR-n, "ipaddr %15V\n", a);
+	n += snprint(buf + n, READSTR - n, "ipaddr %15V\n", a);
 	hnputl(a, dnsip);
-	snprint(buf + n, READSTR-n, "dnsip %15V\n", a);
+	snprint(buf + n, READSTR - n, "dnsip %15V\n", a);
 
 	len = readstr(offset, bp, len, buf);
 	poperror();
@@ -319,5 +302,5 @@ rbootpread(char *bp, ulong offset, int len)
 	return len;
 }
 
-char*	(*bootp)(Ipifc*) = rbootp;
-int	(*bootpread)(char*, ulong, int) = rbootpread;
+char *(*bootp) (Ipifc *) = rbootp;
+int (*bootpread) (char *, ulong, int) = rbootpread;

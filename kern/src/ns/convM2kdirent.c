@@ -31,7 +31,8 @@ struct kdirent {
 
 #endif
 
-unsigned int convM2kdirent(uint8_t * buf, unsigned int nbuf, struct kdirent *kd, char *strs)
+unsigned int convM2kdirent(uint8_t * buf, unsigned int nbuf, struct kdirent *kd,
+						   char *strs)
 {
 	uint8_t *p, *ebuf;
 	char *sv[4];
@@ -76,7 +77,7 @@ unsigned int convM2kdirent(uint8_t * buf, unsigned int nbuf, struct kdirent *kd,
 		p += BIT16SZ;
 		if (p + ns > ebuf)
 			return 0;
-		if(strs){
+		if (strs) {
 			sv[i] = strs;
 			memmove(strs, p, ns);
 			strs += ns;
@@ -139,5 +140,5 @@ unsigned int convM2kstat(uint8_t * buf, unsigned int nbuf, struct kstat *ks)
 	ks->st_nlink = 2;	// links make no sense any more. 
 	ks->st_uid = ks->st_gid = 0;
 
- 	return p - buf;
- }
+	return p - buf;
+}

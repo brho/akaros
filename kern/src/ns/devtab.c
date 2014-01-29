@@ -61,8 +61,7 @@ struct dev *devtabget(int dc, int user)
 	error(Enonexist);
 }
 
-long
-devtabread(struct chan *c, void *buf, long n, int64_t off)
+long devtabread(struct chan *c, void *buf, long n, int64_t off)
 {
 	ERRSTACK(1);
 

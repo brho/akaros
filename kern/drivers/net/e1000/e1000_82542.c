@@ -26,7 +26,7 @@
 
 *******************************************************************************/
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE(GPL2_OR_LATER);
 
 /*
  * 82542 Gigabit Ethernet Controller
@@ -34,16 +34,16 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include "e1000_api.h"
 
-static s32  e1000_init_phy_params_82542(struct e1000_hw *hw);
-static s32  e1000_init_nvm_params_82542(struct e1000_hw *hw);
-static s32  e1000_init_mac_params_82542(struct e1000_hw *hw);
-static s32  e1000_get_bus_info_82542(struct e1000_hw *hw);
-static s32  e1000_reset_hw_82542(struct e1000_hw *hw);
-static s32  e1000_init_hw_82542(struct e1000_hw *hw);
-static s32  e1000_setup_link_82542(struct e1000_hw *hw);
-static s32  e1000_led_on_82542(struct e1000_hw *hw);
-static s32  e1000_led_off_82542(struct e1000_hw *hw);
-static void e1000_rar_set_82542(struct e1000_hw *hw, u8 *addr, u32 index);
+static s32 e1000_init_phy_params_82542(struct e1000_hw *hw);
+static s32 e1000_init_nvm_params_82542(struct e1000_hw *hw);
+static s32 e1000_init_mac_params_82542(struct e1000_hw *hw);
+static s32 e1000_get_bus_info_82542(struct e1000_hw *hw);
+static s32 e1000_reset_hw_82542(struct e1000_hw *hw);
+static s32 e1000_init_hw_82542(struct e1000_hw *hw);
+static s32 e1000_setup_link_82542(struct e1000_hw *hw);
+static s32 e1000_led_on_82542(struct e1000_hw *hw);
+static s32 e1000_led_off_82542(struct e1000_hw *hw);
+static void e1000_rar_set_82542(struct e1000_hw *hw, u8 * addr, u32 index);
 static void e1000_clear_hw_cntrs_82542(struct e1000_hw *hw);
 
 /**
@@ -57,7 +57,7 @@ static s32 e1000_init_phy_params_82542(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_init_phy_params_82542");
 
-	phy->type               = e1000_phy_none;
+	phy->type = e1000_phy_none;
 
 	return ret_val;
 }
@@ -72,18 +72,18 @@ static s32 e1000_init_nvm_params_82542(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_init_nvm_params_82542");
 
-	nvm->address_bits       =  6;
-	nvm->delay_usec         = 50;
-	nvm->opcode_bits        =  3;
-	nvm->type               = e1000_nvm_eeprom_microwire;
-	nvm->word_size          = 64;
+	nvm->address_bits = 6;
+	nvm->delay_usec = 50;
+	nvm->opcode_bits = 3;
+	nvm->type = e1000_nvm_eeprom_microwire;
+	nvm->word_size = 64;
 
 	/* Function Pointers */
-	nvm->ops.read           = e1000_read_nvm_microwire;
-	nvm->ops.release        = e1000_stop_nvm;
-	nvm->ops.write          = e1000_write_nvm_microwire;
-	nvm->ops.update         = e1000_update_nvm_checksum_generic;
-	nvm->ops.validate       = e1000_validate_nvm_checksum_generic;
+	nvm->ops.read = e1000_read_nvm_microwire;
+	nvm->ops.release = e1000_stop_nvm;
+	nvm->ops.write = e1000_write_nvm_microwire;
+	nvm->ops.update = e1000_update_nvm_checksum_generic;
+	nvm->ops.validate = e1000_validate_nvm_checksum_generic;
 
 	return E1000_SUCCESS;
 }
@@ -329,8 +329,7 @@ static s32 e1000_setup_link_82542(struct e1000_hw *hw)
 	 */
 	hw->fc.current_mode = hw->fc.requested_mode;
 
-	DEBUGOUT1("After fix-ups FlowControl is now = %x\n",
-	                                             hw->fc.current_mode);
+	DEBUGOUT1("After fix-ups FlowControl is now = %x\n", hw->fc.current_mode);
 
 	/* Call the necessary subroutine to configure the link. */
 	ret_val = mac->ops.setup_physical_interface(hw);
@@ -410,7 +409,7 @@ static s32 e1000_led_off_82542(struct e1000_hw *hw __unused)
  *  Sets the receive address array register at index to the address passed
  *  in by addr.
  **/
-static void e1000_rar_set_82542(struct e1000_hw *hw, u8 *addr, u32 index)
+static void e1000_rar_set_82542(struct e1000_hw *hw, u8 * addr, u32 index)
 {
 	u32 rar_low, rar_high;
 
@@ -421,8 +420,8 @@ static void e1000_rar_set_82542(struct e1000_hw *hw, u8 *addr, u32 index)
 	 * from network order (big endian) to little endian
 	 */
 	rar_low = ((u32) addr[0] |
-	           ((u32) addr[1] << 8) |
-	           ((u32) addr[2] << 16) | ((u32) addr[3] << 24));
+			   ((u32) addr[1] << 8) |
+			   ((u32) addr[2] << 16) | ((u32) addr[3] << 24));
 
 	rar_high = ((u32) addr[4] | ((u32) addr[5] << 8));
 
@@ -452,80 +451,80 @@ u32 e1000_translate_register_82542(u32 reg)
 	 * function in the same manner.
 	 */
 	switch (reg) {
-	case E1000_RA:
-		reg = 0x00040;
-		break;
-	case E1000_RDTR:
-		reg = 0x00108;
-		break;
-	case E1000_RDBAL(0):
-		reg = 0x00110;
-		break;
-	case E1000_RDBAH(0):
-		reg = 0x00114;
-		break;
-	case E1000_RDLEN(0):
-		reg = 0x00118;
-		break;
-	case E1000_RDH(0):
-		reg = 0x00120;
-		break;
-	case E1000_RDT(0):
-		reg = 0x00128;
-		break;
-	case E1000_RDBAL(1):
-		reg = 0x00138;
-		break;
-	case E1000_RDBAH(1):
-		reg = 0x0013C;
-		break;
-	case E1000_RDLEN(1):
-		reg = 0x00140;
-		break;
-	case E1000_RDH(1):
-		reg = 0x00148;
-		break;
-	case E1000_RDT(1):
-		reg = 0x00150;
-		break;
-	case E1000_FCRTH:
-		reg = 0x00160;
-		break;
-	case E1000_FCRTL:
-		reg = 0x00168;
-		break;
-	case E1000_MTA:
-		reg = 0x00200;
-		break;
-	case E1000_TDBAL(0):
-		reg = 0x00420;
-		break;
-	case E1000_TDBAH(0):
-		reg = 0x00424;
-		break;
-	case E1000_TDLEN(0):
-		reg = 0x00428;
-		break;
-	case E1000_TDH(0):
-		reg = 0x00430;
-		break;
-	case E1000_TDT(0):
-		reg = 0x00438;
-		break;
-	case E1000_TIDV:
-		reg = 0x00440;
-		break;
-	case E1000_VFTA:
-		reg = 0x00600;
-		break;
-	case E1000_TDFH:
-		reg = 0x08010;
-		break;
-	case E1000_TDFT:
-		reg = 0x08018;
-		break;
-	default:
-		break;
+		case E1000_RA:
+			reg = 0x00040;
+			break;
+		case E1000_RDTR:
+			reg = 0x00108;
+			break;
+		case E1000_RDBAL(0):
+			reg = 0x00110;
+			break;
+		case E1000_RDBAH(0):
+			reg = 0x00114;
+			break;
+		case E1000_RDLEN(0):
+			reg = 0x00118;
+			break;
+		case E1000_RDH(0):
+			reg = 0x00120;
+			break;
+		case E1000_RDT(0):
+			reg = 0x00128;
+			break;
+		case E1000_RDBAL(1):
+			reg = 0x00138;
+			break;
+		case E1000_RDBAH(1):
+			reg = 0x0013C;
+			break;
+		case E1000_RDLEN(1):
+			reg = 0x00140;
+			break;
+		case E1000_RDH(1):
+			reg = 0x00148;
+			break;
+		case E1000_RDT(1):
+			reg = 0x00150;
+			break;
+		case E1000_FCRTH:
+			reg = 0x00160;
+			break;
+		case E1000_FCRTL:
+			reg = 0x00168;
+			break;
+		case E1000_MTA:
+			reg = 0x00200;
+			break;
+		case E1000_TDBAL(0):
+			reg = 0x00420;
+			break;
+		case E1000_TDBAH(0):
+			reg = 0x00424;
+			break;
+		case E1000_TDLEN(0):
+			reg = 0x00428;
+			break;
+		case E1000_TDH(0):
+			reg = 0x00430;
+			break;
+		case E1000_TDT(0):
+			reg = 0x00438;
+			break;
+		case E1000_TIDV:
+			reg = 0x00440;
+			break;
+		case E1000_VFTA:
+			reg = 0x00600;
+			break;
+		case E1000_TDFH:
+			reg = 0x08010;
+			break;
+		case E1000_TDFT:
+			reg = 0x08018;
+			break;
+		default:
+			break;
 	}
 
 	return reg;
@@ -560,12 +559,13 @@ static void e1000_clear_hw_cntrs_82542(struct e1000_hw *hw)
 }
 
 static struct pci_device_id e1000_82542_nics[] = {
-     PCI_ROM(0x8086, 0x1000, "E1000_DEV_ID_82542", "E1000_DEV_ID_82542", e1000_82542),
+	PCI_ROM(0x8086, 0x1000, "E1000_DEV_ID_82542", "E1000_DEV_ID_82542",
+			e1000_82542),
 };
 
 struct pci_driver e1000_82542_driver __pci_driver = {
 	.ids = e1000_82542_nics,
-	.id_count = (sizeof (e1000_82542_nics) / sizeof (e1000_82542_nics[0])),
+	.id_count = (sizeof(e1000_82542_nics) / sizeof(e1000_82542_nics[0])),
 	.probe = e1000_probe,
 	.remove = e1000_remove,
 };

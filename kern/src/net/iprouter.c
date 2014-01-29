@@ -19,45 +19,41 @@ struct IProuter iprouter;
  *  User level routing.  Ip packets we don't know what to do with
  *  come here.
  */
-void
-useriprouter(struct Fs *f, struct Ipifc *ifc, struct block *bp)
+void useriprouter(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 {
 	qlock(&(&f->iprouter)->qlock);
-	if(f->iprouter.q != NULL){
+	if (f->iprouter.q != NULL) {
 		bp = padblock(bp, IPaddrlen);
-		if(bp == NULL)
+		if (bp == NULL)
 			return;
 		ipmove(bp->rp, ifc->lifc->local);
 		qpass(f->iprouter.q, bp);
-	}else
+	} else
 		freeb(bp);
 	qunlock(&(&f->iprouter)->qlock);
 }
 
-void
-iprouteropen(struct Fs *f)
+void iprouteropen(struct Fs *f)
 {
 	qlock(&(&f->iprouter)->qlock);
 	f->iprouter.opens++;
-	if(f->iprouter.q == NULL)
-		f->iprouter.q = qopen(64*1024, 0, 0, 0);
-	else if(f->iprouter.opens == 1)
+	if (f->iprouter.q == NULL)
+		f->iprouter.q = qopen(64 * 1024, 0, 0, 0);
+	else if (f->iprouter.opens == 1)
 		qreopen(f->iprouter.q);
 	qunlock(&(&f->iprouter)->qlock);
 }
 
-void
-iprouterclose(struct Fs *f)
+void iprouterclose(struct Fs *f)
 {
 	qlock(&(&f->iprouter)->qlock);
 	f->iprouter.opens--;
-	if(f->iprouter.opens == 0)
+	if (f->iprouter.opens == 0)
 		qclose(f->iprouter.q);
 	qunlock(&(&f->iprouter)->qlock);
 }
 
-long
-iprouterread(struct Fs *f, void *a, int n)
+long iprouterread(struct Fs *f, void *a, int n)
 {
 	return qread(f->iprouter.q, a, n);
 }

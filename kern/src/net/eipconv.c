@@ -32,13 +32,13 @@ uint8_t prefixvals[256] = {
 static char *efmt = "0x%.2lx0x%.2lx0x%.2lx0x%.2lx0x%.2lx0x%.2lx";
 static char *ifmt = "%d.%d.%d.%d";
 
-void printemac(void (*putch)(int, void**), void **putdat, uint8_t *mac)
+void printemac(void (*putch) (int, void **), void **putdat, uint8_t * mac)
 {
 	printfmt(putch, putdat, efmt, mac[0], mac[1], mac[2], mac[3], mac[4],
-					 mac[5]);
+			 mac[5]);
 }
 
-void printip(void (*putch)(int, void**), void **putdat, uint8_t *ip)
+void printip(void (*putch) (int, void **), void **putdat, uint8_t * ip)
 {
 	int i, j, eln, eli;
 	uint16_t s;
@@ -76,12 +76,12 @@ void printip(void (*putch)(int, void**), void **putdat, uint8_t *ip)
 	}
 }
 
-void printipv4(void (*putch)(int, void**), void **putdat, uint8_t *p)
+void printipv4(void (*putch) (int, void **), void **putdat, uint8_t * p)
 {
 	printfmt(putch, putdat, ifmt, p[0], p[1], p[2], p[3]);
 }
 
-void printipmask(void (*putch)(int, void**), void **putdat, uint8_t *ip)
+void printipmask(void (*putch) (int, void **), void **putdat, uint8_t * ip)
 {
 	int i, j, n;
 	/* look for a prefix mask */
@@ -89,12 +89,12 @@ void printipmask(void (*putch)(int, void**), void **putdat, uint8_t *ip)
 		if (ip[i] != 0xff)
 			break;
 	if (i < 16) {
-		if ((prefixvals[ip[i]] & Isprefix) == 0){
+		if ((prefixvals[ip[i]] & Isprefix) == 0) {
 			printip(putch, putdat, ip);
 			return;
 		}
 		for (j = i + 1; j < 16; j++)
-			if (ip[j] != 0){
+			if (ip[j] != 0) {
 				printip(putch, putdat, ip);
 				return;
 			}
@@ -107,17 +107,19 @@ void printipmask(void (*putch)(int, void**), void **putdat, uint8_t *ip)
 }
 
 static uint8_t testvec[11][16] = {
-	{0,0,0,0,0,0,0,0,0,0,0xff,0xff,1,3,4,5,} ,
-	{0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,} ,
-	{0xff,0xff,0x80,0,0,0,0,0,0,0,0,0,0,0,0,0,} ,
-	{0xff,0xff,0xff,0xc0,0,0,0,0,0,0,0,0,0,0,0,0,} ,
-	{0xff,0xff,0xff,0xff,0xe0,0,0,0,0,0,0,0,0,0,0,0,} ,
-	{0xff,0xff,0xff,0xff,0xff,0xf0,0,0,0,0,0,0,0,0,0,0,} ,
-	{0xff,0xff,0xff,0xff,0xff,0xff,0xf8,0,0,0,0,0,0,0,0,0,} ,
-	{0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,} ,
-	{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,} ,
-	{0,0,0,0,0,0x11,0,0,0,0,0,0,0,0,0,0,} ,
-	{0,0,0,0x11,0,0,0,0,0,0,0,0,0,0,0,0x12,} ,
+	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 1, 3, 4, 5,},
+	{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	 0xff, 0xff, 0xff, 0xff,},
+	{0xff, 0xff, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},
+	{0xff, 0xff, 0xff, 0xc0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},
+	{0xff, 0xff, 0xff, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},
+	{0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},
+	{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf8, 0, 0, 0, 0, 0, 0, 0, 0, 0,},
+	{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	 0xff, 0xff, 0xff, 0xff,},
+	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},
+	{0, 0, 0, 0, 0, 0x11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},
+	{0, 0, 0, 0x11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x12,},
 };
 
 /* handy dandy test function. When in doubt, you can call this from the monitor.

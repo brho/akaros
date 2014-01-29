@@ -18,17 +18,16 @@ static int pgrpid;
 static int mountid;
 #define NEXT_ID(x) (__sync_add_and_fetch(&(x), 1))
 
-void
-closepgrp(struct pgrp *p)
+void closepgrp(struct pgrp *p)
 {
 	struct mhead **h, **e, *f, *next;
-	
+
 	wlock(&p->ns);
 	p->pgrpid = -1;
 
 	e = &p->mnthash[MNTHASH];
-	for(h = p->mnthash; h < e; h++) {
-		for(f = *h; f; f = next) {
+	for (h = p->mnthash; h < e; h++) {
+		for (f = *h; f; f = next) {
 			wlock(&f->lock);
 			cclose(f->from);
 			mountfree(f->mount);
@@ -44,15 +43,13 @@ closepgrp(struct pgrp *p)
 	kfree(p);
 }
 
-static void
-freepgrp(struct kref *k)
+static void freepgrp(struct kref *k)
 {
 	struct pgrp *p = container_of(k, struct pgrp, ref);
 	closepgrp(p);
 }
 
-struct pgrp*
-newpgrp(void)
+struct pgrp *newpgrp(void)
 {
 	struct pgrp *p;
 
@@ -65,18 +62,17 @@ newpgrp(void)
 	return p;
 }
 
-void
-pgrpinsert(struct mount **order, struct mount *m)
+void pgrpinsert(struct mount **order, struct mount *m)
 {
 	struct mount *f;
 
 	m->order = 0;
-	if(*order == 0) {
+	if (*order == 0) {
 		*order = m;
 		return;
 	}
-	for(f = *order; f; f = f->order) {
-		if(m->mountid < f->mountid) {
+	for (f = *order; f; f = f->order) {
+		if (m->mountid < f->mountid) {
 			m->order = f;
 			*order = m;
 			return;
@@ -89,8 +85,7 @@ pgrpinsert(struct mount **order, struct mount *m)
 /*
  * pgrpcpy MUST preserve the mountid allocation order of the parent group
  */
-void
-pgrpcpy(struct pgrp *to, struct pgrp *from)
+void pgrpcpy(struct pgrp *to, struct pgrp *from)
 {
 	ERRSTACK(2);
 	int i;
@@ -98,17 +93,17 @@ pgrpcpy(struct pgrp *to, struct pgrp *from)
 	struct mhead *f, **tom, **l, *mh;
 
 	wlock(&from->ns);
-	if(waserror()){
+	if (waserror()) {
 		wunlock(&from->ns);
 		nexterror();
 	}
 	order = 0;
 	tom = to->mnthash;
-	for(i = 0; i < MNTHASH; i++) {
+	for (i = 0; i < MNTHASH; i++) {
 		l = tom++;
-		for(f = from->mnthash[i]; f; f = f->hash) {
+		for (f = from->mnthash[i]; f; f = f->hash) {
 			rlock(&f->lock);
-			if(waserror()){
+			if (waserror()) {
 				runlock(&f->lock);
 				nexterror();
 			}
@@ -118,7 +113,7 @@ pgrpcpy(struct pgrp *to, struct pgrp *from)
 			*l = mh;
 			l = &mh->hash;
 			link = &mh->mount;
-			for(m = f->mount; m; m = m->next) {
+			for (m = f->mount; m; m = m->next) {
 				n = newmount(mh, m->to, m->mflag, m->spec);
 				m->copy = n;
 				pgrpinsert(&order, m);
@@ -133,7 +128,7 @@ pgrpcpy(struct pgrp *to, struct pgrp *from)
 	 * Allocate mount ids in the same sequence as the parent group
 	 */
 	/* should probably protect with a spinlock and be done with it */
-	for(m = order; m; m = m->order){
+	for (m = order; m; m = m->order) {
 		m->copy->mountid = NEXT_ID(mountid);
 	}
 
@@ -146,8 +141,7 @@ pgrpcpy(struct pgrp *to, struct pgrp *from)
 	wunlock(&from->ns);
 }
 
-void
-closefgrp(struct fgrp *f)
+void closefgrp(struct fgrp *f)
 {
 	/* TODO: look at this more carefully.  sharing fgrps might be unnecessary,
 	 * due to our parallelism style. */
@@ -166,21 +160,19 @@ closefgrp(struct fgrp *f)
 	kref_put(&f->ref);
 }
 
-static void
-freefgrp(struct kref *k)
+static void freefgrp(struct kref *k)
 {
 	struct fgrp *f = container_of(k, struct fgrp, ref);
 	struct chan *c;
-	for(int i = 0; i <= f->maxfd; i++)
-		if((c = f->fd[i]))
+	for (int i = 0; i <= f->maxfd; i++)
+		if ((c = f->fd[i]))
 			cclose(c);
 
 	kfree(f->fd);
 	kfree(f);
 }
 
-struct fgrp*
-newfgrp(void)
+struct fgrp *newfgrp(void)
 {
 	struct fgrp *new;
 	int n;
@@ -194,8 +186,7 @@ newfgrp(void)
 	return new;
 }
 
-struct fgrp*
-dupfgrp(struct fgrp *f)
+struct fgrp *dupfgrp(struct fgrp *f)
 {
 	int i;
 	struct chan *c;
@@ -211,19 +202,19 @@ dupfgrp(struct fgrp *f)
 		error("File group closed");
 	}
 	n = DELTAFD;
-	if(f->maxfd >= n)
-		n = (f->maxfd+1 + DELTAFD-1)/DELTAFD * DELTAFD;
+	if (f->maxfd >= n)
+		n = (f->maxfd + 1 + DELTAFD - 1) / DELTAFD * DELTAFD;
 	new->nfd = n;
 	new->fd = kzmalloc(n * sizeof(struct chan *), 0);
-	if(new->fd == NULL){
+	if (new->fd == NULL) {
 		spin_unlock(&f->lock);
 		kfree(new);
 		error(Enomem);
 	}
 	new->maxfd = f->maxfd;
 	new->minfd = f->minfd;
-	for(i = 0; i <= f->maxfd; i++) {
-		if((c = f->fd[i])){
+	for (i = 0; i <= f->maxfd; i++) {
+		if ((c = f->fd[i])) {
 			kref_get(&c->ref, 1);
 			new->fd[i] = c;
 		}
@@ -233,8 +224,7 @@ dupfgrp(struct fgrp *f)
 	return new;
 }
 
-struct mount*
-newmount(struct mhead *mh, struct chan *to, int flag, char *spec)
+struct mount *newmount(struct mhead *mh, struct chan *to, int flag, char *spec)
 {
 	struct mount *m;
 
@@ -244,18 +234,17 @@ newmount(struct mhead *mh, struct chan *to, int flag, char *spec)
 	kref_get(&to->ref, 1);
 	m->mountid = NEXT_ID(mountid);
 	m->mflag = flag;
-	if(spec != 0)
+	if (spec != 0)
 		kstrdup(&m->spec, spec);
 
 	return m;
 }
 
-void
-mountfree(struct mount *m)
+void mountfree(struct mount *m)
 {
 	struct mount *f;
 
-	while(m) {
+	while (m) {
 		f = m->next;
 		cclose(m->to);
 		m->mountid = 0;
@@ -266,17 +255,15 @@ mountfree(struct mount *m)
 }
 
 #if 0
-almost certainly not needed.
-void
-resrcwait(char *reason)
+almost certainly not needed.void resrcwait(char *reason)
 {
 	char *p;
 
-	if(current == 0)
+	if (current == 0)
 		panic("resrcwait");
 
 	p = up->psstate;
-	if(reason) {
+	if (reason) {
 		up->psstate = reason;
 		printd("%s\n", reason);
 	}
@@ -297,8 +284,7 @@ static void __sigs_release(struct kref *kref)
 	kfree(s);
 }
 
-void
-closesigs(struct skeyset *s)
+void closesigs(struct skeyset *s)
 {
 	if (!s)
 		return;
@@ -309,12 +295,11 @@ static void __key_release(struct kref *kref)
 {
 	struct signerkey *key = container_of(kref, struct signerkey, ref);
 	kfree(key->owner);
-	(*key->pkfree)(key->pk);
+	(*key->pkfree) (key->pk);
 	kfree(key);
 }
 
-void
-freeskey(struct signerkey *key)
+void freeskey(struct signerkey *key)
 {
 	if (!key)
 		return;

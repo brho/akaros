@@ -29,16 +29,17 @@
 #ifndef _E1000_MANAGE_H_
 #define _E1000_MANAGE_H_
 
-bool e1000_check_mng_mode_generic(struct e1000_hw *hw);
+bool e1000_check_mng_mode_generic(struct e1000_hw * hw);
 bool e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw);
-int32_t  e1000_mng_enable_host_if_generic(struct e1000_hw *hw);
-int32_t  e1000_mng_host_if_write_generic(struct e1000_hw *hw, uint8_t *buffer,
-                                     uint16_t length,
-				     uint16_t offset, uint8_t *sum);
-int32_t  e1000_mng_write_cmd_header_generic(struct e1000_hw *hw,
-                                    struct e1000_host_mng_command_header *hdr);
-int32_t  e1000_mng_write_dhcp_info_generic(struct e1000_hw *hw,
-                                       uint8_t *buffer, uint16_t length);
+int32_t e1000_mng_enable_host_if_generic(struct e1000_hw *hw);
+int32_t e1000_mng_host_if_write_generic(struct e1000_hw *hw, uint8_t * buffer,
+										uint16_t length,
+										uint16_t offset, uint8_t * sum);
+int32_t e1000_mng_write_cmd_header_generic(struct e1000_hw *hw,
+										   struct e1000_host_mng_command_header
+										   *hdr);
+int32_t e1000_mng_write_dhcp_info_generic(struct e1000_hw *hw, uint8_t * buffer,
+										  uint16_t length);
 bool e1000_enable_mng_pass_thru(struct e1000_hw *hw);
 
 enum e1000_mng_mode {
@@ -66,14 +67,14 @@ enum e1000_mng_mode {
 #define E1000_VFTA_ENTRY_MASK                0x7F
 #define E1000_VFTA_ENTRY_BIT_SHIFT_MASK      0x1F
 
-#define E1000_HI_MAX_BLOCK_BYTE_LENGTH       1792 /* Num of bytes in range */
-#define E1000_HI_MAX_BLOCK_DWORD_LENGTH      448 /* Num of dwords in range */
-#define E1000_HI_COMMAND_TIMEOUT             500 /* Process HI command limit */
+#define E1000_HI_MAX_BLOCK_BYTE_LENGTH       1792	/* Num of bytes in range */
+#define E1000_HI_MAX_BLOCK_DWORD_LENGTH      448	/* Num of dwords in range */
+#define E1000_HI_COMMAND_TIMEOUT             500	/* Process HI command limit */
 
-#define E1000_HICR_EN              0x01  /* Enable bit - RO */
+#define E1000_HICR_EN              0x01	/* Enable bit - RO */
 /* Driver sets this bit when done to put command in RAM */
 #define E1000_HICR_C               0x02
-#define E1000_HICR_SV              0x04  /* Status Validity */
+#define E1000_HICR_SV              0x04	/* Status Validity */
 #define E1000_HICR_FW_RESET_ENABLE 0x40
 #define E1000_HICR_FW_RESET        0x80
 

@@ -226,7 +226,7 @@ static void paddr_check(void *kaddr)
 {
 	if (paddr_high32(kaddr))
 		panic("rtl8139: attempted to publish paddr > 4GB!.  "
-		      "Try running with less memory.");
+			  "Try running with less memory.");
 }
 
 static void rtl8139promiscuous(void *arg, int on)
@@ -348,7 +348,7 @@ static void rtl8139init(struct ether *edev)
 	 * Receiver
 	 */
 	// inferno had mmucacheinhib here
-	alloc = (uint8_t*)ROUNDUP((uintptr_t)ctlr->alloc, ARCH_CL_SIZE);
+	alloc = (uint8_t *) ROUNDUP((uintptr_t) ctlr->alloc, ARCH_CL_SIZE);
 	ctlr->rbstart = alloc;
 	alloc += ctlr->rblen + 16;
 	memset(ctlr->rbstart, 0, ctlr->rblen + 16);
@@ -397,7 +397,7 @@ static void rtl8139attach(struct ether *edev)
 	if (ctlr->alloc == NULL) {
 		ctlr->rblen = 1 << ((Rblen >> RblenSHIFT) + 13);
 		ctlr->alloc = kzmalloc(ctlr->rblen + 16 + Ntd * Tdbsz + ARCH_CL_SIZE,
-		                       KMALLOC_WAIT);
+							   KMALLOC_WAIT);
 		rtl8139init(edev);
 	}
 	qunlock(&ctlr->alock);
@@ -418,7 +418,7 @@ static void rtl8139txstart(struct ether *edev)
 		size = BLEN(bp);
 
 		td = &ctlr->td[ctlr->tdh];
-		if (((uintptr_t)bp->rp) & 0x03) {
+		if (((uintptr_t) bp->rp) & 0x03) {
 			memmove(td->data, bp->rp, size);
 			/* flushing the data cache? */
 			//dcflush(td->data, size);
@@ -635,14 +635,14 @@ static struct ctlr *rtl8139match(struct ether *edev, int id)
 		if (edev->port != 0 && edev->port != port)
 			continue;
 
-		#if 0
+#if 0
 		/* trying to alloc PIO ports (.size of them?).  for now, we just assume
 		 * they are free */
 		if (ioalloc(port, pcidev->mem[0].size, 0, "rtl8139") < 0) {
 			printd("rtl8139: port 0x%x in use\n", port);
 			continue;
 		}
-		#endif
+#endif
 
 		ctlr->port = port;
 		if (rtl8139reset(ctlr))
@@ -684,7 +684,7 @@ static int rtl8139pnp(struct ether *edev)
 	if (ctlrhead == NULL) {
 		STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
 			/* this skips over non-ethernet devices. */
-			if (pcidev->class != 0x02|| pcidev->subclass != 0)
+			if (pcidev->class != 0x02 || pcidev->subclass != 0)
 				continue;
 
 			ctlr = kzmalloc(sizeof(struct ctlr), KMALLOC_WAIT);
@@ -710,12 +710,12 @@ static int rtl8139pnp(struct ether *edev)
 	 * specific controller only.
 	 */
 	id = 0;
-	#if 0 // No struct ether options yet (goes with archenter, i think)
+#if 0	// No struct ether options yet (goes with archenter, i think)
 	for (i = 0; i < edev->nopt; i++) {
 		if (cistrncmp(edev->opt[i], "id=", 3) == 0)
 			id = strtol(&edev->opt[i][3], NULL, 0);
 	}
-	#endif
+#endif
 
 	ctlr = NULL;
 	if (id != 0)
@@ -729,7 +729,7 @@ static int rtl8139pnp(struct ether *edev)
 		return -1;
 
 	printd("RTL8139 driver found %s at %02x:%02x.%x\n", rtl8139pci[i].name,
-	       ctlr->pcidev->bus, ctlr->pcidev->dev, ctlr->pcidev->func);
+		   ctlr->pcidev->bus, ctlr->pcidev->dev, ctlr->pcidev->func);
 	edev->ctlr = ctlr;
 	edev->port = ctlr->port;
 	edev->irq = ctlr->pcidev->irqline;

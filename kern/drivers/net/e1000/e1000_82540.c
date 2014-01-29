@@ -26,7 +26,7 @@
 
 *******************************************************************************/
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE(GPL2_OR_LATER);
 
 /*
  * 82540EM Gigabit Ethernet Controller
@@ -41,19 +41,19 @@ FILE_LICENCE ( GPL2_OR_LATER );
 
 #include "e1000_api.h"
 
-static s32  e1000_init_phy_params_82540(struct e1000_hw *hw);
-static s32  e1000_init_nvm_params_82540(struct e1000_hw *hw);
-static s32  e1000_init_mac_params_82540(struct e1000_hw *hw);
-static s32  e1000_adjust_serdes_amplitude_82540(struct e1000_hw *hw);
+static s32 e1000_init_phy_params_82540(struct e1000_hw *hw);
+static s32 e1000_init_nvm_params_82540(struct e1000_hw *hw);
+static s32 e1000_init_mac_params_82540(struct e1000_hw *hw);
+static s32 e1000_adjust_serdes_amplitude_82540(struct e1000_hw *hw);
 static void e1000_clear_hw_cntrs_82540(struct e1000_hw *hw);
-static s32  e1000_init_hw_82540(struct e1000_hw *hw);
-static s32  e1000_reset_hw_82540(struct e1000_hw *hw);
-static s32  e1000_set_phy_mode_82540(struct e1000_hw *hw);
-static s32  e1000_set_vco_speed_82540(struct e1000_hw *hw);
-static s32  e1000_setup_copper_link_82540(struct e1000_hw *hw);
-static s32  e1000_setup_fiber_serdes_link_82540(struct e1000_hw *hw);
+static s32 e1000_init_hw_82540(struct e1000_hw *hw);
+static s32 e1000_reset_hw_82540(struct e1000_hw *hw);
+static s32 e1000_set_phy_mode_82540(struct e1000_hw *hw);
+static s32 e1000_set_vco_speed_82540(struct e1000_hw *hw);
+static s32 e1000_setup_copper_link_82540(struct e1000_hw *hw);
+static s32 e1000_setup_fiber_serdes_link_82540(struct e1000_hw *hw);
 static void e1000_power_down_phy_copper_82540(struct e1000_hw *hw);
-static s32  e1000_read_mac_addr_82540(struct e1000_hw *hw);
+static s32 e1000_read_mac_addr_82540(struct e1000_hw *hw);
 
 /**
  * e1000_init_phy_params_82540 - Init PHY func ptrs.
@@ -64,27 +64,27 @@ static s32 e1000_init_phy_params_82540(struct e1000_hw *hw)
 	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val = E1000_SUCCESS;
 
-	phy->addr                      = 1;
-	phy->autoneg_mask              = AUTONEG_ADVERTISE_SPEED_DEFAULT;
-	phy->reset_delay_us            = 10000;
-	phy->type                      = e1000_phy_m88;
+	phy->addr = 1;
+	phy->autoneg_mask = AUTONEG_ADVERTISE_SPEED_DEFAULT;
+	phy->reset_delay_us = 10000;
+	phy->type = e1000_phy_m88;
 
 	/* Function Pointers */
-	phy->ops.check_polarity        = e1000_check_polarity_m88;
-	phy->ops.commit                = e1000_phy_sw_reset_generic;
+	phy->ops.check_polarity = e1000_check_polarity_m88;
+	phy->ops.commit = e1000_phy_sw_reset_generic;
 #if 0
-	phy->ops.force_speed_duplex    = e1000_phy_force_speed_duplex_m88;
+	phy->ops.force_speed_duplex = e1000_phy_force_speed_duplex_m88;
 #endif
 #if 0
-	phy->ops.get_cable_length      = e1000_get_cable_length_m88;
+	phy->ops.get_cable_length = e1000_get_cable_length_m88;
 #endif
-	phy->ops.get_cfg_done          = e1000_get_cfg_done_generic;
-	phy->ops.read_reg              = e1000_read_phy_reg_m88;
-	phy->ops.reset                 = e1000_phy_hw_reset_generic;
-	phy->ops.write_reg             = e1000_write_phy_reg_m88;
-	phy->ops.get_info              = e1000_get_phy_info_m88;
-	phy->ops.power_up              = e1000_power_up_phy_copper;
-	phy->ops.power_down            = e1000_power_down_phy_copper_82540;
+	phy->ops.get_cfg_done = e1000_get_cfg_done_generic;
+	phy->ops.read_reg = e1000_read_phy_reg_m88;
+	phy->ops.reset = e1000_phy_hw_reset_generic;
+	phy->ops.write_reg = e1000_write_phy_reg_m88;
+	phy->ops.get_info = e1000_get_phy_info_m88;
+	phy->ops.power_up = e1000_power_up_phy_copper;
+	phy->ops.power_down = e1000_power_down_phy_copper_82540;
 
 	ret_val = e1000_get_phy_id(hw);
 	if (ret_val)
@@ -92,18 +92,18 @@ static s32 e1000_init_phy_params_82540(struct e1000_hw *hw)
 
 	/* Verify phy id */
 	switch (hw->mac.type) {
-	case e1000_82540:
-	case e1000_82545:
-	case e1000_82545_rev_3:
-	case e1000_82546:
-	case e1000_82546_rev_3:
-		if (phy->id == M88E1011_I_PHY_ID)
+		case e1000_82540:
+		case e1000_82545:
+		case e1000_82545_rev_3:
+		case e1000_82546:
+		case e1000_82546_rev_3:
+			if (phy->id == M88E1011_I_PHY_ID)
+				break;
+			/* Fall Through */
+		default:
+			ret_val = -E1000_ERR_PHY;
+			goto out;
 			break;
-		/* Fall Through */
-	default:
-		ret_val = -E1000_ERR_PHY;
-		goto out;
-		break;
 	}
 
 out:
@@ -121,32 +121,32 @@ static s32 e1000_init_nvm_params_82540(struct e1000_hw *hw)
 
 	DEBUGFUNC("e1000_init_nvm_params_82540");
 
-	nvm->type               = e1000_nvm_eeprom_microwire;
-	nvm->delay_usec         = 50;
-	nvm->opcode_bits        = 3;
+	nvm->type = e1000_nvm_eeprom_microwire;
+	nvm->delay_usec = 50;
+	nvm->opcode_bits = 3;
 	switch (nvm->override) {
-	case e1000_nvm_override_microwire_large:
-		nvm->address_bits       = 8;
-		nvm->word_size          = 256;
-		break;
-	case e1000_nvm_override_microwire_small:
-		nvm->address_bits       = 6;
-		nvm->word_size          = 64;
-		break;
-	default:
-		nvm->address_bits       = eecd & E1000_EECD_SIZE ? 8 : 6;
-		nvm->word_size          = eecd & E1000_EECD_SIZE ? 256 : 64;
-		break;
+		case e1000_nvm_override_microwire_large:
+			nvm->address_bits = 8;
+			nvm->word_size = 256;
+			break;
+		case e1000_nvm_override_microwire_small:
+			nvm->address_bits = 6;
+			nvm->word_size = 64;
+			break;
+		default:
+			nvm->address_bits = eecd & E1000_EECD_SIZE ? 8 : 6;
+			nvm->word_size = eecd & E1000_EECD_SIZE ? 256 : 64;
+			break;
 	}
 
 	/* Function Pointers */
-	nvm->ops.acquire            = e1000_acquire_nvm_generic;
-	nvm->ops.read               = e1000_read_nvm_microwire;
-	nvm->ops.release            = e1000_release_nvm_generic;
-	nvm->ops.update             = e1000_update_nvm_checksum_generic;
-	nvm->ops.valid_led_default  = e1000_valid_led_default_generic;
-	nvm->ops.validate           = e1000_validate_nvm_checksum_generic;
-	nvm->ops.write              = e1000_write_nvm_microwire;
+	nvm->ops.acquire = e1000_acquire_nvm_generic;
+	nvm->ops.read = e1000_read_nvm_microwire;
+	nvm->ops.release = e1000_release_nvm_generic;
+	nvm->ops.update = e1000_update_nvm_checksum_generic;
+	nvm->ops.valid_led_default = e1000_valid_led_default_generic;
+	nvm->ops.validate = e1000_validate_nvm_checksum_generic;
+	nvm->ops.write = e1000_write_nvm_microwire;
 
 	return E1000_SUCCESS;
 }
@@ -164,19 +164,19 @@ static s32 e1000_init_mac_params_82540(struct e1000_hw *hw)
 
 	/* Set media type */
 	switch (hw->device_id) {
-	case E1000_DEV_ID_82545EM_FIBER:
-	case E1000_DEV_ID_82545GM_FIBER:
-	case E1000_DEV_ID_82546EB_FIBER:
-	case E1000_DEV_ID_82546GB_FIBER:
-		hw->phy.media_type = e1000_media_type_fiber;
-		break;
-	case E1000_DEV_ID_82545GM_SERDES:
-	case E1000_DEV_ID_82546GB_SERDES:
-		hw->phy.media_type = e1000_media_type_internal_serdes;
-		break;
-	default:
-		hw->phy.media_type = e1000_media_type_copper;
-		break;
+		case E1000_DEV_ID_82545EM_FIBER:
+		case E1000_DEV_ID_82545GM_FIBER:
+		case E1000_DEV_ID_82546EB_FIBER:
+		case E1000_DEV_ID_82546GB_FIBER:
+			hw->phy.media_type = e1000_media_type_fiber;
+			break;
+		case E1000_DEV_ID_82545GM_SERDES:
+		case E1000_DEV_ID_82546GB_SERDES:
+			hw->phy.media_type = e1000_media_type_internal_serdes;
+			break;
+		default:
+			hw->phy.media_type = e1000_media_type_copper;
+			break;
 	}
 
 	/* Set mta register count */
@@ -198,30 +198,28 @@ static s32 e1000_init_mac_params_82540(struct e1000_hw *hw)
 	mac->ops.setup_link = e1000_setup_link_generic;
 	/* physical interface setup */
 	mac->ops.setup_physical_interface =
-	        (hw->phy.media_type == e1000_media_type_copper)
-	                ? e1000_setup_copper_link_82540
-	                : e1000_setup_fiber_serdes_link_82540;
+		(hw->phy.media_type == e1000_media_type_copper)
+		? e1000_setup_copper_link_82540 : e1000_setup_fiber_serdes_link_82540;
 	/* check for link */
 	switch (hw->phy.media_type) {
-	case e1000_media_type_copper:
-		mac->ops.check_for_link = e1000_check_for_copper_link_generic;
-		break;
-	case e1000_media_type_fiber:
-		mac->ops.check_for_link = e1000_check_for_fiber_link_generic;
-		break;
-	case e1000_media_type_internal_serdes:
-		mac->ops.check_for_link = e1000_check_for_serdes_link_generic;
-		break;
-	default:
-		ret_val = -E1000_ERR_CONFIG;
-		goto out;
-		break;
+		case e1000_media_type_copper:
+			mac->ops.check_for_link = e1000_check_for_copper_link_generic;
+			break;
+		case e1000_media_type_fiber:
+			mac->ops.check_for_link = e1000_check_for_fiber_link_generic;
+			break;
+		case e1000_media_type_internal_serdes:
+			mac->ops.check_for_link = e1000_check_for_serdes_link_generic;
+			break;
+		default:
+			ret_val = -E1000_ERR_CONFIG;
+			goto out;
+			break;
 	}
 	/* link info */
-	mac->ops.get_link_up_info =
-	        (hw->phy.media_type == e1000_media_type_copper)
-	                ? e1000_get_speed_and_duplex_copper_generic
-	                : e1000_get_speed_and_duplex_fiber_serdes_generic;
+	mac->ops.get_link_up_info = (hw->phy.media_type == e1000_media_type_copper)
+		? e1000_get_speed_and_duplex_copper_generic
+		: e1000_get_speed_and_duplex_fiber_serdes_generic;
 	/* multicast address update */
 	mac->ops.update_mc_addr_list = e1000_update_mc_addr_list_generic;
 	/* writing VFTA */
@@ -293,18 +291,18 @@ static s32 e1000_reset_hw_82540(struct e1000_hw *hw)
 
 	DEBUGOUT("Issuing a global reset to 82540/82545/82546 MAC\n");
 	switch (hw->mac.type) {
-	case e1000_82545_rev_3:
-	case e1000_82546_rev_3:
-		E1000_WRITE_REG(hw, E1000_CTRL_DUP, ctrl | E1000_CTRL_RST);
-		break;
-	default:
-		/*
-		 * These controllers can't ack the 64-bit write when
-		 * issuing the reset, so we use IO-mapping as a
-		 * workaround to issue the reset.
-		 */
-		E1000_WRITE_REG_IO(hw, E1000_CTRL, ctrl | E1000_CTRL_RST);
-		break;
+		case e1000_82545_rev_3:
+		case e1000_82546_rev_3:
+			E1000_WRITE_REG(hw, E1000_CTRL_DUP, ctrl | E1000_CTRL_RST);
+			break;
+		default:
+			/*
+			 * These controllers can't ack the 64-bit write when
+			 * issuing the reset, so we use IO-mapping as a
+			 * workaround to issue the reset.
+			 */
+			E1000_WRITE_REG_IO(hw, E1000_CTRL, ctrl | E1000_CTRL_RST);
+			break;
 	}
 
 	/* Wait for EEPROM reload */
@@ -375,8 +373,7 @@ static s32 e1000_init_hw_82540(struct e1000_hw *hw)
 	ret_val = mac->ops.setup_link(hw);
 
 	txdctl = E1000_READ_REG(hw, E1000_TXDCTL(0));
-	txdctl = (txdctl & ~E1000_TXDCTL_WTHRESH) |
-	         E1000_TXDCTL_FULL_TX_DESC_WB;
+	txdctl = (txdctl & ~E1000_TXDCTL_WTHRESH) | E1000_TXDCTL_FULL_TX_DESC_WB;
 	E1000_WRITE_REG(hw, E1000_TXDCTL(0), txdctl);
 
 	/*
@@ -388,7 +385,7 @@ static s32 e1000_init_hw_82540(struct e1000_hw *hw)
 	e1000_clear_hw_cntrs_82540(hw);
 
 	if ((hw->device_id == E1000_DEV_ID_82546GB_QUAD_COPPER) ||
-	    (hw->device_id == E1000_DEV_ID_82546GB_QUAD_COPPER_KSP3)) {
+		(hw->device_id == E1000_DEV_ID_82546GB_QUAD_COPPER_KSP3)) {
 		ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
 		/*
 		 * Relaxed ordering must be disabled to avoid a parity
@@ -427,8 +424,7 @@ static s32 e1000_setup_copper_link_82540(struct e1000_hw *hw)
 	if (ret_val)
 		goto out;
 
-	if (hw->mac.type == e1000_82545_rev_3 ||
-	    hw->mac.type == e1000_82546_rev_3) {
+	if (hw->mac.type == e1000_82545_rev_3 || hw->mac.type == e1000_82546_rev_3) {
 		ret_val = hw->phy.ops.read_reg(hw, M88E1000_PHY_SPEC_CTRL, &data);
 		if (ret_val)
 			goto out;
@@ -465,23 +461,23 @@ static s32 e1000_setup_fiber_serdes_link_82540(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_setup_fiber_serdes_link_82540");
 
 	switch (mac->type) {
-	case e1000_82545_rev_3:
-	case e1000_82546_rev_3:
-		if (hw->phy.media_type == e1000_media_type_internal_serdes) {
-			/*
-			 * If we're on serdes media, adjust the output
-			 * amplitude to value set in the EEPROM.
-			 */
-			ret_val = e1000_adjust_serdes_amplitude_82540(hw);
+		case e1000_82545_rev_3:
+		case e1000_82546_rev_3:
+			if (hw->phy.media_type == e1000_media_type_internal_serdes) {
+				/*
+				 * If we're on serdes media, adjust the output
+				 * amplitude to value set in the EEPROM.
+				 */
+				ret_val = e1000_adjust_serdes_amplitude_82540(hw);
+				if (ret_val)
+					goto out;
+			}
+			/* Adjust VCO speed to improve BER performance */
+			ret_val = e1000_set_vco_speed_82540(hw);
 			if (ret_val)
 				goto out;
-		}
-		/* Adjust VCO speed to improve BER performance */
-		ret_val = e1000_set_vco_speed_82540(hw);
-		if (ret_val)
-			goto out;
-	default:
-		break;
+		default:
+			break;
 	}
 
 	ret_val = e1000_setup_fiber_serdes_link_generic(hw);
@@ -510,9 +506,7 @@ static s32 e1000_adjust_serdes_amplitude_82540(struct e1000_hw *hw)
 	if (nvm_data != NVM_RESERVED_WORD) {
 		/* Adjust serdes output amplitude only. */
 		nvm_data &= NVM_SERDES_AMPLITUDE_MASK;
-		ret_val = hw->phy.ops.write_reg(hw,
-		                             M88E1000_PHY_EXT_CTRL,
-		                             nvm_data);
+		ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_EXT_CTRL, nvm_data);
 		if (ret_val)
 			goto out;
 	}
@@ -529,7 +523,7 @@ out:
  **/
 static s32 e1000_set_vco_speed_82540(struct e1000_hw *hw)
 {
-	s32  ret_val = E1000_SUCCESS;
+	s32 ret_val = E1000_SUCCESS;
 	u16 default_page = 0;
 	u16 phy_data;
 
@@ -537,9 +531,7 @@ static s32 e1000_set_vco_speed_82540(struct e1000_hw *hw)
 
 	/* Set PHY register 30, page 5, bit 8 to 0 */
 
-	ret_val = hw->phy.ops.read_reg(hw,
-	                            M88E1000_PHY_PAGE_SELECT,
-	                            &default_page);
+	ret_val = hw->phy.ops.read_reg(hw, M88E1000_PHY_PAGE_SELECT, &default_page);
 	if (ret_val)
 		goto out;
 
@@ -571,8 +563,7 @@ static s32 e1000_set_vco_speed_82540(struct e1000_hw *hw)
 	if (ret_val)
 		goto out;
 
-	ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_PAGE_SELECT,
-	                              default_page);
+	ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_PAGE_SELECT, default_page);
 
 out:
 	return ret_val;
@@ -605,15 +596,12 @@ static s32 e1000_set_phy_mode_82540(struct e1000_hw *hw)
 	}
 
 	if ((nvm_data != NVM_RESERVED_WORD) && (nvm_data & NVM_PHY_CLASS_A)) {
-		ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_PAGE_SELECT,
-		                              0x000B);
+		ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_PAGE_SELECT, 0x000B);
 		if (ret_val) {
 			ret_val = -E1000_ERR_PHY;
 			goto out;
 		}
-		ret_val = hw->phy.ops.write_reg(hw,
-		                              M88E1000_PHY_GEN_CONTROL,
-		                              0x8104);
+		ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_GEN_CONTROL, 0x8104);
 		if (ret_val) {
 			ret_val = -E1000_ERR_PHY;
 			goto out;
@@ -697,7 +685,7 @@ static void e1000_clear_hw_cntrs_82540(struct e1000_hw *hw)
  **/
 s32 e1000_read_mac_addr_82540(struct e1000_hw *hw)
 {
-	s32  ret_val = E1000_SUCCESS;
+	s32 ret_val = E1000_SUCCESS;
 	u16 offset, nvm_data, i;
 
 	DEBUGFUNC("e1000_read_mac_addr");
@@ -709,8 +697,8 @@ s32 e1000_read_mac_addr_82540(struct e1000_hw *hw)
 			DEBUGOUT("NVM Read Error\n");
 			goto out;
 		}
-		hw->mac.perm_addr[i] = (u8)(nvm_data & 0xFF);
-		hw->mac.perm_addr[i+1] = (u8)(nvm_data >> 8);
+		hw->mac.perm_addr[i] = (u8) (nvm_data & 0xFF);
+		hw->mac.perm_addr[i + 1] = (u8) (nvm_data >> 8);
 	}
 
 	/* Flip last bit of mac address if we're on second port */
@@ -725,30 +713,49 @@ out:
 }
 
 static struct pci_device_id e1000_82540_nics[] = {
-     PCI_ROM(0x8086, 0x100E, "E1000_DEV_ID_82540EM", "E1000_DEV_ID_82540EM", e1000_82540),
-     PCI_ROM(0x8086, 0x1015, "E1000_DEV_ID_82540EM_LOM", "E1000_DEV_ID_82540EM_LOM", e1000_82540),
-     PCI_ROM(0x8086, 0x1016, "E1000_DEV_ID_82540EP_LOM", "E1000_DEV_ID_82540EP_LOM", e1000_82540),
-     PCI_ROM(0x8086, 0x1017, "E1000_DEV_ID_82540EP", "E1000_DEV_ID_82540EP", e1000_82540),
-     PCI_ROM(0x8086, 0x101E, "E1000_DEV_ID_82540EP_LP", "E1000_DEV_ID_82540EP_LP", e1000_82540),
-     PCI_ROM(0x8086, 0x100F, "E1000_DEV_ID_82545EM_COPPER", "E1000_DEV_ID_82545EM_COPPER", e1000_82545),
-     PCI_ROM(0x8086, 0x1011, "E1000_DEV_ID_82545EM_FIBER", "E1000_DEV_ID_82545EM_FIBER", e1000_82545),
-     PCI_ROM(0x8086, 0x1026, "E1000_DEV_ID_82545GM_COPPER", "E1000_DEV_ID_82545GM_COPPER", e1000_82545_rev_3),
-     PCI_ROM(0x8086, 0x1027, "E1000_DEV_ID_82545GM_FIBER", "E1000_DEV_ID_82545GM_FIBER", e1000_82545_rev_3),
-     PCI_ROM(0x8086, 0x1028, "E1000_DEV_ID_82545GM_SERDES", "E1000_DEV_ID_82545GM_SERDES", e1000_82545_rev_3),
-     PCI_ROM(0x8086, 0x1010, "E1000_DEV_ID_82546EB_COPPER", "E1000_DEV_ID_82546EB_COPPER", e1000_82546),
-     PCI_ROM(0x8086, 0x1012, "E1000_DEV_ID_82546EB_FIBER", "E1000_DEV_ID_82546EB_FIBER", e1000_82546),
-     PCI_ROM(0x8086, 0x101D, "E1000_DEV_ID_82546EB_QUAD_COPPER", "E1000_DEV_ID_82546EB_QUAD_COPPER", e1000_82546),
-     PCI_ROM(0x8086, 0x1079, "E1000_DEV_ID_82546GB_COPPER", "E1000_DEV_ID_82546GB_COPPER", e1000_82546_rev_3),
-     PCI_ROM(0x8086, 0x107A, "E1000_DEV_ID_82546GB_FIBER", "E1000_DEV_ID_82546GB_FIBER", e1000_82546_rev_3),
-     PCI_ROM(0x8086, 0x107B, "E1000_DEV_ID_82546GB_SERDES", "E1000_DEV_ID_82546GB_SERDES", e1000_82546_rev_3),
-     PCI_ROM(0x8086, 0x108A, "E1000_DEV_ID_82546GB_PCIE", "E1000_DEV_ID_82546GB_PCIE", e1000_82546_rev_3),
-     PCI_ROM(0x8086, 0x1099, "E1000_DEV_ID_82546GB_QUAD_COPPER", "E1000_DEV_ID_82546GB_QUAD_COPPER", e1000_82546_rev_3),
-     PCI_ROM(0x8086, 0x10B5, "E1000_DEV_ID_82546GB_QUAD_COPPER_KSP3", "E1000_DEV_ID_82546GB_QUAD_COPPER_KSP3", e1000_82546_rev_3),
+	PCI_ROM(0x8086, 0x100E, "E1000_DEV_ID_82540EM", "E1000_DEV_ID_82540EM",
+			e1000_82540),
+	PCI_ROM(0x8086, 0x1015, "E1000_DEV_ID_82540EM_LOM",
+			"E1000_DEV_ID_82540EM_LOM", e1000_82540),
+	PCI_ROM(0x8086, 0x1016, "E1000_DEV_ID_82540EP_LOM",
+			"E1000_DEV_ID_82540EP_LOM", e1000_82540),
+	PCI_ROM(0x8086, 0x1017, "E1000_DEV_ID_82540EP", "E1000_DEV_ID_82540EP",
+			e1000_82540),
+	PCI_ROM(0x8086, 0x101E, "E1000_DEV_ID_82540EP_LP",
+			"E1000_DEV_ID_82540EP_LP", e1000_82540),
+	PCI_ROM(0x8086, 0x100F, "E1000_DEV_ID_82545EM_COPPER",
+			"E1000_DEV_ID_82545EM_COPPER", e1000_82545),
+	PCI_ROM(0x8086, 0x1011, "E1000_DEV_ID_82545EM_FIBER",
+			"E1000_DEV_ID_82545EM_FIBER", e1000_82545),
+	PCI_ROM(0x8086, 0x1026, "E1000_DEV_ID_82545GM_COPPER",
+			"E1000_DEV_ID_82545GM_COPPER", e1000_82545_rev_3),
+	PCI_ROM(0x8086, 0x1027, "E1000_DEV_ID_82545GM_FIBER",
+			"E1000_DEV_ID_82545GM_FIBER", e1000_82545_rev_3),
+	PCI_ROM(0x8086, 0x1028, "E1000_DEV_ID_82545GM_SERDES",
+			"E1000_DEV_ID_82545GM_SERDES", e1000_82545_rev_3),
+	PCI_ROM(0x8086, 0x1010, "E1000_DEV_ID_82546EB_COPPER",
+			"E1000_DEV_ID_82546EB_COPPER", e1000_82546),
+	PCI_ROM(0x8086, 0x1012, "E1000_DEV_ID_82546EB_FIBER",
+			"E1000_DEV_ID_82546EB_FIBER", e1000_82546),
+	PCI_ROM(0x8086, 0x101D, "E1000_DEV_ID_82546EB_QUAD_COPPER",
+			"E1000_DEV_ID_82546EB_QUAD_COPPER", e1000_82546),
+	PCI_ROM(0x8086, 0x1079, "E1000_DEV_ID_82546GB_COPPER",
+			"E1000_DEV_ID_82546GB_COPPER", e1000_82546_rev_3),
+	PCI_ROM(0x8086, 0x107A, "E1000_DEV_ID_82546GB_FIBER",
+			"E1000_DEV_ID_82546GB_FIBER", e1000_82546_rev_3),
+	PCI_ROM(0x8086, 0x107B, "E1000_DEV_ID_82546GB_SERDES",
+			"E1000_DEV_ID_82546GB_SERDES", e1000_82546_rev_3),
+	PCI_ROM(0x8086, 0x108A, "E1000_DEV_ID_82546GB_PCIE",
+			"E1000_DEV_ID_82546GB_PCIE", e1000_82546_rev_3),
+	PCI_ROM(0x8086, 0x1099, "E1000_DEV_ID_82546GB_QUAD_COPPER",
+			"E1000_DEV_ID_82546GB_QUAD_COPPER", e1000_82546_rev_3),
+	PCI_ROM(0x8086, 0x10B5, "E1000_DEV_ID_82546GB_QUAD_COPPER_KSP3",
+			"E1000_DEV_ID_82546GB_QUAD_COPPER_KSP3", e1000_82546_rev_3),
 };
 
 struct pci_driver e1000_82540_driver __pci_driver = {
 	.ids = e1000_82540_nics,
-	.id_count = (sizeof (e1000_82540_nics) / sizeof (e1000_82540_nics[0])),
+	.id_count = (sizeof(e1000_82540_nics) / sizeof(e1000_82540_nics[0])),
 	.probe = e1000_probe,
 	.remove = e1000_remove,
 };

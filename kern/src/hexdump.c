@@ -33,35 +33,32 @@ static int isprint(int c)
 
 void hexdump(void *v, int length)
 {
-        int i;
-        uint8_t *m = v;
-	uintptr_t memory = (uintptr_t)v;
-        int all_zero = 0;
+	int i;
+	uint8_t *m = v;
+	uintptr_t memory = (uintptr_t) v;
+	int all_zero = 0;
 
-        for (i = 0; i < length; i += 16) {
-                int j;
+	for (i = 0; i < length; i += 16) {
+		int j;
 
-                all_zero++;
-                for (j = 0; j < 16; j++) {
-                        if(m[i+j] != 0) {
-                                all_zero = 0;
-                                break;
-                        }
-                }
+		all_zero++;
+		for (j = 0; j < 16; j++) {
+			if (m[i + j] != 0) {
+				all_zero = 0;
+				break;
+			}
+		}
 
-                if (all_zero < 2) {
-                        printk("%08lx:", memory + i);
-                        for (j = 0; j < 16; j++)
-                                printk(" %02x", m[i+j]);
-                        printk("  ");
-                        for (j = 0; j < 16; j++)
-                                printk("%c",
-					isprint(m[i+j]) ? m[i+j] : '.');
-                        printk("\n");
-                } else if (all_zero == 2) {
-                        printk("...\n");
-                }
-        }
+		if (all_zero < 2) {
+			printk("%08lx:", memory + i);
+			for (j = 0; j < 16; j++)
+				printk(" %02x", m[i + j]);
+			printk("  ");
+			for (j = 0; j < 16; j++)
+				printk("%c", isprint(m[i + j]) ? m[i + j] : '.');
+			printk("\n");
+		} else if (all_zero == 2) {
+			printk("...\n");
+		}
+	}
 }
-
-

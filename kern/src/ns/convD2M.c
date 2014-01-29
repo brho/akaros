@@ -13,8 +13,7 @@
 #include <smp.h>
 #include <ip.h>
 
-unsigned int
-sizeD2M(struct dir *d)
+unsigned int sizeD2M(struct dir *d)
 {
 	char *sv[4];
 	int i, ns;
@@ -25,21 +24,20 @@ sizeD2M(struct dir *d)
 	sv[3] = d->muid;
 
 	ns = 0;
-	for(i = 0; i < 4; i++)
-		if(sv[i])
+	for (i = 0; i < 4; i++)
+		if (sv[i])
 			ns += strlen(sv[i]);
 
 	return STATFIXLEN + ns;
 }
 
-unsigned int
-convD2M(struct dir *d, uint8_t *buf, unsigned int nbuf)
+unsigned int convD2M(struct dir *d, uint8_t * buf, unsigned int nbuf)
 {
 	uint8_t *p, *ebuf;
 	char *sv[4];
 	int i, ns, nsv[4], ss;
 
-	if(nbuf < BIT16SZ)
+	if (nbuf < BIT16SZ)
 		return 0;
 
 	p = buf;
@@ -51,8 +49,8 @@ convD2M(struct dir *d, uint8_t *buf, unsigned int nbuf)
 	sv[3] = d->muid;
 
 	ns = 0;
-	for(i = 0; i < 4; i++){
-		if(sv[i])
+	for (i = 0; i < 4; i++) {
+		if (sv[i])
 			nsv[i] = strlen(sv[i]);
 		else
 			nsv[i] = 0;
@@ -63,10 +61,10 @@ convD2M(struct dir *d, uint8_t *buf, unsigned int nbuf)
 
 	/* set size befor erroring, so user can know how much is needed */
 	/* note that length excludes count field itself */
-	PBIT16(p, ss-BIT16SZ);
+	PBIT16(p, ss - BIT16SZ);
 	p += BIT16SZ;
 
-	if(ss > nbuf)
+	if (ss > nbuf)
 		return BIT16SZ;
 
 	PBIT16(p, d->type);
@@ -88,18 +86,18 @@ convD2M(struct dir *d, uint8_t *buf, unsigned int nbuf)
 	PBIT64(p, d->length);
 	p += BIT64SZ;
 
-	for(i = 0; i < 4; i++){
+	for (i = 0; i < 4; i++) {
 		ns = nsv[i];
-		if(p + ns + BIT16SZ > ebuf)
+		if (p + ns + BIT16SZ > ebuf)
 			return 0;
 		PBIT16(p, ns);
 		p += BIT16SZ;
-		if(ns)
+		if (ns)
 			memmove(p, sv[i], ns);
 		p += ns;
 	}
 
-	if(ss != p - buf)
+	if (ss != p - buf)
 		return 0;
 
 	return p - buf;

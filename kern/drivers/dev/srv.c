@@ -43,10 +43,10 @@ struct srvfile {
 	TAILQ_ENTRY(srvfile) link;
 	char *name;
 	struct chan *chan;
-	struct kref ref;		/* +1 for existing on create, -1 on remove */
+	struct kref ref;			/* +1 for existing on create, -1 on remove */
 	char *user;
 	uint32_t perm;
-	atomic_t opens;			/* used for exclusive open checks */
+	atomic_t opens;				/* used for exclusive open checks */
 };
 
 struct srvfile *top_dir;
@@ -55,7 +55,7 @@ TAILQ_HEAD(srvfilelist, srvfile) srvfiles = TAILQ_HEAD_INITIALIZER(srvfiles);
  * without the lock. (if you're on the list, we can grab a ref). */
 spinlock_t srvlock = SPINLOCK_INITIALIZER;
 
-atomic_t nr_srvs = 0; /* debugging - concerned about leaking mem */
+atomic_t nr_srvs = 0;			/* debugging - concerned about leaking mem */
 
 /* Given a pointer (internal ref), we attempt to get a kref */
 static bool grab_ref(struct srvfile *srv)
@@ -85,7 +85,7 @@ static void srv_release(struct kref *kref)
 }
 
 static int srvgen(struct chan *c, char *name, struct dirtab *tab,
-                  int ntab, int s, struct dir *dp)
+				  int ntab, int s, struct dir *dp)
 {
 	struct srvfile *prev, *next;
 	struct qid q;
@@ -112,7 +112,7 @@ static int srvgen(struct chan *c, char *name, struct dirtab *tab,
 	mkqid(&q, Qsrvfile, 0, QTFILE);
 	/* once we release the lock, next could disappear, including next->name */
 	strncpy(get_cur_genbuf(), next->name, GENBUF_SZ);
-	devdir(c, q, get_cur_genbuf(), 1/* length */, next->user, next->perm, dp);
+	devdir(c, q, get_cur_genbuf(), 1 /* length */ , next->user, next->perm, dp);
 	spin_unlock(&srvlock);
 	return 1;
 }
@@ -178,14 +178,14 @@ static struct chan *srvopen(struct chan *c, int omode)
 	}
 	devpermcheck(srv->user, srv->perm, omode);
 	/* No remove on close support yet */
-	#if 0
+#if 0
 	if (omode & ORCLOSE) {
 		if (strcmp(srv->user, up->env->user) != 0)
 			error(Eperm);
 		else
 			srv->flags |= SORCLOSE;
 	}
-	#endif
+#endif
 	if ((srv->perm & DMEXCL) && atomic_read(&srv->opens))
 		error(Einuse);
 	/* srv->chan is write-once, so we don't need to sync. */
@@ -210,7 +210,7 @@ static void srvcreate(struct chan *c, char *name, int omode, uint32_t perm)
 	kstrdup(&srv->name, name);
 	kstrdup(&srv->user, current ? current->user : "eve");
 	srv->perm = 0770;	/* TODO need some security thoughts */
-	atomic_set(&srv->opens, 1);			/* we return it opened */
+	atomic_set(&srv->opens, 1);	/* we return it opened */
 	mkqid(&c->qid, Qsrvfile, 0, QTFILE);
 	c->aux = srv;
 	/* one ref for being on the list */

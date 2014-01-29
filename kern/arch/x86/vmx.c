@@ -43,16 +43,17 @@ static struct litevm_stats_debugfs_item {
 	const char *name;
 	uint32_t *data;
 } debugfs_entries[] = {
-	{ "pf_fixed", &litevm_stat.pf_fixed },
-	{ "pf_guest", &litevm_stat.pf_guest },
-	{ "tlb_flush", &litevm_stat.tlb_flush },
-	{ "invlpg", &litevm_stat.invlpg },
-	{ "exits", &litevm_stat.exits },
-	{ "io_exits", &litevm_stat.io_exits },
-	{ "mmio_exits", &litevm_stat.mmio_exits },
-	{ "signal_exits", &litevm_stat.signal_exits },
-	{ "irq_exits", &litevm_stat.irq_exits },
-	{ 0, 0 }
+	{
+	"pf_fixed", &litevm_stat.pf_fixed}, {
+	"pf_guest", &litevm_stat.pf_guest}, {
+	"tlb_flush", &litevm_stat.tlb_flush}, {
+	"invlpg", &litevm_stat.invlpg}, {
+	"exits", &litevm_stat.exits}, {
+	"io_exits", &litevm_stat.io_exits}, {
+	"mmio_exits", &litevm_stat.mmio_exits}, {
+	"signal_exits", &litevm_stat.signal_exits}, {
+	"irq_exits", &litevm_stat.irq_exits}, {
+	0, 0}
 };
 
 static struct dentry *debugfs_dir;
@@ -61,8 +62,9 @@ static const uint32_t vmx_msr_index[] = {
 #ifdef __x86_64__
 	MSR_SYSCALL_MASK, MSR_LSTAR, MSR_CSTAR, MSR_KERNEL_GS_BASE,
 #endif
-	MSR_EFER, // wtf? MSR_K6_STAR,
+	MSR_EFER,	// wtf? MSR_K6_STAR,
 };
+
 #define NR_VMX_MSR (sizeof(vmx_msr_index) / sizeof(*vmx_msr_index))
 
 #ifdef __x86_64__
@@ -110,14 +112,14 @@ static const uint32_t vmx_msr_index[] = {
 static inline unsigned long __ffs(unsigned long word)
 {
 	print_func_entry();
-	asm("rep; bsf %1,%0"
-		: "=r" (word)
-		: "rm" (word));
+asm("rep; bsf %1,%0":"=r"(word)
+:		"rm"(word));
 	print_func_exit();
 	return word;
 }
 
-static struct vmx_msr_entry *find_msr_entry(struct litevm_vcpu *vcpu, uint32_t msr)
+static struct vmx_msr_entry *find_msr_entry(struct litevm_vcpu *vcpu,
+											uint32_t msr)
 {
 	print_func_entry();
 	int i;
@@ -134,19 +136,19 @@ static struct vmx_msr_entry *find_msr_entry(struct litevm_vcpu *vcpu, uint32_t m
 struct descriptor_table {
 	uint16_t limit;
 	unsigned long base;
-} __attribute__((packed));
+} __attribute__ ((packed));
 
 static void get_gdt(struct descriptor_table *table)
 {
 	print_func_entry();
-	asm ("sgdt %0" : "=m"(*table));
+asm("sgdt %0":"=m"(*table));
 	print_func_exit();
 }
 
 static void get_idt(struct descriptor_table *table)
 {
 	print_func_entry();
-	asm ("sidt %0" : "=m"(*table));
+asm("sidt %0":"=m"(*table));
 	print_func_exit();
 }
 
@@ -154,7 +156,7 @@ static uint16_t read_fs(void)
 {
 	print_func_entry();
 	uint16_t seg;
-	asm ("mov %%fs, %0" : "=g"(seg));
+asm("mov %%fs, %0":"=g"(seg));
 	print_func_exit();
 	return seg;
 }
@@ -163,7 +165,7 @@ static uint16_t read_gs(void)
 {
 	print_func_entry();
 	uint16_t seg;
-	asm ("mov %%gs, %0" : "=g"(seg));
+asm("mov %%gs, %0":"=g"(seg));
 	print_func_exit();
 	return seg;
 }
@@ -172,7 +174,7 @@ static uint16_t read_ldt(void)
 {
 	print_func_entry();
 	uint16_t ldt;
-	asm ("sldt %0" : "=g"(ldt));
+asm("sldt %0":"=g"(ldt));
 	print_func_exit();
 	return ldt;
 }
@@ -180,14 +182,14 @@ static uint16_t read_ldt(void)
 static void load_fs(uint16_t sel)
 {
 	print_func_entry();
-	asm ("mov %0, %%fs" : : "g"(sel));
+asm("mov %0, %%fs": :"g"(sel));
 	print_func_exit();
 }
 
 static void load_gs(uint16_t sel)
 {
 	print_func_entry();
-	asm ("mov %0, %%gs" : : "g"(sel));
+asm("mov %0, %%gs": :"g"(sel));
 	print_func_exit();
 }
 
@@ -195,7 +197,7 @@ static void load_gs(uint16_t sel)
 static void load_ldt(uint16_t sel)
 {
 	print_func_entry();
-	asm ("lldt %0" : : "g"(sel));
+asm("lldt %0": :"g"(sel));
 	print_func_exit();
 }
 #endif
@@ -203,39 +205,39 @@ static void load_ldt(uint16_t sel)
 static void fx_save(void *image)
 {
 	print_func_entry();
-	asm ("fxsave (%0)":: "r" (image));
+	asm("fxsave (%0)"::"r"(image));
 	print_func_exit();
 }
 
 static void fx_restore(void *image)
 {
 	print_func_entry();
-	asm ("fxrstor (%0)":: "r" (image));
+	asm("fxrstor (%0)"::"r"(image));
 	print_func_exit();
 }
 
 static void fpu_init(void)
 {
 	print_func_entry();
-	asm ("finit");
+	asm("finit");
 	print_func_exit();
 }
 
 struct segment_descriptor {
 	uint16_t limit_low;
 	uint16_t base_low;
-	uint8_t  base_mid;
-	uint8_t  type : 4;
-	uint8_t  system : 1;
-	uint8_t  dpl : 2;
-	uint8_t  present : 1;
-	uint8_t  limit_high : 4;
-	uint8_t  avl : 1;
-	uint8_t  long_mode : 1;
-	uint8_t  default_op : 1;
-	uint8_t  granularity : 1;
-	uint8_t  base_high;
-} __attribute__((packed));
+	uint8_t base_mid;
+	uint8_t type:4;
+	uint8_t system:1;
+	uint8_t dpl:2;
+	uint8_t present:1;
+	uint8_t limit_high:4;
+	uint8_t avl:1;
+	uint8_t long_mode:1;
+	uint8_t default_op:1;
+	uint8_t granularity:1;
+	uint8_t base_high;
+} __attribute__ ((packed));
 
 #ifdef __x86_64__
 // LDT or TSS descriptor in the GDT. 16 bytes.
@@ -256,21 +258,20 @@ static unsigned long segment_base(uint16_t selector)
 	typedef unsigned long ul;
 	unsigned long v;
 
-	asm ("sgdt %0" : "=m"(gdt));
+asm("sgdt %0":"=m"(gdt));
 	table_base = gdt.base;
 
-	if (selector & 4) {           /* from ldt */
+	if (selector & 4) {	/* from ldt */
 		uint16_t ldt_selector;
 
-		asm ("sldt %0" : "=g"(ldt_selector));
+asm("sldt %0":"=g"(ldt_selector));
 		table_base = segment_base(ldt_selector);
 	}
 	d = (struct segment_descriptor *)(table_base + (selector & ~7));
-	v = d->base_low | ((ul)d->base_mid << 16) | ((ul)d->base_high << 24);
+	v = d->base_low | ((ul) d->base_mid << 16) | ((ul) d->base_high << 24);
 #ifdef __x86_64__
-	if (d->system == 0
-	    && (d->type == 2 || d->type == 9 || d->type == 11))
-		v |= ((ul)((struct segment_descriptor_64 *)d)->base_higher) << 32;
+	if (d->system == 0 && (d->type == 2 || d->type == 9 || d->type == 11))
+		v |= ((ul) ((struct segment_descriptor_64 *)d)->base_higher) << 32;
 #endif
 	print_func_exit();
 	return v;
@@ -280,14 +281,14 @@ static unsigned long read_tr_base(void)
 {
 	print_func_entry();
 	uint16_t tr;
-	asm ("str %0" : "=g"(tr));
+asm("str %0":"=g"(tr));
 	print_func_exit();
 	return segment_base(tr);
 }
 
 static void reload_tss(void)
 {
-print_func_entry();
+	print_func_entry();
 #ifndef __x86_64__
 
 	/*
@@ -298,10 +299,10 @@ print_func_entry();
 
 	get_gdt(&gdt);
 	descs = (void *)gdt.base;
-	descs[GDT_ENTRY_TSS].type = 9; /* available TSS */
+	descs[GDT_ENTRY_TSS].type = 9;	/* available TSS */
 	load_TR_desc();
 #endif
-print_func_exit();
+	print_func_exit();
 }
 
 static struct vmcs_descriptor {
@@ -318,12 +319,8 @@ static inline struct page *_gfn_to_page(struct litevm *litevm, gfn_t gfn)
 	return (slot) ? slot->phys_mem[gfn - slot->base_gfn] : 0;
 }
 
-
-
 int litevm_read_guest(struct litevm_vcpu *vcpu,
-			     gva_t addr,
-			     unsigned long size,
-			     void *dest)
+					  gva_t addr, unsigned long size, void *dest)
 {
 	print_func_entry();
 	unsigned char *host_buf = dest;
@@ -339,11 +336,11 @@ int litevm_read_guest(struct litevm_vcpu *vcpu,
 
 		if (is_error_hpa(paddr))
 			break;
-		guest_buf = (hva_t)KADDR(paddr);
+		guest_buf = (hva_t) KADDR(paddr);
 		offset = addr & ~PAGE_MASK;
 		guest_buf |= offset;
 		now = MIN(size, PAGE_SIZE - offset);
-		memcpy(host_buf, (void*)guest_buf, now);
+		memcpy(host_buf, (void *)guest_buf, now);
 		host_buf += now;
 		addr += now;
 		size -= now;
@@ -353,9 +350,7 @@ int litevm_read_guest(struct litevm_vcpu *vcpu,
 }
 
 int litevm_write_guest(struct litevm_vcpu *vcpu,
-			     gva_t addr,
-			     unsigned long size,
-			     void *data)
+					   gva_t addr, unsigned long size, void *data)
 {
 	print_func_entry();
 	unsigned char *host_buf = data;
@@ -372,11 +367,11 @@ int litevm_write_guest(struct litevm_vcpu *vcpu,
 		if (is_error_hpa(paddr))
 			break;
 
-		guest_buf = (hva_t)KADDR(paddr);
+		guest_buf = (hva_t) KADDR(paddr);
 		offset = addr & ~PAGE_MASK;
 		guest_buf |= offset;
 		now = MIN(size, PAGE_SIZE - offset);
-		memcpy((void*)guest_buf, host_buf, now);
+		memcpy((void *)guest_buf, host_buf, now);
 		host_buf += now;
 		addr += now;
 		size -= now;
@@ -391,12 +386,12 @@ static void setup_vmcs_descriptor(void)
 	uint64_t msr;
 
 	msr = read_msr(MSR_IA32_VMX_BASIC_MSR);
-	vmcs_descriptor.size = (msr>>32) & 0x1fff;
-	vmcs_descriptor.order = LOG2_UP(vmcs_descriptor.size>>PAGE_SHIFT);
-	vmcs_descriptor.revision_id = (uint32_t)msr;
+	vmcs_descriptor.size = (msr >> 32) & 0x1fff;
+	vmcs_descriptor.order = LOG2_UP(vmcs_descriptor.size >> PAGE_SHIFT);
+	vmcs_descriptor.revision_id = (uint32_t) msr;
 	printk("setup_vmcs_descriptor: msr 0x%x, size 0x%x order 0x%x id 0x%x\n",
-	       msr, vmcs_descriptor.size, vmcs_descriptor.order,
-	       vmcs_descriptor.revision_id);
+		   msr, vmcs_descriptor.size, vmcs_descriptor.order,
+		   vmcs_descriptor.revision_id);
 	print_func_exit();
 };
 
@@ -406,11 +401,10 @@ static void vmcs_clear(struct vmcs *vmcs)
 	uint64_t phys_addr = PADDR(vmcs);
 	uint8_t error;
 	printk("%d: vmcs %p phys_addr %p\n", core_id(), vmcs, (void *)phys_addr);
-	asm volatile ("vmclear %1; setna %0"
-		       : "=m"(error) : "m"(phys_addr) : "cc", "memory" );
+	asm volatile ("vmclear %1; setna %0":"=m" (error):"m"(phys_addr):"cc",
+				  "memory");
 	if (error)
-		printk("litevm: vmclear fail: %p/%llx\n",
-		       vmcs, phys_addr);
+		printk("litevm: vmclear fail: %p/%llx\n", vmcs, phys_addr);
 	print_func_exit();
 }
 
@@ -419,8 +413,9 @@ static void __vcpu_clear(struct hw_trapframe *hw_tf, void *arg)
 	print_func_entry();
 	struct litevm_vcpu *vcpu = arg;
 	int cpu = core_id();
-	printd("__vcpu_clear: cpu %d vcpu->cpu %d currentcpu->vmcs %p vcpu->vmcs %p\n", 
-	       cpu, vcpu->cpu, currentcpu->vmcs, vcpu->vmcs);
+	printd
+		("__vcpu_clear: cpu %d vcpu->cpu %d currentcpu->vmcs %p vcpu->vmcs %p\n",
+		 cpu, vcpu->cpu, currentcpu->vmcs, vcpu->vmcs);
 
 	if (vcpu->cpu == cpu)
 		vmcs_clear(vcpu->vmcs);
@@ -458,13 +453,10 @@ static struct litevm_vcpu *__vcpu_load(struct litevm_vcpu *vcpu)
 		uint8_t error;
 
 		currentcpu->vmcs = vcpu->vmcs;
-		asm volatile ("vmptrld %1; setna %0"
-			       : "=m"(error) : "m"(phys_addr) : "cc" );
-		if (error){
-			printk("litevm: vmptrld %p/%llx fail\n",
-			       vcpu->vmcs, phys_addr);
-			error("litevm: vmptrld %p/%llx fail\n",
-			       vcpu->vmcs, phys_addr);
+		asm volatile ("vmptrld %1; setna %0":"=m" (error):"m"(phys_addr):"cc");
+		if (error) {
+			printk("litevm: vmptrld %p/%llx fail\n", vcpu->vmcs, phys_addr);
+			error("litevm: vmptrld %p/%llx fail\n", vcpu->vmcs, phys_addr);
 		}
 	}
 
@@ -477,12 +469,12 @@ static struct litevm_vcpu *__vcpu_load(struct litevm_vcpu *vcpu)
 		 * Linux uses per-cpu TSS and GDT, so set these when switching
 		 * processors.
 		 */
-		vmcs_writel(HOST_TR_BASE, read_tr_base()); /* 22.2.4 */
+		vmcs_writel(HOST_TR_BASE, read_tr_base());	/* 22.2.4 */
 		get_gdt(&dt);
-		vmcs_writel(HOST_GDTR_BASE, dt.base);   /* 22.2.4 */
+		vmcs_writel(HOST_GDTR_BASE, dt.base);	/* 22.2.4 */
 
 		sysenter_esp = read_msr(MSR_IA32_SYSENTER_ESP);
-		vmcs_writel(HOST_IA32_SYSENTER_ESP, sysenter_esp); /* 22.2.3 */
+		vmcs_writel(HOST_IA32_SYSENTER_ESP, sysenter_esp);	/* 22.2.3 */
 	}
 	print_func_exit();
 	return vcpu;
@@ -515,7 +507,6 @@ static void vcpu_put(struct litevm_vcpu *vcpu)
 	print_func_exit();
 }
 
-
 static struct vmcs *alloc_vmcs_cpu(int cpu)
 {
 	print_func_entry();
@@ -528,7 +519,7 @@ static struct vmcs *alloc_vmcs_cpu(int cpu)
 		return 0;
 	}
 	memset(vmcs, 0, vmcs_descriptor.size);
-	vmcs->revision_id = vmcs_descriptor.revision_id; /* vmcs revision id */
+	vmcs->revision_id = vmcs_descriptor.revision_id;	/* vmcs revision id */
 	print_func_exit();
 	return vmcs;
 }
@@ -547,7 +538,7 @@ static int cpu_has_litevm_support(void)
 	print_func_entry();
 	uint32_t ecx = cpuid_ecx(1);
 	print_func_exit();
-	return ecx & 5; /* CPUID.1:ECX.VMX[bit 5] -> VT */
+	return ecx & 5;	/* CPUID.1:ECX.VMX[bit 5] -> VT */
 }
 
 static int vmx_disabled_by_bios(void)
@@ -557,7 +548,7 @@ static int vmx_disabled_by_bios(void)
 
 	msr = read_msr(MSR_IA32_FEATURE_CONTROL);
 	print_func_exit();
-	return (msr & 5) == 1; /* locked but not enabled */
+	return (msr & 5) == 1;	/* locked but not enabled */
 }
 
 static void vm_enable(struct hw_trapframe *hw_tf, void *garbage)
@@ -568,40 +559,40 @@ static void vm_enable(struct hw_trapframe *hw_tf, void *garbage)
 	uint64_t old;
 	uint64_t status = 0;
 	currentcpu->vmxarea = get_cont_pages_node(core_id(), vmcs_descriptor.order,
-						  KMALLOC_WAIT);
-	if (! currentcpu->vmxarea)
+											  KMALLOC_WAIT);
+	if (!currentcpu->vmxarea)
 		return;
 	memset(currentcpu->vmxarea, 0, vmcs_descriptor.size);
 	currentcpu->vmxarea->revision_id = vmcs_descriptor.revision_id;
 	phys_addr = PADDR(currentcpu->vmxarea);
 	printk("%d: currentcpu->vmxarea %p phys_addr %p\n", core_id(),
-	       currentcpu->vmxarea, (void *)phys_addr);
-	if (phys_addr & 0xfff){
+		   currentcpu->vmxarea, (void *)phys_addr);
+	if (phys_addr & 0xfff) {
 		printk("fix vmxarea alignment!");
 	}
 	printk("%d: CR4 is 0x%x, and VMXE is %x\n", core_id(), rcr4(), CR4_VMXE);
 	old = read_msr(MSR_IA32_FEATURE_CONTROL);
 	printk("%d: vm_enable, old is %d\n", core_id(), old);
-	if ((old & 5) == 0){
+	if ((old & 5) == 0) {
 		/* enable and lock */
 		write_msr(MSR_IA32_FEATURE_CONTROL, old | 5);
 		old = read_msr(MSR_IA32_FEATURE_CONTROL);
 		printk("%d:vm_enable, tried to set 5, old is %d\n", core_id(), old);
 	}
 	printk("%d:CR4 is 0x%x, and VMXE is %x\n", core_id(), rcr4(), CR4_VMXE);
-	lcr4(rcr4() | CR4_VMXE); /* FIXME: not cpu hotplug safe */
+	lcr4(rcr4() | CR4_VMXE);	/* FIXME: not cpu hotplug safe */
 	printk("%d:CR4 is 0x%x, and VMXE is %x\n", core_id(), rcr4(), CR4_VMXE);
 	printk("%d:cr0 is %x\n", core_id(), rcr0());
 	lcr0(rcr0() | 0x20);
 	printk("%d:cr0 is %x\n", core_id(), rcr0());
 	printk("%d:A20 is %d (0x2 should be set)\n", core_id(), inb(0x92));
-	outb(0x92, inb(0x92)|2);
+	outb(0x92, inb(0x92) | 2);
 	printk("%d:A20 is %d (0x2 should be set)\n", core_id(), inb(0x92));
-	asm volatile ("vmxon %1\njbe 1f\nmovl $1, %0\n1:"	\
-		      : "=m" (status) : "m"(phys_addr) : "memory", "cc");
+	asm volatile ("vmxon %1\njbe 1f\nmovl $1, %0\n1:":"=m" (status):"m"
+				  (phys_addr):"memory", "cc");
 	printk("%d:vmxon status is %d\n", core_id(), status);
 	printk("%d:CR4 is 0x%x, and VMXE is %x\n", core_id(), rcr4(), CR4_VMXE);
-	if (! status){
+	if (!status) {
 		printk("%d:vm_enable: status says fail\n", core_id());
 	}
 	print_func_exit();
@@ -610,7 +601,7 @@ static void vm_enable(struct hw_trapframe *hw_tf, void *garbage)
 static void litevm_disable(void *garbage)
 {
 	print_func_entry();
-	asm volatile ("vmxoff" : : : "cc");
+	asm volatile ("vmxoff":::"cc");
 	print_func_exit();
 }
 
@@ -646,14 +637,14 @@ struct litevm *vmx_open(void)
  * Free any memory in @free but not in @dont.
  */
 static void litevm_free_physmem_slot(struct litevm_memory_slot *free,
-				  struct litevm_memory_slot *dont)
+									 struct litevm_memory_slot *dont)
 {
 	print_func_entry();
 	int i;
 
 	if (!dont || free->phys_mem != dont->phys_mem)
 		if (free->phys_mem) {
-			for (i = 0; i < free->npages; ++i){
+			for (i = 0; i < free->npages; ++i) {
 				page_t *page = free->phys_mem[i];
 				page_decref(page);
 				assert(page_is_free(page2ppn(page)));
@@ -713,7 +704,7 @@ static void litevm_free_vcpus(struct litevm *litevm)
 
 static int litevm_dev_release(struct litevm *litevm)
 {
-print_func_entry();
+	print_func_entry();
 
 	litevm_free_vcpus(litevm);
 	litevm_free_physmem(litevm);
@@ -727,7 +718,7 @@ unsigned long vmcs_readl(unsigned long field)
 	print_func_entry();
 	unsigned long value;
 
-	asm volatile ("vmread %1, %0" : "=g"(value) : "r"(field) : "cc");
+	asm volatile ("vmread %1, %0":"=g" (value):"r"(field):"cc");
 	print_func_exit();
 	return value;
 }
@@ -737,11 +728,11 @@ void vmcs_writel(unsigned long field, unsigned long value)
 	print_func_entry();
 	uint8_t error;
 
-	asm volatile ("vmwrite %1, %2; setna %0"
-		       : "=g"(error) : "r"(value), "r"(field) : "cc" );
+	asm volatile ("vmwrite %1, %2; setna %0":"=g" (error):"r"(value),
+				  "r"(field):"cc");
 	if (error)
 		printk("vmwrite error: reg %lx value %lx (err %d)\n",
-		       field, value, vmcs_read32(VM_INSTRUCTION_ERROR));
+			   field, value, vmcs_read32(VM_INSTRUCTION_ERROR));
 	print_func_exit();
 }
 
@@ -754,28 +745,26 @@ static void vmcs_write16(unsigned long field, uint16_t value)
 
 static void vmcs_write64(unsigned long field, uint64_t value)
 {
-print_func_entry();
+	print_func_entry();
 #ifdef __x86_64__
 	vmcs_writel(field, value);
 #else
 	vmcs_writel(field, value);
 	asm volatile ("");
-	vmcs_writel(field+1, value >> 32);
+	vmcs_writel(field + 1, value >> 32);
 #endif
-print_func_exit();
+	print_func_exit();
 }
 
 static void inject_gp(struct litevm_vcpu *vcpu)
 {
 	print_func_entry();
-	printd("inject_general_protection: rip 0x%lx\n",
-	       vmcs_readl(GUEST_RIP));
+	printd("inject_general_protection: rip 0x%lx\n", vmcs_readl(GUEST_RIP));
 	vmcs_write32(VM_ENTRY_EXCEPTION_ERROR_CODE, 0);
 	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD,
-		     GP_VECTOR |
-		     INTR_TYPE_EXCEPTION |
-		     INTR_INFO_DELIEVER_CODE_MASK |
-		     INTR_INFO_VALID_MASK);
+				 GP_VECTOR |
+				 INTR_TYPE_EXCEPTION |
+				 INTR_INFO_DELIEVER_CODE_MASK | INTR_INFO_VALID_MASK);
 	print_func_exit();
 }
 
@@ -806,11 +795,11 @@ static void enter_pmode(struct litevm_vcpu *vcpu)
 	vmcs_writel(GUEST_RFLAGS, flags);
 
 	vmcs_writel(GUEST_CR4, (vmcs_readl(GUEST_CR4) & ~CR4_VME_MASK) |
-			(vmcs_readl(CR0_READ_SHADOW) & CR4_VME_MASK) );
+				(vmcs_readl(CR0_READ_SHADOW) & CR4_VME_MASK));
 
 	update_exception_bitmap(vcpu);
 
-	#define FIX_PMODE_DATASEG(seg, save) {				\
+#define FIX_PMODE_DATASEG(seg, save) {				\
 			vmcs_write16(GUEST_##seg##_SELECTOR, 0); 	\
 			vmcs_writel(GUEST_##seg##_BASE, 0); 		\
 			vmcs_write32(GUEST_##seg##_LIMIT, 0xffff);	\
@@ -824,15 +813,16 @@ static void enter_pmode(struct litevm_vcpu *vcpu)
 	FIX_PMODE_DATASEG(FS, vcpu->rmode.fs);
 
 	vmcs_write16(GUEST_CS_SELECTOR,
-		     vmcs_read16(GUEST_CS_SELECTOR) & ~SELECTOR_RPL_MASK);
+				 vmcs_read16(GUEST_CS_SELECTOR) & ~SELECTOR_RPL_MASK);
 	vmcs_write32(GUEST_CS_AR_BYTES, 0x9b);
 	print_func_exit();
 }
 
-static int rmode_tss_base(struct litevm* litevm)
+static int rmode_tss_base(struct litevm *litevm)
 {
 	print_func_entry();
-	gfn_t base_gfn = litevm->memslots[0].base_gfn + litevm->memslots[0].npages - 3;
+	gfn_t base_gfn =
+		litevm->memslots[0].base_gfn + litevm->memslots[0].npages - 3;
 	print_func_exit();
 	return base_gfn << PAGE_SHIFT;
 }
@@ -862,7 +852,7 @@ static void enter_rmode(struct litevm_vcpu *vcpu)
 	vmcs_writel(GUEST_CR4, vmcs_readl(GUEST_CR4) | CR4_VME_MASK);
 	update_exception_bitmap(vcpu);
 
-	#define FIX_RMODE_SEG(seg, save) {				   \
+#define FIX_RMODE_SEG(seg, save) {				   \
 		vmcs_write16(GUEST_##seg##_SELECTOR, 			   \
 					vmcs_readl(GUEST_##seg##_BASE) >> 4); \
 		vmcs_write32(GUEST_##seg##_LIMIT, 0xffff);		   \
@@ -880,7 +870,7 @@ static void enter_rmode(struct litevm_vcpu *vcpu)
 	print_func_exit();
 }
 
-static int init_rmode_tss(struct litevm* litevm)
+static int init_rmode_tss(struct litevm *litevm)
 {
 	print_func_entry();
 	struct page *p1, *p2, *p3;
@@ -899,7 +889,7 @@ static int init_rmode_tss(struct litevm* litevm)
 
 	page = page2kva(p1);
 	memset(page, 0, PAGE_SIZE);
-	*(uint16_t*)(page + 0x66) = TSS_BASE_SIZE + TSS_REDIRECTION_SIZE;
+	*(uint16_t *) (page + 0x66) = TSS_BASE_SIZE + TSS_REDIRECTION_SIZE;
 
 	page = page2kva(p2);
 	memset(page, 0, PAGE_SIZE);
@@ -922,14 +912,14 @@ static void __set_efer(struct litevm_vcpu *vcpu, uint64_t efer)
 	vcpu->shadow_efer = efer;
 	if (efer & EFER_LMA) {
 		vmcs_write32(VM_ENTRY_CONTROLS,
-				     vmcs_read32(VM_ENTRY_CONTROLS) |
-				     VM_ENTRY_CONTROLS_IA32E_MASK);
+					 vmcs_read32(VM_ENTRY_CONTROLS) |
+					 VM_ENTRY_CONTROLS_IA32E_MASK);
 		msr->data = efer;
 
 	} else {
 		vmcs_write32(VM_ENTRY_CONTROLS,
-				     vmcs_read32(VM_ENTRY_CONTROLS) &
-				     ~VM_ENTRY_CONTROLS_IA32E_MASK);
+					 vmcs_read32(VM_ENTRY_CONTROLS) &
+					 ~VM_ENTRY_CONTROLS_IA32E_MASK);
 
 		msr->data = efer & ~EFER_LME;
 	}
@@ -943,19 +933,16 @@ static void enter_lmode(struct litevm_vcpu *vcpu)
 
 	guest_tr_ar = vmcs_read32(GUEST_TR_AR_BYTES);
 	if ((guest_tr_ar & AR_TYPE_MASK) != AR_TYPE_BUSY_64_TSS) {
-		printd("%s: tss fixup for long mode. \n",
-		       __FUNCTION__);
-		vmcs_write32(GUEST_TR_AR_BYTES,
-			     (guest_tr_ar & ~AR_TYPE_MASK)
-			     | AR_TYPE_BUSY_64_TSS);
+		printd("%s: tss fixup for long mode. \n", __FUNCTION__);
+		vmcs_write32(GUEST_TR_AR_BYTES, (guest_tr_ar & ~AR_TYPE_MASK)
+					 | AR_TYPE_BUSY_64_TSS);
 	}
 
 	vcpu->shadow_efer |= EFER_LMA;
 
 	find_msr_entry(vcpu, MSR_EFER)->data |= EFER_LMA | EFER_LME;
-	vmcs_write32(VM_ENTRY_CONTROLS,
-		     vmcs_read32(VM_ENTRY_CONTROLS)
-		     | VM_ENTRY_CONTROLS_IA32E_MASK);
+	vmcs_write32(VM_ENTRY_CONTROLS, vmcs_read32(VM_ENTRY_CONTROLS)
+				 | VM_ENTRY_CONTROLS_IA32E_MASK);
 	print_func_exit();
 }
 
@@ -964,9 +951,8 @@ static void exit_lmode(struct litevm_vcpu *vcpu)
 	print_func_entry();
 	vcpu->shadow_efer &= ~EFER_LMA;
 
-	vmcs_write32(VM_ENTRY_CONTROLS,
-		     vmcs_read32(VM_ENTRY_CONTROLS)
-		     & ~VM_ENTRY_CONTROLS_IA32E_MASK);
+	vmcs_write32(VM_ENTRY_CONTROLS, vmcs_read32(VM_ENTRY_CONTROLS)
+				 & ~VM_ENTRY_CONTROLS_IA32E_MASK);
 	print_func_exit();
 }
 
@@ -996,11 +982,11 @@ static void __set_cr0(struct litevm_vcpu *vcpu, unsigned long cr0)
 }
 
 static int pdptrs_have_reserved_bits_set(struct litevm_vcpu *vcpu,
-					 unsigned long cr3)
+										 unsigned long cr3)
 {
 	print_func_entry();
 	gfn_t pdpt_gfn = cr3 >> PAGE_SHIFT;
-	unsigned offset = (cr3 & (PAGE_SIZE-1)) >> 5;
+	unsigned offset = (cr3 & (PAGE_SIZE - 1)) >> 5;
 	int i;
 	uint64_t pdpte;
 	uint64_t *pdpt;
@@ -1027,8 +1013,7 @@ static void set_cr0(struct litevm_vcpu *vcpu, unsigned long cr0)
 {
 	print_func_entry();
 	if (cr0 & CR0_RESEVED_BITS) {
-		printd("set_cr0: 0x%lx #GP, reserved bits 0x%lx\n",
-		       cr0, guest_cr0());
+		printd("set_cr0: 0x%lx #GP, reserved bits 0x%lx\n", cr0, guest_cr0());
 		inject_gp(vcpu);
 		print_func_exit();
 		return;
@@ -1042,8 +1027,7 @@ static void set_cr0(struct litevm_vcpu *vcpu, unsigned long cr0)
 	}
 
 	if ((cr0 & CR0_PG_MASK) && !(cr0 & CR0_PE_MASK)) {
-		printd("set_cr0: #GP, set PG flag "
-		       "and a clear PE flag\n");
+		printd("set_cr0: #GP, set PG flag " "and a clear PE flag\n");
 		inject_gp(vcpu);
 		print_func_exit();
 		return;
@@ -1055,7 +1039,7 @@ static void set_cr0(struct litevm_vcpu *vcpu, unsigned long cr0)
 			uint32_t guest_cs_ar;
 			if (!is_pae()) {
 				printd("set_cr0: #GP, start paging "
-				       "in long mode while PAE is disabled\n");
+					   "in long mode while PAE is disabled\n");
 				inject_gp(vcpu);
 				print_func_exit();
 				return;
@@ -1063,7 +1047,7 @@ static void set_cr0(struct litevm_vcpu *vcpu, unsigned long cr0)
 			guest_cs_ar = vmcs_read32(GUEST_CS_AR_BYTES);
 			if (guest_cs_ar & SEGMENT_AR_L_MASK) {
 				printd("set_cr0: #GP, start paging "
-				       "in long mode while CS.L == 1\n");
+					   "in long mode while CS.L == 1\n");
 				inject_gp(vcpu);
 				print_func_exit();
 				return;
@@ -1071,10 +1055,8 @@ static void set_cr0(struct litevm_vcpu *vcpu, unsigned long cr0)
 			}
 		} else
 #endif
-		if (is_pae() &&
-			    pdptrs_have_reserved_bits_set(vcpu, vcpu->cr3)) {
-			printd("set_cr0: #GP, pdptrs "
-			       "reserved bits\n");
+		if (is_pae() && pdptrs_have_reserved_bits_set(vcpu, vcpu->cr3)) {
+			printd("set_cr0: #GP, pdptrs " "reserved bits\n");
 			inject_gp(vcpu);
 			print_func_exit();
 			return;
@@ -1110,7 +1092,8 @@ static void __set_cr4(struct litevm_vcpu *vcpu, unsigned long cr4)
 	print_func_entry();
 	vmcs_writel(CR4_READ_SHADOW, cr4);
 	vmcs_writel(GUEST_CR4, cr4 | (vcpu->rmode.active ?
-		    LITEVM_RMODE_VM_CR4_ALWAYS_ON : LITEVM_PMODE_VM_CR4_ALWAYS_ON));
+								  LITEVM_RMODE_VM_CR4_ALWAYS_ON :
+								  LITEVM_PMODE_VM_CR4_ALWAYS_ON));
 	print_func_exit();
 }
 
@@ -1126,14 +1109,13 @@ static void set_cr4(struct litevm_vcpu *vcpu, unsigned long cr4)
 
 	if (is_long_mode()) {
 		if (!(cr4 & CR4_PAE_MASK)) {
-			printd("set_cr4: #GP, clearing PAE while "
-			       "in long mode\n");
+			printd("set_cr4: #GP, clearing PAE while " "in long mode\n");
 			inject_gp(vcpu);
 			print_func_exit();
 			return;
 		}
 	} else if (is_paging() && !is_pae() && (cr4 & CR4_PAE_MASK)
-		   && pdptrs_have_reserved_bits_set(vcpu, vcpu->cr3)) {
+			   && pdptrs_have_reserved_bits_set(vcpu, vcpu->cr3)) {
 		printd("set_cr4: #GP, pdptrs reserved bits\n");
 		inject_gp(vcpu);
 	}
@@ -1155,7 +1137,7 @@ static void set_cr3(struct litevm_vcpu *vcpu, unsigned long cr3)
 {
 	print_func_entry();
 	if (is_long_mode()) {
-		if ( cr3 & CR3_L_MODE_RESEVED_BITS) {
+		if (cr3 & CR3_L_MODE_RESEVED_BITS) {
 			printd("set_cr3: #GP, reserved bits\n");
 			inject_gp(vcpu);
 			print_func_exit();
@@ -1168,10 +1150,8 @@ static void set_cr3(struct litevm_vcpu *vcpu, unsigned long cr3)
 			print_func_exit();
 			return;
 		}
-		if (is_paging() && is_pae() &&
-		    pdptrs_have_reserved_bits_set(vcpu, cr3)) {
-			printd("set_cr3: #GP, pdptrs "
-			       "reserved bits\n");
+		if (is_paging() && is_pae() && pdptrs_have_reserved_bits_set(vcpu, cr3)) {
+			printd("set_cr3: #GP, pdptrs " "reserved bits\n");
 			inject_gp(vcpu);
 			print_func_exit();
 			return;
@@ -1188,7 +1168,7 @@ static void set_cr3(struct litevm_vcpu *vcpu, unsigned long cr3)
 static void set_cr8(struct litevm_vcpu *vcpu, unsigned long cr8)
 {
 	print_func_entry();
-	if ( cr8 & CR8_RESEVED_BITS) {
+	if (cr8 & CR8_RESEVED_BITS) {
 		printd("set_cr8: #GP, reserved bits 0x%lx\n", cr8);
 		inject_gp(vcpu);
 		print_func_exit();
@@ -1203,8 +1183,7 @@ static uint32_t get_rdx_init_val(void)
 	print_func_entry();
 	uint32_t val;
 
-	asm ("movl $1, %%eax \n\t"
-	     "movl %%eax, %0 \n\t" : "=g"(val) );
+asm("movl $1, %%eax \n\t" "movl %%eax, %0 \n\t":"=g"(val));
 	print_func_exit();
 	return val;
 
@@ -1214,12 +1193,12 @@ static void fx_init(struct litevm_vcpu *vcpu)
 {
 	print_func_entry();
 	struct __attribute__ ((__packed__)) fx_image_s {
-		uint16_t control; //fcw
-		uint16_t status; //fsw
-		uint16_t tag; // ftw
-		uint16_t opcode; //fop
-		uint64_t ip; // fpu ip
-		uint64_t operand;// fpu dp
+		uint16_t control;		//fcw
+		uint16_t status;		//fsw
+		uint16_t tag;			// ftw
+		uint16_t opcode;		//fop
+		uint64_t ip;			// fpu ip
+		uint64_t operand;		// fpu dp
 		uint32_t mxcsr;
 		uint32_t mxcsr_mask;
 
@@ -1233,11 +1212,12 @@ static void fx_init(struct litevm_vcpu *vcpu)
 	fx_image = (struct fx_image_s *)vcpu->guest_fx_image;
 	fx_image->mxcsr = 0x1f80;
 	memset(vcpu->guest_fx_image + sizeof(struct fx_image_s),
-	       0, FX_IMAGE_SIZE - sizeof(struct fx_image_s));
+		   0, FX_IMAGE_SIZE - sizeof(struct fx_image_s));
 	print_func_exit();
 }
 
-static void vmcs_write32_fixedbits(uint32_t msr, uint32_t vmcs_field, uint32_t val)
+static void vmcs_write32_fixedbits(uint32_t msr, uint32_t vmcs_field,
+								   uint32_t val)
 {
 	print_func_entry();
 	uint32_t msr_high, msr_low;
@@ -1245,7 +1225,7 @@ static void vmcs_write32_fixedbits(uint32_t msr, uint32_t vmcs_field, uint32_t v
 
 	msrval = read_msr(msr);
 	msr_low = msrval;
-	msr_high = (msrval>>32);
+	msr_high = (msrval >> 32);
 
 	val &= msr_high;
 	val |= msr_low;
@@ -1258,7 +1238,7 @@ static void vmcs_write32_fixedbits(uint32_t msr, uint32_t vmcs_field, uint32_t v
  */
 static int litevm_vcpu_setup(struct litevm_vcpu *vcpu)
 {
-print_func_entry();
+	print_func_entry();
 /* no op on x86_64 */
 #define asmlinkage
 	extern asmlinkage void litevm_vmx_return(void);
@@ -1271,7 +1251,6 @@ print_func_entry();
 	uint64_t tsc;
 	int nr_good_msrs;
 
-
 	if (!init_rmode_tss(vcpu->litevm)) {
 		error("vcpu_setup: init_rmode_tss failed");
 	}
@@ -1280,8 +1259,8 @@ print_func_entry();
 	vcpu->regs[VCPU_REGS_RDX] = get_rdx_init_val();
 	vcpu->cr8 = 0;
 	vcpu->apic_base = 0xfee00000 |
-			/*for vcpu 0*/ MSR_IA32_APICBASE_BSP |
-			MSR_IA32_APICBASE_ENABLE;
+		/*for vcpu 0 */ MSR_IA32_APICBASE_BSP |
+		MSR_IA32_APICBASE_ENABLE;
 
 	fx_init(vcpu);
 
@@ -1347,76 +1326,69 @@ print_func_entry();
 	tsc = read_tsc();
 	vmcs_write64(TSC_OFFSET, -tsc);
 
-	vmcs_write64(VMCS_LINK_POINTER, -1ull); /* 22.3.1.5 */
+	vmcs_write64(VMCS_LINK_POINTER, -1ull);	/* 22.3.1.5 */
 
 	/* Special registers */
 	vmcs_write64(GUEST_IA32_DEBUGCTL, 0);
 
 	/* Control */
-	vmcs_write32_fixedbits(MSR_IA32_VMX_PINBASED_CTLS_MSR,
-			       PIN_BASED_VM_EXEC_CONTROL,
-			       PIN_BASED_EXT_INTR_MASK   /* 20.6.1 */
-			       | PIN_BASED_NMI_EXITING   /* 20.6.1 */
-			);
-	vmcs_write32_fixedbits(MSR_IA32_VMX_PROCBASED_CTLS_MSR,
-			       CPU_BASED_VM_EXEC_CONTROL,
-			       CPU_BASED_HLT_EXITING         /* 20.6.2 */
-			       | CPU_BASED_CR8_LOAD_EXITING    /* 20.6.2 */
-			       | CPU_BASED_CR8_STORE_EXITING   /* 20.6.2 */
-			       | CPU_BASED_UNCOND_IO_EXITING   /* 20.6.2 */
-			       | CPU_BASED_INVDPG_EXITING
-			       | CPU_BASED_MOV_DR_EXITING
-			       | CPU_BASED_USE_TSC_OFFSETING   /* 21.3 */
-			);
+	vmcs_write32_fixedbits(MSR_IA32_VMX_PINBASED_CTLS_MSR, PIN_BASED_VM_EXEC_CONTROL, PIN_BASED_EXT_INTR_MASK	/* 20.6.1 */
+						   | PIN_BASED_NMI_EXITING	/* 20.6.1 */
+		);
+	vmcs_write32_fixedbits(MSR_IA32_VMX_PROCBASED_CTLS_MSR, CPU_BASED_VM_EXEC_CONTROL, CPU_BASED_HLT_EXITING	/* 20.6.2 */
+						   | CPU_BASED_CR8_LOAD_EXITING	/* 20.6.2 */
+						   | CPU_BASED_CR8_STORE_EXITING	/* 20.6.2 */
+						   | CPU_BASED_UNCOND_IO_EXITING	/* 20.6.2 */
+						   | CPU_BASED_INVDPG_EXITING | CPU_BASED_MOV_DR_EXITING | CPU_BASED_USE_TSC_OFFSETING	/* 21.3 */
+		);
 
 	vmcs_write32(EXCEPTION_BITMAP, 1 << PF_VECTOR);
 	vmcs_write32(PAGE_FAULT_ERROR_CODE_MASK, 0);
 	vmcs_write32(PAGE_FAULT_ERROR_CODE_MATCH, 0);
-	vmcs_write32(CR3_TARGET_COUNT, 0);           /* 22.2.1 */
+	vmcs_write32(CR3_TARGET_COUNT, 0);	/* 22.2.1 */
 
-	vmcs_writel(HOST_CR0, rcr0());  /* 22.2.3 */
-	vmcs_writel(HOST_CR4, rcr4());  /* 22.2.3, 22.2.5 */
-	vmcs_writel(HOST_CR3, rcr3());  /* 22.2.3  FIXME: shadow tables */
+	vmcs_writel(HOST_CR0, rcr0());	/* 22.2.3 */
+	vmcs_writel(HOST_CR4, rcr4());	/* 22.2.3, 22.2.5 */
+	vmcs_writel(HOST_CR3, rcr3());	/* 22.2.3  FIXME: shadow tables */
 
 #warning "not setting selectors; do we need them?"
 #if 0
-	vmcs_write16(HOST_CS_SELECTOR, __KERNEL_CS);  /* 22.2.4 */
-	vmcs_write16(HOST_DS_SELECTOR, __KERNEL_DS);  /* 22.2.4 */
-	vmcs_write16(HOST_ES_SELECTOR, __KERNEL_DS);  /* 22.2.4 */
+	vmcs_write16(HOST_CS_SELECTOR, __KERNEL_CS);	/* 22.2.4 */
+	vmcs_write16(HOST_DS_SELECTOR, __KERNEL_DS);	/* 22.2.4 */
+	vmcs_write16(HOST_ES_SELECTOR, __KERNEL_DS);	/* 22.2.4 */
 #endif
-	vmcs_write16(HOST_FS_SELECTOR, read_fs());    /* 22.2.4 */
-	vmcs_write16(HOST_GS_SELECTOR, read_gs());    /* 22.2.4 */
+	vmcs_write16(HOST_FS_SELECTOR, read_fs());	/* 22.2.4 */
+	vmcs_write16(HOST_GS_SELECTOR, read_gs());	/* 22.2.4 */
 #if 0
-	vmcs_write16(HOST_SS_SELECTOR, __KERNEL_DS);  /* 22.2.4 */
+	vmcs_write16(HOST_SS_SELECTOR, __KERNEL_DS);	/* 22.2.4 */
 #endif
 #ifdef __x86_64__
 	a = read_msr(MSR_FS_BASE);
-	vmcs_writel(HOST_FS_BASE, a); /* 22.2.4 */
+	vmcs_writel(HOST_FS_BASE, a);	/* 22.2.4 */
 	a = read_msr(MSR_GS_BASE);
-	vmcs_writel(HOST_GS_BASE, a); /* 22.2.4 */
+	vmcs_writel(HOST_GS_BASE, a);	/* 22.2.4 */
 #else
-	vmcs_writel(HOST_FS_BASE, 0); /* 22.2.4 */
-	vmcs_writel(HOST_GS_BASE, 0); /* 22.2.4 */
+	vmcs_writel(HOST_FS_BASE, 0);	/* 22.2.4 */
+	vmcs_writel(HOST_GS_BASE, 0);	/* 22.2.4 */
 #endif
 
 #warning "Not setting HOST_TR_SELECTOR"
 #if 0
-	vmcs_write16(HOST_TR_SELECTOR, GDT_ENTRY_TSS*8);  /* 22.2.4 */
+	vmcs_write16(HOST_TR_SELECTOR, GDT_ENTRY_TSS * 8);	/* 22.2.4 */
 #endif
 
 	get_idt(&dt);
-	vmcs_writel(HOST_IDTR_BASE, dt.base);   /* 22.2.4 */
+	vmcs_writel(HOST_IDTR_BASE, dt.base);	/* 22.2.4 */
 
-
-	vmcs_writel(HOST_RIP, (unsigned long)litevm_vmx_return); /* 22.2.5 */
+	vmcs_writel(HOST_RIP, (unsigned long)litevm_vmx_return);	/* 22.2.5 */
 
 	/* it's the HIGH 32 bits! */
 	host_sysenter_cs = read_msr(MSR_IA32_SYSENTER_CS) >> 32;
 	vmcs_write32(HOST_IA32_SYSENTER_CS, host_sysenter_cs);
 	a = read_msr(MSR_IA32_SYSENTER_ESP);
-	vmcs_writel(HOST_IA32_SYSENTER_ESP, a);   /* 22.2.3 */
+	vmcs_writel(HOST_IA32_SYSENTER_ESP, a);	/* 22.2.3 */
 	a = read_msr(MSR_IA32_SYSENTER_EIP);
-	vmcs_writel(HOST_IA32_SYSENTER_EIP, a);   /* 22.2.3 */
+	vmcs_writel(HOST_IA32_SYSENTER_EIP, a);	/* 22.2.3 */
 
 	ret = -ENOMEM;
 	vcpu->guest_msrs = kmalloc(PAGE_SIZE, KMALLOC_WAIT);
@@ -1433,8 +1405,8 @@ print_func_entry();
 		int j = vcpu->nmsrs;
 
 #warning "need readmsr_safe"
-//		if (rdmsr_safe(index, &data_low, &data_high) < 0)
-//			continue;
+//      if (rdmsr_safe(index, &data_low, &data_high) < 0)
+//          continue;
 		data = read_msr(index);
 		vcpu->host_msrs[j].index = index;
 		vcpu->host_msrs[j].reserved = 0;
@@ -1445,23 +1417,17 @@ print_func_entry();
 	printk("msrs: %d\n", vcpu->nmsrs);
 
 	nr_good_msrs = vcpu->nmsrs - NR_BAD_MSRS;
-	vmcs_writel(VM_ENTRY_MSR_LOAD_ADDR,
-		    PADDR(vcpu->guest_msrs + NR_BAD_MSRS));
-	vmcs_writel(VM_EXIT_MSR_STORE_ADDR,
-		    PADDR(vcpu->guest_msrs + NR_BAD_MSRS));
-	vmcs_writel(VM_EXIT_MSR_LOAD_ADDR,
-		    PADDR(vcpu->host_msrs + NR_BAD_MSRS));
-	vmcs_write32_fixedbits(MSR_IA32_VMX_EXIT_CTLS_MSR, VM_EXIT_CONTROLS,
-		     	       (HOST_IS_64 << 9));  /* 22.2,1, 20.7.1 */
-	vmcs_write32(VM_EXIT_MSR_STORE_COUNT, nr_good_msrs); /* 22.2.2 */
-	vmcs_write32(VM_EXIT_MSR_LOAD_COUNT, nr_good_msrs);  /* 22.2.2 */
-	vmcs_write32(VM_ENTRY_MSR_LOAD_COUNT, nr_good_msrs); /* 22.2.2 */
-
+	vmcs_writel(VM_ENTRY_MSR_LOAD_ADDR, PADDR(vcpu->guest_msrs + NR_BAD_MSRS));
+	vmcs_writel(VM_EXIT_MSR_STORE_ADDR, PADDR(vcpu->guest_msrs + NR_BAD_MSRS));
+	vmcs_writel(VM_EXIT_MSR_LOAD_ADDR, PADDR(vcpu->host_msrs + NR_BAD_MSRS));
+	vmcs_write32_fixedbits(MSR_IA32_VMX_EXIT_CTLS_MSR, VM_EXIT_CONTROLS, (HOST_IS_64 << 9));	/* 22.2,1, 20.7.1 */
+	vmcs_write32(VM_EXIT_MSR_STORE_COUNT, nr_good_msrs);	/* 22.2.2 */
+	vmcs_write32(VM_EXIT_MSR_LOAD_COUNT, nr_good_msrs);	/* 22.2.2 */
+	vmcs_write32(VM_ENTRY_MSR_LOAD_COUNT, nr_good_msrs);	/* 22.2.2 */
 
 	/* 22.2.1, 20.8.1 */
-	vmcs_write32_fixedbits(MSR_IA32_VMX_ENTRY_CTLS_MSR,
-                               VM_ENTRY_CONTROLS, 0);
-	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);  /* 22.2.1 */
+	vmcs_write32_fixedbits(MSR_IA32_VMX_ENTRY_CTLS_MSR, VM_ENTRY_CONTROLS, 0);
+	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);	/* 22.2.1 */
 
 	vmcs_writel(VIRTUAL_APIC_PAGE_ADDR, 0);
 	vmcs_writel(TPR_THRESHOLD, 0);
@@ -1469,7 +1435,7 @@ print_func_entry();
 	vmcs_writel(CR0_GUEST_HOST_MASK, LITEVM_GUEST_CR0_MASK);
 	vmcs_writel(CR4_GUEST_HOST_MASK, LITEVM_GUEST_CR4_MASK);
 
-	__set_cr0(vcpu, 0x60000010); // enter rmode
+	__set_cr0(vcpu, 0x60000010);	// enter rmode
 	__set_cr4(vcpu, 0);
 #ifdef __x86_64__
 	__set_efer(vcpu, 0);
@@ -1522,9 +1488,11 @@ int vmx_create_vcpu(struct litevm *litevm, int n)
 	struct vmcs *vmcs;
 	char *errstring = NULL;
 
-	if (n < 0 || n >= LITEVM_MAX_VCPUS){
-		printk("%d is out of range; LITEVM_MAX_VCPUS is %d", n, LITEVM_MAX_VCPUS);
-		error("%d is out of range; LITEVM_MAX_VCPUS is %d", n, LITEVM_MAX_VCPUS);
+	if (n < 0 || n >= LITEVM_MAX_VCPUS) {
+		printk("%d is out of range; LITEVM_MAX_VCPUS is %d", n,
+			   LITEVM_MAX_VCPUS);
+		error("%d is out of range; LITEVM_MAX_VCPUS is %d", n,
+			  LITEVM_MAX_VCPUS);
 	}
 
 	vcpu = &litevm->vcpus[n];
@@ -1540,14 +1508,14 @@ int vmx_create_vcpu(struct litevm *litevm, int n)
 	/* I'm a bad person */
 	//ALIGN(vcpu->fx_buf, FX_IMAGE_ALIGN);
 	uint64_t a = (uint64_t) vcpu->fx_buf;
-	a += FX_IMAGE_ALIGN-1;
+	a += FX_IMAGE_ALIGN - 1;
 	a /= FX_IMAGE_ALIGN;
 	a *= FX_IMAGE_ALIGN;
 
-	vcpu->host_fx_image = (char*)a;
+	vcpu->host_fx_image = (char *)a;
 	vcpu->guest_fx_image = vcpu->host_fx_image + FX_IMAGE_SIZE;
 
-	vcpu->cpu = -1;  /* First load will set up TR */
+	vcpu->cpu = -1;	/* First load will set up TR */
 	vcpu->litevm = litevm;
 
 	vmcs = alloc_vmcs();
@@ -1566,8 +1534,8 @@ int vmx_create_vcpu(struct litevm *litevm, int n)
 	__vcpu_load(vcpu);
 
 	printk("PAST vcpu_load\n");
-	#warning unmatched waserror!
-	if (waserror()){
+#warning unmatched waserror!
+	if (waserror()) {
 		/* we really need to fix waserror() */
 		poperror();
 		goto out_free_vcpus;
@@ -1579,8 +1547,8 @@ int vmx_create_vcpu(struct litevm *litevm, int n)
 
 	printk("r is %d\n", r);
 
-	if (! r) {
-		
+	if (!r) {
+
 		print_func_exit();
 		return 0;
 	}
@@ -1603,7 +1571,7 @@ out:
  * Discontiguous memory is allowed, mostly for framebuffers.
  */
 int vm_set_memory_region(struct litevm *litevm,
-					   struct litevm_memory_region *mem)
+						 struct litevm_memory_region *mem)
 {
 	print_func_entry();
 	ERRSTACK(2);
@@ -1619,7 +1587,7 @@ int vm_set_memory_region(struct litevm *litevm,
 
 	printk("litevm %p\n", litevm);
 	/* should not happen but ... */
-	if (! litevm)
+	if (!litevm)
 		error("NULL litevm in %s", __func__);
 
 	if (!mem)
@@ -1632,12 +1600,13 @@ int vm_set_memory_region(struct litevm *litevm,
 	if (mem->memory_size & (PAGE_SIZE - 1))
 		error("mem->memory_size %lld is not page-aligned", mem->memory_size);
 	if (mem->guest_phys_addr & (PAGE_SIZE - 1))
-		error("guest_phys_addr 0x%llx is not page-aligned", mem->guest_phys_addr);
+		error("guest_phys_addr 0x%llx is not page-aligned",
+			  mem->guest_phys_addr);
 	if (mem->slot >= LITEVM_MEMORY_SLOTS)
 		error("Slot %d is >= %d", mem->slot, LITEVM_MEMORY_SLOTS);
 	if (mem->guest_phys_addr + mem->memory_size < mem->guest_phys_addr)
-		error("0x%x + 0x%x is < 0x%x", 
-		      mem->guest_phys_addr, mem->memory_size, mem->guest_phys_addr);
+		error("0x%x + 0x%x is < 0x%x",
+			  mem->guest_phys_addr, mem->memory_size, mem->guest_phys_addr);
 
 	memslot = &litevm->memslots[mem->slot];
 	base_gfn = mem->guest_phys_addr >> PAGE_SHIFT;
@@ -1656,11 +1625,11 @@ raced:
 	spin_lock_irqsave(&litevm->lock);
 	printk("locked\n");
 
-	if (waserror()){
+	if (waserror()) {
 		spin_unlock(&litevm->lock);
 		nexterror();
 	}
-		
+
 	memory_config_version = litevm->memory_config_version;
 	new = old = *memslot;
 
@@ -1672,7 +1641,7 @@ raced:
 	r = -EINVAL;
 	if (npages && old.npages && npages != old.npages)
 		error("npages is %d, old.npages is %d, can't change",
-		      npages, old.npages);
+			  npages, old.npages);
 
 	/* Check for overlaps */
 	r = -EEXIST;
@@ -1682,7 +1651,7 @@ raced:
 		if (s == memslot)
 			continue;
 		if (!((base_gfn + npages <= s->base_gfn) ||
-		      (base_gfn >= s->base_gfn + s->npages)))
+			  (base_gfn >= s->base_gfn + s->npages)))
 			error("Overlap");
 	}
 	/*
@@ -1715,9 +1684,9 @@ raced:
 			ret = kpage_alloc(&new.phys_mem[i]);
 			if (ret != ESUCCESS)
 				goto out_free;
-			if (init_data){
+			if (init_data) {
 				printk("init data memcpy(%p,%p,4096);\n",
-				       page2kva(new.phys_mem[i]), init_data);
+					   page2kva(new.phys_mem[i]), init_data);
 				memcpy(page2kva(new.phys_mem[i]), init_data, PAGE_SIZE);
 				init_data += PAGE_SIZE;
 			}
@@ -1726,11 +1695,13 @@ raced:
 
 	/* Allocate page dirty bitmap if needed */
 	if ((new.flags & LITEVM_MEM_LOG_DIRTY_PAGES) && !new.dirty_bitmap) {
-		unsigned dirty_bytes;//ALIGN(npages, BITS_PER_LONG) / 8;
-		dirty_bytes = (((npages + BITS_PER_LONG-1)/BITS_PER_LONG)*BITS_PER_LONG)/8;
+		unsigned dirty_bytes;	//ALIGN(npages, BITS_PER_LONG) / 8;
+		dirty_bytes =
+			(((npages + BITS_PER_LONG -
+			   1) / BITS_PER_LONG) * BITS_PER_LONG) / 8;
 
 		new.dirty_bitmap = kzmalloc(dirty_bytes, KMALLOC_WAIT);
-		if (!new.dirty_bitmap){
+		if (!new.dirty_bitmap) {
 			printk("VM: alloc of %d bytes for map failed\n", dirty_bytes);
 			goto out_free;
 		}
@@ -1746,7 +1717,7 @@ raced:
 	}
 
 	r = -EAGAIN;
-	if (litevm->busy){
+	if (litevm->busy) {
 		printk("BUSY!\n");
 		goto out_unlock;
 	}
@@ -1790,7 +1761,7 @@ out:
  * Get (and clear) the dirty memory log for a memory slot.
  */
 static int litevm_dev_ioctl_get_dirty_log(struct litevm *litevm,
-				       struct litevm_dirty_log *log)
+										  struct litevm_dirty_log *log)
 {
 	struct litevm_memory_slot *memslot;
 	int r, i;
@@ -1822,7 +1793,6 @@ static int litevm_dev_ioctl_get_dirty_log(struct litevm *litevm,
 	r = -EFAULT;
 	if (copy_to_user(log->dirty_bitmap, memslot->dirty_bitmap, n))
 		goto out;
-
 
 	if (any) {
 		spin_lock_irqsave(&litevm->lock);
@@ -1858,7 +1828,7 @@ struct litevm_memory_slot *gfn_to_memslot(struct litevm *litevm, gfn_t gfn)
 		struct litevm_memory_slot *memslot = &litevm->memslots[i];
 
 		if (gfn >= memslot->base_gfn
-		    && gfn < memslot->base_gfn + memslot->npages) {
+			&& gfn < memslot->base_gfn + memslot->npages) {
 			print_func_exit();
 			return memslot;
 		}
@@ -1878,7 +1848,7 @@ void mark_page_dirty(struct litevm *litevm, gfn_t gfn)
 		memslot = &litevm->memslots[i];
 
 		if (gfn >= memslot->base_gfn
-		    && gfn < memslot->base_gfn + memslot->npages) {
+			&& gfn < memslot->base_gfn + memslot->npages) {
 
 			if (!memslot || !memslot->dirty_bitmap) {
 				print_func_exit();
@@ -1913,15 +1883,13 @@ static void skip_emulated_instruction(struct litevm_vcpu *vcpu)
 	 */
 	interruptibility = vmcs_read32(GUEST_INTERRUPTIBILITY_INFO);
 	if (interruptibility & 3)
-		vmcs_write32(GUEST_INTERRUPTIBILITY_INFO,
-			     interruptibility & ~3);
+		vmcs_write32(GUEST_INTERRUPTIBILITY_INFO, interruptibility & ~3);
 	print_func_exit();
 }
 
 static int emulator_read_std(unsigned long addr,
-			     unsigned long *val,
-			     unsigned int bytes,
-			     struct x86_emulate_ctxt *ctxt)
+							 unsigned long *val,
+							 unsigned int bytes, struct x86_emulate_ctxt *ctxt)
 {
 	print_func_entry();
 	struct litevm_vcpu *vcpu = ctxt->vcpu;
@@ -1929,8 +1897,8 @@ static int emulator_read_std(unsigned long addr,
 
 	while (bytes) {
 		gpa_t gpa = vcpu->mmu.gva_to_gpa(vcpu, addr);
-		unsigned offset = addr & (PAGE_SIZE-1);
-		unsigned tocopy = bytes < (unsigned)PAGE_SIZE - offset ? 
+		unsigned offset = addr & (PAGE_SIZE - 1);
+		unsigned tocopy = bytes < (unsigned)PAGE_SIZE - offset ?
 			bytes : (unsigned)PAGE_SIZE - offset;
 		unsigned long pfn;
 		struct litevm_memory_slot *memslot;
@@ -1960,21 +1928,19 @@ static int emulator_read_std(unsigned long addr,
 }
 
 static int emulator_write_std(unsigned long addr,
-			      unsigned long val,
-			      unsigned int bytes,
-			      struct x86_emulate_ctxt *ctxt)
+							  unsigned long val,
+							  unsigned int bytes, struct x86_emulate_ctxt *ctxt)
 {
 	print_func_entry();
-	printk("emulator_write_std: addr %lx n %d\n",
-	       addr, bytes);
+	printk("emulator_write_std: addr %lx n %d\n", addr, bytes);
 	print_func_exit();
 	return X86EMUL_UNHANDLEABLE;
 }
 
 static int emulator_read_emulated(unsigned long addr,
-				  unsigned long *val,
-				  unsigned int bytes,
-				  struct x86_emulate_ctxt *ctxt)
+								  unsigned long *val,
+								  unsigned int bytes,
+								  struct x86_emulate_ctxt *ctxt)
 {
 	print_func_entry();
 	struct litevm_vcpu *vcpu = ctxt->vcpu;
@@ -1985,11 +1951,10 @@ static int emulator_read_emulated(unsigned long addr,
 		print_func_exit();
 		return X86EMUL_CONTINUE;
 	} else if (emulator_read_std(addr, val, bytes, ctxt)
-		   == X86EMUL_CONTINUE) {
+			   == X86EMUL_CONTINUE) {
 		print_func_exit();
 		return X86EMUL_CONTINUE;
-	}
-	else {
+	} else {
 		gpa_t gpa = vcpu->mmu.gva_to_gpa(vcpu, addr);
 		if (gpa == UNMAPPED_GVA) {
 			print_func_exit();
@@ -2006,9 +1971,9 @@ static int emulator_read_emulated(unsigned long addr,
 }
 
 static int emulator_write_emulated(unsigned long addr,
-				   unsigned long val,
-				   unsigned int bytes,
-				   struct x86_emulate_ctxt *ctxt)
+								   unsigned long val,
+								   unsigned int bytes,
+								   struct x86_emulate_ctxt *ctxt)
 {
 	print_func_entry();
 	struct litevm_vcpu *vcpu = ctxt->vcpu;
@@ -2030,10 +1995,10 @@ static int emulator_write_emulated(unsigned long addr,
 }
 
 static int emulator_cmpxchg_emulated(unsigned long addr,
-				     unsigned long old,
-				     unsigned long new,
-				     unsigned int bytes,
-				     struct x86_emulate_ctxt *ctxt)
+									 unsigned long old,
+									 unsigned long new,
+									 unsigned int bytes,
+									 struct x86_emulate_ctxt *ctxt)
 {
 	print_func_entry();
 	static int reported;
@@ -2062,30 +2027,29 @@ static void report_emulation_failure(struct x86_emulate_ctxt *ctxt)
 	emulator_read_std(rip_linear, (void *)opcodes, 4, ctxt);
 
 	printk("emulation failed but !mmio_needed?"
-	       " rip %lx %02x %02x %02x %02x\n",
-	       rip, opcodes[0], opcodes[1], opcodes[2], opcodes[3]);
+		   " rip %lx %02x %02x %02x %02x\n",
+		   rip, opcodes[0], opcodes[1], opcodes[2], opcodes[3]);
 	reported = 1;
 	print_func_exit();
 }
 
 struct x86_emulate_ops emulate_ops = {
-	.read_std            = emulator_read_std,
-	.write_std           = emulator_write_std,
-	.read_emulated       = emulator_read_emulated,
-	.write_emulated      = emulator_write_emulated,
-	.cmpxchg_emulated    = emulator_cmpxchg_emulated,
+	.read_std = emulator_read_std,
+	.write_std = emulator_write_std,
+	.read_emulated = emulator_read_emulated,
+	.write_emulated = emulator_write_emulated,
+	.cmpxchg_emulated = emulator_cmpxchg_emulated,
 };
 
 enum emulation_result {
-	EMULATE_DONE,       /* no further processing */
-	EMULATE_DO_MMIO,      /* litevm_run filled with mmio request */
-	EMULATE_FAIL,         /* can't emulate this instruction */
+	EMULATE_DONE,				/* no further processing */
+	EMULATE_DO_MMIO,			/* litevm_run filled with mmio request */
+	EMULATE_FAIL,				/* can't emulate this instruction */
 };
 
 static int emulate_instruction(struct litevm_vcpu *vcpu,
-			       struct litevm_run *run,
-			       unsigned long cr2,
-			       uint16_t error_code)
+							   struct litevm_run *run,
+							   unsigned long cr2, uint16_t error_code)
 {
 	print_func_entry();
 	struct x86_emulate_ctxt emulate_ctxt;
@@ -2101,7 +2065,7 @@ static int emulate_instruction(struct litevm_vcpu *vcpu,
 	emulate_ctxt.cr2 = cr2;
 	emulate_ctxt.mode = (emulate_ctxt.eflags & X86_EFLAGS_VM)
 		? X86EMUL_MODE_REAL : (cs_ar & AR_L_MASK)
-		? X86EMUL_MODE_PROT64 :	(cs_ar & AR_DB_MASK)
+		? X86EMUL_MODE_PROT64 : (cs_ar & AR_DB_MASK)
 		? X86EMUL_MODE_PROT32 : X86EMUL_MODE_PROT16;
 
 	if (emulate_ctxt.mode == X86EMUL_MODE_PROT64) {
@@ -2176,7 +2140,7 @@ void realmode_lidt(struct litevm_vcpu *vcpu, uint16_t limit, unsigned long base)
 }
 
 void realmode_lmsw(struct litevm_vcpu *vcpu, unsigned long msw,
-		   unsigned long *rflags)
+				   unsigned long *rflags)
 {
 	print_func_entry();
 	lmsw(vcpu, msw);
@@ -2188,51 +2152,51 @@ unsigned long realmode_get_cr(struct litevm_vcpu *vcpu, int cr)
 {
 	print_func_entry();
 	switch (cr) {
-	case 0:
-		print_func_exit();
-		return guest_cr0();
-	case 2:
-		print_func_exit();
-		return vcpu->cr2;
-	case 3:
-		print_func_exit();
-		return vcpu->cr3;
-	case 4:
-		print_func_exit();
-		return guest_cr4();
-	default:
-		vcpu_printf(vcpu, "%s: unexpected cr %u\n", __FUNCTION__, cr);
-		print_func_exit();
-		return 0;
+		case 0:
+			print_func_exit();
+			return guest_cr0();
+		case 2:
+			print_func_exit();
+			return vcpu->cr2;
+		case 3:
+			print_func_exit();
+			return vcpu->cr3;
+		case 4:
+			print_func_exit();
+			return guest_cr4();
+		default:
+			vcpu_printf(vcpu, "%s: unexpected cr %u\n", __FUNCTION__, cr);
+			print_func_exit();
+			return 0;
 	}
 }
 
 void realmode_set_cr(struct litevm_vcpu *vcpu, int cr, unsigned long val,
-		     unsigned long *rflags)
+					 unsigned long *rflags)
 {
 	print_func_entry();
 	switch (cr) {
-	case 0:
-		set_cr0(vcpu, mk_cr_64(guest_cr0(), val));
-		*rflags = vmcs_readl(GUEST_RFLAGS);
-		break;
-	case 2:
-		vcpu->cr2 = val;
-		break;
-	case 3:
-		set_cr3(vcpu, val);
-		break;
-	case 4:
-		set_cr4(vcpu, mk_cr_64(guest_cr4(), val));
-		break;
-	default:
-		vcpu_printf(vcpu, "%s: unexpected cr %u\n", __FUNCTION__, cr);
+		case 0:
+			set_cr0(vcpu, mk_cr_64(guest_cr0(), val));
+			*rflags = vmcs_readl(GUEST_RFLAGS);
+			break;
+		case 2:
+			vcpu->cr2 = val;
+			break;
+		case 3:
+			set_cr3(vcpu, val);
+			break;
+		case 4:
+			set_cr4(vcpu, mk_cr_64(guest_cr4(), val));
+			break;
+		default:
+			vcpu_printf(vcpu, "%s: unexpected cr %u\n", __FUNCTION__, cr);
 	}
 	print_func_exit();
 }
 
 static int handle_rmode_exception(struct litevm_vcpu *vcpu,
-				  int vec, uint32_t err_code)
+								  int vec, uint32_t err_code)
 {
 	print_func_entry();
 	if (!vcpu->rmode.active) {
@@ -2249,7 +2213,8 @@ static int handle_rmode_exception(struct litevm_vcpu *vcpu,
 	return 0;
 }
 
-static int handle_exception(struct litevm_vcpu *vcpu, struct litevm_run *litevm_run)
+static int handle_exception(struct litevm_vcpu *vcpu,
+							struct litevm_run *litevm_run)
 {
 	print_func_entry();
 	uint32_t intr_info, error_code;
@@ -2260,20 +2225,20 @@ static int handle_exception(struct litevm_vcpu *vcpu, struct litevm_run *litevm_
 	vect_info = vmcs_read32(IDT_VECTORING_INFO_FIELD);
 	intr_info = vmcs_read32(VM_EXIT_INTR_INFO);
 
-	if ((vect_info & VECTORING_INFO_VALID_MASK) &&
-						!is_page_fault(intr_info)) {
+	if ((vect_info & VECTORING_INFO_VALID_MASK) && !is_page_fault(intr_info)) {
 		printk("%s: unexpected, vectoring info 0x%x "
-		       "intr info 0x%x\n", __FUNCTION__, vect_info, intr_info);
+			   "intr info 0x%x\n", __FUNCTION__, vect_info, intr_info);
 	}
 
 	if (is_external_interrupt(vect_info)) {
 		int irq = vect_info & VECTORING_INFO_VECTOR_MASK;
-		SET_BITMASK_BIT_ATOMIC(((uint8_t *)&vcpu->irq_pending), irq);
-		SET_BITMASK_BIT_ATOMIC(((uint8_t *)&vcpu->irq_summary), irq / BITS_PER_LONG);
+		SET_BITMASK_BIT_ATOMIC(((uint8_t *) & vcpu->irq_pending), irq);
+		SET_BITMASK_BIT_ATOMIC(((uint8_t *) & vcpu->irq_summary),
+							   irq / BITS_PER_LONG);
 	}
 
-	if ((intr_info & INTR_INFO_INTR_TYPE_MASK) == 0x200) { /* nmi */
-		asm ("int $2");
+	if ((intr_info & INTR_INFO_INTR_TYPE_MASK) == 0x200) {	/* nmi */
+		asm("int $2");
 		print_func_exit();
 		return 1;
 	}
@@ -2295,30 +2260,31 @@ static int handle_exception(struct litevm_vcpu *vcpu, struct litevm_run *litevm_
 		spin_unlock(&vcpu->litevm->lock);
 
 		switch (er) {
-		case EMULATE_DONE:
-			print_func_exit();
-			return 1;
-		case EMULATE_DO_MMIO:
-			++litevm_stat.mmio_exits;
-			litevm_run->exit_reason = LITEVM_EXIT_MMIO;
-			print_func_exit();
-			return 0;
-		 case EMULATE_FAIL:
-			vcpu_printf(vcpu, "%s: emulate fail\n", __FUNCTION__);
-			break;
-		default:
-			assert(0);
+			case EMULATE_DONE:
+				print_func_exit();
+				return 1;
+			case EMULATE_DO_MMIO:
+				++litevm_stat.mmio_exits;
+				litevm_run->exit_reason = LITEVM_EXIT_MMIO;
+				print_func_exit();
+				return 0;
+			case EMULATE_FAIL:
+				vcpu_printf(vcpu, "%s: emulate fail\n", __FUNCTION__);
+				break;
+			default:
+				assert(0);
 		}
 	}
 
 	if (vcpu->rmode.active &&
-	    handle_rmode_exception(vcpu, intr_info & INTR_INFO_VECTOR_MASK,
-								error_code)) {
-	    	print_func_exit();
-		    return 1;
-	    }
+		handle_rmode_exception(vcpu, intr_info & INTR_INFO_VECTOR_MASK,
+							   error_code)) {
+		print_func_exit();
+		return 1;
+	}
 
-	if ((intr_info & (INTR_INFO_INTR_TYPE_MASK | INTR_INFO_VECTOR_MASK)) == (INTR_TYPE_EXCEPTION | 1)) {
+	if ((intr_info & (INTR_INFO_INTR_TYPE_MASK | INTR_INFO_VECTOR_MASK)) ==
+		(INTR_TYPE_EXCEPTION | 1)) {
 		litevm_run->exit_reason = LITEVM_EXIT_DEBUG;
 		print_func_exit();
 		return 0;
@@ -2331,7 +2297,7 @@ static int handle_exception(struct litevm_vcpu *vcpu, struct litevm_run *litevm_
 }
 
 static int handle_external_interrupt(struct litevm_vcpu *vcpu,
-				     struct litevm_run *litevm_run)
+									 struct litevm_run *litevm_run)
 {
 	print_func_entry();
 	++litevm_stat.irq_exits;
@@ -2339,8 +2305,7 @@ static int handle_external_interrupt(struct litevm_vcpu *vcpu,
 	return 1;
 }
 
-
-static int get_io_count(struct litevm_vcpu *vcpu, uint64_t *count)
+static int get_io_count(struct litevm_vcpu *vcpu, uint64_t * count)
 {
 	print_func_entry();
 	uint64_t inst;
@@ -2353,33 +2318,32 @@ static int get_io_count(struct litevm_vcpu *vcpu, uint64_t *count)
 	} else {
 		uint32_t cs_ar = vmcs_read32(GUEST_CS_AR_BYTES);
 
-		countr_size = (cs_ar & AR_L_MASK) ? 8:
-			      (cs_ar & AR_DB_MASK) ? 4: 2;
+		countr_size = (cs_ar & AR_L_MASK) ? 8 : (cs_ar & AR_DB_MASK) ? 4 : 2;
 	}
 
-	rip =  vmcs_readl(GUEST_RIP);
+	rip = vmcs_readl(GUEST_RIP);
 	if (countr_size != 8)
 		rip += vmcs_readl(GUEST_CS_BASE);
 
 	n = litevm_read_guest(vcpu, rip, sizeof(inst), &inst);
 
 	for (i = 0; i < n; i++) {
-		switch (((uint8_t*)&inst)[i]) {
-		case 0xf0:
-		case 0xf2:
-		case 0xf3:
-		case 0x2e:
-		case 0x36:
-		case 0x3e:
-		case 0x26:
-		case 0x64:
-		case 0x65:
-		case 0x66:
-			break;
-		case 0x67:
-			countr_size = (countr_size == 2) ? 4: (countr_size >> 1);
-		default:
-			goto done;
+		switch (((uint8_t *) & inst)[i]) {
+			case 0xf0:
+			case 0xf2:
+			case 0xf3:
+			case 0x2e:
+			case 0x36:
+			case 0x3e:
+			case 0x26:
+			case 0x64:
+			case 0x65:
+			case 0x66:
+				break;
+			case 0x67:
+				countr_size = (countr_size == 2) ? 4 : (countr_size >> 1);
+			default:
+				goto done;
 		}
 	}
 	print_func_exit();
@@ -2416,12 +2380,13 @@ static int handle_io(struct litevm_vcpu *vcpu, struct litevm_run *litevm_run)
 		}
 		litevm_run->io.address = vmcs_readl(GUEST_LINEAR_ADDRESS);
 	} else
-		litevm_run->io.value = vcpu->regs[VCPU_REGS_RAX]; /* rax */
+		litevm_run->io.value = vcpu->regs[VCPU_REGS_RAX];	/* rax */
 	print_func_exit();
 	return 0;
 }
 
-static int handle_invlpg(struct litevm_vcpu *vcpu, struct litevm_run *litevm_run)
+static int handle_invlpg(struct litevm_vcpu *vcpu,
+						 struct litevm_run *litevm_run)
 {
 	print_func_entry();
 	uint64_t address = vmcs_read64(EXIT_QUALIFICATION);
@@ -2454,66 +2419,65 @@ static int handle_cr(struct litevm_vcpu *vcpu, struct litevm_run *litevm_run)
 	cr = exit_qualification & 15;
 	reg = (exit_qualification >> 8) & 15;
 	switch ((exit_qualification >> 4) & 3) {
-	case 0: /* mov to cr */
-		switch (cr) {
-		case 0:
-			vcpu_load_rsp_rip(vcpu);
-			set_cr0(vcpu, vcpu->regs[reg]);
-			skip_emulated_instruction(vcpu);
-			print_func_exit();
-			return 1;
-		case 3:
-			vcpu_load_rsp_rip(vcpu);
-			set_cr3(vcpu, vcpu->regs[reg]);
-			skip_emulated_instruction(vcpu);
-			print_func_exit();
-			return 1;
-		case 4:
-			vcpu_load_rsp_rip(vcpu);
-			set_cr4(vcpu, vcpu->regs[reg]);
-			skip_emulated_instruction(vcpu);
-			print_func_exit();
-			return 1;
-		case 8:
-			vcpu_load_rsp_rip(vcpu);
-			set_cr8(vcpu, vcpu->regs[reg]);
-			skip_emulated_instruction(vcpu);
-			print_func_exit();
-			return 1;
-		};
-		break;
-	case 1: /*mov from cr*/
-		switch (cr) {
-		case 3:
-			vcpu_load_rsp_rip(vcpu);
-			vcpu->regs[reg] = vcpu->cr3;
-			vcpu_put_rsp_rip(vcpu);
-			skip_emulated_instruction(vcpu);
-			print_func_exit();
-			return 1;
-		case 8:
-			printd("handle_cr: read CR8 "
-			       "cpu erratum AA15\n");
-			vcpu_load_rsp_rip(vcpu);
-			vcpu->regs[reg] = vcpu->cr8;
-			vcpu_put_rsp_rip(vcpu);
-			skip_emulated_instruction(vcpu);
-			print_func_exit();
-			return 1;
-		}
-		break;
-	case 3: /* lmsw */
-		lmsw(vcpu, (exit_qualification >> LMSW_SOURCE_DATA_SHIFT) & 0x0f);
+		case 0:	/* mov to cr */
+			switch (cr) {
+				case 0:
+					vcpu_load_rsp_rip(vcpu);
+					set_cr0(vcpu, vcpu->regs[reg]);
+					skip_emulated_instruction(vcpu);
+					print_func_exit();
+					return 1;
+				case 3:
+					vcpu_load_rsp_rip(vcpu);
+					set_cr3(vcpu, vcpu->regs[reg]);
+					skip_emulated_instruction(vcpu);
+					print_func_exit();
+					return 1;
+				case 4:
+					vcpu_load_rsp_rip(vcpu);
+					set_cr4(vcpu, vcpu->regs[reg]);
+					skip_emulated_instruction(vcpu);
+					print_func_exit();
+					return 1;
+				case 8:
+					vcpu_load_rsp_rip(vcpu);
+					set_cr8(vcpu, vcpu->regs[reg]);
+					skip_emulated_instruction(vcpu);
+					print_func_exit();
+					return 1;
+			};
+			break;
+		case 1:	/*mov from cr */
+			switch (cr) {
+				case 3:
+					vcpu_load_rsp_rip(vcpu);
+					vcpu->regs[reg] = vcpu->cr3;
+					vcpu_put_rsp_rip(vcpu);
+					skip_emulated_instruction(vcpu);
+					print_func_exit();
+					return 1;
+				case 8:
+					printd("handle_cr: read CR8 " "cpu erratum AA15\n");
+					vcpu_load_rsp_rip(vcpu);
+					vcpu->regs[reg] = vcpu->cr8;
+					vcpu_put_rsp_rip(vcpu);
+					skip_emulated_instruction(vcpu);
+					print_func_exit();
+					return 1;
+			}
+			break;
+		case 3:	/* lmsw */
+			lmsw(vcpu, (exit_qualification >> LMSW_SOURCE_DATA_SHIFT) & 0x0f);
 
-		skip_emulated_instruction(vcpu);
-		print_func_exit();
-		return 1;
-	default:
-		break;
+			skip_emulated_instruction(vcpu);
+			print_func_exit();
+			return 1;
+		default:
+			break;
 	}
 	litevm_run->exit_reason = 0;
 	printk("litevm: unhandled control register: op %d cr %d\n",
-	       (int)(exit_qualification >> 4) & 3, cr);
+		   (int)(exit_qualification >> 4) & 3, cr);
 	print_func_exit();
 	return 0;
 }
@@ -2536,14 +2500,14 @@ static int handle_dr(struct litevm_vcpu *vcpu, struct litevm_run *litevm_run)
 	if (exit_qualification & 16) {
 		/* mov from dr */
 		switch (dr) {
-		case 6:
-			val = 0xffff0ff0;
-			break;
-		case 7:
-			val = 0x400;
-			break;
-		default:
-			val = 0;
+			case 6:
+				val = 0xffff0ff0;
+				break;
+			case 7:
+				val = 0x400;
+				break;
+			default:
+				val = 0;
 		}
 		vcpu->regs[reg] = val;
 	} else {
@@ -2578,47 +2542,47 @@ static int handle_rdmsr(struct litevm_vcpu *vcpu, struct litevm_run *litevm_run)
 	}
 
 	switch (ecx) {
-	case MSR_FS_BASE:
-		data = vmcs_readl(GUEST_FS_BASE);
-		break;
-	case MSR_GS_BASE:
-		data = vmcs_readl(GUEST_GS_BASE);
-		break;
-	case MSR_IA32_SYSENTER_CS:
-		data = vmcs_read32(GUEST_SYSENTER_CS);
-		break;
-	case MSR_IA32_SYSENTER_EIP:
-		data = vmcs_read32(GUEST_SYSENTER_EIP);
-		break;
-	case MSR_IA32_SYSENTER_ESP:
-		data = vmcs_read32(GUEST_SYSENTER_ESP);
-		break;
-	case MSR_IA32_MC0_CTL:
-	case MSR_IA32_MCG_STATUS:
-	case MSR_IA32_MCG_CAP:
-	case MSR_IA32_MC0_MISC:
-	case MSR_IA32_MC0_MISC+4:
-	case MSR_IA32_MC0_MISC+8:
-	case MSR_IA32_MC0_MISC+12:
-	case MSR_IA32_MC0_MISC+16:
-	case MSR_IA32_UCODE_REV:
-		/* MTRR registers */
-	case 0xfe:
-	case 0x200 ... 0x2ff:
-		data = 0;
-		break;
-	case MSR_IA32_APICBASE:
-		data = vcpu->apic_base;
-		break;
-	default:
-		if (msr) {
-			data = msr->data;
+		case MSR_FS_BASE:
+			data = vmcs_readl(GUEST_FS_BASE);
 			break;
-		}
-		printk("litevm: unhandled rdmsr: %x\n", ecx);
-		inject_gp(vcpu);
-		print_func_exit();
-		return 1;
+		case MSR_GS_BASE:
+			data = vmcs_readl(GUEST_GS_BASE);
+			break;
+		case MSR_IA32_SYSENTER_CS:
+			data = vmcs_read32(GUEST_SYSENTER_CS);
+			break;
+		case MSR_IA32_SYSENTER_EIP:
+			data = vmcs_read32(GUEST_SYSENTER_EIP);
+			break;
+		case MSR_IA32_SYSENTER_ESP:
+			data = vmcs_read32(GUEST_SYSENTER_ESP);
+			break;
+		case MSR_IA32_MC0_CTL:
+		case MSR_IA32_MCG_STATUS:
+		case MSR_IA32_MCG_CAP:
+		case MSR_IA32_MC0_MISC:
+		case MSR_IA32_MC0_MISC + 4:
+		case MSR_IA32_MC0_MISC + 8:
+		case MSR_IA32_MC0_MISC + 12:
+		case MSR_IA32_MC0_MISC + 16:
+		case MSR_IA32_UCODE_REV:
+			/* MTRR registers */
+		case 0xfe:
+		case 0x200 ... 0x2ff:
+			data = 0;
+			break;
+		case MSR_IA32_APICBASE:
+			data = vcpu->apic_base;
+			break;
+		default:
+			if (msr) {
+				data = msr->data;
+				break;
+			}
+			printk("litevm: unhandled rdmsr: %x\n", ecx);
+			inject_gp(vcpu);
+			print_func_exit();
+			return 1;
 	}
 
 	/* FIXME: handling of bits 32:63 of rax, rdx */
@@ -2637,8 +2601,7 @@ static void set_efer(struct litevm_vcpu *vcpu, uint64_t efer)
 	struct vmx_msr_entry *msr;
 
 	if (efer & EFER_RESERVED_BITS) {
-		printd("set_efer: 0x%llx #GP, reserved bits\n",
-		       efer);
+		printd("set_efer: 0x%llx #GP, reserved bits\n", efer);
 		inject_gp(vcpu);
 		print_func_exit();
 		return;
@@ -2659,7 +2622,7 @@ static void set_efer(struct litevm_vcpu *vcpu, uint64_t efer)
 	msr = find_msr_entry(vcpu, MSR_EFER);
 
 	if (!(efer & EFER_LMA))
-	    efer &= ~EFER_LME;
+		efer &= ~EFER_LME;
 	msr->data = efer;
 	skip_emulated_instruction(vcpu);
 	print_func_exit();
@@ -2675,7 +2638,7 @@ static int handle_wrmsr(struct litevm_vcpu *vcpu, struct litevm_run *litevm_run)
 	uint32_t ecx = vcpu->regs[VCPU_REGS_RCX];
 	struct vmx_msr_entry *msr;
 	uint64_t data = (vcpu->regs[VCPU_REGS_RAX] & -1u)
-		| ((uint64_t)(vcpu->regs[VCPU_REGS_RDX] & -1u) << 32);
+		| ((uint64_t) (vcpu->regs[VCPU_REGS_RDX] & -1u) << 32);
 
 	if (guest_cpl() != 0) {
 		vcpu_printf(vcpu, "%s: not supervisor\n", __FUNCTION__);
@@ -2685,53 +2648,52 @@ static int handle_wrmsr(struct litevm_vcpu *vcpu, struct litevm_run *litevm_run)
 	}
 
 	switch (ecx) {
-	case MSR_FS_BASE:
-		vmcs_writel(GUEST_FS_BASE, data);
-		break;
-	case MSR_GS_BASE:
-		vmcs_writel(GUEST_GS_BASE, data);
-		break;
-	case MSR_IA32_SYSENTER_CS:
-		vmcs_write32(GUEST_SYSENTER_CS, data);
-		break;
-	case MSR_IA32_SYSENTER_EIP:
-		vmcs_write32(GUEST_SYSENTER_EIP, data);
-		break;
-	case MSR_IA32_SYSENTER_ESP:
-		vmcs_write32(GUEST_SYSENTER_ESP, data);
-		break;
-	case MSR_EFER:
-		set_efer(vcpu, data);
-		print_func_exit();
-		return 1;
-	case MSR_IA32_MC0_STATUS:
-		printk("%s: MSR_IA32_MC0_STATUS 0x%llx, nop\n"
-			    , __FUNCTION__, data);
-		break;
-	case MSR_IA32_TIME_STAMP_COUNTER: {
-		uint64_t tsc;
-		
-		tsc = read_tsc();
-		vmcs_write64(TSC_OFFSET, data - tsc);
-		break;
-	}
-	case MSR_IA32_UCODE_REV:
-	case MSR_IA32_UCODE_WRITE:
-	case 0x200 ... 0x2ff: /* MTRRs */
-		break;
-	case MSR_IA32_APICBASE:
-		vcpu->apic_base = data;
-		break;
-	default:
-		msr = find_msr_entry(vcpu, ecx);
-		if (msr) {
-			msr->data = data;
+		case MSR_FS_BASE:
+			vmcs_writel(GUEST_FS_BASE, data);
 			break;
-		}
-		printk("litevm: unhandled wrmsr: %x\n", ecx);
-		inject_gp(vcpu);
-		print_func_exit();
-		return 1;
+		case MSR_GS_BASE:
+			vmcs_writel(GUEST_GS_BASE, data);
+			break;
+		case MSR_IA32_SYSENTER_CS:
+			vmcs_write32(GUEST_SYSENTER_CS, data);
+			break;
+		case MSR_IA32_SYSENTER_EIP:
+			vmcs_write32(GUEST_SYSENTER_EIP, data);
+			break;
+		case MSR_IA32_SYSENTER_ESP:
+			vmcs_write32(GUEST_SYSENTER_ESP, data);
+			break;
+		case MSR_EFER:
+			set_efer(vcpu, data);
+			print_func_exit();
+			return 1;
+		case MSR_IA32_MC0_STATUS:
+			printk("%s: MSR_IA32_MC0_STATUS 0x%llx, nop\n", __FUNCTION__, data);
+			break;
+		case MSR_IA32_TIME_STAMP_COUNTER:{
+				uint64_t tsc;
+
+				tsc = read_tsc();
+				vmcs_write64(TSC_OFFSET, data - tsc);
+				break;
+			}
+		case MSR_IA32_UCODE_REV:
+		case MSR_IA32_UCODE_WRITE:
+		case 0x200 ... 0x2ff:	/* MTRRs */
+			break;
+		case MSR_IA32_APICBASE:
+			vcpu->apic_base = data;
+			break;
+		default:
+			msr = find_msr_entry(vcpu, ecx);
+			if (msr) {
+				msr->data = data;
+				break;
+			}
+			printk("litevm: unhandled wrmsr: %x\n", ecx);
+			inject_gp(vcpu);
+			print_func_exit();
+			return 1;
 	}
 	skip_emulated_instruction(vcpu);
 	print_func_exit();
@@ -2739,13 +2701,13 @@ static int handle_wrmsr(struct litevm_vcpu *vcpu, struct litevm_run *litevm_run)
 }
 
 static int handle_interrupt_window(struct litevm_vcpu *vcpu,
-				   struct litevm_run *litevm_run)
+								   struct litevm_run *litevm_run)
 {
 	print_func_entry();
 	/* Turn off interrupt window reporting. */
 	vmcs_write32(CPU_BASED_VM_EXEC_CONTROL,
-		     vmcs_read32(CPU_BASED_VM_EXEC_CONTROL)
-		     & ~CPU_BASED_VIRTUAL_INTR_PENDING);
+				 vmcs_read32(CPU_BASED_VM_EXEC_CONTROL)
+				 & ~CPU_BASED_VIRTUAL_INTR_PENDING);
 	print_func_exit();
 	return 1;
 }
@@ -2769,20 +2731,19 @@ static int handle_halt(struct litevm_vcpu *vcpu, struct litevm_run *litevm_run)
  * may resume.  Otherwise they set the litevm_run parameter to indicate what needs
  * to be done to userspace and return 0.
  */
-static int (*litevm_vmx_exit_handlers[])(struct litevm_vcpu *vcpu,
-				      struct litevm_run *litevm_run) = {
-	[EXIT_REASON_EXCEPTION_NMI]           = handle_exception,
-	[EXIT_REASON_EXTERNAL_INTERRUPT]      = handle_external_interrupt,
-	[EXIT_REASON_IO_INSTRUCTION]          = handle_io,
-	[EXIT_REASON_INVLPG]                  = handle_invlpg,
-	[EXIT_REASON_CR_ACCESS]               = handle_cr,
-	[EXIT_REASON_DR_ACCESS]               = handle_dr,
-	[EXIT_REASON_CPUID]                   = handle_cpuid,
-	[EXIT_REASON_MSR_READ]                = handle_rdmsr,
-	[EXIT_REASON_MSR_WRITE]               = handle_wrmsr,
-	[EXIT_REASON_PENDING_INTERRUPT]       = handle_interrupt_window,
-	[EXIT_REASON_HLT]                     = handle_halt,
-};
+static int (*litevm_vmx_exit_handlers[]) (struct litevm_vcpu * vcpu,
+										  struct litevm_run * litevm_run) = {
+[EXIT_REASON_EXCEPTION_NMI] = handle_exception,
+		[EXIT_REASON_EXTERNAL_INTERRUPT] = handle_external_interrupt,
+		[EXIT_REASON_IO_INSTRUCTION] = handle_io,
+		[EXIT_REASON_INVLPG] = handle_invlpg,
+		[EXIT_REASON_CR_ACCESS] = handle_cr,
+		[EXIT_REASON_DR_ACCESS] = handle_dr,
+		[EXIT_REASON_CPUID] = handle_cpuid,
+		[EXIT_REASON_MSR_READ] = handle_rdmsr,
+		[EXIT_REASON_MSR_WRITE] = handle_wrmsr,
+		[EXIT_REASON_PENDING_INTERRUPT] = handle_interrupt_window,
+		[EXIT_REASON_HLT] = handle_halt,};
 
 static const int litevm_vmx_max_exit_handlers =
 	sizeof(litevm_vmx_exit_handlers) / sizeof(*litevm_vmx_exit_handlers);
@@ -2791,23 +2752,23 @@ static const int litevm_vmx_max_exit_handlers =
  * The guest has exited.  See if we can fix it or if we need userspace
  * assistance.
  */
-static int litevm_handle_exit(struct litevm_run *litevm_run, struct litevm_vcpu *vcpu)
+static int litevm_handle_exit(struct litevm_run *litevm_run,
+							  struct litevm_vcpu *vcpu)
 {
 	print_func_entry();
 	uint32_t vectoring_info = vmcs_read32(IDT_VECTORING_INFO_FIELD);
 	uint32_t exit_reason = vmcs_read32(VM_EXIT_REASON);
 
-	if ( (vectoring_info & VECTORING_INFO_VALID_MASK) &&
-				exit_reason != EXIT_REASON_EXCEPTION_NMI )
+	if ((vectoring_info & VECTORING_INFO_VALID_MASK) &&
+		exit_reason != EXIT_REASON_EXCEPTION_NMI)
 		printk("%s: unexpected, valid vectoring info and "
-		       "exit reason is 0x%x\n", __FUNCTION__, exit_reason);
+			   "exit reason is 0x%x\n", __FUNCTION__, exit_reason);
 	litevm_run->instruction_length = vmcs_read32(VM_EXIT_INSTRUCTION_LEN);
 	if (exit_reason < litevm_vmx_max_exit_handlers
-	    && litevm_vmx_exit_handlers[exit_reason]) {
+		&& litevm_vmx_exit_handlers[exit_reason]) {
 		print_func_exit();
-		return litevm_vmx_exit_handlers[exit_reason](vcpu, litevm_run);
-	}
-	else {
+		return litevm_vmx_exit_handlers[exit_reason] (vcpu, litevm_run);
+	} else {
 		litevm_run->exit_reason = LITEVM_EXIT_UNKNOWN;
 		litevm_run->hw.hardware_exit_reason = exit_reason;
 	}
@@ -2823,42 +2784,40 @@ static void inject_rmode_irq(struct litevm_vcpu *vcpu, int irq)
 	uint16_t ip;
 	unsigned long flags;
 	unsigned long ss_base = vmcs_readl(GUEST_SS_BASE);
-	uint16_t sp =  vmcs_readl(GUEST_RSP);
+	uint16_t sp = vmcs_readl(GUEST_RSP);
 	uint32_t ss_limit = vmcs_read32(GUEST_SS_LIMIT);
 
 	if (sp > ss_limit || ((sp - 6) > sp)) {
 		vcpu_printf(vcpu, "%s: #SS, rsp 0x%lx ss 0x%lx limit 0x%x\n",
-			    __FUNCTION__,
-			    vmcs_readl(GUEST_RSP),
-			    vmcs_readl(GUEST_SS_BASE),
-			    vmcs_read32(GUEST_SS_LIMIT));
+					__FUNCTION__,
+					vmcs_readl(GUEST_RSP),
+					vmcs_readl(GUEST_SS_BASE), vmcs_read32(GUEST_SS_LIMIT));
 		print_func_exit();
 		return;
 	}
 
 	if (litevm_read_guest(vcpu, irq * sizeof(ent), sizeof(ent), &ent) !=
-								sizeof(ent)) {
+		sizeof(ent)) {
 		//vcpu_printf(vcpu, "%s: read guest err\n", __FUNCTION__);
 		print_func_exit();
 		return;
 	}
 
-	flags =  vmcs_readl(GUEST_RFLAGS);
-	cs =  vmcs_readl(GUEST_CS_BASE) >> 4;
-	ip =  vmcs_readl(GUEST_RIP);
-
+	flags = vmcs_readl(GUEST_RFLAGS);
+	cs = vmcs_readl(GUEST_CS_BASE) >> 4;
+	ip = vmcs_readl(GUEST_RIP);
 
 	if (litevm_write_guest(vcpu, ss_base + sp - 2, 2, &flags) != 2 ||
-	    litevm_write_guest(vcpu, ss_base + sp - 4, 2, &cs) != 2 ||
-	    litevm_write_guest(vcpu, ss_base + sp - 6, 2, &ip) != 2) {
+		litevm_write_guest(vcpu, ss_base + sp - 4, 2, &cs) != 2 ||
+		litevm_write_guest(vcpu, ss_base + sp - 6, 2, &ip) != 2) {
 		//vcpu_printf(vcpu, "%s: write guest err\n", __FUNCTION__);
 		print_func_exit();
 		return;
 	}
 
 	vmcs_writel(GUEST_RFLAGS, flags &
-		    ~( X86_EFLAGS_IF | X86_EFLAGS_AC | X86_EFLAGS_TF));
-	vmcs_write16(GUEST_CS_SELECTOR, ent[1]) ;
+				~(X86_EFLAGS_IF | X86_EFLAGS_AC | X86_EFLAGS_TF));
+	vmcs_write16(GUEST_CS_SELECTOR, ent[1]);
 	vmcs_writel(GUEST_CS_BASE, ent[1] << 4);
 	vmcs_writel(GUEST_RIP, ent[0]);
 	vmcs_writel(GUEST_RSP, (vmcs_readl(GUEST_RSP) & ~0xffff) | (sp - 6));
@@ -2877,7 +2836,7 @@ static void litevm_do_inject_irq(struct litevm_vcpu *vcpu)
 	 */
 	vcpu->irq_pending[word_index] &= ~(1 << bit_index);
 	if (!vcpu->irq_pending[word_index])
-		vcpu->irq_summary &= ~ (1 << word_index);
+		vcpu->irq_summary &= ~(1 << word_index);
 
 	if (vcpu->rmode.active) {
 		inject_rmode_irq(vcpu, irq);
@@ -2885,7 +2844,7 @@ static void litevm_do_inject_irq(struct litevm_vcpu *vcpu)
 		return;
 	}
 	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD,
-			irq | INTR_TYPE_EXT_INTR | INTR_INFO_VALID_MASK);
+				 irq | INTR_TYPE_EXT_INTR | INTR_INFO_VALID_MASK);
 	print_func_exit();
 }
 
@@ -2893,7 +2852,7 @@ static void litevm_try_inject_irq(struct litevm_vcpu *vcpu)
 {
 	print_func_entry();
 	if ((vmcs_readl(GUEST_RFLAGS) & X86_EFLAGS_IF)
-	    && (vmcs_read32(GUEST_INTERRUPTIBILITY_INFO) & 3) == 0)
+		&& (vmcs_read32(GUEST_INTERRUPTIBILITY_INFO) & 3) == 0)
 		/*
 		 * Interrupts enabled, and not blocked by sti or mov ss. Good.
 		 */
@@ -2903,8 +2862,8 @@ static void litevm_try_inject_irq(struct litevm_vcpu *vcpu)
 		 * Interrupts blocked.  Wait for unblock.
 		 */
 		vmcs_write32(CPU_BASED_VM_EXEC_CONTROL,
-			     vmcs_read32(CPU_BASED_VM_EXEC_CONTROL)
-			     | CPU_BASED_VIRTUAL_INTR_PENDING);
+					 vmcs_read32(CPU_BASED_VM_EXEC_CONTROL)
+					 | CPU_BASED_VIRTUAL_INTR_PENDING);
 	print_func_exit();
 }
 
@@ -2961,7 +2920,7 @@ int vm_run(struct litevm *litevm, struct litevm_run *litevm_run)
 
 	if (litevm_run->vcpu < 0 || litevm_run->vcpu >= LITEVM_MAX_VCPUS)
 		error("vcpu is %d but must be in the range %d..%d\n",
-		      litevm_run->vcpu, LITEVM_MAX_VCPUS);
+			  litevm_run->vcpu, LITEVM_MAX_VCPUS);
 
 	vcpu = vcpu_load(litevm, litevm_run->vcpu);
 	if (!vcpu)
@@ -3002,7 +2961,7 @@ again:
 #endif
 
 	if (vcpu->irq_summary &&
-	    !(vmcs_read32(VM_ENTRY_INTR_INFO_FIELD) & INTR_INFO_VALID_MASK))
+		!(vmcs_read32(VM_ENTRY_INTR_INFO_FIELD) & INTR_INFO_VALID_MASK))
 		litevm_try_inject_irq(vcpu);
 
 	if (vcpu->guest_debug.enabled)
@@ -3014,124 +2973,92 @@ again:
 	save_msrs(vcpu->host_msrs, vcpu->nmsrs);
 	load_msrs(vcpu->guest_msrs, NR_BAD_MSRS);
 
-	asm (
-		/* Store host registers */
-		"pushf \n\t"
+	asm(
+		   /* Store host registers */
+		   "pushf \n\t"
 #ifdef __x86_64__
-		"push %%rax; push %%rbx; push %%rdx;"
-		"push %%rsi; push %%rdi; push %%rbp;"
-		"push %%r8;  push %%r9;  push %%r10; push %%r11;"
-		"push %%r12; push %%r13; push %%r14; push %%r15;"
-		"push %%rcx \n\t"
-		"vmwrite %%rsp, %2 \n\t"
+		   "push %%rax; push %%rbx; push %%rdx;"
+		   "push %%rsi; push %%rdi; push %%rbp;"
+		   "push %%r8;  push %%r9;  push %%r10; push %%r11;"
+		   "push %%r12; push %%r13; push %%r14; push %%r15;"
+		   "push %%rcx \n\t" "vmwrite %%rsp, %2 \n\t"
 #else
-		"pusha; push %%ecx \n\t"
-		"vmwrite %%esp, %2 \n\t"
+		   "pusha; push %%ecx \n\t" "vmwrite %%esp, %2 \n\t"
 #endif
-		/* Check if vmlaunch of vmresume is needed */
-		"cmp $0, %1 \n\t"
-		/* Load guest registers.  Don't clobber flags. */
+		   /* Check if vmlaunch of vmresume is needed */
+		   "cmp $0, %1 \n\t"
+		   /* Load guest registers.  Don't clobber flags. */
 #ifdef __x86_64__
-		"mov %c[cr2](%3), %%rax \n\t"
-		"mov %%rax, %%cr2 \n\t"
-		"mov %c[rax](%3), %%rax \n\t"
-		"mov %c[rbx](%3), %%rbx \n\t"
-		"mov %c[rdx](%3), %%rdx \n\t"
-		"mov %c[rsi](%3), %%rsi \n\t"
-		"mov %c[rdi](%3), %%rdi \n\t"
-		"mov %c[rbp](%3), %%rbp \n\t"
-		"mov %c[r8](%3),  %%r8  \n\t"
-		"mov %c[r9](%3),  %%r9  \n\t"
-		"mov %c[r10](%3), %%r10 \n\t"
-		"mov %c[r11](%3), %%r11 \n\t"
-		"mov %c[r12](%3), %%r12 \n\t"
-		"mov %c[r13](%3), %%r13 \n\t"
-		"mov %c[r14](%3), %%r14 \n\t"
-		"mov %c[r15](%3), %%r15 \n\t"
-		"mov %c[rcx](%3), %%rcx \n\t" /* kills %3 (rcx) */
+		   "mov %c[cr2](%3), %%rax \n\t" "mov %%rax, %%cr2 \n\t" "mov %c[rax](%3), %%rax \n\t" "mov %c[rbx](%3), %%rbx \n\t" "mov %c[rdx](%3), %%rdx \n\t" "mov %c[rsi](%3), %%rsi \n\t" "mov %c[rdi](%3), %%rdi \n\t" "mov %c[rbp](%3), %%rbp \n\t" "mov %c[r8](%3),  %%r8  \n\t" "mov %c[r9](%3),  %%r9  \n\t" "mov %c[r10](%3), %%r10 \n\t" "mov %c[r11](%3), %%r11 \n\t" "mov %c[r12](%3), %%r12 \n\t" "mov %c[r13](%3), %%r13 \n\t" "mov %c[r14](%3), %%r14 \n\t" "mov %c[r15](%3), %%r15 \n\t" "mov %c[rcx](%3), %%rcx \n\t"	/* kills %3 (rcx) */
 #else
-		"mov %c[cr2](%3), %%eax \n\t"
-		"mov %%eax,   %%cr2 \n\t"
-		"mov %c[rax](%3), %%eax \n\t"
-		"mov %c[rbx](%3), %%ebx \n\t"
-		"mov %c[rdx](%3), %%edx \n\t"
-		"mov %c[rsi](%3), %%esi \n\t"
-		"mov %c[rdi](%3), %%edi \n\t"
-		"mov %c[rbp](%3), %%ebp \n\t"
-		"mov %c[rcx](%3), %%ecx \n\t" /* kills %3 (ecx) */
+		   "mov %c[cr2](%3), %%eax \n\t" "mov %%eax,   %%cr2 \n\t" "mov %c[rax](%3), %%eax \n\t" "mov %c[rbx](%3), %%ebx \n\t" "mov %c[rdx](%3), %%edx \n\t" "mov %c[rsi](%3), %%esi \n\t" "mov %c[rdi](%3), %%edi \n\t" "mov %c[rbp](%3), %%ebp \n\t" "mov %c[rcx](%3), %%ecx \n\t"	/* kills %3 (ecx) */
 #endif
-		/* Enter guest mode */
-		"jne launched \n\t"
-		"vmlaunch \n\t"
-		"jmp litevm_vmx_return \n\t"
-		"launched: vmresume \n\t"
-		".globl litevm_vmx_return \n\t"
-		"litevm_vmx_return: "
-		/* Save guest registers, load host registers, keep flags */
+		   /* Enter guest mode */
+		   "jne launched \n\t"
+		   "vmlaunch \n\t"
+		   "jmp litevm_vmx_return \n\t"
+		   "launched: vmresume \n\t"
+		   ".globl litevm_vmx_return \n\t" "litevm_vmx_return: "
+		   /* Save guest registers, load host registers, keep flags */
 #ifdef __x86_64__
-		"xchg %3,     0(%%rsp) \n\t"
-		"mov %%rax, %c[rax](%3) \n\t"
-		"mov %%rbx, %c[rbx](%3) \n\t"
-		"pushq 0(%%rsp); popq %c[rcx](%3) \n\t"
-		"mov %%rdx, %c[rdx](%3) \n\t"
-		"mov %%rsi, %c[rsi](%3) \n\t"
-		"mov %%rdi, %c[rdi](%3) \n\t"
-		"mov %%rbp, %c[rbp](%3) \n\t"
-		"mov %%r8,  %c[r8](%3) \n\t"
-		"mov %%r9,  %c[r9](%3) \n\t"
-		"mov %%r10, %c[r10](%3) \n\t"
-		"mov %%r11, %c[r11](%3) \n\t"
-		"mov %%r12, %c[r12](%3) \n\t"
-		"mov %%r13, %c[r13](%3) \n\t"
-		"mov %%r14, %c[r14](%3) \n\t"
-		"mov %%r15, %c[r15](%3) \n\t"
-		"mov %%cr2, %%rax   \n\t"
-		"mov %%rax, %c[cr2](%3) \n\t"
-		"mov 0(%%rsp), %3 \n\t"
-
-		"pop  %%rcx; pop  %%r15; pop  %%r14; pop  %%r13; pop  %%r12;"
-		"pop  %%r11; pop  %%r10; pop  %%r9;  pop  %%r8;"
-		"pop  %%rbp; pop  %%rdi; pop  %%rsi;"
-		"pop  %%rdx; pop  %%rbx; pop  %%rax \n\t"
+		   "xchg %3,     0(%%rsp) \n\t"
+		   "mov %%rax, %c[rax](%3) \n\t"
+		   "mov %%rbx, %c[rbx](%3) \n\t"
+		   "pushq 0(%%rsp); popq %c[rcx](%3) \n\t"
+		   "mov %%rdx, %c[rdx](%3) \n\t"
+		   "mov %%rsi, %c[rsi](%3) \n\t"
+		   "mov %%rdi, %c[rdi](%3) \n\t"
+		   "mov %%rbp, %c[rbp](%3) \n\t"
+		   "mov %%r8,  %c[r8](%3) \n\t"
+		   "mov %%r9,  %c[r9](%3) \n\t"
+		   "mov %%r10, %c[r10](%3) \n\t"
+		   "mov %%r11, %c[r11](%3) \n\t"
+		   "mov %%r12, %c[r12](%3) \n\t"
+		   "mov %%r13, %c[r13](%3) \n\t"
+		   "mov %%r14, %c[r14](%3) \n\t"
+		   "mov %%r15, %c[r15](%3) \n\t"
+		   "mov %%cr2, %%rax   \n\t"
+		   "mov %%rax, %c[cr2](%3) \n\t"
+		   "mov 0(%%rsp), %3 \n\t"
+		   "pop  %%rcx; pop  %%r15; pop  %%r14; pop  %%r13; pop  %%r12;"
+		   "pop  %%r11; pop  %%r10; pop  %%r9;  pop  %%r8;"
+		   "pop  %%rbp; pop  %%rdi; pop  %%rsi;"
+		   "pop  %%rdx; pop  %%rbx; pop  %%rax \n\t"
 #else
-		"xchg %3, 0(%%esp) \n\t"
-		"mov %%eax, %c[rax](%3) \n\t"
-		"mov %%ebx, %c[rbx](%3) \n\t"
-		"pushl 0(%%esp); popl %c[rcx](%3) \n\t"
-		"mov %%edx, %c[rdx](%3) \n\t"
-		"mov %%esi, %c[rsi](%3) \n\t"
-		"mov %%edi, %c[rdi](%3) \n\t"
-		"mov %%ebp, %c[rbp](%3) \n\t"
-		"mov %%cr2, %%eax  \n\t"
-		"mov %%eax, %c[cr2](%3) \n\t"
-		"mov 0(%%esp), %3 \n\t"
-
-		"pop %%ecx; popa \n\t"
+		   "xchg %3, 0(%%esp) \n\t"
+		   "mov %%eax, %c[rax](%3) \n\t"
+		   "mov %%ebx, %c[rbx](%3) \n\t"
+		   "pushl 0(%%esp); popl %c[rcx](%3) \n\t"
+		   "mov %%edx, %c[rdx](%3) \n\t"
+		   "mov %%esi, %c[rsi](%3) \n\t"
+		   "mov %%edi, %c[rdi](%3) \n\t"
+		   "mov %%ebp, %c[rbp](%3) \n\t"
+		   "mov %%cr2, %%eax  \n\t"
+		   "mov %%eax, %c[cr2](%3) \n\t"
+		   "mov 0(%%esp), %3 \n\t" "pop %%ecx; popa \n\t"
 #endif
-		"setbe %0 \n\t"
-		"popf \n\t"
-	      : "=g" (fail)
-	      : "r"(vcpu->launched), "r"((unsigned long)HOST_RSP),
-		"c"(vcpu),
-		[rax]"i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_RAX])),
-		[rbx]"i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_RBX])),
-		[rcx]"i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_RCX])),
-		[rdx]"i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_RDX])),
-		[rsi]"i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_RSI])),
-		[rdi]"i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_RDI])),
-		[rbp]"i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_RBP])),
+"setbe %0 \n\t" "popf \n\t":"=g"(fail)
+:		   "r"(vcpu->launched), "r"((unsigned long)HOST_RSP),
+		   "c"(vcpu),
+		   [rax] "i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_RAX])),
+		   [rbx] "i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_RBX])),
+		   [rcx] "i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_RCX])),
+		   [rdx] "i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_RDX])),
+		   [rsi] "i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_RSI])),
+		   [rdi] "i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_RDI])),
+		   [rbp] "i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_RBP])),
 #ifdef __x86_64__
-		[r8 ]"i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_R8 ])),
-		[r9 ]"i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_R9 ])),
-		[r10]"i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_R10])),
-		[r11]"i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_R11])),
-		[r12]"i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_R12])),
-		[r13]"i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_R13])),
-		[r14]"i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_R14])),
-		[r15]"i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_R15])),
+		   [r8] "i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_R8])),
+		   [r9] "i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_R9])),
+		   [r10] "i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_R10])),
+		   [r11] "i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_R11])),
+		   [r12] "i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_R12])),
+		   [r13] "i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_R13])),
+		   [r14] "i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_R14])),
+		   [r15] "i"(offsetof(struct litevm_vcpu, regs[VCPU_REGS_R15])),
 #endif
-		[cr2]"i"(offsetof(struct litevm_vcpu, cr2))
-	      : "cc", "memory" );
+		   [cr2] "i"(offsetof(struct litevm_vcpu, cr2))
+		   :"cc", "memory");
 
 	++litevm_stat.exits;
 	printk("vm_run exits");
@@ -3142,7 +3069,7 @@ again:
 	fx_restore(vcpu->host_fx_image);
 
 #ifndef __x86_64__
-	asm ("mov %0, %%ds; mov %0, %%es" : : "r"(__USER_DS));
+asm("mov %0, %%ds; mov %0, %%es": :"r"(__USER_DS));
 #endif
 
 	litevm_run->exit_type = 0;
@@ -3191,7 +3118,8 @@ again:
 	return 0;
 }
 
-static int litevm_dev_ioctl_get_regs(struct litevm *litevm, struct litevm_regs *regs)
+static int litevm_dev_ioctl_get_regs(struct litevm *litevm,
+									 struct litevm_regs *regs)
 {
 	print_func_entry();
 	struct litevm_vcpu *vcpu;
@@ -3241,7 +3169,8 @@ static int litevm_dev_ioctl_get_regs(struct litevm *litevm, struct litevm_regs *
 	return 0;
 }
 
-static int litevm_dev_ioctl_set_regs(struct litevm *litevm, struct litevm_regs *regs)
+static int litevm_dev_ioctl_set_regs(struct litevm *litevm,
+									 struct litevm_regs *regs)
 {
 	print_func_entry();
 	struct litevm_vcpu *vcpu;
@@ -3285,7 +3214,8 @@ static int litevm_dev_ioctl_set_regs(struct litevm *litevm, struct litevm_regs *
 	return 0;
 }
 
-static int litevm_dev_ioctl_get_sregs(struct litevm *litevm, struct litevm_sregs *sregs)
+static int litevm_dev_ioctl_get_sregs(struct litevm *litevm,
+									  struct litevm_sregs *sregs)
 {
 	print_func_entry();
 	struct litevm_vcpu *vcpu;
@@ -3299,7 +3229,6 @@ static int litevm_dev_ioctl_get_sregs(struct litevm *litevm, struct litevm_sregs
 		print_func_exit();
 		return -ENOENT;
 	}
-
 #define get_segment(var, seg) \
 	do { \
 		uint32_t ar; \
@@ -3355,7 +3284,8 @@ static int litevm_dev_ioctl_get_sregs(struct litevm *litevm, struct litevm_sregs
 	return 0;
 }
 
-static int litevm_dev_ioctl_set_sregs(struct litevm *litevm, struct litevm_sregs *sregs)
+static int litevm_dev_ioctl_set_sregs(struct litevm *litevm,
+									  struct litevm_sregs *sregs)
 {
 	print_func_entry();
 	struct litevm_vcpu *vcpu;
@@ -3370,7 +3300,6 @@ static int litevm_dev_ioctl_set_sregs(struct litevm *litevm, struct litevm_sregs
 		print_func_exit();
 		return -ENOENT;
 	}
-
 #define set_segment(var, seg) \
 	do { \
 		uint32_t ar; \
@@ -3431,7 +3360,7 @@ static int litevm_dev_ioctl_set_sregs(struct litevm *litevm, struct litevm_sregs
 	vmcs_writel(CR0_READ_SHADOW, sregs->cr0);
 	vmcs_writel(GUEST_CR0, sregs->cr0 | LITEVM_VM_CR0_ALWAYS_ON);
 
-	mmu_reset_needed |=  guest_cr4() != sregs->cr4;
+	mmu_reset_needed |= guest_cr4() != sregs->cr4;
 	__set_cr4(vcpu, sregs->cr4);
 
 	if (mmu_reset_needed)
@@ -3445,7 +3374,8 @@ static int litevm_dev_ioctl_set_sregs(struct litevm *litevm, struct litevm_sregs
 /*
  * Translate a guest virtual address to a guest physical address.
  */
-static int litevm_dev_ioctl_translate(struct litevm *litevm, struct litevm_translation *tr)
+static int litevm_dev_ioctl_translate(struct litevm *litevm,
+									  struct litevm_translation *tr)
 {
 	print_func_entry();
 	unsigned long vaddr = tr->linear_address;
@@ -3471,7 +3401,8 @@ static int litevm_dev_ioctl_translate(struct litevm *litevm, struct litevm_trans
 }
 
 #if 0
-static int litevm_dev_ioctl_interrupt(struct litevm *litevm, struct litevm_interrupt *irq)
+static int litevm_dev_ioctl_interrupt(struct litevm *litevm,
+									  struct litevm_interrupt *irq)
 {
 	struct litevm_vcpu *vcpu;
 
@@ -3494,7 +3425,7 @@ static int litevm_dev_ioctl_interrupt(struct litevm *litevm, struct litevm_inter
 
 #if 0
 static int litevm_dev_ioctl_debug_guest(struct litevm *litevm,
-				     struct litevm_debug_guest *dbg)
+										struct litevm_debug_guest *dbg)
 {
 	struct litevm_vcpu *vcpu;
 	unsigned long dr7 = 0x400;
@@ -3514,20 +3445,20 @@ static int litevm_dev_ioctl_debug_guest(struct litevm *litevm,
 	if (vcpu->guest_debug.enabled) {
 		int i;
 
-		dr7 |= 0x200;  /* exact */
+		dr7 |= 0x200;	/* exact */
 		for (i = 0; i < 4; ++i) {
 			if (!dbg->breakpoints[i].enabled)
 				continue;
 			vcpu->guest_debug.bp[i] = dbg->breakpoints[i].address;
-			dr7 |= 2 << (i*2);    /* global enable */
-			dr7 |= 0 << (i*4+16); /* execution breakpoint */
+			dr7 |= 2 << (i * 2);	/* global enable */
+			dr7 |= 0 << (i * 4 + 16);	/* execution breakpoint */
 		}
 
-		exception_bitmap |= (1u << 1);  /* Trap debug exceptions */
+		exception_bitmap |= (1u << 1);	/* Trap debug exceptions */
 
 		vcpu->guest_debug.singlestep = dbg->singlestep;
 	} else {
-		exception_bitmap &= ~(1u << 1); /* Ignore debug exceptions */
+		exception_bitmap &= ~(1u << 1);	/* Ignore debug exceptions */
 		vcpu->guest_debug.singlestep = 0;
 	}
 
@@ -3554,144 +3485,149 @@ long litevm_control(struct litevm *litevm, int command, unsigned long arg)
 	int r = -EINVAL;
 
 	switch (command) {
-	case LITEVM_CREATE_VCPU: {
-		r = create_vcpu(litevm, arg);
-		if (r)
-			goto out;
-		break;
-	}
-	case LITEVM_RUN: {
-		struct litevm_run litevm_run;
+		case LITEVM_CREATE_VCPU:{
+				r = create_vcpu(litevm, arg);
+				if (r)
+					goto out;
+				break;
+			}
+		case LITEVM_RUN:{
+				struct litevm_run litevm_run;
 
-		r = -EFAULT;
-		if (copy_from_user(&litevm_run, (void *)arg, sizeof litevm_run))
-			goto out;
-		r = litevm_dev_ioctl_run(litevm, &litevm_run);
-		if (r < 0)
-			goto out;
-		r = -EFAULT;
-		if (copy_to_user((void *)arg, &litevm_run, sizeof litevm_run))
-			goto out;
-		r = 0;
-		break;
-	}
-	case LITEVM_GET_REGS: {
-		struct litevm_regs litevm_regs;
+				r = -EFAULT;
+				if (copy_from_user(&litevm_run, (void *)arg, sizeof litevm_run))
+					goto out;
+				r = litevm_dev_ioctl_run(litevm, &litevm_run);
+				if (r < 0)
+					goto out;
+				r = -EFAULT;
+				if (copy_to_user((void *)arg, &litevm_run, sizeof litevm_run))
+					goto out;
+				r = 0;
+				break;
+			}
+		case LITEVM_GET_REGS:{
+				struct litevm_regs litevm_regs;
 
-		r = -EFAULT;
-		if (copy_from_user(&litevm_regs, (void *)arg, sizeof litevm_regs))
-			goto out;
-		r = litevm_dev_ioctl_get_regs(litevm, &litevm_regs);
-		if (r)
-			goto out;
-		r = -EFAULT;
-		if (copy_to_user((void *)arg, &litevm_regs, sizeof litevm_regs))
-			goto out;
-		r = 0;
-		break;
-	}
-	case LITEVM_SET_REGS: {
-		struct litevm_regs litevm_regs;
+				r = -EFAULT;
+				if (copy_from_user
+					(&litevm_regs, (void *)arg, sizeof litevm_regs))
+					goto out;
+				r = litevm_dev_ioctl_get_regs(litevm, &litevm_regs);
+				if (r)
+					goto out;
+				r = -EFAULT;
+				if (copy_to_user((void *)arg, &litevm_regs, sizeof litevm_regs))
+					goto out;
+				r = 0;
+				break;
+			}
+		case LITEVM_SET_REGS:{
+				struct litevm_regs litevm_regs;
 
-		r = -EFAULT;
-		if (copy_from_user(&litevm_regs, (void *)arg, sizeof litevm_regs))
-			goto out;
-		r = litevm_dev_ioctl_set_regs(litevm, &litevm_regs);
-		if (r)
-			goto out;
-		r = 0;
-		break;
-	}
-	case LITEVM_GET_SREGS: {
-		struct litevm_sregs litevm_sregs;
+				r = -EFAULT;
+				if (copy_from_user
+					(&litevm_regs, (void *)arg, sizeof litevm_regs))
+					goto out;
+				r = litevm_dev_ioctl_set_regs(litevm, &litevm_regs);
+				if (r)
+					goto out;
+				r = 0;
+				break;
+			}
+		case LITEVM_GET_SREGS:{
+				struct litevm_sregs litevm_sregs;
 
-		r = -EFAULT;
-		if (copy_from_user(&litevm_sregs, (void *)arg, sizeof litevm_sregs))
-			goto out;
-		r = litevm_dev_ioctl_get_sregs(litevm, &litevm_sregs);
-		if (r)
-			goto out;
-		r = -EFAULT;
-		if (copy_to_user((void *)arg, &litevm_sregs, sizeof litevm_sregs))
-			goto out;
-		r = 0;
-		break;
-	}
-	case LITEVM_SET_SREGS: {
-		struct litevm_sregs litevm_sregs;
+				r = -EFAULT;
+				if (copy_from_user
+					(&litevm_sregs, (void *)arg, sizeof litevm_sregs))
+					goto out;
+				r = litevm_dev_ioctl_get_sregs(litevm, &litevm_sregs);
+				if (r)
+					goto out;
+				r = -EFAULT;
+				if (copy_to_user
+					((void *)arg, &litevm_sregs, sizeof litevm_sregs))
+					goto out;
+				r = 0;
+				break;
+			}
+		case LITEVM_SET_SREGS:{
+				struct litevm_sregs litevm_sregs;
 
-		r = -EFAULT;
-		if (copy_from_user(&litevm_sregs, (void *)arg, sizeof litevm_sregs))
-			goto out;
-		r = litevm_dev_ioctl_set_sregs(litevm, &litevm_sregs);
-		if (r)
-			goto out;
-		r = 0;
-		break;
-	}
-	case LITEVM_TRANSLATE: {
-		struct litevm_translation tr;
+				r = -EFAULT;
+				if (copy_from_user
+					(&litevm_sregs, (void *)arg, sizeof litevm_sregs))
+					goto out;
+				r = litevm_dev_ioctl_set_sregs(litevm, &litevm_sregs);
+				if (r)
+					goto out;
+				r = 0;
+				break;
+			}
+		case LITEVM_TRANSLATE:{
+				struct litevm_translation tr;
 
-		r = -EFAULT;
-		if (copy_from_user(&tr, (void *)arg, sizeof tr))
-			goto out;
-		r = litevm_dev_ioctl_translate(litevm, &tr);
-		if (r)
-			goto out;
-		r = -EFAULT;
-		if (copy_to_user((void *)arg, &tr, sizeof tr))
-			goto out;
-		r = 0;
-		break;
-	}
-	case LITEVM_INTERRUPT: {
-		struct litevm_interrupt irq;
+				r = -EFAULT;
+				if (copy_from_user(&tr, (void *)arg, sizeof tr))
+					goto out;
+				r = litevm_dev_ioctl_translate(litevm, &tr);
+				if (r)
+					goto out;
+				r = -EFAULT;
+				if (copy_to_user((void *)arg, &tr, sizeof tr))
+					goto out;
+				r = 0;
+				break;
+			}
+		case LITEVM_INTERRUPT:{
+				struct litevm_interrupt irq;
 
-		r = -EFAULT;
-		if (copy_from_user(&irq, (void *)arg, sizeof irq))
-			goto out;
-		r = litevm_dev_ioctl_interrupt(litevm, &irq);
-		if (r)
-			goto out;
-		r = 0;
-		break;
-	}
-	case LITEVM_DEBUG_GUEST: {
-		struct litevm_debug_guest dbg;
+				r = -EFAULT;
+				if (copy_from_user(&irq, (void *)arg, sizeof irq))
+					goto out;
+				r = litevm_dev_ioctl_interrupt(litevm, &irq);
+				if (r)
+					goto out;
+				r = 0;
+				break;
+			}
+		case LITEVM_DEBUG_GUEST:{
+				struct litevm_debug_guest dbg;
 
-		r = -EFAULT;
-		if (copy_from_user(&dbg, (void *)arg, sizeof dbg))
-			goto out;
-		r = litevm_dev_ioctl_debug_guest(litevm, &dbg);
-		if (r)
-			goto out;
-		r = 0;
-		break;
-	}
-	case LITEVM_SET_MEMORY_REGION: {
-		struct litevm_memory_region litevm_mem;
+				r = -EFAULT;
+				if (copy_from_user(&dbg, (void *)arg, sizeof dbg))
+					goto out;
+				r = litevm_dev_ioctl_debug_guest(litevm, &dbg);
+				if (r)
+					goto out;
+				r = 0;
+				break;
+			}
+		case LITEVM_SET_MEMORY_REGION:{
+				struct litevm_memory_region litevm_mem;
 
-		r = -EFAULT;
-		if (copy_from_user(&litevm_mem, (void *)arg, sizeof litevm_mem))
-			goto out;
-		r = litevm_dev_ioctl_set_memory_region(litevm, &litevm_mem);
-		if (r)
-			goto out;
-		break;
-	}
-	case LITEVM_GET_DIRTY_LOG: {
-		struct litevm_dirty_log log;
+				r = -EFAULT;
+				if (copy_from_user(&litevm_mem, (void *)arg, sizeof litevm_mem))
+					goto out;
+				r = litevm_dev_ioctl_set_memory_region(litevm, &litevm_mem);
+				if (r)
+					goto out;
+				break;
+			}
+		case LITEVM_GET_DIRTY_LOG:{
+				struct litevm_dirty_log log;
 
-		r = -EFAULT;
-		if (copy_from_user(&log, (void *)arg, sizeof log))
-			goto out;
-		r = litevm_dev_ioctl_get_dirty_log(litevm, &log);
-		if (r)
-			goto out;
-		break;
-	}
-	default:
-		;
+				r = -EFAULT;
+				if (copy_from_user(&log, (void *)arg, sizeof log))
+					goto out;
+				r = litevm_dev_ioctl_get_dirty_log(litevm, &log);
+				if (r)
+					goto out;
+				break;
+			}
+		default:
+			;
 	}
 out:
 	return r;
@@ -3720,7 +3656,7 @@ static int litevm_dev_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 #if 0
 static int litevm_reboot(struct notifier_block *notifier, unsigned long val,
-                       void *v)
+						 void *v)
 {
 	panic("litevm_reboot");
 	if (val == SYS_RESTART) {
@@ -3759,7 +3695,7 @@ int vmx_init(void)
 
 	setup_vmcs_descriptor();
 	smp_call_function_all(vm_enable, 0, &w);
-	if (smp_call_wait(w)){
+	if (smp_call_wait(w)) {
 		printk("litevm_init. smp_call_wait failed. Expect a panic.\n");
 	}
 
@@ -3778,5 +3714,3 @@ static void litevm_exit(void)
 	//__free_page(pfn_to_page(bad_page_address >> PAGE_SHIFT));
 	print_func_exit();
 }
-
-

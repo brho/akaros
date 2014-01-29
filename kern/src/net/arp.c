@@ -17,17 +17,15 @@
  *  address resolution tables
  */
 
-enum
-{
-	NHASH		= (1<<6),
-	NCACHE		= 256,
+enum {
+	NHASH = (1 << 6),
+	NCACHE = 256,
 
-	AOK		= 1,
-	AWAIT		= 2,
+	AOK = 1,
+	AWAIT = 2,
 };
 
-char *arpstate[] =
-{
+char *arpstate[] = {
 	"UNUSED",
 	"OK",
 	"WAIT",
@@ -36,27 +34,25 @@ char *arpstate[] =
 /*
  *  one per Fs
  */
-struct arp
-{
+struct arp {
 	qlock_t qlock;
-	struct Fs	*f;
-	struct arpent	*hash[NHASH];
-	struct arpent	cache[NCACHE];
-	struct arpent	*rxmt;
-	struct proc	*rxmitp;	/* neib sol re-transmit proc */
-	struct rendez	rxmtq;
-	struct block 	*dropf, *dropl;
+	struct Fs *f;
+	struct arpent *hash[NHASH];
+	struct arpent cache[NCACHE];
+	struct arpent *rxmt;
+	struct proc *rxmitp;		/* neib sol re-transmit proc */
+	struct rendez rxmtq;
+	struct block *dropf, *dropl;
 };
 
 char *Ebadarp = "bad arp";
 
 #define haship(s) ((s)[IPaddrlen-1]%NHASH)
 
-int 	ReTransTimer = RETRANS_TIMER;
-static void 	rxmitproc(void *v);
+int ReTransTimer = RETRANS_TIMER;
+static void rxmitproc(void *v);
 
-void
-arpinit(struct Fs *f)
+void arpinit(struct Fs *f)
 {
 	f->arp = kzmalloc(sizeof(struct arp), KMALLOC_WAIT);
 	qlock_init(&f->arp->qlock);
@@ -70,8 +66,8 @@ arpinit(struct Fs *f)
 /*
  *  create a new arp entry for an ip address.
  */
-static struct arpent*
-newarp6(struct arp *arp, uint8_t *ip, struct Ipifc *ifc, int addrxt)
+static struct arpent *newarp6(struct arp *arp, uint8_t * ip, struct Ipifc *ifc,
+							  int addrxt)
 {
 	unsigned int t;
 	struct block *next, *xp;
@@ -83,8 +79,8 @@ newarp6(struct arp *arp, uint8_t *ip, struct Ipifc *ifc, int addrxt)
 	e = &arp->cache[NCACHE];
 	a = arp->cache;
 	t = a->utime;
-	for(f = a; f < e; f++){
-		if(f->utime < t){
+	for (f = a; f < e; f++) {
+		if (f->utime < t) {
 			t = f->utime;
 			a = f;
 		}
@@ -94,21 +90,20 @@ newarp6(struct arp *arp, uint8_t *ip, struct Ipifc *ifc, int addrxt)
 	xp = a->hold;
 	a->hold = NULL;
 
-	if(isv4(a->ip)){
-		while(xp){
+	if (isv4(a->ip)) {
+		while (xp) {
 			next = xp->list;
 			freeblist(xp);
 			xp = next;
 		}
-	}
-	else {	// queue icmp unreachable for rxmitproc later on, w/o arp lock
-		if(xp){
-			if(arp->dropl == NULL) 
+	} else {	// queue icmp unreachable for rxmitproc later on, w/o arp lock
+		if (xp) {
+			if (arp->dropl == NULL)
 				arp->dropf = xp;
 			else
 				arp->dropl->list = xp;
 
-			for(next = xp->list; next; next = next->list)
+			for (next = xp->list; next; next = next->list)
 				xp = next;
 			arp->dropl = xp;
 			rendez_wakeup(&arp->rxmtq);
@@ -117,8 +112,8 @@ newarp6(struct arp *arp, uint8_t *ip, struct Ipifc *ifc, int addrxt)
 
 	/* take out of current chain */
 	l = &arp->hash[haship(a->ip)];
-	for(f = *l; f; f = f->hash){
-		if(f == a){
+	for (f = *l; f; f = f->hash) {
+		if (f == a) {
 			*l = a->hash;
 			break;
 		}
@@ -141,22 +136,22 @@ newarp6(struct arp *arp, uint8_t *ip, struct Ipifc *ifc, int addrxt)
 	a->ifcid = ifc->ifcid;
 
 	/* put to the end of re-transmit chain; addrxt is 0 when isv4(a->ip) */
-	if(!ipismulticast(a->ip) && addrxt){
+	if (!ipismulticast(a->ip) && addrxt) {
 		l = &arp->rxmt;
-		empty = (*l==NULL);
+		empty = (*l == NULL);
 
-		for(f = *l; f; f = f->nextrxt){
-			if(f == a){
+		for (f = *l; f; f = f->nextrxt) {
+			if (f == a) {
 				*l = a->nextrxt;
 				break;
 			}
 			l = &f->nextrxt;
 		}
-		for(f = *l; f; f = f->nextrxt){
+		for (f = *l; f; f = f->nextrxt) {
 			l = &f->nextrxt;
 		}
 		*l = a;
-		if(empty) 
+		if (empty)
 			rendez_wakeup(&arp->rxmtq);
 	}
 
@@ -167,8 +162,7 @@ newarp6(struct arp *arp, uint8_t *ip, struct Ipifc *ifc, int addrxt)
 
 /* called with arp qlocked */
 
-void
-cleanarpent(struct arp *arp, struct arpent *a)
+void cleanarpent(struct arp *arp, struct arpent *a)
 {
 	struct arpent *f, **l;
 
@@ -176,11 +170,11 @@ cleanarpent(struct arp *arp, struct arpent *a)
 	a->ctime = 0;
 	a->type = 0;
 	a->state = 0;
-	
+
 	/* take out of current chain */
 	l = &arp->hash[haship(a->ip)];
-	for(f = *l; f; f = f->hash){
-		if(f == a){
+	for (f = *l; f; f = f->hash) {
+		if (f == a) {
 			*l = a->hash;
 			break;
 		}
@@ -189,8 +183,8 @@ cleanarpent(struct arp *arp, struct arpent *a)
 
 	/* take out of re-transmit chain */
 	l = &arp->rxmt;
-	for(f = *l; f; f = f->nextrxt){
-		if(f == a){
+	for (f = *l; f; f = f->nextrxt) {
+		if (f == a) {
 			*l = a->nextrxt;
 			break;
 		}
@@ -209,49 +203,48 @@ cleanarpent(struct arp *arp, struct arpent *a)
  *  for ip.  Add the packet to be sent onto the list of packets
  *  waiting for ip->mac to be resolved.
  */
-struct arpent*
-arpget(struct arp *arp, struct block *bp, int version, struct Ipifc *ifc, uint8_t *ip,
-       uint8_t *mac)
+struct arpent *arpget(struct arp *arp, struct block *bp, int version,
+					  struct Ipifc *ifc, uint8_t * ip, uint8_t * mac)
 {
 	int hash;
 	struct arpent *a;
 	struct medium *type = ifc->m;
 	uint8_t v6ip[IPaddrlen];
 
-	if(version == V4){
+	if (version == V4) {
 		v4tov6(v6ip, ip);
 		ip = v6ip;
 	}
 
 	qlock(&arp->qlock);
 	hash = haship(ip);
-	for(a = arp->hash[hash]; a; a = a->hash){
-		if(memcmp(ip, a->ip, sizeof(a->ip)) == 0)
-		if(type == a->type)
-			break;
+	for (a = arp->hash[hash]; a; a = a->hash) {
+		if (memcmp(ip, a->ip, sizeof(a->ip)) == 0)
+			if (type == a->type)
+				break;
 	}
 
-	if(a == NULL){
+	if (a == NULL) {
 		a = newarp6(arp, ip, ifc, (version != V4));
 		a->state = AWAIT;
 	}
 	a->utime = NOW;
-	if(a->state == AWAIT){
-		if(bp != NULL){
-			if(a->hold)
+	if (a->state == AWAIT) {
+		if (bp != NULL) {
+			if (a->hold)
 				a->last->list = bp;
 			else
 				a->hold = bp;
 			a->last = bp;
-			bp->list = NULL; 
+			bp->list = NULL;
 		}
-		return a;		/* return with arp qlocked */
+		return a;	/* return with arp qlocked */
 	}
 
 	memmove(mac, a->mac, a->type->maclen);
 
 	/* remove old entries */
-	if(NOW - a->ctime > 15*60*1000)
+	if (NOW - a->ctime > 15 * 60 * 1000)
 		cleanarpent(arp, a);
 
 	qunlock(&arp->qlock);
@@ -261,8 +254,7 @@ arpget(struct arp *arp, struct block *bp, int version, struct Ipifc *ifc, uint8_
 /*
  * called with arp locked
  */
-void
-arprelease(struct arp *arp, struct arpent*a)
+void arprelease(struct arp *arp, struct arpent *a)
 {
 	qunlock(&arp->qlock);
 }
@@ -273,16 +265,16 @@ arprelease(struct arp *arp, struct arpent*a)
  *
  * called with arp locked
  */
-struct block*
-arpresolve(struct arp *arp, struct arpent *a, struct medium *type, uint8_t *mac)
+struct block *arpresolve(struct arp *arp, struct arpent *a, struct medium *type,
+						 uint8_t * mac)
 {
 	struct block *bp;
 	struct arpent *f, **l;
 
-	if(!isv4(a->ip)){
+	if (!isv4(a->ip)) {
 		l = &arp->rxmt;
-		for(f = *l; f; f = f->nextrxt){
-			if(f == a){
+		for (f = *l; f; f = f->nextrxt) {
+			if (f == a) {
 				*l = a->nextrxt;
 				break;
 			}
@@ -302,7 +294,8 @@ arpresolve(struct arp *arp, struct arpent *a, struct medium *type, uint8_t *mac)
 }
 
 void
-arpenter(struct Fs *fs, int version, uint8_t *ip, uint8_t *mac, int n, int refresh)
+arpenter(struct Fs *fs, int version, uint8_t * ip, uint8_t * mac, int n,
+		 int refresh)
 {
 	ERRSTACK(1);
 	struct arp *arp;
@@ -315,27 +308,27 @@ arpenter(struct Fs *fs, int version, uint8_t *ip, uint8_t *mac, int n, int refre
 
 	arp = fs->arp;
 
-	if(n != 6){
-//		print("arp: len = %d\n", n);
+	if (n != 6) {
+//      print("arp: len = %d\n", n);
 		return;
 	}
 
-	switch(version){
-	case V4:
-		r = v4lookup(fs, ip, NULL);
-		v4tov6(v6ip, ip);
-		ip = v6ip;
-		break;
-	case V6:
-		r = v6lookup(fs, ip, NULL);
-		break;
-	default:
-		panic("arpenter: version %d", version);
-		return;	/* to supress warnings */
+	switch (version) {
+		case V4:
+			r = v4lookup(fs, ip, NULL);
+			v4tov6(v6ip, ip);
+			ip = v6ip;
+			break;
+		case V6:
+			r = v6lookup(fs, ip, NULL);
+			break;
+		default:
+			panic("arpenter: version %d", version);
+			return;	/* to supress warnings */
 	}
 
-	if(r == NULL){
-//		print("arp: no route for entry\n");
+	if (r == NULL) {
+//      print("arp: no route for entry\n");
 		return;
 	}
 
@@ -343,19 +336,19 @@ arpenter(struct Fs *fs, int version, uint8_t *ip, uint8_t *mac, int n, int refre
 	type = ifc->m;
 
 	qlock(&arp->qlock);
-	for(a = arp->hash[haship(ip)]; a; a = a->hash){
-		if(a->type != type || (a->state != AWAIT && a->state != AOK))
+	for (a = arp->hash[haship(ip)]; a; a = a->hash) {
+		if (a->type != type || (a->state != AWAIT && a->state != AOK))
 			continue;
 
-		if(ipcmp(a->ip, ip) == 0){
+		if (ipcmp(a->ip, ip) == 0) {
 			a->state = AOK;
 			memmove(a->mac, mac, type->maclen);
 
-			if(version == V6){
+			if (version == V6) {
 				/* take out of re-transmit chain */
 				l = &arp->rxmt;
-				for(f = *l; f; f = f->nextrxt){
-					if(f == a){
+				for (f = *l; f; f = f->nextrxt) {
+					if (f == a) {
 						*l = a->nextrxt;
 						break;
 					}
@@ -367,21 +360,21 @@ arpenter(struct Fs *fs, int version, uint8_t *ip, uint8_t *mac, int n, int refre
 			a->ifcid = ifc->ifcid;
 			bp = a->hold;
 			a->hold = NULL;
-			if(version == V4)
+			if (version == V4)
 				ip += IPv4off;
 			a->utime = NOW;
 			a->ctime = a->utime;
 			qunlock(&arp->qlock);
 
-			while(bp){
+			while (bp) {
 				next = bp->list;
-				if(ifc != NULL){
-					if(waserror()){
+				if (ifc != NULL) {
+					if (waserror()) {
 						runlock(&ifc->rwlock);
 						nexterror();
 					}
 					rlock(&ifc->rwlock);
-					if(ifc->m != NULL)
+					if (ifc->m != NULL)
 						ifc->m->bwrite(ifc, bp, version, ip);
 					else
 						freeb(bp);
@@ -395,7 +388,7 @@ arpenter(struct Fs *fs, int version, uint8_t *ip, uint8_t *mac, int n, int refre
 		}
 	}
 
-	if(refresh == 0){
+	if (refresh == 0) {
 		a = newarp6(arp, ip, ifc, 0);
 		a->state = AOK;
 		a->type = type;
@@ -406,8 +399,7 @@ arpenter(struct Fs *fs, int version, uint8_t *ip, uint8_t *mac, int n, int refre
 	qunlock(&arp->qlock);
 }
 
-int
-arpwrite(struct Fs *fs, char *s, int len)
+int arpwrite(struct Fs *fs, char *s, int len)
 {
 	int n;
 	struct route *r;
@@ -420,25 +412,25 @@ arpwrite(struct Fs *fs, char *s, int len)
 
 	arp = fs->arp;
 
-	if(len == 0)
+	if (len == 0)
 		error(Ebadarp);
-	if(len >= sizeof(buf))
-		len = sizeof(buf)-1;
+	if (len >= sizeof(buf))
+		len = sizeof(buf) - 1;
 	strncpy(buf, s, len);
 	buf[len] = 0;
-	if(len > 0 && buf[len-1] == '\n')
-		buf[len-1] = 0;
+	if (len > 0 && buf[len - 1] == '\n')
+		buf[len - 1] = 0;
 
 	n = getfields(buf, f, 4, 1, " ");
-	if(strcmp(f[0], "flush") == 0){
+	if (strcmp(f[0], "flush") == 0) {
 		qlock(&arp->qlock);
-		for(a = arp->cache; a < &arp->cache[NCACHE]; a++){
+		for (a = arp->cache; a < &arp->cache[NCACHE]; a++) {
 			memset(a->ip, 0, sizeof(a->ip));
 			memset(a->mac, 0, sizeof(a->mac));
 			a->hash = NULL;
 			a->state = 0;
 			a->utime = 0;
-			while(a->hold != NULL){
+			while (a->hold != NULL) {
 				bp = a->hold->list;
 				freeblist(a->hold);
 				a->hold = bp;
@@ -450,55 +442,55 @@ arpwrite(struct Fs *fs, char *s, int len)
 		arp->dropf = NULL;
 		arp->dropl = NULL;
 		qunlock(&arp->qlock);
-	} else if(strcmp(f[0], "add") == 0){
-		switch(n){
-		default:
-			error(Ebadarg);
-		case 3:
-			parseip(ip, f[1]);
-			if(isv4(ip))
-				r = v4lookup(fs, ip+IPv4off, NULL);
-			else
-				r = v6lookup(fs, ip, NULL);
-			if(r == NULL)
-				error("Destination unreachable");
-			m = r->rt.ifc->m;
-			n = parsemac(mac, f[2], m->maclen);
-			break;
-		case 4:
-			m = ipfindmedium(f[1]);
-			if(m == NULL)
-				error(Ebadarp);
-			parseip(ip, f[2]);
-			n = parsemac(mac, f[3], m->maclen);
-			break;
+	} else if (strcmp(f[0], "add") == 0) {
+		switch (n) {
+			default:
+				error(Ebadarg);
+			case 3:
+				parseip(ip, f[1]);
+				if (isv4(ip))
+					r = v4lookup(fs, ip + IPv4off, NULL);
+				else
+					r = v6lookup(fs, ip, NULL);
+				if (r == NULL)
+					error("Destination unreachable");
+				m = r->rt.ifc->m;
+				n = parsemac(mac, f[2], m->maclen);
+				break;
+			case 4:
+				m = ipfindmedium(f[1]);
+				if (m == NULL)
+					error(Ebadarp);
+				parseip(ip, f[2]);
+				n = parsemac(mac, f[3], m->maclen);
+				break;
 		}
 
-		if(m->ares == NULL)
+		if (m->ares == NULL)
 			error(Ebadarp);
 
 		m->ares(fs, V6, ip, mac, n, 0);
-	} else if(strcmp(f[0], "del") == 0){
-		if(n != 2)
+	} else if (strcmp(f[0], "del") == 0) {
+		if (n != 2)
 			error(Ebadarg);
 
 		parseip(ip, f[1]);
 		qlock(&arp->qlock);
 
 		l = &arp->hash[haship(ip)];
-		for(a = *l; a; a = a->hash){
-			if(memcmp(ip, a->ip, sizeof(a->ip)) == 0){
+		for (a = *l; a; a = a->hash) {
+			if (memcmp(ip, a->ip, sizeof(a->ip)) == 0) {
 				*l = a->hash;
 				break;
 			}
 			l = &a->hash;
 		}
-	
-		if(a){
+
+		if (a) {
 			/* take out of re-transmit chain */
 			l = &arp->rxmt;
-			for(fl = *l; fl; fl = fl->nextrxt){
-				if(fl == a){
+			for (fl = *l; fl; fl = fl->nextrxt) {
+				if (fl == a) {
 					*l = a->nextrxt;
 					break;
 				}
@@ -520,43 +512,40 @@ arpwrite(struct Fs *fs, char *s, int len)
 	return len;
 }
 
-enum
-{
-	Alinelen=	90,
+enum {
+	Alinelen = 90,
 };
 
 char *aformat = "%-6.6s %-8.8s %-40.40I %-32.32s\n";
 
-static void
-convmac(char *p, uint8_t *mac, int n)
+static void convmac(char *p, uint8_t * mac, int n)
 {
 	int left = n;
-	while(n-- > 0){
+	while (n-- > 0) {
 		p += snprintf(p, left, "0x%2.2x", *mac++);
 		left -= n;
 	}
 }
 
-int
-arpread(struct arp *arp, char *p, uint32_t offset, int len)
+int arpread(struct arp *arp, char *p, uint32_t offset, int len)
 {
 	struct arpent *a;
 	int n;
-	char mac[2*MAClen+1];
+	char mac[2 * MAClen + 1];
 	int left = len;
 	int amt;
 
-	if(offset % Alinelen)
+	if (offset % Alinelen)
 		return 0;
 
-	offset = offset/Alinelen;
-	len = len/Alinelen;
+	offset = offset / Alinelen;
+	len = len / Alinelen;
 
 	n = 0;
-	for(a = arp->cache; len > 0 && a < &arp->cache[NCACHE]; a++){
-		if(a->state == 0)
+	for (a = arp->cache; len > 0 && a < &arp->cache[NCACHE]; a++) {
+		if (a->state == 0)
 			continue;
-		if(offset > 0){
+		if (offset > 0) {
 			offset--;
 			continue;
 		}
@@ -564,8 +553,8 @@ arpread(struct arp *arp, char *p, uint32_t offset, int len)
 		left--;
 		qlock(&arp->qlock);
 		convmac(mac, a->mac, a->type->maclen);
-		amt = snprintf(p+n, left,
-			      aformat, a->type->name, arpstate[a->state], a->ip, mac);
+		amt = snprintf(p + n, left,
+					   aformat, a->type->name, arpstate[a->state], a->ip, mac);
 		n += amt;
 		left -= amt;
 		qunlock(&arp->qlock);
@@ -574,8 +563,7 @@ arpread(struct arp *arp, char *p, uint32_t offset, int len)
 	return n;
 }
 
-extern int
-rxmitsols(struct arp *arp)
+extern int rxmitsols(struct arp *arp)
 {
 	unsigned int sflag;
 	struct block *next, *xp;
@@ -589,54 +577,53 @@ rxmitsols(struct arp *arp)
 	f = arp->f;
 
 	a = arp->rxmt;
-	if(a==NULL){
+	if (a == NULL) {
 		nrxt = 0;
-		goto dodrops; 		//return nrxt;
+		goto dodrops;	//return nrxt;
 	}
 	nrxt = a->rtime - NOW;
-	if(nrxt > 3*ReTransTimer/4) 
-		goto dodrops; 		//return nrxt;
+	if (nrxt > 3 * ReTransTimer / 4)
+		goto dodrops;	//return nrxt;
 
-	for(; a; a = a->nextrxt){
+	for (; a; a = a->nextrxt) {
 		ifc = a->ifc;
 		assert(ifc != NULL);
-		if((a->rxtsrem <= 0) || !(canrlock(&ifc->rwlock)) || (a->ifcid != ifc->ifcid)){
+		if ((a->rxtsrem <= 0) || !(canrlock(&ifc->rwlock))
+			|| (a->ifcid != ifc->ifcid)) {
 			xp = a->hold;
 			a->hold = NULL;
 
-			if(xp){
-				if(arp->dropl == NULL) 
+			if (xp) {
+				if (arp->dropl == NULL)
 					arp->dropf = xp;
 				else
 					arp->dropl->list = xp;
 			}
 
 			cleanarpent(arp, a);
-		}
-		else
+		} else
 			break;
 	}
-	if(a == NULL)
+	if (a == NULL)
 		goto dodrops;
 
-
 	qunlock(&arp->qlock);	/* for icmpns */
-	if((sflag = ipv6anylocal(ifc, ipsrc)) != SRC_UNSPEC) 
-		icmpns(f, ipsrc, sflag, a->ip, TARG_MULTI, ifc->mac); 
+	if ((sflag = ipv6anylocal(ifc, ipsrc)) != SRC_UNSPEC)
+		icmpns(f, ipsrc, sflag, a->ip, TARG_MULTI, ifc->mac);
 
 	runlock(&ifc->rwlock);
-	qlock(&arp->qlock);	
+	qlock(&arp->qlock);
 
 	/* put to the end of re-transmit chain */
 	l = &arp->rxmt;
-	for(b = *l; b; b = b->nextrxt){
-		if(b == a){
+	for (b = *l; b; b = b->nextrxt) {
+		if (b == a) {
 			*l = a->nextrxt;
 			break;
 		}
 		l = &b->nextrxt;
 	}
-	for(b = *l; b; b = b->nextrxt){
+	for (b = *l; b; b = b->nextrxt) {
 		l = &b->nextrxt;
 	}
 	*l = a;
@@ -645,9 +632,9 @@ rxmitsols(struct arp *arp)
 	a->rtime = NOW + ReTransTimer;
 
 	a = arp->rxmt;
-	if(a==NULL)
+	if (a == NULL)
 		nrxt = 0;
-	else 
+	else
 		nrxt = a->rtime - NOW;
 
 dodrops:
@@ -656,7 +643,7 @@ dodrops:
 	arp->dropl = NULL;
 	qunlock(&arp->qlock);
 
-	for(; xp; xp = next){
+	for (; xp; xp = next) {
 		next = xp->list;
 		icmphostunr(f, ifc, xp, icmp6_adr_unreach, 1);
 	}
@@ -665,10 +652,9 @@ dodrops:
 
 }
 
-static int
-rxready(void *v)
+static int rxready(void *v)
 {
-	struct arp *arp = (struct arp *) v;
+	struct arp *arp = (struct arp *)v;
 	int x;
 
 	x = ((arp->rxmt != NULL) || (arp->dropf != NULL));
@@ -676,8 +662,7 @@ rxready(void *v)
 	return x;
 }
 
-static void
-rxmitproc(void *v)
+static void rxmitproc(void *v)
 {
 	ERRSTACK(2);
 	struct arp *arp = v;
@@ -685,19 +670,18 @@ rxmitproc(void *v)
 
 	arp->rxmitp = current;
 	//print("arp rxmitproc started\n");
-	if(waserror()){
+	if (waserror()) {
 		arp->rxmitp = 0;
 		poperror();
 		warn("arp rxmit ktask exited");
 		return;
 	}
-	for(;;){
+	for (;;) {
 		wakeupat = rxmitsols(arp);
-		if(wakeupat == 0) 
-			rendez_sleep(&arp->rxmtq, rxready, v); 
-		else if(wakeupat > ReTransTimer/4) 
-			udelay_sched(wakeupat * 1000); 
+		if (wakeupat == 0)
+			rendez_sleep(&arp->rxmtq, rxready, v);
+		else if (wakeupat > ReTransTimer / 4)
+			udelay_sched(wakeupat * 1000);
 	}
 	poperror();
 }
-

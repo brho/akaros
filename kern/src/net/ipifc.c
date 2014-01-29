@@ -17,37 +17,34 @@
 
 enum {
 	Maxmedia = 32,
-	Nself = Maxmedia*5,
-	NHASH = (1<<6),
+	Nself = Maxmedia * 5,
+	NHASH = (1 << 6),
 	NCACHE = 256,
-	QMAX = 64*1024-1,
+	QMAX = 64 * 1024 - 1,
 };
 
-struct medium *media[Maxmedia] =
-{
+struct medium *media[Maxmedia] = {
 	0
 };
 
 /*
  *  cache of local addresses (addresses we answer to)
  */
-struct Ipself
-{
-	uint8_t	a[IPaddrlen];
-	struct Ipself	*hnext;		/* next address in the hash table */
-	struct Iplink	*link;		/* binding twixt Ipself and Ipifc */
-	uint32_t	expire;
-	uint8_t	type;		/* type of address */
-	int	ref;
-	struct Ipself	*next;		/* free list */
+struct Ipself {
+	uint8_t a[IPaddrlen];
+	struct Ipself *hnext;		/* next address in the hash table */
+	struct Iplink *link;		/* binding twixt Ipself and Ipifc */
+	uint32_t expire;
+	uint8_t type;				/* type of address */
+	int ref;
+	struct Ipself *next;		/* free list */
 };
 
-struct Ipselftab
-{
+struct Ipselftab {
 	qlock_t qlock;
-	int	inited;
-	int	acceptall;	/* true if an interface has the null address */
-	struct Ipself	*hash[NHASH];	/* hash chains */
+	int inited;
+	int acceptall;				/* true if an interface has the null address */
+	struct Ipself *hash[NHASH];	/* hash chains */
 };
 
 /*
@@ -55,11 +52,10 @@ struct Ipselftab
  *  we can remove them when the Chan is closed.
  */
 typedef struct Ipmcast Ipmcast;
-struct Ipmcast
-{
-	Ipmcast	*next;
-	uint8_t	ma[IPaddrlen];	/* multicast address */
-	uint8_t	ia[IPaddrlen];	/* interface address */
+struct Ipmcast {
+	Ipmcast *next;
+	uint8_t ma[IPaddrlen];		/* multicast address */
+	uint8_t ia[IPaddrlen];		/* interface address */
 };
 
 /* quick hash for ip addresses */
@@ -67,26 +63,25 @@ struct Ipmcast
 
 static char tifc[] = "ifc ";
 
-static void	addselfcache(struct Fs *f, struct Ipifc *ifc, struct Iplifc *lifc,
-				uint8_t *a, int type);
-static void	remselfcache(struct Fs *f,
-				struct Ipifc *ifc,
-				struct Iplifc *lifc, uint8_t *a);
-static char*	ipifcjoinmulti(struct Ipifc *ifc, char **argv, int argc);
-static char*	ipifcleavemulti(struct Ipifc *ifc, char **argv, int argc);
-static void	ipifcregisterproxy(struct Fs*, struct Ipifc*, uint8_t *unused_uint8_p_t);
-static char*	ipifcremlifc(struct Ipifc*, struct Iplifc*);
+static void addselfcache(struct Fs *f, struct Ipifc *ifc, struct Iplifc *lifc,
+						 uint8_t * a, int type);
+static void remselfcache(struct Fs *f,
+						 struct Ipifc *ifc, struct Iplifc *lifc, uint8_t * a);
+static char *ipifcjoinmulti(struct Ipifc *ifc, char **argv, int argc);
+static char *ipifcleavemulti(struct Ipifc *ifc, char **argv, int argc);
+static void ipifcregisterproxy(struct Fs *, struct Ipifc *,
+							   uint8_t * unused_uint8_p_t);
+static char *ipifcremlifc(struct Ipifc *, struct Iplifc *);
 
 /*
  *  link in a new medium
  */
-void
-addipmedium(struct medium *med)
+void addipmedium(struct medium *med)
 {
 	int i;
 
-	for(i = 0; i < ARRAY_SIZE(media)-1; i++)
-		if(media[i] == NULL){
+	for (i = 0; i < ARRAY_SIZE(media) - 1; i++)
+		if (media[i] == NULL) {
 			media[i] = med;
 			break;
 		}
@@ -95,13 +90,12 @@ addipmedium(struct medium *med)
 /*
  *  find the medium with this name
  */
-struct medium*
-ipfindmedium(char *name)
+struct medium *ipfindmedium(char *name)
 {
 	struct medium **mp;
 
-	for(mp = media; *mp != NULL; mp++)
-		if(strcmp((*mp)->name, name) == 0)
+	for (mp = media; *mp != NULL; mp++)
+		if (strcmp((*mp)->name, name) == 0)
 			break;
 	return *mp;
 }
@@ -110,58 +104,57 @@ ipfindmedium(char *name)
  *  attach a device (or pkt driver) to the interface.
  *  called with c locked
  */
-static char*
-ipifcbind(struct conv *c, char **argv, int argc)
+static char *ipifcbind(struct conv *c, char **argv, int argc)
 {
 	ERRSTACK(1);
 	struct Ipifc *ifc;
 	struct medium *m;
 
-	if(argc < 2)
+	if (argc < 2)
 		return Ebadarg;
 
-	ifc = (struct Ipifc*)c->ptcl;
+	ifc = (struct Ipifc *)c->ptcl;
 
 	/* bind the device to the interface */
 	m = ipfindmedium(argv[1]);
-	if(m == NULL)
+	if (m == NULL)
 		return "unknown interface type";
 
 	wlock(&ifc->rwlock);
-	if(ifc->m != NULL){
+	if (ifc->m != NULL) {
 		wunlock(&ifc->rwlock);
-		return "interface already bound";	
+		return "interface already bound";
 	}
-	if(waserror()){
+	if (waserror()) {
 		wunlock(&ifc->rwlock);
 		nexterror();
 	}
 
 	/* do medium specific binding */
-	(*m->bind)(ifc, argc, argv);
+	(*m->bind) (ifc, argc, argv);
 
 	/* set the bound device name */
-	if(argc > 2)
+	if (argc > 2)
 		strncpy(ifc->dev, argv[2], sizeof(ifc->dev));
 	else
 		snprintf(ifc->dev, sizeof ifc->dev, "%s%d", m->name, c->x);
-	ifc->dev[sizeof(ifc->dev)-1] = 0;
+	ifc->dev[sizeof(ifc->dev) - 1] = 0;
 
 	/* set up parameters */
 	ifc->m = m;
 	ifc->mintu = ifc->m->mintu;
 	ifc->maxtu = ifc->m->maxtu;
-	if(ifc->m->unbindonclose == 0)
+	if (ifc->m->unbindonclose == 0)
 		ifc->conv->inuse++;
-	ifc->rp.mflag = 0;		// default not managed
+	ifc->rp.mflag = 0;	// default not managed
 	ifc->rp.oflag = 0;
 	ifc->rp.maxraint = 600000;	// millisecs
 	ifc->rp.minraint = 200000;
-	ifc->rp.linkmtu = 0;		// no mtu sent
+	ifc->rp.linkmtu = 0;	// no mtu sent
 	ifc->rp.reachtime = 0;
 	ifc->rp.rxmitra = 0;
 	ifc->rp.ttl = MAXTTL;
-	ifc->rp.routerlt = 3*(ifc->rp.maxraint);
+	ifc->rp.routerlt = 3 * (ifc->rp.maxraint);
 
 	/* any ancillary structures (like routes) no longer pertain */
 	ifc->ifcid++;
@@ -181,26 +174,25 @@ ipifcbind(struct conv *c, char **argv, int argc)
  *  detach a device from an interface, close the interface
  *  called with ifc->conv closed
  */
-static char*
-ipifcunbind(struct Ipifc *ifc)
+static char *ipifcunbind(struct Ipifc *ifc)
 {
 	ERRSTACK(1);
 	char *err;
 
-	if(waserror()){
+	if (waserror()) {
 		wunlock(&ifc->rwlock);
 		nexterror();
 	}
 	wlock(&ifc->rwlock);
 
 	/* dissociate routes */
-	if(ifc->m != NULL && ifc->m->unbindonclose == 0)
+	if (ifc->m != NULL && ifc->m->unbindonclose == 0)
 		ifc->conv->inuse--;
 	ifc->ifcid++;
 
 	/* disassociate device */
-	if(ifc->m != NULL && ifc->m->unbind)
-		(*ifc->m->unbind)(ifc);
+	if (ifc->m != NULL && ifc->m->unbind)
+		(*ifc->m->unbind) (ifc);
 	memset(ifc->dev, 0, sizeof(ifc->dev));
 	ifc->arg = NULL;
 	ifc->reassemble = 0;
@@ -211,9 +203,9 @@ ipifcunbind(struct Ipifc *ifc)
 	qclose(ifc->conv->sq);
 
 	/* disassociate logical interfaces */
-	while(ifc->lifc){
+	while (ifc->lifc) {
 		err = ipifcremlifc(ifc, ifc->lifc);
-		if(err)
+		if (err)
 			error(err);
 	}
 
@@ -223,77 +215,71 @@ ipifcunbind(struct Ipifc *ifc)
 	return NULL;
 }
 
-
-
-char sfixedformat[] = "device %s maxtu %d sendra %d recvra %d mflag %d oflag %d maxraint %d minraint %d linkmtu %d reachtime %d rxmitra %d ttl %d routerlt %d pktin %lu pktout %lu errin %lu errout %lu\n";
+char sfixedformat[] =
+	"device %s maxtu %d sendra %d recvra %d mflag %d oflag %d maxraint %d minraint %d linkmtu %d reachtime %d rxmitra %d ttl %d routerlt %d pktin %lu pktout %lu errin %lu errout %lu\n";
 
 char slineformat[] = "	%-40I %-10M %-40I %-12lu %-12lu\n";
 
-
-static int
-ipifcstate(struct conv *c, char *state, int n)
+static int ipifcstate(struct conv *c, char *state, int n)
 {
 	struct Ipifc *ifc;
 	struct Iplifc *lifc;
 	int m;
 
-	ifc = (struct Ipifc*)c->ptcl;
+	ifc = (struct Ipifc *)c->ptcl;
 
 	m = snprintf(state, n, sfixedformat,
-		ifc->dev, ifc->maxtu, ifc->sendra6, ifc->recvra6,
-		     ifc->rp.mflag, ifc->rp.oflag, ifc->rp.maxraint,
-		     ifc->rp.minraint, ifc->rp.linkmtu, ifc->rp.reachtime,
-		     ifc->rp.rxmitra, ifc->rp.ttl, ifc->rp.routerlt,
-		     ifc->in, ifc->out, ifc->inerr, ifc->outerr);
+				 ifc->dev, ifc->maxtu, ifc->sendra6, ifc->recvra6,
+				 ifc->rp.mflag, ifc->rp.oflag, ifc->rp.maxraint,
+				 ifc->rp.minraint, ifc->rp.linkmtu, ifc->rp.reachtime,
+				 ifc->rp.rxmitra, ifc->rp.ttl, ifc->rp.routerlt,
+				 ifc->in, ifc->out, ifc->inerr, ifc->outerr);
 
 	rlock(&ifc->rwlock);
-	for(lifc = ifc->lifc; lifc && n > m; lifc = lifc->next)
-		m += snprintf(state+m, n - m, slineformat,
-			lifc->local, lifc->mask, lifc->remote,
-			lifc->validlt, lifc->preflt);
-	if(ifc->lifc == NULL)
-		m += snprintf(state+m, n - m, "\n");
+	for (lifc = ifc->lifc; lifc && n > m; lifc = lifc->next)
+		m += snprintf(state + m, n - m, slineformat,
+					  lifc->local, lifc->mask, lifc->remote,
+					  lifc->validlt, lifc->preflt);
+	if (ifc->lifc == NULL)
+		m += snprintf(state + m, n - m, "\n");
 	runlock(&ifc->rwlock);
 	return m;
 }
 
-static int
-ipifclocal(struct conv *c, char *state, int n)
+static int ipifclocal(struct conv *c, char *state, int n)
 {
 	struct Ipifc *ifc;
 	struct Iplifc *lifc;
 	struct Iplink *link;
 	int m;
 
-	ifc = (struct Ipifc*)c->ptcl;
+	ifc = (struct Ipifc *)c->ptcl;
 
 	m = 0;
 
 	rlock(&ifc->rwlock);
-	for(lifc = ifc->lifc; lifc; lifc = lifc->next){
-		m += snprintf(state+m, n - m, "%-40.40I ->", lifc->local);
-		for(link = lifc->link; link; link = link->lifclink)
-			m += snprintf(state+m, n - m, " %-40.40I", link->self->a);
-		m += snprintf(state+m, n - m, "\n");
+	for (lifc = ifc->lifc; lifc; lifc = lifc->next) {
+		m += snprintf(state + m, n - m, "%-40.40I ->", lifc->local);
+		for (link = lifc->link; link; link = link->lifclink)
+			m += snprintf(state + m, n - m, " %-40.40I", link->self->a);
+		m += snprintf(state + m, n - m, "\n");
 	}
 	runlock(&ifc->rwlock);
 	return m;
 }
 
-static int
-ipifcinuse(struct conv *c)
+static int ipifcinuse(struct conv *c)
 {
 	struct Ipifc *ifc;
 
-	ifc = (struct Ipifc*)c->ptcl;
+	ifc = (struct Ipifc *)c->ptcl;
 	return ifc->m != NULL;
 }
 
 /*
  *  called when a process writes to an interface's 'data'
  */
-static void
-ipifckick(void *x)
+static void ipifckick(void *x)
 {
 	ERRSTACK(1);
 	struct conv *c = x;
@@ -301,22 +287,22 @@ ipifckick(void *x)
 	struct Ipifc *ifc;
 
 	bp = qget(c->wq);
-	if(bp == NULL)
+	if (bp == NULL)
 		return;
 
-	ifc = (struct Ipifc*)c->ptcl;
-	if(!canrlock(&ifc->rwlock)){
+	ifc = (struct Ipifc *)c->ptcl;
+	if (!canrlock(&ifc->rwlock)) {
 		freeb(bp);
 		return;
 	}
-	if(waserror()){
+	if (waserror()) {
 		runlock(&ifc->rwlock);
 		nexterror();
 	}
-	if(ifc->m == NULL || ifc->m->pktin == NULL)
+	if (ifc->m == NULL || ifc->m->pktin == NULL)
 		freeb(bp);
 	else
-		(*ifc->m->pktin)(c->p->f, ifc, bp);
+		(*ifc->m->pktin) (c->p->f, ifc, bp);
 	runlock(&ifc->rwlock);
 	poperror();
 }
@@ -324,15 +310,14 @@ ipifckick(void *x)
 /*
  *  called when a new ipifc structure is created
  */
-static void
-ipifccreate(struct conv *c)
+static void ipifccreate(struct conv *c)
 {
 	struct Ipifc *ifc;
 
 	c->rq = qopen(QMAX, 0, 0, 0);
-	c->sq = qopen(2*QMAX, 0, 0, 0);
+	c->sq = qopen(2 * QMAX, 0, 0, 0);
 	c->wq = qopen(QMAX, Qkick, ipifckick, c);
-	ifc = (struct Ipifc*)c->ptcl;
+	ifc = (struct Ipifc *)c->ptcl;
 	ifc->conv = c;
 	ifc->unbinding = 0;
 	ifc->m = NULL;
@@ -343,32 +328,30 @@ ipifccreate(struct conv *c)
  *  called after last close of ipifc data or ctl
  *  called with c locked, we must unlock
  */
-static void
-ipifcclose(struct conv *c)
+static void ipifcclose(struct conv *c)
 {
 	struct Ipifc *ifc;
 	struct medium *m;
 
-	ifc = (struct Ipifc*)c->ptcl;
+	ifc = (struct Ipifc *)c->ptcl;
 	m = ifc->m;
-	if(m != NULL && m->unbindonclose)
+	if (m != NULL && m->unbindonclose)
 		ipifcunbind(ifc);
 }
 
 /*
  *  change an interface's mtu
  */
-char*
-ipifcsetmtu(struct Ipifc *ifc, char **argv, int argc)
+char *ipifcsetmtu(struct Ipifc *ifc, char **argv, int argc)
 {
 	int mtu;
 
-	if(argc < 2)
+	if (argc < 2)
 		return Ebadarg;
-	if(ifc->m == NULL)
+	if (ifc->m == NULL)
 		return Ebadarg;
 	mtu = strtoul(argv[1], 0, 0);
-	if(mtu < ifc->m->mintu || mtu > ifc->m->maxtu)
+	if (mtu < ifc->m->mintu || mtu > ifc->m->maxtu)
 		return Ebadarg;
 	ifc->maxtu = mtu;
 	return NULL;
@@ -377,9 +360,8 @@ ipifcsetmtu(struct Ipifc *ifc, char **argv, int argc)
 /*
  *  add an address to an interface.
  */
-char*
-ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
-	 struct Iplifc *lifcp)
+char *ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
+			   struct Iplifc *lifcp)
 {
 	uint8_t ip[IPaddrlen], mask[IPaddrlen], rem[IPaddrlen];
 	uint8_t bcast[IPaddrlen], net[IPaddrlen];
@@ -388,7 +370,7 @@ ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
 	struct Fs *f;
 	int sendnbrdisc = 0;
 
-	if(ifc->m == NULL)
+	if (ifc->m == NULL)
 		return "ipifc not yet bound to device";
 
 	f = ifc->conv->p->f;
@@ -397,48 +379,48 @@ ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
 	memset(ip, 0, IPaddrlen);
 	memset(mask, 0, IPaddrlen);
 	memset(rem, 0, IPaddrlen);
-	switch(argc){
-	case 6:
-		if(strcmp(argv[5], "proxy") == 0)
-			type |= Rproxy;
-		/* fall through */
-	case 5:
-		mtu = strtoul(argv[4], 0, 0);
-		if(mtu >= ifc->m->mintu && mtu <= ifc->m->maxtu)
-			ifc->maxtu = mtu;
-		/* fall through */
-	case 4:
-		parseip(ip, argv[1]);
-		parseipmask(mask, argv[2]);
-		parseip(rem, argv[3]);
-		maskip(rem, mask, net);
-		break;
-	case 3:
-		parseip(ip, argv[1]);
-		parseipmask(mask, argv[2]);
-		maskip(ip, mask, rem);
-		maskip(rem, mask, net);
-		break;
-	case 2:
-		parseip(ip, argv[1]);
-		memmove(mask, defmask(ip), IPaddrlen);
-		maskip(ip, mask, rem);
-		maskip(rem, mask, net);
-		break;
-	default:
-		return Ebadarg;
-		break;
+	switch (argc) {
+		case 6:
+			if (strcmp(argv[5], "proxy") == 0)
+				type |= Rproxy;
+			/* fall through */
+		case 5:
+			mtu = strtoul(argv[4], 0, 0);
+			if (mtu >= ifc->m->mintu && mtu <= ifc->m->maxtu)
+				ifc->maxtu = mtu;
+			/* fall through */
+		case 4:
+			parseip(ip, argv[1]);
+			parseipmask(mask, argv[2]);
+			parseip(rem, argv[3]);
+			maskip(rem, mask, net);
+			break;
+		case 3:
+			parseip(ip, argv[1]);
+			parseipmask(mask, argv[2]);
+			maskip(ip, mask, rem);
+			maskip(rem, mask, net);
+			break;
+		case 2:
+			parseip(ip, argv[1]);
+			memmove(mask, defmask(ip), IPaddrlen);
+			maskip(ip, mask, rem);
+			maskip(rem, mask, net);
+			break;
+		default:
+			return Ebadarg;
+			break;
 	}
-	if(isv4(ip))
+	if (isv4(ip))
 		tentative = 0;
 	wlock(&ifc->rwlock);
 
 	/* ignore if this is already a local address for this ifc */
-	for(lifc = ifc->lifc; lifc; lifc = lifc->next) {
-		if(ipcmp(lifc->local, ip) == 0) {
-			if(lifc->tentative != tentative)
+	for (lifc = ifc->lifc; lifc; lifc = lifc->next) {
+		if (ipcmp(lifc->local, ip) == 0) {
+			if (lifc->tentative != tentative)
 				lifc->tentative = tentative;
-			if(lifcp != NULL) {
+			if (lifcp != NULL) {
 				lifc->onlink = lifcp->onlink;
 				lifc->autoflag = lifcp->autoflag;
 				lifc->validlt = lifcp->validlt;
@@ -456,84 +438,82 @@ ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
 	ipmove(lifc->remote, rem);
 	ipmove(lifc->net, net);
 	lifc->tentative = tentative;
-	if(lifcp != NULL) {
+	if (lifcp != NULL) {
 		lifc->onlink = lifcp->onlink;
 		lifc->autoflag = lifcp->autoflag;
 		lifc->validlt = lifcp->validlt;
 		lifc->preflt = lifcp->preflt;
 		lifc->origint = lifcp->origint;
-	}
-	else {		// default values
+	} else {	// default values
 		lifc->onlink = 1;
 		lifc->autoflag = 1;
 		lifc->validlt = 0xffffffff;
 		lifc->preflt = 0xffffffff;
-		lifc->origint = NOW / 10^3;
+		lifc->origint = NOW / 10 ^ 3;
 	}
 	lifc->next = NULL;
 
-	for(l = &ifc->lifc; *l; l = &(*l)->next)
-		;
+	for (l = &ifc->lifc; *l; l = &(*l)->next) ;
 	*l = lifc;
 
 	/* check for point-to-point interface */
-	if(ipcmp(ip, v6loopback))  /* skip v6 loopback, it's a special address */
-	if(ipcmp(mask, IPallbits) == 0)
-		type |= Rptpt;
+	if (ipcmp(ip, v6loopback))	/* skip v6 loopback, it's a special address */
+		if (ipcmp(mask, IPallbits) == 0)
+			type |= Rptpt;
 
 	/* add local routes */
-	if(isv4(ip))
-		v4addroute(f, tifc, rem+IPv4off, mask+IPv4off, rem+IPv4off, type);
+	if (isv4(ip))
+		v4addroute(f, tifc, rem + IPv4off, mask + IPv4off, rem + IPv4off, type);
 	else
 		v6addroute(f, tifc, rem, mask, rem, type);
 
 	addselfcache(f, ifc, lifc, ip, Runi);
 
-	if((type & (Rproxy|Rptpt)) == (Rproxy|Rptpt)){
+	if ((type & (Rproxy | Rptpt)) == (Rproxy | Rptpt)) {
 		ipifcregisterproxy(f, ifc, rem);
 		goto out;
 	}
 
-	if(isv4(ip) || ipcmp(ip, IPnoaddr) == 0) {
+	if (isv4(ip) || ipcmp(ip, IPnoaddr) == 0) {
 		/* add subnet directed broadcast address to the self cache */
-		for(i = 0; i < IPaddrlen; i++)
+		for (i = 0; i < IPaddrlen; i++)
 			bcast[i] = (ip[i] & mask[i]) | ~mask[i];
 		addselfcache(f, ifc, lifc, bcast, Rbcast);
 
 		/* add subnet directed network address to the self cache */
-		for(i = 0; i < IPaddrlen; i++)
+		for (i = 0; i < IPaddrlen; i++)
 			bcast[i] = (ip[i] & mask[i]) & mask[i];
 		addselfcache(f, ifc, lifc, bcast, Rbcast);
 
 		/* add network directed broadcast address to the self cache */
 		memmove(mask, defmask(ip), IPaddrlen);
-		for(i = 0; i < IPaddrlen; i++)
+		for (i = 0; i < IPaddrlen; i++)
 			bcast[i] = (ip[i] & mask[i]) | ~mask[i];
 		addselfcache(f, ifc, lifc, bcast, Rbcast);
 
 		/* add network directed network address to the self cache */
 		memmove(mask, defmask(ip), IPaddrlen);
-		for(i = 0; i < IPaddrlen; i++)
+		for (i = 0; i < IPaddrlen; i++)
 			bcast[i] = (ip[i] & mask[i]) & mask[i];
 		addselfcache(f, ifc, lifc, bcast, Rbcast);
-		
+
 		addselfcache(f, ifc, lifc, IPv4bcast, Rbcast);
-	}
-	else {
-		if(ipcmp(ip, v6loopback) == 0) {
+	} else {
+		if (ipcmp(ip, v6loopback) == 0) {
 			/* add node-local mcast address */
 			addselfcache(f, ifc, lifc, v6allnodesN, Rmulti);
 
 			/* add route for all node multicast */
-			v6addroute(f, tifc, v6allnodesN, v6allnodesNmask, v6allnodesN, Rmulti);
+			v6addroute(f, tifc, v6allnodesN, v6allnodesNmask, v6allnodesN,
+					   Rmulti);
 		}
 
 		/* add all nodes multicast address */
 		addselfcache(f, ifc, lifc, v6allnodesL, Rmulti);
-		
+
 		/* add route for all nodes multicast */
 		v6addroute(f, tifc, v6allnodesL, v6allnodesLmask, v6allnodesL, Rmulti);
-		
+
 		/* add solicited-node multicast address */
 		ipv62smcast(bcast, ip);
 		addselfcache(f, ifc, lifc, bcast, Rmulti);
@@ -542,12 +522,12 @@ ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
 	}
 
 	/* register the address on this network for address resolution */
-	if(isv4(ip) && ifc->m->areg != NULL)
-		(*ifc->m->areg)(ifc, ip);
+	if (isv4(ip) && ifc->m->areg != NULL)
+		(*ifc->m->areg) (ifc, ip);
 
 out:
 	wunlock(&ifc->rwlock);
-	if(tentative && sendnbrdisc)
+	if (tentative && sendnbrdisc)
 		icmpns(f, 0, SRC_UNSPEC, ip, TARG_MULTI, ifc->mac);
 	return NULL;
 }
@@ -556,8 +536,7 @@ out:
  *  remove a logical interface from an ifc
  *  always called with ifc wlock'd
  */
-static char*
-ipifcremlifc(struct Ipifc *ifc, struct Iplifc *lifc)
+static char *ipifcremlifc(struct Ipifc *ifc, struct Iplifc *lifc)
 {
 	struct Iplifc **l;
 	struct Fs *f;
@@ -569,25 +548,24 @@ ipifcremlifc(struct Ipifc *ifc, struct Iplifc *lifc)
 	 *  for pt to pt we actually specify the remote address as the
 	 *  addresss to remove.
 	 */
-	for(l = &ifc->lifc; *l != NULL && *l != lifc; l = &(*l)->next)
-		;
-	if(*l == NULL)
+	for (l = &ifc->lifc; *l != NULL && *l != lifc; l = &(*l)->next) ;
+	if (*l == NULL)
 		return "address not on this interface";
 	*l = lifc->next;
 
 	/* disassociate any addresses */
-	while(lifc->link)
+	while (lifc->link)
 		remselfcache(f, ifc, lifc, lifc->link->self->a);
 
 	/* remove the route for this logical interface */
-	if(isv4(lifc->local))
-		v4delroute(f, lifc->remote+IPv4off, lifc->mask+IPv4off, 1);
+	if (isv4(lifc->local))
+		v4delroute(f, lifc->remote + IPv4off, lifc->mask + IPv4off, 1);
 	else {
 		v6delroute(f, lifc->remote, lifc->mask, 1);
-		if(ipcmp(lifc->local, v6loopback) == 0)
+		if (ipcmp(lifc->local, v6loopback) == 0)
 			/* remove route for all node multicast */
 			v6delroute(f, v6allnodesN, v6allnodesNmask, 1);
-		else if(memcmp(lifc->local, v6linklocal, v6llpreflen) == 0)
+		else if (memcmp(lifc->local, v6linklocal, v6llpreflen) == 0)
 			/* remove route for all link multicast */
 			v6delroute(f, v6allnodesL, v6allnodesLmask, 1);
 	}
@@ -601,8 +579,7 @@ ipifcremlifc(struct Ipifc *ifc, struct Iplifc *lifc)
  *  remove an address from an interface.
  *  called with c locked
  */
-char*
-ipifcrem(struct Ipifc *ifc, char **argv, int argc)
+char *ipifcrem(struct Ipifc *ifc, char **argv, int argc)
 {
 	uint8_t ip[IPaddrlen];
 	uint8_t mask[IPaddrlen];
@@ -610,12 +587,12 @@ ipifcrem(struct Ipifc *ifc, char **argv, int argc)
 	struct Iplifc *lifc;
 	char *rv;
 
-	if(argc < 3)
+	if (argc < 3)
 		return Ebadarg;
 
 	parseip(ip, argv[1]);
 	parseipmask(mask, argv[2]);
-	if(argc < 4)
+	if (argc < 4)
 		maskip(ip, mask, rem);
 	else
 		parseip(rem, argv[3]);
@@ -627,10 +604,10 @@ ipifcrem(struct Ipifc *ifc, char **argv, int argc)
 	 *  for pt to pt we actually specify the remote address as the
 	 *  addresss to remove.
 	 */
-	for(lifc = ifc->lifc; lifc != NULL; lifc = lifc->next) {
+	for (lifc = ifc->lifc; lifc != NULL; lifc = lifc->next) {
 		if (memcmp(ip, lifc->local, IPaddrlen) == 0
-		&& memcmp(mask, lifc->mask, IPaddrlen) == 0
-		&& memcmp(rem, lifc->remote, IPaddrlen) == 0)
+			&& memcmp(mask, lifc->mask, IPaddrlen) == 0
+			&& memcmp(rem, lifc->remote, IPaddrlen) == 0)
 			break;
 	}
 
@@ -644,41 +621,40 @@ ipifcrem(struct Ipifc *ifc, char **argv, int argc)
  * TRIP linecards
  */
 void
-ipifcaddroute(struct Fs *f, int vers, uint8_t *addr, uint8_t *mask,
-	      uint8_t *gate, int type)
+ipifcaddroute(struct Fs *f, int vers, uint8_t * addr, uint8_t * mask,
+			  uint8_t * gate, int type)
 {
 	struct medium *m;
 	struct conv **cp, **e;
 	struct Ipifc *ifc;
 
 	e = &f->ipifc->conv[f->ipifc->nc];
-	for(cp = f->ipifc->conv; cp < e; cp++){
-		if(*cp != NULL) {
-			ifc = (struct Ipifc*)(*cp)->ptcl;
+	for (cp = f->ipifc->conv; cp < e; cp++) {
+		if (*cp != NULL) {
+			ifc = (struct Ipifc *)(*cp)->ptcl;
 			m = ifc->m;
-			if(m == NULL)
+			if (m == NULL)
 				continue;
-			if(m->addroute != NULL)
+			if (m->addroute != NULL)
 				m->addroute(ifc, vers, addr, mask, gate, type);
 		}
 	}
 }
 
-void
-ipifcremroute(struct Fs *f, int vers, uint8_t *addr, uint8_t *mask)
+void ipifcremroute(struct Fs *f, int vers, uint8_t * addr, uint8_t * mask)
 {
 	struct medium *m;
 	struct conv **cp, **e;
 	struct Ipifc *ifc;
 
 	e = &f->ipifc->conv[f->ipifc->nc];
-	for(cp = f->ipifc->conv; cp < e; cp++){
-		if(*cp != NULL) {
-			ifc = (struct Ipifc*)(*cp)->ptcl;
+	for (cp = f->ipifc->conv; cp < e; cp++) {
+		if (*cp != NULL) {
+			ifc = (struct Ipifc *)(*cp)->ptcl;
 			m = ifc->m;
-			if(m == NULL)
+			if (m == NULL)
 				continue;
-			if(m->remroute != NULL)
+			if (m->remroute != NULL)
 				m->remroute(ifc, vers, addr, mask);
 		}
 	}
@@ -689,33 +665,32 @@ ipifcremroute(struct Fs *f, int vers, uint8_t *addr, uint8_t *mask)
  *  addresses.  This is a macro that means, remove all the old interfaces
  *  and add a new one.
  */
-static char*
-ipifcconnect(struct conv* c, char **argv, int argc)
+static char *ipifcconnect(struct conv *c, char **argv, int argc)
 {
 	ERRSTACK(1);
 	char *err;
 	struct Ipifc *ifc;
 
-	ifc = (struct Ipifc*)c->ptcl;
+	ifc = (struct Ipifc *)c->ptcl;
 
-	if(ifc->m == NULL)
-		 return "ipifc not yet bound to device";
+	if (ifc->m == NULL)
+		return "ipifc not yet bound to device";
 
-	if(waserror()){
+	if (waserror()) {
 		wunlock(&ifc->rwlock);
 		nexterror();
 	}
 	wlock(&ifc->rwlock);
-	while(ifc->lifc){
+	while (ifc->lifc) {
 		err = ipifcremlifc(ifc, ifc->lifc);
-		if(err)
+		if (err)
 			error(err);
 	}
 	wunlock(&ifc->rwlock);
 	poperror();
 
 	err = ipifcadd(ifc, argv, argc, 0, NULL);
-	if(err)
+	if (err)
 		return err;
 
 	Fsconnected(c, NULL);
@@ -723,49 +698,48 @@ ipifcconnect(struct conv* c, char **argv, int argc)
 	return NULL;
 }
 
-char*
-ipifcsetpar6(struct Ipifc *ifc, char **argv, int argc)
+char *ipifcsetpar6(struct Ipifc *ifc, char **argv, int argc)
 {
 	int i, argsleft, vmax = ifc->rp.maxraint, vmin = ifc->rp.minraint;
 
 	argsleft = argc - 1;
 	i = 1;
 
-	if(argsleft % 2 != 0)
+	if (argsleft % 2 != 0)
 		return Ebadarg;
 
 	while (argsleft > 1) {
-		if(strcmp(argv[i],"recvra")==0)
-			ifc->recvra6 = (atoi(argv[i+1]) != 0);
-		else if(strcmp(argv[i],"sendra")==0)
-			ifc->sendra6 = (atoi(argv[i+1]) != 0);
-		else if(strcmp(argv[i],"mflag")==0)
-			ifc->rp.mflag = (atoi(argv[i+1]) != 0);
-		else if(strcmp(argv[i],"oflag")==0)
-			ifc->rp.oflag = (atoi(argv[i+1]) != 0);
-		else if(strcmp(argv[i],"maxraint")==0)
-			ifc->rp.maxraint = atoi(argv[i+1]);
-		else if(strcmp(argv[i],"minraint")==0)
-			ifc->rp.minraint = atoi(argv[i+1]);
-		else if(strcmp(argv[i],"linkmtu")==0)
-			ifc->rp.linkmtu = atoi(argv[i+1]);
-		else if(strcmp(argv[i],"reachtime")==0)
-			ifc->rp.reachtime = atoi(argv[i+1]);
-		else if(strcmp(argv[i],"rxmitra")==0)
-			ifc->rp.rxmitra = atoi(argv[i+1]);
-		else if(strcmp(argv[i],"ttl")==0)
-			ifc->rp.ttl = atoi(argv[i+1]);
-		else if(strcmp(argv[i],"routerlt")==0)
-			ifc->rp.routerlt = atoi(argv[i+1]);
+		if (strcmp(argv[i], "recvra") == 0)
+			ifc->recvra6 = (atoi(argv[i + 1]) != 0);
+		else if (strcmp(argv[i], "sendra") == 0)
+			ifc->sendra6 = (atoi(argv[i + 1]) != 0);
+		else if (strcmp(argv[i], "mflag") == 0)
+			ifc->rp.mflag = (atoi(argv[i + 1]) != 0);
+		else if (strcmp(argv[i], "oflag") == 0)
+			ifc->rp.oflag = (atoi(argv[i + 1]) != 0);
+		else if (strcmp(argv[i], "maxraint") == 0)
+			ifc->rp.maxraint = atoi(argv[i + 1]);
+		else if (strcmp(argv[i], "minraint") == 0)
+			ifc->rp.minraint = atoi(argv[i + 1]);
+		else if (strcmp(argv[i], "linkmtu") == 0)
+			ifc->rp.linkmtu = atoi(argv[i + 1]);
+		else if (strcmp(argv[i], "reachtime") == 0)
+			ifc->rp.reachtime = atoi(argv[i + 1]);
+		else if (strcmp(argv[i], "rxmitra") == 0)
+			ifc->rp.rxmitra = atoi(argv[i + 1]);
+		else if (strcmp(argv[i], "ttl") == 0)
+			ifc->rp.ttl = atoi(argv[i + 1]);
+		else if (strcmp(argv[i], "routerlt") == 0)
+			ifc->rp.routerlt = atoi(argv[i + 1]);
 		else
-			return Ebadarg;	
+			return Ebadarg;
 
 		argsleft -= 2;
 		i += 2;
 	}
 
 	// consistency check
-	if(ifc->rp.maxraint < ifc->rp.minraint) {
+	if (ifc->rp.maxraint < ifc->rp.minraint) {
 		ifc->rp.maxraint = vmax;
 		ifc->rp.minraint = vmin;
 		return Ebadarg;
@@ -774,27 +748,25 @@ ipifcsetpar6(struct Ipifc *ifc, char **argv, int argc)
 	return NULL;
 }
 
-char*
-ipifcsendra6(struct Ipifc *ifc, char **argv, int argc)
+char *ipifcsendra6(struct Ipifc *ifc, char **argv, int argc)
 {
 	int i;
-	
+
 	i = 0;
-	if(argc > 1)
+	if (argc > 1)
 		i = atoi(argv[1]);
-	ifc->sendra6 = (i!=0);
+	ifc->sendra6 = (i != 0);
 	return NULL;
 }
 
-char*
-ipifcrecvra6(struct Ipifc *ifc, char **argv, int argc)
+char *ipifcrecvra6(struct Ipifc *ifc, char **argv, int argc)
 {
 	int i;
-	
+
 	i = 0;
-	if(argc > 1)
+	if (argc > 1)
 		i = atoi(argv[1]);
-	ifc->recvra6 = (i!=0);	
+	ifc->recvra6 = (i != 0);
 	return NULL;
 }
 
@@ -802,47 +774,44 @@ ipifcrecvra6(struct Ipifc *ifc, char **argv, int argc)
  *  non-standard control messages.
  *  called with c locked.
  */
-static char*
-ipifcctl(struct conv* c, char**argv, int argc)
+static char *ipifcctl(struct conv *c, char **argv, int argc)
 {
 	struct Ipifc *ifc;
 	int i;
 
-	ifc = (struct Ipifc*)c->ptcl;
-	if(strcmp(argv[0], "add") == 0)
+	ifc = (struct Ipifc *)c->ptcl;
+	if (strcmp(argv[0], "add") == 0)
 		return ipifcadd(ifc, argv, argc, 0, NULL);
-	else if(strcmp(argv[0], "bootp") == 0)
+	else if (strcmp(argv[0], "bootp") == 0)
 		return bootp(ifc);
-	else if(strcmp(argv[0], "try") == 0)
+	else if (strcmp(argv[0], "try") == 0)
 		return ipifcadd(ifc, argv, argc, 1, NULL);
-	else if(strcmp(argv[0], "remove") == 0)
+	else if (strcmp(argv[0], "remove") == 0)
 		return ipifcrem(ifc, argv, argc);
-	else if(strcmp(argv[0], "unbind") == 0)
+	else if (strcmp(argv[0], "unbind") == 0)
 		return ipifcunbind(ifc);
-	else if(strcmp(argv[0], "joinmulti") == 0)
+	else if (strcmp(argv[0], "joinmulti") == 0)
 		return ipifcjoinmulti(ifc, argv, argc);
-	else if(strcmp(argv[0], "leavemulti") == 0)
+	else if (strcmp(argv[0], "leavemulti") == 0)
 		return ipifcleavemulti(ifc, argv, argc);
-	else if(strcmp(argv[0], "mtu") == 0)
+	else if (strcmp(argv[0], "mtu") == 0)
 		return ipifcsetmtu(ifc, argv, argc);
-	else if(strcmp(argv[0], "reassemble") == 0){
+	else if (strcmp(argv[0], "reassemble") == 0) {
 		ifc->reassemble = 1;
 		return NULL;
-	}
-	else if(strcmp(argv[0], "iprouting") == 0){
+	} else if (strcmp(argv[0], "iprouting") == 0) {
 		i = 1;
-		if(argc > 1)
+		if (argc > 1)
 			i = atoi(argv[1]);
 		iprouting(c->p->f, i);
 		return NULL;
-	}
-	else if(strcmp(argv[0], "addpref6") == 0)
+	} else if (strcmp(argv[0], "addpref6") == 0)
 		return ipifcaddpref6(ifc, argv, argc);
-	else if(strcmp(argv[0], "setpar6") == 0)
+	else if (strcmp(argv[0], "setpar6") == 0)
 		return ipifcsetpar6(ifc, argv, argc);
-	else if(strcmp(argv[0], "sendra6") == 0)
+	else if (strcmp(argv[0], "sendra6") == 0)
 		return ipifcsendra6(ifc, argv, argc);
-	else if(strcmp(argv[0], "recvra6") == 0)
+	else if (strcmp(argv[0], "recvra6") == 0)
 		return ipifcrecvra6(ifc, argv, argc);
 	return "unsupported ctl";
 }
@@ -852,8 +821,7 @@ int ipifcstats(struct Proto *ipifc, char *buf, int len)
 	return ipstats(ipifc->f, buf, len);
 }
 
-void
-ipifcinit(struct Fs *f)
+void ipifcinit(struct Fs *f)
 {
 	struct Proto *ipifc;
 
@@ -875,7 +843,7 @@ ipifcinit(struct Fs *f)
 	ipifc->nc = Maxmedia;
 	ipifc->ptclsize = sizeof(struct Ipifc);
 
-	f->ipifc = ipifc;			/* hack for ipifcremroute, findipifc, ... */
+	f->ipifc = ipifc;	/* hack for ipifcremroute, findipifc, ... */
 	f->self = kzmalloc(sizeof(struct Ipselftab), 0);	/* hack for ipforme */
 	qlock_init(&f->self->qlock);
 
@@ -888,7 +856,7 @@ ipifcinit(struct Fs *f)
  */
 static void
 addselfcache(struct Fs *f, struct Ipifc *ifc,
-	     struct Iplifc *lifc, uint8_t *a, int type)
+			 struct Iplifc *lifc, uint8_t * a, int type)
 {
 	struct Ipself *p;
 	struct Iplink *lp;
@@ -898,12 +866,12 @@ addselfcache(struct Fs *f, struct Ipifc *ifc,
 
 	/* see if the address already exists */
 	h = hashipa(a);
-	for(p = f->self->hash[h]; p; p = p->next)
-		if(memcmp(a, p->a, IPaddrlen) == 0)
+	for (p = f->self->hash[h]; p; p = p->next)
+		if (memcmp(a, p->a, IPaddrlen) == 0)
 			break;
 
 	/* allocate a local address and add to hash chain */
-	if(p == NULL){
+	if (p == NULL) {
 		p = kzmalloc(sizeof(*p), 0);
 		ipmove(p->a, a);
 		p->type = type;
@@ -911,17 +879,17 @@ addselfcache(struct Fs *f, struct Ipifc *ifc,
 		f->self->hash[h] = p;
 
 		/* if the null address, accept all packets */
-		if(ipcmp(a, v4prefix) == 0 || ipcmp(a, IPnoaddr) == 0)
+		if (ipcmp(a, v4prefix) == 0 || ipcmp(a, IPnoaddr) == 0)
 			f->self->acceptall = 1;
 	}
 
 	/* look for a link for this lifc */
-	for(lp = p->link; lp; lp = lp->selflink)
-		if(lp->lifc == lifc)
+	for (lp = p->link; lp; lp = lp->selflink)
+		if (lp->lifc == lifc)
 			break;
 
 	/* allocate a lifc-to-local link and link to both */
-	if(lp == NULL){
+	if (lp == NULL) {
 		lp = kzmalloc(sizeof(*lp), 0);
 		kref_init(&lp->ref, fake_release, 1);
 		lp->lifc = lifc;
@@ -932,13 +900,14 @@ addselfcache(struct Fs *f, struct Ipifc *ifc,
 		lifc->link = lp;
 
 		/* add to routing table */
-		if(isv4(a))
-			v4addroute(f, tifc, a+IPv4off, IPallbits+IPv4off, a+IPv4off, type);
+		if (isv4(a))
+			v4addroute(f, tifc, a + IPv4off, IPallbits + IPv4off, a + IPv4off,
+					   type);
 		else
 			v6addroute(f, tifc, a, IPallbits, a, type);
 
-		if((type & Rmulti) && ifc->m->addmulti != NULL)
-			(*ifc->m->addmulti)(ifc, a, lifc->local);
+		if ((type & Rmulti) && ifc->m->addmulti != NULL)
+			(*ifc->m->addmulti) (ifc, a, lifc->local);
 	} else {
 		kref_get(&lp->ref, 1);
 	}
@@ -955,41 +924,40 @@ addselfcache(struct Fs *f, struct Ipifc *ifc,
 static struct Iplink *freeiplink;
 static struct Ipself *freeipself;
 
-static void
-iplinkfree(struct Iplink *p)
+static void iplinkfree(struct Iplink *p)
 {
 	struct Iplink **l, *np;
 	uint32_t now = NOW;
 
 	l = &freeiplink;
-	for(np = *l; np; np = *l){
-		if(np->expire > now){
+	for (np = *l; np; np = *l) {
+		if (np->expire > now) {
 			*l = np->next;
 			kfree(np);
 			continue;
 		}
 		l = &np->next;
 	}
-	p->expire = now + 5000;		/* give other threads 5 secs to get out */
+	p->expire = now + 5000;	/* give other threads 5 secs to get out */
 	p->next = NULL;
 	*l = p;
 }
-static void
-ipselffree(struct Ipself *p)
+
+static void ipselffree(struct Ipself *p)
 {
 	struct Ipself **l, *np;
 	uint32_t now = NOW;
 
 	l = &freeipself;
-	for(np = *l; np; np = *l){
-		if(np->expire > now){
+	for (np = *l; np; np = *l) {
+		if (np->expire > now) {
 			*l = np->next;
 			kfree(np);
 			continue;
 		}
 		l = &np->next;
 	}
-	p->expire = now + 5000;		/* give other threads 5 secs to get out */
+	p->expire = now + 5000;	/* give other threads 5 secs to get out */
 	p->next = NULL;
 	*l = p;
 }
@@ -1000,7 +968,7 @@ ipselffree(struct Ipself *p)
  *	called with c locked
  */
 static void
-remselfcache(struct Fs *f, struct Ipifc *ifc, struct Iplifc *lifc, uint8_t *a)
+remselfcache(struct Fs *f, struct Ipifc *ifc, struct Iplifc *lifc, uint8_t * a)
 {
 	struct Ipself *p, **l;
 	struct Iplink *link, **l_self, **l_lifc;
@@ -1009,13 +977,13 @@ remselfcache(struct Fs *f, struct Ipifc *ifc, struct Iplifc *lifc, uint8_t *a)
 
 	/* find the unique selftab entry */
 	l = &f->self->hash[hashipa(a)];
-	for(p = *l; p; p = *l){
-		if(ipcmp(p->a, a) == 0)
+	for (p = *l; p; p = *l) {
+		if (ipcmp(p->a, a) == 0)
 			break;
 		l = &p->next;
 	}
 
-	if(p == NULL)
+	if (p == NULL)
 		goto out;
 
 	/*
@@ -1023,13 +991,13 @@ remselfcache(struct Fs *f, struct Ipifc *ifc, struct Iplifc *lifc, uint8_t *a)
 	 *  that matches the selftab entry
 	 */
 	l_lifc = &lifc->link;
-	for(link = *l_lifc; link; link = *l_lifc){
-		if(link->self == p)
+	for (link = *l_lifc; link; link = *l_lifc) {
+		if (link->self == p)
 			break;
 		l_lifc = &link->lifclink;
 	}
 
-	if(link == NULL)
+	if (link == NULL)
 		goto out;
 
 	/*
@@ -1037,41 +1005,41 @@ remselfcache(struct Fs *f, struct Ipifc *ifc, struct Iplifc *lifc, uint8_t *a)
 	 *  the one we just found
 	 */
 	l_self = &p->link;
-	for(link = *l_self; link; link = *l_self){
-		if(link == *(l_lifc))
+	for (link = *l_self; link; link = *l_self) {
+		if (link == *(l_lifc))
 			break;
 		l_self = &link->selflink;
 	}
 
-	if(link == NULL)
+	if (link == NULL)
 		panic("remselfcache");
 
-	if(kref_refcnt(&link->ref) > 1)
+	if (kref_refcnt(&link->ref) > 1)
 		goto out;
 
-	if((p->type & Rmulti) && ifc->m->remmulti != NULL)
-		(*ifc->m->remmulti)(ifc, a, lifc->local);
+	if ((p->type & Rmulti) && ifc->m->remmulti != NULL)
+		(*ifc->m->remmulti) (ifc, a, lifc->local);
 
 	/* ref == 0, remove from both chains and free the link */
 	*l_lifc = link->lifclink;
 	*l_self = link->selflink;
 	iplinkfree(link);
 
-	if(p->link != NULL)
+	if (p->link != NULL)
 		goto out;
 
 	/* remove from routing table */
-	if(isv4(a))
-		v4delroute(f, a+IPv4off, IPallbits+IPv4off, 1);
+	if (isv4(a))
+		v4delroute(f, a + IPv4off, IPallbits + IPv4off, 1);
 	else
 		v6delroute(f, a, IPallbits, 1);
-	
+
 	/* no more links, remove from hash and free */
 	*l = p->next;
 	ipselffree(p);
 
 	/* if IPnoaddr, forget */
-	if(ipcmp(a, v4prefix) == 0 || ipcmp(a, IPnoaddr) == 0)
+	if (ipcmp(a, v4prefix) == 0 || ipcmp(a, IPnoaddr) == 0)
 		f->self->acceptall = 0;
 
 out:
@@ -1079,13 +1047,11 @@ out:
 }
 
 static char *stformat = "%-44.44I %2.2d %4.4s\n";
-enum
-{
-	Nstformat= 41,
+enum {
+	Nstformat = 41,
 };
 
-long
-ipselftabread(struct Fs *f, char *cp, uint32_t offset, int n)
+long ipselftabread(struct Fs *f, char *cp, uint32_t offset, int n)
 {
 	int i, m, nifc, off;
 	struct Ipself *p;
@@ -1095,14 +1061,14 @@ ipselftabread(struct Fs *f, char *cp, uint32_t offset, int n)
 	m = 0;
 	off = offset;
 	qlock(&f->self->qlock);
-	for(i = 0; i < NHASH && m < n; i++){
-		for(p = f->self->hash[i]; p != NULL && m < n; p = p->next){
+	for (i = 0; i < NHASH && m < n; i++) {
+		for (p = f->self->hash[i]; p != NULL && m < n; p = p->next) {
 			nifc = 0;
-			for(link = p->link; link; link = link->selflink)
+			for (link = p->link; link; link = link->selflink)
 				nifc++;
 			routetype(p->type, state);
 			m += snprintf(cp + m, n - m, stformat, p->a, nifc, state);
-			if(off > 0){
+			if (off > 0) {
 				off -= m;
 				m = 0;
 			}
@@ -1112,14 +1078,13 @@ ipselftabread(struct Fs *f, char *cp, uint32_t offset, int n)
 	return m;
 }
 
-int
-iptentative(struct Fs *f, uint8_t *addr)
+int iptentative(struct Fs *f, uint8_t * addr)
 {
- 	struct Ipself *p;
+	struct Ipself *p;
 
 	p = f->self->hash[hashipa(addr)];
-	for(; p; p = p->next){
-		if(ipcmp(addr, p->a) == 0) {
+	for (; p; p = p->next) {
+		if (ipcmp(addr, p->a) == 0) {
 			return p->link->lifc->tentative;
 		}
 	}
@@ -1133,19 +1098,18 @@ iptentative(struct Fs *f, uint8_t *addr)
  *	Rbcast
  *	Rmcast
  */
-int
-ipforme(struct Fs *f, uint8_t *addr)
+int ipforme(struct Fs *f, uint8_t * addr)
 {
 	struct Ipself *p;
 
 	p = f->self->hash[hashipa(addr)];
-	for(; p; p = p->next){
-		if(ipcmp(addr, p->a) == 0)
+	for (; p; p = p->next) {
+		if (ipcmp(addr, p->a) == 0)
 			return p->type;
 	}
 
 	/* hack to say accept anything */
-	if(f->self->acceptall)
+	if (f->self->acceptall)
 		return Runi;
 
 	return 0;
@@ -1155,8 +1119,7 @@ ipforme(struct Fs *f, uint8_t *addr)
  *  find the ifc on same net as the remote system.  If none,
  *  return NULL.
  */
-struct Ipifc*
-findipifc(struct Fs *f, uint8_t *remote, int type)
+struct Ipifc *findipifc(struct Fs *f, uint8_t * remote, int type)
 {
 	struct Ipifc *ifc, *x;
 	struct Iplifc *lifc;
@@ -1164,40 +1127,41 @@ findipifc(struct Fs *f, uint8_t *remote, int type)
 	uint8_t gnet[IPaddrlen];
 	uint8_t xmask[IPaddrlen];
 
-	x = NULL; memset(xmask, 0, IPaddrlen);
+	x = NULL;
+	memset(xmask, 0, IPaddrlen);
 
 	/* find most specific match */
 	e = &f->ipifc->conv[f->ipifc->nc];
-	for(cp = f->ipifc->conv; cp < e; cp++){
-		if(*cp == 0)
+	for (cp = f->ipifc->conv; cp < e; cp++) {
+		if (*cp == 0)
 			continue;
 
-		ifc = (struct Ipifc*)(*cp)->ptcl;
+		ifc = (struct Ipifc *)(*cp)->ptcl;
 
-		for(lifc = ifc->lifc; lifc; lifc = lifc->next){
+		for (lifc = ifc->lifc; lifc; lifc = lifc->next) {
 			maskip(remote, lifc->mask, gnet);
-			if(ipcmp(gnet, lifc->net) == 0){
-				if(x == NULL || ipcmp(lifc->mask, xmask) > 0){
+			if (ipcmp(gnet, lifc->net) == 0) {
+				if (x == NULL || ipcmp(lifc->mask, xmask) > 0) {
 					x = ifc;
 					ipmove(xmask, lifc->mask);
 				}
 			}
 		}
 	}
-	if(x != NULL)
+	if (x != NULL)
 		return x;
 
 	/* for now for broadcast and multicast, just use first interface */
-	if(type & (Rbcast|Rmulti)){
-		for(cp = f->ipifc->conv; cp < e; cp++){
-			if(*cp == 0)
+	if (type & (Rbcast | Rmulti)) {
+		for (cp = f->ipifc->conv; cp < e; cp++) {
+			if (*cp == 0)
 				continue;
-			ifc = (struct Ipifc*)(*cp)->ptcl;
-			if(ifc->lifc != NULL)
+			ifc = (struct Ipifc *)(*cp)->ptcl;
+			if (ifc->lifc != NULL)
 				return ifc;
 		}
 	}
-		
+
 	return NULL;
 }
 
@@ -1210,24 +1174,22 @@ enum {
 	globalv6,
 };
 
-int
-v6addrtype(uint8_t *addr)
+int v6addrtype(uint8_t * addr)
 {
-	if(isv6global(addr))
+	if (isv6global(addr))
 		return globalv6;
-	if(islinklocal(addr))
+	if (islinklocal(addr))
 		return linklocalv6;
-	if(isv6mcast(addr))
+	if (isv6mcast(addr))
 		return multicastv6;
-	if(issitelocal(addr))
+	if (issitelocal(addr))
 		return sitelocalv6;
 	return unknownv6;
 }
 
 #define v6addrcurr(lifc) (( (lifc)->origint + (lifc)->preflt >= (NOW/10^3) ) || ( (lifc)->preflt == 0xffffffff ))
 
-static void
-findprimaryipv6(struct Fs *f, uint8_t *local)
+static void findprimaryipv6(struct Fs *f, uint8_t * local)
 {
 	struct conv **cp, **e;
 	struct Ipifc *ifc;
@@ -1241,19 +1203,19 @@ findprimaryipv6(struct Fs *f, uint8_t *local)
 	 * local address; address must be current */
 
 	e = &f->ipifc->conv[f->ipifc->nc];
-	for(cp = f->ipifc->conv; cp < e; cp++){
-		if(*cp == 0)
+	for (cp = f->ipifc->conv; cp < e; cp++) {
+		if (*cp == 0)
 			continue;
-		ifc = (struct Ipifc*)(*cp)->ptcl;
-		for(lifc = ifc->lifc; lifc; lifc = lifc->next){
+		ifc = (struct Ipifc *)(*cp)->ptcl;
+		for (lifc = ifc->lifc; lifc; lifc = lifc->next) {
 			atypel = v6addrtype(lifc->local);
-			if(atypel > atype)
-			if(v6addrcurr(lifc)) {
-				ipmove(local, lifc->local);
-				atype = atypel;
-				if(atype == globalv6)
-					return;
-			}
+			if (atypel > atype)
+				if (v6addrcurr(lifc)) {
+					ipmove(local, lifc->local);
+					atype = atypel;
+					if (atype == globalv6)
+						return;
+				}
 		}
 	}
 }
@@ -1261,8 +1223,7 @@ findprimaryipv6(struct Fs *f, uint8_t *local)
 /*
  *  returns first ip address configured
  */
-static void
-findprimaryipv4(struct Fs *f, uint8_t *local)
+static void findprimaryipv4(struct Fs *f, uint8_t * local)
 {
 	struct conv **cp, **e;
 	struct Ipifc *ifc;
@@ -1270,11 +1231,11 @@ findprimaryipv4(struct Fs *f, uint8_t *local)
 
 	/* find first ifc local address */
 	e = &f->ipifc->conv[f->ipifc->nc];
-	for(cp = f->ipifc->conv; cp < e; cp++){
-		if(*cp == 0)
+	for (cp = f->ipifc->conv; cp < e; cp++) {
+		if (*cp == 0)
 			continue;
-		ifc = (struct Ipifc*)(*cp)->ptcl;
-		if((lifc = ifc->lifc) != NULL){
+		ifc = (struct Ipifc *)(*cp)->ptcl;
+		if ((lifc = ifc->lifc) != NULL) {
 			ipmove(local, lifc->local);
 			return;
 		}
@@ -1285,8 +1246,7 @@ findprimaryipv4(struct Fs *f, uint8_t *local)
  *  find the local address 'closest' to the remote system, copy it to
  *  local and return the ifc for that address
  */
-void
-findlocalip(struct Fs *f, uint8_t *local, uint8_t *remote)
+void findlocalip(struct Fs *f, uint8_t * local, uint8_t * remote)
 {
 	struct Ipifc *ifc;
 	struct Iplifc *lifc;
@@ -1298,11 +1258,11 @@ findlocalip(struct Fs *f, uint8_t *local, uint8_t *remote)
 
 	qlock(&f->ipifc->qlock);
 	r = v6lookup(f, remote, NULL);
- 	version = (memcmp(remote, v4prefix, IPv4off) == 0) ? V4 : V6;
-	
-	if(r != NULL){
+	version = (memcmp(remote, v4prefix, IPv4off) == 0) ? V4 : V6;
+
+	if (r != NULL) {
 		ifc = r->rt.ifc;
-		if(r->rt.type & Rv4)
+		if (r->rt.type & Rv4)
 			v4tov6(gate, r->v4.gate);
 		else {
 			ipmove(gate, r->v6.gate);
@@ -1310,46 +1270,46 @@ findlocalip(struct Fs *f, uint8_t *local, uint8_t *remote)
 		}
 
 		/* find ifc address closest to the gateway to use */
-		switch(version) {
-		case V4:
-			for(lifc = ifc->lifc; lifc; lifc = lifc->next){
-				maskip(gate, lifc->mask, gnet);
-				if(ipcmp(gnet, lifc->net) == 0){
-					ipmove(local, lifc->local);
+		switch (version) {
+			case V4:
+				for (lifc = ifc->lifc; lifc; lifc = lifc->next) {
+					maskip(gate, lifc->mask, gnet);
+					if (ipcmp(gnet, lifc->net) == 0) {
+						ipmove(local, lifc->local);
+						goto out;
+					}
+				}
+				break;
+			case V6:
+				for (lifc = ifc->lifc; lifc; lifc = lifc->next) {
+					atypel = v6addrtype(lifc->local);
+					maskip(gate, lifc->mask, gnet);
+					if (ipcmp(gnet, lifc->net) == 0)
+						if (atypel > atype)
+							if (v6addrcurr(lifc)) {
+								ipmove(local, lifc->local);
+								atype = atypel;
+								if (atype == globalv6)
+									break;
+							}
+				}
+				if (atype > unspecifiedv6)
 					goto out;
-				}
-			}
-			break;
-		case V6:
-			for(lifc = ifc->lifc; lifc; lifc = lifc->next){
-				atypel = v6addrtype(lifc->local);
-				maskip(gate, lifc->mask, gnet);
-				if(ipcmp(gnet, lifc->net) == 0)
-				if(atypel > atype)
-				if(v6addrcurr(lifc)) {
-					ipmove(local, lifc->local);
-					atype = atypel;
-					if(atype == globalv6)
-						break;
-				}
-			}
-			if(atype > unspecifiedv6)
-				goto out;
-			break;
-		default:
-			panic("findlocalip: version %d", version);
+				break;
+			default:
+				panic("findlocalip: version %d", version);
 		}
 	}
 
-	switch(version){
-	case V4:
-		findprimaryipv4(f, local);
-		break;
-	case V6:
-		findprimaryipv6(f, local);
-		break;
-	default:
-		panic("findlocalip2: version %d", version);
+	switch (version) {
+		case V4:
+			findprimaryipv4(f, local);
+			break;
+		case V6:
+			findprimaryipv6(f, local);
+			break;
+		default:
+			panic("findlocalip2: version %d", version);
 	}
 
 out:
@@ -1359,14 +1319,13 @@ out:
 /*
  *  return first v4 address associated with an interface
  */
-int
-ipv4local(struct Ipifc *ifc, uint8_t *addr)
+int ipv4local(struct Ipifc *ifc, uint8_t * addr)
 {
 	struct Iplifc *lifc;
 
-	for(lifc = ifc->lifc; lifc; lifc = lifc->next){
-		if(isv4(lifc->local)){
-			memmove(addr, lifc->local+IPv4off, IPv4addrlen);
+	for (lifc = ifc->lifc; lifc; lifc = lifc->next) {
+		if (isv4(lifc->local)) {
+			memmove(addr, lifc->local + IPv4off, IPv4addrlen);
 			return 1;
 		}
 	}
@@ -1376,13 +1335,12 @@ ipv4local(struct Ipifc *ifc, uint8_t *addr)
 /*
  *  return first v6 address associated with an interface
  */
-int
-ipv6local(struct Ipifc *ifc, uint8_t *addr)
+int ipv6local(struct Ipifc *ifc, uint8_t * addr)
 {
 	struct Iplifc *lifc;
 
-	for(lifc = ifc->lifc; lifc; lifc = lifc->next){
-		if(!isv4(lifc->local) && !(lifc->tentative)){
+	for (lifc = ifc->lifc; lifc; lifc = lifc->next) {
+		if (!isv4(lifc->local) && !(lifc->tentative)) {
 			ipmove(addr, lifc->local);
 			return 1;
 		}
@@ -1390,13 +1348,12 @@ ipv6local(struct Ipifc *ifc, uint8_t *addr)
 	return 0;
 }
 
-int
-ipv6anylocal(struct Ipifc *ifc, uint8_t *addr)
+int ipv6anylocal(struct Ipifc *ifc, uint8_t * addr)
 {
 	struct Iplifc *lifc;
 
-	for(lifc = ifc->lifc; lifc; lifc = lifc->next){
-		if(!isv4(lifc->local)){
+	for (lifc = ifc->lifc; lifc; lifc = lifc->next) {
+		if (!isv4(lifc->local)) {
 			ipmove(addr, lifc->local);
 			return SRC_UNI;
 		}
@@ -1407,23 +1364,20 @@ ipv6anylocal(struct Ipifc *ifc, uint8_t *addr)
 /*
  *  see if this address is bound to the interface
  */
-struct Iplifc*
-iplocalonifc(struct Ipifc *ifc, uint8_t *ip)
+struct Iplifc *iplocalonifc(struct Ipifc *ifc, uint8_t * ip)
 {
 	struct Iplifc *lifc;
 
-	for(lifc = ifc->lifc; lifc; lifc = lifc->next)
-		if(ipcmp(ip, lifc->local) == 0)
+	for (lifc = ifc->lifc; lifc; lifc = lifc->next)
+		if (ipcmp(ip, lifc->local) == 0)
 			return lifc;
 	return NULL;
 }
 
-
 /*
  *  See if we're proxying for this address on this interface
  */
-int
-ipproxyifc(struct Fs *f, struct Ipifc *ifc, uint8_t *ip)
+int ipproxyifc(struct Fs *f, struct Ipifc *ifc, uint8_t * ip)
 {
 	struct route *r;
 	uint8_t net[IPaddrlen];
@@ -1431,15 +1385,15 @@ ipproxyifc(struct Fs *f, struct Ipifc *ifc, uint8_t *ip)
 
 	/* see if this is a direct connected pt to pt address */
 	r = v6lookup(f, ip, NULL);
-	if(r == NULL)
+	if (r == NULL)
 		return 0;
-	if((r->rt.type & (Rifc|Rproxy)) != (Rifc|Rproxy))
+	if ((r->rt.type & (Rifc | Rproxy)) != (Rifc | Rproxy))
 		return 0;
 
 	/* see if this is on the right interface */
-	for(lifc = ifc->lifc; lifc; lifc = lifc->next){
+	for (lifc = ifc->lifc; lifc; lifc = lifc->next) {
 		maskip(ip, lifc->mask, net);
-		if(ipcmp(net, lifc->remote) == 0)
+		if (ipcmp(net, lifc->remote) == 0)
 			return 1;
 	}
 
@@ -1449,40 +1403,36 @@ ipproxyifc(struct Fs *f, struct Ipifc *ifc, uint8_t *ip)
 /*
  *  return multicast version if any
  */
-int
-ipismulticast(uint8_t *ip)
+int ipismulticast(uint8_t * ip)
 {
-	if(isv4(ip)){
-		if(ip[IPv4off] >= 0xe0 && ip[IPv4off] < 0xf0)
+	if (isv4(ip)) {
+		if (ip[IPv4off] >= 0xe0 && ip[IPv4off] < 0xf0)
 			return V4;
 	} else {
-		if(ip[0] == 0xff)
+		if (ip[0] == 0xff)
 			return V6;
 	}
 	return 0;
 }
 
-int
-ipisbm(uint8_t *ip)
+int ipisbm(uint8_t * ip)
 {
-	if(isv4(ip)){
-		if(ip[IPv4off] >= 0xe0 && ip[IPv4off] < 0xf0)
+	if (isv4(ip)) {
+		if (ip[IPv4off] >= 0xe0 && ip[IPv4off] < 0xf0)
 			return V4;
-		if(ipcmp(ip, IPv4bcast) == 0)
+		if (ipcmp(ip, IPv4bcast) == 0)
 			return V4;
 	} else {
-		if(ip[0] == 0xff)
+		if (ip[0] == 0xff)
 			return V6;
 	}
 	return 0;
 }
-
 
 /*
  *  add a multicast address to an interface, called with c locked
  */
-void
-ipifcaddmulti(struct conv *c, uint8_t *ma, uint8_t *ia)
+void ipifcaddmulti(struct conv *c, uint8_t * ma, uint8_t * ia)
 {
 	ERRSTACK(1);
 	struct Ipifc *ifc;
@@ -1492,40 +1442,38 @@ ipifcaddmulti(struct conv *c, uint8_t *ma, uint8_t *ia)
 	struct Fs *f;
 
 	f = c->p->f;
-	
-	for(l = &c->multi; *l; l = &(*l)->next)
-		if(ipcmp(ma, (*l)->ma) == 0)
-		if(ipcmp(ia, (*l)->ia) == 0)
-			return;		/* it's already there */
+
+	for (l = &c->multi; *l; l = &(*l)->next)
+		if (ipcmp(ma, (*l)->ma) == 0)
+			if (ipcmp(ia, (*l)->ia) == 0)
+				return;	/* it's already there */
 
 	multi = *l = kzmalloc(sizeof(*multi), 0);
 	ipmove(multi->ma, ma);
 	ipmove(multi->ia, ia);
 	multi->next = NULL;
 
-	for(p = f->ipifc->conv; *p; p++){
-		if((*p)->inuse == 0)
+	for (p = f->ipifc->conv; *p; p++) {
+		if ((*p)->inuse == 0)
 			continue;
-		ifc = (struct Ipifc*)(*p)->ptcl;
-		if(waserror()){
+		ifc = (struct Ipifc *)(*p)->ptcl;
+		if (waserror()) {
 			wunlock(&ifc->rwlock);
 			nexterror();
 		}
 		wlock(&ifc->rwlock);
-		for(lifc = ifc->lifc; lifc; lifc = lifc->next)
-			if(ipcmp(ia, lifc->local) == 0)
+		for (lifc = ifc->lifc; lifc; lifc = lifc->next)
+			if (ipcmp(ia, lifc->local) == 0)
 				addselfcache(f, ifc, lifc, ma, Rmulti);
 		wunlock(&ifc->rwlock);
 		poperror();
 	}
 }
 
-
 /*
  *  remove a multicast address from an interface, called with c locked
  */
-void
-ipifcremmulti(struct conv *c, uint8_t *ma, uint8_t *ia)
+void ipifcremmulti(struct conv *c, uint8_t * ma, uint8_t * ia)
 {
 	ERRSTACK(1);
 	struct Ipmulti *multi, **l;
@@ -1535,30 +1483,30 @@ ipifcremmulti(struct conv *c, uint8_t *ma, uint8_t *ia)
 	struct Fs *f;
 
 	f = c->p->f;
-	
-	for(l = &c->multi; *l; l = &(*l)->next)
-		if(ipcmp(ma, (*l)->ma) == 0)
-		if(ipcmp(ia, (*l)->ia) == 0)
-			break;
+
+	for (l = &c->multi; *l; l = &(*l)->next)
+		if (ipcmp(ma, (*l)->ma) == 0)
+			if (ipcmp(ia, (*l)->ia) == 0)
+				break;
 
 	multi = *l;
-	if(multi == NULL)
-		return; 	/* we don't have it open */
+	if (multi == NULL)
+		return;	/* we don't have it open */
 
 	*l = multi->next;
 
-	for(p = f->ipifc->conv; *p; p++){
-		if((*p)->inuse == 0)
+	for (p = f->ipifc->conv; *p; p++) {
+		if ((*p)->inuse == 0)
 			continue;
 
-		ifc = (struct Ipifc*)(*p)->ptcl;
-		if(waserror()){
+		ifc = (struct Ipifc *)(*p)->ptcl;
+		if (waserror()) {
 			wunlock(&ifc->rwlock);
 			nexterror();
 		}
 		wlock(&ifc->rwlock);
-		for(lifc = ifc->lifc; lifc; lifc = lifc->next)
-			if(ipcmp(ia, lifc->local) == 0)
+		for (lifc = ifc->lifc; lifc; lifc = lifc->next)
+			if (ipcmp(ia, lifc->local) == 0)
 				remselfcache(f, ifc, lifc, ma);
 		wunlock(&ifc->rwlock);
 		poperror();
@@ -1570,20 +1518,17 @@ ipifcremmulti(struct conv *c, uint8_t *ma, uint8_t *ia)
 /*
  *  make lifc's join and leave multicast groups
  */
-static char*
-ipifcjoinmulti(struct Ipifc *ifc, char **argv, int argc)
+static char *ipifcjoinmulti(struct Ipifc *ifc, char **argv, int argc)
 {
 	return NULL;
 }
 
-static char*
-ipifcleavemulti(struct Ipifc *ifc, char **argv, int argc)
+static char *ipifcleavemulti(struct Ipifc *ifc, char **argv, int argc)
 {
 	return NULL;
 }
 
-static void
-ipifcregisterproxy(struct Fs *f, struct Ipifc *ifc, uint8_t *ip)
+static void ipifcregisterproxy(struct Fs *f, struct Ipifc *ifc, uint8_t * ip)
 {
 	struct conv **cp, **e;
 	struct Ipifc *nifc;
@@ -1594,23 +1539,23 @@ ipifcregisterproxy(struct Fs *f, struct Ipifc *ifc, uint8_t *ip)
 	/* register the address on any network that will proxy for us */
 	e = &f->ipifc->conv[f->ipifc->nc];
 
-	if(!isv4(ip)) { // V6
-		for(cp = f->ipifc->conv; cp < e; cp++){
-			if(*cp == NULL)
+	if (!isv4(ip)) {	// V6
+		for (cp = f->ipifc->conv; cp < e; cp++) {
+			if (*cp == NULL)
 				continue;
-			nifc = (struct Ipifc*)(*cp)->ptcl;
-			if(nifc == ifc)
+			nifc = (struct Ipifc *)(*cp)->ptcl;
+			if (nifc == ifc)
 				continue;
-	
+
 			rlock(&nifc->rwlock);
 			m = nifc->m;
-			if(m == NULL || m->addmulti == NULL) {
+			if (m == NULL || m->addmulti == NULL) {
 				runlock(&nifc->rwlock);
 				continue;
 			}
-			for(lifc = nifc->lifc; lifc; lifc = lifc->next){
+			for (lifc = nifc->lifc; lifc; lifc = lifc->next) {
 				maskip(ip, lifc->mask, net);
-				if(ipcmp(net, lifc->remote) == 0) { /* add solicited-node multicast address */
+				if (ipcmp(net, lifc->remote) == 0) {	/* add solicited-node multicast address */
 					ipv62smcast(net, ip);
 					addselfcache(f, nifc, lifc, net, Rmulti);
 					arpenter(f, V6, ip, nifc->mac, 6, 0);
@@ -1621,25 +1566,24 @@ ipifcregisterproxy(struct Fs *f, struct Ipifc *ifc, uint8_t *ip)
 			runlock(&nifc->rwlock);
 		}
 		return;
-	}
-	else { // V4
-		for(cp = f->ipifc->conv; cp < e; cp++){
-			if(*cp == NULL)
+	} else {	// V4
+		for (cp = f->ipifc->conv; cp < e; cp++) {
+			if (*cp == NULL)
 				continue;
-			nifc = (struct Ipifc*)(*cp)->ptcl;
-			if(nifc == ifc)
+			nifc = (struct Ipifc *)(*cp)->ptcl;
+			if (nifc == ifc)
 				continue;
-	
+
 			rlock(&nifc->rwlock);
 			m = nifc->m;
-			if(m == NULL || m->areg == NULL){
+			if (m == NULL || m->areg == NULL) {
 				runlock(&nifc->rwlock);
 				continue;
 			}
-			for(lifc = nifc->lifc; lifc; lifc = lifc->next){
+			for (lifc = nifc->lifc; lifc; lifc = lifc->next) {
 				maskip(ip, lifc->mask, net);
-				if(ipcmp(net, lifc->remote) == 0){
-					(*m->areg)(nifc, ip);
+				if (ipcmp(net, lifc->remote) == 0) {
+					(*m->areg) (nifc, ip);
 					break;
 				}
 			}
@@ -1648,82 +1592,76 @@ ipifcregisterproxy(struct Fs *f, struct Ipifc *ifc, uint8_t *ip)
 	}
 }
 
-
 // added for new v6 mesg types
-static void
-adddefroute6(struct Fs *f, uint8_t *gate, int force)
+static void adddefroute6(struct Fs *f, uint8_t * gate, int force)
 {
 	struct route *r;
 
 	r = v6lookup(f, v6Unspecified, NULL);
-	if(r!=NULL)
-	if(!(force) && (strcmp(r->rt.tag,"ra")!=0))	// route entries generated
-		return;			// by all other means take
-					// precedence over router annc
+	if (r != NULL)
+		if (!(force) && (strcmp(r->rt.tag, "ra") != 0))	// route entries generated
+			return;	// by all other means take
+	// precedence over router annc
 
 	v6delroute(f, v6Unspecified, v6Unspecified, 1);
 	v6addroute(f, "ra", v6Unspecified, v6Unspecified, gate, 0);
 }
 
-enum
-{
+enum {
 	Ngates = 3,
 };
 
-char*
-ipifcaddpref6(struct Ipifc *ifc, char**argv, int argc)
+char *ipifcaddpref6(struct Ipifc *ifc, char **argv, int argc)
 {
-	uint8_t	onlink = 1;
-	uint8_t	autoflag = 1;
-	long 	validlt = 0xffffffff;
-	long 	preflt = 0xffffffff;
-	long	origint = NOW / 10^3;
-	uint8_t	prefix[IPaddrlen];
-	int	plen = 64;
-	struct Iplifc	*lifc;
-	char	addr[40], preflen[6];
-	char	*params[3];
+	uint8_t onlink = 1;
+	uint8_t autoflag = 1;
+	long validlt = 0xffffffff;
+	long preflt = 0xffffffff;
+	long origint = NOW / 10 ^ 3;
+	uint8_t prefix[IPaddrlen];
+	int plen = 64;
+	struct Iplifc *lifc;
+	char addr[40], preflen[6];
+	char *params[3];
 
-	switch(argc) {
-	case 7:
-		preflt = atoi(argv[6]);
-		/* fall through */
-	case 6:
-		validlt = atoi(argv[5]);
-		/* fall through */
-	case 5:
-		autoflag =  atoi(argv[4]);
-		/* fall through */
-	case 4:
-		onlink = atoi(argv[3]);
-		/* fall through */
-	case 3:
-		plen = atoi(argv[2]);
-	case 2:
-		break;
-	default:
-		return Ebadarg;
+	switch (argc) {
+		case 7:
+			preflt = atoi(argv[6]);
+			/* fall through */
+		case 6:
+			validlt = atoi(argv[5]);
+			/* fall through */
+		case 5:
+			autoflag = atoi(argv[4]);
+			/* fall through */
+		case 4:
+			onlink = atoi(argv[3]);
+			/* fall through */
+		case 3:
+			plen = atoi(argv[2]);
+		case 2:
+			break;
+		default:
+			return Ebadarg;
 	}
 
-	if((parseip(prefix, argv[1])!=6) ||
-	 	(validlt < preflt) ||
-		(plen < 0) || (plen > 64) ||
-		(islinklocal(prefix))
-	)
+	if ((parseip(prefix, argv[1]) != 6) ||
+		(validlt < preflt) || (plen < 0) || (plen > 64) || (islinklocal(prefix))
+		)
 		return Ebadarg;
 
 	lifc = kzmalloc(sizeof(struct Iplifc), 0);
-	lifc->onlink = (onlink!=0);
-	lifc->autoflag = (autoflag!=0);
+	lifc->onlink = (onlink != 0);
+	lifc->autoflag = (autoflag != 0);
 	lifc->validlt = validlt;
 	lifc->preflt = preflt;
 	lifc->origint = origint;
 
-	if(ifc->m->pref2addr!=NULL)
+	if (ifc->m->pref2addr != NULL)
 		ifc->m->pref2addr(prefix, ifc->mac);
 	else
 		return Ebadarg;
-	
+
 	snprintf(addr, sizeof(addr), "%I", prefix);
 	snprintf(preflen, sizeof(preflen), "/%d", plen);
 	params[0] = "add";
@@ -1732,4 +1670,3 @@ ipifcaddpref6(struct Ipifc *ifc, char**argv, int argc)
 
 	return ipifcadd(ifc, params, 3, 0, lifc);
 }
-

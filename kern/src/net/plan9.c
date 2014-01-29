@@ -17,26 +17,22 @@
  *  some hacks for commonality twixt inferno and plan9
  */
 
-char*
-commonuser(void)
+char *commonuser(void)
 {
 	return current->user;
 }
 
-struct chan*
-commonfdtochan(int fd, int mode, int a, int b)
+struct chan *commonfdtochan(int fd, int mode, int a, int b)
 {
 	return fdtochan(current->fgrp, fd, mode, a, b);
 }
 
-char*
-commonerror(void)
+char *commonerror(void)
 {
 	return current_errstr();
 }
 
-int
-postnote(struct proc *p, int unused_int, char *note, int val)
+int postnote(struct proc *p, int unused_int, char *note, int val)
 {
 	panic("postnote");
 	return 0;

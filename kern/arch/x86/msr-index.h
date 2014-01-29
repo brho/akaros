@@ -4,24 +4,24 @@
 /* CPU model specific register (MSR) numbers */
 
 /* x86-64 specific MSRs */
-#define MSR_EFER		0xc0000080 /* extended feature register */
-#define MSR_STAR		0xc0000081 /* legacy mode SYSCALL target */
-#define MSR_LSTAR		0xc0000082 /* long mode SYSCALL target */
-#define MSR_CSTAR		0xc0000083 /* compat mode SYSCALL target */
-#define MSR_SYSCALL_MASK	0xc0000084 /* EFLAGS mask for syscall */
-#define MSR_FS_BASE		0xc0000100 /* 64bit FS base */
-#define MSR_GS_BASE		0xc0000101 /* 64bit GS base */
-#define MSR_KERNEL_GS_BASE	0xc0000102 /* SwapGS GS shadow */
-#define MSR_TSC_AUX		0xc0000103 /* Auxiliary TSC */
+#define MSR_EFER		0xc0000080	/* extended feature register */
+#define MSR_STAR		0xc0000081	/* legacy mode SYSCALL target */
+#define MSR_LSTAR		0xc0000082	/* long mode SYSCALL target */
+#define MSR_CSTAR		0xc0000083	/* compat mode SYSCALL target */
+#define MSR_SYSCALL_MASK	0xc0000084	/* EFLAGS mask for syscall */
+#define MSR_FS_BASE		0xc0000100	/* 64bit FS base */
+#define MSR_GS_BASE		0xc0000101	/* 64bit GS base */
+#define MSR_KERNEL_GS_BASE	0xc0000102	/* SwapGS GS shadow */
+#define MSR_TSC_AUX		0xc0000103	/* Auxiliary TSC */
 
 /* EFER bits: */
-#define _EFER_SCE		0  /* SYSCALL/SYSRET */
-#define _EFER_LME		8  /* Long mode enable */
-#define _EFER_LMA		10 /* Long mode active (read-only) */
-#define _EFER_NX		11 /* No execute enable */
-#define _EFER_SVME		12 /* Enable virtualization */
-#define _EFER_LMSLE		13 /* Long Mode Segment Limit Enable */
-#define _EFER_FFXSR		14 /* Enable Fast FXSAVE/FXRSTOR */
+#define _EFER_SCE		0	/* SYSCALL/SYSRET */
+#define _EFER_LME		8	/* Long mode enable */
+#define _EFER_LMA		10	/* Long mode active (read-only) */
+#define _EFER_NX		11	/* No execute enable */
+#define _EFER_SVME		12	/* Enable virtualization */
+#define _EFER_LMSLE		13	/* Long Mode Segment Limit Enable */
+#define _EFER_FFXSR		14	/* Enable Fast FXSAVE/FXRSTOR */
 
 #define EFER_SCE		(1<<_EFER_SCE)
 #define EFER_LME		(1<<_EFER_LME)
@@ -94,8 +94,8 @@
 #define MSR_IA32_LASTINTTOIP		0x000001de
 
 /* DEBUGCTLMSR bits (others vary by model): */
-#define DEBUGCTLMSR_LBR			(1UL <<  0) /* last branch recording */
-#define DEBUGCTLMSR_BTF			(1UL <<  1) /* single-step on branches */
+#define DEBUGCTLMSR_LBR			(1UL <<  0)	/* last branch recording */
+#define DEBUGCTLMSR_BTF			(1UL <<  1)	/* single-step on branches */
 #define DEBUGCTLMSR_TR			(1UL <<  6)
 #define DEBUGCTLMSR_BTS			(1UL <<  7)
 #define DEBUGCTLMSR_BTINT		(1UL <<  8)
@@ -192,7 +192,7 @@
 #define MSR_AMD64_IBSOP_REG_MASK	((1UL<<MSR_AMD64_IBSOP_REG_COUNT)-1)
 #define MSR_AMD64_IBSCTL		0xc001103a
 #define MSR_AMD64_IBSBRTARGET		0xc001103b
-#define MSR_AMD64_IBS_REG_COUNT_MAX	8 /* includes MSR_AMD64_IBSBRTARGET */
+#define MSR_AMD64_IBS_REG_COUNT_MAX	8	/* includes MSR_AMD64_IBSBRTARGET */
 
 /* Fam 15h MSRs */
 #define MSR_F15H_PERF_CTL		0xc0010200
@@ -215,9 +215,9 @@
 /* C1E active bits in int pending message */
 #define K8_INTP_C1E_ACTIVE_MASK		0x18000000
 #define MSR_K8_TSEG_ADDR		0xc0010112
-#define K8_MTRRFIXRANGE_DRAM_ENABLE	0x00040000 /* MtrrFixDramEn bit    */
-#define K8_MTRRFIXRANGE_DRAM_MODIFY	0x00080000 /* MtrrFixDramModEn bit */
-#define K8_MTRR_RDMEM_WRMEM_MASK	0x18181818 /* Mask: RdMem|WrMem    */
+#define K8_MTRRFIXRANGE_DRAM_ENABLE	0x00040000	/* MtrrFixDramEn bit    */
+#define K8_MTRRFIXRANGE_DRAM_MODIFY	0x00080000	/* MtrrFixDramModEn bit */
+#define K8_MTRR_RDMEM_WRMEM_MASK	0x18181818	/* Mask: RdMem|WrMem    */
 
 /* K7 MSRs */
 #define MSR_K7_EVNTSEL0			0xc0010000
@@ -469,7 +469,7 @@
 #define MSR_P4_SAAT_ESCR0		0x000003ae
 #define MSR_P4_SAAT_ESCR1		0x000003af
 #define MSR_P4_SSU_ESCR0		0x000003be
-#define MSR_P4_SSU_ESCR1		0x000003bf /* guess: not in manual */
+#define MSR_P4_SSU_ESCR1		0x000003bf	/* guess: not in manual */
 
 #define MSR_P4_TBPU_ESCR0		0x000003c2
 #define MSR_P4_TBPU_ESCR1		0x000003c3

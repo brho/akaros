@@ -26,7 +26,7 @@
 
 *******************************************************************************/
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE(GPL2_OR_LATER);
 
 #ifndef _E1000_82543_H_
 #define _E1000_82543_H_
@@ -38,7 +38,7 @@ FILE_LICENCE ( GPL2_OR_LATER );
 #define PHY_OP_WRITE      0x1
 #define PHY_TURNAROUND    0x2
 
-#define TBI_COMPAT_ENABLED 0x1 /* Global "knob" for the workaround */
+#define TBI_COMPAT_ENABLED 0x1	/* Global "knob" for the workaround */
 /* If TBI_COMPAT_ENABLED, then this is the current state (on/off) */
 #define TBI_SBP_ENABLED    0x2
 

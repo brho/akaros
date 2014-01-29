@@ -16,30 +16,24 @@
 /*
  * no cache in hosted mode
  */
-void
-cinit(void)
+void cinit(void)
 {
 }
 
-void
-copen(struct chan *c)
+void copen(struct chan *c)
 {
 	c->flag &= ~CCACHE;
 }
 
-int
-cread(struct chan *c, uint8_t *b, int n, int64_t off)
+int cread(struct chan *c, uint8_t * b, int n, int64_t off)
 {
 	return 0;
 }
 
-void
-cwrite(struct chan *c, uint8_t *buf, int n, int64_t off)
+void cwrite(struct chan *c, uint8_t * buf, int n, int64_t off)
 {
 }
 
-void
-cupdate(struct chan *c, uint8_t *buf,  int n, int64_t off)
+void cupdate(struct chan *c, uint8_t * buf, int n, int64_t off)
 {
 }
-

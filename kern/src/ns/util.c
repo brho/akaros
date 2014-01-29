@@ -5,7 +5,7 @@
 
 /* Copies n bytes from mem + offset into buf, similar to a read() call. */
 int readmem(unsigned long offset, char *buf, unsigned long n,
-            void *mem, size_t mem_len)
+			void *mem, size_t mem_len)
 {
 	if (offset >= mem_len)
 		return 0;
@@ -19,7 +19,7 @@ int readmem(unsigned long offset, char *buf, unsigned long n,
  * 'size' parameter (the old plan9 users just picked NUMSIZE (12), though they
  * seem to want to limit it).  */
 int readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
-            size_t size)
+			size_t size)
 {
 	char tmp[64];
 	size = MIN(sizeof(tmp), size);

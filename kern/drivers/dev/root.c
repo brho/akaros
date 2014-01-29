@@ -43,45 +43,44 @@ int inumber = 13;
 */
 /* we pack the qid as follows: path is the index, vers is ., and type is type */
 struct dirtab roottab[MAXFILE] = {
-	{"",	{0, 1, QTDIR},	 0,	0777},
-	{"chan",{1, 2, QTDIR},	 0,	0777},
-	{"dev",	{2, 3, QTDIR},	 0,	0777},
-	{"fd",	{3, 4, QTDIR},	 0,	0777},
-	{"prog",{4, 5, QTDIR},	 0,	0777},
-	{"prof",{5, 6, QTDIR},	 0,	0777},
-	{"net",	{6, 7, QTDIR},	 0,	0777},
-	{"net.alt",{7, 8, QTDIR},0,	0777},
-	{"nvfs",{8, 9, QTDIR},	 0,	0777},
-	{"env",	{9, 10, QTDIR},	 0,	0777},
-	{"root",{10, 11, QTDIR},	 0,	0777},
-	{"srv",	{11, 12, QTDIR},	 0,	0777},
+	{"", {0, 1, QTDIR}, 0, 0777},
+	{"chan", {1, 2, QTDIR}, 0, 0777},
+	{"dev", {2, 3, QTDIR}, 0, 0777},
+	{"fd", {3, 4, QTDIR}, 0, 0777},
+	{"prog", {4, 5, QTDIR}, 0, 0777},
+	{"prof", {5, 6, QTDIR}, 0, 0777},
+	{"net", {6, 7, QTDIR}, 0, 0777},
+	{"net.alt", {7, 8, QTDIR}, 0, 0777},
+	{"nvfs", {8, 9, QTDIR}, 0, 0777},
+	{"env", {9, 10, QTDIR}, 0, 0777},
+	{"root", {10, 11, QTDIR}, 0, 0777},
+	{"srv", {11, 12, QTDIR}, 0, 0777},
 	/* not courtesy of mkroot */
-	{"mnt",	{12, 0, QTDIR},	 0,	0777},
+	{"mnt", {12, 0, QTDIR}, 0, 0777},
 };
 
-struct rootdata
-{
-	int	dotdot;
-	int     child;
-	void	*ptr;
-	int	size;
-	int	*sizep;
+struct rootdata {
+	int dotdot;
+	int child;
+	void *ptr;
+	int size;
+	int *sizep;
 };
 
 struct rootdata rootdata[MAXFILE] = {
-	{0,	0,	 &roottab[1],	 12,	NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
+	{0, 0, &roottab[1], 12, NULL},
+	{0, 0, NULL, 0, NULL},
+	{0, 0, NULL, 0, NULL},
+	{0, 0, NULL, 0, NULL},
+	{0, 0, NULL, 0, NULL},
+	{0, 0, NULL, 0, NULL},
+	{0, 0, NULL, 0, NULL},
+	{0, 0, NULL, 0, NULL},
+	{0, 0, NULL, 0, NULL},
+	{0, 0, NULL, 0, NULL},
+	{0, 0, NULL, 0, NULL},
+	{0, 0, NULL, 0, NULL},
+	{0, 0, NULL, 0, NULL},
 };
 
 void dumprootdev(void)
@@ -90,22 +89,22 @@ void dumprootdev(void)
 	struct rootdata *rd = rootdata;
 	int i;
 
-	for(i = 0; i < rootmaxq; i++, r++, rd++){
-		if (i && (! r->name[0]))
+	for (i = 0; i < rootmaxq; i++, r++, rd++) {
+		if (i && (!r->name[0]))
 			continue;
 		printk("[%p]%s: [%d, %d, %d], %d, %o; ",
-		       r,
-		       r->name, r->qid.path, r->qid.vers, r->qid.type,
-		       r->length, r->perm);
-		printk("dotdot %d, child %d, ptr %p, size %d, sizep %p\n", 
-		       rd->dotdot, rd->child, rd->ptr, rd->size, rd->sizep);
+			   r,
+			   r->name, r->qid.path, r->qid.vers, r->qid.type,
+			   r->length, r->perm);
+		printk("dotdot %d, child %d, ptr %p, size %d, sizep %p\n",
+			   rd->dotdot, rd->child, rd->ptr, rd->size, rd->sizep);
 	}
 }
 
 static int findempty(void)
 {
 	int i;
-	for(i = 0; i < rootmaxq; i++){
+	for (i = 0; i < rootmaxq; i++) {
 		if (!roottab[i].qid.type) {
 			return i;
 		}
@@ -127,7 +126,7 @@ static int newentry(int old)
 		error("#r. No more");
 	printk("new entry is %d\n", n);
 	sib = rootdata[old].child;
-	if (sib){
+	if (sib) {
 		roottab[n].qid.vers = roottab[sib].qid.vers;
 		roottab[sib].qid.vers = n;
 	}
@@ -142,7 +141,7 @@ static int createentry(int dir, char *name, int length, int perm)
 	roottab[n].length;
 	roottab[n].perm = perm;
 	/* vers is already properly set. */
-	mkqid(&roottab[n].qid, n, roottab[n].qid.vers, perm&DMDIR ? QTDIR : 'f');
+	mkqid(&roottab[n].qid, n, roottab[n].qid.vers, perm & DMDIR ? QTDIR : 'f');
 	rootdata[n].dotdot = roottab[dir].qid.path;
 	rootdata[dir].ptr = &roottab[n];
 	rootdata[n].size = 0;
@@ -150,25 +149,24 @@ static int createentry(int dir, char *name, int length, int perm)
 	return n;
 }
 
-static struct chan*
-rootattach(char *spec)
+static struct chan *rootattach(char *spec)
 {
 	int i;
 	uint32_t len;
 	struct rootdata *r;
 
-	if(*spec)
+	if (*spec)
 		error(Ebadspec);
 	/* this begins with the root. */
-	for (i = 0; ;i++){
+	for (i = 0;; i++) {
 		r = &rootdata[i];
-		if (r->sizep){
+		if (r->sizep) {
 			len = *r->sizep;
 			r->size = len;
 			roottab[i].length = len;
 		}
 		i = roottab[i].qid.vers;
-		if (! i)
+		if (!i)
 			break;
 	}
 	return devattach('r', spec);
@@ -176,28 +174,28 @@ rootattach(char *spec)
 
 static int
 rootgen(struct chan *c, char *name,
-	struct dirtab *tab, int nd, int s, struct dir *dp)
+		struct dirtab *tab, int nd, int s, struct dir *dp)
 {
 	int p, i;
 	struct rootdata *r;
 	int iter;
-	printk("rootgen, path is %d, tap %p, nd %d s %d\n", rootdata[c->qid.path].dotdot, 
-	       tab, nd, s);
+	printk("rootgen, path is %d, tap %p, nd %d s %d\n",
+		   rootdata[c->qid.path].dotdot, tab, nd, s);
 
-	if(s == DEVDOTDOT){
+	if (s == DEVDOTDOT) {
 		printk("rootgen, DEVDOTDOT\n");
 		p = rootdata[c->qid.path].dotdot;
 		c->qid.path = p;
 		c->qid.type = QTDIR;
 		name = "#r";
-		if(p != 0){
-			for(i = p; ;){
-				if(roottab[i].qid.path == c->qid.path){
+		if (p != 0) {
+			for (i = p;;) {
+				if (roottab[i].qid.path == c->qid.path) {
 					name = roottab[i].name;
 					break;
 				}
 				i = roottab[i].qid.vers;
-				if (! i)
+				if (!i)
 					break;
 			}
 		}
@@ -205,31 +203,31 @@ rootgen(struct chan *c, char *name,
 		return 1;
 	}
 
-	if(name != NULL){
+	if (name != NULL) {
 		int path = c->qid.path;
 		isdir(c);
 		tab = &roottab[path];
 		/* we're starting at a directory. It might be '.' */
-		for(iter = 0, i=path; ; iter++){
-			if(strcmp(tab->name, name) == 0){
+		for (iter = 0, i = path;; iter++) {
+			if (strcmp(tab->name, name) == 0) {
 				devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
 				return 1;
 			}
-			if (iter > rootmaxq){
+			if (iter > rootmaxq) {
 				printk("BUG:");
 				dumprootdev();
 				printk("name %s\n", name);
 				return -1;
 			}
 			i = roottab[i].qid.vers;
-			if (! i)
+			if (!i)
 				break;
 			tab = &roottab[i];
 		}
 		return -1;
 	}
 
-	if(s >= nd) {
+	if (s >= nd) {
 		return -1;
 	}
 	tab += s;
@@ -238,27 +236,26 @@ rootgen(struct chan *c, char *name,
 	return 1;
 }
 
-static struct walkqid*
-rootwalk(struct chan *c, struct chan *nc, char **name, int nname)
+static struct walkqid *rootwalk(struct chan *c, struct chan *nc, char **name,
+								int nname)
 {
 	uint32_t p;
-	if (0){
+	if (0) {
 		printk("rootwalk: c %p. ", c);
-		if (nname){
+		if (nname) {
 			int i;
-			for(i = 0; i < nname-1; i++)
+			for (i = 0; i < nname - 1; i++)
 				printk("%s/", name[i]);
 			printk("%s", name[i]);
 		}
 	}
 	p = c->qid.path;
-	if(nname == 0)
+	if (nname == 0)
 		p = rootdata[p].dotdot;
 	return devwalk(c, nc, name, nname, &roottab[p], rootdata[p].size, rootgen);
 }
 
-static int
-rootstat(struct chan *c, uint8_t *dp, int n)
+static int rootstat(struct chan *c, uint8_t * dp, int n)
 {
 	int p;
 
@@ -266,8 +263,7 @@ rootstat(struct chan *c, uint8_t *dp, int n)
 	return devstat(c, dp, n, rootdata[p].ptr, rootdata[p].size, rootgen);
 }
 
-static struct chan*
-rootopen(struct chan *c, int omode)
+static struct chan *rootopen(struct chan *c, int omode)
 {
 	int p;
 
@@ -275,13 +271,13 @@ rootopen(struct chan *c, int omode)
 	return devopen(c, omode, rootdata[p].ptr, rootdata[p].size, rootgen);
 }
 
-static void
-rootcreate(struct chan *c, char *name, int omode, uint32_t perm)
+static void rootcreate(struct chan *c, char *name, int omode, uint32_t perm)
 {
 	struct dirtab *r = &roottab[c->qid.path], *newr;
 	struct rootdata *rd = &rootdata[c->qid.path];
-	if (1)printk("rootcreate: c %p, name %s, omode %o, perm %x\n", 
-	       c, name, omode, perm);
+	if (1)
+		printk("rootcreate: c %p, name %s, omode %o, perm %x\n",
+			   c, name, omode, perm);
 	/* find an empty slot */
 	//wlock(&root)
 	int path = c->qid.path;
@@ -290,42 +286,40 @@ rootcreate(struct chan *c, char *name, int omode, uint32_t perm)
 	rd->size++;
 	if (newfile > rootmaxq)
 		rootmaxq = newfile;
-	if (1) printk("create: %s, newfile %d, dotdot %d, rootmaxq %d\n", name, newfile,
-		  rootdata[newfile].dotdot, rootmaxq);
+	if (1)
+		printk("create: %s, newfile %d, dotdot %d, rootmaxq %d\n", name,
+			   newfile, rootdata[newfile].dotdot, rootmaxq);
 }
 
 /*
  * sysremove() knows this is a nop
  */
-static void	 
-rootclose(struct chan *c)
+static void rootclose(struct chan *c)
 {
 }
 
-static long	 
-rootread(struct chan *c, void *buf, long n, int64_t offset)
+static long rootread(struct chan *c, void *buf, long n, int64_t offset)
 {
 	uint32_t p, len;
 	uint8_t *data;
 
 	p = c->qid.path;
-	if(c->qid.type & QTDIR) {
-		return devdirread(c, buf, n, rootdata[p].ptr, rootdata[p].size, rootgen);
+	if (c->qid.type & QTDIR) {
+		return devdirread(c, buf, n, rootdata[p].ptr, rootdata[p].size,
+						  rootgen);
 	}
 	len = rootdata[p].size;
-	if(offset < 0 || offset >= len) {
+	if (offset < 0 || offset >= len) {
 		return 0;
 	}
-	if(offset+n > len)
+	if (offset + n > len)
 		n = len - offset;
 	data = rootdata[p].ptr;
-	memmove(buf, data+offset, n);
+	memmove(buf, data + offset, n);
 	return n;
 }
 
-
-static long	 
-rootwrite(struct chan *c, void *a, long n, int64_t off)
+static long rootwrite(struct chan *c, void *a, long n, int64_t off)
 {
 	error(Eperm);
 	return 0;

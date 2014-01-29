@@ -19,27 +19,25 @@ nullbind(struct Ipifc *unused_ipifc, int unused_int, char **unused_char_pp_t)
 	error("cannot bind null device");
 }
 
-static void
-nullunbind(struct Ipifc *unused_ipifc)
+static void nullunbind(struct Ipifc *unused_ipifc)
 {
 }
 
 static void
-nullbwrite(struct Ipifc *unused_ipifc, struct block*b, int unused_int, uint8_t *unused_uint8_p_t)
+nullbwrite(struct Ipifc *unused_ipifc, struct block *b, int unused_int,
+		   uint8_t * unused_uint8_p_t)
 {
 	error("nullbwrite");
 }
 
-struct medium nullmedium =
-{
-.name=		"null",
-.bind=		nullbind,
-.unbind=	nullunbind,
-.bwrite=	nullbwrite,
+struct medium nullmedium = {
+	.name = "null",
+	.bind = nullbind,
+	.unbind = nullunbind,
+	.bwrite = nullbwrite,
 };
 
-void
-nullmediumlink(void)
+void nullmediumlink(void)
 {
 	addipmedium(&nullmedium);
 }

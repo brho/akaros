@@ -14,11 +14,10 @@
 #include <ip.h>
 #include <process.h>
 
-enum
-{
-	Hdrspc		= 64,		/* leave room for high-level headers */
-	Bdead		= 0x51494F42,	/* "QIOB" */
-	BLOCKALIGN  = 32,		/* was the old BY2V in inferno, which was 8 */
+enum {
+	Hdrspc = 64,				/* leave room for high-level headers */
+	Bdead = 0x51494F42,	/* "QIOB" */
+	BLOCKALIGN = 32,	/* was the old BY2V in inferno, which was 8 */
 };
 
 static atomic_t ialloc_bytes = 0;
@@ -36,7 +35,7 @@ struct block *_allocb(int size)
 
 	/* TODO: verify we end up with properly aligned blocks */
 	b = kzmalloc(sizeof(struct block) + size + Hdrspc + (BLOCKALIGN - 1),
-	             KMALLOC_WAIT);
+				 KMALLOC_WAIT);
 	if (b == NULL)
 		return NULL;
 
@@ -45,15 +44,17 @@ struct block *_allocb(int size)
 	b->free = NULL;
 	b->flag = 0;
 
-	addr = (uintptr_t)b;
+	addr = (uintptr_t) b;
 	addr = ROUNDUP(addr + sizeof(struct block), BLOCKALIGN);
-	b->base = (uint8_t*)addr;
+	b->base = (uint8_t *) addr;
 	/* interesting. We can ask the allocator, after allocating,
 	 * the *real* size of the block we got. Very nice.
 	 * Not on akaros yet.
-	b->lim = ((uint8_t*)b) + msize(b);
+	 b->lim = ((uint8_t*)b) + msize(b);
 	 */
-	b->lim = ((uint8_t*)b) + sizeof(struct block) + size + Hdrspc + (BLOCKALIGN - 1);
+	b->lim =
+		((uint8_t *) b) + sizeof(struct block) + size + Hdrspc + (BLOCKALIGN -
+																  1);
 	b->rp = b->base;
 	n = b->lim - b->base - size;
 	b->rp += n & ~(BLOCKALIGN - 1);
@@ -79,13 +80,13 @@ struct block *iallocb(int size)
 {
 	struct block *b;
 
-	#if 0 /* conf is some inferno global config */
+#if 0	/* conf is some inferno global config */
 	if (atomic_read(&ialloc_bytes) > conf.ialloc) {
 		//printk("iallocb: limited %lu/%lu\n", atomic_read(&ialloc_bytes),
 		//       conf.ialloc);
 		return NULL;
 	}
-	#endif
+#endif
 
 	b = _allocb(size);
 	if (b == NULL) {
@@ -159,5 +160,5 @@ void checkb(struct block *b, char *msg)
 
 void iallocsummary(void)
 {
-	printd("ialloc %lu/%lu\n", atomic_read(&ialloc_bytes), 0 /*conf.ialloc*/);
+	printd("ialloc %lu/%lu\n", atomic_read(&ialloc_bytes), 0 /*conf.ialloc */ );
 }

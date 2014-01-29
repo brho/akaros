@@ -26,7 +26,7 @@
 
 *******************************************************************************/
 
-FILE_LICENCE ( GPL2_ONLY );
+FILE_LICENCE(GPL2_ONLY);
 
 REQUIRE_OBJECT(e1000_main);
 REQUIRE_OBJECT(e1000_82540);

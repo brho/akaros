@@ -46,7 +46,7 @@ static void genrandom(void *unused)
 	unsigned int mod_four = 0;
 	//setpri(PriBackground);
 
-	for(;;) {
+	for (;;) {
 		/* this seems just as good (or bad) as the old genrandom incrementing a
 		 * shared memory variable concurrently */
 		rand_two_bits = read_tsc() & 0x3;
@@ -62,7 +62,7 @@ static void genrandom(void *unused)
 
 		/* the old plan9 generator would xor our rand_byte with both the value
 		 * of the read pointer and the write pointer:
-		 * 		*rb.wp ^= rb.bits ^ *rb.rp;
+		 *      *rb.wp ^= rb.bits ^ *rb.rp;
 		 * we'll peak into the apipe to do the same */
 		rp_byte = rb.buf[rb.ap.ap_rd_off & (RAND_BUF_SZ - 1)];
 		wp_byte = rb.buf[rb.ap.ap_wr_off & (RAND_BUF_SZ - 1)];

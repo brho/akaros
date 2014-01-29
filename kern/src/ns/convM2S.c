@@ -14,30 +14,28 @@
 #include <ip.h>
 
 static
-uint8_t*
-gstring(uint8_t *p, uint8_t *ep, char **s)
+uint8_t *gstring(uint8_t * p, uint8_t * ep, char **s)
 {
 	unsigned int n;
 
-	if(p+BIT16SZ > ep)
+	if (p + BIT16SZ > ep)
 		return NULL;
 	n = GBIT16(p);
 	p += BIT16SZ - 1;
-	if(p+n+1 > ep)
+	if (p + n + 1 > ep)
 		return NULL;
 	/* move it down, on top of count, to make room for '\0' */
 	memmove(p, p + 1, n);
 	p[n] = '\0';
-	*s = ( char *)p;
-	p += n+1;
+	*s = (char *)p;
+	p += n + 1;
 	return p;
 }
 
 static
-uint8_t*
-gqid(uint8_t *p, uint8_t *ep, struct qid *q)
+uint8_t *gqid(uint8_t * p, uint8_t * ep, struct qid *q)
 {
-	if(p+QIDSZ > ep)
+	if (p + QIDSZ > ep)
 		return NULL;
 	q->type = GBIT8(p);
 	p += BIT8SZ;
@@ -58,8 +56,7 @@ gqid(uint8_t *p, uint8_t *ep, struct qid *q)
  * main switch statement checks range and also can fall through
  * to test at end of routine.
  */
-unsigned int
-convM2S(uint8_t *ap, unsigned int nap, struct fcall *f)
+unsigned int convM2S(uint8_t * ap, unsigned int nap, struct fcall *f)
 {
 	uint8_t *p, *ep;
 	unsigned int i, size;
@@ -67,12 +64,12 @@ convM2S(uint8_t *ap, unsigned int nap, struct fcall *f)
 	p = ap;
 	ep = p + nap;
 
-	if(p+BIT32SZ+BIT8SZ+BIT16SZ > ep)
+	if (p + BIT32SZ + BIT8SZ + BIT16SZ > ep)
 		return 0;
 	size = GBIT32(p);
 	p += BIT32SZ;
 
-	if(size < BIT32SZ+BIT8SZ+BIT16SZ)
+	if (size < BIT32SZ + BIT8SZ + BIT16SZ)
 		return 0;
 
 	f->type = GBIT8(p);
@@ -80,247 +77,246 @@ convM2S(uint8_t *ap, unsigned int nap, struct fcall *f)
 	f->tag = GBIT16(p);
 	p += BIT16SZ;
 
-	switch(f->type)
-	{
-	default:
-		return 0;
-
-	case Tversion:
-		if(p+BIT32SZ > ep)
+	switch (f->type) {
+		default:
 			return 0;
-		f->msize = GBIT32(p);
-		p += BIT32SZ;
-		p = gstring(p, ep, &f->version);
-		break;
 
-	case Tflush:
-		if(p+BIT16SZ > ep)
-			return 0;
-		f->oldtag = GBIT16(p);
-		p += BIT16SZ;
-		break;
-
-	case Tauth:
-		if(p+BIT32SZ > ep)
-			return 0;
-		f->afid = GBIT32(p);
-		p += BIT32SZ;
-		p = gstring(p, ep, &f->uname);
-		if(p == NULL)
+		case Tversion:
+			if (p + BIT32SZ > ep)
+				return 0;
+			f->msize = GBIT32(p);
+			p += BIT32SZ;
+			p = gstring(p, ep, &f->version);
 			break;
-		p = gstring(p, ep, &f->aname);
-		if(p == NULL)
-			break;
-		break;
 
-	case Tattach:
-		if(p+BIT32SZ > ep)
-			return 0;
-		f->fid = GBIT32(p);
-		p += BIT32SZ;
-		if(p+BIT32SZ > ep)
-			return 0;
-		f->afid = GBIT32(p);
-		p += BIT32SZ;
-		p = gstring(p, ep, &f->uname);
-		if(p == NULL)
+		case Tflush:
+			if (p + BIT16SZ > ep)
+				return 0;
+			f->oldtag = GBIT16(p);
+			p += BIT16SZ;
 			break;
-		p = gstring(p, ep, &f->aname);
-		if(p == NULL)
-			break;
-		break;
 
-	case Twalk:
-		if(p+BIT32SZ+BIT32SZ+BIT16SZ > ep)
-			return 0;
-		f->fid = GBIT32(p);
-		p += BIT32SZ;
-		f->newfid = GBIT32(p);
-		p += BIT32SZ;
-		f->nwname = GBIT16(p);
-		p += BIT16SZ;
-		if(f->nwname > MAXWELEM)
-			return 0;
-		for(i=0; i<f->nwname; i++){
-			p = gstring(p, ep, &f->wname[i]);
-			if(p == NULL)
+		case Tauth:
+			if (p + BIT32SZ > ep)
+				return 0;
+			f->afid = GBIT32(p);
+			p += BIT32SZ;
+			p = gstring(p, ep, &f->uname);
+			if (p == NULL)
 				break;
-		}
-		break;
-
-	case Topen:
-		if(p+BIT32SZ+BIT8SZ > ep)
-			return 0;
-		f->fid = GBIT32(p);
-		p += BIT32SZ;
-		f->mode = GBIT8(p);
-		p += BIT8SZ;
-		break;
-
-	case Tcreate:
-		if(p+BIT32SZ > ep)
-			return 0;
-		f->fid = GBIT32(p);
-		p += BIT32SZ;
-		p = gstring(p, ep, &f->name);
-		if(p == NULL)
+			p = gstring(p, ep, &f->aname);
+			if (p == NULL)
+				break;
 			break;
-		if(p+BIT32SZ+BIT8SZ > ep)
-			return 0;
-		f->perm = GBIT32(p);
-		p += BIT32SZ;
-		f->mode = GBIT8(p);
-		p += BIT8SZ;
-		break;
 
-	case Tread:
-		if(p+BIT32SZ+BIT64SZ+BIT32SZ > ep)
-			return 0;
-		f->fid = GBIT32(p);
-		p += BIT32SZ;
-		f->offset = GBIT64(p);
-		p += BIT64SZ;
-		f->count = GBIT32(p);
-		p += BIT32SZ;
-		break;
+		case Tattach:
+			if (p + BIT32SZ > ep)
+				return 0;
+			f->fid = GBIT32(p);
+			p += BIT32SZ;
+			if (p + BIT32SZ > ep)
+				return 0;
+			f->afid = GBIT32(p);
+			p += BIT32SZ;
+			p = gstring(p, ep, &f->uname);
+			if (p == NULL)
+				break;
+			p = gstring(p, ep, &f->aname);
+			if (p == NULL)
+				break;
+			break;
 
-	case Twrite:
-		if(p+BIT32SZ+BIT64SZ+BIT32SZ > ep)
-			return 0;
-		f->fid = GBIT32(p);
-		p += BIT32SZ;
-		f->offset = GBIT64(p);
-		p += BIT64SZ;
-		f->count = GBIT32(p);
-		p += BIT32SZ;
-		if(p+f->count > ep)
-			return 0;
-		f->data = ( char *)p;
-		p += f->count;
-		break;
+		case Twalk:
+			if (p + BIT32SZ + BIT32SZ + BIT16SZ > ep)
+				return 0;
+			f->fid = GBIT32(p);
+			p += BIT32SZ;
+			f->newfid = GBIT32(p);
+			p += BIT32SZ;
+			f->nwname = GBIT16(p);
+			p += BIT16SZ;
+			if (f->nwname > MAXWELEM)
+				return 0;
+			for (i = 0; i < f->nwname; i++) {
+				p = gstring(p, ep, &f->wname[i]);
+				if (p == NULL)
+					break;
+			}
+			break;
 
-	case Tclunk:
-	case Tremove:
-		if(p+BIT32SZ > ep)
-			return 0;
-		f->fid = GBIT32(p);
-		p += BIT32SZ;
-		break;
+		case Topen:
+			if (p + BIT32SZ + BIT8SZ > ep)
+				return 0;
+			f->fid = GBIT32(p);
+			p += BIT32SZ;
+			f->mode = GBIT8(p);
+			p += BIT8SZ;
+			break;
 
-	case Tstat:
-		if(p+BIT32SZ > ep)
-			return 0;
-		f->fid = GBIT32(p);
-		p += BIT32SZ;
-		break;
+		case Tcreate:
+			if (p + BIT32SZ > ep)
+				return 0;
+			f->fid = GBIT32(p);
+			p += BIT32SZ;
+			p = gstring(p, ep, &f->name);
+			if (p == NULL)
+				break;
+			if (p + BIT32SZ + BIT8SZ > ep)
+				return 0;
+			f->perm = GBIT32(p);
+			p += BIT32SZ;
+			f->mode = GBIT8(p);
+			p += BIT8SZ;
+			break;
 
-	case Twstat:
-		if(p+BIT32SZ+BIT16SZ > ep)
-			return 0;
-		f->fid = GBIT32(p);
-		p += BIT32SZ;
-		f->nstat = GBIT16(p);
-		p += BIT16SZ;
-		if(p+f->nstat > ep)
-			return 0;
-		f->stat = p;
-		p += f->nstat;
-		break;
+		case Tread:
+			if (p + BIT32SZ + BIT64SZ + BIT32SZ > ep)
+				return 0;
+			f->fid = GBIT32(p);
+			p += BIT32SZ;
+			f->offset = GBIT64(p);
+			p += BIT64SZ;
+			f->count = GBIT32(p);
+			p += BIT32SZ;
+			break;
+
+		case Twrite:
+			if (p + BIT32SZ + BIT64SZ + BIT32SZ > ep)
+				return 0;
+			f->fid = GBIT32(p);
+			p += BIT32SZ;
+			f->offset = GBIT64(p);
+			p += BIT64SZ;
+			f->count = GBIT32(p);
+			p += BIT32SZ;
+			if (p + f->count > ep)
+				return 0;
+			f->data = (char *)p;
+			p += f->count;
+			break;
+
+		case Tclunk:
+		case Tremove:
+			if (p + BIT32SZ > ep)
+				return 0;
+			f->fid = GBIT32(p);
+			p += BIT32SZ;
+			break;
+
+		case Tstat:
+			if (p + BIT32SZ > ep)
+				return 0;
+			f->fid = GBIT32(p);
+			p += BIT32SZ;
+			break;
+
+		case Twstat:
+			if (p + BIT32SZ + BIT16SZ > ep)
+				return 0;
+			f->fid = GBIT32(p);
+			p += BIT32SZ;
+			f->nstat = GBIT16(p);
+			p += BIT16SZ;
+			if (p + f->nstat > ep)
+				return 0;
+			f->stat = p;
+			p += f->nstat;
+			break;
 
 /*
  */
-	case Rversion:
-		if(p+BIT32SZ > ep)
-			return 0;
-		f->msize = GBIT32(p);
-		p += BIT32SZ;
-		p = gstring(p, ep, &f->version);
-		break;
-
-	case Rerror:
-		p = gstring(p, ep, &f->ename);
-		break;
-
-	case Rflush:
-		break;
-
-	case Rauth:
-		p = gqid(p, ep, &f->aqid);
-		if(p == NULL)
+		case Rversion:
+			if (p + BIT32SZ > ep)
+				return 0;
+			f->msize = GBIT32(p);
+			p += BIT32SZ;
+			p = gstring(p, ep, &f->version);
 			break;
-		break;
 
-	case Rattach:
-		p = gqid(p, ep, &f->qid);
-		if(p == NULL)
+		case Rerror:
+			p = gstring(p, ep, &f->ename);
 			break;
-		break;
 
-	case Rwalk:
-		if(p+BIT16SZ > ep)
-			return 0;
-		f->nwqid = GBIT16(p);
-		p += BIT16SZ;
-		if(f->nwqid > MAXWELEM)
-			return 0;
-		for(i=0; i<f->nwqid; i++){
-			p = gqid(p, ep, &f->wqid[i]);
-			if(p == NULL)
+		case Rflush:
+			break;
+
+		case Rauth:
+			p = gqid(p, ep, &f->aqid);
+			if (p == NULL)
 				break;
-		}
-		break;
-
-	case Ropen:
-	case Rcreate:
-		p = gqid(p, ep, &f->qid);
-		if(p == NULL)
 			break;
-		if(p+BIT32SZ > ep)
-			return 0;
-		f->iounit = GBIT32(p);
-		p += BIT32SZ;
-		break;
 
-	case Rread:
-		if(p+BIT32SZ > ep)
-			return 0;
-		f->count = GBIT32(p);
-		p += BIT32SZ;
-		if(p+f->count > ep)
-			return 0;
-		f->data = ( char *)p;
-		p += f->count;
-		break;
+		case Rattach:
+			p = gqid(p, ep, &f->qid);
+			if (p == NULL)
+				break;
+			break;
 
-	case Rwrite:
-		if(p+BIT32SZ > ep)
-			return 0;
-		f->count = GBIT32(p);
-		p += BIT32SZ;
-		break;
+		case Rwalk:
+			if (p + BIT16SZ > ep)
+				return 0;
+			f->nwqid = GBIT16(p);
+			p += BIT16SZ;
+			if (f->nwqid > MAXWELEM)
+				return 0;
+			for (i = 0; i < f->nwqid; i++) {
+				p = gqid(p, ep, &f->wqid[i]);
+				if (p == NULL)
+					break;
+			}
+			break;
 
-	case Rclunk:
-	case Rremove:
-		break;
+		case Ropen:
+		case Rcreate:
+			p = gqid(p, ep, &f->qid);
+			if (p == NULL)
+				break;
+			if (p + BIT32SZ > ep)
+				return 0;
+			f->iounit = GBIT32(p);
+			p += BIT32SZ;
+			break;
 
-	case Rstat:
-		if(p+BIT16SZ > ep)
-			return 0;
-		f->nstat = GBIT16(p);
-		p += BIT16SZ;
-		if(p+f->nstat > ep)
-			return 0;
-		f->stat = p;
-		p += f->nstat;
-		break;
+		case Rread:
+			if (p + BIT32SZ > ep)
+				return 0;
+			f->count = GBIT32(p);
+			p += BIT32SZ;
+			if (p + f->count > ep)
+				return 0;
+			f->data = (char *)p;
+			p += f->count;
+			break;
 
-	case Rwstat:
-		break;
+		case Rwrite:
+			if (p + BIT32SZ > ep)
+				return 0;
+			f->count = GBIT32(p);
+			p += BIT32SZ;
+			break;
+
+		case Rclunk:
+		case Rremove:
+			break;
+
+		case Rstat:
+			if (p + BIT16SZ > ep)
+				return 0;
+			f->nstat = GBIT16(p);
+			p += BIT16SZ;
+			if (p + f->nstat > ep)
+				return 0;
+			f->stat = p;
+			p += f->nstat;
+			break;
+
+		case Rwstat:
+			break;
 	}
 
-	if(p==NULL || p>ep)
+	if (p == NULL || p > ep)
 		return 0;
-	if(ap+size == p)
+	if (ap + size == p)
 		return size;
 	return 0;
 }

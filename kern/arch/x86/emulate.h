@@ -48,9 +48,9 @@ struct x86_emulate_ctxt;
 /* Access is unhandleable: bail from emulation and return error to caller. */
 #define X86EMUL_UNHANDLEABLE    1
 /* Terminate emulation but return success to the caller. */
-#define X86EMUL_PROPAGATE_FAULT 2 /* propagate a generated fault to guest */
-#define X86EMUL_RETRY_INSTR     2 /* retry the instruction for some reason */
-#define X86EMUL_CMPXCHG_FAILED  2 /* cmpxchg did not see expected value */
+#define X86EMUL_PROPAGATE_FAULT 2	/* propagate a generated fault to guest */
+#define X86EMUL_RETRY_INSTR     2	/* retry the instruction for some reason */
+#define X86EMUL_CMPXCHG_FAILED  2	/* cmpxchg did not see expected value */
 struct x86_emulate_ops {
 	/*
 	 * read_std: Read bytes of standard (non-emulated/special) memory.
@@ -59,9 +59,9 @@ struct x86_emulate_ops {
 	 *  @val:   [OUT] Value read from memory, zero-extended to 'u_long'.
 	 *  @bytes: [IN ] Number of bytes to read from memory.
 	 */
-	int (*read_std)(unsigned long addr,
-			unsigned long *val,
-			unsigned int bytes, struct x86_emulate_ctxt * ctxt);
+	int (*read_std) (unsigned long addr,
+					 unsigned long *val,
+					 unsigned int bytes, struct x86_emulate_ctxt * ctxt);
 
 	/*
 	 * write_std: Write bytes of standard (non-emulated/special) memory.
@@ -71,9 +71,9 @@ struct x86_emulate_ops {
 	 *                required).
 	 *  @bytes: [IN ] Number of bytes to write to memory.
 	 */
-	int (*write_std)(unsigned long addr,
-			 unsigned long val,
-			 unsigned int bytes, struct x86_emulate_ctxt * ctxt);
+	int (*write_std) (unsigned long addr,
+					  unsigned long val,
+					  unsigned int bytes, struct x86_emulate_ctxt * ctxt);
 
 	/*
 	 * read_emulated: Read bytes from emulated/special memory area.
@@ -82,9 +82,8 @@ struct x86_emulate_ops {
 	 *  @bytes: [IN ] Number of bytes to read from memory.
 	 */
 	int (*read_emulated) (unsigned long addr,
-			      unsigned long *val,
-			      unsigned int bytes,
-			      struct x86_emulate_ctxt * ctxt);
+						  unsigned long *val,
+						  unsigned int bytes, struct x86_emulate_ctxt * ctxt);
 
 	/*
 	 * write_emulated: Read bytes from emulated/special memory area.
@@ -94,9 +93,8 @@ struct x86_emulate_ops {
 	 *  @bytes: [IN ] Number of bytes to write to memory.
 	 */
 	int (*write_emulated) (unsigned long addr,
-			       unsigned long val,
-			       unsigned int bytes,
-			       struct x86_emulate_ctxt * ctxt);
+						   unsigned long val,
+						   unsigned int bytes, struct x86_emulate_ctxt * ctxt);
 
 	/*
 	 * cmpxchg_emulated: Emulate an atomic (LOCKed) CMPXCHG operation on an
@@ -107,10 +105,10 @@ struct x86_emulate_ops {
 	 *  @bytes: [IN ] Number of bytes to access using CMPXCHG.
 	 */
 	int (*cmpxchg_emulated) (unsigned long addr,
-				 unsigned long old,
-				 unsigned long new,
-				 unsigned int bytes,
-				 struct x86_emulate_ctxt * ctxt);
+							 unsigned long old,
+							 unsigned long new,
+							 unsigned int bytes,
+							 struct x86_emulate_ctxt * ctxt);
 
 	/*
 	 * cmpxchg8b_emulated: Emulate an atomic (LOCKed) CMPXCHG8B operation on an
@@ -125,11 +123,11 @@ struct x86_emulate_ops {
 	 *     to defining a function that always returns X86EMUL_UNHANDLEABLE.
 	 */
 	int (*cmpxchg8b_emulated) (unsigned long addr,
-				   unsigned long old_lo,
-				   unsigned long old_hi,
-				   unsigned long new_lo,
-				   unsigned long new_hi,
-				   struct x86_emulate_ctxt * ctxt);
+							   unsigned long old_lo,
+							   unsigned long old_hi,
+							   unsigned long new_lo,
+							   unsigned long new_hi,
+							   struct x86_emulate_ctxt * ctxt);
 };
 
 struct cpu_user_regs;
@@ -172,7 +170,7 @@ struct x86_emulate_ctxt {
  * Returns -1 on failure, 0 on success.
  */
 int x86_emulate_memop(struct x86_emulate_ctxt *ctxt,
-		      struct x86_emulate_ops *ops);
+					  struct x86_emulate_ops *ops);
 
 /*
  * Given the 'reg' portion of a ModRM byte, and a register block, return a
@@ -180,6 +178,6 @@ int x86_emulate_memop(struct x86_emulate_ctxt *ctxt,
  * @highbyte_regs specifies whether to decode AH,CH,DH,BH.
  */
 void *decode_register(uint8_t modrm_reg, unsigned long *regs,
-		      int highbyte_regs);
+					  int highbyte_regs);
 
-#endif				/* __X86_EMULATE_H__ */
+#endif /* __X86_EMULATE_H__ */

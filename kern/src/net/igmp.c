@@ -7,90 +7,84 @@
 
 #include "ip.h"
 
-enum
-{
-	IGMP_IPHDRSIZE	= 20,		/* size of ip header */
-	IGMP_HDRSIZE	= 8,		/* size of IGMP header */
-	IP_IGMPPROTO	= 2,
+enum {
+	IGMP_IPHDRSIZE = 20,		/* size of ip header */
+	IGMP_HDRSIZE = 8,	/* size of IGMP header */
+	IP_IGMPPROTO = 2,
 
-	IGMPquery	= 1,
-	IGMPreport	= 2,
+	IGMPquery = 1,
+	IGMPreport = 2,
 
-	MSPTICK		= 100,
-	MAXTIMEOUT	= 10000/MSPTICK,	/* at most 10 secs for a response */
+	MSPTICK = 100,
+	MAXTIMEOUT = 10000 / MSPTICK,	/* at most 10 secs for a response */
 };
 
 typedef struct IGMPpkt IGMPpkt;
-struct IGMPpkt
-{
+struct IGMPpkt {
 	/* ip header */
-	uchar	vihl;		/* Version and header length */
-	uchar	tos;		/* Type of service */
-	uchar	len[2];		/* packet length (including headers) */
-	uchar	id[2];		/* Identification */
-	uchar	frag[2];	/* Fragment information */
-	uchar	Unused;	
-	uchar	proto;		/* Protocol */
-	uchar	cksum[2];	/* checksum of ip portion */
-	uchar	src[IPaddrlen];		/* Ip source */
-	uchar	dst[IPaddrlen];		/* Ip destination */
+	uchar vihl;					/* Version and header length */
+	uchar tos;					/* Type of service */
+	uchar len[2];				/* packet length (including headers) */
+	uchar id[2];				/* Identification */
+	uchar frag[2];				/* Fragment information */
+	uchar Unused;
+	uchar proto;				/* Protocol */
+	uchar cksum[2];				/* checksum of ip portion */
+	uchar src[IPaddrlen];		/* Ip source */
+	uchar dst[IPaddrlen];		/* Ip destination */
 
 	/* igmp header */
-	uchar	vertype;	/* version and type */
-	uchar	unused;
-	uchar	igmpcksum[2];		/* checksum of igmp portion */
-	uchar	group[IPaddrlen];	/* multicast group */
+	uchar vertype;				/* version and type */
+	uchar unused;
+	uchar igmpcksum[2];			/* checksum of igmp portion */
+	uchar group[IPaddrlen];		/* multicast group */
 };
 
 /*
  *  lists for group reports
  */
 typedef struct IGMPrep IGMPrep;
-struct IGMPrep
-{
-	IGMPrep		*next;
-	Media		*m;
-	int		ticks;
-	Multicast	*multi;
+struct IGMPrep {
+	IGMPrep *next;
+	Media *m;
+	int ticks;
+	Multicast *multi;
 };
 
 typedef struct IGMP IGMP;
-struct IGMP
-{
+struct IGMP {
 	Lock;
-	Rendez	r;
-	IGMPrep	*reports;
+	Rendez r;
+	IGMPrep *reports;
 };
 
 IGMP igmpalloc;
 
-	Proto	igmp;
-extern	Fs	fs;
+Proto igmp;
+extern Fs fs;
 
-static struct Stats
-{
-	ulong 	inqueries;
-	ulong	outqueries;
-	ulong	inreports;
-	ulong	outreports;
+static struct Stats {
+	ulong inqueries;
+	ulong outqueries;
+	ulong inreports;
+	ulong outreports;
 } stats;
 
-void
-igmpsendreport(Media *m, uchar *addr)
+void igmpsendreport(Media * m, uchar * addr)
 {
 	IGMPpkt *p;
 	Block *bp;
 
 	bp = allocb(sizeof(IGMPpkt));
-	if(bp == nil)
+	if (bp == nil)
 		return;
-	p = (IGMPpkt*)bp->wp;
+	p = (IGMPpkt *) bp->wp;
 	p->vihl = IP_VER4;
 	bp->wp += sizeof(IGMPpkt);
 	memset(bp->rp, 0, sizeof(IGMPpkt));
 	hnputl(p->src, Mediagetaddr(m));
 	hnputl(p->dst, Ipallsys);
-	p->vertype = (1<<4) | IGMPreport;
+	p->vertype = (1 << 4) | IGMPreport;
 	p->proto = IP_IGMPPROTO;
 	memmove(p->group, addr, IPaddrlen);
 	hnputs(p->igmpcksum, ptclcsum(bp, IGMP_IPHDRSIZE, IGMP_HDRSIZE));
@@ -99,16 +93,13 @@ igmpsendreport(Media *m, uchar *addr)
 	ipoput4(bp, 0, 1, DFLTTOS, nil);	/* TTL of 1 */
 }
 
-static int
-isreport(void *a)
+static int isreport(void *a)
 {
 	USED(a);
 	return igmpalloc.reports != 0;
 }
 
-
-void
-igmpproc(void *a)
+void igmpproc(void *a)
 {
 	IGMPrep *rp, **lrp;
 	Multicast *mp, **lmp;
@@ -116,31 +107,31 @@ igmpproc(void *a)
 
 	USED(a);
 
-	for(;;){
+	for (;;) {
 		rendez_sleep(&igmpalloc.r, isreport, 0);
-		for(;;){
+		for (;;) {
 			lock(&igmpalloc);
 
-			if(igmpalloc.reports == nil)
+			if (igmpalloc.reports == nil)
 				break;
-	
+
 			/* look for a single report */
 			lrp = &igmpalloc.reports;
 			mp = nil;
-			for(rp = *lrp; rp; rp = *lrp){
+			for (rp = *lrp; rp; rp = *lrp) {
 				rp->ticks++;
 				lmp = &rp->multi;
-				for(mp = *lmp; mp; mp = *lmp){
-					if(rp->ticks >= mp->timeout){
+				for (mp = *lmp; mp; mp = *lmp) {
+					if (rp->ticks >= mp->timeout) {
 						*lmp = mp->next;
 						break;
 					}
 					lmp = &mp->next;
 				}
-				if(mp != nil)
+				if (mp != nil)
 					break;
 
-				if(rp->multi != nil){
+				if (rp->multi != nil) {
 					lrp = &rp->next;
 					continue;
 				} else {
@@ -150,7 +141,7 @@ igmpproc(void *a)
 			}
 			unlock(&igmpalloc);
 
-			if(mp){
+			if (mp) {
 				/* do a single report and try again */
 				hnputl(ip, mp->addr);
 				igmpsendreport(rp->m, ip);
@@ -165,8 +156,7 @@ igmpproc(void *a)
 
 }
 
-void
-igmpiput(Media *m, Ipifc *, Block *bp)
+void igmpiput(Media * m, Ipifc *, Block * bp)
 {
 	int n;
 	IGMPpkt *ghp;
@@ -174,86 +164,86 @@ igmpiput(Media *m, Ipifc *, Block *bp)
 	IGMPrep *rp, **lrp;
 	Multicast *mp, **lmp;
 
-	ghp = (IGMPpkt*)(bp->rp);
+	ghp = (IGMPpkt *) (bp->rp);
 	netlog(Logigmp, "igmpiput: %d %I\n", ghp->vertype, ghp->group);
 
 	n = blocklen(bp);
-	if(n < IGMP_IPHDRSIZE+IGMP_HDRSIZE){
+	if (n < IGMP_IPHDRSIZE + IGMP_HDRSIZE) {
 		netlog(Logigmp, "igmpiput: bad len\n");
 		goto error;
 	}
-	if((ghp->vertype>>4) != 1){
+	if ((ghp->vertype >> 4) != 1) {
 		netlog(Logigmp, "igmpiput: bad igmp type\n");
 		goto error;
 	}
-	if(ptclcsum(bp, IGMP_IPHDRSIZE, IGMP_HDRSIZE)){
+	if (ptclcsum(bp, IGMP_IPHDRSIZE, IGMP_HDRSIZE)) {
 		netlog(Logigmp, "igmpiput: checksum error %I\n", ghp->src);
 		goto error;
 	}
 
 	group = nhgetl(ghp->group);
-	
+
 	lock(&igmpalloc);
-	switch(ghp->vertype & 0xf){
-	case IGMPquery:
-		/*
-		 *  start reporting groups that we're a member of.
-		 */
-		stats.inqueries++;
-		for(rp = igmpalloc.reports; rp; rp = rp->next)
-			if(rp->m == m)
+	switch (ghp->vertype & 0xf) {
+		case IGMPquery:
+			/*
+			 *  start reporting groups that we're a member of.
+			 */
+			stats.inqueries++;
+			for (rp = igmpalloc.reports; rp; rp = rp->next)
+				if (rp->m == m)
+					break;
+			if (rp != nil)
+				break;	/* already reporting */
+
+			mp = Mediacopymulti(m);
+			if (mp == nil)
 				break;
-		if(rp != nil)
-			break;	/* already reporting */
 
-		mp = Mediacopymulti(m);
-		if(mp == nil)
-			break;
-
-		rp = malloc(sizeof(*rp));
-		if(rp == nil)
-			break;
-
-		rp->m = m;
-		rp->multi = mp;
-		rp->ticks = 0;
-		for(; mp; mp = mp->next)
-			mp->timeout = nrand(MAXTIMEOUT);
-		rp->next = igmpalloc.reports;
-		igmpalloc.reports = rp;
-
-		rendez_wakeup(&igmpalloc.r);
-
-		break;
-	case IGMPreport:
-		/*
-		 *  find report list for this medium
-		 */
-		stats.inreports++;
-		lrp = &igmpalloc.reports;
-		for(rp = *lrp; rp; rp = *lrp){
-			if(rp->m == m)
+			rp = malloc(sizeof(*rp));
+			if (rp == nil)
 				break;
-			lrp = &rp->next;
-		}
-		if(rp == nil)
-			break;
 
-		/*
-		 *  if someone else has reported a group,
-		 *  we don't have to.
-		 */
-		lmp = &rp->multi;
-		for(mp = *lmp; mp; mp = *lmp){
-			if(mp->addr == group){
-				*lmp = mp->next;
-				free(mp);
-				break;
+			rp->m = m;
+			rp->multi = mp;
+			rp->ticks = 0;
+			for (; mp; mp = mp->next)
+				mp->timeout = nrand(MAXTIMEOUT);
+			rp->next = igmpalloc.reports;
+			igmpalloc.reports = rp;
+
+			rendez_wakeup(&igmpalloc.r);
+
+			break;
+		case IGMPreport:
+			/*
+			 *  find report list for this medium
+			 */
+			stats.inreports++;
+			lrp = &igmpalloc.reports;
+			for (rp = *lrp; rp; rp = *lrp) {
+				if (rp->m == m)
+					break;
+				lrp = &rp->next;
 			}
-			lmp = &mp->next;
-		}
+			if (rp == nil)
+				break;
 
-		break;
+			/*
+			 *  if someone else has reported a group,
+			 *  we don't have to.
+			 */
+			lmp = &rp->multi;
+			for (mp = *lmp; mp; mp = *lmp) {
+				if (mp->addr == group) {
+					*lmp = mp->next;
+					free(mp);
+					break;
+				}
+				lmp = &mp->next;
+			}
+
+			break;
 	}
 	unlock(&igmpalloc);
 
@@ -261,16 +251,14 @@ error:
 	freeb(bp);
 }
 
-int
-igmpstats(char *buf, int len)
+int igmpstats(char *buf, int len)
 {
 	return snprint(buf, len, "\trcvd %d %d\n\tsent %d %d\n",
-		stats.inqueries, stats.inreports,
-		stats.outqueries, stats.outreports);
+				   stats.inqueries, stats.inreports,
+				   stats.outqueries, stats.outreports);
 }
 
-void
-igmpinit(Fs *fs)
+void igmpinit(Fs * fs)
 {
 	igmp.name = "igmp";
 	igmp.connect = nil;

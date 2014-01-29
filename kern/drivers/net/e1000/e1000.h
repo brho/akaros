@@ -26,7 +26,6 @@
 
 *******************************************************************************/
 
-
 /* Linux PRO/1000 Ethernet Driver main header file */
 
 #ifndef _E1000_H_
@@ -56,9 +55,8 @@ struct e1000_adapter;
 #define E1000_MIN_RXD                       80
 #define E1000_MAX_82544_RXD               4096
 
-#define E1000_MIN_ITR_USECS                 10 /* 100000 irq/sec */
-#define E1000_MAX_ITR_USECS              10000 /* 100    irq/sec */
-
+#define E1000_MIN_ITR_USECS                 10	/* 100000 irq/sec */
+#define E1000_MAX_ITR_USECS              10000	/* 100    irq/sec */
 
 /* this is the size past which hardware will drop packets when setting LPE=0 */
 #define MAXIMUM_ETHERNET_VLAN_SIZE 1522
@@ -85,7 +83,7 @@ struct e1000_adapter;
 /* Early Receive defines */
 #define E1000_ERT_2048 0x100
 
-#define E1000_FC_PAUSE_TIME 0x0680 /* 858 usec */
+#define E1000_FC_PAUSE_TIME 0x0680	/* 858 usec */
 
 /* How many Tx Descriptors do we need to call netif_wake_queue ? */
 #define E1000_TX_QUEUE_WAKE	16
@@ -112,8 +110,6 @@ struct e1000_rx_buffer {
 	struct page *page;
 };
 
-
-
 struct e1000_tx_ring {
 	/* pointer to the descriptor ring memory */
 	void *desc;
@@ -135,18 +131,18 @@ struct e1000_tx_ring {
 	uint16_t tdt;
 
 	/* TXDdescriptor index increment to be used when advancing
-	* to the next descriptor. This is normally one, but on some
-	* architectures, but on some architectures there are cache
-	* coherency issues that require only the first descriptor in
-	* cache line can be used.
-	*/
+	 * to the next descriptor. This is normally one, but on some
+	 * architectures, but on some architectures there are cache
+	 * coherency issues that require only the first descriptor in
+	 * cache line can be used.
+	 */
 	unsigned int step;
 
 	bool last_tx_tso;
 };
 
 struct e1000_rx_ring {
-	struct e1000_adapter *adapter; /* back link */
+	struct e1000_adapter *adapter;	/* back link */
 	/* pointer to the descriptor ring memory */
 	void *desc;
 	/* physical address of the descriptor ring */
@@ -169,7 +165,6 @@ struct e1000_rx_ring {
 	uint16_t rdh;
 	uint16_t rdt;
 };
-
 
 #define E1000_TX_DESC_INC(R,index) \
 	{index += (R)->step; if (index == (R)->count) index = 0; }
@@ -232,11 +227,10 @@ struct e1000_adapter {
 	bool detect_tx_hung;
 
 	/* RX */
-	bool (*clean_rx) (struct e1000_adapter *adapter,
-			       struct e1000_rx_ring *rx_ring);
-	void (*alloc_rx_buf) (struct e1000_adapter *adapter,
-			      struct e1000_rx_ring *rx_ring,
-				int cleaned_count);
+	 bool(*clean_rx) (struct e1000_adapter * adapter,
+					  struct e1000_rx_ring * rx_ring);
+	void (*alloc_rx_buf) (struct e1000_adapter * adapter,
+						  struct e1000_rx_ring * rx_ring, int cleaned_count);
 	struct e1000_rx_ring *rx_ring;
 
 	u64 hw_csum_err;
@@ -249,7 +243,6 @@ struct e1000_adapter {
 	u64 gorc_old;
 	uint32_t max_frame_size;
 	uint32_t min_frame_size;
-
 
 	/* OS defined structs */
 	struct net_device *netdev;

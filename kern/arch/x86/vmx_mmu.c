@@ -67,7 +67,6 @@
 #define PT32_DIR_PSE36_SHIFT 13
 #define PT32_DIR_PSE36_MASK (((1ULL << PT32_DIR_PSE36_SIZE) - 1) << PT32_DIR_PSE36_SHIFT)
 
-
 #define PT32_PTE_COPY_MASK \
 	(PT_PRESENT_MASK | PT_PWT_MASK | PT_PCD_MASK | \
 	PT_ACCESSED_MASK | PT_DIRTY_MASK | PT_PAT_MASK | \
@@ -77,14 +76,11 @@
 	(PT_PRESENT_MASK | PT_PWT_MASK | PT_PCD_MASK | \
 	PT_ACCESSED_MASK | PT_DIRTY_MASK)
 
-
 #define PT64_PTE_COPY_MASK \
 	(PT64_NX_MASK | PT32_PTE_COPY_MASK)
 
 #define PT64_NON_PTE_COPY_MASK \
 	(PT64_NX_MASK | PT32_NON_PTE_COPY_MASK)
-
-
 
 #define PT_FIRST_AVAIL_BITS_SHIFT 9
 #define PT64_SECOND_AVAIL_BITS_SHIFT 52
@@ -113,7 +109,6 @@
 #define PT64_INDEX(address, level)\
 	(((address) >> PT64_LEVEL_SHIFT(level)) & ((1 << PT64_LEVEL_BITS) - 1))
 
-
 #define PT32_LEVEL_BITS 10
 
 #define PT32_LEVEL_SHIFT(level) \
@@ -125,7 +120,6 @@
 #define PT32_INDEX(address, level)\
 	(((address) >> PT32_LEVEL_SHIFT(level)) & ((1 << PT32_LEVEL_BITS) - 1))
 
-
 #define PT64_BASE_ADDR_MASK (((1ULL << 52) - 1) & PAGE_MASK)
 #define PT64_DIR_BASE_ADDR_MASK \
 	(PT64_BASE_ADDR_MASK & ~((1ULL << (PAGE_SHIFT + PT64_LEVEL_BITS)) - 1))
@@ -133,7 +127,6 @@
 #define PT32_BASE_ADDR_MASK PAGE_MASK
 #define PT32_DIR_BASE_ADDR_MASK \
 	(PAGE_MASK & ~((1ULL << (PAGE_SHIFT + PT32_LEVEL_BITS)) - 1))
-
 
 #define PFERR_PRESENT_MASK (1U << 0)
 #define PFERR_WRITE_MASK (1U << 1)
@@ -200,7 +193,7 @@ static int is_empty_shadow_page(hpa_t page_hpa)
 	uint32_t *pos;
 	uint32_t *end;
 	for (pos = KADDR(page_hpa), end = pos + PAGE_SIZE / sizeof(uint32_t);
-		      pos != end; pos++)
+		 pos != end; pos++)
 		if (*pos != 0) {
 			print_func_exit();
 			return 0;
@@ -210,7 +203,7 @@ static int is_empty_shadow_page(hpa_t page_hpa)
 }
 
 static hpa_t litevm_mmu_alloc_page(struct litevm_vcpu *vcpu,
-				   uint64_t *parent_pte)
+								   uint64_t * parent_pte)
 {
 	print_func_entry();
 	struct litevm_mmu_page *page;
@@ -237,7 +230,7 @@ static void page_header_update_slot(struct litevm *litevm, void *pte, gpa_t gpa)
 	int slot = memslot_id(litevm, gfn_to_memslot(litevm, gpa >> PAGE_SHIFT));
 	struct litevm_mmu_page *page_head = page_header(PADDR(pte));
 
-	SET_BITMASK_BIT_ATOMIC((uint8_t *)&page_head->slot_bitmap, slot);
+	SET_BITMASK_BIT_ATOMIC((uint8_t *) & page_head->slot_bitmap, slot);
 	print_func_exit();
 }
 
@@ -247,10 +240,10 @@ hpa_t safe_gpa_to_hpa(struct litevm_vcpu *vcpu, gpa_t gpa)
 	hpa_t hpa = gpa_to_hpa(vcpu, gpa);
 
 	print_func_exit();
-	return is_error_hpa(hpa) ? bad_page_address | (gpa & ~PAGE_MASK): hpa;
+	return is_error_hpa(hpa) ? bad_page_address | (gpa & ~PAGE_MASK) : hpa;
 }
 
-hpa_t gpa_to_hpa(struct litevm_vcpu *vcpu, gpa_t gpa)
+hpa_t gpa_to_hpa(struct litevm_vcpu * vcpu, gpa_t gpa)
 {
 	print_func_entry();
 	struct litevm_memory_slot *slot;
@@ -264,11 +257,11 @@ hpa_t gpa_to_hpa(struct litevm_vcpu *vcpu, gpa_t gpa)
 	}
 	page = gfn_to_page(slot, gpa >> PAGE_SHIFT);
 	print_func_exit();
-	return ((hpa_t)page2ppn(page) << PAGE_SHIFT)
-		| (gpa & (PAGE_SIZE-1));
+	return ((hpa_t) page2ppn(page) << PAGE_SHIFT)
+		| (gpa & (PAGE_SIZE - 1));
 }
 
-hpa_t gva_to_hpa(struct litevm_vcpu *vcpu, gva_t gva)
+hpa_t gva_to_hpa(struct litevm_vcpu * vcpu, gva_t gva)
 {
 	print_func_entry();
 	gpa_t gpa = vcpu->mmu.gva_to_gpa(vcpu, gva);
@@ -281,9 +274,8 @@ hpa_t gva_to_hpa(struct litevm_vcpu *vcpu, gva_t gva)
 	return gpa_to_hpa(vcpu, gpa);
 }
 
-
 static void release_pt_page_64(struct litevm_vcpu *vcpu, hpa_t page_hpa,
-			       int level)
+							   int level)
 {
 	print_func_entry();
 	ASSERT(vcpu);
@@ -297,15 +289,14 @@ static void release_pt_page_64(struct litevm_vcpu *vcpu, hpa_t page_hpa,
 		uint64_t *end;
 
 		for (pos = KADDR(page_hpa), end = pos + PT64_ENT_PER_PAGE;
-		     pos != end; pos++) {
+			 pos != end; pos++) {
 			uint64_t current_ent = *pos;
 
 			*pos = 0;
 			if (is_present_pte(current_ent))
 				release_pt_page_64(vcpu,
-						  current_ent &
-						  PT64_BASE_ADDR_MASK,
-						  level - 1);
+								   current_ent &
+								   PT64_BASE_ADDR_MASK, level - 1);
 		}
 	}
 	litevm_mmu_free_page(vcpu, page_hpa);
@@ -314,8 +305,8 @@ static void release_pt_page_64(struct litevm_vcpu *vcpu, hpa_t page_hpa,
 
 static void nonpaging_new_cr3(struct litevm_vcpu *vcpu)
 {
-print_func_entry();
-print_func_exit();
+	print_func_entry();
+	print_func_exit();
 }
 
 static int nonpaging_map(struct litevm_vcpu *vcpu, gva_t v, hpa_t p)
@@ -324,7 +315,7 @@ static int nonpaging_map(struct litevm_vcpu *vcpu, gva_t v, hpa_t p)
 	int level = PT32E_ROOT_LEVEL;
 	hpa_t table_addr = vcpu->mmu.root_hpa;
 
-	for (; ; level--) {
+	for (;; level--) {
 		uint32_t index = PT64_INDEX(v, level);
 		uint64_t *table;
 
@@ -335,14 +326,14 @@ static int nonpaging_map(struct litevm_vcpu *vcpu, gva_t v, hpa_t p)
 			mark_page_dirty(vcpu->litevm, v >> PAGE_SHIFT);
 			page_header_update_slot(vcpu->litevm, table, v);
 			table[index] = p | PT_PRESENT_MASK | PT_WRITABLE_MASK |
-								PT_USER_MASK;
+				PT_USER_MASK;
 			print_func_exit();
 			return 0;
 		}
 
 		if (table[index] == 0) {
 			hpa_t new_table = litevm_mmu_alloc_page(vcpu,
-							     &table[index]);
+													&table[index]);
 
 			if (!VALID_PAGE(new_table)) {
 				pgprintk("nonpaging_map: ENOMEM\n");
@@ -354,7 +345,7 @@ static int nonpaging_map(struct litevm_vcpu *vcpu, gva_t v, hpa_t p)
 				table[index] = new_table | PT_PRESENT_MASK;
 			else
 				table[index] = new_table | PT_PRESENT_MASK |
-						PT_WRITABLE_MASK | PT_USER_MASK;
+					PT_WRITABLE_MASK | PT_USER_MASK;
 		}
 		table_addr = table[index] & PT64_BASE_ADDR_MASK;
 	}
@@ -387,7 +378,7 @@ static gpa_t nonpaging_gva_to_gpa(struct litevm_vcpu *vcpu, gva_t vaddr)
 }
 
 static int nonpaging_page_fault(struct litevm_vcpu *vcpu, gva_t gva,
-			       uint32_t error_code)
+								uint32_t error_code)
 {
 	print_func_entry();
 	int ret;
@@ -397,21 +388,21 @@ static int nonpaging_page_fault(struct litevm_vcpu *vcpu, gva_t gva,
 	ASSERT(VALID_PAGE(vcpu->mmu.root_hpa));
 
 	for (;;) {
-	     hpa_t paddr;
+		hpa_t paddr;
 
-	     paddr = gpa_to_hpa(vcpu , addr & PT64_BASE_ADDR_MASK);
+		paddr = gpa_to_hpa(vcpu, addr & PT64_BASE_ADDR_MASK);
 
-	     if (is_error_hpa(paddr)) {
-	     	print_func_exit();
-		     return 1;
-	     }
+		if (is_error_hpa(paddr)) {
+			print_func_exit();
+			return 1;
+		}
 
-	     ret = nonpaging_map(vcpu, addr & PAGE_MASK, paddr);
-	     if (ret) {
-		     nonpaging_flush(vcpu);
-		     continue;
-	     }
-	     break;
+		ret = nonpaging_map(vcpu, addr & PAGE_MASK, paddr);
+		if (ret) {
+			nonpaging_flush(vcpu);
+			continue;
+		}
+		break;
 	}
 	print_func_exit();
 	return ret;
@@ -419,8 +410,8 @@ static int nonpaging_page_fault(struct litevm_vcpu *vcpu, gva_t gva,
 
 static void nonpaging_inval_page(struct litevm_vcpu *vcpu, gva_t addr)
 {
-print_func_entry();
-print_func_exit();
+	print_func_entry();
+	print_func_exit();
 }
 
 static void nonpaging_free(struct litevm_vcpu *vcpu)
@@ -455,15 +446,13 @@ static int nonpaging_init_context(struct litevm_vcpu *vcpu)
 	return 0;
 }
 
-
 static void litevm_mmu_flush_tlb(struct litevm_vcpu *vcpu)
 {
 	print_func_entry();
 	struct litevm_mmu_page *page, *npage;
 
 	//list_for_each_entry_safe(page, npage, &vcpu->litevm->active_mmu_pages,
-	LIST_FOREACH_SAFE(page, &vcpu->litevm->link,
-				 link, npage) {
+	LIST_FOREACH_SAFE(page, &vcpu->litevm->link, link, npage) {
 		if (page->global)
 			continue;
 
@@ -492,10 +481,8 @@ static void mark_pagetable_nonglobal(void *shadow_pte)
 }
 
 static inline void set_pte_common(struct litevm_vcpu *vcpu,
-			     uint64_t *shadow_pte,
-			     gpa_t gaddr,
-			     int dirty,
-			     uint64_t access_bits)
+								  uint64_t * shadow_pte,
+								  gpa_t gaddr, int dirty, uint64_t access_bits)
 {
 	print_func_entry();
 	hpa_t paddr;
@@ -526,8 +513,7 @@ static inline void set_pte_common(struct litevm_vcpu *vcpu,
 }
 
 static void inject_page_fault(struct litevm_vcpu *vcpu,
-			      uint64_t addr,
-			      uint32_t err_code)
+							  uint64_t addr, uint32_t err_code)
 {
 	print_func_entry();
 	uint32_t vect_info = vmcs_read32(IDT_VECTORING_INFO_FIELD);
@@ -537,34 +523,30 @@ static void inject_page_fault(struct litevm_vcpu *vcpu,
 	++litevm_stat.pf_guest;
 
 	if (is_page_fault(vect_info)) {
-		printd( "inject_page_fault: "
-		       "double fault 0x%llx @ 0x%lx\n",
-		       addr, vmcs_readl(GUEST_RIP));
+		printd("inject_page_fault: "
+			   "double fault 0x%llx @ 0x%lx\n", addr, vmcs_readl(GUEST_RIP));
 		vmcs_write32(VM_ENTRY_EXCEPTION_ERROR_CODE, 0);
 		vmcs_write32(VM_ENTRY_INTR_INFO_FIELD,
-			     DF_VECTOR |
-			     INTR_TYPE_EXCEPTION |
-			     INTR_INFO_DELIEVER_CODE_MASK |
-			     INTR_INFO_VALID_MASK);
+					 DF_VECTOR |
+					 INTR_TYPE_EXCEPTION |
+					 INTR_INFO_DELIEVER_CODE_MASK | INTR_INFO_VALID_MASK);
 		print_func_exit();
 		return;
 	}
 	vcpu->cr2 = addr;
 	vmcs_write32(VM_ENTRY_EXCEPTION_ERROR_CODE, err_code);
 	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD,
-		     PF_VECTOR |
-		     INTR_TYPE_EXCEPTION |
-		     INTR_INFO_DELIEVER_CODE_MASK |
-		     INTR_INFO_VALID_MASK);
+				 PF_VECTOR |
+				 INTR_TYPE_EXCEPTION |
+				 INTR_INFO_DELIEVER_CODE_MASK | INTR_INFO_VALID_MASK);
 
 	print_func_exit();
 }
 
-static inline int fix_read_pf(uint64_t *shadow_ent)
+static inline int fix_read_pf(uint64_t * shadow_ent)
 {
 	print_func_entry();
-	if ((*shadow_ent & PT_SHADOW_USER_MASK) &&
-	    !(*shadow_ent & PT_USER_MASK)) {
+	if ((*shadow_ent & PT_SHADOW_USER_MASK) && !(*shadow_ent & PT_USER_MASK)) {
 		/*
 		 * If supervisor write protect is disabled, we shadow kernel
 		 * pages as user pages so we can trap the write access.
@@ -582,15 +564,15 @@ static inline int fix_read_pf(uint64_t *shadow_ent)
 
 static int may_access(uint64_t pte, int write, int user)
 {
-print_func_entry();
+	print_func_entry();
 
 	if (user && !(pte & PT_USER_MASK)) {
-	print_func_exit();
-	return 0;
+		print_func_exit();
+		return 0;
 	}
 	if (write && !(pte & PT_WRITABLE_MASK)) {
-	print_func_exit();
-	return 0;
+		print_func_exit();
+		return 0;
 	}
 	print_func_exit();
 	return 1;
@@ -607,11 +589,11 @@ static void paging_inval_page(struct litevm_vcpu *vcpu, gva_t addr)
 
 	++litevm_stat.invlpg;
 
-	for (; ; level--) {
+	for (;; level--) {
 		uint32_t index = PT64_INDEX(addr, level);
 		uint64_t *table = KADDR(page_addr);
 
-		if (level == PT_PAGE_TABLE_LEVEL ) {
+		if (level == PT_PAGE_TABLE_LEVEL) {
 			table[index] = 0;
 			print_func_exit();
 			return;
@@ -624,14 +606,13 @@ static void paging_inval_page(struct litevm_vcpu *vcpu, gva_t addr)
 
 		page_addr = table[index] & PT64_BASE_ADDR_MASK;
 
-		if (level == PT_DIRECTORY_LEVEL &&
-			  (table[index] & PT_SHADOW_PS_MARK)) {
+		if (level == PT_DIRECTORY_LEVEL && (table[index] & PT_SHADOW_PS_MARK)) {
 			table[index] = 0;
 			release_pt_page_64(vcpu, page_addr, PT_PAGE_TABLE_LEVEL);
 
 			//flush tlb
 			vmcs_writel(GUEST_CR3, vcpu->mmu.root_hpa |
-				    (vcpu->cr3 & (CR3_PCD_MASK | CR3_WPT_MASK)));
+						(vcpu->cr3 & (CR3_PCD_MASK | CR3_WPT_MASK)));
 			print_func_exit();
 			return;
 		}
@@ -670,7 +651,7 @@ static int paging64_init_context(struct litevm_vcpu *vcpu)
 	context->root_hpa = litevm_mmu_alloc_page(vcpu, 0);
 	ASSERT(VALID_PAGE(context->root_hpa));
 	vmcs_writel(GUEST_CR3, context->root_hpa |
-		    (vcpu->cr3 & (CR3_PCD_MASK | CR3_WPT_MASK)));
+				(vcpu->cr3 & (CR3_PCD_MASK | CR3_WPT_MASK)));
 	print_func_exit();
 	return 0;
 }
@@ -690,7 +671,7 @@ static int paging32_init_context(struct litevm_vcpu *vcpu)
 	context->root_hpa = litevm_mmu_alloc_page(vcpu, 0);
 	ASSERT(VALID_PAGE(context->root_hpa));
 	vmcs_writel(GUEST_CR3, context->root_hpa |
-		    (vcpu->cr3 & (CR3_PCD_MASK | CR3_WPT_MASK)));
+				(vcpu->cr3 & (CR3_PCD_MASK | CR3_WPT_MASK)));
 	print_func_exit();
 	return 0;
 }
@@ -720,20 +701,16 @@ static int init_litevm_mmu(struct litevm_vcpu *vcpu)
 	if (!is_paging()) {
 		print_func_exit();
 		return nonpaging_init_context(vcpu);
-	}
-	else if (is_long_mode()) {
+	} else if (is_long_mode()) {
 		print_func_exit();
 		return paging64_init_context(vcpu);
-	}
-	else if (is_pae()) {
+	} else if (is_pae()) {
 		print_func_exit();
 		return paging32E_init_context(vcpu);
+	} else {
+		print_func_exit();
+		return paging32_init_context(vcpu);
 	}
-	else
-		{
-			print_func_exit();
-			return paging32_init_context(vcpu);
-		}
 }
 
 static void destroy_litevm_mmu(struct litevm_vcpu *vcpu)
@@ -763,7 +740,7 @@ static void free_mmu_pages(struct litevm_vcpu *vcpu)
 		struct litevm_mmu_page *vmpage;
 		vmpage = LIST_FIRST(&vcpu->link);
 		LIST_REMOVE(vmpage, link);
-		uintptr_t ppn = vmpage->page_hpa>>PAGE_SHIFT;
+		uintptr_t ppn = vmpage->page_hpa >> PAGE_SHIFT;
 		page_decref(ppn2page(ppn));
 		assert(page_is_free(ppn));
 		vmpage->page_hpa = INVALID_PAGE;
@@ -788,7 +765,7 @@ static int alloc_mmu_pages(struct litevm_vcpu *vcpu)
 		if ((page = kpage_alloc_addr()) == NULL)
 			goto error_1;
 		page->pg_private = page_header;
-		page_header->page_hpa = (hpa_t)page2ppn(page) << PAGE_SHIFT;
+		page_header->page_hpa = (hpa_t) page2ppn(page) << PAGE_SHIFT;
 		memset(KADDR(page_header->page_hpa), 0, PAGE_SIZE);
 		LIST_INSERT_HEAD(&vcpu->link, page_header, link);
 	}
@@ -843,7 +820,7 @@ void litevm_mmu_slot_remove_write_access(struct litevm *litevm, int slot)
 		int i;
 		uint64_t *pt;
 
-		if (!GET_BITMASK_BIT((uint8_t*)&page->slot_bitmap, slot))
+		if (!GET_BITMASK_BIT((uint8_t *) & page->slot_bitmap, slot))
 			continue;
 
 		pt = KADDR(page->page_hpa);

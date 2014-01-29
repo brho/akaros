@@ -13,40 +13,39 @@
 #include <smp.h>
 #include <ip.h>
 
-int
-getfields(char *str, char **args, int max, int mflag, char *set)
+int getfields(char *str, char **args, int max, int mflag, char *set)
 {
 	//Rune r;
 	int next = 0;
 	int r;
 	int nr, intok, narg;
 
-	if(max <= 0)
+	if (max <= 0)
 		return 0;
 
 	narg = 0;
 	args[narg] = str;
-	if(!mflag)
+	if (!mflag)
 		narg++;
 	intok = 0;
-	for(;; str += nr) {
+	for (;; str += nr) {
 		r = str[next++];
 		//nr = chartorune(&r, str);
 		nr = 1;
-		
-		if(r == 0)
+
+		if (r == 0)
 			break;
 		//if(utfrune(set, r)) {
-		if(strchr(set, r)) {
-			if(narg >= max)
+		if (strchr(set, r)) {
+			if (narg >= max)
 				break;
 			*str = 0;
 			intok = 0;
 			args[narg] = str + nr;
-			if(!mflag)
+			if (!mflag)
 				narg++;
 		} else {
-			if(!intok && mflag)
+			if (!intok && mflag)
 				narg++;
 			intok = 1;
 		}

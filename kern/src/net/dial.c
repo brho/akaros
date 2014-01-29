@@ -15,25 +15,23 @@
 
 typedef struct DS DS;
 
-static int	call( char *cp, char*cp1, DS*DS);
-static int	csdial(DS*DS);
-static void	_dial_string_parse( char *cp, DS*DS);
-static int	nettrans( char *cp, char*cp1, int na, char*cp2, int i);
+static int call(char *cp, char *cp1, DS * DS);
+static int csdial(DS * DS);
+static void _dial_string_parse(char *cp, DS * DS);
+static int nettrans(char *cp, char *cp1, int na, char *cp2, int i);
 
-enum
-{
-	Maxstring=	128,
+enum {
+	Maxstring = 128,
 };
 
-struct DS
-{
-	char	buf[Maxstring];			/* dist string */
-	char	*netdir;
-	char	*proto;
-	char	*rem;
-	char	*local;				/* other args */
-	char	*dir;
-	int	*cfdp;
+struct DS {
+	char buf[Maxstring];		/* dist string */
+	char *netdir;
+	char *proto;
+	char *rem;
+	char *local;				/* other args */
+	char *dir;
+	int *cfdp;
 };
 
 /* only used here for now. */
@@ -45,8 +43,7 @@ static void kerrstr(void *err, int len)
 /*
  *  the dialstring is of the form '[/net/]proto!dest'
  */
-int
-kdial(char *dest, char *local, char *dir, int *cfdp)
+int kdial(char *dest, char *local, char *dir, int *cfdp)
 {
 	DS ds;
 	int rv;
@@ -57,37 +54,36 @@ kdial(char *dest, char *local, char *dir, int *cfdp)
 	ds.cfdp = cfdp;
 
 	_dial_string_parse(dest, &ds);
-	if(ds.netdir)
+	if (ds.netdir)
 		return csdial(&ds);
 
 	ds.netdir = "/net";
 	rv = csdial(&ds);
-	if(rv >= 0)
+	if (rv >= 0)
 		return rv;
 
 	err[0] = 0;
 	strncpy(err, current_errstr(), sizeof err);
-	if(strstr(err, "refused") != 0){
+	if (strstr(err, "refused") != 0) {
 		return rv;
 	}
 
 	ds.netdir = "/net.alt";
 	rv = csdial(&ds);
-	if(rv >= 0)
+	if (rv >= 0)
 		return rv;
 
 	alterr[0] = 0;
 	kerrstr(alterr, sizeof err);
 
-	if(strstr(alterr, "translate") || strstr(alterr, "does not exist"))
+	if (strstr(alterr, "translate") || strstr(alterr, "does not exist"))
 		kerrstr(err, sizeof err);
 	else
 		kerrstr(alterr, sizeof alterr);
 	return rv;
 }
 
-static int
-csdial(DS *ds)
+static int csdial(DS * ds)
 {
 	int n, fd, rv;
 	char *p, buf[Maxstring], clone[Maxpath], err[ERRMAX], besterr[ERRMAX];
@@ -97,7 +93,7 @@ csdial(DS *ds)
 	 */
 	snprintf(buf, sizeof(buf), "%s/cs", ds->netdir);
 	fd = sysopen(buf, ORDWR);
-	if(fd < 0){
+	if (fd < 0) {
 		/* no connection server, don't translate */
 		snprintf(clone, sizeof(clone), "%s/%s/clone", ds->netdir, ds->proto);
 		return call(clone, ds->rem, ds);
@@ -107,7 +103,7 @@ csdial(DS *ds)
 	 *  ask connection server to translate
 	 */
 	snprintf(buf, sizeof(buf), "%s!%s", ds->proto, ds->rem);
-	if(syswrite(fd, buf, strlen(buf)) < 0){
+	if (syswrite(fd, buf, strlen(buf)) < 0) {
 		kerrstr(err, sizeof err);
 		sysclose(fd);
 		set_errstr("%s (%s)", err, buf);
@@ -119,69 +115,67 @@ csdial(DS *ds)
 	 *  we get one that works.
 	 */
 	*besterr = 0;
-	strncpy(err,  Egreg, sizeof(err));
+	strncpy(err, Egreg, sizeof(err));
 	rv = -1;
 	sysseek(fd, 0, 0);
-	while((n = sysread(fd, buf, sizeof(buf) - 1)) > 0){
+	while ((n = sysread(fd, buf, sizeof(buf) - 1)) > 0) {
 		buf[n] = 0;
 		p = strchr(buf, ' ');
-		if(p == 0)
+		if (p == 0)
 			continue;
 		*p++ = 0;
 		rv = call(buf, p, ds);
-		if(rv >= 0)
+		if (rv >= 0)
 			break;
 		err[0] = 0;
 		kerrstr(err, sizeof err);
-		if(strstr(err, "does not exist") == 0)
+		if (strstr(err, "does not exist") == 0)
 			memmove(besterr, err, sizeof besterr);
 	}
 	sysclose(fd);
 
-	if(rv < 0 && *besterr)
+	if (rv < 0 && *besterr)
 		kerrstr(besterr, sizeof besterr);
 	else
 		kerrstr(err, sizeof err);
 	return rv;
 }
 
-static int
-call(char *clone, char *dest, DS *ds)
+static int call(char *clone, char *dest, DS * ds)
 {
 	int fd, cfd, n;
 	char name[Maxpath], data[Maxpath], err[ERRMAX], *p;
 
 	cfd = sysopen(clone, ORDWR);
-	if(cfd < 0){
+	if (cfd < 0) {
 		kerrstr(err, sizeof err);
 		set_errstr("%s (%s)", err, clone);
 		return -1;
 	}
 
 	/* get directory name */
-	n = sysread(cfd, name, sizeof(name)-1);
-	if(n < 0){
+	n = sysread(cfd, name, sizeof(name) - 1);
+	if (n < 0) {
 		kerrstr(err, sizeof err);
 		sysclose(cfd);
 		set_errstr("read %s: %s", clone, err);
 		return -1;
 	}
 	name[n] = 0;
-	for(p = name; *p == ' '; p++)
-		;
+	for (p = name; *p == ' '; p++) ;
 	snprintf(name, sizeof(name), "%ld", strtoul(p, 0, 0));
 	p = strrchr(clone, '/');
 	*p = 0;
-	if(ds->dir)
+	if (ds->dir)
 		snprintf(ds->dir, NETPATHLEN, "%s/%s", clone, name);
 	snprintf(data, sizeof(data), "%s/%s/data", clone, name);
 
 	/* connect */
-	if(ds->local)
+	if (ds->local)
 		snprintf(name, sizeof(name), "connect %s %s", dest, ds->local);
 	else
 		snprintf(name, sizeof(name), "connect %s", dest);
-	if(syswrite(cfd, name, strlen(name)) < 0){
+	if (syswrite(cfd, name, strlen(name)) < 0) {
 		err[0] = 0;
 		kerrstr(err, sizeof err);
 		sysclose(cfd);
@@ -191,14 +185,14 @@ call(char *clone, char *dest, DS *ds)
 
 	/* open data connection */
 	fd = sysopen(data, ORDWR);
-	if(fd < 0){
+	if (fd < 0) {
 		err[0] = 0;
 		kerrstr(err, sizeof err);
 		set_errstr("%s (%s)", err, data);
 		sysclose(cfd);
 		return -1;
 	}
-	if(ds->cfdp)
+	if (ds->cfdp)
 		*ds->cfdp = cfd;
 	else
 		sysclose(cfd);
@@ -209,26 +203,24 @@ call(char *clone, char *dest, DS *ds)
 /*
  *  parse a dial string
  */
-static void
-_dial_string_parse(char *str, DS *ds)
+static void _dial_string_parse(char *str, DS * ds)
 {
 	char *p, *p2;
 
 	strncpy(ds->buf, str, Maxstring);
-	ds->buf[Maxstring-1] = 0;
+	ds->buf[Maxstring - 1] = 0;
 
 	p = strchr(ds->buf, '!');
-	if(p == 0) {
+	if (p == 0) {
 		ds->netdir = 0;
 		ds->proto = "net";
 		ds->rem = ds->buf;
 	} else {
-		if(*ds->buf != '/' && *ds->buf != '#'){
+		if (*ds->buf != '/' && *ds->buf != '#') {
 			ds->netdir = 0;
 			ds->proto = ds->buf;
 		} else {
-			for(p2 = p; *p2 != '/'; p2--)
-				;
+			for (p2 = p; *p2 != '/'; p2--) ;
 			*p2++ = 0;
 			ds->netdir = ds->buf;
 			ds->proto = p2;
@@ -241,8 +233,7 @@ _dial_string_parse(char *str, DS *ds)
 /*
  *  announce a network service.
  */
-int
-kannounce(char *addr, char *dir)
+int kannounce(char *addr, char *dir)
 {
 	int ctl, n, m;
 	char buf[NETPATHLEN];
@@ -254,14 +245,14 @@ kannounce(char *addr, char *dir)
 	/*
 	 *  translate the address
 	 */
-	if(nettrans(addr, naddr, sizeof(naddr), netdir, sizeof(netdir)) < 0)
+	if (nettrans(addr, naddr, sizeof(naddr), netdir, sizeof(netdir)) < 0)
 		return -1;
 
 	/*
 	 * get a control channel
 	 */
 	ctl = sysopen(netdir, ORDWR);
-	if(ctl<0)
+	if (ctl < 0)
 		return -1;
 	cp = strrchr(netdir, '/');
 	*cp = 0;
@@ -270,18 +261,18 @@ kannounce(char *addr, char *dir)
 	 *  find out which line we have
 	 */
 	n = snprintf(buf, sizeof(buf), "%.*s/", sizeof buf, netdir);
-	m = sysread(ctl, &buf[n], sizeof(buf)-n-1);
-	if(m <= 0){
+	m = sysread(ctl, &buf[n], sizeof(buf) - n - 1);
+	if (m <= 0) {
 		sysclose(ctl);
 		return -1;
 	}
-	buf[n+m] = 0;
+	buf[n + m] = 0;
 
 	/*
 	 *  make the call
 	 */
 	n = snprintf(buf2, sizeof buf2, "announce %s", naddr);
-	if(syswrite(ctl, buf2, n)!=n){
+	if (syswrite(ctl, buf2, n) != n) {
 		sysclose(ctl);
 		return -1;
 	}
@@ -289,16 +280,15 @@ kannounce(char *addr, char *dir)
 	/*
 	 *  return directory etc.
 	 */
-	if(dir)
-		strncpy(dir,  buf, sizeof(dir));
+	if (dir)
+		strncpy(dir, buf, sizeof(dir));
 	return ctl;
 }
 
 /*
  *  listen for an incoming call
  */
-int
-klisten(char *dir, char *newdir)
+int klisten(char *dir, char *newdir)
 {
 	int ctl, n, m;
 	char buf[NETPATHLEN];
@@ -309,28 +299,28 @@ klisten(char *dir, char *newdir)
 	 */
 	snprintf(buf, sizeof buf, "%s/listen", dir);
 	ctl = sysopen(buf, ORDWR);
-	if(ctl < 0)
+	if (ctl < 0)
 		return -1;
 
 	/*
 	 *  find out which line we have
 	 */
-	strncpy(buf,  dir, sizeof(buf));
+	strncpy(buf, dir, sizeof(buf));
 	cp = strrchr(buf, '/');
 	*++cp = 0;
-	n = cp-buf;
+	n = cp - buf;
 	m = sysread(ctl, cp, sizeof(buf) - n - 1);
-	if(m <= 0){
+	if (m <= 0) {
 		sysclose(ctl);
 		return -1;
 	}
-	buf[n+m] = 0;
+	buf[n + m] = 0;
 
 	/*
 	 *  return directory etc.
 	 */
-	if(newdir)
-		strncpy(newdir,  buf, sizeof(newdir));
+	if (newdir)
+		strncpy(newdir, buf, sizeof(newdir));
 	return ctl;
 
 }
@@ -344,17 +334,16 @@ identtrans(char *netdir, char *addr, char *naddr, int na, char *file, int nf)
 	char proto[Maxpath];
 	char *p;
 
-
 	/* parse the protocol */
 	strncpy(proto, addr, sizeof(proto));
-	proto[sizeof(proto)-1] = 0;
+	proto[sizeof(proto) - 1] = 0;
 	p = strchr(proto, '!');
-	if(p)
+	if (p)
 		*p++ = 0;
 
 	snprintf(file, nf, "%s/%s/clone", netdir, proto);
 	strncpy(naddr, p, na);
-	naddr[na-1] = 0;
+	naddr[na - 1] = 0;
 
 	return 1;
 }
@@ -362,8 +351,7 @@ identtrans(char *netdir, char *addr, char *naddr, int na, char *file, int nf)
 /*
  *  call up the connection server and get a translation
  */
-static int
-nettrans(char *addr, char *naddr, int na, char *file, int nf)
+static int nettrans(char *addr, char *naddr, int na, char *file, int nf)
 {
 	int i, fd;
 	char buf[Maxpath];
@@ -375,17 +363,16 @@ nettrans(char *addr, char *naddr, int na, char *file, int nf)
 	 *  parse, get network directory
 	 */
 	p = strchr(addr, '!');
-	if(p == 0){
+	if (p == 0) {
 		set_errstr("bad dial string: %s", addr);
 		return -1;
 	}
-	if(*addr != '/'){
-		strncpy(netdir,  "/net", sizeof(netdir));
+	if (*addr != '/') {
+		strncpy(netdir, "/net", sizeof(netdir));
 	} else {
-		for(p2 = p; *p2 != '/'; p2--)
-			;
+		for (p2 = p; *p2 != '/'; p2--) ;
 		i = p2 - addr;
-		if(i == 0 || i >= sizeof(netdir)){
+		if (i == 0 || i >= sizeof(netdir)) {
 			set_errstr("bad dial string: %s", addr);
 			return -1;
 		}
@@ -399,16 +386,16 @@ nettrans(char *addr, char *naddr, int na, char *file, int nf)
 	 */
 	snprintf(buf, sizeof(buf), "%s/cs", netdir);
 	fd = sysopen(buf, ORDWR);
-	if(fd < 0)
+	if (fd < 0)
 		return identtrans(netdir, addr, naddr, na, file, nf);
-	if(syswrite(fd, addr, strlen(addr)) < 0){
+	if (syswrite(fd, addr, strlen(addr)) < 0) {
 		sysclose(fd);
 		return -1;
 	}
 	sysseek(fd, 0, 0);
-	n = sysread(fd, buf, sizeof(buf)-1);
+	n = sysread(fd, buf, sizeof(buf) - 1);
 	sysclose(fd);
-	if(n <= 0)
+	if (n <= 0)
 		return -1;
 	buf[n] = 0;
 
@@ -416,12 +403,12 @@ nettrans(char *addr, char *naddr, int na, char *file, int nf)
 	 *  parse the reply
 	 */
 	p = strchr(buf, ' ');
-	if(p == 0)
+	if (p == 0)
 		return -1;
 	*p++ = 0;
 	strncpy(naddr, p, na);
-	naddr[na-1] = 0;
+	naddr[na - 1] = 0;
 	strncpy(file, buf, nf);
-	file[nf-1] = 0;
+	file[nf - 1] = 0;
 	return 0;
 }

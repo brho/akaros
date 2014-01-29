@@ -26,13 +26,13 @@
 
 *******************************************************************************/
 
-FILE_LICENCE ( GPL2_OR_LATER );
+FILE_LICENCE(GPL2_OR_LATER);
 
 #if 0
 
 #include "e1000_api.h"
 
-static u8 e1000_calculate_checksum(u8 *buffer, u32 length);
+static u8 e1000_calculate_checksum(u8 * buffer, u32 length);
 
 /**
  *  e1000_calculate_checksum - Calculate checksum for buffer
@@ -42,10 +42,10 @@ static u8 e1000_calculate_checksum(u8 *buffer, u32 length);
  *  Calculates the checksum for some buffer on a specified length.  The
  *  checksum calculated is returned.
  **/
-static u8 e1000_calculate_checksum(u8 *buffer, u32 length)
+static u8 e1000_calculate_checksum(u8 * buffer, u32 length)
 {
 	u32 i;
-	u8  sum = 0;
+	u8 sum = 0;
 
 	DEBUGFUNC("e1000_calculate_checksum");
 
@@ -68,11 +68,11 @@ static u8 e1000_calculate_checksum(u8 *buffer, u32 length)
  *  and also checks whether the previous command is completed.  It busy waits
  *  in case of previous command is not completed.
  **/
-s32 e1000_mng_enable_host_if_generic(struct e1000_hw *hw)
+s32 e1000_mng_enable_host_if_generic(struct e1000_hw * hw)
 {
 	u32 hicr;
 	s32 ret_val = E1000_SUCCESS;
-	u8  i;
+	u8 i;
 
 	DEBUGFUNC("e1000_mng_enable_host_if_generic");
 
@@ -108,7 +108,7 @@ out:
  *  Reads the firmware semaphore register and returns true (>0) if
  *  manageability is enabled, else false (0).
  **/
-bool e1000_check_mng_mode_generic(struct e1000_hw *hw)
+bool e1000_check_mng_mode_generic(struct e1000_hw * hw)
 {
 	u32 fwsm;
 
@@ -117,7 +117,7 @@ bool e1000_check_mng_mode_generic(struct e1000_hw *hw)
 	fwsm = E1000_READ_REG(hw, E1000_FWSM);
 
 	return (fwsm & E1000_FWSM_MODE_MASK) ==
-	        (E1000_MNG_IAMT_MODE << E1000_FWSM_MODE_SHIFT);
+		(E1000_MNG_IAMT_MODE << E1000_FWSM_MODE_SHIFT);
 }
 
 /**
@@ -127,10 +127,10 @@ bool e1000_check_mng_mode_generic(struct e1000_hw *hw)
  *  Enables packet filtering on transmit packets if manageability is enabled
  *  and host interface is enabled.
  **/
-bool e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw)
+bool e1000_enable_tx_pkt_filtering_generic(struct e1000_hw * hw)
 {
 	struct e1000_host_mng_dhcp_cookie *hdr = &hw->mng_cookie;
-	u32 *buffer = (u32 *)&hw->mng_cookie;
+	u32 *buffer = (u32 *) & hw->mng_cookie;
 	u32 offset;
 	s32 ret_val, hdr_csum, csum;
 	u8 i, len;
@@ -155,17 +155,15 @@ bool e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw)
 	}
 
 	/* Read in the header.  Length and offset are in dwords. */
-	len    = E1000_MNG_DHCP_COOKIE_LENGTH >> 2;
+	len = E1000_MNG_DHCP_COOKIE_LENGTH >> 2;
 	offset = E1000_MNG_DHCP_COOKIE_OFFSET >> 2;
 	for (i = 0; i < len; i++) {
 		*(buffer + i) = E1000_READ_REG_ARRAY_DWORD(hw,
-		                                           E1000_HOST_IF,
-		                                           offset + i);
+												   E1000_HOST_IF, offset + i);
 	}
 	hdr_csum = hdr->checksum;
 	hdr->checksum = 0;
-	csum = e1000_calculate_checksum((u8 *)hdr,
-	                                E1000_MNG_DHCP_COOKIE_LENGTH);
+	csum = e1000_calculate_checksum((u8 *) hdr, E1000_MNG_DHCP_COOKIE_LENGTH);
 	/*
 	 * If either the checksums or signature don't match, then
 	 * the cookie area isn't considered valid, in which case we
@@ -193,8 +191,8 @@ out:
  *
  *  Writes the DHCP information to the host interface.
  **/
-s32 e1000_mng_write_dhcp_info_generic(struct e1000_hw *hw, u8 *buffer,
-                                      u16 length)
+s32 e1000_mng_write_dhcp_info_generic(struct e1000_hw * hw, u8 * buffer,
+									  u16 length)
 {
 	struct e1000_host_mng_command_header hdr;
 	s32 ret_val;
@@ -215,7 +213,7 @@ s32 e1000_mng_write_dhcp_info_generic(struct e1000_hw *hw, u8 *buffer,
 
 	/* Populate the host interface with the contents of "buffer". */
 	ret_val = hw->mac.ops.mng_host_if_write(hw, buffer, length,
-	                                  sizeof(hdr), &(hdr.checksum));
+											sizeof(hdr), &(hdr.checksum));
 	if (ret_val)
 		goto out;
 
@@ -239,8 +237,9 @@ out:
  *
  *  Writes the command header after does the checksum calculation.
  **/
-s32 e1000_mng_write_cmd_header_generic(struct e1000_hw *hw,
-                                    struct e1000_host_mng_command_header *hdr)
+s32 e1000_mng_write_cmd_header_generic(struct e1000_hw * hw,
+									   struct e1000_host_mng_command_header *
+									   hdr)
 {
 	u16 i, length = sizeof(struct e1000_host_mng_command_header);
 
@@ -248,13 +247,12 @@ s32 e1000_mng_write_cmd_header_generic(struct e1000_hw *hw,
 
 	/* Write the whole command header structure with new checksum. */
 
-	hdr->checksum = e1000_calculate_checksum((u8 *)hdr, length);
+	hdr->checksum = e1000_calculate_checksum((u8 *) hdr, length);
 
 	length >>= 2;
 	/* Write the relevant command block into the ram area. */
 	for (i = 0; i < length; i++) {
-		E1000_WRITE_REG_ARRAY_DWORD(hw, E1000_HOST_IF, i,
-		                            *((u32 *) hdr + i));
+		E1000_WRITE_REG_ARRAY_DWORD(hw, E1000_HOST_IF, i, *((u32 *) hdr + i));
 		E1000_WRITE_FLUSH(hw);
 	}
 
@@ -273,8 +271,8 @@ s32 e1000_mng_write_cmd_header_generic(struct e1000_hw *hw,
  *  It also does alignment considerations to do the writes in most efficient
  *  way.  Also fills up the sum of the buffer in *buffer parameter.
  **/
-s32 e1000_mng_host_if_write_generic(struct e1000_hw *hw, u8 *buffer,
-                                    u16 length, u16 offset, u8 *sum)
+s32 e1000_mng_host_if_write_generic(struct e1000_hw * hw, u8 * buffer,
+									u16 length, u16 offset, u8 * sum)
 {
 	u8 *tmp;
 	u8 *bufptr = buffer;
@@ -291,7 +289,7 @@ s32 e1000_mng_host_if_write_generic(struct e1000_hw *hw, u8 *buffer,
 		goto out;
 	}
 
-	tmp = (u8 *)&data;
+	tmp = (u8 *) & data;
 	prev_bytes = offset & 0x3;
 	offset >>= 2;
 
@@ -322,8 +320,7 @@ s32 e1000_mng_host_if_write_generic(struct e1000_hw *hw, u8 *buffer,
 			*sum += *(tmp + j);
 		}
 
-		E1000_WRITE_REG_ARRAY_DWORD(hw, E1000_HOST_IF, offset + i,
-		                            data);
+		E1000_WRITE_REG_ARRAY_DWORD(hw, E1000_HOST_IF, offset + i, data);
 	}
 	if (remaining) {
 		for (j = 0; j < sizeof(u32); j++) {
@@ -347,7 +344,7 @@ out:
  *
  *  Verifies the hardware needs to allow ARPs to be processed by the host.
  **/
-bool e1000_enable_mng_pass_thru(struct e1000_hw *hw)
+bool e1000_enable_mng_pass_thru(struct e1000_hw * hw)
 {
 	u32 manc;
 	u32 fwsm, factps;
@@ -361,7 +358,7 @@ bool e1000_enable_mng_pass_thru(struct e1000_hw *hw)
 	manc = E1000_READ_REG(hw, E1000_MANC);
 
 	if (!(manc & E1000_MANC_RCV_TCO_EN) ||
-	    !(manc & E1000_MANC_EN_MAC_ADDR_FILTER))
+		!(manc & E1000_MANC_EN_MAC_ADDR_FILTER))
 		goto out;
 
 	if (hw->mac.arc_subsystem_valid) {
@@ -369,14 +366,13 @@ bool e1000_enable_mng_pass_thru(struct e1000_hw *hw)
 		factps = E1000_READ_REG(hw, E1000_FACTPS);
 
 		if (!(factps & E1000_FACTPS_MNGCG) &&
-		    ((fwsm & E1000_FWSM_MODE_MASK) ==
-		     (e1000_mng_mode_pt << E1000_FWSM_MODE_SHIFT))) {
+			((fwsm & E1000_FWSM_MODE_MASK) ==
+			 (e1000_mng_mode_pt << E1000_FWSM_MODE_SHIFT))) {
 			ret_val = true;
 			goto out;
 		}
 	} else {
-		if ((manc & E1000_MANC_SMBUS_EN) &&
-		    !(manc & E1000_MANC_ASF_EN)) {
+		if ((manc & E1000_MANC_SMBUS_EN) && !(manc & E1000_MANC_ASF_EN)) {
 			ret_val = true;
 			goto out;
 		}
