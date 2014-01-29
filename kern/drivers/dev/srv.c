@@ -320,5 +320,7 @@ struct dev srvdevtab __devtab = {
 	srvwrite,
 	devbwrite,
 	srvremove,
-	srvwstat
+	srvwstat,
+	devpower,
+	devchaninfo,
 };

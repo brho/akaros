@@ -412,6 +412,7 @@ struct dev
 	int	(*wstat)(struct chan*, uint8_t *unused_uint8_p_t, int);
 	void	(*power)(int);	/* power mgt: power(1) → on, power (0) → off */
 //	int	(*config)( int unused_int, char *unused_char_p_t, DevConf*);
+	char*	(*chaninfo)(struct chan*, char*, size_t);
 	/* we need to be aligned, i think to 32 bytes, for the linker tables. */
 } __attribute__ ((aligned(32)));;
 
@@ -695,6 +696,7 @@ struct walkqid*	devwalk(struct chan*,
 			struct chan*, char **unused_char_pp_t, int unused_int,
 			struct dirtab*, int unused_intw, Devgen*);
 int		devwstat(struct chan*, uint8_t *unused_uint8_p_t, int);
+char 	*devchaninfo(struct chan *chan, char *ret, size_t ret_l);
 void		disinit(void*);
 void		disfault(void*, char *unused_char_p_t);
 int		domount(struct chan**, struct mhead**);

@@ -188,4 +188,6 @@ struct dev rootdevtab __devtab = {
 	devbwrite,
 	devremove,
 	devwstat,
+	devpower,
+	devchaninfo,
 };

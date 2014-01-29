@@ -1089,6 +1089,8 @@ struct dev consdevtab __devtab = {
 	devbwrite,
 	devremove,
 	devwstat,
+	devpower,
+	devchaninfo,
 };
 
 static	uint32_t	randn;

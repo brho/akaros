@@ -1374,8 +1374,7 @@ void print_chaninfo(struct chan *c)
 	printk("Chan pathname: %s, Dev: %s, Devinfo: %s\n",
 	       c->name ? c->name->s : "no cname",
 	       has_dev ? devtab[c->type].name : "no dev",
-		   /* TODO: chaninfo op */
-	       //has_dev ? devtab[c->type].chaninfo(c, buf, sizeof(buf)) :
+	       has_dev ? devtab[c->type].chaninfo(c, buf, sizeof(buf)) :
 		               "no info");
 	if (!has_dev)
 		printk("No dev: intermediate chan? qid.path: %p\n", c->qid.path);

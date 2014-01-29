@@ -1235,4 +1235,6 @@ struct dev mntdevtab __devtab = {
 	devbwrite,
 	mntremove,
 	mntwstat,
+	devpower,
+	devchaninfo,
 };

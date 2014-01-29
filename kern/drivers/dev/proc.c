@@ -411,5 +411,5 @@ struct dev procdevtab __devtab = {
 	procwstat,
 	devpower,
 //	devconfig,
-//	devchaninfo,
+	devchaninfo,
 };

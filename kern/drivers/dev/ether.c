@@ -827,4 +827,5 @@ struct dev etherdevtab __devtab = {
 	devremove,
 	etherwstat,
 	etherpower,
+	devchaninfo,
 };

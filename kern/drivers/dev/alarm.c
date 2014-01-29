@@ -422,5 +422,5 @@ struct dev alarmdevtab __devtab = {
 	alarmwstat,
 	devpower,
 	//devconfig,
-	//devchaninfo,
+	devchaninfo,
 };

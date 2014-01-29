@@ -478,4 +478,6 @@ struct dev pipedevtab __devtab = {
 	pipebwrite,
 	devremove,
 	pipewstat,
+	devpower,
+	devchaninfo,
 };

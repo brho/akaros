@@ -568,6 +568,48 @@ ipwstat(struct chan *c, uint8_t *dp, int n)
 	return n;
 }
 
+/* Should be able to handle any file type chan. Feel free to extend it. */
+static char *ipchaninfo(struct chan *ch, char *ret, size_t ret_l)
+{
+	struct conv *conv;
+	struct Proto *proto;
+	char *p;
+	struct Fs *f;
+	
+	f = ipfs[ch->dev];
+	
+	switch (TYPE(ch->qid)) {
+		default:
+			ret = "Unknown type";
+			break;
+		case Qdata:
+			proto = f->p[PROTO(ch->qid)];
+			conv = proto->conv[CONV(ch->qid)];
+			snprintf(ret, ret_l, "Qdata, proto %s, conv idx %d", proto->name,
+			         conv->x);
+			break;
+		case Qarp:
+			ret = "Qarp";
+			break;
+		case Qiproute:
+			ret = "Qiproute";
+			break;
+		case Qlog:
+			ret = "Qlog";
+			break;
+		case Qndb:
+			ret = "Qndb";
+			break;
+		case Qctl:
+			proto = f->p[PROTO(ch->qid)];
+			conv = proto->conv[CONV(ch->qid)];
+			snprintf(ret, ret_l, "Qctl, proto %s, conv idx %d", proto->name,
+			         conv->x);
+			break;
+	}
+	return ret;
+}
+
 static void
 closeconv(struct conv *cv)
 {
@@ -1227,6 +1269,8 @@ struct dev ipdevtab __devtab = {
 	ipbwrite,
 	devremove,
 	ipwstat,
+	devpower,
+	ipchaninfo,
 };
 
 int

@@ -527,5 +527,5 @@ struct dev vmdevtab __devtab = {
 	vmwstat,
 	devpower,
 //	devconfig,
-//	devchaninfo,
+	devchaninfo,
 };
