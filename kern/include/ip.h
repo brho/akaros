@@ -870,8 +870,10 @@ enum
  *  Macros to manage Qid's used for multiplexed devices
  */
 #define NETTYPE(x)	(((uint32_t)x)&0x1f)
-#define NETID(x)	((((uint32_t)x))>>5)
-#define NETQID(i,t)	((((uint32_t)i)<<5)|(t))
+/* The net's ID + 1 is stored starting at 1 << 5.  So ID 0 = 32, ID 1 = 64, and
+ * NETID == -1 means no netid */
+#define NETID(x)	(((uint32_t)(x) >> 5) - 1)
+#define NETQID(i,t)	((((uint32_t)(i) + 1) << 5) | (t))
 
 /*
  *  one per multiplexed connection

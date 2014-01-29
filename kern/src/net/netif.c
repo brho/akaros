@@ -46,7 +46,6 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp, int unused_in
 	struct qid q;
 	struct netif *nif = (struct netif*)vp;
 	struct netfile *f;
-	int t;
 	int perm;
 	char *o;
 
@@ -73,9 +72,42 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp, int unused_in
 		return 1;
 	}
 
-	/* second level contains clone plus all the conversations */
-	t = NETTYPE(c->qid.path);
-	if(t == N2ndqid || t == Ncloneqid || t == Naddrqid){
+	/* second level contains clone plus all the conversations.
+	 *
+	 * This ancient comment is from plan9.  Inferno and nxm both had issues
+	 * here.  You couldn't ls /net/ether0/ when it didn't have any convs.  There
+	 * were also issues with nxm where you couldn't stat ether0/x/stats
+	 * properly.
+	 *
+	 * The issue is that if we handle things like Nstatqid, then we will never
+	 * pass it down to the third level. And since we just set the path ==
+	 * Nstatqid, we won't have the NETID muxed in. If someone isn't trying to
+	 * generate a chan, but instead is looking it up (devwalk generates, devstat
+	 * already has the chan), then they are also looking for a devdir with path
+	 * containing ID << 5. So if you stat ether0/1/ifstats, devstat is looking
+	 * for path 41, but we return path 9 (41 = 32 + 9). (these numbers are
+	 * before we tracked NETID + 1).
+	 *
+	 * We (akaros and plan9) had a big if here, that would catch things that do
+	 * not exist in the subdirs of a netif. Things like clone make sense here.
+	 * I guess addr too, though that seems to be added since the original
+	 * comment. You can see what the 3rd level was expecting to parse by looking
+	 * farther down in the code.
+	 *
+	 * The root of the problem was that the old code couldn't tell the
+	 * difference between no netid and netid 0. Now, we determine if we're at
+	 * the second level by the lack of a netid, instead of trying to enumerate
+	 * the qid types that the second level could have. The latter approach
+	 * allowed for something like ether0/1/stats, but we couldn't actually
+	 * devstat ether0/stats directly. It's worth noting that there is no
+	 * difference to the content of ether0/stats and ether0/x/stats (when you
+	 * read), but they have different chan qids.
+	 *
+	 * Here's the old if block:
+	        t = NETTYPE(c->qid.path);
+	        if (t == N2ndqid || t == Ncloneqid || t == Naddrqid) {
+	 */
+	if (NETID(c->qid.path) == -1) {
 		switch(i) {
 		case DEVDOTDOT:
 			q.type = QTDIR;
