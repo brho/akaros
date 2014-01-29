@@ -26,7 +26,7 @@ int inumber = 13;
  */
 /* Da Rules.
  * The roottab contains [name, qid, length, perm]. Length means length for files.
- * Qid is [path, vers, type]. Path is '.'. vers is next. Type is 'd' for dir
+ * Qid is [path, vers, type]. Path is me. vers is next. Type is 'd' for dir
  * and 'f' for file and 0 for empty.
  * Data is [dotdot, ptr, size, *sizep, next]
  * dotdot is .., ptr is data (for files)
@@ -34,6 +34,7 @@ int inumber = 13;
  * *sizep is a pointer for reasons not understood.
  * next is the sibling. For a dir, it's the first element after '.'.
  *	int	dotdot;
+ *      int     child; 
  *	void	*ptr;
  *	int	size;
  *	int	*sizep;
@@ -61,25 +62,26 @@ struct dirtab roottab[MAXFILE] = {
 struct rootdata
 {
 	int	dotdot;
+	int     child;
 	void	*ptr;
 	int	size;
 	int	*sizep;
 };
 
 struct rootdata rootdata[MAXFILE] = {
-	{0,	 &roottab[1],	 12,	NULL},
-	{0,	 NULL,	 0,	 NULL},
-	{0,	 NULL,	 0,	 NULL},
-	{0,	 NULL,	 0,	 NULL},
-	{0,	 NULL,	 0,	 NULL},
-	{0,	 NULL,	 0,	 NULL},
-	{0,	 NULL,	 0,	 NULL},
-	{0,	 NULL,	 0,	 NULL},
-	{0,	 NULL,	 0,	 NULL},
-	{0,	 NULL,	 0,	 NULL},
-	{0,	 NULL,	 0,	 NULL},
-	{0,	 NULL,	 0,	 NULL},
-	{0,	 NULL,	 0,	 NULL},
+	{0,	0,	 &roottab[1],	 12,	NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
 };
 
 void dumprootdev(void)
@@ -91,11 +93,12 @@ void dumprootdev(void)
 	for(i = 0; i < rootmaxq; i++, r++, rd++){
 		if (i && (! r->name[0]))
 			continue;
-		printk("%s: [%d, %d, %d], %d, %o; ",
+		printk("[%p]%s: [%d, %d, %d], %d, %o; ",
+		       r,
 		       r->name, r->qid.path, r->qid.vers, r->qid.type,
 		       r->length, r->perm);
-		printk("dotdot %d, ptr %p, size %d, sizep %p\n", 
-		       rd->dotdot, rd->ptr, rd->size, rd->sizep);
+		printk("dotdot %d, child %d, ptr %p, size %d, sizep %p\n", 
+		       rd->dotdot, rd->child, rd->ptr, rd->size, rd->sizep);
 	}
 }
 
@@ -103,8 +106,9 @@ static int findempty(void)
 {
 	int i;
 	for(i = 0; i < rootmaxq; i++){
-		if (!roottab[i].qid.type)
+		if (!roottab[i].qid.type) {
 			return i;
+		}
 	}
 	memset(&roottab[i], 0, sizeof(roottab[i]));
 	return -1;
@@ -118,13 +122,16 @@ static void freeempty(int i)
 static int newentry(int old)
 {
 	int n = findempty();
+	int sib;
 	if (n < 0)
 		error("#r. No more");
 	printk("new entry is %d\n", n);
-	dumprootdev();
-	roottab[n].qid.vers = roottab[old].qid.vers;
-	roottab[old].qid.vers = n;
-	dumprootdev();
+	sib = rootdata[old].child;
+	if (sib){
+		roottab[n].qid.vers = roottab[sib].qid.vers;
+		roottab[sib].qid.vers = n;
+	}
+	rootdata[old].child = n;
 	return n;
 }
 
@@ -137,10 +144,9 @@ static int createentry(int dir, char *name, int length, int perm)
 	/* vers is already properly set. */
 	mkqid(&roottab[n].qid, n, roottab[n].qid.vers, perm&DMDIR ? QTDIR : 'f');
 	rootdata[n].dotdot = roottab[dir].qid.path;
-	rootdata[n].ptr = &roottab[n];
+	rootdata[dir].ptr = &roottab[n];
 	rootdata[n].size = 0;
 	rootdata[n].sizep = &rootdata[n].size;
-	dumprootdev();
 	return n;
 }
 
@@ -175,14 +181,17 @@ rootgen(struct chan *c, char *name,
 	int p, i;
 	struct rootdata *r;
 	int iter;
+	printk("rootgen, path is %d, tap %p, nd %d s %d\n", rootdata[c->qid.path].dotdot, 
+	       tab, nd, s);
 
 	if(s == DEVDOTDOT){
+		printk("rootgen, DEVDOTDOT\n");
 		p = rootdata[c->qid.path].dotdot;
 		c->qid.path = p;
 		c->qid.type = QTDIR;
 		name = "#r";
 		if(p != 0){
-			for(i = 0; ;){
+			for(i = p; ;){
 				if(roottab[i].qid.path == c->qid.path){
 					name = roottab[i].name;
 					break;
@@ -220,8 +229,9 @@ rootgen(struct chan *c, char *name,
 		return -1;
 	}
 
-	if(s >= nd)
+	if(s >= nd) {
 		return -1;
+	}
 	tab += s;
 
 	devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
@@ -244,7 +254,7 @@ rootwalk(struct chan *c, struct chan *nc, char **name, int nname)
 	p = c->qid.path;
 	if(nname == 0)
 		p = rootdata[p].dotdot;
-	return devwalk(c, nc, name, nname, rootdata[p].ptr, rootdata[p].size, rootgen);
+	return devwalk(c, nc, name, nname, &roottab[p], rootdata[p].size, rootgen);
 }
 
 static int
@@ -299,11 +309,13 @@ rootread(struct chan *c, void *buf, long n, int64_t offset)
 	uint8_t *data;
 
 	p = c->qid.path;
-	if(c->qid.type & QTDIR)
+	if(c->qid.type & QTDIR) {
 		return devdirread(c, buf, n, rootdata[p].ptr, rootdata[p].size, rootgen);
+	}
 	len = rootdata[p].size;
-	if(offset < 0 || offset >= len)
+	if(offset < 0 || offset >= len) {
 		return 0;
+	}
 	if(offset+n > len)
 		n = len - offset;
 	data = rootdata[p].ptr;
