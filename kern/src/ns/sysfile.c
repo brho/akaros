@@ -849,16 +849,16 @@ int sysremove(char *path)
 
 	c = namec(path, Aremove, 0, 0);
 	if (waserror()) {
-		c->type = 0;	/* see below */
+		c->type = -1;	/* see below */
 		cclose(c);
 		nexterror();
 	}
 	devtab[c->type].remove(c);
 	/*
 	 * Remove clunks the fid, but we need to recover the Chan
-	 * so fake it up.  rootclose() is known to be a nop.
+	 * so fake it up.  -1 aborts the dev's close.
 	 */
-	c->type = 0;
+	c->type = -1;
 	poperror();
 	cclose(c);
 
