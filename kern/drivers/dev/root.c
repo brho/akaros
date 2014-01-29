@@ -269,7 +269,7 @@ static int rootstat(struct chan *c, uint8_t * dp, int n)
 static struct chan *rootopen(struct chan *c, int omode)
 {
 	int p;
-
+	printk("rootopen: omode %o\n", omode);
 	p = c->qid.path;
 	return devopen(c, omode, rootdata[p].ptr, rootdata[p].size, rootgen);
 }
@@ -315,14 +315,36 @@ static long rootread(struct chan *c, void *buf, long n, int64_t offset)
 	if (offset + n > len)
 		n = len - offset;
 	data = rootdata[p].ptr;
-	memmove(buf, data + offset, n);
+	if (memcpy_to_user_errno(buf, data + offset, n) < 0)
+		return -1;
 	return n;
 }
 
+/* For now, just kzmalloc the right amount. Later, we should use
+ * pages so mmap will go smoothly. Would be really nice to have a
+ * kpagemalloc ... barret?
+ */
 static long rootwrite(struct chan *c, void *a, long n, int64_t off)
 {
-	error(Eperm);
-	return 0;
+	struct rootdata *rd = &rootdata[c->qid.path];
+	struct roottab *r = &roottab[c->qid.path];
+
+	if (off < 0)
+		error("rootwrite: offset < 0!");
+
+	if (off + n > rd->size){
+		void *p;
+		p = krealloc(rd->ptr, off + n, KMALLOC_WAIT);
+		if (! p)
+			error("rootwrite: could not grow the file to %d bytes", off + n);
+		rd->ptr = p;
+		rd->size = off + n;
+	}
+
+	if (memcpy_from_user_errno(current, rd->ptr + off, a, n) < 0)
+		return -1;
+
+	return n;
 }
 
 struct dev rootdevtab __devtab = {
