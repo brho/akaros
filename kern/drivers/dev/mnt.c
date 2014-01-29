@@ -51,6 +51,11 @@ enum
 	NMASK = (64*1024)>>TAGSHIFT,
 };
 
+/* Our TRUNC and remove on close differ from 9ps, so we'll need to translate.
+ * I got these flags from http://man.cat-v.org/plan_9/5/open */
+#define MNT_9P_OPEN_OTRUNC		0x10
+#define MNT_9P_OPEN_ORCLOSE		0x40
+
 struct Mntalloc
 {
 	spinlock_t	l;
@@ -522,7 +527,11 @@ mntopencreate(int type, struct chan *c, char *name, int omode, uint32_t perm)
 	}
 	r->request.type = type;
 	r->request.fid = c->fid;
-	r->request.mode = omode;
+	r->request.mode = omode & O_ACCMODE; /* not using openmode, want O_EXEC */
+	if (omode & O_TRUNC)
+		r->request.mode |= MNT_9P_OPEN_OTRUNC;
+	if (omode & O_REMCLO)
+		r->request.mode |= MNT_9P_OPEN_ORCLOSE;
 	if(type == Tcreate){
 		r->request.perm = perm;
 		r->request.name = name;
