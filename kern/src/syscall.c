@@ -1074,8 +1074,10 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 				return -1;
 			}
 		} else {
-			if (oflag & O_CREATE)
+			if (oflag & O_CREATE) {
+				mode &= S_PMASK;
 				fd = syscreate(t_path, oflag, mode);
+			}
 		}
 	}
 	user_memdup_free(p, t_path);
@@ -1426,11 +1428,15 @@ intreg_t sys_mkdir(struct proc *p, const char *path, size_t path_l, int mode)
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
+	mode &= S_PMASK;
 	mode &= ~p->fs_env.umask;
 	retval = do_mkdir(t_path, mode);
 	if (retval) {
 		unset_errno();
-		retval = syscreate(t_path, DMDIR, mode);
+		/* mixing plan9 and glibc here, make sure DMDIR doesn't overlap with any
+		 * permissions */
+		static_assert(!(S_PMASK & DMDIR));
+		retval = syscreate(t_path, O_RDWR, DMDIR | mode);
 	}
 	user_memdup_free(p, t_path);
 	return retval;
