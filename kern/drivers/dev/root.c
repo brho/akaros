@@ -48,8 +48,8 @@ struct dirtab roottab[MAXFILE] = {
 	{"fd",	{3, 4, QTDIR},	 0,	0777},
 	{"prog",{4, 5, QTDIR},	 0,	0777},
 	{"prof",{5, 6, QTDIR},	 0,	0777},
-	{"net",	{6, 8, QTDIR},	 0,	0777},
-	{"net.alt",{8, 0, QTDIR},0,	0777},
+	{"net",	{6, 7, QTDIR},	 0,	0777},
+	{"net.alt",{7, 8, QTDIR},0,	0777},
 	{"nvfs",{8, 9, QTDIR},	 0,	0777},
 	{"env",	{9, 10, QTDIR},	 0,	0777},
 	{"root",{10, 11, QTDIR},	 0,	0777},
@@ -82,6 +82,23 @@ struct rootdata rootdata[MAXFILE] = {
 	{0,	 NULL,	 0,	 NULL},
 };
 
+void dumprootdev(void)
+{
+	struct dirtab *r = roottab;
+	struct rootdata *rd = rootdata;
+	int i;
+
+	for(i = 0; i < rootmaxq; i++, r++, rd++){
+		if (i && (! r->name[0]))
+			continue;
+		printk("%s: [%d, %d, %d], %d, %o; ",
+		       r->name, r->qid.path, r->qid.vers, r->qid.type,
+		       r->length, r->perm);
+		printk("dotdot %d, ptr %p, size %d, sizep %p\n", 
+		       rd->dotdot, rd->ptr, rd->size, rd->sizep);
+	}
+}
+
 static int findempty(void)
 {
 	int i;
@@ -89,6 +106,7 @@ static int findempty(void)
 		if (!roottab[i].qid.type)
 			return i;
 	}
+	memset(&roottab[i], 0, sizeof(roottab[i]));
 	return -1;
 }
 
@@ -102,8 +120,12 @@ static int newentry(int old)
 	int n = findempty();
 	if (n < 0)
 		error("#r. No more");
+	printk("new entry is %d\n", n);
+	dumprootdev();
 	roottab[n].qid.vers = roottab[old].qid.vers;
 	roottab[old].qid.vers = n;
+	dumprootdev();
+	return n;
 }
 
 static int createentry(int dir, char *name, int length, int perm)
@@ -112,7 +134,13 @@ static int createentry(int dir, char *name, int length, int perm)
 	strncpy(roottab[n].name, name, sizeof(roottab[n].name));
 	roottab[n].length;
 	roottab[n].perm = perm;
-	mkqid(&roottab[n].qid, dir, roottab[dir].qid.vers, perm&DMDIR ? QTDIR : 'f');
+	/* vers is already properly set. */
+	mkqid(&roottab[n].qid, n, roottab[n].qid.vers, perm&DMDIR ? QTDIR : 'f');
+	rootdata[n].dotdot = roottab[dir].qid.path;
+	rootdata[n].ptr = &roottab[n];
+	rootdata[n].size = 0;
+	rootdata[n].sizep = &rootdata[n].size;
+	dumprootdev();
 	return n;
 }
 
@@ -146,6 +174,7 @@ rootgen(struct chan *c, char *name,
 {
 	int p, i;
 	struct rootdata *r;
+	int iter;
 
 	if(s == DEVDOTDOT){
 		p = rootdata[c->qid.path].dotdot;
@@ -172,10 +201,16 @@ rootgen(struct chan *c, char *name,
 		isdir(c);
 		tab = &roottab[path];
 		/* we're starting at a directory. It might be '.' */
-		for(i=path; ;){
+		for(iter = 0, i=path; ; iter++){
 			if(strcmp(tab->name, name) == 0){
 				devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
 				return 1;
+			}
+			if (iter > rootmaxq){
+				printk("BUG:");
+				dumprootdev();
+				printk("name %s\n", name);
+				return -1;
 			}
 			i = roottab[i].qid.vers;
 			if (! i)
@@ -234,28 +269,19 @@ static void
 rootcreate(struct chan *c, char *name, int omode, uint32_t perm)
 {
 	struct dirtab *r = &roottab[c->qid.path], *newr;
-	struct rootdata *rd = &rootdata[c->qid.path], *newrd;
-	if (0)printk("rootcreate: c %p, name %s, omode %o, perm %x\n", 
+	struct rootdata *rd = &rootdata[c->qid.path];
+	if (1)printk("rootcreate: c %p, name %s, omode %o, perm %x\n", 
 	       c, name, omode, perm);
 	/* find an empty slot */
 	//wlock(&root)
 	int path = c->qid.path;
-	int newfile = inumber++; // kref
-	newr = &roottab[newfile];
-	strncpy(newr->name, name, sizeof(newr->name));
-	mkqid(&newr->qid, newfile, newfile, perm&DMDIR);
-	newr->length = 0;
-	newr->perm = perm;
-	newrd = &rootdata[newfile];
-	newrd->dotdot = path;
-	newrd->ptr = newr;
-	newrd->size = 0;
-	newrd->sizep = &newrd->size;
+	int newfile;
+	newfile = createentry(path, name, omode, perm);
 	rd->size++;
 	if (newfile > rootmaxq)
 		rootmaxq = newfile;
 	if (1) printk("create: %s, newfile %d, dotdot %d, rootmaxq %d\n", name, newfile,
-		  newrd->dotdot, rootmaxq);
+		  rootdata[newfile].dotdot, rootmaxq);
 }
 
 /*
@@ -291,23 +317,6 @@ rootwrite(struct chan *c, void *a, long n, int64_t off)
 {
 	error(Eperm);
 	return 0;
-}
-
-void dumprootdev(void)
-{
-	struct dirtab *r = roottab;
-	struct rootdata *rd = rootdata;
-	int i;
-
-	for(i = 0; i < rootmaxq; i++){
-		if (! r->name[0])
-			continue;
-		printk("%s: [%d, %d, %d], %d, %o; ",
-		       r->name, r->qid.path, r->qid.vers, r->qid.type,
-		       r->length, r->perm);
-		printk("dotdot %d, ptr %p, size %d, sizep %p\n", 
-		       rd->dotdot, rd->ptr, rd->size, rd->sizep);
-	}
 }
 
 struct dev rootdevtab __devtab = {
