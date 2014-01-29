@@ -12,6 +12,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <kthread.h>
+#include <ns.h>
 
 /* Print a number (base <= 16) in reverse order,
  * using specified putch function and associated pointer putdat. */
@@ -161,7 +162,7 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 			if ((lp = va_arg(ap, uint32_t *)) != NULL){
 				uint32_t hostfmt;
 				for(i = 0; i < 4; i++){
-					hnputl(&lp[i], &hostfmt);
+					hnputl(&hostfmt, lp[i]);
 					printfmt(putch, putdat, "%08lx", hostfmt);
 				}
 			}

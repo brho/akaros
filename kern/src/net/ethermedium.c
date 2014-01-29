@@ -265,7 +265,9 @@ static void
 etherunbind(struct Ipifc *ifc)
 {
 	Etherrock *er = ifc->arg;
-#warning "postnote"
+	printk("[kernel] etherunbind not supported yet!\n");
+	
+	// we'll need to tell the ktasks to exit, maybe via flags and a wakeup
 #if 0
 	if(er->read4p)
 		postnote(er->read4p, 1, "unbind", 0);
