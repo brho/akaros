@@ -24,20 +24,36 @@ int inumber = 13;
  * (< 200 entries) so I doubt we'll need to do that. It just makes debugging
  * memory a tad easier.
  */
+/* Da Rules.
+ * The roottab contains [name, qid, length, perm]. Length means length for files.
+ * Qid is [path, vers, type]. Path is '.'. vers is next. Type is 'd' for dir
+ * and 'f' for file and 0 for empty.
+ * Data is [dotdot, ptr, size, *sizep, next]
+ * dotdot is .., ptr is data (for files)
+ * size is # elements (for dirs)
+ * *sizep is a pointer for reasons not understood.
+ * next is the sibling. For a dir, it's the first element after '.'.
+ *	int	dotdot;
+ *	void	*ptr;
+ *	int	size;
+ *	int	*sizep;
+ * 
+ * entry is empty if type is 0. We look in roottab to determine that. 
+*/
 /* we pack the qid as follows: path is the index, vers is ., and type is type */
 struct dirtab roottab[MAXFILE] = {
-	{"",	{0, 0, QTDIR},	 0,	0777},
-	{"chan",	{1, 0, QTDIR},	 0,	0777},
-	{"dev",	{2, 0, QTDIR},	 0,	0777},
-	{"fd",	{3, 0, QTDIR},	 0,	0777},
-	{"prog",	{4, 0, QTDIR},	 0,	0777},
-	{"prof",	{5, 0, QTDIR},	 0,	0777},
-	{"net",	{6, 0, QTDIR},	 0,	0777},
-	{"net.alt",	{7, 0, QTDIR},	 0,	0777},
-	{"nvfs",	{8, 0, QTDIR},	 0,	0777},
-	{"env",	{9, 0, QTDIR},	 0,	0777},
-	{"root",	{10, 0, QTDIR},	 0,	0777},
-	{"srv",	{11, 0, QTDIR},	 0,	0777},
+	{"",	{0, 1, QTDIR},	 0,	0777},
+	{"chan",{1, 2, QTDIR},	 0,	0777},
+	{"dev",	{2, 3, QTDIR},	 0,	0777},
+	{"fd",	{3, 4, QTDIR},	 0,	0777},
+	{"prog",{4, 5, QTDIR},	 0,	0777},
+	{"prof",{5, 6, QTDIR},	 0,	0777},
+	{"net",	{6, 8, QTDIR},	 0,	0777},
+	{"net.alt",{8, 0, QTDIR},0,	0777},
+	{"nvfs",{8, 9, QTDIR},	 0,	0777},
+	{"env",	{9, 10, QTDIR},	 0,	0777},
+	{"root",{10, 11, QTDIR},	 0,	0777},
+	{"srv",	{11, 12, QTDIR},	 0,	0777},
 	/* not courtesy of mkroot */
 	{"mnt",	{12, 0, QTDIR},	 0,	0777},
 };
@@ -66,6 +82,40 @@ struct rootdata rootdata[MAXFILE] = {
 	{0,	 NULL,	 0,	 NULL},
 };
 
+static int findempty(void)
+{
+	int i;
+	for(i = 0; i < rootmaxq; i++){
+		if (!roottab[i].qid.type)
+			return i;
+	}
+	return -1;
+}
+
+static void freeempty(int i)
+{
+	roottab[i].qid.type = 0;
+}
+
+static int newentry(int old)
+{
+	int n = findempty();
+	if (n < 0)
+		error("#r. No more");
+	roottab[n].qid.vers = roottab[old].qid.vers;
+	roottab[old].qid.vers = n;
+}
+
+static int createentry(int dir, char *name, int length, int perm)
+{
+	int n = newentry(dir);
+	strncpy(roottab[n].name, name, sizeof(roottab[n].name));
+	roottab[n].length;
+	roottab[n].perm = perm;
+	mkqid(&roottab[n].qid, dir, roottab[dir].qid.vers, perm&DMDIR ? QTDIR : 'f');
+	return n;
+}
+
 static struct chan*
 rootattach(char *spec)
 {
@@ -75,13 +125,17 @@ rootattach(char *spec)
 
 	if(*spec)
 		error(Ebadspec);
-	for (i = 0; i < rootmaxq; i++){
+	/* this begins with the root. */
+	for (i = 0; ;i++){
 		r = &rootdata[i];
 		if (r->sizep){
 			len = *r->sizep;
 			r->size = len;
 			roottab[i].length = len;
 		}
+		i = roottab[i].qid.vers;
+		if (! i)
+			break;
 	}
 	return devattach('r', spec);
 }
@@ -99,11 +153,15 @@ rootgen(struct chan *c, char *name,
 		c->qid.type = QTDIR;
 		name = "#r";
 		if(p != 0){
-			for(i = 0; i < rootmaxq; i++)
+			for(i = 0; ;){
 				if(roottab[i].qid.path == c->qid.path){
 					name = roottab[i].name;
 					break;
 				}
+				i = roottab[i].qid.vers;
+				if (! i)
+					break;
+			}
 		}
 		devdir(c, c->qid, name, 0, eve, 0777, dp);
 		return 1;
@@ -112,25 +170,18 @@ rootgen(struct chan *c, char *name,
 	if(name != NULL){
 		int path = c->qid.path;
 		isdir(c);
-		r = &rootdata[path];
-		tab = r->ptr;
-		/* it's almost always at or after your current spot. */
-		for(i=0; i<r->size; i++, tab++)
+		tab = &roottab[path];
+		/* we're starting at a directory. It might be '.' */
+		for(i=path; ;){
 			if(strcmp(tab->name, name) == 0){
 				devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
 				return 1;
 			}
-		/* well we tried. */
-		/* Round up the usual suspects. Search every level. */
-		/* luckily this is pretty fast. */
-		tab = roottab;
-		r = rootdata;
-		for(i=0; i<path; i++, tab++, r++)
-			if(tab->name && (roottab[r->dotdot].qid.path == c->qid.path) &&
-			   (strcmp(tab->name, name) == 0)){
-				devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
-				return 1;
-			}
+			i = roottab[i].qid.vers;
+			if (! i)
+				break;
+			tab = &roottab[i];
+		}
 		return -1;
 	}
 
