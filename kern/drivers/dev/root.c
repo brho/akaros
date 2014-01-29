@@ -134,14 +134,14 @@ static int newentry(int old)
 	return n;
 }
 
-static int createentry(int dir, char *name, int length, int perm)
+static int createentry(int dir, char *name, int omode, int perm)
 {
 	int n = newentry(dir);
 	strncpy(roottab[n].name, name, sizeof(roottab[n].name));
 	roottab[n].length = 0;
 	roottab[n].perm = perm;
 	/* vers is already properly set. */
-	mkqid(&roottab[n].qid, n, roottab[n].qid.vers, perm & DMDIR ? QTDIR : 'f');
+	mkqid(&roottab[n].qid, n, roottab[n].qid.vers, omode & DMDIR ? QTDIR : 'f');
 	rootdata[n].dotdot = roottab[dir].qid.path;
 	rootdata[dir].ptr = &roottab[n];
 	rootdata[n].size = 0;
@@ -278,7 +278,7 @@ static void rootcreate(struct chan *c, char *name, int omode, uint32_t perm)
 {
 	struct dirtab *r = &roottab[c->qid.path], *newr;
 	struct rootdata *rd = &rootdata[c->qid.path];
-	if (0)printk("rootcreate: c %p, name %s, omode %o, perm %x\n", 
+	if (1)printk("rootcreate: c %p, name %s, omode %o, perm %x\n", 
 	       c, name, omode, perm);
 	/* find an empty slot */
 	int path = c->qid.path;
