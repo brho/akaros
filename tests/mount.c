@@ -16,13 +16,13 @@ int main(int argc, char *argv[])
 	int flag = 0;
 	/* crap arg handling for now. */
 	argc--,argv++;
-	if (argc > 2){
+	while (argc > 2){
 		switch(argv[0][1]){
-			case 'b': flag = 1;
+			case 'b': flag |= 1;
 			break;
-			case 'a': flag = 2;
+			case 'a': flag |= 2;
 			break;
-			case 'c': flag = 4;
+			case 'c': flag |= 4;
 			break;
 			default: 
 				printf("-a or -b and/or -c for now\n");
