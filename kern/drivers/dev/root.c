@@ -68,19 +68,19 @@ struct rootdata {
 };
 
 struct rootdata rootdata[MAXFILE] = {
-	{0, 0, &roottab[1], 12, NULL},
-	{0, 0, NULL, 0, NULL},
-	{0, 0, NULL, 0, NULL},
-	{0, 0, NULL, 0, NULL},
-	{0, 0, NULL, 0, NULL},
-	{0, 0, NULL, 0, NULL},
-	{0, 0, NULL, 0, NULL},
-	{0, 0, NULL, 0, NULL},
-	{0, 0, NULL, 0, NULL},
-	{0, 0, NULL, 0, NULL},
-	{0, 0, NULL, 0, NULL},
-	{0, 0, NULL, 0, NULL},
-	{0, 0, NULL, 0, NULL},
+	{0,	1,	 &roottab[1],	 12,	NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
 };
 
 void dumprootdev(void)
@@ -124,7 +124,7 @@ static int newentry(int old)
 	int sib;
 	if (n < 0)
 		error("#r. No more");
-	printk("new entry is %d\n", n);
+	printd("new entry is %d\n", n);
 	sib = rootdata[old].child;
 	if (sib) {
 		roottab[n].qid.vers = roottab[sib].qid.vers;
@@ -138,7 +138,7 @@ static int createentry(int dir, char *name, int length, int perm)
 {
 	int n = newentry(dir);
 	strncpy(roottab[n].name, name, sizeof(roottab[n].name));
-	roottab[n].length;
+	roottab[n].length = 0;
 	roottab[n].perm = perm;
 	/* vers is already properly set. */
 	mkqid(&roottab[n].qid, n, roottab[n].qid.vers, perm & DMDIR ? QTDIR : 'f');
@@ -179,11 +179,10 @@ rootgen(struct chan *c, char *name,
 	int p, i;
 	struct rootdata *r;
 	int iter;
-	printk("rootgen, path is %d, tap %p, nd %d s %d\n",
-		   rootdata[c->qid.path].dotdot, tab, nd, s);
+	printd("rootgen, path is %d, tap %p, nd %d s %d name %s\n", c->qid.path,
+	       tab, nd, s, name);
 
-	if (s == DEVDOTDOT) {
-		printk("rootgen, DEVDOTDOT\n");
+	if(s == DEVDOTDOT){
 		p = rootdata[c->qid.path].dotdot;
 		c->qid.path = p;
 		c->qid.type = QTDIR;
@@ -206,11 +205,13 @@ rootgen(struct chan *c, char *name,
 	if (name != NULL) {
 		int path = c->qid.path;
 		isdir(c);
-		tab = &roottab[path];
+		tab = &roottab[rootdata[path].child];
 		/* we're starting at a directory. It might be '.' */
-		for (iter = 0, i = path;; iter++) {
-			if (strcmp(tab->name, name) == 0) {
+		for(iter = 0, i=path; ; iter++){
+			if(strcmp(tab->name, name) == 0){
+				printd("Rootgen returns 1 for %s\n", name);
 				devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
+				printd("return 1 with [%d, %d, %d]\n", dp->qid.path, c->qid.vers, c->qid.type);
 				return 1;
 			}
 			if (iter > rootmaxq) {
@@ -224,6 +225,7 @@ rootgen(struct chan *c, char *name,
 				break;
 			tab = &roottab[i];
 		}
+		printd("rootgen: :%s: failed at path %d\n", name, path);
 		return -1;
 	}
 
@@ -240,18 +242,19 @@ static struct walkqid *rootwalk(struct chan *c, struct chan *nc, char **name,
 								int nname)
 {
 	uint32_t p;
-	if (0) {
-		printk("rootwalk: c %p. ", c);
-		if (nname) {
+	if (0){
+		printk("rootwalk: c %p. :", c);
+		if (nname){
 			int i;
 			for (i = 0; i < nname - 1; i++)
 				printk("%s/", name[i]);
-			printk("%s", name[i]);
+			printk("%s:\n", name[i]);
 		}
 	}
 	p = c->qid.path;
-	if (nname == 0)
+	if((nname == 0) && 0)
 		p = rootdata[p].dotdot;
+	printd("Start from #%d at %p\n", p, &roottab[p]);
 	return devwalk(c, nc, name, nname, &roottab[p], rootdata[p].size, rootgen);
 }
 
@@ -267,7 +270,7 @@ static struct chan *rootopen(struct chan *c, int omode)
 {
 	int p;
 
-	p = rootdata[c->qid.path].dotdot;
+	p = c->qid.path;
 	return devopen(c, omode, rootdata[p].ptr, rootdata[p].size, rootgen);
 }
 
@@ -275,20 +278,17 @@ static void rootcreate(struct chan *c, char *name, int omode, uint32_t perm)
 {
 	struct dirtab *r = &roottab[c->qid.path], *newr;
 	struct rootdata *rd = &rootdata[c->qid.path];
-	if (1)
-		printk("rootcreate: c %p, name %s, omode %o, perm %x\n",
-			   c, name, omode, perm);
+	if (0)printk("rootcreate: c %p, name %s, omode %o, perm %x\n", 
+	       c, name, omode, perm);
 	/* find an empty slot */
-	//wlock(&root)
 	int path = c->qid.path;
 	int newfile;
 	newfile = createentry(path, name, omode, perm);
 	rd->size++;
 	if (newfile > rootmaxq)
 		rootmaxq = newfile;
-	if (1)
-		printk("create: %s, newfile %d, dotdot %d, rootmaxq %d\n", name,
-			   newfile, rootdata[newfile].dotdot, rootmaxq);
+	if (0) printk("create: %s, newfile %d, dotdot %d, rootmaxq %d\n", name, newfile,
+		  rootdata[newfile].dotdot, rootmaxq);
 }
 
 /*
