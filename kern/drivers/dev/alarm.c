@@ -182,17 +182,17 @@ static int alarmgen(struct chan *c, char *entry_name,
 					return 1;
 			}
 			return -1;
-			/* Need to also provide a direct hit for Qclone and all other files (at
-			 * all levels of the hierarchy).  Every file is both
-			 * generated (via the s increments in their respective directories) and
-			 * directly gen-able.  devstat() will call gen with a specific path in
-			 * the qid.  In these cases, we make a dir for whatever they are asking
-			 * for.  Note the qid stays the same.  I think this is what the old
-			 * plan9 comments above devgen were talking about for (ii).
+			/* Need to also provide a direct hit for Qclone and all other files
+			 * (at all levels of the hierarchy).  Every file is both generated
+			 * (via the s increments in their respective directories) and
+			 * directly gen-able.  devstat() will call gen with a specific path
+			 * in the qid.  In these cases, we make a dir for whatever they are
+			 * asking for.  Note the qid stays the same.  I think this is what
+			 * the old plan9 comments above devgen were talking about for (ii).
 			 *
-			 * We don't need to do this for the directories - devstat will look for
-			 * the a directory by path and fail.  Then it will manually build the
-			 * stat output (check the -1 case in devstat). */
+			 * We don't need to do this for the directories - devstat will look
+			 * for the a directory by path and fail.  Then it will manually
+			 * build the stat output (check the -1 case in devstat). */
 		case Qclone:
 			devdir(c, c->qid, "clone", 0, eve, 0666, dp);
 			return 1;

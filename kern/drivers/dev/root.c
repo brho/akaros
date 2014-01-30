@@ -12,12 +12,22 @@
 #include <pmap.h>
 #include <smp.h>
 #include <ip.h>
+#include <umem.h>
 
-/* courtesy of the inferno mkroot script. */
 /* make it a power of 2 and nobody gets hurt */
 #define MAXFILE 1024
 int rootmaxq = MAXFILE;
 int inumber = 13;
+
+/* TODO:
+ *  - fix DOTDOT in gen.
+ *  - synchronization!  what needs protection from concurrent use, etc.
+ * 	- clean up documentation and whatnot
+ * 	- does remove, mkdir, rmdir work?
+ * 	- fill this with cpio stuff
+ * 	- figure out how to use the page cache
+ */
+
 /* this gives you some idea of how much I like linked lists. Just make
  * a big old table. Later on we can put next and prev indices into the
  * data if we want but, our current kfs is 1-3 levels deep and very small
@@ -26,8 +36,8 @@ int inumber = 13;
  */
 /* Da Rules.
  * The roottab contains [name, qid, length, perm]. Length means length for files.
- * Qid is [path, vers, type]. Path is me. vers is next. Type is 'd' for dir
- * and 'f' for file and 0 for empty.
+ * Qid is [path, vers, type]. Path is me. vers is next. Type is QTDIR for dir
+ * and QTFILE for file and 0 for empty.
  * Data is [dotdot, ptr, size, *sizep, next]
  * dotdot is .., ptr is data (for files)
  * size is # elements (for dirs)
@@ -42,21 +52,25 @@ int inumber = 13;
  * entry is empty if type is 0. We look in roottab to determine that. 
 */
 /* we pack the qid as follows: path is the index, vers is ., and type is type */
+
+/* Inferno seems to want to: perm |= DMDIR.  It gets checked in other places.
+ * NxM didn't want this, IIRC.
+ *
+ * Also note that "" (/, #r, whatever) has no vers/next/sibling. */
 struct dirtab roottab[MAXFILE] = {
-	{"", {0, 1, QTDIR}, 0, 0777},
-	{"chan", {1, 2, QTDIR}, 0, 0777},
-	{"dev", {2, 3, QTDIR}, 0, 0777},
-	{"fd", {3, 4, QTDIR}, 0, 0777},
-	{"prog", {4, 5, QTDIR}, 0, 0777},
-	{"prof", {5, 6, QTDIR}, 0, 0777},
-	{"net", {6, 7, QTDIR}, 0, 0777},
-	{"net.alt", {7, 8, QTDIR}, 0, 0777},
-	{"nvfs", {8, 9, QTDIR}, 0, 0777},
-	{"env", {9, 10, QTDIR}, 0, 0777},
-	{"root", {10, 11, QTDIR}, 0, 0777},
-	{"srv", {11, 12, QTDIR}, 0, 0777},
-	/* not courtesy of mkroot */
-	{"mnt", {12, 0, QTDIR}, 0, 0777},
+	{"", {0, 0, QTDIR}, 0, DMDIR | 0777},
+	{"chan", {1, 2, QTDIR}, 0, DMDIR | 0777},
+	{"dev", {2, 3, QTDIR}, 0, DMDIR | 0777},
+	{"fd", {3, 4, QTDIR}, 0, DMDIR | 0777},
+	{"prog", {4, 5, QTDIR}, 0, DMDIR | 0777},
+	{"prof", {5, 6, QTDIR}, 0, DMDIR | 0777},
+	{"net", {6, 7, QTDIR}, 0, DMDIR | 0777},
+	{"net.alt", {7, 8, QTDIR}, 0, DMDIR | 0777},
+	{"nvfs", {8, 9, QTDIR}, 0, DMDIR | 0777},
+	{"env", {9, 10, QTDIR}, 0, DMDIR | 0777},
+	{"root", {10, 11, QTDIR}, 0, DMDIR | 0777},
+	{"srv", {11, 12, QTDIR}, 0, DMDIR | 0777},
+	{"mnt", {12, 0, QTDIR}, 0, DMDIR | 0777},
 };
 
 struct rootdata {
@@ -83,20 +97,23 @@ struct rootdata rootdata[MAXFILE] = {
 	{0,	0,	 NULL,	 0,	 NULL},
 };
 
+/* this is super useful */
 void dumprootdev(void)
 {
 	struct dirtab *r = roottab;
 	struct rootdata *rd = rootdata;
 	int i;
 
+	printk("[       dirtab     ]      name: [pth, ver, typ],   len,        "
+	       "perm,  .., chld,       data pointer,  size,       size pointer\n");
 	for (i = 0; i < rootmaxq; i++, r++, rd++) {
 		if (i && (!r->name[0]))
 			continue;
-		printk("[%p]%s: [%d, %d, %d], %d, %o; ",
+		printk("[%p]%10s: [%3d, %3d, %3d], %5d, %11o,",
 			   r,
 			   r->name, r->qid.path, r->qid.vers, r->qid.type,
 			   r->length, r->perm);
-		printk("dotdot %d, child %d, ptr %p, size %d, sizep %p\n",
+		printk(" %3d, %4d, %p, %5d, %p\n",
 			   rd->dotdot, rd->child, rd->ptr, rd->size, rd->sizep);
 	}
 }
@@ -106,10 +123,10 @@ static int findempty(void)
 	int i;
 	for (i = 0; i < rootmaxq; i++) {
 		if (!roottab[i].qid.type) {
+			memset(&roottab[i], 0, sizeof(roottab[i]));
 			return i;
 		}
 	}
-	memset(&roottab[i], 0, sizeof(roottab[i]));
 	return -1;
 }
 
@@ -118,19 +135,16 @@ static void freeempty(int i)
 	roottab[i].qid.type = 0;
 }
 
-static int newentry(int old)
+static int newentry(int parent)
 {
 	int n = findempty();
 	int sib;
 	if (n < 0)
 		error("#r. No more");
 	printd("new entry is %d\n", n);
-	sib = rootdata[old].child;
-	if (sib) {
-		roottab[n].qid.vers = roottab[sib].qid.vers;
-		roottab[sib].qid.vers = n;
-	}
-	rootdata[old].child = n;
+	/* add the new one to the head of the linked list.  vers is 'next' */
+	roottab[n].qid.vers = rootdata[parent].child;
+	rootdata[parent].child = n;
 	return n;
 }
 
@@ -141,7 +155,8 @@ static int createentry(int dir, char *name, int omode, int perm)
 	roottab[n].length = 0;
 	roottab[n].perm = perm;
 	/* vers is already properly set. */
-	mkqid(&roottab[n].qid, n, roottab[n].qid.vers, omode & DMDIR ? QTDIR : 'f');
+	mkqid(&roottab[n].qid, n, roottab[n].qid.vers,
+	      perm & DMDIR ? QTDIR : QTFILE);
 	rootdata[n].dotdot = roottab[dir].qid.path;
 	rootdata[dir].ptr = &roottab[n];
 	rootdata[n].size = 0;
@@ -149,14 +164,13 @@ static int createentry(int dir, char *name, int omode, int perm)
 	return n;
 }
 
-static struct chan *rootattach(char *spec)
+static void rootinit(void)
 {
+	/* brho: pretty sure this should only be run once.  putting it in attach
+	 * will run it multiple times. */
 	int i;
 	uint32_t len;
 	struct rootdata *r;
-
-	if (*spec)
-		error(Ebadspec);
 	/* this begins with the root. */
 	for (i = 0;; i++) {
 		r = &rootdata[i];
@@ -169,7 +183,16 @@ static struct chan *rootattach(char *spec)
 		if (!i)
 			break;
 	}
-	return devattach('r', spec);
+}
+
+static struct chan *rootattach(char *spec)
+{
+	struct chan *c;
+	if (*spec)
+		error(Ebadspec);
+	c = devattach('r', spec);
+	mkqid(&c->qid, roottab[0].qid.path, roottab[0].qid.vers, QTDIR);
+	return c;
 }
 
 static int
@@ -182,12 +205,16 @@ rootgen(struct chan *c, char *name,
 	printd("rootgen, path is %d, tap %p, nd %d s %d name %s\n", c->qid.path,
 	       tab, nd, s, name);
 
-	if(s == DEVDOTDOT){
+	if (s == DEVDOTDOT) {
+		panic("this is busted");
 		p = rootdata[c->qid.path].dotdot;
+		// XXX we need to set the vers too.  equiv to mkqid(&c->qid, ...)
 		c->qid.path = p;
 		c->qid.type = QTDIR;
 		name = "#r";
 		if (p != 0) {
+			/* TODO: what is this doing?  do we want to walk the entire table,
+			 * or are we just walking the siblings of our parent? */
 			for (i = p;;) {
 				if (roottab[i].qid.path == c->qid.path) {
 					name = roottab[i].name;
@@ -202,16 +229,26 @@ rootgen(struct chan *c, char *name,
 		return 1;
 	}
 
+	if (c->qid.type != QTDIR) {
+		/* return ourselved the first time; after that, -1 */
+		if (s)
+			return -1;
+		tab = &roottab[c->qid.path];
+		devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
+		return 1;
+	}
+
 	if (name != NULL) {
 		int path = c->qid.path;
 		isdir(c);
 		tab = &roottab[rootdata[path].child];
 		/* we're starting at a directory. It might be '.' */
-		for(iter = 0, i=path; ; iter++){
+		for (iter = 0, i = rootdata[path].child; /* break */; iter++) {
 			if(strcmp(tab->name, name) == 0){
 				printd("Rootgen returns 1 for %s\n", name);
 				devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
-				printd("return 1 with [%d, %d, %d]\n", dp->qid.path, c->qid.vers, c->qid.type);
+				printd("return 1 with [%d, %d, %d]\n", dp->qid.path,
+				       dp->qid.vers, dp->qid.type);
 				return 1;
 			}
 			if (iter > rootmaxq) {
@@ -228,12 +265,24 @@ rootgen(struct chan *c, char *name,
 		printd("rootgen: :%s: failed at path %d\n", name, path);
 		return -1;
 	}
-
+	/* need to gen the file or the contents of the directory we are currently
+	 * at.  but i think the tab entries are all over the place.  nd is how
+	 * many entries the directory has. */
 	if (s >= nd) {
+		printd("S OVERFLOW\n");
 		return -1;
 	}
-	tab += s;
-
+	//tab += s;	/* this would only work if our entries were contig in the tab */
+	for (i = rootdata[c->qid.path].child; i; i = roottab[i].qid.vers) {
+		tab = &roottab[i];
+		if (s-- == 0)
+			break;
+	}
+	if (!i) {
+		printd("I OVERFLOW\n");
+		return -1;
+	}
+	printd("root scan find returns path %p name %s\n", tab->qid.path, tab->name);
 	devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
 	return 1;
 }
@@ -252,24 +301,20 @@ static struct walkqid *rootwalk(struct chan *c, struct chan *nc, char **name,
 		}
 	}
 	p = c->qid.path;
-	if((nname == 0) && 0)
-		p = rootdata[p].dotdot;
 	printd("Start from #%d at %p\n", p, &roottab[p]);
 	return devwalk(c, nc, name, nname, &roottab[p], rootdata[p].size, rootgen);
 }
 
 static int rootstat(struct chan *c, uint8_t * dp, int n)
 {
-	int p;
-
-	p = rootdata[c->qid.path].dotdot;
+	int p = c->qid.path;
 	return devstat(c, dp, n, rootdata[p].ptr, rootdata[p].size, rootgen);
 }
 
 static struct chan *rootopen(struct chan *c, int omode)
 {
 	int p;
-	printk("rootopen: omode %o\n", omode);
+	printd("rootopen: omode %o\n", omode);
 	p = c->qid.path;
 	return devopen(c, omode, rootdata[p].ptr, rootdata[p].size, rootgen);
 }
@@ -278,21 +323,26 @@ static void rootcreate(struct chan *c, char *name, int omode, uint32_t perm)
 {
 	struct dirtab *r = &roottab[c->qid.path], *newr;
 	struct rootdata *rd = &rootdata[c->qid.path];
-	if (1)printk("rootcreate: c %p, name %s, omode %o, perm %x\n", 
+	/* need to filter openmode so that it gets only the access-type bits */
+	omode = openmode(omode);
+	c->mode = openmode(omode);
+	printd("rootcreate: c %p, name %s, omode %o, perm %x\n", 
 	       c, name, omode, perm);
 	/* find an empty slot */
 	int path = c->qid.path;
 	int newfile;
 	newfile = createentry(path, name, omode, perm);
+	c->qid = roottab[newfile].qid;	/* need to update c */
 	rd->size++;
 	if (newfile > rootmaxq)
 		rootmaxq = newfile;
-	if (0) printk("create: %s, newfile %d, dotdot %d, rootmaxq %d\n", name, newfile,
-		  rootdata[newfile].dotdot, rootmaxq);
+	printd("create: %s, newfile %d, dotdot %d, rootmaxq %d\n", name, newfile,
+	       rootdata[newfile].dotdot, rootmaxq);
 }
 
 /*
  * sysremove() knows this is a nop
+ * 		fyi, this isn't true anymore!  they need to set c->type = -1;
  */
 static void rootclose(struct chan *c)
 {
@@ -315,19 +365,25 @@ static long rootread(struct chan *c, void *buf, long n, int64_t offset)
 	if (offset + n > len)
 		n = len - offset;
 	data = rootdata[p].ptr;
-	if (memcpy_to_user_errno(buf, data + offset, n) < 0)
-		return -1;
+	/* we might call read from the kernel (load_elf()) */
+	if (current) {
+		if (memcpy_to_user_errno(current, buf, data + offset, n) < 0)
+			error("%s: bad user addr %p", __FUNCTION__, buf);
+	} else {
+		memcpy(buf, data + offset, n);
+	}
 	return n;
 }
 
 /* For now, just kzmalloc the right amount. Later, we should use
  * pages so mmap will go smoothly. Would be really nice to have a
  * kpagemalloc ... barret?
+ * 		we have kpage_alloc (gives a page) and kpage_alloc_addr (void*)
  */
 static long rootwrite(struct chan *c, void *a, long n, int64_t off)
 {
 	struct rootdata *rd = &rootdata[c->qid.path];
-	struct roottab *r = &roottab[c->qid.path];
+	struct dirtab *r = &roottab[c->qid.path];
 
 	if (off < 0)
 		error("rootwrite: offset < 0!");
@@ -340,9 +396,9 @@ static long rootwrite(struct chan *c, void *a, long n, int64_t off)
 		rd->ptr = p;
 		rd->size = off + n;
 	}
-
+	assert(current);
 	if (memcpy_from_user_errno(current, rd->ptr + off, a, n) < 0)
-		return -1;
+		error("%s: bad user addr %p", __FUNCTION__, a);
 
 	return n;
 }
@@ -351,7 +407,7 @@ struct dev rootdevtab __devtab = {
 	'r',
 	"root",
 	devreset,
-	devinit,
+	rootinit,
 	devshutdown,
 	rootattach,
 	rootwalk,
