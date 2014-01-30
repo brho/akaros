@@ -1286,8 +1286,27 @@ intreg_t sys_umask(struct proc *p, int mask)
 	return old_mask;
 }
 
+static void init_dir_for_wstat(struct dir *d)
+{
+	d->type = ~0;
+	d->dev = ~0;
+	d->qid.path = ~0;
+	d->qid.vers = ~0;
+	d->qid.type = ~0;
+	d->mode = ~0;
+	d->atime = ~0;
+	d->mtime = ~0;
+	d->length = ~0;
+	d->name = "";
+	d->uid = "";
+	d->gid = "";
+	d->muid = "";
+
+}
+
 intreg_t sys_chmod(struct proc *p, const char *path, size_t path_l, int mode)
 {
+	ERRSTACK(1);
 	int retval;
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
@@ -1296,9 +1315,25 @@ intreg_t sys_chmod(struct proc *p, const char *path, size_t path_l, int mode)
 	retval = do_chmod(t_path, mode);
 	user_memdup_free(p, t_path);
 	if (retval < 0) {
-		set_errno(-retval);
-		return -1;
+		uint8_t *buf;
+		int size;
+		/* let's try 9ns */
+		struct dir d;
+		init_dir_for_wstat(&d);
+		d.mode = mode;
+		size = sizeD2M(&d);
+		buf = kmalloc(size, KMALLOC_WAIT);
+		if (waserror()) {
+			kfree(buf);
+			poperror();
+			return -1;
+		}
+		convD2M(&d, buf, size);
+		retval = syswstat(t_path, buf, size);
+		poperror();
+		kfree(buf);
 	}
+	set_errno(-retval);
 	return retval;
 }
 
