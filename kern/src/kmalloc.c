@@ -125,13 +125,31 @@ void *kzmalloc_align(size_t size, int flags, size_t align)
 void *krealloc(void* buf, size_t size, int flags)
 {
 	void *nbuf;
-	int osize = 0;
+	size_t osize = 0;
+	int *tag_flags;
 	if (buf){
 		struct kmalloc_tag *tag = (struct kmalloc_tag*)(buf -
 	                                                sizeof(struct kmalloc_tag));
-		if (tag->my_cache->obj_size >= size)
+		tag_flags = (int*)(buf - sizeof(int));
+		if ((*tag_flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_UNALIGN)
+			panic("krealloc of a kmalloc_align not supported");
+		if (tag->canary != KMALLOC_CANARY){
+			printk("krealloc bad canary: %08lx, expected %08lx\n", tag->canary,
+			       KMALLOC_CANARY);
+			hexdump((void *)(buf - sizeof(struct kmalloc_tag)), 256);
+		}
+		/* whatever we got from either a slab or the page allocator is meant for
+		 * both the buf+size as well as the kmalloc tag */
+		if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_CACHE) {
+			osize = tag->my_cache->obj_size - sizeof(struct kmalloc_tag);
+		} else if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_PAGES) {
+			osize = LOG2_UP(tag->num_pages) * PGSIZE
+			        - sizeof(struct kmalloc_tag);
+		} else {
+			panic("Probably a bad tag, flags %p\n", tag->flags);
+		}
+		if (osize >= size)
 			return buf;
-		osize = tag->my_cache->obj_size;
 	}
 
 	nbuf = kmalloc(size, flags);
@@ -166,7 +184,7 @@ void kfree(void *addr)
 	if (tag->canary != KMALLOC_CANARY){
 		printk("Canary is bogus: %08lx, expected %08lx\n", tag->canary,
 		       KMALLOC_CANARY);
-		hexdump((void *)(addr-128), 256);
+		hexdump((void*)(addr - sizeof(struct kmalloc_tag)), 256);
 	}
 	assert(tag->canary == KMALLOC_CANARY);
 	if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_CACHE)
