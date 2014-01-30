@@ -1301,39 +1301,35 @@ static void init_dir_for_wstat(struct dir *d)
 	d->uid = "";
 	d->gid = "";
 	d->muid = "";
-
 }
 
 intreg_t sys_chmod(struct proc *p, const char *path, size_t path_l, int mode)
 {
-	ERRSTACK(1);
 	int retval;
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
-	/* TODO: 9ns support */
+	/* busybox sends in the upper bits as 37777777 (-1), perhaps trying to get
+	 * the 'default' setting? */
+	if (mode & ~S_PMASK)
+		printd("[kernel] sys_chmod ignoring upper bits %o\n", mode & ~S_PMASK);
+	mode &= S_PMASK;
 	retval = do_chmod(t_path, mode);
-	user_memdup_free(p, t_path);
+	/* let's try 9ns */
 	if (retval < 0) {
+		unset_errno();
 		uint8_t *buf;
 		int size;
-		/* let's try 9ns */
 		struct dir d;
 		init_dir_for_wstat(&d);
 		d.mode = mode;
 		size = sizeD2M(&d);
 		buf = kmalloc(size, KMALLOC_WAIT);
-		if (waserror()) {
-			kfree(buf);
-			poperror();
-			return -1;
-		}
 		convD2M(&d, buf, size);
 		retval = syswstat(t_path, buf, size);
-		poperror();
 		kfree(buf);
 	}
-	set_errno(-retval);
+	user_memdup_free(p, t_path);
 	return retval;
 }
 
