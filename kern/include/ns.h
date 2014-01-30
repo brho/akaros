@@ -87,7 +87,7 @@ extern int parseether(uint8_t * unused_uint8_p_t, char *unused_char_p_t);
 #define QTEXCL		0x20	/* type bit for exclusive use files */
 #define QTMOUNT		0x10	/* type bit for mounted channel */
 #define QTAUTH		0x08	/* type bit for authentication file */
-#define QTFILE		0x00	/* plain file */
+#define QTFILE		0x01	/* plain file */
 
 /* bits in Dir.mode */
 #define DMDIR		0x80000000	/* mode bit for directories */
