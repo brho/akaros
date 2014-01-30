@@ -1,0 +1,7 @@
+#!/bin/ash
+cat '#V/clone'
+ls '#V'
+cp /bin/busybox '#r'
+echo fillmem '#r/busybox' 0 0 0 0x2000 > '#V/vm0/ctl'
+
+
