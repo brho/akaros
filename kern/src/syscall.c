@@ -1326,7 +1326,9 @@ intreg_t sys_chmod(struct proc *p, const char *path, size_t path_l, int mode)
 		size = sizeD2M(&d);
 		buf = kmalloc(size, KMALLOC_WAIT);
 		convD2M(&d, buf, size);
+		/* wstat returns the number of bytes written */
 		retval = syswstat(t_path, buf, size);
+		retval = (retval > 0 ? 0 : -1);
 		kfree(buf);
 	}
 	user_memdup_free(p, t_path);

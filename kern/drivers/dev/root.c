@@ -403,6 +403,33 @@ static long rootwrite(struct chan *c, void *a, long n, int64_t off)
 	return n;
 }
 
+static int rootwstat(struct chan *c, uint8_t *m_buf, int m_buf_sz)
+{
+	struct dirtab *file = &roottab[c->qid.path];
+	struct dir *dir;
+	int m_sz;
+
+	/* TODO: some security check, Eperm on error */
+
+	/* common trick in wstats.  we want the dir and any strings in the M.  the
+	 * strings are smaller than entire M (strings plus other M).  the strings
+	 * will be placed right after the dir (dir[1]) */
+	dir = kzmalloc(sizeof(struct dir) + m_buf_sz, KMALLOC_WAIT);
+	m_sz = convM2D(m_buf, m_buf_sz, &dir[0], (char*)&dir[1]);
+	if (!m_sz) {
+		kfree(dir);
+		error(Eshortstat);
+	}
+	/* TODO: handle more things than just the mode */
+	if (!emptystr(dir->name))
+		printk("[%s] attempted rename of %s to %s\n", __FUNCTION__,
+		       file->name, dir->name);	/* strncpy for this btw */
+	if (dir->mode != ~0UL)
+		file->perm = dir->mode | (file->qid.type == QTDIR ? DMDIR : 0);
+	kfree(dir);
+	return m_sz;
+}
+
 struct dev rootdevtab __devtab = {
 	'r',
 	"root",
@@ -420,7 +447,7 @@ struct dev rootdevtab __devtab = {
 	rootwrite,
 	devbwrite,
 	devremove,
-	devwstat,
+	rootwstat,
 	devpower,
 	devchaninfo,
 };

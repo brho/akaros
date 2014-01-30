@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Busybox version: 1.17.3
-# Mon Nov  4 17:24:22 2013
+# Thu Jan 30 12:02:08 2014
 #
 CONFIG_HAVE_DOT_CONFIG=y
 
@@ -175,7 +175,7 @@ CONFIG_FEATURE_TEST_64=y
 # CONFIG_CAL is not set
 # CONFIG_CATV is not set
 # CONFIG_CHGRP is not set
-# CONFIG_CHMOD is not set
+CONFIG_CHMOD=y
 # CONFIG_CHOWN is not set
 # CONFIG_FEATURE_CHOWN_LONG_OPTIONS is not set
 # CONFIG_CHROOT is not set
@@ -213,7 +213,7 @@ CONFIG_FEATURE_FANCY_ECHO=y
 # CONFIG_INSTALL is not set
 # CONFIG_FEATURE_INSTALL_LONG_OPTIONS is not set
 # CONFIG_LENGTH is not set
-# CONFIG_LN is not set
+CONFIG_LN=y
 # CONFIG_LOGNAME is not set
 CONFIG_LS=y
 CONFIG_FEATURE_LS_FILETYPES=y
