@@ -947,6 +947,7 @@ struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 	Elemlist e;
 	struct mhead *m;
 	char tmperrbuf[ERRMAX];
+	int saved_errno;
 	char *name;
 	// Rune r;
 
@@ -1277,8 +1278,10 @@ Open:
 
 			/* save error, so walk doesn't clobber our existing errstr */
 			strncpy(tmperrbuf, current_errstr(), MAX_ERRSTR_LEN);
+			saved_errno = get_errno();
 			/* note: we depend that walk does not error */
 			if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, nomount, NULL) < 0) {
+				set_errno(saved_errno);
 				error(tmperrbuf);	/* report the error we had originally */
 			}
 			strncpy(current_errstr(), tmperrbuf, MAX_ERRSTR_LEN);

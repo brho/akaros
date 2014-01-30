@@ -45,6 +45,7 @@ void run_local_syscall(struct syscall *sysc);
 intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
                  uintreg_t a2, uintreg_t a3, uintreg_t a4, uintreg_t a5);
 void set_errno(int errno);
+int get_errno(void);
 void unset_errno(void);
 void set_errstr(char *errstr, ...);
 char *current_errstr(void);

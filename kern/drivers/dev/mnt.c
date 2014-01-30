@@ -26,6 +26,17 @@
 
 #define MAXRPC (IOHDRSZ+8192)
 
+static __inline int isxdigit(int c)
+{
+	if ((c >= '0') && (c <= '9'))
+		return 1;
+	if ((c >= 'a') && (c <= 'f'))
+		return 1;
+	if ((c >= 'A') && (c <= 'F'))
+		return 1;
+	return 0;
+}
+
 struct mntrpc {
 	struct chan *c;				/* Channel for whom we are working */
 	struct mntrpc *list;		/* Free/pending list */
@@ -746,6 +757,7 @@ void mountrpc(struct mnt *m, struct mntrpc *r)
 {
 	char *sn, *cn;
 	int t;
+	char *e;
 
 	r->reply.tag = 0;
 	r->reply.type = Tmax;	/* can't ever be a valid message type */
@@ -755,7 +767,20 @@ void mountrpc(struct mnt *m, struct mntrpc *r)
 	t = r->reply.type;
 	switch (t) {
 		case Rerror:
-			error(r->reply.ename);
+			/* in Akaros mode, first four characters
+			 * are errno.
+			 */
+			e = r->reply.ename;
+			/* If it is in the format "XXXX <at least one char>" */
+			if ((strlen(e) > 5) && isxdigit(e[0]) &&
+				isxdigit(e[1]) &&
+				isxdigit(e[2]) &&
+				isxdigit(e[3])) {
+				int errno = strtoul(e, NULL, 16);
+				set_errno(errno);
+				error(&r->reply.ename[5]);
+			} else
+				error(r->reply.ename);
 		case Rflush:
 			error(Eintr);
 		default:

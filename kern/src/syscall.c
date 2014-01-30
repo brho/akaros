@@ -95,6 +95,18 @@ void set_errno(int errno)
 		pcpui->cur_kthread->sysc->err = errno;
 }
 
+/* Callable by any function while executing a syscall (or otherwise, actually).
+ */
+int get_errno(void)
+{
+	/* if there's no errno to get, that's not an error I guess. */
+	int errno = 0;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	if (pcpui->cur_kthread && pcpui->cur_kthread->sysc)
+		errno = pcpui->cur_kthread->sysc->err;
+	return errno;
+}
+
 void unset_errno(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
