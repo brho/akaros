@@ -536,6 +536,15 @@ static struct vmcs *alloc_vmcs(void)
 static int cpu_has_litevm_support(void)
 {
 	print_func_entry();
+	/* sigh ... qemu. */
+	char vid[16];
+	if (vendor_id(vid) < 0)
+		return 0;
+	printk("vendor id is %s\n", vid);
+	if (vid[0] == 'Q') /* qemu */
+		return 0;
+	if (vid[0] == 'A') /* AMD or qemu claiming to be AMD */
+		return 0;
 	uint32_t ecx = cpuid_ecx(1);
 	print_func_exit();
 	return ecx & 5;	/* CPUID.1:ECX.VMX[bit 5] -> VT */
