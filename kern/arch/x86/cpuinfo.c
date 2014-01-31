@@ -213,3 +213,21 @@ void show_mapping(uintptr_t start, size_t size)
 		}
 	}
 }
+
+/* return 0 if ok, -1 if it failed for some reason.
+ * Be sensible and call it with 16 bytes.
+ */
+int vendor_id(char *vid)
+{
+	uint32_t eax, ebx, ecx, edx;
+
+	asm volatile ("cpuid;"
+	          "movl    %%ebx, (%2);"
+	          "movl    %%edx, 4(%2);"
+	          "movl    %%ecx, 8(%2);"
+	         : "=a"(eax)
+	         : "a"(0), "D"(vid)
+	         : "%ebx", "%ecx", "%edx");
+
+	vid[12] = '\0';
+}

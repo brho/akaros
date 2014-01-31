@@ -41,6 +41,7 @@ void send_ipi(uint32_t os_coreid, uint8_t vector);
 /* in cpuinfo.c */
 void print_cpuinfo(void);
 void show_mapping(uintptr_t start, size_t size);
+int vendor_id(char *);
 
 /* declared in smp.c */
 extern int hw_coreid_lookup[MAX_NUM_CPUS];
