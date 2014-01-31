@@ -64,6 +64,7 @@ static command_t (RO commands)[] = {
 	{ "fs", "Filesystem Diagnostics", mon_fs},
 	{ "bb", "Try to run busybox (ash)", mon_bb},
 	{ "alarm", "Alarm Diagnostics", mon_alarm},
+	{ "msr", "read/write msr: msr msr [value]", mon_msr},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -960,4 +961,30 @@ int mon_alarm(int argc, char **argv, struct hw_trapframe *hw_tf)
 		return 1;
 	}
 	return 0;
+}
+
+int mon_msr(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+#ifndef CONFIG_X86
+	cprintf("Not on this architecture\n");
+	return 1;
+#else
+	uint64_t val;
+	uint32_t msr;
+	if (argc < 2 || argc > 3) {
+		printk("Usage: msr register [value]\n");
+		return 1;
+	}
+	msr = strtoul(argv[1], 0, 16);
+	val = read_msr(msr);
+	printk("%08x: %016llx\n", msr, val);
+	if (argc < 3)
+		return 0;
+	/* somewhat bogus on 32 bit. */
+	val = strtoul(argv[2], 0, 16);
+	write_msr(msr, val);
+	val = read_msr(msr);
+	printk("After write: %08x: %016llx\n", msr, val);
+	return 0;
+#endif
 }
