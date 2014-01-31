@@ -1134,7 +1134,7 @@ static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 		kref_put(&file->f_kref);
 	} else {
 		unset_errno();	/* Go can't handle extra errnos */
-	    if (sysfstat(fd, (uint8_t*)kbuf, sizeof(*kbuf)) < 0) {
+	    if (sysfstatakaros(fd, (uint8_t*)kbuf, sizeof(*kbuf)) < 0) {
 			kfree(kbuf);
 			return -1;
 		}
@@ -1174,7 +1174,7 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 	} else {
 		/* VFS failed, checking 9ns */
 		unset_errno();	/* Go can't handle extra errnos */
-		retval = sysstat(t_path, (uint8_t*)kbuf, sizeof(*kbuf));
+		retval = sysstatakaros(t_path, (uint8_t*)kbuf, sizeof(*kbuf));
 		printd("sysstat returns %d\n", retval);
 		/* both VFS and 9ns failed, bail out */
 		if (retval < 0)
@@ -1417,14 +1417,19 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 {
 	char *symname;
 	ssize_t copy_amt;
+	int fail = 0;
 	struct dentry *path_d;
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (t_path == NULL)
 		return -1;
 	/* TODO: 9ns support */
 	path_d = lookup_dentry(t_path, 0);
+	if (!path_d){
+		/* try 9ns. */
+		fail = 1;
+	}
 	user_memdup_free(p, t_path);
-	if (!path_d)
+	if (fail)
 		return -1;
 	symname = path_d->d_inode->i_op->readlink(path_d);
 	copy_amt = strnlen(symname, buf_l - 1) + 1;

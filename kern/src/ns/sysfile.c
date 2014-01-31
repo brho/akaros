@@ -313,32 +313,6 @@ int sysdup(int old, int new)
 	return fd;
 }
 
-int sysfstat(int fd, uint8_t * buf, int n)
-{
-	ERRSTACK(2);
-	struct chan *c;
-	struct dir dir9ns;
-
-	if (waserror()) {
-		poperror();
-		return -1;
-	}
-
-	c = fdtochan(current->fgrp, fd, -1, 0, 1);
-	if (waserror()) {
-		cclose(c);
-		nexterror();
-	}
-	devtab[c->type].stat(c, (void *)&dir9ns, sizeof(struct dir));
-
-	poperror();
-	cclose(c);
-
-	poperror();
-	convM2kstat((void *)&dir9ns, sizeof(struct dir), (struct kstat *)buf);
-	return n;
-}
-
 char *sysfd2path(int fd)
 {
 	ERRSTACK(1);
@@ -964,11 +938,43 @@ void validstat(uint8_t * s, int n)
 		validname(buf, 0);
 }
 
-int sysstat(char *path, uint8_t * buf, int n)
+int sysfstat(int fd, struct dir *dir9ns, int n)
 {
 	ERRSTACK(2);
 	struct chan *c;
+
+	if (waserror()) {
+		poperror();
+		return -1;
+	}
+
+	c = fdtochan(current->fgrp, fd, -1, 0, 1);
+	if (waserror()) {
+		cclose(c);
+		nexterror();
+	}
+	devtab[c->type].stat(c, (void *)dir9ns, n);
+
+	poperror();
+	cclose(c);
+
+	poperror();
+	return n;
+}
+
+int sysfstatakaros(int fd, uint8_t *buf, int n)
+{
 	struct dir dir9ns;
+	if ((n = sysfstat(fd, &dir9ns, sizeof(dir9ns))) < 0)
+		return n;
+	convM2kstat((void *)&dir9ns, sizeof(struct dir), (struct kstat *)buf);
+	return n;
+}
+
+int sysstat(char *path, struct dir *dir9ns, int n)
+{
+	ERRSTACK(2);
+	struct chan *c;
 
 	if (waserror()) {
 		poperror();
@@ -980,11 +986,21 @@ int sysstat(char *path, uint8_t * buf, int n)
 		cclose(c);
 		nexterror();
 	}
-	devtab[c->type].stat(c, (void *)&dir9ns, sizeof(struct dir));
+	devtab[c->type].stat(c, (void *)dir9ns, sizeof(struct dir));
 	poperror();
 	cclose(c);
 
 	poperror();
+
+	return n;
+}
+
+int sysstatakaros(char *path, uint8_t * buf, int n)
+{
+	struct dir dir9ns;
+	n = sysstat(path, &dir9ns, sizeof(dir9ns));
+	if (n < 0)
+		return n;
 	convM2kstat((void *)&dir9ns, sizeof(struct dir), (struct kstat *)buf);
 	return 0;
 }
