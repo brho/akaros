@@ -963,6 +963,36 @@ int mon_alarm(int argc, char **argv, struct hw_trapframe *hw_tf)
 	return 0;
 }
 
+static void show_msr(struct hw_trapframe *unused, void *v)
+{
+	int core = core_id();
+	uint64_t val;
+	uint32_t msr = *(uint32_t *)v;
+	val = read_msr(msr);
+	printk("%d: %08x: %016llx\n", core, msr, val);
+	val = read_msr(msr);
+	printk("After write: %08x: %016llx\n", msr, val);
+
+}
+
+struct set {
+	uint32_t msr;
+	uint64_t val;
+};
+
+static void set_msr(struct hw_trapframe *unused, void *v)
+{
+	int core = core_id();
+	struct set *s = v;
+	uint32_t msr = s->msr;
+	uint64_t val = s->val;
+	val = read_msr(msr);
+	printk("%d: %08x: %016llx\n", core, msr, val);
+	write_msr(msr, val);
+	val = read_msr(msr);
+	printk("%d: %08x: %016llx\n", core, msr, val);
+}
+
 int mon_msr(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 #ifndef CONFIG_X86
@@ -976,15 +1006,20 @@ int mon_msr(int argc, char **argv, struct hw_trapframe *hw_tf)
 		return 1;
 	}
 	msr = strtoul(argv[1], 0, 16);
-	val = read_msr(msr);
-	printk("%08x: %016llx\n", msr, val);
+	handler_wrapper_t *w;
+	smp_call_function_all(show_msr, &msr, &w);
+	smp_call_wait(w);
+
 	if (argc < 3)
 		return 0;
 	/* somewhat bogus on 32 bit. */
 	val = strtoul(argv[2], 0, 16);
-	write_msr(msr, val);
-	val = read_msr(msr);
-	printk("After write: %08x: %016llx\n", msr, val);
+
+	struct set set;
+	set.msr = msr;
+	set.val = val;
+	smp_call_function_all(set_msr, &set, &w);
+	smp_call_wait(w);
 	return 0;
 #endif
 }
