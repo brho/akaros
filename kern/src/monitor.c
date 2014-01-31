@@ -970,9 +970,6 @@ static void show_msr(struct hw_trapframe *unused, void *v)
 	uint32_t msr = *(uint32_t *)v;
 	val = read_msr(msr);
 	printk("%d: %08x: %016llx\n", core, msr, val);
-	val = read_msr(msr);
-	printk("After write: %08x: %016llx\n", msr, val);
-
 }
 
 struct set {
@@ -986,8 +983,6 @@ static void set_msr(struct hw_trapframe *unused, void *v)
 	struct set *s = v;
 	uint32_t msr = s->msr;
 	uint64_t val = s->val;
-	val = read_msr(msr);
-	printk("%d: %08x: %016llx\n", core, msr, val);
 	write_msr(msr, val);
 	val = read_msr(msr);
 	printk("%d: %08x: %016llx\n", core, msr, val);
