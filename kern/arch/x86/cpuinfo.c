@@ -230,4 +230,5 @@ int vendor_id(char *vid)
 	         : "%ebx", "%ecx", "%edx");
 
 	vid[12] = '\0';
+	return 0;
 }
