@@ -115,8 +115,19 @@ static int smp_call_function(uint8_t type, uint32_t dest, isr_t handler,
 		atomic_dec(&outstanding_calls);
 	}
 
-	// now register our handler to run
-	register_raw_irq(wrapper->vector, handler, data);
+	/* TODO: once we can unregister, we can reregister.  This here assumes that
+	 * there is only one IRQ registered, and its the one for SMP call function.
+	 * We're waiting on RCU to do a nice unregister. */
+	extern struct irq_handler *irq_handlers[];
+	if (!irq_handlers[wrapper->vector]) {
+		register_raw_irq(wrapper->vector, handler, data);
+	} else {
+		/* we're replacing the old one.  hope it was ours, and the IRQ is firing
+		 * concurrently (if it is, there's an smp_call bug)! */
+		irq_handlers[wrapper->vector]->isr = handler;
+		irq_handlers[wrapper->vector]->data = data;
+	}
+
 	// WRITE MEMORY BARRIER HERE
 	enable_irqsave(&state);
 	// Send the proper type of IPI.  I made up these numbers.
