@@ -1415,9 +1415,10 @@ intreg_t sys_symlink(struct proc *p, char *old_path, size_t old_l,
 intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
                       char *u_buf, size_t buf_l)
 {
-	char *symname;
+	char *symname = NULL;
+	uint8_t *buf = NULL;
 	ssize_t copy_amt;
-	int fail = 0;
+	int ret = -1;
 	struct dentry *path_d;
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (t_path == NULL)
@@ -1425,21 +1426,32 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 	/* TODO: 9ns support */
 	path_d = lookup_dentry(t_path, 0);
 	if (!path_d){
-		/* try 9ns. */
-		fail = 1;
-	}
+		int n = 2048;
+		buf = kmalloc(n*2, KMALLOC_WAIT);
+		struct dir *d = (void *)&buf[n];
+ 		/* try 9ns. */
+		if (sysstat(t_path, buf, n) > 0) {
+			printk("sysstat t_path %s\n", t_path);
+			convM2D(buf, n, d, (char *)&d[1]);
+			/* will be NULL if things did not work out */
+			symname = d->muid;
+		}
+	} else
+		symname = path_d->d_inode->i_op->readlink(path_d);
+
 	user_memdup_free(p, t_path);
-	if (fail)
-		return -1;
-	symname = path_d->d_inode->i_op->readlink(path_d);
-	copy_amt = strnlen(symname, buf_l - 1) + 1;
-	if (memcpy_to_user_errno(p, u_buf, symname, copy_amt)) {
-		kref_put(&path_d->d_kref);
-		return -1;
+
+	if (symname){
+		copy_amt = strnlen(symname, buf_l - 1) + 1;
+		if (! memcpy_to_user_errno(p, u_buf, symname, copy_amt))
+			ret = copy_amt;
 	}
-	kref_put(&path_d->d_kref);
+	if (path_d)
+		kref_put(&path_d->d_kref);
+	if (buf)
+		kfree(buf);
 	printd("READLINK returning %s\n", u_buf);
-	return copy_amt;
+	return ret;
 }
 
 intreg_t sys_chdir(struct proc *p, const char *path, size_t path_l)
