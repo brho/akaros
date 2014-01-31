@@ -30,7 +30,8 @@ void devtabinit()
 
 	for (i = 0; &devtab[i] < __devtabend; i++) {
 		/* if we have errors, check the align of struct dev and objdump */
-		printd("i %d, dev %p, init %p\n", i, &devtab[i], devtab[i].init);
+		printd("i %d, '%s', dev %p, init %p\n", i, devtab[i].name,
+				&devtab[i], devtab[i].init);
 		devtab[i].init();
 	}
 }
