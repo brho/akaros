@@ -94,6 +94,7 @@ extern int parseether(uint8_t * unused_uint8_p_t, char *unused_char_p_t);
 #define DMAPPEND	0x40000000	/* mode bit for append only files */
 #define DMEXCL		0x20000000	/* mode bit for exclusive use files */
 #define DMMOUNT		0x10000000	/* mode bit for mounted channel */
+#define DMSYMLINK	0x02000000	/* symlink -- from 9p2000.u */
 #define DMREAD		0x4	/* mode bit for read permission */
 #define DMWRITE		0x2	/* mode bit for write permission */
 #define DMEXEC		0x1	/* mode bit for execute permission */
@@ -393,7 +394,7 @@ struct dev {
 //  int (*config)( int unused_int, char *unused_char_p_t, DevConf*);
 	char *(*chaninfo) (struct chan *, char *, size_t);
 	/* we need to be aligned, i think to 32 bytes, for the linker tables. */
-} __attribute__ ((aligned(32)));;
+} __attribute__ ((aligned(32)));
 
 struct dirtab {
 	char name[KNAMELEN];
