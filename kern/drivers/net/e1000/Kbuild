@@ -1,0 +1,12 @@
+# need at least one obj file to build for Kbuild
+obj-y                                                   += e1000_mac.o
+#obj-y                                                   += e1000_82540.o
+#obj-y                                                   += e1000_82541.o
+#obj-y                                                   += e1000_82542.o
+#obj-y                                                   += e1000_82543.o
+#obj-y                                                   += e1000_api.o
+#obj-y                                                   += e1000.o
+#obj-y                                                   += e1000_main.o
+#obj-y                                                   += e1000_manage.o
+#obj-y                                                   += e1000_nvm.o
+#obj-y                                                   += e1000_phy.o
