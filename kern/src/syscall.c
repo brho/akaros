@@ -1134,7 +1134,7 @@ static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 		kref_put(&file->f_kref);
 	} else {
 		unset_errno();	/* Go can't handle extra errnos */
-	    if (sysfstatakaros(fd, (uint8_t*)kbuf, sizeof(*kbuf)) < 0) {
+	    if (sysfstatakaros(fd, (struct kstat *)kbuf) < 0) {
 			kfree(kbuf);
 			return -1;
 		}
@@ -1174,7 +1174,7 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 	} else {
 		/* VFS failed, checking 9ns */
 		unset_errno();	/* Go can't handle extra errnos */
-		retval = sysstatakaros(t_path, (uint8_t*)kbuf, sizeof(*kbuf));
+		retval = sysstatakaros(t_path, (struct stat *)kbuf);
 		printd("sysstat returns %d\n", retval);
 		/* both VFS and 9ns failed, bail out */
 		if (retval < 0)

@@ -938,7 +938,7 @@ void validstat(uint8_t * s, int n)
 		validname(buf, 0);
 }
 
-int sysfstat(int fd, struct dir *dir9ns, int n)
+int sysfstat(int fd, uint8_t *buf, int n)
 {
 	ERRSTACK(2);
 	struct chan *c;
@@ -953,7 +953,7 @@ int sysfstat(int fd, struct dir *dir9ns, int n)
 		cclose(c);
 		nexterror();
 	}
-	devtab[c->type].stat(c, (void *)dir9ns, n);
+	devtab[c->type].stat(c, buf, n);
 
 	poperror();
 	cclose(c);
@@ -962,16 +962,21 @@ int sysfstat(int fd, struct dir *dir9ns, int n)
 	return n;
 }
 
-int sysfstatakaros(int fd, uint8_t *buf, int n)
+int sysfstatakaros(int fd, struct kstat *ks)
 {
-	struct dir dir9ns;
-	if ((n = sysfstat(fd, &dir9ns, sizeof(dir9ns))) < 0)
-		return n;
-	convM2kstat((void *)&dir9ns, sizeof(struct dir), (struct kstat *)buf);
+	int n = 4096;
+	uint8_t *buf;
+	buf = kmalloc(n, KMALLOC_WAIT);
+	n = sysfstat(fd, buf, n);
+	if (n > 0) {
+		convM2kstat(buf, n, ks);
+		n = 0;
+	}
+	kfree(buf);
 	return n;
 }
 
-int sysstat(char *path, struct dir *dir9ns, int n)
+int sysstat(char *path, uint8_t *buf, int n)
 {
 	ERRSTACK(2);
 	struct chan *c;
@@ -986,7 +991,7 @@ int sysstat(char *path, struct dir *dir9ns, int n)
 		cclose(c);
 		nexterror();
 	}
-	devtab[c->type].stat(c, (void *)dir9ns, sizeof(struct dir));
+	devtab[c->type].stat(c, buf, n);
 	poperror();
 	cclose(c);
 
@@ -995,14 +1000,18 @@ int sysstat(char *path, struct dir *dir9ns, int n)
 	return n;
 }
 
-int sysstatakaros(char *path, uint8_t * buf, int n)
+int sysstatakaros(char *path, struct kstat *ks)
 {
-	struct dir dir9ns;
-	n = sysstat(path, &dir9ns, sizeof(dir9ns));
-	if (n < 0)
-		return n;
-	convM2kstat((void *)&dir9ns, sizeof(struct dir), (struct kstat *)buf);
-	return 0;
+	int n = 4096;
+	uint8_t *buf;
+	buf = kmalloc(n, KMALLOC_WAIT);
+	n = sysstat(path, buf, n);
+	if (n > 0) {
+		convM2kstat(buf, n, ks);
+		n = 0;
+	}
+	kfree(buf);
+	return n;
 }
 
 static long rwrite(int fd, void *va, long n, int64_t * offp)
