@@ -124,6 +124,9 @@ unsigned int convM2kstat(uint8_t * buf, unsigned int nbuf, struct kstat *ks)
 	if (ks->st_mode & DMDIR) {
 		ks->st_mode &= ~DMDIR;
 		ks->st_mode |= __S_IFDIR;
+	} else if (ks->st_mode & DMSYMLINK) {
+		ks->st_mode &= ~DMSYMLINK;
+		ks->st_mode |= __S_IFLNK;
 	} else {
 		ks->st_mode |= __S_IFREG;
 	}
