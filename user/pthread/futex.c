@@ -43,9 +43,31 @@ static inline void futex_init()
 static void __futex_block(struct uthread *uthread, void *arg) {
   pthread_t pthread = (pthread_t)uthread;
   struct futex_element *e = (struct futex_element*)arg;
+
+  // Set the remaining properties of the futex element
+  e->pthread = pthread;
+  e->timedout = false;
+  // Adjust the timeout properties on the futex element
+  bool enable_timer = false;
+  if(e->ms_timeout != (uint64_t)-1) {
+    e->ms_timeout += __futex.time;
+	// If we are setting the timeout, get ready to
+	// enable the timer if it is currently disabled.
+    if(__futex.timer_enabled == false) {
+      __futex.timer_enabled = true;
+      enable_timer = true;
+    }
+  }
+  // Notify the scheduler of the type of yield we did
   __pthread_generic_yield(pthread);
   pthread->state = PTH_BLK_MUTEX;
-  e->pthread = pthread;
+  // Insert the futex element into the queue
+  TAILQ_INSERT_TAIL(&__futex.queue, e, link);
+  // Unlock the pdr_lock 
+  mcs_pdr_unlock(&__futex.lock);
+  // Enable the timer if we need to outside the lock
+  if(enable_timer)
+    futex_wake(&__futex.timer_enabled, 1);
 }
 
 static inline int futex_wait(int *uaddr, int val, uint64_t ms_timeout)
@@ -56,40 +78,27 @@ static inline int futex_wait(int *uaddr, int val, uint64_t ms_timeout)
   if(*uaddr == val) {
     // Create a new futex element and initialize it.
     struct futex_element e;
-    bool enable_timer = false;
     e.uaddr = uaddr;
-    e.pthread = NULL;
     e.ms_timeout = ms_timeout;
-    e.timedout = false;
-    if(e.ms_timeout != (uint64_t)-1) {
-      e.ms_timeout += __futex.time;
-	  // If we are setting the timeout, get ready to
-	  // enable the timer if it is currently disabled.
-      if(__futex.timer_enabled == false) {
-        __futex.timer_enabled = true;
-        enable_timer = true;
-      }
-    }
-    // Insert the futex element into the queue
-    TAILQ_INSERT_TAIL(&__futex.queue, &e, link);
-    mcs_pdr_unlock(&__futex.lock);
-
-    // Enable the timer if we need to outside the lock
-    if(enable_timer)
-      futex_wake(&__futex.timer_enabled, 1);
-
-    // Yield the current uthread
+    // Yield the uthread...
+    // We set the remaining properties of the futex element, adjust the
+    // timeout, set the timer, and unlock the pdr lock on the other side.
+    // It is important that we do the unlock on the other side, because (unlike
+    // linux, etc.) its possible to get interrupted and drop into vcore context
+    // right after releasing the lock.  If that vcore code then calls
+    // futex_wake(), we would be screwed.  Doing things this way means we have
+    // to hold the lock longer, but its necessary for correctness.
     uthread_yield(TRUE, __futex_block, &e);
+    // We are unlocked here!
 
-	// After waking, if we timed out, set the error
-	// code appropriately and return
+    // After waking, if we timed out, set the error
+    // code appropriately and return
     if(e.timedout) {
       errno = ETIMEDOUT;
       return -1;
     }
-  }
-  else {
-    mcs_pdr_unlock(&__futex.lock);
+  } else {
+      mcs_pdr_unlock(&__futex.lock);
   }
   return 0;
 }
@@ -122,8 +131,6 @@ static inline int futex_wake(int *uaddr, int count)
   while(e != NULL) {
     n = TAILQ_NEXT(e, link);
     TAILQ_REMOVE(&q, e, link);
-    while(e->pthread == NULL)
-      cpu_relax();
     uthread_runnable((struct uthread*)e->pthread);
     e = n;
   }
@@ -172,8 +179,6 @@ static void *timer_thread(void *arg)
     while(e != NULL) {
       n = TAILQ_NEXT(e, link);
       TAILQ_REMOVE(&q, e, link);
-      while(e->pthread == NULL)
-        cpu_relax();
       uthread_runnable((struct uthread*)e->pthread);
       e = n;
     }
