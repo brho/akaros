@@ -63,6 +63,7 @@ static spinlock_t vmlock;
 /* array, not linked list. We expect few, might as well be cache friendly. */
 static struct vm *vms = NULL;
 static int nvm = 0;
+static int vmok = 0;
 
 static spinlock_t vmidlock[1];
 static struct kref vmid[1] = { {(void *)1, fake_release} };
@@ -227,12 +228,13 @@ static int vmgen(struct chan *c, char *entry_name,
 
 static void vminit(void)
 {
-	return;
 	print_func_entry();
 	int i;
 	spinlock_init_irqsave(&vmlock);
 	spinlock_init_irqsave(vmidlock);
 	i = vmx_init();
+	if (i == 0)
+		vmok = 1;
 	printk("vminit: litevm_init returns %d\n", i);
 
 	print_func_exit();
@@ -241,6 +243,8 @@ static void vminit(void)
 static struct chan *vmattach(char *spec)
 {
 	print_func_entry();
+	if (!vmok)
+		error("No VMs available");
 	struct chan *c = devattach('V', spec);
 	mkqid(&c->qid, Qtopdir, 0, QTDIR);
 	print_func_exit();
