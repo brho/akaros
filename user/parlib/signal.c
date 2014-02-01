@@ -1,5 +1,6 @@
 /* Copyright (c) 2013 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
+ * Kevin Klues <klueska@cs.berkeley.edu>
  * See LICENSE for details.
  *
  * POSIX signal handling glue.  All glibc programs link against parlib, so they
@@ -28,10 +29,78 @@
 
 #include <event.h>
 #include <assert.h>
+#include <ros/procinfo.h>
+#include <ros/syscall.h>
 
-struct sigaction sigactions[_NSIG - 1];
+/* This is list of sigactions associated with each posix signal. */
+static struct sigaction sigactions[_NSIG - 1];
 
-void handle_posix_signal(struct event_msg *ev_msg, unsigned int ev_type)
+/* These are the default handlers for each posix signal.  They are listed in
+ * SIGNAL(7) of the Linux Programmer's Manual */
+/* Exit codes are set as suggested in the following link.  I wish I could find
+ * the definitive source, but this will have to do for now.
+ * http://unix.stackexchange.com/questions/99112/default-exit-code-when-process-is-terminated
+ * */
+static void default_ignr_handler(int signr)
+{
+	/* Do nothing. We are ingoring the signal after all! */
+}
+static void default_term_handler(int signr)
+{
+	ros_syscall(SYS_proc_destroy, __procinfo.pid, signr, 0, 0, 0, 0);
+}
+static void default_core_handler(int signr)
+{
+	fprintf(stderr, "Segmentation Fault (sorry, no core dump yet)");
+	default_term_handler((1 << 7) + signr);
+}
+static void default_stop_handler(int signr)
+{
+	fprintf(stderr, "Stop signal received!  No support to stop yet though!");
+}
+static void default_cont_handler(int signr)
+{
+	fprintf(stderr, "Cont signal received!  No support to cont yet though!");
+}
+static __sighandler_t default_handlers[] = {
+	[SIGHUP]    = default_term_handler, 
+	[SIGINT]    = default_term_handler, 
+	[SIGQUIT]   = default_core_handler, 
+	[SIGILL]    = default_core_handler, 
+	[SIGTRAP]   = default_core_handler, 
+	[SIGABRT]   = default_core_handler, 
+	[SIGIOT]    = default_core_handler, 
+	[SIGBUS]    = default_core_handler, 
+	[SIGFPE]    = default_core_handler, 
+	[SIGKILL]   = default_term_handler, 
+	[SIGUSR1]   = default_term_handler, 
+	[SIGSEGV]   = default_core_handler, 
+	[SIGUSR2]   = default_term_handler, 
+	[SIGPIPE]   = default_term_handler, 
+	[SIGALRM]   = default_term_handler, 
+	[SIGTERM]   = default_term_handler, 
+	[SIGSTKFLT] = default_term_handler, 
+	[SIGCHLD]   = default_ignr_handler, 
+	[SIGCONT]   = default_cont_handler, 
+	[SIGSTOP]   = default_stop_handler, 
+	[SIGTSTP]   = default_stop_handler, 
+	[SIGTTIN]   = default_stop_handler, 
+	[SIGTTOU]   = default_stop_handler, 
+	[SIGURG]    = default_term_handler, 
+	[SIGXCPU]   = default_ignr_handler, 
+	[SIGXFSZ]   = default_core_handler, 
+	[SIGVTALRM] = default_term_handler, 
+	[SIGPROF]   = default_term_handler, 
+	[SIGWINCH]  = default_ignr_handler, 
+	[SIGIO]     = default_term_handler, 
+	[SIGPWR]    = default_ignr_handler, 
+	[SIGSYS]    = default_core_handler
+};
+
+/* This is the catch all akaros event->posix signal handler.  All posix signals
+ * are received in a single akaros event type.  They are then dispatched from
+ * this function to their proper posix signal handler */
+static void handle_posix_signal(struct event_msg *ev_msg, unsigned int ev_type)
 {
 	int sig_nr;
 	struct sigaction *action;
@@ -49,8 +118,11 @@ void handle_posix_signal(struct event_msg *ev_msg, unsigned int ev_type)
 		return;
 	if (action->sa_handler == SIG_IGN)
 		return;
-	if (action->sa_handler == SIG_DFL) 	/* aka, 0 */
+	if (action->sa_handler == SIG_DFL) {
+		default_handlers[sig_nr](sig_nr);
 		return;
+	}
+
 	if (action->sa_flags & SA_SIGINFO) {
 		info.si_signo = sig_nr;
 		/* TODO: consider pid and whatnot */
