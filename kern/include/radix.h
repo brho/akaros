@@ -45,7 +45,8 @@ void radix_tree_init(struct radix_tree *tree);	/* inits one tree */
 void radix_tree_destroy(struct radix_tree *tree);
 
 /* Item management */
-int radix_insert(struct radix_tree *tree, unsigned long key, void *item);
+int radix_insert(struct radix_tree *tree, unsigned long key, void *item,
+                 void ***slot_p);
 void *radix_delete(struct radix_tree *tree, unsigned long key);
 void *radix_lookup(struct radix_tree *tree, unsigned long key);
 void **radix_lookup_slot(struct radix_tree *tree, unsigned long key);

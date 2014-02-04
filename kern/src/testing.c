@@ -1197,15 +1197,15 @@ void test_radix_tree(void)
 	struct radix_tree *tree = &real_tree;
 	void *retval;
 
-	if (radix_insert(tree, 0, (void*)0xdeadbeef))
+	if (radix_insert(tree, 0, (void*)0xdeadbeef, 0))
 		printk("Failed to insert at 0!\n");
 	radix_delete(tree, 0);
-	if (radix_insert(tree, 0, (void*)0xdeadbeef))
+	if (radix_insert(tree, 0, (void*)0xdeadbeef, 0))
 		printk("Failed to re-insert at 0!\n");
 
-	if (radix_insert(tree, 3, (void*)0xdeadbeef))
+	if (radix_insert(tree, 3, (void*)0xdeadbeef, 0))
 		printk("Failed to insert first!\n");
-	radix_insert(tree, 4, (void*)0x04040404);
+	radix_insert(tree, 4, (void*)0x04040404, 0);
 	assert((void*)0xdeadbeef == radix_lookup(tree, 3));
 	for (int i = 5; i < 100; i++)
 		if ((retval = radix_lookup(tree, i))) {
@@ -1214,13 +1214,13 @@ void test_radix_tree(void)
 			print_radix_tree(tree);
 			monitor(0);
 		}
-	if (radix_insert(tree, 65, (void*)0xcafebabe))
+	if (radix_insert(tree, 65, (void*)0xcafebabe, 0))
 		printk("Failed to insert a two-tier!\n");
-	if (!radix_insert(tree, 4, (void*)0x03030303))
+	if (!radix_insert(tree, 4, (void*)0x03030303, 0))
 		printk("Should not let us reinsert\n");
-	if (radix_insert(tree, 4095, (void*)0x4095))
+	if (radix_insert(tree, 4095, (void*)0x4095, 0))
 		printk("Failed to insert a two-tier boundary!\n");
-	if (radix_insert(tree, 4096, (void*)0x4096))
+	if (radix_insert(tree, 4096, (void*)0x4096, 0))
 		printk("Failed to insert a three-tier!\n");
 	//print_radix_tree(tree);
 	radix_delete(tree, 65);

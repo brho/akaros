@@ -64,7 +64,7 @@ static int pm_insert_page(struct page_map *pm, unsigned long index,
 {
 	int error = 0;
 	spin_lock(&pm->pm_tree_lock);
-	error = radix_insert(&pm->pm_tree, index, page);
+	error = radix_insert(&pm->pm_tree, index, page, 0);
 	if (!error) {
 		page_incref(page);
 		/* setting PG_BUF since we know it'll be used for IO later... */

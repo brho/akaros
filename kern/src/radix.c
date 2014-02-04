@@ -43,8 +43,10 @@ void radix_tree_destroy(struct radix_tree *tree)
 }
 
 /* Attempts to insert an item in the tree at the given key.  ENOMEM if we ran
- * out of memory, EEXIST if an item is already in the tree. */
-int radix_insert(struct radix_tree *tree, unsigned long key, void *item)
+ * out of memory, EEXIST if an item is already in the tree.  On success, will
+ * also return the slot pointer, if requested. */
+int radix_insert(struct radix_tree *tree, unsigned long key, void *item,
+                 void ***slot_p)
 {
 	printd("RADIX: insert %p at %d\n", item, key);
 	struct radix_node *r_node;
@@ -82,6 +84,8 @@ int radix_insert(struct radix_tree *tree, unsigned long key, void *item)
 		return -EEXIST;
 	*slot = item;
 	r_node->num_items++;
+	if (slot_p)
+		*slot_p = slot;
 	return 0;
 }
 
