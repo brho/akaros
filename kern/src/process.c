@@ -1771,6 +1771,8 @@ void switch_back(struct proc *new_p, struct proc *old_proc)
  * immediate message. */
 void proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
 {
+	/* TODO: need a better way to find cores running our address space.  we can
+	 * have kthreads running syscalls, async calls, processes being created. */
 	struct vcore *vc_i;
 	/* TODO: we might be able to avoid locking here in the future (we must hit
 	 * all online, and we can check __mapped).  it'll be complicated. */
@@ -1786,14 +1788,6 @@ void proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
 				                    0, KMSG_IMMEDIATE);
 			}
 			break;
-		case (PROC_DYING):
-			/* if it is dying, death messages are already on the way to all
-			 * cores, including ours, which will clear the TLB. */
-			break;
-		default:
-			/* will probably get this when we have the short handlers */
-			warn("Unexpected case %s in %s", procstate2str(p->state),
-			     __FUNCTION__);
 	}
 	spin_unlock(&p->proc_lock);
 }
