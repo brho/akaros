@@ -33,6 +33,7 @@ typedef LIST_ENTRY(page) page_list_entry_t;
 #define PG_DIRTY		0x004	/* page map, data is dirty */
 #define PG_BUFFER		0x008	/* is a buffer page, has BHs */
 #define PG_PAGEMAP		0x010	/* belongs to a page map */
+#define PG_REMOVAL		0x020	/* Working flag for page map removal */
 
 /* TODO: this struct is not protected from concurrent operations in some
  * functions.  If you want to lock on it, use the spinlock in the semaphore.
@@ -43,8 +44,9 @@ struct page {
 	LIST_ENTRY(page)			pg_link;	/* membership in various lists */
 	struct kref					pg_kref;
 	atomic_t					pg_flags;
-	struct page_map				*pg_mapping;
+	struct page_map				*pg_mapping; /* for debugging... */
 	unsigned long				pg_index;
+	void						**pg_tree_slot;
 	void						*pg_private;	/* type depends on page usage */
 	struct semaphore 			pg_sem;		/* for blocking on IO */
 };

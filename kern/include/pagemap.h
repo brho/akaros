@@ -18,6 +18,7 @@
 struct page;
 struct inode;
 struct block_device;
+struct chan;
 struct page_map_operations;
 
 /* Every object that has pages, like an inode or the swap (or even direct block
@@ -27,15 +28,14 @@ struct page_map {
 	union {
 		struct inode				*pm_host;	/* inode of the owner, if any */
 		struct block_device			*pm_bdev;	/* bdev of the owner, if any */
+		struct chan					*pm_chan;
 	};
 	struct radix_tree			pm_tree;		/* tracks present pages */
-	spinlock_t					pm_tree_lock;	/* spinlock => we can't block */
 	unsigned long				pm_num_pages;	/* how many pages are present */
 	struct page_map_operations	*pm_op;
-	unsigned int				pm_flags;
-	/*... and private lists, backing block dev info, other mappings, etc. */
 	spinlock_t					pm_lock;
 	struct vmr_tailq			pm_vmrs;
+	atomic_t					pm_removal;
 };
 
 /* Operations performed on a page_map.  These are usually FS specific, which
@@ -63,6 +63,8 @@ int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp);
 void pm_put_page(struct page *page);
 void pm_add_vmr(struct page_map *pm, struct vm_region *vmr);
 void pm_remove_vmr(struct page_map *pm, struct vm_region *vmr);
+int pm_remove_contig(struct page_map *pm, unsigned long index,
+                     unsigned long nr_pgs);
 void print_page_map_info(struct page_map *pm);
 
 #endif /* ROS_KERN_PAGEMAP_H */

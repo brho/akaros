@@ -740,6 +740,15 @@ int handle_page_fault(struct proc* p, uintptr_t va, int prot)
 	return ret;
 }
 
+/* Helper - drop the page differently based on where it is from */
+static void __put_page(struct page *page)
+{
+	if (atomic_read(&page->pg_flags) & PG_PAGEMAP)
+		pm_put_page(page);
+	else
+		page_decref(page);
+}
+
 /* Returns 0 on success, or an appropriate -error code.  Assumes you hold the
  * vmr_lock.
  *
@@ -767,6 +776,7 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 		/* No file - just want anonymous memory */
 		if (upage_alloc(p, &a_page, TRUE))
 			return -ENOMEM;
+		a_page->pg_tree_slot = 0;
 	} else {
 		/* If this fails, either something got screwed up with the VMR, or the
 		 * permissions changed after mmap/mprotect.  Either way, I want to know
@@ -801,11 +811,12 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 		if ((vmr->vm_flags & MAP_PRIVATE)) {
 			struct page *cache_page = a_page;
 			if (upage_alloc(p, &a_page, FALSE)) {
-				page_decref(cache_page);	/* was the original a_page */
+				__put_page(cache_page);	/* was the original a_page */
 				return -ENOMEM;
 			}
+			a_page->pg_tree_slot = 0;
 			memcpy(page2kva(a_page), page2kva(cache_page), PGSIZE);
-			page_decref(cache_page);		/* was the original a_page */
+			__put_page(cache_page);		/* was the original a_page */
 			/* Debugging */
 			if (!(vmr->vm_prot & PROT_WRITE))
 				printd("[kernel] private, but unwritable file mapping of %s "
@@ -826,7 +837,7 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 	pte = pgdir_walk(p->env_pgdir, (void*)va, 1);
 	if (!pte) {
 		spin_unlock(&p->pte_lock);
-		pm_put_page(a_page);
+		__put_page(a_page);
 		return -ENOMEM;
 	}
 	/* a spurious, valid PF is possible due to a legit race: the page might have
@@ -834,18 +845,19 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 	 * in which case we should just return. */
 	if (PAGE_PRESENT(*pte)) {
 		spin_unlock(&p->pte_lock);
-		pm_put_page(a_page);
+		__put_page(a_page);
 		return 0;
-	} else if (PAGE_PAGED_OUT(*pte)) {
-		/* TODO: (SWAP) bring in the paged out frame. (BLK) */
-		panic("Swapping not supported!");
-		spin_unlock(&p->pte_lock);
-		pm_put_page(a_page);
-		return -1;
 	}
+	/* preserve the dirty bit - pm removal could be looking concurrently */
+	pte_prot |= (*pte & PTE_D ? PTE_D : 0);
 	/* We have a ref to a_page, which we are storing in the PTE */
 	*pte = PTE(page2ppn(a_page), PTE_P | pte_prot);
 	spin_unlock(&p->pte_lock);
+	/* the VMR's existence in the PM (via the mmap) allows us to have PTE point
+	 * to a_page without it magically being reallocated.  For non-PM memory
+	 * (anon memory or private pages) we transferred the ref to the PTE. */
+	if (atomic_read(&a_page->pg_flags) & PG_PAGEMAP)
+		pm_put_page(a_page);
 	return 0;
 }
 
