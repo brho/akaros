@@ -754,6 +754,11 @@ int ext2_readpage(struct page_map *pm, struct page *page)
 	return 0;
 }
 
+int ext2_writepage(struct page_map *pm, struct page *page)
+{
+	return -1;
+}
+
 /* Super Operations */
 
 /* Creates and initializes a new inode.  FS specific, yet inode-generic fields
@@ -1448,6 +1453,7 @@ int ext2_check_flags(int flags)
 /* Redeclaration and initialization of the FS ops structures */
 struct page_map_operations ext2_pm_op = {
 	ext2_readpage,
+	ext2_writepage,
 };
 
 struct super_operations ext2_s_op = {

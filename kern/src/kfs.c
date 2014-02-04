@@ -155,6 +155,11 @@ int kfs_readpage(struct page_map *pm, struct page *page)
 	return 0;
 }
 
+int kfs_writepage(struct page_map *pm, struct page *page)
+{
+	return -1;
+}
+
 /* Super Operations */
 
 /* Creates and initializes a new inode.  FS specific, yet inode-generic fields
@@ -688,6 +693,7 @@ int kfs_check_flags(int flags)
 /* Redeclaration and initialization of the FS ops structures */
 struct page_map_operations kfs_pm_op = {
 	kfs_readpage,
+	kfs_writepage,
 };
 
 struct super_operations kfs_s_op = {

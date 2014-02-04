@@ -43,6 +43,7 @@ struct page_map {
  * Will fill these in as they are created/needed/used. */
 struct page_map_operations {
 	int (*readpage) (struct page_map *, struct page *);
+	int (*writepage) (struct page_map *, struct page *);
 /*	readpages: read a list of pages
 	writepage: write from a page to its backing store
 	writepages: write a list of pages
