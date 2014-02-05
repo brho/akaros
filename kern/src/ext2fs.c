@@ -704,7 +704,7 @@ int ext2_readpage(struct page_map *pm, struct page *page)
 	struct block_request *breq;
 	void *eobh;
 
-	assert(atomic_read(&page->pg_flags) & PG_BUFFER);
+	atomic_or(&page->pg_flags, PG_BUFFER);
 	retval = ext2_mappage(pm, page);
 	if (retval)
 		return retval;

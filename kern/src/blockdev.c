@@ -191,7 +191,7 @@ struct buffer_head *bdev_get_buffer(struct block_device *bdev,
 	if (error)
 		panic("Failed to load page! (%d)", error);
 	my_buf = page2kva(page) + blk_offset;
-	assert(atomic_read(&page->pg_flags) & PG_BUFFER);
+	atomic_or(&page->pg_flags, PG_BUFFER);
 retry:
 	bh = (struct buffer_head*)page->pg_private;
 	prev = 0;

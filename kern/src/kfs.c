@@ -139,6 +139,7 @@ int kfs_readpage(struct page_map *pm, struct page *page)
 	struct buffer_head *bh = kmem_cache_alloc(bh_kcache, 0);
 	if (!bh)
 		return -1;			/* untested, un-thought-through */
+	atomic_or(&page->pg_flags, PG_BUFFER);
 	/* KFS does a 1:1 BH to page mapping */
 	bh->bh_page = page;								/* weak ref */
 	bh->bh_buffer = page2kva(page);

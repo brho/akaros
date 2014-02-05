@@ -200,11 +200,8 @@ int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp)
 		if (kpage_alloc(&page))
 			return -ENOMEM;
 		/* important that UP_TO_DATE is not set.  once we put it in the PM,
-		 * others can find it, and we still need to fill it.
-		 *
-		 * TODO: seems shitty: setting PG_BUF since we know it'll be used for IO
-		 * later... */
-		atomic_set(&page->pg_flags, PG_LOCKED | PG_BUFFER | PG_PAGEMAP);
+		 * others can find it, and we still need to fill it. */
+		atomic_set(&page->pg_flags, PG_LOCKED | PG_PAGEMAP);
 		page->pg_sem.nr_signals = 0;	/* preemptively locking */
 		error = pm_insert_page(pm, index, page);
 		switch (error) {
@@ -240,7 +237,6 @@ int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp)
 	}
 	/* fall through */
 load_locked_page:
-	/* TODO: this is slightly shitty: readpage sets UPTODATE */
 	error = pm->pm_op->readpage(pm, page);
 	assert(!error);
 	assert(atomic_read(&page->pg_flags) & PG_UPTODATE);
