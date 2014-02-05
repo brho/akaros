@@ -333,3 +333,25 @@ bool regions_collide_unsafe(uintptr_t start1, uintptr_t end1,
 		return TRUE;
 	}
 }
+
+void print_free_mem(void)
+{
+	static uint8_t *bm = 0;
+	/* racy, but this is debugging code */
+	if (!bm)
+		bm = kzmalloc((max_nr_pages + 1) / 8, 0);
+
+	long x = 0;
+	for (int i = 0; i < max_nr_pages; i++) {
+		if (page_is_free(i)) {
+			x++;
+			SET_BITMASK_BIT(bm, i);
+		} else {
+			if (GET_BITMASK_BIT(bm, i)) {
+				print_pageinfo(ppn2page(i));
+				CLR_BITMASK_BIT(bm, i);
+			}
+		}
+	}
+	printk("Nr Free pages: %lld\n", x);
+}
