@@ -443,7 +443,7 @@ static struct litevm_vcpu *__vcpu_load(struct litevm_vcpu *vcpu)
 	int cpu;
 	cpu = core_id();
 
-	if (vcpu->cpu != cpu) {
+	if ((vcpu->cpu != cpu) && (vcpu->cpu != -1)){
 		handler_wrapper_t *w;
 		smp_call_function_single(vcpu->cpu, __vcpu_clear, vcpu, &w);
 		smp_call_wait(w);
