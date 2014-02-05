@@ -329,7 +329,8 @@ void sem_down(struct semaphore *sem)
 	 * the process context and transfer the refcnt to kthread->proc. */
 	if (!kthread->is_ktask) {
 		kthread->proc = current;
-		proc_incref(kthread->proc, 1);
+		if (kthread->proc)	/* still could be none, like during init */
+			proc_incref(kthread->proc, 1);
 	} else {
 		kthread->proc = 0;
 	} 
