@@ -847,6 +847,26 @@ void monitor(struct hw_trapframe *hw_tf)
 	}
 }
 
+static void pm_flusher(void *unused)
+{
+	struct super_block *sb;
+	struct inode *inode;
+	unsigned long nr_pages;
+
+	/* could also put the delay between calls, or even within remove, during the
+	 * WB phase. */
+	while (1) {
+		udelay_sched(5000);
+		TAILQ_FOREACH(sb, &super_blocks, s_list) {
+			TAILQ_FOREACH(inode, &sb->s_inodes, i_sb_list) {
+				nr_pages = ROUNDUP(inode->i_size, PGSIZE) >> PGSHIFT;
+				if (nr_pages)
+					pm_remove_contig(inode->i_mapping, 0, nr_pages);
+			}
+		}
+	}
+}
+
 int mon_fs(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	/* this assumes one mounted FS at the NS root */
@@ -861,6 +881,7 @@ int mon_fs(int argc, char **argv, struct hw_trapframe *hw_tf)
 		printk("\tdentries [lru|prune]: show all dentries, opt LRU/prune\n");
 		printk("\tls DIR: print the dir tree starting with DIR\n");
 		printk("\tpid: proc PID's fs crap placeholder\n");
+		printk("\tpmflusher: start a ktask to keep flushing all PMs\n");
 		return 1;
 	}
 	if (!strcmp(argv[1], "open")) {
@@ -868,10 +889,11 @@ int mon_fs(int argc, char **argv, struct hw_trapframe *hw_tf)
 		TAILQ_FOREACH(sb, &super_blocks, s_list) {
 			printk("Superblock for %s\n", sb->s_name);
 			TAILQ_FOREACH(file, &sb->s_files, f_list)
-				printk("File: %p, %s, Refs: %d, Drefs: %d, Irefs: %d\n", file,
-				       file_name(file), kref_refcnt(&file->f_kref),
+				printk("File: %p, %s, Refs: %d, Drefs: %d, Irefs: %d PM: %p\n",
+				       file, file_name(file), kref_refcnt(&file->f_kref),
 				       kref_refcnt(&file->f_dentry->d_kref),
-				       kref_refcnt(&file->f_dentry->d_inode->i_kref));
+				       kref_refcnt(&file->f_dentry->d_inode->i_kref),
+					   file->f_mapping);
 		}
 	} else if (!strcmp(argv[1], "inodes")) {
 		printk("Mounted FS Inodes:\n----------------------------\n");
@@ -934,6 +956,8 @@ int mon_fs(int argc, char **argv, struct hw_trapframe *hw_tf)
 			return 1;
 		}
 		/* whatever.  placeholder. */
+	} else if (!strcmp(argv[1], "pmflusher")) {
+		ktask("pm_flusher", pm_flusher, 0);
 	} else {
 		printk("Bad option\n");
 		return 1;
