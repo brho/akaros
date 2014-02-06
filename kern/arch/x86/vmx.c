@@ -36,6 +36,9 @@
 #include <arch/msr-index.h>
 
 #define currentcpu (&per_cpu_info[core_id()])
+#define QLOCK_init(x) {printk("qlock_init %p\n", x); qlock_init(x); printk("%p lock_inited\n", x);}
+#define QLOCK(x) {printk("qlock %p\n", x); qlock(x); printk("%p locked\n", x);}
+#define QUNLOCK(x) {printk("qunlock %p\n", x); qunlock(x); printk("%p unlocked\n", x);}
 
 struct litevm_stat litevm_stat;
 
@@ -443,12 +446,15 @@ static struct litevm_vcpu *__vcpu_load(struct litevm_vcpu *vcpu)
 	int cpu;
 	cpu = core_id();
 
+	printk("__vcpu_load: vcpu->cpu %d cpu %d\n", vcpu->cpu, cpu);
 	if ((vcpu->cpu != cpu) && (vcpu->cpu != -1)){
 		handler_wrapper_t *w;
 		smp_call_function_single(vcpu->cpu, __vcpu_clear, vcpu, &w);
 		smp_call_wait(w);
 		vcpu->launched = 0;
 	}
+
+	printk("2 ..");
 	if (currentcpu->vmcs != vcpu->vmcs) {
 		uint8_t error;
 
@@ -460,6 +466,7 @@ static struct litevm_vcpu *__vcpu_load(struct litevm_vcpu *vcpu)
 		}
 	}
 
+	printk("3 ..");
 	if (vcpu->cpu != cpu) {
 		struct descriptor_table dt;
 		unsigned long sysenter_esp;
@@ -482,28 +489,33 @@ static struct litevm_vcpu *__vcpu_load(struct litevm_vcpu *vcpu)
 
 /*
  * Switches to specified vcpu, until a matching vcpu_put()
+ * And leaves it locked!
  */
 static struct litevm_vcpu *vcpu_load(struct litevm *litevm, int vcpu_slot)
 {
+	struct litevm_vcpu *ret;
 	print_func_entry();
 	struct litevm_vcpu *vcpu = &litevm->vcpus[vcpu_slot];
 
 	printk("vcpu_slot %d vcpu %p\n", vcpu_slot, vcpu);
 
-	qlock(&vcpu->mutex);
+	QLOCK(&vcpu->mutex);
+	printk("Locked\n");
 	if (!vcpu->vmcs) {
-		qunlock(&vcpu->mutex);
+		QUNLOCK(&vcpu->mutex);
+		printk("vcpu->vmcs for vcpu %p is NULL", vcpu);
 		error("vcpu->vmcs is NULL");
 	}
+	ret = __vcpu_load(vcpu);
 	print_func_exit();
-	return __vcpu_load(vcpu);
+	return ret;
 }
 
 static void vcpu_put(struct litevm_vcpu *vcpu)
 {
 	print_func_entry();
 	//put_cpu();
-	qunlock(&vcpu->mutex);
+	QUNLOCK(&vcpu->mutex);
 	print_func_exit();
 }
 
@@ -514,9 +526,10 @@ static struct vmcs *alloc_vmcs_cpu(int cpu)
 	struct vmcs *vmcs;
 
 	vmcs = get_cont_pages_node(node, vmcs_descriptor.order, KMALLOC_WAIT);
-	if (!pages) {
+	if (!vmcs) {
 		print_func_exit();
-		return 0;
+		printk("no memory for vcpus");
+		error("no memory for vcpus");
 	}
 	memset(vmcs, 0, vmcs_descriptor.size);
 	vmcs->revision_id = vmcs_descriptor.revision_id;	/* vmcs revision id */
@@ -632,7 +645,7 @@ struct litevm *vmx_open(void)
 	for (i = 0; i < LITEVM_MAX_VCPUS; ++i) {
 		struct litevm_vcpu *vcpu = &litevm->vcpus[i];
 
-		qlock_init(&vcpu->mutex);
+		QLOCK_init(&vcpu->mutex);
 		vcpu->mmu.root_hpa = INVALID_PAGE;
 		LIST_INIT(&vcpu->link);
 	}
@@ -974,7 +987,7 @@ static void __set_cr0(struct litevm_vcpu *vcpu, unsigned long cr0)
 		enter_pmode(vcpu);
 
 	if (!vcpu->rmode.active && !(cr0 & CR0_PE_MASK))
-		enter_rmode(vcpu);
+		error("real mode is not supported yet\n"); //enter_rmode(vcpu);
 
 #ifdef __x86_64__
 	if (vcpu->shadow_efer & EFER_LME) {
@@ -1491,7 +1504,7 @@ static void vcpu_put_rsp_rip(struct litevm_vcpu *vcpu)
 int vmx_create_vcpu(struct litevm *litevm, int n)
 {
 	print_func_entry();
-	ERRSTACK(1);
+	ERRSTACK(2);
 	int r;
 	struct litevm_vcpu *vcpu;
 	struct vmcs *vmcs;
@@ -1506,10 +1519,10 @@ int vmx_create_vcpu(struct litevm *litevm, int n)
 
 	vcpu = &litevm->vcpus[n];
 
-	qlock(&vcpu->mutex);
+	QLOCK(&vcpu->mutex);
 
 	if (vcpu->vmcs) {
-		qunlock(&vcpu->mutex);
+		QUNLOCK(&vcpu->mutex);
 		printk("VM already exists\n");
 		error("VM already exists");
 	}
@@ -1527,37 +1540,41 @@ int vmx_create_vcpu(struct litevm *litevm, int n)
 	vcpu->cpu = -1;	/* First load will set up TR */
 	vcpu->litevm = litevm;
 
-	vmcs = alloc_vmcs();
-	if (!vmcs) {
-		errstring = "vmcs allocate failed";
-		printk("%s\n", errstring);
-		qunlock(&vcpu->mutex);
-		goto out_free_vcpus;
+	if (waserror()){
+		printk("ERR 1 in %s\n", __func__);
+		QUNLOCK(&vcpu->mutex);
+		litevm_free_vcpu(vcpu);
+		nexterror();
 	}
+
+	vmcs = alloc_vmcs();
 	vmcs_clear(vmcs);
+
 	printk("after vmcs_clear\n");
 	vcpu->vmcs = vmcs;
+	printk("vcpu %p set vmcs to %p\n", vcpu, vmcs);
 	vcpu->launched = 0;
 	printk("vcpu %p slot %d vmcs is %p\n", vcpu, n, vmcs);
-	error("before vcpu_load");
+
 	__vcpu_load(vcpu);
 
 	printk("PAST vcpu_load\n");
-#warning unmatched waserror!
 	if (waserror()) {
 		/* we really need to fix waserror() */
-		poperror();
-		goto out_free_vcpus;
+		printk("vcpu_setup failed\n");
+		QUNLOCK(&vcpu->mutex);
+		nexterror();
 	}
 
-	r = litevm_vcpu_setup(vcpu);
+	/* ignore the real mode stuff. */
+	r = 1; //litevm_vcpu_setup(vcpu);
 
 	vcpu_put(vcpu);
 
 	printk("r is %d\n", r);
 
 	if (!r) {
-
+		poperror();
 		print_func_exit();
 		return 0;
 	}
@@ -1565,9 +1582,6 @@ int vmx_create_vcpu(struct litevm *litevm, int n)
 	errstring = "vcup set failed";
 
 out_free_vcpus:
-	printk("out_free_vcpus: life sucks\n");
-	litevm_free_vcpu(vcpu);
-	error(errstring);
 out:
 	print_func_exit();
 	return r;
@@ -1743,8 +1757,10 @@ raced:
 		struct litevm_vcpu *vcpu;
 
 		vcpu = vcpu_load(litevm, i);
-		if (!vcpu)
+		if (!vcpu){
+			printk("%s: no cpu %d\n", __func__, i);
 			continue;
+		}
 		litevm_mmu_reset_context(vcpu);
 		vcpu_put(vcpu);
 	}
@@ -1833,6 +1849,7 @@ struct litevm_memory_slot *gfn_to_memslot(struct litevm *litevm, gfn_t gfn)
 	print_func_entry();
 	int i;
 
+	printk("%s: litevm %p gfn %d\n", litevm, gfn);
 	for (i = 0; i < litevm->nmemslots; ++i) {
 		struct litevm_memory_slot *memslot = &litevm->memslots[i];
 
@@ -2934,16 +2951,19 @@ int vm_run(struct litevm *litevm, struct litevm_run *litevm_run)
 	vcpu = vcpu_load(litevm, litevm_run->vcpu);
 	if (!vcpu)
 		error("vcpu_load failed");
+	printk("Loaded\n");
 
 	if (litevm_run->emulated) {
 		skip_emulated_instruction(vcpu);
 		litevm_run->emulated = 0;
 	}
+	printk("Emulated\n");
 
 	if (litevm_run->mmio_completed) {
 		memcpy(vcpu->mmio_data, litevm_run->mmio.data, 8);
 		vcpu->mmio_read_completed = 1;
 	}
+	printk("mmio completed\n");
 
 	vcpu->mmio_needed = 0;
 
@@ -2953,8 +2973,11 @@ again:
 	 * allow segment selectors with cpl > 0 or ti == 1.
 	 */
 	fs_sel = read_fs();
+	printk("fs_sel %x\n", fs_sel);
 	gs_sel = read_gs();
+	printk("gs_sel %x\n", gs_sel);
 	ldt_sel = read_ldt();
+	printk("ldt_sel %x\n", ldt_sel);
 	fs_gs_ldt_reload_needed = (fs_sel & 7) | (gs_sel & 7) | ldt_sel;
 	if (!fs_gs_ldt_reload_needed) {
 		vmcs_write16(HOST_FS_SELECTOR, fs_sel);
@@ -2963,16 +2986,22 @@ again:
 		vmcs_write16(HOST_FS_SELECTOR, 0);
 		vmcs_write16(HOST_GS_SELECTOR, 0);
 	}
+	printk("reloaded gs and gs\n");
 
 #ifdef __x86_64__
 	vmcs_writel(HOST_FS_BASE, read_msr(MSR_FS_BASE));
 	vmcs_writel(HOST_GS_BASE, read_msr(MSR_GS_BASE));
+	printk("Set FS_BASE and GS_BASE");
 #endif
 
+	printk("skipping IRQs for now\n");
+	if (0)
 	if (vcpu->irq_summary &&
 		!(vmcs_read32(VM_ENTRY_INTR_INFO_FIELD) & INTR_INFO_VALID_MASK))
 		litevm_try_inject_irq(vcpu);
 
+	printk("no debugging for now\n");
+	if (0)
 	if (vcpu->guest_debug.enabled)
 		litevm_guest_debug_pre(vcpu);
 
@@ -2982,6 +3011,7 @@ again:
 	save_msrs(vcpu->host_msrs, vcpu->nmsrs);
 	load_msrs(vcpu->guest_msrs, NR_BAD_MSRS);
 
+	printk("GO FOR IT!\n");
 	asm(
 		   /* Store host registers */
 		   "pushf \n\t"
