@@ -1,4 +1,5 @@
 obj-y						+= alarm.o
+obj-y						+= coreboot.o
 obj-y						+= cons.o
 obj-y						+= ether.o
 obj-y						+= mnt.o

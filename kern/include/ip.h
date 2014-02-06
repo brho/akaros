@@ -592,7 +592,9 @@ extern void iprouting(struct Fs *, int);
 extern void icmpnoconv(struct Fs *, struct block *);
 extern void icmpcantfrag(struct Fs *, struct block *, int);
 extern void icmpttlexceeded(struct Fs *, uint8_t * unused_uint8_p_t,
-							struct block *);
+					struct block *);
+
+uint16_t ipchecksum(uint8_t *addr, int len);
 extern uint16_t ipcsum(uint8_t * unused_uint8_p_t);
 extern void ipiput4(struct Fs *, struct Ipifc *unused_ipifc, struct block *);
 extern void ipiput6(struct Fs *, struct Ipifc *unused_ipifc, struct block *);

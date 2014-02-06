@@ -792,6 +792,31 @@ struct fragment4 *ipfragallo4(struct IP *ip)
 	return f;
 }
 
+/* coreboot.c among other things needs this
+ * type of checksum.
+ */
+uint16_t ipchecksum(uint8_t *addr, int len)
+{
+	uint16_t sum = 0;
+
+	while (len > 0) {
+		sum += addr[0] << 8 | addr[1];
+		len -= 2;
+		addr += 2;
+	}
+
+	sum = (sum & 0xffff) + (sum >> 16);
+	sum = (sum & 0xffff) + (sum >> 16);
+
+	return (sum ^ 0xffff);
+
+}
+
+/* change this to call ipchecksum later.
+ * but we have to be sure we're not doing something bad
+ * that violates some ip stack assumption (such as
+ * boundaries etc.)
+ */
 uint16_t ipcsum(uint8_t * addr)
 {
 	int len;

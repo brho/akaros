@@ -44,10 +44,12 @@
 #include <kthread.h>
 #include <console.h>
 #include <linker_func.h>
+#include <ip.h>
+#include <coreboot_tables.h>
 
 // zra: flag for Ivy
 int booting = 1;
-
+struct sysinfo_t sysinfo;
 static void run_linker_funcs(void);
 
 void kernel_init(multiboot_info_t *mboot_info)
@@ -98,7 +100,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 #ifdef CONFIG_ETH_AUDIO
 	eth_audio_init();
 #endif /* CONFIG_ETH_AUDIO */
-
+	get_coreboot_info(&sysinfo);
 	// zra: let's Ivy know we're done booting
 	booting = 0;
 
