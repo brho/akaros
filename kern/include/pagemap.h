@@ -60,6 +60,8 @@ struct page_map_operations {
 /* Page cache functions */
 void pm_init(struct page_map *pm, struct page_map_operations *op, void *host);
 int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp);
+int pm_load_page_nowait(struct page_map *pm, unsigned long index,
+                        struct page **pp);
 void pm_put_page(struct page *page);
 void pm_add_vmr(struct page_map *pm, struct vm_region *vmr);
 void pm_remove_vmr(struct page_map *pm, struct vm_region *vmr);

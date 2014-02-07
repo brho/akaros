@@ -247,6 +247,21 @@ load_locked_page:
 	return 0;
 }
 
+int pm_load_page_nowait(struct page_map *pm, unsigned long index,
+                        struct page **pp)
+{
+	struct page *page = pm_find_page(pm, index);
+	if (!page)
+		return -EAGAIN;
+	if (!(atomic_read(&page->pg_flags) & PG_UPTODATE)) {
+		/* TODO: could have a read_nowait pm_op */
+		pm_put_page(page);
+		return -EAGAIN;
+	}
+	*pp = page;
+	return 0;
+}
+
 static bool vmr_has_page_idx(struct vm_region *vmr, unsigned long pg_idx)
 {
 	unsigned long nr_pgs = (vmr->vm_end - vmr->vm_base) >> PGSHIFT;
