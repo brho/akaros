@@ -35,6 +35,12 @@
 #include <arch/vmdebug.h>
 #include <arch/msr-index.h>
 
+/* from linux */
+#define __KERNEL_CS 0x10
+#define __KERNEL_DS 0x18
+/* used? Who knows */
+#define GDT_ENTRY_TSS 0x24
+
 #define currentcpu (&per_cpu_info[core_id()])
 #define QLOCK_init(x) {printk("qlock_init %p\n", x); qlock_init(x); printk("%p lock_inited\n", x);}
 #define QLOCK(x) {printk("qlock %p\n", x); qlock(x); printk("%p locked\n", x);}
@@ -1382,17 +1388,13 @@ static int litevm_vcpu_setup(struct litevm_vcpu *vcpu)
 	vmcs_writel(HOST_CR4, rcr4());	/* 22.2.3, 22.2.5 */
 	vmcs_writel(HOST_CR3, rcr3());	/* 22.2.3  FIXME: shadow tables */
 
-#warning "not setting selectors; do we need them?"
-#if 0
 	vmcs_write16(HOST_CS_SELECTOR, __KERNEL_CS);	/* 22.2.4 */
 	vmcs_write16(HOST_DS_SELECTOR, __KERNEL_DS);	/* 22.2.4 */
 	vmcs_write16(HOST_ES_SELECTOR, __KERNEL_DS);	/* 22.2.4 */
-#endif
 	vmcs_write16(HOST_FS_SELECTOR, read_fs());	/* 22.2.4 */
 	vmcs_write16(HOST_GS_SELECTOR, read_gs());	/* 22.2.4 */
-#if 0
 	vmcs_write16(HOST_SS_SELECTOR, __KERNEL_DS);	/* 22.2.4 */
-#endif
+
 #ifdef __x86_64__
 	a = read_msr(MSR_FS_BASE);
 	vmcs_writel(HOST_FS_BASE, a);	/* 22.2.4 */
@@ -1403,10 +1405,7 @@ static int litevm_vcpu_setup(struct litevm_vcpu *vcpu)
 	vmcs_writel(HOST_GS_BASE, 0);	/* 22.2.4 */
 #endif
 
-#warning "Not setting HOST_TR_SELECTOR"
-#if 0
 	vmcs_write16(HOST_TR_SELECTOR, GDT_ENTRY_TSS * 8);	/* 22.2.4 */
-#endif
 
 	get_idt(&dt);
 	vmcs_writel(HOST_IDTR_BASE, dt.base);	/* 22.2.4 */
@@ -2821,6 +2820,7 @@ static int litevm_handle_exit(struct litevm_run *litevm_run,
 	uint32_t vectoring_info = vmcs_read32(IDT_VECTORING_INFO_FIELD);
 	uint32_t exit_reason = vmcs_read32(VM_EXIT_REASON);
 
+printk("vectoring_info %08x exit_reason %x\n", vectoring_info, exit_reason);
 	if ((vectoring_info & VECTORING_INFO_VALID_MASK) &&
 		exit_reason != EXIT_REASON_EXCEPTION_NMI)
 		printk("%s: unexpected, valid vectoring info and "
@@ -2828,9 +2828,11 @@ static int litevm_handle_exit(struct litevm_run *litevm_run,
 	litevm_run->instruction_length = vmcs_read32(VM_EXIT_INSTRUCTION_LEN);
 	if (exit_reason < litevm_vmx_max_exit_handlers
 		&& litevm_vmx_exit_handlers[exit_reason]) {
+printk("reason is KNOWN\n");
 		print_func_exit();
 		return litevm_vmx_exit_handlers[exit_reason] (vcpu, litevm_run);
 	} else {
+printk("reason is UNKNOWN\n");
 		litevm_run->exit_reason = LITEVM_EXIT_UNKNOWN;
 		litevm_run->hw.hardware_exit_reason = exit_reason;
 	}
@@ -3156,9 +3158,12 @@ asm("mov %0, %%ds; mov %0, %%es": :"r"(__USER_DS));
 
 	litevm_run->exit_type = 0;
 	if (fail) {
+printk("FAIL\n");
 		litevm_run->exit_type = LITEVM_EXIT_TYPE_FAIL_ENTRY;
 		litevm_run->exit_reason = vmcs_read32(VM_INSTRUCTION_ERROR);
+printk("reason %d\n", litevm_run->exit_reason);
 	} else {
+printk("NOT FAIL\n");
 		if (fs_gs_ldt_reload_needed) {
 			load_ldt(ldt_sel);
 			load_fs(fs_sel);
@@ -3177,6 +3182,7 @@ asm("mov %0, %%ds; mov %0, %%es": :"r"(__USER_DS));
 		}
 		vcpu->launched = 1;
 		litevm_run->exit_type = LITEVM_EXIT_TYPE_VM_EXIT;
+printk("Let's see why it exited\n");
 		if (litevm_handle_exit(litevm_run, vcpu)) {
 			/* Give scheduler a change to reschedule. */
 			vcpu_put(vcpu);
