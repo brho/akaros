@@ -37,25 +37,18 @@ enum {
 	Qimage,
 };
 
-/* This paddr/kaddr is a bit dangerous.  it'll work so long as we don't need all
- * 64 bits for a physical address (48 is the current norm on x86_64).
- * We're probably going to move to a model where we put the VM index or something
- * into the qid, but this works for now.
+/* The QID is the TYPE and the index into the vms array.
+ * We reserve the right to make it an id later.
  */
-#define ADDR_SHIFT 5
-#define QID2VM(q) ((struct vm*)KADDR(((q).path >> ADDR_SHIFT)))
-#define TYPE(q) ((q).path & ((1 << ADDR_SHIFT) - 1))
-#define QID(ptr, type) ((PADDR(ptr) << ADDR_SHIFT) | type)
-
+#define ID_SHIFT 5
 /* vm's have an image.
  * Note that the image can be read even as it is running. */
 struct vm {
-	struct vm *next;
 	struct kref kref;
 	/* should this be an array of pages? Hmm. */
 	void *image;
 	unsigned long imagesize;
-	int id;
+	int id; // not used yet. 
 	struct litevm *archvm;
 };
 
@@ -67,6 +60,23 @@ static int vmok = 0;
 
 static spinlock_t vmidlock[1];
 static struct kref vmid[1] = { {(void *)1, fake_release} };
+
+static inline struct vm *
+QID2VM(struct qid q)
+{
+	return &vms[((q).path >> ID_SHIFT)];
+}
+
+static inline int 
+TYPE(struct qid q)
+{
+	return ((q).path & ((1 << ID_SHIFT) - 1));
+}
+
+static inline int QID(int index, int type)
+{
+	return ((index << ID_SHIFT) | type);
+}
 
 /* we'll need this somewhere more generic. */
 static void readn(struct chan *c, void *vp, long n)
@@ -90,6 +100,7 @@ static void readn(struct chan *c, void *vp, long n)
 	print_func_exit();
 }
 
+/* not called yet.  -- we have to unlink the vm */
 static void vm_release(struct kref *kref)
 {
 	print_func_entry();
@@ -173,7 +184,8 @@ static int vmgen(struct chan *c, char *entry_name,
 			vm_i = &vms[s];
 			snprintf(get_cur_genbuf(), GENBUF_SZ, "vm%d", vm_i->id);
 			spin_unlock(&vmlock);
-			mkqid(&q, QID(vm_i, Qvmdir), 0, QTDIR);
+			printk("clone vm_i is %p\n", vm_i);
+			mkqid(&q, QID(s, Qvmdir), 0, QTDIR);
 			devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
 			print_func_exit();
 			return 1;
@@ -182,12 +194,12 @@ static int vmgen(struct chan *c, char *entry_name,
 			s += Qctl;	/* first time through, start on Qctl */
 			switch (s) {
 				case Qctl:
-					mkqid(&q, QID(QID2VM(c->qid), Qctl), 0, QTFILE);
+					mkqid(&q, QID(s-Qctl, Qctl), 0, QTFILE);
 					devdir(c, q, "ctl", 0, eve, 0666, dp);
 					print_func_exit();
 					return 1;
 				case Qimage:
-					mkqid(&q, QID(QID2VM(c->qid), Qimage), 0, QTFILE);
+					mkqid(&q, QID(s-Qctl, Qimage), 0, QTFILE);
 					devdir(c, q, "image", 0, eve, 0666, dp);
 					print_func_exit();
 					return 1;
@@ -293,7 +305,7 @@ static struct chan *vmopen(struct chan *c, int omode)
 			spin_unlock(&vmlock);
 			kref_init(&v->kref, vm_release, 1);
 			v->id = newvmid();
-			mkqid(&c->qid, QID(v, Qctl), 0, QTFILE);
+			mkqid(&c->qid, QID(nvm, Qctl), 0, QTFILE);
 			c->aux = v;
 			printd("New VM id %d\n", v->id);
 			v->archvm = vmx_open();
@@ -305,13 +317,16 @@ static struct chan *vmopen(struct chan *c, int omode)
 				printk("vm_create failed");
 				error("vm_create failed");
 			}
+			printk("Qclone open: id %d, v is %p, v->archvm is %p\n", 
+					nvm-1,
+					v, v->archvm);
 			break;
 		case Qstat:
 			break;
 		case Qctl:
 		case Qimage:
 			c->aux = QID2VM(c->qid);
-			printk("open qctl: aux is %p\n", c->aux);
+			printk("open qctl: aux (vm) is %p\n", c->aux);
 			break;
 	}
 	c->mode = openmode(omode);
@@ -416,6 +431,8 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 			error(Eperm);
 		case Qctl:
 			vm = c->aux;
+			litevm = vm->archvm;
+			printk("qctl: vm is %p, litevm is %p\n", vm, litevm);
 			cb = parsecmd(ubuf, n);
 			if (waserror()) {
 				kfree(cb);
@@ -425,7 +442,6 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 				int ret;
 				if (cb->nf != 4)
 					error("usage: run vcpu emulated mmio_completed");
-				litevm = vm->archvm;
 				struct litevm_run vmr;
 				vmr.vcpu = strtoul(cb->f[1], NULL, 0);
 				vmr.emulated = strtoul(cb->f[2], NULL, 0);
@@ -436,11 +452,10 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 				return ret;
 			} else if (!strcmp(cb->f[0], "stop")) {
 				error("can't stop a vm yet");
-			} else if (!strcmp(cb->f[0], "fillmem")) {
+			} else if (!strcmp(cb->f[0], "mapmem")) {
 				struct chan *file;
 				void *v;
 				vm = c->aux;
-				litevm = vm->archvm;
 				uint64_t filesize;
 				struct litevm_memory_region vmr;
 				int got;
@@ -482,13 +497,12 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 			} else if (!strcmp(cb->f[0], "region")) {
 				void *v;
 				struct litevm_memory_region vmr;
-				litevm = vm->archvm;
 				if (cb->nf != 5)
 					error("usage: mapmem slot flags addr size");
-				vmr.slot = strtoul(cb->f[2], NULL, 0);
-				vmr.flags = strtoul(cb->f[3], NULL, 0);
-				vmr.guest_phys_addr = strtoul(cb->f[4], NULL, 0);
-				vmr.memory_size = strtoul(cb->f[5], NULL, 0);
+				vmr.slot = strtoul(cb->f[1], NULL, 0);
+				vmr.flags = strtoul(cb->f[2], NULL, 0);
+				vmr.guest_phys_addr = strtoul(cb->f[3], NULL, 0);
+				vmr.memory_size = strtoul(cb->f[4], NULL, 0);
 				if (vm_set_memory_region(litevm, &vmr))
 					error("vm_set_memory_region failed");
 			} else {
