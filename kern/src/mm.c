@@ -359,7 +359,7 @@ void print_vmrs(struct proc *p)
 }
 
 /* Helper: returns the number of pages required to hold nr_bytes */
-unsigned long nr_pages(unsigned long nr_bytes)
+static unsigned long nr_pages(unsigned long nr_bytes)
 {
 	return (nr_bytes >> PGSHIFT) + (PGOFF(nr_bytes) ? 1 : 0);
 }
@@ -416,16 +416,6 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	return result;
 }
 
-void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
-              struct file *file, size_t offset)
-{
-	/* read/write vmr lock (will change the tree) */
-	spin_lock(&p->vmr_lock);
-	void *ret = __do_mmap(p, addr, len, prot, flags, file, offset);
-	spin_unlock(&p->vmr_lock);
-	return ret;
-}
-
 /* Helper: returns TRUE if the VMR is allowed to access the file with prot.
  * This is a bit ghetto still: messes with the file mode and assumes it can walk
  * the dentry/inode paths without locking.  It also ignores the CoW stuff we'll
@@ -474,15 +464,57 @@ out_error:	/* for debugging */
 	return FALSE;
 }
 
-void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
-                struct file *file, size_t offset)
+/* Helper, maps in page at addr, but only if nothing is present there.  Returns
+ * 0 on success.  If this is called by non-PM code, we'll store your ref in the
+ * PTE. */
+static int map_page_at_addr(struct proc *p, struct page *page, uintptr_t addr,
+                            int prot)
+{
+	pte_t *pte;
+	spin_lock(&p->pte_lock);	/* walking and changing PTEs */
+	/* find offending PTE (prob don't read this in).  This might alloc an
+	 * intermediate page table page. */
+	pte = pgdir_walk(p->env_pgdir, (void*)addr, TRUE);
+	if (!pte) {
+		spin_unlock(&p->pte_lock);
+		return -ENOMEM;
+	}
+	/* a spurious, valid PF is possible due to a legit race: the page might have
+	 * been faulted in by another core already (and raced on the memory lock),
+	 * in which case we should just return. */
+	if (PAGE_PRESENT(*pte)) {
+		spin_unlock(&p->pte_lock);
+		return 0;
+	}
+	/* preserve the dirty bit - pm removal could be looking concurrently */
+	prot |= (*pte & PTE_D ? PTE_D : 0);
+	/* We have a ref to page, which we are storing in the PTE */
+	*pte = PTE(page2ppn(page), PTE_P | prot);
+	spin_unlock(&p->pte_lock);
+	return 0;
+}
+
+/* Helper: copies *pp's contents to a new page, replacing your page pointer.  If
+ * this succeeds, you'll have a non-PM page, which matters for how you put it.*/
+static int __copy_and_swap_pmpg(struct proc *p, struct page **pp)
+{
+	struct page *new_page, *old_page = *pp;
+	if (upage_alloc(p, &new_page, FALSE))
+		return -ENOMEM;
+	memcpy(page2kva(new_page), page2kva(old_page), PGSIZE);
+	pm_put_page(old_page);
+	*pp = new_page;
+	return 0;
+}
+
+void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
+              struct file *file, size_t offset)
 {
 	len = ROUNDUP(len, PGSIZE);
-	int num_pages = len / PGSIZE;
-	int retval;
-
 	struct vm_region *vmr, *vmr_temp;
 
+	/* read/write vmr lock (will change the tree) */
+	spin_lock(&p->vmr_lock);
 	/* Sanity check, for callers that bypass mmap().  We want addr for anon
 	 * memory to start above the break limit (BRK_END), but not 0.  Keep this in
 	 * sync with BRK_END in mmap(). */
@@ -503,8 +535,10 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	if (!vmr) {
 		printk("[kernel] do_mmap() aborted for %p + %d!\n", addr, len);
 		set_errno(ENOMEM);
-		return MAP_FAILED;		/* TODO: error propagation for mmap() */
+		spin_unlock(&p->vmr_lock);
+		return MAP_FAILED;
 	}
+	addr = vmr->vm_base;
 	vmr->vm_prot = prot;
 	vmr->vm_flags = flags;
 	if (file) {
@@ -512,6 +546,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 			assert(!vmr->vm_file);
 			destroy_vmr(vmr);
 			set_errno(EACCES);
+			spin_unlock(&p->vmr_lock);
 			return MAP_FAILED;
 		}
 		/* TODO: consider locking the file while checking (not as manadatory as
@@ -532,6 +567,7 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 			assert(!vmr->vm_file);
 			destroy_vmr(vmr);
 			set_errno(EACCES);	/* not quite */
+			spin_unlock(&p->vmr_lock);
 			return MAP_FAILED;
 		}
 		kref_get(&file->f_kref, 1);
@@ -539,32 +575,82 @@ void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	}
 	vmr->vm_file = file;
 	vmr->vm_foff = offset;
-	addr = vmr->vm_base;		/* so we know which pages to populate later */
 	vmr = merge_me(vmr);		/* attempts to merge with neighbors */
-	/* Fault in pages now if MAP_POPULATE.  We want to populate the region
-	 * requested, but we need to be careful and only populate the requested
-	 * length and not any merged regions, which is why we set addr above and use
-	 * it here.
-	 *
-	 * If HPF errors out, we'll warn and fail for now.  This could be due to
-	 * some userspace error, but also occurs when we run out of memory.  If we
-	 * are out of memory, the kernel can't really handle it. */
-	if (flags & MAP_POPULATE && vmr->vm_prot != PROT_NONE)
-		for (int i = 0; i < num_pages; i++) {
-			retval = __handle_page_fault(p, addr + i * PGSIZE, vmr->vm_prot);
-			if (retval) {
-				warn("do_mmap() failing (%d) on addr %p with prot 0x%x",
-				     retval, addr + i * PGSIZE,  vmr->vm_prot);
-				destroy_vmr(vmr);
-				set_errno(-retval);
-				if (retval == -ENOMEM) {
-					printk("[kernel] ENOMEM, killing %d\n", p->pid);
-					proc_destroy(p);
+
+	if (flags & MAP_POPULATE && prot != PROT_NONE) {
+		int pte_prot = (prot & PROT_WRITE) ? PTE_USER_RW :
+	                   (prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
+		int num_pages = len / PGSIZE;
+		int ret = 0;
+		struct page *a_page;
+		if (!file) {
+			for (int i = 0; i < num_pages; i++) {
+				if (upage_alloc(p, &a_page, TRUE)) {
+					ret = -ENOMEM;
+					break;
 				}
-				return MAP_FAILED;
+				a_page->pg_tree_slot = 0;
+				/* could imagine doing a memwalk instead of a for loop */
+				ret = map_page_at_addr(p, a_page, addr + i * PGSIZE, pte_prot);
+				if (ret) {
+					page_decref(a_page);
+					break;
+				}
+			}
+		} else {
+			/* our refcnt on the file keeps the pm alive when we unlock */
+			struct page_map *pm = file->f_mapping;
+			unsigned long pm_idx0 = offset >> PGSHIFT;
+			struct vm_region vmr_copy;
+			memcpy(&vmr_copy, vmr, sizeof(struct vm_region));
+			for (int i = 0; i < num_pages; i++) {
+				ret = pm_load_page_nowait(pm, pm_idx0 + i, &a_page);
+				if (ret) {
+					if (ret != -EAGAIN)
+						break;
+					spin_unlock(&p->vmr_lock);
+					/* might block here, can't hold the spinlock */
+					ret = pm_load_page(pm, pm_idx0 + i, &a_page);
+					spin_lock(&p->vmr_lock);
+					if (ret)
+						break;
+					/* ugly - while we were sleeping, our VMR could have changed
+					 * on us.  should be okay with weird ABA races too. */
+					vmr = find_vmr(p, addr + i * PGSIZE);
+					if (memcmp(&vmr_copy, vmr, sizeof(struct vm_region))) {
+						pm_put_page(a_page);
+						printk("[kernel] FYI: VMR changed during populate\n");
+						break;
+					}
+				}
+				if (flags & MAP_PRIVATE) {
+					ret = __copy_and_swap_pmpg(p, &a_page);
+					if (ret) {
+						pm_put_page(a_page);
+						break;
+					}
+				}
+				/* if this is an executable page, we might have to flush the
+				 * instruction cache if our HW requires it.
+				 * TODO: is this still needed?  andrew put this in a while ago*/
+				if (prot & PROT_EXEC)
+					icache_flush_page(0, page2kva(a_page));
+				ret = map_page_at_addr(p, a_page, addr + i * PGSIZE, pte_prot);
+				if (atomic_read(&a_page->pg_flags) & PG_PAGEMAP)
+					pm_put_page(a_page);
+				if (ret)
+					break;
 			}
 		}
-	return (void*SAFE)TC(addr);
+		if (ret == -ENOMEM) {
+			spin_unlock(&p->vmr_lock);
+			printk("[kernel] ENOMEM, killing %d\n", p->pid);
+			proc_destroy(p);
+			return MAP_FAILED;	/* will never make it back to userspace */
+		}
+	}
+	spin_unlock(&p->vmr_lock);
+	return (void*)addr;
 }
 
 int mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
@@ -727,19 +813,6 @@ int __do_munmap(struct proc *p, uintptr_t addr, size_t len)
 	return 0;
 }
 
-int handle_page_fault(struct proc* p, uintptr_t va, int prot)
-{
-	va = ROUNDDOWN(va,PGSIZE);
-
-	if (prot != PROT_READ && prot != PROT_WRITE && prot != PROT_EXEC)
-		panic("bad prot!");
-	/* read access to the VMRs TODO: RCU */
-	spin_lock(&p->vmr_lock);
-	int ret = __handle_page_fault(p, va, prot);
-	spin_unlock(&p->vmr_lock);
-	return ret;
-}
-
 /* Helper - drop the page differently based on where it is from */
 static void __put_page(struct page *page)
 {
@@ -749,8 +822,7 @@ static void __put_page(struct page *page)
 		page_decref(page);
 }
 
-/* Returns 0 on success, or an appropriate -error code.  Assumes you hold the
- * vmr_lock.
+/* Returns 0 on success, or an appropriate -error code. 
  *
  * Notes: if your TLB caches negative results, you'll need to flush the
  * appropriate tlb entry.  Also, you could have a weird race where a present PTE
@@ -758,25 +830,36 @@ static void __put_page(struct page *page)
  * shootdown is on its way.  Userspace should have waited for the mprotect to
  * return before trying to write (or whatever), so we don't care and will fault
  * them. */
-int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
+int handle_page_fault(struct proc *p, uintptr_t va, int prot)
 {
 	struct vm_region *vmr;
 	struct page *a_page;
 	unsigned int f_idx;	/* index of the missing page in the file */
-	int retval;
 	pte_t *pte;
+	int ret = 0;
+	va = ROUNDDOWN(va,PGSIZE);
 
+	if (prot != PROT_READ && prot != PROT_WRITE && prot != PROT_EXEC)
+		panic("bad prot!");
+refault:
+	/* read access to the VMRs TODO: RCU */
+	spin_lock(&p->vmr_lock);
 	/* Check the vmr's protection */
 	vmr = find_vmr(p, va);
-	if (!vmr)							/* not mapped at all */
-		return -EFAULT;
-	if (!(vmr->vm_prot & prot))			/* wrong prots for this vmr */
-		return -EPERM;
+	if (!vmr) {							/* not mapped at all */
+		ret = -EFAULT;
+		goto out;
+	}
+	if (!(vmr->vm_prot & prot)) {		/* wrong prots for this vmr */
+		ret = -EPERM;
+		goto out;
+	}
 	if (!vmr->vm_file) {
 		/* No file - just want anonymous memory */
-		if (upage_alloc(p, &a_page, TRUE))
-			return -ENOMEM;
-		a_page->pg_tree_slot = 0;
+		if (upage_alloc(p, &a_page, TRUE)) {
+			ret = -ENOMEM;
+			goto out;
+		}
 	} else {
 		/* If this fails, either something got screwed up with the VMR, or the
 		 * permissions changed after mmap/mprotect.  Either way, I want to know
@@ -796,31 +879,39 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 		if (f_idx + 1 > nr_pages(vmr->vm_file->f_dentry->d_inode->i_size)) {
 			/* We're asking for pages that don't exist in the file */
 			/* TODO: unlock the file */
-			return -ESPIPE; /* linux sends a SIGBUS at access time */
+			ret = -ESPIPE; /* linux sends a SIGBUS at access time */
+			goto out;
 		}
-		retval = pm_load_page(vmr->vm_file->f_mapping, f_idx, &a_page);
-		/* TODO: should be able to let go of that file shrink-lock now.  We have
-		 * a page refcnt, which might be enough (depending on how it works) */
-		if (retval)
-			return retval;
+		ret = pm_load_page_nowait(vmr->vm_file->f_mapping, f_idx, &a_page);
+		if (ret) {
+			if (ret != -EAGAIN)
+				goto out;
+			/* keep the file alive after we unlock */
+			kref_get(&vmr->vm_file->f_kref, 1);
+			spin_unlock(&p->vmr_lock);
+
+			/* TODO: here is where we handle SCP vs MCP vs whatever.
+			 * - do some prep
+			 * - prefetch it for userspace, optionally for MCPs
+			 * - this will break if we actually block, since smp_idle will
+			 *   restart the proc
+			 *   */
+			ret = pm_load_page(vmr->vm_file->f_mapping, f_idx, &a_page);
+
+			kref_put(&vmr->vm_file->f_kref);
+			if (ret)
+				return ret;
+			goto refault;
+		}
 		/* If we want a private map, we'll preemptively give you a new page.  We
 		 * used to just care if it was private and writable, but were running
 		 * into issues with libc changing its mapping (map private, then
 		 * mprotect to writable...)  In the future, we want to CoW this anyway,
 		 * so it's not a big deal. */
 		if ((vmr->vm_flags & MAP_PRIVATE)) {
-			struct page *cache_page = a_page;
-			if (upage_alloc(p, &a_page, FALSE)) {
-				__put_page(cache_page);	/* was the original a_page */
-				return -ENOMEM;
-			}
-			a_page->pg_tree_slot = 0;
-			memcpy(page2kva(a_page), page2kva(cache_page), PGSIZE);
-			__put_page(cache_page);		/* was the original a_page */
-			/* Debugging */
-			if (!(vmr->vm_prot & PROT_WRITE))
-				printd("[kernel] private, but unwritable file mapping of %s "
-				       "at va %p\n", file_name(vmr->vm_file), va);
+			ret = __copy_and_swap_pmpg(p, &a_page);
+			if (ret)
+				goto out;
 		}
 		/* if this is an executable page, we might have to flush the instruction
 		 * cache if our HW requires it. */
@@ -831,34 +922,18 @@ int __handle_page_fault(struct proc *p, uintptr_t va, int prot)
 	 * separately (file, no file) */
 	int pte_prot = (vmr->vm_prot & PROT_WRITE) ? PTE_USER_RW :
 	               (vmr->vm_prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
-	spin_lock(&p->pte_lock);	/* walking and changing PTEs */
-	/* find offending PTE (prob don't read this in).  This might alloc an
-	 * intermediate page table page. */
-	pte = pgdir_walk(p->env_pgdir, (void*)va, 1);
-	if (!pte) {
-		spin_unlock(&p->pte_lock);
-		__put_page(a_page);
-		return -ENOMEM;
-	}
-	/* a spurious, valid PF is possible due to a legit race: the page might have
-	 * been faulted in by another core already (and raced on the memory lock),
-	 * in which case we should just return. */
-	if (PAGE_PRESENT(*pte)) {
-		spin_unlock(&p->pte_lock);
-		__put_page(a_page);
-		return 0;
-	}
-	/* preserve the dirty bit - pm removal could be looking concurrently */
-	pte_prot |= (*pte & PTE_D ? PTE_D : 0);
-	/* We have a ref to a_page, which we are storing in the PTE */
-	*pte = PTE(page2ppn(a_page), PTE_P | pte_prot);
-	spin_unlock(&p->pte_lock);
+	ret = map_page_at_addr(p, a_page, va, pte_prot);
+	if (ret)
+		goto out;
 	/* the VMR's existence in the PM (via the mmap) allows us to have PTE point
 	 * to a_page without it magically being reallocated.  For non-PM memory
 	 * (anon memory or private pages) we transferred the ref to the PTE. */
 	if (atomic_read(&a_page->pg_flags) & PG_PAGEMAP)
 		pm_put_page(a_page);
-	return 0;
+	ret = 0;
+out:
+	spin_unlock(&p->vmr_lock);
+	return ret;
 }
 
 /* Kernel Dynamic Memory Mappings */

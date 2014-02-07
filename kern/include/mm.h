@@ -65,11 +65,8 @@ int munmap(struct proc *p, uintptr_t addr, size_t len);
 int handle_page_fault(struct proc *p, uintptr_t va, int prot);
 
 /* These assume the mm_lock is held already */
-void *__do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
-                struct file *f, size_t offset);
 int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot);
 int __do_munmap(struct proc *p, uintptr_t addr, size_t len);
-int __handle_page_fault(struct proc* p, uintptr_t va, int prot);
 
 /* Kernel Dynamic Memory Mappings */
 /* These two are just about reserving VA space */
