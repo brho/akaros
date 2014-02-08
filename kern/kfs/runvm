@@ -4,6 +4,9 @@ ls '#V'
 cp /bin/hlt '#r'
 # our kernel.
 echo mapmem '#r/hlt' 1 0 0 0x2001 > '#V/vm0/ctl'
+# also drop it on top of the reset vector.
+
+echo mapmem '#r/hlt' 1 0 0xffff0 0x2001 > '#V/vm0/ctl'
 echo 'run 0 0 0' > '#V/vm0/ctl'
 
 

@@ -764,13 +764,9 @@ static int alloc_mmu_pages(struct litevm_vcpu *vcpu)
 
 		if (kpage_alloc(&page) != ESUCCESS)
 			goto error_1;
-		printk("page_header %p, page %p\n", page_header, page);
 		page->pg_private = page_header;
-		printk("page2ppn(page) is %lx\n", page2ppn(page));
 		page_header->page_hpa = (hpa_t) page2pa(page);
-		printk("page_hpa is %lx\n", page_header->page_hpa);
 		memset(KADDR(page_header->page_hpa), 0, PAGE_SIZE);
-		printk("INSERT\n");
 		LIST_INSERT_HEAD(&vcpu->link, page_header, link);
 	}
 	print_func_exit();

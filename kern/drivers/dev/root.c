@@ -365,13 +365,11 @@ static long rootread(struct chan *c, void *buf, long n, int64_t offset)
 	if (offset + n > len)
 		n = len - offset;
 	data = rootdata[p].ptr;
-	/* we might call read from the kernel (load_elf()) */
-	if (current) {
-		if (memcpy_to_user_errno(current, buf, data + offset, n) < 0)
-			error("%s: bad user addr %p", __FUNCTION__, buf);
-	} else {
-		memcpy(buf, data + offset, n);
-	}
+	/* we can't really claim it has to be a user address. Lots of
+	 * kernel things read directly, e.g. /dev/reboot, #V, etc.
+	 * Address validation should be done in the syscall layer.
+	 */
+	memcpy(buf, data + offset, n);
 	return n;
 }
 

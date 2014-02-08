@@ -42,12 +42,12 @@
 #define GDT_ENTRY_TSS 0x24
 
 #define currentcpu (&per_cpu_info[core_id()])
-#define QLOCK_init(x) {printk("qlock_init %p\n", x); qlock_init(x); printk("%p lock_inited\n", x);}
-#define QLOCK(x) {printk("qlock %p\n", x); qlock(x); printk("%p locked\n", x);}
-#define QUNLOCK(x) {printk("qunlock %p\n", x); qunlock(x); printk("%p unlocked\n", x);}
-#define SPLI_irqsave(x){printk("spin_lock_init %p:", x); spinlock_init(x); printk("inited\n");}
-#define SPLL(x){printk("spin_lock %p\n", x); spin_lock_irqsave(x); printk("%p locked\n", x);}
-#define SPLU(x){printk("spin_unlock %p\n", x); spin_unlock(x); printk("%p unlocked\n", x);}
+#define QLOCK_init(x) {printd("qlock_init %p\n", x); qlock_init(x); printd("%p lock_inited\n", x);}
+#define QLOCK(x) {printd("qlock %p\n", x); qlock(x); printd("%p locked\n", x);}
+#define QUNLOCK(x) {printd("qunlock %p\n", x); qunlock(x); printd("%p unlocked\n", x);}
+#define SPLI_irqsave(x){printd("spin_lock_init %p:", x); spinlock_init(x); printd("inited\n");}
+#define SPLL(x){printd("spin_lock %p\n", x); spin_lock_irqsave(x); printd("%p locked\n", x);}
+#define SPLU(x){printd("spin_unlock %p\n", x); spin_unlock(x); printd("%p unlocked\n", x);}
 struct litevm_stat litevm_stat;
 
 static struct litevm_stats_debugfs_item {
@@ -755,17 +755,14 @@ static int litevm_dev_release(struct litevm *litevm)
 
 unsigned long vmcs_readl(unsigned long field)
 {
-	print_func_entry();
 	unsigned long value;
 
 	asm volatile ("vmread %1, %0":"=g" (value):"r"(field):"cc");
-	print_func_exit();
 	return value;
 }
 
 void vmcs_writel(unsigned long field, unsigned long value)
 {
-	print_func_entry();
 	uint8_t error;
 
 	asm volatile ("vmwrite %1, %2; setna %0":"=g" (error):"r"(value),
@@ -773,14 +770,11 @@ void vmcs_writel(unsigned long field, unsigned long value)
 	if (error)
 		printk("vmwrite error: reg %lx value %lx (err %d)\n",
 			   field, value, vmcs_read32(VM_INSTRUCTION_ERROR));
-	print_func_exit();
 }
 
 static void vmcs_write16(unsigned long field, uint16_t value)
 {
-	print_func_entry();
 	vmcs_writel(field, value);
-	print_func_exit();
 }
 
 static void vmcs_write64(unsigned long field, uint64_t value)
@@ -1259,7 +1253,6 @@ static void fx_init(struct litevm_vcpu *vcpu)
 static void vmcs_write32_fixedbits(uint32_t msr, uint32_t vmcs_field,
 								   uint32_t val)
 {
-	print_func_entry();
 	uint32_t msr_high, msr_low;
 	uint64_t msrval;
 
@@ -1270,7 +1263,6 @@ static void vmcs_write32_fixedbits(uint32_t msr, uint32_t vmcs_field,
 	val &= msr_high;
 	val |= msr_low;
 	vmcs_write32(vmcs_field, val);
-	print_func_exit();
 }
 
 /*
@@ -1637,8 +1629,10 @@ int vm_set_memory_region(struct litevm *litevm,
 	int memory_config_version;
 	void *init_data = mem->init_data;
 	int pass = 1;
-
-	printk("litevm %p\n", litevm);
+	printk("%s: slot %d base %08x npages %d\n", 
+		__func__, 
+	       mem->slot, mem->guest_phys_addr, 
+	       mem->memory_size);
 	/* should not happen but ... */
 	if (!litevm)
 		error("NULL litevm in %s", __func__);
@@ -1677,6 +1671,7 @@ int vm_set_memory_region(struct litevm *litevm,
 raced:
 	printk("raced: pass %d\n", pass);
 	printk("LOCK %p, locked %d\n", &litevm->lock, spin_locked(&litevm->lock));
+	void monitor(void *);
 	monitor(NULL);
 	SPLL(&litevm->lock);
 	printk("locked\n");
@@ -1705,7 +1700,7 @@ raced:
 	r = -EEXIST;
 	for (i = 0; i < LITEVM_MEMORY_SLOTS; ++i) {
 		struct litevm_memory_slot *s = &litevm->memslots[i];
-
+printk("Region %d: base gfn 0x%x npages %d\n", s->base_gfn, s->npages);
 		if (s == memslot)
 			continue;
 		if (!((base_gfn + npages <= s->base_gfn) ||
@@ -2285,6 +2280,8 @@ static int handle_exception(struct litevm_vcpu *vcpu,
 
 	vect_info = vmcs_read32(IDT_VECTORING_INFO_FIELD);
 	intr_info = vmcs_read32(VM_EXIT_INTR_INFO);
+printk("vect_info %x intro_info %x\n", vect_info, intr_info);
+printk("page fault? %d\n", is_page_fault(intr_info));
 
 	if ((vect_info & VECTORING_INFO_VALID_MASK) && !is_page_fault(intr_info)) {
 		printk("%s: unexpected, vectoring info 0x%x "
@@ -2292,6 +2289,7 @@ static int handle_exception(struct litevm_vcpu *vcpu,
 	}
 
 	if (is_external_interrupt(vect_info)) {
+printk("extern interrupt\n");
 		int irq = vect_info & VECTORING_INFO_VECTOR_MASK;
 		SET_BITMASK_BIT_ATOMIC(((uint8_t *) & vcpu->irq_pending), irq);
 		SET_BITMASK_BIT_ATOMIC(((uint8_t *) & vcpu->irq_summary),
@@ -2299,15 +2297,18 @@ static int handle_exception(struct litevm_vcpu *vcpu,
 	}
 
 	if ((intr_info & INTR_INFO_INTR_TYPE_MASK) == 0x200) {	/* nmi */
+printk("nmi\n");
 		asm("int $2");
 		print_func_exit();
 		return 1;
 	}
 	error_code = 0;
 	rip = vmcs_readl(GUEST_RIP);
+printk("GUEST_RIP %x\n", rip);
 	if (intr_info & INTR_INFO_DELIEVER_CODE_MASK)
 		error_code = vmcs_read32(VM_EXIT_INTR_ERROR_CODE);
 	if (is_page_fault(intr_info)) {
+printk("PAGE FAULT!\n");
 		cr2 = vmcs_readl(EXIT_QUALIFICATION);
 
 		SPLL(&vcpu->litevm->lock);
@@ -2340,6 +2341,7 @@ static int handle_exception(struct litevm_vcpu *vcpu,
 	if (vcpu->rmode.active &&
 		handle_rmode_exception(vcpu, intr_info & INTR_INFO_VECTOR_MASK,
 							   error_code)) {
+	    printk("RMODE EXCEPTION might have been handled\n");
 		print_func_exit();
 		return 1;
 	}
