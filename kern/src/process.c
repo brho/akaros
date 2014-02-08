@@ -1788,6 +1788,11 @@ void proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
 				                    0, KMSG_IMMEDIATE);
 			}
 			break;
+		default:
+			/* TODO: til we fix shootdowns, there are some odd cases where we
+			 * have the address space loaded, but the state is in transition. */
+			if (p == current)
+				tlbflush();
 	}
 	spin_unlock(&p->proc_lock);
 }
