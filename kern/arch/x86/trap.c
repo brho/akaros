@@ -251,6 +251,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			break;
 		case T_ILLOP:
 		{
+			/* TODO: this can PF if there is a concurrent unmap/PM removal. */
 			uintptr_t ip = x86_get_ip_hw(hw_tf);
 			pcpui = &per_cpu_info[core_id()];
 			pcpui->__lock_checking_enabled--;		/* for print debugging */

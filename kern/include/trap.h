@@ -22,6 +22,7 @@ void register_raw_irq(unsigned int vector, isr_t handler, void *data);
 void unregister_raw_irq(unsigned int vector, isr_t handler, void *data);
 int register_dev_irq(int irq, isr_t handler, void *irq_arg);
 void print_trapframe(struct hw_trapframe *hw_tf);
+void print_user_ctx(struct user_context *ctx);
 void page_fault_handler(struct hw_trapframe *hw_tf);
 /* Generic per-core timer interrupt handler.  set_percore_timer() will fire the
  * timer_interrupt(). */

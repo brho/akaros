@@ -226,3 +226,13 @@ void print_kctx_depths(const char *str)
 	printk("%s: Core %d, irq depth %d, ktrap depth %d, irqon %d\n", str, coreid,
 	       irq_depth(pcpui), ktrap_depth(pcpui), irq_is_enabled());
 }
+
+void print_user_ctx(struct user_context *ctx)
+{
+	if (ctx->type == ROS_SW_CTX)
+		print_swtrapframe(&ctx->tf.sw_tf);
+	else if (ctx->type == ROS_HW_CTX)
+		print_trapframe(&ctx->tf.hw_tf);
+	else
+		printk("Bad TF %p type %d!\n", ctx, ctx->type);
+}
