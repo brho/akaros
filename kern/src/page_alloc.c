@@ -344,9 +344,7 @@ void lock_page(struct page *page)
 void unlock_page(struct page *page)
 {
 	atomic_and(&page->pg_flags, ~PG_LOCKED);
-	if (sem_up(&page->pg_sem)) {
-		printk("Unexpected sleeper on a page!");	/* til we test this */
-	}
+	sem_up(&page->pg_sem);
 }
 
 void print_pageinfo(struct page *page)

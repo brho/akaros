@@ -822,6 +822,57 @@ static void __put_page(struct page *page)
 		page_decref(page);
 }
 
+static int __hpf_load_page(struct proc *p, struct page_map *pm,
+                           unsigned long idx, struct page **page, bool first)
+{
+	int ret = 0;
+	int coreid = core_id();
+	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
+	bool wake_scp = FALSE;
+	spin_lock(&p->proc_lock);
+	switch (p->state) {
+		case (PROC_RUNNING_S):
+			wake_scp = TRUE;
+			__proc_set_state(p, PROC_WAITING);
+			/* it's possible for HPF to loop a few times; we can only save the
+			 * first time, o/w we could clobber. */
+			if (first) {
+				__proc_save_context_s(p, pcpui->cur_ctx);
+				__proc_save_fpu_s(p);
+				/* We clear the owner, since userspace doesn't run here
+				 * anymore, but we won't abandon since the fault handler
+				 * still runs in our process. */
+				clear_owning_proc(coreid);
+			}
+			/* other notes: we don't currently need to tell the ksched
+			 * we switched from running to waiting, though we probably
+			 * will later for more generic scheds. */
+			break;
+		case (PROC_RUNNABLE_M):
+		case (PROC_RUNNING_M):
+			printk("MCP pagefault, not supported yet!\n");
+			spin_unlock(&p->proc_lock);
+			/* this might end up not returning or something. */
+			return -EINVAL;
+		default:
+			/* TODO: could be dying, can just error out */
+			printk("HPF unexpectecd state(%s)", procstate2str(p->state));
+			spin_unlock(&p->proc_lock);
+			return -EINVAL;
+	}
+	spin_unlock(&p->proc_lock);
+	ret = pm_load_page(pm, idx, page);
+	if (wake_scp)
+		proc_wakeup(p);
+	if (ret) {
+		printk("load failed with ret %d\n", ret);
+		return ret;
+	}
+	/* need to put our old ref, next time around HPF will get another. */
+	pm_put_page(*page);
+	return 0;
+}
+
 /* Returns 0 on success, or an appropriate -error code. 
  *
  * Notes: if your TLB caches negative results, you'll need to flush the
@@ -837,6 +888,7 @@ int handle_page_fault(struct proc *p, uintptr_t va, int prot)
 	unsigned int f_idx;	/* index of the missing page in the file */
 	pte_t *pte;
 	int ret = 0;
+	bool first = TRUE;
 	va = ROUNDDOWN(va,PGSIZE);
 
 	if (prot != PROT_READ && prot != PROT_WRITE && prot != PROT_EXEC)
@@ -889,15 +941,9 @@ refault:
 			/* keep the file alive after we unlock */
 			kref_get(&vmr->vm_file->f_kref, 1);
 			spin_unlock(&p->vmr_lock);
-
-			/* TODO: here is where we handle SCP vs MCP vs whatever.
-			 * - do some prep
-			 * - prefetch it for userspace, optionally for MCPs
-			 * - this will break if we actually block, since smp_idle will
-			 *   restart the proc
-			 *   */
-			ret = pm_load_page(vmr->vm_file->f_mapping, f_idx, &a_page);
-
+			ret = __hpf_load_page(p, vmr->vm_file->f_mapping, f_idx, &a_page,
+			                      first);
+			first = FALSE;
 			kref_put(&vmr->vm_file->f_kref);
 			if (ret)
 				return ret;
@@ -911,7 +957,7 @@ refault:
 		if ((vmr->vm_flags & MAP_PRIVATE)) {
 			ret = __copy_and_swap_pmpg(p, &a_page);
 			if (ret)
-				goto out;
+				goto out_put_pg;
 		}
 		/* if this is an executable page, we might have to flush the instruction
 		 * cache if our HW requires it. */
@@ -923,14 +969,13 @@ refault:
 	int pte_prot = (vmr->vm_prot & PROT_WRITE) ? PTE_USER_RW :
 	               (vmr->vm_prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
 	ret = map_page_at_addr(p, a_page, va, pte_prot);
-	if (ret)
-		goto out;
+	/* fall through, even for errors */
+out_put_pg:
 	/* the VMR's existence in the PM (via the mmap) allows us to have PTE point
 	 * to a_page without it magically being reallocated.  For non-PM memory
 	 * (anon memory or private pages) we transferred the ref to the PTE. */
 	if (atomic_read(&a_page->pg_flags) & PG_PAGEMAP)
 		pm_put_page(a_page);
-	ret = 0;
 out:
 	spin_unlock(&p->vmr_lock);
 	return ret;
