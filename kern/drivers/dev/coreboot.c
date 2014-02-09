@@ -226,7 +226,7 @@ static int cb_parse_header(void *addr, int len, struct sysinfo_t *info)
 		/* We only care about a few tags here (maybe more later). */
 		switch (rec->tag) {
 		case CB_TAG_FORWARD:
-			forward = KADDR((void *)(unsigned long)((struct cb_forward *)rec)->forward);
+			forward = KADDR((unsigned long)((struct cb_forward *)rec)->forward);
 			return cb_parse_header(forward, len, info);
 			continue;
 		case CB_TAG_MEMORY:
