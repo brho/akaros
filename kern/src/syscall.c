@@ -567,8 +567,11 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	/* Clear the current_ctx.  We won't be returning the 'normal' way.  Even if
 	 * we want to return with an error, we need to go back differently in case
 	 * we succeed.  This needs to be done before we could possibly block, but
-	 * unfortunately happens before the point of no return. */
-	pcpui->cur_ctx = 0;
+	 * unfortunately happens before the point of no return.
+	 *
+	 * Note that we will 'hard block' if we block at all.  We can't return to
+	 * userspace and then asynchronously finish the exec later. */
+	clear_owning_proc(core_id());
 	enable_irqsave(&state);
 	/* This could block: */
 	/* TODO: 9ns support */
@@ -626,7 +629,6 @@ all_out:
 	 * syscall struct (which has been freed and is in the old userspace) (or has
 	 * already been written to).*/
 	disable_irq();			/* abandon_core/clear_own wants irqs disabled */
-	clear_owning_proc(core_id());
 	abandon_core();
 	smp_idle();				/* will reenable interrupts */
 }
