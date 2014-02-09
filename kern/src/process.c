@@ -1740,7 +1740,10 @@ struct proc *switch_to(struct proc *new_p)
 	/* If we aren't the proc already, then switch to it */
 	if (old_proc != new_p) {
 		pcpui->cur_proc = new_p;				/* uncounted ref */
-		lcr3(new_p->env_cr3);
+		if (new_p)
+			lcr3(new_p->env_cr3);
+		else
+			lcr3(boot_cr3);
 	}
 	return old_proc;
 }

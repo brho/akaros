@@ -30,8 +30,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 	
 	/* When reading on behalf of the kernel, we need to make sure no proc is
 	 * "current".  This is a bit ghetto (TODO: KFOP) */
-	struct proc *cur_proc = current;
-	current = 0;
+	struct proc *old_proc = switch_to(0);
 
 	/* Read in ELF header. */
 	elf64_t elfhdr_storage;
@@ -219,7 +218,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 fail:
 	if (phdrs)
 		kfree(phdrs);
-	current = cur_proc;
+	switch_back(0, old_proc);
 	return ret;
 }
 
