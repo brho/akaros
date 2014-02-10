@@ -35,11 +35,7 @@
 #include <arch/vmdebug.h>
 #include <arch/msr-index.h>
 
-/* from linux */
-#define __KERNEL_CS 0x10
-#define __KERNEL_DS 0x18
-/* used? Who knows */
-#define GDT_ENTRY_TSS 0x24
+void monitor(void *);
 
 #define currentcpu (&per_cpu_info[core_id()])
 #define QLOCK_init(x) {printd("qlock_init %p\n", x); qlock_init(x); printd("%p lock_inited\n", x);}
@@ -317,7 +313,7 @@ static void reload_tss(void)
 
 	get_gdt(&gdt);
 	descs = (void *)gdt.base;
-	descs[GDT_ENTRY_TSS].type = 9;	/* available TSS */
+	descs[GD_TSS].type = 9;	/* available TSS */
 	load_TR_desc();
 #endif
 	print_func_exit();
@@ -882,6 +878,7 @@ static void enter_rmode(struct litevm_vcpu *vcpu)
 
 	flags |= X86_EFLAGS_IOPL | X86_EFLAGS_VM;
 
+	printk("FLAGS 0x%x\n", flags);
 	vmcs_writel(GUEST_RFLAGS, flags);
 	vmcs_writel(GUEST_CR4, vmcs_readl(GUEST_CR4) | CR4_VME_MASK);
 	update_exception_bitmap(vcpu);
@@ -1380,12 +1377,12 @@ static int litevm_vcpu_setup(struct litevm_vcpu *vcpu)
 	vmcs_writel(HOST_CR4, rcr4());	/* 22.2.3, 22.2.5 */
 	vmcs_writel(HOST_CR3, rcr3());	/* 22.2.3  FIXME: shadow tables */
 
-	vmcs_write16(HOST_CS_SELECTOR, __KERNEL_CS);	/* 22.2.4 */
-	vmcs_write16(HOST_DS_SELECTOR, __KERNEL_DS);	/* 22.2.4 */
-	vmcs_write16(HOST_ES_SELECTOR, __KERNEL_DS);	/* 22.2.4 */
+	vmcs_write16(HOST_CS_SELECTOR, GD_KT);	/* 22.2.4 */
+	vmcs_write16(HOST_DS_SELECTOR, GD_KD);	/* 22.2.4 */
+	vmcs_write16(HOST_ES_SELECTOR, GD_KD);	/* 22.2.4 */
 	vmcs_write16(HOST_FS_SELECTOR, read_fs());	/* 22.2.4 */
 	vmcs_write16(HOST_GS_SELECTOR, read_gs());	/* 22.2.4 */
-	vmcs_write16(HOST_SS_SELECTOR, __KERNEL_DS);	/* 22.2.4 */
+	vmcs_write16(HOST_SS_SELECTOR, GD_KD);	/* 22.2.4 */
 
 #ifdef __x86_64__
 	a = read_msr(MSR_FS_BASE);
@@ -1397,7 +1394,7 @@ static int litevm_vcpu_setup(struct litevm_vcpu *vcpu)
 	vmcs_writel(HOST_GS_BASE, 0);	/* 22.2.4 */
 #endif
 
-	vmcs_write16(HOST_TR_SELECTOR, GDT_ENTRY_TSS * 8);	/* 22.2.4 */
+	vmcs_write16(HOST_TR_SELECTOR, GD_TSS * 8);	/* 22.2.4 */
 
 	get_idt(&dt);
 	vmcs_writel(HOST_IDTR_BASE, dt.base);	/* 22.2.4 */
@@ -1735,12 +1732,24 @@ printk("Region %d: base gfn 0x%x npages %d\n", s->base_gfn, s->npages);
 		for (i = 0; i < npages; ++i) {
 			int ret;
 			ret = kpage_alloc(&new.phys_mem[i]);
+			printk("PAGEALLOC: va %p pa %p\n",page2kva(new.phys_mem[i]),page2pa(new.phys_mem[i]));
 			if (ret != ESUCCESS)
 				goto out_free;
 			if (init_data) {
 				printk("init data memcpy(%p,%p,4096);\n",
 					   page2kva(new.phys_mem[i]), init_data);
 				memcpy(page2kva(new.phys_mem[i]), init_data, PAGE_SIZE);
+				init_data += PAGE_SIZE;
+			} else {
+				int j;
+				//memset(page2kva(new.phys_mem[i]), 0xf4 /* hlt */, PAGE_SIZE);
+				uint8_t *cp = page2kva(new.phys_mem[i]);
+				for(j = 0; j < PAGE_SIZE; j += 2){
+					cp[j] = 0x31; cp[j+1] = 0xc0;
+				}
+				cp[4094] = 0xeb;
+				cp[4095] = 0xfe;
+					
 				init_data += PAGE_SIZE;
 			}
 		}
@@ -1883,6 +1892,8 @@ struct litevm_memory_slot *gfn_to_memslot(struct litevm *litevm, gfn_t gfn)
 	for (i = 0; i < litevm->nmemslots; ++i) {
 		struct litevm_memory_slot *memslot = &litevm->memslots[i];
 
+		printk("%s: slot %d gfn 0x%lx base_gfn %lx npages %x\n", 
+			__func__, i, gfn,memslot->base_gfn, memslot->npages);
 		if (gfn >= memslot->base_gfn
 			&& gfn < memslot->base_gfn + memslot->npages) {
 			print_func_exit();
@@ -2938,14 +2949,13 @@ static void litevm_guest_debug_pre(struct litevm_vcpu *vcpu)
 	print_func_entry();
 	struct litevm_guest_debug *dbg = &vcpu->guest_debug;
 
-#warning "no debugging guests yet"
-	assert(0);
 /*
 	set_debugreg(dbg->bp[0], 0);
 	set_debugreg(dbg->bp[1], 1);
 	set_debugreg(dbg->bp[2], 2);
 	set_debugreg(dbg->bp[3], 3);
 */
+
 	if (dbg->singlestep) {
 		unsigned long flags;
 
@@ -3041,14 +3051,10 @@ again:
 	printk("Set FS_BASE and GS_BASE");
 #endif
 
-	printk("skipping IRQs for now\n");
-	if (0)
 	if (vcpu->irq_summary &&
 		!(vmcs_read32(VM_ENTRY_INTR_INFO_FIELD) & INTR_INFO_VALID_MASK))
 		litevm_try_inject_irq(vcpu);
 
-	printk("no debugging for now\n");
-	if (0)
 	if (vcpu->guest_debug.enabled)
 		litevm_guest_debug_pre(vcpu);
 
@@ -3058,7 +3064,7 @@ again:
 	save_msrs(vcpu->host_msrs, vcpu->nmsrs);
 	load_msrs(vcpu->guest_msrs, NR_BAD_MSRS);
 
-	printk("GO FOR IT!\n");
+	printk("GO FOR IT! %08lx\n", vmcs_readl(GUEST_RIP));
 	asm(
 		   /* Store host registers */
 		   "pushf \n\t"
@@ -3147,7 +3153,8 @@ again:
 		   :"cc", "memory");
 
 	++litevm_stat.exits;
-	printk("vm_run exits");
+	printk("vm_run exits! %08lx flags %08lx\n", vmcs_readl(GUEST_RIP),
+		vmcs_readl(GUEST_RFLAGS));
 	save_msrs(vcpu->guest_msrs, NR_BAD_MSRS);
 	load_msrs(vcpu->host_msrs, NR_BAD_MSRS);
 
@@ -3186,6 +3193,7 @@ printk("NOT FAIL\n");
 		litevm_run->exit_type = LITEVM_EXIT_TYPE_VM_EXIT;
 printk("Let's see why it exited\n");
 		if (litevm_handle_exit(litevm_run, vcpu)) {
+#if 0
 			/* Give scheduler a change to reschedule. */
 			vcpu_put(vcpu);
 #warning "how to tell if signal is pending"
@@ -3195,9 +3203,13 @@ printk("Let's see why it exited\n");
 				return -EINTR;
 			}
 */
+			consider getting rid of this for now. 
+			Maybe it's just breaking things.
 			kthread_yield();
 			/* Cannot fail -  no vcpu unplug yet. */
 			vcpu_load(litevm, vcpu_slot(vcpu));
+#endif
+			monitor(NULL);
 			goto again;
 		}
 	}

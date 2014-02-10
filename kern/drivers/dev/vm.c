@@ -91,7 +91,7 @@ static void readn(struct chan *c, void *vp, long n)
 		nn = devtab[c->type].read(c, p, n, c->offset);
 		printk("readn: Got %d@%lld\n", nn, c->offset);
 		if (nn == 0)
-			error("%s: wanted %d, got %d", Eshort, total, want);
+			error("%s: wanted %d, got %d", Eshort, want, total);
 		c->offset += nn;
 		p += nn;
 		n -= nn;
@@ -507,6 +507,7 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 				vmr.flags = strtoul(cb->f[2], NULL, 0);
 				vmr.guest_phys_addr = strtoul(cb->f[3], NULL, 0);
 				vmr.memory_size = strtoul(cb->f[4], NULL, 0);
+				vmr.init_data = NULL;
 				if (vm_set_memory_region(litevm, &vmr))
 					error("vm_set_memory_region failed");
 			} else {

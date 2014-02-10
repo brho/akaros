@@ -155,22 +155,22 @@ static int is_cpuid_PSE36(void)
 
 static int is_present_pte(unsigned long pte)
 {
-	print_func_entry();
-	print_func_exit();
+	//print_func_entry();
+	//print_func_exit();
 	return pte & PT_PRESENT_MASK;
 }
 
 static int is_writeble_pte(unsigned long pte)
 {
-	print_func_entry();
-	print_func_exit();
+	//print_func_entry();
+	//print_func_exit();
 	return pte & PT_WRITABLE_MASK;
 }
 
 static int is_io_pte(unsigned long pte)
 {
-	print_func_entry();
-	print_func_exit();
+	//print_func_entry();
+	//print_func_exit();
 	return pte & PT_SHADOW_IO_MARK;
 }
 
@@ -251,12 +251,17 @@ hpa_t gpa_to_hpa(struct litevm_vcpu * vcpu, gpa_t gpa)
 
 	ASSERT((gpa & HPA_ERR_MASK) == 0);
 	slot = gfn_to_memslot(vcpu->litevm, gpa >> PAGE_SHIFT);
+	printk("GFN %016lx memslot %p\n", gpa>>PAGE_SHIFT, slot);
 	if (!slot) {
+		printk("GFN_TO_MEMSLOT FAILED!\n");
 		print_func_exit();
 		return gpa | HPA_ERR_MASK;
 	}
 	page = gfn_to_page(slot, gpa >> PAGE_SHIFT);
+	printk("Page is %p\n", page);
 	print_func_exit();
+	printk("gpa_to_hpa: return %016lx\n",  ((hpa_t) page2ppn(page) << PAGE_SHIFT)
+		| (gpa & (PAGE_SIZE - 1)));
 	return ((hpa_t) page2ppn(page) << PAGE_SHIFT)
 		| (gpa & (PAGE_SIZE - 1));
 }
@@ -314,6 +319,7 @@ static int nonpaging_map(struct litevm_vcpu *vcpu, gva_t v, hpa_t p)
 	print_func_entry();
 	int level = PT32E_ROOT_LEVEL;
 	hpa_t table_addr = vcpu->mmu.root_hpa;
+printk("nonpaging_map: v %016lx, p %016lx\n", v, p);
 
 	for (;; level--) {
 		uint32_t index = PT64_INDEX(v, level);
@@ -384,6 +390,7 @@ static int nonpaging_page_fault(struct litevm_vcpu *vcpu, gva_t gva,
 	int ret;
 	gpa_t addr = gva;
 
+printk("nonpaging_page_fault: %016llx\n", gva);
 	ASSERT(vcpu);
 	ASSERT(VALID_PAGE(vcpu->mmu.root_hpa));
 
@@ -587,6 +594,7 @@ static void paging_inval_page(struct litevm_vcpu *vcpu, gva_t addr)
 	hpa_t page_addr = vcpu->mmu.root_hpa;
 	int level = vcpu->mmu.shadow_root_level;
 
+printk("paging_inval_page: addr %016lx\n", addr);
 	++litevm_stat.invlpg;
 
 	for (;; level--) {
