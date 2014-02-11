@@ -320,6 +320,7 @@ static int nonpaging_map(struct litevm_vcpu *vcpu, gva_t v, hpa_t p)
 	int level = PT32E_ROOT_LEVEL;
 	hpa_t table_addr = vcpu->mmu.root_hpa;
 printk("nonpaging_map: v %016lx, p %016lx\n", v, p);
+hexdump(KADDR(p), 32);
 
 	for (;; level--) {
 		uint32_t index = PT64_INDEX(v, level);
@@ -338,8 +339,7 @@ printk("nonpaging_map: v %016lx, p %016lx\n", v, p);
 		}
 
 		if (table[index] == 0) {
-			hpa_t new_table = litevm_mmu_alloc_page(vcpu,
-													&table[index]);
+			hpa_t new_table = litevm_mmu_alloc_page(vcpu, &table[index]);
 
 			if (!VALID_PAGE(new_table)) {
 				pgprintk("nonpaging_map: ENOMEM\n");

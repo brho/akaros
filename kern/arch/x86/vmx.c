@@ -168,66 +168,66 @@ asm("sidt %0":"=m"(*table));
 
 static uint16_t read_fs(void)
 {
-	print_func_entry();
+	//print_func_entry();
 	uint16_t seg;
-asm("mov %%fs, %0":"=g"(seg));
-	print_func_exit();
+	asm("mov %%fs, %0":"=g"(seg));
+	//print_func_exit();
 	return seg;
 }
 
 static uint16_t read_gs(void)
 {
-	print_func_entry();
+	//print_func_entry();
 	uint16_t seg;
-asm("mov %%gs, %0":"=g"(seg));
-	print_func_exit();
+	asm("mov %%gs, %0":"=g"(seg));
+	//print_func_exit();
 	return seg;
 }
 
 static uint16_t read_ldt(void)
 {
-	print_func_entry();
+	//print_func_entry();
 	uint16_t ldt;
-asm("sldt %0":"=g"(ldt));
-	print_func_exit();
+	asm("sldt %0":"=g"(ldt));
+	//print_func_exit();
 	return ldt;
 }
 
 static void load_fs(uint16_t sel)
 {
-	print_func_entry();
-asm("mov %0, %%fs": :"g"(sel));
-	print_func_exit();
+	//print_func_entry();
+	asm("mov %0, %%fs": :"g"(sel));
+	//print_func_exit();
 }
 
 static void load_gs(uint16_t sel)
 {
-	print_func_entry();
-asm("mov %0, %%gs": :"g"(sel));
-	print_func_exit();
+	//print_func_entry();
+	asm("mov %0, %%gs": :"g"(sel));
+	//print_func_exit();
 }
 
 #ifndef load_ldt
 static void load_ldt(uint16_t sel)
 {
-	print_func_entry();
-asm("lldt %0": :"g"(sel));
-	print_func_exit();
+	//print_func_entry();
+	asm("lldt %0": :"g"(sel));
+	//print_func_exit();
 }
 #endif
 
 static void fx_save(void *image)
 {
-	print_func_entry();
+	//print_func_entry();
 	asm("fxsave (%0)"::"r"(image));
-	print_func_exit();
+	//print_func_exit();
 }
 
 static void fx_restore(void *image)
 {
-	print_func_entry();
+	//print_func_entry();
 	asm("fxrstor (%0)"::"r"(image));
-	print_func_exit();
+	//print_func_exit();
 }
 
 static void fpu_init(void)
@@ -1575,6 +1575,7 @@ int vmx_create_vcpu(struct litevm *litevm, int n)
 	vmr.flags = 0;
 	vmr.guest_phys_addr = /* guess. */ 0x1000000;
 	vmr.memory_size = 0x10000;
+	vmr.init_data = NULL;
 	if (vm_set_memory_region(litevm, &vmr))
 		printk("vm_set_memory_region failed");
 
@@ -1744,11 +1745,16 @@ printk("Region %d: base gfn 0x%x npages %d\n", s->base_gfn, s->npages);
 				int j;
 				//memset(page2kva(new.phys_mem[i]), 0xf4 /* hlt */, PAGE_SIZE);
 				uint8_t *cp = page2kva(new.phys_mem[i]);
+				memset(cp, 0, PAGE_SIZE);
+				if (base_gfn < 0x100000){
 				for(j = 0; j < PAGE_SIZE; j += 2){
+					// XORL %RAX, %RAX
 					cp[j] = 0x31; cp[j+1] = 0xc0;
 				}
+				// 1: jmp 1b
 				cp[4094] = 0xeb;
 				cp[4095] = 0xfe;
+				}
 					
 				init_data += PAGE_SIZE;
 			}
@@ -2373,9 +2379,9 @@ printk("PAGE FAULT!\n");
 static int handle_external_interrupt(struct litevm_vcpu *vcpu,
 									 struct litevm_run *litevm_run)
 {
-	print_func_entry();
+	//print_func_entry();
 	++litevm_stat.irq_exits;
-	print_func_exit();
+	//print_func_exit();
 	return 1;
 }
 
@@ -2829,11 +2835,11 @@ static const int litevm_vmx_max_exit_handlers =
 static int litevm_handle_exit(struct litevm_run *litevm_run,
 							  struct litevm_vcpu *vcpu)
 {
-	print_func_entry();
+	//print_func_entry();
 	uint32_t vectoring_info = vmcs_read32(IDT_VECTORING_INFO_FIELD);
 	uint32_t exit_reason = vmcs_read32(VM_EXIT_REASON);
 
-printk("vectoring_info %08x exit_reason %x\n", vectoring_info, exit_reason);
+//printk("vectoring_info %08x exit_reason %x\n", vectoring_info, exit_reason);
 	if ((vectoring_info & VECTORING_INFO_VALID_MASK) &&
 		exit_reason != EXIT_REASON_EXCEPTION_NMI)
 		printk("%s: unexpected, valid vectoring info and "
@@ -2841,15 +2847,15 @@ printk("vectoring_info %08x exit_reason %x\n", vectoring_info, exit_reason);
 	litevm_run->instruction_length = vmcs_read32(VM_EXIT_INSTRUCTION_LEN);
 	if (exit_reason < litevm_vmx_max_exit_handlers
 		&& litevm_vmx_exit_handlers[exit_reason]) {
-printk("reason is KNOWN\n");
-		print_func_exit();
+//printk("reason is KNOWN\n");
+		//print_func_exit();
 		return litevm_vmx_exit_handlers[exit_reason] (vcpu, litevm_run);
 	} else {
 printk("reason is UNKNOWN\n");
 		litevm_run->exit_reason = LITEVM_EXIT_UNKNOWN;
 		litevm_run->hw.hardware_exit_reason = exit_reason;
 	}
-	print_func_exit();
+	//print_func_exit();
 	return 0;
 }
 
@@ -2968,7 +2974,7 @@ static void litevm_guest_debug_pre(struct litevm_vcpu *vcpu)
 
 static void load_msrs(struct vmx_msr_entry *e, int n)
 {
-	print_func_entry();
+	//print_func_entry();
 	int i;
 
 	if (! e) {
@@ -2976,21 +2982,21 @@ static void load_msrs(struct vmx_msr_entry *e, int n)
 		error("LOAD MSR WITH NULL POINTER?");
 	}
 	for (i = 0; i < n; ++i) {
-		printk("Load MSR (%lx), with %lx\n", e[i].index, e[i].data);
+		//printk("Load MSR (%lx), with %lx\n", e[i].index, e[i].data);
 		write_msr(e[i].index, e[i].data);
-		printk("Done\n");
+		//printk("Done\n");
 	}
-	print_func_exit();
+	//print_func_exit();
 }
 
 static void save_msrs(struct vmx_msr_entry *e, int n)
 {
-	print_func_entry();
+	//print_func_entry();
 	int i;
 
 	for (i = 0; i < n; ++i)
 		e[i].data = read_msr(e[i].index);
-	print_func_exit();
+	//print_func_exit();
 }
 
 int vm_run(struct litevm *litevm, struct litevm_run *litevm_run)
@@ -3030,11 +3036,11 @@ again:
 	 * allow segment selectors with cpl > 0 or ti == 1.
 	 */
 	fs_sel = read_fs();
-	printk("fs_sel %x\n", fs_sel);
+	//printk("fs_sel %x\n", fs_sel);
 	gs_sel = read_gs();
-	printk("gs_sel %x\n", gs_sel);
+	//printk("gs_sel %x\n", gs_sel);
 	ldt_sel = read_ldt();
-	printk("ldt_sel %x\n", ldt_sel);
+	//printk("ldt_sel %x\n", ldt_sel);
 	fs_gs_ldt_reload_needed = (fs_sel & 7) | (gs_sel & 7) | ldt_sel;
 	if (!fs_gs_ldt_reload_needed) {
 		vmcs_write16(HOST_FS_SELECTOR, fs_sel);
@@ -3043,12 +3049,12 @@ again:
 		vmcs_write16(HOST_FS_SELECTOR, 0);
 		vmcs_write16(HOST_GS_SELECTOR, 0);
 	}
-	printk("reloaded gs and gs\n");
+	//printk("reloaded gs and gs\n");
 
 #ifdef __x86_64__
 	vmcs_writel(HOST_FS_BASE, read_msr(MSR_FS_BASE));
 	vmcs_writel(HOST_GS_BASE, read_msr(MSR_GS_BASE));
-	printk("Set FS_BASE and GS_BASE");
+	//printk("Set FS_BASE and GS_BASE");
 #endif
 
 	if (vcpu->irq_summary &&
@@ -3191,10 +3197,10 @@ printk("NOT FAIL\n");
 		}
 		vcpu->launched = 1;
 		litevm_run->exit_type = LITEVM_EXIT_TYPE_VM_EXIT;
-printk("Let's see why it exited\n");
+//printk("Let's see why it exited\n");
 		if (litevm_handle_exit(litevm_run, vcpu)) {
-#if 0
 			/* Give scheduler a change to reschedule. */
+#if 0
 			vcpu_put(vcpu);
 #warning "how to tell if signal is pending"
 /*
@@ -3204,7 +3210,7 @@ printk("Let's see why it exited\n");
 			}
 */
 			consider getting rid of this for now. 
-			Maybe it's just breaking things.
+			Maybe it is just breaking things.
 			kthread_yield();
 			/* Cannot fail -  no vcpu unplug yet. */
 			vcpu_load(litevm, vcpu_slot(vcpu));
@@ -3213,7 +3219,10 @@ printk("Let's see why it exited\n");
 			goto again;
 		}
 	}
+done: 
 
+	printk("vm_run exits! %08lx flags %08lx\n", vmcs_readl(GUEST_RIP),
+		vmcs_readl(GUEST_RFLAGS));
 	vcpu_put(vcpu);
 	printk("vm_run returns\n");
 	print_func_exit();
