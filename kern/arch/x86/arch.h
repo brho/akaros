@@ -203,7 +203,10 @@ static inline void cache_flush(void)
 
 static inline void reboot(void)
 {
+	uint8_t cf9 = inb(0xcf9) & ~6;
 	outb(0x92, 0x3);
+	outb(0xcf9, cf9 | 2);
+	outb(0xcf9, cf9 | 6);
 	asm volatile ("mov $0, %"X86_REG_SP"; int $0");
 	while (1);
 }
