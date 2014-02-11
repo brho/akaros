@@ -571,7 +571,7 @@ static int cpu_has_litevm_support(void)
 		return 0;
 	uint32_t ecx = cpuid_ecx(1);
 	print_func_exit();
-	return ecx & 5;	/* CPUID.1:ECX.VMX[bit 5] -> VT */
+	return ecx & (1 << 5);	/* CPUID.1:ECX.VMX[bit 5] -> VT */
 }
 
 static int vmx_disabled_by_bios(void)
