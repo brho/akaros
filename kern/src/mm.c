@@ -522,9 +522,13 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		addr = BRK_END;
 	assert(!PGOFF(offset));
 
-#ifndef CONFIG_DEMAND_PAGING
-	flags |= MAP_POPULATE;
-#endif
+	/* MCPs will need their code and data pinned.  This check will start to fail
+	 * after uthread_slim_init(), at which point userspace should have enough
+	 * control over its mmaps (i.e. no longer done by LD or load_elf) that it
+	 * can ask for pinned and populated pages.  Except for dl_opens(). */
+	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
+	if (file && (atomic_read(&vcpd->flags) & VC_SCP_NOVCCTX))
+		flags |= MAP_POPULATE | MAP_LOCKED;
 	/* Need to make sure nothing is in our way when we want a FIXED location.
 	 * We just need to split on the end points (if they exist), and then remove
 	 * everything in between.  __do_munmap() will do this.  Careful, this means

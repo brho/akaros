@@ -67,14 +67,6 @@ endmenu
 
 menu "Memory Management"
 
-config DEMAND_PAGING
-	bool "Demand paging"
-	default n
-	help
-		When turned on, mmap() calls do not immediately populate their pages.
-		This does not turn on any sort of real paging.  Saying 'n' will act
-		like all mmap()s have MAP_POPULATE.
-
 config PAGE_COLORING
 	bool "Page coloring"
 	default n
