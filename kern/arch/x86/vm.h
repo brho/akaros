@@ -94,12 +94,6 @@ struct vmcs {
 	char data[0];
 };
 
-struct vmx_msr_entry {
-	uint32_t index;
-	uint32_t reserved;
-	uint64_t data;
-};
-
 struct litevm_vcpu;
 
 /*
@@ -575,11 +569,4 @@ enum {
 	LITEVM_CREATE_VCPU,
 	LITEVM_GET_DIRTY_LOG,
 };
-
-struct litevm *vmx_open(void);
-int vmx_create_vcpu(struct litevm *litevm, int n);
-int vmx_init(void);
-int vm_set_memory_region(struct litevm *litevm,
-						 struct litevm_memory_region *mem);
-int vm_run(struct litevm *litevm, struct litevm_run *litevm_run);
 #endif

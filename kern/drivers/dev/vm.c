@@ -61,6 +61,15 @@ static int vmok = 0;
 static spinlock_t vmidlock[1];
 static struct kref vmid[1] = { {(void *)1, fake_release} };
 
+/* not clear what .h to put these in. Put them here. */
+
+struct litevm *vmx_open(void);
+int vmx_create_vcpu(struct litevm *litevm, int n);
+int vmx_init(void);
+int vm_set_memory_region(struct litevm *litevm,
+						 struct litevm_memory_region *mem);
+int vm_run(struct litevm *litevm, struct litevm_run *litevm_run);
+
 static inline struct vm *
 QID2VM(struct qid q)
 {
