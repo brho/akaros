@@ -35,6 +35,9 @@ struct per_cpu_info {
 	 */
 	struct vmcs *vmxarea;
 	struct vmcs *vmcs;
+	pseudodesc_t host_gdt;
+	int vmx_enabled;
+	void *local_vcpu;
 #endif
 	spinlock_t lock;
 	/* Process management */

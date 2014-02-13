@@ -90,6 +90,7 @@ typedef unsigned long uintreg_t;
 	__b;                                                                       \
 })
 
+#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 // Return the integer logarithm of the value provided rounded down
 static inline uintptr_t LOG2_DOWN(uintptr_t value)
 {

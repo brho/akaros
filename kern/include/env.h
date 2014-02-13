@@ -100,6 +100,7 @@ struct proc {
 	struct proc_alarm_set		alarmset;
 	struct cv_lookup_tailq		abortable_sleepers;
 	spinlock_t					abort_list_lock;
+	void *virtinfo;
 };
 
 /* Til we remove all Env references */

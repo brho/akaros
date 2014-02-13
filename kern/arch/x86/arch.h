@@ -9,6 +9,7 @@
 /* Arch Constants */
 #define ARCH_CL_SIZE				 64
 
+#define __always_inline __attribute__((always_inline))
 static inline void breakpoint(void) __attribute__((always_inline));
 static inline void invlpg(void *addr) __attribute__((always_inline));  
 static inline void tlbflush(void) __attribute__((always_inline));
