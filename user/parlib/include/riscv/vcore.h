@@ -111,4 +111,29 @@ static inline void init_user_ctx(struct user_context *ctx, uint32_t entry_pt,
 	temp; \
 })
 
+#error implement these
+static bool has_refl_fault(struct user_context *ctx)
+{
+	return 0;
+}
+
+static void clear_refl_fault(struct user_context *ctx)
+{
+}
+
+static unsigned int __arch_refl_get_nr(struct user_context *ctx)
+{
+	return 0;
+}
+
+static unsigned int __arch_refl_get_err(struct user_context *ctx)
+{
+	return 0;
+}
+
+static unsigned long __arch_refl_get_aux(struct user_context *ctx)
+{
+	return 0;
+}
+
 #endif /* PARLIB_ARCH_VCORE_H */

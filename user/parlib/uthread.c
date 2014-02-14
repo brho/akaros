@@ -458,12 +458,28 @@ static void set_uthread_tls(struct uthread *uthread, uint32_t vcoreid)
 	}
 }
 
+/* Attempts to handle a fault for uth, etc */
+static void handle_refl_fault(struct uthread *uth, struct user_context *ctx)
+{
+	unsigned int trap_nr = __arch_refl_get_nr(ctx);
+	unsigned int err = __arch_refl_get_err(ctx);
+	unsigned long aux = __arch_refl_get_aux(ctx);
+
+	printf("detected faulted uthread, nr %d, err %08x, aux %p\n", trap_nr, err,
+	       aux);
+	if (err & PF_VMR_BACKED)
+		printf("and it's VMR backed\n");
+	/* TODO: call 2LS op, which needs to handle list membership and resched */
+	exit(-1);
+}
+
 /* Run the thread that was current_uthread, from a previous run.  Should be
  * called only when the uthread already was running, and we were interrupted by
  * the kernel (event, etc).  Do not call this to run a fresh uthread, even if
  * you've set it to be current. */
 void run_current_uthread(void)
 {
+	struct uthread *uth;
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	assert(current_uthread);
@@ -473,6 +489,22 @@ void run_current_uthread(void)
 	assert(!(current_uthread->flags & UTHREAD_FPSAVED));
 	printd("[U] Vcore %d is restarting uthread %08p\n", vcoreid,
 	       current_uthread);
+	if (has_refl_fault(&vcpd->uthread_ctx)) {
+		clear_refl_fault(&vcpd->uthread_ctx);
+		/* we preemptively copy out and make non-running, so that there is a
+		 * consistent state for the handler.  it can then block the uth or
+		 * whatever. */
+		uth = current_uthread;
+		current_uthread = 0;
+		uth->u_ctx = vcpd->uthread_ctx;
+		save_fp_state(&uth->as);
+		uth->state == UT_NOT_RUNNING;
+		uth->flags |= UTHREAD_SAVED | UTHREAD_FPSAVED;
+		handle_refl_fault(uth, &vcpd->uthread_ctx);
+		/* we abort no matter what.  up to the 2LS to reschedule the thread */
+		set_stack_pointer((void*)vcpd->transition_stack);
+		vcore_entry();
+	}
 	/* Go ahead and start the uthread */
 	set_uthread_tls(current_uthread, vcoreid);
 	/* Run, using the TF in the VCPD.  FP state should already be loaded */
@@ -507,6 +539,13 @@ void run_uthread(struct uthread *uthread)
 		assert(uthread->flags & UTHREAD_FPSAVED);
 	else
 		assert(!(uthread->flags & UTHREAD_FPSAVED));
+	if (has_refl_fault(&uthread->u_ctx)) {
+		clear_refl_fault(&uthread->u_ctx);
+		handle_refl_fault(uthread, &uthread->u_ctx);
+		/* we abort no matter what.  up to the 2LS to reschedule the thread */
+		set_stack_pointer((void*)vcpd->transition_stack);
+		vcore_entry();
+	}
 	uthread->state = UT_RUNNING;
 	/* Save a ptr to the uthread we'll run in the transition context's TLS */
 	current_uthread = uthread;
@@ -528,6 +567,10 @@ static void __run_current_uthread_raw(void)
 {
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
+	if (has_refl_fault(&vcpd->uthread_ctx)) {
+		printf("Raw / DONT_MIGRATE uthread took a fault, exiting.\n");
+		exit(-1);
+	}
 	/* We need to manually say we have a notif pending, so we eventually return
 	 * to vcore context.  (note the kernel turned it off for us) */
 	vcpd->notif_pending = TRUE;

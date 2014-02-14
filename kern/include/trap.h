@@ -23,7 +23,6 @@ void unregister_raw_irq(unsigned int vector, isr_t handler, void *data);
 int register_dev_irq(int irq, isr_t handler, void *irq_arg);
 void print_trapframe(struct hw_trapframe *hw_tf);
 void print_user_ctx(struct user_context *ctx);
-void page_fault_handler(struct hw_trapframe *hw_tf);
 /* Generic per-core timer interrupt handler.  set_percore_timer() will fire the
  * timer_interrupt(). */
 void set_core_timer(uint32_t usec, bool periodic);
@@ -41,9 +40,11 @@ uintptr_t get_stack_top(void);
 static inline void save_kernel_ctx(struct kernel_ctx *ctx)
                    __attribute__((always_inline, returns_twice));
 void pop_kernel_ctx(struct kernel_ctx *ctx) __attribute__((noreturn));
-
-/* Sends a non-maskable interrupt, which we have print a trapframe. */
 void send_nmi(uint32_t os_coreid);
+void reflect_unhandled_trap(unsigned int trap_nr, unsigned int err,
+                            unsigned long aux);
+void __arch_reflect_trap_hwtf(struct hw_trapframe *hw_tf, unsigned int trap_nr,
+                              unsigned int err, unsigned long aux);
 
 /* Kernel messages.  This is an in-order 'active message' style messaging
  * subsystem, where you can instruct other cores (including your own) to execute

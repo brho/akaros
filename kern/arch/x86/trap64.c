@@ -115,36 +115,14 @@ void print_swtrapframe(struct sw_trapframe *sw_tf)
 	pcpui->__lock_checking_enabled++;
 }
 
-void page_fault_handler(struct hw_trapframe *hw_tf)
+void __arch_reflect_trap_hwtf(struct hw_trapframe *hw_tf, unsigned int trap_nr,
+                              unsigned int err, unsigned long aux)
 {
-	uintptr_t fault_va = rcr2();
-	int prot = hw_tf->tf_err & PF_ERROR_WRITE ? PROT_WRITE : PROT_READ;
-	int err;
-
-	/* TODO - handle kernel page faults */
-	if ((hw_tf->tf_cs & 3) == 0) {
-		print_trapframe(hw_tf);
-		backtrace_kframe(hw_tf);
-		panic("Page Fault in the Kernel at %p!", fault_va);
-		/* if we want to do something like kill a process or other code, be
-		 * aware we are in a sort of irq-like context, meaning the main kernel
-		 * code we 'interrupted' could be holding locks - even irqsave locks. */
-	}
-	/* safe to reenable after rcr2 */
-	enable_irq();
-	if ((err = handle_page_fault(current, fault_va, prot))) {
-		/* Destroy the faulting process */
-		printk("[%08x] user %s fault va %p ip %p on core %d with err %d\n",
-		       current->pid, prot & PROT_READ ? "READ" : "WRITE", fault_va,
-		       hw_tf->tf_rip, core_id(), err);
-		print_trapframe(hw_tf);
-		/* Turn this on to help debug bad function pointers */
-		printd("rsp %p\n\t 0(rsp): %p\n\t 8(rsp): %p\n\t 16(rsp): %p\n"
-		       "\t24(rsp): %p\n", hw_tf->tf_rsp,
-		       *(uintptr_t*)(hw_tf->tf_rsp +  0),
-		       *(uintptr_t*)(hw_tf->tf_rsp +  8),
-		       *(uintptr_t*)(hw_tf->tf_rsp + 16),
-		       *(uintptr_t*)(hw_tf->tf_rsp + 24));
-		proc_destroy(current);
-	}
+	hw_tf->tf_trapno = trap_nr;
+	/* this can be necessary, since hw_tf is the pcpui one, and the err that
+	 * came in probably came from the kernel stack's hw_tf. */
+	hw_tf->tf_err = err;
+	hw_tf->tf_padding4 = (uint32_t)(aux);
+	hw_tf->tf_padding5 = (uint32_t)(aux >> 32);
+	hw_tf->tf_padding3 = ROS_ARCH_REFL_ID;
 }

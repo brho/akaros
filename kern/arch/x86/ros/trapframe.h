@@ -7,6 +7,14 @@
 
 #include <ros/common.h>
 
+#define ROS_ARCH_REFL_ID 0x1234
+
+/* Page faults return the nature of the fault in the bits of the error code: */
+#define PF_ERROR_PRESENT 		0x01
+#define PF_ERROR_WRITE 			0x02
+#define PF_ERROR_USER 			0x04
+#define PF_VMR_BACKED 			(1 << 31)
+
 #ifdef __x86_64__
 #include <ros/arch/trapframe64.h>
 #else

@@ -26,6 +26,11 @@ struct sw_trapframe {
 #define GPR_A0 18
 #define GPR_A1 19
 
+#error "fix this #define"
+/* this is an error flag, reflected back in faults.  similar to flags that say
+ * if a PF was a write fault, read fault, or user fault. */
+#define PF_VMR_BACKED (1 << 31)
+
 typedef struct ancillary_state
 {
 	uint64_t fpr[32];

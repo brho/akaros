@@ -37,11 +37,6 @@
 
 #define T_DEFAULT   0x0000beef		// catchall
 
-/* Page faults return the nature of the fault in the bits of the error code: */
-#define PF_ERROR_PRESENT 		0x01
-#define PF_ERROR_WRITE 			0x02
-#define PF_ERROR_USER 			0x04
-
 /* Floating point constants */
 #define FP_EXCP_IE				(1 << 0)	/* invalid op */
 #define FP_EXCP_DE				(1 << 1)	/* denormalized op */

@@ -417,4 +417,30 @@ static void print_user_context(struct user_context *ctx)
 		printf("Unknown context type %d\n", ctx->type);
 }
 
+static bool has_refl_fault(struct user_context *ctx)
+{
+	return ctx->tf.hw_tf.tf_padding3 == ROS_ARCH_REFL_ID;
+}
+
+static void clear_refl_fault(struct user_context *ctx)
+{
+	ctx->tf.hw_tf.tf_padding3 = 0;
+}
+
+static unsigned int __arch_refl_get_nr(struct user_context *ctx)
+{
+	return ctx->tf.hw_tf.tf_trapno;
+}
+
+static unsigned int __arch_refl_get_err(struct user_context *ctx)
+{
+	return ctx->tf.hw_tf.tf_err;
+}
+
+static unsigned long __arch_refl_get_aux(struct user_context *ctx)
+{
+	return ((unsigned long)ctx->tf.hw_tf.tf_padding5 << 32) |
+	       ctx->tf.hw_tf.tf_padding4;
+}
+
 #endif /* PARLIB_ARCH_VCORE64_H */

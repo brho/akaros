@@ -220,11 +220,60 @@ void backtrace_kframe(struct hw_trapframe *hw_tf)
 	pcpui->__lock_checking_enabled++;
 }
 
+static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
+{
+	uintptr_t fault_va = rcr2();
+	int prot = hw_tf->tf_err & PF_ERROR_WRITE ? PROT_WRITE : PROT_READ;
+	int err;
+
+	/* TODO - handle kernel page faults */
+	if ((hw_tf->tf_cs & 3) == 0) {
+		print_trapframe(hw_tf);
+		backtrace_kframe(hw_tf);
+		panic("Page Fault in the Kernel at %p!", fault_va);
+		/* if we want to do something like kill a process or other code, be
+		 * aware we are in a sort of irq-like context, meaning the main kernel
+		 * code we 'interrupted' could be holding locks - even irqsave locks. */
+	}
+	/* safe to reenable after rcr2 */
+	enable_irq();
+	if ((err = handle_page_fault(current, fault_va, prot))) {
+		if (err == -EAGAIN)
+			hw_tf->tf_err |= PF_VMR_BACKED;
+		*aux = fault_va;
+		return FALSE;
+		/* useful debugging */
+		printk("[%08x] user %s fault va %p ip %p on core %d with err %d\n",
+		       current->pid, prot & PROT_READ ? "READ" : "WRITE", fault_va,
+		       hw_tf->tf_rip, core_id(), err);
+		print_trapframe(hw_tf);
+		/* Turn this on to help debug bad function pointers */
+#ifdef CONFIG_X86_64
+		printd("rsp %p\n\t 0(rsp): %p\n\t 8(rsp): %p\n\t 16(rsp): %p\n"
+		       "\t24(rsp): %p\n", hw_tf->tf_rsp,
+		       *(uintptr_t*)(hw_tf->tf_rsp +  0),
+		       *(uintptr_t*)(hw_tf->tf_rsp +  8),
+		       *(uintptr_t*)(hw_tf->tf_rsp + 16),
+		       *(uintptr_t*)(hw_tf->tf_rsp + 24));
+#else
+		printd("esp %p\n\t 0(esp): %p\n\t 4(esp): %p\n\t 8(esp): %p\n"
+		       "\t12(esp): %p\n", hw_tf->tf_esp,
+		       *(uintptr_t*)(hw_tf->tf_esp +  0),
+		       *(uintptr_t*)(hw_tf->tf_esp +  4),
+		       *(uintptr_t*)(hw_tf->tf_esp +  8),
+		       *(uintptr_t*)(hw_tf->tf_esp + 12));
+#endif
+	}
+	return TRUE;
+}
+
 /* Certain traps want IRQs enabled, such as the syscall.  Others can't handle
  * it, like the page fault handler.  Turn them on on a case-by-case basis. */
 static void trap_dispatch(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui;
+	bool handled = TRUE;
+	unsigned long aux = 0;
 	// Handle processor exceptions.
 	switch(hw_tf->tf_trapno) {
 		case T_NMI:
@@ -279,7 +328,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			break;
 		}
 		case T_PGFLT:
-			page_fault_handler(hw_tf);
+			handled = __handle_page_fault(hw_tf, &aux);
 			break;
 		case T_FPERR:
 			handle_fperr(hw_tf);
@@ -295,17 +344,15 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 						  (unsigned int)x86_get_systrap_arg1(hw_tf));
 			break;
 		default:
-			// Unexpected trap: The user process or the kernel has a bug.
-			print_trapframe(hw_tf);
-			if (hw_tf->tf_cs == GD_KT)
+			if (hw_tf->tf_cs == GD_KT) {
+				print_trapframe(hw_tf);
 				panic("Damn Damn!  Unhandled trap in the kernel!");
-			else {
-				warn("Unexpected trap from userspace");
-				enable_irq();
-				proc_destroy(current);
+			} else {
+				handled = FALSE;
 			}
 	}
-	return;
+	if (!handled)
+		reflect_unhandled_trap(hw_tf->tf_trapno, hw_tf->tf_err, aux);
 }
 
 /* Helper.  For now, this copies out the TF to pcpui.  Eventually, we should

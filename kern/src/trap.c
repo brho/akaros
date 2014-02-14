@@ -13,6 +13,44 @@
 #include <kdebug.h>
 #include <kmalloc.h>
 
+void reflect_unhandled_trap(unsigned int trap_nr, unsigned int err,
+                            unsigned long aux)
+{
+	uint32_t coreid = core_id();
+	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
+	struct proc *p = pcpui->cur_proc;
+	uint32_t vcoreid = pcpui->owning_vcoreid;
+	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
+	struct hw_trapframe *hw_tf = &pcpui->cur_ctx->tf.hw_tf;
+	assert(p);
+	assert(pcpui->cur_ctx && (pcpui->cur_ctx->type == ROS_HW_CTX));
+	if (!(p->procinfo->is_mcp)) {
+		printk("Unhandled SCP trap\n");
+		goto error_out;
+	}
+	if (vcpd->notif_disabled) {
+		printk("Unhandled MCP trap in vcore context\n");
+		goto error_out;
+	}
+	/* need to store trap_nr, err code, and aux into the tf so that it can get
+	 * extracted on the other end, and we need to flag the TF in some way so we
+	 * can tell it was reflected.  for example, on a PF, we need some number (14
+	 * on x86), the prot violation (write, read, etc), and the virt addr (aux).
+	 * parlib will know how to extract this info. */
+	__arch_reflect_trap_hwtf(hw_tf, trap_nr, err, aux);
+	/* the guts of a __notify */
+	vcpd->notif_disabled = TRUE;
+	vcpd->uthread_ctx = *pcpui->cur_ctx;
+	memset(pcpui->cur_ctx, 0, sizeof(struct user_context));
+	proc_init_ctx(pcpui->cur_ctx, vcoreid, p->env_entry,
+	              vcpd->transition_stack, vcpd->vcore_tls_desc);
+	return;
+error_out:
+	print_trapframe(hw_tf);
+	enable_irq();
+	proc_destroy(p);
+}
+
 struct kmem_cache *kernel_msg_cache;
 
 void kernel_msg_init(void)

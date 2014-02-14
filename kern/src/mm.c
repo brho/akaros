@@ -854,12 +854,14 @@ static int __hpf_load_page(struct proc *p, struct page_map *pm,
 			break;
 		case (PROC_RUNNABLE_M):
 		case (PROC_RUNNING_M):
-			printk("MCP pagefault, not supported yet!\n");
 			spin_unlock(&p->proc_lock);
-			/* this might end up not returning or something. */
+			return -EAGAIN;	/* will get reflected back to userspace */
+		case (PROC_DYING):
+			spin_unlock(&p->proc_lock);
 			return -EINVAL;
 		default:
-			/* TODO: could be dying, can just error out */
+			/* shouldn't have any waitings, under the current yield style.  if
+			 * this becomes an issue, we can branch on is_mcp(). */
 			printk("HPF unexpectecd state(%s)", procstate2str(p->state));
 			spin_unlock(&p->proc_lock);
 			return -EINVAL;

@@ -214,6 +214,7 @@ handle_fault_fetch(struct hw_trapframe *state)
 
 	set_current_ctx_hw(&per_cpu_info[core_id()], state);
 
+#warning "returns EAGAIN if you should reflect the fault"
 	if(handle_page_fault(current, state->epc, PROT_EXEC))
 		unhandled_trap(state, "Instruction Page Fault");
 }
@@ -229,6 +230,7 @@ handle_fault_load(struct hw_trapframe *state)
 
 	set_current_ctx_hw(&per_cpu_info[core_id()], state);
 
+#warning "returns EAGAIN if you should reflect the fault"
 	if(handle_page_fault(current, state->badvaddr, PROT_READ))
 		unhandled_trap(state, "Load Page Fault");
 }
@@ -332,6 +334,8 @@ handle_trap(struct hw_trapframe *hw_tf)
 		} else {
 			trap_handlers[hw_tf->cause](hw_tf);
 		}
+		#warning "if a trap wasn't handled fully, like an MCP pf, reflect it
+		reflect_unhandled_trap(hw_tf->tf_trapno, hw_tf->tf_err, aux);
 	}
 	
 	extern void pop_hw_tf(struct hw_trapframe *tf);	/* in asm */
@@ -362,6 +366,13 @@ void unregister_raw_irq(unsigned int vector, isr_t handler, void *data)
 
 int register_dev_irq(int irq, void (*handler)(struct hw_trapframe *, void *),
                      void *irq_arg)
+{
+	printk("%s not implemented\n", __FUNCTION);
+	return -1;
+}
+
+void __arch_reflect_trap_hwtf(struct hw_trapframe *hw_tf, unsigned int trap_nr,
+                              unsigned int err, unsigned long aux)
 {
 	printk("%s not implemented\n", __FUNCTION);
 }
