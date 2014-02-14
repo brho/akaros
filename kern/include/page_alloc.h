@@ -49,6 +49,8 @@ struct page {
 	void						**pg_tree_slot;
 	void						*pg_private;	/* type depends on page usage */
 	struct semaphore 			pg_sem;		/* for blocking on IO */
+	uint64_t				gpa;		/* physical address in guest */
+								/* pg_private is overloaded. */
 };
 
 /******** Externally visible global variables ************/
