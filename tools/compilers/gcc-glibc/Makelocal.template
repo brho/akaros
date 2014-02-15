@@ -1,4 +1,8 @@
-RISCV_INSTDIR := /scratch/klueska/ros-gcc-glibc/install-riscv-ros-gcc/
-I686_INSTDIR := /scratch/klueska/ros-gcc-glibc/install-i686-ros-gcc/
-X86_64_INSTDIR := /scratch/klueska/ros-gcc-glibc/install-x86_64-ros-gcc/
+# Number of make jobs to spawn.  
+MAKE_JOBS := 
+
+RISCV_INSTDIR         := $(HOME)/install/riscv-ros-gcc/
+I686_INSTDIR          := $(HOME)/install/i686-ros-gcc/
+X86_64_INSTDIR        := $(HOME)/install/x86_64-ros-gcc/
+X86_64_NATIVE_INSTDIR := $(HOME)/install/x86_64-ros-gcc-native/
 

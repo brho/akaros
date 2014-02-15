@@ -1,0 +1,12 @@
+diff -ruN mpc-1.0.2/config.sub mpc-1.0.2-ros/config.sub
+--- mpc-1.0.2/config.sub	2012-09-06 09:30:55.000000000 -0700
++++ mpc-1.0.2-ros/config.sub	2014-02-15 13:30:34.708834608 -0800
+@@ -1348,7 +1348,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -ros* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \

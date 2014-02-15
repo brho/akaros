@@ -1,0 +1,12 @@
+diff -ruN gmp-5.1.3/configfsf.sub gmp-5.1.3-ros/configfsf.sub
+--- gmp-5.1.3/configfsf.sub	2013-09-30 03:18:28.000000000 -0700
++++ gmp-5.1.3-ros/configfsf.sub	2014-02-15 13:14:32.258913976 -0800
+@@ -1359,7 +1359,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -ros* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \

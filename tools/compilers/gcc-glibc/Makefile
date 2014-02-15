@@ -7,12 +7,15 @@ MAKE_JOBS :=
 ifndef RISCV_INSTDIR
 ifndef I686_INSTDIR
 ifndef X86_64_INSTDIR
+ifndef X86_64_NATIVE_INSTDIR
 busted: 
 	@echo "You need to setup either a RISCV_INSTDIR, an I686_INSTDIR, or an X86_64_INSTDIR to point to where you want the tools installed. The best way to do this is to create a 'Makelocal' file in the current directory and put it in there."; false
 riscv: busted
 i686: busted
 x86_64: busted
+x86_64-native: busted
 endif
+endif 
 endif 
 endif 
 
@@ -32,6 +35,9 @@ endif
 BINUTILS_VERSION := 2.21.1
 GCC_VERSION := 4.6.1
 GLIBC_VERSION := 2.14.1
+GMP_VERSION := 5.1.3
+MPFR_VERSION := 3.1.2
+MPC_VERSION := 1.0.2
 
 BUILDDIR ?= $(shell pwd)/
 ROSDIR ?= $(BUILDDIR)/../../../
@@ -57,6 +63,12 @@ X86_64_BINARY_PREFIX := $(X86_64_ARCH)-ros-
 X86_64_GLIBC_CONFIGURE_FLAGS := "--disable-multi-arch"
 X86_64_GCC_BUILD_FLAGS := CFLAGS="-fPIC"
 X86_64_CFLAGS :=
+
+# Configuration parameters for x86_64-native
+X86_64_NATIVE_ARCH := x86_64
+X86_64_NATIVE_BINARY_PREFIX := $(X86_64_NATIVE_ARCH)-native-ros-
+X86_64_NATIVE_GCC_BUILD_FLAGS := CFLAGS="-fPIC"
+X86_64_NATIVE_CFLAGS :=
 
 #If actually building the cross compiler, make sure that the akaros tree is
 #properly configured for the architecture we are creating the cross compiler
@@ -95,6 +107,16 @@ error:
 x86_64: error
 endif
 endif
+ifneq (,$(filter x86_64-native,$(MAKECMDGOALS)))
+ifeq (,$(shell which x86_64-ros-gcc))
+error: 
+	@echo "No x86_64 Akaros cross-compiler installed in path"
+	@echo "Make sure you have built and installed the x86_64 cross-compiler using 'make x86_64'
+	@echo "before trying to build the crossed-native compiler.
+	@false
+x86_64: error
+endif
+endif
 
 all:
 	@echo "You need to run one of the following commands, "
@@ -102,12 +124,15 @@ all:
 	@echo "  make riscv"
 	@echo "  make i686"
 	@echo "  make x86_64"
+	@echo "  make x86-64-native"
 	@echo "  make riscv-revert"
 	@echo "  make i686-revert"
 	@echo "  make x86_64-revert"
+	@echo "  make x86_64-native-revert"
 	@echo "  make riscv-uninstall"
 	@echo "  make i686-uninstall"
 	@echo "  make x86_64-uninstall"
+	@echo "  make x86_64-native-uninstall"
 	@echo "  make clean"
 
 riscv:
@@ -149,6 +174,17 @@ x86_64:
 	export GCC_BUILD_FLAGS=$(X86_64_GCC_BUILD_FLAGS);\
 	$(MAKE) make-all
 
+x86_64-native:
+	export NATIVE_BUILD=true; \
+	export LD_LIBRARY_PATH=; \
+	export DESTDIR=$(DESTDIR);\
+	export INSTDIR=$(X86_64_NATIVE_INSTDIR);\
+	export ARCH=$(X86_64_NATIVE_ARCH);\
+	export BINARY_PREFIX=$(X86_64_NATIVE_BINARY_PREFIX);\
+	export GCC_BUILD_FLAGS=$(X86_64_NATIVE_GCC_BUILD_FLAGS);\
+	export CXXROOT=$(shell dirname $(shell which $(X86_64_NATIVE_ARCH)-ros-gcc))/..; \
+	$(MAKE) make-native-all
+
 make-all: 
 	$(MAKE) .$(BINARY_PREFIX)binutils-install
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage1-install
@@ -159,6 +195,13 @@ make-all:
 	$(MAKE) .$(BINARY_PREFIX)glibc-stage2-install
 	$(MAKE) .$(BINARY_PREFIX)ros-libs-install
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage3-install
+	$(MAKE) .$(BINARY_PREFIX)gmp-install
+	$(MAKE) .$(BINARY_PREFIX)mpfr-install
+	$(MAKE) .$(BINARY_PREFIX)mpc-install
+
+make-native-all:
+	$(MAKE) .$(BINARY_PREFIX)binutils-install
+	$(MAKE) .$(BINARY_PREFIX)gcc-stage3-install
 
 riscv-uninstall:
 	-rm -rf $(RISCV_INSTDIR)
@@ -168,6 +211,9 @@ i686-uninstall:
 
 x86_64-uninstall:
 	-rm -rf $(X86_64_INSTDIR)
+
+x86_64-native-uninstall:
+	-rm -rf $(X86_64_NATIVE_INSTDIR)
 
 riscv-revert:
 	rm -rf $(RISCV_INSTDIR)
@@ -181,7 +227,14 @@ x86_64-revert:
 	rm -rf $(X86_64_INSTDIR)
 	cp -r $(X86_64_BINARY_PREFIX)install.bak $(X86_64_INSTDIR)
 
+x86_64-native-revert: 
+	rm -rf $(X86_64_NATIVE_INSTDIR)
+	cp -r $(X86_64_NATIVE_BINARY_PREFIX)install.bak $(X86_64_NATIVE_INSTDIR)
+
 %.tar.bz2:
+	wget http://akaros.cs.berkeley.edu/xcc/$@
+
+%.tar.gz:
 	wget http://akaros.cs.berkeley.edu/xcc/$@
 
 #################################
@@ -198,13 +251,28 @@ $(BINARY_PREFIX)binutils-builddir: binutils-$(BINUTILS_VERSION)
 	rm -rf $@
 	mkdir -p $@
 
-.$(BINARY_PREFIX)binutils-configure: 
-	$(MAKE) $(BINARY_PREFIX)binutils-builddir 
+native-binutils-configure:
 	cd $(BINARY_PREFIX)binutils-builddir; \
 	../binutils-$(BINUTILS_VERSION)/configure \
-	            --target=$(ARCH)-ros \
-	            --prefix=$(INSTDIR) \
-	            --disable-nls;
+	    --target=$(ARCH)-ros \
+		--host=$(ARCH)-ros \
+	    --prefix=$(INSTDIR) \
+	    --disable-nls
+
+cross-binutils-configure:
+	cd $(BINARY_PREFIX)binutils-builddir; \
+	../binutils-$(BINUTILS_VERSION)/configure \
+	    --target=$(ARCH)-ros \
+	    --prefix=$(INSTDIR) \
+	    --disable-nls
+
+.$(BINARY_PREFIX)binutils-configure: 
+	$(MAKE) $(BINARY_PREFIX)binutils-builddir 
+	if [ "$(NATIVE_BUILD)" = "true" ]; then \
+		$(MAKE) native-binutils-configure; \
+	else \
+		$(MAKE) cross-binutils-configure; \
+	fi
 	echo "MAKEINFO = :" >> $(BINARY_PREFIX)binutils-builddir/Makefile;
 	touch $@
 
@@ -418,23 +486,54 @@ $(BINARY_PREFIX)gcc-stage3-builddir: gcc-$(GCC_VERSION)
 	rm -rf $@
 	mkdir -p $@
 
-.$(BINARY_PREFIX)gcc-stage3-configure:
-	$(MAKE) $(BINARY_PREFIX)gcc-stage3-builddir
+native-gcc-stage3-prep:
+	mkdir -p $(INSTDIR)/usr; \
+	cp -R $(CXXROOT)/$(ARCH)-ros/sys-include  $(INSTDIR)/usr/include; \
+	cp -R $(CXXROOT)/$(ARCH)-ros/lib* $(INSTDIR)/usr; \
+
+native-gcc-stage3-configure: native-gcc-stage3-prep
 	cd $(BINARY_PREFIX)gcc-stage3-builddir; \
 	../gcc-$(GCC_VERSION)/configure \
-	          --target=$(ARCH)-ros \
-	          --program-prefix=$(BINARY_PREFIX) \
-	          --prefix=$(INSTDIR) \
-	          --disable-nls \
-	          --disable-werror \
-	          --disable-multilib \
-	          --enable-shared \
-	          --enable-tls \
-	          --enable-libgomp \
-	          --enable-languages=c,c++ \
-	          --with-__thread \
-	          --with-headers=$(INSTDIR)/$(ARCH)-ros/include \
-	          $(GCC_BUILD_FLAGS);
+	    --target=$(ARCH)-ros \
+	    --host=$(ARCH)-ros \
+	    --with-gmp=$(CXXROOT) \
+	    --with-mpfr=$(CXXROOT) \
+	    --with-mpc=$(CXXROOT) \
+	    --prefix=$(INSTDIR) \
+	    --disable-nls \
+	    --disable-werror \
+	    --disable-multilib \
+	    --enable-shared \
+	    --enable-tls \
+	    --enable-libgomp \
+	    --enable-languages=c,c++ \
+	    --with-__thread \
+	    $(GCC_BUILD_FLAGS);
+
+cross-gcc-stage3-configure:
+	cd $(BINARY_PREFIX)gcc-stage3-builddir; \
+	../gcc-$(GCC_VERSION)/configure \
+	    --target=$(ARCH)-ros \
+	    --program-prefix=$(BINARY_PREFIX) \
+	    --prefix=$(INSTDIR) \
+	    --disable-nls \
+	    --disable-werror \
+	    --disable-multilib \
+	    --enable-shared \
+	    --enable-tls \
+	    --enable-libgomp \
+	    --enable-languages=c,c++ \
+	    --with-__thread \
+	    --with-headers=$(INSTDIR)/$(ARCH)-ros/include \
+	    $(GCC_BUILD_FLAGS);
+
+.$(BINARY_PREFIX)gcc-stage3-configure:
+	$(MAKE) $(BINARY_PREFIX)gcc-stage3-builddir
+	if [ "$(NATIVE_BUILD)" = "true" ]; then \
+		$(MAKE) native-gcc-stage3-configure; \
+	else \
+		$(MAKE) cross-gcc-stage3-configure; \
+	fi
 	echo "MAKEINFO = :" >> $(BINARY_PREFIX)gcc-stage3-builddir/Makefile;
 	touch $@
 
@@ -446,10 +545,100 @@ $(BINARY_PREFIX)gcc-stage3-builddir: gcc-$(GCC_VERSION)
 	cd $(BINARY_PREFIX)gcc-stage3-builddir; \
 	make -j $(MAKE_JOBS) install
 
+##################################
+######### GMP, MPFR, MPC #########
+##################################
+gmp-$(GMP_VERSION): gmp-$(GMP_VERSION).tar.bz2
+	rm -rf gmp-$(GMP_VERSION)
+	tar -jxf gmp-$(GMP_VERSION).tar.bz2
+	patch -p0 < gmp-$(GMP_VERSION)-ros.patch
+
+mpfr-$(MPFR_VERSION): mpfr-$(MPFR_VERSION).tar.bz2
+	rm -rf mpfr-$(MPFR_VERSION)
+	tar -jxf mpfr-$(MPFR_VERSION).tar.bz2
+	patch -p0 < mpfr-$(MPFR_VERSION)-ros.patch
+
+mpc-$(MPC_VERSION): mpc-$(MPC_VERSION).tar.gz
+	rm -rf mpc-$(MPC_VERSION)
+	tar -zxf mpc-$(MPC_VERSION).tar.gz
+	patch -p0 < mpc-$(MPC_VERSION)-ros.patch
+
+$(BINARY_PREFIX)gmp-builddir: gmp-$(GMP_VERSION)
+	rm -rf $@
+	mkdir -p $@
+
+$(BINARY_PREFIX)mpfr-builddir: mpfr-$(MPFR_VERSION)
+	rm -rf $@
+	mkdir -p $@
+
+$(BINARY_PREFIX)mpc-builddir: mpc-$(MPC_VERSION)
+	rm -rf $@
+	mkdir -p $@
+
+.$(BINARY_PREFIX)gmp-configure:
+	$(MAKE) $(BINARY_PREFIX)gmp-builddir
+	cd $(BINARY_PREFIX)gmp-builddir; \
+	../gmp-$(GMP_VERSION)/configure \
+	    --disable-static \
+	    --prefix=$(INSTDIR) \
+	    --host=$(ARCH)-ros
+	touch $@
+
+.$(BINARY_PREFIX)mpfr-configure:
+	$(MAKE) $(BINARY_PREFIX)mpfr-builddir
+	cd $(BINARY_PREFIX)mpfr-builddir; \
+	../mpfr-$(MPFR_VERSION)/configure \
+	    --disable-static \
+	    --prefix=$(INSTDIR) \
+	    --with-gmp=$(INSTDIR) \
+	    --host=$(ARCH)-ros
+	touch $@
+
+.$(BINARY_PREFIX)mpc-configure:
+	$(MAKE) $(BINARY_PREFIX)mpc-builddir
+	cd $(BINARY_PREFIX)mpc-builddir; \
+	../mpc-$(MPC_VERSION)/configure \
+	    --disable-static \
+	    --prefix=$(INSTDIR) \
+	    --with-gmp=$(INSTDIR) \
+	    --with-mpfr=$(INSTDIR) \
+	    --host=$(ARCH)-ros
+	touch $@
+
+.$(BINARY_PREFIX)gmp-make: .$(BINARY_PREFIX)gmp-configure
+	cd $(BINARY_PREFIX)gmp-builddir; \
+	make -j $(MAKE_JOBS)
+
+.$(BINARY_PREFIX)mpfr-make: .$(BINARY_PREFIX)mpfr-configure
+	cd $(BINARY_PREFIX)mpfr-builddir; \
+	make -j $(MAKE_JOBS)
+
+.$(BINARY_PREFIX)mpc-make: .$(BINARY_PREFIX)mpc-configure
+	cd $(BINARY_PREFIX)mpc-builddir; \
+	make -j $(MAKE_JOBS)
+
+.$(BINARY_PREFIX)gmp-install: .$(BINARY_PREFIX)gmp-make
+	cd $(BINARY_PREFIX)gmp-builddir; \
+	make -j $(MAKE_JOBS) install
+
+.$(BINARY_PREFIX)mpfr-install: .$(BINARY_PREFIX)mpfr-make
+	cd $(BINARY_PREFIX)mpfr-builddir; \
+	make -j $(MAKE_JOBS) install
+
+.$(BINARY_PREFIX)mpc-install: .$(BINARY_PREFIX)mpc-make
+	cd $(BINARY_PREFIX)mpc-builddir; \
+	make -j $(MAKE_JOBS) install
+
+##################################
+######## Clean it all up! ########
+##################################
 clean:
 	rm -rf binutils-$(BINUTILS_VERSION) 
 	rm -rf gcc-$(GCC_VERSION) 
 	rm -rf glibc-$(GLIBC_VERSION) 
+	rm -rf gmp-$(GMP_VERSION)
+	rm -rf mpfr-$(MPFR_VERSION)
+	rm -rf mpc-$(MPC_VERSION)
 	rm -rf *-builddir
 	rm -rf .*-ros-*-configure
 	rm -rf *$(BINARY_PREFIX)install.bak
