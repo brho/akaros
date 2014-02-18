@@ -70,6 +70,7 @@ struct proc {
 	spinlock_t vmr_lock;		/* Protects VMR tree (mem mgmt) */
 	spinlock_t pte_lock;		/* Protects page tables (mem mgmt) */
 	struct vmr_tailq vm_regions;
+	int vmr_history;
 
 	// Per process info and data pages
  	procinfo_t *SAFE procinfo;       // KVA of per-process shared info table (RO)

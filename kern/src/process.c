@@ -319,6 +319,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent)
 	spinlock_init(&p->vmr_lock);
 	spinlock_init(&p->pte_lock);
 	TAILQ_INIT(&p->vm_regions); /* could init this in the slab */
+	p->vmr_history = 0;
 	/* Initialize the vcore lists, we'll build the inactive list so that it
 	 * includes all vcores when we initialize procinfo.  Do this before initing
 	 * procinfo. */

@@ -250,6 +250,7 @@ void unmap_and_destroy_vmrs(struct proc *p)
 	/* this only gets called from __proc_free, so there should be no sync
 	 * concerns.  still, better safe than sorry. */
 	spin_lock(&p->vmr_lock);
+	p->vmr_history++;
 	spin_lock(&p->pte_lock);
 	TAILQ_FOREACH(vmr_i, &p->vm_regions, vm_link) {
 		/* note this CB sets the PTE = 0, regardless of if it was P or not */
@@ -484,6 +485,8 @@ static int map_page_at_addr(struct proc *p, struct page *page, uintptr_t addr,
 	 * in which case we should just return. */
 	if (PAGE_PRESENT(*pte)) {
 		spin_unlock(&p->pte_lock);
+		/* callers expect us to eat the ref if we succeed. */
+		page_decref(page);
 		return 0;
 	}
 	/* preserve the dirty bit - pm removal could be looking concurrently */
@@ -507,6 +510,77 @@ static int __copy_and_swap_pmpg(struct proc *p, struct page **pp)
 	return 0;
 }
 
+/* Hold the VMR lock when you call this - it'll assume the entire VA range is
+ * mappable, which isn't true if there are concurrent changes to the VMRs. */
+static int populate_anon_va(struct proc *p, uintptr_t va, unsigned long nr_pgs,
+                            int pte_prot)
+{
+	struct page *page;
+	int ret;
+	for (long i = 0; i < nr_pgs; i++) {
+		if (upage_alloc(p, &page, TRUE))
+			return -ENOMEM;
+		/* could imagine doing a memwalk instead of a for loop */
+		ret = map_page_at_addr(p, page, va + i * PGSIZE, pte_prot);
+		if (ret) {
+			page_decref(page);
+			return ret;
+		}
+	}
+	return 0;
+}
+
+/* This will periodically unlock the vmr lock. */
+static int populate_pm_va(struct proc *p, uintptr_t va, unsigned long nr_pgs,
+                          int pte_prot, struct page_map *pm, size_t offset,
+                          int flags, bool exec)
+{
+	int ret = 0;
+	unsigned long pm_idx0 = offset >> PGSHIFT;
+	int vmr_history = ACCESS_ONCE(p->vmr_history);
+	struct page *page;
+
+	/* locking rules: start the loop holding the vmr lock, enter and exit the
+	 * entire func holding the lock. */
+	for (long i = 0; i < nr_pgs; i++) {
+		ret = pm_load_page_nowait(pm, pm_idx0 + i, &page);
+		if (ret) {
+			if (ret != -EAGAIN)
+				break;
+			spin_unlock(&p->vmr_lock);
+			/* might block here, can't hold the spinlock */
+			ret = pm_load_page(pm, pm_idx0 + i, &page);
+			spin_lock(&p->vmr_lock);
+			if (ret)
+				break;
+			/* while we were sleeping, the VMRs could have changed on us. */
+			if (vmr_history != ACCESS_ONCE(p->vmr_history)) {
+				pm_put_page(page);
+				printk("[kernel] FYI: VMR changed during populate\n");
+				break;
+			}
+		}
+		if (flags & MAP_PRIVATE) {
+			ret = __copy_and_swap_pmpg(p, &page);
+			if (ret) {
+				pm_put_page(page);
+				break;
+			}
+		}
+		/* if this is an executable page, we might have to flush the
+		 * instruction cache if our HW requires it.
+		 * TODO: is this still needed?  andrew put this in a while ago*/
+		if (exec)
+			icache_flush_page(0, page2kva(page));
+		ret = map_page_at_addr(p, page, va + i * PGSIZE, pte_prot);
+		if (atomic_read(&page->pg_flags) & PG_PAGEMAP)
+			pm_put_page(page);
+		if (ret)
+			break;
+	}
+	return ret;
+}
+
 void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
               struct file *file, size_t offset)
 {
@@ -515,6 +589,7 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 
 	/* read/write vmr lock (will change the tree) */
 	spin_lock(&p->vmr_lock);
+	p->vmr_history++;
 	/* Sanity check, for callers that bypass mmap().  We want addr for anon
 	 * memory to start above the break limit (BRK_END), but not 0.  Keep this in
 	 * sync with BRK_END in mmap(). */
@@ -584,67 +659,15 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	if (flags & MAP_POPULATE && prot != PROT_NONE) {
 		int pte_prot = (prot & PROT_WRITE) ? PTE_USER_RW :
 	                   (prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
-		int num_pages = len / PGSIZE;
+		unsigned long nr_pgs = len >> PGSHIFT;
 		int ret = 0;
-		struct page *a_page;
 		if (!file) {
-			for (int i = 0; i < num_pages; i++) {
-				if (upage_alloc(p, &a_page, TRUE)) {
-					ret = -ENOMEM;
-					break;
-				}
-				a_page->pg_tree_slot = 0;
-				/* could imagine doing a memwalk instead of a for loop */
-				ret = map_page_at_addr(p, a_page, addr + i * PGSIZE, pte_prot);
-				if (ret) {
-					page_decref(a_page);
-					break;
-				}
-			}
+			ret = populate_anon_va(p, addr, nr_pgs, pte_prot);
 		} else {
-			/* our refcnt on the file keeps the pm alive when we unlock */
-			struct page_map *pm = file->f_mapping;
-			unsigned long pm_idx0 = offset >> PGSHIFT;
-			struct vm_region vmr_copy;
-			memcpy(&vmr_copy, vmr, sizeof(struct vm_region));
-			for (int i = 0; i < num_pages; i++) {
-				ret = pm_load_page_nowait(pm, pm_idx0 + i, &a_page);
-				if (ret) {
-					if (ret != -EAGAIN)
-						break;
-					spin_unlock(&p->vmr_lock);
-					/* might block here, can't hold the spinlock */
-					ret = pm_load_page(pm, pm_idx0 + i, &a_page);
-					spin_lock(&p->vmr_lock);
-					if (ret)
-						break;
-					/* ugly - while we were sleeping, our VMR could have changed
-					 * on us.  should be okay with weird ABA races too. */
-					vmr = find_vmr(p, addr + i * PGSIZE);
-					if (memcmp(&vmr_copy, vmr, sizeof(struct vm_region))) {
-						pm_put_page(a_page);
-						printk("[kernel] FYI: VMR changed during populate\n");
-						break;
-					}
-				}
-				if (flags & MAP_PRIVATE) {
-					ret = __copy_and_swap_pmpg(p, &a_page);
-					if (ret) {
-						pm_put_page(a_page);
-						break;
-					}
-				}
-				/* if this is an executable page, we might have to flush the
-				 * instruction cache if our HW requires it.
-				 * TODO: is this still needed?  andrew put this in a while ago*/
-				if (prot & PROT_EXEC)
-					icache_flush_page(0, page2kva(a_page));
-				ret = map_page_at_addr(p, a_page, addr + i * PGSIZE, pte_prot);
-				if (atomic_read(&a_page->pg_flags) & PG_PAGEMAP)
-					pm_put_page(a_page);
-				if (ret)
-					break;
-			}
+			/* Note: this will unlock if it blocks.  our refcnt on the file
+			 * keeps the pm alive when we unlock */
+			ret = populate_pm_va(p, addr, nr_pgs, pte_prot, file->f_mapping,
+			                     offset, flags, prot & PROT_EXEC);
 		}
 		if (ret == -ENOMEM) {
 			spin_unlock(&p->vmr_lock);
@@ -673,6 +696,7 @@ int mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 	}
 	/* read/write lock, will probably change the tree and settings */
 	spin_lock(&p->vmr_lock);
+	p->vmr_history++;
 	int ret = __do_mprotect(p, addr, len, prot);
 	spin_unlock(&p->vmr_lock);
 	return ret;
@@ -735,6 +759,7 @@ int munmap(struct proc *p, uintptr_t addr, size_t len)
 	}
 	/* read/write: changing the vmrs (trees, properties, and whatnot) */
 	spin_lock(&p->vmr_lock);
+	p->vmr_history++;
 	int ret = __do_munmap(p, addr, len);
 	spin_unlock(&p->vmr_lock);
 	return ret;
