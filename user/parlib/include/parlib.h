@@ -55,6 +55,8 @@ int         sys_change_to_m(void);
 int         sys_poke_ksched(int pid, unsigned int res_type);
 int         sys_abort_sysc(struct syscall *sysc);
 
+long		syscall_async(struct syscall *sysc, unsigned long num, ...);
+
 void		init_posix_signals(void);	/* in signal.c */
 #ifdef __cplusplus
 }

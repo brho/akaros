@@ -166,3 +166,23 @@ int sys_abort_sysc(struct syscall *sysc)
 {
 	return ros_syscall(SYS_abort_sysc, sysc, 0, 0, 0, 0, 0);
 }
+
+long syscall_async(struct syscall *sysc, unsigned long num, ...)
+{
+	va_list args;
+
+	sysc->num = num;
+	sysc->flags = 0;
+	sysc->ev_q = 0;		/* not necessary, but good for debugging */
+	/* This is a little dangerous, since we'll usually pull more args than were
+	 * passed in, ultimately reading gibberish off the stack. */
+	va_start(args, num);
+	sysc->arg0 = va_arg(args, long);
+	sysc->arg1 = va_arg(args, long);
+	sysc->arg2 = va_arg(args, long);
+	sysc->arg3 = va_arg(args, long);
+	sysc->arg4 = va_arg(args, long);
+	sysc->arg5 = va_arg(args, long);
+	va_end(args);
+	__ros_arch_syscall((long)sysc, 1);
+}
