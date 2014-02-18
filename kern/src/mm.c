@@ -1012,6 +1012,56 @@ out:
 	return ret;
 }
 
+/* Attempts to populate the pages, as if there was a page faults.  Bails on
+ * errors, and returns the number of pages populated.  */
+unsigned long populate_va(struct proc *p, uintptr_t va, unsigned long nr_pgs)
+{
+	struct vm_region *vmr, vmr_copy;
+	unsigned long nr_pgs_this_vmr;
+	unsigned long nr_filled = 0;
+	struct page *page;
+	int pte_prot;
+
+	/* we can screw around with ways to limit the find_vmr calls (can do the
+	 * next in line if we didn't unlock, etc., but i don't expect us to do this
+	 * for more than a single VMR in most cases. */
+	spin_lock(&p->vmr_lock);
+	while (nr_pgs) {
+		vmr = find_vmr(p, va);
+		if (!vmr)
+			break;
+		if (vmr->vm_prot == PROT_NONE)
+			break;
+		pte_prot = (vmr->vm_prot & PROT_WRITE) ? PTE_USER_RW :
+		           (vmr->vm_prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
+		nr_pgs_this_vmr = MIN(nr_pgs, (vmr->vm_end - va) >> PGSHIFT);
+		if (!vmr->vm_file) {
+			if (populate_anon_va(p, va, nr_pgs_this_vmr, pte_prot)) {
+				/* on any error, we can just bail.  we might be underestimating
+				 * nr_filled. */
+				break;
+			}
+		} else {
+			/* need to keep the file alive in case we unlock/block */
+			kref_get(&vmr->vm_file->f_kref, 1);
+			if (populate_pm_va(p, va, nr_pgs_this_vmr, pte_prot,
+			                   vmr->vm_file->f_mapping,
+			                   vmr->vm_foff - (va - vmr->vm_base),
+							   vmr->vm_flags, vmr->vm_prot & PROT_EXEC)) {
+				/* we might have failed if the underlying file doesn't cover the
+				 * mmap window, depending on how we'll deal with truncation. */
+				break;
+			}
+			kref_put(&vmr->vm_file->f_kref);
+		}
+		nr_filled += nr_pgs_this_vmr;
+		va += nr_pgs_this_vmr << PGSHIFT;
+		nr_pgs -= nr_pgs_this_vmr;
+	}
+	spin_unlock(&p->vmr_lock);
+	return nr_filled;
+}
+
 /* Kernel Dynamic Memory Mappings */
 uintptr_t dyn_vmap_llim = KERN_DYN_TOP;
 spinlock_t dyn_vmap_lock = SPINLOCK_INITIALIZER;

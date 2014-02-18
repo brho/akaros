@@ -42,6 +42,7 @@
 #define SYS_change_to_m				29
 #define SYS_poke_ksched				30
 #define SYS_abort_sysc				31
+#define SYS_populate_va				32
 
 /* FS Syscalls */
 #define SYS_read				100

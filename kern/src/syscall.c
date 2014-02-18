@@ -1011,6 +1011,12 @@ static int sys_abort_sysc(struct proc *p, struct syscall *sysc)
 	return abort_sysc(p, sysc);
 }
 
+static unsigned long sys_populate_va(struct proc *p, uintptr_t va,
+                                     unsigned long nr_pgs)
+{
+	return populate_va(p, ROUNDDOWN(va, PGSIZE), nr_pgs);
+}
+
 static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 {
 	ssize_t ret;
@@ -1763,6 +1769,7 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_change_to_m] = {(syscall_t)sys_change_to_m, "change_to_m"},
 	[SYS_poke_ksched] = {(syscall_t)sys_poke_ksched, "poke_ksched"},
 	[SYS_abort_sysc] = {(syscall_t)sys_abort_sysc, "abort_sysc"},
+	[SYS_populate_va] = {(syscall_t)sys_populate_va, "populate_va"},
 
 	[SYS_read] = {(syscall_t)sys_read, "read"},
 	[SYS_write] = {(syscall_t)sys_write, "write"},
