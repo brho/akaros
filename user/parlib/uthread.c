@@ -461,16 +461,9 @@ static void set_uthread_tls(struct uthread *uthread, uint32_t vcoreid)
 /* Attempts to handle a fault for uth, etc */
 static void handle_refl_fault(struct uthread *uth, struct user_context *ctx)
 {
-	unsigned int trap_nr = __arch_refl_get_nr(ctx);
-	unsigned int err = __arch_refl_get_err(ctx);
-	unsigned long aux = __arch_refl_get_aux(ctx);
-
-	printf("detected faulted uthread, nr %d, err %08x, aux %p\n", trap_nr, err,
-	       aux);
-	if (err & PF_VMR_BACKED)
-		printf("and it's VMR backed\n");
-	/* TODO: call 2LS op, which needs to handle list membership and resched */
-	exit(-1);
+	sched_ops->thread_refl_fault(uth, __arch_refl_get_nr(ctx),
+	                             __arch_refl_get_err(ctx),
+	                             __arch_refl_get_aux(ctx));
 }
 
 /* Run the thread that was current_uthread, from a previous run.  Should be
@@ -498,7 +491,7 @@ void run_current_uthread(void)
 		current_uthread = 0;
 		uth->u_ctx = vcpd->uthread_ctx;
 		save_fp_state(&uth->as);
-		uth->state == UT_NOT_RUNNING;
+		uth->state = UT_NOT_RUNNING;
 		uth->flags |= UTHREAD_SAVED | UTHREAD_FPSAVED;
 		handle_refl_fault(uth, &vcpd->uthread_ctx);
 		/* we abort no matter what.  up to the 2LS to reschedule the thread */

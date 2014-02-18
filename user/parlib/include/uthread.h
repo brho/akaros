@@ -25,8 +25,9 @@ struct uthread {
 	struct ancillary_state as;
 	void *tls_desc;
 	int flags;
-	struct syscall *sysc;	/* syscall we're blocking on, if any */
 	int state;
+	struct syscall *sysc;	/* syscall we're blocking on, if any */
+	struct syscall local_sysc;	/* for when we don't want to use the stack */
 	void (*yield_func)(struct uthread*, void*);
 	void *yield_arg;
 	int err_no;
@@ -35,7 +36,7 @@ struct uthread {
 typedef struct uthread uthread_t;
 extern __thread struct uthread *current_uthread;
 
-/* 2L-Scheduler operations.  Can be 0.  Examples in pthread.c. */
+/* 2L-Scheduler operations.  Examples in pthread.c. */
 struct schedule_ops {
 	/* Functions supporting thread ops */
 	void (*sched_entry)(void);
@@ -43,6 +44,8 @@ struct schedule_ops {
 	void (*thread_paused)(struct uthread *);
 	void (*thread_blockon_sysc)(struct uthread *, void *);
 	void (*thread_has_blocked)(struct uthread *, int);
+	void (*thread_refl_fault)(struct uthread *, unsigned int, unsigned int,
+							  unsigned long);
 	/* Functions event handling wants */
 	void (*preempt_pending)(void);
 	void (*spawn_thread)(uintptr_t pc_start, void *data);	/* don't run yet */

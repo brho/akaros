@@ -39,6 +39,8 @@ void pth_thread_runnable(struct uthread *uthread);
 void pth_thread_paused(struct uthread *uthread);
 void pth_thread_blockon_sysc(struct uthread *uthread, void *sysc);
 void pth_thread_has_blocked(struct uthread *uthread, int flags);
+void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
+                           unsigned int err, unsigned long aux);
 void pth_preempt_pending(void);
 void pth_spawn_thread(uintptr_t pc_start, void *data);
 
@@ -51,6 +53,7 @@ struct schedule_ops pthread_sched_ops = {
 	pth_thread_paused,
 	pth_thread_blockon_sysc,
 	pth_thread_has_blocked,
+	pth_thread_refl_fault,
 	0, /* pth_preempt_pending, */
 	0, /* pth_spawn_thread, */
 };
@@ -223,7 +226,6 @@ void pth_thread_blockon_sysc(struct uthread *uthread, void *syscall)
 {
 	struct syscall *sysc = (struct syscall*)syscall;
 	int old_flags;
-	bool need_to_restart = FALSE;
 	uint32_t vcoreid = vcore_id();
 	/* rip from the active queue */
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
@@ -254,6 +256,44 @@ void pth_thread_has_blocked(struct uthread *uthread, int flags)
 	/* Just for yucks: */
 	if (flags == UTH_EXT_BLK_JUSTICE)
 		printf("For great justice!\n");
+}
+
+void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
+                           unsigned int err, unsigned long aux)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	pthread->state = PTH_BLK_SYSC;
+	mcs_pdr_lock(&queue_lock);
+	threads_active--;
+	TAILQ_REMOVE(&active_queue, pthread, next);
+	mcs_pdr_unlock(&queue_lock);
+
+	if (trap_nr != 14) {
+		printf("Pthread has unhandled fault\n");
+		print_user_context(&uthread->u_ctx);
+		exit(-1);
+	}
+
+	if (!(err & PF_VMR_BACKED)) {
+		/* TODO: put your SIGSEGV handling here */
+		printf("Pthread page faulted outside a VMR\n");
+		print_user_context(&uthread->u_ctx);
+		exit(-1);
+	}
+	/* stitching for the event handler.  sysc -> uth, uth -> sysc */
+	uthread->local_sysc.u_data = uthread;
+	uthread->sysc = &uthread->local_sysc;
+	pthread->state = PTH_BLK_SYSC;
+	/* one downside is that we'll never check the return val of the syscall.  if
+	 * we errored out, we wouldn't know til we PF'd again, and inspected the old
+	 * retval/err and other sysc fields (make sure the PF is on the same addr,
+	 * etc).  could run into this issue on truncated files too. */
+	syscall_async(&uthread->local_sysc, SYS_populate_va, aux, 1);
+	if (!register_evq(&uthread->local_sysc, sysc_mgmt[vcore_id()].ev_q)) {
+		/* Lost the race with the call being done.  The kernel won't send the
+		 * event.  Just restart him. */
+		restart_thread(&uthread->local_sysc);
+	}
 }
 
 void pth_preempt_pending(void)
