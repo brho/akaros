@@ -27,4 +27,4 @@ then
 fi
 # get our directory list, send the list of all files in those paths to gtags
 DIRS=`cat $GTAGS_INC_FILE`
-find $DIRS -type f | gtags -f - -i
+find -L $DIRS -type f | gtags -f - -i
