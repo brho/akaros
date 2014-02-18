@@ -141,10 +141,6 @@ static inline bool mult_will_overflow_u64(uint64_t a, uint64_t b)
  * http://lwn.net/Articles/508991/ for more info. */
 #define ACCESS_ONCE(x) (*(volatile typeof(x) *)&(x))
 
-// Ivy currently can only handle 63 bits (OCaml thing), so use this to make
-// a uint64_t programatically
-#define UINT64(upper, lower) ( (((uint64_t)(upper)) << 32) | (lower) )
-
 /* Makes sure func is run exactly once.  Can handle concurrent callers, and
  * other callers spin til the func is complete. */
 #define run_once(func)                                                         \
