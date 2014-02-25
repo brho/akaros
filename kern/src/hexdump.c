@@ -42,7 +42,7 @@ void hexdump(void *v, int length)
 		int j;
 
 		all_zero++;
-		for (j = 0; j < 16; j++) {
+		for (j = 0; (j < 16) && (i + j < length); j++) {
 			if (m[i + j] != 0) {
 				all_zero = 0;
 				break;
@@ -61,4 +61,11 @@ void hexdump(void *v, int length)
 			printk("...\n");
 		}
 	}
+}
+
+/* easier in monitor */
+void pahexdump(uintptr_t pa, int len)
+{
+	void *v = KADDR(pa);
+	hexdump(v, len);
 }

@@ -1734,7 +1734,7 @@ static int sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
 
 /************** Syscall Invokation **************/
 
-const static struct sys_table_entry syscall_table[] = {
+const struct sys_table_entry syscall_table[] = {
 	[SYS_null] = {(syscall_t)sys_null, "null"},
 	[SYS_block] = {(syscall_t)sys_block, "block"},
 	[SYS_cache_buster] = {(syscall_t)sys_cache_buster, "buster"},
@@ -1804,7 +1804,7 @@ const static struct sys_table_entry syscall_table[] = {
 	[SYS_fd2path] ={(syscall_t)sys_fd2path, "fd2path"},
 
 };
-
+const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
 /* Executes the given syscall.
  *
  * Note tf is passed in, which points to the tf of the context on the kernel
@@ -1818,7 +1818,7 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 {
 	intreg_t ret = -1;
 	ERRSTACK(1);
-	const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
+
 
 	uint32_t coreid, vcoreid;
 	if (systrace_flags & SYSTRACE_ON) {

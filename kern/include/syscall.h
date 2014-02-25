@@ -38,7 +38,8 @@ struct sys_table_entry {
 	syscall_t call;
 	char *name;
 };
-const static struct sys_table_entry syscall_table[];
+extern const struct sys_table_entry syscall_table[];
+extern const int max_syscall;
 /* Syscall invocation */
 void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_calls);
 void run_local_syscall(struct syscall *sysc);
