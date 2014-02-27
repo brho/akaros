@@ -42,11 +42,4 @@ spatch --sp-file scripts/spatch/malloc.cocci --in-place $1
 sh scripts/plan9 $1
 # kref. Idempotent.
 spatch --sp-file scripts/spatch/kref.cocci --in-place $1
-ed $1 << EOF
-1i
-// INFERNO
-.
-w
-q
-EOF
 

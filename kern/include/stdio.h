@@ -58,4 +58,5 @@ void printemac(void (*putch)(int, void**), void **putdat, uint8_t *mac);
 void printip(void (*putch)(int, void**), void **putdat, uint8_t *ip);
 void printipmask(void (*putch)(int, void**), void **putdat, uint8_t *ip);
 void printipv4(void (*putch)(int, void**), void **putdat, uint8_t *ip);
+
 #endif /* !ROS_INC_STDIO_H */

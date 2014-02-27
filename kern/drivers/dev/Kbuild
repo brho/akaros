@@ -1,3 +1,4 @@
+obj-y						+= acpi.o
 obj-y						+= alarm.o
 obj-y						+= coreboot.o
 obj-y						+= cons.o
