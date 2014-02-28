@@ -102,14 +102,18 @@ void test_pic_reception(void)
 void test_ioapic_pit_reroute(void) 
 {
 	register_raw_irq(0x20, test_hello_world_handler, NULL);
+#ifdef CONFIG_ENABLE_MPTABLES
 	ioapic_route_irq(0, 3);	
+#endif
 
 	cprintf("Starting pit on core 3....\n");
 	udelay(3000000);
 	pit_set_timer(0xFFFE,TIMER_RATEGEN); // totally arbitrary time
 	
 	udelay(3000000);
+#ifdef CONFIG_ENABLE_MPTABLES
 	ioapic_unroute_irq(0);
+#endif
 	udelay(300000);
 	cprintf("Masked pit. Waiting before return...\n");
 	udelay(3000000);
