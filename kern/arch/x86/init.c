@@ -6,9 +6,7 @@
 
 #include <smp.h>
 
-#include <arch/mptables.h>
 #include <arch/pci.h>
-#include <arch/ioapic.h>
 #include <arch/console.h>
 #include <arch/perfmon.h>
 #include <arch/init.h>
