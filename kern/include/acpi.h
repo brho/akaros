@@ -397,4 +397,4 @@ struct Xsdt
 
 extern uintptr_t acpimblocksize(uintptr_t, int*);
 
-void Gfmt(void (*putch) (int, void **), void **putdat, struct Gas *g);
+void dumpGas(char *prefix, struct Gas *g);

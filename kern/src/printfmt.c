@@ -159,13 +159,6 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 			}
 			printemac(putch, putdat, mac);
 			break;
-		case 'G':
-			/* what to do if they screw up? */
-			g = va_arg(ap, struct Gas*);
-			if (0 && g)
-				Gfmt(putch, putdat, g);
-			printk("%p\n", g);
-			break;
 		case 'i':
 			/* what to do if they screw up? */
 			if ((lp = va_arg(ap, uint32_t *)) != NULL){
