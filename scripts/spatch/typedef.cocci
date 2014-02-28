@@ -476,4 +476,33 @@ typedef SDreq;
 -SDreq
 +struct sdreq
 
+@@
+typedef Bus;
+@@
+-Bus
++struct bus
+
+@@
+typedef Aintr;
+@@
+-Aintr
++struct aintr
+
+@@
+typedef Apic;
+@@
+-Apic
++struct apic
+
+@@
+typedef Ioapic;
+@@
+-Ioapic
++struct ioapic
+
+@@
+typedef Lapic;
+@@
+-Lapic
++struct lapic
 

@@ -116,6 +116,7 @@ acpiregid(char *s)
 	return -1;
 }
 
+#if 0
 static uint64_t
 l64get(uint8_t* p)
 {
@@ -127,7 +128,7 @@ l64get(uint8_t* p)
 	 */
 	return (((uint64_t)l32get(p+4)<<32)|l32get(p));
 }
-
+#endif
 static uint8_t
 mget8(uintptr_t p, void*unused)
 {

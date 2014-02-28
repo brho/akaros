@@ -316,6 +316,7 @@ CFLAGS_KERNEL += -fno-stack-protector
 CFLAGS_KERNEL += -Wall -Wno-format -Wno-unused
 CFLAGS_KERNEL += -DROS_KERNEL 
 CFLAGS_KERNEL += -include include/generated/autoconf.h -include include/common.h
+CFLAGS_KERNEL += -fplan9-extensions
 ifeq ($(CONFIG_64BIT),y)
 CFLAGS_KERNEL += -m64 -g
 else
