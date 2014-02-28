@@ -161,8 +161,10 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 			break;
 		case 'G':
 			/* what to do if they screw up? */
-			if ((g = va_arg(ap, struct Gas*)) != NULL)
+			g = va_arg(ap, struct Gas*);
+			if (0 && g)
 				Gfmt(putch, putdat, g);
+			printk("%p\n", g);
 			break;
 		case 'i':
 			/* what to do if they screw up? */

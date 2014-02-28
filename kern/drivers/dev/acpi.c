@@ -95,127 +95,165 @@ static char* regnames[] = {
 static char*
 acpiregstr(int id)
 {
+	print_func_entry();
 	static char buf[20];	/* BUG */
 
-	if(id >= 0 && id < ARRAY_SIZE(regnames))
+	if(id >= 0 && id < ARRAY_SIZE(regnames)) {
+		print_func_exit();
 		return regnames[id];
+	}
 	seprintf(buf, buf+sizeof(buf), "spc:%#x", id);
+	print_func_exit();
 	return buf;
 }
 
 static int
 acpiregid(char *s)
 {
+	print_func_entry();
 	int i;
 
 	for(i = 0; i < ARRAY_SIZE(regnames); i++)
-		if(strcmp(regnames[i], s) == 0)
+		if(strcmp(regnames[i], s) == 0) {
+			print_func_exit();
 			return i;
+		}
+	print_func_exit();
 	return -1;
 }
 
 static uint64_t
 l64get(uint8_t* p)
 {
+	print_func_entry();
 	/*
 	 * Doing this as a define
 	 * #define l64get(p)	(((u64int)l32get(p+4)<<32)|l32get(p))
 	 * causes 8c to abort with "out of fixed registers" in
 	 * rsdlink() below.
 	 */
+	print_func_exit();
 	return (((uint64_t)l32get(p+4)<<32)|l32get(p));
 }
 
 static uint8_t
 mget8(uintptr_t p, void*unused)
 {
+	print_func_entry();
 	uint8_t *cp = (uint8_t*)p;
+	print_func_exit();
 	return *cp;
 }
 
 static void
 mset8(uintptr_t p, uint8_t v, void*unused)
 {
+	print_func_entry();
 	uint8_t *cp = (uint8_t*)p;
 	*cp = v;
+	print_func_exit();
 }
 
 static uint16_t
 mget16(uintptr_t p, void*unused)
 {
+	print_func_entry();
 	uint16_t *cp = (uint16_t*)p;
+	print_func_exit();
 	return *cp;
 }
 
 static void
 mset16(uintptr_t p, uint16_t v, void*unused)
 {
+	print_func_entry();
 	uint16_t *cp = (uint16_t*)p;
 	*cp = v;
+	print_func_exit();
 }
 
 static uint32_t
 mget32(uintptr_t p, void*unused)
 {
+	print_func_entry();
 	uint32_t *cp = (uint32_t*)p;
+	print_func_exit();
 	return *cp;
 }
 
 static void
 mset32(uintptr_t p, uint32_t v, void*unused)
 {
+	print_func_entry();
 	uint32_t *cp = (uint32_t*)p;
 	*cp = v;
+	print_func_exit();
 }
 
 static uint64_t
 mget64(uintptr_t p, void*unused)
 {
+	print_func_entry();
 	uint64_t *cp = (uint64_t*)p;
+	print_func_exit();
 	return *cp;
 }
 
 static void
 mset64(uintptr_t p, uint64_t v, void*unused)
 {
+	print_func_entry();
 	uint64_t *cp = (uint64_t*)p;
 	*cp = v;
+	print_func_exit();
 }
 
 static uint8_t
 ioget8(uintptr_t p, void*unused)
 {
+	print_func_entry();
+	print_func_exit();
 	return inb(p);
 }
 
 static void
 ioset8(uintptr_t p, uint8_t v, void*unused)
 {
+	print_func_entry();
 	outb(p, v);
+	print_func_exit();
 }
 
 static uint16_t
 ioget16(uintptr_t p, void*unused)
 {
+	print_func_entry();
+	print_func_exit();
 	return inw(p);
 }
 
 static void
 ioset16(uintptr_t p, uint16_t v, void*unused)
 {
+	print_func_entry();
 	outw(p, v);
+	print_func_exit();
 }
 
 static uint32_t
 ioget32(uintptr_t p, void*unused)
 {
+	print_func_entry();
+	print_func_exit();
 	return inl(p);
 }
 
 static void
 ioset32(uintptr_t p, uint32_t v, void*unused)
 {
+	print_func_entry();
 	outl(p, v);
+	print_func_exit();
 }
 
 #define explode_tbdf(tbdf) {pcidev.bus = tbdf >> 16;\
@@ -226,61 +264,73 @@ ioset32(uintptr_t p, uint32_t v, void*unused)
 static uint8_t
 cfgget8(uintptr_t p, void* r)
 {
+	print_func_entry();
 	struct Reg *ro = r;
 	struct pci_device pcidev;
 
 	explode_tbdf(ro->tbdf);
+	print_func_exit();
 	return pcidev_read8(&pcidev, p);
 }
 
 static void
 cfgset8(uintptr_t p, uint8_t v, void* r)
 {
+	print_func_entry();
 	struct Reg *ro = r;
 	struct pci_device pcidev;
 
 	explode_tbdf(ro->tbdf);
 	pcidev_write8(&pcidev, p, v);
+	print_func_exit();
 }
 
 static uint16_t
 cfgget16(uintptr_t p, void* r)
 {
+	print_func_entry();
 	struct Reg *ro = r;
 	struct pci_device pcidev;
 
 	explode_tbdf(ro->tbdf);
+	print_func_exit();
 	return pcidev_read16(&pcidev, p);
 }
 
 static void
 cfgset16(uintptr_t p, uint16_t v, void* r)
 {
+	print_func_entry();
 	struct Reg *ro = r;
 	struct pci_device pcidev;
 
 	explode_tbdf(ro->tbdf);
 	pcidev_write16(&pcidev, p, v);
+	print_func_exit();
 }
 
 static uint32_t
 cfgget32(uintptr_t p, void* r)
 {
+	print_func_entry();
 	struct Reg *ro = r;
 	struct pci_device pcidev;
 
 	explode_tbdf(ro->tbdf);
+	print_func_exit();
 	return pcidev_read32(&pcidev, p);
 }
 
 static void
 cfgset32(uintptr_t p, uint32_t v, void* r)
 {
+	print_func_entry();
 	struct Reg *ro = r;
 	struct pci_device pcidev;
 
 	explode_tbdf(ro->tbdf);
 	pcidev_write32(&pcidev, p, v);
+	print_func_exit();
 }
 
 static struct Regio memio = 
@@ -311,9 +361,10 @@ static long
 regcpy(struct Regio *dio, uintptr_t da, struct Regio *sio,
        uintptr_t sa, long len, int align)
 {
+	print_func_entry();
 	int n, i;
 
-	printk("regcpy %#ullx %#ullx %#ulx %#ux\n", da, sa, len, align);
+	printk("regcpy %#p %#p %#p %#p\n", da, sa, len, align);
 	if((len%align) != 0)
 		printd("regcpy: bug: copy not aligned. truncated\n");
 	n = len/align;
@@ -341,6 +392,7 @@ regcpy(struct Regio *dio, uintptr_t da, struct Regio *sio,
 		da += align;
 		sa += align;
 	}
+	print_func_exit();
 	return n*align;
 }
 
@@ -351,6 +403,7 @@ regcpy(struct Regio *dio, uintptr_t da, struct Regio *sio,
 static long
 regio(struct Reg *r, void *p, uint32_t len, uintptr_t off, int iswr)
 {
+	print_func_entry();
 	struct Regio rio;
 	uintptr_t rp;
 
@@ -363,6 +416,7 @@ regio(struct Reg *r, void *p, uint32_t len, uintptr_t off, int iswr)
 	}
 	if(len <= 0){
 		printd("regio: zero len\n");
+		print_func_exit();
 		return 0;
 	}
 	switch(r->spc){
@@ -400,12 +454,14 @@ regio(struct Reg *r, void *p, uint32_t len, uintptr_t off, int iswr)
 		regcpy(&rio, rp, &memio, (uintptr_t)p, len, r->accsz);
 	else
 		regcpy(&memio, (uintptr_t)p, &rio, rp, len, r->accsz);
+	print_func_exit();
 	return len;
 }
 
 static struct Atable*
 newtable(uint8_t *p)
 {
+	print_func_entry();
 	struct Atable *t;
 	struct Sdthdr *h;
 
@@ -429,154 +485,180 @@ newtable(uint8_t *p)
 		tlast->next = t;
 		tlast = t;
 	}
+	print_func_exit();
 	return t;
 }
 
 static void*
 sdtchecksum(void* addr, int len)
 {
+	print_func_entry();
 	uint8_t *p, sum;
 
 	sum = 0;
 	for(p = addr; len-- > 0; p++)
 		sum += *p;
-	if(sum == 0)
+	if(sum == 0) {
+		print_func_exit();
 		return addr;
+	}
 
+	print_func_exit();
 	return NULL;
 }
 
 static void *
 sdtmap(uintptr_t pa, int *n, int cksum)
 {
+	print_func_entry();
 	struct Sdthdr* sdt;
 
 	sdt = KADDR(pa); //vmap(pa, sizeof(struct Sdthdr));
 	if(sdt == NULL){
 		printk("acpi: vmap1: NULL\n");
+		print_func_exit();
 		return NULL;
 	}
 	*n = l32get(sdt->length);
 	//vunmap(sdt, sizeof(Sdthdr));
 	if((sdt = KADDR(pa) /*vmap(pa, *n)*/) == NULL){
 		printk("acpi: NULL vmap\n");
+		print_func_exit();
 		return NULL;
 	}
 	if(cksum != 0 && sdtchecksum(sdt, *n) == NULL){
 		printk("acpi: SDT: bad checksum\n");
 		//vunmap(sdt, sizeof(Sdthdr));
+		print_func_exit();
 		return NULL;
 	}
+	print_func_exit();
 	return sdt;
 }
 
 static int
 loadfacs(uintptr_t pa)
 {
+	print_func_entry();
 	int n;
 
 	facs = sdtmap(pa, &n, 0);
-	if(facs == NULL)
+	if(facs == NULL) {
+		print_func_exit();
 		return -1;
+	}
 	if(memcmp(facs, "FACS", 4) != 0){
 		//vunmap(facs, n);
 		facs = NULL;
+		print_func_exit();
 		return -1;
 	}
 	/* no unmap */
 
-	printk("acpi: facs: hwsig: %#ux\n", facs->hwsig);
-	printk("acpi: facs: wakingv: %#ux\n", facs->wakingv);
-	printk("acpi: facs: flags: %#ux\n", facs->flags);
-	printk("acpi: facs: glock: %#ux\n", facs->glock);
-	printk("acpi: facs: xwakingv: %#llux\n", facs->xwakingv);
-	printk("acpi: facs: vers: %#ux\n", facs->vers);
-	printk("acpi: facs: ospmflags: %#ux\n", facs->ospmflags);
+	printk("acpi: facs: hwsig: %#p\n", facs->hwsig);
+	printk("acpi: facs: wakingv: %#p\n", facs->wakingv);
+	printk("acpi: facs: flags: %#p\n", facs->flags);
+	printk("acpi: facs: glock: %#p\n", facs->glock);
+	printk("acpi: facs: xwakingv: %#p\n", facs->xwakingv);
+	printk("acpi: facs: vers: %#p\n", facs->vers);
+	printk("acpi: facs: ospmflags: %#p\n", facs->ospmflags);
+	print_func_exit();
 	return 0;
 }
 
 static void
 loaddsdt(uintptr_t pa)
 {
+	print_func_entry();
 	int n;
 	uint8_t *dsdtp;
 
 	dsdtp = sdtmap(pa, &n, 1);
-	if(dsdtp == NULL)
+	if(dsdtp == NULL) {
+		print_func_exit();
 		return;
+	}
 	if(acpitable(dsdtp, n) == NULL)
 		;//vunmap(dsdtp, n);
+	print_func_exit();
 }
 
 static void
 gasget(struct Gas *gas, uint8_t *p)
 {
+	print_func_entry();
 	gas->spc = p[0];
 	gas->len = p[1];
 	gas->off = p[2];
 	gas->accsz = p[3];
 	gas->addr = l64get(p+4);
+	print_func_exit();
 }
 
 static void
 dumpfadt(struct Fadt *fp)
 {
-	if(2 == 0)
+	print_func_entry();
+	if(2 == 0) {
+		print_func_exit();
 		return;
+	}
 
-	printk("acpi: fadt: facs: %#ux\n", fp->facs);
-	printk("acpi: fadt: dsdt: %#ux\n", fp->dsdt);
-	printk("acpi: fadt: pmprofile: %#ux\n", fp->pmprofile);
-	printk("acpi: fadt: sciint: %#ux\n", fp->sciint);
-	printk("acpi: fadt: smicmd: %#ux\n", fp->smicmd);
-	printk("acpi: fadt: acpienable: %#ux\n", fp->acpienable);
-	printk("acpi: fadt: acpidisable: %#ux\n", fp->acpidisable);
-	printk("acpi: fadt: s4biosreq: %#ux\n", fp->s4biosreq);
-	printk("acpi: fadt: pstatecnt: %#ux\n", fp->pstatecnt);
-	printk("acpi: fadt: pm1aevtblk: %#ux\n", fp->pm1aevtblk);
-	printk("acpi: fadt: pm1bevtblk: %#ux\n", fp->pm1bevtblk);
-	printk("acpi: fadt: pm1acntblk: %#ux\n", fp->pm1acntblk);
-	printk("acpi: fadt: pm1bcntblk: %#ux\n", fp->pm1bcntblk);
-	printk("acpi: fadt: pm2cntblk: %#ux\n", fp->pm2cntblk);
-	printk("acpi: fadt: pmtmrblk: %#ux\n", fp->pmtmrblk);
-	printk("acpi: fadt: gpe0blk: %#ux\n", fp->gpe0blk);
-	printk("acpi: fadt: gpe1blk: %#ux\n", fp->gpe1blk);
-	printk("acpi: fadt: pm1evtlen: %#ux\n", fp->pm1evtlen);
-	printk("acpi: fadt: pm1cntlen: %#ux\n", fp->pm1cntlen);
-	printk("acpi: fadt: pm2cntlen: %#ux\n", fp->pm2cntlen);
-	printk("acpi: fadt: pmtmrlen: %#ux\n", fp->pmtmrlen);
-	printk("acpi: fadt: gpe0blklen: %#ux\n", fp->gpe0blklen);
-	printk("acpi: fadt: gpe1blklen: %#ux\n", fp->gpe1blklen);
-	printk("acpi: fadt: gp1base: %#ux\n", fp->gp1base);
-	printk("acpi: fadt: cstcnt: %#ux\n", fp->cstcnt);
-	printk("acpi: fadt: plvl2lat: %#ux\n", fp->plvl2lat);
-	printk("acpi: fadt: plvl3lat: %#ux\n", fp->plvl3lat);
-	printk("acpi: fadt: flushsz: %#ux\n", fp->flushsz);
-	printk("acpi: fadt: flushstride: %#ux\n", fp->flushstride);
-	printk("acpi: fadt: dutyoff: %#ux\n", fp->dutyoff);
-	printk("acpi: fadt: dutywidth: %#ux\n", fp->dutywidth);
-	printk("acpi: fadt: dayalrm: %#ux\n", fp->dayalrm);
-	printk("acpi: fadt: monalrm: %#ux\n", fp->monalrm);
-	printk("acpi: fadt: century: %#ux\n", fp->century);
-	printk("acpi: fadt: iapcbootarch: %#ux\n", fp->iapcbootarch);
-	printk("acpi: fadt: flags: %#ux\n", fp->flags);
-	printk("acpi: fadt: resetreg: %G\n", &fp->resetreg);
-	printk("acpi: fadt: resetval: %#ux\n", fp->resetval);
+	printk("acpi: fadt: facs: $%p\n", fp->facs);
+	printk("acpi: fadt: dsdt: $%p\n", fp->dsdt);
+	printk("acpi: fadt: pmprofile: $%p\n", fp->pmprofile);
+	printk("acpi: fadt: sciint: $%p\n", fp->sciint);
+	printk("acpi: fadt: smicmd: $%p\n", fp->smicmd);
+	printk("acpi: fadt: acpienable: $%p\n", fp->acpienable);
+	printk("acpi: fadt: acpidisable: $%p\n", fp->acpidisable);
+	printk("acpi: fadt: s4biosreq: $%p\n", fp->s4biosreq);
+	printk("acpi: fadt: pstatecnt: $%p\n", fp->pstatecnt);
+	printk("acpi: fadt: pm1aevtblk: $%p\n", fp->pm1aevtblk);
+	printk("acpi: fadt: pm1bevtblk: $%p\n", fp->pm1bevtblk);
+	printk("acpi: fadt: pm1acntblk: $%p\n", fp->pm1acntblk);
+	printk("acpi: fadt: pm1bcntblk: $%p\n", fp->pm1bcntblk);
+	printk("acpi: fadt: pm2cntblk: $%p\n", fp->pm2cntblk);
+	printk("acpi: fadt: pmtmrblk: $%p\n", fp->pmtmrblk);
+	printk("acpi: fadt: gpe0blk: $%p\n", fp->gpe0blk);
+	printk("acpi: fadt: gpe1blk: $%p\n", fp->gpe1blk);
+	printk("acpi: fadt: pm1evtlen: $%p\n", fp->pm1evtlen);
+	printk("acpi: fadt: pm1cntlen: $%p\n", fp->pm1cntlen);
+	printk("acpi: fadt: pm2cntlen: $%p\n", fp->pm2cntlen);
+	printk("acpi: fadt: pmtmrlen: $%p\n", fp->pmtmrlen);
+	printk("acpi: fadt: gpe0blklen: $%p\n", fp->gpe0blklen);
+	printk("acpi: fadt: gpe1blklen: $%p\n", fp->gpe1blklen);
+	printk("acpi: fadt: gp1base: $%p\n", fp->gp1base);
+	printk("acpi: fadt: cstcnt: $%p\n", fp->cstcnt);
+	printk("acpi: fadt: plvl2lat: $%p\n", fp->plvl2lat);
+	printk("acpi: fadt: plvl3lat: $%p\n", fp->plvl3lat);
+	printk("acpi: fadt: flushsz: $%p\n", fp->flushsz);
+	printk("acpi: fadt: flushstride: $%p\n", fp->flushstride);
+	printk("acpi: fadt: dutyoff: $%p\n", fp->dutyoff);
+	printk("acpi: fadt: dutywidth: $%p\n", fp->dutywidth);
+	printk("acpi: fadt: dayalrm: $%p\n", fp->dayalrm);
+	printk("acpi: fadt: monalrm: $%p\n", fp->monalrm);
+	printk("acpi: fadt: century: $%p\n", fp->century);
+	printk("acpi: fadt: iapcbootarch: $%p\n", fp->iapcbootarch);
+	printk("acpi: fadt: flags: $%p\n", fp->flags);
+	printk("acpi: fadt: resetreg: /*%G*/%p\n", &fp->resetreg);
+	printk("acpi: fadt: resetval: $%p\n", fp->resetval);
 	printk("acpi: fadt: xfacs: %#llux\n", fp->xfacs);
 	printk("acpi: fadt: xdsdt: %#llux\n", fp->xdsdt);
-	printk("acpi: fadt: xpm1aevtblk: %G\n", &fp->xpm1aevtblk);
-	printk("acpi: fadt: xpm1bevtblk: %G\n", &fp->xpm1bevtblk);
-	printk("acpi: fadt: xpm1acntblk: %G\n", &fp->xpm1acntblk);
-	printk("acpi: fadt: xpm1bcntblk: %G\n", &fp->xpm1bcntblk);
-	printk("acpi: fadt: xpm2cntblk: %G\n", &fp->xpm2cntblk);
-	printk("acpi: fadt: xpmtmrblk: %G\n", &fp->xpmtmrblk);
-	printk("acpi: fadt: xgpe0blk: %G\n", &fp->xgpe0blk);
-	printk("acpi: fadt: xgpe1blk: %G\n", &fp->xgpe1blk);
+	printk("acpi: fadt: xpm1aevtblk: /*%G*/%p\n", &fp->xpm1aevtblk);
+	printk("acpi: fadt: xpm1bevtblk: /*%G*/%p\n", &fp->xpm1bevtblk);
+	printk("acpi: fadt: xpm1acntblk: /*%G*/%p\n", &fp->xpm1acntblk);
+	printk("acpi: fadt: xpm1bcntblk: /*%G*/%p\n", &fp->xpm1bcntblk);
+	printk("acpi: fadt: xpm2cntblk: /*%G*/%p\n", &fp->xpm2cntblk);
+	printk("acpi: fadt: xpmtmrblk: /*%G*/%p\n", &fp->xpmtmrblk);
+	printk("acpi: fadt: xgpe0blk: /*%G*/%p\n", &fp->xgpe0blk);
+	printk("acpi: fadt: xgpe1blk: /*%G*/%p\n", &fp->xgpe1blk);
+	print_func_exit();
 }
 
 static struct Atable*
 acpifadt(uint8_t *p, int unused)
 {
+	print_func_entry();
 	struct Fadt *fp;
 
 	fp = &fadt;
@@ -640,12 +722,14 @@ acpifadt(uint8_t *p, int unused)
 	else
 		loaddsdt(fp->dsdt);
 
+	print_func_exit();
 	return NULL;	/* can be unmapped once parsed */
 }
 
 static void
 dumpmsct(struct Msct *msct)
 {
+	print_func_entry();
 	struct Mdom *st;
 
 	printk("acpi: msct: %d doms %d clkdoms %#ullx maxpa\n",
@@ -654,6 +738,7 @@ dumpmsct(struct Msct *msct)
 		printk("\t[%d:%d] %d maxproc %#ullx maxmmem\n",
 			st->start, st->end, st->maxproc, st->maxmem);
 	printk("\n");
+	print_func_exit();
 }
 
 /*
@@ -663,6 +748,7 @@ dumpmsct(struct Msct *msct)
 static struct Atable*
 acpimsct(uint8_t *p, int len)
 {
+	print_func_entry();
 	uint8_t *pe;
 	struct Mdom **stl, *st;
 	int off;
@@ -687,12 +773,14 @@ acpimsct(uint8_t *p, int len)
 	}
 
 	dumpmsct(msct);
+	print_func_exit();
 	return NULL;	/* can be unmapped once parsed */
 }
 
 static void
 dumpsrat(struct Srat *st)
 {
+	print_func_entry();
 	printk("acpi: srat:\n");
 	for(; st != NULL; st = st->next)
 		switch(st->type){
@@ -716,17 +804,20 @@ dumpsrat(struct Srat *st)
 			printk("\t<unknown srat entry>\n");
 		}
 	printk("\n");
+	print_func_exit();
 }
 
 static struct Atable*
 acpisrat(uint8_t *p, int len)
 {
+	print_func_entry();
 	struct Srat **stl, *st;
 	uint8_t *pe;
 	int stlen, flags;
 
 	if(srat != NULL){
 		printd("acpi: two SRATs?\n");
+		print_func_exit();
 		return NULL;
 	}
 
@@ -782,33 +873,39 @@ acpisrat(uint8_t *p, int len)
 	}
 
 	dumpsrat(srat);
+	print_func_exit();
 	return NULL;	/* can be unmapped once parsed */
 }
 
 static void
 dumpslit(struct Slit *sl)
 {
+	print_func_entry();
 	int i;
 	
 	printk("acpi slit:\n");
 	for(i = 0; i < sl->rowlen*sl->rowlen; i++){
 		printk("slit: %ux\n", sl->e[i/sl->rowlen][i%sl->rowlen].dist);
 	}
+	print_func_exit();
 }
 
 static int
 cmpslitent(void* v1, void* v2)
 {
+	print_func_entry();
 	struct SlEntry *se1, *se2;
 
 	se1 = v1;
 	se2 = v2;
+	print_func_exit();
 	return se1->dist - se2->dist;
 }
 
 static struct Atable*
 acpislit(uint8_t *p, int len)
 {
+	print_func_entry();
 	uint8_t *pe;
 	int i, j, k;
 	struct SlEntry *se;
@@ -836,20 +933,24 @@ acpislit(uint8_t *p, int len)
 	
 	dumpslit(slit);
 #endif
+	print_func_exit();
 	return NULL;	/* can be unmapped once parsed */
 }
 
 uintptr_t
 acpimblocksize(uintptr_t addr, int *dom)
 {
+	print_func_entry();
 	struct Srat *sl;
 
 	for(sl = srat; sl != NULL; sl = sl->next)
 		if(sl->type == SRmem)
 		if(sl->mem.addr <= addr && sl->mem.addr + sl->mem.len > addr){
 			*dom = sl->mem.dom;
+			print_func_exit();
 			return sl->mem.len - (addr - sl->mem.addr);
 		}
+	print_func_exit();
 	return 0;
 }
 
@@ -861,8 +962,10 @@ acpimblocksize(uintptr_t addr, int *dom)
 int
 corecolor(int core)
 {
+print_func_entry();
 #warning "can't do core colors yet"
-	return -1;
+	print_func_exit();
+return -1;
 #if 0
 	struct Srat *sl;
 	static int colors[32];
@@ -890,13 +993,17 @@ corecolor(int core)
 int
 pickcore(int mycolor, int index)
 {
+	print_func_entry();
 	int color;
 	int ncorepercol;
 
-	if(slit == NULL)
+	if(slit == NULL) {
+		print_func_exit();
 		return 0;
+	}
 	ncorepercol = num_cpus/slit->rowlen;
 	color = slit->e[mycolor][index/ncorepercol].dom;
+	print_func_exit();
 	return color * ncorepercol + index % ncorepercol;
 }
 
@@ -904,6 +1011,7 @@ pickcore(int mycolor, int index)
 static void
 dumpmadt(struct Madt *apics)
 {
+	print_func_entry();
 	struct Apicst *st;
 
 	printk("acpi: madt lapic paddr %llux pcat %d:\n", apics->lapicpa, apics->pcat);
@@ -918,15 +1026,15 @@ dumpmadt(struct Madt *apics)
 				st->ioapic.id, st->ioapic.addr, st->ioapic.ibase);
 			break;
 		case ASintovr:
-			printk("\tintovr irq %d intr %d flags %#ux\n",
+			printk("\tintovr irq %d intr %d flags $%p\n",
 				st->intovr.irq, st->intovr.intr,st->intovr.flags);
 			break;
 		case ASnmi:
-			printk("\tnmi intr %d flags %#ux\n",
+			printk("\tnmi intr %d flags $%p\n",
 				st->nmi.intr, st->nmi.flags);
 			break;
 		case ASlnmi:
-			printk("\tlnmi pid %d lint %d flags %#ux\n",
+			printk("\tlnmi pid %d lint %d flags $%p\n",
 				st->lnmi.pid, st->lnmi.lint, st->lnmi.flags);
 			break;
 		case ASlsapic:
@@ -945,18 +1053,20 @@ dumpmadt(struct Madt *apics)
 			printk("\tlx2apic puid %d id %d\n", st->lx2apic.puid, st->lx2apic.id);
 			break;
 		case ASlx2nmi:
-			printk("\tlx2nmi puid %d intr %d flags %#ux\n",
+			printk("\tlx2nmi puid %d intr %d flags $%p\n",
 				st->lx2nmi.puid, st->lx2nmi.intr, st->lx2nmi.flags);
 			break;
 		default:
 			printk("\t<unknown madt entry>\n");
 		}
 	printk("\n");
+	print_func_exit();
 }
 
 static struct Atable*
 acpimadt(uint8_t *p, int len)
 {
+	print_func_entry();
 	uint8_t *pe;
 	struct Apicst *st, *l, **stl;
 	int stlen, id;
@@ -1071,6 +1181,7 @@ acpimadt(uint8_t *p, int len)
 	}
 
 	dumpmadt(apics);
+	print_func_exit();
 	return NULL;	/* can be unmapped once parsed */
 }
 
@@ -1080,14 +1191,19 @@ acpimadt(uint8_t *p, int len)
 static struct Atable*
 acpitable(uint8_t *p, int len)
 {
-	if(len < Sdthdrsz)
+	print_func_entry();
+	if(len < Sdthdrsz) {
+		print_func_exit();
 		return NULL;
+	}
+	print_func_exit();
 	return newtable(p);
 }
 
 static void
 dumptable(char *sig, uint8_t *p, int l)
 {
+	print_func_entry();
 	int n, i;
 
 	if(2 > 1){
@@ -1106,11 +1222,13 @@ dumptable(char *sig, uint8_t *p, int l)
 		printk("\n");
 		printk("\n");
 	}
+	print_func_exit();
 }
 
 static char*
 seprinttable(char *s, char *e, struct Atable *t)
 {
+	print_func_entry();
 	uint8_t *p;
 	int i, n;
 
@@ -1124,6 +1242,7 @@ seprinttable(char *s, char *e, struct Atable *t)
 		if((i % 16) == 15)
 			s = seprintf(s, e, "\n");
 	}
+	print_func_exit();
 	return seprintf(s, e, "\n\n");
 }
 
@@ -1134,6 +1253,7 @@ seprinttable(char *s, char *e, struct Atable *t)
 static int
 acpixsdtload(char *sig)
 {
+	print_func_entry();
 	int i, l, t, unmap, found;
 	uintptr_t dhpa;
 	uint8_t *sdt;
@@ -1163,68 +1283,73 @@ acpixsdtload(char *sig)
 //		if(unmap)
 //			vunmap(sdt, l);
 	}
+	print_func_exit();
 	return found;
 }
 
 static void*
 rsdscan(uint8_t* addr, int len, char* signature)
 {
+	print_func_entry();
 	int sl;
 	uint8_t *e, *p;
 
+	printk("SCANNNNNNNNNNNNNNNNNNNNNNNNNNNNN\n");
 	e = addr+len;
 	sl = strlen(signature);
 	for(p = addr; p+sl < e; p += 16){
+		if (p == (void *)0xf15c0)
+			printk("CHECK F15C0!!!!!!!!!!!!!!!\n");
 		if(memcmp(p, signature, sl))
 			continue;
+		printk("WE GOT %p\n", p);
+		print_func_exit();
 		return p;
 	}
 
+	print_func_exit();
 	return NULL;
 }
 
 static void*
 rsdsearch(char* signature)
 {
+	print_func_entry();
 	uintptr_t p;
 	uint8_t *bda;
 	void *rsd;
 
 	/*
 	 * Search for the data structure signature:
-	 * 1) in the first KB of the EBDA;
-	 * 2) in the BIOS ROM between 0xE0000 and 0xFFFFF.
+	 * 1) in the BIOS ROM between 0xE0000 and 0xFFFFF.
 	 */
-	if(strncmp(( char *)KADDR(0xFFFD9), "EISA", 4) == 0){
-		bda = KADDR(1024);
-		if((p = (bda[0x0F]<<8)|bda[0x0E])){
-			rsd = rsdscan(KADDR(p), 1024, signature);
-			if (rsd)
-				return rsd;
-		}
-	}
+	print_func_exit();
 	return rsdscan(KADDR(0xE0000), 0x20000, signature);
 }
 
 static void
 acpirsdptr(void)
 {
+	print_func_entry();
 	struct Rsdp *rsd;
 	int asize;
 	uintptr_t sdtpa;
 
-	if((rsd = rsdsearch("RSD PTR ")) == NULL)
+	if((rsd = rsdsearch("RSD PTR ")) == NULL) {
+		print_func_exit();
 		return;
+	}
 
 	assert(sizeof(struct Sdthdr) == 36);
 
-	printk("acpi: RSD PTR@ %#p, physaddr %#ux length %ud %#llux rev %d\n",
+	printk("acpi: RSD PTR@ %#p, physaddr $%p length %ud %#llux rev %d\n",
 		rsd, l32get(rsd->raddr), l32get(rsd->length),
 		l64get(rsd->xaddr), rsd->revision);
 
 	if(rsd->revision >= 2){
 		if(sdtchecksum(rsd, 36) == NULL){
 			printk("acpi: RSD: bad checksum\n");
+			print_func_exit();
 			return;
 		}
 		sdtpa = l64get(rsd->xaddr);
@@ -1233,6 +1358,7 @@ acpirsdptr(void)
 	else{
 		if(sdtchecksum(rsd, 20) == NULL){
 			printk("acpi: RSD: bad checksum\n");
+			print_func_exit();
 			return;
 		}
 		sdtpa = l32get(rsd->raddr);
@@ -1245,10 +1371,12 @@ acpirsdptr(void)
 	xsdt = kzmalloc(sizeof(struct Xsdt), 0);
 	if(xsdt == NULL){
 		printk("acpi: malloc failed\n");
+		print_func_exit();
 		return;
 	}
 	if((xsdt->p = sdtmap(sdtpa, &xsdt->len, 1)) == NULL){
 		printk("acpi: sdtmap failed\n");
+		print_func_exit();
 		return;
 	}
 	if((xsdt->p[0] != 'R' && xsdt->p[0] != 'X') || memcmp(xsdt->p+1, "SDT", 3) != 0){
@@ -1257,6 +1385,7 @@ acpirsdptr(void)
 		kfree(xsdt);
 		xsdt = NULL;
 		//vunmap(xsdt, xsdt->len);
+		print_func_exit();
 		return;
 	}
 	xsdt->p += sizeof(struct Sdthdr);
@@ -1266,33 +1395,40 @@ acpirsdptr(void)
 	acpixsdtload(NULL);
 	/* xsdt is kept and not unmapped */
 
+	print_func_exit();
 }
 
 static int
 acpigen(struct chan *c, char *unused_char_p_t, struct dirtab *tab, int ntab, int i,
 	struct dir *dp)
 {
+	print_func_entry();
 	struct qid qid;
 
 	if(i == DEVDOTDOT){
 		mkqid(&qid, Qdir, 0, QTDIR);
 		devdir(c, qid, ".", 0, eve, 0555, dp);
+		print_func_exit();
 		return 1;
 	}
 	i++; /* skip first element for . itself */
-	if(tab==0 || i>=ntab)
+	if(tab==0 || i>=ntab) {
+		print_func_exit();
 		return -1;
+	}
 	tab += i;
 	qid = tab->qid;
 	qid.path &= ~Qdir;
 	qid.vers = 0;
 	devdir(c, qid, tab->name, tab->length, eve, tab->perm, dp);
+	print_func_exit();
 	return 1;
 }
 
 void
 Gfmt(void (*putch) (int, void **), void **putdat, struct Gas *g)
 {
+	print_func_entry();
 	static char* rnames[] = {
 			"mem", "io", "pcicfg", "embed",
 			"smb", "cmos", "pcibar", "ipmi"};
@@ -1309,23 +1445,25 @@ Gfmt(void (*putch) (int, void **), void **putdat, struct Gas *g)
 		break;
 	case Rpcicfg:
 		printfmt(putch, putdat, "[pci ");
-		printfmt(putch, putdat, "dev %#ulx ", (uint32_t)(g->addr >> 32) & 0xFFFF);
-		printfmt(putch, putdat, "fn %#ulx ", (uint32_t)(g->addr & 0xFFFF0000) >> 16);
-		printfmt(putch, putdat, "adr %#ulx ", (uint32_t)(g->addr &0xFFFF));
+		printfmt(putch, putdat, "dev %#p ", (uint32_t)(g->addr >> 32) & 0xFFFF);
+		printfmt(putch, putdat, "fn %#p ", (uint32_t)(g->addr & 0xFFFF0000) >> 16);
+		printfmt(putch, putdat, "adr %#p ", (uint32_t)(g->addr &0xFFFF));
 		break;
 	case Rfixedhw:
 		printfmt(putch, putdat, "[hw ");
 		break;
 	default:
-		printfmt(putch, putdat, "[spc=%#ux ", g->spc);
+		printfmt(putch, putdat, "[spc=%#p ", g->spc);
 	}
 	printfmt(putch, putdat, "off %d len %d addr %#ullx sz%d]",
 		g->off, g->len, g->addr, g->accsz);
+	print_func_exit();
 }
 
 static unsigned int
 getbanked(uintptr_t ra, uintptr_t rb, int sz)
 {
+	print_func_entry();
 	unsigned int r;
 
 	r = 0;
@@ -1351,12 +1489,14 @@ getbanked(uintptr_t ra, uintptr_t rb, int sz)
 	default:
 		printd("getbanked: wrong size\n");
 	}
+	print_func_exit();
 	return r;
 }
 
 static unsigned int
 setbanked(uintptr_t ra, uintptr_t rb, int sz, int v)
 {
+	print_func_entry();
 	unsigned int r;
 
 	r = -1;
@@ -1382,46 +1522,58 @@ setbanked(uintptr_t ra, uintptr_t rb, int sz, int v)
 	default:
 		printd("setbanked: wrong size\n");
 	}
+	print_func_exit();
 	return r;
 }
 
 static unsigned int
 getpm1ctl(void)
 {
+	print_func_entry();
+	print_func_exit();
 	return getbanked(fadt.pm1acntblk, fadt.pm1bcntblk, fadt.pm1cntlen);
 }
 
 static void
 setpm1sts(unsigned int v)
 {
-	printk("acpi: setpm1sts %#ux\n", v);
+	print_func_entry();
+	printk("acpi: setpm1sts %#p\n", v);
 	setbanked(fadt.pm1aevtblk, fadt.pm1bevtblk, fadt.pm1evtlen/2, v);
+	print_func_exit();
 }
 
 static unsigned int
 getpm1sts(void)
 {
+	print_func_entry();
+	print_func_exit();
 	return getbanked(fadt.pm1aevtblk, fadt.pm1bevtblk, fadt.pm1evtlen/2);
 }
 
 static unsigned int
 getpm1en(void)
 {
+	print_func_entry();
 	int sz;
 
 	sz = fadt.pm1evtlen/2;
+	print_func_exit();
 	return getbanked(fadt.pm1aevtblk+sz, fadt.pm1bevtblk+sz, sz);
 }
 
 static int
 getgpeen(int n)
 {
+	print_func_entry();
+	print_func_exit();
 	return inb(gpes[n].enio) & 1<<gpes[n].enbit;
 }
 
 static void
 setgpeen(int n, unsigned int v)
 {
+	print_func_entry();
 	int old;
 
 	printk("acpi: setgpe %d %d\n", n, v);
@@ -1430,17 +1582,22 @@ setgpeen(int n, unsigned int v)
 		outb(gpes[n].enio, old | 1<<gpes[n].enbit);
 	else
 		outb(gpes[n].enio, old & ~(1<<gpes[n].enbit));
+	print_func_exit();
 }
 
 static void
 clrgpests(int n)
 {
+	print_func_entry();
 	outb(gpes[n].stsio, 1<<gpes[n].stsbit);
+	print_func_exit();
 }
 
 static unsigned int
 getgpests(int n)
 {
+	print_func_entry();
+	print_func_exit();
 	return inb(gpes[n].stsio) & 1<<gpes[n].stsbit;
 }
 
@@ -1468,7 +1625,7 @@ acpiintr(Ureg*, void*)
 		}
 	sts = getpm1sts();
 	en = getpm1en();
-	printd("acpiitr: pm1sts %#ux pm1en %#ux\n", sts, en);
+	printd("acpiitr: pm1sts %#p pm1en %#p\n", sts, en);
 	if(sts&en)
 		printd("have enabled events\n");
 	if(sts&1)
@@ -1480,6 +1637,7 @@ acpiintr(Ureg*, void*)
 static void
 initgpes(void)
 {
+	print_func_entry();
 	int i, n0, n1;
 
 	n0 = fadt.gpe0blklen/2;
@@ -1504,41 +1662,52 @@ initgpes(void)
 		setgpeen(i, 0);
 		clrgpests(i);
 	}
+	print_func_exit();
 }
 
 static void
 acpiioalloc(unsigned int addr, int len)
 {
+	print_func_entry();
 	if(addr != 0){
 		printk("Just TAKING port %016lx to %016lx\n", 
 		       addr, addr + len);
 		//ioalloc(addr, len, 0, "acpi");
 	}
+	print_func_exit();
 }
 
 int
 acpiinit(void)
 {
+	print_func_entry();
 	if(fadt.smicmd == 0){
 		//fmtinstall('G', Gfmt);
 		acpirsdptr();
-		if(fadt.smicmd == 0)
+		if(fadt.smicmd == 0) {
+			print_func_exit();
 			return -1;
+		}
 	}
+	print_func_exit();
 	return 0;
 }
 
 static struct chan*
 acpiattach(char *spec)
 {
+	print_func_entry();
 	int i;
 
+	printk("ACPI attach\n");
 	/*
 	 * This was written for the stock kernel.
 	 * This code must use 64 registers to be acpi ready in nix.
 	 */
-	if(1 || acpiinit() < 0)
+	if(acpiinit() < 0){
+		printk("ACPIINIT is called\n");
 		error("no acpi");
+	}
 
 	/*
 	 * should use fadt->xpm* and fadt->xgpe* registers for 64 bits.
@@ -1562,7 +1731,8 @@ acpiattach(char *spec)
 	 * This starts ACPI, which may require we handle
 	 * power mgmt events ourselves. Use with care.
 	 */
-	printk("acpi starting\n");
+	printk("acpi NOT starting\n");
+	if (0){
 	outb(fadt.smicmd, fadt.acpienable);
 	for(i = 0; i < 10; i++)
 		if(getpm1ctl() & Pm1SciEn)
@@ -1571,30 +1741,40 @@ acpiattach(char *spec)
 		error("acpi: failed to enable\n");
 //	if(fadt.sciint != 0)
 //		intrenable(fadt.sciint, acpiintr, 0, BUSUNKNOWN, "acpi");
+	}
+	print_func_exit();
 	return devattach('a', spec);
 }
 
 static struct walkqid*
 acpiwalk(struct chan *c, struct chan *nc, char **name, int nname)
 {
+	print_func_entry();
+	print_func_exit();
 	return devwalk(c, nc, name, nname, acpidir, ARRAY_SIZE(acpidir), acpigen);
 }
 
 static int
 acpistat(struct chan *c, uint8_t *dp, int n)
 {
+	print_func_entry();
+	print_func_exit();
 	return devstat(c, dp, n, acpidir, ARRAY_SIZE(acpidir), acpigen);
 }
 
 static struct chan*
 acpiopen(struct chan *c, int omode)
 {
+	print_func_entry();
+	print_func_exit();
 	return devopen(c, omode, acpidir, ARRAY_SIZE(acpidir), acpigen);
 }
 
 static void
 acpiclose(struct chan *unused)
 {
+print_func_entry();
+print_func_exit();
 }
 
 static char*ttext;
@@ -1603,6 +1783,7 @@ static int tlen;
 static long
 acpiread(struct chan *c, void *a, long n, int64_t off)
 {
+	print_func_entry();
 	long q;
 	struct Atable *t;
 	char *ns, *s, *e, *ntext;
@@ -1610,6 +1791,7 @@ acpiread(struct chan *c, void *a, long n, int64_t off)
 	q = c->qid.path;
 	switch(q){
 	case Qdir:
+		print_func_exit();
 		return devdirread(c, a, n, acpidir, ARRAY_SIZE(acpidir), acpigen);
 	case Qtbl:
 		if(ttext == NULL){
@@ -1617,6 +1799,7 @@ acpiread(struct chan *c, void *a, long n, int64_t off)
 			ttext = kzmalloc(tlen, 0);
 			if(ttext == NULL){
 				printd("acpi: no memory\n");
+				print_func_exit();
 				return 0;
 			}
 			s = ttext;
@@ -1639,19 +1822,23 @@ acpiread(struct chan *c, void *a, long n, int64_t off)
 			}
 					
 		}
+		print_func_exit();
 		return readstr(off, a, n, ttext);
 	case Qio:
 		if(reg == NULL)
 			error("region not configured");
+		print_func_exit();
 		return regio(reg, a, n, off, 0);
 	}
 	error(Eperm);
+	print_func_exit();
 	return -1;
 }
 
 static long
 acpiwrite(struct chan *c, void *a, long n, int64_t off)
 {
+	print_func_entry();
 	ERRSTACK(2);
 	struct cmdtab *ct;
 	struct cmdbuf *cb;
@@ -1661,6 +1848,7 @@ acpiwrite(struct chan *c, void *a, long n, int64_t off)
 	if(c->qid.path == Qio){
 		if(reg == NULL)
 			error("region not configured");
+		print_func_exit();
 		return regio(reg, a, n, off, 1);
 	}
 	if(c->qid.path != Qctl)
@@ -1705,7 +1893,7 @@ acpiwrite(struct chan *c, void *a, long n, int64_t off)
 			error("bad region access size");
 		}
 		reg = r;
-		printk("region %s %s %llux %llux sz%d",
+		printk("region %s %s %p %p sz%d",
 			r->name, acpiregstr(r->spc), r->base, r->len, r->accsz);
 		break;
 	case CMgpe:
@@ -1721,11 +1909,12 @@ acpiwrite(struct chan *c, void *a, long n, int64_t off)
 	}
 	poperror();
 	kfree(cb);
+	print_func_exit();
 	return n;
 }
 
 
-struct dev acpidevtab = {
+struct dev acpidevtab __devtab = {
 	'a',
 	"acpi",
 
