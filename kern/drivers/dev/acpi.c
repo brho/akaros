@@ -519,7 +519,7 @@ static char *
 dumpfadt(char *start, char *end, struct Fadt *fp)
 {
 	if(2 == 0) {
-		return;
+		return NULL;
 	}
 
 	start = seprintf(start, end, "acpi: fadt: facs: $%p\n", fp->facs);
@@ -645,17 +645,20 @@ acpifadt(uint8_t *p, int unused)
 	return NULL;	/* can be unmapped once parsed */
 }
 
-static void
-dumpmsct(struct Msct *msct)
+static char *
+dumpmsct(char *start, char *end, struct Msct *msct)
 {
 	struct Mdom *st;
 
-	printk("acpi: msct: %d doms %d clkdoms %#p maxpa\n",
+	if (! msct)
+		return start;
+	start = seprintf(start, end, "acpi: msct: %d doms %d clkdoms %#p maxpa\n",
 		msct->ndoms, msct->nclkdoms, msct->maxpa);
 	for(st = msct->dom; st != NULL; st = st->next)
-		printk("\t[%d:%d] %d maxproc %#p maxmmem\n",
+		start = seprintf(start, end, "\t[%d:%d] %d maxproc %#p maxmmem\n",
 			st->start, st->end, st->maxproc, st->maxmem);
-	printk("\n");
+	start = seprintf(start, end, "\n");
+	return start;
 }
 
 /*
@@ -668,6 +671,7 @@ acpimsct(uint8_t *p, int len)
 	uint8_t *pe;
 	struct Mdom **stl, *st;
 	int off;
+	char *dump;
 
 	msct = kzmalloc(sizeof(struct Msct), KMALLOC_WAIT);
 	msct->ndoms = l32get(p+40) + 1;
@@ -688,41 +692,46 @@ acpimsct(uint8_t *p, int len)
 		stl = &st->next;
 	}
 
-	dumpmsct(msct);
+	dump = kzmalloc(1024, KMALLOC_WAIT);
+	dumpmsct(dump, &dump[1023], msct);
+	printk("%s\n", dump);
+	kfree(dump);
 	return NULL;	/* can be unmapped once parsed */
 }
 
-static void
-dumpsrat(struct Srat *st)
+static char *
+dumpsrat(char *start, char *end, struct Srat *st)
 {
-	printk("acpi: srat:\n");
+	start = seprintf(start, end, "acpi: srat:\n");
 	for(; st != NULL; st = st->next)
 		switch(st->type){
 		case SRlapic:
-			printk("\tlapic: dom %d apic %d sapic %d clk %d\n",
+			start = seprintf(start, end, "\tlapic: dom %d apic %d sapic %d clk %d\n",
 				st->lapic.dom, st->lapic.apic,
 				st->lapic.sapic, st->lapic.clkdom);
 			break;
 		case SRmem:
-			printk("\tmem: dom %d %#p %#p %c%c\n",
+			start = seprintf(start, end, "\tmem: dom %d %#p %#p %c%c\n",
 				st->mem.dom, st->mem.addr, st->mem.len,
 				st->mem.hplug?'h':'-',
 				st->mem.nvram?'n':'-');
 			break;
 		case SRlx2apic:
-			printk("\tlx2apic: dom %d apic %d clk %d\n",
+			start = seprintf(start, end, "\tlx2apic: dom %d apic %d clk %d\n",
 				st->lx2apic.dom, st->lx2apic.apic,
 				st->lx2apic.clkdom);
 			break;
 		default:
-			printk("\t<unknown srat entry>\n");
+			start = seprintf(start, end, "\t<unknown srat entry>\n");
 		}
-	printk("\n");
+	start = seprintf(start, end, "\n");
+	return start;
 }
 
 static struct Atable*
 acpisrat(uint8_t *p, int len)
 {
+	char *dump;
 	struct Srat **stl, *st;
 	uint8_t *pe;
 	int stlen, flags;
@@ -783,19 +792,27 @@ acpisrat(uint8_t *p, int len)
 		}
 	}
 
-	dumpsrat(srat);
+	dump = kzmalloc(8192, KMALLOC_WAIT);
+	dumpsrat(dump, &dump[8192], srat);
+	printk("%s\n", dump);
+	kfree(dump);
 	return NULL;	/* can be unmapped once parsed */
 }
 
-static void
-dumpslit(struct Slit *sl)
+static char *
+dumpslit(char *start, char *end, struct Slit *sl)
 {
 	int i;
 	
-	printk("acpi slit:\n");
+	if (! sl)
+		return start;
+	start = seprintf(start, end, "acpi slit:\n");
 	for(i = 0; i < sl->rowlen*sl->rowlen; i++){
-		printk("slit: %ux\n", sl->e[i/sl->rowlen][i%sl->rowlen].dist);
+		start = seprintf(start, end,
+				"slit: %ux\n", sl->e[i/sl->rowlen][i%sl->rowlen].dist);
 	}
+	start = seprintf(start, end, "\n");
+	return start;
 }
 
 static int
@@ -811,6 +828,7 @@ cmpslitent(void* v1, void* v2)
 static struct Atable*
 acpislit(uint8_t *p, int len)
 {
+	char *dump;
 	uint8_t *pe;
 	int i, j, k;
 	struct SlEntry *se;
@@ -830,7 +848,10 @@ acpislit(uint8_t *p, int len)
 		se->dom = k;
 		se->dist = *p;
 	}
-	dumpslit(slit);
+	dump = kzmalloc(8192, KMALLOC_WAIT);
+	dumpslit(dump, &dump[8191], slit);
+	printk("%s", dump);
+	kfree(dump);
 #warning "no qsort"
 #if 0
 	for(i = 0; i < slit->rowlen; i++)
@@ -904,62 +925,64 @@ pickcore(int mycolor, int index)
 }
 
 
-static void
-dumpmadt(struct Madt *apics)
+static char *
+dumpmadt(char *start, char *end, struct Madt *apics)
 {
 	struct Apicst *st;
 
-	printk("acpi: madt lapic paddr %llux pcat %d:\n", apics->lapicpa, apics->pcat);
+	start = seprintf(start, end, "acpi: madt lapic paddr %llux pcat %d:\n", apics->lapicpa, apics->pcat);
 	for(st = apics->st; st != NULL; st = st->next)
 		switch(st->type){
 		case ASlapic:
-			printk("\tlapic pid %d id %d\n", st->lapic.pid, st->lapic.id);
+			start = seprintf(start, end, "\tlapic pid %d id %d\n", st->lapic.pid, st->lapic.id);
 			break;
 		case ASioapic:
 		case ASiosapic:
-			printk("\tioapic id %d addr %#llux ibase %d\n",
+			start = seprintf(start, end, "\tioapic id %d addr %#llux ibase %d\n",
 				st->ioapic.id, st->ioapic.addr, st->ioapic.ibase);
 			break;
 		case ASintovr:
-			printk("\tintovr irq %d intr %d flags $%p\n",
+			start = seprintf(start, end, "\tintovr irq %d intr %d flags $%p\n",
 				st->intovr.irq, st->intovr.intr,st->intovr.flags);
 			break;
 		case ASnmi:
-			printk("\tnmi intr %d flags $%p\n",
+			start = seprintf(start, end, "\tnmi intr %d flags $%p\n",
 				st->nmi.intr, st->nmi.flags);
 			break;
 		case ASlnmi:
-			printk("\tlnmi pid %d lint %d flags $%p\n",
+			start = seprintf(start, end, "\tlnmi pid %d lint %d flags $%p\n",
 				st->lnmi.pid, st->lnmi.lint, st->lnmi.flags);
 			break;
 		case ASlsapic:
-			printk("\tlsapic pid %d id %d eid %d puid %d puids %s\n",
+			start = seprintf(start, end, "\tlsapic pid %d id %d eid %d puid %d puids %s\n",
 				st->lsapic.pid, st->lsapic.id,
 				st->lsapic.eid, st->lsapic.puid,
 				st->lsapic.puids);
 			break;
 		case ASintsrc:
-			printk("\tintr type %d pid %d peid %d iosv %d intr %d %#x\n",
+			start = seprintf(start, end, "\tintr type %d pid %d peid %d iosv %d intr %d %#x\n",
 				st->type, st->intsrc.pid,
 				st->intsrc.peid, st->intsrc.iosv,
 				st->intsrc.intr, st->intsrc.flags);
 			break;
 		case ASlx2apic:
-			printk("\tlx2apic puid %d id %d\n", st->lx2apic.puid, st->lx2apic.id);
+			start = seprintf(start, end, "\tlx2apic puid %d id %d\n", st->lx2apic.puid, st->lx2apic.id);
 			break;
 		case ASlx2nmi:
-			printk("\tlx2nmi puid %d intr %d flags $%p\n",
+			start = seprintf(start, end, "\tlx2nmi puid %d intr %d flags $%p\n",
 				st->lx2nmi.puid, st->lx2nmi.intr, st->lx2nmi.flags);
 			break;
 		default:
-			printk("\t<unknown madt entry>\n");
+			start = seprintf(start, end, "\t<unknown madt entry>\n");
 		}
-	printk("\n");
+	start = seprintf(start, end, "\n");
+	return start;
 }
 
 static struct Atable*
 acpimadt(uint8_t *p, int len)
 {
+	char *dump;
 	uint8_t *pe;
 	struct Apicst *st, *l, **stl;
 	int stlen, id;
@@ -1072,8 +1095,10 @@ acpimadt(uint8_t *p, int len)
 			stl = &st->next;
 		}
 	}
-
-	dumpmadt(apics);
+	dump = kzmalloc(8192, KMALLOC_WAIT);
+	dumpmadt(dump, &dump[8191], apics);
+	printk("%s\n", dump);
+	kfree(dump);
 	return NULL;	/* can be unmapped once parsed */
 }
 
@@ -1089,27 +1114,28 @@ acpitable(uint8_t *p, int len)
 	return newtable(p);
 }
 
-static void
-dumptable(char *sig, uint8_t *p, int l)
+static char *
+dumptable(char *start, char *end, char *sig, uint8_t *p, int l)
 {
 	int n, i;
 
 	if(2 > 1){
-		printk("%s @ %#p\n", sig, p);
+		start = seprintf(start, end, "%s @ %#p\n", sig, p);
 		if(2 > 2)
 			n = l;
 		else
 			n = 256;
 		for(i = 0; i < n; i++){
 			if((i % 16) == 0)
-				printk("%x: ", i);
-			printk(" %2.2ux", p[i]);
+				start = seprintf(start, end, "%x: ", i);
+			start = seprintf(start, end, " %2.2ux", p[i]);
 			if((i % 16) == 15)
-				printk("\n");
+				start = seprintf(start, end, "\n");
 		}
-		printk("\n");
-		printk("\n");
+		start = seprintf(start, end, "\n");
+		start = seprintf(start, end, "\n");
 	}
+	return start;
 }
 
 static char*
@@ -1142,6 +1168,7 @@ acpixsdtload(char *sig)
 	uintptr_t dhpa;
 	uint8_t *sdt;
 	char tsig[5];
+	char table[128];
 
 	found = 0;
 	for(i = 0; i < xsdt->len; i += xsdt->asize){
@@ -1158,7 +1185,7 @@ acpixsdtload(char *sig)
 			printk("acpi: %s addr %#p\n", tsig, sdt);
 			for(t = 0; t < ARRAY_SIZE(ptables); t++)
 				if(strcmp(tsig, ptables[t].sig) == 0){
-					dumptable(tsig, sdt, l);
+					dumptable(table, &table[127], tsig, sdt, l);
 					unmap = ptables[t].f(sdt, l) == NULL;
 					found = 1;
 					break;
@@ -1624,7 +1651,7 @@ acpiread(struct chan *c, void *a, long n, int64_t off)
 		return devdirread(c, a, n, acpidir, ARRAY_SIZE(acpidir), acpigen);
 	case Qtbl:
 		if(ttext == NULL){ // XXXXXX
-			tlen = 8192;
+			tlen = 32768;
 			ttext = kzmalloc(tlen, 0);
 			if(ttext == NULL){
 				printd("acpi: no memory\n");
@@ -1653,7 +1680,7 @@ acpiread(struct chan *c, void *a, long n, int64_t off)
 		return readstr(off, a, n, ttext);
 	case Qpretty:
 		if(ttext == NULL){
-			tlen = 8192;
+			tlen = 32768;
 			ttext = kzmalloc(tlen, 0);
 			if(ttext == NULL){
 				printd("acpi: no memory\n");
@@ -1661,7 +1688,11 @@ acpiread(struct chan *c, void *a, long n, int64_t off)
 			}
 			s = ttext;
 			e = ttext + tlen;
-			dumpfadt(s, e, &fadt);
+			s = dumpfadt(s, e, &fadt);
+			s = dumpmadt(s, e, apics);
+			s = dumpslit(s, e, slit);
+			s = dumpsrat(s, e, srat);
+			dumpmsct(s, e, msct);
 		}
 		return readstr(off, a, n, ttext);
 	case Qio:
