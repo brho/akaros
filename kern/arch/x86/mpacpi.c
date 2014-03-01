@@ -45,9 +45,8 @@ mpacpi(int ncleft)
 			}
 			else if(ncleft != 0){
 				ncleft--;
-#warning "not calling fictitions acpiinit"
 				printk("apicinit(%d, %p, %d);\n", st->lapic.id, apics->lapicpa, bp);
-				//apicinit(st->lapic.id, apics->lapicpa, bp);
+				apicinit(st->lapic.id, apics->lapicpa, bp);
 			} else
 				already = "(off)";
 
@@ -62,6 +61,7 @@ mpacpi(int ncleft)
 				already = "(mp)";
 				goto pr1;
 			}
+			printk("ioapicinit(%d, %p, %p);\n", st->lapic.id, apics->lapicpa, st->ioapic.addr);
 			ioapicinit(st->ioapic.id, st->ioapic.ibase, st->ioapic.addr);
 		pr1:
 			printd("ioapic %d ", st->ioapic.id);
