@@ -11,10 +11,9 @@
  * Functions and definitions for dealing with the APIC and PIC, specific to
  * Intel.  Does not handle an x2APIC.
  */
-
 #include <arch/mmu.h>
 #include <arch/x86.h>
-#include <arch/ioapic.h>
+#include <atomic.h>
 
 /* PIC (8259A)
  * When looking at the specs, A0 is our CMD line, and A1 is the DATA line.  This
@@ -327,10 +326,12 @@ static inline void __send_nmi(uint8_t hw_coreid)
  */
 
 struct ioapic {
-	// include hell. spinlock_t lock;					/* IOAPIC: register access */
+	spinlock_t lock;					/* IOAPIC: register access */
 	uint32_t*	addr;				/* IOAPIC: register base */
+	uintptr_t paddr;                        /* register base */
 	int	nrdt;				/* IOAPIC: size of RDT */
 	int	gsib;				/* IOAPIC: global RDT index */
+	int	ibase;				/* global interrupt base */
 };
 
 struct lapic {
@@ -346,7 +347,7 @@ struct lapic {
 	int64_t	div;
 };
 
-struct Apic {
+struct apic {
 	int	useable;			/* en */
 	struct ioapic;
 	struct lapic;
@@ -399,6 +400,8 @@ extern	struct apic	xioapic[Napic];
 #define l16get(p)	(((p)[1]<<8)|(p)[0])
 #define	l32get(p)	(((uint32_t)l16get(p+2)<<16)|l16get(p))
 #define	l64get(p)	(((uint64_t)l32get(p+4)<<32)|l32get(p))
+
+#include <arch/ioapic.h>
 
 extern void apicdump(void);
 extern void apictimerenab(void);

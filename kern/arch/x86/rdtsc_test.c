@@ -754,7 +754,8 @@ void test_tsc_cycles(void)
 				      : : : "eax", "cc");
 	}
 	end = read_tsc_serialized();
-	end = end - start - system_timing.timing_overhead;
+# warning "what happened to system_timing?"
+	end = end - start - 0; //system_timing.timing_overhead;
 	printk("%llu (100,000) ticks passed, run twice to load the icache\n", end);
 
 	enable_irqsave(&irq_state);

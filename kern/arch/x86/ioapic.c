@@ -132,7 +132,7 @@ ioapicintrinit(int busno, int apicno, int intin, int devno, uint32_t lo)
 }
 
 void
-ioapicinit(int id, int ibase, uintptr_t_t pa)
+ioapicinit(int id, int ibase, uintptr_t pa)
 {
 	struct apic *apic;
 	static int base;
@@ -145,7 +145,7 @@ ioapicinit(int id, int ibase, uintptr_t_t pa)
 		return;
 
 	apic = &xioapic[id];
-	if(apic->useable || (apic->addr = vmap(pa, 1024)) == NULL)
+	if(apic->useable || (apic->addr = KADDR(pa)/*vmap(pa, 1024)*/) == NULL)
 		return;
 	apic->useable = 1;
 	apic->paddr = pa;
@@ -225,7 +225,7 @@ ioapiconline(void)
 }
 
 static int dfpolicy = 0;
-
+#if 0
 static void
 ioapicintrdd(uint32_t* hi, uint32_t* lo)
 {
@@ -272,7 +272,7 @@ ioapicintrdd(uint32_t* hi, uint32_t* lo)
 			if(xlapic[i].useable && xlapic[i].addr == 0)
 				break;
 		}
-		spin_unlock(&(&dflock)->lock);
+		spin_unlock(&dflock->lock);
 
 		*hi = i<<24;
 		break;
@@ -285,12 +285,12 @@ nextvec(void)
 {
 	unsigned int vecno;
 
-	spin_lock(&(&idtnolock)->lock);
+	spin_lock(&idtnolock->lock);
 	vecno = idtno;
 	idtno = (idtno+8) % IdtMAX;
 	if(idtno < IdtIOAPIC)
 		idtno += IdtIOAPIC;
-	spin_unlock(&(&idtnolock)->lock);
+	spin_unlock(&idtnolock->lock);
 
 	return vecno;
 }
@@ -495,3 +495,4 @@ ioapicintrdisable(int vecno)
 
 	return 0;
 }
+#endif

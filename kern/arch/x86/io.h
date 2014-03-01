@@ -67,34 +67,34 @@ enum {
 	IdtMAX		= 255,
 };
 
-typedef struct Vkey {
+struct Vkey {
 	int	tbdf;			/* pci: ioapic or msi sources */
 	int	irq;			/* 8259-emulating sources */
-} Vkey;
+};
 
 typedef struct Vctl {
-	Vctl*	next;			/* handlers on this vector */
+	struct Vctl*	next;			/* handlers on this vector */
 
 	int	isintr;			/* interrupt or fault/trap */
 
-	Vkey;				/* source-specific key; tbdf for pci */
-	void	(*f)(Ureg*, void*);	/* handler to call */
+	struct Vkey;				/* source-specific key; tbdf for pci */
+	//void	(*f)(Ureg*, void*);	/* handler to call */
 	void*	a;			/* argument to call it with */
 	char	name[KNAMELEN];		/* of driver */
 	char	*type;
 
 	int	(*isr)(int);		/* get isr bit for this irq */
 	int	(*eoi)(int);		/* eoi */
-	int	(*mask)(Vkey*, int);	/* interrupt enable returns masked vector */
+	int	(*mask)(struct Vkey*, int);	/* interrupt enable returns masked vector */
 	int	vno;
 } Vctl;
 
-typedef struct ACVctl {
-	char*	(*f)(Ureg*,void*);
+struct ACVctl {
+	//char*	(*f)(Ureg*,void*);
 	void*	a;
 	int	vno;
 	char	name[KNAMELEN];		/* of driver */
-} ACVctl;
+};
 
 enum {
 	BusCBUS		= 0,		/* Corollary CBUS */
@@ -270,16 +270,14 @@ enum {
 	PciCapSATA	= 0x12,
 	PciCapHSW	= 0x0c,		/* hot swap */
 };
-
-typedef struct Pcisiz Pcisiz;
+#if 0
 struct Pcisiz
 {
-	Pcidev*	dev;
+//	Pcidev*	dev;
 	int	siz;
 	int	bar;
 };
 
-typedef struct Pcidev Pcidev;
 struct Pcidev
 {
 	int	tbdf;			/* type+bus+device+function */
@@ -315,10 +313,9 @@ struct Pcidev
 		int	size;
 	} ioa, mema;
 };
-
+#endif
 #define PCIWINDOW	0
 #define PCIWADDR(va)	(PADDR(va)+PCIWINDOW)
 #define ISAWINDOW	0
 #define ISAWADDR(va)	(PADDR(va)+ISAWINDOW)
 
-#pragma	varargck	type	"T"	int

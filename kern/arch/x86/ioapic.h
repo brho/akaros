@@ -9,38 +9,8 @@
 
 #ifndef ROS_KERN_IOAPIC_H
 #define ROS_KERN_IOAPIC_H
-struct bus {
-	uint8_t	type;
-	uint8_t	busno;
-	uint8_t	po;
-	uint8_t	el;
-
-	struct aintr*	aintr;			/* interrupts tied to this bus */
-	struct bus*	next;
-};
-
-struct aintr {
-	// no idea yet. PCMPintr* intr;
-	struct apic*	apic;
-	struct aintr*	next;
-};
-
-struct apic {
-	int     useable;
-	int	type;
-	int	apicno;
-	uint32_t*	addr;			/* register base address */
-	uint32_t	paddr;
-	int	flags;			/* PcmpBP|PcmpEN */
-
-	//spinlock_t lock;		/* I/O APIC: register access */
-	int	mre;			/* I/O APIC: maximum redirection entry */
-
-	int	lintr[2];		/* Local APIC */
-	int	machno;
-
-	int	online;
-};
+#include <atomic.h>
+#include <arch/apic.h>
 
 enum {
 	MaxAPICNO	= 254,		/* 255 is physical broadcast */
@@ -83,7 +53,7 @@ enum {
 	IOAPIC_PBASE    = 0xfec00000, /* default *physical* address */
 };
 
-extern void ioapicinit(struct apic*, int);
+extern void ioapicinit(int id, int ibase, uintptr_t pa);
 extern void ioapicrdtr(struct apic*, int unused_int, int*, int*);
 extern void ioapicrdtw(struct apic*, int unused_int, int, int);
 

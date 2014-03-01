@@ -44,7 +44,9 @@ mpacpi(int ncleft)
 			}
 			else if(ncleft != 0){
 				ncleft--;
-				apicinit(st->lapic.id, apics->lapicpa, bp);
+#warning "not calling fictitions acpiinit"
+				printk("apicinit(%d, %p, %d);\n", st->lapic.id, apics->lapicpa, bp);
+				//apicinit(st->lapic.id, apics->lapicpa, bp);
 			} else
 				already = "(off)";
 
