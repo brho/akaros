@@ -403,9 +403,10 @@ extern	struct apic	xioapic[Napic];
 
 #include <arch/ioapic.h>
 
-extern void apicdump(void);
-extern void apictimerenab(void);
-extern void ioapicdump(void);
+void apicdump(void);
+void apictimerenab(void);
+void ioapicdump(void);
+void apicinit(int apicno, uintptr_t pa, int isbp);
 
 /*
 extern int pcimsienable(Pcidev*, uint64_t);

@@ -12,20 +12,6 @@
 #include <smp.h>
 #include <ip.h>
 
-#include <vfs.h>
-#include <kfs.h>
-#include <slab.h>
-#include <kmalloc.h>
-#include <kref.h>
-#include <string.h>
-#include <stdio.h>
-#include <assert.h>
-#include <error.h>
-#include <cpio.h>
-#include <pmap.h>
-#include <smp.h>
-#include <ip.h>
-
 enum {						/* Local APIC registers */
 	Id		= 0x0020,		/* Identification */
 	Ver		= 0x0030,		/* Version */
