@@ -4,7 +4,6 @@
 #include <ros/arch/arch.h>
 #include <ros/common.h>
 #include <arch/x86.h>
-#include <arch/apic.h>
 
 /* Arch Constants */
 #define ARCH_CL_SIZE				 64
@@ -27,12 +26,6 @@ static inline void cpu_relax(void) __attribute__((always_inline));
 static inline void cpu_halt(void) __attribute__((always_inline));
 static inline void clflush(uintptr_t* addr) __attribute__((always_inline));
 static inline int irq_is_enabled(void) __attribute__((always_inline));
-static inline int get_hw_coreid(uint32_t coreid) __attribute__((always_inline));
-static inline int hw_core_id(void) __attribute__((always_inline));
-static inline int get_os_coreid(int hw_coreid) __attribute__((always_inline));
-static inline int core_id(void) __attribute__((always_inline));
-static inline int node_id(void) __attribute__((always_inline));
-static inline int core_id_early(void) __attribute__((always_inline));
 static inline void cache_flush(void) __attribute__((always_inline));
 static inline void reboot(void)
               __attribute__((always_inline)) __attribute__((noreturn));
@@ -43,10 +36,6 @@ void send_ipi(uint32_t os_coreid, uint8_t vector);
 void print_cpuinfo(void);
 void show_mapping(uintptr_t start, size_t size);
 int vendor_id(char *);
-
-/* declared in smp.c */
-extern int hw_coreid_lookup[MAX_NUM_CPUS];
-extern int os_coreid_lookup[MAX_NUM_CPUS];
 
 static inline void breakpoint(void)
 {
@@ -149,52 +138,6 @@ static inline void clflush(uintptr_t* addr)
 static inline int irq_is_enabled(void)
 {
 	return read_flags() & FL_IF;
-}
-
-/* os_coreid -> hw_coreid */
-static inline int get_hw_coreid(uint32_t coreid)
-{
-	return hw_coreid_lookup[coreid];
-}
-
-static inline int hw_core_id(void)
-{
-	return lapic_get_id();
-}
-
-/* hw_coreid -> os_coreid */
-static inline int get_os_coreid(int hw_coreid)
-{
-	return os_coreid_lookup[hw_coreid];
-}
-
-static inline int node_id(void)
-{
-	return 0;
-}
-
-#ifdef CONFIG_FAST_COREID
-static inline int core_id(void)
-{
-	int ret;
-	asm volatile ("rdtscp" : "=c"(ret) : : "eax", "edx");
-	return ret;
-}
-#else
-/* core_id() returns the OS core number, not to be confused with the
- * hardware-specific core identifier (such as the lapic id) returned by
- * hw_core_id() */
-static inline int core_id(void)
-{
-	return get_os_coreid(hw_core_id());
-}
-#endif /* CONFIG_FAST_COREID */
-
-static inline int core_id_early(void)
-{
-	if (!core_id_ready)
-		return 0;
-	return core_id();
 }
 
 static inline void cache_flush(void)

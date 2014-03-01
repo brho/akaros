@@ -84,6 +84,7 @@
 #include <arch/mmu.h>
 #include <ros/trapframe.h>
 #include <arch/pci.h>
+#include <arch/coreid.h>
 
 /* The kernel's interrupt descriptor table */
 extern gatedesc_t idt[];
