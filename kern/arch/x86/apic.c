@@ -17,6 +17,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <bitmask.h>
+#include <arch/coreid.h>
 
 system_timing_t RO system_timing = {0, 0, 0xffff, 0};
 bool core_id_ready = FALSE;

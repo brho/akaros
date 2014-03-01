@@ -13,6 +13,7 @@
 #include <ip.h>
 #include <acpi.h>
 #include <arch/ioapic.h>
+#include <arch/coreid.h>
 
 extern	struct Madt	*apics;
 

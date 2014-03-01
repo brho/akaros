@@ -79,7 +79,7 @@ static struct Fadt	fadt;	/* Fixed ACPI description. To reach ACPI registers */
 static struct Xsdt*	xsdt;	/* XSDT table */
 static struct Atable*	tfirst;	/* loaded DSDT/SSDT/... tables */
 static struct Atable*	tlast;	/* pointer to last table */
-static struct Madt*	apics;	/* APIC info */
+struct Madt*	apics;	/* APIC info */
 static struct Srat*	srat;	/* System resource affinity, used by physalloc */
 static struct Slit*	slit;	/* System locality information table used by the scheduler */
 static struct Msct*	msct;	/* Maximum system characteristics table */

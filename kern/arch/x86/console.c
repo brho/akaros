@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <sys/queue.h>
+#include <arch/coreid.h>
 
 #include <ros/memlayout.h>
 
