@@ -35,12 +35,12 @@
 
 #define l16get(p)	(((p)[1]<<8)|(p)[0])
 #define l32get(p)	(((uint32_t)l16get(p+2)<<16)|l16get(p))
-static struct Atable* acpifadt( uint8_t *unused_uint8_p_t, int);
-static struct Atable* acpitable( uint8_t *unused_uint8_p_t, int);
-static struct Atable* acpimadt( uint8_t *unused_uint8_p_t, int);
-static struct Atable* acpimsct( uint8_t *unused_uint8_p_t, int);
-static struct Atable* acpisrat( uint8_t *unused_uint8_p_t, int);
-static struct Atable* acpislit( uint8_t *unused_uint8_p_t, int);
+static struct Atable* acpifadt( uint8_t *, int);
+static struct Atable* acpitable( uint8_t *, int);
+static struct Atable* acpimadt( uint8_t *, int);
+static struct Atable* acpimsct( uint8_t *, int);
+static struct Atable* acpisrat( uint8_t *, int);
+static struct Atable* acpislit( uint8_t *, int);
 
 
 static struct cmdtab ctls[] =
@@ -54,6 +54,7 @@ static struct dirtab acpidir[]={
 	{"acpictl",	{Qctl},			0,	0666},
 	{"acpitbl",	{Qtbl},			0,	0444},
 	{"acpiregio",	{Qio},			0,	0666},
+	{"acpipretty",	{Qpretty},		0,	0444},
 };
 
 /*
@@ -92,6 +93,9 @@ static char* regnames[] = {
 	"smb", "cmos", "pcibar",
 };
 
+static char *
+dumpGas(char *start, char *end, char *prefix, struct Gas *g);
+
 static char*
 acpiregstr(int id)
 {
@@ -116,19 +120,6 @@ acpiregid(char *s)
 	return -1;
 }
 
-#if 0
-static uint64_t
-l64get(uint8_t* p)
-{
-	/*
-	 * Doing this as a define
-	 * #define l64get(p)	(((u64int)l32get(p+4)<<32)|l32get(p))
-	 * causes 8c to abort with "out of fixed registers" in
-	 * rsdlink() below.
-	 */
-	return (((uint64_t)l32get(p+4)<<32)|l32get(p));
-}
-#endif
 static uint8_t
 mget8(uintptr_t p, void*unused)
 {
@@ -357,7 +348,7 @@ regio(struct Reg *r, void *p, uint32_t len, uintptr_t off, int iswr)
 	struct Regio rio;
 	uintptr_t rp;
 
-	printk("reg%s %s %#p %#ullx %#lx sz=%d\n",
+	printk("reg%s %s %#p %#p %#lx sz=%d\n",
 		iswr ? "out" : "in", r->name, p, off, len, r->accsz);
 	rp = 0;
 	if(off + len > r->len){
@@ -524,61 +515,62 @@ gasget(struct Gas *gas, uint8_t *p)
 	gas->addr = l64get(p+4);
 }
 
-static void
-dumpfadt(struct Fadt *fp)
+static char *
+dumpfadt(char *start, char *end, struct Fadt *fp)
 {
 	if(2 == 0) {
 		return;
 	}
 
-	printk("acpi: fadt: facs: $%p\n", fp->facs);
-	printk("acpi: fadt: dsdt: $%p\n", fp->dsdt);
-	printk("acpi: fadt: pmprofile: $%p\n", fp->pmprofile);
-	printk("acpi: fadt: sciint: $%p\n", fp->sciint);
-	printk("acpi: fadt: smicmd: $%p\n", fp->smicmd);
-	printk("acpi: fadt: acpienable: $%p\n", fp->acpienable);
-	printk("acpi: fadt: acpidisable: $%p\n", fp->acpidisable);
-	printk("acpi: fadt: s4biosreq: $%p\n", fp->s4biosreq);
-	printk("acpi: fadt: pstatecnt: $%p\n", fp->pstatecnt);
-	printk("acpi: fadt: pm1aevtblk: $%p\n", fp->pm1aevtblk);
-	printk("acpi: fadt: pm1bevtblk: $%p\n", fp->pm1bevtblk);
-	printk("acpi: fadt: pm1acntblk: $%p\n", fp->pm1acntblk);
-	printk("acpi: fadt: pm1bcntblk: $%p\n", fp->pm1bcntblk);
-	printk("acpi: fadt: pm2cntblk: $%p\n", fp->pm2cntblk);
-	printk("acpi: fadt: pmtmrblk: $%p\n", fp->pmtmrblk);
-	printk("acpi: fadt: gpe0blk: $%p\n", fp->gpe0blk);
-	printk("acpi: fadt: gpe1blk: $%p\n", fp->gpe1blk);
-	printk("acpi: fadt: pm1evtlen: $%p\n", fp->pm1evtlen);
-	printk("acpi: fadt: pm1cntlen: $%p\n", fp->pm1cntlen);
-	printk("acpi: fadt: pm2cntlen: $%p\n", fp->pm2cntlen);
-	printk("acpi: fadt: pmtmrlen: $%p\n", fp->pmtmrlen);
-	printk("acpi: fadt: gpe0blklen: $%p\n", fp->gpe0blklen);
-	printk("acpi: fadt: gpe1blklen: $%p\n", fp->gpe1blklen);
-	printk("acpi: fadt: gp1base: $%p\n", fp->gp1base);
-	printk("acpi: fadt: cstcnt: $%p\n", fp->cstcnt);
-	printk("acpi: fadt: plvl2lat: $%p\n", fp->plvl2lat);
-	printk("acpi: fadt: plvl3lat: $%p\n", fp->plvl3lat);
-	printk("acpi: fadt: flushsz: $%p\n", fp->flushsz);
-	printk("acpi: fadt: flushstride: $%p\n", fp->flushstride);
-	printk("acpi: fadt: dutyoff: $%p\n", fp->dutyoff);
-	printk("acpi: fadt: dutywidth: $%p\n", fp->dutywidth);
-	printk("acpi: fadt: dayalrm: $%p\n", fp->dayalrm);
-	printk("acpi: fadt: monalrm: $%p\n", fp->monalrm);
-	printk("acpi: fadt: century: $%p\n", fp->century);
-	printk("acpi: fadt: iapcbootarch: $%p\n", fp->iapcbootarch);
-	printk("acpi: fadt: flags: $%p\n", fp->flags);
-	dumpGas("acpi: fadt: resetreg: ", &fp->resetreg);
-	printk("acpi: fadt: resetval: $%p\n", fp->resetval);
-	printk("acpi: fadt: xfacs: %#llux\n", fp->xfacs);
-	printk("acpi: fadt: xdsdt: %#llux\n", fp->xdsdt);
-	dumpGas("acpi: fadt: xpm1aevtblk:", &fp->xpm1aevtblk);
-	dumpGas("acpi: fadt: xpm1bevtblk:", &fp->xpm1bevtblk);
-	dumpGas("acpi: fadt: xpm1acntblk:", &fp->xpm1acntblk);
-	dumpGas("acpi: fadt: xpm1bcntblk:", &fp->xpm1bcntblk);
-	dumpGas("acpi: fadt: xpm2cntblk:", &fp->xpm2cntblk);
-	dumpGas("acpi: fadt: xpmtmrblk:", &fp->xpmtmrblk);
-	dumpGas("acpi: fadt: xgpe0blk:", &fp->xgpe0blk);
-	dumpGas("acpi: fadt: xgpe1blk:", &fp->xgpe1blk);
+	start = seprintf(start, end, "acpi: fadt: facs: $%p\n", fp->facs);
+	start = seprintf(start, end, "acpi: fadt: dsdt: $%p\n", fp->dsdt);
+	start = seprintf(start, end, "acpi: fadt: pmprofile: $%p\n", fp->pmprofile);
+	start = seprintf(start, end, "acpi: fadt: sciint: $%p\n", fp->sciint);
+	start = seprintf(start, end, "acpi: fadt: smicmd: $%p\n", fp->smicmd);
+	start = seprintf(start, end, "acpi: fadt: acpienable: $%p\n", fp->acpienable);
+	start = seprintf(start, end, "acpi: fadt: acpidisable: $%p\n", fp->acpidisable);
+	start = seprintf(start, end, "acpi: fadt: s4biosreq: $%p\n", fp->s4biosreq);
+	start = seprintf(start, end, "acpi: fadt: pstatecnt: $%p\n", fp->pstatecnt);
+	start = seprintf(start, end, "acpi: fadt: pm1aevtblk: $%p\n", fp->pm1aevtblk);
+	start = seprintf(start, end, "acpi: fadt: pm1bevtblk: $%p\n", fp->pm1bevtblk);
+	start = seprintf(start, end, "acpi: fadt: pm1acntblk: $%p\n", fp->pm1acntblk);
+	start = seprintf(start, end, "acpi: fadt: pm1bcntblk: $%p\n", fp->pm1bcntblk);
+	start = seprintf(start, end, "acpi: fadt: pm2cntblk: $%p\n", fp->pm2cntblk);
+	start = seprintf(start, end, "acpi: fadt: pmtmrblk: $%p\n", fp->pmtmrblk);
+	start = seprintf(start, end, "acpi: fadt: gpe0blk: $%p\n", fp->gpe0blk);
+	start = seprintf(start, end, "acpi: fadt: gpe1blk: $%p\n", fp->gpe1blk);
+	start = seprintf(start, end, "acpi: fadt: pm1evtlen: $%p\n", fp->pm1evtlen);
+	start = seprintf(start, end, "acpi: fadt: pm1cntlen: $%p\n", fp->pm1cntlen);
+	start = seprintf(start, end, "acpi: fadt: pm2cntlen: $%p\n", fp->pm2cntlen);
+	start = seprintf(start, end, "acpi: fadt: pmtmrlen: $%p\n", fp->pmtmrlen);
+	start = seprintf(start, end, "acpi: fadt: gpe0blklen: $%p\n", fp->gpe0blklen);
+	start = seprintf(start, end, "acpi: fadt: gpe1blklen: $%p\n", fp->gpe1blklen);
+	start = seprintf(start, end, "acpi: fadt: gp1base: $%p\n", fp->gp1base);
+	start = seprintf(start, end, "acpi: fadt: cstcnt: $%p\n", fp->cstcnt);
+	start = seprintf(start, end, "acpi: fadt: plvl2lat: $%p\n", fp->plvl2lat);
+	start = seprintf(start, end, "acpi: fadt: plvl3lat: $%p\n", fp->plvl3lat);
+	start = seprintf(start, end, "acpi: fadt: flushsz: $%p\n", fp->flushsz);
+	start = seprintf(start, end, "acpi: fadt: flushstride: $%p\n", fp->flushstride);
+	start = seprintf(start, end, "acpi: fadt: dutyoff: $%p\n", fp->dutyoff);
+	start = seprintf(start, end, "acpi: fadt: dutywidth: $%p\n", fp->dutywidth);
+	start = seprintf(start, end, "acpi: fadt: dayalrm: $%p\n", fp->dayalrm);
+	start = seprintf(start, end, "acpi: fadt: monalrm: $%p\n", fp->monalrm);
+	start = seprintf(start, end, "acpi: fadt: century: $%p\n", fp->century);
+	start = seprintf(start, end, "acpi: fadt: iapcbootarch: $%p\n", fp->iapcbootarch);
+	start = seprintf(start, end, "acpi: fadt: flags: $%p\n", fp->flags);
+	start = dumpGas(start, end, "acpi: fadt: resetreg: ", &fp->resetreg);
+	start = seprintf(start, end, "acpi: fadt: resetval: $%p\n", fp->resetval);
+	start = seprintf(start, end, "acpi: fadt: xfacs: %p\n", fp->xfacs);
+	start = seprintf(start, end, "acpi: fadt: xdsdt: %p\n", fp->xdsdt);
+	start = dumpGas(start, end, "acpi: fadt: xpm1aevtblk:", &fp->xpm1aevtblk);
+	start = dumpGas(start, end, "acpi: fadt: xpm1bevtblk:", &fp->xpm1bevtblk);
+	start = dumpGas(start, end, "acpi: fadt: xpm1acntblk:", &fp->xpm1acntblk);
+	start = dumpGas(start, end, "acpi: fadt: xpm1bcntblk:", &fp->xpm1bcntblk);
+	start = dumpGas(start, end, "acpi: fadt: xpm2cntblk:", &fp->xpm2cntblk);
+	start = dumpGas(start, end, "acpi: fadt: xpmtmrblk:", &fp->xpmtmrblk);
+	start = dumpGas(start, end, "acpi: fadt: xgpe0blk:", &fp->xgpe0blk);
+	start = dumpGas(start, end, "acpi: fadt: xgpe1blk:", &fp->xgpe1blk);
+	return start;
 }
 
 static struct Atable*
@@ -636,7 +628,10 @@ acpifadt(uint8_t *p, int unused)
 	gasget(&fp->xgpe0blk, p+220);
 	gasget(&fp->xgpe1blk, p+232);
 
-	dumpfadt(fp);
+	static char buf[8192]; // XXX
+	char *out;
+	out = dumpfadt(buf, &buf[8191], fp);
+	printk("%s\n", out);
 	if(fp->xfacs != 0)
 		loadfacs(fp->xfacs);
 	else
@@ -655,10 +650,10 @@ dumpmsct(struct Msct *msct)
 {
 	struct Mdom *st;
 
-	printk("acpi: msct: %d doms %d clkdoms %#ullx maxpa\n",
+	printk("acpi: msct: %d doms %d clkdoms %#p maxpa\n",
 		msct->ndoms, msct->nclkdoms, msct->maxpa);
 	for(st = msct->dom; st != NULL; st = st->next)
-		printk("\t[%d:%d] %d maxproc %#ullx maxmmem\n",
+		printk("\t[%d:%d] %d maxproc %#p maxmmem\n",
 			st->start, st->end, st->maxproc, st->maxmem);
 	printk("\n");
 }
@@ -709,7 +704,7 @@ dumpsrat(struct Srat *st)
 				st->lapic.sapic, st->lapic.clkdom);
 			break;
 		case SRmem:
-			printk("\tmem: dom %d %#ullx %#ullx %c%c\n",
+			printk("\tmem: dom %d %#p %#p %c%c\n",
 				st->mem.dom, st->mem.addr, st->mem.len,
 				st->mem.hplug?'h':'-',
 				st->mem.nvram?'n':'-');
@@ -1296,13 +1291,13 @@ acpigen(struct chan *c, char *unused_char_p_t, struct dirtab *tab, int ntab, int
 	return 1;
 }
 
-void
-dumpGas(char *prefix, struct Gas *g)
+static char *
+dumpGas(char *start, char *end, char *prefix, struct Gas *g)
 {
 	static char* rnames[] = {
 			"mem", "io", "pcicfg", "embed",
 			"smb", "cmos", "pcibar", "ipmi"};
-	printk("%s", prefix);
+	start = seprintf(start, end, "%s", prefix);
 
 	switch(g->spc){
 	case Rsysmem:
@@ -1312,22 +1307,24 @@ dumpGas(char *prefix, struct Gas *g)
 	case Rcmos:
 	case Rpcibar:
 	case Ripmi:
-		printk("[%s ", rnames[g->spc]);
+		start = seprintf(start, end, "[%s ", rnames[g->spc]);
 		break;
 	case Rpcicfg:
-		printk("[pci ");
-		printk("dev %#p ", (uint32_t)(g->addr >> 32) & 0xFFFF);
-		printk("fn %#p ", (uint32_t)(g->addr & 0xFFFF0000) >> 16);
-		printk("adr %#p ", (uint32_t)(g->addr &0xFFFF));
+		start = seprintf(start, end, "[pci ");
+		start = seprintf(start, end, "dev %#p ", (uint32_t)(g->addr >> 32) & 0xFFFF);
+		start = seprintf(start, end, "fn %#p ", (uint32_t)(g->addr & 0xFFFF0000) >> 16);
+		start = seprintf(start, end, "adr %#p ", (uint32_t)(g->addr &0xFFFF));
 		break;
 	case Rfixedhw:
-		printk("[hw ");
+		start = seprintf(start, end, "[hw ");
 		break;
 	default:
-		printk("[spc=%#p ", g->spc);
+		start = seprintf(start, end, "[spc=%#p ", g->spc);
 	}
-	printk("off %d len %d addr %#ullx sz%d]",
+	start = seprintf(start, end, "off %d len %d addr %#p sz%d]",
 		g->off, g->len, g->addr, g->accsz);
+	start = seprintf(start, end, "\n");
+	return start;
 }
 
 static unsigned int
@@ -1530,8 +1527,12 @@ acpiinit(void)
 		//fmtinstall('G', Gfmt);
 		acpirsdptr();
 		if(fadt.smicmd == 0) {
+			printk("acpiinit returns -1\n");
 			return -1;
 		}
+		int mpacpi(int ncleft);
+		printk("mpacpi(32) is %d\n", mpacpi(32));
+
 	}
 	return 0;
 }
@@ -1573,8 +1574,6 @@ acpiattach(char *spec)
 	 * This starts ACPI, which may require we handle
 	 * power mgmt events ourselves. Use with care.
 	 */
-	printk("acpi NOT starting\n");
-	if (0){
 	outb(fadt.smicmd, fadt.acpienable);
 	for(i = 0; i < 10; i++)
 		if(getpm1ctl() & Pm1SciEn)
@@ -1583,7 +1582,6 @@ acpiattach(char *spec)
 		error("acpi: failed to enable\n");
 //	if(fadt.sciint != 0)
 //		intrenable(fadt.sciint, acpiintr, 0, BUSUNKNOWN, "acpi");
-	}
 	return devattach('a', spec);
 }
 
@@ -1625,8 +1623,8 @@ acpiread(struct chan *c, void *a, long n, int64_t off)
 	case Qdir:
 		return devdirread(c, a, n, acpidir, ARRAY_SIZE(acpidir), acpigen);
 	case Qtbl:
-		if(ttext == NULL){
-			tlen = 1024;
+		if(ttext == NULL){ // XXXXXX
+			tlen = 8192;
 			ttext = kzmalloc(tlen, 0);
 			if(ttext == NULL){
 				printd("acpi: no memory\n");
@@ -1651,6 +1649,19 @@ acpiread(struct chan *c, void *a, long n, int64_t off)
 				s = ns;
 			}
 					
+		}
+		return readstr(off, a, n, ttext);
+	case Qpretty:
+		if(ttext == NULL){
+			tlen = 8192;
+			ttext = kzmalloc(tlen, 0);
+			if(ttext == NULL){
+				printd("acpi: no memory\n");
+				return 0;
+			}
+			s = ttext;
+			e = ttext + tlen;
+			dumpfadt(s, e, &fadt);
 		}
 		return readstr(off, a, n, ttext);
 	case Qio:

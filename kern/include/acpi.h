@@ -76,6 +76,7 @@ enum
 	Qctl,
 	Qtbl,
 	Qio,
+	Qpretty,
 };
 
 /*
@@ -396,5 +397,3 @@ struct Xsdt
 };
 
 extern uintptr_t acpimblocksize(uintptr_t, int*);
-
-void dumpGas(char *prefix, struct Gas *g);
