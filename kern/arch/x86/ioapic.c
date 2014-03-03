@@ -21,6 +21,7 @@
 #include <smp.h>
 #include <ip.h>
 #include <arch/io.h>
+#include <acpi.h>
 
 struct Rbus {
 	struct Rbus	*next;
@@ -140,6 +141,52 @@ ioapicintrinit(int busno, int apicno, int intin, int devno, uint32_t lo)
 	rdtbus[busno] = rbus;
 }
 
+static int map_polarity[4] = {
+	-1, IPhigh, -1, IPlow
+};
+
+static int map_edge_level[4] = {
+	-1, TMedge, -1, TMlevel
+};
+int
+ioapic_route_irq(int irq, int apicno)
+{
+	extern struct Madt *apics;
+	struct Madt *a = apics;
+	struct Apicst *st;
+	uint32_t lo;
+	int pol, edge_level;
+
+	/* find it. */
+	for(st = apics->st; st != NULL; st = st->next)
+		switch(st->type){
+		default: 
+			continue;
+		case ASintovr:
+			if (st->intovr.irq == irq)
+				break;
+		}
+	if (! st) {
+		printk("IRQ %d not found in MADT\n", irq);
+		return -1;
+	}
+	
+	pol = map_polarity[st->intovr.flags & AFpmask];
+	if (pol < 0) {
+		printk("BAD POLARITY\n");
+		return -1;
+	}
+	
+	edge_level = map_edge_level[(st->intovr.flags&AFlevel)>>2];
+	if (edge_level < 0) {
+		printk("BAD edge/level\n");
+		return -1;
+	}
+	lo = pol | edge_level;
+	ioapicintrinit(0, 0, irq, /* ah shit int devno*/ 0, lo);
+	printk("FOUND the MADT for %d\n", irq);
+	return 0;
+}
 void
 ioapicinit(int id, int ibase, uintptr_t pa)
 {

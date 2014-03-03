@@ -958,6 +958,7 @@ static char *printiflags(char *start, char *end, int flags)
 		polarity[flags & AFpmask], 
 		trigger[(flags & AFtmask)>>2]);
 }
+
 static char *
 dumpmadt(char *start, char *end, struct Madt *apics)
 {
@@ -965,6 +966,7 @@ dumpmadt(char *start, char *end, struct Madt *apics)
 
 	start = seprintf(start, end, "acpi: madt lapic paddr %llux pcat %d:\n", apics->lapicpa, apics->pcat);
 	for(st = apics->st; st != NULL; st = st->next)
+
 		switch(st->type){
 		case ASlapic:
 			start = seprintf(start, end, "\tlapic pid %d id %d\n", st->lapic.pid, st->lapic.id);

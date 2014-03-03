@@ -593,7 +593,7 @@ int register_dev_irq(int irq, isr_t handler, void *irq_arg)
 	/* Just sending to core 0 for now */
 #warning "NOT routing the ioapic irq"
 	printk("NOT ROUTING irq %d to core 0!\n", irq);
-	//ioapic_route_irq(irq, 0);
+	ioapic_route_irq(irq, 0);
 #else
 	pic_unmask_irq(irq);
 	unmask_lapic_lvt(LAPIC_LVT_LINT0);
