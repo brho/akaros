@@ -628,10 +628,12 @@ acpifadt(uint8_t *p, int unused)
 	gasget(&fp->xgpe0blk, p+220);
 	gasget(&fp->xgpe1blk, p+232);
 
+#if 0
 	static char buf[8192]; // XXX
 	char *out;
 	out = dumpfadt(buf, &buf[8191], fp);
 	printk("%s\n", out);
+#endif
 	if(fp->xfacs != 0)
 		loadfacs(fp->xfacs);
 	else
@@ -671,7 +673,7 @@ acpimsct(uint8_t *p, int len)
 	uint8_t *pe;
 	struct Mdom **stl, *st;
 	int off;
-	char *dump;
+
 
 	msct = kzmalloc(sizeof(struct Msct), KMALLOC_WAIT);
 	msct->ndoms = l32get(p+40) + 1;
@@ -691,11 +693,14 @@ acpimsct(uint8_t *p, int len)
 		*stl = st;
 		stl = &st->next;
 	}
-
+#if 0
+	// no longer works if called from init.c
+	char *dump;
 	dump = kzmalloc(1024, KMALLOC_WAIT);
 	dumpmsct(dump, &dump[1023], msct);
 	printk("%s\n", dump);
 	kfree(dump);
+#endif
 	return NULL;	/* can be unmapped once parsed */
 }
 
@@ -731,7 +736,7 @@ dumpsrat(char *start, char *end, struct Srat *st)
 static struct Atable*
 acpisrat(uint8_t *p, int len)
 {
-	char *dump;
+
 	struct Srat **stl, *st;
 	uint8_t *pe;
 	int stlen, flags;
@@ -792,10 +797,13 @@ acpisrat(uint8_t *p, int len)
 		}
 	}
 
+#if 0
+	char *dump;
 	dump = kzmalloc(8192, KMALLOC_WAIT);
 	dumpsrat(dump, &dump[8192], srat);
 	printk("%s\n", dump);
 	kfree(dump);
+#endif
 	return NULL;	/* can be unmapped once parsed */
 }
 
@@ -828,7 +836,7 @@ cmpslitent(void* v1, void* v2)
 static struct Atable*
 acpislit(uint8_t *p, int len)
 {
-	char *dump;
+
 	uint8_t *pe;
 	int i, j, k;
 	struct SlEntry *se;
@@ -848,12 +856,14 @@ acpislit(uint8_t *p, int len)
 		se->dom = k;
 		se->dist = *p;
 	}
+
+#warning "no qsort"
+#if 0
+	char *dump;
 	dump = kzmalloc(8192, KMALLOC_WAIT);
 	dumpslit(dump, &dump[8191], slit);
 	printk("%s", dump);
 	kfree(dump);
-#warning "no qsort"
-#if 0
 	for(i = 0; i < slit->rowlen; i++)
 		qsort(slit->e[i], slit->rowlen, sizeof(slit->e[0][0]), cmpslitent);
 	
@@ -982,7 +992,7 @@ dumpmadt(char *start, char *end, struct Madt *apics)
 static struct Atable*
 acpimadt(uint8_t *p, int len)
 {
-	char *dump;
+
 	uint8_t *pe;
 	struct Apicst *st, *l, **stl;
 	int stlen, id;
@@ -1095,10 +1105,13 @@ acpimadt(uint8_t *p, int len)
 			stl = &st->next;
 		}
 	}
+#if 0
+	char *dump;
 	dump = kzmalloc(8192, KMALLOC_WAIT);
 	dumpmadt(dump, &dump[8191], apics);
 	printk("%s\n", dump);
 	kfree(dump);
+#endif
 	return NULL;	/* can be unmapped once parsed */
 }
 
@@ -1185,7 +1198,7 @@ acpixsdtload(char *sig)
 			printk("acpi: %s addr %#p\n", tsig, sdt);
 			for(t = 0; t < ARRAY_SIZE(ptables); t++)
 				if(strcmp(tsig, ptables[t].sig) == 0){
-					dumptable(table, &table[127], tsig, sdt, l);
+					//dumptable(table, &table[127], tsig, sdt, l);
 					unmap = ptables[t].f(sdt, l) == NULL;
 					found = 1;
 					break;
@@ -1550,6 +1563,7 @@ acpiioalloc(unsigned int addr, int len)
 int
 acpiinit(void)
 {
+	/* this smicmd test implements 'run once' for now. */
 	if(fadt.smicmd == 0){
 		//fmtinstall('G', Gfmt);
 		acpirsdptr();

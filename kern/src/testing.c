@@ -103,7 +103,8 @@ void test_ioapic_pit_reroute(void)
 {
 	register_raw_irq(0x20, test_hello_world_handler, NULL);
 #ifdef CONFIG_ENABLE_MPTABLES
-	ioapic_route_irq(0, 3);	
+#warning "not routing the irq"
+	//ioapic_route_irq(0, 3);	
 #endif
 
 	cprintf("Starting pit on core 3....\n");
@@ -112,7 +113,8 @@ void test_ioapic_pit_reroute(void)
 	
 	udelay(3000000);
 #ifdef CONFIG_ENABLE_MPTABLES
-	ioapic_unroute_irq(0);
+#warning "NOT unrouting the irq"
+	//ioapic_unroute_irq(0);
 #endif
 	udelay(300000);
 	cprintf("Masked pit. Waiting before return...\n");

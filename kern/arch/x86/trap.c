@@ -591,7 +591,8 @@ int register_dev_irq(int irq, isr_t handler, void *irq_arg)
 #ifdef CONFIG_ENABLE_MPTABLES
 	/* TODO: this should be for any IOAPIC EOI, not just MPTABLES */
 	/* Just sending to core 0 for now */
-	ioapic_route_irq(irq, 0);
+#warning "NOT routing the ioapic irq"
+	//ioapic_route_irq(irq, 0);
 #else
 	pic_unmask_irq(irq);
 	unmask_lapic_lvt(LAPIC_LVT_LINT0);

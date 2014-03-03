@@ -70,10 +70,11 @@ void arch_init()
 	save_fp_state(&x86_default_fpu); /* used in arch/trap.h for fpu init */
 	pci_init();
 #ifdef CONFIG_ENABLE_MPTABLES
-	mptables_parse();
-	ioapic_init(); // MUST BE AFTER PCI/ISA INIT!
-	// TODO: move these back to regular init.  requires fixing the 
-	// CONFIG_NETWORKING inits to not need multiple cores running.
+	int acpiinit(void);
+	/* this also does the mpacpi ... is that enough? */
+	acpiinit();
+	void ioapiconline(void);
+	ioapiconline();
 #endif
 	// this returns when all other cores are done and ready to receive IPIs
 	#ifdef CONFIG_SINGLE_CORE
