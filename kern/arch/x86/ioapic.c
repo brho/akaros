@@ -96,6 +96,15 @@ rdtlookup(struct apic *apic, int intin)
 	return NULL;
 }
 
+/* busno is the source bus
+ * apic is the destination apic
+ * intin is the INTIN pin on the destination apic
+ * devno is the device number in the style of a PCI Interrupt
+ * Assignment Entry. Which is devno << 2? 
+ * lo is the vector table entry. We need to figure out how
+ * to compute this from acpi. We used to get it from the
+ * mptable but we would like to avoid that.
+ */
 void
 ioapicintrinit(int busno, int apicno, int intin, int devno, uint32_t lo)
 {

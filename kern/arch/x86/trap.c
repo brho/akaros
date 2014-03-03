@@ -592,6 +592,7 @@ int register_dev_irq(int irq, isr_t handler, void *irq_arg)
 	/* TODO: this should be for any IOAPIC EOI, not just MPTABLES */
 	/* Just sending to core 0 for now */
 #warning "NOT routing the ioapic irq"
+	printk("NOT ROUTING irq %d to core 0!\n", irq);
 	//ioapic_route_irq(irq, 0);
 #else
 	pic_unmask_irq(irq);
