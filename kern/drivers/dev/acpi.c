@@ -935,6 +935,27 @@ pickcore(int mycolor, int index)
 }
 
 
+static char *polarity[4] = {
+	"polarity/trigger like in ISA",
+	"active high",
+	"BOGUS POLARITY",
+	"active low"
+};
+
+static char *trigger[] = {
+	"BOGUS TRIGGER",
+	"edge",
+	"BOGUS TRIGGER",
+	"level"
+};
+
+static char *printiflags(char *start, char *end, int flags)
+{
+
+	return seprintf(start, end, "[%s,%s]",
+		polarity[flags & AFpmask], 
+		trigger[(flags & AFtmask)>>2]);
+}
 static char *
 dumpmadt(char *start, char *end, struct Madt *apics)
 {
@@ -949,11 +970,13 @@ dumpmadt(char *start, char *end, struct Madt *apics)
 		case ASioapic:
 		case ASiosapic:
 			start = seprintf(start, end, "\tioapic id %d addr %#llux ibase %d\n",
-				st->ioapic.id, st->ioapic.addr, st->ioapic.ibase);
+					 st->ioapic.id, st->ioapic.addr, st->ioapic.ibase);
 			break;
 		case ASintovr:
-			start = seprintf(start, end, "\tintovr irq %d intr %d flags $%p\n",
-				st->intovr.irq, st->intovr.intr,st->intovr.flags);
+			start = seprintf(start, end, "\tintovr irq %d intr %d flags $%p",
+					 st->intovr.irq, st->intovr.intr,st->intovr.flags);
+			start = printiflags(start, end, st->intovr.flags);
+			start = seprintf(start, end, "\n");
 			break;
 		case ASnmi:
 			start = seprintf(start, end, "\tnmi intr %d flags $%p\n",
@@ -974,6 +997,8 @@ dumpmadt(char *start, char *end, struct Madt *apics)
 				st->type, st->intsrc.pid,
 				st->intsrc.peid, st->intsrc.iosv,
 				st->intsrc.intr, st->intsrc.flags);
+			start = printiflags(start, end, st->intsrc.flags);
+			start = seprintf(start, end, "\n");
 			break;
 		case ASlx2apic:
 			start = seprintf(start, end, "\tlx2apic puid %d id %d\n", st->lx2apic.puid, st->lx2apic.id);
