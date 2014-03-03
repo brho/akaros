@@ -58,7 +58,7 @@ static void cons_irq_init(void)
 	struct cons_dev *i;
 	/* Register interrupt handlers for all console devices */
 	SLIST_FOREACH(i, &cdev_list, next)
-		register_dev_irq(i->irq, irq_console, i);
+		register_dev_irq(i->irq, irq_console, i, -1);
 }
 
 void arch_init()

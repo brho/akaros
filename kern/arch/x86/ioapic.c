@@ -60,7 +60,8 @@ static spinlock_t idtnolock;
 static int idtno = IdtIOAPIC;
 
 struct apic	xioapic[Napic];
-
+int apiceoi(int);
+int apicisr(int);
 static void
 rtblget(struct apic* apic, int sel, uint32_t* hi, uint32_t* lo)
 {
@@ -128,7 +129,7 @@ ioapicintrinit(int busno, int apicno, int intin, int devno, uint32_t lo)
 	}else{
 		if(lo != rdt->lo){
 			printd("mutiple irq botch bus %d %d/%d/%d lo %d vs %d\n",
-				busno, apicno, intin, devno, lo, rdt->lo);
+			       busno, apicno, intin, devno, lo, rdt->lo);
 			return;
 		}
 		printk("dup rdt %d %d %d %d %.8ux\n", busno, apicno, intin, devno, lo);
@@ -156,16 +157,16 @@ ioapic_route_irq(int irq, int apicno)
 	struct Apicst *st;
 	uint32_t lo;
 	int pol, edge_level;
-
+	printk("%s(%d,%d);\n", __func__, irq, apicno);
 	/* find it. */
-	for(st = apics->st; st != NULL; st = st->next)
-		switch(st->type){
-		default: 
-			continue;
-		case ASintovr:
+	for(st = apics->st; st != NULL; st = st->next){
+		printk("Check %d, ", st->type);
+		if (st->type == ASintovr){
+			printk("irq of st is %d\n", st->intovr.irq);
 			if (st->intovr.irq == irq)
 				break;
 		}
+	}
 	if (! st) {
 		printk("IRQ %d not found in MADT\n", irq);
 		return -1;
@@ -241,7 +242,7 @@ ioapicdump(char *start, char *end)
 		if(!apic->useable || apic->addr == 0)
 			continue;
 		start = seprintf(start, end, "ioapic %d addr %#p nrdt %d ibase %d\n",
-			i, apic->addr, apic->nrdt, apic->ibase);
+				 i, apic->addr, apic->nrdt, apic->ibase);
 		for(n = 0; n < apic->nrdt; n++){
 			spin_lock(&apic->lock);
 			rtblget(apic, n, &hi, &lo);
@@ -256,9 +257,9 @@ ioapicdump(char *start, char *end)
 		for(; rbus != NULL; rbus = rbus->next){
 			rdt = rbus->rdt;
 			start = seprintf(start, end,
-				" apic %ld devno %#p (%d %d) intin %d lo %#p ref %d\n",
-				rdt->apic-xioapic, rbus->devno, rbus->devno>>2,
-				rbus->devno & 0x03, rdt->intin, rdt->lo, rdt->ref);
+					 " apic %ld devno %#p (%d %d) intin %d lo %#p ref %d\n",
+					 rdt->apic-xioapic, rbus->devno, rbus->devno>>2,
+					 rbus->devno & 0x03, rdt->intin, rdt->lo, rdt->ref);
 		}
 	}
 	return start;
@@ -282,7 +283,7 @@ ioapiconline(void)
 }
 
 static int dfpolicy = 0;
-#if 0
+
 static void
 ioapicintrdd(uint32_t* hi, uint32_t* lo)
 {
@@ -308,7 +309,8 @@ ioapicintrdd(uint32_t* hi, uint32_t* lo)
 	 */
 	switch(dfpolicy){
 	default:				/* noise core 0 */
-		*hi = sys->machptr[0]->apicno<<24;
+#warning "sys->machptr[0]->apicno --- what is this in Akaros?"
+		*hi = 0; //sys->machptr[0]->apicno<<24;
 		break;
 	case 1:					/* round-robin */
 		/*
@@ -318,18 +320,22 @@ ioapicintrdd(uint32_t* hi, uint32_t* lo)
 		 * thread in a core. But, as usual, Intel make that an onerous
 		 * task.
 		 */
-		spin_lock(&(&dflock)->lock);
+		spin_lock(&dflock);
 		for(;;){
+#if 0
 			i = df++;
 			if(df >= sys->nmach+1)
 				df = 0;
 			if(sys->machptr[i] == NULL || !sys->machptr[i]->online)
 				continue;
 			i = sys->machptr[i]->apicno;
+#endif
+#warning "always picking acpino 0"
+			i = 0;
 			if(xlapic[i].useable && xlapic[i].addr == 0)
 				break;
 		}
-		spin_unlock(&dflock->lock);
+		spin_unlock(&dflock);
 
 		*hi = i<<24;
 		break;
@@ -342,29 +348,36 @@ nextvec(void)
 {
 	unsigned int vecno;
 
-	spin_lock(&idtnolock->lock);
+	spin_lock(&idtnolock);
 	vecno = idtno;
 	idtno = (idtno+8) % IdtMAX;
 	if(idtno < IdtIOAPIC)
 		idtno += IdtIOAPIC;
-	spin_unlock(&idtnolock->lock);
+	spin_unlock(&idtnolock);
 
 	return vecno;
 }
 
+#warning "no msi mask yet"
 static int
-msimask(Vkey *v, int mask)
+msimask(struct Vkey *v, int mask)
 {
+#if 0
 	Pcidev *p;
-
+	
 	p = pcimatchtbdf(v->tbdf);
 	if(p == NULL)
 		return -1;
 	return pcimsimask(p, mask);
+#else
+	return -1;
+#endif
 }
 
+#warning "No msi yet"
+#if 0
 static int
-intrenablemsi(Vctl* v, Pcidev *p)
+intrenablemsi(struct vctl* v, Pcidev *p)
 {
 	unsigned int vno, lo, hi;
 	uint64_t msivec;
@@ -389,7 +402,9 @@ intrenablemsi(Vctl* v, Pcidev *p)
 	printk("msiirq: %T: enabling %.16llux %s irq %d vno %d\n", p->tbdf, msivec, v->name, v->irq, vno);
 	return vno;
 }
-
+#endif
+#warning "no disable msi yet"
+#if 0
 int
 disablemsi(Vctl*, Pcidev *p)
 {
@@ -397,20 +412,21 @@ disablemsi(Vctl*, Pcidev *p)
 		return -1;
 	return pcimsimask(p, 1);
 }
-
+#endif
 int
 ioapicintrenable(Vctl* v)
 {
 	struct Rbus *rbus;
 	struct Rdt *rdt;
 	uint32_t hi, lo;
-	int busno, devno, vecno;
+	int busno = 0, devno, vecno;
 
-	/*
-	 * Bridge between old and unspecified new scheme,
-	 * the work in progress...
-	 */
+/*
+ * Bridge between old and unspecified new scheme,
+ * the work in progress...
+ */
 	if(v->tbdf == BUSUNKNOWN){
+
 		if(v->irq >= IrqLINT0 && v->irq <= MaxIrqLAPIC){
 			if(v->irq != IrqSPURIOUS)
 				v->isr = apiceoi;
@@ -423,11 +439,14 @@ ioapicintrenable(Vctl* v)
 			 * Make a busno and devno using the
 			 * ISA bus number and the irq.
 			 */
+#if 0
 			extern int mpisabusno;
-
+			
 			if(mpisabusno == -1)
 				panic("no ISA bus allocated");
 			busno = mpisabusno;
+#endif
+			busno = 0;
 			devno = v->irq<<2;
 		}
 	}
@@ -436,25 +455,35 @@ ioapicintrenable(Vctl* v)
 		 * PCI.
 		 * Make a devno from BUSDNO(tbdf) and pcidev->intp.
 		 */
+		/* we'll assume it's there. */
+#if 0
 		Pcidev *pcidev;
-
+		
 		busno = BUSBNO(v->tbdf);
 		if((pcidev = pcimatchtbdf(v->tbdf)) == NULL)
 			panic("no PCI dev for tbdf %#8.8ux", v->tbdf);
 		if((vecno = intrenablemsi(v, pcidev)) != -1)
 			return vecno;
 		disablemsi(v, pcidev);
-		if((devno = pcicfgr8(pcidev, PciINTP)) == 0)
+#endif
+
+		struct pci_device pcidev;
+		
+		explode_tbdf(v->tbdf);
+		devno = pcidev_read8(&pcidev, PciINTP);
+
+		if(devno == 0)
 			panic("no INTP for tbdf %#8.8ux", v->tbdf);
 		devno = BUSDNO(v->tbdf)<<2|(devno-1);
-		printk("ioapicintrenable: tbdf %#8.8ux busno %d devno %d\n",
-			v->tbdf, busno, devno);
+		printk("ioapicintrenable: tbdf %#8.8p busno %d devno %d\n",
+		       v->tbdf, busno, devno);
 	}
 	else{
-		SET(busno, devno);
-		panic("unknown tbdf %#8.8ux", v->tbdf);
+		//SET(busno, devno);
+		busno = devno = 0;
+		panic("unknown tbdf %#8.8px", v->tbdf);
 	}
-
+	
 	rdt = NULL;
 	for(rbus = rdtbus[busno]; rbus != NULL; rbus = rbus->next)
 		if(rbus->devno == devno){
@@ -463,15 +492,16 @@ ioapicintrenable(Vctl* v)
 		}
 	if(rdt == NULL){
 		extern int mpisabusno;
-
+		
 		/*
 		 * First crack in the smooth exterior of the new code:
-		 * some BIOS make an MPS table where the PCI devices are
-		 * just defaulted to ISA.
-		 * Rewrite this to be cleaner.
-		 */
+		 * some BIOS make an MPS table where the PCI devices
+		 * are just defaulted to ISA.  Rewrite this to be
+		 * cleaner.
+		 * no MPS table in akaros.
 		if((busno = mpisabusno) == -1)
 			return -1;
+		 */
 		devno = v->irq<<2;
 		for(rbus = rdtbus[busno]; rbus != NULL; rbus = rbus->next)
 			if(rbus->devno == devno){
@@ -479,11 +509,11 @@ ioapicintrenable(Vctl* v)
 				break;
 			}
 		printk("isa: tbdf %#8.8ux busno %d devno %d %#p\n",
-			v->tbdf, busno, devno, rdt);
+		       v->tbdf, busno, devno, rdt);
 	}
 	if(rdt == NULL)
 		return -1;
-
+	
 	/*
 	 * Second crack:
 	 * what to do about devices that intrenable/intrdisable frequently?
@@ -513,7 +543,7 @@ ioapicintrenable(Vctl* v)
 	spin_unlock(&rdt->apic->lock);
 
 	printk("busno %d devno %d hi %#8.8ux lo %#8.8ux vecno %d\n",
-		busno, devno, hi, lo, vecno);
+	       busno, devno, hi, lo, vecno);
 	v->isr = apicisr;
 	v->eoi = apiceoi;
 	v->vno = vecno;
@@ -543,13 +573,68 @@ ioapicintrdisable(int vecno)
 		panic("ioapicintrdisable: vecno %d has no rdt", vecno);
 		return -1;
 	}
-
+	
 	spin_lock(&rdt->apic->lock);
 	rdt->enabled--;
 	if(rdt->enabled == 0)
 		rtblput(rdt->apic, rdt->intin, 0, rdt->lo);
 	spin_unlock(&rdt->apic->lock);
-
+	
 	return 0;
 }
+
+spinlock_t vctllock;
+
+void*
+intrenable(int irq, void (*f)(void*, void*), void* a, int tbdf)
+{
+	int vno;
+	Vctl *v;
+	extern int ioapicintrenable(Vctl*);
+
+	if(f == NULL){
+		printk("intrenable: nil handler for %d, tbdf %p\n",
+		       irq, tbdf);
+		return NULL;
+	}
+
+	v = kzmalloc(sizeof(Vctl), KMALLOC_WAIT);
+	v->isintr = 1;
+	v->irq = irq;
+	v->tbdf = tbdf;
+	v->f = f;
+	v->a = a;
+
+	//spilock(&vctllock);
+	vno = ioapicintrenable(v);
+	if(vno == -1){
+		//iunlock(&vctllock);
+		printk("intrenable: couldn't enable irq %d, tbdf %#ux for %s\n",
+			irq, tbdf, v->name);
+		kfree(v);
+		return NULL;
+	}
+#if 0
+	if(vctl[vno]){
+		if(vctl[v->vno]->isr != v->isr || vctl[v->vno]->eoi != v->eoi)
+			panic("intrenable: handler: %s %s %#p %#p %#p %#p",
+				vctl[v->vno]->name, v->name,
+				vctl[v->vno]->isr, v->isr, vctl[v->vno]->eoi, v->eoi);
+	}
+
+	v->vno = vno;
+	v->next = vctl[vno];
+	vctl[vno] = v;
 #endif
+	//iunlock(&vctllock);
+
+	if(v->mask)
+		v->mask(v, 0);
+
+	/*
+	 * Return the assigned vector so intrdisable can find
+	 * the handler; the IRQ is useless in the wonderful world
+	 * of the IOAPIC.
+	 */
+	return v;
+}

@@ -582,7 +582,10 @@ void unregister_raw_irq(unsigned int vector, isr_t handler, void *data)
 	printk("Unregistering not supported\n");
 }
 
-int register_dev_irq(int irq, isr_t handler, void *irq_arg)
+/* The devno is arbitrary data. Normally, however, it will be a
+ * PCI type-bus-dev.func. It is required for ioapics.
+ */
+int register_dev_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 {
 	register_raw_irq(KERNEL_IRQ_OFFSET + irq, handler, irq_arg);
 
@@ -592,8 +595,8 @@ int register_dev_irq(int irq, isr_t handler, void *irq_arg)
 	/* TODO: this should be for any IOAPIC EOI, not just MPTABLES */
 	/* Just sending to core 0 for now */
 #warning "NOT routing the ioapic irq"
-	printk("NOT ROUTING irq %d to core 0!\n", irq);
-	ioapic_route_irq(irq, 0);
+	printk("ROUTING irq %d to core 0!\n", irq);
+	intrenable(irq, handler, irq_arg, tbdf);
 #else
 	pic_unmask_irq(irq);
 	unmask_lapic_lvt(LAPIC_LVT_LINT0);

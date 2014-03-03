@@ -78,7 +78,7 @@ typedef struct Vctl {
 	int	isintr;			/* interrupt or fault/trap */
 
 	struct Vkey;				/* source-specific key; tbdf for pci */
-	//void	(*f)(Ureg*, void*);	/* handler to call */
+	void	(*f)(void*, void*);	/* handler to call */
 	void*	a;			/* argument to call it with */
 	char	name[KNAMELEN];		/* of driver */
 	char	*type;

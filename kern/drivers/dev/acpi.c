@@ -214,11 +214,6 @@ ioset32(uintptr_t p, uint32_t v, void*unused)
 	outl(p, v);
 }
 
-#define explode_tbdf(tbdf) {pcidev.bus = tbdf >> 16;\
-		pcidev.dev = (tbdf>>11)&0x1f;\
-		pcidev.func = (tbdf>>8)&3;}
-
-
 static uint8_t
 cfgget8(uintptr_t p, void* r)
 {
