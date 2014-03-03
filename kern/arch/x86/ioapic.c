@@ -426,7 +426,7 @@ ioapicintrenable(Vctl* v)
  * the work in progress...
  */
 	if(v->tbdf == BUSUNKNOWN){
-
+printk("%s; BUSUNKNOWN\n", __func__);
 		if(v->irq >= IrqLINT0 && v->irq <= MaxIrqLAPIC){
 			if(v->irq != IrqSPURIOUS)
 				v->isr = apiceoi;
@@ -434,6 +434,8 @@ ioapicintrenable(Vctl* v)
 			return v->irq;
 		}
 		else{
+printk("%s; legacy isa\n", __func__);
+
 			/*
 			 * Legacy ISA.
 			 * Make a busno and devno using the
@@ -451,6 +453,7 @@ ioapicintrenable(Vctl* v)
 		}
 	}
 	else if(BUSTYPE(v->tbdf) == BusPCI){
+printk("%s; BusPCI \n", __func__);
 		/*
 		 * PCI.
 		 * Make a devno from BUSDNO(tbdf) and pcidev->intp.
@@ -471,10 +474,12 @@ ioapicintrenable(Vctl* v)
 		
 		explode_tbdf(v->tbdf);
 		devno = pcidev_read8(&pcidev, PciINTP);
+printk("INTP is %d\n", devno);
 
 		if(devno == 0)
 			panic("no INTP for tbdf %#8.8ux", v->tbdf);
 		devno = BUSDNO(v->tbdf)<<2|(devno-1);
+printk("devno is %08lx\n", devno);
 		printk("ioapicintrenable: tbdf %#8.8p busno %d devno %d\n",
 		       v->tbdf, busno, devno);
 	}
@@ -485,13 +490,16 @@ ioapicintrenable(Vctl* v)
 	}
 	
 	rdt = NULL;
-	for(rbus = rdtbus[busno]; rbus != NULL; rbus = rbus->next)
+	for(rbus = rdtbus[busno]; rbus != NULL; rbus = rbus->next){
+		printk("Check rbus->devno %p devno %p\n", rbus->devno, devno);
 		if(rbus->devno == devno){
 			rdt = rbus->rdt;
 			break;
 		}
+	}
 	if(rdt == NULL){
 		extern int mpisabusno;
+printk("rdt is NULLLLLLLLLLLLLLLLLLLLLL\n");
 		
 		/*
 		 * First crack in the smooth exterior of the new code:
@@ -505,15 +513,19 @@ ioapicintrenable(Vctl* v)
 		devno = v->irq<<2;
 		for(rbus = rdtbus[busno]; rbus != NULL; rbus = rbus->next)
 			if(rbus->devno == devno){
+printk("rbus->devno = %p, devno %p\n", rbus->devno, devno);
 				rdt = rbus->rdt;
 				break;
 			}
 		printk("isa: tbdf %#8.8ux busno %d devno %d %#p\n",
 		       v->tbdf, busno, devno, rdt);
 	}
-	if(rdt == NULL)
+	if(rdt == NULL){
+		printk("RDT Is STILL NULL!\n");
 		return -1;
+	}
 	
+printk("Second crack\n");
 	/*
 	 * Second crack:
 	 * what to do about devices that intrenable/intrdisable frequently?
@@ -527,13 +539,13 @@ ioapicintrenable(Vctl* v)
 	 * rather than putting a Lock in each entry.
 	 */
 	spin_lock(&rdt->apic->lock);
-	printk("%T: %ld/%d/%d (%d)\n", v->tbdf, rdt->apic - xioapic, rbus->devno, rdt->intin, devno);
+	printk("%p: %ld/%d/%d (%d)\n", v->tbdf, rdt->apic - xioapic, rbus->devno, rdt->intin, devno);
 	if((rdt->lo & 0xff) == 0){
 		vecno = nextvec();
 		rdt->lo |= vecno;
 		rdtvecno[vecno] = rdt;
 	}else
-		printk("%T: mutiple irq bus %d dev %d\n", v->tbdf, busno, devno);
+		printk("%p: mutiple irq bus %d dev %d\n", v->tbdf, busno, devno);
 
 	rdt->enabled++;
 	lo = (rdt->lo & ~Im);
@@ -542,7 +554,7 @@ ioapicintrenable(Vctl* v)
 	vecno = lo & 0xff;
 	spin_unlock(&rdt->apic->lock);
 
-	printk("busno %d devno %d hi %#8.8ux lo %#8.8ux vecno %d\n",
+	printk("busno %d devno %d hi %#8.8p lo %#8.8p vecno %d\n",
 	       busno, devno, hi, lo, vecno);
 	v->isr = apicisr;
 	v->eoi = apiceoi;
@@ -607,9 +619,10 @@ intrenable(int irq, void (*f)(void*, void*), void* a, int tbdf)
 
 	//spilock(&vctllock);
 	vno = ioapicintrenable(v);
+	printk("INTRENABLE, vno is %d\n", vno);
 	if(vno == -1){
 		//iunlock(&vctllock);
-		printk("intrenable: couldn't enable irq %d, tbdf %#ux for %s\n",
+		printk("intrenable: couldn't enable irq %d, tbdf %p for %s\n",
 			irq, tbdf, v->name);
 		kfree(v);
 		return NULL;
@@ -636,5 +649,6 @@ intrenable(int irq, void (*f)(void*, void*), void* a, int tbdf)
 	 * the handler; the IRQ is useless in the wonderful world
 	 * of the IOAPIC.
 	 */
+	printk("INTRNABLE returns %d\n", v);
 	return v;
 }

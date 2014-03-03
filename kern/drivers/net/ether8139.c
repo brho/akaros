@@ -17,6 +17,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <ip.h>
+#include <arch/io.h>
 
 enum {							/* registers */
 	Idr0 = 0x0000,				/* MAC address */
@@ -749,6 +750,10 @@ static int rtl8139pnp(struct ether *edev)
 		edev->ea[4] = i;
 		edev->ea[5] = i >> 8;
 	}
+	edev->tbdf = MKBUS(BusPCI, ctlr->pcidev->bus, 
+			   ctlr->pcidev->dev, ctlr->pcidev->func);
+	printk("TBDF is %p\n", edev->tbdf);
+monitor(NULL);
 	edev->attach = rtl8139attach;
 	edev->transmit = rtl8139transmit;
 	edev->interrupt = rtl8139interrupt;

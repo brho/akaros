@@ -682,7 +682,7 @@ static void etherreset(void)
 			snprintf(name, sizeof(name), "ether%d", ctlrno);
 
 			if (ether->interrupt != NULL)
-				register_dev_irq(ether->irq, ether->interrupt, ether, BUSUNKNOWN);
+				register_dev_irq(ether->irq, ether->interrupt, ether, ether->tbdf);
 
 			i = snprintf(buf, sizeof(buf),
 						 "#l%d: %s: %dMbps port 0x%x irq %u", ctlrno,

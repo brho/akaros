@@ -20,6 +20,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <ip.h>
+#include <arch/io.h>
 
 enum {
 	Qtopdir = 0,
