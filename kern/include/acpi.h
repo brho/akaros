@@ -77,6 +77,8 @@ enum
 	Qtbl,
 	Qio,
 	Qpretty,
+	Qioapic,
+	Qapic,
 };
 
 /*

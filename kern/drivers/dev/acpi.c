@@ -55,6 +55,8 @@ static struct dirtab acpidir[]={
 	{"acpitbl",	{Qtbl},			0,	0444},
 	{"acpiregio",	{Qio},			0,	0666},
 	{"acpipretty",	{Qpretty},		0,	0444},
+	{"ioapic",	{Qioapic},		0,	0444},
+	{"apic",	{Qapic},		0,	0444},
 };
 
 /*
@@ -1684,55 +1686,51 @@ acpiread(struct chan *c, void *a, long n, int64_t off)
 	struct Atable *t;
 	char *ns, *s, *e, *ntext;
 
+	if (ttext == NULL) {
+		tlen = 32768;
+		ttext = kzmalloc(tlen, KMALLOC_WAIT);
+	}
+	if (ttext == NULL) {
+		error("acpiread: no memory");
+	}
 	q = c->qid.path;
 	switch(q){
 	case Qdir:
 		return devdirread(c, a, n, acpidir, ARRAY_SIZE(acpidir), acpigen);
 	case Qtbl:
-		if(ttext == NULL){ // XXXXXX
-			tlen = 32768;
-			ttext = kzmalloc(tlen, 0);
-			if(ttext == NULL){
-				printd("acpi: no memory\n");
-				return 0;
-			}
-			s = ttext;
-			e = ttext + tlen;
-			strncpy(s,  "no tables\n", sizeof(s));
-			for(t = tfirst; t != NULL; t = t->next){
+		s = ttext;
+		e = ttext + tlen;
+		strncpy(s,  "no tables\n", sizeof(s));
+		for(t = tfirst; t != NULL; t = t->next){
+			ns = seprinttable(s, e, t);
+			while(ns == e - 1){
+				printk("acpiread: allocated %d\n", tlen*2);
+				ntext = krealloc(ttext, tlen*2, 0);
+				if(ntext == NULL)
+					panic("acpi: no memory\n");
+				s = ntext + (ttext - s);
+				ttext = ntext;
+				tlen *= 2;
+				e = ttext + tlen;
 				ns = seprinttable(s, e, t);
-				while(ns == e - 1){
-					printk("acpiread: allocated %d\n", tlen*2);
-					ntext = krealloc(ttext, tlen*2, 0);
-					if(ntext == NULL)
-						panic("acpi: no memory\n");
-					s = ntext + (ttext - s);
-					ttext = ntext;
-					tlen *= 2;
-					e = ttext + tlen;
-					ns = seprinttable(s, e, t);
-				}
-				s = ns;
 			}
-					
+			s = ns;
 		}
 		return readstr(off, a, n, ttext);
 	case Qpretty:
-		if(ttext == NULL){
-			tlen = 32768;
-			ttext = kzmalloc(tlen, 0);
-			if(ttext == NULL){
-				printd("acpi: no memory\n");
-				return 0;
-			}
-			s = ttext;
-			e = ttext + tlen;
-			s = dumpfadt(s, e, &fadt);
-			s = dumpmadt(s, e, apics);
-			s = dumpslit(s, e, slit);
-			s = dumpsrat(s, e, srat);
-			dumpmsct(s, e, msct);
-		}
+		s = ttext;
+		e = ttext + tlen;
+		s = dumpfadt(s, e, &fadt);
+		s = dumpmadt(s, e, apics);
+		s = dumpslit(s, e, slit);
+		s = dumpsrat(s, e, srat);
+		dumpmsct(s, e, msct);
+		return readstr(off, a, n, ttext);
+	case Qioapic:
+		s = ioapicdump(ttext, ttext + tlen);
+		return readstr(off, a, n, ttext);
+	case Qapic:
+		s = apicdump(ttext, ttext + tlen);
 		return readstr(off, a, n, ttext);
 	case Qio:
 		if(reg == NULL)

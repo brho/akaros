@@ -53,8 +53,9 @@ enum {
 	IOAPIC_PBASE    = 0xfec00000, /* default *physical* address */
 };
 
-extern void ioapicinit(int id, int ibase, uintptr_t pa);
-extern void ioapicrdtr(struct apic*, int unused_int, int*, int*);
-extern void ioapicrdtw(struct apic*, int unused_int, int, int);
+void ioapicinit(int id, int ibase, uintptr_t pa);
+void ioapicrdtr(struct apic*, int unused_int, int*, int*);
+void ioapicrdtw(struct apic*, int unused_int, int, int);
+char *ioapicdump(char *start, char *end);
 
 #endif /* ROS_KERN_IOAPIC_H */

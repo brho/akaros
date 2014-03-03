@@ -178,8 +178,8 @@ ioapicinit(int id, int ibase, uintptr_t pa)
 	spin_unlock(&apic->lock);
 }
 
-void
-ioapicdump(void)
+char *
+ioapicdump(char *start, char *end)
 {
 	int i, n;
 	struct Rbus *rbus;
@@ -188,31 +188,33 @@ ioapicdump(void)
 	uint32_t hi, lo;
 
 	if(!2)
-		return;
+		return start;
 	for(i = 0; i < Napic; i++){
 		apic = &xioapic[i];
 		if(!apic->useable || apic->addr == 0)
 			continue;
-		printd("ioapic %d addr %#p nrdt %d ibase %d\n",
+		start = seprintf(start, end, "ioapic %d addr %#p nrdt %d ibase %d\n",
 			i, apic->addr, apic->nrdt, apic->ibase);
 		for(n = 0; n < apic->nrdt; n++){
 			spin_lock(&apic->lock);
 			rtblget(apic, n, &hi, &lo);
 			spin_unlock(&apic->lock);
-			printd(" rdt %2.2d %#8.8ux %#8.8ux\n", n, hi, lo);
+			start = seprintf(start, end, " rdt %2.2d %#8.8p %#8.8p\n", n, hi, lo);
 		}
 	}
 	for(i = 0; i < Nbus; i++){
 		if((rbus = rdtbus[i]) == NULL)
 			continue;
-		printd("iointr bus %d:\n", i);
+		start = seprintf(start, end, "iointr bus %d:\n", i);
 		for(; rbus != NULL; rbus = rbus->next){
 			rdt = rbus->rdt;
-			printd(" apic %ld devno %#ux (%d %d) intin %d lo %#ux ref %d\n",
+			start = seprintf(start, end,
+				" apic %ld devno %#p (%d %d) intin %d lo %#p ref %d\n",
 				rdt->apic-xioapic, rbus->devno, rbus->devno>>2,
 				rbus->devno & 0x03, rdt->intin, rdt->lo, rdt->ref);
 		}
 	}
+	return start;
 }
 
 void
@@ -230,7 +232,6 @@ ioapiconline(void)
 			spin_unlock(&apic->lock);
 		}
 	}
-	ioapicdump();
 }
 
 static int dfpolicy = 0;

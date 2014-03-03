@@ -144,50 +144,56 @@ apicinit(int apicno, uintptr_t pa, int isbp)
 		printk("apicinit%d: apicbase %#p -> %#p\n", apicno, pa, apicbase);
 	}
 	apic->useable = 1;
+	printk("apicinit%d: it's useable\n", apicno);
 
 	/*
 	 * Assign a machno to the processor associated with this
 	 * APIC, it may not be an identity map.
 	 * Machno 0 is always the bootstrap processor.
+	 */
 
 	if(isbp){
 		apic->machno = 0;
-		m->apicno = apicno;
+#warning "where in pcpui do we put the apicno?"
+		//m->apicno = apicno;
 	}
 	else
 		apic->machno = apmachno++;
-	 */
-}
-#if 0
-static void
-apicdump0(struct apic *apic, int i)
-{
-	if(!apic->useable || apic->addr != 0)
-		return;
-	printk("apic%d: machno %d lint0 %#8.8ux lint1 %#8.8ux\n",
-		i, apic->machno, apic->lvt[0], apic->lvt[1]);
-	printk(" tslvt %#8.8ux pclvt %#8.8ux elvt %#8.8ux\n",
-		apicrget(Tslvt), apicrget(Pclvt), apicrget(Elvt));
-	printk(" tlvt %#8.8ux lint0 %#8.8ux lint1 %#8.8ux siv %#8.8ux\n",
-		apicrget(Tlvt), apicrget(Lint0),
-		apicrget(Lint1), apicrget(Siv));
 }
 
-void
-apicdump(void)
+static char *
+apicdump0(char *start, char *end, struct apic *apic, int i)
+{
+	if(!apic->useable || apic->addr != 0)
+		return start;
+	start = seprintf(start, end, "apic%d: machno %d lint0 %#8.8p lint1 %#8.8p\n",
+		i, apic->machno, apic->lvt[0], apic->lvt[1]);
+	start = seprintf(start, end, " tslvt %#8.8p pclvt %#8.8p elvt %#8.8p\n",
+		apicrget(Tslvt), apicrget(Pclvt), apicrget(Elvt));
+	start = seprintf(start, end, " tlvt %#8.8p lint0 %#8.8p lint1 %#8.8p siv %#8.8p\n",
+		apicrget(Tlvt), apicrget(Lint0),
+		apicrget(Lint1), apicrget(Siv));
+	return start;
+}
+
+char *
+apicdump(char *start, char *end)
 {
 	int i;
 
 	if(!2)
-		return;
+		return start;
 
-	printk("apicbase %#p apmachno %d\n", apicbase, apmachno);
+	start = seprintf(start, end, "apicbase %#p apmachno %d\n", apicbase, apmachno);
 	for(i = 0; i < Napic; i++)
-		apicdump0(xlapic + i, i);
+		start = apicdump0(start, end, xlapic + i, i);
+	/* endxioapic?
 	for(i = 0; i < Napic; i++)
-		apicdump0(xioapic + i, i);
+		start = apicdump0(start, endxioapic + i, i);
+	*/
+	return start;
 }
-
+#if 0
 static void
 apictimer(Ureg* ureg, void*)
 {
