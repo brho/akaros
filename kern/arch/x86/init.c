@@ -75,6 +75,8 @@ void arch_init()
 	acpiinit();
 	void ioapiconline(void);
 	ioapiconline();
+	void apiconline(void);
+	apiconline();
 #endif
 	// this returns when all other cores are done and ready to receive IPIs
 	#ifdef CONFIG_SINGLE_CORE

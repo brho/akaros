@@ -11,6 +11,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <ip.h>
+#include <arch/io.h>
 
 enum {						/* Local APIC registers */
 	Id		= 0x0020,		/* Identification */
@@ -200,6 +201,7 @@ apictimer(Ureg* ureg, void*)
 	timerintr(ureg, 0);
 }
 
+#endif
 int
 apiconline(void)
 {
@@ -224,20 +226,20 @@ apiconline(void)
 	ver = apicrget(Ver);
 	nlvt = ((ver>>16) & 0xff) + 1;
 	if(nlvt > ARRAY_SIZE(apic->lvt)){
-		printd("apicinit%d: nlvt %d > max (%d)\n",
+		printk("apicinit%d: nlvt %d > max (%d)\n",
 			apicno, nlvt, ARRAY_SIZE(apic->lvt));
 		nlvt = ARRAY_SIZE(apic->lvt);
 	}
 	apic->nlvt = nlvt;
 	apic->ver = ver & 0xff;
-
+#warning "fix me for AMD apic"
 	/*
 	 * These don't really matter in Physical mode;
 	 * set the defaults anyway.
-	 */
 	if(memcmp(m->cpuinfo, "AuthenticAMD", 12) == 0)
 		dfr = 0xf0000000;
 	else
+	 */
 		dfr = 0xffffffff;
 	apicrput(Df, dfr);
 	apicrput(Ld, 0x00000000);
@@ -268,19 +270,20 @@ apiconline(void)
 	 */
 	apicrput(Tdc, DivX1);
 	apicrput(Tlvt, Im);
-	tsc = rdtsc() + m->cpuhz/10;
+	// system_timing.tsc_freq? is that valid yet?
+	tsc = read_tsc() + 2*1024*(1048576/10) /*m->cpuhz/10*/ ;
 	apicrput(Tic, 0xffffffff);
 
-	while(rdtsc() < tsc)
+	while(read_tsc() < tsc)
 		;
-
+#define HZ 60
 	apic->hz = (0xffffffff-apicrget(Tcc))*10;
 	apic->max = apic->hz/HZ;
 	apic->min = apic->hz/(100*HZ);
-	apic->div = ((m->cpuhz/apic->max)+HZ/2)/HZ;
+	apic->div = ((2ULL*1024*1048576 /*m->cpuhz*/ /apic->max)+HZ/2)/HZ;
 
-	if(m->machno == 0 || 2){
-		printd("apic%d: hz %lld max %lld min %lld div %lld\n", apicno,
+	if(/*m->machno == 0 ||*/ 2){
+		printk("apic%d: hz %lld max %lld min %lld div %lld\n", apicno,
 			apic->hz, apic->max, apic->min, apic->div);
 	}
 
@@ -318,27 +321,35 @@ apiconline(void)
 		;
 	 */
 
+#warning "not reloading the timer"
 	/*
 	 * Reload the timer to de-synchronise the processors,
 	 * then lower the task priority to allow interrupts to be
 	 * accepted by the APIC.
-	 */
 	microdelay((TK2MS(1)*1000/apmachno) * m->machno);
+	 */
 
+#if 0
 	if(apic->machno == 0){
 		apicrput(Tic, apic->max);
 		intrenable(IdtTIMER, apictimer, 0, -1, "APIC timer");
 		apicrput(Tlvt, Periodic|IrqTIMER);
 	}
 
-	if(m->machno == 0)
+#endif
+	if(node_id() /*m->machno*/ == 0)
 		apicrput(Tp, 0);
 
+#warning "map from apicno to cpu info not installed"
+/*
+	maps from apic to per-cpu info
 	xlapicmachptr[apicno] = m;
+*/
 
 	return 1;
 }
 
+#if 0
 /* To start timers on TCs as part of the boot process. */
 void
 apictimerenab(void)
