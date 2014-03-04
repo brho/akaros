@@ -34,5 +34,7 @@ void *BND(s,s+len)	memfind(const void *COUNT(len) s, int c, size_t len);
 long	strtol(const char *NTS s, char **endptr, int base);
 unsigned long strtoul(const char *s, char **endptr, int base);
 int	atoi(const char*NTS s);
+int sigchecksum(void *address, int length);
+void *sigscan(uint8_t *address, int length, char *signature);
 
 #endif /* not ROS_INC_STRING_H */

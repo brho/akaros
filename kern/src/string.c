@@ -422,3 +422,30 @@ int atoi(const char *s)
 	// no overflow detection
 	return (int)strtol(s,NULL,10);
 }
+
+int sigchecksum(void *address, int length)
+{
+	uint8_t *p, sum;
+
+	sum = 0;
+	for (p = address; length-- > 0; p++)
+		sum += *p;
+
+	return sum;
+}
+
+void *sigscan(uint8_t *address, int length, char *signature)
+{
+	uint8_t *e, *p;
+	int siglength;
+
+	e = address + length;
+	siglength = strlen(signature);
+	for (p = address; p + siglength < e; p += 16) {
+		if (memcmp(p, signature, siglength))
+			continue;
+		return p;
+	}
+
+	return NULL;
+}

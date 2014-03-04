@@ -1215,26 +1215,6 @@ static int acpixsdtload(char *sig)
 	return found;
 }
 
-static void *rsdscan(uint8_t * addr, int len, char *signature)
-{
-	int sl;
-	uint8_t *e, *p;
-
-	printk("SCANNNNNNNNNNNNNNNNNNNNNNNNNNNNN\n");
-	e = addr + len;
-	sl = strlen(signature);
-	for (p = addr; p + sl < e; p += 16) {
-		if (p == (void *)0xf15c0)
-			printk("CHECK F15C0!!!!!!!!!!!!!!!\n");
-		if (memcmp(p, signature, sl))
-			continue;
-		printk("WE GOT %p\n", p);
-		return p;
-	}
-
-	return NULL;
-}
-
 static void *rsdsearch(char *signature)
 {
 	uintptr_t p;
@@ -1245,7 +1225,7 @@ static void *rsdsearch(char *signature)
 	 * Search for the data structure signature:
 	 * 1) in the BIOS ROM between 0xE0000 and 0xFFFFF.
 	 */
-	return rsdscan(KADDR(0xE0000), 0x20000, signature);
+	return sigscan(KADDR(0xE0000), 0x20000, signature);
 }
 
 static void acpirsdptr(void)
