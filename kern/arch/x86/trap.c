@@ -594,7 +594,6 @@ int register_dev_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 #ifdef CONFIG_ENABLE_MPTABLES
 	/* TODO: this should be for any IOAPIC EOI, not just MPTABLES */
 	/* Just sending to core 0 for now */
-#warning "NOT routing the ioapic irq"
 	printk("ROUTING irq %d to core 0!\n", irq);
 	intrenable(irq, handler, irq_arg, tbdf);
 #else
