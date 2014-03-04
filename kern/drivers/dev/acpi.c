@@ -1595,9 +1595,6 @@ acpiinit(void)
 			printk("acpiinit returns -1\n");
 			return -1;
 		}
-		int mpacpi(int ncleft);
-		printk("mpacpi(32) is %d\n", mpacpi(32));
-
 	}
 	return 0;
 }

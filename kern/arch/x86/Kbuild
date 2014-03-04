@@ -11,6 +11,7 @@ obj-y						+= ioapic.o
 obj-y						+= kclock.o
 obj-y						+= kdebug.o
 obj-y						+= mpacpi.o
+obj-y						+= mp.o
 obj-y						+= page_alloc.o
 obj-y						+= pci.o
 obj-y						+= perfmon.o
