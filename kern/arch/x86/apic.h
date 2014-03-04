@@ -42,7 +42,7 @@
  * spaces.  We just happen to have a slight 'hole' in addressable physical
  * memory.  We can move the PBASE, but we're limited to 32 bit (physical)
  * addresses. */
-#define LAPIC_PBASE					0xfee00000 /* default *physical* address */
+#define LAPIC_PBASE					0xfee00000	/* default *physical* address */
 #define LAPIC_EOI					(LAPIC_BASE + 0x0b0)
 #define LAPIC_SPURIOUS				(LAPIC_BASE + 0x0f0)
 #define LAPIC_VERSION				(LAPIC_BASE + 0x030)
@@ -61,7 +61,7 @@
 #define LAPIC_TIMER_INIT			(LAPIC_BASE + 0x380)
 #define LAPIC_TIMER_CURRENT			(LAPIC_BASE + 0x390)
 #define LAPIC_TIMER_DIVIDE			(LAPIC_BASE + 0x3e0)
-#define LAPIC_TIMER_DEFAULT_VECTOR	0xeb 		/* Aka 235, IRQ203 */
+#define LAPIC_TIMER_DEFAULT_VECTOR	0xeb	/* Aka 235, IRQ203 */
 /* Quick note on the divisor.  The LAPIC timer ticks once per divisor-bus ticks
  * (system bus or APIC bus, depending on the model).  Ex: A divisor of 128 means
  * 128 bus ticks results in 1 timer tick.  The divisor increases the time range
@@ -106,7 +106,7 @@
 
 #define PIT_FREQ 					1193182
 
-#define IO_TIMER1   0x40        /* 8253 Timer #1 */
+#define IO_TIMER1   0x40	/* 8253 Timer #1 */
 #define TIMER_CNTR0 (IO_TIMER1 + TIMER_REG_CNTR0)
 #define TIMER_CNTR1 (IO_TIMER1 + TIMER_REG_CNTR1)
 #define TIMER_CNTR2 (IO_TIMER1 + TIMER_REG_CNTR2)
@@ -163,7 +163,7 @@ static inline void lapic_send_eoi(void);
 static inline uint32_t lapic_get_version(void);
 static inline uint32_t lapic_get_error(void);
 static inline uint32_t lapic_get_id(void);
-static inline void lapic_set_id(uint8_t id); // Careful, may not actually work
+static inline void lapic_set_id(uint8_t id);	// Careful, may not actually work
 static inline uint8_t lapic_get_logid(void);
 static inline void lapic_set_logid(uint8_t id);
 static inline void lapic_disable_timer(void);
@@ -191,7 +191,7 @@ static inline void lapic_send_eoi(void)
 
 static inline uint32_t lapic_get_version(void)
 {
-	return read_mmreg32(LAPIC_VERSION);	
+	return read_mmreg32(LAPIC_VERSION);
 }
 
 static inline uint32_t lapic_get_error(void)
@@ -239,7 +239,7 @@ static inline void lapic_disable(void)
  */
 static inline void lapic_wait_to_send(void)
 {
-	while(read_mmreg32(LAPIC_IPI_ICR_LOWER) & 0x1000)
+	while (read_mmreg32(LAPIC_IPI_ICR_LOWER) & 0x1000)
 		__cpu_relax();
 }
 
@@ -307,7 +307,6 @@ static inline void __send_nmi(uint8_t hw_coreid)
 	write_msr(IA32_APIC_BASE, msr_val);
 */
 
-
 /* 
  * This file is part of the UCB release of Plan 9. It is subject to the license
  * terms in the LICENSE file found in the top-level directory of this
@@ -326,37 +325,37 @@ static inline void __send_nmi(uint8_t hw_coreid)
  */
 
 struct ioapic {
-	spinlock_t lock;					/* IOAPIC: register access */
-	uint32_t*	addr;				/* IOAPIC: register base */
-	uintptr_t paddr;                        /* register base */
-	int	nrdt;				/* IOAPIC: size of RDT */
-	int	gsib;				/* IOAPIC: global RDT index */
-	int	ibase;				/* global interrupt base */
+	spinlock_t lock;			/* IOAPIC: register access */
+	uint32_t *addr;				/* IOAPIC: register base */
+	uintptr_t paddr;			/* register base */
+	int nrdt;					/* IOAPIC: size of RDT */
+	int gsib;					/* IOAPIC: global RDT index */
+	int ibase;					/* global interrupt base */
 };
 
 struct lapic {
-	int	machno;				/* APIC */
+	int machno;					/* APIC */
 
-	uint32_t	lvt[6];
-	int	nlvt;
-	int	ver;
+	uint32_t lvt[6];
+	int nlvt;
+	int ver;
 
-	int64_t	hz;				/* APIC Timer frequency */
-	int64_t	max;
-	int64_t	min;
-	int64_t	div;
+	int64_t hz;					/* APIC Timer frequency */
+	int64_t max;
+	int64_t min;
+	int64_t div;
 };
 
 struct apic {
-	int	useable;			/* en */
+	int useable;				/* en */
 	struct ioapic;
 	struct lapic;
 };
 
 enum {
-	Nbus		= 256,
-	Napic		= 254,			/* xAPIC architectural limit */
-	Nrdt		= 64,
+	Nbus = 256,
+	Napic = 254,	/* xAPIC architectural limit */
+	Nrdt = 64,
 };
 
 /*
@@ -373,29 +372,29 @@ enum {
  * [16] Interrupt Mask
  */
 enum {
-	MTf		= 0x00000000,		/* Fixed */
-	MTlp		= 0x00000100,		/* Lowest Priority */
-	MTsmi		= 0x00000200,		/* SMI */
-	MTrr		= 0x00000300,		/* Remote Read */
-	MTnmi		= 0x00000400,		/* NMI */
-	MTir		= 0x00000500,		/* INIT/RESET */
-	MTsipi		= 0x00000600,		/* Startup IPI */
-	MTei		= 0x00000700,		/* ExtINT */
+	MTf = 0x00000000,			/* Fixed */
+	MTlp = 0x00000100,	/* Lowest Priority */
+	MTsmi = 0x00000200,	/* SMI */
+	MTrr = 0x00000300,	/* Remote Read */
+	MTnmi = 0x00000400,	/* NMI */
+	MTir = 0x00000500,	/* INIT/RESET */
+	MTsipi = 0x00000600,	/* Startup IPI */
+	MTei = 0x00000700,	/* ExtINT */
 
-	Pm		= 0x00000000,		/* Physical Mode */
-	Lm		= 0x00000800,		/* Logical Mode */
+	Pm = 0x00000000,	/* Physical Mode */
+	Lm = 0x00000800,	/* Logical Mode */
 
-	Ds		= 0x00001000,		/* Delivery Status */
-	IPhigh		= 0x00000000,		/* IIPP High */
-	IPlow		= 0x00002000,		/* IIPP Low */
-	Rirr		= 0x00004000,		/* Remote IRR */
-	TMedge		= 0x00000000,		/* Trigger Mode Edge */
-	TMlevel		= 0x00008000,		/* Trigger Mode Level */
-	Im		= 0x00010000,		/* Interrupt Mask */
+	Ds = 0x00001000,	/* Delivery Status */
+	IPhigh = 0x00000000,	/* IIPP High */
+	IPlow = 0x00002000,	/* IIPP Low */
+	Rirr = 0x00004000,	/* Remote IRR */
+	TMedge = 0x00000000,	/* Trigger Mode Edge */
+	TMlevel = 0x00008000,	/* Trigger Mode Level */
+	Im = 0x00010000,	/* Interrupt Mask */
 };
 
-extern	struct apic	xlapic[Napic];
-extern	struct apic	xioapic[Napic];
+extern struct apic xlapic[Napic];
+extern struct apic xioapic[Napic];
 
 #define l16get(p)	(((p)[1]<<8)|(p)[0])
 #define	l32get(p)	(((uint32_t)l16get(p+2)<<16)|l16get(p))
