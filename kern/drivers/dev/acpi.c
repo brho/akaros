@@ -1045,7 +1045,7 @@ acpimadt(uint8_t *p, int len)
 			st->ioapic.id = id = p[2];
 			st->ioapic.addr = l32get(p+4);
 			st->ioapic.ibase = l32get(p+8);
-			/* iosapic overrides any ioapic entry for the same id */
+			/* ioapic overrides any ioapic entry for the same id */
 			for(l = apics->st; l != NULL; l = l->next)
 				if(l->type == ASiosapic && l->iosapic.id == id){
 					st->ioapic = l->iosapic;

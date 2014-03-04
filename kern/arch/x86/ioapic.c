@@ -108,20 +108,28 @@ rdtlookup(struct apic *apic, int intin)
  * mptable but we would like to avoid that.
  */
 void
-ioapicintrinit(int busno, int apicno, int intin, int devno, uint32_t lo)
+ioapicintrinit(int busno, int apicno, int intin, int devno, int lo)
 {
 	struct Rbus *rbus;
 	struct Rdt *rdt;
 	struct apic *apic;
+printk("%s: busno %d apicno %d intin %d devno %p lo %p\n", __func__,
+	busno, apicno, intin, devno, lo);
 
-	if(busno >= Nbus || apicno >= Napic || nrdtarray >= Nrdt)
+	if(busno >= Nbus || apicno >= Napic || nrdtarray >= Nrdt){
+		printk("FAIL 1\n");
 		return;
+	}
 	apic = &xioapic[apicno];
-	if(!apic->useable || intin >= apic->nrdt)
+	if(!apic->useable || intin >= apic->nrdt){
+		printk("apic->usable %d intin %d apic->nrdt %d OOR\n", apic->useable, intin,
+			apic->nrdt);
 		return;
+	}
 
 	rdt = rdtlookup(apic, intin);
 	if(rdt == NULL){
+printk("NO RDT, install it for apic %d intin %d lo %p\n", apic, intin, lo);
 		rdt = &rdtarray[nrdtarray++];
 		rdt->apic = apic;
 		rdt->intin = intin;
@@ -150,7 +158,7 @@ static int map_edge_level[4] = {
 	-1, TMedge, -1, TMlevel
 };
 int
-ioapic_route_irq(int irq, int apicno)
+ioapic_route_irq(int irq, int apicno, int devno)
 {
 	extern struct Madt *apics;
 	struct Madt *a = apics;
@@ -184,7 +192,7 @@ ioapic_route_irq(int irq, int apicno)
 		return -1;
 	}
 	lo = pol | edge_level;
-	ioapicintrinit(0, 0, irq, /* ah shit int devno*/ 0, lo);
+	ioapicintrinit(0, 0, 0/*st->intovr.intr*/, devno, lo);
 	printk("FOUND the MADT for %d\n", irq);
 	return 0;
 }
@@ -498,6 +506,9 @@ printk("devno is %08lx\n", devno);
 		}
 	}
 	if(rdt == NULL){
+		// install it? Who knows?
+int ioapic_route_irq(int irq, int apicno, int devno);
+		ioapic_route_irq(v->irq, 0, devno);
 		extern int mpisabusno;
 printk("rdt is NULLLLLLLLLLLLLLLLLLLLLL\n");
 		
@@ -509,8 +520,9 @@ printk("rdt is NULLLLLLLLLLLLLLLLLLLLLL\n");
 		 * no MPS table in akaros.
 		if((busno = mpisabusno) == -1)
 			return -1;
-		 */
+
 		devno = v->irq<<2;
+		 */
 		for(rbus = rdtbus[busno]; rbus != NULL; rbus = rbus->next)
 			if(rbus->devno == devno){
 printk("rbus->devno = %p, devno %p\n", rbus->devno, devno);
