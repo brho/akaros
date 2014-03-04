@@ -3,6 +3,7 @@ obj-y						+= apic9.o
 obj-y						+= colored_caches.o
 obj-y						+= console.o
 obj-y						+= cpuinfo.o
+obj-y						+= devarch.o
 obj-y						+= entry$(BITS).o
 #obj-y						+= emulate.o
 obj-y						+= frontend.o
