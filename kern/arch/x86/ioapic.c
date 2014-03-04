@@ -129,7 +129,7 @@ printk("%s: busno %d apicno %d intin %d devno %p lo %p\n", __func__,
 
 	rdt = rdtlookup(apic, intin);
 	if(rdt == NULL){
-printk("NO RDT, install it for apic %d intin %d lo %p\n", apic, intin, lo);
+printk("NO RDT, install it for apic %d intin %d lo %p\n", apicno, intin, lo);
 		rdt = &rdtarray[nrdtarray++];
 		rdt->apic = apic;
 		rdt->intin = intin;

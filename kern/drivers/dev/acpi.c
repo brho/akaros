@@ -335,6 +335,11 @@ regcpy(struct Regio *dio, uintptr_t da, struct Regio *sio,
 	return n*align;
 }
 
+// until we know.
+//#define vmap(x,y) (void *)vmap_pmem((x),(y))
+//#define vunmap(x,y) vunmap_vmem((uintptr_t)(x),(y))
+#define vmap(x,y) KADDR((x))
+#define vunmap(x,y) 
 /*
  * Perform I/O within region in access units of accsz bytes.
  * All units in bytes.
@@ -362,8 +367,7 @@ regio(struct Reg *r, void *p, uint32_t len, uintptr_t off, int iswr)
 		// A region might be too large.
 		// we don't have this nonsense in akaros, right? 
 		if(r->p == NULL)
-			//r->p = vmap(r->base, len);
-			r->p = KADDR(r->base);
+			r->p = vmap(r->base, len);
 		if(r->p == NULL)
 			error("regio: vmap failed");
 		rp = (uintptr_t)r->p + off;
@@ -443,20 +447,28 @@ sdtmap(uintptr_t pa, int *n, int cksum)
 {
 	struct Sdthdr* sdt;
 
-	sdt = KADDR(pa); //vmap(pa, sizeof(struct Sdthdr));
+	if (! pa){
+		printk("sdtmap: NULL pa\n");
+		return NULL;
+	}
+	sdt = vmap(pa, sizeof(*sdt));
 	if(sdt == NULL){
 		printk("acpi: vmap1: NULL\n");
 		return NULL;
 	}
 	*n = l32get(sdt->length);
-	//vunmap(sdt, sizeof(Sdthdr));
-	if((sdt = KADDR(pa) /*vmap(pa, *n)*/) == NULL){
+	vunmap(sdt, sizeof(*sdt));
+	if (! *n) {
+		printk("sdt has zero length!\n");
+		return NULL;
+	}
+	if((sdt = vmap(pa, *n)) == NULL){
 		printk("acpi: NULL vmap\n");
 		return NULL;
 	}
 	if(cksum != 0 && sdtchecksum(sdt, *n) == NULL){
 		printk("acpi: SDT: bad checksum\n");
-		//vunmap(sdt, sizeof(Sdthdr));
+		vunmap(sdt, sizeof(*sdt));
 		return NULL;
 	}
 	return sdt;

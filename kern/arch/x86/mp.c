@@ -58,7 +58,7 @@ static void
 mpintrprint(char* s, uint8_t* p)
 {
 	char buf[128], *b, *e;
-	char format[] = " type %d flags %#ux bus %d IRQ %d APIC %d INTIN %d\n";
+	char format[] = " type %d flags %p bus %d IRQ %d APIC %d INTIN %d\n";
 
 	b = buf;
 	e = b + sizeof(buf);
@@ -69,9 +69,9 @@ mpintrprint(char* s, uint8_t* p)
 	seprintf(b, e, format, p[1], l16get(p+2), p[4], p[5], p[6], p[7]);
 	printd(buf);
 */
-	b = printk("mpparse: intr:");
+	printk("mpparse: intr:");
 	if(s != NULL)
-		b = printk(" %s:", s);
+		printk(" %s:", s);
 	printk(format, p[1], l16get(p+2), p[4], p[5], p[6], p[7]);
 }
 
@@ -213,7 +213,7 @@ mpparse(PCMP* pcmp, int maxcores)
 		 * CPU and identical for all. Indicate whether this is
 		 * the bootstrap processor (p[3] & 0x02).
 		 */
-		printk("mpparse: cpu %d pa %#ux bp %d\n",
+		printk("mpparse: cpu %d pa %p bp %d\n",
 			p[1], l32get(pcmp->apicpa), p[3] & 0x02);
 		if((p[3] & 0x01) != 0 && maxcores > 0){
 				maxcores--;
@@ -445,10 +445,10 @@ mpsinit(int maxcores)
 	}
 
 	if(2){
-		printk("_MP_ @ %#p, addr %#ux length %ud rev %d",
+		printk("_MP_ @ %#p, addr %p length %ud rev %d",
 			mp, l32get(mp->addr), mp->length, mp->revision);
 		for(i = 0; i < sizeof(mp->feature); i++)
-			printk(" %2.2#ux", mp->feature[i]);
+			printk(" %2.2p", mp->feature[i]);
 		printk("\n");
 	}
 	if(mp->revision != 1 && mp->revision != 4)
