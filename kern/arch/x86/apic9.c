@@ -47,6 +47,42 @@ enum {						/* Local APIC registers */
 	Tslvt		= Lvt5,			/* Thermal Sensor */
 };
 
+
+static char *apicregnames[] = {
+	[Id]	"Identification",
+	[Ver]	"Version",
+	[Tp]	"Task Priority",
+	[Ap]	"Arbitration Priority",
+	[Pp]	"Processor Priority",
+	[Eoi]	"EOI",
+	[Ld]	"Logical Destination",
+	[Df]	"Destination Format",
+	[Siv]	"Spurious Interrupt Vector",
+	[Is]	"Interrupt Status (8)",
+	[Tm]	"Trigger Mode (8)",
+	[Ir]	"Interrupt Request (8)",
+	[Es]	"Error Status",
+	[Iclo]	"Interrupt Command",
+	[Ichi]	"Interrupt Command [63:32]",
+	[Lvt0]	"Local Vector Table 0",
+	[Lvt5]	"Local Vector Table 5",
+	[Lvt4]	"Local Vector Table 4",
+	[Lvt1]	"Local Vector Table 1",
+	[Lvt2]	"Local Vector Table 2",
+	[Lvt3]	"Local Vector Table 3",
+	[Tic]	"Timer Initial Count",
+	[Tcc]	"Timer Current Count",
+	[Tdc]	"Timer Divide Configuration",
+
+	[Tlvt]	"Timer",
+	[Lint0]	"Local Interrupt 0",
+	[Lint1]	"Local Interrupt 1",
+	[Elvt]	"Error",
+	[Pclvt]	"Performance Counter",
+	[Tslvt]	"Thermal Sensor",
+};
+
+
 enum {						/* Siv */
 	Swen		= 0x00000100,		/* Software Enable */
 	Fdis		= 0x00000200,		/* Focus Disable */
@@ -84,9 +120,13 @@ struct apic	xlapic[Napic];
 static uint32_t
 apicrget(int r)
 {
+	uint32_t val;
 	if (! apicbase)
 		panic("apicrget: no apic");
+	val = *((uint32_t*)(apicbase+r));
+	printk("apicrget: %s returns %p\n", apicregnames[r], val);
 	return *((uint32_t*)(apicbase+r));
+	return val;
 }
 
 static void
@@ -94,6 +134,7 @@ apicrput(int r, uint32_t data)
 {
 	if (! apicbase)
 		panic("apicrput: no apic");
+	printk("apicrput: %s = %p\n", apicregnames[r], data);
 	*((uint32_t*)(apicbase+r)) = data;
 }
 
@@ -137,13 +178,8 @@ apicinit(int apicno, uintptr_t pa, int isbp)
 		printd("apicinit%d: already initialised\n", apicno);
 		return;
 	}
-	if(apicbase == NULL){
-		if((apicbase = vmap_pmem(pa, 1024)) == NULL){
-			printd("apicinit%d: can't map apicbase\n", apicno);
-			return;
-		}
-		printk("apicinit%d: apicbase %#p -> %#p\n", apicno, pa, apicbase);
-	}
+	apicbase = LAPIC_BASE;
+	printk("apicinit%d: apicbase %#p -> %#p\n", apicno, pa, apicbase);
 	apic->useable = 1;
 	printk("apicinit%d: it's useable\n", apicno);
 
@@ -226,7 +262,7 @@ apiconline(void)
 	ver = apicrget(Ver);
 	nlvt = ((ver>>16) & 0xff) + 1;
 	if(nlvt > ARRAY_SIZE(apic->lvt)){
-		printk("apicinit%d: nlvt %d > max (%d)\n",
+		printk("apiconline%d: nlvt %d > max (%d)\n",
 			apicno, nlvt, ARRAY_SIZE(apic->lvt));
 		nlvt = ARRAY_SIZE(apic->lvt);
 	}

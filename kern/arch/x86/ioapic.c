@@ -140,7 +140,7 @@ printk("NO RDT, install it for apic %d intin %d lo %p\n", apic, intin, lo);
 			       busno, apicno, intin, devno, lo, rdt->lo);
 			return;
 		}
-		printk("dup rdt %d %d %d %d %.8ux\n", busno, apicno, intin, devno, lo);
+		printk("dup rdt %d %d %d %d %.8p\n", busno, apicno, intin, devno, lo);
 	}
 	rdt->ref++;
 	rbus = kzmalloc(sizeof *rbus, 0);
@@ -210,7 +210,8 @@ ioapicinit(int id, int ibase, uintptr_t pa)
 		return;
 
 	apic = &xioapic[id];
-	if(apic->useable || (apic->addr = vmap_pmem(pa, 1024)) == NULL)
+	apic->addr = IOAPIC_BASE;
+	if(apic->useable)
 		return;
 	apic->useable = 1;
 	apic->paddr = pa;
@@ -255,7 +256,7 @@ ioapicdump(char *start, char *end)
 			spin_lock(&apic->lock);
 			rtblget(apic, n, &hi, &lo);
 			spin_unlock(&apic->lock);
-			start = seprintf(start, end, " rdt %2.2d %#8.8p %#8.8p\n", n, hi, lo);
+			start = seprintf(start, end, " rdt %2.2d %p %p\n", n, hi, lo);
 		}
 	}
 	for(i = 0; i < Nbus; i++){
@@ -407,7 +408,7 @@ intrenablemsi(struct vctl* v, Pcidev *p)
 	v->type = "msi";
 	v->mask = msimask;
 
-	printk("msiirq: %T: enabling %.16llux %s irq %d vno %d\n", p->tbdf, msivec, v->name, v->irq, vno);
+	printk("msiirq: %T: enabling %.16llp %s irq %d vno %d\n", p->tbdf, msivec, v->name, v->irq, vno);
 	return vno;
 }
 #endif
@@ -472,7 +473,7 @@ printk("%s; BusPCI \n", __func__);
 		
 		busno = BUSBNO(v->tbdf);
 		if((pcidev = pcimatchtbdf(v->tbdf)) == NULL)
-			panic("no PCI dev for tbdf %#8.8ux", v->tbdf);
+			panic("no PCI dev for tbdf %p", v->tbdf);
 		if((vecno = intrenablemsi(v, pcidev)) != -1)
 			return vecno;
 		disablemsi(v, pcidev);
@@ -485,16 +486,16 @@ printk("%s; BusPCI \n", __func__);
 printk("INTP is %d\n", devno);
 
 		if(devno == 0)
-			panic("no INTP for tbdf %#8.8ux", v->tbdf);
+			panic("no INTP for tbdf %p", v->tbdf);
 		devno = BUSDNO(v->tbdf)<<2|(devno-1);
 printk("devno is %08lx\n", devno);
-		printk("ioapicintrenable: tbdf %#8.8p busno %d devno %d\n",
+		printk("ioapicintrenable: tbdf %p busno %d devno %d\n",
 		       v->tbdf, busno, devno);
 	}
 	else{
 		//SET(busno, devno);
 		busno = devno = 0;
-		panic("unknown tbdf %#8.8px", v->tbdf);
+		panic("unknown tbdf %px", v->tbdf);
 	}
 	
 	rdt = NULL;
@@ -529,7 +530,7 @@ printk("rbus->devno = %p, devno %p\n", rbus->devno, devno);
 				rdt = rbus->rdt;
 				break;
 			}
-		printk("isa: tbdf %#8.8ux busno %d devno %d %#p\n",
+		printk("isa: tbdf %p busno %d devno %d %#p\n",
 		       v->tbdf, busno, devno, rdt);
 	}
 	if(rdt == NULL){
@@ -566,7 +567,7 @@ printk("Second crack\n");
 	vecno = lo & 0xff;
 	spin_unlock(&rdt->apic->lock);
 
-	printk("busno %d devno %d hi %#8.8p lo %#8.8p vecno %d\n",
+	printk("busno %d devno %d hi %p lo %p vecno %d\n",
 	       busno, devno, hi, lo, vecno);
 	v->isr = apicisr;
 	v->eoi = apiceoi;
