@@ -26,6 +26,7 @@ mpacpi(int ncleft)
 	struct apic *apic;
 	struct Apicst *st;
 
+	printk("mpacpi ncleft %d\n", ncleft);
 	if (apics == NULL)
 		return ncleft;
 
@@ -54,6 +55,7 @@ mpacpi(int ncleft)
 				already = "(off)";
 
 			printd("apic proc %d/%d apicid %d %s\n", np-1, apic->machno, st->lapic.id, already);
+monitor(NULL);
 			break;
 		case ASioapic:
 			printd("ASioapic %d\n", st->ioapic.id);
@@ -67,6 +69,7 @@ mpacpi(int ncleft)
 			}
 			printk("ioapicinit(%d, %p, %p);\n", st->lapic.id, apics->lapicpa, st->ioapic.addr);
 			ioapicinit(st->ioapic.id, st->ioapic.ibase, st->ioapic.addr);
+monitor(NULL);
 		pr1:
 			printd("ioapic %d ", st->ioapic.id);
 			printd("addr %p base %d %s\n", apic->paddr, apic->ibase, already);

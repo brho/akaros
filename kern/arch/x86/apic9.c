@@ -138,7 +138,7 @@ apicinit(int apicno, uintptr_t pa, int isbp)
 		return;
 	}
 	if(apicbase == NULL){
-		if((apicbase = KADDR(pa)) == NULL){
+		if((apicbase = vmap_pmem(pa, 1024)) == NULL){
 			printd("apicinit%d: can't map apicbase\n", apicno);
 			return;
 		}

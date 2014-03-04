@@ -210,7 +210,7 @@ ioapicinit(int id, int ibase, uintptr_t pa)
 		return;
 
 	apic = &xioapic[id];
-	if(apic->useable || (apic->addr = KADDR(pa)/*vmap(pa, 1024)*/) == NULL)
+	if(apic->useable || (apic->addr = vmap_pmem(pa, 1024)) == NULL)
 		return;
 	apic->useable = 1;
 	apic->paddr = pa;
