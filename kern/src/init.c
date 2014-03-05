@@ -45,6 +45,7 @@
 #include <console.h>
 #include <linker_func.h>
 #include <ip.h>
+#include <acpi.h>
 #include <coreboot_tables.h>
 
 // zra: flag for Ivy
@@ -74,6 +75,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	radix_init();
 	cache_color_alloc_init();       // Inits data structs
 	colored_page_alloc_init();      // Allocates colors for agnostic processes
+	acpiinit();
 	kthread_init();					/* might need to tweak when this happens */
 	vmr_init();
 	file_init();

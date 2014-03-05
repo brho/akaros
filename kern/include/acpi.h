@@ -381,3 +381,5 @@ struct Xsdt {
 };
 
 extern uintptr_t acpimblocksize(uintptr_t, int *);
+
+int acpiinit(void);

@@ -69,20 +69,6 @@ void arch_init()
 	asm volatile ("fninit");
 	save_fp_state(&x86_default_fpu); /* used in arch/trap.h for fpu init */
 	pci_init();
-#ifdef CONFIG_ENABLE_MPTABLES
-	int ncleft;
-	int mpsinit(int maxcores);
-	int acpiinit(void);
-	/* this also does the mpacpi ... is that enough? */
-	ncleft = mpsinit(254);
-	/* NEVER printd here ... */
-	printk("mpacpi is %d\n", mpacpi(ncleft));
-	acpiinit();
-	void ioapiconline(void);
-	ioapiconline();
-	void apiconline(void);
-	apiconline();
-#endif
 	// this returns when all other cores are done and ready to receive IPIs
 	#ifdef CONFIG_SINGLE_CORE
 		smp_percpu_init();

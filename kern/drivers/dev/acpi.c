@@ -608,12 +608,6 @@ static struct Atable *acpifadt(uint8_t * p, int unused)
 	gasget(&fp->xgpe0blk, p + 220);
 	gasget(&fp->xgpe1blk, p + 232);
 
-#if 0
-	static char buf[8192];		// XXX
-	char *out;
-	out = dumpfadt(buf, &buf[8191], fp);
-	printk("%s\n", out);
-#endif
 	if (fp->xfacs != 0)
 		loadfacs(fp->xfacs);
 	else
@@ -670,14 +664,6 @@ static struct Atable *acpimsct(uint8_t * p, int len)
 		*stl = st;
 		stl = &st->next;
 	}
-#if 0
-	// no longer works if called from init.c
-	char *dump;
-	dump = kzmalloc(1024, KMALLOC_WAIT);
-	dumpmsct(dump, &dump[1023], msct);
-	printk("%s\n", dump);
-	kfree(dump);
-#endif
 	return NULL;	/* can be unmapped once parsed */
 }
 
@@ -774,14 +760,6 @@ static struct Atable *acpisrat(uint8_t * p, int len)
 			stl = &st->next;
 		}
 	}
-
-#if 0
-	char *dump;
-	dump = kzmalloc(8192, KMALLOC_WAIT);
-	dumpsrat(dump, &dump[8192], srat);
-	printk("%s\n", dump);
-	kfree(dump);
-#endif
 	return NULL;	/* can be unmapped once parsed */
 }
 
@@ -832,18 +810,10 @@ static struct Atable *acpislit(uint8_t * p, int len)
 		se->dom = k;
 		se->dist = *p;
 	}
-
-#warning "no qsort"
 #if 0
-	char *dump;
-	dump = kzmalloc(8192, KMALLOC_WAIT);
-	dumpslit(dump, &dump[8191], slit);
-	printk("%s", dump);
-	kfree(dump);
+	/* TODO: might need to sort this shit */
 	for (i = 0; i < slit->rowlen; i++)
 		qsort(slit->e[i], slit->rowlen, sizeof(slit->e[0][0]), cmpslitent);
-
-	dumpslit(slit);
 #endif
 	return NULL;	/* can be unmapped once parsed */
 }
@@ -1114,13 +1084,6 @@ static struct Atable *acpimadt(uint8_t * p, int len)
 			stl = &st->next;
 		}
 	}
-#if 0
-	char *dump;
-	dump = kzmalloc(8192, KMALLOC_WAIT);
-	dumpmadt(dump, &dump[8191], apics);
-	printk("%s\n", dump);
-	kfree(dump);
-#endif
 	return NULL;	/* can be unmapped once parsed */
 }
 
