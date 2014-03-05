@@ -538,7 +538,7 @@ void handle_irq(struct hw_trapframe *hw_tf)
 	if (hw_tf->tf_trapno != LAPIC_TIMER_DEFAULT_VECTOR)	/* timer irq */
 	if (hw_tf->tf_trapno != 255) /* kmsg */
 	if (hw_tf->tf_trapno != 36)	/* serial */
-		printd("Incoming IRQ, ISR: %d on core %d\n", hw_tf->tf_trapno,
+		printk("Incoming IRQ, ISR: %d on core %d\n", hw_tf->tf_trapno,
 		       core_id());
 	if (check_spurious_irq(hw_tf->tf_trapno))
 		goto out_no_eoi;
@@ -602,16 +602,18 @@ void unregister_raw_irq(unsigned int vector, isr_t handler, void *data)
  */
 int register_dev_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 {
+	/* TODO: remove this - need it to poll serial for now */
 	register_raw_irq(KERNEL_IRQ_OFFSET + irq, handler, irq_arg);
-
 	/* TODO: whenever we sort out the ACPI/IOAPIC business, we'll probably want
 	 * a helper to reroute an irq? */
 #ifdef CONFIG_ENABLE_MPTABLES
-	/* TODO: this should be for any IOAPIC EOI, not just MPTABLES */
-	/* Just sending to core 0 for now */
-	printk("ROUTING irq %d to core 0!\n", irq);
-	intrenable(irq, handler, irq_arg, tbdf);
+	/* TODO: dirty hack to get the IOAPIC vector */
+extern int intrenable(int irq, void (*f) (void *, void *), void *a, int tbdf);
+int x =	intrenable(irq, handler, irq_arg, tbdf);
+	if (x > 0)
+		register_raw_irq(x, handler, irq_arg);
 #else
+	register_raw_irq(KERNEL_IRQ_OFFSET + irq, handler, irq_arg);
 	pic_unmask_irq(irq);
 	unmask_lapic_lvt(LAPIC_LVT_LINT0);
 	enable_irq();

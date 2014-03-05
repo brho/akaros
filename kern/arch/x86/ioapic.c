@@ -120,6 +120,8 @@ void ioapicintrinit(int busno, int apicno, int intin, int devno, int lo)
 	if (!apic->useable || intin >= apic->nrdt) {
 		printk("apic->usable %d intin %d apic->nrdt %d OOR\n", apic->useable,
 			   intin, apic->nrdt);
+		printk("apicno %d, apic %p\n", apicno, apic);
+		monitor(0);
 		return;
 	}
 
@@ -189,7 +191,7 @@ int ioapic_route_irq(int irq, int apicno, int devno)
 		return -1;
 	}
 	lo = pol | edge_level;
-	ioapicintrinit(0, 0, 0 /*st->intovr.intr */ , devno, lo);
+	ioapicintrinit(0, 8, 0 /*st->intovr.intr */ , devno, lo);
 	printk("FOUND the MADT for %d\n", irq);
 	return 0;
 }
@@ -199,6 +201,7 @@ void ioapicinit(int id, int ibase, uintptr_t pa)
 	struct apic *apic;
 	static int base;
 
+	assert(pa == IOAPIC_PBASE);
 	/*
 	 * Mark the IOAPIC useable if it has a good ID
 	 * and the registers can be mapped.
@@ -211,6 +214,7 @@ void ioapicinit(int id, int ibase, uintptr_t pa)
 	if (apic->useable)
 		return;
 	apic->useable = 1;
+	printk("\t\tioapicinit %d: it's useable, apic %p\n", id, apic);
 	apic->paddr = pa;
 
 	/*
@@ -597,7 +601,7 @@ int ioapicintrdisable(int vecno)
 
 spinlock_t vctllock;
 
-void *intrenable(int irq, void (*f) (void *, void *), void *a, int tbdf)
+int intrenable(int irq, void (*f) (void *, void *), void *a, int tbdf)
 {
 	int vno;
 	Vctl *v;
@@ -647,6 +651,7 @@ void *intrenable(int irq, void (*f) (void *, void *), void *a, int tbdf)
 	 * the handler; the IRQ is useless in the wonderful world
 	 * of the IOAPIC.
 	 */
-	printk("INTRNABLE returns %d\n", v);
-	return v;
+	printk("INTRNABLE returns %p\n", v);
+	printk("INTRNABLE returns %d\n", v->vno);
+	return v->vno;
 }

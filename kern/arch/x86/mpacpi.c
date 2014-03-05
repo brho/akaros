@@ -55,7 +55,6 @@ int mpacpi(int ncleft)
 
 				printd("apic proc %d/%d apicid %d %s\n", np - 1, apic->machno,
 					   st->lapic.id, already);
-				monitor(NULL);
 				break;
 			case ASioapic:
 				printd("ASioapic %d\n", st->ioapic.id);
@@ -70,7 +69,6 @@ int mpacpi(int ncleft)
 				printk("ioapicinit(%d, %p, %p);\n", st->lapic.id,
 					   apics->lapicpa, st->ioapic.addr);
 				ioapicinit(st->ioapic.id, st->ioapic.ibase, st->ioapic.addr);
-				monitor(NULL);
 pr1:
 				printd("ioapic %d ", st->ioapic.id);
 				printd("addr %p base %d %s\n", apic->paddr, apic->ibase,

@@ -646,7 +646,7 @@ static struct Atable *acpimsct(uint8_t * p, int len)
 	struct Mdom **stl, *st;
 	int off;
 
-	msct = kzmalloc(sizeof(struct Msct), KMALLOC_WAIT);
+	msct = kzmalloc(sizeof(struct Msct), 0);
 	msct->ndoms = l32get(p + 40) + 1;
 	msct->nclkdoms = l32get(p + 44) + 1;
 	msct->maxpa = l64get(p + 48);
@@ -655,7 +655,7 @@ static struct Atable *acpimsct(uint8_t * p, int len)
 	pe = p + len;
 	off = l32get(p + 36);
 	for (p += off; p < pe; p += 22) {
-		st = kzmalloc(sizeof(struct Mdom), KMALLOC_WAIT);
+		st = kzmalloc(sizeof(struct Mdom), 0);
 		st->next = NULL;
 		st->start = l32get(p + 2);
 		st->end = l32get(p + 6);
@@ -1588,7 +1588,7 @@ static long acpiread(struct chan *c, void *a, long n, int64_t off)
 
 	if (ttext == NULL) {
 		tlen = 32768;
-		ttext = kzmalloc(tlen, KMALLOC_WAIT);
+		ttext = kzmalloc(tlen, 0);
 	}
 	if (ttext == NULL) {
 		error("acpiread: no memory");

@@ -171,10 +171,11 @@ void apicinit(int apicno, uintptr_t pa, int isbp)
 		printd("apicinit%d: already initialised\n", apicno);
 		return;
 	}
+	assert(pa == LAPIC_PBASE);
 	apicbase = LAPIC_BASE;
 	printk("apicinit%d: apicbase %#p -> %#p\n", apicno, pa, apicbase);
 	apic->useable = 1;
-	printk("apicinit%d: it's useable\n", apicno);
+	printk("\t\tapicinit%d: it's useable\n", apicno);
 
 	/*
 	 * Assign a machno to the processor associated with this
@@ -185,9 +186,10 @@ void apicinit(int apicno, uintptr_t pa, int isbp)
 	if (isbp) {
 		apic->machno = 0;
 #warning "where in pcpui do we put the apicno?"
-		//m->apicno = apicno;
+		//m->apicno = apicno; // acpino is the hw_coreid
 	} else
 		apic->machno = apmachno++;
+		// ^^ machno is the os_coreid
 }
 
 static char *apicdump0(char *start, char *end, struct apic *apic, int i)
@@ -293,6 +295,9 @@ int apiconline(void)
 	 */
 	apicrput(Eoi, 0);
 
+
+
+// TODO: sort this shit out with the system timing stuff
 	/*
 	 * Use the TSC to determine the APIC timer frequency.
 	 * It might be possible to snarf this from a chipset
@@ -316,6 +321,9 @@ int apiconline(void)
 		printk("apic%d: hz %lld max %lld min %lld div %lld\n", apicno,
 			   apic->hz, apic->max, apic->min, apic->div);
 	}
+
+
+
 
 	/*
 	 * Mask interrupts on Performance Counter overflow and
