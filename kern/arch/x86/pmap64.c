@@ -397,8 +397,8 @@ static void check_syms_va(void)
 {
 	/* Make sure our symbols are up to date (see arch/ros/mmu64.h) */
 	check_sym_va(KERN_LOAD_ADDR, 0xffffffffc0000000);
-	check_sym_va(LAPIC_BASE,     0xffffffffbffff000);
-	check_sym_va(IOAPIC_BASE,    0xffffffffbfffe000);
+	check_sym_va(LAPIC_BASE,     0xffffffffbff00000);
+	check_sym_va(IOAPIC_BASE,    0xffffffffbfe00000);
 	check_sym_va(VPT_TOP,        0xffffff0000000000);
 	check_sym_va(VPT,            0xfffffe8000000000);
 	check_sym_va(KERN_VMAP_TOP,  0xfffffe8000000000);
@@ -436,9 +436,9 @@ void vm_init(void)
 	}
 	/* For the LAPIC and IOAPIC, we use PAT (but not *the* PAT flag) to make
 	 * these type UC */
-	map_segment(boot_pgdir, LAPIC_BASE, PGSIZE, LAPIC_PBASE,
+	map_segment(boot_pgdir, LAPIC_BASE, APIC_SIZE, LAPIC_PBASE,
 	            PTE_PCD | PTE_PWT | PTE_W | PTE_G, max_jumbo_shift);
-	map_segment(boot_pgdir, IOAPIC_BASE, PGSIZE, IOAPIC_PBASE,
+	map_segment(boot_pgdir, IOAPIC_BASE, APIC_SIZE, IOAPIC_PBASE,
 	            PTE_PCD | PTE_PWT | PTE_W | PTE_G, max_jumbo_shift);
 	/* VPT mapping: recursive PTE inserted at the VPT spot */
 	boot_pgdir[PDX(VPT)] = PADDR(boot_pgdir) | PTE_W | PTE_P;

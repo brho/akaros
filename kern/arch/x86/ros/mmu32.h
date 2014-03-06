@@ -31,10 +31,10 @@ typedef unsigned long pde_t;
  *    KERNBASE ----->  +------------------------------+ 0xc0000000
  *                     |  Cur. Page Table (Kern. RW)  | RW/--  PTSIZE
  *    VPT          --> +------------------------------+ 0xbfc00000
- *                     |          Local APIC          | RW/--  PGSIZE
- *    LAPIC        --> +------------------------------+ 0xbfbff000
- *                     |            IOAPIC            | RW/--  PGSIZE
- *    IOAPIC,      --> +------------------------------+ 0xbfbfe000
+ *                     |          Local APIC          | RW/--  APIC_SIZE
+ *    LAPIC        --> +------------------------------+ 0xbfb00000
+ *                     |            IOAPIC            | RW/--  APIC_SIZE
+ *    IOAPIC,      --> +------------------------------+ 0xbfa00000
  *  KERN_DYN_TOP       |   Kernel Dynamic Mappings    |
  *                     |              .               |
  *                     :              .               :
@@ -112,8 +112,9 @@ typedef unsigned long pde_t;
 #define VPT				(KERNBASE - PTSIZE)
 #define VPD (VPT + (VPT >> 10))
 #define vpd VPD
-#define LAPIC_BASE		(VPT - PGSIZE)
-#define IOAPIC_BASE		(LAPIC_BASE - PGSIZE)
+#define APIC_SIZE 		0x100000
+#define LAPIC_BASE		(VPT - APIC_SIZE)
+#define IOAPIC_BASE		(LAPIC_BASE - APIC_SIZE)
 
 /* All arches must define this, which is the lower limit of their static
  * mappings, and where the dynamic mappings will start. */

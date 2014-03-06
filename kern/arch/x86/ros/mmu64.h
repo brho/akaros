@@ -25,13 +25,13 @@ typedef unsigned long pde_t;
  *                     |                              |                     |
  * KERN_LOAD_ADDR -->  +------------------------------+ 0xffffffffc0000000 -+
  *                     |                              |
- *                     |          Local APIC          | RW/--  PGSIZE
+ *                     |          Local APIC          | RW/--  APIC_SIZE (1MB)
  *                     |                              |
- *    LAPIC_BASE  -->  +------------------------------+ 0xffffffffbffff000
+ *    LAPIC_BASE  -->  +------------------------------+ 0xffffffffbff00000
  *                     |                              |
- *                     |            IOAPIC            | RW/--  PGSIZE
+ *                     |            IOAPIC            | RW/--  APIC_SIZE (1MB)
  *                     |                              |
- *  IOAPIC_BASE,  -->  +------------------------------+ 0xffffffffbfffe000
+ *  IOAPIC_BASE,  -->  +------------------------------+ 0xffffffffbfe00000
  *  KERN_DYN_TOP       |   Kernel Dynamic Mappings    |
  *                     |              .               |
  *                     :              .               :
@@ -134,8 +134,9 @@ typedef unsigned long pde_t;
  * the top 1 GB. */
 #define KERN_LOAD_ADDR  0xffffffffc0000000
 /* Static kernel mappings */
-#define LAPIC_BASE		(KERN_LOAD_ADDR - PGSIZE)
-#define IOAPIC_BASE		(LAPIC_BASE - PGSIZE)
+#define APIC_SIZE 		0x100000
+#define LAPIC_BASE		(KERN_LOAD_ADDR - APIC_SIZE)
+#define IOAPIC_BASE		(LAPIC_BASE - APIC_SIZE)
 /* All arches must define this, which is the lower limit of their static
  * mappings, and where the dynamic mappings will start. */
 #define KERN_DYN_TOP	IOAPIC_BASE

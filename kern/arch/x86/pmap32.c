@@ -211,10 +211,10 @@ vm_init(void)
 
 	// APIC mapping: using PAT (but not *the* PAT flag) to make these type UC
 	// IOAPIC
-	boot_map_segment(pgdir, IOAPIC_BASE, PGSIZE, IOAPIC_PBASE, 
+	boot_map_segment(pgdir, IOAPIC_BASE, APIC_SIZE, IOAPIC_PBASE,
 	                 PTE_PCD | PTE_PWT | PTE_W | PTE_G);
 	// Local APIC
-	boot_map_segment(pgdir, LAPIC_BASE, PGSIZE, LAPIC_PBASE,
+	boot_map_segment(pgdir, LAPIC_BASE, APIC_SIZE, LAPIC_PBASE,
 	                 PTE_PCD | PTE_PWT | PTE_W | PTE_G);
 
 	// Check that the initial page directory has been set up correctly.
