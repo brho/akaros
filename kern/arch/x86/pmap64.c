@@ -194,7 +194,7 @@ static uintptr_t __map_segment(pte_t *pgdir, uintptr_t va, size_t size,
 	}
 	/* Map whatever is left over */
 	if (size)
-		amt_mapped += __map_segment(pgdir, va, amt_to_submap, pa, perm,
+		amt_mapped += __map_segment(pgdir, va, size, pa, perm,
 		                            pml_shift - BITS_PER_PML);
 	return amt_mapped;
 }
