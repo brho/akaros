@@ -315,7 +315,7 @@ static int mpparse(PCMP * pcmp, int maxcores)
 				 */
 				if (p[6] == 0xff) {
 					for (i = 0; i < Napic; i++) {
-						if (!xlapic[i].useable || xlapic[i].addr != NULL)
+						if (!xlapic[i].useable || xlapic[i].addr)
 							continue;
 						xlapic[i].lvt[p[7]] = lo;
 					}

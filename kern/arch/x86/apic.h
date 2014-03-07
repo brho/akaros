@@ -326,7 +326,7 @@ static inline void __send_nmi(uint8_t hw_coreid)
 
 struct ioapic {
 	spinlock_t lock;			/* IOAPIC: register access */
-	uint32_t *addr;				/* IOAPIC: register base */
+	uintptr_t addr;				/* IOAPIC: register base */
 	uintptr_t paddr;			/* register base */
 	int nrdt;					/* IOAPIC: size of RDT */
 	int gsib;					/* IOAPIC: global RDT index */

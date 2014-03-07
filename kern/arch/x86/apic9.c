@@ -110,7 +110,7 @@ enum {							/* Tdc */
 	DivX1 = 0x0000000b,	/* Divide by 1 */
 };
 
-static uint8_t *apicbase;
+static uintptr_t apicbase;
 static int apmachno = 1;
 
 struct apic xlapic[Napic];
@@ -120,7 +120,7 @@ static uint32_t apicrget(int r)
 	uint32_t val;
 	if (!apicbase)
 		panic("apicrget: no apic");
-	val = *((uint32_t *) (apicbase + r));
+	val = read_mmreg32(apicbase + r);
 	printk("apicrget: %s returns %p\n", apicregnames[r], val);
 	return *((uint32_t *) (apicbase + r));
 	return val;
@@ -131,7 +131,7 @@ static void apicrput(int r, uint32_t data)
 	if (!apicbase)
 		panic("apicrput: no apic");
 	printk("apicrput: %s = %p\n", apicregnames[r], data);
-	*((uint32_t *) (apicbase + r)) = data;
+	write_mmreg32(apicbase + r, data);
 }
 
 int apiceoi(int vecno)
@@ -242,14 +242,13 @@ int apiconline(void)
 	uint32_t dfr, ver;
 	int apicno, nlvt;
 
-	if (apicbase == NULL)
+	if (!apicbase)
 		return 0;
 	if ((apicno = ((apicrget(Id) >> 24) & 0xff)) >= Napic)
 		return 0;
 	apic = &xlapic[apicno];
-	if (!apic->useable || apic->addr != NULL)
+	if (!apic->useable || apic->addr)
 		return 0;
-
 	/*
 	 * Things that can only be done when on the processor
 	 * owning the APIC, apicinit above runs on the bootstrap

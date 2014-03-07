@@ -40,7 +40,7 @@ struct Rdt {
 
 enum {							/* IOAPIC registers */
 	Ioregsel = 0x00,			/* indirect register address */
-	Iowin = 0x04,	/* indirect register data */
+	Iowin = 0x10,	/* indirect register data */
 	Ioipa = 0x08,	/* IRQ Pin Assertion */
 	Ioeoi = 0x10,	/* EOI */
 
@@ -60,26 +60,29 @@ static spinlock_t idtnolock;
 static int idtno = IdtIOAPIC;
 
 struct apic xioapic[Napic];
+
+/* TODO: put these in a header */
 int apiceoi(int);
 int apicisr(int);
+
 static void rtblget(struct apic *apic, int sel, uint32_t * hi, uint32_t * lo)
 {
 	sel = Ioredtbl + 2 * sel;
 
-	*(apic->addr + Ioregsel) = sel + 1;
-	*hi = *(apic->addr + Iowin);
-	*(apic->addr + Ioregsel) = sel;
-	*lo = *(apic->addr + Iowin);
+	write_mmreg32(apic->addr + Ioregsel, sel + 1);
+	*hi = read_mmreg32(apic->addr + Iowin);
+	write_mmreg32(apic->addr + Ioregsel, sel);
+	*lo = read_mmreg32(apic->addr + Iowin);
 }
 
 static void rtblput(struct apic *apic, int sel, uint32_t hi, uint32_t lo)
 {
 	sel = Ioredtbl + 2 * sel;
 
-	*(apic->addr + Ioregsel) = sel + 1;
-	*(apic->addr + Iowin) = hi;
-	*(apic->addr + Ioregsel) = sel;
-	*(apic->addr + Iowin) = lo;
+	write_mmreg32(apic->addr + Ioregsel, sel + 1);
+	write_mmreg32(apic->addr + Iowin, hi);
+	write_mmreg32(apic->addr + Ioregsel, sel);
+	write_mmreg32(apic->addr + Iowin, lo);
 }
 
 struct Rdt *rdtlookup(struct apic *apic, int intin)
@@ -223,16 +226,16 @@ void ioapicinit(int id, int ibase, uintptr_t pa)
 	 * responsibility of the O/S to set the APIC ID.
 	 */
 	spin_lock(&apic->lock);
-	*(apic->addr + Ioregsel) = Ioapicver;
-	apic->nrdt = ((*(apic->addr + Iowin) >> 16) & 0xff) + 1;
+	write_mmreg32(apic->addr + Ioregsel, Ioapicver);
+	apic->nrdt = ((read_mmreg32(apic->addr + Iowin) >> 16) & 0xff) + 1;
 	if (ibase != -1)
 		apic->ibase = ibase;
 	else {
 		apic->ibase = base;
 		base += apic->nrdt;
 	}
-	*(apic->addr + Ioregsel) = Ioapicid;
-	*(apic->addr + Iowin) = id << 24;
+	write_mmreg32(apic->addr + Ioregsel, Ioapicid);
+	write_mmreg32(apic->addr + Iowin, id << 24);
 	spin_unlock(&apic->lock);
 }
 
@@ -274,13 +277,14 @@ char *ioapicdump(char *start, char *end)
 	return start;
 }
 
+/* Zeros and masks every redirect entry in every IOAPIC */
 void ioapiconline(void)
 {
 	int i;
 	struct apic *apic;
 
 	for (apic = xioapic; apic < &xioapic[Napic]; apic++) {
-		if (!apic->useable || apic->addr == NULL)
+		if (!apic->useable || !apic->addr)
 			continue;
 		for (i = 0; i < apic->nrdt; i++) {
 			spin_lock(&apic->lock);
@@ -609,7 +613,7 @@ int intrenable(int irq, void (*f) (void *, void *), void *a, int tbdf)
 
 	if (f == NULL) {
 		printk("intrenable: nil handler for %d, tbdf %p\n", irq, tbdf);
-		return NULL;
+		return 0;
 	}
 
 	v = kzmalloc(sizeof(Vctl), KMALLOC_WAIT);
@@ -627,7 +631,7 @@ int intrenable(int irq, void (*f) (void *, void *), void *a, int tbdf)
 		printk("intrenable: couldn't enable irq %d, tbdf %p for %s\n",
 			   irq, tbdf, v->name);
 		kfree(v);
-		return NULL;
+		return 0;
 	}
 #if 0
 	if (vctl[vno]) {
