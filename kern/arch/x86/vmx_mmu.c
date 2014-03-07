@@ -536,7 +536,7 @@ static void inject_page_fault(struct litevm_vcpu *vcpu,
 		vmcs_write32(VM_ENTRY_INTR_INFO_FIELD,
 					 DF_VECTOR |
 					 INTR_TYPE_EXCEPTION |
-					 INTR_INFO_DELIEVER_CODE_MASK | INTR_INFO_VALID_MASK);
+					 INTR_INFO_DELIVER_CODE_MASK | INTR_INFO_VALID_MASK);
 		print_func_exit();
 		return;
 	}
@@ -545,7 +545,7 @@ static void inject_page_fault(struct litevm_vcpu *vcpu,
 	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD,
 				 PF_VECTOR |
 				 INTR_TYPE_EXCEPTION |
-				 INTR_INFO_DELIEVER_CODE_MASK | INTR_INFO_VALID_MASK);
+				 INTR_INFO_DELIVER_CODE_MASK | INTR_INFO_VALID_MASK);
 
 	print_func_exit();
 }

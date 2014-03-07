@@ -1,4 +1,4 @@
-sudo qemu-system-x86_64 -s -cpu qemu64 -smp 4 -m 2048 -nographic  \
+sudo qemu-system-x86_64 -s -cpu Haswell,+hypervisor,+vmx -smp 4 -m 2048 -nographic  \
 -net nic,model=rtl8139 \
 -net user,hostfwd=tcp::5555-:23 \
 -kernel obj/kern/akaros-kernel $*

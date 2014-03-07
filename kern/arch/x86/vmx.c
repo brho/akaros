@@ -116,6 +116,9 @@ static const char* vmx_msr_name[] = {
 #define HOST_IS_64 0
 #endif
 
+int vm_set_memory_region(struct litevm *litevm,
+						 struct litevm_memory_region *mem);
+
 /* bit ops not yet widely used in akaros and we're not sure where to put them. */
 /**
  * __ffs - find first set bit in word
@@ -559,6 +562,7 @@ static struct vmcs *alloc_vmcs(void)
 
 static int cpu_has_litevm_support(void)
 {
+	int ret;
 	print_func_entry();
 	/* sigh ... qemu. */
 	char vid[16];
@@ -570,8 +574,10 @@ static int cpu_has_litevm_support(void)
 	if (vid[0] == 'A') /* AMD or qemu claiming to be AMD */
 		return 0;
 	uint32_t ecx = cpuid_ecx(1);
+	ret = ecx & (1 << 5);	/* CPUID.1:ECX.VMX[bit 5] -> VT */
+	printk("%s: CPUID.1:ECX.VMX[bit 5] -> VT is%s available\n", __func__, ret ? "" : " NOT");
 	print_func_exit();
-	return ecx & (1 << 5);	/* CPUID.1:ECX.VMX[bit 5] -> VT */
+	return ret;
 }
 
 static int vmx_disabled_by_bios(void)
@@ -794,7 +800,7 @@ static void inject_gp(struct litevm_vcpu *vcpu)
 	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD,
 				 GP_VECTOR |
 				 INTR_TYPE_EXCEPTION |
-				 INTR_INFO_DELIEVER_CODE_MASK | INTR_INFO_VALID_MASK);
+				 INTR_INFO_DELIVER_CODE_MASK | INTR_INFO_VALID_MASK);
 	print_func_exit();
 }
 
@@ -945,14 +951,14 @@ static void __set_efer(struct litevm_vcpu *vcpu, uint64_t efer)
 		vmcs_write32(VM_ENTRY_CONTROLS,
 					 vmcs_read32(VM_ENTRY_CONTROLS) |
 					 VM_ENTRY_CONTROLS_IA32E_MASK);
-		msr->data = efer;
+		msr->value = efer;
 
 	} else {
 		vmcs_write32(VM_ENTRY_CONTROLS,
 					 vmcs_read32(VM_ENTRY_CONTROLS) &
 					 ~VM_ENTRY_CONTROLS_IA32E_MASK);
 
-		msr->data = efer & ~EFER_LME;
+		msr->value = efer & ~EFER_LME;
 	}
 	print_func_exit();
 }
@@ -971,7 +977,7 @@ static void enter_lmode(struct litevm_vcpu *vcpu)
 
 	vcpu->shadow_efer |= EFER_LMA;
 
-	find_msr_entry(vcpu, MSR_EFER)->data |= EFER_LMA | EFER_LME;
+	find_msr_entry(vcpu, MSR_EFER)->value |= EFER_LMA | EFER_LME;
 	vmcs_write32(VM_ENTRY_CONTROLS, vmcs_read32(VM_ENTRY_CONTROLS)
 				 | VM_ENTRY_CONTROLS_IA32E_MASK);
 	print_func_exit();
@@ -1429,7 +1435,7 @@ static int litevm_vcpu_setup(struct litevm_vcpu *vcpu)
 		data = read_msr(index);
 		vcpu->host_msrs[j].index = index;
 		vcpu->host_msrs[j].reserved = 0;
-		vcpu->host_msrs[j].data = data;
+		vcpu->host_msrs[j].value = data;
 		vcpu->guest_msrs[j] = vcpu->host_msrs[j];
 		++vcpu->nmsrs;
 	}
@@ -2322,7 +2328,7 @@ printk("nmi\n");
 	error_code = 0;
 	rip = vmcs_readl(GUEST_RIP);
 printk("GUEST_RIP %x\n", rip);
-	if (intr_info & INTR_INFO_DELIEVER_CODE_MASK)
+	if (intr_info & INTR_INFO_DELIVER_CODE_MASK)
 		error_code = vmcs_read32(VM_EXIT_INTR_ERROR_CODE);
 	if (is_page_fault(intr_info)) {
 printk("PAGE FAULT!\n");
@@ -2656,7 +2662,7 @@ static int handle_rdmsr(struct litevm_vcpu *vcpu, struct litevm_run *litevm_run)
 			break;
 		default:
 			if (msr) {
-				data = msr->data;
+				data = msr->value;
 				break;
 			}
 			printk("litevm: unhandled rdmsr: %x\n", ecx);
@@ -2703,7 +2709,7 @@ static void set_efer(struct litevm_vcpu *vcpu, uint64_t efer)
 
 	if (!(efer & EFER_LMA))
 		efer &= ~EFER_LME;
-	msr->data = efer;
+	msr->value = efer;
 	skip_emulated_instruction(vcpu);
 	print_func_exit();
 }
@@ -2767,7 +2773,7 @@ static int handle_wrmsr(struct litevm_vcpu *vcpu, struct litevm_run *litevm_run)
 		default:
 			msr = find_msr_entry(vcpu, ecx);
 			if (msr) {
-				msr->data = data;
+				msr->value = data;
 				break;
 			}
 			printk("litevm: unhandled wrmsr: %x\n", ecx);
@@ -2870,7 +2876,12 @@ static void inject_rmode_irq(struct litevm_vcpu *vcpu, int irq)
 	uint16_t sp = vmcs_readl(GUEST_RSP);
 	uint32_t ss_limit = vmcs_read32(GUEST_SS_LIMIT);
 
+	/* This is the 'does it wrap' test. */
+	/* This original test elicited complaints from the C compiler. 
+	 * It's a bit too Klever for me.
 	if (sp > ss_limit || ((sp - 6) > sp)) {
+	*/
+	if (sp > ss_limit || (sp < 6)) {
 		vcpu_printf(vcpu, "%s: #SS, rsp 0x%lx ss 0x%lx limit 0x%x\n",
 					__FUNCTION__,
 					vmcs_readl(GUEST_RSP),
@@ -2983,7 +2994,7 @@ static void load_msrs(struct vmx_msr_entry *e, int n)
 	}
 	for (i = 0; i < n; ++i) {
 		//printk("Load MSR (%lx), with %lx\n", e[i].index, e[i].data);
-		write_msr(e[i].index, e[i].data);
+		write_msr(e[i].index, e[i].value);
 		//printk("Done\n");
 	}
 	//print_func_exit();
@@ -2995,7 +3006,7 @@ static void save_msrs(struct vmx_msr_entry *e, int n)
 	int i;
 
 	for (i = 0; i < n; ++i)
-		e[i].data = read_msr(e[i].index);
+		e[i].value = read_msr(e[i].index);
 	//print_func_exit();
 }
 
