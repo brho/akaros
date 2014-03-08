@@ -166,6 +166,13 @@ config PRINTK_NO_BACKSPACE
 
 endmenu
 
+config VM
+	bool "Virtual Machine support"
+	default n
+	help
+		VM support -- not working! Based on KVM.
+
+
 menu "Misc/Old Options"
 
 config ARSC_SERVER

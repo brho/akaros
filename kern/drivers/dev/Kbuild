@@ -8,4 +8,6 @@ obj-y						+= mnt.o
 obj-y						+= pipe.o
 obj-y						+= root.o
 obj-y						+= srv.o
-obj-y						+= vm.o
+
+# VM support. Optional.
+obj-$(CONFIG_VM)				+= vm.o

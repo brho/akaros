@@ -5,7 +5,6 @@ obj-y						+= console.o
 obj-y						+= cpuinfo.o
 obj-y						+= devarch.o
 obj-y						+= entry$(BITS).o
-obj-y						+= emulate.o
 obj-y						+= frontend.o
 obj-y						+= init.o
 obj-y						+= ioapic.o
@@ -25,5 +24,8 @@ obj-y						+= smp_boot.o
 obj-y						+= smp_entry$(BITS).o
 obj-y						+= trap.o trap$(BITS).o
 obj-y						+= trapentry$(BITS).o
-obj-y						+= vmx.o
-obj-y						+= vmx_mmu.o
+
+# Virtual machine support. Optional.
+obj-$(CONFIG_VM)				+= emulate.o
+obj-$(CONFIG_VM)				+= vmx.o
+obj-$(CONFIG_VM)				+= vmx_mmu.o
