@@ -213,6 +213,7 @@ static void srvcreate(struct chan *c, char *name, int omode, uint32_t perm)
 	atomic_set(&srv->opens, 1);	/* we return it opened */
 	mkqid(&c->qid, Qsrvfile, 0, QTFILE);
 	c->aux = srv;
+	c->mode = openmode(omode);
 	/* one ref for being on the list */
 	kref_init(&srv->ref, srv_release, 1);
 	spin_lock(&srvlock);
