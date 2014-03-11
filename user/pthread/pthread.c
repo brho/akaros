@@ -275,10 +275,17 @@ void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
 	}
 
 	if (!(err & PF_VMR_BACKED)) {
-		/* TODO: put your SIGSEGV handling here */
-		printf("Pthread page faulted outside a VMR\n");
-		print_user_context(&uthread->u_ctx);
-		exit(-1);
+		struct siginfo info = {0};
+		info.si_code = SEGV_MAPERR;
+		info.si_addr = (void*)aux;
+
+		int vcoreid = vcore_id();
+		void *temp_tls_desc = get_tls_desc(vcoreid);
+		set_tls_desc(uthread->tls_desc, vcore_id());
+		trigger_posix_signal(SIGSEGV, &info, &uthread->u_ctx);
+		set_tls_desc(temp_tls_desc, vcoreid);
+		pth_thread_runnable(uthread);
+		return;
 	}
 	/* stitching for the event handler.  sysc -> uth, uth -> sysc */
 	uthread->local_sysc.u_data = uthread;

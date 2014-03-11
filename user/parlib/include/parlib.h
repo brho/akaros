@@ -14,6 +14,7 @@
 #include <ros/syscall.h>
 #include <ros/procinfo.h>
 #include <ros/procdata.h>
+#include <signal.h>
 #include <stdint.h>
 #include <errno.h>
 #include <ros_debug.h>
@@ -58,6 +59,7 @@ int         sys_abort_sysc(struct syscall *sysc);
 long		syscall_async(struct syscall *sysc, unsigned long num, ...);
 
 void		init_posix_signals(void);	/* in signal.c */
+void		trigger_posix_signal(int sig_nr, struct siginfo *info, void *aux);
 #ifdef __cplusplus
 }
 #endif
