@@ -1,0 +1,10 @@
+#!/bin/sh
+# N.B. Preserve blank line we match against so this is idempotent.
+sed -i '/^#include/,/^$/c\
+#include <stdlib.h>\
+#include <stdio.h>\
+#include <parlib.h>\
+#include <unistd.h>\
+#include <signal.h>\
+#include <iplib.h>\
+' $1
