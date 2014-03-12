@@ -138,8 +138,9 @@ extern system_timing_t system_timing;
 extern bool core_id_ready;
 
 void pic_remap(void);
-void pic_mask_irq(int irq);
-void pic_unmask_irq(int irq);
+void pic_mask_irq(int trap_nr);
+void pic_unmask_irq(int trap_nr);
+void pic_mask_all(void);
 uint16_t pic_get_mask(void);
 uint16_t pic_get_irr(void);
 uint16_t pic_get_isr(void);

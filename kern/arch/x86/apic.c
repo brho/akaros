@@ -49,8 +49,9 @@ void pic_remap(void)
 	spin_unlock_irqsave(&piclock);
 }
 
-void pic_mask_irq(int irq)
+void pic_mask_irq(int trap_nr)
 {
+	int irq = trap_nr - PIC1_OFFSET;
 	spin_lock_irqsave(&piclock);
 	if (irq > 7)
 		outb(PIC2_DATA, inb(PIC2_DATA) | (1 << (irq - 8)));
@@ -59,8 +60,9 @@ void pic_mask_irq(int irq)
 	spin_unlock_irqsave(&piclock);
 }
 
-void pic_unmask_irq(int irq)
+void pic_unmask_irq(int trap_nr)
 {
+	int irq = trap_nr - PIC1_OFFSET;
 	spin_lock_irqsave(&piclock);
 	if (irq > 7) {
 		outb(PIC2_DATA, inb(PIC2_DATA) & ~(1 << (irq - 8)));
@@ -68,6 +70,12 @@ void pic_unmask_irq(int irq)
 	} else
 		outb(PIC1_DATA, inb(PIC1_DATA) & ~(1 << irq));
 	spin_unlock_irqsave(&piclock);
+}
+
+void pic_mask_all(void)
+{
+	for (int i = 0 + PIC1_OFFSET; i < 16 + PIC1_OFFSET; i++)
+		pic_mask_irq(i);
 }
 
 /* Aka, the IMR.  Simply reading the data port are OCW1s. */
@@ -260,7 +268,7 @@ uint32_t lapic_get_default_id(void)
 // timer init calibrates both tsc timer and lapic timer using PIT
 void timer_init(void){
 	/* some boards have this unmasked early on. */
-	pic_mask_irq(0);
+	pic_mask_irq(0 + PIC1_OFFSET);
 	uint64_t tscval[2];
 	long timercount[2];
 	pit_set_timer(0xffff, TIMER_RATEGEN);

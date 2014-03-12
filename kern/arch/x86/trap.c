@@ -160,6 +160,9 @@ void idt_init(void)
 
 	asm volatile("lidt %0" : : "m"(idt_pd));
 
+	pic_remap();
+	pic_mask_all();
+
 #ifdef CONFIG_ENABLE_MPTABLES
 	int ncleft;
 	int mpsinit(int maxcores);
@@ -173,14 +176,10 @@ void idt_init(void)
 	apiconline(); /* TODO: do this this for all cores*/
 	ioapiconline();
 #else
-	// This will go away when we start using the IOAPIC properly
-	pic_remap();
 	// set LINT0 to receive ExtINTs (KVM's default).  At reset they are 0x1000.
 	write_mmreg32(LAPIC_LVT_LINT0, 0x700);
-	// mask it to shut it up for now
-	mask_lapic_lvt(LAPIC_LVT_LINT0);
-	// and turn it on
 	lapic_enable();
+	unmask_lapic_lvt(LAPIC_LVT_LINT0);
 #endif
 
 	/* register the generic timer_interrupt() handler for the per-core timers */
@@ -576,9 +575,7 @@ int x =	intrenable(irq, handler, irq_arg, tbdf);
 #else
 	// only need the ghetto one up above
 	//register_raw_irq(KERNEL_IRQ_OFFSET + irq, handler, irq_arg);
-	pic_unmask_irq(irq);
-	unmask_lapic_lvt(LAPIC_LVT_LINT0);
-	enable_irq();
+	pic_unmask_irq(irq + PIC1_OFFSET);
 #endif
 	return 0;
 }
