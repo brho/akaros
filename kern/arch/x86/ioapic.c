@@ -446,14 +446,13 @@ int ioapicintrenable(Vctl * v)
 			 * Make a busno and devno using the
 			 * ISA bus number and the irq.
 			 */
-#if 0
 			extern int mpisabusno;
 
 			if (mpisabusno == -1)
 				panic("no ISA bus allocated");
 			busno = mpisabusno;
-#endif
-			busno = 0;
+			/* need to track the irq in devno in PCI interrupt assignment entry
+			 * format (see mp.c or MP spec D.3). */
 			devno = v->irq << 2;
 		}
 	} else if (BUSTYPE(v->tbdf) == BusPCI) {

@@ -479,16 +479,6 @@ void handle_irq(struct hw_trapframe *hw_tf)
 		irq_h->isr(hw_tf, irq_h->data);
 		irq_h = irq_h->next;
 	}
-
-	//lapic_print_isr();
-	//printk("LAPIC LINT0: %p\n", read_mmreg32(LAPIC_LVT_LINT0));
-	//printk("COM1, IIR %p\n", inb(0x3f8 + 2));
-	irq_h = irq_handlers[4 + 32];
-	while (irq_h) {
-		irq_h->isr(hw_tf, irq_h->data);
-		irq_h = irq_h->next;
-	}
-
 	// if we're a general purpose IPI function call, down the cpu_list
 	extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
 	if ((I_SMP_CALL0 <= hw_tf->tf_trapno) &&
@@ -562,8 +552,6 @@ void unregister_raw_irq(unsigned int vector, isr_t handler, void *data)
  */
 int register_dev_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 {
-	/* TODO: remove this - need it to poll serial for now */
-	register_raw_irq(KERNEL_IRQ_OFFSET + irq, handler, irq_arg);
 	/* TODO: whenever we sort out the ACPI/IOAPIC business, we'll probably want
 	 * a helper to reroute an irq? */
 #ifdef CONFIG_ENABLE_MPTABLES
@@ -573,8 +561,7 @@ int x =	intrenable(irq, handler, irq_arg, tbdf);
 	if (x > 0)
 		register_raw_irq(x, handler, irq_arg);
 #else
-	// only need the ghetto one up above
-	//register_raw_irq(KERNEL_IRQ_OFFSET + irq, handler, irq_arg);
+	register_raw_irq(KERNEL_IRQ_OFFSET + irq, handler, irq_arg);
 	pic_unmask_irq(irq + PIC1_OFFSET);
 #endif
 	return 0;
