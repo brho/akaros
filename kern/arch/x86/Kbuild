@@ -14,6 +14,7 @@ obj-y						+= mpacpi.o
 obj-y						+= mp.o
 obj-y						+= page_alloc.o
 obj-y						+= pci.o
+obj-y						+= pic.o
 obj-y						+= perfmon.o
 obj-y						+= pmap.o pmap$(BITS).o
 obj-y						+= process$(BITS).o

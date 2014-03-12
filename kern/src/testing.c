@@ -19,7 +19,6 @@
 #include <string.h>
 #include <testing.h>
 #include <trap.h>
-#include <trap.h>
 #include <process.h>
 #include <syscall.h>
 #include <time.h>

@@ -15,27 +15,6 @@
 #include <arch/x86.h>
 #include <atomic.h>
 
-/* PIC (8259A)
- * When looking at the specs, A0 is our CMD line, and A1 is the DATA line.  This
- * means that blindly writing to PIC1_DATA is an OCW1 (interrupt masks).  When
- * writing to CMD (A0), the chip can determine betweeb OCW2 and OCW3 by the
- * setting of a few specific bits (OCW2 has bit 3 unset, OCW3 has it set). */
-#define PIC1_CMD					0x20
-#define PIC1_DATA					0x21
-#define PIC2_CMD					0xA0
-#define PIC2_DATA					0xA1
-// These are also hardcoded into the IRQ_HANDLERs of kern/trapentry.S
-#define PIC1_OFFSET					0x20
-#define PIC2_OFFSET					0x28
-#define PIC1_SPURIOUS				(7 + PIC1_OFFSET)
-#define PIC2_SPURIOUS				(7 + PIC2_OFFSET)
-#define PIC_EOI						0x20	/* OCW2 EOI */
-/* These set the next CMD read to return specific values.  Note that the chip
- * remembers what setting we had before (IRR or ISR), if you do other reads of
- * CMD. (not tested, written in the spec sheet) */
-#define PIC_READ_IRR				0x0a	/* OCW3 irq ready next CMD read */
-#define PIC_READ_ISR				0x0b	/* OCW3 irq service next CMD read */
-
 // Local APIC
 /* PBASE is the physical address.  It is mapped in at the VADDR LAPIC_BASE.
  * 64 bit note: it looks like this is mapped to the same place in 64 bit address
@@ -137,15 +116,6 @@ extern system_timing_t system_timing;
  * other than core 0 when it is called before smp_boot completes. */
 extern bool core_id_ready;
 
-void pic_remap(void);
-void pic_mask_irq(int trap_nr);
-void pic_unmask_irq(int trap_nr);
-void pic_mask_all(void);
-uint16_t pic_get_mask(void);
-uint16_t pic_get_irr(void);
-uint16_t pic_get_isr(void);
-bool pic_check_spurious(int trap_nr);
-void pic_send_eoi(int trap_nr);
 bool lapic_check_spurious(int trap_nr);
 bool lapic_get_isr_bit(uint8_t vector);
 bool lapic_get_irr_bit(uint8_t vector);

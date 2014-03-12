@@ -84,6 +84,7 @@
 #include <arch/mmu.h>
 #include <ros/trapframe.h>
 #include <arch/pci.h>
+#include <arch/pic.h>
 #include <arch/coreid.h>
 
 struct irq_handler {
