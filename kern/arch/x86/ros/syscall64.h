@@ -5,8 +5,6 @@
 #error "Do not include include ros/arch/syscall64.h directly"
 #endif
 
-#define T_SYSCALL	0x80
-
 #ifndef ROS_KERNEL
 
 #include <sys/types.h>

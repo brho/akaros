@@ -13,6 +13,7 @@
 #include <arch/x86.h>
 #include <arch/arch.h>
 #include <arch/apic.h>
+#include <trap.h>
 #include <time.h>
 #include <assert.h>
 #include <stdio.h>
@@ -122,7 +123,7 @@ void lapic_set_timer(uint32_t usec, bool periodic)
 	                    / 1000000;
 	uint32_t ticks32 = ((ticks64 >> 32) ? 0xffffffff : ticks64);
 	assert(ticks32 > 0);
-	__lapic_set_timer(ticks32, LAPIC_TIMER_DEFAULT_VECTOR, periodic,
+	__lapic_set_timer(ticks32, IdtLAPIC_TIMER, periodic,
 	                  LAPIC_TIMER_DIVISOR_BITS);
 }
 

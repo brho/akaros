@@ -322,7 +322,7 @@ void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain)
 		/* TODO: using the LAPIC vector is a bit ghetto, since that's x86.  But
 		 * RISCV ignores the vector field, and we don't have a global IRQ vector
 		 * namespace or anything. */
-		send_ipi(rem_pcpui - &per_cpu_info[0], LAPIC_TIMER_DEFAULT_VECTOR);
+		send_ipi(rem_pcpui - &per_cpu_info[0], IdtLAPIC_TIMER);
 		return;
 	}
 	if (time) {

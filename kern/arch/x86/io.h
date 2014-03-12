@@ -7,65 +7,6 @@
  * in the LICENSE file.
  */
 
-enum {
-	VectorNMI = 2,				/* non-maskable interrupt */
-	VectorBPT = 3,	/* breakpoint */
-	VectorUD = 6,	/* invalid opcode exception */
-	VectorCNA = 7,	/* coprocessor not available */
-	Vector2F = 8,	/* double fault */
-	VectorCSO = 9,	/* coprocessor segment overrun */
-	VectorPF = 14,	/* page fault */
-	Vector15 = 15,	/* reserved */
-	VectorCERR = 16,	/* coprocessor error */
-
-	VectorPIC = 32,	/* external i8259 interrupts */
-	IrqCLOCK = 0,
-	IrqKBD = 1,
-	IrqUART1 = 3,
-	IrqUART0 = 4,
-	IrqPCMCIA = 5,
-	IrqFLOPPY = 6,
-	IrqLPT = 7,
-	IrqIRQ7 = 7,
-	IrqAUX = 12,	/* PS/2 port */
-	IrqIRQ13 = 13,	/* coprocessor on 386 */
-	IrqATA0 = 14,
-	IrqATA1 = 15,
-	MaxIrqPIC = 15,
-
-	VectorLAPIC = VectorPIC + 16,	/* local APIC interrupts */
-	IrqLINT0 = VectorLAPIC + 0,
-	IrqLINT1 = VectorLAPIC + 1,
-	IrqTIMER = VectorLAPIC + 2,
-	IrqERROR = VectorLAPIC + 3,
-	IrqPCINT = VectorLAPIC + 4,
-	IrqSPURIOUS = VectorLAPIC + 15,
-	MaxIrqLAPIC = VectorLAPIC + 15,
-
-	VectorSYSCALL = 64,
-
-	VectorAPIC = 65,	/* external APIC interrupts */
-	MaxVectorAPIC = 255,
-};
-
-enum {
-	IdtPIC = 32,				/* external i8259 interrupts */
-
-	IdtLINT0 = 48,	/* local APIC interrupts */
-	IdtLINT1 = 49,
-	IdtTIMER = 50,
-	IdtERROR = 51,
-	IdtPCINT = 52,
-
-	IdtIPI = 62,
-	IdtSPURIOUS = 63,
-
-	IdtSYSCALL = 64,
-
-	IdtIOAPIC = 65,	/* external APIC interrupts */
-
-	IdtMAX = 255,
-};
 
 struct Vkey {
 	int tbdf;					/* pci: ioapic or msi sources */

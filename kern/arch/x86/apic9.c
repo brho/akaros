@@ -12,6 +12,7 @@
 #include <smp.h>
 #include <ip.h>
 #include <arch/io.h>
+#include <trap.h>
 
 enum {							/* Local APIC registers */
 	Id = 0x0020,				/* Identification */
@@ -287,7 +288,7 @@ int apiconline(void)
 	 * bits 3-0 0x0f unless the Extended Spurious Vector Enable bit
 	 * is set in the HyperTransport Transaction Control register.
 	 */
-	apicrput(Siv, Swen | IdtSPURIOUS);
+	apicrput(Siv, Swen | IdtLAPIC_SPURIOUS);
 
 	/*
 	 * Acknowledge any outstanding interrupts.
@@ -339,12 +340,12 @@ int apiconline(void)
 		 /*FALLTHROUGH*/ default:
 			break;
 	}
-	apicrput(Lint1, apic->lvt[1] | Im | IdtLINT1);
-	apicrput(Lint0, apic->lvt[0] | Im | IdtLINT0);
+	apicrput(Lint1, apic->lvt[1] | Im | IdtLAPIC_LINT1);
+	apicrput(Lint0, apic->lvt[0] | Im | IdtLAPIC_LINT0);
 
 	apicrput(Es, 0);
 	apicrget(Es);
-	apicrput(Elvt, IdtERROR);
+	apicrput(Elvt, IdtLAPIC_ERROR);
 
 	/*
 	 * Issue an INIT Level De-Assert to synchronise arbitration ID's.

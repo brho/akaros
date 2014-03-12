@@ -22,6 +22,7 @@
 #include <ip.h>
 #include <arch/io.h>
 #include <acpi.h>
+#include <trap.h>
 
 struct Rbus {
 	struct Rbus *next;
@@ -433,8 +434,8 @@ int ioapicintrenable(Vctl * v)
  */
 	if (v->tbdf == BUSUNKNOWN) {
 		printk("%s; BUSUNKNOWN\n", __func__);
-		if (v->irq >= IrqLINT0 && v->irq <= MaxIrqLAPIC) {
-			if (v->irq != IrqSPURIOUS)
+		if (idt_vec_is_lapic(v->irq)) {
+			if (v->irq != IdtLAPIC_SPURIOUS)
 				v->isr = apiceoi;
 			v->type = "lapic";
 			return v->irq;
@@ -583,7 +584,7 @@ int ioapicintrdisable(int vecno)
 	 *
 	 * What about any pending interrupts?
 	 */
-	if (vecno < 0 || vecno > MaxVectorAPIC) {
+	if (vecno < 0 || vecno > MaxIdtIOAPIC) {
 		panic("ioapicintrdisable: vecno %d out of range", vecno);
 		return -1;
 	}

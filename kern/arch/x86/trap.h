@@ -4,10 +4,8 @@
 #include "msr-index.h"
 
 #define NUM_IRQS					256
-#define KERNEL_IRQ_OFFSET			32
 
-// Trap numbers
-// These are processor defined:
+/* 0-31 are hardware traps */
 #define T_DIVIDE     0		// divide error
 #define T_DEBUG      1		// debug exception
 #define T_NMI        2		// non-maskable interrupt
@@ -29,11 +27,45 @@
 #define T_MCHK      18		// machine check
 #define T_SIMDERR   19		// SIMD floating point error
 
-// These are arbitrarily chosen, but with care not to overlap
-// processor defined exceptions or interrupt vectors.
+/* 32-47 are PIC/8259 IRQ vectors */
+#define IdtPIC					32
+#define IrqCLOCK				0
+#define IrqKBD					1
+#define IrqUART1				3
+#define IrqUART0				4
+#define IrqPCMCIA				5
+#define IrqFLOPPY				6
+#define IrqLPT					7
+#define IrqAUX					12	/* PS/2 port */
+#define IrqIRQ13				13	/* coprocessor on 386 */
+#define IrqATA0					14
+#define IrqATA1					15
+#define MaxIrqPIC				15
+#define MaxIdtPIC				(IdtPIC + MaxIrqPIC)
 
-// T_SYSCALL is defined by the following include:
+/* 48-63 are LAPIC vectors */
+#define IdtLAPIC				(IdtPIC + 16)
+#define IdtLAPIC_LINT0			(IdtLAPIC + 0)
+#define IdtLAPIC_LINT1			(IdtLAPIC + 1)
+#define IdtLAPIC_TIMER			(IdtLAPIC + 2)
+#define IdtLAPIC_ERROR			(IdtLAPIC + 3)
+#define IdtLAPIC_PCINT			(IdtLAPIC + 4)
+/* Plan 9 apic note: the spurious vector number must have bits 3-0 0x0f
+ * unless the Extended Spurious Vector Enable bit is set in the
+ * HyperTransport Transaction Control register.  Plan 9 used 63 (0x3f), but
+ * 55 should have worked too (0x37). */
+#define IdtLAPIC_SPURIOUS		(IdtLAPIC + 15) /* Aka 63, 0x3f */
+#define MaxIdtLAPIC				(IdtLAPIC + 15)
+
+/* T_SYSCALL is defined by the following include (64) */
 #include <ros/arch/syscall.h>
+
+/* 65-229 are IOAPIC routing vectors (from IOAPIC to LAPIC) */
+#define IdtIOAPIC				(T_SYSCALL + 1)
+#define MaxIdtIOAPIC			229
+/* 230-255 are OS IPI vectors */
+#define IdtMAX					255
+
 
 #define T_DEFAULT   0x0000beef		// catchall
 
@@ -108,6 +140,16 @@ struct irq_handler {
 	#define IRQ_NAME_LEN 26
 	char name[IRQ_NAME_LEN];
 };
+
+static bool idt_vec_is_pic(int vec)
+{
+	return (IdtPIC <= vec) && (vec <= MaxIdtPIC);
+}
+
+static bool idt_vec_is_lapic(int vec)
+{
+	return (IdtLAPIC <= vec) && (vec <= MaxIdtLAPIC);
+}
 
 /* The kernel's interrupt descriptor table */
 extern gatedesc_t idt[];

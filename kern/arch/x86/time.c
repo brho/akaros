@@ -9,6 +9,7 @@
 #include <arch/pic.h>
 #include <arch/apic.h>
 #include <time.h>
+#include <trap.h>
 #include <assert.h>
 #include <stdio.h>
 
@@ -27,7 +28,7 @@ void timer_init(void){
 	tscval[1] = read_tsc();
 	system_timing.tsc_freq = SINIT(tscval[1] - tscval[0]);
 	cprintf("TSC Frequency: %llu\n", system_timing.tsc_freq);
-	__lapic_set_timer(0xffffffff, LAPIC_TIMER_DEFAULT_VECTOR, FALSE,
+	__lapic_set_timer(0xffffffff, IdtLAPIC_TIMER, FALSE,
 	                  LAPIC_TIMER_DIVISOR_BITS);
 	// Mask the LAPIC Timer, so we never receive this interrupt (minor race)
 	mask_lapic_lvt(LAPIC_LVT_TIMER);

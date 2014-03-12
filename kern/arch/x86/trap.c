@@ -119,6 +119,7 @@ void idt_init(void)
 	extern struct trapinfo trap_tbl_end[];
 	int i, trap_tbl_size = trap_tbl_end - trap_tbl;
 	extern void ISR_default(void);
+	extern void ISR_syscall(void);
 
 	/* set all to default, to catch everything */
 	for (i = 0; i < 256; i++)
@@ -130,7 +131,11 @@ void idt_init(void)
 	 * the idt[] */
 	for (i = 0; i < trap_tbl_size - 1; i++)
 		SETGATE(idt[trap_tbl[i].trapnumber], 0, GD_KT, trap_tbl[i].trapaddr, 0);
-
+	/* Sanity check */
+	assert((uintptr_t)ISR_syscall ==
+	       ((uintptr_t)idt[T_SYSCALL].gd_off_63_32 << 32 |
+	        (uintptr_t)idt[T_SYSCALL].gd_off_31_16 << 16 |
+	        (uintptr_t)idt[T_SYSCALL].gd_off_15_0));
 	/* turn on trap-based syscall handling and other user-accessible ints
 	 * DPL 3 means this can be triggered by the int instruction */
 	idt[T_SYSCALL].gd_dpl = SINIT(3);
@@ -183,7 +188,7 @@ void idt_init(void)
 #endif
 
 	/* register the generic timer_interrupt() handler for the per-core timers */
-	register_raw_irq(LAPIC_TIMER_DEFAULT_VECTOR, timer_interrupt, NULL);
+	register_raw_irq(IdtLAPIC_TIMER, timer_interrupt, NULL);
 	/* register the kernel message handler */
 	register_raw_irq(I_KERNEL_MSG, handle_kmsg_ipi, NULL);
 }
@@ -466,7 +471,7 @@ void handle_irq(struct hw_trapframe *hw_tf)
 	/* Coupled with cpu_halt() and smp_idle() */
 	abort_halt(hw_tf);
 	//if (core_id())
-	if (hw_tf->tf_trapno != LAPIC_TIMER_DEFAULT_VECTOR)	/* timer irq */
+	if (hw_tf->tf_trapno != IdtLAPIC_TIMER)	/* timer irq */
 	if (hw_tf->tf_trapno != 255) /* kmsg */
 	if (hw_tf->tf_trapno != 36)	/* serial */
 		printd("Incoming IRQ, ISR: %d on core %d\n", hw_tf->tf_trapno,
@@ -561,8 +566,8 @@ int x =	intrenable(irq, handler, irq_arg, tbdf);
 	if (x > 0)
 		register_raw_irq(x, handler, irq_arg);
 #else
-	register_raw_irq(KERNEL_IRQ_OFFSET + irq, handler, irq_arg);
-	pic_unmask_irq(irq + PIC1_OFFSET);
+	register_raw_irq(irq + IdtPIC, handler, irq_arg);
+	pic_unmask_irq(irq + IdtPIC);
 #endif
 	return 0;
 }
