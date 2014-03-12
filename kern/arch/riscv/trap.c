@@ -130,7 +130,9 @@ static void exit_halt_loop(struct hw_trapframe *hw_tf)
 
 static void handle_keypress(char c)
 {
-	amr_t handler = c == 'G' ? __run_mon : __cons_add_char;
+	/* brho: not sure if this will work on riscv or not... */
+	#define capchar2ctl(x) ((x) - '@')
+	amr_t handler = c == capchar2ctl('G') ? __run_mon : __cons_add_char;
 	send_kernel_message(core_id(), handler, (long)&cons_buf, (long)c, 0,
 	                    KMSG_ROUTINE);
 	cons_init();

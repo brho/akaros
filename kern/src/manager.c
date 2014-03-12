@@ -115,11 +115,12 @@ void manager_brho(void)
 	if (first) {	
 		printk("*** IRQs must be enabled for input emergency codes ***\n");
 		#ifdef CONFIG_X86
-		printk("*** Hit ctrl-g or shift-g to enter the monitor. ***\n");
+		printk("*** Hit ctrl-g to enter the monitor. ***\n");
 		printk("*** Hit ctrl-q to force-enter the monitor. ***\n");
 		printk("*** Hit ctrl-b for a backtrace of core 0 ***\n");
 		#else
-		printk("*** Hit shift-g to enter the monitor. ***\n");
+		printk("*** Hit ctrl-g to enter the monitor. ***\n");
+		#warning "***** ctrl-g untested on riscv, check k/a/r/trap.c *****"
 		#endif
 		first = FALSE;
 	}

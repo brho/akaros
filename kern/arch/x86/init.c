@@ -29,7 +29,7 @@ static void irq_console(struct hw_trapframe *hw_tf, void *data)
 	/* Control code intercepts */
 	switch (c) {
 		case capchar2ctl('G'):
-			/* traditional 'shift-g', will put you in the monitor gracefully */
+			/* traditional 'ctrl-g', will put you in the monitor gracefully */
 			send_kernel_message(core_id(), __run_mon, 0, 0, 0, KMSG_ROUTINE);
 			return;
 		case capchar2ctl('Q'):
@@ -46,11 +46,8 @@ static void irq_console(struct hw_trapframe *hw_tf, void *data)
 	}
 	/* Do our work in an RKM, instead of interrupt context.  Note the RKM will
 	 * cast 'c' to a char. */
-	if (c == 'G')
-		send_kernel_message(core_id(), __run_mon, 0, 0, 0, KMSG_ROUTINE);
-	else
-		send_kernel_message(core_id(), __cons_add_char, (long)&cons_buf,
-		                    (long)c, 0, KMSG_ROUTINE);
+	send_kernel_message(core_id(), __cons_add_char, (long)&cons_buf, (long)c,
+	                    0, KMSG_ROUTINE);
 }
 
 static void cons_irq_init(void)
