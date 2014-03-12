@@ -23,6 +23,7 @@ obj-y						+= setjmp$(BITS).o
 obj-y						+= smp.o
 obj-y						+= smp_boot.o
 obj-y						+= smp_entry$(BITS).o
+obj-y						+= time.o
 obj-y						+= trap.o trap$(BITS).o
 obj-y						+= trapentry$(BITS).o
 
