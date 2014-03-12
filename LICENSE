@@ -1,6 +1,9 @@
 ROS is *NOT* licensed for any form of distribution.  We'll eventually license
 it, once we sort through the mess of contributions.
 
+Code from the UCB release of Plan 9 are subject to the license terms in
+LICENSE-PLAN9 and at http://akaros.cs.berkeley.edu/files/Plan9License.
+
 
 The old JOS code came with the following:
 -----------------------------------------
