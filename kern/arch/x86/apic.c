@@ -49,7 +49,7 @@ void pic_remap(void)
 	spin_unlock_irqsave(&piclock);
 }
 
-void pic_mask_irq(uint8_t irq)
+void pic_mask_irq(int irq)
 {
 	spin_lock_irqsave(&piclock);
 	if (irq > 7)
@@ -59,7 +59,7 @@ void pic_mask_irq(uint8_t irq)
 	spin_unlock_irqsave(&piclock);
 }
 
-void pic_unmask_irq(uint8_t irq)
+void pic_unmask_irq(int irq)
 {
 	spin_lock_irqsave(&piclock);
 	if (irq > 7) {
@@ -105,14 +105,55 @@ uint16_t pic_get_isr(void)
 	return __pic_get_irq_reg(PIC_READ_ISR);
 }
 
-void pic_send_eoi(uint32_t irq)
+/* Takes a raw vector/trap number (32-47), not a device IRQ (0-15) */
+bool pic_check_spurious(int trap_nr)
 {
+	/* the PIC may send spurious irqs via one of the chips irq 7.  if the isr
+	 * doesn't show that irq, then it was spurious, and we don't send an eoi.
+	 * Check out http://wiki.osdev.org/8259_PIC#Spurious_IRQs */
+	if ((trap_nr == PIC1_SPURIOUS) && !(pic_get_isr() & (1 << 7))) {
+		printd("Spurious PIC1 irq!\n");	/* want to know if this happens */
+		return TRUE;
+	}
+	if ((trap_nr == PIC2_SPURIOUS) && !(pic_get_isr() & (1 << 15))) {
+		printd("Spurious PIC2 irq!\n");	/* want to know if this happens */
+		/* for the cascaded PIC, we *do* need to send an EOI to the master's
+		 * cascade irq (2). */
+		pic_send_eoi(2 + PIC1_OFFSET);
+		return TRUE;
+	}
+	return FALSE;
+}
+
+void pic_send_eoi(int trap_nr)
+{
+	int irq = trap_nr - PIC1_OFFSET;
 	spin_lock_irqsave(&piclock);
 	// all irqs beyond the first seven need to be chained to the slave
 	if (irq > 7)
 		outb(PIC2_CMD, PIC_EOI);
 	outb(PIC1_CMD, PIC_EOI);
 	spin_unlock_irqsave(&piclock);
+}
+
+bool lapic_check_spurious(int trap_nr)
+{
+	/* FYI: lapic_spurious is 255 on qemu and 15 on the nehalem..  We actually
+	 * can set bits 4-7, and P6s have 0-3 hardwired to 0.  YMMV.
+	 *
+	 * The SDM recommends not using the spurious vector for any other IRQs (LVT
+	 * or IOAPIC RTE), since the handlers don't send an EOI.  However, our check
+	 * here allows us to use the vector since we can tell the diff btw a
+	 * spurious and a real IRQ. */
+	uint8_t lapic_spurious = read_mmreg32(LAPIC_SPURIOUS) & 0xff;
+	/* Note the lapic's vectors are not shifted by an offset. */
+	if ((trap_nr == lapic_spurious) && !lapic_get_isr_bit(lapic_spurious)) {
+		/* i'm still curious about these */
+		printk("Spurious LAPIC irq %d, core %d!\n", lapic_spurious, core_id());
+		lapic_print_isr();
+		return TRUE;
+	}
+	return FALSE;
 }
 
 /* Debugging helper.  Note the ISR/IRR are 32 bits at a time, spaced every 16
@@ -153,7 +194,7 @@ bool lapic_get_irr_bit(uint8_t vector)
  * ExtInts.  To prevent abuse, we'll use it just for IPIs for now (which only
  * come via the APIC).
  *
- * We only check the IRR, due to how we send EOIs.  Since we don't send til
+ * We only check the ISR, due to how we send EOIs.  Since we don't send til
  * after handlers return, the ISR will show pending for the current IRQ.  It is
  * the EOI that clears the bit from the ISR. */
 bool ipi_is_pending(uint8_t vector)

@@ -11,11 +11,6 @@
 
 // func ptr for interrupt service routines
 typedef void (*isr_t)(struct hw_trapframe *hw_tf, void *data);
-struct irq_handler {
-	isr_t isr;
-	void *data;
-	struct irq_handler *next;
-};
 
 void idt_init(void);
 void register_raw_irq(unsigned int vector, isr_t handler, void *data);

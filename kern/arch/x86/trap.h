@@ -86,6 +86,28 @@
 #include <arch/pci.h>
 #include <arch/coreid.h>
 
+struct irq_handler {
+	struct irq_handler *next;
+	void (*isr)(struct hw_trapframe *hw_tf, void *data);
+	void *data;
+
+	/* all handlers in the chain need to have the same func pointers.  we only
+	 * really use the first one, and the latter are to catch bugs.  also, we
+	 * won't be doing a lot of IRQ line sharing */
+	bool (*check_spurious)(int);
+	void (*eoi)(int);
+	void (*mask)(int);
+	void (*unmask)(int);
+
+	int pci_tbdf;
+	int dev_irq;
+	int apic_vector;
+
+	char *type;
+	#define IRQ_NAME_LEN 26
+	char name[IRQ_NAME_LEN];
+};
+
 /* The kernel's interrupt descriptor table */
 extern gatedesc_t idt[];
 extern pseudodesc_t idt_pd;

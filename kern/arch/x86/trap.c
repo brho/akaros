@@ -447,74 +447,6 @@ void trap(struct hw_trapframe *hw_tf)
 	assert(0);
 }
 
-/* Tells us if an interrupt (trap_nr) came from the PIC or not */
-static bool irq_from_pic(uint32_t trap_nr)
-{
-	/* The 16 IRQs within the range [PIC1_OFFSET, PIC1_OFFSET + 15] came from
-	 * the PIC.  [32-47] */
-	if (trap_nr < PIC1_OFFSET)
-		return FALSE;
-	if (trap_nr > PIC1_OFFSET + 15)
-		return FALSE;
-	return TRUE;
-}
-
-/* Helper: returns TRUE if the irq is spurious.  Pass in the trap_nr, not the
- * IRQ number (trap_nr = PIC_OFFSET + irq) */
-static bool check_spurious_irq(uint32_t trap_nr)
-{
-#ifndef CONFIG_ENABLE_MPTABLES		/* TODO: our proxy for using the PIC */
-	/* the PIC may send spurious irqs via one of the chips irq 7.  if the isr
-	 * doesn't show that irq, then it was spurious, and we don't send an eoi.
-	 * Check out http://wiki.osdev.org/8259_PIC#Spurious_IRQs */
-	if ((trap_nr == PIC1_SPURIOUS) && !(pic_get_isr() & (1 << 7))) {
-		printd("Spurious PIC1 irq!\n");	/* want to know if this happens */
-		return TRUE;
-	}
-	if ((trap_nr == PIC2_SPURIOUS) && !(pic_get_isr() & (1 << 15))) {
-		printd("Spurious PIC2 irq!\n");	/* want to know if this happens */
-		/* for the cascaded PIC, we *do* need to send an EOI to the master's
-		 * cascade irq (2). */
-		pic_send_eoi(2);
-		return TRUE;
-	}
-	/* At this point, we know the PIC didn't send a spurious IRQ */
-	if (irq_from_pic(trap_nr))
-		return FALSE;
-#endif
-	/* Either way (with or without a PIC), we need to check the LAPIC.
-	 * FYI: lapic_spurious is 255 on qemu and 15 on the nehalem..  We actually
-	 * can set bits 4-7, and P6s have 0-3 hardwired to 0.  YMMV.
-	 *
-	 * The SDM recommends not using the spurious vector for any other IRQs (LVT
-	 * or IOAPIC RTE), since the handlers don't send an EOI.  However, our check
-	 * here allows us to use the vector since we can tell the diff btw a
-	 * spurious and a real IRQ. */
-	uint8_t lapic_spurious = read_mmreg32(LAPIC_SPURIOUS) & 0xff;
-	/* Note the lapic's vectors are not shifted by an offset. */
-	if ((trap_nr == lapic_spurious) && !lapic_get_isr_bit(lapic_spurious)) {
-		printk("Spurious LAPIC irq %d, core %d!\n", lapic_spurious, core_id());
-		lapic_print_isr();
-		return TRUE;
-	}
-	return FALSE;
-}
-
-/* Helper, sends an end-of-interrupt for the trap_nr (not HW IRQ number). */
-static void send_eoi(uint32_t trap_nr)
-{
-#ifndef CONFIG_ENABLE_MPTABLES		/* TODO: our proxy for using the PIC */
-	/* WARNING: this will break if the LAPIC requests vectors that overlap with
-	 * the PIC's range. */
-	if (irq_from_pic(trap_nr))
-		pic_send_eoi(trap_nr - PIC1_OFFSET);
-	else
-		lapic_send_eoi();
-#else
-	lapic_send_eoi();
-#endif
-}
-
 /* Note IRQs are disabled unless explicitly turned on.
  *
  * In general, we should only get trapno's >= PIC1_OFFSET (32).  Anything else
@@ -538,12 +470,12 @@ void handle_irq(struct hw_trapframe *hw_tf)
 	if (hw_tf->tf_trapno != LAPIC_TIMER_DEFAULT_VECTOR)	/* timer irq */
 	if (hw_tf->tf_trapno != 255) /* kmsg */
 	if (hw_tf->tf_trapno != 36)	/* serial */
-		printk("Incoming IRQ, ISR: %d on core %d\n", hw_tf->tf_trapno,
+		printd("Incoming IRQ, ISR: %d on core %d\n", hw_tf->tf_trapno,
 		       core_id());
-	if (check_spurious_irq(hw_tf->tf_trapno))
-		goto out_no_eoi;
 	/* TODO: RCU read lock */
 	irq_h = irq_handlers[hw_tf->tf_trapno];
+	if (!irq_h || irq_h->check_spurious(hw_tf->tf_trapno))
+		goto out_no_eoi;
 	while (irq_h) {
 		irq_h->isr(hw_tf, irq_h->data);
 		irq_h = irq_h->next;
@@ -564,7 +496,7 @@ void handle_irq(struct hw_trapframe *hw_tf)
 	    (hw_tf->tf_trapno <= I_SMP_CALL_LAST))
 		down_checklist(handler_wrappers[hw_tf->tf_trapno & 0x0f].cpu_list);
 	/* Keep in sync with ipi_is_pending */
-	send_eoi(hw_tf->tf_trapno);
+	irq_handlers[hw_tf->tf_trapno]->eoi(hw_tf->tf_trapno);
 	/* Fall-through */
 out_no_eoi:
 	dec_irq_depth(pcpui);
@@ -577,6 +509,19 @@ out_no_eoi:
 	assert(0);
 }
 
+/* Tells us if an interrupt (trap_nr) came from the PIC or not */
+static bool irq_from_pic(uint32_t trap_nr)
+{
+	/* The 16 IRQs within the range [PIC1_OFFSET, PIC1_OFFSET + 15] came from
+	 * the PIC.  [32-47] */
+	if (trap_nr < PIC1_OFFSET)
+		return FALSE;
+	if (trap_nr > PIC1_OFFSET + 15)
+		return FALSE;
+	return TRUE;
+}
+
+/* TODO: remove the distinction btw raw and device IRQs */
 void register_raw_irq(unsigned int vector, isr_t handler, void *data)
 {
 	struct irq_handler *irq_h;
@@ -585,6 +530,22 @@ void register_raw_irq(unsigned int vector, isr_t handler, void *data)
 	spin_lock_irqsave(&irq_handler_wlock);
 	irq_h->isr = handler;
 	irq_h->data = data;
+	/* TODO: better way to sort out LAPIC vs PIC */
+	if (irq_from_pic(vector)) {
+		irq_h->check_spurious = pic_check_spurious;
+		irq_h->eoi = pic_send_eoi;
+		irq_h->mask = pic_mask_irq;
+		irq_h->unmask = pic_unmask_irq;
+		irq_h->type = "pic";
+	} else {
+		irq_h->check_spurious = lapic_check_spurious;
+		irq_h->eoi = lapic_send_eoi;
+		/* TODO: which mask we pick also depends on source: IOAPIC, LINT, etc */
+		irq_h->mask = 0;
+		irq_h->unmask = 0;
+		irq_h->type = "lapic";
+	}
+	irq_h->apic_vector = vector;
 	irq_h->next = irq_handlers[vector];
 	wmb();	/* make sure irq_h is done before publishing to readers */
 	irq_handlers[vector] = irq_h;
@@ -613,7 +574,8 @@ int x =	intrenable(irq, handler, irq_arg, tbdf);
 	if (x > 0)
 		register_raw_irq(x, handler, irq_arg);
 #else
-	register_raw_irq(KERNEL_IRQ_OFFSET + irq, handler, irq_arg);
+	// only need the ghetto one up above
+	//register_raw_irq(KERNEL_IRQ_OFFSET + irq, handler, irq_arg);
 	pic_unmask_irq(irq);
 	unmask_lapic_lvt(LAPIC_LVT_LINT0);
 	enable_irq();
