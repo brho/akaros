@@ -188,9 +188,11 @@ void idt_init(void)
 #endif
 
 	/* register the generic timer_interrupt() handler for the per-core timers */
-	register_raw_irq(IdtLAPIC_TIMER, timer_interrupt, NULL);
+	register_irq(IdtLAPIC_TIMER, timer_interrupt, NULL,
+	                 MKBUS(BusLAPIC, 0, 0, 0));
 	/* register the kernel message handler */
-	register_raw_irq(I_KERNEL_MSG, handle_kmsg_ipi, NULL);
+	register_irq(I_KERNEL_MSG, handle_kmsg_ipi, NULL,
+	                 MKBUS(BusLAPIC, 0, 0, 0));
 }
 
 static void handle_fperr(struct hw_trapframe *hw_tf)
@@ -516,7 +518,7 @@ static bool irq_from_pic(uint32_t trap_nr)
 }
 
 /* TODO: remove the distinction btw raw and device IRQs */
-void register_raw_irq(unsigned int vector, isr_t handler, void *data)
+static void register_raw_irq(unsigned int vector, isr_t handler, void *data)
 {
 	struct irq_handler *irq_h;
 	irq_h = kmalloc(sizeof(struct irq_handler), 0);
@@ -555,7 +557,7 @@ void unregister_raw_irq(unsigned int vector, isr_t handler, void *data)
 /* The devno is arbitrary data. Normally, however, it will be a
  * PCI type-bus-dev.func. It is required for ioapics.
  */
-int register_dev_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
+int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 {
 	/* TODO: whenever we sort out the ACPI/IOAPIC business, we'll probably want
 	 * a helper to reroute an irq? */
@@ -566,8 +568,12 @@ int x =	intrenable(irq, handler, irq_arg, tbdf);
 	if (x > 0)
 		register_raw_irq(x, handler, irq_arg);
 #else
-	register_raw_irq(irq + IdtPIC, handler, irq_arg);
-	pic_unmask_irq(irq + IdtPIC);
+	if (irq_from_pic(irq + IdtPIC)) {
+		register_raw_irq(irq + IdtPIC, handler, irq_arg);
+		pic_unmask_irq(irq + IdtPIC);
+	} else {
+		register_raw_irq(irq, handler, irq_arg);
+	}
 #endif
 	return 0;
 }

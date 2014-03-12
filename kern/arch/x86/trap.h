@@ -118,6 +118,7 @@
 #include <arch/pci.h>
 #include <arch/pic.h>
 #include <arch/coreid.h>
+#include <arch/io.h>
 
 struct irq_handler {
 	struct irq_handler *next;

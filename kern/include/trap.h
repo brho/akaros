@@ -13,9 +13,7 @@
 typedef void (*isr_t)(struct hw_trapframe *hw_tf, void *data);
 
 void idt_init(void);
-void register_raw_irq(unsigned int vector, isr_t handler, void *data);
-void unregister_raw_irq(unsigned int vector, isr_t handler, void *data);
-int register_dev_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf);
+int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf);
 void print_trapframe(struct hw_trapframe *hw_tf);
 void print_user_ctx(struct user_context *ctx);
 /* Generic per-core timer interrupt handler.  set_percore_timer() will fire the

@@ -51,7 +51,8 @@ void test_ipi_sending(void)
 {
 	int8_t state = 0;
 
-	register_raw_irq(I_TESTING, test_hello_world_handler, NULL);
+	register_irq(I_TESTING, test_hello_world_handler, NULL,
+	                 MKBUS(BusLAPIC, 0, 0, 0));
 	enable_irqsave(&state);
 	cprintf("\nCORE 0 sending broadcast\n");
 	send_broadcast_ipi(I_TESTING);
@@ -87,7 +88,8 @@ void test_ipi_sending(void)
 // Note this never returns and will muck with any other timer work
 void test_pic_reception(void)
 {
-	register_raw_irq(0x20, test_hello_world_handler, NULL);
+	register_irq(0x20, test_hello_world_handler, NULL,
+	                 MKBUS(BusLAPIC, 0, 0, 0));
 	pit_set_timer(100,TIMER_RATEGEN); // totally arbitrary time
 	pic_unmask_irq(0);
 	cprintf("PIC1 Mask = 0x%04x\n", inb(PIC1_DATA));
@@ -100,7 +102,8 @@ void test_pic_reception(void)
 
 void test_ioapic_pit_reroute(void) 
 {
-	register_raw_irq(0x20, test_hello_world_handler, NULL);
+	register_irq(0x20, test_hello_world_handler, NULL,
+	                 MKBUS(BusLAPIC, 0, 0, 0));
 #ifdef CONFIG_ENABLE_MPTABLES
 #warning "not routing the irq"
 	//ioapic_route_irq(0, 3);	
@@ -555,7 +558,8 @@ void test_smp_call_functions(void)
 #ifdef CONFIG_X86
 void test_lapic_status_bit(void)
 {
-	register_raw_irq(I_TESTING, test_incrementer_handler, &a);
+	register_irq(I_TESTING, test_incrementer_handler, &a,
+	                 MKBUS(BusLAPIC, 0, 0, 0));
 	#define NUM_IPI 100000
 	atomic_set(&a,0);
 	printk("IPIs received (should be 0): %d\n", a);
@@ -657,7 +661,8 @@ void test_pit(void)
 
 	atomic_t waiting;
 	atomic_init(&waiting, 1);
-	register_raw_irq(I_TESTING, test_waiting_handler, &waiting);
+	register_irq(I_TESTING, test_waiting_handler, &waiting,
+	                 MKBUS(BusLAPIC, 0, 0, 0));
 	while(atomic_read(&waiting))
 		cpu_relax();
 	cprintf("End now\n");

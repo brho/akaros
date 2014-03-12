@@ -7,6 +7,8 @@
  * in the LICENSE file.
  */
 
+#ifndef ROS_KERN_ARCH_IO_H
+#define ROS_KERN_ARCH_IO_H
 
 struct Vkey {
 	int tbdf;					/* pci: ioapic or msi sources */
@@ -21,7 +23,7 @@ typedef struct Vctl {
 	struct Vkey;				/* source-specific key; tbdf for pci */
 	void (*f) (void *, void *);	/* handler to call */
 	void *a;					/* argument to call it with */
-	char name[KNAMELEN];		/* of driver */
+	char name[26];		/* of driver */
 	char *type;
 
 	int (*isr) (int);			/* get isr bit for this irq */
@@ -34,7 +36,7 @@ struct ACVctl {
 	//char* (*f)(Ureg*,void*);
 	void *a;
 	int vno;
-	char name[KNAMELEN];		/* of driver */
+	char name[26];		/* of driver */
 };
 
 enum {
@@ -56,6 +58,7 @@ enum {
 	BusVL,	/* VESA Local bus */
 	BusVME,	/* VMEbus */
 	BusXPRESS,	/* Express System Bus */
+	BusLAPIC,	/* Local APIC, fake type */
 };
 
 #define MKBUS(t,b,d,f)	(((t)<<24)|(((b)&0xFF)<<16)|(((d)&0x1F)<<11)|(((f)&0x07)<<8))
@@ -257,3 +260,5 @@ struct Pcidev {
 #define PCIWADDR(va)	(PADDR(va)+PCIWINDOW)
 #define ISAWINDOW	0
 #define ISAWADDR(va)	(PADDR(va)+ISAWINDOW)
+
+#endif /* ROS_KERN_ARCH_IO_H */

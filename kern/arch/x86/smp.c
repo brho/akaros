@@ -120,7 +120,7 @@ static int smp_call_function(uint8_t type, uint32_t dest, isr_t handler,
 	 * We're waiting on RCU to do a nice unregister. */
 	extern struct irq_handler *irq_handlers[];
 	if (!irq_handlers[wrapper->vector]) {
-		register_raw_irq(wrapper->vector, handler, data);
+		register_irq(wrapper->vector, handler, data, MKBUS(BusLAPIC, 0, 0, 0));
 	} else {
 		/* we're replacing the old one.  hope it was ours, and the IRQ is firing
 		 * concurrently (if it is, there's an smp_call bug)! */

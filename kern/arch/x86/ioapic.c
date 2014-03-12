@@ -358,9 +358,10 @@ int nextvec(void)
 {
 	unsigned int vecno;
 
+	/* TODO: half-way decent integer service (vmem) */
 	spin_lock(&idtnolock);
 	vecno = idtno;
-	idtno = (idtno + 8) % IdtMAX;
+	idtno = (idtno + 1) % IdtMAX;
 	if (idtno < IdtIOAPIC)
 		idtno += IdtIOAPIC;
 	spin_unlock(&idtnolock);
@@ -421,75 +422,75 @@ int disablemsi(Vctl *, Pcidev * p)
 	return pcimsimask(p, 1);
 }
 #endif
+
+
+/* V does a bunch of IRQ things.  has the device (via tbdf) and irq we are
+ * trying to enable, returns some other stuff like the type, and esp the
+ * IRQ/APIC vector (for the IDT).
+ *
+ * 	inputs
+ * 		v->irq, v->tbdf
+ * 			v->func and v->arg are also already set
+ * 	outputs
+ * 		v->type
+ * 		returns vector number
+ * 		v->isr (but not for spurious LAPIC IRQs)
+ * 		v->eoi (sometimes, not for LAPIC)
+ * 		v->vno (vector number, but not on LAPICs)
+ *
+ * 		do we want unmask functions too?  (like pic_unmask)
+ *
+ * */
 int ioapicintrenable(Vctl * v)
 {
 	struct Rbus *rbus;
 	struct Rdt *rdt;
 	uint32_t hi, lo;
 	int busno = 0, devno, vecno;
+	extern int mpisabusno;
+	struct pci_device pcidev;
 
-/*
- * Bridge between old and unspecified new scheme,
- * the work in progress...
- */
-	if (v->tbdf == BUSUNKNOWN) {
-		printk("%s; BUSUNKNOWN\n", __func__);
-		if (idt_vec_is_lapic(v->irq)) {
+	switch (BUSTYPE(v->tbdf)) {
+		case BusLAPIC:
 			if (v->irq != IdtLAPIC_SPURIOUS)
 				v->isr = apiceoi;
 			v->type = "lapic";
+			/* For the LAPIC, irq == vector */
 			return v->irq;
-		} else {
-			printk("%s; legacy isa\n", __func__);
-
-			/*
-			 * Legacy ISA.
-			 * Make a busno and devno using the
-			 * ISA bus number and the irq.
-			 */
-			extern int mpisabusno;
-
+		case BusISA:
 			if (mpisabusno == -1)
 				panic("no ISA bus allocated");
 			busno = mpisabusno;
 			/* need to track the irq in devno in PCI interrupt assignment entry
 			 * format (see mp.c or MP spec D.3). */
 			devno = v->irq << 2;
-		}
-	} else if (BUSTYPE(v->tbdf) == BusPCI) {
-		printk("%s; BusPCI \n", __func__);
-		/*
-		 * PCI.
-		 * Make a devno from BUSDNO(tbdf) and pcidev->intp.
-		 */
-		/* we'll assume it's there. */
+			break;
+		case BusPCI:
+			/* we'll assume it's there. */
 #if 0
-		Pcidev *pcidev;
+			Pcidev *pcidev;
 
-		busno = BUSBNO(v->tbdf);
-		if ((pcidev = pcimatchtbdf(v->tbdf)) == NULL)
-			panic("no PCI dev for tbdf %p", v->tbdf);
-		if ((vecno = intrenablemsi(v, pcidev)) != -1)
-			return vecno;
-		disablemsi(v, pcidev);
+			busno = BUSBNO(v->tbdf);
+			if ((pcidev = pcimatchtbdf(v->tbdf)) == NULL)
+				panic("no PCI dev for tbdf %p", v->tbdf);
+			if ((vecno = intrenablemsi(v, pcidev)) != -1)
+				return vecno;
+			disablemsi(v, pcidev);
 #endif
+			explode_tbdf(v->tbdf);
+			devno = pcidev_read8(&pcidev, PciINTP);
+			printk("INTP is %d\n", devno);
 
-		struct pci_device pcidev;
-
-		explode_tbdf(v->tbdf);
-		devno = pcidev_read8(&pcidev, PciINTP);
-		printk("INTP is %d\n", devno);
-
-		if (devno == 0)
-			panic("no INTP for tbdf %p", v->tbdf);
-		devno = BUSDNO(v->tbdf) << 2 | (devno - 1);
-		printk("devno is %08lx\n", devno);
-		printk("ioapicintrenable: tbdf %p busno %d devno %d\n",
-			   v->tbdf, busno, devno);
-	} else {
-		//SET(busno, devno);
-		busno = devno = 0;
-		panic("unknown tbdf %px", v->tbdf);
+			if (devno == 0)
+				panic("no INTP for tbdf %p", v->tbdf);
+			/* remember, devno is the device shifted with irq pin in bits 0-1 */
+			devno = BUSDNO(v->tbdf) << 2 | (devno - 1);
+			printk("devno is %08lx\n", devno);
+			printk("ioapicintrenable: tbdf %p busno %d devno %d\n",
+				   v->tbdf, busno, devno);
+			break;
+		default:
+			panic("Unknown bus type, TBDF %p", v->tbdf);
 	}
 
 	rdt = NULL;
@@ -624,7 +625,6 @@ int intrenable(int irq, void (*f) (void *, void *), void *a, int tbdf)
 
 	//spilock(&vctllock);
 	vno = ioapicintrenable(v);
-	printk("INTRENABLE, vno is %d\n", vno);
 	if (vno == -1) {
 		//iunlock(&vctllock);
 		printk("intrenable: couldn't enable irq %d, tbdf %p for %s\n",
@@ -654,7 +654,7 @@ int intrenable(int irq, void (*f) (void *, void *), void *a, int tbdf)
 	 * the handler; the IRQ is useless in the wonderful world
 	 * of the IOAPIC.
 	 */
-	printk("INTRNABLE returns %p\n", v);
-	printk("INTRNABLE returns %d\n", v->vno);
-	return v->vno;
+	printk("INTRNABLE returns %d\n", vno);
+	kfree(v);
+	return vno;
 }
