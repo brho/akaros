@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
-#include <libip.h>
+#include <iplib.h>
 #include <dir.h>
 #include <ndb.h>
 #include <fcall.h>

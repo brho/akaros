@@ -14,7 +14,7 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <ctype.h>
-#include <libip.h>
+#include <iplib.h>
 #include <ndb.h>
 
 /*

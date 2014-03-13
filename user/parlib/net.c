@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#if 0
 /* my cheap dial, assumes either /net/ or a protocol first, with !s btw the
  * proto, host, and port.  it also will modify addr temporarily.  */
 int dial(char *addr, char *local, char *dir, int *cfdp)
@@ -104,3 +105,4 @@ out_buf:
 	free(buf);
 	return ret;
 }
+#endif

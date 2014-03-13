@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
-#include <libip.h>
+#include <iplib.h>
 #include <ndb.h>
 
 /* replace a in t with b, the line structure in b is lost, c'est la vie */
