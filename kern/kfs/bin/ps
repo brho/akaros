@@ -1,0 +1,6 @@
+#!/bin/ash
+for i in `echo '#p/*/status'`
+do
+cat $i
+echo
+done
