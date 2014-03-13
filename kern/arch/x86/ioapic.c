@@ -124,7 +124,6 @@ void ioapicintrinit(int busno, int apicno, int intin, int devno, int lo)
 		printk("apic->usable %d intin %d apic->nrdt %d OOR\n", apic->useable,
 			   intin, apic->nrdt);
 		printk("apicno %d, apic %p\n", apicno, apic);
-		monitor(0);
 		return;
 	}
 
