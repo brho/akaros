@@ -505,76 +505,33 @@ out_no_eoi:
 	assert(0);
 }
 
-/* Tells us if an interrupt (trap_nr) came from the PIC or not */
-static bool irq_from_pic(uint32_t trap_nr)
-{
-	/* The 16 IRQs within the range [PIC1_OFFSET, PIC1_OFFSET + 15] came from
-	 * the PIC.  [32-47] */
-	if (trap_nr < PIC1_OFFSET)
-		return FALSE;
-	if (trap_nr > PIC1_OFFSET + 15)
-		return FALSE;
-	return TRUE;
-}
-
-/* TODO: remove the distinction btw raw and device IRQs */
-static void register_raw_irq(unsigned int vector, isr_t handler, void *data)
+int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 {
 	struct irq_handler *irq_h;
+	int vector;
 	irq_h = kmalloc(sizeof(struct irq_handler), 0);
 	assert(irq_h);
-	spin_lock_irqsave(&irq_handler_wlock);
-	irq_h->isr = handler;
-	irq_h->data = data;
-	/* TODO: better way to sort out LAPIC vs PIC */
-	if (irq_from_pic(vector)) {
-		irq_h->check_spurious = pic_check_spurious;
-		irq_h->eoi = pic_send_eoi;
-		irq_h->mask = pic_mask_irq;
-		irq_h->unmask = pic_unmask_irq;
-		irq_h->type = "pic";
-	} else {
-		irq_h->check_spurious = lapic_check_spurious;
-		irq_h->eoi = lapic_send_eoi;
-		/* TODO: which mask we pick also depends on source: IOAPIC, LINT, etc */
-		irq_h->mask = 0;
-		irq_h->unmask = 0;
-		irq_h->type = "lapic";
+	irq_h->dev_irq = irq;
+	irq_h->tbdf = tbdf;
+	vector = bus_irq_enable(irq_h);
+	if (vector == -1) {
+		kfree(irq_h);
+		return -1;
 	}
+	printd("IRQ %d, vector %d, type %s\n", irq, vector, irq_h->type);
+	assert(irq_h->check_spurious && irq_h->eoi);
+	irq_h->isr = handler;
+	irq_h->data = irq_arg;
 	irq_h->apic_vector = vector;
+	/* RCU write lock */
+	spin_lock_irqsave(&irq_handler_wlock);
 	irq_h->next = irq_handlers[vector];
 	wmb();	/* make sure irq_h is done before publishing to readers */
 	irq_handlers[vector] = irq_h;
 	spin_unlock_irqsave(&irq_handler_wlock);
-}
-
-void unregister_raw_irq(unsigned int vector, isr_t handler, void *data)
-{
-	/* TODO: RCU */
-	printk("Unregistering not supported\n");
-}
-
-/* The devno is arbitrary data. Normally, however, it will be a
- * PCI type-bus-dev.func. It is required for ioapics.
- */
-int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
-{
-	/* TODO: whenever we sort out the ACPI/IOAPIC business, we'll probably want
-	 * a helper to reroute an irq? */
-#ifdef CONFIG_ENABLE_MPTABLES
-	/* TODO: dirty hack to get the IOAPIC vector */
-extern int intrenable(int irq, void (*f) (void *, void *), void *a, int tbdf);
-int x =	intrenable(irq, handler, irq_arg, tbdf);
-	if (x > 0)
-		register_raw_irq(x, handler, irq_arg);
-#else
-	if (irq_from_pic(irq + IdtPIC)) {
-		register_raw_irq(irq + IdtPIC, handler, irq_arg);
-		pic_unmask_irq(irq + IdtPIC);
-	} else {
-		register_raw_irq(irq, handler, irq_arg);
-	}
-#endif
+	/* might need to pass the irq_h, in case unmask needs more info */
+	if (irq_h->unmask)
+		irq_h->unmask(vector);
 	return 0;
 }
 

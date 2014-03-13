@@ -62,6 +62,12 @@ static int idtno = IdtIOAPIC;
 
 struct apic xioapic[Napic];
 
+static bool ioapic_exists(void)
+{
+	/* not foolproof, if we called this before parsing */
+	return xioapic[0].useable ? TRUE : FALSE;
+}
+
 /* TODO: put these in a header */
 int apiceoi(int);
 int apicisr(int);
@@ -370,19 +376,17 @@ int nextvec(void)
 }
 
 #warning "no msi mask yet"
+#if 0
 static int msimask(struct Vkey *v, int mask)
 {
-#if 0
 	Pcidev *p;
 
 	p = pcimatchtbdf(v->tbdf);
 	if (p == NULL)
 		return -1;
 	return pcimsimask(p, mask);
-#else
-	return -1;
-#endif
 }
+#endif
 
 #warning "No msi yet"
 #if 0
@@ -424,73 +428,84 @@ int disablemsi(Vctl *, Pcidev * p)
 #endif
 
 
-/* V does a bunch of IRQ things.  has the device (via tbdf) and irq we are
- * trying to enable, returns some other stuff like the type, and esp the
- * IRQ/APIC vector (for the IDT).
+/* Attempts to enable a bus interrupt, initializes irq_h, and returns the IDT
+ * vector to use (-1 on error).
  *
- * 	inputs
- * 		v->irq, v->tbdf
- * 			v->func and v->arg are also already set
- * 	outputs
- * 		v->type
- * 		returns vector number
- * 		v->isr (but not for spurious LAPIC IRQs)
- * 		v->eoi (sometimes, not for LAPIC)
- * 		v->vno (vector number, but not on LAPICs)
+ * This will determine the type of bus the device is on (LAPIC, IOAPIC, PIC,
+ * etc), and set the appropriate fields in isr_h.  If applicable, it'll also
+ * allocate an IDT vector, such as for an IOAPIC, and route the IOAPIC entries
+ * appropriately.
  *
- * 		do we want unmask functions too?  (like pic_unmask)
+ * Callers init irq_h->dev_irq and ->tbdf.  tbdf encodes the bus type and the
+ * classic PCI bus:dev:func.
  *
- * */
-int ioapicintrenable(Vctl * v)
+ * In plan9, this was ioapicintrenable(). */
+int bus_irq_enable(struct irq_handler *irq_h)
 {
 	struct Rbus *rbus;
 	struct Rdt *rdt;
 	uint32_t hi, lo;
 	int busno = 0, devno, vecno;
-	extern int mpisabusno;
+	extern int mpisabusno;	// XXX
 	struct pci_device pcidev;
 
-	switch (BUSTYPE(v->tbdf)) {
+	if (!ioapic_exists() && (BUSTYPE(irq_h->tbdf) != BusLAPIC)) {
+		irq_h->check_spurious = pic_check_spurious;
+		irq_h->eoi = pic_send_eoi;
+		irq_h->mask = pic_mask_irq;
+		irq_h->unmask = pic_unmask_irq;
+		irq_h->type = "pic";
+		/* PIC devices have vector = irq + 32 */
+		return irq_h->dev_irq + IdtPIC;
+	}
+	switch (BUSTYPE(irq_h->tbdf)) {
 		case BusLAPIC:
-			if (v->irq != IdtLAPIC_SPURIOUS)
-				v->isr = apiceoi;
-			v->type = "lapic";
+			/* nxm used to set the initial 'isr' method (i think equiv to our
+			 * check_spurious) to apiceoi for non-spurious lapic vectors.  in
+			 * effect, i think they were sending the EOI early, and their eoi
+			 * method was 0.  we're not doing that (unless we have to). */
+			irq_h->check_spurious = lapic_check_spurious;
+			irq_h->eoi = lapic_send_eoi;
+			irq_h->mask = 0;
+			irq_h->unmask = 0;
+			irq_h->type = "lapic";
 			/* For the LAPIC, irq == vector */
-			return v->irq;
+			return irq_h->dev_irq;
 		case BusISA:
+			/* TODO: handle when we have ACPI, but no MP tables */
 			if (mpisabusno == -1)
 				panic("no ISA bus allocated");
 			busno = mpisabusno;
 			/* need to track the irq in devno in PCI interrupt assignment entry
 			 * format (see mp.c or MP spec D.3). */
-			devno = v->irq << 2;
+			devno = irq_h->dev_irq << 2;
 			break;
 		case BusPCI:
 			/* we'll assume it's there. */
 #if 0
 			Pcidev *pcidev;
 
-			busno = BUSBNO(v->tbdf);
-			if ((pcidev = pcimatchtbdf(v->tbdf)) == NULL)
-				panic("no PCI dev for tbdf %p", v->tbdf);
-			if ((vecno = intrenablemsi(v, pcidev)) != -1)
+			busno = BUSBNO(irq_h->tbdf);
+			if ((pcidev = pcimatchtbdf(irq_h->tbdf)) == NULL)
+				panic("no PCI dev for tbdf %p", irq_h->tbdf);
+			if ((vecno = intrenablemsi(irq_h, pcidev)) != -1)
 				return vecno;
-			disablemsi(v, pcidev);
+			disablemsi(irq_h, pcidev);
 #endif
-			explode_tbdf(v->tbdf);
+			explode_tbdf(irq_h->tbdf);
 			devno = pcidev_read8(&pcidev, PciINTP);
 			printk("INTP is %d\n", devno);
 
 			if (devno == 0)
-				panic("no INTP for tbdf %p", v->tbdf);
+				panic("no INTP for tbdf %p", irq_h->tbdf);
 			/* remember, devno is the device shifted with irq pin in bits 0-1 */
-			devno = BUSDNO(v->tbdf) << 2 | (devno - 1);
+			devno = BUSDNO(irq_h->tbdf) << 2 | (devno - 1);
 			printk("devno is %08lx\n", devno);
-			printk("ioapicintrenable: tbdf %p busno %d devno %d\n",
-				   v->tbdf, busno, devno);
+			printk("bus_irq_enable: tbdf %p busno %d devno %d\n",
+				   irq_h->tbdf, busno, devno);
 			break;
 		default:
-			panic("Unknown bus type, TBDF %p", v->tbdf);
+			panic("Unknown bus type, TBDF %p", irq_h->tbdf);
 	}
 
 	rdt = NULL;
@@ -504,8 +519,7 @@ int ioapicintrenable(Vctl * v)
 	if (rdt == NULL) {
 		// install it? Who knows?
 		int ioapic_route_irq(int irq, int apicno, int devno);
-		ioapic_route_irq(v->irq, 0, devno);
-		extern int mpisabusno;
+		ioapic_route_irq(irq_h->dev_irq, 0, devno);
 		printk("rdt is NULLLLLLLLLLLLLLLLLLLLLL\n");
 
 		/*
@@ -517,7 +531,7 @@ int ioapicintrenable(Vctl * v)
 		 if((busno = mpisabusno) == -1)
 		 return -1;
 
-		 devno = v->irq<<2;
+		 devno = irq_h->dev_irq<<2;
 		 */
 		for (rbus = rdtbus[busno]; rbus != NULL; rbus = rbus->next)
 			if (rbus->devno == devno) {
@@ -526,7 +540,7 @@ int ioapicintrenable(Vctl * v)
 				break;
 			}
 		printk("isa: tbdf %p busno %d devno %d %#p\n",
-			   v->tbdf, busno, devno, rdt);
+			   irq_h->tbdf, busno, devno, rdt);
 	}
 	if (rdt == NULL) {
 		printk("RDT Is STILL NULL!\n");
@@ -547,28 +561,30 @@ int ioapicintrenable(Vctl * v)
 	 * rather than putting a Lock in each entry.
 	 */
 	spin_lock(&rdt->apic->lock);
-	printk("%p: %ld/%d/%d (%d)\n", v->tbdf, rdt->apic - xioapic, rbus->devno,
+	printk("%p: %ld/%d/%d (%d)\n", irq_h->tbdf, rdt->apic - xioapic, rbus->devno,
 		   rdt->intin, devno);
 	if ((rdt->lo & 0xff) == 0) {
 		vecno = nextvec();
 		rdt->lo |= vecno;
 		rdtvecno[vecno] = rdt;
 	} else
-		printk("%p: mutiple irq bus %d dev %d\n", v->tbdf, busno, devno);
+		printk("%p: mutiple irq bus %d dev %d\n", irq_h->tbdf, busno, devno);
 
 	rdt->enabled++;
 	lo = (rdt->lo & ~Im);
-	ioapicintrdd(&hi, &lo);
+	ioapicintrdd(&hi, &lo);	// XXX picks a destination and sets phys/fixed
 	rtblput(rdt->apic, rdt->intin, hi, lo);
 	vecno = lo & 0xff;
 	spin_unlock(&rdt->apic->lock);
 
 	printk("busno %d devno %d hi %p lo %p vecno %d\n",
 		   busno, devno, hi, lo, vecno);
-	v->isr = apicisr;
-	v->eoi = apiceoi;
-	v->vno = vecno;
-	v->type = "ioapic";
+
+	irq_h->check_spurious = lapic_check_spurious;
+	irq_h->eoi = lapic_send_eoi;
+	irq_h->mask = 0;
+	irq_h->unmask = 0;
+	irq_h->type = "ioapic";
 
 	return vecno;
 }
@@ -590,71 +606,18 @@ int ioapicintrdisable(int vecno)
 		return -1;
 	}
 	if ((rdt = rdtvecno[vecno]) == NULL) {
+		// XXX what if they asked for a LAPIC vector?
 		panic("ioapicintrdisable: vecno %d has no rdt", vecno);
 		return -1;
 	}
 
 	spin_lock(&rdt->apic->lock);
 	rdt->enabled--;
+	/* XXX looks like they think rdt->lo is supposed to have Im set/masked?  and
+	 * they also blow away their 'hi' routing decision from earlier */
 	if (rdt->enabled == 0)
 		rtblput(rdt->apic, rdt->intin, 0, rdt->lo);
 	spin_unlock(&rdt->apic->lock);
 
 	return 0;
-}
-
-spinlock_t vctllock;
-
-int intrenable(int irq, void (*f) (void *, void *), void *a, int tbdf)
-{
-	int vno;
-	Vctl *v;
-	extern int ioapicintrenable(Vctl *);
-
-	if (f == NULL) {
-		printk("intrenable: nil handler for %d, tbdf %p\n", irq, tbdf);
-		return 0;
-	}
-
-	v = kzmalloc(sizeof(Vctl), KMALLOC_WAIT);
-	v->isintr = 1;
-	v->irq = irq;
-	v->tbdf = tbdf;
-	v->f = f;
-	v->a = a;
-
-	//spilock(&vctllock);
-	vno = ioapicintrenable(v);
-	if (vno == -1) {
-		//iunlock(&vctllock);
-		printk("intrenable: couldn't enable irq %d, tbdf %p for %s\n",
-			   irq, tbdf, v->name);
-		kfree(v);
-		return 0;
-	}
-#if 0
-	if (vctl[vno]) {
-		if (vctl[v->vno]->isr != v->isr || vctl[v->vno]->eoi != v->eoi)
-			panic("intrenable: handler: %s %s %#p %#p %#p %#p",
-				  vctl[v->vno]->name, v->name,
-				  vctl[v->vno]->isr, v->isr, vctl[v->vno]->eoi, v->eoi);
-	}
-
-	v->vno = vno;
-	v->next = vctl[vno];
-	vctl[vno] = v;
-#endif
-	//iunlock(&vctllock);
-
-	if (v->mask)
-		v->mask(v, 0);
-
-	/*
-	 * Return the assigned vector so intrdisable can find
-	 * the handler; the IRQ is useless in the wonderful world
-	 * of the IOAPIC.
-	 */
-	printk("INTRNABLE returns %d\n", vno);
-	kfree(v);
-	return vno;
 }

@@ -52,6 +52,7 @@ void pic_mask_irq(int trap_nr)
 void pic_unmask_irq(int trap_nr)
 {
 	int irq = trap_nr - PIC1_OFFSET;
+	printd("PIC unmask for TRAP %d, IRQ %d\n", trap_nr, irq);
 	spin_lock_irqsave(&piclock);
 	if (irq > 7) {
 		outb(PIC2_DATA, inb(PIC2_DATA) & ~(1 << (irq - 8)));

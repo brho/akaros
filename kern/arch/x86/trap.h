@@ -132,8 +132,9 @@ struct irq_handler {
 	void (*eoi)(int);
 	void (*mask)(int);
 	void (*unmask)(int);
+	/* TODO: add a helper to (re)route irqs? */
 
-	int pci_tbdf;
+	int tbdf;
 	int dev_irq;
 	int apic_vector;
 
@@ -158,6 +159,7 @@ extern pseudodesc_t idt_pd;
 extern taskstate_t ts;
 /* Mapping of irq -> PCI device (TODO: make this PCI-agnostic) */
 extern struct pci_device *irq_pci_map[NUM_IRQS];
+int bus_irq_enable(struct irq_handler *irq_h);	/* ioapic.c */
 extern const char *x86_trapname(int trapno);
 extern void sysenter_handler(void);
 void backtrace_kframe(struct hw_trapframe *hw_tf);

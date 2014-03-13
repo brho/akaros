@@ -9,6 +9,7 @@
 
 #ifndef ROS_KERN_IOAPIC_H
 #define ROS_KERN_IOAPIC_H
+
 #include <atomic.h>
 #include <arch/apic.h>
 

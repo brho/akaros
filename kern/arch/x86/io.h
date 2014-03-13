@@ -10,35 +10,6 @@
 #ifndef ROS_KERN_ARCH_IO_H
 #define ROS_KERN_ARCH_IO_H
 
-struct Vkey {
-	int tbdf;					/* pci: ioapic or msi sources */
-	int irq;					/* 8259-emulating sources */
-};
-
-typedef struct Vctl {
-	struct Vctl *next;			/* handlers on this vector */
-
-	int isintr;					/* interrupt or fault/trap */
-
-	struct Vkey;				/* source-specific key; tbdf for pci */
-	void (*f) (void *, void *);	/* handler to call */
-	void *a;					/* argument to call it with */
-	char name[26];		/* of driver */
-	char *type;
-
-	int (*isr) (int);			/* get isr bit for this irq */
-	int (*eoi) (int);			/* eoi */
-	int (*mask) (struct Vkey *, int);	/* interrupt enable returns masked vector */
-	int vno;
-} Vctl;
-
-struct ACVctl {
-	//char* (*f)(Ureg*,void*);
-	void *a;
-	int vno;
-	char name[26];		/* of driver */
-};
-
 enum {
 	BusCBUS = 0,				/* Corollary CBUS */
 	BusCBUSII,	/* Corollary CBUS II */
