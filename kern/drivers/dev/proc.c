@@ -522,7 +522,6 @@ static struct chan *procopen(struct chan *c, int omode)
 
 		case Qargs:
 		case Qnoteid:
-		case Qstatus:
 		case Qwait:
 		case Qregs:
 		case Qfpregs:
@@ -537,7 +536,8 @@ static struct chan *procopen(struct chan *c, int omode)
 				error(Eperm);
 			c->aux = kzmalloc(sizeof(struct mntwalk), KMALLOC_WAIT);
 			break;
-
+	case Qstatus:
+		break;
 		case Qnotepg:
 			error("not yet");
 #if 0
@@ -1143,6 +1143,14 @@ regread:
 			kfree(wq);
 			return n;
 #endif
+	case Qstatus:{
+			char buf[8 + 1 + 10 + 1 + 6 + 2]; /* 2 is paranoia */
+			snprintf(buf, sizeof(buf),
+				 "%8d %-10s %6d", p->pid, procstate2str(p->state), p->ppid);
+			kref_put(&p->p_kref);
+			return readstr(off, va, n, buf);
+		}
+
 		case Qns:
 			//qlock(&p->debug);
 			if (waserror()) {
