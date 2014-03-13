@@ -6,6 +6,7 @@ obj-y						+= ether.o
 obj-y						+= mnt.o
 #obj-y						+= pci.o
 obj-y						+= pipe.o
+obj-y						+= proc.o
 obj-y						+= root.o
 obj-y						+= srv.o
 

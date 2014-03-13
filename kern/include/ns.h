@@ -916,6 +916,7 @@ extern char Ebadstat[];			/* malformed stat buffer */
 extern char Ecmdargs[];			/* wrong #args in control message */
 extern char Enofd[];			/* no free file descriptors */
 extern char Enoctl[];			/* unknown control request */
+extern char Eprocdied[];		/* process died */
 
 /* kern/src/err.c */
 int errpush(struct errbuf *errstack, int stacksize, int *curindex,
@@ -987,6 +988,9 @@ int plan9setup(struct proc *new_proc, struct proc *parent);
 int iseve(void);
 int fd_getfl(int fd);
 int fd_setfl(int fd, int flags);
+
+/* kern/drivers/dev/srv.c */
+char *srvname(struct chan *c);
 
 static inline int abs(int a)
 {
