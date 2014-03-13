@@ -54,6 +54,8 @@ enum {
 	IOAPIC_PBASE    = 0xfec00000, /* default *physical* address */
 };
 
+extern int mpisabusno;
+
 void ioapicinit(int id, int ibase, uintptr_t pa);
 void ioapicrdtr(struct apic*, int unused_int, int*, int*);
 void ioapicrdtw(struct apic*, int unused_int, int, int);

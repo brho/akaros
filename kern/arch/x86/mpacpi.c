@@ -1,3 +1,10 @@
+/* This file is part of the UCB release of Plan 9. It is subject to the license
+ * terms in the LICENSE file found in the top-level directory of this
+ * distribution and at http://akaros.cs.berkeley.edu/files/Plan9License. No
+ * part of the UCB release of Plan 9, including this file, may be copied,
+ * modified, propagated, or distributed except according to the terms contained
+ * in the LICENSE file. */
+
 #define DEBUG
 #include <vfs.h>
 #include <kfs.h>
@@ -24,6 +31,14 @@ int mpacpi(int ncleft)
 	int np, bp;
 	struct apic *apic;
 	struct Apicst *st;
+
+	/* If we don't have an mpisabusno yet, it's because the MP tables failed to
+	 * parse.  So we'll just take the last one available.  I think we're
+	 * supposed to parse the ACPI shit with the AML to figure out the buses and
+	 * find a clear one, but fuck that.  Note this busno is just for our own
+	 * RDT/Rbus bookkeeping. */
+	if (mpisabusno == -1)
+		mpisabusno = Nbus - 1;
 
 	printk("mpacpi ncleft %d\n", ncleft);
 	if (apics == NULL)

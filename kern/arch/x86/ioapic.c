@@ -55,6 +55,7 @@ enum {							/* IOAPIC registers */
 static struct Rdt rdtarray[Nrdt];
 static int nrdtarray;
 static struct Rbus *rdtbus[Nbus];
+/* reverse mapping of IDT vector to the RDT/IOAPIC entry triggering vector */
 static struct Rdt *rdtvecno[IdtMAX + 1];
 
 static spinlock_t idtnolock;
@@ -210,7 +211,7 @@ void ioapicinit(int id, int ibase, uintptr_t pa)
 	struct apic *apic;
 	static int base;
 
-	assert(pa == IOAPIC_PBASE);
+	assert((IOAPIC_PBASE <= pa) && (pa + PGSIZE <= IOAPIC_PBASE + APIC_SIZE));
 	/*
 	 * Mark the IOAPIC useable if it has a good ID
 	 * and the registers can be mapped.
@@ -219,7 +220,7 @@ void ioapicinit(int id, int ibase, uintptr_t pa)
 		return;
 
 	apic = &xioapic[id];
-	apic->addr = IOAPIC_BASE;
+	apic->addr = IOAPIC_BASE + (pa - IOAPIC_PBASE);
 	if (apic->useable)
 		return;
 	apic->useable = 1;
@@ -446,7 +447,6 @@ int bus_irq_enable(struct irq_handler *irq_h)
 	struct Rdt *rdt;
 	uint32_t hi, lo;
 	int busno = 0, devno, vecno;
-	extern int mpisabusno;	// XXX
 	struct pci_device pcidev;
 
 	if (!ioapic_exists() && (BUSTYPE(irq_h->tbdf) != BusLAPIC)) {

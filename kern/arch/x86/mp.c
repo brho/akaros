@@ -1,3 +1,10 @@
+/* This file is part of the UCB release of Plan 9. It is subject to the license
+ * terms in the LICENSE file found in the top-level directory of this
+ * distribution and at http://akaros.cs.berkeley.edu/files/Plan9License. No
+ * part of the UCB release of Plan 9, including this file, may be copied,
+ * modified, propagated, or distributed except according to the terms contained
+ * in the LICENSE file. */
+
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -54,6 +61,7 @@ static Mpbus mpbusdef[] = {
 
 static Mpbus *mpbus[Nbus];
 int mpisabusno = -1;
+#define MP_VERBOSE_DEBUG 0
 
 static void mpintrprint(char *s, uint8_t * p)
 {
@@ -199,7 +207,7 @@ static int mpparse(PCMP * pcmp, int maxcores)
 				for (i = 0; p < e; i++) {
 					if (i && ((i & 0x0f) == 0))
 						printd("\n");
-					printd(" %#2.2ux", *p);
+					printd(" 0x%#2.2x", *p);
 					p++;
 				}
 				printd("\n");
@@ -268,8 +276,8 @@ static int mpparse(PCMP * pcmp, int maxcores)
 				 * p[2-3] contains the polarity and trigger mode;
 				 * p[4] is the source bus;
 				 * p[5] is the IRQ on the source bus;
-				 * p[6] is the destination APIC;
-				 * p[7] is the INITIN pin on the destination APIC.
+				 * p[6] is the destination IOAPIC;
+				 * p[7] is the INITIN pin on the destination IOAPIC.
 				 */
 				if (p[6] == 0xff) {
 					mpintrprint("routed to all IOAPICs", p);
@@ -280,7 +288,7 @@ static int mpparse(PCMP * pcmp, int maxcores)
 					p += 8;
 					break;
 				}
-				if (2)
+				if (MP_VERBOSE_DEBUG)
 					mpintrprint(NULL, p);
 
 				/*
@@ -289,6 +297,9 @@ static int mpparse(PCMP * pcmp, int maxcores)
 				 * bus the IRQ is the device number but unencoded.
 				 * May need to handle other buses here in the future
 				 * (but unlikely).
+				 *
+				 * For PCI devices, this field's lowest two bits are INT#A == 0,
+				 * INT#B == 1, etc.  Bits 2-6 are the PCI device number.
 				 */
 				devno = p[5];
 				if (memcmp(mpbus[p[4]]->type, "PCI   ", 6) != 0)
@@ -307,8 +318,8 @@ static int mpparse(PCMP * pcmp, int maxcores)
 					p += 8;
 					break;
 				}
-				if (2)
-					mpintrprint(NULL, p);
+				if (MP_VERBOSE_DEBUG)
+					mpintrprint("LINTR", p);
 
 				/*
 				 * Everything was checked in mpmkintr above.
@@ -407,11 +418,13 @@ int mpsinit(int maxcores)
 	PCMP *pcmp;
 
 	if ((mp = sigsearch("_MP_")) == NULL) {
-		printd("no mp tables\n");
+		printk("No mp tables found, might have issues!\n");
 		return ncleft;
 	}
+	/* TODO: if an IMCR exists, we should set it to 1, though i've heard that
+	 * ACPI-capable HW doesn't have the IMCR anymore. */
 
-	if (2) {
+	if (MP_VERBOSE_DEBUG) {
 		printk("_MP_ @ %#p, addr %p length %ud rev %d",
 			   mp, l32get(mp->addr), mp->length, mp->revision);
 		for (i = 0; i < sizeof(mp->feature); i++)
@@ -438,7 +451,7 @@ int mpsinit(int maxcores)
 		vunmap(pcmp, n);
 		return ncleft;
 	}
-	if (2) {
+	if (MP_VERBOSE_DEBUG) {
 		printk("PCMP @ %#p length %p revision %d\n",
 			   pcmp, l16get(pcmp->length), pcmp->revision);
 		printk(" %20.20s oaddr %p olength %p\n",

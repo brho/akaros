@@ -7,6 +7,9 @@
  * in the LICENSE file.
  */
 
+#ifndef ROS_KERN_ACPI_H
+#define ROS_KERN_ACPI_H
+
 enum {
 
 	Sdthdrsz = 36,				/* size of SDT header */
@@ -383,3 +386,6 @@ struct Xsdt {
 extern uintptr_t acpimblocksize(uintptr_t, int *);
 
 int acpiinit(void);
+extern struct Madt *apics;
+
+#endif /* ROS_KERN_ACPI_H */

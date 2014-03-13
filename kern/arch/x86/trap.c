@@ -169,15 +169,15 @@ void idt_init(void)
 	pic_mask_all();
 
 #ifdef CONFIG_ENABLE_MPTABLES
-	int ncleft;
+	int ncleft = MAX_NUM_CPUS;
 	int mpsinit(int maxcores);
-
-	ncleft = mpsinit(MAX_NUM_CPUS);
-	/* NEVER printd here ... */
-	printk("mpacpi is %d\n", mpacpi(ncleft));
-
 	void ioapiconline(void);
 	void apiconline(void);
+
+	ncleft = mpsinit(ncleft);
+	ncleft = mpacpi(ncleft);
+	printk("mpacpi is %d\n", ncleft);
+
 	apiconline(); /* TODO: do this this for all cores*/
 	ioapiconline();
 #else

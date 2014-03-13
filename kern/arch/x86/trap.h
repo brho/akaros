@@ -143,16 +143,6 @@ struct irq_handler {
 	char name[IRQ_NAME_LEN];
 };
 
-static bool idt_vec_is_pic(int vec)
-{
-	return (IdtPIC <= vec) && (vec <= MaxIdtPIC);
-}
-
-static bool idt_vec_is_lapic(int vec)
-{
-	return (IdtLAPIC <= vec) && (vec <= MaxIdtLAPIC);
-}
-
 /* The kernel's interrupt descriptor table */
 extern gatedesc_t idt[];
 extern pseudodesc_t idt_pd;
