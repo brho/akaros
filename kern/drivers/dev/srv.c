@@ -156,6 +156,26 @@ static int srvstat(struct chan *c, uint8_t * db, int n)
 	return devstat(c, db, n, 0, 0, srvgen);
 }
 
+char*
+srvname(struct chan *c)
+{
+	struct srvfile *srv_i;
+	char *s;
+
+	spin_lock(&srvlock);
+	TAILQ_FOREACH(srv_i, &srvfiles, link) {
+		if(srv_i->chan == c){
+			int len = 3 + strlen(srv_i->name) + 1;
+			s = kzmalloc(len, 0);
+			snprintf(s, len, "#s/%s", srv_i->name);
+			spin_unlock(&srvlock);
+			return s;
+		}
+	}
+	spin_unlock(&srvlock);
+	return NULL;
+}
+
 static struct chan *srvopen(struct chan *c, int omode)
 {
 	ERRSTACK(1);
