@@ -41,10 +41,6 @@ static struct sigaction sigactions[_NSIG - 1];
  * the definitive source, but this will have to do for now.
  * http://unix.stackexchange.com/questions/99112/default-exit-code-when-process-is-terminated
  * */
-static void default_ignr_handler(int signr)
-{
-	/* Do nothing. We are ingoring the signal after all! */
-}
 static void default_term_handler(int signr)
 {
 	ros_syscall(SYS_proc_destroy, __procinfo.pid, signr, 0, 0, 0, 0);
@@ -80,20 +76,20 @@ static __sighandler_t default_handlers[] = {
 	[SIGALRM]   = default_term_handler, 
 	[SIGTERM]   = default_term_handler, 
 	[SIGSTKFLT] = default_term_handler, 
-	[SIGCHLD]   = default_ignr_handler, 
+	[SIGCHLD]   = SIG_IGN, 
 	[SIGCONT]   = default_cont_handler, 
 	[SIGSTOP]   = default_stop_handler, 
 	[SIGTSTP]   = default_stop_handler, 
 	[SIGTTIN]   = default_stop_handler, 
 	[SIGTTOU]   = default_stop_handler, 
 	[SIGURG]    = default_term_handler, 
-	[SIGXCPU]   = default_ignr_handler, 
+	[SIGXCPU]   = SIG_IGN, 
 	[SIGXFSZ]   = default_core_handler, 
 	[SIGVTALRM] = default_term_handler, 
 	[SIGPROF]   = default_term_handler, 
-	[SIGWINCH]  = default_ignr_handler, 
+	[SIGWINCH]  = SIG_IGN, 
 	[SIGIO]     = default_term_handler, 
-	[SIGPWR]    = default_ignr_handler, 
+	[SIGPWR]    = SIG_IGN, 
 	[SIGSYS]    = default_core_handler
 };
 
@@ -115,7 +111,8 @@ void trigger_posix_signal(int sig_nr, struct siginfo *info, void *aux)
 	if (action->sa_handler == SIG_IGN)
 		return;
 	if (action->sa_handler == SIG_DFL) {
-		default_handlers[sig_nr](sig_nr);
+		if (default_handlers[sig_nr] != SIG_IGN)
+			default_handlers[sig_nr](sig_nr);
 		return;
 	}
 
@@ -142,6 +139,8 @@ static void handle_event(struct event_msg *ev_msg, unsigned int ev_type)
 {
 	int sig_nr;
 	struct siginfo info = {0};
+	info.si_code = SI_USER;
+
 	assert(ev_msg);
 	sig_nr = ev_msg->ev_arg1;
 	trigger_posix_signal(sig_nr, &info, 0);
