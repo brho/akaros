@@ -92,10 +92,10 @@ static struct chan *pipeattach(char *spec)
 	kref_init(&p->ref, pipe_release, 1);
 	qlock_init(&p->qlock);
 
-	p->q[0] = qopen(pipealloc.pipeqsize, 0, 0, 0);
+	p->q[0] = qopen(pipealloc.pipeqsize, Qcoalesce, 0, 0);
 	if (p->q[0] == 0)
 		error(Enomem);
-	p->q[1] = qopen(pipealloc.pipeqsize, 0, 0, 0);
+	p->q[1] = qopen(pipealloc.pipeqsize, Qcoalesce, 0, 0);
 	if (p->q[1] == 0)
 		error(Enomem);
 	poperror();

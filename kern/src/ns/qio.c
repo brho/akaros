@@ -686,6 +686,8 @@ int qproduce(struct queue *q, void *vp, int len)
 
 	/* save in buffer */
 	/* use Qcoalesce here to save storage */
+	// TODO: Consider removing the Qcoalesce flag and force a coalescing
+	// strategy by default.
 	b = q->blast;
 	if ((q->state & Qcoalesce) == 0 || q->bfirst == NULL
 		|| b->lim - b->wp < len) {
@@ -1077,6 +1079,8 @@ again:
 	}
 
 	/* if we get here, there's at least one block in the queue */
+	// TODO: Consider removing the Qcoalesce flag and force a coalescing
+	// strategy by default.
 	if (q->state & Qcoalesce) {
 		/* when coalescing, 0 length blocks just go away */
 		b = q->bfirst;
