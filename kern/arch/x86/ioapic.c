@@ -35,8 +35,8 @@ struct Rbus {
 struct Rdt {
 	struct apic *apic;
 	int intin;
-	uint32_t lo;				/* should match the lo in the intin */
-								/* don't have a hi for some reason */
+	uint32_t lo;				/* matches the lo in the intin, incl Im */
+	uint32_t hi;				/* matches the hi in the intin, incl routing */
 
 	int ref;					/* could map to multiple busses */
 	int enabled;				/* times enabled */
@@ -151,6 +151,7 @@ void ioapicintrinit(int busno, int ioapicno, int intin, int devno, int lo)
 		rdt->apic = ioapic;
 		rdt->intin = intin;
 		rdt->lo = lo;
+		rdt->hi = 0;
 	} else {
 		if (lo != rdt->lo) {
 			printk("mutiple irq botch bus %d %d/%d/%d lo %d vs %d\n",
@@ -318,7 +319,7 @@ char *ioapicdump(char *start, char *end)
 		apic = &xioapic[i];
 		if (!apic->useable || apic->addr == 0)
 			continue;
-		start = seprintf(start, end, "ioapic %d addr %#p nrdt %d ibase %d\n",
+		start = seprintf(start, end, "ioapic %d addr %p nrdt %d ibase %d\n",
 						 i, apic->addr, apic->nrdt, apic->ibase);
 		for (n = 0; n < apic->nrdt; n++) {
 			spin_lock(&apic->lock);
@@ -334,9 +335,9 @@ char *ioapicdump(char *start, char *end)
 		for (; rbus != NULL; rbus = rbus->next) {
 			rdt = rbus->rdt;
 			start = seprintf(start, end,
-							 " apic %ld devno %#p (%d %d) intin %d lo %#p ref %d\n",
+							 " apic %ld devno %p(%d %d) intin %d hi %p lo %p\n",
 							 rdt->apic - xioapic, rbus->devno, rbus->devno >> 2,
-							 rbus->devno & 0x03, rdt->intin, rdt->lo, rdt->ref);
+							 rbus->devno & 0x03, rdt->intin, rdt->hi, rdt->lo);
 		}
 	}
 	return start;
@@ -357,66 +358,6 @@ void ioapiconline(void)
 			spin_unlock(&apic->lock);
 		}
 	}
-}
-
-static int dfpolicy = 0;
-
-static void ioapicintrdd(uint32_t * hi, uint32_t * lo)
-{
-	int i;
-	static int df;
-	static spinlock_t dflock;
-
-	/*
-	 * Set delivery mode (lo) and destination field (hi),
-	 * according to interrupt routing policy.
-	 */
-	/*
-	 * The bulk of this code was written ~1995, when there was
-	 * one architecture and one generation of hardware, the number
-	 * of CPUs was up to 4(8) and the choices for interrupt routing
-	 * were physical, or flat logical (optionally with lowest
-	 * priority interrupt). Logical mode hasn't scaled well with
-	 * the increasing number of packages/cores/threads, so the
-	 * fall-back is to physical mode, which works across all processor
-	 * generations, both AMD and Intel, using the APIC and xAPIC.
-	 *
-	 * Interrupt routing policy can be set here.
-	 */
-	switch (dfpolicy) {
-		default:	/* noise core 0 */
-#warning "sys->machptr[0]->apicno --- what is this in Akaros?"
-			*hi = 0;	//sys->machptr[0]->apicno<<24;
-			break;
-		case 1:	/* round-robin */
-			/*
-			 * Assign each interrupt to a different CPU on a round-robin
-			 * Some idea of the packages/cores/thread topology would be
-			 * useful here, e.g. to not assign interrupts to more than one
-			 * thread in a core. But, as usual, Intel make that an onerous
-			 * task.
-			 */
-			spin_lock(&dflock);
-			for (;;) {
-#if 0
-				i = df++;
-				if (df >= sys->nmach + 1)
-					df = 0;
-				if (sys->machptr[i] == NULL || !sys->machptr[i]->online)
-					continue;
-				i = sys->machptr[i]->apicno;
-#endif
-#warning "always picking acpino 0"
-				i = 0;
-				if (xlapic[i].useable && xlapic[i].addr == 0)
-					break;
-			}
-			spin_unlock(&dflock);
-
-			*hi = i << 24;
-			break;
-	}
-	*lo |= Pm | MTf;
 }
 
 int nextvec(void)
@@ -486,9 +427,85 @@ int disablemsi(Vctl *, Pcidev * p)
 }
 #endif
 
+static struct Rdt *ioapic_vector2rdt(int apic_vector)
+{
+	struct Rdt *rdt;
+	if (apic_vector < IdtIOAPIC || apic_vector > MaxIdtIOAPIC) {
+		printk("ioapic vector %d out of range", apic_vector);
+		return 0;
+	}
+	/* Fortunately rdtvecno[vecno] is static once assigned. o/w, we'll need some
+	 * global sync for the callers, both for lookup and keeping rdt valid. */
+	rdt = rdtvecno[apic_vector];
+	if (!rdt) {
+		printk("vector %d has no RDT! (did you enable it?)", apic_vector);
+		return 0;
+	}
+	return rdt;
+}
 
-/* Attempts to enable a bus interrupt, initializes irq_h, and returns the IDT
- * vector to use (-1 on error).
+/* Routes the IRQ to the os_coreid.  Will take effect immediately.  Route
+ * masking from rdt->lo will take effect. */
+static int ioapic_route_irq(int apic_vector, int os_coreid)
+{
+	int hw_coreid;
+	struct Rdt *rdt = ioapic_vector2rdt(apic_vector);
+	if (!rdt)
+		return -1;
+	if (os_coreid >= MAX_NUM_CPUS) {
+		printk("os_coreid %d out of range!\n", os_coreid);
+		return -1;
+	}
+	/* using the old akaros-style lapic id lookup */
+	hw_coreid = get_hw_coreid(os_coreid);
+	if (hw_coreid == -1) {
+		printk("os_coreid %d not a valid hw core!", os_coreid);
+		return -1;
+	}
+	spin_lock(&rdt->apic->lock);
+	/* this bit gets set in apicinit, only if we found it via MP or ACPI */
+	if (!xlapic[hw_coreid].useable) {
+		printk("Can't route to uninitialized LAPIC %d!\n", hw_coreid);
+		spin_unlock(&rdt->apic->lock);
+		return -1;
+	}
+	rdt->hi = hw_coreid << 24;
+	rdt->lo |= Pm | MTf;
+	rtblput(rdt->apic, rdt->intin, rdt->hi, rdt->lo);
+	spin_unlock(&rdt->apic->lock);
+	return 0;
+}
+
+static void ioapic_mask_irq(int apic_vector)
+{
+	struct Rdt *rdt = ioapic_vector2rdt(apic_vector);
+	if (!rdt)
+		return;
+	spin_lock(&rdt->apic->lock);
+	/* don't allow shared vectors to be masked.  whatever. */
+	if (rdt->enabled > 1) {
+		spin_unlock(&rdt->apic->lock);
+		return;
+	}
+	rdt->lo |= Im;
+	rtblput(rdt->apic, rdt->intin, rdt->hi, rdt->lo);
+	spin_unlock(&rdt->apic->lock);
+}
+
+static void ioapic_unmask_irq(int apic_vector)
+{
+	struct Rdt *rdt = ioapic_vector2rdt(apic_vector);
+	if (!rdt)
+		return;
+	spin_lock(&rdt->apic->lock);
+	rdt->lo &= ~Im;
+	rtblput(rdt->apic, rdt->intin, rdt->hi, rdt->lo);
+	spin_unlock(&rdt->apic->lock);
+}
+
+/* Attempts to init a bus interrupt, initializes irq_h, and returns the IDT
+ * vector to use (-1 on error).  If routable, the IRQ will route to core 0.  The
+ * IRQ will be masked, if possible.  Call irq_h->unmask() when you're ready.
  *
  * This will determine the type of bus the device is on (LAPIC, IOAPIC, PIC,
  * etc), and set the appropriate fields in isr_h.  If applicable, it'll also
@@ -498,12 +515,13 @@ int disablemsi(Vctl *, Pcidev * p)
  * Callers init irq_h->dev_irq and ->tbdf.  tbdf encodes the bus type and the
  * classic PCI bus:dev:func.
  *
- * In plan9, this was ioapicintrenable(). */
-int bus_irq_enable(struct irq_handler *irq_h)
+ * In plan9, this was ioapicintrenable(), which also unmasked.  We don't have a
+ * deinit/disable method that would tear down the route yet.  All the plan9 one
+ * did was dec enabled and mask the entry. */
+int bus_irq_setup(struct irq_handler *irq_h)
 {
 	struct Rbus *rbus;
 	struct Rdt *rdt;
-	uint32_t hi, lo;
 	int busno = 0, devno, vecno;
 	struct pci_device pcidev;
 
@@ -512,6 +530,7 @@ int bus_irq_enable(struct irq_handler *irq_h)
 		irq_h->eoi = pic_send_eoi;
 		irq_h->mask = pic_mask_irq;
 		irq_h->unmask = pic_unmask_irq;
+		irq_h->route_irq = 0;
 		irq_h->type = "pic";
 		/* PIC devices have vector = irq + 32 */
 		return irq_h->dev_irq + IdtPIC;
@@ -526,6 +545,7 @@ int bus_irq_enable(struct irq_handler *irq_h)
 			irq_h->eoi = lapic_send_eoi;
 			irq_h->mask = 0;
 			irq_h->unmask = 0;
+			irq_h->route_irq = 0;
 			irq_h->type = "lapic";
 			/* For the LAPIC, irq == vector */
 			return irq_h->dev_irq;
@@ -578,12 +598,12 @@ int bus_irq_enable(struct irq_handler *irq_h)
 		printk("Unable to build IOAPIC route for irq %d\n", irq_h->dev_irq);
 		return -1;
 	}
-
 	/*
 	 * what to do about devices that intrenable/intrdisable frequently?
 	 * 1) there is no ioapicdisable yet;
 	 * 2) it would be good to reuse freed vectors.
 	 * Oh bugger.
+	 * brho: plus the diff btw mask/unmask and enable/disable is unclear
 	 */
 	/*
 	 * This is a low-frequency event so just lock
@@ -591,6 +611,9 @@ int bus_irq_enable(struct irq_handler *irq_h)
 	 * rather than putting a Lock in each entry.
 	 */
 	spin_lock(&rdt->apic->lock);
+	/* if a destination has already been picked, we store it in the lo.  this
+	 * stays around regardless of enabled/disabled, since we don't reap vectors
+	 * yet.  nor do we really mess with enabled... */
 	if ((rdt->lo & 0xff) == 0) {
 		vecno = nextvec();
 		rdt->lo |= vecno;
@@ -598,52 +621,19 @@ int bus_irq_enable(struct irq_handler *irq_h)
 	} else {
 		printd("%p: mutiple irq bus %d dev %d\n", irq_h->tbdf, busno, devno);
 	}
-
 	rdt->enabled++;
-	lo = (rdt->lo & ~Im);
-	ioapicintrdd(&hi, &lo);	// XXX picks a destination and sets phys/fixed
-	rtblput(rdt->apic, rdt->intin, hi, lo);
-	vecno = lo & 0xff;
+	rdt->hi = 0;			/* route to 0 by default */
+	rdt->lo |= Pm | MTf;
+	rtblput(rdt->apic, rdt->intin, rdt->hi, rdt->lo);
+	vecno = rdt->lo & 0xff;
 	spin_unlock(&rdt->apic->lock);
 
 	irq_h->check_spurious = lapic_check_spurious;
 	irq_h->eoi = lapic_send_eoi;
-	irq_h->mask = 0;	/* TODO */
-	irq_h->unmask = 0;
+	irq_h->mask = ioapic_mask_irq;
+	irq_h->unmask = ioapic_unmask_irq;
+	irq_h->route_irq = ioapic_route_irq;
 	irq_h->type = "ioapic";
 
 	return vecno;
-}
-
-int ioapicintrdisable(int vecno)
-{
-	struct Rdt *rdt;
-
-	/*
-	 * FOV. Oh dear. This isn't very good.
-	 * Fortunately rdtvecno[vecno] is static
-	 * once assigned.
-	 * Must do better.
-	 *
-	 * What about any pending interrupts?
-	 */
-	if (vecno < 0 || vecno > MaxIdtIOAPIC) {
-		panic("ioapicintrdisable: vecno %d out of range", vecno);
-		return -1;
-	}
-	if ((rdt = rdtvecno[vecno]) == NULL) {
-		// XXX what if they asked for a LAPIC vector?
-		panic("ioapicintrdisable: vecno %d has no rdt", vecno);
-		return -1;
-	}
-
-	spin_lock(&rdt->apic->lock);
-	rdt->enabled--;
-	/* XXX looks like they think rdt->lo is supposed to have Im set/masked?  and
-	 * they also blow away their 'hi' routing decision from earlier */
-	if (rdt->enabled == 0)
-		rtblput(rdt->apic, rdt->intin, 0, rdt->lo);
-	spin_unlock(&rdt->apic->lock);
-
-	return 0;
 }

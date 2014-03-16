@@ -513,7 +513,7 @@ int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 	assert(irq_h);
 	irq_h->dev_irq = irq;
 	irq_h->tbdf = tbdf;
-	vector = bus_irq_enable(irq_h);
+	vector = bus_irq_setup(irq_h);
 	if (vector == -1) {
 		kfree(irq_h);
 		return -1;
