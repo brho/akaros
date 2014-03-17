@@ -20,8 +20,10 @@
 #include <pmap.h>
 #include <smp.h>
 #include <ip.h>
-#include <arch/pci.h>
 #include <acpi.h>
+#ifdef CONFIG_X86
+#include <arch/pci.h>
+#endif
 
 /*
  * ACPI 4.0 Support.
@@ -193,6 +195,8 @@ static void ioset32(uintptr_t p, uint32_t v, void *unused)
 	outl(p, v);
 }
 
+/* TODO: these cfgs are hacky.	maybe all the struct Reg should have struct
+ * pci_device or something? */
 static uint8_t cfgget8(uintptr_t p, void *r)
 {
 	struct Reg *ro = r;
@@ -274,26 +278,27 @@ regcpy(struct Regio *dio, uintptr_t da, struct Regio *sio,
 {
 	int n, i;
 
-	printk("regcpy %#p %#p %#p %#p\n", da, sa, len, align);
+	printd("regcpy %#p %#p %#p %#p\n", da, sa, len, align);
 	if ((len % align) != 0)
 		printd("regcpy: bug: copy not aligned. truncated\n");
 	n = len / align;
 	for (i = 0; i < n; i++) {
 		switch (align) {
 			case 1:
-				printk("cpy8 %#p %#p\n", da, sa);
+				printd("cpy8 %#p %#p\n", da, sa);
 				dio->set8(da, sio->get8(sa, sio->arg), dio->arg);
 				break;
 			case 2:
-				printk("cpy16 %#p %#p\n", da, sa);
+				printd("cpy16 %#p %#p\n", da, sa);
 				dio->set16(da, sio->get16(sa, sio->arg), dio->arg);
 				break;
 			case 4:
-				printk("cpy32 %#p %#p\n", da, sa);
+				printd("cpy32 %#p %#p\n", da, sa);
 				dio->set32(da, sio->get32(sa, sio->arg), dio->arg);
 				break;
 			case 8:
-				printk("cpy64 %#p %#p\n", da, sa);
+				printd("cpy64 %#p %#p\n", da, sa);
+				warn("Not doing set64 for some reason, fix me!");
 				//  dio->set64(da, sio->get64(sa, sio->arg), dio->arg);
 				break;
 			default:
@@ -305,10 +310,10 @@ regcpy(struct Regio *dio, uintptr_t da, struct Regio *sio,
 	return n * align;
 }
 
-// until we know.
+// until we know.  TODO: spatch/find_replace this shit, same with mp.c
 //#define vmap(x,y) (void *)vmap_pmem((x),(y))
 //#define vunmap(x,y) vunmap_vmem((uintptr_t)(x),(y))
-#define vmap(x,y) KADDR((x))
+#define vmap(x,y) ((void*)(x + KERNBASE))
 #define vunmap(x,y)
 /*
  * Perform I/O within region in access units of accsz bytes.
@@ -319,7 +324,7 @@ static long regio(struct Reg *r, void *p, uint32_t len, uintptr_t off, int iswr)
 	struct Regio rio;
 	uintptr_t rp;
 
-	printk("reg%s %s %#p %#p %#lx sz=%d\n",
+	printd("reg%s %s %#p %#p %#lx sz=%d\n",
 		   iswr ? "out" : "in", r->name, p, off, len, r->accsz);
 	rp = 0;
 	if (off + len > r->len) {
@@ -332,9 +337,6 @@ static long regio(struct Reg *r, void *p, uint32_t len, uintptr_t off, int iswr)
 	}
 	switch (r->spc) {
 		case Rsysmem:
-			// XXX should map only what we are going to use
-			// A region might be too large.
-			// we don't have this nonsense in akaros, right? 
 			if (r->p == NULL)
 				r->p = vmap(r->base, len);
 			if (r->p == NULL)
@@ -455,13 +457,13 @@ static int loadfacs(uintptr_t pa)
 	}
 	/* no unmap */
 
-	printk("acpi: facs: hwsig: %#p\n", facs->hwsig);
-	printk("acpi: facs: wakingv: %#p\n", facs->wakingv);
-	printk("acpi: facs: flags: %#p\n", facs->flags);
-	printk("acpi: facs: glock: %#p\n", facs->glock);
-	printk("acpi: facs: xwakingv: %#p\n", facs->xwakingv);
-	printk("acpi: facs: vers: %#p\n", facs->vers);
-	printk("acpi: facs: ospmflags: %#p\n", facs->ospmflags);
+	printd("acpi: facs: hwsig: %#p\n", facs->hwsig);
+	printd("acpi: facs: wakingv: %#p\n", facs->wakingv);
+	printd("acpi: facs: flags: %#p\n", facs->flags);
+	printd("acpi: facs: glock: %#p\n", facs->glock);
+	printd("acpi: facs: xwakingv: %#p\n", facs->xwakingv);
+	printd("acpi: facs: vers: %#p\n", facs->vers);
+	printd("acpi: facs: ospmflags: %#p\n", facs->ospmflags);
 	return 0;
 }
 
@@ -831,37 +833,6 @@ uintptr_t acpimblocksize(uintptr_t addr, int *dom)
 	return 0;
 }
 
-/*
- * we use mp->machno (or index in Mach array) as the identifier,
- * but ACPI relies on the apic identifier.
- */
-int corecolor(int core)
-{
-#warning "can't do core colors yet"
-	return -1;
-#if 0
-	struct Srat *sl;
-	static int colors[32];
-
-	if (core < 0 || core >= num_cpus)
-		return -1;
-	m = sys->machptr[core];
-	if (m == NULL)
-		return -1;
-
-	if (core >= 0 && core < ARRAY_SIZE(colors) && colors[core] != 0)
-		return colors[core] - 1;
-
-	for (sl = srat; sl != NULL; sl = sl->next)
-		if (sl->type == SRlapic && sl->lapic.apic == m->apicno) {
-			if (core >= 0 && core < ARRAY_SIZE(colors))
-				colors[core] = 1 + sl->lapic.dom;
-			return sl->lapic.dom;
-		}
-	return -1;
-#endif
-}
-
 int pickcore(int mycolor, int index)
 {
 	int color;
@@ -1163,7 +1134,7 @@ static int acpixsdtload(char *sig)
 		memmove(tsig, sdt, 4);
 		tsig[4] = 0;
 		if (sig == NULL || strcmp(sig, tsig) == 0) {
-			printk("acpi: %s addr %#p\n", tsig, sdt);
+			printd("acpi: %s addr %#p\n", tsig, sdt);
 			for (t = 0; t < ARRAY_SIZE(ptables); t++)
 				if (strcmp(tsig, ptables[t].sig) == 0) {
 					//dumptable(table, &table[127], tsig, sdt, l);
@@ -1203,7 +1174,7 @@ static void acpirsdptr(void)
 
 	assert(sizeof(struct Sdthdr) == 36);
 
-	printk("acpi: RSD PTR@ %#p, physaddr $%p length %ud %#llux rev %d\n",
+	printd("acpi: RSD PTR@ %#p, physaddr $%p length %ud %#llux rev %d\n",
 		   rsd, l32get(rsd->raddr), l32get(rsd->length),
 		   l64get(rsd->xaddr), rsd->revision);
 
@@ -1237,7 +1208,7 @@ static void acpirsdptr(void)
 	}
 	if ((xsdt->p[0] != 'R' && xsdt->p[0] != 'X')
 		|| memcmp(xsdt->p + 1, "SDT", 3) != 0) {
-		printk("acpi: xsdt sig: %c%c%c%c\n", xsdt->p[0], xsdt->p[1], xsdt->p[2],
+		printd("acpi: xsdt sig: %c%c%c%c\n", xsdt->p[0], xsdt->p[1], xsdt->p[2],
 			   xsdt->p[3]);
 		kfree(xsdt);
 		xsdt = NULL;
@@ -1247,7 +1218,7 @@ static void acpirsdptr(void)
 	xsdt->p += sizeof(struct Sdthdr);
 	xsdt->len -= sizeof(struct Sdthdr);
 	xsdt->asize = asize;
-	printk("acpi: XSDT %#p\n", xsdt);
+	printd("acpi: XSDT %#p\n", xsdt);
 	acpixsdtload(NULL);
 	/* xsdt is kept and not unmapped */
 
@@ -1384,7 +1355,6 @@ static unsigned int getpm1ctl(void)
 
 static void setpm1sts(unsigned int v)
 {
-	printk("acpi: setpm1sts %#p\n", v);
 	setbanked(fadt.pm1aevtblk, fadt.pm1bevtblk, fadt.pm1evtlen / 2, v);
 }
 
@@ -1410,7 +1380,6 @@ static void setgpeen(int n, unsigned int v)
 {
 	int old;
 
-	printk("acpi: setgpe %d %d\n", n, v);
 	old = inb(gpes[n].enio);
 	if (v)
 		outb(gpes[n].enio, old | 1 << gpes[n].enbit);
@@ -1503,10 +1472,10 @@ int acpiinit(void)
 		//fmtinstall('G', Gfmt);
 		acpirsdptr();
 		if (fadt.smicmd == 0) {
-			printk("acpiinit returns -1\n");
 			return -1;
 		}
 	}
+	printk("ACPI initialized\n");
 	return 0;
 }
 
@@ -1514,13 +1483,11 @@ static struct chan *acpiattach(char *spec)
 {
 	int i;
 
-	printk("ACPI attach\n");
 	/*
 	 * This was written for the stock kernel.
 	 * This code must use 64 registers to be acpi ready in nix.
 	 */
 	if (acpiinit() < 0) {
-		printk("ACPIINIT is called\n");
 		error("no acpi");
 	}
 
@@ -1528,7 +1495,6 @@ static struct chan *acpiattach(char *spec)
 	 * should use fadt->xpm* and fadt->xgpe* registers for 64 bits.
 	 * We are not ready in this kernel for that.
 	 */
-	printk("acpi io alloc\n");
 	acpiioalloc(fadt.smicmd, 1);
 	acpiioalloc(fadt.pm1aevtblk, fadt.pm1evtlen);
 	acpiioalloc(fadt.pm1bevtblk, fadt.pm1evtlen);
@@ -1539,7 +1505,6 @@ static struct chan *acpiattach(char *spec)
 	acpiioalloc(fadt.gpe0blk, fadt.gpe0blklen);
 	acpiioalloc(fadt.gpe1blk, fadt.gpe1blklen);
 
-	printk("acpi init gpes\n");
 	initgpes();
 
 	/*
@@ -1604,7 +1569,6 @@ static long acpiread(struct chan *c, void *a, long n, int64_t off)
 			for (t = tfirst; t != NULL; t = t->next) {
 				ns = seprinttable(s, e, t);
 				while (ns == e - 1) {
-					printk("acpiread: allocated %d\n", tlen * 2);
 					ntext = krealloc(ttext, tlen * 2, 0);
 					if (ntext == NULL)
 						panic("acpi: no memory\n");
@@ -1663,9 +1627,9 @@ static long acpiwrite(struct chan *c, void *a, long n, int64_t off)
 		nexterror();
 	}
 	ct = lookupcmd(cb, ctls, ARRAY_SIZE(ctls));
-	printk("acpi ctl %s\n", cb->f[0]);
 	switch (ct->index) {
 		case CMregion:
+			/* TODO: this block is racy on reg (global) */
 			r = reg;
 			if (r == NULL) {
 				r = kzmalloc(sizeof(struct Reg), 0);
@@ -1683,8 +1647,11 @@ static long acpiwrite(struct chan *c, void *a, long n, int64_t off)
 				fun = r->base >> Rpcifunshift & Rpcifunmask;
 				dev = r->base >> Rpcidevshift & Rpcidevmask;
 				bus = r->base >> Rpcibusshift & Rpcibusmask;
-#define MKBUS(t,b,d,f)	(((t)<<24)|(((b)&0xFF)<<16)|(((d)&0x1F)<<11)|(((f)&0x07)<<8))
-				r->tbdf = MKBUS(0 /*BusPCI */ , bus, dev, fun);
+				#ifdef CONFIG_X86
+				r->tbdf = MKBUS(BusPCI, bus, dev, fun);
+				#else
+				r->tbdf = 0
+				#endif
 				r->base = rno;	/* register ~ our base addr */
 			}
 			r->base = strtoul(cb->f[3], NULL, 0);
@@ -1696,7 +1663,7 @@ static long acpiwrite(struct chan *c, void *a, long n, int64_t off)
 				error("bad region access size");
 			}
 			reg = r;
-			printk("region %s %s %p %p sz%d",
+			printd("region %s %s %p %p sz%d",
 				   r->name, acpiregstr(r->spc), r->base, r->len, r->accsz);
 			break;
 		case CMgpe:
@@ -1704,7 +1671,6 @@ static long acpiwrite(struct chan *c, void *a, long n, int64_t off)
 			if (i >= ngpes)
 				error("gpe out of range");
 			kstrdup(&gpes[i].obj, cb->f[2]);
-			printk("gpe %d %s\n", i, gpes[i].obj);
 			setgpeen(i, 1);
 			break;
 		default:

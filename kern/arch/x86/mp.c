@@ -18,6 +18,8 @@
 #include <pmap.h>
 #include <smp.h>
 #include <ip.h>
+#include <arch/mptables.h>
+#include <arch/ioapic.h>
 
 /*
  * MultiProcessor Specification Version 1.[14].
@@ -220,7 +222,7 @@ static int mpparse(PCMP * pcmp, int maxcores)
 				 * CPU and identical for all. Indicate whether this is
 				 * the bootstrap processor (p[3] & 0x02).
 				 */
-				printk("mpparse: cpu %d pa %p bp %d\n",
+				printd("mpparse: cpu %d pa %p bp %d\n",
 					   p[1], l32get(pcmp->apicpa), p[3] & 0x02);
 				if ((p[3] & 0x01) != 0 && maxcores > 0) {
 					maxcores--;
@@ -229,7 +231,7 @@ static int mpparse(PCMP * pcmp, int maxcores)
 				p += 20;
 				break;
 			case 1:	/* bus */
-				printk("mpparse: bus: %d type %6.6s\n", p[1], (char *)p + 2);
+				printd("mpparse: bus: %d type %6.6s\n", p[1], (char *)p + 2);
 				if (p[1] >= Nbus) {
 					printd("mpparse: bus %d out of range\n", p[1]);
 					p += 8;
@@ -304,8 +306,6 @@ static int mpparse(PCMP * pcmp, int maxcores)
 				devno = p[5];
 				if (memcmp(mpbus[p[4]]->type, "PCI   ", 6) != 0)
 					devno <<= 2;
-				void ioapicintrinit(int busno, int apicno, int intin, int devno,
-									int lo);
 				ioapicintrinit(p[4], p[6], p[7], devno, lo);
 
 				p += 8;
@@ -356,19 +356,19 @@ static int mpparse(PCMP * pcmp, int maxcores)
 				printd("\n");
 				break;
 			case 128:
-				printk("address space mapping\n");
-				printk(" bus %d type %d base %#llux length %#llux\n",
+				printd("address space mapping\n");
+				printd(" bus %d type %d base %#llux length %#llux\n",
 					   p[2], p[3], l64get(p + 4), l64get(p + 12));
 				p += p[1];
 				break;
 			case 129:
-				printk("bus hierarchy descriptor\n");
-				printk(" bus %d sd %d parent bus %d\n", p[2], p[3], p[4]);
+				printd("bus hierarchy descriptor\n");
+				printd(" bus %d sd %d parent bus %d\n", p[2], p[3], p[4]);
 				p += p[1];
 				break;
 			case 130:
-				printk("compatibility bus address space modifier\n");
-				printk(" bus %d pr %d range list %d\n",
+				printd("compatibility bus address space modifier\n");
+				printd(" bus %d pr %d range list %d\n",
 					   p[2], p[3], l32get(p + 4));
 				p += p[1];
 				break;
@@ -401,7 +401,7 @@ static void *sigsearch(char *signature)
 		return r;
 #endif
 	r = sigscan(KADDR(0xe0000), 0x20000, signature);
-	printk("Found mp table at %p\n", r);
+	printk("Found MP table at %p\n", r);
 	if (r != NULL)
 		return r;
 
@@ -435,7 +435,7 @@ int mpsinit(int maxcores)
 		return ncleft;
 	if (sigchecksum(mp, mp->length * 16) != 0)
 		return ncleft;
-#define vmap(x,y) KADDR((x))
+#define vmap(x,y) ((void*)(x + KERNBASE))
 #define vunmap(x,y)
 
 	if ((pcmp = vmap(l32get(mp->addr), sizeof(PCMP))) == NULL)

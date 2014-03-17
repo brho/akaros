@@ -25,17 +25,20 @@ bool core_id_ready = FALSE;
 bool lapic_check_spurious(int trap_nr)
 {
 	/* FYI: lapic_spurious is 255 on qemu and 15 on the nehalem..  We actually
-	 * can set bits 4-7, and P6s have 0-3 hardwired to 0.  YMMV.
+	 * can set bits 4-7, and P6s have 0-3 hardwired to 0.  YMMV.  NxM seems to
+	 * say the lower 3 bits are usually 1.  We'll see if the assert trips.
 	 *
 	 * The SDM recommends not using the spurious vector for any other IRQs (LVT
 	 * or IOAPIC RTE), since the handlers don't send an EOI.  However, our check
 	 * here allows us to use the vector since we can tell the diff btw a
 	 * spurious and a real IRQ. */
-	uint8_t lapic_spurious = read_mmreg32(LAPIC_SPURIOUS) & 0xff;
+	assert(IdtLAPIC_SPURIOUS == (read_mmreg32(LAPIC_SPURIOUS) & 0xff));
 	/* Note the lapic's vectors are not shifted by an offset. */
-	if ((trap_nr == lapic_spurious) && !lapic_get_isr_bit(lapic_spurious)) {
+	if ((trap_nr == IdtLAPIC_SPURIOUS) &&
+	     !lapic_get_isr_bit(IdtLAPIC_SPURIOUS)) {
 		/* i'm still curious about these */
-		printk("Spurious LAPIC irq %d, core %d!\n", lapic_spurious, core_id());
+		printk("Spurious LAPIC irq %d, core %d!\n", IdtLAPIC_SPURIOUS,
+		       core_id());
 		lapic_print_isr();
 		return TRUE;
 	}

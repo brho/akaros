@@ -88,6 +88,7 @@ bool ipi_is_pending(uint8_t vector);
 void __lapic_set_timer(uint32_t ticks, uint8_t vec, bool periodic, uint8_t div);
 void lapic_set_timer(uint32_t usec, bool periodic);
 uint32_t lapic_get_default_id(void);
+int apiconline(void);
 
 static inline void lapic_send_eoi(int unused);
 static inline uint32_t lapic_get_version(void);
@@ -109,6 +110,7 @@ static inline void __send_ipi(uint8_t hw_coreid, uint8_t vector);
 static inline void send_group_ipi(uint8_t hw_groupid, uint8_t vector);
 static inline void __send_nmi(uint8_t hw_coreid);
 
+/* XXX: remove these */
 #define mask_lapic_lvt(entry) \
 	write_mmreg32(entry, read_mmreg32(entry) | LAPIC_LVT_MASK)
 #define unmask_lapic_lvt(entry) \
@@ -259,21 +261,15 @@ struct ioapic {
 	uintptr_t addr;				/* IOAPIC: register base */
 	uintptr_t paddr;			/* register base */
 	int nrdt;					/* IOAPIC: size of RDT */
-	int gsib;					/* IOAPIC: global RDT index */
 	int ibase;					/* global interrupt base */
 };
 
 struct lapic {
-	int machno;					/* APIC */
+	int machno;					/* similar to os_coreid, unused */
 
 	uint32_t lvt[6];
 	int nlvt;
 	int ver;
-
-	int64_t hz;					/* APIC Timer frequency */
-	int64_t max;
-	int64_t min;
-	int64_t div;
 };
 
 struct apic {

@@ -53,8 +53,7 @@
 #define IdtLAPIC_ERROR			(IdtLAPIC + 5)
 /* Plan 9 apic note: the spurious vector number must have bits 3-0 0x0f
  * unless the Extended Spurious Vector Enable bit is set in the
- * HyperTransport Transaction Control register.  Plan 9 used 63 (0x3f), but
- * 55 should have worked too (0x37). */
+ * HyperTransport Transaction Control register.  Plan 9 used 63 (0x3f). */
 #define IdtLAPIC_SPURIOUS		(IdtLAPIC + 15) /* Aka 63, 0x3f */
 #define MaxIdtLAPIC				(IdtLAPIC + 15)
 
@@ -148,8 +147,6 @@ struct irq_handler {
 extern gatedesc_t idt[];
 extern pseudodesc_t idt_pd;
 extern taskstate_t ts;
-/* Mapping of irq -> PCI device (TODO: make this PCI-agnostic) */
-extern struct pci_device *irq_pci_map[NUM_IRQS];
 int bus_irq_setup(struct irq_handler *irq_h);	/* ioapic.c */
 extern const char *x86_trapname(int trapno);
 extern void sysenter_handler(void);

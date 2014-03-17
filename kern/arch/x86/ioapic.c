@@ -72,10 +72,6 @@ static bool ioapic_exists(void)
 	return xioapic[0].useable ? TRUE : FALSE;
 }
 
-/* TODO: put these in a header */
-int apiceoi(int);
-int apicisr(int);
-
 static void rtblget(struct apic *apic, int sel, uint32_t * hi, uint32_t * lo)
 {
 	sel = Ioredtbl + 2 * sel;
@@ -154,7 +150,7 @@ void ioapicintrinit(int busno, int ioapicno, int intin, int devno, int lo)
 		rdt->hi = 0;
 	} else {
 		if (lo != rdt->lo) {
-			printk("mutiple irq botch bus %d %d/%d/%d lo %d vs %d\n",
+			printk("multiple irq botch bus %d %d/%d/%d lo %d vs %d\n",
 				   busno, ioapicno, intin, devno, lo, rdt->lo);
 			return;
 		}
@@ -283,7 +279,6 @@ void ioapicinit(int id, int ibase, uintptr_t pa)
 	if (apic->useable)
 		return;
 	apic->useable = 1;
-	printk("\t\tioapicinit %d: it's useable, apic %p\n", id, apic);
 	apic->paddr = pa;
 
 	/*
@@ -294,6 +289,9 @@ void ioapicinit(int id, int ibase, uintptr_t pa)
 	spin_lock(&apic->lock);
 	write_mmreg32(apic->addr + Ioregsel, Ioapicver);
 	apic->nrdt = ((read_mmreg32(apic->addr + Iowin) >> 16) & 0xff) + 1;
+	/* the ibase is the global system interrupt base, told to us by ACPI.  if
+	 * it's -1, we're called from mpparse, and just guess/make up our own
+	 * assignments. */
 	if (ibase != -1)
 		apic->ibase = ibase;
 	else {
@@ -303,6 +301,7 @@ void ioapicinit(int id, int ibase, uintptr_t pa)
 	write_mmreg32(apic->addr + Ioregsel, Ioapicid);
 	write_mmreg32(apic->addr + Iowin, id << 24);
 	spin_unlock(&apic->lock);
+	printk("IOAPIC initialized at %p\n", apic->addr);
 }
 
 char *ioapicdump(char *start, char *end)
@@ -375,7 +374,7 @@ int nextvec(void)
 	return vecno;
 }
 
-#warning "no msi mask yet"
+/* TODO: MSI work */
 #if 0
 static int msimask(struct Vkey *v, int mask)
 {
@@ -386,10 +385,7 @@ static int msimask(struct Vkey *v, int mask)
 		return -1;
 	return pcimsimask(p, mask);
 }
-#endif
 
-#warning "No msi yet"
-#if 0
 static int intrenablemsi(struct vctl *v, Pcidev * p)
 {
 	unsigned int vno, lo, hi;
@@ -416,9 +412,7 @@ static int intrenablemsi(struct vctl *v, Pcidev * p)
 		   v->name, v->irq, vno);
 	return vno;
 }
-#endif
-#warning "no disable msi yet"
-#if 0
+
 int disablemsi(Vctl *, Pcidev * p)
 {
 	if (p == NULL)
@@ -567,7 +561,7 @@ int bus_irq_setup(struct irq_handler *irq_h)
 			devno = irq_h->dev_irq << 2;
 			break;
 		case BusPCI:
-			/* we'll assume it's there. */
+			/* TODO: we'll assume it's there.  (fix when adding MSI) */
 #if 0
 			Pcidev *pcidev;
 
@@ -580,15 +574,11 @@ int bus_irq_setup(struct irq_handler *irq_h)
 #endif
 			explode_tbdf(irq_h->tbdf);
 			devno = pcidev_read8(&pcidev, PciINTP);
-			printk("INTP is %d\n", devno);
 
 			if (devno == 0)
 				panic("no INTP for tbdf %p", irq_h->tbdf);
 			/* remember, devno is the device shifted with irq pin in bits 0-1 */
 			devno = BUSDNO(irq_h->tbdf) << 2 | (devno - 1);
-			printk("devno is %08lx\n", devno);
-			printk("bus_irq_enable: tbdf %p busno %d devno %d\n",
-				   irq_h->tbdf, busno, devno);
 			break;
 		default:
 			panic("Unknown bus type, TBDF %p", irq_h->tbdf);

@@ -21,6 +21,7 @@
 #include <syscall.h>
 #include <kdebug.h>
 #include <kmalloc.h>
+#include <arch/mptables.h>
 
 taskstate_t RO ts;
 
@@ -32,10 +33,6 @@ pseudodesc_t idt_pd;
  * given IRQ.  Modification requires holding the lock (TODO: RCU) */
 struct irq_handler *irq_handlers[NUM_IRQS];
 spinlock_t irq_handler_wlock = SPINLOCK_INITIALIZER_IRQSAVE;
-
-/* Which pci devices hang off of which irqs */
-/* TODO: make this an array of SLISTs (pain from ioapic.c, etc...) */
-struct pci_device *irq_pci_map[NUM_IRQS] = {0};
 
 const char *x86_trapname(int trapno)
 {
@@ -170,15 +167,12 @@ void idt_init(void)
 
 #ifdef CONFIG_ENABLE_MPTABLES
 	int ncleft = MAX_NUM_CPUS;
-	int mpsinit(int maxcores);
-	void ioapiconline(void);
-	void apiconline(void);
 
 	ncleft = mpsinit(ncleft);
 	ncleft = mpacpi(ncleft);
-	printk("mpacpi is %d\n", ncleft);
+	printk("MP and ACPI found %d cores\n", MAX_NUM_CPUS - ncleft);
 
-	apiconline(); /* TODO: do this this for all cores*/
+	apiconline();
 	ioapiconline();
 #else
 	// set LINT0 to receive ExtINTs (KVM's default).  At reset they are 0x1000.
@@ -473,8 +467,8 @@ void handle_irq(struct hw_trapframe *hw_tf)
 	abort_halt(hw_tf);
 	//if (core_id())
 	if (hw_tf->tf_trapno != IdtLAPIC_TIMER)	/* timer irq */
-	if (hw_tf->tf_trapno != 255) /* kmsg */
-	if (hw_tf->tf_trapno != 36)	/* serial */
+	if (hw_tf->tf_trapno != I_KERNEL_MSG)
+	if (hw_tf->tf_trapno != 65)	/* qemu serial tends to get this one */
 		printd("Incoming IRQ, ISR: %d on core %d\n", hw_tf->tf_trapno,
 		       core_id());
 	/* TODO: RCU read lock */
@@ -528,7 +522,8 @@ int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 	wmb();	/* make sure irq_h is done before publishing to readers */
 	irq_handlers[vector] = irq_h;
 	spin_unlock_irqsave(&irq_handler_wlock);
-	/* might need to pass the irq_h, in case unmask needs more info */
+	/* Most IRQs other than the BusIPI should need their irq unmasked.
+	 * Might need to pass the irq_h, in case unmask needs more info */
 	if (irq_h->unmask)
 		irq_h->unmask(vector);
 	return 0;

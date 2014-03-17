@@ -56,6 +56,8 @@ enum {
 
 extern int mpisabusno;
 
+void ioapicintrinit(int busno, int apicno, int intin, int devno, int lo);
+void ioapiconline(void);
 void ioapicinit(int id, int ibase, uintptr_t pa);
 void ioapicrdtr(struct apic*, int unused_int, int*, int*);
 void ioapicrdtw(struct apic*, int unused_int, int, int);

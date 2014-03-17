@@ -392,7 +392,7 @@ uint32_t pci_getiobar32(uint32_t bar);
 /* Other common PCI functions */
 void pci_set_bus_master(struct pci_device *pcidev);
 
-/* this is quite the Hacke */
+/* TODO: this is quite the Hacke */
 #define explode_tbdf(tbdf) {pcidev.bus = tbdf >> 16;\
 		pcidev.dev = (tbdf>>11)&0x1f;\
 		pcidev.func = (tbdf>>8)&3;}

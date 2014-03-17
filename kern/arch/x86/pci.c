@@ -110,12 +110,6 @@ void pci_init(void) {
 				pcidev->irqline = pcidev_read8(pcidev, PCI_IRQLINE_STD);
 				/* This is the interrupt pin the device uses (INTA# - INTD#) */
 				pcidev->irqpin = pcidev_read8(pcidev, PCI_IRQPIN_STD);
-				if (pcidev->irqpin != PCI_NOINT) {
-					/* TODO: use a list (check for collisions for now) (massive
-					 * collisions on a desktop with bridge IRQs. */
-					//assert(!irq_pci_map[pcidev->irqline]);
-					irq_pci_map[pcidev->irqline] = pcidev;
-				}
 				/* bottom 7 bits are header type */
 				switch (pcidev_read8(pcidev, PCI_HEADER_REG) & 0x7c) {
 					case 0x00:

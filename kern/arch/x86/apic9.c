@@ -122,8 +122,7 @@ static uint32_t apicrget(int r)
 	if (!apicbase)
 		panic("apicrget: no apic");
 	val = read_mmreg32(apicbase + r);
-	printk("apicrget: %s returns %p\n", apicregnames[r], val);
-	return *((uint32_t *) (apicbase + r));
+	printd("apicrget: %s returns %p\n", apicregnames[r], val);
 	return val;
 }
 
@@ -131,24 +130,8 @@ static void apicrput(int r, uint32_t data)
 {
 	if (!apicbase)
 		panic("apicrput: no apic");
-	printk("apicrput: %s = %p\n", apicregnames[r], data);
+	printd("apicrput: %s = %p\n", apicregnames[r], data);
 	write_mmreg32(apicbase + r, data);
-}
-
-int apiceoi(int vecno)
-{
-	apicrput(Eoi, 0);
-
-	return vecno;
-}
-
-int apicisr(int vecno)
-{
-	int isr;
-
-	isr = apicrget(Is + (vecno / 32) * 16);
-
-	return isr & (1 << (vecno % 32));
 }
 
 void apicinit(int apicno, uintptr_t pa, int isbp)
@@ -163,7 +146,7 @@ void apicinit(int apicno, uintptr_t pa, int isbp)
 	 * are used for the APIC ID. There is also xAPIC and x2APIC
 	 * to be dealt with sometime.
 	 */
-	printk("apicinit: apicno %d pa %#p isbp %d\n", apicno, pa, isbp);
+	printd("apicinit: apicno %d pa %#p isbp %d\n", apicno, pa, isbp);
 	if (apicno >= Napic) {
 		printd("apicinit%d: out of range\n", apicno);
 		return;
@@ -173,24 +156,13 @@ void apicinit(int apicno, uintptr_t pa, int isbp)
 		return;
 	}
 	assert(pa == LAPIC_PBASE);
-	apicbase = LAPIC_BASE;
-	printk("apicinit%d: apicbase %#p -> %#p\n", apicno, pa, apicbase);
+	apicbase = LAPIC_BASE;	/* was the plan to just clobber the global? */
 	apic->useable = 1;
-	printk("\t\tapicinit%d: it's useable\n", apicno);
 
-	/*
-	 * Assign a machno to the processor associated with this
-	 * APIC, it may not be an identity map.
-	 * Machno 0 is always the bootstrap processor.
-	 */
-
-	if (isbp) {
-		apic->machno = 0;
-#warning "where in pcpui do we put the apicno?"
-		//m->apicno = apicno; // acpino is the hw_coreid
-	} else
-		apic->machno = apmachno++;
-		// ^^ machno is the os_coreid
+	/* plan 9 used to set up a mapping btw apic and pcpui like so:
+		pcpui->apicno = apicno; // acpino is the hw_coreid
+		apic->machno = apmachno++; // machno is the os_coreid
+	 * akaros does its own remapping of hw <-> os coreid during smp_boot */
 }
 
 static char *apicdump0(char *start, char *end, struct apic *apic, int i)
@@ -198,8 +170,8 @@ static char *apicdump0(char *start, char *end, struct apic *apic, int i)
 	if (!apic->useable || apic->addr != 0)
 		return start;
 	start =
-		seprintf(start, end, "apic%d: machno %d lint0 %#8.8p lint1 %#8.8p\n", i,
-				 apic->machno, apic->lvt[0], apic->lvt[1]);
+		seprintf(start, end, "apic%d: oscore %d lint0 %#8.8p lint1 %#8.8p\n", i,
+				 get_os_coreid(i), apic->lvt[0], apic->lvt[1]);
 	start =
 		seprintf(start, end, " tslvt %#8.8p pclvt %#8.8p elvt %#8.8p\n",
 				 apicrget(Tslvt), apicrget(Pclvt), apicrget(Elvt));
@@ -222,20 +194,11 @@ char *apicdump(char *start, char *end)
 		seprintf(start, end, "apicbase %#p apmachno %d\n", apicbase, apmachno);
 	for (i = 0; i < Napic; i++)
 		start = apicdump0(start, end, xlapic + i, i);
-	/* endxioapic?
-	   for(i = 0; i < Napic; i++)
-	   start = apicdump0(start, endxioapic + i, i);
-	 */
+	for (i = 0; i < Napic; i++)
+		start = apicdump0(start, end, xioapic + i, i);
 	return start;
 }
 
-#if 0
-static void apictimer(Ureg * ureg, void *)
-{
-	timerintr(ureg, 0);
-}
-
-#endif
 int apiconline(void)
 {
 	struct apic *apic;
@@ -243,18 +206,22 @@ int apiconline(void)
 	uint32_t dfr, ver;
 	int apicno, nlvt;
 
-	if (!apicbase)
+	if (!apicbase) {
+		printk("No apicbase on HW core %d!!\n", hw_core_id());
 		return 0;
-	if ((apicno = ((apicrget(Id) >> 24) & 0xff)) >= Napic)
+	}
+	if ((apicno = ((apicrget(Id) >> 24) & 0xff)) >= Napic) {
+		printk("Bad apicno %d on HW core %d!!\n", apicno, hw_core_id());
 		return 0;
+	}
 	apic = &xlapic[apicno];
-	if (!apic->useable || apic->addr)
+	/* The addr check tells us if it is an IOAPIC or not... */
+	if (!apic->useable || apic->addr) {
+		printk("Unsuitable apicno %d on HW core %d!!\n", apicno, hw_core_id());
 		return 0;
-	/*
-	 * Things that can only be done when on the processor
-	 * owning the APIC, apicinit above runs on the bootstrap
-	 * processor.
-	 */
+	}
+	/* Things that can only be done when on the processor owning the APIC,
+	 * apicinit above runs on the bootstrap processor. */
 	ver = apicrget(Ver);
 	nlvt = ((ver >> 16) & 0xff) + 1;
 	if (nlvt > ARRAY_SIZE(apic->lvt)) {
@@ -264,200 +231,65 @@ int apiconline(void)
 	}
 	apic->nlvt = nlvt;
 	apic->ver = ver & 0xff;
-#warning "fix me for AMD apic"
-	/*
-	 * These don't really matter in Physical mode;
-	 * set the defaults anyway.
-	 if(memcmp(m->cpuinfo, "AuthenticAMD", 12) == 0)
-	 dfr = 0xf0000000;
-	 else
-	 */
-	dfr = 0xffffffff;
+
+	/* These don't really matter in Physical mode; set the defaults anyway.  If
+	 * we have problems with logical IPIs on AMD, check this out: */
+	//if (memcmp(m->cpuinfo, "AuthenticAMD", 12) == 0)
+	//	dfr = 0xf0000000;
+	//else
+		dfr = 0xffffffff;
 	apicrput(Df, dfr);
 	apicrput(Ld, 0x00000000);
 
-	/*
-	 * Disable interrupts until ready by setting the Task Priority
-	 * register to 0xff.
-	 */
+	/* Disable interrupts until ready by setting the Task Priority register to
+	 * 0xff. */
 	apicrput(Tp, 0xff);
 
-	/*
-	 * Software-enable the APIC in the Spurious Interrupt Vector
-	 * register and set the vector number. The vector number must have
-	 * bits 3-0 0x0f unless the Extended Spurious Vector Enable bit
-	 * is set in the HyperTransport Transaction Control register.
-	 */
+	/* Software-enable the APIC in the Spurious Interrupt Vector register and
+	 * set the vector number. The vector number must have bits 3-0 0x0f unless
+	 * the Extended Spurious Vector Enable bit is set in the HyperTransport
+	 * Transaction Control register. */
 	apicrput(Siv, Swen | IdtLAPIC_SPURIOUS);
 
-	/*
-	 * Acknowledge any outstanding interrupts.
-	 */
+	/* Acknowledge any outstanding interrupts. */
 	apicrput(Eoi, 0);
 
-
-
-// TODO: sort this shit out with the system timing stuff
-	/*
-	 * Use the TSC to determine the APIC timer frequency.
-	 * It might be possible to snarf this from a chipset
-	 * register instead.
-	 */
-	apicrput(Tdc, DivX1);
-	apicrput(Tlvt, Im);
-	// system_timing.tsc_freq? is that valid yet?
-	tsc = read_tsc() + 2 * 1024 * (1048576 / 10) /*m->cpuhz/10 */ ;
-	apicrput(Tic, 0xffffffff);
-
-	while (read_tsc() < tsc) ;
-#define HZ 60
-	apic->hz = (0xffffffff - apicrget(Tcc)) * 10;
-	apic->max = apic->hz / HZ;
-	apic->min = apic->hz / (100 * HZ);
-	apic->div =
-		((2ULL * 1024 * 1048576 /*m->cpuhz */  / apic->max) + HZ / 2) / HZ;
-
-	if ( /*m->machno == 0 || */ 2) {
-		printk("apic%d: hz %lld max %lld min %lld div %lld\n", apicno,
-			   apic->hz, apic->max, apic->min, apic->div);
-	}
-
-
-
-
-	/*
-	 * Mask interrupts on Performance Counter overflow and
-	 * Thermal Sensor if implemented, and on Lintr0 (Legacy INTR),
-	 * and Lintr1 (Legacy NMI).
-	 * Clear any Error Status (write followed by read) and enable
-	 * the Error interrupt.
-	 */
+	/* Mask interrupts on Performance Counter overflow and Thermal Sensor if
+	 * implemented, and on Lintr0 (Legacy INTR), Lintr1 (Legacy NMI), and the
+	 * Timer.  Clear any Error Status (write followed by read) and enable the
+	 * Error interrupt. */
 	switch (apic->nlvt) {
 		case 6:
 			apicrput(Tslvt, Im);
-		 /*FALLTHROUGH*/ case 5:
+			/* fall-through */
+		case 5:
 			apicrput(Pclvt, Im);
-		 /*FALLTHROUGH*/ default:
+			/* fall-through */
+		default:
 			break;
 	}
+	/* lvt[0] and [1] were set to 0 in the BSS */
 	apicrput(Lint1, apic->lvt[1] | Im | IdtLAPIC_LINT1);
 	apicrput(Lint0, apic->lvt[0] | Im | IdtLAPIC_LINT0);
+	apicrput(Tlvt, Im);
 
 	apicrput(Es, 0);
 	apicrget(Es);
 	apicrput(Elvt, IdtLAPIC_ERROR);
 
-	/*
+	/* Not sure we need this from plan 9, Akaros never did:
+	 *
 	 * Issue an INIT Level De-Assert to synchronise arbitration ID's.
-	 * (Necessary in this implementation? - not if Pentium 4 or Xeon
-	 * (APIC Version >= 0x14), or AMD).
-	 apicrput(Ichi, 0);
-	 apicrput(Iclo, DSallinc|Lassert|MTir);
-	 while(apicrget(Iclo) & Ds)
-	 ;
-	 */
+	 * (Necessary in this implementation? - not if Pentium 4 or Xeon (APIC
+	 * Version >= 0x14), or AMD). */
+	//apicrput(Ichi, 0);
+	//apicrput(Iclo, DSallinc | Lassert | MTir);
+	//while (apicrget(Iclo) & Ds)
+	//	cpu_relax();
 
-#warning "not reloading the timer"
-	/*
-	 * Reload the timer to de-synchronise the processors,
-	 * then lower the task priority to allow interrupts to be
-	 * accepted by the APIC.
-	 microdelay((TK2MS(1)*1000/apmachno) * m->machno);
-	 */
-
-#if 0
-	if (apic->machno == 0) {
-		apicrput(Tic, apic->max);
-		intrenable(IdtTIMER, apictimer, 0, -1, "APIC timer");
-		apicrput(Tlvt, Periodic | IrqTIMER);
-	}
-#endif
-	if (node_id() /*m->machno */  == 0)
-		apicrput(Tp, 0);
-
-#warning "map from apicno to cpu info not installed"
-/*
-	maps from apic to per-cpu info
-	xlapicmachptr[apicno] = m;
-*/
-
+ 	/* this is to enable the APIC interrupts.  we did a SW lapic_enable()
+	 * earlier.  if we ever have issues where the lapic seems offline, check
+	 * here. */
+	apicrput(Tp, 0);
 	return 1;
 }
-
-#if 0
-/* To start timers on TCs as part of the boot process. */
-void apictimerenab(void)
-{
-	struct apic *apic;
-
-	apic = &xlapic[(apicrget(Id) >> 24) & 0xff];
-
-	apiceoi(IdtTIMER);
-	apicrput(Tic, apic->max);
-	apicrput(Tlvt, Periodic | IrqTIMER);
-
-}
-
-void apictimerset(uint64_t next)
-{
-	Mpl pl;
-	struct apic *apic;
-	int64_t period;
-
-	apic = &xlapic[(apicrget(Id) >> 24) & 0xff];
-
-	pl = splhi();
-	spin_lock(&(&m->apictimerlock)->lock);
-
-	period = apic->max;
-	if (next != 0) {
-		period = next - fastticks(NULL);	/* fastticks is just rdtsc() */
-		period /= apic->div;
-
-		if (period < apic->min)
-			period = apic->min;
-		else if (period > apic->max - apic->min)
-			period = apic->max;
-	}
-	apicrput(Tic, period);
-
-	spin_unlock(&(&m->apictimerlock)->lock);
-	splx(pl);
-}
-
-void apicsipi(int apicno, uintptr_t pa)
-{
-	int i;
-	uint32_t crhi, crlo;
-
-	/*
-	 * SIPI - Start-up IPI.
-	 * To do: checks on apic validity.
-	 */
-	crhi = apicno << 24;
-	apicrput(Ichi, crhi);
-	apicrput(Iclo, DSnone | TMlevel | Lassert | MTir);
-	microdelay(200);
-	apicrput(Iclo, DSnone | TMlevel | MTir);
-	millidelay(10);
-
-	crlo = DSnone | TMedge | MTsipi | ((uint32_t) pa / (4 * KiB));
-	for (i = 0; i < 2; i++) {
-		apicrput(Ichi, crhi);
-		apicrput(Iclo, crlo);
-		microdelay(200);
-	}
-}
-
-void apicipi(int apicno)
-{
-	apicrput(Ichi, apicno << 24);
-	apicrput(Iclo, DSnone | TMedge | Lassert | MTf | IdtIPI);
-	while (apicrget(Iclo) & Ds) ;
-}
-
-void apicpri(int pri)
-{
-	apicrput(Tp, pri);
-}
-#endif

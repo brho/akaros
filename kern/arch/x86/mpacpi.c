@@ -5,7 +5,6 @@
  * modified, propagated, or distributed except according to the terms contained
  * in the LICENSE file. */
 
-#define DEBUG
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -40,7 +39,6 @@ int mpacpi(int ncleft)
 	if (mpisabusno == -1)
 		mpisabusno = Nbus - 1;
 
-	printk("mpacpi ncleft %d\n", ncleft);
 	if (apics == NULL)
 		return ncleft;
 
@@ -62,8 +60,6 @@ int mpacpi(int ncleft)
 					already = "(mp)";
 				} else if (ncleft != 0) {
 					ncleft--;
-					printk("apicinit(%d, %p, %d);\n", st->lapic.id,
-						   apics->lapicpa, bp);
 					apicinit(st->lapic.id, apics->lapicpa, bp);
 				} else
 					already = "(off)";
@@ -81,8 +77,6 @@ int mpacpi(int ncleft)
 					already = "(mp)";
 					goto pr1;
 				}
-				printk("ioapicinit(%d, %p, %p);\n", st->lapic.id,
-					   apics->lapicpa, st->ioapic.addr);
 				ioapicinit(st->ioapic.id, st->ioapic.ibase, st->ioapic.addr);
 pr1:
 				printd("ioapic %d ", st->ioapic.id);

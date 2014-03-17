@@ -750,10 +750,8 @@ static int rtl8139pnp(struct ether *edev)
 		edev->ea[4] = i;
 		edev->ea[5] = i >> 8;
 	}
-	/* TODO: sort out this TBDF shit */
-	edev->tbdf = MKBUS(BusPCI, ctlr->pcidev->bus, 
-			   ctlr->pcidev->dev, ctlr->pcidev->func);
-	printk("TBDF is %p\n", edev->tbdf);
+	edev->tbdf = MKBUS(BusPCI, ctlr->pcidev->bus, ctlr->pcidev->dev,
+	                   ctlr->pcidev->func);
 	edev->attach = rtl8139attach;
 	edev->transmit = rtl8139transmit;
 	edev->interrupt = rtl8139interrupt;
