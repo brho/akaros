@@ -543,11 +543,20 @@ int bus_irq_setup(struct irq_handler *irq_h)
 			 * method was 0.  we're not doing that (unless we have to). */
 			irq_h->check_spurious = lapic_check_spurious;
 			irq_h->eoi = lapic_send_eoi;
-			irq_h->mask = 0;
-			irq_h->unmask = 0;
+			irq_h->mask = lapic_mask_irq;
+			irq_h->unmask = lapic_unmask_irq;
 			irq_h->route_irq = 0;
 			irq_h->type = "lapic";
 			/* For the LAPIC, irq == vector */
+			return irq_h->dev_irq;
+		case BusIPI:
+			/* similar to LAPIC, but we don't actually have LVT entries */
+			irq_h->check_spurious = lapic_check_spurious;
+			irq_h->eoi = lapic_send_eoi;
+			irq_h->mask = 0;
+			irq_h->unmask = 0;
+			irq_h->route_irq = 0;
+			irq_h->type = "IPI";
 			return irq_h->dev_irq;
 		case BusISA:
 			if (mpisabusno == -1)

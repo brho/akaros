@@ -189,10 +189,9 @@ void idt_init(void)
 
 	/* register the generic timer_interrupt() handler for the per-core timers */
 	register_irq(IdtLAPIC_TIMER, timer_interrupt, NULL,
-	                 MKBUS(BusLAPIC, 0, 0, 0));
+	             MKBUS(BusLAPIC, 0, 0, 0));
 	/* register the kernel message handler */
-	register_irq(I_KERNEL_MSG, handle_kmsg_ipi, NULL,
-	                 MKBUS(BusLAPIC, 0, 0, 0));
+	register_irq(I_KERNEL_MSG, handle_kmsg_ipi, NULL, MKBUS(BusIPI, 0, 0, 0));
 }
 
 static void handle_fperr(struct hw_trapframe *hw_tf)

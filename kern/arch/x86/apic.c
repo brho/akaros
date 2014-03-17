@@ -62,8 +62,8 @@ void lapic_print_isr(void)
 static bool __lapic_get_isrr_bit(unsigned long base, uint8_t vector)
 {
 	int which_reg = vector >> 5;	/* 32 bits per reg */
-	uint32_t *lapic_reg = (uint32_t*)(base + which_reg * 0x10);	/* offset 16 */
-	return (*lapic_reg & (1 << (vector % 32)) ? 1 : 0);
+	uintptr_t lapic_reg = base + which_reg * 0x10;	/* offset 16 */
+	return (read_mmreg32(lapic_reg) & (1 << (vector % 32)) ? 1 : 0);
 }
 
 bool lapic_get_isr_bit(uint8_t vector)
@@ -74,6 +74,28 @@ bool lapic_get_isr_bit(uint8_t vector)
 bool lapic_get_irr_bit(uint8_t vector)
 {
 	return __lapic_get_isrr_bit(LAPIC_IRR, vector);
+}
+
+void lapic_mask_irq(int apic_vector)
+{
+	uintptr_t mm_reg;
+	if (apic_vector < IdtLAPIC || IdtLAPIC + 4 < apic_vector) {
+		warn("Bad apic vector %d\n", apic_vector);
+		return;
+	}
+	mm_reg = LAPIC_BASE + (apic_vector - IdtLAPIC) * 0x10;
+	write_mmreg32(mm_reg, read_mmreg32(mm_reg) | LAPIC_LVT_MASK);
+}
+
+void lapic_unmask_irq(int apic_vector)
+{
+	uintptr_t mm_reg;
+	if (apic_vector < IdtLAPIC || IdtLAPIC + 4 < apic_vector) {
+		warn("Bad apic vector %d\n", apic_vector);
+		return;
+	}
+	mm_reg = LAPIC_BASE + (apic_vector - IdtLAPIC) * 0x10;
+	write_mmreg32(mm_reg, read_mmreg32(mm_reg) & ~LAPIC_LVT_MASK);
 }
 
 /* This works for any interrupt that goes through the LAPIC, but not things like

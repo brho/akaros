@@ -30,11 +30,11 @@
 #define LAPIC_LOGICAL_ID			(LAPIC_BASE + 0x0d0)
 // LAPIC Local Vector Table
 #define LAPIC_LVT_TIMER				(LAPIC_BASE + 0x320)
+#define LAPIC_LVT_THERMAL			(LAPIC_BASE + 0x330)
+#define LAPIC_LVT_PERFMON			(LAPIC_BASE + 0x340)
 #define LAPIC_LVT_LINT0				(LAPIC_BASE + 0x350)
 #define LAPIC_LVT_LINT1				(LAPIC_BASE + 0x360)
 #define LAPIC_LVT_ERROR				(LAPIC_BASE + 0x370)
-#define LAPIC_LVT_PERFMON			(LAPIC_BASE + 0x340)
-#define LAPIC_LVT_THERMAL			(LAPIC_BASE + 0x330)
 #define LAPIC_LVT_MASK				0x00010000
 // LAPIC Timer
 #define LAPIC_TIMER_INIT			(LAPIC_BASE + 0x380)
@@ -82,6 +82,8 @@ bool lapic_check_spurious(int trap_nr);
 bool lapic_get_isr_bit(uint8_t vector);
 bool lapic_get_irr_bit(uint8_t vector);
 void lapic_print_isr(void);
+void lapic_mask_irq(int apic_vector);
+void lapic_unmask_irq(int apic_vector);
 bool ipi_is_pending(uint8_t vector);
 void __lapic_set_timer(uint32_t ticks, uint8_t vec, bool periodic, uint8_t div);
 void lapic_set_timer(uint32_t usec, bool periodic);

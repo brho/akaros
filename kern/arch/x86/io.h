@@ -30,6 +30,7 @@ enum {
 	BusVME,	/* VMEbus */
 	BusXPRESS,	/* Express System Bus */
 	BusLAPIC,	/* Local APIC, fake type */
+	BusIPI,	/* IPIs, fake type like the LAPIC */
 };
 
 #define MKBUS(t,b,d,f)	(((t)<<24)|(((b)&0xFF)<<16)|(((d)&0x1F)<<11)|(((f)&0x07)<<8))

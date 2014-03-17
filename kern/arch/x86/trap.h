@@ -45,11 +45,12 @@
 
 /* 48-63 are LAPIC vectors */
 #define IdtLAPIC				(IdtPIC + 16)
-#define IdtLAPIC_LINT0			(IdtLAPIC + 0)
-#define IdtLAPIC_LINT1			(IdtLAPIC + 1)
-#define IdtLAPIC_TIMER			(IdtLAPIC + 2)
-#define IdtLAPIC_ERROR			(IdtLAPIC + 3)
-#define IdtLAPIC_PCINT			(IdtLAPIC + 4)
+#define IdtLAPIC_TIMER			(IdtLAPIC + 0)
+#define IdtLAPIC_THERMAL		(IdtLAPIC + 1)
+#define IdtLAPIC_PCINT			(IdtLAPIC + 2)
+#define IdtLAPIC_LINT0			(IdtLAPIC + 3)
+#define IdtLAPIC_LINT1			(IdtLAPIC + 4)
+#define IdtLAPIC_ERROR			(IdtLAPIC + 5)
 /* Plan 9 apic note: the spurious vector number must have bits 3-0 0x0f
  * unless the Extended Spurious Vector Enable bit is set in the
  * HyperTransport Transaction Control register.  Plan 9 used 63 (0x3f), but
