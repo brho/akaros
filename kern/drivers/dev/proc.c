@@ -73,16 +73,6 @@ enum {
 	CMwaitstop,
 	CMwired,
 	CMtrace,
-	/* real time */
-	CMperiod,
-	CMdeadline,
-	CMcost,
-	CMsporadic,
-	CMdeadlinenotes,
-	CMadmit,
-	CMextra,
-	CMexpel,
-	CMevent,
 	CMcore,
 };
 
@@ -90,10 +80,8 @@ enum {
 	Nevents = 0x4000,
 	Emask = Nevents - 1,
 	Ntracedpids = 1024,
+	STATSIZE = 8 + 1 + 10 + 1 + 6 + 2,
 };
-
-/* + 6 * 12 for extra NIX counters. */
-#define STATSIZE	(2*KNAMELEN+12+9*12 +6*12)
 
 /*
  * Status, fd, and ns are left fully readable (0444) because of their use in debugging,
@@ -141,20 +129,8 @@ struct cmdtab proccmd[] = {
 	{CMwaitstop, "waitstop", 1},
 	{CMwired, "wired", 2},
 	{CMtrace, "trace", 0},
-	{CMperiod, "period", 2},
-	{CMdeadline, "deadline", 2},
-	{CMcost, "cost", 2},
-	{CMsporadic, "sporadic", 1},
-	{CMdeadlinenotes, "deadlinenotes", 1},
-	{CMadmit, "admit", 1},
-	{CMextra, "extra", 1},
-	{CMexpel, "expel", 1},
-	{CMevent, "event", 1},
 	{CMcore, "core", 2},
 };
-
-/* Segment type from portdat.h */
-static char *sname[] = { "Text", "Data", "Bss", "Stack", "Shared", "Phys", };
 
 /*
  * struct qids are, in path:
@@ -513,7 +489,6 @@ static struct chan *procopen(struct chan *c, int omode)
 			break;
 
 		case Qmem:
-		case Qctl:
 //          if (p->privatemem)
 			error(Eperm);
 			//nonone(p);
@@ -536,6 +511,7 @@ static struct chan *procopen(struct chan *c, int omode)
 			c->aux = kzmalloc(sizeof(struct mntwalk), KMALLOC_WAIT);
 			break;
 		case Qstatus:
+		case Qctl:
 			break;
 		case Qnotepg:
 			error("not yet");
