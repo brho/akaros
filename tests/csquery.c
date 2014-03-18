@@ -86,7 +86,7 @@ void main(int argc, char **argv)
 	if (argc > 0)
 		server = argv[0];
 	else
-		server = "#s/cs"; // "/net/cs";
+		server = "/net/cs";
 
 	if (argc > 1) {
 		for (i = 1; i < argc; i++)
