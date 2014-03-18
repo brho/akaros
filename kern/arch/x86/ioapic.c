@@ -65,6 +65,7 @@ static spinlock_t idtnolock;
 static int idtno = IdtIOAPIC;
 
 struct apic xioapic[Napic];
+int pcimsimask(struct pci_device *p, int mask);
 
 static bool ioapic_exists(void)
 {
@@ -373,28 +374,46 @@ int nextvec(void)
 
 	return vecno;
 }
-
-/* TODO: MSI work */
-#if 0
-static int msimask(struct Vkey *v, int mask)
+static struct pci_device *pcimatchtbdf(int tbdf)
 {
-	Pcidev *p;
+	/* don't we have macros for this somewhere? */
+	int bus, dev, func;
+	bus = tbdf >> 16;
+	dev = (tbdf>>11)&0x1f;
+	func = (tbdf>>8)&3;
 
+	struct pci_device *search;
+	STAILQ_FOREACH(search, &pci_devices, all_dev) {
+		if ((search->bus == bus) &&
+		    (search->dev == dev) &&
+		    (search->func == func))
+			return search;
+	}
+	return NULL;
+}
+static int msimask(struct vkey *v, int mask)
+{
+	int pcimsimask(struct pci_device *p, int mask);
+
+	struct pci_device *p;
 	p = pcimatchtbdf(v->tbdf);
 	if (p == NULL)
 		return -1;
 	return pcimsimask(p, mask);
 }
 
-static int intrenablemsi(struct vctl *v, Pcidev * p)
+static int intrenablemsi(struct irq_handler *v, struct pci_device *p)
 {
-	unsigned int vno, lo, hi;
+	int pcimsienable(struct pci_device *p, uint64_t vec);
+
+	unsigned int vno, lo, hi = 0;
 	uint64_t msivec;
 
 	vno = nextvec();
 
 	lo = IPlow | TMedge | vno;
-	ioapicintrdd(&hi, &lo);
+#warning "what happened to ioapicintrdd"
+//	ioapicintrdd(&hi, &lo);
 
 	if (lo & Lm)
 		lo |= MTlp;
@@ -402,24 +421,26 @@ static int intrenablemsi(struct vctl *v, Pcidev * p)
 	msivec = (uint64_t) hi << 32 | lo;
 	if (pcimsienable(p, msivec) == -1)
 		return -1;
-	v->isr = apicisr;
-	v->eoi = apiceoi;
-	v->vno = vno;
+#warning "apicisr? apiceoi? "
+//	v->isr = apicisr;
+//	v->eoi = apiceoi;
+	v->apic_vector = vno;
 	v->type = "msi";
 	v->mask = msimask;
 
-	printk("msiirq: %T: enabling %.16llp %s irq %d vno %d\n", p->tbdf, msivec,
-		   v->name, v->irq, vno);
+	printk("msiirq: (%d,%d,%d): enabling %.16llp %s irq %d vno %d\n", 
+	       p->bus, p->dev, p->func, msivec,
+		   v->name, v->apic_vector, vno);
 	return vno;
 }
 
-int disablemsi(Vctl *, Pcidev * p)
+int disablemsi(void *unused, struct pci_device *p)
 {
+
 	if (p == NULL)
 		return -1;
 	return pcimsimask(p, 1);
 }
-#endif
 
 static struct Rdt *ioapic_vector2rdt(int apic_vector)
 {
@@ -518,6 +539,7 @@ int bus_irq_setup(struct irq_handler *irq_h)
 	struct Rdt *rdt;
 	int busno = 0, devno, vecno;
 	struct pci_device pcidev;
+	struct pci_device *msidev;
 
 	if (!ioapic_exists() && (BUSTYPE(irq_h->tbdf) != BusLAPIC)) {
 		irq_h->check_spurious = pic_check_spurious;
@@ -562,16 +584,14 @@ int bus_irq_setup(struct irq_handler *irq_h)
 			break;
 		case BusPCI:
 			/* TODO: we'll assume it's there.  (fix when adding MSI) */
-#if 0
-			Pcidev *pcidev;
 
+			if ((msidev = pcimatchtbdf(irq_h->tbdf)) == NULL) {
+				printk("no PCI dev for tbdf %p", irq_h->tbdf);
+				if ((vecno = intrenablemsi(irq_h, msidev)) != -1)
+					return vecno;
+				disablemsi(irq_h, msidev);
+			}
 			busno = BUSBNO(irq_h->tbdf);
-			if ((pcidev = pcimatchtbdf(irq_h->tbdf)) == NULL)
-				panic("no PCI dev for tbdf %p", irq_h->tbdf);
-			if ((vecno = intrenablemsi(irq_h, pcidev)) != -1)
-				return vecno;
-			disablemsi(irq_h, pcidev);
-#endif
 			explode_tbdf(irq_h->tbdf);
 			devno = pcidev_read8(&pcidev, PciINTP);
 

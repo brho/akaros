@@ -120,6 +120,11 @@
 #include <arch/coreid.h>
 #include <arch/io.h>
 
+struct vkey {
+	int tbdf;
+	int dev_irq;
+};
+
 struct irq_handler {
 	struct irq_handler *next;
 	void (*isr)(struct hw_trapframe *hw_tf, void *data);
