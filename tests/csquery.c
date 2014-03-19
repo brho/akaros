@@ -35,11 +35,9 @@ void query(char *addr)
 	int fd, n;
 	int amt;
 
-	printf("CSQUERY:Open %s\n", server);
 	fd = open(server, O_RDWR);
 	if (fd < 0)
 		error(1, 0, "cannot open %s: %r", server);
-printf("CSQUERY:ask %d about :%s:\n", fd, addr);
 	amt = write(fd, addr, strlen(addr));
 	if (amt != strlen(addr)) {
 		printf("CSQUERY:Tried to write %d to fd %d, only wrote %d\n", strlen(addr),fd,amt);
@@ -50,16 +48,12 @@ printf("CSQUERY:ask %d about :%s:\n", fd, addr);
 		return;
 	}
 	if (!statusonly) {
-printf("CSQUERY:lseek\n");
 		lseek(fd, 0, 0);
-printf("CSQUERY:now read:");
 		while ((n = read(fd, buf, sizeof(buf) - 1)) > 0) {
 			buf[n] = 0;
-			printf("%s\n", buf);
 		}
-printf("CSQUERY:done reading ... %s\n", buf);
+		printf("%s\n", buf);
 	}
-printf("CSQUERY:close and return\n");
 	close(fd);
 }
 
@@ -106,7 +100,6 @@ void main(int argc, char **argv)
 		if (i < 0)
 			break;
 		p[i] = 0;
-		printf("CSQUERY:Got %d bytes:%s:\n", i, p);
 		if (i)
 			query(p);
 	}

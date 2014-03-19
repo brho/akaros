@@ -338,7 +338,6 @@ mountinit(char *service, char *mntpt)
 	 * ORCLOSE means remove on last close. Handy. Not here yet. 
 	 */
 	f = open(service, O_WRONLY|O_CREAT/*|ORCLOSE*/, 0666);
-printf("open %s gets %d\n", service, f);
 	if(f < 0)
 		error(1, 0, "%s: %r",service);
 	snprintf(buf, sizeof(buf), "%d", p[1]);
@@ -444,13 +443,10 @@ void *job_thread(void* arg)
 	Mfile *mf;
 	Job *job = arg;
 	//lock(&dblock);
-printf("JOB!\n");
 	mf = newfid(job->request.fid);
 
-printf("NEWFID is %p\n", mf);
 	if(debug)
 		fprintf(stderr, "CS:%F", &job->request);
-printf("DO %d\n", job->request.type);
 	switch(job->request.type){
 	default:
 		fprintf(stderr, "CS:unknown request type %d", job->request.type);
@@ -499,7 +495,8 @@ printf("DO %d\n", job->request.type);
 
 	freejob(job);
 
-	fprintf(stderr, "CS:Job done\n");
+	if (debug)
+		fprintf(stderr, "CS:Job done\n");
 	return 0;
 }
 
@@ -532,9 +529,7 @@ io(void)
 		 * later if we want to.
 		 */
 #if 0
-printf("RUN THAT JOB!\n");
 		if (pthread_create(&job->thread, NULL, &job_thread, job)) {
-printf("ERROR!\n");
 			error(1, 0, "%s: %r","Failed to create job");
 			continue;
 		}
@@ -627,7 +622,6 @@ rwalk(Job *job, Mfile *mf)
 	if(nelems > 0){
 		/* walk fid */
 		for(i=0; i<nelems && i<MAXWELEM; i++){
-printf("cs: i %d nelems %d \n", i, nelems);
 			if((qid.type & QTDIR) == 0){
 				err = "not a directory";
 				break;
@@ -643,7 +637,6 @@ printf("cs: i %d nelems %d \n", i, nelems);
 			if(strcmp(elems[i], "cs") == 0){
 				qid.type = QTFILE;
 				qid.path = Qcs;
-printf("found cs, goto Found\n");
 				goto Found;
 			}
 			err = malloc(4096);
@@ -746,8 +739,6 @@ rread(Job *job, Mfile *mf)
 		}
 
 		/* give back a single reply (or part of one) */
-		printf("mf->reply[%d] is %s; off %d, toff %d\n", 
-				i, mf->reply[i], off, toff);
 		job->reply.data = mf->reply[i] + (off - toff);
 		if(cnt > toff - off + n)
 			n = toff - off + n;
@@ -807,7 +798,6 @@ rwrite(Job *job, Mfile *mf)
 		goto send;
 	}
 	job->request.data[cnt] = 0;
-printf("CS: request data is :%s:\n", job->request.data);
 	/*
 	 *  toggle debugging
 	 */
@@ -890,8 +880,6 @@ printf("CS: request data is :%s:\n", job->request.data);
 		mf->net = strdup(field[0]);
 		break;
 	}
-printf("CS: net %s host %s serv %s rem %s\n", 
-mf->net, mf->host, mf->serv, mf->rem);
 	/*
 	 *  do the first net worth of lookup
 	 */
@@ -967,15 +955,12 @@ sendmsg(Job *job, char *err)
 		job->reply.type = job->request.type+1;
 	}
 	job->reply.tag = job->request.tag;
-	if (job->reply.type == Rread && job->reply.data)
-		hexdump(stdout, job->reply.data, job->reply.count);
 	n = convS2M(&job->reply, mdata, sizeof mdata);
 	if(n == 1){
 		fprintf(stderr,  "CS:sendmsg convS2M of %F returns 0", &job->reply);
 		abort();
 	}
 	//lock(&joblock);
-	hexdump(stdout, mdata, n);
 	if(job->flushed == 0)
 		if(write(mfd[1], mdata, n)!=n)
 			error(1, 0, "%s: %r","mount write");
@@ -1206,7 +1191,6 @@ lookup(Mfile *mf)
 	if(mf->net == NULL)
 		return 0;	/* must have been a genquery */
 
-printf("CS: Look up net %s \n", mf->net);
 	if(strcmp(mf->net, "net") == 0){
 		/*
 		 *  go through set of default nets
@@ -1247,16 +1231,13 @@ printf("CS: Look up net %s \n", mf->net);
 	/*
 	 *  look for a specific network
 	 */
-printf("CS: netlist is %p\n", netlist);
 	for(np = netlist; np && np->net != NULL; np++){
 		if(np->fasttimeouthack)
 			continue;
-printf("CS: compare net np->net %s mf->net %s\n", np->net, mf->net);
 		if(strcmp(np->net, mf->net) == 0)
 			break;
 	}
 
-printf("CS: np is %p np->net %p\n", np, np ? np->net : NULL);
 	if(np && np->net != NULL){
 		/*
 		 *  known network
@@ -1264,7 +1245,6 @@ printf("CS: np is %p np->net %p\n", np, np ? np->net : NULL);
 		nt = (*np->lookup)(np, mf->host, mf->serv, 1);
 		for(t = nt; mf->nreply < Nreply && t; t = t->entry){
 			cp = (*np->trans)(t, np, mf->serv, mf->rem, 0);
-printf("CS: Lookup %s\n", cp);
 			if(cp){
 				mf->replylen[mf->nreply] = strlen(cp);
 				mf->reply[mf->nreply++] = cp;
@@ -1274,7 +1254,6 @@ printf("CS: Lookup %s\n", cp);
 		ndbfree(nt);
 		return rv;
 	} else {
-printf("UNKONW NET\n");
 		/*
 		 *  not a known network, don't translate host or service
 		 */
@@ -1284,7 +1263,6 @@ printf("UNKONW NET\n");
 		else
 			snprintf(reply, sizeof(reply), "%s/%s/clone %s",
 				mntpt, mf->net, mf->host);
-printf("CS: reply is %s\n", reply);
 		mf->reply[0] = strdup(reply);
 		mf->replylen[0] = strlen(reply);
 		mf->nreply = 1;
@@ -1308,7 +1286,6 @@ ipserv(Network *np, char *name, char *buf, int blen)
 	struct ndbtuple *t, *nt;
 	struct ndbs s;
 
-printf("CS: port %s\n", name);
 	/* '*' means any service */
 	if(strcmp(name, "*")==0){
 		strcpy(buf, name);
@@ -1329,7 +1306,6 @@ printf("CS: port %s\n", name);
 	p = NULL;
 	if(alpha){
 		p = ndbgetvalue(db, &s, np->net, name, "port", &t);
-printf("CS: get value of port %s, p is (we hope not null)%p\n", name, p);
 		if(p == NULL)
 			return 0;
 	} else {
@@ -1350,7 +1326,6 @@ printf("CS: get value of port %s, p is (we hope not null)%p\n", name, p);
 	}
 	snprintf(buf, blen, "%s%s", p, restr ? "!r" : "");
 	free(p);
-printf("CS: buf is %s\n", buf);
 	return buf;
 }
 
