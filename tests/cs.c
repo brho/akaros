@@ -848,7 +848,7 @@ printf("CS: request data is :%s:\n", job->request.data);
 	 *  refresh all state
 	 */
 	if(strncmp(job->request.data, "refresh", 7)==0){
-		netinit(1);
+		netinit(0/*1*/);
 		goto send;
 	}
 
@@ -888,7 +888,8 @@ printf("CS: request data is :%s:\n", job->request.data);
 		mf->net = strdup(field[0]);
 		break;
 	}
-
+printf("CS: net %s host %s serv %s rem %s\n", 
+mf->net, mf->host, mf->serv, mf->rem);
 	/*
 	 *  do the first net worth of lookup
 	 */
@@ -965,7 +966,7 @@ sendmsg(Job *job, char *err)
 	}
 	job->reply.tag = job->request.tag;
 	n = convS2M(&job->reply, mdata, sizeof mdata);
-	if(n == 0){
+	if(n == 1){
 		fprintf(stderr,  "CS:sendmsg convS2M of %F returns 0", &job->reply);
 		abort();
 	}
@@ -1107,11 +1108,16 @@ netinit(int background)
 
 	/* add the mounted networks to the default list */
 	for(np = network; np->net; np++){
+		int fuckup;
 		if(np->considered)
 			continue;
 		snprintf(clone, sizeof(clone), "%s/%s/clone", mntpt, np->net);
-		if(access(clone, R_OK))
+		fuckup = open(clone, O_RDONLY);
+		if (fuckup < 0)
 			continue;
+		close(fuckup);
+		//if(access(clone, R_OK))
+			//continue;
 		if(netlist)
 			last->next = np;
 		else
@@ -1195,6 +1201,7 @@ lookup(Mfile *mf)
 	if(mf->net == NULL)
 		return 0;	/* must have been a genquery */
 
+printf("CS: Look up net %s \n", mf->net);
 	if(strcmp(mf->net, "net") == 0){
 		/*
 		 *  go through set of default nets
@@ -1235,13 +1242,16 @@ lookup(Mfile *mf)
 	/*
 	 *  look for a specific network
 	 */
+printf("CS: netlist is %p\n", netlist);
 	for(np = netlist; np && np->net != NULL; np++){
 		if(np->fasttimeouthack)
 			continue;
+printf("CS: compare net np->net %s mf->net %s\n", np->net, mf->net);
 		if(strcmp(np->net, mf->net) == 0)
 			break;
 	}
 
+printf("CS: np is %p np->net %p\n", np, np ? np->net : NULL);
 	if(np && np->net != NULL){
 		/*
 		 *  known network
@@ -1249,6 +1259,7 @@ lookup(Mfile *mf)
 		nt = (*np->lookup)(np, mf->host, mf->serv, 1);
 		for(t = nt; mf->nreply < Nreply && t; t = t->entry){
 			cp = (*np->trans)(t, np, mf->serv, mf->rem, 0);
+printf("CS: Lookup %s\n", cp);
 			if(cp){
 				mf->replylen[mf->nreply] = strlen(cp);
 				mf->reply[mf->nreply++] = cp;
@@ -1258,6 +1269,7 @@ lookup(Mfile *mf)
 		ndbfree(nt);
 		return rv;
 	} else {
+printf("UNKONW NET\n");
 		/*
 		 *  not a known network, don't translate host or service
 		 */
@@ -1267,6 +1279,7 @@ lookup(Mfile *mf)
 		else
 			snprintf(reply, sizeof(reply), "%s/%s/clone %s",
 				mntpt, mf->net, mf->host);
+printf("CS: reply is %s\n", reply);
 		mf->reply[0] = strdup(reply);
 		mf->replylen[0] = strlen(reply);
 		mf->nreply = 1;
@@ -1290,6 +1303,7 @@ ipserv(Network *np, char *name, char *buf, int blen)
 	struct ndbtuple *t, *nt;
 	struct ndbs s;
 
+printf("CS: port %s\n", name);
 	/* '*' means any service */
 	if(strcmp(name, "*")==0){
 		strcpy(buf, name);
@@ -1310,6 +1324,7 @@ ipserv(Network *np, char *name, char *buf, int blen)
 	p = NULL;
 	if(alpha){
 		p = ndbgetvalue(db, &s, np->net, name, "port", &t);
+printf("CS: get value of port %s, p is (we hope not null)%p\n", name, p);
 		if(p == NULL)
 			return 0;
 	} else {
@@ -1330,7 +1345,7 @@ ipserv(Network *np, char *name, char *buf, int blen)
 	}
 	snprintf(buf, blen, "%s%s", p, restr ? "!r" : "");
 	free(p);
-
+printf("CS: buf is %s\n", buf);
 	return buf;
 }
 
