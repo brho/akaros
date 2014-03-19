@@ -746,6 +746,8 @@ rread(Job *job, Mfile *mf)
 		}
 
 		/* give back a single reply (or part of one) */
+		printf("mf->reply[%d] is %s; off %d, toff %d\n", 
+				i, mf->reply[i], off, toff);
 		job->reply.data = mf->reply[i] + (off - toff);
 		if(cnt > toff - off + n)
 			n = toff - off + n;
@@ -965,12 +967,15 @@ sendmsg(Job *job, char *err)
 		job->reply.type = job->request.type+1;
 	}
 	job->reply.tag = job->request.tag;
+	if (job->reply.type == Rread && job->reply.data)
+		hexdump(stdout, job->reply.data, job->reply.count);
 	n = convS2M(&job->reply, mdata, sizeof mdata);
 	if(n == 1){
 		fprintf(stderr,  "CS:sendmsg convS2M of %F returns 0", &job->reply);
 		abort();
 	}
 	//lock(&joblock);
+	hexdump(stdout, mdata, n);
 	if(job->flushed == 0)
 		if(write(mfd[1], mdata, n)!=n)
 			error(1, 0, "%s: %r","mount write");

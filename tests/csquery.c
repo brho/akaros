@@ -52,11 +52,10 @@ printf("CSQUERY:ask %d about :%s:\n", fd, addr);
 	if (!statusonly) {
 printf("CSQUERY:lseek\n");
 		lseek(fd, 0, 0);
-printf("CSQUERY:now read\n");
+printf("CSQUERY:now read:");
 		while ((n = read(fd, buf, sizeof(buf) - 1)) > 0) {
-printf("CSQUERY:got %d bytes\n", n);
 			buf[n] = 0;
-			printf("CSQUERY:%s\n", buf);
+			printf("%s\n", buf);
 		}
 printf("CSQUERY:done reading ... %s\n", buf);
 	}
