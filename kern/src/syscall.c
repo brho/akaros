@@ -1352,16 +1352,21 @@ static intreg_t sys_llseek(struct proc *p, int fd, off_t offset_hi,
 	off64_t retoff = 0;
 	off64_t tempoff = 0;
 	int ret = 0;
-	struct file *file = get_file_from_fd(&p->open_files, fd);
-	if (!file) {
-		set_errno(EBADF);
-		return -1;
-	}
+	struct file *file;
 	tempoff = offset_hi;
 	tempoff <<= 32;
 	tempoff |= offset_lo;
-	ret = file->f_op->llseek(file, tempoff, &retoff, whence);
-	kref_put(&file->f_kref);
+	file = get_file_from_fd(&p->open_files, fd);
+	if (file) {
+		ret = file->f_op->llseek(file, tempoff, &retoff, whence);
+		kref_put(&file->f_kref);
+	} else {
+		/* won't return here if error ... */
+		ret = sysseek(fd, tempoff, whence);
+		retoff = ret;
+		ret = 0;
+	}
+
 	if (ret)
 		return -1;
 	if (memcpy_to_user_errno(p, result, &retoff, sizeof(off64_t)))
