@@ -39,6 +39,7 @@ static inline void futex_init()
 static void __futex_timeout(struct alarm_waiter *awaiter) {
   struct futex_element *__e = NULL;
   struct futex_element *e = (struct futex_element*)awaiter->data;
+  //printf("timeout fired: %p\n", e->uaddr);
 
   // Atomically remove the timed-out element from the futex queue if we won the
   // race against actually completing.
@@ -52,6 +53,7 @@ static void __futex_timeout(struct alarm_waiter *awaiter) {
   // If we removed it, restart it outside the lock
   if (__e != NULL) {
     e->timedout = true;
+    //printf("timeout: %p\n", e->uaddr);
     uthread_runnable((struct uthread*)e->pthread);
   }
   // Set this as the very last thing we do whether we successfully woke the
@@ -68,9 +70,19 @@ static void __futex_block(struct uthread *uthread, void *arg) {
 
   // Set the remaining properties of the futex element
   e->pthread = pthread;
+  e->timedout = false;
 
   // Insert the futex element into the queue
   TAILQ_INSERT_TAIL(&__futex.queue, e, link);
+
+  // Set an alarm for the futex timeout if applicable
+  if(e->us_timeout != (uint64_t)-1) {
+    e->awaiter.data = e;
+    init_awaiter(&e->awaiter, __futex_timeout);
+    set_awaiter_rel(&e->awaiter, e->us_timeout);
+    //printf("timeout set: %p\n", e->uaddr);
+    set_alarm(&e->awaiter);
+  }
 
   // Notify the scheduler of the type of yield we did
   __pthread_generic_yield(pthread);
@@ -86,33 +98,28 @@ static inline int futex_wait(int *uaddr, int val, uint64_t us_timeout)
   mcs_pdr_lock(&__futex.lock);
   // If the value of *uaddr matches val
   if(*uaddr == val) {
+    //printf("wait: %p, %d\n", uaddr, us_timeout);
     // Create a new futex element and initialize it.
     struct futex_element e;
     e.uaddr = uaddr;
     e.us_timeout = us_timeout;
-    // Set an alarm for the futex timeout if applicable
-    e.timedout = false;
-    if(e.us_timeout != (uint64_t)-1) {
-      e.awaiter.data = &e;
-      init_awaiter(&e.awaiter, __futex_timeout);
-      set_awaiter_rel(&e.awaiter, e.us_timeout);
-      set_alarm(&e.awaiter);
-    }
     // Yield the uthread...
-    // We set the remaining properties of the futex element, and unlock the pdr
-    // lock on the other side.  It is important that we do the unlock on the
-    // other side, because (unlike linux, etc.) its possible to get interrupted
-    // and drop into vcore context right after releasing the lock.  If that
-    // vcore code then calls futex_wake(), we would be screwed.  Doing things
-    // this way means we have to hold the lock longer, but its necessary for
-    // correctness.
+    // We set the remaining properties of the futex element, set the timeout
+    // timer, and unlock the pdr lock on the other side.  It is important that
+    // we do the unlock on the other side, because (unlike linux, etc.) its
+    // possible to get interrupted and drop into vcore context right after
+    // releasing the lock.  If that vcore code then calls futex_wake(), we
+    // would be screwed.  Doing things this way means we have to hold the lock
+    // longer, but its necessary for correctness.
     uthread_yield(TRUE, __futex_block, &e);
     // We are unlocked here!
 
-    // Spin briefly to make sure that all references to e are gone between the
-    // wake() and the timeout() code. We use e.awaiter.data to do this.
-    while (e.awaiter.data != NULL)
-      cpu_relax();
+    // If this futex had a timeout, spin briefly to make sure that all
+    // references to e are gone between the wake() and the timeout() code. We
+    // use e.awaiter.data to do this.
+    if(e.us_timeout != (uint64_t)-1)
+      while (e.awaiter.data != NULL)
+        cpu_relax();
 
     // After waking, if we timed out, set the error
     // code appropriately and return
@@ -128,6 +135,7 @@ static inline int futex_wait(int *uaddr, int val, uint64_t us_timeout)
 
 static inline int futex_wake(int *uaddr, int count)
 {
+  int max = count;
   struct futex_element *e,*n = NULL;
   struct futex_queue q = TAILQ_HEAD_INITIALIZER(q);
 
@@ -164,13 +172,16 @@ static inline int futex_wake(int *uaddr, int count)
       // one who removed e from the queue, so we are basically just
       // deciding who should set awaiter->data to NULL to indicate that
       // there are no more references to it.
-      if(unset_alarm(&e->awaiter))
+      if(unset_alarm(&e->awaiter)) {
+        //printf("timeout canceled: %p\n", e->uaddr);
         e->awaiter.data = NULL;
+      }
     }
+    //printf("wake: %p\n", uaddr);
     uthread_runnable((struct uthread*)e->pthread);
     e = n;
   }
-  return 0;
+  return max-count;
 }
 
 int futex(int *uaddr, int op, int val,
