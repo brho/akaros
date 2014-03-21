@@ -2136,6 +2136,23 @@ int get_fd(struct files_struct *open_files, int low_fd)
 	return slot;
 }
 
+/* Claims a specific FD when duping FDs. used by 9ns.  < 0 == error. */
+int claim_fd(struct files_struct *open_files, int file_desc)
+{
+	if ((file_desc < 0) || (file_desc > NR_FILE_DESC_MAX))
+		return -EINVAL;
+	if (open_files->closed)
+		return -EINVAL;	/* won't matter, they are dying */
+	if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc))
+		return -ENFILE; /* Should never really happen. Here to catch bugs. */
+
+	SET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc);
+	assert(file_desc < open_files->max_files && open_files->fd[0].fd_file == 0);
+	if (file_desc >= open_files->next_fd)
+		open_files->next_fd = file_desc + 1;
+	return 0;
+}
+
 /* Inserts the file in the files_struct, returning the corresponding new file
  * descriptor, or an error code.  We start looking for open fds from low_fd. */
 int insert_file(struct files_struct *open_files, struct file *file, int low_fd)

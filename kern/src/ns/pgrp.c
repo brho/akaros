@@ -186,7 +186,7 @@ struct fgrp *newfgrp(void)
 	return new;
 }
 
-struct fgrp *dupfgrp(struct fgrp *f)
+struct fgrp *dupfgrp(struct proc *new_proc, struct fgrp *f)
 {
 	int i;
 	struct chan *c;
@@ -216,6 +216,7 @@ struct fgrp *dupfgrp(struct fgrp *f)
 	for (i = 0; i <= f->maxfd; i++) {
 		if ((c = f->fd[i])) {
 			kref_get(&c->ref, 1);
+			claim_fd(&new_proc->open_files, i);
 			new->fd[i] = c;
 		}
 	}

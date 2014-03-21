@@ -493,5 +493,6 @@ extern struct dentry_operations dummy_d_op;
 
 int put_fd(struct files_struct *open_files, int file_desc);
 int get_fd(struct files_struct *open_files, int low_fd);
+int claim_fd(struct files_struct *open_files, int file_desc);
 
 #endif /* ROS_KERN_VFS_H */

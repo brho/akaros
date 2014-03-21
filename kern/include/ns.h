@@ -664,7 +664,7 @@ int domount(struct chan **, struct mhead **);
 void drawactive(int);
 void drawcmap(void);
 void dumpstack(void);
-struct fgrp *dupfgrp(struct fgrp *);
+struct fgrp *dupfgrp(struct proc *, struct fgrp *);
 void egrpcpy(struct egrp *, struct egrp *);
 int emptystr(char *unused_char_p_t);
 int eqchan(struct chan *, struct chan *, int);
