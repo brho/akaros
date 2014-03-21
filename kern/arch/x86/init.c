@@ -77,37 +77,6 @@ void arch_init()
 	#endif
 	proc_init();
 
-	/* EXPERIMENTAL NETWORK FUNCTIONALITY
-	 * To enable, define CONFIG_NETWORKING in your Makelocal
-	 * If enabled, will load the rl8168 driver (if device exists)
-	 * and will a boot into userland matrix, so remote syscalls can be performed.
- 	 * If in simulation, will do some debugging information with the ne2k device
-	 *
-	 * Note: If you use this, you should also define the mac address of the 
-	 * teathered machine via USER_MAC_ADDRESS in Makelocal.
-	 *
-	 * Additionally, you should have a look at the syscall server in the tools directory
-	 */
-	#ifdef CONFIG_NETWORKING
-	#ifdef CONFIG_SINGLE_CORE
-		warn("You currently can't have networking if you boot into single core mode!!\n");
-	#else
-		/* TODO: use something like linux's device_init() to call these. */
-		#ifdef CONFIG_RL8168
-		extern void rl8168_init(void);		
-		rl8168_init();		
-		#endif
-		#ifdef CONFIG_NE2K
-		extern void ne2k_init(void);		
-		ne2k_init();
-		#endif
-		#ifdef CONFIG_E1000
-		extern void e1000_init(void);		
-		e1000_init();
-		#endif
-	#endif // CONFIG_SINGLE_CORE
-	#endif // CONFIG_NETWORKING
-
 	perfmon_init();
 	cons_irq_init();
 	check_timing_stability();
