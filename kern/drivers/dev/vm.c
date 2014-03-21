@@ -454,7 +454,9 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 				vmr.vcpu = strtoul(cb->f[1], NULL, 0);
 				vmr.emulated = strtoul(cb->f[2], NULL, 0);
 				vmr.mmio_completed = strtoul(cb->f[3], NULL, 0);
+				disable_irq();
 				ret = vm_run(litevm, &vmr);
+				enable_irq();
 				printk("vm_run returns %d\n", ret);
 				//print_func_exit();
 				return ret;
