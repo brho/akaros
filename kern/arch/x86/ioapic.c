@@ -380,30 +380,12 @@ int nextvec(void)
 	return vecno;
 }
 
-static struct pci_device *pcimatchtbdf(int tbdf)
-{
-	/* don't we have macros for this somewhere? */
-	int bus, dev, func;
-	bus = tbdf >> 16;
-	dev = (tbdf>>11)&0x1f;
-	func = (tbdf>>8)&3;
-
-	struct pci_device *search;
-	STAILQ_FOREACH(search, &pci_devices, all_dev) {
-		if ((search->bus == bus) &&
-		    (search->dev == dev) &&
-		    (search->func == func))
-			return search;
-	}
-	return NULL;
-}
-
 static int msimask(struct vkey *v, int mask)
 {
 	int pcimsimask(struct pci_device *p, int mask);
 
 	struct pci_device *p;
-	p = pcimatchtbdf(v->tbdf);
+	p = pci_match_tbdf(v->tbdf);
 	if (p == NULL)
 		return -1;
 	return pcimsimask(p, mask);
@@ -537,8 +519,7 @@ int bus_irq_setup(struct irq_handler *irq_h)
 	struct Rbus *rbus;
 	struct Rdt *rdt;
 	int busno, devno, vecno;
-	struct pci_device pcidev;
-	struct pci_device *msidev;
+	struct pci_device *pcidev;
 
 	if (!ioapic_exists()) {
 		switch (BUSTYPE(irq_h->tbdf)) {
@@ -588,19 +569,17 @@ int bus_irq_setup(struct irq_handler *irq_h)
 			devno = irq_h->dev_irq << 2;
 			break;
 		case BusPCI:
-			/* TODO: we'll assume it's there.  (fix when adding MSI) */
-
-			/* temp disable MSI til we get ACPI and such sorted */
-			if ((msidev = pcimatchtbdf(irq_h->tbdf)) == NULL) {
-				printk("no PCI dev for tbdf %p", irq_h->tbdf);
-			} else {
-				if ((vecno = intrenablemsi(irq_h, msidev)) != -1)
-					return vecno;
-				disablemsi(irq_h, msidev);
+			pcidev = pci_match_tbdf(irq_h->tbdf);
+			if (!pcidev) {
+				printk("No PCI dev for tbdf %p!", irq_h->tbdf);
+				return -1;
 			}
+			if ((vecno = intrenablemsi(irq_h, pcidev)) != -1)
+				return vecno;
+			disablemsi(irq_h, pcidev);
 			busno = BUSBNO(irq_h->tbdf);
-			explode_tbdf(irq_h->tbdf);
-			devno = pcidev_read8(&pcidev, PciINTP);
+			assert(busno == pcidev->bus);
+			devno = pcidev_read8(pcidev, PciINTP);
 
 			/* this might not be a big deal - some PCI devices have no INTP.  if
 			 * so, change our devno - 1 below. */

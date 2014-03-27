@@ -399,3 +399,20 @@ void pci_clr_bus_master(struct pci_device *pcidev)
 	reg &= ~PCI_CMD_BUS_MAS;
 	pcidev_write16(pcidev, PCI_CMD_REG, reg);
 }
+
+struct pci_device *pci_match_tbdf(int tbdf)
+{
+	struct pci_device *search;
+	int bus, dev, func;
+	bus = BUSBNO(tbdf);
+	dev = BUSDNO(tbdf);
+	func = BUSFNO(tbdf);
+
+	STAILQ_FOREACH(search, &pci_devices, all_dev) {
+		if ((search->bus == bus) &&
+		    (search->dev == dev) &&
+		    (search->func == func))
+			return search;
+	}
+	return NULL;
+}
