@@ -523,8 +523,9 @@ int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 	irq_handlers[vector] = irq_h;
 	spin_unlock_irqsave(&irq_handler_wlock);
 	/* Most IRQs other than the BusIPI should need their irq unmasked.
-	 * Might need to pass the irq_h, in case unmask needs more info */
-	if (irq_h->unmask)
+	 * Might need to pass the irq_h, in case unmask needs more info.
+	 * The lapic IRQs need to be unmasked on a per-core basis */
+	if (irq_h->unmask && strcmp(irq_h->type, "lapic"))
 		irq_h->unmask(vector);
 	return 0;
 }

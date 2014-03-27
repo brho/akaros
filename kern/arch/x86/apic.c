@@ -24,6 +24,10 @@ bool core_id_ready = FALSE;
 
 bool lapic_check_spurious(int trap_nr)
 {
+#ifndef CONFIG_ENABLE_MPTABLES
+	/* no MP tables doesn't use the new spurious vec */
+	return FALSE;
+#endif
 	/* FYI: lapic_spurious is 255 on qemu and 15 on the nehalem..  We actually
 	 * can set bits 4-7, and P6s have 0-3 hardwired to 0.  YMMV.  NxM seems to
 	 * say the lower 3 bits are usually 1.  We'll see if the assert trips.
@@ -97,7 +101,7 @@ void lapic_unmask_irq(int apic_vector)
 		warn("Bad apic vector %d\n", apic_vector);
 		return;
 	}
-	mm_reg = LAPIC_BASE + (apic_vector - IdtLAPIC) * 0x10;
+	mm_reg = LAPIC_BASE + 0x320 + (apic_vector - IdtLAPIC) * 0x10;
 	write_mmreg32(mm_reg, read_mmreg32(mm_reg) & ~LAPIC_LVT_MASK);
 }
 
@@ -128,7 +132,7 @@ void __lapic_set_timer(uint32_t ticks, uint8_t vec, bool periodic, uint8_t div)
 	// clears bottom bit and then set divider
 	write_mmreg32(LAPIC_TIMER_DIVIDE, (read_mmreg32(LAPIC_TIMER_DIVIDE) &~0xf) |
 	              (div & 0xf));
-	// set LVT with interrupt handling information
+	// set LVT with interrupt handling information.  also unmasks.
 	write_mmreg32(LAPIC_LVT_TIMER, vec | (periodic << 17));
 	write_mmreg32(LAPIC_TIMER_INIT, ticks);
 	// For debugging when we expand this
