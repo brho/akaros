@@ -442,7 +442,8 @@ static struct Rdt *ioapic_vector2rdt(int apic_vector)
 
 /* Routes the IRQ to the os_coreid.  Will take effect immediately.  Route
  * masking from rdt->lo will take effect. */
-static int ioapic_route_irq(int apic_vector, int os_coreid)
+static int ioapic_route_irq(struct irq_handler *unused, int apic_vector,
+                            int os_coreid)
 {
 	int hw_coreid;
 	struct Rdt *rdt = ioapic_vector2rdt(apic_vector);
@@ -472,8 +473,9 @@ static int ioapic_route_irq(int apic_vector, int os_coreid)
 	return 0;
 }
 
-static void ioapic_mask_irq(int apic_vector)
+static void ioapic_mask_irq(struct irq_handler *unused, int apic_vector)
 {
+	/* could store the rdt in the irq_h */
 	struct Rdt *rdt = ioapic_vector2rdt(apic_vector);
 	if (!rdt)
 		return;
@@ -488,7 +490,7 @@ static void ioapic_mask_irq(int apic_vector)
 	spin_unlock(&rdt->apic->lock);
 }
 
-static void ioapic_unmask_irq(int apic_vector)
+static void ioapic_unmask_irq(struct irq_handler *unused, int apic_vector)
 {
 	struct Rdt *rdt = ioapic_vector2rdt(apic_vector);
 	if (!rdt)

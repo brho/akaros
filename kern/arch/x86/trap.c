@@ -527,7 +527,7 @@ int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 	 * Might need to pass the irq_h, in case unmask needs more info.
 	 * The lapic IRQs need to be unmasked on a per-core basis */
 	if (irq_h->unmask && strcmp(irq_h->type, "lapic"))
-		irq_h->unmask(vector);
+		irq_h->unmask(irq_h, vector);
 	return 0;
 }
 

@@ -18,7 +18,7 @@ system_timing_t system_timing = {0, 0, 0xffff, 0};
 // timer init calibrates both tsc timer and lapic timer using PIT
 void timer_init(void){
 	/* some boards have this unmasked early on. */
-	pic_mask_irq(0 + PIC1_OFFSET);
+	pic_mask_irq(0, 0 + PIC1_OFFSET);
 	uint64_t tscval[2];
 	long timercount[2];
 	pit_set_timer(0xffff, TIMER_RATEGEN);

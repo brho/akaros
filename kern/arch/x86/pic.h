@@ -30,9 +30,11 @@
 #define PIC_READ_IRR				0x0a	/* OCW3 irq ready next CMD read */
 #define PIC_READ_ISR				0x0b	/* OCW3 irq service next CMD read */
 
+struct irq_handler;	/* include loops */
+
 void pic_remap(void);
-void pic_mask_irq(int trap_nr);
-void pic_unmask_irq(int trap_nr);
+void pic_mask_irq(struct irq_handler *unused, int trap_nr);
+void pic_unmask_irq(struct irq_handler *unused, int trap_nr);
 void pic_mask_all(void);
 uint16_t pic_get_mask(void);
 uint16_t pic_get_irr(void);

@@ -77,13 +77,14 @@
  * Note that core_id() will return 0 (or possibly another wrong answer) on cores
  * other than core 0 when it is called before smp_boot completes. */
 extern bool core_id_ready;
+struct irq_handler;	/* include loops */
 
 bool lapic_check_spurious(int trap_nr);
 bool lapic_get_isr_bit(uint8_t vector);
 bool lapic_get_irr_bit(uint8_t vector);
 void lapic_print_isr(void);
-void lapic_mask_irq(int apic_vector);
-void lapic_unmask_irq(int apic_vector);
+void lapic_mask_irq(struct irq_handler *unused, int apic_vector);
+void lapic_unmask_irq(struct irq_handler *unused, int apic_vector);
 bool ipi_is_pending(uint8_t vector);
 void __lapic_set_timer(uint32_t ticks, uint8_t vec, bool periodic, uint8_t div);
 void lapic_set_timer(uint32_t usec, bool periodic);

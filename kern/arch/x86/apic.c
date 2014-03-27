@@ -83,7 +83,7 @@ bool lapic_get_irr_bit(uint8_t vector)
 	return __lapic_get_isrr_bit(LAPIC_IRR, vector);
 }
 
-void lapic_mask_irq(int apic_vector)
+void lapic_mask_irq(struct irq_handler *unused, int apic_vector)
 {
 	uintptr_t mm_reg;
 	if (apic_vector < IdtLAPIC || IdtLAPIC + 4 < apic_vector) {
@@ -94,7 +94,7 @@ void lapic_mask_irq(int apic_vector)
 	write_mmreg32(mm_reg, read_mmreg32(mm_reg) | LAPIC_LVT_MASK);
 }
 
-void lapic_unmask_irq(int apic_vector)
+void lapic_unmask_irq(struct irq_handler *unused, int apic_vector)
 {
 	uintptr_t mm_reg;
 	if (apic_vector < IdtLAPIC || IdtLAPIC + 4 < apic_vector) {

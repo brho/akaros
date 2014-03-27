@@ -135,9 +135,9 @@ struct irq_handler {
 	 * won't be doing a lot of IRQ line sharing */
 	bool (*check_spurious)(int);
 	void (*eoi)(int);
-	void (*mask)(int);
-	void (*unmask)(int);
-	int (*route_irq)(int, int);
+	void (*mask)(struct irq_handler *irq_h, int vec);
+	void (*unmask)(struct irq_handler *irq_h, int vec);
+	int (*route_irq)(struct irq_handler *irq_h, int vec, int dest);
 
 	int tbdf;
 	int dev_irq;

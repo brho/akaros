@@ -91,7 +91,7 @@ void test_pic_reception(void)
 	register_irq(IdtPIC + IrqCLOCK, test_hello_world_handler, NULL,
 	             MKBUS(BusISA, 0, 0, 0));
 	pit_set_timer(100,TIMER_RATEGEN); // totally arbitrary time
-	pic_unmask_irq(0);
+	pic_unmask_irq(0, 0);
 	cprintf("PIC1 Mask = 0x%04x\n", inb(PIC1_DATA));
 	cprintf("PIC2 Mask = 0x%04x\n", inb(PIC2_DATA));
 	unmask_lapic_lvt(LAPIC_LVT_LINT0);
