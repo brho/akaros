@@ -199,6 +199,15 @@ char *apicdump(char *start, char *end)
 	return start;
 }
 
+void handle_lapic_error(struct hw_trapframe *hw_tf, void *data)
+{
+	uint32_t err;
+	apicrput(Es, 0);
+	err = apicrget(Es);
+	/* i get a shitload of these on my nehalem, many with err == 0 */
+	printd("LAPIC error vector, got 0x%08x\n", err);
+}
+
 int apiconline(void)
 {
 	struct apic *apic;
@@ -275,7 +284,7 @@ int apiconline(void)
 
 	apicrput(Es, 0);
 	apicrget(Es);
-	apicrput(Elvt, IdtLAPIC_ERROR);
+	apicrput(Elvt, IdtLAPIC_ERROR | Im);
 
 	/* Not sure we need this from plan 9, Akaros never did:
 	 *

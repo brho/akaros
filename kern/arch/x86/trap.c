@@ -181,10 +181,11 @@ void idt_init(void)
 	unmask_lapic_lvt(LAPIC_LVT_LINT0);
 #endif
 
-	/* register the generic timer_interrupt() handler for the per-core timers */
+	/* the lapic IRQs need to be unmasked on a per-core basis */
 	register_irq(IdtLAPIC_TIMER, timer_interrupt, NULL,
 	             MKBUS(BusLAPIC, 0, 0, 0));
-	/* register the kernel message handler */
+	register_irq(IdtLAPIC_ERROR, handle_lapic_error, NULL,
+	             MKBUS(BusLAPIC, 0, 0, 0));
 	register_irq(I_KERNEL_MSG, handle_kmsg_ipi, NULL, MKBUS(BusIPI, 0, 0, 0));
 }
 

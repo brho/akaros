@@ -13,6 +13,7 @@
  */
 #include <arch/mmu.h>
 #include <arch/x86.h>
+#include <ros/trapframe.h>
 #include <atomic.h>
 
 // Local APIC
@@ -40,7 +41,6 @@
 #define LAPIC_TIMER_INIT			(LAPIC_BASE + 0x380)
 #define LAPIC_TIMER_CURRENT			(LAPIC_BASE + 0x390)
 #define LAPIC_TIMER_DIVIDE			(LAPIC_BASE + 0x3e0)
-#define LAPIC_TIMER_DEFAULT_VECTOR	0xeb	/* Aka 235, IRQ203 */
 /* Quick note on the divisor.  The LAPIC timer ticks once per divisor-bus ticks
  * (system bus or APIC bus, depending on the model).  Ex: A divisor of 128 means
  * 128 bus ticks results in 1 timer tick.  The divisor increases the time range
@@ -89,6 +89,7 @@ void __lapic_set_timer(uint32_t ticks, uint8_t vec, bool periodic, uint8_t div);
 void lapic_set_timer(uint32_t usec, bool periodic);
 uint32_t lapic_get_default_id(void);
 int apiconline(void);
+void handle_lapic_error(struct hw_trapframe *hw_tf, void *data);
 
 static inline void lapic_send_eoi(int unused);
 static inline uint32_t lapic_get_version(void);
