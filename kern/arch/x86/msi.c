@@ -131,6 +131,7 @@ pcimsienable(struct pci_device *p, uint64_t vec)
 	if(c == 0)
 		return -1;
 
+	printk("Found cap at %d\n", c);
 	/* read it, clear out the Mmesgmsk bits. 
 	 * This means that there will be no multiple
 	 * messages enabled.
@@ -159,6 +160,8 @@ pcimsienable(struct pci_device *p, uint64_t vec)
 	/* OK, Msiabase is fee00000, and we offset with the
 	 * dest from above, lowpri, and logical.
 	 */
+	printk("Write to %d %08lx \n",c + 4, Msiabase | Msiaedest * d
+		| Msialowpri * lopri | Msialogical * logical);
 	pcidev_write32(p, c + 4, Msiabase | Msiaedest * d
 		| Msialowpri * lopri | Msialogical * logical);
 
@@ -178,6 +181,8 @@ pcimsienable(struct pci_device *p, uint64_t vec)
 	 * of things. It's not yet clear if this is a plan 9 chosen
 	 * thing or a PCI spec chosen thing.
 	 */
+	printk("Write data %p %d %04x\n", c + datao, Msidassert | Msidlogical * logical
+		       | Msidmode * dmode | ((unsigned int)vec & 0xff));
 	pcidev_write16(p, c + datao, Msidassert | Msidlogical * logical
 		       | Msidmode * dmode | ((unsigned int)vec & 0xff));
 
@@ -191,8 +196,9 @@ pcimsienable(struct pci_device *p, uint64_t vec)
 	 * Mmesg mask (which is a power of 2) set to 0
 	 * (meaning one message only).
 	 */
+	printk("write @ %d %04lx\n",c + 2, f); 
 	pcidev_write16(p, c + 2, f);
-	return 0;
+	return -1; //0;
 }
 
 /* Mask the msi function. Since 'masking' means disable it,
@@ -209,9 +215,11 @@ pcimsimask(struct pci_device *p, int mask)
 		return -1;
 	f = pcidev_read16(p, c + 2);
 	if(mask){
+		printk("DISABLE MSI\n");
 		pcidev_write16(p, c + 2, f & ~Msienable);
 		pci_clr_bus_master(p);
 	}else{
+		printk("ENABLE MSI\n");
 		pci_set_bus_master(p);
 		pcidev_write16(p, c + 2, f | Msienable);
 	}

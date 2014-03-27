@@ -419,8 +419,6 @@ static int intrenablemsi(struct irq_handler *v, struct pci_device *p)
 	vno = nextvec();
 
 	lo = IPlow | TMedge | vno;
-#warning "what happened to ioapicintrdd"
-//	ioapicintrdd(&hi, &lo);
 
 	if (lo & Lm)
 		lo |= MTlp;
@@ -428,17 +426,11 @@ static int intrenablemsi(struct irq_handler *v, struct pci_device *p)
 	msivec = (uint64_t) hi << 32 | lo;
 	if (pcimsienable(p, msivec) == -1)
 		return -1;
-#warning "apicisr? apiceoi? "
-//	v->isr = apicisr;
-//	v->eoi = apiceoi;
-	v->apic_vector = vno;
-	v->type = "msi";
-	v->mask = msimask;
 
 	printk("msiirq: (%d,%d,%d): enabling %.16llp %s irq %d vno %d\n", 
 	       p->bus, p->dev, p->func, msivec,
 		   v->name, v->apic_vector, vno);
-	return vno;
+	return -1; //vno;
 }
 
 int disablemsi(void *unused, struct pci_device *p)
@@ -599,14 +591,13 @@ int bus_irq_setup(struct irq_handler *irq_h)
 			/* TODO: we'll assume it's there.  (fix when adding MSI) */
 
 			/* temp disable MSI til we get ACPI and such sorted */
-			#if 0
 			if ((msidev = pcimatchtbdf(irq_h->tbdf)) == NULL) {
 				printk("no PCI dev for tbdf %p", irq_h->tbdf);
+			} else {
 				if ((vecno = intrenablemsi(irq_h, msidev)) != -1)
 					return vecno;
 				disablemsi(irq_h, msidev);
 			}
-			#endif
 			busno = BUSBNO(irq_h->tbdf);
 			explode_tbdf(irq_h->tbdf);
 			devno = pcidev_read8(&pcidev, PciINTP);
