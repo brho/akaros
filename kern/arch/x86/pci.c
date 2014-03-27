@@ -391,3 +391,11 @@ void pci_set_bus_master(struct pci_device *pcidev)
 	pcidev_write16(pcidev, PCI_CMD_REG, pcidev_read16(pcidev, PCI_CMD_REG) |
 	                                    PCI_CMD_BUS_MAS);
 }
+
+void pci_clr_bus_master(struct pci_device *pcidev)
+{
+	uint16_t reg;
+	reg = pcidev_read16(pcidev, PCI_CMD_REG);
+	reg &= ~PCI_CMD_BUS_MAS;
+	pcidev_write16(pcidev, PCI_CMD_REG, reg);
+}

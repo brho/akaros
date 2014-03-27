@@ -46,13 +46,14 @@ enum {
 
 enum{
 	/* msi capabilities */
-	Vmask		= 1<<8,
-	Cap64		= 1<<7,
-	Mmesgmsk	= 7<<4,
-	Mmcap		= 7<<1,
-	Msienable	= 1<<0,
+	Vmask		= 1<<8,	/* Vectors can be masked. Optional. */
+	Cap64		= 1<<7, /* 64-bit addresses. Optional. */
+	Mmesgmsk	= 7<<4, /* Mask for # of messages allowed. See 6.8.1.3 */
+	Mmcap		= 7<<1, /* # of messages the function can support. */
+	Msienable	= 1<<0, /* Enable. */
 };
 
+/* Find an arbitrary capability. This should move to pci.c? */
 int
 pcicap(struct pci_device *p, int cap)
 {
@@ -87,6 +88,9 @@ pcicap(struct pci_device *p, int cap)
 	return -1;
 }
 
+/* Find the offset in config space of this function of the msi capability.
+ * It is defined in 6.8.1 and is variable-sized.
+ */
 static int
 msicap(struct pci_device *p)
 {
@@ -108,40 +112,93 @@ blacklist(struct pci_device *p)
 	return 0;
 }
 
+/* see section 6.8.1 of the pci spec. */
+/* Set up a single function on a single device.
+ * We need to take the vec, bust it up into bits,
+ * and put parts of it in the msi address and parts
+ * in the msi data.
+ */
 int
 pcimsienable(struct pci_device *p, uint64_t vec)
 {
 	char *s;
 	unsigned int c, f, d, datao, lopri, dmode, logical;
 
+	/* Get the offset of the MSI capability
+	 * in the function's config space.
+	 */
 	c = msicap(p);
 	if(c == 0)
 		return -1;
 
+	/* read it, clear out the Mmesgmsk bits. 
+	 * This means that there will be no multiple
+	 * messages enabled.
+	 */
 	f = pcidev_read16(p, c + 2) & ~Mmesgmsk;
 
+	/* See if it's a broken device, currently
+	 * there's only Marvell there.
+	 */
 	if(blacklist(p) != 0)
 		return -1;
+
+	/* Data begins at 8 bytes in. */
 	datao = 8;
+
+	/* The data we write is 16 bits, scarfed
+	 * in the upper 16 bits of d.
+	 */
 	d = vec>>48;
+
+	/* Hard to see it being anything but lopri but ... */
 	lopri = (vec & 0x700) == MTlp;
+
 	logical = (vec & Lm) != 0;
+
+	/* OK, Msiabase is fee00000, and we offset with the
+	 * dest from above, lowpri, and logical.
+	 */
 	pcidev_write32(p, c + 4, Msiabase | Msiaedest * d
 		| Msialowpri * lopri | Msialogical * logical);
+
+	/* And even if it's 64-bit capable, we do nothing with
+	 * the high order bits. If it is 64-bit we need to offset
+	 * datao (data offset) by 4 (i.e. another 32 bits)
+	 */
 	if(f & Cap64){
 		datao += 4;
 		pcidev_write32(p, c + 8, 0);
 	}
+
+	/* pick up the delivery mode from the vector */
 	dmode = (vec >> 8) & 7;
+
+	/* the data we write to that location is a combination
+	 * of things. It's not yet clear if this is a plan 9 chosen
+	 * thing or a PCI spec chosen thing.
+	 */
 	pcidev_write16(p, c + datao, Msidassert | Msidlogical * logical
 		       | Msidmode * dmode | ((unsigned int)vec & 0xff));
+
+	/* If we have the option of masking the vectors,
+	 * blow all the masks to 0. It's a 32-bit mask.
+	 */
 	if(f & Vmask)
 		pcidev_write32(p, c + datao + 4, 0);
 
+	/* Now write the control bits back, with the
+	 * Mmesg mask (which is a power of 2) set to 0
+	 * (meaning one message only).
+	 */
 	pcidev_write16(p, c + 2, f);
 	return 0;
 }
 
+/* Mask the msi function. Since 'masking' means disable it,
+ * but the parameter has a 1 for disabling it, well, it's a
+ * bit clear operation.
+ */
 int
 pcimsimask(struct pci_device *p, int mask)
 {
@@ -150,10 +207,10 @@ pcimsimask(struct pci_device *p, int mask)
 	c = msicap(p);
 	if(c == 0)
 		return -1;
-	f = pcidev_read16(p, c + 2) & ~Msienable;
+	f = pcidev_read16(p, c + 2);
 	if(mask){
 		pcidev_write16(p, c + 2, f & ~Msienable);
-//		pciclrbme(p);		cheeze
+		pci_clr_bus_master(p);
 	}else{
 		pci_set_bus_master(p);
 		pcidev_write16(p, c + 2, f | Msienable);
