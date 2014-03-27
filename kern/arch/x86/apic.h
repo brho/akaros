@@ -267,7 +267,7 @@ struct ioapic {
 struct lapic {
 	int machno;					/* similar to os_coreid, unused */
 
-	uint32_t lvt[6];
+	uint32_t lvt[8];
 	int nlvt;
 	int ver;
 };

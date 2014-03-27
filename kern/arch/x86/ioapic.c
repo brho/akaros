@@ -70,7 +70,10 @@ int pcimsimask(struct pci_device *p, int mask);
 static bool ioapic_exists(void)
 {
 	/* not foolproof, if we called this before parsing */
-	return xioapic[0].useable ? TRUE : FALSE;
+	for (int i = 0; i < Napic; i++)
+		if (xioapic[i].useable)
+			return TRUE;
+	return FALSE;
 }
 
 static void rtblget(struct apic *apic, int sel, uint32_t * hi, uint32_t * lo)
@@ -150,12 +153,14 @@ void ioapicintrinit(int busno, int ioapicno, int intin, int devno, int lo)
 		rdt->lo = lo;
 		rdt->hi = 0;
 	} else {
-		if (lo != rdt->lo) {
+		/* Polarity/trigger check.  Stored lo also has the vector in 0xff */
+		if (lo != (rdt->lo & ~0xff)) {
 			printk("multiple irq botch bus %d %d/%d/%d lo %d vs %d\n",
 				   busno, ioapicno, intin, devno, lo, rdt->lo);
 			return;
 		}
 	}
+	/* TODO: this shit is racy.  (refcnt, linked list addition) */
 	rdt->ref++;
 	rbus = kzmalloc(sizeof *rbus, 0);
 	rbus->rdt = rdt;
@@ -374,6 +379,7 @@ int nextvec(void)
 
 	return vecno;
 }
+
 static struct pci_device *pcimatchtbdf(int tbdf)
 {
 	/* don't we have macros for this somewhere? */
@@ -391,6 +397,7 @@ static struct pci_device *pcimatchtbdf(int tbdf)
 	}
 	return NULL;
 }
+
 static int msimask(struct vkey *v, int mask)
 {
 	int pcimsimask(struct pci_device *p, int mask);
@@ -537,19 +544,25 @@ int bus_irq_setup(struct irq_handler *irq_h)
 {
 	struct Rbus *rbus;
 	struct Rdt *rdt;
-	int busno = 0, devno, vecno;
+	int busno, devno, vecno;
 	struct pci_device pcidev;
 	struct pci_device *msidev;
 
-	if (!ioapic_exists() && (BUSTYPE(irq_h->tbdf) != BusLAPIC)) {
-		irq_h->check_spurious = pic_check_spurious;
-		irq_h->eoi = pic_send_eoi;
-		irq_h->mask = pic_mask_irq;
-		irq_h->unmask = pic_unmask_irq;
-		irq_h->route_irq = 0;
-		irq_h->type = "pic";
-		/* PIC devices have vector = irq + 32 */
-		return irq_h->dev_irq + IdtPIC;
+	if (!ioapic_exists()) {
+		switch (BUSTYPE(irq_h->tbdf)) {
+			case BusLAPIC:
+			case BusIPI:
+				break;
+			default:
+				irq_h->check_spurious = pic_check_spurious;
+				irq_h->eoi = pic_send_eoi;
+				irq_h->mask = pic_mask_irq;
+				irq_h->unmask = pic_unmask_irq;
+				irq_h->route_irq = 0;
+				irq_h->type = "pic";
+				/* PIC devices have vector = irq + 32 */
+				return irq_h->dev_irq + IdtPIC;
+		}
 	}
 	switch (BUSTYPE(irq_h->tbdf)) {
 		case BusLAPIC:
@@ -585,19 +598,26 @@ int bus_irq_setup(struct irq_handler *irq_h)
 		case BusPCI:
 			/* TODO: we'll assume it's there.  (fix when adding MSI) */
 
+			/* temp disable MSI til we get ACPI and such sorted */
+			#if 0
 			if ((msidev = pcimatchtbdf(irq_h->tbdf)) == NULL) {
 				printk("no PCI dev for tbdf %p", irq_h->tbdf);
 				if ((vecno = intrenablemsi(irq_h, msidev)) != -1)
 					return vecno;
 				disablemsi(irq_h, msidev);
 			}
+			#endif
 			busno = BUSBNO(irq_h->tbdf);
 			explode_tbdf(irq_h->tbdf);
 			devno = pcidev_read8(&pcidev, PciINTP);
 
+			/* this might not be a big deal - some PCI devices have no INTP.  if
+			 * so, change our devno - 1 below. */
 			if (devno == 0)
 				panic("no INTP for tbdf %p", irq_h->tbdf);
-			/* remember, devno is the device shifted with irq pin in bits 0-1 */
+			/* remember, devno is the device shifted with irq pin in bits 0-1.
+			 * we subtract 1, since the PCI intp maps 1 -> INTA, 2 -> INTB, etc,
+			 * and the MP spec uses 0 -> INTA, 1 -> INTB, etc. */
 			devno = BUSDNO(irq_h->tbdf) << 2 | (devno - 1);
 			break;
 		default:
