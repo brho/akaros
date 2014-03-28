@@ -245,15 +245,8 @@ static int acpi_make_rdt(int tbdf, int irq, int busno, int devno)
 			gsi_irq = irq;
 		} else {
 			/* Need to query ACPI at some point to handle this */
-			printk("Non-ISA IRQ %d not found in MADT", irq);
-			if (BUSTYPE(tbdf) != BusPCI) {
-				printk(", aborting...\n");
-				return -1;
-			}
-			/* Going to just guess some values for PCI */
-			printk(", guessing...\n");
-			lo = IPlow | TMlevel;
-			gsi_irq = irq;
+			printk("Non-ISA IRQ %d not found in MADT, aborting", irq);
+			return -1;
 		}
 	}
 	ioapic_nr = acpi_irq2ioapic(gsi_irq);

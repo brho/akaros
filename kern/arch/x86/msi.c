@@ -224,7 +224,8 @@ void msi_mask_irq(struct irq_handler *irq_h, int apic_vector)
 	struct pci_device *p = (struct pci_device*)irq_h->dev_private;
 	unsigned int c, f;
 	c = msicap(p);
-	assert(c);
+	if (!c)
+		return;
 
 	f = pcidev_read16(p, c + 2);
 	pcidev_write16(p, c + 2, f & ~Msienable);
