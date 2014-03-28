@@ -1,6 +1,9 @@
 # need at least one obj file to build for Kbuild
 obj-y							+= dummy.o
 obj-y							+= ether8139.o
+obj-y							+= ether8169.o
+obj-y							+= ethermii.o
+obj-y							+= etherigbe.o
 # Following are from gpxe and need a lot of help.
 #obj-y							+= mii.o
 #obj-y							+= r8169.o
