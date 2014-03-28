@@ -405,6 +405,7 @@ struct irq_handler; /* include loops */
 void msi_mask_irq(struct irq_handler *irq_h, int apic_vector);
 void msi_unmask_irq(struct irq_handler *irq_h, int apic_vector);
 int msi_route_irq(struct irq_handler *irq_h, int apic_vector, int dest);
+int pci_find_unused_bars(struct pci_device *dev, int *bars, int need);
 
 /* TODO: this is quite the Hacke */
 #define explode_tbdf(tbdf) {pcidev.bus = tbdf >> 16;\

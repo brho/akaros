@@ -400,6 +400,17 @@ void pci_clr_bus_master(struct pci_device *pcidev)
 	pcidev_write16(pcidev, PCI_CMD_REG, reg);
 }
 
+/* Find up to 'need' unused bars. Needed for MSI-X */
+int pci_find_unused_bars(struct pci_device *dev, int *bars, int need)
+{
+	int i, found;
+	for(i = found = 0; found < need && i < ARRAY_SIZE(dev->bar); i++)
+		if (!dev->bar[i].raw_bar)
+			bars[found++] = i;
+	return found;
+
+}
+
 struct pci_device *pci_match_tbdf(int tbdf)
 {
 	struct pci_device *search;
