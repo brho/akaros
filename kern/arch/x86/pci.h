@@ -355,6 +355,8 @@ struct pci_device {
 	uint8_t						class;
 	uint8_t						subclass;
 	uint8_t						progif;
+	uint32_t					msi_hi;
+	uint32_t					msi_lo;
 	uint8_t						nr_bars;
 	struct pci_bar				bar[MAX_PCI_BAR];
 };
@@ -393,6 +395,16 @@ uint32_t pci_getiobar32(uint32_t bar);
 void pci_set_bus_master(struct pci_device *pcidev);
 void pci_clr_bus_master(struct pci_device *pcidev);
 struct pci_device *pci_match_tbdf(int tbdf);
+
+/* MSI functions, msi.c */
+int pci_cap(struct pci_device *p, int cap);
+int pci_msi_enable(struct pci_device *p, uint64_t vec);
+
+/* MSI irq handler functions, msi.c */
+struct irq_handler; /* include loops */
+void msi_mask_irq(struct irq_handler *irq_h, int apic_vector);
+void msi_unmask_irq(struct irq_handler *irq_h, int apic_vector);
+int msi_route_irq(struct irq_handler *irq_h, int apic_vector, int dest);
 
 /* TODO: this is quite the Hacke */
 #define explode_tbdf(tbdf) {pcidev.bus = tbdf >> 16;\

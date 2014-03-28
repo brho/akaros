@@ -120,15 +120,11 @@
 #include <arch/coreid.h>
 #include <arch/io.h>
 
-struct vkey {
-	int tbdf;
-	int dev_irq;
-};
-
 struct irq_handler {
 	struct irq_handler *next;
 	void (*isr)(struct hw_trapframe *hw_tf, void *data);
 	void *data;
+	int apic_vector;
 
 	/* all handlers in the chain need to have the same func pointers.  we only
 	 * really use the first one, and the latter are to catch bugs.  also, we
@@ -141,8 +137,8 @@ struct irq_handler {
 
 	int tbdf;
 	int dev_irq;
-	int apic_vector;
 
+	void *dev_private;
 	char *type;
 	#define IRQ_NAME_LEN 26
 	char name[IRQ_NAME_LEN];

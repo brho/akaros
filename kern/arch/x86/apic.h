@@ -334,9 +334,4 @@ char *apicdump(char *, char *);
 void apictimerenab(void);
 void apicinit(int apicno, uintptr_t pa, int isbp);
 
-/*
-extern int pcimsienable(Pcidev*, uint64_t);
-extern int pcimsimask(Pcidev*, int);
-*/
-
 #endif /* ROS_KERN_APIC_H */

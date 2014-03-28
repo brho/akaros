@@ -65,7 +65,6 @@ static spinlock_t idtnolock;
 static int idtno = IdtIOAPIC;
 
 struct apic xioapic[Napic];
-int pcimsimask(struct pci_device *p, int mask);
 
 static bool ioapic_exists(void)
 {
@@ -380,47 +379,33 @@ int nextvec(void)
 	return vecno;
 }
 
-static int msimask(struct vkey *v, int mask)
+static int msi_irq_enable(struct irq_handler *irq_h, struct pci_device *p)
 {
-	int pcimsimask(struct pci_device *p, int mask);
-
-	struct pci_device *p;
-	p = pci_match_tbdf(v->tbdf);
-	if (p == NULL)
-		return -1;
-	return pcimsimask(p, mask);
-}
-
-static int intrenablemsi(struct irq_handler *v, struct pci_device *p)
-{
-	int pcimsienable(struct pci_device *p, uint64_t vec);
-
 	unsigned int vno, lo, hi = 0;
 	uint64_t msivec;
 
 	vno = nextvec();
 
-	lo = IPlow | TMedge | vno;
-
-	if (lo & Lm)
-		lo |= MTlp;
+	/* routing the IRQ to core 0 (hi = 0) in physical mode (Pm) */
+	lo = IPlow | TMedge | Pm | vno;
 
 	msivec = (uint64_t) hi << 32 | lo;
-	if (pcimsienable(p, msivec) == -1)
+	if (pci_msi_enable(p, msivec) == -1) {
+		/* TODO: should free vno here */
 		return -1;
-
-	printk("msiirq: (%d,%d,%d): enabling %.16llp %s irq %d vno %d\n", 
+	}
+	p->msi_hi = hi;
+	p->msi_lo = lo;
+	irq_h->check_spurious = lapic_check_spurious;
+	irq_h->eoi = lapic_send_eoi;
+	irq_h->mask = msi_mask_irq;
+	irq_h->unmask = msi_unmask_irq;
+	irq_h->route_irq = msi_route_irq;
+	irq_h->type = "msi";
+	printd("msiirq: (%d,%d,%d): enabling %.16llp %s irq %d vno %d\n",
 	       p->bus, p->dev, p->func, msivec,
-		   v->name, v->apic_vector, vno);
-	return -1; //vno;
-}
-
-int disablemsi(void *unused, struct pci_device *p)
-{
-
-	if (p == NULL)
-		return -1;
-	return pcimsimask(p, 1);
+		   irq_h->name, irq_h->apic_vector, vno);
+	return vno;
 }
 
 static struct Rdt *ioapic_vector2rdt(int apic_vector)
@@ -576,9 +561,11 @@ int bus_irq_setup(struct irq_handler *irq_h)
 				printk("No PCI dev for tbdf %p!", irq_h->tbdf);
 				return -1;
 			}
-			if ((vecno = intrenablemsi(irq_h, pcidev)) != -1)
+			irq_h->dev_private = pcidev;
+			if ((vecno = msi_irq_enable(irq_h, pcidev)) != -1)
 				return vecno;
-			disablemsi(irq_h, pcidev);
+			/* in case we turned it half-on */;
+			msi_mask_irq(irq_h, 0 /* unused */);
 			busno = BUSBNO(irq_h->tbdf);
 			assert(busno == pcidev->bus);
 			devno = pcidev_read8(pcidev, PciINTP);
