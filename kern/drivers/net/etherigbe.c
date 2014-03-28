@@ -535,8 +535,15 @@ struct ctlr {
 	int	fcrth;
 };
 
-#define csr32r(c, r)	(*((c)->nic+((r)/4)))
-#define csr32w(c, r, v)	(*((c)->nic+((r)/4)) = (v))
+static inline uint32_t csr32r(struct ctlr *c, uintptr_t reg)
+{
+	return read_mmreg32((uintptr_t)(c->nic + (reg / 4)));
+}
+
+static inline void csr32w(struct ctlr *c, uintptr_t reg, uint32_t val)
+{
+	write_mmreg32((uintptr_t)(c->nic + (reg / 4)), val);
+}
 
 static struct ctlr* igbectlrhead;
 static struct ctlr* igbectlrtail;
