@@ -106,6 +106,7 @@ blacklist(struct pci_device *p)
 {
 	switch(p->ven_id<<16 | p->dev_id){
 	case 0x11ab<<16 | 0x6485:
+	case 0x8086<<16 | 0x100f:
 		return -1;
 	}
 	return 0;

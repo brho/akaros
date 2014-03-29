@@ -619,6 +619,19 @@ static char* statistics[Nstatistics] = {
 	"TCP Segmentation Context Fail",
 };
 
+static void igbe_print_rd(struct Rd *rd)
+{
+	printk("Rd %p: stat 0x%02x, err 0x%02x, len 0x%04x, check 0x%04x, "
+	       "spec 0x%04x, addr[1] 0x%08x, addr[0] 0x%08x\n", rd,
+		   rd->status,
+		   rd->errors,
+		   rd->length,
+		   rd->checksum,
+		   rd->special,
+		   rd->addr[1],
+		   rd->addr[0]);
+}
+
 static long
 igbeifstat(struct ether* edev, void* a, long n, uint32_t offset)
 {

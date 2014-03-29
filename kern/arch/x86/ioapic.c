@@ -245,7 +245,7 @@ static int acpi_make_rdt(int tbdf, int irq, int busno, int devno)
 			gsi_irq = irq;
 		} else {
 			/* Need to query ACPI at some point to handle this */
-			printk("Non-ISA IRQ %d not found in MADT, aborting", irq);
+			printk("Non-ISA IRQ %d not found in MADT, aborting\n", irq);
 			return -1;
 		}
 	}
