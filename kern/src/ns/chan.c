@@ -1004,7 +1004,8 @@ struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 			t = devno( /*r */ get_cur_genbuf()[1], 1);
 			if (t == -1)
 				error(Ebadsharp);
-			c = devtab[t].attach(get_cur_genbuf() + n);
+			/* genbuf + 2: skips the # and X, just the spec left */
+			c = devtab[t].attach(get_cur_genbuf() + 2);
 			break;
 
 		default:
