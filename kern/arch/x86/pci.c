@@ -27,7 +27,7 @@ uint32_t pci_membar_get_sz(struct pci_device *pcidev, int bar)
 {
 	/* save the old value, write all 1s, invert, add 1, restore.
 	 * http://wiki.osdev.org/PCI for details. */
-	uint8_t bar_off = PCI_BAR0_STD + bar * PCI_BAR_OFF;
+	uint32_t bar_off = PCI_BAR0_STD + bar * PCI_BAR_OFF;
 	uint32_t old_val = pcidev_read32(pcidev, bar_off);
 	uint32_t retval;
 	pcidev_write32(pcidev, bar_off, 0xffffffff);
@@ -144,101 +144,93 @@ void pci_init(void) {
 	}
 }
 
-uint32_t pci_config_addr(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg)
+uint32_t pci_config_addr(uint8_t bus, uint8_t dev, uint8_t func, uint32_t reg)
 {
 	return (uint32_t)(((uint32_t)bus << 16) |
 	                  ((uint32_t)dev << 11) |
 	                  ((uint32_t)func << 8) |
-	                  (reg & 0xfc) | 0x80000000);
+	                  (reg & 0xfc) |
+	                  ((reg & 0xf00) << 16) |	/* extended PCI CFG space... */
+					  0x80000000);
 }
 
 /* Helper to read 32 bits from the config space of B:D:F.  'Offset' is how far
  * into the config space we offset before reading, aka: where we are reading. */
-uint32_t pci_read32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset)
+uint32_t pci_read32(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset)
 {
-	/* Send type 1 requests for everything beyond bus 0.  Note this does nothing
-	 * until we configure the PCI bridges (which we don't do yet). */
-	if (bus !=  0)
-		offset |= 0x1;
 	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
 	return inl(PCI_CONFIG_DATA);
 }
 
 /* Same, but writes (doing 32bit at a time).  Never actually tested (not sure if
  * PCI lets you write back). */
-void pci_write32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t offset,
+void pci_write32(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
                  uint32_t value)
 {
 	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
 	outl(PCI_CONFIG_DATA, value);
 }
 
-/* Helper to read from a specific device's config space. */
-uint32_t pcidev_read32(struct pci_device *pcidev, uint8_t offset)
+uint32_t pci_read16(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset)
+{
+	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
+	return inw(PCI_CONFIG_DATA + (offset & 2));
+}
+
+void pci_write16(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
+                 uint32_t value)
+{
+	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
+	outw(PCI_CONFIG_DATA + (offset & 2), value);
+}
+
+uint32_t pci_read8(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset)
+{
+	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
+	return inb(PCI_CONFIG_DATA + (offset & 3));
+}
+
+void pci_write8(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
+                uint32_t value)
+{
+	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
+	outb(PCI_CONFIG_DATA + (offset & 3), value);
+}
+
+uint32_t pcidev_read32(struct pci_device *pcidev, uint32_t offset)
 {
 	return pci_read32(pcidev->bus, pcidev->dev, pcidev->func, offset);
 }
 
-/* Helper to write to a specific device */
-void pcidev_write32(struct pci_device *pcidev, uint8_t offset, uint32_t value)
+void pcidev_write32(struct pci_device *pcidev, uint32_t offset, uint32_t value)
 {
 	pci_write32(pcidev->bus, pcidev->dev, pcidev->func, offset, value);
 }
 
-/* For the 16 and 8 functions, we need to access on 32 bit alignments, then
- * figure out which byte/word we need to read/write.  & 0xfc will give us the 4
- * byte aligned offset to access in PCI space.  & 0x3 will give the offset
- * within the 32 bits (number of bytes).  When writing, we also need to x-out
- * any existing values (and not just |=). */
-
-/* Returns the 32-bit addr/offset needed to access 'offset'. */
-static inline uint8_t __pci_off32(uint8_t offset)
+uint16_t pcidev_read16(struct pci_device *pcidev, uint32_t offset)
 {
-	return offset & 0xfc;
+	return pci_read16(pcidev->bus, pcidev->dev, pcidev->func, offset);
 }
 
-/* Returns the number of bits needed to shift to get the offset's spot in a 32
- * bit config register. */
-static inline uint8_t __pci_shift_for(uint8_t offset)
+void pcidev_write16(struct pci_device *pcidev, uint32_t offset, uint16_t value)
 {
-	return (offset & 0x3) * 8;
+	pci_write16(pcidev->bus, pcidev->dev, pcidev->func, offset, value);
 }
 
-uint16_t pcidev_read16(struct pci_device *pcidev, uint8_t offset)
+uint8_t pcidev_read8(struct pci_device *pcidev, uint32_t offset)
 {
-	uint32_t retval = pcidev_read32(pcidev, __pci_off32(offset));
-	/* 0x2 would work here, since offset & 0x3 should be 0 or 2 */
-	retval >>= __pci_shift_for(offset);
-	return (uint16_t)(retval & 0xffff);
+	return pci_read8(pcidev->bus, pcidev->dev, pcidev->func, offset);
 }
 
-void pcidev_write16(struct pci_device *pcidev, uint8_t offset, uint16_t value)
+void pcidev_write8(struct pci_device *pcidev, uint32_t offset, uint8_t value)
 {
-	uint32_t readval = pcidev_read32(pcidev, __pci_off32(offset));
-	uint32_t writeval = (uint32_t)value << __pci_shift_for(offset);
-	readval &= ~(0xffff << __pci_shift_for(offset));
-	pcidev_write32(pcidev, __pci_off32(offset), readval | writeval);
-}
-
-uint8_t pcidev_read8(struct pci_device *pcidev, uint8_t offset)
-{
-	uint32_t retval = pcidev_read32(pcidev, __pci_off32(offset));
-	retval >>= __pci_shift_for(offset);
-	return (uint8_t)(retval & 0xff);
-}
-
-void pcidev_write8(struct pci_device *pcidev, uint8_t offset, uint8_t value)
-{
-	uint32_t readval = pcidev_read32(pcidev, __pci_off32(offset));
-	uint32_t writeval = (uint32_t)value << __pci_shift_for(offset);
-	readval &= ~(0xff << __pci_shift_for(offset));
-	pcidev_write32(pcidev, __pci_off32(offset), readval | writeval);
+	pci_write8(pcidev->bus, pcidev->dev, pcidev->func, offset, value);
 }
 
 /* Gets any old raw bar, with some catches based on type. */
 uint32_t pci_getbar(struct pci_device *pcidev, unsigned int bar)
 {
-	uint32_t type;
+	uint8_t type;
 	if (bar >= MAX_PCI_BAR)
 		panic("Nonexistant bar requested!");
 	type = pcidev_read8(pcidev, PCI_HEADER_REG);
