@@ -234,6 +234,7 @@ uint32_t pci_getbar(struct pci_device *pcidev, unsigned int bar)
 	if (bar >= MAX_PCI_BAR)
 		panic("Nonexistant bar requested!");
 	type = pcidev_read8(pcidev, PCI_HEADER_REG);
+	type &= ~0x80;	/* drop the MF bit */
 	/* Only types 0 and 1 have BARS */
 	if ((type != 0x00) && (type != 0x01))
 		return 0;
