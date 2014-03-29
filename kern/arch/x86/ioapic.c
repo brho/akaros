@@ -395,7 +395,7 @@ static int msi_irq_enable(struct irq_handler *irq_h, struct pci_device *p)
 	irq_h->unmask = msi_unmask_irq;
 	irq_h->route_irq = msi_route_irq;
 	irq_h->type = "msi";
-	printd("msiirq: (%d,%d,%d): enabling %.16llp %s irq %d vno %d\n",
+	printk("msiirq: (%d,%d,%d): enabling %.16llp %s irq %d vno %d\n",
 	       p->bus, p->dev, p->func, msivec,
 		   irq_h->name, irq_h->apic_vector, vno);
 	return vno;

@@ -22,6 +22,7 @@ export rootdir=/root
 export rootspec=''
 export rootsrv=boot
 
+NIC="0"
 #authentication='nvram=/boot/adm/nvram auth/factotum -sfactotum -S'      # -a ...
 # test xyzip=(0 0 0 104.9.33)
 # test fsaddr='tcp!135.$xyzip(4)^!564'
@@ -47,6 +48,8 @@ then
 	mask=255.255.255.0
 	remote=169.229.49.0
 	route=169.229.49.1
+	# skip the shitty e1000s
+	NIC="2"
 fi
 
 if [ "x$MACHINE" = "xhossin" ]
@@ -81,13 +84,13 @@ bind -b '#s' /srv
 # Configure the networks.
 #
 bind -a '#I' /net
-bind -a '#l0' /net
+bind -a \#l$NIC /net
 
 # note: dhcp is possible, just not done yet.
 #get an instance of a network stack
 i=`cat /net/ipifc/clone`
 # bind the ether0 to it
-echo "bind ether /net/ether0 " > /net/ipifc/$i/ctl
+echo "bind ether /net/ether$NIC " > /net/ipifc/$i/ctl
 # ifconfig it
 echo "add $me $mask $remote" > /net/ipifc/$i/ctl
 echo "add 0 0 $route" > /net/iproute
