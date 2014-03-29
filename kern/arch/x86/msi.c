@@ -101,6 +101,20 @@ msicap(struct pci_device *p)
 	return c;
 }
 
+/* Find the offset in config space of this function of the msi-x capability.
+ * It is defined in 6.8.1 and is variable-sized.
+ */
+static int
+msixcap(struct pci_device *p)
+{
+	int c;
+
+	c = pci_cap(p, PciCapMSIX);
+	if(c == -1)
+		return 0;
+	return c;
+}
+
 static int
 blacklist(struct pci_device *p)
 {
@@ -142,6 +156,104 @@ int pci_msi_enable(struct pci_device *p, uint64_t vec)
 	if(blacklist(p) != 0)
 		return -1;
 
+	/* Data begins at 8 bytes in. */
+	datao = 8;
+
+	/* The data we write is 16 bits, scarfed
+	 * in the upper 16 bits of d.
+	 */
+	d = vec>>48;
+
+	/* Hard to see it being anything but lopri but ... */
+	lopri = (vec & 0x700) == MTlp;
+
+	logical = (vec & Lm) != 0;
+
+	/* OK, Msiabase is fee00000, and we offset with the
+	 * dest from above, lowpri, and logical.
+	 */
+	printd("Write to %d %08lx \n",c + 4, Msiabase | Msiaedest * d
+		| Msialowpri * lopri | Msialogical * logical);
+	pcidev_write32(p, c + 4, Msiabase | Msiaedest * d
+		| Msialowpri * lopri | Msialogical * logical);
+
+	/* And even if it's 64-bit capable, we do nothing with
+	 * the high order bits. If it is 64-bit we need to offset
+	 * datao (data offset) by 4 (i.e. another 32 bits)
+	 */
+	if(f & Cap64){
+		datao += 4;
+		pcidev_write32(p, c + 8, 0);
+	}
+
+	/* pick up the delivery mode from the vector */
+	dmode = (vec >> 8) & 7;
+
+	/* the data we write to that location is a combination
+	 * of things. It's not yet clear if this is a plan 9 chosen
+	 * thing or a PCI spec chosen thing.
+	 */
+	printd("Write data %d %04x\n", c + datao, Msidassert | Msidlogical * logical
+		       | Msidmode * dmode | ((unsigned int)vec & 0xff));
+	pcidev_write16(p, c + datao, Msidassert | Msidlogical * logical
+		       | Msidmode * dmode | ((unsigned int)vec & 0xff));
+
+	/* If we have the option of masking the vectors,
+	 * blow all the masks to 0. It's a 32-bit mask.
+	 */
+	if(f & Vmask)
+		pcidev_write32(p, c + datao + 4, 0);
+
+	/* Now write the control bits back, with the
+	 * Mmesg mask (which is a power of 2) set to 0
+	 * (meaning one message only).
+	 */
+	printd("write @ %d %04lx\n",c + 2, f);
+	pcidev_write16(p, c + 2, f);
+	return 0;
+}
+
+/* see section 6.8.1 of the pci spec. */
+/* Set up a single function on a single device.
+ * We need to take the vec, bust it up into bits,
+ * and put parts of it in the msi address and parts
+ * in the msi data.
+ */
+int pci_msix_enable(struct pci_device *p, uint64_t vec)
+{
+	char *s;
+	unsigned int c, f, d, datao, lopri, dmode, logical;
+	int bars[2], found;
+
+	/* Get the offset of the MSI capability
+	 * in the function's config space.
+	 */
+	c = msixcap(p);
+	if(c == 0)
+		return -1;
+
+	/* for this to work, we need at least one free BAR. */
+	found = pci_find_unused_bars(p, bars, 2);
+
+	if (found < 1)
+		return -1;
+
+	/* read it, clear out the Mmesgmsk bits. 
+	 * This means that there will be no multiple
+	 * messages enabled.
+	 */
+	f = pcidev_read16(p, c + 2) & ~Mmesgmsk;
+
+	/* See if it's a broken device, currently
+	 * there's only Marvell there.
+	 */
+	if(blacklist(p) != 0)
+		return -1;
+
+	/* alloc two physically contiguous pages. */
+	/* init them. */
+	/* point the bar you found to them. */
+	/* set the cap to point to the bar. */
 	/* Data begins at 8 bytes in. */
 	datao = 8;
 
