@@ -10,7 +10,7 @@
 #include <parlib.h>
 #include <unistd.h>
 #include <signal.h>
-#include <nixip.h>
+#include <iplib.h>
 #include <icmp.h>
 #include <ctype.h>
 #include <pthread.h>
