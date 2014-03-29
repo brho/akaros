@@ -961,7 +961,7 @@ struct etherpkt {
 };
 // INFERNO
 enum {
-	MaxEther = 4,
+	MaxEther = 32,
 	MaxFID = 16,
 	Ntypes = 8,
 };
