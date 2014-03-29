@@ -537,8 +537,7 @@ endif #ifeq ($(mixed-targets),1)
 # such as how pthread depends on parlib.
 
 user-dirs = parlib pthread benchutil iplib ndblib 
-pthread: parlib
-pthread: parlib
+pthread: parlib benchutil
 iplib: parlib
 ndblib: iplib
 
