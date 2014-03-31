@@ -1309,7 +1309,7 @@ char *tcphangup(struct conv *s)
 		poperror();
 		return commonerror();
 	}
-	if (s->raddr != 0) {
+	if (ipcmp(s->raddr, IPnoaddr)) {
 		/* discard error style, poperror regardless */
 		if (!waserror()) {
 			seg.flags = RST | ACK;
