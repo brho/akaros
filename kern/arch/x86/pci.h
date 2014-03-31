@@ -359,6 +359,10 @@ struct pci_device {
 	uint32_t					msi_lo;
 	uint8_t						nr_bars;
 	struct pci_bar				bar[MAX_PCI_BAR];
+	/* for MSI-X we might have allocated two physically contiguous pages. */
+	void *                                          msix;
+	int                                             msixbar;
+	int                                             msixsize;
 };
 
 /* List of all discovered devices */
