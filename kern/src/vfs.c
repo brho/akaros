@@ -2058,6 +2058,52 @@ struct file *get_file_from_fd(struct files_struct *open_files, int file_desc)
 	return retval;
 }
 
+/* Grow the vfs fd set */
+static int grow_fd_set(struct files_struct *open_files) {
+	int n;
+	struct file_desc *nfd, *ofd;
+
+	/* Only update open_fds once. If currently pointing to open_fds_init, then
+ 	 * update it to point to a newly allocated fd_set with space for
+ 	 * NR_FILE_DESC_MAX */
+	if (open_files->open_fds == (struct fd_set*)&open_files->open_fds_init) {
+		open_files->open_fds = kzmalloc(sizeof(struct fd_set), 0);
+		memmove(open_files->open_fds, &open_files->open_fds_init,
+		        sizeof(struct small_fd_set));
+	}
+
+	/* Grow the open_files->fd array in increments of NR_OPEN_FILES_DEFAULT */
+	n = open_files->max_files + NR_OPEN_FILES_DEFAULT;
+	if (n > NR_FILE_DESC_MAX)
+		n = NR_FILE_DESC_MAX;
+	nfd = kzmalloc(n * sizeof(struct file_desc), 0);
+	if (nfd == NULL)
+		return -1;
+
+	/* Move the old array on top of the new one */
+	ofd = open_files->fd;
+	memmove(nfd, ofd, open_files->max_files * sizeof(struct file_desc));
+
+	/* Update the array and the maxes for both max_files and max_fdset */
+	open_files->fd = nfd;
+	open_files->max_files = n;
+	open_files->max_fdset = n;
+
+	/* Only free the old one if it wasn't pointing to open_files->fd_array */
+	if (ofd != open_files->fd_array)
+		kfree(ofd);
+	return 0;
+}
+
+/* Free the vfs fd set if necessary */
+static void free_fd_set(struct files_struct *open_files) {
+	if (open_files->open_fds != (struct fd_set*)&open_files->open_fds_init) {
+		kfree(open_files->open_fds);
+		assert(open_files->fd != open_files->fd_array);
+		kfree(open_files->fd);
+	}
+}
+
 /* 9ns: puts back an FD from the VFS-FD-space. */
 int put_fd(struct files_struct *open_files, int file_desc)
 {
@@ -2110,19 +2156,28 @@ static int __get_fd(struct files_struct *open_files, int low_fd)
 		return -EINVAL;
 	if (open_files->closed)
 		return -EINVAL;	/* won't matter, they are dying */
-	for (int i = low_fd; i < open_files->max_fdset; i++) {
-		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, i))
-			continue;
-		slot = i;
-		SET_BITMASK_BIT(open_files->open_fds->fds_bits, slot);
-		assert(slot < open_files->max_files &&
-		       open_files->fd[slot].fd_file == 0);
-		if (slot >= open_files->next_fd)
-			open_files->next_fd = slot + 1;
-		break;
+
+	/* Loop until we have a valid slot (we grow the fd_array at the bottom of
+ 	 * the loop if we haven't found a slot in the current array */
+	while (slot == -1) {
+		for (low_fd; low_fd < open_files->max_fdset; low_fd++) {
+			if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, low_fd))
+				continue;
+			slot = low_fd;
+			SET_BITMASK_BIT(open_files->open_fds->fds_bits, slot);
+			assert(slot < open_files->max_files &&
+			       open_files->fd[slot].fd_file == 0);
+			if (slot >= open_files->next_fd)
+				open_files->next_fd = slot + 1;
+			break;
+		}
+		if (slot == -1)	{
+			/* Expand the FD array and fd_set */
+			if (grow_fd_set(open_files) == -1)
+				return -ENOMEM;
+			/* loop after growing */
+		}
 	}
-	if (slot == -1)	/* should expand the FD array and fd_set */
-		warn("Ran out of file descriptors, deal with me!");
 	return slot;
 }
 
@@ -2136,13 +2191,20 @@ int get_fd(struct files_struct *open_files, int low_fd)
 	return slot;
 }
 
-/* Claims a specific FD when duping FDs. used by 9ns.  < 0 == error. */
-int claim_fd(struct files_struct *open_files, int file_desc)
+static int __claim_fd(struct files_struct *open_files, int file_desc)
 {
 	if ((file_desc < 0) || (file_desc > NR_FILE_DESC_MAX))
 		return -EINVAL;
 	if (open_files->closed)
 		return -EINVAL;	/* won't matter, they are dying */
+
+	/* Grow the open_files->fd_set until the file_desc can fit inside it */
+	while(file_desc >= open_files->max_files) {
+		grow_fd_set(open_files);
+		cpu_relax();
+	}
+
+	/* If we haven't grown, this could be a problem, so check for it */
 	if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc))
 		return -ENFILE; /* Should never really happen. Here to catch bugs. */
 
@@ -2151,6 +2213,16 @@ int claim_fd(struct files_struct *open_files, int file_desc)
 	if (file_desc >= open_files->next_fd)
 		open_files->next_fd = file_desc + 1;
 	return 0;
+}
+
+/* Claims a specific FD when duping FDs. used by 9ns.  < 0 == error. */
+int claim_fd(struct files_struct *open_files, int file_desc)
+{
+	int ret;
+	spin_lock(&open_files->lock);
+	ret = __claim_fd(open_files, file_desc);
+	spin_unlock(&open_files->lock);
+	return ret;
 }
 
 /* Inserts the file in the files_struct, returning the corresponding new file
@@ -2183,8 +2255,6 @@ void close_all_files(struct files_struct *open_files, bool cloexec)
 		spin_unlock(&open_files->lock);
 		return;
 	}
-	if (!cloexec)
-		open_files->closed = TRUE;
 	for (int i = 0; i < open_files->max_fdset; i++) {
 		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, i)) {
 			/* while max_files and max_fdset might not line up, we should never
@@ -2202,6 +2272,10 @@ void close_all_files(struct files_struct *open_files, bool cloexec)
 			kref_put(&file->f_kref);
 			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, i);
 		}
+	}
+	if (!cloexec) {
+		free_fd_set(open_files);
+		open_files->closed = TRUE;
 	}
 	spin_unlock(&open_files->lock);
 }
