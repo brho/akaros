@@ -736,13 +736,15 @@ void localclose(struct conv *s, char *reason)
 
 	if (tcb->state == Syn_sent)
 		Fsconnected(s, reason);
-	if (s->state == Announced)
-		rendez_wakeup(&s->listenr);
 
 	qhangup(s->rq, reason);
 	qhangup(s->wq, reason);
 
 	tcpsetstate(s, Closed);
+
+	/* listener will check the rq state */
+	if (s->state == Announced)
+		rendez_wakeup(&s->listenr);
 }
 
 /* mtu (- TCP + IP hdr len) of 1st hop */

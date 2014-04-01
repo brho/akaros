@@ -351,12 +351,13 @@ static int ipstat(struct chan *c, uint8_t * db, int n)
 	return devstat(c, db, n, NULL, 0, ipgen);
 }
 
-static int incoming(void *arg)
+static int should_wake(void *arg)
 {
-	struct conv *conv;
-
-	conv = arg;
-	return conv->incall != NULL;
+	struct conv *cv = arg;
+	/* signal that the conv is closed */
+	if (qisclosed(cv->rq))
+		return TRUE;
+	return cv->incall != NULL;
 }
 
 static int m2p[] = {
@@ -493,8 +494,10 @@ static struct chan *ipopen(struct chan *c, int omode)
 				}
 
 				/* wait for a connect */
-				rendez_sleep(&cv->listenr, incoming, cv);
+				rendez_sleep(&cv->listenr, should_wake, cv);
 
+				/* if there is a concurrent hangup, they will hold the qlock
+				 * until the hangup is complete, including closing the cv->rq */
 				qlock(&cv->qlock);
 				nc = cv->incall;
 				if (nc != NULL) {
