@@ -37,6 +37,13 @@ endmenu
 
 menu "x86 Hacks"
 
+config POLL_CONSOLE
+	bool "Poll Console Devices"
+	default n
+	help
+		On some boards, we have trouble getting the serial IRQ.  This will
+		spawn ktasks for all console devices that poll every 10ms.  
+
 config LOUSY_LAPIC_TIMER
 	bool "Lousy Local APIC Timer"
 	default n

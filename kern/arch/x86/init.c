@@ -40,6 +40,10 @@ static void irq_console(struct hw_trapframe *hw_tf, void *data)
 		case capchar2ctl('B'):
 			/* backtrace / debugging for the core receiving the irq */
 			printk("\nForced trapframe and backtrace for core %d\n", core_id());
+			if (!hw_tf) {
+				printk("(no hw_tf, we probably polled the console)\n");
+				return;
+			}
 			print_trapframe(hw_tf);
 			backtrace_kframe(hw_tf);
 			return;
@@ -50,12 +54,24 @@ static void irq_console(struct hw_trapframe *hw_tf, void *data)
 	                    0, KMSG_ROUTINE);
 }
 
+static void cons_poller(void *arg)
+{
+	while (1) {
+		udelay_sched(10000);
+		irq_console(0, arg);
+	}
+}
+
 static void cons_irq_init(void)
 {
 	struct cons_dev *i;
 	/* Register interrupt handlers for all console devices */
-	SLIST_FOREACH(i, &cdev_list, next)
+	SLIST_FOREACH(i, &cdev_list, next) {
 		register_irq(i->irq, irq_console, i, MKBUS(BusISA, 0, 0, 0));
+#ifdef CONFIG_POLL_CONSOLE
+		ktask("cons_poller", cons_poller, i);
+#endif /* CONFIG_POLL_CONSOLE */
+	}
 }
 
 void arch_init()
