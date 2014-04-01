@@ -748,6 +748,8 @@ int munmap(struct proc *p, uintptr_t addr, size_t len)
 	printd("munmap(addr %x, len %x)\n", addr, len);
 	if (!len)
 		return 0;
+	len = ROUNDUP(len, PGSIZE);
+
 	if ((addr % PGSIZE) || (addr < MMAP_LOWEST_VA)) {
 		set_errno(EINVAL);
 		return -1;
