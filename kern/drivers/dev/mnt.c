@@ -1080,6 +1080,7 @@ struct mntrpc *mntralloc(struct chan *c, uint32_t msize)
 			spin_unlock(&mntalloc.l);
 			exhausted("mount rpc header");
 		}
+		rendez_init(&new->r);
 		/*
 		 * The header is split from the data buffer as
 		 * mountmux may swap the buffer with another header.
