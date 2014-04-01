@@ -51,6 +51,14 @@ int newfd(struct chan *c)
 	 * know if we closed anything.  Since we share the FD numbers with the VFS,
 	 * there is no way to know that. */
 	i = get_fd(&current->open_files, 0);
+	while (i >= f->nfd) {
+		if (growfd(f, i) < 0) {
+			spin_unlock(&f->lock);
+			exhausted("file descriptors");
+			return -1;
+		}
+		cpu_relax();
+	}
 	assert(f->fd[i] == 0);
 #if 0	// 9ns style
 	/* TODO: use a unique integer allocator */
