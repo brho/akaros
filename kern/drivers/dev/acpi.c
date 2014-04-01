@@ -556,10 +556,14 @@ static char *dumpfadt(char *start, char *end, struct Fadt *fp)
 	return start;
 }
 
-static struct Atable *acpifadt(uint8_t * p, int unused)
+static struct Atable *acpifadt(uint8_t * p, int len)
 {
 	struct Fadt *fp;
 
+	if (len < 116) {
+		printk("ACPI: unusually short FADT, aborting!\n");
+		return 0;
+	}
 	fp = &fadt;
 	fp->facs = l32get(p + 36);
 	fp->dsdt = l32get(p + 40);
@@ -597,6 +601,11 @@ static struct Atable *acpifadt(uint8_t * p, int unused)
 	fp->century = p[108];
 	fp->iapcbootarch = l16get(p + 109);
 	fp->flags = l32get(p + 112);
+
+	/* qemu gives us a 116 byte fadt, though i haven't seen any HW do that. */
+	if (len < 244)
+		return 0;
+
 	gasget(&fp->resetreg, p + 116);
 	fp->resetval = p[128];
 	fp->xfacs = l64get(p + 132);
