@@ -257,12 +257,12 @@ static int pci_msix_init(struct pci_device *p)
 	if(blacklist(p) != 0)
 		return -1;
 
-	/* alloc two physically contiguous pages. */
-	p->msix = get_cont_pages(2, KMALLOC_WAIT);
+	/* alloc 8 physically contiguous pages. */
+	p->msix = get_cont_pages(8, KMALLOC_WAIT);
 	if (! p->msix)
 		return -1;
 	/* init them. */
-	memset(p->msix, 0, 2*PAGE_SIZE);
+	memset(p->msix, 0, 8*PAGE_SIZE);
 	/* point the bar you found to them. */
 	p->msixbar = found;
 	p->msixsize = f & Msixsize;
@@ -274,7 +274,7 @@ static int pci_msix_init(struct pci_device *p)
 	/* table is at offset 0. */
 	pcidev_write32(p, c + 4, found);
 	/* PBA is at offset 4096 */
-	pcidev_write32(p, c + 8, found | 4096);
+	pcidev_write32(p, c + 8, found | 4*PAGE_SIZE);
 	/* that seems to be it for the config space. */
 	return 0;
 }
