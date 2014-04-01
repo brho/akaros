@@ -287,12 +287,14 @@ int pci_msix_enable(struct pci_device *p, uint64_t vec)
 {
 	int i;
 	struct msixentry *entry;
-	static int ready = 0;
 	unsigned int c, d, datao, lopri, dmode, logical;
-	if (! ready) {
+	/* we don't call this much, so we don't mind
+	 * retrying it.
+	 */
+	if (! p->msixready) {
 		if (pci_msix_init(p) < 0)
 			return -1;
-		ready = 1;
+		p->msixready = 1;
 	}
 
 	/* find an unused slot. */

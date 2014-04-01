@@ -362,6 +362,7 @@ struct pci_device {
 	/* for MSI-X we might have allocated two physically contiguous pages. */
 	void *                                          msix;
 	int                                             msixbar;
+	int                                             msixready;
 	int                                             msixsize;
 };
 
