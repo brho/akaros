@@ -239,7 +239,7 @@ static int pci_msix_init(struct pci_device *p)
 		return -1;
 
 	/* for this to work, we need at least one free BAR. */
-	found = pci_find_unused_bars(p, bars, 2);
+	found = pci_find_unused_bars(p, bars, 1);
 
 	/* we'll use one for now. */
 	if (found < 1)
@@ -248,7 +248,7 @@ static int pci_msix_init(struct pci_device *p)
 	f = pcidev_read16(p, c + 2);
 	printd("msix control %04x\n", f);
 	if (!(f & Msixenable)){
-		printd("msix not enabled; done\n");
+		printk("msix not enabled, f is 0x%x; done\n", f);
 		return -1;
 	}
 

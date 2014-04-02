@@ -410,6 +410,7 @@ struct pci_device *pci_match_tbdf(int tbdf);
 /* MSI functions, msi.c */
 int pci_cap(struct pci_device *p, int cap);
 int pci_msi_enable(struct pci_device *p, uint64_t vec);
+int pci_msix_enable(struct pci_device *p, uint64_t vec);
 
 /* MSI irq handler functions, msi.c */
 struct irq_handler; /* include loops */
