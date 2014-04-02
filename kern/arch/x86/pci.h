@@ -359,6 +359,7 @@ struct pci_device {
 	uint32_t					msi_lo;
 	uint8_t						nr_bars;
 	struct pci_bar				bar[MAX_PCI_BAR];
+	uint32_t					caps[PCI_CAP_ID_MAX + 1];
 	/* for MSI-X we might have allocated two physically contiguous pages. */
 	void *                                          msix;
 	int                                             msixbar;
@@ -408,7 +409,6 @@ void pci_clr_bus_master(struct pci_device *pcidev);
 struct pci_device *pci_match_tbdf(int tbdf);
 
 /* MSI functions, msi.c */
-int pci_cap(struct pci_device *p, int cap);
 int pci_msi_enable(struct pci_device *p, uint64_t vec);
 int pci_msix_enable(struct pci_device *p, uint64_t vec);
 

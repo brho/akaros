@@ -57,52 +57,12 @@ enum{
 	Msixsize        = 0x3ff,
 };
 
-/* Find an arbitrary capability. This should move to pci.c? */
-int pci_cap(struct pci_device *p, int cap)
-{
-	int i, c, off;
-
-	/* status register bit 4 has capabilities */
-	if((pcidev_read16(p, PciPSR) & 1<<4) == 0)
-		return -1;
-	switch(pcidev_read8(p, PciHDT) & 0x7f){
-	default:
-		return -1;
-	case 0:				/* etc */
-	case 1:				/* pci to pci bridge */
-		off = 0x34;
-		break;
-	case 2:				/* cardbus bridge */
-		off = 0x14;
-		break;
-	}
-	for(i = 48; i--;){
-		off = pcidev_read8(p, off);
-		if(off < 0x40 || (off & 3))
-			break;
-		off &= ~3;
-		c = pcidev_read8(p, off);
-		if(c == 0xff)
-			break;
-		if(c == cap)
-			return off;
-		off++;
-	}
-	return -1;
-}
-
 /* Find the offset in config space of this function of the msi capability.
- * It is defined in 6.8.1 and is variable-sized.
- */
+ * It is defined in 6.8.1 and is variable-sized.  Returns 0 on failure. */
 static int
 msicap(struct pci_device *p)
 {
-	int c;
-
-	c = pci_cap(p, PciCapMSI);
-	if(c == -1)
-		return 0;
-	return c;
+	return p->caps[PCI_CAP_ID_MSI];
 }
 
 /* Find the offset in config space of this function of the msi-x capability.
@@ -111,12 +71,7 @@ msicap(struct pci_device *p)
 static int
 msixcap(struct pci_device *p)
 {
-	int c;
-
-	c = pci_cap(p, PciCapMSIX);
-	if(c == -1)
-		return 0;
-	return c;
+	return p->caps[PCI_CAP_ID_MSIX];
 }
 
 static int

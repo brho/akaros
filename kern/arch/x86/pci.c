@@ -81,6 +81,42 @@ static void pci_handle_bars(struct pci_device *pcidev)
 	}
 }
 
+static void pci_parse_caps(struct pci_device *pcidev)
+{
+	uint32_t cap_off;	/* not sure if this can be extended from u8 */
+	uint8_t cap_id;
+	if (!(pcidev_read16(pcidev, PCI_STATUS_REG) & (1 << 4)))
+		return;
+	switch (pcidev_read8(pcidev, PCI_HEADER_REG) & 0x7f) {
+		case 0:				/* etc */
+		case 1:				/* pci to pci bridge */
+			cap_off = 0x34;
+			break;
+		case 2:				/* cardbus bridge */
+			cap_off = 0x14;
+			break;
+		default:
+			return;
+	}
+	/* initial offset points to the addr of the first cap */
+	cap_off = pcidev_read8(pcidev, cap_off);
+	cap_off &= ~0x3;	/* osdev says the lower 2 bits are reserved */
+	while (cap_off) {
+		cap_id = pcidev_read8(pcidev, cap_off);
+		if (cap_id > PCI_CAP_ID_MAX) {
+			printk("PCI %x:%x:%x had bad cap 0x%x\n", pcidev->bus, pcidev->dev,
+			       pcidev->func, cap_id);
+			return;
+		}
+		pcidev->caps[cap_id] = cap_off;
+		cap_off = pcidev_read8(pcidev, cap_off + 1);
+		/* not sure if subsequent caps must be aligned or not */
+		if (cap_off & 0x3)
+			printk("PCI %x:%x:%x had unaligned cap offset 0x%x\n", pcidev->bus,
+			       pcidev->dev, pcidev->func, cap_off);
+	}
+}
+
 /* Scans the PCI bus.  Won't actually work for anything other than bus 0, til we
  * sort out how to handle bridge devices. */
 void pci_init(void) {
@@ -128,6 +164,7 @@ void pci_init(void) {
 						pcidev->header_type = "Unknown Header Type";
 				}
 				pci_handle_bars(pcidev);
+				pci_parse_caps(pcidev);
 				STAILQ_INSERT_TAIL(&pci_devices, pcidev, all_dev);
 				#ifdef CONFIG_PCI_VERBOSE
 				pcidev_print_info(pcidev, 4);
@@ -398,6 +435,12 @@ void pcidev_print_info(struct pci_device *pcidev, int verbosity)
 			}
 		}
 	}
+	printk("\tCapabilities:");
+	for (int i = 0; i < PCI_CAP_ID_MAX + 1; i++) {
+		if (pcidev->caps[i])
+			printk(" 0x%02x", i);
+	}
+	printk("\n");
 }
 
 void pci_set_bus_master(struct pci_device *pcidev)
