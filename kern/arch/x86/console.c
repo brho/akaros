@@ -534,6 +534,9 @@ kbd_proc_data(void)
 		shift |= E0ESC;
 		return 0;
 	} else if (data & 0x80) {
+		/* TODO: need a better check for bad key releases */
+		if (data == 0xff)
+			return -1;
 		// Key released
 		data = (shift & E0ESC ? data : data & 0x7F);
 		shift &= ~(shiftcode[data] | E0ESC);
