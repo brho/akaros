@@ -1714,7 +1714,7 @@ intreg_t sys_nunmount(struct proc *p, char *name, int name_l, char *old_path, in
 	return ret;
 }
 
-static int sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
+static intreg_t sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
 {
 	int ret;
 	struct chan *ch;
