@@ -1,24 +1,29 @@
 #
-#	The master for this file is /n/fs/lib/ndb/common
-#
-
-#
 # real dns root server ips
 #
-dom=A.ROOT-SERVERS.NET ip=198.41.0.4
-dom=B.ROOT-SERVERS.NET ip=128.9.0.107
-dom=C.ROOT-SERVERS.NET ip=192.33.4.12
-dom=D.ROOT-SERVERS.NET ip=128.8.10.90
-dom=E.ROOT-SERVERS.NET ip=192.203.230.10
-dom=F.ROOT-SERVERS.NET ip=192.5.5.241
-dom=G.ROOT-SERVERS.NET ip=192.112.36.4
-dom=H.ROOT-SERVERS.NET ip=128.63.2.53
-dom=I.ROOT-SERVERS.NET ip=192.36.148.17
-dom=J.ROOT-SERVERS.NET ip=198.41.0.10
-dom=K.ROOT-SERVERS.NET ip=193.0.14.129
-dom=L.ROOT-SERVERS.NET ip=198.32.64.12	# old
-			ip=199.7.83.42	# new, nov 2007
-dom=M.ROOT-SERVERS.NET ip=202.12.27.33
+dom=a.root-servers.net ip=198.41.0.4
+dom=b.root-servers.net ip=192.228.79.201
+dom=c.root-servers.net ip=192.33.4.12
+dom=d.root-servers.net ip=199.7.91.13
+dom=e.root-servers.net ip=192.203.230.10
+dom=f.root-servers.net ip=192.5.5.241
+dom=g.root-servers.net ip=192.112.36.4
+dom=h.root-servers.net ip=128.63.2.53
+dom=i.root-servers.net ip=192.36.148.17
+dom=j.root-servers.net ip=192.58.128.30
+dom=k.root-servers.net ip=193.0.14.129
+dom=l.root-servers.net ip=199.7.83.42		# nov 2007
+dom=m.root-servers.net ip=202.12.27.33
+
+# dom=a.root-servers.net ipv6=2001:503:ba3e::2:30
+# dom=d.root-servers.net ipv6=2001:500:2d::d
+# dom=f.root-servers.net ipv6=2001:500:2f::f
+# dom=h.root-servers.net ipv6=2001:500:1::803f:235
+# dom=i.root-servers.net ipv6=2001:7fe::53
+# dom=j.root-servers.net ipv6=2001:503:c27::2:30
+# dom=k.root-servers.net ipv6=2001:7fd::1
+# dom=l.root-servers.net ipv6=2001:500:3::42
+# dom=m.root-servers.net ipv6=2001:dc3::35
 
 dom=a.gtld-servers.net ip=192.5.6.30
 dom=b.gtld-servers.net ip=192.33.14.30
@@ -33,6 +38,9 @@ dom=j.gtld-servers.net ip=192.48.79.30
 dom=k.gtld-servers.net ip=192.52.178.30
 dom=l.gtld-servers.net ip=192.41.162.30
 dom=m.gtld-servers.net ip=192.55.83.30
+
+# dom=a.gtld-servers.net ipv6=2001:503:a83e::2:30
+# dom=b.gtld-servers.net ipv6=2001:503:231d::2:30
 
 #
 # spam defense.  unfortunately, arin doesn't give negative
@@ -68,18 +76,19 @@ dom=10.in-addr.arpa soa=		# rfc1918 zones
 	dom=9.e.f.ip6.arpa soa=
 	dom=a.e.f.ip6.arpa soa=
 	dom=b.e.f.ip6.arpa soa=
-	refresh=3600 ttl=3600
-	ns=ns1.cs.bell-labs.com
-	ns=ns2.cs.bell-labs.com
+	refresh=86400 ttl=86400
+	ns=a.root-servers.net
+	ns=j.root-servers.net
 
 #
-#  ip protocol numbers
+#  ip v4 & v6 protocol numbers (only used by ape's getprotobyname via cs).
 #
-protocol=reserved	ipv4proto=0
+protocol=hopopt		ipv4proto=0
 protocol=icmp		ipv4proto=1
 protocol=igmp		ipv4proto=2
 protocol=ggp		ipv4proto=3
 protocol=ip		ipv4proto=4
+protocol=ipv4		ipv4proto=4
 protocol=st		ipv4proto=5
 protocol=tcp		ipv4proto=6
 protocol=ucl		ipv4proto=7
@@ -116,20 +125,25 @@ protocol=ddp		ipv4proto=37
 protocol=idpr-cmtp	ipv4proto=38
 protocol=tp++		ipv4proto=39
 protocol=il		ipv4proto=40
-protocol=sip		ipv4proto=41
+protocol=ipv6		ipv4proto=41
 protocol=sdrp		ipv4proto=42
-protocol=sip-sr		ipv4proto=43
-protocol=sip-frag	ipv4proto=44
+protocol=ipv6-route	ipv4proto=43
+protocol=ipv6-frag	ipv4proto=44
 protocol=idrp		ipv4proto=45
 protocol=rsvp		ipv4proto=46
 protocol=gre		ipv4proto=47
 protocol=mhrp		ipv4proto=48
 protocol=bna		ipv4proto=49
-protocol=sipp-esp	ipv4proto=50
-protocol=sipp-ah	ipv4proto=51
+protocol=esp		ipv4proto=50
+protocol=ah		ipv4proto=51
 protocol=i-nlsp		ipv4proto=52
 protocol=swipe		ipv4proto=53
-protocol=nhrp		ipv4proto=54
+protocol=narp		ipv4proto=54
+protocol=mobile		ipv4proto=55
+protocol=tlsp		ipv4proto=56
+protocol=ipv6-icmp	ipv4proto=58
+protocol=ipv6-nonxt	ipv4proto=59
+protocol=ipv6-opts	ipv4proto=60
 protocol=any		ipv4proto=61
 protocol=cftp		ipv4proto=62
 protocol=any		ipv4proto=63
@@ -170,6 +184,9 @@ protocol=etherip	ipv4proto=97
 protocol=encap		ipv4proto=98
 protocol=any		ipv4proto=99
 protocol=gmtp		ipv4proto=100
+protocol=pipe		ipv4proto=131
+protocol=mobility	ipv4proto=135
+protocol=mpls-in-ip	ipv4proto=137
 protocol=rudp		ipv4proto=254	# unofficial
 
 #
@@ -191,6 +208,7 @@ tcp=time port=37
 tcp=whois port=43
 tcp=dns port=53
 tcp=domain port=53
+tcp=dns-test port=54	# localism
 tcp=uucp port=64
 tcp=gopher port=70
 tcp=rje port=77
@@ -214,6 +232,7 @@ tcp=imap port=143
 tcp=NeWS port=144
 tcp=print-srv port=170
 tcp=z39.50 port=210
+tcp=ldap port=389
 tcp=fsb port=400
 tcp=sysmon port=401
 tcp=proxy port=402
@@ -234,7 +253,11 @@ tcp=9fs port=564
 tcp=whoami port=565
 tcp=guard port=566
 tcp=ticket port=567
+tcp=ldaps port=636
 tcp=fmclient port=729
+tcp=iscsi-system port=860
+tcp=ftps-data port=989
+tcp=ftps port=990
 tcp=imaps port=993
 tcp=pop3s port=995
 tcp=ingreslock port=1524
@@ -242,8 +265,11 @@ tcp=pptp port=1723
 tcp=nfs port=2049
 tcp=webster port=2627
 tcp=weather port=3000
+tcp=iscsi port=3260
+tcp=mysql port=3306
 tcp=sip port=5060
 tcp=sips port=5061
+tcp=ttcp port=5117
 tcp=secstore port=5356
 tcp=vnc-http port=5800
 tcp=vnc port=5900
@@ -256,27 +282,48 @@ tcp=infsigner port=6671
 tcp=infcsigner port=6672
 tcp=inflogin port=6673
 tcp=bandt port=7330
-tcp=face port=32000
+tcp=ccnx port=9695
 tcp=dhashgate port=11978
+tcp=piepea port=13146	# πp
 tcp=exportfs port=17007
 tcp=rexexec port=17009
 tcp=ncpu port=17010
-tcp=cpu port=17013
+tcp=cpu port=17010		# about to rename ncpu to cpu
+# tcp=cpu port=17013 # phasing out this obsolete protocol used by very old drawterm
+tcp=glenglenda1 port=17020
+tcp=glenglenda2 port=17021
+tcp=glenglenda3 port=17022
+tcp=glenglenda4 port=17023
+tcp=glenglenda5 port=17024
+tcp=glenglenda6 port=17025
+tcp=glenglenda7 port=17026
+tcp=glenglenda8 port=17027
+tcp=glenglenda9 port=17028
+tcp=glenglenda10 port=17029
+tcp=flyboy port=17032
 tcp=venti port=17034
 tcp=wiki port=17035
 tcp=vica port=17036
+tcp=aan port=17037
+tcp=face port=32000
+
+# testing
+tcp=9fsa port=18008
 
 udp=echo port=7
 udp=tacacs port=49
 udp=tftp port=69
 udp=bootpc port=68
 udp=bootp port=67
+udp=bootps port=67
 udp=domain port=53
 udp=dns port=53
+udp=dns-test port=54		# localism
 udp=portmap port=111
 udp=ntp port=123
 udp=netbios-ns port=137
 udp=snmp port=161
+udp=ha port=434			# mobile ip home agent
 udp=ikev2 port=500
 udp=syslog port=514
 udp=rip port=520
@@ -286,18 +333,42 @@ udp=nfs port=2049
 udp=bfs port=2201
 udp=virgil port=2202
 udp=sip port=5060
-udp=bandt2 port=7331
+udp=bandt2 port=7331		# viaducts
 udp=oradius port=1812
 udp=radius port=1812
+udp=ccnx port=9695
 udp=dhash port=11977
 udp=ulctl port=12666
 udp=uldata port=12667
 udp=dldata port=12668
+udp=piepea port=13146		# πp
 
 gre=ppp port=34827
+
+ssh=ssh port=22
 
 #
 # authdom declarations need to be visible on the inside network,
 # even for outside machines.  putting them here ensures
 # their visibility everywhere.
 #
+
+# for geoff's external ipv6 testing
+auth=9grid.hamnavoe.com
+	authdom=9grid.hamnavoe.com
+auth=ec2.hamnavoe.com
+	authdom=ec2.hamnavoe.com
+
+auth=whale.lsub.org
+	authdom=lsub.org
+	authdom=dat.escet.urjc.es
+
+# for jmk
+auth=tor.texas.9grid.us authdom=9grid.us
+auth=9grid.net authdom=9grid.net
+auth=ibmremote.dyndns.org
+	authdom=ibmremote.dyndns.org
+	authdom=austin.ibm.com
+
+# for sape
+auth=130.89.145.31 authdom=cs.utwente.nl
