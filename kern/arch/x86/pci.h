@@ -355,8 +355,9 @@ struct pci_device {
 	uint8_t						class;
 	uint8_t						subclass;
 	uint8_t						progif;
-	uint32_t					msi_hi;
-	uint32_t					msi_lo;
+	uint32_t					msi_msg_addr_hi;
+	uint32_t					msi_msg_addr_lo;
+	uint32_t					msi_msg_data;
 	uint8_t						nr_bars;
 	struct pci_bar				bar[MAX_PCI_BAR];
 	uint32_t					caps[PCI_CAP_ID_MAX + 1];

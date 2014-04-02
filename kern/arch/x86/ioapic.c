@@ -387,8 +387,6 @@ static int msi_irq_enable(struct irq_handler *irq_h, struct pci_device *p)
 		/* TODO: should free vno here */
 		return -1;
 	}
-	p->msi_hi = hi;
-	p->msi_lo = lo;
 	irq_h->check_spurious = lapic_check_spurious;
 	irq_h->eoi = lapic_send_eoi;
 	irq_h->mask = msi_mask_irq;
