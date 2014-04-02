@@ -1674,7 +1674,7 @@ qreply(Mfile *mf, struct ndbtuple *t)
 			len = 0;
 		else {
 			len -= amt;
-			cur += len;
+			cur += amt;
 		}
 
 		if(nt->line != nt->entry){
@@ -1688,7 +1688,7 @@ qreply(Mfile *mf, struct ndbtuple *t)
 				len = 0;
 			else {
 				len -= amt;
-				cur += len;
+				cur += amt;
 			}
 		}
 
