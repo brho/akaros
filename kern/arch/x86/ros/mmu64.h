@@ -274,6 +274,7 @@ typedef unsigned long pde_t;
 #define PTE_PAT			0x080	/* Page attribute table */
 #define PTE_G			0x100	/* Global Page */
 #define PTE_JPAT		0x800	/* Jumbo PAT */
+#define PTE_NOCACHE		(PTE_PWT | PTE_PCD)
 
 /* Permissions fields and common access modes.  These should be read as 'just
  * kernel or user too' and 'RO or RW'.  USER_RO means read-only for everyone. */

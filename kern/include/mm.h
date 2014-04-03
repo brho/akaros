@@ -79,6 +79,7 @@ int map_vmap_segment(uintptr_t vaddr, uintptr_t paddr, unsigned long num_pages,
 int unmap_vmap_segment(uintptr_t vaddr, unsigned long num_pages);
 /* Helper wrappers, since no one will probably call the *_segment funcs */
 uintptr_t vmap_pmem(uintptr_t paddr, size_t nr_bytes);
+uintptr_t vmap_pmem_nocache(uintptr_t paddr, size_t nr_bytes);
 int vunmap_vmem(uintptr_t vaddr, size_t nr_bytes);
 
 #endif /* !ROS_KERN_MM_H */

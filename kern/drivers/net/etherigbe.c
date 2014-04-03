@@ -2022,7 +2022,7 @@ igbepci(void)
 
 		mmio_paddr = pcidev->bar[0].mmio_base32 ? pcidev->bar[0].mmio_base32 : 
 		                                          pcidev->bar[0].mmio_base64;
-		mem = (void*)vmap_pmem(mmio_paddr, pcidev->bar[0].mmio_sz);
+		mem = (void*)vmap_pmem_nocache(mmio_paddr, pcidev->bar[0].mmio_sz);
 		if(mem == NULL){
 			printd("igbe: can't map %p\n", pcidev->bar[0].mmio_base32);
 			continue;

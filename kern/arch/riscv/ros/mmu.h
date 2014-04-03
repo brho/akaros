@@ -107,6 +107,7 @@
 #define PTE_SR   0x200 // Supervisor Write permission
 #define PTE_PERM (PTE_SR | PTE_SW | PTE_SX | PTE_UR | PTE_UW | PTE_UX)
 #define PTE_PPN_SHIFT 13
+#define PTE_NOCACHE	0 // PTE bits to turn off caching, if possible
 
 // commly used access modes
 #define PTE_KERN_RW	(PTE_SR | PTE_SW | PTE_SX)

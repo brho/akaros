@@ -188,6 +188,7 @@ typedef unsigned long pde_t;
 #define PTE_PS		0x080	// Page Size (only applies to PDEs)
 #define PTE_PAT		0x080	// PAT (only applies to second layer PTEs)
 #define PTE_G		0x100	// Global Page
+#define PTE_NOCACHE	(PTE_PWT | PTE_PCD)
 
 #define PTE_PERM	(PTE_W | PTE_U) // The permissions fields
 // commly used access modes
