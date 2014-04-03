@@ -308,29 +308,6 @@
 #define  PCI_AF_STATUS_TP	0x01
 #define PCI_CAP_AF_SIZEOF	6	/* size of AF registers */
 
-/* this part of the file is from linux, with an odd copyright. */
-/*
- * Copyright (C) 2003-2004 Intel
- * Copyright (C) Tom Long Nguyen (tom.l.nguyen@intel.com)
- */
-
-#define msi_control_reg(base)		(base + PCI_MSI_FLAGS)
-#define msi_lower_address_reg(base)	(base + PCI_MSI_ADDRESS_LO)
-#define msi_upper_address_reg(base)	(base + PCI_MSI_ADDRESS_HI)
-#define msi_data_reg(base, is64bit)	\
-	(base + ((is64bit == 1) ? PCI_MSI_DATA_64 : PCI_MSI_DATA_32))
-#define msi_mask_reg(base, is64bit)	\
-	(base + ((is64bit == 1) ? PCI_MSI_MASK_64 : PCI_MSI_MASK_32))
-#define is_64bit_address(control)	(!!(control & PCI_MSI_FLAGS_64BIT))
-#define is_mask_bit_support(control)	(!!(control & PCI_MSI_FLAGS_MASKBIT))
-
-#define msix_table_offset_reg(base)	(base + PCI_MSIX_TABLE)
-#define msix_pba_offset_reg(base)	(base + PCI_MSIX_PBA)
-#define msix_table_size(control) 	((control & PCI_MSIX_FLAGS_QSIZE)+1)
-#define multi_msix_capable(control)	msix_table_size((control))
-
-/* end odd copyright. */
-
 struct pci_bar {
 	uint32_t					raw_bar;
 	uint32_t					pio_base;
@@ -361,11 +338,24 @@ struct pci_device {
 	uint8_t						nr_bars;
 	struct pci_bar				bar[MAX_PCI_BAR];
 	uint32_t					caps[PCI_CAP_ID_MAX + 1];
-	/* for MSI-X we might have allocated two physically contiguous pages. */
-	void *                                          msix;
-	int                                             msixbar;
-	int                                             msixready;
-	int                                             msixsize;
+	uintptr_t					msix_tbl_paddr;
+	uintptr_t					msix_tbl_vaddr;
+	uintptr_t					msix_pba_paddr;
+	uintptr_t					msix_pba_vaddr;
+	unsigned int				msix_nr_vec;
+	bool						msix_ready;
+};
+
+struct msix_entry {
+	uint32_t addr_lo, addr_hi, data, vector;
+};
+
+struct msix_irq_vector {
+	struct pci_device *pcidev;
+	struct msix_entry *entry;
+	uint32_t addr_lo;
+	uint32_t addr_hi;
+	uint32_t data;
 };
 
 /* List of all discovered devices */
@@ -403,22 +393,26 @@ bool pci_is_membar32(uint32_t bar);
 bool pci_is_membar64(uint32_t bar);
 uint32_t pci_getmembar32(uint32_t bar);
 uint32_t pci_getiobar32(uint32_t bar);
+uintptr_t pci_get_membar(struct pci_device *pcidev, int bir);
 
 /* Other common PCI functions */
 void pci_set_bus_master(struct pci_device *pcidev);
 void pci_clr_bus_master(struct pci_device *pcidev);
 struct pci_device *pci_match_tbdf(int tbdf);
 
+struct irq_handler; /* include loops */
 /* MSI functions, msi.c */
 int pci_msi_enable(struct pci_device *p, uint64_t vec);
-int pci_msix_enable(struct pci_device *p, uint64_t vec);
+int pci_msix_enable(struct irq_handler *irq_h, struct pci_device *p,
+                    uint64_t vec);
 
 /* MSI irq handler functions, msi.c */
-struct irq_handler; /* include loops */
 void msi_mask_irq(struct irq_handler *irq_h, int apic_vector);
 void msi_unmask_irq(struct irq_handler *irq_h, int apic_vector);
 int msi_route_irq(struct irq_handler *irq_h, int apic_vector, int dest);
-int pci_find_unused_bars(struct pci_device *dev, int *bars, int need);
+void msix_mask_irq(struct irq_handler *irq_h, int apic_vector);
+void msix_unmask_irq(struct irq_handler *irq_h, int apic_vector);
+int msix_route_irq(struct irq_handler *irq_h, int apic_vector, int dest);
 
 /* TODO: this is quite the Hacke */
 #define explode_tbdf(tbdf) {pcidev.bus = tbdf >> 16;\

@@ -339,6 +339,18 @@ uint32_t pci_getiobar32(uint32_t bar)
 	return bar & 0xfffffffc;
 }
 
+/* Helper to get the membar value for BAR index bir */
+uintptr_t pci_get_membar(struct pci_device *pcidev, int bir)
+{
+	if (bir >= pcidev->nr_bars)
+		return 0;
+	if (pci_is_iobar(pcidev->bar[bir].raw_bar))
+		return 0;
+	return (pci_is_membar64(pcidev->bar[bir].raw_bar) ?
+	        pcidev->bar[bir].mmio_base64 :
+	        pcidev->bar[bir].mmio_base32);
+}
+
 /* Helper to get the class description strings.  Adapted from
  * http://www.pcidatabase.com/reports.php?type=c-header */
 static void pcidev_get_cldesc(struct pci_device *pcidev, char **class,
@@ -424,7 +436,8 @@ void pcidev_print_info(struct pci_device *pcidev, int verbosity)
 			printk("IO port 0x%04x\n", pcidev->bar[i].pio_base);
 		} else {
 			bool bar_is_64 = pci_is_membar64(pcidev->bar[i].raw_bar);
-			printk("MMIO Base %p, MMIO Size %p\n",
+			printk("MMIO Base%s %p, MMIO Size %p\n",
+			       bar_is_64 ? "64" : "32",
 			       bar_is_64 ? pcidev->bar[i].mmio_base64 :
 			                   pcidev->bar[i].mmio_base32,
 			       pcidev->bar[i].mmio_sz);
@@ -455,17 +468,6 @@ void pci_clr_bus_master(struct pci_device *pcidev)
 	reg = pcidev_read16(pcidev, PCI_CMD_REG);
 	reg &= ~PCI_CMD_BUS_MAS;
 	pcidev_write16(pcidev, PCI_CMD_REG, reg);
-}
-
-/* Find up to 'need' unused bars. Needed for MSI-X */
-int pci_find_unused_bars(struct pci_device *dev, int *bars, int need)
-{
-	int i, found;
-	for(i = found = 0; found < need && i < ARRAY_SIZE(dev->bar); i++)
-		if (!dev->bar[i].raw_bar)
-			bars[found++] = i;
-	return found;
-
 }
 
 struct pci_device *pci_match_tbdf(int tbdf)

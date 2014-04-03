@@ -383,19 +383,31 @@ static int msi_irq_enable(struct irq_handler *irq_h, struct pci_device *p)
 	lo = IPlow | TMedge | Pm | vno;
 
 	msivec = (uint64_t) hi << 32 | lo;
-	if (pci_msi_enable(p, msivec) == -1) {
-		/* TODO: should free vno here */
-		return -1;
+	if (pci_msix_enable(irq_h, p, msivec) == -1) {
+		if (pci_msi_enable(p, msivec) == -1) {
+			/* in case we turned it half-on */;
+			msi_mask_irq(irq_h, 0 /* unused */);
+			/* TODO: should free vno here */
+			return -1;
+		}
+		irq_h->check_spurious = lapic_check_spurious;
+		irq_h->eoi = lapic_send_eoi;
+		irq_h->mask = msi_mask_irq;
+		irq_h->unmask = msi_unmask_irq;
+		irq_h->route_irq = msi_route_irq;
+		irq_h->type = "msi";
+		printk("MSI irq: (%x,%x,%x): enabling %p %s vno %d\n",
+			   p->bus, p->dev, p->func, msivec, irq_h->name, vno);
+		return vno;
 	}
 	irq_h->check_spurious = lapic_check_spurious;
 	irq_h->eoi = lapic_send_eoi;
-	irq_h->mask = msi_mask_irq;
-	irq_h->unmask = msi_unmask_irq;
-	irq_h->route_irq = msi_route_irq;
-	irq_h->type = "msi";
-	printk("msiirq: (%d,%d,%d): enabling %.16llp %s irq %d vno %d\n",
-	       p->bus, p->dev, p->func, msivec,
-		   irq_h->name, irq_h->apic_vector, vno);
+	irq_h->mask = msix_mask_irq;
+	irq_h->unmask = msix_unmask_irq;
+	irq_h->route_irq = msix_route_irq;
+	irq_h->type = "msi-x";
+	printk("MSI-X irq: (%x,%x,%x): enabling %p %s vno %d\n",
+	       p->bus, p->dev, p->func, msivec, irq_h->name, vno);
 	return vno;
 }
 
@@ -555,8 +567,6 @@ int bus_irq_setup(struct irq_handler *irq_h)
 			irq_h->dev_private = pcidev;
 			if ((vecno = msi_irq_enable(irq_h, pcidev)) != -1)
 				return vecno;
-			/* in case we turned it half-on */;
-			msi_mask_irq(irq_h, 0 /* unused */);
 			busno = BUSBNO(irq_h->tbdf);
 			assert(busno == pcidev->bus);
 			devno = pcidev_read8(pcidev, PciINTP);

@@ -73,14 +73,13 @@ enum{
 	Msienable	= 1<<0, /* Enable. */
 	/* msix capabilities */
 	Msixenable      = 1<<15,
-	Msixmask        = 1<<15,
-	Msixsize        = 0x3ff,
+	Msixmask        = 1<<14,
+	Msixtblsize     = 0x7ff,
 };
 
 /* Find the offset in config space of this function of the msi capability.
  * It is defined in 6.8.1 and is variable-sized.  Returns 0 on failure. */
-static int
-msicap(struct pci_device *p)
+static int msicap(struct pci_device *p)
 {
 	return p->caps[PCI_CAP_ID_MSI];
 }
@@ -88,21 +87,57 @@ msicap(struct pci_device *p)
 /* Find the offset in config space of this function of the msi-x capability.
  * It is defined in 6.8.1 and is variable-sized.
  */
-static int
-msixcap(struct pci_device *p)
+static int msixcap(struct pci_device *p)
 {
 	return p->caps[PCI_CAP_ID_MSIX];
 }
 
-static int
-blacklist(struct pci_device *p)
+static int msi_blacklist(struct pci_device *p)
 {
-	switch(p->ven_id<<16 | p->dev_id){
-	case 0x11ab<<16 | 0x6485:
-	case 0x8086<<16 | 0x100f:
-		return -1;
+	switch (p->ven_id << 16 | p->dev_id) {
+		case 0x11ab << 16 | 0x6485:
+		case 0x8086 << 16 | 0x100f:
+			return -1;
 	}
 	return 0;
+}
+
+static int msix_blacklist(struct pci_device *p)
+{
+	switch (p->ven_id << 16 | p->dev_id) {
+//		case 0x11ab << 16 | 0x6485:	/* placeholder */
+			return -1;
+	}
+	return 0;
+}
+
+static uint32_t msi_make_addr_lo(uint64_t vec)
+{
+	unsigned int dest, lopri, logical;
+	/* The destination is the traditional 8-bit APIC id is in 63:56 of the
+	 * vector.  Later we may need to deal with extra destination bits
+	 * (Msiaedest, in this code).  I haven't seen anything in the Intel SDM
+	 * about using Msiaedest (the bits are reserved) */
+	dest = vec >> 56;
+	/* lopri is rarely set, and intel doesn't recommend using it.  with msi, the
+	 * lopri field is actually a redirection hint, and also must be set when
+	 * sending logical messages. */
+	lopri = (vec & 0x700) == MTlp;
+	logical = (vec & Lm) != 0;
+	if (logical)
+		lopri = 1;
+	return Msiabase | Msiadest * dest | Msialowpri * lopri |
+	       Msialogical * logical;
+}
+
+static uint32_t msi_make_data(uint64_t vec)
+{
+	unsigned int deliv_mode;
+	deliv_mode = (vec >> 8) & 7;
+	/* We can only specify the lower 16 bits of the MSI message, the rest gets
+	 * forced to 0 by the device.  MSI-X can use the full 32 bits.  We're
+	 * assuming edge triggered here. */
+	return Msidmode * deliv_mode | ((unsigned int)vec & 0xff);
 }
 
 /* see section 6.8.1 of the pci spec. */
@@ -113,8 +148,7 @@ blacklist(struct pci_device *p)
  */
 int pci_msi_enable(struct pci_device *p, uint64_t vec)
 {
-	char *s;
-	unsigned int c, f, dest, datao, lopri, dmode, logical;
+	unsigned int c, f, datao;
 
 	/* Get the offset of the MSI capability
 	 * in the function's config space.
@@ -130,32 +164,12 @@ int pci_msi_enable(struct pci_device *p, uint64_t vec)
 	 */
 	f = pcidev_read16(p, c + 2) & ~Mmesgmsk;
 
-	if (blacklist(p) != 0)
+	if (msi_blacklist(p) != 0)
 		return -1;
 
 	/* Data begins at 8 bytes in. */
 	datao = 8;
-
-	/* The destination is the traditional 8-bit APIC id is in 63:56 of the
-	 * vector.  Later we may need to deal with extra destination bits
-	 * (Msiaedest, in this code).  I haven't seen anything in the Intel SDM
-	 * about using Msiaedest (the bits are reserved) */
-	dest = vec >> 56;
-
-	/* lopri is rarely set, and intel doesn't recommend using it.  with msi, the
-	 * lopri field is actually a redirection hint, and also must be set when
-	 * sending logical messages. */
-	lopri = (vec & 0x700) == MTlp;
-
-	logical = (vec & Lm) != 0;
-	if (logical)
-		lopri = 1;
-
-	/* OK, Msiabase is fee00000, and we offset with the
-	 * dest from above, lowpri, and logical.
-	 */
-	p->msi_msg_addr_lo = Msiabase | Msiadest * dest | Msialowpri * lopri |
-	                     Msialogical * logical;
+	p->msi_msg_addr_lo = msi_make_addr_lo(vec);
 	printd("Write to %d %08lx \n",c + 4, p->msi_msg_addr_lo);
 	pcidev_write32(p, c + 4, p->msi_msg_addr_lo);
 
@@ -169,12 +183,7 @@ int pci_msi_enable(struct pci_device *p, uint64_t vec)
 	}
 	p->msi_msg_addr_hi = 0;
 
-	/* pick up the delivery mode from the vector */
-	dmode = (vec >> 8) & 7;
-
-	/* We can only specify the lower 16 bits of the MSI message, the rest gets
-	 * forced to 0 by the device.  We're assuming edge triggered here. */
-	p->msi_msg_data = Msidmode * dmode | ((unsigned int)vec & 0xff);
+	p->msi_msg_data = msi_make_data(vec);
 	printd("Write data %d %04x\n", c + datao, p->msi_msg_data);
 	pcidev_write16(p, c + datao, p->msi_msg_data);
 
@@ -186,157 +195,131 @@ int pci_msi_enable(struct pci_device *p, uint64_t vec)
 
 	/* Now write the control bits back, with the Mmesg mask (which is a power of
 	 * 2) set to 0 (meaning one vector only).  Note we still haven't enabled
-	 * MSI.  Will do that when we unmask. */
+	 * MSI.  Will do that when we unmask.  According to the spec, we're not
+	 * supposed to use the Msienable bit to mask the IRQ, though I don't see how
+	 * we can mask on non-Vmask-supported HW. */
 	printd("write @ %d %04lx\n",c + 2, f);
 	pcidev_write16(p, c + 2, f);
 	return 0;
 }
 
-/* see section 6.8.1 of the pci spec. */
-/* Set up a single function on a single device.
- * We need to take the vec, bust it up into bits,
- * and put parts of it in the msi address and parts
- * in the msi data.
- */
+static void msix_mask_entry(struct msix_entry *entry)
+{
+	uintptr_t reg = (uintptr_t)&entry->vector;
+	write_mmreg32(reg, read_mmreg32(reg) | 0x1);
+}
+
+static void msix_unmask_entry(struct msix_entry *entry)
+{
+	uintptr_t reg = (uintptr_t)&entry->vector;
+	write_mmreg32(reg, read_mmreg32(reg) & ~0x1);
+}
+
+static uintptr_t msix_get_capbar_paddr(struct pci_device *p, int offset)
+{
+	uint32_t bir, capbar_off;
+	uintptr_t membar;
+	
+	bir = pcidev_read32(p, offset);
+	capbar_off = bir & ~0x7;
+	bir &= 0x7;
+	membar = pci_get_membar(p, bir);
+
+	if (!membar) {
+		printk("MSI-X: no cap membar, bir %d\n", bir);
+		return 0;
+	}
+	membar += capbar_off;
+	if (PGOFF(membar)) {
+		printk("MSI-X: unaligned cap membar %p\n", membar);
+		return 0;
+	}
+	return membar;
+}
+
+/* One time initialization of MSI-X for a PCI device.  -1 on error.  Otherwise,
+ * the device will be ready to assign/route MSI-X entries/vectors.  All vectors
+ * are masked, but the overall MSI-X function is unmasked. */
 static int pci_msix_init(struct pci_device *p)
 {
-	char *s;
-	unsigned int c, d, datao, lopri, dmode, logical;
+	unsigned int c;
 	uint16_t f;
-	int bars[2], found;
+	int tbl_bir, tbl_off, pba_bir, pba_off;
+	struct msix_entry *entry;
 
-	/* Get the offset of the MSI capability
-	 * in the function's config space.
-	 */
+	if (msix_blacklist(p) != 0)
+		return -1;
+	/* Get the offset of the MSI capability in the function's config space. */
 	c = msixcap(p);
-	if(c == 0)
+	if (c == 0)
 		return -1;
-
-	/* for this to work, we need at least one free BAR. */
-	found = pci_find_unused_bars(p, bars, 1);
-
-	/* we'll use one for now. */
-	if (found < 1)
-		return -1;
-
 	f = pcidev_read16(p, c + 2);
-	printd("msix control %04x\n", f);
-	if (!(f & Msixenable)){
-		printk("msix not enabled, f is 0x%x; done\n", f);
+	/* enable and mask the entire function/all vectors */
+	f |= Msixenable | Msixmask;
+	pcidev_write16(p, c + 2, f);
+
+	p->msix_tbl_paddr = msix_get_capbar_paddr(p, c + 4);
+	p->msix_pba_paddr = msix_get_capbar_paddr(p, c + 8);
+	if (!p->msix_tbl_paddr || !p->msix_pba_paddr)
+		return -1;
+	p->msix_nr_vec = (f & Msixtblsize) + 1;
+	p->msix_tbl_vaddr = vmap_pmem_nocache(p->msix_tbl_paddr, p->msix_nr_vec *
+	                                      sizeof(struct msix_entry));
+	if (!p->msix_tbl_vaddr) {
+		printk("MSI-X: unable to vmap the Table!\n");
 		return -1;
 	}
-
-	/* See if it's a broken device.
-	 */
-	if(blacklist(p) != 0)
+	p->msix_pba_vaddr = vmap_pmem_nocache(p->msix_pba_paddr,
+	                                      ROUNDUP(p->msix_nr_vec, 8) / 8);
+	if (!p->msix_pba_vaddr) {
+		printk("MSI-X: unable to vmap the PBA!\n");
+		vunmap_vmem(p->msix_tbl_paddr,
+	                p->msix_nr_vec * sizeof(struct msix_entry));
 		return -1;
-
-	/* alloc 8 physically contiguous pages. */
-	p->msix = get_cont_pages(8, KMALLOC_WAIT);
-	if (! p->msix)
-		return -1;
-	/* init them. */
-	memset(p->msix, 0, 8*PAGE_SIZE);
-	/* point the bar you found to them. */
-	p->msixbar = found;
-	p->msixsize = f & Msixsize;
-	/* what do we do for 64-bit bars? Who knows? */
-	/* there's an issue here. Does it need to be 8k aligned? Hmm. */
-	pcidev_write32(p, 0x10 + p->msixbar, paddr_low32(p->msix));
-	/* set the caps to point to the bar. */
-	/* Format is offset from the msibar | which bar it is. */
-	/* table is at offset 0. */
-	pcidev_write32(p, c + 4, found);
-	/* PBA is at offset 4096 */
-	pcidev_write32(p, c + 8, found | 4*PAGE_SIZE);
-	/* that seems to be it for the config space. */
+	}
+	/* they should all be masked already, but just in case */
+	entry = (struct msix_entry*)p->msix_tbl_vaddr;
+	for (int i = 0; i < p->msix_nr_vec; i++, entry++) {
+		msix_mask_entry(entry);
+	}
+	/* unmask the device, now that all the vectors are masked */
+	f &= ~Msixmask;
+	pcidev_write16(p, c + 2, f);
 	return 0;
 }
 
-struct msixentry {
-	uint32_t addrlo, addrhi, data, vector;
-};
-
-int pci_msix_enable(struct pci_device *p, uint64_t vec)
+int pci_msix_enable(struct irq_handler *irq_h, struct pci_device *p,
+                    uint64_t vec)
 {
 	int i;
-	struct msixentry *entry;
-	unsigned int c, d, datao, lopri, dmode, logical;
-	/* we don't call this much, so we don't mind
-	 * retrying it.
-	 */
-	if (! p->msixready) {
+	struct msix_entry *entry;
+	struct msix_irq_vector *linkage;
+	unsigned int c, datao;
+
+	/* TODO: sync protection */
+	if (!p->msix_ready) {
 		if (pci_msix_init(p) < 0)
 			return -1;
-		p->msixready = 1;
+		p->msix_ready = TRUE;
 	}
-
-	/* find an unused slot. */
-	for(i = 0, entry = p->msix; i < p->msixsize; i++, entry++)
-		if (! entry->vector)
+	/* find an unused slot (no apic_vector assigned).  later, we might want to
+	 * point back to the irq_hs for each entry.  not a big deal now. */
+	entry = (struct msix_entry*)p->msix_tbl_vaddr;
+	for (i = 0; i < p->msix_nr_vec; i++, entry++)
+		if (!(read_mmreg32((uintptr_t)&entry->data) & 0xff))
 			break;
-	if (i == p->msixsize)
+	if (i == p->msix_nr_vec)
 		return -1;
-
-	/* The data we write is 16 bits, scarfed
-	 * in the upper 16 bits of d.
-	 */
-	/* The data we write is 16 bits, scarfed
-	 * in the upper 16 bits of d.
-	 */
-	d = vec>>48;
-
-	entry->data = d;
-
-	/* Hard to see it being anything but lopri but ... */
-	lopri = (vec & 0x700) == MTlp;
-
-	logical = (vec & Lm) != 0;
-
-	/* OK, Msiabase is fee00000, and we offset with the
-	 * dest from above, lowpri, and logical.
-	 */
-	printd("Write to %d %08lx \n",c + 4, Msiabase | Msiaedest * d
-		| Msialowpri * lopri | Msialogical * logical);
-	entry->addrlo = Msiabase | Msiaedest * d
-		| Msialowpri * lopri | Msialogical * logical;
-	
-	/* And even if it's 64-bit capable, we do nothing with
-	 * the high order bits. If it is 64-bit we need to offset
-	 * datao (data offset) by 4 (i.e. another 32 bits)
-	 */
-	entry->addrhi = 0;
-
-	/* pick up the delivery mode from the vector */
-	dmode = (vec >> 8) & 7;
-
-	/* the data we write to that location is a combination
-	 * of things. It's not yet clear if this is a plan 9 chosen
-	 * thing or a PCI spec chosen thing.
-	 */
-	printd("Write data @%p %04x\n", &entry->data, Msidassert |
-	       Msidmode * dmode | ((unsigned int)vec & 0xff));
-	entry->data = Msidassert | Msidmode * dmode | ((unsigned int)vec & 0xff);
-	return 0;
-}
-/* Mask the msi function. Since 'masking' means disable it,
- * but the parameter has a 1 for disabling it, well, it's a
- * bit clear operation.
- */
-int
-pcimsimask(struct pci_device *p, int mask)
-{
-	unsigned int c, f;
-
-	c = msicap(p);
-	if(c == 0)
-		return -1;
-	f = pcidev_read16(p, c + 2);
-	if(mask){
-		pcidev_write16(p, c + 2, f & ~Msienable);
-	}else{
-		pcidev_write16(p, c + 2, f | Msienable);
-	}
+	linkage = kmalloc(sizeof(struct msix_irq_vector), KMALLOC_WAIT);
+	linkage->pcidev = p;
+	linkage->entry = entry;
+	linkage->addr_lo = msi_make_addr_lo(vec);
+	linkage->addr_hi = 0;
+	linkage->data = msi_make_data(vec);
+	write_mmreg32((uintptr_t)&entry->data, linkage->data);
+	write_mmreg32((uintptr_t)&entry->addr_lo, linkage->addr_lo);
+	write_mmreg32((uintptr_t)&entry->addr_hi, linkage->addr_hi);
+	irq_h->dev_private = linkage;
 	return 0;
 }
 
@@ -373,7 +356,29 @@ int msi_route_irq(struct irq_handler *irq_h, int apic_vector, int dest)
 
 	/* mask out the old destination, replace with new */
 	p->msi_msg_addr_lo &= ~(((1 << 8) - 1) << 12);
-	p->msi_msg_addr_lo |= dest << 12;
+	p->msi_msg_addr_lo |= (dest & 0xff) << 12;
 	pcidev_write32(p, c + 4, p->msi_msg_addr_lo);
+	return 0;
+}
+
+void msix_mask_irq(struct irq_handler *irq_h, int apic_vector)
+{
+	struct msix_irq_vector *linkage = irq_h->dev_private;
+	msix_mask_entry(linkage->entry);
+}
+
+void msix_unmask_irq(struct irq_handler *irq_h, int apic_vector)
+{
+	struct msix_irq_vector *linkage = irq_h->dev_private;
+	msix_unmask_entry(linkage->entry);
+}
+
+int msix_route_irq(struct irq_handler *irq_h, int apic_vector, int dest)
+{
+	struct msix_irq_vector *linkage = irq_h->dev_private;
+	/* mask out the old destination, replace with new */
+	linkage->addr_lo &= ~(((1 << 8) - 1) << 12);
+	linkage->addr_lo |= (dest & 0xff) << 12;
+	write_mmreg32((uintptr_t)&linkage->entry->addr_lo, linkage->addr_lo);
 	return 0;
 }

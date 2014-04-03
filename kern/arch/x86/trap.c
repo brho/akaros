@@ -512,7 +512,7 @@ int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 		kfree(irq_h);
 		return -1;
 	}
-	printd("IRQ %d, vector %d, type %s\n", irq, vector, irq_h->type);
+	printk("IRQ %d, vector %d (%x), type %s\n", irq, vector, vector, irq_h->type);
 	assert(irq_h->check_spurious && irq_h->eoi);
 	irq_h->isr = handler;
 	irq_h->data = irq_arg;
