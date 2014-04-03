@@ -1731,7 +1731,10 @@ static intreg_t sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
 		return -1;
 	}
 	ch = fdtochan(current->fgrp, fd, -1, FALSE, TRUE);
-	ret = snprintf(u_buf, len, "%s", "chanpath(ch)");
+	if (ch->name != NULL) {
+		memmove(u_buf, ch->name->s, ch->name->len + 1);
+	}
+	ret = ch->name->len;
 	cclose(ch);
 	poperror();
 	return ret;
