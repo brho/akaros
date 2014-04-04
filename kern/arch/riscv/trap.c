@@ -356,18 +356,13 @@ void send_nmi(uint32_t os_coreid)
 	printk("%s not implemented\n", __FUNCTION);
 }
 
-void register_raw_irq(unsigned int vector, isr_t handler, void *data)
+int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 {
 	printk("%s not implemented\n", __FUNCTION);
+	return -1;
 }
 
-void unregister_raw_irq(unsigned int vector, isr_t handler, void *data)
-{
-	printk("%s not implemented\n", __FUNCTION);
-}
-
-int register_dev_irq(int irq, void (*handler)(struct hw_trapframe *, void *),
-                     void *irq_arg)
+int route_irqs(int cpu_vec, int coreid)
 {
 	printk("%s not implemented\n", __FUNCTION);
 	return -1;

@@ -447,6 +447,12 @@ void trap(struct hw_trapframe *hw_tf)
 	assert(0);
 }
 
+static bool vector_is_irq(int apic_vec)
+{
+	/* arguably, we could limit them to MaxIdtIOAPIC */
+	return (IdtPIC <= apic_vec) && (apic_vec <= IdtMAX);
+}
+
 /* Note IRQs are disabled unless explicitly turned on.
  *
  * In general, we should only get trapno's >= PIC1_OFFSET (32).  Anything else
@@ -512,7 +518,8 @@ int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 		kfree(irq_h);
 		return -1;
 	}
-	printk("IRQ %d, vector %d (%x), type %s\n", irq, vector, vector, irq_h->type);
+	printk("IRQ %d, vector %d (0x%x), type %s\n", irq, vector, vector,
+	       irq_h->type);
 	assert(irq_h->check_spurious && irq_h->eoi);
 	irq_h->isr = handler;
 	irq_h->data = irq_arg;
@@ -529,6 +536,50 @@ int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 	if (irq_h->unmask && strcmp(irq_h->type, "lapic"))
 		irq_h->unmask(irq_h, vector);
 	return 0;
+}
+
+/* These routing functions only allow the routing of an irq to a single core.
+ * If we want to route to multiple cores, we'll probably need to set up logical
+ * groups or something and take some additional parameters. */
+static int route_irq_h(struct irq_handler *irq_h, int os_coreid)
+{
+	int hw_coreid;
+	if (!irq_h->route_irq) {
+		printk("[kernel] apic_vec %d, type %s cannot be routed\n",
+		       irq_h->apic_vector, irq_h->type);
+		return -1;
+	}
+	if (os_coreid >= MAX_NUM_CPUS) {
+		printk("[kernel] os_coreid %d out of range!\n", os_coreid);
+		return -1;
+	}
+	hw_coreid = get_hw_coreid(os_coreid);
+	if (hw_coreid == -1) {
+		printk("[kernel] os_coreid %d not a valid hw core!\n", os_coreid);
+		return -1;
+	}
+	irq_h->route_irq(irq_h, irq_h->apic_vector, hw_coreid);
+	return 0;
+}
+
+/* Routes all irqs for a given apic_vector to os_coreid.  Returns 0 if all of
+ * them succeeded.  -1 if there were none or if any of them failed.  We don't
+ * share IRQs often (if ever anymore), so this shouldn't be an issue. */
+int route_irqs(int apic_vec, int os_coreid)
+{
+	struct irq_handler *irq_h;
+	int ret = -1;
+	if (!vector_is_irq(apic_vec)) {
+		printk("[kernel] vector %d is not an IRQ vector!\n", apic_vec);
+		return -1;
+	}
+	irq_h = irq_handlers[apic_vec];
+	while (irq_h) {
+		assert(irq_h->apic_vector == apic_vec);
+		ret = route_irq_h(irq_h, os_coreid);
+		irq_h = irq_h->next;
+	}
+	return ret;
 }
 
 /* It's a moderate pain in the ass to put these in bit-specific files (header

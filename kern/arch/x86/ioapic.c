@@ -382,10 +382,9 @@ static void msi_unmask_irq(struct irq_handler *irq_h, int apic_vector)
 	pci_msi_unmask(irq_h->dev_private);
 }
 
-static int msi_route_irq(struct irq_handler *irq_h, int apic_vector, int dest)
+static void msi_route_irq(struct irq_handler *irq_h, int apic_vector, int dest)
 {
 	pci_msi_route(irq_h->dev_private, dest);
-	return 0;
 }
 
 static void msix_mask_irq(struct irq_handler *irq_h, int apic_vector)
@@ -398,10 +397,9 @@ static void msix_unmask_irq(struct irq_handler *irq_h, int apic_vector)
 	pci_msix_unmask_vector(irq_h->dev_private);
 }
 
-static int msix_route_irq(struct irq_handler *irq_h, int apic_vector, int dest)
+static void msix_route_irq(struct irq_handler *irq_h, int apic_vector, int dest)
 {
 	pci_msix_route_vector(irq_h->dev_private, dest);
-	return 0;
 }
 
 static int msi_irq_enable(struct irq_handler *irq_h, struct pci_device *p)
@@ -461,37 +459,28 @@ static struct Rdt *ioapic_vector2rdt(int apic_vector)
 	return rdt;
 }
 
-/* Routes the IRQ to the os_coreid.  Will take effect immediately.  Route
- * masking from rdt->lo will take effect. */
-static int ioapic_route_irq(struct irq_handler *unused, int apic_vector,
-                            int os_coreid)
+/* Routes the IRQ to the hw_coreid.  Will take effect immediately.  Route
+ * masking from rdt->lo will take effect.  The early return cases are probably
+ * bugs in IOAPIC irq_h setup. */
+static void ioapic_route_irq(struct irq_handler *unused, int apic_vector,
+                             int hw_coreid)
 {
-	int hw_coreid;
 	struct Rdt *rdt = ioapic_vector2rdt(apic_vector);
-	if (!rdt)
-		return -1;
-	if (os_coreid >= MAX_NUM_CPUS) {
-		printk("os_coreid %d out of range!\n", os_coreid);
-		return -1;
-	}
-	/* using the old akaros-style lapic id lookup */
-	hw_coreid = get_hw_coreid(os_coreid);
-	if (hw_coreid == -1) {
-		printk("os_coreid %d not a valid hw core!", os_coreid);
-		return -1;
+	if (!rdt) {
+		printk("Missing IOAPIC route for vector!\n", apic_vector);
+		return;
 	}
 	spin_lock(&rdt->apic->lock);
 	/* this bit gets set in apicinit, only if we found it via MP or ACPI */
 	if (!xlapic[hw_coreid].useable) {
 		printk("Can't route to uninitialized LAPIC %d!\n", hw_coreid);
 		spin_unlock(&rdt->apic->lock);
-		return -1;
+		return;
 	}
 	rdt->hi = hw_coreid << 24;
 	rdt->lo |= Pm | MTf;
 	rtblput(rdt->apic, rdt->intin, rdt->hi, rdt->lo);
 	spin_unlock(&rdt->apic->lock);
-	return 0;
 }
 
 static void ioapic_mask_irq(struct irq_handler *unused, int apic_vector)
