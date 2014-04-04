@@ -150,24 +150,27 @@ int pci_msi_enable(struct pci_device *p, uint64_t vec)
 {
 	unsigned int c, f, datao;
 
+	spin_lock_irqsave(&p->lock);
 	if (p->msix_ready) {
 		printk("MSI: MSI-X is already enabled, aborting\n");
+		spin_unlock_irqsave(&p->lock);
 		return -1;
 	}
 	if (p->msi_ready) {
 		/* only allowing one enable of MSI per device (not supporting multiple
 		 * vectors) */
 		printk("MSI: MSI is already enabled, aborting\n");
+		spin_unlock_irqsave(&p->lock);
 		return -1;
 	}
 	p->msi_ready = TRUE;
 
-	/* Get the offset of the MSI capability
-	 * in the function's config space.
-	 */
+	/* Get the offset of the MSI capability in the function's config space. */
 	c = msicap(p);
-	if(c == 0)
+	if (!c) {
+		spin_unlock_irqsave(&p->lock);
 		return -1;
+	}
 
 	/* read it, clear out the Mmesgmsk bits. 
 	 * This means that there will be no multiple
@@ -175,8 +178,10 @@ int pci_msi_enable(struct pci_device *p, uint64_t vec)
 	 */
 	f = pcidev_read16(p, c + 2) & ~Mmesgmsk;
 
-	if (msi_blacklist(p) != 0)
+	if (msi_blacklist(p) != 0) {
+		spin_unlock_irqsave(&p->lock);
 		return -1;
+	}
 
 	/* Data begins at 8 bytes in. */
 	datao = 8;
@@ -211,16 +216,17 @@ int pci_msi_enable(struct pci_device *p, uint64_t vec)
 	 * we can mask on non-Vmask-supported HW. */
 	printd("write @ %d %04lx\n",c + 2, f);
 	pcidev_write16(p, c + 2, f);
+	spin_unlock_irqsave(&p->lock);
 	return 0;
 }
 
-static void msix_mask_entry(struct msix_entry *entry)
+static void __msix_mask_entry(struct msix_entry *entry)
 {
 	uintptr_t reg = (uintptr_t)&entry->vector;
 	write_mmreg32(reg, read_mmreg32(reg) | 0x1);
 }
 
-static void msix_unmask_entry(struct msix_entry *entry)
+static void __msix_unmask_entry(struct msix_entry *entry)
 {
 	uintptr_t reg = (uintptr_t)&entry->vector;
 	write_mmreg32(reg, read_mmreg32(reg) & ~0x1);
@@ -250,8 +256,10 @@ static uintptr_t msix_get_capbar_paddr(struct pci_device *p, int offset)
 
 /* One time initialization of MSI-X for a PCI device.  -1 on error.  Otherwise,
  * the device will be ready to assign/route MSI-X entries/vectors.  All vectors
- * are masked, but the overall MSI-X function is unmasked. */
-static int pci_msix_init(struct pci_device *p)
+ * are masked, but the overall MSI-X function is unmasked.
+ *
+ * Hold the pci_device lock. */
+static int __pci_msix_init(struct pci_device *p)
 {
 	unsigned int c;
 	uint16_t f;
@@ -275,8 +283,11 @@ static int pci_msix_init(struct pci_device *p)
 
 	p->msix_tbl_paddr = msix_get_capbar_paddr(p, c + 4);
 	p->msix_pba_paddr = msix_get_capbar_paddr(p, c + 8);
-	if (!p->msix_tbl_paddr || !p->msix_pba_paddr)
+	if (!p->msix_tbl_paddr || !p->msix_pba_paddr) {
+		printk("MSI-X: Missing a tbl (%p) or PBA (%p) paddr!\n",
+		       p->msix_tbl_paddr, p->msix_pba_paddr);
 		return -1;
+	}
 	p->msix_nr_vec = (f & Msixtblsize) + 1;
 	p->msix_tbl_vaddr = vmap_pmem_nocache(p->msix_tbl_paddr, p->msix_nr_vec *
 	                                      sizeof(struct msix_entry));
@@ -295,7 +306,7 @@ static int pci_msix_init(struct pci_device *p)
 	/* they should all be masked already, but just in case */
 	entry = (struct msix_entry*)p->msix_tbl_vaddr;
 	for (int i = 0; i < p->msix_nr_vec; i++, entry++) {
-		msix_mask_entry(entry);
+		__msix_mask_entry(entry);
 	}
 	/* unmask the device, now that all the vectors are masked */
 	f &= ~Msixmask;
@@ -314,10 +325,12 @@ struct msix_irq_vector *pci_msix_enable(struct pci_device *p, uint64_t vec)
 	struct msix_irq_vector *linkage;
 	unsigned int c, datao;
 
-	/* TODO: sync protection */
+	spin_lock_irqsave(&p->lock);
 	if (!p->msix_ready) {
-		if (pci_msix_init(p) < 0)
+		if (__pci_msix_init(p) < 0) {
+			spin_unlock_irqsave(&p->lock);
 			return 0;
+		}
 		p->msix_ready = TRUE;
 	}
 	/* find an unused slot (no apic_vector assigned).  later, we might want to
@@ -326,8 +339,10 @@ struct msix_irq_vector *pci_msix_enable(struct pci_device *p, uint64_t vec)
 	for (i = 0; i < p->msix_nr_vec; i++, entry++)
 		if (!(read_mmreg32((uintptr_t)&entry->data) & 0xff))
 			break;
-	if (i == p->msix_nr_vec)
+	if (i == p->msix_nr_vec) {
+		spin_unlock_irqsave(&p->lock);
 		return 0;
+	}
 	linkage = kmalloc(sizeof(struct msix_irq_vector), KMALLOC_WAIT);
 	linkage->pcidev = p;
 	linkage->entry = entry;
@@ -337,18 +352,20 @@ struct msix_irq_vector *pci_msix_enable(struct pci_device *p, uint64_t vec)
 	write_mmreg32((uintptr_t)&entry->data, linkage->data);
 	write_mmreg32((uintptr_t)&entry->addr_lo, linkage->addr_lo);
 	write_mmreg32((uintptr_t)&entry->addr_hi, linkage->addr_hi);
+	spin_unlock_irqsave(&p->lock);
 	return linkage;
 }
 
-/* TODO: should lock in all of these PCI/MSI functions */
 void pci_msi_mask(struct pci_device *p)
 {
 	unsigned int c, f;
 	c = msicap(p);
 	assert(c);
 
+	spin_lock_irqsave(&p->lock);
 	f = pcidev_read16(p, c + 2);
 	pcidev_write16(p, c + 2, f & ~Msienable);
+	spin_unlock_irqsave(&p->lock);
 }
 
 void pci_msi_unmask(struct pci_device *p)
@@ -357,37 +374,46 @@ void pci_msi_unmask(struct pci_device *p)
 	c = msicap(p);
 	assert(c);
 
+	spin_lock_irqsave(&p->lock);
 	f = pcidev_read16(p, c + 2);
 	pcidev_write16(p, c + 2, f | Msienable);
+	spin_unlock_irqsave(&p->lock);
 }
 
-int pci_msi_route(struct pci_device *p, int dest)
+void pci_msi_route(struct pci_device *p, int dest)
 {
 	unsigned int c, f;
 	c = msicap(p);
 	assert(c);
 
+	spin_lock_irqsave(&p->lock);
 	/* mask out the old destination, replace with new */
 	p->msi_msg_addr_lo &= ~(((1 << 8) - 1) << 12);
 	p->msi_msg_addr_lo |= (dest & 0xff) << 12;
 	pcidev_write32(p, c + 4, p->msi_msg_addr_lo);
-	return 0;
+	spin_unlock_irqsave(&p->lock);
 }
 
 void pci_msix_mask_vector(struct msix_irq_vector *linkage)
 {
-	msix_mask_entry(linkage->entry);
+	spin_lock_irqsave(&linkage->pcidev->lock);
+	__msix_mask_entry(linkage->entry);
+	spin_unlock_irqsave(&linkage->pcidev->lock);
 }
 
 void pci_msix_unmask_vector(struct msix_irq_vector *linkage)
 {
-	msix_unmask_entry(linkage->entry);
+	spin_lock_irqsave(&linkage->pcidev->lock);
+	__msix_unmask_entry(linkage->entry);
+	spin_unlock_irqsave(&linkage->pcidev->lock);
 }
 
 void pci_msix_route_vector(struct msix_irq_vector *linkage, int dest)
 {
+	spin_lock_irqsave(&linkage->pcidev->lock);
 	/* mask out the old destination, replace with new */
 	linkage->addr_lo &= ~(((1 << 8) - 1) << 12);
 	linkage->addr_lo |= (dest & 0xff) << 12;
 	write_mmreg32((uintptr_t)&linkage->entry->addr_lo, linkage->addr_lo);
+	spin_unlock_irqsave(&linkage->pcidev->lock);
 }

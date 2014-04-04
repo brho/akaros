@@ -9,6 +9,7 @@
 
 #include <ros/common.h>
 #include <sys/queue.h>
+#include <atomic.h>
 
 #define pci_debug(...)  printk(__VA_ARGS__)  
 
@@ -316,10 +317,10 @@ struct pci_bar {
 	uint32_t					mmio_sz;
 };
 
-/* Struct for some meager contents of a PCI device */
 struct pci_device {
 	STAILQ_ENTRY(pci_device)	all_dev;	/* list of all devices */
 	SLIST_ENTRY(pci_device)		irq_dev;	/* list of all devs off an irq */
+	spinlock_t					lock;
 	bool						in_use;		/* prevent double discovery */
 	uint8_t						bus;
 	uint8_t						dev;
@@ -364,6 +365,21 @@ STAILQ_HEAD(pcidev_stailq, pci_device);
 SLIST_HEAD(pcidev_slist, pci_device);
 extern struct pcidev_stailq pci_devices;
 
+/* Sync rules for PCI: once a device is added to the list, it is never removed,
+ * and its read-only fields can be accessed at any time.  There is no need for
+ * refcnts or things like that.
+ *
+ * The device list is built early on when we're single threaded, so I'm not
+ * bothering with locks for that yet.  Append-only, singly-linked-list reads
+ * don't need a lock either.
+ *
+ * Other per-device accesses (like read-modify-writes to config space or MSI
+ * fields) require the device's lock.  If we ever want to unplug, we'll probably
+ * work out an RCU-like scheme for the pci_devices list.
+ *
+ * Note this is in addition to the config space global locking done by every
+ * pci_read or write call. */
+
 void pci_init(void);
 void pcidev_print_info(struct pci_device *pcidev, int verbosity);
 uint32_t pci_config_addr(uint8_t bus, uint8_t dev, uint8_t func, uint32_t reg);
@@ -386,27 +402,18 @@ void pcidev_write16(struct pci_device *pcidev, uint32_t offset, uint16_t value);
 uint8_t pcidev_read8(struct pci_device *pcidev, uint32_t offset);
 void pcidev_write8(struct pci_device *pcidev, uint32_t offset, uint8_t value);
 
-/* BAR helpers, some more helpful than others. */
-uint32_t pci_membar_get_sz(struct pci_device *pcidev, int bar);
-uint32_t pci_getbar(struct pci_device *pcidev, unsigned int bar);
-bool pci_is_iobar(uint32_t bar);
-bool pci_is_membar32(uint32_t bar);
-bool pci_is_membar64(uint32_t bar);
-uint32_t pci_getmembar32(uint32_t bar);
-uint32_t pci_getiobar32(uint32_t bar);
-uintptr_t pci_get_membar(struct pci_device *pcidev, int bir);
-
 /* Other common PCI functions */
 void pci_set_bus_master(struct pci_device *pcidev);
 void pci_clr_bus_master(struct pci_device *pcidev);
 struct pci_device *pci_match_tbdf(int tbdf);
+uintptr_t pci_get_membar(struct pci_device *pcidev, int bir);
 
 /* MSI functions, msi.c */
 int pci_msi_enable(struct pci_device *p, uint64_t vec);
 struct msix_irq_vector *pci_msix_enable(struct pci_device *p, uint64_t vec);
 void pci_msi_mask(struct pci_device *p);
 void pci_msi_unmask(struct pci_device *p);
-int pci_msi_route(struct pci_device *p, int dest);
+void pci_msi_route(struct pci_device *p, int dest);
 void pci_msix_mask_vector(struct msix_irq_vector *linkage);
 void pci_msix_unmask_vector(struct msix_irq_vector *linkage);
 void pci_msix_route_vector(struct msix_irq_vector *linkage, int dest);

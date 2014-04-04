@@ -23,10 +23,66 @@ static char STD_PCI_DEV[] = "Standard PCI Device";
 static char PCI2PCI[] = "PCI-to-PCI Bridge";
 static char PCI2CARDBUS[] = "PCI-Cardbus Bridge";
 
+/* Gets any old raw bar, with some catches based on type. */
+static uint32_t pci_getbar(struct pci_device *pcidev, unsigned int bar)
+{
+	uint8_t type;
+	if (bar >= MAX_PCI_BAR)
+		panic("Nonexistant bar requested!");
+	type = pcidev_read8(pcidev, PCI_HEADER_REG);
+	type &= ~0x80;	/* drop the MF bit */
+	/* Only types 0 and 1 have BARS */
+	if ((type != 0x00) && (type != 0x01))
+		return 0;
+	/* Only type 0 has BAR2 - BAR5 */
+	if ((bar > 1) && (type != 0x00))
+		return 0;
+	return pcidev_read32(pcidev, PCI_BAR0_STD + bar * PCI_BAR_OFF);
+}
+
+/* Determines if a given bar is IO (o/w, it's mem) */
+static bool pci_is_iobar(uint32_t bar)
+{
+	return bar & PCI_BAR_IO;
+}
+
+static bool pci_is_membar32(uint32_t bar)
+{
+	if (pci_is_iobar(bar))
+		return FALSE;
+	return (bar & PCI_MEMBAR_TYPE) == PCI_MEMBAR_32BIT;
+}
+
+static bool pci_is_membar64(uint32_t bar)
+{
+	if (pci_is_iobar(bar))
+		return FALSE;
+	return (bar & PCI_MEMBAR_TYPE) == PCI_MEMBAR_64BIT;
+}
+
+/* Helper to get the address from a membar.  Check the type beforehand */
+static uint32_t pci_getmembar32(uint32_t bar)
+{
+	uint8_t type = bar & PCI_MEMBAR_TYPE;
+	if (type != PCI_MEMBAR_32BIT) {
+		warn("Unhandled PCI membar type: %02p\n", type >> 1);
+		return 0;
+	}
+	return bar & 0xfffffff0;
+}
+
+/* Helper to get the address from an IObar.  Check the type beforehand */
+static uint32_t pci_getiobar32(uint32_t bar)
+{
+	return bar & 0xfffffffc;
+}
+
 /* memory bars have a little dance you go through to detect what the size of the
  * memory region is.  for 64 bit bars, i'm assuming you only need to do this to
- * the lower part (no device will need > 4GB, right?). */
-uint32_t pci_membar_get_sz(struct pci_device *pcidev, int bar)
+ * the lower part (no device will need > 4GB, right?).
+ *
+ * Hold the dev's lock, or o/w avoid sync issues. */
+static uint32_t __pci_membar_get_sz(struct pci_device *pcidev, int bar)
 {
 	/* save the old value, write all 1s, invert, add 1, restore.
 	 * http://wiki.osdev.org/PCI for details. */
@@ -45,7 +101,7 @@ uint32_t pci_membar_get_sz(struct pci_device *pcidev, int bar)
  * where the base is.  fills results into pcidev.  i don't know if you can have
  * multiple bars with conflicting/different regions (like two separate PIO
  * ranges).  I'm assuming you don't, and will warn if we see one. */
-static void pci_handle_bars(struct pci_device *pcidev)
+static void __pci_handle_bars(struct pci_device *pcidev)
 {
 	uint32_t bar_val;
 	int max_bars;
@@ -66,7 +122,7 @@ static void pci_handle_bars(struct pci_device *pcidev)
 		} else {
 			if (pci_is_membar32(bar_val)) {
 				pcidev->bar[i].mmio_base32 = bar_val & PCI_BAR_MEM_MASK;
-				pcidev->bar[i].mmio_sz = pci_membar_get_sz(pcidev, i);
+				pcidev->bar[i].mmio_sz = __pci_membar_get_sz(pcidev, i);
 			} else if (pci_is_membar64(bar_val)) {
 				/* 64 bit, the lower 32 are in this bar, the upper
 				 * are in the next bar */
@@ -76,7 +132,7 @@ static void pci_handle_bars(struct pci_device *pcidev)
 				/* note we don't check for IO or memsize.  the entire next bar
 				 * is supposed to be for the upper 32 bits. */
 				pcidev->bar[i].mmio_base64 |= (uint64_t)bar_val << 32;
-				pcidev->bar[i].mmio_sz = pci_membar_get_sz(pcidev, i);
+				pcidev->bar[i].mmio_sz = __pci_membar_get_sz(pcidev, i);
 				i++;
 			}
 		}
@@ -86,7 +142,7 @@ static void pci_handle_bars(struct pci_device *pcidev)
 	}
 }
 
-static void pci_parse_caps(struct pci_device *pcidev)
+static void __pci_parse_caps(struct pci_device *pcidev)
 {
 	uint32_t cap_off;	/* not sure if this can be extended from u8 */
 	uint8_t cap_id;
@@ -124,7 +180,8 @@ static void pci_parse_caps(struct pci_device *pcidev)
 
 /* Scans the PCI bus.  Won't actually work for anything other than bus 0, til we
  * sort out how to handle bridge devices. */
-void pci_init(void) {
+void pci_init(void)
+{
 	uint32_t result = 0;
 	uint16_t dev_id, ven_id;
 	struct pci_device *pcidev;
@@ -140,6 +197,8 @@ void pci_init(void) {
 				if (ven_id == INVALID_VENDOR_ID) 
 					break;	/* skip functions too, they won't exist */
 				pcidev = kzmalloc(sizeof(struct pci_device), 0);
+				/* we don't need to lock it til we post the pcidev to the list*/
+				spinlock_init_irqsave(&pcidev->lock);
 				pcidev->bus = i;
 				pcidev->dev = j;
 				pcidev->func = k;
@@ -168,8 +227,9 @@ void pci_init(void) {
 					default:
 						pcidev->header_type = "Unknown Header Type";
 				}
-				pci_handle_bars(pcidev);
-				pci_parse_caps(pcidev);
+				__pci_handle_bars(pcidev);
+				__pci_parse_caps(pcidev);
+				/* we're the only writer at this point in the boot process */
 				STAILQ_INSERT_TAIL(&pci_devices, pcidev, all_dev);
 				#ifdef CONFIG_PCI_VERBOSE
 				pcidev_print_info(pcidev, 4);
@@ -290,72 +350,6 @@ void pcidev_write8(struct pci_device *pcidev, uint32_t offset, uint8_t value)
 	pci_write8(pcidev->bus, pcidev->dev, pcidev->func, offset, value);
 }
 
-/* Gets any old raw bar, with some catches based on type. */
-uint32_t pci_getbar(struct pci_device *pcidev, unsigned int bar)
-{
-	uint8_t type;
-	if (bar >= MAX_PCI_BAR)
-		panic("Nonexistant bar requested!");
-	type = pcidev_read8(pcidev, PCI_HEADER_REG);
-	type &= ~0x80;	/* drop the MF bit */
-	/* Only types 0 and 1 have BARS */
-	if ((type != 0x00) && (type != 0x01))
-		return 0;
-	/* Only type 0 has BAR2 - BAR5 */
-	if ((bar > 1) && (type != 0x00))
-		return 0;
-	return pcidev_read32(pcidev, PCI_BAR0_STD + bar * PCI_BAR_OFF);
-}
-
-/* Determines if a given bar is IO (o/w, it's mem) */
-bool pci_is_iobar(uint32_t bar)
-{
-	return bar & PCI_BAR_IO;
-}
-
-bool pci_is_membar32(uint32_t bar)
-{
-	if (pci_is_iobar(bar))
-		return FALSE;
-	return (bar & PCI_MEMBAR_TYPE) == PCI_MEMBAR_32BIT;
-}
-
-bool pci_is_membar64(uint32_t bar)
-{
-	if (pci_is_iobar(bar))
-		return FALSE;
-	return (bar & PCI_MEMBAR_TYPE) == PCI_MEMBAR_64BIT;
-}
-
-/* Helper to get the address from a membar.  Check the type beforehand */
-uint32_t pci_getmembar32(uint32_t bar)
-{
-	uint8_t type = bar & PCI_MEMBAR_TYPE;
-	if (type != PCI_MEMBAR_32BIT) {
-		warn("Unhandled PCI membar type: %02p\n", type >> 1);
-		return 0;
-	}
-	return bar & 0xfffffff0;
-}
-
-/* Helper to get the address from an IObar.  Check the type beforehand */
-uint32_t pci_getiobar32(uint32_t bar)
-{
-	return bar & 0xfffffffc;
-}
-
-/* Helper to get the membar value for BAR index bir */
-uintptr_t pci_get_membar(struct pci_device *pcidev, int bir)
-{
-	if (bir >= pcidev->nr_bars)
-		return 0;
-	if (pci_is_iobar(pcidev->bar[bir].raw_bar))
-		return 0;
-	return (pci_is_membar64(pcidev->bar[bir].raw_bar) ?
-	        pcidev->bar[bir].mmio_base64 :
-	        pcidev->bar[bir].mmio_base32);
-}
-
 /* Helper to get the class description strings.  Adapted from
  * http://www.pcidatabase.com/reports.php?type=c-header */
 static void pcidev_get_cldesc(struct pci_device *pcidev, char **class,
@@ -463,16 +457,20 @@ void pcidev_print_info(struct pci_device *pcidev, int verbosity)
 
 void pci_set_bus_master(struct pci_device *pcidev)
 {
+	spin_lock_irqsave(&pcidev->lock);
 	pcidev_write16(pcidev, PCI_CMD_REG, pcidev_read16(pcidev, PCI_CMD_REG) |
 	                                    PCI_CMD_BUS_MAS);
+	spin_unlock_irqsave(&pcidev->lock);
 }
 
 void pci_clr_bus_master(struct pci_device *pcidev)
 {
 	uint16_t reg;
+	spin_lock_irqsave(&pcidev->lock);
 	reg = pcidev_read16(pcidev, PCI_CMD_REG);
 	reg &= ~PCI_CMD_BUS_MAS;
 	pcidev_write16(pcidev, PCI_CMD_REG, reg);
+	spin_unlock_irqsave(&pcidev->lock);
 }
 
 struct pci_device *pci_match_tbdf(int tbdf)
@@ -490,4 +488,16 @@ struct pci_device *pci_match_tbdf(int tbdf)
 			return search;
 	}
 	return NULL;
+}
+
+/* Helper to get the membar value for BAR index bir */
+uintptr_t pci_get_membar(struct pci_device *pcidev, int bir)
+{
+	if (bir >= pcidev->nr_bars)
+		return 0;
+	if (pci_is_iobar(pcidev->bar[bir].raw_bar))
+		return 0;
+	return (pci_is_membar64(pcidev->bar[bir].raw_bar) ?
+	        pcidev->bar[bir].mmio_base64 :
+	        pcidev->bar[bir].mmio_base32);
 }
