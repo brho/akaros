@@ -372,10 +372,43 @@ int nextvec(void)
 	return vecno;
 }
 
+static void msi_mask_irq(struct irq_handler *irq_h, int apic_vector)
+{
+	pci_msi_mask(irq_h->dev_private);
+}
+
+static void msi_unmask_irq(struct irq_handler *irq_h, int apic_vector)
+{
+	pci_msi_unmask(irq_h->dev_private);
+}
+
+static int msi_route_irq(struct irq_handler *irq_h, int apic_vector, int dest)
+{
+	pci_msi_route(irq_h->dev_private, dest);
+	return 0;
+}
+
+static void msix_mask_irq(struct irq_handler *irq_h, int apic_vector)
+{
+	pci_msix_mask_vector(irq_h->dev_private);
+}
+
+static void msix_unmask_irq(struct irq_handler *irq_h, int apic_vector)
+{
+	pci_msix_unmask_vector(irq_h->dev_private);
+}
+
+static int msix_route_irq(struct irq_handler *irq_h, int apic_vector, int dest)
+{
+	pci_msix_route_vector(irq_h->dev_private, dest);
+	return 0;
+}
+
 static int msi_irq_enable(struct irq_handler *irq_h, struct pci_device *p)
 {
 	unsigned int vno, lo, hi = 0;
 	uint64_t msivec;
+	struct msix_irq_vector *linkage;
 
 	vno = nextvec();
 
@@ -383,13 +416,13 @@ static int msi_irq_enable(struct irq_handler *irq_h, struct pci_device *p)
 	lo = IPlow | TMedge | Pm | vno;
 
 	msivec = (uint64_t) hi << 32 | lo;
-	if (pci_msix_enable(irq_h, p, msivec) == -1) {
+	irq_h->dev_private = pci_msix_enable(p, msivec);
+	if (!irq_h->dev_private) {
 		if (pci_msi_enable(p, msivec) == -1) {
-			/* in case we turned it half-on */;
-			msi_mask_irq(irq_h, 0 /* unused */);
 			/* TODO: should free vno here */
 			return -1;
 		}
+		irq_h->dev_private = p;
 		irq_h->check_spurious = lapic_check_spurious;
 		irq_h->eoi = lapic_send_eoi;
 		irq_h->mask = msi_mask_irq;
@@ -564,7 +597,6 @@ int bus_irq_setup(struct irq_handler *irq_h)
 				printk("No PCI dev for tbdf %p!", irq_h->tbdf);
 				return -1;
 			}
-			irq_h->dev_private = pcidev;
 			if ((vecno = msi_irq_enable(irq_h, pcidev)) != -1)
 				return vecno;
 			busno = BUSBNO(irq_h->tbdf);

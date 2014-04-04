@@ -332,6 +332,7 @@ struct pci_device {
 	uint8_t						class;
 	uint8_t						subclass;
 	uint8_t						progif;
+	bool						msi_ready;
 	uint32_t					msi_msg_addr_hi;
 	uint32_t					msi_msg_addr_lo;
 	uint32_t					msi_msg_data;
@@ -400,19 +401,15 @@ void pci_set_bus_master(struct pci_device *pcidev);
 void pci_clr_bus_master(struct pci_device *pcidev);
 struct pci_device *pci_match_tbdf(int tbdf);
 
-struct irq_handler; /* include loops */
 /* MSI functions, msi.c */
 int pci_msi_enable(struct pci_device *p, uint64_t vec);
-int pci_msix_enable(struct irq_handler *irq_h, struct pci_device *p,
-                    uint64_t vec);
-
-/* MSI irq handler functions, msi.c */
-void msi_mask_irq(struct irq_handler *irq_h, int apic_vector);
-void msi_unmask_irq(struct irq_handler *irq_h, int apic_vector);
-int msi_route_irq(struct irq_handler *irq_h, int apic_vector, int dest);
-void msix_mask_irq(struct irq_handler *irq_h, int apic_vector);
-void msix_unmask_irq(struct irq_handler *irq_h, int apic_vector);
-int msix_route_irq(struct irq_handler *irq_h, int apic_vector, int dest);
+struct msix_irq_vector *pci_msix_enable(struct pci_device *p, uint64_t vec);
+void pci_msi_mask(struct pci_device *p);
+void pci_msi_unmask(struct pci_device *p);
+int pci_msi_route(struct pci_device *p, int dest);
+void pci_msix_mask_vector(struct msix_irq_vector *linkage);
+void pci_msix_unmask_vector(struct msix_irq_vector *linkage);
+void pci_msix_route_vector(struct msix_irq_vector *linkage, int dest);
 
 /* TODO: this is quite the Hacke */
 #define explode_tbdf(tbdf) {pcidev.bus = tbdf >> 16;\

@@ -150,10 +150,21 @@ int pci_msi_enable(struct pci_device *p, uint64_t vec)
 {
 	unsigned int c, f, datao;
 
+	if (p->msix_ready) {
+		printk("MSI: MSI-X is already enabled, aborting\n");
+		return -1;
+	}
+	if (p->msi_ready) {
+		/* only allowing one enable of MSI per device (not supporting multiple
+		 * vectors) */
+		printk("MSI: MSI is already enabled, aborting\n");
+		return -1;
+	}
+	p->msi_ready = TRUE;
+
 	/* Get the offset of the MSI capability
 	 * in the function's config space.
 	 */
-
 	c = msicap(p);
 	if(c == 0)
 		return -1;
@@ -247,6 +258,10 @@ static int pci_msix_init(struct pci_device *p)
 	int tbl_bir, tbl_off, pba_bir, pba_off;
 	struct msix_entry *entry;
 
+	if (p->msi_ready) {
+		printk("MSI-X: MSI is already on, aborting\n");
+		return -1;
+	}
 	if (msix_blacklist(p) != 0)
 		return -1;
 	/* Get the offset of the MSI capability in the function's config space. */
@@ -288,8 +303,11 @@ static int pci_msix_init(struct pci_device *p)
 	return 0;
 }
 
-int pci_msix_enable(struct irq_handler *irq_h, struct pci_device *p,
-                    uint64_t vec)
+/* Enables an MSI-X vector for a PCI device.  vec is formatted like an ioapic
+ * route.  This should be able to handle multiple vectors for a device.  Returns
+ * a msix_irq_vector linkage struct on success (the connection btw an irq_h and
+ * the specific {pcidev, entry}), and 0 on failure. */
+struct msix_irq_vector *pci_msix_enable(struct pci_device *p, uint64_t vec)
 {
 	int i;
 	struct msix_entry *entry;
@@ -299,7 +317,7 @@ int pci_msix_enable(struct irq_handler *irq_h, struct pci_device *p,
 	/* TODO: sync protection */
 	if (!p->msix_ready) {
 		if (pci_msix_init(p) < 0)
-			return -1;
+			return 0;
 		p->msix_ready = TRUE;
 	}
 	/* find an unused slot (no apic_vector assigned).  later, we might want to
@@ -309,7 +327,7 @@ int pci_msix_enable(struct irq_handler *irq_h, struct pci_device *p,
 		if (!(read_mmreg32((uintptr_t)&entry->data) & 0xff))
 			break;
 	if (i == p->msix_nr_vec)
-		return -1;
+		return 0;
 	linkage = kmalloc(sizeof(struct msix_irq_vector), KMALLOC_WAIT);
 	linkage->pcidev = p;
 	linkage->entry = entry;
@@ -319,26 +337,22 @@ int pci_msix_enable(struct irq_handler *irq_h, struct pci_device *p,
 	write_mmreg32((uintptr_t)&entry->data, linkage->data);
 	write_mmreg32((uintptr_t)&entry->addr_lo, linkage->addr_lo);
 	write_mmreg32((uintptr_t)&entry->addr_hi, linkage->addr_hi);
-	irq_h->dev_private = linkage;
-	return 0;
+	return linkage;
 }
 
 /* TODO: should lock in all of these PCI/MSI functions */
-void msi_mask_irq(struct irq_handler *irq_h, int apic_vector)
+void pci_msi_mask(struct pci_device *p)
 {
-	struct pci_device *p = (struct pci_device*)irq_h->dev_private;
 	unsigned int c, f;
 	c = msicap(p);
-	if (!c)
-		return;
+	assert(c);
 
 	f = pcidev_read16(p, c + 2);
 	pcidev_write16(p, c + 2, f & ~Msienable);
 }
 
-void msi_unmask_irq(struct irq_handler *irq_h, int apic_vector)
+void pci_msi_unmask(struct pci_device *p)
 {
-	struct pci_device *p = (struct pci_device*)irq_h->dev_private;
 	unsigned int c, f;
 	c = msicap(p);
 	assert(c);
@@ -347,9 +361,8 @@ void msi_unmask_irq(struct irq_handler *irq_h, int apic_vector)
 	pcidev_write16(p, c + 2, f | Msienable);
 }
 
-int msi_route_irq(struct irq_handler *irq_h, int apic_vector, int dest)
+int pci_msi_route(struct pci_device *p, int dest)
 {
-	struct pci_device *p = (struct pci_device*)irq_h->dev_private;
 	unsigned int c, f;
 	c = msicap(p);
 	assert(c);
@@ -361,24 +374,20 @@ int msi_route_irq(struct irq_handler *irq_h, int apic_vector, int dest)
 	return 0;
 }
 
-void msix_mask_irq(struct irq_handler *irq_h, int apic_vector)
+void pci_msix_mask_vector(struct msix_irq_vector *linkage)
 {
-	struct msix_irq_vector *linkage = irq_h->dev_private;
 	msix_mask_entry(linkage->entry);
 }
 
-void msix_unmask_irq(struct irq_handler *irq_h, int apic_vector)
+void pci_msix_unmask_vector(struct msix_irq_vector *linkage)
 {
-	struct msix_irq_vector *linkage = irq_h->dev_private;
 	msix_unmask_entry(linkage->entry);
 }
 
-int msix_route_irq(struct irq_handler *irq_h, int apic_vector, int dest)
+void pci_msix_route_vector(struct msix_irq_vector *linkage, int dest)
 {
-	struct msix_irq_vector *linkage = irq_h->dev_private;
 	/* mask out the old destination, replace with new */
 	linkage->addr_lo &= ~(((1 << 8) - 1) << 12);
 	linkage->addr_lo |= (dest & 0xff) << 12;
 	write_mmreg32((uintptr_t)&linkage->entry->addr_lo, linkage->addr_lo);
-	return 0;
 }
