@@ -47,9 +47,14 @@ uint32_t pci_membar_get_sz(struct pci_device *pcidev, int bar)
  * ranges).  I'm assuming you don't, and will warn if we see one. */
 static void pci_handle_bars(struct pci_device *pcidev)
 {
-	/* only handling standards for now */
 	uint32_t bar_val;
-	int max_bars = pcidev->header_type == STD_PCI_DEV ? MAX_PCI_BAR : 0;
+	int max_bars;
+	if (pcidev->header_type == STD_PCI_DEV)
+		max_bars = MAX_PCI_BAR;
+	else if (pcidev->header_type == PCI2PCI)
+		max_bars = 2;
+	else
+		max_bars = 0;
 	/* TODO: consider aborting for classes 00, 05 (memory ctlr), 06 (bridge) */
 	for (int i = 0; i < max_bars; i++) {
 		bar_val = pci_getbar(pcidev, i);
