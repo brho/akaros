@@ -65,6 +65,7 @@ void init_awaiter(struct alarm_waiter *waiter,
                   void (*func) (struct alarm_waiter *));
 /* Sets the time an awaiter goes off */
 void set_awaiter_abs(struct alarm_waiter *waiter, uint64_t abs_time);
+void set_awaiter_abs_unix(struct alarm_waiter *waiter, uint64_t abs_time);
 void set_awaiter_rel(struct alarm_waiter *waiter, uint64_t usleep);
 void set_awaiter_inc(struct alarm_waiter *waiter, uint64_t usleep);
 /* Arms/disarms the alarm */

@@ -22,6 +22,7 @@
  * - printks, and other minor stuff. */
 
 #include <sys/queue.h>
+#include <sys/time.h>
 #include <alarm.h>
 #include <stdio.h>
 #include <assert.h>
@@ -51,6 +52,21 @@ static void handle_user_alarm(struct event_msg *ev_msg, unsigned int ev_type);
 /* One chain to rule them all. */
 struct timer_chain global_tchain;
 
+/* Unix time offsets so we can allow people to specify an absolute unix time to
+ * an alarm, rather than an absolute time in terms of raw tsc ticks.  This
+ * value is initialized when the timer service is started. */
+static struct {
+	uint64_t tod; // The initial time of day in microseconds
+	uint64_t tsc; // The initial value of the tsc counter
+} unixtime_offsets;
+static inline void init_unixtime_offsets()
+{
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	unixtime_offsets.tsc = read_tsc();
+	unixtime_offsets.tod = tv.tv_sec*1000000 + tv.tv_usec;
+}
+
 /* Helper, resets the earliest/latest times, based on the elements of the list.
  * If the list is empty, we set the times to be the 12345 poison time.  Since
  * the list is empty, the alarm shouldn't be going off. */
@@ -72,6 +88,9 @@ static void init_alarm_service(void)
 	char buf[20];
 	char path[32];
 	struct event_queue *ev_q;
+
+	/* Initialize the unixtime_offsets */
+	init_unixtime_offsets();
 
 	/* Sets up timer chain (only one chain per process) */
 	spin_pdr_init(&global_tchain.lock);
@@ -141,6 +160,14 @@ void init_awaiter(struct alarm_waiter *waiter,
 void set_awaiter_abs(struct alarm_waiter *waiter, uint64_t abs_time)
 {
 	waiter->wake_up_time = abs_time;
+}
+
+/* Give this the absolute unix time (in microseconds) that you want the alarm
+ * to go off. */
+void set_awaiter_abs_unix(struct alarm_waiter *waiter, uint64_t abs_time)
+{
+	abs_time = usec2tsc(abs_time - unixtime_offsets.tod) + unixtime_offsets.tsc;
+	set_awaiter_abs(waiter, abs_time);
 }
 
 /* Give this a relative time from now, in microseconds.  This might be easier to
