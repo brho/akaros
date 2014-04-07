@@ -579,6 +579,10 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	user_memdup_free(p, t_path);
 	if (!program)
 		goto early_error;
+	if (!is_valid_elf(program)) {
+		set_errno(ENOEXEC);
+		goto early_error;
+	}
 	/* Set the argument stuff needed by glibc */
 	if (memcpy_from_user_errno(p, p->procinfo->argp, pi->argp,
 	                           sizeof(pi->argp)))

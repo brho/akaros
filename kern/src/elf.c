@@ -14,6 +14,28 @@
 # define elf_field(obj, field) ((obj##32)->field)
 #endif
 
+/* Check if the file is valid elf file (i.e. by checking for ELF_MAGIC in the
+ * header) */
+bool is_valid_elf(struct file *f)
+{
+	elf64_t h;
+	off64_t o = 0;
+	struct proc *c = switch_to(0);
+
+	if (f->f_op->read(f, (char*)&h, sizeof(elf64_t), &o) != sizeof(elf64_t)) {
+		goto fail;
+	}
+	if (h.e_magic != ELF_MAGIC) {
+		goto fail;
+	}
+success:
+	switch_back(0, c);
+	return TRUE;
+fail:
+	switch_back(0, c);
+	return FALSE;
+}
+
 /* We need the writable flag for ld.  Even though the elf header says it wants
  * RX (and not W) for its main program header, it will page fault (eip 56f0,
  * 46f0 after being relocated to 0x1000, va 0x20f4). */

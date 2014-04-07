@@ -148,6 +148,7 @@ typedef long elf_aux_t[2];
 #define ELF_HWCAP_SPARC_FLUSH	1
 
 struct file;
+bool is_valid_elf(struct file *f);
 int load_elf(struct proc* p, struct file* f);
 
 #endif /* !ROS_INC_ELF_H */
