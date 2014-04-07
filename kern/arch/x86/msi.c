@@ -247,10 +247,6 @@ static uintptr_t msix_get_capbar_paddr(struct pci_device *p, int offset)
 		return 0;
 	}
 	membar += capbar_off;
-	if (PGOFF(membar)) {
-		printk("MSI-X: unaligned cap membar %p\n", membar);
-		return 0;
-	}
 	return membar;
 }
 
@@ -307,10 +303,13 @@ static int __pci_msix_init(struct pci_device *p)
 	                p->msix_nr_vec * sizeof(struct msix_entry));
 		return -1;
 	}
-	/* they should all be masked already, but just in case */
+	/* they should all be masked already, but remasking just in case.  likewise,
+	 * we need to 0 out the data, since we'll use the lower byte later when
+	 * determining if an msix vector is free or not. */
 	entry = (struct msix_entry*)p->msix_tbl_vaddr;
 	for (int i = 0; i < p->msix_nr_vec; i++, entry++) {
 		__msix_mask_entry(entry);
+		write_mmreg32((uintptr_t)&entry->data, 0);
 	}
 	/* unmask the device, now that all the vectors are masked */
 	f &= ~Msixmask;
@@ -344,6 +343,7 @@ struct msix_irq_vector *pci_msix_enable(struct pci_device *p, uint64_t vec)
 		if (!(read_mmreg32((uintptr_t)&entry->data) & 0xff))
 			break;
 	if (i == p->msix_nr_vec) {
+		printk("[kernel] unable to alloc an MSI-X vector (bug?)\n");
 		spin_unlock_irqsave(&p->lock);
 		return 0;
 	}
