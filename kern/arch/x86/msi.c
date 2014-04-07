@@ -284,6 +284,8 @@ static int __pci_msix_init(struct pci_device *p)
 	p->msix_tbl_paddr = msix_get_capbar_paddr(p, c + 4);
 	p->msix_pba_paddr = msix_get_capbar_paddr(p, c + 8);
 	if (!p->msix_tbl_paddr || !p->msix_pba_paddr) {
+		/* disable msix, so we can possibly use msi */
+		pcidev_write16(p, c + 2, f & ~Msixenable);
 		printk("MSI-X: Missing a tbl (%p) or PBA (%p) paddr!\n",
 		       p->msix_tbl_paddr, p->msix_pba_paddr);
 		return -1;
@@ -292,12 +294,14 @@ static int __pci_msix_init(struct pci_device *p)
 	p->msix_tbl_vaddr = vmap_pmem_nocache(p->msix_tbl_paddr, p->msix_nr_vec *
 	                                      sizeof(struct msix_entry));
 	if (!p->msix_tbl_vaddr) {
+		pcidev_write16(p, c + 2, f & ~Msixenable);
 		printk("MSI-X: unable to vmap the Table!\n");
 		return -1;
 	}
 	p->msix_pba_vaddr = vmap_pmem_nocache(p->msix_pba_paddr,
 	                                      ROUNDUP(p->msix_nr_vec, 8) / 8);
 	if (!p->msix_pba_vaddr) {
+		pcidev_write16(p, c + 2, f & ~Msixenable);
 		printk("MSI-X: unable to vmap the PBA!\n");
 		vunmap_vmem(p->msix_tbl_paddr,
 	                p->msix_nr_vec * sizeof(struct msix_entry));
