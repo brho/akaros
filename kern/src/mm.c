@@ -1155,21 +1155,27 @@ int unmap_vmap_segment(uintptr_t vaddr, unsigned long num_pages)
 	return 0;
 }
 
+/* This can handle unaligned paddrs */
 static uintptr_t vmap_pmem_flags(uintptr_t paddr, size_t nr_bytes, int flags)
 {
 	uintptr_t vaddr;
-	unsigned long nr_pages = ROUNDUP(nr_bytes, PGSIZE) >> PGSHIFT;
+	unsigned long nr_pages;
 	assert(nr_bytes && paddr);
+	nr_bytes += PGOFF(paddr);
+	nr_pages = ROUNDUP(nr_bytes, PGSIZE) >> PGSHIFT;
 	vaddr = get_vmap_segment(nr_pages);
 	if (!vaddr) {
 		warn("Unable to get a vmap segment");	/* probably a bug */
 		return 0;
 	}
-	if (map_vmap_segment(vaddr, paddr, nr_pages, PTE_P | PTE_KERN_RW | flags)) {
+	/* it's not strictly necessary to drop paddr's pgoff, but it might save some
+	 * vmap heartache in the future. */
+	if (map_vmap_segment(vaddr, PG_ADDR(paddr), nr_pages,
+	                     PTE_P | PTE_KERN_RW | flags)) {
 		warn("Unable to map a vmap segment");	/* probably a bug */
 		return 0;
 	}
-	return vaddr;
+	return vaddr + PGOFF(paddr);
 }
 
 uintptr_t vmap_pmem(uintptr_t paddr, size_t nr_bytes)
