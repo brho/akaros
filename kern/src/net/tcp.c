@@ -856,14 +856,15 @@ void tcpstart(struct conv *s, int mode)
 {
 	Tcpctl *tcb;
 	struct tcppriv *tpriv;
-	char kpname[KNAMELEN];
+	/* tcpackproc needs to free this if it ever exits */
+	char *kpname = kmalloc(KNAMELEN, KMALLOC_WAIT);
 
 	tpriv = s->p->priv;
 
 	if (tpriv->ackprocstarted == 0) {
 		qlock(&tpriv->apl);
 		if (tpriv->ackprocstarted == 0) {
-			snprintf(kpname, sizeof(kpname), "#I%dtcpack", s->p->f->dev);
+			snprintf(kpname, KNAMELEN, "#I%dtcpack", s->p->f->dev);
 			ktask(kpname, tcpackproc, s->p);
 			tpriv->ackprocstarted = 1;
 		}

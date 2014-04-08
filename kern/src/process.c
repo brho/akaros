@@ -2186,6 +2186,7 @@ void print_proc_info(pid_t pid)
 	printk("PID: %d\n", p->pid);
 	printk("PPID: %d\n", p->ppid);
 	printk("State: %s (%p)\n", procstate2str(p->state), p->state);
+	printk("\tIs %san MCP\n", p->procinfo->is_mcp ? "" : "not ");
 	printk("Refcnt: %d\n", atomic_read(&p->p_kref.refcount) - 1);
 	printk("Flags: 0x%08x\n", p->env_flags);
 	printk("CR3(phys): %p\n", p->env_cr3);
