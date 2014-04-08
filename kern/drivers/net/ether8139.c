@@ -754,7 +754,6 @@ static int rtl8139pnp(struct ether *edev)
 	                   ctlr->pcidev->func);
 	edev->attach = rtl8139attach;
 	edev->transmit = rtl8139transmit;
-	edev->interrupt = rtl8139interrupt;
 	edev->ifstat = rtl8139ifstat;
 
 	edev->netif.arg = edev;
@@ -766,6 +765,7 @@ static int rtl8139pnp(struct ether *edev)
 	if ((csr8r(ctlr, Msr) & (Speed10 | Linkb)) == 0)
 		edev->netif.mbps = 100;
 
+	register_irq(edev->irq, rtl8139interrupt, edev, edev->tbdf);
 	return 0;
 }
 

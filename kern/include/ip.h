@@ -971,6 +971,7 @@ struct ether {
 	int ctlrno;
 	char *type;
 	int irq;
+	unsigned int tbdf;
 	int port;
 	int minmtu;
 	int maxmtu;
@@ -981,7 +982,6 @@ struct ether {
 	void (*closed) (struct ether *);
 	void (*detach) (struct ether *);
 	void (*transmit) (struct ether *);
-	void (*interrupt) (struct hw_trapframe *, void *);
 	long (*ifstat) (struct ether *, void *, long, uint32_t);
 	long (*ctl) (struct ether *, void *, long);	/* custom ctl messages */
 	void (*power) (struct ether *, int);	/* power on/off */
@@ -999,9 +999,6 @@ struct ether {
 
 	/* another case where we wish we had anon struct members. */
 	struct netif netif;
-
-	/* xxxx -- this is a defect in this implementation. */
-	unsigned int tbdf;
 };
 
 extern struct block *etheriq(struct ether *, struct block *, int);

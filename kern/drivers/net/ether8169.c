@@ -1220,7 +1220,6 @@ rtl8169pnp(struct ether* edev)
 	                   ctlr->pci->func);
 	edev->attach = rtl8169attach;
 	edev->transmit = rtl8169transmit;
-	edev->interrupt = rtl8169interrupt;
 	edev->ifstat = rtl8169ifstat;
 
 	edev->netif.arg = edev;
@@ -1229,6 +1228,7 @@ rtl8169pnp(struct ether* edev)
 //	edev->netif.shutdown = rtl8169shutdown;
 
 	rtl8169link(edev);
+	register_irq(edev->irq, rtl8169interrupt, edev, edev->tbdf);
 
 	return 0;
 }
