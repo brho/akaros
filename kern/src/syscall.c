@@ -1895,12 +1895,14 @@ void run_local_syscall(struct syscall *sysc)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
-	/* TODO: (UMEM) assert / pin the memory for the sysc */
 	assert(irq_is_enabled());	/* in case we proc destroy */
-	/* Abort on mem check failure, for now */
-	if (!user_mem_check(pcpui->cur_proc, sysc, sizeof(struct syscall),
-	                    sizeof(uintptr_t), PTE_USER_RW))
+	/* In lieu of pinning, we just check the sysc and will PF on the user addr
+	 * later (if the addr was unmapped).  Which is the plan for all UMEM. */
+	if (!is_user_rwaddr(sysc, sizeof(struct syscall))) {
+		printk("[kernel] bad user addr %p (+%p) in %s (user bug)\n", sysc,
+		       sizeof(struct syscall), __FUNCTION__);
 		return;
+	}
 	pcpui->cur_kthread->sysc = sysc;	/* let the core know which sysc it is */
 	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
 	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
@@ -1911,7 +1913,6 @@ void run_local_syscall(struct syscall *sysc)
 	if ((current_errstr()[0] != 0) && (!sysc->err))
 		sysc->err = EUNSPECIFIED;
 	finish_sysc(sysc, pcpui->cur_proc);
-	/* Can unpin (UMEM) at this point */
 	pcpui->cur_kthread->sysc = 0;	/* no longer working on sysc */
 }
 
@@ -1922,8 +1923,10 @@ void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_syscs)
 {
 	int retval;
 	/* Careful with pcpui here, we could have migrated */
-	if (!nr_syscs)
+	if (!nr_syscs) {
+		printk("[kernel] No nr_sysc, probably a bug, user!\n");
 		return;
+	}
 	/* For all after the first call, send ourselves a KMSG (TODO). */
 	if (nr_syscs != 1)
 		warn("Only one supported (Debutante calls: %d)\n", nr_syscs);

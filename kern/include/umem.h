@@ -15,13 +15,6 @@ static inline bool is_user_rwaddr(void *addr, size_t len);
 /* Same deal, but read-only */
 static inline bool is_user_raddr(void *addr, size_t len);
 
-/* Can they use the area in the manner of perm? */
-void *user_mem_check(struct proc *p, const void *DANGEROUS va, size_t len,
-                     size_t align, int perm);
-/* Kills them if they can't use the area in the manner of perm */
-void *user_mem_assert(struct proc *p, const void *DANGEROUS va, size_t len, 
-                      size_t align, int perm);
-
 /* Copy from proc p into the kernel's dest from src */
 int memcpy_from_user(struct proc *p, void *dest, const void *DANGEROUS va,
                      size_t len);

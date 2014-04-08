@@ -980,11 +980,10 @@ void test_ucq(void)
 
 		printk("Running the alarm handler!\n");
 		printk("NR msg per page: %d\n", NR_MSG_PER_PAGE);
-		/* might not be mmaped yet, if not, abort */
-		if (!user_mem_check(p, ucq, PGSIZE, 1, PTE_USER_RW)) {
-			printk("Not mmaped yet\n");
-			goto abort;
-		}
+		/* might not be mmaped yet, if not, abort.  We used to user_mem_check,
+		 * but now we just touch it and PF. */
+		char touch = *(char*)ucq;
+		asm volatile ("" : : "r"(touch));
 		/* load their address space */
 		old_proc = switch_to(p);
 		/* So it's mmaped, see if it is ready (note that this is dangerous) */
