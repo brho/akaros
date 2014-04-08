@@ -509,7 +509,7 @@ int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 {
 	struct irq_handler *irq_h;
 	int vector;
-	irq_h = kmalloc(sizeof(struct irq_handler), 0);
+	irq_h = kzmalloc(sizeof(struct irq_handler), 0);
 	assert(irq_h);
 	irq_h->dev_irq = irq;
 	irq_h->tbdf = tbdf;
