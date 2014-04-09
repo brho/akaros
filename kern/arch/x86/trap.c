@@ -241,18 +241,29 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 	int prot = hw_tf->tf_err & PF_ERROR_WRITE ? PROT_WRITE : PROT_READ;
 	int err;
 
-	/* TODO - handle kernel page faults */
-	if ((hw_tf->tf_cs & 3) == 0) {
-		print_trapframe(hw_tf);
-		backtrace_kframe(hw_tf);
-		panic("Page Fault in the Kernel at %p!", fault_va);
-		/* if we want to do something like kill a process or other code, be
-		 * aware we are in a sort of irq-like context, meaning the main kernel
-		 * code we 'interrupted' could be holding locks - even irqsave locks. */
-	}
 	/* safe to reenable after rcr2 */
 	enable_irq();
+
+	if (!current) {
+		/* still catch KPFs */
+		assert((hw_tf->tf_cs & 3) == 0);
+		print_trapframe(hw_tf);
+		backtrace_kframe(hw_tf);
+		panic("Proc-less Page Fault in the Kernel at %p!", fault_va);
+	}
+	/* TODO - handle kernel page faults.  This is dangerous, since we might be
+	 * holding locks in the kernel and could deadlock when we HPF. */
 	if ((err = handle_page_fault(current, fault_va, prot))) {
+		if ((hw_tf->tf_cs & 3) == 0) {
+			print_trapframe(hw_tf);
+			backtrace_kframe(hw_tf);
+			panic("Proc-ful Page Fault in the Kernel at %p!", fault_va);
+			/* if we want to do something like kill a process or other code, be
+			 * aware we are in a sort of irq-like context, meaning the main
+			 * kernel code we 'interrupted' could be holding locks - even
+			 * irqsave locks. */
+		}
+
 		if (err == -EAGAIN)
 			hw_tf->tf_err |= PF_VMR_BACKED;
 		*aux = fault_va;
