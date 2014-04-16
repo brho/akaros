@@ -833,10 +833,10 @@ static int notempty(void *a)
 	return (q->state & Qclosed) || q->bfirst != 0;
 }
 
-/*
- *  wait for the queue to be non-empty or closed.
- *  called with q ilocked.
- */
+/* wait for the queue to be non-empty or closed.
+ *
+ * called with q ilocked.  rendez may error out, back through the caller, with
+ * the irqsave lock unlocked.  */
 static int qwait(struct queue *q)
 {
 	/* wait for data */
@@ -854,6 +854,7 @@ static int qwait(struct queue *q)
 
 		q->state |= Qstarve;	/* flag requesting producer to wake me */
 		spin_unlock_irqsave(&q->lock);
+		/* may throw an error() */
 		rendez_sleep(&q->rr, notempty, q);
 		spin_lock_irqsave(&q->lock);
 	}
@@ -1151,6 +1152,7 @@ long qbwrite(struct queue *q, struct block *b)
 {
 	ERRSTACK(1);
 	int n, dowakeup;
+	volatile bool should_free_b = TRUE;
 
 	n = BLEN(b);
 
@@ -1162,7 +1164,7 @@ long qbwrite(struct queue *q, struct block *b)
 	dowakeup = 0;
 	qlock(&q->wlock);
 	if (waserror()) {
-		if (b != NULL)
+		if (b != NULL && should_free_b)
 			freeb(b);
 		qunlock(&q->wlock);
 		nexterror();
@@ -1189,6 +1191,7 @@ long qbwrite(struct queue *q, struct block *b)
 	}
 
 	/* queue the block */
+	should_free_b = FALSE;
 	if (q->bfirst)
 		q->blast->next = b;
 	else

@@ -181,16 +181,25 @@ void kthread_yield(void)
 
 static void __ktask_wrapper(uint32_t srcid, long a0, long a1, long a2)
 {
+	ERRSTACK(1);
 	void (*fn)(void*) = (void (*)(void*))a0;
 	void *arg = (void*)a1;
 	char *name = (char*)a2;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	assert(pcpui->cur_kthread->is_ktask);
 	pcpui->cur_kthread->name = name;
+	/* There are some rendezs out there that aren't wrapped.  Though no one can
+	 * abort them.  Yet. */
+	if (waserror()) {
+		printk("Ktask %s threw error %s\n", name, current_errstr());
+		goto out;
+	}
 	enable_irq();
 	fn(arg);
+out:
 	disable_irq();
 	pcpui->cur_kthread->name = 0;
+	poperror();
 	/* if we blocked, when we return, PRKM will smp_idle() */
 }
 

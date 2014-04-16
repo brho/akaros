@@ -808,6 +808,13 @@ void mountio(struct mnt *m, struct mntrpc *r)
 	while (waserror()) {
 		if (m->rip == current)
 			mntgate(m);
+		if (!strcmp(current_errstr(), "syscall aborted")) {
+			/* not sure what devmnt wants us to do here.  bail on aborted
+			 * syscall?  keep looping forever? (probably not) */
+			printk("[kernel] mountio had aborted syscall");
+			mntflushfree(m, r);
+			nexterror();
+		}
 		if (strcmp(current_errstr(), Eintr) != 0) {
 			mntflushfree(m, r);
 			nexterror();
