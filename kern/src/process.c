@@ -412,6 +412,7 @@ static int __cb_assert_no_pg(struct proc *p, pte_t *pte, void *va, void *arg)
 static void __proc_free(struct kref *kref)
 {
 	struct proc *p = container_of(kref, struct proc, p_kref);
+	void *hash_ret;
 	physaddr_t pa;
 
 	printd("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
@@ -438,10 +439,14 @@ static void __proc_free(struct kref *kref)
 	}
 	/* Remove us from the pid_hash and give our PID back (in that order). */
 	spin_lock(&pid_hash_lock);
-	if (!hashtable_remove(pid_hash, (void*)(long)p->pid))
-		panic("Proc not in the pid table in %s", __FUNCTION__);
+	hash_ret = hashtable_remove(pid_hash, (void*)(long)p->pid);
 	spin_unlock(&pid_hash_lock);
-	put_free_pid(p->pid);
+	/* might not be in the hash/ready, if we failed during proc creation */
+	if (hash_ret)
+		put_free_pid(p->pid);
+	else
+		printd("[kernel] pid %d not in the PID hash in %s\n", p->pid,
+		       __FUNCTION__);
 	/* all memory below UMAPTOP should have been freed via the VMRs.  the stuff
 	 * above is the global page and procinfo/procdata */
 	env_user_mem_free(p, (void*)UMAPTOP, UVPT - UMAPTOP); /* 3rd arg = len... */

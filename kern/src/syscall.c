@@ -339,17 +339,25 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	/* TODO: need to split the proc creation, since you must load after setting
 	 * args/env, since auxp gets set up there. */
 	//new_p = proc_create(program, 0, 0);
-	if (proc_alloc(&new_p, current))
+	if (proc_alloc(&new_p, current)) {
+		set_errstr("Failed to alloc new proc");
 		goto mid_error;
+	}
 	/* Set the argument stuff needed by glibc */
 	if (memcpy_from_user_errno(p, new_p->procinfo->argp, pi->argp,
-	                           sizeof(pi->argp)))
+	                           sizeof(pi->argp))) {
+		set_errstr("Failed to memcpy argp");
 		goto late_error;
+	}
 	if (memcpy_from_user_errno(p, new_p->procinfo->argbuf, pi->argbuf,
-	                           sizeof(pi->argbuf)))
+	                           sizeof(pi->argbuf))) {
+		set_errstr("Failed to memcpy argbuf");
 		goto late_error;
-	if (load_elf(new_p, program))
+	}
+	if (load_elf(new_p, program)) {
+		set_errstr("Failed to load elf");
 		goto late_error;
+	}
 	kref_put(&program->f_kref);
 	/* Connect to stdin, stdout, stderr (part of proc_create()) */
 	assert(insert_file(&new_p->open_files, dev_stdin,  0) == 0);
@@ -360,8 +368,12 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	proc_decref(new_p);	/* give up the reference created in proc_create() */
 	return pid;
 late_error:
+	set_errno(EINVAL);
+	/* proc_destroy will decref once, which is for the ref created in
+	 * proc_create().  We don't decref again (the usual "+1 for existing"),
+	 * since the scheduler, which usually handles that, hasn't heard about the
+	 * process (via __proc_ready()). */
 	proc_destroy(new_p);
-	proc_decref(new_p);	/* give up the reference created in proc_create() */
 mid_error:
 	kref_put(&program->f_kref);
 	return -1;
