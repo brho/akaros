@@ -40,13 +40,3 @@ void print_throughput(void **data, unsigned int nr_steps, uint64_t interval,
                       int nr_i, int nr_j,
                       int (*get_sample)(void **data, int i, int j,
                                         uint64_t *sample));
-
-/* Conversion btw tsc ticks and time units.  From Akaros's kern/src/time.c */
-uint64_t tsc2sec(uint64_t tsc_time);
-uint64_t tsc2msec(uint64_t tsc_time);
-uint64_t tsc2usec(uint64_t tsc_time);
-uint64_t tsc2nsec(uint64_t tsc_time);
-uint64_t sec2tsc(uint64_t sec);
-uint64_t msec2tsc(uint64_t msec);
-uint64_t usec2tsc(uint64_t usec);
-uint64_t nsec2tsc(uint64_t nsec);

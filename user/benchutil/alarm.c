@@ -36,6 +36,7 @@
 #include <measure.h>
 #include <uthread.h>
 #include <spinlock.h>
+#include <timing.h>
 
 /* Helpers, basically renamed kernel interfaces, with the *tchain. */
 static void __tc_locked_set_alarm(struct timer_chain *tchain,

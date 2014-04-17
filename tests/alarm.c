@@ -11,6 +11,7 @@
 #include <event.h>
 #include <measure.h>
 #include <uthread.h>
+#include <timing.h>
 
 /* Am I the only one annoyed at how open has different includes than
  * close/read/write? */
