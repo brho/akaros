@@ -63,6 +63,7 @@ hfread(struct ndbhf *hf, long off, int len)
 static struct ndbhf*
 hfopen(struct ndb *db, char *attr)
 {
+	static int beenhere = 0;
 	struct ndbhf *hf;
 	char buf[sizeof(hf->attr)+sizeof(db->file)+2];
 	uint8_t *p;
@@ -77,12 +78,14 @@ hfopen(struct ndb *db, char *attr)
 	if((d = dirfstat(Bfildes(&db->b))) == NULL || db->qid.path != d->qid.path
 	|| db->qid.vers != d->qid.vers){
 #else
-	if (1){
+	if (! beenhere){
 #endif
 		if(ndbreopen(db) < 0){
 			free(d);
 			return 0;
 		}
+		beenhere = 1;
+		db->mtime = 1;
 	}
 	free(d);
 
@@ -134,7 +137,6 @@ ndbsearch(struct ndb *db, struct ndbs *s, char *attr, char *val)
 	uint8_t *p;
 	struct ndbtuple *t;
 	struct ndbhf *hf;
-
 	hf = hfopen(db, attr);
 
 	memset(s, 0, sizeof(*s));

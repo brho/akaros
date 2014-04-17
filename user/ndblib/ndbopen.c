@@ -31,6 +31,7 @@ static char *deffile = "/lib/ndb/local";
 struct ndb*
 ndbopen(char *file)
 {
+
 	struct ndb *db, *first, *last;
 	struct ndbs s;
 	struct ndbtuple *t, *nt;
@@ -38,13 +39,15 @@ ndbopen(char *file)
 	if(file == 0)
 		file = deffile;
 	db = doopen(file);
-	if(db == 0)
+	if(db == 0) {
 		return 0;
+	}
 	first = last = db;
 	t = ndbsearch(db, &s, "database", "");
 	fseek(db->b, 0, 0);
-	if(t == 0)
+	if(t == 0) {
 		return db;
+	}
 	for(nt = t; nt; nt = nt->entry){
 		if(strcmp(nt->attr, "file") != 0)
 			continue;
@@ -77,11 +80,13 @@ ndbopen(char *file)
 static struct ndb*
 doopen(char *file)
 {
+
 	struct ndb *db;
 
 	db = (struct ndb*)calloc(sizeof(struct ndb), 1);
-	if(db == 0)
+	if(db == 0) {
 		return 0;
+	}
 	memset(db, 0, sizeof(struct ndb));
 	strncpy(db->file, file, sizeof(db->file)-1);
 
@@ -99,6 +104,7 @@ doopen(char *file)
 int
 ndbreopen(struct ndb *db)
 {
+
 	int fd;
 	struct dir *d;
 
@@ -113,8 +119,9 @@ ndbreopen(struct ndb *db)
 
 	/* try the open again */
 	db->b = fopen(db->file, "r");
-	if(! db->b)
+	if(! db->b) {
 		return -1;
+	}
 #if 0
 	d = dirfstat(fd);
 	if(d == NULL){
@@ -122,10 +129,17 @@ ndbreopen(struct ndb *db)
 		return -1;
 	}
 
-	db->qid = d->qid;
+	db->qid.path = d->qid.path;
 	db->mtime = d->mtime;
 	db->length = d->length;
 	free(d);
+#else
+	struct stat s;
+	/* we opened it, this WILL work */
+	stat(db->file, &s);
+	db->qid.path = s.st_ino;
+	db->mtime = s.st_mtime + 1;
+	db->length = s.st_size;
 #endif
 	db->isopen = 1;
 	return 0;
@@ -137,6 +151,7 @@ ndbreopen(struct ndb *db)
 void
 ndbclose(struct ndb *db)
 {
+
 	struct ndb *nextdb;
 
 	for(; db; db = nextdb){
@@ -154,6 +169,7 @@ ndbclose(struct ndb *db)
 static void
 hffree(struct ndb *db)
 {
+
 	struct ndbhf *hf, *next;
 
 	for(hf = db->hf; hf; hf = next){
@@ -170,7 +186,8 @@ hffree(struct ndb *db)
 int
 ndbchanged(struct ndb *db)
 {
-	return 1;
+#warning "ndbchanged always returns 0"
+	return 0;
 #if 0
 	struct ndb *ndb;
 	struct dir *d;
