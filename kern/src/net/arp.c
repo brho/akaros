@@ -516,7 +516,7 @@ enum {
 	Alinelen = 90,
 };
 
-char *aformat = "%-6.6s %-8.8s %-40.40I %-32.32s\n";
+char *aformat = "%-6.6s %-8.8s %-40.40I %E\n";
 
 static void convmac(char *p, uint8_t * mac, int n)
 {

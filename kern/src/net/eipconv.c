@@ -29,7 +29,7 @@ uint8_t prefixvals[256] = {
 	[0xFF] 8 | Isprefix,
 };
 
-static char *efmt = "0x%.2lx0x%.2lx0x%.2lx0x%.2lx0x%.2lx0x%.2lx";
+static char *efmt = "%02x:%02x:%02x:%02x:%02x:%02x";
 static char *ifmt = "%d.%d.%d.%d";
 
 void printemac(void (*putch) (int, void **), void **putdat, uint8_t * mac)
