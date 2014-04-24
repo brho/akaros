@@ -212,3 +212,5 @@ config BSD_ON_CORE0
 		This was an old joke.  Say 'n', since we can't simply #include <bsd>.
 
 endmenu
+
+source "kern/Kconfig.testing"

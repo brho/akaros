@@ -22,7 +22,7 @@
 #include <process.h>
 #include <schedule.h>
 #include <syscall.h>
-#include <testing.h>
+#include <test_infrastructure.h>
 #include <kfs.h>
 #include <stdio.h>
 #include <time.h>
@@ -33,6 +33,41 @@
 #include <arch/console.h>
 #include <time.h>
 #include <ros/arch/membar.h>
+
+char *kern_test_msg; // Variable defined in test_infrastructure.h.
+
+
+void postboot_kernel_tests(void)
+{
+	printk("\nRunning %d postboot Kernel tests:\n", 
+		   num_pb_kernel_tests);
+
+	// Do not remove this line, it is being used by Jenkins.
+	printk("<-- BEGIN_KERNEL_POSTBOOT_TESTS -->\n");
+	for (int i=0; i<num_pb_kernel_tests; i++) {
+		struct pb_kernel_test *test = &pb_kernel_tests[i];
+		if (test->enabled) {
+			uint64_t start = read_tsc();
+			bool result = test->func();
+			uint64_t end = read_tsc();
+			uint64_t et_us = tsc2usec(end - start) % 1000000;
+			uint64_t et_s = tsc2sec(end - start);
+
+			if (result) {
+				printk("\tPASSED   [%s](%llu.%06llus)\n", test->name, et_s, 
+				       et_us);
+			} else {
+				printk("\tFAILED   [%s](%llu.%06llus)  %s\n", test->name, et_s, 
+				       et_us, kern_test_msg);
+				kfree(kern_test_msg);
+			}
+		} else {
+			printk("\tDISABLED [%s]\n", test->name);
+		}
+	}
+	// Do not remove this line, it is being used by Jenkins.
+	printk("<-- END_KERNEL_POSTBOOT_TESTS -->\n");
+}
 
 /*
  * Currently, if you leave this function by way of proc_run (process_workqueue
@@ -48,6 +83,11 @@ void manager(void)
 	// LoL
 	#define PASTE(s1,s2) s1 ## s2
 	#define MANAGER_FUNC(dev) PASTE(manager_,dev)
+
+	// Run Kernel post boot tests (from tests_postboot_kernel.c)
+	#ifdef CONFIG_POSTBOOT_KERNEL_TESTING
+		postboot_kernel_tests();
+	#endif
 
 	void MANAGER_FUNC(DEVELOPER_NAME)(void);
 	MANAGER_FUNC(DEVELOPER_NAME)();

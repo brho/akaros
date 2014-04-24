@@ -1,3 +1,8 @@
+/*
+ * Postboot kernel tests: Tests to be ran after boot in kernel mode.
+ * TODO: Some of the tests here may not necessarily be tests to be ran after
+ *       boot. If that is the case, change them in
+ */
 
 #ifdef __SHARC__
 #pragma nosharc
@@ -37,6 +42,7 @@
 #include <umem.h>
 #include <ucq.h>
 #include <setjmp.h>
+
 #include <apipe.h>
 #include <rwlock.h>
 #include <rendez.h>
@@ -47,7 +53,8 @@
 
 #ifdef CONFIG_X86
 
-void test_ipi_sending(void)
+// TODO: Do test if possible inside this function, and add assertions.
+bool test_ipi_sending(void)
 {
 	int8_t state = 0;
 
@@ -83,10 +90,13 @@ void test_ipi_sending(void)
 	udelay(3000000);
 	cprintf("\nDone!\n");
 	disable_irqsave(&state);
+
+	return true;
 }
 
+// TODO: Refactor to make it return and add assertions.
 // Note this never returns and will muck with any other timer work
-void test_pic_reception(void)
+bool test_pic_reception(void)
 {
 	register_irq(IdtPIC + IrqCLOCK, test_hello_world_handler, NULL,
 	             MKBUS(BusISA, 0, 0, 0));
@@ -98,21 +108,54 @@ void test_pic_reception(void)
 	cprintf("Core %d's LINT0: 0x%08x\n", core_id(), read_mmreg32(LAPIC_LVT_LINT0));
 	enable_irq();
 	while(1);
+
+	return true;
+}
+
+// TODO: Add assertions.
+bool test_ioapic_pit_reroute(void) 
+{
+	register_irq(IdtPIC + IrqCLOCK, test_hello_world_handler, NULL,
+	             MKBUS(BusISA, 0, 0, 0));
+#ifdef CONFIG_ENABLE_MPTABLES
+#warning "not routing the irq"
+	//ioapic_route_irq(0, 3);	
+#endif
+
+	cprintf("Starting pit on core 3....\n");
+	udelay(3000000);
+	pit_set_timer(0xFFFE,TIMER_RATEGEN); // totally arbitrary time
+	
+	udelay(3000000);
+#ifdef CONFIG_ENABLE_MPTABLES
+#warning "NOT unrouting the irq"
+	//ioapic_unroute_irq(0);
+#endif
+	udelay(300000);
+	cprintf("Masked pit. Waiting before return...\n");
+	udelay(3000000);
+
+	return true;
 }
 
 #endif // CONFIG_X86
 
-
-void test_print_info(void)
+// TODO: Assert printed info follows the standard (or whatever we want to test).
+bool test_print_info(void)
 {
 	cprintf("\nCORE 0 asking all cores to print info:\n");
 	smp_call_function_all(test_print_info_handler, NULL, 0);
 	cprintf("\nDone!\n");
+	return true;
 }
 
-void test_page_coloring(void) 
+// TODO: Add assertions. Possibly the way to go is to extract relevant info 
+//       from cache properties and make assertions on the colored pages lists 
+//       based on those.
+// TODO: The test was commented out. Figure out why was it like that and fix it.
+bool test_page_coloring(void) 
 {
-/*
+	/*
 	//Print the different cache properties of our machine
 	print_cache_properties("L1", l1);
 	cprintf("\n");
@@ -190,10 +233,12 @@ void test_page_coloring(void)
 		cprintf("Page: %d\n", page2ppn(page));	
 	
 	page_init();
-*/
+	*/
+	return true;
 }
 
-void test_color_alloc() {
+// TODO: Add assertions.
+bool test_color_alloc(void) {
 	size_t checkpoint = 0;
 	uint8_t* colors_map = kmalloc(BYTES_FOR_BITMASK(llc_cache->num_colors), 0);
 	cache_color_alloc(l2, colors_map);
@@ -230,64 +275,71 @@ print_cache_colors:
 	printk("Process allocated colors\n");
 	PRINT_BITMASK(colors_map, llc_cache->num_colors);
 	printk("test_color_alloc() complete!\n");
+
+	return true;
 }
 
 barrier_t test_cpu_array;
 
-void test_barrier(void)
+// TODO: Add assertions, try to do everything from within this same function.
+bool test_barrier(void)
 {
 	cprintf("Core 0 initializing barrier\n");
 	init_barrier(&test_cpu_array, num_cpus);
 	cprintf("Core 0 asking all cores to print ids, barrier, rinse, repeat\n");
 	smp_call_function_all(test_barrier_handler, NULL, 0);
+
+	return true;
 }
 
-void test_interrupts_irqsave(void)
+// TODO: Maybe remove all the printing statements and instead use the 
+//       KT_ASSERT_M macro to include a message on assertions.
+bool test_interrupts_irqsave(void)
 {
 	int8_t state = 0;
 	printd("Testing Nesting Enabling first, turning ints off:\n");
 	disable_irq();
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(!irq_is_enabled());
+	KT_ASSERT(!irq_is_enabled());
 	printd("Enabling IRQSave\n");
 	enable_irqsave(&state);
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(irq_is_enabled());
+	KT_ASSERT(irq_is_enabled());
 	printd("Enabling IRQSave Again\n");
 	enable_irqsave(&state);
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(irq_is_enabled());
+	KT_ASSERT(irq_is_enabled());
 	printd("Disabling IRQSave Once\n");
 	disable_irqsave(&state);
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(irq_is_enabled());
+	KT_ASSERT(irq_is_enabled());
 	printd("Disabling IRQSave Again\n");
 	disable_irqsave(&state);
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(!irq_is_enabled());
+	KT_ASSERT(!irq_is_enabled());
 	printd("Done.  Should have been 0, 200, 200, 200, 0\n");
 
 	printd("Testing Nesting Disabling first, turning ints on:\n");
 	state = 0;
 	enable_irq();
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(irq_is_enabled());
+	KT_ASSERT(irq_is_enabled());
 	printd("Disabling IRQSave Once\n");
 	disable_irqsave(&state);
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(!irq_is_enabled());
+	KT_ASSERT(!irq_is_enabled());
 	printd("Disabling IRQSave Again\n");
 	disable_irqsave(&state);
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(!irq_is_enabled());
+	KT_ASSERT(!irq_is_enabled());
 	printd("Enabling IRQSave Once\n");
 	enable_irqsave(&state);
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(!irq_is_enabled());
+	KT_ASSERT(!irq_is_enabled());
 	printd("Enabling IRQSave Again\n");
 	enable_irqsave(&state);
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(irq_is_enabled());
+	KT_ASSERT(irq_is_enabled());
 	printd("Done.  Should have been 200, 0, 0, 0, 200 \n");
 
 	state = 0;
@@ -295,10 +347,10 @@ void test_interrupts_irqsave(void)
 	printd("Ints are off, enabling then disabling.\n");
 	enable_irqsave(&state);
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(irq_is_enabled());
+	KT_ASSERT(irq_is_enabled());
 	disable_irqsave(&state);
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(!irq_is_enabled());
+	KT_ASSERT(!irq_is_enabled());
 	printd("Done.  Should have been 200, 0\n");
 
 	state = 0;
@@ -306,10 +358,10 @@ void test_interrupts_irqsave(void)
 	printd("Ints are on, enabling then disabling.\n");
 	enable_irqsave(&state);
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(irq_is_enabled());
+	KT_ASSERT(irq_is_enabled());
 	disable_irqsave(&state);
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(irq_is_enabled());
+	KT_ASSERT(irq_is_enabled());
 	printd("Done.  Should have been 200, 200\n");
 
 	state = 0;
@@ -317,10 +369,10 @@ void test_interrupts_irqsave(void)
 	printd("Ints are off, disabling then enabling.\n");
 	disable_irqsave(&state);
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(!irq_is_enabled());
+	KT_ASSERT(!irq_is_enabled());
 	enable_irqsave(&state);
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(!irq_is_enabled());
+	KT_ASSERT(!irq_is_enabled());
 	printd("Done.  Should have been 0, 0\n");
 
 	state = 0;
@@ -328,47 +380,46 @@ void test_interrupts_irqsave(void)
 	printd("Ints are on, disabling then enabling.\n");
 	disable_irqsave(&state);
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(!irq_is_enabled());
+	KT_ASSERT(!irq_is_enabled());
 	enable_irqsave(&state);
 	printd("Interrupts are: %x\n", irq_is_enabled());
-	assert(irq_is_enabled());
+	KT_ASSERT(irq_is_enabled());
 	printd("Done.  Should have been 0, 200\n");
 
 	disable_irq();
-	cprintf("Passed enable_irqsave tests\n");
+	return true;
 }
 
-void test_bitmasks(void)
+// TODO: Maybe remove PRINT_BITMASK statements and use KT_ASSERT_M instead
+//       somehow.
+bool test_bitmasks(void)
 {
 #define masksize 67
 	DECL_BITMASK(mask, masksize);
-	printk("size of mask %d\n", sizeof(mask));
 	CLR_BITMASK(mask, masksize);
-	PRINT_BITMASK(mask, masksize);
-	printk("cleared\n");
+//	PRINT_BITMASK(mask, masksize);
 	SET_BITMASK_BIT(mask, 0);
 	SET_BITMASK_BIT(mask, 11);
 	SET_BITMASK_BIT(mask, 17);
 	SET_BITMASK_BIT(mask, masksize-1);
-	printk("bits set\n");
-	PRINT_BITMASK(mask, masksize);
+//	PRINT_BITMASK(mask, masksize);
 	DECL_BITMASK(mask2, masksize);
 	COPY_BITMASK(mask2, mask, masksize);
-	printk("copy of original mask, should be the same as the prev\n");
-	PRINT_BITMASK(mask2, masksize);
+//	printk("copy of original mask, should be the same as the prev\n");
+//	PRINT_BITMASK(mask2, masksize);
 	CLR_BITMASK_BIT(mask, 11);
-	printk("11 cleared\n");
-	PRINT_BITMASK(mask, masksize);
-	printk("bit 17 is %d (should be 1)\n", GET_BITMASK_BIT(mask, 17));
-	printk("bit 11 is %d (should be 0)\n", GET_BITMASK_BIT(mask, 11));
+//	PRINT_BITMASK(mask, masksize);
+	KT_ASSERT_M("Bit 17 should be 1", 1 == GET_BITMASK_BIT(mask, 17));
+	KT_ASSERT_M("Bit 11 should be 0", 0 == GET_BITMASK_BIT(mask, 11));
 	FILL_BITMASK(mask, masksize);
-	PRINT_BITMASK(mask, masksize);
-	printk("should be all 1's, except for a few at the end\n");
-	printk("Is Clear?: %d (should be 0)\n", BITMASK_IS_CLEAR(mask,masksize));
+//	PRINT_BITMASK(mask, masksize);
+	KT_ASSERT_M("Bitmask should not be clear after calling FILL_BITMASK", 
+	            0 == BITMASK_IS_CLEAR(mask,masksize));
 	CLR_BITMASK(mask, masksize);
-	PRINT_BITMASK(mask, masksize);
-	printk("Is Clear?: %d (should be 1)\n", BITMASK_IS_CLEAR(mask,masksize));
-	printk("should be cleared\n");
+//	PRINT_BITMASK(mask, masksize);
+	KT_ASSERT_M("Bitmask should be clear after calling CLR_BITMASK", 
+	            1 == BITMASK_IS_CLEAR(mask,masksize));
+	return true;
 }
 
 checklist_t *RO the_global_list;
@@ -380,7 +431,8 @@ static void test_checklist_handler(struct hw_trapframe *hw_tf, void *data)
 	down_checklist(the_global_list);
 }
 
-void test_checklists(void)
+// TODO: Add assertions
+bool test_checklists(void)
 {
 	INIT_CHECKLIST(a_list, MAX_NUM_CPUS);
 	the_global_list = &a_list;
@@ -411,6 +463,7 @@ void test_checklists(void)
 	waiton_checklist(&a_list);
 	printk("Done Waiting!\n");
 
+	return true;
 }
 
 atomic_t a, b, c;
@@ -426,7 +479,8 @@ static void test_null_handler(struct hw_trapframe *tf, void *data)
 	asm volatile("nop");
 }
 
-void test_smp_call_functions(void)
+// TODO: Add assertions.
+bool test_smp_call_functions(void)
 {
 	int i;
 	atomic_init(&a, 0);
@@ -530,16 +584,20 @@ void test_smp_call_functions(void)
 	printk("\tMade it through!\n");
 
 	printk("Done\n");
+
+	return true;
 }
 
 #ifdef CONFIG_X86
-void test_lapic_status_bit(void)
+// TODO: Fix the KT_ASSERTs
+bool test_lapic_status_bit(void)
 {
 	register_irq(I_TESTING, test_incrementer_handler, &a,
 	             MKBUS(BusIPI, 0, 0, 0));
 	#define NUM_IPI 100000
 	atomic_set(&a,0);
 	printk("IPIs received (should be 0): %d\n", a);
+	// KT_ASSERT_M("IPIs received should be 0", (0 == a));
 	for(int i = 0; i < NUM_IPI; i++) {
 		send_ipi(7, I_TESTING);
 		lapic_wait_to_send();
@@ -547,7 +605,10 @@ void test_lapic_status_bit(void)
 	// need to wait a bit to let those IPIs get there
 	udelay(5000000);
 	printk("IPIs received (should be %d): %d\n", a, NUM_IPI);
+	// KT_ASSERT_M("IPIs received should be 100000", (NUM_IPI == a));
 	// hopefully that handler never fires again.  leaving it registered for now.
+
+	return true;
 }
 #endif // CONFIG_X86
 
@@ -623,7 +684,8 @@ static void test_waiting_handler(struct hw_trapframe *hw_tf, void *data)
 }
 
 #ifdef CONFIG_X86
-void test_pit(void)
+// TODO: Add assertions.
+bool test_pit(void)
 {
 	cprintf("Starting test for PIT now (10s)\n");
 	udelay_pit(10000000);
@@ -643,9 +705,12 @@ void test_pit(void)
 	while(atomic_read(&waiting))
 		cpu_relax();
 	cprintf("End now\n");
+
+	return true;
 }
 
-void test_circ_buffer(void)
+// TODO: Add assertions.
+bool test_circ_buffer(void)
 {
 	int arr[5] = {0, 1, 2, 3, 4};
 
@@ -653,7 +718,8 @@ void test_circ_buffer(void)
 		FOR_CIRC_BUFFER(i, 5, j)
 			printk("Starting with current = %d, each value = %d\n", i, j);
 	}
-	return;
+	
+	return true;
 }
 
 static void test_km_handler(uint32_t srcid, long a0, long a1, long a2)
@@ -663,7 +729,8 @@ static void test_km_handler(uint32_t srcid, long a0, long a1, long a2)
 	return;
 }
 
-void test_kernel_messages(void)
+// TODO: Add assertions. Try to do everything inside this function.
+bool test_kernel_messages(void)
 {
 	printk("Testing Kernel Messages\n");
 	/* Testing sending multiples, sending different types, alternating, and
@@ -694,7 +761,8 @@ void test_kernel_messages(void)
 		                    KMSG_ROUTINE);
 	}
 	udelay(5000000);
-	return;
+	
+	return true;
 }
 #endif // CONFIG_X86
 static void test_single_cache(int iters, size_t size, int align, int flags,
@@ -726,14 +794,18 @@ void a_dtor(void *buf, size_t size)
 	printk("destructin tests\n");
 }
 
-void test_slab(void)
+// TODO: Make test_single_cache return something, and then add assertions here.
+bool test_slab(void)
 {
 	test_single_cache(10, 128, 512, 0, 0, 0);
 	test_single_cache(10, 128, 4, 0, a_ctor, a_dtor);
 	test_single_cache(10, 1024, 16, 0, 0, 0);
+
+	return true;
 }
 
-void test_kmalloc(void)
+// TODO: Add assertions.
+bool test_kmalloc(void)
 {
 	printk("Testing Kmalloc\n");
 	void *bufs[NUM_KMALLOC_CACHES + 1];	
@@ -752,6 +824,8 @@ void test_kmalloc(void)
 	bufs[0] = kmalloc(size, 0);
 	printk("Size %d, Addr = %p\n", size, bufs[0]);
 	kfree(bufs[0]);
+
+	return true;
 }
 
 static size_t test_hash_fn_col(void *k)
@@ -759,7 +833,7 @@ static size_t test_hash_fn_col(void *k)
 	return (size_t)k % 2; // collisions in slots 0 and 1
 }
 
-void test_hashtable(void)
+bool test_hashtable(void)
 {
 	struct test {int x; int y;};
 	struct test tstruct[10];
@@ -771,91 +845,107 @@ void test_hashtable(void)
 	h = create_hashtable(32, __generic_hash, __generic_eq);
 	
 	// test inserting one item, then finding it again
-	printk("Tesing one item, insert, search, and removal\n");
-	if(!hashtable_insert(h, (void*)k, v))
-		printk("Failed to insert to hashtable!\n");
+	KT_ASSERT_M("It should be possible to insert items to a hashtable", 
+	            hashtable_insert(h, (void*)k, v));
 	v = NULL;
-	if (!(v = hashtable_search(h, (void*)k)))
-		printk("Failed to find in hashtable!\n");
-	if (v != &tstruct[0])
-		printk("Got the wrong item! (got %p, wanted %p)\n", v, &tstruct[0]);
+	KT_ASSERT_M("It should be possible to find inserted stuff in a hashtable", 
+	            (v = hashtable_search(h, (void*)k)));
+
+	KT_ASSERT_M("The extracted element should be the same we inserted", 
+	            (v == &tstruct[0]));
+
 	v = NULL;
-	if (!(v = hashtable_remove(h, (void*)k)))
-		printk("Failed to remove from hashtable!\n");
-	// shouldn't be able to find it again
-	if ((v = hashtable_search(h, (void*)k)))
-		printk("Should not have been able to find in hashtable!\n");
-	
-	printk("Tesing a bunch of items, insert, search, and removal\n");
+
+	KT_ASSERT_M("It should be possible to remove an existing element", 
+	            (v = hashtable_remove(h, (void*)k)));
+
+	KT_ASSERT_M("An element should not remain in a hashtable after deletion", 
+	            !(v = hashtable_search(h, (void*)k)));
+
+	/* Testing a bunch of items, insert, search, and removal */
 	for (int i = 0; i < 10; i++) {
 		k = i; // vary the key, we don't do KEY collisions
-		if(!hashtable_insert(h, (void*)k, &tstruct[i]))
-			printk("Failed to insert iter %d to hashtable!\n", i);
+		KT_ASSERT_M("It should be possible to insert elements to a hashtable", 
+		            (hashtable_insert(h, (void*)k, &tstruct[i])));
 	}
 	// read out the 10 items
 	for (int i = 0; i < 10; i++) {
 		k = i;
-		if (!(v = hashtable_search(h, (void*)k)))
-			printk("Failed to find in hashtable!\n");
-		if (v != &tstruct[i])
-			printk("Got the wrong item! (got %p, wanted %p)\n", v, &tstruct[i]);
+		KT_ASSERT_M("It should be possible to find inserted stuff in a hashtable", 
+		            (v = hashtable_search(h, (void*)k)));
+		KT_ASSERT_M("The extracted element should be the same we inserted", 
+		            (v == &tstruct[i]));
 	}
-	if (hashtable_count(h) != 10)
-		printk("Wrong accounting of number of elements!\n");
+
+	KT_ASSERT_M("The total count of number of elements should be 10", 
+	            (10 == hashtable_count(h)));
+
 	// remove the 10 items
 	for (int i = 0; i < 10; i++) {
 		k = i;
-		if (!(v = hashtable_remove(h, (void*)k)))
-			printk("Failed to remove from hashtable!\n");
+		KT_ASSERT_M("It should be possible to remove an existing element", 
+		            (v = hashtable_remove(h, (void*)k)));
+
 	}
 	// make sure they are all gone
 	for (int i = 0; i < 10; i++) {
 		k = i;
-		if ((v = hashtable_search(h, (void*)k)))
-			printk("Should not have been able to find in hashtable!\n");
+		KT_ASSERT_M("An element should not remain in a hashtable after deletion", 
+		            !(v = hashtable_search(h, (void*)k)));
 	}
-	if (hashtable_count(h))
-		printk("Wrong accounting of number of elements!\n");
+
+	KT_ASSERT_M("The hashtable should be empty", 
+	            (0 == hashtable_count(h)));
+
 	hashtable_destroy(h);
 
 	// same test of a bunch of items, but with collisions.
-	printk("Tesing a bunch of items with collisions, etc.\n");
+	/* Testing a bunch of items with collisions, etc. */
 	h = create_hashtable(32, test_hash_fn_col, __generic_eq);
 	// insert 10 items
 	for (int i = 0; i < 10; i++) {
 		k = i; // vary the key, we don't do KEY collisions
-		if(!hashtable_insert(h, (void*)k, &tstruct[i]))
-			printk("Failed to insert iter %d to hashtable!\n", i);
+
+		KT_ASSERT_M("It should be possible to insert elements to a hashtable", 
+		            (hashtable_insert(h, (void*)k, &tstruct[i])));
 	}
 	// read out the 10 items
 	for (int i = 0; i < 10; i++) {
 		k = i;
-		if (!(v = hashtable_search(h, (void*)k)))
-			printk("Failed to find in hashtable!\n");
-		if (v != &tstruct[i])
-			printk("Got the wrong item! (got %p, wanted %p)\n", v, &tstruct[i]);
+		KT_ASSERT_M("It should be possible to find inserted stuff in a hashtable", 
+		            (v = hashtable_search(h, (void*)k)));
+		KT_ASSERT_M("The extracted element should be the same we inserted", 
+		            (v == &tstruct[i]));
 	}
-	if (hashtable_count(h) != 10)
-		printk("Wrong accounting of number of elements!\n");
+
+	KT_ASSERT_M("The total count of number of elements should be 10", 
+	            (10 == hashtable_count(h)));
+
 	// remove the 10 items
 	for (int i = 0; i < 10; i++) {
 		k = i;
-		if (!(v = hashtable_remove(h, (void*)k)))
-			printk("Failed to remove from hashtable!\n");
+		KT_ASSERT_M("It should be possible to remove an existing element", 
+		            (v = hashtable_remove(h, (void*)k)));
 	}
 	// make sure they are all gone
 	for (int i = 0; i < 10; i++) {
 		k = i;
-		if ((v = hashtable_search(h, (void*)k)))
-			printk("Should not have been able to find in hashtable!\n");
+
+		KT_ASSERT_M("An element should not remain in a hashtable after deletion", 
+		            !(v = hashtable_search(h, (void*)k)));
 	}
-	if (hashtable_count(h))
-		printk("Wrong accounting of number of elements!\n");
+
+	KT_ASSERT_M("The hashtable should be empty", 
+	            (0 == hashtable_count(h)));
+
 	hashtable_destroy(h);
+
+	return true;
 }
 
 /* Ghetto test, only tests one prod or consumer at a time */
-void test_bcq(void)
+// TODO: Un-guetto test, add assertions.
+bool test_bcq(void)
 {
 	/* Tests a basic struct */
 	struct my_struct {
@@ -936,13 +1026,16 @@ void test_bcq(void)
 		retval[i] = bcq_dequeue(&a_bcq, &output[i], NR_ELEM_A_BCQ);
 		printk("dequeued: %d with retval %d\n", output[i], retval[i]);
 	}
+
+	return true;
 }
 
 /* Test a simple concurrent send and receive (one prod, one cons).  We spawn a
  * process that will go into _M mode on another core, and we'll do the test from
  * an alarm handler run on our core.  When we start up the process, we won't
  * return so we need to defer the work with an alarm. */
-void test_ucq(void)
+// TODO: Check if we can add more assertions.
+bool test_ucq(void)
 {
 	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
 	struct alarm_waiter *waiter = kmalloc(sizeof(struct alarm_waiter), 0);
@@ -1014,10 +1107,10 @@ void test_ucq(void)
 	/* Just spawn the program */
 	struct file *program;
 	program = do_file_open("/bin/ucq", 0, 0);
-	if (!program) {
-		printk("Unable to find /bin/ucq!\n");
-		return;
-	}
+	
+	KT_ASSERT_M("We should be able to find /bin/ucq", 
+	            program);
+
 	char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 	struct proc *p = proc_create(program, 0, p_envp);
 	proc_wakeup(p);
@@ -1030,13 +1123,19 @@ void test_ucq(void)
 	 * around that are runnable */
 	run_scheduler();
 	smp_idle();
-	assert(0);
+	
+	KT_ASSERT_M("We should never return from schedule",
+	            false);
+
+	return true;
 }
 
 /* rudimentary tests.  does the basics, create, merge, split, etc.  Feel free to
  * add more, esp for the error conditions and finding free slots.  This is also
  * a bit lazy with setting the caller's fields (perm, flags, etc). */
-void test_vm_regions(void)
+// TODO: See if we could add more assertions, try to add more descriptive
+//       messages to assertions.
+bool test_vm_regions(void)
 {
 	#define MAX_VMR_TESTS 10
 	struct proc pr, *p = &pr;	/* too lazy to even create one */
@@ -1081,8 +1180,8 @@ void test_vm_regions(void)
 	results[0].end = 0x4000;
 	check_vmrs(p, results, 1, n++);
 	/* Grow it poorly */
-	if (-1 != grow_vmr(vmrs[0], 0x3000))
-		printk("Bad grow test failed\n");
+	KT_ASSERT_M("It should pass bad grow test", 
+	            (-1 == grow_vmr(vmrs[0], 0x3000)));
 	check_vmrs(p, results, 1, n++);
 	/* Make another right next to it */
 	vmrs[1] = create_vmr(p, 0x4000, 0x1000);
@@ -1090,8 +1189,8 @@ void test_vm_regions(void)
 	results[1].end = 0x5000;
 	check_vmrs(p, results, 2, n++);
 	/* try to grow through it */
-	if (-1 != grow_vmr(vmrs[0], 0x5000))
-		printk("Bad grow test failed\n");
+	KT_ASSERT_M("It should pass bad grow test", 
+	            (-1 == grow_vmr(vmrs[0], 0x5000)));
 	check_vmrs(p, results, 2, n++);
 	/* Merge them */
 	merge_vmr(vmrs[0], vmrs[1]);
@@ -1104,8 +1203,8 @@ void test_vm_regions(void)
 	results[1].end = 0xa000;
 	check_vmrs(p, results, 2, n++);
 	/* try to merge unmergables (just testing ranges) */
-	if (-1 != merge_vmr(vmrs[0], vmrs[1]))
-		printk("Bad merge test failed\n");
+	KT_ASSERT_M("It should pass bad merge test", 
+	            (-1 == merge_vmr(vmrs[0], vmrs[1])));
 	check_vmrs(p, results, 2, n++);
 	vmrs[2] = split_vmr(vmrs[1], 0x8000);
 	results[1].end = 0x8000;
@@ -1122,14 +1221,14 @@ void test_vm_regions(void)
 	results[1].base = 0x8000;
 	results[1].end = 0x9000;
 	check_vmrs(p, results, 2, n++);	/* 10 */
-	if (vmrs[2] != find_vmr(p, 0x8500))
-		printk("Failed to find the right vmr!\n");
-	if (vmrs[2] != find_first_vmr(p, 0x8500))
-		printk("Failed to find the right vmr!\n");
-	if (vmrs[2] != find_first_vmr(p, 0x7500))
-		printk("Failed to find the right vmr!\n");
-	if (find_first_vmr(p, 0x9500))
-		printk("Found a vmr when we shouldn't!\n");
+	KT_ASSERT_M("We should be able to find the right vmr", 
+	            (vmrs[2] == find_vmr(p, 0x8500)));
+	KT_ASSERT_M("We should be able to find the right vmr", 
+	            (vmrs[2] == find_first_vmr(p, 0x8500)));
+	KT_ASSERT_M("We should be able to find the right vmr", 
+	            (vmrs[2] == find_first_vmr(p, 0x7500)));
+	KT_ASSERT_M("We shouldn't be able to find a vmr", 
+	            !(find_first_vmr(p, 0x9500)));
 	/* grow up to another */
 	grow_vmr(vmrs[0], 0x8000);
 	results[0].end = 0x8000;
@@ -1137,8 +1236,8 @@ void test_vm_regions(void)
 	vmrs[0]->vm_prot = 88;
 	vmrs[2]->vm_prot = 77;
 	/* should be unmergeable due to perms */
-	if (-1 != merge_vmr(vmrs[0], vmrs[2]))
-		printk("Bad merge test failed\n");
+	KT_ASSERT_M("It should pass bad merge test", 
+	            -1 == merge_vmr(vmrs[0], vmrs[2]));
 	check_vmrs(p, results, 2, n++);
 	/* should merge now */
 	vmrs[2]->vm_prot = 88;
@@ -1174,25 +1273,25 @@ void test_vm_regions(void)
 	results[2].end  = 0x3000;
 	check_vmrs(p, results, 3, n++);
 
-	printk("Finished vm_regions test!\n");
+	return true;
 }
 
-void test_radix_tree(void)
+bool test_radix_tree(void)
 {
 	struct radix_tree real_tree = RADIX_INITIALIZER;
 	struct radix_tree *tree = &real_tree;
 	void *retval;
 
-	if (radix_insert(tree, 0, (void*)0xdeadbeef, 0))
-		printk("Failed to insert at 0!\n");
+	KT_ASSERT_M("It should be possible to insert at 0", 
+	            !radix_insert(tree, 0, (void*)0xdeadbeef, 0));
 	radix_delete(tree, 0);
-	if (radix_insert(tree, 0, (void*)0xdeadbeef, 0))
-		printk("Failed to re-insert at 0!\n");
+	KT_ASSERT_M("It should be possible to re-insert at 0", 
+	            !radix_insert(tree, 0, (void*)0xdeadbeef, 0));
 
-	if (radix_insert(tree, 3, (void*)0xdeadbeef, 0))
-		printk("Failed to insert first!\n");
+	KT_ASSERT_M("It should be possible to insert first", 
+	            !radix_insert(tree, 3, (void*)0xdeadbeef, 0));
 	radix_insert(tree, 4, (void*)0x04040404, 0);
-	assert((void*)0xdeadbeef == radix_lookup(tree, 3));
+	KT_ASSERT((void*)0xdeadbeef == radix_lookup(tree, 3));
 	for (int i = 5; i < 100; i++)
 		if ((retval = radix_lookup(tree, i))) {
 			printk("Extra item %p at slot %d in tree %p\n", retval, i,
@@ -1200,14 +1299,14 @@ void test_radix_tree(void)
 			print_radix_tree(tree);
 			monitor(0);
 		}
-	if (radix_insert(tree, 65, (void*)0xcafebabe, 0))
-		printk("Failed to insert a two-tier!\n");
-	if (!radix_insert(tree, 4, (void*)0x03030303, 0))
-		printk("Should not let us reinsert\n");
-	if (radix_insert(tree, 4095, (void*)0x4095, 0))
-		printk("Failed to insert a two-tier boundary!\n");
-	if (radix_insert(tree, 4096, (void*)0x4096, 0))
-		printk("Failed to insert a three-tier!\n");
+	KT_ASSERT_M("It should be possible to insert a two-tier", 
+	            !radix_insert(tree, 65, (void*)0xcafebabe, 0));
+	KT_ASSERT_M("It should not be possible to reinsert", 
+	            radix_insert(tree, 4, (void*)0x03030303, 0));
+	KT_ASSERT_M("It should be possible to insert a two-tier boundary", 
+	            !radix_insert(tree, 4095, (void*)0x4095, 0));
+	KT_ASSERT_M("It should be possible to insert a three-tier", 
+	            !radix_insert(tree, 4096, (void*)0x4096, 0));
 	//print_radix_tree(tree);
 	radix_delete(tree, 65);
 	radix_delete(tree, 3);
@@ -1215,33 +1314,35 @@ void test_radix_tree(void)
 	radix_delete(tree, 4095);
 	radix_delete(tree, 4096);
 	//print_radix_tree(tree);
-	printk("Finished radix tree tests!\n");
+
+	return true;
 }
 
 /* Assorted FS tests, which were hanging around in init.c */
-void test_random_fs(void)
+// TODO: remove all the print statements and try to convert most into assertions
+bool test_random_fs(void)
 {
 	int retval = do_symlink("/dir1/sym", "/bin/hello", S_IRWXU);
-	if (retval)
-		printk("symlink1 creation failed\n");
+	KT_ASSERT_M("symlink1 should be created successfully", 
+	            (!retval));
 	retval = do_symlink("/symdir", "/dir1/dir1-1", S_IRWXU);
-	if (retval)
-		printk("symlink1 creation failed\n");
+	KT_ASSERT_M("symlink1 should be created successfully", 
+	            (!retval));
 	retval = do_symlink("/dir1/test.txt", "/dir2/test2.txt", S_IRWXU);
-	if (retval)
-		printk("symlink2 creation failed\n");
+	KT_ASSERT_M("symlink2 should be created successfully", 
+	            (!retval));
 	retval = do_symlink("/dir1/dir1-1/up", "../../", S_IRWXU);
-	if (retval)
-		printk("symlink3 creation failed\n");
+	KT_ASSERT_M("symlink3 should be created successfully", 
+	            (!retval));
 	retval = do_symlink("/bin/hello-sym", "hello", S_IRWXU);
-	if (retval)
-		printk("symlink4 creation failed\n");
-	
+	KT_ASSERT_M("symlink4 should be created successfully", 
+	            (!retval));
+
 	struct dentry *dentry;
 	struct nameidata nd_r = {0}, *nd = &nd_r;
 	retval = path_lookup("/dir1/sym", 0, nd);
-	if (retval)
-		printk("symlink lookup failed: %d\n", retval);
+	KT_ASSERT_M("symlink lookup should work for an existing symlink", 
+	            (!retval));	
 	char *symname = nd->dentry->d_inode->i_op->readlink(nd->dentry);
 	printk("Pathlookup got %s (sym)\n", nd->dentry->d_name.name);
 	if (!symname)
@@ -1252,16 +1353,17 @@ void test_random_fs(void)
 	/* try with follow */
 	memset(nd, 0, sizeof(struct nameidata));
 	retval = path_lookup("/dir1/sym", LOOKUP_FOLLOW, nd);
-	if (retval)
-		printk("symlink lookup failed: %d\n", retval);
+	
+	KT_ASSERT_M("symlink lookup should work for an existing symlink", 
+	            (!retval));
 	printk("Pathlookup got %s (hello)\n", nd->dentry->d_name.name);
 	path_release(nd);
 	
 	/* try with a directory */
 	memset(nd, 0, sizeof(struct nameidata));
 	retval = path_lookup("/symdir/f1-1.txt", 0, nd);
-	if (retval)
-		printk("symlink lookup failed: %d\n", retval);
+	KT_ASSERT_M("symlink lookup should work for an existing symlink", 
+	            (!retval));
 	printk("Pathlookup got %s (f1-1.txt)\n", nd->dentry->d_name.name);
 	path_release(nd);
 	
@@ -1269,17 +1371,19 @@ void test_random_fs(void)
 	printk("Try with a rel path\n");
 	memset(nd, 0, sizeof(struct nameidata));
 	retval = path_lookup("/symdir/up/hello.txt", 0, nd);
-	if (retval)
-		printk("symlink lookup failed: %d\n", retval);
+	KT_ASSERT_M("symlink lookup should work for an existing symlink", 
+	            (!retval));
 	printk("Pathlookup got %s (hello.txt)\n", nd->dentry->d_name.name);
 	path_release(nd);
 	
 	printk("Try for an ELOOP\n");
 	memset(nd, 0, sizeof(struct nameidata));
 	retval = path_lookup("/symdir/up/symdir/up/symdir/up/symdir/up/hello.txt", 0, nd);
-	if (retval)
-		printk("Symlink lookup failed (it should): %d (-40)\n", retval);
+	KT_ASSERT_M("symlink lookup should fail for a non existing symlink", 
+	            (retval));
 	path_release(nd);
+
+	return true;
 }
 
 /* Kernel message to restart our kthread */
@@ -1299,7 +1403,8 @@ static void __test_up_sem(uint32_t srcid, long a0, long a1, long a2)
  * better infrastructure, we send ourselves a kmsg to run the kthread, which
  * we'll handle in smp_idle (which you may have to manually call).  Note this
  * doesn't test things like memory being leaked, or dealing with processes. */
-void test_kthreads(void)
+// TODO: Add assertions.
+bool test_kthreads(void)
 {
 	struct semaphore sem;
 	sem_init(&sem, 1);		/* set to 1 to test the unwind */
@@ -1317,6 +1422,8 @@ void test_kthreads(void)
 	printk("About to sleep for real\n");
 	sem_down(&sem);
 	printk("Kthread restarted!, Stacktop is %p.\n", get_stack_top());
+
+	return true;
 }
 
 /* Second player's kmsg */
@@ -1335,7 +1442,8 @@ static void __test_kref_2(uint32_t srcid, long a0, long a1, long a2)
 }
 
 /* Runs a simple test between core 0 (caller) and core 2 */
-void test_kref(void)
+// TODO: I believe we need more assertions.
+bool test_kref(void)
 {
 	struct kref local_kref;
 	bool done = FALSE;
@@ -1350,38 +1458,41 @@ void test_kref(void)
 	}
 	while (!done)
 		cpu_relax();
-	assert(kref_refcnt(&local_kref) == 1);
+	KT_ASSERT(kref_refcnt(&local_kref) == 1);
 	printk("[TEST-KREF] Simple 2-core getting/putting passed.\n");
+
+	return true;
 }
 
-void test_atomics(void)
+// TODO: Add more descriptive assertion messages.
+bool test_atomics(void)
 {
 	/* subtract_and_test */
 	atomic_t num;
 	/* Test subing to 0 */
 	atomic_init(&num, 1);
-	assert(atomic_sub_and_test(&num, 1) == 1);
+	KT_ASSERT(atomic_sub_and_test(&num, 1) == 1);
 	atomic_init(&num, 2);
-	assert(atomic_sub_and_test(&num, 2) == 1);
+	KT_ASSERT(atomic_sub_and_test(&num, 2) == 1);
 	/* Test not getting to 0 */
 	atomic_init(&num, 1);
-	assert(atomic_sub_and_test(&num, 0) == 0);
+	KT_ASSERT(atomic_sub_and_test(&num, 0) == 0);
 	atomic_init(&num, 2);
-	assert(atomic_sub_and_test(&num, 1) == 0);
+	KT_ASSERT(atomic_sub_and_test(&num, 1) == 0);
 	/* Test negatives */
 	atomic_init(&num, -1);
-	assert(atomic_sub_and_test(&num, 1) == 0);
+	KT_ASSERT(atomic_sub_and_test(&num, 1) == 0);
 	atomic_init(&num, -1);
-	assert(atomic_sub_and_test(&num, -1) == 1);
+	KT_ASSERT(atomic_sub_and_test(&num, -1) == 1);
 	/* Test larger nums */
 	atomic_init(&num, 265);
-	assert(atomic_sub_and_test(&num, 265) == 1);
+	KT_ASSERT(atomic_sub_and_test(&num, 265) == 1);
 	atomic_init(&num, 265);
-	assert(atomic_sub_and_test(&num, 2) == 0);
+	KT_ASSERT(atomic_sub_and_test(&num, 2) == 0);
 
 	/* CAS */
 	/* Simple test, make sure the bool retval of CAS handles failure */
-	void test_cas_val(long init_val)
+	bool test_cas_val(long init_val)
 	{
 		atomic_t actual_num;
 		long old_num;
@@ -1395,11 +1506,17 @@ void test_atomics(void)
 				old_num++;
 			attempt++;	
 		} while (!atomic_cas(&actual_num, old_num, old_num + 10));
-		if (atomic_read(&actual_num) != init_val + 10)
-			printk("FUCK, CAS test failed for %d\n", init_val);
+		if (atomic_read(&actual_num) != init_val + 10) {
+			return false;
+		} else {
+			return true;
+		}
 	}
-	test_cas_val(257);
-	test_cas_val(1);
+	KT_ASSERT_M("CAS test for 257 should be successful.",
+	            test_cas_val(257));
+	KT_ASSERT_M("CAS test for 1 should be successful.",
+	            test_cas_val(1));
+	return true;
 }
 
 /* Helper KMSG for test_abort.  Core 1 does this, while core 0 sends an IRQ. */
@@ -1416,7 +1533,8 @@ static void __test_try_halt(uint32_t srcid, long a0, long a1, long a2)
 /* x86 test, making sure our cpu_halt() and handle_irq() work.  If you want to
  * see it fail, you'll probably need to put a nop in the asm for cpu_halt(), and
  * comment out abort_halt() in handle_irq(). */
-void test_abort_halt(void)
+// TODO: Add assertions.
+bool test_abort_halt(void)
 {
 #ifdef CONFIG_X86
 	send_kernel_message(1, __test_try_halt, 0, 0, 0, KMSG_ROUTINE);
@@ -1426,6 +1544,7 @@ void test_abort_halt(void)
 	send_ipi(0x01, I_TESTING);
 	printk("Core 0 sent the IPI\n");
 #endif /* CONFIG_X86 */
+	return true;
 }
 
 /* Funcs and global vars for test_cv() */
@@ -1467,7 +1586,8 @@ void __test_cv_waiter_t3(uint32_t srcid, long a0, long a1, long a2)
 	atomic_dec(&counter);
 }
 
-void test_cv(void)
+// TODO: Add more assertions.
+bool test_cv(void)
 {
 	int nr_msgs;
 
@@ -1514,7 +1634,7 @@ void test_cv(void)
 		udelay(1000000);
 		kthread_yield();	/* run whatever messages we sent to ourselves */
 	}
-	assert(!cv->nr_waiters);
+	KT_ASSERT(!cv->nr_waiters);
 	printk("test_cv: massive message storm complete\n");
 
 	/* Test 3: basic one signaller, one receiver.  we want to vary the amount of
@@ -1539,14 +1659,16 @@ void test_cv(void)
 			 * done */
 			while (atomic_read(&counter))
 				cpu_relax();
-			assert(!cv->nr_waiters);
+			KT_ASSERT(!cv->nr_waiters);
 		}
 	}
 	printk("test_cv: single sender/receiver complete\n");
+
+	return true;
 }
 
 /* Based on a bug I noticed.  TODO: actual memset test... */
-void test_memset(void)
+bool test_memset(void)
 {
 	#define ARR_SZ 256
 	
@@ -1556,32 +1678,41 @@ void test_memset(void)
 			printk("%04d: %02x\n", i, *c++);
 	}
 	
-	void check_array(char *c, char x, size_t len)
+	bool check_array(char *c, char x, size_t len)
 	{
 		for (int i = 0; i < len; i++) {
-			if (*c != x) {
-				printk("Char %d is %c (%02x), should be %c (%02x)\n", i, *c,
-				       *c, x, x);
-				break;
-			}
+			#define ASSRT_SIZE 64
+			char *assrt_msg = (char*) kmalloc(ASSRT_SIZE, 0);
+			snprintf(assrt_msg, ASSRT_SIZE, 
+				     "Char %d is %c (%02x), should be %c (%02x)", i, *c, *c,
+				     x, x);
+			KT_ASSERT_M(assrt_msg, (*c == x));
 			c++;
 		}
+		return true;
 	}
 	
-	void run_check(char *arr, int ch, size_t len)
+	bool run_check(char *arr, int ch, size_t len)
 	{
 		char *c = arr;
 		for (int i = 0; i < ARR_SZ; i++)
 			*c++ = 0x0;
 		memset(arr, ch, len - 4);
-		check_array(arr, ch, len - 4);
-		check_array(arr + len - 4, 0x0, 4);
+		if (check_array(arr, ch, len - 4) &&
+		    check_array(arr + len - 4, 0x0, 4)) {
+			return true;
+		} else {
+			return false;
+		}
 	}
 
 	char bytes[ARR_SZ];
-	run_check(bytes, 0xfe, 20);
-	run_check(bytes, 0xc0fe, 20);
-	printk("Done!\n");
+
+	if (!run_check(bytes, 0xfe, 20) || !run_check(bytes, 0xc0fe, 20)) {
+		return false;
+	}
+
+	return true;
 }
 
 void __attribute__((noinline)) __longjmp_wrapper(struct jmpbuf* jb)
@@ -1593,7 +1724,8 @@ void __attribute__((noinline)) __longjmp_wrapper(struct jmpbuf* jb)
 	printk("Exiting: %s\n", __FUNCTION__); 
 }
 
-void test_setjmp()
+// TODO: Add assertions.
+bool test_setjmp()
 {
 	struct jmpbuf jb;
 	printk("Starting: %s\n", __FUNCTION__);
@@ -1605,9 +1737,12 @@ void test_setjmp()
       __longjmp_wrapper(&jb);
     }
 	printk("Exiting: %s\n", __FUNCTION__);
+
+	return true;
 }
 
-void test_apipe(void)
+// TODO: add assertions.
+bool test_apipe(void)
 {
 	static struct atomic_pipe test_pipe;
 
@@ -1672,7 +1807,7 @@ void test_apipe(void)
 	}
 
 	void *pipe_buf = kpage_alloc_addr();
-	assert(pipe_buf);
+	KT_ASSERT(pipe_buf);
 	apipe_init(&test_pipe, pipe_buf, PGSIZE, sizeof(struct some_struct));
 	printd("*ap_buf %p\n", test_pipe.ap_buf);
 	printd("ap_ring_sz %p\n", test_pipe.ap_ring_sz);
@@ -1698,18 +1833,21 @@ void test_apipe(void)
 	/* We could be on core 1 now.  If we were called from core0, our caller
 	 * might expect us to return while being on core 0 (like if we were kfunc'd
 	 * from the monitor.  Be careful if you copy this code. */
+
+	return true;
 }
 
 static struct rwlock rwlock, *rwl = &rwlock;
 static atomic_t rwlock_counter;
-void test_rwlock(void)
+// TODO: Add assertions.
+bool test_rwlock(void)
 {
 	bool ret;
 	rwinit(rwl);
 	/* Basic: can i lock twice, recursively? */
 	rlock(rwl);
 	ret = canrlock(rwl);
-	assert(ret);
+	KT_ASSERT(ret);
 	runlock(rwl);
 	runlock(rwl);
 	/* Other simply tests */
@@ -1750,6 +1888,8 @@ void test_rwlock(void)
 	while (atomic_read(&rwlock_counter))
 		cpu_relax();
 	printk("rwlock test complete\n");
+
+	return true;
 }
 
 /* Funcs and global vars for test_rv() */
@@ -1784,7 +1924,8 @@ void __test_rv_sleeper_timeout(uint32_t srcid, long a0, long a1, long a2)
 	atomic_dec(&counter);
 }
 
-void test_rv(void)
+// TODO: Add more assertions.
+bool test_rv(void)
 {
 	int nr_msgs;
 
@@ -1832,12 +1973,15 @@ void test_rv(void)
 		udelay(1000000);
 		kthread_yield();	/* run whatever messages we sent to ourselves */
 	}
-	assert(!rv->cv.nr_waiters);
+	KT_ASSERT(!rv->cv.nr_waiters);
 	printk("test_rv: lots of sleepers/timeouts complete\n");
+
+	return true;
 }
 
 /* Cheap test for the alarm internal management */
-void test_alarm(void)
+// TODO: Add assertions.
+bool test_alarm(void)
 {
 	uint64_t now = tsc2usec(read_tsc());
 	struct alarm_waiter await1, await2;
@@ -1868,6 +2012,8 @@ void test_alarm(void)
 	unset_alarm(tchain, &await2);
 
 	printk("%s complete\n", __FUNCTION__);
+
+	return true;
 }
 
 /* Linker function tests.  Keep them commented, etc. */
