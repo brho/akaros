@@ -1,0 +1,16 @@
+NETWORK_CARD ?= rtl8139
+CPU_MODEL ?= Nehalem
+NUM_CPUS ?= 8
+MEMORY_SIZE ?= 1024
+KERNEL_BIN ?= obj/kern/akaros-kernel
+ENABLE_KVM ?= #-enable-kvm
+
+QEMU_NETWORK = -net nic,model=$(NETWORK_CARD) -net user,hostfwd=tcp::5555-:23
+
+qemu: all qemu-run 
+
+# PLEASE NOTE: This may fail if qemu_launcher does not run with sudo permissions.
+# See http://www.tuxation.com/setuid-on-shell-scripts.html
+qemu-run:
+	qemu_launcher -s $(ENABLE_KVM) $(QEMU_NETWORK) -cpu $(CPU_MODEL) \
+	-smp $(NUM_CPUS) -m $(MEMORY_SIZE) -kernel $(KERNEL_BIN) -nographic

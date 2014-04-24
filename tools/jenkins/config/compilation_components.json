@@ -1,0 +1,39 @@
+{
+    "_comment" : "Please see utils/changes.py for explanation of this file.",
+    "compilation_components" : {
+        "cross-compiler": {
+            "PATHS": [
+                "./tools/compilers/+",
+                "./kern/include/ros/+",
+                "./kern/arch/{{arch}}/ros/+",
+                "./user/parlib/include/+",
+                "./user/pthread/+"
+            ]
+        },
+        "kernel": {
+            "PATHS": [
+                "./",
+                "./kern/arch/+",
+                "./kern/drivers/+",
+                "./kern/include/+",
+                "./kern/kfs/+",
+                "./kern/src/+",
+                "./scripts/kconfig/+"
+            ]
+        },
+        "userspace": {
+            "PATHS": [
+                "./",
+                "./kern/include/ros/+",
+                "./user/+",
+                "./tests/+",
+                "./scripts/kconfig/+"
+            ]
+        },
+        "busybox": {
+            "PATHS": [
+                "./tools/patches/busybox/+"
+            ]
+        }
+    }
+}
