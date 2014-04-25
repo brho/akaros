@@ -1,13 +1,22 @@
+/* Copyright (c) 2010-14 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details.
+ *
+ * Basic test for pthreading.  Spawns a bunch of threads that yield.
+ *
+ * To build on linux, cd into tests and run:
+ * $ gcc -O2 -std=gnu99 -fno-stack-protector -g pthread_test.c -lpthread
+ *
+ * Make sure you run it with taskset to fix the number of vcores/cpus. */
+
+#define _GNU_SOURCE /* for pth_yield on linux */
+
 #include <stdio.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/time.h>
-
-/* OS dependent #incs */
-#include <parlib.h>
-#include <vcore.h>
-#include <timing.h>
+#include "misc-compat.h" /* OS dependent #incs */
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 #define printf_safe(...) {}
@@ -33,12 +42,12 @@ void *yield_thread(void* arg)
 	while (!ready)
 		cpu_relax();
 	for (int i = 0; i < nr_yield_loops; i++) {
-		printf_safe("[A] pthread %d %p on vcore %d, itr: %d\n", pthread_self()->id,
-		       pthread_self(), vcore_id(), i);
+		printf_safe("[A] pthread %d %p on vcore %d, itr: %d\n", pthread_id(),
+		            pthread_self(), vcore_id(), i);
 		/* Fakes some work by spinning a bit.  Amount varies per uth/vcore,
 		 * scaled by fake_work */
 		if (amt_fake_work)
-			udelay(amt_fake_work * (pthread_self()->id * (vcore_id() + 1)));
+			udelay(amt_fake_work * (pthread_id() * (vcore_id() + 2)));
 		pthread_yield();
 		printf_safe("[A] pthread %p returned from yield on vcore %d, itr: %d\n",
 		            pthread_self(), vcore_id(), i);
@@ -66,6 +75,7 @@ int main(int argc, char** argv)
 	       nr_yield_threads, nr_yield_loops, nr_vcores, amt_fake_work);
 
 	/* OS dependent prep work */
+#ifdef __ros__
 	if (nr_vcores) {
 		/* Only do the vcore trickery if requested */
 		pthread_can_vcore_request(FALSE);	/* 2LS won't manage vcores */
@@ -73,10 +83,11 @@ int main(int argc, char** argv)
 		pthread_lib_init();					/* gives us one vcore */
 		vcore_request(nr_vcores - 1);		/* ghetto incremental interface */
 		for (int i = 0; i < nr_vcores; i++) {
-			printd("Vcore %d mapped to pcore %d\n", i,
-			       __procinfo.vcoremap[i].pcoreid);
+			printf_safe("Vcore %d mapped to pcore %d\n", i,
+			            __procinfo.vcoremap[i].pcoreid);
 		}
 	}
+#endif /* __ros__ */
 
 	/* create and join on yield */
 	for (int i = 0; i < nr_yield_threads; i++) {
@@ -100,8 +111,8 @@ int main(int argc, char** argv)
 	            (end_tv.tv_usec - start_tv.tv_usec);
 	printf("Done: %d uthreads, %d loops, %d vcores, %d work\n",
 	       nr_yield_threads, nr_yield_loops, nr_vcores, amt_fake_work);
-	printf("Nr context switches: %d\n", nr_ctx_switches);
-	printf("Time to run: %d usec\n", usec_diff);
+	printf("Nr context switches: %ld\n", nr_ctx_switches);
+	printf("Time to run: %ld usec\n", usec_diff);
 	if (nr_vcores == 1)
 		printf("Context switch latency: %d nsec\n",
 		       (int)(1000LL*usec_diff / nr_ctx_switches));
