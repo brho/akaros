@@ -23,6 +23,7 @@ int mon_bin_ls(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_bin_run(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_manager(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_procinfo(int argc, char **argv, struct hw_trapframe *hw_tf);
+int mon_kill(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_exit(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_kfunc(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_notify(int argc, char **argv, struct hw_trapframe *hw_tf);

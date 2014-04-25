@@ -55,6 +55,7 @@ static command_t (RO commands)[] = {
 	{ "bin_run", "Create and run a program from /bin", mon_bin_run},
 	{ "manager", "Run the manager", mon_manager},
 	{ "procinfo", "Show information about processes", mon_procinfo},
+	{ "kill", "Kills a process", mon_kill},
 	{ "exit", "Leave the monitor", mon_exit},
 	{ "kfunc", "Run a kernel function directly (!!!)", mon_kfunc},
 	{ "notify", "Notify a process.  Vcoreid will skip their prefs", mon_notify},
@@ -383,6 +384,26 @@ int mon_procinfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 		printk("Bad option\n");
 		return 1;
 	}
+	return 0;
+}
+
+int mon_kill(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+	struct proc *p;
+	int8_t irq_state = 0;
+	if (argc < 2) {
+		printk("Usage: kill PID\n");
+		return 1;
+	}
+	p = pid2proc(strtol(argv[1], 0, 0));
+	if (!p) {
+		printk("No such proc\n");
+		return 1;
+	}
+	enable_irqsave(&irq_state);
+	proc_destroy(p);
+	disable_irqsave(&irq_state);
+	proc_decref(p);
 	return 0;
 }
 
