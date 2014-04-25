@@ -66,6 +66,7 @@ static command_t (RO commands)[] = {
 	{ "bb", "Try to run busybox (ash)", mon_bb},
 	{ "alarm", "Alarm Diagnostics", mon_alarm},
 	{ "msr", "read/write msr: msr msr [value]", mon_msr},
+	{ "db", "Misc debugging", mon_db},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -1062,4 +1063,20 @@ int mon_msr(int argc, char **argv, struct hw_trapframe *hw_tf)
 	smp_call_wait(w);
 	return 0;
 #endif
+}
+
+int mon_db(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+	if (argc < 2) {
+		printk("Usage: db OPTION\n");
+		printk("\tsem: print all semaphore info\n");
+		return 1;
+	}
+	if (!strcmp(argv[1], "sem")) {
+		print_all_sem_info();
+	} else {
+		printk("Bad option\n");
+		return 1;
+	}
+	return 0;
 }

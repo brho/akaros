@@ -514,6 +514,7 @@ void print_sem_info(struct semaphore *sem)
 	TAILQ_FOREACH(kth_i, &sem->waiters, link)
 		printk("\tKthread %p (%s), proc %d (%p), sysc %p\n", kth_i, kth_i->name,
 		       kth_i->proc ? kth_i->proc->pid : 0, kth_i->proc, kth_i->sysc);
+	printk("\n");
 	spin_unlock_irqsave(&sem->lock);
 }
 
