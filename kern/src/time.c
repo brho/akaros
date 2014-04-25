@@ -59,6 +59,8 @@ void timer_interrupt(struct hw_trapframe *hw_tf, void *data)
 	int coreid = core_id();
 	/* run the alarms out of RKM context, so that event delivery works nicely
 	 * (keeps the proc lock and ksched lock non-irqsave) */
+	/* this is about the only place we can stash this info. */
+	per_cpu_info[coreid].rip = hw_tf->tf_rip;
 	send_kernel_message(coreid, __trigger_tchain,
 	                    (long)&per_cpu_info[coreid].tchain, 0, 0, KMSG_ROUTINE);
 }

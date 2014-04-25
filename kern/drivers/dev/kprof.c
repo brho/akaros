@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is part of the UCB release of Plan 9. It is subject to the license
  * terms in the LICENSE file found in the top-level directory of this
  * distribution and at http://akaros.cs.berkeley.edu/files/Plan9License. No
@@ -23,7 +23,7 @@
 
 
 #define LRES	3		/* log of PC resolution */
-#define CELLSIZE	8		/* sizeof of count cell; well known as 4 */
+#define CELLSIZE	8	/* sizeof of count cell; well known as 4 */
 
 struct
 {
@@ -35,6 +35,12 @@ struct
 	spinlock_t lock;
 }kprof;
 
+/* output format. Nice fixed size. That makes it seekable.
+ * small subtle bit here. You have to convert offset FROM FORMATSIZE units
+ * to CELLSIZE units in a few places.
+ */
+char *outformat = "%30s %016llx\n";
+#define FORMATSIZE 48
 enum{
 	Kprofdirqid,
 	Kprofdataqid,
@@ -52,7 +58,7 @@ kprofattach(char *spec)
 	uint32_t n;
 
 	/* allocate when first used */
-	kprof.minpc = KERN_LOAD_ADDR;
+	kprof.minpc = 0xffffffffc2000000; //KERN_LOAD_ADDR;
 	kprof.maxpc = (uintptr_t)&etext;
 	kprof.nbuf = (kprof.maxpc-kprof.minpc) >> LRES;
 	n = kprof.nbuf*CELLSIZE;
@@ -67,7 +73,7 @@ kprofattach(char *spec)
 }
 
 static void
-_kproftimer(uintptr_t pc)
+kproftimer(uintptr_t pc)
 {
 	if(kprof.time == 0)
 		return;
@@ -87,26 +93,41 @@ _kproftimer(uintptr_t pc)
 	 */
 
 //	ilock(&kprof);
-#warning "how do we fill out this timing info"
-#if 0
-	kprof.buf[0] += TK2MS(1);
+	/* this is weird. What we do is assume that all the time since the last
+	 * measurement went into this PC. It's the best
+	 * we can do I suppose. And we are sampling at 1 ms. for now.
+	 * better ideas welcome.
+	 */
+	kprof.buf[0] += 1; //Total count of ticks.
 	if(kprof.minpc<=pc && pc<kprof.maxpc){
 		pc -= kprof.minpc;
 		pc >>= LRES;
-		kprof.buf[pc] += TK2MS(1);
+		kprof.buf[pc] += 1;
 	}else
-		kprof.buf[1] += TK2MS(1);
-#endif
+		kprof.buf[1] += 1; // Why?
 //	iunlock(&kprof);
 }
 
+static void setup_timers(void)
+{
+	void handler(struct alarm_waiter *waiter)
+	{
+		struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
+		kproftimer(per_cpu_info[core_id()].rip);
+		set_awaiter_rel(waiter, 1000);
+		__set_alarm(tchain, waiter);
+	}
+	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
+	struct alarm_waiter *waiter = kmalloc(sizeof(struct alarm_waiter), 0);
+	init_awaiter(waiter, handler);
+	set_awaiter_rel(waiter, 1000);
+	set_alarm(tchain, waiter);
+}
 static void
 kprofinit(void)
 {
 	if(CELLSIZE != sizeof kprof.buf[0])
 		panic("kprof size");
-#warning "how do we set up this timer"
-	//kproftimer = _kproftimer;
 }
 
 static struct walkqid*
@@ -144,8 +165,10 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 {
 	uintptr_t end;
 	uint64_t w, *bp;
-	uint8_t *a, *ea;
+	char *a, *ea;
 	uintptr_t offset = off;
+	uint64_t pc;
+	int ret = 0;
 
 	switch((int)c->qid.path){
 	case Kprofdirqid:
@@ -153,32 +176,34 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 
 	case Kprofdataqid:
 		end = kprof.nbuf*CELLSIZE;
-		if(offset & (CELLSIZE-1))
-			error(Ebadarg);
-		if(offset >= end){
+
+		if (n < FORMATSIZE){
 			n = 0;
 			break;
 		}
-		if(offset+n > end)
-			n = end-offset;
-		n &= ~(CELLSIZE-1);
 		a = va;
 		ea = a + n;
-		bp = kprof.buf + offset/CELLSIZE;
-		while(a < ea){
-			w = *bp++;
-			/* I'd really like not to have to worry
-			 * about 32 bit machines any more!
+		bp = kprof.buf + offset/FORMATSIZE;
+		while((a < ea) && (n >= FORMATSIZE)){
+			/* what a pain. We need to manage the
+			 * fact that the *prints all make room for
+			 * \0
 			 */
-			*a++ = w>>56;
-			*a++ = w>>48;
-			*a++ = w>>40;
-			*a++ = w>>32;
-			*a++ = w>>24;
-			*a++ = w>>16;
-			*a++ = w>>8;
-			*a++ = w>>0;
+			char print[FORMATSIZE+1];
+			char *name;
+
+			if(offset/FORMATSIZE >= kprof.nbuf){
+				break;
+			}
+			w = *bp++;
+			pc = kprof.minpc + ((offset/FORMATSIZE)<<LRES);
+			name = get_fn_name(pc);
+			snprintf(print, sizeof(print), outformat, name, w);
+			memmove(a, print, FORMATSIZE);
+			n -= FORMATSIZE;
+			ret += FORMATSIZE;
 		}
+		n = ret;
 		break;
 
 	default:
@@ -196,9 +221,10 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 		if(strncmp(a, "startclr", 8) == 0){
 			memset((char *)kprof.buf, 0, kprof.nbuf*CELLSIZE);
 			kprof.time = 1;
-		}else if(strncmp(a, "start", 5) == 0)
+		}else if(strncmp(a, "start", 5) == 0) {
 			kprof.time = 1;
-		else if(strncmp(a, "stop", 4) == 0)
+			setup_timers();
+		} else if(strncmp(a, "stop", 4) == 0)
 			kprof.time = 0;
 		break;
 	default:

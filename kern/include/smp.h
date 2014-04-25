@@ -29,6 +29,8 @@ typedef sharC_env_t;
 struct per_cpu_info {
 #ifdef CONFIG_X86_64
 	uintptr_t stacktop;
+	/* the rip at the last clock interrupt. For profiling. */
+	uintptr_t rip;
 	/* virtual machines */
 	/* this is all kind of gross, but so it goes. Kmalloc
 	 * the vmxarea. It varies in size depending on the architecture.
