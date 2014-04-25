@@ -466,8 +466,8 @@ void pthread_lib_init(void)
 	atomic_init(&threads_total, 1);			/* one for thread0 */
 }
 
-int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
-                   void *(*start_routine)(void *), void *arg)
+int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+                     void *(*start_routine)(void *), void *arg)
 {
 	struct uth_thread_attr uth_attr = {0};
 	run_once(pthread_lib_init());
@@ -503,9 +503,16 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	if (need_tls)
 		uth_attr.want_tls = TRUE;
 	uthread_init((struct uthread*)pthread, &uth_attr);
-	pth_thread_runnable((struct uthread*)pthread);
 	*thread = pthread;
 	atomic_inc(&threads_total);
+	return 0;
+}
+
+int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+                   void *(*start_routine)(void *), void *arg)
+{
+	if (!__pthread_create(thread, attr, start_routine, arg))
+		pth_thread_runnable((struct uthread*)*thread);
 	return 0;
 }
 
