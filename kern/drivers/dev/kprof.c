@@ -39,8 +39,8 @@ struct
  * small subtle bit here. You have to convert offset FROM FORMATSIZE units
  * to CELLSIZE units in a few places.
  */
-char *outformat = "%30s %016llx\n";
-#define FORMATSIZE 48
+char *outformat = "%016llx %29s %016llx\n";
+#define FORMATSIZE 64
 enum{
 	Kprofdirqid,
 	Kprofdataqid,
@@ -198,8 +198,9 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 			w = *bp++;
 			pc = kprof.minpc + ((offset/FORMATSIZE)<<LRES);
 			name = get_fn_name(pc);
-			snprintf(print, sizeof(print), outformat, name, w);
+			snprintf(print, sizeof(print), outformat, pc, name, w);
 			memmove(a, print, FORMATSIZE);
+			a += FORMATSIZE;
 			n -= FORMATSIZE;
 			ret += FORMATSIZE;
 		}
