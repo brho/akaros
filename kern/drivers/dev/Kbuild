@@ -3,6 +3,7 @@ obj-y						+= alarm.o
 obj-y						+= coreboot.o
 obj-y						+= cons.o
 obj-y						+= ether.o
+obj-y						+= kprof.o
 obj-y						+= mnt.o
 #obj-y						+= pci.o
 obj-y						+= pipe.o

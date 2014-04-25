@@ -99,3 +99,8 @@ echo I am $me, default route $route
 i=`cat /net/ipifc/clone`
 echo "bind loopback /dev/null " > /net/ipifc/$i/ctl
 echo "add 127.0.0.1 255.0.0.0 127.0.0.0 " > /net/ipifc/$i/ctl
+
+cs&
+mount -a \#s/cs /net
+echo debug > /net/cs
+
