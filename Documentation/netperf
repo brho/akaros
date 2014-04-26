@@ -1,0 +1,8 @@
+Building netperf. 
+
+Forget about modifying the configure file, that way lies madness.
+
+First, the command to make it sort of build.
+
+./configure CC=x86_64-ros-gcc CFLAGS=-Dros --host x86_64-unknown-linux-gnu  enable_rtlookup=none enable_drvlookup=none LIBS=/home/rminnich/akaros/user/bsd/obj/libbsd.a
+Then a few other things.
