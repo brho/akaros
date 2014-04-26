@@ -19,6 +19,7 @@
 #include <tsc-compat.h>
 #include <printf-ext.h>
 #include <alarm.h>
+#include <ndb.h>
 
 #define NR_MSG				4
 #define SLEEPMS				1000
@@ -480,8 +481,6 @@ isv4name(char *name)
 		return 1;
 	else if (isv6lit(ds.rem))
 		return 0;
-#warning "Fix me when we get /net/cs"
-#if 0
 	/*we don't have cs.*/
 	/* map name to ip and look at its syntax */
 	ip = csgetvalue(root, "sys", ds.rem, "ip", NULL);
@@ -493,7 +492,6 @@ isv4name(char *name)
 		ip = csgetvalue(root, "dom", ds.rem, "ipv6", NULL);
 	if (ip != NULL)
 		r = isv4name(ip);
-#endif
 	free(ip);
 	return r;
 }
