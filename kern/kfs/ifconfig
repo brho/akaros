@@ -101,6 +101,17 @@ echo "bind loopback /dev/null " > /net/ipifc/$i/ctl
 echo "add 127.0.0.1 255.0.0.0 127.0.0.0 " > /net/ipifc/$i/ctl
 
 cs&
+if [ ! -e "#s/cs" ] 
+then
+	echo "cs hasn't created #s/cs yet, sleeping until it does..."
+	until [ -e "#s/cs" ] 
+	do 
+		usleep 1000
+	done
+fi
 mount -a \#s/cs /net
-echo debug > /net/cs
 
+# this is noisy, so it is off by default.
+#echo debug > /net/cs
+
+echo "ifconfig complete"
