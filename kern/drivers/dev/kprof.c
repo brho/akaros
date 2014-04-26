@@ -184,6 +184,7 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 		a = va;
 		ea = a + n;
 		bp = kprof.buf + offset/FORMATSIZE;
+		pc = kprof.minpc + ((offset/FORMATSIZE)<<LRES);
 		while((a < ea) && (n >= FORMATSIZE)){
 			/* what a pain. We need to manage the
 			 * fact that the *prints all make room for
@@ -196,13 +197,13 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 				break;
 			}
 			w = *bp++;
-			pc = kprof.minpc + ((offset/FORMATSIZE)<<LRES);
 			name = get_fn_name(pc);
 			snprintf(print, sizeof(print), outformat, pc, name, w);
 			memmove(a, print, FORMATSIZE);
 			a += FORMATSIZE;
 			n -= FORMATSIZE;
 			ret += FORMATSIZE;
+			pc++;
 		}
 		n = ret;
 		break;
