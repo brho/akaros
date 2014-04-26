@@ -1,0 +1,41 @@
+The kprof devices samples the kernel IP at 1 Khz. 
+
+You have to bind into /net for now as 9namespace doesn't yet control /dev.
+
+bind -a '#K' /net
+
+set up your world.
+
+echo start > /net/kpctl
+
+run your tests
+
+echo stop > /net/kpctl
+
+get the data
+cat /net/kpdata > some-file
+
+The file should probably NOT be on the akaros node, funnel it out over a mnt
+or similar path to a persistent place where you can run tools.
+
+The data is in this form
+pc name count-in-milliseconds
+The format is
+%016llx %29s %016llx\n
+
+The pc is 8-byte aligned. You'll see the function name a lot. You might want to reduce the
+number of times you see it.
+
+One way to process:
+
+awk '{
+> kp[$3]++;
+> }
+> END{
+> for (var in kp)
+> print var, " ", kp[var]
+> }
+> ' kp.txt
+
+Oh, and, currently, we tend to assume that the pc is a kernel pc. That's kind of dumb, and
+we need to fix it.
