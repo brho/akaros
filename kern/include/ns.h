@@ -121,6 +121,9 @@ struct dir {
 	char *muid;					/* last modifier name */
 };
 
+/* Part of the dirty kdirent hack in sysread.  Used to be 59... */
+#define MIN_M_BUF_SZ 52			/* TODO: 53 is the smallest i've seen */
+
 struct waitmsg {
 	int pid;					/* of loved one */
 	uint32_t time[3];			/* of loved one and descendants */

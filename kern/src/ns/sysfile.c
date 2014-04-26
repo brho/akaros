@@ -716,7 +716,6 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 	int64_t off;
 
 	/* dirty dirent hack */
-#define MIN_M_BUF_SZ 58	/* TODO: 59 is the smallest i've seen */
 	void *real_va = va;
 	void *buf_for_M = 0;
 	size_t buf_sz = 0;
