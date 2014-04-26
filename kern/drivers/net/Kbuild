@@ -2,6 +2,7 @@
 obj-y							+= dummy.o
 obj-y							+= ether8139.o
 obj-y							+= ether8169.o
+obj-y							+= ether82563.o
 obj-y							+= ethermii.o
 obj-y							+= etherigbe.o
 # Following are from gpxe and need a lot of help.
