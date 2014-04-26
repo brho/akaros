@@ -45,6 +45,7 @@ static command_t (RO commands)[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "backtrace", "Dump a backtrace", mon_backtrace },
+	{ "bt", "Dump a backtrace", mon_bt },
 	{ "reboot", "Take a ride to the South Bay", mon_reboot },
 	{ "showmapping", "Shows VA->PA mappings", mon_showmapping},
 	{ "setmapperm", "Sets permissions on a VA->PA mapping", mon_setmapperm},
@@ -128,7 +129,7 @@ static char RO* function_of(uint32_t address)
 }
 #endif
 
-int mon_backtrace(int argc, char **argv, struct hw_trapframe *hw_tf)
+static int __backtrace(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	uintptr_t pc, fp;
 	if (argc == 1) {
@@ -144,6 +145,16 @@ int mon_backtrace(int argc, char **argv, struct hw_trapframe *hw_tf)
 	printk("Backtrace from instruction %p, with frame pointer %p\n", pc, fp);
 	backtrace_frame(pc, fp);
 	return 0;
+}
+
+int mon_backtrace(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+	return __backtrace(argc, argv, hw_tf);
+}
+
+int mon_bt(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+	return __backtrace(argc, argv, hw_tf);
 }
 
 int mon_reboot(int argc, char **argv, struct hw_trapframe *hw_tf)
