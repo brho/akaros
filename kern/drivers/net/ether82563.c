@@ -1,5 +1,5 @@
 /*
- * Copyright 2008
+ * Copyright 2008-2014
  * erik quanstrom
  *
  * This software is provided `as-is,' without any express or implied
