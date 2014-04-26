@@ -56,25 +56,21 @@ accept(int fd, __SOCKADDR_ARG __addr,
 		/* get control file name from listener process */
 		n = read(fd, name, sizeof(name)-1);
 		if(n <= 0){
-			_syserrno();
 			return -1;
 		}
 		name[n] = 0;
 		cfd = open(name, O_RDWR);
 		if(cfd < 0){
-			_syserrno();
 			return -1;
 		}
 
 		nfd = _sock_data(cfd, net, r->domain, r->stype, r->protocol, &nr);
 		if(nfd < 0){
-			_syserrno();
 			return -1;
 		}
 
 		if(write(fd, "OK", 2) < 0){
 			close(nfd);
-			_syserrno();
 			return -1;
 		}
 

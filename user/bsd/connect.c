@@ -49,7 +49,6 @@ int connect (int fd, __CONST_SOCKADDR_ARG a, socklen_t alen)
 		/* set up a tcp or udp connection */
 		cfd = open(r->ctl, O_RDWR);
 		if(cfd < 0){
-			_syserrno();
 			return -1;
 		}
 		/* whatever .. */
@@ -66,7 +65,6 @@ int connect (int fd, __CONST_SOCKADDR_ARG a, socklen_t alen)
 				r->reserved ? "!r" : "");
 		n = write(cfd, msg, strlen(msg));
 		if(n < 0){
-			_syserrno();
 			close(cfd);
 			return -1;
 		}
@@ -96,12 +94,10 @@ int connect (int fd, __CONST_SOCKADDR_ARG a, socklen_t alen)
 		_sock_srvname(file, runix->sun_path);
 		nfd = open(file, O_RDWR);
 		if(nfd < 0){
-			_syserrno();
 			unlink(msg);
 			return -1;
 		}
 		if(write(nfd, msg, strlen(msg)) < 0){
-			_syserrno();
 			close(nfd);
 			unlink(msg);
 			return -1;

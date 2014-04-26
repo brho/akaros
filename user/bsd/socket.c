@@ -139,13 +139,11 @@ socket(int domain, int stype, int protocol)
 			return -1;
 		}
 		if(cfd < 0){
-			_syserrno();
 			return -1;
 		}
 		return _sock_data(cfd, net, domain, stype, protocol, 0);
 	case PF_UNIX:
 		if(pipe(pfd) < 0){
-			_syserrno();
 			return -1;
 		}
 		r = _sock_newrock(pfd[0]);

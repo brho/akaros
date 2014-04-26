@@ -53,12 +53,10 @@ _sock_srv(char *path, int fd)
 	sfd = creat(msg, 0666);
 	if(sfd < 0){
 		close(fd);
-		_syserrno();
 		return -1;
 	}
 	snprintf(msg, sizeof msg, "%d", fd);
 	if(write(sfd, msg, strlen(msg)) < 0){
-		_syserrno();
 		close(sfd);
 		close(fd);
 		return -1;

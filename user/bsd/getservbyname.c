@@ -53,7 +53,6 @@ getservbyname(const char *name, const char *proto)
 	/* connect to server */
 	fd = open("/net/cs", O_RDWR);
 	if(fd < 0){
-		_syserrno();
 		return 0;
 	}
 
@@ -65,7 +64,6 @@ getservbyname(const char *name, const char *proto)
 
 	/* query the server */
 	if(write(fd, buf, strlen(buf)) < 0){
-		_syserrno();
 		return 0;
 	}
 	lseek(fd, 0, 0);

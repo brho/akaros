@@ -43,7 +43,6 @@ struct protoent *getprotobyname(const char *name) {
 	/* connect to server */
 	fd = open("/net/cs", O_RDWR);
 	if(fd < 0){
-		_syserrno();
 		h_errno = NO_RECOVERY;
 		return 0;
 	}
@@ -53,7 +52,6 @@ struct protoent *getprotobyname(const char *name) {
 
 	/* query the server */
 	if(write(fd, buf, strlen(buf)) < 0){
-		_syserrno();
 		h_errno = TRY_AGAIN;
 		return 0;
 	}
