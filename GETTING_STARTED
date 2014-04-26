@@ -152,10 +152,11 @@ Other userspace programs, like busybox need to be compiled with the cross
 compiler and then have their binaries copied to kern/kfs/bin (I do this
 manually).
 
-I'm running busybox 1.17.3, and the config file I use is in tools/patches.
-Copy that to your busybox directory (once you download and untar it, etc) and
-name it ".config".  This config file assumes you want x86_64-ros-gcc.  If you
-are builidng for 32 bit x86 or riscv, you will need to edit the config file.
+I'm running busybox 1.17.3, and the config file I use is in
+tools/patches/busybox.  Copy that to your busybox directory (once you download
+and untar it, etc) and name it ".config".  This config file assumes you want
+x86_64-ros-gcc.  If you are builidng for 32 bit x86 or riscv, you will need to
+edit the config file.
 
 You can get busybox from http://www.busybox.net/downloads/.  Eventually I'll
 upgrade, though it hasn't been a big deal yet.
@@ -164,9 +165,14 @@ $ cd BUSYBOXDIR/..
 $ wget http://www.busybox.net/downloads/busybox-1.17.3.tar.bz2
 $ tar -jxvf busybox-1.17.3.tar.bz2
 $ cd AKAROS-ROOT
-$ cp tools/patches/busybox-1.17.3.config BUSYBOXDIR/.config
+$ cp tools/patches/busybox/busybox-1.17.3.config BUSYBOXDIR/.config
 
-$ cd BUSYBOXDIR ; make
+$ cd BUSYBOXDIR
+
+You'll also want to apply any patches for busybox.  From the busybox directory:
+
+$ patch -p1 < AKAROS-ROOT/tools/patches/busybox/EACH_PATCH_FILE.patch
+$ make
 
 Then I copy the unstripped binary to KFS.
 
