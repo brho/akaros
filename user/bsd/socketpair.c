@@ -16,6 +16,8 @@
 #include <sys/uio.h>
 #include <sys/socket.h>
 
+#include "priv.h"
+
 int
 socketpair(int domain, int type, int protocol, int *sv)
 {

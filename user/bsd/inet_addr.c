@@ -17,6 +17,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+#include "priv.h"
+
 /* where to define this? only used once? */
 unsigned long nptohl(void *p);
 

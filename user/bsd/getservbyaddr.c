@@ -17,6 +17,8 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
+#include "priv.h"
+
 struct servent *getservbyport (int port, __const char *proto)
 {
 	char buf[32];

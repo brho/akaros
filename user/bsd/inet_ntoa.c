@@ -18,6 +18,8 @@
 #include <netinet/in.h>
 #include <sys/un.h>
 
+#include "priv.h"
+
 char*
 inet_ntoa(struct in_addr in)
 {

@@ -17,6 +17,8 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
+#include "priv.h"
+
 int h_errno;
 
 struct hostent *gethostbyaddr (__const void *addr, __socklen_t len,

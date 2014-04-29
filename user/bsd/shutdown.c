@@ -9,6 +9,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "priv.h"
+
 int
 shutdown(int fd, int how)
 {

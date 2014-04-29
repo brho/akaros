@@ -11,6 +11,8 @@
 #include <fcntl.h>
 #include <string.h>
 
+#include "priv.h"
+
 int
 putenv(char *s)
 {

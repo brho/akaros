@@ -6,6 +6,16 @@
  * modified, propagated, or distributed except according to the terms contained
  * in the LICENSE file.
  */
+#include <parlib.h>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/socket.h>
+
+#include <netinet/in.h>
+
+
 typedef struct Rock Rock;
 
 enum

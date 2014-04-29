@@ -540,6 +540,7 @@ user-dirs = parlib pthread benchutil iplib ndblib bsd
 pthread: parlib benchutil
 iplib: parlib
 ndblib: iplib
+bsd: parlib iplib
 
 PHONY += install-libs $(user-dirs)
 install-libs: $(user-dirs) symlinks cc-exists

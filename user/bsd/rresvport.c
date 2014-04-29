@@ -19,6 +19,8 @@
 #include <netinet/in.h>
 #include <sys/un.h>
 
+#include "priv.h"
+
 int
 rresvport(int *p)
 {

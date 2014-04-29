@@ -13,6 +13,8 @@
 #include <fcntl.h>
 #include <string.h>
 
+#include "priv.h"
+
 int
 gethostname(char *name, size_t namelen)
 {

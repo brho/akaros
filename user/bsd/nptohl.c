@@ -6,6 +6,8 @@
  * modified, propagated, or distributed except according to the terms contained
  * in the LICENSE file.
  */
+#include "priv.h"
+
 unsigned long
 nptohl(void *p)
 {
