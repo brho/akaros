@@ -7,7 +7,7 @@ enum {
 	Addrlen = 64,
 	Maxproto = 20,
 	Nhash = 64,
-	Maxincall = 5,
+	Maxincall = 500,
 	Nchans = 256,
 	MAClen = 16,	/* longest mac address */
 
