@@ -9,7 +9,6 @@
 
 #include <stdio.h>
 #include <kmalloc.h>
-#include <generated/autoconf.h>
 
 /* Macros for assertions. 
  * They depend on <stdbool.h> and printk() to be included in the source file. 
@@ -46,13 +45,13 @@ struct pb_kernel_test {
  * wherever you need a boolean defined.  Returns 0 or 1. */
 #define is_defined(macro) is_defined_(macro)
 #define is_defined_test_1 ,
-#define is_defined_(value) is_defined__(is_defined_test_##value)
-#define is_defined__(comma) is_defined___(comma 1, 0)
+#define is_defined_(value) is_defined__(is_defined_test_##value, value)
+#define is_defined__(comma, value) is_defined___(comma value, 0)
 #define is_defined___(_, v, ...) v
 
 /* Macro for registering a postboot kernel test. */
-#define PB_K_TEST_REG(name) \
-	{"test_" #name, test_##name, is_defined(CONFIG_TEST_##name)}
+#define PB_K_TEST_REG(name, config) \
+	{"test_" #name, test_##name, is_defined(config)}
 
 extern struct pb_kernel_test pb_kernel_tests[];
 extern int num_pb_kernel_tests;
