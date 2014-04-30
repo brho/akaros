@@ -43,6 +43,9 @@ typedef unsigned long uintreg_t;
 #define FOR_CIRC_BUFFER(next, size, var) \
 	for (int _var = 0, var = (next); _var < (size); _var++, var = (var + 1) % (size))
 
+#define STRINGIFY(s) __STRINGIFY(s)
+#define __STRINGIFY(s) #s
+
 // Efficient min and max operations
 #ifdef ROS_KERNEL /* Glibc has their own */
 #define MIN(_a, _b)						\

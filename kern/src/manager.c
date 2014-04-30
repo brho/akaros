@@ -84,10 +84,18 @@ void manager(void)
 	#define PASTE(s1,s2) s1 ## s2
 	#define MANAGER_FUNC(dev) PASTE(manager_,dev)
 
-	// Run Kernel post boot tests (from tests_postboot_kernel.c)
+	// Run Kernel post boot tests (from tests_postboot_kernel.c).
 	#ifdef CONFIG_POSTBOOT_KERNEL_TESTING
 		postboot_kernel_tests();
 	#endif
+	// Run userspace tests (from config specified path).
+	if (strlen(CONFIG_USERSPACE_TESTING) != 0)
+	{
+		printk("'%s' is %d chars long", CONFIG_USERSPACE_TESTING,
+			   strlen(STRINGIFY(CONFIG_USERSPACE_TESTING)));
+		char *usp_args[] = {"bin_run", "ash", CONFIG_USERSPACE_TESTING};
+		mon_bin_run(3, usp_args, NULL);
+	} 
 
 	void MANAGER_FUNC(DEVELOPER_NAME)(void);
 	MANAGER_FUNC(DEVELOPER_NAME)();

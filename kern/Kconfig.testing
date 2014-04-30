@@ -244,4 +244,10 @@ config TEST_alarm
     help
         Run the alarm test
 
+config USERSPACE_TESTING
+string "Userspace testing. Fill with path to test launcher script, or leave empty for skipping"
+    help
+        Run userspace unit tests from the specified path. Leave empty to skip
+        testing.
+
 endmenu
