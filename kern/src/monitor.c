@@ -48,6 +48,7 @@ static command_t (RO commands)[] = {
 	{ "bt", "Dump a backtrace", mon_bt },
 	{ "reboot", "Take a ride to the South Bay", mon_reboot },
 	{ "showmapping", "Shows VA->PA mappings", mon_showmapping},
+	{ "sm", "Shows VA->PA mappings", mon_sm},
 	{ "setmapperm", "Sets permissions on a VA->PA mapping", mon_setmapperm},
 	{ "cpuinfo", "Prints CPU diagnostics", mon_cpuinfo},
 	{ "ps", "Prints process list", mon_ps},
@@ -167,24 +168,48 @@ int mon_reboot(int argc, char **argv, struct hw_trapframe *hw_tf)
 	return 0;
 }
 
-int mon_showmapping(int argc, char **argv, struct hw_trapframe *hw_tf)
+static int __showmapping(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-	if (argc < 2) {
-		cprintf("Shows virtual -> physical mappings for a virt addr range.\n");
-		cprintf("Usage: showmapping START_ADDR [END_ADDR]\n");
-		return 1;
-	}
+	struct proc *p;
 	uintptr_t start;
 	size_t size;
-	start = ROUNDDOWN(strtol(argv[1], 0, 16), PGSIZE);
-	size = (argc == 2) ? 1 : strtol(argv[2], 0, 16) - start;
+	pde_t *pgdir;
+	pid_t pid;
+	if (argc < 3) {
+		printk("Shows virtual -> physical mappings for a virt addr range.\n");
+		printk("Usage: showmapping PID START_ADDR [END_ADDR]\n");
+		printk("    PID == 0 for the boot pgdir\n");
+		return 1;
+	}
+	pid = strtol(argv[1], 0, 10);
+	if (!pid) {
+		pgdir = boot_pgdir;
+	} else {
+		p = pid2proc(pid);
+		if (!p) {
+			printk("No proc with pid %d\n", pid);
+			return 1;
+		}
+		pgdir = p->env_pgdir;
+	}
+	start = ROUNDDOWN(strtol(argv[2], 0, 16), PGSIZE);
+	size = (argc == 3) ? 1 : strtol(argv[3], 0, 16) - start;
 	if (size/PGSIZE > 512) {
 		cprintf("Not going to do this for more than 512 items\n");
 		return 1;
 	}
-
-	show_mapping(start,size);
+	show_mapping(pgdir, start, size);
 	return 0;
+}
+
+int mon_showmapping(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+	return __showmapping(argc, argv, hw_tf);
+}
+
+int mon_sm(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+	return __showmapping(argc, argv, hw_tf);
 }
 
 int mon_setmapperm(int argc, char **argv, struct hw_trapframe *hw_tf)

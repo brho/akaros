@@ -17,6 +17,7 @@ int mon_bt(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_ps(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_reboot(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_showmapping(int argc, char **argv, struct hw_trapframe *hw_tf);
+int mon_sm(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_setmapperm(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_cpuinfo(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_nanwan(int argc, char **argv, struct hw_trapframe *hw_tf);

@@ -24,9 +24,8 @@ print_cpuinfo(void)
 	cprintf("CPU Info: RISC-V %s\n", name);
 }
 
-void show_mapping(uintptr_t start, size_t size)
+void show_mapping(pde_t *pt, uintptr_t start, size_t size)
 {
-  pde_t* pt = (pde_t*)KADDR(rcr3());
 	pte_t* pte;
 	uintptr_t i;
 	page_t* page;

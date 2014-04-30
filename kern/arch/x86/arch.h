@@ -34,7 +34,7 @@ static inline void reboot(void)
 void send_ipi(uint32_t os_coreid, uint8_t vector);
 /* in cpuinfo.c */
 void print_cpuinfo(void);
-void show_mapping(uintptr_t start, size_t size);
+void show_mapping(pde_t *pgdir, uintptr_t start, size_t size);
 int vendor_id(char *);
 
 static inline void breakpoint(void)

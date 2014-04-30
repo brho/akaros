@@ -12,7 +12,7 @@
 #define ARCH_CL_SIZE 64
 
 void print_cpuinfo(void);
-void show_mapping(uintptr_t start, size_t size);
+void show_mapping(pde_t *pgdir, uintptr_t start, size_t size);
 void backtrace(void);
 
 static __inline void breakpoint(void)

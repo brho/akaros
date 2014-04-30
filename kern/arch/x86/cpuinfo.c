@@ -186,9 +186,8 @@ void print_cpuinfo(void)
 #define BIT_DASHES ""
 #endif
 
-void show_mapping(uintptr_t start, size_t size)
+void show_mapping(pde_t *pgdir, uintptr_t start, size_t size)
 {
-	pde_t *pgdir = (pde_t*)vpd;
 	pte_t *pte;
 	pte_t *pde;
 	page_t *page;
