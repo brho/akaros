@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Busybox version: 1.17.3
-# Thu Jan 30 12:02:08 2014
+# Wed Apr 30 13:25:36 2014
 #
 CONFIG_HAVE_DOT_CONFIG=y
 
@@ -206,8 +206,8 @@ CONFIG_FEATURE_FANCY_ECHO=y
 # CONFIG_FALSE is not set
 # CONFIG_FOLD is not set
 # CONFIG_FSYNC is not set
-# CONFIG_HEAD is not set
-# CONFIG_FEATURE_FANCY_HEAD is not set
+CONFIG_HEAD=y
+CONFIG_FEATURE_FANCY_HEAD=y
 # CONFIG_HOSTID is not set
 # CONFIG_ID is not set
 # CONFIG_INSTALL is not set
@@ -250,8 +250,8 @@ CONFIG_RMDIR=y
 # CONFIG_SLEEP is not set
 # CONFIG_FEATURE_FANCY_SLEEP is not set
 # CONFIG_FEATURE_FLOAT_SLEEP is not set
-# CONFIG_SORT is not set
-# CONFIG_FEATURE_SORT_BIG is not set
+CONFIG_SORT=y
+CONFIG_FEATURE_SORT_BIG=y
 # CONFIG_SPLIT is not set
 # CONFIG_FEATURE_SPLIT_FANCY is not set
 # CONFIG_STAT is not set
