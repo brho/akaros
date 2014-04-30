@@ -47,6 +47,10 @@ MAKEFLAGS += -rR --no-print-directory
 PHONY := all
 all: akaros-kernel
 
+# Export the location of this top level directory
+AKAROS_ROOT = $(CURDIR)
+export AKAROS_ROOT
+
 # Setup dumping ground for object files and any temporary files we need to
 # generate for non-kbuild targets
 OBJDIR ?= obj

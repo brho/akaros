@@ -1,0 +1,5 @@
+#ifndef TESTS_TESTING_H
+#define TESTS_TESTING_H
+
+#endif // TESTS_TESTING_H
+
