@@ -1,115 +1,115 @@
 menu "Testing"
 
 menuconfig POSTBOOT_KERNEL_TESTING
-	bool "Post-boot kernel testing"
-	default n
-	help
-		Run unit tests for after the kernel has booted.
+    bool "Post-boot kernel testing"
+    default n
+    help
+        Run unit tests for after the kernel has booted.
 
 config TEST_ipi_sending
-	depends on POSTBOOT_KERNEL_TESTING && X86
-	bool "IPI sending test"
-	default n
-	help
-		Run the ipi_sending test
+    depends on POSTBOOT_KERNEL_TESTING && X86
+    bool "IPI sending test"
+    default n
+    help
+        Run the ipi_sending test
 
 config TEST_pic_reception
-	depends on POSTBOOT_KERNEL_TESTING && X86
-	bool "PIC reception test"
-	default n
-	help
-		Run the pic_reception
+    depends on POSTBOOT_KERNEL_TESTING && X86
+    bool "PIC reception test"
+    default n
+    help
+        Run the pic_reception
 
 config TEST_ioapic_pit_reroute 
-	depends on POSTBOOT_KERNEL_TESTING && X86
-	bool "IOAPIC PIT reroute test"
-	default n
-	help
-		Run the ioapic_pit_reroute test
+    depends on POSTBOOT_KERNEL_TESTING && X86
+    bool "IOAPIC PIT reroute test"
+    default n
+    help
+        Run the ioapic_pit_reroute test
 
 config TEST_lapic_status_bit
-	depends on POSTBOOT_KERNEL_TESTING && X86
-	bool "LAPIC status bit test"
-	default n
-	help
-		Run the lapic_status_bit
+    depends on POSTBOOT_KERNEL_TESTING && X86
+    bool "LAPIC status bit test"
+    default n
+    help
+        Run the lapic_status_bit
 
 config TEST_pit
-	depends on POSTBOOT_KERNEL_TESTING && X86
-	bool "PIT test"
-	default n
-	help
-		Run the pit test
+    depends on POSTBOOT_KERNEL_TESTING && X86
+    bool "PIT test"
+    default n
+    help
+        Run the pit test
 
 config TEST_circ_buffer
-	depends on POSTBOOT_KERNEL_TESTING && X86
-	bool "Circular buffer test"
-	default n
-	help
-		Run the circ_buffer test
+    depends on POSTBOOT_KERNEL_TESTING && X86
+    bool "Circular buffer test"
+    default n
+    help
+        Run the circ_buffer test
 
 config TEST_kernel_messages
-	depends on POSTBOOT_KERNEL_TESTING && X86
-	bool "Kernel messages test"
-	default n
-	help
-		Run the kernel_messages test
+    depends on POSTBOOT_KERNEL_TESTING && X86
+    bool "Kernel messages test"
+    default n
+    help
+        Run the kernel_messages test
 
 config TEST_page_coloring
-	depends on POSTBOOT_KERNEL_TESTING && PAGE_COLORING
-	bool "Page coloring test"
-	default n
-	help
-		Run the page_coloring test
+    depends on POSTBOOT_KERNEL_TESTING && PAGE_COLORING
+    bool "Page coloring test"
+    default n
+    help
+        Run the page_coloring test
 
 config TEST_color_alloc
-	depends on POSTBOOT_KERNEL_TESTING && PAGE_COLORING
-	bool "Color allocation test"
-	default n
-	help
-		Run the color_alloc test
+    depends on POSTBOOT_KERNEL_TESTING && PAGE_COLORING
+    bool "Color allocation test"
+    default n
+    help
+        Run the color_alloc test
 
 config TEST_print_info
-	depends on POSTBOOT_KERNEL_TESTING
-	bool "Print info test"
-	default n
-	help
-		Run the print_info test
+    depends on POSTBOOT_KERNEL_TESTING
+    bool "Print info test"
+    default n
+    help
+        Run the print_info test
 
 config TEST_barrier
-	depends on POSTBOOT_KERNEL_TESTING
-	bool "Barrier test"
-	default n
-	help
-		Run the barrier test
+    depends on POSTBOOT_KERNEL_TESTING
+    bool "Barrier test"
+    default n
+    help
+        Run the barrier test
 
 config TEST_interrupts_irqsave
-	depends on POSTBOOT_KERNEL_TESTING
-	bool "Interrupts irqsave test"
-	default y
-	help
-		Run the interrupts_irqsave test
+    depends on POSTBOOT_KERNEL_TESTING
+    bool "Interrupts irqsave test"
+    default y
+    help
+        Run the interrupts_irqsave test
 
 config TEST_bitmasks
-	depends on POSTBOOT_KERNEL_TESTING
-	bool "Bitmasks test"
-	default y
-	help
-		Run the bitmasks test
+    depends on POSTBOOT_KERNEL_TESTING
+    bool "Bitmasks test"
+    default y
+    help
+        Run the bitmasks test
 
 config TEST_checklists
-	depends on POSTBOOT_KERNEL_TESTING
-	bool "Checklists test"
-	default n
-	help
-		Run the checklists test
+    depends on POSTBOOT_KERNEL_TESTING
+    bool "Checklists test"
+    default n
+    help
+        Run the checklists test
 
 config TEST_smp_call_functions
-	depends on POSTBOOT_KERNEL_TESTING
-	bool "SMP call functions test"
-	default n
-	help
-		Run the smp_call_functions test
+    depends on POSTBOOT_KERNEL_TESTING
+    bool "SMP call functions test"
+    default n
+    help
+        Run the smp_call_functions test
 
 config TEST_slab
     depends on POSTBOOT_KERNEL_TESTING
@@ -244,10 +244,17 @@ config TEST_alarm
     help
         Run the alarm test
 
-config USERSPACE_TESTING
-string "Userspace testing. Fill with path to test launcher script, or leave empty for skipping"
+menuconfig USERSPACE_TESTING
+    bool "User-space testing"
+    default n
     help
-        Run userspace unit tests from the specified path. Leave empty to skip
-        testing.
+        Run userspace unit tests after the kernel has booted.
+
+config USERSPACE_TESTING_SCRIPT
+    depends on USERSPACE_TESTING
+    string "Path to test launcher script."
+    default fill/me/in
+    help
+        Run userspace unit tests from the specified path. 
 
 endmenu

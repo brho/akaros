@@ -89,13 +89,15 @@ void manager(void)
 		postboot_kernel_tests();
 	#endif
 	// Run userspace tests (from config specified path).
-	if (strlen(CONFIG_USERSPACE_TESTING) != 0)
+	#ifdef CONFIG_USERSPACE_TESTING
+	if (strlen(CONFIG_USERSPACE_TESTING_SCRIPT) != 0)
 	{
-		printk("'%s' is %d chars long", CONFIG_USERSPACE_TESTING,
-			   strlen(STRINGIFY(CONFIG_USERSPACE_TESTING)));
-		char *usp_args[] = {"bin_run", "ash", CONFIG_USERSPACE_TESTING};
+		char *usp_args[] = {"bin_run", "ash", CONFIG_USERSPACE_TESTING_SCRIPT};
 		mon_bin_run(3, usp_args, NULL);
-	} 
+	} else {
+		printk("No user-space launcher file specified.\n");
+	}
+	#endif
 
 	void MANAGER_FUNC(DEVELOPER_NAME)(void);
 	MANAGER_FUNC(DEVELOPER_NAME)();
