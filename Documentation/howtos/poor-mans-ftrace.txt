@@ -1,0 +1,16 @@
+Poor-man's Ftrace is a live printk function tracer.  It does not handle
+concurrency well, whether that is interleaved IRQs or especially parallelism.
+Everything gets printed at the same time, and shares the same global
+indentation variable.  Still, it works reasonably well for IRQs, ktasks, and
+syscalls.
+
+Careful using this on certain devices in k/d/dev/, like acpi and console.  One
+of the devs locks up if you try to print.
+
+I usually turn off the 'print' bool in kdebug.c for booting, then turn it on
+via 'kfunc toggle_print_func'.
+
+To spatch the networking code, try something like:
+
+$ for i in kern/src/net kern/drivers/net kern/drivers/dev/ether.c; do
+    spatch --sp-file scripts/spatch/poor-ftrace.cocci  --in-place $i; done

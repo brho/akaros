@@ -59,6 +59,7 @@ static const char *blacklist[] = {
 	"calcd",
 	"freeroute",
 	"genrandom",	/* not noisy, just never returns */
+	"limborexmit",
 	"rangecompare",
 	"walkadd",
 };
@@ -89,6 +90,22 @@ void toggle_print_func(void)
 
 static spinlock_t lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
+static void __print_hdr(void)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	printd("Core %2d ", core_id());	/* may help with multicore output */
+	if (in_irq_ctx(pcpui)) {
+		printk("IRQ       :");
+	} else {
+		assert(pcpui->cur_kthread);
+		if (pcpui->cur_kthread->is_ktask) {
+			printk("%10s:", pcpui->cur_kthread->name);
+		} else {
+			printk("PID %3d   :", pcpui->cur_proc ? pcpui->cur_proc->pid : 0);
+		}
+	}
+}
+
 void __print_func_entry(const char *func, const char *file)
 {
 	if (!print)
@@ -96,7 +113,7 @@ void __print_func_entry(const char *func, const char *file)
 	if (is_blacklisted(func))
 		return;
 	spin_lock_irqsave(&lock);
-	printd("Core %2d", core_id());	/* helps with multicore output */
+	__print_hdr();
 	for (int i = 0; i < tab_depth; i++)
 		printk("\t");
 	printk("%s() in %s\n", func, file);
@@ -112,7 +129,7 @@ void __print_func_exit(const char *func, const char *file)
 		return;
 	tab_depth--;
 	spin_lock_irqsave(&lock);
-	printd("Core %2d", core_id());
+	__print_hdr();
 	for (int i = 0; i < tab_depth; i++)
 		printk("\t");
 	printk("---- %s()\n", func);
