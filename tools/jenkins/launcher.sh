@@ -91,10 +91,14 @@ function build_config() {
 	    ;;
 	esac
 
-	# Enable postboot kernel tests to run.
+	# Enable tests to run.
 	# These don't take much to execute so we can run them always and just parse
 	# results if needed.
 	echo "CONFIG_POSTBOOT_KERNEL_TESTING=y" >> .config
+	echo "CONFIG_USERSPACE_TESTING=y" >> .config
+	# Set all config variables dependent on the above changes to their defaults
+	# without prompting
+	make olddefconfig 
 
 	echo -e "[SET_MAKE_CONFIG]: End\n"
 }
