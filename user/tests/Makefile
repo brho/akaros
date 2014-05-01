@@ -8,6 +8,7 @@ INCDIR = $(SRCDIR)include
 
 LDLIBS := -lpthread -lbenchutil -lm -liplib -lndb -lbsd
 
+SCRIPTS := $(wildcard $(SRCDIR)*.sh)
 SRCS_C := $(wildcard $(SRCDIR)*.c)
 SRCS_CPP := $(wildcard $(SRCDIR)*.cc)
 HEADERS := $(shell find $(INCDIR) -name *.h)
@@ -35,14 +36,12 @@ $(OBJDIR)/%: $(SRCS_CPP)
 
 all: $(EXECS)
 
-install: $(EXECS)
-	@mkdir -p $(AKAROS_ROOT)/$(FIRST_KFS_PATH)/bin
-	$(Q)cp -uP $^ $(AKAROS_ROOT)/$(FIRST_KFS_PATH)/bin
+install: $(EXECS) $(SCRIPTS)
+	@mkdir -p $(AKAROS_ROOT)/$(FIRST_KFS_PATH)/bin/tests/user
+	$(Q)cp -uP $^ $(AKAROS_ROOT)/$(FIRST_KFS_PATH)/bin/tests/user
 
 uninstall: $(EXECS)
-	@for i in $(EXECS); do \
-		rm -rf $(AKAROS_ROOT)/$(FIRST_KFS_PATH)/bin/$i; \
-	done;
+	$(Q)rm -rf $(AKAROS_ROOT)/$(FIRST_KFS_PATH)/bin/tests/user
 
 clean:
 	@echo + clean [TESTS]
