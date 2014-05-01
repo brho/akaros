@@ -18,7 +18,7 @@ EXECS_CPP = $(patsubst $(SRCDIR)%.cc, $(OBJDIR)/%, $(SRCS_CPP))
 EXECS = $(EXECS_C) $(EXECS_CPP)
 
 STATIC := $(findstring static,$(CFLAGS_USER))
-$(OBJDIR)/%: $(SRCS_C)
+$(OBJDIR)/%: $(SRCS_C) $(HEADERS)
 	@echo + cc [TESTS] $<
 	@mkdir -p $(@D)
 	$(Q)$(CC) $(CFLAGS_USER) -I$(INCDIR) -o $@ $< $(LDLIBS)
@@ -29,7 +29,7 @@ $(OBJDIR)/%: $(SRCS_C)
 
 # Note that we don't disassemble CPPs by default, even if they aren't static.
 # The files are pretty large regardless (9MB for a simple stream test asm).
-$(OBJDIR)/%: $(SRCS_CPP)
+$(OBJDIR)/%: $(SRCS_CPP) $(HEADERS)
 	@echo + cc [TESTS] $<
 	@mkdir -p $(@D)
 	$(Q)$(CPP) $(CXXFLAGS_USER) -I$(INCDIR) -o $@ $< $(LDLIBS)

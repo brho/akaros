@@ -253,7 +253,7 @@ menuconfig USERSPACE_TESTING
 config USERSPACE_TESTING_SCRIPT
     depends on USERSPACE_TESTING
     string "Path to test launcher script."
-    default fill/me/in
+    default /bin/tests/user/runall.sh
     help
         Run userspace unit tests from the specified path. 
 
