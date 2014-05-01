@@ -29,6 +29,14 @@ readonly BUSYBOX_DL_URL=http://www.busybox.net/downloads/busybox-1.17.3.tar.bz2
 readonly BUSYBOX_CONF_FILE=tools/patches/busybox/busybox-1.17.3-config
 
 ################################################################################
+###############                 HELPER FUNCTIONS                 ###############
+################################################################################
+function last_stable_build() {
+	curl -s localhost:8080/job/Test_akaros_github/lastStableBuild/api/json?tree=actions%5bbuildsByBranchName%5brevision%5bSHA1%5d%5d%5d | \
+	        python -c 'import sys, json; print json.load(sys.stdin)["actions"][3]["buildsByBranchName"]["'$GIT_BRANCH'"]["revision"]["SHA1"]'
+}
+
+################################################################################
 ###############                   INITIAL SETUP                  ###############
 ################################################################################
 
@@ -166,7 +174,6 @@ function build_userspace() {
 	make install-libs
 
 	# Compile tests.
-	make testclean
 	make tests
 
 	# Fill memory with tests.
@@ -254,7 +261,7 @@ if [ "$COMPILE_ALL" == true ]; then
 	AFFECTED_COMPONENTS="cross-compiler kernel userspace busybox"
 else
 	# Save changed files between last tested commit and current one.
-	git diff --stat $GIT_PREVIOUS_COMMIT $GIT_COMMIT > $DIFF_FILE
+	git diff --stat $(last_stable_build) $GIT_COMMIT > $DIFF_FILE
 
 	# Extract build targets by parsing diff file.
 	AFFECTED_COMPONENTS=`$SCR_GIT_CHANGES $DIFF_FILE $CONF_COMP_COMPONENTS_FILE`
