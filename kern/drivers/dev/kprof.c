@@ -7,6 +7,22 @@
  * in the LICENSE file.
  */
 
+// get_fn_name is slowing down the kprocread 
+// 	have an array of translated fns
+// 	or a "next" iterator, since we're walking in order
+//
+// irqsave locks
+//
+// kprof struct should be a ptr, have them per core
+// 		we'll probably need to track the length still, so userspace knows how
+// 		big it is
+//
+// 		will also want more files in the kprof dir for each cpu or something
+// 		
+// maybe don't use slot 0 and 1 as total and 'not kernel' ticks
+//
+// fix the failed assert XXX
+
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -23,23 +39,25 @@
 
 
 #define LRES	3		/* log of PC resolution */
-#define CELLSIZE	8	/* sizeof of count cell; well known as 4 */
+#define CELLSIZE	8	/* sizeof of count cell */
 
-struct
+struct kprof
 {
 	uintptr_t	minpc;
 	uintptr_t	maxpc;
 	int	nbuf;
 	int	time;
-	uint64_t	*buf;
+	uint64_t	*buf;	/* keep in sync with cellsize */
+	size_t		buf_sz;
 	spinlock_t lock;
-}kprof;
+};
+struct kprof kprof;
 
 /* output format. Nice fixed size. That makes it seekable.
  * small subtle bit here. You have to convert offset FROM FORMATSIZE units
  * to CELLSIZE units in a few places.
  */
-char *outformat = "%016llx %29s %016llx\n";
+char *outformat = "%016llx %29.29s %016llx\n";
 #define FORMATSIZE 64
 enum{
 	Kprofdirqid,
@@ -68,7 +86,8 @@ kprofattach(char *spec)
 		if(kprof.buf == 0)
 			error(Enomem);
 	}
-	kproftab[1].length = n;
+	kproftab[1].length = kprof.nbuf * FORMATSIZE;
+	kprof.buf_sz = n;
 	return devattach('K', spec);
 }
 
@@ -163,19 +182,17 @@ kprofclose(struct chan*unused)
 static long
 kprofread(struct chan *c, void *va, long n, int64_t off)
 {
-	uintptr_t end;
 	uint64_t w, *bp;
 	char *a, *ea;
 	uintptr_t offset = off;
 	uint64_t pc;
-	int ret = 0;
+	int snp_ret, ret = 0;
 
 	switch((int)c->qid.path){
 	case Kprofdirqid:
 		return devdirread(c, va, n, kproftab, ARRAY_SIZE(kproftab), devgen);
 
 	case Kprofdataqid:
-		end = kprof.nbuf*CELLSIZE;
 
 		if (n < FORMATSIZE){
 			n = 0;
@@ -183,6 +200,9 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 		}
 		a = va;
 		ea = a + n;
+
+		/* we check offset later before deref bp.  offset / FORMATSIZE is how
+		 * many entries we're skipping/offsetting. */
 		bp = kprof.buf + offset/FORMATSIZE;
 		pc = kprof.minpc + ((offset/FORMATSIZE)<<LRES);
 		while((a < ea) && (n >= FORMATSIZE)){
@@ -192,18 +212,34 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 			 */
 			char print[FORMATSIZE+1];
 			char *name;
+			int amt_read;
 
-			if(offset/FORMATSIZE >= kprof.nbuf){
+			if (pc >= kprof.maxpc)
 				break;
-			}
+			/* pc is also our exit for bp.  should be in lockstep */
+			// XXX this assert fails, fix it!
+			//assert(bp < kprof.buf + kprof.nbuf);
+			/* do not attempt to filter these results based on w < threshold.
+			 * earlier, we computed bp/pc based on assuming a full-sized file,
+			 * and skipping entries will result in read() calls thinking they
+			 * received earlier entries when they really received later ones.
+			 * imagine a case where there are 1000 skipped items, and read()
+			 * asks for chunks of 32.  it'll get chunks of the next 32 valid
+			 * items, over and over (1000/32 times). */
 			w = *bp++;
 			name = get_fn_name(pc);
-			snprintf(print, sizeof(print), outformat, pc, name, w);
-			memmove(a, print, FORMATSIZE);
-			a += FORMATSIZE;
-			n -= FORMATSIZE;
-			ret += FORMATSIZE;
-			pc++;
+			snp_ret = snprintf(print, sizeof(print), outformat, pc, name, w);
+			assert(snp_ret == FORMATSIZE);
+			kfree(name);
+
+			amt_read = readmem(offset % FORMATSIZE, a, n, print, FORMATSIZE);
+			offset = 0;	/* future loops have no offset */
+
+			a += amt_read;
+			n -= amt_read;
+			ret += amt_read;
+
+			pc += (1 << LRES);
 		}
 		n = ret;
 		break;
@@ -215,19 +251,29 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 	return n;
 }
 
+static void kprof_clear(struct kprof *kp)
+{
+	spin_lock(&kp->lock);
+	memset(kp->buf, 0, kp->buf_sz);
+	spin_unlock(&kp->lock);
+}
+
 static long
 kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 {
 	switch((int)(c->qid.path)){
 	case Kprofctlqid:
 		if(strncmp(a, "startclr", 8) == 0){
-			memset((char *)kprof.buf, 0, kprof.nbuf*CELLSIZE);
+			kprof_clear(&kprof);
 			kprof.time = 1;
 		}else if(strncmp(a, "start", 5) == 0) {
 			kprof.time = 1;
 			setup_timers();
-		} else if(strncmp(a, "stop", 4) == 0)
+		} else if(strncmp(a, "stop", 4) == 0) {
 			kprof.time = 0;
+		} else if(strncmp(a, "clear", 5) == 0) {
+			kprof_clear(&kprof);
+		}
 		break;
 	default:
 		error(Ebadusefd);

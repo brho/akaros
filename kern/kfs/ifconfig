@@ -114,4 +114,6 @@ mount -a \#s/cs /net
 # this is noisy, so it is off by default.
 #echo debug > /net/cs
 
+bind -a \#K /prof/
+
 echo "ifconfig complete"
