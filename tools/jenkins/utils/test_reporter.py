@@ -155,7 +155,7 @@ class TestParser() :
 		return matchRes.group(1)
 
 	def __extract_test_fail_msg(self, line) :
-		regex = r'^\s*FAILED\s*\[(?:[a-zA-Z_-]+)\](?:\(.*\))?\s+(.*)$'
+		regex = r'^\s*FAILED\s*\[(?:[a-zA-Z_-]+)\](?:\(.*?\))\s+(.*)$'
 		matchRes = re.match(regex, line)
 		return matchRes.group(1)
 
@@ -205,10 +205,15 @@ class TestParser() :
 		return test_suite
 
 
-
-KERNEL_PB_TESTS_KEY = 'KERNEL_POSTBOOT'
-KERNEL_PB_TESTS_SUITE_NAME = 'KERNEL'
-KERNEL_PB_TESTS_CLASS_NAME = 'POSTBOOT'
+def extract_tests(path):
+	regex = r'^\s*<--\s*BEGIN_(.+_.+)_TESTS\s*-->\s*$'
+	f = open(path, 'r')
+	tests = []
+	for line in f:
+		matchRes = re.match(regex, line)
+		if matchRes:
+			tests.append(matchRes.group(1))
+	return tests
 
 def save_report(dir, filename, report) :
 	filepath = dir + '/' + filename + '_TESTS.xml'
@@ -221,16 +226,14 @@ def save_report(dir, filename, report) :
 def main() :
 	akaros_output_file_path = sys.argv[1]
 	test_output_dir = sys.argv[2]
-	tests_to_run = sys.argv[3].strip().split(' ')
+	tests = extract_tests(akaros_output_file_path)
 
-	# Kernel Postboot Tests
-	if KERNEL_PB_TESTS_KEY in tests_to_run :
+	# Parse, process, and save the test results
+	for test in tests :
+		suite_name, class_name = test.split('_')
 		test_suite = TestParser(akaros_output_file_path, \
-		                        KERNEL_PB_TESTS_SUITE_NAME, \
-		                        KERNEL_PB_TESTS_CLASS_NAME).parse_test_suite()
+		                        suite_name, class_name).parse_test_suite()
 		test_report_str = test_suite.generate_markup().__str__()
-		kernel_pb_tests_report = save_report(test_output_dir, \
-		                                     KERNEL_PB_TESTS_KEY, \
-		                                     test_report_str)
+		save_report(test_output_dir, test, test_report_str)
 
 main()

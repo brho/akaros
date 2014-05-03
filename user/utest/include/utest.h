@@ -1,5 +1,5 @@
-#ifndef TESTS_TESTING_H
-#define TESTS_TESTING_H
+#ifndef UTEST_UTEST_H
+#define UTEST_UTEST_H
 
 /*
  * Header file with infrastructure needed for userspace unit tests:
@@ -13,64 +13,57 @@
 #include <stdio.h>
 #include <string.h>
 #include <timing.h>
+#include <execinfo.h>
 
 /* 
  * Macros for assertions. 
- * UT_ASSERT_M prints a message in case of failure, UT_ASSERT just asserts.
  */
+#define UT_ASSERT(test)                                                          \
+	UT_ASSERT_M("", test)
+
 #define UT_ASSERT_M(message, test)                                               \
 	do {                                                                         \
 		if (!(test)) {                                                           \
-			char prefix[] = "Assertion failed: ";                                \
-			int msg_size = sizeof(prefix) + sizeof(message) - 1;                 \
-			test_msg = (char*) malloc(msg_size);                                 \
-			snprintf(test_msg, msg_size, "%s%s", prefix, message);               \
+			char fmt[] = "Assertion failure in %s() at %s:%d: %s";               \
+			sprintf(utest_msg, fmt, __FUNCTION__, __FILE__, __LINE__, message);  \
 			return false;                                                        \
 		}                                                                        \
 	} while (0)
-
-#define UT_ASSERT(test)                                                          \
-	do {                                                                         \
-		if (!(test)) {                                                           \
-			return false;                                                        \
-		}                                                                        \
-	} while (0)
-
-
 
 /*
  * Structs and macros for registering test cases.
  */
-struct usertest {
+struct utest {
 	char name[256]; // Name of the test function.
 	bool (*func)(void); // Name of the test function, should be equal to 'name'.
 	bool enabled; // Whether or not to run the test.
 };
 
 /* Used for defining an userspace test structure entry inline. */
-#define U_TEST_REG(name) \
+#define UTEST_REG(name) \
 	{"test_" #name, test_##name, true}
-
-
 
 /*
  * Creates all the runnable code for a test suite.
  */
 #define TEST_SUITE(__suite_name)                                                 \
-	char *test_msg;                                                              \
+	char utest_msg[1024];                                                        \
 	char suite_name[] = __suite_name;
 
-#define RUN_TEST_SUITE(whitelist, whitelist_len)                                 \
-	int num_tests = sizeof(usertests) / sizeof(struct usertest);                 \
-	testing_main(whitelist, whitelist_len, usertests, num_tests);
+#define RUN_TEST_SUITE(utests, num_utests, whitelist, whitelist_len)             \
+	do {                                                                         \
+		if (whitelist_len > 0)                                                   \
+			apply_whitelist(whitelist, whitelist_len, utests, num_utests);       \
+		run_utests(suite_name, utests, num_utests);                              \
+	} while (0)
 
 /* Disables all the tests not passed through a whitelist. */
 static void apply_whitelist(char *whitelist[], int whitelist_len,
-	                        struct usertest tests[], int num_tests) {
+	                        struct utest tests[], int num_tests) {
 	for (int i=0; i<num_tests; i++) {
-		struct usertest *test = &tests[i];
+		struct utest *test = &tests[i];
 		if (test->enabled) {
-			for (int j = 1; j < whitelist_len; ++j) {
+			for (int j = 0; j < whitelist_len; ++j) {
 				test->enabled = false;
 				if (strcmp(test->name, whitelist[j]) == 0) {
 					test->enabled = true;
@@ -81,22 +74,12 @@ static void apply_whitelist(char *whitelist[], int whitelist_len,
 	}
 }
 
-
-
-static int testing_main(char *whitelist[], int whitelist_len, 
-	                    struct usertest tests[], int num_tests) {
-	extern char *test_msg, suite_name[];
+static int run_utests(char *suite_name, struct utest tests[], int num_tests) {
+	extern char utest_msg[];
 	printf("<-- BEGIN_USERSPACE_%s_TESTS -->\n", suite_name);
 
-	// If any arguments are passed, treat them as a whitelist of what tests
-	// to run (i.e., disable all the rest).
-	if (whitelist_len > 0) {
-		apply_whitelist(whitelist, whitelist_len, tests, num_tests);
-	}
-
-	// Run tests.
 	for (int i=0; i<num_tests; i++) {
-		struct usertest *test = &tests[i];
+		struct utest *test = &tests[i];
 		if (test->enabled) {
 			uint64_t start = read_tsc();
 			bool result = test->func();
@@ -104,13 +87,11 @@ static int testing_main(char *whitelist[], int whitelist_len,
 			uint64_t et_us = tsc2usec(end - start) % 1000000;
 			uint64_t et_s = tsc2sec(end - start);
 
+			char fmt[] = "\t%s   [%s](%llu.%06llus)   %s\n";
 			if (result) {
-				printf("\tPASSED   [%s](%llu.%06llus)\n", test->name, et_s, 
-				       et_us);
+				printf(fmt, "PASSED", test->name, et_s, et_us, "");
 			} else {
-				printf("\tFAILED   [%s](%llu.%06llus)  %s\n", test->name, et_s, 
-				       et_us, test_msg);
-				free(test_msg);
+				printf(fmt, "FAILED", test->name, et_s, et_us, utest_msg);
 			}
 		} else {
 			printf("\tDISABLED [%s]\n", test->name);
@@ -120,4 +101,4 @@ static int testing_main(char *whitelist[], int whitelist_len,
 	printf("<-- END_USERSPACE_%s_TESTS -->\n", suite_name);
 }
 
-#endif // TESTS_TESTING_H
+#endif // UTEST_UTEST_H

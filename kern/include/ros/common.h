@@ -46,6 +46,14 @@ typedef unsigned long uintreg_t;
 #define STRINGIFY(s) __STRINGIFY(s)
 #define __STRINGIFY(s) #s
 
+/* A macro for testing if another macro has been #defined or not.  Can be used
+ * wherever you need a boolean defined.  Returns 0 or 1. */
+#define is_defined(macro) is_defined_(macro)
+#define is_defined_test_1 ,
+#define is_defined_(value) is_defined__(is_defined_test_##value, value)
+#define is_defined__(comma, value) is_defined___(comma 1, 0)
+#define is_defined___(_, v, ...) v
+
 // Efficient min and max operations
 #ifdef ROS_KERNEL /* Glibc has their own */
 #define MIN(_a, _b)						\

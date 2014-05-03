@@ -48,14 +48,12 @@ $(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS_CPP)
 all: $(TESTS_EXECS)
 	@:
 
-fill-kfs: $(TESTS_EXECS)
+install: $(TESTS_EXECS)
 	@mkdir -p $(FIRST_KFS_PATH)/bin
 	$(Q)cp -uP $^ $(FIRST_KFS_PATH)/bin
-	@echo "User space tests installed to KFS"
 
-unfill-kfs:
+uninstall:
 	$(Q)rm -rf $(addprefix $(FIRST_KFS_PATH)/bin/, $(notdir $(TESTS_EXECS)))
-	@echo "User space tests removed from KFS"
 
 clean:
 	@echo + clean [TESTS]

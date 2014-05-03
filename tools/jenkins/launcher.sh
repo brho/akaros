@@ -102,7 +102,7 @@ function build_config() {
 	# Enable tests to run.
 	# These don't take much to execute so we can run them always and just parse
 	# results if needed.
-	echo "CONFIG_POSTBOOT_KERNEL_TESTING=y" >> .config
+	echo "CONFIG_KERNEL_POSTBOOT_TESTING=y" >> .config
 	echo "CONFIG_USERSPACE_TESTING=y" >> .config
 	# Set all config variables dependent on the above changes to their defaults
 	# without prompting
@@ -174,7 +174,7 @@ function build_userspace() {
 	make install-libs
 
 	# Compile tests.
-	make tests
+	make utest
 
 	# Fill memory with tests.
 	make fill-kfs
@@ -202,12 +202,14 @@ function build_busybox() {
 	fi
 
 	# Build busybox and copy it into kfs
+	echo -e "Build busybox"
 	cd $BUSYBOX_DIR
 	make
 	cp busybox_unstripped ../../kern/kfs/bin/busybox
 	cd ../../
 
 	# Recompile kernel to include busybox
+	echo -e "Recompile kernel to include busybox"
 	make
 
 	echo -e "[BUILD_BUSYBOX]: End\n"
@@ -222,9 +224,7 @@ function run_qemu() {
 	make qemu > $AKAROS_OUTPUT_FILE &
 	MAKE_PID=$!
 
-	# TODO: Rather than finishing after Kernel PB Tests, put a generic 
-	#       "C'est fini" statement somewhere and look for it
-	WAIT_RESULT=`$SCR_WAIT_UNTIL $AKAROS_OUTPUT_FILE END_KERNEL_POSTBOOT_TESTS \
+	WAIT_RESULT=`$SCR_WAIT_UNTIL $AKAROS_OUTPUT_FILE END_USERSPACE_TESTS \
 	    ${MAX_RUN_TIME:-100}`
 
 	# Extract Qemu_launcher PID
@@ -234,7 +234,11 @@ function run_qemu() {
 	# To kill qemu we need to send a USR1 signal to Qemu_launcher.
 	kill -10 $QEMU_PID
 
+	# Then we wait....
 	wait $MAKE_PID
+
+	# cat the output of the file so we can see it in the console log
+	cat $AKAROS_OUTPUT_FILE
 
 	echo -e "[RUN_AKAROS_IN_QEMU]: End\n"
 
@@ -308,15 +312,8 @@ fi
 
 echo -e "\n[TEST_REPORTING]: Begin"
 
-TESTS_TO_RUN="KERNEL_POSTBOOT" # TODO(alfongj): Remove this when not needed.
-# for COMPONENT in "${AFFECTED_COMPONENTS_ARRAY[@]}"; 
-# do
-# 	# TODO(alfongj): Add to tests to run the name of the test suites to be ran.
-# 	# TESTS_TO_RUN="$TESTS_TO_RUN SOMETHING"
-# done
-
 # Generate test report
-$SCR_GEN_TEST_REPORTS $AKAROS_OUTPUT_FILE $TEST_OUTPUT_DIR $TESTS_TO_RUN
+$SCR_GEN_TEST_REPORTS $AKAROS_OUTPUT_FILE $TEST_OUTPUT_DIR 
 echo "Tests generated in $TEST_OUTPUT_DIR"
 
 echo -e "[TEST_REPORTING]: End\n"

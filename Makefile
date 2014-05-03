@@ -564,6 +564,10 @@ tests/: tests
 tests: install-libs
 	@$(MAKE) -f tests/Makefile
 
+PHONY += utest
+utest: $(user-dirs)
+	@cd user/$@ && $(MAKE) 
+
 testclean:
 	@$(MAKE) -f tests/Makefile clean
 
@@ -574,14 +578,20 @@ XCC_SO_FILES = $(addprefix $(XCC_TARGET_ROOT)/lib/, *.so*)
 $(OBJDIR)/.dont-force-fill-kfs:
 	$(Q)rm -rf $(addprefix $(FIRST_KFS_PATH)/lib/, $(notdir $(XCC_SO_FILES)))
 	@echo "Cross Compiler 'so' files removed from KFS"
-	@$(MAKE) -f tests/Makefile unfill-kfs
+	@$(MAKE) -f tests/Makefile uninstall
+	@echo "Apps from /test removed from KFS"
+	@cd user/utest && $(MAKE) uninstall
+	@echo "User space tests removed from KFS"
 	@touch $(OBJDIR)/.dont-force-fill-kfs
 
 fill-kfs: $(OBJDIR)/.dont-force-fill-kfs install-libs
 	@mkdir -p $(FIRST_KFS_PATH)/lib
 	$(Q)cp -uP $(XCC_SO_FILES) $(FIRST_KFS_PATH)/lib
 	@echo "Cross Compiler 'so' files installed to KFS"
-	@$(MAKE) -f tests/Makefile fill-kfs
+	@$(MAKE) -f tests/Makefile install
+	@echo "Apps from /test installed to KFS"
+	@cd user/utest && $(MAKE) install
+	@echo "User space tests installed to KFS"
 
 # Use doxygen to make documentation for ROS (Untested since 2010 or so)
 doxygen-dir := $(CUR_DIR)/Documentation/doxygen

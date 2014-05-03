@@ -22,7 +22,7 @@
 #include <process.h>
 #include <schedule.h>
 #include <syscall.h>
-#include <test_infrastructure.h>
+#include <ktest.h>
 #include <kfs.h>
 #include <stdio.h>
 #include <time.h>
@@ -34,41 +34,6 @@
 #include <time.h>
 #include <ros/arch/membar.h>
 
-char *kern_test_msg; // Variable defined in test_infrastructure.h.
-
-
-void postboot_kernel_tests(void)
-{
-	printk("\nRunning %d postboot Kernel tests:\n", 
-		   num_pb_kernel_tests);
-
-	// Do not remove this line, it is being used by Jenkins.
-	printk("<-- BEGIN_KERNEL_POSTBOOT_TESTS -->\n");
-	for (int i=0; i<num_pb_kernel_tests; i++) {
-		struct pb_kernel_test *test = &pb_kernel_tests[i];
-		if (test->enabled) {
-			uint64_t start = read_tsc();
-			bool result = test->func();
-			uint64_t end = read_tsc();
-			uint64_t et_us = tsc2usec(end - start) % 1000000;
-			uint64_t et_s = tsc2sec(end - start);
-
-			if (result) {
-				printk("\tPASSED   [%s](%llu.%06llus)\n", test->name, et_s, 
-				       et_us);
-			} else {
-				printk("\tFAILED   [%s](%llu.%06llus)  %s\n", test->name, et_s, 
-				       et_us, kern_test_msg);
-				kfree(kern_test_msg);
-			}
-		} else {
-			printk("\tDISABLED [%s]\n", test->name);
-		}
-	}
-	// Do not remove this line, it is being used by Jenkins.
-	printk("<-- END_KERNEL_POSTBOOT_TESTS -->\n");
-}
-
 /*
  * Currently, if you leave this function by way of proc_run (process_workqueue
  * that proc_runs), you will never come back to where you left off, and the
@@ -76,27 +41,18 @@ void postboot_kernel_tests(void)
  */
 void manager(void)
 {
-	#ifndef DEVELOPER_NAME
-		#define DEVELOPER_NAME brho
-	#endif
-
 	// LoL
 	#define PASTE(s1,s2) s1 ## s2
 	#define MANAGER_FUNC(dev) PASTE(manager_,dev)
 
-	// Run Kernel post boot tests (from tests_postboot_kernel.c).
-	#ifdef CONFIG_POSTBOOT_KERNEL_TESTING
-		postboot_kernel_tests();
+	#if !defined(DEVELOPER_NAME) && \
+	    (defined(CONFIG_KERNEL_POSTBOOT_TESTING) || \
+	     defined(CONFIG_USERSPACE_TESTING))
+		#define DEVELOPER_NAME jenkins
 	#endif
-	// Run userspace tests (from config specified path).
-	#ifdef CONFIG_USERSPACE_TESTING
-	if (strlen(CONFIG_USERSPACE_TESTING_SCRIPT) != 0)
-	{
-		char *usp_args[] = {"bin_run", "ash", CONFIG_USERSPACE_TESTING_SCRIPT};
-		mon_bin_run(3, usp_args, NULL);
-	} else {
-		printk("No user-space launcher file specified.\n");
-	}
+
+	#ifndef DEVELOPER_NAME
+		#define DEVELOPER_NAME brho
 	#endif
 
 	void MANAGER_FUNC(DEVELOPER_NAME)(void);
@@ -269,6 +225,35 @@ void manager_brho(void)
 	*/
 	return;
 #endif
+}
+
+void manager_jenkins()
+{
+	#ifdef CONFIG_KERNEL_POSTBOOT_TESTING
+		extern struct ktest pb_ktests[];
+		extern int num_pb_ktests;
+		run_ktests("POSTBOOT", pb_ktests, num_pb_ktests);
+	#endif
+	// Run userspace tests (from config specified path).
+	#ifdef CONFIG_USERSPACE_TESTING
+	if (strlen(CONFIG_USERSPACE_TESTING_SCRIPT) != 0) {
+		char exec[] = "/bin/ash";
+		char *p_argv[] = {exec, CONFIG_USERSPACE_TESTING_SCRIPT, 0};
+		char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
+
+		struct file *program = do_file_open(exec, 0, 0);
+		struct proc *p = proc_create(program, p_argv, p_envp);
+		proc_wakeup(p);
+		proc_decref(p); /* let go of the reference created in proc_create() */
+		kref_put(&program->f_kref);
+		run_scheduler();
+	    // Need a way to wait for p to finish
+	} else {
+		printk("No user-space launcher file specified.\n");
+	}
+	#endif
+	smp_idle();
+	assert(0);
 }
 
 void manager_klueska()

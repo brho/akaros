@@ -1,8 +1,6 @@
-#include <testing.h>
+#include <utest.h>
 
 TEST_SUITE("EXAMPLE");
-
-
 
 /* <--- Begin definition of test cases ---> */
 
@@ -15,21 +13,22 @@ bool test_two(void) {
 }
 
 bool test_three(void) {
-	UT_ASSERT_M("One should equal 0", 1 == 0);
+	UT_ASSERT_M("1 should equal 1", 1 == 1);
 }
 
 /* <--- End definition of test cases ---> */
 
-
-
-struct usertest usertests[] = {
-	U_TEST_REG(one),
-	U_TEST_REG(two),
-	U_TEST_REG(three) // This one will fail.
+struct utest utests[] = {
+	UTEST_REG(one),
+	UTEST_REG(two),
+	UTEST_REG(three) 
 };
+int num_utests = sizeof(utests) / sizeof(struct utest);
 
 int main(int argc, char *argv[]) {
 	// Run test suite passing it all the args as whitelist of what tests to run.
-	RUN_TEST_SUITE(&argv[1], argc-1);
+	char **whitelist = &argv[1];
+	int whitelist_len = argc - 1;
+	RUN_TEST_SUITE(utests, num_utests, whitelist, whitelist_len);
 }
 
