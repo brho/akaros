@@ -237,7 +237,8 @@ function run_qemu() {
 	# Then we wait....
 	wait $MAKE_PID
 
-	# cat the output of the file so we can see it in the console log
+	# clean and cat the output of the file so we can see it in the console log
+	sed -i -e 's///g' $AKAROS_OUTPUT_FILE
 	cat $AKAROS_OUTPUT_FILE
 
 	echo -e "[RUN_AKAROS_IN_QEMU]: End\n"
