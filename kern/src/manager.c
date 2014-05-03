@@ -228,12 +228,15 @@ void manager_brho(void)
 }
 
 void manager_jenkins()
-{
+{ 
+	printk("<-- BEGIN_KERNEL_TESTS -->\n");
 	#ifdef CONFIG_KERNEL_POSTBOOT_TESTING
 		extern struct ktest pb_ktests[];
 		extern int num_pb_ktests;
 		run_ktests("POSTBOOT", pb_ktests, num_pb_ktests);
 	#endif
+	printk("<-- END_KERNEL_TESTS -->\n");
+
 	// Run userspace tests (from config specified path).
 	#ifdef CONFIG_USERSPACE_TESTING
 	if (strlen(CONFIG_USERSPACE_TESTING_SCRIPT) != 0) {
