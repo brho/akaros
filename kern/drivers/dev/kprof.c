@@ -227,10 +227,18 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 			 * asks for chunks of 32.  it'll get chunks of the next 32 valid
 			 * items, over and over (1000/32 times). */
 			w = *bp++;
-			name = get_fn_name(pc);
+
+			if (pc == kprof.minpc)
+				name = "Total";
+			else if (pc == kprof.minpc + 8)
+				name = "User";
+			else
+				name = get_fn_name(pc);
+
 			snp_ret = snprintf(print, sizeof(print), outformat, pc, name, w);
 			assert(snp_ret == FORMATSIZE);
-			kfree(name);
+			if ((pc != kprof.minpc) && (pc != kprof.minpc + 8))
+				kfree(name);
 
 			amt_read = readmem(offset % FORMATSIZE, a, n, print, FORMATSIZE);
 			offset = 0;	/* future loops have no offset */
