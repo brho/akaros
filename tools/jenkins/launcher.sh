@@ -179,8 +179,6 @@ function build_userspace() {
 	# Fill memory with tests.
 	make fill-kfs
 
-	# Recompile kernel.
-	make
 	echo -e "[BUILD_USERSPACE]: End\n"
 }
 
