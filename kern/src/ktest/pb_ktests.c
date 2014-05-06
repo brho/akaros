@@ -140,15 +140,6 @@ bool test_ioapic_pit_reroute(void)
 
 #endif // CONFIG_X86
 
-// TODO: Assert printed info follows the standard (or whatever we want to test).
-bool test_print_info(void)
-{
-	cprintf("\nCORE 0 asking all cores to print info:\n");
-	smp_call_function_all(test_print_info_handler, NULL, 0);
-	cprintf("\nDone!\n");
-	return true;
-}
-
 // TODO: Add assertions. Possibly the way to go is to extract relevant info 
 //       from cache properties and make assertions on the colored pages lists 
 //       based on those.
@@ -626,40 +617,6 @@ void test_hello_world_handler(struct hw_trapframe *hw_tf, void *data)
 
 	cprintf("Incoming IRQ, ISR: %d on core %d with tf at %p\n",
 	        trapno, core_id(), hw_tf);
-}
-
-spinlock_t print_info_lock = SPINLOCK_INITIALIZER_IRQSAVE;
-
-void test_print_info_handler(struct hw_trapframe *hw_tf, void *data)
-{
-	uint64_t tsc = read_tsc();
-
-	spin_lock_irqsave(&print_info_lock);
-	cprintf("----------------------------\n");
-	cprintf("This is Core %d\n", core_id());
-	cprintf("Timestamp = %lld\n", tsc);
-#ifdef CONFIG_X86
-	cprintf("Hardware core %d\n", hw_core_id());
-	cprintf("MTRR_DEF_TYPE = 0x%08x\n", read_msr(IA32_MTRR_DEF_TYPE));
-	cprintf("MTRR Phys0 Base = 0x%016llx, Mask = 0x%016llx\n",
-	        read_msr(0x200), read_msr(0x201));
-	cprintf("MTRR Phys1 Base = 0x%016llx, Mask = 0x%016llx\n",
-	        read_msr(0x202), read_msr(0x203));
-	cprintf("MTRR Phys2 Base = 0x%016llx, Mask = 0x%016llx\n",
-	        read_msr(0x204), read_msr(0x205));
-	cprintf("MTRR Phys3 Base = 0x%016llx, Mask = 0x%016llx\n",
-	        read_msr(0x206), read_msr(0x207));
-	cprintf("MTRR Phys4 Base = 0x%016llx, Mask = 0x%016llx\n",
-	        read_msr(0x208), read_msr(0x209));
-	cprintf("MTRR Phys5 Base = 0x%016llx, Mask = 0x%016llx\n",
-	        read_msr(0x20a), read_msr(0x20b));
-	cprintf("MTRR Phys6 Base = 0x%016llx, Mask = 0x%016llx\n",
-	        read_msr(0x20c), read_msr(0x20d));
-	cprintf("MTRR Phys7 Base = 0x%016llx, Mask = 0x%016llx\n",
-	        read_msr(0x20e), read_msr(0x20f));
-#endif // CONFIG_X86
-	cprintf("----------------------------\n");
-	spin_unlock_irqsave(&print_info_lock);
 }
 
 void test_barrier_handler(struct hw_trapframe *hw_tf, void *data)
@@ -2030,7 +1987,6 @@ static struct ktest ktests[] = {
 	KTEST_REG(page_coloring,      CONFIG_TEST_page_coloring),
 	KTEST_REG(color_alloc,        CONFIG_TEST_color_alloc),
 #endif // CONFIG_PAGE_COLORING
-	KTEST_REG(print_info,         CONFIG_TEST_print_info),
 	KTEST_REG(barrier,            CONFIG_TEST_barrier),
 	KTEST_REG(interrupts_irqsave, CONFIG_TEST_interrupts_irqsave),
 	KTEST_REG(bitmasks,           CONFIG_TEST_bitmasks),

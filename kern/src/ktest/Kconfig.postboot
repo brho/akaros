@@ -68,13 +68,6 @@ config TEST_color_alloc
     help
         Run the color_alloc test
 
-config TEST_print_info
-    depends on PB_KTESTS
-    bool "Print info test"
-    default n
-    help
-        Run the print_info test
-
 config TEST_barrier
     depends on PB_KTESTS
     bool "Barrier test"

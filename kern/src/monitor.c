@@ -252,16 +252,58 @@ int mon_setmapperm(int argc, char **argv, struct hw_trapframe *hw_tf)
 #endif
 }
 
+static spinlock_t print_info_lock = SPINLOCK_INITIALIZER_IRQSAVE;
+
+static void print_info_handler(struct hw_trapframe *hw_tf, void *data)
+{
+	uint64_t tsc = read_tsc();
+
+	spin_lock_irqsave(&print_info_lock);
+	cprintf("----------------------------\n");
+	cprintf("This is Core %d\n", core_id());
+	cprintf("Timestamp = %lld\n", tsc);
+#ifdef CONFIG_X86
+	cprintf("Hardware core %d\n", hw_core_id());
+	cprintf("MTRR_DEF_TYPE = 0x%08x\n", read_msr(IA32_MTRR_DEF_TYPE));
+	cprintf("MTRR Phys0 Base = 0x%016llx, Mask = 0x%016llx\n",
+	        read_msr(0x200), read_msr(0x201));
+	cprintf("MTRR Phys1 Base = 0x%016llx, Mask = 0x%016llx\n",
+	        read_msr(0x202), read_msr(0x203));
+	cprintf("MTRR Phys2 Base = 0x%016llx, Mask = 0x%016llx\n",
+	        read_msr(0x204), read_msr(0x205));
+	cprintf("MTRR Phys3 Base = 0x%016llx, Mask = 0x%016llx\n",
+	        read_msr(0x206), read_msr(0x207));
+	cprintf("MTRR Phys4 Base = 0x%016llx, Mask = 0x%016llx\n",
+	        read_msr(0x208), read_msr(0x209));
+	cprintf("MTRR Phys5 Base = 0x%016llx, Mask = 0x%016llx\n",
+	        read_msr(0x20a), read_msr(0x20b));
+	cprintf("MTRR Phys6 Base = 0x%016llx, Mask = 0x%016llx\n",
+	        read_msr(0x20c), read_msr(0x20d));
+	cprintf("MTRR Phys7 Base = 0x%016llx, Mask = 0x%016llx\n",
+	        read_msr(0x20e), read_msr(0x20f));
+#endif // CONFIG_X86
+	cprintf("----------------------------\n");
+	spin_unlock_irqsave(&print_info_lock);
+}
+
+static bool print_all_info(void)
+{
+	cprintf("\nCORE 0 asking all cores to print info:\n");
+	smp_call_function_all(print_info_handler, NULL, 0);
+	cprintf("\nDone!\n");
+	return true;
+}
+
 int mon_cpuinfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	cprintf("Number of CPUs detected: %d\n", num_cpus);
 	cprintf("Calling CPU's ID: 0x%08x\n", core_id());
 
 	if (argc < 2)
-		smp_call_function_self(test_print_info_handler, NULL, 0);
+		smp_call_function_self(print_info_handler, NULL, 0);
 	else
 		smp_call_function_single(strtol(argv[1], 0, 10),
-		                         test_print_info_handler, NULL, 0);
+		                         print_info_handler, NULL, 0);
 	return 0;
 }
 
