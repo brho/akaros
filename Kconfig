@@ -213,4 +213,4 @@ config BSD_ON_CORE0
 
 endmenu
 
-source "kern/Kconfig.testing"
+source "kern/src/ktest/Kconfig"

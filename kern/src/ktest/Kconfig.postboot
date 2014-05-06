@@ -1,260 +1,244 @@
-menu "Testing"
-
-menuconfig KERNEL_POSTBOOT_TESTING
-    bool "Post-boot kernel testing"
+menuconfig PB_KTESTS
+    depends on KERNEL_TESTING
+    bool "Post-boot kernel tests"
     default n
     help
-        Run unit tests for after the kernel has booted.
+        Run unit tests after the kernel has booted.
 
 config TEST_ipi_sending
-    depends on KERNEL_POSTBOOT_TESTING && X86
+    depends on PB_KTESTS && X86
     bool "IPI sending test"
     default n
     help
         Run the ipi_sending test
 
 config TEST_pic_reception
-    depends on KERNEL_POSTBOOT_TESTING && X86
+    depends on PB_KTESTS && X86
     bool "PIC reception test"
     default n
     help
         Run the pic_reception
 
 config TEST_ioapic_pit_reroute 
-    depends on KERNEL_POSTBOOT_TESTING && X86
+    depends on PB_KTESTS && X86
     bool "IOAPIC PIT reroute test"
     default n
     help
         Run the ioapic_pit_reroute test
 
 config TEST_lapic_status_bit
-    depends on KERNEL_POSTBOOT_TESTING && X86
+    depends on PB_KTESTS && X86
     bool "LAPIC status bit test"
     default n
     help
         Run the lapic_status_bit
 
 config TEST_pit
-    depends on KERNEL_POSTBOOT_TESTING && X86
+    depends on PB_KTESTS && X86
     bool "PIT test"
     default n
     help
         Run the pit test
 
 config TEST_circ_buffer
-    depends on KERNEL_POSTBOOT_TESTING && X86
+    depends on PB_KTESTS && X86
     bool "Circular buffer test"
     default n
     help
         Run the circ_buffer test
 
 config TEST_kernel_messages
-    depends on KERNEL_POSTBOOT_TESTING && X86
+    depends on PB_KTESTS && X86
     bool "Kernel messages test"
     default n
     help
         Run the kernel_messages test
 
 config TEST_page_coloring
-    depends on KERNEL_POSTBOOT_TESTING && PAGE_COLORING
+    depends on PB_KTESTS && PAGE_COLORING
     bool "Page coloring test"
     default n
     help
         Run the page_coloring test
 
 config TEST_color_alloc
-    depends on KERNEL_POSTBOOT_TESTING && PAGE_COLORING
+    depends on PB_KTESTS && PAGE_COLORING
     bool "Color allocation test"
     default n
     help
         Run the color_alloc test
 
 config TEST_print_info
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Print info test"
     default n
     help
         Run the print_info test
 
 config TEST_barrier
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Barrier test"
     default n
     help
         Run the barrier test
 
 config TEST_interrupts_irqsave
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Interrupts irqsave test"
     default y
     help
         Run the interrupts_irqsave test
 
 config TEST_bitmasks
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Bitmasks test"
     default y
     help
         Run the bitmasks test
 
 config TEST_checklists
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Checklists test"
     default n
     help
         Run the checklists test
 
 config TEST_smp_call_functions
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "SMP call functions test"
     default n
     help
         Run the smp_call_functions test
 
 config TEST_slab
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Slab test"
     default n
     help
         Run the slab test
 
 config TEST_kmalloc
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Kmalloc test"
     default n
     help
         Run the kmalloc test
 
 config TEST_hashtable
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Hashtable test"
     default y
     help
         Run the hashtable test
 
 config TEST_bcq
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "BCQ test"
     default n
     help
         Run the bcq test
 
 config TEST_ucq
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "UCQ test"
     default n
     help
         Run the ucq test
 
 config TEST_vm_regions
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "VM regions test"
     default y
     help
         Run the vm_regions test
 
 config TEST_radix_tree
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Radix Tree test"
     default y
     help
         Run the radix_tree test
 
 config TEST_random_fs
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Random FS test"
     default n
     help
         Run the random_fs test
 
 config TEST_kthreads
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Kthreads test"
     default n
     help
         Run the kthreads test
 
 config TEST_kref
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Kref test"
     default n
     help
         Run the kref test
 
 config TEST_atomics
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Atomics test"
     default y
     help
         Run the atomics test
 
 config TEST_abort_halt
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Abort halt test"
     default n
     help
         Run the abort_halt test
 
 config TEST_cv
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Condition Variable test"
     default n
     help
         Run the cv test
 
 config TEST_memset
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Memset test"
     default y
     help
         Run the memset test
 
 config TEST_setjmp
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Setjmp test"
     default n
     help
         Run the setjmp test
 
 config TEST_apipe
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Apipe test"
     default n
     help
         Run the apipe test
 
 config TEST_rwlock
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Rwlock test"
     default n
     help
         Run the rwlock test
 
 config TEST_rv
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Rendezvous test"
     default n
     help
         Run the rv test
 
 config TEST_alarm
-    depends on KERNEL_POSTBOOT_TESTING
+    depends on PB_KTESTS
     bool "Alarm test"
     default n
     help
         Run the alarm test
-
-menuconfig USERSPACE_TESTING
-    bool "User-space testing"
-    default n
-    help
-        Run userspace unit tests after the kernel has booted.
-
-config USERSPACE_TESTING_SCRIPT
-    depends on USERSPACE_TESTING
-    string "Path to test launcher script."
-    default /bin/tests/utest/runall.sh
-    help
-        Run userspace unit tests from the specified path. 
-
-endmenu

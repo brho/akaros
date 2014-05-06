@@ -1,0 +1,6 @@
+menu "Testing"
+
+source "kern/src/ktest/Kconfig.kernel"
+source "kern/src/ktest/Kconfig.userspace"
+
+endmenu

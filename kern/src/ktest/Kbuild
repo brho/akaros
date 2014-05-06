@@ -1,0 +1,2 @@
+obj-y							+= ktest.o
+obj-$(CONFIG_PB_KTESTS)			+= pb_ktests.o
