@@ -32,7 +32,7 @@ readonly BUSYBOX_CONF_FILE=tools/patches/busybox/busybox-1.17.3-config
 ###############                 HELPER FUNCTIONS                 ###############
 ################################################################################
 function last_stable_build() {
-	curl -s localhost:8080/job/Test_akaros_github/lastStableBuild/api/json?tree=actions%5bbuildsByBranchName%5brevision%5bSHA1%5d%5d%5d | \
+	curl -s localhost:8080/job/$JOB_NAME/lastStableBuild/api/json?tree=actions%5bbuildsByBranchName%5brevision%5bSHA1%5d%5d%5d | \
 	        python -c 'import sys, json; print json.load(sys.stdin)["actions"][3]["buildsByBranchName"]["'$GIT_BRANCH'"]["revision"]["SHA1"]'
 }
 
