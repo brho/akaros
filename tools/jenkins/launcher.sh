@@ -4,7 +4,7 @@
 # It analyzes what parts of the codebase have been modified, compiles everything
 # that is needed, and reports on the results. 
 
-set -e
+#set -e
 
 readonly TMP_DIR=tmp
 readonly DIFF_FILE=$TMP_DIR/changes.txt
@@ -213,6 +213,14 @@ function build_busybox() {
 	echo -e "[BUILD_BUSYBOX]: End\n"
 }
 
+function build_all() {
+	build_config
+	build_cross_compiler
+	build_userspace
+	build_busybox
+	build_kernel
+}
+
 # TODO: This won't work for RISCV, it must be changed to whatever is used.
 function run_qemu() {
 	echo -e "\n[RUN_AKAROS_IN_QEMU]: Begin"
@@ -252,56 +260,57 @@ function run_qemu() {
 
 if [ "$COMPILE_ALL" == true ]; then
 	echo "Building all AKAROS"
-	build_config
-	
-	build_cross_compiler
-	build_userspace
-	build_busybox
-	build_kernel
-
+	build_all
 	run_qemu
 
 	AFFECTED_COMPONENTS="cross-compiler kernel userspace busybox"
 else
 	# Save changed files between last tested commit and current one.
 	git diff --stat $(last_stable_build) $GIT_COMMIT > $DIFF_FILE
+	if [ $? -ne 0 ]; then
+		echo "Diff failed, rebuild everything"
+		build_all
+		run_qemu
 
-	# Extract build targets by parsing diff file.
-	AFFECTED_COMPONENTS=`$SCR_GIT_CHANGES $DIFF_FILE $CONF_COMP_COMPONENTS_FILE`
-	# Can contain {cross-compiler, kernel, userspace, busybox}
+		AFFECTED_COMPONENTS="cross-compiler kernel userspace busybox"
+	else 
+		# Extract build targets by parsing diff file.
+		AFFECTED_COMPONENTS=`$SCR_GIT_CHANGES $DIFF_FILE $CONF_COMP_COMPONENTS_FILE`
+		# Can contain {cross-compiler, kernel, userspace, busybox}
 
-	if [[ -n $AFFECTED_COMPONENTS ]]; 
-	then
-		echo "Detected changes in "$AFFECTED_COMPONENTS
-		build_config
-
-		if [[ $AFFECTED_COMPONENTS == *cross-compiler* ]]
+		if [[ -n $AFFECTED_COMPONENTS ]]; 
 		then
-			build_cross_compiler
-			build_userspace
-			build_busybox
-			build_kernel
-		else 
-			if [[ $AFFECTED_COMPONENTS == *userspace* ]]
+			echo "Detected changes in "$AFFECTED_COMPONENTS
+			build_config
+
+			if [[ $AFFECTED_COMPONENTS == *cross-compiler* ]]
 			then
+				build_cross_compiler
 				build_userspace
-			fi
-
-			if [[ $AFFECTED_COMPONENTS == *busybox* ]]
-			then
 				build_busybox
-			fi
-
-			if [[ $AFFECTED_COMPONENTS == *kernel* ]]
-			then
 				build_kernel
-			fi
-		fi
-	else
-		echo "Skipping build. No changes detected."
-	fi
+			else 
+				if [[ $AFFECTED_COMPONENTS == *userspace* ]]
+				then
+					build_userspace
+				fi
 
-	run_qemu
+				if [[ $AFFECTED_COMPONENTS == *busybox* ]]
+				then
+					build_busybox
+				fi
+
+				if [[ $AFFECTED_COMPONENTS == *kernel* ]]
+				then
+					build_kernel
+				fi
+			fi
+		else
+			echo "Skipping build. No changes detected."
+		fi
+
+		run_qemu
+	fi
 fi
 
 
