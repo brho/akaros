@@ -257,9 +257,9 @@ if [ "$COMPILE_ALL" == true ]; then
 	build_config
 	
 	build_cross_compiler
-	build_kernel
 	build_userspace
 	build_busybox
+	build_kernel
 
 	run_qemu
 
@@ -280,15 +280,10 @@ else
 		if [[ $AFFECTED_COMPONENTS == *cross-compiler* ]]
 		then
 			build_cross_compiler
-			build_kernel
 			build_userspace
 			build_busybox
+			build_kernel
 		else 
-			if [[ $AFFECTED_COMPONENTS == *kernel* ]]
-			then
-				build_kernel
-			fi
-
 			if [[ $AFFECTED_COMPONENTS == *userspace* ]]
 			then
 				build_userspace
@@ -297,6 +292,11 @@ else
 			if [[ $AFFECTED_COMPONENTS == *busybox* ]]
 			then
 				build_busybox
+			fi
+
+			if [[ $AFFECTED_COMPONENTS == *kernel* ]]
+			then
+				build_kernel
 			fi
 		fi
 	else
