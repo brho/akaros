@@ -135,8 +135,7 @@ X86_64_INSTDIR        := $WORKSPACE/install/${ARCH_SUBDIRS["X86_64"]}/
 
 	# Create / clean directory where the cross compiler will be installed.
 	CROSS_COMP_DIR=$WORKSPACE/install/${ARCH_SUBDIRS["$COMPILATION_ARCH"]}/
-	mkdir -p CROSS_COMP_DIR
-	rm -rf CROSS_COMP_DIR*
+	rm -rf $CROSS_COMP_DIR
 
 	# Compile cross compiler.
 	case "$COMPILATION_ARCH" in
