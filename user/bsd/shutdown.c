@@ -14,8 +14,7 @@
 int
 shutdown(int fd, int how)
 {
-	if(how == 2)
-		close(fd);
-
+	/* plan 9 doesn't do a shutdown.  if you shut it down, it's now closed. */
+	close(fd);
 	return 0;
 }
