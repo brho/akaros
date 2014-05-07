@@ -73,6 +73,8 @@ struct per_cpu_info {
 	struct kernel_msg_list NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) immed_amsgs;
 	spinlock_t routine_amsg_lock;
 	struct kernel_msg_list NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) routine_amsgs;
+	/* profiling -- opaque to all but the profiling code. */
+	void *profiling;
 }__attribute__((aligned(ARCH_CL_SIZE)));
 
 /* Allows the kernel to figure out what process is running on this core.  Can be
