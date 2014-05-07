@@ -38,7 +38,7 @@ struct queue {
 	int len;					/* bytes allocated to queue */
 	int dlen;					/* data bytes in queue */
 	int limit;					/* max bytes in queue */
-	int iNULLim;				/* initial limit */
+	int inilim;				/* initial limit */
 	int state;
 	int noblock;				/* true if writes return immediately when q full */
 	int eof;					/* number of eofs read by user */
@@ -797,7 +797,7 @@ struct queue *qopen(int limit, int msg, void (*kick) (void *), void *arg)
 		return 0;
 	qinit_common(q);
 
-	q->limit = q->iNULLim = limit;
+	q->limit = q->inilim = limit;
 	q->kick = kick;
 	q->arg = arg;
 	q->state = msg;
@@ -1413,7 +1413,7 @@ void qreopen(struct queue *q)
 	q->state &= ~Qclosed;
 	q->state |= Qstarve;
 	q->eof = 0;
-	q->limit = q->iNULLim;
+	q->limit = q->inilim;
 	spin_unlock_irqsave(&q->lock);
 }
 
