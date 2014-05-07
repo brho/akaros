@@ -1011,7 +1011,7 @@ static int i82563cleanup(struct ether *e)
 
 	c = e->ctlr;
 	tdh = c->tdh;
-	m = c->ntd - 1;
+	m = c->ntd;
 	while (c->tdba[n = NEXT_RING(tdh, m)].status & Tdd) {
 		tdh = n;
 		if ((b = c->tb[tdh]) != NULL) {
@@ -1044,7 +1044,7 @@ static void i82563tproc(void *v)
 	edev = v;
 	ctlr = edev->ctlr;
 	tdt = ctlr->tdt;
-	m = ctlr->ntd - 1;
+	m = ctlr->ntd;
 
 	i82563txinit(ctlr);
 
@@ -1077,7 +1077,7 @@ static int i82563replenish(struct ctlr *ctlr, int maysleep)
 	Rd *rd;
 
 	rdt = ctlr->rdt;
-	m = ctlr->nrd - 1;
+	m = ctlr->nrd;
 	p = rbtab + ctlr->pool;
 	i = 0;
 	for (; NEXT_RING(rdt, m) != ctlr->rdh; rdt = NEXT_RING(rdt, m)) {
@@ -1197,7 +1197,7 @@ static void i82563rproc(void *arg)
 		im = Rxt0 | Rxo | Rxdmt0 | Rxseq | Ack;
 	} else
 		im = Rxt0 | Rxo | Rxdmt0 | Rxseq | Ack;
-	m = ctlr->nrd - 1;
+	m = ctlr->nrd;
 
 	for (;;) {
 		i82563im(ctlr, im);
