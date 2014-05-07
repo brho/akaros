@@ -63,11 +63,13 @@ enum{
 	Kprofdirqid,
 	Kprofdataqid,
 	Kprofctlqid,
+	Kprofoprofileqid,
 };
 struct dirtab kproftab[]={
 	{".",		{Kprofdirqid, 0, QTDIR},0,	DMDIR|0550},
 	{"kpdata",	{Kprofdataqid},		0,	0600},
 	{"kpctl",	{Kprofctlqid},		0,	0600},
+	{"kpoprofile",	{Kprofoprofileqid},	0,	0600},
 };
 
 static struct chan*
@@ -88,6 +90,9 @@ kprofattach(char *spec)
 	}
 	kproftab[1].length = kprof.nbuf * FORMATSIZE;
 	kprof.buf_sz = n;
+	/* NO, I'm not sure how we should do this yet. */
+	int alloc_cpu_buffers(void);
+	alloc_cpu_buffers();
 	return devattach('K', spec);
 }
 
@@ -187,6 +192,8 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 	uintptr_t offset = off;
 	uint64_t pc;
 	int snp_ret, ret = 0;
+	/* the oprofile queue */
+	extern struct queue *opq;
 
 	switch((int)c->qid.path){
 	case Kprofdirqid:
@@ -251,7 +258,8 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 		}
 		n = ret;
 		break;
-
+	case Kprofoprofileqid:
+		return qread(opq, va, n);
 	default:
 		n = 0;
 		break;

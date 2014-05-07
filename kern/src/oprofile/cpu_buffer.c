@@ -33,7 +33,7 @@ struct queue *opq;
 
 /* this is run from core 0 for all cpu buffers. */
 static void wq_sync_buffer(void);
-unsigned long oprofile_cpu_buffer_size = 65536; 
+unsigned long oprofile_cpu_buffer_size = 65536;
 unsigned long oprofile_backtrace_depth = 8;
 
 #define DEFAULT_TIMER_EXPIRE (HZ / 10)
@@ -109,39 +109,45 @@ void free_cpu_buffers(void)
 int alloc_cpu_buffers(void)
 {
 	int i;
-
 	unsigned long buffer_size = oprofile_cpu_buffer_size;
 	unsigned long byte_size = buffer_size * (sizeof(struct op_sample) +
 						 RB_EVENT_HDR_SIZE);
-
+	/* this can get called lots of times. Things might have been freed.
+	 * So be careful.
+	 */
 	/* what limit? No idea. */
-	opq = qopen(1024, Qmsg, NULL, NULL);
+	if (! opq)
+		opq = qopen(1024, Qmsg, NULL, NULL);
 	if (! opq)
 		goto fail;
 
-	op_cpu_buffer = kzmalloc(sizeof(*op_cpu_buffer), num_cpus);
-	if (! op_cpu_buffer)
-		goto fail;
+	/* we *really* don't want to block. Losing data is better. */
+	qnoblock(opq, 1);
+	if (! op_cpu_buffer) {
+		op_cpu_buffer = kzmalloc(sizeof(*op_cpu_buffer), num_cpus);
+		if (! op_cpu_buffer)
+			goto fail;
 
-	for(i = 0; i < num_cpus; i++) {
-		struct oprofile_cpu_buffer *b = &op_cpu_buffer[i];
-		/* short term: for each event, we're going to kmalloc a
-		 * sample and shove it into the opq.
-		 * Long term: TBD. One option is to create a big damn Block and
-		 * add to it as needed. Once the block is full we can push
-		 * it onto the opq. That will actually be pretty fast and easy
-		 * if we make the block page-sized. Far, far simpler than the
-		 * Linux tracebuffer stuff. 
-		 */
-		b->last_proc = NULL;
-		b->last_is_kernel = -1;
-		b->tracing = 0;
-		b->buffer_size = buffer_size;
-		b->sample_received = 0;
-		b->sample_lost_overflow = 0;
-		b->backtrace_aborted = 0;
-		b->sample_invalid_eip = 0;
-		b->cpu = i;
+		for(i = 0; i < num_cpus; i++) {
+			struct oprofile_cpu_buffer *b = &op_cpu_buffer[i];
+			/* short term: for each event, we're going to kmalloc a
+			 * sample and shove it into the opq.
+			 * Long term: TBD. One option is to create a big damn Block and
+			 * add to it as needed. Once the block is full we can push
+			 * it onto the opq. That will actually be pretty fast and easy
+			 * if we make the block page-sized. Far, far simpler than the
+			 * Linux tracebuffer stuff.
+			 */
+			b->last_proc = NULL;
+			b->last_is_kernel = -1;
+			b->tracing = 0;
+			b->buffer_size = buffer_size;
+			b->sample_received = 0;
+			b->sample_lost_overflow = 0;
+			b->backtrace_aborted = 0;
+			b->sample_invalid_eip = 0;
+			b->cpu = i;
+		}
 	}
 
 	return 0;
@@ -156,7 +162,7 @@ void start_cpu_work(void)
 	int i;
 
 	work_enabled = 1;
-	/* task starts here. 
+	/* task starts here.
 	schedule_delayed_work_on(i, &b->work, DEFAULT_TIMER_EXPIRE + i);
 	*/
 }
@@ -186,7 +192,7 @@ struct op_sample *op_cpu_buffer_read_entry(struct op_entry *entry, int cpu)
 static struct block *op_cpu_buffer_write_reserve(struct op_entry *entry, int size)
 {
 	struct block *b;
-	
+
 	b = allocb(sizeof(struct op_sample) +
 		   size * sizeof(entry->sample->data[0]));
 	if (!b)
@@ -306,7 +312,7 @@ log_sample(struct oprofile_cpu_buffer *cpu_buf, unsigned long pc,
 		return 0;
 	}
 
-	/* ah, so great. op_add* return 1 in event of failure. 
+	/* ah, so great. op_add* return 1 in event of failure.
 	 * this function returns 0 in event of failure.
 	 * what a cluster.
 	 */
