@@ -27,9 +27,4 @@ void wake_up_buffer_waiter(void);
 #define INVALID_COOKIE ~0UL
 #define NO_COOKIE 0UL
 
-/* mutex between sync_cpu_buffers() and the
- * file reading code.
- */
-extern struct mutex buffer_mutex;
-
 #endif /* EVENT_BUFFER_H */

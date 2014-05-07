@@ -30,6 +30,7 @@ obj-y						+= monitor.o
 obj-y						+= multiboot.o
 obj-y						+= net/
 obj-y						+= ns/
+obj-y						+= oprofile/
 obj-y						+= page_alloc.o
 obj-y						+= pagemap.o
 obj-y						+= pmap.o
