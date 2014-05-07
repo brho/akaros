@@ -1,7 +1,7 @@
 menuconfig PB_KTESTS
     depends on KERNEL_TESTING
     bool "Post-boot kernel tests"
-    default n
+    default y
     help
         Run unit tests after the kernel has booted.
 

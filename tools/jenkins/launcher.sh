@@ -102,7 +102,7 @@ function build_config() {
 	# Enable tests to run.
 	# These don't take much to execute so we can run them always and just parse
 	# results if needed.
-	echo "CONFIG_KERNEL_POSTBOOT_TESTING=y" >> .config
+	echo "CONFIG_KERNEL_TESTING=y" >> .config
 	echo "CONFIG_USERSPACE_TESTING=y" >> .config
 	# Set all config variables dependent on the above changes to their defaults
 	# without prompting
