@@ -205,10 +205,6 @@ function build_busybox() {
 	cp busybox_unstripped ../../kern/kfs/bin/busybox
 	cd ../../
 
-	# Recompile kernel to include busybox
-	echo -e "Recompile kernel to include busybox"
-	make
-
 	echo -e "[BUILD_BUSYBOX]: End\n"
 }
 
