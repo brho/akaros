@@ -48,8 +48,8 @@ then
 	mask=255.255.255.0
 	remote=169.229.49.0
 	route=169.229.49.1
-	# skip the shitty e1000s
-	NIC="2"
+	# the i350 NIC that is plugged in is the first NIC
+	NIC="0"
 fi
 
 if [ "x$MACHINE" = "xhossin" ]
