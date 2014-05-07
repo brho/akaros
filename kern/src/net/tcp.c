@@ -455,7 +455,7 @@ static int tcpstate(struct conv *c, char *state, int n)
 	s = (Tcpctl *) (c->ptcl);
 
 	return snprintf(state, n,
-					"%s qin %d qout %d srtt %d mdev %d cwin %lu swin %lu>>%d rwin %lu>>%d timer.start %llu timer.count %llu rerecv %d katimer.start %d katimer.count %d\n",
+					"%s qin %d qout %d srtt %d mdev %d cwin %u swin %u>>%d rwin %u>>%d timer.start %llu timer.count %llu rerecv %d katimer.start %d katimer.count %d\n",
 					tcpstates[s->state],
 					c->rq ? qlen(c->rq) : 0,
 					c->wq ? qlen(c->wq) : 0,

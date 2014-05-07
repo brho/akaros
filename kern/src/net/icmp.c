@@ -141,7 +141,7 @@ extern char *icmpconnect(struct conv *c, char **argv, int argc)
 
 extern int icmpstate(struct conv *c, char *state, int n)
 {
-	return snprintf(state, n, "%s qin %d qout %d",
+	return snprintf(state, n, "%s qin %d qout %d\n",
 					"Datagram",
 					c->rq ? qlen(c->rq) : 0, c->wq ? qlen(c->wq) : 0);
 }

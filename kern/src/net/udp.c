@@ -136,7 +136,7 @@ static char *udpconnect(struct conv *c, char **argv, int argc)
 
 static int udpstate(struct conv *c, char *state, int n)
 {
-	return snprintf(state, n, "%s qin %d qout %d",
+	return snprintf(state, n, "%s qin %d qout %d\n",
 					c->inuse ? "Open" : "Closed",
 					c->rq ? qlen(c->rq) : 0, c->wq ? qlen(c->wq) : 0);
 }

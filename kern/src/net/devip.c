@@ -676,6 +676,7 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 	long rv;
 	struct Fs *f;
 	uint32_t offset = off;
+	size_t sofar;
 
 	f = ipfs[ch->dev];
 
@@ -729,10 +730,15 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 			kfree(buf);
 			return rv;
 		case Qstatus:
+			/* this all is a bit screwed up since the size of some state's
+			 * buffers will change from one invocation to another.  a reader
+			 * will come in and read the entire buffer.  then it will come again
+			 * and read from the next offset, expecting EOF.  if the buffer
+			 * changed sizes, it'll reprint the end of the buffer slightly. */
 			buf = kzmalloc(Statelen, 0);
 			x = f->p[PROTO(ch->qid)];
 			c = x->conv[CONV(ch->qid)];
-			(*x->state) (c, buf, Statelen - 2);
+			sofar = (*x->state) (c, buf, Statelen - 2);
 			rv = readstr(offset, p, n, buf);
 			kfree(buf);
 			return rv;
