@@ -58,8 +58,9 @@ static inline
 int op_cpu_buffer_add_data(struct op_entry *entry, unsigned long val)
 {
 	assert(entry->size >= 0);
-	if (!entry->size)
+	if (!entry->size) {
 		return 0;
+	}
 	*entry->data = val;
 	entry->size--;
 	entry->data++;
@@ -78,8 +79,9 @@ static inline
 int op_cpu_buffer_get_data(struct op_entry *entry, unsigned long *val)
 {
 	int size = entry->size;
-	if (!size)
+	if (!size) {
 		return 0;
+	}
 	*val = *entry->data;
 	entry->size--;
 	entry->data++;
@@ -140,7 +142,7 @@ int alloc_cpu_buffers(void)
 			 */
 			b->last_proc = NULL;
 			b->last_is_kernel = -1;
-			b->tracing = 0;
+			b->tracing = 1;
 			b->buffer_size = buffer_size;
 			b->sample_received = 0;
 			b->sample_lost_overflow = 0;
@@ -195,8 +197,10 @@ static struct block *op_cpu_buffer_write_reserve(struct op_entry *entry, int siz
 
 	b = allocb(sizeof(struct op_sample) +
 		   size * sizeof(entry->sample->data[0]));
-	if (!b)
+	if (!b) {
+		printk("%s: fail\n", __func__);
 		return NULL;
+	}
 	entry->sample = (void *)b->wp;
 	entry->size = size;
 	entry->data = entry->sample->data;
@@ -221,6 +225,7 @@ op_add_code(struct oprofile_cpu_buffer *cpu_buf, unsigned long backtrace,
 
 	if (waserror()) {
 		poperror();
+		printk("%s: failed\n", __func__);
 		return 1;
 	}
 
@@ -277,6 +282,7 @@ op_add_sample(struct oprofile_cpu_buffer *cpu_buf,
 
 	if (waserror()) {
 		poperror();
+		printk("%s: failed\n", __func__);
 		return 1;
 	}
 
@@ -285,10 +291,9 @@ op_add_sample(struct oprofile_cpu_buffer *cpu_buf,
 	sample = entry.sample;
 	sample->eip = pc;
 	sample->event = event;
-
 	qbwrite(opq, b);
 	poperror();
-	return 1;
+	return 0;
 }
 
 /*
@@ -353,10 +358,13 @@ __oprofile_add_ext_sample(unsigned long pc, void /*struct pt_regs*/ * const regs
 	 */
 	if (!log_sample(cpu_buf, pc, backtrace, is_kernel, event, proc))
 		/* failed */
-		return;
+		{
+			return;
+		}
 
-	if (!backtrace)
+	if (!backtrace) {
 		return;
+	}
 #if 0
 	oprofile_begin_trace(cpu_buf);
 	oprofile_ops.backtrace(regs, backtrace);
@@ -410,6 +418,7 @@ oprofile_write_reserve(struct op_entry *entry, void /*struct pt_regs*/ * const r
 	struct oprofile_cpu_buffer *cpu_buf = &op_cpu_buffer[core_id()];
 
 	if (waserror()){
+		printk("%s: failed\n", __func__);
 		poperror();
 		goto fail;
 	}
@@ -436,23 +445,28 @@ fail:
 
 int oprofile_add_data(struct op_entry *entry, unsigned long val)
 {
-	if (!entry->event)
+	if (!entry->event) {
 		return 0;
+	}
 	return op_cpu_buffer_add_data(entry, val);
 }
 
 int oprofile_add_data64(struct op_entry *entry, uint64_t val)
 {
-	if (!entry->event)
+	if (!entry->event) {
 		return 0;
+	}
 	if (op_cpu_buffer_get_size(entry) < 2)
 		/*
 		 * the function returns 0 to indicate a too small
 		 * buffer, even if there is some space left
 		 */
+		{
+			return 0;
+		}
+	if (!op_cpu_buffer_add_data(entry, (uint32_t)val)) {
 		return 0;
-	if (!op_cpu_buffer_add_data(entry, (uint32_t)val))
-		return 0;
+	}
 	return op_cpu_buffer_add_data(entry, (uint32_t)(val >> 32));
 }
 
@@ -474,8 +488,9 @@ void oprofile_add_trace(unsigned long pc)
 {
 	struct oprofile_cpu_buffer *cpu_buf = &op_cpu_buffer[core_id()];
 
-	if (!cpu_buf->tracing)
+	if (!cpu_buf->tracing) {
 		return;
+	}
 
 	/*
 	 * broken frame can give an eip with the same value as an
@@ -489,6 +504,7 @@ void oprofile_add_trace(unsigned long pc)
 
 	return;
 fail:
+	printk("%s: fail. Turning of tracing on cpu %d\n", core_id());
 	cpu_buf->tracing = 0;
 	cpu_buf->backtrace_aborted++;
 	return;

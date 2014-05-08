@@ -36,7 +36,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <ip.h>
-
+#include <oprofile.h>
 
 #define LRES	3		/* log of PC resolution */
 #define CELLSIZE	8	/* sizeof of count cell */
@@ -259,7 +259,8 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 		n = ret;
 		break;
 	case Kprofoprofileqid:
-		return qread(opq, va, n);
+		n = qread(opq, va, n);
+		break;
 	default:
 		n = 0;
 		break;
@@ -277,6 +278,7 @@ static void kprof_clear(struct kprof *kp)
 static long
 kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 {
+	uintptr_t pc;
 	switch((int)(c->qid.path)){
 	case Kprofctlqid:
 		if(strncmp(a, "startclr", 8) == 0){
@@ -289,7 +291,20 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 			kprof.time = 0;
 		} else if(strncmp(a, "clear", 5) == 0) {
 			kprof_clear(&kprof);
+		}else if(strncmp(a, "opstart", 8) == 0) {
+			/* maybe have enable/disable for it. */
+		}else if(strncmp(a, "opstop", 6) == 0) {
+		} else  {
+			error("startclr|start|stop|clear|opstart|opstop");
 		}
+		break;
+
+		/* The format is a long as text. We strtoul, and jam it into the
+		 * trace buffer.
+		 */
+	case Kprofoprofileqid:
+		pc = strtoul(a, 0, 0);
+		oprofile_add_trace(pc);
 		break;
 	default:
 		error(Ebadusefd);
