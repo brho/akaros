@@ -33,7 +33,7 @@ struct queue *opq;
 
 /* this is run from core 0 for all cpu buffers. */
 static void wq_sync_buffer(void);
-unsigned long oprofile_cpu_buffer_size = 65536;
+unsigned long oprofile_cpu_buffer_size = 32;
 unsigned long oprofile_backtrace_depth = 8;
 
 #define DEFAULT_TIMER_EXPIRE (HZ / 10)
@@ -55,7 +55,7 @@ static inline void op_cpu_buffer_reset(int cpu)
 
 /* returns the remaining free size of data in the entry */
 static inline
-int op_cpu_buffer_add_data(struct op_entry *entry, unsigned long val)
+	int op_cpu_buffer_add_data(struct op_entry *entry, unsigned long val)
 {
 	assert(entry->size >= 0);
 	if (!entry->size) {
@@ -68,15 +68,14 @@ int op_cpu_buffer_add_data(struct op_entry *entry, unsigned long val)
 }
 
 /* returns the size of data in the entry */
-static inline
-int op_cpu_buffer_get_size(struct op_entry *entry)
+static inline int op_cpu_buffer_get_size(struct op_entry *entry)
 {
 	return entry->size;
 }
 
 /* returns 0 if empty or the size of data including the current value */
 static inline
-int op_cpu_buffer_get_data(struct op_entry *entry, unsigned long *val)
+	int op_cpu_buffer_get_data(struct op_entry *entry, unsigned long *val)
 {
 	int size = entry->size;
 	if (!size) {
@@ -113,24 +112,26 @@ int alloc_cpu_buffers(void)
 	int i;
 	unsigned long buffer_size = oprofile_cpu_buffer_size;
 	unsigned long byte_size = buffer_size * (sizeof(struct op_sample) +
-						 RB_EVENT_HDR_SIZE);
+											 RB_EVENT_HDR_SIZE);
 	/* this can get called lots of times. Things might have been freed.
 	 * So be careful.
 	 */
 	/* what limit? No idea. */
-	if (! opq)
+	if (!opq)
 		opq = qopen(1024, Qmsg, NULL, NULL);
-	if (! opq)
+	if (!opq)
 		goto fail;
 
 	/* we *really* don't want to block. Losing data is better. */
 	qnoblock(opq, 1);
-	if (! op_cpu_buffer) {
-		op_cpu_buffer = kzmalloc(sizeof(*op_cpu_buffer), num_cpus);
-		if (! op_cpu_buffer)
+	if (!op_cpu_buffer) {
+		printk("ALlocate %d bytes\n", sizeof(*op_cpu_buffer) * num_cpus);
+		op_cpu_buffer =
+			kzmalloc(sizeof(*op_cpu_buffer) * num_cpus, KMALLOC_WAIT);
+		if (!op_cpu_buffer)
 			goto fail;
 
-		for(i = 0; i < num_cpus; i++) {
+		for (i = 0; i < num_cpus; i++) {
 			struct oprofile_cpu_buffer *b = &op_cpu_buffer[i];
 			/* short term: for each event, we're going to kmalloc a
 			 * sample and shove it into the opq.
@@ -165,8 +166,8 @@ void start_cpu_work(void)
 
 	work_enabled = 1;
 	/* task starts here.
-	schedule_delayed_work_on(i, &b->work, DEFAULT_TIMER_EXPIRE + i);
-	*/
+	   schedule_delayed_work_on(i, &b->work, DEFAULT_TIMER_EXPIRE + i);
+	 */
 }
 
 void end_cpu_work(void)
@@ -191,12 +192,13 @@ struct op_sample *op_cpu_buffer_read_entry(struct op_entry *entry, int cpu)
 	return NULL;
 }
 
-static struct block *op_cpu_buffer_write_reserve(struct op_entry *entry, int size)
+static struct block *op_cpu_buffer_write_reserve(struct op_entry *entry,
+												 int size)
 {
 	struct block *b;
 
 	b = allocb(sizeof(struct op_sample) +
-		   size * sizeof(entry->sample->data[0]));
+			   size * sizeof(entry->sample->data[0]));
 	if (!b) {
 		printk("%s: fail\n", __func__);
 		return NULL;
@@ -205,14 +207,14 @@ static struct block *op_cpu_buffer_write_reserve(struct op_entry *entry, int siz
 	entry->size = size;
 	entry->data = entry->sample->data;
 
-	b->wp += sizeof(struct op_sample) +
-		size * sizeof(entry->sample->data[0]);
+	b->wp += sizeof(struct op_sample) + size * sizeof(entry->sample->data[0]);
 	return b;
 
 }
+
 static int
 op_add_code(struct oprofile_cpu_buffer *cpu_buf, unsigned long backtrace,
-	    int is_kernel, struct proc *proc)
+			int is_kernel, struct proc *proc)
 {
 	struct block *b;
 	struct op_entry entry;
@@ -233,7 +235,7 @@ op_add_code(struct oprofile_cpu_buffer *cpu_buf, unsigned long backtrace,
 		flags |= TRACE_BEGIN;
 
 	/* notice a switch from user->kernel or vice versa */
-	is_kernel = !!is_kernel;
+	is_kernel = ! !is_kernel;
 	if (cpu_buf->last_is_kernel != is_kernel) {
 		cpu_buf->last_is_kernel = is_kernel;
 		flags |= KERNEL_CTX_SWITCH;
@@ -266,14 +268,14 @@ op_add_code(struct oprofile_cpu_buffer *cpu_buf, unsigned long backtrace,
 	if (size)
 		op_cpu_buffer_add_data(&entry, (unsigned long)proc);
 
-	qbwrite(opq, b); /* note: out of our hands now. Don't free. */
+	qbwrite(opq, b);	/* note: out of our hands now. Don't free. */
 	poperror();
 	return 0;
 }
 
 static inline int
 op_add_sample(struct oprofile_cpu_buffer *cpu_buf,
-	      unsigned long pc, unsigned long event)
+			  unsigned long pc, unsigned long event)
 {
 	ERRSTACK(1);
 	struct op_entry entry;
@@ -306,8 +308,8 @@ op_add_sample(struct oprofile_cpu_buffer *cpu_buf,
  */
 static int
 log_sample(struct oprofile_cpu_buffer *cpu_buf, unsigned long pc,
-	   unsigned long backtrace, int is_kernel, unsigned long event,
-	   struct proc *proc)
+		   unsigned long backtrace, int is_kernel, unsigned long event,
+		   struct proc *proc)
 {
 	struct proc *tsk = proc ? proc : current;
 	cpu_buf->sample_received++;
@@ -345,9 +347,9 @@ static inline void oprofile_end_trace(struct oprofile_cpu_buffer *cpu_buf)
 }
 
 static inline void
-__oprofile_add_ext_sample(unsigned long pc, void /*struct pt_regs*/ * const regs,
-			  unsigned long event, int is_kernel,
-			  struct proc *proc)
+__oprofile_add_ext_sample(unsigned long pc,
+						  void /*struct pt_regs */ *const regs,
+						  unsigned long event, int is_kernel, struct proc *proc)
 {
 	struct oprofile_cpu_buffer *cpu_buf = &op_cpu_buffer[core_id()];
 	unsigned long backtrace = oprofile_backtrace_depth;
@@ -358,9 +360,9 @@ __oprofile_add_ext_sample(unsigned long pc, void /*struct pt_regs*/ * const regs
 	 */
 	if (!log_sample(cpu_buf, pc, backtrace, is_kernel, event, proc))
 		/* failed */
-		{
-			return;
-		}
+	{
+		return;
+	}
 
 	if (!backtrace) {
 		return;
@@ -372,30 +374,33 @@ __oprofile_add_ext_sample(unsigned long pc, void /*struct pt_regs*/ * const regs
 #endif
 }
 
-void oprofile_add_ext_hw_sample(unsigned long pc, void /*struct pt_regs*/ * const regs,
-				unsigned long event, int is_kernel,
-				struct proc *proc)
+void oprofile_add_ext_hw_sample(unsigned long pc,
+								void /*struct pt_regs */ *const regs,
+								unsigned long event, int is_kernel,
+								struct proc *proc)
 {
 	__oprofile_add_ext_sample(pc, regs, event, is_kernel, proc);
 }
 
-void oprofile_add_ext_sample(unsigned long pc, void /*struct pt_regs*/ * const regs,
-			     unsigned long event, int is_kernel)
+void oprofile_add_ext_sample(unsigned long pc,
+							 void /*struct pt_regs */ *const regs,
+							 unsigned long event, int is_kernel)
 {
 	__oprofile_add_ext_sample(pc, regs, event, is_kernel, NULL);
 }
 
-void oprofile_add_sample(void /*struct pt_regs*/ * const regs, unsigned long event)
+void oprofile_add_sample(void /*struct pt_regs */ *const regs,
+						 unsigned long event)
 {
 	int is_kernel;
 	unsigned long pc;
 
 	if (regs) {
-		is_kernel = 0; // FIXME!user_mode(regs);
-		pc = 0; // FIXME profile_pc(regs);
+		is_kernel = 0;	// FIXME!user_mode(regs);
+		pc = 0;	// FIXME profile_pc(regs);
 	} else {
-		is_kernel = 0;    /* This value will not be used */
-		pc = ESCAPE_CODE; /* as this causes an early return. */
+		is_kernel = 0;	/* This value will not be used */
+		pc = ESCAPE_CODE;	/* as this causes an early return. */
 	}
 
 	__oprofile_add_ext_sample(pc, regs, event, is_kernel, NULL);
@@ -408,16 +413,17 @@ void oprofile_add_sample(void /*struct pt_regs*/ * const regs, unsigned long eve
  * oprofile_write_commit(&entry) to commit the sample.
  */
 void
-oprofile_write_reserve(struct op_entry *entry, void /*struct pt_regs*/ * const regs,
-		       unsigned long pc, int code, int size)
+oprofile_write_reserve(struct op_entry *entry,
+					   void /*struct pt_regs */ *const regs,
+					   unsigned long pc, int code, int size)
 {
 	ERRSTACK(1);
 	struct op_sample *sample;
 	struct block *b;
-	int is_kernel = 0; // FIXME!user_mode(regs);
+	int is_kernel = 0;			// FIXME!user_mode(regs);
 	struct oprofile_cpu_buffer *cpu_buf = &op_cpu_buffer[core_id()];
 
-	if (waserror()){
+	if (waserror()) {
 		printk("%s: failed\n", __func__);
 		poperror();
 		goto fail;
@@ -431,7 +437,7 @@ oprofile_write_reserve(struct op_entry *entry, void /*struct pt_regs*/ * const r
 	b = op_cpu_buffer_write_reserve(entry, size + 2);
 	sample = entry->sample;
 	sample->eip = ESCAPE_CODE;
-	sample->event = 0;		/* no flags */
+	sample->event = 0;	/* no flags */
 
 	op_cpu_buffer_add_data(entry, code);
 	op_cpu_buffer_add_data(entry, pc);
@@ -461,13 +467,13 @@ int oprofile_add_data64(struct op_entry *entry, uint64_t val)
 		 * the function returns 0 to indicate a too small
 		 * buffer, even if there is some space left
 		 */
-		{
-			return 0;
-		}
-	if (!op_cpu_buffer_add_data(entry, (uint32_t)val)) {
+	{
 		return 0;
 	}
-	return op_cpu_buffer_add_data(entry, (uint32_t)(val >> 32));
+	if (!op_cpu_buffer_add_data(entry, (uint32_t) val)) {
+		return 0;
+	}
+	return op_cpu_buffer_add_data(entry, (uint32_t) (val >> 32));
 }
 
 int oprofile_write_commit(struct op_entry *entry)
@@ -509,4 +515,3 @@ fail:
 	cpu_buf->backtrace_aborted++;
 	return;
 }
-
