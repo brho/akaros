@@ -52,6 +52,18 @@ struct oprofile_cpu_buffer {
 	unsigned long backtrace_aborted;
 	unsigned long sample_invalid_eip;
 	int cpu;
+	struct block *block;
+	/* long term plan: when we fill the block,
+	 * we write it to fullblock, and pull a
+	 * freeblock from the emptyblock queue. 
+	 * The thread that pulls fullbocks and
+	 * allocates emptyblocks is timer-driven.
+	 * Or, barret will make me use his queues,
+	 * which is also fine; I just find the queue
+	 * functions convenient because they interface to
+	 * the dev code so easily.
+	 */
+	struct queue *fullqueue, *emptyqueue;
 };
 
 struct op_sample *op_cpu_buffer_read_entry(struct op_entry *entry, int cpu);
