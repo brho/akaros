@@ -440,7 +440,7 @@ int devconfig(int unused_int, char *c, DevConf *)
 
 char *devchaninfo(struct chan *chan, char *ret, size_t ret_l)
 {
-	snprintf(ret, ret_l, "qid.path: %p, qid.type: %02x\n", chan->qid.path,
+	snprintf(ret, ret_l, "qid.path: %p, qid.type: %02x", chan->qid.path,
 			 chan->qid.type);
 	return ret;
 }

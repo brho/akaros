@@ -1369,12 +1369,17 @@ void print_chaninfo(struct chan *c)
 {
 	char buf[64] = { 0 };
 	bool has_dev = c->type != -1;
-	printk("Chan pathname: %s, Dev: %s, Devinfo: %s\n",
+	if (has_dev && !devtab[c->type].chaninfo) {
+		printk("Chan type %d has no chaninfo!\n", c->type);
+		has_dev = FALSE;
+	}
+	printk("Chan pathname: %s ref %d, Dev: %s, Devinfo: %s",
 		   c->name ? c->name->s : "no cname",
+		   kref_refcnt(&c->ref),
 		   has_dev ? devtab[c->type].name : "no dev",
-		   has_dev ? devtab[c->type].chaninfo(c, buf, sizeof(buf)) : "no info");
+		   has_dev ? devtab[c->type].chaninfo(c, buf, sizeof(buf)) : "");
 	if (!has_dev)
-		printk("No dev: intermediate chan? qid.path: %p\n", c->qid.path);
+		printk("qid.path: %p\n", c->qid.path);
 	printk("\n");
 }
 
@@ -1387,7 +1392,7 @@ void print_9ns_files(struct proc *p)
 	for (int i = 0; i <= f->maxfd; i++) {
 		if (!f->fd[i])
 			continue;
-		printk("\t9fs %d, ", i);
+		printk("\t9fs %4d, ", i);
 		print_chaninfo(f->fd[i]);
 	}
 	spin_unlock(&f->lock);
