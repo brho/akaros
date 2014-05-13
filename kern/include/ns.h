@@ -600,6 +600,7 @@ struct block *bl2mem(uint8_t * unused_uint8_p_t, struct block *, int);
 int blocklen(struct block *);
 char *channame(struct chan *);
 void cclose(struct chan *);
+void chan_incref(struct chan *);
 void chandevinit(void);
 void chandevreset(void);
 void chandevshutdown(void);

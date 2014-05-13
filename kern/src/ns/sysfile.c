@@ -95,7 +95,7 @@ struct chan *fdtochan(struct fgrp *f, int fd, int mode, int chkmnt, int iref)
 		error(Ebadfd);
 	}
 	if (iref)
-		kref_get(&c->ref, 1);
+		chan_incref(c);
 	spin_unlock(&f->lock);
 
 	if (chkmnt && (c->flag & CMSG)) {
@@ -1434,7 +1434,7 @@ int plan9setup(struct proc *new_proc, struct proc *parent)
 	new_proc->pgrp = parent->pgrp;
 	/* copy semantics on / and . (doesn't make a lot of sense in akaros o/w) */
 	/* / should never disappear while we hold a ref to parent */
-	kref_get(&parent->slash->ref, 1);
+	chan_incref(parent->slash);
 	new_proc->slash = parent->slash;
 	/* dot could change concurrently, and we could fail to gain a ref if whoever
 	 * decref'd dot triggered the release.  if that did happen, new_proc->dot

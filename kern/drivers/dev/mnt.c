@@ -304,7 +304,7 @@ struct chan *mntauth(struct chan *c, char *spec)
 
 	c->qid = r->reply.aqid;
 	c->mchan = m->c;
-	kref_get(&m->c->ref, 1);
+	chan_incref(m->c);
 	c->mqid = c->qid;
 	c->mode = ORDWR;
 
@@ -370,7 +370,7 @@ static struct chan *mntattach(char *muxattach)
 
 	c->qid = r->reply.qid;
 	c->mchan = m->c;
-	kref_get(&m->c->ref, 1);
+	chan_incref(m->c);
 	c->mqid = c->qid;
 
 	poperror();	/* r */
@@ -465,7 +465,7 @@ static struct walkqid *mntwalk(struct chan *c, struct chan *nc, char **name,
 		if (wq->clone != c) {
 			wq->clone->type = c->type;
 			wq->clone->mchan = c->mchan;
-			kref_get(&c->mchan->ref, 1);
+			chan_incref(c->mchan);
 		}
 		if (r->reply.nwqid > 0)
 			wq->clone->qid = r->reply.wqid[r->reply.nwqid - 1];

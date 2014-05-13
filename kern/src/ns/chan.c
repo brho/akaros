@@ -276,6 +276,13 @@ void cclose(struct chan *c)
 	kref_put(&c->ref);
 }
 
+/* convenience wrapper for interposition.  if you do use this, don't forget
+ * about the kref_get_not_zero in plan9setup() */
+void chan_incref(struct chan *c)
+{
+	kref_get(&c->ref, 1);
+}
+
 /*
  * Make sure we have the only copy of c.  (Copy on write.)
  */
@@ -337,7 +344,7 @@ struct mhead *newmhead(struct chan *from)
 	mh = kzmalloc(sizeof(struct mhead), 0);
 	kref_init(&mh->ref, mh_release, 1);
 	mh->from = from;
-	kref_get(&from->ref, 1);
+	chan_incref(from);
 
 /*
 	n = from->name->len;
@@ -575,7 +582,7 @@ findmount(struct chan **cp,
 			}
 			if (*cp != NULL)
 				cclose(*cp);
-			kref_get(&m->mount->to->ref, 1);
+			chan_incref(m->mount->to);
 			*cp = m->mount->to;
 			runlock(&m->lock);
 			return 1;
@@ -623,7 +630,7 @@ struct chan *undomount(struct chan *c, struct cname *name)
 					if (strcmp(t->head->from->name->s, name->s) != 0)
 						continue;
 					nc = t->head->from;
-					kref_get(&nc->ref, 1);
+					chan_incref(nc);
 					cclose(c);
 					c = nc;
 					break;
@@ -651,7 +658,7 @@ int walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror)
 	struct walkqid *wq;
 
 	c = *cp;
-	kref_get(&c->ref, 1);
+	chan_incref(c);
 	cname = c->name;
 	kref_get(&cname->ref, 1);
 	mh = NULL;
@@ -967,7 +974,7 @@ struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 			c = current->slash;
 			if (!c)
 				panic("no slash!");
-			kref_get(&c->ref, 1);
+			chan_incref(c);
 			break;
 
 		case '#':
@@ -1012,7 +1019,7 @@ struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 			c = current->dot;
 			if (!c)
 				panic("no dot!");
-			kref_get(&c->ref, 1);
+			chan_incref(c);
 			break;
 	}
 	prefix = name - aname;
@@ -1238,7 +1245,7 @@ Open:
 					cnew = createdir(cnew, m);
 				else {
 					cnew = c;
-					kref_get(&cnew->ref, 1);
+					chan_incref(cnew);
 				}
 
 				/*

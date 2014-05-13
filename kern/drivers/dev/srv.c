@@ -217,7 +217,7 @@ static struct chan *srvopen(struct chan *c, int omode)
 	/* the magic of srv: open c, get c->srv->chan back */
 	cclose(c);
 	c = srv->chan;
-	kref_get(&c->ref, 1);
+	chan_incref(c);
 	poperror();
 	kref_put(&srv->ref);
 	return c;

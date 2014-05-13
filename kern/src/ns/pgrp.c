@@ -215,7 +215,7 @@ struct fgrp *dupfgrp(struct proc *new_proc, struct fgrp *f)
 	new->minfd = f->minfd;
 	for (i = 0; i <= f->maxfd; i++) {
 		if ((c = f->fd[i])) {
-			kref_get(&c->ref, 1);
+			chan_incref(c);
 			claim_fd(&new_proc->open_files, i);
 			new->fd[i] = c;
 		}
@@ -232,7 +232,7 @@ struct mount *newmount(struct mhead *mh, struct chan *to, int flag, char *spec)
 	m = kzmalloc(sizeof(struct mount), 0);
 	m->to = to;
 	m->head = mh;
-	kref_get(&to->ref, 1);
+	chan_incref(to);
 	m->mountid = NEXT_ID(mountid);
 	m->mflag = flag;
 	if (spec != 0)
