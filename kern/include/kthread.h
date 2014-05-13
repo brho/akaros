@@ -114,6 +114,7 @@ void cv_broadcast_irqsave(struct cond_var *cv, int8_t *irq_state);
 
 bool abort_sysc(struct proc *p, struct syscall *sysc);
 void abort_all_sysc(struct proc *p);
+int abort_all_sysc_fd(struct proc *p, int fd);
 void __reg_abortable_cv(struct cv_lookup_elm *cle, struct cond_var *cv);
 void dereg_abortable_cv(struct cv_lookup_elm *cle);
 bool should_abort(struct cv_lookup_elm *cle);

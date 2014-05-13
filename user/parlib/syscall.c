@@ -167,6 +167,11 @@ int sys_abort_sysc(struct syscall *sysc)
 	return ros_syscall(SYS_abort_sysc, sysc, 0, 0, 0, 0, 0);
 }
 
+int sys_abort_sysc_fd(int fd)
+{
+	return ros_syscall(SYS_abort_sysc_fd, fd, 0, 0, 0, 0, 0);
+}
+
 long syscall_async(struct syscall *sysc, unsigned long num, ...)
 {
 	va_list args;

@@ -63,4 +63,7 @@ int systrace_dereg(bool all, struct proc *p);
 void systrace_print(bool all, struct proc *p);
 void systrace_clear_buffer(void);
 
+/* Utility */
+bool syscall_uses_fd(struct syscall *sysc, int fd);
+
 #endif /* !ROS_KERN_SYSCALL_H */

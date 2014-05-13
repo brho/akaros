@@ -744,16 +744,20 @@ bool abort_sysc(struct proc *p, struct syscall *sysc)
 	return TRUE;
 }
 
-/* This will abort any abortabls at the time the call was started.  New
- * abortables could be registered concurrently.  The main caller I see for this
- * is proc_destroy(), so DYING will be set, and new abortables will quickly
- * abort and dereg when they see their proc is DYING. */
-void abort_all_sysc(struct proc *p)
+/* This will abort any abortables at the time the call was started for which
+ * should_abort(cle, arg) returns true.  New abortables could be registered
+ * concurrently.  The original for this is proc_destroy(), so DYING will be set,
+ * and new abortables will quickly abort and dereg when they see their proc is
+ * DYING. */
+static int __abort_all_sysc(struct proc *p,
+                            bool (*should_abort)(struct cv_lookup_elm*, void*),
+                            void *arg)
 {
 	struct cv_lookup_elm *cle;
 	int8_t irq_state = 0;
 	struct cv_lookup_tailq abortall_list;
 	struct proc *old_proc = switch_to(p);
+	int ret = 0;
 	/* Concerns: we need to not remove them from their original list, since
 	 * concurrent wake ups will cause a dereg, which will remove from the list.
 	 * We also can't touch freed memory, so we need a refcnt to keep cles
@@ -761,13 +765,37 @@ void abort_all_sysc(struct proc *p)
 	TAILQ_INIT(&abortall_list);
 	spin_lock_irqsave(&p->abort_list_lock);
 	TAILQ_FOREACH(cle, &p->abortable_sleepers, link) {
+		if (!should_abort(cle, arg))
+			continue;
 		atomic_inc(&cle->abort_in_progress);
 		TAILQ_INSERT_HEAD(&abortall_list, cle, abortall_link);
+		ret++;
 	}
 	spin_unlock_irqsave(&p->abort_list_lock);
 	TAILQ_FOREACH(cle, &abortall_list, abortall_link)
 		__abort_and_release_cle(cle);
 	switch_back(p, old_proc);
+	return ret;
+}
+
+static bool always_abort(struct cv_lookup_elm *cle, void *arg)
+{
+	return TRUE;
+}
+
+void abort_all_sysc(struct proc *p)
+{
+	__abort_all_sysc(p, always_abort, 0);
+}
+
+static bool sysc_uses_fd(struct cv_lookup_elm *cle, void *fd)
+{
+	return syscall_uses_fd(cle->sysc, (int)(long)fd);
+}
+
+int abort_all_sysc_fd(struct proc *p, int fd)
+{
+	return __abort_all_sysc(p, sysc_uses_fd, (void*)(long)fd);
 }
 
 /* Being on the abortable list means that the CLE, KTH, SYSC, and CV are valid

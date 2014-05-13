@@ -55,6 +55,7 @@ int         sys_change_vcore(uint32_t vcoreid, bool enable_my_notif);
 int         sys_change_to_m(void);
 int         sys_poke_ksched(int pid, unsigned int res_type);
 int         sys_abort_sysc(struct syscall *sysc);
+int         sys_abort_sysc_fd(int fd);
 
 long		syscall_async(struct syscall *sysc, unsigned long num, ...);
 

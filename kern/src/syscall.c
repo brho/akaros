@@ -1027,6 +1027,13 @@ static int sys_abort_sysc(struct proc *p, struct syscall *sysc)
 	return abort_sysc(p, sysc);
 }
 
+static int sys_abort_sysc_fd(struct proc *p, int fd)
+{
+	/* Consider checking for a bad fd.  Doesn't matter now, since we only look
+	 * for actual syscalls blocked that had used fd. */
+	return abort_all_sysc_fd(p, fd);
+}
+
 static unsigned long sys_populate_va(struct proc *p, uintptr_t va,
                                      unsigned long nr_pgs)
 {
@@ -1790,6 +1797,7 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_change_to_m] = {(syscall_t)sys_change_to_m, "change_to_m"},
 	[SYS_poke_ksched] = {(syscall_t)sys_poke_ksched, "poke_ksched"},
 	[SYS_abort_sysc] = {(syscall_t)sys_abort_sysc, "abort_sysc"},
+	[SYS_abort_sysc_fd] = {(syscall_t)sys_abort_sysc_fd, "abort_sysc_fd"},
 	[SYS_populate_va] = {(syscall_t)sys_populate_va, "populate_va"},
 
 	[SYS_read] = {(syscall_t)sys_read, "read"},
@@ -2075,4 +2083,28 @@ void systrace_clear_buffer(void)
 	spin_lock_irqsave(&systrace_lock);
 	memset(systrace_buffer, 0, sizeof(struct systrace_record) * MAX_SYSTRACES);
 	spin_unlock_irqsave(&systrace_lock);
+}
+
+bool syscall_uses_fd(struct syscall *sysc, int fd)
+{
+	switch (sysc->num) {
+		case (SYS_read):
+		case (SYS_write):
+		case (SYS_close):
+		case (SYS_fstat):
+		case (SYS_fcntl):
+		case (SYS_llseek):
+		case (SYS_nmount):
+		case (SYS_fd2path):
+			if (sysc->arg0 == fd)
+				return TRUE;
+			return FALSE;
+		case (SYS_mmap):
+			/* mmap always has to be special. =) */
+			if (sysc->arg4 == fd)
+				return TRUE;
+			return FALSE;
+		default:
+			return FALSE;
+	}
 }
