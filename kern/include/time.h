@@ -57,6 +57,13 @@ uint64_t stop_timing(uint64_t start_time)
 	return diff;
 }
 
+static inline __attribute__((always_inline))
+uint64_t nsec(void)
+{
+	return tsc2nsec(read_tsc());
+}
+
+
 /* Ancient measurement crap below.  TODO: use or lose it */
 
 #if 0
