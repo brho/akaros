@@ -2146,3 +2146,13 @@ bool syscall_uses_fd(struct syscall *sysc, int fd)
 			return FALSE;
 	}
 }
+
+void print_sysc(struct proc *p, struct syscall *sysc)
+{
+	struct proc *old_p = switch_to(p);
+	printk("SYS_%d, flags %p, a0 0x%x, a1 0x%0x, a2 0x%0x, a3 0x%0x, "
+	       "a4 0x%0x, a5 0x%0x\n", sysc->num, atomic_read(&sysc->flags),
+	       sysc->arg0, sysc->arg1, sysc->arg2, sysc->arg3, sysc->arg4,
+	       sysc->arg5);
+	switch_back(p, old_p);
+}
