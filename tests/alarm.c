@@ -15,6 +15,7 @@
 
 /* Am I the only one annoyed at how open has different includes than
  * close/read/write? */
+/* NO. Ron. */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
