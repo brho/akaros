@@ -1991,6 +1991,9 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	 * waiting on a message, roughly) */
 	send_kernel_message(pcoreid, __set_curctx, (long)p, (long)new_vcoreid,
 	                    (long)new_vc->nr_preempts_sent, KMSG_ROUTINE);
+
+	/* almost certainly the wrong place to do this. */
+	p->procinfo->vcoremap[new_vcoreid].resume = nsec();
 	retval = 0;
 	/* Fall through to exit */
 out_locked:
@@ -2088,6 +2091,7 @@ void __preempt(uint32_t srcid, long a0, long a1, long a2)
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	struct preempt_data *vcpd;
 	struct proc *p = (struct proc*)a0;
+	unsigned long ns;
 
 	assert(p);
 	if (p != pcpui->owning_proc) {
@@ -2124,6 +2128,11 @@ void __preempt(uint32_t srcid, long a0, long a1, long a2)
 	atomic_and(&vcpd->flags, ~VC_K_LOCK);
 	/* either __preempt or proc_yield() ends the preempt phase. */
 	p->procinfo->vcoremap[vcoreid].preempt_pending = 0;
+
+	/* accounting */
+	ns = nsec();
+	p->procinfo->vcoremap[vcoreid].total += ns - p->procinfo->vcoremap[vcoreid].resume;
+
 	wmb();	/* make sure everything else hits before we finish the preempt */
 	/* up the nr_done, which signals the next __startcore for this vc */
 	p->procinfo->vcoremap[vcoreid].nr_preempts_done++;
