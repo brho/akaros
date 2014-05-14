@@ -164,6 +164,14 @@ config PRINTK_NO_BACKSPACE
 		One of the serial devices I was using a while back had issues printing
 		backspaces.  This was an old hack to deal with that.
 
+config SYSCALL_STRING_SAVING
+	bool "Syscall string saving"
+	default n
+	help
+		Kmallocs a small buffer for each syscall and attaches it to the
+		kthread, which can be viewed when debugging semaphores.  Individual
+		syscalls can save info in this buffer.
+
 endmenu
 
 config VM

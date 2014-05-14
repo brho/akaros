@@ -53,6 +53,40 @@ static bool proc_is_traced(struct proc *p)
 	return false;
 }
 
+#ifdef CONFIG_SYSCALL_STRING_SAVING
+
+static void alloc_sysc_str(struct kthread *kth)
+{
+	kth->name = kmalloc(SYSCALL_STRLEN, KMALLOC_WAIT);
+}
+
+static void free_sysc_str(struct kthread *kth)
+{
+	char *str = kth->name;
+	kth->name = 0;
+	kfree(str);
+}
+
+#define sysc_save_str(...)                                                     \
+{                                                                              \
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];                     \
+	snprintf(pcpui->cur_kthread->name, SYSCALL_STRLEN, __VA_ARGS__);           \
+}
+
+#else
+
+static void alloc_sysc_str(struct kthread *kth)
+{
+}
+
+static void free_sysc_str(struct kthread *kth)
+{
+}
+
+#define sysc_save_str(...)
+
+#endif /* CONFIG_SYSCALL_STRING_SAVING */
+
 /* Helper to finish a syscall, signalling if appropriate */
 static void finish_sysc(struct syscall *sysc, struct proc *p)
 {
@@ -1044,6 +1078,7 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 {
 	ssize_t ret;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
+	sysc_save_str("read on fd %d", fd);
 	/* VFS */
 	if (file) {
 		if (!file->f_op->read) {
@@ -1097,6 +1132,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	char *t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return -1;
+	sysc_save_str("open %s", t_path);
 	mode &= ~p->fs_env.umask;
 	file = do_file_open(t_path, oflag, mode);
 	/* VFS */
@@ -1924,10 +1960,12 @@ void run_local_syscall(struct syscall *sysc)
 		return;
 	}
 	pcpui->cur_kthread->sysc = sysc;	/* let the core know which sysc it is */
+	alloc_sysc_str(pcpui->cur_kthread);
 	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
 	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
 	/* Need to re-load pcpui, in case we migrated */
 	pcpui = &per_cpu_info[core_id()];
+	free_sysc_str(pcpui->cur_kthread);
 	/* Some 9ns paths set errstr, but not errno.  glibc will ignore errstr.
 	 * this is somewhat hacky, since errno might get set unnecessarily */
 	if ((current_errstr()[0] != 0) && (!sysc->err))

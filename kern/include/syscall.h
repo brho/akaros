@@ -14,6 +14,8 @@
 #define MAX_NUM_TRACED				10
 #define MAX_SYSTRACES				1024
 
+#define SYSCALL_STRLEN				128
+
 #define MAX_ASRC_BATCH				10
 
 /* Consider cache aligning this */
