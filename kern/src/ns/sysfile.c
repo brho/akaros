@@ -153,6 +153,8 @@ long kchanio(void *vc, void *buf, int n, int mode)
 
 int openmode(uint32_t omode)
 {
+/* GIANT WARNING: if this ever throws, ipopen (and probably many others) will
+ * screw up refcnts of Qctl, err, data, etc */
 #if 0
 	/* this is the old plan9 style.  i think they want to turn exec into read,
 	 * and strip off anything higher, and just return the RD/WR style bits.  not
@@ -284,15 +286,19 @@ int sysdup(int old, int new)
 	}
 
 	c = fdtochan(current->fgrp, old, -1, 0, 1);
-	if (c->qid.type & QTAUTH)
+	if (c->qid.type & QTAUTH) {
+		cclose(c);
 		error(Eperm);
+	}
 	fd = new;
 	if (fd != -1) {
 		/* ideally we'll be done with the VFS before we fix this */
+		/* double check the ccloses when you fix this */
 		panic("Need to sync with the VFS");
 		spin_lock(&f->lock);
 		if (f->closed) {
 			spin_unlock(&f->lock);
+			cclose(c);
 			return -1;
 		}
 		if (fd < 0 || growfd(f, fd) < 0) {
@@ -340,8 +346,8 @@ char *sysfd2path(int fd)
 			error(Enomem);
 		}
 		memmove(s, c->name->s, c->name->len + 1);
-		cclose(c);
 	}
+	cclose(c);
 	poperror();
 	return s;
 }
