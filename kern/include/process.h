@@ -111,9 +111,12 @@ void __proc_take_corelist(struct proc *p, uint32_t *pc_arr, uint32_t num,
 /* Takes all cores, returns the count, fills in pc_arr with their pcoreid */
 uint32_t __proc_take_allcores(struct proc *p, uint32_t *pc_arr, bool preempt);
 
-/* Exposed for kern/src/resource.c for now */
+/* Exposed for now for convenience */
 void __map_vcore(struct proc *p, uint32_t vcoreid, uint32_t pcoreid);
 void __unmap_vcore(struct proc *p, uint32_t vcoreid);
+void vcore_account_online(struct proc *p, uint32_t vcoreid);
+void vcore_account_offline(struct proc *p, uint32_t vcoreid);
+uint64_t vcore_account_gettotal(struct proc *p, uint32_t vcoreid);
 
 /* Preemption management.  Some of these will change */
 void __proc_preempt_warn(struct proc *p, uint32_t vcoreid, uint64_t when);

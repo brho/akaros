@@ -30,20 +30,20 @@ int main(int argc, char** argv)
 	uint64_t ns;
 
 	uint64_t resume, total;
-	resume = __procinfo.vcoremap[vcore_id()].resume;
-	total = __procinfo.vcoremap[vcore_id()].total;
+	resume = vcore_resume(vcore_id());
+	total = vcore_total(vcore_id());
 	for(i = 0; i < 1048576*1024; i++)
 		;
 	ns = tsc2nsec(read_tsc());
-	printf("resume %p total %p ns %p\n", resume, total, ns);
-	resume = __procinfo.vcoremap[vcore_id()].resume;
-	total = __procinfo.vcoremap[vcore_id()].total;
+	printf("resume 0x%llx total 0x%llx ns 0x%llx\n", resume, total, ns);
+	resume = vcore_resume(vcore_id());
+	total = vcore_total(vcore_id());
 	ns = tsc2nsec(read_tsc());
-	printf("resume %p total %p ns %p\n", resume, total, ns);
-	resume = __procinfo.vcoremap[vcore_id()].resume;
-	total = __procinfo.vcoremap[vcore_id()].total;
+	printf("resume 0x%llx total 0x%llx ns 0x%llx\n", resume, total, ns);
+	resume = vcore_resume(vcore_id());
+	total = vcore_total(vcore_id());
 	for(i = 0; i < 1048576*1024; i++)
 		;
 	ns = tsc2nsec(read_tsc());
-	printf("resume %p total %p ns %p\n", resume, total, ns);
+	printf("resume 0x%llx total 0x%llx ns 0x%llx\n", resume, total, ns);
 }

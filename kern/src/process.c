@@ -82,6 +82,32 @@ static void put_free_pid(pid_t pid)
 	spin_unlock(&pid_bmask_lock);
 }
 
+/* 'resume' is the time of the most recent onlining.  'total' is the amount of
+ * time consumed up to and including the current offlining.
+ *
+ * We could move these to the map and unmap of vcores, though not every place
+ * uses that (SCPs, in particular).  However, maps/unmaps happen remotely;
+ * something to consider.  If we do it remotely, we can batch them up and do one
+ * rdtsc() for all of them.  For now, I want to do them on the core, around when
+ * we do the context change.  It'll also parallelize the accounting a bit. */
+void vcore_account_online(struct proc *p, uint32_t vcoreid)
+{
+	struct vcore *vc = &p->procinfo->vcoremap[vcoreid];
+	vc->resume = nsec();
+}
+
+void vcore_account_offline(struct proc *p, uint32_t vcoreid)
+{
+	struct vcore *vc = &p->procinfo->vcoremap[vcoreid];
+	vc->total += nsec() - vc->resume;
+}
+
+uint64_t vcore_account_gettotal(struct proc *p, uint32_t vcoreid)
+{
+	struct vcore *vc = &p->procinfo->vcoremap[vcoreid];
+	return vc->total;
+}
+
 /* While this could be done with just an assignment, this gives us the
  * opportunity to check for bad transitions.  Might compile these out later, so
  * we shouldn't rely on them for sanity checking from userspace.  */
@@ -552,6 +578,7 @@ void proc_run_s(struct proc *p)
 			 * lists).  This gets unmapped in resource.c and yield_s, and needs
 			 * work. */
 			__map_vcore(p, 0, coreid); /* not treated like a true vcore */
+			vcore_account_online(p, 0); /* VC# */
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			/* incref, since we're saving a reference in owning proc later */
 			proc_incref(p, 1);
@@ -923,6 +950,7 @@ int proc_change_to_m(struct proc *p)
 			// TODO: (VC#) might need to adjust num_vcores
 			// TODO: (ACR) will need to unmap remotely (receive-side)
 			__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run_s */
+			vcore_account_offline(p, 0); /* VC# */
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			/* change to runnable_m (it's TF is already saved) */
 			__proc_set_state(p, PROC_RUNNABLE_M);
@@ -957,6 +985,7 @@ uint32_t __proc_change_to_s(struct proc *p, uint32_t *pc_arr)
 {
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
 	uint32_t num_revoked;
+	/* Not handling vcore accounting.  Do so if we ever use this */
 	printk("[kernel] trying to transition _M -> _S (deprecated)!\n");
 	assert(p->state == PROC_RUNNING_M); // TODO: (ACR) async core req
 	/* save the context, to be restarted in _S mode */
@@ -1048,6 +1077,7 @@ void __proc_save_context_s(struct proc *p, struct user_context *ctx)
 {
 	p->scp_ctx = *ctx;
 	__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run_s */
+	vcore_account_offline(p, 0); /* VC# */
 }
 
 /* Yields the calling core.  Must be called locally (not async) for now.
@@ -1196,6 +1226,7 @@ void proc_yield(struct proc *SAFE p, bool being_nice)
 	p->procinfo->num_vcores--;
 	p->procinfo->res_grant[RES_CORES] = p->procinfo->num_vcores;
 	__seq_end_write(&p->procinfo->coremap_seqctr);
+	vcore_account_offline(p, vcoreid);
 	/* No more vcores?  Then we wait on an event */
 	if (p->procinfo->num_vcores == 0) {
 		/* consider a ksched op to tell it about us WAITING */
@@ -1869,6 +1900,7 @@ static void __set_curctx_to_vcoreid(struct proc *p, uint32_t vcoreid,
 	/* cur_ctx was built above (in actual_ctx), now use it */
 	pcpui->cur_ctx = &pcpui->actual_ctx;
 	/* this cur_ctx will get run when the kernel returns / idles */
+	vcore_account_online(p, vcoreid);
 }
 
 /* Changes calling vcore to be vcoreid.  enable_my_notif tells us about how the
@@ -1969,6 +2001,7 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	__unmap_vcore(p, caller_vcoreid);
 	__map_vcore(p, new_vcoreid, pcoreid);
 	__seq_end_write(&p->procinfo->coremap_seqctr);
+	vcore_account_offline(p, caller_vcoreid);
 	/* Send either a PREEMPT msg or a CHECK_MSGS msg.  If they said to
 	 * enable_my_notif, then all userspace needs is to check messages, not a
 	 * full preemption recovery. */
@@ -1991,9 +2024,6 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	 * waiting on a message, roughly) */
 	send_kernel_message(pcoreid, __set_curctx, (long)p, (long)new_vcoreid,
 	                    (long)new_vc->nr_preempts_sent, KMSG_ROUTINE);
-
-	/* almost certainly the wrong place to do this. */
-	p->procinfo->vcoremap[new_vcoreid].resume = nsec();
 	retval = 0;
 	/* Fall through to exit */
 out_locked:
@@ -2091,7 +2121,6 @@ void __preempt(uint32_t srcid, long a0, long a1, long a2)
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	struct preempt_data *vcpd;
 	struct proc *p = (struct proc*)a0;
-	unsigned long ns;
 
 	assert(p);
 	if (p != pcpui->owning_proc) {
@@ -2128,11 +2157,7 @@ void __preempt(uint32_t srcid, long a0, long a1, long a2)
 	atomic_and(&vcpd->flags, ~VC_K_LOCK);
 	/* either __preempt or proc_yield() ends the preempt phase. */
 	p->procinfo->vcoremap[vcoreid].preempt_pending = 0;
-
-	/* accounting */
-	ns = nsec();
-	p->procinfo->vcoremap[vcoreid].total += ns - p->procinfo->vcoremap[vcoreid].resume;
-
+	vcore_account_offline(p, vcoreid);
 	wmb();	/* make sure everything else hits before we finish the preempt */
 	/* up the nr_done, which signals the next __startcore for this vc */
 	p->procinfo->vcoremap[vcoreid].nr_preempts_done++;
@@ -2155,6 +2180,7 @@ void __death(uint32_t srcid, long a0, long a1, long a2)
 		vcoreid = pcpui->owning_vcoreid;
 		printd("[kernel] death on physical core %d for process %d's vcore %d\n",
 		       coreid, p->pid, vcoreid);
+		vcore_account_offline(p, vcoreid);	/* in case anyone is counting */
 		/* We won't restart the process later.  current gets cleared later when
 		 * we notice there is no owning_proc and we have nothing to do
 		 * (smp_idle, restartcore, etc) */
@@ -2188,6 +2214,7 @@ void print_allpids(void)
 void print_proc_info(pid_t pid)
 {
 	int j = 0;
+	uint64_t total_time = 0;
 	struct proc *child, *p = pid2proc(pid);
 	struct vcore *vc_i;
 	if (!p) {
@@ -2215,6 +2242,16 @@ void print_proc_info(pid_t pid)
 	printk("Inactive / Yielded:\n");
 	TAILQ_FOREACH(vc_i, &p->inactive_vcs, list)
 		printk("\tVcore %d\n", vcore2vcoreid(p, vc_i));
+	printk("Nsec Online, up to the last offlining:\n------------------------");
+	for (int i = 0; i < p->procinfo->max_vcores; i++) {
+		uint64_t vc_time = vcore_account_gettotal(p, i);
+		if (i % 4 == 0)
+			printk("\n");
+		printk("  VC %3d: %14llu", i, vc_time);
+		total_time += vc_time;
+	}
+	printk("\n");
+	printk("Total CPU-NSEC: %llu\n", total_time);
 	printk("Resources:\n------------------------\n");
 	for (int i = 0; i < MAX_NUM_RESOURCES; i++)
 		printk("\tRes type: %02d, amt wanted: %08d, amt granted: %08d\n", i,
