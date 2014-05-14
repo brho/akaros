@@ -157,6 +157,16 @@ static inline void set_vcpd_tls_desc(uint32_t vcoreid, void *tls_desc)
 	__procdata.vcore_preempt_data[vcoreid].vcore_tls_desc = (uintptr_t)tls_desc;
 }
 
+static inline uint64_t vcore_resume(int vcore)
+{
+	return __procinfo.vcoremap[vcore].resume;
+}
+
+static inline uint64_t vcore_total(int vcore)
+{
+	return __procinfo.vcoremap[vcore].total;
+}
+
 #ifndef __PIC__
 
 #define begin_safe_access_tls_vars()
