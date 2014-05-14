@@ -32,6 +32,15 @@ struct vcore {
 	uint32_t			nr_preempts_sent;	/* these two differ when a preempt*/
 	uint32_t			nr_preempts_done;	/* is in flight. */
 	uint64_t			preempt_pending;
+	/* for profiling. Store nsecs into 'resume' each time we start.
+	 * Each time we stop, subtract resume from current nsecs and add it to total.
+	 * This way, a process can see cumulative runtime as of the last
+	 * resume, and can also calculate runtime in this interval, by adding
+	 * (ns - resume) + total. This assumes we have an easy way to get
+	 * ns at the application level.
+	 */
+	uint64_t			resume;	
+	uint64_t			total;
 };
 
 struct pcore {
