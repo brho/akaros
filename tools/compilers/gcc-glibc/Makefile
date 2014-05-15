@@ -264,6 +264,7 @@ cross-binutils-configure:
 	../binutils-$(BINUTILS_VERSION)/configure \
 	    --target=$(ARCH)-ros \
 	    --prefix=$(INSTDIR) \
+		--disable-werror \
 	    --disable-nls
 
 .$(BINARY_PREFIX)binutils-configure: 
