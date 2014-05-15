@@ -275,10 +275,8 @@ static void proc_init_procinfo(struct proc* p)
 	p->procinfo->num_vcores = 0;
 	p->procinfo->is_mcp = FALSE;
 	p->procinfo->coremap_seqctr = SEQCTR_INITIALIZER;
-	/* For now, we'll go up to the max num_cpus (at runtime).  In the future,
-	 * there may be cases where we can have more vcores than num_cpus, but for
-	 * now we'll leave it like this. */
-	for (int i = 0; i < num_cpus; i++) {
+	/* It's a bug in the kernel if we let them ask for more than max */
+	for (int i = 0; i < p->procinfo->max_vcores; i++) {
 		TAILQ_INSERT_TAIL(&p->inactive_vcs, &p->procinfo->vcoremap[i], list);
 	}
 }
