@@ -57,6 +57,7 @@ static command_t (RO commands)[] = {
 	{ "bin_run", "Create and run a program from /bin", mon_bin_run},
 	{ "manager", "Run the manager", mon_manager},
 	{ "procinfo", "Show information about processes", mon_procinfo},
+	{ "pip", "Shorthand for procinfo pid", mon_pip},
 	{ "kill", "Kills a process", mon_kill},
 	{ "exit", "Leave the monitor", mon_exit},
 	{ "kfunc", "Run a kernel function directly (!!!)", mon_kfunc},
@@ -463,6 +464,16 @@ int mon_procinfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 		printk("Bad option\n");
 		return 1;
 	}
+	return 0;
+}
+
+int mon_pip(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+	if (argc != 2) {
+		printk("Give me a pid number.\n");
+		return 1;
+	}
+	print_proc_info(strtol(argv[1], 0, 0));
 	return 0;
 }
 
