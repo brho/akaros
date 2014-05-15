@@ -141,6 +141,12 @@ int oprofile_perf_init(struct oprofile_operations *ops);
 void oprofile_perf_exit(void);
 char *op_name_from_perf_id(void);
 
+struct op_sample *op_cpu_buffer_read_entry(struct op_entry *entry, int cpu);
+unsigned long op_cpu_buffer_entries(int cpu);
+void oprofile_cpubuf_flushone(int core, int newbuf);
+void oprofile_cpubuf_flushall(int alloc);
+void oprofile_control_trace(int onoff);
+
 #if 0 
 make these weak funcitons. 
 static inline int __init oprofile_perf_init(struct oprofile_operations *ops)

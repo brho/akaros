@@ -291,10 +291,12 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 			kprof.time = 0;
 		} else if(strncmp(a, "clear", 5) == 0) {
 			kprof_clear(&kprof);
-		}else if(strncmp(a, "opstart", 8) == 0) {
-			/* maybe have enable/disable for it. */
+		}else if(strncmp(a, "opstart", 7) == 0) {
+			oprofile_control_trace(1);
 		}else if(strncmp(a, "opstop", 6) == 0) {
+			oprofile_control_trace(0);
 		} else  {
+			printk("startclr|start|stop|clear|opstart|opstop");
 			error("startclr|start|stop|clear|opstart|opstop");
 		}
 		break;

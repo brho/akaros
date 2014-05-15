@@ -43,6 +43,7 @@ struct op_sample {
 struct op_entry;
 
 struct oprofile_cpu_buffer {
+	qlock_t mutex;
 	unsigned long buffer_size;
 	struct proc *last_proc;
 	int last_is_kernel;
@@ -65,9 +66,6 @@ struct oprofile_cpu_buffer {
 	 */
 	struct queue *fullqueue, *emptyqueue;
 };
-
-struct op_sample *op_cpu_buffer_read_entry(struct op_entry *entry, int cpu);
-unsigned long op_cpu_buffer_entries(int cpu);
 
 /* extra data flags */
 #define KERNEL_CTX_SWITCH	(1UL << 0)

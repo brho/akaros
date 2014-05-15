@@ -47,29 +47,36 @@ static int work_enabled;
  */
 static inline void op_cpu_buffer_reset(int cpu)
 {
+	//print_func_entry();
 	struct oprofile_cpu_buffer *cpu_buf = &op_cpu_buffer[core_id()];
 
 	cpu_buf->last_is_kernel = -1;
 	cpu_buf->last_proc = NULL;
+	//print_func_exit();
 }
 
 /* returns the remaining free size of data in the entry */
 static inline
 	int op_cpu_buffer_add_data(struct op_entry *entry, unsigned long val)
 {
+	//print_func_entry();
 	assert(entry->size >= 0);
 	if (!entry->size) {
+		//print_func_exit();
 		return 0;
 	}
 	*entry->data = val;
 	entry->size--;
 	entry->data++;
+	//print_func_exit();
 	return entry->size;
 }
 
 /* returns the size of data in the entry */
 static inline int op_cpu_buffer_get_size(struct op_entry *entry)
 {
+	//print_func_entry();
+	//print_func_exit();
 	return entry->size;
 }
 
@@ -77,38 +84,48 @@ static inline int op_cpu_buffer_get_size(struct op_entry *entry)
 static inline
 	int op_cpu_buffer_get_data(struct op_entry *entry, unsigned long *val)
 {
+	//print_func_entry();
 	int size = entry->size;
 	if (!size) {
+		//print_func_exit();
 		return 0;
 	}
 	*val = *entry->data;
 	entry->size--;
 	entry->data++;
+	//print_func_exit();
 	return size;
 }
 
 unsigned long oprofile_get_cpu_buffer_size(void)
 {
+	//print_func_entry();
+	//print_func_exit();
 	return oprofile_cpu_buffer_size;
 }
 
 void oprofile_cpu_buffer_inc_smpl_lost(void)
 {
+	//print_func_entry();
 	struct oprofile_cpu_buffer *cpu_buf = &op_cpu_buffer[core_id()];
 
 	cpu_buf->sample_lost_overflow++;
+	//print_func_exit();
 }
 
 void free_cpu_buffers(void)
 {
+	//print_func_entry();
 	kfree(op_cpu_buffer);
 	/* we can just leave the queue set up; it will then always return EOF */
+	//print_func_exit();
 }
 
 #define RB_EVENT_HDR_SIZE 4
 
 int alloc_cpu_buffers(void)
 {
+	//print_func_entry();
 	/* should probably start using waserror() here. The fail stuff just gets
 	 * ugly.
 	 */
@@ -136,17 +153,9 @@ int alloc_cpu_buffers(void)
 
 		for (i = 0; i < num_cpus; i++) {
 			struct oprofile_cpu_buffer *b = &op_cpu_buffer[i];
-			/* short term: for each event, we're going to kmalloc a
-			 * sample and shove it into the opq.
-			 * Long term: TBD. One option is to create a big damn Block and
-			 * add to it as needed. Once the block is full we can push
-			 * it onto the opq. That will actually be pretty fast and easy
-			 * if we make the block page-sized. Far, far simpler than the
-			 * Linux tracebuffer stuff.
-			 */
 			b->last_proc = NULL;
 			b->last_is_kernel = -1;
-			b->tracing = 1;
+			b->tracing = 0;
 			b->buffer_size = buffer_size;
 			b->sample_received = 0;
 			b->sample_lost_overflow = 0;
@@ -155,38 +164,47 @@ int alloc_cpu_buffers(void)
 			b->cpu = i;
 			b->fullqueue = qopen(1024, Qmsg, NULL, NULL);
 			b->emptyqueue = qopen(1024, Qmsg, NULL, NULL);
+			qlock_init(&b->mutex);
 		}
 	}
 
+	//print_func_exit();
 	return 0;
 
 fail:
 	free_cpu_buffers();
+	//print_func_exit();
 	return -ENOMEM;
 }
 
 void start_cpu_work(void)
 {
+	//print_func_entry();
 	int i;
 
 	work_enabled = 1;
 	/* task starts here.
 	   schedule_delayed_work_on(i, &b->work, DEFAULT_TIMER_EXPIRE + i);
 	 */
+	//print_func_exit();
 }
 
 void end_cpu_work(void)
 {
+	//print_func_entry();
 	work_enabled = 0;
+	//print_func_exit();
 }
 
 /* placeholder. Not used yet.
  */
 void flush_cpu_work(void)
 {
+	//print_func_entry();
 	int i;
 	struct oprofile_cpu_buffer *b = &op_cpu_buffer[core_id()];
 
+	//print_func_exit();
 }
 
 /* Not used since we're not doing per-cpu buffering yet.
@@ -194,12 +212,15 @@ void flush_cpu_work(void)
 
 struct op_sample *op_cpu_buffer_read_entry(struct op_entry *entry, int cpu)
 {
+	//print_func_entry();
+	//print_func_exit();
 	return NULL;
 }
 
 static struct block *op_cpu_buffer_write_reserve(struct oprofile_cpu_buffer *cpu_buf,
 	struct op_entry *entry, int size)
 {
+	//print_func_entry();
 	struct block *b;
 	int totalsize = sizeof(struct op_sample) +
 		size * sizeof(entry->sample->data[0]);
@@ -209,12 +230,14 @@ static struct block *op_cpu_buffer_write_reserve(struct oprofile_cpu_buffer *cpu
 	if ((! b) || (b->lim - b->wp) < size) {
 		if (b)
 			qbwrite(opq, b);
+		printk("After qbwrite in %s, opq len %d\n", __func__, qlen(opq));
 		/* For now. Later, we will grab a block off the
 		 * emptyblock queue.
 		 */
 		cpu_buf->block = b = allocb(oprofile_cpu_buffer_size);
 		if (!b) {
 			printk("%s: fail\n", __func__);
+			//print_func_exit();
 			return NULL;
 		}
 	}
@@ -223,6 +246,7 @@ static struct block *op_cpu_buffer_write_reserve(struct oprofile_cpu_buffer *cpu
 	entry->data = entry->sample->data;
 
 	b->wp += totalsize;
+	//print_func_exit();
 	return b;
 
 }
@@ -231,6 +255,7 @@ static int
 op_add_code(struct oprofile_cpu_buffer *cpu_buf, unsigned long backtrace,
 			int is_kernel, struct proc *proc)
 {
+	//print_func_entry();
 	struct block *b;
 	struct op_entry entry;
 	struct op_sample *sample;
@@ -243,6 +268,7 @@ op_add_code(struct oprofile_cpu_buffer *cpu_buf, unsigned long backtrace,
 	if (waserror()) {
 		poperror();
 		printk("%s: failed\n", __func__);
+		//print_func_exit();
 		return 1;
 	}
 
@@ -267,6 +293,7 @@ op_add_code(struct oprofile_cpu_buffer *cpu_buf, unsigned long backtrace,
 	if (!flags) {
 		poperror();
 		/* nothing to do */
+		//print_func_exit();
 		return 0;
 	}
 
@@ -284,6 +311,7 @@ op_add_code(struct oprofile_cpu_buffer *cpu_buf, unsigned long backtrace,
 		op_cpu_buffer_add_data(&entry, (unsigned long)proc);
 
 	poperror();
+	//print_func_exit();
 	return 0;
 }
 
@@ -291,6 +319,7 @@ static inline int
 op_add_sample(struct oprofile_cpu_buffer *cpu_buf,
 			  unsigned long pc, unsigned long event)
 {
+	//print_func_entry();
 	ERRSTACK(1);
 	struct op_entry entry;
 	struct op_sample *sample;
@@ -299,6 +328,7 @@ op_add_sample(struct oprofile_cpu_buffer *cpu_buf,
 	if (waserror()) {
 		poperror();
 		printk("%s: failed\n", __func__);
+		//print_func_exit();
 		return 1;
 	}
 
@@ -308,6 +338,7 @@ op_add_sample(struct oprofile_cpu_buffer *cpu_buf,
 	sample->eip = pc;
 	sample->event = event;
 	poperror();
+	//print_func_exit();
 	return 0;
 }
 
@@ -324,11 +355,13 @@ log_sample(struct oprofile_cpu_buffer *cpu_buf, unsigned long pc,
 		   unsigned long backtrace, int is_kernel, unsigned long event,
 		   struct proc *proc)
 {
+	//print_func_entry();
 	struct proc *tsk = proc ? proc : current;
 	cpu_buf->sample_received++;
 
 	if (pc == ESCAPE_CODE) {
 		cpu_buf->sample_invalid_eip++;
+		//print_func_exit();
 		return 0;
 	}
 
@@ -336,27 +369,86 @@ log_sample(struct oprofile_cpu_buffer *cpu_buf, unsigned long pc,
 	 * this function returns 0 in event of failure.
 	 * what a cluster.
 	 */
+	qlock(&cpu_buf->mutex);
 	if (op_add_code(cpu_buf, backtrace, is_kernel, tsk))
 		goto fail;
 
 	if (op_add_sample(cpu_buf, pc, event))
 		goto fail;
+	qunlock(&cpu_buf->mutex);
 
+	//print_func_exit();
 	return 1;
 
 fail:
 	cpu_buf->sample_lost_overflow++;
+	//print_func_exit();
 	return 0;
 }
 
 static inline void oprofile_begin_trace(struct oprofile_cpu_buffer *cpu_buf)
 {
+	//print_func_entry();
 	cpu_buf->tracing = 1;
+	//print_func_exit();
 }
 
 static inline void oprofile_end_trace(struct oprofile_cpu_buffer *cpu_buf)
 {
+	//print_func_entry();
 	cpu_buf->tracing = 0;
+	//print_func_exit();
+}
+
+void oprofile_cpubuf_flushone(int core, int newbuf)
+{
+	//print_func_entry();
+	struct oprofile_cpu_buffer *cpu_buf;
+	cpu_buf = &op_cpu_buffer[core];
+	qlock(&cpu_buf->mutex);
+	if (cpu_buf->block) {
+		printk("Core %d has data\n", core);
+		qbwrite(opq, cpu_buf->block);
+		printk("After qbwrite in %s, opq len %d\n", __func__, qlen(opq));
+	}
+	if (newbuf)
+		cpu_buf->block = allocb(oprofile_cpu_buffer_size);
+	else
+		cpu_buf->block = NULL;
+	qunlock(&cpu_buf->mutex);
+	//print_func_exit();
+}
+
+void oprofile_cpubuf_flushall(int alloc)
+{
+	//print_func_entry();
+	int core;
+
+	for(core = 0; core < num_cpus; core++) {
+		oprofile_cpubuf_flushone(core, alloc);
+	}
+	//print_func_exit();
+}
+
+void oprofile_control_trace(int onoff)
+{
+	//print_func_entry();
+	int core;
+	struct oprofile_cpu_buffer *cpu_buf;
+
+	for(core = 0; core < num_cpus; core++) {
+		cpu_buf = &op_cpu_buffer[core];
+		cpu_buf->tracing = onoff;
+
+		if (onoff) {
+			printk("Enable tracing on %d\n", core);
+			continue;
+		}
+
+		/* halting. Force out all buffers. */
+		oprofile_cpubuf_flushone(core, 0);
+	}
+	//print_func_exit();
 }
 
 static inline void
@@ -364,6 +456,7 @@ __oprofile_add_ext_sample(unsigned long pc,
 						  void /*struct pt_regs */ *const regs,
 						  unsigned long event, int is_kernel, struct proc *proc)
 {
+	//print_func_entry();
 	struct oprofile_cpu_buffer *cpu_buf = &op_cpu_buffer[core_id()];
 	unsigned long backtrace = oprofile_backtrace_depth;
 
@@ -374,10 +467,12 @@ __oprofile_add_ext_sample(unsigned long pc,
 	if (!log_sample(cpu_buf, pc, backtrace, is_kernel, event, proc))
 		/* failed */
 	{
+		//print_func_exit();
 		return;
 	}
 
 	if (!backtrace) {
+		//print_func_exit();
 		return;
 	}
 #if 0
@@ -385,6 +480,7 @@ __oprofile_add_ext_sample(unsigned long pc,
 	oprofile_ops.backtrace(regs, backtrace);
 	oprofile_end_trace(cpu_buf);
 #endif
+	//print_func_exit();
 }
 
 void oprofile_add_ext_hw_sample(unsigned long pc,
@@ -392,19 +488,24 @@ void oprofile_add_ext_hw_sample(unsigned long pc,
 								unsigned long event, int is_kernel,
 								struct proc *proc)
 {
+	//print_func_entry();
 	__oprofile_add_ext_sample(pc, regs, event, is_kernel, proc);
+	//print_func_exit();
 }
 
 void oprofile_add_ext_sample(unsigned long pc,
 							 void /*struct pt_regs */ *const regs,
 							 unsigned long event, int is_kernel)
 {
+	//print_func_entry();
 	__oprofile_add_ext_sample(pc, regs, event, is_kernel, NULL);
+	//print_func_exit();
 }
 
 void oprofile_add_sample(void /*struct pt_regs */ *const regs,
 						 unsigned long event)
 {
+	//print_func_entry();
 	int is_kernel;
 	unsigned long pc;
 
@@ -417,6 +518,7 @@ void oprofile_add_sample(void /*struct pt_regs */ *const regs,
 	}
 
 	__oprofile_add_ext_sample(pc, regs, event, is_kernel, NULL);
+	//print_func_exit();
 }
 
 /*
@@ -430,6 +532,7 @@ oprofile_write_reserve(struct op_entry *entry,
 					   void /*struct pt_regs */ *const regs,
 					   unsigned long pc, int code, int size)
 {
+	//print_func_entry();
 	ERRSTACK(1);
 	struct op_sample *sample;
 	struct block *b;
@@ -455,23 +558,30 @@ oprofile_write_reserve(struct op_entry *entry,
 	op_cpu_buffer_add_data(entry, code);
 	op_cpu_buffer_add_data(entry, pc);
 	poperror();
+	//print_func_exit();
 	return;
 fail:
 	entry->event = NULL;
 	cpu_buf->sample_lost_overflow++;
+	//print_func_exit();
 }
 
 int oprofile_add_data(struct op_entry *entry, unsigned long val)
 {
+	//print_func_entry();
 	if (!entry->event) {
+		//print_func_exit();
 		return 0;
 	}
+	//print_func_exit();
 	return op_cpu_buffer_add_data(entry, val);
 }
 
 int oprofile_add_data64(struct op_entry *entry, uint64_t val)
 {
+	//print_func_entry();
 	if (!entry->event) {
+		//print_func_exit();
 		return 0;
 	}
 	if (op_cpu_buffer_get_size(entry) < 2)
@@ -480,33 +590,43 @@ int oprofile_add_data64(struct op_entry *entry, uint64_t val)
 		 * buffer, even if there is some space left
 		 */
 	{
+		//print_func_exit();
 		return 0;
 	}
 	if (!op_cpu_buffer_add_data(entry, (uint32_t) val)) {
+		//print_func_exit();
 		return 0;
 	}
+	//print_func_exit();
 	return op_cpu_buffer_add_data(entry, (uint32_t) (val >> 32));
 }
 
 int oprofile_write_commit(struct op_entry *entry)
 {
+	//print_func_entry();
 	/* not much to do at present. In future, we might write the Block
 	 * to opq.
 	 */
+	//print_func_exit();
 	return 0;
 }
 
 void oprofile_add_pc(unsigned long pc, int is_kernel, unsigned long event)
 {
+	//print_func_entry();
 	struct oprofile_cpu_buffer *cpu_buf = &op_cpu_buffer[core_id()];
 	log_sample(cpu_buf, pc, 0, is_kernel, event, NULL);
+	//print_func_exit();
 }
 
 void oprofile_add_trace(unsigned long pc)
 {
+	//print_func_entry();
 	struct oprofile_cpu_buffer *cpu_buf = &op_cpu_buffer[core_id()];
 
 	if (!cpu_buf->tracing) {
+		printk("%s: not tracing\n", __func__);
+		//print_func_exit();
 		return;
 	}
 
@@ -517,13 +637,15 @@ void oprofile_add_trace(unsigned long pc)
 	if (pc == ESCAPE_CODE)
 		goto fail;
 
-	if (op_add_sample(cpu_buf, pc, 0))
+	if (op_add_sample(cpu_buf, pc, nsec()))
 		goto fail;
 
+	//print_func_exit();
 	return;
 fail:
 	printk("%s: fail. Turning of tracing on cpu %d\n", core_id());
 	cpu_buf->tracing = 0;
 	cpu_buf->backtrace_aborted++;
+	//print_func_exit();
 	return;
 }
