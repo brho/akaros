@@ -82,8 +82,8 @@ static void put_free_pid(pid_t pid)
 	spin_unlock(&pid_bmask_lock);
 }
 
-/* 'resume' is the time of the most recent onlining.  'total' is the amount of
- * time consumed up to and including the current offlining.
+/* 'resume' is the time int ticks of the most recent onlining.  'total' is the
+ * amount of time in ticks consumed up to and including the current offlining.
  *
  * We could move these to the map and unmap of vcores, though not every place
  * uses that (SCPs, in particular).  However, maps/unmaps happen remotely;
@@ -93,19 +93,19 @@ static void put_free_pid(pid_t pid)
 void vcore_account_online(struct proc *p, uint32_t vcoreid)
 {
 	struct vcore *vc = &p->procinfo->vcoremap[vcoreid];
-	vc->resume = nsec();
+	vc->resume_ticks = read_tsc();
 }
 
 void vcore_account_offline(struct proc *p, uint32_t vcoreid)
 {
 	struct vcore *vc = &p->procinfo->vcoremap[vcoreid];
-	vc->total += nsec() - vc->resume;
+	vc->total_ticks += read_tsc() - vc->resume_ticks;
 }
 
 uint64_t vcore_account_gettotal(struct proc *p, uint32_t vcoreid)
 {
 	struct vcore *vc = &p->procinfo->vcoremap[vcoreid];
-	return vc->total;
+	return vc->total_ticks;
 }
 
 /* While this could be done with just an assignment, this gives us the
@@ -2244,7 +2244,7 @@ void print_proc_info(pid_t pid)
 		printk("\tVcore %d\n", vcore2vcoreid(p, vc_i));
 	printk("Nsec Online, up to the last offlining:\n------------------------");
 	for (int i = 0; i < p->procinfo->max_vcores; i++) {
-		uint64_t vc_time = vcore_account_gettotal(p, i);
+		uint64_t vc_time = tsc2nsec(vcore_account_gettotal(p, i));
 		if (i % 4 == 0)
 			printk("\n");
 		printk("  VC %3d: %14llu", i, vc_time);

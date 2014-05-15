@@ -9,6 +9,7 @@ extern "C" {
 #include <arch/atomic.h>
 #include <sys/param.h>
 #include <string.h>
+#include <timing.h>
 
 /*****************************************************************************/
 /* TODO: This is a complete hack, but necessary for vcore stuff to work for now
@@ -52,6 +53,8 @@ static inline bool preempt_is_pending(uint32_t vcoreid);
 static inline bool __preempt_is_pending(uint32_t vcoreid);
 static inline void *get_vcpd_tls_desc(uint32_t vcoreid);
 static inline void set_vcpd_tls_desc(uint32_t vcoreid, void *tls_desc);
+static inline uint64_t vcore_account_resume_nsec(uint32_t vcoreid);
+static inline uint64_t vcore_account_total_nsec(uint32_t vcoreid);
 void vcore_init(void);
 void vcore_event_init(void);
 void vcore_change_to_m(void);
@@ -157,14 +160,14 @@ static inline void set_vcpd_tls_desc(uint32_t vcoreid, void *tls_desc)
 	__procdata.vcore_preempt_data[vcoreid].vcore_tls_desc = (uintptr_t)tls_desc;
 }
 
-static inline uint64_t vcore_resume(int vcore)
+static inline uint64_t vcore_account_resume_nsec(uint32_t vcoreid)
 {
-	return __procinfo.vcoremap[vcore].resume;
+	return tsc2nsec(__procinfo.vcoremap[vcoreid].resume_ticks);
 }
 
-static inline uint64_t vcore_total(int vcore)
+static inline uint64_t vcore_account_total_nsec(uint32_t vcoreid)
 {
-	return __procinfo.vcoremap[vcore].total;
+	return tsc2nsec(__procinfo.vcoremap[vcoreid].total_ticks);
 }
 
 #ifndef __PIC__

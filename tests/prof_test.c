@@ -30,18 +30,18 @@ int main(int argc, char** argv)
 	uint64_t ns;
 
 	uint64_t resume, total;
-	resume = vcore_resume(vcore_id());
-	total = vcore_total(vcore_id());
+	resume = vcore_account_resume_nsec(vcore_id());
+	total = vcore_account_total_nsec(vcore_id());
 	for(i = 0; i < 1048576*1024; i++)
 		;
 	ns = tsc2nsec(read_tsc());
 	printf("resume 0x%llx total 0x%llx ns 0x%llx\n", resume, total, ns);
-	resume = vcore_resume(vcore_id());
-	total = vcore_total(vcore_id());
+	resume = vcore_account_resume_nsec(vcore_id());
+	total = vcore_account_total_nsec(vcore_id());
 	ns = tsc2nsec(read_tsc());
 	printf("resume 0x%llx total 0x%llx ns 0x%llx\n", resume, total, ns);
-	resume = vcore_resume(vcore_id());
-	total = vcore_total(vcore_id());
+	resume = vcore_account_resume_nsec(vcore_id());
+	total = vcore_account_total_nsec(vcore_id());
 	for(i = 0; i < 1048576*1024; i++)
 		;
 	ns = tsc2nsec(read_tsc());
