@@ -29,3 +29,12 @@ void backtrace_frame(uintptr_t pc, uintptr_t fp)
 {
 	printk("\n\tTODO: backtrace frame on riscv\n\n");
 }
+
+/* can either implement these, or use the x86 ones globally and limit the
+ * arch-indep stuff. */
+size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
+                      size_t nr_slots)
+{
+	printk("\n\tTODO: backtrace list on riscv\n\n");
+	return 0;
+}

@@ -307,43 +307,51 @@ void *debug_get_fn_addr(char *fn_name)
 	return retval;
 }
 
+size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
+                      size_t nr_slots)
+{
+	size_t nr_pcs = 0;
+	while (fp && nr_pcs < nr_slots) {
+		/* could put some sanity checks in here... */
+		pcs[nr_pcs++] = pc;
+		/* PC becomes the retaddr - 1.  the -1 is to put our PC back inside the
+		 * function that called us.  this was necessary in case we called as the
+		 * last instruction in a function (would have to never return).  not
+		 * sure how necessary this still is. */
+		pc = *(uintptr_t*)(fp + sizeof(uintptr_t)) - 1;
+		fp = *(uintptr_t*)fp;
+	}
+	return nr_pcs;
+}
+
 void backtrace_frame(uintptr_t eip, uintptr_t ebp)
 { 
 	extern char (SNT RO _start)[];
 	eipdebuginfo_t debuginfo;
 	char buf[256];
 	char *func_name;
-	int j, i = 1;
+	#define MAX_BT_DEPTH 20
+	uintptr_t pcs[MAX_BT_DEPTH];
+	size_t nr_pcs = backtrace_list(eip, ebp, pcs, MAX_BT_DEPTH);
 
-	// on each iteration, ebp holds the stack frame and eip an addr in that func
-	while (ebp) {
+	for (int i = 0; i < nr_pcs; i++) {
 		#ifdef CONFIG_X86_64
-		func_name = get_fn_name(eip);
-		printk("#%02d [<%p>] in %s\n", i++,  eip, func_name);
-		# ifdef CONFIG_RESET_STACKS
-		if (func_name && !strncmp("__smp_idle", func_name, 10))
-			break;
-		# endif /* CONFIG_RESET_STACKS */
+		func_name = get_fn_name(pcs[i]);
+		printk("#%02d [<%p>] in %s\n", i + 1,  pcs[i], func_name);
 		kfree(func_name);
 		#else
-		debuginfo_eip(eip, &debuginfo);
+		debuginfo_eip(pcs[i], &debuginfo);
 		memset(buf, 0, 256);
 		strncpy(buf, debuginfo.eip_fn_name, MIN(debuginfo.eip_fn_namelen, 256));
 		buf[MIN(debuginfo.eip_fn_namelen, 255)] = 0;
-		cprintf("#%02d [<%p>] in %s+%x(%p) from %s:%d\n", i++,  eip, buf, 
+		cprintf("#%02d [<%p>] in %s+%x(%p) from %s:%d\n", i + 1,  pcs[i], buf, 
 		        debuginfo.eip_fn_addr - (uintptr_t)_start,
 		        debuginfo.eip_fn_addr, debuginfo.eip_file, debuginfo.eip_line);
 		cprintf("    ebp: %x   Args:", ebp);
-		for (j = 0; j < MIN(debuginfo.eip_fn_narg, 5); j++)
+		for (int j = 0; j < MIN(debuginfo.eip_fn_narg, 5); j++)
 			cprintf(" %08x", *(uintptr_t*)(ebp + 2 + j));
 		cprintf("\n");
-		# ifdef CONFIG_RESET_STACKS
-		if (!strncmp("__smp_idle", (char*)debuginfo.eip_fn_name, 10))
-			break;
-		# endif /* CONFIG_RESET_STACKS */
 		#endif /* CONFIG_X86_64 */
-		eip = *(uintptr_t*)(ebp + sizeof(uintptr_t)) - 1;
-		ebp = *(uintptr_t*)ebp;
 	}
 }
 
