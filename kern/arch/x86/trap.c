@@ -252,7 +252,9 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 		panic("Proc-less Page Fault in the Kernel at %p!", fault_va);
 	}
 	/* TODO - handle kernel page faults.  This is dangerous, since we might be
-	 * holding locks in the kernel and could deadlock when we HPF. */
+	 * holding locks in the kernel and could deadlock when we HPF.
+	 *
+	 * Also consider turning on IRQs globally while we call HPF. */
 	if ((err = handle_page_fault(current, fault_va, prot))) {
 		if ((hw_tf->tf_cs & 3) == 0) {
 			print_trapframe(hw_tf);
@@ -493,6 +495,9 @@ void handle_irq(struct hw_trapframe *hw_tf)
 	irq_h = irq_handlers[hw_tf->tf_trapno];
 	if (!irq_h || irq_h->check_spurious(hw_tf->tf_trapno))
 		goto out_no_eoi;
+	/* Can now be interrupted/nested by higher priority IRQs, but not by our
+	 * current IRQ vector, til we EOI. */
+	enable_irq();
 	while (irq_h) {
 		irq_h->isr(hw_tf, irq_h->data);
 		irq_h = irq_h->next;
@@ -502,6 +507,7 @@ void handle_irq(struct hw_trapframe *hw_tf)
 	if ((I_SMP_CALL0 <= hw_tf->tf_trapno) &&
 	    (hw_tf->tf_trapno <= I_SMP_CALL_LAST))
 		down_checklist(handler_wrappers[hw_tf->tf_trapno & 0x0f].cpu_list);
+	disable_irq();
 	/* Keep in sync with ipi_is_pending */
 	irq_handlers[hw_tf->tf_trapno]->eoi(hw_tf->tf_trapno);
 	/* Fall-through */
