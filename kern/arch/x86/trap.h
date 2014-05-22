@@ -185,6 +185,14 @@ set_stack_pointer(uintptr_t sp)
 	asm volatile("mov %0,%%"X86_REG_SP"" : : "r"(sp) : "memory", X86_REG_SP);
 }
 
+static inline void __attribute__((always_inline))
+set_frame_pointer(uintptr_t fp)
+{
+	/* note we can't list BP as a clobber - the compiler will flip out.  makes
+	 * me wonder if clobbering SP above makes a difference (probably not) */
+	asm volatile("mov %0,%%"X86_REG_BP"" : : "r"(fp) : "memory");
+}
+
 extern segdesc_t *gdt;
 
 #ifdef CONFIG_X86_64

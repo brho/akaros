@@ -36,6 +36,13 @@ set_stack_pointer(uintptr_t sp)
 	asm volatile("move sp, %0" : : "r"(sp) : "memory");
 }
 
+static inline void __attribute__((always_inline))
+set_frame_pointer(uintptr_t fp)
+{
+	#warning "brho is just guessing here."
+	asm volatile("move fp, %0" : : "r"(fp) : "memory");
+}
+
 /* Save's the current kernel context into tf, setting the PC to the end of this
  * function.  Note the kernel doesn't need to save a lot.
  * Implemented with extern function to cause compiler to clobber most regs. */

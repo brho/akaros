@@ -79,6 +79,7 @@ void smp_idle(void)
 {
 	#ifdef CONFIG_RESET_STACKS
 	set_stack_pointer(get_stack_top());
+	set_frame_pointer(0);
 	#endif /* CONFIG_RESET_STACKS */
 	__smp_idle();
 	assert(0);
