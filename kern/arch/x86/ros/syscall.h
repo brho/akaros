@@ -1,7 +1,7 @@
 #ifndef ROS_INC_ARCH_SYSCALL_H
 #define ROS_INC_ARCH_SYSCALL_H
 
-#define T_SYSCALL	64
+#define T_SYSCALL	48
 
 #ifndef ROS_KERNEL
 

@@ -43,8 +43,28 @@
 #define MaxIrqPIC				15
 #define MaxIdtPIC				(IdtPIC + MaxIrqPIC)
 
-/* 48-63 are LAPIC vectors */
-#define IdtLAPIC				(IdtPIC + 16)
+/* T_SYSCALL is defined by the following include (48) */
+#include <ros/arch/syscall.h>
+
+/* 49-223 are IOAPIC routing vectors (from IOAPIC to LAPIC) */
+#define IdtIOAPIC				(T_SYSCALL + 1)
+#define MaxIdtIOAPIC			223
+
+/* 224-239 are OS IPI vectors (0xe0-0xef) */
+/* smp_call_function IPIs, keep in sync with NUM_HANDLER_WRAPPERS.
+ * SMP_CALL0 needs to be 16-aligned (we mask in x86/trap.c) */
+#define I_SMP_CALL0				224
+#define I_SMP_CALL1				(I_SMP_CALL0 + 1)
+#define I_SMP_CALL2				(I_SMP_CALL0 + 2)
+#define I_SMP_CALL3				(I_SMP_CALL0 + 3)
+#define I_SMP_CALL4				(I_SMP_CALL0 + 4)
+#define I_SMP_CALL_LAST			I_SMP_CALL4
+#define I_TESTING				237 	/* Testing IPI (used in testing.c) */
+#define I_POKE_CORE				238
+#define I_KERNEL_MSG			239
+
+/* 240-255 are LAPIC vectors (0xf0-0xff), hightest priority class */
+#define IdtLAPIC				240
 #define IdtLAPIC_TIMER			(IdtLAPIC + 0)
 #define IdtLAPIC_THERMAL		(IdtLAPIC + 1)
 #define IdtLAPIC_PCINT			(IdtLAPIC + 2)
@@ -53,19 +73,12 @@
 #define IdtLAPIC_ERROR			(IdtLAPIC + 5)
 /* Plan 9 apic note: the spurious vector number must have bits 3-0 0x0f
  * unless the Extended Spurious Vector Enable bit is set in the
- * HyperTransport Transaction Control register.  Plan 9 used 63 (0x3f). */
-#define IdtLAPIC_SPURIOUS		(IdtLAPIC + 15) /* Aka 63, 0x3f */
-#define MaxIdtLAPIC				(IdtLAPIC + 15)
+ * HyperTransport Transaction Control register.  On some intel machines, those
+ * bits are hardwired to 1s (SDM 3-10.9). */
+#define IdtLAPIC_SPURIOUS		(IdtLAPIC + 0xf) /* Aka 255, 0xff */
+#define MaxIdtLAPIC				(IdtLAPIC + 0xf)
 
-/* T_SYSCALL is defined by the following include (64) */
-#include <ros/arch/syscall.h>
-
-/* 65-229 are IOAPIC routing vectors (from IOAPIC to LAPIC) */
-#define IdtIOAPIC				(T_SYSCALL + 1)
-#define MaxIdtIOAPIC			229
-/* 230-255 are OS IPI vectors */
 #define IdtMAX					255
-
 
 #define T_DEFAULT   0x0000beef		// catchall
 
@@ -91,20 +104,6 @@
 #define FP_CW_RC_SHIFT			(10)
 #define FP_CW_RC_MASK			(3 << FP_CW_RC_SHIFT)
 #define FP_CW_IC				(1 << 12)
-
-/* IPIs */
-/* Testing IPI (used in testing.c) */
-#define I_TESTING		230
-/* smp_call_function IPIs, keep in sync with NUM_HANDLER_WRAPPERS (and < 16)
- * it's important that this begins with 0xf0.  check i386/trap.c for details. */
-#define I_SMP_CALL0 	0xf0 // 240
-#define I_SMP_CALL1 	0xf1
-#define I_SMP_CALL2 	0xf2
-#define I_SMP_CALL3 	0xf3
-#define I_SMP_CALL4 	0xf4
-#define I_SMP_CALL_LAST I_SMP_CALL4
-/* Direct/Hardwired IPIs.  Hardwired in trapentry.S */
-#define I_KERNEL_MSG	255
 
 #ifndef __ASSEMBLER__
 

@@ -116,9 +116,15 @@
 .globl trap_tbl
 trap_tbl:
 
-/*
- * Generate entry points for the different traps.
- */
+/* Generate entry points for the different traps.  Note that all of these bounce
+ * off the corresponding trap.c function, such as handle_irqs, and that the name
+ * e.g. ISR_NMI is soley for the little stup that jumps to something like
+ * _alltraps.
+ *
+ * Technically, these HANDLER entries do not need to be in numeric order.
+ * trap.c will do a 'foreach (up to last-1), set the IDT for the number to point
+ * to the func' in the order in which they appear in the trap tbl, so the 'last
+ * one wins'. */
 TRAPHANDLER_NOEC(ISR_divide_error, T_DIVIDE)
 TRAPHANDLER_NOEC(ISR_debug_exceptions, T_DEBUG)
 TRAPHANDLER_NOEC(ISR_NMI, T_NMI)
@@ -144,6 +150,7 @@ TRAPHANDLER(ISR_alignment_check, T_ALIGN)
 TRAPHANDLER_NOEC(ISR_machine_check, T_MCHK)
 TRAPHANDLER_NOEC(ISR_simd_error, T_SIMDERR)
 /* 20 - 31 reserved */
+/* 32-47 are PIC/8259 IRQ vectors */
 IRQ_HANDLER(IRQ0, 32)
 IRQ_HANDLER(IRQ1, 33)
 IRQ_HANDLER(IRQ2, 34)
@@ -160,8 +167,8 @@ IRQ_HANDLER(IRQ12, 44)
 IRQ_HANDLER(IRQ13, 45)
 IRQ_HANDLER(IRQ14, 46)
 IRQ_HANDLER(IRQ15, 47)
-/* IOAPIC/MSI vectors */
-IRQ_HANDLER(IRQ16, 48)
+TRAPHANDLER_NOEC(ISR_syscall, T_SYSCALL)
+/* 49-223 are IOAPIC routing vectors (from IOAPIC to LAPIC) */
 IRQ_HANDLER(IRQ17, 49)
 IRQ_HANDLER(IRQ18, 50)
 IRQ_HANDLER(IRQ19, 51)
@@ -337,30 +344,29 @@ IRQ_HANDLER(IRQ188, 220)
 IRQ_HANDLER(IRQ189, 221)
 IRQ_HANDLER(IRQ190, 222)
 IRQ_HANDLER(IRQ191, 223)
-IRQ_HANDLER(IRQ192, 224)
-IRQ_HANDLER(IRQ193, 225)
-IRQ_HANDLER(IRQ194, 226)
-IRQ_HANDLER(IRQ195, 227)
-IRQ_HANDLER(IRQ196, 228)
+/* 224-239 are OS IPI vectors (0xe0-0xef) */
+IRQ_HANDLER(IRQ192, I_SMP_CALL0)
+IRQ_HANDLER(IRQ193, I_SMP_CALL1)
+IRQ_HANDLER(IRQ194, I_SMP_CALL2)
+IRQ_HANDLER(IRQ195, I_SMP_CALL3)
+IRQ_HANDLER(IRQ196, I_SMP_CALL4)
 IRQ_HANDLER(IRQ197, 229)
-
-/* 25 general purpose vectors, for use by the LAPIC.  Can expand later. */
-IRQ_HANDLER(IRQ198, I_TESTING) # used in testing.c
+IRQ_HANDLER(IRQ198, 230)
 IRQ_HANDLER(IRQ199, 231)
 IRQ_HANDLER(IRQ200, 232)
 IRQ_HANDLER(IRQ201, 233)
 IRQ_HANDLER(IRQ202, 234)
 IRQ_HANDLER(IRQ203, 235)
 IRQ_HANDLER(IRQ204, 236)
-IRQ_HANDLER(IRQ205, 237)
-IRQ_HANDLER(IRQ206, 238)
-IRQ_HANDLER(IRQ207, 239)
-/* 0xf0 - start of the SMP_CALL IPIS */
-IRQ_HANDLER(IRQ208, I_SMP_CALL0)
-IRQ_HANDLER(IRQ209, I_SMP_CALL1)
-IRQ_HANDLER(IRQ210, I_SMP_CALL2)
-IRQ_HANDLER(IRQ211, I_SMP_CALL3)
-IRQ_HANDLER(IRQ212, I_SMP_CALL4)
+IRQ_HANDLER(IRQ205, I_TESTING)
+POKE_HANDLER(IRQ206, I_POKE_CORE)
+IRQ_HANDLER(IRQ207, I_KERNEL_MSG)
+/* 240-255 are LAPIC vectors (0xf0-0xff), hightest priority class */
+IRQ_HANDLER(IRQ208, 240)
+IRQ_HANDLER(IRQ209, 241)
+IRQ_HANDLER(IRQ210, 242)
+IRQ_HANDLER(IRQ211, 243)
+IRQ_HANDLER(IRQ212, 244)
 IRQ_HANDLER(IRQ213, 245)
 IRQ_HANDLER(IRQ214, 246)
 IRQ_HANDLER(IRQ215, 247)
@@ -370,11 +376,8 @@ IRQ_HANDLER(IRQ218, 250)
 IRQ_HANDLER(IRQ219, 251)
 IRQ_HANDLER(IRQ220, 252)
 IRQ_HANDLER(IRQ221, 253)
-POKE_HANDLER(IRQ222, 254)
-IRQ_HANDLER(IRQ223, I_KERNEL_MSG)
-
-/* Technically, these HANDLER entries do not need to be in numeric order */
-TRAPHANDLER_NOEC(ISR_syscall, T_SYSCALL)
+IRQ_HANDLER(IRQ222, 254)
+IRQ_HANDLER(IRQ223, 255)
 /* But make sure default is last!! */
 TRAPHANDLER_NOEC(ISR_default, T_DEFAULT)
 
