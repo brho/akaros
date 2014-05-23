@@ -637,8 +637,64 @@ void oprofile_add_trace(unsigned long pc)
 	 */
 	if (pc == ESCAPE_CODE)
 		goto fail;
-	if (op_add_sample(cpu_buf, pc, nsec()))
+	if (op_add_sample(cpu_buf, pc, nsec()&~0xf))
 		goto fail;
+
+	//print_func_exit();
+	return;
+fail:
+	printk("%s: fail. Turning of tracing on cpu %d\n", core_id());
+	cpu_buf->tracing = 0;
+	cpu_buf->backtrace_aborted++;
+	//print_func_exit();
+	return;
+}
+
+/* non standard format. Sorry.
+ * pc
+ * event -- bits 63-4 are time in ns. Bit 3-0 are the number of words that
+ * follow.
+ * And then those words. This is so our Go tool can easily create
+ * a pprof-format file for go pprof.
+ */
+void oprofile_add_backtrace(uintptr_t ebp)
+{
+	if (! op_cpu_buffer)
+		return;
+	//print_func_entry();
+	struct oprofile_cpu_buffer *cpu_buf = &op_cpu_buffer[core_id()];
+
+	if (!cpu_buf->tracing) {
+		//print_func_exit();
+		return;
+	}
+
+	uintptr_t eip;
+
+	/* retaddr is right above ebp on the stack.  we subtract an additional 1 to
+	 * make sure the eip we get is actually in the function that called us.
+	 * i had a couple cases early on where call was the last instruction in a
+	 * function, and simply reading the retaddr would point into another
+	 * function (the next one in the object) */
+	eip = *(uintptr_t*)(ebp + sizeof(uintptr_t)) - 1;
+	/* jump back a frame (out of backtrace) */
+	ebp = *(uintptr_t *)ebp;
+
+	struct op_entry entry;
+	struct op_sample *sample;
+	struct block *b;
+	uint64_t event = nsec() & ~0xf;
+
+	b = op_cpu_buffer_write_reserve(cpu_buf, &entry, oprofile_backtrace_depth);
+
+	if (! b)
+		return;
+
+	sample = entry.sample;
+	sample->eip = eip;
+	sample->event = event | oprofile_backtrace_depth;
+	/* later, we should skip the first entry because it replicates eip. */
+	backtrace_list(eip, (uintptr_t)ebp, (uintptr_t *)sample->data, oprofile_backtrace_depth);
 
 	//print_func_exit();
 	return;

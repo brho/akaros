@@ -34,6 +34,6 @@ void pahexdump(uintptr_t pa, int length);
 
 /* circular shit... */
 void oprofile_add_trace(unsigned long pc);
-#define TRACEME() oprofile_add_trace(read_pc())
+#define TRACEME() oprofile_add_backtrace(read_bp())
 
 #endif /* ROS_KERN_KDEBUG_H */
