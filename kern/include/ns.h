@@ -761,6 +761,7 @@ void putstrn(char *unused_char_p_t, int);
 void qaddlist(struct queue *, struct block *);
 struct block *qbread(struct queue *, int);
 long qbwrite(struct queue *, struct block *);
+long qibwrite(struct queue *q, struct block *b);
 struct queue *qbypass(void (*)(void *, struct block *), void *);
 int qcanread(struct queue *);
 void qclose(struct queue *);

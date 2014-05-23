@@ -1245,6 +1245,41 @@ long qbwrite(struct queue *q, struct block *b)
 	return n;
 }
 
+long qibwrite(struct queue *q, struct block *b)
+{
+	int n, dowakeup;
+
+	dowakeup = 0;
+
+	n = BLEN(b);
+
+	spin_lock_irqsave(&q->lock);
+
+	QDEBUG checkb(b, "qibwrite");
+	if (q->bfirst)
+		q->blast->next = b;
+	else
+		q->bfirst = b;
+	q->blast = b;
+	q->len += BALLOC(b);
+	q->dlen += n;
+
+	if (q->state & Qstarve) {
+		q->state &= ~Qstarve;
+		dowakeup = 1;
+	}
+
+	spin_unlock_irqsave(&q->lock);
+
+	if (dowakeup) {
+		if (q->kick)
+			q->kick(q->arg);
+		rendez_wakeup(&q->rr);
+	}
+
+	return n;
+}
+
 /*
  *  write to a queue.  only Maxatomic bytes at a time is atomic.
  */
@@ -1303,31 +1338,10 @@ int qiwrite(struct queue *q, void *vp, int len)
 		if (b == NULL)
 			break;
 		memmove(b->wp, p + sofar, n);
+		/* this adjusts BLEN to be n, or at least it should */
 		b->wp += n;
-
-		spin_lock_irqsave(&q->lock);
-
-		QDEBUG checkb(b, "qiwrite");
-		if (q->bfirst)
-			q->blast->next = b;
-		else
-			q->bfirst = b;
-		q->blast = b;
-		q->len += BALLOC(b);
-		q->dlen += n;
-
-		if (q->state & Qstarve) {
-			q->state &= ~Qstarve;
-			dowakeup = 1;
-		}
-
-		spin_unlock_irqsave(&q->lock);
-
-		if (dowakeup) {
-			if (q->kick)
-				q->kick(q->arg);
-			rendez_wakeup(&q->rr);
-		}
+		assert(n == BLEN(b));
+		qibwrite(q, b);
 
 		sofar += n;
 	} while (sofar < len && (q->state & Qmsg) == 0);
