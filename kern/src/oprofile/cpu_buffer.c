@@ -164,7 +164,7 @@ int alloc_cpu_buffers(void)
 			b->cpu = i;
 			b->fullqueue = qopen(1024, Qmsg, NULL, NULL);
 			b->emptyqueue = qopen(1024, Qmsg, NULL, NULL);
-			qlock_init(&b->mutex);
+			spinlock_init_irqsave(&b->lock);
 		}
 	}
 
@@ -229,12 +229,12 @@ static struct block *op_cpu_buffer_write_reserve(struct oprofile_cpu_buffer *cpu
 	/* we might have run out. */
 	if ((! b) || (b->lim - b->wp) < size) {
 		if (b)
-			qbwrite(opq, b);
-		printk("After qbwrite in %s, opq len %d\n", __func__, qlen(opq));
+			qibwrite(opq, b);
+		printk("After qibwrite in %s, opq len %d\n", __func__, qlen(opq));
 		/* For now. Later, we will grab a block off the
 		 * emptyblock queue.
 		 */
-		cpu_buf->block = b = allocb(oprofile_cpu_buffer_size);
+		cpu_buf->block = b = iallocb(oprofile_cpu_buffer_size);
 		if (!b) {
 			printk("%s: fail\n", __func__);
 			//print_func_exit();
@@ -369,13 +369,13 @@ log_sample(struct oprofile_cpu_buffer *cpu_buf, unsigned long pc,
 	 * this function returns 0 in event of failure.
 	 * what a cluster.
 	 */
-	qlock(&cpu_buf->mutex);
+	spin_lock_irqsave(&cpu_buf->lock);
 	if (op_add_code(cpu_buf, backtrace, is_kernel, tsk))
 		goto fail;
 
 	if (op_add_sample(cpu_buf, pc, event))
 		goto fail;
-	qunlock(&cpu_buf->mutex);
+	spin_unlock_irqsave(&cpu_buf->lock);
 
 	//print_func_exit();
 	return 1;
@@ -405,17 +405,17 @@ void oprofile_cpubuf_flushone(int core, int newbuf)
 	//print_func_entry();
 	struct oprofile_cpu_buffer *cpu_buf;
 	cpu_buf = &op_cpu_buffer[core];
-	qlock(&cpu_buf->mutex);
+	spin_lock_irqsave(&cpu_buf->lock);
 	if (cpu_buf->block) {
 		printk("Core %d has data\n", core);
-		qbwrite(opq, cpu_buf->block);
-		printk("After qbwrite in %s, opq len %d\n", __func__, qlen(opq));
+		qibwrite(opq, cpu_buf->block);
+		printk("After qibwrite in %s, opq len %d\n", __func__, qlen(opq));
 	}
 	if (newbuf)
-		cpu_buf->block = allocb(oprofile_cpu_buffer_size);
+		cpu_buf->block = iallocb(oprofile_cpu_buffer_size);
 	else
 		cpu_buf->block = NULL;
-	qunlock(&cpu_buf->mutex);
+	spin_unlock_irqsave(&cpu_buf->lock);
 	//print_func_exit();
 }
 

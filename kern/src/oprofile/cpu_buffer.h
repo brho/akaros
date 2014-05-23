@@ -43,7 +43,7 @@ struct op_sample {
 struct op_entry;
 
 struct oprofile_cpu_buffer {
-	qlock_t mutex;
+	spinlock_t lock;
 	unsigned long buffer_size;
 	struct proc *last_proc;
 	int last_is_kernel;
