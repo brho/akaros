@@ -621,11 +621,12 @@ void oprofile_add_pc(unsigned long pc, int is_kernel, unsigned long event)
 
 void oprofile_add_trace(unsigned long pc)
 {
+	if (! op_cpu_buffer)
+		return;
 	//print_func_entry();
 	struct oprofile_cpu_buffer *cpu_buf = &op_cpu_buffer[core_id()];
 
 	if (!cpu_buf->tracing) {
-		printk("%s: not tracing\n", __func__);
 		//print_func_exit();
 		return;
 	}
