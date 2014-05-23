@@ -31,4 +31,9 @@ void __print_func_exit(const char *func, const char *file);
 #define print_func_exit() __print_func_exit(__FUNCTION__, __FILE__)
 void hexdump(void *v, int length);
 void pahexdump(uintptr_t pa, int length);
+
+/* circular shit... */
+void oprofile_add_trace(unsigned long pc);
+#define TRACEME() oprofile_add_trace(read_pc())
+
 #endif /* ROS_KERN_KDEBUG_H */
