@@ -29,7 +29,7 @@
 struct oprofile_cpu_buffer *op_cpu_buffer;
 
 /* this one queue is used by #K to get all events. */
-struct queue *opq;
+static struct queue *opq;
 
 /* this is run from core 0 for all cpu buffers. */
 static void wq_sync_buffer(void);
@@ -138,7 +138,7 @@ int alloc_cpu_buffers(void)
 	 */
 	/* what limit? No idea. */
 	if (!opq)
-		opq = qopen(1024, Qmsg, NULL, NULL);
+		opq = qopen(1024, 0, NULL, NULL);
 	if (!opq)
 		goto fail;
 
@@ -228,9 +228,9 @@ static struct block *op_cpu_buffer_write_reserve(struct oprofile_cpu_buffer *cpu
 	b = cpu_buf->block;
 	/* we might have run out. */
 	if ((! b) || (b->lim - b->wp) < size) {
-		if (b)
+		if (b){
 			qibwrite(opq, b);
-		printk("After qibwrite in %s, opq len %d\n", __func__, qlen(opq));
+		}
 		/* For now. Later, we will grab a block off the
 		 * emptyblock queue.
 		 */
@@ -637,7 +637,6 @@ void oprofile_add_trace(unsigned long pc)
 	 */
 	if (pc == ESCAPE_CODE)
 		goto fail;
-
 	if (op_add_sample(cpu_buf, pc, nsec()))
 		goto fail;
 
@@ -649,4 +648,26 @@ fail:
 	cpu_buf->backtrace_aborted++;
 	//print_func_exit();
 	return;
+}
+
+int
+oproflen(void)
+{
+	return qlen(opq);
+}
+
+/* return # bytes read, or 0 if profiling is off, or block if profiling on and no data.
+ */
+int
+oprofread(void *va, int n)
+{
+	int len = qlen(opq);
+	struct oprofile_cpu_buffer *cpu_buf = &op_cpu_buffer[core_id()];
+	if (len == 0) {
+		if (cpu_buf->tracing == 0)
+			return 0;
+	}
+
+	len = qread(opq, va, n);
+	return len;
 }

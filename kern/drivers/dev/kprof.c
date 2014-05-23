@@ -72,9 +72,6 @@ struct dirtab kproftab[]={
 	{"kpoprofile",	{Kprofoprofileqid},	0,	0600},
 };
 
-/* the oprofile queue */
-extern struct queue *opq;
-
 static struct chan*
 kprofattach(char *spec)
 {
@@ -175,7 +172,7 @@ static int
 kprofstat(struct chan *c, uint8_t *db, int n)
 {
 	/* barf. */
-	kproftab[3].length = qlen(opq);
+	kproftab[3].length = oproflen();
 
 	return devstat(c, db, n, kproftab, ARRAY_SIZE(kproftab), devgen);
 }
@@ -271,7 +268,7 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 		n = ret;
 		break;
 	case Kprofoprofileqid:
-		n = qread(opq, va, n);
+		n = oprofread(va,n);
 		break;
 	default:
 		n = 0;

@@ -146,6 +146,8 @@ unsigned long op_cpu_buffer_entries(int cpu);
 void oprofile_cpubuf_flushone(int core, int newbuf);
 void oprofile_cpubuf_flushall(int alloc);
 void oprofile_control_trace(int onoff);
+int oprofread(void *,int);
+int oproflen(void);
 
 #if 0 
 make these weak funcitons. 
