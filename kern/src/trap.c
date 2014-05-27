@@ -107,19 +107,18 @@ void handle_kmsg_ipi(struct hw_trapframe *hw_tf, void *data)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct kernel_message *kmsg_i, *temp;
-	assert(!irq_is_enabled());
 	/* Avoid locking if the list appears empty (lockless peak is okay) */
 	if (STAILQ_EMPTY(&pcpui->immed_amsgs))
 		return;
 	/* The lock serves as a cmb to force a re-read of the head of the list */
-	spin_lock(&pcpui->immed_amsg_lock);
+	spin_lock_irqsave(&pcpui->immed_amsg_lock);
 	STAILQ_FOREACH_SAFE(kmsg_i, &pcpui->immed_amsgs, link, temp) {
 		pcpui_trace_kmsg(pcpui, (uintptr_t)kmsg_i->pc);
 		kmsg_i->pc(kmsg_i->srcid, kmsg_i->arg0, kmsg_i->arg1, kmsg_i->arg2);
 		STAILQ_REMOVE(&pcpui->immed_amsgs, kmsg_i, kernel_message, link);
 		kmem_cache_free(kernel_msg_cache, (void*)kmsg_i);
 	}
-	spin_unlock(&pcpui->immed_amsg_lock);
+	spin_unlock_irqsave(&pcpui->immed_amsg_lock);
 }
 
 /* Helper function, gets the next routine KMSG (RKM).  Returns 0 if the list was
@@ -130,7 +129,8 @@ static kernel_message_t *get_next_rkmsg(struct per_cpu_info *pcpui)
 	/* Avoid locking if the list appears empty (lockless peak is okay) */
 	if (STAILQ_EMPTY(&pcpui->routine_amsgs))
 		return 0;
-	/* The lock serves as a cmb to force a re-read of the head of the list */
+	/* The lock serves as a cmb to force a re-read of the head of the list.
+	 * IRQs are disabled by our caller. */
 	spin_lock(&pcpui->routine_amsg_lock);
 	kmsg = STAILQ_FIRST(&pcpui->routine_amsgs);
 	if (kmsg)
