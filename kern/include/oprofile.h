@@ -95,6 +95,8 @@ void oprofile_add_sample(void* const regs, unsigned long event);
 void oprofile_add_ext_sample(unsigned long pc, void * const regs,
 				unsigned long event, int is_kernel);
 
+/* circular include stuff... */
+struct proc;
 /**
  * Add an hardware sample.
  */
