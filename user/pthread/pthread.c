@@ -1,3 +1,6 @@
+// Needed for sigmask functions...
+#define _GNU_SOURCE
+
 #include <ros/trapframe.h>
 #include <pthread.h>
 #include <vcore.h>
@@ -65,6 +68,18 @@ struct schedule_ops *sched_ops = &pthread_sched_ops;
 static void __pthread_free_stack(struct pthread_tcb *pt);
 static int __pthread_allocate_stack(struct pthread_tcb *pt);
 
+/* Trigger a posix signal on a pthread from vcore context */
+static void __pthread_trigger_posix_signal(pthread_t thread, int signo,
+                                           struct siginfo *info)
+{
+	int vcoreid = vcore_id();
+	void *temp_tls_desc = get_tls_desc(vcoreid);
+	struct uthread *uthread = (struct uthread*)thread;
+	set_tls_desc(uthread->tls_desc, vcore_id());
+	trigger_posix_signal(signo, info, &uthread->u_ctx);
+	set_tls_desc(temp_tls_desc, vcoreid);
+}
+
 /* Called from vcore entry.  Options usually include restarting whoever was
  * running there before or running a new thread.  Events are handled out of
  * event.c (table of function pointers, stuff like that). */
@@ -108,6 +123,19 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 			vcore_yield(FALSE);
 	} while (1);
 	assert(new_thread->state == PTH_RUNNABLE);
+	/* Run any pending posix signal handlers registered via pthread_kill */
+	if (new_thread->sigpending) {
+		sigset_t andset = new_thread->sigpending & (~new_thread->sigmask);
+		if (!__sigisemptyset(&andset)) {
+			for (int i = 1; i < _NSIG; i++) {
+				if (__sigismember(&andset, i)) {
+					__sigdelset(&new_thread->sigpending, i);
+					__pthread_trigger_posix_signal(new_thread, i, NULL);
+				}
+			}
+		}
+	}
+	/* Run the thread itself */
 	run_uthread((struct uthread*)new_thread);
 	assert(0);
 }
@@ -275,15 +303,12 @@ void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
 	}
 
 	if (!(err & PF_VMR_BACKED)) {
-		struct siginfo info = {0};
-		info.si_code = SEGV_MAPERR;
-		info.si_addr = (void*)aux;
-
-		int vcoreid = vcore_id();
-		void *temp_tls_desc = get_tls_desc(vcoreid);
-		set_tls_desc(uthread->tls_desc, vcore_id());
-		trigger_posix_signal(SIGSEGV, &info, &uthread->u_ctx);
-		set_tls_desc(temp_tls_desc, vcoreid);
+		if (!__sigismember(&pthread->sigmask, SIGSEGV)) {
+			struct siginfo info = {0};
+			info.si_code = SEGV_MAPERR;
+			info.si_addr = (void*)aux;
+			__pthread_trigger_posix_signal(pthread, SIGSEGV, &info);
+		}
 		pth_thread_runnable(uthread);
 		return;
 	}
@@ -401,6 +426,8 @@ void pthread_lib_init(void)
 	t->detached = TRUE;
 	t->state = PTH_RUNNING;
 	t->joiner = 0;
+	__sigemptyset(&t->sigmask);
+	__sigemptyset(&t->sigpending);
 	assert(t->id == 0);
 	/* Put the new pthread (thread0) on the active queue */
 	mcs_pdr_lock(&queue_lock);
@@ -482,6 +509,8 @@ int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	pthread->id = get_next_pid();
 	pthread->detached = FALSE;				/* default */
 	pthread->joiner = 0;
+	pthread->sigmask = ((pthread_t)current_uthread)->sigmask;
+	__sigemptyset(&pthread->sigpending);
 	/* Respect the attributes */
 	if (attr) {
 		if (attr->stacksize)					/* don't set a 0 stacksize */
@@ -1026,17 +1055,38 @@ int pthread_detach(pthread_t thread)
 	return 0;
 }
 
-int pthread_kill (pthread_t __threadid, int __signo)
+int pthread_kill(pthread_t thread, int signo)
 {
-	printf("pthread_kill is not yet implemented!");
-	return -1;
+	// Slightly racy with clearing of mask when triggering the signal, but
+	// that's OK, as signals are inherently racy since they don't queue up.
+	return sigaddset(&thread->sigpending, signo);
 }
 
 
 int pthread_sigmask(int how, const sigset_t *set, sigset_t *oset)
 {
-	printf("pthread_sigmask is not yet implemented!");
-	return -1;
+	if (how != SIG_BLOCK && how != SIG_SETMASK && how != SIG_UNBLOCK) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	pthread_t pthread = ((struct pthread_tcb*)current_uthread);
+	if (oset)
+		*oset = pthread->sigmask;
+	switch (how) {
+		case SIG_BLOCK:
+			pthread->sigmask = pthread->sigmask | *set;
+			break;
+		case SIG_SETMASK:
+			pthread->sigmask = *set;
+			break;
+		case SIG_UNBLOCK:
+			pthread->sigmask = pthread->sigmask & ~(*set);
+			break;
+	}
+	// Ensures any signals we just unmasked get processed if they are pending
+	pthread_yield();
+	return 0;
 }
 
 int pthread_sigqueue(pthread_t *thread, int sig, const union sigval value)

@@ -28,6 +28,7 @@
 #include <stdio.h>
 
 #include <event.h>
+#include <errno.h>
 #include <assert.h>
 #include <ros/procinfo.h>
 #include <ros/syscall.h>
@@ -117,6 +118,10 @@ void trigger_posix_signal(int sig_nr, struct siginfo *info, void *aux)
 	}
 
 	if (action->sa_flags & SA_SIGINFO) {
+		/* If NULL info struct passed in, construct our own */
+		struct siginfo s = {0};
+		if (info == NULL)
+			info = &s;
 		/* Make sure the caller either already set singo in the info struct, or
 		 * if they didn't, make sure it has been zeroed out (i.e. not just some
 		 * garbage on the stack. */
@@ -157,19 +162,33 @@ void init_posix_signals(void)
 	register_kevent_q(posix_sig_ev_q, EV_POSIX_SIGNAL);
 }
 
-/* Will need to do these if we have signal masks (sigprocmask style) */
 int sigaddset(sigset_t *__set, int __signo)
 {
+	if (__signo == 0 || __signo > _NSIG) {
+		errno = EINVAL;
+		return -1;
+	}
+	__sigaddset(__set, __signo);
 	return 0;
 }
 
 int sigdelset(sigset_t *__set, int __signo)
 {
+	if (__signo == 0 || __signo > _NSIG) {
+		errno = EINVAL;
+		return -1;
+	}
+	__sigdelset(__set, __signo);
 	return 0;
 }
 
 int sigismember(__const sigset_t *__set, int __signo)
 {
+	if (__signo == 0 || __signo > _NSIG) {
+		errno = EINVAL;
+		return -1;
+	}
+	__sigismember(__set, __signo);
 	return 0;
 }
 
@@ -179,6 +198,8 @@ int sigismember(__const sigset_t *__set, int __signo)
 int sigprocmask(int __how, __const sigset_t *__restrict __set,
                 sigset_t *__restrict __oset)
 {
+	printf("Function not supported generically! "
+           "Use 2LS specific function e.g. pthread_sigmask\n");
 	return 0;
 }
 
