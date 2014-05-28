@@ -93,7 +93,6 @@ function build_config() {
 		   sed -i -e 's/CONFIG_64BIT=y/# CONFIG_64BIT is not set/' \
 		          -e 's/# CONFIG_X86_32 is not set/CONFIG_X86_32=y/' \
 		          -e 's/CONFIG_X86_64=y/# CONFIG_X86_64 is not set/' \
-		          -e 's/CONFIG_LOUSY_LAPIC_TIMER=y/# CONFIG_LOUSY_LAPIC_TIMER is not set/' \
 		          .config
 	    ;;
 	X86_64)  make ARCH=x86 defconfig
@@ -105,6 +104,7 @@ function build_config() {
 	# results if needed.
 	echo "CONFIG_KERNEL_TESTING=y" >> .config
 	echo "CONFIG_USERSPACE_TESTING=y" >> .config
+	echo "CONFIG_LOUSY_LAPIC_TIMER=y" >> .config
 	# Set all config variables dependent on the above changes to their defaults
 	# without prompting
 	make olddefconfig 
