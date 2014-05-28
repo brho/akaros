@@ -650,25 +650,18 @@ fail:
 	return;
 }
 
-/* non standard format. Sorry.
- * pc
- * event -- bits 63-4 are time in ns. Bit 3-0 are the number of words that
- * follow.
- * And then those words. This is so our Go tool can easily create
- * a pprof-format file for go pprof.
- * after discussions:
- * first word
+/* Format for samples:
+ * first word:
  * high 8 bits is ee, which is an invalid address on amd64. 
  * next 8 bits is protocol version
  * next 16 bits is unused, MBZ. Later, we can make it a packet type. 
  * next 16 bits is core id
  * next 8 bits is unused
- * next 8 bits is # words following. This should be at least 1, for one EIP.
+ * next 8 bits is # PCs following. This should be at least 1, for one EIP.
  *
  * second word is time in ns.
  * 
  * Third and following words are PCs, there must be at least one of them. 
- *
  */
 void oprofile_add_backtrace(uintptr_t ebp)
 {
@@ -684,28 +677,22 @@ void oprofile_add_backtrace(uintptr_t ebp)
 		return;
 	}
 
-	uintptr_t eip;
-
-	/* retaddr is right above ebp on the stack.  we subtract an additional 1 to
-	 * make sure the eip we get is actually in the function that called us.
-	 * i had a couple cases early on where call was the last instruction in a
-	 * function, and simply reading the retaddr would point into another
-	 * function (the next one in the object) */
-	eip = *(uintptr_t*)(ebp + sizeof(uintptr_t)) - 1;
-printk("eip %p ebp %p\n", eip, ebp);
-	/* jump back a frame (out of backtrace) */
-	ebp = *(uintptr_t *)ebp;
-printk("eip %p ebp %p\n", eip, ebp);
+	uintptr_t eip = get_caller_pc();
 
 	struct op_entry entry;
 	struct op_sample *sample;
 	struct block *b;
 	uint64_t event = nsec();
 
+	uintptr_t bt_pcs[oprofile_backtrace_depth];
+	
+	int nr_pcs;
+	nr_pcs = backtrace_list(eip, ebp, bt_pcs, oprofile_backtrace_depth);
+
 	/* write_reserve always assumes passed-in-size + 2.
 	 * backtrace_depth should always be > 0.
 	 */
-	b = op_cpu_buffer_write_reserve(cpu_buf, &entry, oprofile_backtrace_depth);
+	b = op_cpu_buffer_write_reserve(cpu_buf, &entry, nr_pcs);
 
 	if (! b)
 		return;
@@ -713,17 +700,12 @@ printk("eip %p ebp %p\n", eip, ebp);
 	/* we are changing the sample format, but not the struct
 	 * member names yet. Later, assuming this works out.
 	 */
-	descriptor |= (core_id() << 16) | oprofile_backtrace_depth;
+	descriptor |= (core_id() << 16) | nr_pcs;
 	sample = entry.sample;
 	sample->eip = descriptor;
 	sample->event = event;
-	/* later, we should skip the first entry because it replicates eip. */
-printk("sample %p sample->data %p \n", sample, sample->data);
-printk("eip %p ebp %p\n", eip, ebp);
-	backtrace_list(eip, (uintptr_t)ebp, (uintptr_t *)sample->data, oprofile_backtrace_depth);
-{int i; for(i = 0; i < 8; i++) printk("%d %p\n", i, sample->data[i]);}
+	memcpy(sample->data, bt_pcs, sizeof(uintptr_t) * nr_pcs);
 
-	cpu_buf->tracing = 0;
 	//print_func_exit();
 	return;
 fail:
