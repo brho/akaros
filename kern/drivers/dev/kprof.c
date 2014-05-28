@@ -142,7 +142,7 @@ static void setup_timers(void)
 	}
 	void kprof_irq_handler(struct hw_trapframe *hw_tf, void *data)
 	{
-		kproftimer(x86_get_hwtf_pc(hw_tf));	/* TODO arch */
+		kproftimer(get_hwtf_pc(hw_tf));
 	}
 	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
 	struct alarm_waiter *waiter = kmalloc(sizeof(struct alarm_waiter), 0);

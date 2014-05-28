@@ -231,7 +231,7 @@ void backtrace_kframe(struct hw_trapframe *hw_tf)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	pcpui->__lock_checking_enabled--;
 	printk("\nBacktrace of faulting kernel context on Core %d:\n", core_id());
-	backtrace_frame(x86_get_hwtf_pc(hw_tf), x86_get_hwtf_fp(hw_tf));
+	backtrace_frame(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf));
 	pcpui->__lock_checking_enabled++;
 }
 

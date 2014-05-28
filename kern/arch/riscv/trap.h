@@ -30,6 +30,22 @@ static inline bool in_kernel(struct hw_trapframe *hw_tf)
 	return hw_tf->sr & SR_PS;
 }
 
+static inline uintptr_t get_hwtf_pc(struct hw_trapframe *hw_tf)
+{
+	#warning "fix me"
+	return 0;
+	//return hw_tf->tf_rip;
+}
+
+static inline uintptr_t get_hwtf_fp(struct hw_trapframe *hw_tf)
+{
+	/* do you even have frame pointers?  this is used for backtrace, but if you
+	 * don't use FPs, we'll need to change up our parameters or something. */
+	#warning "fix me"
+	return 0;
+	//return hw_tf->tf_rbp;
+}
+
 static inline void __attribute__((always_inline))
 set_stack_pointer(uintptr_t sp)
 {

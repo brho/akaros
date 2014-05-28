@@ -24,6 +24,16 @@ static inline bool in_kernel(struct hw_trapframe *hw_tf)
 	return (hw_tf->tf_cs & ~3) == GD_KT;
 }
 
+static inline uintptr_t get_hwtf_pc(struct hw_trapframe *hw_tf)
+{
+	return hw_tf->tf_eip;
+}
+
+static inline uintptr_t get_hwtf_fp(struct hw_trapframe *hw_tf)
+{
+	return hw_tf->tf_regs.reg_ebp;
+}
+
 static inline void save_kernel_ctx(struct kernel_ctx *ctx)
 {
 	/* Save the regs and the future esp. */
@@ -105,16 +115,6 @@ static inline void x86_set_stacktop_tss(struct taskstate *tss, uintptr_t top)
 {
 	tss->ts_esp0 = top;
 	tss->ts_ss0 = GD_KD;
-}
-
-static inline uintptr_t x86_get_hwtf_pc(struct hw_trapframe *hw_tf)
-{
-	return hw_tf->tf_eip;
-}
-
-static inline uintptr_t x86_get_hwtf_fp(struct hw_trapframe *hw_tf)
-{
-	return hw_tf->tf_regs.reg_ebp;
 }
 
 #endif /* ROS_KERN_ARCH_TRAP32_H */
