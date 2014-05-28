@@ -93,6 +93,7 @@ function build_config() {
 		   sed -i -e 's/CONFIG_64BIT=y/# CONFIG_64BIT is not set/' \
 		          -e 's/# CONFIG_X86_32 is not set/CONFIG_X86_32=y/' \
 		          -e 's/CONFIG_X86_64=y/# CONFIG_X86_64 is not set/' \
+		          -e 's/CONFIG_LOUSY_LAPIC_TIMER=y/# CONFIG_LOUSY_LAPIC_TIMER is not set/' \
 		          .config
 	    ;;
 	X86_64)  make ARCH=x86 defconfig
