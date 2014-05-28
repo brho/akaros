@@ -35,7 +35,6 @@ bool test_sigmask(void) {
 	pthread_kill(phandle, SIGUSR2);
 	pthread_join(phandle, NULL);
 
-	printf("count: %d\n", count);
 	UT_ASSERT_M("Should only receive one signal", count == 1); 
 	UT_ASSERT_M("Signal handler run on wrong thread", sigphandle == phandle); 
 	return true;
