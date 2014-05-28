@@ -656,9 +656,24 @@ fail:
  * follow.
  * And then those words. This is so our Go tool can easily create
  * a pprof-format file for go pprof.
+ * after discussions:
+ * first word
+ * high 8 bits is ee, which is an invalid address on amd64. 
+ * next 8 bits is protocol version
+ * next 16 bits is unused, MBZ. Later, we can make it a packet type. 
+ * next 16 bits is core id
+ * next 8 bits is unused
+ * next 8 bits is # words following. This should be at least 1, for one EIP.
+ *
+ * second word is time in ns.
+ * 
+ * Third and following words are PCs, there must be at least one of them. 
+ *
  */
 void oprofile_add_backtrace(uintptr_t ebp)
 {
+	/* version 1. */
+	uint64_t descriptor = 0xee01ULL<<48;
 	if (! op_cpu_buffer)
 		return;
 	//print_func_entry();
@@ -677,25 +692,38 @@ void oprofile_add_backtrace(uintptr_t ebp)
 	 * function, and simply reading the retaddr would point into another
 	 * function (the next one in the object) */
 	eip = *(uintptr_t*)(ebp + sizeof(uintptr_t)) - 1;
+printk("eip %p ebp %p\n", eip, ebp);
 	/* jump back a frame (out of backtrace) */
 	ebp = *(uintptr_t *)ebp;
+printk("eip %p ebp %p\n", eip, ebp);
 
 	struct op_entry entry;
 	struct op_sample *sample;
 	struct block *b;
-	uint64_t event = nsec() & ~0xf;
+	uint64_t event = nsec();
 
+	/* write_reserve always assumes passed-in-size + 2.
+	 * backtrace_depth should always be > 0.
+	 */
 	b = op_cpu_buffer_write_reserve(cpu_buf, &entry, oprofile_backtrace_depth);
 
 	if (! b)
 		return;
 
+	/* we are changing the sample format, but not the struct
+	 * member names yet. Later, assuming this works out.
+	 */
+	descriptor |= (core_id() << 16) | oprofile_backtrace_depth;
 	sample = entry.sample;
-	sample->eip = eip;
-	sample->event = event | oprofile_backtrace_depth;
+	sample->eip = descriptor;
+	sample->event = event;
 	/* later, we should skip the first entry because it replicates eip. */
+printk("sample %p sample->data %p \n", sample, sample->data);
+printk("eip %p ebp %p\n", eip, ebp);
 	backtrace_list(eip, (uintptr_t)ebp, (uintptr_t *)sample->data, oprofile_backtrace_depth);
+{int i; for(i = 0; i < 8; i++) printk("%d %p\n", i, sample->data[i]);}
 
+	cpu_buf->tracing = 0;
 	//print_func_exit();
 	return;
 fail:
