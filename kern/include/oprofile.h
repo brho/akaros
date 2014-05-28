@@ -107,7 +107,7 @@ void oprofile_add_ext_hw_sample(unsigned long pc, /*struct pt_regs*/void * const
 /* Use this instead when the PC value is not from the regs. Doesn't
  * backtrace. */
 void oprofile_add_pc(unsigned long pc, int is_kernel, unsigned long event);
-void oprofile_add_backtrace(uintptr_t ebp);
+void oprofile_add_backtrace(uintptr_t pc, uintptr_t fp);
 
 /* add a backtrace entry, to be called from the ->backtrace callback */
 void oprofile_add_trace(unsigned long eip);

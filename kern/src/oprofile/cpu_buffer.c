@@ -663,7 +663,7 @@ fail:
  * 
  * Third and following words are PCs, there must be at least one of them. 
  */
-void oprofile_add_backtrace(uintptr_t ebp)
+void oprofile_add_backtrace(uintptr_t pc, uintptr_t fp)
 {
 	/* version 1. */
 	uint64_t descriptor = 0xee01ULL<<48;
@@ -677,8 +677,6 @@ void oprofile_add_backtrace(uintptr_t ebp)
 		return;
 	}
 
-	uintptr_t eip = get_caller_pc();
-
 	struct op_entry entry;
 	struct op_sample *sample;
 	struct block *b;
@@ -687,7 +685,7 @@ void oprofile_add_backtrace(uintptr_t ebp)
 	uintptr_t bt_pcs[oprofile_backtrace_depth];
 	
 	int nr_pcs;
-	nr_pcs = backtrace_list(eip, ebp, bt_pcs, oprofile_backtrace_depth);
+	nr_pcs = backtrace_list(pc, fp, bt_pcs, oprofile_backtrace_depth);
 
 	/* write_reserve always assumes passed-in-size + 2.
 	 * backtrace_depth should always be > 0.

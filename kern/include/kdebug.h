@@ -33,6 +33,6 @@ void hexdump(void *v, int length);
 void pahexdump(uintptr_t pa, int length);
 
 #include <oprofile.h>
-#define TRACEME() oprofile_add_backtrace(read_bp())
+#define TRACEME() oprofile_add_backtrace(read_pc(), read_bp())
 
 #endif /* ROS_KERN_KDEBUG_H */

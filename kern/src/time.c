@@ -56,7 +56,10 @@ void udelay_sched(uint64_t usec)
  * you want something to happen in the future, set an alarm. */
 void timer_interrupt(struct hw_trapframe *hw_tf, void *data)
 {
-	TRACEME();
+	if (in_kernel(hw_tf))
+		oprofile_add_backtrace(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf));
+	// else add user_sample or something
+
 	int coreid = core_id();
 	/* run the alarms out of RKM context, so that event delivery works nicely
 	 * (keeps the proc lock and ksched lock non-irqsave) */
