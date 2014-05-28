@@ -58,7 +58,8 @@ void timer_interrupt(struct hw_trapframe *hw_tf, void *data)
 {
 	if (in_kernel(hw_tf))
 		oprofile_add_backtrace(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf));
-	// else add user_sample or something
+	else
+		oprofile_add_userpc(get_hwtf_pc(hw_tf));
 
 	int coreid = core_id();
 	/* run the alarms out of RKM context, so that event delivery works nicely

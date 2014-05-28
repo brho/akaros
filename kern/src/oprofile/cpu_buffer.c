@@ -714,6 +714,30 @@ fail:
 	return;
 }
 
+void oprofile_add_userpc(uintptr_t pc)
+{
+	struct oprofile_cpu_buffer *cpu_buf;
+	uint32_t pcoreid = core_id();
+	struct op_entry entry;
+	struct block *b;
+	uint64_t descriptor = (0xee01ULL << 48) | (pcoreid << 16) | 1;
+
+	if (!op_cpu_buffer)
+		return;
+	cpu_buf = &op_cpu_buffer[pcoreid];
+	if (!cpu_buf->tracing)
+		return;
+	/* write_reserve always assumes passed-in-size + 2.  need room for 1 PC. */
+	b = op_cpu_buffer_write_reserve(cpu_buf, &entry, 1);
+	if (!b)
+		return;
+	entry.sample->eip = descriptor;
+	entry.sample->event = nsec();
+	/* entry.sample->data == entry.data */
+	assert(entry.sample->data == entry.data);
+	*entry.sample->data = pc;
+}
+
 int
 oproflen(void)
 {
