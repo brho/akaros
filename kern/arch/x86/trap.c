@@ -239,12 +239,13 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 {
 	uintptr_t fault_va = rcr2();
 	int prot = hw_tf->tf_err & PF_ERROR_WRITE ? PROT_WRITE : PROT_READ;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	int err;
 
 	/* safe to reenable after rcr2 */
 	enable_irq();
 
-	if (!current) {
+	if (!pcpui->cur_proc) {
 		/* still catch KPFs */
 		assert((hw_tf->tf_cs & 3) == 0);
 		print_trapframe(hw_tf);
@@ -252,11 +253,19 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 		panic("Proc-less Page Fault in the Kernel at %p!", fault_va);
 	}
 	/* TODO - handle kernel page faults.  This is dangerous, since we might be
-	 * holding locks in the kernel and could deadlock when we HPF.
+	 * holding locks in the kernel and could deadlock when we HPF.  For now, I'm
+	 * just disabling the lock checker, since it'll flip out when it sees there
+	 * is a kernel trap.  Will need to think about this a bit, esp when we
+	 * properly handle bad addrs and whatnot.
 	 *
 	 * Also consider turning on IRQs globally while we call HPF. */
-	if ((err = handle_page_fault(current, fault_va, prot))) {
-		if ((hw_tf->tf_cs & 3) == 0) {
+	if (in_kernel(hw_tf))
+		pcpui->__lock_checking_enabled--;
+	err = handle_page_fault(pcpui->cur_proc, fault_va, prot);
+	if (in_kernel(hw_tf))
+		pcpui->__lock_checking_enabled++;
+	if (err) {
+		if (in_kernel(hw_tf)) {
 			print_trapframe(hw_tf);
 			backtrace_kframe(hw_tf);
 			panic("Proc-ful Page Fault in the Kernel at %p!", fault_va);
