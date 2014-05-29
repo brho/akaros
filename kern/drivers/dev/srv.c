@@ -81,7 +81,7 @@ static void srv_release(struct kref *kref)
 	if (srv->chan)
 		cclose(srv->chan);
 	kfree(srv);
-	atomic_dec(nr_srvs);
+	atomic_dec(&nr_srvs);
 }
 
 static int srvgen(struct chan *c, char *name, struct dirtab *tab,
