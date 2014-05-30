@@ -37,6 +37,7 @@
 #include <uthread.h>
 #include <spinlock.h>
 #include <timing.h>
+#include <alarm_dispatch.h>
 
 /* Helpers, basically renamed kernel interfaces, with the *tchain. */
 static void __tc_locked_set_alarm(struct timer_chain *tchain,
@@ -85,7 +86,7 @@ static void reset_tchain_times(struct timer_chain *tchain)
 
 static void init_alarm_service(void)
 {
-	int ctlfd, timerfd, alarm_nr, ret;
+	int ctlfd, timerfd, alarmid, ret;
 	char buf[20];
 	char path[32];
 	struct event_queue *ev_q;
@@ -112,7 +113,7 @@ static void init_alarm_service(void)
 		return;
 	}
 	buf[ret] = 0;
-	global_tchain.alarmid = atoi(buf);
+	alarmid = atoi(buf);
 	snprintf(path, sizeof(path), "#A/a%s/timer", buf);
 	timerfd = open(path, O_RDWR | O_CLOEXEC);
 	if (timerfd < 0) {
@@ -121,7 +122,7 @@ static void init_alarm_service(void)
 	}
 	/* Since we're doing SPAM_PUBLIC later, we actually don't need a big ev_q.
 	 * But someone might copy/paste this and change a flag. */
-	ev_handlers[EV_ALARM] = handle_user_alarm;
+	alarm_dispatch_register(alarmid, handle_user_alarm);
 	if (!(ev_q = get_big_event_q())) {
 		perror("Useralarm: Failed ev_q");
 		return;
@@ -139,6 +140,7 @@ static void init_alarm_service(void)
 	}
 	/* now the alarm is all set, just need to write the timer whenever we want
 	 * it to go off. */
+	global_tchain.alarmid = alarmid;
 	global_tchain.ctlfd = ctlfd;
 	global_tchain.timerfd = timerfd;
 	global_tchain.ev_q = ev_q;	/* mostly for debugging */
