@@ -27,7 +27,9 @@ static void dispatch_alarm(struct event_msg *ev_msg, unsigned int ev_type)
 	if (ev_msg) {
 		// There is a slight race here if you don't disable the alarm before
 		// deregistering its handler.  Make sure you do this properly.
-		dispatch.handlers[ev_msg->ev_arg2](ev_msg, ev_type);
+		handle_event_t handler = dispatch.handlers[ev_msg->ev_arg2];
+		if (handler)
+			handler(ev_msg, ev_type);
 	}
 }
 
@@ -45,8 +47,9 @@ static void init_alarm_dispatch()
 static void __maybe_grow_handler_array(int index)
 {
 	if (dispatch.length <= index) {
-		int new_size = dispatch.length + GROWTH_INC*(index/GROWTH_INC);
-		dispatch.handlers = realloc(dispatch.handlers, new_size);
+		int new_size = GROWTH_INC * (1 + index/GROWTH_INC);
+		dispatch.handlers = realloc(dispatch.handlers,
+		                            new_size * sizeof(handle_event_t));
 		for (int i=dispatch.length; i<new_size; i++)
 			dispatch.handlers[i] = NULL;
 		dispatch.length = new_size;
