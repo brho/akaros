@@ -160,14 +160,37 @@ static inline void set_vcpd_tls_desc(uint32_t vcoreid, void *tls_desc)
 	__procdata.vcore_preempt_data[vcoreid].vcore_tls_desc = (uintptr_t)tls_desc;
 }
 
+static inline uint64_t vcore_account_resume_ticks(uint32_t vcoreid)
+{
+	return __procinfo.vcoremap[vcoreid].resume_ticks;
+}
+
 static inline uint64_t vcore_account_resume_nsec(uint32_t vcoreid)
 {
-	return tsc2nsec(__procinfo.vcoremap[vcoreid].resume_ticks);
+	return tsc2nsec(vcore_account_resume_ticks(vcoreid));
+}
+
+static inline uint64_t vcore_account_total_ticks(uint32_t vcoreid)
+{
+	return __procinfo.vcoremap[vcoreid].total_ticks;
 }
 
 static inline uint64_t vcore_account_total_nsec(uint32_t vcoreid)
 {
-	return tsc2nsec(__procinfo.vcoremap[vcoreid].total_ticks);
+	return tsc2nsec(vcore_account_total_ticks(vcoreid));
+}
+
+static inline uint64_t vcore_account_uptime_ticks(uint32_t vcoreid)
+{
+	uint64_t resume = __procinfo.vcoremap[vcoreid].resume_ticks; 
+	uint64_t total = __procinfo.vcoremap[vcoreid].total_ticks; 
+	uint64_t now = read_tsc();
+	return now - resume + total;
+}
+
+static inline uint64_t vcore_account_uptime_nsec(uint32_t vcoreid)
+{
+	return tsc2nsec(vcore_account_uptime_ticks(vcoreid));
 }
 
 #ifndef __PIC__
