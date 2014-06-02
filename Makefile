@@ -555,7 +555,7 @@ $(user-dirs):
 
 PHONY += userclean $(clean-user-dirs)
 clean-user-dirs := $(addprefix _clean_user_,$(user-dirs))
-userclean: $(clean-user-dirs) testclean
+userclean: $(clean-user-dirs) testclean utestclean
 
 $(clean-user-dirs):
 	@cd user/$(patsubst _clean_user_%,%,$@) && $(MAKE) clean
@@ -570,6 +570,9 @@ utest: $(user-dirs)
 
 testclean:
 	@$(MAKE) -f tests/Makefile clean
+
+utestclean:
+	@$(MAKE) -f user/utest/Makefile clean
 
 # KFS related stuff
 PHONY += fill-kfs unfill-kfs
