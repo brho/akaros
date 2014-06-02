@@ -212,7 +212,7 @@ static void delete_pvcalarm_data(struct pvcalarm_data *pvcalarm_data)
  * online and the pvcalarm service is active */
 static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data)
 {
-	int ctlfd, timerfd, alarmid, ret;
+	int ctlfd, timerfd, alarmid, vcoreid, ev_flags, ret;
 	char buf[20];
 	char path[32];
 	struct event_queue *ev_q;
@@ -239,14 +239,15 @@ static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data)
 		return;
 	}
 	alarm_dispatch_register(alarmid, handle_pvcalarm);
-	if (!(ev_q = get_big_event_q())) {
+	vcoreid = vcore_id();
+	ev_flags = EVENT_IPI | EVENT_VCORE_PRIVATE;
+	ev_q = get_event_q_vcpd(vcoreid, ev_flags);
+	if (!ev_q) {
 		perror("Pvcalarm: Failed ev_q");
 		return;
 	}
-	ev_q->ev_vcore = vcore_id();
-	/* We don't want a FALLBACK since we only care about getting the event on
- 	 * each specific vcore */
-	ev_q->ev_flags = EVENT_IPI | EVENT_INDIR;
+	ev_q->ev_vcore = vcoreid;
+	ev_q->ev_flags = ev_flags;
 	ret = snprintf(path, sizeof(path), "evq %llx", ev_q);
 	ret = write(ctlfd, path, ret);
 	if (ret <= 0) {
