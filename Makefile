@@ -572,7 +572,7 @@ testclean:
 	@$(MAKE) -f tests/Makefile clean
 
 utestclean:
-	@$(MAKE) -f user/utest/Makefile clean
+	@cd user/utest && $(MAKE) clean
 
 # KFS related stuff
 PHONY += fill-kfs unfill-kfs
