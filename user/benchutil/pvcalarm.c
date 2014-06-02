@@ -268,18 +268,22 @@ static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data)
  * the pvcalarms while in vcore context.  This preamble is necessary to ensure
  * we maintain proper invariants when enabling and disabling the pvcalarm
  * service in a running application. */
-static void __vcore_preamble()
+static inline bool __vcore_preamble()
 {
 	assert(in_vcore_context());
-	if (atomic_cas(&global_pvcalarm.state, S_DISABLED, S_DISABLED))
-		return;
-	if (atomic_cas(&global_pvcalarm.state, S_DISABLING, S_DISABLING))
-		return;
 	__sync_fetch_and_add(&global_pvcalarm.busy_count, 1);
+	if (atomic_cas(&global_pvcalarm.state, S_DISABLED, S_DISABLED))
+		goto disabled;
+	if (atomic_cas(&global_pvcalarm.state, S_DISABLING, S_DISABLING))
+		goto disabled;
+	return true;
+disabled:
+	__sync_fetch_and_add(&global_pvcalarm.busy_count, -1);
+	return false;
 }
 
 /* The counterpart to the __vcore_preamble() function */
-static void __vcore_postamble()
+static inline void __vcore_postamble()
 {
 	__sync_fetch_and_add(&global_pvcalarm.busy_count, -1);
 }
@@ -291,7 +295,7 @@ static void __vcore_postamble()
  * NULL before running it. */
 void __vcore_poke_pvcalarm()
 {
-	__vcore_preamble();
+	if (!__vcore_preamble()) return;
 	uint32_t vcoreid = vcore_id();
 	if (!GET_BITMASK_BIT(global_pvcalarm.vcores, vcoreid)) {
 		SET_BITMASK_BIT(global_pvcalarm.vcores, vcoreid);
@@ -310,17 +314,17 @@ void __vcore_poke_pvcalarm()
  * policy. */
 static void handle_pvcalarm(struct event_msg *ev_msg, unsigned int ev_type)
 {
+	if (!__vcore_preamble()) return;
 	global_pvcalarm.handler(ev_msg, ev_type);
+	__vcore_postamble();
 }
 
 /* The pvcalarm handler for the REAL policy.  Simply call the registered
  * callback and restart the interval alarm. */
 static void handle_alarm_real(struct event_msg *ev_msg, unsigned int ev_type)
 {
-	__vcore_preamble();
 	global_pvcalarm.callback();
 	start_pvcalarm(__pvcalarm_data, global_pvcalarm.interval);
-	__vcore_postamble();
 }
 
 /* The pvcalarm handler for the PROF policy.  Account for any time the vcore
@@ -329,7 +333,6 @@ static void handle_alarm_real(struct event_msg *ev_msg, unsigned int ev_type)
  * alarm to make up the difference. */
 static void handle_alarm_prof(struct event_msg *ev_msg, unsigned int ev_type)
 {
-	__vcore_preamble();
 	uint32_t uptime = vcore_account_uptime_ticks(vcore_id());
 	uint64_t diff = uptime - __pvcalarm_data->start_uptime;
 
@@ -340,6 +343,5 @@ static void handle_alarm_prof(struct event_msg *ev_msg, unsigned int ev_type)
 		global_pvcalarm.callback();
 		start_pvcalarm(__pvcalarm_data, global_pvcalarm.interval);
 	}
-	__vcore_postamble();
 }
 
