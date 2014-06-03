@@ -234,11 +234,12 @@ static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data, int vcoreid)
  * service in a running application. */
 static inline bool __vcore_preamble()
 {
+	int state;
 	assert(in_vcore_context());
 	__sync_fetch_and_add(&global_pvcalarm.busy_count, 1);
-	if (atomic_cas(&global_pvcalarm.state, S_DISABLED, S_DISABLED))
-		goto disabled;
-	if (atomic_cas(&global_pvcalarm.state, S_DISABLING, S_DISABLING))
+	cmb();	/* order the state read after the incref.  __sync provides cpu mb */
+	state = atomic_read(&global_pvcalarm.state);
+	if (state == S_DISABLED || state == S_DISABLING)
 		goto disabled;
 	return true;
 disabled:

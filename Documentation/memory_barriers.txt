@@ -10,7 +10,7 @@ Barret Rhoden
 1. Overview
 ====================
 Memory barriers exist to make sure the compiler and the CPU do what we intend.
-The compiler memory barreir (cmb()) (called an optimization barrier in linux)
+The compiler memory barrier (cmb()) (called an optimization barrier in linux)
 prevents the compliler from reordering operations.  However, CPUs can also
 reorder reads and writes, in an architecture-dependent manner.  In most places
 with shared memory synchronization, you'll need some form of memory barriers.
