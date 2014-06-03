@@ -167,7 +167,7 @@
  * 					still spins.  they'll have to make sure their pred runs)
  * 			-adj workers doesn't matter either...
  * 				- the 2LS and preemption handling might be doing this
- * 				automatically, when handle_preempt() does a
+ * 				automatically, when handle_vc_preempt() does a
  * 				thread_paused() on its current_uthread.
  * 				- adj_workers isn't critical if we're using some locks
  * 				that check notif_pending.  eventually someone hears
@@ -605,24 +605,22 @@ atomic_t indir_idx;
 atomic_t preempt_cnt;
 atomic_t indir_cnt;
 
-static void handle_preempt(struct event_msg *ev_msg, unsigned int ev_type,
-                           void *data)
+static void trace_preempt(struct event_msg *ev_msg, unsigned int ev_type,
+                          void *data)
 {
 	unsigned long my_slot = atomic_fetch_and_add(&preempt_idx, 1);
 	if (my_slot < MAX_NR_EVENT_TRACES)
 		preempts[my_slot] = read_tsc();
 	atomic_inc(&preempt_cnt);
-	handle_vc_preempt(ev_msg, ev_type, data);
 }
 
-static void handle_indir(struct event_msg *ev_msg, unsigned int ev_type,
-                         void *data)
+static void trace_indir(struct event_msg *ev_msg, unsigned int ev_type,
+                        void *data)
 {
 	unsigned long my_slot = atomic_fetch_and_add(&indir_idx, 1);
 	if (my_slot < MAX_NR_EVENT_TRACES)
 		indirs[my_slot] = read_tsc();
 	atomic_inc(&indir_cnt);
-	handle_vc_indir(ev_msg, ev_type, data);
 }
 
 /* Helper, prints out the preempt trace */
@@ -666,9 +664,8 @@ static void os_prep_work(int nr_threads)
 	pthread_can_vcore_request(FALSE);	/* 2LS won't manage vcores */
 	pthread_need_tls(FALSE);
 	pthread_lib_init();					/* gives us one vcore */
-	/* TODO: register tracing handlers (old style was replacing) */
-//	register_ev_handler(EV_VCORE_PREEMPT, handle_preempt, 0);
-//	register_ev_handler(EV_CHECK_MSGS, handle_indir, 0);
+	register_ev_handler(EV_VCORE_PREEMPT, trace_preempt, 0);
+	register_ev_handler(EV_CHECK_MSGS, trace_indir, 0);
 	if (pargs.fake_vc_ctx) {
 		/* need to disable events when faking vc ctx.  since we're looping and
 		 * not handling events, we could run OOM */
