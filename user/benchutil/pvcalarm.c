@@ -32,11 +32,8 @@ struct pvcalarm_data {
 	int ctlfd;
 	int timerfd;
 	int alarmid;
-	int state;
 	uint64_t start_uptime;
-	SLIST_ENTRY(pvcalarm_data) next;
 };
-SLIST_HEAD(pvcalarm_data_list, pvcalarm_data);
 
 /* The global state of the pvcalarm service itself */
 struct pvcalarm {
@@ -45,23 +42,16 @@ struct pvcalarm {
 
 	atomic_t state;
 	int busy_count;
-	DECL_BITMASK(vcores, MAX_VCORES);
-	struct spin_pdr_lock list_lock;
-	struct pvcalarm_data_list list;
 	void (*handler) (struct event_msg *ev_msg, unsigned int ev_type);
+	struct pvcalarm_data *data;
 };
 
 /* The only state we need to make sure is set for the global alarm service is
  * to make sure it s in the disabled state at bootup */
 static struct pvcalarm global_pvcalarm = { .state = (void*)S_DISABLED };
-/* Thread local pointer to the pvcalarm_data.  The memory for this is allocated
- * on demand as new vcores pop up */
-static __thread struct pvcalarm_data *__pvcalarm_data; 
-/* If this function is non-null, then the per-vcore alarm service is active and
- * the function should be called early on inside vcore_entry(). */
-void (*vcore_poke_pvcalarm) (void);
 
-static void __vcore_poke_pvcalarm();
+/* Helper functions */
+static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data, int vcoreid);
 static void handle_pvcalarm(struct event_msg *ev_msg, unsigned int ev_type);
 static void handle_alarm_real(struct event_msg *ev_msg, unsigned int ev_type);
 static void handle_alarm_prof(struct event_msg *ev_msg, unsigned int ev_type);
@@ -69,12 +59,16 @@ static void handle_alarm_prof(struct event_msg *ev_msg, unsigned int ev_type);
 /* Initialize the pvcalarm service. Only call this function once */
 static int init_global_pvcalarm()
 {
-	CLR_BITMASK(global_pvcalarm.vcores, MAX_VCORES);
-	spin_pdr_init(&global_pvcalarm.list_lock);
-	SLIST_INIT(&global_pvcalarm.list);
 	global_pvcalarm.interval = 0;
 	global_pvcalarm.callback = NULL;
+	global_pvcalarm.busy_count = 0;
 	global_pvcalarm.handler = NULL;
+
+	/* Preemptively setup timers for all possible vcores */
+	global_pvcalarm.data = malloc(max_vcores() * sizeof(struct pvcalarm_data));
+	for (int i=0; i<max_vcores(); i++) {
+		init_pvcalarm(&global_pvcalarm.data[i], i);
+	}
 }
 
 /* Run the pvc alarm associated with pvcalarm_data for the given amount of
@@ -97,7 +91,7 @@ static void run_pvcalarm(struct pvcalarm_data *pvcalarm_data, uint64_t offset)
 static void start_pvcalarm(struct pvcalarm_data *pvcalarm_data, uint64_t offset)
 {
 	pvcalarm_data->start_uptime = vcore_account_uptime_ticks(vcore_id());
-	run_pvcalarm(__pvcalarm_data, offset);
+	run_pvcalarm(pvcalarm_data, offset);
 }
 
 /* Stop the pvc alarm associated with pvcalarm_data */
@@ -139,12 +133,11 @@ int enable_pvcalarms(int method, uint64_t interval, void (*callback) (void))
 			global_pvcalarm.handler = handle_alarm_prof;
 			break;
 	}
-	vcore_poke_pvcalarm = __vcore_poke_pvcalarm;
 
-	/* Poke all existing vcores so they run the newly initialized
- 	 * vcore_poke_pvcalarm function */
-	for (int i=0; i<num_vcores(); i++)
-		sys_self_notify(i, EV_NONE, 0, TRUE);
+	/* Start the timer on all vcores to go off after interval usecs */
+	for (int i=0; i<max_vcores(); i++) {
+		start_pvcalarm(&global_pvcalarm.data[i], global_pvcalarm.interval);
+	}
 
 	atomic_set(&global_pvcalarm.state, S_ENABLED);
 	return 0;
@@ -170,49 +163,19 @@ int disable_pvcalarms()
 	global_pvcalarm.interval = 0;
 	global_pvcalarm.callback = NULL;
 	global_pvcalarm.handler = NULL;
-	vcore_poke_pvcalarm = NULL;
 
-	/* Loop through all allocated pvcalarm_data structs and disable any alarms
-	 * associated with them */
-	struct pvcalarm_data *pvcalarm_data;
-	SLIST_FOREACH(pvcalarm_data, &global_pvcalarm.list, next) {
-		stop_pvcalarm(pvcalarm_data);
-		pvcalarm_data->state = S_DISABLED;
-	}
+	/* Stop the timer on all vcores */
+	for (int i=0; i<max_vcores(); i++)
+		stop_pvcalarm(&global_pvcalarm.data[i]);
 
 	atomic_set(&global_pvcalarm.state, S_DISABLED);
 }
 
-
-/* Allocate a new pvcalarm_data structure and add it to the global list of
- * registered pvcalarm_data structures */
-static struct pvcalarm_data *new_pvcalarm_data()
-{
-	struct pvcalarm_data *pvcalarm_data = malloc(sizeof(struct pvcalarm_data));
-	pvcalarm_data->ctlfd = 0;
-	pvcalarm_data->timerfd = 0;
-	pvcalarm_data->alarmid = 0;
-	pvcalarm_data->state = S_DISABLED;
-
-	spin_pdr_lock(&global_pvcalarm.list_lock);
-	SLIST_INSERT_HEAD(&global_pvcalarm.list, pvcalarm_data, next);
-	spin_pdr_unlock(&global_pvcalarm.list_lock);
-	return pvcalarm_data;
-}
-
-/* Free a pvcalarm_data structure allocated with new_pvcalarm_data() and remove
- * it from the global list of registered pvcalarm_data structures */
-static void delete_pvcalarm_data(struct pvcalarm_data *pvcalarm_data)
-{
-	SLIST_REMOVE(&global_pvcalarm.list, pvcalarm_data, pvcalarm_data, next);
-	free(pvcalarm_data);
-}
-
 /* Initialize a specific pvcalarm.  This happens once per vcore as it comes
  * online and the pvcalarm service is active */
-static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data)
+static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data, int vcoreid)
 {
-	int ctlfd, timerfd, alarmid, vcoreid, ev_flags, ret;
+	int ctlfd, timerfd, alarmid, ev_flags, ret;
 	char buf[20];
 	char path[32];
 	struct event_queue *ev_q;
@@ -239,7 +202,6 @@ static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data)
 		return;
 	}
 	alarm_dispatch_register(alarmid, handle_pvcalarm);
-	vcoreid = vcore_id();
 	ev_flags = EVENT_IPI | EVENT_VCORE_PRIVATE;
 	ev_q = get_event_q_vcpd(vcoreid, ev_flags);
 	if (!ev_q) {
@@ -288,27 +250,6 @@ static inline void __vcore_postamble()
 	__sync_fetch_and_add(&global_pvcalarm.busy_count, -1);
 }
 
-/* The actual implementation of the vcore_poke_pvcalarm() function. When the
- * pvcalarm service is enabled vcore_poke_pvcalarm will point to this function,
- * otherwise vcore_poke_pvcalarm == NULL.  In this way, vcore_entry() can avoid
- * the overhead of always running this function by doing  a simple check for
- * NULL before running it. */
-void __vcore_poke_pvcalarm()
-{
-	if (!__vcore_preamble()) return;
-	uint32_t vcoreid = vcore_id();
-	if (!GET_BITMASK_BIT(global_pvcalarm.vcores, vcoreid)) {
-		SET_BITMASK_BIT(global_pvcalarm.vcores, vcoreid);
-		__pvcalarm_data = new_pvcalarm_data();
-		init_pvcalarm(__pvcalarm_data);
-	}
-	if (__pvcalarm_data->state == S_DISABLED) {
-		__pvcalarm_data->state = S_ENABLED;
-		start_pvcalarm(__pvcalarm_data, global_pvcalarm.interval);
-	}
-	__vcore_postamble();
-}
-
 /* The global handler function.  It simply calls the proper underlying handler
  * function depending on whether the service is set for the REAL or PERF
  * policy. */
@@ -324,7 +265,7 @@ static void handle_pvcalarm(struct event_msg *ev_msg, unsigned int ev_type)
 static void handle_alarm_real(struct event_msg *ev_msg, unsigned int ev_type)
 {
 	global_pvcalarm.callback();
-	start_pvcalarm(__pvcalarm_data, global_pvcalarm.interval);
+	start_pvcalarm(&global_pvcalarm.data[vcore_id()], global_pvcalarm.interval);
 }
 
 /* The pvcalarm handler for the PROF policy.  Account for any time the vcore
@@ -332,16 +273,18 @@ static void handle_alarm_real(struct event_msg *ev_msg, unsigned int ev_type)
  * the interval time do we run the callback function.  Otherwise we restart the
  * alarm to make up the difference. */
 static void handle_alarm_prof(struct event_msg *ev_msg, unsigned int ev_type)
-{
-	uint32_t uptime = vcore_account_uptime_ticks(vcore_id());
-	uint64_t diff = uptime - __pvcalarm_data->start_uptime;
+{ 
+	int vcoreid = vcore_id();
+	struct pvcalarm_data *pvcalarm_data = &global_pvcalarm.data[vcoreid];
+	uint32_t uptime = vcore_account_uptime_ticks(vcoreid);
+	uint64_t diff = uptime - pvcalarm_data->start_uptime;
 
 	if (diff < global_pvcalarm.interval) {
 		uint64_t remaining = global_pvcalarm.interval - diff;
-		run_pvcalarm(__pvcalarm_data, remaining);
+		run_pvcalarm(pvcalarm_data, remaining);
 	} else {
 		global_pvcalarm.callback();
-		start_pvcalarm(__pvcalarm_data, global_pvcalarm.interval);
+		start_pvcalarm(pvcalarm_data, global_pvcalarm.interval);
 	}
 }
 

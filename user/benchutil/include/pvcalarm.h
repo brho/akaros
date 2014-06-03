@@ -19,10 +19,6 @@ enum {
 	PVCALARM_PROF
 };
 
-/* If this function is non-null, then the per-vcore alarm service is active and
- * the function should be called early on inside vcore_entry(). */
-extern void (*vcore_poke_pvcalarm) (void);
-
 /* Enable the per-vcore calarm service according to one of the policies listed
  * above.  Every interval usecs the provided callback will be called on each
  * active vcore according to that policy. */

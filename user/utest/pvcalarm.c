@@ -10,11 +10,6 @@ void pvcalarm_vcore_entry()
 {
 	uint32_t vcoreid= vcore_id();
 
-	/* Poke the pvcalarm to see if we need to enable it. */
-	/* This function is only non-null if the pvcalarm service is enabled */
-	if (vcore_poke_pvcalarm)
-		vcore_poke_pvcalarm();
-
 	/* Drop back into main thread  for core 0 */
 	if (current_uthread) {
 		assert(vcoreid == 0);
