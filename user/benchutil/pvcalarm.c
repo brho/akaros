@@ -16,7 +16,6 @@
 #include <sys/queue.h>
 #include <fcntl.h>
 #include <pvcalarm.h>
-#include <alarm_dispatch.h>
 
 /* Different states for enabling/disabling the per-vcore alarms. */
 enum {
@@ -204,7 +203,7 @@ static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data, int vcoreid)
 		perror("Pvcalarm: Can't open timer");
 		return;
 	}
-	alarm_dispatch_register(alarmid, handle_pvcalarm);
+	register_ev_handler(EV_ALARM, handle_pvcalarm, 0);
 	ev_flags = EVENT_IPI | EVENT_VCORE_PRIVATE;
 	ev_q = get_event_q_vcpd(vcoreid, ev_flags);
 	if (!ev_q) {
@@ -259,6 +258,9 @@ static inline void __vcore_postamble()
 static void handle_pvcalarm(struct event_msg *ev_msg, unsigned int ev_type,
                             void *data)
 {
+	struct pvcalarm_data *pvcalarm_data = &global_pvcalarm.data[vcore_id()];
+	if (!ev_msg || (ev_msg->ev_arg2 != pvcalarm_data->alarmid))
+		return;
 	if (!__vcore_preamble()) return;
 	global_pvcalarm.handler(ev_msg, ev_type, data);
 	__vcore_postamble();

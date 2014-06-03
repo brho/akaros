@@ -37,7 +37,6 @@
 #include <uthread.h>
 #include <spinlock.h>
 #include <timing.h>
-#include <alarm_dispatch.h>
 
 /* Helpers, basically renamed kernel interfaces, with the *tchain. */
 static void __tc_locked_set_alarm(struct timer_chain *tchain,
@@ -123,7 +122,7 @@ static void init_alarm_service(void)
 	}
 	/* Since we're doing SPAM_PUBLIC later, we actually don't need a big ev_q.
 	 * But someone might copy/paste this and change a flag. */
-	alarm_dispatch_register(alarmid, handle_user_alarm);
+	register_ev_handler(EV_ALARM, handle_user_alarm, 0);
 	if (!(ev_q = get_big_event_q())) {
 		perror("Useralarm: Failed ev_q");
 		return;
