@@ -140,7 +140,8 @@ void trigger_posix_signal(int sig_nr, struct siginfo *info, void *aux)
 /* This is the catch all akaros event->posix signal handler.  All posix signals
  * are received in a single akaros event type.  They are then dispatched from
  * this function to their proper posix signal handler */
-static void handle_event(struct event_msg *ev_msg, unsigned int ev_type)
+static void handle_event(struct event_msg *ev_msg, unsigned int ev_type,
+                         void *data)
 {
 	int sig_nr;
 	struct siginfo info = {0};

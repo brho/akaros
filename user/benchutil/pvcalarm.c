@@ -42,7 +42,7 @@ struct pvcalarm {
 
 	atomic_t state;
 	int busy_count;
-	void (*handler) (struct event_msg *ev_msg, unsigned int ev_type);
+	handle_event_t handler;
 	struct pvcalarm_data *data;
 };
 
@@ -52,9 +52,12 @@ static struct pvcalarm global_pvcalarm = { .state = (void*)S_DISABLED };
 
 /* Helper functions */
 static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data, int vcoreid);
-static void handle_pvcalarm(struct event_msg *ev_msg, unsigned int ev_type);
-static void handle_alarm_real(struct event_msg *ev_msg, unsigned int ev_type);
-static void handle_alarm_prof(struct event_msg *ev_msg, unsigned int ev_type);
+static void handle_pvcalarm(struct event_msg *ev_msg, unsigned int ev_type,
+                            void *data);
+static void handle_alarm_real(struct event_msg *ev_msg, unsigned int ev_type,
+                              void *data);
+static void handle_alarm_prof(struct event_msg *ev_msg, unsigned int ev_type,
+                              void *data);
 
 /* Initialize the pvcalarm service. Only call this function once */
 static int init_global_pvcalarm()
@@ -253,16 +256,18 @@ static inline void __vcore_postamble()
 /* The global handler function.  It simply calls the proper underlying handler
  * function depending on whether the service is set for the REAL or PERF
  * policy. */
-static void handle_pvcalarm(struct event_msg *ev_msg, unsigned int ev_type)
+static void handle_pvcalarm(struct event_msg *ev_msg, unsigned int ev_type,
+                            void *data)
 {
 	if (!__vcore_preamble()) return;
-	global_pvcalarm.handler(ev_msg, ev_type);
+	global_pvcalarm.handler(ev_msg, ev_type, data);
 	__vcore_postamble();
 }
 
 /* The pvcalarm handler for the REAL policy.  Simply call the registered
  * callback and restart the interval alarm. */
-static void handle_alarm_real(struct event_msg *ev_msg, unsigned int ev_type)
+static void handle_alarm_real(struct event_msg *ev_msg, unsigned int ev_type,
+                              void *data)
 {
 	global_pvcalarm.callback();
 	start_pvcalarm(&global_pvcalarm.data[vcore_id()], global_pvcalarm.interval);
@@ -272,7 +277,8 @@ static void handle_alarm_real(struct event_msg *ev_msg, unsigned int ev_type)
  * has been offline.  Only when the uptime since the last interval is equal to
  * the interval time do we run the callback function.  Otherwise we restart the
  * alarm to make up the difference. */
-static void handle_alarm_prof(struct event_msg *ev_msg, unsigned int ev_type)
+static void handle_alarm_prof(struct event_msg *ev_msg, unsigned int ev_type,
+                              void *data)
 { 
 	int vcoreid = vcore_id();
 	struct pvcalarm_data *pvcalarm_data = &global_pvcalarm.data[vcoreid];

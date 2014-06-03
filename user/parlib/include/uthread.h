@@ -91,8 +91,10 @@ void run_uthread(struct uthread *uthread);
 static inline struct uthread **get_cur_uth_addr(uint32_t vcoreid);
 
 /* Event handlers - exported globally so programs can wrap them */
-void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type);
-void handle_vc_indir(struct event_msg *ev_msg, unsigned int ev_type);
+void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type,
+                       void *data);
+void handle_vc_indir(struct event_msg *ev_msg, unsigned int ev_type,
+                     void *data);
 
 /* Asking for trouble with this API, when we just want stacktop (or whatever
  * the SP will be). */

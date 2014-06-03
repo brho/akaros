@@ -20,7 +20,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-static void handle_alarm(struct event_msg *ev_msg, unsigned int ev_type)
+static void handle_alarm(struct event_msg *ev_msg, unsigned int ev_type,
+                         void *data)
 {
 	assert(ev_type == EV_ALARM);
 	printf("\tAlarm fired!, id %d\n", ev_msg ? ev_msg->ev_arg2 : 55555);

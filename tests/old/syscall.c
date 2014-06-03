@@ -9,7 +9,8 @@
 
 /* Deprecated, don't use this in any serious way */
 
-static void handle_syscall(struct event_msg *ev_msg, unsigned int ev_type);
+static void handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
+                           void *data);
 struct syscall sysc = {0};
 struct event_queue *ev_q;
 void ghetto_vcore_entry(void);
@@ -88,7 +89,8 @@ int main(int argc, char** argv)
 	return 0;
 }
 
-static void handle_syscall(struct event_msg *ev_msg, unsigned int ev_type)
+static void handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
+                           void *data)
 {
 	struct syscall *my_sysc;
 	if (!ev_msg)

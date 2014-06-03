@@ -605,22 +605,24 @@ atomic_t indir_idx;
 atomic_t preempt_cnt;
 atomic_t indir_cnt;
 
-static void handle_preempt(struct event_msg *ev_msg, unsigned int ev_type)
+static void handle_preempt(struct event_msg *ev_msg, unsigned int ev_type,
+                           void *data)
 {
 	unsigned long my_slot = atomic_fetch_and_add(&preempt_idx, 1);
 	if (my_slot < MAX_NR_EVENT_TRACES)
 		preempts[my_slot] = read_tsc();
 	atomic_inc(&preempt_cnt);
-	handle_vc_preempt(ev_msg, ev_type);
+	handle_vc_preempt(ev_msg, ev_type, data);
 }
 
-static void handle_indir(struct event_msg *ev_msg, unsigned int ev_type)
+static void handle_indir(struct event_msg *ev_msg, unsigned int ev_type,
+                         void *data)
 {
 	unsigned long my_slot = atomic_fetch_and_add(&indir_idx, 1);
 	if (my_slot < MAX_NR_EVENT_TRACES)
 		indirs[my_slot] = read_tsc();
 	atomic_inc(&indir_cnt);
-	handle_vc_indir(ev_msg, ev_type);
+	handle_vc_indir(ev_msg, ev_type, data);
 }
 
 /* Helper, prints out the preempt trace */

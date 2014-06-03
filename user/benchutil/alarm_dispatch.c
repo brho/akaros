@@ -21,7 +21,8 @@ struct {
 } dispatch;
 
 /* Dispatch the alarm event to its proper handler */
-static void dispatch_alarm(struct event_msg *ev_msg, unsigned int ev_type)
+static void dispatch_alarm(struct event_msg *ev_msg, unsigned int ev_type,
+                           void *data)
 {
 	assert(ev_type == EV_ALARM);
 	if (ev_msg) {
@@ -29,7 +30,7 @@ static void dispatch_alarm(struct event_msg *ev_msg, unsigned int ev_type)
 		// deregistering its handler.  Make sure you do this properly.
 		handle_event_t handler = dispatch.handlers[ev_msg->ev_arg2];
 		if (handler)
-			handler(ev_msg, ev_type);
+			handler(ev_msg, ev_type, data);
 	}
 }
 

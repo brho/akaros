@@ -49,7 +49,8 @@ static bool __tc_unset_alarm(struct timer_chain *tchain,
 static void __tc_reset_alarm_abs(struct timer_chain *tchain,
                                  struct alarm_waiter *waiter,
                                  uint64_t abs_time);
-static void handle_user_alarm(struct event_msg *ev_msg, unsigned int ev_type);
+static void handle_user_alarm(struct event_msg *ev_msg, unsigned int ev_type,
+                              void *data);
 
 /* One chain to rule them all. */
 struct timer_chain global_tchain;
@@ -282,7 +283,8 @@ static void __trigger_tchain(struct timer_chain *tchain)
 	spin_pdr_unlock(&tchain->lock);
 }
 
-static void handle_user_alarm(struct event_msg *ev_msg, unsigned int ev_type)
+static void handle_user_alarm(struct event_msg *ev_msg, unsigned int ev_type,
+                              void *data)
 {
 	assert(ev_type == EV_ALARM);
 	if (ev_msg && (ev_msg->ev_arg2 == global_tchain.alarmid))

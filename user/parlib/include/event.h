@@ -29,10 +29,11 @@ unsigned int get_event_type(struct event_mbox *ev_mbox);
 
 /* List of handlers, process-wide, that the 2LS should fill in.  They all must
  * return (don't context switch to a u_thread) */
-typedef void (*handle_event_t)(struct event_msg *ev_msg, unsigned int ev_type);
+typedef void (*handle_event_t)(struct event_msg *ev_msg, unsigned int ev_type,
+                               void *data);
 extern handle_event_t ev_handlers[];
 /* Default event handlers */
-void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type);
+void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type, void *data);
 
 int handle_events(uint32_t vcoreid);
 void handle_event_q(struct event_queue *ev_q);

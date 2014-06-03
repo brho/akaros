@@ -48,7 +48,8 @@ void pth_preempt_pending(void);
 void pth_spawn_thread(uintptr_t pc_start, void *data);
 
 /* Event Handlers */
-static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type);
+static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
+                               void *data);
 
 struct schedule_ops pthread_sched_ops = {
 	pth_sched_entry,
@@ -226,7 +227,8 @@ static void restart_thread(struct syscall *sysc)
 
 /* This handler is usually run in vcore context, though I can imagine it being
  * called by a uthread in some other threading library. */
-static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type)
+static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
+                               void *data)
 {
 	struct syscall *sysc;
 	assert(in_vcore_context());

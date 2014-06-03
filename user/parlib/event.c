@@ -181,7 +181,7 @@ int handle_one_mbox_msg(struct event_mbox *ev_mbox)
 	assert(ev_type < MAX_NR_EVENT);
 	printd("[event] UCQ (mbox %08p), ev_type: %d\n", ev_mbox, ev_type);
 	if (ev_handlers[ev_type])
-		ev_handlers[ev_type](&local_msg, ev_type);
+		ev_handlers[ev_type](&local_msg, ev_type, 0);
 	return 1;
 }
 
@@ -195,7 +195,7 @@ int handle_mbox(struct event_mbox *ev_mbox)
 	void bit_handler(unsigned int bit) {
 		printd("[event] Bit: ev_type: %d\n", bit);
 		if (ev_handlers[bit])
-			ev_handlers[bit](0, bit);
+			ev_handlers[bit](0, bit, 0);
 		retval = 1;
 		/* Consider checking the queue for incoming messages while we're here */
 	}
@@ -228,7 +228,7 @@ bool mbox_is_empty(struct event_mbox *ev_mbox)
 }
 
 /* The EV_EVENT handler - extract the ev_q from the message. */
-void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type)
+void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type, void *data)
 {
 	struct event_queue *ev_q;
 	/* EV_EVENT can't handle not having a message / being a bit.  If we got a

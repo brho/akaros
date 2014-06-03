@@ -836,7 +836,8 @@ out_we_returned:
 
 /* This handles a preemption message.  When this is done, either we recovered,
  * or recovery *for our message* isn't needed. */
-void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type)
+void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type,
+                       void *data)
 {
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
@@ -935,7 +936,7 @@ out_stealing:
  * their indirs, or the vcore restarted enough so that checking them is
  * unnecessary.  If that happens and they got preempted quickly, then another
  * preempt/check_indirs was sent out. */
-void handle_vc_indir(struct event_msg *ev_msg, unsigned int ev_type)
+void handle_vc_indir(struct event_msg *ev_msg, unsigned int ev_type, void *data)
 {
 	uint32_t vcoreid = vcore_id();
 	uint32_t rem_vcoreid = ev_msg->ev_arg2;
