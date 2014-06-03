@@ -73,7 +73,7 @@ void uthread_lib_init(struct uthread *uthread)
 	init_once_racy(return);
 	vcore_init();
 	uthread_manage_thread0(uthread);
-	ev_handlers[EV_EVENT] = handle_ev_ev;
+	register_ev_handler(EV_EVENT, handle_ev_ev, 0);
 	/* Receive preemption events.  Note that this merely tells the kernel how to
 	 * send the messages, and does not necessarily provide storage space for the
 	 * messages.  What we're doing is saying that all PREEMPT and CHECK_MSGS
@@ -82,8 +82,8 @@ void uthread_lib_init(struct uthread *uthread)
 	 *
 	 * It is critical that these are either SPAM_PUB or INDIR|FALLBACK, so that
 	 * yielding vcores do not miss the preemption messages. */
-	ev_handlers[EV_VCORE_PREEMPT] = handle_vc_preempt;
-	ev_handlers[EV_CHECK_MSGS] = handle_vc_indir;
+	register_ev_handler(EV_VCORE_PREEMPT, handle_vc_preempt, 0);
+	register_ev_handler(EV_CHECK_MSGS, handle_vc_indir, 0);
 	preempt_ev_q = get_event_q();	/* small ev_q, mostly a vehicle for flags */
 	preempt_ev_q->ev_flags = EVENT_IPI | EVENT_SPAM_PUBLIC | EVENT_VCORE_APPRO |
 							 EVENT_VCORE_MUST_RUN;

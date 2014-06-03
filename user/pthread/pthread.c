@@ -445,7 +445,7 @@ void pthread_lib_init(void)
 	enable_kevent(EV_USER_IPI, 0, EVENT_IPI | EVENT_VCORE_PRIVATE);
 
 	/* Handle syscall events. */
-	ev_handlers[EV_SYSCALL] = pth_handle_syscall;
+	register_ev_handler(EV_SYSCALL, pth_handle_syscall, 0);
 	/* Set up the per-vcore structs to track outstanding syscalls */
 	sysc_mgmt = malloc(sizeof(struct sysc_mgmt) * max_vcores());
 	assert(sysc_mgmt);

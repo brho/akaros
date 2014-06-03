@@ -59,9 +59,9 @@ int main(int argc, char** argv)
 	/* handle events: just want to print out what we get.  This is just a
 	 * quick set of handlers, not a registration for a kevent. */
 	for (int i = 0; i < MAX_NR_EVENT; i++)
-		ev_handlers[i] = handle_generic;
+		register_ev_handler(i, handle_generic, 0);
 	/* Want to use the default ev_ev (which we just overwrote) */
-	ev_handlers[EV_EVENT] = handle_ev_ev;
+	register_ev_handler(EV_EVENT, handle_ev_ev, 0);
 	/* vcore_init() done in vcore_request() now. */
 	/* Set up event reception.  For example, this will allow us to receive an
 	 * event and IPI for USER_IPIs on vcore 0.  Check event.c for more stuff.

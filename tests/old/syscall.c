@@ -26,7 +26,7 @@ int main(int argc, char** argv)
 	unsigned int ev_type;
 
 	/* register our syscall handler (2LS does this) */
-	ev_handlers[EV_SYSCALL] = handle_syscall;
+	register_ev_handler(EV_SYSCALL, handle_syscall, 0);
 
 	printf("Trying to block\n");
 	/* Not doing anything else to it: no EVENT_IPI yet, etc. */

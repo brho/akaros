@@ -40,7 +40,7 @@ static void init_alarm_dispatch()
 	spin_pdr_init(&dispatch.lock);
 	dispatch.handlers = NULL;
 	dispatch.length = 0;
-	ev_handlers[EV_ALARM] = dispatch_alarm;
+	register_ev_handler(EV_ALARM, dispatch_alarm, 0);
 }
 
 /* Grow the handler array if necessary.  The array lock must be held when

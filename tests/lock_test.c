@@ -666,8 +666,9 @@ static void os_prep_work(int nr_threads)
 	pthread_can_vcore_request(FALSE);	/* 2LS won't manage vcores */
 	pthread_need_tls(FALSE);
 	pthread_lib_init();					/* gives us one vcore */
-	ev_handlers[EV_VCORE_PREEMPT] = handle_preempt;
-	ev_handlers[EV_CHECK_MSGS] = handle_indir;
+	/* TODO: register tracing handlers (old style was replacing) */
+//	register_ev_handler(EV_VCORE_PREEMPT, handle_preempt, 0);
+//	register_ev_handler(EV_CHECK_MSGS, handle_indir, 0);
 	if (pargs.fake_vc_ctx) {
 		/* need to disable events when faking vc ctx.  since we're looping and
 		 * not handling events, we could run OOM */

@@ -17,6 +17,7 @@
 #include <parlib.h>
 #include <event.h>
 #include <uthread.h>
+#include <spinlock.h>
 
 /* For remote VCPD mbox event handling */
 __thread bool __vc_handle_an_mbox = FALSE;
@@ -164,9 +165,44 @@ unsigned int get_event_type(struct event_mbox *ev_mbox)
 
 /* Actual Event Handling */
 
-/* List of handlers, process-wide, that the 2LS should fill in.  They all must
- * return (don't context switch to a u_thread) */
-handle_event_t ev_handlers[MAX_NR_EVENT];
+/* List of handler lists, process-wide.  They all must return (don't context
+ * switch to a u_thread) */
+struct ev_handler *ev_handlers[MAX_NR_EVENT] = {0};
+spinpdrlock_t ev_h_wlock = SPINPDR_INITIALIZER;
+
+int register_ev_handler(unsigned int ev_type, handle_event_t handler,
+                        void *data)
+{
+	struct ev_handler *new_h = malloc(sizeof(struct ev_handler));
+	if (!new_h)
+		return -1;
+	new_h->func = handler;
+	new_h->data = data;
+	spin_pdr_lock(&ev_h_wlock);
+	new_h->next = ev_handlers[ev_type];
+	wmb();	/* make sure new_h is done before publishing to readers */
+	ev_handlers[ev_type] = new_h;
+	spin_pdr_unlock(&ev_h_wlock);
+	return 0;
+}
+
+int deregister_ev_handler(unsigned int ev_type, handle_event_t handler,
+                          void *data)
+{
+	/* TODO: User-level RCU */
+	printf("Failed to dereg handler, not supported yet!\n");
+}
+
+static void run_ev_handlers(unsigned int ev_type, struct event_msg *ev_msg)
+{
+	struct ev_handler *handler;
+	/* TODO: RCU read lock */
+	handler = ev_handlers[ev_type];
+	while (handler) {
+		handler->func(ev_msg, ev_type, handler->data);
+		handler = handler->next;
+	}
+}
 
 /* Attempts to handle a message.  Returns 1 if we dequeued a msg, 0 o/w. */
 int handle_one_mbox_msg(struct event_mbox *ev_mbox)
@@ -179,8 +215,7 @@ int handle_one_mbox_msg(struct event_mbox *ev_mbox)
 	ev_type = local_msg.ev_type;
 	assert(ev_type < MAX_NR_EVENT);
 	printd("[event] UCQ (mbox %08p), ev_type: %d\n", ev_mbox, ev_type);
-	if (ev_handlers[ev_type])
-		ev_handlers[ev_type](&local_msg, ev_type, 0);
+	run_ev_handlers(ev_type, &local_msg);
 	return 1;
 }
 
@@ -193,8 +228,7 @@ int handle_mbox(struct event_mbox *ev_mbox)
 	uint32_t vcoreid = vcore_id();
 	void bit_handler(unsigned int bit) {
 		printd("[event] Bit: ev_type: %d\n", bit);
-		if (ev_handlers[bit])
-			ev_handlers[bit](0, bit, 0);
+		run_ev_handlers(bit, 0);
 		retval = 1;
 		/* Consider checking the queue for incoming messages while we're here */
 	}
