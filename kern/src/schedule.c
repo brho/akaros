@@ -103,11 +103,11 @@ static void __just_sched(uint32_t srcid, long a0, long a1, long a2)
 	run_scheduler();
 }
 
-/* Kmsg, to run the scheduler tick (not in interrupt context) and reset the
+/* RKM alarm, to run the scheduler tick (not in interrupt context) and reset the
  * alarm.  Note that interrupts will be disabled, but this is not the same as
  * interrupt context.  We're a routine kmsg, which means the core is in a
  * quiescent state. */
-static void __ksched_tick(uint32_t srcid, long a0, long a1, long a2)
+static void __ksched_tick(struct alarm_waiter *waiter)
 {
 	/* TODO: imagine doing some accounting here */
 	run_scheduler();
@@ -118,15 +118,6 @@ static void __ksched_tick(uint32_t srcid, long a0, long a1, long a2)
 	set_alarm(&per_cpu_info[core_id()].tchain, &ksched_waiter);
 }
 
-/* Interrupt/alarm handler: tells our core to run the scheduler (out of
- * interrupt context). */
-static void __kalarm(struct alarm_waiter *waiter)
-{
-	/* Not necessary when alarms are running in RKM context (check
-	 * timer_interrupt()) */
-	send_kernel_message(core_id(), __ksched_tick, 0, 0, 0, KMSG_ROUTINE);
-}
-
 void schedule_init(void)
 {
 	spin_lock(&sched_lock);
@@ -134,7 +125,7 @@ void schedule_init(void)
 	all_pcores = kmalloc(sizeof(struct sched_pcore) * num_cpus, 0);
 	memset(all_pcores, 0, sizeof(struct sched_pcore) * num_cpus);
 	assert(!core_id());		/* want the alarm on core0 for now */
-	init_awaiter(&ksched_waiter, __kalarm);
+	init_awaiter(&ksched_waiter, __ksched_tick);
 	set_ksched_alarm();
 	/* init the idlecore list.  if they turned off hyperthreading, give them the
 	 * odds from 1..max-1.  otherwise, give them everything by 0 (default mgmt
