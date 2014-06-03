@@ -166,8 +166,7 @@ unsigned int get_event_type(struct event_mbox *ev_mbox)
 
 /* List of handlers, process-wide, that the 2LS should fill in.  They all must
  * return (don't context switch to a u_thread) */
-handle_event_t ev_handlers[MAX_NR_EVENT] = {[EV_EVENT] handle_ev_ev,
-                                            0};
+handle_event_t ev_handlers[MAX_NR_EVENT];
 
 /* Attempts to handle a message.  Returns 1 if we dequeued a msg, 0 o/w. */
 int handle_one_mbox_msg(struct event_mbox *ev_mbox)

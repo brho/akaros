@@ -73,6 +73,7 @@ void uthread_lib_init(struct uthread *uthread)
 	init_once_racy(return);
 	vcore_init();
 	uthread_manage_thread0(uthread);
+	ev_handlers[EV_EVENT] = handle_ev_ev;
 	/* Receive preemption events.  Note that this merely tells the kernel how to
 	 * send the messages, and does not necessarily provide storage space for the
 	 * messages.  What we're doing is saying that all PREEMPT and CHECK_MSGS
