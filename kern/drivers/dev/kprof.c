@@ -134,24 +134,17 @@ kproftimer(uintptr_t pc)
 
 static void setup_timers(void)
 {
-	void dummy_alarm(struct alarm_waiter *waiter)
+	void kprof_alarm(struct alarm_waiter *waiter, struct hw_trapframe *hw_tf)
 	{
 		struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
+		kproftimer(get_hwtf_pc(hw_tf));
 		set_awaiter_rel(waiter, 1000);
 		__set_alarm(tchain, waiter);
 	}
-	void kprof_irq_handler(struct hw_trapframe *hw_tf, void *data)
-	{
-		kproftimer(get_hwtf_pc(hw_tf));
-	}
 	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
 	struct alarm_waiter *waiter = kmalloc(sizeof(struct alarm_waiter), 0);
-	init_awaiter(waiter, dummy_alarm);
+	init_awaiter_irq(waiter, kprof_alarm);
 	set_awaiter_rel(waiter, 1000);
-	/* with this style, the timer IRQ goes off and runs us, but doesn't get
-	 * reprogrammed til the next alarm. TODO: irq/rkm alarms. */
-	register_irq(IdtLAPIC_TIMER, kprof_irq_handler, NULL,
-	             MKBUS(BusLAPIC, 0, 0, 0));
 	set_alarm(tchain, waiter);
 }
 
@@ -295,8 +288,10 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 			kprof.time = 1;
 		}else if(strncmp(a, "start", 5) == 0) {
 			kprof.time = 1;
+			/* this sets up the timer on the *calling* core! */
 			setup_timers();
 		} else if(strncmp(a, "stop", 4) == 0) {
+			/* TODO: stop the timers! */
 			kprof.time = 0;
 		} else if(strncmp(a, "clear", 5) == 0) {
 			kprof_clear(&kprof);
