@@ -59,11 +59,17 @@
  * stack of the thread you're about to block on. */
 struct alarm_waiter {
 	uint64_t 					wake_up_time;	/* ugh, this is a TSC for now */
-	void (*func) (struct alarm_waiter *waiter);	/* either this, or a kthread */
-	struct semaphore			sem;			/* kthread will sleep on this */
+	union {
+		void (*func) (struct alarm_waiter *waiter);
+		void (*func_irq) (struct alarm_waiter *waiter,
+		                  struct hw_trapframe *hw_tf);
+		struct semaphore			sem;		/* kthread will sleep on this */
+	};
 	void						*data;
 	TAILQ_ENTRY(alarm_waiter)	next;
 	bool						on_tchain;
+	bool						irq_ok;
+	bool						has_func;
 };
 TAILQ_HEAD(awaiters_tailq, alarm_waiter);		/* ideally not a LL */
 
@@ -86,6 +92,9 @@ void init_timer_chain(struct timer_chain *tchain,
 /* For fresh alarm waiters.  func == 0 for kthreads */
 void init_awaiter(struct alarm_waiter *waiter,
                   void (*func) (struct alarm_waiter *));
+void init_awaiter_irq(struct alarm_waiter *waiter,
+                      void (*func_irq) (struct alarm_waiter *awaiter,
+                                        struct hw_trapframe *hw_tf));
 /* Sets the time an awaiter goes off */
 void set_awaiter_abs(struct alarm_waiter *waiter, uint64_t abs_time);
 void set_awaiter_rel(struct alarm_waiter *waiter, uint64_t usleep);
@@ -98,8 +107,8 @@ void reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
                      uint64_t abs_time);
 /* Blocks on the alarm waiter */
 int sleep_on_awaiter(struct alarm_waiter *waiter);
-/* Interrupt handlers needs to RKM this.  Don't call it directly. */
-void __trigger_tchain(uint32_t srcid, long a0, long a1, long a2);
+/* Interrupt handlers need to call this.  Don't call it directly. */
+void __trigger_tchain(struct timer_chain *tchain, struct hw_trapframe *hw_tf);
 /* How to set a specific alarm: the per-cpu timer interrupt */
 void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain);
 

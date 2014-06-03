@@ -47,14 +47,31 @@ void init_timer_chain(struct timer_chain *tchain,
 
 /* Initializes a new awaiter.  Pass 0 for the function if you want it to be a
  * kthread-alarm, and sleep on it after you set the alarm later. */
+static void __init_awaiter(struct alarm_waiter *waiter)
+{
+	waiter->wake_up_time = ALARM_POISON_TIME;
+	waiter->on_tchain = FALSE;
+	if (!waiter->has_func)
+		sem_init_irqsave(&waiter->sem, 0);
+}
+
 void init_awaiter(struct alarm_waiter *waiter,
                   void (*func) (struct alarm_waiter *awaiter))
 {
-	waiter->wake_up_time = ALARM_POISON_TIME;
-	waiter->func = func;
-	if (!func)
-		sem_init_irqsave(&waiter->sem, 0);
-	waiter->on_tchain = FALSE;
+	waiter->irq_ok = FALSE;
+	waiter->has_func = func ? TRUE : FALSE;
+	waiter->func = func;			/* if !func, this is a harmless zeroing */
+	__init_awaiter(waiter);
+}
+
+void init_awaiter_irq(struct alarm_waiter *waiter,
+                      void (*func_irq) (struct alarm_waiter *awaiter,
+                                        struct hw_trapframe *hw_tf))
+{
+	waiter->irq_ok = TRUE;
+	waiter->has_func = func_irq ? TRUE : FALSE;
+	waiter->func_irq = func_irq;	/* if !func, this is a harmless zeroing */
+	__init_awaiter(waiter);
 }
 
 /* Give this the absolute time.  For now, abs_time is the TSC time that you want
@@ -104,26 +121,41 @@ static void reset_tchain_interrupt(struct timer_chain *tchain)
 	}
 }
 
+static void __run_awaiter(uint32_t srcid, long a0, long a1, long a2)
+{
+	struct alarm_waiter *waiter = (struct alarm_waiter*)a0;
+	waiter->func(waiter);
+}
+
 /* When an awaiter's time has come, this gets called.  If it was a kthread, it
  * will wake up.  o/w, it will call the func ptr stored in the awaiter. */
-static void wake_awaiter(struct alarm_waiter *waiter)
+static void wake_awaiter(struct alarm_waiter *waiter,
+                         struct hw_trapframe *hw_tf)
 {
-	if (waiter->func)
-		waiter->func(waiter);
-	else
+	if (waiter->has_func) {
+		if (waiter->irq_ok)
+			waiter->func_irq(waiter, hw_tf);
+		else
+			send_kernel_message(core_id(), __run_awaiter, (long)waiter,
+			                    0, 0, KMSG_ROUTINE);
+	} else {
 		sem_up(&waiter->sem); /* IRQs are disabled, can call sem_up directly */
+	}
 }
 
 /* This is called when an interrupt triggers a tchain, and needs to wake up
  * everyone whose time is up.  Called from IRQ context. */
-void __trigger_tchain(uint32_t srcid, long a0, long a1, long a2)
+void __trigger_tchain(struct timer_chain *tchain, struct hw_trapframe *hw_tf)
 {
-	struct timer_chain *tchain = (struct timer_chain*)a0;
 	struct alarm_waiter *i, *temp;
 	uint64_t now = read_tsc();
 	bool changed_list = FALSE;
-	assert(!irq_is_enabled());
-	spin_lock(&tchain->lock);
+	/* why do we disable irqs here?  the lock is irqsave, but we (think we) know
+	 * the timer IRQ for this tchain won't fire again.  disabling irqs is nice
+	 * for the lock debugger.  i don't want to disable the debugger completely,
+	 * and we can't make the debugger ignore irq context code either in the
+	 * general case.  it might be nice for handlers to have IRQs disabled too.*/
+	spin_lock_irqsave(&tchain->lock);
 	TAILQ_FOREACH_SAFE(i, &tchain->waiters, next, temp) {
 		printd("Trying to wake up %p who is due at %llu and now is %llu\n",
 		       i, i->wake_up_time, now);
@@ -136,7 +168,7 @@ void __trigger_tchain(uint32_t srcid, long a0, long a1, long a2)
 			/* Don't touch the waiter after waking it, since it could be in use
 			 * on another core (and the waiter can be clobbered as the kthread
 			 * unwinds its stack).  Or it could be kfreed */
-			wake_awaiter(i);
+			wake_awaiter(i, hw_tf);
 		} else {
 			break;
 		}
@@ -146,7 +178,7 @@ void __trigger_tchain(uint32_t srcid, long a0, long a1, long a2)
 	}
 	/* Need to reset the interrupt no matter what */
 	reset_tchain_interrupt(tchain);
-	spin_unlock(&tchain->lock);
+	spin_unlock_irqsave(&tchain->lock);
 }
 
 /* Helper, inserts the waiter into the tchain, returning TRUE if we still need
@@ -280,7 +312,7 @@ void reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
 int sleep_on_awaiter(struct alarm_waiter *waiter)
 {
 	int8_t irq_state = 0;
-	if (waiter->func)
+	if (waiter->has_func)
 		panic("Tried blocking on a waiter %p with a func %p!", waiter,
 		      waiter->func);
 	/* Put the kthread to sleep.  TODO: This can fail (or at least it will be
@@ -299,7 +331,7 @@ int sleep_on_awaiter(struct alarm_waiter *waiter)
  * if time is 0.   Any function like this needs to do a few things:
  * 	- Make sure the interrupt is on and will go off when we want
  * 	- Make sure the interrupt source can find tchain
- * 	- Make sure the interrupt handler sends an RKM to __trigger_tchain(tchain)
+ * 	- Make sure the interrupt handler calls __trigger_tchain(tchain)
  * 	- Make sure you don't clobber an old tchain here (a bug) 
  * This implies the function knows how to find its timer source/void
  *
