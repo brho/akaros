@@ -81,6 +81,21 @@ static void __pthread_trigger_posix_signal(pthread_t thread, int signo,
 	set_tls_desc(temp_tls_desc, vcoreid);
 }
 
+static void __pthread_trigger_pending_posix_signals(pthread_t thread)
+{
+	if (thread->sigpending) {
+		sigset_t andset = thread->sigpending & (~thread->sigmask);
+		if (!__sigisemptyset(&andset)) {
+			for (int i = 1; i < _NSIG; i++) {
+				if (__sigismember(&andset, i)) {
+					__sigdelset(&thread->sigpending, i);
+					__pthread_trigger_posix_signal(thread, i, NULL);
+				}
+			}
+		}
+	}
+}
+
 /* Called from vcore entry.  Options usually include restarting whoever was
  * running there before or running a new thread.  Events are handled out of
  * event.c (table of function pointers, stuff like that). */
@@ -88,7 +103,10 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 {
 	uint32_t vcoreid = vcore_id();
 	if (current_uthread) {
+		/* Run any pending posix signal handlers registered via pthread_kill */
+		__pthread_trigger_pending_posix_signals((pthread_t)current_uthread);
 		run_current_uthread();
+		/* Run the thread itself */
 		assert(0);
 	}
 	/* no one currently running, so lets get someone from the ready queue */
@@ -125,17 +143,7 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 	} while (1);
 	assert(new_thread->state == PTH_RUNNABLE);
 	/* Run any pending posix signal handlers registered via pthread_kill */
-	if (new_thread->sigpending) {
-		sigset_t andset = new_thread->sigpending & (~new_thread->sigmask);
-		if (!__sigisemptyset(&andset)) {
-			for (int i = 1; i < _NSIG; i++) {
-				if (__sigismember(&andset, i)) {
-					__sigdelset(&new_thread->sigpending, i);
-					__pthread_trigger_posix_signal(new_thread, i, NULL);
-				}
-			}
-		}
-	}
+	__pthread_trigger_pending_posix_signals(new_thread);
 	/* Run the thread itself */
 	run_uthread((struct uthread*)new_thread);
 	assert(0);
