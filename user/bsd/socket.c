@@ -56,6 +56,7 @@ _sock_newrock(int fd)
 		r->dev = d.st_dev;
 		r->inode = d.st_ino;
 		r->other = -1;
+		/* TODO: this is not thread-safe! */
 		r->next = _sock_rock;
 		_sock_rock = r;
 	}
@@ -68,6 +69,8 @@ _sock_newrock(int fd)
 	return r;
 }
 
+/* For a ctlfd and a few other settings, it opens and returns the corresponding
+ * datafd. */
 int
 _sock_data(int cfd, char *net, int domain, int stype, int protocol, Rock **rp)
 {

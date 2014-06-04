@@ -29,12 +29,13 @@ accept(int fd, __SOCKADDR_ARG __addr,
        socklen_t *__restrict alen)
 {
 	void *a = (void*)__addr;
-	int n, nfd, cfd;
+	int n, nfd, lcfd;
 	Rock *r, *nr;
 	struct sockaddr_in *ip;
 	char name[Ctlsize];
 	char file[8+Ctlsize+1];
 	char *p, *net;
+	char listen[Ctlsize];
 
 	r = _sock_findrock(fd, 0);
 	if(r == 0){
@@ -52,27 +53,25 @@ accept(int fd, __SOCKADDR_ARG __addr,
 			net = "tcp";
 			break;
 		}
+		/* at this point, our FD is for the data file.  we need to open the
+		 * listen file.  The line is stored in r->ctl (e.g. /net/tcp/666/ctl) */
+		strcpy(listen, r->ctl);
+		p = strrchr(listen, '/');
+		if (p == 0)
+			return -1;
+		strcpy(p + 1, "listen");
 
-		/* get control file name from listener process */
-		n = read(fd, name, sizeof(name)-1);
-		if(n <= 0){
+		lcfd = open(listen, O_RDWR);
+		if (lcfd < 0)
 			return -1;
-		}
-		name[n] = 0;
-		cfd = open(name, O_RDWR);
-		if(cfd < 0){
+		/* at this point, we have a new conversation, and lcfd is its ctl fd.
+		 * nfd will be the FD for that conv's data file. */
+		nfd = _sock_data(lcfd, net, r->domain, r->stype, r->protocol, &nr);
+		if (nfd < 0)
 			return -1;
-		}
-
-		nfd = _sock_data(cfd, net, r->domain, r->stype, r->protocol, &nr);
-		if(nfd < 0){
-			return -1;
-		}
-
-		if(write(fd, "OK", 2) < 0){
-			close(nfd);
-			return -1;
-		}
+		/* we have the data file, and can reopen the ctl based on the info in
+		 * the rock (nr) */
+		close(lcfd);
 
 		/* get remote address */
 		ip = (struct sockaddr_in*)&nr->raddr;

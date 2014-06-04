@@ -25,50 +25,6 @@
 
 #include "priv.h"
 
-/*
- * replace the fd with a pipe and start a process to
- * accept calls in.  this is all to make select work.
- * NO LONGER A PROC ON AKAROS.
- */
-static int
-listenproc(Rock *r, int fd)
-{
-	Rock *nr;
-	char *net;
-	int cfd, nfd, dfd;
-	struct stat d;
-	char *p;
-	char listen[Ctlsize];
-	char name[Ctlsize];
-
-	switch(r->stype){
-	case SOCK_DGRAM:
-		net = "udp";
-		break;
-	case SOCK_STREAM:
-		net = "tcp";
-		break;
-	}
-
-	strcpy(listen, r->ctl);
-	p = strrchr(listen, '/');
-	if(p == 0)
-		return -1;
-	strcpy(p+1, "listen");
-
-	/* start listening process */
-		cfd = open(listen, O_RDWR);
-		if(cfd < 0)
-			return -1;
-
-		dfd = _sock_data(cfd, net, r->domain, r->stype, r->protocol, &nr);
-		if(dfd < 0)
-			return -1;
-
-		return fd;
-
-}
-
 int
 listen(fd, backlog)
 	int fd;
@@ -113,7 +69,8 @@ listen(fd, backlog)
 		}
 		close(cfd);
 
-		return fd;
+		return 0;
+
 	case PF_UNIX:
 		if(r->other < 0){
 			errno = EINVAL;//EGREG;
