@@ -200,6 +200,7 @@ void udpkick(void *x, struct block *bp)
 	struct conv *rc;
 
 	upriv = c->p->priv;
+	assert(upriv);
 	f = c->p->f;
 
 	netlog(c->p->f, Logudp, "udp: kick\n");

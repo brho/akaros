@@ -46,6 +46,12 @@ int connect (int fd, __CONST_SOCKADDR_ARG a, socklen_t alen)
 
 	switch(r->domain){
 	case PF_INET:
+		/* UDP sockets are already announced (during bind), so we can't issue
+		 * a connect message.  Either connect or announce, not both.  All sends
+		 * will later do a sendto, based off the contents of r->raddr, so we're
+		 * already done here */
+		if (r->stype == SOCK_DGRAM)
+			return 0;
 		/* set up a tcp or udp connection */
 		cfd = open(r->ctl, O_RDWR);
 		if(cfd < 0){

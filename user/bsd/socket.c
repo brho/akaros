@@ -124,6 +124,7 @@ socket(int domain, int stype, int protocol)
 	int cfd, fd, n;
 	int pfd[2];
 	char *net;
+	char msg[128];
 
 	switch(domain){
 	case PF_INET:
@@ -132,6 +133,16 @@ socket(int domain, int stype, int protocol)
 		case SOCK_DGRAM:
 			net = "udp";
 			cfd = open("/net/udp/clone", O_RDWR);
+			/* All BSD UDP sockets are in 'headers' mode, where each packet has
+			 * the remote addr:port, local addr:port and other info. */
+			if (!(cfd < 0)) {
+				n = snprintf(msg, sizeof(msg), "headers");
+				n = write(cfd, msg, n);
+				if (n < 0) {
+					perror("UDP socket headers failed");
+					return -1;
+				}
+			}
 			break;
 		case SOCK_STREAM:
 			net = "tcp";

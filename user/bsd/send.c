@@ -21,19 +21,11 @@
 
 ssize_t send (int fd, __const void *a, size_t n, int flags)
 {
-	if(flags & MSG_OOB){
-		errno = EOPNOTSUPP;
-		return -1;
-	}
-	return write(fd, a, n);
+	return sendto(fd, a, n, flags, 0, 0);
 }
 
-ssize_t
-recv(int fd, void *a, size_t n, int flags)
+ssize_t recv(int fd, void *a, size_t n, int flags)
 {
-	if(flags & MSG_OOB){
-		errno = EOPNOTSUPP;
-		return -1;
-	}
-	return read(fd, a, n);
+	socklen_t dummy;
+	return recvfrom(fd, a, n, flags, 0, &dummy);
 }
