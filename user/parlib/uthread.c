@@ -403,7 +403,12 @@ void __ros_mcp_syscall_blockon(struct syscall *sysc)
 {
 	/* even if we are in 'vcore context', an _S can block */
 	if (!in_multi_mode()) {
+		/* the SCP could have an alarm set to abort this sysc.  When we have a
+		 * uth blocked on a sysc, we want this pointer set up (like we do below
+		 * for MCP)s */
+		current_uthread->sysc = sysc;
 		__ros_scp_syscall_blockon(sysc);
+		current_uthread->sysc = 0;
 		return;
 	}
 	/* MCP vcore's don't know what to do yet, so we have to spin */
