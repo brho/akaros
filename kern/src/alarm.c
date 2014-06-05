@@ -19,6 +19,7 @@
 #include <alarm.h>
 #include <stdio.h>
 #include <smp.h>
+#include <kmalloc.h>
 
 /* Helper, resets the earliest/latest times, based on the elements of the list.
  * If the list is empty, we set the times to be the 12345 poison time.  Since
@@ -386,6 +387,18 @@ void print_chain(struct timer_chain *tchain)
 	       tchain->earliest_time,
 	       tchain->latest_time);
 	TAILQ_FOREACH(i, &tchain->waiters, next) {
+		if (i->has_func) {
+			uintptr_t f;
+			if (i->irq_ok)
+				f = (uintptr_t)i->func_irq;
+			else
+				f = (uintptr_t)i->func;
+			char *f_name = get_fn_name(f);
+			printk("\tWaiter %p, time %llu, func %p (%s)\n", i,
+			       i->wake_up_time, f, f_name);
+			kfree(f_name);
+			continue;
+		}
 		struct kthread *kthread = TAILQ_FIRST(&i->sem.waiters);
 		printk("\tWaiter %p, time: %llu, kthread: %p (%p) %s\n", i,
 		       i->wake_up_time, kthread, (kthread ? kthread->proc : 0),
