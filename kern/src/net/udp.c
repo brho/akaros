@@ -158,7 +158,7 @@ static char *udpannounce(struct conv *c, char **argv, int argc)
 
 static void udpcreate(struct conv *c)
 {
-	c->rq = qopen(64 * 1024, Qmsg, 0, 0);
+	c->rq = qopen(128 * 1024, Qmsg, 0, 0);
 	c->wq = qbypass(udpkick, c);
 }
 
