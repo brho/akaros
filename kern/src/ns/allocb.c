@@ -34,7 +34,7 @@ struct block *_allocb(int size)
 	int n;
 
 	/* TODO: verify we end up with properly aligned blocks */
-	b = kzmalloc(sizeof(struct block) + size + Hdrspc + (BLOCKALIGN - 1),
+	b = kmalloc(sizeof(struct block) + size + Hdrspc + (BLOCKALIGN - 1),
 				 KMALLOC_WAIT);
 	if (b == NULL)
 		return NULL;
