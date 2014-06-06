@@ -384,14 +384,15 @@ void udpiput(struct Proto *udp, struct Ipifc *ifc, struct block *bp)
 			lport = nhgets(uh4->udpdport);
 			rport = nhgets(uh4->udpsport);
 
-			if (nhgets(uh4->udpcksum)) {
-				if (ptclcsum(bp, UDP4_PHDR_OFF, len + UDP4_PHDR_SZ)) {
-					upriv->ustats.udpInErrors++;
-					netlog(f, Logudp, "udp: checksum error %I\n", raddr);
-					printd("udp: checksum error %I\n", raddr);
-					freeblist(bp);
-					return;
-				}
+			if (!(bp->flag & Budpck) &&
+			    (uh4->udpcksum[0] || uh4->udpcksum[1]) &&
+			    ptclcsum(bp, UDP4_PHDR_OFF, len + UDP4_PHDR_SZ)) {
+				upriv->ustats.udpInErrors++;
+				netlog(f, Logudp, "udp: checksum error %I\n",
+				       raddr);
+				printd("udp: checksum error %I\n", raddr);
+				freeblist(bp);
+				return;
 			}
 			uh4->Unused = ottl;
 			hnputs(uh4->udpplen, olen);
