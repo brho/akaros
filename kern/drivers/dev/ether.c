@@ -636,7 +636,7 @@ int parseether(uint8_t * to, char *from)
 static void etherreset(void)
 {
 	struct ether *ether;
-	int i, n, ctlrno;
+	int i, n, ctlrno, qsize;
 	char name[KNAMELEN], buf[128];
 
 	for (ether = 0, ctlrno = 0; ctlrno < MaxEther; ctlrno++) {
@@ -701,15 +701,23 @@ static void etherreset(void)
 			snprintf(buf + i, sizeof(buf) - i, "\n");
 			printk(buf);
 
-			if (ether->netif.mbps == 100) {
-				netifinit(&ether->netif, name, Ntypes, 256 * 1024);
-				if (ether->oq == 0)
-					ether->oq = qopen(256 * 1024, Qmsg, 0, 0);
-			} else {
-				netifinit(&ether->netif, name, Ntypes, 64 * 1024);
-				if (ether->oq == 0)
-					ether->oq = qopen(64 * 1024, Qmsg, 0, 0);
+			switch (ether->netif.mbps) {
+
+			case 1 ... 99:
+				qsize = 64 * 1024;
+				break;
+			case 100 ... 999:
+				qsize = 256 * 1024;
+				break;
+			case 1000 ... 9999:
+				qsize = 1024 * 1024;
+				break;
+			default:
+				qsize = 8 * 1024 * 1024;
 			}
+			netifinit(&ether->netif, name, Ntypes, qsize);
+			if (ether->oq == 0)
+				ether->oq = qopen(qsize, Qmsg, 0, 0);
 			if (ether->oq == 0)
 				panic("etherreset %s", name);
 			ether->netif.alen = Eaddrlen;
