@@ -322,6 +322,8 @@ void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
 	if (!(err & PF_VMR_BACKED)) {
 		if (!__sigismember(&pthread->sigmask, SIGSEGV)) {
 			struct siginfo info = {0};
+			info.si_signo = SIGSEGV;
+			info.si_errno = trap_nr;
 			info.si_code = SEGV_MAPERR;
 			info.si_addr = (void*)aux;
 			__pthread_trigger_posix_signal(pthread, SIGSEGV, &info);
