@@ -313,8 +313,8 @@ void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
 	TAILQ_REMOVE(&active_queue, pthread, next);
 	mcs_pdr_unlock(&queue_lock);
 
-	if (trap_nr != 14) {
-		printf("Pthread has unhandled fault\n");
+	if (trap_nr != 14 && trap_nr != 13) {
+		printf("Pthread has unhandled fault: %d\n", trap_nr);
 		print_user_context(&uthread->u_ctx);
 		exit(-1);
 	}
