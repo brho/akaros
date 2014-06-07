@@ -82,6 +82,9 @@ ssize_t dev_stdin_read(struct file *file, char *buf, size_t count,
 {
 	char c;
 	extern struct kb_buffer cons_buf;
+
+	if (!count)
+		return 0;
 	kb_get_from_buf(&cons_buf, &c, 1);
 	/* TODO UMEM */
 	if (current)
