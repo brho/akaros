@@ -13,20 +13,6 @@
 #include <smp.h>
 #include <ip.h>
 
-#include <vfs.h>
-#include <kfs.h>
-#include <slab.h>
-#include <kmalloc.h>
-#include <kref.h>
-#include <string.h>
-#include <stdio.h>
-#include <assert.h>
-#include <error.h>
-#include <cpio.h>
-#include <pmap.h>
-#include <smp.h>
-#include <ip.h>
-
 typedef struct Ip4hdr Ip4hdr;
 typedef struct IP IP;
 typedef struct Fragment4 Fragment4;
