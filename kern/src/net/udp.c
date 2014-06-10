@@ -632,10 +632,10 @@ int udpstats(struct Proto *udp, char *buf, int len)
 	upriv = udp->priv;
 	p = buf;
 	e = p + len;
-	p = seprintf(p, e, "InDatagrams: %lu\n", upriv->ustats.udpInDatagrams);
-	p = seprintf(p, e, "NoPorts: %lu\n", upriv->ustats.udpNoPorts);
-	p = seprintf(p, e, "InErrors: %lu\n", upriv->ustats.udpInErrors);
-	p = seprintf(p, e, "OutDatagrams: %lu\n", upriv->ustats.udpOutDatagrams);
+	p = seprintf(p, e, "InDatagrams: %u\n", upriv->ustats.udpInDatagrams);
+	p = seprintf(p, e, "NoPorts: %u\n", upriv->ustats.udpNoPorts);
+	p = seprintf(p, e, "InErrors: %u\n", upriv->ustats.udpInErrors);
+	p = seprintf(p, e, "OutDatagrams: %u\n", upriv->ustats.udpOutDatagrams);
 	return p - buf;
 }
 

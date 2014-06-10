@@ -3054,7 +3054,7 @@ int tcpstats(struct Proto *tcp, char *buf, int len)
 	p = buf;
 	e = p + len;
 	for (i = 0; i < Nstats; i++)
-		p = seprintf(p, e, "%s: %lu\n", statnames[i], priv->stats[i]);
+		p = seprintf(p, e, "%s: %u\n", statnames[i], priv->stats[i]);
 	return p - buf;
 }
 
