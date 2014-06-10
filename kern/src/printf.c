@@ -50,6 +50,7 @@ int vcprintf(const char *fmt, va_list ap)
 	int cnt = 0;
 	int *cntp = &cnt;
 	volatile int i;
+	int8_t irq_state = 0;
 
 	/* this ktrap depth stuff is in case the kernel faults in a printfmt call.
 	 * we disable the locking if we're in a fault handler so that we don't
@@ -63,7 +64,6 @@ int vcprintf(const char *fmt, va_list ap)
 	 * results as we print. */
 	if (!ktrap_depth(pcpui)) {
 		#ifdef CONFIG_TRACE_LOCKS
-		int8_t irq_state = 0;
 		disable_irqsave(&irq_state);
 		__spin_lock(&output_lock);
 		#else
