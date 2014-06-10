@@ -28,7 +28,7 @@ bool test_alarm(void) {
 	then = tsc2usec(read_tsc());
 	unset_alarm(&waiter);
 	UT_ASSERT_M("Alarms finished too soon", then > (now + INTERVAL*count));
-	UT_ASSERT_M("Alarms finished too late", then < (now + INTERVAL*(count+1)));
+	UT_ASSERT_M("Alarms finished too late", then < (now + 2*INTERVAL*count));
 	return true;
 }
 

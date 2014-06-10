@@ -8,7 +8,7 @@ TEST_SUITE("PVCALARMS");
 /* <--- Begin definition of test cases ---> */
 bool test_pvcalarms(void) {
 	const int INTERVAL = 10000;
-	const int ITERATIONS = 100;
+	const int ITERS = 100;
 	int count[max_vcores()];
 	void pvcalarm_callback()
 	{
@@ -25,13 +25,13 @@ bool test_pvcalarms(void) {
 	now = tsc2usec(read_tsc());
 	enable_pvcalarms(PVCALARM_PROF, INTERVAL, pvcalarm_callback);
 	for (int i=0; i<max_vcores(); i++)
-		while(count[i] < ITERATIONS)
+		while(count[i] < ITERS)
 			cpu_relax();
-	then = tsc2usec(read_tsc());
 	disable_pvcalarms();
+	then = tsc2usec(read_tsc());
 
-	UT_ASSERT_M("Alarms finished too soon", then > (now + INTERVAL*count[0]));
-	UT_ASSERT_M("Alarms finished too late", then < (now + 2*INTERVAL*count[0]));
+	UT_ASSERT_M("Alarms finished too soon", then > (now + INTERVAL*ITERS));
+	UT_ASSERT_M("Alarms finished too late", then < (now + 2*INTERVAL*ITERS));
 	return true;
 }
 
