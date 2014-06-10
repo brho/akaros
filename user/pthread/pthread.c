@@ -75,11 +75,13 @@ static void __pthread_trigger_posix_signal(pthread_t thread, int signo,
 {
 	int vcoreid = vcore_id();
 	struct user_context *ctx;
-	if (current_uthread) {
-		struct preempt_data *vcpd = vcpd_of(vcoreid);
-        ctx = &vcpd->uthread_ctx;
-	} else {
+
+	if (((struct uthread*)thread)->flags & UTHREAD_SAVED) {
 		ctx = &thread->uthread.u_ctx;
+	} else {
+		struct preempt_data *vcpd = vcpd_of(vcoreid);
+		assert(current_uthread == thread);
+		ctx = &vcpd->uthread_ctx;
 	}
 
 	void *temp_tls_desc = get_tls_desc(vcoreid);
