@@ -1917,8 +1917,12 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 			}
 		}
 	}
-	if (sc_num > max_syscall || syscall_table[sc_num].call == NULL)
-		panic("Invalid syscall number %d for proc %x!", sc_num, p);
+	if (sc_num > max_syscall || syscall_table[sc_num].call == NULL) {
+		printk("[kernel] Invalid syscall %d for proc %d\n", sc_num, p->pid);
+		printk("\tArgs: %p, %p, %p, %p, %p, %p\n", a0, a1, a2, a3, a4, a5);
+		print_user_ctx(per_cpu_info[core_id()].cur_ctx);
+		return -1;
+	}
 
 	/* N.B. This is going away. */
 	if (waserror()){
@@ -2150,8 +2154,8 @@ bool syscall_uses_fd(struct syscall *sysc, int fd)
 void print_sysc(struct proc *p, struct syscall *sysc)
 {
 	struct proc *old_p = switch_to(p);
-	printk("SYS_%d, flags %p, a0 0x%x, a1 0x%0x, a2 0x%0x, a3 0x%0x, "
-	       "a4 0x%0x, a5 0x%0x\n", sysc->num, atomic_read(&sysc->flags),
+	printk("SYS_%d, flags %p, a0 %p, a1 %p, a2 %p, a3 %p, a4 %p, a5 %p\n",
+	       sysc->num, atomic_read(&sysc->flags),
 	       sysc->arg0, sysc->arg1, sysc->arg2, sysc->arg3, sysc->arg4,
 	       sysc->arg5);
 	switch_back(p, old_p);
