@@ -627,12 +627,16 @@ void udpadvise(struct Proto *udp, struct block *bp, char *msg)
 int udpstats(struct Proto *udp, char *buf, int len)
 {
 	Udppriv *upriv;
+	char *p, *e;
 
 	upriv = udp->priv;
-	return snprintf(buf, len,
-					"InDatagrams: %lu\nNoPorts: %lu\nInErrors: %lu\nOutDatagrams: %lu\n",
-					upriv->ustats.udpInDatagrams, upriv->ustats.udpNoPorts,
-					upriv->ustats.udpInErrors, upriv->ustats.udpOutDatagrams);
+	p = buf;
+	e = p + len;
+	p = seprintf(p, e, "InDatagrams: %lu\n", upriv->ustats.udpInDatagrams);
+	p = seprintf(p, e, "NoPorts: %lu\n", upriv->ustats.udpNoPorts);
+	p = seprintf(p, e, "InErrors: %lu\n", upriv->ustats.udpInErrors);
+	p = seprintf(p, e, "OutDatagrams: %lu\n", upriv->ustats.udpOutDatagrams);
+	return p - buf;
 }
 
 void udpnewconv(struct Proto *udp, struct conv *conv)
