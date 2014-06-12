@@ -24,15 +24,6 @@ config NOFASTCALL_FSBASE
 		setting FS base from userspace, you can say y to disable the fastcall
 		for a slight improvement for all syscalls.  If unsure, say n.
 
-config FAST_COREID
-	bool "Fast core_id() via rdtscp"
-	default n
-	help
-		Uses rdtscp for a faster core_id() call.  Requires a relatively recent
-		microarchitecture (Nehalem).  Also, in my experience, qemu's support
-		for rdtscp on some machines is a little lacking, so don't be surprised
-		if it doesn't work when virtualized.  Say n if you are unsure.
-
 endmenu
 
 menu "x86 Hacks"

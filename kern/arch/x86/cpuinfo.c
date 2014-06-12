@@ -154,11 +154,6 @@ void print_cpuinfo(void)
 		write_msr(MSR_TSC_AUX, 0);
 	} else {
 		printk("RDTSCP not supported, but emulated for userspace\n");
-		#ifdef CONFIG_FAST_COREID
-		printk("\nCONFIG_FAST_COREID selected, but RDTSCP not available!\n");
-		printk("\nRebuild your kernel without CONFIG_FAST_COREID\n\n");
-		panic("Cannot boot\n");
-		#endif
 	}
 	/* Regardless, make sure userspace can access rdtsc (and rdtscp) */
 	lcr4(rcr4() & ~CR4_TSD);

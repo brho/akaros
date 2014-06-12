@@ -37,14 +37,19 @@ static inline int node_id(void)
 	return 0;
 }
 
-#ifdef CONFIG_FAST_COREID
+#ifdef CONFIG_X86_64
 static inline int core_id(void)
 {
-	int ret;
-	asm volatile ("rdtscp" : "=c"(ret) : : "eax", "edx");
-	return ret;
+	int coreid;
+	/* assuming we're right after stacktop.  gs base is the pcpui struct, but we
+	 * don't have access to the pcpui struct or to the extern per_cpu_info here,
+	 * due to include loops. */
+	asm volatile ("movl %%gs:8, %0" : "=r"(coreid));
+	return coreid;
 }
 #else
+/* 32 bit code just uses the old crap.  could use rdtscp, but not worth the
+ * hassle. */
 /* core_id() returns the OS core number, not to be confused with the
  * hardware-specific core identifier (such as the lapic id) returned by
  * hw_core_id() */
@@ -52,7 +57,7 @@ static inline int core_id(void)
 {
 	return get_os_coreid(hw_core_id());
 }
-#endif /* CONFIG_FAST_COREID */
+#endif /* CONFIG_X86_64 */
 
 static inline int core_id_early(void)
 {

@@ -28,7 +28,8 @@ typedef sharC_env_t;
 
 struct per_cpu_info {
 #ifdef CONFIG_X86_64
-	uintptr_t stacktop;
+	uintptr_t stacktop;			/* must be first */
+	int coreid;					/* must be second */
 	/* virtual machines */
 	/* this is all kind of gross, but so it goes. Kmalloc
 	 * the vmxarea. It varies in size depending on the architecture.

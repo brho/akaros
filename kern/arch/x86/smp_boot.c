@@ -60,6 +60,22 @@ static void init_smp_call_function(void)
 
 /******************************************************************************/
 
+static void setup_rdtscp(int coreid)
+{
+	uint32_t edx;
+	int rdtscp_ecx;
+	/* TODO: have some sort of 'cpu info structure' with flags */
+	cpuid(0x80000001, 0x0, 0, 0, 0, &edx);
+	if (edx & (1 << 27)) {
+		write_msr(MSR_TSC_AUX, coreid);
+		/* Busted versions of qemu bug out here (32 bit) */
+		asm volatile ("rdtscp" : "=c"(rdtscp_ecx) : : "eax", "edx");
+		if (!coreid && (read_msr(MSR_TSC_AUX) != rdtscp_ecx))
+			printk("\nBroken rdtscp detected, don't trust it for pcoreid!\n\n");
+	}
+}
+
+/* TODO: consider merging __arch_pcpu with parts of this (sync with RISCV) */
 void smp_final_core_init(void)
 {
 	/* It is possible that the non-0 cores will wake up before the broadcast
@@ -70,23 +86,15 @@ void smp_final_core_init(void)
 		wait = FALSE;
 	while (wait)
 		cpu_relax();
-#ifdef CONFIG_FAST_COREID
-	/* Need to bootstrap the rdtscp MSR with our OS coreid */
+#ifdef CONFIG_X86_64
 	int coreid = get_os_coreid(hw_core_id());
-	write_msr(MSR_TSC_AUX, coreid);
-
-	/* Busted versions of qemu bug out here (32 bit) */
-	int rdtscp_ecx;
-	asm volatile ("rdtscp" : "=c"(rdtscp_ecx) : : "eax", "edx");
-	if (read_msr(MSR_TSC_AUX) != rdtscp_ecx) {
-		printk("Broken rdtscp detected!  Rebuild without CONFIG_FAST_COREID\n");
-		if (coreid)
-			while(1);
-		/* note this panic may think it is not core 0, and core 0 might not have
-		 * an issue (seems random) */
-		panic("");
-	}
+	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
+	pcpui->coreid = coreid;
+	write_msr(MSR_GS_BASE, (uint64_t)pcpui);
+	write_msr(MSR_KERN_GS_BASE, (uint64_t)pcpui);
 #endif
+	/* don't need this for the kernel anymore, but userspace can still use it */
+	setup_rdtscp(coreid);
 	setup_default_mtrrs(&generic_barrier);
 	smp_percpu_init();
 	waiton_barrier(&generic_barrier);
@@ -329,14 +337,8 @@ void __arch_pcpu_init(uint32_t coreid)
 		                          sizeof(taskstate_t) + sizeof(pseudodesc_t));
 	}
 #ifdef CONFIG_X86_64
-	/* Core 0 set up the base MSRs in entry64 */
-	if (!coreid) {
-		assert(read_msr(MSR_GS_BASE) == (uint64_t)pcpui);
-		assert(read_msr(MSR_KERN_GS_BASE) == (uint64_t)pcpui);
-	} else {
-		write_msr(MSR_GS_BASE, (uint64_t)pcpui);
-		write_msr(MSR_KERN_GS_BASE, (uint64_t)pcpui);
-	}
+	assert(read_msr(MSR_GS_BASE) == (uint64_t)pcpui);
+	assert(read_msr(MSR_KERN_GS_BASE) == (uint64_t)pcpui);
 #endif
 	/* Don't try setting up til after setting GS */
 	x86_sysenter_init(x86_get_stacktop_tss(pcpui->tss));
