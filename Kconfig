@@ -141,6 +141,18 @@ config RESET_STACKS
 		the top of the stack, abandoning its context.  This is useful so we do
 		not run off the end of our stacks, but makes backtracing difficult.
 
+config LARGE_KSTACKS
+	bool "Large (two-page) Kernel Stacks"
+	default y
+	help
+		Ideally, we'd like to use single-page stacks, which are easier on the
+		memory allocator.  Some of the Plan 9 code hogs stack space, and we may
+		run off the end of a single-page stack.
+
+		Say 'y' to play it safe and use the larger, slower stacks.  Say 'n' for
+		higher performance, and mention this setting if you have any weird
+		crashes or panics.
+
 config KTHREAD_POISON
 	bool "Kthread Poison Canary"
 	default n

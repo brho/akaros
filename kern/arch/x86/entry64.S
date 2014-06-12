@@ -5,7 +5,7 @@
 #include <arch/mmu.h>
 #include <arch/trap.h>
 #include <arch/x86.h>
-#include <ros/memlayout.h>
+#include <kstack.h>
 
 #define MULTIBOOT_PAGE_ALIGN  (1<<0)
 #define MULTIBOOT_MEMORY_INFO (1<<1)

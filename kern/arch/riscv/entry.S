@@ -1,6 +1,6 @@
 #include <arch/pcr.h>
 #include <arch/trap.h>
-#include <ros/memlayout.h>
+#include <kstack.h>
 
 #ifdef __riscv64
 # define STORE    sd

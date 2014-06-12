@@ -4,7 +4,7 @@
 
 #include <arch/mmu.h>
 #include <arch/trap.h>
-#include <ros/memlayout.h>
+#include <kstack.h>
 
 .set CODE_SEL,0x8		# index of code seg within mygdt
 .set DATA_SEL,0x10		# index of data seg within mygdt

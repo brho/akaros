@@ -11,6 +11,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <schedule.h>
+#include <kstack.h>
 
 uintptr_t get_kstack(void)
 {
