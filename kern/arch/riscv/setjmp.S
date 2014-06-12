@@ -1,4 +1,4 @@
-# Kernel implementations for setjmp/longjmp.
+# Kernel implementations for slim setjmp/longjmp.
 # TODO: Implement for riscv
 #
 # int setjmp(struct jmpbuf *env);
@@ -6,12 +6,12 @@
 
 .text
 .align 4
-.globl setjmp
-.type setjmp, @function
-setjmp:
+.globl slim_setjmp
+.type slim_setjmp, @function
+slim_setjmp:
 	ret
 	
-.size setjmp,.-setjmp
+.size slim_setjmp,.-slim_setjmp
 
 .text
 .align 4

@@ -10,7 +10,6 @@ struct errbuf {
 	struct jmpbuf jmpbuf;
 };
 
-/* add 1 in case they forget they need an entry for the passed-in errbuf */
 #define ERRSTACK(x) struct errbuf *prev_errbuf; struct errbuf errstack[(x)];   \
                     int curindex = 0;
 #define waserror() (errpush(errstack, ARRAY_SIZE(errstack), &curindex,         \

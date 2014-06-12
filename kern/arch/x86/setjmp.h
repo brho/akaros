@@ -9,22 +9,26 @@
 struct jmpbuf {
 	uintptr_t retaddr; // return address
 	uintreg_t rsp;     // post-return rsp
-	uintreg_t rbx;     // callee saved registers
 	uintreg_t rbp;
-	uintreg_t r12;
-	uintreg_t r13;
-	uintreg_t r14;
-	uintreg_t r15;
 };
+
+static inline void __ros_clobber_callee_regs(void)
+{
+	asm volatile ("" : : : "rbx", "r12", "r13", "r14", "r15");
+}
+
 #else
+
 struct jmpbuf {
 	uintptr_t retaddr; // return address
  	uintreg_t esp;     // post-return esp
- 	uintreg_t ebx;     // callee saved registers
 	uintreg_t ebp;
-	uintreg_t esi;
-	uintreg_t edi;
 };
+
+static inline __ros_clobber_callee_regs(void)
+{
+	asm volatile ("" : : : "ebx", "esi", "edi");
+}
 #endif
 
 #endif /* !ROS_ARCH_SETJMP_H */

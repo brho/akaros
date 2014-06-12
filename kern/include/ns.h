@@ -923,12 +923,6 @@ extern char Enofd[];			/* no free file descriptors */
 extern char Enoctl[];			/* unknown control request */
 extern char Eprocdied[];		/* process died */
 
-/* kern/src/err.c */
-int errpush(struct errbuf *errstack, int stacksize, int *curindex,
-			struct errbuf **prev_errbuf);
-void errpop(struct errbuf *errstack, int stacksize, int *curindex,
-			struct errbuf *prev_errbuf);
-/* */
 char *get_cur_genbuf(void);
 
 /* hack for now. */
