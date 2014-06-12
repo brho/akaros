@@ -444,7 +444,7 @@ int kfs_rmdir(struct inode *dir, struct dentry *dentry)
 	if (!empty)
 		return -ENOTEMPTY;
 	kref_put(&dentry->d_kref);				/* unpin the dentry, KFS-style */
-	printk("DENTRY %s REFCNT %d\n", dentry->d_name.name, kref_refcnt(&dentry->d_kref));
+	printd("DENTRY %s REFCNT %d\n", dentry->d_name.name, kref_refcnt(&dentry->d_kref));
 	return 0;
 }
 

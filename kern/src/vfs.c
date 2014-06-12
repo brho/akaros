@@ -715,7 +715,7 @@ void dentry_release(struct kref *kref)
 void __dentry_free(struct dentry *dentry)
 {
 	if (dentry->d_inode)
-		printk("Freeing dentry %p: %s\n", dentry, dentry->d_name.name);
+		printd("Freeing dentry %p: %s\n", dentry, dentry->d_name.name);
 	assert(dentry->d_op);	/* catch bugs.  a while back, some lacked d_op */
 	dentry->d_op->d_release(dentry);
 	/* TODO: check/test the boundaries on this. */
