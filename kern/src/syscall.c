@@ -1142,6 +1142,8 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 		if (fd < 0)
 			warn("File insertion failed");
 	} else {
+		if (get_errno() == EEXIST)
+			return -1;
 		unset_errno();	/* Go can't handle extra errnos */
 		fd = sysopen(t_path, oflag);
 		/* successful lookup with CREATE and EXCL is an error */
