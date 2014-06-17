@@ -24,6 +24,9 @@
 #include <ndb.h>
 #include <fcntl.h>
 
+#include <sys/types.h>
+#include <sys/wait.h>
+
 int verbose;
 
 void
@@ -122,6 +125,9 @@ main(int argc, char **argv)
 			fprintf(stderr, "exec: %r\n");
 			exit(1);
 		default:
+			/* reap any available children */
+			while (waitpid(-1, 0, WNOHANG) > 0)
+				;
 			close(nctl);
 			break;
 		}
