@@ -70,22 +70,23 @@ static void __pthread_free_stack(struct pthread_tcb *pt);
 static int __pthread_allocate_stack(struct pthread_tcb *pt);
 
 /* Trigger a posix signal on a pthread from vcore context */
-static void __pthread_trigger_posix_signal(pthread_t thread, int signo,
+static void __pthread_trigger_posix_signal(pthread_t pthread, int signo,
                                            struct siginfo *info)
 {
 	int vcoreid = vcore_id();
 	struct user_context *ctx;
+	struct uthread *uthread = (struct uthread*)pthread;
 
-	if (((struct uthread*)thread)->flags & UTHREAD_SAVED) {
-		ctx = &thread->uthread.u_ctx;
+	if (uthread->flags & UTHREAD_SAVED) {
+		ctx = &uthread->u_ctx;
 	} else {
 		struct preempt_data *vcpd = vcpd_of(vcoreid);
-		assert(current_uthread == thread);
+		assert(current_uthread == uthread);
 		ctx = &vcpd->uthread_ctx;
 	}
 
 	void *temp_tls_desc = get_tls_desc(vcoreid);
-	set_tls_desc(thread->uthread.tls_desc, vcoreid);
+	set_tls_desc(uthread->tls_desc, vcoreid);
 	trigger_posix_signal(signo, info, ctx);
 	set_tls_desc(temp_tls_desc, vcoreid);
 }
