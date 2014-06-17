@@ -59,6 +59,8 @@ static inline int core_id(void)
 }
 #endif /* CONFIG_X86_64 */
 
+/* Tracks whether it is safe to execute core_id() or not. */
+extern bool core_id_ready;
 static inline int core_id_early(void)
 {
 	if (!core_id_ready)

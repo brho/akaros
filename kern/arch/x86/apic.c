@@ -20,8 +20,6 @@
 #include <bitmask.h>
 #include <arch/coreid.h>
 
-bool core_id_ready = FALSE;
-
 bool lapic_check_spurious(int trap_nr)
 {
 #ifndef CONFIG_ENABLE_MPTABLES

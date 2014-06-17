@@ -282,7 +282,8 @@ void sem_down(struct semaphore *sem)
 
 	assert(can_block(pcpui));
 	/* Make sure we aren't holding any locks (only works if SPINLOCK_DEBUG) */
-	assert(!pcpui->lock_depth);
+	if (pcpui->lock_depth)
+		panic("Kthread tried to sleep, with lockdepth %d\n", pcpui->lock_depth);
 	assert(pcpui->cur_kthread);
 	/* Try to down the semaphore.  If there is a signal there, we can skip all
 	 * of the sleep prep and just return. */

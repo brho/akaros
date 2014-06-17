@@ -452,11 +452,6 @@ void vm_init(void)
 	gdt_pd = (pseudodesc_t) {sizeof(segdesc_t) * SEG_COUNT - 1,
 	                         (uintptr_t)gdt};
 	asm volatile("lgdt %0" : : "m"(gdt_pd));
-	/* LAPIC is mapped, if we're using that.  if we're using rdtscp or some
-	 * other non-LAPIC method, we can (probably) start using it right away.  we
-	 * may get 0 back on other cores, if smp_boot hasn't completed, though
-	 * that's no different than before this is TRUE. */
-	core_id_ready = TRUE;
 }
 
 void x86_cleanup_bootmem(void)

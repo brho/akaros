@@ -60,6 +60,8 @@ static void init_smp_call_function(void)
 
 /******************************************************************************/
 
+bool core_id_ready = FALSE;
+
 static void setup_rdtscp(int coreid)
 {
 	uint32_t edx;
@@ -80,13 +82,16 @@ void smp_final_core_init(void)
 {
 	/* It is possible that the non-0 cores will wake up before the broadcast
 	 * ipi.  this can be due to spurious IRQs or some such.  anyone other than
-	 * core 0 that comes in here will wait til core 0 has set everything up */
+	 * core 0 that comes in here will wait til core 0 has set everything up.
+	 * those other cores might have come up before core 0 remapped the coreids,
+	 * so we can only look at the HW coreid, which is only 0 for core 0. */
 	static bool wait = TRUE;
-	if (get_os_coreid(hw_core_id()) == 0)
+	if (hw_core_id() == 0)
 		wait = FALSE;
 	while (wait)
 		cpu_relax();
 #ifdef CONFIG_X86_64
+	/* at this point, it is safe to get the OS coreid */
 	int coreid = get_os_coreid(hw_core_id());
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	pcpui->coreid = coreid;
@@ -95,6 +100,18 @@ void smp_final_core_init(void)
 #endif
 	/* don't need this for the kernel anymore, but userspace can still use it */
 	setup_rdtscp(coreid);
+	/* After this point, all cores have set up their segmentation and whatnot to
+	 * be able to do a proper core_id().  As a note to posterity, using the
+	 * LAPIC coreid (like get_hw_coreid()) needs the LAPIC set up, which happens
+	 * by the end of vm_init() */
+	waiton_barrier(&generic_barrier);
+	if (hw_core_id() == 0) {
+		core_id_ready = TRUE;
+		cmb();
+		pcpui->__lock_checking_enabled = 1;
+	}
+	/* being paranoid with this, it's all a bit ugly */
+	waiton_barrier(&generic_barrier);
 	setup_default_mtrrs(&generic_barrier);
 	smp_percpu_init();
 	waiton_barrier(&generic_barrier);
@@ -145,6 +162,7 @@ static void smp_remap_coreids(void)
 
 void smp_boot(void)
 {
+	struct per_cpu_info *pcpui0 = &per_cpu_info[0];
 	/* set core0's mappings */
 	assert(lapic_get_id() == 0);
 	os_coreid_lookup[0] = 0;
@@ -161,7 +179,8 @@ void smp_boot(void)
 #ifndef CONFIG_X86_64
 	// This mapping allows access to the trampoline with paging on and off
 	// via trampoline_pg
-	page_insert(boot_pgdir, pa2page(trampoline_pg), (void*SNT)trampoline_pg, PTE_W);
+	page_insert(boot_pgdir, pa2page(trampoline_pg), (void*SNT)trampoline_pg,
+	            PTE_W);
 #endif
 
 	// Allocate a stack for the cores starting up.  One for all, must share
@@ -169,6 +188,10 @@ void smp_boot(void)
 		panic("No memory for SMP boot stack!");
 	smp_stack_top = SINIT((uintptr_t)(page2kva(smp_stack) + PGSIZE));
 
+	/* During SMP boot, core_id_early() returns 0, so all of the cores, which
+	 * grab locks concurrently, share the same pcpui and thus the same
+	 * lock_depth.  We need to disable checking until core_id works properly. */
+	pcpui0->__lock_checking_enabled = 0;
 	// Start the IPI process (INIT, wait, SIPI, wait, SIPI, wait)
 	send_init_ipi();
 	// SDM 3A is a little wonky wrt the proper delays.  These are my best guess.
