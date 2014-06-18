@@ -1125,7 +1125,7 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
                          int oflag, int mode)
 {
-	int fd;
+	int fd = -1;
 	struct file *file;
 
 	printd("File %s Open attempt oflag %x mode %x\n", path, oflag, mode);
@@ -1141,9 +1141,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 		kref_put(&file->f_kref);	/* drop our ref */
 		if (fd < 0)
 			warn("File insertion failed");
-	} else {
-		if (get_errno() == EEXIST)
-			return -1;
+	} else { //if (get_errno() == ENOENT) {
 		unset_errno();	/* Go can't handle extra errnos */
 		fd = sysopen(t_path, oflag);
 		/* successful lookup with CREATE and EXCL is an error */
@@ -1460,7 +1458,7 @@ intreg_t sys_unlink(struct proc *p, const char *path, size_t path_l)
 	if (!t_path)
 		return -1;
 	retval = do_unlink(t_path);
-	if (retval) {
+	if (retval && (get_errno() == ENOENT)) {
 		unset_errno();
 		retval = sysremove(t_path);
 	}
@@ -1567,7 +1565,7 @@ intreg_t sys_mkdir(struct proc *p, const char *path, size_t path_l, int mode)
 	mode &= S_PMASK;
 	mode &= ~p->fs_env.umask;
 	retval = do_mkdir(t_path, mode);
-	if (retval) {
+	if (retval && (get_errno() == ENOENT)) {
 		unset_errno();
 		/* mixing plan9 and glibc here, make sure DMDIR doesn't overlap with any
 		 * permissions */
@@ -1856,7 +1854,7 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_readlink] = {(syscall_t)sys_readlink, "readlink"},
 	[SYS_chdir] = {(syscall_t)sys_chdir, "chdir"},
 	[SYS_getcwd] = {(syscall_t)sys_getcwd, "getcwd"},
-	[SYS_mkdir] = {(syscall_t)sys_mkdir, "mkdri"},
+	[SYS_mkdir] = {(syscall_t)sys_mkdir, "mkdir"},
 	[SYS_rmdir] = {(syscall_t)sys_rmdir, "rmdir"},
 	[SYS_pipe] = {(syscall_t)sys_pipe, "pipe"},
 	[SYS_gettimeofday] = {(syscall_t)sys_gettimeofday, "gettime"},
