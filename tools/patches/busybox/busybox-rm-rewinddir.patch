@@ -1,0 +1,10 @@
+--- a/libbb/remove_file.c	2014-06-18 11:44:05.962239038 -0700
++++ b/libbb/remove_file.c	2014-06-18 11:44:11.331956241 -0700
+@@ -59,6 +59,7 @@
+ 				continue;
+ 			if (remove_file(new_path, flags) < 0)
+ 				status = -1;
++			rewinddir(dp);
+ 			free(new_path);
+ 		}
+ 
