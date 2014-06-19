@@ -376,6 +376,8 @@ static int etheroq(struct ether *ether, struct block *bp)
 			hnputs(bp->rp + 2 * Eaddrlen + 2, ether->vlanid & 0xFFF);	/* prio:3 0:1 vid:12 */
 			ether = ether->ctlr;
 		}
+
+		ptclcsum_finalize(bp, ether->netif.feat);
 		qbwrite(ether->oq, bp);
 		if (ether->transmit != NULL)
 			ether->transmit(ether);

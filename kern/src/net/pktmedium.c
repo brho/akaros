@@ -56,6 +56,7 @@ pktbwrite(struct Ipifc *ifc, struct block *bp, int unused_int,
 {
 	/* enqueue onto the conversation's rq */
 	bp = concatblock(bp);
+	ptclcsum_finalize(bp, 0);
 	if (atomic_read(&ifc->conv->snoopers) > 0)
 		qpass(ifc->conv->sq, copyblock(bp, BLEN(bp)));
 	qpass(ifc->conv->rq, bp);

@@ -2,6 +2,7 @@
 
 #ifndef ROS_KERN_IP_H
 #define ROS_KERN_IP_H
+#include <ns.h>
 
 enum {
 	Addrlen = 64,
@@ -609,6 +610,20 @@ extern void ip_init(struct Fs *);
 extern void update_mtucache(uint8_t * unused_uint8_p_t, uint32_t);
 extern uint32_t restrict_mtu(uint8_t * unused_uint8_p_t, uint32_t);
 
+static inline void ptclcsum_finalize(struct block *bp, unsigned int feat)
+{
+	unsigned int flag = bp->flag & BCKSUM_FLAGS;
+	uint8_t *csum_store;
+
+	if (flag && (flag & feat) != flag) {
+		csum_store = bp->rp + bp->checksum_start + bp->checksum_offset;
+		hnputs((uint16_t *)csum_store,
+		       ptclcsum(bp, bp->checksum_start,
+				BLEN(bp) - bp->checksum_start));
+		bp->flag &= ~BCKSUM_FLAGS;
+	}
+}
+
 /*
  * bootp.c
  */
@@ -889,6 +904,20 @@ struct netaddr {
 };
 
 /*
+ * These flags overlap with block flags, to make detecting unsupported
+ * offloads efficient.
+ */
+#define NETF_BASE_SHIFT		(NS_SHIFT_MAX + 1)
+#define NETF_PADMIN_SHIFT	(NETF_BASE_SHIFT + 0)
+#define NETF_SG_SHIFT		(NETF_BASE_SHIFT + 1)
+enum {
+	NETF_IPCK = (1 << NS_IPCK_SHIFT),	/* xmit ip checksum */
+	NETF_UDPCK = (1 << NS_UDPCK_SHIFT),	/* xmit udp checksum */
+	NETF_TCPCK = (1 << NS_TCPCK_SHIFT),	/* xmit tcp checksum */
+	NETF_PADMIN = (1 << NETF_SG_SHIFT),	/* device pads to mintu */
+	NETF_SG	= (1 << NETF_SG_SHIFT),		/* device can do scatter/gather */
+};
+/*
  *  a network interface
  */
 struct netif {
@@ -904,6 +933,7 @@ struct netif {
 	int alen;					/* address length */
 	int mbps;					/* megabits per sec */
 	int link;					/* link status */
+	unsigned int feat;				/* dev features */
 	uint8_t addr[Nmaxaddr];
 	uint8_t bcast[Nmaxaddr];
 	struct netaddr *maddr;		/* known multicast addresses */

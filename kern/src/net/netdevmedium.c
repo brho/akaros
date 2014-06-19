@@ -96,6 +96,7 @@ netdevbwrite(struct Ipifc *ifc, struct block *bp, int unused_int,
 	if (BLEN(bp) < ifc->mintu)
 		bp = adjustblock(bp, ifc->mintu);
 
+	ptclcsum_finalize(bp, 0);
 	devtab[er->mchan->type].bwrite(er->mchan, bp, 0);
 	ifc->out++;
 }

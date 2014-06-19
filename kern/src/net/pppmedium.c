@@ -158,6 +158,7 @@ static void pppbwrite(Ipifc * ifc, Block * bp, int, uchar *)
 {
 	PPP *ppp = ifc->arg;
 
+	ptclcsum_finalize(bp, 0);
 	pppwrite(ppp, bp);
 	ifc->out++;
 }

@@ -332,6 +332,9 @@ ipoput4(struct Fs *f,
 		goto raise;
 	}
 
+	/* compute tcp/udp checksum in software before fragmenting */
+	ptclcsum_finalize(bp, 0);
+
 	dlen = len - IP4HDR;
 	xp = bp;
 	if (gating)

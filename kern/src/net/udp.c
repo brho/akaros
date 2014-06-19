@@ -294,8 +294,10 @@ void udpkick(void *x, struct block *bp)
 			uh4->udpcksum[0] = 0;
 			uh4->udpcksum[1] = 0;
 			hnputs(uh4->udpcksum,
-				   ptclcsum(bp, UDP4_PHDR_OFF,
-							dlen + UDP_UDPHDR_SZ + UDP4_PHDR_SZ));
+				   ~ptclcsum(bp, UDP4_PHDR_OFF, UDP4_PHDR_SZ));
+			bp->checksum_start = UDP4_IPHDR_SZ;
+			bp->checksum_offset = uh4->udpcksum - uh4->udpsport;
+			bp->flag |= Budpck;
 			uh4->vihl = IP_VER4;
 			ipoput4(f, bp, 0, c->ttl, c->tos, rc);
 			break;

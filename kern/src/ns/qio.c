@@ -92,10 +92,14 @@ struct block *padblock(struct block *bp, int size)
 {
 	int n;
 	struct block *nbp;
+	uint8_t bcksum = bp->flag & BCKSUM_FLAGS;
+	uint16_t checksum_start = bp->checksum_start;
+	uint16_t checksum_offset = bp->checksum_offset;
 
 	QDEBUG checkb(bp, "padblock 1");
 	if (size >= 0) {
 		if (bp->rp - bp->base >= size) {
+			bp->checksum_start += size;
 			bp->rp -= size;
 			return bp;
 		}
@@ -126,6 +130,11 @@ struct block *padblock(struct block *bp, int size)
 		memmove(nbp->wp, bp->rp, n);
 		nbp->wp += n;
 		freeb(bp);
+	}
+	if (bcksum) {
+		nbp->flag |= bcksum;
+		nbp->checksum_start = checksum_start;
+		nbp->checksum_offset = checksum_offset;
 	}
 	QDEBUG checkb(nbp, "padblock 1");
 	return nbp;
@@ -306,6 +315,11 @@ struct block *copyblock(struct block *bp, int count)
 
 	QDEBUG checkb(bp, "copyblock 0");
 	nbp = allocb(count);
+	if (bp->flag & BCKSUM_FLAGS) {
+		nbp->flag |= (bp->flag & BCKSUM_FLAGS);
+		nbp->checksum_start = bp->checksum_start;
+		nbp->checksum_offset = bp->checksum_offset;
+	}
 	for (; count > 0 && bp != 0; bp = bp->next) {
 		l = BLEN(bp);
 		if (l > count)
