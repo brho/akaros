@@ -322,8 +322,6 @@ etherbwrite(struct Ipifc *ifc, struct block *bp, int version, uint8_t * ip)
 	bp = padblock(bp, ifc->m->hsize);
 	if (bp->next)
 		bp = concatblock(bp);
-	if (BLEN(bp) < ifc->mintu)
-		bp = adjustblock(bp, ifc->mintu);
 	eh = (Etherhdr *) bp->rp;
 
 	/* copy in mac addresses and ether type */

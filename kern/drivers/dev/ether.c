@@ -377,6 +377,9 @@ static int etheroq(struct ether *ether, struct block *bp)
 			ether = ether->ctlr;
 		}
 
+		if ((ether->netif.feat & NETF_PADMIN) == 0 && BLEN(bp) < ether->minmtu)
+			bp = adjustblock(bp, ether->minmtu);
+
 		ptclcsum_finalize(bp, ether->netif.feat);
 		qbwrite(ether->oq, bp);
 		if (ether->transmit != NULL)
@@ -427,8 +430,6 @@ static long etherwrite(struct chan *chan, void *buf, long n, int64_t unused)
 
 	if (n > ether->maxmtu)
 		error(Etoobig);
-	if (n < ether->minmtu)
-		error(Etoosmall);
 	bp = allocb(n);
 	if (waserror()) {
 		freeb(bp);
@@ -472,10 +473,6 @@ static long etherbwrite(struct chan *chan, struct block *bp, uint32_t unused)
 	if (n > ether->maxmtu) {
 		freeb(bp);
 		error(Etoobig);
-	}
-	if (n < ether->minmtu) {
-		freeb(bp);
-		error(Etoosmall);
 	}
 	n = etheroq(ether, bp);
 	poperror();
