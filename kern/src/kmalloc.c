@@ -32,8 +32,12 @@ static page_list_t LCKD(&pages_list_lock)pages_list;
 struct kmem_cache *kmalloc_caches[NUM_KMALLOC_CACHES];
 void kmalloc_init(void)
 {
-	static_assert(sizeof(struct kmalloc_tag) == 16);
-	// build caches of common sizes
+	/* we want at least a 16 byte alignment of the tag so that the bufs kmalloc
+	 * returns are 16 byte aligned.  we used to check the actual size == 16,
+	 * since we adjusted the KMALLOC_SMALLEST based on that. */
+	static_assert(ALIGNED(sizeof(struct kmalloc_tag), 16));
+	/* build caches of common sizes.  this size will later include the tag and
+	 * the actual returned buffer. */
 	size_t ksize = KMALLOC_SMALLEST;
 	for (int i = 0; i < NUM_KMALLOC_CACHES; i++) {
 		kmalloc_caches[i] = kmem_cache_create("kmalloc_cache", ksize,
@@ -82,7 +86,7 @@ void *kmalloc(size_t size, int flags)
 void *kzmalloc(size_t size, int flags) 
 {
 	void *v = kmalloc(size, flags);
-	if (! v)
+	if (!v)
 		return v;
 	memset(v, 0, size);
 	return v;
@@ -122,22 +126,42 @@ void *kzmalloc_align(size_t size, int flags, size_t align)
 	return v;
 }
 
+static struct kmalloc_tag *__get_km_tag(void *buf)
+{
+	struct kmalloc_tag *tag = (struct kmalloc_tag*)(buf -
+	                                            sizeof(struct kmalloc_tag));
+	if (tag->canary != KMALLOC_CANARY){
+		printk("__get_km_tag bad canary: %08lx, expected %08lx\n", tag->canary,
+		       KMALLOC_CANARY);
+		hexdump((void *)(buf - sizeof(struct kmalloc_tag)), 256);
+	}
+	return tag;
+}
+
+/* If we kmalloc_aligned, the buf we got back (and are now trying to perform
+ * some operation on) might not be the original, underlying, unaligned buf.
+ *
+ * This returns the underlying, unaligned buf, or 0 if the buf was not realigned
+ * in the first place. */
+static void *__get_unaligned_orig_buf(void *buf)
+{
+	int *tag_flags = (int*)(buf - sizeof(int));
+	if ((*tag_flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_UNALIGN)
+		return (buf - (*tag_flags >> KMALLOC_ALIGN_SHIFT));
+	else
+		return 0;
+}
+
 void *krealloc(void* buf, size_t size, int flags)
 {
 	void *nbuf;
 	size_t osize = 0;
-	int *tag_flags;
+	struct kmalloc_tag *tag;
+
 	if (buf){
-		struct kmalloc_tag *tag = (struct kmalloc_tag*)(buf -
-	                                                sizeof(struct kmalloc_tag));
-		tag_flags = (int*)(buf - sizeof(int));
-		if ((*tag_flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_UNALIGN)
+		if (__get_unaligned_orig_buf(buf))
 			panic("krealloc of a kmalloc_align not supported");
-		if (tag->canary != KMALLOC_CANARY){
-			printk("krealloc bad canary: %08lx, expected %08lx\n", tag->canary,
-			       KMALLOC_CANARY);
-			hexdump((void *)(buf - sizeof(struct kmalloc_tag)), 256);
-		}
+		tag = __get_km_tag(buf);
 		/* whatever we got from either a slab or the page allocator is meant for
 		 * both the buf+size as well as the kmalloc tag */
 		if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_CACHE) {
@@ -171,22 +195,14 @@ void *krealloc(void* buf, size_t size, int flags)
 void kfree(void *addr)
 {
 	struct kmalloc_tag *tag;
-	int *tag_flags;
+	void *orig_buf;
 	if (addr == NULL)
 		return;
-	tag_flags = (int*)(addr - sizeof(int));
-	if ((*tag_flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_UNALIGN) {
-		kfree(addr - (*tag_flags >> KMALLOC_ALIGN_SHIFT));
+	if ((orig_buf = __get_unaligned_orig_buf(addr))) {
+		kfree(orig_buf);
 		return;
 	}
-	tag = (struct kmalloc_tag*)(addr - sizeof(struct kmalloc_tag));
-	assert(tag_flags == &tag->flags);
-	if (tag->canary != KMALLOC_CANARY){
-		printk("Canary is bogus: %08lx, expected %08lx\n", tag->canary,
-		       KMALLOC_CANARY);
-		hexdump((void*)(addr - sizeof(struct kmalloc_tag)), 256);
-	}
-	assert(tag->canary == KMALLOC_CANARY);
+	tag = __get_km_tag(addr);
 	if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_CACHE)
 		kmem_cache_free(tag->my_cache, tag);
 	else if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_PAGES) {
