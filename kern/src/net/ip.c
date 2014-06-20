@@ -526,7 +526,7 @@ void ipiput4(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 	}
 
 	frag = nhgets(h->frag);
-	if (frag) {
+	if (frag && frag != IP_DF) {
 		h->tos = 0;
 		if (frag & IP_MF)
 			h->tos = 1;
