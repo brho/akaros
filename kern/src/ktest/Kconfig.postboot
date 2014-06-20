@@ -235,3 +235,8 @@ config TEST_alarm
     default n
     help
         Run the alarm test
+
+config TEST_kmalloc_incref
+    depends on PB_KTESTS
+    bool "Kmalloc incref"
+    default n

@@ -1973,6 +1973,52 @@ bool test_alarm(void)
 	return true;
 }
 
+bool test_kmalloc_incref(void)
+{
+	/* this test is a bit invasive of the kmalloc internals */
+	void *__get_unaligned_orig_buf(void *buf)
+	{
+		int *tag_flags = (int*)(buf - sizeof(int));
+		if ((*tag_flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_UNALIGN)
+			return (buf - (*tag_flags >> KMALLOC_ALIGN_SHIFT));
+		else
+			return 0;
+	}
+
+	bool test_buftag(void *b, struct kmalloc_tag *btag, char *str)
+	{
+		KT_ASSERT_M(str, kref_refcnt(&btag->kref) == 1);
+		kmalloc_incref(b);
+		KT_ASSERT_M(str, kref_refcnt(&btag->kref) == 2);
+		kfree(b);
+		KT_ASSERT_M(str, kref_refcnt(&btag->kref) == 1);
+		kfree(b);
+		/* dangerous read, it's been freed */
+		KT_ASSERT_M(str, kref_refcnt(&btag->kref) == 0);
+		return TRUE;
+	}
+
+	void *b1, *b2, *b2o;
+	struct kmalloc_tag *b1tag, *b2tag;
+
+	/* no realigned case */
+	b1 = kmalloc(55, 0);
+	KT_ASSERT(!__get_unaligned_orig_buf(b1));
+	b1tag = (struct kmalloc_tag*)(b1 - sizeof(struct kmalloc_tag));
+
+	/* realigned case.  alloc'd before b1's test, so we know we get different
+	 * buffers. */
+	b2 = kmalloc_align(55, 0, 64);
+	b2o = __get_unaligned_orig_buf(b2);
+	KT_ASSERT(b2o);
+	b2tag = (struct kmalloc_tag*)(b2o - sizeof(struct kmalloc_tag));
+
+	test_buftag(b1, b1tag, "b1, no realign");
+	test_buftag(b2, b2tag, "b2, realigned");
+
+	return TRUE;
+}
+
 static struct ktest ktests[] = {
 #ifdef CONFIG_X86
 	KTEST_REG(ipi_sending,        CONFIG_TEST_ipi_sending),
@@ -2010,7 +2056,8 @@ static struct ktest ktests[] = {
 	KTEST_REG(apipe,              CONFIG_TEST_apipe),
 	KTEST_REG(rwlock,             CONFIG_TEST_rwlock),
 	KTEST_REG(rv,                 CONFIG_TEST_rv),
-	KTEST_REG(alarm,              CONFIG_TEST_alarm)
+	KTEST_REG(alarm,              CONFIG_TEST_alarm),
+	KTEST_REG(kmalloc_incref,     CONFIG_TEST_kmalloc_incref),
 };
 static int num_ktests = sizeof(ktests) / sizeof(struct ktest);
 linker_func_1(register_pb_ktests)

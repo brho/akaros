@@ -30,6 +30,9 @@ static spinlock_t pages_list_lock = SPINLOCK_INITIALIZER;
 static page_list_t LCKD(&pages_list_lock)pages_list;
 
 struct kmem_cache *kmalloc_caches[NUM_KMALLOC_CACHES];
+
+static void __kfree_release(struct kref *kref);
+
 void kmalloc_init(void)
 {
 	/* we want at least a 16 byte alignment of the tag so that the bufs kmalloc
@@ -69,6 +72,7 @@ void *kmalloc(size_t size, int flags)
 		tag->flags = KMALLOC_TAG_PAGES;
 		tag->num_pages = num_pgs;
 		tag->canary = KMALLOC_CANARY;
+		kref_init(&tag->kref, __kfree_release, 1);
 		return buf + sizeof(struct kmalloc_tag);
 	}
 	// else, alloc from the appropriate cache
@@ -80,6 +84,7 @@ void *kmalloc(size_t size, int flags)
 	tag->flags = KMALLOC_TAG_CACHE;
 	tag->my_cache = kmalloc_caches[cache_id];
 	tag->canary = KMALLOC_CANARY;
+	kref_init(&tag->kref, __kfree_release, 1);
 	return buf + sizeof(struct kmalloc_tag);
 }
 
@@ -192,23 +197,40 @@ void *krealloc(void* buf, size_t size, int flags)
 	return nbuf;
 }
 
-void kfree(void *addr)
+/* Grabs a reference on a buffer.  Release with kfree().
+ *
+ * Note that a krealloc on a buffer with ref > 1 that needs a new, underlying
+ * buffer will result in two buffers existing.  In this case, the krealloc is a
+ * kmalloc and a kfree, but that kfree does not completely free since the
+ * original ref > 1. */
+void kmalloc_incref(void *buf)
 {
-	struct kmalloc_tag *tag;
-	void *orig_buf;
-	if (addr == NULL)
-		return;
-	if ((orig_buf = __get_unaligned_orig_buf(addr))) {
-		kfree(orig_buf);
-		return;
-	}
-	tag = __get_km_tag(addr);
+	void *orig_buf = __get_unaligned_orig_buf(buf);
+	buf = orig_buf ? orig_buf : buf;
+	/* if we want a smaller tag, we can extract the code from kref and manually
+	 * set the release method in kfree. */
+	kref_get(&__get_km_tag(buf)->kref, 1);
+}
+
+static void __kfree_release(struct kref *kref)
+{
+	struct kmalloc_tag *tag = container_of(kref, struct kmalloc_tag, kref);
 	if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_CACHE)
 		kmem_cache_free(tag->my_cache, tag);
-	else if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_PAGES) {
+	else if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_PAGES)
 		free_cont_pages(tag, LOG2_UP(tag->num_pages));
-	} else 
-		panic("[Italian Accent]: Che Cazzo! BO! Flag in kmalloc!!!");
+	else
+		panic("Bad flag 0x%x in %s", tag->flags, __FUNCTION__);
+}
+
+void kfree(void *buf)
+{
+	void *orig_buf;
+	if (buf == NULL)
+		return;
+	orig_buf = __get_unaligned_orig_buf(buf);
+	buf = orig_buf ? orig_buf : buf;
+	kref_put(&__get_km_tag(buf)->kref);
 }
 
 void kmalloc_canary_check(char *str)

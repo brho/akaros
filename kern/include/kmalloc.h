@@ -21,8 +21,9 @@ void* (DALLOC(size) kmalloc)(size_t size, int flags);
 void* (DALLOC(size) kzmalloc)(size_t size, int flags);
 void *kmalloc_align(size_t size, int flags, size_t align);
 void *kzmalloc_align(size_t size, int flags, size_t align);
-void* (DALLOC(size) krealloc)(void* buf, size_t size, int flags);
-void  (DFREE(addr) kfree)(void *addr);
+void *krealloc(void *buf, size_t size, int flags);
+void kmalloc_incref(void *buf);
+void kfree(void *buf);
 void kmalloc_canary_check(char *str);
 void *debug_canary;
 
@@ -52,6 +53,7 @@ struct kmalloc_tag {
 		size_t num_pages WHEN(flags == KMALLOC_TAG_PAGES);
 		uint64_t unused_force_align;
 	};
+	struct kref kref;
 	uint32_t canary;
 	int flags;
 };
