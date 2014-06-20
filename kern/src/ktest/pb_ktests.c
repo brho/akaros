@@ -112,32 +112,6 @@ bool test_pic_reception(void)
 	return true;
 }
 
-// TODO: Add assertions.
-bool test_ioapic_pit_reroute(void) 
-{
-	register_irq(IdtPIC + IrqCLOCK, test_hello_world_handler, NULL,
-	             MKBUS(BusISA, 0, 0, 0));
-#ifdef CONFIG_ENABLE_MPTABLES
-#warning "not routing the irq"
-	//ioapic_route_irq(0, 3);	
-#endif
-
-	cprintf("Starting pit on core 3....\n");
-	udelay(3000000);
-	pit_set_timer(0xFFFE,TIMER_RATEGEN); // totally arbitrary time
-	
-	udelay(3000000);
-#ifdef CONFIG_ENABLE_MPTABLES
-#warning "NOT unrouting the irq"
-	//ioapic_unroute_irq(0);
-#endif
-	udelay(300000);
-	cprintf("Masked pit. Waiting before return...\n");
-	udelay(3000000);
-
-	return true;
-}
-
 #endif // CONFIG_X86
 
 // TODO: Add assertions. Possibly the way to go is to extract relevant info 
@@ -2023,7 +1997,6 @@ static struct ktest ktests[] = {
 #ifdef CONFIG_X86
 	KTEST_REG(ipi_sending,        CONFIG_TEST_ipi_sending),
 	KTEST_REG(pic_reception,      CONFIG_TEST_pic_reception),
-	KTEST_REG(ioapic_pit_reroute, CONFIG_TEST_ioapic_status_bit),
 	KTEST_REG(lapic_status_bit,   CONFIG_TEST_lapic_status_bit),
 	KTEST_REG(pit,                CONFIG_TEST_pit),
 	KTEST_REG(circ_buffer,        CONFIG_TEST_circ_buffer),
