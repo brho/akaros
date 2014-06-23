@@ -206,10 +206,11 @@ void cleanarpent(struct arp *arp, struct arpent *a)
 struct arpent *arpget(struct arp *arp, struct block *bp, int version,
 					  struct Ipifc *ifc, uint8_t * ip, uint8_t * mac)
 {
-	int hash;
+	int hash, len;
 	struct arpent *a;
 	struct medium *type = ifc->m;
 	uint8_t v6ip[IPaddrlen];
+	uint16_t *s, *d;
 
 	if (version == V4) {
 		v4tov6(v6ip, ip);
@@ -219,7 +220,7 @@ struct arpent *arpget(struct arp *arp, struct block *bp, int version,
 	qlock(&arp->qlock);
 	hash = haship(ip);
 	for (a = arp->hash[hash]; a; a = a->hash) {
-		if (memcmp(ip, a->ip, sizeof(a->ip)) == 0)
+		if (ipcmp(ip, a->ip) == 0)
 			if (type == a->type)
 				break;
 	}
@@ -241,7 +242,13 @@ struct arpent *arpget(struct arp *arp, struct block *bp, int version,
 		return a;	/* return with arp qlocked */
 	}
 
-	memmove(mac, a->mac, a->type->maclen);
+	s = (uint16_t *)a->mac;
+	d = (uint16_t *)mac;
+	len = a->type->maclen / 2;
+	while (len) {
+		*d++ = *s++;
+		len--;
+	}
 
 	/* remove old entries */
 	if (NOW - a->ctime > 15 * 60 * 1000)

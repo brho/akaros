@@ -12,6 +12,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <ip.h>
+#include <endian.h>
 
 /*
  *  well known IP addresses
@@ -324,51 +325,37 @@ extern char *v4parseip(uint8_t * to, char *from)
 
 int isv4(uint8_t * ip)
 {
-	return memcmp(ip, v4prefix, IPv4off) == 0;
+	unsigned short *ips = (unsigned short *)ip;
+	return 0xffff == ips[5];
 }
 
 /*
  *  the following routines are unrolled with no memset's to speed
- *  up the usual case
+ *  up the usual case.  They assume IP addresses are naturally aligned.
  */
 void v4tov6(uint8_t * v6, uint8_t * v4)
 {
-	v6[0] = 0;
-	v6[1] = 0;
-	v6[2] = 0;
-	v6[3] = 0;
-	v6[4] = 0;
-	v6[5] = 0;
-	v6[6] = 0;
-	v6[7] = 0;
-	v6[8] = 0;
-	v6[9] = 0;
-	v6[10] = 0xff;
-	v6[11] = 0xff;
-	v6[12] = v4[0];
-	v6[13] = v4[1];
-	v6[14] = v4[2];
-	v6[15] = v4[3];
+	uint32_t *v6p = (uint32_t *)v6;
+	uint32_t *v4p = (uint32_t *)v4;
+
+	v6p[0] = 0;
+	v6p[1] = 0;
+	v6p[2] = (unsigned int)PP_NTOHL(0xffff);
+	v6p[3] = v4p[0];
 }
 
 int v6tov4(uint8_t * v4, uint8_t * v6)
 {
-	if (v6[0] == 0
-		&& v6[1] == 0
-		&& v6[2] == 0
-		&& v6[3] == 0
-		&& v6[4] == 0
-		&& v6[5] == 0
-		&& v6[6] == 0
-		&& v6[7] == 0
-		&& v6[8] == 0 && v6[9] == 0 && v6[10] == 0xff && v6[11] == 0xff) {
-		v4[0] = v6[12];
-		v4[1] = v6[13];
-		v4[2] = v6[14];
-		v4[3] = v6[15];
+
+	uint32_t *v6p = (uint32_t *)v6;
+	uint32_t *v4p = (uint32_t *)v4;
+
+	if (v6p[0] == 0 && v6p[1] == 0 &&
+	    v6p[2] == (unsigned int)PP_NTOHL(0xffff)) {
+		v4p[0] = v6p[3];
 		return 0;
 	} else {
-		memset(v4, 0, 4);
+		v4p[0] = 0;
 		return -1;
 	}
 }

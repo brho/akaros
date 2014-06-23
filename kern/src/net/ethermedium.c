@@ -288,6 +288,19 @@ static void etherunbind(struct Ipifc *ifc)
 }
 
 /*
+ * copy ethernet address
+ */
+static inline void etherfilladdr(uint16_t *pkt, uint16_t *dst, uint16_t *src)
+{
+	*pkt++ = *dst++;
+	*pkt++ = *dst++;
+	*pkt++ = *dst++;
+	*pkt++ = *src++;
+	*pkt++ = *src++;
+	*pkt = *src;
+}
+
+/*
  *  called by ipoput with a single block to write with ifc rlock'd
  */
 static void
@@ -325,8 +338,7 @@ etherbwrite(struct Ipifc *ifc, struct block *bp, int version, uint8_t * ip)
 	eh = (Etherhdr *) bp->rp;
 
 	/* copy in mac addresses and ether type */
-	memmove(eh->s, ifc->mac, sizeof(eh->s));
-	memmove(eh->d, mac, sizeof(eh->d));
+	etherfilladdr((uint16_t *)bp->rp, (uint16_t *)mac, (uint16_t *)ifc->mac);
 
 	switch (version) {
 		case V4:

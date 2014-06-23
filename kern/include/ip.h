@@ -531,8 +531,29 @@ extern void v4tov6(uint8_t * v6, uint8_t * v4);
 extern int v6tov4(uint8_t * v4, uint8_t * v6);
 //extern int    eipfmt(Fmt*);
 
-#define	ipmove(x, y) memmove(x, y, IPaddrlen)
-#define	ipcmp(x, y) ( (x)[IPaddrlen-1] != (y)[IPaddrlen-1] || memcmp(x, y, IPaddrlen) )
+
+#ifdef CONFIG_RISCV
+#warning "Potentially unaligned IP addrs!"
+#endif
+static inline void ipmove(unsigned char *x, unsigned char *y)
+{
+	uint32_t *a = (uint32_t *)x;
+	uint32_t *b = (uint32_t *)y;
+
+	a[0] = b[0];
+	a[1] = b[1];
+	a[2] = b[2];
+	a[3] = b[3];
+}
+
+static inline long ipcmp(unsigned char *x, unsigned char *y)
+{
+	uint32_t *a = (uint32_t *)x;
+	uint32_t *b = (uint32_t *)y;
+	return (a[0] ^ b[0]) | (a[1] ^ b[1]) |
+		(a[2] ^ b[2]) | (a[3] ^ b[3]);
+}
+
 
 extern uint8_t IPv4bcast[IPaddrlen];
 extern uint8_t IPv4bcastobs[IPaddrlen];

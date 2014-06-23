@@ -1258,7 +1258,7 @@ void findlocalip(struct Fs *f, uint8_t * local, uint8_t * remote)
 
 	qlock(&f->ipifc->qlock);
 	r = v6lookup(f, remote, NULL);
-	version = (memcmp(remote, v4prefix, IPv4off) == 0) ? V4 : V6;
+	version = isv4(remote) ? V4 : V6;
 
 	if (r != NULL) {
 		ifc = r->rt.ifc;

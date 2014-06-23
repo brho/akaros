@@ -251,6 +251,18 @@ static void etherrtrace(struct netfile *f, struct etherpkt *pkt, int len)
 	qpass(f->in, bp);
 }
 
+#ifdef CONFIG_RISCV
+#warning "Potentially unaligned ethernet addrs!"
+#endif
+
+static inline int eaddrcmp(uint8_t *x, uint8_t *y)
+{
+	uint16_t *a = (uint16_t *)x;
+	uint16_t *b = (uint16_t *)y;
+
+	return (a[0] ^ b[0]) | (a[1] ^ b[1]) | (a[2] ^ b[2]);
+}
+
 struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 {
 	struct etherpkt *pkt;
@@ -285,7 +297,7 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 
 	multi = pkt->d[0] & 1;
 	/* check for valid multcast addresses */
-	if (multi && memcmp(pkt->d, ether->netif.bcast, sizeof(pkt->d)) != 0
+	if (multi && eaddrcmp(pkt->d, ether->netif.bcast) != 0
 		&& ether->netif.prom == 0) {
 		if (!activemulti(&ether->netif, pkt->d, sizeof(pkt->d))) {
 			if (fromwire) {
@@ -297,8 +309,8 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 	}
 
 	/* is it for me? */
-	tome = memcmp(pkt->d, ether->ea, sizeof(pkt->d)) == 0;
-	fromme = memcmp(pkt->s, ether->ea, sizeof(pkt->s)) == 0;
+	tome = eaddrcmp(pkt->d, ether->ea) == 0;
+	fromme = eaddrcmp(pkt->s, ether->ea) == 0;
 
 	/*
 	 * Multiplex the packet to all the connections which want it.
@@ -359,8 +371,8 @@ static int etheroq(struct ether *ether, struct block *bp)
 	 */
 	pkt = (struct etherpkt *)bp->rp;
 	len = BLEN(bp);
-	loopback = memcmp(pkt->d, ether->ea, sizeof(pkt->d)) == 0;
-	if (loopback || memcmp(pkt->d, ether->netif.bcast, sizeof(pkt->d)) == 0
+	loopback = eaddrcmp(pkt->d, ether->ea) == 0;
+	if (loopback || eaddrcmp(pkt->d, ether->netif.bcast) == 0
 		|| ether->netif.prom) {
 		disable_irqsave(&irq_state);
 		etheriq(ether, bp, 0);
