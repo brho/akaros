@@ -287,17 +287,23 @@ static void icmpkick6(void *x, struct block *bp)
 		ipmove(raddr, bp->rp);
 		bp->rp += IPaddrlen;
 		bp = padblock(bp, sizeof(struct ip6hdr));
-	}
 
-	if (blocklen(bp) < sizeof(struct IPICMP)) {
-		freeblist(bp);
-		return;
-	}
-	p = (struct IPICMP *)(bp->rp);
-	if (icb->headers == 6) {
+		if (blocklen(bp) < sizeof(struct IPICMP)) {
+			freeblist(bp);
+			return;
+		}
+		p = (struct IPICMP *)(bp->rp);
+
 		ipmove(p->dst, raddr);
 		ipmove(p->src, laddr);
+
 	} else {
+		if (blocklen(bp) < sizeof(struct IPICMP)) {
+			freeblist(bp);
+			return;
+		}
+		p = (struct IPICMP *)(bp->rp);
+
 		ipmove(p->dst, c->raddr);
 		ipmove(p->src, c->laddr);
 		hnputs(p->icmpid, c->lport);
