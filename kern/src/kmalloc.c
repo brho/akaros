@@ -139,6 +139,7 @@ static struct kmalloc_tag *__get_km_tag(void *buf)
 		printk("__get_km_tag bad canary: %08lx, expected %08lx\n", tag->canary,
 		       KMALLOC_CANARY);
 		hexdump((void *)(buf - sizeof(struct kmalloc_tag)), 256);
+		panic("Bad canary");
 	}
 	return tag;
 }
@@ -210,6 +211,13 @@ void kmalloc_incref(void *buf)
 	/* if we want a smaller tag, we can extract the code from kref and manually
 	 * set the release method in kfree. */
 	kref_get(&__get_km_tag(buf)->kref, 1);
+}
+
+int kmalloc_refcnt(void *buf)
+{
+	void *orig_buf = __get_unaligned_orig_buf(buf);
+	buf = orig_buf ? orig_buf : buf;
+	return kref_refcnt(&__get_km_tag(buf)->kref);
 }
 
 static void __kfree_release(struct kref *kref)

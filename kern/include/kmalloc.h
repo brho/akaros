@@ -22,6 +22,7 @@ void* (DALLOC(size) kzmalloc)(size_t size, int flags);
 void *kmalloc_align(size_t size, int flags, size_t align);
 void *kzmalloc_align(size_t size, int flags, size_t align);
 void *krealloc(void *buf, size_t size, int flags);
+int kmalloc_refcnt(void *buf);
 void kmalloc_incref(void *buf);
 void kfree(void *buf);
 void kmalloc_canary_check(char *str);
