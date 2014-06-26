@@ -15,6 +15,20 @@ config 64BIT
 	help
 		Say yes to build a 64-bit kernel, amd64 / x86_64, riscv64, etc.
 
+menuconfig RUN_INIT_SCRIPT
+	bool "Run init script after boot"
+	default n
+	help
+		Run an init script after boot instead of dropping into the monitor
+
+config INIT_SCRIPT_PATH_AND_ARGS
+    depends on RUN_INIT_SCRIPT
+    string "Path to init script, followed by its arguments."
+    default /bin/init.sh
+    help
+		Path to the init script run at boot time, followed by a space separated
+		list of arguments
+
 source "kern/arch/$SRCARCH/Kconfig"
 
 source "kern/src/net/Kconfig"

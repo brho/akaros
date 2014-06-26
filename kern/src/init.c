@@ -52,6 +52,7 @@
 int booting = 1;
 struct sysinfo_t sysinfo;
 static void run_linker_funcs(void);
+static int run_init_script(void);
 
 void kernel_init(multiboot_info_t *mboot_info)
 {
@@ -106,7 +107,59 @@ void kernel_init(multiboot_info_t *mboot_info)
 	// zra: let's Ivy know we're done booting
 	booting = 0;
 
+#ifdef CONFIG_RUN_INIT_SCRIPT
+	if (run_init_script()) {
+		printk("Configured to run init script, but no script specified!\n");
+		manager();
+	}
+#else
 	manager();
+#endif
+}
+
+static int run_init_script(void)
+{
+	/* If we have an init script path specified */
+	if (strlen(CONFIG_INIT_SCRIPT_PATH_AND_ARGS) != 0) {
+		int vargs = 0;
+		char *sptr = &CONFIG_INIT_SCRIPT_PATH_AND_ARGS[0];
+
+		/* Figure out how many arguments there are, by finding the spaces */
+		while (*sptr != '\0') {
+			if (*(sptr++) != ' ') {
+				vargs++;
+				while ((*sptr != ' ') && (*sptr != '\0'))
+					sptr++;
+			}
+		}
+
+		/* Initialize l_argv with its first three arguments, but allocate space
+		 * for all arguments as calculated above */
+		int static_args = 3;
+		int total_args = vargs + static_args;
+		char *l_argv[total_args];
+		l_argv[0] = "";
+		l_argv[1] = "busybox";
+		l_argv[2] = "ash";
+
+		/* Initialize l_argv with the rest of the arguments */
+		int i = static_args;
+		sptr = &CONFIG_INIT_SCRIPT_PATH_AND_ARGS[0];
+		while (*sptr != '\0') {
+			if (*sptr != ' ') {
+				char *sbeg = sptr;
+				while ((*sptr != ' ') && (*sptr != '\0'))
+					sptr++;
+				*sptr = '\0';
+				l_argv[i++] = sbeg;
+			}
+			sptr++;
+		}
+
+		/* Run the script with its arguments */
+		mon_bin_run(total_args, l_argv, NULL);
+	}
+	return -1;
 }
 
 /*
