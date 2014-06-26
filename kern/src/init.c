@@ -117,6 +117,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 #endif
 }
 
+#ifdef CONFIG_RUN_INIT_SCRIPT
 static int run_init_script(void)
 {
 	/* If we have an init script path specified */
@@ -161,6 +162,7 @@ static int run_init_script(void)
 	}
 	return -1;
 }
+#endif
 
 /*
  * Panic is called on unresolvable fatal errors.
