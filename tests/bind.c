@@ -47,5 +47,7 @@ int main(int argc, char *argv[])
 	printf("bind %s -> %s flag %d\n", src_path, onto_path, flag);
 	ret = syscall(SYS_nbind, src_path, strlen(src_path), onto_path,
 	              strlen(onto_path), flag);
+	if (ret < 0)
+		perror("Bind failed");
 	return ret;
 }
