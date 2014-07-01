@@ -477,7 +477,7 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 	return 0;
 }
 
-struct dev archdevtab = {
+struct dev archdevtab __devtab = {
 	'P',
 	"arch",
 
