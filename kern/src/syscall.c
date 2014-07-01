@@ -354,7 +354,7 @@ static pid_t sys_getpid(struct proc *p)
  * default, so it needs it's status to be changed so that the next call to
  * schedule() will try to run it.  TODO: take args/envs from userspace. */
 static int sys_proc_create(struct proc *p, char *path, size_t path_l,
-                           struct procinfo *pi)
+                           struct procinfo *pi, int flags)
 {
 	int pid = 0;
 	char *t_path;
@@ -373,10 +373,13 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	/* TODO: need to split the proc creation, since you must load after setting
 	 * args/env, since auxp gets set up there. */
 	//new_p = proc_create(program, 0, 0);
-	if (proc_alloc(&new_p, current)) {
+	if (proc_alloc(&new_p, current, flags)) {
 		set_errstr("Failed to alloc new proc");
 		goto mid_error;
 	}
+	/* close the CLOEXEC ones, even though this isn't really an exec */
+	close_9ns_files(new_p, TRUE);
+	close_all_files(&new_p->open_files, TRUE);
 	/* Set the argument stuff needed by glibc */
 	if (memcpy_from_user_errno(p, new_p->procinfo->argp, pi->argp,
 	                           sizeof(pi->argp))) {
@@ -393,10 +396,6 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 		goto late_error;
 	}
 	kref_put(&program->f_kref);
-	/* Connect to stdin, stdout, stderr (part of proc_create()) */
-	assert(insert_file(&new_p->open_files, dev_stdin,  0) == 0);
-	assert(insert_file(&new_p->open_files, dev_stdout, 0) == 1);
-	assert(insert_file(&new_p->open_files, dev_stderr, 0) == 2);
 	__proc_ready(new_p);
 	pid = new_p->pid;
 	proc_decref(new_p);	/* give up the reference created in proc_create() */
@@ -508,7 +507,8 @@ static ssize_t sys_fork(env_t* e)
 		return -1;
 	}
 	env_t* env;
-	assert(!proc_alloc(&env, current));
+	ret = proc_alloc(&env, current, PROC_DUP_FGRP);
+	assert(!ret);
 	assert(env != NULL);
 
 	env->heap_top = e->heap_top;
@@ -554,7 +554,6 @@ static ssize_t sys_fork(env_t* e)
 	env->procdata->ldt = e->procdata->ldt;
 	#endif
 
-	clone_files(&e->open_files, &env->open_files);
 	/* FYI: once we call ready, the proc is open for concurrent usage */
 	__proc_ready(env);
 	proc_wakeup(env);
@@ -644,6 +643,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	/* When we destroy our memory regions, accessing cur_sysc would PF */
 	pcpui->cur_kthread->sysc = 0;
 	unmap_and_destroy_vmrs(p);
+	/* close the CLOEXEC ones */
 	close_9ns_files(p, TRUE);
 	close_all_files(&p->open_files, TRUE);
 	env_user_mem_free(p, 0, UMAPTOP);

@@ -37,7 +37,8 @@ int main(int argc, char **argv, char **envp)
 	printf("U: attempting to create and run hello\n");
 	p_argv[0] = filename;
 	printf("SPAWN, I'm pid %d, filename %s\n", getpid(), filename);
-	child_pid[0] = sys_proc_create(FILENAME, strlen(FILENAME), p_argv, p_envp);
+	child_pid[0] = sys_proc_create(FILENAME, strlen(FILENAME), p_argv, p_envp,
+	                               PROC_DUP_FGRP);
 	if (child_pid[0] <= 0)
 		printf("Failed to create the child\n");
 	else

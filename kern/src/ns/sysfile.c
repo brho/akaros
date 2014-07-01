@@ -1406,7 +1406,7 @@ void print_9ns_files(struct proc *p)
 
 /* TODO: 9ns ns inheritance flags: Shared, copied, or empty.  Looks like we're
  * copying the fgrp, and sharing the pgrp. */
-int plan9setup(struct proc *new_proc, struct proc *parent)
+int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 {
 	struct proc *old_current;
 	struct kref *new_dot_ref;
@@ -1437,9 +1437,12 @@ int plan9setup(struct proc *new_proc, struct proc *parent)
 		poperror();
 		return 0;
 	}
-	/* Copy semantics: do not change this without revisiting proc_destroy,
-	 * close_9ns_files, and closefgrp. */
-	new_proc->fgrp = dupfgrp(new_proc, parent->fgrp);
+	/* When we use the old fgrp, we have copy semantics: do not change this
+	 * without revisiting proc_destroy, close_9ns_files, and closefgrp. */
+	if (flags & PROC_DUP_FGRP)
+		new_proc->fgrp = dupfgrp(new_proc, parent->fgrp);
+	else
+		new_proc->fgrp = newfgrp();
 	/* Shared semantics */
 	kref_get(&parent->pgrp->ref, 1);
 	new_proc->pgrp = parent->pgrp;

@@ -10,6 +10,9 @@
 #include <ros/arch/arch.h>
 #include <string.h>
 
+/* Process creation flags */
+#define PROC_DUP_FGRP			1
+
 #define PROCINFO_MAX_ARGP 32
 #define PROCINFO_ARGBUF_SIZE 3072
 

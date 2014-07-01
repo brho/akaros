@@ -61,7 +61,7 @@ void proc_init(void);
 
 /* Process management: */
 struct proc *pid_nth(unsigned int n);
-error_t proc_alloc(struct proc **pp, struct proc *parent);
+error_t proc_alloc(struct proc **pp, struct proc *parent, int flags);
 void __proc_ready(struct proc *p);
 struct proc *proc_create(struct file *prog, char **argv, char **envp);
 int __proc_set_state(struct proc *p, uint32_t state) WRITES(p->state);

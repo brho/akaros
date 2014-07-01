@@ -992,7 +992,7 @@ int sysiounit(int fd);
 void close_9ns_files(struct proc *p, bool only_cloexec);
 void print_chaninfo(struct chan *ch);
 void print_9ns_files(struct proc *p);
-int plan9setup(struct proc *new_proc, struct proc *parent);
+int plan9setup(struct proc *new_proc, struct proc *parent, int flags);
 int iseve(void);
 int fd_getfl(int fd);
 int fd_setfl(int fd, int flags);
