@@ -70,7 +70,8 @@ struct dirtab roottab[MAXFILE] = {
 	{"env", {9, 10, QTDIR}, 0, DMDIR | 0777},
 	{"root", {10, 11, QTDIR}, 0, DMDIR | 0777},
 	{"srv", {11, 12, QTDIR}, 0, DMDIR | 0777},
-	{"mnt", {12, 0, QTDIR}, 0, DMDIR | 0777},
+	{"mnt", {12, 13, QTDIR}, 0, DMDIR | 0777},
+	{"proc", {13, 0, QTDIR}, 0, DMDIR | 0777},
 };
 
 struct rootdata {
