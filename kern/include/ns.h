@@ -318,7 +318,8 @@ enum {
 #define NS_UDPCK_SHIFT 3
 #define NS_TCPCK_SHIFT 4
 #define NS_PKTCK_SHIFT 5
-#define NS_SHIFT_MAX 5
+#define NS_TSO_SHIFT 6
+#define NS_SHIFT_MAX 6
 
 enum {
 	BINTR = (1 << 0),
@@ -327,8 +328,9 @@ enum {
 	Budpck = (1 << NS_UDPCK_SHIFT),	/* udp checksum */
 	Btcpck = (1 << NS_TCPCK_SHIFT),	/* tcp checksum */
 	Bpktck = (1 << NS_PKTCK_SHIFT),	/* packet checksum */
+	Btso = (1 << NS_TSO_SHIFT),	/* TSO */
 };
-#define BCKSUM_FLAGS (Bipck|Budpck|Btcpck|Bpktck)
+#define BCKSUM_FLAGS (Bipck|Budpck|Btcpck|Bpktck|Btso)
 
 struct block {
 	struct block *next;
@@ -342,6 +344,7 @@ struct block {
 	uint16_t checksum;			/* IP checksum of complete packet (minus media header) */
 	uint16_t checksum_start;		/* off from start of block to start csum */
 	uint16_t checksum_offset;		/* off from checksum_offset to store csum */
+	uint16_t mss;               /* TCP MSS for TSO */
 };
 #define BLEN(s)	((s)->wp - (s)->rp)
 #define BALLOC(s) ((s)->lim - (s)->base)

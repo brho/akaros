@@ -937,6 +937,7 @@ enum {
 	NETF_TCPCK = (1 << NS_TCPCK_SHIFT),	/* xmit tcp checksum */
 	NETF_PADMIN = (1 << NETF_SG_SHIFT),	/* device pads to mintu */
 	NETF_SG	= (1 << NETF_SG_SHIFT),		/* device can do scatter/gather */
+	NETF_TSO = (1 << NS_TSO_SHIFT),	/* device can do TSO */
 };
 /*
  *  a network interface
