@@ -8,6 +8,7 @@ void ( _panic)(const char* NTS, int, const char* NTS, ...)
     __attribute__((noreturn));
 
 #define warn(...) _warn(__FILE__, __LINE__, __VA_ARGS__)
+#define warn_once(...) run_once_racy(warn(__VA_ARGS__))
 #define panic(...) _panic(__FILE__, __LINE__, __VA_ARGS__)
 #define exhausted(...) _panic(__FILE__, __LINE__, __VA_ARGS__)
 
