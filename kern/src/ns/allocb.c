@@ -14,8 +14,9 @@
 #include <ip.h>
 #include <process.h>
 
+/* Note that Hdrspc is only available via padblock (to the 'left' of the rp). */
 enum {
-	Hdrspc = 64,				/* leave room for high-level headers */
+	Hdrspc = 128,		/* leave room for high-level headers */
 	Bdead = 0x51494F42,	/* "QIOB" */
 	BLOCKALIGN = 32,	/* was the old BY2V in inferno, which was 8 */
 };
@@ -42,6 +43,9 @@ static struct block *_allocb(int size, int mem_flags)
 	b->list = NULL;
 	b->free = NULL;
 	b->flag = 0;
+	b->extra_len = 0;
+	b->nr_extra_bufs = 0;
+	b->extra_data = 0;
 
 	addr = (uintptr_t) b;
 	addr = ROUNDUP(addr + sizeof(struct block), BLOCKALIGN);
@@ -71,6 +75,33 @@ struct block *allocb(int size)
 	return _allocb(size, KMALLOC_WAIT);
 }
 
+/* Makes sure b has nr_bufs extra_data.  Will grow, but not shrink, an existing
+ * extra_data array.  When growing, it'll copy over the old entries.  All new
+ * entries will be zeroed.  mem_flags determines if we'll block on kmallocs.
+ *
+ * Caller is responsible for concurrent access to the block's metadata. */
+void block_add_extd(struct block *b, unsigned int nr_bufs, int mem_flags)
+{
+	unsigned int old_nr_bufs = b->nr_extra_bufs;
+	size_t old_amt = sizeof(struct extra_bdata) * old_nr_bufs;
+	size_t new_amt = sizeof(struct extra_bdata) * nr_bufs;
+	void *new_bdata;
+
+	if (old_nr_bufs >= nr_bufs)
+		return;
+	if (b->extra_data) {
+		new_bdata = krealloc(b->extra_data, new_amt, mem_flags);
+		if (!new_bdata)
+			return;
+		memset(new_bdata + old_amt, 0, new_amt - old_amt);
+	} else {
+		new_bdata = kzmalloc(new_amt, mem_flags);
+		if (!new_bdata)
+			return;
+	}
+	b->extra_data = new_bdata;
+	b->nr_extra_bufs = nr_bufs;
+}
 
 /*
  *  interrupt time allocation
@@ -103,10 +134,20 @@ struct block *iallocb(int size)
 void freeb(struct block *b)
 {
 	void *dead = (void *)Bdead;
+	struct extra_bdata *ebd;
 
 	if (b == NULL)
 		return;
 
+	/* assuming our release method is kfree, which will change when we support
+	 * user buffers */
+	for (int i = 0; i < b->nr_extra_bufs; i++) {
+		ebd = &b->extra_data[i];
+		if (ebd->base)
+			kfree((void*)ebd->base);
+	}
+	kfree(b->extra_data);	/* harmless if it is 0 */
+	b->extra_data = 0;		/* in case the block is reused by a free override */
 	/*
 	 * drivers which perform non cache coherent DMA manage their own buffer
 	 * pool of uncached buffers and provide their own free routine.
@@ -133,6 +174,7 @@ void freeb(struct block *b)
 void checkb(struct block *b, char *msg)
 {
 	void *dead = (void *)Bdead;
+	struct extra_bdata *ebd;
 
 	if (b == dead)
 		panic("checkb b %s 0x%lx", msg, b);
@@ -154,10 +196,60 @@ void checkb(struct block *b, char *msg)
 		panic("checkb 3 %s 0x%lx 0x%lx", msg, b->rp, b->lim);
 	if (b->wp > b->lim)
 		panic("checkb 4 %s 0x%lx 0x%lx", msg, b->wp, b->lim);
+	if (b->nr_extra_bufs && !b->extra_data)
+		panic("checkb 5 %s missing extra_data", msg);
+
+	for (int i = 0; i < b->nr_extra_bufs; i++) {
+		ebd = &b->extra_data[i];
+		if (ebd->base) {
+			assert(kmalloc_refcnt((void*)ebd->base));
+		}
+	}
 
 }
 
 void iallocsummary(void)
 {
 	printd("ialloc %lu/%lu\n", atomic_read(&ialloc_bytes), 0 /*conf.ialloc */ );
+}
+
+void printblock(struct block *b)
+{
+	unsigned char *c;
+	unsigned int off, elen;
+	struct extra_bdata *e;
+
+	printk("block of BLEN = %d, with %d header and %d data in %d extras\n",
+	       BLEN(b), BHLEN(b), b->extra_len, b->nr_extra_bufs);
+
+	printk("header:\n");
+	printk("%2x:\t", 0);
+	off = 0;
+	for (c = b->rp; c < b->wp; c++) {
+		printk("  %02x", *c & 0xff);
+		off++;
+		if (off % 8 == 0) {
+			printk("\n");
+			printk("%2x:\t", off);
+		}
+	}
+	printk("\n");
+	elen = b->extra_len;
+	for (int i = 0; (i < b->nr_extra_bufs) && elen; i++) {
+		e = &b->extra_data[i];
+		if (e->len == 0)
+			continue;
+		elen -= e->len;
+		printk("data %d:\n", i);
+		printk("%2x:\t", 0);
+		for (off = 0; off < e->len; off++) {
+			c = (unsigned char *)e->base + e->off + off;
+			printk("  %02x", *c & 0xff);
+			if ((off + 1) % 8 == 0 && off +1 < e->len) {
+				printk("\n");
+				printk("%2x:\t", off + 1);
+			}
+		}
+	}
+	printk("\n");
 }

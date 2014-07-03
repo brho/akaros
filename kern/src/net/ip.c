@@ -296,7 +296,7 @@ ipoput4(struct Fs *f,
 
 	/* If we dont need to fragment just send it */
 	medialen = ifc->maxtu - ifc->m->hsize;
-	if (len <= medialen) {
+	if (bp->flag & Btso || len <= medialen) {
 		if (!gating)
 			hnputs(eh->id, NEXT_ID(ip->id4));
 		hnputs(eh->length, len);
@@ -342,6 +342,8 @@ ipoput4(struct Fs *f,
 	else
 		lid = NEXT_ID(ip->id4);
 
+	/* advance through the blist enough to drop IP4HDR size.  this should
+	 * usually just be the first block. */
 	offset = IP4HDR;
 	while (xp != NULL && offset && offset >= BLEN(xp)) {
 		offset -= BLEN(xp);
@@ -355,7 +357,7 @@ ipoput4(struct Fs *f,
 		fragoff = 0;
 	dlen += fragoff;
 	for (; fragoff < dlen; fragoff += seglen) {
-		nb = allocb(IP4HDR + seglen);
+		nb = blist_clone(xp, IP4HDR, seglen, fragoff);
 		feh = (struct Ip4hdr *)(nb->rp);
 
 		memmove(nb->wp, eh, IP4HDR);
@@ -369,27 +371,6 @@ ipoput4(struct Fs *f,
 
 		hnputs(feh->length, seglen + IP4HDR);
 		hnputs(feh->id, lid);
-
-		/* Copy up the data area */
-		chunk = seglen;
-		while (chunk) {
-			if (!xp) {
-				ip->stats[OutDiscards]++;
-				ip->stats[FragFails]++;
-				freeblist(nb);
-				netlog(f, Logip, "!xp: chunk %d\n", chunk);
-				goto raise;
-			}
-			blklen = chunk;
-			if (BLEN(xp) < chunk)
-				blklen = BLEN(xp);
-			memmove(nb->wp, xp->rp, blklen);
-			nb->wp += blklen;
-			xp->rp += blklen;
-			chunk -= blklen;
-			if (xp->rp == xp->wp)
-				xp = xp->next;
-		}
 
 		feh->cksum[0] = 0;
 		feh->cksum[1] = 0;

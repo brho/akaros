@@ -360,6 +360,8 @@ static int etheroq(struct ether *ether, struct block *bp)
 
 	ether->netif.outpackets++;
 
+	if (!(ether->netif.feat & NETF_SG))
+		bp = linearizeblock(bp);
 	/*
 	 * Check if the packet has to be placed back onto the input queue,
 	 * i.e. if it's a loopback or broadcast packet or the interface is

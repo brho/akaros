@@ -332,6 +332,13 @@ enum {
 };
 #define BCKSUM_FLAGS (Bipck|Budpck|Btcpck|Bpktck|Btso)
 
+struct extra_bdata {
+	uintptr_t base;
+	/* using u32s for packing reasons.  this means no extras > 4GB */
+	uint32_t off;
+	uint32_t len;
+};
+
 struct block {
 	struct block *next;
 	struct block *list;
@@ -343,11 +350,16 @@ struct block {
 	uint16_t flag;
 	uint16_t checksum;			/* IP checksum of complete packet (minus media header) */
 	uint16_t checksum_start;		/* off from start of block to start csum */
-	uint16_t checksum_offset;		/* off from checksum_offset to store csum */
+	uint16_t checksum_offset;		/* off from checksum_start to store csum */
 	uint16_t mss;               /* TCP MSS for TSO */
+	/* might want something to track the next free extra_data slot */
+	size_t extra_len;
+	unsigned int nr_extra_bufs;
+	struct extra_bdata *extra_data;
 };
-#define BLEN(s)	((s)->wp - (s)->rp)
-#define BALLOC(s) ((s)->lim - (s)->base)
+#define BLEN(s)	((s)->wp - (s)->rp + (s)->extra_len)
+#define BHLEN(s) ((s)->wp - (s)->rp)
+#define BALLOC(s) ((s)->lim - (s)->base + (s)->extra_len)
 
 struct chan {
 	spinlock_t lock;
@@ -605,6 +617,7 @@ void addprog(struct proc *);
 void addrootfile(char *unused_char_p_t, uint8_t * unused_uint8_p_t, uint32_t);
 struct block *adjustblock(struct block *, int);
 struct block *allocb(int);
+void block_add_extd(struct block *b, unsigned int nr_bufs, int mem_flags);
 int anyhigher(void);
 int anyready(void);
 void _assert(char *unused_char_p_t);
@@ -634,6 +647,7 @@ struct mhead *newmhead(struct chan *from);
 int cmount(struct chan *, struct chan *, int unused_int, char *unused_char_p_t);
 void cnameclose(struct cname *);
 struct block *concatblock(struct block *);
+struct block *linearizeblock(struct block *b);
 void confinit(void);
 void copen(struct chan *);
 struct block *copyblock(struct block *, int);
@@ -708,6 +722,7 @@ void hnputl(void *, uint32_t);
 void hnputs(void *, uint16_t);
 struct block *iallocb(int);
 void iallocsummary(void);
+void printblock(struct block *b);
 void ilock(spinlock_t *);
 int iprint(char *unused_char_p_t, ...);
 void isdir(struct chan *);
@@ -779,6 +794,10 @@ int qcanread(struct queue *);
 void qclose(struct queue *);
 int qconsume(struct queue *, void *, int);
 struct block *qcopy(struct queue *, int unused_int, uint32_t);
+struct block *qclone(struct queue *q, int header_len, int len,
+                     uint32_t offset);
+struct block *blist_clone(struct block *blist, int header_len, int len,
+                          uint32_t offset);
 int qdiscard(struct queue *, int);
 void qflush(struct queue *);
 void qfree(struct queue *);

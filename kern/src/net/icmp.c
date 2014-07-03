@@ -176,10 +176,9 @@ static void icmpkick(void *x, struct block *bp)
 	if (bp == NULL)
 		return;
 
-	if (blocklen(bp) < ICMP_IPSIZE + ICMP_HDRSIZE) {
-		freeblist(bp);
+	bp = pullupblock(bp, ICMP_IPSIZE + ICMP_HDRSIZE);
+	if (bp == 0)
 		return;
-	}
 	p = (Icmp *) (bp->rp);
 	p->vihl = IP_VER4;
 	ipriv = c->p->priv;

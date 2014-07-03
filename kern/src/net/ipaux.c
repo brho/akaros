@@ -216,6 +216,53 @@ uint8_t v6solicitednodemask[IPaddrlen] = {
 
 int v6snpreflen = 13;
 
+uint16_t ptclcsum_one(struct block *bp, int offset, int len)
+{
+	uint8_t *addr;
+	uint32_t losum, hisum;
+	uint16_t csum;
+	int odd, blocklen, x, i, boff;
+	struct extra_bdata *ebd;
+
+	hisum = 0;
+	losum = 0;
+	odd = 0;
+
+	if (offset < BHLEN(bp)) {
+		x = MIN(len, BHLEN(bp) - offset);
+		odd = (odd + x) & 1;
+		addr = bp->rp + offset;
+		losum = ptclbsum(addr, x);
+		len -= x;
+		offset = 0;
+	} else {
+		offset -= BHLEN(bp);
+	}
+	for (int i = 0; (i < bp->nr_extra_bufs) && len; i++) {
+		ebd = &bp->extra_data[i];
+		boff = MIN(offset, ebd->len);
+		if (offset) {
+			offset -= boff;
+			if (offset)
+				continue;
+		}
+		x = MIN(len, ebd->len - boff);
+		addr = (void *)(ebd->base + ebd->off);
+		if (odd)
+			hisum += ptclbsum(addr, x);
+		else
+			losum += ptclbsum(addr, x);
+		len -= x;
+
+	}
+	losum += hisum >> 8;
+	losum += (hisum & 0xff) << 8;
+	while ((csum = losum >> 16) != 0)
+		losum = csum + (losum & 0xffff);
+
+	return losum & 0xffff;
+}
+
 uint16_t ptclcsum(struct block *bp, int offset, int len)
 {
 	uint8_t *addr;
@@ -234,7 +281,7 @@ uint16_t ptclcsum(struct block *bp, int offset, int len)
 	addr = bp->rp + offset;
 	blocklen = BLEN(bp) - offset;
 
-	if (bp->next == NULL) {
+	if (bp->next == NULL && bp->extra_len == 0) {
 		if (blocklen < len)
 			len = blocklen;
 		return ~ptclbsum(addr, len) & 0xffff;
@@ -245,11 +292,8 @@ uint16_t ptclcsum(struct block *bp, int offset, int len)
 
 	odd = 0;
 	while (len) {
-		x = blocklen;
-		if (len < x)
-			x = len;
-
-		csum = ptclbsum(addr, x);
+		x = MIN(blocklen, len);
+		csum = ptclcsum_one(bp, offset, x);
 		if (odd)
 			hisum += csum;
 		else
@@ -261,7 +305,7 @@ uint16_t ptclcsum(struct block *bp, int offset, int len)
 		if (bp == NULL)
 			break;
 		blocklen = BLEN(bp);
-		addr = bp->rp;
+		offset = 0;
 	}
 
 	losum += hisum >> 8;

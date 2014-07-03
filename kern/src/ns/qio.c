@@ -13,6 +13,12 @@
 #include <smp.h>
 #include <ip.h>
 
+#define WARN_EXTRA(b)                                                          \
+{                                                                              \
+	if ((b)->extra_len)                                                        \
+		warn_once("%s doesn't handle extra_data", __FUNCTION__);               \
+}
+
 static uint32_t padblockcnt;
 static uint32_t concatblockcnt;
 static uint32_t pullupblockcnt;
@@ -104,6 +110,7 @@ struct block *padblock(struct block *bp, int size)
 			return bp;
 		}
 
+		WARN_EXTRA(bp);
 		if (bp->next)
 			panic("padblock %p", getcallerpc(&bp));
 		n = BLEN(bp);
@@ -117,6 +124,8 @@ struct block *padblock(struct block *bp, int size)
 		nbp->rp -= size;
 	} else {
 		size = -size;
+
+		WARN_EXTRA(bp);
 
 		if (bp->next)
 			panic("padblock %p", getcallerpc(&bp));
@@ -182,6 +191,8 @@ struct block *concatblock(struct block *bp)
 	if (bp->next == 0)
 		return bp;
 
+	/* probably use parts of qclone */
+	WARN_EXTRA(bp);
 	nb = allocb(blocklen(bp));
 	for (f = bp; f; f = f->next) {
 		len = BLEN(f);
@@ -194,20 +205,91 @@ struct block *concatblock(struct block *bp)
 	return nb;
 }
 
+/* Returns a block with the remaining contents of b all in the main body of the
+ * returned block.  Replace old references to b with the returned value (which
+ * may still be 'b', if no change was needed. */
+struct block *linearizeblock(struct block *b)
+{
+	struct block *newb;
+	size_t len;
+	struct extra_bdata *ebd;
+
+	if (!b->extra_len)
+		return b;
+
+	newb = allocb(BLEN(b));
+	len = BHLEN(b);
+	memcpy(newb->wp, b->rp, len);
+	newb->wp += len;
+	len = b->extra_len;
+	for (int i = 0; (i < b->nr_extra_bufs) && len; i++) {
+		ebd = &b->extra_data[i];
+		if (!ebd->base || !ebd->len)
+			continue;
+		memcpy(newb->wp, (void*)(ebd->base + ebd->off), ebd->len);
+		newb->wp += ebd->len;
+		len -= ebd->len;
+	}
+	/* TODO: any other flags that need copied over? */
+	if (b->flag & BCKSUM_FLAGS) {
+		newb->flag |= (b->flag & BCKSUM_FLAGS);
+		newb->checksum_start = b->checksum_start;
+		newb->checksum_offset = b->checksum_offset;
+	}
+	freeb(b);
+	return newb;
+}
+
 /*
- *  make sure the first block has at least n bytes
+ *  make sure the first block has at least n bytes in its main body
  */
 struct block *pullupblock(struct block *bp, int n)
 {
-	int i;
+	int i, len, seglen;
 	struct block *nbp;
+	struct extra_bdata *ebd;
 
 	/*
 	 *  this should almost always be true, it's
 	 *  just to avoid every caller checking.
 	 */
-	if (BLEN(bp) >= n)
+	if (BHLEN(bp) >= n)
 		return bp;
+
+	 /* a start at explicit main-body / header management */
+	if (bp->extra_len) {
+		if (n > bp->lim - bp->rp) {
+			/* would need to realloc a new block and copy everything over. */
+			panic("can't pullup, no place to put it\n");
+		}
+		len = n - BHLEN(bp);
+		if (len > bp->extra_len)
+			panic("pullup more than extra (%d, %d, %d)\n",
+			      n, BHLEN(bp), bp->extra_len);
+		checkb(bp, "before pullup");
+		for (int i = 0; (i < bp->nr_extra_bufs) && len; i++) {
+			ebd = &bp->extra_data[i];
+			if (!ebd->base || !ebd->len)
+				continue;
+			seglen = MIN(ebd->len, len);
+			memcpy(bp->wp, (void*)(ebd->base + ebd->off), seglen);
+			bp->wp += seglen;
+			len -= seglen;
+			ebd->len -= seglen;
+			ebd->off += seglen;
+			bp->extra_len -= seglen;
+			if (ebd->len == 0) {
+				kfree((void *)ebd->base);
+				ebd->len = 0;
+				ebd->off = 0;
+			}
+		}
+		/* maybe just call pullupblock recursively here */
+		if (len)
+			panic("pullup %d bytes overdrawn\n", len);
+		checkb(bp, "after pullup");
+		return bp;
+	}
 
 	/*
 	 *  if not enough room in the first block,
@@ -257,6 +339,7 @@ struct block *pullupqueue(struct queue *q, int n)
 {
 	struct block *b;
 
+	/* TODO: lock to protect the queue links? */
 	if ((BLEN(q->bfirst) >= n))
 		return q->bfirst;
 	q->bfirst = pullupblock(q->bfirst, n);
@@ -287,6 +370,7 @@ struct block *trimblock(struct block *bp, int offset, int len)
 		bp = nb;
 	}
 
+	WARN_EXTRA(bp);
 	startb = bp;
 	bp->rp += offset;
 
@@ -320,6 +404,7 @@ struct block *copyblock(struct block *bp, int count)
 		nbp->checksum_start = bp->checksum_start;
 		nbp->checksum_offset = bp->checksum_offset;
 	}
+	WARN_EXTRA(bp);
 	for (; count > 0 && bp != 0; bp = bp->next) {
 		l = BLEN(bp);
 		if (l > count)
@@ -348,6 +433,7 @@ struct block *adjustblock(struct block *bp, int len)
 		return NULL;
 	}
 
+	WARN_EXTRA(bp);
 	if (bp->rp + len > bp->lim) {
 		nbp = copyblock(bp, len);
 		freeblist(bp);
@@ -381,6 +467,8 @@ int pullblock(struct block **bph, int count)
 
 	while (*bph != NULL && count != 0) {
 		bp = *bph;
+	WARN_EXTRA(bp);
+
 		n = BLEN(bp);
 		if (count < n)
 			n = count;
@@ -442,7 +530,8 @@ struct block *qget(struct queue *q)
 int qdiscard(struct queue *q, int len)
 {
 	struct block *b;
-	int dowakeup, n, sofar;
+	int dowakeup, n, sofar, body_amt, extra_amt;
+	struct extra_bdata *ebd;
 
 	spin_lock_irqsave(&q->lock);
 	for (sofar = 0; sofar < len; sofar += n) {
@@ -459,8 +548,32 @@ int qdiscard(struct queue *q, int len)
 			freeb(b);
 		} else {
 			n = len - sofar;
-			b->rp += n;
 			q->dlen -= n;
+			/* partial block removal */
+			body_amt = MIN(BHLEN(b), n);
+			b->rp += body_amt;
+			extra_amt = n - body_amt;
+			/* reduce q->len by the amount we remove from the extras.  The
+			 * header will always be accounted for above, during block removal.
+			 * */
+			q->len -= extra_amt;
+			for (int i = 0; (i < b->nr_extra_bufs) && extra_amt; i++) {
+				ebd = &b->extra_data[i];
+				if (!ebd->base || !ebd->len)
+					continue;
+				if (extra_amt >= ebd->len) {
+					/* remove the entire entry, note the kfree release */
+					b->extra_len -= ebd->len;
+					extra_amt -= ebd->len;
+					kfree((void*)ebd->base);
+					ebd->base = ebd->off = ebd->len = 0;
+					continue;
+				}
+				ebd->off += extra_amt;
+				ebd->len -= extra_amt;
+				b->extra_len -= extra_amt;
+				extra_amt = 0;
+			}
 		}
 	}
 
@@ -521,6 +634,7 @@ int qconsume(struct queue *q, void *vp, int len)
 		tofree = b;
 	};
 
+	WARN_EXTRA(b);
 	if (n < len)
 		len = n;
 	memmove(p, b->rp, len);
@@ -666,6 +780,7 @@ struct block *packblock(struct block *bp)
 	struct block **l, *nbp;
 	int n;
 
+	WARN_EXTRA(bp);
 	for (l = &bp; *l; l = &(*l)->next) {
 		nbp = *l;
 		n = BLEN(nbp);
@@ -719,6 +834,7 @@ int qproduce(struct queue *q, void *vp, int len)
 		/* b->next = 0; done by iallocb() */
 		q->len += BALLOC(b);
 	}
+	WARN_EXTRA(b);
 	memmove(b->wp, p, len);
 	producecnt += len;
 	b->wp += len;
@@ -740,10 +856,166 @@ int qproduce(struct queue *q, void *vp, int len)
 	return len;
 }
 
+/* Add an extra_data entry to newb at newb_idx pointing to b's body, starting at
+ * body_rp, for up to len.  Returns the len consumed. 
+ *
+ * The base is 'b', so that we can kfree it later.  This currently ties us to
+ * using kfree for the release method for all extra_data.
+ *
+ * It is possible to have a body size that is 0, if there is no offset, and
+ * b->wp == b->rp.  This will have an extra data entry of 0 length. */
+static size_t point_to_body(struct block *b, uint8_t *body_rp,
+                            struct block *newb, unsigned int newb_idx,
+                            size_t len)
+{
+	struct extra_bdata *ebd = &newb->extra_data[newb_idx];
+
+	assert(newb_idx < newb->nr_extra_bufs);
+
+	kmalloc_incref(b);
+	ebd->base = (uintptr_t)b;
+	ebd->off = (uint32_t)(body_rp - (uint8_t*)b);
+	ebd->len = MIN(b->wp - body_rp, len);	/* think of body_rp as b->rp */
+	assert((int)ebd->len >= 0);
+	newb->extra_len += ebd->len;
+	return ebd->len;
+}
+
+/* Add an extra_data entry to newb at newb_idx pointing to b's b_idx'th
+ * extra_data buf, at b_off within that buffer, for up to len.  Returns the len
+ * consumed.
+ *
+ * We can have blocks with 0 length, but they are still refcnt'd.  See above. */
+static size_t point_to_buf(struct block *b, unsigned int b_idx, uint32_t b_off,
+                           struct block *newb, unsigned int newb_idx,
+                           size_t len)
+{
+	struct extra_bdata *n_ebd = &newb->extra_data[newb_idx];
+	struct extra_bdata *b_ebd = &b->extra_data[b_idx];
+
+	assert(b_idx < b->nr_extra_bufs);
+	assert(newb_idx < newb->nr_extra_bufs);
+
+	kmalloc_incref((void*)b_ebd->base);
+	n_ebd->base = b_ebd->base;
+	n_ebd->off = b_ebd->off + b_off;
+	n_ebd->len = MIN(b_ebd->len - b_off, len);
+	newb->extra_len += n_ebd->len;
+	return n_ebd->len;
+}
+
+/* given a string of blocks, fills the new block's extra_data  with the contents
+ * of the blist [offset, len + offset)
+ *
+ * returns 0 on success.  the only failure is if the extra_data array was too
+ * small, so this returns a positive integer saying how big the extra_data needs
+ * to be.
+ *
+ * callers are responsible for protecting the list structure. */
+static int __blist_clone_to(struct block *blist, struct block *newb, int len,
+                            uint32_t offset)
+{
+	struct block *b, *first;
+	unsigned int nr_bufs = 0;
+	unsigned int b_idx, newb_idx = 0;
+	uint8_t *first_main_body = 0;
+
+	/* find the first block; keep offset relative to the latest b in the list */
+	for (b = blist; b; b = b->next) {
+		if (BLEN(b) > offset)
+			break;
+		offset -= BLEN(b);
+	}
+	/* qcopy semantics: if you asked for an offset outside the block list, you
+	 * get an empty block back */
+	if (!b)
+		return 0;
+	first = b;
+	/* upper bound for how many buffers we'll need in newb */
+	for (/* b is set*/; b; b = b->next) {
+		nr_bufs += 1 + b->nr_extra_bufs;	/* 1 for the main body */
+	}
+	/* we might be holding a spinlock here, so we won't wait for kmalloc */
+	block_add_extd(newb, nr_bufs, 0);
+	if (newb->nr_extra_bufs < nr_bufs) {
+		/* caller will need to alloc these, then re-call us */
+		return nr_bufs;
+	}
+	for (b = first; b && len; b = b->next) {
+		b_idx = 0;
+		if (offset) {
+			if (offset < BHLEN(b)) {
+				/* off is in the main body */
+				len -= point_to_body(b, b->rp + offset, newb, newb_idx, len);
+				newb_idx++;
+			} else {
+				/* off is in one of the buffers (or just past the last one).
+				 * we're not going to point to b's main body at all. */
+				offset -= BHLEN(b);
+				assert(b->extra_data);
+				/* assuming these extrabufs are packed, or at least that len
+				 * isn't gibberish */
+				while (b->extra_data[b_idx].len <= offset) {
+					offset -= b->extra_data[b_idx].len;
+					b_idx++;
+				}
+				/* now offset is set to our offset in the b_idx'th buf */
+				len -= point_to_buf(b, b_idx, offset, newb, newb_idx, len);
+				newb_idx++;
+				b_idx++;
+			}
+			offset = 0;
+		} else {
+			len -= point_to_body(b, b->rp, newb, newb_idx, len);
+			newb_idx++;
+		}
+		/* knock out all remaining bufs.  we only did one point_to_ op by now,
+		 * and any point_to_ could be our last if it consumed all of len. */
+		for (int i = b_idx; (i < b->nr_extra_bufs) && len; i++) {
+			len -= point_to_buf(b, i, 0, newb, newb_idx, len);
+			newb_idx++;
+		}
+	}
+	return 0;
+}
+
+struct block *blist_clone(struct block *blist, int header_len, int len,
+                          uint32_t offset)
+{
+	int ret;
+	struct block *newb = allocb(header_len);
+	do {
+		ret = __blist_clone_to(blist, newb, len, offset);
+		if (ret)
+			block_add_extd(newb, ret, KMALLOC_WAIT);
+	} while (ret);
+	return newb;
+}
+
+/* given a queue, makes a single block with header_len reserved space in the
+ * block main body, and the contents of [offset, len + offset) pointed to in the
+ * new blocks ext_data. */
+struct block *qclone(struct queue *q, int header_len, int len, uint32_t offset)
+{
+	int ret;
+	struct block *newb = allocb(header_len);
+	/* the while loop should rarely be used: it would require someone
+	 * concurrently adding to the queue. */
+	do {
+		/* TODO: RCU: protecting the q list (b->next) (need read lock) */
+		spin_lock_irqsave(&q->lock);
+		ret = __blist_clone_to(q->bfirst, newb, len, offset);
+		spin_unlock_irqsave(&q->lock);
+		if (ret)
+			block_add_extd(newb, ret, KMALLOC_WAIT);
+	} while (ret);
+	return newb;
+}
+
 /*
  *  copy from offset in the queue
  */
-struct block *qcopy(struct queue *q, int len, uint32_t offset)
+struct block *qcopy_old(struct queue *q, int len, uint32_t offset)
 {
 	int sofar;
 	int n;
@@ -775,6 +1047,7 @@ struct block *qcopy(struct queue *q, int len, uint32_t offset)
 	for (sofar = 0; sofar < len;) {
 		if (n > len - sofar)
 			n = len - sofar;
+		WARN_EXTRA(b);
 		memmove(nb->wp, p, n);
 		qcopycnt += n;
 		sofar += n;
@@ -788,6 +1061,15 @@ struct block *qcopy(struct queue *q, int len, uint32_t offset)
 	spin_unlock_irqsave(&q->lock);
 
 	return nb;
+}
+
+struct block *qcopy(struct queue *q, int len, uint32_t offset)
+{
+#ifdef CONFIG_BLOCK_EXTRAS
+	return qclone(q, 0, len, offset);
+#else
+	return qcopy_old(q, len, offset);
+#endif
 }
 
 static void qinit_common(struct queue *q)
@@ -880,6 +1162,7 @@ static int qwait(struct queue *q)
  */
 void qaddlist(struct queue *q, struct block *b)
 {
+	/* TODO: q lock? */
 	/* queue the block */
 	if (q->bfirst)
 		q->blast->next = b;
@@ -910,6 +1193,45 @@ struct block *qremove(struct queue *q)
 	return b;
 }
 
+static size_t read_from_block(struct block *b, uint8_t *to, size_t amt)
+{
+	size_t copy_amt, retval = 0;
+	struct extra_bdata *ebd;
+	
+	copy_amt = MIN(BHLEN(b), amt);
+	memcpy(to, b->rp, copy_amt);
+	/* advance the rp, since this block not be completely consumed and future
+	 * reads need to know where to pick up from */
+	b->rp += copy_amt;
+	to += copy_amt;
+	amt -= copy_amt;
+	retval += copy_amt;
+	for (int i = 0; (i < b->nr_extra_bufs) && amt; i++) {
+		ebd = &b->extra_data[i];
+		/* skip empty entires.  if we track this in the struct block, we can
+		 * just start the for loop early */
+		if (!ebd->base || !ebd->len)
+			continue;
+		copy_amt = MIN(ebd->len, amt);
+		memcpy(to, (void*)(ebd->base + ebd->off), copy_amt);
+		/* we're actually consuming the entries, just like how we advance rp up
+		 * above, and might only consume part of one. */
+		ebd->len -= copy_amt;
+		ebd->off += copy_amt;
+		b->extra_len -= copy_amt;
+		if (!ebd->len) {
+			/* we don't actually have to decref here.  it's also done in
+			 * freeb().  this is the earliest we can free. */
+			kfree((void*)ebd->base);
+			ebd->base = ebd->off = 0;
+		}
+		to += copy_amt;
+		amt -= copy_amt;
+		retval += copy_amt;
+	}
+	return retval;
+}
+
 /*
  *  copy the contents of a string of blocks into
  *  memory.  emptied blocks are freed.  return
@@ -920,17 +1242,18 @@ struct block *bl2mem(uint8_t * p, struct block *b, int n)
 	int i;
 	struct block *next;
 
+	/* could be slicker here, since read_from_block is smart */
 	for (; b != NULL; b = next) {
 		i = BLEN(b);
 		if (i > n) {
-			memmove(p, b->rp, n);
-			b->rp += n;
+			/* partial block, consume some */
+			read_from_block(b, p, n);
 			return b;
 		}
-		memmove(p, b->rp, i);
+		/* full block, consume all and move on */
+		i = read_from_block(b, p, i);
 		n -= i;
 		p += i;
-		b->rp += i;
 		next = b->next;
 		freeb(b);
 	}
@@ -959,6 +1282,7 @@ struct block *mem2bl(uint8_t * p, int len)
 			n = Maxatomic;
 
 		*l = b = allocb(n);
+		/* TODO consider extra_data */
 		memmove(b->wp, p, n);
 		b->wp += n;
 		p += n;
@@ -1044,6 +1368,7 @@ struct block *qbread(struct queue *q, int len)
 	/* split block if it's too big and this is not a message queue */
 	nb = b;
 	if (n > len) {
+		WARN_EXTRA(b);
 		if ((q->state & Qmsg) == 0) {
 			n -= len;
 			b = allocb(n);
@@ -1299,10 +1624,10 @@ long qibwrite(struct queue *q, struct block *b)
  */
 int qwrite(struct queue *q, void *vp, int len)
 {
-	ERRSTACK(1);
 	int n, sofar;
 	struct block *b;
 	uint8_t *p = vp;
+	void *ext_buf;
 
 	QDEBUG if (!islo())
 		 printd("qwrite hi %p\n", getcallerpc(&q));
@@ -1310,18 +1635,32 @@ int qwrite(struct queue *q, void *vp, int len)
 	sofar = 0;
 	do {
 		n = len - sofar;
+		/* This is 64K, the max amount per single block.  Still a good value? */
 		if (n > Maxatomic)
 			n = Maxatomic;
 
+		/* If n is small, we don't need to bother with the extra_data.  But
+		 * until the whole stack can handle extd blocks, we'll use them
+		 * unconditionally. */
+#ifdef CONFIG_BLOCK_EXTRAS
+		/* allocb builds in 128 bytes of header space to all blocks, but this is
+		 * only available via padblock (to the left).  we also need some space
+		 * for pullupblock for some basic headers (like icmp) that get written
+		 * in directly */
+		b = allocb(64);
+		ext_buf = kmalloc(n, 0);
+		memcpy(ext_buf, p + sofar, n);
+		block_add_extd(b, 1, KMALLOC_WAIT); /* returns 0 on success */
+		b->extra_data[0].base = (uintptr_t)ext_buf;
+		b->extra_data[0].off = 0;
+		b->extra_data[0].len = n;
+		b->extra_len += n;
+#else
 		b = allocb(n);
-		if (waserror()) {
-			freeb(b);
-			nexterror();
-		}
 		memmove(b->wp, p + sofar, n);
-		poperror();
 		b->wp += n;
-
+#endif
+			
 		qbwrite(q, b);
 
 		sofar += n;
@@ -1351,6 +1690,7 @@ int qiwrite(struct queue *q, void *vp, int len)
 		b = iallocb(n);
 		if (b == NULL)
 			break;
+		/* TODO consider extra_data */
 		memmove(b->wp, p + sofar, n);
 		/* this adjusts BLEN to be n, or at least it should */
 		b->wp += n;
