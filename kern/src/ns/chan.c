@@ -169,6 +169,7 @@ struct chan *newchan(void)
 	c->mqid.vers = 0;
 	c->mqid.type = 0;
 	c->name = 0;
+	c->buf = NULL;
 	return c;
 }
 
@@ -258,6 +259,10 @@ void chanfree(struct chan *c)
 	}
 
 	cnameclose(c->name);
+	if (c->buf)
+		kfree(c->buf);
+	c->buf = NULL;
+	c->bufused = 0;
 
 	spin_lock(&(&chanalloc)->lock);
 	c->next = chanalloc.free;

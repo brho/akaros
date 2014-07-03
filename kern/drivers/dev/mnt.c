@@ -654,10 +654,17 @@ static int mntwstat(struct chan *c, uint8_t * dp, int n)
 	return n;
 }
 
+/* the servers should either return units of whole directory entries
+ * OR support seeking to an arbitrary place. One or other.
+ * Both are fine, but at least one is a minimum.
+ * If the return a partial result, but more than one result,
+ * we'll return a shorter read and the next offset will be aligned
+ */
 static long mntread(struct chan *c, void *buf, long n, int64_t off)
 {
 	uint8_t *p, *e;
 	int nc, cache, isdir, dirlen;
+	int numdirent = 0;
 
 	isdir = 0;
 	cache = c->flag & CCACHE;
@@ -682,16 +689,24 @@ static long mntread(struct chan *c, void *buf, long n, int64_t off)
 	}
 
 	n = mntrdwr(Tread, c, buf, n, off);
+
 	if (isdir) {
 		for (e = &p[n]; p + BIT16SZ < e; p += dirlen) {
 			dirlen = BIT16SZ + GBIT16(p);
-			if (p + dirlen > e)
+			if (p + dirlen > e){
 				break;
+			}
 			validstat(p, dirlen);
 			mntdirfix(p, c);
+			numdirent += dirlen;
 		}
-		if (p != e)
-			error(Esbadstat);
+		if (p != e) {
+			//error(Esbadstat);
+			/* not really. Maybe the server supports
+			 * arbitrary seek like go9p now does.
+			 */
+			n = numdirent;
+		}
 	}
 	return n;
 }

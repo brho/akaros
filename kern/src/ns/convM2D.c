@@ -20,8 +20,13 @@ int statcheck(uint8_t * buf, unsigned int nbuf)
 
 	ebuf = buf + nbuf;
 
-	if (nbuf < STATFIXLEN || nbuf != BIT16SZ + GBIT16(buf))
+	if (nbuf < STATFIXLEN || nbuf != BIT16SZ + GBIT16(buf)){
+		printk("nbuf %d, STATFIXLEN %d ", nbuf, STATFIXLEN);
+		printk("BIT16SZ %d, GBIT16(buf) %d ", 
+			BIT16SZ, GBIT16(buf));
+		printk("This is bad!\n");
 		return -1;
+	}
 
 	buf += STATFIXLEN - 4 * BIT16SZ;
 
@@ -31,8 +36,9 @@ int statcheck(uint8_t * buf, unsigned int nbuf)
 		buf += BIT16SZ + GBIT16(buf);
 	}
 
-	if (buf != ebuf)
+	if (buf != ebuf){
 		return -1;
+	}
 
 	return 0;
 }

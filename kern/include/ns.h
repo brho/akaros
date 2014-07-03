@@ -389,6 +389,9 @@ struct chan {
 	struct chan *mchan;			/* channel to mounted server */
 	struct qid mqid;			/* qid of root of mount point */
 	struct cname *name;
+	/* hack for reads to try to get them right. */
+	void *buf;
+	int bufused;
 };
 
 struct cname {

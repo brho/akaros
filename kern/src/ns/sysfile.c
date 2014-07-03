@@ -15,19 +15,23 @@
 
 static int growfd(struct fgrp *f, int fd)
 {
+	
 	int n;
 	struct chan **nfd, **ofd;
 
-	if (fd < f->nfd)
+	if (fd < f->nfd) {
 		return 0;
+	}
 	n = f->nfd + DELTAFD;
 	if (n > MAXNFD)
 		n = MAXNFD;
-	if (fd >= n)
+	if (fd >= n) {
 		return -1;
+	}
 	nfd = kzmalloc(n * sizeof(struct chan *), 0);
-	if (nfd == NULL)
+	if (nfd == NULL) {
 		return -1;
+	}
 	ofd = f->fd;
 	memmove(nfd, ofd, f->nfd * sizeof(struct chan *));
 	f->fd = nfd;
@@ -38,6 +42,7 @@ static int growfd(struct fgrp *f, int fd)
 
 int newfd(struct chan *c)
 {
+	
 	int i;
 	struct fgrp *f = current->fgrp;
 
@@ -81,6 +86,7 @@ int newfd(struct chan *c)
 
 struct chan *fdtochan(struct fgrp *f, int fd, int mode, int chkmnt, int iref)
 {
+	
 	struct chan *c;
 
 	c = 0;
@@ -104,8 +110,9 @@ struct chan *fdtochan(struct fgrp *f, int fd, int mode, int chkmnt, int iref)
 		error(Ebadusefd);
 	}
 
-	if (mode < 0 || c->mode == ORDWR)
+	if (mode < 0 || c->mode == ORDWR) {
 		return c;
+	}
 
 	if ((mode & OTRUNC) && IS_RDONLY(c->mode)) {
 		if (iref)
@@ -171,13 +178,15 @@ int openmode(uint32_t omode)
 #endif
 	/* no error checking (we have a shitload of flags anyway), and we return the
 	 * basic access modes (RD/WR/ETC) */
-	if (omode == O_EXEC)
-		return O_RDONLY;
+	if (omode == O_EXEC) {
+	return O_RDONLY;
+	}
 	return omode & O_ACCMODE;
 }
 
 void fdclose(struct fgrp *f, int fd)
 {
+	
 	int i;
 	struct chan *c;
 
@@ -723,12 +732,8 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 
 	/* dirty dirent hack */
 	void *real_va = va;
-	void *buf_for_M = 0;
-	size_t buf_sz = 0;
-	long real_n = n;
 
 	if (waserror()) {
-		kfree(buf_for_M);
 		poperror();
 		return -1;
 	}
@@ -744,33 +749,30 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 
 	dir = c->qid.type & QTDIR;
 
-	/* dirty kdirent hack: userspace is expecting kdirents, but all of 9ns
-	 * produces Ms.  i'm assuming we're only being asked to read a single
-	 * dirent, which is usually the case for calls like readdir() (which just
-	 * calls read for a single dirent). */
-	if (dir)
+	/* kdirent hack: userspace is expecting kdirents, but all of 9ns
+	 * produces Ms.  Just save up what we don't use and append the
+	 * new stuff later. Allocate 2048 bytes for that purpose. 
+	 */
+	if (dir) {
 		assert(n >= sizeof(struct kdirent));
-	buf_sz = 2 * MIN_M_BUF_SZ - 1;
 	/* We need to read exactly one dirent and avoid reading too much from the
-	 * underlying dev, so that subsequent reads don't miss any dirents.  So we
-	 * start small, and if our buffer is too small (e.g. for long named
-	 * dirents), we increase by a minumum amount.  This way, we'll succeed on
-	 * the next invocation, but we won't have enough room for more than one
-	 * entry. */
+	 * underlying dev, so that subsequent reads don't miss any dirents. 
+	 * Buffer 2*MAXPATH, to be safe. Read off what you can. Return one
+	 * kdirent at a time. If you don't have enough, read more. If you run out,
+	 * you're done.
+	 */
+	if (!c->buf){
+		c->buf=kmalloc(2048, KMALLOC_WAIT);
+		c->bufused = 0;
+	}
+	}
 	while (waserror()) {
-		/* FYI: this scheme doesn't work with mounts */
-		if (!dir || strcmp(current_errstr(), Eshort))
-			nexterror();
-		buf_sz += MIN_M_BUF_SZ;
-		poperror();
+		printk("Well, sysread of a dir sucks.%s \n", current_errstr());
+		nexterror();
 	}
 	if (dir) {
-		if (!buf_for_M)
-			buf_for_M = kmalloc(buf_sz, KMALLOC_WAIT);
-		else
-			buf_for_M = krealloc(buf_for_M, buf_sz, KMALLOC_WAIT);
-		va = buf_for_M;
-		n = buf_sz;
+		va = c->buf + c->bufused;
+		n = 2048 - c->bufused;
 	}
 
 	/* this is the normal plan9 read */
@@ -802,8 +804,12 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 
 	/* dirty kdirent hack */
 	if (dir) {
-		convM2kdirent(buf_for_M, buf_sz, real_va, 0);
-		kfree(buf_for_M);
+		int amt;
+		c->bufused = c->bufused + n;
+		amt = convM2kdirent(c->buf, c->bufused, real_va, 0);
+		c->bufused -= amt;
+		memmove(c->buf, c->buf + amt, c->bufused);
+		n = amt;
 	}
 	poperror();	/* matching our while(waserror) */
 
@@ -927,6 +933,7 @@ int64_t sysseek(int fd, int64_t off, int whence)
 
 void validstat(uint8_t * s, int n)
 {
+	
 	int m;
 	char buf[64];
 
@@ -942,8 +949,9 @@ void validstat(uint8_t * s, int n)
 	 */
 	m = GBIT16(s);
 	s += BIT16SZ;
-	if (m + 1 > sizeof buf)
+	if (m + 1 > sizeof buf) {
 		return;
+	}
 	memmove(buf, s, m);
 	buf[m] = '\0';
 	/* name could be '/' */
@@ -977,6 +985,7 @@ int sysfstat(int fd, uint8_t *buf, int n)
 
 int sysfstatakaros(int fd, struct kstat *ks)
 {
+	
 	int n = 4096;
 	uint8_t *buf;
 	buf = kmalloc(n, KMALLOC_WAIT);
@@ -1015,6 +1024,7 @@ int sysstat(char *path, uint8_t *buf, int n)
 
 int sysstatakaros(char *path, struct kstat *ks)
 {
+	
 	int n = 4096;
 	uint8_t *buf;
 	buf = kmalloc(n, KMALLOC_WAIT);
@@ -1218,6 +1228,7 @@ struct dir *sysdirfstat(int fd)
 
 int sysdirwstat(char *name, struct dir *dir)
 {
+	
 	uint8_t *buf;
 	int r;
 
@@ -1231,6 +1242,7 @@ int sysdirwstat(char *name, struct dir *dir)
 
 int sysdirfwstat(int fd, struct dir *dir)
 {
+	
 	uint8_t *buf;
 	int r;
 
@@ -1244,12 +1256,14 @@ int sysdirfwstat(int fd, struct dir *dir)
 
 static long dirpackage(uint8_t * buf, long ts, struct kdirent **d)
 {
+	
 	char *s;
 	long ss, i, n, nn, m = 0;
 
 	*d = NULL;
-	if (ts <= 0)
+	if (ts <= 0) {
 		return ts;
+	}
 
 	/*
 	 * first find number of all stats, check they look like stats, & size all associated strings
@@ -1348,6 +1362,7 @@ int sysiounit(int fd)
  *   never happen with the current code). */
 void close_9ns_files(struct proc *p, bool only_cloexec)
 {
+	
 	struct fgrp *f = p->fgrp;
 
 	spin_lock(&f->lock);
@@ -1373,6 +1388,7 @@ void close_9ns_files(struct proc *p, bool only_cloexec)
 
 void print_chaninfo(struct chan *c)
 {
+	
 	char buf[64] = { 0 };
 	bool has_dev = c->type != -1;
 	if (has_dev && !devtab[c->type].chaninfo) {
@@ -1391,6 +1407,7 @@ void print_chaninfo(struct chan *c)
 
 void print_9ns_files(struct proc *p)
 {
+	
 	struct fgrp *f = p->fgrp;
 	spin_lock(&f->lock);
 	printk("9ns files for proc %d:\n", p->pid);
@@ -1408,6 +1425,7 @@ void print_9ns_files(struct proc *p)
  * copying the fgrp, and sharing the pgrp. */
 int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 {
+	
 	struct proc *old_current;
 	struct kref *new_dot_ref;
 	ERRSTACK(1);
