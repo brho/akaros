@@ -27,15 +27,14 @@ static atomic_t ialloc_bytes = 0;
  *  if mallocz gives us more than we asked for, leave room at the front
  *  for header.
  */
-struct block *_allocb(int size)
+static struct block *_allocb(int size, int mem_flags)
 {
 	struct block *b;
 	uintptr_t addr;
 	int n;
 
-	/* TODO: verify we end up with properly aligned blocks */
 	b = kmalloc(sizeof(struct block) + size + Hdrspc + (BLOCKALIGN - 1),
-				 KMALLOC_WAIT);
+				mem_flags);
 	if (b == NULL)
 		return NULL;
 
@@ -47,6 +46,7 @@ struct block *_allocb(int size)
 	addr = (uintptr_t) b;
 	addr = ROUNDUP(addr + sizeof(struct block), BLOCKALIGN);
 	b->base = (uint8_t *) addr;
+	/* TODO: support this */
 	/* interesting. We can ask the allocator, after allocating,
 	 * the *real* size of the block we got. Very nice.
 	 * Not on akaros yet.
@@ -59,19 +59,18 @@ struct block *_allocb(int size)
 	n = b->lim - b->base - size;
 	b->rp += n & ~(BLOCKALIGN - 1);
 	b->wp = b->rp;
-
+	/* b->base is aligned, rounded up from b
+	 * b->lim is the upper bound on our malloc
+	 * b->rp is advanced by some aligned amount, based on how much extra we
+	 * received from kmalloc and the Hdrspc. */
 	return b;
 }
 
 struct block *allocb(int size)
 {
-	struct block *b;
-
-	b = _allocb(size);
-	if (b == 0)
-		exhausted("Blocks");
-	return b;
+	return _allocb(size, KMALLOC_WAIT);
 }
+
 
 /*
  *  interrupt time allocation
@@ -88,7 +87,7 @@ struct block *iallocb(int size)
 	}
 #endif
 
-	b = _allocb(size);
+	b = _allocb(size, 0);	/* no KMALLOC_WAIT */
 	if (b == NULL) {
 		//printk("iallocb: no memory %lu/%lu\n", atomic_read(&ialloc_bytes),
 		//       conf.ialloc);
