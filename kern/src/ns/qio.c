@@ -1191,7 +1191,6 @@ struct block *qremove(struct queue *q)
 	q->dlen -= BLEN(b);
 	q->len -= BALLOC(b);
 	QDEBUG checkb(b, "qremove");
-	b = linearizeblock(b);
 	return b;
 }
 

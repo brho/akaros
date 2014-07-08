@@ -944,6 +944,8 @@ int mntrpcread(struct mnt *m, struct mntrpc *r)
 	*l = NULL;
 	do {
 		b = qremove(m->q);
+		/* TODO: have better block helpers for this and the memmove below */
+		b = linearizeblock(b);
 		if (hlen > 0) {
 			b->rp += hlen;
 			len -= hlen;
