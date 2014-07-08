@@ -263,6 +263,7 @@ void chanfree(struct chan *c)
 		kfree(c->buf);
 	c->buf = NULL;
 	c->bufused = 0;
+	c->ateof = 0;
 
 	spin_lock(&(&chanalloc)->lock);
 	c->next = chanalloc.free;

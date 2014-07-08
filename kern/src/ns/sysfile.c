@@ -799,7 +799,13 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 			}
 			unionrewind(c);
 		}
-		n = devtab[c->type].read(c, va, n, off);
+		if (! c->ateof) {
+			n = devtab[c->type].read(c, va, n, off);
+			if (n == 0 && dir)
+				c->ateof = 1;
+		} else {
+			n = 0;
+		}
 		spin_lock(&c->lock);
 		c->offset += n;
 		spin_unlock(&c->lock);
