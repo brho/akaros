@@ -754,23 +754,17 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 	 * new stuff later. Allocate 2048 bytes for that purpose. 
 	 */
 	if (dir) {
+		/* expecting only one dirent at a time, o/w we're busted */
 		assert(n >= sizeof(struct kdirent));
-	/* We need to read exactly one dirent and avoid reading too much from the
-	 * underlying dev, so that subsequent reads don't miss any dirents. 
-	 * Buffer 2*MAXPATH, to be safe. Read off what you can. Return one
-	 * kdirent at a time. If you don't have enough, read more. If you run out,
-	 * you're done.
-	 */
-	if (!c->buf){
-		c->buf=kmalloc(2048, KMALLOC_WAIT);
-		c->bufused = 0;
-	}
-	}
-	while (waserror()) {
-		printk("Well, sysread of a dir sucks.%s \n", current_errstr());
-		nexterror();
-	}
-	if (dir) {
+		if (!c->buf) {
+			c->buf=kmalloc(2048, KMALLOC_WAIT);
+			c->bufused = 0;
+		}
+		/* debugging */
+		if (waserror()) {
+			printk("Well, sysread of a dir sucks.%s \n", current_errstr());
+			nexterror();
+		}
 		va = c->buf + c->bufused;
 		n = 2048 - c->bufused;
 	}
@@ -810,8 +804,8 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 		c->bufused -= amt;
 		memmove(c->buf, c->buf + amt, c->bufused);
 		n = amt;
+		poperror();	/* matching our debugging waserror */
 	}
-	poperror();	/* matching our while(waserror) */
 
 	poperror();
 	cclose(c);

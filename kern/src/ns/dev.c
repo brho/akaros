@@ -314,7 +314,6 @@ devdirread(struct chan *c, char *d, long n,
 						error(Eshort);
 					return m;
 				}
-				assert(dsz >= MIN_M_BUF_SZ);
 				m += dsz;
 				d += dsz;
 				break;
