@@ -13,6 +13,15 @@
 #include <smp.h>
 #include <ip.h>
 
+enum {
+	DIRSIZE = STATFIXLEN + 32 * 4,
+	DIRREADLIM = 2048,	/* should handle the largest reasonable directory entry */
+	DIRREADSIZE=8192,	/* Just read a lot. Memory is cheap, lots of bandwidth,
+				 * and RPCs are very expensive. At the same time,
+				 * let's not yet exceed a common MSIZE. */
+
+};
+
 static int growfd(struct fgrp *f, int fd)
 {
 	
@@ -751,7 +760,7 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 
 	/* kdirent hack: userspace is expecting kdirents, but all of 9ns
 	 * produces Ms.  Just save up what we don't use and append the
-	 * new stuff later. Allocate 2048 bytes for that purpose. 
+	 * new stuff later. Allocate DIRREADSIZE bytes for that purpose.
 	 */
 	if (dir) {
 		/* expecting only one dirent at a time, o/w we're busted */
@@ -766,7 +775,7 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 			nexterror();
 		}
 		va = c->buf + c->bufused;
-		n = 2048 - c->bufused;
+		n = DIRREADSIZE - c->bufused;
 	}
 
 	/* this is the normal plan9 read */
@@ -1132,11 +1141,6 @@ int syswstat(char *path, uint8_t * buf, int n)
 	poperror();
 	return n;
 }
-
-enum {
-	DIRSIZE = STATFIXLEN + 32 * 4,
-	DIRREADLIM = 2048,	/* should handle the largest reasonable directory entry */
-};
 
 struct dir *chandirstat(struct chan *c)
 {
