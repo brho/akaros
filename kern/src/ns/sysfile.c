@@ -766,7 +766,7 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 		/* expecting only one dirent at a time, o/w we're busted */
 		assert(n >= sizeof(struct kdirent));
 		if (!c->buf) {
-			c->buf=kmalloc(2048, KMALLOC_WAIT);
+			c->buf=kmalloc(DIRREADSIZE, KMALLOC_WAIT);
 			c->bufused = 0;
 		}
 		/* debugging */
