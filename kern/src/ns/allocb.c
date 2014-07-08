@@ -202,7 +202,8 @@ void checkb(struct block *b, char *msg)
 	for (int i = 0; i < b->nr_extra_bufs; i++) {
 		ebd = &b->extra_data[i];
 		if (ebd->base) {
-			assert(kmalloc_refcnt((void*)ebd->base));
+			if (!kmalloc_refcnt((void*)ebd->base))
+				panic("checkb buf %d, base %p has no refcnt!\n", i, ebd->base);
 		}
 	}
 

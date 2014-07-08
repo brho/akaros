@@ -282,6 +282,7 @@ struct block *pullupblock(struct block *bp, int n)
 				kfree((void *)ebd->base);
 				ebd->len = 0;
 				ebd->off = 0;
+				ebd->base = 0;
 			}
 		}
 		/* maybe just call pullupblock recursively here */
@@ -333,14 +334,14 @@ struct block *pullupblock(struct block *bp, int n)
 }
 
 /*
- *  make sure the first block has at least n bytes
+ *  make sure the first block has at least n bytes in its main body
  */
 struct block *pullupqueue(struct queue *q, int n)
 {
 	struct block *b;
 
 	/* TODO: lock to protect the queue links? */
-	if ((BLEN(q->bfirst) >= n))
+	if ((BHLEN(q->bfirst) >= n))
 		return q->bfirst;
 	q->bfirst = pullupblock(q->bfirst, n);
 	for (b = q->bfirst; b != NULL && b->next != NULL; b = b->next) ;
