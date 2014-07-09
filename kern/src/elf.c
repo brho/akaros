@@ -200,11 +200,23 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 						goto fail;
 					}
 
-					/* Zero the end of it. */
+					/* Zero the end of it.  This is a huge pain in the ass.  The
+					 * filesystems should zero out the last bits of a page if
+					 * the file doesn't fill the last page.  But we're dealing
+					 * with windows into otherwise complete files. */
 					pte_t *pte = pgdir_walk(p->env_pgdir, (void*)last_page, 0);
-					assert(pte);
-					void* last_page_kva = ppn2kva(PTE2PPN(*pte));
-					memset(last_page_kva + partial, 0, PGSIZE - partial);
+					/* if we were able to get a PTE, then there is a real page
+					 * backing the VMR, and we need to zero the excess.  if
+					 * there isn't, then the page fault code should handle it.
+					 * since we set populate above, we should have a PTE, except
+					 * in cases where the offset + len window exceeded the file
+					 * size.  in this case, we let them mmap it, but didn't
+					 * populate it.  there will be a PF right away if someone
+					 * tries to use this.  check out do_mmap for more info. */
+					if (pte) {
+						void* last_page_kva = ppn2kva(PTE2PPN(*pte));
+						memset(last_page_kva + partial, 0, PGSIZE - partial);
+					}
 
 					filesz = ROUNDUP(filesz, PGSIZE);
 				}
