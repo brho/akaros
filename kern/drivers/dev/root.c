@@ -56,7 +56,12 @@ int inumber = 13;
 /* Inferno seems to want to: perm |= DMDIR.  It gets checked in other places.
  * NxM didn't want this, IIRC.
  *
- * Also note that "" (/, #r, whatever) has no vers/next/sibling. */
+ * Also note that "" (/, #r, whatever) has no vers/next/sibling.
+ *
+ * If you want to add new entries, add it to the roottab such that the linked
+ * list of indexes is a cycle (change the last current one), then add an entry
+ * to rootdata, and then change the first rootdata entry to have another entry.
+ * Yeah, it's a pain in the ass. */
 struct dirtab roottab[MAXFILE] = {
 	{"", {0, 0, QTDIR}, 0, DMDIR | 0777},
 	{"chan", {1, 2, QTDIR}, 0, DMDIR | 0777},
@@ -83,7 +88,8 @@ struct rootdata {
 };
 
 struct rootdata rootdata[MAXFILE] = {
-	{0,	1,	 &roottab[1],	 12,	NULL},
+	{0,	1,	 &roottab[1],	 13,	NULL},
+	{0,	0,	 NULL,	 0,	 NULL},
 	{0,	0,	 NULL,	 0,	 NULL},
 	{0,	0,	 NULL,	 0,	 NULL},
 	{0,	0,	 NULL,	 0,	 NULL},
