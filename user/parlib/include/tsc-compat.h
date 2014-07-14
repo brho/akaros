@@ -39,6 +39,7 @@ static inline uint64_t get_tsc_overhead(void)
 
 #include <sys/time.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 /* Akaros has this helper in ros/common.h. (it returns a bool btw)
  *
@@ -46,7 +47,7 @@ static inline uint64_t get_tsc_overhead(void)
 static inline int mult_will_overflow_u64(uint64_t a, uint64_t b)
 {
 	if (!a)
-		return FALSE;
+		return false;
 	return (uint64_t)(-1) / a < b;
 }
 
