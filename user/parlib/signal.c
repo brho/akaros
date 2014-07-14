@@ -290,3 +290,17 @@ int sigaltstack(__const struct sigaltstack *__restrict __ss,
 {
 	return 0;
 }
+
+__sighandler_t signal(int sig, __sighandler_t handler)
+{
+	int ret;
+	struct sigaction newsa = {0};
+	struct sigaction oldsa = {0};
+	newsa.sa_handler = handler;
+	ret = sigaction(sig, &newsa, &oldsa);
+	if (ret < 0) {
+		errno = EINVAL;
+		return SIG_ERR;
+	}
+	return oldsa.sa_handler;
+}
