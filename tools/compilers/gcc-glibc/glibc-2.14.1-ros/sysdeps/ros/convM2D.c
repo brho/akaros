@@ -6,38 +6,29 @@
  * modified, propagated, or distributed except according to the terms contained
  * in the LICENSE file.
  */
-#include <stdlib.h>
 
-#include <stdio.h>
-#include <parlib.h>
-#include <unistd.h>
-#include <signal.h>
-#include <fcntl.h>
-#include <iplib.h>
-#include <dir.h>
-#include <ndb.h>
 #include <fcall.h>
+#include <string.h>
 
-int
-statcheck(uint8_t *buf, unsigned int nbuf)
+int statcheck(uint8_t * buf, unsigned int nbuf)
 {
 	uint8_t *ebuf;
 	int i;
 
 	ebuf = buf + nbuf;
 
-	if(nbuf < STATFIXLEN || nbuf != BIT16SZ + GBIT16(buf))
+	if (nbuf < STATFIXLEN || nbuf != BIT16SZ + GBIT16(buf))
 		return -1;
 
 	buf += STATFIXLEN - 4 * BIT16SZ;
 
-	for(i = 0; i < 4; i++){
-		if(buf + BIT16SZ > ebuf)
+	for (i = 0; i < 4; i++) {
+		if (buf + BIT16SZ > ebuf)
 			return -1;
 		buf += BIT16SZ + GBIT16(buf);
 	}
 
-	if(buf != ebuf)
+	if (buf != ebuf)
 		return -1;
 
 	return 0;
@@ -46,14 +37,14 @@ statcheck(uint8_t *buf, unsigned int nbuf)
 static char nullstring[] = "";
 
 unsigned int
-convM2D(uint8_t *buf, unsigned int nbuf, struct dir *d, char *strs)
+convM2D(uint8_t * buf, unsigned int nbuf, struct dir *d, char *strs)
 {
 	uint8_t *p, *ebuf;
 	char *sv[4];
 	int i, ns;
 
-	if(nbuf < STATFIXLEN)
-		return 0; 
+	if (nbuf < STATFIXLEN)
+		return 0;
 
 	p = buf;
 	ebuf = buf + nbuf;
@@ -78,14 +69,14 @@ convM2D(uint8_t *buf, unsigned int nbuf, struct dir *d, char *strs)
 	d->length = GBIT64(p);
 	p += BIT64SZ;
 
-	for(i = 0; i < 4; i++){
-		if(p + BIT16SZ > ebuf)
+	for (i = 0; i < 4; i++) {
+		if (p + BIT16SZ > ebuf)
 			return 0;
 		ns = GBIT16(p);
 		p += BIT16SZ;
-		if(p + ns > ebuf)
+		if (p + ns > ebuf)
 			return 0;
-		if(strs){
+		if (strs) {
 			sv[i] = strs;
 			memmove(strs, p, ns);
 			strs += ns;
@@ -94,17 +85,17 @@ convM2D(uint8_t *buf, unsigned int nbuf, struct dir *d, char *strs)
 		p += ns;
 	}
 
-	if(strs){
+	if (strs) {
 		d->name = sv[0];
 		d->uid = sv[1];
 		d->gid = sv[2];
 		d->muid = sv[3];
-	}else{
+	} else {
 		d->name = nullstring;
 		d->uid = nullstring;
 		d->gid = nullstring;
 		d->muid = nullstring;
 	}
-	
+
 	return p - buf;
 }

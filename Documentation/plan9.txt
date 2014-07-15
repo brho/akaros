@@ -141,3 +141,6 @@ If you overflow or underflow the error stack the kernel will panic.
 The implementation is in kern/src/error.c, the macros are in
 kern/include/plan9.h.
 
+
+For info on the format of Ms (which are part of the kernel interface):
+	http://9p.cat-v.org/documentation/rfc/ 

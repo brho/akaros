@@ -9,3 +9,13 @@ ifeq ($(subdir),socket)
 sysdep_routines += sa_len
 endif
 sysdep_headers += sys/syscall.h sys/vcore-tls.h
+
+# plan 9 conversion routines.  all C files need to be in exactly one directory.
+# stdlib seems like a reasonable place. */
+ifeq ($(subdir),stdlib)
+sysdep_routines += convD2M
+sysdep_routines += convM2D
+sysdep_routines += convM2S
+sysdep_routines += convS2M
+endif
+sysdep_headers += fcall.h

@@ -7,21 +7,49 @@
  * in the LICENSE file.
  */
 /*
-
  * Copyright 2013 Google Inc.
  * Copyright (c) 1989-2003 by Lucent Technologies, Bell Laboratories.
  */
 
-#ifndef ROS_INC_FCALL_H
-#define ROS_INC_FCALL_H
+#ifndef _GLIBC_ROS_FCALL_H
+#define _GLIBC_ROS_FCALL_H
 
-#include <printf-ext.h>
+#include <ros/common.h>
+
+/* There are a bunch of structs and macros in there that the kernel also uses,
+ * though none of this is part of the actual kernel interface (I think) */
+
+/* STATFIXLEN includes leading 16-bit count */
+/* The count, however, excludes itself; total size is BIT16SZ+count */
+#define STATFIXLEN	(BIT16SZ+QIDSZ+5*BIT16SZ+4*BIT32SZ+1*BIT64SZ)	/* amount of fixed length data in a stat buffer */
+
+struct qid {
+	uint64_t path;
+	uint32_t vers;
+	uint8_t type;
+};
+
+struct dir {
+	/* system-modified data */
+	uint16_t type;				/* server type */
+	unsigned int dev;			/* server subtype */
+	/* file data */
+	struct qid qid;				/* unique id from server */
+	uint32_t mode;				/* permissions */
+	uint32_t atime;				/* last read time */
+	uint32_t mtime;				/* last write time */
+	int64_t length;				/* file length: see <u.h> */
+	char *name;					/* last element of path */
+	char *uid;					/* owner name */
+	char *gid;					/* group name */
+	char *muid;					/* last modifier name */
+};
 
 #define	VERSION9P	"9P2000"
 
 #define	MAXWELEM	16
 
-	struct fcall {
+struct fcall {
 	uint8_t type;
 	uint32_t fid;
 	uint16_t tag;
@@ -72,7 +100,7 @@
 			uint8_t *stat;		/* Twstat, Rstat */
 		};
 	};
-} fcall;
+};
 
 #define	GBIT8(p)	((p)[0])
 #define	GBIT16(p)	((p)[0]|((p)[1]<<8))
@@ -132,6 +160,7 @@ enum {
 	Tmax,
 };
 
+void init_empty_dir(struct dir *d);
 unsigned int convM2S(uint8_t *, unsigned int, struct fcall *);
 unsigned int convS2M(struct fcall *, uint8_t *, unsigned int);
 unsigned int sizeS2M(struct fcall *);
@@ -141,15 +170,4 @@ unsigned int convM2D(uint8_t *, unsigned int, struct dir *, char *);
 unsigned int convD2M(struct dir *, uint8_t *, unsigned int);
 unsigned int sizeD2M(struct dir *);
 
-int printf_fcall(FILE *stream, const struct printf_info *info,
-                 const void *const *args);
-int printf_fcall_info(const struct printf_info* info, size_t n, int *argtypes,
-                      int *size);
-int printf_dir(FILE *stream, const struct printf_info *info,
-               const void *const *args);
-int printf_dir_info(const struct printf_info* info, size_t n, int *argtypes,
-                    int *size);
-
-int read9pmsg(int, void *, unsigned int);
-
-#endif /* ROS_INC_FCALL_H */
+#endif /* _GLIBC_ROS_FCALL_H */

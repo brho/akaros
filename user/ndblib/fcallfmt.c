@@ -20,9 +20,9 @@
 #include <ctype.h>
 #include <error.h>
 #include <iplib.h>
-#include <dir.h>
-#include <ndb.h>
 #include <fcall.h>
+#include <ndb.h>
+#include <fcallfmt.h>
 
 static int dumpsome(FILE *, char *, long);
 static int fdirconv(FILE *, struct dir *);

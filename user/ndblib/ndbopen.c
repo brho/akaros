@@ -16,7 +16,6 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <iplib.h>
-#include <dir.h>
 #include <ndb.h>
 #include "ndbhf.h"
 

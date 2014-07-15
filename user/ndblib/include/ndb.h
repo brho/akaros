@@ -10,7 +10,7 @@
 
 #define ROS_INC_NDB_H
 
-#include <dir.h>
+#include <fcall.h>
 
 enum
 {

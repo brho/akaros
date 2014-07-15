@@ -14,8 +14,8 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <iplib.h>
-#include <dir.h>
 #include <fcall.h>
+#include <fcallfmt.h>
 #include <ndb.h>
 
 long

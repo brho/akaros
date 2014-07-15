@@ -18,5 +18,14 @@ libc {
     allocate_tls;
     free_tls;
     reinit_tls;
+
+    init_empty_dir;
+    convM2S;
+    convS2M;
+    sizeS2M;
+    statcheck;
+    convM2D;
+    convD2M;
+    sizeD2M;
   }
 }
