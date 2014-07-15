@@ -101,6 +101,7 @@ struct block *padblock(struct block *bp, int size)
 	uint8_t bcksum = bp->flag & BCKSUM_FLAGS;
 	uint16_t checksum_start = bp->checksum_start;
 	uint16_t checksum_offset = bp->checksum_offset;
+	uint16_t mss = bp->mss;
 
 	QDEBUG checkb(bp, "padblock 1");
 	if (size >= 0) {
@@ -144,6 +145,7 @@ struct block *padblock(struct block *bp, int size)
 		nbp->flag |= bcksum;
 		nbp->checksum_start = checksum_start;
 		nbp->checksum_offset = checksum_offset;
+		nbp->mss = mss;
 	}
 	QDEBUG checkb(nbp, "padblock 1");
 	return nbp;
@@ -235,6 +237,7 @@ struct block *linearizeblock(struct block *b)
 		newb->flag |= (b->flag & BCKSUM_FLAGS);
 		newb->checksum_start = b->checksum_start;
 		newb->checksum_offset = b->checksum_offset;
+		newb->mss = b->mss;
 	}
 	freeb(b);
 	return newb;
@@ -404,6 +407,7 @@ struct block *copyblock(struct block *bp, int count)
 		nbp->flag |= (bp->flag & BCKSUM_FLAGS);
 		nbp->checksum_start = bp->checksum_start;
 		nbp->checksum_offset = bp->checksum_offset;
+		nbp->mss = bp->mss;
 	}
 	WARN_EXTRA(bp);
 	for (; count > 0 && bp != 0; bp = bp->next) {

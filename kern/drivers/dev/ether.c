@@ -484,7 +484,7 @@ static long etherbwrite(struct chan *chan, struct block *bp, uint32_t unused)
 		runlock(&ether->rwlock);
 		nexterror();
 	}
-	if (n > ether->maxmtu) {
+	if (n > ether->maxmtu && (bp->flag & Btso) == 0) {
 		freeb(bp);
 		error(Etoobig);
 	}

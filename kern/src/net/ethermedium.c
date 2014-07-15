@@ -120,6 +120,25 @@ struct Etherarp {
 
 static char *nbmsg = "nonblocking";
 
+static unsigned int parsefeat(char *ptr)
+{
+	unsigned int feat = 0;
+
+	if (strstr(ptr, "ipck"))
+		feat |= NETF_IPCK;
+	if (strstr(ptr, "udpck"))
+		feat |= NETF_UDPCK;
+	if (strstr(ptr, "tcpck"))
+		feat |= NETF_TCPCK;
+	if (strstr(ptr, "padmin"))
+		feat |= NETF_PADMIN;
+	if (strstr(ptr, "sg"))
+		feat |= NETF_SG;
+	if (strstr(ptr, "tso"))
+		feat |= NETF_TSO;
+	return feat;
+}
+
 /*
  *  called to bind an IP ifc to an ethernet device
  *  called with ifc wlock'd
@@ -204,6 +223,14 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	} else
 		ifc->mbps = 100;
 
+
+	ptr = strstr(buf, "feat: ");
+	if (ptr) {
+		ptr += 6;
+		ifc->feat = parsefeat(ptr);
+	} else {
+		ifc->feat = 0;
+	}
 	/*
 	 *  open arp conversation
 	 */

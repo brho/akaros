@@ -80,6 +80,7 @@ enum {
 	RETRAN = 4,
 	ACTIVE = 8,
 	SYNACK = 16,
+	TSO = 32,
 
 	LOGAGAIN = 3,
 	LOGDGAIN = 2,
@@ -602,7 +603,7 @@ void tcpacktimer(void *v)
 static void tcpcreate(struct conv *c)
 {
 	c->rq = qopen(QMAX, Qcoalesce, tcpacktimer, c);
-	c->wq = qopen((3 * QMAX) / 2, Qkick, tcpkick, c);
+	c->wq = qopen(8 * QMAX, Qkick, tcpkick, c);
 }
 
 static void timerstate(struct tcppriv *priv, Tcptimer * t, int newstate)
@@ -748,7 +749,8 @@ void localclose(struct conv *s, char *reason)
 }
 
 /* mtu (- TCP + IP hdr len) of 1st hop */
-int tcpmtu(struct Proto *tcp, uint8_t * addr, int version, int *scale)
+int tcpmtu(struct Proto *tcp, uint8_t * addr, int version, int *scale,
+	   uint8_t *flags)
 {
 	struct Ipifc *ifc;
 	int mtu;
@@ -767,6 +769,8 @@ int tcpmtu(struct Proto *tcp, uint8_t * addr, int version, int *scale)
 				mtu = ifc->maxtu - ifc->m->hsize - (TCP6_PKT + TCP6_HDRSIZE);
 			break;
 	}
+	*flags &= ~TSO;
+
 	if (ifc != NULL) {
 		if (ifc->mbps > 100)
 			*scale = HaveWS | 3;
@@ -774,6 +778,8 @@ int tcpmtu(struct Proto *tcp, uint8_t * addr, int version, int *scale)
 			*scale = HaveWS | 1;
 		else
 			*scale = HaveWS | 0;
+		if (ifc->feat & NETF_TSO)
+			*flags |= TSO;
 	} else
 		*scale = HaveWS | 0;
 
@@ -1213,7 +1219,8 @@ void tcpsndsyn(struct conv *s, Tcpctl * tcb)
 	tcb->sndsyntime = NOW;
 
 	/* set desired mss and scale */
-	tcb->mss = tcpmtu(s->p, s->laddr, s->ipversion, &tcb->scale);
+	tcb->mss = tcpmtu(s->p, s->laddr, s->ipversion, &tcb->scale,
+			  &tcb->flags);
 }
 
 void
@@ -1358,6 +1365,7 @@ int sndsynack(struct Proto *tcp, Limbo * lp)
 	Tcp6hdr ph6;
 	Tcp seg;
 	int scale;
+	uint8_t flag = 0;
 
 	/* make pseudo header */
 	switch (lp->version) {
@@ -1389,7 +1397,7 @@ int sndsynack(struct Proto *tcp, Limbo * lp)
 	seg.ack = lp->irs + 1;
 	seg.flags = SYN | ACK;
 	seg.urg = 0;
-	seg.mss = tcpmtu(tcp, lp->laddr, lp->version, &scale);
+	seg.mss = tcpmtu(tcp, lp->laddr, lp->version, &scale, &flag);
 	seg.wnd = QMAX;
 
 	/* if the other side set scale, we should too */
@@ -2445,8 +2453,33 @@ void tcpoutput(struct conv *s)
 				   tcb->snd.wnd, tcb->cwind);
 		if (usable < ssize)
 			ssize = usable;
-		if (tcb->mss < ssize)
-			ssize = tcb->mss;
+		if (ssize > tcb->mss) {
+			if ((tcb->flags & TSO) == 0) {
+				ssize = tcb->mss;
+			} else {
+				int segs, window;
+
+				/*  Don't send too much.  32K is arbitrary..
+				 */
+				if (ssize > 32 * 1024)
+					ssize = 32 * 1024;
+
+				/* Clamp xmit to an integral MSS to
+				 * avoid ragged tail segments causing
+				 * poor link utilization.  Also
+				 * account for each segment sent in
+				 * msg heuristic, and round up to the
+				 * next multiple of 4, to ensure we
+				 * still yeild.
+				 */
+				segs = ssize / tcb->mss;
+				ssize = segs * tcb->mss;
+				msgs += segs;
+				if (segs > 3)
+					msgs = (msgs + 4) & ~3;
+			}
+		}
+
 		dsize = ssize;
 		seg.urg = 0;
 
@@ -2501,6 +2534,10 @@ void tcpoutput(struct conv *s)
 			if (BLEN(bp) != dsize) {
 				seg.flags |= FIN;
 				dsize--;
+			}
+			if (BLEN(bp) > tcb->mss) {
+				bp->flag |= Btso;
+				bp->mss = tcb->mss;
 			}
 		}
 

@@ -187,6 +187,7 @@ struct Ipifc {
 	struct medium *m;			/* Media pointer */
 	int maxtu;					/* Maximum transfer unit */
 	int mintu;					/* Minumum tranfer unit */
+	unsigned int feat;				/* Offload features */
 	int mbps;					/* megabits per second */
 	void *arg;					/* medium specific */
 	int reassemble;				/* reassemble IP packets before forwarding */
@@ -935,9 +936,9 @@ enum {
 	NETF_IPCK = (1 << NS_IPCK_SHIFT),	/* xmit ip checksum */
 	NETF_UDPCK = (1 << NS_UDPCK_SHIFT),	/* xmit udp checksum */
 	NETF_TCPCK = (1 << NS_TCPCK_SHIFT),	/* xmit tcp checksum */
-	NETF_PADMIN = (1 << NETF_SG_SHIFT),	/* device pads to mintu */
+	NETF_PADMIN = (1 << NETF_PADMIN_SHIFT),	/* device pads to mintu */
 	NETF_SG	= (1 << NETF_SG_SHIFT),		/* device can do scatter/gather */
-	NETF_TSO = (1 << NS_TSO_SHIFT),	/* device can do TSO */
+	NETF_TSO = (1 << NS_TSO_SHIFT),		/* device can do TSO */
 };
 /*
  *  a network interface

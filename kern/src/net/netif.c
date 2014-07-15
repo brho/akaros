@@ -273,6 +273,20 @@ netifread(struct netif *nif, struct chan *c, void *a, long n, uint32_t offset)
 			j += snprintf(p + j, READSTR - j, "addr: ");
 			for (i = 0; i < nif->alen; i++)
 				j += snprintf(p + j, READSTR - j, "%02.2x", nif->addr[i]);
+			j += snprintf(p + j, READSTR - j, "\n");
+			j += snprintf(p + j, READSTR - j, "feat: ");
+			if (nif->feat & NETF_IPCK)
+				j += snprintf(p + j, READSTR - j, "ipck ");
+			if (nif->feat & NETF_UDPCK)
+				j += snprintf(p + j, READSTR - j, "udpck ");
+			if (nif->feat & NETF_TCPCK)
+				j += snprintf(p + j, READSTR - j, "tcppck ");
+			if (nif->feat & NETF_PADMIN)
+				j += snprintf(p + j, READSTR - j, "padmin ");
+			if (nif->feat & NETF_SG)
+				j += snprintf(p + j, READSTR - j, "sg ");
+			if (nif->feat & NETF_TSO)
+				j += snprintf(p + j, READSTR - j, "tso ");
 			snprintf(p + j, READSTR - j, "\n");
 			n = readstr(offset, a, n, p);
 			kfree(p);
