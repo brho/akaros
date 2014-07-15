@@ -477,6 +477,7 @@ static int sys_proc_yield(struct proc *p, bool being_nice)
 	/* proc_yield() often doesn't return - we need to set the syscall retval
 	 * early.  If it doesn't return, it expects to eat our reference (for now).
 	 */
+	free_sysc_str(pcpui->cur_kthread);
 	finish_sysc(pcpui->cur_kthread->sysc, pcpui->cur_proc);
 	pcpui->cur_kthread->sysc = 0;	/* don't touch sysc again */
 	proc_incref(p, 1);
@@ -666,6 +667,7 @@ mid_error:
 	 * error value (errno is already set). */
 	kref_put(&program->f_kref);
 early_error:
+	free_sysc_str(pcpui->cur_kthread);
 	finish_current_sysc(-1);
 success:
 	/* Here's how we restart the new (on success) or old (on failure) proc: */
@@ -1965,6 +1967,8 @@ void run_local_syscall(struct syscall *sysc)
 	}
 	pcpui->cur_kthread->sysc = sysc;	/* let the core know which sysc it is */
 	alloc_sysc_str(pcpui->cur_kthread);
+	/* syscall() does not return for exec and yield, so put any cleanup in there
+	 * too. */
 	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
 	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
 	/* Need to re-load pcpui, in case we migrated */
