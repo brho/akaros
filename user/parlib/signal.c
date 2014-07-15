@@ -32,34 +32,56 @@
 #include <assert.h>
 #include <ros/procinfo.h>
 #include <ros/syscall.h>
+#include <vcore.h> /* for print_user_context() */
 
 /* This is list of sigactions associated with each posix signal. */
 static struct sigaction sigactions[_NSIG - 1];
 
 /* These are the default handlers for each posix signal.  They are listed in
- * SIGNAL(7) of the Linux Programmer's Manual */
-/* Exit codes are set as suggested in the following link.  I wish I could find
+ * SIGNAL(7) of the Linux Programmer's Manual.  We run them as default
+ * sigactions, instead of the older handlers, so that we have access to the
+ * faulting context.
+ *
+ * Exit codes are set as suggested in the following link.  I wish I could find
  * the definitive source, but this will have to do for now.
  * http://unix.stackexchange.com/questions/99112/default-exit-code-when-process-is-terminated
  * */
-static void default_term_handler(int signr)
+static void default_term_handler(int signr, siginfo_t *info, void *ctx)
 {
 	ros_syscall(SYS_proc_destroy, __procinfo.pid, signr, 0, 0, 0, 0);
 }
-static void default_core_handler(int signr)
+
+static void default_core_handler(int signr, siginfo_t *info, void *ctx)
 {
 	fprintf(stderr, "Segmentation Fault (sorry, no core dump yet)\n");
-	default_term_handler((1 << 7) + signr);
+	print_user_context((struct user_context*)ctx);
+	if (info) {
+		/* ghetto, we don't have access to the PF err, since we only have a few
+		 * fields available in siginfo (e.g. there's no si_trapno). */
+		fprintf(stderr, "Fault type %d at addr %p\n", info->si_errno,
+		        info->si_addr);
+	} else {
+		fprintf(stderr, "No fault info\n");
+	}
+	default_term_handler((1 << 7) + signr, info, ctx);
 }
-static void default_stop_handler(int signr)
+
+static void default_stop_handler(int signr, siginfo_t *info, void *ctx)
 {
 	fprintf(stderr, "Stop signal received!  No support to stop yet though!\n");
 }
-static void default_cont_handler(int signr)
+
+static void default_cont_handler(int signr, siginfo_t *info, void *ctx)
 {
 	fprintf(stderr, "Cont signal received!  No support to cont yet though!\n");
 }
-static __sighandler_t default_handlers[] = {
+
+typedef void (*__sigacthandler_t)(int, siginfo_t *, void *);
+#define SIGACT_ERR	((__sigacthandler_t) -1)	/* Error return.  */
+#define SIGACT_DFL	((__sigacthandler_t) 0)		/* Default action.  */
+#define SIGACT_IGN	((__sigacthandler_t) 1)		/* Ignore signal.  */
+
+static __sigacthandler_t default_handlers[] = {
 	[SIGHUP]    = default_term_handler, 
 	[SIGINT]    = default_term_handler, 
 	[SIGQUIT]   = default_core_handler, 
@@ -77,20 +99,20 @@ static __sighandler_t default_handlers[] = {
 	[SIGALRM]   = default_term_handler, 
 	[SIGTERM]   = default_term_handler, 
 	[SIGSTKFLT] = default_term_handler, 
-	[SIGCHLD]   = SIG_IGN, 
+	[SIGCHLD]   = SIGACT_IGN,
 	[SIGCONT]   = default_cont_handler, 
 	[SIGSTOP]   = default_stop_handler, 
 	[SIGTSTP]   = default_stop_handler, 
 	[SIGTTIN]   = default_stop_handler, 
 	[SIGTTOU]   = default_stop_handler, 
 	[SIGURG]    = default_term_handler, 
-	[SIGXCPU]   = SIG_IGN, 
+	[SIGXCPU]   = SIGACT_IGN,
 	[SIGXFSZ]   = default_core_handler, 
 	[SIGVTALRM] = default_term_handler, 
 	[SIGPROF]   = default_term_handler, 
-	[SIGWINCH]  = SIG_IGN, 
+	[SIGWINCH]  = SIGACT_IGN,
 	[SIGIO]     = default_term_handler, 
-	[SIGPWR]    = SIG_IGN, 
+	[SIGPWR]    = SIGACT_IGN,
 	[SIGSYS]    = default_core_handler
 };
 
@@ -112,8 +134,8 @@ void trigger_posix_signal(int sig_nr, struct siginfo *info, void *aux)
 	if (action->sa_handler == SIG_IGN)
 		return;
 	if (action->sa_handler == SIG_DFL) {
-		if (default_handlers[sig_nr] != SIG_IGN)
-			default_handlers[sig_nr](sig_nr);
+		if (default_handlers[sig_nr] != SIGACT_IGN)
+			default_handlers[sig_nr](sig_nr, info, aux);
 		return;
 	}
 

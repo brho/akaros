@@ -316,8 +316,10 @@ void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
 	TAILQ_REMOVE(&active_queue, pthread, next);
 	mcs_pdr_unlock(&queue_lock);
 
+	/* TODO: RISCV/x86 issue! (14 is PF, etc) */
 	if (trap_nr != 14 && trap_nr != 13) {
 		printf("Pthread has unhandled fault: %d\n", trap_nr);
+		/* Note that uthread.c already copied out our ctx into the uth struct */
 		print_user_context(&uthread->u_ctx);
 		exit(-1);
 	}
