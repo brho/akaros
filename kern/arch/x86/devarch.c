@@ -62,9 +62,9 @@ static Rdwrfn *writefn[Qmax];
 static struct dirtab archdir[Qmax] = {
 	{".", {Qdir, 0, QTDIR}, 0, 0555},
 	{"ioalloc", {Qioalloc, 0}, 0, 0444},
-	{"iob", {Qiob, 0}, 0, 0660},
-	{"iow", {Qiow, 0}, 0, 0660},
-	{"iol", {Qiol, 0}, 0, 0660},
+	{"iob", {Qiob, 0}, 0, 0666},
+	{"iow", {Qiow, 0}, 0, 0666},
+	{"iol", {Qiol, 0}, 0, 0666},
 	{"gdb", {Qgdb, 0}, 0, 0660},
 	{"mapram", {Qmapram, 0}, 0, 0444},
 	{"realmodemem", {Qrealmem, 0}, 0, 0660},
