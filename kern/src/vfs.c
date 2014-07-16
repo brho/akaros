@@ -2368,7 +2368,7 @@ char *do_getcwd(struct fs_struct *fs_env, char **kfree_this, size_t cwd_l)
 			set_errno(ERANGE);
 			return 0;
 		}
-		path_start -= link_len + 1;	/* the 1 is for the \0 */
+		path_start -= link_len;
 		strncpy(path_start, dentry->d_name.name, link_len);
 		path_start--;
 		*path_start = '/';
