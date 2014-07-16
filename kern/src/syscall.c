@@ -1554,6 +1554,7 @@ intreg_t sys_getcwd(struct proc *p, char *u_cwd, size_t cwd_l)
 		return -1;		/* errno set by do_getcwd */
 	if (memcpy_to_user_errno(p, u_cwd, k_cwd, strnlen(k_cwd, cwd_l - 1) + 1))
 		retval = -1;
+	retval = strnlen(k_cwd, cwd_l - 1);
 	kfree(kfree_this);
 	return retval;
 }
