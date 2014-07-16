@@ -349,6 +349,7 @@ struct mhead *newmhead(struct chan *from)
 
 	mh = kzmalloc(sizeof(struct mhead), 0);
 	kref_init(&mh->ref, mh_release, 1);
+	rwinit(&mh->lock);
 	mh->from = from;
 	chan_incref(from);
 
