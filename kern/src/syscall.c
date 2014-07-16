@@ -1469,7 +1469,7 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 	if (symname){
 		copy_amt = strnlen(symname, buf_l - 1) + 1;
 		if (! memcpy_to_user_errno(p, u_buf, symname, copy_amt))
-			ret = copy_amt;
+			ret = copy_amt - 1;
 	}
 	if (path_d)
 		kref_put(&path_d->d_kref);
