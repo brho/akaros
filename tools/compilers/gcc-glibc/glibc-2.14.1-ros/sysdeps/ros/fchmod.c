@@ -1,4 +1,4 @@
-/* Copyright (C) 1991, 1995, 1996, 1997 Free Software Foundation, Inc.
+/* Copyright (C) 1991, 1992, 1995, 1996, 1997, 2011 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -18,31 +18,31 @@
 
 #include <errno.h>
 #include <stddef.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <ros/syscall.h>
 #include <fcall.h>
 
-/* Change the protections of FILE to MODE.  */
+/* Change the permissions of the file referenced by FD to MODE.  */
 int
-__chmod (const char* file, mode_t mode)
+__fchmod (fd, mode)
+     int fd;
+     mode_t mode;
 {
   struct dir dir;
   size_t mlen;
   char mbuf[STATFIXLEN];
   int ret;
 
-  if (file == NULL)
-  {
-    __set_errno (EINVAL);
-    return -1;
-  }
+  if (fd < 0)
+    {
+      __set_errno (EINVAL);
+      return -1;
+    }
 
   init_empty_dir(&dir);
   dir.mode = mode;
   mlen = convD2M(&dir, mbuf, STATFIXLEN);
-  ret = ros_syscall(SYS_wstat, file, strlen(file), mbuf, mlen, WSTAT_MODE, 0);
+  ret = ros_syscall(SYS_fwstat, fd, mbuf, mlen, WSTAT_MODE, 0, 0);
   return (ret == mlen ? 0 : -1);
 }
-weak_alias (__chmod, chmod)
+weak_alias (__fchmod, fchmod)

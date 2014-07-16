@@ -1355,55 +1355,6 @@ intreg_t sys_umask(struct proc *p, int mask)
 	return old_mask;
 }
 
-static void init_dir_for_wstat(struct dir *d)
-{
-	d->type = ~0;
-	d->dev = ~0;
-	d->qid.path = ~0;
-	d->qid.vers = ~0;
-	d->qid.type = ~0;
-	d->mode = ~0;
-	d->atime = ~0;
-	d->mtime = ~0;
-	d->length = ~0;
-	d->name = "";
-	d->uid = "";
-	d->gid = "";
-	d->muid = "";
-}
-
-intreg_t sys_chmod(struct proc *p, const char *path, size_t path_l, int mode)
-{
-	int retval;
-	char *t_path = user_strdup_errno(p, path, path_l);
-	if (!t_path)
-		return -1;
-	/* busybox sends in the upper bits as 37777777 (-1), perhaps trying to get
-	 * the 'default' setting? */
-	if (mode & ~S_PMASK)
-		printd("[kernel] sys_chmod ignoring upper bits %o\n", mode & ~S_PMASK);
-	mode &= S_PMASK;
-	retval = do_chmod(t_path, mode);
-	/* let's try 9ns */
-	if (retval < 0) {
-		unset_errno();
-		uint8_t *buf;
-		int size;
-		struct dir d;
-		init_dir_for_wstat(&d);
-		d.mode = mode;
-		size = sizeD2M(&d);
-		buf = kmalloc(size, KMALLOC_WAIT);
-		convD2M(&d, buf, size);
-		/* wstat returns the number of bytes written */
-		retval = syswstat(t_path, buf, size);
-		retval = (retval > 0 ? 0 : -1);
-		kfree(buf);
-	}
-	user_memdup_free(p, t_path);
-	return retval;
-}
-
 /* 64 bit seek, with the off64_t passed in via two (potentially 32 bit) off_ts.
  * We're supporting both 32 and 64 bit kernels/userspaces, but both use the
  * llseek syscall with 64 bit parameters. */
@@ -1804,16 +1755,78 @@ intreg_t sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
 	return ret;
 }
 
+/* Helper, interprets the wstat and performs the VFS action.  Returns stat_sz on
+ * success for all ops, -1 or 0 o/w.  If one op fails, it'll skip the remaining
+ * ones. */
+static int vfs_wstat(struct file *file, uint8_t *stat_m, size_t stat_sz,
+                     int flags)
+{
+	struct dir *dir;
+	int m_sz;
+	int retval = 0;
+
+	dir = kzmalloc(sizeof(struct dir) + stat_sz, KMALLOC_WAIT);
+	m_sz = convM2D(stat_m, stat_sz, &dir[0], (char*)&dir[1]);
+	if (m_sz != stat_sz) {
+		set_errstr(Eshortstat);
+		set_errno(EINVAL);
+		kfree(dir);
+		return -1;
+	}
+	if (flags & WSTAT_MODE) {
+		retval = do_file_chmod(file, dir->mode);
+		if (retval < 0)
+			goto out;
+	}
+
+out:
+	kfree(dir);
+	/* convert vfs retval to wstat retval */
+	if (retval >= 0)
+		retval = stat_sz;
+	return retval;
+}
+
 intreg_t sys_wstat(struct proc *p, char *path, size_t path_l,
                    uint8_t *stat_m, size_t stat_sz, int flags)
 {
-	return -1;
+	int retval = 0;
+	char *t_path = user_strdup_errno(p, path, path_l);
+	struct file *file;
+
+	if (!t_path)
+		return -1;
+	retval = syswstat(t_path, stat_m, stat_sz);
+	if (retval == stat_sz) {
+		user_memdup_free(p, t_path);
+		return stat_sz;
+	}
+	/* 9ns failed, we'll need to check the VFS */
+	file = do_file_open(t_path, 0, 0);
+	user_memdup_free(p, t_path);
+	if (!file)
+		return -1;
+	retval = vfs_wstat(file, stat_m, stat_sz, flags);
+	kref_put(&file->f_kref);
+	return retval;
 }
 
 intreg_t sys_fwstat(struct proc *p, int fd, uint8_t *stat_m, size_t stat_sz,
                     int flags)
 {
-	return -1;
+	int retval = 0;
+	struct file *file;
+
+	retval = sysfwstat(fd, stat_m, stat_sz);
+	if (retval == stat_sz)
+		return stat_sz;
+	/* 9ns failed, we'll need to check the VFS */
+	file = get_file_from_fd(&p->open_files, fd);
+	if (!file)
+		return -1;
+	retval = vfs_wstat(file, stat_m, stat_sz, flags);
+	kref_put(&file->f_kref);
+	return retval;
 }
 
 intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
@@ -1874,7 +1887,6 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_fcntl] = {(syscall_t)sys_fcntl, "fcntl"},
 	[SYS_access] = {(syscall_t)sys_access, "access"},
 	[SYS_umask] = {(syscall_t)sys_umask, "umask"},
-	[SYS_chmod] = {(syscall_t)sys_chmod, "chmod"},
 	[SYS_llseek] = {(syscall_t)sys_llseek, "llseek"},
 	[SYS_link] = {(syscall_t)sys_link, "link"},
 	[SYS_unlink] = {(syscall_t)sys_unlink, "unlink"},
