@@ -1556,15 +1556,17 @@ int do_chmod(char *path, int mode)
 {
 	struct nameidata nd_r = {0}, *nd = &nd_r;
 	int retval = 0;
+	int old_mode_ftype;
 	retval = path_lookup(path, 0, nd);
 	if (!retval) {
+		old_mode_ftype = nd->dentry->d_inode->i_mode & __S_IFMT;
 		#if 0
 		/* TODO: when we have notions of uid, check for the proc's uid */
 		if (nd->dentry->d_inode->i_uid != UID_OF_ME)
 			retval = -EPERM;
 		else
 		#endif
-			nd->dentry->d_inode->i_mode |= mode & S_PMASK;
+			nd->dentry->d_inode->i_mode = (mode & S_PMASK) | old_mode_ftype;
 	}
 	path_release(nd);	
 	return retval;
