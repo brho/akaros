@@ -1544,6 +1544,11 @@ intreg_t sys_chdir(struct proc *p, const char *path, size_t path_l)
 	return 0;
 }
 
+intreg_t sys_fchdir(struct proc *p, int fd)
+{
+	return -1;
+}
+
 /* Note cwd_l is not a strlen, it's an absolute size */
 intreg_t sys_getcwd(struct proc *p, char *u_cwd, size_t cwd_l)
 {
@@ -1776,7 +1781,7 @@ intreg_t sys_nunmount(struct proc *p, char *name, int name_l, char *old_path, in
 	return ret;
 }
 
-static intreg_t sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
+intreg_t sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
 {
 	int ret;
 	struct chan *ch;
@@ -1797,6 +1802,26 @@ static intreg_t sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
 	cclose(ch);
 	poperror();
 	return ret;
+}
+
+intreg_t sys_wstat(struct proc *p, char *path, size_t path_l,
+                   uint8_t *stat_m, size_t stat_sz, int flags)
+{
+	return -1;
+}
+
+intreg_t sys_fwstat(struct proc *p, int fd, uint8_t *stat_m, size_t stat_sz,
+                    int flags)
+{
+	return -1;
+}
+
+intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
+                    char *new_path, size_t new_path_l)
+{
+	/* this might trick userspace code to fallback to copying, for now */
+	set_errno(EXDEV);
+	return -1;
 }
 
 /************** Syscall Invokation **************/
@@ -1856,6 +1881,7 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_symlink] = {(syscall_t)sys_symlink, "symlink"},
 	[SYS_readlink] = {(syscall_t)sys_readlink, "readlink"},
 	[SYS_chdir] = {(syscall_t)sys_chdir, "chdir"},
+	[SYS_fchdir] = {(syscall_t)sys_fchdir, "fchdir"},
 	[SYS_getcwd] = {(syscall_t)sys_getcwd, "getcwd"},
 	[SYS_mkdir] = {(syscall_t)sys_mkdir, "mkdir"},
 	[SYS_rmdir] = {(syscall_t)sys_rmdir, "rmdir"},
@@ -1870,7 +1896,9 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_nmount] ={(syscall_t)sys_nmount, "nmount"},
 	[SYS_nunmount] ={(syscall_t)sys_nunmount, "nunmount"},
 	[SYS_fd2path] ={(syscall_t)sys_fd2path, "fd2path"},
-
+	[SYS_wstat] ={(syscall_t)sys_wstat, "wstat"},
+	[SYS_fwstat] ={(syscall_t)sys_fwstat, "fwstat"},
+	[SYS_rename] ={(syscall_t)sys_rename, "rename"},
 };
 const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
 /* Executes the given syscall.

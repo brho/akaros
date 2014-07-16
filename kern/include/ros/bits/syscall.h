@@ -68,6 +68,11 @@
 #define SYS_rmdir				119
 #define SYS_pipe				120
 
+#define SYS_wstat				121
+#define SYS_fwstat				122
+#define SYS_rename				123
+#define SYS_fchdir				124
+
 /* Misc syscalls */
 #define SYS_gettimeofday		140
 #define SYS_tcgetattr			141
@@ -93,5 +98,15 @@
 
 // for system calls that pass filenames
 #define MAX_PATH_LEN 256
+
+/* wstat flags, so the kernel knows what M fields to look at */
+#define WSTAT_MODE				0x001
+#define WSTAT_ATIME				0x002
+#define WSTAT_MTIME				0x004
+#define WSTAT_LENGTH			0x008
+#define WSTAT_NAME				0x010
+#define WSTAT_UID				0x020
+#define WSTAT_GID				0x040
+#define WSTAT_MUID				0x080
 
 #endif /* !ROS_INCLUDE_SYSCALL_H */
