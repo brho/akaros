@@ -763,11 +763,20 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 	 * new stuff later. Allocate DIRREADSIZE bytes for that purpose.
 	 */
 	if (dir) {
+		int amt;
 		/* expecting only one dirent at a time, o/w we're busted */
 		assert(n >= sizeof(struct kdirent));
 		if (!c->buf) {
 			c->buf=kmalloc(DIRREADSIZE, KMALLOC_WAIT);
 			c->bufused = 0;
+		}
+		/* Attempt to extract an M, in case there was some already */
+		amt = convM2kdirent(c->buf, c->bufused, real_va, 0);
+		if (amt) {
+			c->bufused -= amt;
+			memmove(c->buf, c->buf + amt, c->bufused);
+			n = sizeof(struct kdirent);
+			goto out;
 		}
 		/* debugging */
 		if (waserror()) {
@@ -815,13 +824,15 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 	if (dir) {
 		int amt;
 		c->bufused = c->bufused + n;
+		/* extract an M from the front, then shift the remainder back */
 		amt = convM2kdirent(c->buf, c->bufused, real_va, 0);
 		c->bufused -= amt;
 		memmove(c->buf, c->buf + amt, c->bufused);
-		n = amt;
+		n = amt ? sizeof(struct kdirent) : 0;
 		poperror();	/* matching our debugging waserror */
 	}
 
+out:
 	poperror();
 	cclose(c);
 
