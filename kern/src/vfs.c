@@ -1156,20 +1156,23 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
 	unsigned long first_idx, last_idx;
 	size_t copy_amt;
 	char *buf_end;
+	/* read in offset, in case of a concurrent reader/writer, so we don't screw
+	 * up our math for count, the idxs, etc. */
+	off64_t orig_off = ACCESS_ONCE(*offset);
 
 	/* Consider pushing some error checking higher in the VFS */
 	if (!count)
 		return 0;
-	if (*offset >= file->f_dentry->d_inode->i_size)
+	if (orig_off >= file->f_dentry->d_inode->i_size)
 		return 0; /* EOF */
 	/* Make sure we don't go past the end of the file */
-	if (*offset + count > file->f_dentry->d_inode->i_size) {
-		count = file->f_dentry->d_inode->i_size - *offset;
+	if (orig_off + count > file->f_dentry->d_inode->i_size) {
+		count = file->f_dentry->d_inode->i_size - orig_off;
 	}
 	assert((long)count > 0);
-	page_off = *offset & (PGSIZE - 1);
-	first_idx = *offset >> PGSHIFT;
-	last_idx = (*offset + count) >> PGSHIFT;
+	page_off = orig_off & (PGSIZE - 1);
+	first_idx = orig_off >> PGSHIFT;
+	last_idx = (orig_off + count) >> PGSHIFT;
 	buf_end = buf + count;
 	/* For each file page, make sure it's in the page cache, then copy it out.
 	 * TODO: will probably need to consider concurrently truncated files here.*/
@@ -1192,7 +1195,10 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
 		pm_put_page(page);	/* it's still in the cache, we just don't need it */
 	}
 	assert(buf == buf_end);
-	*offset += count;
+	/* could have concurrent file ops that screw with offset, so userspace isn't
+	 * safe.  but at least it'll be a value that one of the concurrent ops could
+	 * have produced (compared to *offset_changed_concurrently += count. */
+	*offset = orig_off + count;
 	return count;
 }
 
@@ -1212,17 +1218,18 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
 	unsigned long first_idx, last_idx;
 	size_t copy_amt;
 	const char *buf_end;
+	off64_t orig_off = ACCESS_ONCE(*offset);
 
 	/* Consider pushing some error checking higher in the VFS */
 	if (!count)
 		return 0;
 	/* Extend the file.  Should put more checks in here, and maybe do this per
 	 * page in the for loop below. */
-	if (*offset + count > file->f_dentry->d_inode->i_size)
-		file->f_dentry->d_inode->i_size = *offset + count;
-	page_off = *offset & (PGSIZE - 1);
-	first_idx = *offset >> PGSHIFT;
-	last_idx = (*offset + count) >> PGSHIFT;
+	if (orig_off + count > file->f_dentry->d_inode->i_size)
+		file->f_dentry->d_inode->i_size = orig_off + count;
+	page_off = orig_off & (PGSIZE - 1);
+	first_idx = orig_off >> PGSHIFT;
+	last_idx = (orig_off + count) >> PGSHIFT;
 	buf_end = buf + count;
 	/* For each file page, make sure it's in the page cache, then write it.*/
 	for (int i = first_idx; i <= last_idx; i++) {
@@ -1243,7 +1250,7 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
 		pm_put_page(page);	/* it's still in the cache, we just don't need it */
 	}
 	assert(buf == buf_end);
-	*offset += count;
+	*offset = orig_off + count;
 	return count;
 }
 
