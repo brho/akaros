@@ -65,13 +65,13 @@ accept(int fd, __SOCKADDR_ARG __addr,
 		if (lcfd < 0)
 			return -1;
 		/* at this point, we have a new conversation, and lcfd is its ctl fd.
-		 * nfd will be the FD for that conv's data file. */
+		 * nfd will be the FD for that conv's data file.  sock_data will trade
+		 * our lcfd for the data file fd.  even if it fails, sock_data will
+		 * close our lcfd for us.  when it succeeds, it'll open the data file
+		 * before closing lcfd, which will keep the converstation alive. */
 		nfd = _sock_data(lcfd, net, r->domain, r->stype, r->protocol, &nr);
 		if (nfd < 0)
 			return -1;
-		/* we have the data file, and can reopen the ctl based on the info in
-		 * the rock (nr) */
-		close(lcfd);
 
 		/* get remote address */
 		ip = (struct sockaddr_in*)&nr->raddr;

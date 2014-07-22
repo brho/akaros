@@ -1179,6 +1179,11 @@ static intreg_t sys_close(struct proc *p, int fd)
 	}
 	/* 9ns, should also handle errors (bad FD, etc) */
 	retval = sysclose(fd);
+	if (retval < 0) {
+		/* no one checks their retvals.  a double close will cause problems. */
+		printk("[kernel] sys_close failed: proc %d fd %d.  Check your rets.\n",
+		       p, fd);
+	}
 	return retval;
 }
 
