@@ -1158,12 +1158,13 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
 	/* Consider pushing some error checking higher in the VFS */
 	if (!count)
 		return 0;
-	if (*offset == file->f_dentry->d_inode->i_size)
+	if (*offset >= file->f_dentry->d_inode->i_size)
 		return 0; /* EOF */
 	/* Make sure we don't go past the end of the file */
 	if (*offset + count > file->f_dentry->d_inode->i_size) {
 		count = file->f_dentry->d_inode->i_size - *offset;
 	}
+	assert((long)count > 0);
 	page_off = *offset & (PGSIZE - 1);
 	first_idx = *offset >> PGSHIFT;
 	last_idx = (*offset + count) >> PGSHIFT;
