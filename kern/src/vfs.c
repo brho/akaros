@@ -812,8 +812,10 @@ void dcache_put(struct super_block *sb, struct dentry *key_val)
 	int retval;
 	spin_lock(&sb->s_dcache_lock);
 	old = hashtable_remove(sb->s_dcache, key_val);
-	if (old) {
-		assert(old->d_flags & DENTRY_NEGATIVE);
+	/* if it is old and non-negative, our caller lost a race with someone else
+	 * adding the dentry.  but since we yanked it out, like a bunch of idiots,
+	 * we still have to put it back.  should be fairly rare. */
+	if (old && (old->d_flags & DENTRY_NEGATIVE)) {
 		/* This is possible, but rare for now (about to be put on the LRU) */
 		assert(!(old->d_flags & DENTRY_USED));
 		assert(!kref_refcnt(&old->d_kref));
