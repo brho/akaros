@@ -126,6 +126,7 @@ static int run_init_script(void)
 		char *sptr = &CONFIG_INIT_SCRIPT_PATH_AND_ARGS[0];
 
 		/* Figure out how many arguments there are, by finding the spaces */
+		/* TODO: consider rewriting this stuff with parsecmd */
 		while (*sptr != '\0') {
 			if (*(sptr++) != ' ') {
 				vargs++;
@@ -148,11 +149,12 @@ static int run_init_script(void)
 		sptr = &CONFIG_INIT_SCRIPT_PATH_AND_ARGS[0];
 		while (*sptr != '\0') {
 			if (*sptr != ' ') {
-				char *sbeg = sptr;
+				l_argv[i++] = sptr;
 				while ((*sptr != ' ') && (*sptr != '\0'))
 					sptr++;
+				if (*sptr == '\0')
+					break;
 				*sptr = '\0';
-				l_argv[i++] = sbeg;
 			}
 			sptr++;
 		}
