@@ -1,4 +1,5 @@
-/* Copyright (C) 1991, 1995, 1996, 1997 Free Software Foundation, Inc.
+/* futimes -- change access and modification times of open file.  Stub version.
+   Copyright (C) 2002 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -16,20 +17,23 @@
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  */
 
-#include <stdio.h>
+#include <sys/time.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
-
-/* Rename the file OLD to NEW.  */
+/* Change the access time of FILE to TVP[0] and
+   the modification time of FILE to TVP[1], but do not follow symlinks.  */
 int
-rename (old, new)
-     const char *old;
-     const char *new;
+__futimes (int fd, const struct timeval tvp[2])
 {
-  if (old == NULL || new == NULL)
-    {
-      __set_errno (EINVAL);
-      return -1;
-    }
-  return ros_syscall(SYS_rename, old, strlen(old), new, strlen(new), 0, 0);
+  struct timespec tsp[2];
+  if (!tvp)
+  	return futimens(fd, 0);
+  tsp[0].tv_sec = tvp[0].tv_sec;
+  tsp[0].tv_nsec = 0;
+  tsp[1].tv_sec = tvp[1].tv_sec;
+  tsp[1].tv_nsec = 0;
+  return futimens(fd, tsp);
 }
+weak_alias (__futimes, futimes)

@@ -1,4 +1,4 @@
-/* Copyright (C) 1991, 1995, 1996, 1997 Free Software Foundation, Inc.
+/* Copyright (C) 1997, 1998, 2001, 2011 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -16,20 +16,32 @@
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  */
 
-#include <stdio.h>
+#include <sys/types.h>
 #include <errno.h>
+#include <unistd.h>
+#include <fcall.h>
 
-
-/* Rename the file OLD to NEW.  */
+/* Truncate the file referenced by FD to LENGTH bytes.  */
 int
-rename (old, new)
-     const char *old;
-     const char *new;
+__ftruncate64 (fd, length)
+     int fd;
+     off64_t length;
 {
-  if (old == NULL || new == NULL)
+  struct dir dir;
+  size_t mlen;
+  char mbuf[STATFIXLEN];
+  int ret;
+
+  if (fd < 0)
     {
       __set_errno (EINVAL);
       return -1;
     }
-  return ros_syscall(SYS_rename, old, strlen(old), new, strlen(new), 0, 0);
+
+  init_empty_dir(&dir);
+  dir.length = length;
+  mlen = convD2M(&dir, mbuf, STATFIXLEN);
+  ret = ros_syscall(SYS_fwstat, fd, mbuf, mlen, WSTAT_LENGTH, 0, 0);
+  return (ret == mlen ? 0 : -1);
 }
+weak_alias (__ftruncate64, ftruncate64)

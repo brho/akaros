@@ -1788,6 +1788,27 @@ static int vfs_wstat(struct file *file, uint8_t *stat_m, size_t stat_sz,
 		if (retval < 0)
 			goto out;
 	}
+	if (flags & WSTAT_LENGTH) {
+		printk("Got truncate for file %s to length %d\n", file_name(file),
+		       dir->length);
+		/* Fail for now */
+		retval = -1;
+		goto out;
+	}
+	if (flags & WSTAT_ATIME) {
+		printk("Got atime change for file %s to time %d\n", file_name(file),
+		       dir->atime);
+		/* Fail for now */
+		retval = -1;
+		goto out;
+	}
+	if (flags & WSTAT_MTIME) {
+		printk("Got mtime change for file %s to time %d\n", file_name(file),
+		       dir->mtime);
+		/* Fail for now */
+		retval = -1;
+		goto out;
+	}
 
 out:
 	kfree(dir);
@@ -1842,6 +1863,7 @@ intreg_t sys_fwstat(struct proc *p, int fd, uint8_t *stat_m, size_t stat_sz,
 intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
                     char *new_path, size_t new_path_l)
 {
+	printk("got rename from %s to %s\n", old_path, new_path);
 	/* this might trick userspace code to fallback to copying, for now */
 	set_errno(EXDEV);
 	return -1;

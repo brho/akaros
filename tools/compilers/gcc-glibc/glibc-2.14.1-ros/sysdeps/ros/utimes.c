@@ -1,4 +1,4 @@
-/* Copyright (C) 1991, 1995, 1996, 1997 Free Software Foundation, Inc.
+/* Copyright (C) 1991,95,96,97,2000,02 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -16,20 +16,26 @@
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  */
 
-#include <stdio.h>
+#include <sys/time.h>
 #include <errno.h>
+#include <stddef.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
-
-/* Rename the file OLD to NEW.  */
+/* Change the access time of FILE to TVP[0] and
+   the modification time of FILE to TVP[1].  */
 int
-rename (old, new)
-     const char *old;
-     const char *new;
+__utimes (file, tvp)
+     const char *file;
+     const struct timeval tvp[2];
 {
-  if (old == NULL || new == NULL)
-    {
-      __set_errno (EINVAL);
-      return -1;
-    }
-  return ros_syscall(SYS_rename, old, strlen(old), new, strlen(new), 0, 0);
+  struct timespec tsp[2];
+  if (!tvp)
+  	return utimensat(AT_FDCWD, file, 0, 0);
+  tsp[0].tv_sec = tvp[0].tv_sec;
+  tsp[0].tv_nsec = 0;
+  tsp[1].tv_sec = tvp[1].tv_sec;
+  tsp[1].tv_nsec = 0;
+  return utimensat(AT_FDCWD, file, tsp, 0);
 }
+weak_alias (__utimes, utimes)
