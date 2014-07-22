@@ -306,6 +306,57 @@ void pth_thread_has_blocked(struct uthread *uthread, int flags)
 		printf("For great justice!\n");
 }
 
+static void signal_and_make_runnable(struct pthread_tcb *pthread, int signo,
+                                     int code, void *addr)
+{
+	if (!__sigismember(&pthread->sigmask,  signo)) {
+		struct siginfo info = {0};
+		info.si_signo =  signo;
+		info.si_code = code;
+		info.si_addr = addr;
+		__pthread_trigger_posix_signal(pthread, signo, &info);
+	}
+	pth_thread_runnable((struct uthread*)pthread);
+}
+
+static void handle_div_by_zero(struct uthread *uthread, unsigned int err,
+                               unsigned long aux)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	signal_and_make_runnable(pthread, SIGFPE, FPE_INTDIV, (void*)aux);
+}
+
+static void handle_gp_fault(struct uthread *uthread, unsigned int err,
+                            unsigned long aux)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	signal_and_make_runnable(pthread, SIGSEGV, SEGV_ACCERR, (void*)aux);
+}
+
+static void handle_page_fault(struct uthread *uthread, unsigned int err,
+                              unsigned long aux)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+	if (!(err & PF_VMR_BACKED)) {
+		signal_and_make_runnable(pthread, SIGSEGV, SEGV_MAPERR, (void*)aux);
+	} else {
+		/* stitching for the event handler.  sysc -> uth, uth -> sysc */
+		uthread->local_sysc.u_data = uthread;
+		uthread->sysc = &uthread->local_sysc;
+		pthread->state = PTH_BLK_SYSC;
+		/* one downside is that we'll never check the return val of the syscall.  if
+		 * we errored out, we wouldn't know til we PF'd again, and inspected the old
+		 * retval/err and other sysc fields (make sure the PF is on the same addr,
+		 * etc).  could run into this issue on truncated files too. */
+		syscall_async(&uthread->local_sysc, SYS_populate_va, aux, 1);
+		if (!register_evq(&uthread->local_sysc, sysc_mgmt[vcore_id()].ev_q)) {
+			/* Lost the race with the call being done.  The kernel won't send the
+			 * event.  Just restart him. */
+			restart_thread(&uthread->local_sysc);
+		}
+	}
+}
+
 void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
                            unsigned int err, unsigned long aux)
 {
@@ -316,40 +367,27 @@ void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
 	TAILQ_REMOVE(&active_queue, pthread, next);
 	mcs_pdr_unlock(&queue_lock);
 
-	/* TODO: RISCV/x86 issue! (14 is PF, etc) */
-	if (trap_nr != 14 && trap_nr != 13) {
-		printf("Pthread has unhandled fault: %d\n", trap_nr);
-		/* Note that uthread.c already copied out our ctx into the uth struct */
-		print_user_context(&uthread->u_ctx);
-		exit(-1);
+	/* TODO: RISCV/x86 issue! (0 is divby0, 14 is PF, etc) */
+#if defined(__i386__) || defined(__x86_64__) 
+	switch(trap_nr) {
+		case 0:
+			handle_div_by_zero(uthread, err, aux);
+			break;
+		case 13:
+			handle_gp_fault(uthread, err, aux);
+			break;
+		case 14:
+			handle_page_fault(uthread, err, aux);
+			break;
+		default:
+			printf("Pthread has unhandled fault: %d\n", trap_nr);
+			/* Note that uthread.c already copied out our ctx into the uth struct */
+			print_user_context(&uthread->u_ctx);
+			exit(-1);
 	}
-
-	if (!(err & PF_VMR_BACKED)) {
-		if (!__sigismember(&pthread->sigmask, SIGSEGV)) {
-			struct siginfo info = {0};
-			info.si_signo = SIGSEGV;
-			info.si_errno = trap_nr;
-			info.si_code = SEGV_MAPERR;
-			info.si_addr = (void*)aux;
-			__pthread_trigger_posix_signal(pthread, SIGSEGV, &info);
-		}
-		pth_thread_runnable(uthread);
-		return;
-	}
-	/* stitching for the event handler.  sysc -> uth, uth -> sysc */
-	uthread->local_sysc.u_data = uthread;
-	uthread->sysc = &uthread->local_sysc;
-	pthread->state = PTH_BLK_SYSC;
-	/* one downside is that we'll never check the return val of the syscall.  if
-	 * we errored out, we wouldn't know til we PF'd again, and inspected the old
-	 * retval/err and other sysc fields (make sure the PF is on the same addr,
-	 * etc).  could run into this issue on truncated files too. */
-	syscall_async(&uthread->local_sysc, SYS_populate_va, aux, 1);
-	if (!register_evq(&uthread->local_sysc, sysc_mgmt[vcore_id()].ev_q)) {
-		/* Lost the race with the call being done.  The kernel won't send the
-		 * event.  Just restart him. */
-		restart_thread(&uthread->local_sysc);
-	}
+#else
+	#error "Handling hardware faults is currently only supported on x86"
+#endif
 }
 
 void pth_preempt_pending(void)
