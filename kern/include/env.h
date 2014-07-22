@@ -26,6 +26,7 @@
 TAILQ_HEAD(vcore_tailq, vcore);
 /* 'struct proc_list' declared in sched.h (not ideal...) */
 
+#define PROC_PROGNAME_SZ 20
 // TODO: clean this up.
 struct proc {
 	TAILQ_ENTRY(proc) proc_arsc_link;
@@ -33,7 +34,7 @@ struct proc {
 	spinlock_t proc_lock;
 	struct user_context scp_ctx; 	/* context for an SCP.  TODO: move to vc0 */
 	char user[64]; /* user name */
-
+	char progname[PROC_PROGNAME_SZ];
 	pid_t pid;
 	/* Tempting to add a struct proc *parent, but we'd need to protect the use
 	 * of that reference from concurrent parent-death (letting init inherit

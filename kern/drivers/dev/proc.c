@@ -1110,10 +1110,12 @@ regread:
 			return n;
 #endif
 		case Qstatus:{
-				char buf[8 + 1 + 10 + 1 + 6 + 2];	/* 2 is paranoia */
+				/* the extra 2 is paranoia */
+				char buf[8 + 1 + PROC_PROGNAME_SZ + 1 + 10 + 1 + 6 + 2];
 				snprintf(buf, sizeof(buf),
-						 "%8d %-10s %6d", p->pid, procstate2str(p->state),
-						 p->ppid);
+				         "%8d %-*s %-10s %6d", p->pid, PROC_PROGNAME_SZ,
+				         p->progname, procstate2str(p->state),
+				         p->ppid);
 				kref_put(&p->p_kref);
 				return readstr(off, va, n, buf);
 			}

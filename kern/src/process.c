@@ -256,6 +256,14 @@ void proc_init(void)
 	atomic_init(&num_envs, 0);
 }
 
+void proc_set_progname(struct proc *p, char *name)
+{
+	/* might have an issue if a dentry name isn't null terminated, and we'd get
+	 * extra junk up to progname_sz. */
+	strncpy(p->progname, name, PROC_PROGNAME_SZ);
+	p->progname[PROC_PROGNAME_SZ - 1] = '\0';
+}
+
 /* Be sure you init'd the vcore lists before calling this. */
 static void proc_init_procinfo(struct proc* p)
 {
@@ -425,6 +433,7 @@ struct proc *proc_create(struct file *prog, char **argv, char **envp)
 	error_t r;
 	if ((r = proc_alloc(&p, current, 0 /* flags */)) < 0)
 		panic("proc_create: %e", r);	/* one of 3 quaint usages of %e */
+	proc_set_progname(p, file_name(prog));
 	procinfo_pack_args(p->procinfo, argv, envp);
 	assert(load_elf(p, prog) == 0);
 	__proc_ready(p);
@@ -451,6 +460,7 @@ static void __proc_free(struct kref *kref)
 	assert(kref_refcnt(&p->p_kref) == 0);
 	assert(TAILQ_EMPTY(&p->alarmset.list));
 
+	p->progname[0] = 0;
 	cclose(p->dot);
 	cclose(p->slash);
 	p->dot = p->slash = 0; /* catch bugs */
@@ -2207,10 +2217,18 @@ void print_allpids(void)
 	{
 		struct proc *p = (struct proc*)item;
 		assert(p);
-		printk("%8d %-10s %6d\n", p->pid, procstate2str(p->state), p->ppid);
+		/* this actually adds an extra space, since no progname is ever
+		 * PROGNAME_SZ bytes, due to the \0 counted in PROGNAME. */
+		printk("%8d %-*s %-10s %6d\n", p->pid, PROC_PROGNAME_SZ, p->progname,
+		       procstate2str(p->state), p->ppid);
 	}
-	printk("     PID STATE      Parent    \n");
-	printk("------------------------------\n");
+	char dashes[PROC_PROGNAME_SZ];
+	memset(dashes, '-', PROC_PROGNAME_SZ);
+	dashes[PROC_PROGNAME_SZ - 1] = '\0';
+	/* -5, for 'Name ' */
+	printk("     PID Name %-*s State      Parent    \n",
+	       PROC_PROGNAME_SZ - 5, "");
+	printk("------------------------------%s\n", dashes);
 	spin_lock(&pid_hash_lock);
 	hash_for_each(pid_hash, print_proc_state);
 	spin_unlock(&pid_hash_lock);
@@ -2229,6 +2247,7 @@ void print_proc_info(pid_t pid)
 	spinlock_debug(&p->proc_lock);
 	//spin_lock(&p->proc_lock); // No locking!!
 	printk("struct proc: %p\n", p);
+	printk("Program name: %s\n", p->progname);
 	printk("PID: %d\n", p->pid);
 	printk("PPID: %d\n", p->ppid);
 	printk("State: %s (%p)\n", procstate2str(p->state), p->state);

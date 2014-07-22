@@ -377,6 +377,7 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 		set_errstr("Failed to alloc new proc");
 		goto mid_error;
 	}
+	proc_set_progname(new_p, file_name(program));
 	/* close the CLOEXEC ones, even though this isn't really an exec */
 	close_9ns_files(new_p, TRUE);
 	close_all_files(&new_p->open_files, TRUE);
@@ -511,12 +512,15 @@ static ssize_t sys_fork(env_t* e)
 	ret = proc_alloc(&env, current, PROC_DUP_FGRP);
 	assert(!ret);
 	assert(env != NULL);
+	proc_set_progname(env, e->progname);
 
 	env->heap_top = e->heap_top;
 	env->ppid = e->pid;
 	disable_irqsave(&state);	/* protect cur_ctx */
 	/* Can't really fork if we don't have a current_ctx to fork */
 	if (!current_ctx) {
+		proc_destroy(env);
+		proc_decref(env);
 		set_errno(EINVAL);
 		return -1;
 	}
@@ -637,6 +641,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	                           sizeof(pi->argbuf)))
 		goto mid_error;
 	/* This is the point of no return for the process. */
+	proc_set_progname(p, file_name(program));
 	#ifdef CONFIG_X86
 	/* clear this, so the new program knows to get an LDT */
 	p->procdata->ldt = 0;
