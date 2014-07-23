@@ -958,6 +958,7 @@ void load_inode(struct dentry *dentry, unsigned long ino)
  * note we don't pass this an nd, like Linux does... */
 static struct inode *create_inode(struct dentry *dentry, int mode)
 {
+	uint64_t now = epoch_seconds();
 	/* note it is the i_ino that uniquely identifies a file in the specific
 	 * filesystem.  there's a diff between creating an inode (even for an in-use
 	 * ino) and then filling it in, and vs creating a brand new one.
@@ -970,10 +971,10 @@ static struct inode *create_inode(struct dentry *dentry, int mode)
 	inode->i_nlink = 1;
 	inode->i_size = 0;
 	inode->i_blocks = 0;
-	inode->i_atime.tv_sec = 0;		/* TODO: now! */
-	inode->i_ctime.tv_sec = 0;
-	inode->i_mtime.tv_sec = 0;
-	inode->i_atime.tv_nsec = 0;		/* are these supposed to be the extra ns? */
+	inode->i_atime.tv_sec = now;
+	inode->i_ctime.tv_sec = now;
+	inode->i_mtime.tv_sec = now;
+	inode->i_atime.tv_nsec = 0;
 	inode->i_ctime.tv_nsec = 0;
 	inode->i_mtime.tv_nsec = 0;
 	inode->i_bdev = inode->i_sb->s_bdev;

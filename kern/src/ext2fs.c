@@ -1088,19 +1088,11 @@ int ext2_create(struct inode *dir, struct dentry *dentry, int mode,
 	struct ext2_i_info *e2ii;
 	uint32_t dir_block;
 	unsigned int our_rec_len;
-	/* TODO: figure out the real time!  (Nanwan's birthday, bitches!) */
-	time_t now = 1242129600;
 	struct ext2_dirent *new_dirent;
 	/* Set basic inode stuff for files, get a disk inode, etc */
 	SET_FTYPE(inode->i_mode, __S_IFREG);
 	inode->i_fop = &ext2_f_op_file;
 	inode->i_ino = ext2_alloc_diskinode(inode, dir_bg);
-	inode->i_atime.tv_sec = now;
-	inode->i_atime.tv_nsec = 0;
-	inode->i_ctime.tv_sec = now;
-	inode->i_ctime.tv_nsec = 0;
-	inode->i_mtime.tv_sec = now;
-	inode->i_mtime.tv_nsec = 0;
 	/* Initialize disk inode (this will be different for short symlinks) */
 	disk_inode = ext2_get_diskinode(inode);
 	ext2_init_diskinode(disk_inode, inode);

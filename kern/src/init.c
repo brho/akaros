@@ -81,11 +81,11 @@ void kernel_init(multiboot_info_t *mboot_info)
 	vmr_init();
 	file_init();
 	page_check();
-	vfs_init();
-	devfs_init();
 	idt_init();
 	kernel_msg_init();
 	timer_init();
+	vfs_init();
+	devfs_init();
 	train_timing();
 	kb_buf_init(&cons_buf);
 	arch_init();

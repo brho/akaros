@@ -5,7 +5,7 @@
 #include <arch/time.h>
 
 /* (newlib) Time Value Specification Structures, P1003.1b-1993, p. 261 */
-typedef long time_t;
+typedef long time_t; /* TODO: this is fucked.  Thanks POSIX. */
 
 struct timespec {
   time_t  tv_sec;   /* Seconds */
@@ -33,6 +33,7 @@ uint64_t sec2tsc(uint64_t sec);
 uint64_t msec2tsc(uint64_t msec);
 uint64_t usec2tsc(uint64_t usec);
 uint64_t nsec2tsc(uint64_t nsec);
+uint64_t epoch_seconds(void);
 
 /* Just takes a time measurement.  Meant to be paired with stop_timing.  Use
  * this if you don't want to muck with overheads or subtraction. */

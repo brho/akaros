@@ -132,3 +132,10 @@ uint64_t nsec2tsc(uint64_t nsec)
 	else
 		return (nsec * system_timing.tsc_freq) / 1000000000;
 }
+
+uint64_t epoch_seconds(void)
+{
+	/* TODO: figure out what epoch time TSC == 0 is */
+	uint64_t boot_sec = 1242129600; /* nanwan's birthday */
+	return tsc2sec(read_tsc()) + boot_sec;
+}
