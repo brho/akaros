@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Busybox version: 1.17.4
-# Fri Jun 20 11:27:09 2014
+# Busybox version: 1.17.3
+# Tue Jul 22 17:00:17 2014
 #
 CONFIG_HAVE_DOT_CONFIG=y
 
@@ -264,7 +264,7 @@ CONFIG_STTY=y
 # CONFIG_FEATURE_FANCY_TAIL is not set
 # CONFIG_TEE is not set
 # CONFIG_FEATURE_TEE_USE_BLOCK_IO is not set
-# CONFIG_TOUCH is not set
+CONFIG_TOUCH=y
 # CONFIG_TRUE is not set
 CONFIG_TTY=y
 # CONFIG_UNAME is not set
