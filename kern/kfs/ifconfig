@@ -52,6 +52,15 @@ then
 	NIC="0"
 fi
 
+if [ "x$MACHINE" = "xaltdra" ]
+then
+	# yuzhu's soda hall bridged vm
+	me=128.32.37.37
+	mask=255.255.255.0
+	remote=128.32.37.0
+	route=128.32.37.1
+fi
+
 if [ "x$MACHINE" = "xhossin" ]
 then
 	# brho's soda hall desktop
