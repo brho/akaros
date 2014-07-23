@@ -1796,18 +1796,13 @@ static int vfs_wstat(struct file *file, uint8_t *stat_m, size_t stat_sz,
 		goto out;
 	}
 	if (flags & WSTAT_ATIME) {
-		printk("Got atime change for file %s to time %d\n", file_name(file),
-		       dir->atime);
-		/* Fail for now */
-		retval = -1;
-		goto out;
+		/* wstat only gives us seconds */
+		file->f_dentry->d_inode->i_atime.tv_sec = dir->atime;
+		file->f_dentry->d_inode->i_atime.tv_nsec = 0;
 	}
 	if (flags & WSTAT_MTIME) {
-		printk("Got mtime change for file %s to time %d\n", file_name(file),
-		       dir->mtime);
-		/* Fail for now */
-		retval = -1;
-		goto out;
+		file->f_dentry->d_inode->i_mtime.tv_sec = dir->mtime;
+		file->f_dentry->d_inode->i_mtime.tv_nsec = 0;
 	}
 
 out:
