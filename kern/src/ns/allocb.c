@@ -220,6 +220,11 @@ void printblock(struct block *b)
 	unsigned int off, elen;
 	struct extra_bdata *e;
 
+	if (b == NULL) {
+		printk("block is null\n");
+		return;
+	}
+
 	printk("block of BLEN = %d, with %d header and %d data in %d extras\n",
 	       BLEN(b), BHLEN(b), b->extra_len, b->nr_extra_bufs);
 

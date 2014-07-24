@@ -283,7 +283,6 @@ struct block *pullupblock(struct block *bp, int n)
 			bp->extra_len -= seglen;
 			if (ebd->len == 0) {
 				kfree((void *)ebd->base);
-				ebd->len = 0;
 				ebd->off = 0;
 				ebd->base = 0;
 			}
@@ -352,13 +351,105 @@ struct block *pullupqueue(struct queue *q, int n)
 	return q->bfirst;
 }
 
+/* throw away count bytes from the front of
+ * block's extradata.  Returns count of bytes
+ * thrown away
+ */
+
+static int pullext(struct block *bp, int count)
+{
+	struct extra_bdata *ed;
+	int i, rem, bytes = 0;
+
+	for (i = 0; bp->extra_len && count && i < bp->nr_extra_bufs; i++) {
+		ed = &bp->extra_data[i];
+		rem = MIN(count, ed->len);
+		bp->extra_len -= rem;
+		count -= rem;
+		bytes += rem;
+		ed->off += rem;
+		ed->len -= rem;
+		if (ed->len == 0) {
+			kfree((void *)ed->base);
+			ed->base = 0;
+			ed->off = 0;
+		}
+	}
+	return bytes;
+}
+
+/* throw away count bytes from the end of a
+ * block's extradata.  Returns count of bytes
+ * thrown away
+ */
+
+static int dropext(struct block *bp, int count)
+{
+	struct extra_bdata *ed;
+	int i, rem, bytes = 0;
+
+	for (i = bp->nr_extra_bufs - 1; bp->extra_len && count && i >= 0; i--) {
+		ed = &bp->extra_data[i];
+		rem = MIN(count, ed->len);
+		bp->extra_len -= rem;
+		count -= rem;
+		bytes += rem;
+		ed->len -= rem;
+		if (ed->len == 0) {
+			kfree((void *)ed->base);
+			ed->base = 0;
+			ed->off = 0;
+		}
+	}
+	return bytes;
+}
+
+/*
+ *  throw away up to count bytes from a
+ *  list of blocks.  Return count of bytes
+ *  thrown away.
+ */
+static int _pullblock(struct block **bph, int count, int free)
+{
+	struct block *bp;
+	int n, bytes;
+
+	bytes = 0;
+	if (bph == NULL)
+		return 0;
+
+	while (*bph != NULL && count != 0) {
+		bp = *bph;
+
+		n = MIN(BHLEN(bp), count);
+		bytes += n;
+		count -= n;
+		bp->rp += n;
+		n = pullext(bp, count);
+		bytes += n;
+		count -= n;
+		QDEBUG checkb(bp, "pullblock ");
+		if (BLEN(bp) == 0 && (free || count)) {
+			*bph = bp->next;
+			bp->next = NULL;
+			freeb(bp);
+		}
+	}
+	return bytes;
+}
+
+int pullblock(struct block **bph, int count)
+{
+	return _pullblock(bph, count, 1);
+}
+
 /*
  *  trim to len bytes starting at offset
  */
 struct block *trimblock(struct block *bp, int offset, int len)
 {
-	uint32_t l;
-	struct block *nb, *startb;
+	uint32_t l, trim;
+	int olen = len;
 
 	QDEBUG checkb(bp, "trimblock 1");
 	if (blocklen(bp) < offset + len) {
@@ -366,31 +457,28 @@ struct block *trimblock(struct block *bp, int offset, int len)
 		return NULL;
 	}
 
-	while ((l = BLEN(bp)) < offset) {
-		offset -= l;
-		nb = bp->next;
-		bp->next = NULL;
-		freeb(bp);
-		bp = nb;
+	l =_pullblock(&bp, offset, 0);
+	if (bp == NULL)
+		return NULL;
+	if (l != offset) {
+		freeblist(bp);
+		return NULL;
 	}
-
-	WARN_EXTRA(bp);
-	startb = bp;
-	bp->rp += offset;
 
 	while ((l = BLEN(bp)) < len) {
 		len -= l;
 		bp = bp->next;
 	}
 
-	bp->wp -= (BLEN(bp) - len);
+	trim = BLEN(bp) - len;
+	trim -= dropext(bp, trim);
+	bp->wp -= trim;
 
 	if (bp->next) {
 		freeblist(bp->next);
 		bp->next = NULL;
 	}
-
-	return startb;
+	return bp;
 }
 
 /*
@@ -456,39 +544,6 @@ struct block *adjustblock(struct block *bp, int len)
 	return bp;
 }
 
-/*
- *  throw away up to count bytes from a
- *  list of blocks.  Return count of bytes
- *  thrown away.
- */
-int pullblock(struct block **bph, int count)
-{
-	struct block *bp;
-	int n, bytes;
-
-	bytes = 0;
-	if (bph == NULL)
-		return 0;
-
-	while (*bph != NULL && count != 0) {
-		bp = *bph;
-	WARN_EXTRA(bp);
-
-		n = BLEN(bp);
-		if (count < n)
-			n = count;
-		bytes += n;
-		count -= n;
-		bp->rp += n;
-		QDEBUG checkb(bp, "pullblock ");
-		if (BLEN(bp) == 0) {
-			*bph = bp->next;
-			bp->next = NULL;
-			freeb(bp);
-		}
-	}
-	return bytes;
-}
 
 /*
  *  get next block from a queue, return null if nothing there
