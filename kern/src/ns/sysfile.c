@@ -498,7 +498,7 @@ int sysfwstat(int fd, uint8_t * buf, int n)
 		return -1;
 	}
 
-	validstat(buf, n);
+	validstat(buf, n, 0);
 	c = fdtochan(current->fgrp, fd, -1, 1, 1);
 	if (waserror()) {
 		cclose(c);
@@ -951,7 +951,7 @@ int64_t sysseek(int fd, int64_t off, int whence)
 	return off;
 }
 
-void validstat(uint8_t * s, int n)
+void validstat(uint8_t * s, int n, int slashok)
 {
 	
 	int m;
@@ -976,7 +976,7 @@ void validstat(uint8_t * s, int n)
 	buf[m] = '\0';
 	/* name could be '/' */
 	if (strcmp(buf, "/") != 0)
-		validname(buf, 0);
+		validname(buf, slashok);
 }
 
 int sysfstat(int fd, uint8_t *buf, int n)
@@ -1145,7 +1145,7 @@ int syswstat(char *path, uint8_t * buf, int n)
 		return -1;
 	}
 
-	validstat(buf, n);
+	validstat(buf, n, 0);
 	c = namec(path, Aaccess, 0, 0);
 	if (waserror()) {
 		cclose(c);

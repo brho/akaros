@@ -506,7 +506,7 @@ static int mntstat(struct chan *c, uint8_t * dp, int n)
 	} else {
 		n = r->reply.nstat;
 		memmove(dp, r->reply.stat, n);
-		validstat(dp, n);
+		validstat(dp, n, 0);
 		mntdirfix(dp, c);
 	}
 	poperror();
@@ -696,7 +696,7 @@ static long mntread(struct chan *c, void *buf, long n, int64_t off)
 			if (p + dirlen > e){
 				break;
 			}
-			validstat(p, dirlen);
+			validstat(p, dirlen, 0);
 			mntdirfix(p, c);
 			numdirent += dirlen;
 		}

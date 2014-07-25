@@ -4,3 +4,9 @@ kern/include \
 kern/kfs \
 kern/src \
 kern/arch/x86 | awk '/\.[ch]$/{print $2}'`
+etags `du -a  \
+kern/drivers \
+kern/include \
+kern/kfs \
+kern/src \
+kern/arch/x86 | awk '/\.[ch]$/{print $2}'`

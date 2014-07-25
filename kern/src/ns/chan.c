@@ -396,7 +396,7 @@ int cmount(struct chan *new, struct chan *old, int flag, char *spec)
 	 * work.  The check of mount->mflag catches things like
 	 *  mount fd /root
 	 *  bind -c /root /
-	 * 
+	 *
 	 * This is far more complicated than it should be, but I don't
 	 * see an easier way at the moment.     -rsc
 	 */
@@ -485,7 +485,7 @@ void cunmount(struct chan *mnt, struct chan *mounted)
 		printd("cunmount newp extra umh %p has %p\n", mnt, mnt->umh);
 
 	/*
-	 * It _can_ happen that mounted->umh is non-NULL, 
+	 * It _can_ happen that mounted->umh is non-NULL,
 	 * because mounted is the result of namec(Aopen)
 	 * (see sysfile.c:/^sysunmount).
 	 * If we open a union directory, it will have a umh.
@@ -951,6 +951,9 @@ void *memrchr(void *va, int c, long n)
  * correct Chan* but with an incorrect struct cname attached.
  * Since the functions that open Aaccess (sysstat, syswstat, sys_stat)
  * do not use the struct cname*, this avoids an unnecessary clone.
+ *
+ * Acreatechan will never open. It will do all the tests and return a chan
+ * for the directory where an open will succeed.
  */
 struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 {
@@ -1052,7 +1055,7 @@ struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 	/*
 	 * On create, ....
 	 */
-	if (amode == Acreate) {
+	if ((amode == Acreate) || (amode == Acreatechan)) {
 		/* perm must have DMDIR if last element is / or /. */
 		if (e.mustbedir && !(perm & DMDIR)) {
 			npath = e.ARRAY_SIZEs;
@@ -1190,6 +1193,14 @@ Open:
 			 */
 			break;
 
+		case Acreatechan:
+			/*
+			 * We've walked to the place where it *could* be created.
+			 * Return that chan.
+			 */
+			printk("Acreatechan: all but last? c is %p\n", c);
+			break;
+
 		case Acreate:
 			/*
 			 * We've already walked all but the last element.
@@ -1208,11 +1219,11 @@ Open:
 			 * The semantics of the create(2) system call are that if the
 			 * file exists and can be written, it is to be opened with truncation.
 			 * On the other hand, the create(5) message fails if the file exists.
-			 * If we get two create(2) calls happening simultaneously, 
-			 * they might both get here and send create(5) messages, but only 
+			 * If we get two create(2) calls happening simultaneously,
+			 * they might both get here and send create(5) messages, but only
 			 * one of the messages will succeed.  To provide the expected create(2)
 			 * semantics, the call with the failed message needs to try the above
-			 * walk again, opening for truncation.  This correctly solves the 
+			 * walk again, opening for truncation.  This correctly solves the
 			 * create/create race, in the sense that any observable outcome can
 			 * be explained as one happening before the other.
 			 * The create/create race is quite common.  For example, it happens
@@ -1222,7 +1233,7 @@ Open:
 			 * The implementation still admits a create/create/remove race:
 			 * (A) walk to file, fails
 			 * (B) walk to file, fails
-			 * (A) create file, succeeds, returns 
+			 * (A) create file, succeeds, returns
 			 * (B) create file, fails
 			 * (A) remove file, succeeds, returns
 			 * (B) walk to file, return failure.
@@ -1402,7 +1413,7 @@ void isdir(struct chan *c)
  * The mount list is deleted when we cunmount.
  * The RWlock ensures that nothing is using the mount list at that time.
  *
- * It is okay to replace c->mh with whatever you want as 
+ * It is okay to replace c->mh with whatever you want as
  * long as you are sure you have a unique reference to it.
  *
  * This comment might belong somewhere else.
