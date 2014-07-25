@@ -46,6 +46,23 @@ uint8_t *gqid(uint8_t * p, uint8_t * ep, struct qid *q)
 	return p;
 }
 
+void init_empty_dir(struct dir *d)
+{
+	d->type = ~0;
+	d->dev = ~0;
+	d->qid.path = ~0;
+	d->qid.vers = ~0;
+	d->qid.type = ~0;
+	d->mode = ~0;
+	d->atime = ~0;
+	d->mtime = ~0;
+	d->length = ~0;
+	d->name = "";
+	d->uid = "";
+	d->gid = "";
+	d->muid = "";
+}
+
 /*
  * no syntactic checks.
  * three causes for error:
