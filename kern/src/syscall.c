@@ -1883,6 +1883,7 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 		set_errno(EPERM);
 		goto done;
 	}
+	printk("Newchan: %C\n", newchan);
 	if ((newchan->dev != oldchan->dev) || 
 		(newchan->type != oldchan->type)) {
 		printk("Old chan and new chan do not match\n");
@@ -1926,10 +1927,10 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 	printk("syswstat returns %d\n", retval);
 
 done: 
+	user_memdup_free(p, from_path);
 	user_memdup_free(p, to_path);
-	user_memdup_free(p, to_path);
-	//cclose(oldchan);
-	//cclose(newchan);
+	cclose(oldchan);
+	cclose(newchan);
 	return retval;
 }
 
