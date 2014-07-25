@@ -243,6 +243,7 @@ enum {
 	Tmax,
 };
 
+void init_empty_dir(struct dir *d);
 unsigned int convM2S(uint8_t * unused_uint8_p_t, unsigned int unused_int,
 					 struct fcall *);
 unsigned int convS2M(struct fcall *, uint8_t * unused_uint8_p_t, unsigned int);
@@ -300,6 +301,7 @@ enum {
 	Amount,						/* to be mounted or mounted upon */
 	Acreate,					/* is to be created */
 	Aremove,					/* will be removed by caller */
+	Acreatechan,					/* return a chan for a create request. for sysrename. */
 
 	COPEN = 0x0001,				/* for i/o */
 	CMSG = 0x0002,	/* the message channel for a mount */
@@ -1022,6 +1024,11 @@ int fd_setfl(int fd, int flags);
 
 /* kern/drivers/dev/srv.c */
 char *srvname(struct chan *c);
+
+/* kern/src/eipconv.c. Put them here or face real include hell. */
+void printqid(void (*putch) (int, void **), void **putdat, struct qid *q);
+void printcname(void (*putch) (int, void **), void **putdat, struct cname *c);
+void printchan(void (*putch) (int, void **), void **putdat, struct chan *c);
 
 static inline int abs(int a)
 {

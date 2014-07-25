@@ -106,6 +106,54 @@ void printipmask(void (*putch) (int, void **), void **putdat, uint8_t * ip)
 	printfmt(putch, putdat, "/%d", n);
 }
 
+void printqid(void (*putch) (int, void **), void **putdat, struct qid *q)
+{
+	printfmt(putch, putdat, "{path:%p,type:%02x,vers:%p}",
+		 q->path, q->type, q->vers);
+
+}
+
+void printcname(void (*putch) (int, void **), void **putdat, struct cname *c)
+{
+	printfmt(putch, putdat, "{ref %d, alen %d, len %d, s %s}",
+		 kref_refcnt(&c->ref), c->alen, c->len, c->s);
+}
+
+void printchan(void (*putch) (int, void **), void **putdat, struct chan *c)
+{
+
+	printfmt(putch, putdat, "%slocked ", spin_locked(&c->lock) ? "":"un");
+	printfmt(putch, putdat, "refs %p ", kref_refcnt(&c->ref));
+//	printfmt(putch, putdat, "%p ", struct chan *next,
+//	printfmt(putch, putdat, "%p ", struct chan *link,
+	printfmt(putch, putdat, "off %p ", c->offset);
+	printfmt(putch, putdat, "type %p ", c->type);
+	printfmt(putch, putdat, "dev %p ", c->dev);
+	printfmt(putch, putdat, "mode %p ", c->mode);
+	printfmt(putch, putdat, "flag %p ", c->flag);
+	printfmt(putch, putdat, "qid");
+	printqid(putch, putdat, &c->qid);
+	printfmt(putch, putdat, " fid %p ", c->fid);
+	printfmt(putch, putdat, "iounit %p ", c->iounit);
+	printfmt(putch, putdat, "umh %p ", c->umh);
+	printfmt(putch, putdat, "umc %p ", c->umc);
+//      printfmt(putch, putdat, "%p ", qlock_t umqlock,
+	printfmt(putch, putdat, "uri %p ", c->uri);
+	printfmt(putch, putdat, "dri %p ", c->dri);
+	printfmt(putch, putdat, "mountid %p ", c->mountid);
+	printfmt(putch, putdat, "mntcache %p ", c->mcp);
+	printfmt(putch, putdat, "mnt %p ", c->mux);
+	printfmt(putch, putdat, "aux %p ", c->aux);
+	printfmt(putch, putdat, "mchan %p ", c->mchan);
+	printfmt(putch, putdat, "mqid %p ");
+	printqid(putch, putdat, &c->mqid);
+	printfmt(putch, putdat, " cname ");
+	printcname(putch, putdat, c->name);
+	printfmt(putch, putdat, " ateof %p ", c->ateof);
+	printfmt(putch, putdat, "buf %p ", c->buf);
+	printfmt(putch, putdat, "bufused %p ", c->bufused);
+}
+
 static uint8_t testvec[11][16] = {
 	{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 1, 3, 4, 5,},
 	{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,

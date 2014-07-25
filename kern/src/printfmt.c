@@ -135,6 +135,11 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 			lflag++;
 			goto reswitch;
 
+		// chan
+		case 'C':
+			printchan(putch, putdat, va_arg(ap, void*));
+			break;
+
 		// character
 		case 'c':
 			putch(va_arg(ap, int), putdat);
@@ -247,6 +252,10 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 			base = 16;
 			goto number;
 
+		// qid
+		case 'Q':
+			printqid(putch, putdat, va_arg(ap, void*));
+			break;
 		number:
 			printnum(putch, putdat, num, base, width, padc);
 			break;
