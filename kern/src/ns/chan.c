@@ -658,7 +658,7 @@ static char Edoesnotexist[] = "does not exist";
 int walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror)
 {
 	int dev, dotdot, i, n, nhave, ntry, type;
-	struct chan *c, *nc;
+	struct chan *c, *nc, *lastmountpoint = NULL;
 	struct cname *cname;
 	struct mount *f;
 	struct mhead *mh, *nmh;
@@ -672,13 +672,13 @@ int walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror)
 
 	/*
 	 * While we haven't gotten all the way down the path:
-	 *    1. step through a mount po int unused_int, if any
+	 *    1. step through a mount point, if any
 	 *    2. send a walk request for initial dotdot or initial prefix without dotdot
 	 *    3. move to the first mountpoint along the way.
 	 *    4. repeat.
 	 *
 	 * An invariant is that each time through the loop, c is on the undomount
-	 * side of the mount po int unused_int, and c's name is cname.
+	 * side of the mount point, and c's name is cname.
 	 */
 	for (nhave = 0; nhave < nnames; nhave += n) {
 		if ((c->qid.type & QTDIR) == 0) {
@@ -780,6 +780,7 @@ int walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror)
 					cclose(wq->clone);
 					wq->clone = NULL;
 				}
+				lastmountpoint = nc;
 				n = i + 1;
 			}
 			for (i = 0; i < n; i++)
@@ -804,6 +805,7 @@ int walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror)
 
 	cnameclose(c->name);
 	c->name = cname;
+	c->mountpoint = lastmountpoint;
 
 	cclose(*cp);
 	*cp = c;
@@ -972,7 +974,6 @@ struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 	if (name[0] == '\0')
 		error("empty file name");
 	validname(name, 1);
-
 	/*
 	 * Find the starting off point (the current slash, the root of
 	 * a device tree, or the current dot) as well as the name to
@@ -1178,7 +1179,7 @@ Open:
 
 		case Atodir:
 			/*
-			 * Directories (e.g. for cd) are left before the mount po int unused_int,
+			 * Directories (e.g. for cd) are left before the mount point,
 			 * so one may mount on / or . and see the effect.
 			 */
 			if (!(c->qid.type & QTDIR))
@@ -1198,7 +1199,6 @@ Open:
 			 * We've walked to the place where it *could* be created.
 			 * Return that chan.
 			 */
-			printk("Acreatechan: all but last? c is %p\n", c);
 			break;
 
 		case Acreate:

@@ -1859,6 +1859,7 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
                     char *new_path, size_t new_path_l)
 {
 	ERRSTACK(1);
+	int mountpointlen = 0;
 	char *from_path = user_strdup_errno(p, old_path, old_path_l);
 	char *to_path = user_strdup_errno(p, new_path, new_path_l);
 	struct chan *oldchan, *newchan = NULL;
@@ -1866,48 +1867,80 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 
 	if ((!from_path) || (!to_path))
 		return -1;
-	printk("sys_rename :%s: to :%s: : ", from_path, to_path);
+	printd("sys_rename :%s: to :%s: : ", from_path, to_path);
 
 	/* we need a fid for the wstat. */
 	oldchan = namec(from_path, Aaccess, 0, 0);
-	printk("Oldchan: %C\n", oldchan);
 	if (! oldchan) {
-		printk("Could not get a chan for %s\n", from_path);
+		printd("Could not get a chan for %s\n", from_path);
 		set_errno(ENOENT);
 		goto done;
 	}
-	/* the omode and perm are of no importance, we think. */
+
+	printd("Oldchan: %C\n", oldchan);
+	printd("Oldchan: mchan %C\n", oldchan->mchan);
+
+	/* If walked through a mountpoint, we need to take that
+	 * into account for the Twstat.
+	 */
+	if (oldchan->mountpoint) {
+		printd("mountpoint: %C\n", oldchan->mountpoint);
+		if (oldchan->mountpoint->name)
+			mountpointlen = oldchan->mountpoint->name->len;
+	}
+
+	/* This test makes sense even when mountpointlen is 0 */
+	if (strlen(to_path) < mountpointlen) {
+		set_errno(EINVAL);
+		goto done;
+	}
+
+	/* the omode and perm are of no importance. */
 	newchan = namec(to_path, Acreatechan, 0, 0);
 	if (newchan == NULL) {
 		printd("sys_rename %s to %s found no chan\n", from_path, to_path);
 		set_errno(EPERM);
 		goto done;
 	}
-	printk("Newchan: %C\n", newchan);
+	printd("Newchan: %C\n", newchan);
+	printd("Newchan: mchan %C\n", newchan->mchan);
+
 	if ((newchan->dev != oldchan->dev) || 
 		(newchan->type != oldchan->type)) {
-		printk("Old chan and new chan do not match\n");
+		printd("Old chan and new chan do not match\n");
 		set_errno(ENODEV);
 		goto done;
 	}
 
-	printk("let's do it. ");
 	struct dir dir;
 	size_t mlen;
 	uint8_t mbuf[STATFIXLEN + MAX_PATH_LEN + 1];
 
 	init_empty_dir(&dir);
 	dir.name = to_path;
+	/* absolute paths need the mountpoint name stripped from them.
+	 * Once stripped, it still has to be an absolute path.
+	 */
+	if (dir.name[0] == '/') {
+		dir.name = to_path + mountpointlen;
+		if (dir.name[0] != '/') {
+			set_errno(EINVAL);
+			goto done;
+		}
+	}
+
 	mlen = convD2M(&dir, mbuf, sizeof(mbuf));
 	if (! mlen) {
 		printk("convD2M failed\n");
 		set_errno(EINVAL);
 		goto done;
 	}
+
 	if (waserror()) {
 		printk("validstat failed: %s\n", current_errstr());
 		goto done;
 	}
+
 	validstat(mbuf, mlen, 1);
 	poperror();
 
@@ -1918,6 +1951,7 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 
 	retval = devtab[oldchan->type].wstat(oldchan, mbuf, mlen);
 
+	poperror();
 	if (retval == mlen) {
 		retval = mlen;
 	} else {

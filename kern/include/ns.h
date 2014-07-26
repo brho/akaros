@@ -385,6 +385,10 @@ struct chan {
 		void *aux;
 		char tag[4];			/* for iproute */
 	};
+	/* mountpoint, as discovered during walk.
+	 * Used for rename at present.
+	 */
+	struct chan *mountpoint;
 	struct chan *mchan;			/* channel to mounted server */
 	struct qid mqid;			/* qid of root of mount point */
 	struct cname *name;

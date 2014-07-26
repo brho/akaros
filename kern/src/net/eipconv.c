@@ -115,13 +115,16 @@ void printqid(void (*putch) (int, void **), void **putdat, struct qid *q)
 
 void printcname(void (*putch) (int, void **), void **putdat, struct cname *c)
 {
-	printfmt(putch, putdat, "{ref %d, alen %d, len %d, s %s}",
-		 kref_refcnt(&c->ref), c->alen, c->len, c->s);
+	if (c)
+		printfmt(putch, putdat, "{ref %d, alen %d, len %d, s %s}",
+		 	kref_refcnt(&c->ref), c->alen, c->len, c->s);
 }
 
 void printchan(void (*putch) (int, void **), void **putdat, struct chan *c)
 {
-
+	if (! c)
+		return;
+	printfmt(putch, putdat, "(%p): ", c);
 	printfmt(putch, putdat, "%slocked ", spin_locked(&c->lock) ? "":"un");
 	printfmt(putch, putdat, "refs %p ", kref_refcnt(&c->ref));
 //	printfmt(putch, putdat, "%p ", struct chan *next,
@@ -142,7 +145,8 @@ void printchan(void (*putch) (int, void **), void **putdat, struct chan *c)
 	printfmt(putch, putdat, "dri %p ", c->dri);
 	printfmt(putch, putdat, "mountid %p ", c->mountid);
 	printfmt(putch, putdat, "mntcache %p ", c->mcp);
-	printfmt(putch, putdat, "mnt %p ", c->mux);
+	printfmt(putch, putdat, "mux %p ", c->mux);
+	if (c->mux && c->mux->c) 	printfmt(putch, putdat, "mux->c %p ", c->mux->c);
 	printfmt(putch, putdat, "aux %p ", c->aux);
 	printfmt(putch, putdat, "mchan %p ", c->mchan);
 	printfmt(putch, putdat, "mqid %p ");
