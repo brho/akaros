@@ -170,6 +170,7 @@ struct chan *newchan(void)
 	c->mqid.type = 0;
 	c->name = 0;
 	c->buf = NULL;
+	c->mountpoint = NULL;
 	return c;
 }
 
