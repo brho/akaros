@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <net.h>
+#include <iplib.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>

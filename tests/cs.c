@@ -20,6 +20,7 @@
 #include <error.h>
 #include <iplib.h>
 #include <ndb.h>
+#include <fcallfmt.h>
 #include <fcall.h>
 
 enum
