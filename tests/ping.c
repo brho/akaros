@@ -268,7 +268,7 @@ sender(int fd, int msglen, int interval, int n)
 			if(pingrint != 0)
 				extra = rand();
 			/* uth_sleep takes seconds, interval is in ms */
-			uthread_sleep((interval + extra) / 1000);
+			uthread_usleep((interval + extra) * 1000);
 		}
 		r = calloc(sizeof *r, 1);
 		if (r == NULL){

@@ -378,6 +378,12 @@ void uthread_sleep(unsigned int seconds)
 {
 	sys_block(seconds * 1000000);	/* usec sleep */
 }
+/* If we are providing a dummy sleep function, might as well provide the more
+ * accurate/useful one. */
+void uthread_usleep(unsigned int usecs)
+{
+	sys_block(usecs);	/* usec sleep */
+}
 
 /* Cleans up the uthread (the stuff we did in uthread_init()).  If you want to
  * destroy a currently running uthread, you'll want something like

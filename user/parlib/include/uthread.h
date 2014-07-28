@@ -75,6 +75,7 @@ void uthread_runnable(struct uthread *uthread);
 void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
                    void *yield_arg);
 void uthread_sleep(unsigned int seconds);
+void uthread_usleep(unsigned int usecs);
 
 /* Utility functions */
 bool __check_preempt_pending(uint32_t vcoreid);	/* careful: check the code */
