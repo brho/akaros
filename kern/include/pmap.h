@@ -146,4 +146,9 @@ static inline ppn_t kva2ppn(void* addr)
 	return page2ppn(kva2page(addr));
 }
 
+static inline bool is_kaddr(void *addr)
+{
+	return (uintptr_t)addr >= KERNBASE;
+}
+
 #endif /* !ROS_KERN_PMAP_H */

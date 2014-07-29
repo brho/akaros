@@ -1187,7 +1187,7 @@ static intreg_t sys_close(struct proc *p, int fd)
 	if (retval < 0) {
 		/* no one checks their retvals.  a double close will cause problems. */
 		printk("[kernel] sys_close failed: proc %d fd %d.  Check your rets.\n",
-		       p, fd);
+		       p->pid, fd);
 	}
 	return retval;
 }

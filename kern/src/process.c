@@ -2284,7 +2284,8 @@ void print_proc_info(pid_t pid)
 	struct files_struct *files = &p->open_files;
 	spin_lock(&files->lock);
 	for (int i = 0; i < files->max_files; i++)
-		if (files->fd[i].fd_file) {
+		if (GET_BITMASK_BIT(files->open_fds->fds_bits, i) &&
+		    (files->fd[i].fd_file)) {
 			printk("\tFD: %02d, File: %p, File name: %s\n", i,
 			       files->fd[i].fd_file, file_name(files->fd[i].fd_file));
 		}
