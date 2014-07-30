@@ -266,8 +266,13 @@ int load_elf(struct proc* p, struct file* f)
 		struct file *interp = do_file_open(ei.interp, 0, 0);
 		if (!interp)
 			return -1;
-		/* Load dynamic linker one page into the address space */
-		int error = load_one_elf(p, interp, 1, &interp_ei, TRUE);
+		/* Load dynamic linker at 1M. Obvious MIB joke avoided.
+		 * It used to be loaded at page 1, but the existence of valid addresses
+		 * that low masked bad derefs through NULL pointer structs. This in turn
+		 * helped us waste a full day debugging a bug in the Go runtime. True!
+		 * Note that MMAP_LOWEST_VA also has this value but we want to make this
+		 * explicit. */
+		int error = load_one_elf(p, interp, MiB>>12, &interp_ei, TRUE);
 		kref_put(&interp->f_kref);
 		if (error)
 			return -1;
