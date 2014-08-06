@@ -495,11 +495,11 @@ struct arpent {
 	struct arpent *hash;
 	struct block *hold;
 	struct block *last;
-	unsigned int ctime;			/* time entry was created or refreshed */
-	unsigned int utime;			/* time entry was last used */
+	uint64_t ctime;			/* time entry was created or refreshed */
+	uint64_t utime;			/* time entry was last used */
 	uint8_t state;
 	struct arpent *nextrxt;		/* re-transmit chain */
-	unsigned int rtime;			/* time for next retransmission */
+	uint64_t rtime;			/* time for next retransmission */
 	uint8_t rxtsrem;
 	struct Ipifc *ifc;
 	uint8_t ifcid;				/* must match ifc->id */

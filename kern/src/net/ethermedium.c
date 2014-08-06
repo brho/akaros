@@ -338,10 +338,15 @@ etherbwrite(struct Ipifc *ifc, struct block *bp, int version, uint8_t * ip)
 	uint8_t mac[6];
 	Etherrock *er = ifc->arg;
 
-	/* get mac address of destination */
+	/* get mac address of destination.
+	 *
+	 * Locking is tricky here.  If we get arpent 'a' back, the f->arp is
+	 * qlocked.  if multicastarp returns bp, then it unlocked it for us.  if
+	 * not, sendarp or resolveaddr6 unlocked it for us.  yikes. */
 	a = arpget(er->f->arp, bp, version, ifc, ip, mac);
 	if (a) {
-		/* check for broadcast or multicast */
+		/* check for broadcast or multicast.  if it is either, this sorts that
+		 * out and returns the bp for the first packet on the arp's hold list.*/
 		bp = multicastarp(er->f, a, ifc->m, mac);
 		if (bp == NULL) {
 			switch (version) {
@@ -511,7 +516,8 @@ static void etherremmulti(struct Ipifc *ifc, uint8_t * a, uint8_t * unused)
 /*
  *  send an ethernet arp
  *  (only v4, v6 uses the neighbor discovery, rfc1970)
- */
+ *
+ * May drop packets on stale arps. */
 static void sendarp(struct Ipifc *ifc, struct arpent *a)
 {
 	int n;
@@ -525,7 +531,8 @@ static void sendarp(struct Ipifc *ifc, struct arpent *a)
 		return;
 	}
 
-	/* remove all but the last message */
+	/* remove all but the last message.  brho: this might be unnecessary.  we'll
+	 * eventually send them.  but they should be quite stale at this point. */
 	while ((bp = a->hold) != NULL) {
 		if (bp == a->last)
 			break;

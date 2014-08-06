@@ -127,7 +127,7 @@ static struct arpent *newarp6(struct arp *arp, uint8_t * ip, struct Ipifc *ifc,
 
 	memmove(a->ip, ip, sizeof(a->ip));
 	a->utime = NOW;
-	a->ctime = 0;
+	a->ctime = a->utime;
 	a->type = m;
 
 	a->rtime = NOW + ReTransTimer;
@@ -295,6 +295,10 @@ struct block *arpresolve(struct arp *arp, struct arpent *a, struct medium *type,
 	a->utime = NOW;
 	bp = a->hold;
 	a->hold = NULL;
+	/* brho: it looks like we return the entire hold list, though it might be
+	 * purged by now via some other crazy arp list management.  our callers
+	 * can't handle the arp's b->list stuff. */
+	assert(!bp->list);
 	qunlock(&arp->qlock);
 
 	return bp;
