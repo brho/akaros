@@ -151,9 +151,9 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 			if (err < 0)
 				err = -err;
 			if (err >= NUMERRORS)
-				printfmt(putch, putdat, "error %d", err);
+				printfmt(putch, putdat, "error %d(%s)", err, get_cur_errbuf());
 			else
-				printfmt(putch, putdat, "%s", error_string[err]);
+				printfmt(putch, putdat, "%s (%s)", error_string[err], get_cur_errbuf());
 			break;
 
 		case 'E': // ENET MAC
