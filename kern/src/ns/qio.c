@@ -13,10 +13,10 @@
 #include <smp.h>
 #include <ip.h>
 
-#define WARN_EXTRA(b)                                                          \
+#define PANIC_EXTRA(b)                                                          \
 {                                                                              \
 	if ((b)->extra_len)                                                        \
-		warn_once("%s doesn't handle extra_data", __FUNCTION__);               \
+		panic("%s doesn't handle extra_data", __FUNCTION__);               \
 }
 
 static uint32_t padblockcnt;
@@ -111,7 +111,7 @@ struct block *padblock(struct block *bp, int size)
 			return bp;
 		}
 
-		WARN_EXTRA(bp);
+		PANIC_EXTRA(bp);
 		if (bp->next)
 			panic("padblock %p", getcallerpc(&bp));
 		n = BLEN(bp);
@@ -126,7 +126,7 @@ struct block *padblock(struct block *bp, int size)
 	} else {
 		size = -size;
 
-		WARN_EXTRA(bp);
+		PANIC_EXTRA(bp);
 
 		if (bp->next)
 			panic("padblock %p", getcallerpc(&bp));
@@ -194,7 +194,7 @@ struct block *concatblock(struct block *bp)
 		return bp;
 
 	/* probably use parts of qclone */
-	WARN_EXTRA(bp);
+	PANIC_EXTRA(bp);
 	nb = allocb(blocklen(bp));
 	for (f = bp; f; f = f->next) {
 		len = BLEN(f);
@@ -497,7 +497,7 @@ struct block *copyblock(struct block *bp, int count)
 		nbp->checksum_offset = bp->checksum_offset;
 		nbp->mss = bp->mss;
 	}
-	WARN_EXTRA(bp);
+	PANIC_EXTRA(bp);
 	for (; count > 0 && bp != 0; bp = bp->next) {
 		l = BLEN(bp);
 		if (l > count)
@@ -526,7 +526,7 @@ struct block *adjustblock(struct block *bp, int len)
 		return NULL;
 	}
 
-	WARN_EXTRA(bp);
+	PANIC_EXTRA(bp);
 	if (bp->rp + len > bp->lim) {
 		nbp = copyblock(bp, len);
 		freeblist(bp);
@@ -694,7 +694,7 @@ int qconsume(struct queue *q, void *vp, int len)
 		tofree = b;
 	};
 
-	WARN_EXTRA(b);
+	PANIC_EXTRA(b);
 	if (n < len)
 		len = n;
 	memmove(p, b->rp, len);
@@ -840,7 +840,8 @@ struct block *packblock(struct block *bp)
 	struct block **l, *nbp;
 	int n;
 
-	WARN_EXTRA(bp);
+	if (bp->extra_len)
+		return bp;
 	for (l = &bp; *l; l = &(*l)->next) {
 		nbp = *l;
 		n = BLEN(nbp);
@@ -894,7 +895,7 @@ int qproduce(struct queue *q, void *vp, int len)
 		/* b->next = 0; done by iallocb() */
 		q->len += BALLOC(b);
 	}
-	WARN_EXTRA(b);
+	PANIC_EXTRA(b);
 	memmove(b->wp, p, len);
 	producecnt += len;
 	b->wp += len;
@@ -1107,7 +1108,7 @@ struct block *qcopy_old(struct queue *q, int len, uint32_t offset)
 	for (sofar = 0; sofar < len;) {
 		if (n > len - sofar)
 			n = len - sofar;
-		WARN_EXTRA(b);
+		PANIC_EXTRA(b);
 		memmove(nb->wp, p, n);
 		qcopycnt += n;
 		sofar += n;
@@ -1428,7 +1429,7 @@ struct block *qbread(struct queue *q, int len)
 	/* split block if it's too big and this is not a message queue */
 	nb = b;
 	if (n > len) {
-		WARN_EXTRA(b);
+		PANIC_EXTRA(b);
 		if ((q->state & Qmsg) == 0) {
 			n -= len;
 			b = allocb(n);
