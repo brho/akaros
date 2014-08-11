@@ -94,7 +94,8 @@ struct Job
 	pthread_t thread;
 };
 
-spinpdrlock_t joblock;
+//spinlock_t	joblock;
+int joblock;
 Job	*joblist;
 
 Mlist	*mlist;
@@ -140,8 +141,8 @@ void	cleanmf(Mfile*);
 
 extern void	paralloc(void);
 
-spinpdrlock_t	dblock;		/* mutex on database operations */
-spinpdrlock_t	netlock;	/* mutex for netinit() */
+spinlock_t	dblock;		/* mutex on database operations */
+spinlock_t	netlock;	/* mutex for netinit() */
 
 char	*logfile = "cs";
 char	*paranoiafile = "cs.paranoia";
@@ -187,7 +188,7 @@ Network network[] = {
 	{ 0 },
 };
 
-spinpdrlock_t ipifclock;
+spinlock_t ipifclock;
 struct ipifc *ipifcs;
 
 char	eaddr[16];		/* ascii ethernet address */
@@ -249,10 +250,6 @@ main(int argc, char *argv[])
 	char ext[Maxpath], servefile[Maxpath];
 	argv0 = argv[0];
 	justsetname = 0;
-  spin_pdr_init(&joblock);
-  spin_pdr_init(&dblock);
-  //spin_pdr_init(&netlock);
-  spin_pdr_init(&ipifclock);
 	setnetmtpt(mntpt, sizeof(mntpt), NULL);
 	ext[0] = 0;
 	argc--, argv++;
@@ -401,11 +398,12 @@ newjob(void)
 	if (! job){
 		error(1, 0, "%s: %r","job calloc");
 	}
-  spin_pdr_lock(&joblock);
+#warning "fix lock"
+//	//lock(&joblock);
 	job->next = joblist;
 	joblist = job;
 	job->request.tag = -1;
-  spin_pdr_unlock(&joblock);
+//	//unlock(&joblock);
 	return job;
 }
 
@@ -414,7 +412,7 @@ freejob(Job *job)
 {
 	Job **l;
 return;
-  spin_pdr_lock(&joblock);
+	//lock(&joblock);
 	for(l = &joblist; *l; l = &(*l)->next){
 		if((*l) == job){
 			*l = job->next;
@@ -422,7 +420,7 @@ return;
 			break;
 		}
 	}
-  spin_pdr_unlock(&joblock);
+	//unlock(&joblock);
 }
 
 void
@@ -430,21 +428,21 @@ flushjob(int tag)
 {
 	Job *job;
 
-  spin_pdr_lock(&joblock);
+	//lock(&joblock);
 	for(job = joblist; job; job = job->next){
 		if(job->request.tag == tag && job->request.type != Tflush){
 			job->flushed = 1;
 			break;
 		}
 	}
-  spin_pdr_unlock(&joblock);
+	//unlock(&joblock);
 }
 
 void *job_thread(void* arg)
 {
 	Mfile *mf;
 	Job *job = arg;
-	spin_pdr_lock(&dblock);
+	//lock(&dblock);
 	mf = newfid(job->request.fid);
 
 	if(debug)
@@ -493,7 +491,7 @@ void *job_thread(void* arg)
 		rwstat(job, mf);
 		break;
 	}
-	spin_pdr_unlock(&dblock);
+	//unlock(&dblock);
 
 	freejob(job);
 
@@ -510,7 +508,7 @@ io(void)
 
 	uint8_t mdata[IOHDRSZ + Maxfdata];
 	Job *job;
-  // TODO: Creating threads right now makes no difference, because of big locks!
+
 	/*
 	 * each request is handled via a thread. Somewhat less efficient than the old
 	 * cs but way cleaner. 
@@ -530,10 +528,14 @@ io(void)
 		/* stash the thread in the job so we can join them all
 		 * later if we want to.
 		 */
+#if 0
 		if (pthread_create(&job->thread, NULL, &job_thread, job)) {
 			error(1, 0, "%s: %r","Failed to create job");
 			continue;
 		}
+#endif
+	job_thread(job);
+
 
 	}
 }
@@ -958,11 +960,11 @@ sendmsg(Job *job, char *err)
 		fprintf(stderr,  "CS:sendmsg convS2M of %F returns 0", &job->reply);
 		abort();
 	}
-	spin_pdr_lock(&joblock);
+	//lock(&joblock);
 	if(job->flushed == 0)
 		if(write(mfd[1], mdata, n)!=n)
 			error(1, 0, "%s: %r","mount write");
-	spin_pdr_unlock(&joblock);
+	//unlock(&joblock);
 	if(debug)
 		fprintf(stderr,  "CS:%F %d", &job->reply, n);
 }
@@ -1446,7 +1448,7 @@ iplookup(Network *np, char *host, char *serv, int nolookup)
 	/*
 	 * reorder according to our interfaces
 	 */
-	spin_pdr_lock(&ipifclock);
+	//lock(&ipifclock);
 	for(ifc = ipifcs; ifc != NULL; ifc = ifc->next){
 		for(lifc = ifc->lifc; lifc != NULL; lifc = lifc->next){
 			maskip(lifc->ip, lifc->mask, net);
@@ -1457,13 +1459,13 @@ iplookup(Network *np, char *host, char *serv, int nolookup)
 				maskip(ip, lifc->mask, tnet);
 				if(memcmp(net, tnet, IPaddrlen) == 0){
 					t = reorder(t, nt);
-					spin_pdr_unlock(&ipifclock);
+					//unlock(&ipifclock);
 					return t;
 				}
 			}
 		}
 	}
-	spin_pdr_unlock(&ipifclock);
+	//unlock(&ipifclock);
 
 	return t;
 }
@@ -1602,8 +1604,8 @@ dnsiplookup(char *host, struct ndbs *s)
 {
 	char buf[Maxreply];
 	struct ndbtuple *t;
-  // XXX: really?
-	spin_pdr_unlock(&dblock);
+
+	//unlock(&dblock);
 
 	/* save the name */
 	snprintf(buf, sizeof(buf), "%s", host);
@@ -1626,7 +1628,7 @@ dnsiplookup(char *host, struct ndbs *s)
 			werrstr("temporary problem: %s", buf);
 	}
 
-	spin_pdr_lock(&dblock);
+	//lock(&dblock);
 	return t;
 }
 
