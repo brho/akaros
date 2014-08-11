@@ -409,7 +409,7 @@ static void etherread4(void *a)
 		return;
 	}
 	for (;;) {
-		bp = devtab[er->mchan4->type].bread(er->mchan4, ifc->maxtu, 0);
+		bp = devtab[er->mchan4->type].bread(er->mchan4, 128 * 1024, 0);
 		if (!canrlock(&ifc->rwlock)) {
 			freeb(bp);
 			continue;
