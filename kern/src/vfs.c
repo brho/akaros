@@ -463,6 +463,8 @@ int path_lookup(char *path, int flags, struct nameidata *nd)
 	int retval;
 	printd("Path lookup for %s\n", path);
 	/* we allow absolute lookups with no process context */
+	/* TODO: RCU read lock on pwd or kref_not_zero in a loop.  concurrent chdir
+	 * could decref nd->dentry before we get to incref it below. */
 	if (path[0] == '/') {			/* absolute lookup */
 		if (!current)
 			nd->dentry = default_ns.root->mnt_root;
@@ -2322,6 +2324,20 @@ void clone_files(struct files_struct *src, struct files_struct *dst)
 	spin_unlock(&src->lock);
 }
 
+static void __chpwd(struct fs_struct *fs_env, struct dentry *new_pwd)
+{
+	struct dentry *old_pwd;
+	kref_get(&new_pwd->d_kref, 1);
+	/* writer lock, make sure we replace pwd with ours.  could also CAS.
+	 * readers don't lock at all, so they need to either loop, or we need to
+	 * delay releasing old_pwd til an RCU grace period. */
+	spin_lock(&fs_env->lock);
+	old_pwd = fs_env->pwd;
+	fs_env->pwd = new_pwd;
+	spin_unlock(&fs_env->lock);
+	kref_put(&old_pwd->d_kref);
+}
+
 /* Change the working directory of the given fs env (one per process, at this
  * point).  Returns 0 for success, -ERROR for whatever error. */
 int do_chdir(struct fs_struct *fs_env, char *path)
@@ -2331,12 +2347,20 @@ int do_chdir(struct fs_struct *fs_env, char *path)
 	retval = path_lookup(path, LOOKUP_DIRECTORY, nd);
 	if (!retval) {
 		/* nd->dentry is the place we want our PWD to be */
-		kref_get(&nd->dentry->d_kref, 1);
-		kref_put(&fs_env->pwd->d_kref);
-		fs_env->pwd = nd->dentry;
+		__chpwd(fs_env, nd->dentry);
 	}
 	path_release(nd);
 	return retval;
+}
+
+int do_fchdir(struct fs_struct *fs_env, struct file *file)
+{
+	if ((file->f_dentry->d_inode->i_mode & __S_IFMT) != __S_IFDIR) {
+		set_errno(ENOTDIR);
+		return -1;
+	}
+	__chpwd(fs_env, file->f_dentry);
+	return 0;
 }
 
 /* Returns a null-terminated string of up to length cwd_l containing the

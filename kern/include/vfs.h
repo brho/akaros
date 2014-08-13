@@ -483,6 +483,7 @@ int insert_file(struct files_struct *open_files, struct file *file, int low_fd);
 void close_all_files(struct files_struct *open_files, bool cloexec);
 void clone_files(struct files_struct *src, struct files_struct *dst);
 int do_chdir(struct fs_struct *fs_env, char *path);
+int do_fchdir(struct fs_struct *fs_env, struct file *file);
 char *do_getcwd(struct fs_struct *fs_env, char **kfree_this, size_t cwd_l);
 
 /* Debugging */

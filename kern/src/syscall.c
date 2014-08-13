@@ -1507,7 +1507,17 @@ intreg_t sys_chdir(struct proc *p, const char *path, size_t path_l)
 
 intreg_t sys_fchdir(struct proc *p, int fd)
 {
-	return -1;
+	struct file *file;
+	int retval;
+	file = get_file_from_fd(&p->open_files, fd);
+	if (!file) {
+		/* TODO: 9ns */
+		set_errno(EBADF);
+		return -1;
+	}
+	retval = do_fchdir(&p->fs_env, file);
+	kref_put(&file->f_kref);
+	return retval;
 }
 
 /* Note cwd_l is not a strlen, it's an absolute size */

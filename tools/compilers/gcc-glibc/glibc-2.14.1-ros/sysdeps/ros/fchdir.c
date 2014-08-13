@@ -25,8 +25,6 @@ int
 fchdir (fd)
      int fd;
 {
-  __set_errno (ENOSYS);
-  return -1;
+  return ros_syscall(SYS_fchdir, fd, 0, 0, 0, 0, 0);
 }
-stub_warning (fchdir)
 strong_alias (fchdir,__fchdir)

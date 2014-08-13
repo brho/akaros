@@ -113,6 +113,7 @@ int main()
 		printf("End of the directory\n");
 	else
 		printf("Dirent name: %s\n", result->d_name);
+	closedir(dir);
 	
 	/* Hardlink tests */
 	printf("Linking to /bin/hello at /dir1/hardhello\n");
@@ -145,9 +146,14 @@ int main()
 	retval = access("dir1/f1.txt", R_OK);
 	if (retval < 0)
 		printf("WARNING! Access error for dir1/f1.txt!\n");
-	retval = chdir("/dir1");
+	fd = open("/dir1", O_RDONLY);
+	printf("OPENED DIR1, got fd %d\n", fd);
+	if (fd < 1)
+		printf("WARNING!, failed to open /dir1!\n");
+	retval = fchdir(fd);
 	if (retval < 0)
-		printf("WARNING! Chdir failed for /dir1!\n");
+		printf("WARNING! fchdir failed for /dir1!\n");
+	close(fd);
 	retval = access("f1.txt", R_OK);
 	if (retval < 0)
 		printf("WARNING! Access error for f1.txt!\n");
@@ -167,6 +173,14 @@ int main()
 	else
 		printf("Got CWD (/dir1/dir1-1/): %s\n", cwd);
 	free(cwd);
+	fd = open("/hello.txt", O_RDONLY);
+	if (fd < 1)
+		printf("WARNING! failed to open hello.txt!\n");
+	retval = fchdir(fd);
+	if (!retval || errno != ENOTDIR)
+		printf("WARNING! didn't fail to fchdir to hello.txt %d %d\n", retval,
+		       errno);
+	close(fd);
 
 	/* Try a chmod() */
 	printf("Trying a chmod\n");
