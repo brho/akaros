@@ -1136,10 +1136,10 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	struct file *file;
 
 	printd("File %s Open attempt oflag %x mode %x\n", path, oflag, mode);
-	/* Make sure only one of O_RDONLY, O_WRONLY, O_RDWR is specified in flags */
-	if (((flags & (O_RDONLY | O_WRONLY | O_RDWR)) != O_RDONLY) &&
-	    ((flags & (O_RDONLY | O_WRONLY | O_RDWR)) != O_WRONLY) &&
-	    ((flags & (O_RDONLY | O_WRONLY | O_RDWR)) != O_RDWR)) {
+	/* Make sure only one of O_RDONLY, O_WRONLY, O_RDWR is specified in flag */
+	if (((oflag & (O_RDONLY | O_WRONLY | O_RDWR)) != O_RDONLY) &&
+	    ((oflag & (O_RDONLY | O_WRONLY | O_RDWR)) != O_WRONLY) &&
+	    ((oflag & (O_RDONLY | O_WRONLY | O_RDWR)) != O_RDWR)) {
 		set_errno(EINVAL);
 		return -1;
 	}
