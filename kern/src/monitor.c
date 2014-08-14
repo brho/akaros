@@ -386,12 +386,11 @@ int mon_bin_run(int argc, char **argv, struct hw_trapframe *hw_tf)
 	for (int i = 0; i < argc - 1; i++)
 		p_argv[i] = argv[i + 1];
 	p_argv[argc - 1] = 0;
-	char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 	/* super ugly: we need to stash current, so that proc_create doesn't pick up
 	 * on random processes running here and assuming they are the parent */
 	struct proc *old_cur = current;
 	current = 0;
-	struct proc *p = proc_create(program, p_argv, p_envp);
+	struct proc *p = proc_create(program, p_argv, NULL);
 	current = old_cur;
 	kfree(p_argv);
 	proc_wakeup(p);

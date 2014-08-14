@@ -1042,8 +1042,7 @@ bool test_ucq(void)
 	KT_ASSERT_M("We should be able to find /bin/ucq", 
 	            program);
 
-	char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
-	struct proc *p = proc_create(program, 0, p_envp);
+	struct proc *p = proc_create(program, NULL, NULL);
 	proc_wakeup(p);
 	/* instead of getting rid of the reference created in proc_create, we'll put
 	 * it in the awaiter */

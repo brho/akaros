@@ -60,14 +60,13 @@ void manager(void)
 }
 
 char *p_argv[] = {0, 0, 0};
-char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 /* Helper macro for quickly running a process.  Pass it a string, *file, and a
  * *proc. */
 #define quick_proc_run(x, p, f)                                                  \
 	(f) = do_file_open((x), 0, 0);                                               \
 	assert((f));                                                                 \
 	p_argv[0] = file_name((f));                                                  \
-	(p) = proc_create((f), p_argv, p_envp);                                      \
+	(p) = proc_create((f), p_argv, NULL);                                        \
 	kref_put(&(f)->f_kref);                                                      \
 	spin_lock(&(p)->proc_lock);                                                  \
 	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
@@ -79,7 +78,7 @@ char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 	(f) = do_file_open((x), 0, 0);                                               \
 	assert((f));                                                                 \
 	p_argv[0] = file_name((f));                                                  \
-	(p) = proc_create((f), p_argv, p_envp);                                      \
+	(p) = proc_create((f), p_argv, NULL);                                        \
 	kref_put(&(f)->f_kref);                                                      \
 	spin_lock(&(p)->proc_lock);                                                  \
 	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
@@ -89,7 +88,7 @@ char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 	(f) = do_file_open((x), 0, 0);                                               \
 	assert((f));                                                                 \
 	p_argv[0] = file_name((f));                                                  \
-	(p) = proc_create((f), p_argv, p_envp);                                      \
+	(p) = proc_create((f), p_argv, NULL);                                        \
 	kref_put(&(f)->f_kref);                                                      \
 	spin_lock(&(p)->proc_lock);                                                  \
 	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
@@ -104,7 +103,7 @@ char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 	(f) = do_file_open((x), 0, 0);                                               \
 	assert((f));                                                                 \
 	p_argv[0] = file_name((f));                                                  \
-	(p) = proc_create((f), p_argv, p_envp);                                      \
+	(p) = proc_create((f), p_argv, NULL);                                        \
 	kref_put(&(f)->f_kref);                                                      \
 	spin_lock(&(p)->proc_lock);                                                  \
 	__proc_set_state((p), PROC_RUNNABLE_S);                                      \
@@ -240,10 +239,9 @@ void manager_jenkins()
 	if (strlen(CONFIG_USERSPACE_TESTING_SCRIPT) != 0) {
 		char exec[] = "/bin/ash";
 		char *p_argv[] = {exec, CONFIG_USERSPACE_TESTING_SCRIPT, 0};
-		char *p_envp[] = {"LD_LIBRARY_PATH=/lib", 0};
 
 		struct file *program = do_file_open(exec, 0, 0);
-		struct proc *p = proc_create(program, p_argv, p_envp);
+		struct proc *p = proc_create(program, p_argv, NULL);
 		proc_wakeup(p);
 		proc_decref(p); /* let go of the reference created in proc_create() */
 		kref_put(&program->f_kref);
