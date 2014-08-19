@@ -291,6 +291,7 @@ int syscreate(char *path, int mode, uint32_t perm)
 	return fd;
 }
 
+// This is in need of rework but for now just copy and convert.
 int sysdup(int old, int new)
 {
 	ERRSTACK(2);
@@ -332,6 +333,62 @@ int sysdup(int old, int new)
 		if (oc)
 			cclose(oc);
 	} else {
+		if (waserror()) {
+			cclose(c);
+			nexterror();
+		}
+		fd = newfd(c);
+		if (fd < 0)
+			error(Enofd);
+		poperror();
+	}
+	poperror();
+	return fd;
+}
+
+int sysdup2(struct proc *to, int old, int new)
+{
+	ERRSTACK(2);
+	int fd;
+	struct chan *c, *oc;
+	struct fgrp *fromf = current->fgrp;
+	struct fgrp *tof = to->fgrp;
+
+	if (waserror()) {
+		poperror();
+		return -1;
+	}
+
+	c = fdtochan(current->fgrp, old, -1, 0, 1);
+	if (c->qid.type & QTAUTH) {
+		cclose(c);
+		error(Eperm);
+	}
+	fd = new;
+	if (fd != -1) {
+		/* ideally we'll be done with the VFS before we fix this */
+		/* double check the ccloses when you fix this */
+		panic("Need to sync with the VFS");
+		spin_lock(&tof->lock);
+		if (tof->closed) {
+			spin_unlock(&tof->lock);
+			cclose(c);
+			return -1;
+		}
+		if (fd < 0 || growfd(tof, fd) < 0) {
+			spin_unlock(&tof->lock);
+			cclose(c);
+			error(Ebadfd);
+		}
+		if (fd > tof->maxfd)
+			tof->maxfd = fd;
+		oc = tof->fd[fd];
+		tof->fd[fd] = c;
+		spin_unlock(&tof->lock);
+		if (oc)
+			cclose(oc);
+	} else {
+		panic("unhandled; rewrite newfd");
 		if (waserror()) {
 			cclose(c);
 			nexterror();

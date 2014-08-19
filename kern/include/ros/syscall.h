@@ -32,6 +32,12 @@ struct syscall {
 	char						errstr[MAX_ERRSTR_LEN];
 };
 
+struct childfdmap {
+	int parentfd;
+	int childfd;
+	int ok;
+};
+
 #ifndef ROS_KERNEL
 
 /* Temp hack, til the rest of glibc/userspace uses sys/syscall.h */

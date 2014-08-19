@@ -2244,11 +2244,15 @@ int claim_fd(struct files_struct *open_files, int file_desc)
 
 /* Inserts the file in the files_struct, returning the corresponding new file
  * descriptor, or an error code.  We start looking for open fds from low_fd. */
-int insert_file(struct files_struct *open_files, struct file *file, int low_fd)
+int insert_file(struct files_struct *open_files, struct file *file, int low_fd, int must)
 {
 	int slot;
 	spin_lock(&open_files->lock);
-	slot = __get_fd(open_files, low_fd);
+	if (must)
+		slot = __claim_fd(open_files, low_fd);
+	else
+		slot = __get_fd(open_files, low_fd);
+
 	if (slot < 0) {
 		spin_unlock(&open_files->lock);
 		return slot;
