@@ -1127,35 +1127,6 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 	return ret;
 }
 
-static intreg_t sys_mapchildfds(struct proc *p, int pid, struct childfdmap *map, int nentries)
-{
-	ssize_t ret = 0;
-	int i;
-	// TODO: validate pointer, etc.
-	struct proc *child = pid2proc(pid);
-	if (! child)
-		return -ENOENT;
-
-	for (i = 0; i < nentries; i++) {
-		int slot;
-		struct file *file = get_file_from_fd(&p->open_files, map[i].parentfd);
-		printk("Try to map parent fd %d(%p) to %d\n", map[i].parentfd, file, map[i].childfd);
-		map[i].ok = -1;
-		if (! file) {
-			printk("sys_mapchildfds: %d is wrong\n", map[i].parentfd);
-			continue;
-		}
-		slot = insert_file(&child->open_files, file, map[i].childfd, 1);
-		printk("%s: slot is %d\n", __func__, slot);
-		if (slot == map[i].childfd) {
-			map[i].ok = 0;
-			ret++;
-		}
-		kref_put(&file->f_kref);
-	}
-	return ret;
-}
-
 /* Checks args/reads in the path, opens the file, and inserts it into the
  * process's open file list. */
 static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
@@ -2015,6 +1986,43 @@ done:
 	return retval;
 }
 
+static intreg_t sys_dup_fds_to(struct proc *p, unsigned int pid,
+                               struct childfdmap *map, unsigned int nentries)
+{
+	ssize_t ret = 0;
+	struct proc *child;
+	int slot;
+	struct file *file;
+
+	if (!is_user_rwaddr(map, sizeof(struct childfdmap) * nentries))
+		return -EINVAL;
+	child = pid2proc(pid);
+	if (!child)
+		return -ENOENT;
+	for (int i = 0; i < nentries; i++) {
+		map[i].ok = -1;
+		file = get_file_from_fd(&p->open_files, map[i].parentfd);
+		if (file) {
+			slot = insert_file(&child->open_files, file, map[i].childfd, TRUE);
+			if (slot == map[i].childfd) {
+				map[i].ok = 0;
+				ret++;
+			}
+			kref_put(&file->f_kref);
+			continue;
+		}
+		if (!sys_dup_to(p, map[i].parentfd, child, map[i].childfd)) {
+			map[i].ok = 0;
+			ret++;
+			continue;
+		}
+		/* probably a bug, could send EBADF, maybe via 'ok' */
+		printk("[kernel] dup_fds_to: couldn't find %d\n", map[i].parentfd);
+	}
+	proc_decref(child);
+	return ret;
+}
+
 /************** Syscall Invokation **************/
 
 const struct sys_table_entry syscall_table[] = {
@@ -2089,7 +2097,7 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_wstat] ={(syscall_t)sys_wstat, "wstat"},
 	[SYS_fwstat] ={(syscall_t)sys_fwstat, "fwstat"},
 	[SYS_rename] ={(syscall_t)sys_rename, "rename"},
-	[65536] = {(syscall_t)sys_mapchildfds, "mapchildfds"},
+	[SYS_dup_fds_to] = {(syscall_t)sys_dup_fds_to, "dup_fds_to"},
 };
 const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
 /* Executes the given syscall.

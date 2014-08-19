@@ -33,9 +33,9 @@ struct syscall {
 };
 
 struct childfdmap {
-	int parentfd;
-	int childfd;
-	int ok;
+	unsigned int				parentfd;
+	unsigned int				childfd;
+	int							ok;
 };
 
 #ifndef ROS_KERNEL

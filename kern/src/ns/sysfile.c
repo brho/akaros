@@ -346,60 +346,52 @@ int sysdup(int old, int new)
 	return fd;
 }
 
-int sysdup2(struct proc *to, int old, int new)
+/* Could pass in the fgrp instead of the proc, but we need the to_proc for now
+ * so we can claim a VFS FD */
+int sys_dup_to(struct proc *from_proc, unsigned int from_fd,
+               struct proc *to_proc, unsigned int to_fd)
 {
-	ERRSTACK(2);
-	int fd;
-	struct chan *c, *oc;
-	struct fgrp *fromf = current->fgrp;
-	struct fgrp *tof = to->fgrp;
+	ERRSTACK(1);
+	struct chan *c, *old_chan;
+	struct fgrp *to_fgrp = to_proc->fgrp;
 
 	if (waserror()) {
 		poperror();
 		return -1;
 	}
 
-	c = fdtochan(current->fgrp, old, -1, 0, 1);
+	c = fdtochan(from_proc->fgrp, from_fd, -1, 0, 1);
 	if (c->qid.type & QTAUTH) {
 		cclose(c);
 		error(Eperm);
 	}
-	fd = new;
-	if (fd != -1) {
-		/* ideally we'll be done with the VFS before we fix this */
-		/* double check the ccloses when you fix this */
-		panic("Need to sync with the VFS");
-		spin_lock(&tof->lock);
-		if (tof->closed) {
-			spin_unlock(&tof->lock);
-			cclose(c);
-			return -1;
-		}
-		if (fd < 0 || growfd(tof, fd) < 0) {
-			spin_unlock(&tof->lock);
-			cclose(c);
-			error(Ebadfd);
-		}
-		if (fd > tof->maxfd)
-			tof->maxfd = fd;
-		oc = tof->fd[fd];
-		tof->fd[fd] = c;
-		spin_unlock(&tof->lock);
-		if (oc)
-			cclose(oc);
-	} else {
-		panic("unhandled; rewrite newfd");
-		if (waserror()) {
-			cclose(c);
-			nexterror();
-		}
-		fd = newfd(c);
-		if (fd < 0)
-			error(Enofd);
-		poperror();
+
+	spin_lock(&to_fgrp->lock);
+	if (to_fgrp->closed) {
+		spin_unlock(&to_fgrp->lock);
+		cclose(c);
+		error("Can't dup, FGRP closed");
 	}
+	if (claim_fd(&to_proc->open_files, to_fd)) {
+		spin_unlock(&to_fgrp->lock);
+		cclose(c);
+		error("Can't claim FD %d", to_fd);
+	}
+	if (growfd(to_fgrp, to_fd) < 0) {
+		spin_unlock(&to_fgrp->lock);
+		cclose(c);
+		error("Couldn't grow, to_fd %d", to_fd);
+	}
+	if (to_fd > to_fgrp->maxfd)
+		to_fgrp->maxfd = to_fd;
+	old_chan = to_fgrp->fd[to_fd];
+	to_fgrp->fd[to_fd] = c;
+	spin_unlock(&to_fgrp->lock);
+	if (old_chan)
+		cclose(old_chan);
+
 	poperror();
-	return fd;
+	return 0;
 }
 
 char *sysfd2path(int fd)

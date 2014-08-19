@@ -987,6 +987,8 @@ int grpclose(struct fgrp *f, int fd);
 int sysclose(int fd);
 int syscreate(char *path, int mode, uint32_t perm);
 int sysdup(int old, int new);
+int sys_dup_to(struct proc *from_proc, unsigned int from_fd,
+               struct proc *to_proc, unsigned int to_fd);
 int sysfstat(int fd, uint8_t*, int n);
 int sysfstatakaros(int fd, struct kstat *);
 char *sysfd2path(int fd);
