@@ -117,8 +117,8 @@ struct Tcptimer {
 	Tcptimer *prev;
 	Tcptimer *readynext;
 	int state;
-	int start;
-	int count;
+	uint64_t start;
+	uint64_t count;
 	void (*func) (void *);
 	void *arg;
 };
@@ -254,8 +254,8 @@ struct Tcpctl {
 	int srtt;					/* Shortened round trip */
 	int mdev;					/* Mean deviation of round trip */
 	int kacounter;				/* count down for keep alive */
-	unsigned int sndsyntime;	/* time syn sent */
-	uint32_t time;				/* time Finwait2 or Syn_received was sent */
+	uint64_t sndsyntime;		/* time syn sent */
+	uint64_t time;				/* time Finwait2 or Syn_received was sent */
 	int nochecksum;				/* non-zero means don't send checksums */
 	int flgcnt;					/* number of flags in the sequence (FIN,SEQ) */
 
@@ -291,7 +291,7 @@ struct Limbo {
 	uint16_t mss;				/* mss from the other end */
 	uint16_t rcvscale;			/* how much to scale rcvd windows */
 	uint16_t sndscale;			/* how much to scale sent windows */
-	uint32_t lastsend;			/* last time we sent a synack */
+	uint64_t lastsend;			/* last time we sent a synack */
 	uint8_t version;			/* v4 or v6 */
 	uint8_t rexmits;			/* number of retransmissions */
 };
@@ -455,7 +455,7 @@ static int tcpstate(struct conv *c, char *state, int n)
 	s = (Tcpctl *) (c->ptcl);
 
 	return snprintf(state, n,
-					"%s qin %d qout %d srtt %d mdev %d cwin %lu swin %lu>>%d rwin %lu>>%d timer.start %d timer.count %d rerecv %d katimer.start %d katimer.count %d\n",
+					"%s qin %d qout %d srtt %d mdev %d cwin %lu swin %lu>>%d rwin %lu>>%d timer.start %llu timer.count %llu rerecv %d katimer.start %d katimer.count %d\n",
 					tcpstates[s->state],
 					c->rq ? qlen(c->rq) : 0,
 					c->wq ? qlen(c->wq) : 0,
@@ -1500,7 +1500,7 @@ static void limborexmit(struct Proto *tcp)
 	Limbo **l, *lp;
 	int h;
 	int seen;
-	uint32_t now;
+	uint64_t now;
 
 	tpriv = tcp->priv;
 
@@ -1746,7 +1746,7 @@ int seq_ge(uint32_t x, uint32_t y)
 void tcpsynackrtt(struct conv *s)
 {
 	Tcpctl *tcb;
-	int delta;
+	uint64_t delta;
 	struct tcppriv *tpriv;
 
 	tcb = (Tcpctl *) s->ptcl;
@@ -2812,7 +2812,7 @@ void tcptimeout(void *arg)
 				localclose(s, Etimedout);
 				break;
 			}
-			netlog(s->p->f, Logtcprxmt, "timeout rexmit 0x%lx %d/%d\n",
+			netlog(s->p->f, Logtcprxmt, "timeout rexmit 0x%lx %llu/%llu\n",
 				   tcb->snd.una, tcb->timer.start, NOW);
 			tcpsettimer(tcb);
 			tcprxmit(s);

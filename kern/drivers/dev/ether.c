@@ -227,7 +227,7 @@ static int etherwstat(struct chan *chan, uint8_t * dp, int n)
 
 static void etherrtrace(struct netfile *f, struct etherpkt *pkt, int len)
 {
-	int i, n;
+	uint64_t i, n;
 	struct block *bp;
 
 	if (qwindow(f->in) <= 0)
@@ -236,18 +236,23 @@ static void etherrtrace(struct netfile *f, struct etherpkt *pkt, int len)
 		n = 58;
 	else
 		n = len;
-	bp = iallocb(64);
+	bp = iallocb(68);
 	if (bp == NULL)
 		return;
 	memmove(bp->wp, pkt->d, n);
+	/* we're storing 8 bytes here (64 bit); old 9ns was 32 bit for msec */
 	i = milliseconds();
 	bp->wp[58] = len >> 8;
 	bp->wp[59] = len;
-	bp->wp[60] = i >> 24;
-	bp->wp[61] = i >> 16;
-	bp->wp[62] = i >> 8;
-	bp->wp[63] = i;
-	bp->wp += 64;
+	bp->wp[60] = i >> 56;
+	bp->wp[61] = i >> 48;
+	bp->wp[62] = i >> 40;
+	bp->wp[63] = i >> 32;
+	bp->wp[64] = i >> 24;
+	bp->wp[65] = i >> 16;
+	bp->wp[66] = i >> 8;
+	bp->wp[67] = i;
+	bp->wp += 68;
 	qpass(f->in, bp);
 }
 

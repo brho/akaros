@@ -107,7 +107,7 @@ struct Fragment4 {
 	uint32_t src;
 	uint32_t dst;
 	uint16_t id;
-	uint32_t age;
+	uint64_t age;
 };
 
 struct fragment6 {
@@ -116,7 +116,7 @@ struct fragment6 {
 	uint8_t src[IPaddrlen];
 	uint8_t dst[IPaddrlen];
 	unsigned int id;
-	uint32_t age;
+	uint64_t age;
 };
 
 struct Ipfrag {

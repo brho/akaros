@@ -576,7 +576,7 @@ int arpread(struct arp *arp, char *p, uint32_t offset, int len)
 	return n;
 }
 
-extern int rxmitsols(struct arp *arp)
+static uint64_t rxmitsols(struct arp *arp)
 {
 	unsigned int sflag;
 	struct block *next, *xp;
@@ -584,7 +584,7 @@ extern int rxmitsols(struct arp *arp)
 	struct Fs *f;
 	uint8_t ipsrc[IPaddrlen];
 	struct Ipifc *ifc = NULL;
-	long nrxt;
+	uint64_t nrxt;
 
 	qlock(&arp->qlock);
 	f = arp->f;
@@ -679,7 +679,7 @@ static void rxmitproc(void *v)
 {
 	ERRSTACK(2);
 	struct arp *arp = v;
-	long wakeupat;
+	uint64_t wakeupat;
 
 	arp->rxmitp = current;
 	//print("arp rxmitproc started\n");

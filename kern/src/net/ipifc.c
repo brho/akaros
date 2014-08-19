@@ -447,8 +447,8 @@ char *ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
 	} else {	// default values
 		lifc->onlink = 1;
 		lifc->autoflag = 1;
-		lifc->validlt = 0xffffffff;
-		lifc->preflt = 0xffffffff;
+		lifc->validlt = UINT64_MAX;
+		lifc->preflt = UINT64_MAX;
 		lifc->origint = NOW / 10 ^ 3;
 	}
 	lifc->next = NULL;
@@ -927,7 +927,7 @@ static struct Ipself *freeipself;
 static void iplinkfree(struct Iplink *p)
 {
 	struct Iplink **l, *np;
-	uint32_t now = NOW;
+	uint64_t now = NOW;
 
 	l = &freeiplink;
 	for (np = *l; np; np = *l) {
@@ -946,7 +946,7 @@ static void iplinkfree(struct Iplink *p)
 static void ipselffree(struct Ipself *p)
 {
 	struct Ipself **l, *np;
-	uint32_t now = NOW;
+	uint64_t now = NOW;
 
 	l = &freeipself;
 	for (np = *l; np; np = *l) {
@@ -1187,7 +1187,7 @@ int v6addrtype(uint8_t * addr)
 	return unknownv6;
 }
 
-#define v6addrcurr(lifc) (( (lifc)->origint + (lifc)->preflt >= (NOW/10^3) ) || ( (lifc)->preflt == 0xffffffff ))
+#define v6addrcurr(lifc) (( (lifc)->origint + (lifc)->preflt >= (NOW/10^3) ) || ( (lifc)->preflt == UINT64_MAX ))
 
 static void findprimaryipv6(struct Fs *f, uint8_t * local)
 {
@@ -1615,9 +1615,9 @@ char *ipifcaddpref6(struct Ipifc *ifc, char **argv, int argc)
 {
 	uint8_t onlink = 1;
 	uint8_t autoflag = 1;
-	long validlt = 0xffffffff;
-	long preflt = 0xffffffff;
-	long origint = NOW / 10 ^ 3;
+	uint64_t validlt = UINT64_MAX;
+	uint64_t preflt = UINT64_MAX;
+	uint64_t origint = NOW / 10 ^ 3;
 	uint8_t prefix[IPaddrlen];
 	int plen = 64;
 	struct Iplifc *lifc;

@@ -146,9 +146,9 @@ struct Iplifc {
 	uint8_t tentative;			/* =1 => v6 dup disc on, =0 => confirmed unique */
 	uint8_t onlink;				/* =1 => onlink, =0 offlink. */
 	uint8_t autoflag;			/* v6 autonomous flag */
-	long validlt;				/* v6 valid lifetime */
-	long preflt;				/* v6 preferred lifetime */
-	long origint;				/* time when addr was added */
+	uint64_t validlt;				/* v6 valid lifetime */
+	uint64_t preflt;				/* v6 preferred lifetime */
+	uint64_t origint;				/* time when addr was added */
 	struct Iplink *link;		/* addresses linked to this lifc */
 	struct Iplifc *next;
 };
@@ -159,7 +159,7 @@ struct Iplink {
 	struct Iplifc *lifc;
 	struct Iplink *selflink;	/* next link for this local address */
 	struct Iplink *lifclink;	/* next link for this ifc */
-	uint32_t expire;
+	uint64_t expire;
 	struct Iplink *next;		/* free list */
 	struct kref ref;
 };
