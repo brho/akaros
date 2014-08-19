@@ -389,9 +389,9 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 			clone_files(&parent->open_files, &p->open_files);
 	} else {
 		/* no parent, we're created from the kernel */
-		assert(insert_file(&p->open_files, dev_stdin,  0, 0) == 0);
-		assert(insert_file(&p->open_files, dev_stdout, 1, 0) == 1);
-		assert(insert_file(&p->open_files, dev_stderr, 2, 0) == 2);
+		assert(insert_file(&p->open_files, dev_stdin,  0, TRUE) == 0);
+		assert(insert_file(&p->open_files, dev_stdout, 1, TRUE) == 1);
+		assert(insert_file(&p->open_files, dev_stderr, 2, TRUE) == 2);
 	}
 	/* Init the ucq hash lock */
 	p->ucq_hashlock = (struct hashlock*)&p->ucq_hl_noref;

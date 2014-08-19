@@ -1180,7 +1180,8 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	file = do_file_open(t_path, oflag, mode);
 	/* VFS */
 	if (file) {
-		fd = insert_file(&p->open_files, file, 0, 0);	/* stores the ref to file */
+		/* stores the ref to file */
+		fd = insert_file(&p->open_files, file, 0, FALSE);
 		kref_put(&file->f_kref);	/* drop our ref */
 		if (fd < 0)
 			warn("File insertion failed");
@@ -1348,7 +1349,7 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 
 	switch (cmd) {
 		case (F_DUPFD):
-			retval = insert_file(&p->open_files, file, arg, 0);
+			retval = insert_file(&p->open_files, file, arg, FALSE);
 			if (retval < 0) {
 				set_errno(-retval);
 				retval = -1;
