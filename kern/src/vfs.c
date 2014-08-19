@@ -2226,7 +2226,8 @@ static int __claim_fd(struct files_struct *open_files, int file_desc)
 		return -ENFILE; /* Should never really happen. Here to catch bugs. */
 
 	SET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc);
-	assert(file_desc < open_files->max_files && open_files->fd[0].fd_file == 0);
+	assert(file_desc < open_files->max_files &&
+	       open_files->fd[file_desc].fd_file == 0);
 	if (file_desc >= open_files->next_fd)
 		open_files->next_fd = file_desc + 1;
 	return 0;
