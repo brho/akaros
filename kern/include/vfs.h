@@ -473,6 +473,7 @@ int do_file_chmod(struct file *file, int mode);
 int do_mkdir(char *path, int mode);
 int do_rmdir(char *path);
 int do_pipe(struct file **pipe_files, int flags);
+int do_rename(char *old_path, char *new_path);
 struct file *dentry_open(struct dentry *dentry, int flags);
 void file_release(struct kref *kref);
 

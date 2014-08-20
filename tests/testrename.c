@@ -29,13 +29,6 @@
 #include <fcntl.h>
 
 
-/* Rename the file OLD to NEW.  */
-int
-rename ( const char *old, const char *new)
-{
-	syscall(123 /*SYS_rename*/, old, strlen(old), new, strlen(new), 0, 0);
-}
-
 int main(int argc, char *argv[])
 {
 	int ret;

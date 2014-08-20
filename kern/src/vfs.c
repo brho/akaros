@@ -614,6 +614,23 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 
 /* Dentry Functions */
 
+static void dentry_set_name(struct dentry *dentry, char *name)
+{
+	size_t name_len = strnlen(name, MAX_FILENAME_SZ);	/* not including \0! */
+	char *l_name = 0;
+	if (name_len < DNAME_INLINE_LEN) {
+		strncpy(dentry->d_iname, name, name_len);
+		dentry->d_iname[name_len] = '\0';
+		qstr_builder(dentry, 0);
+	} else {
+		l_name = kmalloc(name_len + 1, 0);
+		assert(l_name);
+		strncpy(l_name, name, name_len);
+		l_name[name_len] = '\0';
+		qstr_builder(dentry, l_name);
+	}
+}
+
 /* Helper to alloc and initialize a generic dentry.  The following needs to be
  * set still: d_op (if no parent), d_fs_info (opt), d_inode, connect the inode
  * to the dentry (and up the d_kref again), maybe dcache_put().  The inode
@@ -627,9 +644,7 @@ struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
                           char *name)
 {
 	assert(name);
-	size_t name_len = strnlen(name, MAX_FILENAME_SZ);	/* not including \0! */
 	struct dentry *dentry = kmem_cache_alloc(dentry_kcache, 0);
-	char *l_name = 0;
 
 	if (!dentry) {
 		set_errno(ENOMEM);
@@ -651,17 +666,7 @@ struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
 	dentry->d_parent = parent;
 	dentry->d_flags = DENTRY_USED;
 	dentry->d_fs_info = 0;
-	if (name_len < DNAME_INLINE_LEN) {
-		strncpy(dentry->d_iname, name, name_len);
-		dentry->d_iname[name_len] = '\0';
-		qstr_builder(dentry, 0);
-	} else {
-		l_name = kmalloc(name_len + 1, 0);
-		assert(l_name);
-		strncpy(l_name, name, name_len);
-		l_name[name_len] = '\0';
-		qstr_builder(dentry, l_name);
-	}
+	dentry_set_name(dentry, name);
 	/* Catch bugs by aggressively zeroing this (o/w we use old stuff) */
 	dentry->d_inode = 0;
 	return dentry;
@@ -824,6 +829,9 @@ void dcache_put(struct super_block *sb, struct dentry *key_val)
 		spin_lock(&sb->s_lru_lock);
 		TAILQ_REMOVE(&sb->s_lru_d, old, d_lru);
 		spin_unlock(&sb->s_lru_lock);
+		/* TODO: this seems suspect.  isn't this the same memory as key_val?
+		 * in which case, we just adjust the flags (remove NEG) and reinsert? */
+		assert(old != key_val); // checking TODO comment
 		__dentry_free(old);
 	}
 	/* this returns 0 on failure (TODO: Fix this ghetto shit) */
@@ -1960,6 +1968,166 @@ error_post_dentry:
 	/* Note we only free the dentry on failure. */
 	kref_put(&pipe_d->d_kref);
 	return -1;
+}
+
+int do_rename(char *old_path, char *new_path)
+{
+	struct nameidata nd_old = {0}, *nd_o = &nd_old;
+	struct nameidata nd_new = {0}, *nd_n = &nd_new;
+	struct dentry *old_dir_d, *new_dir_d;
+	struct inode *old_dir_i, *new_dir_i;
+	struct dentry *old_d, *new_d, *unlink_d;
+	int error;
+	int retval = 0;
+	uint64_t now;
+
+	nd_o->intent = LOOKUP_ACCESS; /* maybe, might need another type */
+
+	/* get the parent, but don't follow links */
+	error = path_lookup(old_path, LOOKUP_PARENT | LOOKUP_DIRECTORY, nd_o);
+	if (error) {
+		set_errno(-error);
+		retval = -1;
+		goto out_old_path;
+	}
+	old_dir_d = nd_o->dentry;
+	old_dir_i = old_dir_d->d_inode;
+
+	old_d = do_lookup(old_dir_d, nd_o->last.name);
+	if (!old_d) {
+		set_errno(ENOENT);
+		retval = -1;
+		goto out_old_path;
+	}
+
+	nd_n->intent = LOOKUP_CREATE;
+	error = path_lookup(new_path, LOOKUP_PARENT | LOOKUP_DIRECTORY, nd_n);
+	if (error) {
+		set_errno(-error);
+		retval = -1;
+		goto out_paths_and_src;
+	}
+	new_dir_d = nd_n->dentry;
+	new_dir_i = new_dir_d->d_inode;
+	/* TODO if new_dir == old_dir, we might be able to simplify things */
+
+	if (new_dir_i->i_sb != old_dir_i->i_sb) {
+		set_errno(EXDEV);
+		retval = -1;
+		goto out_paths_and_src;
+	}
+	/* TODO: check_perms is lousy, want to just say "writable" here */
+	if (check_perms(old_dir_i, S_IWUSR) || check_perms(new_dir_i, S_IWUSR)) {
+		set_errno(EPERM);
+		retval = -1;
+		goto out_paths_and_src;
+	}
+	/* TODO: if we're doing a rename that moves a directory, we need to make
+	 * sure the new_path doesn't include the old_path.  it's not as simple as
+	 * just checking, since there could be a concurrent rename that breaks the
+	 * check later.  e.g. what if new_dir's parent is being moved into a child
+	 * of old_dir?
+	 *
+	 * linux has a per-fs rename mutex for these scenarios, so only one can
+	 * proceed at a time.  i don't see another way to deal with it either.
+	 * maybe something like flagging all dentries on the new_path with "do not
+	 * move". */
+
+	/* TODO: this is all very racy.  right after we do a new_d lookup, someone
+	 * else could create or unlink new_d.  need to lock here, or else push this
+	 * into the sub-FS.
+	 *
+	 * For any locking scheme, we probably need to lock both the old and new
+	 * dirs.  To prevent deadlock, we need a total ordering of all inodes (or
+	 * dentries, if we locking them instead).  inode number or struct inode*
+	 * will work for this. */
+	new_d = do_lookup(new_dir_d, nd_n->last.name);
+	if (new_d) {
+		if (new_d->d_inode == old_d->d_inode)
+			goto out_paths_and_refs; 	/* rename does nothing */
+		/* TODO: Here's a bunch of other racy checks we need to do, maybe in the
+		 * sub-FS:
+		 *
+		 * if src is a dir, dst must be an empty dir if it exists (RACYx2)
+		 * 		racing on dst being created and it getting new entries
+		 * if src is a file, dst must be a file if it exists (RACY)
+		 *		racing on dst being created and still being a file
+		 *		racing on dst being unlinked and a new one being added
+		 */
+		/* TODO: we should allow empty dirs */
+		if (S_ISDIR(new_d->d_inode->i_mode)) {
+			set_errno(EISDIR);
+			retval = -1;
+			goto out_paths_and_refs;
+		}
+		/* TODO: need this to be atomic with rename */
+		error = new_dir_i->i_op->unlink(new_dir_i, new_d);
+		if (error) {
+			set_errno(-error);
+			retval = -1;
+			goto out_paths_and_refs;
+		}
+		new_d->d_flags |= DENTRY_DYING;
+		/* TODO: racy with other lookups on new_d */
+		dcache_remove(new_d->d_sb, new_d);
+		new_d->d_inode->i_nlink--;  /* TODO: race here, esp with a decref */
+		kref_put(&new_d->d_kref);
+	}
+	/* new_d is just a vessel for the name.  somewhat lousy. */
+	new_d = get_dentry(new_dir_d->d_sb, new_dir_d, nd_n->last.name);
+
+	/* TODO: more races.  need to remove old_d from the dcache, since we're
+	 * about to change its parentage.  could be readded concurrently. */
+	dcache_remove(old_dir_d->d_sb, old_d);
+	error = new_dir_i->i_op->rename(old_dir_i, old_d, new_dir_i, new_d);
+	if (error) {
+		/* TODO: oh crap, we already unlinked!  now we're screwed, and violated
+		 * our atomicity requirements. */
+		printk("[kernel] rename failed, you might have lost data\n");
+		set_errno(-error);
+		retval = -1;
+		goto out_paths_and_refs;
+	}
+
+	/* old_dir loses old_d, new_dir gains old_d, renamed to new_d.  this is
+	 * particularly cumbersome since there are two levels here: the FS has its
+	 * info about where things are, and the VFS has its dentry tree.  and it's
+	 * all racy (TODO). */
+	dentry_set_name(old_d, new_d->d_name.name);
+	old_d->d_parent = new_d->d_parent;
+	if (S_ISDIR(old_d->d_inode->i_mode)) {
+		TAILQ_REMOVE(&old_dir_d->d_subdirs, old_d, d_subdirs_link);
+		old_dir_i->i_nlink--; /* TODO: racy, etc */
+		TAILQ_INSERT_TAIL(&new_dir_d->d_subdirs, old_d, d_subdirs_link);
+		new_dir_i->i_nlink--; /* TODO: racy, etc */
+	}
+
+	/* and then the third level: dcache stuff.  we could have old versions of
+	 * old_d or negative versions of new_d sitting around.  dcache_put should
+	 * replace a potentially negative dentry for new_d (now called old_d) */
+	dcache_put(old_dir_d->d_sb, old_d);
+
+	/* TODO could have a helper for this, but it's going away soon */
+	now = epoch_seconds();
+	old_dir_i->i_ctime.tv_sec = now;
+	old_dir_i->i_mtime.tv_sec = now;
+	old_dir_i->i_ctime.tv_nsec = 0;
+	old_dir_i->i_mtime.tv_nsec = 0;
+	new_dir_i->i_ctime.tv_sec = now;
+	new_dir_i->i_mtime.tv_sec = now;
+	new_dir_i->i_ctime.tv_nsec = 0;
+	new_dir_i->i_mtime.tv_nsec = 0;
+
+	/* fall-through */
+out_paths_and_refs:
+	kref_put(&new_d->d_kref);
+out_paths_and_src:
+	kref_put(&old_d->d_kref);
+out_paths:
+	path_release(nd_n);
+out_old_path:
+	path_release(nd_o);
+	return retval;
 }
 
 struct file *alloc_file(void)

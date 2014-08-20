@@ -456,11 +456,26 @@ int kfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 	return -1;
 }
 
-/* Moves old_dentry from old_dir to new_dentry in new_dir */
-int kfs_rename(struct inode *old_dir, struct dentry *old_dentry,
-               struct inode *new_dir, struct dentry *new_dentry)
+/* Moves old_d from old_dir to new_d in new_dir.  TODO: super racy */
+int kfs_rename(struct inode *old_dir, struct dentry *old_d,
+               struct inode *new_dir, struct dentry *new_d)
 {
-	return -1;
+	/* new_d is already gone, we just use it for its name.  kfs might not care
+	 * about the name.  it might just use whatever the dentry says. */
+	struct kfs_i_info *old_info = (struct kfs_i_info*)old_dir->i_fs_info;
+	struct kfs_i_info *new_info = (struct kfs_i_info*)new_dir->i_fs_info;
+	printd("KFS rename: %s/%s -> %s/%s\n",
+	       TAILQ_FIRST(&old_dir->i_dentry)->d_name.name, old_d->d_name.name,
+	       TAILQ_FIRST(&new_dir->i_dentry)->d_name.name, new_d->d_name.name);
+	/* we want to remove from the old and add to the new.  for non-directories,
+	 * we need to adjust parent's children lists (which reuses subdirs_link,
+	 * yikes!).  directories aren't actually tracked by KFS; it just hopes the
+	 * VFS's pinned dentry tree is enough (aka, "all paths pinned"). */
+	if (!S_ISDIR(old_d->d_inode->i_mode)) {
+		TAILQ_REMOVE(&old_info->children, old_d, d_subdirs_link);
+		TAILQ_INSERT_TAIL(&new_info->children, old_d, d_subdirs_link);
+	}
+	return 0;
 }
 
 /* Returns the char* for the symname for the given dentry.  The VFS code that

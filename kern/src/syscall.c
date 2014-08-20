@@ -1880,7 +1880,7 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 	int mountpointlen = 0;
 	char *from_path = user_strdup_errno(p, old_path, old_path_l);
 	char *to_path = user_strdup_errno(p, new_path, new_path_l);
-	struct chan *oldchan, *newchan = NULL;
+	struct chan *oldchan = 0, *newchan = NULL;
 	int retval = -1;
 
 	if ((!from_path) || (!to_path))
@@ -1888,11 +1888,18 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 	printd("sys_rename :%s: to :%s: : ", from_path, to_path);
 
 	/* we need a fid for the wstat. */
-	oldchan = namec(from_path, Aaccess, 0, 0);
-	if (! oldchan) {
-		printd("Could not get a chan for %s\n", from_path);
-		set_errno(ENOENT);
-		goto done;
+	/* TODO: maybe wrap the 9ns stuff better.  sysrename maybe? */
+
+	/* discard namec error */
+	if (!waserror()) {
+		oldchan = namec(from_path, Aaccess, 0, 0);
+	}
+	poperror();
+	if (!oldchan) {
+		retval = do_rename(from_path, to_path);
+		user_memdup_free(p, from_path);
+		user_memdup_free(p, to_path);
+		return retval;
 	}
 
 	printd("Oldchan: %C\n", oldchan);
