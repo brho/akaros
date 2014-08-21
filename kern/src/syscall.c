@@ -1807,11 +1807,9 @@ static int vfs_wstat(struct file *file, uint8_t *stat_m, size_t stat_sz,
 			goto out;
 	}
 	if (flags & WSTAT_LENGTH) {
-		printk("Got truncate for file %s to length %d\n", file_name(file),
-		       dir->length);
-		/* Fail for now */
-		retval = -1;
-		goto out;
+		retval = do_truncate(file->f_dentry->d_inode, dir->length);
+		if (retval < 0)
+			goto out;
 	}
 	if (flags & WSTAT_ATIME) {
 		/* wstat only gives us seconds */

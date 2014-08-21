@@ -1236,8 +1236,14 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
 		return 0;
 	/* Extend the file.  Should put more checks in here, and maybe do this per
 	 * page in the for loop below. */
-	if (orig_off + count > file->f_dentry->d_inode->i_size)
-		file->f_dentry->d_inode->i_size = orig_off + count;
+	if (orig_off + count > file->f_dentry->d_inode->i_size) {
+		/* lock for writes to i_size.  we allow lockless reads.  checking the
+		 * i_size again in case of concurrent writers since our orig check.  */
+		spin_lock(&file->f_dentry->d_inode->i_lock);
+		if (orig_off + count > file->f_dentry->d_inode->i_size)
+			file->f_dentry->d_inode->i_size = orig_off + count;
+		spin_unlock(&file->f_dentry->d_inode->i_lock);
+	}
 	page_off = orig_off & (PGSIZE - 1);
 	first_idx = orig_off >> PGSHIFT;
 	last_idx = (orig_off + count) >> PGSHIFT;
@@ -1333,6 +1339,7 @@ struct file *do_file_open(char *path, int flags, int mode)
 	struct inode *parent_i;
 	struct nameidata nd_r = {0}, *nd = &nd_r;
 	int error;
+	unsigned long nr_pages;
 
 	/* The file might exist, lets try to just open it right away */
 	nd->intent = LOOKUP_OPEN;
@@ -1398,8 +1405,11 @@ open_the_file:
 	/* now open the file (freshly created or if it already existed).  At this
 	 * point, file_d is a refcnt'd dentry, regardless of which branch we took.*/
 	if (flags & O_TRUNC) {
+		spin_lock(&file_d->d_inode->i_lock);
+		nr_pages = ROUNDUP(file_d->d_inode->i_size, PGSIZE) >> PGSHIFT;
 		file_d->d_inode->i_size = 0;
-		/* TODO: probably should remove the garbage pages from the page map */
+		spin_unlock(&file_d->d_inode->i_lock);
+		pm_remove_contig(file_d->d_inode->i_mapping, 0, nr_pages);
 	}
 	file = dentry_open(file_d, flags);				/* sets errno */
 	/* Note the fall through to the exit paths.  File is 0 by default and if
@@ -2128,6 +2138,42 @@ out_paths:
 out_old_path:
 	path_release(nd_o);
 	return retval;
+}
+
+int do_truncate(struct inode *inode, off64_t len)
+{
+	off64_t old_len;
+	uint64_t now;
+	if (len < 0) {
+		set_errno(EINVAL);
+		return -1;
+	}
+	if (len > PiB) {
+		printk("[kernel] truncate for > petabyte, probably a bug\n");
+		/* continuing, not too concerned.  could set EINVAL or EFBIG */
+	}
+	spin_lock(&inode->i_lock);
+	old_len = inode->i_size;
+	if (old_len == len) {
+		spin_unlock(&inode->i_lock);
+		return 0;
+	}
+	inode->i_size = len;
+	/* truncate can't block, since we're holding the spinlock.  but it can rely
+	 * on that lock being held */
+	inode->i_op->truncate(inode);
+	spin_unlock(&inode->i_lock);
+
+	if (old_len < len) {
+		pm_remove_contig(inode->i_mapping, old_len >> PGSHIFT,
+		                 (len >> PGSHIFT) - (old_len >> PGSHIFT));
+	}
+	now = epoch_seconds();
+	inode->i_ctime.tv_sec = now;
+	inode->i_mtime.tv_sec = now;
+	inode->i_ctime.tv_nsec = 0;
+	inode->i_mtime.tv_nsec = 0;
+	return 0;
 }
 
 struct file *alloc_file(void)

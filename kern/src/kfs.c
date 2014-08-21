@@ -158,6 +158,7 @@ int kfs_readpage(struct page_map *pm, struct page *page)
 
 int kfs_writepage(struct page_map *pm, struct page *page)
 {
+	warn_once("KFS writepage does not save file contents!\n");
 	return -1;
 }
 
@@ -495,6 +496,11 @@ char *kfs_readlink(struct dentry *dentry)
 /* Modifies the size of the file of inode to whatever its i_size is set to */
 void kfs_truncate(struct inode *inode)
 {
+	struct kfs_i_info *k_i_info = (struct kfs_i_info*)inode->i_fs_info;
+	/* init_size tracks how much of the file KFS has.  everything else is 0s.
+	 * we only need to update it if we are dropping data.  as with other data
+	 * beyond init_size, KFS will not save it during a write page! */
+	k_i_info->init_size = MIN(k_i_info->init_size, inode->i_size);
 }
 
 /* Checks whether the the access mode is allowed for the file belonging to the
@@ -545,8 +551,7 @@ void kfs_d_iput(struct dentry *dentry, struct inode *inode)
 
 /* file_operations */
 
-/* Updates the file pointer.  KFS doesn't let you go past the end of a file
- * yet, so it won't let you seek past either.  TODO: think about locking. */
+/* Updates the file pointer.  TODO: think about locking. */
 int kfs_llseek(struct file *file, off64_t offset, off64_t *ret, int whence)
 {
 	off64_t temp_off = 0;
