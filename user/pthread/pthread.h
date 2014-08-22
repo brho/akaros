@@ -41,6 +41,7 @@ struct pthread_tcb {
 	void *retval;
 	sigset_t sigmask;
 	sigset_t sigpending;
+	struct sigdata *sigdata;
 };
 typedef struct pthread_tcb* pthread_t;
 TAILQ_HEAD(pthread_queue, pthread_tcb);

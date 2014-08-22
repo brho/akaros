@@ -27,15 +27,25 @@
 #include <signal.h>
 #include <stdio.h>
 
+#include <parlib.h>
 #include <event.h>
 #include <errno.h>
 #include <assert.h>
 #include <ros/procinfo.h>
 #include <ros/syscall.h>
+#include <sys/mman.h>
 #include <vcore.h> /* for print_user_context() */
+#include <waitfreelist.h>
 
 /* This is list of sigactions associated with each posix signal. */
 static struct sigaction sigactions[_NSIG - 1];
+
+/* This is a wait-free-list used to hold the data necessary to execute signal
+ * handlers inside a 2LS. We are able to store them in a wfl because all
+ * sigdata structs are created equal, and reuse is encouraged as uthreads
+ * ask for them on demand. */
+static struct wfl sigdata_list;
+#define SIGNAL_STACK_SIZE (2*PGSIZE + sizeof(struct sigdata))
 
 /* These are the default handlers for each posix signal.  They are listed in
  * SIGNAL(7) of the Linux Programmer's Manual.  We run them as default
@@ -116,6 +126,31 @@ static __sigacthandler_t default_handlers[] = {
 	[SIGSYS]    = default_core_handler
 };
 
+/* This function allocates a sigdata struct for use when running signal
+ * handlers inside a 2LS. The sigdata struct returned is pre-initialized with
+ * the 'stack' field pointing to a valid stack.  Space is allocated for both
+ * the sigdata struct and the stack in a single mmap call.  The sigdata struct
+ * just sits at the bottom of the stack, and its 'stack' field points just
+ * above it.  */
+struct sigdata *alloc_sigdata()
+{
+	struct sigdata *data = wfl_remove(&sigdata_list);
+	if (data == NULL) {
+		void *stack = mmap(0, SIGNAL_STACK_SIZE,
+		                   PROT_READ|PROT_WRITE|PROT_EXEC,
+		                   MAP_POPULATE|MAP_ANONYMOUS, -1, 0);
+		assert(stack != MAP_FAILED);
+		data = stack + SIGNAL_STACK_SIZE - sizeof(struct sigdata);
+		data->stack = data;
+	}
+	return data;
+}
+
+/* This function frees a previously allocated sigdata struct. */
+void free_sigdata(struct sigdata *sigdata)
+{
+	wfl_insert(&sigdata_list, sigdata);
+}
 
 /* This is the akaros posix signal trigger.  Signals are dispatched from
  * this function to their proper posix signal handler */
@@ -183,6 +218,7 @@ void init_posix_signals(void)
 	assert(posix_sig_ev_q);
 	posix_sig_ev_q->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_FALLBACK;
 	register_kevent_q(posix_sig_ev_q, EV_POSIX_SIGNAL);
+	wfl_init(&sigdata_list);
 }
 
 int sigaddset(sigset_t *__set, int __signo)

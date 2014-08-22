@@ -60,8 +60,18 @@ int         sys_abort_sysc_fd(int fd);
 
 long		syscall_async(struct syscall *sysc, unsigned long num, ...);
 
-void		init_posix_signals(void);	/* in signal.c */
-void		trigger_posix_signal(int sig_nr, struct siginfo *info, void *aux);
+/* Posix signal related stuff */
+struct sigdata {
+	struct user_context u_ctx;
+	struct ancillary_state as;
+	struct siginfo info;
+	void *stack;
+};
+void init_posix_signals(void);
+struct sigdata *alloc_sigdata();
+void free_sigdata(struct sigdata *sigdata);
+void trigger_posix_signal(int sig_nr, struct siginfo *info, void *aux);
+
 #ifdef __cplusplus
 }
 #endif
