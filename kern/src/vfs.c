@@ -1234,15 +1234,22 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
 	/* Consider pushing some error checking higher in the VFS */
 	if (!count)
 		return 0;
-	/* Extend the file.  Should put more checks in here, and maybe do this per
-	 * page in the for loop below. */
-	if (orig_off + count > file->f_dentry->d_inode->i_size) {
-		/* lock for writes to i_size.  we allow lockless reads.  checking the
-		 * i_size again in case of concurrent writers since our orig check.  */
+	if (file->f_flags & O_APPEND) {
 		spin_lock(&file->f_dentry->d_inode->i_lock);
-		if (orig_off + count > file->f_dentry->d_inode->i_size)
-			file->f_dentry->d_inode->i_size = orig_off + count;
+		orig_off = file->f_dentry->d_inode->i_size;
+		/* setting the filesize here, instead of during the extend-check, since
+		 * we need to atomically reserve space and set our write position. */
+		file->f_dentry->d_inode->i_size += count;
 		spin_unlock(&file->f_dentry->d_inode->i_lock);
+	} else {
+		if (orig_off + count > file->f_dentry->d_inode->i_size) {
+			/* lock for writes to i_size.  we allow lockless reads.  recheck
+			 * i_size in case of concurrent writers since our orig check.  */
+			spin_lock(&file->f_dentry->d_inode->i_lock);
+			if (orig_off + count > file->f_dentry->d_inode->i_size)
+				file->f_dentry->d_inode->i_size = orig_off + count;
+			spin_unlock(&file->f_dentry->d_inode->i_lock);
+		}
 	}
 	page_off = orig_off & (PGSIZE - 1);
 	first_idx = orig_off >> PGSHIFT;
