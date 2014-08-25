@@ -32,11 +32,15 @@ struct syscall {
 	char						errstr[MAX_ERRSTR_LEN];
 };
 
+// include hell with go and friends.
+#ifndef STRUCT_CHILDFDMAP_DEFINED
+#define STRUCT_CHILDFDMAP_DEFINED
 struct childfdmap {
-	unsigned int				parentfd;
-	unsigned int				childfd;
-	int							ok;
+  int parentfd;
+  int childfd;
+  int ok;
 };
+#endif
 
 #ifndef ROS_KERNEL
 
