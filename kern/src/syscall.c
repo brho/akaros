@@ -194,6 +194,22 @@ char *get_cur_genbuf(void)
 	return pcpui->cur_kthread->generic_buf;
 }
 
+/* Helper, looks up proc* for pid and ensures p controls that proc. 0 o/w */
+static struct proc *get_controllable_proc(struct proc *p, pid_t pid)
+{
+	struct proc *target = pid2proc(pid);
+	if (!target) {
+		set_errno(ESRCH);
+		return 0;
+	}
+	if (!proc_controls(p, target)) {
+		set_errno(EPERM);
+		proc_decref(target);
+		return 0;
+	}
+	return target;
+}
+
 /************** Utility Syscalls **************/
 
 static int sys_null(void)
@@ -416,29 +432,20 @@ mid_error:
 /* Makes process PID runnable.  Consider moving the functionality to process.c */
 static error_t sys_proc_run(struct proc *p, unsigned pid)
 {
-	struct proc *target = pid2proc(pid);
 	error_t retval = 0;
-
-	if (!target) {
-		set_errno(ESRCH);
+	struct proc *target = get_controllable_proc(p, pid);
+	if (!target)
 		return -1;
-	}
-	/* make sure we have access and it's in the right state to be activated */
-	if (!proc_controls(p, target)) {
-		set_errno(EPERM);
-		goto out_error;
-	} else if (target->state != PROC_CREATED) {
+	if (target->state != PROC_CREATED) {
 		set_errno(EINVAL);
-		goto out_error;
+		proc_decref(target);
+		return -1;
 	}
 	/* Note a proc can spam this for someone it controls.  Seems safe - if it
 	 * isn't we can change it. */
 	proc_wakeup(target);
 	proc_decref(target);
 	return 0;
-out_error:
-	proc_decref(target);
-	return -1;
 }
 
 /* Destroy proc pid.  If this is called by the dying process, it will never
@@ -448,17 +455,9 @@ out_error:
 static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 {
 	error_t r;
-	struct proc *p_to_die = pid2proc(pid);
-
-	if (!p_to_die) {
-		set_errno(ESRCH);
+	struct proc *p_to_die = get_controllable_proc(p, pid);
+	if (!p_to_die)
 		return -1;
-	}
-	if (!proc_controls(p, p_to_die)) {
-		proc_decref(p_to_die);
-		set_errno(EPERM);
-		return -1;
-	}
 	if (p_to_die == p) {
 		p->exitcode = exitcode;
 		printd("[PID %d] proc exiting gracefully (code %d)\n", p->pid,exitcode);
@@ -925,16 +924,9 @@ static int sys_notify(struct proc *p, int target_pid, unsigned int ev_type,
                       struct event_msg *u_msg)
 {
 	struct event_msg local_msg = {0};
-	struct proc *target = pid2proc(target_pid);
-	if (!target) {
-		set_errno(ESRCH);
+	struct proc *target = get_controllable_proc(p, target_pid);
+	if (!target)
 		return -1;
-	}
-	if (!proc_controls(p, target)) {
-		proc_decref(target);
-		set_errno(EPERM);
-		return -1;
-	}
 	/* if the user provided an ev_msg, copy it in and use that */
 	if (u_msg) {
 		if (memcpy_from_user(p, &local_msg, u_msg, sizeof(struct event_msg))) {
