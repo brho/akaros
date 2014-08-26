@@ -169,6 +169,12 @@ static void __pthread_signal_and_restart(struct pthread_tcb *pthread,
                                           int signo, int code, void *addr)
 {
 	if (!__sigismember(&pthread->sigmask, signo)) {
+		if (pthread->sigdata) {
+			printf("Pthread sighandler faulted, signal: %d\n", signo);
+			/* uthread.c already copied out the faulting ctx into the uth */
+			print_user_context(&pthread->uthread.u_ctx);
+			exit(-1);
+		}
 		struct siginfo info = {0};
 		info.si_signo = signo;
 		info.si_code = code;
