@@ -19,12 +19,13 @@
 #include <errno.h>
 #include <stddef.h>
 #include <unistd.h>
+#include <sys/types.h>
 
 /* Change the current directory to FD.  */
 int
 fchdir (fd)
      int fd;
 {
-  return ros_syscall(SYS_fchdir, fd, 0, 0, 0, 0, 0);
+  return ros_syscall(SYS_fchdir, getpid(), fd, 0, 0, 0, 0);
 }
 strong_alias (fchdir,__fchdir)

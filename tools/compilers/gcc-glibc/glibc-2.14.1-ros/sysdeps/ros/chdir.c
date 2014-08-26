@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <string.h>
 #include <ros/syscall.h>
 
@@ -33,6 +34,6 @@ __chdir (path)
     return -1;
   }
 
-  return ros_syscall(SYS_chdir, path, strlen(path), 0, 0, 0, 0);
+  return ros_syscall(SYS_chdir, getpid(), path, strlen(path), 0, 0, 0);
 }
 weak_alias (__chdir, chdir)

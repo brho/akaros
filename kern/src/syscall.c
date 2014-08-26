@@ -1489,34 +1489,45 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 	return ret;
 }
 
-intreg_t sys_chdir(struct proc *p, const char *path, size_t path_l)
+static int sys_chdir(struct proc *p, pid_t pid, const char *path, size_t path_l)
 {
 	int retval;
-	char *t_path = user_strdup_errno(p, path, path_l);
-	if (!t_path)
+	char *t_path;
+	struct proc *target = get_controllable_proc(p, pid);
+	if (!target)
 		return -1;
-	/* TODO: 9ns support */
-	retval = do_chdir(&p->fs_env, t_path);
-	user_memdup_free(p, t_path);
-	if (retval) {
-		set_errno(-retval);
+	t_path = user_strdup_errno(p, path, path_l);
+	if (!t_path) {
+		proc_decref(target);
 		return -1;
 	}
-	return 0;
+	/* TODO: 9ns support */
+	retval = do_chdir(&target->fs_env, t_path);
+	/* do_chdir doesn't set errno (though fchdir does) */
+	if (retval)
+		set_errno(-retval);
+	user_memdup_free(p, t_path);
+	proc_decref(target);
+	return retval;
 }
 
-intreg_t sys_fchdir(struct proc *p, int fd)
+static int sys_fchdir(struct proc *p, pid_t pid, int fd)
 {
 	struct file *file;
 	int retval;
+	struct proc *target = get_controllable_proc(p, pid);
+	if (!target)
+		return -1;
 	file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
 		/* TODO: 9ns */
 		set_errno(EBADF);
+		proc_decref(target);
 		return -1;
 	}
-	retval = do_fchdir(&p->fs_env, file);
+	retval = do_fchdir(&target->fs_env, file);
 	kref_put(&file->f_kref);
+	proc_decref(target);
 	return retval;
 }
 
