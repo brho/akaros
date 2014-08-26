@@ -100,29 +100,6 @@ procinfo_pack_args(procinfo_t* p, char* const* argv, char* const* envp)
 		pos += len;
 	}
 	p->argp[nargv+nenvp+1] = 0;
-
-	return 0;
-}
-#ifndef STRUCT_CHILDFDMAP_DEFINED
-#define STRUCT_CHILDFDMAP_DEFINED
-struct childfdmap {
-  int parentfd;
-  int childfd;
-  int ok;
-};
-#endif
-
-// the fdlist is an map: list[childfd] ->parentfd
-static int
-childfdmap_pack(struct childfdmap *cfdmap, int *fdlist, int len)
-{
-	int i;
-
-	for (i = 0; i < len; i++) {
-		cfdmap[i].ok = -1;
-		cfdmap[i].childfd = i;
-		cfdmap[i].parentfd = fdlist[i];
-	}
 	
 	return 0;
 }
