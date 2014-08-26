@@ -1991,11 +1991,13 @@ static intreg_t sys_dup_fds_to(struct proc *p, unsigned int pid,
 	int slot;
 	struct file *file;
 
-	if (!is_user_rwaddr(map, sizeof(struct childfdmap) * nentries))
-		return -EINVAL;
-	child = pid2proc(pid);
+	if (!is_user_rwaddr(map, sizeof(struct childfdmap) * nentries)) {
+		set_errno(EINVAL);
+		return -1;
+	}
+	child = get_controllable_proc(p, pid);
 	if (!child)
-		return -ENOENT;
+		return -1;
 	for (int i = 0; i < nentries; i++) {
 		map[i].ok = -1;
 		file = get_file_from_fd(&p->open_files, map[i].parentfd);
