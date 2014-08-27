@@ -2582,18 +2582,21 @@ static void __chpwd(struct fs_struct *fs_env, struct dentry *new_pwd)
 }
 
 /* Change the working directory of the given fs env (one per process, at this
- * point).  Returns 0 for success, -ERROR for whatever error. */
+ * point).  Returns 0 for success, sets errno and returns -1 otherwise. */
 int do_chdir(struct fs_struct *fs_env, char *path)
 {
 	struct nameidata nd_r = {0}, *nd = &nd_r;
-	int retval;
-	retval = path_lookup(path, LOOKUP_DIRECTORY, nd);
-	if (!retval) {
-		/* nd->dentry is the place we want our PWD to be */
-		__chpwd(fs_env, nd->dentry);
+	int error;
+	error = path_lookup(path, LOOKUP_DIRECTORY, nd);
+	if (error) {
+		set_errno(-error);
+		path_release(nd);
+		return -1;
 	}
+	/* nd->dentry is the place we want our PWD to be */
+	__chpwd(fs_env, nd->dentry);
 	path_release(nd);
-	return retval;
+	return 0;
 }
 
 int do_fchdir(struct fs_struct *fs_env, struct file *file)

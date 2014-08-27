@@ -1503,9 +1503,6 @@ static int sys_chdir(struct proc *p, pid_t pid, const char *path, size_t path_l)
 	}
 	/* TODO: 9ns support */
 	retval = do_chdir(&target->fs_env, t_path);
-	/* do_chdir doesn't set errno (though fchdir does) */
-	if (retval)
-		set_errno(-retval);
 	user_memdup_free(p, t_path);
 	proc_decref(target);
 	return retval;
