@@ -1489,7 +1489,7 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 	return ret;
 }
 
-static int sys_chdir(struct proc *p, pid_t pid, const char *path, size_t path_l)
+static intreg_t sys_chdir(struct proc *p, pid_t pid, const char *path, size_t path_l)
 {
 	int retval;
 	char *t_path;
@@ -1508,7 +1508,7 @@ static int sys_chdir(struct proc *p, pid_t pid, const char *path, size_t path_l)
 	return retval;
 }
 
-static int sys_fchdir(struct proc *p, pid_t pid, int fd)
+static intreg_t sys_fchdir(struct proc *p, pid_t pid, int fd)
 {
 	struct file *file;
 	int retval;
