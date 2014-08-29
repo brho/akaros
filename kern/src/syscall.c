@@ -1168,6 +1168,8 @@ static unsigned long sys_populate_va(struct proc *p, uintptr_t va,
 
 static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct systrace_record *t = pcpui->cur_kthread->trace;
 	ssize_t ret;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	sysc_save_str("read on fd %d", fd);
@@ -1184,15 +1186,23 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 		 * it */
 		ret = file->f_op->read(file, buf, len, &file->f_pos);
 		kref_put(&file->f_kref);
-		return ret;
+	} else {
+		/* plan9, should also handle errors (EBADF) */
+		ret = sysread(fd, buf, len);
 	}
-	/* plan9, should also handle errors (EBADF) */
-    ret = sysread(fd, buf, len);
+
+	if ((ret > 0) && t) {
+		t->datalen = MIN(sizeof(t->data), ret);
+		memmove(t->data, buf, t->datalen);
+	}
+
 	return ret;
 }
 
 static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct systrace_record *t = pcpui->cur_kthread->trace;
 	ssize_t ret;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	/* VFS */
@@ -1205,11 +1215,17 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 		/* TODO: (UMEM) */
 		ret = file->f_op->write(file, buf, len, &file->f_pos);
 		kref_put(&file->f_kref);
-		return ret;
+	} else {
+		/* plan9, should also handle errors */
+		ret = syswrite(fd, (void*)buf, len);
 	}
-	/* plan9, should also handle errors */
-	ret = syswrite(fd, (void*)buf, len);
+
+	if (t) {
+		t->datalen = MIN(sizeof(t->data), ret);
+		memmove(t->data, buf, t->datalen);
+	}
 	return ret;
+
 }
 
 /* Checks args/reads in the path, opens the file, and inserts it into the
@@ -1217,20 +1233,29 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
                          int oflag, int mode)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct systrace_record *t = pcpui->cur_kthread->trace;
 	int fd = -1;
 	struct file *file;
 
 	printd("File %s Open attempt oflag %x mode %x\n", path, oflag, mode);
+	char *t_path = user_strdup_errno(p, path, path_l);
+	if (!t_path)
+		return -1;
+	if (t) {
+		t->datalen = MIN(sizeof(t->data), path_l);
+		memmove(t->data, t_path, path_l);
+	}
+
 	/* Make sure only one of O_RDONLY, O_WRONLY, O_RDWR is specified in flag */
 	if (((oflag & (O_RDONLY | O_WRONLY | O_RDWR)) != O_RDONLY) &&
 	    ((oflag & (O_RDONLY | O_WRONLY | O_RDWR)) != O_WRONLY) &&
 	    ((oflag & (O_RDONLY | O_WRONLY | O_RDWR)) != O_RDWR)) {
 		set_errno(EINVAL);
+		user_memdup_free(p, t_path);
 		return -1;
 	}
-	char *t_path = user_strdup_errno(p, path, path_l);
-	if (!t_path)
-		return -1;
+
 	sysc_save_str("open %s", t_path);
 	mode &= ~p->fs_env.umask;
 	file = do_file_open(t_path, oflag, mode);
@@ -1967,6 +1992,8 @@ intreg_t sys_fwstat(struct proc *p, int fd, uint8_t *stat_m, size_t stat_sz,
 intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
                     char *new_path, size_t new_path_l)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct systrace_record *t = pcpui->cur_kthread->trace;
 	ERRSTACK(1);
 	int mountpointlen = 0;
 	char *from_path = user_strdup_errno(p, old_path, old_path_l);
@@ -1977,6 +2004,9 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 	if ((!from_path) || (!to_path))
 		return -1;
 	printd("sys_rename :%s: to :%s: : ", from_path, to_path);
+	if (t) {
+		t->datalen = snprintf((char *)t->data, sizeof(t->data), "Rename :%s: to :%s:", from_path, to_path);
+	}
 
 	/* we need a fid for the wstat. */
 	/* TODO: maybe wrap the 9ns stuff better.  sysrename maybe? */
