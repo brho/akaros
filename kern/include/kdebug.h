@@ -31,6 +31,7 @@ void __print_func_exit(const char *func, const char *file);
 #define print_func_exit() __print_func_exit(__FUNCTION__, __FILE__)
 void hexdump(void *v, int length);
 void pahexdump(uintptr_t pa, int length);
+int printdump(char *buf, int buflen, uint8_t *data);
 
 #include <oprofile.h>
 #define TRACEME() oprofile_add_backtrace(read_pc(), read_bp())

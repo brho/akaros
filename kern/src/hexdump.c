@@ -69,3 +69,22 @@ void pahexdump(uintptr_t pa, int len)
 	void *v = KADDR(pa);
 	hexdump(v, len);
 }
+
+/* Print a string, with printables preserved, and \xxx where not possible. */
+int printdump(char *buf, int buflen, uint8_t *data)
+{
+	int ret = 0;
+	int ix = 0;
+	while (ret < buflen) {
+		if (isprint(data[ix])) {
+			buf[ret++] = data[ix];
+		} else if (ret < buflen - 4) {
+			/* guarantee there is room for a \xxx sequence */
+			ret += snprintf(&buf[ret], buflen-ret, "\\%03o", data[ix]);
+		} else {
+			break;
+		}
+		ix++;
+	}
+	return ret;
+}
