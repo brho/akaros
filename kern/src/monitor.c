@@ -770,8 +770,8 @@ int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 	int core;
 	if (argc < 2) {
 		printk("Usage: trace OPTION\n");
-		printk("\tsyscall start [silent] [pid]: starts tracing\n");
-		printk("\tsyscall stop: stops tracing, prints if it was silent\n");
+		printk("\tsyscall start [silent (0 or non-zero, NOT the word silent)] [pid]: starts tracing\n");
+		printk("\tsyscall stop: stops tracing.\n");
 		printk("\tcoretf COREID: prints PC, -1 for all cores, verbose => TF\n");
 		printk("\tpcpui [type [coreid]]: runs pcpui trace ring handlers\n");
 		printk("\tpcpui-reset [noclear]: resets/clears pcpui trace ring\n");
@@ -802,10 +802,9 @@ int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 			if (systrace_reg(all, p))
 				printk("No room to trace more processes\n");
 		} else if (!strcmp(argv[2], "stop")) {
-			/* Stop and print for all processes */
+			/* Stop. To see the output, kfunc systrace_print and systrace_clear */
+			/* or cat #K/kptrace or /prof/kptrace */
 			systrace_stop();
-			systrace_print(TRUE, 0);
-			systrace_clear_buffer();
 		}
 	} else if (!strcmp(argv[1], "coretf")) {
 		if (argc != 3) {

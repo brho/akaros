@@ -36,6 +36,7 @@ struct kthread {
 	bool						is_ktask;	/* default is FALSE */
 	char						*name;
 	char						generic_buf[GENBUF_SZ];
+	struct systrace_record		*trace;
 };
 
 /* Semaphore for kthreads to sleep on.  0 or less means you need to sleep */

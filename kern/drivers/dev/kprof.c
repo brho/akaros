@@ -50,6 +50,7 @@ struct kprof
 	uint64_t	*buf;	/* keep in sync with cellsize */
 	size_t		buf_sz;
 	spinlock_t lock;
+	struct queue *systrace;
 };
 struct kprof kprof;
 
@@ -64,12 +65,14 @@ enum{
 	Kprofdataqid,
 	Kprofctlqid,
 	Kprofoprofileqid,
+	Kptraceqid,
 };
 struct dirtab kproftab[]={
 	{".",		{Kprofdirqid, 0, QTDIR},0,	DMDIR|0550},
 	{"kpdata",	{Kprofdataqid},		0,	0600},
 	{"kpctl",	{Kprofctlqid},		0,	0600},
 	{"kpoprofile",	{Kprofoprofileqid},	0,	0600},
+	{"kptrace",	{Kptraceqid},		0,	0600},
 };
 
 static struct chan*
@@ -93,6 +96,10 @@ kprofattach(char *spec)
 	/* NO, I'm not sure how we should do this yet. */
 	int alloc_cpu_buffers(void);
 	alloc_cpu_buffers();
+	kprof.systrace = qopen(2 << 20, 0, 0, 0);
+	if (! kprof.systrace) {
+		printk("systrace allocate failed. No system call tracing\n");
+	}
 	return devattach('K', spec);
 }
 
@@ -166,6 +173,11 @@ kprofstat(struct chan *c, uint8_t *db, int n)
 {
 	/* barf. */
 	kproftab[3].length = oproflen();
+	/* twice */
+	if (kprof.systrace)
+		kproftab[4].length = qlen(kprof.systrace);
+	else
+		kproftab[4].length = 0;
 
 	return devstat(c, db, n, kproftab, ARRAY_SIZE(kproftab), devgen);
 }
@@ -263,6 +275,16 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 	case Kprofoprofileqid:
 		n = oprofread(va,n);
 		break;
+	case Kptraceqid:
+		if (kprof.systrace) {
+			printd("Kptraceqid: kprof.systrace %p len %p\n", kprof.systrace, qlen(kprof.systrace));
+			if (qlen(kprof.systrace) > 0)
+				n = qread(kprof.systrace, va, n);
+			else
+				n = 0;
+		} else
+			error("no systrace queue");
+		break;
 	default:
 		n = 0;
 		break;
@@ -316,6 +338,12 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 		error(Ebadusefd);
 	}
 	return n;
+}
+
+void kprof_write_sysrecord(char *pretty_buf, size_t len)
+{
+	if (kprof.systrace)
+		qiwrite(kprof.systrace, pretty_buf, len);
 }
 
 struct dev kprofdevtab __devtab = {

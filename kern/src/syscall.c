@@ -44,6 +44,9 @@ size_t systrace_bufsize = 0;
 struct proc *systrace_procs[MAX_NUM_TRACED] = {0};
 spinlock_t systrace_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
+// for now, only want this visible here.
+void kprof_write_sysrecord(char *pretty_buf, size_t len);
+
 /* Not enforcing the packing of systrace_procs yet, but don't rely on that */
 static bool proc_is_traced(struct proc *p)
 {
@@ -51,6 +54,93 @@ static bool proc_is_traced(struct proc *p)
 		if (systrace_procs[i] == p)
 			return true;
 	return false;
+}
+
+static bool __trace_this_proc(struct proc *p)
+{
+	return (systrace_flags & SYSTRACE_ON) &&
+	       ((systrace_flags & SYSTRACE_ALLPROC) || (proc_is_traced(p)));
+}
+
+static size_t systrace_fill_pretty_buf(struct systrace_record *trace)
+{
+	size_t len = 0;
+	len = snprintf(trace->pretty_buf, SYSTR_PRETTY_BUF_SZ - len,
+	           "[%16llu] [%16lu] Syscall %3d (%12s):(0x%x, 0x%x, 0x%x, 0x%x, "
+	           "0x%x, 0x%x) ret: %p proc: %d core: %d vcore: %d data: ",
+	           trace->start_timestamp,
+	           trace->end_timestamp,
+	           trace->syscallno,
+	           syscall_table[trace->syscallno].name,
+	           trace->arg0,
+	           trace->arg1,
+	           trace->arg2,
+	           trace->arg3,
+	           trace->arg4,
+	           trace->arg5,
+	           trace->retval,
+	           trace->pid,
+	           trace->coreid,
+	           trace->vcoreid);
+	len += printdump(trace->pretty_buf + len,
+	                 MIN(trace->datalen, SYSTR_PRETTY_BUF_SZ - len - 1),
+	                 trace->data);
+	len += snprintf(trace->pretty_buf + len, SYSTR_PRETTY_BUF_SZ - len, "\n");
+	return len;
+}
+
+static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
+{
+	struct systrace_record *trace;
+	int coreid, vcoreid;
+	struct proc *p = current;
+
+	if (!__trace_this_proc(p))
+		return;
+	assert(!kthread->trace);	/* catch memory leaks */
+	coreid = core_id();
+	vcoreid = proc_get_vcoreid(p);
+	if (systrace_flags & SYSTRACE_LOUD) {
+		printk("ENTER [%16llu] Syscall %3d (%12s):(0x%x, 0x%x, 0x%x, 0x%x, "
+		       "0x%x, 0x%x) proc: %d core: %d vcore: %d\n", read_tsc(),
+		       sysc->num, syscall_table[sysc->num].name,
+			   sysc->arg0, sysc->arg1, sysc->arg2, sysc->arg3, sysc->arg4,
+			   sysc->arg5, p->pid, coreid, vcoreid);
+	}
+	trace = kmalloc(SYSTR_BUF_SZ, 0);
+	if (!trace)
+		return;
+	kthread->trace = trace;
+	trace->start_timestamp = read_tsc();
+	trace->syscallno = sysc->num;
+	trace->arg0 = sysc->arg0;
+	trace->arg1 = sysc->arg1;
+	trace->arg2 = sysc->arg2;
+	trace->arg3 = sysc->arg3;
+	trace->arg4 = sysc->arg4;
+	trace->arg5 = sysc->arg5;
+	trace->pid = p->pid;
+	trace->coreid = coreid;
+	trace->vcoreid = vcoreid;
+	trace->pretty_buf = (char*)trace + sizeof(struct systrace_record);
+	trace->datalen = 0;
+	trace->data[0] = 0;
+}
+
+static void systrace_finish_trace(struct kthread *kthread, long retval)
+{
+	struct systrace_record *trace = kthread->trace;
+	size_t pretty_len;
+	if (trace) {
+		trace->end_timestamp = read_tsc();
+		trace->retval = retval;
+		kthread->trace = 0;
+		pretty_len = systrace_fill_pretty_buf(trace);
+		kprof_write_sysrecord(trace->pretty_buf, pretty_len);
+		if (systrace_flags & SYSTRACE_LOUD)
+			printk("EXIT %s", trace->pretty_buf);
+		kfree(trace);
+	}
 }
 
 #ifdef CONFIG_SYSCALL_STRING_SAVING
@@ -478,6 +568,7 @@ static int sys_proc_yield(struct proc *p, bool being_nice)
 	 * early.  If it doesn't return, it expects to eat our reference (for now).
 	 */
 	free_sysc_str(pcpui->cur_kthread);
+	systrace_finish_trace(pcpui->cur_kthread, 0);
 	finish_sysc(pcpui->cur_kthread->sysc, pcpui->cur_proc);
 	pcpui->cur_kthread->sysc = 0;	/* don't touch sysc again */
 	proc_incref(p, 1);
@@ -662,6 +753,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	}
 	printd("[PID %d] exec %s\n", p->pid, file_name(program));
 	kref_put(&program->f_kref);
+	systrace_finish_trace(pcpui->cur_kthread, 0);
 	goto success;
 	/* These error and out paths are so we can handle the async interface, both
 	 * for when we want to error/return to the proc, as well as when we succeed
@@ -671,9 +763,10 @@ mid_error:
 	 * error value (errno is already set). */
 	kref_put(&program->f_kref);
 early_error:
-	free_sysc_str(pcpui->cur_kthread);
 	finish_current_sysc(-1);
+	systrace_finish_trace(pcpui->cur_kthread, -1);
 success:
+	free_sysc_str(pcpui->cur_kthread);
 	/* Here's how we restart the new (on success) or old (on failure) proc: */
 	spin_lock(&p->proc_lock);
 	__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run_s */
@@ -2118,42 +2211,10 @@ const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
 intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
                  uintreg_t a2, uintreg_t a3, uintreg_t a4, uintreg_t a5)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	intreg_t ret = -1;
 	ERRSTACK(1);
 
-
-	uint32_t coreid, vcoreid;
-	if (systrace_flags & SYSTRACE_ON) {
-		if ((systrace_flags & SYSTRACE_ALLPROC) || (proc_is_traced(p))) {
-			coreid = core_id();
-			vcoreid = proc_get_vcoreid(p);
-			if (systrace_flags & SYSTRACE_LOUD) {
-				printk("[%16llu] Syscall %3d (%12s):(%p, %p, %p, %p, "
-				       "%p, %p) proc: %d core: %d vcore: %d\n", read_tsc(),
-				       sc_num, syscall_table[sc_num].name, a0, a1, a2, a3,
-				       a4, a5, p->pid, coreid, vcoreid);
-			} else {
-				struct systrace_record *trace;
-				uintptr_t idx, new_idx;
-				do {
-					idx = systrace_bufidx;
-					new_idx = (idx + 1) % systrace_bufsize;
-				} while (!atomic_cas_u32(&systrace_bufidx, idx, new_idx));
-				trace = &systrace_buffer[idx];
-				trace->timestamp = read_tsc();
-				trace->syscallno = sc_num;
-				trace->arg0 = a0;
-				trace->arg1 = a1;
-				trace->arg2 = a2;
-				trace->arg3 = a3;
-				trace->arg4 = a4;
-				trace->arg5 = a5;
-				trace->pid = p->pid;
-				trace->coreid = coreid;
-				trace->vcoreid = vcoreid;
-			}
-		}
-	}
 	if (sc_num > max_syscall || syscall_table[sc_num].call == NULL) {
 		printk("[kernel] Invalid syscall %d for proc %d\n", sc_num, p->pid);
 		printk("\tArgs: %p, %p, %p, %p, %p, %p\n", a0, a1, a2, a3, a4, a5);
@@ -2175,12 +2236,11 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 	ret = syscall_table[sc_num].call(p, a0, a1, a2, a3, a4, a5);
 	//printd("after syscall errstack base %p\n", get_cur_errbuf());
 	if (get_cur_errbuf() != &errstack[0]) {
-		coreid = core_id();
-		vcoreid = proc_get_vcoreid(p);
+		/* Can't trust coreid and vcoreid anymore, need to check the trace */
 		printk("[%16llu] Syscall %3d (%12s):(%p, %p, %p, %p, "
-		       "%p, %p) proc: %d core: %d vcore: %d\n", read_tsc(),
+		       "%p, %p) proc: %d\n", read_tsc(),
 		       sc_num, syscall_table[sc_num].name, a0, a1, a2, a3,
-		       a4, a5, p->pid, coreid, vcoreid);
+		       a4, a5, p->pid);
 		if (sc_num != SYS_fork)
 			printk("YOU SHOULD PANIC: errstack mismatch");
 	}
@@ -2201,6 +2261,7 @@ void run_local_syscall(struct syscall *sysc)
 		return;
 	}
 	pcpui->cur_kthread->sysc = sysc;	/* let the core know which sysc it is */
+	systrace_start_trace(pcpui->cur_kthread, sysc);
 	alloc_sysc_str(pcpui->cur_kthread);
 	/* syscall() does not return for exec and yield, so put any cleanup in there
 	 * too. */
@@ -2209,6 +2270,7 @@ void run_local_syscall(struct syscall *sysc)
 	/* Need to re-load pcpui, in case we migrated */
 	pcpui = &per_cpu_info[core_id()];
 	free_sysc_str(pcpui->cur_kthread);
+	systrace_finish_trace(pcpui->cur_kthread, sysc->retval);
 	/* Some 9ns paths set errstr, but not errno.  glibc will ignore errstr.
 	 * this is somewhat hacky, since errno might get set unnecessarily */
 	if ((current_errstr()[0] != 0) && (!sysc->err))
@@ -2341,10 +2403,10 @@ void systrace_print(bool all, struct proc *p)
 	/* if you want to be clever, you could make this start from the earliest
 	 * timestamp and loop around.  Careful of concurrent writes. */
 	for (int i = 0; i < systrace_bufsize; i++)
-		if (systrace_buffer[i].timestamp)
+		if (systrace_buffer[i].start_timestamp)
 			printk("[%16llu] Syscall %3d (%12s):(%p, %p, %p, %p, %p,"
 			       "%p) proc: %d core: %d vcore: %d\n",
-			       systrace_buffer[i].timestamp,
+			       systrace_buffer[i].start_timestamp,
 			       systrace_buffer[i].syscallno,
 			       syscall_table[systrace_buffer[i].syscallno].name,
 			       systrace_buffer[i].arg0,

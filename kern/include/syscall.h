@@ -18,19 +18,28 @@
 
 #define MAX_ASRC_BATCH				10
 
-/* Consider cache aligning this */
+#define SYSTR_RECORD_SZ				256
+#define SYSTR_BUF_SZ 				PGSIZE
+#define SYSTR_PRETTY_BUF_SZ			(SYSTR_BUF_SZ -                            \
+                                     sizeof(struct systrace_record))
 struct systrace_record {
-	uint64_t		timestamp;
-	uintreg_t		syscallno;
-	uintreg_t		arg0;
-	uintreg_t		arg1;
-	uintreg_t		arg2;
-	uintreg_t		arg3;
-	uintreg_t		arg4;
-	uintreg_t		arg5;
-	int				pid;
-	uint32_t		coreid;
-	uint32_t		vcoreid;
+	struct systrace_record_anon {
+		uint64_t		start_timestamp, end_timestamp;
+		uintreg_t		syscallno;
+		uintreg_t		arg0;
+		uintreg_t		arg1;
+		uintreg_t		arg2;
+		uintreg_t		arg3;
+		uintreg_t		arg4;
+		uintreg_t		arg5;
+		uintreg_t		retval;
+		int				pid;
+		uint32_t		coreid;
+		uint32_t		vcoreid;
+		char			*pretty_buf;
+		uint8_t			datalen;
+	};
+	uint8_t			data[SYSTR_RECORD_SZ - sizeof(struct systrace_record_anon)];
 };
 
 /* Syscall table */
