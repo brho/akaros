@@ -12,6 +12,7 @@
 #include <arch/init.h>
 #include <console.h>
 #include <monitor.h>
+#include <arch/usb.h>
 
 struct ancillary_state x86_default_fpu;
 uint32_t kerndate;
@@ -92,5 +93,6 @@ void arch_init()
 
 	perfmon_init();
 	cons_irq_init();
+	usb_disable_legacy();
 	check_timing_stability();
 }
