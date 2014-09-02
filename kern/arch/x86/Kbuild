@@ -7,6 +7,7 @@ obj-y						+= devarch.o
 obj-y						+= entry$(BITS).o
 obj-y						+= frontend.o
 obj-y						+= init.o
+obj-y						+= intel.o
 obj-y						+= ioapic.o
 obj-y						+= kclock.o
 obj-y						+= kdebug.o

@@ -362,7 +362,6 @@ struct msix_irq_vector {
 
 /* List of all discovered devices */
 STAILQ_HEAD(pcidev_stailq, pci_device);
-SLIST_HEAD(pcidev_slist, pci_device);
 extern struct pcidev_stailq pci_devices;
 
 /* Sync rules for PCI: once a device is added to the list, it is never removed,
