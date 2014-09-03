@@ -342,8 +342,14 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 
 void kprof_write_sysrecord(char *pretty_buf, size_t len)
 {
-	if (kprof.systrace)
-		qiwrite(kprof.systrace, pretty_buf, len);
+	int wrote;
+	if (kprof.systrace) {
+		wrote = qiwrite(kprof.systrace, pretty_buf, len);
+		/* based on the current queue settings, we only drop when we're running
+		 * out of memory.  odds are, we won't make it this far. */
+		if (wrote != len)
+			printk("DROPPED %s", pretty_buf);
+	}
 }
 
 struct dev kprofdevtab __devtab = {
