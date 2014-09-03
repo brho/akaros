@@ -65,11 +65,18 @@ static bool __trace_this_proc(struct proc *p)
 static size_t systrace_fill_pretty_buf(struct systrace_record *trace)
 {
 	size_t len = 0;
+	struct timespec ts_start;
+	struct timespec ts_end;;
+	tsc2timespec(trace->start_timestamp, &ts_start);
+	tsc2timespec(trace->end_timestamp, &ts_end);
+
 	len = snprintf(trace->pretty_buf, SYSTR_PRETTY_BUF_SZ - len,
-	           "[%16llu] [%16lu] Syscall %3d (%12s):(0x%x, 0x%x, 0x%x, 0x%x, "
-	           "0x%x, 0x%x) ret: %p proc: %d core: %d vcore: %d data: ",
-	           trace->start_timestamp,
-	           trace->end_timestamp,
+	           "[%7d.%03d]-[%7d.%03d] Syscall %3d (%12s):(0x%x, 0x%x, 0x%x, "
+	           "0x%x, 0x%x, 0x%x) ret: 0x%x proc: %d core: %d vcore: %d data: ",
+	           ts_start.tv_sec,
+	           ts_start.tv_nsec / 1000000, /* msec */
+	           ts_end.tv_sec,
+	           ts_end.tv_nsec / 1000000,
 	           trace->syscallno,
 	           syscall_table[trace->syscallno].name,
 	           trace->arg0,

@@ -34,6 +34,7 @@ uint64_t msec2tsc(uint64_t msec);
 uint64_t usec2tsc(uint64_t usec);
 uint64_t nsec2tsc(uint64_t nsec);
 uint64_t epoch_seconds(void);
+void tsc2timespec(uint64_t tsc_time, struct timespec *ts);
 
 /* Just takes a time measurement.  Meant to be paired with stop_timing.  Use
  * this if you don't want to muck with overheads or subtraction. */

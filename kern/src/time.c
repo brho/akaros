@@ -139,3 +139,11 @@ uint64_t epoch_seconds(void)
 	uint64_t boot_sec = 1242129600; /* nanwan's birthday */
 	return tsc2sec(read_tsc()) + boot_sec;
 }
+
+void tsc2timespec(uint64_t tsc_time, struct timespec *ts)
+{
+	ts->tv_sec = tsc2sec(tsc_time);
+	/* subtract off everything but the remainder */
+	tsc_time -= sec2tsc(ts->tv_sec);
+	ts->tv_nsec = tsc2nsec(tsc_time);
+}
