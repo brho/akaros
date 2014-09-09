@@ -437,20 +437,15 @@ int mpsinit(int maxcores)
 		return ncleft;
 	if (sigchecksum(mp, mp->length * 16) != 0)
 		return ncleft;
-#define vmap(x,y) ((void*)(x + KERNBASE))
-#define vunmap(x,y)
-
-	if ((pcmp = vmap(l32get(mp->addr), sizeof(PCMP))) == NULL)
+	if ((pcmp = KADDR_NOCHECK(l32get(mp->addr))) == NULL)
 		return ncleft;
 	if (pcmp->revision != 1 && pcmp->revision != 4) {
 		return ncleft;
 	}
 	n = l16get(pcmp->length) + l16get(pcmp->xlength);
-	vunmap(pcmp, sizeof(PCMP));
-	if ((pcmp = vmap(l32get(mp->addr), n)) == NULL)
+	if ((pcmp = KADDR_NOCHECK(l32get(mp->addr))) == NULL)
 		return ncleft;
 	if (sigchecksum(pcmp, l16get(pcmp->length)) != 0) {
-		vunmap(pcmp, n);
 		return ncleft;
 	}
 	if (MP_VERBOSE_DEBUG) {
@@ -470,7 +465,6 @@ int mpsinit(int maxcores)
 		i = sigchecksum(p, l16get(pcmp->xlength));
 		if (((i + pcmp->xchecksum) & 0xff) != 0) {
 			printd("extended table checksums to %p\n", i);
-			vunmap(pcmp, n);
 			return ncleft;
 		}
 	}

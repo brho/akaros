@@ -63,7 +63,10 @@ static struct dirtab acpidir[] = {
  * required to do early initialization before we have user processes.
  * Other tables are given to the user level interpreter for
  * execution.
- */
+ *
+ * These historically returned a value to tell acpi whether or not it was okay
+ * to unmap the table.  (return 0 means there was no table, meaning it was okay
+ * to unmap).  We just use the kernbase mapping, so it's irrelevant. */
 static struct Parse ptables[] = {
 	{"FACP", acpifadt},
 	{"APIC", acpimadt,},
@@ -308,11 +311,6 @@ regcpy(struct Regio *dio, uintptr_t da, struct Regio *sio,
 	return n * align;
 }
 
-// until we know.  TODO: spatch/find_replace this shit, same with mp.c
-//#define vmap(x,y) (void *)vmap_pmem((x),(y))
-//#define vunmap(x,y) vunmap_vmem((uintptr_t)(x),(y))
-#define vmap(x,y) ((void*)(x + KERNBASE))
-#define vunmap(x,y)
 /*
  * Perform I/O within region in access units of accsz bytes.
  * All units in bytes.
@@ -336,9 +334,9 @@ static long regio(struct Reg *r, void *p, uint32_t len, uintptr_t off, int iswr)
 	switch (r->spc) {
 		case Rsysmem:
 			if (r->p == NULL)
-				r->p = vmap(r->base, len);
+				r->p = KADDR_NOCHECK(r->base);
 			if (r->p == NULL)
-				error("regio: vmap failed");
+				error("regio: vmap/KADDR failed");
 			rp = (uintptr_t) r->p + off;
 			rio = memio;
 			break;
@@ -417,24 +415,22 @@ static void *sdtmap(uintptr_t pa, int *n, int cksum)
 		printk("sdtmap: NULL pa\n");
 		return NULL;
 	}
-	sdt = vmap(pa, sizeof(*sdt));
+	sdt = KADDR_NOCHECK(pa);
 	if (sdt == NULL) {
 		printk("acpi: vmap1: NULL\n");
 		return NULL;
 	}
 	*n = l32get(sdt->length);
-	vunmap(sdt, sizeof(*sdt));
 	if (!*n) {
 		printk("sdt has zero length!\n");
 		return NULL;
 	}
-	if ((sdt = vmap(pa, *n)) == NULL) {
+	if ((sdt = KADDR_NOCHECK(pa)) == NULL) {
 		printk("acpi: NULL vmap\n");
 		return NULL;
 	}
 	if (cksum != 0 && sdtchecksum(sdt, *n) == NULL) {
 		printk("acpi: SDT: bad checksum\n");
-		vunmap(sdt, sizeof(*sdt));
 		return NULL;
 	}
 	return sdt;
@@ -449,7 +445,6 @@ static int loadfacs(uintptr_t pa)
 		return -1;
 	}
 	if (memcmp(facs, "FACS", 4) != 0) {
-		//vunmap(facs, n);
 		facs = NULL;
 		return -1;
 	}
@@ -474,7 +469,6 @@ static void loaddsdt(uintptr_t pa)
 	if (dsdtp == NULL) {
 		return;
 	}
-	if (acpitable(dsdtp, n) == NULL) ;	//vunmap(dsdtp, n);
 }
 
 static void gasget(struct Gas *gas, uint8_t * p)
@@ -1123,7 +1117,7 @@ static char *seprinttable(char *s, char *e, struct Atable *t)
  */
 static int acpixsdtload(char *sig)
 {
-	int i, l, t, unmap, found;
+	int i, l, t, found;
 	uintptr_t dhpa;
 	uint8_t *sdt;
 	char tsig[5];
@@ -1137,7 +1131,6 @@ static int acpixsdtload(char *sig)
 			dhpa = l32get(xsdt->p + i);
 		if ((sdt = sdtmap(dhpa, &l, 1)) == NULL)
 			continue;
-		unmap = 1;
 		memmove(tsig, sdt, 4);
 		tsig[4] = 0;
 		if (sig == NULL || strcmp(sig, tsig) == 0) {
@@ -1145,13 +1138,11 @@ static int acpixsdtload(char *sig)
 			for (t = 0; t < ARRAY_SIZE(ptables); t++)
 				if (strcmp(tsig, ptables[t].sig) == 0) {
 					//dumptable(table, &table[127], tsig, sdt, l);
-					unmap = ptables[t].f(sdt, l) == NULL;
+					ptables[t].f(sdt, l);
 					found = 1;
 					break;
 				}
 		}
-//      if(unmap)
-//          vunmap(sdt, l);
 	}
 	return found;
 }
@@ -1219,7 +1210,6 @@ static void acpirsdptr(void)
 			   xsdt->p[3]);
 		kfree(xsdt);
 		xsdt = NULL;
-		//vunmap(xsdt, xsdt->len);
 		return;
 	}
 	xsdt->p += sizeof(struct Sdthdr);

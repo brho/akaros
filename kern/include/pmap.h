@@ -54,6 +54,7 @@
 	(void*TRUSTED) (__m_pa + KERNBASE);				\
 })
 
+#define KADDR_NOCHECK(pa) ((void*)(pa + KERNBASE))
 #define KBASEADDR(kla) KADDR(PADDR(kla))
 
 extern char (SNT RO bootstacktop)[], (SNT RO bootstack)[];
