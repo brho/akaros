@@ -4,11 +4,16 @@
  *
  * Macros to convert to and from endian-data */
 
+#ifndef ROS_KERN_ENDIAN_H
+#define ROS_KERN_ENDIAN_H
+
 #include <ros/common.h>
 #include <arch/endian.h>
 
-#ifndef ROS_KERN_ENDIAN_H
-#define ROS_KERN_ENDIAN_H
+/* Endian-generic versions.  Let the compiler figure it out, plan 9-style */
+#define l16get(p)	(((p)[1]<<8)|(p)[0])
+#define l32get(p)	(((uint32_t)l16get(p+2)<<16)|l16get(p))
+#define l64get(p)	(((uint64_t)l32get(p+4)<<32)|l32get(p))
 
 #ifdef LITTLE_ENDIAN
 #define cpu_to_le16(x) ((uint16_t)(x))

@@ -34,8 +34,6 @@
  * for the user-level interpreter.
  */
 
-#define l16get(p)	(((p)[1]<<8)|(p)[0])
-#define l32get(p)	(((uint32_t)l16get(p+2)<<16)|l16get(p))
 static struct Atable *acpifadt(uint8_t *, int);
 static struct Atable *acpitable(uint8_t *, int);
 static struct Atable *acpimadt(uint8_t *, int);
