@@ -21,6 +21,9 @@
 #include <smp.h>
 #include <ip.h>
 #include <acpi.h>
+
+#include "../timers/hpet.h"
+
 #ifdef CONFIG_X86
 #include <arch/pci.h>
 #endif
@@ -74,6 +77,7 @@ static struct Parse ptables[] = {
 	{"SLIT", acpislit,},
 	{"MSCT", acpimsct,},
 	{"SSDT", acpitable,},
+	{"HPET", acpihpet,},
 };
 
 static struct Facs *facs;		/* Firmware ACPI control structure */
@@ -365,7 +369,7 @@ static long regio(struct Reg *r, void *p, uint32_t len, uintptr_t off, int iswr)
 	return len;
 }
 
-static struct Atable *newtable(uint8_t * p)
+struct Atable *new_acpi_table(uint8_t * p)
 {
 	struct Atable *t;
 	struct Sdthdr *h;
@@ -1067,7 +1071,7 @@ static struct Atable *acpitable(uint8_t * p, int len)
 	if (len < Sdthdrsz) {
 		return NULL;
 	}
-	return newtable(p);
+	return new_acpi_table(p);
 }
 
 static char *dumptable(char *start, char *end, char *sig, uint8_t * p, int l)

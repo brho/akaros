@@ -1,0 +1,3 @@
+# if we make this conditional, we'll need to change ACPI or else have a weak
+# alias for aciphpet().  don't forget to keep at least one obj file building.
+obj-y							+= hpet.o

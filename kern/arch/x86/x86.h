@@ -191,6 +191,7 @@ static inline uint32_t cpuid_ecx(int op) __attribute__((always_inline));
 static inline uint64_t read_msr(uint32_t reg) __attribute__((always_inline));
 static inline void write_msr(uint32_t reg, uint64_t val)
               __attribute__((always_inline));
+/* if we have mm64s, change the hpet helpers */
 static inline void write_mmreg32(uintptr_t reg, uint32_t val)
               __attribute__((always_inline));
 static inline uint32_t read_mmreg32(uintptr_t reg)

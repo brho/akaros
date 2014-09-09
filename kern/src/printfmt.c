@@ -13,7 +13,6 @@
 #include <stdarg.h>
 #include <kthread.h>
 #include <ns.h>
-#include <acpi.h>
 
 /* Print a number (base <= 16) in reverse order,
  * using specified putch function and associated pointer putdat. */
