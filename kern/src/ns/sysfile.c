@@ -31,10 +31,14 @@ static int growfd(struct fgrp *f, int fd)
 	if (fd < f->nfd) {
 		return 0;
 	}
-	n = f->nfd + DELTAFD;
+	/* want to grow by a reasonable amount (delta), but also make sure we can
+	 * handle the fd we're asked for */
+	n = MAX(f->nfd, fd + 1) + DELTAFD;
 	if (n > MAXNFD)
 		n = MAXNFD;
 	if (fd >= n) {
+		set_errno(EMFILE);
+		set_errstr("Asked for FD %d, more than %d\n", fd, MAXNFD);
 		return -1;
 	}
 	nfd = kzmalloc(n * sizeof(struct chan *), 0);
@@ -64,27 +68,20 @@ int newfd(struct chan *c)
 	/* We'd like to ask it to start at f->minfd, but that would require us to
 	 * know if we closed anything.  Since we share the FD numbers with the VFS,
 	 * there is no way to know that. */
+#if 1	// VFS hack
 	i = get_fd(&current->open_files, 0);
-	while (i >= f->nfd) {
-		if (growfd(f, i) < 0) {
-			spin_unlock(&f->lock);
-			exhausted("file descriptors");
-			return -1;
-		}
-		cpu_relax();
-	}
-	assert(f->fd[i] == 0);
-#if 0	// 9ns style
+#else 	// 9ns style
 	/* TODO: use a unique integer allocator */
 	for (i = f->minfd; i < f->nfd; i++)
 		if (f->fd[i] == 0)
 			break;
-	if (i >= f->nfd && growfd(f, i) < 0) {
+#endif
+	if (growfd(f, i) < 0) {
 		spin_unlock(&f->lock);
 		exhausted("file descriptors");
 		return -1;
 	}
-#endif
+	assert(f->fd[i] == 0);
 	f->minfd = i + 1;
 	if (i > f->maxfd)
 		f->maxfd = i;
