@@ -62,11 +62,11 @@ struct medium ethermedium = {
 	.pref2addr = etherpref2addr,
 };
 
-struct medium gbemedium = {
-	.name = "gbe",
+struct medium trexmedium = {
+	.name = "trex",
 	.hsize = 14,
 	.mintu = 60,
-	.maxtu = 9014,
+	.maxtu = 1514,
 	.maclen = 6,
 	.bind = etherbind,
 	.unbind = etherunbind,
@@ -824,7 +824,7 @@ static struct block *multicastarp(struct Fs *f,
 linker_func_4(ethermediumlink)
 {
 	addipmedium(&ethermedium);
-	addipmedium(&gbemedium);
+	addipmedium(&trexmedium);
 }
 
 static void etherpref2addr(uint8_t * pref, uint8_t * ea)
