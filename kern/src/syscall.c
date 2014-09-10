@@ -71,12 +71,12 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace)
 	tsc2timespec(trace->end_timestamp, &ts_end);
 
 	len = snprintf(trace->pretty_buf, SYSTR_PRETTY_BUF_SZ - len,
-	           "[%7d.%03d]-[%7d.%03d] Syscall %3d (%12s):(0x%x, 0x%x, 0x%x, "
+	           "[%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%x, 0x%x, 0x%x, "
 	           "0x%x, 0x%x, 0x%x) ret: 0x%x proc: %d core: %d vcore: %d data: ",
 	           ts_start.tv_sec,
-	           ts_start.tv_nsec / 1000000, /* msec */
+	           ts_start.tv_nsec,
 	           ts_end.tv_sec,
-	           ts_end.tv_nsec / 1000000,
+	           ts_end.tv_nsec,
 	           trace->syscallno,
 	           syscall_table[trace->syscallno].name,
 	           trace->arg0,
@@ -89,6 +89,12 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace)
 	           trace->pid,
 	           trace->coreid,
 	           trace->vcoreid);
+	/* if we have extra data, print it out on the next line, lined up nicely.
+	 * this is only useful for looking at the dump in certain terminals.  if we
+	 * have a tool that processes the info, we shouldn't do this. */
+	if (trace->datalen)
+		len += snprintf(trace->pretty_buf + len, SYSTR_PRETTY_BUF_SZ - len,
+		                "\n%67s", "");
 	len += printdump(trace->pretty_buf + len,
 	                 MIN(trace->datalen, SYSTR_PRETTY_BUF_SZ - len - 1),
 	                 trace->data);
