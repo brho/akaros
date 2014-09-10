@@ -304,6 +304,19 @@ void __sched_scp_wakeup(struct proc *p)
 	remove_from_any_list(p);
 	add_to_list(p, &runnable_scps);
 	spin_unlock(&sched_lock);
+	/* we could be on a CG core, and all the mgmt cores could be halted.  if we
+	 * don't tell one of them about the new proc, they will sleep until the
+	 * timer tick goes off. */
+	if (!management_core()) {
+		/* TODO: pick a better core and only send if halted.
+		 *
+		 * ideally, we'd know if a specific mgmt core is sleeping and wake it
+		 * up.  o/w, we could interrupt an already-running mgmt core that won't
+		 * get to our new proc anytime soon.  also, by poking core 0, a
+		 * different mgmt core could remain idle (and this process would sleep)
+		 * until its tick goes off */
+		send_ipi(0, I_POKE_CORE);
+	}
 }
 
 /* Callback to return a core to the ksched, which tracks it as idle and

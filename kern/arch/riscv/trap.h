@@ -18,6 +18,9 @@
 
 /* Kernel message interrupt vector.  ignored, for the most part */
 #define I_KERNEL_MSG 255
+#warning "make sure this poke vector is okay"
+/* this is for an ipi that just wakes a core, but has no handler (for now) */
+#define I_POKE_CORE 254
 
 /* For kernel contexts, when we save/restore/move them around. */
 struct kernel_ctx {
