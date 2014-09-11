@@ -19,12 +19,10 @@ enum {
 	DIRREADSIZE=8192,	/* Just read a lot. Memory is cheap, lots of bandwidth,
 				 * and RPCs are very expensive. At the same time,
 				 * let's not yet exceed a common MSIZE. */
-
 };
 
 static int growfd(struct fgrp *f, int fd)
 {
-	
 	int n;
 	struct chan **nfd, **ofd;
 
@@ -43,6 +41,8 @@ static int growfd(struct fgrp *f, int fd)
 	}
 	nfd = kzmalloc(n * sizeof(struct chan *), 0);
 	if (nfd == NULL) {
+		set_errno(ENOMEM);
+		set_errstr("Failed to growfd for FD %d, OOM\n", fd);
 		return -1;
 	}
 	ofd = f->fd;
@@ -55,7 +55,6 @@ static int growfd(struct fgrp *f, int fd)
 
 int newfd(struct chan *c)
 {
-	
 	int i;
 	struct fgrp *f = current->fgrp;
 
@@ -78,7 +77,6 @@ int newfd(struct chan *c)
 #endif
 	if (growfd(f, i) < 0) {
 		spin_unlock(&f->lock);
-		exhausted("file descriptors");
 		return -1;
 	}
 	assert(f->fd[i] == 0);
@@ -104,7 +102,8 @@ struct chan *fdtochan(struct fgrp *f, int fd, int mode, int chkmnt, int iref)
 	}
 	if (fd < 0 || f->maxfd < fd || (c = f->fd[fd]) == 0) {
 		spin_unlock(&f->lock);
-		error(Ebadfd);
+		set_errno(EBADF);
+		error("Bad FD %d\n", fd);
 	}
 	if (iref)
 		chan_incref(c);
@@ -317,10 +316,16 @@ int sysdup(int old, int new)
 			cclose(c);
 			return -1;
 		}
-		if (fd < 0 || growfd(f, fd) < 0) {
+		if (fd < 0) {
 			spin_unlock(&f->lock);
 			cclose(c);
-			error(Ebadfd);
+			set_errno(EBADF);
+			error("Bad FD %d\n", fd);
+		}
+		if (growfd(f, fd) < 0) {
+			spin_unlock(&f->lock);
+			cclose(c);
+			error(current_errstr());
 		}
 		if (fd > f->maxfd)
 			f->maxfd = fd;
@@ -377,7 +382,7 @@ int sys_dup_to(struct proc *from_proc, unsigned int from_fd,
 	if (growfd(to_fgrp, to_fd) < 0) {
 		spin_unlock(&to_fgrp->lock);
 		cclose(c);
-		error("Couldn't grow, to_fd %d", to_fd);
+		error(current_errstr());
 	}
 	if (to_fd > to_fgrp->maxfd)
 		to_fgrp->maxfd = to_fd;
