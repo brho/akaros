@@ -444,6 +444,7 @@ struct dentry *dcache_get(struct super_block *sb, struct dentry *what_i_want);
 void dcache_put(struct super_block *sb, struct dentry *key_val);
 struct dentry *dcache_remove(struct super_block *sb, struct dentry *key);
 void dcache_prune(struct super_block *sb, bool negative_only);
+int generic_dentry_hash(struct dentry *dentry, struct qstr *qstr);
 
 /* Inode Functions */
 struct inode *get_inode(struct dentry *dentry);

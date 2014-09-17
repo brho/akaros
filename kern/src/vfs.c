@@ -112,16 +112,26 @@ void vfs_init(void)
 	printk("vfs_init() completed\n");
 }
 
+/* FS's can provide another, if they want */
+int generic_dentry_hash(struct dentry *dentry, struct qstr *qstr)
+{
+	unsigned long hash = 5381;
+
+	for (int i = 0; i < qstr->len; i++) {
+		/* hash * 33 + c, djb2's technique */
+		hash = ((hash << 5) + hash) + qstr->name[i];
+	}
+	return hash;
+}
+
 /* Builds / populates the qstr of a dentry based on its d_iname.  If there is an
  * l_name, (long), it will use that instead of the inline name.  This will
  * probably change a bit. */
 void qstr_builder(struct dentry *dentry, char *l_name)
 {
 	dentry->d_name.name = l_name ? l_name : dentry->d_iname;
-	// TODO: pending what we actually do in d_hash
-	//dentry->d_name.hash = dentry->d_op->d_hash(dentry, &dentry->d_name); 
-	dentry->d_name.hash = 0xcafebabe;
 	dentry->d_name.len = strnlen(dentry->d_name.name, MAX_FILENAME_SZ);
+	dentry->d_name.hash = dentry->d_op->d_hash(dentry, &dentry->d_name);
 }
 
 /* Useful little helper - return the string ptr for a given file */

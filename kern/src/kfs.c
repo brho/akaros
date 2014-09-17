@@ -519,12 +519,6 @@ int kfs_d_revalidate(struct dentry *dir, struct nameidata *nd)
 	return -1;
 }
 
-/* Produces the hash to lookup this dentry from the dcache */
-int kfs_d_hash(struct dentry *dentry, struct qstr *name)
-{
-	return -1;
-}
-
 /* Compares name1 and name2.  name1 should be a member of dir. */
 int kfs_d_compare(struct dentry *dir, struct qstr *name1, struct qstr *name2)
 { // default, string comp (case sensitive)
@@ -747,7 +741,7 @@ struct inode_operations kfs_i_op = {
 
 struct dentry_operations kfs_d_op = {
 	kfs_d_revalidate,
-	kfs_d_hash,
+	generic_dentry_hash,
 	kfs_d_compare,
 	kfs_d_delete,
 	kfs_d_release,

@@ -1270,12 +1270,6 @@ int ext2_d_revalidate(struct dentry *dir, struct nameidata *nd)
 	return -1;
 }
 
-/* Produces the hash to lookup this dentry from the dcache */
-int ext2_d_hash(struct dentry *dentry, struct qstr *name)
-{
-	return -1;
-}
-
 /* Compares name1 and name2.  name1 should be a member of dir. */
 int ext2_d_compare(struct dentry *dir, struct qstr *name1, struct qstr *name2)
 { // default, string comp (case sensitive)
@@ -1481,7 +1475,7 @@ struct inode_operations ext2_i_op = {
 
 struct dentry_operations ext2_d_op = {
 	ext2_d_revalidate,
-	ext2_d_hash,
+	generic_dentry_hash,
 	ext2_d_compare,
 	ext2_d_delete,
 	ext2_d_release,

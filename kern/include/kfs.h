@@ -63,7 +63,6 @@ void kfs_truncate(struct inode *inode);
 int kfs_permission(struct inode *inode, int mode, struct nameidata *nd);
 /* dentry_operations */
 int kfs_d_revalidate(struct dentry *dir, struct nameidata *nd);
-int kfs_d_hash(struct dentry *dentry, struct qstr *name);
 int kfs_d_compare(struct dentry *dir, struct qstr *name1, struct qstr *name2);
 int kfs_d_delete(struct dentry *dentry);
 int kfs_d_release(struct dentry *dentry);
