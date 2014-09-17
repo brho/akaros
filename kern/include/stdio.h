@@ -59,4 +59,7 @@ void printip(void (*putch)(int, void**), void **putdat, uint8_t *ip);
 void printipmask(void (*putch)(int, void**), void **putdat, uint8_t *ip);
 void printipv4(void (*putch)(int, void**), void **putdat, uint8_t *ip);
 
+/* #K */
+void trace_printk(const char *fmt, ...);
+
 #endif /* !ROS_INC_STDIO_H */

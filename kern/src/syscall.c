@@ -66,7 +66,7 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace)
 {
 	size_t len = 0;
 	struct timespec ts_start;
-	struct timespec ts_end;;
+	struct timespec ts_end;
 	tsc2timespec(trace->start_timestamp, &ts_start);
 	tsc2timespec(trace->end_timestamp, &ts_end);
 

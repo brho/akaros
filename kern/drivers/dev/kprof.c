@@ -344,12 +344,42 @@ void kprof_write_sysrecord(char *pretty_buf, size_t len)
 {
 	int wrote;
 	if (kprof.systrace) {
+		/* TODO: need qio work so we can simply add the buf as extra data */
 		wrote = qiwrite(kprof.systrace, pretty_buf, len);
 		/* based on the current queue settings, we only drop when we're running
 		 * out of memory.  odds are, we won't make it this far. */
 		if (wrote != len)
 			printk("DROPPED %s", pretty_buf);
 	}
+}
+
+void trace_printk(const char *fmt, ...)
+{
+	va_list ap;
+	struct timespec ts_now;
+	size_t bufsz = 160;	/* 2x terminal width */
+	size_t len = 0;
+	char *buf = kmalloc(bufsz, 0);
+
+	if (!buf)
+		return;
+	tsc2timespec(read_tsc(), &ts_now);
+	len += snprintf(buf + len, bufsz - len, "[%7d.%09d] /* ", ts_now.tv_sec,
+	                ts_now.tv_nsec);
+	va_start(ap, fmt);
+	len += vsnprintf(buf + len, bufsz - len, fmt, ap);
+	va_start(ap, fmt);
+	va_end(ap);
+	len += snprintf(buf + len, bufsz - len, " */\n");
+	va_start(ap, fmt);
+	/* snprintf null terminates the buffer, and does not count that as part of
+	 * the len.  if we maxed out the buffer, let's make sure it has a \n */
+	if (len == bufsz - 1) {
+		assert(buf[bufsz - 1] == '\0');
+		buf[bufsz - 2] = '\n';
+	}
+	kprof_write_sysrecord(buf, len);
+	kfree(buf);
 }
 
 struct dev kprofdevtab __devtab = {
