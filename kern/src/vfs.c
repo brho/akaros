@@ -1391,6 +1391,10 @@ struct file *do_file_open(char *path, int flags, int mode)
 		kref_get(&file_d->d_kref, 1);
 		goto open_the_file;
 	}
+	if (!(flags & O_CREAT)) {
+		set_errno(ENOENT);
+		goto out_path_only;
+	}
 	/* So it didn't already exist, release the path from the previous lookup,
 	 * and then we try to create it. */
 	path_release(nd);	
@@ -1406,6 +1410,7 @@ struct file *do_file_open(char *path, int flags, int mode)
 	file_d = do_lookup(nd->dentry, nd->last.name); 
 	if (!file_d) {
 		if (!(flags & O_CREAT)) {
+			warn("Extremely unlikely race, probably a bug");
 			set_errno(ENOENT);
 			goto out_path_only;
 		}
