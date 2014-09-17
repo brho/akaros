@@ -297,9 +297,10 @@ typedef struct sprintbuf {
 
 static void sprintputch(int ch, sprintbuf_t *NONNULL *NONNULL b)
 {
-	(*b)->cnt++;
-	if ((*b)->buf < (*b)->ebuf)
+	if ((*b)->buf < (*b)->ebuf) {
 		*((*b)->buf++) = ch;
+		(*b)->cnt++;
+	}
 }
 
 int vsnprintf(char *buf, int n, const char *fmt, va_list ap)
@@ -307,8 +308,9 @@ int vsnprintf(char *buf, int n, const char *fmt, va_list ap)
 	sprintbuf_t b;// = {buf, buf+n-1, 0};
 	sprintbuf_t *COUNT(1) NONNULL bp = &b;
 
+	/* this isn't quite the snprintf 'spec', but errors aren't helpful */
 	if (buf == NULL || n < 1)
-		return -EINVAL;
+		return 0;
 
 	b.buf = NULL; // zra : help out the Deputy optimizer a bit
 	b.ebuf = buf+n-1;
