@@ -432,6 +432,9 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
              void *d_fs_info);
 
 /* Dentry Functions */
+struct dentry *get_dentry_with_ops(struct super_block *sb,
+                                   struct dentry *parent, char *name,
+                                   struct dentry_operations *d_op);
 struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
                           char *name);
 void dentry_release(struct kref *kref);

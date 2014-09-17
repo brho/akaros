@@ -575,7 +575,7 @@ void init_sb(struct super_block *sb, struct vfsmount *vmnt,
 {
 	/* Build and init the first dentry / inode.  The dentry ref is stored later
 	 * by vfsmount's mnt_root.  The parent is dealt with later. */
-	struct dentry *d_root = get_dentry(sb, 0,  "/");	/* probably right */
+	struct dentry *d_root = get_dentry_with_ops(sb, 0,  "/", d_op);
 
 	if (!d_root)
 		panic("OOM!  init_sb() can't fail yet!");
@@ -631,17 +631,11 @@ static void dentry_set_name(struct dentry *dentry, char *name)
 	}
 }
 
-/* Helper to alloc and initialize a generic dentry.  The following needs to be
- * set still: d_op (if no parent), d_fs_info (opt), d_inode, connect the inode
- * to the dentry (and up the d_kref again), maybe dcache_put().  The inode
- * stitching is done in get_inode() or lookup (depending on the FS).
- * The setting of the d_op might be problematic when dealing with mounts.  Just
- * overwrite it.
- *
- * If the name is longer than the inline name, it will kmalloc a buffer, so
- * don't worry about the storage for *name after calling this. */
-struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
-                          char *name)
+/* Gets a dentry.  If there is no parent, use d_op.  Only called directly by
+ * superblock init code. */
+struct dentry *get_dentry_with_ops(struct super_block *sb,
+                                   struct dentry *parent, char *name,
+                                   struct dentry_operations *d_op)
 {
 	assert(name);
 	struct dentry *dentry = kmem_cache_alloc(dentry_kcache, 0);
@@ -662,6 +656,8 @@ struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
 	if (parent)	{						/* no parent for rootfs mount */
 		kref_get(&parent->d_kref, 1);
 		dentry->d_op = parent->d_op;	/* d_op set in init_sb for parentless */
+	} else {
+		dentry->d_op = d_op;
 	}
 	dentry->d_parent = parent;
 	dentry->d_flags = DENTRY_USED;
@@ -670,6 +666,21 @@ struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
 	/* Catch bugs by aggressively zeroing this (o/w we use old stuff) */
 	dentry->d_inode = 0;
 	return dentry;
+}
+
+/* Helper to alloc and initialize a generic dentry.  The following needs to be
+ * set still: d_op (if no parent), d_fs_info (opt), d_inode, connect the inode
+ * to the dentry (and up the d_kref again), maybe dcache_put().  The inode
+ * stitching is done in get_inode() or lookup (depending on the FS).
+ * The setting of the d_op might be problematic when dealing with mounts.  Just
+ * overwrite it.
+ *
+ * If the name is longer than the inline name, it will kmalloc a buffer, so
+ * don't worry about the storage for *name after calling this. */
+struct dentry *get_dentry(struct super_block *sb, struct dentry *parent,
+                          char *name)
+{
+	return get_dentry_with_ops(sb, parent, name, 0);
 }
 
 /* Called when the dentry is unreferenced (after kref == 0).  This works closely
