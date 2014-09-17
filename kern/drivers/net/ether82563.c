@@ -1071,15 +1071,15 @@ static void i82563tproc(void *v)
 
 static int i82563replenish(struct ctlr *ctlr, int maysleep)
 {
-	unsigned int rdt, m, i;
+	unsigned int rdt, m;
 	struct block *bp;
 	Rbpool *p;
 	Rd *rd;
+	int retval = 0;
 
 	rdt = ctlr->rdt;
 	m = ctlr->nrd;
 	p = rbtab + ctlr->pool;
-	i = 0;
 	for (; NEXT_RING(rdt, m) != ctlr->rdh; rdt = NEXT_RING(rdt, m)) {
 		rd = &ctlr->rdba[rdt];
 		if (ctlr->rb[rdt] != NULL) {
@@ -1092,27 +1092,29 @@ redux:
 			if (rdt - ctlr->rdh >= 16)
 				break;
 			printd("%s: pool %d: no rx buffers\n", cname(ctlr), ctlr->pool);
-			if (maysleep == 0)
-				return -1;
+			if (maysleep == 0) {
+				retval = -1;
+				goto out;
+			}
 			spin_lock_irqsave(&p->lock);
 			p->starve = 1;
 			spin_unlock_irqsave(&p->lock);
 			rendez_sleep(&p->r, icansleep, p);
 			goto redux;
 		}
-		i++;
 		ctlr->rb[rdt] = bp;
 		rd->addr[0] = paddr_low32(bp->rp);
 		rd->addr[1] = paddr_high32(bp->rp);
 		rd->status = 0;
 		ctlr->rdfree++;
 	}
-	if (i != 0) {
+out:
+	if (ctlr->rdt != rdt) {
 		ctlr->rdt = rdt;
 		wmb_f();
 		csr32w(ctlr, Rdt, rdt);
 	}
-	return 0;
+	return retval;
 }
 
 static void i82563rxinit(struct ctlr *ctlr)
