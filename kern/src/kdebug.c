@@ -108,30 +108,31 @@ static void __print_hdr(void)
 
 void __print_func_entry(const char *func, const char *file)
 {
+	char tentabs[] = "\t\t\t\t\t\t\t\t\t\t"; // ten tabs and a \0
+	char *ourtabs = &tentabs[10 - MIN(tab_depth, 10)];
 	if (!print)
 		return;
 	if (is_blacklisted(func))
 		return;
 	spin_lock_irqsave(&lock);
 	__print_hdr();
-	for (int i = 0; i < tab_depth; i++)
-		printk("\t");
-	printk("%s() in %s\n", func, file);
+	printk("%s%s() in %s\n", ourtabs, func, file);
 	spin_unlock_irqsave(&lock);
 	tab_depth++;
 }
 
 void __print_func_exit(const char *func, const char *file)
 {
+	char tentabs[] = "\t\t\t\t\t\t\t\t\t\t"; // ten tabs and a \0
+	char *ourtabs;
 	if (!print)
 		return;
 	if (is_blacklisted(func))
 		return;
 	tab_depth--;
+	ourtabs = &tentabs[10 - MIN(tab_depth, 10)];
 	spin_lock_irqsave(&lock);
 	__print_hdr();
-	for (int i = 0; i < tab_depth; i++)
-		printk("\t");
-	printk("---- %s()\n", func);
+	printk("%s---- %s()\n", ourtabs, func);
 	spin_unlock_irqsave(&lock);
 }
