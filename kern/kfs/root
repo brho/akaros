@@ -27,8 +27,6 @@ then
 	srv 'tcp!169.229.48.51!1025' $SRVNAME
 elif [ "x$REMOTE" = "xqemu" ]
 then
-	# so this works like usual for the qemu users
-	ash ifconfig
 	srv 'tcp!10.0.2.2!1025' $SRVNAME
 else
 	echo "Unknown remote: $REMOTE!"
