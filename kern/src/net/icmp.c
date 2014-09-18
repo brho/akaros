@@ -297,6 +297,9 @@ static struct block *mkechoreply(struct block *bp)
 	Icmp *q;
 	uint8_t ip[4];
 
+	/* we're repurposing bp to send it back out.  we need to remove any inbound
+	 * checksum flags (which were saying the HW did the checksum) */
+	bp->flag &= ~BCKSUM_FLAGS;
 	q = (Icmp *) bp->rp;
 	q->vihl = IP_VER4;
 	memmove(ip, q->src, sizeof(q->dst));
