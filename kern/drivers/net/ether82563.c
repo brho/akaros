@@ -1515,7 +1515,7 @@ static void serdeslproc(void *v)
 static void i82563attach(struct ether *edev)
 {
 	ERRSTACK(1);
-	char *name;
+	char *lname, *rname, *tname;
 	int i;
 	struct block *bp;
 	struct ctlr *ctlr;
@@ -1563,23 +1563,26 @@ static void i82563attach(struct ether *edev)
 	}
 
 	/* the ktasks should free these names, if they ever exit */
-	name = kmalloc(KNAMELEN, KMALLOC_WAIT);
-	snprintf(name, KNAMELEN, "#l%dlproc", edev->ctlrno);
+	lname = kmalloc(KNAMELEN, KMALLOC_WAIT);
+	rname = kmalloc(KNAMELEN, KMALLOC_WAIT);
+	tname = kmalloc(KNAMELEN, KMALLOC_WAIT);
+
+	snprintf(lname, KNAMELEN, "#l%dlproc", edev->ctlrno);
 
 	if (csr32r(ctlr, Status) & Tbimode)
-		ktask(name, serdeslproc, edev);	/* mac based serdes */
+		ktask(lname, serdeslproc, edev);	/* mac based serdes */
 	else if ((csr32r(ctlr, Ctrlext) & Linkmode) == Serdes)
-		ktask(name, pcslproc, edev);	/* phy based serdes */
+		ktask(lname, pcslproc, edev);	/* phy based serdes */
 	else if (cttab[ctlr->type].flag & F79phy)
-		ktask(name, phyl79proc, edev);
+		ktask(lname, phyl79proc, edev);
 	else
-		ktask(name, phylproc, edev);
+		ktask(lname, phylproc, edev);
 
-	snprintf(name, KNAMELEN, "#l%drproc", edev->ctlrno);
-	ktask(name, i82563rproc, edev);
+	snprintf(rname, KNAMELEN, "#l%drproc", edev->ctlrno);
+	ktask(rname, i82563rproc, edev);
 
-	snprintf(name, KNAMELEN, "#l%dtproc", edev->ctlrno);
-	ktask(name, i82563tproc, edev);
+	snprintf(tname, KNAMELEN, "#l%dtproc", edev->ctlrno);
+	ktask(tname, i82563tproc, edev);
 
 	qunlock(&ctlr->alock);
 	poperror();
