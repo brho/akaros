@@ -580,7 +580,7 @@ enum {
 	PRINTSIZE = 256,
 	NUMSIZE = 12,	/* size of formatted number */
 	MB = (1024 * 1024),
-	READSTR = 1000,	/* temporary buffer size for device reads */
+	READSTR = 2000,	/* temporary buffer size for device reads */
 };
 
 extern struct dev devtab[];
