@@ -1647,7 +1647,7 @@ static int i82563detach(struct ctlr *ctlr)
 	csr32w(ctlr, Rctl, 0);
 	csr32w(ctlr, Tctl, csr32r(ctlr, Tctl) & ~Ten);
 
-	udelay(10 * 1000 * 1000);
+	udelay(1000 * 1000);
 
 	r = csr32r(ctlr, Ctrl);
 	if (ctlr->type == i82566 || ctlr->type == i82579)
