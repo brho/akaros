@@ -529,7 +529,10 @@ static void sendarp(struct Ipifc *ifc, struct arpent *a)
 	Etherarp *e;
 	Etherrock *er = ifc->arg;
 
-	/* don't do anything if it's been less than a second since the last */
+	/* don't do anything if it's been less than a second since the last.  ctime
+	 * is set to 0 for the first time through.  we hold the f->arp qlock, so
+	 * there shouldn't be a problem with another arp request for this same
+	 * arpent coming down til we update ctime again. */
 	if (NOW - a->ctime < 1000) {
 		arprelease(er->f->arp, a);
 		return;
@@ -544,7 +547,7 @@ static void sendarp(struct Ipifc *ifc, struct arpent *a)
 		freeblist(bp);
 	}
 
-	/* try to keep it around for a second more */
+	/* update last sent time */
 	a->ctime = NOW;
 	arprelease(er->f->arp, a);
 

@@ -127,7 +127,7 @@ static struct arpent *newarp6(struct arp *arp, uint8_t * ip, struct Ipifc *ifc,
 
 	memmove(a->ip, ip, sizeof(a->ip));
 	a->utime = NOW;
-	a->ctime = a->utime;
+	a->ctime = 0;	/* somewhat of a "last sent time".  0, to trigger a send. */
 	a->type = m;
 
 	a->rtime = NOW + ReTransTimer;
