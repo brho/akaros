@@ -66,6 +66,7 @@ enum{
 	Kprofctlqid,
 	Kprofoprofileqid,
 	Kptraceqid,
+	Kprintxqid,
 };
 struct dirtab kproftab[]={
 	{".",		{Kprofdirqid, 0, QTDIR},0,	DMDIR|0550},
@@ -73,6 +74,7 @@ struct dirtab kproftab[]={
 	{"kpctl",	{Kprofctlqid},		0,	0600},
 	{"kpoprofile",	{Kprofoprofileqid},	0,	0600},
 	{"kptrace",	{Kptraceqid},		0,	0600},
+	{"kprintx",	{Kprintxqid},		0,	0600},
 };
 
 static struct chan*
@@ -285,6 +287,9 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 		} else
 			error("no systrace queue");
 		break;
+	case Kprintxqid:
+		n = readstr(offset, va, n, printx_on ? "on" : "off");
+		break;
 	default:
 		n = 0;
 		break;
@@ -333,6 +338,16 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 	case Kprofoprofileqid:
 		pc = strtoul(a, 0, 0);
 		oprofile_add_trace(pc);
+		break;
+	case Kprintxqid:
+		if (!strncmp(a, "on", 2))
+			set_printx(1);
+		else if (!strncmp(a, "off", 3))
+			set_printx(0);
+		else if (!strncmp(a, "toggle", 6))	/* why not. */
+			set_printx(2);
+		else
+			error("invalid option to Kprintx %s\n", a);
 		break;
 	default:
 		error(Ebadusefd);

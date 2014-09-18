@@ -74,18 +74,11 @@ static bool is_blacklisted(const char *s)
 }
 
 static int tab_depth = 0;
-static bool print = TRUE;
 
-/* Call these via kfunc */
+/* Call this via kfunc */
 void reset_print_func_depth(void)
 {
 	tab_depth = 0;
-}
-
-void toggle_print_func(void)
-{
-	print = !print;
-	printk("Func entry/exit printing is now %sabled\n", print ? "en" : "dis");
 }
 
 static spinlock_t lock = SPINLOCK_INITIALIZER_IRQSAVE;
@@ -110,7 +103,7 @@ void __print_func_entry(const char *func, const char *file)
 {
 	char tentabs[] = "\t\t\t\t\t\t\t\t\t\t"; // ten tabs and a \0
 	char *ourtabs = &tentabs[10 - MIN(tab_depth, 10)];
-	if (!print)
+	if (!printx_on)
 		return;
 	if (is_blacklisted(func))
 		return;
@@ -125,7 +118,7 @@ void __print_func_exit(const char *func, const char *file)
 {
 	char tentabs[] = "\t\t\t\t\t\t\t\t\t\t"; // ten tabs and a \0
 	char *ourtabs;
-	if (!print)
+	if (!printx_on)
 		return;
 	if (is_blacklisted(func))
 		return;
@@ -135,4 +128,21 @@ void __print_func_exit(const char *func, const char *file)
 	__print_hdr();
 	printk("%s---- %s()\n", ourtabs, func);
 	spin_unlock_irqsave(&lock);
+}
+
+bool printx_on = FALSE;
+
+void set_printx(int mode)
+{
+	switch (mode) {
+		case 0:
+			printx_on = FALSE;
+			break;
+		case 1:
+			printx_on = TRUE;
+			break;
+		case 2:
+			printx_on = !printx_on;
+			break;
+	}
 }

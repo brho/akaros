@@ -70,6 +70,7 @@ static command_t (RO commands)[] = {
 	{ "alarm", "Alarm Diagnostics", mon_alarm},
 	{ "msr", "read/write msr: msr msr [value]", mon_msr},
 	{ "db", "Misc debugging", mon_db},
+	{ "px", "Toggle printx", mon_px},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -1165,5 +1166,12 @@ int mon_db(int argc, char **argv, struct hw_trapframe *hw_tf)
 		printk("Bad option\n");
 		return 1;
 	}
+	return 0;
+}
+
+int mon_px(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+	set_printx(2);
+	printk("Printxing is now %sabled\n", printx_on ? "en" : "dis");
 	return 0;
 }

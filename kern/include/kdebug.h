@@ -33,6 +33,11 @@ void hexdump(void *v, int length);
 void pahexdump(uintptr_t pa, int length);
 int printdump(char *buf, int buflen, uint8_t *data);
 
+extern bool printx_on;
+void set_printx(int mode);
+#define printx(args...) if (printx_on) printk(args)
+#define trace_printx(args...) if (printx_on) trace_printk(args)
+
 #include <oprofile.h>
 #define TRACEME() oprofile_add_backtrace(read_pc(), read_bp())
 
