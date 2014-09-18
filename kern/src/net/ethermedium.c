@@ -147,9 +147,7 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 {
 	ERRSTACK(1);
 	struct chan *mchan4, *cchan4, *achan, *mchan6, *cchan6;
-	char addr[Maxpath];			//char addr[2*KNAMELEN];
-	char dir[Maxpath];			//char dir[2*KNAMELEN];
-	char *buf;
+	char *addr, *dir, *buf;
 	int fd, cfd, n;
 	char *ptr;
 	Etherrock *er;
@@ -157,6 +155,8 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	if (argc < 2)
 		error(Ebadarg);
 
+	addr = kmalloc(Maxpath, KMALLOC_WAIT);	//char addr[2*KNAMELEN];
+	dir = kmalloc(Maxpath, KMALLOC_WAIT);	//char addr[2*KNAMELEN];
 	mchan4 = cchan4 = achan = mchan6 = cchan6 = NULL;
 	buf = NULL;
 	if (waserror()) {
@@ -172,6 +172,8 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 			cclose(cchan6);
 		if (buf != NULL)
 			kfree(buf);
+		kfree(addr);
+		kfree(dir);
 		nexterror();
 	}
 
@@ -181,7 +183,7 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	 *  the dial will fail if the type is already open on
 	 *  this device.
 	 */
-	snprintf(addr, sizeof(addr), "%s!0x800", argv[2]);
+	snprintf(addr, Maxpath, "%s!0x800", argv[2]);
 	fd = kdial(addr, NULL, dir, &cfd);
 	if (fd < 0)
 		error("dial 0x800 failed: %s", get_cur_errbuf());
@@ -198,7 +200,7 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	/*
 	 *  get mac address and speed
 	 */
-	snprintf(addr, sizeof(addr), "%s/stats", dir);
+	snprintf(addr, Maxpath, "%s/stats", dir);
 	fd = sysopen(addr, OREAD);
 	if (fd < 0)
 		error("can't open ether stats: %s", get_cur_errbuf());
@@ -234,7 +236,7 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	/*
 	 *  open arp conversation
 	 */
-	snprintf(addr, sizeof(addr), "%s!0x806", argv[2]);
+	snprintf(addr, Maxpath, "%s!0x806", argv[2]);
 	fd = kdial(addr, NULL, NULL, NULL);
 	if (fd < 0)
 		error("dial 0x806 failed: %s", get_cur_errbuf());
@@ -247,7 +249,7 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	 *  the dial will fail if the type is already open on
 	 *  this device.
 	 */
-	snprintf(addr, sizeof(addr), "%s!0x86DD", argv[2]);
+	snprintf(addr, Maxpath, "%s!0x86DD", argv[2]);
 	fd = kdial(addr, NULL, dir, &cfd);
 	if (fd < 0)
 		error("dial 0x86DD failed: %s", get_cur_errbuf());
@@ -271,6 +273,8 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	ifc->arg = er;
 
 	kfree(buf);
+	kfree(addr);
+	kfree(dir);
 	poperror();
 
 	ktask("etherread4", etherread4, ifc);

@@ -47,67 +47,80 @@ int kdial(char *dest, char *local, char *dir, int *cfdp)
 {
 	DS ds;
 	int rv;
-	char err[ERRMAX], alterr[ERRMAX];
+	char *err, *alterr;
+
+	err = kmalloc(ERRMAX, KMALLOC_WAIT);
+	alterr = kmalloc(ERRMAX, KMALLOC_WAIT);
 
 	ds.local = local;
 	ds.dir = dir;
 	ds.cfdp = cfdp;
 
 	_dial_string_parse(dest, &ds);
-	if (ds.netdir)
-		return csdial(&ds);
+	if (ds.netdir) {
+		rv = csdial(&ds);
+		goto out;
+	}
 
 	ds.netdir = "/net";
 	rv = csdial(&ds);
 	if (rv >= 0)
-		return rv;
+		goto out;
 
 	err[0] = 0;
-	strncpy(err, current_errstr(), sizeof err);
+	strncpy(err, current_errstr(), ERRMAX);
 	if (strstr(err, "refused") != 0) {
-		return rv;
+		goto out;
 	}
 
 	ds.netdir = "/net.alt";
 	rv = csdial(&ds);
 	if (rv >= 0)
-		return rv;
+		goto out;
 
 	alterr[0] = 0;
-	kerrstr(alterr, sizeof err);
+	kerrstr(alterr, ERRMAX);
 
 	if (strstr(alterr, "translate") || strstr(alterr, "does not exist"))
-		kerrstr(err, sizeof err);
+		kerrstr(err, ERRMAX);
 	else
-		kerrstr(alterr, sizeof alterr);
+		kerrstr(alterr, ERRMAX);
+out:
+	kfree(err);
+	kfree(alterr);
 	return rv;
 }
 
 static int csdial(DS * ds)
 {
-	int n, fd, rv;
-	char *p, buf[Maxstring], clone[Maxpath], err[ERRMAX], besterr[ERRMAX];
+	int n, fd, rv = -1;
+	char *p, *buf, *clone, *err, *besterr;
 
+	buf = kmalloc(Maxstring, KMALLOC_WAIT);
+	clone = kmalloc(Maxpath, KMALLOC_WAIT);
+	err = kmalloc(ERRMAX, KMALLOC_WAIT);
+	besterr = kmalloc(ERRMAX, KMALLOC_WAIT);
 	/*
 	 *  open connection server
 	 */
-	snprintf(buf, sizeof(buf), "%s/cs", ds->netdir);
+	snprintf(buf, Maxstring, "%s/cs", ds->netdir);
 	fd = sysopen(buf, ORDWR);
 	if (fd < 0) {
 		/* no connection server, don't translate */
-		snprintf(clone, sizeof(clone), "%s/%s/clone", ds->netdir, ds->proto);
-		return call(clone, ds->rem, ds);
+		snprintf(clone, Maxpath, "%s/%s/clone", ds->netdir, ds->proto);
+		rv = call(clone, ds->rem, ds);
+		goto out;
 	}
 
 	/*
 	 *  ask connection server to translate
 	 */
-	snprintf(buf, sizeof(buf), "%s!%s", ds->proto, ds->rem);
+	snprintf(buf, Maxstring, "%s!%s", ds->proto, ds->rem);
 	if (syswrite(fd, buf, strlen(buf)) < 0) {
-		kerrstr(err, sizeof err);
+		kerrstr(err, ERRMAX);
 		sysclose(fd);
 		set_errstr("%s (%s)", err, buf);
-		return -1;
+		goto out;
 	}
 
 	/*
@@ -115,10 +128,9 @@ static int csdial(DS * ds)
 	 *  we get one that works.
 	 */
 	*besterr = 0;
-	strncpy(err, Egreg, sizeof(err));
-	rv = -1;
+	strncpy(err, Egreg, ERRMAX);
 	sysseek(fd, 0, 0);
-	while ((n = sysread(fd, buf, sizeof(buf) - 1)) > 0) {
+	while ((n = sysread(fd, buf, Maxstring - 1)) > 0) {
 		buf[n] = 0;
 		p = strchr(buf, ' ');
 		if (p == 0)
@@ -128,76 +140,94 @@ static int csdial(DS * ds)
 		if (rv >= 0)
 			break;
 		err[0] = 0;
-		kerrstr(err, sizeof err);
+		kerrstr(err, ERRMAX);
 		if (strstr(err, "does not exist") == 0)
-			memmove(besterr, err, sizeof besterr);
+			memmove(besterr, err, ERRMAX);
 	}
 	sysclose(fd);
 
 	if (rv < 0 && *besterr)
-		kerrstr(besterr, sizeof besterr);
+		kerrstr(besterr, ERRMAX);
 	else
-		kerrstr(err, sizeof err);
+		kerrstr(err, ERRMAX);
+out:
+	kfree(buf);
+	kfree(clone);
+	kfree(err);
+	kfree(besterr);
 	return rv;
 }
 
 static int call(char *clone, char *dest, DS * ds)
 {
-	int fd, cfd, n;
-	char name[Maxpath], data[Maxpath], err[ERRMAX], *p;
+	int fd, cfd, n, retval;
+	char *name, *data, *err, *p;
+
+	name = kmalloc(Maxpath, KMALLOC_WAIT);
+	data = kmalloc(Maxpath, KMALLOC_WAIT);
+	err = kmalloc(ERRMAX, KMALLOC_WAIT);
 
 	cfd = sysopen(clone, ORDWR);
 	if (cfd < 0) {
-		kerrstr(err, sizeof err);
+		kerrstr(err, ERRMAX);
 		set_errstr("%s (%s)", err, clone);
-		return -1;
+		retval = -1;
+		goto out;
 	}
 
 	/* get directory name */
-	n = sysread(cfd, name, sizeof(name) - 1);
+	n = sysread(cfd, name, Maxpath - 1);
 	if (n < 0) {
-		kerrstr(err, sizeof err);
+		kerrstr(err, ERRMAX);
 		sysclose(cfd);
 		set_errstr("read %s: %s", clone, err);
-		return -1;
+		retval = -1;
+		goto out;
 	}
 	name[n] = 0;
 	for (p = name; *p == ' '; p++) ;
-	snprintf(name, sizeof(name), "%ld", strtoul(p, 0, 0));
+	snprintf(name, Maxpath, "%ld", strtoul(p, 0, 0));
 	p = strrchr(clone, '/');
 	*p = 0;
 	if (ds->dir)
 		snprintf(ds->dir, NETPATHLEN, "%s/%s", clone, name);
-	snprintf(data, sizeof(data), "%s/%s/data", clone, name);
+	snprintf(data, Maxpath, "%s/%s/data", clone, name);
 
 	/* connect */
 	if (ds->local)
-		snprintf(name, sizeof(name), "connect %s %s", dest, ds->local);
+		snprintf(name, Maxpath, "connect %s %s", dest, ds->local);
 	else
-		snprintf(name, sizeof(name), "connect %s", dest);
+		snprintf(name, Maxpath, "connect %s", dest);
 	if (syswrite(cfd, name, strlen(name)) < 0) {
 		err[0] = 0;
-		kerrstr(err, sizeof err);
+		kerrstr(err, ERRMAX);
 		sysclose(cfd);
 		set_errstr("%s (%s)", err, name);
-		return -1;
+		retval = -1;
+		goto out;
 	}
 
 	/* open data connection */
 	fd = sysopen(data, ORDWR);
 	if (fd < 0) {
 		err[0] = 0;
-		kerrstr(err, sizeof err);
+		kerrstr(err, ERRMAX);
 		set_errstr("%s (%s)", err, data);
 		sysclose(cfd);
-		return -1;
+		retval = -1;
+		goto out;
 	}
 	if (ds->cfdp)
 		*ds->cfdp = cfd;
 	else
 		sysclose(cfd);
+	retval = fd;
+out:
+	kfree(name);
+	kfree(data);
+	kfree(err);
 
-	return fd;
+	return retval;
 }
 
 /*
