@@ -828,7 +828,7 @@ igberbfree(struct block* bp)
 {
 	bp->rp = bp->lim - Rbsz;
 	bp->wp = bp->rp;
- 	bp->flag &= ~(Bipck | Budpck | Btcpck | Bpktck);
+	bp->flag &= ~BCKSUM_FLAGS;
 
 	ilock(&igberblock);
 	bp->next = igberbpool;

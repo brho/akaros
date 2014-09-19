@@ -868,7 +868,7 @@ static void rbfree(struct block *b, int t)
 
 	p = rbtab + t;
 	b->rp = b->wp = (uint8_t *) ROUNDUP((uintptr_t) b->base, Rbalign);
-	b->flag &= ~(Bipck | Budpck | Btcpck | Bpktck);
+	b->flag &= ~BCKSUM_FLAGS;
 
 	spin_lock_irqsave(&p->lock);
 	b->next = p->b;
