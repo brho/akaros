@@ -398,7 +398,6 @@ newjob(void)
 	if (! job){
 		error(1, 0, "%s: %r","job calloc");
 	}
-#warning "fix lock"
 //	//lock(&joblock);
 	job->next = joblist;
 	joblist = job;
@@ -411,7 +410,6 @@ void
 freejob(Job *job)
 {
 	Job **l;
-return;
 	//lock(&joblock);
 	for(l = &joblist; *l; l = &(*l)->next){
 		if((*l) == job){
