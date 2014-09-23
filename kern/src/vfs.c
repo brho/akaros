@@ -1392,7 +1392,7 @@ struct file *do_file_open(char *path, int flags, int mode)
 		goto open_the_file;
 	}
 	if (!(flags & O_CREAT)) {
-		set_errno(ENOENT);
+		set_errno(-error);
 		goto out_path_only;
 	}
 	/* So it didn't already exist, release the path from the previous lookup,
