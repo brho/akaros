@@ -1472,30 +1472,6 @@ static void procctlreq(struct proc *p, char *va, int n)
 			 * hyperthreaded core. */
 			spin_on(p->env_cr3);
 			break;
-#if 0
-			core ownership.From NIX.case CMcore:core = atoi(cb->f[1]);
-			if (core >= MACHMAX)
-				error("wrong core number");
-			else if (core == 0) {
-				if (p->ac == NULL)
-					error("not running in an ac");
-				p->procctl = struct proc_totc;
-				if (p != up && p->state == Exotic) {
-					/* see the comment in postnote */
-					intrac(p);
-				}
-			} else {
-				if (p->ac != NULL)
-					error("running in an ac");
-				if (core < 0)
-					p->ac = getac(p, -1);
-				else
-					p->ac = getac(p, core);
-				p->procctl = struct proc_toac;
-				p->prepagemem = 1;
-			}
-			break;
-#endif
 	}
 	poperror();
 	kfree(cb);
