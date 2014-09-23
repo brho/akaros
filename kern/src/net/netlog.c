@@ -241,7 +241,7 @@ void netlog(struct Fs *f, int mask, char *fmt, ...)
 		return;
 
 	va_start(arg, fmt);
-	n = snprintf(buf, sizeof(buf), fmt, arg);
+	n = vsnprintf(buf, sizeof(buf), fmt, arg);
 	va_end(arg);
 
 	spin_lock(&f->alog->lock);

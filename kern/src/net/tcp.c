@@ -1233,7 +1233,7 @@ sndrst(struct Proto *tcp, uint8_t * source, uint8_t * dest,
 	Tcp4hdr ph4;
 	Tcp6hdr ph6;
 
-	netlog(tcp->f, Logtcp, "sndrst: %s", reason);
+	netlog(tcp->f, Logtcp, "sndrst: %s\n", reason);
 
 	tpriv = tcp->priv;
 
@@ -1604,7 +1604,7 @@ static struct conv *tcpincoming(struct conv *s, Tcp * segp, uint8_t * src,
 	h = hashipa(src, segp->source);
 	for (l = &tpriv->lht[h]; (lp = *l) != NULL; l = &lp->next) {
 		netlog(s->p->f, Logtcp,
-			   "tcpincoming s %I,0x%x/%I,0x%x d %I,0x%x/%I,0x%x v %d/%d", src,
+			   "tcpincoming s %I!%d/%I!%d d %I!%d/%I!%d v %d/%d\n", src,
 			   segp->source, lp->raddr, lp->rport, dst, segp->dest, lp->laddr,
 			   lp->lport, version, lp->version);
 
@@ -1618,7 +1618,7 @@ static struct conv *tcpincoming(struct conv *s, Tcp * segp, uint8_t * src,
 
 		/* we're assuming no data with the initial SYN */
 		if (segp->seq != lp->irs + 1 || segp->ack != lp->iss + 1) {
-			netlog(s->p->f, Logtcp, "tcpincoming s 0x%lx/0x%lx a 0x%lx 0x%lx",
+			netlog(s->p->f, Logtcp, "tcpincoming s 0x%lx/0x%lx a 0x%lx 0x%lx\n",
 				   segp->seq, lp->irs + 1, segp->ack, lp->iss + 1);
 			lp = NULL;
 		} else {
@@ -2014,7 +2014,7 @@ void tcpiput(struct Proto *tcp, struct Ipifc *unused, struct block *bp)
 	/* Look for a matching conversation */
 	s = iphtlook(&tpriv->ht, source, seg.source, dest, seg.dest);
 	if (s == NULL) {
-		netlog(f, Logtcp, "iphtlook failed");
+		netlog(f, Logtcp, "iphtlook failed\n");
 reset:
 		qunlock(&tcp->qlock);
 		sndrst(tcp, source, dest, length, &seg, version, "no conversation");
