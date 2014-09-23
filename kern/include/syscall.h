@@ -68,6 +68,7 @@ void __signal_syscall(struct syscall *sysc, struct proc *p);
 
 /* Tracing functions */
 void systrace_start(bool silent);
+int systrace_trace_pid(struct proc *p);
 void systrace_stop(void);
 int systrace_reg(bool all, struct proc *p);
 int systrace_dereg(bool all, struct proc *p);

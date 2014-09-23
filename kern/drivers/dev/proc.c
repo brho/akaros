@@ -1447,7 +1447,9 @@ static void procctlreq(struct proc *p, char *va, int n)
 		default:
 			error("nope\n");
 			break;
-
+		case CMtrace:
+			systrace_trace_pid(p);
+			break;
 		case CMclose:
 			procctlclosefiles(p, 0, atoi(cb->f[1]));
 			break;
