@@ -263,7 +263,8 @@ struct block *pullupblock(struct block *bp, int n)
 	if (bp->extra_len) {
 		if (n > bp->lim - bp->rp) {
 			/* would need to realloc a new block and copy everything over. */
-			panic("can't pullup, no place to put it\n");
+			panic("can't pullup %d bytes, no place to put it: bp->lim %p, bp->rp %p, bp->lim-bp->rp %d\n",
+					n, bp->lim, bp->rp, bp->lim-bp->rp);
 		}
 		len = n - BHLEN(bp);
 		if (len > bp->extra_len)
