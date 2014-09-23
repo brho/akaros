@@ -61,7 +61,7 @@ struct kprof kprof;
 char *outformat = "%016llx %29.29s %016llx\n";
 #define FORMATSIZE 64
 enum{
-	Kprofdirqid,
+	Kprofdirqid = 0,
 	Kprofdataqid,
 	Kprofctlqid,
 	Kprofoprofileqid,
@@ -93,7 +93,7 @@ kprofattach(char *spec)
 		if(kprof.buf == 0)
 			error(Enomem);
 	}
-	kproftab[1].length = kprof.nbuf * FORMATSIZE;
+	kproftab[Kprofdataqid].length = kprof.nbuf * FORMATSIZE;
 	kprof.buf_sz = n;
 	/* NO, I'm not sure how we should do this yet. */
 	int alloc_cpu_buffers(void);
@@ -173,13 +173,11 @@ kprofwalk(struct chan *c, struct chan *nc, char **name, int nname)
 static int
 kprofstat(struct chan *c, uint8_t *db, int n)
 {
-	/* barf. */
-	kproftab[3].length = oproflen();
-	/* twice */
+	kproftab[Kprofoprofileqid].length = oproflen();
 	if (kprof.systrace)
-		kproftab[4].length = qlen(kprof.systrace);
+		kproftab[Kptraceqid].length = qlen(kprof.systrace);
 	else
-		kproftab[4].length = 0;
+		kproftab[Kptraceqid].length = 0;
 
 	return devstat(c, db, n, kproftab, ARRAY_SIZE(kproftab), devgen);
 }
