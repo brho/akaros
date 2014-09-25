@@ -251,6 +251,7 @@ main(int argc, char *argv[])
 	argv0 = argv[0];
 	justsetname = 0;
 	setnetmtpt(mntpt, sizeof(mntpt), NULL);
+	register_printf_specifier('F', printf_fcall, printf_fcall_info);
 	ext[0] = 0;
 	argc--, argv++;
 	while (argc && **argv == '-'){
@@ -518,6 +519,8 @@ io(void)
 			error(1, 0, "%s: %r","mount read");
 		job = newjob();
 		if(convM2S(mdata, n, &job->request) != n){
+			fprintf(stderr, "convM2S went south: format error %ux %ux %ux %ux %ux",
+				mdata[0], mdata[1], mdata[2], mdata[3], mdata[4]);
 			error(1, 0, "format error %ux %ux %ux %ux %ux",
 				mdata[0], mdata[1], mdata[2], mdata[3], mdata[4]);
 			freejob(job);
