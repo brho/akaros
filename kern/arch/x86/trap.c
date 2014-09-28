@@ -502,7 +502,16 @@ void handle_irq(struct hw_trapframe *hw_tf)
 		       core_id());
 	/* TODO: RCU read lock */
 	irq_h = irq_handlers[hw_tf->tf_trapno];
-	if (!irq_h || irq_h->check_spurious(hw_tf->tf_trapno))
+	if (!irq_h) {
+		warn_once("Received IRQ %d, had no handler registered!",
+		          hw_tf->tf_trapno);
+		/* If we don't have an IRQ handler, we don't know how to EOI.  Odds are,
+		 * it's a LAPIC IRQ, such as I_TESTING */
+		if (!lapic_check_spurious(hw_tf->tf_trapno))
+			lapic_send_eoi(hw_tf->tf_trapno);
+		goto out_no_eoi;
+	}
+	if (irq_h->check_spurious(hw_tf->tf_trapno))
 		goto out_no_eoi;
 	/* Can now be interrupted/nested by higher priority IRQs, but not by our
 	 * current IRQ vector, til we EOI. */
