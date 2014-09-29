@@ -38,6 +38,15 @@ send_ipi(uint32_t who, uint8_t vector)
 }
 
 static __inline void
+send_broadcast_ipi(uint8_t vector)
+{
+#warning "broadcast ipi?"
+	/* num_cpus might not be visible here */
+	for (int i = 0; i < num_cpus; i++)
+		send_ipi(i, vector);
+}
+
+static __inline void
 clear_ipi()
 {
 	mtpcr(PCR_CLR_IPI, 0);
