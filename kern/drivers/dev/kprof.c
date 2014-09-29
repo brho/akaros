@@ -97,7 +97,6 @@ kprofattach(char *spec)
 	kprof.nbuf = (kprof.maxpc-kprof.minpc) >> LRES;
 	n = kprof.nbuf*CELLSIZE;
 	if(kprof.buf == 0) {
-		printk("Allocate %d bytes\n", n);
 		kprof.buf = kzmalloc(n, KMALLOC_WAIT);
 		if(kprof.buf == 0)
 			error(Enomem);
@@ -434,7 +433,6 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 		}else if(strncmp(a, "opstop", 6) == 0) {
 			oprofile_control_trace(0);
 		} else  {
-			printk("startclr|start|stop|clear|opstart|opstop");
 			error("startclr|start|stop|clear|opstart|opstop");
 		}
 		break;

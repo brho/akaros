@@ -99,7 +99,9 @@ bind -a \#l$NIC /net
 #get an instance of a network stack
 i=`cat /net/ipifc/clone`
 # bind the ether0 to it
-echo "bind ether /net/ether$NIC " > /net/ipifc/$i/ctl
+# the kernel sets errno, though it doesn't return -1 or anything.  but our bb
+# hacks doesn't know any better, and echo will think it was an error
+echo "bind ether /net/ether$NIC " > /net/ipifc/$i/ctl 2> /dev/null
 # ifconfig it
 echo "add $me $mask $remote" > /net/ipifc/$i/ctl
 echo "add 0 0 $route" > /net/iproute

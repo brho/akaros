@@ -145,7 +145,6 @@ int alloc_cpu_buffers(void)
 	/* we *really* don't want to block. Losing data is better. */
 	qnoblock(opq, 1);
 	if (!op_cpu_buffer) {
-		printk("ALlocate %d bytes\n", sizeof(*op_cpu_buffer) * num_cpus);
 		op_cpu_buffer =
 			kzmalloc(sizeof(*op_cpu_buffer) * num_cpus, KMALLOC_WAIT);
 		if (!op_cpu_buffer)
