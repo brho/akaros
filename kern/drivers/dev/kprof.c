@@ -51,6 +51,7 @@ struct kprof
 	size_t		buf_sz;
 	spinlock_t lock;
 	struct queue *systrace;
+	bool		mpstat_ipi;
 };
 struct kprof kprof;
 
@@ -67,7 +68,10 @@ enum{
 	Kprofoprofileqid,
 	Kptraceqid,
 	Kprintxqid,
+	Kmpstatqid,
+	Kmpstatrawqid,
 };
+
 struct dirtab kproftab[]={
 	{".",		{Kprofdirqid, 0, QTDIR},0,	DMDIR|0550},
 	{"kpdata",	{Kprofdataqid},		0,	0600},
@@ -75,7 +79,12 @@ struct dirtab kproftab[]={
 	{"kpoprofile",	{Kprofoprofileqid},	0,	0600},
 	{"kptrace",	{Kptraceqid},		0,	0600},
 	{"kprintx",	{Kprintxqid},		0,	0600},
+	{"mpstat",	{Kmpstatqid},		0,	0600},
+	{"mpstat-raw",	{Kmpstatrawqid},		0,	0600},
 };
+
+static size_t mpstatraw_len(void);
+static size_t mpstat_len(void);
 
 static struct chan*
 kprofattach(char *spec)
@@ -102,6 +111,7 @@ kprofattach(char *spec)
 	if (! kprof.systrace) {
 		printk("systrace allocate failed. No system call tracing\n");
 	}
+	kprof.mpstat_ipi = TRUE;
 	return devattach('K', spec);
 }
 
@@ -162,6 +172,8 @@ kprofinit(void)
 {
 	if(CELLSIZE != sizeof kprof.buf[0])
 		panic("kprof size");
+	kproftab[Kmpstatqid].length = mpstat_len();
+	kproftab[Kmpstatrawqid].length = mpstatraw_len();
 }
 
 static struct walkqid*
@@ -198,6 +210,88 @@ kprofopen(struct chan *c, int omode)
 static void
 kprofclose(struct chan*unused)
 {
+}
+
+static size_t mpstat_len(void)
+{
+	size_t each_row = 7 + NR_CPU_STATES * 26;
+	return each_row * (num_cpus + 1) + 1;
+}
+
+static long mpstat_read(void *va, long n, int64_t off)
+{
+	size_t bufsz = mpstat_len();
+	char *buf = kmalloc(bufsz, KMALLOC_WAIT);
+	int len = 0;
+	struct per_cpu_info *pcpui;
+	uint64_t cpu_total;
+	struct timespec ts;
+
+	/* the IPI interferes with other cores, might want to disable that. */
+	if (kprof.mpstat_ipi)
+		send_broadcast_ipi(I_POKE_CORE);
+
+	len += snprintf(buf + len, bufsz - len, "  CPU: ");
+	for (int j = 0; j < NR_CPU_STATES; j++)
+		len += snprintf(buf + len, bufsz - len, "%23s%s", cpu_state_names[j],
+		                j != NR_CPU_STATES - 1 ? "   " : "  \n");
+
+	for (int i = 0; i < num_cpus; i++) {
+		pcpui = &per_cpu_info[i];
+		cpu_total = 0;
+		len += snprintf(buf + len, bufsz - len, "%5d: ", i);
+		for (int j = 0; j < NR_CPU_STATES; j++)
+			cpu_total += pcpui->state_ticks[j];
+		cpu_total = MAX(cpu_total, 1);	/* for the divide later */
+		for (int j = 0; j < NR_CPU_STATES; j++) {
+			tsc2timespec(pcpui->state_ticks[j], &ts);
+			len += snprintf(buf + len, bufsz - len, "%10d.%06d (%3d%%)%s",
+			                ts.tv_sec, ts.tv_nsec / 1000,
+			                MIN((pcpui->state_ticks[j] * 100) / cpu_total, 100),
+			                j != NR_CPU_STATES - 1 ? ", " : " \n");
+		}
+	}
+	n = readstr(off, va, n, buf);
+	kfree(buf);
+	return n;
+}
+
+static size_t mpstatraw_len(void)
+{
+	size_t header_row = 27 + NR_CPU_STATES * 7 + 1;
+	size_t cpu_row = 7 + NR_CPU_STATES * 17;
+	return header_row + cpu_row * num_cpus + 1;
+}
+
+static long mpstatraw_read(void *va, long n, int64_t off)
+{
+	size_t bufsz = mpstatraw_len();
+	char *buf = kmalloc(bufsz, KMALLOC_WAIT);
+	int len = 0;
+	struct per_cpu_info *pcpui;
+
+	/* could spit it all out in binary, though then it'd be harder to process
+	 * the data across a mnt (if we export #K).  probably not a big deal. */
+
+	/* header line: version, num_cpus, tsc freq, state names */
+	len += snprintf(buf + len, bufsz - len, "v%03d %5d %16llu", 1, num_cpus,
+	                system_timing.tsc_freq);
+	for (int j = 0; j < NR_CPU_STATES; j++)
+		len += snprintf(buf + len, bufsz - len, " %6s", cpu_state_names[j]);
+	len += snprintf(buf + len, bufsz - len, "\n");
+
+	for (int i = 0; i < num_cpus; i++) {
+		pcpui = &per_cpu_info[i];
+		len += snprintf(buf + len, bufsz - len, "%5d: ", i);
+		for (int j = 0; j < NR_CPU_STATES; j++) {
+			len += snprintf(buf + len, bufsz - len, "%16llx%s",
+			                pcpui->state_ticks[j],
+			                j != NR_CPU_STATES - 1 ? " " : "\n");
+		}
+	}
+	n = readstr(off, va, n, buf);
+	kfree(buf);
+	return n;
 }
 
 static long
@@ -288,6 +382,12 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 	case Kprintxqid:
 		n = readstr(offset, va, n, printx_on ? "on" : "off");
 		break;
+	case Kmpstatqid:
+		n = mpstat_read(va, n, offset);
+		break;
+	case Kmpstatrawqid:
+		n = mpstatraw_read(va, n, offset);
+		break;
 	default:
 		n = 0;
 		break;
@@ -305,7 +405,16 @@ static void kprof_clear(struct kprof *kp)
 static long
 kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 {
+	ERRSTACK(1);
 	uintptr_t pc;
+	struct cmdbuf *cb;
+	cb = parsecmd(a, n);
+
+	if (waserror()) {
+		kfree(cb);
+		nexterror();
+	}
+
 	switch((int)(c->qid.path)){
 	case Kprofctlqid:
 		if(strncmp(a, "startclr", 8) == 0){
@@ -347,9 +456,35 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 		else
 			error("invalid option to Kprintx %s\n", a);
 		break;
+	case Kmpstatqid:
+	case Kmpstatrawqid:
+		if (cb->nf < 1)
+			error("mpstat bad option (reset|ipi|on|off)");
+		if (!strcmp(cb->f[0], "reset")) {
+			for (int i = 0; i < num_cpus; i++)
+				reset_cpu_state_ticks(i);
+		} else if (!strcmp(cb->f[0], "on")) {
+			/* TODO: enable the ticks */ ;
+		} else if (!strcmp(cb->f[0], "off")) {
+			/* TODO: disable the ticks */ ;
+		} else if (!strcmp(cb->f[0], "ipi")) {
+			if (cb->nf < 2)
+				error("need another arg: ipi [on|off]");
+			if (!strcmp(cb->f[1], "on"))
+				kprof.mpstat_ipi = TRUE;
+			else if (!strcmp(cb->f[1], "off"))
+				kprof.mpstat_ipi = FALSE;
+			else
+				error("ipi [on|off]");
+		} else {
+			error("mpstat bad option (reset|ipi|on|off)");
+		}
+		break;
 	default:
 		error(Ebadusefd);
 	}
+	kfree(cb);
+	poperror();
 	return n;
 }
 
