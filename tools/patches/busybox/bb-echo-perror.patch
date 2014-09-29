@@ -1,0 +1,36 @@
+--- a/coreutils/echo.c	2014-09-28 20:44:19.024670523 -0700
++++ b/coreutils/echo.c	2014-09-28 20:46:14.278666374 -0700
+@@ -31,6 +31,7 @@
+ 
+ int echo_main(int argc UNUSED_PARAM, char **argv)
+ {
++	int ret;
+ 	const char *arg;
+ #if !ENABLE_FEATURE_FANCY_ECHO
+ 	enum {
+@@ -101,7 +102,11 @@
+ 
+ 		if (!eflag) {
+ 			/* optimization for very common case */
+-			fputs(arg, stdout);
++			errno = 0;
++			fputs(arg, stdout);
++			if (errno)
++				perror("echo failed");
++
+ 		} else while ((c = *arg++)) {
+ 			if (c == eflag) {	/* Check for escape seq. */
+ 				if (*arg == 'c') {
+@@ -141,7 +146,11 @@
+ 		bb_putchar('\n');
+ 	}
+  ret:
+-	return fflush_all();
++	errno = 0;
++	ret = fflush_all();
++	if (errno)
++		perror("echo failed");
++	return ret;
+ }
+ 
+ /*-
