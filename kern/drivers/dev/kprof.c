@@ -197,7 +197,7 @@ static struct chan*
 kprofopen(struct chan *c, int omode)
 {
 	if(c->qid.type & QTDIR){
-		if(omode != OREAD)
+		if(openmode(omode) != OREAD)
 			error(Eperm);
 	}
 	c->mode = openmode(omode);
