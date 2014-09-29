@@ -446,11 +446,13 @@ void trap(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* Copy out the TF for now */
-	if (!in_kernel(hw_tf))
+	if (!in_kernel(hw_tf)) {
 		set_current_ctx_hw(pcpui, hw_tf);
-	else
+		/* ignoring state for nested kernel traps.  should be rare. */
+		__set_cpu_state(pcpui, CPU_STATE_KERNEL);
+	} else {
 		inc_ktrap_depth(pcpui);
-
+	}
 	printd("Incoming TRAP %d on core %d, TF at %p\n", hw_tf->tf_trapno,
 	       core_id(), hw_tf);
 	if ((hw_tf->tf_cs & ~3) != GD_UT && (hw_tf->tf_cs & ~3) != GD_KT) {
@@ -491,6 +493,8 @@ void handle_irq(struct hw_trapframe *hw_tf)
 	/* Copy out the TF for now */
 	if (!in_kernel(hw_tf))
 		set_current_ctx_hw(pcpui, hw_tf);
+	if (!in_irq_ctx(pcpui))
+		__set_cpu_state(pcpui, CPU_STATE_IRQ);
 	inc_irq_depth(pcpui);
 	/* Coupled with cpu_halt() and smp_idle() */
 	abort_halt(hw_tf);
@@ -531,6 +535,8 @@ void handle_irq(struct hw_trapframe *hw_tf)
 	/* Fall-through */
 out_no_eoi:
 	dec_irq_depth(pcpui);
+	if (!in_irq_ctx(pcpui))
+		__set_cpu_state(pcpui, CPU_STATE_KERNEL);
 	/* Return to the current process, which should be runnable.  If we're the
 	 * kernel, we should just return naturally.  Note that current and tf need
 	 * to still be okay (might not be after blocking) */
@@ -625,6 +631,7 @@ void sysenter_callwrapper(struct syscall *sysc, unsigned long count,
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	set_current_ctx_sw(pcpui, sw_tf);
+	__set_cpu_state(pcpui, CPU_STATE_KERNEL);
 	/* Once we've set_current_ctx, we can enable interrupts.  This used to be
 	 * mandatory (we had immediate KMSGs that would muck with cur_ctx).  Now it
 	 * should only help for sanity/debugging. */

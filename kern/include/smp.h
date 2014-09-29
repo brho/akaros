@@ -26,6 +26,20 @@
 typedef sharC_env_t;
 #endif
 
+#define CPU_STATE_IRQ			0
+#define CPU_STATE_KERNEL		1
+#define CPU_STATE_USER			2
+#define CPU_STATE_IDLE			3
+#define NR_CPU_STATES			4
+
+static char *cpu_state_names[NR_CPU_STATES] =
+{
+	"irq",
+	"kern",
+	"user",
+	"idle",
+};
+
 struct per_cpu_info {
 #ifdef CONFIG_X86_64
 	uintptr_t stacktop;			/* must be first */
@@ -55,7 +69,9 @@ struct per_cpu_info {
 	struct timer_chain tchain;	/* for the per-core alarm */
 	unsigned int lock_depth;
 	struct trace_ring traces;
-
+	int cpu_state;
+	uint64_t last_tick_cnt;
+	uint64_t state_ticks[NR_CPU_STATES];
 #ifdef __SHARC__
 	// held spin-locks. this will have to go elsewhere if multiple kernel
 	// threads can share a CPU.
@@ -95,6 +111,9 @@ void smp_boot(void);
 void smp_idle(void) __attribute__((noreturn));
 void smp_percpu_init(void); // this must be called by each core individually
 void __arch_pcpu_init(uint32_t coreid);	/* each arch has one of these */
+
+void __set_cpu_state(struct per_cpu_info *pcpui, int state);
+void reset_cpu_state_ticks(int coreid);
 
 /* SMP utility functions */
 int smp_call_function_self(isr_t handler, void *data,

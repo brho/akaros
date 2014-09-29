@@ -69,6 +69,7 @@ static void __attribute__((noinline, noreturn)) __smp_idle(void)
 		 * Important to do this, since we could have a RKM come in via an
 		 * interrupt right while PRKM is returning, and we wouldn't catch
 		 * it. */
+		__set_cpu_state(pcpui, CPU_STATE_IDLE);
 		cpu_halt();
 		/* interrupts are back on now (given our current semantics) */
 	}
@@ -117,8 +118,49 @@ void smp_percpu_init(void)
 	assert(trace_buf);
 	trace_ring_init(&pcpui->traces, trace_buf, PGSIZE,
 	                sizeof(struct pcpu_trace_event));
+	for (int i = 0; i < NR_CPU_STATES; i++)
+		pcpui->state_ticks[i] = 0;
+	pcpui->last_tick_cnt = read_tsc();
+	/* Core 0 is in the KERNEL state, called from smp_boot.  The other cores are
+	 * too, at least on x86, where we were called from asm (woken by POKE). */
+	pcpui->cpu_state = CPU_STATE_KERNEL;
 	/* Enable full lock debugging, after all pcpui work is done */
 	pcpui->__lock_checking_enabled = 1;
+}
+
+/* it's actually okay to set the state to the existing state.  originally, it
+ * was a bug in the state tracking, but it is possible, at least on x86, to have
+ * a halted core (state IDLE) get woken up by an IRQ that does not trigger the
+ * IRQ handling state.  for example, there is the I_POKE_CORE ipi.  smp_idle
+ * will just sleep again, and reset the state from IDLE to IDLE. */
+void __set_cpu_state(struct per_cpu_info *pcpui, int state)
+{
+	uint64_t now_ticks;
+	assert(!irq_is_enabled());
+	/* TODO: could put in an option to enable/disable state tracking. */
+	now_ticks = read_tsc();
+	pcpui->state_ticks[pcpui->cpu_state] += now_ticks - pcpui->last_tick_cnt;
+	/* TODO: if the state was user, we could account for the vcore's time,
+	 * similar to the total_ticks in struct vcore.  the difference is that the
+	 * total_ticks tracks the vcore's virtual time, while this tracks user time.
+	 * something like vcore->user_ticks. */
+	pcpui->cpu_state = state;
+	pcpui->last_tick_cnt = now_ticks;
+}
+
+void reset_cpu_state_ticks(int coreid)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
+	uint64_t now_ticks;
+	if (coreid >= num_cpus)
+		return;
+	/* need to update last_tick_cnt, so the current value doesn't get added in
+	 * next time we update */
+	now_ticks = read_tsc();
+	for (int i = 0; i < NR_CPU_STATES; i++) {
+		pcpui->state_ticks[i] = 0;
+		pcpui->last_tick_cnt = now_ticks;
+	}
 }
 
 /* PCPUI Trace Rings: */
