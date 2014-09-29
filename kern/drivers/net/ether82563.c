@@ -1058,6 +1058,12 @@ static void i82563tproc(void *v)
 			continue;
 		}
 		bp = qbread(edev->oq, 100000);
+		if (!bp) {
+			/* this only happens if the q is closed.  qbread can also throw,
+			 * btw, which we don't handle. */
+			warn("i350 tproc failed to get a block, aborting!");
+			return;
+		}
 		td = &ctlr->tdba[tdt];
 		td->addr[0] = paddr_low32(bp->rp);
 		td->addr[1] = paddr_high32(bp->rp);
