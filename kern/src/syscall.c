@@ -71,8 +71,9 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace)
 	tsc2timespec(trace->end_timestamp, &ts_end);
 
 	len = snprintf(trace->pretty_buf, SYSTR_PRETTY_BUF_SZ - len,
-	           "[%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%x, 0x%x, 0x%x, "
-	           "0x%x, 0x%x, 0x%x) ret: 0x%x proc: %d core: %d vcore: %d data: ",
+	           "[%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%llx, 0x%llx, "
+	           "0x%llx, 0x%llx, 0x%llx, 0x%llx) ret: 0x%llx proc: %d core: %d "
+	           "vcore: %d data: ",
 	           ts_start.tv_sec,
 	           ts_start.tv_nsec,
 	           ts_end.tv_sec,
@@ -114,8 +115,9 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 	coreid = core_id();
 	vcoreid = proc_get_vcoreid(p);
 	if (systrace_flags & SYSTRACE_LOUD) {
-		printk("ENTER [%16llu] Syscall %3d (%12s):(0x%x, 0x%x, 0x%x, 0x%x, "
-		       "0x%x, 0x%x) proc: %d core: %d vcore: %d\n", read_tsc(),
+		printk("ENTER [%16llu] Syscall %3d (%12s):(0x%llx, 0x%llx, 0x%llx, "
+		       "0x%llx, 0x%llx, 0x%llx) proc: %d core: %d vcore: %d\n",
+		       read_tsc(),
 		       sysc->num, syscall_table[sysc->num].name,
 			   sysc->arg0, sysc->arg1, sysc->arg2, sysc->arg3, sysc->arg4,
 			   sysc->arg5, p->pid, coreid, vcoreid);
@@ -161,6 +163,7 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 static void alloc_sysc_str(struct kthread *kth)
 {
 	kth->name = kmalloc(SYSCALL_STRLEN, KMALLOC_WAIT);
+	kth->name[0] = 0;
 }
 
 static void free_sysc_str(struct kthread *kth)
@@ -1218,6 +1221,7 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 	struct systrace_record *t = pcpui->cur_kthread->trace;
 	ssize_t ret;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
+	sysc_save_str("write on fd %d", fd);
 	/* VFS */
 	if (file) {
 		if (!file->f_op->write) {
