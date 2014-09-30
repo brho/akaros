@@ -71,6 +71,7 @@ static command_t (RO commands)[] = {
 	{ "msr", "read/write msr: msr msr [value]", mon_msr},
 	{ "db", "Misc debugging", mon_db},
 	{ "px", "Toggle printx", mon_px},
+	{ "kpfret", "Attempt to idle after a kernel fault", mon_kpfret},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -1174,4 +1175,59 @@ int mon_px(int argc, char **argv, struct hw_trapframe *hw_tf)
 	set_printx(2);
 	printk("Printxing is now %sabled\n", printx_on ? "en" : "dis");
 	return 0;
+}
+
+/* Super hack.  Given a kernel hw_tf, we hack the RIP to smp_idle, then return
+ * to it.  Any locks or other stuff being done is completely lost, so you could
+ * deadlock.  This gets out of the "we're totall screwed, but don't want to
+ * reboot right now", typically caused by screw-ups from the monitor. */
+int mon_kpfret(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	/* if monitor had a TF, try to use that */
+	if (!hw_tf) {
+		if (argc < 2) {
+			printk("Usage: kpfret HW_TF\n");
+			return 1;
+		}
+		/* the hw_tf passed in is the one we got from monitor, which is 0 from
+		 * panics. */
+		hw_tf = (struct hw_trapframe*)strtol(argv[1], 0, 16);
+	}
+
+	if (!in_kernel(hw_tf)) {
+		printk("hw_tf %p was not a kernel tf!\n", hw_tf);
+		return -1;
+	}
+
+#ifdef CONFIG_X86_64
+	hw_tf->tf_rip = (uintptr_t)smp_idle;
+	dec_ktrap_depth(pcpui);
+
+	asm volatile("mov %0, %%rsp;"
+	             "addq $0x10, %%rsp;"
+	             "popq %%rax;"
+	             "popq %%rbx;"
+	             "popq %%rcx;"
+	             "popq %%rdx;"
+	             "popq %%rbp;"
+	             "popq %%rsi;"
+	             "popq %%rdi;"
+	             "popq %%r8;"
+	             "popq %%r9;"
+	             "popq %%r10;"
+	             "popq %%r11;"
+	             "popq %%r12;"
+	             "popq %%r13;"
+	             "popq %%r14;"
+	             "popq %%r15;"
+	             "addq $0x10, %%rsp;"
+	             "iretq;"
+				 : : "r"(hw_tf));
+	assert(0);
+#else
+	printk("KPF return not supported\n");
+	return -1;
+#endif /* CONFIG_X86_64 */
 }
