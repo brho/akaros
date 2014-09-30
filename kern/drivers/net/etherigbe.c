@@ -467,7 +467,6 @@ enum {					/* Td status */
 enum {
 	Nrd		= 256,		/* multiple of 8 */
 	Ntd		= 64,		/* multiple of 8 */
-	Nrb		= 1024,		/* private receive buffers per Ctlr */
 	Rbsz		= 2048,
 };
 
@@ -486,7 +485,6 @@ struct ctlr {
 	void*	alloc;			/* receive/transmit descriptors */
 	int	nrd;
 	int	ntd;
-	int	nrb;			/* how many this Ctlr has in the pool */
 
 	int*	nic;
 	spinlock_t	imlock;
@@ -547,10 +545,6 @@ static inline void csr32w(struct ctlr *c, uintptr_t reg, uint32_t val)
 
 static struct ctlr* igbectlrhead;
 static struct ctlr* igbectlrtail;
-
-/* lock for igberpool (free receive Blocks) */
-static spinlock_t igberblock = SPINLOCK_INITIALIZER_IRQSAVE;
-static struct block* igberbpool;	/* receive Blocks for all igbe controllers */
 
 static char* statistics[Nstatistics] = {
 	"CRC Error",
@@ -807,35 +801,6 @@ igbemulticast(void* arg, uint8_t* addr, int add)
 	csr32w(ctlr, Mta+x*4, ctlr->mta[x]);
 }
 
-static struct block*
-igberballoc(void)
-{
-	struct block *bp;
-
-	ilock(&igberblock);
-	if((bp = igberbpool) != NULL){
-		igberbpool = bp->next;
-		bp->next = NULL;
-		/* _xinc(&bp->ref);	prevent bp from being freed */
-	}
-	iunlock(&igberblock);
-
-	return bp;
-}
-
-static void
-igberbfree(struct block* bp)
-{
-	bp->rp = bp->lim - Rbsz;
-	bp->wp = bp->rp;
-	bp->flag &= ~BCKSUM_FLAGS;
-
-	ilock(&igberblock);
-	bp->next = igberbpool;
-	igberbpool = bp;
-	iunlock(&igberblock);
-}
-
 static void
 igbeim(struct ctlr* ctlr, int im)
 {
@@ -1089,7 +1054,7 @@ igbereplenish(struct ctlr* ctlr)
 	while(NEXT_RING(rdt, ctlr->nrd) != ctlr->rdh){
 		rd = &ctlr->rdba[rdt];
 		if(ctlr->rb[rdt] == NULL){
-			bp = igberballoc();
+			bp = iallocb(Rbsz);
 			if(bp == NULL){
 				/* needs to be a safe print for interrupt level */
 				printk("#l%d: igbereplenish: no available buffers\n",
@@ -1264,14 +1229,7 @@ igbeattach(struct ether* edev)
 	ctlr->tb = NULL;
 	ctlr->rb = NULL;
 	ctlr->alloc = NULL;
-	ctlr->nrb = 0;
 	if(waserror()){
-		while(ctlr->nrb > 0){
-			bp = igberballoc();
-			bp->free = NULL;
-			freeb(bp);
-			ctlr->nrb--;
-		}
 		kfree(ctlr->tb);
 		ctlr->tb = NULL;
 		kfree(ctlr->rb);
@@ -1297,13 +1255,6 @@ igbeattach(struct ether* edev)
 	if (ctlr->rb == NULL || ctlr->tb == NULL) {
 		printd("igbe: can't allocate ctlr->rb or ctlr->tb\n");
 		error(Enomem);
-	}
-
-	for(ctlr->nrb = 0; ctlr->nrb < Nrb; ctlr->nrb++){
-		if((bp = allocb(Rbsz)) == NULL)
-			break;
-		bp->free = igberbfree;
-		freeb(bp);
 	}
 
 	/* the ktasks should free these names, if they ever exit */
