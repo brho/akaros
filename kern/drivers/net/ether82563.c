@@ -450,7 +450,6 @@ enum {
 enum {
 	Nrd = 256,					/* power of two */
 	Ntd = 256,	/* power of two */
-	Nrb = 3 * 512,	/* private receive buffers per Ctlr */
 	Rbalign = 16,	/* rx buffer alignment */
 	Npool = 10,
 };
@@ -530,7 +529,6 @@ struct ctlr {
 	struct ctlr *next;
 	int active;
 	int type;
-	int pool;
 	uint16_t eeprom[0x40];
 
 	qlock_t alock;				/* attach */
@@ -587,25 +585,6 @@ struct ctlr {
 	uint32_t pba;				/* packet buffer allocation */
 };
 
-typedef struct Rbpool Rbpool;
-struct Rbpool {
-	union {
-		struct {
-			spinlock_t lock;
-			struct block *b;
-			unsigned int nstarve;
-			unsigned int nwakey;
-			unsigned int starve;
-			struct rendez r;
-		};
-		uint8_t pad[64];		/* cacheline */
-	};
-
-	struct block *x;
-	unsigned int nfast;
-	unsigned int nslow;
-};
-
 static inline uint32_t csr32r(struct ctlr *c, uintptr_t reg)
 {
 	return read_mmreg32((uintptr_t)(c->nic + (reg / 4)));
@@ -617,7 +596,6 @@ static inline void csr32w(struct ctlr *c, uintptr_t reg, uint32_t val)
 }
 
 static struct ctlr *i82563ctlr;
-static Rbpool rbtab[Npool];
 
 static char *statistics[Nstatistics] = {
 	"CRC Error",
@@ -706,7 +684,6 @@ static long i82563ifstat(struct ether* edev, void* a, long n, uint32_t offset)
 	int i, r;
 	uint64_t tuvl, ruvl;
 	struct ctlr *ctlr;
-	Rbpool *b;
 
 	ctlr = edev->ctlr;
 	qlock(&ctlr->slock);
@@ -759,10 +736,6 @@ static long i82563ifstat(struct ether* edev, void* a, long n, uint32_t offset)
 	p = seprintf(p, e, "txdctl: %.8ux\n", csr32r(ctlr, Txdctl));
 	p = seprintf(p, e, "pba: %.8ux\n", ctlr->pba);
 
-	b = rbtab + ctlr->pool;
-	p = seprintf(p, e,
-				 "pool: fast %ud slow %ud nstarve %ud nwakey %ud starve %ud\n",
-				 b->nfast, b->nslow, b->nstarve, b->nwakey, b->starve);
 	p = seprintf(p, e, "speeds: 10:%ud 100:%ud 1000:%ud ?:%ud\n",
 				 ctlr->speeds[0], ctlr->speeds[1], ctlr->speeds[2],
 				 ctlr->speeds[3]);
@@ -821,143 +794,6 @@ static void i82563multicast(void *arg, uint8_t * addr, int on)
 //      ctlr->mta[x] &= ~(1<<bit);
 
 	csr32w(ctlr, Mta + x * 4, ctlr->mta[x]);
-}
-
-static int icansleep(void *v)
-{
-	Rbpool *p;
-	int r;
-
-	p = v;
-	spin_lock_irqsave(&p->lock);
-	r = p->starve == 0;
-	spin_unlock_irqsave(&p->lock);
-
-	return r;
-}
-
-static struct block *i82563rballoc(Rbpool * p)
-{
-	struct block *b;
-
-	for (;;) {
-		if ((b = p->x) != NULL) {
-			p->nfast++;
-			p->x = b->next;
-			b->next = NULL;
-			return b;
-		}
-
-		spin_lock_irqsave(&p->lock);
-		b = p->b;
-		p->b = NULL;
-		if (b == NULL) {
-			p->nstarve++;
-			spin_unlock_irqsave(&p->lock);
-			return NULL;
-		}
-		p->nslow++;
-		spin_unlock_irqsave(&p->lock);
-		p->x = b;
-	}
-}
-
-static void rbfree(struct block *b, int t)
-{
-	Rbpool *p;
-
-	p = rbtab + t;
-	b->rp = b->wp = (uint8_t *) ROUNDUP((uintptr_t) b->base, Rbalign);
-	b->flag &= ~BCKSUM_FLAGS;
-
-	spin_lock_irqsave(&p->lock);
-	b->next = p->b;
-	p->b = b;
-	if (p->starve) {
-		if (0)
-			printk("wakey %d; %d %d\n", t, p->nstarve, p->nwakey);
-		p->nwakey++;
-		p->starve = 0;
-		spin_unlock_irqsave(&p->lock);
-		rendez_wakeup(&p->r);
-	} else
-		spin_unlock_irqsave(&p->lock);
-}
-
-static void rbfree0(struct block *b)
-{
-	rbfree(b, 0);
-}
-
-static void rbfree1(struct block *b)
-{
-	rbfree(b, 1);
-}
-
-static void rbfree2(struct block *b)
-{
-	rbfree(b, 2);
-}
-
-static void rbfree3(struct block *b)
-{
-	rbfree(b, 3);
-}
-
-static void rbfree4(struct block *b)
-{
-	rbfree(b, 4);
-}
-
-static void rbfree5(struct block *b)
-{
-	rbfree(b, 5);
-}
-
-static void rbfree6(struct block *b)
-{
-	rbfree(b, 6);
-}
-
-static void rbfree7(struct block *b)
-{
-	rbfree(b, 7);
-}
-
-static void rbfree8(struct block *b)
-{
-	rbfree(b, 8);
-}
-
-static void rbfree9(struct block *b)
-{
-	rbfree(b, 9);
-}
-
-static Freefn freetab[Npool] = {
-	rbfree0,
-	rbfree1,
-	rbfree2,
-	rbfree3,
-	rbfree4,
-	rbfree5,
-	rbfree6,
-	rbfree7,
-	rbfree8,
-	rbfree9,
-};
-
-static int newpool(void)
-{
-	static int seq;
-
-	if (seq == ARRAY_SIZE(freetab))
-		return -1;
-	if (freetab[seq] == NULL) {
-		printd("82563: bad freetab\n");
-		return -1;
-	}
-	return seq++;
 }
 
 static void i82563im(struct ctlr *ctlr, int im)
@@ -1079,34 +915,22 @@ static int i82563replenish(struct ctlr *ctlr, int maysleep)
 {
 	unsigned int rdt, m;
 	struct block *bp;
-	Rbpool *p;
 	Rd *rd;
 	int retval = 0;
 
 	rdt = ctlr->rdt;
 	m = ctlr->nrd;
-	p = rbtab + ctlr->pool;
 	for (; NEXT_RING(rdt, m) != ctlr->rdh; rdt = NEXT_RING(rdt, m)) {
 		rd = &ctlr->rdba[rdt];
 		if (ctlr->rb[rdt] != NULL) {
 			printk("%s: tx overrun\n", cname(ctlr));
 			break;
 		}
-redux:
-		bp = i82563rballoc(p);
+		bp = iallocb(ctlr->rbsz + Rbalign);
 		if (bp == NULL) {
-			if (rdt - ctlr->rdh >= 16)
-				break;
-			printd("%s: pool %d: no rx buffers\n", cname(ctlr), ctlr->pool);
-			if (maysleep == 0) {
-				retval = -1;
-				goto out;
-			}
-			spin_lock_irqsave(&p->lock);
-			p->starve = 1;
-			spin_unlock_irqsave(&p->lock);
-			rendez_sleep(&p->r, icansleep, p);
-			goto redux;
+			/* could do a sleeping allocb btw, we're a ktask */
+			warn_once("OOM, trying to survive");
+			break;
 		}
 		ctlr->rb[rdt] = bp;
 		rd->addr[0] = paddr_low32(bp->rp);
@@ -1114,7 +938,6 @@ redux:
 		rd->status = 0;
 		ctlr->rdfree++;
 	}
-out:
 	if (ctlr->rdt != rdt) {
 		ctlr->rdt = rdt;
 		wmb_f();
@@ -1548,10 +1371,6 @@ static void i82563attach(struct ether *edev)
 	ctlr->tb = kzmalloc(ctlr->ntd * sizeof(struct block *), 0);
 
 	if (waserror()) {
-		while ((bp = i82563rballoc(rbtab + ctlr->pool))) {
-			bp->free = NULL;
-			freeb(bp);
-		}
 		kfree(ctlr->tb);
 		ctlr->tb = NULL;
 		kfree(ctlr->rb);
@@ -1560,12 +1379,6 @@ static void i82563attach(struct ether *edev)
 		ctlr->alloc = NULL;
 		qunlock(&ctlr->alock);
 		nexterror();
-	}
-
-	for (i = 0; i < Nrb; i++) {
-		bp = allocb(ctlr->rbsz + Rbalign);
-		bp->free = freetab[ctlr->pool];
-		freeb(bp);
 	}
 
 	/* the ktasks should free these names, if they ever exit */
@@ -2062,10 +1875,6 @@ static int setup(struct ctlr *ctlr)
 {
 	struct pci_device *p;
 
-	if ((ctlr->pool = newpool()) == -1) {
-		printd("%s: no pool\n", cname(ctlr));
-		return -1;
-	}
 	p = ctlr->pcidev;
 	ctlr->nic = (void*)vmap_pmem(ctlr->mmio_paddr, p->bar[0].mmio_sz);
 	if (ctlr->nic == NULL) {
@@ -2082,10 +1891,6 @@ static int setup(struct ctlr *ctlr)
 
 static void i82563_init(void)
 {
-	for (struct Rbpool *rb = rbtab; rb < rbtab + Npool; rb++) {
-		spinlock_init_irqsave(&rb->lock);
-		rendez_init(&rb->r);
-	}
 	i82563pci();
 }
 
