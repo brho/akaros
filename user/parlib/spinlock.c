@@ -29,28 +29,25 @@
 
 void spinlock_init(spinlock_t *lock)
 {
-  assert(lock);
-  lock->lock = 0;
+	lock->lock = 0;
 }
 
 int spinlock_trylock(spinlock_t *lock) 
 {
-  assert(lock);
-  return __sync_lock_test_and_set(&lock->lock, EBUSY);
+	if (lock->lock)
+		return EBUSY;
+	return __sync_lock_test_and_set(&lock->lock, EBUSY);
 }
 
-/* TODO: this will perform worse than test, then test and set */
 void spinlock_lock(spinlock_t *lock) 
 {
-  assert(lock);
-  while (spinlock_trylock(lock))
-    cpu_relax();
+	while (spinlock_trylock(lock))
+		cpu_relax();
 }
 
 void spinlock_unlock(spinlock_t *lock) 
 {
-  assert(lock);
-  __sync_lock_release(&lock->lock, 0);
+	__sync_lock_release(&lock->lock, 0);
 }
 
 /* Two different versions, with and without CAS.  Default is with CAS. */
@@ -68,7 +65,6 @@ void __spin_pdr_lock(struct spin_pdr_lock *pdr_lock)
 {
 	uint32_t vcoreid = vcore_id();
 	uint32_t lock_val;
-	assert(vcoreid != SPINPDR_UNLOCKED);
 	do {
 		while ((lock_val = pdr_lock->lock) != SPINPDR_UNLOCKED) {
 			ensure_vcore_runs(lock_val);
@@ -102,7 +98,6 @@ void __spin_pdr_lock(struct spin_pdr_lock *pdr_lock)
 {
 	uint32_t vcoreid = vcore_id();
 	uint32_t ensure_tgt;
-	assert(vcoreid != SPINPDR_VCOREID_UNKNOWN);
 	while (spinlock_trylock(&pdr_lock->spinlock)) {
 		ensure_tgt = pdr_lock->lockholder;
 		/* ensure will make sure *every* vcore runs if you pass it your self. */
