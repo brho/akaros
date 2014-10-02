@@ -110,6 +110,67 @@ static inline uint64_t get_tsc_overhead(void)
 	return 0;
 }
 
+static inline uint64_t tsc2sec(uint64_t tsc_time)
+{
+	return tsc_time / get_tsc_freq();
+}
+
+static inline uint64_t tsc2msec(uint64_t tsc_time)
+{
+	if (mult_will_overflow_u64(tsc_time, 1000))
+		return tsc2sec(tsc_time) * 1000;
+	else
+		return (tsc_time * 1000) / get_tsc_freq();
+}
+
+static inline uint64_t tsc2usec(uint64_t tsc_time)
+{
+	if (mult_will_overflow_u64(tsc_time, 1000000))
+		return tsc2msec(tsc_time) * 1000;
+	else
+		return (tsc_time * 1000000) / get_tsc_freq();
+}
+
+static inline uint64_t tsc2nsec(uint64_t tsc_time)
+{
+	if (mult_will_overflow_u64(tsc_time, 1000000000))
+		return tsc2usec(tsc_time) * 1000;
+	else
+		return (tsc_time * 1000000000) / get_tsc_freq();
+}
+
+static inline uint64_t sec2tsc(uint64_t sec)
+{
+	if (mult_will_overflow_u64(sec, get_tsc_freq()))
+		return (uint64_t)(-1);
+	else
+		return sec * get_tsc_freq();
+}
+
+static inline uint64_t msec2tsc(uint64_t msec)
+{
+	if (mult_will_overflow_u64(msec, get_tsc_freq()))
+		return sec2tsc(msec / 1000);
+	else
+		return (msec * get_tsc_freq()) / 1000;
+}
+
+static inline uint64_t usec2tsc(uint64_t usec)
+{
+	if (mult_will_overflow_u64(usec, get_tsc_freq()))
+		return msec2tsc(usec / 1000);
+	else
+		return (usec * get_tsc_freq()) / 1000000;
+}
+
+static inline uint64_t nsec2tsc(uint64_t nsec)
+{
+	if (mult_will_overflow_u64(nsec, get_tsc_freq()))
+		return usec2tsc(nsec / 1000);
+	else
+		return (nsec * get_tsc_freq()) / 1000000000;
+}
+
 #endif /* ! _ros_ */
 
 #ifdef __cplusplus

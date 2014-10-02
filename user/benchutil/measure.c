@@ -7,13 +7,14 @@
  * For now, this is built into parlib.  We can pull it out in the future.  Many
  * of the larger functions are in flux. */
 
-#include <ros/common.h>
-#include <tsc-compat.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/param.h>
+#ifdef __ros__
+#include <tsc-compat.h>
 #include <measure.h>
+#endif /* __ros__ */
 
 /* Basic stats computation and printing.
  *
@@ -69,7 +70,7 @@ void compute_stats(void **data, int nr_i, int nr_j, struct sample_stats *stats)
 		}
 	}
 	if (stats->total_samples < 2) {
-		printf("Not enough samples (%d) for avg and var\n",
+		printf("Not enough samples (%llu) for avg and var\n",
 		       stats->total_samples);
 		return;
 	}
@@ -192,7 +193,7 @@ void compute_stats(void **data, int nr_i, int nr_j, struct sample_stats *stats)
 	if (coef_var > HI_COEF_VAR)
 		printf("\tHigh coeff of var with serious outliers, adjusted bins\n");
 	/* numbers are overestimates by at most a lat bin */
-	printf("50/75/90/99: %d / %d / %d / %d (-<%d)\n", stats->lat_50,
+	printf("50/75/90/99: %d / %d / %d / %d (-<%ld)\n", stats->lat_50,
 	       stats->lat_75, stats->lat_90, stats->lat_99, lat_bin_sz);
 	printf("Min / Max  : %llu / %llu\n", stats->min_time, stats->max_time);
 	printf("\n");

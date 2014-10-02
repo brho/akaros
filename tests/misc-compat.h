@@ -22,6 +22,12 @@
 
 /* not quite, since akaros udelay is a busy wait */
 #define udelay(usec) usleep(usec)
+#define ndelay(nsec)                                                           \
+{                                                                              \
+	struct timespec ts = {0, 0};                                               \
+	ts.tv_nsec = (nsec);                                                       \
+	nanosleep(&ts, 0);                                                         \
+}
 
 /* not quite a normal relax, which also pauses, but this works for all archs */
 static inline void cpu_relax(void)
@@ -32,6 +38,33 @@ static inline void cpu_relax(void)
 #define pthread_id() (pthread_self())
 
 #define vcore_id() (-1)
+
+#define num_vcores() ((int)sysconf(_SC_NPROCESSORS_ONLN))
+
+#define ACCESS_ONCE(x) (*(volatile typeof(x) *)&(x))
+
+typedef void* atomic_t;
+
+static void uth_disable_notifs(void)
+{
+}
+
+static void uth_enable_notifs(void)
+{
+}
+
+#define printd(args...) {}
+
+#ifdef __x86_64__
+
+#define mb() ({ asm volatile("mfence" ::: "memory"); })
+#define cmb() ({ asm volatile("" ::: "memory"); })
+#define rmb() cmb()
+#define wmb() cmb()
+#define wrmb() mb()
+#define rwmb() cmb()
+
+#endif /* __x86_64__ */
 
 #endif /* __ros__ */
 #endif /* MISC_COMPAT_H */

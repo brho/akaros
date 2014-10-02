@@ -7,8 +7,6 @@
  * For now, this is built into parlib.  We can pull it out in the future.  Many
  * of the larger functions are in flux (interfaces, options, etc). */
 
-#include <ros/common.h>
-
 /* Basic stats computation and printing.
  *
  * All of these expect a 2D collection of samples, where the first array is an
