@@ -1,8 +1,14 @@
-/* Copyright (c) 2013 The Regents of the University of California
+/* Copyright (c) 2013, 2014 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
- * lock_test: microbenchmark to measure different styles of spinlocks. */
+ * lock_test: microbenchmark to measure different styles of spinlocks.
+ *
+ * to build on linux: (hacky)
+ * $ gcc -O2 -std=gnu99 -fno-stack-protector -g tests/lock_test.c -lpthread \
+ *    -lm -o linux_lock_test */
+
+#define _GNU_SOURCE /* pthread_yield */
 
 #include <stdio.h>
 #include <pthread.h>
@@ -14,11 +20,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
-#include <tsc-compat.h>
-#include <measure.h>
+#include <assert.h>
+#include <string.h>
 
 /* OS dependent #incs */
+#ifdef __ros__
+
 #include <parlib.h>
 #include <vcore.h>
 #include <timing.h>
@@ -26,6 +33,44 @@
 #include <mcs.h>
 #include <arch/arch.h>
 #include <event.h>
+
+#include <tsc-compat.h>
+#include <measure.h>
+
+#else
+
+#include "../user/parlib/include/tsc-compat.h"
+#include "misc-compat.h"
+#include "linux-lock-hacks.h" /* TODO: have a build system and lib / C file */
+
+#include "../user/benchutil/include/measure.h"
+#include "../user/benchutil/measure.c"
+
+static void os_prep_work(pthread_t *worker_threads, int nr_threads)
+{
+	if (nr_threads > num_vcores())
+		printf("WARNING: %d threads requested, but only %d cores available\n",
+		       nr_threads, num_vcores());
+}
+
+static void os_post_work(pthread_t *worker_threads, int nr_threads)
+{
+	if (nr_threads > num_vcores())
+		return;
+	/* assuming we're taking cores 0..nr_threads, and we never move. */
+	for (int i = 0; i < nr_threads; i++) {
+		cpu_set_t cpuset;
+		CPU_ZERO(&cpuset);
+		CPU_SET(i, &cpuset);
+		pthread_setaffinity_np(worker_threads[i], sizeof(cpu_set_t), &cpuset);
+	}
+}
+
+#define print_preempt_trace(args...) {}
+
+__thread int __vcore_context = 0;
+
+#endif
 
 /* TODO: There's lot of work to do still, both on this program and on locking
  * and vcore code.  For some of the issues, I'll leave in the discussion /
@@ -462,12 +507,6 @@ pthread_barrier_t start_test;
 /* Locking functions.  Define globals here, init them in main (if possible), and
  * use the lock_func() macro to make your thread func. */
 
-spinlock_t spin_lock = SPINLOCK_INITIALIZER;
-struct spin_pdr_lock spdr_lock = SPINPDR_INITIALIZER;
-struct mcs_lock mcs_lock = MCS_LOCK_INIT;
-struct mcs_pdr_lock mcspdr_lock;
-struct mcs_pdro_lock mcspdro_lock = MCSPDRO_LOCK_INIT;
-
 #define lock_func(lock_name, lock_cmd, unlock_cmd)                             \
 void *lock_name##_thread(void *arg)                                            \
 {                                                                              \
@@ -543,6 +582,16 @@ void *lock_name##_thread(void *arg)                                            \
 	return (void*)(long)i;                                                     \
 }
 
+#define fake_lock_func(lock_name, x1, x2)                                      \
+void *lock_name##_thread(void *arg)                                            \
+{                                                                              \
+	printf("Lock " #lock_name " not supported!\n");                            \
+	exit(-1);                                                                  \
+}
+
+spinlock_t spin_lock = SPINLOCK_INITIALIZER;
+struct mcs_lock mcs_lock = MCS_LOCK_INIT;
+
 /* Defines locking funcs like "mcs_thread" */
 lock_func(mcs,
           mcs_lock_lock(&mcs_lock, &mcs_qnode);,
@@ -550,6 +599,15 @@ lock_func(mcs,
 lock_func(mcscas,
           mcs_lock_lock(&mcs_lock, &mcs_qnode);,
           mcs_lock_unlock_cas(&mcs_lock, &mcs_qnode);)
+lock_func(spin,
+          spinlock_lock(&spin_lock);,
+          spinlock_unlock(&spin_lock);)
+
+#ifdef __ros__
+struct spin_pdr_lock spdr_lock = SPINPDR_INITIALIZER;
+struct mcs_pdr_lock mcspdr_lock;
+struct mcs_pdro_lock mcspdro_lock = MCSPDRO_LOCK_INIT;
+
 lock_func(mcspdr,
           mcs_pdr_lock(&mcspdr_lock);,
           mcs_pdr_unlock(&mcspdr_lock);)
@@ -559,12 +617,17 @@ lock_func(mcspdro,
 lock_func(__mcspdro,
           __mcs_pdro_lock(&mcspdro_lock, &pdro_qnode);,
           __mcs_pdro_unlock(&mcspdro_lock, &pdro_qnode);)
-lock_func(spin,
-          spinlock_lock(&spin_lock);,
-          spinlock_unlock(&spin_lock);)
 lock_func(spinpdr,
           spin_pdr_lock(&spdr_lock);,
           spin_pdr_unlock(&spdr_lock);)
+#else
+
+fake_lock_func(mcspdr, 0, 0);
+fake_lock_func(mcspdro, 0, 0);
+fake_lock_func(__mcspdro, 0, 0);
+fake_lock_func(spinpdr, 0, 0);
+
+#endif
 
 static int get_acq_latency(void **data, int i, int j, uint64_t *sample)
 {
@@ -601,6 +664,8 @@ static int get_acq_timestamp(void **data, int i, int j, uint64_t *sample)
 	*sample = times[i][j].acq;
 	return 0;
 }
+
+#ifdef __ros__
 
 /* Lousy event intercept.  build something similar in the event library? */
 #define MAX_NR_EVENT_TRACES 1000
@@ -656,7 +721,7 @@ static void print_preempt_trace(uint64_t starttsc, int nr_print_rows)
 }
 
 /* Make sure we have enough VCs for nr_threads, pref 1:1 at the start */
-static void os_prep_work(int nr_threads)
+static void os_prep_work(pthread_t *worker_threads, int nr_threads)
 {
 	if (nr_threads > max_vcores()) {
 		printf("Too many threads (%d) requested, can't get more than %d vc\n",
@@ -688,6 +753,12 @@ static void os_prep_work(int nr_threads)
 		       __procinfo.vcoremap[i].pcoreid);
 	}
 }
+
+static void os_post_work(pthread_t *worker_threads, int nr_threads)
+{
+}
+
+#endif
 
 /* Argument parsing */
 static error_t parse_opt (int key, char *arg, struct argp_state *state)
@@ -851,7 +922,7 @@ int main(int argc, char** argv)
 	}
 	printf("Record tracking takes %ld bytes of memory\n",
 	       nr_threads * nr_loops * sizeof(struct time_stamp));
-	os_prep_work(nr_threads);	/* ensure we have enough VCs */
+	os_prep_work(worker_threads, nr_threads);	/* ensure we have enough VCs */
 	/* Doing this in MCP ctx, so we might have been getting a few preempts
 	 * already.  Want to read start before the threads pass their barrier */
 	starttsc = read_tsc();
@@ -861,6 +932,7 @@ int main(int argc, char** argv)
 		                   (void*)i))
 			perror("pth_create failed");
 	}
+	os_post_work(worker_threads, nr_threads);
 	if (gettimeofday(&start_tv, 0))
 		perror("Start time error...");
 	for (int i = 0; i < nr_threads; i++) {
