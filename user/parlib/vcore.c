@@ -417,12 +417,12 @@ void ensure_vcore_runs(uint32_t vcoreid)
  * context.  sys_change_vcore will probably mess you up. */
 void cpu_relax_vc(uint32_t vcoreid)
 {
-	unsigned int spun = 0;
+	static __thread unsigned int __vc_relax_spun = 0;
 	assert(in_vcore_context());
-	if (spun++ >= NR_RELAX_SPINS) {
+	if (__vc_relax_spun++ >= NR_RELAX_SPINS) {
 		/* if vcoreid == vcore_id(), this might be expensive */
 		ensure_vcore_runs(vcoreid);
-		spun = 0;
+		__vc_relax_spun = 0;
 	}
 	cpu_relax();
 }
