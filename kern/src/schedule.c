@@ -935,3 +935,27 @@ void next_core(uint32_t pcoreid)
 	}
 	spin_unlock(&sched_lock);
 }
+
+void sort_idles(void)
+{
+	struct sched_pcore *spc_i, *spc_j, *temp;
+	struct sched_pcore_tailq sorter = TAILQ_HEAD_INITIALIZER(sorter);
+	bool added;
+	spin_lock(&sched_lock);
+	TAILQ_CONCAT(&sorter, &idlecores, alloc_next);
+	TAILQ_FOREACH_SAFE(spc_i, &sorter, alloc_next, temp) {
+		TAILQ_REMOVE(&sorter, spc_i, alloc_next);
+		added = FALSE;
+		/* don't need foreach_safe since we break after we muck with the list */
+		TAILQ_FOREACH(spc_j, &idlecores, alloc_next) {
+			if (spc_i < spc_j) {
+				TAILQ_INSERT_BEFORE(spc_j, spc_i, alloc_next);
+				added = TRUE;
+				break;
+			}
+		}
+		if (!added)
+			TAILQ_INSERT_TAIL(&idlecores, spc_i, alloc_next);
+	}
+	spin_unlock(&sched_lock);
+}

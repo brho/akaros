@@ -72,6 +72,7 @@ static command_t (RO commands)[] = {
 	{ "db", "Misc debugging", mon_db},
 	{ "px", "Toggle printx", mon_px},
 	{ "kpfret", "Attempt to idle after a kernel fault", mon_kpfret},
+	{ "ks", "Kernel scheduler hacks", mon_ks},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -413,23 +414,14 @@ int mon_procinfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 	int8_t irq_state = 0;
 	if (argc < 2) {
 		printk("Usage: procinfo OPTION\n");
-		printk("\tidlecores: show idle core map\n");
 		printk("\tall: show all active pids\n");
-		printk("\tsched: scheduler diagnostic report\n");
-		printk("\tresources: show resources wanted/granted for all procs\n");
 		printk("\tpid NUM: show a lot of info for proc NUM\n");
 		printk("\tunlock: unlock the lock for the ADDR (OMG!!!)\n");
 		printk("\tkill NUM: destroy proc NUM\n");
 		return 1;
 	}
-	if (!strcmp(argv[1], "idlecores")) {
-		print_idlecoremap();
-	} else if (!strcmp(argv[1], "all")) {
+	if (!strcmp(argv[1], "all")) {
 		print_allpids();
-	} else if (!strcmp(argv[1], "sched")) {
-		sched_diag();
-	} else if (!strcmp(argv[1], "resources")) {
-		print_all_resources();
 	} else if (!strcmp(argv[1], "pid")) {
 		if (argc != 3) {
 			printk("Give me a pid number.\n");
@@ -1230,4 +1222,37 @@ int mon_kpfret(int argc, char **argv, struct hw_trapframe *hw_tf)
 	printk("KPF return not supported\n");
 	return -1;
 #endif /* CONFIG_X86_64 */
+}
+
+int mon_ks(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+	if (argc < 2) {
+usage:
+		printk("Usage: ks OPTION\n");
+		printk("\tidles: show idle core map\n");
+		printk("\tdiag: scheduler diagnostic report\n");
+		printk("\tresources: show resources wanted/granted for all procs\n");
+		printk("\tsort: sorts the idlecoremap, 1..n\n");
+		printk("\tnc PCOREID: sets the next CG core allocated\n");
+		return 1;
+	}
+	if (!strcmp(argv[1], "idles")) {
+		print_idlecoremap();
+	} else if (!strcmp(argv[1], "diag")) {
+		sched_diag();
+	} else if (!strcmp(argv[1], "resources")) {
+		print_all_resources();
+	} else if (!strcmp(argv[1], "sort")) {
+		sort_idles();
+	} else if (!strcmp(argv[1], "nc")) {
+		if (argc != 3) {
+			printk("Need a pcore number.\n");
+			return 1;
+		}
+		next_core(strtol(argv[2], 0, 0));
+	} else {
+		printk("Bad option %s\n", argv[1]);
+		goto usage;
+	}
+	return 0;
 }

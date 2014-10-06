@@ -40,5 +40,6 @@ int mon_msr(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_db(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_px(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_kpfret(int argc, char **argv, struct hw_trapframe *hw_tf);
+int mon_ks(int argc, char **argv, struct hw_trapframe *hw_tf);
 
 #endif	// !ROS_KERN_MONITOR_H
