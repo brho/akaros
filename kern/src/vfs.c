@@ -2360,11 +2360,24 @@ static int grow_fd_set(struct files_struct *open_files) {
 }
 
 /* Free the vfs fd set if necessary */
-static void free_fd_set(struct files_struct *open_files) {
+static void free_fd_set(struct files_struct *open_files)
+{
+	void *free_me;
 	if (open_files->open_fds != (struct fd_set*)&open_files->open_fds_init) {
-		kfree(open_files->open_fds);
 		assert(open_files->fd != open_files->fd_array);
-		kfree(open_files->fd);
+		/* need to reset the pointers to the internal addrs, in case we take a
+		 * look while debugging.  0 them out, since they have old data.  our
+		 * current versions should all be closed. */
+		memset(&open_files->open_fds_init, 0, sizeof(struct small_fd_set));
+		memset(&open_files->fd_array, 0, sizeof(open_files->fd_array));
+
+		free_me = open_files->open_fds;
+		open_files->open_fds = (struct fd_set*)&open_files->open_fds_init;
+		kfree(free_me);
+
+		free_me = open_files->fd;
+		open_files->fd = open_files->fd_array;
+		kfree(free_me);
 	}
 }
 
