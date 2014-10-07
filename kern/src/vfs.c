@@ -2323,7 +2323,8 @@ struct file *get_file_from_fd(struct files_struct *open_files, int file_desc)
 }
 
 /* Grow the vfs fd set */
-static int grow_fd_set(struct files_struct *open_files) {
+static int grow_fd_set(struct files_struct *open_files)
+{
 	int n;
 	struct file_desc *nfd, *ofd;
 
@@ -2339,10 +2340,10 @@ static int grow_fd_set(struct files_struct *open_files) {
 	/* Grow the open_files->fd array in increments of NR_OPEN_FILES_DEFAULT */
 	n = open_files->max_files + NR_OPEN_FILES_DEFAULT;
 	if (n > NR_FILE_DESC_MAX)
-		n = NR_FILE_DESC_MAX;
+		return -EMFILE;
 	nfd = kzmalloc(n * sizeof(struct file_desc), 0);
 	if (nfd == NULL)
-		return -1;
+		return -ENOMEM;
 
 	/* Move the old array on top of the new one */
 	ofd = open_files->fd;
@@ -2429,6 +2430,7 @@ struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
 static int __get_fd(struct files_struct *open_files, int low_fd)
 {
 	int slot = -1;
+	int error;
 	if ((low_fd < 0) || (low_fd > NR_FILE_DESC_MAX))
 		return -EINVAL;
 	if (open_files->closed)
@@ -2449,10 +2451,8 @@ static int __get_fd(struct files_struct *open_files, int low_fd)
 			break;
 		}
 		if (slot == -1)	{
-			/* Expand the FD array and fd_set */
-			if (grow_fd_set(open_files) == -1)
-				return -ENOMEM;
-			/* loop after growing */
+			if ((error = grow_fd_set(open_files)))
+				return error;
 		}
 	}
 	return slot;
@@ -2470,6 +2470,7 @@ int get_fd(struct files_struct *open_files, int low_fd)
 
 static int __claim_fd(struct files_struct *open_files, int file_desc)
 {
+	int error;
 	if ((file_desc < 0) || (file_desc > NR_FILE_DESC_MAX))
 		return -EINVAL;
 	if (open_files->closed)
@@ -2477,7 +2478,8 @@ static int __claim_fd(struct files_struct *open_files, int file_desc)
 
 	/* Grow the open_files->fd_set until the file_desc can fit inside it */
 	while(file_desc >= open_files->max_files) {
-		grow_fd_set(open_files);
+		if ((error = grow_fd_set(open_files)))
+			return error;
 		cpu_relax();
 	}
 
