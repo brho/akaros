@@ -347,8 +347,8 @@ struct pipe_inode_info
 /* Per-process structs */
 #define NR_OPEN_FILES_DEFAULT 32
 #define NR_FILE_DESC_DEFAULT 32
-/* keep this in sync with glibc's fd_setsize */
-#define NR_FILE_DESC_MAX 1024
+/* this is not in sync with glibc, sysdeps/ros/bits/typesizes.h */
+#define NR_FILE_DESC_MAX (512 * 1024)
 
 /* Bitmask for file descriptors, big for when we exceed the initial small.  We
  * could just use the fd_array to check for openness instead of the bitmask,
