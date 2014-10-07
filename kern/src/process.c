@@ -2283,6 +2283,12 @@ void print_proc_info(pid_t pid)
 		       p->procdata->res_req[i].amt_wanted, p->procinfo->res_grant[i]);
 	printk("Open Files:\n");
 	struct files_struct *files = &p->open_files;
+	if (spin_locked(&files->lock)) {
+		spinlock_debug(&files->lock);
+		printk("FILE LOCK HELD, ABORTING\n");
+		proc_decref(p);
+		return;
+	}
 	spin_lock(&files->lock);
 	for (int i = 0; i < files->max_files; i++)
 		if (GET_BITMASK_BIT(files->open_fds->fds_bits, i) &&
