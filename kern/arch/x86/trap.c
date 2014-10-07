@@ -651,6 +651,7 @@ void sysenter_callwrapper(struct hw_trapframe *hw_tf)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	assert(!in_kernel(hw_tf));
 	set_current_ctx_hw(pcpui, hw_tf);
+	__set_cpu_state(pcpui, CPU_STATE_KERNEL);
 	/* Once we've set_current_ctx, we can enable interrupts.  This used to be
 	 * mandatory (we had immediate KMSGs that would muck with cur_ctx).  Now it
 	 * should only help for sanity/debugging. */
