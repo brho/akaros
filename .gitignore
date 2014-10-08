@@ -41,3 +41,4 @@ scripts/kconfig/zconf.lex.c
 kern/include/config/*
 kern/include/generated/*
 tags
+TAGS
