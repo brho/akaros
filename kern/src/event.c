@@ -156,14 +156,10 @@ static bool spam_list_member(struct vcore_tailq *list, struct proc *p,
 		 * something more customized for the lists. */
 		spam_vcore(p, vcoreid, ev_msg, ev_flags);
 		wrmb();	/* prev write (notif_pending) must come before following reads*/
-		/* if they are still alertable after we sent the msg, then they'll get
-		 * it before yielding (racing with userspace yield here).  This check is
-		 * not as critical as the next one, but will allow us to alert vcores
-		 * that happen to concurrently be moved from the active to the
-		 * bulk_preempt list. */
-		if (can_msg_vcore(vcoreid))
-			return TRUE;
-		/* As a backup, if they are still the first on the list, then they are
+		/* I used to check can_msg_vcore(vcoreid) here, but that would make
+		 * spamming list members unusable for MUST_RUN scenarios.
+		 *
+		 * Regardless, if they are still the first on the list, then they are
 		 * still going to get the message.  For the online list, proc_yield()
 		 * will return them to userspace (where they will get the message)
 		 * because __alert_vcore() set notif_pending.  For the BP list, they
@@ -213,10 +209,21 @@ static void spam_public_msg(struct proc *p, struct event_msg *ev_msg,
 							uint32_t vcoreid, int ev_flags)
 {
 	struct vcore *vc;
-	/* First, try posting to the desired vcore (so long as we don't have to send
-	 * it to a vcore that will run, like we do for preempt messages). */
-	if (!(ev_flags & EVENT_VCORE_MUST_RUN) &&
-	   (try_spam_vcore(p, vcoreid, ev_msg, ev_flags)))
+	if (ev_flags & EVENT_VCORE_MUST_RUN) {
+		/* Could check for waiting and skip these spams, which will fail.  Could
+		 * also skip trying for vcoreid, and just spam any old online VC. */
+		if (vcore_is_mapped(p, vcoreid)) {	/* check, signal, check again */
+			spam_vcore(p, vcoreid, ev_msg, ev_flags);
+			wrmb();	/* notif_pending write must come before following read */
+			if (vcore_is_mapped(p, vcoreid))
+				return;
+		}
+		if (spam_list_member(&p->online_vcs, p, ev_msg, ev_flags))
+			return;
+		goto ultimate_fallback;
+	}
+	/* First, try posting to the desired vcore */
+	if (try_spam_vcore(p, vcoreid, ev_msg, ev_flags))
 		return;
 	/* If the process is WAITING, let's just jump to the fallback */
 	if (p->state == PROC_WAITING)
