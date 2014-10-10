@@ -281,7 +281,7 @@ void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type, void *data)
 	handle_event_q(ev_q);
 }
 
-/* Attempts to handle events, if notif_pending.  The kernel always sets
+/* Handles VCPD events (public and private).  The kernel always sets
  * notif_pending after posting a message to either public or private mailbox.
  * When this returns, as far as we are concerned, notif_pending is FALSE.
  * However, a concurrent kernel writer could have reset it to true.  This is
@@ -293,12 +293,10 @@ int handle_events(uint32_t vcoreid)
 {
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	int retval = 0;
-	if (vcpd->notif_pending) {
-		vcpd->notif_pending = FALSE;
-		wrmb();	/* prevent future reads from happening before notif_p write */
-		retval += handle_mbox(&vcpd->ev_mbox_private);
-		retval += handle_mbox(&vcpd->ev_mbox_public);
-	}
+	vcpd->notif_pending = FALSE;
+	wrmb();	/* prevent future reads from happening before notif_p write */
+	retval += handle_mbox(&vcpd->ev_mbox_private);
+	retval += handle_mbox(&vcpd->ev_mbox_public);
 	return retval;
 }
 
