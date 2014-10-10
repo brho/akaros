@@ -1999,9 +1999,13 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 		 * __startcore, to make the caller look like it was preempted. */
 		caller_vcpd->vcore_ctx = *current_ctx;
 		save_vc_fp_state(caller_vcpd);
-		/* Mark our core as preempted (for userspace recovery). */
-		atomic_or(&caller_vcpd->flags, VC_PREEMPTED);
 	}
+	/* Mark our core as preempted (for userspace recovery).  Userspace checks
+	 * this in handle_indirs, and it needs to check the mbox regardless of
+	 * enable_my_notif.  This does mean cores that change-to with no intent to
+	 * return will be tracked as PREEMPTED until they start back up (maybe
+	 * forever). */
+	atomic_or(&caller_vcpd->flags, VC_PREEMPTED);
 	/* Either way, unmap and offline our current vcore */
 	/* Move the caller from online to inactive */
 	TAILQ_REMOVE(&p->online_vcs, caller_vc, list);
