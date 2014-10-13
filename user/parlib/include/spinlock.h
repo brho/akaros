@@ -63,6 +63,7 @@ struct spin_pdr_lock {
 # define SPINPDR_VCOREID_UNKNOWN ((uint32_t)-1)
 
 struct spin_pdr_lock {
+	/* consider putting these on separate cache lines, if we ever use them */
 	spinlock_t spinlock;
 	uint32_t lockholder;
 };

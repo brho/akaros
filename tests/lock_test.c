@@ -523,7 +523,7 @@ void *lock_name##_thread(void *arg)                                            \
 	int i;                                                                     \
 	/* guessing a unique vcoreid for vcoreid for the __mcspdr test.  if the
 	 * program gets preempted for that test, things may go nuts */             \
-	pdro_qnode.vcoreid = thread_id - 1;                                        \
+	pdro_qnode.vcoreid = thread_id + 1 % pargs.nr_threads;                     \
 	/* Wait til all threads are created.  Ideally, I'd like to busywait unless
 	 * absolutely critical to yield */                                         \
 	pthread_barrier_wait(&start_test);                                         \
@@ -969,6 +969,8 @@ int main(int argc, char** argv)
 	}
 	printf("Average number of loops done, per thread: %ld\n",
 	       total_loops / nr_threads);
+	for (int i = 0; i < nr_threads; i++)
+		printf("\tThread %d performed %lu loops\n", i, (long)loops_done[i]);
 
 	if (pargs.outfile_path) {
 		fprintf(outfile, "#");
@@ -979,6 +981,7 @@ int main(int argc, char** argv)
 		                 "tsc_overhead\n");
 		fprintf(outfile, "# acquire latency: acq - pre - tsc_overhead\n");
 		fprintf(outfile, "# hold time: un - acq - tsc_overhead\n");
+		fprintf(outfile, "# tsc_frequency %llu\n", get_tsc_freq());
 		fprintf(outfile, "# tsc_overhead is 0 on linux, hard code it with a "
 		                 "value from akaros\n");
 		for (int i = 0; i < nr_threads; i++) {
