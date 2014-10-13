@@ -12,6 +12,7 @@ struct schedule_ops default_2ls_ops = {0};
 struct schedule_ops *sched_ops __attribute__((weak)) = &default_2ls_ops;
 
 __thread struct uthread *current_uthread = 0;
+__thread bool __uth_disable_depth = 0;
 /* ev_q for all preempt messages (handled here to keep 2LSs from worrying
  * extensively about the details.  Will call out when necessary. */
 struct event_queue *preempt_ev_q;
@@ -705,6 +706,8 @@ bool __check_preempt_pending(uint32_t vcoreid)
 void uth_disable_notifs(void)
 {
 	if (!in_vcore_context() && in_multi_mode()) {
+		if (__uth_disable_depth++)
+			return;
 		if (current_uthread)
 			current_uthread->flags |= UTHREAD_DONT_MIGRATE;
 		cmb();	/* don't issue the flag write before the vcore_id() read */
@@ -716,6 +719,8 @@ void uth_disable_notifs(void)
 void uth_enable_notifs(void)
 {
 	if (!in_vcore_context() && in_multi_mode()) {
+		if (--__uth_disable_depth)
+			return;
 		if (current_uthread)
 			current_uthread->flags &= ~UTHREAD_DONT_MIGRATE;
 		cmb();	/* don't enable before ~DONT_MIGRATE */
