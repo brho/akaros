@@ -433,7 +433,7 @@ struct proc *proc_create(struct file *prog, char **argv, char **envp)
 	error_t r;
 	if ((r = proc_alloc(&p, current, 0 /* flags */)) < 0)
 		panic("proc_create: %e", r);	/* one of 3 quaint usages of %e */
-	proc_set_progname(p, file_name(prog));
+	proc_set_progname(p, argv[0]);
 	procinfo_pack_args(p->procinfo, argv, envp);
 	assert(load_elf(p, prog) == 0);
 	__proc_ready(p);

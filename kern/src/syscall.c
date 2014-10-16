@@ -499,7 +499,6 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 		set_errstr("Failed to alloc new proc");
 		goto mid_error;
 	}
-	proc_set_progname(new_p, file_name(program));
 	/* close the CLOEXEC ones, even though this isn't really an exec */
 	close_9ns_files(new_p, TRUE);
 	close_all_files(&new_p->open_files, TRUE);
@@ -518,6 +517,8 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 		set_errstr("Failed to load elf");
 		goto late_error;
 	}
+	/* progname is argv0, which accounts for symlinks */
+	proc_set_progname(p, p->procinfo->argbuf);
 	kref_put(&program->f_kref);
 	__proc_ready(new_p);
 	pid = new_p->pid;
@@ -747,7 +748,8 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	                           sizeof(pi->argbuf)))
 		goto mid_error;
 	/* This is the point of no return for the process. */
-	proc_set_progname(p, file_name(program));
+	/* progname is argv0, which accounts for symlinks */
+	proc_set_progname(p, p->procinfo->argbuf);
 	#ifdef CONFIG_X86
 	/* clear this, so the new program knows to get an LDT */
 	p->procdata->ldt = 0;
