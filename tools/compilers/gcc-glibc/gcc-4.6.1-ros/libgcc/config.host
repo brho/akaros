@@ -162,7 +162,7 @@ case ${host} in
 *-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-knetbsd*-gnu | *-*-gnu*)
   extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
   ;;
-*-*-ros*)
+*-*-akaros*)
   extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
   ;;
 *-*-netbsd*)
@@ -300,13 +300,13 @@ i[34567]86-*-openbsd2.*|i[34567]86-*openbsd3.[0123])
 	;;
 i[34567]86-*-openbsd*)
 	;;
-riscv*-*-ros*)
+riscv*-*-akaros*)
 	;;
-i[34567]86-*-ros* | i[34567]86-*-linux* | i[34567]86-*-kfreebsd*-gnu | i[34567]86-*-knetbsd*-gnu | i[34567]86-*-gnu*)
+i[34567]86-*-akaros* | i[34567]86-*-linux* | i[34567]86-*-kfreebsd*-gnu | i[34567]86-*-knetbsd*-gnu | i[34567]86-*-gnu*)
 	extra_parts="$extra_parts crtprec32.o crtprec64.o crtprec80.o crtfastmath.o"
 	tmake_file="${tmake_file} i386/t-crtpc i386/t-crtfm"
 	;;
-x86_64-*-ros* | x86_64-*-linux* | x86_64-*-kfreebsd*-gnu | x86_64-*-knetbsd*-gnu)
+x86_64-*-akaros* | x86_64-*-linux* | x86_64-*-kfreebsd*-gnu | x86_64-*-knetbsd*-gnu)
 	extra_parts="$extra_parts crtprec32.o crtprec64.o crtprec80.o crtfastmath.o"
 	tmake_file="${tmake_file} i386/t-crtpc i386/t-crtfm"
 	;;
@@ -626,7 +626,7 @@ i[34567]86-*-darwin* | x86_64-*-darwin* | \
   i[34567]86-*-kfreebsd*-gnu | x86_64-*-kfreebsd*-gnu | \
   i[34567]86-*-linux* | x86_64-*-linux* | \
   i[34567]86-*-gnu* | \
-  i[34567]86-*-ros* | \
+  i[34567]86-*-akaros* | \
   i[34567]86-*-solaris2* | \
   i[34567]86-*-cygwin* | i[34567]86-*-mingw* | x86_64-*-mingw* | \
   i[34567]86-*-freebsd* | x86_64-*-freebsd*)

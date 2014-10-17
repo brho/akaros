@@ -30,9 +30,12 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #define ROS_TARGET_OS_CPP_BUILTINS()				\
     do {							\
+	builtin_define ("__gnu_akaros__");			\
 	builtin_define ("__gnu_ros__");			\
+	builtin_define_std ("akaros");				\
 	builtin_define_std ("ros");				\
 	builtin_define_std ("unix");				\
+	builtin_assert ("system=akaros");			\
 	builtin_assert ("system=ros");			\
 	builtin_assert ("system=unix");				\
 	builtin_assert ("system=posix");			\

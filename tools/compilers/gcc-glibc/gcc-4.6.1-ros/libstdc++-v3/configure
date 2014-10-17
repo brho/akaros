@@ -57157,7 +57157,7 @@ $as_echo "$ac_ld_relro" >&6; }
     $as_echo "#define HAVE_SINHL 1" >>confdefs.h
 
     ;;
-  *-ros*)
+  *-akaros*)
 
   ac_test_CXXFLAGS="${CXXFLAGS+set}"
   ac_save_CXXFLAGS="$CXXFLAGS"

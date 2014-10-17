@@ -116,8 +116,8 @@ case "${target}" in
 	esac
 	;;
 
-  *-*-ros*)
-	config_path="ros posix"
+  *-*-akaros*)
+	config_path="akaros posix"
 	;;
 
   *-*-mingw32*)

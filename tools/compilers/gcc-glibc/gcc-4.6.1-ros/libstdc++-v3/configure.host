@@ -272,8 +272,8 @@ case "${host_os}" in
     os_include_dir="os/qnx/qnx6.1"
     c_model=c
     ;;
-  ros*)
-    os_include_dir="os/ros"
+  akaros*)
+    os_include_dir="os/akaros"
     ;;
   solaris2)
     # This too-vague configuration does not provide enough information

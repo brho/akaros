@@ -13227,7 +13227,7 @@ case ${host} in
   *-*-darwin*)   is_darwin=yes;  GOOS=darwin ;;
   *-*-freebsd*)  is_freebsd=yes; GOOS=freebsd ;;
   *-*-linux*)    is_linux=yes;   GOOS=linux ;;
-  *-*-ros*)      is_akaros=yes;  GOOS=akaros ;;
+  *-*-akaros*)   is_akaros=yes;  GOOS=akaros ;;
   *-*-rtems*)    is_rtems=yes;   GOOS=rtems ;;
   *-*-solaris2*) is_solaris=yes; GOOS=solaris ;;
 esac

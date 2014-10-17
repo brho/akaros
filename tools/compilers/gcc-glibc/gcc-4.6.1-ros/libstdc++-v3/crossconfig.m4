@@ -198,7 +198,7 @@ case "${host}" in
     AC_DEFINE(HAVE_SINHF)
     AC_DEFINE(HAVE_SINHL)
     ;;
-  *-ros*)
+  *-akaros*)
     GLIBCXX_CHECK_MATH_SUPPORT
     GLIBCXX_CHECK_STDLIB_SUPPORT
     ;;

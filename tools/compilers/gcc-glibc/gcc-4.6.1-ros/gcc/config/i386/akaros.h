@@ -24,7 +24,7 @@ along with GCC; see the file COPYING3.  If not see
 /* The .file command should always begin the output.  */
 #define TARGET_ASM_FILE_START_FILE_DIRECTIVE true
 
-#define TARGET_VERSION fprintf (stderr, " (i386 ROS/ELF)");
+#define TARGET_VERSION fprintf (stderr, " (i386 AKAROS/ELF)");
 
 /* The svr4 ABI for the i386 says that records and unions are returned
    in memory.  */

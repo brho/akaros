@@ -699,7 +699,7 @@ case ${target} in
   default_use_cxa_atexit=yes
   use_gcc_stdint=wrap
   ;;
-*-*-ros*)
+*-*-akaros*)
   tm_defines="$tm_defines DEFAULT_LIBC=LIBC_GLIBC"
   extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
   default_use_cxa_atexit=yes
@@ -1218,19 +1218,19 @@ x86_64-*-elf*)
 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h"
 	tmake_file="${tmake_file} i386/t-i386elf t-svr4"
 	;;
-i[34567]86-*-ros*)
-	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h glibc-stdint.h gnu-user.h ros.h i386/ros.h"
+i[34567]86-*-akaros*)
+	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h glibc-stdint.h gnu-user.h akaros.h i386/akaros.h"
 	tmake_file="${tmake_file} i386/t-crtstuff i386/t-crtpc i386/t-crtfm t-dfprules"
 	tmake_file="${tmake_file} t-slibgcc-elf-ver t-linux i386/t-fprules-softfp soft-fp/t-softfp i386/t-linux"
 	;;
-x86_64-*-ros*)
-	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h gnu-user.h ros.h glibc-stdint.h i386/x86-64.h i386/ros64.h"
+x86_64-*-akaros*)
+	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h gnu-user.h akaros.h glibc-stdint.h i386/x86-64.h i386/akaros64.h"
 	default_gnu_indirect_function=glibc-2011
 	tmake_file="${tmake_file} i386/t-linux64 i386/t-crtstuff i386/t-crtpc i386/t-crtfm t-dfprules"
 	tmake_file="${tmake_file} i386/t-fprules-softfp soft-fp/t-softfp i386/t-linux"
 	;;
-riscv*-*-ros*)
-	tm_file="dbxelf.h elfos.h gnu-user.h ros.h ${tm_file} riscv/ros.h riscv/ros64.h glibc-stdint.h"
+riscv*-*-akaros*)
+	tm_file="dbxelf.h elfos.h gnu-user.h akaros.h ${tm_file} riscv/akaros.h riscv/akaros64.h glibc-stdint.h"
 	tmake_file="${tmake_file} t-slibgcc-elf-ver t-linux"
 	;;
 i[34567]86-*-freebsd*)

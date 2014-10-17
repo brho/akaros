@@ -25,9 +25,9 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 <http://www.gnu.org/licenses/>.  */
 
 #if TARGET_64BIT_DEFAULT
-#define TARGET_VERSION fprintf (stderr, " (x86-64 ROS/ELF)");
+#define TARGET_VERSION fprintf (stderr, " (x86-64 AKAROS/ELF)");
 #else
-#define TARGET_VERSION fprintf (stderr, " (i386 ROS/ELF)");
+#define TARGET_VERSION fprintf (stderr, " (i386 AKAROS/ELF)");
 #endif
 
 #define TARGET_OS_CPP_BUILTINS()				\
@@ -66,7 +66,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
  * lib64 and set up a more unique name.  Check out
  * glibc-2.14.1-ros/sysdeps/unix/sysv/linux/configure and
  * glibc-2.14.1-ros/shlib-versions for some starters. */
-#define GLIBC_DYNAMIC_LINKER32 "/lib/ld-ros.so.2"
+#define GLIBC_DYNAMIC_LINKER32 "/lib/ld-akaros.so.2"
 #define GLIBC_DYNAMIC_LINKER64 "/lib/ld.so.1"
 
 #if TARGET_64BIT_DEFAULT
