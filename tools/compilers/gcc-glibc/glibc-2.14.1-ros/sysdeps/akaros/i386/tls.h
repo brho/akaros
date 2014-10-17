@@ -445,7 +445,7 @@ static inline void *__get_tls_desc(uint32_t vcoreid)
 /* passing in the vcoreid, since it'll be in TLS of the caller */
 static inline void __set_tls_desc(void *tls_desc, uint32_t vcoreid)
 {
-	/* Keep this technique in sync with sysdeps/ros/i386/tls.h */
+	/* Keep this technique in sync with sysdeps/akaros/i386/tls.h */
 	segdesc_t tmp = SEG(STA_W, (uint32_t)tls_desc, 0xffffffff, 3);
 	__procdata.ldt[vcoreid] = tmp;
 

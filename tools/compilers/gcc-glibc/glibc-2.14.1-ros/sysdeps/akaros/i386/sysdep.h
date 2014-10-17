@@ -18,8 +18,8 @@
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  */
 
-#ifndef _ROS_I386_SYSDEP_H
-#define _ROS_I386_SYSDEP_H
+#ifndef _AKAROS_I386_SYSDEP_H
+#define _AKAROS_I386_SYSDEP_H
 
 #undef __i686 /* Having __i686 defined messes with SETUP_PIC_REG et al. */
 
@@ -179,4 +179,4 @@ __i686.get_pc_thunk.reg:						      \
 
 #endif	/* __ASSEMBLER__ */
 
-#endif /* _ROS_I386_SYSDEP_H */
+#endif /* _AKAROS_I386_SYSDEP_H */

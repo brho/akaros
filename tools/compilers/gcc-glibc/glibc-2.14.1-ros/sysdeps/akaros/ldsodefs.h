@@ -1,5 +1,5 @@
-#ifndef _ROS_LDSODEFS_H
-#define _ROS_LDSODEFS_H
+#ifndef _AKAROS_LDSODEFS_H
+#define _AKAROS_LDSODEFS_H
 
 #define HAVE_AUX_VECTOR
 

@@ -7,7 +7,7 @@
 
 #include <limits.h>
 
-/* ROS note: similar to other sysdeps params.h, we pull what we need. */
+/* AKAROS note: similar to other sysdeps params.h, we pull what we need. */
 
 #define NBBY CHAR_BIT
 

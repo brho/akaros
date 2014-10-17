@@ -20,7 +20,7 @@
 #ifndef __NETPACKET_PACKET_H
 #define __NETPACKET_PACKET_H	1
 
-/* ROS note: this is the linux one, unaltered */
+/* AKAROS note: this is the linux one, unaltered */
 
 struct sockaddr_ll
   {

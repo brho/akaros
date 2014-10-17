@@ -23,7 +23,7 @@
 #include <string.h>
 #include <unistd.h>
 
-/* ROS: grossly limited version of abort, so we at least get a non-zero exit
+/* AKAROS: grossly limited version of abort, so we at least get a non-zero exit
  * code.  Previously, the program seemed to exit properly (unlike on Linux). */
 
 /* Try to get a machine dependent instruction which will make the

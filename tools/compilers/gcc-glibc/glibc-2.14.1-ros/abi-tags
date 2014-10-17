@@ -28,7 +28,7 @@
 
 .*-.*-syllable.*	5	2.0.0	# just an arbitrary value
 
-.*-.*-ros.*			6	1.0.0	# just an arbitrary value
+.*-.*-akaros.*		6	1.0.0	# just an arbitrary value
 
 # There is no catch-all default here because every supported OS that uses
 # ELF must have its own unique ABI tag.

@@ -20,7 +20,7 @@
 #ifndef _NET_IF_H
 #define _NET_IF_H	1
 
-/* ROS note: this is the GNU sysdep's net/if.h, unaltered */
+/* AKAROS note: this is the GNU sysdep's net/if.h, unaltered */
 
 #include <features.h>
 

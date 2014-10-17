@@ -29,7 +29,7 @@
 s390x-.*-linux.*        DEFAULT			GLIBC_2.2
 cris-.*-linux.*		DEFAULT			GLIBC_2.2
 x86_64-.*-linux.*       DEFAULT			GLIBC_2.2.5
-x86_64-.*-ros.*       DEFAULT			GLIBC_2.2.5
+x86_64-.*-akaros.*      DEFAULT			GLIBC_2.2.5
 powerpc64-.*-linux.*	DEFAULT			GLIBC_2.3
 .*-.*-gnu-gnu.*		DEFAULT			GLIBC_2.2.6
 
@@ -66,7 +66,7 @@ ia64-.*-linux.*		libc=6.1		GLIBC_2.2
 sh.*-.*-linux.*		libc=6			GLIBC_2.2
 sparc64.*-.*-linux.*	libc=6			GLIBC_2.2
 .*-.*-linux.*		libc=6
-.*-.*-ros.*		libc=6
+.*-.*-akaros.*		libc=6
 
 # libmachuser.so.1 corresponds to mach/*.defs as of Utah's UK22 release.
 .*-.*-gnu-gnu.*		libmachuser=1

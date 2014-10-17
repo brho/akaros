@@ -4306,11 +4306,11 @@ while m=`echo $tail | sed 's@^\(.*\)/\([^/]*\)$@& \1@'`; test -n "$m"; do
   tail="$2"
 done
 
-# For ros, we don't have a base OS, which messes things up. Change this for the
-# purpose of sysdeps detection.
+# For akaros, we don't have a base OS, which messes things up. Change this for
+# the purpose of sysdeps detection.
 test "x$base_os" != x || case "$os" in
-ros*)
-  base=/ros
+akaros*)
+  base=/akaros
   vendor=
   ostry=
   ;;

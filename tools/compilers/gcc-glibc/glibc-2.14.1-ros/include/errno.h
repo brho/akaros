@@ -23,8 +23,8 @@ extern int rtld_errno attribute_hidden;
 
 #  include <tls.h>
 
-/* ROS doesn't want the redef of errno */
-#  ifndef __ros__
+/* AKAROS doesn't want the redef of errno */
+#  ifndef __akaros__
 #   if USE___THREAD
 #    undef  errno
 #    ifndef NOT_IN_libc

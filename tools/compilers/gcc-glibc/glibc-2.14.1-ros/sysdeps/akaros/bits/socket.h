@@ -25,8 +25,8 @@
 # error "Never include <bits/socket.h> directly; use <sys/socket.h> instead."
 #endif
 
-/* ROS note: we're including this file from the linux port.  We changed the asm
- * include to ros/glibc-asm. */
+/* AKAROS note: we're including this file from the linux port.  We changed the
+ * asm include to ros/glibc-asm. */
 
 #define	__need_size_t
 #include <stddef.h>

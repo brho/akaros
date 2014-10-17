@@ -21,7 +21,7 @@ void *allocate_tls(void)
 		return 0;
 #ifdef TLS_TCB_AT_TP
 	/* Make sure the TLS is set up properly - its tcb pointer points to itself.
-	 * Keep this in sync with sysdeps/ros/XXX/tls.h.  For whatever reason,
+	 * Keep this in sync with sysdeps/akaros/XXX/tls.h.  For whatever reason,
 	 * dynamically linked programs do not need this to be redone, but statics
 	 * do. */
 	tcbhead_t *head = (tcbhead_t*)tcb;

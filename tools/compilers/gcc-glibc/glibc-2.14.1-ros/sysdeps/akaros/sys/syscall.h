@@ -4,8 +4,8 @@
  *
  * glibc syscall functions / tools for working with Akaros */
 
-#ifndef _GLIBC_ROS_SYSCALL_H
-#define _GLIBC_ROS_SYSCALL_H
+#ifndef _GLIBC_AKAROS_SYSCALL_H
+#define _GLIBC_AKAROS_SYSCALL_H
 
 #ifndef __ASSEMBLER__
 
@@ -61,4 +61,4 @@ void __ros_scp_syscall_blockon(struct syscall *sysc);
 
 #endif
 
-#endif /* _GLIBC_ROS_SYSCALL_H */
+#endif /* _GLIBC_AKAROS_SYSCALL_H */

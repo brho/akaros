@@ -17,9 +17,9 @@
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  */
 
-#ifndef _ROS_X86_64_SYSDEP_H
-#define _ROS_X86_64_SYSDEP_H 1
+#ifndef _AKAROS_X86_64_SYSDEP_H
+#define _AKAROS_X86_64_SYSDEP_H 1
 
 #include <sysdeps/unix/sysv/linux/x86_64/sysdep.h>
 
-#endif /* ros/x86_64/sysdep.h */
+#endif /* akaros/x86_64/sysdep.h */

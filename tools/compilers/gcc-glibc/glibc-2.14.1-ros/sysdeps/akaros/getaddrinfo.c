@@ -35,8 +35,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /* This software is Copyright 1996 by Craig Metz, All Rights Reserved.  */
 
-/* ROS note: this is the sysdeps/posix one (not to be confused with the posix/
- * stub one.  Needed for something or other in the network related subdirs */
+/* AKAROS note: this is the sysdeps/posix one (not to be confused with the
+ * posix/ stub one.  Needed for something or other in the network related
+ * subdirs */
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>

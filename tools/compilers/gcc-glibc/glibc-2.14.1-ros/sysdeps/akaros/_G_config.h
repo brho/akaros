@@ -4,7 +4,7 @@
 #ifndef _G_config_h
 #define _G_config_h 1
 
-/* this is the same as the GNU version, unless marked 'ROS' */
+/* this is the same as the GNU version, unless marked 'AKAROS' */
 
 /* Define types for libio in terms of the standard internal type names.  */
 
@@ -69,7 +69,7 @@ typedef unsigned int _G_uint32_t __attribute__ ((__mode__ (__SI__)));
 
 #define _G_HAVE_PRINTF_FP 1
 #define _G_HAVE_MMAP 1
-//#define _G_HAVE_MREMAP 1 /* ROS: turning off mremap */
+//#define _G_HAVE_MREMAP 1 /* AKAROS: turning off mremap */
 #define _G_HAVE_LONG_DOUBLE_IO 1
 #define _G_HAVE_IO_FILE_OPEN 1
 #define _G_HAVE_IO_GETLINE_INFO 1

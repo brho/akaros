@@ -17,7 +17,7 @@
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  */
 
-/* ROS note: this is the linux version, neutered/commented out.  Needed to let
+/* AKAROS note: this is the linux version, neutered/commented out.  Needed to let
  * getaddrinfo compile */
 #include <assert.h>
 #include <errno.h>

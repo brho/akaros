@@ -625,4 +625,4 @@ struct {								\
 		(head2)->tqh_last = &(head2)->tqh_first;		\
 } while (0)
 
-#endif /* ROS_KERN_SYS_QUEUE_H */
+#endif /* _SYS_QUEUE_H */

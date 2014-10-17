@@ -21,7 +21,7 @@
 # error "Never include <bits/sigaction.h> directly; use <signal.h> instead."
 #endif
 
-/* ROS: Copy of sysdeps/unix/sysv/linux/bits/sigaction.h */
+/* AKAROS: Copy of sysdeps/unix/sysv/linux/bits/sigaction.h */
 
 /* Structure describing the action to be taken when a signal arrives.  */
 struct sigaction

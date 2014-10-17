@@ -11,8 +11,8 @@
  * Copyright (c) 1989-2003 by Lucent Technologies, Bell Laboratories.
  */
 
-#ifndef _GLIBC_ROS_FCALL_H
-#define _GLIBC_ROS_FCALL_H
+#ifndef _GLIBC_AKAROS_FCALL_H
+#define _GLIBC_AKAROS_FCALL_H
 
 #include <ros/common.h>
 
@@ -170,4 +170,4 @@ unsigned int convM2D(uint8_t *, unsigned int, struct dir *, char *);
 unsigned int convD2M(struct dir *, uint8_t *, unsigned int);
 unsigned int sizeD2M(struct dir *);
 
-#endif /* _GLIBC_ROS_FCALL_H */
+#endif /* _GLIBC_AKAROS_FCALL_H */

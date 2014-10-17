@@ -20,8 +20,8 @@
 # error "Never use <bits/ioctls.h> directly; include <sys/ioctl.h> instead."
 #endif
 
-/* ROS note: we're including this file from the linux port.  We changed the asm
- * include to ros/glibc-asm. */
+/* AKAROS note: we're including this file from the linux port.  We changed the
+ * asm include to ros/glibc-asm. */
 
 /* Use the definitions from the kernel header files.  */
 #include <ros/glibc-asm/ioctls.h>
