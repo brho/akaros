@@ -6,7 +6,7 @@ diff -ruN mpc-1.0.2/config.sub mpc-1.0.2-ros/config.sub
  	      | -sym* | -kopensolaris* \
  	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
 -	      | -aos* | -aros* \
-+	      | -aos* | -aros* | -ros* \
++	      | -aos* | -aros* | -akaros* \
  	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
  	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
  	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \

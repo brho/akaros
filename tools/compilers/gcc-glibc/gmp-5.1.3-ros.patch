@@ -6,7 +6,7 @@ diff -ruN gmp-5.1.3/configfsf.sub gmp-5.1.3-ros/configfsf.sub
  	      | -sym* | -kopensolaris* \
  	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
 -	      | -aos* | -aros* \
-+	      | -aos* | -aros* | -ros* \
++	      | -aos* | -aros* | -akaros* \
  	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
  	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
  	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \

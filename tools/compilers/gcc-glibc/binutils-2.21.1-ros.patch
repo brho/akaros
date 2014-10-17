@@ -5,7 +5,7 @@ diff -ruN binutils-2.21.1/bfd/config.bfd binutils-2.21.1-ros/bfd/config.bfd
    i[3-7]86-*-aros*)
      targ_defvec=bfd_elf32_i386_vec
      ;;
-+  i[3-7]86-*-ros*)
++  i[3-7]86-*-akaros*)
 +    targ_defvec=bfd_elf32_i386_vec
 +    ;;
    i[3-7]86-*-chorus*)
@@ -15,7 +15,7 @@ diff -ruN binutils-2.21.1/bfd/config.bfd binutils-2.21.1-ros/bfd/config.bfd
      targ_archs="$targ_archs bfd_powerpc_arch bfd_rs6000_arch"
      want64=true
      ;;
-+  x86_64-*-ros*)
++  x86_64-*-akaros*)
 +    targ_defvec=bfd_elf64_x86_64_vec
 +    targ_selvecs="bfd_elf32_i386_vec bfd_elf64_l1om_vec"
 +    want64=true
@@ -31,7 +31,7 @@ diff -ruN binutils-2.21.1/config.sub binutils-2.21.1-ros/config.sub
  	      | -sym* | -kopensolaris* \
  	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
 -	      | -aos* | -aros* \
-+	      | -aos* | -aros* | -ros* \
++	      | -aos* | -aros* | -akaros* \
  	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
  	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
  	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
@@ -56,7 +56,7 @@ diff -ruN binutils-2.21.1/gas/configure.tgt binutils-2.21.1-ros/gas/configure.tg
    i386-*-beos*)				fmt=elf ;;
    i386-*-coff)				fmt=coff ;;
    i386-*-elf)				fmt=elf ;;
-+  i386-*-ros)				fmt=elf ;;
++  i386-*-akaros)			fmt=elf ;;
    i386-*-kaos*)				fmt=elf ;;
    i386-*-bsd*)				fmt=aout em=386bsd ;;
    i386-*-netbsd0.8)			fmt=aout em=386bsd ;;
@@ -67,8 +67,8 @@ diff -ruN binutils-2.21.1/ld/configure.tgt binutils-2.21.1-ros/ld/configure.tgt
  x86_64-*-elf*)		targ_emul=elf_x86_64
  			targ_extra_emuls="elf_i386 elf_l1om"
  			;;
-+i[3-7]86-*-ros)	targ_emul=elf_i386 ;;
-+x86_64-*-ros*)		targ_emul=elf_x86_64
++i[3-7]86-*-akaros)	targ_emul=elf_i386 ;;
++x86_64-*-akaros*)	targ_emul=elf_x86_64
 +			targ_extra_emuls="elf_i386 elf_l1om"
 +			;;
  i[3-7]86-*-kaos*)	targ_emul=elf_i386 ;;
