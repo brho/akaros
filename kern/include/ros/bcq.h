@@ -111,7 +111,10 @@ struct bcq_header {
 
 /* Functions */                                                                
 #define bcq_init(_bcq, _ele_type, _num_elems)                                  \
-	memset((_bcq), 0, sizeof( _ele_type ) * (_num_elems))                                 
+({                                                                             \
+	memset((_bcq), 0, sizeof(*(_bcq)));                                        \
+	assert((_num_elems) == ROUNDUPPWR2(_num_elems));                           \
+})
 
 /* Num empty buffer slots in the BCQ */
 #define BCQ_FREE_SLOTS(_p, _cp, _ne) ((_ne) - ((_p) - (_cp)))
@@ -149,6 +152,7 @@ struct bcq_header {
 	if (!__retval) {                                                           \
 		/* from here out, __prod is the local __prod that we won */            \
 		(_bcq)->wraps[__prod & ((_num_elems)-1)].elem = *(_elem);              \
+		wmb();                                                                 \
 		(_bcq)->wraps[__prod & ((_num_elems)-1)].rdy_for_cons = TRUE;          \
 	}                                                                          \
 	__retval;                                                                  \
@@ -189,5 +193,8 @@ struct bcq_header {
 /* Checks of a bcq is empty (meaning no work), instead of trying to dequeue */
 #define bcq_empty(_bcq)                                                        \
 	BCQ_NO_WORK((_bcq)->hdr.prod_idx, (_bcq)->hdr.cons_pvt_idx)
+
+#define bcq_nr_full(_bcq)                                                      \
+	((_bcq)->hdr.prod_idx - (_bcq)->hdr.cons_pub_idx)
 
 #endif /* ROS_INC_BCQ_H */

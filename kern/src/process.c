@@ -6,7 +6,6 @@
 #pragma nosharc
 #endif
 
-#include <ros/bcq.h>
 #include <event.h>
 #include <arch/arch.h>
 #include <bitmask.h>
