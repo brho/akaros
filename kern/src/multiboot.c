@@ -34,7 +34,7 @@ static void mboot_parsing(struct multiboot_info *mbi)
 
 bool mboot_has_mmaps(struct multiboot_info *mbi)
 {
-	return mbi->flags & MULTIBOOT_INFO_ELF_SHDR;
+	return mbi->flags & MULTIBOOT_INFO_MEM_MAP;
 }
 
 /* This only notices bios detectable memory - there's a lot more in the higher
