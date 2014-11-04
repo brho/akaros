@@ -817,19 +817,12 @@ void mountrpc(struct mnt *m, struct mntrpc *r)
 
 void mountio(struct mnt *m, struct mntrpc *r)
 {
-	ERRSTACK(1);
+	ERRSTACK(2);
 	int n;
 
 	while (waserror()) {
 		if (m->rip == current)
 			mntgate(m);
-		if (!strcmp(current_errstr(), "syscall aborted")) {
-			/* not sure what devmnt wants us to do here.  bail on aborted
-			 * syscall?  keep looping forever? (probably not) */
-			printk("[kernel] mountio had aborted syscall");
-			mntflushfree(m, r);
-			nexterror();
-		}
 		if (strcmp(current_errstr(), Eintr) != 0) {
 			mntflushfree(m, r);
 			nexterror();
@@ -862,7 +855,24 @@ void mountio(struct mnt *m, struct mntrpc *r)
 		if (m->rip == 0)
 			break;
 		spin_unlock(&m->lock);
+		/* Strcmp to check the error? Yep, it's a strcmp. Don't worry:
+		 * 1. it's after a LONG timeout
+		 * 2. it's after a packet IO, which is also long
+		 * 3. it will almost certainly not match after about 1 character
+		 * So, in theory, bad; in practice, not an issue.
+		 */
+		if (waserror()) {
+			if (strcmp(current_errstr(), "syscall aborted")) {
+				/* not a timeout? Well, then, things are bleak. */
+				nexterror();
+			}
+			printk("mountio had a timeout\n");
+			poperror();
+			continue;
+		}
+
 		rendez_sleep(&r->r, rpcattn, r);
+		poperror();
 		if (r->done) {
 			poperror();
 			mntflushfree(m, r);
