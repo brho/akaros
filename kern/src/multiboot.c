@@ -121,7 +121,7 @@ bool mboot_region_collides(struct multiboot_info *mbi, uintptr_t base,
 	                           (uintptr_t)mbi + sizeof(struct multiboot_info),
 	                           base, end))
 		return TRUE;
-	if ((mbi->flags & MULTIBOOT_INFO_ELF_SHDR)) {
+	if (mboot_has_mmaps(mbi)) {
 		if (regions_collide_unsafe((uintptr_t)mbi->mmap_addr + KERNBASE,
 		                           (uintptr_t)mbi->mmap_addr + KERNBASE
 		                                                     + mbi->mmap_length,
