@@ -817,13 +817,19 @@ void mountrpc(struct mnt *m, struct mntrpc *r)
 
 void mountio(struct mnt *m, struct mntrpc *r)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int n;
 
 	while (waserror()) {
 		if (m->rip == current)
 			mntgate(m);
-		if (strcmp(current_errstr(), Eintr) != 0) {
+		/* Syscall aborts are like Plan 9 Eintr.  For those, we need to change
+		 * the old request to a flsh (mntflushalloc) and try again.  We'll
+		 * always try to flush, and you can't get out until the flush either
+		 * succeeds or errors out with a non-abort/Eintr error. */
+		if (strcmp(current_errstr(), "syscall aborted") &&
+		    strcmp(current_errstr(), Eintr)) {
+			/* all other errors (not abort or Eintr) */
 			mntflushfree(m, r);
 			nexterror();
 		}
@@ -855,24 +861,7 @@ void mountio(struct mnt *m, struct mntrpc *r)
 		if (m->rip == 0)
 			break;
 		spin_unlock(&m->lock);
-		/* Strcmp to check the error? Yep, it's a strcmp. Don't worry:
-		 * 1. it's after a LONG timeout
-		 * 2. it's after a packet IO, which is also long
-		 * 3. it will almost certainly not match after about 1 character
-		 * So, in theory, bad; in practice, not an issue.
-		 */
-		if (waserror()) {
-			if (strcmp(current_errstr(), "syscall aborted")) {
-				/* not a timeout? Well, then, things are bleak. */
-				nexterror();
-			}
-			printk("mountio had a timeout\n");
-			poperror();
-			continue;
-		}
-
 		rendez_sleep(&r->r, rpcattn, r);
-		poperror();
 		if (r->done) {
 			poperror();
 			mntflushfree(m, r);
