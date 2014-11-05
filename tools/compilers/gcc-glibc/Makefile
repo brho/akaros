@@ -45,28 +45,28 @@ DESTDIR ?= /
 
 # Configuration parameters for make-riscv
 RISCV_ARCH := riscv
-RISCV_BINARY_PREFIX := $(RISCV_ARCH)-akaros-
+RISCV_BINARY_PREFIX := $(RISCV_ARCH)-ucb-akaros-
 RISCV_GLIBC_CONFIGURE_FLAGS := 
 RISCV_GCC_BUILD_FLAGS := 
 RISCV_CFLAGS :=
 
 # Configuration parameters for x86
 I686_ARCH := i686
-I686_BINARY_PREFIX := $(I686_ARCH)-akaros-
+I686_BINARY_PREFIX := $(I686_ARCH)-ucb-akaros-
 I686_GLIBC_CONFIGURE_FLAGS := 
 I686_GCC_BUILD_FLAGS := 
 I686_CFLAGS := -march=i486
 
 # Configuration parameters for x86_64
 X86_64_ARCH := x86_64
-X86_64_BINARY_PREFIX := $(X86_64_ARCH)-akaros-
+X86_64_BINARY_PREFIX := $(X86_64_ARCH)-ucb-akaros-
 X86_64_GLIBC_CONFIGURE_FLAGS := "--disable-multi-arch"
 X86_64_GCC_BUILD_FLAGS := CFLAGS="-fPIC"
 X86_64_CFLAGS :=
 
 # Configuration parameters for x86_64-native
 X86_64_NATIVE_ARCH := x86_64
-X86_64_NATIVE_BINARY_PREFIX := $(X86_64_NATIVE_ARCH)-native-akaros-
+X86_64_NATIVE_BINARY_PREFIX := 
 X86_64_NATIVE_GCC_BUILD_FLAGS := CFLAGS="-fPIC"
 X86_64_NATIVE_CFLAGS :=
 
@@ -108,7 +108,7 @@ x86_64: error
 endif
 endif
 ifneq (,$(filter x86_64-native,$(MAKECMDGOALS)))
-ifeq (,$(shell which x86_64-akaros-gcc))
+ifeq (,$(shell which x86_64-ucb-akaros-gcc))
 error: 
 	@echo "No x86_64 Akaros cross-compiler installed in path"
 	@echo "Make sure you have built and installed the x86_64 cross-compiler using 'make x86_64'
@@ -182,7 +182,7 @@ x86_64-native:
 	export ARCH=$(X86_64_NATIVE_ARCH);\
 	export BINARY_PREFIX=$(X86_64_NATIVE_BINARY_PREFIX);\
 	export GCC_BUILD_FLAGS=$(X86_64_NATIVE_GCC_BUILD_FLAGS);\
-	export CXXROOT=$(shell dirname $(shell which $(X86_64_NATIVE_ARCH)-akaros-gcc))/..; \
+	export CXXROOT=$(shell dirname $(shell which $(X86_64_NATIVE_ARCH)-ucb-akaros-gcc))/..; \
 	$(MAKE) make-native-all
 
 make-all: 
@@ -254,15 +254,15 @@ $(BINARY_PREFIX)binutils-builddir: binutils-$(BINUTILS_VERSION)
 native-binutils-configure:
 	cd $(BINARY_PREFIX)binutils-builddir; \
 	../binutils-$(BINUTILS_VERSION)/configure \
-	    --target=$(ARCH)-akaros \
-		--host=$(ARCH)-akaros \
+	    --target=$(ARCH)-ucb-akaros \
+		--host=$(ARCH)-ucb-akaros \
 	    --prefix=$(INSTDIR) \
 	    --disable-nls
 
 cross-binutils-configure:
 	cd $(BINARY_PREFIX)binutils-builddir; \
 	../binutils-$(BINUTILS_VERSION)/configure \
-	    --target=$(ARCH)-akaros \
+	    --target=$(ARCH)-ucb-akaros \
 	    --prefix=$(INSTDIR) \
 		--disable-werror \
 	    --disable-nls
@@ -314,7 +314,7 @@ $(BINARY_PREFIX)gcc-stage1-builddir: gcc-$(GCC_VERSION)
 	$(MAKE) $(BINARY_PREFIX)gcc-stage1-builddir
 	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
 	../gcc-$(GCC_VERSION)/configure \
-	        --target=$(ARCH)-akaros \
+	        --target=$(ARCH)-ucb-akaros \
 	        --program-prefix=$(BINARY_PREFIX) \
 	        --prefix=$(INSTDIR) \
 	        --disable-nls \
@@ -344,7 +344,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	$(MAKE) $(BINARY_PREFIX)gcc-stage2-builddir
 	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
 	../gcc-$(GCC_VERSION)/configure \
-	        --target=$(ARCH)-akaros \
+	        --target=$(ARCH)-ucb-akaros \
 	        --program-prefix=$(BINARY_PREFIX) \
 	        --prefix=$(INSTDIR) \
 	        --disable-nls \
@@ -368,29 +368,29 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 ######### AKAROS Headers ###########
 ####################################
 .$(BINARY_PREFIX)akaros-headers-install: $(ROSDIR)
-	rm -rf $(INSTDIR)/$(ARCH)-akaros/sys-include/*
-	mkdir -p $(INSTDIR)/$(ARCH)-akaros/sys-include
+	rm -rf $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/*
+	mkdir -p $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include
 	cp -r $(ROSDIR)/kern/include/ros \
-	   $(INSTDIR)/$(ARCH)-akaros/sys-include/
-	rm -f $(INSTDIR)/$(ARCH)-akaros/sys-include/ros/arch
-	mkdir $(INSTDIR)/$(ARCH)-akaros/sys-include/ros/arch
+	   $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/
+	rm -f $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/ros/arch
+	mkdir $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/ros/arch
 	cp -r $(ROSDIR)/kern/arch/$(ROS_ARCH_DIR)/ros/* \
-	   $(INSTDIR)/$(ARCH)-akaros/sys-include/ros/arch/
+	   $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/ros/arch/
 	cp -r $(ROSDIR)/user/parlib/include/* \
-	   $(INSTDIR)/$(ARCH)-akaros/sys-include/
+	   $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/
 	cp -r $(ROSDIR)/user/pthread/*.h \
-	   $(INSTDIR)/$(ARCH)-akaros/sys-include/
-	rm -rf $(INSTDIR)/$(ARCH)-akaros/sys-include/arch
-	ln -s $(ROS_ARCH_DIR) $(INSTDIR)/$(ARCH)-akaros/sys-include/arch 
+	   $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/
+	rm -rf $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/arch
+	ln -s $(ROS_ARCH_DIR) $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/arch 
 
 #################################
 ###### Dummy Libs Install #######
 #################################
 .$(BINARY_PREFIX)dummy-libs-install:
-	rm -rf $(INSTDIR)/$(ARCH)-akaros/lib/libparlib.a
-	rm -rf $(INSTDIR)/$(ARCH)-akaros/lib/libgcc_eh.a
-	$(ARCH)-akaros-ar cr $(INSTDIR)/$(ARCH)-akaros/lib/libparlib.a
-	$(ARCH)-akaros-ar cr $(INSTDIR)/$(ARCH)-akaros/lib/libgcc_eh.a
+	rm -rf $(INSTDIR)/$(ARCH)-ucb-akaros/lib/libparlib.a
+	rm -rf $(INSTDIR)/$(ARCH)-ucb-akaros/lib/libgcc_eh.a
+	$(ARCH)-ucb-akaros-ar cr $(INSTDIR)/$(ARCH)-ucb-akaros/lib/libparlib.a
+	$(ARCH)-ucb-akaros-ar cr $(INSTDIR)/$(ARCH)-ucb-akaros/lib/libgcc_eh.a
 
 #################################
 ######### Glibc Stage 1 #########
@@ -420,16 +420,17 @@ $(BINARY_PREFIX)glibc-stage1-builddir: glibc-$(GLIBC_VERSION)
 	$(MAKE) $(BINARY_PREFIX)glibc-stage1-builddir;
 	cd $(BINARY_PREFIX)glibc-stage1-builddir; \
 	../glibc-$(GLIBC_VERSION)/configure \
-	          --host=$(ARCH)-akaros \
-	          --prefix=$(INSTDIR)/$(ARCH)-akaros \
+	          --host=$(ARCH)-ucb-akaros \
+	          --prefix=$(INSTDIR)/$(ARCH)-ucb-akaros \
 	          --enable-hacker-mode \
 	          --disable-shared \
               --disable-add-ons \
 	          --disable-nls \
-	          --with-headers=$(INSTDIR)/$(ARCH)-akaros/sys-include \
+	          --with-headers=$(INSTDIR)/$(ARCH)-ucb-akaros/sys-include \
 	          --with-elf \
 	          --with-tls \
 	          --with-__thread \
+	          --without-nptl \
 	          $(GLIBC_CONFIGURE_FLAGS) \
 	          CFLAGS="$(ARCH_CFLAGS) -g -fpermissive -O2 -pipe";
 	touch $@
@@ -449,15 +450,16 @@ $(BINARY_PREFIX)glibc-stage2-builddir: glibc-$(GLIBC_VERSION)
 	$(MAKE) $(BINARY_PREFIX)glibc-stage2-builddir
 	cd $(BINARY_PREFIX)glibc-stage2-builddir; \
 	../glibc-$(GLIBC_VERSION)/configure \
-	          --host=$(ARCH)-akaros \
+	          --host=$(ARCH)-ucb-akaros \
 	          --enable-hacker-mode \
 	          --enable-shared \
 	          --disable-nls \
 	          --with-elf \
 	          --with-tls \
 	          --with-__thread \
-	          --with-headers=$(INSTDIR)/$(ARCH)-akaros/sys-include \
-	          --prefix=$(INSTDIR)/$(ARCH)-akaros \
+	          --without-nptl \
+	          --with-headers=$(INSTDIR)/$(ARCH)-ucb-akaros/sys-include \
+	          --prefix=$(INSTDIR)/$(ARCH)-ucb-akaros \
 	          libc_cv_forced_unwind=yes \
 	          libc_cv_c_cleanup=yes \
 	          $(GLIBC_CONFIGURE_FLAGS) \
@@ -489,14 +491,14 @@ $(BINARY_PREFIX)gcc-stage3-builddir: gcc-$(GCC_VERSION)
 
 native-gcc-stage3-prep:
 	mkdir -p $(INSTDIR)/usr; \
-	cp -R $(CXXROOT)/$(ARCH)-akaros/sys-include  $(INSTDIR)/usr/include; \
-	cp -R $(CXXROOT)/$(ARCH)-akaros/lib* $(INSTDIR)/usr; \
+	cp -R $(CXXROOT)/$(ARCH)-ucb-akaros/sys-include  $(INSTDIR)/usr/include; \
+	cp -R $(CXXROOT)/$(ARCH)-ucb-akaros/lib* $(INSTDIR)/usr; \
 
 native-gcc-stage3-configure: native-gcc-stage3-prep
 	cd $(BINARY_PREFIX)gcc-stage3-builddir; \
 	../gcc-$(GCC_VERSION)/configure \
-	    --target=$(ARCH)-akaros \
-	    --host=$(ARCH)-akaros \
+	    --target=$(ARCH)-ucb-akaros \
+	    --host=$(ARCH)-ucb-akaros \
 	    --with-gmp=$(CXXROOT) \
 	    --with-mpfr=$(CXXROOT) \
 	    --with-mpc=$(CXXROOT) \
@@ -514,7 +516,7 @@ native-gcc-stage3-configure: native-gcc-stage3-prep
 cross-gcc-stage3-configure:
 	cd $(BINARY_PREFIX)gcc-stage3-builddir; \
 	../gcc-$(GCC_VERSION)/configure \
-	    --target=$(ARCH)-akaros \
+	    --target=$(ARCH)-ucb-akaros \
 	    --program-prefix=$(BINARY_PREFIX) \
 	    --prefix=$(INSTDIR) \
 	    --disable-nls \
@@ -525,7 +527,7 @@ cross-gcc-stage3-configure:
 	    --enable-libgomp \
 	    --enable-languages=c,c++ \
 	    --with-__thread \
-	    --with-headers=$(INSTDIR)/$(ARCH)-akaros/include \
+	    --with-headers=$(INSTDIR)/$(ARCH)-ucb-akaros/include \
 	    $(GCC_BUILD_FLAGS);
 
 .$(BINARY_PREFIX)gcc-stage3-configure:
@@ -582,7 +584,7 @@ $(BINARY_PREFIX)mpc-builddir: mpc-$(MPC_VERSION)
 	../gmp-$(GMP_VERSION)/configure \
 	    --disable-static \
 	    --prefix=$(INSTDIR) \
-	    --host=$(ARCH)-akaros
+	    --host=$(ARCH)-ucb-akaros
 	touch $@
 
 .$(BINARY_PREFIX)mpfr-configure:
@@ -592,7 +594,7 @@ $(BINARY_PREFIX)mpc-builddir: mpc-$(MPC_VERSION)
 	    --disable-static \
 	    --prefix=$(INSTDIR) \
 	    --with-gmp=$(INSTDIR) \
-	    --host=$(ARCH)-akaros
+	    --host=$(ARCH)-ucb-akaros
 	touch $@
 
 .$(BINARY_PREFIX)mpc-configure:
@@ -603,7 +605,7 @@ $(BINARY_PREFIX)mpc-builddir: mpc-$(MPC_VERSION)
 	    --prefix=$(INSTDIR) \
 	    --with-gmp=$(INSTDIR) \
 	    --with-mpfr=$(INSTDIR) \
-	    --host=$(ARCH)-akaros
+	    --host=$(ARCH)-ucb-akaros
 	touch $@
 
 .$(BINARY_PREFIX)gmp-make: .$(BINARY_PREFIX)gmp-configure
