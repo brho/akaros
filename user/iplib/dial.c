@@ -16,6 +16,7 @@
 
 #define NAMELEN 28
 #define NETPATHLEN 40
+static int isdigit(int c) {return ((c >= '0' && c <= '9'));}
 
 static int
 call(char *clone, char *dest, int *cfdp, char *dir, char *local)
@@ -96,6 +97,19 @@ dial(char *dest, char *local, char *dir, int *cfdp)
 		strcpy(netdir, "/net");
  
 
+	// special case because we are so special.
+	// if the first char of the address is a digit,
+	// and the first char of the port is a digit,
+	// skip all this cs stuff.
+	p = strchr(net, '!');
+	if (p && isdigit(p[1])) {
+		char *q = strchr(&p[1], '!');
+		if (q && isdigit(q[1])) {
+			*p++ = 0;
+			sprintf(clone, "%s/%s/clone", netdir, net);
+			return call(clone, p, cfdp, dir, local);
+		}
+	}
 	/* call the connection server */
 	sprintf(csname, "%s/cs", netdir);
 	fd = open(csname, O_RDWR);
