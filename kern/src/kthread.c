@@ -279,6 +279,7 @@ void sem_down(struct semaphore *sem)
 	struct kthread *kthread, *new_kthread;
 	register uintptr_t new_stacktop;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	bool irqs_were_on = irq_is_enabled();
 
 	assert(can_block(pcpui));
 	/* Make sure we aren't holding any locks (only works if SPINLOCK_DEBUG) */
@@ -397,6 +398,14 @@ unwind_sleep_prep:
 #endif /* CONFIG_KTHREAD_POISON */
 block_return_path:
 	printd("[kernel] Returning from being 'blocked'! at %llu\n", read_tsc());
+	/* restart_kthread and pop_kernel_ctx do not reenable IRQs.  IRQs (and
+	 * flags) are in whatever state they were in by the restart code (disabled,
+	 * flags are garbage.  save_kernel_ctx expects the flags to be clobbered.
+	 * ("cc")).  We need to make sure irqs are on if they were on when we
+	 * started to block.  If they were already on and we short-circuited the
+	 * block, it's harmless to reenable them. */
+	if (irqs_were_on)
+		enable_irq();
 	return;
 }
 
