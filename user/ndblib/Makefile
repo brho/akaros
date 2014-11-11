@@ -11,7 +11,7 @@ INCDIR = $(SRCDIR)include
 
 INCS = -I. -I$(INCDIR)
 FINALLIB = $(OBJDIR)/lib$(LIBNAME).a
-FINALLIB-INSTALL = $(XCC_TARGET_ROOT)/lib/lib$(LIBNAME).a
+FINALLIB-INSTALL = $(XCC_TARGET_LIB)/lib$(LIBNAME).a
 
 uc = $(shell echo $(1) | tr a-z A-Z)
 
@@ -42,10 +42,10 @@ $(FINALLIB): $(OBJS)
 	$(Q)$(AR) rc $@ $(OBJS)
 
 $(FINALLIB-INSTALL): $(FINALLIB)
-	@cp $(FINALLIB) $(XCC_TARGET_ROOT)/lib/
-	@cp -R $(INCDIR)/* $(XCC_TARGET_ROOT)/sys-include/
-	@rm -rf $(XCC_TARGET_ROOT)/sys-include/libip  
-	@ln -fs . $(XCC_TARGET_ROOT)/sys-include/libip  
+	@cp $(FINALLIB) $@
+	@cp -R $(INCDIR)/* $(XCC_TARGET_INCLUDE)/
+	@rm -rf $(XCC_TARGET_INCLUDE)/libip
+	@ln -fs . $(XCC_TARGET_INCLUDE)/libip
 
 install: $(FINALLIB-INSTALL)
 	@echo > /dev/null

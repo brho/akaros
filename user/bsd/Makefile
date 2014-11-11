@@ -11,7 +11,7 @@ INCDIR = .
 
 INCS = -I. -I$(INCDIR)
 FINALLIB = $(OBJDIR)/lib$(LIBNAME).a
-FINALLIB-INSTALL = $(XCC_TARGET_ROOT)/lib/lib$(LIBNAME).a
+FINALLIB-INSTALL = $(XCC_TARGET_LIB)/lib$(LIBNAME).a
 
 uc = $(shell echo $(1) | tr a-z A-Z)
 
@@ -42,7 +42,7 @@ $(FINALLIB): $(OBJS)
 	$(Q)$(AR) rc $@ $(OBJS)
 
 $(FINALLIB-INSTALL): $(FINALLIB)
-	@cp $(FINALLIB) $(XCC_TARGET_ROOT)/lib/
+	@cp $(FINALLIB) $@
 
 install: $(FINALLIB-INSTALL)
 	@echo > /dev/null

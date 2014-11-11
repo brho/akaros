@@ -310,8 +310,16 @@ KERNEL_LD ?= kernel.ld
 gcc-lib := $(shell $(CC) -print-libgcc-file-name 2>/dev/null)
 NOSTDINC_FLAGS += -nostdinc -isystem \
                   $(shell $(CC) -print-file-name=include 2>/dev/null)
-XCC_TARGET_ROOT := $(dir $(shell which $(CC) 2> /dev/null))../$(patsubst %-,%,\
-                                                               $(CROSS_COMPILE))
+XCC_TARGET_ROOT := $(shell $(CC) --print-sysroot 2> /dev/null)
+ifeq ($(XCC_TARGET_ROOT),)
+	XCC_TARGET_ROOT := $(dir $(shell which $(CC) 2> \
+                           /dev/null))../$(patsubst %-,%, $(CROSS_COMPILE))
+	XCC_TARGET_LIB := $(XCC_TARGET_ROOT)/lib/
+	XCC_TARGET_INCLUDE := $(XCC_TARGET_ROOT)/sys-include/
+else
+	XCC_TARGET_LIB := $(XCC_TARGET_ROOT)/usr/lib/
+	XCC_TARGET_INCLUDE := $(XCC_TARGET_ROOT)/usr/include/
+endif
 
 CFLAGS_KERNEL += -O2 -pipe -MD
 CFLAGS_KERNEL += -std=gnu99 -fgnu89-inline
@@ -343,7 +351,7 @@ KBUILD_CHECKSRC := 0
 export AKAROSINCLUDE CROSS_COMPILE
 export CC CPP AS AR LD OBJCOPY OBJDUMP NM STRIP
 export CFLAGS_KERNEL AFLAGS_KERNEL
-export NOSTDINC_FLAGS XCC_TARGET_ROOT
+export NOSTDINC_FLAGS XCC_TARGET_ROOT XCC_TARGET_LIB XCC_TARGET_INCLUDE
 export KBUILD_BUILTIN KBUILD_CHECKSRC
 
 CFLAGS_USER += -O2 -std=gnu99 -fno-stack-protector -fgnu89-inline
