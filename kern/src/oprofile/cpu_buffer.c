@@ -34,7 +34,7 @@ static struct queue *opq;
 /* this is run from core 0 for all cpu buffers. */
 static void wq_sync_buffer(void);
 unsigned long oprofile_cpu_buffer_size = 65536;
-unsigned long oprofile_backtrace_depth = 8;
+unsigned long oprofile_backtrace_depth = 16;
 
 #define DEFAULT_TIMER_EXPIRE (HZ / 10)
 static int work_enabled;
