@@ -78,6 +78,11 @@ static inline uint64_t read_tscp(void)
 	return (uint64_t)edx << 32 | eax;
 }
 
+static inline void mwait(void *eax)
+{
+  asm volatile("movq %0, %%rax; xorq %%rcx, %%rcx; xorq %%rdx, %%rdx; monitor; mwait\n":
+	       : "rax"(eax));
+}
 /* Check out k/a/x86/rdtsc_test.c for more info */
 static inline uint64_t read_tsc_serialized(void)
 {

@@ -1,5 +1,6 @@
-#sudo qemu-system-x86_64 -s -cpu core2duo,+hypervisor,+vmx -smp 3 -m 2048 -nographic  \
-sudo qemu-system-x86_64 -s -cpu phenom -smp 8 -m 2048 -nographic  \
+#sudo qemu-system-x86_64 -s -cpu core2duo,+hypervisor,+vmx -smp 3 -m 2048  -nographic  \
+#sudo qemu-system-x86_64 -s -cpu phenom -smp 8 -m 2048 \
+sudo qemu-system-x86_64 -s -cpu phenom -smp 8 -m 2048 -nographic \
 --machine pc \
 -net nic,model=rtl8139 \
 -net user,hostfwd=tcp::5555-:23 \

@@ -238,6 +238,12 @@ config VM
 	help
 		VM support -- not working! Based on KVM.
 
+config NIX
+	bool "NIX support"
+	default n
+	help
+		NIX support -- Sort of working. You can start kernels that don't enable interrupts.
+
 
 menu "Misc/Old Options"
 
