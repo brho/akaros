@@ -1,6 +1,9 @@
 ARCH ?= none # catch bugs
 CFLAGS_USER += -static -fomit-frame-pointer -g
 LIBNAME = pthread
+# DEPLIBS passed in from the top-level Makefile
+DEPLIBS := $(DEPLIBS)
+DEPLIBAS = $(patsubst %, $(XCC_TARGET_ROOT)/lib/lib%.a, $(DEPLIBS))
 
 SRCDIR := 
 OBJDIR := $(SRCDIR)obj
@@ -24,7 +27,7 @@ $(OBJDIR)/%.o: $(SRCDIR)%.c $(HEADERS)
 	@mkdir -p $(@D)
 	$(Q)$(CC) $(CFLAGS_USER) $(INCS) -o $@ -c $<
 
-$(FINALLIB): $(OBJS)
+$(FINALLIB): $(OBJS) $(DEPLIBAS)
 	@echo + ar [$(LIBUCNAME)] $@
 	@mkdir -p $(@D)
 	$(Q)$(AR) rc $@ $(OBJS)

@@ -551,7 +551,7 @@ PHONY += install-libs $(user-dirs)
 install-libs: $(user-dirs) symlinks cc-exists
 
 $(user-dirs):
-	@cd user/$@ && $(MAKE) && $(MAKE) install
+	@cd user/$@ && $(MAKE) DEPLIBS="$^" && $(MAKE) install
 
 
 PHONY += userclean $(clean-user-dirs)
