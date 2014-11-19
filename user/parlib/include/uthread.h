@@ -26,6 +26,7 @@ struct uthread {
 	void *tls_desc;
 	int flags;
 	int state;
+	int notif_disabled_depth;
 	struct syscall *sysc;	/* syscall we're blocking on, if any */
 	struct syscall local_sysc;	/* for when we don't want to use the stack */
 	void (*yield_func)(struct uthread*, void*);

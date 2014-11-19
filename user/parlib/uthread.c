@@ -12,7 +12,6 @@ struct schedule_ops default_2ls_ops = {0};
 struct schedule_ops *sched_ops __attribute__((weak)) = &default_2ls_ops;
 
 __thread struct uthread *current_uthread = 0;
-__thread bool __uth_disable_depth = 0;
 /* ev_q for all preempt messages (handled here to keep 2LSs from worrying
  * extensively about the details.  Will call out when necessary. */
 struct event_queue *preempt_ev_q;
@@ -56,6 +55,7 @@ static void uthread_manage_thread0(struct uthread *uthread)
 	uthread->flags &= ~(UTHREAD_SAVED | UTHREAD_FPSAVED);
 	/* need to track thread0 for TLS deallocation */
 	uthread->flags |= UTHREAD_IS_THREAD0;
+	uthread->notif_disabled_depth = 0;
 	/* Change temporarily to vcore0s tls region so we can save the newly created
 	 * tcb into its current_uthread variable and then restore it.  One minor
 	 * issue is that vcore0's transition-TLS isn't TLS_INITed yet.  Until it is
@@ -227,6 +227,7 @@ void uthread_init(struct uthread *new_thread, struct uth_thread_attr *attr)
 	 * There is no FP context to be restored yet.  We only save the FPU when we
 	 * were interrupted off a core. */
 	new_thread->flags |= UTHREAD_SAVED;
+	new_thread->notif_disabled_depth = 0;
 	if (attr && attr->want_tls) {
 		/* Get a TLS.  If we already have one, reallocate/refresh it */
 		if (new_thread->tls_desc)
@@ -280,6 +281,10 @@ __uthread_yield(void)
 	 * uthread_destroy() */
 	uthread->flags &= ~UTHREAD_DONT_MIGRATE;
 	uthread->state = UT_NOT_RUNNING;
+	/* Any locks that were held before the yield must be unlocked in the
+	 * callback.  That callback won't get a chance to update our disabled depth.
+	 * This sets us up for the next time the uthread runs. */
+	uthread->notif_disabled_depth = 0;
 	/* Do whatever the yielder wanted us to do */
 	assert(uthread->yield_func);
 	uthread->yield_func(uthread, uthread->yield_arg);
@@ -429,8 +434,12 @@ void __ros_mcp_syscall_blockon(struct syscall *sysc)
 	assert(current_uthread);
 	if (current_uthread->flags & UTHREAD_DONT_MIGRATE) {
 		assert(!notif_is_enabled(vcore_id()));	/* catch bugs */
+		/* if we had a notif_disabled_depth, then we should also have
+		 * DONT_MIGRATE set */
 		__ros_syscall_spinon(sysc);
+		return;
 	}
+	assert(!current_uthread->notif_disabled_depth);
 	/* double check before doing all this crap */
 	if (atomic_read(&sysc->flags) & (SC_DONE | SC_PROGRESS))
 		return;
@@ -706,23 +715,26 @@ bool __check_preempt_pending(uint32_t vcoreid)
 void uth_disable_notifs(void)
 {
 	if (!in_vcore_context() && in_multi_mode()) {
-		if (__uth_disable_depth++)
-			return;
-		if (current_uthread)
-			current_uthread->flags |= UTHREAD_DONT_MIGRATE;
+		assert(current_uthread);
+		if (current_uthread->notif_disabled_depth++)
+			goto out;
+		current_uthread->flags |= UTHREAD_DONT_MIGRATE;
 		cmb();	/* don't issue the flag write before the vcore_id() read */
 		disable_notifs(vcore_id());
 	}
+out:
+	if (in_multi_mode())
+		assert(!notif_is_enabled(vcore_id()));
 }
 
 /* Helper: Pair this with uth_disable_notifs(). */
 void uth_enable_notifs(void)
 {
 	if (!in_vcore_context() && in_multi_mode()) {
-		if (--__uth_disable_depth)
+		assert(current_uthread);
+		if (--current_uthread->notif_disabled_depth)
 			return;
-		if (current_uthread)
-			current_uthread->flags &= ~UTHREAD_DONT_MIGRATE;
+		current_uthread->flags &= ~UTHREAD_DONT_MIGRATE;
 		cmb();	/* don't enable before ~DONT_MIGRATE */
 		enable_notifs(vcore_id());
 	}
