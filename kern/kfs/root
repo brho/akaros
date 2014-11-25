@@ -22,9 +22,9 @@ fi
 if [ "x$REMOTE" = "xc75" ]
 then
 	srv 'tcp!169.229.49.175!1025' $SRVNAME
-elif [ "x$REMOTE" = "xs141" ]
+elif [ "x$REMOTE" = "xa8" ]
 then
-	srv 'tcp!169.229.48.51!1025' $SRVNAME
+	srv 'tcp!169.229.49.48!1025' $SRVNAME
 elif [ "x$REMOTE" = "xqemu" ]
 then
 	srv 'tcp!10.0.2.2!1025' $SRVNAME
