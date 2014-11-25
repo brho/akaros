@@ -2,6 +2,9 @@ ARCH ?= none # catch bugs
 CFLAGS_USER += -g
 CXXFLAGS_USER += -g
 LIBNAME = utest 
+# DEPLIBS passed in from the top-level Makefile
+DEPLIBS := $(DEPLIBS)
+DEPLIBAS = $(patsubst %, $(XCC_TARGET_ROOT)/lib/lib%.a, $(DEPLIBS))
 
 SRCDIR := 
 OBJDIR := $(SRCDIR)obj
@@ -22,7 +25,7 @@ EXECS_CPP = $(patsubst $(SRCDIR)%.cc, $(OBJDIR)/%, $(SRCS_CPP))
 EXECS = $(EXECS_C) $(EXECS_CPP)
 
 STATIC := $(findstring static,$(CFLAGS_USER))
-$(OBJDIR)/%: %.c $(HEADERS)
+$(OBJDIR)/%: %.c $(HEADERS) $(DEPLIBAS)
 	@echo + cc [$(LIBUCNAME)] $<
 	@mkdir -p $(@D)
 	$(Q)$(CC) $(CFLAGS_USER) -I$(INCDIR) -o $@ $< $(LDLIBS)
@@ -33,7 +36,7 @@ $(OBJDIR)/%: %.c $(HEADERS)
 
 # Note that we don't disassemble CPPs by default, even if they aren't static.
 # The files are pretty large regardless (9MB for a simple stream test asm).
-$(OBJDIR)/%: %.cc $(HEADERS)
+$(OBJDIR)/%: %.cc $(HEADERS) $(DEPLIBAS)
 	@echo + cc [$(LIBUCNAME)] $<
 	@mkdir -p $(@D)
 	$(Q)$(CPP) $(CXXFLAGS_USER) -I$(INCDIR) -o $@ $< $(LDLIBS)

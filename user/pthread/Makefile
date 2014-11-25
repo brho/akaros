@@ -11,6 +11,7 @@ INCDIR = $(SRCDIR).
 
 INCS = -I$(INCDIR) 
 FINALLIB = $(OBJDIR)/lib$(LIBNAME).a
+FINALLIB-INSTALL = $(XCC_TARGET_ROOT)/lib/lib$(LIBNAME).a
 
 uc = $(shell echo $(1) | tr a-z A-Z)
 
@@ -22,19 +23,22 @@ OBJS    := $(patsubst %.c, $(OBJDIR)/%.o, $(CFILES))
 all: $(FINALLIB)
 	@:
 
-$(OBJDIR)/%.o: $(SRCDIR)%.c $(HEADERS)
+$(OBJDIR)/%.o: $(SRCDIR)%.c $(HEADERS) $(DEPLIBAS)
 	@echo + cc [$(LIBUCNAME)] $<
 	@mkdir -p $(@D)
 	$(Q)$(CC) $(CFLAGS_USER) $(INCS) -o $@ -c $<
 
-$(FINALLIB): $(OBJS) $(DEPLIBAS)
+$(FINALLIB): $(OBJS)
 	@echo + ar [$(LIBUCNAME)] $@
 	@mkdir -p $(@D)
 	$(Q)$(AR) rc $@ $(OBJS)
 
-install: $(FINALLIB)
-	@cp $(FINALLIB) $(XCC_TARGET_ROOT)/lib/
+$(FINALLIB-INSTALL): $(FINALLIB)
+	@cp $(FINALLIB) $@
 	@cp -R $(INCDIR)/*.h $(XCC_TARGET_ROOT)/sys-include/
+
+install: $(FINALLIB-INSTALL)
+	@echo > /dev/null
 
 clean: 
 	@echo + clean [$(LIBUCNAME)]
