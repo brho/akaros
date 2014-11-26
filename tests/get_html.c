@@ -12,21 +12,26 @@
  * check out http://www.d.umn.edu/~gshute/net/http-script.html for some info. */
 int main(int argc, char *argv[])
 {
-	char *host, *page;
+	char *host, *page, *port;
 	int dfd, ret;
-	char buf[128];
+	char buf[256];
 	char addr[256];
-	if (argc != 3) {
-		printf("Usage: %s HOST PAGE\n", argv[0]);
-		host = "128.32.37.180";
-		page = "files/test.html";
-	} else {
+	host = "128.32.37.180";
+	page = "files/test.html";
+	port = "80";
+
+	if (argc > 1)
 		host = argv[1];
-		page = argv[2];
-	}
-	printf("Trying to access http://%s/%s\n", host, page);
+	if (argc > 2)
+		port = argv[2];
+	if (argc > 3)
+		page = argv[3];
+
+	printf("FYI, Usage: %s [HOST [PORT [PAGE]]]\n", argv[0]);
+
+	printf("Trying to access http://%s:%s/%s\n", host, port, page);
 	/* manually making our own addr (no mkaddr, which was racy anyway) */
-	ret = snprintf(addr, sizeof(addr), "tcp!%s!%s", host, "80");
+	ret = snprintf(addr, sizeof(addr), "tcp!%s!%s", host, port);
 	if (snprintf_overflow(ret, addr, sizeof(addr))) {
 		perror("Addr string too long");
 		exit(-1);
@@ -37,7 +42,7 @@ int main(int argc, char *argv[])
 		exit(-1);
 	}
 	/* short get style */
-	snprintf(buf, sizeof(buf), "GET /%s\n\n", page);
+	snprintf(buf, sizeof(buf), "GET /%s\r\nConnection: close\r\n\r\n", page);
 	ret = write(dfd, buf, strlen(buf));
 	if (ret < 0) {
 		perror("Write");
