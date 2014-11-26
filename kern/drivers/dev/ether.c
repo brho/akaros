@@ -367,6 +367,7 @@ static int etheroq(struct ether *ether, struct block *bp)
 
 	if (!(ether->netif.feat & NETF_SG))
 		bp = linearizeblock(bp);
+	ptclcsum_finalize(bp, ether->netif.feat);
 	/*
 	 * Check if the packet has to be placed back onto the input queue,
 	 * i.e. if it's a loopback or broadcast packet or the interface is
@@ -399,7 +400,6 @@ static int etheroq(struct ether *ether, struct block *bp)
 		if ((ether->netif.feat & NETF_PADMIN) == 0 && BLEN(bp) < ether->minmtu)
 			bp = adjustblock(bp, ether->minmtu);
 
-		ptclcsum_finalize(bp, ether->netif.feat);
 		qbwrite(ether->oq, bp);
 		if (ether->transmit != NULL)
 			ether->transmit(ether);
