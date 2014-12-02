@@ -81,6 +81,7 @@ void kernel_msg_init(void);
 uint32_t send_kernel_message(uint32_t dst, amr_t pc, long arg0, long arg1,
                              long arg2, int type);
 void handle_kmsg_ipi(struct hw_trapframe *hw_tf, void *data);
+bool has_routine_kmsg(void);
 void process_routine_kmsg(void);
 void print_kmsgs(uint32_t coreid);
 

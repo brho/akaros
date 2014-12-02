@@ -107,7 +107,7 @@ void handle_kmsg_ipi(struct hw_trapframe *hw_tf, void *data)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct kernel_message *kmsg_i, *temp;
-	/* Avoid locking if the list appears empty (lockless peak is okay) */
+	/* Avoid locking if the list appears empty (lockless peek is okay) */
 	if (STAILQ_EMPTY(&pcpui->immed_amsgs))
 		return;
 	/* The lock serves as a cmb to force a re-read of the head of the list */
@@ -121,12 +121,19 @@ void handle_kmsg_ipi(struct hw_trapframe *hw_tf, void *data)
 	spin_unlock_irqsave(&pcpui->immed_amsg_lock);
 }
 
+bool has_routine_kmsg(void)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	/* lockless peek */
+	return !STAILQ_EMPTY(&pcpui->routine_amsgs);
+}
+
 /* Helper function, gets the next routine KMSG (RKM).  Returns 0 if the list was
  * empty. */
 static kernel_message_t *get_next_rkmsg(struct per_cpu_info *pcpui)
 {
 	struct kernel_message *kmsg;
-	/* Avoid locking if the list appears empty (lockless peak is okay) */
+	/* Avoid locking if the list appears empty (lockless peek is okay) */
 	if (STAILQ_EMPTY(&pcpui->routine_amsgs))
 		return 0;
 	/* The lock serves as a cmb to force a re-read of the head of the list.
