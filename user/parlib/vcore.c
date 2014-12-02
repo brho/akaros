@@ -355,17 +355,42 @@ void disable_notifs(uint32_t vcoreid)
 }
 
 /* Like smp_idle(), this will put the core in a state that it can only be woken
- * up by an IPI.  In the future, we may halt or something.  This will return if
- * an event was pending (could be the one you were waiting for). */
+ * up by an IPI.  For now, this is a halt.  Maybe an mwait in the future.
+ *
+ * This will return if an event was pending (could be the one you were waiting
+ * for) or if the halt failed for some reason, such as a concurrent RKM.  If
+ * successful, this will not return at all, and the vcore will restart from the
+ * top next time it wakes.  Any sort of IRQ will wake the core.
+ *
+ * Alternatively, I might make this so it never returns, if that's easier to
+ * work with (similar issues with yield). */
 void vcore_idle(void)
 {
 	uint32_t vcoreid = vcore_id();
+	/* Once we enable notifs, the calling context will be treated like a uthread
+	 * (saved into the uth slot).  We don't want to ever run it again, so we
+	 * need to make sure there's no cur_uth. */
+	assert(!current_uthread);
+	/* This clears notif_pending (check, signal, check again pattern). */
 	if (handle_events(vcoreid))
 		return;
+	/* This enables notifs, but also checks notif pending.  At this point, any
+	 * new notifs will restart the vcore from the top. */
 	enable_notifs(vcoreid);
-	while (1) {
-		cpu_relax();
-	}
+	/* From now, til we get into the kernel, any notifs will permanently destroy
+	 * this context and start the VC from the top.
+	 *
+	 * Once we're in the kernel, any messages (__notify, __preempt), will be
+	 * RKMs.  halt will need to check for those atomically.  Checking for
+	 * notif_pending in the kernel (sleep only if not set) is not enough, since
+	 * not all reasons for the kernel to stay awak set notif_pending (e.g.,
+	 * __preempts and __death).
+	 *
+	 * At this point, we're out of VC ctx, so anyone who sets notif_pending
+	 * should also send an IPI / __notify */
+	sys_halt_core(0);
+	/* in case halt returns without actually restarting the VC ctx. */
+	disable_notifs(vcoreid);
 }
 
 /* Helper, that actually makes sure a vcore is running.  Call this is you really

@@ -35,6 +35,7 @@
 #include <arsc_server.h>
 #include <event.h>
 #include <termios.h>
+#include <manager.h>
 
 /* Tracing Globals */
 int systrace_flags = 0;
@@ -1091,31 +1092,52 @@ static int sys_vc_entry(struct proc *p)
 	return 0;
 }
 
-/* This will set a local timer for usec, then shut down the core.  There's a
- * slight race between spinner and halt.  For now, the core will wake up for
- * other interrupts and service them, but will not process routine messages or
- * do anything other than halt until the alarm goes off.  We could just unset
- * the alarm and return early.  On hardware, there are a lot of interrupts that
- * come in.  If we ever use this, we can take a closer look.  */
+/* This will halt the core, waking on an IRQ.  These could be kernel IRQs for
+ * things like timers or devices, or they could be IPIs for RKMs (__notify for
+ * an evq with IPIs for a syscall completion, etc).
+ *
+ * We don't need to finish the syscall early (worried about the syscall struct,
+ * on the vcore's stack).  The syscall will finish before any __preempt RKM
+ * executes, so the vcore will not restart somewhere else before the syscall
+ * completes (unlike with yield, where the syscall itself adjusts the vcore
+ * structures).
+ *
+ * In the future, RKM code might avoid sending IPIs if the core is already in
+ * the kernel.  That code will need to check the CPU's state in some manner, and
+ * send if the core is halted/idle.
+ *
+ * The core must wake up for RKMs, including RKMs that arrive while the kernel
+ * is trying to halt.  The core need not abort the halt for notif_pending for
+ * the vcore, only for a __notify or other RKM.  Anyone setting notif_pending
+ * should then attempt to __notify (o/w it's probably a bug). */
 static int sys_halt_core(struct proc *p, unsigned int usec)
 {
-	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
-	struct alarm_waiter a_waiter;
-	bool spinner = TRUE;
-	void unblock(struct alarm_waiter *waiter)
-	{
-		spinner = FALSE;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct preempt_data *vcpd;
+	/* The user can only halt CG cores!  (ones it owns) */
+	if (management_core())
+		return -1;
+	disable_irq();
+	/* both for accounting and possible RKM optimizations */
+	__set_cpu_state(pcpui, CPU_STATE_IDLE);
+	wrmb();
+	if (has_routine_kmsg()) {
+		__set_cpu_state(pcpui, CPU_STATE_KERNEL);
+		enable_irq();
+		return 0;
 	}
-	init_awaiter(&a_waiter, unblock);
-	set_awaiter_rel(&a_waiter, MAX(usec, 100));
-	set_alarm(tchain, &a_waiter);
-	enable_irq();
-	/* Could wake up due to another interrupt, but we want to sleep still. */
-	while (spinner) {
-		cpu_halt();	/* slight race between spinner and halt */
-		cpu_relax();
+	/* This situation possible, though the check is not necessary.  We can't
+	 * assert notif_pending isn't set, since another core may be in the
+	 * proc_notify.  Thus we can't tell if this check here caught a bug, or just
+	 * aborted early. */
+	vcpd = &p->procdata->vcore_preempt_data[pcpui->owning_vcoreid];
+	if (vcpd->notif_pending) {
+		__set_cpu_state(pcpui, CPU_STATE_KERNEL);
+		enable_irq();
+		return 0;
 	}
-	printd("Returning from halting\n");
+	/* CPU_STATE is reset to KERNEL by the IRQ handler that wakes us */
+	cpu_halt();
 	return 0;
 }
 
