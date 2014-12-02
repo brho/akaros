@@ -46,6 +46,7 @@ DESTDIR ?= /
 # Configuration parameters for make-riscv
 RISCV_ARCH := riscv
 RISCV_BINARY_PREFIX := $(RISCV_ARCH)-ucb-akaros-
+RISCV_SYSROOT := $(RISCV_INSTDIR)/$(RISCV_ARCH)-ucb-akaros/sysroot
 RISCV_GLIBC_CONFIGURE_FLAGS := 
 RISCV_GCC_BUILD_FLAGS := 
 RISCV_CFLAGS :=
@@ -53,6 +54,7 @@ RISCV_CFLAGS :=
 # Configuration parameters for x86
 I686_ARCH := i686
 I686_BINARY_PREFIX := $(I686_ARCH)-ucb-akaros-
+I686_SYSROOT := $(I686_INSTDIR)/$(I686_ARCH)-ucb-akaros/sysroot
 I686_GLIBC_CONFIGURE_FLAGS := 
 I686_GCC_BUILD_FLAGS := 
 I686_CFLAGS := -march=i486
@@ -60,6 +62,7 @@ I686_CFLAGS := -march=i486
 # Configuration parameters for x86_64
 X86_64_ARCH := x86_64
 X86_64_BINARY_PREFIX := $(X86_64_ARCH)-ucb-akaros-
+X86_64_SYSROOT := $(X86_64_INSTDIR)/$(X86_64_ARCH)-ucb-akaros/sysroot
 X86_64_GLIBC_CONFIGURE_FLAGS := "--disable-multi-arch"
 X86_64_GCC_BUILD_FLAGS := CFLAGS="-fPIC"
 X86_64_CFLAGS :=
@@ -67,6 +70,7 @@ X86_64_CFLAGS :=
 # Configuration parameters for x86_64-native
 X86_64_NATIVE_ARCH := x86_64
 X86_64_NATIVE_BINARY_PREFIX := 
+X86_64_NATIVE_SYSROOT := $(X86_64_NATIVE_INSTDIR)
 X86_64_NATIVE_GCC_BUILD_FLAGS := CFLAGS="-fPIC"
 X86_64_NATIVE_CFLAGS :=
 
@@ -139,6 +143,7 @@ riscv:
 	export LD_LIBRARY_PATH=; \
 	export DESTDIR=$(DESTDIR);\
 	export INSTDIR=$(RISCV_INSTDIR);\
+	export SYSROOT=$(RISCV_SYSROOT);\
 	export PATH=$(DESTDIR)$(RISCV_INSTDIR)/bin:$(PATH);\
 	export ARCH=$(RISCV_ARCH);\
 	export ARCH_CFLAGS=$(RISCV_CFLAGS);\
@@ -152,6 +157,7 @@ i686:
 	export LD_LIBRARY_PATH=; \
 	export DESTDIR=$(DESTDIR);\
 	export INSTDIR=$(I686_INSTDIR);\
+	export SYSROOT=$(I686_SYSROOT);\
 	export PATH=$(DESTDIR)$(I686_INSTDIR)/bin:$(PATH);\
 	export ARCH=$(I686_ARCH);\
 	export ARCH_CFLAGS=$(I686_CFLAGS);\
@@ -165,6 +171,7 @@ x86_64:
 	export LD_LIBRARY_PATH=; \
 	export DESTDIR=$(DESTDIR);\
 	export INSTDIR=$(X86_64_INSTDIR);\
+	export SYSROOT=$(X86_64_SYSROOT);\
 	export PATH=$(DESTDIR)$(X86_64_INSTDIR)/bin:$(PATH);\
 	export ARCH=$(X86_64_ARCH);\
 	export ARCH_CFLAGS=$(X86_64_CFLAGS);\
@@ -179,6 +186,7 @@ x86_64-native:
 	export LD_LIBRARY_PATH=; \
 	export DESTDIR=$(DESTDIR);\
 	export INSTDIR=$(X86_64_NATIVE_INSTDIR);\
+	export SYSROOT=$(X86_64_NATIVE_SYSROOT);\
 	export ARCH=$(X86_64_NATIVE_ARCH);\
 	export BINARY_PREFIX=$(X86_64_NATIVE_BINARY_PREFIX);\
 	export GCC_BUILD_FLAGS=$(X86_64_NATIVE_GCC_BUILD_FLAGS);\
@@ -253,19 +261,35 @@ $(BINARY_PREFIX)binutils-builddir: binutils-$(BINUTILS_VERSION)
 
 native-binutils-configure:
 	cd $(BINARY_PREFIX)binutils-builddir; \
+	CFLAGS="-O2 -g -pipe" \
+	CXXFLAGS="-O2 -g -pipe" \
+	LDFLAGS="" \
 	../binutils-$(BINUTILS_VERSION)/configure \
-	    --target=$(ARCH)-ucb-akaros \
+		--target=$(ARCH)-ucb-akaros \
 		--host=$(ARCH)-ucb-akaros \
-	    --prefix=$(INSTDIR) \
-	    --disable-nls
+		--prefix=$(INSTDIR) \
+		--disable-werror \
+		--enable-ld=yes \
+		--enable-gold=no \
+		--with-pkgversion="akaros-repo" \
+		--disable-multilib \
+		--disable-nls
 
 cross-binutils-configure:
 	cd $(BINARY_PREFIX)binutils-builddir; \
+	CFLAGS="-O2 -g -pipe" \
+	CXXFLAGS="-O2 -g -pipe" \
+	LDFLAGS="" \
 	../binutils-$(BINUTILS_VERSION)/configure \
-	    --target=$(ARCH)-ucb-akaros \
-	    --prefix=$(INSTDIR) \
+		--target=$(ARCH)-ucb-akaros \
+		--prefix=$(INSTDIR) \
 		--disable-werror \
-	    --disable-nls
+		--enable-ld=yes \
+		--enable-gold=no \
+		--with-pkgversion="akaros-repo" \
+		--disable-multilib \
+		--disable-nls \
+		--with-sysroot=$(SYSROOT)
 
 .$(BINARY_PREFIX)binutils-configure: 
 	$(MAKE) $(BINARY_PREFIX)binutils-builddir 
@@ -313,15 +337,31 @@ $(BINARY_PREFIX)gcc-stage1-builddir: gcc-$(GCC_VERSION)
 .$(BINARY_PREFIX)gcc-stage1-configure: 
 	$(MAKE) $(BINARY_PREFIX)gcc-stage1-builddir
 	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
+	CFLAGS="-O2 -g -pipe" \
+	CXXFLAGS="-O2 -g -pipe" \
+	LDFLAGS="-lstdc++ -lm" \
 	../gcc-$(GCC_VERSION)/configure \
-	        --target=$(ARCH)-ucb-akaros \
-	        --program-prefix=$(BINARY_PREFIX) \
-	        --prefix=$(INSTDIR) \
-	        --disable-nls \
-	        --disable-shared \
-	        --enable-languages=c,c++ \
-	        --without-headers \
-	        $(GCC_BUILD_FLAGS);
+		--target=$(ARCH)-ucb-akaros \
+		--prefix=$(INSTDIR) \
+		--with-local-prefix=$(SYSROOT) \
+		--disable-mudflap \
+		--with-sysroot=$(SYSROOT) \
+		--with-newlib \
+		--enable-threads=no \
+		--disable-shared \
+		--with-pkgversion="akaros-repo" \
+		--disable-__cxa_atexit \
+		--with-ppl=no \
+		--with-isl=no \
+		--with-cloog=no \
+		--with-libelf=no \
+		--disable-lto \
+		--disable-libgomp \
+		--disable-mudflap \
+		--disable-nls \
+		--disable-multilib \
+		--enable-languages=c \
+		$(GCC_BUILD_FLAGS);
 	echo "MAKEINFO = :" >> $(BINARY_PREFIX)gcc-stage1-builddir/Makefile;
 	touch $@
 
@@ -343,16 +383,31 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 .$(BINARY_PREFIX)gcc-stage2-configure: 
 	$(MAKE) $(BINARY_PREFIX)gcc-stage2-builddir
 	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
+	CFLAGS="-O2 -g -pipe" \
+	CXXFLAGS="-O2 -g -pipe" \
+	LDFLAGS="-lstdc++ -lm" \
 	../gcc-$(GCC_VERSION)/configure \
-	        --target=$(ARCH)-ucb-akaros \
-	        --program-prefix=$(BINARY_PREFIX) \
-	        --prefix=$(INSTDIR) \
-	        --disable-nls \
-	        --disable-shared \
-	        --disable-multilib \
-	        --enable-languages=c \
-	        --without-headers \
-	        $(GCC_BUILD_FLAGS);
+		--target=$(ARCH)-ucb-akaros \
+		--prefix=$(INSTDIR) \
+		--with-local-prefix=$(SYSROOT) \
+		--disable-mudflap \
+		--with-sysroot=$(SYSROOT) \
+		--with-newlib \
+		--enable-threads=no \
+		--disable-shared \
+		--with-pkgversion="akaros-repo" \
+		--disable-__cxa_atexit \
+		--with-ppl=no \
+		--with-sil=no \
+		--with-cloog=no \
+		--with-libelf=no \
+		--disable-lto \
+		--disable-libgomp \
+		--disable-libmudflap \
+		--disable-nls \
+		--enable-languages=c \
+		--disable-multilib \
+		$(GCC_BUILD_FLAGS);
 	echo "MAKEINFO = :" >> $(BINARY_PREFIX)gcc-stage2-builddir/Makefile;
 	touch $@
 
@@ -368,29 +423,30 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 ######### AKAROS Headers ###########
 ####################################
 .$(BINARY_PREFIX)akaros-headers-install: $(ROSDIR)
-	rm -rf $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/*
-	mkdir -p $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include
+	rm -rf $(SYSROOT)/usr/include/*
+	mkdir -p $(SYSROOT)/usr/include
 	cp -r $(ROSDIR)/kern/include/ros \
-	   $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/
-	rm -f $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/ros/arch
-	mkdir $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/ros/arch
+	    $(SYSROOT)/usr/include/
+	rm -f $(SYSROOT)/usr/include/ros/arch
+	mkdir $(SYSROOT)/usr/include/ros/arch
 	cp -r $(ROSDIR)/kern/arch/$(ROS_ARCH_DIR)/ros/* \
-	   $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/ros/arch/
+	    $(SYSROOT)/usr/include/ros/arch/
 	cp -r $(ROSDIR)/user/parlib/include/* \
-	   $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/
+	    $(SYSROOT)/usr/include/
 	cp -r $(ROSDIR)/user/pthread/*.h \
-	   $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/
-	rm -rf $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/arch
-	ln -s $(ROS_ARCH_DIR) $(INSTDIR)/$(ARCH)-ucb-akaros/sys-include/arch 
+	    $(SYSROOT)/usr/include/
+	rm -rf $(SYSROOT)/usr/include/arch
+	ln -s $(ROS_ARCH_DIR) $(SYSROOT)/usr/include/arch
 
 #################################
 ###### Dummy Libs Install #######
 #################################
 .$(BINARY_PREFIX)dummy-libs-install:
-	rm -rf $(INSTDIR)/$(ARCH)-ucb-akaros/lib/libparlib.a
-	rm -rf $(INSTDIR)/$(ARCH)-ucb-akaros/lib/libgcc_eh.a
-	$(ARCH)-ucb-akaros-ar cr $(INSTDIR)/$(ARCH)-ucb-akaros/lib/libparlib.a
-	$(ARCH)-ucb-akaros-ar cr $(INSTDIR)/$(ARCH)-ucb-akaros/lib/libgcc_eh.a
+	rm -rf $(SYSROOT)/lib/libparlib.a
+	rm -rf $(SYSROOT)/lib/libgcc_eh.a
+	mkdir -p $(SYSROOT)/lib
+	$(ARCH)-ucb-akaros-ar cr $(SYSROOT)/lib/libparlib.a
+	$(ARCH)-ucb-akaros-ar cr $(SYSROOT)/lib/libgcc_eh.a
 
 #################################
 ######### Glibc Stage 1 #########
@@ -419,25 +475,42 @@ $(BINARY_PREFIX)glibc-stage1-builddir: glibc-$(GLIBC_VERSION)
 .$(BINARY_PREFIX)glibc-stage1-configure: 
 	$(MAKE) $(BINARY_PREFIX)glibc-stage1-builddir;
 	cd $(BINARY_PREFIX)glibc-stage1-builddir; \
+	CFLAGS="$(ARCH_CFLAGS) -U_FORTIFY_SOURCE -g -fpermissive -O2 -pipe" \
+	CC=$(ARCH)-ucb-akaros-gcc \
+	AR=$(ARCH)-ucb-akaros-ar \
+	RANLIB=$(ARCH)-ucb-akaros-ranlib \
 	../glibc-$(GLIBC_VERSION)/configure \
-	          --host=$(ARCH)-ucb-akaros \
-	          --prefix=$(INSTDIR)/$(ARCH)-ucb-akaros \
-	          --enable-hacker-mode \
-	          --disable-shared \
-              --disable-add-ons \
-	          --disable-nls \
-	          --with-headers=$(INSTDIR)/$(ARCH)-ucb-akaros/sys-include \
-	          --with-elf \
-	          --with-tls \
-	          --with-__thread \
-	          --without-nptl \
-	          $(GLIBC_CONFIGURE_FLAGS) \
-	          CFLAGS="$(ARCH_CFLAGS) -g -fpermissive -O2 -pipe";
+		--prefix=/usr \
+		--host=$(ARCH)-ucb-akaros \
+		--cache-file=$(BINARY_PREFIX)glibc-stage1-builddir/config.cache \
+		--without-cvs \
+		--disable-profile \
+		--without-gd \
+		--with-headers=$(SYSROOT)/usr/include \
+		--disable-debug \
+		--disable-sanity-checks \
+		--enable-kernel= \
+		--with-__thread \
+		--with-tls \
+		--without-nptl \
+		--enable-shared \
+		--enable-add-ons=no \
+		--with-pkgversion="akaros-repo" \
+		--with-elf \
+		--enable-hacker-mode \
+		$(GLIBC_CONFIGURE_FLAGS);
 	touch $@
 
 .$(BINARY_PREFIX)glibc-stage1-install: .$(BINARY_PREFIX)glibc-stage1-configure
 	cd $(BINARY_PREFIX)glibc-stage1-builddir; \
-	comma=, make -j $(MAKE_JOBS) install-headers install-bootstrap-headers=yes; \
+	make -j $(MAKE_JOBS) \
+		install_root=$(SYSROOT) \
+		install-bootstrap-headers=yes \
+		install-headers; \
+	touch $(SYSROOT)/usr/include/gnu/stubs.h; \
+	cp glibc-$(GLIBC_VERSION)/include/features.h $(SYSROOT)/usr/include/features.h; \
+	cp bits/stdio_lim.h $(SYSROOT)/usr/include/bits/stdio_lim.h; \
+	make -j $(MAKE_JOBS) csu/subdir_lib;
 
 ####################################
 ########## Glibc Stage 2  ##########
@@ -449,30 +522,39 @@ $(BINARY_PREFIX)glibc-stage2-builddir: glibc-$(GLIBC_VERSION)
 .$(BINARY_PREFIX)glibc-stage2-configure: 
 	$(MAKE) $(BINARY_PREFIX)glibc-stage2-builddir
 	cd $(BINARY_PREFIX)glibc-stage2-builddir; \
+	CFLAGS="$(ARCH_CFLAGS) -U_FORTIFY_SOURCE -g -fpermissive -O2 -pipe" \
+	CC=x86_64-ucb-akaros-gcc \
+	AR=x86_64-ucb-akaros-ar \
+	RANLIB=x86_64-ucb-akaros-ranlib \
 	../glibc-$(GLIBC_VERSION)/configure \
-	          --host=$(ARCH)-ucb-akaros \
-	          --enable-hacker-mode \
-	          --enable-shared \
-	          --disable-nls \
-	          --with-elf \
-	          --with-tls \
-	          --with-__thread \
-	          --without-nptl \
-	          --with-headers=$(INSTDIR)/$(ARCH)-ucb-akaros/sys-include \
-	          --prefix=$(INSTDIR)/$(ARCH)-ucb-akaros \
-	          libc_cv_forced_unwind=yes \
-	          libc_cv_c_cleanup=yes \
-	          $(GLIBC_CONFIGURE_FLAGS) \
-	          CFLAGS="$(ARCH_CFLAGS) -g -fpermissive -O2 -pipe";
+		--prefix=/usr \
+		--host=$(ARCH)-ucb-akaros \
+		--cache-file=$(BINARY_PREFIX)glibc-stage2-builddir/config.cache \
+		--without-cvs \
+		--disable-profile \
+		--without-gd \
+		--with-headers=$(SYSROOT)/usr/include \
+		--disable-debug \
+		--disable-sanity-checks \
+		--enable-kernel= \
+		--with-__thread \
+		--with-tls \
+		--without-nptl \
+		--enable-shared \
+		--enable-add-ons=no \
+		--with-pkgversion="akaros-repo" \
+		--with-elf \
+		--enable-hacker-mode \
+		$(GLIBC_CONFIGURE_FLAGS);
 	touch $@
 
 .$(BINARY_PREFIX)glibc-stage2-make: .$(BINARY_PREFIX)glibc-stage2-configure
 	cd $(BINARY_PREFIX)glibc-stage2-builddir; \
-	make -j $(MAKE_JOBS) || make -j $(MAKE_JOBS)
+	make -j $(MAKE_JOBS)
 
 .$(BINARY_PREFIX)glibc-stage2-install: .$(BINARY_PREFIX)glibc-stage2-make
 	cd $(BINARY_PREFIX)glibc-stage2-builddir; \
-	make -j $(MAKE_JOBS) install
+	make -j $(MAKE_JOBS) install_root=$(SYSROOT) install
 
 ###################################
 ####### AKAROS Libs Install #######
@@ -491,44 +573,65 @@ $(BINARY_PREFIX)gcc-stage3-builddir: gcc-$(GCC_VERSION)
 
 native-gcc-stage3-prep:
 	mkdir -p $(INSTDIR)/usr; \
-	cp -R $(CXXROOT)/$(ARCH)-ucb-akaros/sys-include  $(INSTDIR)/usr/include; \
-	cp -R $(CXXROOT)/$(ARCH)-ucb-akaros/lib* $(INSTDIR)/usr; \
 
 native-gcc-stage3-configure: native-gcc-stage3-prep
 	cd $(BINARY_PREFIX)gcc-stage3-builddir; \
 	../gcc-$(GCC_VERSION)/configure \
-	    --target=$(ARCH)-ucb-akaros \
-	    --host=$(ARCH)-ucb-akaros \
-	    --with-gmp=$(CXXROOT) \
-	    --with-mpfr=$(CXXROOT) \
-	    --with-mpc=$(CXXROOT) \
-	    --prefix=$(INSTDIR) \
-	    --disable-nls \
-	    --disable-werror \
-	    --disable-multilib \
-	    --enable-shared \
-	    --enable-tls \
-	    --enable-libgomp \
-	    --enable-languages=c,c++ \
-	    --with-__thread \
-	    $(GCC_BUILD_FLAGS);
+		--target=$(ARCH)-ucb-akaros \
+		--host=$(ARCH)-ucb-akaros \
+		--prefix=$(INSTDIR) \
+		--with-gmp=$(CXXROOT) \
+		--with-mpfr=$(CXXROOT) \
+		--with-mpc=$(CXXROOT) \
+		--enable-languages=c,c++ \
+		--with-pkgversion="akaros-repo" \
+		--disable-__cxa_atexit \
+		--disable-mudflap \
+		--enable-libgomp \
+		--disable-libssp \
+		--disable-libquadmath \
+		--disable-libquadmath-support \
+		--with-ppl=no \
+		--with-isl=no \
+		--with-cloog=no \
+		--with-libelf=no \
+		--enable-threads=no \
+		--disable-nls \
+		--disable-multilib \
+		--enable-c99 \
+		--enable-long-long \
+		--enable-shared \
+		$(GCC_BUILD_FLAGS);
 
 cross-gcc-stage3-configure:
 	cd $(BINARY_PREFIX)gcc-stage3-builddir; \
+	CFLAGS="-O2 -g -pipe" \
+	CXXFLAGS="-O2 -g -pipe" \
+	LDFLAGS="-lstdc++ -lm" \
 	../gcc-$(GCC_VERSION)/configure \
-	    --target=$(ARCH)-ucb-akaros \
-	    --program-prefix=$(BINARY_PREFIX) \
-	    --prefix=$(INSTDIR) \
-	    --disable-nls \
-	    --disable-werror \
-	    --disable-multilib \
-	    --enable-shared \
-	    --enable-tls \
-	    --enable-libgomp \
-	    --enable-languages=c,c++ \
-	    --with-__thread \
-	    --with-headers=$(INSTDIR)/$(ARCH)-ucb-akaros/include \
-	    $(GCC_BUILD_FLAGS);
+		--target=$(ARCH)-ucb-akaros \
+		--prefix=$(INSTDIR) \
+		--with-sysroot=$(SYSROOT) \
+		--enable-languages=c,c++ \
+		--with-pkgversion="akaros-repo" \
+		--disable-__cxa_atexit \
+		--disable-mudflap \
+		--enable-libgomp \
+		--disable-libssp \
+		--disable-libquadmath \
+		--disable-libquadmath-support \
+		--with-ppl=no \
+		--with-isl=no \
+		--with-cloog=no \
+		--with-libelf=no \
+		--enable-threads=no \
+		--disable-nls \
+		--disable-multilib \
+		--with-local-prefix=$(SYSROOT) \
+		--enable-c99 \
+		--enable-long-long \
+		--enable-shared \
+		$(GCC_BUILD_FLAGS);
 
 .$(BINARY_PREFIX)gcc-stage3-configure:
 	$(MAKE) $(BINARY_PREFIX)gcc-stage3-builddir
@@ -643,6 +746,6 @@ clean:
 	rm -rf mpfr-$(MPFR_VERSION)
 	rm -rf mpc-$(MPC_VERSION)
 	rm -rf *-builddir
-	rm -rf .*-akaros-*-configure
+	rm -rf .*-configure
 	rm -rf *$(BINARY_PREFIX)install.bak
 
