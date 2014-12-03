@@ -458,7 +458,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	-cd glibc-$(GLIBC_VERSION); \
 	diff -ruB --unidirectional-new-file \
 	     ../glibc-$(GLIBC_VERSION) \
-	     ../glibc-$(GLIBC_VERSION)-ros \
+	     ../glibc-$(GLIBC_VERSION)-akaros \
 	     | grep -v "Only in ../glibc-$(GLIBC_VERSION)" \
 	     | patch -p2 
 
@@ -661,17 +661,17 @@ cross-gcc-stage3-configure:
 gmp-$(GMP_VERSION): gmp-$(GMP_VERSION).tar.bz2
 	rm -rf gmp-$(GMP_VERSION)
 	tar -jxf gmp-$(GMP_VERSION).tar.bz2
-	patch -p0 < gmp-$(GMP_VERSION)-ros.patch
+	patch -p0 < gmp-$(GMP_VERSION)-akaros.patch
 
 mpfr-$(MPFR_VERSION): mpfr-$(MPFR_VERSION).tar.bz2
 	rm -rf mpfr-$(MPFR_VERSION)
 	tar -jxf mpfr-$(MPFR_VERSION).tar.bz2
-	patch -p0 < mpfr-$(MPFR_VERSION)-ros.patch
+	patch -p0 < mpfr-$(MPFR_VERSION)-akaros.patch
 
 mpc-$(MPC_VERSION): mpc-$(MPC_VERSION).tar.gz
 	rm -rf mpc-$(MPC_VERSION)
 	tar -zxf mpc-$(MPC_VERSION).tar.gz
-	patch -p0 < mpc-$(MPC_VERSION)-ros.patch
+	patch -p0 < mpc-$(MPC_VERSION)-akaros.patch
 
 $(BINARY_PREFIX)gmp-builddir: gmp-$(GMP_VERSION)
 	rm -rf $@
