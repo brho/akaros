@@ -32,7 +32,7 @@ ifneq ($(GMP_OK),OK)
 $(error You need to have the libraries GMP, MPFR, and MPC installed on your system!)
 endif
 
-BINUTILS_VERSION := 2.21.1
+BINUTILS_VERSION := 2.24
 GCC_VERSION := 4.6.1
 GLIBC_VERSION := 2.14.1
 GMP_VERSION := 5.1.3
@@ -251,9 +251,8 @@ x86_64-native-revert:
 binutils-$(BINUTILS_VERSION): binutils-$(BINUTILS_VERSION).tar.bz2
 	rm -rf binutils-$(BINUTILS_VERSION);
 	tar -jxf binutils-$(BINUTILS_VERSION).tar.bz2
-	patch -p0 < binutils-$(BINUTILS_VERSION)-ros.patch
+	patch -p0 < binutils-$(BINUTILS_VERSION)-akaros.patch
 	patch --no-backup-if-mismatch -p0 < binutils-$(BINUTILS_VERSION)-riscv.patch
-	patch -p0 < binutils-$(BINUTILS_VERSION)-objdump.patch
 
 $(BINARY_PREFIX)binutils-builddir: binutils-$(BINUTILS_VERSION)
 	rm -rf $@
