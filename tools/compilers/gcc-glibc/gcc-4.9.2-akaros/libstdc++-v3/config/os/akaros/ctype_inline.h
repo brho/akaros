@@ -1,7 +1,6 @@
 // Locale support -*- C++ -*-
 
-// Copyright (C) 1997, 1998, 1999, 2003, 2009, 2010
-// Free Software Foundation, Inc.
+// Copyright (C) 2000-2014 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -23,37 +22,55 @@
 // see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 // <http://www.gnu.org/licenses/>.
 
+/** @file bits/ctype_inline.h
+ *  This is an internal header file, included by other library headers.
+ *  Do not attempt to use it directly. @headername{locale}
+ */
+
 //
 // ISO C++ 14882: 22.1  Locales
 //
 
-// Default information, may not be appropriate for specific host.
+// ctype bits to be inlined go here. Non-inlinable (ie virtual do_*)
+// functions go in ctype.cc
 
 namespace std _GLIBCXX_VISIBILITY(default)
 {
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
-  /// @brief  Base class for ctype.
-  struct ctype_base
-  {
-    // Non-standard typedefs.
-    typedef const int* 		__to_type;
+  bool
+  ctype<char>::
+  is(mask __m, char __c) const
+  { return _M_table[static_cast<unsigned char>(__c)] & __m; }
 
-    // NB: Offsets into ctype<char>::_M_table force a particular size
-    // on the mask type. Because of this, we don't use an enum.
-    typedef unsigned int 	mask;
-    static const mask upper    	= 1 << 0;
-    static const mask lower 	= 1 << 1;
-    static const mask alpha 	= 1 << 2;
-    static const mask digit 	= 1 << 3;
-    static const mask xdigit 	= 1 << 4;
-    static const mask space 	= 1 << 5;
-    static const mask print 	= 1 << 6;
-    static const mask graph 	= (1 << 2) | (1 << 3) | (1 << 9); // alnum|punct
-    static const mask cntrl 	= 1 << 8;
-    static const mask punct 	= 1 << 9;
-    static const mask alnum 	= (1 << 2) | (1 << 3);  // alpha|digit
-  };
+  const char*
+  ctype<char>::
+  is(const char* __low, const char* __high, mask* __vec) const
+  {
+    while (__low < __high)
+      *__vec++ = _M_table[static_cast<unsigned char>(*__low++)];
+    return __high;
+  }
+
+  const char*
+  ctype<char>::
+  scan_is(mask __m, const char* __low, const char* __high) const
+  {
+    while (__low < __high
+	   && !(_M_table[static_cast<unsigned char>(*__low)] & __m))
+      ++__low;
+    return __low;
+  }
+
+  const char*
+  ctype<char>::
+  scan_not(mask __m, const char* __low, const char* __high) const
+  {
+    while (__low < __high
+	   && (_M_table[static_cast<unsigned char>(*__low)] & __m) != 0)
+      ++__low;
+    return __low;
+  }
 
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace

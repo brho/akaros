@@ -24,12 +24,6 @@ a copy of the GCC Runtime Library Exception along with this program;
 see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 <http://www.gnu.org/licenses/>.  */
 
-#if TARGET_64BIT_DEFAULT
-#define TARGET_VERSION fprintf (stderr, " (x86-64 AKAROS/ELF)");
-#else
-#define TARGET_VERSION fprintf (stderr, " (i386 AKAROS/ELF)");
-#endif
-
 #define TARGET_OS_CPP_BUILTINS()				\
   do								\
     {								\
@@ -113,8 +107,6 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define TF_SIZE 113
 
 #define TARGET_ASM_FILE_END file_end_indicate_exec_stack
-
-#define MD_UNWIND_SUPPORT "config/i386/linux-unwind.h"
 
 /* The stack pointer needs to be moved while checking the stack.  */
 #define STACK_CHECK_MOVING_SP 1

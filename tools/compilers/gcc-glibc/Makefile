@@ -33,7 +33,7 @@ $(error You need to have the libraries GMP, MPFR, and MPC installed on your syst
 endif
 
 BINUTILS_VERSION := 2.24
-GCC_VERSION := 4.6.1
+GCC_VERSION := 4.9.2
 GLIBC_VERSION := 2.14.1
 GMP_VERSION := 5.1.3
 MPFR_VERSION := 3.1.2
@@ -319,7 +319,7 @@ binutils-clean:
 	-cd gcc-$(GCC_VERSION); \
 	diff -ruB --unidirectional-new-file \
 	     ../gcc-$(GCC_VERSION) \
-	     ../gcc-$(GCC_VERSION)-ros \
+	     ../gcc-$(GCC_VERSION)-akaros \
 	     | grep -v "Only in ../gcc-$(GCC_VERSION)" \
 	     | patch -p2 
 
@@ -347,6 +347,7 @@ $(BINARY_PREFIX)gcc-stage1-builddir: gcc-$(GCC_VERSION)
 		--with-sysroot=$(SYSROOT) \
 		--with-newlib \
 		--enable-threads=no \
+		--enable-tls \
 		--disable-shared \
 		--with-pkgversion="akaros-repo" \
 		--disable-__cxa_atexit \
@@ -393,6 +394,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 		--with-sysroot=$(SYSROOT) \
 		--with-newlib \
 		--enable-threads=no \
+		--enable-tls \
 		--disable-shared \
 		--with-pkgversion="akaros-repo" \
 		--disable-__cxa_atexit \
@@ -412,7 +414,9 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 
 .$(BINARY_PREFIX)gcc-stage2-make: .$(BINARY_PREFIX)gcc-stage2-configure
 	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
-	make -j $(MAKE_JOBS) all-gcc all-target-libgcc;
+	make -j $(MAKE_JOBS) gcc_cv_libc_provides_ssp=yes \
+	                     all-gcc \
+	                     all-target-libgcc;
 
 .$(BINARY_PREFIX)gcc-stage2-install: .$(BINARY_PREFIX)gcc-stage2-make
 	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
@@ -595,6 +599,7 @@ native-gcc-stage3-configure: native-gcc-stage3-prep
 		--with-cloog=no \
 		--with-libelf=no \
 		--enable-threads=no \
+		--enable-tls \
 		--disable-nls \
 		--disable-multilib \
 		--enable-c99 \
