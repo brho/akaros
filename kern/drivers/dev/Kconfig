@@ -1,0 +1,6 @@
+config REGRESS
+        bool "Include the regression test device"
+        default y
+        help
+                The regression test device allows you to push commands to monitor()
+		for testing. Defaults to 'y' for now.

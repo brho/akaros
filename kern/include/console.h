@@ -36,4 +36,7 @@ void kb_get_from_buf(struct kb_buffer *kb, char *dst, size_t cnt);
 void __cons_add_char(uint32_t srcid, long a0, long a1, long a2);
 void __run_mon(uint32_t srcid, long a0, long a1, long a2);
 
+/* function to run one command. */
+int onecmd(int argc, char *argv[], struct hw_trapframe *hw_tf);
+
 #endif /* ROS_KERN_CONSOLE_H */
