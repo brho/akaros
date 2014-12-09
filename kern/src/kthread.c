@@ -260,6 +260,9 @@ void sem_init_irqsave(struct semaphore *sem, int signals)
 bool sem_trydown(struct semaphore *sem)
 {
 	bool ret = FALSE;
+	/* lockless peek */
+	if (sem->nr_signals <= 0)
+		return ret;
 	spin_lock(&sem->lock);
 	if (sem->nr_signals > 0) {
 		sem->nr_signals--;
@@ -288,8 +291,16 @@ void sem_down(struct semaphore *sem)
 	assert(pcpui->cur_kthread);
 	/* Try to down the semaphore.  If there is a signal there, we can skip all
 	 * of the sleep prep and just return. */
+#ifdef CONFIG_SEM_SPINWAIT
+	for (int i = 0; i < CONFIG_SEM_SPINWAIT_NR_LOOPS; i++) {
+		if (sem_trydown(sem))
+			goto block_return_path;
+		cpu_relax();
+	}
+#else
 	if (sem_trydown(sem))
 		goto block_return_path;
+#endif
 	/* We're probably going to sleep, so get ready.  We'll check again later. */
 	kthread = pcpui->cur_kthread;
 	/* We need to have a spare slot for restart, so we also use it when

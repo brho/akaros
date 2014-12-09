@@ -147,6 +147,21 @@ config SEMAPHORE_DEBUG
 		semaphore was downed, and provides a linked list of all semaphores that
 		have waiters.  This will slow down all semaphore ups and downs.
 
+config SEM_SPINWAIT
+	bool "Semaphore spinwaiting"
+	default n
+	help
+		Turns on semaphore spinwaiting.  In lieu of intelligent Adaptive
+		Mutexes, busy semaphores will just spin for a while before fully
+		sleeping.
+
+config SEM_SPINWAIT_NR_LOOPS
+	int "Number of polls before sleeping"
+	depends on SEM_SPINWAIT
+	default 100
+	help
+		How many times to poll a busy semaphore before going to sleep.
+
 config RESET_STACKS
 	bool "Reset Stacks"
 	default y
