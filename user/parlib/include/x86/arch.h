@@ -6,11 +6,10 @@
 #include <ros/common.h>
 #include <string.h>
 
-#define internal_function   __attribute ((regparm (3), stdcall))
-
 #define ARCH_CL_SIZE 64
 #ifdef __x86_64__
 
+#define internal_function 
 #define X86_REG_BP					"rbp"
 #define X86_REG_SP					"rsp"
 #define X86_REG_IP					"rip"
@@ -21,6 +20,7 @@
 
 #else /* 32 bit */
 
+#define internal_function   __attribute ((regparm (3), stdcall))
 #define X86_REG_BP					"ebp"
 #define X86_REG_SP					"esp"
 #define X86_REG_IP					"eip"
