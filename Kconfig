@@ -162,6 +162,14 @@ config SEM_SPINWAIT_NR_LOOPS
 	help
 		How many times to poll a busy semaphore before going to sleep.
 
+config SEM_TRACE_BLOCKERS
+	bool "Semaphore Blocker Tracing"
+	default n
+	help
+		Drops a TRACEME whenever a semaphore would block (barring slight
+		races).  To access the trace data, you'll need to use the opcontrols
+		and process the data with op2.
+
 config RESET_STACKS
 	bool "Reset Stacks"
 	default y
