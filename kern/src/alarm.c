@@ -292,11 +292,10 @@ bool unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
  * tchain.  Either way, this will put the waiter on the list, set to go off at
  * abs_time.  If you know the alarm has fired, don't call this.  Just set the
  * awaiter, and then set_alarm() */
-void reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
-                     uint64_t abs_time)
+void __reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
+                       uint64_t abs_time)
 {
 	bool reset_int = FALSE;		/* whether or not to reset the interrupt */
-	spin_lock_irqsave(&tchain->lock);
 	/* We only need to remove/unset when the alarm has not fired yet (is still
 	 * on the tchain).  If it has fired, it's like a fresh insert */
 	if (waiter->on_tchain)
@@ -305,6 +304,31 @@ void reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
 	/* regardless, we need to be reinserted */
 	if (__insert_awaiter(tchain, waiter) || reset_int)
 		reset_tchain_interrupt(tchain);
+}
+
+void __reset_alarm_rel(struct timer_chain *tchain, struct alarm_waiter *waiter,
+                       uint64_t usleep)
+{
+	uint64_t now, then;
+	now = read_tsc();
+	then = now + usec2tsc(usleep);
+	assert(now <= then);
+	__reset_alarm_abs(tchain, waiter, then);
+}
+
+void reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
+                     uint64_t abs_time)
+{
+	spin_lock_irqsave(&tchain->lock);
+	__reset_alarm_abs(tchain, waiter, abs_time);
+	spin_unlock_irqsave(&tchain->lock);
+}
+
+void reset_alarm_rel(struct timer_chain *tchain, struct alarm_waiter *waiter,
+                     uint64_t usleep)
+{
+	spin_lock_irqsave(&tchain->lock);
+	__reset_alarm_rel(tchain, waiter, usleep);
 	spin_unlock_irqsave(&tchain->lock);
 }
 
