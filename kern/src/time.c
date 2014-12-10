@@ -56,11 +56,6 @@ void udelay_sched(uint64_t usec)
  * you want something to happen in the future, set an alarm. */
 void timer_interrupt(struct hw_trapframe *hw_tf, void *data)
 {
-	if (in_kernel(hw_tf))
-		oprofile_add_backtrace(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf));
-	else
-		oprofile_add_userpc(get_hwtf_pc(hw_tf));
-
 	__trigger_tchain(&per_cpu_info[core_id()].tchain, hw_tf);
 }
 

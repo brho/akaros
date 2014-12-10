@@ -86,6 +86,22 @@ struct dirtab kproftab[]={
 static size_t mpstatraw_len(void);
 static size_t mpstat_len(void);
 
+static struct alarm_waiter *oprof_alarms;
+static unsigned int oprof_timer_period = 1000;
+
+static void oprof_alarm_handler(struct alarm_waiter *waiter,
+                                struct hw_trapframe *hw_tf)
+{
+	int coreid = core_id();
+	struct timer_chain *tchain = &per_cpu_info[coreid].tchain;
+	if (in_kernel(hw_tf))
+		oprofile_add_backtrace(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf));
+	else
+		oprofile_add_userpc(get_hwtf_pc(hw_tf));
+	/* we're an IRQ handler, so the tchain is locked */
+	__reset_alarm_rel(tchain, waiter, oprof_timer_period);
+}
+
 static struct chan*
 kprofattach(char *spec)
 {
@@ -106,6 +122,11 @@ kprofattach(char *spec)
 	/* NO, I'm not sure how we should do this yet. */
 	int alloc_cpu_buffers(void);
 	alloc_cpu_buffers();
+	oprof_alarms = kzmalloc(sizeof(struct alarm_waiter) * num_cpus,
+	                        KMALLOC_WAIT);
+	for (int i = 0; i < num_cpus; i++)
+		init_awaiter_irq(&oprof_alarms[i], oprof_alarm_handler);
+
 	kprof.systrace = qopen(2 << 20, 0, 0, 0);
 	if (! kprof.systrace) {
 		printk("systrace allocate failed. No system call tracing\n");
@@ -401,12 +422,32 @@ static void kprof_clear(struct kprof *kp)
 	spin_unlock(&kp->lock);
 }
 
+static void manage_oprof_timer(int coreid, struct cmdbuf *cb)
+{
+	struct timer_chain *tchain = &per_cpu_info[coreid].tchain;
+	struct alarm_waiter *waiter = &oprof_alarms[coreid];
+	if (!strcmp(cb->f[2], "on")) {
+		/* pcpu waiters already inited.  will set/reset each time (1 ms
+		 * default). */
+		reset_alarm_rel(tchain, waiter, oprof_timer_period);
+	} else if (!strcmp(cb->f[2], "off")) {
+		/* since the alarm handler runs and gets reset within IRQ context, then
+		 * we should never fail to cancel the alarm if it was already running
+		 * (tchain locks synchronize us).  but it might not be set at all, which
+		 * is fine. */
+		unset_alarm(tchain, waiter);
+	} else {
+		error("optimer needs on|off");
+	}
+}
+
 static long
 kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 {
 	ERRSTACK(1);
 	uintptr_t pc;
 	struct cmdbuf *cb;
+	char *ctlstring = "startclr|start|stop|clear|opstart|opstop|optimer";
 	cb = parsecmd(a, n);
 
 	if (waserror()) {
@@ -416,24 +457,45 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 
 	switch((int)(c->qid.path)){
 	case Kprofctlqid:
-		if(strncmp(a, "startclr", 8) == 0){
+		if (cb->nf < 1)
+			error(ctlstring);
+			
+		/* Kprof: a "which kaddr are we at when the timer goes off".  not used
+		 * much anymore */
+		if (!strcmp(cb->f[0], "startclr")) {
 			kprof_clear(&kprof);
 			kprof.time = 1;
-		}else if(strncmp(a, "start", 5) == 0) {
+		} else if (!strcmp(cb->f[0], "start")) {
 			kprof.time = 1;
 			/* this sets up the timer on the *calling* core! */
 			setup_timers();
-		} else if(strncmp(a, "stop", 4) == 0) {
+		} else if (!strcmp(cb->f[0], "stop")) {
 			/* TODO: stop the timers! */
 			kprof.time = 0;
-		} else if(strncmp(a, "clear", 5) == 0) {
+		} else if (!strcmp(cb->f[0], "clear")) {
 			kprof_clear(&kprof);
-		}else if(strncmp(a, "opstart", 7) == 0) {
+
+		/* oprof: samples and traces using oprofile */
+		} else if (!strcmp(cb->f[0], "optimer")) {
+			if (cb->nf < 3)
+				error("optimer [<0|1|..|n|all> <on|off>] [period USEC]");
+			if (!strcmp(cb->f[1], "period")) {
+				oprof_timer_period = strtoul(cb->f[2], 0, 10);
+			} else if (!strcmp(cb->f[1], "all")) {
+				for (int i = 0; i < num_cpus; i++)
+					manage_oprof_timer(i, cb);
+			} else {
+				int pcoreid = strtoul(cb->f[1], 0, 10);
+				if (pcoreid >= num_cpus)
+					error("no such coreid %d", pcoreid);
+				manage_oprof_timer(pcoreid, cb);
+			}
+		} else if (!strcmp(cb->f[0], "opstart")) {
 			oprofile_control_trace(1);
-		}else if(strncmp(a, "opstop", 6) == 0) {
+		} else if (!strcmp(cb->f[0], "opstop")) {
 			oprofile_control_trace(0);
-		} else  {
-			error("startclr|start|stop|clear|opstart|opstop");
+		} else {
+			error(ctlstring);
 		}
 		break;
 
