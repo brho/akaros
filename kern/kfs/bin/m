@@ -1,0 +1,9 @@
+#!/bin/ash
+
+if [ $# -lt 1 ]
+then
+	echo Usage: $0 CMDS TO KERNEL MONITOR...
+	exit
+fi
+
+echo $@ > "#Z/mondata"
