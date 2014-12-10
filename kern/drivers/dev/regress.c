@@ -26,6 +26,7 @@
 #include <smp.h>
 #include <ip.h>
 #include <console.h>
+#include <ktest.h>
 
 struct regress
 {
@@ -46,8 +47,7 @@ struct dirtab regresstab[]={
 	{"monctl",	{Monitorctlqid},		0,	0600},
 };
 
-static size_t mpstatraw_len(void);
-static size_t mpstat_len(void);
+static char *ctlcommands = "ktest";
 
 static struct chan*
 regressattach(char *spec)
@@ -112,7 +112,12 @@ regressread(struct chan *c, void *va, long n, int64_t off)
 
 	switch((int)c->qid.path){
 	case Monitordirqid:
-		return devdirread(c, va, n, regresstab, ARRAY_SIZE(regresstab), devgen);
+		n = devdirread(c, va, n, regresstab, ARRAY_SIZE(regresstab), devgen);
+		break;
+
+	case Monitorctlqid:
+		n = readstr(off, va, n, ctlcommands);
+		break;
 
 	case Monitordataqid:
 		if (regress.monitor) {
@@ -146,7 +151,11 @@ regresswrite(struct chan *c, void *a, long n, int64_t unused)
 
 	switch((int)(c->qid.path)){
 	case Monitorctlqid:
-		error("no ctl commands yet");
+		if(strncmp(a, "ktest", 5) == 0){
+			run_registered_ktest_suites();
+		} else {
+			error("regresswrite: only commands are %s", ctlcommands);
+		}
 		break;
 
 	case Monitordataqid:
