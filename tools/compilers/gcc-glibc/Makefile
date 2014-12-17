@@ -34,7 +34,7 @@ endif
 
 BINUTILS_VERSION := 2.24
 GCC_VERSION := 4.9.2
-GLIBC_VERSION := 2.14.1
+GLIBC_VERSION := 2.19
 GMP_VERSION := 5.1.3
 MPFR_VERSION := 3.1.2
 MPC_VERSION := 1.0.2
@@ -467,9 +467,6 @@ glibc-$(GLIBC_VERSION): glibc-$(GLIBC_VERSION).tar.bz2
 	tar -jxf glibc-$(GLIBC_VERSION).tar.bz2
 	$(MAKE) .glibc-akaros-patch
 	patch --no-backup-if-mismatch -p0 < glibc-$(GLIBC_VERSION)-riscv.patch
-	rm glibc-$(GLIBC_VERSION)/sysdeps/riscv/elf/start.S
-	rm glibc-$(GLIBC_VERSION)/sysdeps/i386/elf/start.S
-	rm glibc-$(GLIBC_VERSION)/sysdeps/x86_64/elf/start.S
 
 $(BINARY_PREFIX)glibc-stage1-builddir: glibc-$(GLIBC_VERSION)
 	rm -rf $@
@@ -478,7 +475,8 @@ $(BINARY_PREFIX)glibc-stage1-builddir: glibc-$(GLIBC_VERSION)
 .$(BINARY_PREFIX)glibc-stage1-configure: 
 	$(MAKE) $(BINARY_PREFIX)glibc-stage1-builddir;
 	cd $(BINARY_PREFIX)glibc-stage1-builddir; \
-	CFLAGS="$(ARCH_CFLAGS) -U_FORTIFY_SOURCE -g -fpermissive -O2 -pipe" \
+	CFLAGS="$(ARCH_CFLAGS) -U_FORTIFY_SOURCE -g -O2 -pipe" \
+	CXXFLAGS="-fpermissive" \
 	CC=$(ARCH)-ucb-akaros-gcc \
 	AR=$(ARCH)-ucb-akaros-ar \
 	RANLIB=$(ARCH)-ucb-akaros-ranlib \
@@ -525,7 +523,8 @@ $(BINARY_PREFIX)glibc-stage2-builddir: glibc-$(GLIBC_VERSION)
 .$(BINARY_PREFIX)glibc-stage2-configure: 
 	$(MAKE) $(BINARY_PREFIX)glibc-stage2-builddir
 	cd $(BINARY_PREFIX)glibc-stage2-builddir; \
-	CFLAGS="$(ARCH_CFLAGS) -U_FORTIFY_SOURCE -g -fpermissive -O2 -pipe" \
+	CFLAGS="$(ARCH_CFLAGS) -U_FORTIFY_SOURCE -g -O2 -pipe" \
+	CXXFLAGS="-fpermissive" \
 	CC=x86_64-ucb-akaros-gcc \
 	AR=x86_64-ucb-akaros-ar \
 	RANLIB=x86_64-ucb-akaros-ranlib \
