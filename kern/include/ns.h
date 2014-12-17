@@ -427,8 +427,8 @@ struct dev {
 	void (*power) (int);		/* power mgt: power(1) → on, power (0) → off */
 //  int (*config)( int unused_int, char *unused_char_p_t, DevConf*);
 	char *(*chaninfo) (struct chan *, char *, size_t);
-	/* we need to be aligned, i think to 32 bytes, for the linker tables. */
-} __attribute__ ((aligned(32)));
+	/* we need to be aligned, we think to 64 bytes, for the linker tables. */
+} __attribute__ ((aligned(64)));
 
 struct dirtab {
 	char name[KNAMELEN];
