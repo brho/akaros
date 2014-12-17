@@ -578,7 +578,7 @@ utestclean:
 
 # KFS related stuff
 PHONY += fill-kfs unfill-kfs
-XCC_SO_FILES = $(addprefix $(XCC_TARGET_ROOT)/lib/, *.so*)
+XCC_SO_FILES = $(addprefix $(XCC_TARGET_LIB), *.so*)
 
 $(OBJDIR)/.dont-force-fill-kfs:
 	$(Q)rm -rf $(addprefix $(FIRST_KFS_PATH)/lib/, $(notdir $(XCC_SO_FILES)))
