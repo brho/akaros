@@ -331,6 +331,10 @@ static void icmpiput(struct Proto *icmp, struct Ipifc *unused, struct block *bp)
 	char m2[128];
 	Icmppriv *ipriv;
 
+	bp = pullupblock(bp, ICMP_IPSIZE + ICMP_HDRSIZE);
+	if (bp == NULL)
+		return;
+
 	ipriv = icmp->priv;
 
 	ipriv->stats[InMsgs]++;
