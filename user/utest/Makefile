@@ -4,7 +4,7 @@ CXXFLAGS_USER += -g
 LIBNAME = utest 
 # DEPLIBS passed in from the top-level Makefile
 DEPLIBS := $(DEPLIBS)
-DEPLIBAS = $(patsubst %, $(XCC_TARGET_ROOT)/lib/lib%.a, $(DEPLIBS))
+DEPLIBAS = $(patsubst %, $(XCC_TARGET_LIB)/lib%.a, $(DEPLIBS))
 
 SRCDIR := 
 OBJDIR := $(SRCDIR)obj

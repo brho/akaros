@@ -3,7 +3,7 @@ CFLAGS_USER += -static -fomit-frame-pointer -g
 LIBNAME = bsd
 # DEPLIBS passed in from the top-level Makefile
 DEPLIBS := $(DEPLIBS)
-DEPLIBAS = $(patsubst %, $(XCC_TARGET_ROOT)/lib/lib%.a, $(DEPLIBS))
+DEPLIBAS = $(patsubst %, $(XCC_TARGET_LIB)/lib%.a, $(DEPLIBS))
 
 SRCDIR := 
 OBJDIR := $(SRCDIR)obj
