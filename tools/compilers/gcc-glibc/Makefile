@@ -445,11 +445,11 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 ###### Dummy Libs Install #######
 #################################
 .$(BINARY_PREFIX)dummy-libs-install:
-	rm -rf $(SYSROOT)/lib/libparlib.a
-	rm -rf $(SYSROOT)/lib/libgcc_eh.a
-	mkdir -p $(SYSROOT)/lib
-	$(ARCH)-ucb-akaros-ar cr $(SYSROOT)/lib/libparlib.a
-	$(ARCH)-ucb-akaros-ar cr $(SYSROOT)/lib/libgcc_eh.a
+	rm -rf $(SYSROOT)/usr/lib/libparlib.a
+	rm -rf $(SYSROOT)/usr/lib/libgcc_eh.a
+	mkdir -p $(SYSROOT)/usr/lib
+	$(ARCH)-ucb-akaros-ar cr $(SYSROOT)/usr/lib/libparlib.a
+	$(ARCH)-ucb-akaros-ar cr $(SYSROOT)/usr/lib/libgcc_eh.a
 
 #################################
 ######### Glibc Stage 1 #########
