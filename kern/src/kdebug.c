@@ -146,3 +146,38 @@ void set_printx(int mode)
 			break;
 	}
 }
+
+void debug_addr_proc(struct proc *p, unsigned long addr)
+{
+	struct vm_region *vmr;
+	spin_lock(&p->vmr_lock);
+	TAILQ_FOREACH(vmr, &p->vm_regions, vm_link) {
+		if ((vmr->vm_base <= addr) && (addr < vmr->vm_end))
+			break;
+	}
+	if (!vmr) {
+		spin_unlock(&p->vmr_lock);
+		printk("Addr %p has no VMR\n", addr);
+		return;
+	}
+	if (!vmr->vm_file) {
+		spin_unlock(&p->vmr_lock);
+		printk("Addr %p's VMR has no file\n", addr);
+		return;
+	}
+	printk("Addr %p is in %s at offset %p\n", addr, file_name(vmr->vm_file),
+	       addr - vmr->vm_base + vmr->vm_foff);
+	spin_unlock(&p->vmr_lock);
+}
+
+void debug_addr_pid(int pid, unsigned long addr)
+{
+	struct proc *p;
+	p = pid2proc(pid);
+	if (!p) {
+		printk("No such proc for pid %d\n", pid);
+		return;
+	}
+	debug_addr_proc(p, addr);
+	proc_decref(p);
+}

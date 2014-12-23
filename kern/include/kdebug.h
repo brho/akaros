@@ -41,4 +41,7 @@ void set_printx(int mode);
 #include <oprofile.h>
 #define TRACEME() oprofile_add_backtrace(read_pc(), read_bp())
 
+void debug_addr_proc(struct proc *p, unsigned long addr);
+void debug_addr_pid(int pid, unsigned long addr);
+
 #endif /* ROS_KERN_KDEBUG_H */
