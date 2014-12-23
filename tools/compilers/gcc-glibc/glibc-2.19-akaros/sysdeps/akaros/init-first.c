@@ -32,6 +32,7 @@
 #include <locale/localeinfo.h>
 #include <sys/time.h>
 #include <elf.h>
+#include <ctype.h>
 
 /* Set nonzero if we have to be prepared for more then one libc being
    used in the process.  Safe assumption if initializer never runs.  */
@@ -134,6 +135,9 @@ _init (int argc, char **argv, char **envp)
   /* This is a hack to make the special getopt in GNU libc working.  */
   __getopt_clean_environment (envp);
 #endif
+
+  /* Initialize ctype data.  */
+  __ctype_init ();
 
 #ifdef SHARED
   __libc_global_ctors ();

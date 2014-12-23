@@ -79,8 +79,10 @@ _start(void)
 		set_tls_desc((void*)__procdata.vcore_preempt_data[id].vcore_tls_desc,
 		             id);
 		#endif
+		/* These TLS setters actually only need to happen once, at init time */
 		__vcoreid = id;
 		__vcore_context = TRUE;
+		__ctype_init();	/* set locale info for ctype functions */
 		vcore_entry();
 		failmsg("why did vcore_entry() return?");
 		goto diediedie;

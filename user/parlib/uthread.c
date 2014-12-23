@@ -235,7 +235,14 @@ void uthread_init(struct uthread *new_thread, struct uth_thread_attr *attr)
 		else
 			ret = __uthread_allocate_tls(new_thread);
 		assert(!ret);
-		uthread_set_tls_var(new_thread, current_uthread, new_thread);
+		begin_access_tls_vars(new_thread->tls_desc);
+		current_uthread = new_thread;
+		/* ctypes stores locale info in TLS.  we need this only once per TLS, so
+		 * we don't have to do it here, but it is convenient since we already
+		 * loaded the uthread's TLS. */
+		extern void __ctype_init(void);
+		__ctype_init();
+		end_access_tls_vars();
 	} else {
 		new_thread->tls_desc = UTH_TLSDESC_NOTLS;
 	}
