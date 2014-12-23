@@ -36,6 +36,10 @@
 // This keeps isanum, et al from being propagated as macros.
 #define __NO_CTYPE 1
 
+// See libstdc++/43738
+// Just as on windows, on akaros targets there is no ioctl function.
+#define _GLIBCXX_NO_IOCTL 1
+
 #include <features.h>
 
 // Provide a declaration for the possibly deprecated gets function, as
