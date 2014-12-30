@@ -30,10 +30,6 @@ extern inline void init_fp_state(void);
 void set_stack_top(uintptr_t stacktop);
 uintptr_t get_stack_top(void);
 
-/* It's important that this is inline and that ctx is not a stack variable */
-static inline void save_kernel_ctx(struct kernel_ctx *ctx)
-                   __attribute__((always_inline, returns_twice));
-void pop_kernel_ctx(struct kernel_ctx *ctx) __attribute__((noreturn));
 void send_nmi(uint32_t os_coreid);
 void reflect_unhandled_trap(unsigned int trap_nr, unsigned int err,
                             unsigned long aux);

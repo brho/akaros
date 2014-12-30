@@ -14,11 +14,6 @@
 #error "Do not include arch/trap64.h directly."
 #endif
 
-/* For kernel contexts, when we save/restore/move them around. */
-struct kernel_ctx {
-	struct sw_trapframe 		sw_tf;
-};
-
 void print_swtrapframe(struct sw_trapframe *sw_tf);
 
 static inline bool in_kernel(struct hw_trapframe *hw_tf)
@@ -34,27 +29,6 @@ static inline uintptr_t get_hwtf_pc(struct hw_trapframe *hw_tf)
 static inline uintptr_t get_hwtf_fp(struct hw_trapframe *hw_tf)
 {
 	return hw_tf->tf_rbp;
-}
-
-/* Using SW contexts for now, for x86_64 */
-static inline void save_kernel_ctx(struct kernel_ctx *ctx)
-{
-	long dummy;
-	/* not bothering with the FP fields */
-	asm volatile("mov %%rsp, 0x48(%0);   " /* save rsp in its slot*/
-	             "leaq 1f, %%rax;        " /* get future rip */
-	             "mov %%rax, 0x40(%0);   " /* save rip in its slot*/
-	             "mov %%r15, 0x38(%0);   "
-	             "mov %%r14, 0x30(%0);   "
-	             "mov %%r13, 0x28(%0);   "
-	             "mov %%r12, 0x20(%0);   "
-	             "mov %%rbp, 0x18(%0);   "
-	             "mov %%rbx, 0x10(%0);   "
-	             "1:                     " /* where this tf will restart */
-				 : "=D"(dummy) /* force rdi clobber */
-				 : "D"(&ctx->sw_tf)
-	             : "rax", "rcx", "rdx", "rsi", "r8", "r9", "r10", "r11",
-	               "memory", "cc");
 }
 
 static inline uintptr_t x86_get_ip_hw(struct hw_trapframe *hw_tf)

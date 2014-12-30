@@ -13,6 +13,7 @@
 #include <trap.h>
 #include <sys/queue.h>
 #include <atomic.h>
+#include <setjmp.h>
 
 struct proc;
 struct kthread;
@@ -26,7 +27,7 @@ TAILQ_HEAD(semaphore_tailq, semaphore);
  * a kthread is running, we make sure its stacktop is the default kernel stack,
  * meaning it will receive the interrupts from userspace. */
 struct kthread {
-	struct kernel_ctx			context;
+	struct jmpbuf				context;
 	uintptr_t					stacktop;
 	struct proc					*proc;
 	struct syscall				*sysc;

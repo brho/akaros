@@ -23,26 +23,6 @@
 #include <kdebug.h>
 #include <kmalloc.h>
 
-/* Starts running the current TF, just using ret. */
-void pop_kernel_ctx(struct kernel_ctx *ctx)
-{
-	asm volatile ("movl %1,%%esp;           " /* move to future stack */
-	              "pushl %2;                " /* push cs */
-	              "movl %0,%%esp;           " /* move to TF */
-	              "addl $0x20,%%esp;        " /* move to tf_gs slot */
-	              "movl %1,(%%esp);         " /* write future esp */
-	              "subl $0x20,%%esp;        " /* move back to tf start */
-	              "popal;                   " /* restore regs */
-	              "popl %%esp;              " /* set stack ptr */
-	              "subl $0x4,%%esp;         " /* jump down past CS */
-	              "ret                      " /* return to the EIP */
-	              :
-	              : "g"(&ctx->hw_tf), "r"(ctx->hw_tf.tf_esp),
-	                "r"(ctx->hw_tf.tf_eip)
-	              : "memory");
-	panic("ret failed");				/* mostly to placate your mom */
-}
-
 static void print_regs(push_regs_t *regs)
 {
 	printk("  edi  0x%08x\n", regs->reg_edi);

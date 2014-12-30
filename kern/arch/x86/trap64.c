@@ -23,25 +23,6 @@
 #include <kdebug.h>
 #include <kmalloc.h>
 
-/* Starts running the current TF, just using ret. */
-void pop_kernel_ctx(struct kernel_ctx *ctx)
-{
-	struct sw_trapframe *tf = &ctx->sw_tf;
-	/* We're starting at rbx's spot in the sw_tf */
-	asm volatile ("movq %0, %%rsp;          "
-				  "popq %%rbx;              "
-				  "popq %%rbp;              "
-				  "popq %%r12;              "
-				  "popq %%r13;              "
-				  "popq %%r14;              "
-				  "popq %%r15;              "
-				  "popq %%rax;              " /* pop rip */
-				  "popq %%rsp;              "
-				  "jmp *%%rax;              " /* stored rip */
-				  : : "g"(&ctx->sw_tf.tf_rbx) : "memory");
-	panic("ret failed");
-}
-
 void print_trapframe(struct hw_trapframe *hw_tf)
 {
 	static spinlock_t ptf_lock = SPINLOCK_INITIALIZER_IRQSAVE;

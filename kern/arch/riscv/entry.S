@@ -38,6 +38,7 @@ save_kernel_tf_asm:
   STORE  ra,33*REGBYTES(a0)
   ret
 
+# Remove these (or this comment) when implementing setjmp on riscv.
   .text
   .global pop_kernel_ctx
 pop_kernel_ctx:

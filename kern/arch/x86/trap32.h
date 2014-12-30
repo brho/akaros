@@ -14,11 +14,6 @@
 #error "Do not include arch/trap32.h directly."
 #endif
 
-/* For kernel contexts, when we save/restore/move them around. */
-struct kernel_ctx {
-	struct hw_trapframe 		hw_tf;
-};
-
 static inline bool in_kernel(struct hw_trapframe *hw_tf)
 {
 	return (hw_tf->tf_cs & ~3) == GD_KT;
@@ -32,27 +27,6 @@ static inline uintptr_t get_hwtf_pc(struct hw_trapframe *hw_tf)
 static inline uintptr_t get_hwtf_fp(struct hw_trapframe *hw_tf)
 {
 	return hw_tf->tf_regs.reg_ebp;
-}
-
-static inline void save_kernel_ctx(struct kernel_ctx *ctx)
-{
-	/* Save the regs and the future esp. */
-	/* Careful when updating; %0, %1, and %2 are not listed as clobbers */
-	asm volatile("movl %%esp,(%0);       " /* save esp in it's slot*/
-	             "pushl %%eax;           " /* temp save eax */
-	             "leal 1f,%%eax;         " /* get future eip */
-	             "movl %%eax,(%1);       " /* store future eip */
-	             "popl %%eax;            " /* restore eax */
-	             "movl %2,%%esp;         " /* move to the beginning of the tf */
-	             "addl $0x20,%%esp;      " /* move to after the push_regs */
-	             "pushal;                " /* save regs */
-	             "addl $0x44,%%esp;      " /* move to esp slot */
-	             "popl %%esp;            " /* restore esp */
-	             "1:                     " /* where this tf will restart */
-	             : 
-	             : "r"(&ctx->hw_tf.tf_esp), "r"(&ctx->hw_tf.tf_eip),
-	               "g"(&ctx->hw_tf)
-	             : "eax", "memory", "cc");
 }
 
 static inline uintptr_t x86_get_ip_hw(struct hw_trapframe *hw_tf)

@@ -22,12 +22,6 @@
 /* this is for an ipi that just wakes a core, but has no handler (for now) */
 #define I_POKE_CORE 254
 
-/* For kernel contexts, when we save/restore/move them around. */
-struct kernel_ctx {
-	/* RISCV's current pop_kernel_ctx assumes the hw_tf is the first member */
-	struct hw_trapframe 		hw_tf;
-};
-
 static inline bool in_kernel(struct hw_trapframe *hw_tf)
 {
 	return hw_tf->sr & SR_PS;
@@ -60,15 +54,6 @@ set_frame_pointer(uintptr_t fp)
 {
 	#warning "brho is just guessing here."
 	asm volatile("move fp, %0" : : "r"(fp) : "memory");
-}
-
-/* Save's the current kernel context into tf, setting the PC to the end of this
- * function.  Note the kernel doesn't need to save a lot.
- * Implemented with extern function to cause compiler to clobber most regs. */
-static inline void save_kernel_ctx(struct kernel_ctx *ctx)
-{
-  extern void save_kernel_tf_asm(struct hw_trapframe*);
-	save_kernel_tf_asm(&ctx->hw_tf);
 }
 
 void handle_trap(struct hw_trapframe *hw_tf);

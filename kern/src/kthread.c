@@ -107,7 +107,7 @@ void restart_kthread(struct kthread *kthread)
 		pcpui->cur_proc = kthread->proc;
 	}
 	/* Finally, restart our thread */
-	pop_kernel_ctx(&kthread->context);
+	longjmp(&kthread->context, 1);
 }
 
 /* Kmsg handler to launch/run a kthread.  This must be a routine message, since
@@ -278,7 +278,6 @@ bool sem_trydown(struct semaphore *sem)
  * signal is already there is not optimized. */
 void sem_down(struct semaphore *sem)
 {
-	volatile bool blocking = TRUE;	/* signal to short circuit when restarting*/
 	struct kthread *kthread, *new_kthread;
 	register uintptr_t new_stacktop;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
@@ -360,11 +359,8 @@ void sem_down(struct semaphore *sem)
 	} else {
 		kthread->proc = 0;
 	} 
-	/* Save the context, toggle blocking for the reactivation */
-	save_kernel_ctx(&kthread->context);
-	if (!blocking)
+	if (setjmp(&kthread->context))
 		goto block_return_path;
-	blocking = FALSE;					/* for when it starts back up */
 	/* Down the semaphore.  We need this to be inline.  If we're sleeping, once
 	 * we unlock the kthread could be started up again and can return and start
 	 * trashing this function's stack, hence the weird control flow. */
@@ -412,12 +408,10 @@ unwind_sleep_prep:
 #endif /* CONFIG_KTHREAD_POISON */
 block_return_path:
 	printd("[kernel] Returning from being 'blocked'! at %llu\n", read_tsc());
-	/* restart_kthread and pop_kernel_ctx do not reenable IRQs.  IRQs (and
-	 * flags) are in whatever state they were in by the restart code (disabled,
-	 * flags are garbage.  save_kernel_ctx expects the flags to be clobbered.
-	 * ("cc")).  We need to make sure irqs are on if they were on when we
-	 * started to block.  If they were already on and we short-circuited the
-	 * block, it's harmless to reenable them. */
+	/* restart_kthread and longjmp did not reenable IRQs.  We need to make sure
+	 * irqs are on if they were on when we started to block.  If they were
+	 * already on and we short-circuited the block, it's harmless to reenable
+	 * them. */
 	if (irqs_were_on)
 		enable_irq();
 	return;
