@@ -171,7 +171,7 @@ void sync_stop(void)
 	profile_event_unregister(PROFILE_MUNMAP, &munmap_nb);
 	profile_event_unregister(PROFILE_TASK_EXIT, &task_exit_nb);
 	task_handoff_unregister(&task_free_nb);
-	barrier();			/* do all of the above first */
+	cmb();			/* do all of the above first */
 
 	flush_cpu_work();
 

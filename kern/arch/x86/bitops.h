@@ -7,8 +7,6 @@
  * Note: inlines with more than a single statement should be marked
  * __always_inline to avoid problems with older gcc's inlining heuristics.
  */
-// barrier? Where is that defined? 
-#define barrier()
 
 #define BIT_64(n)			(U64_C(1) << (n))
 #define DECLARE_BITMAP(name,bits) \
@@ -29,8 +27,7 @@
 
 #define ADDR				BITOP_ADDR(addr)
 
-/* no idea what to really do about this */
-#define LOCK_PREFIX
+#define LOCK_PREFIX "lock "
 /*
  * We do the locked ops that don't return the old value as
  * a mask operation on a byte.
@@ -91,7 +88,14 @@ static inline void __set_bit(int nr, volatile unsigned long *addr)
  * not contain a memory barrier, so if it is used for locking purposes,
  * you should call smp_mb__before_clear_bit() and/or smp_mb__after_clear_bit()
  * in order to ensure changes are visible on other processors.
- */
+ * 
+ * Note from brho: I think the use of LOCK_PREFIX (assuming it is "lock")
+ * provides a memory barrier against hardware reordering accesses around the
+ * LOCK ("lock" serializes).  This lacks a cmb() (called a barrier() in Linux),
+ * which would prevent the compiler from reordering the instructions.  The
+ * above-mentioned smp_mb__before_clear_bit appears to be this cmb(), so it's
+ * not clear what the usage of "memory barrier" means exactly here and
+ * elsewhere in this file. */
 static __always_inline void
 clear_bit(int nr, volatile unsigned long *addr)
 {
@@ -116,7 +120,7 @@ clear_bit(int nr, volatile unsigned long *addr)
  */
 static inline void clear_bit_unlock(unsigned nr, volatile unsigned long *addr)
 {
-  //barrier();
+	cmb();
 	clear_bit(nr, addr);
 }
 
@@ -139,12 +143,12 @@ static inline void __clear_bit(int nr, volatile unsigned long *addr)
  */
 static inline void __clear_bit_unlock(unsigned nr, volatile unsigned long *addr)
 {
-	barrier();
+	cmb();
 	__clear_bit(nr, addr);
 }
 
-#define smp_mb__before_clear_bit()	barrier()
-#define smp_mb__after_clear_bit()	barrier()
+#define smp_mb__before_clear_bit()	cmb()
+#define smp_mb__after_clear_bit()	cmb()
 
 /**
  * __change_bit - Toggle a bit in memory
