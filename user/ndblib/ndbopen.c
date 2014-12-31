@@ -187,7 +187,8 @@ hffree(struct ndb *db)
 int
 ndbchanged(struct ndb *db)
 {
-#warning "ndbchanged always returns 0"
+	/* TODO: implement me (no one calls this yet) */
+	assert(0);
 	return 0;
 #if 0
 	struct ndb *ndb;

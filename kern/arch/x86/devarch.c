@@ -74,6 +74,9 @@ spinlock_t archwlock;			/* the lock is only for changing archdir */
 int narchdir = Qbase;
 int gdbactive = 0;
 
+/* If we use these, put this in a header */
+int ioalloc(int port, int size, int align, char *tag);
+
 /*
  * Add a file to the #P listing.  Once added, you can't delete it.
  * You can't add a file with the same name as one already there,
@@ -117,6 +120,7 @@ void ioinit(void)
 	int i;
 	char *excluded = "";
 
+	panic("Akaros doesn't do IO port allocation yet.  Don't init.");
 	for (i = 0; i < ARRAY_SIZE(iomap.maps) - 1; i++)
 		iomap.maps[i].next = &iomap.maps[i + 1];
 	iomap.maps[i].next = NULL;
@@ -140,8 +144,7 @@ void ioinit(void)
 			*ends++ = '\0';
 		s = ends;
 
-#warning "how do we do io allocate"
-		//ioalloc(io_s, io_e - io_s + 1, 0, "pre-allocated");
+		ioalloc(io_s, io_e - io_s + 1, 0, "pre-allocated");
 	}
 }
 
@@ -503,10 +506,6 @@ struct dev archdevtab __devtab = {
 void nop(void)
 {
 }
-
-//void (*coherence)(void) = mfence;
-#warning "need memory fence"
-#define coherence()
 
 static long cputyperead(struct chan *unused, void *a, long n, int64_t off)
 {

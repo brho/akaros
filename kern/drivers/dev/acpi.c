@@ -1398,7 +1398,6 @@ static unsigned int getgpests(int n)
 	return inb(gpes[n].stsio) & 1 << gpes[n].stsbit;
 }
 
-#warning "no acpi interrupts yet"
 #if 0
 static void acpiintr(Ureg *, void *)
 {
