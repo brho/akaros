@@ -34,7 +34,12 @@ typedef unsigned long uintreg_t;
 #define PiB	1125899906842624ull
 #define EiB	1152921504606846976ull
 
+/* Test for alignment, e.g. 2^6 */
 #define ALIGNED(p, a)	(!(((uintptr_t)(p)) & ((a)-1)))
+/* Aligns x up to the mask, e.g. (2^6 - 1) */
+#define __ALIGN_MASK(x, mask)       (((x) + (mask)) & ~(mask))
+/* Will return false for 0.  Debatable, based on what you want. */
+#define IS_PWR2(x) ((x) && !((x) & (x - 1)))
 
 #define ARRAY_SIZE(x) (sizeof((x))/sizeof((x)[0]))
 

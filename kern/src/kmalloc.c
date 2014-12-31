@@ -107,6 +107,7 @@ void *kmalloc_align(size_t size, int flags, size_t align)
 	/* must fit in the space reserved for the offset amount, which is at most
 	 * 'align'. */
 	assert(align < (1 << (32 - KMALLOC_ALIGN_SHIFT)));
+	assert(IS_PWR2(align));
 	addr = kmalloc(size + align, flags);
 	if (!addr)
 		return 0;

@@ -13,8 +13,6 @@
 #include <bitops.h>
 #include <bitmap.h>
 
-#warning "find where something like __ALIGN_MASK is defined"
-#define __ALIGN_MASK(x, mask)       (((x) + (mask)) & ~(mask))
 /*
  * bitmaps provide an array of bits, implemented using an an
  * array of unsigned longs.  The number of valid bits in a
