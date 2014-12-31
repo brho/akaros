@@ -361,35 +361,28 @@ void sem_down(struct semaphore *sem)
 	} 
 	if (setjmp(&kthread->context))
 		goto block_return_path;
-	/* Down the semaphore.  We need this to be inline.  If we're sleeping, once
-	 * we unlock the kthread could be started up again and can return and start
-	 * trashing this function's stack, hence the weird control flow. */
 	spin_lock(&sem->lock);
 	if (sem->nr_signals-- <= 0) {
 		TAILQ_INSERT_TAIL(&sem->waiters, kthread, link);
-		debug_downed_sem(sem);
+		debug_downed_sem(sem);	/* need to debug after inserting */
 		/* At this point, we know we'll sleep and change stacks later.  Once we
 		 * unlock, we could have the kthread restarted (possibly on another
 		 * core), so we need to disable irqs until we are on our new stack.
 		 * Otherwise, if we take an IRQ, we'll be using our stack while another
 		 * core is using it (restarted kthread).  Basically, disabling irqs
-		 * allows us to atomically unlock and 'yield'. */
+		 * allows us to atomically unlock and 'yield'.  Also, IRQs might have
+		 * already been disabled if this was an irqsave sem. */
 		disable_irq();
-	} else {							/* we didn't sleep */
-		debug_downed_sem(sem);
-		goto unwind_sleep_prep;
+		spin_unlock(&sem->lock);
+		/* Switch to the core's default stack.  After this, don't use local
+		 * variables. */
+		set_stack_pointer(new_stacktop);
+		smp_idle();							/* reenables irqs eventually */
+		assert(0);
 	}
-	spin_unlock(&sem->lock);
-	/* Switch to the core's default stack.  After this, don't use local
-	 * variables.  TODO: we shouldn't be using new_stacktop either, can't always
-	 * trust the register keyword (AFAIK). */
-	set_stack_pointer(new_stacktop);
-	smp_idle();							/* reenables irqs eventually */
-	/* smp_idle never returns */
-	assert(0);
-unwind_sleep_prep:
 	/* We get here if we should not sleep on sem (the signal beat the sleep).
-	 * Note we are not optimizing for cases where the signal won. */
+	 * We debug_downed_sem since we actually downed it - just didn't sleep. */
+	debug_downed_sem(sem);
 	spin_unlock(&sem->lock);
 	printd("[kernel] Didn't sleep, unwinding...\n");
 	/* Restore the core's current and default stacktop */
