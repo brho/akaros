@@ -7,4 +7,3 @@ extern int kopen(char *, int);
 extern long kread(int, void *, long);
 extern long kseek(int, vlong, int);
 extern long kwrite(int, void *, long);
-extern void kwerrstr(char *, ...);

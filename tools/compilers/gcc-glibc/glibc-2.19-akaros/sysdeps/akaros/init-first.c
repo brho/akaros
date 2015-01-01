@@ -18,6 +18,7 @@
    02111-1307 USA.  */
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -158,4 +159,18 @@ void
 _dl_start (void)
 {
   abort ();
+}
+
+/* There are issues using stdio as part of rtld.  You'll get errors like: 
+ * 		multiple definition of `__libc_multiple_libcs'
+ * Some info: https://sourceware.org/ml/libc-hacker/2000-01/msg00170.html
+ * For this reason, I couldn't put this in sysdeps/akaros/errno.c and still use
+ * snprintf.  init-first is a reasonable dumping ground, and is one of the
+ * sources of the multiple_libcs. */
+void werrstr(char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(errstr(), MAX_ERRSTR_LEN, fmt, ap);
+	va_end(ap);
 }

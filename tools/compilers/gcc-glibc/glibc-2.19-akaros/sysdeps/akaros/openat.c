@@ -72,8 +72,7 @@ __openat (fd, file, oflag)
 	/* TODO: actually implement openat as the primary kernel interface.  for
 	 * now, only allow absolute or relative-to-CWD paths. */
 	if (fd != AT_FDCWD && file[0] != '/') {
-		char openat_err[] = "openat not implemented";
-		memcpy(errstr(), openat_err, MIN(sizeof(openat_err), MAX_ERRSTR_LEN));
+		werrstr("openat not implemented");
 		__set_errno (ENOSYS);
 		return -1;
 	}

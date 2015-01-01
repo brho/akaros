@@ -875,7 +875,6 @@ uint32_t userpc(void);
 void validname(char *, int);
 void validwstatname(char *);
 int walk(struct chan **, char **unused_char_pp_t, int unused_int, int, int *);
-void werrstr(char *unused_char_p_t, ...);
 void *xalloc(uint32_t);
 void *xallocz(uint32_t, int);
 void xfree(void *);

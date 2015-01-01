@@ -6,6 +6,7 @@ libc {
     ros_errstr_loc;
     __errno_location;
     errstr;
+    werrstr;
     ros_syscall_blockon;
     ros_syscall_sync;
     __ros_scp_syscall_blockon;

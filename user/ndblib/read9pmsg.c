@@ -56,8 +56,7 @@ read9pmsg(int fd, void *abuf, unsigned int n)
 
 	len = GBIT32(buf);
 	if(len <= BIT32SZ || len > n){
-#warning "implement werrstr in user mode"
-		/*werrstr(*/fprintf(stderr,"bad length in 9P2000 message header");
+		werrstr("bad length in 9P2000 message header");
 		return -1;
 	}
 	len -= BIT32SZ;

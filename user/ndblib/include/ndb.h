@@ -170,7 +170,6 @@ struct ndbtuple*_ndbparseline(char *cp);
 //void		ndbsetmalloctag(struct ndbtuple*, uintptr_t);
 static inline void		ndbsetmalloctag(struct ndbtuple*t, uintptr_t v){}
 
-static inline void werrstr(char *v, ...){}
 static inline uintptr_t getcallerpc(void *v){return 0;}
 static inline void setmalloctag(void *v){}
 
