@@ -48,8 +48,9 @@ void reflect_unhandled_trap(unsigned int trap_nr, unsigned int err,
 error_out:
 	print_trapframe(hw_tf);
 	enable_irq();
-	printk("err 0x%x, aux %p\n", err, aux);
+	printk("err 0x%x (for PFs: User 4, Wr 2, Rd 1), aux %p\n", err, aux);
 	debug_addr_proc(p, get_hwtf_pc(hw_tf));
+	print_vmrs(p);
 	proc_destroy(p);
 }
 
