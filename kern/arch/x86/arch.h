@@ -80,8 +80,14 @@ static inline uint64_t read_tscp(void)
 
 static inline void mwait(void *eax)
 {
-  asm volatile("movq %0, %%rax; xorq %%rcx, %%rcx; xorq %%rdx, %%rdx; monitor; mwait\n":
-	       : "rax"(eax));
+	asm volatile("xorq %%rcx, %%rcx;"
+	             "xorq %%rdx, %%rdx;"
+	             "monitor;"
+				 /* this is racy, generically.  we never check if the write to
+				  * the monitored address happened already. */
+	             "movq $0, %%rax;"	/* c-state hint.  this is C1 */
+	             "mwait;"
+	             : : "a"(eax));
 }
 /* Check out k/a/x86/rdtsc_test.c for more info */
 static inline uint64_t read_tsc_serialized(void)
