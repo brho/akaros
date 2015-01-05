@@ -1160,10 +1160,17 @@ int mon_db(int argc, char **argv, struct hw_trapframe *hw_tf)
 	if (argc < 2) {
 		printk("Usage: db OPTION\n");
 		printk("\tsem: print all semaphore info\n");
+		printk("\taddr: for PID lookup ADDR's file/vmr info\n");
 		return 1;
 	}
 	if (!strcmp(argv[1], "sem")) {
 		print_all_sem_info();
+	} else if (!strcmp(argv[1], "addr")) {
+		if (argc < 4) {
+			printk("Usage: db addr PID 0xADDR\n");
+			return 1;
+		}
+		debug_addr_pid(strtol(argv[2], 0, 10), strtol(argv[3], 0, 16));
 	} else {
 		printk("Bad option\n");
 		return 1;
