@@ -6,6 +6,8 @@
  *
  * devnix/#t: a device for NIX mode
  *
+ * FOR THE MOMENT, this is only intended to run one NIX at a time.
+ * Too many sharp edges for any other mode.
  */
 
 #include <kmalloc.h>
@@ -23,7 +25,6 @@
 #include <umem.h>
 #include <devalarm.h>
 #include <arch/types.h>
-#include <arch/nix.h>
 #include <arch/emulate.h>
 #include <arch/vmdebug.h>
 #include <kdebug.h>
@@ -64,8 +65,7 @@ static int npages;
 // only 4 gig for now.
 static page_t *nixpages[1048576];
 
-static spinlock_t nixidlock[1];
-static struct kref nixid[1] = { {(void *)1, fake_release} };
+static atomic_t nixid;
 
 //int nix_run(struct nix *nix, struct nix_run *nix_run);
 
@@ -137,11 +137,7 @@ static void nix_release(struct kref *kref)
 static int newnixid(void)
 {
 	print_func_entry();
-	int id;
-	spin_lock_irqsave(nixidlock);
-	id = kref_refcnt(nixid);
-	kref_get(nixid, 1);
-	spin_unlock(nixidlock);
+	int id = atomic_fetch_and_add(&nixid, 1);
 	print_func_exit();
 	return id - 1;
 }
@@ -255,8 +251,7 @@ static void nixinit(void)
 	//error_t kpage_alloc_specific(page_t** page, size_t ppn)
 	print_func_entry();
 	uint64_t ppn = GiB/4096;
-	spinlock_init_irqsave(&nixlock);
-	spinlock_init_irqsave(nixidlock);
+	spinlock_init_irqsave(nixid);
 	while (1) {
 		if (!page_is_free(ppn)) {
 			printk("%s: got a non-free page@ppn %p\n", __func__, ppn);
@@ -393,7 +388,8 @@ static void nixclose(struct chan *c)
 		return;
 	}
 	switch (TYPE(c->qid)) {
-		/* for now, leave the NIX active even when we close ctl */
+		/* the idea of 'stopping' a nix is tricky. 
+		 * for now, leave the NIX active even when we close ctl */
 	case Qctl:
 		break;
 	case Qimage:
@@ -441,7 +437,7 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 {
 	struct nix *v = c->aux;
 	print_func_entry();
-	ERRSTACK(3);
+	ERRSTACK(1);
 	char buf[32];
 	struct cmdbuf *cb;
 	struct nix *nix;
