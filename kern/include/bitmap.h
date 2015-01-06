@@ -1,6 +1,8 @@
 #ifndef __LINUX_BITMAP_H
 #define __LINUX_BITMAP_H
 
+#include <bitops.h>
+
 /*
  * bitmaps provide bit arrays that consume one or more unsigned
  * longs.  The bitmap interface and available operations are listed
