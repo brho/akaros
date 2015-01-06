@@ -1,5 +1,6 @@
 obj-y						+= acpi.o
 obj-y						+= alarm.o
+#obj-y						+= bxe/
 obj-y						+= coreboot.o
 obj-y						+= cons.o
 obj-y						+= ether.o
