@@ -27,6 +27,7 @@
 #include <arch/emulate.h>
 #include <arch/vmdebug.h>
 #include <kdebug.h>
+#include <bitmap.h>
 
 /* qid path types */
 enum {
@@ -50,22 +51,10 @@ struct nix {
 	void *image;
 	unsigned long imagesize;
 	int id; // not used yet.
+	/* we could dynamically alloc one of these with num_cpus */
+	DECLARE_BITMAP(cpus, MAX_NUM_CPUS);
 };
 
-// NIX style application cores for now.
-// we set result to zero. We spin on assignment.
-// assigner sets work pointer and then assignment IP.
-// once assigned, we run until done, then set result non-zero.
-struct mycore {
-	void (*assignment)(void);
-	void *work;
-	void *result;
-	void *done;
-	int usable;
-	int state;
-};
-
-static struct mycore allcores[32];
 static spinlock_t nixlock;
 /* array, not linked list. We expect few, might as well be cache friendly. */
 static struct nix *nixs = NULL;
@@ -257,36 +246,7 @@ static int nixgen(struct chan *c, char *entry_name,
 
 void nixtest(void)
 {
-	int core = hw_core_id();
-	allcores[core].state = 2;
-	wmb();
 	printk("nixtest\n");
-	allcores[core].assignment = 0;
-	wmb();
-}
-
-void nixhost(uint32_t srcid, long a0, long a1, long a2)
-{
-	int core = a0;
-	printk("nixhost server starting: %d %d %d %d\n", srcid, core, a1, a2);
-	allcores[core].assignment = 0;
-	allcores[core].usable = 1;
-	allcores[core].state = 0;
-	while (1) {
-		while (allcores[core].assignment == (void *)0) {
-			allcores[core].state = 0;
-			wmb();
-			//printk("mwait for assignment\n");
-			mwait(&allcores[core].assignment);
-		}
-		allcores[core].state = 1;
-		wmb();
-		printk("Core %d assigned %p\n", allcores[core].assignment);
-		(allcores[core].assignment)();
-		allcores[core].assignment = 0;
-		allcores[core].state = 2;
-		wmb();
-	}
 }
 
 // allocate pages, starting at 1G, and running until we run out.
@@ -311,12 +271,6 @@ static void nixinit(void)
 	if (npages > 0) {
 		nixok = 1;
 	}
-
-	int nix_coreid = get_any_idle_core();
-	/* TODO: gracefully fail */
-	assert(nix_coreid >= 0);
-	send_kernel_message(nix_coreid, nixhost, nix_coreid, 0, 0, KMSG_ROUTINE);
-	printk("Using core %d for a NIX host\n", nix_coreid);
 
 	print_func_exit();
 }
@@ -378,6 +332,7 @@ static struct chan *nixopen(struct chan *c, int omode)
 		v->image = KADDR(GiB);
 		v->imagesize = npages * 4096;
 		c->aux = v;
+		bitmap_zero(v->cpus, MAX_NUM_CPUS);
 		printd("New NIX id %d @ %p\n", v->id, v);
 		printk("image is %p with %d bytes\n", v->image, v->imagesize);
 		printk("Qclone open: id %d, v is %p\n", nnix-1, v);
@@ -476,6 +431,12 @@ static long nixread(struct chan *c, void *ubuf, long n, int64_t offset)
 	return 0;
 }
 
+static void nixwrapper(uint32_t srcid, long a0, long a1, long a2)
+{
+	void (*f)(void) = (void (*)(void))a0;
+	f();
+}
+
 static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 {
 	struct nix *v = c->aux;
@@ -495,6 +456,7 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 		nix = c->aux;
 		printk("qctl: nix is %p, nix is %p\n", nix, nix);
 		cb = parsecmd(ubuf, n);
+		/* TODO: lock the nix here, unlock in waserror and before popping */
 		if (waserror()) {
 			kfree(cb);
 			nexterror();
@@ -506,10 +468,9 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 				error("usage: run core entry");
 			core = strtoul(cb->f[1], 0, 0);
 			ip = strtoul(cb->f[2], 0, 0);
-			if (!allcores[core].usable)
+			if (!test_bit(core, nix->cpus))
 				error("Bad core %d", core);
-			allcores[core].assignment = (void *)ip;
-			wmb();
+			send_kernel_message(core, nixwrapper, (long)ip, 0, 0, KMSG_ROUTINE);
 			printk("nix_run returns \n");
 			print_func_exit();
 		} else if (!strcmp(cb->f[0], "test")) {
@@ -517,24 +478,32 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 			if (cb->nf != 2)
 				error("usage: test core");
 			core = strtoul(cb->f[1], 0, 0);
-			if (!allcores[core].usable)
+			if (!test_bit(core, nix->cpus))
 				error("Bad core %d", core);
-			allcores[core].assignment = nixtest;
-			wmb();
-			printk("nix_run returns \n");
+			send_kernel_message(core, nixwrapper, (long)nixtest, 0, 0,
+			                    KMSG_ROUTINE);
+			printk("nix_run (test) returns \n");
 			print_func_exit();
+		} else if (!strcmp(cb->f[0], "reserve")) {
+			int core;
+			if (cb->nf != 2)
+				error("Usage: reserve core (-1 for any)");
+			core = strtol(cb->f[1], 0, 0);
+			if (core == -1) {
+				core = get_any_idle_core();
+				if (core < 0)
+					error("No free idle cores!");
+			} else {
+				if (get_this_idle_core(core) < 0)
+					error("Failed to reserve core %d\n", core);
+			}
+			set_bit(core, nix->cpus);
 		} else if (!strcmp(cb->f[0], "check")) {
 			int i;
-			for(i = 0; i < ARRAY_SIZE(allcores); i++) {
-				if (! allcores[i].usable)
+			for(i = 0; i < MAX_NUM_CPUS; i++) {
+				if (!test_bit(i, nix->cpus))
 					continue;
-				printk("%p %p %p %p %d %d\n",
-				       allcores[i].assignment,
-				       allcores[i].work,
-				       allcores[i].result,
-				       allcores[i].done,
-				       allcores[i].usable,
-				       allcores[i].state);
+				printk("Core %d is available to nix%d\n", i, nix->id);
 			}
 		} else if (!strcmp(cb->f[0], "stop")) {
 			error("can't stop a nix yet");
