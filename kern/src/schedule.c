@@ -19,6 +19,7 @@
 #include <alarm.h>
 #include <sys/queue.h>
 #include <kmalloc.h>
+#include <arsc_server.h>
 
 /* Process Lists.  'unrunnable' is a holding list for SCPs that are running or
  * waiting or otherwise not considered for sched decisions. */
@@ -138,17 +139,14 @@ void schedule_init(void)
 	for (int i = 1; i < num_cpus; i += 2)
 		TAILQ_INSERT_TAIL(&idlecores, pcoreid2spc(i), alloc_next);
 #endif /* CONFIG_DISABLE_SMT */
-#ifdef CONFIG_ARSC_SERVER
-	struct sched_pcore *a_core = TAILQ_FIRST(&idlecores);
-	assert(a_core);
-	TAILQ_REMOVE(&idlecores, a_core, alloc_next);
-	send_kernel_message(spc2pcoreid(a_core), arsc_server, 0, 0, 0,
-	                    KMSG_ROUTINE);
-	warn("Using core %d for the ARSCs - there are probably issues with this.",
-	     spc2pcoreid(a_core));
-#endif /* CONFIG_ARSC_SERVER */
 	spin_unlock(&sched_lock);
-	return;
+
+#ifdef CONFIG_ARSC_SERVER
+	int arsc_coreid = get_any_idle_core();
+	assert(arsc_coreid >= 0);
+	send_kernel_message(arsc_coreid, arsc_server, 0, 0, 0, KMSG_ROUTINE);
+	printk("Using core %d for the ARSC server\n", arsc_coreid);
+#endif /* CONFIG_ARSC_SERVER */
 }
 
 static uint32_t spc2pcoreid(struct sched_pcore *spc)

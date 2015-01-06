@@ -312,27 +312,12 @@ static void nixinit(void)
 		nixok = 1;
 	}
 
-	// are your cpu etc. etc.
-	// there has to be a better way but for now make it work.
-	int seen_0 = 0;
-	struct sched_pcore *p;
-	extern struct sched_pcore_tailq idlecores;
-	extern struct sched_pcore *all_pcores;
-	TAILQ_FOREACH(p, &idlecores, alloc_next) {
-		int coreid = p - all_pcores;
-		if (! coreid) {
-			if (seen_0++ > 1)
-				break;
-		}
-		if (coreid > 3){
-			TAILQ_REMOVE(&idlecores, p, alloc_next);
-			send_kernel_message(coreid, nixhost, coreid, 0, 0,
-					    KMSG_ROUTINE);
-			warn("Using core %d for the ARSCs - there are probably issues with this.", coreid);
-			break;
+	int nix_coreid = get_any_idle_core();
+	/* TODO: gracefully fail */
+	assert(nix_coreid >= 0);
+	send_kernel_message(nix_coreid, nixhost, nix_coreid, 0, 0, KMSG_ROUTINE);
+	printk("Using core %d for a NIX host\n", nix_coreid);
 
-		}
-	}
 	print_func_exit();
 }
 
