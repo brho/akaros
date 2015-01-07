@@ -67,7 +67,6 @@ static page_t *nixpages[1048576];
 
 static atomic_t nixid = 0;
 
-//int nix_run(struct nix *nix, struct nix_run *nix_run);
 
 static inline struct nix *
 QID2NIX(struct qid q)
@@ -89,7 +88,6 @@ static inline int QID(int index, int type)
 /* we'll need this somewhere more generic. */
 static void readn(struct chan *c, void *vp, long n)
 {
-	print_func_entry();
 	char *p;
 	long nn;
 	int total = 0, want = n;
@@ -105,13 +103,11 @@ static void readn(struct chan *c, void *vp, long n)
 		n -= nn;
 		total += nn;
 	}
-	print_func_exit();
 }
 
 /* not called yet.  -- we have to unlink the nix */
 static void nix_release(struct kref *kref)
 {
-	print_func_entry();
 	struct nix *v = container_of(kref, struct nix, kref);
 	spin_lock_irqsave(&nixlock);
 	/* cute trick. Save the last element of the array in place of the
@@ -129,59 +125,46 @@ static void nix_release(struct kref *kref)
 	}
 	nnix--;
 	spin_unlock(&nixlock);
-	print_func_exit();
 }
 
 /* NIX ids run in the range 1..infinity.
  */
 static int newnixid(void)
 {
-	print_func_entry();
-	int id = atomic_fetch_and_add(&nixid, 1);
-	print_func_exit();
-	return id;
+	return atomic_fetch_and_add(&nixid, 1);
 }
 
 static int nixgen(struct chan *c, char *entry_name,
 		   struct dirtab *unused, int unused_nr_dirtab,
 		   int s, struct dir *dp)
 {
-	print_func_entry();
 	struct qid q;
 	struct nix *nix_i;
-	printd("GEN s %d\n", s);
 	/* Whether we're in one dir or at the top, .. still takes us to the top. */
 	if (s == DEVDOTDOT) {
 		mkqid(&q, Qtopdir, 0, QTDIR);
 		devdir(c, c->qid, "#V", 0, eve, 0555, dp);
-		print_func_exit();
 		return 1;
 	}
-	printd("TYPE %d\n", TYPE(c->qid));
 	switch (TYPE(c->qid)) {
 	case Qtopdir:
-		printd("Qtopdir s %d nnix %d\n", s, nnix);
 		/* Generate elements for the top level dir.  We support clone, stat,
 		 * nix dirs at the top level */
 		if (s == 0) {
 			mkqid(&q, Qclone, 0, QTFILE);
 			devdir(c, q, "clone", 0, eve, 0666, dp);
-			print_func_exit();
 			return 1;
 		}
 		s--;
 		if (s == 0) {
 			mkqid(&q, Qstat, 0, QTFILE);
 			devdir(c, q, "stat", 0, eve, 0666, dp);
-			print_func_exit();
 			return 1;
 		}
 		s--;	/* 1 -> 0th element, 2 -> 1st element, etc */
 		spin_lock_irqsave(&nixlock);
 		if (s >= nnix) {
-			printd("DONE qtopdir\n");
 			spin_unlock(&nixlock);
-			print_func_exit();
 			return -1;
 		}
 		nix_i = &nixs[s];
@@ -189,7 +172,6 @@ static int nixgen(struct chan *c, char *entry_name,
 		spin_unlock(&nixlock);
 		mkqid(&q, QID(s, Qnixdir), 0, QTDIR);
 		devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
-		print_func_exit();
 		return 1;
 	case Qnixdir:
 		/* Gen the contents of the nix dirs */
@@ -198,15 +180,12 @@ static int nixgen(struct chan *c, char *entry_name,
 		case Qctl:
 			mkqid(&q, QID(s-Qctl, Qctl), 0, QTFILE);
 			devdir(c, q, "ctl", 0, eve, 0666, dp);
-			print_func_exit();
 			return 1;
 		case Qimage:
 			mkqid(&q, QID(s-Qctl, Qimage), 0, QTFILE);
 			devdir(c, q, "image", 0, eve, 0666, dp);
-			print_func_exit();
 			return 1;
 		}
-		print_func_exit();
 		return -1;
 		/* Need to also provide a direct hit for Qclone and all other files (at
 		 * all levels of the hierarchy).  Every file is both
@@ -221,35 +200,29 @@ static int nixgen(struct chan *c, char *entry_name,
 		 * stat output (check the -1 case in devstat). */
 	case Qclone:
 		devdir(c, c->qid, "clone", 0, eve, 0666, dp);
-		print_func_exit();
 		return 1;
 	case Qstat:
 		devdir(c, c->qid, "stat", 0, eve, 0444, dp);
-		print_func_exit();
 		return 1;
 	case Qctl:
 		devdir(c, c->qid, "ctl", 0, eve, 0666, dp);
-		print_func_exit();
 		return 1;
 	case Qimage:
 		devdir(c, c->qid, "image", 0, eve, 0666, dp);
-		print_func_exit();
 		return 1;
 	}
-	print_func_exit();
 	return -1;
 }
 
 void nixtest(void)
 {
-	printk("nixtest\n");
+	printk("nixtest ran on core %d\n", core_id());
 }
 
 // allocate pages, starting at 1G, and running until we run out.
 static void nixinit(void)
 {
 	//error_t kpage_alloc_specific(page_t** page, size_t ppn)
-	print_func_entry();
 	uint64_t ppn = GiB/4096;
 	while (1) {
 		if (!page_is_free(ppn)) {
@@ -265,33 +238,25 @@ static void nixinit(void)
 	if (npages > 0) {
 		nixok = 1;
 	}
-
-	print_func_exit();
 }
 
 static struct chan *nixattach(char *spec)
 {
-	print_func_entry();
 	if (!nixok)
 		error("No NIXs available");
 	struct chan *c = devattach('t', spec);
 	mkqid(&c->qid, Qtopdir, 0, QTDIR);
-	print_func_exit();
 	return c;
 }
 
 static struct walkqid *nixwalk(struct chan *c, struct chan *nc, char **name,
 				int nname)
 {
-	print_func_entry();
-	print_func_exit();
 	return devwalk(c, nc, name, nname, 0, 0, nixgen);
 }
 
 static int nixstat(struct chan *c, uint8_t * db, int n)
 {
-	print_func_entry();
-	print_func_exit();
 	return devstat(c, db, n, 0, 0, nixgen);
 }
 
@@ -299,10 +264,8 @@ static int nixstat(struct chan *c, uint8_t * db, int n)
  * the open chan into p's fd table, then decref the chan. */
 static struct chan *nixopen(struct chan *c, int omode)
 {
-	print_func_entry();
 	ERRSTACK(1);
 	struct nix *v = QID2NIX(c->qid);
-	printk("nixopen: v is %p\n", v);
 	if (waserror()) {
 		nexterror();
 	}
@@ -325,11 +288,9 @@ static struct chan *nixopen(struct chan *c, int omode)
 		v->id = newnixid();
 		v->image = KADDR(GiB);
 		v->imagesize = npages * 4096;
+		printk("nix image is %p with %d bytes\n", v->image, v->imagesize);
 		c->aux = v;
 		bitmap_zero(v->cpus, MAX_NUM_CPUS);
-		printd("New NIX id %d @ %p\n", v->id, v);
-		printk("image is %p with %d bytes\n", v->image, v->imagesize);
-		printk("Qclone open: id %d, v is %p\n", nnix-1, v);
 		break;
 	case Qstat:
 		break;
@@ -337,7 +298,6 @@ static struct chan *nixopen(struct chan *c, int omode)
 	case Qimage:
 		//kref_get(&v->kref, 1);
 		c->aux = QID2NIX(c->qid);
-		printk("open qctl/image: aux (nix) is %p\n", c->aux);
 		break;
 	}
 	c->mode = openmode(omode);
@@ -345,47 +305,35 @@ static struct chan *nixopen(struct chan *c, int omode)
 	c->flag |= COPEN;
 	c->offset = 0;
 	poperror();
-	print_func_exit();
 	return c;
 }
 
 static void nixcreate(struct chan *c, char *name, int omode, uint32_t perm)
 {
-	print_func_entry();
 	error(Eperm);
-	print_func_exit();
 }
 
 static void nixremove(struct chan *c)
 {
-	print_func_entry();
 	error(Eperm);
-	print_func_exit();
 }
 
 static int nixwstat(struct chan *c, uint8_t * dp, int n)
 {
-	print_func_entry();
 	error("No nixwstat");
-	print_func_exit();
 	return 0;
 }
 
 static void nixclose(struct chan *c)
 {
-	print_func_entry();
 	struct nix *v = c->aux;
-	if (!v) {
-		print_func_exit();
+	if (!v)
 		return;
-	}
 	/* There are more closes than opens.  For instance, sysstat doesn't open,
 	 * but it will close the chan it got from namec.  We only want to clean
 	 * up/decref chans that were actually open. */
-	if (!(c->flag & COPEN)) {
-		print_func_exit();
+	if (!(c->flag & COPEN))
 		return;
-	}
 	switch (TYPE(c->qid)) {
 		/* the idea of 'stopping' a nix is tricky. 
 		 * for now, leave the NIX active even when we close ctl */
@@ -395,34 +343,26 @@ static void nixclose(struct chan *c)
 		//kref_put(&v->kref);
 		break;
 	}
-	print_func_exit();
 }
 
 static long nixread(struct chan *c, void *ubuf, long n, int64_t offset)
 {
-	print_func_entry();
 	struct nix *v = c->aux;
-	printd("NIXREAD\n");
 	switch (TYPE(c->qid)) {
 	case Qtopdir:
 	case Qnixdir:
-		print_func_exit();
 		return devdirread(c, ubuf, n, 0, 0, nixgen);
 	case Qstat:
-		print_func_exit();
 		return readnum(offset, ubuf, n, nnix, NUMSIZE32);
 	case Qctl:
 		assert(v);
-		print_func_exit();
 		return readnum(offset, ubuf, n, v->id, NUMSIZE32);
 	case Qimage:
 		assert(v);
-		print_func_exit();
 		return readmem(offset, ubuf, n, v->image, v->imagesize);
 	default:
 		panic("Bad QID %p in devnix", c->qid.path);
 	}
-	print_func_exit();
 	return 0;
 }
 
@@ -435,13 +375,11 @@ static void nixwrapper(uint32_t srcid, long a0, long a1, long a2)
 static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 {
 	struct nix *v = c->aux;
-	print_func_entry();
 	ERRSTACK(1);
 	char buf[32];
 	struct cmdbuf *cb;
 	struct nix *nix;
 	uint64_t hexval;
-	printd("nixwrite(%p, %p, %d)\n", c, ubuf, n);
 	switch (TYPE(c->qid)) {
 	case Qtopdir:
 	case Qnixdir:
@@ -449,7 +387,6 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 		error(Eperm);
 	case Qctl:
 		nix = c->aux;
-		printk("qctl: nix is %p, nix is %p\n", nix, nix);
 		cb = parsecmd(ubuf, n);
 		/* TODO: lock the nix here, unlock in waserror and before popping */
 		if (waserror()) {
@@ -466,8 +403,6 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 			if (!test_bit(core, nix->cpus))
 				error("Bad core %d", core);
 			send_kernel_message(core, nixwrapper, (long)ip, 0, 0, KMSG_ROUTINE);
-			printk("nix_run returns \n");
-			print_func_exit();
 		} else if (!strcmp(cb->f[0], "test")) {
 			int core;
 			if (cb->nf != 2)
@@ -477,8 +412,6 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 				error("Bad core %d", core);
 			send_kernel_message(core, nixwrapper, (long)nixtest, 0, 0,
 			                    KMSG_ROUTINE);
-			printk("nix_run (test) returns \n");
-			print_func_exit();
 		} else if (!strcmp(cb->f[0], "reserve")) {
 			int core;
 			if (cb->nf != 2)
@@ -515,7 +448,6 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 		if (off + n > v->imagesize) {
 			n = v->imagesize - off;
 		}
-		printd("copy to %p ubuf %p size %d\n", v->image + off, ubuf, n);
 
 		if (memcpy_from_user_errno(current, v->image + off, ubuf, n) < 0)
 			error("%s: bad user addr %p", __FUNCTION__, ubuf);
@@ -524,7 +456,6 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 	default:
 		panic("Bad QID %p in devnix", c->qid.path);
 	}
-	print_func_exit();
 	return n;
 }
 
