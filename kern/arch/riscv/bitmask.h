@@ -86,7 +86,7 @@ static void SET_BITMASK_BIT_ATOMIC(uint8_t* name, size_t bit)
 	} \
 	clear; })
 
-static inline bool BITMASK_IS_FULL(uint8_t* map, size_t size)
+static inline bool BITMASK_IS_FULL(volatile uint8_t *map, size_t size)
 {
 	int _size = size;
 	for (int i = 0; i < BYTES_FOR_BITMASK(size); i++) {

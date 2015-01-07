@@ -204,6 +204,7 @@ int waiton_checklist(checklist_t* list);
 int release_checklist(checklist_t* list);
 int checklist_is_locked(checklist_t* list);
 int checklist_is_clear(checklist_t* list);
+int checklist_is_full(checklist_t* list);
 void reset_checklist(checklist_t* list);
 void down_checklist(checklist_t* list);
 // TODO - do we want to adjust the size?  (YES, don't want to check it all)

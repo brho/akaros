@@ -274,7 +274,7 @@ int waiton_checklist(checklist_t* list)
 {
 	extern atomic_t outstanding_calls;
 	// can consider breakout out early, like above, and erroring out
-	while (!checklist_is_clear(list))
+	while (!checklist_is_full(list))
 		cpu_relax();
 	spin_unlock_irqsave(&list->lock);
 	// global counter of wrappers either waited on or being contended for.
@@ -299,6 +299,12 @@ int checklist_is_locked(checklist_t* list)
 int checklist_is_clear(checklist_t* list)
 {
 	return BITMASK_IS_CLEAR(list->mask.bits, list->mask.size);
+}
+
+// no synch guarantees - just looks at the list
+int checklist_is_full(checklist_t* list)
+{
+	return BITMASK_IS_FULL(list->mask.bits, list->mask.size);
 }
 
 // no synch guarantees - just resets the list to empty
