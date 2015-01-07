@@ -238,12 +238,31 @@ config VM
 	help
 		VM support -- not working! Based on KVM.
 
-config NIX
+menuconfig NIX
 	bool "NIX support"
 	default n
 	help
-		NIX support -- Sort of working. You can start kernels that don't enable interrupts.
+		NIX support -- Sort of working. You can start kernels that don't enable
+		interrupts.
 
+if NIX
+
+config NIX_IMG_PADDR
+	hex "Physical address for the NIX image"
+	depends on NIX
+	default 0x40000000
+	help
+		Physical address that the NIX device will allocate during
+		initialization.
+
+config NIX_IMG_SIZE
+	hex "Size of the NIX image"
+	depends on NIX
+	default 0x40000000
+	help
+		Size in bytes of the NIX image.  Must be a power of two.
+
+endif # NIX
 
 menu "Misc/Old Options"
 

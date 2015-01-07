@@ -107,10 +107,9 @@ static spinlock_t nixlock = SPINLOCK_INITIALIZER_IRQSAVE;
 static struct nix *nixs = NULL;
 static int nnix = 0;
 static int nixok = 0;
-static int npages;
-// only 4 gig for now.
-// XXX is this for all nixs?
-static page_t *nixpages[1048576];
+/* TODO: make this per-nix, somehow. */
+static physaddr_t img_paddr = CONFIG_NIX_IMG_PADDR;
+static size_t img_size = CONFIG_NIX_IMG_SIZE;
 
 static atomic_t nixid = 0;
 
@@ -247,25 +246,23 @@ void nixtest(void)
 	printk("nixtest ran on core %d\n", core_id());
 }
 
-// allocate pages, starting at 1G, and running until we run out.
 static void nixinit(void)
 {
-	//error_t kpage_alloc_specific(page_t** page, size_t ppn)
-	uint64_t ppn = GiB/4096;
-	while (1) {
-		if (!page_is_free(ppn)) {
-			printk("%s: got a non-free page@ppn %p\n", __func__, ppn);
-			break;
-		}
-		kpage_alloc_specific(&nixpages[ppn], ppn);
-		npages++;
-		ppn++;
-	}
-	printk("nixinit: nix_init returns %d\n", npages);
+	size_t img_order = LOG2_UP(nr_pages(img_size));
+	void *img_kaddr;
 
-	if (npages > 0) {
-		nixok = 1;
+	if (img_size != 1ULL << img_order << PGSHIFT) {
+		printk("nixinit rounding up image size to a power of 2 pgs (was %p)\n",
+		       img_size);
+		img_size = 1ULL << img_order << PGSHIFT;
 	}
+	img_kaddr = get_cont_phys_pages_at(img_order, img_paddr, 0);
+	if (!img_kaddr) {
+		printk("nixinit failed to get an image!\n");
+		return;
+	}
+	nixok = 1;
+	printk("nixinit image at KVA %p of size %p\n", img_kaddr, img_size);
 }
 
 static struct chan *nixattach(char *spec)
@@ -319,8 +316,8 @@ static struct chan *nixopen(struct chan *c, int omode)
 		spin_unlock(&nixlock);
 		kref_init(&v->kref, nix_release, 1);
 		v->id = newnixid();
-		v->image = KADDR(GiB);
-		v->imagesize = npages * 4096;
+		v->image = KADDR(img_paddr);
+		v->imagesize = img_size;
 		printk("nix image is %p with %d bytes\n", v->image, v->imagesize);
 		c->aux = v;
 		bitmap_zero(v->cpus, MAX_NUM_CPUS);
