@@ -95,6 +95,12 @@ static ssize_t __colored_page_alloc(uint8_t* map, page_t** page,
 	return ret;
 }
 
+static void __real_page_alloc(struct page *page)
+{
+	LIST_REMOVE(page, pg_link);
+	__page_init(page);
+}
+
 /* Internal version of page_alloc_specific.  Grab the lock first. */
 static error_t __page_alloc_specific(page_t** page, size_t ppn)
 {
@@ -102,8 +108,7 @@ static error_t __page_alloc_specific(page_t** page, size_t ppn)
 	if (!page_is_free(ppn))
 		return -ENOMEM;
 	*page = sp_page;
-	LIST_REMOVE(*page, pg_link);
-	__page_init(*page);
+	__real_page_alloc(sp_page);
 	return 0;
 }
 
@@ -228,6 +233,45 @@ void *get_cont_pages(size_t order, int flags)
 void *get_cont_pages_node(int node, size_t order, int flags)
 {
 	return get_cont_pages(order, flags);
+}
+
+/**
+ * @brief Allocated 2^order contiguous physical pages starting at paddr 'at'.
+ * Will increment the reference count for the pages.
+ *
+ * We might need some restrictions on size of the alloc and its 'at' alignment.
+ * For instance, for a future buddy allocator (if we go that route), it might be
+ * easier if the order was aligned to the 'at'.  e.g., a 1GB alloc must be at a
+ * 1GB aligned addr.  A 2GB alloc would not be allowed at a merely 1GB
+ * alignment.
+ *
+ * For now, anything goes.  Note that the request is for a physical starting
+ * point, but the return is the KVA.
+ *
+ * @param[in] order order of the allocation
+ * @param[in] at starting address
+ * @param[in] flags memory allocation flags
+ *
+ * @return The KVA of the first page, NULL otherwise.
+ */
+void *get_cont_phys_pages_at(size_t order, physaddr_t at, int flags)
+{
+	unsigned long nr_pgs = 1 << order;
+	unsigned long first_pg_nr = pa2ppn(at);
+
+	if (first_pg_nr + nr_pgs > pa2ppn(max_paddr))
+		return 0;
+	spin_lock_irqsave(&colored_page_free_list_lock);
+	for (unsigned long i = first_pg_nr; i < first_pg_nr + nr_pgs; i++) {
+		if (!page_is_free(i)) {
+			spin_unlock_irqsave(&colored_page_free_list_lock);
+			return 0;
+		}
+	}
+	for (unsigned long i = first_pg_nr; i < first_pg_nr + nr_pgs; i++)
+		__real_page_alloc(ppn2page(i));
+	spin_unlock_irqsave(&colored_page_free_list_lock);
+	return KADDR(at);
 }
 
 void free_cont_pages(void *buf, size_t order)
