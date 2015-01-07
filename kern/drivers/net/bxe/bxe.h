@@ -40,6 +40,12 @@
 #include <stdio.h>
 #include <string.h>
 
+
+/* MACROS for conversion to AKAROS. Might we want this stuff someday? */
+#define __predict_false(x) (x)
+/* TYPEDEFS for conversion to AKAROS. These are temporary, but it makes it easier to see what is in need of change. */
+typedef struct netif *if_t;
+
 #if _BYTE_ORDER == _LITTLE_ENDIAN
 #ifndef LITTLE_ENDIAN
 #define LITTLE_ENDIAN
@@ -68,9 +74,6 @@
 #include "bxe_stats.h"
 
 #include "bxe_elink.h"
-
-#endif
-
 
 #if __FreeBSD_version >= 1000000
 #define PCIR_EXPRESS_DEVICE_STA        PCIER_DEVICE_STA
