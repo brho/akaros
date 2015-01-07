@@ -24,8 +24,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/dev/bxe/57710_init_values.c 265411 2014-05-06 02:32:27Z davidcs $");
+//__FBSDID("$FreeBSD: head/sys/dev/bxe/57710_init_values.c 265411 2014-05-06 02:32:27Z davidcs $");
 
 
 /*
@@ -44,10 +43,6 @@ __FBSDID("$FreeBSD: head/sys/dev/bxe/57710_init_values.c 265411 2014-05-06 02:32
 #include "bxe.h"
 
 #include "ecore_init.h"
-
-#ifdef __SunOS
-#define const
-#endif
 
 static const struct raw_op init_ops_e1[] = {
 /* #define BRB1_COMMON_START        22 */

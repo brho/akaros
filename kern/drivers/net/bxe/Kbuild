@@ -1,4 +1,4 @@
-#obj-y                                           += 57710_init_values.o
+obj-y                                           += 57710_init_values.o
 #obj-y                                           += 57711_init_values.o
 #obj-y                                           += 57712_init_values.o
 #obj-y                                           += bxe.o

@@ -27,60 +27,18 @@
 #ifndef __BXE_H__
 #define __BXE_H__
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/dev/bxe/bxe.h 268854 2014-07-18 20:04:11Z davidcs $");
+//__FBSDID("$FreeBSD: head/sys/dev/bxe/bxe.h 268854 2014-07-18 20:04:11Z davidcs $");
 
-#include <sys/param.h>
-#include <sys/kernel.h>
-#include <sys/systm.h>
-#include <sys/lock.h>
-#include <sys/mutex.h>
-#include <sys/sx.h>
-#include <sys/module.h>
-#include <sys/endian.h>
-#include <sys/types.h>
-#include <sys/malloc.h>
-#include <sys/kobj.h>
-#include <sys/bus.h>
-#include <sys/rman.h>
-#include <sys/socket.h>
-#include <sys/sockio.h>
-#include <sys/sysctl.h>
-#include <sys/smp.h>
-#include <sys/bitstring.h>
-#include <sys/limits.h>
-#include <sys/queue.h>
-#include <sys/taskqueue.h>
-
-#include <net/if.h>
-#include <net/if_types.h>
-#include <net/if_arp.h>
-#include <net/ethernet.h>
-#include <net/if_dl.h>
-#include <net/if_var.h>
-#include <net/if_media.h>
-#include <net/if_vlan_var.h>
-#include <net/zlib.h>
-#include <net/bpf.h>
-
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <netinet/ip6.h>
-#include <netinet/tcp.h>
-#include <netinet/udp.h>
-
-#include <dev/pci/pcireg.h>
-#include <dev/pci/pcivar.h>
-
-#include <machine/atomic.h>
-#include <machine/resource.h>
-#include <machine/endian.h>
-#include <machine/bus.h>
-#include <machine/in_cksum.h>
-
-#include "device_if.h"
-#include "bus_if.h"
-#include "pci_if.h"
+#include <assert.h>
+#include <error.h>
+#include <ip.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <pmap.h>
+#include <slab.h>
+#include <smp.h>
+#include <stdio.h>
+#include <string.h>
 
 #if _BYTE_ORDER == _LITTLE_ENDIAN
 #ifndef LITTLE_ENDIAN
@@ -111,22 +69,8 @@ __FBSDID("$FreeBSD: head/sys/dev/bxe/bxe.h 268854 2014-07-18 20:04:11Z davidcs $
 
 #include "bxe_elink.h"
 
-#if __FreeBSD_version < 800054
-#if defined(__i386__) || defined(__amd64__)
-#define mb()  __asm volatile("mfence;" : : : "memory")
-#define wmb() __asm volatile("sfence;" : : : "memory")
-#define rmb() __asm volatile("lfence;" : : : "memory")
-static __inline void prefetch(void *x)
-{
-    __asm volatile("prefetcht0 %0" :: "m" (*(unsigned long *)x));
-}
-#else
-#define mb()
-#define rmb()
-#define wmb()
-#define prefetch(x)
 #endif
-#endif
+
 
 #if __FreeBSD_version >= 1000000
 #define PCIR_EXPRESS_DEVICE_STA        PCIER_DEVICE_STA
@@ -137,29 +81,6 @@ static __inline void prefetch(void *x)
 #define PCIR_EXPRESS_DEVICE_CTL        PCIER_DEVICE_CTL
 #define PCIM_EXP_CTL_MAX_PAYLOAD       PCIEM_CTL_MAX_PAYLOAD
 #define PCIM_EXP_CTL_MAX_READ_REQUEST  PCIEM_CTL_MAX_READ_REQUEST
-#endif
-
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-#endif
-#ifndef ARRSIZE
-#define ARRSIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-#endif
-#ifndef DIV_ROUND_UP
-#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
-#endif
-#ifndef roundup
-#define roundup(x, y) ((((x) + ((y) - 1)) / (y)) * (y))
-#endif
-#ifndef ilog2
-static inline
-int bxe_ilog2(int x)
-{
-    int log = 0;
-    while (x >>= 1) log++;
-    return (log);
-}
-#define ilog2(x) bxe_ilog2(x)
 #endif
 
 #include "ecore_sp.h"

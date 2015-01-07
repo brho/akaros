@@ -27,8 +27,8 @@
 #ifndef BXE_STATS_H
 #define BXE_STATS_H
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/dev/bxe/bxe_stats.h 271782 2014-09-18 15:56:14Z glebius $");
+
+//__FBSDID("$FreeBSD: head/sys/dev/bxe/bxe_stats.h 271782 2014-09-18 15:56:14Z glebius $");
 
 #include <sys/types.h>
 

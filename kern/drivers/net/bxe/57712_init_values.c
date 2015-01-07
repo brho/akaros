@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/dev/bxe/57712_init_values.c 265411 2014-05-06 02:32:27Z davidcs $");
+//__FBSDID("$FreeBSD: head/sys/dev/bxe/57712_init_values.c 265411 2014-05-06 02:32:27Z davidcs $");
 
 
 /*

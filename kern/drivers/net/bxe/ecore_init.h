@@ -24,8 +24,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/dev/bxe/ecore_init.h 265411 2014-05-06 02:32:27Z davidcs $");
+
+//__FBSDID("$FreeBSD: head/sys/dev/bxe/ecore_init.h 265411 2014-05-06 02:32:27Z davidcs $");
 
 #ifndef ECORE_INIT_H
 #define ECORE_INIT_H

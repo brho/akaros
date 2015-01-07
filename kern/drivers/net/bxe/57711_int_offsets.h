@@ -24,11 +24,11 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/dev/bxe/57710_int_offsets.h 265411 2014-05-06 02:32:27Z davidcs $");
+
+//__FBSDID("$FreeBSD: head/sys/dev/bxe/57711_int_offsets.h 265411 2014-05-06 02:32:27Z davidcs $");
 
 
-static const struct iro e1_iro_arr[379] = {
+static const struct iro e1h_iro_arr[379] = {
 	{     0x40,      0x0,      0x0,      0x0,      0x0},	// COMMON_SB_SIZE
 	{     0x40,      0x0,      0x0,      0x0,      0x0},	// COMMON_SB_DATA_SIZE
 	{     0x28,      0x0,      0x0,      0x0,      0x0},	// COMMON_SP_SB_SIZE
@@ -59,26 +59,26 @@ static const struct iro e1_iro_arr[379] = {
 	{      0x0,      0x0,      0x0,      0x0,      0x0},	// COMMON_KUKU_QM_PAUSE_OPCODE
 	{      0x0,      0x0,      0x0,      0x0,      0x0},	// COMMON_KUKU_TEST_UNUSED_FOCS_SUCCESS_OPCODE_VALUE
 	{      0x0,      0x0,      0x0,      0x0,      0x0},	// COMMON_KUKU_TEST_UNUSED_FOCS_OPCODE_VALUE
-	{   0x3320,     0x10,      0x0,      0x0,      0x8},	// XSTORM_SPQ_PAGE_BASE_OFFSET(funcId)
-	{   0x3328,     0x10,      0x0,      0x0,      0x2},	// XSTORM_SPQ_PROD_OFFSET(funcId)
-	{   0x3320,     0x10,      0x0,      0x0,     0x10},	// XSTORM_SPQ_DATA_OFFSET(funcId)
+	{   0x9000,     0x10,      0x0,      0x0,      0x8},	// XSTORM_SPQ_PAGE_BASE_OFFSET(funcId)
+	{   0x9008,     0x10,      0x0,      0x0,      0x2},	// XSTORM_SPQ_PROD_OFFSET(funcId)
+	{   0x9000,     0x10,      0x0,      0x0,     0x10},	// XSTORM_SPQ_DATA_OFFSET(funcId)
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// XSTORM_HIGIG_HDR_LENGTH_OFFSET(portId)
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// XSTORM_VF_SPQ_PAGE_BASE_OFFSET(vfId)
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// XSTORM_VF_SPQ_PROD_OFFSET(vfId)
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// XSTORM_VF_SPQ_DATA_OFFSET(vfId)
-	{   0x3358,      0x1,      0x4,      0x0,      0x1},	// XSTORM_JUMBO_SUPPORT_OFFSET(pfId)
-	{   0x3360,      0x0,      0x0,      0x0,      0x2},	// XSTORM_COMMON_IP_ID_MASK_OFFSET
-	{   0x3368,      0x0,      0x0,      0x0,      0x8},	// XSTORM_COMMON_RTC_PARAMS_OFFSET
-	{   0x336c,      0x0,      0x0,      0x0,      0x2},	// XSTORM_COMMON_RTC_RESOLUTION_OFFSET
-	{   0x3920,      0x0,      0x0,      0x0,      0x8},	// XSTORM_FW_VERSION_OFFSET
-	{   0x3af8,     0x40,      0x0,      0x0,     0x40},	// XSTORM_LICENSE_VALUES_OFFSET(pfId)
-	{   0x3938,     0x80,      0x0,      0x0,     0x48},	// XSTORM_CMNG_PER_PORT_VARS_OFFSET(portId)
-	{   0x3a38,     0x40,      0x0,      0x0,      0x8},	// XSTORM_RATE_SHAPING_PER_VN_VARS_OFFSET(pfId)
-	{   0x3a48,     0x40,      0x0,      0x0,     0x18},	// XSTORM_FAIRNESS_PER_VN_VARS_OFFSET(pfId)
-	{   0x3370,     0x28,      0x0,      0x0,     0x28},	// XSTORM_PER_QUEUE_STATS_OFFSET(xStatQueueId)
-	{   0x3c20,      0x8,      0x0,      0x0,      0x1},	// XSTORM_FUNC_EN_OFFSET(funcId)
-	{   0x3c21,      0x8,      0x0,      0x0,      0x1},	// XSTORM_VF_TO_PF_OFFSET(funcId)
-	{   0x3c22,      0x8,      0x0,      0x0,      0x1},	// XSTORM_RECORD_SLOW_PATH_OFFSET(funcId)
+	{   0x93b8,      0x1,      0x4,      0x0,      0x1},	// XSTORM_JUMBO_SUPPORT_OFFSET(pfId)
+	{   0x93c0,      0x0,      0x0,      0x0,      0x2},	// XSTORM_COMMON_IP_ID_MASK_OFFSET
+	{   0x93c8,      0x0,      0x0,      0x0,      0x8},	// XSTORM_COMMON_RTC_PARAMS_OFFSET
+	{   0x93cc,      0x0,      0x0,      0x0,      0x2},	// XSTORM_COMMON_RTC_RESOLUTION_OFFSET
+	{   0x93d0,      0x0,      0x0,      0x0,      0x8},	// XSTORM_FW_VERSION_OFFSET
+	{   0x9720,     0x40,      0x0,      0x0,     0x40},	// XSTORM_LICENSE_VALUES_OFFSET(pfId)
+	{   0x93e0,     0x80,      0x0,      0x0,     0x48},	// XSTORM_CMNG_PER_PORT_VARS_OFFSET(portId)
+	{   0x94e0,     0x40,      0x0,      0x0,      0x8},	// XSTORM_RATE_SHAPING_PER_VN_VARS_OFFSET(pfId)
+	{   0x94f0,     0x40,      0x0,      0x0,     0x18},	// XSTORM_FAIRNESS_PER_VN_VARS_OFFSET(pfId)
+	{   0xa000,     0x28,      0x0,      0x0,     0x28},	// XSTORM_PER_QUEUE_STATS_OFFSET(xStatQueueId)
+	{   0xc0c0,      0x8,      0x0,      0x0,      0x1},	// XSTORM_FUNC_EN_OFFSET(funcId)
+	{   0xc0c1,      0x8,      0x0,      0x0,      0x1},	// XSTORM_VF_TO_PF_OFFSET(funcId)
+	{   0xc0c2,      0x8,      0x0,      0x0,      0x1},	// XSTORM_RECORD_SLOW_PATH_OFFSET(funcId)
 	{   0x2008,     0x10,      0x0,      0x0,     0x10},	// XSTORM_ASSERT_LIST_OFFSET(assertListEntry)
 	{   0x2000,      0x0,      0x0,      0x0,      0x8},	// XSTORM_ASSERT_LIST_INDEX_OFFSET
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// XSTORM_TIME_SYNC_TEST_ADDRESS_OFFSET
@@ -129,15 +129,15 @@ static const struct iro e1_iro_arr[379] = {
 	{      0x0,      0x0,      0x0,      0x0,      0x0},	// XSTORM_KUKU_PBF_ECHO_SUCCESS_VALUE
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// XSTORM_KUKU_TIME_SYNC_FLG_OFFSET(funcId)
 	{      0x0,      0x0,      0x0,      0x0,      0x0},	// TSTORM_INDIRECTION_TABLE_ENTRY_SIZE
-	{   0x19c8,      0x0,      0x0,      0x0,      0x8},	// TSTORM_COMMON_RTC_PARAMS_OFFSET
+	{   0x1ec8,      0x0,      0x0,      0x0,      0x8},	// TSTORM_COMMON_RTC_PARAMS_OFFSET
 	{   0x2008,     0x10,      0x0,      0x0,     0x10},	// TSTORM_ASSERT_LIST_OFFSET(assertListEntry)
 	{   0x2000,      0x0,      0x0,      0x0,      0x8},	// TSTORM_ASSERT_LIST_INDEX_OFFSET
-	{   0x4870,      0x8,      0x0,      0x0,      0x1},	// TSTORM_FUNC_EN_OFFSET(funcId)
-	{   0x4871,      0x8,      0x0,      0x0,      0x1},	// TSTORM_VF_TO_PF_OFFSET(funcId)
-	{   0x4872,      0x8,      0x0,      0x0,      0x1},	// TSTORM_RECORD_SLOW_PATH_OFFSET(funcId)
-	{   0x4040,     0x38,      0x0,      0x0,     0x38},	// TSTORM_PER_QUEUE_STATS_OFFSET(tStatQueueId)
-	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// TSTORM_COMMON_SAFC_WORKAROUND_ENABLE_OFFSET
-	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// TSTORM_COMMON_SAFC_WORKAROUND_TIMEOUT_10USEC_OFFSET
+	{   0xa080,      0x8,      0x0,      0x0,      0x1},	// TSTORM_FUNC_EN_OFFSET(funcId)
+	{   0xa081,      0x8,      0x0,      0x0,      0x1},	// TSTORM_VF_TO_PF_OFFSET(funcId)
+	{   0xa082,      0x8,      0x0,      0x0,      0x1},	// TSTORM_RECORD_SLOW_PATH_OFFSET(funcId)
+	{   0x9070,     0x38,      0x0,      0x0,     0x38},	// TSTORM_PER_QUEUE_STATS_OFFSET(tStatQueueId)
+	{   0x1ed8,      0x0,      0x0,      0x0,      0x2},	// TSTORM_COMMON_SAFC_WORKAROUND_ENABLE_OFFSET
+	{   0x1eda,      0x0,      0x0,      0x0,      0x2},	// TSTORM_COMMON_SAFC_WORKAROUND_TIMEOUT_10USEC_OFFSET
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// TSTORM_ERROR_HANDLER_STATISTICS_RAM_OFFSET
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// TSTORM_VFC_TEST_RSS_KEY_OFFSET(portId)
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// TSTORM_QUEUE_ZONE_OFFSET(queueId)
@@ -161,29 +161,29 @@ static const struct iro e1_iro_arr[379] = {
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// TSTORM_PCI_READ_TEST_PCI_ENTITY_OFFSET
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// TSTORM_TIME_SYNC_TEST_ADDRESS_OFFSET
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// TSTORM_KUKU_NIG_PAUSE_TEST_MASK_OFFSET
-	{   0x4000,     0x40,      0x0,      0x0,     0x40},	// CSTORM_STATUS_BLOCK_OFFSET(sbId)
-	{   0x4800,     0x40,      0x0,      0x0,     0x40},	// CSTORM_STATUS_BLOCK_DATA_OFFSET(sbId)
-	{   0x482e,     0x40,      0x0,      0x0,      0x1},	// CSTORM_STATUS_BLOCK_DATA_STATE_OFFSET(sbId)
-	{   0x4800,     0x40,      0x2,      0x0,      0x1},	// CSTORM_STATUS_BLOCK_DATA_TIMEOUT_OFFSET(sbId,hcIndex)
-	{   0x4801,     0x40,      0x2,      0x0,      0x0},	// CSTORM_STATUS_BLOCK_DATA_FLAGS_OFFSET(sbId,hcIndex)
-	{   0x3000,     0x40,      0x0,      0x0,     0x40},	// CSTORM_SYNC_BLOCK_OFFSET(sbId)
+	{   0xc000,     0x40,      0x0,      0x0,     0x40},	// CSTORM_STATUS_BLOCK_OFFSET(sbId)
+	{   0xc800,     0x40,      0x0,      0x0,     0x40},	// CSTORM_STATUS_BLOCK_DATA_OFFSET(sbId)
+	{   0xc82e,     0x40,      0x0,      0x0,      0x1},	// CSTORM_STATUS_BLOCK_DATA_STATE_OFFSET(sbId)
+	{   0xc800,     0x40,      0x2,      0x0,      0x1},	// CSTORM_STATUS_BLOCK_DATA_TIMEOUT_OFFSET(sbId,hcIndex)
+	{   0xc801,     0x40,      0x2,      0x0,      0x0},	// CSTORM_STATUS_BLOCK_DATA_FLAGS_OFFSET(sbId,hcIndex)
+	{   0x8000,     0x40,      0x0,      0x0,     0x40},	// CSTORM_SYNC_BLOCK_OFFSET(sbId)
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// CSTORM_HC_SYNC_LINE_INDEX_E2_OFFSET(hcIndex,sbId)
-	{   0x3000,      0x8,     0x40,      0x0,      0x4},	// CSTORM_HC_SYNC_LINE_INDEX_E1X_OFFSET(hcIndex,sbId)
-	{   0x3004,      0x8,     0x40,      0x0,      0x4},	// CSTORM_HC_SYNC_LINE_DHC_OFFSET(sbSyncLines,sbId)
-	{   0x3b80,     0x28,      0x0,      0x0,     0x28},	// CSTORM_SP_STATUS_BLOCK_OFFSET(pfId)
-	{   0x3bd0,     0x10,      0x0,      0x0,     0x10},	// CSTORM_SP_STATUS_BLOCK_DATA_OFFSET(pfId)
-	{   0x3bda,     0x10,      0x0,      0x0,      0x1},	// CSTORM_SP_STATUS_BLOCK_DATA_STATE_OFFSET(pfId)
-	{   0x3800,     0x80,      0x0,      0x0,     0x80},	// CSTORM_SP_SYNC_BLOCK_OFFSET(pfId)
-	{   0x3800,      0x8,     0x80,      0x0,      0x2},	// CSTORM_SP_HC_SYNC_LINE_INDEX_OFFSET(hcSpIndex,pfId)
-	{   0x3900,     0x40,      0x0,      0x0,     0x40},	// CSTORM_DYNAMIC_HC_CONFIG_OFFSET(pfId)
+	{   0x8000,      0x8,     0x40,      0x0,      0x4},	// CSTORM_HC_SYNC_LINE_INDEX_E1X_OFFSET(hcIndex,sbId)
+	{   0x8004,      0x8,     0x40,      0x0,      0x4},	// CSTORM_HC_SYNC_LINE_DHC_OFFSET(sbSyncLines,sbId)
+	{   0xb000,     0x28,      0x0,      0x0,     0x28},	// CSTORM_SP_STATUS_BLOCK_OFFSET(pfId)
+	{   0xb140,     0x10,      0x0,      0x0,     0x10},	// CSTORM_SP_STATUS_BLOCK_DATA_OFFSET(pfId)
+	{   0xb14a,     0x10,      0x0,      0x0,      0x1},	// CSTORM_SP_STATUS_BLOCK_DATA_STATE_OFFSET(pfId)
+	{   0x8800,     0x80,      0x0,      0x0,     0x80},	// CSTORM_SP_SYNC_BLOCK_OFFSET(pfId)
+	{   0x8800,      0x8,     0x80,      0x0,      0x2},	// CSTORM_SP_HC_SYNC_LINE_INDEX_OFFSET(hcSpIndex,pfId)
+	{   0x8c00,     0x40,      0x0,      0x0,     0x40},	// CSTORM_DYNAMIC_HC_CONFIG_OFFSET(pfId)
 	{   0x2008,     0x10,      0x0,      0x0,     0x10},	// CSTORM_ASSERT_LIST_OFFSET(assertListEntry)
 	{   0x2000,      0x0,      0x0,      0x0,      0x8},	// CSTORM_ASSERT_LIST_INDEX_OFFSET
-	{   0x5198,      0x8,      0x0,      0x0,      0x1},	// CSTORM_FUNC_EN_OFFSET(funcId)
-	{   0x5199,      0x8,      0x0,      0x0,      0x1},	// CSTORM_VF_TO_PF_OFFSET(funcId)
-	{   0x519a,      0x8,      0x0,      0x0,      0x1},	// CSTORM_RECORD_SLOW_PATH_OFFSET(funcId)
-	{   0x3980,     0x10,      0x4,      0x0,      0x4},	// CSTORM_BYTE_COUNTER_OFFSET(sbId,dhcIndex)
-	{   0x51a8,     0x30,     0x18,      0x0,     0x10},	// CSTORM_EVENT_RING_DATA_OFFSET(pfId)
-	{   0x51b0,     0x30,     0x18,      0x0,      0x2},	// CSTORM_EVENT_RING_PROD_OFFSET(pfId)
+	{   0x1250,      0x8,      0x0,      0x0,      0x1},	// CSTORM_FUNC_EN_OFFSET(funcId)
+	{   0x1251,      0x8,      0x0,      0x0,      0x1},	// CSTORM_VF_TO_PF_OFFSET(funcId)
+	{   0x1252,      0x8,      0x0,      0x0,      0x1},	// CSTORM_RECORD_SLOW_PATH_OFFSET(funcId)
+	{   0x8e00,     0x10,      0x4,      0x0,      0x4},	// CSTORM_BYTE_COUNTER_OFFSET(sbId,dhcIndex)
+	{   0x1290,     0x30,     0x18,      0x0,     0x10},	// CSTORM_EVENT_RING_DATA_OFFSET(pfId)
+	{   0x1298,     0x30,     0x18,      0x0,      0x2},	// CSTORM_EVENT_RING_PROD_OFFSET(pfId)
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// CSTORM_VF_PF_CHANNEL_STATE_OFFSET(vfId)
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// CSTORM_VF_PF_CHANNEL_VALID_OFFSET(vfId)
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// CSTORM_IGU_MODE_OFFSET
@@ -203,18 +203,18 @@ static const struct iro e1_iro_arr[379] = {
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// CSTORM_IGU_TEST_VF_VALID_OFFSET
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// CSTORM_IGU_TEST_ADDRESS_OFFSET
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// CSTORM_IGU_TEST_IGU_COMMAND_OFFSET
-	{   0x23e8,     0x80,      0x0,      0x0,     0x80},	// USTORM_INDIRECTION_TABLE_OFFSET(portId)
+	{   0x8308,     0x80,      0x0,      0x0,     0x80},	// USTORM_INDIRECTION_TABLE_OFFSET(portId)
 	{      0x1,      0x0,      0x0,      0x0,      0x0},	// USTORM_INDIRECTION_TABLE_ENTRY_SIZE
 	{   0x2008,     0x10,      0x0,      0x0,     0x10},	// USTORM_ASSERT_LIST_OFFSET(assertListEntry)
 	{   0x2000,      0x0,      0x0,      0x0,      0x8},	// USTORM_ASSERT_LIST_INDEX_OFFSET
-	{   0x2e70,      0x8,      0x0,      0x0,      0x1},	// USTORM_FUNC_EN_OFFSET(funcId)
-	{   0x2e71,      0x8,      0x0,      0x0,      0x1},	// USTORM_VF_TO_PF_OFFSET(funcId)
-	{   0x2e72,      0x8,      0x0,      0x0,      0x1},	// USTORM_RECORD_SLOW_PATH_OFFSET(funcId)
-	{   0x24e8,     0x38,      0x0,      0x0,     0x38},	// USTORM_PER_QUEUE_STATS_OFFSET(uStatQueueId)
-	{   0x2dd0,      0x8,      0x0,      0x0,      0x8},	// USTORM_MEM_WORKAROUND_ADDRESS_OFFSET(pfId)
-	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_ETH_PAUSE_ENABLED_OFFSET(portId)
-	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_TOE_PAUSE_ENABLED_OFFSET(portId)
-	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_MAX_PAUSE_TIME_USEC_OFFSET(portId)
+	{   0x8500,      0x8,      0x0,      0x0,      0x1},	// USTORM_FUNC_EN_OFFSET(funcId)
+	{   0x8501,      0x8,      0x0,      0x0,      0x1},	// USTORM_VF_TO_PF_OFFSET(funcId)
+	{   0x8502,      0x8,      0x0,      0x0,      0x1},	// USTORM_RECORD_SLOW_PATH_OFFSET(funcId)
+	{   0x6000,     0x38,      0x0,      0x0,     0x38},	// USTORM_PER_QUEUE_STATS_OFFSET(uStatQueueId)
+	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_MEM_WORKAROUND_ADDRESS_OFFSET(pfId)
+	{   0x8454,      0x8,      0x0,      0x0,      0x2},	// USTORM_ETH_PAUSE_ENABLED_OFFSET(portId)
+	{   0x8456,      0x8,      0x0,      0x0,      0x2},	// USTORM_TOE_PAUSE_ENABLED_OFFSET(portId)
+	{   0x8464,     0x10,      0x0,      0x0,      0x4},	// USTORM_MAX_PAUSE_TIME_USEC_OFFSET(portId)
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_ERROR_HANDLER_STATISTICS_RAM_OFFSET
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_QUEUE_ZONE_OFFSET(queueId)
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_VF_ZONE_OFFSET(vfId)
@@ -230,124 +230,124 @@ static const struct iro e1_iro_arr[379] = {
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_PCI_READ_TEST_RAM_ADDRESS_OFFSET
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_PCI_READ_TEST_PCI_ENTITY_OFFSET
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_KUKU_NIG_PAUSE_TEST_MASK_OFFSET
-	{   0x2500,     0x40,      0x0,      0x0,      0x8},	// TSTORM_FUNCTION_COMMON_CONFIG_OFFSET(pfId)
-	{   0x2508,     0x40,      0x0,      0x0,     0x20},	// TSTORM_MAC_FILTER_CONFIG_OFFSET(pfId)
-	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// TSTORM_APPROXIMATE_MATCH_MULTICAST_FILTERING_OFFSET(pfId)
-	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// TSTORM_ACCEPT_CLASSIFY_FAILED_OFFSET
+	{   0x3000,     0x40,      0x0,      0x0,      0x8},	// TSTORM_FUNCTION_COMMON_CONFIG_OFFSET(pfId)
+	{   0x3008,     0x40,      0x0,      0x0,     0x20},	// TSTORM_MAC_FILTER_CONFIG_OFFSET(pfId)
+	{   0x3200,     0x20,      0x0,      0x0,     0x20},	// TSTORM_APPROXIMATE_MATCH_MULTICAST_FILTERING_OFFSET(pfId)
+	{   0x37a8,      0x0,      0x0,      0x0,      0x8},	// TSTORM_ACCEPT_CLASSIFY_FAILED_OFFSET
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_CQE_PAGE_NEXT_OFFSET(portId,clientId)
-	{   0x3000,      0x0,      0x0,      0x0,   0x1000},	// USTORM_AGG_DATA_OFFSET
-	{   0x50a1,      0x0,      0x0,      0x0,      0x1},	// USTORM_TPA_BTR_OFFSET
-	{   0x50b8,      0x0,      0x0,      0x0,      0x2},	// USTORM_ETH_DYNAMIC_HC_PARAM_OFFSET
-	{   0x50c8,     0x90,      0x8,      0x0,      0x8},	// USTORM_RX_PRODS_E1X_OFFSET(portId,clientId)
+	{   0xa000,      0x0,      0x0,      0x0,   0x2000},	// USTORM_AGG_DATA_OFFSET
+	{   0x3ec1,      0x0,      0x0,      0x0,      0x1},	// USTORM_TPA_BTR_OFFSET
+	{   0x3ee0,      0x0,      0x0,      0x0,      0x2},	// USTORM_ETH_DYNAMIC_HC_PARAM_OFFSET
+	{   0x1e00,     0xe0,      0x8,      0x0,      0x8},	// USTORM_RX_PRODS_E1X_OFFSET(portId,clientId)
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_RX_PRODS_E2_OFFSET(qzoneId)
-	{   0x2960,      0x8,      0x0,      0x0,      0x1},	// XSTORM_TCP_GLOBAL_DEL_ACK_COUNTER_ENABLED_OFFSET(portId)
-	{   0x2961,      0x8,      0x0,      0x0,      0x1},	// XSTORM_TCP_GLOBAL_DEL_ACK_COUNTER_MAX_COUNT_OFFSET(portId)
-	{   0x2970,      0x8,      0x4,      0x0,      0x2},	// XSTORM_TCP_IPID_OFFSET(pfId)
-	{   0x2978,      0x8,      0x4,      0x0,      0x4},	// XSTORM_TCP_TX_SWS_TIMER_VAL_OFFSET(pfId)
+	{   0x4000,      0x8,      0x0,      0x0,      0x1},	// XSTORM_TCP_GLOBAL_DEL_ACK_COUNTER_ENABLED_OFFSET(portId)
+	{   0x4001,      0x8,      0x0,      0x0,      0x1},	// XSTORM_TCP_GLOBAL_DEL_ACK_COUNTER_MAX_COUNT_OFFSET(portId)
+	{   0x4040,      0x8,      0x4,      0x0,      0x2},	// XSTORM_TCP_IPID_OFFSET(pfId)
+	{   0x4060,      0x8,      0x4,      0x0,      0x4},	// XSTORM_TCP_TX_SWS_TIMER_VAL_OFFSET(pfId)
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// XSTORM_TCP_TX_SWITCHING_EN_OFFSET(portId)
-	{   0x2fb0,      0x8,      0x0,      0x0,      0x4},	// TSTORM_TCP_DUPLICATE_ACK_THRESHOLD_OFFSET(pfId)
-	{   0x2fb4,      0x8,      0x0,      0x0,      0x4},	// TSTORM_TCP_MAX_CWND_OFFSET(pfId)
-	{   0x2fc0,      0x0,      0x0,      0x0,      0x8},	// TSTORM_TCP_GLOBAL_PARAMS_OFFSET
-	{   0x2fc8,      0x0,      0x0,      0x0,      0x8},	// TSTORM_TCP_ISLES_ARRAY_DESCRIPTOR_OFFSET
-	{   0x3000,      0x0,      0x0,      0x0,     0x10},	// TSTORM_TCP_ISLES_ARRAY_OFFSET
-	{   0x5040,      0x1,      0x1,      0x0,      0x1},	// XSTORM_TOE_LLC_SNAP_ENABLED_OFFSET(pfId)
+	{   0x4000,      0x8,      0x0,      0x0,      0x4},	// TSTORM_TCP_DUPLICATE_ACK_THRESHOLD_OFFSET(pfId)
+	{   0x4004,      0x8,      0x0,      0x0,      0x4},	// TSTORM_TCP_MAX_CWND_OFFSET(pfId)
+	{   0x4040,      0x0,      0x0,      0x0,      0x8},	// TSTORM_TCP_GLOBAL_PARAMS_OFFSET
+	{   0x4048,      0x0,      0x0,      0x0,      0x8},	// TSTORM_TCP_ISLES_ARRAY_DESCRIPTOR_OFFSET
+	{   0x8000,      0x0,      0x0,      0x0,     0x10},	// TSTORM_TCP_ISLES_ARRAY_OFFSET
+	{   0x5040,      0x1,      0x4,      0x0,      0x1},	// XSTORM_TOE_LLC_SNAP_ENABLED_OFFSET(pfId)
 	{   0x5000,      0x0,      0x0,      0x0,     0x20},	// XSTORM_OUT_OCTETS_OFFSET
-	{    0x808,     0x10,      0x0,      0x0,      0x4},	// TSTORM_TOE_MAX_SEG_RETRANSMIT_OFFSET(pfId)
-	{    0x80c,     0x10,      0x0,      0x0,      0x1},	// TSTORM_TOE_DOUBT_REACHABILITY_OFFSET(pfId)
-	{    0x8b7,      0x0,      0x0,      0x0,      0x1},	// TSTORM_TOE_MAX_DOMINANCE_VALUE_OFFSET
-	{    0x8b6,      0x0,      0x0,      0x0,      0x1},	// TSTORM_TOE_DOMINANCE_THRESHOLD_OFFSET
-	{   0x1000,     0x40,     0x20,      0x0,      0x4},	// CSTORM_TOE_CQ_CONS_PTR_LO_OFFSET(rssId,portId)
-	{   0x1004,     0x40,     0x20,      0x0,      0x4},	// CSTORM_TOE_CQ_CONS_PTR_HI_OFFSET(rssId,portId)
-	{   0x1008,     0x40,     0x20,      0x0,      0x2},	// CSTORM_TOE_CQ_PROD_OFFSET(rssId,portId)
-	{   0x100a,     0x40,     0x20,      0x0,      0x2},	// CSTORM_TOE_CQ_CONS_OFFSET(rssId,portId)
-	{   0x100c,     0x40,     0x20,      0x0,      0x1},	// CSTORM_TOE_CQ_NXT_PAGE_ADDR_VALID_OFFSET(rssId,portId)
-	{   0x100d,     0x40,     0x20,      0x0,      0x1},	// CSTORM_TOE_STATUS_BLOCK_ID_OFFSET(rssId,portId)
-	{   0x100e,     0x40,     0x20,      0x0,      0x1},	// CSTORM_TOE_STATUS_BLOCK_INDEX_OFFSET(rssId,portId)
-	{   0x1010,     0x40,     0x20,      0x0,      0x4},	// CSTORM_TOE_CQ_NEXT_PAGE_BASE_ADDR_LO_OFFSET(rssId,portId)
-	{   0x1014,     0x40,     0x20,      0x0,      0x4},	// CSTORM_TOE_CQ_NEXT_PAGE_BASE_ADDR_HI_OFFSET(rssId,portId)
-	{   0x1018,     0x40,     0x20,      0x0,      0x4},	// CSTORM_TOE_DYNAMIC_HC_PROD_OFFSET(rssId,portId)
-	{   0x101c,     0x40,     0x20,      0x0,      0x4},	// CSTORM_TOE_DYNAMIC_HC_CONS_OFFSET(rssId,portId)
-	{   0x3000,    0x100,     0x80,      0x8,      0x4},	// USTORM_GRQ_CACHE_BD_LO_OFFSET(rssId,portId,grqBdId)
-	{   0x3004,    0x100,     0x80,      0x8,      0x4},	// USTORM_GRQ_CACHE_BD_HI_OFFSET(rssId,portId,grqBdId)
+	{   0x5008,     0x10,      0x0,      0x0,      0x4},	// TSTORM_TOE_MAX_SEG_RETRANSMIT_OFFSET(pfId)
+	{   0x500c,     0x10,      0x0,      0x0,      0x1},	// TSTORM_TOE_DOUBT_REACHABILITY_OFFSET(pfId)
+	{   0x52c7,      0x0,      0x0,      0x0,      0x1},	// TSTORM_TOE_MAX_DOMINANCE_VALUE_OFFSET
+	{   0x52c6,      0x0,      0x0,      0x0,      0x1},	// TSTORM_TOE_DOMINANCE_THRESHOLD_OFFSET
+	{   0x3000,     0x40,     0x20,      0x0,      0x4},	// CSTORM_TOE_CQ_CONS_PTR_LO_OFFSET(rssId,portId)
+	{   0x3004,     0x40,     0x20,      0x0,      0x4},	// CSTORM_TOE_CQ_CONS_PTR_HI_OFFSET(rssId,portId)
+	{   0x3008,     0x40,     0x20,      0x0,      0x2},	// CSTORM_TOE_CQ_PROD_OFFSET(rssId,portId)
+	{   0x300a,     0x40,     0x20,      0x0,      0x2},	// CSTORM_TOE_CQ_CONS_OFFSET(rssId,portId)
+	{   0x300c,     0x40,     0x20,      0x0,      0x1},	// CSTORM_TOE_CQ_NXT_PAGE_ADDR_VALID_OFFSET(rssId,portId)
+	{   0x300d,     0x40,     0x20,      0x0,      0x1},	// CSTORM_TOE_STATUS_BLOCK_ID_OFFSET(rssId,portId)
+	{   0x300e,     0x40,     0x20,      0x0,      0x1},	// CSTORM_TOE_STATUS_BLOCK_INDEX_OFFSET(rssId,portId)
+	{   0x3010,     0x40,     0x20,      0x0,      0x4},	// CSTORM_TOE_CQ_NEXT_PAGE_BASE_ADDR_LO_OFFSET(rssId,portId)
+	{   0x3014,     0x40,     0x20,      0x0,      0x4},	// CSTORM_TOE_CQ_NEXT_PAGE_BASE_ADDR_HI_OFFSET(rssId,portId)
+	{   0x3018,     0x40,     0x20,      0x0,      0x4},	// CSTORM_TOE_DYNAMIC_HC_PROD_OFFSET(rssId,portId)
+	{   0x301c,     0x40,     0x20,      0x0,      0x4},	// CSTORM_TOE_DYNAMIC_HC_CONS_OFFSET(rssId,portId)
+	{   0x5000,    0x100,     0x80,      0x8,      0x4},	// USTORM_GRQ_CACHE_BD_LO_OFFSET(rssId,portId,grqBdId)
+	{   0x5004,    0x100,     0x80,      0x8,      0x4},	// USTORM_GRQ_CACHE_BD_HI_OFFSET(rssId,portId,grqBdId)
 	{      0xa,      0x0,      0x0,      0x0,      0x0},	// USTORM_TOE_GRQ_CACHE_NUM_BDS
-	{   0x3068,    0x100,     0x80,      0x0,      0x1},	// USTORM_TOE_GRQ_LOCAL_PROD_OFFSET(rssId,portId)
-	{   0x3069,    0x100,     0x80,      0x0,      0x1},	// USTORM_TOE_GRQ_LOCAL_CONS_OFFSET(rssId,portId)
-	{   0x306c,    0x100,     0x80,      0x0,      0x2},	// USTORM_TOE_GRQ_CONS_OFFSET(rssId,portId)
-	{   0x306e,    0x100,     0x80,      0x0,      0x2},	// USTORM_TOE_GRQ_PROD_OFFSET(rssId,portId)
-	{   0x3070,    0x100,     0x80,      0x0,      0x4},	// USTORM_TOE_GRQ_CONS_PTR_LO_OFFSET(rssId,portId)
-	{   0x3074,    0x100,     0x80,      0x0,      0x4},	// USTORM_TOE_GRQ_CONS_PTR_HI_OFFSET(rssId,portId)
-	{   0x3066,    0x100,     0x80,      0x0,      0x2},	// USTORM_TOE_GRQ_BUF_SIZE_OFFSET(rssId,portId)
-	{   0x3064,    0x100,     0x80,      0x0,      0x1},	// USTORM_TOE_CQ_NXT_PAGE_ADDR_VALID_OFFSET(rssId,portId)
-	{   0x3060,    0x100,     0x80,      0x0,      0x2},	// USTORM_TOE_CQ_CONS_OFFSET(rssId,portId)
-	{   0x3062,    0x100,     0x80,      0x0,      0x2},	// USTORM_TOE_CQ_PROD_OFFSET(rssId,portId)
-	{   0x3050,    0x100,     0x80,      0x0,      0x4},	// USTORM_TOE_CQ_NEXT_PAGE_BASE_ADDR_LO_OFFSET(rssId,portId)
-	{   0x3054,    0x100,     0x80,      0x0,      0x4},	// USTORM_TOE_CQ_NEXT_PAGE_BASE_ADDR_HI_OFFSET(rssId,portId)
-	{   0x3058,    0x100,     0x80,      0x0,      0x4},	// USTORM_TOE_CQ_CONS_PTR_LO_OFFSET(rssId,portId)
-	{   0x305c,    0x100,     0x80,      0x0,      0x4},	// USTORM_TOE_CQ_CONS_PTR_HI_OFFSET(rssId,portId)
-	{   0x307c,    0x100,     0x80,      0x0,      0x1},	// USTORM_TOE_STATUS_BLOCK_ID_OFFSET(rssId,portId)
-	{   0x307d,    0x100,     0x80,      0x0,      0x1},	// USTORM_TOE_STATUS_BLOCK_INDEX_OFFSET(rssId,portId)
-	{   0x1c18,     0x10,      0x0,      0x0,      0x4},	// USTORM_TOE_TCP_PUSH_TIMER_TICKS_OFFSET(pfId)
-	{   0x1c30,     0x10,      0x0,      0x0,      0x4},	// USTORM_TOE_GRQ_XOFF_COUNTER_OFFSET(pfId)
-	{   0x1c38,     0x10,      0x0,      0x0,      0x4},	// USTORM_TOE_RCQ_XOFF_COUNTER_OFFSET(pfId)
-	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_TOE_CQ_THR_LOW_OFFSET
-	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_TOE_GRQ_THR_LOW_OFFSET
-	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_TOE_CQ_THR_HIGH_OFFSET
-	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_TOE_GRQ_THR_HIGH_OFFSET
-	{   0x4c10,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_TCP_VARS_FLAGS_OFFSET(pfId)
-	{   0x4c12,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_TCP_VARS_LSB_LOCAL_MAC_ADDR_OFFSET(pfId)
-	{   0x4c14,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_TCP_VARS_MID_LOCAL_MAC_ADDR_OFFSET(pfId)
-	{   0x4c16,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_TCP_VARS_MSB_LOCAL_MAC_ADDR_OFFSET(pfId)
-	{   0x4c20,      0x8,      0x0,      0x0,      0x8},	// TSTORM_ISCSI_RQ_SIZE_OFFSET(pfId)
-	{   0x4c00,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_PAGE_SIZE_OFFSET(pfId)
-	{   0x4c02,      0x8,      0x0,      0x0,      0x1},	// TSTORM_ISCSI_PAGE_SIZE_LOG_OFFSET(pfId)
-	{   0x4c04,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_NUM_OF_TASKS_OFFSET(pfId)
-	{   0x4c30,      0x8,      0x0,      0x0,      0x8},	// TSTORM_ISCSI_ERROR_BITMAP_OFFSET(pfId)
-	{   0x4c40,      0x8,      0x0,      0x0,      0x4},	// TSTORM_ISCSI_L2_ISCSI_OOO_CID_TABLE_OFFSET(pfId)
-	{   0x4c44,      0x8,      0x0,      0x0,      0x1},	// TSTORM_ISCSI_L2_ISCSI_OOO_CLIENT_ID_TABLE_OFFSET(pfId)
-	{   0x4c50,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_L2_ISCSI_OOO_PROD_OFFSET(pfId)
-	{   0x4c54,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_L2_ISCSI_OOO_RX_BDS_THRSHLD_OFFSET(pfId)
-	{   0x4c52,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_L2_ISCSI_OOO_CONS_OFFSET(pfId)
-	{   0x4c60,      0x8,      0x0,      0x0,      0x4},	// TSTORM_ISCSI_TCP_LOCAL_ADV_WND_OFFSET(pfId)
-	{   0x1400,      0x8,      0x0,      0x0,      0x2},	// USTORM_ISCSI_PAGE_SIZE_OFFSET(pfId)
-	{   0x1402,      0x8,      0x0,      0x0,      0x1},	// USTORM_ISCSI_PAGE_SIZE_LOG_OFFSET(pfId)
-	{   0x1404,      0x8,      0x0,      0x0,      0x2},	// USTORM_ISCSI_NUM_OF_TASKS_OFFSET(pfId)
-	{   0x1410,      0x8,      0x0,      0x0,      0x2},	// USTORM_ISCSI_R2TQ_SIZE_OFFSET(pfId)
-	{   0x1414,      0x8,      0x0,      0x0,      0x2},	// USTORM_ISCSI_CQ_SIZE_OFFSET(pfId)
-	{   0x1416,      0x8,      0x0,      0x0,      0x2},	// USTORM_ISCSI_CQ_SQN_SIZE_OFFSET(pfId)
-	{   0x19b8,      0x8,      0x0,      0x0,      0x8},	// USTORM_ISCSI_GLOBAL_BUF_PHYS_ADDR_OFFSET(pfId)
-	{   0x1420,      0x8,      0x0,      0x0,      0x2},	// USTORM_ISCSI_RQ_BUFFER_SIZE_OFFSET(pfId)
-	{   0x1424,      0x8,      0x0,      0x0,      0x2},	// USTORM_ISCSI_RQ_SIZE_OFFSET(pfId)
-	{   0x19c8,      0x8,      0x0,      0x0,      0x8},	// USTORM_ISCSI_ERROR_BITMAP_OFFSET(pfId)
-	{   0x2c10,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_TCP_VARS_TTL_OFFSET(pfId)
-	{   0x2c11,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_TCP_VARS_TOS_OFFSET(pfId)
-	{   0x2c12,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_TCP_VARS_FLAGS_OFFSET(pfId)
-	{   0x2c13,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_TCP_VARS_ADV_WND_SCL_OFFSET(pfId)
-	{   0x2c00,      0x8,      0x0,      0x0,      0x2},	// XSTORM_ISCSI_PAGE_SIZE_OFFSET(pfId)
-	{   0x2c02,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_PAGE_SIZE_LOG_OFFSET(pfId)
-	{   0x2c04,      0x8,      0x0,      0x0,      0x2},	// XSTORM_ISCSI_NUM_OF_TASKS_OFFSET(pfId)
-	{   0x2c30,      0x8,      0x0,      0x0,      0x2},	// XSTORM_ISCSI_HQ_SIZE_OFFSET(pfId)
-	{   0x2c32,      0x8,      0x0,      0x0,      0x2},	// XSTORM_ISCSI_SQ_SIZE_OFFSET(pfId)
-	{   0x2c34,      0x8,      0x0,      0x0,      0x2},	// XSTORM_ISCSI_R2TQ_SIZE_OFFSET(pfId)
-	{   0x2c20,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_LOCAL_MAC_ADDR0_OFFSET(pfId)
-	{   0x2c21,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_LOCAL_MAC_ADDR1_OFFSET(pfId)
-	{   0x2c22,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_LOCAL_MAC_ADDR2_OFFSET(pfId)
-	{   0x2c23,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_LOCAL_MAC_ADDR3_OFFSET(pfId)
-	{   0x2c24,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_LOCAL_MAC_ADDR4_OFFSET(pfId)
-	{   0x2c25,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_LOCAL_MAC_ADDR5_OFFSET(pfId)
-	{   0x2c26,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_LOCAL_VLAN_OFFSET(pfId)
-	{   0x1480,      0x8,      0x0,      0x0,      0x2},	// CSTORM_ISCSI_PAGE_SIZE_OFFSET(pfId)
-	{   0x1482,      0x8,      0x0,      0x0,      0x1},	// CSTORM_ISCSI_PAGE_SIZE_LOG_OFFSET(pfId)
-	{   0x1484,      0x8,      0x0,      0x0,      0x2},	// CSTORM_ISCSI_NUM_OF_TASKS_OFFSET(pfId)
-	{   0x1492,     0xc0,     0x18,      0x0,      0x2},	// CSTORM_ISCSI_EQ_PROD_OFFSET(pfId,iscsiEqId)
-	{   0x1490,     0xc0,     0x18,      0x0,      0x2},	// CSTORM_ISCSI_EQ_CONS_OFFSET(pfId,iscsiEqId)
-	{   0x149c,     0xc0,     0x18,      0x0,      0x8},	// CSTORM_ISCSI_EQ_NEXT_PAGE_ADDR_OFFSET(pfId,iscsiEqId)
-	{   0x1494,     0xc0,     0x18,      0x0,      0x8},	// CSTORM_ISCSI_EQ_NEXT_EQE_ADDR_OFFSET(pfId,iscsiEqId)
-	{   0x14a7,     0xc0,     0x18,      0x0,      0x1},	// CSTORM_ISCSI_EQ_NEXT_PAGE_ADDR_VALID_OFFSET(pfId,iscsiEqId)
-	{   0x14a4,     0xc0,     0x18,      0x0,      0x2},	// CSTORM_ISCSI_EQ_SB_NUM_OFFSET(pfId,iscsiEqId)
-	{   0x14a6,     0xc0,     0x18,      0x0,      0x1},	// CSTORM_ISCSI_EQ_SB_INDEX_OFFSET(pfId,iscsiEqId)
-	{   0x1610,      0x8,      0x0,      0x0,      0x8},	// CSTORM_ISCSI_HQ_SIZE_OFFSET(pfId)
-	{   0x1620,      0x8,      0x0,      0x0,      0x8},	// CSTORM_ISCSI_CQ_SIZE_OFFSET(pfId)
-	{   0x1630,      0x8,      0x0,      0x0,      0x8},	// CSTORM_ISCSI_CQ_SQN_SIZE_OFFSET(pfId)
+	{   0x5068,    0x100,     0x80,      0x0,      0x1},	// USTORM_TOE_GRQ_LOCAL_PROD_OFFSET(rssId,portId)
+	{   0x5069,    0x100,     0x80,      0x0,      0x1},	// USTORM_TOE_GRQ_LOCAL_CONS_OFFSET(rssId,portId)
+	{   0x506c,    0x100,     0x80,      0x0,      0x2},	// USTORM_TOE_GRQ_CONS_OFFSET(rssId,portId)
+	{   0x506e,    0x100,     0x80,      0x0,      0x2},	// USTORM_TOE_GRQ_PROD_OFFSET(rssId,portId)
+	{   0x5070,    0x100,     0x80,      0x0,      0x4},	// USTORM_TOE_GRQ_CONS_PTR_LO_OFFSET(rssId,portId)
+	{   0x5074,    0x100,     0x80,      0x0,      0x4},	// USTORM_TOE_GRQ_CONS_PTR_HI_OFFSET(rssId,portId)
+	{   0x5066,    0x100,     0x80,      0x0,      0x2},	// USTORM_TOE_GRQ_BUF_SIZE_OFFSET(rssId,portId)
+	{   0x5064,    0x100,     0x80,      0x0,      0x1},	// USTORM_TOE_CQ_NXT_PAGE_ADDR_VALID_OFFSET(rssId,portId)
+	{   0x5060,    0x100,     0x80,      0x0,      0x2},	// USTORM_TOE_CQ_CONS_OFFSET(rssId,portId)
+	{   0x5062,    0x100,     0x80,      0x0,      0x2},	// USTORM_TOE_CQ_PROD_OFFSET(rssId,portId)
+	{   0x5050,    0x100,     0x80,      0x0,      0x4},	// USTORM_TOE_CQ_NEXT_PAGE_BASE_ADDR_LO_OFFSET(rssId,portId)
+	{   0x5054,    0x100,     0x80,      0x0,      0x4},	// USTORM_TOE_CQ_NEXT_PAGE_BASE_ADDR_HI_OFFSET(rssId,portId)
+	{   0x5058,    0x100,     0x80,      0x0,      0x4},	// USTORM_TOE_CQ_CONS_PTR_LO_OFFSET(rssId,portId)
+	{   0x505c,    0x100,     0x80,      0x0,      0x4},	// USTORM_TOE_CQ_CONS_PTR_HI_OFFSET(rssId,portId)
+	{   0x507c,    0x100,     0x80,      0x0,      0x1},	// USTORM_TOE_STATUS_BLOCK_ID_OFFSET(rssId,portId)
+	{   0x507d,    0x100,     0x80,      0x0,      0x1},	// USTORM_TOE_STATUS_BLOCK_INDEX_OFFSET(rssId,portId)
+	{   0x4018,     0x10,      0x0,      0x0,      0x4},	// USTORM_TOE_TCP_PUSH_TIMER_TICKS_OFFSET(pfId)
+	{   0x4090,     0x10,      0x0,      0x0,      0x4},	// USTORM_TOE_GRQ_XOFF_COUNTER_OFFSET(pfId)
+	{   0x4098,     0x10,      0x0,      0x0,      0x4},	// USTORM_TOE_RCQ_XOFF_COUNTER_OFFSET(pfId)
+	{   0x4110,      0x0,      0x0,      0x0,      0x2},	// USTORM_TOE_CQ_THR_LOW_OFFSET
+	{   0x4112,      0x0,      0x0,      0x0,      0x2},	// USTORM_TOE_GRQ_THR_LOW_OFFSET
+	{   0x4114,      0x0,      0x0,      0x0,      0x2},	// USTORM_TOE_CQ_THR_HIGH_OFFSET
+	{   0x4116,      0x0,      0x0,      0x0,      0x2},	// USTORM_TOE_GRQ_THR_HIGH_OFFSET
+	{   0x6040,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_TCP_VARS_FLAGS_OFFSET(pfId)
+	{   0x6042,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_TCP_VARS_LSB_LOCAL_MAC_ADDR_OFFSET(pfId)
+	{   0x6044,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_TCP_VARS_MID_LOCAL_MAC_ADDR_OFFSET(pfId)
+	{   0x6046,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_TCP_VARS_MSB_LOCAL_MAC_ADDR_OFFSET(pfId)
+	{   0x6080,      0x8,      0x0,      0x0,      0x8},	// TSTORM_ISCSI_RQ_SIZE_OFFSET(pfId)
+	{   0x6000,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_PAGE_SIZE_OFFSET(pfId)
+	{   0x6002,      0x8,      0x0,      0x0,      0x1},	// TSTORM_ISCSI_PAGE_SIZE_LOG_OFFSET(pfId)
+	{   0x6004,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_NUM_OF_TASKS_OFFSET(pfId)
+	{   0x60c0,      0x8,      0x0,      0x0,      0x8},	// TSTORM_ISCSI_ERROR_BITMAP_OFFSET(pfId)
+	{   0x6100,      0x8,      0x0,      0x0,      0x4},	// TSTORM_ISCSI_L2_ISCSI_OOO_CID_TABLE_OFFSET(pfId)
+	{   0x6104,      0x8,      0x0,      0x0,      0x1},	// TSTORM_ISCSI_L2_ISCSI_OOO_CLIENT_ID_TABLE_OFFSET(pfId)
+	{   0x6140,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_L2_ISCSI_OOO_PROD_OFFSET(pfId)
+	{   0x6144,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_L2_ISCSI_OOO_RX_BDS_THRSHLD_OFFSET(pfId)
+	{   0x6142,      0x8,      0x0,      0x0,      0x2},	// TSTORM_ISCSI_L2_ISCSI_OOO_CONS_OFFSET(pfId)
+	{   0x6180,      0x8,      0x0,      0x0,      0x4},	// TSTORM_ISCSI_TCP_LOCAL_ADV_WND_OFFSET(pfId)
+	{   0x7000,      0x8,      0x0,      0x0,      0x2},	// USTORM_ISCSI_PAGE_SIZE_OFFSET(pfId)
+	{   0x7002,      0x8,      0x0,      0x0,      0x1},	// USTORM_ISCSI_PAGE_SIZE_LOG_OFFSET(pfId)
+	{   0x7004,      0x8,      0x0,      0x0,      0x2},	// USTORM_ISCSI_NUM_OF_TASKS_OFFSET(pfId)
+	{   0x7040,      0x8,      0x0,      0x0,      0x2},	// USTORM_ISCSI_R2TQ_SIZE_OFFSET(pfId)
+	{   0x7044,      0x8,      0x0,      0x0,      0x2},	// USTORM_ISCSI_CQ_SIZE_OFFSET(pfId)
+	{   0x7046,      0x8,      0x0,      0x0,      0x2},	// USTORM_ISCSI_CQ_SQN_SIZE_OFFSET(pfId)
+	{   0x7660,      0x8,      0x0,      0x0,      0x8},	// USTORM_ISCSI_GLOBAL_BUF_PHYS_ADDR_OFFSET(pfId)
+	{   0x7080,      0x8,      0x0,      0x0,      0x2},	// USTORM_ISCSI_RQ_BUFFER_SIZE_OFFSET(pfId)
+	{   0x7084,      0x8,      0x0,      0x0,      0x2},	// USTORM_ISCSI_RQ_SIZE_OFFSET(pfId)
+	{   0x76a0,      0x8,      0x0,      0x0,      0x8},	// USTORM_ISCSI_ERROR_BITMAP_OFFSET(pfId)
+	{   0x8040,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_TCP_VARS_TTL_OFFSET(pfId)
+	{   0x8041,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_TCP_VARS_TOS_OFFSET(pfId)
+	{   0x8042,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_TCP_VARS_FLAGS_OFFSET(pfId)
+	{   0x8043,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_TCP_VARS_ADV_WND_SCL_OFFSET(pfId)
+	{   0x8000,      0x8,      0x0,      0x0,      0x2},	// XSTORM_ISCSI_PAGE_SIZE_OFFSET(pfId)
+	{   0x8002,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_PAGE_SIZE_LOG_OFFSET(pfId)
+	{   0x8004,      0x8,      0x0,      0x0,      0x2},	// XSTORM_ISCSI_NUM_OF_TASKS_OFFSET(pfId)
+	{   0x80c0,      0x8,      0x0,      0x0,      0x2},	// XSTORM_ISCSI_HQ_SIZE_OFFSET(pfId)
+	{   0x80c2,      0x8,      0x0,      0x0,      0x2},	// XSTORM_ISCSI_SQ_SIZE_OFFSET(pfId)
+	{   0x80c4,      0x8,      0x0,      0x0,      0x2},	// XSTORM_ISCSI_R2TQ_SIZE_OFFSET(pfId)
+	{   0x8080,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_LOCAL_MAC_ADDR0_OFFSET(pfId)
+	{   0x8081,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_LOCAL_MAC_ADDR1_OFFSET(pfId)
+	{   0x8082,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_LOCAL_MAC_ADDR2_OFFSET(pfId)
+	{   0x8083,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_LOCAL_MAC_ADDR3_OFFSET(pfId)
+	{   0x8084,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_LOCAL_MAC_ADDR4_OFFSET(pfId)
+	{   0x8085,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_LOCAL_MAC_ADDR5_OFFSET(pfId)
+	{   0x8086,      0x8,      0x0,      0x0,      0x1},	// XSTORM_ISCSI_LOCAL_VLAN_OFFSET(pfId)
+	{   0x6000,      0x8,      0x0,      0x0,      0x2},	// CSTORM_ISCSI_PAGE_SIZE_OFFSET(pfId)
+	{   0x6002,      0x8,      0x0,      0x0,      0x1},	// CSTORM_ISCSI_PAGE_SIZE_LOG_OFFSET(pfId)
+	{   0x6004,      0x8,      0x0,      0x0,      0x2},	// CSTORM_ISCSI_NUM_OF_TASKS_OFFSET(pfId)
+	{   0x6042,     0xc0,     0x18,      0x0,      0x2},	// CSTORM_ISCSI_EQ_PROD_OFFSET(pfId,iscsiEqId)
+	{   0x6040,     0xc0,     0x18,      0x0,      0x2},	// CSTORM_ISCSI_EQ_CONS_OFFSET(pfId,iscsiEqId)
+	{   0x604c,     0xc0,     0x18,      0x0,      0x8},	// CSTORM_ISCSI_EQ_NEXT_PAGE_ADDR_OFFSET(pfId,iscsiEqId)
+	{   0x6044,     0xc0,     0x18,      0x0,      0x8},	// CSTORM_ISCSI_EQ_NEXT_EQE_ADDR_OFFSET(pfId,iscsiEqId)
+	{   0x6057,     0xc0,     0x18,      0x0,      0x1},	// CSTORM_ISCSI_EQ_NEXT_PAGE_ADDR_VALID_OFFSET(pfId,iscsiEqId)
+	{   0x6054,     0xc0,     0x18,      0x0,      0x2},	// CSTORM_ISCSI_EQ_SB_NUM_OFFSET(pfId,iscsiEqId)
+	{   0x6056,     0xc0,     0x18,      0x0,      0x1},	// CSTORM_ISCSI_EQ_SB_INDEX_OFFSET(pfId,iscsiEqId)
+	{   0x6640,      0x8,      0x0,      0x0,      0x8},	// CSTORM_ISCSI_HQ_SIZE_OFFSET(pfId)
+	{   0x6680,      0x8,      0x0,      0x0,      0x8},	// CSTORM_ISCSI_CQ_SIZE_OFFSET(pfId)
+	{   0x66c0,      0x8,      0x0,      0x0,      0x8},	// CSTORM_ISCSI_CQ_SQN_SIZE_OFFSET(pfId)
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_FCOE_EQ_PROD_OFFSET(pfId)
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_FCOE_TIMER_PARAM_OFFSET
 	{UNDEF_IRO,      0x0,      0x0,      0x0,      0x0},	// USTORM_TIMER_ARRAY_OFFSET

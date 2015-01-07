@@ -24,22 +24,11 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/dev/bxe/ecore_sp.h 271728 2014-09-17 22:49:29Z davidcs $");
+
+//__FBSDID("$FreeBSD: head/sys/dev/bxe/ecore_sp.h 271728 2014-09-17 22:49:29Z davidcs $");
 
 #ifndef ECORE_SP_H
 #define ECORE_SP_H
-
-
-#include <sys/types.h>
-#include <sys/endian.h>
-#include <sys/param.h>
-#include <sys/lock.h>
-#include <sys/mutex.h>
-#include <sys/malloc.h>
-#include <sys/kernel.h>
-#include <machine/bus.h>
-#include <net/ethernet.h>
 
 #if _BYTE_ORDER == _LITTLE_ENDIAN
 #ifndef LITTLE_ENDIAN

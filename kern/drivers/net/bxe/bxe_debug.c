@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/dev/bxe/bxe_debug.c 266979 2014-06-02 18:54:45Z marcel $");
+//__FBSDID("$FreeBSD: head/sys/dev/bxe/bxe_debug.c 266979 2014-06-02 18:54:45Z marcel $");
 
 #include "bxe.h"
 

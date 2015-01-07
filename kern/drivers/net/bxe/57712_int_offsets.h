@@ -24,8 +24,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/dev/bxe/57712_int_offsets.h 265411 2014-05-06 02:32:27Z davidcs $");
+
+//__FBSDID("$FreeBSD: head/sys/dev/bxe/57712_int_offsets.h 265411 2014-05-06 02:32:27Z davidcs $");
 
 
 static const struct iro e2_iro_arr[379] = {

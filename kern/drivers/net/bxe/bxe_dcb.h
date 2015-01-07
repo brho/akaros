@@ -24,8 +24,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/dev/bxe/bxe_dcb.h 265411 2014-05-06 02:32:27Z davidcs $");
+
+//__FBSDID("$FreeBSD: head/sys/dev/bxe/bxe_dcb.h 265411 2014-05-06 02:32:27Z davidcs $");
 
 #ifndef BXE_DCB_H
 #define BXE_DCB_H

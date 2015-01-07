@@ -24,8 +24,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/dev/bxe/ecore_mfw_req.h 265411 2014-05-06 02:32:27Z davidcs $");
+//__FBSDID("$FreeBSD: head/sys/dev/bxe/ecore_mfw_req.h 265411 2014-05-06 02:32:27Z davidcs $");
 
 #ifndef ECORE_MFW_REQ_H
 #define ECORE_MFW_REQ_H

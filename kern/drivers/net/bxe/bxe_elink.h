@@ -24,8 +24,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/sys/dev/bxe/bxe_elink.h 265411 2014-05-06 02:32:27Z davidcs $");
+
+//__FBSDID("$FreeBSD: head/sys/dev/bxe/bxe_elink.h 265411 2014-05-06 02:32:27Z davidcs $");
 
 #ifndef ELINK_H
 #define ELINK_H
@@ -102,7 +102,6 @@ extern void elink_cb_notify_link_changed(struct bxe_softc *sc);
 #define ELINK_EVENT_ID_SFP_UNQUALIFIED_MODULE 	1
 #define ELINK_EVENT_ID_SFP_POWER_FAULT 		2
 
-#define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
 /* Debug prints */
 #ifdef ELINK_DEBUG
 
