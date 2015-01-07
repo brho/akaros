@@ -41,9 +41,8 @@ enum {
 };
 
 /* The QID is the TYPE and the index into the nix array.
- * We reserve the right to make it an id later.
- */
-#define ID_SHIFT 5
+ * We reserve the right to make it an id later. */
+#define INDEX_SHIFT 5
 /* nix's have an image.
  * Note that the image can be read even as it is running. */
 struct nix {
@@ -51,7 +50,7 @@ struct nix {
 	/* should this be an array of pages? Hmm. */
 	void *image;
 	unsigned long imagesize;
-	int id; // not used yet.
+	int id;
 	/* we could dynamically alloc one of these with num_cpus */
 	DECLARE_BITMAP(cpus, MAX_NUM_CPUS);
 };
@@ -63,26 +62,26 @@ static int nnix = 0;
 static int nixok = 0;
 static int npages;
 // only 4 gig for now.
+// XXX is this for all nixs?
 static page_t *nixpages[1048576];
 
 static atomic_t nixid = 0;
 
-
-static inline struct nix *
-QID2NIX(struct qid q)
+/* The index is not the id, for now.  The index is the spot in nixs[].  The id
+ * is an increasing integer, regardless of struct nix* reuse. */
+static inline struct nix *QID2NIX(struct qid q)
 {
-	return &nixs[((q).vers)];
+	return &nixs[q.path >> INDEX_SHIFT];
 }
 
-static inline int
-TYPE(struct qid q)
+static inline int TYPE(struct qid q)
 {
-	return ((q).path & ((1 << ID_SHIFT) - 1));
+	return ((q).path & ((1 << INDEX_SHIFT) - 1));
 }
 
 static inline int QID(int index, int type)
 {
-	return ((index << ID_SHIFT) | type);
+	return ((index << INDEX_SHIFT) | type);
 }
 
 /* we'll need this somewhere more generic. */
@@ -127,8 +126,7 @@ static void nix_release(struct kref *kref)
 	spin_unlock(&nixlock);
 }
 
-/* NIX ids run in the range 1..infinity.
- */
+/* NIX ids run in the range 0..infinity.  */
 static int newnixid(void)
 {
 	return atomic_fetch_and_add(&nixid, 1);
