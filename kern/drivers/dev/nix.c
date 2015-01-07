@@ -56,7 +56,7 @@ struct nix {
 	DECLARE_BITMAP(cpus, MAX_NUM_CPUS);
 };
 
-static spinlock_t nixlock;
+static spinlock_t nixlock = SPINLOCK_INITIALIZER_IRQSAVE;
 /* array, not linked list. We expect few, might as well be cache friendly. */
 static struct nix *nixs = NULL;
 static int nnix = 0;
@@ -65,7 +65,7 @@ static int npages;
 // only 4 gig for now.
 static page_t *nixpages[1048576];
 
-static atomic_t nixid;
+static atomic_t nixid = 0;
 
 //int nix_run(struct nix *nix, struct nix_run *nix_run);
 
@@ -139,7 +139,7 @@ static int newnixid(void)
 	print_func_entry();
 	int id = atomic_fetch_and_add(&nixid, 1);
 	print_func_exit();
-	return id - 1;
+	return id;
 }
 
 static int nixgen(struct chan *c, char *entry_name,
@@ -251,7 +251,6 @@ static void nixinit(void)
 	//error_t kpage_alloc_specific(page_t** page, size_t ppn)
 	print_func_entry();
 	uint64_t ppn = GiB/4096;
-	spinlock_init_irqsave(nixid);
 	while (1) {
 		if (!page_is_free(ppn)) {
 			printk("%s: got a non-free page@ppn %p\n", __func__, ppn);
