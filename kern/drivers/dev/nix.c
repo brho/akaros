@@ -6,8 +6,55 @@
  *
  * devnix/#t: a device for NIX mode
  *
- * FOR THE MOMENT, this is only intended to run one NIX at a time.
- * Too many sharp edges for any other mode.
+ * A struct nix is a "visitor" chunk of code.  It has a memory image, and can be
+ * told to run an arbitrary address (in that image or otherwise) in kernel mode
+ * on various pcores, to which it has exclusive access.
+ *
+ * TODO:
+ *
+ * - FOR THE MOMENT, this is only intended to run one NIX at a time.  Too many
+ * sharp edges for any other mode.
+ *
+ * - memory images: we have one now for all nixs.  that'll be a mess.
+ *
+ * - what do we want to do for refcnting?  decref on chan close?  or remove?
+ * how do we manage the struct nix memory? (MGMT)
+ * 		- right now, we aren't decreffing at all.  it's easier to work with from
+ * 		the shell, but it's definitely a debugging thing.  the proper way to do
+ * 		these devices is to release on close (i think).  the use case for the
+ * 		NIX is a "turn it on once and reboot if you don't like it", so this is
+ * 		fine for now.
+ * 		- we're using c->aux, which needs to be an uncounted ref, in my opinion.
+ * 		i messed around with this for a long time with devsrv, and all the
+ * 		different ways 9ns interacts with a device make it very tricky.
+ * 		- once we start freeing, we'll need to manage the memory better.  if we
+ * 		have holes in the nixs[], we'll need to handle that in nixgen
+ *
+ * - how are we going to stop a nix?
+ * 		- graceful vs immediate?  with some sort of immediate power-cord style
+ * 		halting, the entire nix is garbage once we pull the plug.  a more
+ * 		graceful style would require the nix to poll or something - probably
+ * 		overkill.
+ * 		- could send an immediate kmsg (IPI), but we'd need to do some
+ * 		bookkeeping to know we're interrupting a NIX and whatnot
+ * 		- if we were sure it's a nix core, we might be able to send an immediate
+ * 		message telling the core to just smp_idle.  doing that from hard IRQ
+ * 		would break a little, so we'd need to be careful (adjust various
+ * 		flags, etc).
+ * 		- another option would be to hack the halted context and have it call
+ * 		a cleanup function (which ultimately smp_idles)
+ * 		- if we had a process running the core, and "running the NIX" was a
+ * 		syscall or something, we'd want to abort the syscall.  but since the
+ * 		syscall isn't trying to rendez or sleep, we couldn't use the existing
+ * 		facilities.  so it's the same problem: know it is a nix, somehow
+ * 		kill/cleanup.  then just smp_idle.
+ * 		- we'll also need to unreserve a core first, so we don't have any
+ * 		concurrent startups.  careful of various races with cores coming and
+ * 		going.  we can lock the nix before sending the message, but stale RKMs
+ * 		could exist for a while.
+ * 		- maybe we use a ktask, named nixID or something, to help detect if a
+ * 		nix is running.  might also need to track the number of messages sent
+ * 		and completed (track completed via the wrapper)
  */
 
 #include <kmalloc.h>
@@ -84,7 +131,7 @@ static inline int QID(int index, int type)
 	return ((index << INDEX_SHIFT) | type);
 }
 
-/* not called yet.  -- we have to unlink the nix */
+/* TODO: (MGMT) not called yet.  -- we have to unlink the nix */
 static void nix_release(struct kref *kref)
 {
 	struct nix *v = container_of(kref, struct nix, kref);
@@ -96,7 +143,9 @@ static void nix_release(struct kref *kref)
 	 * the QIDs, which have pointers embedded in them.
 	 * darn it, may have to use a linked list. Nope, will probably
 	 * just walk the array until we find a matching id. Still ... yuck.
-	 */
+	 *
+	 * If we have lots, we can track the lowest free, similar to FDs and low_fd.
+	 * honestly, we need an integer allocator (vmem and magazine paper) */
 	if (v != &nixs[nnix - 1]) {
 		/* free the image ... oops */
 		/* get rid of the kref. */
@@ -146,6 +195,7 @@ static int nixgen(struct chan *c, char *entry_name,
 			return -1;
 		}
 		nix_i = &nixs[s];
+		/* TODO (MGMT): if no nix_i, advance (in case of holes) */
 		snprintf(get_cur_genbuf(), GENBUF_SZ, "nix%d", nix_i->id);
 		spin_unlock(&nixlock);
 		mkqid(&q, QID(s, Qnixdir), 0, QTDIR);
@@ -257,6 +307,11 @@ static struct chan *nixopen(struct chan *c, int omode)
 		break;
 	case Qclone:
 		spin_lock_irqsave(&nixlock);
+		if (nnix >= 1) {
+			spin_unlock_irqsave(&nixlock);
+			set_errno(EBUSY);
+			error("Already have 1 nix, we don't support more");
+		}
 		nixs = krealloc(nixs, sizeof(nixs[0]) * (nnix + 1), 0);
 		v = &nixs[nnix];
 		mkqid(&c->qid, QID(nnix, Qctl), 0, QTFILE);
@@ -274,6 +329,7 @@ static struct chan *nixopen(struct chan *c, int omode)
 		break;
 	case Qctl:
 	case Qimage:
+		/* TODO: (MGMT) refcnting */
 		//kref_get(&v->kref, 1);
 		c->aux = QID2NIX(c->qid);
 		break;
@@ -313,7 +369,7 @@ static void nixclose(struct chan *c)
 	if (!(c->flag & COPEN))
 		return;
 	switch (TYPE(c->qid)) {
-		/* the idea of 'stopping' a nix is tricky. 
+		/* TODO: (MGMT) the idea of 'stopping' a nix is tricky.
 		 * for now, leave the NIX active even when we close ctl */
 	case Qctl:
 		break;
@@ -348,6 +404,7 @@ static void nixwrapper(uint32_t srcid, long a0, long a1, long a2)
 {
 	void (*f)(void) = (void (*)(void))a0;
 	f();
+	/* TODO: could do some tracking to say this message has been completed */
 }
 
 static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
