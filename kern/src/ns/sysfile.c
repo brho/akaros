@@ -891,6 +891,31 @@ out:
 	return n;
 }
 
+/* Reads exactly n bytes from chan c, starting at its offset.  Can block, but if
+ * we get 0 back too soon (EOF or error), then we'll error out with Eshort.
+ * That might need a little work - if there was a previous error, then we
+ * clobbered it and only know Eshort but not why we completed early. */
+void read_exactly_n(struct chan *c, void *vp, long n)
+{
+	char *p;
+	long nn;
+	int total = 0, want = n;
+
+	p = vp;
+	while (n > 0) {
+		nn = devtab[c->type].read(c, p, n, c->offset);
+		printd("readn: Got %d@%lld\n", nn, c->offset);
+		if (nn == 0)
+			error("%s: wanted %d, got %d", Eshort, want, total);
+		spin_lock(&c->lock);
+		c->offset += nn;
+		spin_unlock(&c->lock);
+		p += nn;
+		n -= nn;
+		total += nn;
+	}
+}
+
 long sysread(int fd, void *va, long n)
 {
 	return rread(fd, va, n, NULL);

@@ -84,26 +84,6 @@ static inline int QID(int index, int type)
 	return ((index << INDEX_SHIFT) | type);
 }
 
-/* we'll need this somewhere more generic. */
-static void readn(struct chan *c, void *vp, long n)
-{
-	char *p;
-	long nn;
-	int total = 0, want = n;
-
-	p = vp;
-	while (n > 0) {
-		nn = devtab[c->type].read(c, p, n, c->offset);
-		printk("readn: Got %d@%lld\n", nn, c->offset);
-		if (nn == 0)
-			error("%s: wanted %d, got %d", Eshort, want, total);
-		c->offset += nn;
-		p += nn;
-		n -= nn;
-		total += nn;
-	}
-}
-
 /* not called yet.  -- we have to unlink the nix */
 static void nix_release(struct kref *kref)
 {

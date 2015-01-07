@@ -1001,6 +1001,7 @@ int sysmount(int fd, int afd, char *old, int flags, char *spec);
 int sysunmount(char *old, char *new);
 int sysopen(char *path, int mode);
 long unionread(struct chan *c, void *va, long n);
+void read_exactly_n(struct chan *c, void *vp, long n);
 long sysread(int fd, void *va, long n);
 long syspread(int fd, void *va, long n, int64_t off);
 int sysremove(char *path);
