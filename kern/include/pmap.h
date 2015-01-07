@@ -152,4 +152,9 @@ static inline bool is_kaddr(void *addr)
 	return (uintptr_t)addr >= KERNBASE;
 }
 
+static inline unsigned long nr_pages(size_t nr_bytes)
+{
+	return (nr_bytes >> PGSHIFT) + (PGOFF(nr_bytes) ? 1 : 0);
+}
+
 #endif /* !ROS_KERN_PMAP_H */

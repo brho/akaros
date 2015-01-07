@@ -359,12 +359,6 @@ void print_vmrs(struct proc *p)
 		       vmr->vm_file, vmr->vm_foff);
 }
 
-/* Helper: returns the number of pages required to hold nr_bytes */
-static unsigned long nr_pages(unsigned long nr_bytes)
-{
-	return (nr_bytes >> PGSHIFT) + (PGOFF(nr_bytes) ? 1 : 0);
-}
-
 /* Error values aren't quite comprehensive - check man mmap() once we do better
  * with the FS.
  *
