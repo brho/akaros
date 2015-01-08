@@ -28,10 +28,6 @@
 
 #include "bxe.h"
 
-#include "ddb/ddb.h"
-#include "ddb/db_sym.h"
-#include "ddb/db_lex.h"
-
 #ifdef BXE_REG_NO_INLINE
 
 /*
@@ -43,10 +39,7 @@ void
 bxe_reg_write8(struct bxe_adapter *sc, bus_size_t offset, uint8_t val)
 {
     BLOGD(sc, DBG_REGS, "offset=0x%08lx val=0x%02x\n", offset, val);
-    bus_space_write_1(sc->bar[BAR0].tag,
-                      sc->bar[BAR0].handle,
-                      offset,
-                      val);
+    outb(sc->bar[BAR0].mmio_base64 + offset, val);
 }
 
 void
@@ -57,10 +50,7 @@ bxe_reg_write16(struct bxe_adapter *sc, bus_size_t offset, uint16_t val)
     }
 
     BLOGD(sc, DBG_REGS, "offset=0x%08lx val=0x%04x\n", offset, val);
-    bus_space_write_2(sc->bar[BAR0].tag,
-                      sc->bar[BAR0].handle,
-                      offset,
-                      val);
+    outw(sc->bar[BAR0].mmio_base64 + offset, val);
 }
 
 void
@@ -71,10 +61,7 @@ bxe_reg_write32(struct bxe_adapter *sc, bus_size_t offset, uint32_t val)
     }
 
     BLOGD(sc, DBG_REGS, "offset=0x%08lx val=0x%08x\n", offset, val);
-    bus_space_write_4(sc->bar[BAR0].tag,
-                      sc->bar[BAR0].handle,
-                      offset,
-                      val);
+    outl(sc->bar[BAR0].mmio_base64+offset, val);
 }
 
 uint8_t
@@ -82,9 +69,8 @@ bxe_reg_read8(struct bxe_adapter *sc, bus_size_t offset)
 {
     uint8_t val;
 
-    val = bus_space_read_1(sc->bar[BAR0].tag,
-                           sc->bar[BAR0].handle,
-                           offset);
+    val = inb(
+                           sc->bar[BAR0].mmio_base64  + offset);
     BLOGD(sc, DBG_REGS, "offset=0x%08lx val=0x%02x\n", offset, val);
 
     return (val);
@@ -99,9 +85,7 @@ bxe_reg_read16(struct bxe_adapter *sc, bus_size_t offset)
         BLOGD(sc, DBG_REGS, "Unaligned 16-bit read from 0x%08lx\n", offset);
     }
 
-    val = bus_space_read_2(sc->bar[BAR0].tag,
-                           sc->bar[BAR0].handle,
-                           offset);
+    val = inw(sc->bar[BAR0].mmio_base64 + offset);
     BLOGD(sc, DBG_REGS, "offset=0x%08lx val=0x%08x\n", offset, val);
 
     return (val);
@@ -116,9 +100,8 @@ bxe_reg_read32(struct bxe_adapter *sc, bus_size_t offset)
         BLOGD(sc, DBG_REGS, "Unaligned 32-bit read from 0x%08lx\n", offset);
     }
 
-    val = bus_space_read_4(sc->bar[BAR0].tag,
-                           sc->bar[BAR0].handle,
-                           offset);
+    val = inl(
+                           sc->bar[BAR0].mmio_base64 + offset);
     BLOGD(sc, DBG_REGS, "offset=0x%08lx val=0x%08x\n", offset, val);
 
     return (val);
