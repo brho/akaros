@@ -1427,8 +1427,7 @@ struct bxe_adapter {
 
     int if_capen; /* enabled interface capabilities */
 
-#warning "no bxe_devinfo"
-  //    struct bxe_devinfo devinfo;
+  struct bxe_devinfo devinfo;
     char fw_ver_str[32];
     char mf_mode_str[32];
     char pci_link_str[32];
@@ -1621,7 +1620,7 @@ struct bxe_adapter {
 
     /* slow path */
   struct bxe_dma      sp_dma;
-  //    struct bxe_slowpath *sp;
+  struct bxe_slowpath *sp;
     unsigned long       sp_state;
 
     /* slow path queue */
@@ -1848,6 +1847,7 @@ struct bxe_func_init_params {
 #define BAR1 2
 #define BAR2 4
 
+#define BXE_REG_NO_INLINE
 #ifdef BXE_REG_NO_INLINE
 
 uint8_t bxe_reg_read8(struct bxe_adapter *sc, bus_size_t offset);

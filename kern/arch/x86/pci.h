@@ -346,6 +346,8 @@ struct pci_device {
 	uintptr_t					msix_pba_vaddr;
 	unsigned int				msix_nr_vec;
 	bool						msix_ready;
+	// Expansion ROM and attached FLASH
+	int						flash_size;
 };
 
 struct msix_entry {

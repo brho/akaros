@@ -2104,7 +2104,7 @@ static void elink_update_pfc_xmac(struct elink_params *params,
 	       ((params->mac_addr[0] << 8) |
 		(params->mac_addr[1])));
 
-	DELAY(30);
+	udelay(30);
 }
 
 
@@ -2188,7 +2188,7 @@ static void elink_set_mdio_clk(struct bxe_adapter *sc, uint32_t chip_id,
 	ELINK_DEBUG_P2(sc, "Changing emac_mode from 0x%x to 0x%x\n",
 	   cur_mode, new_mode);
 	REG_WR(sc, emac_base + EMAC_REG_EMAC_MDIO_MODE, new_mode);
-	DELAY(40);
+	udelay(40);
 }
 
 static void elink_set_mdio_emac_per_phy(struct bxe_adapter *sc,
@@ -2227,7 +2227,7 @@ static void elink_emac_init(struct elink_params *params,
 
 	REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_CLEAR,
 	       (MISC_REGISTERS_RESET_REG_2_RST_EMAC0_HARD_CORE << port));
-	DELAY(5);
+	udelay(5);
 	REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_SET,
 	       (MISC_REGISTERS_RESET_REG_2_RST_EMAC0_HARD_CORE << port));
 
@@ -2302,7 +2302,7 @@ static void elink_umac_enable(struct elink_params *params,
 	/* Reset UMAC */
 	REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_CLEAR,
 	       (MISC_REGISTERS_RESET_REG_2_UMAC0 << params->port));
-	DELAY(1000 * 1);
+	udelay(1000 * 1);
 
 	REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_SET,
 	       (MISC_REGISTERS_RESET_REG_2_UMAC0 << params->port));
@@ -2344,7 +2344,7 @@ static void elink_umac_enable(struct elink_params *params,
 		val |= UMAC_COMMAND_CONFIG_REG_HD_ENA;
 
 	REG_WR(sc, umac_base + UMAC_REG_COMMAND_CONFIG, val);
-	DELAY(50);
+	udelay(50);
 
 	/* Configure UMAC for EEE */
 	if (vars->eee_status & SHMEM_EEE_ADV_STATUS_MASK) {
@@ -2371,7 +2371,7 @@ static void elink_umac_enable(struct elink_params *params,
 	val |= UMAC_COMMAND_CONFIG_REG_TX_ENA |
 		UMAC_COMMAND_CONFIG_REG_RX_ENA;
 	REG_WR(sc, umac_base + UMAC_REG_COMMAND_CONFIG, val);
-	DELAY(50);
+	udelay(50);
 
 	/* Remove SW Reset */
 	val &= ~UMAC_COMMAND_CONFIG_REG_SW_RESET;
@@ -2417,7 +2417,7 @@ static void elink_xmac_init(struct elink_params *params, uint32_t max_speed)
 	/* Hard reset */
 	REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_CLEAR,
 	       MISC_REGISTERS_RESET_REG_2_XMAC);
-	DELAY(1000 * 1);
+	udelay(1000 * 1);
 
 	REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_SET,
 	       MISC_REGISTERS_RESET_REG_2_XMAC);
@@ -2447,7 +2447,7 @@ static void elink_xmac_init(struct elink_params *params, uint32_t max_speed)
 	/* Soft reset */
 	REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_CLEAR,
 	       MISC_REGISTERS_RESET_REG_2_XMAC_SOFT);
-	DELAY(1000 * 1);
+	udelay(1000 * 1);
 
 	REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_SET,
 	       MISC_REGISTERS_RESET_REG_2_XMAC_SOFT);
@@ -2774,7 +2774,7 @@ static void elink_update_pfc_bmac2(struct elink_params *params,
 	wb_data[0] = val;
 	wb_data[1] = 0;
 	REG_WR_DMAE(sc, bmac_addr + BIGMAC2_REGISTER_RX_CONTROL, wb_data, 2);
-	DELAY(30);
+	udelay(30);
 
 	/* Tx control */
 	val = 0xc0;
@@ -3144,7 +3144,7 @@ static elink_status_t elink_bmac2_enable(struct elink_params *params,
 	wb_data[0] = 0;
 	wb_data[1] = 0;
 	REG_WR_DMAE(sc, bmac_addr + BIGMAC2_REGISTER_BMAC_CONTROL, wb_data, 2);
-	DELAY(30);
+	udelay(30);
 
 	/* XGXS control: Reset phy HW, MDIO registers, PHY PLL and BMAC */
 	wb_data[0] = 0x3c;
@@ -3152,7 +3152,7 @@ static elink_status_t elink_bmac2_enable(struct elink_params *params,
 	REG_WR_DMAE(sc, bmac_addr + BIGMAC2_REGISTER_BMAC_XGXS_CONTROL,
 		    wb_data, 2);
 
-	DELAY(30);
+	udelay(30);
 
 	/* TX MAC SA */
 	wb_data[0] = ((params->mac_addr[2] << 24) |
@@ -3164,31 +3164,31 @@ static elink_status_t elink_bmac2_enable(struct elink_params *params,
 	REG_WR_DMAE(sc, bmac_addr + BIGMAC2_REGISTER_TX_SOURCE_ADDR,
 		    wb_data, 2);
 
-	DELAY(30);
+	udelay(30);
 
 	/* Configure SAFC */
 	wb_data[0] = 0x1000200;
 	wb_data[1] = 0;
 	REG_WR_DMAE(sc, bmac_addr + BIGMAC2_REGISTER_RX_LLFC_MSG_FLDS,
 		    wb_data, 2);
-	DELAY(30);
+	udelay(30);
 
 	/* Set RX MTU */
 	wb_data[0] = ELINK_ETH_MAX_JUMBO_PACKET_SIZE + ELINK_ETH_OVREHEAD;
 	wb_data[1] = 0;
 	REG_WR_DMAE(sc, bmac_addr + BIGMAC2_REGISTER_RX_MAX_SIZE, wb_data, 2);
-	DELAY(30);
+	udelay(30);
 
 	/* Set TX MTU */
 	wb_data[0] = ELINK_ETH_MAX_JUMBO_PACKET_SIZE + ELINK_ETH_OVREHEAD;
 	wb_data[1] = 0;
 	REG_WR_DMAE(sc, bmac_addr + BIGMAC2_REGISTER_TX_MAX_SIZE, wb_data, 2);
-	DELAY(30);
+	udelay(30);
 	/* Set cnt max size */
 	wb_data[0] = ELINK_ETH_MAX_JUMBO_PACKET_SIZE + ELINK_ETH_OVREHEAD - 2;
 	wb_data[1] = 0;
 	REG_WR_DMAE(sc, bmac_addr + BIGMAC2_REGISTER_CNT_MAX_SIZE, wb_data, 2);
-	DELAY(30);
+	udelay(30);
 	elink_update_pfc_bmac2(params, vars, is_lb);
 
 	return ELINK_STATUS_OK;
@@ -3206,7 +3206,7 @@ static elink_status_t elink_bmac_enable(struct elink_params *params,
 	if (reset_bmac) {
 		REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_CLEAR,
 		       (MISC_REGISTERS_RESET_REG_2_RST_BMAC0 << port));
-		DELAY(1000 * 1);
+		udelay(1000 * 1);
 	}
 
 	REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_SET,
@@ -3261,7 +3261,7 @@ static void elink_set_bmac_rx(struct bxe_adapter *sc, uint32_t chip_id, uint8_t 
 		else
 			wb_data[0] &= ~ELINK_BMAC_CONTROL_RX_ENABLE;
 		REG_WR_DMAE(sc, bmac_addr, wb_data, 2);
-		DELAY(1000 * 1);
+		udelay(1000 * 1);
 	}
 }
 
@@ -3282,7 +3282,7 @@ static elink_status_t elink_pbf_update(struct elink_params *params, uint32_t flo
 	ELINK_DEBUG_P2(sc, "init_crd 0x%x  crd 0x%x\n", init_crd, crd);
 
 	while ((init_crd != crd) && count) {
-		DELAY(1000 * 5);
+		udelay(1000 * 5);
 		crd = REG_RD(sc, PBF_REG_P0_CREDIT + port*8);
 		count--;
 	}
@@ -3327,7 +3327,7 @@ static elink_status_t elink_pbf_update(struct elink_params *params, uint32_t flo
 
 	/* Probe the credit changes */
 	REG_WR(sc, PBF_REG_INIT_P0 + port*4, 0x1);
-	DELAY(1000 * 5);
+	udelay(1000 * 5);
 	REG_WR(sc, PBF_REG_INIT_P0 + port*4, 0x0);
 
 	/* Enable port */
@@ -3404,11 +3404,11 @@ static elink_status_t elink_cl22_write(struct bxe_adapter *sc,
 	REG_WR(sc, phy->mdio_ctrl + EMAC_REG_EMAC_MDIO_COMM, tmp);
 
 	for (i = 0; i < 50; i++) {
-		DELAY(10);
+		udelay(10);
 
 		tmp = REG_RD(sc, phy->mdio_ctrl + EMAC_REG_EMAC_MDIO_COMM);
 		if (!(tmp & EMAC_MDIO_COMM_START_BUSY)) {
-			DELAY(5);
+			udelay(5);
 			break;
 		}
 	}
@@ -3440,12 +3440,12 @@ static elink_status_t elink_cl22_read(struct bxe_adapter *sc,
 	REG_WR(sc, phy->mdio_ctrl + EMAC_REG_EMAC_MDIO_COMM, val);
 
 	for (i = 0; i < 50; i++) {
-		DELAY(10);
+		udelay(10);
 
 		val = REG_RD(sc, phy->mdio_ctrl + EMAC_REG_EMAC_MDIO_COMM);
 		if (!(val & EMAC_MDIO_COMM_START_BUSY)) {
 			*ret_val = (uint16_t)(val & EMAC_MDIO_COMM_DATA);
-			DELAY(5);
+			udelay(5);
 			break;
 		}
 	}
@@ -3485,11 +3485,11 @@ static elink_status_t elink_cl45_read(struct bxe_adapter *sc, struct elink_phy *
 	REG_WR(sc, phy->mdio_ctrl + EMAC_REG_EMAC_MDIO_COMM, val);
 
 	for (i = 0; i < 50; i++) {
-		DELAY(10);
+		udelay(10);
 
 		val = REG_RD(sc, phy->mdio_ctrl + EMAC_REG_EMAC_MDIO_COMM);
 		if (!(val & EMAC_MDIO_COMM_START_BUSY)) {
-			DELAY(5);
+			udelay(5);
 			break;
 		}
 	}
@@ -3507,7 +3507,7 @@ static elink_status_t elink_cl45_read(struct bxe_adapter *sc, struct elink_phy *
 		REG_WR(sc, phy->mdio_ctrl + EMAC_REG_EMAC_MDIO_COMM, val);
 
 		for (i = 0; i < 50; i++) {
-			DELAY(10);
+			udelay(10);
 
 			val = REG_RD(sc, phy->mdio_ctrl +
 				     EMAC_REG_EMAC_MDIO_COMM);
@@ -3563,11 +3563,11 @@ static elink_status_t elink_cl45_write(struct bxe_adapter *sc, struct elink_phy 
 	REG_WR(sc, phy->mdio_ctrl + EMAC_REG_EMAC_MDIO_COMM, tmp);
 
 	for (i = 0; i < 50; i++) {
-		DELAY(10);
+		udelay(10);
 
 		tmp = REG_RD(sc, phy->mdio_ctrl + EMAC_REG_EMAC_MDIO_COMM);
 		if (!(tmp & EMAC_MDIO_COMM_START_BUSY)) {
-			DELAY(5);
+			udelay(5);
 			break;
 		}
 	}
@@ -3584,12 +3584,12 @@ static elink_status_t elink_cl45_write(struct bxe_adapter *sc, struct elink_phy 
 		REG_WR(sc, phy->mdio_ctrl + EMAC_REG_EMAC_MDIO_COMM, tmp);
 
 		for (i = 0; i < 50; i++) {
-			DELAY(10);
+			udelay(10);
 
 			tmp = REG_RD(sc, phy->mdio_ctrl +
 				     EMAC_REG_EMAC_MDIO_COMM);
 			if (!(tmp & EMAC_MDIO_COMM_START_BUSY)) {
-				DELAY(5);
+				udelay(5);
 				break;
 			}
 		}
@@ -3921,7 +3921,7 @@ static elink_status_t elink_bsc_read(struct elink_params *params,
 	i = 0;
 	val = REG_RD(sc, MCP_REG_MCPR_IMC_COMMAND);
 	while (((val >> MCPR_IMC_COMMAND_IMC_STATUS_BITSHIFT) & 0x3) != 1) {
-		DELAY(10);
+		udelay(10);
 		val = REG_RD(sc, MCP_REG_MCPR_IMC_COMMAND);
 		if (i++ > 1000) {
 			ELINK_DEBUG_P1(sc, "wr 0 byte timed out after %d try\n",
@@ -3945,7 +3945,7 @@ static elink_status_t elink_bsc_read(struct elink_params *params,
 	i = 0;
 	val = REG_RD(sc, MCP_REG_MCPR_IMC_COMMAND);
 	while (((val >> MCPR_IMC_COMMAND_IMC_STATUS_BITSHIFT) & 0x3) != 1) {
-		DELAY(10);
+		udelay(10);
 		val = REG_RD(sc, MCP_REG_MCPR_IMC_COMMAND);
 		if (i++ > 1000) {
 			ELINK_DEBUG_P1(sc, "rd op timed out after %d try\n", i);
@@ -4116,9 +4116,9 @@ static void elink_set_serdes_access(struct bxe_adapter *sc, uint8_t port)
 	/* Set Clause 22 */
 	REG_WR(sc, NIG_REG_SERDES0_CTRL_MD_ST + port*0x10, 1);
 	REG_WR(sc, emac_base + EMAC_REG_EMAC_MDIO_COMM, 0x245f8000);
-	DELAY(500);
+	udelay(500);
 	REG_WR(sc, emac_base + EMAC_REG_EMAC_MDIO_COMM, 0x245d000f);
-	DELAY(500);
+	udelay(500);
 	 /* Set Clause 45 */
 	REG_WR(sc, NIG_REG_SERDES0_CTRL_MD_ST + port*0x10, 0);
 }
@@ -4133,7 +4133,7 @@ static void elink_serdes_deassert(struct bxe_adapter *sc, uint8_t port)
 
 	/* Reset and unreset the SerDes/XGXS */
 	REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_3_CLEAR, val);
-	DELAY(500);
+	udelay(500);
 	REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_3_SET, val);
 
 	elink_set_serdes_access(sc, port);
@@ -4169,7 +4169,7 @@ static void elink_xgxs_deassert(struct elink_params *params)
 
 	/* Reset and unreset the SerDes/XGXS */
 	REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_3_CLEAR, val);
-	DELAY(500);
+	udelay(500);
 	REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_3_SET, val);
 	elink_xgxs_specific_func(&params->phy[ELINK_INT_PHY], params,
 				 ELINK_PHY_INIT);
@@ -5658,7 +5658,7 @@ static elink_status_t elink_reset_unicore(struct elink_params *params,
 
 	/* Wait for the reset to self clear */
 	for (i = 0; i < ELINK_MDIO_ACCESS_TIMEOUT; i++) {
-		DELAY(5);
+		udelay(5);
 
 		/* The reset erased the previous bank value */
 		CL22_RD_OVER_CL45(sc, phy,
@@ -5667,7 +5667,7 @@ static elink_status_t elink_reset_unicore(struct elink_params *params,
 				  &mii_control);
 
 		if (!(mii_control & MDIO_COMBO_IEEO_MII_CONTROL_RESET)) {
-			DELAY(5);
+			udelay(5);
 			return ELINK_STATUS_OK;
 		}
 	}
@@ -6776,7 +6776,7 @@ static uint16_t elink_wait_reset_complete(struct bxe_adapter *sc,
 				MDIO_PMA_REG_CTRL, &ctrl);
 		if (!(ctrl & (1<<15)))
 			break;
-		DELAY(1000 * 1);
+		udelay(1000 * 1);
 	}
 
 	if (cnt == 1000)
@@ -7026,7 +7026,7 @@ static void elink_set_xgxs_loopback(struct elink_phy *phy,
 				 (MDIO_REG_BANK_CL73_IEEEB0 +
 				  (MDIO_CL73_IEEEB0_CL73_AN_CONTROL & 0xf)),
 				 0x6041);
-		DELAY(1000 * 200);
+		udelay(1000 * 200);
 		/* Set aer mmd back */
 		elink_set_aer_mmd(params, phy);
 
@@ -7422,7 +7422,7 @@ static elink_status_t elink_update_link_down(struct elink_params *params,
 	if (!CHIP_IS_E3(sc))
 		REG_WR(sc, NIG_REG_NIG_EMAC0_EN + port*4, 0);
 
-	DELAY(1000 * 10);
+	udelay(1000 * 10);
 	/* Reset BigMac/Xmac */
 	if (CHIP_IS_E1x(sc) ||
 	    CHIP_IS_E2(sc))
@@ -7532,7 +7532,7 @@ static elink_status_t elink_update_link_up(struct elink_params *params,
 			break;
 		}
 	}
-	DELAY(1000 * 20);
+	udelay(1000 * 20);
 	return rc;
 }
 /* The elink_link_update function should be called upon link
@@ -7736,7 +7736,7 @@ elink_status_t elink_link_update(struct elink_params *params, struct elink_vars 
 		} else if (prev_line_speed != vars->line_speed) {
 			REG_WR(sc, NIG_REG_EGRESS_DRAIN0_MODE + params->port*4,
 			       0);
-			DELAY(1000 * 1);
+			udelay(1000 * 1);
 		}
 	}
 
@@ -7806,7 +7806,7 @@ void elink_ext_phy_hw_reset(struct bxe_adapter *sc, uint8_t port)
 {
 	elink_cb_gpio_write(sc, MISC_REGISTERS_GPIO_1,
 		       MISC_REGISTERS_GPIO_OUTPUT_LOW, port);
-	DELAY(1000 * 1);
+	udelay(1000 * 1);
 	elink_cb_gpio_write(sc, MISC_REGISTERS_GPIO_1,
 		       MISC_REGISTERS_GPIO_OUTPUT_HIGH, port);
 }
@@ -7926,7 +7926,7 @@ static elink_status_t elink_8073_8727_external_rom_boot(struct bxe_adapter *sc,
 			 MDIO_PMA_REG_GEN_CTRL_ROM_RESET_INTERNAL_MP);
 
 	/* Delay 100ms per the PHY specifications */
-	DELAY(1000 * 100);
+	udelay(1000 * 100);
 
 	/* 8073 sometimes taking longer to download */
 	do {
@@ -7947,7 +7947,7 @@ static elink_status_t elink_8073_8727_external_rom_boot(struct bxe_adapter *sc,
 				MDIO_PMA_DEVAD,
 				MDIO_PMA_REG_M8051_MSGOUT_REG, &fw_msgout);
 
-		DELAY(1000 * 1);
+		udelay(1000 * 1);
 	} while (fw_ver1 == 0 || fw_ver1 == 0x4321 ||
 			((fw_msgout & 0xff) != 0x03 && (phy->type ==
 			PORT_HW_CFG_XGXS_EXT_PHY_TYPE_BCM8073)));
@@ -8041,11 +8041,11 @@ static elink_status_t elink_8073_xaui_wa(struct bxe_adapter *sc, struct elink_ph
 					  "XAUI workaround has completed\n");
 					return ELINK_STATUS_OK;
 				 }
-				 DELAY(1000 * 3);
+				 udelay(1000 * 3);
 			}
 			break;
 		}
-		DELAY(1000 * 3);
+		udelay(1000 * 3);
 	}
 	ELINK_DEBUG_P0(sc, "Warning: XAUI work-around timeout !!!\n");
 	return ELINK_STATUS_ERROR;
@@ -8096,7 +8096,7 @@ static void elink_8073_set_pause_cl37(struct elink_params *params,
 
 	elink_cl45_write(sc, phy,
 			 MDIO_AN_DEVAD, MDIO_AN_REG_CL37_FC_LD, cl37_val);
-	DELAY(1000 * 500);
+	udelay(1000 * 500);
 }
 
 static void elink_8073_specific_func(struct elink_phy *phy,
@@ -8256,7 +8256,7 @@ static elink_status_t elink_8073_config_init(struct elink_phy *phy,
 	elink_ext_phy_set_pause(params, phy, vars);
 
 	/* Restart autoneg */
-	DELAY(1000 * 500);
+	udelay(1000 * 500);
 	elink_cl45_write(sc, phy, MDIO_AN_DEVAD, MDIO_AN_REG_CTRL, 0x1200);
 	ELINK_DEBUG_P2(sc, "807x Autoneg Restart: Advertise 1G=%x, 10G=%x\n",
 		   ((val & (1<<5)) > 0), ((val & (1<<7)) > 0));
@@ -8632,7 +8632,7 @@ static elink_status_t elink_8726_read_sfp_module_eeprom(struct elink_phy *phy,
 		if ((val & MDIO_PMA_REG_SFP_TWO_WIRE_CTRL_STATUS_MASK) ==
 		    MDIO_PMA_REG_SFP_TWO_WIRE_STATUS_COMPLETE)
 			break;
-		DELAY(5);
+		udelay(5);
 	}
 
 	if ((val & MDIO_PMA_REG_SFP_TWO_WIRE_CTRL_STATUS_MASK) !=
@@ -8658,7 +8658,7 @@ static elink_status_t elink_8726_read_sfp_module_eeprom(struct elink_phy *phy,
 		if ((val & MDIO_PMA_REG_SFP_TWO_WIRE_CTRL_STATUS_MASK) ==
 		    MDIO_PMA_REG_SFP_TWO_WIRE_STATUS_IDLE)
 			return ELINK_STATUS_OK;
-		DELAY(1000 * 1);
+		udelay(1000 * 1);
 	}
 	return ELINK_STATUS_ERROR;
 }
@@ -8708,7 +8708,7 @@ static elink_status_t elink_warpcore_read_sfp_module_eeprom(struct elink_phy *ph
 		if ((!is_init) && (cnt == I2C_WA_PWR_ITER)) {
 			elink_warpcore_power_module(params, 0);
 			/* Note that 100us are not enough here */
-			DELAY(1000 * 1);
+			udelay(1000 * 1);
 			elink_warpcore_power_module(params, 1);
 		}
 		rc = elink_bsc_read(params, sc, dev_addr, addr32, 0, byte_cnt,
@@ -8779,7 +8779,7 @@ static elink_status_t elink_8727_read_sfp_module_eeprom(struct elink_phy *phy,
 	/* Wait appropriate time for two-wire command to finish before
 	 * polling the status register
 	 */
-	DELAY(1000 * 1);
+	udelay(1000 * 1);
 
 	/* Wait up to 500us for command complete status */
 	for (i = 0; i < 100; i++) {
@@ -8789,7 +8789,7 @@ static elink_status_t elink_8727_read_sfp_module_eeprom(struct elink_phy *phy,
 		if ((val & MDIO_PMA_REG_SFP_TWO_WIRE_CTRL_STATUS_MASK) ==
 		    MDIO_PMA_REG_SFP_TWO_WIRE_STATUS_COMPLETE)
 			break;
-		DELAY(5);
+		udelay(5);
 	}
 
 	if ((val & MDIO_PMA_REG_SFP_TWO_WIRE_CTRL_STATUS_MASK) !=
@@ -8815,7 +8815,7 @@ static elink_status_t elink_8727_read_sfp_module_eeprom(struct elink_phy *phy,
 		if ((val & MDIO_PMA_REG_SFP_TWO_WIRE_CTRL_STATUS_MASK) ==
 		    MDIO_PMA_REG_SFP_TWO_WIRE_STATUS_IDLE)
 			return ELINK_STATUS_OK;
-		DELAY(1000 * 1);
+		udelay(1000 * 1);
 	}
 
 	return ELINK_STATUS_ERROR;
@@ -9103,7 +9103,7 @@ static elink_status_t elink_wait_for_sfp_module_initialized(struct elink_phy *ph
 			   timeout * 5);
 			return ELINK_STATUS_OK;
 		}
-		DELAY(1000 * 5);
+		udelay(1000 * 5);
 	}
 	rc = elink_read_sfp_module_eeprom(phy, params, ELINK_I2C_DEV_ADDR_A0,
 					  1, 1, &val);
@@ -9657,7 +9657,7 @@ static uint8_t elink_8706_config_init(struct elink_phy *phy,
 				MDIO_PMA_DEVAD, MDIO_PMA_REG_ROM_VER1, &val);
 		if (val)
 			break;
-		DELAY(1000 * 10);
+		udelay(1000 * 10);
 	}
 	ELINK_DEBUG_P1(sc, "XGXS 8706 is initialized after %d ms\n", cnt);
 	if ((params->feature_config_flags &
@@ -9765,7 +9765,7 @@ static void elink_8726_external_rom_boot(struct elink_phy *phy,
 {
 	struct bxe_adapter *sc = params->sc;
 	/* Need to wait 100ms after reset */
-	DELAY(1000 * 100);
+	udelay(1000 * 100);
 
 	/* Micro controller re-boot */
 	elink_cl45_write(sc, phy,
@@ -9787,14 +9787,14 @@ static void elink_8726_external_rom_boot(struct elink_phy *phy,
 			 MDIO_PMA_REG_GEN_CTRL_ROM_RESET_INTERNAL_MP);
 
 	/* Wait for 150ms for microcode load */
-	DELAY(1000 * 150);
+	udelay(1000 * 150);
 
 	/* Disable serial boot control, tristates pins SS_N, SCK, MOSI, MISO */
 	elink_cl45_write(sc, phy,
 			 MDIO_PMA_DEVAD,
 			 MDIO_PMA_REG_MISC_CTRL1, 0x0000);
 
-	DELAY(1000 * 200);
+	udelay(1000 * 200);
 	elink_save_bcm_spirom_ver(sc, phy, params->port);
 }
 
@@ -10414,7 +10414,7 @@ static void elink_save_848xx_spirom_version(struct elink_phy *phy,
 			elink_cl45_read(sc, phy, MDIO_PMA_DEVAD, 0xA818, &val);
 			if (val & 1)
 				break;
-			DELAY(5);
+			udelay(5);
 		}
 		if (cnt == 100) {
 			ELINK_DEBUG_P0(sc, "Unable to read 848xx "
@@ -10433,7 +10433,7 @@ static void elink_save_848xx_spirom_version(struct elink_phy *phy,
 			elink_cl45_read(sc, phy, MDIO_PMA_DEVAD, 0xA818, &val);
 			if (val & 1)
 				break;
-			DELAY(5);
+			udelay(5);
 		}
 		if (cnt == 100) {
 			ELINK_DEBUG_P0(sc, "Unable to read 848xx phy fw "
@@ -10699,7 +10699,7 @@ static elink_status_t elink_84833_cmd_hdlr(struct elink_phy *phy,
 				MDIO_84833_CMD_HDLR_STATUS, &val);
 		if (val == PHY84833_STATUS_CMD_OPEN_FOR_CMDS)
 			break;
-		DELAY(1000 * 1);
+		udelay(1000 * 1);
 	}
 	if (idx >= PHY84833_CMDHDLR_WAIT) {
 		ELINK_DEBUG_P0(sc, "FW cmd: FW not ready.\n");
@@ -10720,7 +10720,7 @@ static elink_status_t elink_84833_cmd_hdlr(struct elink_phy *phy,
 		if ((val == PHY84833_STATUS_CMD_COMPLETE_PASS) ||
 			(val == PHY84833_STATUS_CMD_COMPLETE_ERROR))
 			break;
-		DELAY(1000 * 1);
+		udelay(1000 * 1);
 	}
 	if ((idx >= PHY84833_CMDHDLR_WAIT) ||
 		(val == PHY84833_STATUS_CMD_COMPLETE_ERROR)) {
@@ -10832,7 +10832,7 @@ static elink_status_t elink_84833_hw_reset_phy(struct elink_phy *phy,
 						  params->chip_id);
 
 	elink_cb_gpio_mult_write(sc, reset_gpios, MISC_REGISTERS_GPIO_OUTPUT_LOW);
-	DELAY(10);
+	udelay(10);
 	ELINK_DEBUG_P1(sc, "84833 hw reset on pin values 0x%x\n",
 		reset_gpios);
 
@@ -10890,7 +10890,7 @@ static elink_status_t elink_848x3_config_init(struct elink_phy *phy,
 	uint16_t cmd_args[PHY84833_CMDHDLR_MAX_ARGS];
 	elink_status_t rc = ELINK_STATUS_OK;
 
-	DELAY(1000 * 1);
+	udelay(1000 * 1);
 
 	if (!(CHIP_IS_E1x(sc)))
 		port = SC_PATH(sc);
@@ -10911,7 +10911,7 @@ static elink_status_t elink_848x3_config_init(struct elink_phy *phy,
 	elink_wait_reset_complete(sc, phy, params);
 
 	/* Wait for GPHY to come out of reset */
-	DELAY(1000 * 50);
+	udelay(1000 * 50);
 	if ((phy->type != PORT_HW_CFG_XGXS_EXT_PHY_TYPE_BCM84833) &&
 	    (phy->type != PORT_HW_CFG_XGXS_EXT_PHY_TYPE_BCM84834)) {
 		/* BCM84823 requires that XGXS links up first @ 10G for normal
@@ -11554,7 +11554,7 @@ static elink_status_t elink_54618se_config_init(struct elink_phy *phy,
 	uint32_t cfg_pin;
 
 	ELINK_DEBUG_P0(sc, "54618SE cfg init\n");
-	DELAY(1000 * 1);
+	udelay(1000 * 1);
 
 	/* This works with E3 only, no need to check the chip
 	 * before determining the port.
@@ -11571,7 +11571,7 @@ static elink_status_t elink_54618se_config_init(struct elink_phy *phy,
 	elink_set_cfg_pin(sc, cfg_pin, 1);
 
 	/* wait for GPHY to reset */
-	DELAY(1000 * 50);
+	udelay(1000 * 50);
 
 	/* reset phy */
 	elink_cl22_write(sc, phy,
@@ -11579,7 +11579,7 @@ static elink_status_t elink_54618se_config_init(struct elink_phy *phy,
 	elink_wait_reset_complete(sc, phy, params);
 
 	/* Wait for GPHY to reset */
-	DELAY(1000 * 50);
+	udelay(1000 * 50);
 
 
 	elink_54618se_specific_func(phy, params, ELINK_PHY_INIT);
@@ -12073,7 +12073,7 @@ void elink_sfx7101_sp_sw_reset(struct bxe_adapter *sc, struct elink_phy *phy)
 			MDIO_PMA_REG_7101_RESET, &val);
 
 	for (cnt = 0; cnt < 10; cnt++) {
-		DELAY(1000 * 50);
+		udelay(1000 * 50);
 		/* Writes a self-clearing reset */
 		elink_cl45_write(sc, phy,
 				 MDIO_PMA_DEVAD,
@@ -13702,7 +13702,7 @@ elink_status_t elink_phy_init(struct elink_params *params, struct elink_vars *va
 				elink_serdes_deassert(sc, params->port);
 		}
 		elink_link_initialize(params, vars);
-		DELAY(1000 * 30);
+		udelay(1000 * 30);
 		elink_link_int_enable(params);
 		break;
 	}
@@ -13760,7 +13760,7 @@ elink_status_t elink_link_reset(struct elink_params *params, struct elink_vars *
 	if (!CHIP_IS_E3(sc))
 		REG_WR(sc, NIG_REG_NIG_EMAC0_EN + port*4, 0);
 
-	DELAY(1000 * 10);
+	udelay(1000 * 10);
 	/* The PHY reset is controlled by GPIO 1
 	 * Hold it as vars low
 	 */
@@ -13843,7 +13843,7 @@ elink_status_t elink_lfa_reset(struct elink_params *params,
 		elink_set_umac_rxtx(params, 0);
 	}
 	/* Wait 10ms for the pipe to clean up*/
-	DELAY(1000 * 10);
+	udelay(1000 * 10);
 
 	/* Clean the NIG-BRB using the network filters in a way that will
 	 * not cut a packet in the middle.
@@ -13930,7 +13930,7 @@ static elink_status_t elink_8073_common_init_phy(struct bxe_adapter *sc,
 	}
 
 	/* Add delay of 150ms after reset */
-	DELAY(1000 * 150);
+	udelay(1000 * 150);
 
 	if (phy[PORT_0].addr & 0x1) {
 		phy_blk[PORT_0] = &(phy[PORT_1]);
@@ -13968,7 +13968,7 @@ static elink_status_t elink_8073_common_init_phy(struct bxe_adapter *sc,
 	/* Toggle Transmitter: Power down and then up with 600ms delay
 	 * between
 	 */
-	DELAY(1000 * 600);
+	udelay(1000 * 600);
 
 	/* PART3 - complete TX_POWER_DOWN process, and set GPIO2 back to low */
 	for (port = PORT_MAX - 1; port >= PORT_0; port--) {
@@ -13981,7 +13981,7 @@ static elink_status_t elink_8073_common_init_phy(struct bxe_adapter *sc,
 		elink_cl45_write(sc, phy_blk[port],
 				MDIO_PMA_DEVAD,
 				MDIO_PMA_REG_TX_POWER_DOWN, (val & (~(1<<10))));
-		DELAY(1000 * 15);
+		udelay(1000 * 15);
 
 		/* Read modify write the SPI-ROM version select register */
 		elink_cl45_read(sc, phy_blk[port],
@@ -14013,7 +14013,7 @@ static elink_status_t elink_8726_common_init_phy(struct bxe_adapter *sc,
 	REG_WR(sc, MISC_REG_GPIO_EVENT_EN, val);
 
 	elink_ext_phy_hw_reset(sc, 0);
-	DELAY(1000 * 5);
+	udelay(1000 * 5);
 	for (port = 0; port < PORT_MAX; port++) {
 		uint32_t shmem_base, shmem2_base;
 
@@ -14120,11 +14120,11 @@ static elink_status_t elink_8727_common_init_phy(struct bxe_adapter *sc,
 	/* Initiate PHY reset*/
 	elink_cb_gpio_write(sc, reset_gpio, MISC_REGISTERS_GPIO_OUTPUT_LOW,
 		       port);
-	DELAY(1000 * 1);
+	udelay(1000 * 1);
 	elink_cb_gpio_write(sc, reset_gpio, MISC_REGISTERS_GPIO_OUTPUT_HIGH,
 		       port);
 
-	DELAY(1000 * 5);
+	udelay(1000 * 5);
 
 	/* PART1 - Reset both phys */
 	for (port = PORT_MAX - 1; port >= PORT_0; port--) {
@@ -14163,7 +14163,7 @@ static elink_status_t elink_8727_common_init_phy(struct bxe_adapter *sc,
 	}
 
 	/* Add delay of 150ms after reset */
-	DELAY(1000 * 150);
+	udelay(1000 * 150);
 	if (phy[PORT_0].addr & 0x1) {
 		phy_blk[PORT_0] = &(phy[PORT_1]);
 		phy_blk[PORT_1] = &(phy[PORT_0]);
@@ -14200,7 +14200,7 @@ static elink_status_t elink_84833_common_init_phy(struct bxe_adapter *sc,
 	uint8_t reset_gpios;
 	reset_gpios = elink_84833_get_reset_gpios(sc, shmem_base_path, chip_id);
 	elink_cb_gpio_mult_write(sc, reset_gpios, MISC_REGISTERS_GPIO_OUTPUT_LOW);
-	DELAY(10);
+	udelay(10);
 	elink_cb_gpio_mult_write(sc, reset_gpios, MISC_REGISTERS_GPIO_OUTPUT_HIGH);
 	ELINK_DEBUG_P1(sc, "84833 reset pulse on pin values 0x%x\n",
 		reset_gpios);
