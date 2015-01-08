@@ -24,7 +24,6 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 //__FBSDID("$FreeBSD: head/sys/dev/bxe/bxe_debug.c 266979 2014-06-02 18:54:45Z marcel $");
 
 #include "bxe.h"
@@ -41,7 +40,7 @@
  */
 
 void
-bxe_reg_write8(struct bxe_softc *sc, bus_size_t offset, uint8_t val)
+bxe_reg_write8(struct bxe_adapter *sc, bus_size_t offset, uint8_t val)
 {
     BLOGD(sc, DBG_REGS, "offset=0x%08lx val=0x%02x\n", offset, val);
     bus_space_write_1(sc->bar[BAR0].tag,
@@ -51,7 +50,7 @@ bxe_reg_write8(struct bxe_softc *sc, bus_size_t offset, uint8_t val)
 }
 
 void
-bxe_reg_write16(struct bxe_softc *sc, bus_size_t offset, uint16_t val)
+bxe_reg_write16(struct bxe_adapter *sc, bus_size_t offset, uint16_t val)
 {
     if ((offset % 2) != 0) {
         BLOGD(sc, DBG_REGS, "Unaligned 16-bit write to 0x%08lx\n", offset);
@@ -65,7 +64,7 @@ bxe_reg_write16(struct bxe_softc *sc, bus_size_t offset, uint16_t val)
 }
 
 void
-bxe_reg_write32(struct bxe_softc *sc, bus_size_t offset, uint32_t val)
+bxe_reg_write32(struct bxe_adapter *sc, bus_size_t offset, uint32_t val)
 {
     if ((offset % 4) != 0) {
         BLOGD(sc, DBG_REGS, "Unaligned 32-bit write to 0x%08lx\n", offset);
@@ -79,7 +78,7 @@ bxe_reg_write32(struct bxe_softc *sc, bus_size_t offset, uint32_t val)
 }
 
 uint8_t
-bxe_reg_read8(struct bxe_softc *sc, bus_size_t offset)
+bxe_reg_read8(struct bxe_adapter *sc, bus_size_t offset)
 {
     uint8_t val;
 
@@ -92,7 +91,7 @@ bxe_reg_read8(struct bxe_softc *sc, bus_size_t offset)
 }
 
 uint16_t
-bxe_reg_read16(struct bxe_softc *sc, bus_size_t offset)
+bxe_reg_read16(struct bxe_adapter *sc, bus_size_t offset)
 {
     uint16_t val;
 
@@ -109,7 +108,7 @@ bxe_reg_read16(struct bxe_softc *sc, bus_size_t offset)
 }
 
 uint32_t
-bxe_reg_read32(struct bxe_softc *sc, bus_size_t offset)
+bxe_reg_read32(struct bxe_adapter *sc, bus_size_t offset)
 {
     uint32_t val;
 
@@ -130,7 +129,7 @@ bxe_reg_read32(struct bxe_softc *sc, bus_size_t offset)
 #ifdef ELINK_DEBUG
 
 void
-elink_cb_dbg(struct bxe_softc *sc,
+elink_cb_dbg(struct bxe_adapter *sc,
              char             *fmt)
 {
     char buf[128];
@@ -141,7 +140,7 @@ elink_cb_dbg(struct bxe_softc *sc,
 }
 
 void
-elink_cb_dbg1(struct bxe_softc *sc,
+elink_cb_dbg1(struct bxe_adapter *sc,
               char             *fmt,
               uint32_t         arg1)
 {
@@ -154,7 +153,7 @@ elink_cb_dbg1(struct bxe_softc *sc,
 }
 
 void
-elink_cb_dbg2(struct bxe_softc *sc,
+elink_cb_dbg2(struct bxe_adapter *sc,
               char             *fmt,
               uint32_t         arg1,
               uint32_t         arg2)
@@ -168,7 +167,7 @@ elink_cb_dbg2(struct bxe_softc *sc,
 }
 
 void
-elink_cb_dbg3(struct bxe_softc *sc,
+elink_cb_dbg3(struct bxe_adapter *sc,
               char             *fmt,
               uint32_t         arg1,
               uint32_t         arg2,
@@ -187,7 +186,7 @@ elink_cb_dbg3(struct bxe_softc *sc,
 extern struct mtx bxe_prev_mtx;
 
 void
-bxe_dump_mem(struct bxe_softc *sc,
+bxe_dump_mem(struct bxe_adapter *sc,
              char             *tag,
              uint8_t          *mem,
              uint32_t         len)
@@ -225,7 +224,7 @@ bxe_dump_mem(struct bxe_softc *sc,
 }
 
 void
-bxe_dump_mbuf_data(struct bxe_softc *sc,
+bxe_dump_mbuf_data(struct bxe_adapter *sc,
                    char             *tag,
                    struct mbuf      *m,
                    uint8_t          contents)
@@ -300,7 +299,7 @@ static void bxe_ddb(db_expr_t blah1,
 {
     char if_xname[IFNAMSIZ];
     if_t ifp = NULL;
-    struct bxe_softc *sc;
+    struct bxe_adapter *sc;
     db_expr_t next_arg;
     int index;
     int tok;
@@ -341,7 +340,7 @@ static void bxe_ddb(db_expr_t blah1,
         goto bxe_ddb_done;
     }
 
-    sc = (struct bxe_softc *)if_getsoftc(ifp);
+    sc = (struct bxe_adapter *)if_getsoftc(ifp);
     db_printf("ifnet=%p (%s)\n", ifp, if_xname);
     db_printf("softc=%p\n", sc);
     db_printf("  dev=%p\n", sc->dev);

@@ -443,7 +443,7 @@ struct bxe_intr {
 
 /* Used to manage DMA allocations. */
 struct bxe_dma {
-    struct bxe_softc  *sc;
+    struct bxe_adapter  *sc;
     bus_addr_t        paddr;
     void              *vaddr;
     bus_dma_tag_t     tag;
@@ -513,7 +513,7 @@ struct bxe_sw_tpa_info {
  */
 struct bxe_fastpath {
     /* pointer back to parent structure */
-    struct bxe_softc *sc;
+    struct bxe_adapter *sc;
 #warning "need to fix up the mtx"
   /*
     struct mtx tx_mtx;
@@ -1313,12 +1313,16 @@ enum {
 
 /* Top level device private data structure. */
 #warning "need to fix up device private"
-struct bxe_softc {
+struct bxe_adapter {
     /*
      * First entry must be a pointer to the BSD ifnet struct which
      * has a first element of 'void *if_softc' (which is us). XXX
      */
     if_t 	    ifp;
+	/* OS defined structs */
+	struct net_device *netdev;
+	struct pci_device *pdev;
+	//struct net_device_stats net_stats;
 #warning "no ifmedia. "
   // struct ifmedia  ifmedia; /* network interface media structure */
     int             media;
@@ -1790,7 +1794,7 @@ struct bxe_softc {
     uint8_t prio_to_cos[BXE_MAX_PRIORITY];
 
     int panic;
-}; /* struct bxe_softc */
+}; /* struct bxe_adapter */
 
 /* IOCTL sub-commands for edebug and firmware upgrade */
 #define BXE_IOC_RD_NVRAM        1
@@ -1846,13 +1850,13 @@ struct bxe_func_init_params {
 
 #ifdef BXE_REG_NO_INLINE
 
-uint8_t bxe_reg_read8(struct bxe_softc *sc, bus_size_t offset);
-uint16_t bxe_reg_read16(struct bxe_softc *sc, bus_size_t offset);
-uint32_t bxe_reg_read32(struct bxe_softc *sc, bus_size_t offset);
+uint8_t bxe_reg_read8(struct bxe_adapter *sc, bus_size_t offset);
+uint16_t bxe_reg_read16(struct bxe_adapter *sc, bus_size_t offset);
+uint32_t bxe_reg_read32(struct bxe_adapter *sc, bus_size_t offset);
 
-void bxe_reg_write8(struct bxe_softc *sc, bus_size_t offset, uint8_t val);
-void bxe_reg_write16(struct bxe_softc *sc, bus_size_t offset, uint16_t val);
-void bxe_reg_write32(struct bxe_softc *sc, bus_size_t offset, uint32_t val);
+void bxe_reg_write8(struct bxe_adapter *sc, bus_size_t offset, uint8_t val);
+void bxe_reg_write16(struct bxe_adapter *sc, bus_size_t offset, uint16_t val);
+void bxe_reg_write32(struct bxe_adapter *sc, bus_size_t offset, uint32_t val);
 
 #define REG_RD8(sc, offset)  bxe_reg_read8(sc, offset)
 #define REG_RD16(sc, offset) bxe_reg_read16(sc, offset)
@@ -2125,45 +2129,45 @@ int  bxe_test_and_set_bit(int nr, volatile unsigned long * addr);
 int  bxe_test_and_clear_bit(int nr, volatile unsigned long * addr);
 int  bxe_cmpxchg(volatile int *addr, int old, int new);
 
-void bxe_reg_wr_ind(struct bxe_softc *sc, uint32_t addr,
+void bxe_reg_wr_ind(struct bxe_adapter *sc, uint32_t addr,
                     uint32_t val);
-uint32_t bxe_reg_rd_ind(struct bxe_softc *sc, uint32_t addr);
+uint32_t bxe_reg_rd_ind(struct bxe_adapter *sc, uint32_t addr);
 
 
-int bxe_dma_alloc(struct bxe_softc *sc, bus_size_t size,
+int bxe_dma_alloc(struct bxe_adapter *sc, bus_size_t size,
                   struct bxe_dma *dma, const char *msg);
-void bxe_dma_free(struct bxe_softc *sc, struct bxe_dma *dma);
+void bxe_dma_free(struct bxe_adapter *sc, struct bxe_dma *dma);
 
 uint32_t bxe_dmae_opcode_add_comp(uint32_t opcode, uint8_t comp_type);
 uint32_t bxe_dmae_opcode_clr_src_reset(uint32_t opcode);
-uint32_t bxe_dmae_opcode(struct bxe_softc *sc, uint8_t src_type,
+uint32_t bxe_dmae_opcode(struct bxe_adapter *sc, uint8_t src_type,
                          uint8_t dst_type, uint8_t with_comp,
                          uint8_t comp_type);
-void bxe_post_dmae(struct bxe_softc *sc, struct dmae_command *dmae, int idx);
-void bxe_read_dmae(struct bxe_softc *sc, uint32_t src_addr, uint32_t len32);
-void bxe_write_dmae(struct bxe_softc *sc, bus_addr_t dma_addr,
+void bxe_post_dmae(struct bxe_adapter *sc, struct dmae_command *dmae, int idx);
+void bxe_read_dmae(struct bxe_adapter *sc, uint32_t src_addr, uint32_t len32);
+void bxe_write_dmae(struct bxe_adapter *sc, bus_addr_t dma_addr,
                     uint32_t dst_addr, uint32_t len32);
-void bxe_write_dmae_phys_len(struct bxe_softc *sc, bus_addr_t phys_addr,
+void bxe_write_dmae_phys_len(struct bxe_adapter *sc, bus_addr_t phys_addr,
                              uint32_t addr, uint32_t len);
 
-void bxe_set_ctx_validation(struct bxe_softc *sc, struct eth_context *cxt,
+void bxe_set_ctx_validation(struct bxe_adapter *sc, struct eth_context *cxt,
                             uint32_t cid);
-void bxe_update_coalesce_sb_index(struct bxe_softc *sc, uint8_t fw_sb_id,
+void bxe_update_coalesce_sb_index(struct bxe_adapter *sc, uint8_t fw_sb_id,
                                   uint8_t sb_index, uint8_t disable,
                                   uint16_t usec);
 
-int bxe_sp_post(struct bxe_softc *sc, int command, int cid,
+int bxe_sp_post(struct bxe_adapter *sc, int command, int cid,
                 uint32_t data_hi, uint32_t data_lo, int cmd_type);
 
-void bxe_igu_ack_sb(struct bxe_softc *sc, uint8_t igu_sb_id,
+void bxe_igu_ack_sb(struct bxe_adapter *sc, uint8_t igu_sb_id,
                     uint8_t segment, uint16_t index, uint8_t op,
                     uint8_t update);
 
-void ecore_init_e1_firmware(struct bxe_softc *sc);
-void ecore_init_e1h_firmware(struct bxe_softc *sc);
-void ecore_init_e2_firmware(struct bxe_softc *sc);
+void ecore_init_e1_firmware(struct bxe_adapter *sc);
+void ecore_init_e1h_firmware(struct bxe_adapter *sc);
+void ecore_init_e2_firmware(struct bxe_adapter *sc);
 
-void ecore_storm_memset_struct(struct bxe_softc *sc, uint32_t addr,
+void ecore_storm_memset_struct(struct bxe_adapter *sc, uint32_t addr,
                                size_t size, uint32_t *data);
 
 /*********************/
@@ -2195,12 +2199,10 @@ void ecore_storm_memset_struct(struct bxe_softc *sc, uint32_t addr,
     } while (0)
 
 /* log a debug message */
-#define BLOGD(sc, codepath, format, args...)           
-#if 0
-\
+#define BLOGD(sc, codepath, format, args...)           \
     do {                                               \
         if (__predict_false(sc->debug & (codepath))) { \
-            device_printf((sc)->dev,                   \
+            /*device_printf((sc)->dev,*/printk(                   \
                           "%s(%s:%d) " format,         \
                           __FUNCTION__,                \
                           __FILE__,                    \
@@ -2208,67 +2210,57 @@ void ecore_storm_memset_struct(struct bxe_softc *sc, uint32_t addr,
                           ## args);                    \
         }                                              \
     } while(0)
-#endif
 
 /* log a info message */
-#define BLOGI(sc, format, args...)
-#if 0
-             \
+#define BLOGI(sc, format, args...) \
     do {                                       \
         if (__predict_false(sc->debug)) {      \
-            device_printf((sc)->dev,           \
+            /*device_printf((sc)->dev,*/printk(           \
                           "%s(%s:%d) " format, \
                           __FUNCTION__,        \
                           __FILE__,            \
                           __LINE__,            \
                           ## args);            \
         } else {                               \
-            device_printf((sc)->dev,           \
+            /*device_printf((sc)->dev,*/printk(           \
                           format,              \
                           ## args);            \
         }                                      \
     } while(0)
-#endif
 
 /* log a warning message */
-#define BLOGW(sc, format, args...)
-#if 0
-                      \
+#define BLOGW(sc, format, args...) \
     do {                                                \
         if (__predict_false(sc->debug)) {               \
-            device_printf((sc)->dev,                    \
+            /*device_printf((sc)->dev,*/printk(                    \
                           "%s(%s:%d) WARNING: " format, \
                           __FUNCTION__,                 \
                           __FILE__,                     \
                           __LINE__,                     \
                           ## args);                     \
         } else {                                        \
-            device_printf((sc)->dev,                    \
+            /*device_printf((sc)->dev,*/printk(                    \
                           "WARNING: " format,           \
                           ## args);                     \
         }                                               \
     } while(0)
-#endif
 
 /* log a error message */
-#define BLOGE(sc, format, args...)
-#if 0
-                    \
+#define BLOGE(sc, format, args...) \
     do {                                              \
         if (__predict_false(sc->debug)) {             \
-            device_printf((sc)->dev,                  \
+            /*device_printf((sc)->dev,*/printk(                  \
                           "%s(%s:%d) ERROR: " format, \
                           __FUNCTION__,               \
                           __FILE__,                   \
                           __LINE__,                   \
                           ## args);                   \
         } else {                                      \
-            device_printf((sc)->dev,                  \
+            /*device_printf((sc)->dev,*/printk(                  \
                           "ERROR: " format,           \
                           ## args);                   \
         }                                             \
     } while(0)
-#endif
 
 #ifdef ECORE_STOP_ON_ERROR
 
@@ -2280,16 +2272,16 @@ void ecore_storm_memset_struct(struct bxe_softc *sc, uint32_t addr,
 #else
 
 #define bxe_panic(sc, msg) \
-    device_printf((sc)->dev, "%s (%s,%d)\n", __FUNCTION__, __FILE__, __LINE__);
+    /*device_printf((sc)->dev,*/printk( "%s (%s,%d)\n", __FUNCTION__, __FILE__, __LINE__);
 
 #endif
 
 #define CATC_TRIGGER(sc, data) REG_WR((sc), 0x2000, (data));
 #define CATC_TRIGGER_START(sc) CATC_TRIGGER((sc), 0xcafecafe)
 
-void bxe_dump_mem(struct bxe_softc *sc, char *tag,
+void bxe_dump_mem(struct bxe_adapter *sc, char *tag,
                   uint8_t *mem, uint32_t len);
-void bxe_dump_mbuf_data(struct bxe_softc *sc, char *pTag,
+void bxe_dump_mbuf_data(struct bxe_adapter *sc, char *pTag,
                         struct mbuf *m, uint8_t contents);
 
 /***********/
@@ -2297,7 +2289,7 @@ void bxe_dump_mbuf_data(struct bxe_softc *sc, char *pTag,
 /***********/
 
 static inline uint32_t
-reg_poll(struct bxe_softc *sc,
+reg_poll(struct bxe_adapter *sc,
          uint32_t         reg,
          uint32_t         expected,
          int              ms,
@@ -2325,7 +2317,7 @@ bxe_update_fp_sb_idx(struct bxe_fastpath *fp)
 }
 
 static inline void
-bxe_igu_ack_sb_gen(struct bxe_softc *sc,
+bxe_igu_ack_sb_gen(struct bxe_adapter *sc,
                    uint8_t          igu_sb_id,
                    uint8_t          segment,
                    uint16_t         index,
@@ -2353,7 +2345,7 @@ bxe_igu_ack_sb_gen(struct bxe_softc *sc,
 }
 
 static inline void
-bxe_hc_ack_sb(struct bxe_softc *sc,
+bxe_hc_ack_sb(struct bxe_adapter *sc,
               uint8_t          sb_id,
               uint8_t          storm,
               uint16_t         index,
@@ -2380,7 +2372,7 @@ bxe_hc_ack_sb(struct bxe_softc *sc,
 }
 
 static inline void
-bxe_ack_sb(struct bxe_softc *sc,
+bxe_ack_sb(struct bxe_adapter *sc,
            uint8_t          igu_sb_id,
            uint8_t          storm,
            uint16_t         index,
@@ -2407,7 +2399,7 @@ bxe_ack_sb(struct bxe_softc *sc,
 }
 
 static inline uint16_t
-bxe_hc_ack_int(struct bxe_softc *sc)
+bxe_hc_ack_int(struct bxe_adapter *sc)
 {
     uint32_t hc_addr = (HC_REG_COMMAND_REG + SC_PORT(sc)*32 +
                         COMMAND_REG_SIMD_MASK);
@@ -2419,7 +2411,7 @@ bxe_hc_ack_int(struct bxe_softc *sc)
 
 #warning "fix all igu stuff"
 static inline uint16_t
-bxe_igu_ack_int(struct bxe_softc *sc)
+bxe_igu_ack_int(struct bxe_adapter *sc)
 {
 #if 0
     uint32_t igu_addr = (BAR_IGU_INTMEM + IGU_REG_SISR_MDPC_WMASK_LSB_UPPER*8);
@@ -2435,7 +2427,7 @@ bxe_igu_ack_int(struct bxe_softc *sc)
 }
 
 static inline uint16_t
-bxe_ack_int(struct bxe_softc *sc)
+bxe_ack_int(struct bxe_adapter *sc)
 {
     mb();
 #if 0
@@ -2449,7 +2441,7 @@ bxe_ack_int(struct bxe_softc *sc)
 }
 
 static inline int
-func_by_vn(struct bxe_softc *sc,
+func_by_vn(struct bxe_adapter *sc,
            int              vn)
 {
     return (2 * vn + SC_PORT(sc));
@@ -2464,7 +2456,7 @@ bxe_stats_id(struct bxe_fastpath *fp)
 {
   return 0;
 #if 0
-    struct bxe_softc *sc = fp->sc;
+    struct bxe_adapter *sc = fp->sc;
 
     if (!CHIP_IS_E1x(sc)) {
 #if 0

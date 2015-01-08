@@ -49,7 +49,7 @@ bxe_hilo(uint32_t *hiref)
 }
 
 static inline uint16_t
-bxe_get_port_stats_dma_len(struct bxe_softc *sc)
+bxe_get_port_stats_dma_len(struct bxe_adapter *sc)
 {
     uint16_t res = 0;
     uint32_t size;
@@ -92,7 +92,7 @@ bxe_get_port_stats_dma_len(struct bxe_softc *sc)
  */
 
 static void
-bxe_dp_stats(struct bxe_softc *sc)
+bxe_dp_stats(struct bxe_adapter *sc)
 {
     int i;
 
@@ -138,7 +138,7 @@ bxe_dp_stats(struct bxe_softc *sc)
  * sent in order).
  */
 static void
-bxe_storm_stats_post(struct bxe_softc *sc)
+bxe_storm_stats_post(struct bxe_adapter *sc)
 {
     int rc;
 
@@ -176,7 +176,7 @@ bxe_storm_stats_post(struct bxe_softc *sc)
 }
 
 static void
-bxe_hw_stats_post(struct bxe_softc *sc)
+bxe_hw_stats_post(struct bxe_adapter *sc)
 {
     struct dmae_command *dmae = &sc->stats_dmae;
     uint32_t *stats_comp = BXE_SP(sc, stats_comp);
@@ -226,7 +226,7 @@ bxe_hw_stats_post(struct bxe_softc *sc)
 }
 
 static int
-bxe_stats_comp(struct bxe_softc *sc)
+bxe_stats_comp(struct bxe_adapter *sc)
 {
     uint32_t *stats_comp = BXE_SP(sc, stats_comp);
     int cnt = 10;
@@ -249,7 +249,7 @@ bxe_stats_comp(struct bxe_softc *sc)
  */
 
 static void
-bxe_stats_pmf_update(struct bxe_softc *sc)
+bxe_stats_pmf_update(struct bxe_adapter *sc)
 {
     struct dmae_command *dmae;
     uint32_t opcode;
@@ -308,7 +308,7 @@ bxe_stats_pmf_update(struct bxe_softc *sc)
 }
 
 static void
-bxe_port_stats_init(struct bxe_softc *sc)
+bxe_port_stats_init(struct bxe_adapter *sc)
 {
     struct dmae_command *dmae;
     int port = SC_PORT(sc);
@@ -536,7 +536,7 @@ bxe_port_stats_init(struct bxe_softc *sc)
 }
 
 static void
-bxe_func_stats_init(struct bxe_softc *sc)
+bxe_func_stats_init(struct bxe_adapter *sc)
 {
     struct dmae_command *dmae = &sc->stats_dmae;
     uint32_t *stats_comp = BXE_SP(sc, stats_comp);
@@ -565,7 +565,7 @@ bxe_func_stats_init(struct bxe_softc *sc)
 }
 
 static void
-bxe_stats_start(struct bxe_softc *sc)
+bxe_stats_start(struct bxe_adapter *sc)
 {
     /*
      * VFs travel through here as part of the statistics FSM, but no action
@@ -588,7 +588,7 @@ bxe_stats_start(struct bxe_softc *sc)
 }
 
 static void
-bxe_stats_pmf_start(struct bxe_softc *sc)
+bxe_stats_pmf_start(struct bxe_adapter *sc)
 {
     bxe_stats_comp(sc);
     bxe_stats_pmf_update(sc);
@@ -596,7 +596,7 @@ bxe_stats_pmf_start(struct bxe_softc *sc)
 }
 
 static void
-bxe_stats_restart(struct bxe_softc *sc)
+bxe_stats_restart(struct bxe_adapter *sc)
 {
     /*
      * VFs travel through here as part of the statistics FSM, but no action
@@ -611,7 +611,7 @@ bxe_stats_restart(struct bxe_softc *sc)
 }
 
 static void
-bxe_bmac_stats_update(struct bxe_softc *sc)
+bxe_bmac_stats_update(struct bxe_adapter *sc)
 {
     struct host_port_stats *pstats = BXE_SP(sc, port_stats);
     struct bxe_eth_stats *estats = &sc->eth_stats;
@@ -714,7 +714,7 @@ bxe_bmac_stats_update(struct bxe_softc *sc)
 }
 
 static void
-bxe_mstat_stats_update(struct bxe_softc *sc)
+bxe_mstat_stats_update(struct bxe_adapter *sc)
 {
     struct host_port_stats *pstats = BXE_SP(sc, port_stats);
     struct bxe_eth_stats *estats = &sc->eth_stats;
@@ -792,7 +792,7 @@ bxe_mstat_stats_update(struct bxe_softc *sc)
 }
 
 static void
-bxe_emac_stats_update(struct bxe_softc *sc)
+bxe_emac_stats_update(struct bxe_adapter *sc)
 {
     struct emac_stats *new = BXE_SP(sc, mac_stats.emac_stats);
     struct host_port_stats *pstats = BXE_SP(sc, port_stats);
@@ -850,7 +850,7 @@ bxe_emac_stats_update(struct bxe_softc *sc)
 }
 
 static int
-bxe_hw_stats_update(struct bxe_softc *sc)
+bxe_hw_stats_update(struct bxe_adapter *sc)
 {
     struct nig_stats *new = BXE_SP(sc, nig_stats);
     struct nig_stats *old = &(sc->port.old_nig_stats);
@@ -926,7 +926,7 @@ bxe_hw_stats_update(struct bxe_softc *sc)
 }
 
 static int
-bxe_storm_stats_validate_counters(struct bxe_softc *sc)
+bxe_storm_stats_validate_counters(struct bxe_adapter *sc)
 {
     struct stats_counter *counters = &sc->fw_stats_data->storm_counters;
     uint16_t cur_stats_counter;
@@ -976,7 +976,7 @@ bxe_storm_stats_validate_counters(struct bxe_softc *sc)
 }
 
 static int
-bxe_storm_stats_update(struct bxe_softc *sc)
+bxe_storm_stats_update(struct bxe_adapter *sc)
 {
     struct tstorm_per_port_stats *tport =
         &sc->fw_stats_data->port.tstorm_port_statistics;
@@ -1162,7 +1162,7 @@ bxe_storm_stats_update(struct bxe_softc *sc)
 }
 
 static void
-bxe_net_stats_update(struct bxe_softc *sc)
+bxe_net_stats_update(struct bxe_adapter *sc)
 {
 
     for (int i = 0; i < sc->num_queues; i++)
@@ -1173,7 +1173,7 @@ bxe_net_stats_update(struct bxe_softc *sc)
 uint64_t
 bxe_get_counter(if_t ifp, ift_counter cnt)
 {
-	struct bxe_softc *sc;
+	struct bxe_adapter *sc;
 	struct bxe_eth_stats *estats;
 
 	sc = if_getsoftc(ifp);
@@ -1215,7 +1215,7 @@ bxe_get_counter(if_t ifp, ift_counter cnt)
 }
 
 static void
-bxe_drv_stats_update(struct bxe_softc *sc)
+bxe_drv_stats_update(struct bxe_adapter *sc)
 {
     struct bxe_eth_stats *estats = &sc->eth_stats;
     int i;
@@ -1271,7 +1271,7 @@ bxe_drv_stats_update(struct bxe_softc *sc)
 }
 
 static uint8_t
-bxe_edebug_stats_stopped(struct bxe_softc *sc)
+bxe_edebug_stats_stopped(struct bxe_adapter *sc)
 {
     uint32_t val;
 
@@ -1287,7 +1287,7 @@ bxe_edebug_stats_stopped(struct bxe_softc *sc)
 }
 
 static void
-bxe_stats_update(struct bxe_softc *sc)
+bxe_stats_update(struct bxe_adapter *sc)
 {
     uint32_t *stats_comp = BXE_SP(sc, stats_comp);
 
@@ -1334,7 +1334,7 @@ bxe_stats_update(struct bxe_softc *sc)
 }
 
 static void
-bxe_port_stats_stop(struct bxe_softc *sc)
+bxe_port_stats_stop(struct bxe_adapter *sc)
 {
     struct dmae_command *dmae;
     uint32_t opcode;
@@ -1389,7 +1389,7 @@ bxe_port_stats_stop(struct bxe_softc *sc)
 }
 
 static void
-bxe_stats_stop(struct bxe_softc *sc)
+bxe_stats_stop(struct bxe_adapter *sc)
 {
     uint8_t update = FALSE;
 
@@ -1414,13 +1414,13 @@ bxe_stats_stop(struct bxe_softc *sc)
 }
 
 static void
-bxe_stats_do_nothing(struct bxe_softc *sc)
+bxe_stats_do_nothing(struct bxe_adapter *sc)
 {
     return;
 }
 
 static const struct {
-    void (*action)(struct bxe_softc *sc);
+    void (*action)(struct bxe_adapter *sc);
     enum bxe_stats_state next_state;
 } bxe_stats_stm[STATS_STATE_MAX][STATS_EVENT_MAX] = {
     {
@@ -1437,7 +1437,7 @@ static const struct {
     }
 };
 
-void bxe_stats_handle(struct bxe_softc     *sc,
+void bxe_stats_handle(struct bxe_adapter     *sc,
                       enum bxe_stats_event event)
 {
     enum bxe_stats_state state;
@@ -1461,7 +1461,7 @@ void bxe_stats_handle(struct bxe_softc     *sc,
 }
 
 static void
-bxe_port_stats_base_init(struct bxe_softc *sc)
+bxe_port_stats_base_init(struct bxe_adapter *sc)
 {
     struct dmae_command *dmae;
     uint32_t *stats_comp = BXE_SP(sc, stats_comp);
@@ -1497,7 +1497,7 @@ bxe_port_stats_base_init(struct bxe_softc *sc)
  * send the ramrod each time we have to.
  */
 static void
-bxe_prep_fw_stats_req(struct bxe_softc *sc)
+bxe_prep_fw_stats_req(struct bxe_adapter *sc)
 {
     int i;
     int first_queue_query_index;
@@ -1616,7 +1616,7 @@ bxe_prep_fw_stats_req(struct bxe_softc *sc)
 }
 
 void
-bxe_stats_init(struct bxe_softc *sc)
+bxe_stats_init(struct bxe_adapter *sc)
 {
     int /*abs*/port = SC_PORT(sc);
     int mb_idx = SC_FW_MB_IDX(sc);
@@ -1700,7 +1700,7 @@ bxe_stats_init(struct bxe_softc *sc)
 }
 
 void
-bxe_save_statistics(struct bxe_softc *sc)
+bxe_save_statistics(struct bxe_adapter *sc)
 {
     int i;
 
@@ -1747,7 +1747,7 @@ bxe_save_statistics(struct bxe_softc *sc)
 }
 
 void
-bxe_afex_collect_stats(struct bxe_softc *sc,
+bxe_afex_collect_stats(struct bxe_adapter *sc,
                        void             *void_afex_stats,
                        uint32_t         stats_type)
 {

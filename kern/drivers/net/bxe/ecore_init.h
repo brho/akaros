@@ -245,7 +245,7 @@ enum {
 
 
 /* Maps the specified queue to the specified COS */
-static inline void ecore_map_q_cos(struct bxe_softc *sc, uint32_t q_num, uint32_t new_cos)
+static inline void ecore_map_q_cos(struct bxe_adapter *sc, uint32_t q_num, uint32_t new_cos)
 {
 	/* find current COS mapping */
 	uint32_t curr_cos = REG_RD(sc, QM_REG_QVOQIDX_0 + q_num * 4);
@@ -299,7 +299,7 @@ static inline void ecore_map_q_cos(struct bxe_softc *sc, uint32_t q_num, uint32_
 }
 
 /* Configures the QM according to the specified per-traffic-type COSes */
-static inline void ecore_dcb_config_qm(struct bxe_softc *sc, enum cos_mode mode,
+static inline void ecore_dcb_config_qm(struct bxe_adapter *sc, enum cos_mode mode,
 				       struct priority_cos *traffic_cos)
 {
 	ecore_map_q_cos(sc, ECORE_FCOE_Q,
@@ -741,7 +741,7 @@ static const struct {
 		MISC_AEU_ENABLE_MCP_PRTY_SUB_BITS }
 };
 
-static inline void ecore_set_mcp_parity(struct bxe_softc *sc, uint8_t enable)
+static inline void ecore_set_mcp_parity(struct bxe_adapter *sc, uint8_t enable)
 {
 	int i;
 	uint32_t reg_val;
@@ -758,7 +758,7 @@ static inline void ecore_set_mcp_parity(struct bxe_softc *sc, uint8_t enable)
 	}
 }
 
-static inline uint32_t ecore_parity_reg_mask(struct bxe_softc *sc, int idx)
+static inline uint32_t ecore_parity_reg_mask(struct bxe_adapter *sc, int idx)
 {
 	if (CHIP_IS_E1(sc))
 		return ecore_blocks_parity_data[idx].reg_mask.e1;
@@ -770,7 +770,7 @@ static inline uint32_t ecore_parity_reg_mask(struct bxe_softc *sc, int idx)
 		return ecore_blocks_parity_data[idx].reg_mask.e3;
 }
 
-static inline void ecore_disable_blocks_parity(struct bxe_softc *sc)
+static inline void ecore_disable_blocks_parity(struct bxe_adapter *sc)
 {
 	int i;
 
@@ -793,7 +793,7 @@ static inline void ecore_disable_blocks_parity(struct bxe_softc *sc)
 /**
  * Clear the parity error status registers.
  */
-static inline void ecore_clear_blocks_parity(struct bxe_softc *sc)
+static inline void ecore_clear_blocks_parity(struct bxe_adapter *sc)
 {
 	int i;
 	uint32_t reg_val, mcp_aeu_bits =
@@ -837,7 +837,7 @@ static inline void ecore_clear_blocks_parity(struct bxe_softc *sc)
 	REG_WR(sc, MISC_REG_AEU_CLR_LATCH_SIGNAL, 0x780);
 }
 
-static inline void ecore_enable_blocks_parity(struct bxe_softc *sc)
+static inline void ecore_enable_blocks_parity(struct bxe_adapter *sc)
 {
 	int i;
 

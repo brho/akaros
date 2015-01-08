@@ -41,37 +41,37 @@
 /*                  CLC Call backs functions               */
 /***********************************************************/
 /* CLC device structure */
-struct bxe_softc;
+struct bxe_adapter;
 
-extern uint32_t elink_cb_reg_read(struct bxe_softc *sc, uint32_t reg_addr);
-extern void elink_cb_reg_write(struct bxe_softc *sc, uint32_t reg_addr, uint32_t val);
+extern uint32_t elink_cb_reg_read(struct bxe_adapter *sc, uint32_t reg_addr);
+extern void elink_cb_reg_write(struct bxe_adapter *sc, uint32_t reg_addr, uint32_t val);
 /* wb_write - pointer to 2 32 bits vars to be passed to the DMAE*/
-extern void elink_cb_reg_wb_write(struct bxe_softc *sc, uint32_t offset,
+extern void elink_cb_reg_wb_write(struct bxe_adapter *sc, uint32_t offset,
 				uint32_t *wb_write, uint16_t len);
-extern void elink_cb_reg_wb_read(struct bxe_softc *sc, uint32_t offset,
+extern void elink_cb_reg_wb_read(struct bxe_adapter *sc, uint32_t offset,
 			       uint32_t *wb_write, uint16_t len);
 
 /* mode - 0( LOW ) /1(HIGH)*/
-extern uint8_t elink_cb_gpio_write(struct bxe_softc *sc,
+extern uint8_t elink_cb_gpio_write(struct bxe_adapter *sc,
 			    uint16_t gpio_num,
 			    uint8_t mode, uint8_t port);
-extern uint8_t elink_cb_gpio_mult_write(struct bxe_softc *sc,
+extern uint8_t elink_cb_gpio_mult_write(struct bxe_adapter *sc,
 			    uint8_t pins,
 			    uint8_t mode);
 
-extern uint32_t elink_cb_gpio_read(struct bxe_softc *sc, uint16_t gpio_num, uint8_t port);
-extern uint8_t elink_cb_gpio_int_write(struct bxe_softc *sc,
+extern uint32_t elink_cb_gpio_read(struct bxe_adapter *sc, uint16_t gpio_num, uint8_t port);
+extern uint8_t elink_cb_gpio_int_write(struct bxe_adapter *sc,
 				uint16_t gpio_num,
 				uint8_t mode, uint8_t port);
 
-extern uint32_t elink_cb_fw_command(struct bxe_softc *sc, uint32_t command, uint32_t param);
+extern uint32_t elink_cb_fw_command(struct bxe_adapter *sc, uint32_t command, uint32_t param);
 
 /* Delay */
-extern void elink_cb_udelay(struct bxe_softc *sc, uint32_t microsecond);
+extern void elink_cb_udelay(struct bxe_adapter *sc, uint32_t microsecond);
 
 /* This function is called every 1024 bytes downloading of phy firmware.
 Driver can use it to print to screen indication for download progress */
-extern void elink_cb_download_progress(struct bxe_softc *sc, uint32_t cur, uint32_t total);
+extern void elink_cb_download_progress(struct bxe_adapter *sc, uint32_t cur, uint32_t total);
 
 /* Each log type has its own parameters */
 typedef enum elink_log_id {
@@ -90,12 +90,12 @@ typedef enum elink_status {
 	ELINK_STATUS_INVALID_IMAGE,
 	ELINK_OP_NOT_SUPPORTED = 122
 } elink_status_t;
-extern void elink_cb_event_log(struct bxe_softc *sc, const elink_log_id_t log_id, ...);
+extern void elink_cb_event_log(struct bxe_adapter *sc, const elink_log_id_t log_id, ...);
 extern void elink_cb_load_warpcore_microcode(void);
 
-extern uint8_t elink_cb_path_id(struct bxe_softc *sc);
+extern uint8_t elink_cb_path_id(struct bxe_adapter *sc);
 
-extern void elink_cb_notify_link_changed(struct bxe_softc *sc);
+extern void elink_cb_notify_link_changed(struct bxe_adapter *sc);
 
 #define ELINK_EVENT_LOG_LEVEL_ERROR 	1
 #define ELINK_EVENT_LOG_LEVEL_WARNING 	2
@@ -105,10 +105,10 @@ extern void elink_cb_notify_link_changed(struct bxe_softc *sc);
 /* Debug prints */
 #ifdef ELINK_DEBUG
 
-extern void elink_cb_dbg(struct bxe_softc *sc,  char *fmt);
-extern void elink_cb_dbg1(struct bxe_softc *sc,  char *fmt, uint32_t arg1);
-extern void elink_cb_dbg2(struct bxe_softc *sc,  char *fmt, uint32_t arg1, uint32_t arg2);
-extern void elink_cb_dbg3(struct bxe_softc *sc,  char *fmt, uint32_t arg1, uint32_t arg2,
+extern void elink_cb_dbg(struct bxe_adapter *sc,  char *fmt);
+extern void elink_cb_dbg1(struct bxe_adapter *sc,  char *fmt, uint32_t arg1);
+extern void elink_cb_dbg2(struct bxe_adapter *sc,  char *fmt, uint32_t arg1, uint32_t arg2);
+extern void elink_cb_dbg3(struct bxe_adapter *sc,  char *fmt, uint32_t arg1, uint32_t arg2,
 			  uint32_t arg3);
 
 #define ELINK_DEBUG_P0(sc, fmt) 		elink_cb_dbg(sc, fmt)
@@ -448,7 +448,7 @@ struct elink_params {
 	uint32_t multi_phy_config;
 
 	/* Device pointer passed to all callback functions */
-	struct bxe_softc *sc;
+	struct bxe_adapter *sc;
 	uint16_t req_fc_auto_adv; /* Should be set to TX / BOTH when
 				req_flow_ctrl is set to AUTO */
 	uint16_t link_flags;
@@ -554,14 +554,14 @@ elink_status_t elink_test_link(struct elink_params *params, struct elink_vars *v
 
 
 /* One-time initialization for external phy after power up */
-elink_status_t elink_common_init_phy(struct bxe_softc *sc, uint32_t shmem_base_path[],
+elink_status_t elink_common_init_phy(struct bxe_adapter *sc, uint32_t shmem_base_path[],
 			  uint32_t shmem2_base_path[], uint32_t chip_id, uint8_t one_port_enabled);
 
 /* Reset the external PHY using GPIO */
-void elink_ext_phy_hw_reset(struct bxe_softc *sc, uint8_t port);
+void elink_ext_phy_hw_reset(struct bxe_adapter *sc, uint8_t port);
 
 /* Reset the external of SFX7101 */
-void elink_sfx7101_sp_sw_reset(struct bxe_softc *sc, struct elink_phy *phy);
+void elink_sfx7101_sp_sw_reset(struct bxe_adapter *sc, struct elink_phy *phy);
 
 /* Read "byte_cnt" bytes from address "addr" from the SFP+ EEPROM */
 elink_status_t elink_read_sfp_module_eeprom(struct elink_phy *phy,
@@ -577,7 +577,7 @@ uint32_t elink_phy_selection(struct elink_params *params);
 elink_status_t elink_phy_probe(struct elink_params *params);
 
 /* Checks if fan failure detection is required on one of the phys on board */
-uint8_t elink_fan_failure_det_req(struct bxe_softc *sc, uint32_t shmem_base,
+uint8_t elink_fan_failure_det_req(struct bxe_adapter *sc, uint32_t shmem_base,
 			     uint32_t shmem2_base, uint8_t port);
 
 /* Open / close the gate between the NIG and the BRB */
@@ -670,7 +670,7 @@ elink_status_t elink_ets_e3b0_config(const struct elink_params *params,
 void elink_pfc_statistic(struct elink_params *params, struct elink_vars *vars,
 						 uint32_t pfc_frames_sent[2],
 						 uint32_t pfc_frames_received[2]);
-void elink_init_mod_abs_int(struct bxe_softc *sc, struct elink_vars *vars,
+void elink_init_mod_abs_int(struct bxe_adapter *sc, struct elink_vars *vars,
 			    uint32_t chip_id, uint32_t shmem_base, uint32_t shmem2_base,
 			    uint8_t port);
 

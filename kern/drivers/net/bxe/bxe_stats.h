@@ -670,11 +670,11 @@ struct bxe_fw_port_stats_old {
         SUB_EXTEND_64(qstats->t##_hi, qstats->t##_lo, diff);  \
     } while (0)
 
-struct bxe_softc;
-void bxe_stats_init(struct bxe_softc *sc);
-void bxe_stats_handle(struct bxe_softc *sc, enum bxe_stats_event event);
-void bxe_save_statistics(struct bxe_softc *sc);
-void bxe_afex_collect_stats(struct bxe_softc *sc, void *void_afex_stats, uint32_t stats_type);
+struct bxe_adapter;
+void bxe_stats_init(struct bxe_adapter *sc);
+void bxe_stats_handle(struct bxe_adapter *sc, enum bxe_stats_event event);
+void bxe_save_statistics(struct bxe_adapter *sc);
+void bxe_afex_collect_stats(struct bxe_adapter *sc, void *void_afex_stats, uint32_t stats_type);
 uint64_t bxe_get_counter(if_t, ift_counter);
 
 #endif /* BXE_STATS_H */

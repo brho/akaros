@@ -39,13 +39,13 @@
 
 
 
-static int ecore_gunzip(struct bxe_softc *sc, const uint8_t *zbuf, int len);
-static void ecore_reg_wr_ind(struct bxe_softc *sc, uint32_t addr, uint32_t val);
-static void ecore_write_dmae_phys_len(struct bxe_softc *sc,
+static int ecore_gunzip(struct bxe_adapter *sc, const uint8_t *zbuf, int len);
+static void ecore_reg_wr_ind(struct bxe_adapter *sc, uint32_t addr, uint32_t val);
+static void ecore_write_dmae_phys_len(struct bxe_adapter *sc,
 				      ecore_dma_addr_t phys_addr, uint32_t addr,
 				      uint32_t len);
 
-static void ecore_init_str_wr(struct bxe_softc *sc, uint32_t addr,
+static void ecore_init_str_wr(struct bxe_adapter *sc, uint32_t addr,
 			      const uint32_t *data, uint32_t len)
 {
 	uint32_t i;
@@ -54,7 +54,7 @@ static void ecore_init_str_wr(struct bxe_softc *sc, uint32_t addr,
 		REG_WR(sc, addr + i*4, data[i]);
 }
 
-static void ecore_init_ind_wr(struct bxe_softc *sc, uint32_t addr,
+static void ecore_init_ind_wr(struct bxe_adapter *sc, uint32_t addr,
 			      const uint32_t *data, uint32_t len)
 {
 	uint32_t i;
@@ -63,7 +63,7 @@ static void ecore_init_ind_wr(struct bxe_softc *sc, uint32_t addr,
 		ecore_reg_wr_ind(sc, addr + i*4, data[i]);
 }
 
-static void ecore_write_big_buf(struct bxe_softc *sc, uint32_t addr, uint32_t len,
+static void ecore_write_big_buf(struct bxe_adapter *sc, uint32_t addr, uint32_t len,
 				uint8_t wb)
 {
 	if (DMAE_READY(sc))
@@ -78,7 +78,7 @@ static void ecore_write_big_buf(struct bxe_softc *sc, uint32_t addr, uint32_t le
 		ecore_init_str_wr(sc, addr, GUNZIP_BUF(sc), len);
 }
 
-static void ecore_init_fill(struct bxe_softc *sc, uint32_t addr, int fill,
+static void ecore_init_fill(struct bxe_adapter *sc, uint32_t addr, int fill,
 			    uint32_t len, uint8_t wb)
 {
 	uint32_t buf_len = (((len*4) > FW_BUF_SIZE) ? FW_BUF_SIZE : (len*4));
@@ -94,7 +94,7 @@ static void ecore_init_fill(struct bxe_softc *sc, uint32_t addr, int fill,
 	}
 }
 
-static void ecore_write_big_buf_wb(struct bxe_softc *sc, uint32_t addr, uint32_t len)
+static void ecore_write_big_buf_wb(struct bxe_adapter *sc, uint32_t addr, uint32_t len)
 {
 	if (DMAE_READY(sc))
 		ecore_write_dmae_phys_len(sc, GUNZIP_PHYS(sc), addr, len);
@@ -108,7 +108,7 @@ static void ecore_write_big_buf_wb(struct bxe_softc *sc, uint32_t addr, uint32_t
 		ecore_init_str_wr(sc, addr, GUNZIP_BUF(sc), len);
 }
 
-static void ecore_init_wr_64(struct bxe_softc *sc, uint32_t addr,
+static void ecore_init_wr_64(struct bxe_adapter *sc, uint32_t addr,
 			     const uint32_t *data, uint32_t len64)
 {
 	uint32_t buf_len32 = FW_BUF_SIZE/4;
@@ -147,7 +147,7 @@ static void ecore_init_wr_64(struct bxe_softc *sc, uint32_t addr,
 #define IF_IS_PRAM_ADDR(base, addr) \
 			if (((base) <= (addr)) && ((base) + 0x40000 >= (addr)))
 
-static const uint8_t *ecore_sel_blob(struct bxe_softc *sc, uint32_t addr,
+static const uint8_t *ecore_sel_blob(struct bxe_adapter *sc, uint32_t addr,
 				const uint8_t *data)
 {
 	IF_IS_INT_TABLE_ADDR(TSEM_REG_INT_TABLE, addr)
@@ -177,7 +177,7 @@ static const uint8_t *ecore_sel_blob(struct bxe_softc *sc, uint32_t addr,
 	return data;
 }
 
-static void ecore_init_wr_wb(struct bxe_softc *sc, uint32_t addr,
+static void ecore_init_wr_wb(struct bxe_adapter *sc, uint32_t addr,
 			     const uint32_t *data, uint32_t len)
 {
 	if (DMAE_READY(sc))
@@ -193,7 +193,7 @@ static void ecore_init_wr_wb(struct bxe_softc *sc, uint32_t addr,
 }
 
 #ifndef FW_ZIP_SUPPORT
-static void ecore_init_fw(struct bxe_softc *sc, uint32_t addr, uint32_t len)
+static void ecore_init_fw(struct bxe_adapter *sc, uint32_t addr, uint32_t len)
 {
 	const uint8_t *data = NULL;
 
@@ -213,7 +213,7 @@ static void ecore_init_fw(struct bxe_softc *sc, uint32_t addr, uint32_t len)
 
 #endif
 
-static void ecore_wr_64(struct bxe_softc *sc, uint32_t reg, uint32_t val_lo,
+static void ecore_wr_64(struct bxe_adapter *sc, uint32_t reg, uint32_t val_lo,
 			uint32_t val_hi)
 {
 	uint32_t wb_write[2];
@@ -223,7 +223,7 @@ static void ecore_wr_64(struct bxe_softc *sc, uint32_t reg, uint32_t val_lo,
 	REG_WR_DMAE_LEN(sc, reg, wb_write, 2);
 }
 
-static void ecore_init_wr_zp(struct bxe_softc *sc, uint32_t addr, uint32_t len,
+static void ecore_init_wr_zp(struct bxe_adapter *sc, uint32_t addr, uint32_t len,
 			     uint32_t blob_off)
 {
 	const uint8_t *data = NULL;
@@ -245,7 +245,7 @@ static void ecore_init_wr_zp(struct bxe_softc *sc, uint32_t addr, uint32_t len,
 	ecore_write_big_buf_wb(sc, addr, len);
 }
 
-static void ecore_init_block(struct bxe_softc *sc, uint32_t block, uint32_t stage)
+static void ecore_init_block(struct bxe_adapter *sc, uint32_t block, uint32_t stage)
 {
 	uint16_t op_start =
 		INIT_OPS_OFFSETS(sc)[BLOCK_OPS_IDX(block, stage,
@@ -501,7 +501,7 @@ static const struct arb_line write_arb_addr[NUM_WR_Q-1] = {
 		PXP2_REG_RQ_BW_WR_UBOUND30}
 };
 
-static void ecore_init_pxp_arb(struct bxe_softc *sc, int r_order,
+static void ecore_init_pxp_arb(struct bxe_adapter *sc, int r_order,
 			       int w_order)
 {
 	uint32_t val, i;
@@ -644,7 +644,7 @@ static void ecore_init_pxp_arb(struct bxe_softc *sc, int r_order,
 #define ILT_ADDR2(x)		((uint32_t)((1 << 20) | ((uint64_t)x >> 44)))
 #define ILT_RANGE(f, l)		(((l) << 10) | f)
 
-static int ecore_ilt_line_mem_op(struct bxe_softc *sc,
+static int ecore_ilt_line_mem_op(struct bxe_adapter *sc,
 				 struct ilt_line *line, uint32_t size, uint8_t memop)
 {
 	if (memop == ILT_MEMOP_FREE) {
@@ -659,7 +659,7 @@ static int ecore_ilt_line_mem_op(struct bxe_softc *sc,
 }
 
 
-static int ecore_ilt_client_mem_op(struct bxe_softc *sc, int cli_num,
+static int ecore_ilt_client_mem_op(struct bxe_adapter *sc, int cli_num,
 				   uint8_t memop)
 {
 	int i, rc;
@@ -679,7 +679,7 @@ static int ecore_ilt_client_mem_op(struct bxe_softc *sc, int cli_num,
 	return rc;
 }
 
-static inline int ecore_ilt_mem_op_cnic(struct bxe_softc *sc, uint8_t memop)
+static inline int ecore_ilt_mem_op_cnic(struct bxe_adapter *sc, uint8_t memop)
 {
 	int rc = 0;
 
@@ -691,7 +691,7 @@ static inline int ecore_ilt_mem_op_cnic(struct bxe_softc *sc, uint8_t memop)
 	return rc;
 }
 
-static int ecore_ilt_mem_op(struct bxe_softc *sc, uint8_t memop)
+static int ecore_ilt_mem_op(struct bxe_adapter *sc, uint8_t memop)
 {
 	int rc = ecore_ilt_client_mem_op(sc, ILT_CLIENT_CDU, memop);
 	if (!rc)
@@ -702,7 +702,7 @@ static int ecore_ilt_mem_op(struct bxe_softc *sc, uint8_t memop)
 	return rc;
 }
 
-static void ecore_ilt_line_wr(struct bxe_softc *sc, int abs_idx,
+static void ecore_ilt_line_wr(struct bxe_adapter *sc, int abs_idx,
 			      ecore_dma_addr_t page_mapping)
 {
 	uint32_t reg;
@@ -715,7 +715,7 @@ static void ecore_ilt_line_wr(struct bxe_softc *sc, int abs_idx,
 	ecore_wr_64(sc, reg, ILT_ADDR1(page_mapping), ILT_ADDR2(page_mapping));
 }
 
-static void ecore_ilt_line_init_op(struct bxe_softc *sc,
+static void ecore_ilt_line_init_op(struct bxe_adapter *sc,
 				   struct ecore_ilt *ilt, int idx, uint8_t initop)
 {
 	ecore_dma_addr_t	null_mapping;
@@ -735,7 +735,7 @@ static void ecore_ilt_line_init_op(struct bxe_softc *sc,
 	}
 }
 
-static void ecore_ilt_boundry_init_op(struct bxe_softc *sc,
+static void ecore_ilt_boundry_init_op(struct bxe_adapter *sc,
 				      struct ilt_client_info *ilt_cli,
 				      uint32_t ilt_start, uint8_t initop)
 {
@@ -788,7 +788,7 @@ static void ecore_ilt_boundry_init_op(struct bxe_softc *sc,
 	}
 }
 
-static void ecore_ilt_client_init_op_ilt(struct bxe_softc *sc,
+static void ecore_ilt_client_init_op_ilt(struct bxe_adapter *sc,
 					 struct ecore_ilt *ilt,
 					 struct ilt_client_info *ilt_cli,
 					 uint8_t initop)
@@ -805,7 +805,7 @@ static void ecore_ilt_client_init_op_ilt(struct bxe_softc *sc,
 	ecore_ilt_boundry_init_op(sc, ilt_cli, ilt->start_line, initop);
 }
 
-static void ecore_ilt_client_init_op(struct bxe_softc *sc,
+static void ecore_ilt_client_init_op(struct bxe_adapter *sc,
 				     struct ilt_client_info *ilt_cli, uint8_t initop)
 {
 	struct ecore_ilt *ilt = SC_ILT(sc);
@@ -813,7 +813,7 @@ static void ecore_ilt_client_init_op(struct bxe_softc *sc,
 	ecore_ilt_client_init_op_ilt(sc, ilt, ilt_cli, initop);
 }
 
-static void ecore_ilt_client_id_init_op(struct bxe_softc *sc,
+static void ecore_ilt_client_id_init_op(struct bxe_adapter *sc,
 					int cli_num, uint8_t initop)
 {
 	struct ecore_ilt *ilt = SC_ILT(sc);
@@ -822,14 +822,14 @@ static void ecore_ilt_client_id_init_op(struct bxe_softc *sc,
 	ecore_ilt_client_init_op(sc, ilt_cli, initop);
 }
 
-static inline void ecore_ilt_init_op_cnic(struct bxe_softc *sc, uint8_t initop)
+static inline void ecore_ilt_init_op_cnic(struct bxe_adapter *sc, uint8_t initop)
 {
 	if (CONFIGURE_NIC_MODE(sc))
 		ecore_ilt_client_id_init_op(sc, ILT_CLIENT_SRC, initop);
 	ecore_ilt_client_id_init_op(sc, ILT_CLIENT_TM, initop);
 }
 
-static void ecore_ilt_init_op(struct bxe_softc *sc, uint8_t initop)
+static void ecore_ilt_init_op(struct bxe_adapter *sc, uint8_t initop)
 {
 	ecore_ilt_client_id_init_op(sc, ILT_CLIENT_CDU, initop);
 	ecore_ilt_client_id_init_op(sc, ILT_CLIENT_QM, initop);
@@ -837,7 +837,7 @@ static void ecore_ilt_init_op(struct bxe_softc *sc, uint8_t initop)
 		ecore_ilt_client_id_init_op(sc, ILT_CLIENT_SRC, initop);
 }
 
-static void ecore_ilt_init_client_psz(struct bxe_softc *sc, int cli_num,
+static void ecore_ilt_init_client_psz(struct bxe_adapter *sc, int cli_num,
 				      uint32_t psz_reg, uint8_t initop)
 {
 	struct ecore_ilt *ilt = SC_ILT(sc);
@@ -861,7 +861,7 @@ static void ecore_ilt_init_client_psz(struct bxe_softc *sc, int cli_num,
  * called during init common stage, ilt clients should be initialized
  * prioir to calling this function
  */
-static void ecore_ilt_init_page_size(struct bxe_softc *sc, uint8_t initop)
+static void ecore_ilt_init_page_size(struct bxe_adapter *sc, uint8_t initop)
 {
 	ecore_ilt_init_client_psz(sc, ILT_CLIENT_CDU,
 				  PXP2_REG_RQ_CDU_P_SIZE, initop);
@@ -881,7 +881,7 @@ static void ecore_ilt_init_page_size(struct bxe_softc *sc, uint8_t initop)
 #define QM_INIT(cid_cnt)	(cid_cnt > QM_INIT_MIN_CID_COUNT)
 
 /* called during init port stage */
-static void ecore_qm_init_cid_count(struct bxe_softc *sc, int qm_cid_count,
+static void ecore_qm_init_cid_count(struct bxe_adapter *sc, int qm_cid_count,
 				    uint8_t initop)
 {
 	int port = SC_PORT(sc);
@@ -900,7 +900,7 @@ static void ecore_qm_init_cid_count(struct bxe_softc *sc, int qm_cid_count,
 	}
 }
 
-static void ecore_qm_set_ptr_table(struct bxe_softc *sc, int qm_cid_count,
+static void ecore_qm_set_ptr_table(struct bxe_adapter *sc, int qm_cid_count,
 				   uint32_t base_reg, uint32_t reg)
 {
 	int i;
@@ -914,7 +914,7 @@ static void ecore_qm_set_ptr_table(struct bxe_softc *sc, int qm_cid_count,
 }
 
 /* called during init common stage */
-static void ecore_qm_init_ptr_table(struct bxe_softc *sc, int qm_cid_count,
+static void ecore_qm_init_ptr_table(struct bxe_adapter *sc, int qm_cid_count,
 				    uint8_t initop)
 {
 	if (!QM_INIT(qm_cid_count))
@@ -941,7 +941,7 @@ static void ecore_qm_init_ptr_table(struct bxe_softc *sc, int qm_cid_count,
 ****************************************************************************/
 #ifdef ECORE_L5
 /* called during init func stage */
-static void ecore_src_init_t2(struct bxe_softc *sc, struct src_ent *t2,
+static void ecore_src_init_t2(struct bxe_adapter *sc, struct src_ent *t2,
 			      ecore_dma_addr_t t2_mapping, int src_cid_count)
 {
 	int i;

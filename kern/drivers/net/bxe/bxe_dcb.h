@@ -259,13 +259,13 @@ struct pg_help_data {
 };
 
 /* forward DCB/PFC related declarations */
-struct bxe_softc;
+struct bxe_adapter;
 /* void bxe_dcbx_update(struct work_struct *work); */
-void bxe_dcbx_init_params(struct bxe_softc *sc);
-void bxe_dcbx_set_state(struct bxe_softc *sc, uint8_t dcb_on, uint32_t dcbx_enabled);
-int  bxe_dcb_get_lldp_params_ioctl(struct bxe_softc *sc, void *uaddr);
-int  bxe_dcb_get_dcbx_params_ioctl(struct bxe_softc *sc, void *uaddr);
-int  bxe_dcb_set_dcbx_params_ioctl(struct bxe_softc *sc, void *uaddr);
+void bxe_dcbx_init_params(struct bxe_adapter *sc);
+void bxe_dcbx_set_state(struct bxe_adapter *sc, uint8_t dcb_on, uint32_t dcbx_enabled);
+int  bxe_dcb_get_lldp_params_ioctl(struct bxe_adapter *sc, void *uaddr);
+int  bxe_dcb_get_dcbx_params_ioctl(struct bxe_adapter *sc, void *uaddr);
+int  bxe_dcb_set_dcbx_params_ioctl(struct bxe_adapter *sc, void *uaddr);
 
 enum {
     BXE_DCBX_STATE_NEG_RECEIVED = 0x1,
@@ -273,8 +273,8 @@ enum {
     BXE_DCBX_STATE_TX_RELEASED
 };
 
-void bxe_dcbx_set_params(struct bxe_softc *sc, uint32_t state);
-void bxe_dcbx_pmf_update(struct bxe_softc *sc);
+void bxe_dcbx_set_params(struct bxe_adapter *sc, uint32_t state);
+void bxe_dcbx_pmf_update(struct bxe_adapter *sc);
 
 #endif /* BXE_DCB_H */
 

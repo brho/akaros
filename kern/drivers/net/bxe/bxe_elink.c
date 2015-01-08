@@ -914,7 +914,7 @@ typedef elink_status_t (*read_sfp_module_eeprom_func_p)(struct elink_phy *phy,
 		(_bank + (_addr & 0xf)), \
 		_val)
 
-static uint32_t elink_bits_en(struct bxe_softc *sc, uint32_t reg, uint32_t bits)
+static uint32_t elink_bits_en(struct bxe_adapter *sc, uint32_t reg, uint32_t bits)
 {
 	uint32_t val = REG_RD(sc, reg);
 
@@ -923,7 +923,7 @@ static uint32_t elink_bits_en(struct bxe_softc *sc, uint32_t reg, uint32_t bits)
 	return val;
 }
 
-static uint32_t elink_bits_dis(struct bxe_softc *sc, uint32_t reg, uint32_t bits)
+static uint32_t elink_bits_dis(struct bxe_adapter *sc, uint32_t reg, uint32_t bits)
 {
 	uint32_t val = REG_RD(sc, reg);
 
@@ -945,7 +945,7 @@ static int elink_check_lfa(struct elink_params *params)
 	uint32_t link_status, cfg_idx, lfa_mask, cfg_size;
 	uint32_t cur_speed_cap_mask, cur_req_fc_auto_adv, additional_config;
 	uint32_t saved_val, req_val, eee_status;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	additional_config =
 		REG_RD(sc, params->lfa_base +
@@ -1062,7 +1062,7 @@ static int elink_check_lfa(struct elink_params *params)
 /******************************************************************/
 /*			EPIO/GPIO section			  */
 /******************************************************************/
-static void elink_get_epio(struct bxe_softc *sc, uint32_t epio_pin, uint32_t *en)
+static void elink_get_epio(struct bxe_adapter *sc, uint32_t epio_pin, uint32_t *en)
 {
 	uint32_t epio_mask, gp_oenable;
 	*en = 0;
@@ -1079,7 +1079,7 @@ static void elink_get_epio(struct bxe_softc *sc, uint32_t epio_pin, uint32_t *en
 
 	*en = (REG_RD(sc, MCP_REG_MCPR_GP_INPUTS) & epio_mask) >> epio_pin;
 }
-static void elink_set_epio(struct bxe_softc *sc, uint32_t epio_pin, uint32_t en)
+static void elink_set_epio(struct bxe_adapter *sc, uint32_t epio_pin, uint32_t en)
 {
 	uint32_t epio_mask, gp_output, gp_oenable;
 
@@ -1104,7 +1104,7 @@ static void elink_set_epio(struct bxe_softc *sc, uint32_t epio_pin, uint32_t en)
 	REG_WR(sc, MCP_REG_MCPR_GP_OENABLE, gp_oenable | epio_mask);
 }
 
-static void elink_set_cfg_pin(struct bxe_softc *sc, uint32_t pin_cfg, uint32_t val)
+static void elink_set_cfg_pin(struct bxe_adapter *sc, uint32_t pin_cfg, uint32_t val)
 {
 	if (pin_cfg == PIN_CFG_NA)
 		return;
@@ -1117,7 +1117,7 @@ static void elink_set_cfg_pin(struct bxe_softc *sc, uint32_t pin_cfg, uint32_t v
 	}
 }
 
-static uint32_t elink_get_cfg_pin(struct bxe_softc *sc, uint32_t pin_cfg, uint32_t *val)
+static uint32_t elink_get_cfg_pin(struct bxe_adapter *sc, uint32_t pin_cfg, uint32_t *val)
 {
 	if (pin_cfg == PIN_CFG_NA)
 		return ELINK_STATUS_ERROR;
@@ -1137,7 +1137,7 @@ static uint32_t elink_get_cfg_pin(struct bxe_softc *sc, uint32_t pin_cfg, uint32
 static void elink_ets_e2e3a0_disabled(struct elink_params *params)
 {
 	/* ETS disabled configuration*/
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	ELINK_DEBUG_P0(sc, "ETS E2E3 disabled configuration\n");
 
@@ -1228,7 +1228,7 @@ static void elink_ets_e3b0_set_credit_upper_bound_nig(
 	const struct elink_params *params,
 	const uint32_t min_w_val)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	const uint8_t port = params->port;
 	const uint32_t credit_upper_bound =
 	    elink_ets_get_credit_upper_bound(min_w_val);
@@ -1266,7 +1266,7 @@ static void elink_ets_e3b0_set_credit_upper_bound_nig(
 static void elink_ets_e3b0_nig_disabled(const struct elink_params *params,
 					const struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	const uint8_t port = params->port;
 	const uint32_t min_w_val = elink_ets_get_min_w_val_nig(vars);
 	/* Mapping between entry  priority to client number (0,1,2 -debug and
@@ -1350,7 +1350,7 @@ static void elink_ets_e3b0_set_credit_upper_bound_pbf(
 	const struct elink_params *params,
 	const uint32_t min_w_val)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	const uint32_t credit_upper_bound =
 	    elink_ets_get_credit_upper_bound(min_w_val);
 	const uint8_t port = params->port;
@@ -1382,7 +1382,7 @@ static void elink_ets_e3b0_set_credit_upper_bound_pbf(
 ******************************************************************************/
 static void elink_ets_e3b0_pbf_disabled(const struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	const uint8_t port = params->port;
 	const uint32_t min_w_val_pbf = ELINK_ETS_E3B0_PBF_MIN_W_VAL;
 	uint8_t i = 0;
@@ -1441,7 +1441,7 @@ static void elink_ets_e3b0_pbf_disabled(const struct elink_params *params)
 static elink_status_t elink_ets_e3b0_disabled(const struct elink_params *params,
 				   const struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	if (!CHIP_IS_E3B0(sc)) {
 		ELINK_DEBUG_P0(sc,
@@ -1464,7 +1464,7 @@ static elink_status_t elink_ets_e3b0_disabled(const struct elink_params *params,
 elink_status_t elink_ets_disabled(struct elink_params *params,
 		      struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	elink_status_t elink_status = ELINK_STATUS_OK;
 
 	if ((CHIP_IS_E2(sc)) || (CHIP_IS_E3A0(sc)))
@@ -1489,7 +1489,7 @@ static elink_status_t elink_ets_e3b0_cli_map(const struct elink_params *params,
 				  const uint8_t cos_sp_bitmap,
 				  const uint8_t cos_bw_bitmap)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	const uint8_t port = params->port;
 	const uint8_t nig_cli_sp_bitmap = 0x7 | (cos_sp_bitmap << 3);
 	const uint8_t pbf_cli_sp_bitmap = cos_sp_bitmap;
@@ -1518,7 +1518,7 @@ static elink_status_t elink_ets_e3b0_cli_map(const struct elink_params *params,
 *	This function is needed because NIG ARB_CREDIT_WEIGHT_X are
 *	not continues and ARB_CREDIT_WEIGHT_0 + offset is suitable.
 ******************************************************************************/
-static elink_status_t elink_ets_e3b0_set_cos_bw(struct bxe_softc *sc,
+static elink_status_t elink_ets_e3b0_set_cos_bw(struct bxe_adapter *sc,
 				     const uint8_t cos_entry,
 				     const uint32_t min_w_val_nig,
 				     const uint32_t min_w_val_pbf,
@@ -1595,7 +1595,7 @@ static elink_status_t elink_ets_e3b0_get_total_bw(
 	struct elink_ets_params *ets_params,
 	uint16_t *total_bw)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t cos_idx = 0;
 	uint8_t is_bw_cos_exist = 0;
 
@@ -1655,7 +1655,7 @@ static elink_status_t elink_ets_e3b0_sp_pri_to_cos_set(const struct elink_params
 					    uint8_t *sp_pri_to_cos, const uint8_t pri,
 					    const uint8_t cos_entry)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	const uint8_t port = params->port;
 	const uint8_t max_num_of_cos = (port) ? ELINK_DCBX_E3B0_MAX_NUM_COS_PORT1 :
 		ELINK_DCBX_E3B0_MAX_NUM_COS_PORT0;
@@ -1736,7 +1736,7 @@ static uint64_t elink_e3b0_sp_get_pri_cli_reg_pbf(const uint8_t cos, const uint8
 static elink_status_t elink_ets_e3b0_sp_set_pri_cli_reg(const struct elink_params *params,
 					     uint8_t *sp_pri_to_cos)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t i = 0;
 	const uint8_t port = params->port;
 	/* MCP Dbg0 and dbg1 are always with higher strict pri*/
@@ -1830,7 +1830,7 @@ elink_status_t elink_ets_e3b0_config(const struct elink_params *params,
 			 const struct elink_vars *vars,
 			 struct elink_ets_params *ets_params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	elink_status_t elink_status = ELINK_STATUS_OK;
 	const uint8_t port = params->port;
 	uint16_t total_bw = 0;
@@ -1931,7 +1931,7 @@ elink_status_t elink_ets_e3b0_config(const struct elink_params *params,
 static void elink_ets_bw_limit_common(const struct elink_params *params)
 {
 	/* ETS disabled configuration */
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	ELINK_DEBUG_P0(sc, "ETS enabled BW limit configuration\n");
 	/* Defines which entries (clients) are subjected to WFQ arbitration
 	 * COS0 0x8
@@ -1976,7 +1976,7 @@ void elink_ets_bw_limit(const struct elink_params *params, const uint32_t cos0_b
 			const uint32_t cos1_bw)
 {
 	/* ETS disabled configuration*/
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	const uint32_t total_bw = cos0_bw + cos1_bw;
 	uint32_t cos0_credit_weight = 0;
 	uint32_t cos1_credit_weight = 0;
@@ -2007,7 +2007,7 @@ void elink_ets_bw_limit(const struct elink_params *params, const uint32_t cos0_b
 elink_status_t elink_ets_strict(const struct elink_params *params, const uint8_t strict_cos)
 {
 	/* ETS disabled configuration*/
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t val	= 0;
 
 	ELINK_DEBUG_P0(sc, "ETS enabled strict configuration\n");
@@ -2051,7 +2051,7 @@ static void elink_update_pfc_xmac(struct elink_params *params,
 				  struct elink_vars *vars,
 				  uint8_t is_lb)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t xmac_base;
 	uint32_t pause_val, pfc0_val, pfc1_val;
 
@@ -2114,7 +2114,7 @@ static void elink_emac_get_pfc_stat(struct elink_params *params,
 				    uint32_t pfc_frames_received[2])
 {
 	/* Read pfc statistic */
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t emac_base = params->port ? GRCBASE_EMAC1 : GRCBASE_EMAC0;
 	uint32_t val_xon = 0;
 	uint32_t val_xoff = 0;
@@ -2146,7 +2146,7 @@ void elink_pfc_statistic(struct elink_params *params, struct elink_vars *vars,
 			 uint32_t pfc_frames_received[2])
 {
 	/* Read pfc statistic */
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	ELINK_DEBUG_P0(sc, "pfc statistic\n");
 
@@ -2162,7 +2162,7 @@ void elink_pfc_statistic(struct elink_params *params, struct elink_vars *vars,
 /******************************************************************/
 /*			MAC/PBF section				  */
 /******************************************************************/
-static void elink_set_mdio_clk(struct bxe_softc *sc, uint32_t chip_id,
+static void elink_set_mdio_clk(struct bxe_adapter *sc, uint32_t chip_id,
 			       uint32_t emac_base)
 {
 	uint32_t new_mode, cur_mode;
@@ -2192,7 +2192,7 @@ static void elink_set_mdio_clk(struct bxe_softc *sc, uint32_t chip_id,
 	DELAY(40);
 }
 
-static void elink_set_mdio_emac_per_phy(struct bxe_softc *sc,
+static void elink_set_mdio_emac_per_phy(struct bxe_adapter *sc,
 					struct elink_params *params)
 {
 	uint8_t phy_index;
@@ -2203,7 +2203,7 @@ static void elink_set_mdio_emac_per_phy(struct bxe_softc *sc,
 				   params->phy[phy_index].mdio_ctrl);
 }
 
-static uint8_t elink_is_4_port_mode(struct bxe_softc *sc)
+static uint8_t elink_is_4_port_mode(struct bxe_adapter *sc)
 {
 	uint32_t port4mode_ovwr_val;
 	/* Check 4-port override enabled */
@@ -2220,7 +2220,7 @@ static void elink_emac_init(struct elink_params *params,
 			    struct elink_vars *vars)
 {
 	/* reset and unreset the emac core */
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t port = params->port;
 	uint32_t emac_base = port ? GRCBASE_EMAC1 : GRCBASE_EMAC0;
 	uint32_t val;
@@ -2265,7 +2265,7 @@ static void elink_set_xumac_nig(struct elink_params *params,
 				uint16_t tx_pause_en,
 				uint8_t enable)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	REG_WR(sc, params->port ? NIG_REG_P1_MAC_IN_EN : NIG_REG_P0_MAC_IN_EN,
 	       enable);
@@ -2279,7 +2279,7 @@ static void elink_set_umac_rxtx(struct elink_params *params, uint8_t en)
 {
 	uint32_t umac_base = params->port ? GRCBASE_UMAC1 : GRCBASE_UMAC0;
 	uint32_t val;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	if (!(REG_RD(sc, MISC_REG_RESET_REG_2) &
 		   (MISC_REGISTERS_RESET_REG_2_UMAC0 << params->port)))
 		return;
@@ -2299,7 +2299,7 @@ static void elink_umac_enable(struct elink_params *params,
 {
 	uint32_t val;
 	uint32_t umac_base = params->port ? GRCBASE_UMAC1 : GRCBASE_UMAC0;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	/* Reset UMAC */
 	REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_CLEAR,
 	       (MISC_REGISTERS_RESET_REG_2_UMAC0 << params->port));
@@ -2395,7 +2395,7 @@ static void elink_umac_enable(struct elink_params *params,
 /* Define the XMAC mode */
 static void elink_xmac_init(struct elink_params *params, uint32_t max_speed)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t is_port4mode = elink_is_4_port_mode(sc);
 
 	/* In 4-port mode, need to set the mode only once, so if XMAC is
@@ -2458,7 +2458,7 @@ static void elink_xmac_init(struct elink_params *params, uint32_t max_speed)
 static void elink_set_xmac_rxtx(struct elink_params *params, uint8_t en)
 {
 	uint8_t port = params->port;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t pfc_ctrl, xmac_base = (port) ? GRCBASE_XMAC1 : GRCBASE_XMAC0;
 	uint32_t val;
 
@@ -2487,7 +2487,7 @@ static elink_status_t elink_xmac_enable(struct elink_params *params,
 			     struct elink_vars *vars, uint8_t lb)
 {
 	uint32_t val, xmac_base;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	ELINK_DEBUG_P0(sc, "enabling XMAC\n");
 
 	xmac_base = (params->port) ? GRCBASE_XMAC1 : GRCBASE_XMAC0;
@@ -2556,7 +2556,7 @@ static elink_status_t elink_xmac_enable(struct elink_params *params,
 static elink_status_t elink_emac_enable(struct elink_params *params,
 			     struct elink_vars *vars, uint8_t lb)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t port = params->port;
 	uint32_t emac_base = port ? GRCBASE_EMAC1 : GRCBASE_EMAC0;
 	uint32_t val;
@@ -2729,7 +2729,7 @@ static void elink_update_pfc_bmac1(struct elink_params *params,
 				   struct elink_vars *vars)
 {
 	uint32_t wb_data[2];
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t bmac_addr =  params->port ? NIG_REG_INGRESS_BMAC1_MEM :
 		NIG_REG_INGRESS_BMAC0_MEM;
 
@@ -2762,7 +2762,7 @@ static void elink_update_pfc_bmac2(struct elink_params *params,
 	 * control packets to the system as well
 	 */
 	uint32_t wb_data[2];
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t bmac_addr = params->port ? NIG_REG_INGRESS_BMAC1_MEM :
 		NIG_REG_INGRESS_BMAC0_MEM;
 	uint32_t val = 0x14;
@@ -2844,7 +2844,7 @@ static void elink_update_pfc_bmac2(struct elink_params *params,
 *  This function is needed because NIG ARB_CREDIT_WEIGHT_X are
 *  not continues and ARB_CREDIT_WEIGHT_0 + offset is suitable.
 ******************************************************************************/
-static elink_status_t elink_pfc_nig_rx_priority_mask(struct bxe_softc *sc,
+static elink_status_t elink_pfc_nig_rx_priority_mask(struct bxe_adapter *sc,
 					   uint8_t cos_entry,
 					   uint32_t priority_mask, uint8_t port)
 {
@@ -2889,7 +2889,7 @@ static elink_status_t elink_pfc_nig_rx_priority_mask(struct bxe_softc *sc,
 }
 static void elink_update_mng(struct elink_params *params, uint32_t link_status)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	REG_WR(sc, params->shmem_base +
 	       offsetof(struct shmem_region,
@@ -2898,7 +2898,7 @@ static void elink_update_mng(struct elink_params *params, uint32_t link_status)
 
 static void elink_update_link_attr(struct elink_params *params, uint32_t link_attr)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	if (SHMEM2_HAS(sc, link_attr_sync))
 		REG_WR(sc, params->shmem2_base +
@@ -2913,7 +2913,7 @@ static void elink_update_pfc_nig(struct elink_params *params,
 	uint32_t xcm_mask = 0, ppp_enable = 0, pause_enable = 0, llfc_out_en = 0;
 	uint32_t llfc_enable = 0, xcm_out_en = 0, hwpfc_enable = 0;
 	uint32_t pkt_priority_to_cos = 0;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t port = params->port;
 
 	int set_pfc = params->feature_config_flags &
@@ -3011,7 +3011,7 @@ elink_status_t elink_update_pfc(struct elink_params *params,
 	 * disabled, pause are set according to the pause result.
 	 */
 	uint32_t val;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	elink_status_t elink_status = ELINK_STATUS_OK;
 	uint8_t bmac_loopback = (params->loopback_mode == ELINK_LOOPBACK_BMAC);
 
@@ -3061,7 +3061,7 @@ static elink_status_t elink_bmac1_enable(struct elink_params *params,
 			      struct elink_vars *vars,
 			      uint8_t is_lb)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t port = params->port;
 	uint32_t bmac_addr = port ? NIG_REG_INGRESS_BMAC1_MEM :
 			       NIG_REG_INGRESS_BMAC0_MEM;
@@ -3134,7 +3134,7 @@ static elink_status_t elink_bmac2_enable(struct elink_params *params,
 			      struct elink_vars *vars,
 			      uint8_t is_lb)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t port = params->port;
 	uint32_t bmac_addr = port ? NIG_REG_INGRESS_BMAC1_MEM :
 			       NIG_REG_INGRESS_BMAC0_MEM;
@@ -3201,7 +3201,7 @@ static elink_status_t elink_bmac_enable(struct elink_params *params,
 {
 	elink_status_t rc = ELINK_STATUS_OK;
 	uint8_t port = params->port;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t val;
 	/* Reset and unreset the BigMac */
 	if (reset_bmac) {
@@ -3240,7 +3240,7 @@ static elink_status_t elink_bmac_enable(struct elink_params *params,
 	return rc;
 }
 
-static void elink_set_bmac_rx(struct bxe_softc *sc, uint32_t chip_id, uint8_t port, uint8_t en)
+static void elink_set_bmac_rx(struct bxe_adapter *sc, uint32_t chip_id, uint8_t port, uint8_t en)
 {
 	uint32_t bmac_addr = port ? NIG_REG_INGRESS_BMAC1_MEM :
 			NIG_REG_INGRESS_BMAC0_MEM;
@@ -3269,7 +3269,7 @@ static void elink_set_bmac_rx(struct bxe_softc *sc, uint32_t chip_id, uint8_t po
 static elink_status_t elink_pbf_update(struct elink_params *params, uint32_t flow_ctrl,
 			    uint32_t line_speed)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t port = params->port;
 	uint32_t init_crd, crd;
 	uint32_t count = 1000;
@@ -3351,7 +3351,7 @@ static elink_status_t elink_pbf_update(struct elink_params *params, uint32_t flo
  * configuration, is passed here as mdc_mdio_access and selects
  * the emac_base for the CL45 read/writes operations
  */
-static uint32_t elink_get_emac_base(struct bxe_softc *sc,
+static uint32_t elink_get_emac_base(struct bxe_adapter *sc,
 			       uint32_t mdc_mdio_access, uint8_t port)
 {
 	uint32_t emac_base = 0;
@@ -3386,7 +3386,7 @@ static uint32_t elink_get_emac_base(struct bxe_softc *sc,
 /******************************************************************/
 /*			CL22 access functions			  */
 /******************************************************************/
-static elink_status_t elink_cl22_write(struct bxe_softc *sc,
+static elink_status_t elink_cl22_write(struct bxe_adapter *sc,
 				       struct elink_phy *phy,
 				       uint16_t reg, uint16_t val)
 {
@@ -3421,7 +3421,7 @@ static elink_status_t elink_cl22_write(struct bxe_softc *sc,
 	return rc;
 }
 
-static elink_status_t elink_cl22_read(struct bxe_softc *sc,
+static elink_status_t elink_cl22_read(struct bxe_adapter *sc,
 				      struct elink_phy *phy,
 				      uint16_t reg, uint16_t *ret_val)
 {
@@ -3463,7 +3463,7 @@ static elink_status_t elink_cl22_read(struct bxe_softc *sc,
 /******************************************************************/
 /*			CL45 access functions			  */
 /******************************************************************/
-static elink_status_t elink_cl45_read(struct bxe_softc *sc, struct elink_phy *phy,
+static elink_status_t elink_cl45_read(struct bxe_adapter *sc, struct elink_phy *phy,
 			   uint8_t devad, uint16_t reg, uint16_t *ret_val)
 {
 	uint32_t val;
@@ -3540,7 +3540,7 @@ static elink_status_t elink_cl45_read(struct bxe_softc *sc, struct elink_phy *ph
 	return rc;
 }
 
-static elink_status_t elink_cl45_write(struct bxe_softc *sc, struct elink_phy *phy,
+static elink_status_t elink_cl45_write(struct bxe_adapter *sc, struct elink_phy *phy,
 			    uint8_t devad, uint16_t reg, uint16_t val)
 {
 	uint32_t tmp;
@@ -3620,7 +3620,7 @@ static elink_status_t elink_cl45_write(struct bxe_softc *sc, struct elink_phy *p
 /******************************************************************/
 static uint8_t elink_eee_has_cap(struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	if (REG_RD(sc, params->shmem2_base) <=
 		   offsetof(struct shmem2_region, eee_status[params->port]))
@@ -3672,7 +3672,7 @@ static elink_status_t elink_eee_time_to_nvram(uint32_t idle_timer, uint32_t *nvr
 static uint32_t elink_eee_calc_timer(struct elink_params *params)
 {
 	uint32_t eee_mode, eee_idle;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	if (params->eee_mode & ELINK_EEE_MODE_OVERRIDE_NVRAM) {
 		if (params->eee_mode & ELINK_EEE_MODE_OUTPUT_TIME) {
@@ -3705,7 +3705,7 @@ static elink_status_t elink_eee_set_timers(struct elink_params *params,
 				   struct elink_vars *vars)
 {
 	uint32_t eee_idle = 0, eee_mode;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	eee_idle = elink_eee_calc_timer(params);
 
@@ -3757,7 +3757,7 @@ static elink_status_t elink_eee_disable(struct elink_phy *phy,
 				struct elink_params *params,
 				struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	/* Make Certain LPI is disabled */
 	REG_WR(sc, MISC_REG_CPMU_LP_FW_ENABLE_P0 + (params->port << 2), 0);
@@ -3773,7 +3773,7 @@ static elink_status_t elink_eee_advertise(struct elink_phy *phy,
 				  struct elink_params *params,
 				  struct elink_vars *vars, uint8_t modes)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t val = 0;
 
 	/* Mask events preventing LPI generation */
@@ -3798,7 +3798,7 @@ static elink_status_t elink_eee_advertise(struct elink_phy *phy,
 
 static void elink_update_mng_eee(struct elink_params *params, uint32_t eee_status)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	if (elink_eee_has_cap(params))
 		REG_WR(sc, params->shmem2_base +
@@ -3810,7 +3810,7 @@ static void elink_eee_an_resolve(struct elink_phy *phy,
 				  struct elink_params *params,
 				  struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t adv = 0, lp = 0;
 	uint32_t lp_adv = 0;
 	uint8_t neg = 0;
@@ -3860,7 +3860,7 @@ static void elink_bsc_module_sel(struct elink_params *params)
 	int idx;
 	uint32_t board_cfg, sfp_ctrl;
 	uint32_t i2c_pins[I2C_SWITCH_WIDTH], i2c_val[I2C_SWITCH_WIDTH];
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t port = params->port;
 	/* Read I2C output PINs */
 	board_cfg = REG_RD(sc, params->shmem_base +
@@ -3882,7 +3882,7 @@ static void elink_bsc_module_sel(struct elink_params *params)
 }
 
 static elink_status_t elink_bsc_read(struct elink_params *params,
-			  struct bxe_softc *sc,
+			  struct bxe_adapter *sc,
 			  uint8_t sl_devid,
 			  uint16_t sl_addr,
 			  uint8_t lc_addr,
@@ -3969,7 +3969,7 @@ static elink_status_t elink_bsc_read(struct elink_params *params,
 	return rc;
 }
 
-static void elink_cl45_read_or_write(struct bxe_softc *sc, struct elink_phy *phy,
+static void elink_cl45_read_or_write(struct bxe_adapter *sc, struct elink_phy *phy,
 				     uint8_t devad, uint16_t reg, uint16_t or_val)
 {
 	uint16_t val;
@@ -3977,7 +3977,7 @@ static void elink_cl45_read_or_write(struct bxe_softc *sc, struct elink_phy *phy
 	elink_cl45_write(sc, phy, devad, reg, val | or_val);
 }
 
-static void elink_cl45_read_and_write(struct bxe_softc *sc,
+static void elink_cl45_read_and_write(struct bxe_adapter *sc,
 				      struct elink_phy *phy,
 				      uint8_t devad, uint16_t reg, uint16_t and_val)
 {
@@ -4023,7 +4023,7 @@ static uint8_t elink_get_warpcore_lane(struct elink_phy *phy,
 				  struct elink_params *params)
 {
 	uint8_t lane = 0;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t path_swap, path_swap_ovr;
 	uint8_t path, port;
 
@@ -4078,7 +4078,7 @@ static void elink_set_aer_mmd(struct elink_params *params,
 {
 	uint32_t ser_lane;
 	uint16_t offset, aer_val;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	ser_lane = ((params->lane_config &
 		     PORT_HW_CFG_LANE_SWAP_CFG_MASTER_MASK) >>
 		     PORT_HW_CFG_LANE_SWAP_CFG_MASTER_SHIFT);
@@ -4110,7 +4110,7 @@ static void elink_set_aer_mmd(struct elink_params *params,
 /*			Internal phy section			  */
 /******************************************************************/
 
-static void elink_set_serdes_access(struct bxe_softc *sc, uint8_t port)
+static void elink_set_serdes_access(struct bxe_adapter *sc, uint8_t port)
 {
 	uint32_t emac_base = (port) ? GRCBASE_EMAC1 : GRCBASE_EMAC0;
 
@@ -4124,7 +4124,7 @@ static void elink_set_serdes_access(struct bxe_softc *sc, uint8_t port)
 	REG_WR(sc, NIG_REG_SERDES0_CTRL_MD_ST + port*0x10, 0);
 }
 
-static void elink_serdes_deassert(struct bxe_softc *sc, uint8_t port)
+static void elink_serdes_deassert(struct bxe_adapter *sc, uint8_t port)
 {
 	uint32_t val;
 
@@ -4147,7 +4147,7 @@ static void elink_xgxs_specific_func(struct elink_phy *phy,
 				     struct elink_params *params,
 				     uint32_t action)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	switch (action) {
 	case ELINK_PHY_INIT:
 		/* Set correct devad */
@@ -4160,7 +4160,7 @@ static void elink_xgxs_specific_func(struct elink_phy *phy,
 
 static void elink_xgxs_deassert(struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t port;
 	uint32_t val;
 	ELINK_DEBUG_P0(sc, "elink_xgxs_deassert\n");
@@ -4179,7 +4179,7 @@ static void elink_xgxs_deassert(struct elink_params *params)
 static void elink_calc_ieee_aneg_adv(struct elink_phy *phy,
 				     struct elink_params *params, uint16_t *ieee_fc)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	*ieee_fc = MDIO_COMBO_IEEE0_AUTO_NEG_ADV_FULL_DUPLEX;
 	/* Resolve pause mode and advertisement Please refer to Table
 	 * 28B-3 of the 802.3ab-1999 spec
@@ -4220,7 +4220,7 @@ static void elink_calc_ieee_aneg_adv(struct elink_phy *phy,
 static void set_phy_vars(struct elink_params *params,
 			 struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t actual_phy_idx, phy_index, link_cfg_idx;
 	uint8_t phy_config_swapped = params->multi_phy_config &
 			PORT_HW_CFG_PHY_SWAPPED_ENABLED;
@@ -4263,7 +4263,7 @@ static void elink_ext_phy_set_pause(struct elink_params *params,
 				    struct elink_vars *vars)
 {
 	uint16_t val;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	/* Read modify write pause advertizing */
 	elink_cl45_read(sc, phy, MDIO_AN_DEVAD, MDIO_AN_REG_ADV_PAUSE, &val);
 
@@ -4320,7 +4320,7 @@ static void elink_ext_phy_update_adv_fc(struct elink_phy *phy,
 	uint16_t ld_pause;		/* local */
 	uint16_t lp_pause;		/* link partner */
 	uint16_t pause_result;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	if (phy->type == PORT_HW_CFG_XGXS_EXT_PHY_TYPE_BCM54618SE) {
 		elink_cl22_read(sc, phy, 0x4, &ld_pause);
 		elink_cl22_read(sc, phy, 0x5, &lp_pause);
@@ -4410,7 +4410,7 @@ static void elink_warpcore_enable_AN_KR2(struct elink_phy *phy,
 					 struct elink_params *params,
 					 struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t i;
 	static struct elink_reg_set reg_set[] = {
 		/* Step 1 - Program the TX/RX alignment markers */
@@ -4449,7 +4449,7 @@ static void elink_disable_kr2(struct elink_params *params,
 			      struct elink_vars *vars,
 			      struct elink_phy *phy)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	int i;
 	static struct elink_reg_set reg_set[] = {
 		/* Step 1 - Program the TX/RX alignment markers */
@@ -4483,7 +4483,7 @@ static void elink_disable_kr2(struct elink_params *params,
 static void elink_warpcore_set_lpi_passthrough(struct elink_phy *phy,
 					       struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	ELINK_DEBUG_P0(sc, "Configure WC for LPI pass through\n");
 	elink_cl45_write(sc, phy, MDIO_WC_DEVAD,
@@ -4496,7 +4496,7 @@ static void elink_warpcore_restart_AN_KR(struct elink_phy *phy,
 					 struct elink_params *params)
 {
 	/* Restart autoneg on the leading lane only */
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t lane = elink_get_warpcore_lane(phy, params);
 	CL22_WR_OVER_CL45(sc, phy, MDIO_REG_BANK_AER_BLOCK,
 			  MDIO_AER_BLOCK_AER_REG, lane);
@@ -4511,7 +4511,7 @@ static void elink_warpcore_enable_AN_KR(struct elink_phy *phy,
 					struct elink_params *params,
 					struct elink_vars *vars) {
 	uint16_t lane, i, cl72_ctrl, an_adv = 0;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	static struct elink_reg_set reg_set[] = {
 		{MDIO_WC_DEVAD, MDIO_WC_REG_SERDESDIGITAL_CONTROL1000X2, 0x7},
 		{MDIO_PMA_DEVAD, MDIO_WC_REG_IEEE0BLK_AUTONEGNP, 0x0},
@@ -4650,7 +4650,7 @@ static void elink_warpcore_set_10G_KR(struct elink_phy *phy,
 				      struct elink_params *params,
 				      struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t val16, i, lane;
 	static struct elink_reg_set reg_set[] = {
 		/* Disable Autoneg */
@@ -4718,7 +4718,7 @@ static void elink_warpcore_set_10G_XFI(struct elink_phy *phy,
 				       struct elink_params *params,
 				       uint8_t is_xfi)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t misc1_val, tap_val, tx_driver_val, lane, val;
 	uint32_t cfg_tap_val, tx_drv_brdct, tx_equal;
 
@@ -4832,7 +4832,7 @@ static void elink_warpcore_set_20G_force_KR2(struct elink_phy *phy,
 					     struct elink_params *params)
 {
 	uint16_t val;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	/* Set global registers, so set AER lane to 0 */
 	CL22_WR_OVER_CL45(sc, phy, MDIO_REG_BANK_AER_BLOCK,
 			  MDIO_AER_BLOCK_AER_REG, 0);
@@ -4881,7 +4881,7 @@ static void elink_warpcore_set_20G_force_KR2(struct elink_phy *phy,
 	elink_set_aer_mmd(params, phy);
 }
 
-static void elink_warpcore_set_20G_DXGXS(struct bxe_softc *sc,
+static void elink_warpcore_set_20G_DXGXS(struct bxe_adapter *sc,
 					 struct elink_phy *phy,
 					 uint16_t lane)
 {
@@ -4940,7 +4940,7 @@ static void elink_warpcore_set_sgmii_speed(struct elink_phy *phy,
 					   uint8_t fiber_mode,
 					   uint8_t always_autoneg)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t val16, digctrl_kx1, digctrl_kx2;
 
 	/* Clear XFI clock comp in non-10G single lane mode. */
@@ -5018,7 +5018,7 @@ static void elink_warpcore_set_sgmii_speed(struct elink_phy *phy,
 }
 
 
-static void elink_warpcore_reset_lane(struct bxe_softc *sc,
+static void elink_warpcore_reset_lane(struct bxe_adapter *sc,
 				      struct elink_phy *phy,
 				      uint8_t reset)
 {
@@ -5041,7 +5041,7 @@ static void elink_warpcore_clear_regs(struct elink_phy *phy,
 				      struct elink_params *params,
 				      uint16_t lane)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t i;
 	static struct elink_reg_set wc_regs[] = {
 		{MDIO_AN_DEVAD, MDIO_AN_REG_CTRL, 0},
@@ -5073,7 +5073,7 @@ static void elink_warpcore_clear_regs(struct elink_phy *phy,
 
 }
 
-static elink_status_t elink_get_mod_abs_int_cfg(struct bxe_softc *sc,
+static elink_status_t elink_get_mod_abs_int_cfg(struct bxe_adapter *sc,
 						uint32_t chip_id,
 						uint32_t shmem_base, uint8_t port,
 						uint8_t *gpio_num, uint8_t *gpio_port)
@@ -5115,7 +5115,7 @@ static elink_status_t elink_get_mod_abs_int_cfg(struct bxe_softc *sc,
 static int elink_is_sfp_module_plugged(struct elink_phy *phy,
 				       struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t gpio_num, gpio_port;
 	uint32_t gpio_val;
 	if (elink_get_mod_abs_int_cfg(sc, params->chip_id,
@@ -5134,7 +5134,7 @@ static int elink_warpcore_get_sigdet(struct elink_phy *phy,
 				     struct elink_params *params)
 {
 	uint16_t gp2_status_reg0, lane;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	lane = elink_get_warpcore_lane(phy, params);
 
@@ -5148,7 +5148,7 @@ static void elink_warpcore_config_runtime(struct elink_phy *phy,
 					  struct elink_params *params,
 					  struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t serdes_net_if;
 	uint16_t gp_status1 = 0, lnkup = 0, lnkup_kr = 0;
 
@@ -5201,7 +5201,7 @@ static void elink_warpcore_config_sfi(struct elink_phy *phy,
 				      struct elink_params *params)
 {
 	uint16_t lane = elink_get_warpcore_lane(phy, params);
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	elink_warpcore_clear_regs(phy, params, lane);
 	if ((params->req_line_speed[ELINK_LINK_CONFIG_IDX(ELINK_INT_PHY)] ==
 	     ELINK_SPEED_10000) &&
@@ -5218,7 +5218,7 @@ static void elink_sfp_e3_set_transmitter(struct elink_params *params,
 					 struct elink_phy *phy,
 					 uint8_t tx_en)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t cfg_pin;
 	uint8_t port = params->port;
 
@@ -5239,7 +5239,7 @@ static void elink_warpcore_config_init(struct elink_phy *phy,
 				       struct elink_params *params,
 				       struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t serdes_net_if;
 	uint8_t fiber_mode;
 	uint16_t lane = elink_get_warpcore_lane(phy, params);
@@ -5346,7 +5346,7 @@ static void elink_warpcore_config_init(struct elink_phy *phy,
 static void elink_warpcore_link_reset(struct elink_phy *phy,
 				      struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t val16, lane;
 	elink_sfp_e3_set_transmitter(params, phy, 0);
 	elink_set_mdio_emac_per_phy(sc, params);
@@ -5401,7 +5401,7 @@ static void elink_warpcore_link_reset(struct elink_phy *phy,
 static void elink_set_warpcore_loopback(struct elink_phy *phy,
 					struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t val16;
 	uint32_t lane;
 	ELINK_DEBUG_P2(sc, "Setting Warpcore loopback type %x, speed %d\n",
@@ -5446,7 +5446,7 @@ static void elink_set_warpcore_loopback(struct elink_phy *phy,
 static void elink_sync_link(struct elink_params *params,
 			     struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t link_10g_plus;
 	if (vars->link_status & LINK_STATUS_PHYSICAL_LINK_FLAG)
 		vars->phy_flags |= PHY_PHYSICAL_LINK_FLAG;
@@ -5552,7 +5552,7 @@ static void elink_sync_link(struct elink_params *params,
 void elink_link_status_update(struct elink_params *params,
 			      struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t port = params->port;
 	uint32_t sync_offset, media_types;
 	/* Update PHY configuration */
@@ -5619,7 +5619,7 @@ void elink_link_status_update(struct elink_params *params,
 static void elink_set_master_ln(struct elink_params *params,
 				struct elink_phy *phy)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t new_master_ln, ser_lane;
 	ser_lane = ((params->lane_config &
 		     PORT_HW_CFG_LANE_SWAP_CFG_MASTER_MASK) >>
@@ -5641,7 +5641,7 @@ static elink_status_t elink_reset_unicore(struct elink_params *params,
 			       struct elink_phy *phy,
 			       uint8_t set_serdes)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t mii_control;
 	uint16_t i;
 	CL22_RD_OVER_CL45(sc, phy,
@@ -5684,7 +5684,7 @@ static elink_status_t elink_reset_unicore(struct elink_params *params,
 static void elink_set_swap_lanes(struct elink_params *params,
 				 struct elink_phy *phy)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	/* Each two bits represents a lane number:
 	 * No swap is 0123 => 0x1b no need to enable the swap
 	 */
@@ -5726,7 +5726,7 @@ static void elink_set_swap_lanes(struct elink_params *params,
 static void elink_set_parallel_detection(struct elink_phy *phy,
 					 struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t control2;
 	CL22_RD_OVER_CL45(sc, phy,
 			  MDIO_REG_BANK_SERDES_DIGITAL,
@@ -5781,7 +5781,7 @@ static void elink_set_autoneg(struct elink_phy *phy,
 			      struct elink_vars *vars,
 			      uint8_t enable_cl73)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t reg_val;
 
 	/* CL37 Autoneg */
@@ -5884,7 +5884,7 @@ static void elink_program_serdes(struct elink_phy *phy,
 				 struct elink_params *params,
 				 struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t reg_val;
 
 	/* Program duplex, disable autoneg and sgmii*/
@@ -5932,7 +5932,7 @@ static void elink_program_serdes(struct elink_phy *phy,
 static void elink_set_brcm_cl37_advertisement(struct elink_phy *phy,
 					      struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t val = 0;
 
 	/* Set extended capabilities */
@@ -5953,7 +5953,7 @@ static void elink_set_ieee_aneg_advertisement(struct elink_phy *phy,
 					      struct elink_params *params,
 					      uint16_t ieee_fc)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t val;
 	/* For AN, we are always publishing full duplex */
 
@@ -5974,7 +5974,7 @@ static void elink_restart_autoneg(struct elink_phy *phy,
 				  struct elink_params *params,
 				  uint8_t enable_cl73)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t mii_control;
 
 	ELINK_DEBUG_P0(sc, "elink_restart_autoneg\n");
@@ -6014,7 +6014,7 @@ static void elink_initialize_sgmii_process(struct elink_phy *phy,
 					   struct elink_params *params,
 					   struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t control1;
 
 	/* In SGMII mode, the unicore is always slave */
@@ -6085,7 +6085,7 @@ static void elink_initialize_sgmii_process(struct elink_phy *phy,
 static elink_status_t elink_direct_parallel_detect_used(struct elink_phy *phy,
 					     struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t pd_10g, status2_1000x;
 	if (phy->req_line_speed != ELINK_SPEED_AUTO_NEG)
 		return ELINK_STATUS_OK;
@@ -6124,7 +6124,7 @@ static void elink_update_adv_fc(struct elink_phy *phy,
 	uint16_t ld_pause;   /* local driver */
 	uint16_t lp_pause;   /* link partner */
 	uint16_t pause_result;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	if ((gp_status &
 	     (MDIO_GP_STATUS_TOP_AN_STATUS1_CL73_AUTONEG_COMPLETE |
 	      MDIO_GP_STATUS_TOP_AN_STATUS1_CL73_MR_LP_NP_AN_ABLE)) ==
@@ -6168,7 +6168,7 @@ static void elink_flow_ctrl_resolve(struct elink_phy *phy,
 				    struct elink_vars *vars,
 				    uint32_t gp_status)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	vars->flow_ctrl = ELINK_FLOW_CTRL_NONE;
 
 	/* Resolve from gp_status in case of AN complete and not sgmii */
@@ -6194,7 +6194,7 @@ static void elink_flow_ctrl_resolve(struct elink_phy *phy,
 static void elink_check_fallback_to_cl37(struct elink_phy *phy,
 					 struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t rx_status, ustat_val, cl37_fsm_received;
 	ELINK_DEBUG_P0(sc, "elink_check_fallback_to_cl37\n");
 	/* Step 1: Make sure signal is detected */
@@ -6279,7 +6279,7 @@ static elink_status_t elink_get_link_speed_duplex(struct elink_phy *phy,
 				      uint16_t speed_mask,
 				      uint16_t is_duplex)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	if (phy->req_line_speed == ELINK_SPEED_AUTO_NEG)
 		vars->link_status |= LINK_STATUS_AUTO_NEGOTIATE_ENABLED;
 	if (is_link_up) {
@@ -6367,7 +6367,7 @@ static elink_status_t elink_link_settings_status(struct elink_phy *phy,
 				      struct elink_params *params,
 				      struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	uint16_t gp_status, duplex = DUPLEX_HALF, link_up = 0, speed_mask;
 	elink_status_t rc = ELINK_STATUS_OK;
@@ -6441,7 +6441,7 @@ static elink_status_t elink_warpcore_read_status(struct elink_phy *phy,
 				     struct elink_params *params,
 				     struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t lane;
 	uint16_t gp_status1, gp_speed, link_up, duplex = DUPLEX_FULL;
 	elink_status_t rc = ELINK_STATUS_OK;
@@ -6565,7 +6565,7 @@ static elink_status_t elink_warpcore_read_status(struct elink_phy *phy,
 }
 static void elink_set_gmii_tx_driver(struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	struct elink_phy *phy = &params->phy[ELINK_INT_PHY];
 	uint16_t lp_up2;
 	uint16_t tx_driver;
@@ -6605,7 +6605,7 @@ static void elink_set_gmii_tx_driver(struct elink_params *params)
 static elink_status_t elink_emac_program(struct elink_params *params,
 			      struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t port = params->port;
 	uint16_t mode = 0;
 
@@ -6654,7 +6654,7 @@ static void elink_set_preemphasis(struct elink_phy *phy,
 {
 
 	uint16_t bank, i = 0;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	for (bank = MDIO_REG_BANK_RX0, i = 0; bank <= MDIO_REG_BANK_RX3;
 	      bank += (MDIO_REG_BANK_RX1-MDIO_REG_BANK_RX0), i++) {
@@ -6677,7 +6677,7 @@ static void elink_xgxs_config_init(struct elink_phy *phy,
 				   struct elink_params *params,
 				   struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t enable_cl73 = (ELINK_SINGLE_MEDIA_DIRECT(params) ||
 			  (params->loopback_mode == ELINK_LOOPBACK_XGXS));
 	if (!(vars->phy_flags & PHY_SGMII_FLAG)) {
@@ -6761,7 +6761,7 @@ static elink_status_t elink_prepare_xgxs(struct elink_phy *phy,
 	return rc;
 }
 
-static uint16_t elink_wait_reset_complete(struct bxe_softc *sc,
+static uint16_t elink_wait_reset_complete(struct bxe_adapter *sc,
 				     struct elink_phy *phy,
 				     struct elink_params *params)
 {
@@ -6792,7 +6792,7 @@ static void elink_link_int_enable(struct elink_params *params)
 {
 	uint8_t port = params->port;
 	uint32_t mask;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	/* Setting the status to report on link up for either XGXS or SerDes */
 	if (CHIP_IS_E3(sc)) {
@@ -6836,7 +6836,7 @@ static void elink_link_int_enable(struct elink_params *params)
 	   REG_RD(sc, NIG_REG_XGXS0_STATUS_LINK_STATUS + port*0x68));
 }
 
-static void elink_rearm_latch_signal(struct bxe_softc *sc, uint8_t port,
+static void elink_rearm_latch_signal(struct bxe_adapter *sc, uint8_t port,
 				     uint8_t exp_mi_int)
 {
 	uint32_t latch_status = 0;
@@ -6873,7 +6873,7 @@ static void elink_rearm_latch_signal(struct bxe_softc *sc, uint8_t port,
 static void elink_link_int_ack(struct elink_params *params,
 			       struct elink_vars *vars, uint8_t is_10g_plus)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t port = params->port;
 	uint32_t mask;
 	/* First reset all status we assume only one line will be
@@ -6959,7 +6959,7 @@ static elink_status_t elink_null_format_ver(uint32_t spirom_ver, uint8_t *str, u
 elink_status_t elink_get_ext_phy_fw_version(struct elink_params *params, uint8_t *version,
 				 uint16_t len)
 {
-	struct bxe_softc *sc;
+	struct bxe_adapter *sc;
 	uint32_t spirom_ver = 0;
 	elink_status_t status = ELINK_STATUS_OK;
 	uint8_t *ver_p = version;
@@ -7000,7 +7000,7 @@ static void elink_set_xgxs_loopback(struct elink_phy *phy,
 				    struct elink_params *params)
 {
 	uint8_t port = params->port;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	if (phy->req_line_speed != ELINK_SPEED_1000) {
 		uint32_t md_devad = 0;
@@ -7060,7 +7060,7 @@ elink_status_t elink_set_led(struct elink_params *params,
 	uint8_t phy_idx;
 	uint32_t tmp;
 	uint32_t emac_base = port ? GRCBASE_EMAC1 : GRCBASE_EMAC0;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	ELINK_DEBUG_P2(sc, "elink_set_led: port %x, mode %d\n", port, mode);
 	ELINK_DEBUG_P2(sc, "speed 0x%x, hw_led_mode 0x%x\n",
 		 speed, hw_led_mode);
@@ -7207,7 +7207,7 @@ elink_status_t elink_set_led(struct elink_params *params,
 elink_status_t elink_test_link(struct elink_params *params, struct elink_vars *vars,
 		    uint8_t is_serdes)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t gp_status = 0, phy_index = 0;
 	uint8_t ext_phy_link_up = 0, serdes_phy_type;
 	struct elink_vars temp_vars;
@@ -7298,7 +7298,7 @@ static elink_status_t elink_link_initialize(struct elink_params *params,
 {
 	elink_status_t rc = ELINK_STATUS_OK;
 	uint8_t phy_index, non_ext_phy;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	/* In case of external phy existence, the line speed would be the
 	 * line speed linked up by the external phy. In case it is direct
 	 * only, then the line_speed during initialization will be
@@ -7383,7 +7383,7 @@ static void elink_int_link_reset(struct elink_phy *phy,
 static void elink_common_ext_link_reset(struct elink_phy *phy,
 					struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t gpio_port;
 	/* HW reset */
 	if (CHIP_IS_E2(sc))
@@ -7402,7 +7402,7 @@ static void elink_common_ext_link_reset(struct elink_phy *phy,
 static elink_status_t elink_update_link_down(struct elink_params *params,
 				  struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t port = params->port;
 
 	ELINK_DEBUG_P1(sc, "Port %x: Link is down\n", port);
@@ -7450,7 +7450,7 @@ static elink_status_t elink_update_link_up(struct elink_params *params,
 				struct elink_vars *vars,
 				uint8_t link_10g)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t phy_idx, port = params->port;
 	elink_status_t rc = ELINK_STATUS_OK;
 
@@ -7550,7 +7550,7 @@ static elink_status_t elink_update_link_up(struct elink_params *params,
  */
 elink_status_t elink_link_update(struct elink_params *params, struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	struct elink_vars phy_vars[ELINK_MAX_PHYS];
 	uint8_t port = params->port;
 	uint8_t link_10g_plus, phy_index;
@@ -7803,7 +7803,7 @@ elink_status_t elink_link_update(struct elink_params *params, struct elink_vars 
 /*****************************************************************************/
 /*			    External Phy section			     */
 /*****************************************************************************/
-void elink_ext_phy_hw_reset(struct bxe_softc *sc, uint8_t port)
+void elink_ext_phy_hw_reset(struct bxe_adapter *sc, uint8_t port)
 {
 	elink_cb_gpio_write(sc, MISC_REGISTERS_GPIO_1,
 		       MISC_REGISTERS_GPIO_OUTPUT_LOW, port);
@@ -7812,7 +7812,7 @@ void elink_ext_phy_hw_reset(struct bxe_softc *sc, uint8_t port)
 		       MISC_REGISTERS_GPIO_OUTPUT_HIGH, port);
 }
 
-static void elink_save_spirom_version(struct bxe_softc *sc, uint8_t port,
+static void elink_save_spirom_version(struct bxe_adapter *sc, uint8_t port,
 				      uint32_t spirom_ver, uint32_t ver_addr)
 {
 	ELINK_DEBUG_P3(sc, "FW version 0x%x:0x%x for port %d\n",
@@ -7822,7 +7822,7 @@ static void elink_save_spirom_version(struct bxe_softc *sc, uint8_t port,
 		REG_WR(sc, ver_addr, spirom_ver);
 }
 
-static void elink_save_bcm_spirom_ver(struct bxe_softc *sc,
+static void elink_save_bcm_spirom_ver(struct bxe_adapter *sc,
 				      struct elink_phy *phy,
 				      uint8_t port)
 {
@@ -7836,7 +7836,7 @@ static void elink_save_bcm_spirom_ver(struct bxe_softc *sc,
 				  phy->ver_addr);
 }
 
-static void elink_ext_phy_10G_an_resolve(struct bxe_softc *sc,
+static void elink_ext_phy_10G_an_resolve(struct bxe_adapter *sc,
 				       struct elink_phy *phy,
 				       struct elink_vars *vars)
 {
@@ -7860,7 +7860,7 @@ static void elink_8073_resolve_fc(struct elink_phy *phy,
 				  struct elink_params *params,
 				  struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	if (phy->req_line_speed == ELINK_SPEED_10 ||
 	    phy->req_line_speed == ELINK_SPEED_100) {
 		vars->flow_ctrl = phy->req_flow_ctrl;
@@ -7889,7 +7889,7 @@ static void elink_8073_resolve_fc(struct elink_phy *phy,
 			   pause_result);
 	}
 }
-static elink_status_t elink_8073_8727_external_rom_boot(struct bxe_softc *sc,
+static elink_status_t elink_8073_8727_external_rom_boot(struct bxe_adapter *sc,
 					     struct elink_phy *phy,
 					     uint8_t port)
 {
@@ -7970,7 +7970,7 @@ static elink_status_t elink_8073_8727_external_rom_boot(struct bxe_softc *sc,
 /******************************************************************/
 /*			BCM8073 PHY SECTION			  */
 /******************************************************************/
-static elink_status_t elink_8073_is_snr_needed(struct bxe_softc *sc, struct elink_phy *phy)
+static elink_status_t elink_8073_is_snr_needed(struct bxe_adapter *sc, struct elink_phy *phy)
 {
 	/* This is only required for 8073A1, version 102 only */
 	uint16_t val;
@@ -7996,7 +7996,7 @@ static elink_status_t elink_8073_is_snr_needed(struct bxe_softc *sc, struct elin
 	return 1;
 }
 
-static elink_status_t elink_8073_xaui_wa(struct bxe_softc *sc, struct elink_phy *phy)
+static elink_status_t elink_8073_xaui_wa(struct bxe_adapter *sc, struct elink_phy *phy)
 {
 	uint16_t val, cnt, cnt1 ;
 
@@ -8052,7 +8052,7 @@ static elink_status_t elink_8073_xaui_wa(struct bxe_softc *sc, struct elink_phy 
 	return ELINK_STATUS_ERROR;
 }
 
-static void elink_807x_force_10G(struct bxe_softc *sc, struct elink_phy *phy)
+static void elink_807x_force_10G(struct bxe_adapter *sc, struct elink_phy *phy)
 {
 	/* Force KR or KX */
 	elink_cl45_write(sc, phy,
@@ -8070,7 +8070,7 @@ static void elink_8073_set_pause_cl37(struct elink_params *params,
 				      struct elink_vars *vars)
 {
 	uint16_t cl37_val;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	elink_cl45_read(sc, phy,
 			MDIO_AN_DEVAD, MDIO_AN_REG_CL37_FC_LD, &cl37_val);
 
@@ -8104,7 +8104,7 @@ static void elink_8073_specific_func(struct elink_phy *phy,
 				     struct elink_params *params,
 				     uint32_t action)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	switch (action) {
 	case ELINK_PHY_INIT:
 		/* Enable LASI */
@@ -8120,7 +8120,7 @@ static elink_status_t elink_8073_config_init(struct elink_phy *phy,
 				  struct elink_params *params,
 				  struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t val = 0, tmp1;
 	uint8_t gpio_port;
 	ELINK_DEBUG_P0(sc, "Init 8073\n");
@@ -8268,7 +8268,7 @@ static uint8_t elink_8073_read_status(struct elink_phy *phy,
 				 struct elink_params *params,
 				 struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t link_up = 0;
 	uint16_t val1, val2;
 	uint16_t link_status = 0;
@@ -8412,7 +8412,7 @@ static uint8_t elink_8073_read_status(struct elink_phy *phy,
 static void elink_8073_link_reset(struct elink_phy *phy,
 				  struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t gpio_port;
 	if (CHIP_IS_E2(sc))
 		gpio_port = SC_PATH(sc);
@@ -8432,7 +8432,7 @@ static elink_status_t elink_8705_config_init(struct elink_phy *phy,
 				  struct elink_params *params,
 				  struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	ELINK_DEBUG_P0(sc, "init 8705\n");
 	/* Restore normal power mode*/
 	elink_cb_gpio_write(sc, MISC_REGISTERS_GPIO_2,
@@ -8461,7 +8461,7 @@ static uint8_t elink_8705_read_status(struct elink_phy *phy,
 {
 	uint8_t link_up = 0;
 	uint16_t val1, rx_sd;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	ELINK_DEBUG_P0(sc, "read status 8705\n");
 	elink_cl45_read(sc, phy,
 		      MDIO_WIS_DEVAD, MDIO_WIS_REG_LASI_STATUS, &val1);
@@ -8495,7 +8495,7 @@ static void elink_set_disable_pmd_transmit(struct elink_params *params,
 					   struct elink_phy *phy,
 					   uint8_t pmd_dis)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	/* Disable transmitter only for bootcodes which can enable it afterwards
 	 * (for D3 link)
 	 */
@@ -8518,7 +8518,7 @@ static uint8_t elink_get_gpio_port(struct elink_params *params)
 {
 	uint8_t gpio_port;
 	uint32_t swap_val, swap_override;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	if (CHIP_IS_E2(sc))
 		gpio_port = SC_PATH(sc);
 	else
@@ -8534,7 +8534,7 @@ static void elink_sfp_e1e2_set_transmitter(struct elink_params *params,
 {
 	uint16_t val;
 	uint8_t port = params->port;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t tx_en_mode;
 
 	/* Disable/Enable transmitter ( TX laser of the SFP+ module.)*/
@@ -8589,7 +8589,7 @@ static void elink_sfp_set_transmitter(struct elink_params *params,
 				      struct elink_phy *phy,
 				      uint8_t tx_en)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	ELINK_DEBUG_P1(sc, "Setting SFP+ transmitter to %d\n", tx_en);
 	if (CHIP_IS_E3(sc))
 		elink_sfp_e3_set_transmitter(params, phy, tx_en);
@@ -8602,7 +8602,7 @@ static elink_status_t elink_8726_read_sfp_module_eeprom(struct elink_phy *phy,
 					     uint8_t dev_addr, uint16_t addr, uint8_t byte_cnt,
 					     uint8_t *o_buf, uint8_t is_init)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t val = 0;
 	uint16_t i;
 	if (byte_cnt > ELINK_SFP_EEPROM_PAGE_SIZE) {
@@ -8668,7 +8668,7 @@ static void elink_warpcore_power_module(struct elink_params *params,
 					uint8_t power)
 {
 	uint32_t pin_cfg;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	pin_cfg = (REG_RD(sc, params->shmem_base +
 			  offsetof(struct shmem_region,
@@ -8695,7 +8695,7 @@ static elink_status_t elink_warpcore_read_sfp_module_eeprom(struct elink_phy *ph
 	uint8_t i, j = 0, cnt = 0;
 	uint32_t data_array[4];
 	uint16_t addr32;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	if (byte_cnt > ELINK_SFP_EEPROM_PAGE_SIZE) {
 		ELINK_DEBUG_P0(sc,
@@ -8731,7 +8731,7 @@ static elink_status_t elink_8727_read_sfp_module_eeprom(struct elink_phy *phy,
 					     uint8_t dev_addr, uint16_t addr, uint8_t byte_cnt,
 					     uint8_t *o_buf, uint8_t is_init)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t val, i;
 
 	if (byte_cnt > ELINK_SFP_EEPROM_PAGE_SIZE) {
@@ -8826,7 +8826,7 @@ elink_status_t elink_read_sfp_module_eeprom(struct elink_phy *phy,
 				 uint16_t addr, uint16_t byte_cnt, uint8_t *o_buf)
 {
 	elink_status_t rc = 0;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t xfer_size;
 	uint8_t *user_data = o_buf;
 	read_sfp_module_eeprom_func_p read_func;
@@ -8866,7 +8866,7 @@ static elink_status_t elink_get_edc_mode(struct elink_phy *phy,
 			      struct elink_params *params,
 			      uint16_t *edc_mode)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t sync_offset = 0, phy_idx, media_types;
 	uint8_t gport, val[2], check_limiting_mode = 0;
 	*edc_mode = ELINK_EDC_MODE_LIMITING;
@@ -9006,7 +9006,7 @@ static elink_status_t elink_get_edc_mode(struct elink_phy *phy,
 static elink_status_t elink_verify_sfp_module(struct elink_phy *phy,
 				   struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t val, cmd;
 	uint32_t fw_resp, fw_cmd_param;
 	char vendor_name[ELINK_SFP_EEPROM_VENDOR_NAME_SIZE+1];
@@ -9083,7 +9083,7 @@ static elink_status_t elink_wait_for_sfp_module_initialized(struct elink_phy *ph
 {
 	uint8_t val;
 	elink_status_t rc;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t timeout;
 	/* Initialization time after hot-plug may take up to 300ms for
 	 * some phys type ( e.g. JDSU )
@@ -9111,7 +9111,7 @@ static elink_status_t elink_wait_for_sfp_module_initialized(struct elink_phy *ph
 	return rc;
 }
 
-static void elink_8727_power_module(struct bxe_softc *sc,
+static void elink_8727_power_module(struct bxe_adapter *sc,
 				    struct elink_phy *phy,
 				    uint8_t is_power_up) {
 	/* Make sure GPIOs are not using for LED mode */
@@ -9143,7 +9143,7 @@ static void elink_8727_power_module(struct bxe_softc *sc,
 			 val);
 }
 
-static elink_status_t elink_8726_set_limiting_mode(struct bxe_softc *sc,
+static elink_status_t elink_8726_set_limiting_mode(struct bxe_adapter *sc,
 					struct elink_phy *phy,
 					uint16_t edc_mode)
 {
@@ -9192,7 +9192,7 @@ static elink_status_t elink_8726_set_limiting_mode(struct bxe_softc *sc,
 	return ELINK_STATUS_OK;
 }
 
-static elink_status_t elink_8727_set_limiting_mode(struct bxe_softc *sc,
+static elink_status_t elink_8727_set_limiting_mode(struct bxe_adapter *sc,
 					struct elink_phy *phy,
 					uint16_t edc_mode)
 {
@@ -9230,7 +9230,7 @@ static void elink_8727_specific_func(struct elink_phy *phy,
 				     struct elink_params *params,
 				     uint32_t action)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t val;
 	switch (action) {
 	case ELINK_DISABLE_TX:
@@ -9275,7 +9275,7 @@ static void elink_8727_specific_func(struct elink_phy *phy,
 static void elink_set_e1e2_module_fault_led(struct elink_params *params,
 					   uint8_t gpio_mode)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	uint32_t fault_led_gpio = REG_RD(sc, params->shmem_base +
 			    offsetof(struct shmem_region,
@@ -9309,7 +9309,7 @@ static void elink_set_e3_module_fault_led(struct elink_params *params,
 {
 	uint32_t pin_cfg;
 	uint8_t port = params->port;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	pin_cfg = (REG_RD(sc, params->shmem_base +
 			 offsetof(struct shmem_region,
 				  dev_info.port_hw_config[port].e3_sfp_ctrl)) &
@@ -9323,7 +9323,7 @@ static void elink_set_e3_module_fault_led(struct elink_params *params,
 static void elink_set_sfp_module_fault_led(struct elink_params *params,
 					   uint8_t gpio_mode)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	ELINK_DEBUG_P1(sc, "Setting SFP+ module fault LED to %d\n", gpio_mode);
 	if (CHIP_IS_E3(sc)) {
 		/* Low ==> if SFP+ module is supported otherwise
@@ -9337,7 +9337,7 @@ static void elink_set_sfp_module_fault_led(struct elink_params *params,
 static void elink_warpcore_hw_reset(struct elink_phy *phy,
 				    struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	elink_warpcore_power_module(params, 0);
 	/* Put Warpcore in low power mode */
 	REG_WR(sc, MISC_REG_WC0_RESET, 0x0c0e);
@@ -9352,7 +9352,7 @@ static void elink_power_sfp_module(struct elink_params *params,
 				   struct elink_phy *phy,
 				   uint8_t power)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	ELINK_DEBUG_P1(sc, "Setting SFP+ power to %x\n", power);
 
 	switch (phy->type) {
@@ -9373,7 +9373,7 @@ static void elink_warpcore_set_limiting_mode(struct elink_params *params,
 {
 	uint16_t val = 0;
 	uint16_t mode = MDIO_WC_REG_UC_INFO_B1_FIRMWARE_MODE_DEFAULT;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	uint8_t lane = elink_get_warpcore_lane(phy, params);
 	/* This is a global register which controls all lanes */
@@ -9428,7 +9428,7 @@ static void elink_set_limiting_mode(struct elink_params *params,
 elink_status_t elink_sfp_module_detection(struct elink_phy *phy,
 			       struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t edc_mode;
 	elink_status_t rc = ELINK_STATUS_OK;
 
@@ -9482,7 +9482,7 @@ elink_status_t elink_sfp_module_detection(struct elink_phy *phy,
 
 void elink_handle_module_detect_int(struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	struct elink_phy *phy;
 	uint32_t gpio_val;
 	uint8_t gpio_num, gpio_port;
@@ -9552,7 +9552,7 @@ void elink_handle_module_detect_int(struct elink_params *params)
 /******************************************************************/
 /*		Used by 8706 and 8727                             */
 /******************************************************************/
-static void elink_sfp_mask_fault(struct bxe_softc *sc,
+static void elink_sfp_mask_fault(struct bxe_adapter *sc,
 				 struct elink_phy *phy,
 				 uint16_t alarm_status_offset,
 				 uint16_t alarm_ctrl_offset)
@@ -9581,7 +9581,7 @@ static uint8_t elink_8706_8726_read_status(struct elink_phy *phy,
 {
 	uint8_t link_up = 0;
 	uint16_t val1, val2, rx_sd, pcs_status;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	ELINK_DEBUG_P0(sc, "XGXS 8706/8726\n");
 	/* Clear RX Alarm*/
 	elink_cl45_read(sc, phy,
@@ -9643,7 +9643,7 @@ static uint8_t elink_8706_config_init(struct elink_phy *phy,
 {
 	uint32_t tx_en_mode;
 	uint16_t cnt, val, tmp1;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	elink_cb_gpio_write(sc, MISC_REGISTERS_GPIO_2,
 		       MISC_REGISTERS_GPIO_OUTPUT_HIGH, params->port);
@@ -9756,7 +9756,7 @@ static elink_status_t elink_8706_read_status(struct elink_phy *phy,
 static void elink_8726_config_loopback(struct elink_phy *phy,
 				       struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	ELINK_DEBUG_P0(sc, "PMA/PMD ext_phy_loopback: 8726\n");
 	elink_cl45_write(sc, phy, MDIO_PMA_DEVAD, MDIO_PMA_REG_CTRL, 0x0001);
 }
@@ -9764,7 +9764,7 @@ static void elink_8726_config_loopback(struct elink_phy *phy,
 static void elink_8726_external_rom_boot(struct elink_phy *phy,
 					 struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	/* Need to wait 100ms after reset */
 	DELAY(1000 * 100);
 
@@ -9803,7 +9803,7 @@ static uint8_t elink_8726_read_status(struct elink_phy *phy,
 				 struct elink_params *params,
 				 struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t val1;
 	uint8_t link_up = elink_8706_8726_read_status(phy, params, vars);
 	if (link_up) {
@@ -9824,7 +9824,7 @@ static elink_status_t elink_8726_config_init(struct elink_phy *phy,
 				  struct elink_params *params,
 				  struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	ELINK_DEBUG_P0(sc, "Initializing BCM8726\n");
 
 	elink_cl45_write(sc, phy, MDIO_PMA_DEVAD, MDIO_PMA_REG_CTRL, 1<<15);
@@ -9908,7 +9908,7 @@ static elink_status_t elink_8726_config_init(struct elink_phy *phy,
 static void elink_8726_link_reset(struct elink_phy *phy,
 				  struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	ELINK_DEBUG_P1(sc, "elink_8726_link_reset port %d\n", params->port);
 	/* Set serial boot control for external load */
 	elink_cl45_write(sc, phy,
@@ -9923,7 +9923,7 @@ static void elink_8726_link_reset(struct elink_phy *phy,
 static void elink_8727_set_link_led(struct elink_phy *phy,
 				    struct elink_params *params, uint8_t mode)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t led_mode_bitmask = 0;
 	uint16_t gpio_pins_bitmask = 0;
 	uint16_t val;
@@ -9973,7 +9973,7 @@ static void elink_8727_hw_reset(struct elink_phy *phy,
 	/* The PHY reset is controlled by GPIO 1. Fake the port number
 	 * to cancel the swap done in set_gpio()
 	 */
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	swap_val = REG_RD(sc, NIG_REG_PORT_SWAP);
 	swap_override = REG_RD(sc, NIG_REG_STRAP_OVERRIDE);
 	port = (swap_val && swap_override) ^ 1;
@@ -9984,7 +9984,7 @@ static void elink_8727_hw_reset(struct elink_phy *phy,
 static void elink_8727_config_speed(struct elink_phy *phy,
 				    struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t tmp1, val;
 	/* Set option 1G speed */
 	if ((phy->req_line_speed == ELINK_SPEED_1000) ||
@@ -10044,7 +10044,7 @@ static elink_status_t elink_8727_config_init(struct elink_phy *phy,
 {
 	uint32_t tx_en_mode;
 	uint16_t tmp1, mod_abs, tmp2;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	/* Enable PMD link, MOD_ABS_FLT, and 1G link alarm */
 
 	elink_wait_reset_complete(sc, phy, params);
@@ -10127,7 +10127,7 @@ static elink_status_t elink_8727_config_init(struct elink_phy *phy,
 static void elink_8727_handle_mod_abs(struct elink_phy *phy,
 				      struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t mod_abs, rx_alarm_status;
 	uint32_t val = REG_RD(sc, params->shmem_base +
 			     offsetof(struct shmem_region, dev_info.
@@ -10214,7 +10214,7 @@ static uint8_t elink_8727_read_status(struct elink_phy *phy,
 				 struct elink_vars *vars)
 
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t link_up = 0, oc_port = params->port;
 	uint16_t link_status = 0;
 	uint16_t rx_alarm_status, lasi_ctrl, val1;
@@ -10370,7 +10370,7 @@ static uint8_t elink_8727_read_status(struct elink_phy *phy,
 static void elink_8727_link_reset(struct elink_phy *phy,
 				  struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	/* Enable/Disable PHY transmitter output */
 	elink_set_disable_pmd_transmit(params, phy, 1);
@@ -10386,7 +10386,7 @@ static void elink_8727_link_reset(struct elink_phy *phy,
 /*		BCM8481/BCM84823/BCM84833 PHY SECTION	          */
 /******************************************************************/
 static void elink_save_848xx_spirom_version(struct elink_phy *phy,
-					    struct bxe_softc *sc,
+					    struct bxe_adapter *sc,
 					    uint8_t port)
 {
 	uint16_t val, fw_ver2, cnt, i;
@@ -10454,7 +10454,7 @@ static void elink_save_848xx_spirom_version(struct elink_phy *phy,
 	}
 
 }
-static void elink_848xx_set_led(struct bxe_softc *sc,
+static void elink_848xx_set_led(struct bxe_adapter *sc,
 				struct elink_phy *phy)
 {
 	uint16_t val, offset, i;
@@ -10498,7 +10498,7 @@ static void elink_848xx_specific_func(struct elink_phy *phy,
 				      struct elink_params *params,
 				      uint32_t action)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	switch (action) {
 	case ELINK_PHY_INIT:
 		if ((phy->type != PORT_HW_CFG_XGXS_EXT_PHY_TYPE_BCM84833) &&
@@ -10522,7 +10522,7 @@ static elink_status_t elink_848xx_cmn_config_init(struct elink_phy *phy,
 				       struct elink_params *params,
 				       struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t autoneg_val, an_1000_val, an_10_100_val;
 
 	elink_848xx_specific_func(phy, params, ELINK_PHY_INIT);
@@ -10669,7 +10669,7 @@ static elink_status_t elink_8481_config_init(struct elink_phy *phy,
 				  struct elink_params *params,
 				  struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	/* Restore normal power mode*/
 	elink_cb_gpio_write(sc, MISC_REGISTERS_GPIO_2,
 		       MISC_REGISTERS_GPIO_OUTPUT_HIGH, params->port);
@@ -10690,7 +10690,7 @@ static elink_status_t elink_84833_cmd_hdlr(struct elink_phy *phy,
 {
 	int idx;
 	uint16_t val;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	/* Write CMD_OPEN_OVERRIDE to STATUS reg */
 	elink_cl45_write(sc, phy, MDIO_CTL_DEVAD,
 			MDIO_84833_CMD_HDLR_STATUS,
@@ -10747,7 +10747,7 @@ static elink_status_t elink_84833_pair_swap_cfg(struct elink_phy *phy,
 	uint32_t pair_swap;
 	uint16_t data[PHY84833_CMDHDLR_MAX_ARGS];
 	elink_status_t status;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	/* Check for configuration. */
 	pair_swap = REG_RD(sc, params->shmem_base +
@@ -10769,7 +10769,7 @@ static elink_status_t elink_84833_pair_swap_cfg(struct elink_phy *phy,
 	return status;
 }
 
-static uint8_t elink_84833_get_reset_gpios(struct bxe_softc *sc,
+static uint8_t elink_84833_get_reset_gpios(struct bxe_adapter *sc,
 				      uint32_t shmem_base_path[],
 				      uint32_t chip_id)
 {
@@ -10810,7 +10810,7 @@ static uint8_t elink_84833_get_reset_gpios(struct bxe_softc *sc,
 static elink_status_t elink_84833_hw_reset_phy(struct elink_phy *phy,
 				struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t reset_gpios;
 	uint32_t other_shmem_base_addr = REG_RD(sc, params->shmem2_base +
 				offsetof(struct shmem2_region,
@@ -10845,7 +10845,7 @@ static elink_status_t elink_8483x_disable_eee(struct elink_phy *phy,
 				   struct elink_vars *vars)
 {
 	elink_status_t rc;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t cmd_args = 0;
 
 	ELINK_DEBUG_P0(sc, "Don't Advertise 10GBase-T EEE\n");
@@ -10866,7 +10866,7 @@ static elink_status_t elink_8483x_enable_eee(struct elink_phy *phy,
 				   struct elink_vars *vars)
 {
 	elink_status_t rc;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t cmd_args = 1;
 
 	rc = elink_84833_cmd_hdlr(phy, params,
@@ -10884,7 +10884,7 @@ static elink_status_t elink_848x3_config_init(struct elink_phy *phy,
 				   struct elink_params *params,
 				   struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t port, initialize = 1;
 	uint16_t val;
 	uint32_t actual_phy_selection;
@@ -11050,7 +11050,7 @@ static uint8_t elink_848xx_read_status(struct elink_phy *phy,
 				  struct elink_params *params,
 				  struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t val, val1, val2;
 	uint8_t link_up = 0;
 
@@ -11216,7 +11216,7 @@ static void elink_8481_link_reset(struct elink_phy *phy,
 static void elink_848x3_link_reset(struct elink_phy *phy,
 				   struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t port;
 	uint16_t val16;
 
@@ -11243,7 +11243,7 @@ static void elink_848x3_link_reset(struct elink_phy *phy,
 static void elink_848xx_set_link_led(struct elink_phy *phy,
 				     struct elink_params *params, uint8_t mode)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t val;
 	uint8_t port;
 
@@ -11520,7 +11520,7 @@ static void elink_54618se_specific_func(struct elink_phy *phy,
 					struct elink_params *params,
 					uint32_t action)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t temp;
 	switch (action) {
 	case ELINK_PHY_INIT:
@@ -11549,7 +11549,7 @@ static elink_status_t elink_54618se_config_init(struct elink_phy *phy,
 					       struct elink_params *params,
 					       struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t port;
 	uint16_t autoneg_val, an_1000_val, an_10_100_val, fc_val, temp;
 	uint32_t cfg_pin;
@@ -11755,7 +11755,7 @@ static elink_status_t elink_54618se_config_init(struct elink_phy *phy,
 static void elink_5461x_set_link_led(struct elink_phy *phy,
 				       struct elink_params *params, uint8_t mode)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t temp;
 
 	elink_cl22_write(sc, phy,
@@ -11791,7 +11791,7 @@ static void elink_5461x_set_link_led(struct elink_phy *phy,
 static void elink_54618se_link_reset(struct elink_phy *phy,
 				     struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t cfg_pin;
 	uint8_t port;
 
@@ -11817,7 +11817,7 @@ static uint8_t elink_54618se_read_status(struct elink_phy *phy,
 				    struct elink_params *params,
 				    struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t val;
 	uint8_t link_up = 0;
 	uint16_t legacy_status, legacy_speed;
@@ -11923,7 +11923,7 @@ static uint8_t elink_54618se_read_status(struct elink_phy *phy,
 static void elink_54618se_config_loopback(struct elink_phy *phy,
 					  struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t val;
 	uint32_t umac_base = params->port ? GRCBASE_UMAC1 : GRCBASE_UMAC0;
 
@@ -11966,7 +11966,7 @@ static void elink_54618se_config_loopback(struct elink_phy *phy,
 static void elink_7101_config_loopback(struct elink_phy *phy,
 				       struct elink_params *params)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	/* SFX7101_XGXS_TEST1 */
 	elink_cl45_write(sc, phy,
 			 MDIO_XS_DEVAD, MDIO_XS_SFX7101_XGXS_TEST1, 0x100);
@@ -11977,7 +11977,7 @@ static elink_status_t elink_7101_config_init(struct elink_phy *phy,
 				  struct elink_vars *vars)
 {
 	uint16_t fw_ver1, fw_ver2, val;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	ELINK_DEBUG_P0(sc, "Setting the SFX7101 LASI indication\n");
 
 	/* Restore normal power mode*/
@@ -12016,7 +12016,7 @@ static uint8_t elink_7101_read_status(struct elink_phy *phy,
 				 struct elink_params *params,
 				 struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t link_up;
 	uint16_t val1, val2;
 	elink_cl45_read(sc, phy,
@@ -12065,7 +12065,7 @@ static elink_status_t elink_7101_format_ver(uint32_t spirom_ver, uint8_t *str, u
 	return ELINK_STATUS_OK;
 }
 
-void elink_sfx7101_sp_sw_reset(struct bxe_softc *sc, struct elink_phy *phy)
+void elink_sfx7101_sp_sw_reset(struct bxe_adapter *sc, struct elink_phy *phy)
 {
 	uint16_t val, cnt;
 
@@ -12104,7 +12104,7 @@ static void elink_7101_set_link_led(struct elink_phy *phy,
 				    struct elink_params *params, uint8_t mode)
 {
 	uint16_t val = 0;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	switch (mode) {
 	case ELINK_LED_MODE_FRONT_PANEL_OFF:
 	case ELINK_LED_MODE_OFF:
@@ -12623,7 +12623,7 @@ static const struct elink_phy phy_54618se = {
 /*                                                               */
 /*****************************************************************/
 
-static void elink_populate_preemphasis(struct bxe_softc *sc, uint32_t shmem_base,
+static void elink_populate_preemphasis(struct bxe_adapter *sc, uint32_t shmem_base,
 				     struct elink_phy *phy, uint8_t port,
 				     uint8_t phy_index)
 {
@@ -12660,7 +12660,7 @@ static void elink_populate_preemphasis(struct bxe_softc *sc, uint32_t shmem_base
 	}
 }
 
-static uint32_t elink_get_ext_phy_config(struct bxe_softc *sc, uint32_t shmem_base,
+static uint32_t elink_get_ext_phy_config(struct bxe_adapter *sc, uint32_t shmem_base,
 				    uint8_t phy_index, uint8_t port)
 {
 	uint32_t ext_phy_config = 0;
@@ -12682,7 +12682,7 @@ static uint32_t elink_get_ext_phy_config(struct bxe_softc *sc, uint32_t shmem_ba
 
 	return ext_phy_config;
 }
-static elink_status_t elink_populate_int_phy(struct bxe_softc *sc, uint32_t shmem_base, uint8_t port,
+static elink_status_t elink_populate_int_phy(struct bxe_adapter *sc, uint32_t shmem_base, uint8_t port,
 				  struct elink_phy *phy)
 {
 	uint32_t phy_addr;
@@ -12820,7 +12820,7 @@ static elink_status_t elink_populate_int_phy(struct bxe_softc *sc, uint32_t shme
 	return ELINK_STATUS_OK;
 }
 
-static elink_status_t elink_populate_ext_phy(struct bxe_softc *sc,
+static elink_status_t elink_populate_ext_phy(struct bxe_adapter *sc,
 				  uint8_t phy_index,
 				  uint32_t shmem_base,
 				  uint32_t shmem2_base,
@@ -12947,7 +12947,7 @@ static elink_status_t elink_populate_ext_phy(struct bxe_softc *sc,
 	return ELINK_STATUS_OK;
 }
 
-static elink_status_t elink_populate_phy(struct bxe_softc *sc, uint8_t phy_index, uint32_t shmem_base,
+static elink_status_t elink_populate_phy(struct bxe_adapter *sc, uint8_t phy_index, uint32_t shmem_base,
 			      uint32_t shmem2_base, uint8_t port, struct elink_phy *phy)
 {
 	elink_status_t status = ELINK_STATUS_OK;
@@ -12963,7 +12963,7 @@ static void elink_phy_def_cfg(struct elink_params *params,
 			      struct elink_phy *phy,
 			      uint8_t phy_index)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t link_config;
 	/* Populate the default phy configuration for MF mode */
 	if (phy_index == ELINK_EXT_PHY2) {
@@ -13068,7 +13068,7 @@ elink_status_t elink_phy_probe(struct elink_params *params)
 {
 	uint8_t phy_index, actual_phy_idx;
 	uint32_t phy_config_swapped, sync_offset, media_types;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	struct elink_phy *phy;
 	params->num_phys = 0;
 	ELINK_DEBUG_P0(sc, "Begin phy probe\n");
@@ -13146,7 +13146,7 @@ elink_status_t elink_phy_probe(struct elink_params *params)
 static elink_status_t elink_init_e3_emul_mac(struct elink_params *params,
 					     struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	vars->line_speed = params->req_line_speed[0];
 	/* In case link speed is auto, set speed the highest as possible */
 	if (params->req_line_speed[0] == ELINK_SPEED_AUTO_NEG) {
@@ -13222,7 +13222,7 @@ static elink_status_t elink_init_e3_emul_mac(struct elink_params *params,
 static elink_status_t elink_init_emul(struct elink_params *params,
 			    struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	if (CHIP_IS_E3(sc)) {
 		if (elink_init_e3_emul_mac(params, vars) !=
 		    ELINK_STATUS_OK)
@@ -13269,7 +13269,7 @@ static elink_status_t elink_init_fpga(struct elink_params *params,
 			    struct elink_vars *vars)
 {
 	/* Enable on E1.5 FPGA */
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	vars->duplex = DUPLEX_FULL;
 	vars->flow_ctrl = ELINK_FLOW_CTRL_NONE;
 	if (!(CHIP_IS_E1(sc))) {
@@ -13329,7 +13329,7 @@ static elink_status_t elink_init_fpga(struct elink_params *params,
 static void elink_init_bmac_loopback(struct elink_params *params,
 				     struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 		vars->link_up = 1;
 		vars->line_speed = ELINK_SPEED_10000;
 		vars->duplex = DUPLEX_FULL;
@@ -13349,7 +13349,7 @@ static void elink_init_bmac_loopback(struct elink_params *params,
 static void elink_init_emac_loopback(struct elink_params *params,
 				     struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 		vars->link_up = 1;
 		vars->line_speed = ELINK_SPEED_1000;
 		vars->duplex = DUPLEX_FULL;
@@ -13368,7 +13368,7 @@ static void elink_init_emac_loopback(struct elink_params *params,
 static void elink_init_xmac_loopback(struct elink_params *params,
 				     struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	vars->link_up = 1;
 	if (!params->req_line_speed[0])
 		vars->line_speed = ELINK_SPEED_10000;
@@ -13394,7 +13394,7 @@ static void elink_init_xmac_loopback(struct elink_params *params,
 static void elink_init_umac_loopback(struct elink_params *params,
 				     struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	vars->link_up = 1;
 	vars->line_speed = ELINK_SPEED_1000;
 	vars->duplex = DUPLEX_FULL;
@@ -13409,7 +13409,7 @@ static void elink_init_umac_loopback(struct elink_params *params,
 static void elink_init_xgxs_loopback(struct elink_params *params,
 				     struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	struct elink_phy *int_phy = &params->phy[ELINK_INT_PHY];
 	vars->link_up = 1;
 	vars->flow_ctrl = ELINK_FLOW_CTRL_NONE;
@@ -13460,7 +13460,7 @@ static void elink_init_xgxs_loopback(struct elink_params *params,
 
 void elink_set_rx_filter(struct elink_params *params, uint8_t en)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t val = en * 0x1F;
 
 	/* Open / close the gate between the NIG and the BRB */
@@ -13481,7 +13481,7 @@ static elink_status_t elink_avoid_link_flap(struct elink_params *params,
 {
 	uint32_t phy_idx;
 	uint32_t dont_clear_stat, lfa_sts;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	/* Sync the link parameters */
 	elink_link_status_update(params, vars);
@@ -13555,7 +13555,7 @@ static void elink_cannot_avoid_link_flap(struct elink_params *params,
 					 int lfa_status)
 {
 	uint32_t lfa_sts, cfg_idx, tmp_val;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 
 	elink_link_reset(params, vars, 1);
 
@@ -13613,7 +13613,7 @@ static void elink_cannot_avoid_link_flap(struct elink_params *params,
 elink_status_t elink_phy_init(struct elink_params *params, struct elink_vars *vars)
 {
 	int lfa_status;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	ELINK_DEBUG_P0(sc, "Phy Initialization started\n");
 	ELINK_DEBUG_P2(sc, "(1) req_speed %d, req_flowctrl %d\n",
 		   params->req_line_speed[0], params->req_flow_ctrl[0]);
@@ -13716,7 +13716,7 @@ elink_status_t elink_phy_init(struct elink_params *params, struct elink_vars *va
 elink_status_t elink_link_reset(struct elink_params *params, struct elink_vars *vars,
 		     uint8_t reset_ext_phy)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint8_t phy_index, port = params->port, clear_latch_ind = 0;
 	ELINK_DEBUG_P1(sc, "Resetting the link of port %d\n", port);
 	/* Disable attentions */
@@ -13820,7 +13820,7 @@ elink_status_t elink_link_reset(struct elink_params *params, struct elink_vars *
 elink_status_t elink_lfa_reset(struct elink_params *params,
 			       struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	vars->link_up = 0;
 	vars->phy_flags = 0;
 	params->link_flags &= ~ELINK_PHY_INITIALIZED;
@@ -13872,7 +13872,7 @@ elink_status_t elink_lfa_reset(struct elink_params *params,
 /****************************************************************************/
 /*				Common function				    */
 /****************************************************************************/
-static elink_status_t elink_8073_common_init_phy(struct bxe_softc *sc,
+static elink_status_t elink_8073_common_init_phy(struct bxe_adapter *sc,
 				      uint32_t shmem_base_path[],
 				      uint32_t shmem2_base_path[], uint8_t phy_index,
 				      uint32_t chip_id)
@@ -13998,7 +13998,7 @@ static elink_status_t elink_8073_common_init_phy(struct bxe_softc *sc,
 	}
 	return ELINK_STATUS_OK;
 }
-static elink_status_t elink_8726_common_init_phy(struct bxe_softc *sc,
+static elink_status_t elink_8726_common_init_phy(struct bxe_adapter *sc,
 				      uint32_t shmem_base_path[],
 				      uint32_t shmem2_base_path[], uint8_t phy_index,
 				      uint32_t chip_id)
@@ -14047,7 +14047,7 @@ static elink_status_t elink_8726_common_init_phy(struct bxe_softc *sc,
 
 	return ELINK_STATUS_OK;
 }
-static void elink_get_ext_phy_reset_gpio(struct bxe_softc *sc, uint32_t shmem_base,
+static void elink_get_ext_phy_reset_gpio(struct bxe_adapter *sc, uint32_t shmem_base,
 					 uint8_t *io_gpio, uint8_t *io_port)
 {
 
@@ -14093,7 +14093,7 @@ static void elink_get_ext_phy_reset_gpio(struct bxe_softc *sc, uint32_t shmem_ba
 	}
 }
 
-static elink_status_t elink_8727_common_init_phy(struct bxe_softc *sc,
+static elink_status_t elink_8727_common_init_phy(struct bxe_adapter *sc,
 				      uint32_t shmem_base_path[],
 				      uint32_t shmem2_base_path[], uint8_t phy_index,
 				      uint32_t chip_id)
@@ -14192,7 +14192,7 @@ static elink_status_t elink_8727_common_init_phy(struct bxe_softc *sc,
 	return ELINK_STATUS_OK;
 }
 
-static elink_status_t elink_84833_common_init_phy(struct bxe_softc *sc,
+static elink_status_t elink_84833_common_init_phy(struct bxe_adapter *sc,
 						uint32_t shmem_base_path[],
 						uint32_t shmem2_base_path[],
 						uint8_t phy_index,
@@ -14207,7 +14207,7 @@ static elink_status_t elink_84833_common_init_phy(struct bxe_softc *sc,
 		reset_gpios);
 	return ELINK_STATUS_OK;
 }
-static elink_status_t elink_ext_phy_common_init(struct bxe_softc *sc, uint32_t shmem_base_path[],
+static elink_status_t elink_ext_phy_common_init(struct bxe_adapter *sc, uint32_t shmem_base_path[],
 				     uint32_t shmem2_base_path[], uint8_t phy_index,
 				     uint32_t ext_phy_type, uint32_t chip_id)
 {
@@ -14261,7 +14261,7 @@ static elink_status_t elink_ext_phy_common_init(struct bxe_softc *sc, uint32_t s
 	return rc;
 }
 
-elink_status_t elink_common_init_phy(struct bxe_softc *sc, uint32_t shmem_base_path[],
+elink_status_t elink_common_init_phy(struct bxe_adapter *sc, uint32_t shmem_base_path[],
 			  uint32_t shmem2_base_path[], uint32_t chip_id,
 			  uint8_t one_port_enabled)
 {
@@ -14310,7 +14310,7 @@ elink_status_t elink_common_init_phy(struct bxe_softc *sc, uint32_t shmem_base_p
 static void elink_check_over_curr(struct elink_params *params,
 				  struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t cfg_pin;
 	uint8_t port = params->port;
 	uint32_t pin_val;
@@ -14346,7 +14346,7 @@ static uint8_t elink_analyze_link_error(struct elink_params *params,
 				    struct elink_vars *vars, uint32_t status,
 				    uint32_t phy_flag, uint32_t link_flag, uint8_t notify)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	/* Compare new value with previous value */
 	uint8_t led_mode;
 	uint32_t old_status = (vars->phy_flags & phy_flag) ? 1 : 0;
@@ -14425,7 +14425,7 @@ elink_status_t elink_check_half_open_conn(struct elink_params *params,
 				struct elink_vars *vars,
 				uint8_t notify)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t lss_status = 0;
 	uint32_t mac_base;
 	/* In case link status is physically up @ 10G do */
@@ -14480,7 +14480,7 @@ static void elink_sfp_tx_fault_detection(struct elink_phy *phy,
 					 struct elink_params *params,
 					 struct elink_vars *vars)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint32_t cfg_pin, value = 0;
 	uint8_t led_change, port = params->port;
 
@@ -14523,7 +14523,7 @@ static void elink_kr2_recovery(struct elink_params *params,
 			       struct elink_vars *vars,
 			       struct elink_phy *phy)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	ELINK_DEBUG_P0(sc, "KR2 recovery\n");
 	elink_warpcore_enable_AN_KR2(phy, params, vars);
 	elink_warpcore_restart_AN_KR(phy, params);
@@ -14533,7 +14533,7 @@ static void elink_check_kr2_wa(struct elink_params *params,
 			       struct elink_vars *vars,
 			       struct elink_phy *phy)
 {
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	uint16_t base_page, next_page, not_kr2_device, lane;
 	int sigdet;
 
@@ -14605,7 +14605,7 @@ static void elink_check_kr2_wa(struct elink_params *params,
 void elink_period_func(struct elink_params *params, struct elink_vars *vars)
 {
 	uint16_t phy_idx;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	for (phy_idx = ELINK_INT_PHY; phy_idx < ELINK_MAX_PHYS; phy_idx++) {
 		if (params->phy[phy_idx].flags & ELINK_FLAGS_TX_ERROR_CHECK) {
 			elink_set_aer_mmd(params, &params->phy[phy_idx]);
@@ -14645,7 +14645,7 @@ void elink_period_func(struct elink_params *params, struct elink_vars *vars)
 	}
 }
 
-uint8_t elink_fan_failure_det_req(struct bxe_softc *sc,
+uint8_t elink_fan_failure_det_req(struct bxe_adapter *sc,
 			     uint32_t shmem_base,
 			     uint32_t shmem2_base,
 			     uint8_t port)
@@ -14669,7 +14669,7 @@ uint8_t elink_fan_failure_det_req(struct bxe_softc *sc,
 void elink_hw_reset_phy(struct elink_params *params)
 {
 	uint8_t phy_index;
-	struct bxe_softc *sc = params->sc;
+	struct bxe_adapter *sc = params->sc;
 	elink_update_mng(params, 0);
 	elink_bits_dis(sc, NIG_REG_MASK_INTERRUPT_PORT0 + params->port*4,
 		       (ELINK_NIG_MASK_XGXS0_LINK_STATUS |
@@ -14688,7 +14688,7 @@ void elink_hw_reset_phy(struct elink_params *params)
 	}
 }
 
-void elink_init_mod_abs_int(struct bxe_softc *sc, struct elink_vars *vars,
+void elink_init_mod_abs_int(struct bxe_adapter *sc, struct elink_vars *vars,
 			    uint32_t chip_id, uint32_t shmem_base, uint32_t shmem2_base,
 			    uint8_t port)
 {

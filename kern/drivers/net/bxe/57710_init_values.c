@@ -29131,7 +29131,7 @@ static const uint8_t xsem_pram_data_e1[] = {
 	0xff, 0x3f, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0x3f, 0x00, 0x00, 
 	};
 
-void ecore_init_e1_firmware(struct bxe_softc *sc)
+void ecore_init_e1_firmware(struct bxe_adapter *sc)
 {
 	INIT_OPS(sc)                  = (const struct raw_op *)init_ops_e1;
 	INIT_DATA(sc)                 = (const uint32_t *)init_data_e1;

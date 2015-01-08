@@ -55,7 +55,7 @@
 #include "ecore_hsi.h"
 #include "ecore_reg.h"
 
-struct bxe_softc;
+struct bxe_adapter;
 typedef bus_addr_t ecore_dma_addr_t; /* expected to be 64 bit wide */
 typedef volatile int ecore_atomic_t;
 
@@ -157,7 +157,7 @@ typedef _Bool bool;
     do {                                                                   \
         x = malloc(sizeof(struct bxe_dma), M_DEVBUF, (M_NOWAIT | M_ZERO)); \
         if (x) {                                                           \
-            if (bxe_dma_alloc((struct bxe_softc *)sc,                      \
+            if (bxe_dma_alloc((struct bxe_adapter *)sc,                      \
                               size, (struct bxe_dma *)x,                   \
                               "ECORE_ILT") != 0) {                         \
                 free(x, M_DEVBUF);                                         \
@@ -172,7 +172,7 @@ typedef _Bool bool;
 #define ECORE_ILT_FREE(x, y, size)                   \
     do {                                             \
         if (x) {                                     \
-            bxe_dma_free((struct bxe_softc *)sc, x); \
+            bxe_dma_free((struct bxe_adapter *)sc, x); \
             free(x, M_DEVBUF);                       \
             x = NULL;                                \
             y = 0;                                   \
@@ -462,7 +462,7 @@ enum {
 
 
 
-struct bxe_softc;
+struct bxe_adapter;
 struct eth_context;
 
 /* Bits representing general command's configuration */
@@ -534,7 +534,7 @@ struct ecore_raw_obj {
 
 	ecore_obj_type	obj_type;
 
-	int (*wait_comp)(struct bxe_softc *sc,
+	int (*wait_comp)(struct bxe_adapter *sc,
 			 struct ecore_raw_obj *o);
 
 	bool (*check_pending)(struct ecore_raw_obj *o);
@@ -611,21 +611,21 @@ union ecore_exeq_comp_elem {
 
 struct ecore_exe_queue_obj;
 
-typedef int (*exe_q_validate)(struct bxe_softc *sc,
+typedef int (*exe_q_validate)(struct bxe_adapter *sc,
 			      union ecore_qable_obj *o,
 			      struct ecore_exeq_elem *elem);
 
-typedef int (*exe_q_remove)(struct bxe_softc *sc,
+typedef int (*exe_q_remove)(struct bxe_adapter *sc,
 			    union ecore_qable_obj *o,
 			    struct ecore_exeq_elem *elem);
 
 /* Return positive if entry was optimized, 0 - if not, negative
  * in case of an error.
  */
-typedef int (*exe_q_optimize)(struct bxe_softc *sc,
+typedef int (*exe_q_optimize)(struct bxe_adapter *sc,
 			      union ecore_qable_obj *o,
 			      struct ecore_exeq_elem *elem);
-typedef int (*exe_q_execute)(struct bxe_softc *sc,
+typedef int (*exe_q_execute)(struct bxe_adapter *sc,
 			     union ecore_qable_obj *o,
 			     ecore_list_t *exe_chunk,
 			     unsigned long *ramrod_flags);
@@ -761,7 +761,7 @@ struct ecore_vlan_mac_obj {
 	 * @return number of copied bytes
 	 */
 
-	int (*get_n_elements)(struct bxe_softc *sc,
+	int (*get_n_elements)(struct bxe_adapter *sc,
 			      struct ecore_vlan_mac_obj *o, int n, uint8_t *base,
 			      uint8_t stride, uint8_t size);
 
@@ -771,7 +771,7 @@ struct ecore_vlan_mac_obj {
 	 * @return zero if the element may be added
 	 */
 
-	int (*check_add)(struct bxe_softc *sc,
+	int (*check_add)(struct bxe_adapter *sc,
 			 struct ecore_vlan_mac_obj *o,
 			 union ecore_classification_ramrod_data *data);
 
@@ -781,7 +781,7 @@ struct ecore_vlan_mac_obj {
 	 * @return TRUE if the element may be deleted
 	 */
 	struct ecore_vlan_mac_registry_elem *
-		(*check_del)(struct bxe_softc *sc,
+		(*check_del)(struct bxe_adapter *sc,
 			     struct ecore_vlan_mac_obj *o,
 			     union ecore_classification_ramrod_data *data);
 
@@ -790,7 +790,7 @@ struct ecore_vlan_mac_obj {
 	 *
 	 * @return TRUE if the element may be deleted
 	 */
-	bool (*check_move)(struct bxe_softc *sc,
+	bool (*check_move)(struct bxe_adapter *sc,
 			   struct ecore_vlan_mac_obj *src_o,
 			   struct ecore_vlan_mac_obj *dst_o,
 			   union ecore_classification_ramrod_data *data);
@@ -807,7 +807,7 @@ struct ecore_vlan_mac_obj {
 	/**
 	 * Configures one rule in the ramrod data buffer.
 	 */
-	void (*set_one_rule)(struct bxe_softc *sc,
+	void (*set_one_rule)(struct bxe_adapter *sc,
 			     struct ecore_vlan_mac_obj *o,
 			     struct ecore_exeq_elem *elem, int rule_idx,
 			     int cam_offset);
@@ -829,7 +829,7 @@ struct ecore_vlan_mac_obj {
 	 *         if there are pending for completion commands,
 	 *         negative value in case of failure.
 	 */
-	int (*delete_all)(struct bxe_softc *sc,
+	int (*delete_all)(struct bxe_adapter *sc,
 			  struct ecore_vlan_mac_obj *o,
 			  unsigned long *vlan_mac_flags,
 			  unsigned long *ramrod_flags);
@@ -849,7 +849,7 @@ struct ecore_vlan_mac_obj {
 	 *
 	 * @return int
 	 */
-	int (*restore)(struct bxe_softc *sc,
+	int (*restore)(struct bxe_adapter *sc,
 		       struct ecore_vlan_mac_ramrod_params *p,
 		       struct ecore_vlan_mac_registry_elem **ppos);
 
@@ -870,7 +870,7 @@ struct ecore_vlan_mac_obj {
 	 *         Negative value in case of an error (including an
 	 *         error in the cqe).
 	 */
-	int (*complete)(struct bxe_softc *sc, struct ecore_vlan_mac_obj *o,
+	int (*complete)(struct bxe_adapter *sc, struct ecore_vlan_mac_obj *o,
 			union event_ring_elem *cqe,
 			unsigned long *ramrod_flags);
 
@@ -879,7 +879,7 @@ struct ecore_vlan_mac_obj {
 	 * just wait. It assumes that the completion code will schedule
 	 * for new commands.
 	 */
-	int (*wait)(struct bxe_softc *sc, struct ecore_vlan_mac_obj *o);
+	int (*wait)(struct bxe_adapter *sc, struct ecore_vlan_mac_obj *o);
 };
 
 enum {
@@ -888,7 +888,7 @@ enum {
 	ECORE_LLH_CAM_MAX_PF_LINE = NIG_REG_LLH1_FUNC_MEM_SIZE / 2
 };
 
-void ecore_set_mac_in_nig(struct bxe_softc *sc,
+void ecore_set_mac_in_nig(struct bxe_adapter *sc,
 			  bool add, unsigned char *dev_addr, int index);
 
 /** RX_MODE verbs:DROP_ALL/ACCEPT_ALL/ACCEPT_ALL_MULTI/ACCEPT_ALL_VLAN/NORMAL */
@@ -935,10 +935,10 @@ struct ecore_rx_mode_ramrod_params {
 };
 
 struct ecore_rx_mode_obj {
-	int (*config_rx_mode)(struct bxe_softc *sc,
+	int (*config_rx_mode)(struct bxe_adapter *sc,
 			      struct ecore_rx_mode_ramrod_params *p);
 
-	int (*wait_comp)(struct bxe_softc *sc,
+	int (*wait_comp)(struct bxe_adapter *sc,
 			 struct ecore_rx_mode_ramrod_params *p);
 };
 
@@ -1020,7 +1020,7 @@ struct ecore_mcast_obj {
 	/**
 	 * @param cmd command to execute (ECORE_MCAST_CMD_X, see above)
 	 */
-	int (*config_mcast)(struct bxe_softc *sc,
+	int (*config_mcast)(struct bxe_adapter *sc,
 			    struct ecore_mcast_ramrod_params *p,
 			    enum ecore_mcast_cmd cmd);
 
@@ -1035,14 +1035,14 @@ struct ecore_mcast_obj {
 	 * @return -1 if we handled the whole registry or index of the last
 	 *         handled registry element.
 	 */
-	int (*hdl_restore)(struct bxe_softc *sc, struct ecore_mcast_obj *o,
+	int (*hdl_restore)(struct bxe_adapter *sc, struct ecore_mcast_obj *o,
 			   int start_bin, int *rdata_idx);
 
-	int (*enqueue_cmd)(struct bxe_softc *sc, struct ecore_mcast_obj *o,
+	int (*enqueue_cmd)(struct bxe_adapter *sc, struct ecore_mcast_obj *o,
 			   struct ecore_mcast_ramrod_params *p,
 			   enum ecore_mcast_cmd cmd);
 
-	void (*set_one_rule)(struct bxe_softc *sc,
+	void (*set_one_rule)(struct bxe_adapter *sc,
 			     struct ecore_mcast_obj *o, int idx,
 			     union ecore_mcast_config_data *cfg_data,
 			     enum ecore_mcast_cmd cmd);
@@ -1060,21 +1060,21 @@ struct ecore_mcast_obj {
 	bool (*check_sched)(struct ecore_mcast_obj *o);
 
 	/* Wait until all pending commands complete */
-	int (*wait_comp)(struct bxe_softc *sc, struct ecore_mcast_obj *o);
+	int (*wait_comp)(struct bxe_adapter *sc, struct ecore_mcast_obj *o);
 
 	/**
 	 * Handle the internal object counters needed for proper
 	 * commands handling. Checks that the provided parameters are
 	 * feasible.
 	 */
-	int (*validate)(struct bxe_softc *sc,
+	int (*validate)(struct bxe_adapter *sc,
 			struct ecore_mcast_ramrod_params *p,
 			enum ecore_mcast_cmd cmd);
 
 	/**
 	 * Restore the values of internal counters in case of a failure.
 	 */
-	void (*revert)(struct bxe_softc *sc,
+	void (*revert)(struct bxe_adapter *sc,
 		       struct ecore_mcast_ramrod_params *p,
 		       int old_num_bins);
 
@@ -1200,7 +1200,7 @@ struct ecore_rss_config_obj {
 	uint8_t			udp_rss_v4;
 	uint8_t			udp_rss_v6;
 
-	int (*config_rss)(struct bxe_softc *sc,
+	int (*config_rss)(struct bxe_adapter *sc,
 			  struct ecore_config_rss_params *p);
 };
 
@@ -1491,7 +1491,7 @@ struct ecore_queue_sp_obj {
 	 *
 	 * @return 0 in case of success and negative value otherwise.
 	 */
-	int (*send_cmd)(struct bxe_softc *sc,
+	int (*send_cmd)(struct bxe_adapter *sc,
 			struct ecore_queue_state_params *params);
 
 	/**
@@ -1503,18 +1503,18 @@ struct ecore_queue_sp_obj {
 	/**
 	 * Checks that the requested state transition is legal.
 	 */
-	int (*check_transition)(struct bxe_softc *sc,
+	int (*check_transition)(struct bxe_adapter *sc,
 				struct ecore_queue_sp_obj *o,
 				struct ecore_queue_state_params *params);
 
 	/**
 	 * Completes the pending command.
 	 */
-	int (*complete_cmd)(struct bxe_softc *sc,
+	int (*complete_cmd)(struct bxe_adapter *sc,
 			    struct ecore_queue_sp_obj *o,
 			    enum ecore_queue_cmd);
 
-	int (*wait_comp)(struct bxe_softc *sc,
+	int (*wait_comp)(struct bxe_adapter *sc,
 			 struct ecore_queue_sp_obj *o,
 			 enum ecore_queue_cmd cmd);
 };
@@ -1643,23 +1643,23 @@ struct ecore_func_sp_drv_ops {
 	 *      - Port
 	 *      - Function phases
 	 */
-	int (*init_hw_cmn_chip)(struct bxe_softc *sc);
-	int (*init_hw_cmn)(struct bxe_softc *sc);
-	int (*init_hw_port)(struct bxe_softc *sc);
-	int (*init_hw_func)(struct bxe_softc *sc);
+	int (*init_hw_cmn_chip)(struct bxe_adapter *sc);
+	int (*init_hw_cmn)(struct bxe_adapter *sc);
+	int (*init_hw_port)(struct bxe_adapter *sc);
+	int (*init_hw_func)(struct bxe_adapter *sc);
 
 	/* Reset Function HW: Common, Port, Function phases. */
-	void (*reset_hw_cmn)(struct bxe_softc *sc);
-	void (*reset_hw_port)(struct bxe_softc *sc);
-	void (*reset_hw_func)(struct bxe_softc *sc);
+	void (*reset_hw_cmn)(struct bxe_adapter *sc);
+	void (*reset_hw_port)(struct bxe_adapter *sc);
+	void (*reset_hw_func)(struct bxe_adapter *sc);
 
 	/* Init/Free GUNZIP resources */
-	int (*gunzip_init)(struct bxe_softc *sc);
-	void (*gunzip_end)(struct bxe_softc *sc);
+	int (*gunzip_init)(struct bxe_adapter *sc);
+	void (*gunzip_end)(struct bxe_adapter *sc);
 
 	/* Prepare/Release FW resources */
-	int (*init_fw)(struct bxe_softc *sc);
-	void (*release_fw)(struct bxe_softc *sc);
+	int (*init_fw)(struct bxe_adapter *sc);
+	void (*release_fw)(struct bxe_adapter *sc);
 };
 
 struct ecore_func_sp_obj {
@@ -1696,24 +1696,24 @@ struct ecore_func_sp_obj {
 	 *
 	 * @return 0 in case of success and negative value otherwise.
 	 */
-	int (*send_cmd)(struct bxe_softc *sc,
+	int (*send_cmd)(struct bxe_adapter *sc,
 			struct ecore_func_state_params *params);
 
 	/**
 	 * Checks that the requested state transition is legal.
 	 */
-	int (*check_transition)(struct bxe_softc *sc,
+	int (*check_transition)(struct bxe_adapter *sc,
 				struct ecore_func_sp_obj *o,
 				struct ecore_func_state_params *params);
 
 	/**
 	 * Completes the pending command.
 	 */
-	int (*complete_cmd)(struct bxe_softc *sc,
+	int (*complete_cmd)(struct bxe_adapter *sc,
 			    struct ecore_func_sp_obj *o,
 			    enum ecore_func_cmd cmd);
 
-	int (*wait_comp)(struct bxe_softc *sc, struct ecore_func_sp_obj *o,
+	int (*wait_comp)(struct bxe_adapter *sc, struct ecore_func_sp_obj *o,
 			 enum ecore_func_cmd cmd);
 };
 
@@ -1723,45 +1723,45 @@ union ecore_qable_obj {
 	struct ecore_vlan_mac_obj vlan_mac;
 };
 /************** Function state update *********/
-void ecore_init_func_obj(struct bxe_softc *sc,
+void ecore_init_func_obj(struct bxe_adapter *sc,
 			 struct ecore_func_sp_obj *obj,
 			 void *rdata, ecore_dma_addr_t rdata_mapping,
 			 void *afex_rdata, ecore_dma_addr_t afex_rdata_mapping,
 			 struct ecore_func_sp_drv_ops *drv_iface);
 
-int ecore_func_state_change(struct bxe_softc *sc,
+int ecore_func_state_change(struct bxe_adapter *sc,
 			    struct ecore_func_state_params *params);
 
-enum ecore_func_state ecore_func_get_state(struct bxe_softc *sc,
+enum ecore_func_state ecore_func_get_state(struct bxe_adapter *sc,
 					   struct ecore_func_sp_obj *o);
 /******************* Queue State **************/
-void ecore_init_queue_obj(struct bxe_softc *sc,
+void ecore_init_queue_obj(struct bxe_adapter *sc,
 			  struct ecore_queue_sp_obj *obj, uint8_t cl_id, uint32_t *cids,
 			  uint8_t cid_cnt, uint8_t func_id, void *rdata,
 			  ecore_dma_addr_t rdata_mapping, unsigned long type);
 
-int ecore_queue_state_change(struct bxe_softc *sc,
+int ecore_queue_state_change(struct bxe_adapter *sc,
 			     struct ecore_queue_state_params *params);
 
-int ecore_get_q_logical_state(struct bxe_softc *sc,
+int ecore_get_q_logical_state(struct bxe_adapter *sc,
 			       struct ecore_queue_sp_obj *obj);
 
 /********************* VLAN-MAC ****************/
-void ecore_init_mac_obj(struct bxe_softc *sc,
+void ecore_init_mac_obj(struct bxe_adapter *sc,
 			struct ecore_vlan_mac_obj *mac_obj,
 			uint8_t cl_id, uint32_t cid, uint8_t func_id, void *rdata,
 			ecore_dma_addr_t rdata_mapping, int state,
 			unsigned long *pstate, ecore_obj_type type,
 			struct ecore_credit_pool_obj *macs_pool);
 
-void ecore_init_vlan_obj(struct bxe_softc *sc,
+void ecore_init_vlan_obj(struct bxe_adapter *sc,
 			 struct ecore_vlan_mac_obj *vlan_obj,
 			 uint8_t cl_id, uint32_t cid, uint8_t func_id, void *rdata,
 			 ecore_dma_addr_t rdata_mapping, int state,
 			 unsigned long *pstate, ecore_obj_type type,
 			 struct ecore_credit_pool_obj *vlans_pool);
 
-void ecore_init_vlan_mac_obj(struct bxe_softc *sc,
+void ecore_init_vlan_mac_obj(struct bxe_adapter *sc,
 			     struct ecore_vlan_mac_obj *vlan_mac_obj,
 			     uint8_t cl_id, uint32_t cid, uint8_t func_id, void *rdata,
 			     ecore_dma_addr_t rdata_mapping, int state,
@@ -1769,24 +1769,24 @@ void ecore_init_vlan_mac_obj(struct bxe_softc *sc,
 			     struct ecore_credit_pool_obj *macs_pool,
 			     struct ecore_credit_pool_obj *vlans_pool);
 
-int ecore_vlan_mac_h_read_lock(struct bxe_softc *sc,
+int ecore_vlan_mac_h_read_lock(struct bxe_adapter *sc,
 					struct ecore_vlan_mac_obj *o);
-void ecore_vlan_mac_h_read_unlock(struct bxe_softc *sc,
+void ecore_vlan_mac_h_read_unlock(struct bxe_adapter *sc,
 				  struct ecore_vlan_mac_obj *o);
-int ecore_vlan_mac_h_write_lock(struct bxe_softc *sc,
+int ecore_vlan_mac_h_write_lock(struct bxe_adapter *sc,
 				struct ecore_vlan_mac_obj *o);
-void ecore_vlan_mac_h_write_unlock(struct bxe_softc *sc,
+void ecore_vlan_mac_h_write_unlock(struct bxe_adapter *sc,
 					  struct ecore_vlan_mac_obj *o);
-int ecore_config_vlan_mac(struct bxe_softc *sc,
+int ecore_config_vlan_mac(struct bxe_adapter *sc,
 			   struct ecore_vlan_mac_ramrod_params *p);
 
-int ecore_vlan_mac_move(struct bxe_softc *sc,
+int ecore_vlan_mac_move(struct bxe_adapter *sc,
 			struct ecore_vlan_mac_ramrod_params *p,
 			struct ecore_vlan_mac_obj *dest_o);
 
 /********************* RX MODE ****************/
 
-void ecore_init_rx_mode_obj(struct bxe_softc *sc,
+void ecore_init_rx_mode_obj(struct bxe_adapter *sc,
 			    struct ecore_rx_mode_obj *o);
 
 /**
@@ -1798,12 +1798,12 @@ void ecore_init_rx_mode_obj(struct bxe_softc *sc,
  *         positive number - if there are pending completions,
  *         negative - if there were errors
  */
-int ecore_config_rx_mode(struct bxe_softc *sc,
+int ecore_config_rx_mode(struct bxe_adapter *sc,
 			 struct ecore_rx_mode_ramrod_params *p);
 
 /****************** MULTICASTS ****************/
 
-void ecore_init_mcast_obj(struct bxe_softc *sc,
+void ecore_init_mcast_obj(struct bxe_adapter *sc,
 			  struct ecore_mcast_obj *mcast_obj,
 			  uint8_t mcast_cl_id, uint32_t mcast_cid, uint8_t func_id,
 			  uint8_t engine_id, void *rdata, ecore_dma_addr_t rdata_mapping,
@@ -1830,20 +1830,20 @@ void ecore_init_mcast_obj(struct bxe_softc *sc,
  *         negative if there were errors, positive if there are pending
  *         completions.
  */
-int ecore_config_mcast(struct bxe_softc *sc,
+int ecore_config_mcast(struct bxe_adapter *sc,
 		       struct ecore_mcast_ramrod_params *p,
 		       enum ecore_mcast_cmd cmd);
 
 /****************** CREDIT POOL ****************/
-void ecore_init_mac_credit_pool(struct bxe_softc *sc,
+void ecore_init_mac_credit_pool(struct bxe_adapter *sc,
 				struct ecore_credit_pool_obj *p, uint8_t func_id,
 				uint8_t func_num);
-void ecore_init_vlan_credit_pool(struct bxe_softc *sc,
+void ecore_init_vlan_credit_pool(struct bxe_adapter *sc,
 				 struct ecore_credit_pool_obj *p, uint8_t func_id,
 				 uint8_t func_num);
 
 /****************** RSS CONFIGURATION ****************/
-void ecore_init_rss_config_obj(struct bxe_softc *sc,
+void ecore_init_rss_config_obj(struct bxe_adapter *sc,
 			       struct ecore_rss_config_obj *rss_obj,
 			       uint8_t cl_id, uint32_t cid, uint8_t func_id, uint8_t engine_id,
 			       void *rdata, ecore_dma_addr_t rdata_mapping,
@@ -1855,7 +1855,7 @@ void ecore_init_rss_config_obj(struct bxe_softc *sc,
  *
  * Return: 0 in case of success
  */
-int ecore_config_rss(struct bxe_softc *sc,
+int ecore_config_rss(struct bxe_adapter *sc,
 		     struct ecore_config_rss_params *p);
 
 /**
@@ -1869,7 +1869,7 @@ void ecore_get_rss_ind_table(struct ecore_rss_config_obj *rss_obj,
 			     uint8_t *ind_table);
 
 /* set as inline so printout will show the offending function */
-int validate_vlan_mac(struct bxe_softc *sc,
+int validate_vlan_mac(struct bxe_adapter *sc,
 		      struct ecore_vlan_mac_obj *vlan_mac);
 
 #endif /* ECORE_SP_H */

@@ -261,7 +261,7 @@ static device_method_t bxe_methods[] = {
 static driver_t bxe_driver = {
     "bxe",                   /* module name */
     bxe_methods,             /* event handler */
-    sizeof(struct bxe_softc) /* extra data */
+    sizeof(struct bxe_adapter) /* extra data */
 };
 
 /*
@@ -663,36 +663,36 @@ static const struct {
 #define BXE_NUM_ETH_Q_STATS ARRAY_SIZE(bxe_eth_q_stats_arr)
 
 
-static void    bxe_cmng_fns_init(struct bxe_softc *sc,
+static void    bxe_cmng_fns_init(struct bxe_adapter *sc,
                                  uint8_t          read_cfg,
                                  uint8_t          cmng_type);
-static int     bxe_get_cmng_fns_mode(struct bxe_softc *sc);
-static void    storm_memset_cmng(struct bxe_softc *sc,
+static int     bxe_get_cmng_fns_mode(struct bxe_adapter *sc);
+static void    storm_memset_cmng(struct bxe_adapter *sc,
                                  struct cmng_init *cmng,
                                  uint8_t          port);
-static void    bxe_set_reset_global(struct bxe_softc *sc);
-static void    bxe_set_reset_in_progress(struct bxe_softc *sc);
-static uint8_t bxe_reset_is_done(struct bxe_softc *sc,
+static void    bxe_set_reset_global(struct bxe_adapter *sc);
+static void    bxe_set_reset_in_progress(struct bxe_adapter *sc);
+static uint8_t bxe_reset_is_done(struct bxe_adapter *sc,
                                  int              engine);
-static uint8_t bxe_clear_pf_load(struct bxe_softc *sc);
-static uint8_t bxe_chk_parity_attn(struct bxe_softc *sc,
+static uint8_t bxe_clear_pf_load(struct bxe_adapter *sc);
+static uint8_t bxe_chk_parity_attn(struct bxe_adapter *sc,
                                    uint8_t          *global,
                                    uint8_t          print);
-static void    bxe_int_disable(struct bxe_softc *sc);
-static int     bxe_release_leader_lock(struct bxe_softc *sc);
-static void    bxe_pf_disable(struct bxe_softc *sc);
-static void    bxe_free_fp_buffers(struct bxe_softc *sc);
-static inline void bxe_update_rx_prod(struct bxe_softc    *sc,
+static void    bxe_int_disable(struct bxe_adapter *sc);
+static int     bxe_release_leader_lock(struct bxe_adapter *sc);
+static void    bxe_pf_disable(struct bxe_adapter *sc);
+static void    bxe_free_fp_buffers(struct bxe_adapter *sc);
+static inline void bxe_update_rx_prod(struct bxe_adapter    *sc,
                                       struct bxe_fastpath *fp,
                                       uint16_t            rx_bd_prod,
                                       uint16_t            rx_cq_prod,
                                       uint16_t            rx_sge_prod);
-static void    bxe_link_report_locked(struct bxe_softc *sc);
-static void    bxe_link_report(struct bxe_softc *sc);
-static void    bxe_link_status_update(struct bxe_softc *sc);
+static void    bxe_link_report_locked(struct bxe_adapter *sc);
+static void    bxe_link_report(struct bxe_adapter *sc);
+static void    bxe_link_status_update(struct bxe_adapter *sc);
 static void    bxe_periodic_callout_func(void *xsc);
-static void    bxe_periodic_start(struct bxe_softc *sc);
-static void    bxe_periodic_stop(struct bxe_softc *sc);
+static void    bxe_periodic_start(struct bxe_adapter *sc);
+static void    bxe_periodic_stop(struct bxe_adapter *sc);
 static int     bxe_alloc_rx_bd_mbuf(struct bxe_fastpath *fp,
                                     uint16_t prev_index,
                                     uint16_t index);
@@ -700,24 +700,24 @@ static int     bxe_alloc_rx_tpa_mbuf(struct bxe_fastpath *fp,
                                      int                 queue);
 static int     bxe_alloc_rx_sge_mbuf(struct bxe_fastpath *fp,
                                      uint16_t            index);
-static uint8_t bxe_txeof(struct bxe_softc *sc,
+static uint8_t bxe_txeof(struct bxe_adapter *sc,
                          struct bxe_fastpath *fp);
 static void    bxe_task_fp(struct bxe_fastpath *fp);
-static __noinline void bxe_dump_mbuf(struct bxe_softc *sc,
+static __noinline void bxe_dump_mbuf(struct bxe_adapter *sc,
                                      struct mbuf      *m,
                                      uint8_t          contents);
-static int     bxe_alloc_mem(struct bxe_softc *sc);
-static void    bxe_free_mem(struct bxe_softc *sc);
-static int     bxe_alloc_fw_stats_mem(struct bxe_softc *sc);
-static void    bxe_free_fw_stats_mem(struct bxe_softc *sc);
-static int     bxe_interrupt_attach(struct bxe_softc *sc);
-static void    bxe_interrupt_detach(struct bxe_softc *sc);
-static void    bxe_set_rx_mode(struct bxe_softc *sc);
-static int     bxe_init_locked(struct bxe_softc *sc);
-static int     bxe_stop_locked(struct bxe_softc *sc);
-static __noinline int bxe_nic_load(struct bxe_softc *sc,
+static int     bxe_alloc_mem(struct bxe_adapter *sc);
+static void    bxe_free_mem(struct bxe_adapter *sc);
+static int     bxe_alloc_fw_stats_mem(struct bxe_adapter *sc);
+static void    bxe_free_fw_stats_mem(struct bxe_adapter *sc);
+static int     bxe_interrupt_attach(struct bxe_adapter *sc);
+static void    bxe_interrupt_detach(struct bxe_adapter *sc);
+static void    bxe_set_rx_mode(struct bxe_adapter *sc);
+static int     bxe_init_locked(struct bxe_adapter *sc);
+static int     bxe_stop_locked(struct bxe_adapter *sc);
+static __noinline int bxe_nic_load(struct bxe_adapter *sc,
                                    int              load_mode);
-static __noinline int bxe_nic_unload(struct bxe_softc *sc,
+static __noinline int bxe_nic_unload(struct bxe_adapter *sc,
                                      uint32_t         unload_mode,
                                      uint8_t          keep_link);
 
@@ -910,7 +910,7 @@ bxe_dma_map_addr(void *arg, bus_dma_segment_t *segs, int nseg, int error)
  *   0 = Success, !0 = Failure
  */
 int
-bxe_dma_alloc(struct bxe_softc *sc,
+bxe_dma_alloc(struct bxe_adapter *sc,
               bus_size_t       size,
               struct bxe_dma   *dma,
               const char       *msg)
@@ -978,7 +978,7 @@ bxe_dma_alloc(struct bxe_softc *sc,
 }
 
 void
-bxe_dma_free(struct bxe_softc *sc,
+bxe_dma_free(struct bxe_adapter *sc,
              struct bxe_dma   *dma)
 {
     if (dma->size > 0) {
@@ -1007,7 +1007,7 @@ bxe_dma_free(struct bxe_softc *sc,
  */
 
 void
-bxe_reg_wr_ind(struct bxe_softc *sc,
+bxe_reg_wr_ind(struct bxe_adapter *sc,
                uint32_t         addr,
                uint32_t         val)
 {
@@ -1017,7 +1017,7 @@ bxe_reg_wr_ind(struct bxe_softc *sc,
 }
 
 uint32_t
-bxe_reg_rd_ind(struct bxe_softc *sc,
+bxe_reg_rd_ind(struct bxe_adapter *sc,
                uint32_t         addr)
 {
     uint32_t val;
@@ -1030,7 +1030,7 @@ bxe_reg_rd_ind(struct bxe_softc *sc,
 }
 
 #if 0
-void bxe_dp_dmae(struct bxe_softc *sc, struct dmae_command *dmae, int msglvl)
+void bxe_dp_dmae(struct bxe_adapter *sc, struct dmae_command *dmae, int msglvl)
 {
     uint32_t src_type = dmae->opcode & DMAE_COMMAND_SRC;
 
@@ -1093,7 +1093,7 @@ void bxe_dp_dmae(struct bxe_softc *sc, struct dmae_command *dmae, int msglvl)
 #endif
 
 static int
-bxe_acquire_hw_lock(struct bxe_softc *sc,
+bxe_acquire_hw_lock(struct bxe_adapter *sc,
                     uint32_t         resource)
 {
     uint32_t lock_status;
@@ -1138,7 +1138,7 @@ bxe_acquire_hw_lock(struct bxe_softc *sc,
 }
 
 static int
-bxe_release_hw_lock(struct bxe_softc *sc,
+bxe_release_hw_lock(struct bxe_adapter *sc,
                     uint32_t         resource)
 {
     uint32_t lock_status;
@@ -1186,7 +1186,7 @@ bxe_release_hw_lock(struct bxe_softc *sc,
  * access corrupted by pf B).*
  */
 static int
-bxe_acquire_nvram_lock(struct bxe_softc *sc)
+bxe_acquire_nvram_lock(struct bxe_adapter *sc)
 {
     int port = SC_PORT(sc);
     int count, i;
@@ -1223,7 +1223,7 @@ bxe_acquire_nvram_lock(struct bxe_softc *sc)
 }
 
 static int
-bxe_release_nvram_lock(struct bxe_softc *sc)
+bxe_release_nvram_lock(struct bxe_adapter *sc)
 {
     int port = SC_PORT(sc);
     int count, i;
@@ -1260,7 +1260,7 @@ bxe_release_nvram_lock(struct bxe_softc *sc)
 }
 
 static void
-bxe_enable_nvram_access(struct bxe_softc *sc)
+bxe_enable_nvram_access(struct bxe_adapter *sc)
 {
     uint32_t val;
 
@@ -1272,7 +1272,7 @@ bxe_enable_nvram_access(struct bxe_softc *sc)
 }
 
 static void
-bxe_disable_nvram_access(struct bxe_softc *sc)
+bxe_disable_nvram_access(struct bxe_adapter *sc)
 {
     uint32_t val;
 
@@ -1285,7 +1285,7 @@ bxe_disable_nvram_access(struct bxe_softc *sc)
 }
 
 static int
-bxe_nvram_read_dword(struct bxe_softc *sc,
+bxe_nvram_read_dword(struct bxe_adapter *sc,
                      uint32_t         offset,
                      uint32_t         *ret_val,
                      uint32_t         cmd_flags)
@@ -1339,7 +1339,7 @@ bxe_nvram_read_dword(struct bxe_softc *sc,
 }
 
 static int
-bxe_nvram_read(struct bxe_softc *sc,
+bxe_nvram_read(struct bxe_adapter *sc,
                uint32_t         offset,
                uint8_t          *ret_buf,
                int              buf_size)
@@ -1397,7 +1397,7 @@ bxe_nvram_read(struct bxe_softc *sc,
 }
 
 static int
-bxe_nvram_write_dword(struct bxe_softc *sc,
+bxe_nvram_write_dword(struct bxe_adapter *sc,
                       uint32_t         offset,
                       uint32_t         val,
                       uint32_t         cmd_flags)
@@ -1447,7 +1447,7 @@ bxe_nvram_write_dword(struct bxe_softc *sc,
 #define BYTE_OFFSET(offset) (8 * (offset & 0x03))
 
 static int
-bxe_nvram_write1(struct bxe_softc *sc,
+bxe_nvram_write1(struct bxe_adapter *sc,
                  uint32_t         offset,
                  uint8_t          *data_buf,
                  int              buf_size)
@@ -1497,7 +1497,7 @@ bxe_nvram_write1(struct bxe_softc *sc,
 }
 
 static int
-bxe_nvram_write(struct bxe_softc *sc,
+bxe_nvram_write(struct bxe_adapter *sc,
                 uint32_t         offset,
                 uint8_t          *data_buf,
                 int              buf_size)
@@ -1568,7 +1568,7 @@ bxe_nvram_write(struct bxe_softc *sc,
 
 /* copy command into DMAE command memory and set DMAE command Go */
 void
-bxe_post_dmae(struct bxe_softc    *sc,
+bxe_post_dmae(struct bxe_adapter    *sc,
               struct dmae_command *dmae,
               int                 idx)
 {
@@ -1598,7 +1598,7 @@ bxe_dmae_opcode_clr_src_reset(uint32_t opcode)
 }
 
 uint32_t
-bxe_dmae_opcode(struct bxe_softc *sc,
+bxe_dmae_opcode(struct bxe_adapter *sc,
                 uint8_t          src_type,
                 uint8_t          dst_type,
                 uint8_t          with_comp,
@@ -1632,7 +1632,7 @@ bxe_dmae_opcode(struct bxe_softc *sc,
 }
 
 static void
-bxe_prep_dmae_with_comp(struct bxe_softc    *sc,
+bxe_prep_dmae_with_comp(struct bxe_adapter    *sc,
                         struct dmae_command *dmae,
                         uint8_t             src_type,
                         uint8_t             dst_type)
@@ -1651,7 +1651,7 @@ bxe_prep_dmae_with_comp(struct bxe_softc    *sc,
 
 /* issue a DMAE command over the init channel and wait for completion */
 static int
-bxe_issue_dmae_with_comp(struct bxe_softc    *sc,
+bxe_issue_dmae_with_comp(struct bxe_adapter    *sc,
                          struct dmae_command *dmae)
 {
     uint32_t *wb_comp = BXE_SP(sc, wb_comp);
@@ -1692,7 +1692,7 @@ bxe_issue_dmae_with_comp(struct bxe_softc    *sc,
 }
 
 void
-bxe_read_dmae(struct bxe_softc *sc,
+bxe_read_dmae(struct bxe_adapter *sc,
               uint32_t         src_addr,
               uint32_t         len32)
 {
@@ -1731,7 +1731,7 @@ bxe_read_dmae(struct bxe_softc *sc,
 }
 
 void
-bxe_write_dmae(struct bxe_softc *sc,
+bxe_write_dmae(struct bxe_adapter *sc,
                bus_addr_t       dma_addr,
                uint32_t         dst_addr,
                uint32_t         len32)
@@ -1768,7 +1768,7 @@ bxe_write_dmae(struct bxe_softc *sc,
 }
 
 void
-bxe_write_dmae_phys_len(struct bxe_softc *sc,
+bxe_write_dmae_phys_len(struct bxe_adapter *sc,
                         bus_addr_t       phys_addr,
                         uint32_t         addr,
                         uint32_t         len)
@@ -1792,7 +1792,7 @@ bxe_write_dmae_phys_len(struct bxe_softc *sc,
 }
 
 void
-bxe_set_ctx_validation(struct bxe_softc   *sc,
+bxe_set_ctx_validation(struct bxe_adapter   *sc,
                        struct eth_context *cxt,
                        uint32_t           cid)
 {
@@ -1807,7 +1807,7 @@ bxe_set_ctx_validation(struct bxe_softc   *sc,
 }
 
 static void
-bxe_storm_memset_hc_timeout(struct bxe_softc *sc,
+bxe_storm_memset_hc_timeout(struct bxe_adapter *sc,
                             uint8_t          port,
                             uint8_t          fw_sb_id,
                             uint8_t          sb_index,
@@ -1825,7 +1825,7 @@ bxe_storm_memset_hc_timeout(struct bxe_softc *sc,
 }
 
 static void
-bxe_storm_memset_hc_disable(struct bxe_softc *sc,
+bxe_storm_memset_hc_disable(struct bxe_adapter *sc,
                             uint8_t          port,
                             uint16_t         fw_sb_id,
                             uint8_t          sb_index,
@@ -1850,7 +1850,7 @@ bxe_storm_memset_hc_disable(struct bxe_softc *sc,
 }
 
 void
-bxe_update_coalesce_sb_index(struct bxe_softc *sc,
+bxe_update_coalesce_sb_index(struct bxe_adapter *sc,
                              uint8_t          fw_sb_id,
                              uint8_t          sb_index,
                              uint8_t          disable,
@@ -1866,21 +1866,21 @@ bxe_update_coalesce_sb_index(struct bxe_softc *sc,
 }
 
 void
-elink_cb_udelay(struct bxe_softc *sc,
+elink_cb_udelay(struct bxe_adapter *sc,
                 uint32_t         usecs)
 {
     DELAY(usecs);
 }
 
 uint32_t
-elink_cb_reg_read(struct bxe_softc *sc,
+elink_cb_reg_read(struct bxe_adapter *sc,
                   uint32_t         reg_addr)
 {
     return (REG_RD(sc, reg_addr));
 }
 
 void
-elink_cb_reg_write(struct bxe_softc *sc,
+elink_cb_reg_write(struct bxe_adapter *sc,
                    uint32_t         reg_addr,
                    uint32_t         val)
 {
@@ -1888,7 +1888,7 @@ elink_cb_reg_write(struct bxe_softc *sc,
 }
 
 void
-elink_cb_reg_wb_write(struct bxe_softc *sc,
+elink_cb_reg_wb_write(struct bxe_adapter *sc,
                       uint32_t         offset,
                       uint32_t         *wb_write,
                       uint16_t         len)
@@ -1897,7 +1897,7 @@ elink_cb_reg_wb_write(struct bxe_softc *sc,
 }
 
 void
-elink_cb_reg_wb_read(struct bxe_softc *sc,
+elink_cb_reg_wb_read(struct bxe_adapter *sc,
                      uint32_t         offset,
                      uint32_t         *wb_write,
                      uint16_t         len)
@@ -1906,13 +1906,13 @@ elink_cb_reg_wb_read(struct bxe_softc *sc,
 }
 
 uint8_t
-elink_cb_path_id(struct bxe_softc *sc)
+elink_cb_path_id(struct bxe_adapter *sc)
 {
     return (SC_PATH(sc));
 }
 
 void
-elink_cb_event_log(struct bxe_softc     *sc,
+elink_cb_event_log(struct bxe_adapter     *sc,
                    const elink_log_id_t elink_log_id,
                    ...)
 {
@@ -1927,7 +1927,7 @@ elink_cb_event_log(struct bxe_softc     *sc,
 }
 
 static int
-bxe_set_spio(struct bxe_softc *sc,
+bxe_set_spio(struct bxe_adapter *sc,
              int              spio,
              uint32_t         mode)
 {
@@ -1976,7 +1976,7 @@ bxe_set_spio(struct bxe_softc *sc,
 }
 
 static int
-bxe_gpio_read(struct bxe_softc *sc,
+bxe_gpio_read(struct bxe_adapter *sc,
               int              gpio_num,
               uint8_t          port)
 {
@@ -2001,7 +2001,7 @@ bxe_gpio_read(struct bxe_softc *sc,
 }
 
 static int
-bxe_gpio_write(struct bxe_softc *sc,
+bxe_gpio_write(struct bxe_adapter *sc,
                int              gpio_num,
                uint32_t         mode,
                uint8_t          port)
@@ -2062,7 +2062,7 @@ bxe_gpio_write(struct bxe_softc *sc,
 }
 
 static int
-bxe_gpio_mult_write(struct bxe_softc *sc,
+bxe_gpio_mult_write(struct bxe_adapter *sc,
                     uint8_t          pins,
                     uint32_t         mode)
 {
@@ -2110,7 +2110,7 @@ bxe_gpio_mult_write(struct bxe_softc *sc,
 }
 
 static int
-bxe_gpio_int_write(struct bxe_softc *sc,
+bxe_gpio_int_write(struct bxe_adapter *sc,
                    int              gpio_num,
                    uint32_t         mode,
                    uint8_t          port)
@@ -2163,7 +2163,7 @@ bxe_gpio_int_write(struct bxe_softc *sc,
 }
 
 uint32_t
-elink_cb_gpio_read(struct bxe_softc *sc,
+elink_cb_gpio_read(struct bxe_adapter *sc,
                    uint16_t         gpio_num,
                    uint8_t          port)
 {
@@ -2171,7 +2171,7 @@ elink_cb_gpio_read(struct bxe_softc *sc,
 }
 
 uint8_t
-elink_cb_gpio_write(struct bxe_softc *sc,
+elink_cb_gpio_write(struct bxe_adapter *sc,
                     uint16_t         gpio_num,
                     uint8_t          mode, /* 0=low 1=high */
                     uint8_t          port)
@@ -2180,7 +2180,7 @@ elink_cb_gpio_write(struct bxe_softc *sc,
 }
 
 uint8_t
-elink_cb_gpio_mult_write(struct bxe_softc *sc,
+elink_cb_gpio_mult_write(struct bxe_adapter *sc,
                          uint8_t          pins,
                          uint8_t          mode) /* 0=low 1=high */
 {
@@ -2188,7 +2188,7 @@ elink_cb_gpio_mult_write(struct bxe_softc *sc,
 }
 
 uint8_t
-elink_cb_gpio_int_write(struct bxe_softc *sc,
+elink_cb_gpio_int_write(struct bxe_adapter *sc,
                         uint16_t         gpio_num,
                         uint8_t          mode, /* 0=low 1=high */
                         uint8_t          port)
@@ -2197,7 +2197,7 @@ elink_cb_gpio_int_write(struct bxe_softc *sc,
 }
 
 void
-elink_cb_notify_link_changed(struct bxe_softc *sc)
+elink_cb_notify_link_changed(struct bxe_adapter *sc)
 {
     REG_WR(sc, (MISC_REG_AEU_GENERAL_ATTN_12 +
                 (SC_FUNC(sc) * sizeof(uint32_t))), 1);
@@ -2205,7 +2205,7 @@ elink_cb_notify_link_changed(struct bxe_softc *sc)
 
 /* send the MCP a request, block until there is a reply */
 uint32_t
-elink_cb_fw_command(struct bxe_softc *sc,
+elink_cb_fw_command(struct bxe_adapter *sc,
                     uint32_t         command,
                     uint32_t         param)
 {
@@ -2250,7 +2250,7 @@ elink_cb_fw_command(struct bxe_softc *sc,
 }
 
 static uint32_t
-bxe_fw_command(struct bxe_softc *sc,
+bxe_fw_command(struct bxe_adapter *sc,
                uint32_t         command,
                uint32_t         param)
 {
@@ -2258,7 +2258,7 @@ bxe_fw_command(struct bxe_softc *sc,
 }
 
 static void
-__storm_memset_dma_mapping(struct bxe_softc *sc,
+__storm_memset_dma_mapping(struct bxe_adapter *sc,
                            uint32_t         addr,
                            bus_addr_t       mapping)
 {
@@ -2267,7 +2267,7 @@ __storm_memset_dma_mapping(struct bxe_softc *sc,
 }
 
 static void
-storm_memset_spq_addr(struct bxe_softc *sc,
+storm_memset_spq_addr(struct bxe_adapter *sc,
                       bus_addr_t       mapping,
                       uint16_t         abs_fid)
 {
@@ -2277,7 +2277,7 @@ storm_memset_spq_addr(struct bxe_softc *sc,
 }
 
 static void
-storm_memset_vf_to_pf(struct bxe_softc *sc,
+storm_memset_vf_to_pf(struct bxe_adapter *sc,
                       uint16_t         abs_fid,
                       uint16_t         pf_id)
 {
@@ -2288,7 +2288,7 @@ storm_memset_vf_to_pf(struct bxe_softc *sc,
 }
 
 static void
-storm_memset_func_en(struct bxe_softc *sc,
+storm_memset_func_en(struct bxe_adapter *sc,
                      uint16_t         abs_fid,
                      uint8_t          enable)
 {
@@ -2299,7 +2299,7 @@ storm_memset_func_en(struct bxe_softc *sc,
 }
 
 static void
-storm_memset_eq_data(struct bxe_softc       *sc,
+storm_memset_eq_data(struct bxe_adapter       *sc,
                      struct event_ring_data *eq_data,
                      uint16_t               pfid)
 {
@@ -2312,7 +2312,7 @@ storm_memset_eq_data(struct bxe_softc       *sc,
 }
 
 static void
-storm_memset_eq_prod(struct bxe_softc *sc,
+storm_memset_eq_prod(struct bxe_adapter *sc,
                      uint16_t         eq_prod,
                      uint16_t         pfid)
 {
@@ -2383,7 +2383,7 @@ storm_memset_eq_prod(struct bxe_softc *sc,
 
 /* must be called under the spq lock */
 static inline
-struct eth_spe *bxe_sp_get_next(struct bxe_softc *sc)
+struct eth_spe *bxe_sp_get_next(struct bxe_adapter *sc)
 {
     struct eth_spe *next_spe = sc->spq_prod_bd;
 
@@ -2401,7 +2401,7 @@ struct eth_spe *bxe_sp_get_next(struct bxe_softc *sc)
 
 /* must be called under the spq lock */
 static inline
-void bxe_sp_prod_update(struct bxe_softc *sc)
+void bxe_sp_prod_update(struct bxe_adapter *sc)
 {
     int func = SC_FUNC(sc);
 
@@ -2457,7 +2457,7 @@ int bxe_is_contextless_ramrod(int cmd,
  * data as if it's two uint32 fields.
  */
 int
-bxe_sp_post(struct bxe_softc *sc,
+bxe_sp_post(struct bxe_adapter *sc,
             int              command,
             int              cid,
             uint32_t         data_hi,
@@ -2545,7 +2545,7 @@ bxe_sp_post(struct bxe_softc *sc,
  */
 #if 0
 static void
-bxe_debug_print_ind_table(struct bxe_softc               *sc,
+bxe_debug_print_ind_table(struct bxe_adapter               *sc,
                           struct ecore_config_rss_params *p)
 {
     int i;
@@ -2580,7 +2580,7 @@ bxe_debug_print_ind_table(struct bxe_softc               *sc,
 static int
 bxe_probe(device_t dev)
 {
-    struct bxe_softc *sc;
+    struct bxe_adapter *sc;
     struct bxe_device_type *t;
     char *descbuf;
     uint16_t did, sdid, svid, vid;
@@ -2628,7 +2628,7 @@ bxe_probe(device_t dev)
 }
 
 static void
-bxe_init_mutexes(struct bxe_softc *sc)
+bxe_init_mutexes(struct bxe_adapter *sc)
 {
 #ifdef BXE_CORE_LOCK_SX
     snprintf(sc->core_sx_name, sizeof(sc->core_sx_name),
@@ -2670,7 +2670,7 @@ bxe_init_mutexes(struct bxe_softc *sc)
 }
 
 static void
-bxe_release_mutexes(struct bxe_softc *sc)
+bxe_release_mutexes(struct bxe_adapter *sc)
 {
 #ifdef BXE_CORE_LOCK_SX
     sx_destroy(&sc->core_sx);
@@ -2710,7 +2710,7 @@ bxe_release_mutexes(struct bxe_softc *sc)
 }
 
 static void
-bxe_tx_disable(struct bxe_softc* sc)
+bxe_tx_disable(struct bxe_adapter* sc)
 {
     if_t ifp = sc->ifp;
 
@@ -2721,14 +2721,14 @@ bxe_tx_disable(struct bxe_softc* sc)
 }
 
 static void
-bxe_drv_pulse(struct bxe_softc *sc)
+bxe_drv_pulse(struct bxe_adapter *sc)
 {
     SHMEM_WR(sc, func_mb[SC_FW_MB_IDX(sc)].drv_pulse_mb,
              sc->fw_drv_pulse_wr_seq);
 }
 
 static inline uint16_t
-bxe_tx_avail(struct bxe_softc *sc,
+bxe_tx_avail(struct bxe_adapter *sc,
              struct bxe_fastpath *fp)
 {
     int16_t  used;
@@ -2780,7 +2780,7 @@ bxe_has_rx_work(struct bxe_fastpath *fp)
 }
 
 static void
-bxe_sp_event(struct bxe_softc    *sc,
+bxe_sp_event(struct bxe_adapter    *sc,
              struct bxe_fastpath *fp,
              union eth_rx_cqe    *rr_cqe)
 {
@@ -2889,7 +2889,7 @@ bxe_sp_event(struct bxe_softc    *sc,
  * the current aggregation queue as in-progress.
  */
 static void
-bxe_tpa_start(struct bxe_softc            *sc,
+bxe_tpa_start(struct bxe_adapter            *sc,
               struct bxe_fastpath         *fp,
               uint16_t                    queue,
               uint16_t                    cons,
@@ -2980,7 +2980,7 @@ bxe_tpa_start(struct bxe_softc            *sc,
  * up the stack. Refill all freed SGEs with mbufs as we go along.
  */
 static int
-bxe_fill_frag_mbuf(struct bxe_softc          *sc,
+bxe_fill_frag_mbuf(struct bxe_adapter          *sc,
                    struct bxe_fastpath       *fp,
                    struct bxe_sw_tpa_info    *tpa_info,
                    uint16_t                  queue,
@@ -3097,7 +3097,7 @@ bxe_update_last_max_sge(struct bxe_fastpath *fp,
 }
 
 static inline void
-bxe_update_sge_prod(struct bxe_softc          *sc,
+bxe_update_sge_prod(struct bxe_adapter          *sc,
                     struct bxe_fastpath       *fp,
                     uint16_t                  sge_len,
                     struct eth_end_agg_rx_cqe *cqe)
@@ -3161,7 +3161,7 @@ bxe_update_sge_prod(struct bxe_softc          *sc,
  * calculations, and send the resuting mbuf to the stack.
  */
 static void
-bxe_tpa_stop(struct bxe_softc          *sc,
+bxe_tpa_stop(struct bxe_adapter          *sc,
              struct bxe_fastpath       *fp,
              struct bxe_sw_tpa_info    *tpa_info,
              uint16_t                  queue,
@@ -3239,7 +3239,7 @@ bxe_tpa_stop_exit:
 }
 
 static uint8_t
-bxe_rxeof(struct bxe_softc    *sc,
+bxe_rxeof(struct bxe_adapter    *sc,
           struct bxe_fastpath *fp)
 {
     if_t ifp = sc->ifp;
@@ -3499,7 +3499,7 @@ next_cqe:
 }
 
 static uint16_t
-bxe_free_tx_pkt(struct bxe_softc    *sc,
+bxe_free_tx_pkt(struct bxe_adapter    *sc,
                 struct bxe_fastpath *fp,
                 uint16_t            idx)
 {
@@ -3569,7 +3569,7 @@ bxe_free_tx_pkt(struct bxe_softc    *sc,
 
 /* transmit timeout watchdog */
 static int
-bxe_watchdog(struct bxe_softc    *sc,
+bxe_watchdog(struct bxe_adapter    *sc,
              struct bxe_fastpath *fp)
 {
     BXE_FP_TX_LOCK(fp);
@@ -3591,7 +3591,7 @@ bxe_watchdog(struct bxe_softc    *sc,
 
 /* processes transmit completions */
 static uint8_t
-bxe_txeof(struct bxe_softc    *sc,
+bxe_txeof(struct bxe_adapter    *sc,
           struct bxe_fastpath *fp)
 {
     if_t ifp = sc->ifp;
@@ -3645,7 +3645,7 @@ bxe_txeof(struct bxe_softc    *sc,
 }
 
 static void
-bxe_drain_tx_queues(struct bxe_softc *sc)
+bxe_drain_tx_queues(struct bxe_adapter *sc)
 {
     struct bxe_fastpath *fp;
     int i, count;
@@ -3679,7 +3679,7 @@ bxe_drain_tx_queues(struct bxe_softc *sc)
 }
 
 static int
-bxe_del_all_macs(struct bxe_softc          *sc,
+bxe_del_all_macs(struct bxe_adapter          *sc,
                  struct ecore_vlan_mac_obj *mac_obj,
                  int                       mac_type,
                  uint8_t                   wait_for_comp)
@@ -3704,7 +3704,7 @@ bxe_del_all_macs(struct bxe_softc          *sc,
 }
 
 static int
-bxe_fill_accept_flags(struct bxe_softc *sc,
+bxe_fill_accept_flags(struct bxe_adapter *sc,
                       uint32_t         rx_mode,
                       unsigned long    *rx_accept_flags,
                       unsigned long    *tx_accept_flags)
@@ -3783,7 +3783,7 @@ bxe_fill_accept_flags(struct bxe_softc *sc,
 }
 
 static int
-bxe_set_q_rx_mode(struct bxe_softc *sc,
+bxe_set_q_rx_mode(struct bxe_adapter *sc,
                   uint8_t          cl_id,
                   unsigned long    rx_mode_flags,
                   unsigned long    rx_accept_flags,
@@ -3825,7 +3825,7 @@ bxe_set_q_rx_mode(struct bxe_softc *sc,
 }
 
 static int
-bxe_set_storm_rx_mode(struct bxe_softc *sc)
+bxe_set_storm_rx_mode(struct bxe_adapter *sc)
 {
     unsigned long rx_mode_flags = 0, ramrod_flags = 0;
     unsigned long rx_accept_flags = 0, tx_accept_flags = 0;
@@ -3840,7 +3840,7 @@ bxe_set_storm_rx_mode(struct bxe_softc *sc)
     bxe_set_bit(RAMROD_RX, &ramrod_flags);
     bxe_set_bit(RAMROD_TX, &ramrod_flags);
 
-    /* XXX ensure all fastpath have same cl_id and/or move it to bxe_softc */
+    /* XXX ensure all fastpath have same cl_id and/or move it to bxe_adapter */
     return (bxe_set_q_rx_mode(sc, sc->fp[0].cl_id, rx_mode_flags,
                               rx_accept_flags, tx_accept_flags,
                               ramrod_flags));
@@ -3848,7 +3848,7 @@ bxe_set_storm_rx_mode(struct bxe_softc *sc)
 
 /* returns the "mcp load_code" according to global load_count array */
 static int
-bxe_nic_load_no_mcp(struct bxe_softc *sc)
+bxe_nic_load_no_mcp(struct bxe_adapter *sc)
 {
     int path = SC_PATH(sc);
     int port = SC_PORT(sc);
@@ -3872,7 +3872,7 @@ bxe_nic_load_no_mcp(struct bxe_softc *sc)
 
 /* returns the "mcp load_code" according to global load_count array */
 static int
-bxe_nic_unload_no_mcp(struct bxe_softc *sc)
+bxe_nic_unload_no_mcp(struct bxe_adapter *sc)
 {
     int port = SC_PORT(sc);
     int path = SC_PATH(sc);
@@ -3896,7 +3896,7 @@ bxe_nic_unload_no_mcp(struct bxe_softc *sc)
 
 /* request unload mode from the MCP: COMMON, PORT or FUNCTION */
 static uint32_t
-bxe_send_unload_req(struct bxe_softc *sc,
+bxe_send_unload_req(struct bxe_adapter *sc,
                     int              unload_mode)
 {
     uint32_t reset_code = 0;
@@ -3961,7 +3961,7 @@ bxe_send_unload_req(struct bxe_softc *sc,
 
 /* send UNLOAD_DONE command to the MCP */
 static void
-bxe_send_unload_done(struct bxe_softc *sc,
+bxe_send_unload_done(struct bxe_adapter *sc,
                      uint8_t          keep_link)
 {
     uint32_t reset_param =
@@ -3974,7 +3974,7 @@ bxe_send_unload_done(struct bxe_softc *sc,
 }
 
 static int
-bxe_func_wait_started(struct bxe_softc *sc)
+bxe_func_wait_started(struct bxe_adapter *sc)
 {
     int tout = 50;
 
@@ -4032,7 +4032,7 @@ bxe_func_wait_started(struct bxe_softc *sc)
 }
 
 static int
-bxe_stop_queue(struct bxe_softc *sc,
+bxe_stop_queue(struct bxe_adapter *sc,
                int              index)
 {
     struct bxe_fastpath *fp = &sc->fp[index];
@@ -4072,7 +4072,7 @@ bxe_stop_queue(struct bxe_softc *sc,
 
 /* wait for the outstanding SP commands */
 static inline uint8_t
-bxe_wait_sp_comp(struct bxe_softc *sc,
+bxe_wait_sp_comp(struct bxe_adapter *sc,
                  unsigned long    mask)
 {
     unsigned long tmp;
@@ -4101,7 +4101,7 @@ bxe_wait_sp_comp(struct bxe_softc *sc,
 }
 
 static int
-bxe_func_stop(struct bxe_softc *sc)
+bxe_func_stop(struct bxe_adapter *sc)
 {
     struct ecore_func_state_params func_params = { NULL };
     int rc;
@@ -4129,7 +4129,7 @@ bxe_func_stop(struct bxe_softc *sc)
 }
 
 static int
-bxe_reset_hw(struct bxe_softc *sc,
+bxe_reset_hw(struct bxe_adapter *sc,
              uint32_t         load_code)
 {
     struct ecore_func_state_params func_params = { NULL };
@@ -4146,7 +4146,7 @@ bxe_reset_hw(struct bxe_softc *sc,
 }
 
 static void
-bxe_int_disable_sync(struct bxe_softc *sc,
+bxe_int_disable_sync(struct bxe_adapter *sc,
                      int              disable_hw)
 {
     if (disable_hw) {
@@ -4162,7 +4162,7 @@ bxe_int_disable_sync(struct bxe_softc *sc,
 }
 
 static void
-bxe_chip_cleanup(struct bxe_softc *sc,
+bxe_chip_cleanup(struct bxe_adapter *sc,
                  uint32_t         unload_mode,
                  uint8_t          keep_link)
 {
@@ -4276,7 +4276,7 @@ unload_error:
 }
 
 static void
-bxe_disable_close_the_gate(struct bxe_softc *sc)
+bxe_disable_close_the_gate(struct bxe_adapter *sc)
 {
     uint32_t val;
     int port = SC_PORT(sc);
@@ -4303,7 +4303,7 @@ bxe_disable_close_the_gate(struct bxe_softc *sc)
  * ramrods. Should be run when interrutps are disabled.
  */
 static void
-bxe_squeeze_objects(struct bxe_softc *sc)
+bxe_squeeze_objects(struct bxe_adapter *sc)
 {
     unsigned long ramrod_flags = 0, vlan_mac_flags = 0;
     struct ecore_mcast_ramrod_params rparam = { NULL };
@@ -4360,7 +4360,7 @@ bxe_squeeze_objects(struct bxe_softc *sc)
 
 /* stop the controller */
 static __noinline int
-bxe_nic_unload(struct bxe_softc *sc,
+bxe_nic_unload(struct bxe_adapter *sc,
                uint32_t         unload_mode,
                uint8_t          keep_link)
 {
@@ -4519,7 +4519,7 @@ bxe_nic_unload(struct bxe_softc *sc,
 static int
 bxe_ifmedia_update(struct ifnet  *ifp)
 {
-    struct bxe_softc *sc = (struct bxe_softc *)if_getsoftc(ifp);
+    struct bxe_adapter *sc = (struct bxe_adapter *)if_getsoftc(ifp);
     struct ifmedia *ifm;
 
     ifm = &sc->ifmedia;
@@ -4552,7 +4552,7 @@ bxe_ifmedia_update(struct ifnet  *ifp)
 static void
 bxe_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 {
-    struct bxe_softc *sc = if_getsoftc(ifp);
+    struct bxe_adapter *sc = if_getsoftc(ifp);
 
     /* Report link down if the driver isn't running. */
     if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) == 0) {
@@ -4581,7 +4581,7 @@ bxe_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 }
 
 static int
-bxe_ioctl_nvram(struct bxe_softc *sc,
+bxe_ioctl_nvram(struct bxe_adapter *sc,
                 uint32_t         priv_op,
                 struct ifreq     *ifr)
 {
@@ -4634,7 +4634,7 @@ bxe_ioctl_nvram(struct bxe_softc *sc,
 }
 
 static int
-bxe_ioctl_stats_show(struct bxe_softc *sc,
+bxe_ioctl_stats_show(struct bxe_adapter *sc,
                      uint32_t         priv_op,
                      struct ifreq     *ifr)
 {
@@ -4692,7 +4692,7 @@ static void
 bxe_handle_chip_tq(void *context,
                    int  pending)
 {
-    struct bxe_softc *sc = (struct bxe_softc *)context;
+    struct bxe_adapter *sc = (struct bxe_adapter *)context;
     long work = atomic_load_acq_long(&sc->chip_tq_flags);
 
     switch (work)
@@ -4748,7 +4748,7 @@ bxe_ioctl(if_t ifp,
           u_long       command,
           caddr_t      data)
 {
-    struct bxe_softc *sc = if_getsoftc(ifp);
+    struct bxe_adapter *sc = if_getsoftc(ifp);
     struct ifreq *ifr = (struct ifreq *)data;
     struct bxe_nvram_data *nvdata;
     uint32_t priv_op;
@@ -4985,7 +4985,7 @@ bxe_ioctl(if_t ifp,
 }
 
 static __noinline void
-bxe_dump_mbuf(struct bxe_softc *sc,
+bxe_dump_mbuf(struct bxe_adapter *sc,
               struct mbuf      *m,
               uint8_t          contents)
 {
@@ -5051,7 +5051,7 @@ bxe_dump_mbuf(struct bxe_softc *sc,
  * Returns: 0 if OK to send, 1 if packet needs further defragmentation
  */
 static int
-bxe_chktso_window(struct bxe_softc  *sc,
+bxe_chktso_window(struct bxe_adapter  *sc,
                   int               nsegs,
                   bus_dma_segment_t *segs,
                   struct mbuf       *m)
@@ -5390,7 +5390,7 @@ bxe_tx_encap(struct bxe_fastpath *fp, struct mbuf **m_head)
     uint16_t bd_prod, pkt_prod, total_pkt_size;
     uint8_t mac_type;
     int defragged, error, nsegs, rc, nbds, vlan_off, ovlan;
-    struct bxe_softc *sc;
+    struct bxe_adapter *sc;
     uint16_t tx_bd_avail;
     struct ether_vlan_header *eh;
     uint32_t pbd_e2_parsing_data = 0;
@@ -5824,7 +5824,7 @@ bxe_tx_encap_continue:
 }
 
 static void
-bxe_tx_start_locked(struct bxe_softc *sc,
+bxe_tx_start_locked(struct bxe_adapter *sc,
                     if_t ifp,
                     struct bxe_fastpath *fp)
 {
@@ -5897,7 +5897,7 @@ bxe_tx_start_locked(struct bxe_softc *sc,
 static void
 bxe_tx_start(if_t ifp)
 {
-    struct bxe_softc *sc;
+    struct bxe_adapter *sc;
     struct bxe_fastpath *fp;
 
     sc = if_getsoftc(ifp);
@@ -5927,7 +5927,7 @@ bxe_tx_start(if_t ifp)
 #if __FreeBSD_version >= 800000
 
 static int
-bxe_tx_mq_start_locked(struct bxe_softc    *sc,
+bxe_tx_mq_start_locked(struct bxe_adapter    *sc,
                        if_t                ifp,
                        struct bxe_fastpath *fp,
                        struct mbuf         *m)
@@ -6031,7 +6031,7 @@ static int
 bxe_tx_mq_start(struct ifnet *ifp,
                 struct mbuf  *m)
 {
-    struct bxe_softc *sc = if_getsoftc(ifp);
+    struct bxe_adapter *sc = if_getsoftc(ifp);
     struct bxe_fastpath *fp;
     int fp_index, rc;
 
@@ -6070,7 +6070,7 @@ bxe_tx_mq_start(struct ifnet *ifp,
 static void
 bxe_mq_flush(struct ifnet *ifp)
 {
-    struct bxe_softc *sc = if_getsoftc(ifp);
+    struct bxe_adapter *sc = if_getsoftc(ifp);
     struct bxe_fastpath *fp;
     struct mbuf *m;
     int i;
@@ -6100,7 +6100,7 @@ bxe_mq_flush(struct ifnet *ifp)
 #endif /* FreeBSD_version >= 800000 */
 
 static uint16_t
-bxe_cid_ilt_lines(struct bxe_softc *sc)
+bxe_cid_ilt_lines(struct bxe_adapter *sc)
 {
     if (IS_SRIOV(sc)) {
         return ((BXE_FIRST_VF_CID + BXE_VF_CIDS) / ILT_PAGE_CIDS);
@@ -6109,7 +6109,7 @@ bxe_cid_ilt_lines(struct bxe_softc *sc)
 }
 
 static void
-bxe_ilt_set_info(struct bxe_softc *sc)
+bxe_ilt_set_info(struct bxe_adapter *sc)
 {
     struct ilt_client_info *ilt_client;
     struct ecore_ilt *ilt = sc->ilt;
@@ -6200,7 +6200,7 @@ bxe_ilt_set_info(struct bxe_softc *sc)
 }
 
 static void
-bxe_set_fp_rx_buf_size(struct bxe_softc *sc)
+bxe_set_fp_rx_buf_size(struct bxe_adapter *sc)
 {
     int i;
 
@@ -6231,7 +6231,7 @@ bxe_set_fp_rx_buf_size(struct bxe_softc *sc)
 }
 
 static int
-bxe_alloc_ilt_mem(struct bxe_softc *sc)
+bxe_alloc_ilt_mem(struct bxe_adapter *sc)
 {
     int rc = 0;
 
@@ -6246,7 +6246,7 @@ bxe_alloc_ilt_mem(struct bxe_softc *sc)
 }
 
 static int
-bxe_alloc_ilt_lines_mem(struct bxe_softc *sc)
+bxe_alloc_ilt_lines_mem(struct bxe_adapter *sc)
 {
     int rc = 0;
 
@@ -6261,7 +6261,7 @@ bxe_alloc_ilt_lines_mem(struct bxe_softc *sc)
 }
 
 static void
-bxe_free_ilt_mem(struct bxe_softc *sc)
+bxe_free_ilt_mem(struct bxe_adapter *sc)
 {
     if (sc->ilt != NULL) {
         free(sc->ilt, M_BXE_ILT);
@@ -6270,7 +6270,7 @@ bxe_free_ilt_mem(struct bxe_softc *sc)
 }
 
 static void
-bxe_free_ilt_lines_mem(struct bxe_softc *sc)
+bxe_free_ilt_lines_mem(struct bxe_adapter *sc)
 {
     if (sc->ilt->lines != NULL) {
         free(sc->ilt->lines, M_BXE_ILT);
@@ -6279,7 +6279,7 @@ bxe_free_ilt_lines_mem(struct bxe_softc *sc)
 }
 
 static void
-bxe_free_mem(struct bxe_softc *sc)
+bxe_free_mem(struct bxe_adapter *sc)
 {
     int i;
 
@@ -6306,7 +6306,7 @@ bxe_free_mem(struct bxe_softc *sc)
 }
 
 static int
-bxe_alloc_mem(struct bxe_softc *sc)
+bxe_alloc_mem(struct bxe_adapter *sc)
 {
     int context_size;
     int allocated;
@@ -6390,7 +6390,7 @@ bxe_alloc_mem(struct bxe_softc *sc)
 static void
 bxe_free_rx_bd_chain(struct bxe_fastpath *fp)
 {
-    struct bxe_softc *sc;
+    struct bxe_adapter *sc;
     int i;
 
     sc = fp->sc;
@@ -6420,7 +6420,7 @@ bxe_free_rx_bd_chain(struct bxe_fastpath *fp)
 static void
 bxe_free_tpa_pool(struct bxe_fastpath *fp)
 {
-    struct bxe_softc *sc;
+    struct bxe_adapter *sc;
     int i, max_agg_queues;
 
     sc = fp->sc;
@@ -6452,7 +6452,7 @@ bxe_free_tpa_pool(struct bxe_fastpath *fp)
 static void
 bxe_free_sge_chain(struct bxe_fastpath *fp)
 {
-    struct bxe_softc *sc;
+    struct bxe_adapter *sc;
     int i;
 
     sc = fp->sc;
@@ -6480,7 +6480,7 @@ bxe_free_sge_chain(struct bxe_fastpath *fp)
 }
 
 static void
-bxe_free_fp_buffers(struct bxe_softc *sc)
+bxe_free_fp_buffers(struct bxe_adapter *sc)
 {
     struct bxe_fastpath *fp;
     int i;
@@ -6745,7 +6745,7 @@ bxe_alloc_rx_sge_mbuf(struct bxe_fastpath *fp,
 }
 
 static __noinline int
-bxe_alloc_fp_buffers(struct bxe_softc *sc)
+bxe_alloc_fp_buffers(struct bxe_adapter *sc)
 {
     struct bxe_fastpath *fp;
     int i, j, rc = 0;
@@ -6837,7 +6837,7 @@ bxe_alloc_fp_buffers_error:
 }
 
 static void
-bxe_free_fw_stats_mem(struct bxe_softc *sc)
+bxe_free_fw_stats_mem(struct bxe_adapter *sc)
 {
     bxe_dma_free(sc, &sc->fw_stats_dma);
 
@@ -6853,7 +6853,7 @@ bxe_free_fw_stats_mem(struct bxe_softc *sc)
 }
 
 static int
-bxe_alloc_fw_stats_mem(struct bxe_softc *sc)
+bxe_alloc_fw_stats_mem(struct bxe_adapter *sc)
 {
     uint8_t num_queue_stats;
     int num_groups;
@@ -6950,7 +6950,7 @@ bxe_alloc_fw_stats_mem(struct bxe_softc *sc)
 
 /* set the GLOBAL_RESET bit, should be run under rtnl lock */
 static void
-bxe_set_reset_global(struct bxe_softc *sc)
+bxe_set_reset_global(struct bxe_adapter *sc)
 {
     uint32_t val;
     bxe_acquire_hw_lock(sc, HW_LOCK_RESOURCE_RECOVERY_REG);
@@ -6961,7 +6961,7 @@ bxe_set_reset_global(struct bxe_softc *sc)
 
 /* clear the GLOBAL_RESET bit, should be run under rtnl lock */
 static void
-bxe_clear_reset_global(struct bxe_softc *sc)
+bxe_clear_reset_global(struct bxe_adapter *sc)
 {
     uint32_t val;
     bxe_acquire_hw_lock(sc, HW_LOCK_RESOURCE_RECOVERY_REG);
@@ -6972,7 +6972,7 @@ bxe_clear_reset_global(struct bxe_softc *sc)
 
 /* checks the GLOBAL_RESET bit, should be run under rtnl lock */
 static uint8_t
-bxe_reset_is_global(struct bxe_softc *sc)
+bxe_reset_is_global(struct bxe_adapter *sc)
 {
     uint32_t val = REG_RD(sc, BXE_RECOVERY_GLOB_REG);
     BLOGD(sc, DBG_LOAD, "GLOB_REG=0x%08x\n", val);
@@ -6981,7 +6981,7 @@ bxe_reset_is_global(struct bxe_softc *sc)
 
 /* clear RESET_IN_PROGRESS bit for the engine, should be run under rtnl lock */
 static void
-bxe_set_reset_done(struct bxe_softc *sc)
+bxe_set_reset_done(struct bxe_adapter *sc)
 {
     uint32_t val;
     uint32_t bit = SC_PATH(sc) ? BXE_PATH1_RST_IN_PROG_BIT :
@@ -6999,7 +6999,7 @@ bxe_set_reset_done(struct bxe_softc *sc)
 
 /* set RESET_IN_PROGRESS for the engine, should be run under rtnl lock */
 static void
-bxe_set_reset_in_progress(struct bxe_softc *sc)
+bxe_set_reset_in_progress(struct bxe_adapter *sc)
 {
     uint32_t val;
     uint32_t bit = SC_PATH(sc) ? BXE_PATH1_RST_IN_PROG_BIT :
@@ -7017,7 +7017,7 @@ bxe_set_reset_in_progress(struct bxe_softc *sc)
 
 /* check RESET_IN_PROGRESS bit for an engine, should be run under rtnl lock */
 static uint8_t
-bxe_reset_is_done(struct bxe_softc *sc,
+bxe_reset_is_done(struct bxe_adapter *sc,
                   int              engine)
 {
     uint32_t val = REG_RD(sc, BXE_RECOVERY_GLOB_REG);
@@ -7030,7 +7030,7 @@ bxe_reset_is_done(struct bxe_softc *sc,
 
 /* get the load status for an engine, should be run under rtnl lock */
 static uint8_t
-bxe_get_load_status(struct bxe_softc *sc,
+bxe_get_load_status(struct bxe_adapter *sc,
                     int              engine)
 {
     uint32_t mask = engine ? BXE_PATH1_LOAD_CNT_MASK :
@@ -7051,7 +7051,7 @@ bxe_get_load_status(struct bxe_softc *sc,
 /* set pf load mark */
 /* XXX needs to be under rtnl lock */
 static void
-bxe_set_pf_load(struct bxe_softc *sc)
+bxe_set_pf_load(struct bxe_adapter *sc)
 {
     uint32_t val;
     uint32_t val1;
@@ -7085,7 +7085,7 @@ bxe_set_pf_load(struct bxe_softc *sc)
 /* clear pf load mark */
 /* XXX needs to be under rtnl lock */
 static uint8_t
-bxe_clear_pf_load(struct bxe_softc *sc)
+bxe_clear_pf_load(struct bxe_adapter *sc)
 {
     uint32_t val1, val;
     uint32_t mask = SC_PATH(sc) ? BXE_PATH1_LOAD_CNT_MASK :
@@ -7116,7 +7116,7 @@ bxe_clear_pf_load(struct bxe_softc *sc)
 
 /* send load requrest to mcp and analyze response */
 static int
-bxe_nic_load_request(struct bxe_softc *sc,
+bxe_nic_load_request(struct bxe_adapter *sc,
                      uint32_t         *load_code)
 {
     /* init fw_seq */
@@ -7159,7 +7159,7 @@ bxe_nic_load_request(struct bxe_softc *sc,
  * including loading FW.
  */
 static int
-bxe_nic_load_analyze_req(struct bxe_softc *sc,
+bxe_nic_load_analyze_req(struct bxe_adapter *sc,
                          uint32_t         load_code)
 {
     uint32_t my_fw, loaded_fw;
@@ -7191,7 +7191,7 @@ bxe_nic_load_analyze_req(struct bxe_softc *sc,
 
 /* mark PMF if applicable */
 static void
-bxe_nic_load_pmf(struct bxe_softc *sc,
+bxe_nic_load_pmf(struct bxe_adapter *sc,
                  uint32_t         load_code)
 {
     uint32_t ncsi_oem_data_addr;
@@ -7226,7 +7226,7 @@ bxe_nic_load_pmf(struct bxe_softc *sc,
 }
 
 static void
-bxe_read_mf_cfg(struct bxe_softc *sc)
+bxe_read_mf_cfg(struct bxe_adapter *sc)
 {
     int n = (CHIP_IS_MODE_4_PORT(sc) ? 2 : 1);
     int abs_func;
@@ -7263,7 +7263,7 @@ bxe_read_mf_cfg(struct bxe_softc *sc)
 }
 
 /* acquire split MCP access lock register */
-static int bxe_acquire_alr(struct bxe_softc *sc)
+static int bxe_acquire_alr(struct bxe_adapter *sc)
 {
     uint32_t j, val;
 
@@ -7286,13 +7286,13 @@ static int bxe_acquire_alr(struct bxe_softc *sc)
 }
 
 /* release split MCP access lock register */
-static void bxe_release_alr(struct bxe_softc *sc)
+static void bxe_release_alr(struct bxe_adapter *sc)
 {
     REG_WR(sc, GRCBASE_MCP + 0x9c, 0);
 }
 
 static void
-bxe_fan_failure(struct bxe_softc *sc)
+bxe_fan_failure(struct bxe_adapter *sc)
 {
     int port = SC_PORT(sc);
     uint32_t ext_phy_config;
@@ -7327,7 +7327,7 @@ bxe_fan_failure(struct bxe_softc *sc)
 
 /* this function is called upon a link interrupt */
 static void
-bxe_link_attn(struct bxe_softc *sc)
+bxe_link_attn(struct bxe_adapter *sc)
 {
     uint32_t pause_enabled = 0;
     struct host_port_stats *pstats;
@@ -7385,7 +7385,7 @@ bxe_link_attn(struct bxe_softc *sc)
 }
 
 static void
-bxe_attn_int_asserted(struct bxe_softc *sc,
+bxe_attn_int_asserted(struct bxe_adapter *sc,
                       uint32_t         asserted)
 {
     int port = SC_PORT(sc);
@@ -7524,7 +7524,7 @@ bxe_attn_int_asserted(struct bxe_softc *sc,
 }
 
 static void
-bxe_print_next_block(struct bxe_softc *sc,
+bxe_print_next_block(struct bxe_adapter *sc,
                      int              idx,
                      const char       *blk)
 {
@@ -7532,7 +7532,7 @@ bxe_print_next_block(struct bxe_softc *sc,
 }
 
 static int
-bxe_check_blocks_with_parity0(struct bxe_softc *sc,
+bxe_check_blocks_with_parity0(struct bxe_adapter *sc,
                               uint32_t         sig,
                               int              par_num,
                               uint8_t          print)
@@ -7583,7 +7583,7 @@ bxe_check_blocks_with_parity0(struct bxe_softc *sc,
 }
 
 static int
-bxe_check_blocks_with_parity1(struct bxe_softc *sc,
+bxe_check_blocks_with_parity1(struct bxe_adapter *sc,
                               uint32_t         sig,
                               int              par_num,
                               uint8_t          *global,
@@ -7671,7 +7671,7 @@ bxe_check_blocks_with_parity1(struct bxe_softc *sc,
 }
 
 static int
-bxe_check_blocks_with_parity2(struct bxe_softc *sc,
+bxe_check_blocks_with_parity2(struct bxe_adapter *sc,
                               uint32_t         sig,
                               int              par_num,
                               uint8_t          print)
@@ -7726,7 +7726,7 @@ bxe_check_blocks_with_parity2(struct bxe_softc *sc,
 }
 
 static int
-bxe_check_blocks_with_parity3(struct bxe_softc *sc,
+bxe_check_blocks_with_parity3(struct bxe_adapter *sc,
                               uint32_t         sig,
                               int              par_num,
                               uint8_t          *global,
@@ -7773,7 +7773,7 @@ bxe_check_blocks_with_parity3(struct bxe_softc *sc,
 }
 
 static int
-bxe_check_blocks_with_parity4(struct bxe_softc *sc,
+bxe_check_blocks_with_parity4(struct bxe_adapter *sc,
                               uint32_t         sig,
                               int              par_num,
                               uint8_t          print)
@@ -7804,7 +7804,7 @@ bxe_check_blocks_with_parity4(struct bxe_softc *sc,
 }
 
 static uint8_t
-bxe_parity_attn(struct bxe_softc *sc,
+bxe_parity_attn(struct bxe_adapter *sc,
                 uint8_t          *global,
                 uint8_t          print,
                 uint32_t         *sig)
@@ -7858,7 +7858,7 @@ bxe_parity_attn(struct bxe_softc *sc,
 }
 
 static uint8_t
-bxe_chk_parity_attn(struct bxe_softc *sc,
+bxe_chk_parity_attn(struct bxe_adapter *sc,
                     uint8_t          *global,
                     uint8_t          print)
 {
@@ -7877,7 +7877,7 @@ bxe_chk_parity_attn(struct bxe_softc *sc,
 }
 
 static void
-bxe_attn_int_deasserted4(struct bxe_softc *sc,
+bxe_attn_int_deasserted4(struct bxe_adapter *sc,
                          uint32_t         attn)
 {
     uint32_t val;
@@ -7931,7 +7931,7 @@ bxe_attn_int_deasserted4(struct bxe_softc *sc,
 }
 
 static void
-bxe_e1h_disable(struct bxe_softc *sc)
+bxe_e1h_disable(struct bxe_adapter *sc)
 {
     int port = SC_PORT(sc);
 
@@ -7941,7 +7941,7 @@ bxe_e1h_disable(struct bxe_softc *sc)
 }
 
 static void
-bxe_e1h_enable(struct bxe_softc *sc)
+bxe_e1h_enable(struct bxe_adapter *sc)
 {
     int port = SC_PORT(sc);
 
@@ -7957,7 +7957,7 @@ bxe_e1h_enable(struct bxe_softc *sc)
  *   notify others function about the change
  */
 static void
-bxe_config_mf_bw(struct bxe_softc *sc)
+bxe_config_mf_bw(struct bxe_adapter *sc)
 {
     if (sc->link_vars.link_up) {
         bxe_cmng_fns_init(sc, TRUE, CMNG_FNS_MINMAX);
@@ -7968,14 +7968,14 @@ bxe_config_mf_bw(struct bxe_softc *sc)
 }
 
 static void
-bxe_set_mf_bw(struct bxe_softc *sc)
+bxe_set_mf_bw(struct bxe_adapter *sc)
 {
     bxe_config_mf_bw(sc);
     bxe_fw_command(sc, DRV_MSG_CODE_SET_MF_BW_ACK, 0);
 }
 
 static void
-bxe_handle_eee_event(struct bxe_softc *sc)
+bxe_handle_eee_event(struct bxe_adapter *sc)
 {
     BLOGD(sc, DBG_INTR, "EEE - LLDP event\n");
     bxe_fw_command(sc, DRV_MSG_CODE_EEE_RESULTS_ACK, 0);
@@ -7984,7 +7984,7 @@ bxe_handle_eee_event(struct bxe_softc *sc)
 #define DRV_INFO_ETH_STAT_NUM_MACS_REQUIRED 3
 
 static void
-bxe_drv_info_ether_stat(struct bxe_softc *sc)
+bxe_drv_info_ether_stat(struct bxe_adapter *sc)
 {
     struct eth_stats_info *ether_stat =
         &sc->sp->drv_info_to_mcp.ether_stat;
@@ -8014,7 +8014,7 @@ bxe_drv_info_ether_stat(struct bxe_softc *sc)
 }
 
 static void
-bxe_handle_drv_info_req(struct bxe_softc *sc)
+bxe_handle_drv_info_req(struct bxe_adapter *sc)
 {
     enum drv_info_opcode op_code;
     uint32_t drv_info_ctl = SHMEM2_RD(sc, drv_info_control);
@@ -8055,7 +8055,7 @@ bxe_handle_drv_info_req(struct bxe_softc *sc)
 }
 
 static void
-bxe_dcc_event(struct bxe_softc *sc,
+bxe_dcc_event(struct bxe_adapter *sc,
               uint32_t         dcc_event)
 {
     BLOGD(sc, DBG_INTR, "dcc_event 0x%08x\n", dcc_event);
@@ -8091,7 +8091,7 @@ bxe_dcc_event(struct bxe_softc *sc,
 }
 
 static void
-bxe_pmf_update(struct bxe_softc *sc)
+bxe_pmf_update(struct bxe_adapter *sc)
 {
     int port = SC_PORT(sc);
     uint32_t val;
@@ -8124,7 +8124,7 @@ bxe_pmf_update(struct bxe_softc *sc)
 }
 
 static int
-bxe_mc_assert(struct bxe_softc *sc)
+bxe_mc_assert(struct bxe_adapter *sc)
 {
     char last_idx;
     int i, rc = 0;
@@ -8225,7 +8225,7 @@ bxe_mc_assert(struct bxe_softc *sc)
 }
 
 static void
-bxe_attn_int_deasserted3(struct bxe_softc *sc,
+bxe_attn_int_deasserted3(struct bxe_adapter *sc,
                          uint32_t         attn)
 {
     int func = SC_FUNC(sc);
@@ -8328,7 +8328,7 @@ bxe_attn_int_deasserted3(struct bxe_softc *sc,
 }
 
 static void
-bxe_attn_int_deasserted2(struct bxe_softc *sc,
+bxe_attn_int_deasserted2(struct bxe_adapter *sc,
                          uint32_t         attn)
 {
     int port = SC_PORT(sc);
@@ -8419,7 +8419,7 @@ bxe_attn_int_deasserted2(struct bxe_softc *sc,
 }
 
 static void
-bxe_attn_int_deasserted1(struct bxe_softc *sc,
+bxe_attn_int_deasserted1(struct bxe_adapter *sc,
                          uint32_t         attn)
 {
     int port = SC_PORT(sc);
@@ -8450,7 +8450,7 @@ bxe_attn_int_deasserted1(struct bxe_softc *sc,
 }
 
 static void
-bxe_attn_int_deasserted0(struct bxe_softc *sc,
+bxe_attn_int_deasserted0(struct bxe_adapter *sc,
                          uint32_t         attn)
 {
     int port = SC_PORT(sc);
@@ -8489,7 +8489,7 @@ bxe_attn_int_deasserted0(struct bxe_softc *sc,
 }
 
 static void
-bxe_attn_int_deasserted(struct bxe_softc *sc,
+bxe_attn_int_deasserted(struct bxe_adapter *sc,
                         uint32_t         deasserted)
 {
     struct attn_route attn;
@@ -8591,7 +8591,7 @@ bxe_attn_int_deasserted(struct bxe_softc *sc,
 }
 
 static void
-bxe_attn_int(struct bxe_softc *sc)
+bxe_attn_int(struct bxe_adapter *sc)
 {
     /* read local copy of bits */
     uint32_t attn_bits = le32toh(sc->def_sb->atten_status_block.attn_bits);
@@ -8621,7 +8621,7 @@ bxe_attn_int(struct bxe_softc *sc)
 }
 
 static uint16_t
-bxe_update_dsb_idx(struct bxe_softc *sc)
+bxe_update_dsb_idx(struct bxe_adapter *sc)
 {
     struct host_sp_status_block *def_sb = sc->def_sb;
     uint16_t rc = 0;
@@ -8644,7 +8644,7 @@ bxe_update_dsb_idx(struct bxe_softc *sc)
 }
 
 static inline struct ecore_queue_sp_obj *
-bxe_cid_to_q_obj(struct bxe_softc *sc,
+bxe_cid_to_q_obj(struct bxe_adapter *sc,
                  uint32_t         cid)
 {
     BLOGD(sc, DBG_SP, "retrieving fp from cid %d\n", cid);
@@ -8652,7 +8652,7 @@ bxe_cid_to_q_obj(struct bxe_softc *sc,
 }
 
 static void
-bxe_handle_mcast_eqe(struct bxe_softc *sc)
+bxe_handle_mcast_eqe(struct bxe_adapter *sc)
 {
     struct ecore_mcast_ramrod_params rparam;
     int rc;
@@ -8680,7 +8680,7 @@ bxe_handle_mcast_eqe(struct bxe_softc *sc)
 }
 
 static void
-bxe_handle_classification_eqe(struct bxe_softc      *sc,
+bxe_handle_classification_eqe(struct bxe_adapter      *sc,
                               union event_ring_elem *elem)
 {
     unsigned long ramrod_flags = 0;
@@ -8722,7 +8722,7 @@ bxe_handle_classification_eqe(struct bxe_softc      *sc,
 }
 
 static void
-bxe_handle_rx_mode_eqe(struct bxe_softc      *sc,
+bxe_handle_rx_mode_eqe(struct bxe_adapter      *sc,
                        union event_ring_elem *elem)
 {
     bxe_clear_bit(ECORE_FILTER_RX_MODE_PENDING, &sc->sp_state);
@@ -8745,7 +8745,7 @@ bxe_handle_rx_mode_eqe(struct bxe_softc      *sc,
 }
 
 static void
-bxe_update_eq_prod(struct bxe_softc *sc,
+bxe_update_eq_prod(struct bxe_adapter *sc,
                    uint16_t         prod)
 {
     storm_memset_eq_prod(sc, prod, SC_FUNC(sc));
@@ -8753,7 +8753,7 @@ bxe_update_eq_prod(struct bxe_softc *sc,
 }
 
 static void
-bxe_eq_int(struct bxe_softc *sc)
+bxe_eq_int(struct bxe_adapter *sc)
 {
     uint16_t hw_cons, sw_cons, sw_prod;
     union event_ring_elem *elem;
@@ -8960,7 +8960,7 @@ static void
 bxe_handle_sp_tq(void *context,
                  int  pending)
 {
-    struct bxe_softc *sc = (struct bxe_softc *)context;
+    struct bxe_adapter *sc = (struct bxe_adapter *)context;
     uint16_t status;
 
     BLOGD(sc, DBG_SP, "---> SP TASK <---\n");
@@ -9019,7 +9019,7 @@ bxe_handle_fp_tq(void *context,
                  int  pending)
 {
     struct bxe_fastpath *fp = (struct bxe_fastpath *)context;
-    struct bxe_softc *sc = fp->sc;
+    struct bxe_adapter *sc = fp->sc;
     uint8_t more_tx = FALSE;
     uint8_t more_rx = FALSE;
 
@@ -9065,7 +9065,7 @@ bxe_handle_fp_tq(void *context,
 static void
 bxe_task_fp(struct bxe_fastpath *fp)
 {
-    struct bxe_softc *sc = fp->sc;
+    struct bxe_adapter *sc = fp->sc;
     uint8_t more_tx = FALSE;
     uint8_t more_rx = FALSE;
 
@@ -9113,7 +9113,7 @@ bxe_task_fp(struct bxe_fastpath *fp)
 static void
 bxe_intr_legacy(void *xsc)
 {
-    struct bxe_softc *sc = (struct bxe_softc *)xsc;
+    struct bxe_adapter *sc = (struct bxe_adapter *)xsc;
     struct bxe_fastpath *fp;
     uint16_t status, mask;
     int i;
@@ -9186,7 +9186,7 @@ bxe_intr_legacy(void *xsc)
 static void
 bxe_intr_sp(void *xsc)
 {
-    struct bxe_softc *sc = (struct bxe_softc *)xsc;
+    struct bxe_adapter *sc = (struct bxe_adapter *)xsc;
 
     BLOGD(sc, (DBG_INTR | DBG_SP), "---> SP INTR <---\n");
 
@@ -9202,7 +9202,7 @@ static void
 bxe_intr_fp(void *xfp)
 {
     struct bxe_fastpath *fp = (struct bxe_fastpath *)xfp;
-    struct bxe_softc *sc = fp->sc;
+    struct bxe_adapter *sc = fp->sc;
 
     BLOGD(sc, DBG_INTR, "---> FP INTR %d <---\n", fp->index);
 
@@ -9225,7 +9225,7 @@ bxe_intr_fp(void *xfp)
 
 /* Release all interrupts allocated by the driver. */
 static void
-bxe_interrupt_free(struct bxe_softc *sc)
+bxe_interrupt_free(struct bxe_adapter *sc)
 {
     int i;
 
@@ -9287,7 +9287,7 @@ bxe_interrupt_free(struct bxe_softc *sc)
  *   0 = Success, !0 = Failure.
  */
 static int
-bxe_interrupt_alloc(struct bxe_softc *sc)
+bxe_interrupt_alloc(struct bxe_adapter *sc)
 {
     int msix_count = 0;
     int msi_count = 0;
@@ -9480,7 +9480,7 @@ bxe_interrupt_alloc(struct bxe_softc *sc)
 }
 
 static void
-bxe_interrupt_detach(struct bxe_softc *sc)
+bxe_interrupt_detach(struct bxe_adapter *sc)
 {
     struct bxe_fastpath *fp;
     int i;
@@ -9525,7 +9525,7 @@ bxe_interrupt_detach(struct bxe_softc *sc)
  * ISR must look for both slowpath and fastpath completions.
  */
 static int
-bxe_interrupt_attach(struct bxe_softc *sc)
+bxe_interrupt_attach(struct bxe_adapter *sc)
 {
     struct bxe_fastpath *fp;
     int rc = 0;
@@ -9649,17 +9649,17 @@ bxe_interrupt_attach_exit:
     return (rc);
 }
 
-static int  bxe_init_hw_common_chip(struct bxe_softc *sc);
-static int  bxe_init_hw_common(struct bxe_softc *sc);
-static int  bxe_init_hw_port(struct bxe_softc *sc);
-static int  bxe_init_hw_func(struct bxe_softc *sc);
-static void bxe_reset_common(struct bxe_softc *sc);
-static void bxe_reset_port(struct bxe_softc *sc);
-static void bxe_reset_func(struct bxe_softc *sc);
-static int  bxe_gunzip_init(struct bxe_softc *sc);
-static void bxe_gunzip_end(struct bxe_softc *sc);
-static int  bxe_init_firmware(struct bxe_softc *sc);
-static void bxe_release_firmware(struct bxe_softc *sc);
+static int  bxe_init_hw_common_chip(struct bxe_adapter *sc);
+static int  bxe_init_hw_common(struct bxe_adapter *sc);
+static int  bxe_init_hw_port(struct bxe_adapter *sc);
+static int  bxe_init_hw_func(struct bxe_adapter *sc);
+static void bxe_reset_common(struct bxe_adapter *sc);
+static void bxe_reset_port(struct bxe_adapter *sc);
+static void bxe_reset_func(struct bxe_adapter *sc);
+static int  bxe_gunzip_init(struct bxe_adapter *sc);
+static void bxe_gunzip_end(struct bxe_adapter *sc);
+static int  bxe_init_firmware(struct bxe_adapter *sc);
+static void bxe_release_firmware(struct bxe_adapter *sc);
 
 static struct
 ecore_func_sp_drv_ops bxe_func_sp_drv = {
@@ -9680,7 +9680,7 @@ ecore_func_sp_drv_ops bxe_func_sp_drv = {
 };
 
 static void
-bxe_init_func_obj(struct bxe_softc *sc)
+bxe_init_func_obj(struct bxe_adapter *sc)
 {
     sc->dmae_ready = 0;
 
@@ -9694,7 +9694,7 @@ bxe_init_func_obj(struct bxe_softc *sc)
 }
 
 static int
-bxe_init_hw(struct bxe_softc *sc,
+bxe_init_hw(struct bxe_adapter *sc,
             uint32_t         load_code)
 {
     struct ecore_func_state_params func_params = { NULL };
@@ -9718,7 +9718,7 @@ bxe_init_hw(struct bxe_softc *sc,
 }
 
 static void
-bxe_fill(struct bxe_softc *sc,
+bxe_fill(struct bxe_adapter *sc,
          uint32_t         addr,
          int              fill,
          uint32_t         len)
@@ -9738,7 +9738,7 @@ bxe_fill(struct bxe_softc *sc,
 
 /* writes FP SP data to FW - data_size in dwords */
 static void
-bxe_wr_fp_sb_data(struct bxe_softc *sc,
+bxe_wr_fp_sb_data(struct bxe_adapter *sc,
                   int              fw_sb_id,
                   uint32_t         *sb_data_p,
                   uint32_t         data_size)
@@ -9755,7 +9755,7 @@ bxe_wr_fp_sb_data(struct bxe_softc *sc,
 }
 
 static void
-bxe_zero_fp_sb(struct bxe_softc *sc,
+bxe_zero_fp_sb(struct bxe_adapter *sc,
                int              fw_sb_id)
 {
     struct hc_status_block_data_e2 sb_data_e2;
@@ -9788,7 +9788,7 @@ bxe_zero_fp_sb(struct bxe_softc *sc,
 }
 
 static void
-bxe_wr_sp_sb_data(struct bxe_softc               *sc,
+bxe_wr_sp_sb_data(struct bxe_adapter               *sc,
                   struct hc_sp_status_block_data *sp_sb_data)
 {
     int i;
@@ -9805,7 +9805,7 @@ bxe_wr_sp_sb_data(struct bxe_softc               *sc,
 }
 
 static void
-bxe_zero_sp_sb(struct bxe_softc *sc)
+bxe_zero_sp_sb(struct bxe_adapter *sc)
 {
     struct hc_sp_status_block_data sp_sb_data;
 
@@ -9869,7 +9869,7 @@ bxe_map_sb_state_machines(struct hc_index_data *index_data)
 }
 
 static void
-bxe_init_sb(struct bxe_softc *sc,
+bxe_init_sb(struct bxe_adapter *sc,
             bus_addr_t       busaddr,
             int              vfid,
             uint8_t          vf_valid,
@@ -9943,7 +9943,7 @@ bxe_fp_qzone_id(struct bxe_fastpath *fp)
 }
 
 static inline uint32_t
-bxe_rx_ustorm_prods_offset(struct bxe_softc    *sc,
+bxe_rx_ustorm_prods_offset(struct bxe_adapter    *sc,
                            struct bxe_fastpath *fp)
 {
     uint32_t offset = BAR_USTRORM_INTMEM;
@@ -9965,7 +9965,7 @@ bxe_rx_ustorm_prods_offset(struct bxe_softc    *sc,
 }
 
 static void
-bxe_init_eth_fp(struct bxe_softc *sc,
+bxe_init_eth_fp(struct bxe_adapter *sc,
                 int              idx)
 {
     struct bxe_fastpath *fp = &sc->fp[idx];
@@ -10058,7 +10058,7 @@ bxe_init_eth_fp(struct bxe_softc *sc,
 }
 
 static inline void
-bxe_update_rx_prod(struct bxe_softc    *sc,
+bxe_update_rx_prod(struct bxe_adapter    *sc,
                    struct bxe_fastpath *fp,
                    uint16_t            rx_bd_prod,
                    uint16_t            rx_cq_prod,
@@ -10096,7 +10096,7 @@ bxe_update_rx_prod(struct bxe_softc    *sc,
 }
 
 static void
-bxe_init_rx_rings(struct bxe_softc *sc)
+bxe_init_rx_rings(struct bxe_adapter *sc)
 {
     struct bxe_fastpath *fp;
     int i;
@@ -10148,7 +10148,7 @@ bxe_init_tx_ring_one(struct bxe_fastpath *fp)
 }
 
 static inline void
-bxe_init_tx_rings(struct bxe_softc *sc)
+bxe_init_tx_rings(struct bxe_adapter *sc)
 {
     int i;
 
@@ -10165,7 +10165,7 @@ bxe_init_tx_rings(struct bxe_softc *sc)
 }
 
 static void
-bxe_init_def_sb(struct bxe_softc *sc)
+bxe_init_def_sb(struct bxe_adapter *sc)
 {
     struct host_sp_status_block *def_sb = sc->def_sb;
     bus_addr_t mapping = sc->def_sb_dma.paddr;
@@ -10253,7 +10253,7 @@ bxe_init_def_sb(struct bxe_softc *sc)
 }
 
 static void
-bxe_init_sp_ring(struct bxe_softc *sc)
+bxe_init_sp_ring(struct bxe_adapter *sc)
 {
     atomic_store_rel_long(&sc->cq_spq_left, MAX_SPQ_PENDING);
     sc->spq_prod_idx = 0;
@@ -10263,7 +10263,7 @@ bxe_init_sp_ring(struct bxe_softc *sc)
 }
 
 static void
-bxe_init_eq_ring(struct bxe_softc *sc)
+bxe_init_eq_ring(struct bxe_adapter *sc)
 {
     union event_ring_elem *elem;
     int i;
@@ -10289,7 +10289,7 @@ bxe_init_eq_ring(struct bxe_softc *sc)
 }
 
 static void
-bxe_init_internal_common(struct bxe_softc *sc)
+bxe_init_internal_common(struct bxe_adapter *sc)
 {
     int i;
 
@@ -10325,7 +10325,7 @@ bxe_init_internal_common(struct bxe_softc *sc)
 }
 
 static void
-bxe_init_internal(struct bxe_softc *sc,
+bxe_init_internal(struct bxe_adapter *sc,
                   uint32_t         load_code)
 {
     switch (load_code) {
@@ -10349,7 +10349,7 @@ bxe_init_internal(struct bxe_softc *sc,
 }
 
 static void
-storm_memset_func_cfg(struct bxe_softc                         *sc,
+storm_memset_func_cfg(struct bxe_adapter                         *sc,
                       struct tstorm_eth_function_common_config *tcfg,
                       uint16_t                                  abs_fid)
 {
@@ -10363,7 +10363,7 @@ storm_memset_func_cfg(struct bxe_softc                         *sc,
 }
 
 static void
-bxe_func_init(struct bxe_softc            *sc,
+bxe_func_init(struct bxe_adapter            *sc,
               struct bxe_func_init_params *p)
 {
     struct tstorm_eth_function_common_config tcfg = { 0 };
@@ -10396,7 +10396,7 @@ bxe_func_init(struct bxe_softc            *sc,
  * If all min rates are not zero then those that are zeroes will be set to 1.
  */
 static void
-bxe_calc_vn_min(struct bxe_softc       *sc,
+bxe_calc_vn_min(struct bxe_adapter       *sc,
                 struct cmng_init_input *input)
 {
     uint32_t vn_cfg;
@@ -10436,7 +10436,7 @@ bxe_calc_vn_min(struct bxe_softc       *sc,
 }
 
 static inline uint16_t
-bxe_extract_max_cfg(struct bxe_softc *sc,
+bxe_extract_max_cfg(struct bxe_adapter *sc,
                     uint32_t         mf_cfg)
 {
     uint16_t max_cfg = ((mf_cfg & FUNC_MF_CFG_MAX_BW_MASK) >>
@@ -10451,7 +10451,7 @@ bxe_extract_max_cfg(struct bxe_softc *sc,
 }
 
 static void
-bxe_calc_vn_max(struct bxe_softc       *sc,
+bxe_calc_vn_max(struct bxe_adapter       *sc,
                 int                    vn,
                 struct cmng_init_input *input)
 {
@@ -10479,7 +10479,7 @@ bxe_calc_vn_max(struct bxe_softc       *sc,
 }
 
 static void
-bxe_cmng_fns_init(struct bxe_softc *sc,
+bxe_cmng_fns_init(struct bxe_adapter *sc,
                   uint8_t          read_cfg,
                   uint8_t          cmng_type)
 {
@@ -10518,7 +10518,7 @@ bxe_cmng_fns_init(struct bxe_softc *sc,
 }
 
 static int
-bxe_get_cmng_fns_mode(struct bxe_softc *sc)
+bxe_get_cmng_fns_mode(struct bxe_adapter *sc)
 {
     if (CHIP_REV_IS_SLOW(sc)) {
         return (CMNG_FNS_NONE);
@@ -10532,7 +10532,7 @@ bxe_get_cmng_fns_mode(struct bxe_softc *sc)
 }
 
 static void
-storm_memset_cmng(struct bxe_softc *sc,
+storm_memset_cmng(struct bxe_adapter *sc,
                   struct cmng_init *cmng,
                   uint8_t          port)
 {
@@ -10564,7 +10564,7 @@ storm_memset_cmng(struct bxe_softc *sc,
 }
 
 static void
-bxe_pf_init(struct bxe_softc *sc)
+bxe_pf_init(struct bxe_adapter *sc)
 {
     struct bxe_func_init_params func_init = { 0 };
     struct event_ring_data eq_data = { { 0 } };
@@ -10630,7 +10630,7 @@ bxe_pf_init(struct bxe_softc *sc)
 }
 
 static void
-bxe_hc_int_enable(struct bxe_softc *sc)
+bxe_hc_int_enable(struct bxe_adapter *sc)
 {
     int port = SC_PORT(sc);
     uint32_t addr = (port) ? HC_REG_CONFIG_1 : HC_REG_CONFIG_0;
@@ -10702,7 +10702,7 @@ bxe_hc_int_enable(struct bxe_softc *sc)
 }
 
 static void
-bxe_igu_int_enable(struct bxe_softc *sc)
+bxe_igu_int_enable(struct bxe_adapter *sc)
 {
     uint32_t val;
     uint8_t msix = (sc->interrupt_mode == INTR_MODE_MSIX) ? TRUE : FALSE;
@@ -10766,7 +10766,7 @@ bxe_igu_int_enable(struct bxe_softc *sc)
 }
 
 static void
-bxe_int_enable(struct bxe_softc *sc)
+bxe_int_enable(struct bxe_adapter *sc)
 {
     if (sc->devinfo.int_block == INT_BLOCK_HC) {
         bxe_hc_int_enable(sc);
@@ -10776,7 +10776,7 @@ bxe_int_enable(struct bxe_softc *sc)
 }
 
 static void
-bxe_hc_int_disable(struct bxe_softc *sc)
+bxe_hc_int_disable(struct bxe_adapter *sc)
 {
     int port = SC_PORT(sc);
     uint32_t addr = (port) ? HC_REG_CONFIG_1 : HC_REG_CONFIG_0;
@@ -10816,7 +10816,7 @@ bxe_hc_int_disable(struct bxe_softc *sc)
 }
 
 static void
-bxe_igu_int_disable(struct bxe_softc *sc)
+bxe_igu_int_disable(struct bxe_adapter *sc)
 {
     uint32_t val = REG_RD(sc, IGU_REG_PF_CONFIGURATION);
 
@@ -10836,7 +10836,7 @@ bxe_igu_int_disable(struct bxe_softc *sc)
 }
 
 static void
-bxe_int_disable(struct bxe_softc *sc)
+bxe_int_disable(struct bxe_adapter *sc)
 {
     if (sc->devinfo.int_block == INT_BLOCK_HC) {
         bxe_hc_int_disable(sc);
@@ -10846,7 +10846,7 @@ bxe_int_disable(struct bxe_softc *sc)
 }
 
 static void
-bxe_nic_init(struct bxe_softc *sc,
+bxe_nic_init(struct bxe_adapter *sc,
              int              load_code)
 {
     int i;
@@ -10893,7 +10893,7 @@ bxe_nic_init(struct bxe_softc *sc,
 }
 
 static inline void
-bxe_init_objs(struct bxe_softc *sc)
+bxe_init_objs(struct bxe_adapter *sc)
 {
     /* mcast rules must be added to tx if tx switching is enabled */
     ecore_obj_type o_type =
@@ -10947,7 +10947,7 @@ bxe_init_objs(struct bxe_softc *sc)
  * for the first client.
  */
 static inline int
-bxe_func_start(struct bxe_softc *sc)
+bxe_func_start(struct bxe_adapter *sc)
 {
     struct ecore_func_state_params func_params = { NULL };
     struct ecore_func_start_params *start_params = &func_params.params.start;
@@ -10975,7 +10975,7 @@ bxe_func_start(struct bxe_softc *sc)
 }
 
 static int
-bxe_set_power_state(struct bxe_softc *sc,
+bxe_set_power_state(struct bxe_adapter *sc,
                     uint8_t          state)
 {
     uint16_t pmcsr;
@@ -11039,7 +11039,7 @@ bxe_set_power_state(struct bxe_softc *sc,
 
 /* return true if succeeded to acquire the lock */
 static uint8_t
-bxe_trylock_hw_lock(struct bxe_softc *sc,
+bxe_trylock_hw_lock(struct bxe_adapter *sc,
                     uint32_t         resource)
 {
     uint32_t lock_status;
@@ -11080,7 +11080,7 @@ bxe_trylock_hw_lock(struct bxe_softc *sc,
  * belongs to. Currently only only 2 engines is supported.
  */
 static int
-bxe_get_leader_lock_resource(struct bxe_softc *sc)
+bxe_get_leader_lock_resource(struct bxe_adapter *sc)
 {
     if (SC_PATH(sc)) {
         return (HW_LOCK_RESOURCE_RECOVERY_LEADER_1);
@@ -11091,20 +11091,20 @@ bxe_get_leader_lock_resource(struct bxe_softc *sc)
 
 /* try to acquire a leader lock for current engine */
 static uint8_t
-bxe_trylock_leader_lock(struct bxe_softc *sc)
+bxe_trylock_leader_lock(struct bxe_adapter *sc)
 {
     return (bxe_trylock_hw_lock(sc, bxe_get_leader_lock_resource(sc)));
 }
 
 static int
-bxe_release_leader_lock(struct bxe_softc *sc)
+bxe_release_leader_lock(struct bxe_adapter *sc)
 {
     return (bxe_release_hw_lock(sc, bxe_get_leader_lock_resource(sc)));
 }
 
 /* close gates #2, #3 and #4 */
 static void
-bxe_set_234_gates(struct bxe_softc *sc,
+bxe_set_234_gates(struct bxe_adapter *sc,
                   uint8_t          close)
 {
     uint32_t val;
@@ -11147,7 +11147,7 @@ bxe_set_234_gates(struct bxe_softc *sc,
 
 /* poll for pending writes bit, it should get cleared in no more than 1s */
 static int
-bxe_er_poll_igu_vq(struct bxe_softc *sc)
+bxe_er_poll_igu_vq(struct bxe_adapter *sc)
 {
     uint32_t cnt = 1000;
     uint32_t pend_bits = 0;
@@ -11173,7 +11173,7 @@ bxe_er_poll_igu_vq(struct bxe_softc *sc)
 #define SHARED_MF_CLP_MAGIC  0x80000000 /* 'magic' bit */
 
 static void
-bxe_clp_reset_prep(struct bxe_softc *sc,
+bxe_clp_reset_prep(struct bxe_adapter *sc,
                    uint32_t         *magic_val)
 {
     /* Do some magic... */
@@ -11184,7 +11184,7 @@ bxe_clp_reset_prep(struct bxe_softc *sc,
 
 /* restore the value of the 'magic' bit */
 static void
-bxe_clp_reset_done(struct bxe_softc *sc,
+bxe_clp_reset_done(struct bxe_adapter *sc,
                    uint32_t         magic_val)
 {
     /* Restore the 'magic' bit value... */
@@ -11195,7 +11195,7 @@ bxe_clp_reset_done(struct bxe_softc *sc,
 
 /* prepare for MCP reset, takes care of CLP configurations */
 static void
-bxe_reset_mcp_prep(struct bxe_softc *sc,
+bxe_reset_mcp_prep(struct bxe_adapter *sc,
                    uint32_t         *magic_val)
 {
     uint32_t shmem;
@@ -11221,7 +11221,7 @@ bxe_reset_mcp_prep(struct bxe_softc *sc,
 #define MCP_ONE_TIMEOUT  100    /* 100 ms */
 
 static void
-bxe_mcp_wait_one(struct bxe_softc *sc)
+bxe_mcp_wait_one(struct bxe_adapter *sc)
 {
     /* special handling for emulation and FPGA (10 times longer) */
     if (CHIP_REV_IS_SLOW(sc)) {
@@ -11233,7 +11233,7 @@ bxe_mcp_wait_one(struct bxe_softc *sc)
 
 /* initialize shmem_base and waits for validity signature to appear */
 static int
-bxe_init_shmem(struct bxe_softc *sc)
+bxe_init_shmem(struct bxe_adapter *sc)
 {
     int cnt = 0;
     uint32_t val = 0;
@@ -11259,7 +11259,7 @@ bxe_init_shmem(struct bxe_softc *sc)
 }
 
 static int
-bxe_reset_mcp_comp(struct bxe_softc *sc,
+bxe_reset_mcp_comp(struct bxe_adapter *sc,
                    uint32_t         magic_val)
 {
     int rc = bxe_init_shmem(sc);
@@ -11273,7 +11273,7 @@ bxe_reset_mcp_comp(struct bxe_softc *sc,
 }
 
 static void
-bxe_pxp_prep(struct bxe_softc *sc)
+bxe_pxp_prep(struct bxe_adapter *sc)
 {
     if (!CHIP_IS_E1(sc)) {
         REG_WR(sc, PXP2_REG_RD_START_INIT, 0);
@@ -11292,7 +11292,7 @@ bxe_pxp_prep(struct bxe_softc *sc)
  *      - RBCN, RBCP
  */
 static void
-bxe_process_kill_chip_reset(struct bxe_softc *sc,
+bxe_process_kill_chip_reset(struct bxe_adapter *sc,
                             uint8_t          global)
 {
     uint32_t not_reset_mask1, reset_mask1, not_reset_mask2, reset_mask2;
@@ -11393,7 +11393,7 @@ bxe_process_kill_chip_reset(struct bxe_softc *sc,
 }
 
 static int
-bxe_process_kill(struct bxe_softc *sc,
+bxe_process_kill(struct bxe_adapter *sc,
                  uint8_t          global)
 {
     int cnt = 1000;
@@ -11494,7 +11494,7 @@ bxe_process_kill(struct bxe_softc *sc,
 }
 
 static int
-bxe_leader_reset(struct bxe_softc *sc)
+bxe_leader_reset(struct bxe_adapter *sc)
 {
     int rc = 0;
     uint8_t global = bxe_reset_is_global(sc);
@@ -11567,7 +11567,7 @@ exit_leader_reset:
  *   - Queue's CDU context
  */
 static void
-bxe_pf_q_prep_init(struct bxe_softc               *sc,
+bxe_pf_q_prep_init(struct bxe_adapter               *sc,
                    struct bxe_fastpath            *fp,
                    struct ecore_queue_init_params *init_params)
 {
@@ -11611,7 +11611,7 @@ bxe_pf_q_prep_init(struct bxe_softc               *sc,
 
 /* set flags that are common for the Tx-only and not normal connections */
 static unsigned long
-bxe_get_common_flags(struct bxe_softc    *sc,
+bxe_get_common_flags(struct bxe_adapter    *sc,
                      struct bxe_fastpath *fp,
                      uint8_t             zero_stats)
 {
@@ -11645,7 +11645,7 @@ bxe_get_common_flags(struct bxe_softc    *sc,
 }
 
 static unsigned long
-bxe_get_q_flags(struct bxe_softc    *sc,
+bxe_get_q_flags(struct bxe_adapter    *sc,
                 struct bxe_fastpath *fp,
                 uint8_t             leading)
 {
@@ -11683,7 +11683,7 @@ bxe_get_q_flags(struct bxe_softc    *sc,
 }
 
 static void
-bxe_pf_q_prep_general(struct bxe_softc                  *sc,
+bxe_pf_q_prep_general(struct bxe_adapter                  *sc,
                       struct bxe_fastpath               *fp,
                       struct ecore_general_setup_params *gen_init,
                       uint8_t                           cos)
@@ -11695,7 +11695,7 @@ bxe_pf_q_prep_general(struct bxe_softc                  *sc,
 }
 
 static void
-bxe_pf_rx_q_prep(struct bxe_softc              *sc,
+bxe_pf_rx_q_prep(struct bxe_adapter              *sc,
                  struct bxe_fastpath           *fp,
                  struct rxq_pause_params       *pause,
                  struct ecore_rxq_setup_params *rxq_init)
@@ -11795,7 +11795,7 @@ bxe_pf_rx_q_prep(struct bxe_softc              *sc,
 }
 
 static void
-bxe_pf_tx_q_prep(struct bxe_softc              *sc,
+bxe_pf_tx_q_prep(struct bxe_adapter              *sc,
                  struct bxe_fastpath           *fp,
                  struct ecore_txq_setup_params *txq_init,
                  uint8_t                       cos)
@@ -11823,7 +11823,7 @@ bxe_pf_tx_q_prep(struct bxe_softc              *sc,
  *   2) INIT->SETUP
  */
 static int
-bxe_setup_queue(struct bxe_softc    *sc,
+bxe_setup_queue(struct bxe_adapter    *sc,
                 struct bxe_fastpath *fp,
                 uint8_t             leading)
 {
@@ -11909,13 +11909,13 @@ bxe_setup_queue(struct bxe_softc    *sc,
 }
 
 static int
-bxe_setup_leading(struct bxe_softc *sc)
+bxe_setup_leading(struct bxe_adapter *sc)
 {
     return (bxe_setup_queue(sc, &sc->fp[0], TRUE));
 }
 
 static int
-bxe_config_rss_pf(struct bxe_softc            *sc,
+bxe_config_rss_pf(struct bxe_adapter            *sc,
                   struct ecore_rss_config_obj *rss_obj,
                   uint8_t                     config_hash)
 {
@@ -11963,14 +11963,14 @@ bxe_config_rss_pf(struct bxe_softc            *sc,
 }
 
 static int
-bxe_config_rss_eth(struct bxe_softc *sc,
+bxe_config_rss_eth(struct bxe_adapter *sc,
                    uint8_t          config_hash)
 {
     return (bxe_config_rss_pf(sc, &sc->rss_conf_obj, config_hash));
 }
 
 static int
-bxe_init_rss_pf(struct bxe_softc *sc)
+bxe_init_rss_pf(struct bxe_adapter *sc)
 {
     uint8_t num_eth_queues = BXE_NUM_ETH_QUEUES(sc);
     int i;
@@ -11999,7 +11999,7 @@ bxe_init_rss_pf(struct bxe_softc *sc)
 }
 
 static int
-bxe_set_mac_one(struct bxe_softc          *sc,
+bxe_set_mac_one(struct bxe_adapter          *sc,
                 uint8_t                   *mac,
                 struct ecore_vlan_mac_obj *obj,
                 uint8_t                   set,
@@ -12040,7 +12040,7 @@ bxe_set_mac_one(struct bxe_softc          *sc,
 }
 
 static int
-bxe_set_eth_mac(struct bxe_softc *sc,
+bxe_set_eth_mac(struct bxe_adapter *sc,
                 uint8_t          set)
 {
     unsigned long ramrod_flags = 0;
@@ -12057,7 +12057,7 @@ bxe_set_eth_mac(struct bxe_softc *sc,
 
 #if 0
 static void
-bxe_update_max_mf_config(struct bxe_softc *sc,
+bxe_update_max_mf_config(struct bxe_adapter *sc,
                          uint32_t         value)
 {
     /* load old values */
@@ -12077,7 +12077,7 @@ bxe_update_max_mf_config(struct bxe_softc *sc,
 #endif
 
 static int
-bxe_get_cur_phy_idx(struct bxe_softc *sc)
+bxe_get_cur_phy_idx(struct bxe_adapter *sc)
 {
     uint32_t sel_phy_idx = 0;
 
@@ -12110,7 +12110,7 @@ bxe_get_cur_phy_idx(struct bxe_softc *sc)
 }
 
 static int
-bxe_get_link_cfg_idx(struct bxe_softc *sc)
+bxe_get_link_cfg_idx(struct bxe_adapter *sc)
 {
     uint32_t sel_phy_idx = bxe_get_cur_phy_idx(sc);
 
@@ -12131,7 +12131,7 @@ bxe_get_link_cfg_idx(struct bxe_softc *sc)
 }
 
 static void
-bxe_set_requested_fc(struct bxe_softc *sc)
+bxe_set_requested_fc(struct bxe_adapter *sc)
 {
     /*
      * Initialize link parameters structure variables
@@ -12146,7 +12146,7 @@ bxe_set_requested_fc(struct bxe_softc *sc)
 }
 
 static void
-bxe_calc_fc_adv(struct bxe_softc *sc)
+bxe_calc_fc_adv(struct bxe_adapter *sc)
 {
     uint8_t cfg_idx = bxe_get_link_cfg_idx(sc);
     switch (sc->link_vars.ieee_fc &
@@ -12169,7 +12169,7 @@ bxe_calc_fc_adv(struct bxe_softc *sc)
 }
 
 static uint16_t
-bxe_get_mf_speed(struct bxe_softc *sc)
+bxe_get_mf_speed(struct bxe_adapter *sc)
 {
     uint16_t line_speed = sc->link_vars.line_speed;
     if (IS_MF(sc)) {
@@ -12192,7 +12192,7 @@ bxe_get_mf_speed(struct bxe_softc *sc)
 }
 
 static void
-bxe_fill_report_data(struct bxe_softc            *sc,
+bxe_fill_report_data(struct bxe_adapter            *sc,
                      struct bxe_link_report_data *data)
 {
     uint16_t line_speed = bxe_get_mf_speed(sc);
@@ -12225,7 +12225,7 @@ bxe_fill_report_data(struct bxe_softc            *sc,
 
 /* report link status to OS, should be called under phy_lock */
 static void
-bxe_link_report_locked(struct bxe_softc *sc)
+bxe_link_report_locked(struct bxe_adapter *sc)
 {
     struct bxe_link_report_data cur_data;
 
@@ -12301,7 +12301,7 @@ bxe_link_report_locked(struct bxe_softc *sc)
 }
 
 static void
-bxe_link_report(struct bxe_softc *sc)
+bxe_link_report(struct bxe_adapter *sc)
 {
     BXE_PHY_LOCK(sc);
     bxe_link_report_locked(sc);
@@ -12309,7 +12309,7 @@ bxe_link_report(struct bxe_softc *sc)
 }
 
 static void
-bxe_link_status_update(struct bxe_softc *sc)
+bxe_link_status_update(struct bxe_adapter *sc)
 {
     if (sc->state != BXE_STATE_OPEN) {
         return;
@@ -12384,7 +12384,7 @@ bxe_link_status_update(struct bxe_softc *sc)
 }
 
 static int
-bxe_initial_phy_init(struct bxe_softc *sc,
+bxe_initial_phy_init(struct bxe_adapter *sc,
                      int              load_mode)
 {
     int rc, cfg_idx = bxe_get_link_cfg_idx(sc);
@@ -12461,7 +12461,7 @@ bxe_initial_phy_init(struct bxe_softc *sc,
 
 /* must be called under IF_ADDR_LOCK */
 static int
-bxe_init_mcast_macs_list(struct bxe_softc                 *sc,
+bxe_init_mcast_macs_list(struct bxe_adapter                 *sc,
                          struct ecore_mcast_ramrod_params *p)
 {
     if_t ifp = sc->ifp;
@@ -12531,7 +12531,7 @@ bxe_free_mcast_macs_list(struct ecore_mcast_ramrod_params *p)
 }
 
 static int
-bxe_set_mc_list(struct bxe_softc *sc)
+bxe_set_mc_list(struct bxe_adapter *sc)
 {
     struct ecore_mcast_ramrod_params rparam = { NULL };
     int rc = 0;
@@ -12569,7 +12569,7 @@ bxe_set_mc_list(struct bxe_softc *sc)
 }
 
 static int
-bxe_set_uc_list(struct bxe_softc *sc)
+bxe_set_uc_list(struct bxe_adapter *sc)
 {
     if_t ifp = sc->ifp;
     struct ecore_vlan_mac_obj *mac_obj = &sc->sp_objs->mac_obj;
@@ -12637,7 +12637,7 @@ static void
 bxe_handle_rx_mode_tq(void *context,
                       int  pending)
 {
-    struct bxe_softc *sc = (struct bxe_softc *)context;
+    struct bxe_adapter *sc = (struct bxe_adapter *)context;
     if_t ifp = sc->ifp;
     uint32_t rx_mode = BXE_RX_MODE_NORMAL;
 
@@ -12711,14 +12711,14 @@ bxe_handle_rx_mode_tq(void *context,
 }
 
 static void
-bxe_set_rx_mode(struct bxe_softc *sc)
+bxe_set_rx_mode(struct bxe_adapter *sc)
 {
     taskqueue_enqueue(sc->rx_mode_tq, &sc->rx_mode_tq_task);
 }
 
 /* update flags in shmem */
 static void
-bxe_update_drv_flags(struct bxe_softc *sc,
+bxe_update_drv_flags(struct bxe_adapter *sc,
                      uint32_t         flags,
                      uint32_t         set)
 {
@@ -12746,7 +12746,7 @@ bxe_update_drv_flags(struct bxe_softc *sc,
 static void
 bxe_periodic_callout_func(void *xsc)
 {
-    struct bxe_softc *sc = (struct bxe_softc *)xsc;
+    struct bxe_adapter *sc = (struct bxe_adapter *)xsc;
     int i;
 
     if (!BXE_CORE_TRYLOCK(sc)) {
@@ -12838,14 +12838,14 @@ bxe_periodic_callout_func(void *xsc)
 }
 
 static void
-bxe_periodic_start(struct bxe_softc *sc)
+bxe_periodic_start(struct bxe_adapter *sc)
 {
     atomic_store_rel_long(&sc->periodic_flags, PERIODIC_GO);
     callout_reset(&sc->periodic_callout, hz, bxe_periodic_callout_func, sc);
 }
 
 static void
-bxe_periodic_stop(struct bxe_softc *sc)
+bxe_periodic_stop(struct bxe_adapter *sc)
 {
     atomic_store_rel_long(&sc->periodic_flags, PERIODIC_STOP);
     callout_drain(&sc->periodic_callout);
@@ -12853,7 +12853,7 @@ bxe_periodic_stop(struct bxe_softc *sc)
 
 /* start the controller */
 static __noinline int
-bxe_nic_load(struct bxe_softc *sc,
+bxe_nic_load(struct bxe_adapter *sc,
              int              load_mode)
 {
     uint32_t val;
@@ -13144,7 +13144,7 @@ bxe_nic_load_error0:
 }
 
 static int
-bxe_init_locked(struct bxe_softc *sc)
+bxe_init_locked(struct bxe_adapter *sc)
 {
     int other_engine = SC_PATH(sc) ? 0 : 1;
     uint8_t other_load_status, load_status;
@@ -13226,7 +13226,7 @@ bxe_init_locked_done:
 }
 
 static int
-bxe_stop_locked(struct bxe_softc *sc)
+bxe_stop_locked(struct bxe_adapter *sc)
 {
     BXE_CORE_LOCK_ASSERT(sc);
     return (bxe_nic_unload(sc, UNLOAD_NORMAL, TRUE));
@@ -13242,7 +13242,7 @@ bxe_stop_locked(struct bxe_softc *sc)
 static void
 bxe_init(void *xsc)
 {
-    struct bxe_softc *sc = (struct bxe_softc *)xsc;
+    struct bxe_adapter *sc = (struct bxe_adapter *)xsc;
 
     BXE_CORE_LOCK(sc);
     bxe_init_locked(sc);
@@ -13250,7 +13250,7 @@ bxe_init(void *xsc)
 }
 
 static int
-bxe_init_ifnet(struct bxe_softc *sc)
+bxe_init_ifnet(struct bxe_adapter *sc)
 {
     if_t ifp;
     int capabilities;
@@ -13331,7 +13331,7 @@ bxe_init_ifnet(struct bxe_softc *sc)
 }
 
 static void
-bxe_deallocate_bars(struct bxe_softc *sc)
+bxe_deallocate_bars(struct bxe_adapter *sc)
 {
     int i;
 
@@ -13348,7 +13348,7 @@ bxe_deallocate_bars(struct bxe_softc *sc)
 }
 
 static int
-bxe_allocate_bars(struct bxe_softc *sc)
+bxe_allocate_bars(struct bxe_adapter *sc)
 {
     u_int flags;
     int i;
@@ -13399,7 +13399,7 @@ bxe_allocate_bars(struct bxe_softc *sc)
 }
 
 static void
-bxe_get_function_num(struct bxe_softc *sc)
+bxe_get_function_num(struct bxe_adapter *sc)
 {
     uint32_t val = 0;
 
@@ -13429,7 +13429,7 @@ bxe_get_function_num(struct bxe_softc *sc)
 }
 
 static uint32_t
-bxe_get_shmem_mf_cfg_base(struct bxe_softc *sc)
+bxe_get_shmem_mf_cfg_base(struct bxe_adapter *sc)
 {
     uint32_t shmem2_size;
     uint32_t offset;
@@ -13454,7 +13454,7 @@ bxe_get_shmem_mf_cfg_base(struct bxe_softc *sc)
 }
 
 static uint32_t
-bxe_pcie_capability_read(struct bxe_softc *sc,
+bxe_pcie_capability_read(struct bxe_adapter *sc,
                          int    reg,
                          int    width)
 {
@@ -13474,7 +13474,7 @@ bxe_pcie_capability_read(struct bxe_softc *sc,
 }
 
 static uint8_t
-bxe_is_pcie_pending(struct bxe_softc *sc)
+bxe_is_pcie_pending(struct bxe_adapter *sc)
 {
     return (bxe_pcie_capability_read(sc, PCIR_EXPRESS_DEVICE_STA, 2) &
             PCIM_EXP_STA_TRANSACTION_PND);
@@ -13486,7 +13486,7 @@ bxe_is_pcie_pending(struct bxe_softc *sc)
  * best to walk the list rather than make assumptions.
  */
 static void
-bxe_probe_pci_caps(struct bxe_softc *sc)
+bxe_probe_pci_caps(struct bxe_adapter *sc)
 {
     uint16_t link_status;
     int reg;
@@ -13551,7 +13551,7 @@ bxe_probe_pci_caps(struct bxe_softc *sc)
 }
 
 static int
-bxe_get_shmem_mf_cfg_info_sd(struct bxe_softc *sc)
+bxe_get_shmem_mf_cfg_info_sd(struct bxe_adapter *sc)
 {
     struct bxe_mf_info *mf_info = &sc->devinfo.mf_info;
     uint32_t val;
@@ -13586,7 +13586,7 @@ bxe_get_shmem_mf_cfg_info_sd(struct bxe_softc *sc)
 }
 
 static uint32_t
-bxe_get_shmem_ext_proto_support_flags(struct bxe_softc *sc)
+bxe_get_shmem_ext_proto_support_flags(struct bxe_adapter *sc)
 {
     uint32_t retval = 0;
     uint32_t val;
@@ -13609,7 +13609,7 @@ bxe_get_shmem_ext_proto_support_flags(struct bxe_softc *sc)
 }
 
 static int
-bxe_get_shmem_mf_cfg_info_si(struct bxe_softc *sc)
+bxe_get_shmem_mf_cfg_info_si(struct bxe_adapter *sc)
 {
     struct bxe_mf_info *mf_info = &sc->devinfo.mf_info;
     uint32_t val;
@@ -13632,7 +13632,7 @@ bxe_get_shmem_mf_cfg_info_si(struct bxe_softc *sc)
 }
 
 static int
-bxe_get_shmem_mf_cfg_info_niv(struct bxe_softc *sc)
+bxe_get_shmem_mf_cfg_info_niv(struct bxe_adapter *sc)
 {
     struct bxe_mf_info *mf_info = &sc->devinfo.mf_info;
     uint32_t e1hov_tag;
@@ -13678,7 +13678,7 @@ bxe_get_shmem_mf_cfg_info_niv(struct bxe_softc *sc)
 }
 
 static int
-bxe_check_valid_mf_cfg(struct bxe_softc *sc)
+bxe_check_valid_mf_cfg(struct bxe_adapter *sc)
 {
     struct bxe_mf_info *mf_info = &sc->devinfo.mf_info;
     uint32_t mf_cfg1;
@@ -13778,7 +13778,7 @@ bxe_check_valid_mf_cfg(struct bxe_softc *sc)
 }
 
 static int
-bxe_get_mf_cfg_info(struct bxe_softc *sc)
+bxe_get_mf_cfg_info(struct bxe_adapter *sc)
 {
     struct bxe_mf_info *mf_info = &sc->devinfo.mf_info;
     uint32_t val, mac_upper;
@@ -13937,7 +13937,7 @@ bxe_get_mf_cfg_info(struct bxe_softc *sc)
 }
 
 static int
-bxe_get_shmem_info(struct bxe_softc *sc)
+bxe_get_shmem_info(struct bxe_adapter *sc)
 {
     int port;
     uint32_t mac_hi, mac_lo, val;
@@ -14044,7 +14044,7 @@ bxe_get_shmem_info(struct bxe_softc *sc)
 }
 
 static void
-bxe_get_tunable_params(struct bxe_softc *sc)
+bxe_get_tunable_params(struct bxe_adapter *sc)
 {
     /* sanity checks */
 
@@ -14151,7 +14151,7 @@ bxe_get_tunable_params(struct bxe_softc *sc)
 }
 
 static void
-bxe_media_detect(struct bxe_softc *sc)
+bxe_media_detect(struct bxe_adapter *sc)
 {
     uint32_t phy_idx = bxe_get_cur_phy_idx(sc);
     switch (sc->link_params.phy[phy_idx].media_type) {
@@ -14201,7 +14201,7 @@ bxe_media_detect(struct bxe_softc *sc)
 #define IGU_VEC(val) GET_FIELD((val), IGU_REG_MAPPING_MEMORY_VECTOR)
 
 static int
-bxe_get_igu_cam_info(struct bxe_softc *sc)
+bxe_get_igu_cam_info(struct bxe_adapter *sc)
 {
     int pfid = SC_FUNC(sc);
     int igu_sb_id;
@@ -14266,7 +14266,7 @@ bxe_get_igu_cam_info(struct bxe_softc *sc)
  * shmem, and the user input.
  */
 static int
-bxe_get_device_info(struct bxe_softc *sc)
+bxe_get_device_info(struct bxe_adapter *sc)
 {
     uint32_t val;
     int rc;
@@ -14508,7 +14508,7 @@ bxe_get_device_info(struct bxe_softc *sc)
 }
 
 static void
-bxe_link_settings_supported(struct bxe_softc *sc,
+bxe_link_settings_supported(struct bxe_adapter *sc,
                             uint32_t         switch_cfg)
 {
     uint32_t cfg_size = 0;
@@ -14623,7 +14623,7 @@ bxe_link_settings_supported(struct bxe_softc *sc,
 }
 
 static void
-bxe_link_settings_requested(struct bxe_softc *sc)
+bxe_link_settings_requested(struct bxe_adapter *sc)
 {
     uint32_t link_config;
     uint32_t idx;
@@ -14792,7 +14792,7 @@ bxe_link_settings_requested(struct bxe_softc *sc)
 }
 
 static void
-bxe_get_phy_info(struct bxe_softc *sc)
+bxe_get_phy_info(struct bxe_adapter *sc)
 {
     uint8_t port = SC_PORT(sc);
     uint32_t config = sc->port.config;
@@ -14838,7 +14838,7 @@ bxe_get_phy_info(struct bxe_softc *sc)
 }
 
 static void
-bxe_get_params(struct bxe_softc *sc)
+bxe_get_params(struct bxe_adapter *sc)
 {
     /* get user tunable params */
     bxe_get_tunable_params(sc);
@@ -14852,7 +14852,7 @@ bxe_get_params(struct bxe_softc *sc)
 }
 
 static void
-bxe_set_modes_bitmap(struct bxe_softc *sc)
+bxe_set_modes_bitmap(struct bxe_adapter *sc)
 {
     uint32_t flags = 0;
 
@@ -14908,7 +14908,7 @@ bxe_set_modes_bitmap(struct bxe_softc *sc)
 }
 
 static int
-bxe_alloc_hsi_mem(struct bxe_softc *sc)
+bxe_alloc_hsi_mem(struct bxe_adapter *sc)
 {
     struct bxe_fastpath *fp;
     bus_addr_t busaddr;
@@ -15369,7 +15369,7 @@ bxe_alloc_hsi_mem(struct bxe_softc *sc)
 }
 
 static void
-bxe_free_hsi_mem(struct bxe_softc *sc)
+bxe_free_hsi_mem(struct bxe_adapter *sc)
 {
     struct bxe_fastpath *fp;
     int max_agg_queues;
@@ -15555,7 +15555,7 @@ bxe_free_hsi_mem(struct bxe_softc *sc)
  * the interrupt which detected this from the pglueb and the was-done bit
  */
 static void
-bxe_prev_interrupted_dmae(struct bxe_softc *sc)
+bxe_prev_interrupted_dmae(struct bxe_adapter *sc)
 {
     uint32_t val;
 
@@ -15570,7 +15570,7 @@ bxe_prev_interrupted_dmae(struct bxe_softc *sc)
 }
 
 static int
-bxe_prev_mcp_done(struct bxe_softc *sc)
+bxe_prev_mcp_done(struct bxe_adapter *sc)
 {
     uint32_t rc = bxe_fw_command(sc, DRV_MSG_CODE_UNLOAD_DONE,
                                  DRV_MSG_CODE_UNLOAD_SKIP_LINK_RESET);
@@ -15583,7 +15583,7 @@ bxe_prev_mcp_done(struct bxe_softc *sc)
 }
 
 static struct bxe_prev_list_node *
-bxe_prev_path_get_entry(struct bxe_softc *sc)
+bxe_prev_path_get_entry(struct bxe_adapter *sc)
 {
     struct bxe_prev_list_node *tmp;
 
@@ -15599,7 +15599,7 @@ bxe_prev_path_get_entry(struct bxe_softc *sc)
 }
 
 static uint8_t
-bxe_prev_is_path_marked(struct bxe_softc *sc)
+bxe_prev_is_path_marked(struct bxe_adapter *sc)
 {
     struct bxe_prev_list_node *tmp;
     int rc = FALSE;
@@ -15626,7 +15626,7 @@ bxe_prev_is_path_marked(struct bxe_softc *sc)
 }
 
 static int
-bxe_prev_mark_path(struct bxe_softc *sc,
+bxe_prev_mark_path(struct bxe_adapter *sc,
                    uint8_t          after_undi)
 {
     struct bxe_prev_list_node *tmp;
@@ -15680,7 +15680,7 @@ bxe_prev_mark_path(struct bxe_softc *sc,
 }
 
 static int
-bxe_do_flr(struct bxe_softc *sc)
+bxe_do_flr(struct bxe_adapter *sc)
 {
     int i;
 
@@ -15731,7 +15731,7 @@ struct bxe_mac_vals {
 };
 
 static void
-bxe_prev_unload_close_mac(struct bxe_softc *sc,
+bxe_prev_unload_close_mac(struct bxe_adapter *sc,
                           struct bxe_mac_vals *vals)
 {
     uint32_t val, base_addr, offset, mask, reset_reg;
@@ -15813,7 +15813,7 @@ bxe_prev_unload_close_mac(struct bxe_softc *sc,
 #define BXE_PREV_UNDI_PROD(rcq, bd) ((bd) << 16 | (rcq))
 
 static void
-bxe_prev_unload_undi_inc(struct bxe_softc *sc,
+bxe_prev_unload_undi_inc(struct bxe_adapter *sc,
                          uint8_t          port,
                          uint8_t          inc)
 {
@@ -15832,7 +15832,7 @@ bxe_prev_unload_undi_inc(struct bxe_softc *sc,
 }
 
 static int
-bxe_prev_unload_common(struct bxe_softc *sc)
+bxe_prev_unload_common(struct bxe_adapter *sc)
 {
     uint32_t reset_reg, tmp_reg = 0, rc;
     uint8_t prev_undi = FALSE;
@@ -15938,7 +15938,7 @@ bxe_prev_unload_common(struct bxe_softc *sc)
 }
 
 static int
-bxe_prev_unload_uncommon(struct bxe_softc *sc)
+bxe_prev_unload_uncommon(struct bxe_adapter *sc)
 {
     int rc;
 
@@ -15981,7 +15981,7 @@ bxe_prev_unload_uncommon(struct bxe_softc *sc)
 }
 
 static int
-bxe_prev_unload(struct bxe_softc *sc)
+bxe_prev_unload(struct bxe_adapter *sc)
 {
     int time_counter = 10;
     uint32_t fw, hw_lock_reg, hw_lock_val;
@@ -16049,7 +16049,7 @@ bxe_prev_unload(struct bxe_softc *sc)
 }
 
 void
-bxe_dcbx_set_state(struct bxe_softc *sc,
+bxe_dcbx_set_state(struct bxe_adapter *sc,
                    uint8_t          dcb_on,
                    uint32_t         dcbx_enabled)
 {
@@ -16071,7 +16071,7 @@ bxe_dcbx_set_state(struct bxe_softc *sc,
 
 /* must be called after sriov-enable */
 static int
-bxe_set_qm_cid_count(struct bxe_softc *sc)
+bxe_set_qm_cid_count(struct bxe_adapter *sc)
 {
     int cid_count = BXE_L2_MAX_CID(sc);
 
@@ -16087,7 +16087,7 @@ bxe_set_qm_cid_count(struct bxe_softc *sc)
 }
 
 static void
-bxe_init_multi_cos(struct bxe_softc *sc)
+bxe_init_multi_cos(struct bxe_adapter *sc)
 {
     int pri, cos;
 
@@ -16109,7 +16109,7 @@ bxe_init_multi_cos(struct bxe_softc *sc)
 static int
 bxe_sysctl_state(SYSCTL_HANDLER_ARGS)
 {
-    struct bxe_softc *sc;
+    struct bxe_adapter *sc;
     int error, result;
 
     result = 0;
@@ -16120,7 +16120,7 @@ bxe_sysctl_state(SYSCTL_HANDLER_ARGS)
     }
 
     if (result == 1) {
-        sc = (struct bxe_softc *)arg1;
+        sc = (struct bxe_adapter *)arg1;
         BLOGI(sc, "... dumping driver state ...\n");
         /* XXX */
     }
@@ -16131,7 +16131,7 @@ bxe_sysctl_state(SYSCTL_HANDLER_ARGS)
 static int
 bxe_sysctl_eth_stat(SYSCTL_HANDLER_ARGS)
 {
-    struct bxe_softc *sc = (struct bxe_softc *)arg1;
+    struct bxe_adapter *sc = (struct bxe_adapter *)arg1;
     uint32_t *eth_stats = (uint32_t *)&sc->eth_stats;
     uint32_t *offset;
     uint64_t value = 0;
@@ -16163,7 +16163,7 @@ bxe_sysctl_eth_stat(SYSCTL_HANDLER_ARGS)
 static int
 bxe_sysctl_eth_q_stat(SYSCTL_HANDLER_ARGS)
 {
-    struct bxe_softc *sc = (struct bxe_softc *)arg1;
+    struct bxe_adapter *sc = (struct bxe_adapter *)arg1;
     uint32_t *eth_stats;
     uint32_t *offset;
     uint64_t value = 0;
@@ -16197,7 +16197,7 @@ bxe_sysctl_eth_q_stat(SYSCTL_HANDLER_ARGS)
 }
 
 static void
-bxe_add_sysctls(struct bxe_softc *sc)
+bxe_add_sysctls(struct bxe_adapter *sc)
 {
     struct sysctl_ctx_list *ctx;
     struct sysctl_oid_list *children;
@@ -16314,7 +16314,7 @@ bxe_add_sysctls(struct bxe_softc *sc)
 static int
 bxe_attach(device_t dev)
 {
-    struct bxe_softc *sc;
+    struct bxe_adapter *sc;
 
     sc = device_get_softc(dev);
 
@@ -16475,7 +16475,7 @@ bxe_attach(device_t dev)
 static int
 bxe_detach(device_t dev)
 {
-    struct bxe_softc *sc;
+    struct bxe_adapter *sc;
     if_t ifp;
 
     sc = device_get_softc(dev);
@@ -16550,7 +16550,7 @@ bxe_detach(device_t dev)
 static int
 bxe_shutdown(device_t dev)
 {
-    struct bxe_softc *sc;
+    struct bxe_adapter *sc;
 
     sc = device_get_softc(dev);
 
@@ -16567,7 +16567,7 @@ bxe_shutdown(device_t dev)
 }
 
 void
-bxe_igu_ack_sb(struct bxe_softc *sc,
+bxe_igu_ack_sb(struct bxe_adapter *sc,
                uint8_t          igu_sb_id,
                uint8_t          segment,
                uint16_t         index,
@@ -16580,7 +16580,7 @@ bxe_igu_ack_sb(struct bxe_softc *sc,
 }
 
 static void
-bxe_igu_clear_sb_gen(struct bxe_softc *sc,
+bxe_igu_clear_sb_gen(struct bxe_adapter *sc,
                      uint8_t          func,
                      uint8_t          idu_sb_id,
                      uint8_t          is_pf)
@@ -16637,7 +16637,7 @@ bxe_igu_clear_sb_gen(struct bxe_softc *sc,
 }
 
 static void
-bxe_igu_clear_sb(struct bxe_softc *sc,
+bxe_igu_clear_sb(struct bxe_adapter *sc,
                  uint8_t          idu_sb_id)
 {
     bxe_igu_clear_sb_gen(sc, SC_FUNC(sc), idu_sb_id, TRUE /*PF*/);
@@ -16654,7 +16654,7 @@ bxe_igu_clear_sb(struct bxe_softc *sc,
 /*******************/
 
 static void
-bxe_reset_common(struct bxe_softc *sc)
+bxe_reset_common(struct bxe_adapter *sc)
 {
     uint32_t val = 0x1400;
 
@@ -16670,7 +16670,7 @@ bxe_reset_common(struct bxe_softc *sc)
 }
 
 static void
-bxe_common_init_phy(struct bxe_softc *sc)
+bxe_common_init_phy(struct bxe_adapter *sc)
 {
     uint32_t shmem_base[2];
     uint32_t shmem2_base[2];
@@ -16697,7 +16697,7 @@ bxe_common_init_phy(struct bxe_softc *sc)
 }
 
 static void
-bxe_pf_disable(struct bxe_softc *sc)
+bxe_pf_disable(struct bxe_adapter *sc)
 {
     uint32_t val = REG_RD(sc, IGU_REG_PF_CONFIGURATION);
 
@@ -16709,7 +16709,7 @@ bxe_pf_disable(struct bxe_softc *sc)
 }
 
 static void
-bxe_init_pxp(struct bxe_softc *sc)
+bxe_init_pxp(struct bxe_adapter *sc)
 {
     uint16_t devctl;
     int r_order, w_order;
@@ -16731,7 +16731,7 @@ bxe_init_pxp(struct bxe_softc *sc)
 }
 
 static uint32_t
-bxe_get_pretend_reg(struct bxe_softc *sc)
+bxe_get_pretend_reg(struct bxe_adapter *sc)
 {
     uint32_t base = PXP2_REG_PGL_PRETEND_FUNC_F0;
     uint32_t stride = (PXP2_REG_PGL_PRETEND_FUNC_F1 - base);
@@ -16745,7 +16745,7 @@ bxe_get_pretend_reg(struct bxe_softc *sc)
  * combination.
  */
 static int
-bxe_pretend_func(struct bxe_softc *sc,
+bxe_pretend_func(struct bxe_adapter *sc,
                  uint16_t         pretend_func_val)
 {
     uint32_t pretend_reg;
@@ -16762,7 +16762,7 @@ bxe_pretend_func(struct bxe_softc *sc,
 }
 
 static void
-bxe_iov_init_dmae(struct bxe_softc *sc)
+bxe_iov_init_dmae(struct bxe_adapter *sc)
 {
     return;
 #if 0
@@ -16778,7 +16778,7 @@ bxe_iov_init_dmae(struct bxe_softc *sc)
 
 #if 0
 static int
-bxe_iov_init_ilt(struct bxe_softc *sc,
+bxe_iov_init_ilt(struct bxe_adapter *sc,
                  uint16_t         line)
 {
     return (line);
@@ -16803,7 +16803,7 @@ bxe_iov_init_ilt(struct bxe_softc *sc,
 #endif
 
 static void
-bxe_iov_init_dq(struct bxe_softc *sc)
+bxe_iov_init_dq(struct bxe_adapter *sc)
 {
     return;
 #if 0
@@ -16851,7 +16851,7 @@ bxe_iov_init_dq(struct bxe_softc *sc)
 
 /* send a NIG loopback debug packet */
 static void
-bxe_lb_pckt(struct bxe_softc *sc)
+bxe_lb_pckt(struct bxe_adapter *sc)
 {
     uint32_t wb_write[3];
 
@@ -16873,7 +16873,7 @@ bxe_lb_pckt(struct bxe_softc *sc)
  * To test them we send debug packets.
  */
 static int
-bxe_int_mem_test(struct bxe_softc *sc)
+bxe_int_mem_test(struct bxe_adapter *sc)
 {
     int factor;
     int count, i;
@@ -17026,7 +17026,7 @@ bxe_int_mem_test(struct bxe_softc *sc)
 }
 
 static void
-bxe_setup_fan_failure_detection(struct bxe_softc *sc)
+bxe_setup_fan_failure_detection(struct bxe_adapter *sc)
 {
     int is_required;
     uint32_t val;
@@ -17074,7 +17074,7 @@ bxe_setup_fan_failure_detection(struct bxe_softc *sc)
 }
 
 static void
-bxe_enable_blocks_attention(struct bxe_softc *sc)
+bxe_enable_blocks_attention(struct bxe_adapter *sc)
 {
     uint32_t val;
 
@@ -17143,7 +17143,7 @@ bxe_enable_blocks_attention(struct bxe_softc *sc)
  * @sc:     driver handle
  */
 static int
-bxe_init_hw_common(struct bxe_softc *sc)
+bxe_init_hw_common(struct bxe_adapter *sc)
 {
     uint8_t abs_func_id;
     uint32_t val;
@@ -17633,7 +17633,7 @@ bxe_init_hw_common(struct bxe_softc *sc)
  * @sc:     driver handle
  */
 static int
-bxe_init_hw_common_chip(struct bxe_softc *sc)
+bxe_init_hw_common_chip(struct bxe_adapter *sc)
 {
     int rc = bxe_init_hw_common(sc);
 
@@ -17650,7 +17650,7 @@ bxe_init_hw_common_chip(struct bxe_softc *sc)
 }
 
 static int
-bxe_init_hw_port(struct bxe_softc *sc)
+bxe_init_hw_port(struct bxe_adapter *sc)
 {
     int port = SC_PORT(sc);
     int init_phase = port ? PHASE_PORT1 : PHASE_PORT0;
@@ -17869,7 +17869,7 @@ bxe_init_hw_port(struct bxe_softc *sc)
 }
 
 static uint32_t
-bxe_flr_clnup_reg_poll(struct bxe_softc *sc,
+bxe_flr_clnup_reg_poll(struct bxe_adapter *sc,
                        uint32_t         reg,
                        uint32_t         expected,
                        uint32_t         poll_count)
@@ -17885,7 +17885,7 @@ bxe_flr_clnup_reg_poll(struct bxe_softc *sc,
 }
 
 static int
-bxe_flr_clnup_poll_hw_counter(struct bxe_softc *sc,
+bxe_flr_clnup_poll_hw_counter(struct bxe_adapter *sc,
                               uint32_t         reg,
                               char             *msg,
                               uint32_t         poll_cnt)
@@ -17902,7 +17902,7 @@ bxe_flr_clnup_poll_hw_counter(struct bxe_softc *sc,
 
 /* Common routines with VF FLR cleanup */
 static uint32_t
-bxe_flr_clnup_poll_count(struct bxe_softc *sc)
+bxe_flr_clnup_poll_count(struct bxe_adapter *sc)
 {
     /* adjust polling timeout */
     if (CHIP_REV_IS_EMUL(sc)) {
@@ -17917,7 +17917,7 @@ bxe_flr_clnup_poll_count(struct bxe_softc *sc)
 }
 
 static int
-bxe_poll_hw_usage_counters(struct bxe_softc *sc,
+bxe_poll_hw_usage_counters(struct bxe_adapter *sc,
                            uint32_t         poll_cnt)
 {
     /* wait for CFC PF usage-counter to zero (includes all the VFs) */
@@ -17978,7 +17978,7 @@ bxe_poll_hw_usage_counters(struct bxe_softc *sc,
     (((index) << SDM_OP_GEN_AGG_VECT_IDX_SHIFT) & SDM_OP_GEN_AGG_VECT_IDX)
 
 static int
-bxe_send_final_clnup(struct bxe_softc *sc,
+bxe_send_final_clnup(struct bxe_adapter *sc,
                      uint8_t          clnup_func,
                      uint32_t         poll_cnt)
 {
@@ -18015,7 +18015,7 @@ bxe_send_final_clnup(struct bxe_softc *sc,
 }
 
 static void
-bxe_pbf_pN_buf_flushed(struct bxe_softc       *sc,
+bxe_pbf_pN_buf_flushed(struct bxe_adapter       *sc,
                        struct pbf_pN_buf_regs *regs,
                        uint32_t               poll_count)
 {
@@ -18050,7 +18050,7 @@ bxe_pbf_pN_buf_flushed(struct bxe_softc       *sc,
 }
 
 static void
-bxe_pbf_pN_cmd_flushed(struct bxe_softc       *sc,
+bxe_pbf_pN_cmd_flushed(struct bxe_adapter       *sc,
                        struct pbf_pN_cmd_regs *regs,
                        uint32_t               poll_count)
 {
@@ -18082,7 +18082,7 @@ bxe_pbf_pN_cmd_flushed(struct bxe_softc       *sc,
 }
 
 static void
-bxe_tx_hw_flushed(struct bxe_softc *sc, uint32_t poll_count)
+bxe_tx_hw_flushed(struct bxe_adapter *sc, uint32_t poll_count)
 {
     struct pbf_pN_cmd_regs cmd_regs[] = {
         {0, (CHIP_IS_E3B0(sc)) ?
@@ -18149,7 +18149,7 @@ bxe_tx_hw_flushed(struct bxe_softc *sc, uint32_t poll_count)
 }
 
 static void
-bxe_hw_enable_status(struct bxe_softc *sc)
+bxe_hw_enable_status(struct bxe_adapter *sc)
 {
     uint32_t val;
 
@@ -18179,7 +18179,7 @@ bxe_hw_enable_status(struct bxe_softc *sc)
 }
 
 static int
-bxe_pf_flr_clnup(struct bxe_softc *sc)
+bxe_pf_flr_clnup(struct bxe_adapter *sc)
 {
     uint32_t poll_cnt = bxe_flr_clnup_poll_count(sc);
 
@@ -18228,7 +18228,7 @@ bxe_pf_flr_clnup(struct bxe_softc *sc)
 
 #if 0
 static void
-bxe_init_searcher(struct bxe_softc *sc)
+bxe_init_searcher(struct bxe_adapter *sc)
 {
     int port = SC_PORT(sc);
     ecore_src_init_t2(sc, sc->t2, sc->t2_mapping, SRC_CONN_NUM);
@@ -18238,7 +18238,7 @@ bxe_init_searcher(struct bxe_softc *sc)
 #endif
 
 static int
-bxe_init_hw_func(struct bxe_softc *sc)
+bxe_init_hw_func(struct bxe_adapter *sc)
 {
     int port = SC_PORT(sc);
     int func = SC_FUNC(sc);
@@ -18567,7 +18567,7 @@ bxe_init_hw_func(struct bxe_softc *sc)
 }
 
 static void
-bxe_link_reset(struct bxe_softc *sc)
+bxe_link_reset(struct bxe_adapter *sc)
 {
     if (!BXE_NOMCP(sc)) {
         BXE_PHY_LOCK(sc);
@@ -18581,7 +18581,7 @@ bxe_link_reset(struct bxe_softc *sc)
 }
 
 static void
-bxe_reset_port(struct bxe_softc *sc)
+bxe_reset_port(struct bxe_adapter *sc)
 {
     int port = SC_PORT(sc);
     uint32_t val;
@@ -18613,7 +18613,7 @@ bxe_reset_port(struct bxe_softc *sc)
 }
 
 static void
-bxe_ilt_wr(struct bxe_softc *sc,
+bxe_ilt_wr(struct bxe_adapter *sc,
            uint32_t         index,
            bus_addr_t       addr)
 {
@@ -18632,7 +18632,7 @@ bxe_ilt_wr(struct bxe_softc *sc,
 }
 
 static void
-bxe_clear_func_ilt(struct bxe_softc *sc,
+bxe_clear_func_ilt(struct bxe_adapter *sc,
                    uint32_t         func)
 {
     uint32_t i, base = FUNC_ILT_BASE(func);
@@ -18642,7 +18642,7 @@ bxe_clear_func_ilt(struct bxe_softc *sc,
 }
 
 static void
-bxe_reset_func(struct bxe_softc *sc)
+bxe_reset_func(struct bxe_adapter *sc)
 {
     struct bxe_fastpath *fp;
     int port = SC_PORT(sc);
@@ -18731,19 +18731,19 @@ bxe_reset_func(struct bxe_softc *sc)
 }
 
 static int
-bxe_gunzip_init(struct bxe_softc *sc)
+bxe_gunzip_init(struct bxe_adapter *sc)
 {
     return (0);
 }
 
 static void
-bxe_gunzip_end(struct bxe_softc *sc)
+bxe_gunzip_end(struct bxe_adapter *sc)
 {
     return;
 }
 
 static int
-bxe_init_firmware(struct bxe_softc *sc)
+bxe_init_firmware(struct bxe_adapter *sc)
 {
     if (CHIP_IS_E1(sc)) {
         ecore_init_e1_firmware(sc);
@@ -18763,14 +18763,14 @@ bxe_init_firmware(struct bxe_softc *sc)
 }
 
 static void
-bxe_release_firmware(struct bxe_softc *sc)
+bxe_release_firmware(struct bxe_adapter *sc)
 {
     /* Do nothing */
     return;
 }
 
 static int
-ecore_gunzip(struct bxe_softc *sc,
+ecore_gunzip(struct bxe_adapter *sc,
              const uint8_t    *zbuf,
              int              len)
 {
@@ -18780,7 +18780,7 @@ ecore_gunzip(struct bxe_softc *sc,
 }
 
 static void
-ecore_reg_wr_ind(struct bxe_softc *sc,
+ecore_reg_wr_ind(struct bxe_adapter *sc,
                  uint32_t         addr,
                  uint32_t         val)
 {
@@ -18788,7 +18788,7 @@ ecore_reg_wr_ind(struct bxe_softc *sc,
 }
 
 static void
-ecore_write_dmae_phys_len(struct bxe_softc *sc,
+ecore_write_dmae_phys_len(struct bxe_adapter *sc,
                           bus_addr_t       phys_addr,
                           uint32_t         addr,
                           uint32_t         len)
@@ -18797,7 +18797,7 @@ ecore_write_dmae_phys_len(struct bxe_softc *sc,
 }
 
 void
-ecore_storm_memset_struct(struct bxe_softc *sc,
+ecore_storm_memset_struct(struct bxe_adapter *sc,
                           uint32_t         addr,
                           size_t           size,
                           uint32_t         *data)
