@@ -45,6 +45,23 @@
 #define __predict_false(x) (x)
 /* TYPEDEFS for conversion to AKAROS. These are temporary, but it makes it easier to see what is in need of change. */
 typedef struct netif *if_t;
+typedef uint64_t ift_counter;
+typedef uintptr_t bus_addr_t;
+typedef uintptr_t bus_size_t;
+typedef uintptr_t bus_space_handle_t;
+typedef uintptr_t bus_dma_tag_t;
+typedef uintptr_t bus_dmamap_t;
+typedef uintptr_t bus_dma_segment_t;
+typedef uintptr_t bus_space_tag_t;
+typedef uintptr_t vm_offset_t;
+typedef spinlock_t ECORE_MUTEX_SPIN;
+typedef qlock_t ECORE_MUTEX;
+typedef qlock_t mtx;
+#define mtx_lock(x) ilock(x)
+#define mtx_unlock(x) iunlock(x)
+#define MTX_ASSERT(lock, thing)
+
+
 
 #if _BYTE_ORDER == _LITTLE_ENDIAN
 #ifndef LITTLE_ENDIAN
@@ -497,12 +514,13 @@ struct bxe_sw_tpa_info {
 struct bxe_fastpath {
     /* pointer back to parent structure */
     struct bxe_softc *sc;
-
+#warning "need to fix up the mtx"
+  /*
     struct mtx tx_mtx;
     char       tx_mtx_name[32];
     struct mtx rx_mtx;
     char       rx_mtx_name[32];
-
+  */
 #define BXE_FP_TX_LOCK(fp)        mtx_lock(&fp->tx_mtx)
 #define BXE_FP_TX_UNLOCK(fp)      mtx_unlock(&fp->tx_mtx)
 #define BXE_FP_TX_LOCK_ASSERT(fp) mtx_assert(&fp->tx_mtx, MA_OWNED)
@@ -581,10 +599,13 @@ struct bxe_fastpath {
     uint8_t index; /* this is also the 'cid' */
 #define FP_IDX(fp) (fp->index)
 
+#warning "no interrupt taskqueue -- whatever that is"
     /* interrupt taskqueue (fast) */
+  /*
     struct task      tq_task;
     struct taskqueue *tq;
     char             tq_name[32];
+  */
 
     /* ethernet client ID (each fastpath set of RX/TX/CQE is a client) */
     uint8_t cl_id;
@@ -998,9 +1019,11 @@ struct bxe_port {
 
     uint32_t    phy_addr;
 
-    /* Used to synchronize phy accesses. */
+#warning "no phy mtx"
+    /* Used to synchronize phy accesses. *
     struct mtx  phy_mtx;
     char        phy_mtx_name[32];
+    */
 
 #define BXE_PHY_LOCK(sc)          mtx_lock(&sc->port.phy_mtx)
 #define BXE_PHY_UNLOCK(sc)        mtx_unlock(&sc->port.phy_mtx)
@@ -1097,8 +1120,8 @@ struct bxe_devinfo {
      *   B = Chip Bond ID  (bits 0-3)
      */
     uint32_t chip_id;
-#define CHIP_ID(sc)           ((sc)->devinfo.chip_id & 0xffff0000)
-#define CHIP_NUM(sc)          ((sc)->devinfo.chip_id >> 16)
+#define CHIP_ID(sc)           0 /*((sc)->devinfo.chip_id & 0xffff0000)*/
+#define CHIP_NUM(sc)          0 /*((sc)->devinfo.chip_id >> 16)*/
 /* device ids */
 #define CHIP_NUM_57710        0x164e
 #define CHIP_NUM_57711        0x164f
@@ -1240,7 +1263,8 @@ struct bxe_devinfo {
     uint32_t bc_ver;
     char bc_ver_str[32];
     uint32_t mf_cfg_base; /* bootcode shmem address in BAR memory */
-    struct bxe_mf_info mf_info;
+#warning "bxe_mf_info"
+  //    struct bxe_mf_info mf_info;
 
     int flash_size;
 #define NVRAM_1MB_SIZE      0x20000
@@ -1288,13 +1312,15 @@ enum {
 };
 
 /* Top level device private data structure. */
+#warning "need to fix up device private"
 struct bxe_softc {
     /*
      * First entry must be a pointer to the BSD ifnet struct which
      * has a first element of 'void *if_softc' (which is us). XXX
      */
     if_t 	    ifp;
-    struct ifmedia  ifmedia; /* network interface media structure */
+#warning "no ifmedia. "
+  // struct ifmedia  ifmedia; /* network interface media structure */
     int             media;
 
     int             state; /* device state */
@@ -1332,21 +1358,24 @@ struct bxe_softc {
 
     uint16_t doorbell_size;
 
+#warning "no timer callout"
     /* periodic timer callout */
 #define PERIODIC_STOP 0
 #define PERIODIC_GO   1
-    volatile unsigned long periodic_flags;
+  /*    volatile unsigned long periodic_flags;
     struct callout         periodic_callout;
-
+  */
     /* chip start/stop/reset taskqueue */
 #define CHIP_TQ_NONE   0
 #define CHIP_TQ_START  1
 #define CHIP_TQ_STOP   2
 #define CHIP_TQ_REINIT 3
     volatile unsigned long chip_tq_flags;
-    struct task            chip_tq_task;
-    struct taskqueue       *chip_tq;
-    char                   chip_tq_name[32];
+#warning "no chip_tq_task or other tasks from here on down"
+#if 0
+  struct task            chip_tq_task;
+  struct taskqueue       *chip_tq;
+  char                   chip_tq_name[32];
 
     /* slowpath interrupt taskqueue */
     struct task      sp_tq_task;
@@ -1362,6 +1391,7 @@ struct bxe_softc {
     struct bxe_sp_objs  sp_objs[MAX_RSS_CHAINS];
 
     device_t dev;  /* parent device handle */
+#endif
     uint8_t  unit; /* driver instance number */
 
     int pcie_bus;    /* PCIe bus number */
@@ -1382,20 +1412,27 @@ struct bxe_softc {
 #define VNIC_ID(sc)     SC_VN(sc)
 #define FUNC_ID(sc)     SC_FUNC(sc)
 #define ABS_FUNC_ID(sc) SC_ABS_FUNC(sc)
-#define SC_FW_MB_IDX_VN(sc, vn)                                \
+#define SC_FW_MB_IDX_VN(sc, vn)                                
+#if 0
+\
     (SC_PORT(sc) + (vn) *                                      \
      ((CHIP_IS_E1x(sc) || (CHIP_IS_MODE_4_PORT(sc))) ? 2 : 1))
+#endif
+
 #define SC_FW_MB_IDX(sc) SC_FW_MB_IDX_VN(sc, SC_VN(sc))
 
     int if_capen; /* enabled interface capabilities */
 
-    struct bxe_devinfo devinfo;
+#warning "no bxe_devinfo"
+  //    struct bxe_devinfo devinfo;
     char fw_ver_str[32];
     char mf_mode_str[32];
     char pci_link_str[32];
+#warning "iro_array"
+  //    const struct iro *iro_array;
 
-    const struct iro *iro_array;
-
+#warning "no locking of any kind"
+#if 0
 #ifdef BXE_CORE_LOCK_SX
     struct sx      core_sx;
     char           core_sx_name[32];
@@ -1415,7 +1452,7 @@ struct bxe_softc {
     char           stats_mtx_name[32];
     struct mtx     mcast_mtx;
     char           mcast_mtx_name[32];
-
+#endif
 #ifdef BXE_CORE_LOCK_SX
 #define BXE_CORE_TRYLOCK(sc)      sx_try_xlock(&sc->core_sx)
 #define BXE_CORE_LOCK(sc)         sx_xlock(&sc->core_sx)
@@ -1448,49 +1485,37 @@ struct bxe_softc {
 #define BXE_STATS_UNLOCK(sc)      mtx_unlock(&sc->stats_mtx)
 #define BXE_STATS_LOCK_ASSERT(sc) mtx_assert(&sc->stats_mtx, MA_OWNED)
 
-#if __FreeBSD_version < 800000
 #define BXE_MCAST_LOCK(sc)        \
     do {                          \
-        mtx_lock(&sc->mcast_mtx); \
+    whatever. \\
         IF_ADDR_LOCK(sc->ifp);  \
     } while (0)
-#define BXE_MCAST_UNLOCK(sc)        \
-    do {                            \
-        IF_ADDR_UNLOCK(sc->ifp);  \
-        mtx_unlock(&sc->mcast_mtx); \
-    } while (0)
-#else
-#define BXE_MCAST_LOCK(sc)         \
-    do {                           \
-        mtx_lock(&sc->mcast_mtx);  \
-        if_maddr_rlock(sc->ifp); \
-    } while (0)
-#define BXE_MCAST_UNLOCK(sc)         \
-    do {                             \
-        if_maddr_runlock(sc->ifp); \
-        mtx_unlock(&sc->mcast_mtx);  \
-    } while (0)
-#endif
 #define BXE_MCAST_LOCK_ASSERT(sc) mtx_assert(&sc->mcast_mtx, MA_OWNED)
 
     int dmae_ready;
 #define DMAE_READY(sc) (sc->dmae_ready)
 
+#warning "no credit ppools. "
+#if 0
     struct ecore_credit_pool_obj vlans_pool;
     struct ecore_credit_pool_obj macs_pool;
     struct ecore_rx_mode_obj     rx_mode_obj;
     struct ecore_mcast_obj       mcast_obj;
     struct ecore_rss_config_obj  rss_conf_obj;
     struct ecore_func_sp_obj     func_obj;
-
+#endif
     uint16_t fw_seq;
     uint16_t fw_drv_pulse_wr_seq;
     uint32_t func_stx;
 
+#warning "no elink params"
+#if 0
     struct elink_params         link_params;
     struct elink_vars           link_vars;
+#endif
     uint32_t                    link_cnt;
-    struct bxe_link_report_data last_reported_link;
+#warning "no last reported link"
+  //    struct bxe_link_report_data last_reported_link;
     char mac_addr_str[32];
 
     int last_reported_link_state;
@@ -1514,9 +1539,9 @@ struct bxe_softc {
 #define BXE_RX_MODE_PROMISC  3
 #define BXE_MAX_MULTICAST    64
 
-    struct bxe_port port;
+  //    struct bxe_port port;
 
-    struct cmng_init cmng;
+  //    struct cmng_init cmng;
 
     /* user configs */
     int      num_queues;
@@ -1553,12 +1578,12 @@ struct bxe_softc {
     bus_dma_tag_t parent_dma_tag;
 
     /* default status block */
-    struct bxe_dma              def_sb_dma;
-    struct host_sp_status_block *def_sb;
+  //    struct bxe_dma              def_sb_dma;
+  //    struct host_sp_status_block *def_sb;
     uint16_t                    def_idx;
     uint16_t                    def_att_idx;
     uint32_t                    attn_state;
-    struct attn_route           attn_group[MAX_DYNAMIC_ATTN_GRPS];
+  //    struct attn_route           attn_group[MAX_DYNAMIC_ATTN_GRPS];
 
 /* general SP events - stats query, cfc delete, etc */
 #define HC_SP_INDEX_ETH_DEF_CONS         3
@@ -1572,8 +1597,8 @@ struct bxe_softc {
 #define HC_SP_INDEX_ETH_ISCSI_RX_CQ_CONS 1
 
     /* event queue */
-    struct bxe_dma        eq_dma;
-    union event_ring_elem *eq;
+  //    struct bxe_dma        eq_dma;
+  //    union event_ring_elem *eq;
     uint16_t              eq_prod;
     uint16_t              eq_cons;
     uint16_t              *eq_cons_sb;
@@ -1591,20 +1616,21 @@ struct bxe_softc {
 #define EQ_DESC(x) ((x) & EQ_DESC_MASK)
 
     /* slow path */
-    struct bxe_dma      sp_dma;
-    struct bxe_slowpath *sp;
+  //    struct bxe_dma      sp_dma;
+  //    struct bxe_slowpath *sp;
     unsigned long       sp_state;
 
     /* slow path queue */
-    struct bxe_dma spq_dma;
-    struct eth_spe *spq;
+  //    struct bxe_dma spq_dma;
+  //    struct eth_spe *spq;
 #define SP_DESC_CNT     (BCM_PAGE_SIZE / sizeof(struct eth_spe))
 #define MAX_SP_DESC_CNT (SP_DESC_CNT - 1)
 #define MAX_SPQ_PENDING 8
 
     uint16_t       spq_prod_idx;
-    struct eth_spe *spq_prod_bd;
-    struct eth_spe *spq_last_bd;
+#warning "no eth_spe"
+  //    struct eth_spe *spq_prod_bd;
+  //    struct eth_spe *spq_last_bd;
     uint16_t       *dsb_sp_prod;
     //uint16_t       *spq_hw_con;
     //uint16_t       spq_left;
@@ -1613,9 +1639,10 @@ struct bxe_softc {
     volatile unsigned long cq_spq_left; /* ETH_xxx ramrod credit */
 
     /* fw decompression buffer */
-    struct bxe_dma gz_buf_dma;
+#warning "no decmpress buffer"
+  //    struct bxe_dma gz_buf_dma;
     void           *gz_buf;
-    z_streamp      gz_strm;
+  //    z_streamp      gz_strm;
     uint32_t       gz_outlen;
 #define GUNZIP_BUF(sc)    (sc->gz_buf)
 #define GUNZIP_OUTLEN(sc) (sc->gz_outlen)
@@ -1652,9 +1679,10 @@ struct bxe_softc {
      * For max 196 cids (64*3 + non-eth), 32KB ILT page size and 1KB
      * context size we need 8 ILT entries.
      */
+#warning "ILT -- will this struct ever end?"
 #define ILT_MAX_L2_LINES 8
-    struct hw_context context[ILT_MAX_L2_LINES];
-    struct ecore_ilt *ilt;
+  //    struct hw_context context[ILT_MAX_L2_LINES];
+  //    struct ecore_ilt *ilt;
 #define ILT_MAX_LINES 256
 
 /* max supported number of RSS queues: IGU SBs minus one for CNIC */
@@ -1691,20 +1719,20 @@ struct bxe_softc {
      * This is a memory buffer that will contain both statistics ramrod
      * request and data.
      */
-    struct bxe_dma fw_stats_dma;
+  //    struct bxe_dma fw_stats_dma;
     /*
      * FW statistics request shortcut (points at the beginning of fw_stats
      * buffer).
      */
     int                     fw_stats_req_size;
-    struct bxe_fw_stats_req *fw_stats_req;
+  //    struct bxe_fw_stats_req *fw_stats_req;
     bus_addr_t              fw_stats_req_mapping;
     /*
      * FW statistics data shortcut (points at the beginning of fw_stats
      * buffer + fw_stats_req_size).
      */
     int                      fw_stats_data_size;
-    struct bxe_fw_stats_data *fw_stats_data;
+  //    struct bxe_fw_stats_data *fw_stats_data;
     bus_addr_t               fw_stats_data_mapping;
 
     /* tracking a pending STAT_QUERY ramrod */
@@ -1714,7 +1742,7 @@ struct bxe_softc {
     uint16_t stats_counter;
     uint8_t  stats_init;
     int      stats_state;
-
+#if 0
     struct bxe_eth_stats         eth_stats;
     struct host_func_stats       func_stats;
     struct bxe_eth_stats_old     eth_stats_old;
@@ -1722,12 +1750,15 @@ struct bxe_softc {
     struct bxe_fw_port_stats_old fw_stats_old;
 
     struct dmae_command stats_dmae; /* used by dmae command loader */
+#endif
     int                 executer_idx;
 
     int mtu;
 
     /* LLDP params */
+#if 0
     struct bxe_config_lldp_params lldp_config_params;
+#endif
     /* DCB support on/off */
     int dcb_state;
 #define BXE_DCB_STATE_OFF 0
@@ -1739,8 +1770,10 @@ struct bxe_softc {
 #define BXE_DCBX_ENABLED_ON_NEG_ON  2
 #define BXE_DCBX_ENABLED_INVALID    -1
     uint8_t dcbx_mode_uset;
+#if 0
     struct bxe_config_dcbx_params dcbx_config_params;
     struct bxe_dcbx_port_params   dcbx_port_params;
+#endif
     int dcb_version;
 
     uint8_t cnic_support;
@@ -2162,7 +2195,9 @@ void ecore_storm_memset_struct(struct bxe_softc *sc, uint32_t addr,
     } while (0)
 
 /* log a debug message */
-#define BLOGD(sc, codepath, format, args...)           \
+#define BLOGD(sc, codepath, format, args...)           
+#if 0
+\
     do {                                               \
         if (__predict_false(sc->debug & (codepath))) { \
             device_printf((sc)->dev,                   \
@@ -2173,9 +2208,12 @@ void ecore_storm_memset_struct(struct bxe_softc *sc, uint32_t addr,
                           ## args);                    \
         }                                              \
     } while(0)
+#endif
 
 /* log a info message */
-#define BLOGI(sc, format, args...)             \
+#define BLOGI(sc, format, args...)
+#if 0
+             \
     do {                                       \
         if (__predict_false(sc->debug)) {      \
             device_printf((sc)->dev,           \
@@ -2190,9 +2228,12 @@ void ecore_storm_memset_struct(struct bxe_softc *sc, uint32_t addr,
                           ## args);            \
         }                                      \
     } while(0)
+#endif
 
 /* log a warning message */
-#define BLOGW(sc, format, args...)                      \
+#define BLOGW(sc, format, args...)
+#if 0
+                      \
     do {                                                \
         if (__predict_false(sc->debug)) {               \
             device_printf((sc)->dev,                    \
@@ -2207,9 +2248,12 @@ void ecore_storm_memset_struct(struct bxe_softc *sc, uint32_t addr,
                           ## args);                     \
         }                                               \
     } while(0)
+#endif
 
 /* log a error message */
-#define BLOGE(sc, format, args...)                    \
+#define BLOGE(sc, format, args...)
+#if 0
+                    \
     do {                                              \
         if (__predict_false(sc->debug)) {             \
             device_printf((sc)->dev,                  \
@@ -2224,6 +2268,7 @@ void ecore_storm_memset_struct(struct bxe_softc *sc, uint32_t addr,
                           ## args);                   \
         }                                             \
     } while(0)
+#endif
 
 #ifdef ECORE_STOP_ON_ERROR
 
@@ -2266,7 +2311,7 @@ reg_poll(struct bxe_softc *sc,
             break;
         }
         ms -= wait;
-        DELAY(wait * 1000);
+        udelay(wait);
     } while (ms > 0);
 
     return (val);
@@ -2301,8 +2346,9 @@ bxe_igu_ack_sb_gen(struct bxe_softc *sc,
     REG_WR(sc, igu_addr, cmd_data.sb_id_and_flags);
 
     /* Make sure that ACK is written */
-    bus_space_barrier(sc->bar[0].tag, sc->bar[0].handle, 0, 0,
-                      BUS_SPACE_BARRIER_WRITE);
+#warning "bus space barrier write"
+    //    bus_space_barrier(sc->bar[0].tag, sc->bar[0].handle, 0, 0,
+    //                BUS_SPACE_BARRIER_WRITE);
     mb();
 }
 
@@ -2328,8 +2374,8 @@ bxe_hc_ack_sb(struct bxe_softc *sc,
     REG_WR(sc, hc_addr, (*(uint32_t *)&igu_ack));
 
     /* Make sure that ACK is written */
-    bus_space_barrier(sc->bar[0].tag, sc->bar[0].handle, 0, 0,
-                      BUS_SPACE_BARRIER_WRITE);
+    //    bus_space_barrier(sc->bar[0].tag, sc->bar[0].handle, 0, 0,
+    //                      BUS_SPACE_BARRIER_WRITE);
     mb();
 }
 
@@ -2341,6 +2387,7 @@ bxe_ack_sb(struct bxe_softc *sc,
            uint8_t          op,
            uint8_t          update)
 {
+#if 0
     if (sc->devinfo.int_block == INT_BLOCK_HC)
         bxe_hc_ack_sb(sc, igu_sb_id, storm, index, op, update);
     else {
@@ -2356,6 +2403,7 @@ bxe_ack_sb(struct bxe_softc *sc,
         }
         bxe_igu_ack_sb(sc, igu_sb_id, segment, index, op, update);
     }
+#endif
 }
 
 static inline uint16_t
@@ -2369,9 +2417,11 @@ bxe_hc_ack_int(struct bxe_softc *sc)
     return (result);
 }
 
+#warning "fix all igu stuff"
 static inline uint16_t
 bxe_igu_ack_int(struct bxe_softc *sc)
 {
+#if 0
     uint32_t igu_addr = (BAR_IGU_INTMEM + IGU_REG_SISR_MDPC_WMASK_LSB_UPPER*8);
     uint32_t result = REG_RD(sc, igu_addr);
 
@@ -2380,17 +2430,22 @@ bxe_igu_ack_int(struct bxe_softc *sc)
 
     mb();
     return (result);
+#endif
+    return 0;
 }
 
 static inline uint16_t
 bxe_ack_int(struct bxe_softc *sc)
 {
     mb();
+#if 0
     if (sc->devinfo.int_block == INT_BLOCK_HC) {
         return (bxe_hc_ack_int(sc));
     } else {
         return (bxe_igu_ack_int(sc));
     }
+#endif
+    return 0;
 }
 
 static inline int
@@ -2407,6 +2462,8 @@ func_by_vn(struct bxe_softc *sc,
 static inline uint8_t
 bxe_stats_id(struct bxe_fastpath *fp)
 {
+  return 0;
+#if 0
     struct bxe_softc *sc = fp->sc;
 
     if (!CHIP_IS_E1x(sc)) {
@@ -2420,6 +2477,7 @@ bxe_stats_id(struct bxe_fastpath *fp)
     }
 
     return (fp->cl_id + SC_PORT(sc) * FP_SB_MAX_E1x);
+#endif
 }
 
 #endif /* __BXE_H__ */

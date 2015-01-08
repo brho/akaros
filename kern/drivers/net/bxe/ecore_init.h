@@ -746,7 +746,7 @@ static inline void ecore_set_mcp_parity(struct bxe_softc *sc, uint8_t enable)
 	int i;
 	uint32_t reg_val;
 
-	for (i = 0; i < ARRSIZE(mcp_attn_ctl_regs); i++) {
+	for (i = 0; i < ARRAY_SIZE(mcp_attn_ctl_regs); i++) {
 		reg_val = REG_RD(sc, mcp_attn_ctl_regs[i].addr);
 
 		if (enable)
@@ -774,7 +774,7 @@ static inline void ecore_disable_blocks_parity(struct bxe_softc *sc)
 {
 	int i;
 
-	for (i = 0; i < ARRSIZE(ecore_blocks_parity_data); i++) {
+	for (i = 0; i < ARRAY_SIZE(ecore_blocks_parity_data); i++) {
 		uint32_t dis_mask = ecore_parity_reg_mask(sc, i);
 
 		if (dis_mask) {
@@ -808,7 +808,7 @@ static inline void ecore_clear_blocks_parity(struct bxe_softc *sc)
 	REG_WR(sc, USEM_REG_FAST_MEMORY + SEM_FAST_REG_PARITY_RST, 0x1);
 	REG_WR(sc, CSEM_REG_FAST_MEMORY + SEM_FAST_REG_PARITY_RST, 0x1);
 
-	for (i = 0; i < ARRSIZE(ecore_blocks_parity_data); i++) {
+	for (i = 0; i < ARRAY_SIZE(ecore_blocks_parity_data); i++) {
 		uint32_t reg_mask = ecore_parity_reg_mask(sc, i);
 
 		if (reg_mask) {
@@ -841,7 +841,7 @@ static inline void ecore_enable_blocks_parity(struct bxe_softc *sc)
 {
 	int i;
 
-	for (i = 0; i < ARRSIZE(ecore_blocks_parity_data); i++) {
+	for (i = 0; i < ARRAY_SIZE(ecore_blocks_parity_data); i++) {
 		uint32_t reg_mask = ecore_parity_reg_mask(sc, i);
 
 		if (reg_mask)
