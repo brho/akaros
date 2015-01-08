@@ -3,6 +3,6 @@ obj-y                                           += 57711_init_values.o
 obj-y                                           += 57712_init_values.o
 #obj-y                                           += bxe.o
 #obj-y                                           += bxe_debug.o
-#obj-y                                           += bxe_elink.o
+obj-y                                           += bxe_elink.o
 #obj-y                                           += bxe_stats.o
 #obj-y                                           += ecore_sp.o

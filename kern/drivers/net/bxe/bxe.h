@@ -1582,7 +1582,7 @@ struct bxe_adapter {
     bus_dma_tag_t parent_dma_tag;
 
     /* default status block */
-  //    struct bxe_dma              def_sb_dma;
+  struct bxe_dma              def_sb_dma;
   //    struct host_sp_status_block *def_sb;
     uint16_t                    def_idx;
     uint16_t                    def_att_idx;
@@ -1601,7 +1601,7 @@ struct bxe_adapter {
 #define HC_SP_INDEX_ETH_ISCSI_RX_CQ_CONS 1
 
     /* event queue */
-  //    struct bxe_dma        eq_dma;
+  struct bxe_dma        eq_dma;
   //    union event_ring_elem *eq;
     uint16_t              eq_prod;
     uint16_t              eq_cons;
@@ -1620,12 +1620,12 @@ struct bxe_adapter {
 #define EQ_DESC(x) ((x) & EQ_DESC_MASK)
 
     /* slow path */
-  //    struct bxe_dma      sp_dma;
+  struct bxe_dma      sp_dma;
   //    struct bxe_slowpath *sp;
     unsigned long       sp_state;
 
     /* slow path queue */
-  //    struct bxe_dma spq_dma;
+  struct bxe_dma spq_dma;
   //    struct eth_spe *spq;
 #define SP_DESC_CNT     (BCM_PAGE_SIZE / sizeof(struct eth_spe))
 #define MAX_SP_DESC_CNT (SP_DESC_CNT - 1)
@@ -1644,7 +1644,7 @@ struct bxe_adapter {
 
     /* fw decompression buffer */
 #warning "no decmpress buffer"
-  //    struct bxe_dma gz_buf_dma;
+  struct bxe_dma gz_buf_dma;
     void           *gz_buf;
   //    z_streamp      gz_strm;
     uint32_t       gz_outlen;
@@ -1723,7 +1723,7 @@ struct bxe_adapter {
      * This is a memory buffer that will contain both statistics ramrod
      * request and data.
      */
-  //    struct bxe_dma fw_stats_dma;
+  struct bxe_dma fw_stats_dma;
     /*
      * FW statistics request shortcut (points at the beginning of fw_stats
      * buffer).

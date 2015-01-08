@@ -24,7 +24,6 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 //__FBSDID("$FreeBSD: head/sys/dev/bxe/bxe_elink.c 265411 2014-05-06 02:32:27Z davidcs $");
 
 #include "bxe.h"
