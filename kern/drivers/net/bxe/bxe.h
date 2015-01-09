@@ -43,6 +43,8 @@
 
 /* MACROS for conversion to AKAROS. Might we want this stuff someday? */
 #define __predict_false(x) (x)
+#define __noinline 
+#define ETH_ADDR_LEN 6
 /* TYPEDEFS for conversion to AKAROS. These are temporary, but it makes it easier to see what is in need of change. */
 typedef struct netif *if_t;
 typedef uint64_t ift_counter;
@@ -58,9 +60,12 @@ typedef spinlock_t ECORE_MUTEX_SPIN;
 typedef qlock_t ECORE_MUTEX;
 typedef qlock_t mtx;
 typedef int device_t;
+// WTF ...
+typedef uint64_t uintmax_t;
 #define mtx_lock(x) qlock(x)
 #define mtx_unlock(x) qunlock(x)
-#define MTX_ASSERT(lock, thing)
+#define MA_OWNED 0
+#define MTX_ASSERT(lock, thing) assert(0)
 #define device_printf(ignore, format, args...) printk(format, args)
 
 
@@ -523,11 +528,11 @@ struct bxe_fastpath {
     char       rx_mtx_name[32];
 #define BXE_FP_TX_LOCK(fp)        mtx_lock(&fp->tx_mtx)
 #define BXE_FP_TX_UNLOCK(fp)      mtx_unlock(&fp->tx_mtx)
-#define BXE_FP_TX_LOCK_ASSERT(fp) mtx_assert(&fp->tx_mtx, MA_OWNED)
+#define BXE_FP_TX_LOCK_ASSERT(fp) assert(0) /*mtx_assert(&fp->tx_mtx, MA_OWNED)*/
 
 #define BXE_FP_RX_LOCK(fp)        mtx_lock(&fp->rx_mtx)
 #define BXE_FP_RX_UNLOCK(fp)      mtx_unlock(&fp->rx_mtx)
-#define BXE_FP_RX_LOCK_ASSERT(fp) mtx_assert(&fp->rx_mtx, MA_OWNED)
+#define BXE_FP_RX_LOCK_ASSERT(fp) assert(0) /*mtx_assert(&fp->rx_mtx, MA_OWNED)*/
 
     /* status block */
     struct bxe_dma                 sb_dma;
@@ -899,7 +904,9 @@ struct bxe_fw_stats_data {
  * chip/interface being started/stopped/reinitialized, the actual work is
  * offloaded to a taskqueue.
  */
-#define BXE_CORE_LOCK_SX
+//#define BXE_CORE_LOCK_SX
+// For AKAROS, we don't have sx.
+#undef BXE_CORE_LOCK_SX
 
 /*
  * This is the slowpath data structure. It is mapped into non-paged memory
@@ -1019,11 +1026,8 @@ struct bxe_port {
 
     uint32_t    phy_addr;
 
-#warning "no phy mtx"
-    /* Used to synchronize phy accesses. *
-    struct mtx  phy_mtx;
-    char        phy_mtx_name[32];
-    */
+	qlock_t phy_mtx;
+	char        phy_mtx_name[32];
 
 #define BXE_PHY_LOCK(sc)          mtx_lock(&sc->port.phy_mtx)
 #define BXE_PHY_UNLOCK(sc)        mtx_unlock(&sc->port.phy_mtx)
@@ -1047,11 +1051,13 @@ struct bxe_mf_info {
     uint32_t multi_vnics_mode; /* can be set even if vnics_per_port = 1 */
     uint32_t path_has_ovlan;   /* MF mode in the path (can be different than the MF mode of the function */
 
-#define IS_MULTI_VNIC(sc)  ((sc)->devinfo.mf_info.multi_vnics_mode)
-#define VNICS_PER_PORT(sc) ((sc)->devinfo.mf_info.vnics_per_port)
-#define VNICS_PER_PATH(sc)                                  \
+#define IS_MULTI_VNIC(sc)  0 /*((sc)->devinfo.mf_info.multi_vnics_mode)*/
+#define VNICS_PER_PORT(sc) 1/*((sc)->devinfo.mf_info.vnics_per_port)*/
+#define VNICS_PER_PATH(sc) 1
+  /*							    \
     ((sc)->devinfo.mf_info.vnics_per_port *                 \
      ((CHIP_PORT_MODE(sc) == CHIP_4_PORT_MODE) ? 2 : 1 ))
+  */
 
     uint8_t min_bw[MAX_VNIC_NUM];
     uint8_t max_bw[MAX_VNIC_NUM];
@@ -1264,7 +1270,7 @@ struct bxe_devinfo {
     char bc_ver_str[32];
     uint32_t mf_cfg_base; /* bootcode shmem address in BAR memory */
 #warning "bxe_mf_info"
-  //    struct bxe_mf_info mf_info;
+	struct bxe_mf_info mf_info;
 
     int flash_size;
 #define NVRAM_1MB_SIZE      0x20000
@@ -1314,20 +1320,20 @@ enum {
 /* Top level device private data structure. */
 #warning "need to fix up device private"
 struct bxe_adapter {
-    /*
-     * First entry must be a pointer to the BSD ifnet struct which
-     * has a first element of 'void *if_softc' (which is us). XXX
-     */
-    if_t 	    ifp;
+	/*
+	 * First entry must be a pointer to the BSD ifnet struct which
+	 * has a first element of 'void *if_softc' (which is us). XXX
+	 */
+	if_t 	    ifp;
 	/* OS defined structs */
 	struct net_device *netdev;
 	struct pci_device *pdev;
 	//struct net_device_stats net_stats;
 #warning "no ifmedia. "
-  // struct ifmedia  ifmedia; /* network interface media structure */
-    int             media;
-
-    int             state; /* device state */
+	// struct ifmedia  ifmedia; /* network interface media structure */
+	int             media;
+	
+	int             state; /* device state */
 #define BXE_STATE_CLOSED                 0x0000
 #define BXE_STATE_OPENING_WAITING_LOAD   0x1000
 #define BXE_STATE_OPENING_WAITING_PORT   0x2000
@@ -1338,8 +1344,8 @@ struct bxe_adapter {
 #define BXE_STATE_DISABLED               0xD000
 #define BXE_STATE_DIAG                   0xE000
 #define BXE_STATE_ERROR                  0xF000
-
-    int flags;
+	
+	int flags;
 #define BXE_ONE_PORT_FLAG    0x00000001
 #define BXE_NO_ISCSI         0x00000002
 #define BXE_NO_FCOE          0x00000004
@@ -1354,57 +1360,56 @@ struct bxe_adapter {
 //#define BXE_SAFC_TX_FLAG     0x00000400
 #define BXE_MF_FUNC_DIS      0x00000800
 #define BXE_TX_SWITCHING     0x00001000
-
-    unsigned long debug; /* per-instance debug logging config */
-
+	
+	unsigned long debug; /* per-instance debug logging config */
+	
 #define MAX_BARS 5
-    struct bxe_bar bar[MAX_BARS]; /* map BARs 0, 2, 4 */
-
-    uint16_t doorbell_size;
-
+	struct bxe_bar bar[MAX_BARS]; /* map BARs 0, 2, 4 */
+	
+	uint16_t doorbell_size;
+	
 #warning "no timer callout"
-    /* periodic timer callout */
+	/* periodic timer callout */
 #define PERIODIC_STOP 0
 #define PERIODIC_GO   1
-  /*    volatile unsigned long periodic_flags;
-    struct callout         periodic_callout;
-  */
-    /* chip start/stop/reset taskqueue */
+	volatile unsigned long periodic_flags;
+	//      struct callout         periodic_callout;
+	/* chip start/stop/reset taskqueue */
 #define CHIP_TQ_NONE   0
 #define CHIP_TQ_START  1
 #define CHIP_TQ_STOP   2
 #define CHIP_TQ_REINIT 3
-    volatile unsigned long chip_tq_flags;
+	volatile unsigned long chip_tq_flags;
 #warning "no chip_tq_task or other tasks from here on down"
 #if 0
-  struct task            chip_tq_task;
-  struct taskqueue       *chip_tq;
-  char                   chip_tq_name[32];
+	struct task            chip_tq_task;
+	struct taskqueue       *chip_tq;
+	char                   chip_tq_name[32];
+	
+	/* slowpath interrupt taskqueue */
+	struct task      sp_tq_task;
+	struct taskqueue *sp_tq;
+	char             sp_tq_name[32];
+	
+	/* set rx_mode asynchronous taskqueue */
+	struct task      rx_mode_tq_task;
+	struct taskqueue *rx_mode_tq;
+	char             rx_mode_tq_name[32];
+#endif	
+	struct bxe_fastpath fp[MAX_RSS_CHAINS];
+	struct bxe_sp_objs  sp_objs[MAX_RSS_CHAINS];
+	
 
-    /* slowpath interrupt taskqueue */
-    struct task      sp_tq_task;
-    struct taskqueue *sp_tq;
-    char             sp_tq_name[32];
-
-    /* set rx_mode asynchronous taskqueue */
-    struct task      rx_mode_tq_task;
-    struct taskqueue *rx_mode_tq;
-    char             rx_mode_tq_name[32];
-
-    struct bxe_fastpath fp[MAX_RSS_CHAINS];
-    struct bxe_sp_objs  sp_objs[MAX_RSS_CHAINS];
-
-#endif
-    device_t dev;  /* parent device handle */
-    uint8_t  unit; /* driver instance number */
-
-    int pcie_bus;    /* PCIe bus number */
-    int pcie_device; /* PCIe device/slot number */
-    int pcie_func;   /* PCIe function number */
-
-    uint8_t pfunc_rel; /* function relative */
-    uint8_t pfunc_abs; /* function absolute */
-    uint8_t path_id;   /* function absolute */
+	device_t dev;  /* parent device handle */
+	uint8_t  unit; /* driver instance number */
+	
+	int pcie_bus;    /* PCIe bus number */
+	int pcie_device; /* PCIe device/slot number */
+	int pcie_func;   /* PCIe function number */
+	
+	uint8_t pfunc_rel; /* function relative */
+	uint8_t pfunc_abs; /* function absolute */
+	uint8_t path_id;   /* function absolute */
 #define SC_PATH(sc)     (sc->path_id)
 #define SC_PORT(sc)     (sc->pfunc_rel & 1)
 #define SC_FUNC(sc)     (sc->pfunc_rel)
@@ -1416,45 +1421,40 @@ struct bxe_adapter {
 #define VNIC_ID(sc)     SC_VN(sc)
 #define FUNC_ID(sc)     SC_FUNC(sc)
 #define ABS_FUNC_ID(sc) SC_ABS_FUNC(sc)
-#define SC_FW_MB_IDX_VN(sc, vn)                                
-#if 0
-\
+#define SC_FW_MB_IDX_VN(sc, vn)                                \
     (SC_PORT(sc) + (vn) *                                      \
      ((CHIP_IS_E1x(sc) || (CHIP_IS_MODE_4_PORT(sc))) ? 2 : 1))
-#endif
 
 #define SC_FW_MB_IDX(sc) SC_FW_MB_IDX_VN(sc, SC_VN(sc))
-
-    int if_capen; /* enabled interface capabilities */
-
-  struct bxe_devinfo devinfo;
-    char fw_ver_str[32];
-    char mf_mode_str[32];
-    char pci_link_str[32];
-  const struct iro *iro_array;
-
-#warning "no locking of any kind"
-#if 0
+	
+	int if_capen; /* enabled interface capabilities */
+	
+	struct bxe_devinfo devinfo;
+	char fw_ver_str[32];
+	char mf_mode_str[32];
+	char pci_link_str[32];
+	const struct iro *iro_array;
+	
 #ifdef BXE_CORE_LOCK_SX
-    struct sx      core_sx;
-    char           core_sx_name[32];
+	struct sx      core_sx;
+	char           core_sx_name[32];
 #else
-    struct mtx     core_mtx;
-    char           core_mtx_name[32];
+	qlock_t     core_mtx;
+	char           core_mtx_name[32];
 #endif
-    struct mtx     sp_mtx;
-    char           sp_mtx_name[32];
-    struct mtx     dmae_mtx;
-    char           dmae_mtx_name[32];
-    struct mtx     fwmb_mtx;
-    char           fwmb_mtx_name[32];
-    struct mtx     print_mtx;
-    char           print_mtx_name[32];
-    struct mtx     stats_mtx;
-    char           stats_mtx_name[32];
-    struct mtx     mcast_mtx;
-    char           mcast_mtx_name[32];
-#endif
+	qlock_t     sp_mtx;
+	char           sp_mtx_name[32];
+	qlock_t     dmae_mtx;
+	char           dmae_mtx_name[32];
+	qlock_t     fwmb_mtx;
+	char           fwmb_mtx_name[32];
+	qlock_t     print_mtx;
+	char           print_mtx_name[32];
+	qlock_t     stats_mtx;
+	char           stats_mtx_name[32];
+	qlock_t     mcast_mtx;
+	char           mcast_mtx_name[32];
+	
 #ifdef BXE_CORE_LOCK_SX
 #define BXE_CORE_TRYLOCK(sc)      sx_try_xlock(&sc->core_sx)
 #define BXE_CORE_LOCK(sc)         sx_xlock(&sc->core_sx)
@@ -1487,102 +1487,102 @@ struct bxe_adapter {
 #define BXE_STATS_UNLOCK(sc)      mtx_unlock(&sc->stats_mtx)
 #define BXE_STATS_LOCK_ASSERT(sc) mtx_assert(&sc->stats_mtx, MA_OWNED)
 
+#warning "find outwhat IF_ADDR_LOCK is"
 #define BXE_MCAST_LOCK(sc)        \
     do {                          \
-    whatever. \\
-        IF_ADDR_LOCK(sc->ifp);  \
+	    /*IF_ADDR_LOCK(sc->ifp);*/		\
     } while (0)
 #define BXE_MCAST_LOCK_ASSERT(sc) mtx_assert(&sc->mcast_mtx, MA_OWNED)
-
-    int dmae_ready;
+	
+	int dmae_ready;
 #define DMAE_READY(sc) (sc->dmae_ready)
-
+	
 #warning "no credit ppools. "
-#if 0
-    struct ecore_credit_pool_obj vlans_pool;
-    struct ecore_credit_pool_obj macs_pool;
-    struct ecore_rx_mode_obj     rx_mode_obj;
-    struct ecore_mcast_obj       mcast_obj;
-    struct ecore_rss_config_obj  rss_conf_obj;
-    struct ecore_func_sp_obj     func_obj;
-#endif
-    uint16_t fw_seq;
-    uint16_t fw_drv_pulse_wr_seq;
-    uint32_t func_stx;
 
-    struct elink_params         link_params;
-    struct elink_vars           link_vars;
-    uint32_t                    link_cnt;
-  struct bxe_link_report_data last_reported_link;
-    char mac_addr_str[32];
+	struct ecore_credit_pool_obj vlans_pool;
+	struct ecore_credit_pool_obj macs_pool;
+	struct ecore_rx_mode_obj     rx_mode_obj;
+	struct ecore_mcast_obj       mcast_obj;
+	struct ecore_rss_config_obj  rss_conf_obj;
+	struct ecore_func_sp_obj     func_obj;
 
-    int last_reported_link_state;
-
-    int tx_ring_size;
-    int rx_ring_size;
-    int wol;
-
-    int is_leader;
-    int recovery_state;
+	uint16_t fw_seq;
+	uint16_t fw_drv_pulse_wr_seq;
+	uint32_t func_stx;
+	
+	struct elink_params         link_params;
+	struct elink_vars           link_vars;
+	uint32_t                    link_cnt;
+	struct bxe_link_report_data last_reported_link;
+	char mac_addr_str[32];
+	
+	int last_reported_link_state;
+	
+	int tx_ring_size;
+	int rx_ring_size;
+	int wol;
+	
+	int is_leader;
+	int recovery_state;
 #define BXE_RECOVERY_DONE        1
 #define BXE_RECOVERY_INIT        2
 #define BXE_RECOVERY_WAIT        3
 #define BXE_RECOVERY_FAILED      4
 #define BXE_RECOVERY_NIC_LOADING 5
-
-    uint32_t rx_mode;
+	
+	uint32_t rx_mode;
 #define BXE_RX_MODE_NONE     0
 #define BXE_RX_MODE_NORMAL   1
 #define BXE_RX_MODE_ALLMULTI 2
 #define BXE_RX_MODE_PROMISC  3
 #define BXE_MAX_MULTICAST    64
-
-  struct bxe_port port;
-
-  struct cmng_init cmng;
-
-    /* user configs */
-    int      num_queues;
-    int      max_rx_bufs;
-    int      hc_rx_ticks;
-    int      hc_tx_ticks;
-    int      rx_budget;
-    int      max_aggregation_size;
-    int      mrrs;
-    int      autogreeen;
+	
+	struct bxe_port port;
+	
+	struct cmng_init cmng;
+	
+	/* user configs */
+	int      num_queues;
+	int      max_rx_bufs;
+	int      hc_rx_ticks;
+	int      hc_tx_ticks;
+	int      rx_budget;
+	int      max_aggregation_size;
+	int      mrrs;
+	int      autogreeen;
 #define AUTO_GREEN_HW_DEFAULT 0
 #define AUTO_GREEN_FORCE_ON   1
 #define AUTO_GREEN_FORCE_OFF  2
-    int      interrupt_mode;
+	int      interrupt_mode;
 #define INTR_MODE_INTX 0
 #define INTR_MODE_MSI  1
 #define INTR_MODE_MSIX 2
-    int      udp_rss;
-
-    /* interrupt allocations */
-    struct bxe_intr intr[MAX_RSS_CHAINS+1];
-    int             intr_count;
-    uint8_t         igu_dsb_id;
-    uint8_t         igu_base_sb;
-    uint8_t         igu_sb_cnt;
-    //uint8_t         min_msix_vec_cnt;
-    uint32_t        igu_base_addr;
-    //bus_addr_t      def_status_blk_mapping;
-    uint8_t         base_fw_ndsb;
+	int      udp_rss;
+	
+	/* interrupt allocations */
+	struct bxe_intr intr[MAX_RSS_CHAINS+1];
+	int             intr_count;
+	uint8_t         igu_dsb_id;
+	uint8_t         igu_base_sb;
+	uint8_t         igu_sb_cnt;
+	//uint8_t         min_msix_vec_cnt;
+	uint32_t        igu_base_addr;
+	//bus_addr_t      def_status_blk_mapping;
+	uint8_t         base_fw_ndsb;
 #define DEF_SB_IGU_ID 16
 #define DEF_SB_ID     HC_SP_SB_ID
-
-    /* parent bus DMA tag  */
-    bus_dma_tag_t parent_dma_tag;
-
-    /* default status block */
-  struct bxe_dma              def_sb_dma;
-  //    struct host_sp_status_block *def_sb;
-    uint16_t                    def_idx;
-    uint16_t                    def_att_idx;
-    uint32_t                    attn_state;
-  //    struct attn_route           attn_group[MAX_DYNAMIC_ATTN_GRPS];
-
+	
+	/* parent bus DMA tag  */
+	bus_dma_tag_t parent_dma_tag;
+	
+	/* default status block */
+	struct bxe_dma              def_sb_dma;
+	struct host_sp_status_block *def_sb;
+	uint16_t                    def_idx;
+	uint16_t                    def_att_idx;
+	uint32_t                    attn_state;
+	struct attn_route           attn_group[MAX_DYNAMIC_ATTN_GRPS];
+	
 /* general SP events - stats query, cfc delete, etc */
 #define HC_SP_INDEX_ETH_DEF_CONS         3
 /* EQ completions */
@@ -1594,12 +1594,12 @@ struct bxe_adapter {
 #define HC_SP_INDEX_ETH_ISCSI_CQ_CONS    5
 #define HC_SP_INDEX_ETH_ISCSI_RX_CQ_CONS 1
 
-    /* event queue */
-  struct bxe_dma        eq_dma;
-  //    union event_ring_elem *eq;
-    uint16_t              eq_prod;
-    uint16_t              eq_cons;
-    uint16_t              *eq_cons_sb;
+	/* event queue */
+	struct bxe_dma        eq_dma;
+	union event_ring_elem *eq;
+	uint16_t              eq_prod;
+	uint16_t              eq_cons;
+	uint16_t              *eq_cons_sb;
 #define NUM_EQ_PAGES     1 /* must be a power of 2 */
 #define EQ_DESC_CNT_PAGE (BCM_PAGE_SIZE / sizeof(union event_ring_elem))
 #define EQ_DESC_MAX_PAGE (EQ_DESC_CNT_PAGE - 1)
@@ -1614,53 +1614,53 @@ struct bxe_adapter {
 #define EQ_DESC(x) ((x) & EQ_DESC_MASK)
 
     /* slow path */
-  struct bxe_dma      sp_dma;
-  struct bxe_slowpath *sp;
-    unsigned long       sp_state;
-
-    /* slow path queue */
-  struct bxe_dma spq_dma;
-  //    struct eth_spe *spq;
+	struct bxe_dma      sp_dma;
+	struct bxe_slowpath *sp;
+	unsigned long       sp_state;
+	
+	/* slow path queue */
+	struct bxe_dma spq_dma;
+struct eth_spe *spq;
 #define SP_DESC_CNT     (BCM_PAGE_SIZE / sizeof(struct eth_spe))
 #define MAX_SP_DESC_CNT (SP_DESC_CNT - 1)
 #define MAX_SPQ_PENDING 8
-
-    uint16_t       spq_prod_idx;
+	
+	uint16_t       spq_prod_idx;
 #warning "no eth_spe"
-  //    struct eth_spe *spq_prod_bd;
-  //    struct eth_spe *spq_last_bd;
-    uint16_t       *dsb_sp_prod;
-    //uint16_t       *spq_hw_con;
-    //uint16_t       spq_left;
-
-    volatile unsigned long eq_spq_left; /* COMMON_xxx ramrod credit */
-    volatile unsigned long cq_spq_left; /* ETH_xxx ramrod credit */
-
-    /* fw decompression buffer */
+	struct eth_spe *spq_prod_bd;
+	struct eth_spe *spq_last_bd;
+	uint16_t       *dsb_sp_prod;
+	uint16_t       *spq_hw_con;
+	uint16_t       spq_left;
+	
+	volatile unsigned long eq_spq_left; /* COMMON_xxx ramrod credit */
+	volatile unsigned long cq_spq_left; /* ETH_xxx ramrod credit */
+	
+	/* fw decompression buffer */
 #warning "no decmpress buffer"
-  struct bxe_dma gz_buf_dma;
-    void           *gz_buf;
-  //    z_streamp      gz_strm;
-    uint32_t       gz_outlen;
+	struct bxe_dma gz_buf_dma;
+	void           *gz_buf;
+	//    z_streamp      gz_strm;
+	uint32_t       gz_outlen;
 #define GUNZIP_BUF(sc)    (sc->gz_buf)
 #define GUNZIP_OUTLEN(sc) (sc->gz_outlen)
 #define GUNZIP_PHYS(sc)   (sc->gz_buf_dma.paddr)
 #define FW_BUF_SIZE       0x40000
-
-    const struct raw_op *init_ops;
-    const uint16_t *init_ops_offsets; /* init block offsets inside init_ops */
-    const uint32_t *init_data;        /* data blob, 32 bit granularity */
-    uint32_t       init_mode_flags;
+	
+	const struct raw_op *init_ops;
+	const uint16_t *init_ops_offsets; /* init block offsets inside init_ops */
+	const uint32_t *init_data;        /* data blob, 32 bit granularity */
+	uint32_t       init_mode_flags;
 #define INIT_MODE_FLAGS(sc) (sc->init_mode_flags)
-    /* PRAM blobs - raw data */
-    const uint8_t *tsem_int_table_data;
-    const uint8_t *tsem_pram_data;
-    const uint8_t *usem_int_table_data;
-    const uint8_t *usem_pram_data;
-    const uint8_t *xsem_int_table_data;
-    const uint8_t *xsem_pram_data;
-    const uint8_t *csem_int_table_data;
-    const uint8_t *csem_pram_data;
+	/* PRAM blobs - raw data */
+	const uint8_t *tsem_int_table_data;
+	const uint8_t *tsem_pram_data;
+	const uint8_t *usem_int_table_data;
+	const uint8_t *usem_pram_data;
+	const uint8_t *xsem_int_table_data;
+	const uint8_t *xsem_pram_data;
+	const uint8_t *csem_int_table_data;
+	const uint8_t *csem_pram_data;
 #define INIT_OPS(sc)                 (sc->init_ops)
 #define INIT_OPS_OFFSETS(sc)         (sc->init_ops_offsets)
 #define INIT_DATA(sc)                (sc->init_data)
@@ -1673,121 +1673,116 @@ struct bxe_adapter {
 #define INIT_CSEM_INT_TABLE_DATA(sc) (sc->csem_int_table_data)
 #define INIT_CSEM_PRAM_DATA(sc)      (sc->csem_pram_data)
 
-    /* ILT
-     * For max 196 cids (64*3 + non-eth), 32KB ILT page size and 1KB
-     * context size we need 8 ILT entries.
-     */
-#warning "ILT -- will this struct ever end?"
+	/* ILT
+	 * For max 196 cids (64*3 + non-eth), 32KB ILT page size and 1KB
+	 * context size we need 8 ILT entries.
+	 */
 #define ILT_MAX_L2_LINES 8
-  //    struct hw_context context[ILT_MAX_L2_LINES];
-  //    struct ecore_ilt *ilt;
+	//    struct hw_context context[ILT_MAX_L2_LINES];
+	struct ecore_ilt *ilt;
 #define ILT_MAX_LINES 256
-
+	
 /* max supported number of RSS queues: IGU SBs minus one for CNIC */
 #define BXE_MAX_RSS_COUNT(sc) ((sc)->igu_sb_cnt - CNIC_SUPPORT(sc))
 /* max CID count: Max RSS * Max_Tx_Multi_Cos + FCoE + iSCSI */
 #if 1
 #define BXE_L2_MAX_CID(sc)                                              \
-    (BXE_MAX_RSS_COUNT(sc) * ECORE_MULTI_TX_COS + 2 * CNIC_SUPPORT(sc))
+	(BXE_MAX_RSS_COUNT(sc) * ECORE_MULTI_TX_COS + 2 * CNIC_SUPPORT(sc))
 #else
 #define BXE_L2_MAX_CID(sc) /* OOO + FWD */                              \
-    (BXE_MAX_RSS_COUNT(sc) * ECORE_MULTI_TX_COS + 4 * CNIC_SUPPORT(sc))
+	(BXE_MAX_RSS_COUNT(sc) * ECORE_MULTI_TX_COS + 4 * CNIC_SUPPORT(sc))
 #endif
 #if 1
-#define BXE_L2_CID_COUNT(sc)                                             \
-    (BXE_NUM_ETH_QUEUES(sc) * ECORE_MULTI_TX_COS + 2 * CNIC_SUPPORT(sc))
+#define BXE_L2_CID_COUNT(sc)						\
+	(BXE_NUM_ETH_QUEUES(sc) * ECORE_MULTI_TX_COS + 2 * CNIC_SUPPORT(sc))
 #else
-#define BXE_L2_CID_COUNT(sc) /* OOO + FWD */                             \
-    (BXE_NUM_ETH_QUEUES(sc) * ECORE_MULTI_TX_COS + 4 * CNIC_SUPPORT(sc))
+#define BXE_L2_CID_COUNT(sc) /* OOO + FWD */				\
+	(BXE_NUM_ETH_QUEUES(sc) * ECORE_MULTI_TX_COS + 4 * CNIC_SUPPORT(sc))
 #endif
 #define L2_ILT_LINES(sc)                                \
-    (DIV_ROUND_UP(BXE_L2_CID_COUNT(sc), ILT_PAGE_CIDS))
+	(DIV_ROUND_UP(BXE_L2_CID_COUNT(sc), ILT_PAGE_CIDS))
+	
+	int qm_cid_count;
+	
+	uint8_t dropless_fc;
 
-    int qm_cid_count;
+	struct bxe_dma *t2;
 
-    uint8_t dropless_fc;
-
+	/* total number of FW statistics requests */
+	uint8_t fw_stats_num;
+	/*
+	 * This is a memory buffer that will contain both statistics ramrod
+	 * request and data.
+	 */
+	struct bxe_dma fw_stats_dma;
+	/*
+	 * FW statistics request shortcut (points at the beginning of fw_stats
+	 * buffer).
+	 */
+	int                     fw_stats_req_size;
+	//    struct bxe_fw_stats_req *fw_stats_req;
+	bus_addr_t              fw_stats_req_mapping;
+	/*
+	 * FW statistics data shortcut (points at the beginning of fw_stats
+	 * buffer + fw_stats_req_size).
+	 */
+	int                      fw_stats_data_size;
+	//    struct bxe_fw_stats_data *fw_stats_data;
+	bus_addr_t               fw_stats_data_mapping;
+	
+	/* tracking a pending STAT_QUERY ramrod */
+	uint16_t stats_pending;
+	/* number of completed statistics ramrods */
+	uint16_t stats_comp;
+	uint16_t stats_counter;
+	uint8_t  stats_init;
+	int      stats_state;
 #if 0
-    struct bxe_dma *t2;
+	struct bxe_eth_stats         eth_stats;
+	struct host_func_stats       func_stats;
+	struct bxe_eth_stats_old     eth_stats_old;
+	struct bxe_net_stats_old     net_stats_old;
+	struct bxe_fw_port_stats_old fw_stats_old;
+	
+	struct dmae_command stats_dmae; /* used by dmae command loader */
 #endif
-
-    /* total number of FW statistics requests */
-    uint8_t fw_stats_num;
-    /*
-     * This is a memory buffer that will contain both statistics ramrod
-     * request and data.
-     */
-  struct bxe_dma fw_stats_dma;
-    /*
-     * FW statistics request shortcut (points at the beginning of fw_stats
-     * buffer).
-     */
-    int                     fw_stats_req_size;
-  //    struct bxe_fw_stats_req *fw_stats_req;
-    bus_addr_t              fw_stats_req_mapping;
-    /*
-     * FW statistics data shortcut (points at the beginning of fw_stats
-     * buffer + fw_stats_req_size).
-     */
-    int                      fw_stats_data_size;
-  //    struct bxe_fw_stats_data *fw_stats_data;
-    bus_addr_t               fw_stats_data_mapping;
-
-    /* tracking a pending STAT_QUERY ramrod */
-    uint16_t stats_pending;
-    /* number of completed statistics ramrods */
-    uint16_t stats_comp;
-    uint16_t stats_counter;
-    uint8_t  stats_init;
-    int      stats_state;
+	int                 executer_idx;
+	
+	int mtu;
+	
+	/* LLDP params */
 #if 0
-    struct bxe_eth_stats         eth_stats;
-    struct host_func_stats       func_stats;
-    struct bxe_eth_stats_old     eth_stats_old;
-    struct bxe_net_stats_old     net_stats_old;
-    struct bxe_fw_port_stats_old fw_stats_old;
-
-    struct dmae_command stats_dmae; /* used by dmae command loader */
+	struct bxe_config_lldp_params lldp_config_params;
 #endif
-    int                 executer_idx;
-
-    int mtu;
-
-    /* LLDP params */
-#if 0
-    struct bxe_config_lldp_params lldp_config_params;
-#endif
-    /* DCB support on/off */
-    int dcb_state;
+	/* DCB support on/off */
+	int dcb_state;
 #define BXE_DCB_STATE_OFF 0
 #define BXE_DCB_STATE_ON  1
-    /* DCBX engine mode */
-    int dcbx_enabled;
+	/* DCBX engine mode */
+	int dcbx_enabled;
 #define BXE_DCBX_ENABLED_OFF        0
 #define BXE_DCBX_ENABLED_ON_NEG_OFF 1
 #define BXE_DCBX_ENABLED_ON_NEG_ON  2
 #define BXE_DCBX_ENABLED_INVALID    -1
-    uint8_t dcbx_mode_uset;
-#if 0
-    struct bxe_config_dcbx_params dcbx_config_params;
-    struct bxe_dcbx_port_params   dcbx_port_params;
-#endif
-    int dcb_version;
-
-    uint8_t cnic_support;
-    uint8_t cnic_enabled;
-    uint8_t cnic_loaded;
+	uint8_t dcbx_mode_uset;
+	struct bxe_config_dcbx_params dcbx_config_params;
+	struct bxe_dcbx_port_params   dcbx_port_params;
+	int dcb_version;
+	
+	uint8_t cnic_support;
+	uint8_t cnic_enabled;
+	uint8_t cnic_loaded;
 #define CNIC_SUPPORT(sc) 0 /* ((sc)->cnic_support) */
 #define CNIC_ENABLED(sc) 0 /* ((sc)->cnic_enabled) */
 #define CNIC_LOADED(sc)  0 /* ((sc)->cnic_loaded) */
-
-    /* multiple tx classes of service */
-    uint8_t max_cos;
+	
+	/* multiple tx classes of service */
+	uint8_t max_cos;
 #define BXE_MAX_PRIORITY 8
-    /* priority to cos mapping */
-    uint8_t prio_to_cos[BXE_MAX_PRIORITY];
-
-    int panic;
+	/* priority to cos mapping */
+	uint8_t prio_to_cos[BXE_MAX_PRIORITY];
+	
+	int panic;
 }; /* struct bxe_adapter */
 
 /* IOCTL sub-commands for edebug and firmware upgrade */
@@ -1906,7 +1901,7 @@ void bxe_reg_write32(struct bxe_adapter *sc, bus_size_t offset, uint32_t val);
     (sc->sp_dma.paddr + offsetof(struct bxe_slowpath, var))
 
 #define BXE_FP(sc, nr, var) ((sc)->fp[(nr)].var)
-#define BXE_SP_OBJ(sc, fp) ((sc)->sp_objs[(fp)->index])
+#define BXE_SP_OBJ(sc, fp) (void *) 0 /*((sc)->sp_objs[(fp)->index])*/
 
 #if 0
 #define bxe_fp(sc, nr, var)   ((sc)->fp[nr].var)

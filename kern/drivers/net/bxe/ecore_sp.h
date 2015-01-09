@@ -152,6 +152,7 @@ typedef _Bool bool;
 
 #define SC_ILT(sc)  ((sc)->ilt)
 #define ILOG2(x)    bxe_ilog2(x)
+#if 0
 
 #define ECORE_ILT_ZALLOC(x, y, size)                                       \
     do {                                                                   \
@@ -178,7 +179,7 @@ typedef _Bool bool;
             y = 0;                                   \
         }                                            \
     } while (0)
-
+#endif
 #define ECORE_IS_VALID_ETHER_ADDR(_mac) TRUE
 
 #define ECORE_IS_MF_SD_MODE   IS_MF_SD_MODE

@@ -264,63 +264,61 @@ struct bxe_prev_list_node {
 
 //SYSCTL_NODE(_hw, OID_AUTO, bxe, CTLFLAG_RD, 0, "bxe driver parameters");
 
-#if 0
 /* Debug */
 unsigned long bxe_debug = 0;
-SYSCTL_ULONG(_hw_bxe, OID_AUTO, debug, CTLFLAG_RDTUN,
-             &bxe_debug, 0, "Debug logging mode");
+//SYSCTL_ULONG(_hw_bxe, OID_AUTO, debug, CTLFLAG_RDTUN,
+//             &bxe_debug, 0, "Debug logging mode");
 
 /* Interrupt Mode: 0 (IRQ), 1 (MSI/IRQ), and 2 (MSI-X/MSI/IRQ) */
 static int bxe_interrupt_mode = INTR_MODE_MSIX;
-SYSCTL_INT(_hw_bxe, OID_AUTO, interrupt_mode, CTLFLAG_RDTUN,
-           &bxe_interrupt_mode, 0, "Interrupt (MSI-X/MSI/INTx) mode");
+//SYSCTL_INT(_hw_bxe, OID_AUTO, interrupt_mode, CTLFLAG_RDTUN,
+//           &bxe_interrupt_mode, 0, "Interrupt (MSI-X/MSI/INTx) mode");
 
 /* Number of Queues: 0 (Auto) or 1 to 16 (fixed queue number) */
 static int bxe_queue_count = 4;
-SYSCTL_INT(_hw_bxe, OID_AUTO, queue_count, CTLFLAG_RDTUN,
-           &bxe_queue_count, 0, "Multi-Queue queue count");
+//SYSCTL_INT(_hw_bxe, OID_AUTO, queue_count, CTLFLAG_RDTUN,
+//           &bxe_queue_count, 0, "Multi-Queue queue count");
 
 /* max number of buffers per queue (default RX_BD_USABLE) */
 static int bxe_max_rx_bufs = 0;
-SYSCTL_INT(_hw_bxe, OID_AUTO, max_rx_bufs, CTLFLAG_RDTUN,
-           &bxe_max_rx_bufs, 0, "Maximum Number of Rx Buffers Per Queue");
+//SYSCTL_INT(_hw_bxe, OID_AUTO, max_rx_bufs, CTLFLAG_RDTUN,
+//           &bxe_max_rx_bufs, 0, "Maximum Number of Rx Buffers Per Queue");
 
 /* Host interrupt coalescing RX tick timer (usecs) */
 static int bxe_hc_rx_ticks = 25;
-SYSCTL_INT(_hw_bxe, OID_AUTO, hc_rx_ticks, CTLFLAG_RDTUN,
-           &bxe_hc_rx_ticks, 0, "Host Coalescing Rx ticks");
+//SYSCTL_INT(_hw_bxe, OID_AUTO, hc_rx_ticks, CTLFLAG_RDTUN,
+//           &bxe_hc_rx_ticks, 0, "Host Coalescing Rx ticks");
 
 /* Host interrupt coalescing TX tick timer (usecs) */
 static int bxe_hc_tx_ticks = 50;
-SYSCTL_INT(_hw_bxe, OID_AUTO, hc_tx_ticks, CTLFLAG_RDTUN,
-           &bxe_hc_tx_ticks, 0, "Host Coalescing Tx ticks");
+//SYSCTL_INT(_hw_bxe, OID_AUTO, hc_tx_ticks, CTLFLAG_RDTUN,
+//           &bxe_hc_tx_ticks, 0, "Host Coalescing Tx ticks");
 
 /* Maximum number of Rx packets to process at a time */
 static int bxe_rx_budget = 0xffffffff;
-SYSCTL_INT(_hw_bxe, OID_AUTO, rx_budget, CTLFLAG_TUN,
-           &bxe_rx_budget, 0, "Rx processing budget");
+//SYSCTL_INT(_hw_bxe, OID_AUTO, rx_budget, CTLFLAG_TUN,
+//           &bxe_rx_budget, 0, "Rx processing budget");
 
 /* Maximum LRO aggregation size */
 static int bxe_max_aggregation_size = 0;
-SYSCTL_INT(_hw_bxe, OID_AUTO, max_aggregation_size, CTLFLAG_TUN,
-           &bxe_max_aggregation_size, 0, "max aggregation size");
+//SYSCTL_INT(_hw_bxe, OID_AUTO, max_aggregation_size, CTLFLAG_TUN,
+//           &bxe_max_aggregation_size, 0, "max aggregation size");
 
 /* PCI MRRS: -1 (Auto), 0 (128B), 1 (256B), 2 (512B), 3 (1KB) */
 static int bxe_mrrs = -1;
-SYSCTL_INT(_hw_bxe, OID_AUTO, mrrs, CTLFLAG_RDTUN,
-           &bxe_mrrs, 0, "PCIe maximum read request size");
+//SYSCTL_INT(_hw_bxe, OID_AUTO, mrrs, CTLFLAG_RDTUN,
+//           &bxe_mrrs, 0, "PCIe maximum read request size");
 
 /* AutoGrEEEn: 0 (hardware default), 1 (force on), 2 (force off) */
 static int bxe_autogreeen = 0;
-SYSCTL_INT(_hw_bxe, OID_AUTO, autogreeen, CTLFLAG_RDTUN,
-           &bxe_autogreeen, 0, "AutoGrEEEn support");
+//SYSCTL_INT(_hw_bxe, OID_AUTO, autogreeen, CTLFLAG_RDTUN,
+//           &bxe_autogreeen, 0, "AutoGrEEEn support");
 
 /* 4-tuple RSS support for UDP: 0 (disabled), 1 (enabled) */
 static int bxe_udp_rss = 0;
-SYSCTL_INT(_hw_bxe, OID_AUTO, udp_rss, CTLFLAG_RDTUN,
-           &bxe_udp_rss, 0, "UDP RSS support");
+//SYSCTL_INT(_hw_bxe, OID_AUTO, udp_rss, CTLFLAG_RDTUN,
+//           &bxe_udp_rss, 0, "UDP RSS support");
 
-#endif
 #define STAT_NAME_LEN 32 /* no stat names below can be longer than this */
 
 #define STATS_OFFSET32(stat_name)                   \
@@ -673,9 +671,9 @@ static int     bxe_alloc_rx_sge_mbuf(struct bxe_fastpath *fp,
 static uint8_t bxe_txeof(struct bxe_adapter *sc,
                          struct bxe_fastpath *fp);
 static void    bxe_task_fp(struct bxe_fastpath *fp);
-static __noinline void bxe_dump_mbuf(struct bxe_adapter *sc,
-                                     struct mbuf      *m,
-                                     uint8_t          contents);
+//static __noinline void bxe_dump_mbuf(struct bxe_adapter *sc,
+//                                     struct mbuf      *m,
+//                                     uint8_t          contents);
 static int     bxe_alloc_mem(struct bxe_adapter *sc);
 static void    bxe_free_mem(struct bxe_adapter *sc);
 static int     bxe_alloc_fw_stats_mem(struct bxe_adapter *sc);
@@ -853,6 +851,7 @@ bxe_cmpxchg(volatile int *addr,
 static void
 bxe_dma_map_addr(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 {
+#if 0
     struct bxe_dma *dma = arg;
 
     if (error) {
@@ -869,6 +868,7 @@ bxe_dma_map_addr(void *arg, bus_dma_segment_t *segs, int nseg, int error)
               dma->nseg, dma->size);
 #endif
     }
+#endif
 }
 
 /*
@@ -885,6 +885,7 @@ bxe_dma_alloc(struct bxe_adapter *sc,
               struct bxe_dma   *dma,
               const char       *msg)
 {
+#if 0
     int rc;
 
     if (dma->size > 0) {
@@ -943,7 +944,7 @@ bxe_dma_alloc(struct bxe_adapter *sc,
         memset(dma, 0, sizeof(*dma));
         return (1);
     }
-
+#endif
     return (0);
 }
 
@@ -951,6 +952,7 @@ void
 bxe_dma_free(struct bxe_adapter *sc,
              struct bxe_dma   *dma)
 {
+#if 0
     if (dma->size > 0) {
 #if 0
         BLOGD(sc, DBG_LOAD,
@@ -967,7 +969,7 @@ bxe_dma_free(struct bxe_adapter *sc,
         bus_dmamem_free(dma->tag, dma->vaddr, dma->map);
         bus_dma_tag_destroy(dma->tag);
     }
-
+#endif
     memset(dma, 0, sizeof(*dma));
 }
 
@@ -2385,8 +2387,8 @@ void bxe_sp_prod_update(struct bxe_adapter *sc)
     REG_WR16(sc, (BAR_XSTRORM_INTMEM + XSTORM_SPQ_PROD_OFFSET(func)),
              sc->spq_prod_idx);
 
-    bus_space_barrier(sc->bar[BAR0].tag, sc->bar[BAR0].handle, 0, 0,
-                      BUS_SPACE_BARRIER_WRITE);
+    //    bus_space_barrier(sc->bar[BAR0].tag, sc->bar[BAR0].handle, 0, 0,
+    //                      BUS_SPACE_BARRIER_WRITE);
 }
 
 /**
@@ -2547,9 +2549,12 @@ bxe_debug_print_ind_table(struct bxe_adapter               *sc,
  * Returns:
  *   BUS_PROBE_DEFAULT on success, positive value on failure.
  */
+#warning "no probe function"
+
 static int
 bxe_probe(device_t dev)
 {
+#if 0
     struct bxe_adapter *sc;
     struct bxe_device_type *t;
     char *descbuf;
@@ -2593,13 +2598,14 @@ bxe_probe(device_t dev)
         }
         t++;
     }
-
+#endif
     return (ENXIO);
 }
 
 static void
 bxe_init_mutexes(struct bxe_adapter *sc)
 {
+#if 0
 #ifdef BXE_CORE_LOCK_SX
     snprintf(sc->core_sx_name, sizeof(sc->core_sx_name),
              "bxe%d_core_lock", sc->unit);
@@ -2608,7 +2614,6 @@ bxe_init_mutexes(struct bxe_adapter *sc)
     snprintf(sc->core_mtx_name, sizeof(sc->core_mtx_name),
              "bxe%d_core_lock", sc->unit);
     mtx_init(&sc->core_mtx, sc->core_mtx_name, NULL, MTX_DEF);
-#endif
 
     snprintf(sc->sp_mtx_name, sizeof(sc->sp_mtx_name),
              "bxe%d_sp_lock", sc->unit);
@@ -2637,11 +2642,14 @@ bxe_init_mutexes(struct bxe_adapter *sc)
     snprintf(sc->mcast_mtx_name, sizeof(sc->mcast_mtx_name),
              "bxe%d_mcast_lock", sc->unit);
     mtx_init(&(sc->mcast_mtx), sc->mcast_mtx_name, NULL, MTX_DEF);
+#endif
+#endif
 }
 
 static void
 bxe_release_mutexes(struct bxe_adapter *sc)
 {
+#if 0
 #ifdef BXE_CORE_LOCK_SX
     sx_destroy(&sc->core_sx);
 #else
@@ -2677,6 +2685,7 @@ bxe_release_mutexes(struct bxe_adapter *sc)
     if (mtx_initialized(&sc->mcast_mtx)) {
         mtx_destroy(&sc->mcast_mtx);
     }
+#endif
 }
 
 static void
@@ -2754,6 +2763,7 @@ bxe_sp_event(struct bxe_adapter    *sc,
              struct bxe_fastpath *fp,
              union eth_rx_cqe    *rr_cqe)
 {
+#if 0
     int cid = SW_CID(rr_cqe->ramrod_cqe.conn_and_cmd_data);
     int command = CQE_CMD(rr_cqe->ramrod_cqe.conn_and_cmd_data);
     enum ecore_queue_cmd drv_cmd = ECORE_Q_CMD_MAX;
@@ -2851,6 +2861,7 @@ bxe_sp_event(struct bxe_adapter    *sc,
         bxe_schedule_sp_task(sc);
     }
 #endif
+#endif
 }
 
 /*
@@ -2866,6 +2877,7 @@ bxe_tpa_start(struct bxe_adapter            *sc,
               uint16_t                    prod,
               struct eth_fast_path_rx_cqe *cqe)
 {
+#if 0
     struct bxe_sw_rx_bd tmp_bd;
     struct bxe_sw_rx_bd *rx_buf;
     struct eth_rx_bd *rx_bd;
@@ -2942,8 +2954,9 @@ bxe_tpa_start(struct bxe_adapter            *sc,
     rx_bd = &fp->rx_chain[index];
     rx_bd->addr_hi = htole32(U64_HI(tpa_info->seg.ds_addr));
     rx_bd->addr_lo = htole32(U64_LO(tpa_info->seg.ds_addr));
+#endif
 }
-
+#if 0
 /*
  * When a TPA aggregation is completed, loop through the individual mbufs
  * of the aggregation, combining them into a single mbuf which will be sent
@@ -3025,7 +3038,7 @@ bxe_fill_frag_mbuf(struct bxe_adapter          *sc,
 
     return (rc);
 }
-
+#endif
 static inline void
 bxe_clear_sge_mask_next_elems(struct bxe_fastpath *fp)
 {
@@ -3139,6 +3152,7 @@ bxe_tpa_stop(struct bxe_adapter          *sc,
 			 struct eth_end_agg_rx_cqe *cqe,
              uint16_t                  cqe_idx)
 {
+#if 0
     if_t ifp = sc->ifp;
     struct mbuf *m;
     int rc = 0;
@@ -3206,12 +3220,14 @@ bxe_tpa_stop_exit:
 
     fp->rx_tpa_info[queue].state = BXE_TPA_STATE_STOP;
     fp->rx_tpa_queue_used &= ~(1 << queue);
+#endif
 }
 
 static uint8_t
 bxe_rxeof(struct bxe_adapter    *sc,
           struct bxe_fastpath *fp)
 {
+#if 0
     if_t ifp = sc->ifp;
     uint16_t bd_cons, bd_prod, bd_prod_fw, comp_ring_cons;
     uint16_t hw_cq_cons, sw_cq_cons, sw_cq_prod;
@@ -3466,6 +3482,7 @@ next_cqe:
     BXE_FP_RX_UNLOCK(fp);
 
     return (sw_cq_cons != hw_cq_cons);
+#endif
 }
 
 static uint16_t
@@ -3473,6 +3490,7 @@ bxe_free_tx_pkt(struct bxe_adapter    *sc,
                 struct bxe_fastpath *fp,
                 uint16_t            idx)
 {
+#if 0
     struct bxe_sw_tx_bd *tx_buf = &fp->tx_mbuf_chain[idx];
     struct eth_tx_start_bd *tx_start_bd;
     uint16_t bd_idx = TX_BD(tx_buf->first_bd);
@@ -3484,7 +3502,7 @@ bxe_free_tx_pkt(struct bxe_adapter    *sc,
 
     tx_start_bd = &fp->tx_chain[bd_idx].start_bd;
     nbd = le16toh(tx_start_bd->nbd) - 1;
-
+    // this #if 0 was already here in fbsd
 #if 0
     if ((nbd - 1) > (MAX_MBUF_FRAGS + 2)) {
         bxe_panic(sc, ("BAD nbd!\n"));
@@ -3492,7 +3510,7 @@ bxe_free_tx_pkt(struct bxe_adapter    *sc,
 #endif
 
     new_cons = (tx_buf->first_bd + nbd);
-
+    // this #if 0 was already here in fbsd
 #if 0
     struct eth_tx_bd *tx_data_bd;
 
@@ -3535,6 +3553,7 @@ bxe_free_tx_pkt(struct bxe_adapter    *sc,
     tx_buf->first_bd = 0;
 
     return (new_cons);
+#endif
 }
 
 /* transmit timeout watchdog */
@@ -3542,6 +3561,7 @@ static int
 bxe_watchdog(struct bxe_adapter    *sc,
              struct bxe_fastpath *fp)
 {
+#if 0
     BXE_FP_TX_LOCK(fp);
 
     if ((fp->watchdog_timer == 0) || (--fp->watchdog_timer)) {
@@ -3555,7 +3575,7 @@ bxe_watchdog(struct bxe_adapter    *sc,
 
     atomic_store_rel_long(&sc->chip_tq_flags, CHIP_TQ_REINIT);
     taskqueue_enqueue(sc->chip_tq, &sc->chip_tq_task);
-
+#endif
     return (-1);
 }
 
@@ -3564,6 +3584,7 @@ static uint8_t
 bxe_txeof(struct bxe_adapter    *sc,
           struct bxe_fastpath *fp)
 {
+#if 0
     if_t ifp = sc->ifp;
     uint16_t bd_cons, hw_cons, sw_cons, pkt_cons;
     uint16_t tx_bd_avail;
@@ -3612,11 +3633,13 @@ bxe_txeof(struct bxe_adapter    *sc,
         fp->watchdog_timer = 0;
         return (FALSE);
     }
+#endif
 }
 
 static void
 bxe_drain_tx_queues(struct bxe_adapter *sc)
 {
+#if 0
     struct bxe_fastpath *fp;
     int i, count;
 
@@ -3644,7 +3667,7 @@ bxe_drain_tx_queues(struct bxe_adapter *sc)
             rmb();
         }
     }
-
+#endif
     return;
 }
 
@@ -3654,6 +3677,7 @@ bxe_del_all_macs(struct bxe_adapter          *sc,
                  int                       mac_type,
                  uint8_t                   wait_for_comp)
 {
+#if 0
     unsigned long ramrod_flags = 0, vlan_mac_flags = 0;
     int rc;
 
@@ -3671,6 +3695,8 @@ bxe_del_all_macs(struct bxe_adapter          *sc,
     }
 
     return (rc);
+#endif
+    return -1;
 }
 
 static int
@@ -3679,6 +3705,7 @@ bxe_fill_accept_flags(struct bxe_adapter *sc,
                       unsigned long    *rx_accept_flags,
                       unsigned long    *tx_accept_flags)
 {
+#if 0
     /* Clear the flags first */
     *rx_accept_flags = 0;
     *tx_accept_flags = 0;
@@ -3748,7 +3775,7 @@ bxe_fill_accept_flags(struct bxe_adapter *sc,
         bxe_set_bit(ECORE_ACCEPT_ANY_VLAN, rx_accept_flags);
         bxe_set_bit(ECORE_ACCEPT_ANY_VLAN, tx_accept_flags);
     }
-
+#endif
     return (0);
 }
 
@@ -3760,6 +3787,7 @@ bxe_set_q_rx_mode(struct bxe_adapter *sc,
                   unsigned long    tx_accept_flags,
                   unsigned long    ramrod_flags)
 {
+#if 0
     struct ecore_rx_mode_ramrod_params ramrod_param;
     int rc;
 
@@ -3790,13 +3818,14 @@ bxe_set_q_rx_mode(struct bxe_adapter *sc,
         BLOGE(sc, "Set rx_mode %d failed\n", sc->rx_mode);
         return (rc);
     }
-
+#endif
     return (0);
 }
 
 static int
 bxe_set_storm_rx_mode(struct bxe_adapter *sc)
 {
+#if 0
     unsigned long rx_mode_flags = 0, ramrod_flags = 0;
     unsigned long rx_accept_flags = 0, tx_accept_flags = 0;
     int rc;
@@ -3814,12 +3843,14 @@ bxe_set_storm_rx_mode(struct bxe_adapter *sc)
     return (bxe_set_q_rx_mode(sc, sc->fp[0].cl_id, rx_mode_flags,
                               rx_accept_flags, tx_accept_flags,
                               ramrod_flags));
+#endif
 }
 
 /* returns the "mcp load_code" according to global load_count array */
 static int
 bxe_nic_load_no_mcp(struct bxe_adapter *sc)
 {
+#if 0
     int path = SC_PATH(sc);
     int port = SC_PORT(sc);
 
@@ -3838,12 +3869,14 @@ bxe_nic_load_no_mcp(struct bxe_adapter *sc)
     } else {
         return (FW_MSG_CODE_DRV_LOAD_FUNCTION);
     }
+#endif
 }
 
 /* returns the "mcp load_code" according to global load_count array */
 static int
 bxe_nic_unload_no_mcp(struct bxe_adapter *sc)
 {
+#if 0
     int port = SC_PORT(sc);
     int path = SC_PATH(sc);
 
@@ -3862,6 +3895,7 @@ bxe_nic_unload_no_mcp(struct bxe_adapter *sc)
     } else {
         return (FW_MSG_CODE_DRV_UNLOAD_FUNCTION);
     }
+#endif
 }
 
 /* request unload mode from the MCP: COMMON, PORT or FUNCTION */
@@ -3869,17 +3903,15 @@ static uint32_t
 bxe_send_unload_req(struct bxe_adapter *sc,
                     int              unload_mode)
 {
-    uint32_t reset_code = 0;
 #if 0
+    uint32_t reset_code = 0;
     int port = SC_PORT(sc);
     int path = SC_PATH(sc);
-#endif
 
     /* Select the UNLOAD request mode */
     if (unload_mode == UNLOAD_NORMAL) {
         reset_code = DRV_MSG_CODE_UNLOAD_REQ_WOL_DIS;
     }
-#if 0
     else if (sc->flags & BXE_NO_WOL_FLAG) {
         reset_code = DRV_MSG_CODE_UNLOAD_REQ_WOL_MCP;
     } else if (sc->wol) {
@@ -3914,7 +3946,6 @@ bxe_send_unload_req(struct bxe_adapter *sc,
 
         reset_code = DRV_MSG_CODE_UNLOAD_REQ_WOL_EN;
     }
-#endif
     else {
         reset_code = DRV_MSG_CODE_UNLOAD_REQ_WOL_DIS;
     }
@@ -3927,6 +3958,8 @@ bxe_send_unload_req(struct bxe_adapter *sc,
     }
 
     return (reset_code);
+#endif
+    return 0;
 }
 
 /* send UNLOAD_DONE command to the MCP */
@@ -3946,6 +3979,7 @@ bxe_send_unload_done(struct bxe_adapter *sc,
 static int
 bxe_func_wait_started(struct bxe_adapter *sc)
 {
+#if 0
     int tout = 50;
 
     if (!sc->port.pmf) {
@@ -3997,7 +4031,7 @@ bxe_func_wait_started(struct bxe_adapter *sc)
         func_params.cmd = ECORE_F_CMD_TX_START;
         return (ecore_func_state_change(sc, &func_params));
     }
-
+#endif
     return (0);
 }
 
@@ -4005,6 +4039,7 @@ static int
 bxe_stop_queue(struct bxe_adapter *sc,
                int              index)
 {
+#if 0
     struct bxe_fastpath *fp = &sc->fp[index];
     struct ecore_queue_state_params q_params = { NULL };
     int rc;
@@ -4038,6 +4073,8 @@ bxe_stop_queue(struct bxe_adapter *sc,
     memset(&q_params.params.cfc_del, 0, sizeof(q_params.params.cfc_del));
     q_params.params.cfc_del.cid_index = FIRST_TX_COS_INDEX;
     return (ecore_queue_state_change(sc, &q_params));
+#endif
+    return -1;
 }
 
 /* wait for the outstanding SP commands */
@@ -4073,6 +4110,7 @@ bxe_wait_sp_comp(struct bxe_adapter *sc,
 static int
 bxe_func_stop(struct bxe_adapter *sc)
 {
+#if 0
     struct ecore_func_state_params func_params = { NULL };
     int rc;
 
@@ -4094,7 +4132,7 @@ bxe_func_stop(struct bxe_adapter *sc)
         bxe_set_bit(RAMROD_DRV_CLR_ONLY, &func_params.ramrod_flags);
         return (ecore_func_state_change(sc, &func_params));
     }
-
+#endif
     return (0);
 }
 
@@ -4102,6 +4140,7 @@ static int
 bxe_reset_hw(struct bxe_adapter *sc,
              uint32_t         load_code)
 {
+#if 0
     struct ecore_func_state_params func_params = { NULL };
 
     /* Prepare parameters for function state transitions */
@@ -4113,6 +4152,8 @@ bxe_reset_hw(struct bxe_adapter *sc,
     func_params.params.hw_init.load_phase = load_code;
 
     return (ecore_func_state_change(sc, &func_params));
+#endif
+    return 0;
 }
 
 static void
@@ -4136,6 +4177,7 @@ bxe_chip_cleanup(struct bxe_adapter *sc,
                  uint32_t         unload_mode,
                  uint8_t          keep_link)
 {
+#if 0
     int port = SC_PORT(sc);
     struct ecore_mcast_ramrod_params rparam = { NULL };
     uint32_t reset_code;
@@ -4243,11 +4285,13 @@ unload_error:
 
     /* Report UNLOAD_DONE to MCP */
     bxe_send_unload_done(sc, keep_link);
+#endif
 }
 
 static void
 bxe_disable_close_the_gate(struct bxe_adapter *sc)
 {
+#if 0
     uint32_t val;
     int port = SC_PORT(sc);
 
@@ -4266,6 +4310,7 @@ bxe_disable_close_the_gate(struct bxe_adapter *sc)
                  MISC_AEU_GENERAL_MASK_REG_AEU_NIG_CLOSE_MASK);
         REG_WR(sc, MISC_REG_AEU_GENERAL_MASK, val);
     }
+#endif
 }
 
 /*
@@ -4275,6 +4320,7 @@ bxe_disable_close_the_gate(struct bxe_adapter *sc)
 static void
 bxe_squeeze_objects(struct bxe_adapter *sc)
 {
+#if 0
     unsigned long ramrod_flags = 0, vlan_mac_flags = 0;
     struct ecore_mcast_ramrod_params rparam = { NULL };
     struct ecore_vlan_mac_obj *mac_obj = &sc->sp_objs->mac_obj;
@@ -4326,6 +4372,7 @@ bxe_squeeze_objects(struct bxe_adapter *sc)
 
         rc = ecore_config_mcast(sc, &rparam, ECORE_MCAST_CMD_CONT);
     }
+#endif
 }
 
 /* stop the controller */
@@ -4334,6 +4381,7 @@ bxe_nic_unload(struct bxe_adapter *sc,
                uint32_t         unload_mode,
                uint8_t          keep_link)
 {
+#if 0
     uint8_t global = FALSE;
     uint32_t val;
 
@@ -4478,7 +4526,7 @@ bxe_nic_unload(struct bxe_adapter *sc,
     }
 
     BLOGD(sc, DBG_LOAD, "Ended NIC unload\n");
-
+#endif
     return (0);
 }
 
@@ -4489,6 +4537,7 @@ bxe_nic_unload(struct bxe_adapter *sc,
 static int
 bxe_ifmedia_update(struct ifnet  *ifp)
 {
+#if 0
     struct bxe_adapter *sc = (struct bxe_adapter *)if_getsoftc(ifp);
     struct ifmedia *ifm;
 
@@ -4512,7 +4561,7 @@ bxe_ifmedia_update(struct ifnet  *ifp)
               IFM_SUBTYPE(ifm->ifm_media));
         return (EINVAL);
     }
-
+#endif
     return (0);
 }
 
@@ -4522,6 +4571,7 @@ bxe_ifmedia_update(struct ifnet  *ifp)
 static void
 bxe_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 {
+#if 0
     struct bxe_adapter *sc = if_getsoftc(ifp);
 
     /* Report link down if the driver isn't running. */
@@ -4548,6 +4598,7 @@ bxe_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
     } else {
         ifmr->ifm_active |= IFM_HDX;
     }
+#endif
 }
 
 static int
@@ -4555,6 +4606,7 @@ bxe_ioctl_nvram(struct bxe_adapter *sc,
                 uint32_t         priv_op,
                 struct ifreq     *ifr)
 {
+#if 0
     struct bxe_nvram_data nvdata_base;
     struct bxe_nvram_data *nvdata;
     int len;
@@ -4601,6 +4653,8 @@ bxe_ioctl_nvram(struct bxe_adapter *sc,
     }
 
     return (error);
+#endif
+    return -1;
 }
 
 static int
@@ -4608,6 +4662,7 @@ bxe_ioctl_stats_show(struct bxe_adapter *sc,
                      uint32_t         priv_op,
                      struct ifreq     *ifr)
 {
+#if 0
     const size_t str_size   = (BXE_NUM_ETH_STATS * STAT_NAME_LEN);
     const size_t stats_size = (BXE_NUM_ETH_STATS * sizeof(uint64_t));
     caddr_t p_tmp;
@@ -4656,12 +4711,14 @@ bxe_ioctl_stats_show(struct bxe_adapter *sc,
     default:
         return (-1);
     }
+#endif
 }
 
 static void
 bxe_handle_chip_tq(void *context,
                    int  pending)
 {
+#if 0
     struct bxe_adapter *sc = (struct bxe_adapter *)context;
     long work = atomic_load_acq_long(&sc->chip_tq_flags);
 
@@ -4705,6 +4762,7 @@ bxe_handle_chip_tq(void *context,
     default:
         break;
     }
+#endif
 }
 
 /*
@@ -4715,9 +4773,10 @@ bxe_handle_chip_tq(void *context,
  */
 static int
 bxe_ioctl(if_t ifp,
-          u_long       command,
-          caddr_t      data)
+          unsigned long       command,
+          void *      data)
 {
+#if 0
     struct bxe_adapter *sc = if_getsoftc(ifp);
     struct ifreq *ifr = (struct ifreq *)data;
     struct bxe_nvram_data *nvdata;
@@ -4952,6 +5011,8 @@ bxe_ioctl(if_t ifp,
     }
 
     return (error);
+#endif
+    return -1;
 }
 
 static __noinline void
@@ -4959,6 +5020,7 @@ bxe_dump_mbuf(struct bxe_adapter *sc,
               struct mbuf      *m,
               uint8_t          contents)
 {
+#if 0
     char * type;
     int i = 0;
 
@@ -5011,8 +5073,9 @@ bxe_dump_mbuf(struct bxe_adapter *sc,
         m = m->m_next;
         i++;
     }
+#endif
 }
-
+#if 0
 /*
  * Checks to ensure the 13 bd sliding window is >= MSS for TSO.
  * Check that (13 total bds - 3 bds) = 10 bd window >= MSS.
@@ -5792,12 +5855,14 @@ bxe_tx_encap_continue:
 
     return (0);
 }
+#endif
 
 static void
 bxe_tx_start_locked(struct bxe_adapter *sc,
                     if_t ifp,
                     struct bxe_fastpath *fp)
 {
+#if 0
     struct mbuf *m = NULL;
     int tx_count = 0;
     uint16_t tx_bd_avail;
@@ -5861,12 +5926,14 @@ bxe_tx_start_locked(struct bxe_adapter *sc,
         /* reset the TX watchdog timeout timer */
         fp->watchdog_timer = BXE_TX_TIMEOUT;
     }
+#endif
 }
 
 /* Legacy (non-RSS) dispatch routine */
 static void
 bxe_tx_start(if_t ifp)
 {
+#if 0
     struct bxe_adapter *sc;
     struct bxe_fastpath *fp;
 
@@ -5892,8 +5959,10 @@ bxe_tx_start(if_t ifp)
     BXE_FP_TX_LOCK(fp);
     bxe_tx_start_locked(sc, ifp, fp);
     BXE_FP_TX_UNLOCK(fp);
+#endif
 }
 
+#if 0
 #if __FreeBSD_version >= 800000
 
 static int
@@ -6068,7 +6137,7 @@ bxe_mq_flush(struct ifnet *ifp)
 }
 
 #endif /* FreeBSD_version >= 800000 */
-
+#endif
 static uint16_t
 bxe_cid_ilt_lines(struct bxe_adapter *sc)
 {
@@ -6166,12 +6235,13 @@ bxe_ilt_set_info(struct bxe_adapter *sc)
               ilog2(ilt_client->page_size >> 12));
     }
 
-    KASSERT((line <= ILT_MAX_LINES), ("Invalid number of ILT lines!"));
+    //assert((line <= ILT_MAX_LINES), ("Invalid number of ILT lines!"));
 }
 
 static void
 bxe_set_fp_rx_buf_size(struct bxe_adapter *sc)
 {
+#if 0
     int i;
 
     BLOGD(sc, DBG_LOAD, "mtu = %d\n", sc->mtu);
@@ -6198,20 +6268,21 @@ bxe_set_fp_rx_buf_size(struct bxe_adapter *sc)
         BLOGD(sc, DBG_LOAD, "mbuf_alloc_size for fp[%02d] = %d\n",
               i, sc->fp[i].mbuf_alloc_size);
     }
+#endif
 }
 
 static int
 bxe_alloc_ilt_mem(struct bxe_adapter *sc)
 {
     int rc = 0;
-
+    /*
     if ((sc->ilt =
          (struct ecore_ilt *)malloc(sizeof(struct ecore_ilt),
                                     M_BXE_ILT,
                                     (M_NOWAIT | M_ZERO))) == NULL) {
         rc = 1;
     }
-
+    */
     return (rc);
 }
 
@@ -6219,14 +6290,14 @@ static int
 bxe_alloc_ilt_lines_mem(struct bxe_adapter *sc)
 {
     int rc = 0;
-
+    /*
     if ((sc->ilt->lines =
          (struct ilt_line *)malloc((sizeof(struct ilt_line) * ILT_MAX_LINES),
                                     M_BXE_ILT,
                                     (M_NOWAIT | M_ZERO))) == NULL) {
         rc = 1;
     }
-
+    */
     return (rc);
 }
 
@@ -6234,7 +6305,7 @@ static void
 bxe_free_ilt_mem(struct bxe_adapter *sc)
 {
     if (sc->ilt != NULL) {
-        free(sc->ilt, M_BXE_ILT);
+      kfree(sc->ilt);
         sc->ilt = NULL;
     }
 }
@@ -6243,7 +6314,7 @@ static void
 bxe_free_ilt_lines_mem(struct bxe_adapter *sc)
 {
     if (sc->ilt->lines != NULL) {
-        free(sc->ilt->lines, M_BXE_ILT);
+      kfree(sc->ilt->lines);
         sc->ilt->lines = NULL;
     }
 }
@@ -6261,9 +6332,9 @@ bxe_free_mem(struct bxe_adapter *sc)
 #endif
 
     for (i = 0; i < L2_ILT_LINES(sc); i++) {
-        bxe_dma_free(sc, &sc->context[i].vcxt_dma);
-        sc->context[i].vcxt = NULL;
-        sc->context[i].size = 0;
+      //bxe_dma_free(sc, &sc->context[i].vcxt_dma);
+      //sc->context[i].vcxt = NULL;
+      //sc->context[i].size = 0;
     }
 
     ecore_ilt_mem_op(sc, ILT_MEMOP_FREE);
@@ -6308,6 +6379,7 @@ bxe_alloc_mem(struct bxe_adapter *sc)
      */
     context_size = (sizeof(union cdu_context) * BXE_L2_CID_COUNT(sc));
     for (i = 0, allocated = 0; allocated < context_size; i++) {
+      /*
         sc->context[i].size = min(CDU_ILT_PAGE_SZ,
                                   (context_size - allocated));
 
@@ -6322,6 +6394,7 @@ bxe_alloc_mem(struct bxe_adapter *sc)
             (union cdu_context *)sc->context[i].vcxt_dma.vaddr;
 
         allocated += sc->context[i].size;
+      */
     }
 
     bxe_alloc_ilt_lines_mem(sc);
@@ -6368,7 +6441,7 @@ bxe_free_rx_bd_chain(struct bxe_fastpath *fp)
     if (fp->rx_mbuf_tag == NULL) {
         return;
     }
-
+#if 0
     /* free all mbufs and unload all maps */
     for (i = 0; i < RX_BD_TOTAL; i++) {
         if (fp->rx_mbuf_chain[i].m_map != NULL) {
@@ -6385,6 +6458,7 @@ bxe_free_rx_bd_chain(struct bxe_fastpath *fp)
             fp->eth_q_stats.mbuf_alloc_rx--;
         }
     }
+#endif
 }
 
 static void
@@ -6400,7 +6474,7 @@ bxe_free_tpa_pool(struct bxe_fastpath *fp)
     }
 
     max_agg_queues = MAX_AGG_QS(sc);
-
+#if 0
     /* release all mbufs and unload all DMA maps in the TPA pool */
     for (i = 0; i < max_agg_queues; i++) {
         if (fp->rx_tpa_info[i].bd.m_map != NULL) {
@@ -6417,6 +6491,7 @@ bxe_free_tpa_pool(struct bxe_fastpath *fp)
             fp->eth_q_stats.mbuf_alloc_tpa--;
         }
     }
+#endif
 }
 
 static void
@@ -6430,7 +6505,7 @@ bxe_free_sge_chain(struct bxe_fastpath *fp)
     if (fp->rx_sge_mbuf_tag == NULL) {
         return;
     }
-
+#if 0
     /* rree all mbufs and unload all maps */
     for (i = 0; i < RX_SGE_TOTAL; i++) {
         if (fp->rx_sge_mbuf_chain[i].m_map != NULL) {
@@ -6447,11 +6522,13 @@ bxe_free_sge_chain(struct bxe_fastpath *fp)
             fp->eth_q_stats.mbuf_alloc_sge--;
         }
     }
+#endif
 }
 
 static void
 bxe_free_fp_buffers(struct bxe_adapter *sc)
 {
+#if 0
     struct bxe_fastpath *fp;
     int i;
 
@@ -6505,6 +6582,7 @@ bxe_free_fp_buffers(struct bxe_adapter *sc)
             mtx_destroy(&fp->rx_mtx);
         }
     }
+#endif
 }
 
 static int
@@ -6512,6 +6590,7 @@ bxe_alloc_rx_bd_mbuf(struct bxe_fastpath *fp,
                      uint16_t            prev_index,
                      uint16_t            index)
 {
+#if 0
     struct bxe_sw_rx_bd *rx_buf;
     struct eth_rx_bd *rx_bd;
     bus_dma_segment_t segs[1];
@@ -6589,12 +6668,15 @@ bxe_alloc_rx_bd_mbuf(struct bxe_fastpath *fp,
     rx_bd->addr_lo = htole32(U64_LO(segs[0].ds_addr));
 
     return (rc);
+#endif
+    return -1;
 }
 
 static int
 bxe_alloc_rx_tpa_mbuf(struct bxe_fastpath *fp,
                       int                 queue)
 {
+#if 0
     struct bxe_sw_tpa_info *tpa_info = &fp->rx_tpa_info[queue];
     bus_dma_segment_t segs[1];
     bus_dmamap_t map;
@@ -6645,6 +6727,8 @@ bxe_alloc_rx_tpa_mbuf(struct bxe_fastpath *fp,
     tpa_info->seg = segs[0];
 
     return (rc);
+#endif
+    return 1;
 }
 
 /*
@@ -6656,6 +6740,7 @@ static int
 bxe_alloc_rx_sge_mbuf(struct bxe_fastpath *fp,
                       uint16_t            index)
 {
+#if 0
     struct bxe_sw_rx_bd *sge_buf;
     struct eth_rx_sge *sge;
     bus_dma_segment_t segs[1];
@@ -6712,11 +6797,14 @@ bxe_alloc_rx_sge_mbuf(struct bxe_fastpath *fp,
     sge->addr_lo = htole32(U64_LO(segs[0].ds_addr));
 
     return (rc);
+#endif
+    return -1;
 }
 
 static __noinline int
 bxe_alloc_fp_buffers(struct bxe_adapter *sc)
 {
+#if 0
     struct bxe_fastpath *fp;
     int i, j, rc = 0;
     int ring_prod, cqe_ring_prod;
@@ -6804,6 +6892,8 @@ bxe_alloc_fp_buffers_error:
     bxe_free_sge_chain(fp);
 
     return (ENOBUFS);
+#endif
+    return -1;
 }
 
 static void
@@ -6814,17 +6904,18 @@ bxe_free_fw_stats_mem(struct bxe_adapter *sc)
     sc->fw_stats_num = 0;
 
     sc->fw_stats_req_size = 0;
-    sc->fw_stats_req = NULL;
+    //    sc->fw_stats_req = NULL;
     sc->fw_stats_req_mapping = 0;
 
     sc->fw_stats_data_size = 0;
-    sc->fw_stats_data = NULL;
+    //sc->fw_stats_data = NULL;
     sc->fw_stats_data_mapping = 0;
 }
 
 static int
 bxe_alloc_fw_stats_mem(struct bxe_adapter *sc)
 {
+#if 0
     uint8_t num_queue_stats;
     int num_groups;
 
@@ -6892,7 +6983,7 @@ bxe_alloc_fw_stats_mem(struct bxe_adapter *sc)
 
     BLOGD(sc, DBG_LOAD, "statistics data base address set to %#jx\n",
           (uintmax_t)sc->fw_stats_data_mapping);
-
+#endif
     return (0);
 }
 
@@ -7198,6 +7289,7 @@ bxe_nic_load_pmf(struct bxe_adapter *sc,
 static void
 bxe_read_mf_cfg(struct bxe_adapter *sc)
 {
+#if 0
     int n = (CHIP_IS_MODE_4_PORT(sc) ? 2 : 1);
     int abs_func;
     int vn;
@@ -7230,6 +7322,7 @@ bxe_read_mf_cfg(struct bxe_adapter *sc)
         BLOGD(sc, DBG_LOAD, "mf_cfg function enabled\n");
         sc->flags &= ~BXE_MF_FUNC_DIS;
     }
+#endif
 }
 
 /* acquire split MCP access lock register */
@@ -7956,6 +8049,7 @@ bxe_handle_eee_event(struct bxe_adapter *sc)
 static void
 bxe_drv_info_ether_stat(struct bxe_adapter *sc)
 {
+#if 0
     struct eth_stats_info *ether_stat =
         &sc->sp->drv_info_to_mcp.ether_stat;
 
@@ -7981,6 +8075,7 @@ bxe_drv_info_ether_stat(struct bxe_adapter *sc)
 
     ether_stat->txq_size = sc->tx_ring_size;
     ether_stat->rxq_size = sc->rx_ring_size;
+#endif
 }
 
 static void
@@ -8613,6 +8708,8 @@ bxe_update_dsb_idx(struct bxe_adapter *sc)
     return (rc);
 }
 
+#warning "fix"
+#if 0
 static inline struct ecore_queue_sp_obj *
 bxe_cid_to_q_obj(struct bxe_adapter *sc,
                  uint32_t         cid)
@@ -8620,6 +8717,7 @@ bxe_cid_to_q_obj(struct bxe_adapter *sc,
     BLOGD(sc, DBG_SP, "retrieving fp from cid %d\n", cid);
     return (&sc->sp_objs[CID_TO_FP(cid, sc)].q_obj);
 }
+#endif
 
 static void
 bxe_handle_mcast_eqe(struct bxe_adapter *sc)
@@ -9024,7 +9122,8 @@ bxe_handle_fp_tq(void *context,
 
     if (more_rx /*|| more_tx*/) {
         /* still more work to do */
-        taskqueue_enqueue_fast(fp->tq, &fp->tq_task);
+#warning "task queue"
+      //taskqueue_enqueue_fast(fp->tq, &fp->tq_task);
         return;
     }
 
@@ -9058,7 +9157,7 @@ bxe_task_fp(struct bxe_fastpath *fp)
 
     if (more_rx /*|| more_tx*/) {
         /* still more work to do, bail out if this ISR and process later */
-        taskqueue_enqueue_fast(fp->tq, &fp->tq_task);
+      //taskqueue_enqueue_fast(fp->tq, &fp->tq_task);
         return;
     }
 
@@ -9142,7 +9241,7 @@ bxe_intr_legacy(void *xsc)
         bxe_ack_sb(sc, sc->igu_dsb_id, USTORM_ID, 0, IGU_INT_DISABLE, 0);
 
         /* schedule slowpath handler */
-        taskqueue_enqueue_fast(sc->sp_tq, &sc->sp_tq_task);
+        //taskqueue_enqueue_fast(sc->sp_tq, &sc->sp_tq_task);
 
         status &= ~0x1;
     }
@@ -9164,7 +9263,7 @@ bxe_intr_sp(void *xsc)
     bxe_ack_sb(sc, sc->igu_dsb_id, USTORM_ID, 0, IGU_INT_DISABLE, 0);
 
     /* schedule slowpath handler */
-    taskqueue_enqueue_fast(sc->sp_tq, &sc->sp_tq_task);
+    //taskqueue_enqueue_fast(sc->sp_tq, &sc->sp_tq_task);
 }
 
 /* fastpath interrupt entry point */
@@ -9178,7 +9277,7 @@ bxe_intr_fp(void *xfp)
 
     BLOGD(sc, DBG_INTR,
           "(cpu=%d) MSI-X fp=%d fw_sb=%d igu_sb=%d\n",
-          curcpu, fp->index, fp->fw_sb_id, fp->igu_sb_id);
+          hw_core_id(), fp->index, fp->fw_sb_id, fp->igu_sb_id);
 
 #if 0
     /* Don't handle any interrupts if we're not ready. */
@@ -9197,6 +9296,7 @@ bxe_intr_fp(void *xfp)
 static void
 bxe_interrupt_free(struct bxe_adapter *sc)
 {
+#if 0
     int i;
 
     switch (sc->interrupt_mode) {
@@ -9237,6 +9337,7 @@ bxe_interrupt_free(struct bxe_adapter *sc)
         /* nothing to do as initial allocation failed */
         break;
     }
+#endif
 }
 
 /*
@@ -9259,6 +9360,7 @@ bxe_interrupt_free(struct bxe_adapter *sc)
 static int
 bxe_interrupt_alloc(struct bxe_adapter *sc)
 {
+#if 0
     int msix_count = 0;
     int msi_count = 0;
     int num_requested = 0;
@@ -9447,11 +9549,14 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
     }
 
     return (rc);
+#endif
+    return -1;
 }
 
 static void
 bxe_interrupt_detach(struct bxe_adapter *sc)
 {
+#if 0
     struct bxe_fastpath *fp;
     int i;
 
@@ -9483,6 +9588,7 @@ bxe_interrupt_detach(struct bxe_adapter *sc)
         taskqueue_free(sc->sp_tq);
         sc->sp_tq = NULL;
     }
+#endif
 }
 
 /*
@@ -9497,6 +9603,7 @@ bxe_interrupt_detach(struct bxe_adapter *sc)
 static int
 bxe_interrupt_attach(struct bxe_adapter *sc)
 {
+#if 0
     struct bxe_fastpath *fp;
     int rc = 0;
     int i;
@@ -9617,6 +9724,8 @@ bxe_interrupt_attach(struct bxe_adapter *sc)
 bxe_interrupt_attach_exit:
 
     return (rc);
+#endif
+    return -1;
 }
 
 static int  bxe_init_hw_common_chip(struct bxe_adapter *sc);
@@ -9948,11 +10057,11 @@ bxe_init_eth_fp(struct bxe_adapter *sc,
 
     snprintf(fp->tx_mtx_name, sizeof(fp->tx_mtx_name),
              "bxe%d_fp%d_tx_lock", sc->unit, idx);
-    mtx_init(&fp->tx_mtx, fp->tx_mtx_name, NULL, MTX_DEF);
+    //mtx_init(&fp->tx_mtx, fp->tx_mtx_name, NULL, MTX_DEF);
 
     snprintf(fp->rx_mtx_name, sizeof(fp->rx_mtx_name),
              "bxe%d_fp%d_rx_lock", sc->unit, idx);
-    mtx_init(&fp->rx_mtx, fp->rx_mtx_name, NULL, MTX_DEF);
+    //mtx_init(&fp->rx_mtx, fp->rx_mtx_name, NULL, MTX_DEF);
 
     fp->igu_sb_id = (sc->igu_base_sb + idx + CNIC_SUPPORT(sc));
     fp->fw_sb_id = (sc->base_fw_ndsb + idx + CNIC_SUPPORT(sc));
@@ -10564,7 +10673,8 @@ bxe_pf_init(struct bxe_adapter *sc)
      * This flag is relevant for E1x only.
      * E2 doesn't have a TPA configuration in a function level.
      */
-    flags |= (if_getcapenable(sc->ifp) & IFCAP_LRO) ? FUNC_FLG_TPA : 0;
+#warning "no getcapenable
+//    flags |= (if_getcapenable(sc->ifp) & IFCAP_LRO) ? FUNC_FLG_TPA : 0;
 
     func_init.func_flgs = flags;
     func_init.pf_id     = SC_FUNC(sc);
@@ -11583,7 +11693,8 @@ bxe_pf_q_prep_init(struct bxe_adapter               *sc,
         /* fp->txdata[cos]->cid */
         cxt_index = fp->index / ILT_PAGE_CIDS;
         cxt_offset = fp->index - (cxt_index * ILT_PAGE_CIDS);
-        init_params->cxts[cos] = &sc->context[cxt_index].vcxt[cxt_offset].eth;
+// FIX
+//        init_params->cxts[cos] = &sc->context[cxt_index].vcxt[cxt_offset].eth;
     }
 }
 
@@ -11627,6 +11738,7 @@ bxe_get_q_flags(struct bxe_adapter    *sc,
                 struct bxe_fastpath *fp,
                 uint8_t             leading)
 {
+#if 0
     unsigned long flags = 0;
 
     if (IS_MF_SD(sc)) {
@@ -11658,6 +11770,8 @@ bxe_get_q_flags(struct bxe_adapter    *sc,
 
     /* merge with common flags */
     return (flags | bxe_get_common_flags(sc, fp, TRUE));
+#endif
+    return 0;
 }
 
 static void
@@ -11678,6 +11792,7 @@ bxe_pf_rx_q_prep(struct bxe_adapter              *sc,
                  struct rxq_pause_params       *pause,
                  struct ecore_rxq_setup_params *rxq_init)
 {
+#if 0
     uint8_t max_sge = 0;
     uint16_t sge_sz = 0;
     uint16_t tpa_agg_size = 0;
@@ -11770,6 +11885,7 @@ bxe_pf_rx_q_prep(struct bxe_adapter              *sc,
             sc->devinfo.mf_info.afex_def_vlan_tag;
         rxq_init->silent_removal_mask = EVL_VLID_MASK;
     }
+#endif
 }
 
 static void
@@ -11778,6 +11894,7 @@ bxe_pf_tx_q_prep(struct bxe_adapter              *sc,
                  struct ecore_txq_setup_params *txq_init,
                  uint8_t                       cos)
 {
+#if 0
     /*
      * XXX If multiple CoS is ever supported then each fastpath structure
      * will need to maintain tx producer/consumer/dma/etc values *per* CoS.
@@ -11793,6 +11910,7 @@ bxe_pf_tx_q_prep(struct bxe_adapter              *sc,
      * leading RSS client id
      */
     txq_init->tss_leading_cl_id = BXE_FP(sc, 0, cl_id);
+#endif
 }
 
 /*
@@ -11819,7 +11937,8 @@ bxe_setup_queue(struct bxe_adapter    *sc,
 
     bxe_ack_sb(sc, fp->igu_sb_id, USTORM_ID, 0, IGU_INT_ENABLE, 0);
 
-    q_params.q_obj = &BXE_SP_OBJ(sc, fp).q_obj;
+    // FIX ME. 
+    //q_params.q_obj = &BXE_SP_OBJ(sc, fp).q_obj;
 
     /* we want to wait for completion in this context */
     bxe_set_bit(RAMROD_COMP_WAIT, &q_params.ramrod_flags);
@@ -12205,6 +12324,7 @@ bxe_fill_report_data(struct bxe_adapter            *sc,
 static void
 bxe_link_report_locked(struct bxe_adapter *sc)
 {
+
     struct bxe_link_report_data cur_data;
 
     /* reread mf_cfg */
@@ -12231,7 +12351,7 @@ bxe_link_report_locked(struct bxe_adapter *sc)
 
     if (bxe_test_bit(BXE_LINK_REPORT_LINK_DOWN,
                      &cur_data.link_report_flags)) {
-        if_link_state_change(sc->ifp, LINK_STATE_DOWN);
+  //if_link_state_change(sc->ifp, LINK_STATE_DOWN);
         BLOGI(sc, "NIC Link is Down\n");
     } else {
         const char *duplex;
@@ -12272,7 +12392,7 @@ bxe_link_report_locked(struct bxe_adapter *sc)
             flow = "none";
         }
 
-        if_link_state_change(sc->ifp, LINK_STATE_UP);
+        //if_link_state_change(sc->ifp, LINK_STATE_UP);
         BLOGI(sc, "NIC Link is Up, %d Mbps %s duplex, Flow control: %s\n",
               cur_data.line_speed, duplex, flow);
     }
@@ -12457,27 +12577,29 @@ bxe_init_mcast_macs_list(struct bxe_adapter                 *sc,
         return (0);
     }
 
-    mta = malloc(sizeof(unsigned char) * ETHER_ADDR_LEN *
-            mc_count, M_DEVBUF, M_NOWAIT);
+    mta = malloc(sizeof(unsigned char) * ETH_ADDR_LEN *
+		 mc_count, 0); //M_DEVBUF, M_NOWAIT);
+    mta = NULL;
 
     if(mta == NULL) {
         BLOGE(sc, "Failed to allocate temp mcast list\n");
         return (-1);
     }
     
-    mc_mac = malloc(sizeof(*mc_mac) * mc_count, M_DEVBUF,
-                    (M_NOWAIT | M_ZERO));
+    mc_mac = kmalloc(sizeof(*mc_mac) * mc_count, 0); //M_DEVBUF,
+    //(M_NOWAIT | M_ZERO));
     if (!mc_mac) {
-        free(mta, M_DEVBUF);
+      free(mta); //, M_DEVBUF);
         BLOGE(sc, "Failed to allocate temp mcast list\n");
         return (-1);
     }
 
-    if_multiaddr_array(ifp, mta, &mcnt, mc_count); /* mta and mcnt not expected 
-                                                      to be  different */
+    // BSD thing
+    //    if_multiaddr_array(ifp, mta, &mcnt, mc_count); /* mta and mcnt not expected 
+    //                                   to be  different */
     for(i=0; i< mcnt; i++) {
 
-        bcopy((mta + (i * ETHER_ADDR_LEN)), mc_mac->mac, ETHER_ADDR_LEN);
+        bcopy((mta + (i * ETH_ADDR_LEN)), mc_mac->mac, ETH_ADDR_LEN);
         ECORE_LIST_PUSH_TAIL(&mc_mac->link, &p->mcast_list);
 
         BLOGD(sc, DBG_LOAD,
@@ -12489,7 +12611,7 @@ bxe_init_mcast_macs_list(struct bxe_adapter                 *sc,
     }
 
     p->mcast_list_len = mc_count;
-    free(mta, M_DEVBUF);
+    kfree(mta); //, M_DEVBUF);
 
     return (0);
 }
@@ -12504,7 +12626,7 @@ bxe_free_mcast_macs_list(struct ecore_mcast_ramrod_params *p)
 
     if (mc_mac) {
         /* only a single free as all mc_macs are in the same heap array */
-        free(mc_mac, M_DEVBUF);
+      kfree(mc_mac); //, M_DEVBUF);
     }
 }
 
@@ -12549,6 +12671,7 @@ bxe_set_mc_list(struct bxe_adapter *sc)
 static int
 bxe_set_uc_list(struct bxe_adapter *sc)
 {
+#if 0
     if_t ifp = sc->ifp;
     struct ecore_vlan_mac_obj *mac_obj = &sc->sp_objs->mac_obj;
     struct ifaddr *ifa;
@@ -12609,6 +12732,7 @@ bxe_set_uc_list(struct bxe_adapter *sc)
     bit_set(&ramrod_flags, RAMROD_CONT);
     return (bxe_set_mac_one(sc, NULL, mac_obj, FALSE /* don't care */,
                             ECORE_UC_LIST_MAC, &ramrod_flags));
+#endif
 }
 
 static void
@@ -12628,7 +12752,8 @@ bxe_handle_rx_mode_tq(void *context,
     }
 
     BLOGD(sc, DBG_SP, "if_flags(ifp)=0x%x\n", if_getflags(sc->ifp));
-
+#warning "FIX ALL FLAGS"
+#if 0
     if (if_getflags(ifp) & IFF_PROMISC) {
         rx_mode = BXE_RX_MODE_PROMISC;
     } else if ((if_getflags(ifp) & IFF_ALLMULTI) ||
@@ -12658,7 +12783,7 @@ bxe_handle_rx_mode_tq(void *context,
         }
 #endif
     }
-
+#endif
     sc->rx_mode = rx_mode;
 
     /* schedule the rx_mode command */
@@ -12691,7 +12816,7 @@ bxe_handle_rx_mode_tq(void *context,
 static void
 bxe_set_rx_mode(struct bxe_adapter *sc)
 {
-    taskqueue_enqueue(sc->rx_mode_tq, &sc->rx_mode_tq_task);
+//    taskqueue_enqueue(sc->rx_mode_tq, &sc->rx_mode_tq_task);
 }
 
 /* update flags in shmem */
@@ -12733,8 +12858,8 @@ bxe_periodic_callout_func(void *xsc)
         if ((sc->state == BXE_STATE_OPEN) &&
             (atomic_load_acq_long(&sc->periodic_flags) == PERIODIC_GO)) {
             /* schedule the next periodic callout */
-            callout_reset(&sc->periodic_callout, hz,
-                          bxe_periodic_callout_func, sc);
+		//callout_reset(&sc->periodic_callout, hz,
+		//        bxe_periodic_callout_func, sc);
         }
 
         return;
@@ -12810,23 +12935,23 @@ bxe_periodic_callout_func(void *xsc)
     if ((sc->state == BXE_STATE_OPEN) &&
         (atomic_load_acq_long(&sc->periodic_flags) == PERIODIC_GO)) {
         /* schedule the next periodic callout */
-        callout_reset(&sc->periodic_callout, hz,
-                      bxe_periodic_callout_func, sc);
+//        callout_reset(&sc->periodic_callout, hz,
+//                      bxe_periodic_callout_func, sc);
     }
 }
 
 static void
 bxe_periodic_start(struct bxe_adapter *sc)
 {
-    atomic_store_rel_long(&sc->periodic_flags, PERIODIC_GO);
-    callout_reset(&sc->periodic_callout, hz, bxe_periodic_callout_func, sc);
+	//atomic_store_rel_long(&sc->periodic_flags, PERIODIC_GO);
+    //  callout_reset(&sc->periodic_callout, hz, bxe_periodic_callout_func, sc);
 }
 
 static void
 bxe_periodic_stop(struct bxe_adapter *sc)
 {
-    atomic_store_rel_long(&sc->periodic_flags, PERIODIC_STOP);
-    callout_drain(&sc->periodic_callout);
+//    atomic_store_rel_long(&sc->periodic_flags, PERIODIC_STOP);
+//    callout_drain(&sc->periodic_callout);
 }
 
 /* start the controller */
@@ -12849,7 +12974,7 @@ bxe_nic_load(struct bxe_adapter *sc,
         bxe_ilt_set_info(sc);
     }
 
-    sc->last_reported_link_state = LINK_STATE_UNKNOWN;
+//    sc->last_reported_link_state = LINK_STATE_UNKNOWN;
 
     bxe_set_fp_rx_buf_size(sc);
 
@@ -13079,7 +13204,7 @@ bxe_nic_load(struct bxe_adapter *sc,
 #endif
 
     /* Tell the stack the driver is running! */
-    if_setdrvflags(sc->ifp, IFF_DRV_RUNNING);
+    //if_setdrvflags(sc->ifp, IFF_DRV_RUNNING);
 
     BLOGD(sc, DBG_LOAD, "NIC successfully loaded\n");
 
@@ -13132,10 +13257,10 @@ bxe_init_locked(struct bxe_adapter *sc)
     BXE_CORE_LOCK_ASSERT(sc);
 
     /* check if the driver is already running */
-    if (if_getdrvflags(sc->ifp) & IFF_DRV_RUNNING) {
-        BLOGD(sc, DBG_LOAD, "Init called while driver is running!\n");
-        return (0);
-    }
+//    if (if_getdrvflags(sc->ifp) & IFF_DRV_RUNNING) {
+//        BLOGD(sc, DBG_LOAD, "Init called while driver is running!\n");
+//        return (0);
+//    }
 
     bxe_set_power_state(sc, PCI_PM_D0);
 
@@ -13197,7 +13322,7 @@ bxe_init_locked_done:
         /* Tell the stack the driver is NOT running! */
         BLOGE(sc, "Initialization failed, "
                   "stack notified driver is NOT running!\n");
-	if_setdrvflagbits(sc->ifp, 0, IFF_DRV_RUNNING);
+//	if_setdrvflagbits(sc->ifp, 0, IFF_DRV_RUNNING);
     }
 
     return (rc);
@@ -13230,6 +13355,7 @@ bxe_init(void *xsc)
 static int
 bxe_init_ifnet(struct bxe_adapter *sc)
 {
+#if 0
     if_t ifp;
     int capabilities;
 
@@ -13304,7 +13430,7 @@ bxe_init_ifnet(struct bxe_adapter *sc)
 
     /* attach to the Ethernet interface list */
     ether_ifattach(ifp, sc->link_params.mac_addr);
-
+#endif
     return (0);
 }
 
@@ -13312,7 +13438,7 @@ static void
 bxe_deallocate_bars(struct bxe_adapter *sc)
 {
     int i;
-
+#if 0
     for (i = 0; i < MAX_BARS; i++) {
         if (sc->bar[i].resource != NULL) {
             bus_release_resource(sc->dev,
@@ -13323,14 +13449,15 @@ bxe_deallocate_bars(struct bxe_adapter *sc)
                   i, PCIR_BAR(i));
         }
     }
+#endif
 }
 
 static int
 bxe_allocate_bars(struct bxe_adapter *sc)
 {
-    u_int flags;
+    unsigned int flags;
     int i;
-
+#if 0
     memset(sc->bar, 0, sizeof(sc->bar));
 
     for (i = 0; i < MAX_BARS; i++) {
@@ -13372,7 +13499,7 @@ bxe_allocate_bars(struct bxe_adapter *sc)
               rman_get_size(sc->bar[i].resource),
               (void *)sc->bar[i].kva);
     }
-
+#endif
     return (0);
 }
 
@@ -13439,13 +13566,14 @@ bxe_pcie_capability_read(struct bxe_adapter *sc,
     int pcie_reg;
 
     /* ensure PCIe capability is enabled */
+#if 0
     if (pci_find_cap(sc->dev, PCIY_EXPRESS, &pcie_reg) == 0) {
         if (pcie_reg != 0) {
             BLOGD(sc, DBG_LOAD, "PCIe capability at 0x%04x\n", pcie_reg);
             return (pci_read_config(sc->dev, (pcie_reg + reg), width));
         }
     }
-
+#endif
     BLOGE(sc, "PCIe capability NOT FOUND!!!\n");
 
     return (0);
@@ -13454,8 +13582,10 @@ bxe_pcie_capability_read(struct bxe_adapter *sc,
 static uint8_t
 bxe_is_pcie_pending(struct bxe_adapter *sc)
 {
+#if 0
     return (bxe_pcie_capability_read(sc, PCIR_EXPRESS_DEVICE_STA, 2) &
             PCIM_EXP_STA_TRANSACTION_PND);
+#endif
 }
 
 /*
@@ -13466,6 +13596,7 @@ bxe_is_pcie_pending(struct bxe_adapter *sc)
 static void
 bxe_probe_pci_caps(struct bxe_adapter *sc)
 {
+#if 0
     uint16_t link_status;
     int reg;
 
@@ -13526,11 +13657,13 @@ bxe_probe_pci_caps(struct bxe_adapter *sc)
             sc->devinfo.pcie_msix_cap_reg = (uint16_t)reg;
         }
     }
+#endif
 }
 
 static int
 bxe_get_shmem_mf_cfg_info_sd(struct bxe_adapter *sc)
 {
+#if 0
     struct bxe_mf_info *mf_info = &sc->devinfo.mf_info;
     uint32_t val;
 
@@ -13559,7 +13692,7 @@ bxe_get_shmem_mf_cfg_info_sd(struct bxe_adapter *sc)
 
     mf_info->vnics_per_port =
         (CHIP_PORT_MODE(sc) == CHIP_4_PORT_MODE) ? 2 : 4;
-
+#endif
     return (0);
 }
 
@@ -14097,7 +14230,7 @@ bxe_get_tunable_params(struct bxe_adapter *sc)
         sc->num_queues = 1;
     } else { /* INTR_MODE_MSI or INTR_MODE_MSIX */
         sc->num_queues =
-            min((bxe_queue_count ? bxe_queue_count : mp_ncpus),
+		min((bxe_queue_count ? bxe_queue_count : 8) //mp_ncpus),
                 MAX_RSS_CHAINS);
         if (sc->num_queues > mp_ncpus) {
             sc->num_queues = mp_ncpus;
@@ -14131,6 +14264,7 @@ bxe_get_tunable_params(struct bxe_adapter *sc)
 static void
 bxe_media_detect(struct bxe_adapter *sc)
 {
+#if 0
     uint32_t phy_idx = bxe_get_cur_phy_idx(sc);
     switch (sc->link_params.phy[phy_idx].media_type) {
     case ELINK_ETH_PHY_SFPP_10G_FIBER:
@@ -14171,6 +14305,8 @@ bxe_media_detect(struct bxe_adapter *sc)
         sc->media = 0;
         break;
     }
+#endif
+    asset(0);
 }
 
 #define GET_FIELD(value, fname)                     \
@@ -14398,11 +14534,12 @@ bxe_get_device_info(struct bxe_adapter *sc)
     bxe_get_shmem_info(sc);
 
     if (sc->devinfo.pcie_msix_cap_reg != 0) {
-        val = pci_read_config(sc->dev,
-                              (sc->devinfo.pcie_msix_cap_reg +
-                               PCIR_MSIX_CTRL),
-                              2);
-        sc->igu_sb_cnt = (val & PCIM_MSIXCTRL_TABLE_SIZE);
+	assert(0);
+//        val = pci_read_config(sc->dev,
+//                              (sc->devinfo.pcie_msix_cap_reg +
+//                               PCIR_MSIX_CTRL),
+//                              2);
+//        sc->igu_sb_cnt = (val & PCIM_MSIXCTRL_TABLE_SIZE);
     } else {
         sc->igu_sb_cnt = 1;
     }
@@ -14899,7 +15036,7 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
     int i, j;
 
     /* XXX zero out all vars here and call bxe_alloc_hsi_mem on error */
-
+#if 0
     /* allocate the parent bus DMA tag */
     rc = bus_dma_tag_create(bus_get_dma_tag(sc->dev), /* parent tag */
                             1,                        /* alignment */
@@ -14915,6 +15052,7 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                             NULL,                     /* lock() */
                             NULL,                     /* lock() arg */
                             &sc->parent_dma_tag);     /* returned dma tag */
+#endif
     if (rc != 0) {
         BLOGE(sc, "Failed to alloc parent DMA tag (%d)!\n", rc);
         return (1);
@@ -15003,6 +15141,8 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
         return (1);
     }
 
+#warning "what the hell is gz_strm"
+#if 0
     sc->gz_buf = (void *)sc->gz_buf_dma.vaddr;
 
     if ((sc->gz_strm =
@@ -15021,7 +15161,7 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
         bus_dma_tag_destroy(sc->parent_dma_tag);
         return (1);
     }
-
+#endif
     /*************/
     /* FASTPATHS */
     /*************/
@@ -15160,18 +15300,20 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
         /***********************/
         /* FP TX MBUF DMA MAPS */
         /***********************/
-
+#if 0
         /* set required sizes before mapping to conserve resources */
         if (if_getcapenable(sc->ifp) & (IFCAP_TSO4 | IFCAP_TSO6)) {
             max_size     = BXE_TSO_MAX_SIZE;
             max_segments = BXE_TSO_MAX_SEGMENTS;
             max_seg_size = BXE_TSO_MAX_SEG_SIZE;
         } else {
+#endif
             max_size     = (MCLBYTES * BXE_MAX_SEGMENTS);
             max_segments = BXE_MAX_SEGMENTS;
-            max_seg_size = MCLBYTES;
-        }
+            max_seg_size = 0; // ?? MCLBYTES;
+//        }
 
+#if 0
         /* create a dma tag for the tx mbufs */
         rc = bus_dma_tag_create(sc->parent_dma_tag, /* parent tag */
                                 1,                  /* alignment */
@@ -15187,6 +15329,8 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                                 NULL,               /* lock() */
                                 NULL,               /* lock() arg */
                                 &fp->tx_mbuf_tag);  /* returned dma tag */
+#endif
+	rc = 1;
         if (rc != 0) {
             /* XXX unwind and free previous fastpath allocations */
             BLOGE(sc, "Failed to create dma tag for "
@@ -15194,7 +15338,7 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                   i, rc);
             return (1);
         }
-
+#if 0
         /* create dma maps for each of the tx mbuf clusters */
         for (j = 0; j < TX_BD_TOTAL; j++) {
             if (bus_dmamap_create(fp->tx_mbuf_tag,
@@ -15227,6 +15371,8 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                                 NULL,               /* lock() */
                                 NULL,               /* lock() arg */
                                 &fp->rx_mbuf_tag);  /* returned dma tag */
+#endif
+	rc = 1;
         if (rc != 0) {
             /* XXX unwind and free previous fastpath allocations */
             BLOGE(sc, "Failed to create dma tag for "
@@ -15234,7 +15380,7 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                   i, rc);
             return (1);
         }
-
+#if 0
         /* create dma maps for each of the rx mbuf clusters */
         for (j = 0; j < RX_BD_TOTAL; j++) {
             if (bus_dmamap_create(fp->rx_mbuf_tag,
@@ -15258,11 +15404,11 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                   i, rc);
             return (1);
         }
-
+#endif
         /***************************/
         /* FP RX SGE MBUF DMA MAPS */
         /***************************/
-
+#if 0
         /* create a dma tag for the rx sge mbufs */
         rc = bus_dma_tag_create(sc->parent_dma_tag, /* parent tag */
                                 1,                  /* alignment */
@@ -15278,6 +15424,7 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                                 NULL,               /* lock() */
                                 NULL,               /* lock() arg */
                                 &fp->rx_sge_mbuf_tag); /* returned dma tag */
+#endif
         if (rc != 0) {
             /* XXX unwind and free previous fastpath allocations */
             BLOGE(sc, "Failed to create dma tag for "
@@ -15285,7 +15432,7 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                   i, rc);
             return (1);
         }
-
+#if 0
         /* create dma maps for the rx sge mbuf clusters */
         for (j = 0; j < RX_SGE_TOTAL; j++) {
             if (bus_dmamap_create(fp->rx_sge_mbuf_tag,
@@ -15309,14 +15456,14 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                   i, rc);
             return (1);
         }
-
+#endif
         /***************************/
         /* FP RX TPA MBUF DMA MAPS */
         /***************************/
 
         /* create dma maps for the rx tpa mbuf clusters */
         max_agg_queues = MAX_AGG_QS(sc);
-
+#if 0
         for (j = 0; j < max_agg_queues; j++) {
             if (bus_dmamap_create(fp->rx_mbuf_tag,
                                   BUS_DMA_NOWAIT,
@@ -15341,6 +15488,7 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
         }
 
         bxe_init_sge_ring_bit_mask(fp);
+#endif
     }
 
     return (0);
@@ -15352,7 +15500,7 @@ bxe_free_hsi_mem(struct bxe_adapter *sc)
     struct bxe_fastpath *fp;
     int max_agg_queues;
     int i, j;
-
+#if 0
     if (sc->parent_dma_tag == NULL) {
         return; /* assume nothing was allocated */
     }
@@ -15523,6 +15671,7 @@ bxe_free_hsi_mem(struct bxe_adapter *sc)
 
     bus_dma_tag_destroy(sc->parent_dma_tag);
     sc->parent_dma_tag = NULL;
+#endif
 }
 
 /*
@@ -15632,8 +15781,8 @@ bxe_prev_mark_path(struct bxe_adapter *sc,
     mtx_unlock(&bxe_prev_mtx);
 
     /* Create an entry for this path and add it */
-    tmp = malloc(sizeof(struct bxe_prev_list_node), M_DEVBUF,
-                 (M_NOWAIT | M_ZERO));
+    tmp = kmalloc(sizeof(struct bxe_prev_list_node), 0); //M_DEVBUF,
+//                 (M_NOWAIT | M_ZERO));
     if (!tmp) {
         BLOGE(sc, "Failed to allocate 'bxe_prev_list_node'\n");
         return (-1);
@@ -16174,6 +16323,7 @@ bxe_sysctl_eth_q_stat(SYSCTL_HANDLER_ARGS)
     return (sysctl_handle_64(oidp, &value, 0, req));
 }
 
+#if 0
 static void
 bxe_add_sysctls(struct bxe_adapter *sc)
 {
@@ -16622,7 +16772,7 @@ bxe_igu_clear_sb(struct bxe_adapter *sc,
 }
 
 
-
+#endif
 
 
 
