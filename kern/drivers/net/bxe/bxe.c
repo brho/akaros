@@ -7178,7 +7178,7 @@ bxe_clear_pf_load(struct bxe_adapter *sc)
 /* send load requrest to mcp and analyze response */
 static int
 bxe_nic_load_request(struct bxe_adapter *sc,
-                     uint32_t         *load_code)
+		     int         *load_code)
 {
     /* init fw_seq */
     sc->fw_seq =
@@ -14158,7 +14158,7 @@ static void
 bxe_get_tunable_params(struct bxe_adapter *sc)
 {
     /* sanity checks */
-
+#if 0
     if ((bxe_interrupt_mode != INTR_MODE_INTX) &&
         (bxe_interrupt_mode != INTR_MODE_MSI)  &&
         (bxe_interrupt_mode != INTR_MODE_MSIX)) {
@@ -14216,7 +14216,7 @@ bxe_get_tunable_params(struct bxe_adapter *sc)
     }
 
     /* pull in user settings */
-
+#endif
     sc->interrupt_mode       = bxe_interrupt_mode;
     sc->max_rx_bufs          = bxe_max_rx_bufs;
     sc->hc_rx_ticks          = bxe_hc_rx_ticks;
@@ -14225,7 +14225,7 @@ bxe_get_tunable_params(struct bxe_adapter *sc)
     sc->mrrs                 = bxe_mrrs;
     sc->autogreeen           = bxe_autogreeen;
     sc->udp_rss              = bxe_udp_rss;
-
+#if 0
     if (bxe_interrupt_mode == INTR_MODE_INTX) {
         sc->num_queues = 1;
     } else { /* INTR_MODE_MSI or INTR_MODE_MSIX */
@@ -14236,7 +14236,7 @@ bxe_get_tunable_params(struct bxe_adapter *sc)
             sc->num_queues = mp_ncpus;
         }
     }
-
+#endif
     BLOGD(sc, DBG_LOAD,
           "User Config: "
           "debug=0x%lx "
@@ -15713,7 +15713,7 @@ static struct bxe_prev_list_node *
 bxe_prev_path_get_entry(struct bxe_adapter *sc)
 {
     struct bxe_prev_list_node *tmp;
-
+#if 0
     LIST_FOREACH(tmp, &bxe_prev_list, node) {
         if ((sc->pcie_bus == tmp->bus) &&
             (sc->pcie_device == tmp->slot) &&
@@ -15721,7 +15721,7 @@ bxe_prev_path_get_entry(struct bxe_adapter *sc)
             return (tmp);
         }
     }
-
+#endif
     return (NULL);
 }
 
@@ -15730,8 +15730,8 @@ bxe_prev_is_path_marked(struct bxe_adapter *sc)
 {
     struct bxe_prev_list_node *tmp;
     int rc = FALSE;
-
-    mtx_lock(&bxe_prev_mtx);
+#warning "TODO: figure out bxe_prev_mtx"
+    //    mtx_lock(&bxe_prev_mtx);
 
     tmp = bxe_prev_path_get_entry(sc);
     if (tmp) {
@@ -15747,7 +15747,7 @@ bxe_prev_is_path_marked(struct bxe_adapter *sc)
         }
     }
 
-    mtx_unlock(&bxe_prev_mtx);
+    //    mtx_unlock(&bxe_prev_mtx);
 
     return (rc);
 }
@@ -15758,7 +15758,7 @@ bxe_prev_mark_path(struct bxe_adapter *sc,
 {
     struct bxe_prev_list_node *tmp;
 
-    mtx_lock(&bxe_prev_mtx);
+    //    mtx_lock(&bxe_prev_mtx);
 
     /* Check whether the entry for this path already exists */
     tmp = bxe_prev_path_get_entry(sc);
@@ -15774,11 +15774,11 @@ bxe_prev_mark_path(struct bxe_adapter *sc,
             tmp->aer = 0;
         }
 
-        mtx_unlock(&bxe_prev_mtx);
+	//        mtx_unlock(&bxe_prev_mtx);
         return (0);
     }
 
-    mtx_unlock(&bxe_prev_mtx);
+    //    mtx_unlock(&bxe_prev_mtx);
 
     /* Create an entry for this path and add it */
     tmp = kmalloc(sizeof(struct bxe_prev_list_node), 0); //M_DEVBUF,
@@ -15794,14 +15794,14 @@ bxe_prev_mark_path(struct bxe_adapter *sc,
     tmp->aer  = 0;
     tmp->undi = after_undi ? (1 << SC_PORT(sc)) : 0;
 
-    mtx_lock(&bxe_prev_mtx);
+    //    mtx_lock(&bxe_prev_mtx);
 
     BLOGD(sc, DBG_LOAD,
           "Marked path %d/%d/%d - finished previous unload\n",
           sc->pcie_bus, sc->pcie_device, SC_PATH(sc));
-    LIST_INSERT_HEAD(&bxe_prev_list, tmp, node);
+    //    LIST_INSERT_HEAD(&bxe_prev_list, tmp, node);
 
-    mtx_unlock(&bxe_prev_mtx);
+    //    mtx_unlock(&bxe_prev_mtx);
 
     return (0);
 }
@@ -16101,7 +16101,7 @@ bxe_prev_unload_uncommon(struct bxe_adapter *sc)
     /* Close the MCP request, return failure*/
     rc = bxe_prev_mcp_done(sc);
     if (!rc) {
-        rc = BXE_PREV_WAIT_NEEDED;
+      //        rc = BXE_PREV_WAIT_NEEDED;
     }
 
     return (rc);
@@ -16160,9 +16160,10 @@ bxe_prev_unload(struct bxe_adapter *sc)
 
         /* non-common reply from MCP night require looping */
         rc = bxe_prev_unload_uncommon(sc);
-        if (rc != BXE_PREV_WAIT_NEEDED) {
-            break;
-        }
+#warning "bxe_prev_wait_needed?"
+	//        if (rc != BXE_PREV_WAIT_NEEDED) {
+	//            break;
+	//        }
 
         udelay(20000);
     } while (--time_counter);
@@ -16233,6 +16234,8 @@ bxe_init_multi_cos(struct bxe_adapter *sc)
     }
 }
 
+#warning "move sysctl to write to ctl file"
+#if 0
 static int
 bxe_sysctl_state(SYSCTL_HANDLER_ARGS)
 {
@@ -16254,6 +16257,7 @@ bxe_sysctl_state(SYSCTL_HANDLER_ARGS)
 
     return (error);
 }
+
 
 static int
 bxe_sysctl_eth_stat(SYSCTL_HANDLER_ARGS)
@@ -16322,7 +16326,7 @@ bxe_sysctl_eth_q_stat(SYSCTL_HANDLER_ARGS)
 
     return (sysctl_handle_64(oidp, &value, 0, req));
 }
-
+#endif
 #if 0
 static void
 bxe_add_sysctls(struct bxe_adapter *sc)
@@ -16841,7 +16845,7 @@ bxe_init_pxp(struct bxe_adapter *sc)
 {
     uint16_t devctl;
     int r_order, w_order;
-
+#if 0
     devctl = bxe_pcie_capability_read(sc, PCIR_EXPRESS_DEVICE_CTL, 2);
 
     BLOGD(sc, DBG_LOAD, "read 0x%08x from devctl\n", devctl);
@@ -16856,6 +16860,7 @@ bxe_init_pxp(struct bxe_adapter *sc)
     }
 
     ecore_init_pxp_arb(sc, r_order, w_order);
+#endif
 }
 
 static uint32_t
@@ -18420,10 +18425,10 @@ bxe_init_hw_func(struct bxe_adapter *sc)
 #endif
 
     for (i = 0; i < L2_ILT_LINES(sc); i++) {
-        ilt->lines[cdu_ilt_start + i].page = sc->context[i].vcxt;
-        ilt->lines[cdu_ilt_start + i].page_mapping =
-            sc->context[i].vcxt_dma.paddr;
-        ilt->lines[cdu_ilt_start + i].size = sc->context[i].size;
+      //ilt->lines[cdu_ilt_start + i].page = sc->context[i].vcxt;
+	//        ilt->lines[cdu_ilt_start + i].page_mapping =
+	//            sc->context[i].vcxt_dma.paddr;
+        //ilt->lines[cdu_ilt_start + i].size = sc->context[i].size;
     }
     ecore_ilt_init_op(sc, INITOP_SET);
 
