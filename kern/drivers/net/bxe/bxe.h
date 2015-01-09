@@ -1431,8 +1431,7 @@ struct bxe_adapter {
     char fw_ver_str[32];
     char mf_mode_str[32];
     char pci_link_str[32];
-#warning "iro_array"
-  //    const struct iro *iro_array;
+  const struct iro *iro_array;
 
 #warning "no locking of any kind"
 #if 0
@@ -1511,14 +1510,10 @@ struct bxe_adapter {
     uint16_t fw_drv_pulse_wr_seq;
     uint32_t func_stx;
 
-#warning "no elink params"
-#if 0
     struct elink_params         link_params;
     struct elink_vars           link_vars;
-#endif
     uint32_t                    link_cnt;
-#warning "no last reported link"
-  //    struct bxe_link_report_data last_reported_link;
+  struct bxe_link_report_data last_reported_link;
     char mac_addr_str[32];
 
     int last_reported_link_state;
@@ -1542,9 +1537,9 @@ struct bxe_adapter {
 #define BXE_RX_MODE_PROMISC  3
 #define BXE_MAX_MULTICAST    64
 
-  //    struct bxe_port port;
+  struct bxe_port port;
 
-  //    struct cmng_init cmng;
+  struct cmng_init cmng;
 
     /* user configs */
     int      num_queues;

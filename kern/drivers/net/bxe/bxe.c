@@ -24,7 +24,6 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 //__FBSDID("$FreeBSD: head/sys/dev/bxe/bxe.c 275358 2014-12-01 11:45:24Z hselasky $");
 
 #define BXE_DRIVER_VERSION "1.78.78"
@@ -55,14 +54,6 @@
 #ifndef CSUM_TCP_IPV6
 #define CSUM_TCP_IPV6 0
 #define CSUM_UDP_IPV6 0
-#endif
-
-/*
- * pci_find_cap was added in r219865. Re-define this at pci_find_extcap
- * for older kernels that don't include this changeset.
- */
-#if __FreeBSD_version < 900035
-#define pci_find_cap pci_find_extcap
 #endif
 
 #define BXE_DEF_SB_ATT_IDX 0x0001
@@ -225,9 +216,11 @@ static struct bxe_device_type bxe_devs[] = {
     }
 };
 
-MALLOC_DECLARE(M_BXE_ILT);
-MALLOC_DEFINE(M_BXE_ILT, "bxe_ilt", "bxe ILT pointer");
+#warning "MALLOC_DECLARE?"
+//MALLOC_DECLARE(M_BXE_ILT);
+//MALLOC_DEFINE(M_BXE_ILT, "bxe_ilt", "bxe ILT pointer");
 
+#if 0
 /*
  * FreeBSD device entry points.
  */
@@ -255,30 +248,7 @@ static device_method_t bxe_methods[] = {
     KOBJMETHOD_END
 };
 
-/*
- * FreeBSD KLD Module data declaration
- */
-static driver_t bxe_driver = {
-    "bxe",                   /* module name */
-    bxe_methods,             /* event handler */
-    sizeof(struct bxe_adapter) /* extra data */
-};
-
-/*
- * FreeBSD dev class is needed to manage dev instances and
- * to associate with a bus type
- */
-static devclass_t bxe_devclass;
-
-MODULE_DEPEND(bxe, pci, 1, 1, 1);
-MODULE_DEPEND(bxe, ether, 1, 1, 1);
-DRIVER_MODULE(bxe, pci, bxe_driver, bxe_devclass, 0, 0);
-
-/* resources needed for unloading a previously loaded device */
-
-#define BXE_PREV_WAIT_NEEDED 1
-qlock bxe_prev_mtx;
-#warning "init bxe_prev_mtx"
+#endif
 //MTX_SYSINIT(bxe_prev_mtx, &bxe_prev_mtx, "bxe_prev_lock", MTX_DEF);
 struct bxe_prev_list_node {
     LIST_ENTRY(bxe_prev_list_node) node;
@@ -288,14 +258,13 @@ struct bxe_prev_list_node {
     uint8_t aer; /* XXX automatic error recovery */
     uint8_t undi;
 };
-static LIST_HEAD(, bxe_prev_list_node) bxe_prev_list = LIST_HEAD_INITIALIZER(bxe_prev_list);
-
-static int load_count[2][3] = { {0} }; /* per-path: 0-common, 1-port0, 2-port1 */
+//static LIST_HEAD(, bxe_prev_list_node) bxe_prev_list = LIST_HEAD_INITIALIZER(bxe_prev_list);
 
 /* Tunable device values... */
 
-SYSCTL_NODE(_hw, OID_AUTO, bxe, CTLFLAG_RD, 0, "bxe driver parameters");
+//SYSCTL_NODE(_hw, OID_AUTO, bxe, CTLFLAG_RD, 0, "bxe driver parameters");
 
+#if 0
 /* Debug */
 unsigned long bxe_debug = 0;
 SYSCTL_ULONG(_hw_bxe, OID_AUTO, debug, CTLFLAG_RDTUN,
@@ -351,7 +320,7 @@ static int bxe_udp_rss = 0;
 SYSCTL_INT(_hw_bxe, OID_AUTO, udp_rss, CTLFLAG_RDTUN,
            &bxe_udp_rss, 0, "UDP RSS support");
 
-
+#endif
 #define STAT_NAME_LEN 32 /* no stat names below can be longer than this */
 
 #define STATS_OFFSET32(stat_name)                   \
@@ -1131,7 +1100,7 @@ bxe_acquire_hw_lock(struct bxe_adapter *sc,
         if (lock_status & resource_bit) {
             return (0);
         }
-        DELAY(5000);
+        udelay(5000);
     }
 
     BLOGE(sc, "Resource lock timeout!\n");
@@ -1212,7 +1181,7 @@ bxe_acquire_nvram_lock(struct bxe_adapter *sc)
             break;
         }
 
-        DELAY(5);
+        udelay(5);
     }
 
     if (!(val & (MCPR_NVM_SW_ARB_ARB_ARB1 << port))) {
@@ -1246,7 +1215,7 @@ bxe_release_nvram_lock(struct bxe_adapter *sc)
             break;
         }
 
-        DELAY(5);
+        udelay(5);
     }
 
     if (val & (MCPR_NVM_SW_ARB_ARB_ARB1 << port)) {
@@ -1317,7 +1286,7 @@ bxe_nvram_read_dword(struct bxe_adapter *sc,
     *ret_val = 0;
     rc = -1;
     for (i = 0; i < count; i++) {
-        DELAY(5);
+        udelay(5);
         val = REG_RD(sc, MCP_REG_MCPR_NVM_COMMAND);
 
         if (val & MCPR_NVM_COMMAND_DONE) {
@@ -1430,7 +1399,7 @@ bxe_nvram_write_dword(struct bxe_adapter *sc,
     /* wait for completion */
     rc = -1;
     for (i = 0; i < count; i++) {
-        DELAY(5);
+        udelay(5);
         val = REG_RD(sc, MCP_REG_MCPR_NVM_COMMAND);
         if (val & MCPR_NVM_COMMAND_DONE) {
             rc = 0;
@@ -1667,7 +1636,7 @@ bxe_issue_dmae_with_comp(struct bxe_adapter    *sc,
     bxe_post_dmae(sc, dmae, INIT_DMAE_C(sc));
 
     /* wait for completion */
-    DELAY(5);
+    udelay(5);
 
     while ((*wb_comp & ~DMAE_PCI_ERR_FLAG) != DMAE_COMP_VAL) {
         if (!timeout ||
@@ -1679,7 +1648,7 @@ bxe_issue_dmae_with_comp(struct bxe_adapter    *sc,
         }
 
         timeout--;
-        DELAY(50);
+        udelay(50);
     }
 
     if (*wb_comp & DMAE_PCI_ERR_FLAG) {
@@ -1870,7 +1839,7 @@ void
 elink_cb_udelay(struct bxe_adapter *sc,
                 uint32_t         usecs)
 {
-    DELAY(usecs);
+    udelay(usecs);
 }
 
 uint32_t
@@ -2228,7 +2197,7 @@ elink_cb_fw_command(struct bxe_adapter *sc,
 
     /* Let the FW do it's magic. GIve it up to 5 seconds... */
     do {
-        DELAY(delay * 1000);
+        udelay(delay * 1000);
         rc = SHMEM_RD(sc, func_mb[mb_idx].fw_mb_header);
     } while ((seq != (rc & FW_MSG_SEQ_NUMBER_MASK)) && (cnt++ < 500));
 
@@ -3671,7 +3640,7 @@ bxe_drain_tx_queues(struct bxe_adapter *sc)
             }
 
             count--;
-            DELAY(1000);
+            udelay(1000);
             rmb();
         }
     }
@@ -4004,7 +3973,7 @@ bxe_func_wait_started(struct bxe_adapter *sc)
 
     while (ecore_func_get_state(sc, &sc->func_obj) !=
            ECORE_F_STATE_STARTED && tout--) {
-        DELAY(20000);
+        udelay(20000);
     }
 
     if (ecore_func_get_state(sc, &sc->func_obj) != ECORE_F_STATE_STARTED) {
@@ -4085,7 +4054,7 @@ bxe_wait_sp_comp(struct bxe_adapter *sc,
             return (TRUE);
         }
 
-        DELAY(1000);
+        udelay(1000);
     }
 
     mb();
@@ -4175,7 +4144,7 @@ bxe_chip_cleanup(struct bxe_adapter *sc,
     bxe_drain_tx_queues(sc);
 
     /* give HW time to discard old tx messages */
-    DELAY(1000);
+    udelay(1000);
 
     /* Clean all ETH MACs */
     rc = bxe_del_all_macs(sc, &sc->sp_objs[0].mac_obj, ECORE_ETH_MAC, FALSE);
@@ -7275,7 +7244,7 @@ static int bxe_acquire_alr(struct bxe_adapter *sc)
         if (val & (1L << 31))
             break;
 
-        DELAY(5000);
+        udelay(5000);
     }
 
     if (!(val & (1L << 31))) {
@@ -10896,6 +10865,7 @@ bxe_nic_init(struct bxe_adapter *sc,
 static inline void
 bxe_init_objs(struct bxe_adapter *sc)
 {
+#if 0
     /* mcast rules must be added to tx if tx switching is enabled */
     ecore_obj_type o_type =
         (sc->flags & BXE_TX_SWITCHING) ? ECORE_OBJ_TYPE_RX_TX :
@@ -10941,6 +10911,7 @@ bxe_init_objs(struct bxe_adapter *sc)
                               BXE_SP_MAPPING(sc, rss_rdata),
                               ECORE_FILTER_RSS_CONF_PENDING,
                               &sc->sp_state, ECORE_OBJ_TYPE_RX);
+#endif
 }
 
 /*
@@ -10950,6 +10921,7 @@ bxe_init_objs(struct bxe_adapter *sc)
 static inline int
 bxe_func_start(struct bxe_adapter *sc)
 {
+#if 0
     struct ecore_func_state_params func_params = { NULL };
     struct ecore_func_start_params *start_params = &func_params.params.start;
 
@@ -10973,12 +10945,14 @@ bxe_func_start(struct bxe_adapter *sc)
     start_params->gre_tunnel_rss  = 0;
 
     return (ecore_func_state_change(sc, &func_params));
+#endif
 }
 
 static int
 bxe_set_power_state(struct bxe_adapter *sc,
                     uint8_t          state)
 {
+#if 0
     uint16_t pmcsr;
 
     /* If there is no power capability, silently succeed */
@@ -10999,7 +10973,7 @@ bxe_set_power_state(struct bxe_adapter *sc,
 
         if (pmcsr & PCIM_PSTAT_DMASK) {
             /* delay required during transition out of D3hot */
-            DELAY(20000);
+            udelay(20000);
         }
 
         break;
@@ -11034,6 +11008,7 @@ bxe_set_power_state(struct bxe_adapter *sc,
         return (-1);
     }
 
+#endif
     return (0);
 }
 
@@ -11043,6 +11018,7 @@ static uint8_t
 bxe_trylock_hw_lock(struct bxe_adapter *sc,
                     uint32_t         resource)
 {
+#if 0
     uint32_t lock_status;
     uint32_t resource_bit = (1 << resource);
     int func = SC_FUNC(sc);
@@ -11071,6 +11047,7 @@ bxe_trylock_hw_lock(struct bxe_adapter *sc,
         return (TRUE);
     }
 
+#endif
     BLOGE(sc, "Failed to get a resource lock 0x%x\n", resource);
 
     return (FALSE);
@@ -11160,7 +11137,7 @@ bxe_er_poll_igu_vq(struct bxe_adapter *sc)
             break;
         }
 
-        DELAY(1000);
+        udelay(1000);
     } while (--cnt > 0);
 
     if (cnt == 0) {
@@ -11226,9 +11203,9 @@ bxe_mcp_wait_one(struct bxe_adapter *sc)
 {
     /* special handling for emulation and FPGA (10 times longer) */
     if (CHIP_REV_IS_SLOW(sc)) {
-        DELAY((MCP_ONE_TIMEOUT*10) * 1000);
+        udelay((MCP_ONE_TIMEOUT*10) * 1000);
     } else {
-        DELAY((MCP_ONE_TIMEOUT) * 1000);
+        udelay((MCP_ONE_TIMEOUT) * 1000);
     }
 }
 
@@ -11419,7 +11396,7 @@ bxe_process_kill(struct bxe_adapter *sc,
             (pgl_exp_rom2 == 0xffffffff) &&
             (!CHIP_IS_E3(sc) || (tags_63_32 == 0xffffffff)))
             break;
-        DELAY(1000);
+        udelay(1000);
     } while (cnt-- > 0);
 
     if (cnt <= 0) {
@@ -11455,7 +11432,7 @@ bxe_process_kill(struct bxe_adapter *sc,
      * Wait for 1ms to empty GLUE and PCI-E core queues,
      * PSWHST, GRC and PSWRD Tetris buffer.
      */
-    DELAY(1000);
+    udelay(1000);
 
     /* Prepare to chip reset: */
     /* MCP */
@@ -14456,7 +14433,7 @@ bxe_get_device_info(struct bxe_adapter *sc)
 
             while (tout && REG_RD(sc, IGU_REG_RESET_MEMORIES)) {
                 tout--;
-                DELAY(1000);
+                udelay(1000);
             }
 
             if (REG_RD(sc, IGU_REG_RESET_MEMORIES)) {
@@ -15701,7 +15678,7 @@ bxe_do_flr(struct bxe_adapter *sc)
     /* Wait for Transaction Pending bit clean */
     for (i = 0; i < 4; i++) {
         if (i) {
-            DELAY(((1 << (i - 1)) * 100) * 1000);
+            udelay(((1 << (i - 1)) * 100) * 1000);
         }
 
         if (!bxe_is_pcie_pending(sc)) {
@@ -15804,7 +15781,7 @@ bxe_prev_unload_close_mac(struct bxe_adapter *sc,
     }
 
     if (mac_stopped) {
-        DELAY(20000);
+        udelay(20000);
     }
 }
 
@@ -15904,7 +15881,7 @@ bxe_prev_unload_common(struct bxe_adapter *sc)
                 bxe_prev_unload_undi_inc(sc, SC_PORT(sc), 1);
             }
 
-            DELAY(10);
+            udelay(10);
         }
 
         if (!timer_count) {
@@ -16038,7 +16015,7 @@ bxe_prev_unload(struct bxe_adapter *sc)
             break;
         }
 
-        DELAY(20000);
+        udelay(20000);
     } while (--time_counter);
 
     if (!time_counter || rc) {
@@ -16626,7 +16603,7 @@ bxe_igu_clear_sb_gen(struct bxe_adapter *sc,
 
     /* wait for clean up to finish */
     while (!(REG_RD(sc, igu_addr_ack) & sb_bit) && --cnt) {
-        DELAY(20000);
+        udelay(20000);
     }
 
     if (!(REG_RD(sc, igu_addr_ack) & sb_bit)) {
@@ -16910,7 +16887,7 @@ bxe_int_mem_test(struct bxe_adapter *sc)
             break;
         }
 
-        DELAY(10000);
+        udelay(10000);
         count--;
     }
 
@@ -16927,7 +16904,7 @@ bxe_int_mem_test(struct bxe_adapter *sc)
             break;
         }
 
-        DELAY(10000);
+        udelay(10000);
         count--;
     }
 
@@ -16938,9 +16915,9 @@ bxe_int_mem_test(struct bxe_adapter *sc)
 
     /* Reset and init BRB, PRS */
     REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_1_CLEAR, 0x03);
-    DELAY(50000);
+    udelay(50000);
     REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_1_SET, 0x03);
-    DELAY(50000);
+    udelay(50000);
     ecore_init_block(sc, BLOCK_BRB1, PHASE_COMMON);
     ecore_init_block(sc, BLOCK_PRS, PHASE_COMMON);
 
@@ -16967,7 +16944,7 @@ bxe_int_mem_test(struct bxe_adapter *sc)
             break;
         }
 
-        DELAY(10000);
+        udelay(10000);
         count--;
     }
 
@@ -16986,7 +16963,7 @@ bxe_int_mem_test(struct bxe_adapter *sc)
     REG_WR(sc, PRS_REG_CFC_SEARCH_INITIAL_CREDIT, 0x1);
 
     /* Wait until PRS register shows 3 packets */
-    DELAY(10000 * factor);
+    udelay(10000 * factor);
 
     /* Wait until NIG register shows 1 packet of size 0x10 */
     val = REG_RD(sc, PRS_REG_NUM_OF_PACKETS);
@@ -17007,9 +16984,9 @@ bxe_int_mem_test(struct bxe_adapter *sc)
 
     /* Reset and init BRB, PRS, NIG */
     REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_1_CLEAR, 0x03);
-    DELAY(50000);
+    udelay(50000);
     REG_WR(sc, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_1_SET, 0x03);
-    DELAY(50000);
+    udelay(50000);
     ecore_init_block(sc, BLOCK_BRB1, PHASE_COMMON);
     ecore_init_block(sc, BLOCK_PRS, PHASE_COMMON);
     if (!CNIC_SUPPORT(sc)) {
@@ -17237,7 +17214,7 @@ bxe_init_hw_common(struct bxe_adapter *sc)
     }
 
     /* let the HW do it's magic... */
-    DELAY(100000);
+    udelay(100000);
 
     /* finish PXP init */
     val = REG_RD(sc, PXP2_REG_RQ_CFG_DONE);
@@ -17367,7 +17344,7 @@ bxe_init_hw_common(struct bxe_adapter *sc)
 
         /* let the HW do it's magic... */
         do {
-            DELAY(200000);
+            udelay(200000);
             val = REG_RD(sc, ATC_REG_ATC_INIT_DONE);
         } while (factor-- && (val != 1));
 
@@ -17463,7 +17440,7 @@ bxe_init_hw_common(struct bxe_adapter *sc)
                VFC_MEMORIES_RST_REG_CAM_RST |
                VFC_MEMORIES_RST_REG_RAM_RST);
 
-        DELAY(20000);
+        udelay(20000);
     }
 
     ecore_init_block(sc, BLOCK_TSEM, PHASE_COMMON);
@@ -17575,7 +17552,7 @@ bxe_init_hw_common(struct bxe_adapter *sc)
     }
 
     if (CHIP_REV_IS_SLOW(sc)) {
-        DELAY(200000);
+        udelay(200000);
     }
 
     /* finish CFC init */
@@ -17775,7 +17752,7 @@ bxe_init_hw_port(struct bxe_adapter *sc)
 
         /* probe changes */
         REG_WR(sc, PBF_REG_INIT_P0 + port*4, 1);
-        DELAY(50);
+        udelay(50);
         REG_WR(sc, PBF_REG_INIT_P0 + port*4, 0);
     }
 
@@ -17879,7 +17856,7 @@ bxe_flr_clnup_reg_poll(struct bxe_adapter *sc,
     uint32_t val;
 
     while ((val = REG_RD(sc, reg)) != expected && cur_cnt--) {
-        DELAY(FLR_WAIT_INTERVAL);
+        udelay(FLR_WAIT_INTERVAL);
     }
 
     return (val);
@@ -18035,7 +18012,7 @@ bxe_pbf_pN_buf_flushed(struct bxe_adapter       *sc,
            ((uint32_t)((int32_t)crd_freed - (int32_t)crd_freed_start) <
             (init_crd - crd_start))) {
         if (cur_cnt--) {
-            DELAY(FLR_WAIT_INTERVAL);
+            udelay(FLR_WAIT_INTERVAL);
             crd = REG_RD(sc, regs->crd);
             crd_freed = REG_RD(sc, regs->crd_freed);
         } else {
@@ -18067,7 +18044,7 @@ bxe_pbf_pN_cmd_flushed(struct bxe_adapter       *sc,
     while (occup &&
            ((uint32_t)((int32_t)freed - (int32_t)freed_start) < to_free)) {
         if (cur_cnt--) {
-            DELAY(FLR_WAIT_INTERVAL);
+            udelay(FLR_WAIT_INTERVAL);
             occup = REG_RD(sc, regs->lines_occup);
             freed = REG_RD(sc, regs->lines_freed);
         } else {
@@ -18208,7 +18185,7 @@ bxe_pf_flr_clnup(struct bxe_adapter *sc)
     bxe_tx_hw_flushed(sc, poll_cnt);
 
     /* Wait 100ms (not adjusted according to platform) */
-    DELAY(100000);
+    udelay(100000);
 
     /* Verify no pending pci transactions */
     if (bxe_is_pcie_pending(sc)) {
@@ -18329,7 +18306,7 @@ bxe_init_hw_func(struct bxe_adapter *sc)
          * needed to make sure there are no requests in
          * one of the PXP internal queues with "old" ILT addresses
          */
-        DELAY(20000);
+        udelay(20000);
 
         /*
          * Master enable - Due to WB DMAE writes performed before this
@@ -18601,7 +18578,7 @@ bxe_reset_port(struct bxe_adapter *sc)
     /* Configure AEU */
     REG_WR(sc, MISC_REG_AEU_MASK_ATTN_FUNC_0 + port*4, 0);
 
-    DELAY(100000);
+    udelay(100000);
 
     /* Check for BRB port occupancy */
     val = REG_RD(sc, BRB1_REG_PORT_NUM_OCC_BLOCKS_0 + port*4);
@@ -18699,7 +18676,7 @@ bxe_reset_func(struct bxe_adapter *sc)
          * scan to complete
          */
         for (i = 0; i < 200; i++) {
-            DELAY(10000);
+            udelay(10000);
             if (!REG_RD(sc, TM_REG_LIN0_SCAN_ON + port*4))
                 break;
         }
