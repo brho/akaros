@@ -57,7 +57,7 @@ typedef uintptr_t bus_dmamap_t;
 typedef uintptr_t bus_dma_segment_t;
 typedef uintptr_t bus_space_tag_t;
 typedef uintptr_t vm_offset_t;
-typedef spinlock_t ECORE_MUTEX_SPIN;
+typedef qlock_t ECORE_MUTEX_SPIN;
 typedef qlock_t ECORE_MUTEX;
 typedef qlock_t mtx;
 typedef int device_t;
@@ -1721,14 +1721,14 @@ struct eth_spe *spq;
 	 * buffer).
 	 */
 	int                     fw_stats_req_size;
-	//    struct bxe_fw_stats_req *fw_stats_req;
+	struct bxe_fw_stats_req *fw_stats_req;
 	bus_addr_t              fw_stats_req_mapping;
 	/*
 	 * FW statistics data shortcut (points at the beginning of fw_stats
 	 * buffer + fw_stats_req_size).
 	 */
 	int                      fw_stats_data_size;
-	//    struct bxe_fw_stats_data *fw_stats_data;
+	struct bxe_fw_stats_data *fw_stats_data;
 	bus_addr_t               fw_stats_data_mapping;
 	
 	/* tracking a pending STAT_QUERY ramrod */
@@ -1738,7 +1738,7 @@ struct eth_spe *spq;
 	uint16_t stats_counter;
 	uint8_t  stats_init;
 	int      stats_state;
-#if 0
+
 	struct bxe_eth_stats         eth_stats;
 	struct host_func_stats       func_stats;
 	struct bxe_eth_stats_old     eth_stats_old;
@@ -1746,7 +1746,7 @@ struct eth_spe *spq;
 	struct bxe_fw_port_stats_old fw_stats_old;
 	
 	struct dmae_command stats_dmae; /* used by dmae command loader */
-#endif
+
 	int                 executer_idx;
 	
 	int mtu;

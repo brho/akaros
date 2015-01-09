@@ -84,14 +84,16 @@ typedef _Bool bool;
 #define IRO sc->iro_array
 
 //typedef struct mtx ECORE_MUTEX;
-#define ECORE_MUTEX_INIT(_mutex) \
-    mtx_init(_mutex, "ecore_lock", "ECORE Lock", MTX_DEF)
+#define ECORE_MUTEX_INIT(_mutex) 
+//								\
+//    mtx_init(_mutex, "ecore_lock", "ECORE Lock", MTX_DEF)
 #define ECORE_MUTEX_LOCK(_mutex)   mtx_lock(_mutex)
 #define ECORE_MUTEX_UNLOCK(_mutex) mtx_unlock(_mutex)
 
 //typedef struct mtx ECORE_MUTEX_SPIN;
-#define ECORE_SPIN_LOCK_INIT(_spin, _sc) \
-    mtx_init(_spin, "ecore_lock", "ECORE Lock", MTX_DEF)
+#define ECORE_SPIN_LOCK_INIT(_spin, _sc)
+//								\
+//    mtx_init(_spin, "ecore_lock", "ECORE Lock", MTX_DEF)
 #define ECORE_SPIN_LOCK_BH(_spin)   mtx_lock(_spin) /* bh = bottom-half */
 #define ECORE_SPIN_UNLOCK_BH(_spin) mtx_unlock(_spin) /* bh = bottom-half */
 
@@ -143,12 +145,12 @@ typedef _Bool bool;
 #define ECORE_UNLIKELY(x) __predict_false(x)
 
 #define ECORE_ZALLOC(_size, _flags, _sc) \
-    malloc(_size, M_TEMP, (M_NOWAIT | M_ZERO))
+	kzmalloc(_size, KMALLOC_WAIT) /*M_TEMP, (M_NOWAIT | M_ZERO))*/
 
 #define ECORE_CALLOC(_len, _size, _flags, _sc) \
-    malloc(_len * _size, M_TEMP, (M_NOWAIT | M_ZERO))
+    kzmalloc(_len * _size, KMALLOC_WAIT) /*M_TEMP, (M_NOWAIT | M_ZERO))*/
 
-#define ECORE_FREE(_s, _buf, _size) free(_buf, M_TEMP)
+#define ECORE_FREE(_s, _buf, _size) kfree(_buf); /*, M_TEMP)*/
 
 #define SC_ILT(sc)  ((sc)->ilt)
 #define ILOG2(x)    bxe_ilog2(x)

@@ -489,7 +489,7 @@ struct bxe_fw_port_stats_old {
 #define ADD_64_LE16(s_hi, a_hi_le, s_lo, a_lo_le) \
         ADD_64(s_hi, le16toh(a_hi_le),            \
                s_lo, le16toh(a_lo_le))
-
+#define UINT_MAX (0xffffffffffffffffull)
 /* difference = minuend - subtrahend */
 #define DIFF_64(d_hi, m_hi, s_hi, d_lo, m_lo, s_lo)  \
     do {                                             \

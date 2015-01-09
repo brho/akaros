@@ -4,8 +4,3 @@ menuconfig NETWORKING
 	help
 		This is a placeholder for networking related option.  Right now,
 		CONFIG_NETWORKING does not change the build in any way.
-
-if NETWORKING
-
-endif # NETWORKING
-

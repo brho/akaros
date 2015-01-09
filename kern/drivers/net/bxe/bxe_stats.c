@@ -24,7 +24,6 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 //__FBSDID("$FreeBSD: head/sys/dev/bxe/bxe_stats.c 271782 2014-09-18 15:56:14Z glebius $");
 
 #include "bxe.h"
@@ -95,7 +94,7 @@ static void
 bxe_dp_stats(struct bxe_adapter *sc)
 {
     int i;
-
+#if 0
     BLOGD(sc, DBG_STATS,
           "dumping stats:\n"
           "  fw_stats_req\n"
@@ -128,6 +127,7 @@ bxe_dp_stats(struct bxe_adapter *sc)
               sc->fw_stats_req->query[i].address.hi,
               sc->fw_stats_req->query[i].address.lo);
     }
+#endif
 }
 
 /*
@@ -141,7 +141,7 @@ static void
 bxe_storm_stats_post(struct bxe_adapter *sc)
 {
     int rc;
-
+#if 0
     if (!sc->stats_pending) {
         BXE_STATS_LOCK(sc);
 
@@ -173,11 +173,13 @@ bxe_storm_stats_post(struct bxe_adapter *sc)
 
         BXE_STATS_UNLOCK(sc);
     }
+#endif
 }
 
 static void
 bxe_hw_stats_post(struct bxe_adapter *sc)
 {
+#if 0
     struct dmae_command *dmae = &sc->stats_dmae;
     uint32_t *stats_comp = BXE_SP(sc, stats_comp);
     int loader_idx;
@@ -223,6 +225,7 @@ bxe_hw_stats_post(struct bxe_adapter *sc)
         *stats_comp = 0;
         bxe_post_dmae(sc, dmae, INIT_DMAE_C(sc));
     }
+#endif
 }
 
 static int
@@ -538,7 +541,8 @@ bxe_port_stats_init(struct bxe_adapter *sc)
 static void
 bxe_func_stats_init(struct bxe_adapter *sc)
 {
-    struct dmae_command *dmae = &sc->stats_dmae;
+#if 0
+  struct dmae_command *dmae = &sc->stats_dmae;
     uint32_t *stats_comp = BXE_SP(sc, stats_comp);
 
     /* sanity */
@@ -562,6 +566,7 @@ bxe_func_stats_init(struct bxe_adapter *sc)
     dmae->comp_val = DMAE_COMP_VAL;
 
     *stats_comp = 0;
+#endif
 }
 
 static void
@@ -614,7 +619,7 @@ static void
 bxe_bmac_stats_update(struct bxe_adapter *sc)
 {
     struct host_port_stats *pstats = BXE_SP(sc, port_stats);
-    struct bxe_eth_stats *estats = &sc->eth_stats;
+    //    struct bxe_eth_stats *estats = &sc->eth_stats;
     struct {
         uint32_t lo;
         uint32_t hi;
@@ -656,7 +661,7 @@ bxe_bmac_stats_update(struct bxe_adapter *sc)
         UPDATE_STAT64(tx_stat_gtufl, tx_stat_mac_ufl);
     } else {
         struct bmac2_stats *new = BXE_SP(sc, mac_stats.bmac2_stats);
-        struct bxe_fw_port_stats_old *fwstats = &sc->fw_stats_old;
+	//        struct bxe_fw_port_stats_old *fwstats = &sc->fw_stats_old;
 
         /* the macros below will use "bmac2_stats" type */
         UPDATE_STAT64(rx_stat_grerb, rx_stat_ifhcinbadoctets);
@@ -692,15 +697,16 @@ bxe_bmac_stats_update(struct bxe_adapter *sc)
         /* collect PFC stats */
         pstats->pfc_frames_tx_hi = new->tx_stat_gtpp_hi;
         pstats->pfc_frames_tx_lo = new->tx_stat_gtpp_lo;
-        ADD_64(pstats->pfc_frames_tx_hi, fwstats->pfc_frames_tx_hi,
-               pstats->pfc_frames_tx_lo, fwstats->pfc_frames_tx_lo);
+	//        ADD_64(pstats->pfc_frames_tx_hi, fwstats->pfc_frames_tx_hi,
+	//     pstats->pfc_frames_tx_lo, fwstats->pfc_frames_tx_lo);
 
         pstats->pfc_frames_rx_hi = new->rx_stat_grpp_hi;
         pstats->pfc_frames_rx_lo = new->rx_stat_grpp_lo;
-        ADD_64(pstats->pfc_frames_rx_hi, fwstats->pfc_frames_rx_hi,
-               pstats->pfc_frames_rx_lo, fwstats->pfc_frames_rx_lo);
+	//        ADD_64(pstats->pfc_frames_rx_hi, fwstats->pfc_frames_rx_hi,
+	//     pstats->pfc_frames_rx_lo, fwstats->pfc_frames_rx_lo);
     }
 
+#if 0
     estats->pause_frames_received_hi = pstats->mac_stx[1].rx_stat_mac_xpf_hi;
     estats->pause_frames_received_lo = pstats->mac_stx[1].rx_stat_mac_xpf_lo;
 
@@ -711,6 +717,7 @@ bxe_bmac_stats_update(struct bxe_adapter *sc)
     estats->pfc_frames_received_lo = pstats->pfc_frames_rx_lo;
     estats->pfc_frames_sent_hi = pstats->pfc_frames_tx_hi;
     estats->pfc_frames_sent_lo = pstats->pfc_frames_tx_lo;
+#endif
 }
 
 static void
@@ -1146,6 +1153,7 @@ bxe_storm_stats_update(struct bxe_adapter *sc)
            estats->error_bytes_received_lo,
            estats->rx_stat_ifhcinbadoctets_lo);
 
+#if 0
     if (sc->port.pmf) {
         struct bxe_fw_port_stats_old *fwstats = &sc->fw_stats_old;
         UPDATE_FW_STAT(mac_filter_discard);
@@ -1153,7 +1161,7 @@ bxe_storm_stats_update(struct bxe_adapter *sc)
         UPDATE_FW_STAT(brb_truncate_discard);
         UPDATE_FW_STAT(mac_discard);
     }
-
+#endif
     fstats->host_func_stats_start = ++fstats->host_func_stats_end;
 
     sc->stats_pending = 0;
@@ -1165,14 +1173,15 @@ static void
 bxe_net_stats_update(struct bxe_adapter *sc)
 {
 
-    for (int i = 0; i < sc->num_queues; i++)
-        if_inc_counter(sc->ifp, IFCOUNTER_IQDROPS,
-	    le32toh(sc->fp[i].old_tclient.checksum_discard));
+  //    for (int i = 0; i < sc->num_queues; i++)
+  //        if_inc_counter(sc->ifp, IFCOUNTER_IQDROPS,
+  //	    le32toh(sc->fp[i].old_tclient.checksum_discard));
 }
 
 uint64_t
 bxe_get_counter(if_t ifp, ift_counter cnt)
 {
+#if 0
 	struct bxe_adapter *sc;
 	struct bxe_eth_stats *estats;
 
@@ -1212,6 +1221,7 @@ bxe_get_counter(if_t ifp, ift_counter cnt)
 	default:
 		return (if_get_counter_default(ifp, cnt));
 	}
+#endif
 }
 
 static void
@@ -1306,10 +1316,12 @@ bxe_stats_update(struct bxe_adapter *sc)
 
         if (bxe_storm_stats_update(sc)) {
             if (sc->stats_pending++ == 3) {
+#if 0
 		if (if_getdrvflags(sc->ifp) & IFF_DRV_RUNNING) {
 			atomic_store_rel_long(&sc->chip_tq_flags, CHIP_TQ_REINIT);
 			taskqueue_enqueue(sc->chip_tq, &sc->chip_tq_task);
 		}
+#endif
             }
             return;
         }
