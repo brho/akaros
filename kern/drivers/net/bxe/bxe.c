@@ -277,8 +277,9 @@ DRIVER_MODULE(bxe, pci, bxe_driver, bxe_devclass, 0, 0);
 /* resources needed for unloading a previously loaded device */
 
 #define BXE_PREV_WAIT_NEEDED 1
-struct mtx bxe_prev_mtx;
-MTX_SYSINIT(bxe_prev_mtx, &bxe_prev_mtx, "bxe_prev_lock", MTX_DEF);
+qlock bxe_prev_mtx;
+#warning "init bxe_prev_mtx"
+//MTX_SYSINIT(bxe_prev_mtx, &bxe_prev_mtx, "bxe_prev_lock", MTX_DEF);
 struct bxe_prev_list_node {
     LIST_ENTRY(bxe_prev_list_node) node;
     uint8_t bus;

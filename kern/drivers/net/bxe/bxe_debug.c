@@ -39,7 +39,7 @@ void
 bxe_reg_write8(struct bxe_adapter *sc, bus_size_t offset, uint8_t val)
 {
     BLOGD(sc, DBG_REGS, "offset=0x%08lx val=0x%02x\n", offset, val);
-    outb(sc->bar[BAR0].mmio_base64 + offset, val);
+    outb(sc->pdev->bar[BAR0].mmio_base64 + offset, val);
 }
 
 void
@@ -50,7 +50,7 @@ bxe_reg_write16(struct bxe_adapter *sc, bus_size_t offset, uint16_t val)
     }
 
     BLOGD(sc, DBG_REGS, "offset=0x%08lx val=0x%04x\n", offset, val);
-    outw(sc->bar[BAR0].mmio_base64 + offset, val);
+    outw(sc->pdev->bar[BAR0].mmio_base64 + offset, val);
 }
 
 void
@@ -61,7 +61,7 @@ bxe_reg_write32(struct bxe_adapter *sc, bus_size_t offset, uint32_t val)
     }
 
     BLOGD(sc, DBG_REGS, "offset=0x%08lx val=0x%08x\n", offset, val);
-    outl(sc->bar[BAR0].mmio_base64+offset, val);
+    outl(sc->pdev->bar[BAR0].mmio_base64+offset, val);
 }
 
 uint8_t
@@ -70,7 +70,7 @@ bxe_reg_read8(struct bxe_adapter *sc, bus_size_t offset)
     uint8_t val;
 
     val = inb(
-                           sc->bar[BAR0].mmio_base64  + offset);
+                           sc->pdev->bar[BAR0].mmio_base64  + offset);
     BLOGD(sc, DBG_REGS, "offset=0x%08lx val=0x%02x\n", offset, val);
 
     return (val);
@@ -85,7 +85,7 @@ bxe_reg_read16(struct bxe_adapter *sc, bus_size_t offset)
         BLOGD(sc, DBG_REGS, "Unaligned 16-bit read from 0x%08lx\n", offset);
     }
 
-    val = inw(sc->bar[BAR0].mmio_base64 + offset);
+    val = inw(sc->pdev->bar[BAR0].mmio_base64 + offset);
     BLOGD(sc, DBG_REGS, "offset=0x%08lx val=0x%08x\n", offset, val);
 
     return (val);
@@ -101,7 +101,7 @@ bxe_reg_read32(struct bxe_adapter *sc, bus_size_t offset)
     }
 
     val = inl(
-                           sc->bar[BAR0].mmio_base64 + offset);
+                           sc->pdev->bar[BAR0].mmio_base64 + offset);
     BLOGD(sc, DBG_REGS, "offset=0x%08lx val=0x%08x\n", offset, val);
 
     return (val);
@@ -166,8 +166,9 @@ elink_cb_dbg3(struct bxe_adapter *sc,
 
 #endif /* ELINK_DEBUG */
 
-extern struct mtx bxe_prev_mtx;
+extern qlock_t bxe_prev_mtx;
 
+#if 0
 void
 bxe_dump_mem(struct bxe_adapter *sc,
              char             *tag,
@@ -205,7 +206,8 @@ bxe_dump_mem(struct bxe_adapter *sc,
 
     mtx_unlock(&bxe_prev_mtx);
 }
-
+#endif
+#if 0
 void
 bxe_dump_mbuf_data(struct bxe_adapter *sc,
                    char             *tag,
@@ -264,6 +266,7 @@ bxe_dump_mbuf_data(struct bxe_adapter *sc,
 
     mtx_unlock(&bxe_prev_mtx);
 }
+#endif
 
 #ifdef DDB
 

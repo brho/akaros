@@ -57,9 +57,11 @@ typedef uintptr_t vm_offset_t;
 typedef spinlock_t ECORE_MUTEX_SPIN;
 typedef qlock_t ECORE_MUTEX;
 typedef qlock_t mtx;
-#define mtx_lock(x) ilock(x)
-#define mtx_unlock(x) iunlock(x)
+typedef int device_t;
+#define mtx_lock(x) qlock(x)
+#define mtx_unlock(x) qunlock(x)
 #define MTX_ASSERT(lock, thing)
+#define device_printf(ignore, format, args...) printk(format, args)
 
 
 
@@ -515,12 +517,10 @@ struct bxe_fastpath {
     /* pointer back to parent structure */
     struct bxe_adapter *sc;
 #warning "need to fix up the mtx"
-  /*
-    struct mtx tx_mtx;
+    qlock_t tx_mtx;
     char       tx_mtx_name[32];
-    struct mtx rx_mtx;
+    qlock_t rx_mtx;
     char       rx_mtx_name[32];
-  */
 #define BXE_FP_TX_LOCK(fp)        mtx_lock(&fp->tx_mtx)
 #define BXE_FP_TX_UNLOCK(fp)      mtx_unlock(&fp->tx_mtx)
 #define BXE_FP_TX_LOCK_ASSERT(fp) mtx_assert(&fp->tx_mtx, MA_OWNED)
@@ -1394,8 +1394,8 @@ struct bxe_adapter {
     struct bxe_fastpath fp[MAX_RSS_CHAINS];
     struct bxe_sp_objs  sp_objs[MAX_RSS_CHAINS];
 
-    device_t dev;  /* parent device handle */
 #endif
+    device_t dev;  /* parent device handle */
     uint8_t  unit; /* driver instance number */
 
     int pcie_bus;    /* PCIe bus number */
