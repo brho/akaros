@@ -112,9 +112,10 @@ typedef _Bool bool;
 #define ECORE_CLEAR_BIT(bit, var)    clear_bit(bit, var)
 #define ECORE_TEST_AND_CLEAR_BIT(bit, var) test_and_clear_bit(bit, var)
 
-#define ECORE_ATOMIC_READ(a) atomic_load_acq_int((volatile int *)a)
-#define ECORE_ATOMIC_SET(a, v) atomic_store_rel_int((volatile int *)a, v)
-#define ECORE_ATOMIC_CMPXCHG(a, o, n) bxe_cmpxchg((volatile int *)a, o, n)
+/* TODO: probably should use atomic_t for real */
+#define ECORE_ATOMIC_READ(a) atomic_read((atomic_t*)a)
+#define ECORE_ATOMIC_SET(a, v) atomic_set((atomic_t*)a, v)
+#define ECORE_ATOMIC_CMPXCHG(a, o, n) atomic_cas_u32((uint32_t*)a, o, n)
 
 #define ECORE_RET_PENDING(pending_bit, pending) \
     (ECORE_TEST_BIT(pending_bit, pending) ? ECORE_PENDING : ECORE_SUCCESS)

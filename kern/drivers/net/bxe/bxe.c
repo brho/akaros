@@ -777,19 +777,6 @@ calc_crc32(uint8_t  *crc32_packet,
     return (crc32_result);
 }
 
-
-int
-bxe_cmpxchg(volatile int *addr,
-            int          old,
-            int          new)
-{
-    int x;
-    do {
-        x = *addr;
-    } while (atomic_cmpset_acq_int(addr, old, new) == 0);
-    return (x);
-}
-
 /*
  * Get DMA memory from the OS.
  *
@@ -2399,13 +2386,13 @@ bxe_sp_post(struct bxe_adapter *sc,
     BXE_SP_LOCK(sc);
 
     if (common) {
-        if (!atomic_load_acq_long(&sc->eq_spq_left)) {
+        if (!atomic_read(&sc->eq_spq_left)) {
             BLOGE(sc, "EQ ring is full!\n");
             BXE_SP_UNLOCK(sc);
             return (-1);
         }
     } else {
-        if (!atomic_load_acq_long(&sc->cq_spq_left)) {
+        if (!atomic_read(&sc->cq_spq_left)) {
             BLOGE(sc, "SPQ ring is full!\n");
             BXE_SP_UNLOCK(sc);
             return (-1);
@@ -2435,9 +2422,9 @@ bxe_sp_post(struct bxe_adapter *sc,
      * memory barrier is needed.
      */
     if (common) {
-        atomic_subtract_acq_long(&sc->eq_spq_left, 1);
+        atomic_add(&sc->eq_spq_left, -1);
     } else {
-        atomic_subtract_acq_long(&sc->cq_spq_left, 1);
+        atomic_add(&sc->cq_spq_left, -1);
     }
 
     BLOGD(sc, DBG_SP, "SPQE -> %#jx\n", (uintmax_t)sc->spq_dma.paddr);
@@ -2454,8 +2441,8 @@ bxe_sp_post(struct bxe_adapter *sc,
           data_hi,
           data_lo,
           type,
-          atomic_load_acq_long(&sc->cq_spq_left),
-          atomic_load_acq_long(&sc->eq_spq_left));
+          atomic_read(&sc->cq_spq_left),
+          atomic_read(&sc->eq_spq_left));
 
     bxe_sp_prod_update(sc);
 
@@ -2792,10 +2779,10 @@ bxe_sp_event(struct bxe_adapter    *sc,
     bxe_iov_sp_event(sc, cid, TRUE);
 #endif
 
-    atomic_add_acq_long(&sc->cq_spq_left, 1);
+    atomic_add(&sc->cq_spq_left, 1);
 
     BLOGD(sc, DBG_SP, "sc->cq_spq_left 0x%lx\n",
-          atomic_load_acq_long(&sc->cq_spq_left));
+          atomic_read(&sc->cq_spq_left));
 
 #if 0
     if ((drv_cmd == ECORE_Q_CMD_UPDATE) && (IS_FCOE_FP(fp)) &&
@@ -3527,7 +3514,7 @@ bxe_watchdog(struct bxe_adapter    *sc,
 
     BXE_FP_TX_UNLOCK(fp);
 
-    atomic_store_rel_long(&sc->chip_tq_flags, CHIP_TQ_REINIT);
+    atomic_set(&sc->chip_tq_flags, CHIP_TQ_REINIT);
     taskqueue_enqueue(sc->chip_tq, &sc->chip_tq_task);
 #endif
     return (-1);
@@ -4038,7 +4025,7 @@ bxe_wait_sp_comp(struct bxe_adapter *sc,
 
     while (tout--) {
         mb();
-        if (!(atomic_load_acq_long(&sc->sp_state) & mask)) {
+        if (!(atomic_read(&sc->sp_state) & mask)) {
             return (TRUE);
         }
 
@@ -4047,7 +4034,7 @@ bxe_wait_sp_comp(struct bxe_adapter *sc,
 
     mb();
 
-    tmp = atomic_load_acq_long(&sc->sp_state);
+    tmp = atomic_read(&sc->sp_state);
     if (tmp & mask) {
         BLOGE(sc, "Filtering completion timed out: "
                   "sp_state 0x%lx, mask 0x%lx\n",
@@ -4671,7 +4658,7 @@ bxe_handle_chip_tq(void *context,
 {
 #if 0
     struct bxe_adapter *sc = (struct bxe_adapter *)context;
-    long work = atomic_load_acq_long(&sc->chip_tq_flags);
+    long work = atomic_read(&sc->chip_tq_flags);
 
     switch (work)
     {
@@ -4757,10 +4744,10 @@ bxe_ioctl(if_t ifp,
             break;
         }
 
-        atomic_store_rel_int((volatile unsigned int *)&sc->mtu,
+        atomic_set(volatile unsigned int *)&sc->mtu,
                              (unsigned long)ifr->ifr_mtu);
 	/* 
-        atomic_store_rel_long((volatile unsigned long *)&if_getmtu(ifp),
+        atomic_set((volatile unsigned long *)&if_getmtu(ifp),
                               (unsigned long)ifr->ifr_mtu);
 	XXX - Not sure why it needs to be atomic
 	*/
@@ -4778,12 +4765,12 @@ bxe_ioctl(if_t ifp,
                 /* set the receive mode flags */
                 bxe_set_rx_mode(sc);
             } else {
-                atomic_store_rel_long(&sc->chip_tq_flags, CHIP_TQ_START);
+                atomic_set(&sc->chip_tq_flags, CHIP_TQ_START);
                 taskqueue_enqueue(sc->chip_tq, &sc->chip_tq_task);
             }
         } else {
             if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
-                atomic_store_rel_long(&sc->chip_tq_flags, CHIP_TQ_STOP);
+                atomic_set(&sc->chip_tq_flags, CHIP_TQ_STOP);
                 taskqueue_enqueue(sc->chip_tq, &sc->chip_tq_task);
             }
         }
@@ -4957,7 +4944,7 @@ bxe_ioctl(if_t ifp,
     if (reinit && (if_getdrvflags(sc->ifp) & IFF_DRV_RUNNING)) {
         BLOGD(sc, DBG_LOAD | DBG_IOCTL,
               "Re-initializing hardware from IOCTL change\n");
-        atomic_store_rel_long(&sc->chip_tq_flags, CHIP_TQ_REINIT);
+        atomic_set(&sc->chip_tq_flags, CHIP_TQ_REINIT);
         taskqueue_enqueue(sc->chip_tq, &sc->chip_tq_task);
     }
 
@@ -8804,7 +8791,7 @@ bxe_eq_int(struct bxe_adapter *sc)
     sw_prod = sc->eq_prod;
 
     BLOGD(sc, DBG_SP,"EQ: hw_cons=%u sw_cons=%u eq_spq_left=0x%lx\n",
-          hw_cons, sw_cons, atomic_load_acq_long(&sc->eq_spq_left));
+          hw_cons, sw_cons, atomic_read(&sc->eq_spq_left));
 
     for (;
          sw_cons != hw_cons;
@@ -8963,7 +8950,7 @@ next_spqe:
     } /* for */
 
     mb();
-    atomic_add_acq_long(&sc->eq_spq_left, spqe_cnt);
+    atomic_add(&sc->eq_spq_left, spqe_cnt);
 
     sc->eq_cons = sw_cons;
     sc->eq_prod = sw_prod;
@@ -10285,7 +10272,7 @@ bxe_init_def_sb(struct bxe_adapter *sc)
 static void
 bxe_init_sp_ring(struct bxe_adapter *sc)
 {
-    atomic_store_rel_long(&sc->cq_spq_left, MAX_SPQ_PENDING);
+    atomic_set(&sc->cq_spq_left, MAX_SPQ_PENDING);
     sc->spq_prod_idx = 0;
     sc->dsb_sp_prod = &sc->def_sb->sp_sb.index_values[HC_SP_INDEX_ETH_DEF_CONS];
     sc->spq_prod_bd = sc->spq;
@@ -10313,7 +10300,7 @@ bxe_init_eq_ring(struct bxe_adapter *sc)
     sc->eq_prod    = NUM_EQ_DESC;
     sc->eq_cons_sb = &sc->def_sb->sp_sb.index_values[HC_SP_INDEX_EQ_CONS];
 
-    atomic_store_rel_long(&sc->eq_spq_left,
+    atomic_set(&sc->eq_spq_left,
                           (min((MAX_SP_DESC_CNT - MAX_SPQ_PENDING),
                                NUM_EQ_DESC) - 1));
 }
@@ -12806,7 +12793,7 @@ bxe_periodic_callout_func(void *xsc)
         /* just bail and try again next time */
 
         if ((sc->state == BXE_STATE_OPEN) &&
-            (atomic_load_acq_long(&sc->periodic_flags) == PERIODIC_GO)) {
+            (atomic_read(&sc->periodic_flags) == PERIODIC_GO)) {
             /* schedule the next periodic callout */
 		//callout_reset(&sc->periodic_callout, hz,
 		//        bxe_periodic_callout_func, sc);
@@ -12816,7 +12803,7 @@ bxe_periodic_callout_func(void *xsc)
     }
 
     if ((sc->state != BXE_STATE_OPEN) ||
-        (atomic_load_acq_long(&sc->periodic_flags) == PERIODIC_STOP)) {
+        (atomic_read(&sc->periodic_flags) == PERIODIC_STOP)) {
         BLOGW(sc, "periodic callout exit (state=0x%x)\n", sc->state);
         BXE_CORE_UNLOCK(sc);
         return;
@@ -12883,7 +12870,7 @@ bxe_periodic_callout_func(void *xsc)
     BXE_CORE_UNLOCK(sc);
 
     if ((sc->state == BXE_STATE_OPEN) &&
-        (atomic_load_acq_long(&sc->periodic_flags) == PERIODIC_GO)) {
+        (atomic_read(&sc->periodic_flags) == PERIODIC_GO)) {
         /* schedule the next periodic callout */
 //        callout_reset(&sc->periodic_callout, hz,
 //                      bxe_periodic_callout_func, sc);
@@ -12893,14 +12880,14 @@ bxe_periodic_callout_func(void *xsc)
 static void
 bxe_periodic_start(struct bxe_adapter *sc)
 {
-	//atomic_store_rel_long(&sc->periodic_flags, PERIODIC_GO);
+	//atomic_set(&sc->periodic_flags, PERIODIC_GO);
     //  callout_reset(&sc->periodic_callout, hz, bxe_periodic_callout_func, sc);
 }
 
 static void
 bxe_periodic_stop(struct bxe_adapter *sc)
 {
-//    atomic_store_rel_long(&sc->periodic_flags, PERIODIC_STOP);
+//    atomic_set(&sc->periodic_flags, PERIODIC_STOP);
 //    callout_drain(&sc->periodic_callout);
 }
 
@@ -16582,7 +16569,7 @@ bxe_detach(device_t dev)
     bxe_periodic_stop(sc);
 
     /* stop the chip taskqueue */
-    atomic_store_rel_long(&sc->chip_tq_flags, CHIP_TQ_NONE);
+    atomic_set(&sc->chip_tq_flags, CHIP_TQ_NONE);
     if (sc->chip_tq) {
         taskqueue_drain(sc->chip_tq, &sc->chip_tq_task);
         taskqueue_free(sc->chip_tq);

@@ -1374,14 +1374,14 @@ struct bxe_adapter {
 	/* periodic timer callout */
 #define PERIODIC_STOP 0
 #define PERIODIC_GO   1
-	volatile unsigned long periodic_flags;
+	atomic_t periodic_flags;
 	//      struct callout         periodic_callout;
 	/* chip start/stop/reset taskqueue */
 #define CHIP_TQ_NONE   0
 #define CHIP_TQ_START  1
 #define CHIP_TQ_STOP   2
 #define CHIP_TQ_REINIT 3
-	volatile unsigned long chip_tq_flags;
+	atomic_t chip_tq_flags;
 #warning "no chip_tq_task or other tasks from here on down"
 #if 0
 	struct task            chip_tq_task;
@@ -1617,7 +1617,7 @@ struct bxe_adapter {
     /* slow path */
 	struct bxe_dma      sp_dma;
 	struct bxe_slowpath *sp;
-	unsigned long       sp_state;
+	atomic_t       sp_state;
 	
 	/* slow path queue */
 	struct bxe_dma spq_dma;
@@ -1634,8 +1634,8 @@ struct eth_spe *spq;
 	uint16_t       *spq_hw_con;
 	uint16_t       spq_left;
 	
-	volatile unsigned long eq_spq_left; /* COMMON_xxx ramrod credit */
-	volatile unsigned long cq_spq_left; /* ETH_xxx ramrod credit */
+	atomic_t eq_spq_left; /* COMMON_xxx ramrod credit */
+	atomic_t cq_spq_left; /* ETH_xxx ramrod credit */
 	
 	/* fw decompression buffer */
 #warning "no decmpress buffer"
@@ -2118,7 +2118,6 @@ static const uint32_t dmae_reg_go_c[] = {
 #define bxe_clear_bit(nr, addr) clear_bit(nr, addr)
 #define bxe_test_and_set_bit(nr, addr) test_and_set_bit(nr, addr)
 #define bxe_test_and_clear_bit(nr, addr) test_and_clear_bit(nr, addr)
-int  bxe_cmpxchg(volatile int *addr, int old, int new);
 
 void bxe_reg_wr_ind(struct bxe_adapter *sc, uint32_t addr,
                     uint32_t val);
