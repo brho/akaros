@@ -52,7 +52,8 @@
 
 /* 224-239 are OS IPI vectors (0xe0-0xef) */
 /* smp_call_function IPIs, keep in sync with NUM_HANDLER_WRAPPERS.
- * SMP_CALL0 needs to be 16-aligned (we mask in x86/trap.c) */
+ * SMP_CALL0 needs to be 16-aligned (we mask in x86/trap.c).  If you move these,
+ * also change INIT_HANDLER_WRAPPER */
 #define I_SMP_CALL0				224
 #define I_SMP_CALL1				(I_SMP_CALL0 + 1)
 #define I_SMP_CALL2				(I_SMP_CALL0 + 2)

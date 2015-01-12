@@ -38,7 +38,7 @@ barrier_t generic_barrier;
 
 #define INIT_HANDLER_WRAPPER(v)                                     \
 {                                                                   \
-	handler_wrappers[(v)].vector = 0xf##v;                          \
+	handler_wrappers[(v)].vector = 0xe##v;                          \
 	handler_wrappers[(v)].cpu_list = &f##v##_cpu_list;              \
 	handler_wrappers[(v)].cpu_list->mask.size = num_cpus;           \
 }
