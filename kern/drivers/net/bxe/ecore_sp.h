@@ -105,12 +105,12 @@ typedef _Bool bool;
 #define ECORE_SMP_WMB()                 wmb()
 #define ECORE_MMIOWB()                  wmb()
 
-#define ECORE_SET_BIT_NA(bit, var)   bit_set(var, bit) /* non-atomic */
-#define ECORE_CLEAR_BIT_NA(bit, var) bit_clear(var, bit) /* non-atomic */
-#define ECORE_TEST_BIT(bit, var)     bxe_test_bit(bit, var)
-#define ECORE_SET_BIT(bit, var)      bxe_set_bit(bit, var)
-#define ECORE_CLEAR_BIT(bit, var)    bxe_clear_bit(bit, var)
-#define ECORE_TEST_AND_CLEAR_BIT(bit, var) bxe_test_and_clear_bit(bit, var)
+#define ECORE_SET_BIT_NA(bit, var)   __set_bit(bit, var) /* non-atomic */
+#define ECORE_CLEAR_BIT_NA(bit, var) __clear_bit(bit, var) /* non-atomic */
+#define ECORE_TEST_BIT(bit, var)     test_bit(bit, var)
+#define ECORE_SET_BIT(bit, var)      set_bit(bit, var)
+#define ECORE_CLEAR_BIT(bit, var)    clear_bit(bit, var)
+#define ECORE_TEST_AND_CLEAR_BIT(bit, var) test_and_clear_bit(bit, var)
 
 #define ECORE_ATOMIC_READ(a) atomic_load_acq_int((volatile int *)a)
 #define ECORE_ATOMIC_SET(a, v) atomic_store_rel_int((volatile int *)a, v)

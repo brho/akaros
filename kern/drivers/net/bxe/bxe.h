@@ -39,6 +39,7 @@
 #include <smp.h>
 #include <stdio.h>
 #include <string.h>
+#include <bitmap.h>
 
 
 /* MACROS for conversion to AKAROS. Might we want this stuff someday? */
@@ -2112,11 +2113,11 @@ static const uint32_t dmae_reg_go_c[] = {
 #define PCI_PM_D0    1
 #define PCI_PM_D3hot 2
 
-int  bxe_test_bit(int nr, volatile unsigned long * addr);
-void bxe_set_bit(unsigned int nr, volatile unsigned long * addr);
-void bxe_clear_bit(int nr, volatile unsigned long * addr);
-int  bxe_test_and_set_bit(int nr, volatile unsigned long * addr);
-int  bxe_test_and_clear_bit(int nr, volatile unsigned long * addr);
+#define bxe_test_bit(nr, addr) test_bit(nr, addr)
+#define bxe_set_bit(nr, addr) set_bit(nr, addr)
+#define bxe_clear_bit(nr, addr) clear_bit(nr, addr)
+#define bxe_test_and_set_bit(nr, addr) test_and_set_bit(nr, addr)
+#define bxe_test_and_clear_bit(nr, addr) test_and_clear_bit(nr, addr)
 int  bxe_cmpxchg(volatile int *addr, int old, int new);
 
 void bxe_reg_wr_ind(struct bxe_adapter *sc, uint32_t addr,

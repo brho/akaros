@@ -777,52 +777,6 @@ calc_crc32(uint8_t  *crc32_packet,
     return (crc32_result);
 }
 
-int
-bxe_test_bit(int                    nr,
-             volatile unsigned long *addr)
-{
-    return ((atomic_load_acq_long(addr) & (1 << nr)) != 0);
-}
-
-void
-bxe_set_bit(unsigned int           nr,
-            volatile unsigned long *addr)
-{
-    atomic_set_acq_long(addr, (1 << nr));
-}
-
-void
-bxe_clear_bit(int                    nr,
-              volatile unsigned long *addr)
-{
-    atomic_clear_acq_long(addr, (1 << nr));
-}
-
-int
-bxe_test_and_set_bit(int                    nr,
-                       volatile unsigned long *addr)
-{
-    unsigned long x;
-    nr = (1 << nr);
-    do {
-        x = *addr;
-    } while (atomic_cmpset_acq_long(addr, x, x | nr) == 0);
-    // if (x & nr) bit_was_set; else bit_was_not_set;
-    return (x & nr);
-}
-
-int
-bxe_test_and_clear_bit(int                    nr,
-                       volatile unsigned long *addr)
-{
-    unsigned long x;
-    nr = (1 << nr);
-    do {
-        x = *addr;
-    } while (atomic_cmpset_acq_long(addr, x, x & ~nr) == 0);
-    // if (x & nr) bit_was_set; else bit_was_not_set;
-    return (x & nr);
-}
 
 int
 bxe_cmpxchg(volatile int *addr,
