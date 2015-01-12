@@ -2462,7 +2462,7 @@ bxe_sp_post(struct bxe_adapter *sc,
 
     /* CID needs port number to be encoded int it */
     spe->hdr.conn_and_cmd_data =
-        htole32((command << SPE_HDR_CMD_ID_SHIFT) | HW_CID(sc, cid));
+        cpu_to_le32((command << SPE_HDR_CMD_ID_SHIFT) | HW_CID(sc, cid));
 
     type = (cmd_type << SPE_HDR_CONN_TYPE_SHIFT) & SPE_HDR_CONN_TYPE;
 
@@ -2470,10 +2470,10 @@ bxe_sp_post(struct bxe_adapter *sc,
     type |= ((SC_FUNC(sc) << SPE_HDR_FUNCTION_ID_SHIFT) &
              SPE_HDR_FUNCTION_ID);
 
-    spe->hdr.type = htole16(type);
+    spe->hdr.type = cpu_to_le16(type);
 
-    spe->data.update_data_addr.hi = htole32(data_hi);
-    spe->data.update_data_addr.lo = htole32(data_lo);
+    spe->data.update_data_addr.hi = cpu_to_le32(data_hi);
+    spe->data.update_data_addr.lo = cpu_to_le32(data_lo);
 
     /*
      * It's ok if the actual decrement is issued towards the memory
@@ -10347,10 +10347,10 @@ bxe_init_eq_ring(struct bxe_adapter *sc)
     for (i = 1; i <= NUM_EQ_PAGES; i++) {
         elem = &sc->eq[EQ_DESC_CNT_PAGE * i - 1];
 
-        elem->next_page.addr.hi = htole32(U64_HI(sc->eq_dma.paddr +
+        elem->next_page.addr.hi = cpu_to_le32(U64_HI(sc->eq_dma.paddr +
                                                  BCM_PAGE_SIZE *
                                                  (i % NUM_EQ_PAGES)));
-        elem->next_page.addr.lo = htole32(U64_LO(sc->eq_dma.paddr +
+        elem->next_page.addr.lo = cpu_to_le32(U64_LO(sc->eq_dma.paddr +
                                                  BCM_PAGE_SIZE *
                                                  (i % NUM_EQ_PAGES)));
     }
@@ -15218,8 +15218,8 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
             /* point to the next page and wrap from last page */
             busaddr = (fp->tx_dma.paddr +
                        (BCM_PAGE_SIZE * (j % TX_BD_NUM_PAGES)));
-            tx_next_bd->addr_hi = htole32(U64_HI(busaddr));
-            tx_next_bd->addr_lo = htole32(U64_LO(busaddr));
+            tx_next_bd->addr_hi = cpu_to_le32(U64_HI(busaddr));
+            tx_next_bd->addr_lo = cpu_to_le32(U64_LO(busaddr));
         }
 
         /******************/
@@ -15244,8 +15244,8 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
             /* point to the next page and wrap from last page */
             busaddr = (fp->rx_dma.paddr +
                        (BCM_PAGE_SIZE * (j % RX_BD_NUM_PAGES)));
-            rx_bd->addr_hi = htole32(U64_HI(busaddr));
-            rx_bd->addr_lo = htole32(U64_LO(busaddr));
+            rx_bd->addr_hi = cpu_to_le32(U64_HI(busaddr));
+            rx_bd->addr_lo = cpu_to_le32(U64_LO(busaddr));
         }
 
         /*******************/
@@ -15271,8 +15271,8 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
             /* point to the next page and wrap from last page */
             busaddr = (fp->rcq_dma.paddr +
                        (BCM_PAGE_SIZE * (j % RCQ_NUM_PAGES)));
-            rx_cqe_next->addr_hi = htole32(U64_HI(busaddr));
-            rx_cqe_next->addr_lo = htole32(U64_LO(busaddr));
+            rx_cqe_next->addr_hi = cpu_to_le32(U64_HI(busaddr));
+            rx_cqe_next->addr_lo = cpu_to_le32(U64_LO(busaddr));
         }
 
         /*******************/
@@ -15297,8 +15297,8 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
             /* point to the next page and wrap from last page */
             busaddr = (fp->rx_sge_dma.paddr +
                        (BCM_PAGE_SIZE * (j % RX_SGE_NUM_PAGES)));
-            rx_sge->addr_hi = htole32(U64_HI(busaddr));
-            rx_sge->addr_lo = htole32(U64_LO(busaddr));
+            rx_sge->addr_hi = cpu_to_le32(U64_HI(busaddr));
+            rx_sge->addr_lo = cpu_to_le32(U64_LO(busaddr));
         }
 
         /***********************/

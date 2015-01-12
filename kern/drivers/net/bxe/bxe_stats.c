@@ -1531,8 +1531,8 @@ bxe_prep_fw_stats_req(struct bxe_adapter *sc)
     cur_data_offset = (sc->fw_stats_data_mapping +
                        offsetof(struct bxe_fw_stats_data, storm_counters));
 
-    stats_hdr->stats_counters_addrs.hi = htole32(U64_HI(cur_data_offset));
-    stats_hdr->stats_counters_addrs.lo = htole32(U64_LO(cur_data_offset));
+    stats_hdr->stats_counters_addrs.hi = cpu_to_le32(U64_HI(cur_data_offset));
+    stats_hdr->stats_counters_addrs.lo = cpu_to_le32(U64_LO(cur_data_offset));
 
     /*
      * Prepare the first stats ramrod (will be completed with
@@ -1551,9 +1551,9 @@ bxe_prep_fw_stats_req(struct bxe_adapter *sc)
     /* For port query index is a DONT CARE */
     cur_query_entry->index = SC_PORT(sc);
     /* For port query funcID is a DONT CARE */
-    cur_query_entry->funcID = htole16(SC_FUNC(sc));
-    cur_query_entry->address.hi = htole32(U64_HI(cur_data_offset));
-    cur_query_entry->address.lo = htole32(U64_LO(cur_data_offset));
+    cur_query_entry->funcID = cpu_to_le16(SC_FUNC(sc));
+    cur_query_entry->address.hi = cpu_to_le32(U64_HI(cur_data_offset));
+    cur_query_entry->address.lo = cpu_to_le32(U64_LO(cur_data_offset));
 
     /**** PF FW statistics data ****/
     cur_data_offset = (sc->fw_stats_data_mapping +
@@ -1564,9 +1564,9 @@ bxe_prep_fw_stats_req(struct bxe_adapter *sc)
     cur_query_entry->kind = STATS_TYPE_PF;
     /* For PF query index is a DONT CARE */
     cur_query_entry->index = SC_PORT(sc);
-    cur_query_entry->funcID = htole16(SC_FUNC(sc));
-    cur_query_entry->address.hi = htole32(U64_HI(cur_data_offset));
-    cur_query_entry->address.lo = htole32(U64_LO(cur_data_offset));
+    cur_query_entry->funcID = cpu_to_le16(SC_FUNC(sc));
+    cur_query_entry->address.hi = cpu_to_le32(U64_HI(cur_data_offset));
+    cur_query_entry->address.lo = cpu_to_le32(U64_LO(cur_data_offset));
 
 #if 0
     /**** FCoE FW statistics data ****/
@@ -1606,9 +1606,9 @@ bxe_prep_fw_stats_req(struct bxe_adapter *sc)
 
         cur_query_entry->kind = STATS_TYPE_QUEUE;
         cur_query_entry->index = bxe_stats_id(&sc->fp[i]);
-        cur_query_entry->funcID = htole16(SC_FUNC(sc));
-        cur_query_entry->address.hi = htole32(U64_HI(cur_data_offset));
-        cur_query_entry->address.lo = htole32(U64_LO(cur_data_offset));
+        cur_query_entry->funcID = cpu_to_le16(SC_FUNC(sc));
+        cur_query_entry->address.hi = cpu_to_le32(U64_HI(cur_data_offset));
+        cur_query_entry->address.lo = cpu_to_le32(U64_LO(cur_data_offset));
 
         cur_data_offset += sizeof(struct per_queue_stats);
     }
