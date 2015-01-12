@@ -28,6 +28,7 @@
 
 #include "bxe.h"
 #include "bxe_stats.h"
+#include <time.h>	/* udelay */
 
 #ifdef __i386__
 #define BITS_PER_LONG 32
@@ -241,7 +242,7 @@ bxe_stats_comp(struct bxe_adapter *sc)
         }
 
         cnt--;
-        DELAY(1000);
+        udelay(1000);
     }
 
     return (1);

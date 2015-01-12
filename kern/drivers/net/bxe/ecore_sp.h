@@ -54,6 +54,7 @@
 #include "ecore_fw_defs.h"
 #include "ecore_hsi.h"
 #include "ecore_reg.h"
+#include <time.h>	/* udelay */
 
 struct bxe_adapter;
 typedef bus_addr_t ecore_dma_addr_t; /* expected to be 64 bit wide */
@@ -138,11 +139,11 @@ typedef _Bool bool;
 #define ECORE_CPU_TO_LE16(x) htole16(x)
 #define ECORE_CPU_TO_LE32(x) htole32(x)
 
-#define ECORE_WAIT(_s, _t) DELAY(1000)
-#define ECORE_MSLEEP(_t)   DELAY((_t) * 1000)
+#define ECORE_WAIT(_s, _t) udelay(1000)
+#define ECORE_MSLEEP(_t)   udelay((_t) * 1000)
 
-#define ECORE_LIKELY(x)   __predict_true(x)
-#define ECORE_UNLIKELY(x) __predict_false(x)
+#define ECORE_LIKELY(x)   (x)
+#define ECORE_UNLIKELY(x) (x)
 
 #define ECORE_ZALLOC(_size, _flags, _sc) \
 	kzmalloc(_size, KMALLOC_WAIT) /*M_TEMP, (M_NOWAIT | M_ZERO))*/
@@ -247,15 +248,15 @@ extern unsigned long bxe_debug;
 
 #define ECORE_DBG_BREAK_IF(exp)     \
     if (bxe_debug & BXE_DEBUG_ECORE_DBG_BREAK_IF) \
-        printf("%s (%s,%d)\n", __FUNCTION__, __FILE__, __LINE__);
+        printk("%s (%s,%d)\n", __FUNCTION__, __FILE__, __LINE__);
 
 #define ECORE_BUG(exp)     \
     if (bxe_debug & BXE_DEBUG_ECORE_BUG) \
-        printf("%s (%s,%d)\n", __FUNCTION__, __FILE__, __LINE__);
+        printk("%s (%s,%d)\n", __FUNCTION__, __FILE__, __LINE__);
 
 #define ECORE_BUG_ON(exp)     \
     if (bxe_debug & BXE_DEBUG_ECORE_BUG_ON) \
-        printf("%s (%s,%d)\n", __FUNCTION__, __FILE__, __LINE__);
+        printk("%s (%s,%d)\n", __FUNCTION__, __FILE__, __LINE__);
 
 
 #endif /* #ifdef ECORE_STOP_ON_ERROR */

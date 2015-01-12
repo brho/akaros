@@ -30,15 +30,6 @@
 #ifndef ECORE_INIT_OPS_H
 #define ECORE_INIT_OPS_H
 
-
-
-
-
-
-
-
-
-
 static int ecore_gunzip(struct bxe_adapter *sc, const uint8_t *zbuf, int len);
 static void ecore_reg_wr_ind(struct bxe_adapter *sc, uint32_t addr, uint32_t val);
 static void ecore_write_dmae_phys_len(struct bxe_adapter *sc,
@@ -88,7 +79,7 @@ static void ecore_init_fill(struct bxe_adapter *sc, uint32_t addr, int fill,
 	ECORE_MEMSET(GUNZIP_BUF(sc), (uint8_t)fill, buf_len);
 
 	for (i = 0; i < len; i += buf_len32) {
-		uint32_t cur_len = min(buf_len32, len - i);
+		uint32_t cur_len = MIN(buf_len32, len - i);
 
 		ecore_write_big_buf(sc, addr + i*4, cur_len, wb);
 	}
@@ -119,7 +110,7 @@ static void ecore_init_wr_64(struct bxe_adapter *sc, uint32_t addr,
 	/* 64 bit value is in a blob: first low DWORD, then high DWORD */
 	data64 = HILO_U64((*(data + 1)), (*data));
 
-	len64 = min((uint32_t)(FW_BUF_SIZE/8), len64);
+	len64 = MIN((uint32_t)(FW_BUF_SIZE/8), len64);
 	for (i = 0; i < len64; i++) {
 		uint64_t *pdata = ((uint64_t *)(GUNZIP_BUF(sc))) + i;
 
@@ -127,7 +118,7 @@ static void ecore_init_wr_64(struct bxe_adapter *sc, uint32_t addr,
 	}
 
 	for (i = 0; i < len; i += buf_len32) {
-		uint32_t cur_len = min(buf_len32, len - i);
+		uint32_t cur_len = MIN(buf_len32, len - i);
 
 		ecore_write_big_buf_wb(sc, addr + i*4, cur_len);
 	}

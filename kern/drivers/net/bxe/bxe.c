@@ -3119,7 +3119,7 @@ bxe_update_sge_prod(struct bxe_adapter          *sc,
 
     /* now update the prod */
     for (i = first_elem; i != last_elem; i = RX_SGE_NEXT_MASK_ELEM(i)) {
-        if (__predict_true(fp->sge_mask[i])) {
+        if (fp->sge_mask[i]) {
             break;
         }
 
@@ -3450,7 +3450,7 @@ next_rx:
         bd_prod_fw = RX_BD_NEXT(bd_prod_fw);
 
         /* pass the frame to the stack */
-        if (__predict_true(m != NULL)) {
+        if (m != NULL) {
             if_inc_counter(ifp, IFCOUNTER_IPACKETS, 1);
             rx_pkts++;
             if_input(ifp, m);
@@ -3542,7 +3542,7 @@ bxe_free_tx_pkt(struct bxe_adapter    *sc,
 #endif
 
     /* free the mbuf */
-    if (__predict_true(tx_buf->m != NULL)) {
+    if (tx_buf->m != NULL) {
         m_freem(tx_buf->m);
         fp->eth_q_stats.mbuf_alloc_tx--;
     } else {
@@ -14311,7 +14311,7 @@ bxe_media_detect(struct bxe_adapter *sc)
         break;
     }
 #endif
-    asset(0);
+    assert(0);
 }
 
 #define GET_FIELD(value, fname)                     \
@@ -16215,7 +16215,7 @@ bxe_set_qm_cid_count(struct bxe_adapter *sc)
         cid_count += CNIC_CID_MAX;
     }
 
-    return (roundup(cid_count, QM_CID_ROUND));
+    return (ROUNDUP(cid_count, QM_CID_ROUND));
 }
 
 static void
