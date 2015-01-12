@@ -1328,7 +1328,7 @@ struct bxe_adapter {
 	if_t 	    ifp;
 	/* OS defined structs */
 	struct net_device *netdev;
-	struct pci_device *pdev;
+	struct pci_device *pcidev;
 	//struct net_device_stats net_stats;
 #warning "no ifmedia. "
 	// struct ifmedia  ifmedia; /* network interface media structure */
@@ -1401,7 +1401,6 @@ struct bxe_adapter {
 	struct bxe_sp_objs  sp_objs[MAX_RSS_CHAINS];
 	
 
-	device_t dev;  /* parent device handle */
 	uint8_t  unit; /* driver instance number */
 	
 	int pcie_bus;    /* PCIe bus number */

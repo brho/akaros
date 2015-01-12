@@ -983,9 +983,9 @@ bxe_reg_wr_ind(struct bxe_adapter *sc,
                uint32_t         addr,
                uint32_t         val)
 {
-    pci_write_config(sc->dev, PCICFG_GRC_ADDRESS, addr, 4);
-    pci_write_config(sc->dev, PCICFG_GRC_DATA, val, 4);
-    pci_write_config(sc->dev, PCICFG_GRC_ADDRESS, 0, 4);
+    pcidev_write32(sc->pcidev, PCICFG_GRC_ADDRESS, addr);
+    pcidev_write32(sc->pcidev, PCICFG_GRC_DATA, val);
+    pcidev_write32(sc->pcidev, PCICFG_GRC_ADDRESS, 0);
 }
 
 uint32_t
@@ -994,9 +994,9 @@ bxe_reg_rd_ind(struct bxe_adapter *sc,
 {
     uint32_t val;
 
-    pci_write_config(sc->dev, PCICFG_GRC_ADDRESS, addr, 4);
-    val = pci_read_config(sc->dev, PCICFG_GRC_DATA, 4);
-    pci_write_config(sc->dev, PCICFG_GRC_ADDRESS, 0, 4);
+    pcidev_write32(sc->pcidev, PCICFG_GRC_ADDRESS, addr);
+    val = pcidev_read32(sc->pcidev, PCICFG_GRC_DATA);
+    pcidev_write32(sc->pcidev, PCICFG_GRC_ADDRESS, 0);
 
     return (val);
 }
@@ -2562,7 +2562,7 @@ bxe_probe(device_t dev)
 
     /* Find our device structure */
     sc = device_get_softc(dev);
-    sc->dev = dev;
+    sc->pcidev= dev;
     t = bxe_devs;
 
     /* Get the data for the device to be probed. */
@@ -2587,9 +2587,9 @@ bxe_probe(device_t dev)
             /* Print out the device identity. */
             snprintf(descbuf, BXE_DEVDESC_MAX,
                      "%s (%c%d) BXE v:%s\n", t->bxe_name,
-                     (((pci_read_config(dev, PCIR_REVID, 4) &
+                     (((pcidev_read32(dev, PCIR_REVID) &
                         0xf0) >> 4) + 'A'),
-                     (pci_read_config(dev, PCIR_REVID, 4) & 0xf),
+                     (pcidev_read32(dev, PCIR_REVID) & 0xf),
                      BXE_DRIVER_VERSION);
 
             device_set_desc_copy(dev, descbuf);
@@ -3916,7 +3916,7 @@ bxe_send_unload_req(struct bxe_adapter *sc,
         reset_code = DRV_MSG_CODE_UNLOAD_REQ_WOL_MCP;
     } else if (sc->wol) {
         uint32_t emac_base = port ? GRCBASE_EMAC1 : GRCBASE_EMAC0;
-        uint8_t *mac_addr = sc->dev->dev_addr;
+        uint8_t *mac_addr = sc->pcidev->dev_addr;
         uint32_t val;
         uint16_t pmc;
 
@@ -3934,15 +3934,12 @@ bxe_send_unload_req(struct bxe_adapter *sc,
         EMAC_WR(sc, EMAC_REG_EMAC_MAC_MATCH + entry + 4, val);
 
         /* Enable the PME and clear the status */
-        pmc = pci_read_config(sc->dev,
+        pmc = pcidev_read16(sc->pcidev,
                               (sc->devinfo.pcie_pm_cap_reg +
-                               PCIR_POWER_STATUS),
-                              2);
+                               PCIR_POWER_STATUS));
         pmc |= PCIM_PSTAT_PMEENABLE | PCIM_PSTAT_PME;
-        pci_write_config(sc->dev,
-                         (sc->devinfo.pcie_pm_cap_reg +
-                          PCIR_POWER_STATUS),
-                         pmc, 4);
+        pcidev_write32(sc->pcidev,
+		       (sc->devinfo.pcie_pm_cap_reg + PCIR_POWER_STATUS), pmc);
 
         reset_code = DRV_MSG_CODE_UNLOAD_REQ_WOL_EN;
     }
@@ -9303,7 +9300,7 @@ bxe_interrupt_free(struct bxe_adapter *sc)
     case INTR_MODE_INTX:
         BLOGD(sc, DBG_LOAD, "Releasing legacy INTx vector\n");
         if (sc->intr[0].resource != NULL) {
-            bus_release_resource(sc->dev,
+            bus_release_resource(sc->pcidev,
                                  SYS_RES_IRQ,
                                  sc->intr[0].rid,
                                  sc->intr[0].resource);
@@ -9313,25 +9310,25 @@ bxe_interrupt_free(struct bxe_adapter *sc)
         for (i = 0; i < sc->intr_count; i++) {
             BLOGD(sc, DBG_LOAD, "Releasing MSI vector %d\n", i);
             if (sc->intr[i].resource && sc->intr[i].rid) {
-                bus_release_resource(sc->dev,
+                bus_release_resource(sc->pcidev,
                                      SYS_RES_IRQ,
                                      sc->intr[i].rid,
                                      sc->intr[i].resource);
             }
         }
-        pci_release_msi(sc->dev);
+        pci_release_msi(sc->pcidev);
         break;
     case INTR_MODE_MSIX:
         for (i = 0; i < sc->intr_count; i++) {
             BLOGD(sc, DBG_LOAD, "Releasing MSI-X vector %d\n", i);
             if (sc->intr[i].resource && sc->intr[i].rid) {
-                bus_release_resource(sc->dev,
+                bus_release_resource(sc->pcidev,
                                      SYS_RES_IRQ,
                                      sc->intr[i].rid,
                                      sc->intr[i].resource);
             }
         }
-        pci_release_msi(sc->dev);
+        pci_release_msi(sc->pcidev);
         break;
     default:
         /* nothing to do as initial allocation failed */
@@ -9371,11 +9368,11 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
     /* get the number of available MSI/MSI-X interrupts from the OS */
     if (sc->interrupt_mode > 0) {
         if (sc->devinfo.pcie_cap_flags & BXE_MSIX_CAPABLE_FLAG) {
-            msix_count = pci_msix_count(sc->dev);
+            msix_count = pci_msix_count(sc->pcidev);
         }
 
         if (sc->devinfo.pcie_cap_flags & BXE_MSI_CAPABLE_FLAG) {
-            msi_count = pci_msi_count(sc->dev);
+            msi_count = pci_msi_count(sc->pcidev);
         }
 
         BLOGD(sc, DBG_LOAD, "%d MSI and %d MSI-X vectors available\n",
@@ -9399,7 +9396,7 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
         BLOGD(sc, DBG_LOAD, "Requesting %d MSI-X vectors\n", num_requested);
 
         num_allocated = num_requested;
-        if ((rc = pci_alloc_msix(sc->dev, &num_allocated)) != 0) {
+        if ((rc = pci_alloc_msix(sc->pcidev, &num_allocated)) != 0) {
             BLOGE(sc, "MSI-X alloc failed! (%d)\n", rc);
             sc->interrupt_mode = INTR_MODE_MSI; /* try MSI next */
             break;
@@ -9408,7 +9405,7 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
         if (num_allocated < 2) { /* possible? */
             BLOGE(sc, "MSI-X allocation less than 2!\n");
             sc->interrupt_mode = INTR_MODE_MSI; /* try MSI next */
-            pci_release_msi(sc->dev);
+            pci_release_msi(sc->pcidev);
             break;
         }
 
@@ -9426,7 +9423,7 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
             sc->intr[i].rid = (rid + i);
 
             if ((sc->intr[i].resource =
-                 bus_alloc_resource_any(sc->dev,
+                 bus_alloc_resource_any(sc->pcidev,
                                         SYS_RES_IRQ,
                                         &sc->intr[i].rid,
                                         RF_ACTIVE)) == NULL) {
@@ -9434,7 +9431,7 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
                       i, (rid + i));
 
                 for (j = (i - 1); j >= 0; j--) {
-                    bus_release_resource(sc->dev,
+                    bus_release_resource(sc->pcidev,
                                          SYS_RES_IRQ,
                                          sc->intr[j].rid,
                                          sc->intr[j].resource);
@@ -9443,7 +9440,7 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
                 sc->intr_count = 0;
                 sc->num_queues = 0;
                 sc->interrupt_mode = INTR_MODE_MSI; /* try MSI next */
-                pci_release_msi(sc->dev);
+                pci_release_msi(sc->pcidev);
                 break;
             }
 
@@ -9468,7 +9465,7 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
         BLOGD(sc, DBG_LOAD, "Requesting %d MSI vectors\n", num_requested);
 
         num_allocated = num_requested;
-        if ((rc = pci_alloc_msi(sc->dev, &num_allocated)) != 0) {
+        if ((rc = pci_alloc_msi(sc->pcidev, &num_allocated)) != 0) {
             BLOGE(sc, "MSI alloc failed (%d)!\n", rc);
             sc->interrupt_mode = INTR_MODE_INTX; /* try INTx next */
             break;
@@ -9477,7 +9474,7 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
         if (num_allocated != 1) { /* possible? */
             BLOGE(sc, "MSI allocation is not 1!\n");
             sc->interrupt_mode = INTR_MODE_INTX; /* try INTx next */
-            pci_release_msi(sc->dev);
+            pci_release_msi(sc->pcidev);
             break;
         }
 
@@ -9493,7 +9490,7 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
         sc->intr[0].rid = rid;
 
         if ((sc->intr[0].resource =
-             bus_alloc_resource_any(sc->dev,
+             bus_alloc_resource_any(sc->pcidev,
                                     SYS_RES_IRQ,
                                     &sc->intr[0].rid,
                                     RF_ACTIVE)) == NULL) {
@@ -9501,7 +9498,7 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
             sc->intr_count = 0;
             sc->num_queues = 0;
             sc->interrupt_mode = INTR_MODE_INTX; /* try INTx next */
-            pci_release_msi(sc->dev);
+            pci_release_msi(sc->pcidev);
             break;
         }
 
@@ -9524,7 +9521,7 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
         sc->intr[0].rid = rid;
 
         if ((sc->intr[0].resource =
-             bus_alloc_resource_any(sc->dev,
+             bus_alloc_resource_any(sc->pcidev,
                                     SYS_RES_IRQ,
                                     &sc->intr[0].rid,
                                     (RF_ACTIVE | RF_SHAREABLE))) == NULL) {
@@ -9564,7 +9561,7 @@ bxe_interrupt_detach(struct bxe_adapter *sc)
     for (i = 0; i < sc->intr_count; i++) {
         if (sc->intr[i].resource && sc->intr[i].tag) {
             BLOGD(sc, DBG_LOAD, "Disabling interrupt vector %d\n", i);
-            bus_teardown_intr(sc->dev, sc->intr[i].resource, sc->intr[i].tag);
+            bus_teardown_intr(sc->pcidev, sc->intr[i].resource, sc->intr[i].tag);
         }
     }
 
@@ -9646,7 +9643,7 @@ bxe_interrupt_attach(struct bxe_adapter *sc)
          * Setup the interrupt handler. Note that we pass the driver instance
          * to the interrupt handler for the slowpath.
          */
-        if ((rc = bus_setup_intr(sc->dev, sc->intr[0].resource,
+        if ((rc = bus_setup_intr(sc->pcidev, sc->intr[0].resource,
                                  (INTR_TYPE_NET | INTR_MPSAFE),
                                  NULL, bxe_intr_sp, sc,
                                  &sc->intr[0].tag)) != 0) {
@@ -9654,10 +9651,10 @@ bxe_interrupt_attach(struct bxe_adapter *sc)
             goto bxe_interrupt_attach_exit;
         }
 
-        bus_describe_intr(sc->dev, sc->intr[0].resource,
+        bus_describe_intr(sc->pcidev, sc->intr[0].resource,
                           sc->intr[0].tag, "sp");
 
-        /* bus_bind_intr(sc->dev, sc->intr[0].resource, 0); */
+        /* bus_bind_intr(sc->pcidev, sc->intr[0].resource, 0); */
 
         /* initialize the fastpath vectors (note the first was used for sp) */
         for (i = 0; i < sc->num_queues; i++) {
@@ -9669,7 +9666,7 @@ bxe_interrupt_attach(struct bxe_adapter *sc)
              * fastpath context to the interrupt handler in this
              * case.
              */
-            if ((rc = bus_setup_intr(sc->dev, sc->intr[i + 1].resource,
+            if ((rc = bus_setup_intr(sc->pcidev, sc->intr[i + 1].resource,
                                      (INTR_TYPE_NET | INTR_MPSAFE),
                                      NULL, bxe_intr_fp, fp,
                                      &sc->intr[i + 1].tag)) != 0) {
@@ -9678,12 +9675,12 @@ bxe_interrupt_attach(struct bxe_adapter *sc)
                 goto bxe_interrupt_attach_exit;
             }
 
-            bus_describe_intr(sc->dev, sc->intr[i + 1].resource,
+            bus_describe_intr(sc->pcidev, sc->intr[i + 1].resource,
                               sc->intr[i + 1].tag, "fp%02d", i);
 
             /* bind the fastpath instance to a cpu */
             if (sc->num_queues > 1) {
-                bus_bind_intr(sc->dev, sc->intr[i + 1].resource, i);
+                bus_bind_intr(sc->pcidev, sc->intr[i + 1].resource, i);
             }
 
             fp->state = BXE_FP_STATE_IRQ;
@@ -9696,7 +9693,7 @@ bxe_interrupt_attach(struct bxe_adapter *sc)
          * driver instance to the interrupt handler which
          * will handle both the slowpath and fastpath.
          */
-        if ((rc = bus_setup_intr(sc->dev, sc->intr[0].resource,
+        if ((rc = bus_setup_intr(sc->pcidev, sc->intr[0].resource,
                                  (INTR_TYPE_NET | INTR_MPSAFE),
                                  NULL, bxe_intr_legacy, sc,
                                  &sc->intr[0].tag)) != 0) {
@@ -9712,7 +9709,7 @@ bxe_interrupt_attach(struct bxe_adapter *sc)
          * driver instance to the interrupt handler which
          * will handle both the slowpath and fastpath.
          */
-        if ((rc = bus_setup_intr(sc->dev, sc->intr[0].resource,
+        if ((rc = bus_setup_intr(sc->pcidev, sc->intr[0].resource,
                                  (INTR_TYPE_NET | INTR_MPSAFE),
                                  NULL, bxe_intr_legacy, sc,
                                  &sc->intr[0].tag)) != 0) {
@@ -11071,15 +11068,14 @@ bxe_set_power_state(struct bxe_adapter *sc,
         return (0);
     }
 
-    pmcsr = pci_read_config(sc->dev,
-                            (sc->devinfo.pcie_pm_cap_reg + PCIR_POWER_STATUS),
-                            2);
+    pmcsr = pcidev_read16(sc->pcidev,
+                            (sc->devinfo.pcie_pm_cap_reg + PCIR_POWER_STATUS));
 
     switch (state) {
     case PCI_PM_D0:
-        pci_write_config(sc->dev,
-                         (sc->devinfo.pcie_pm_cap_reg + PCIR_POWER_STATUS),
-                         ((pmcsr & ~PCIM_PSTAT_DMASK) | PCIM_PSTAT_PME), 2);
+        pcidev_write16(sc->pcidev,
+		       (sc->devinfo.pcie_pm_cap_reg + PCIR_POWER_STATUS),
+		       ((pmcsr & ~PCIM_PSTAT_DMASK) | PCIM_PSTAT_PME));
 
         if (pmcsr & PCIM_PSTAT_DMASK) {
             /* delay required during transition out of D3hot */
@@ -11103,9 +11099,9 @@ bxe_set_power_state(struct bxe_adapter *sc,
             pmcsr |= PCIM_PSTAT_PMEENABLE;
         }
 
-        pci_write_config(sc->dev,
-                         (sc->devinfo.pcie_pm_cap_reg + PCIR_POWER_STATUS),
-                         pmcsr, 4);
+        pcidev_write32(sc->pcidev,
+		       (sc->devinfo.pcie_pm_cap_reg + PCIR_POWER_STATUS),
+		       pmcsr);
 
         /*
          * No more memory access after this point until device is brought back
@@ -13378,7 +13374,7 @@ bxe_init_ifnet(struct bxe_adapter *sc)
     }
 
     if_setsoftc(ifp, sc);
-    if_initname(ifp, device_get_name(sc->dev), device_get_unit(sc->dev));
+    if_initname(ifp, device_get_name(sc->pcidev), device_get_unit(sc->pcidev));
     if_setflags(ifp, (IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST));
     if_setioctlfn(ifp, bxe_ioctl);
     if_setstartfn(ifp, bxe_tx_start);
@@ -13441,7 +13437,7 @@ bxe_deallocate_bars(struct bxe_adapter *sc)
 #if 0
     for (i = 0; i < MAX_BARS; i++) {
         if (sc->bar[i].resource != NULL) {
-            bus_release_resource(sc->dev,
+            bus_release_resource(sc->pcidev,
                                  SYS_RES_MEMORY,
                                  sc->bar[i].rid,
                                  sc->bar[i].resource);
@@ -13476,7 +13472,7 @@ bxe_allocate_bars(struct bxe_adapter *sc)
         }
 
         if ((sc->bar[i].resource =
-             bus_alloc_resource_any(sc->dev,
+             bus_alloc_resource_any(sc->pcidev,
                                     SYS_RES_MEMORY,
                                     &sc->bar[i].rid,
                                     flags)) == NULL) {
@@ -13567,10 +13563,19 @@ bxe_pcie_capability_read(struct bxe_adapter *sc,
 
     /* ensure PCIe capability is enabled */
 #if 0
-    if (pci_find_cap(sc->dev, PCIY_EXPRESS, &pcie_reg) == 0) {
+    if (pci_find_cap(sc->pcidev, PCIY_EXPRESS, &pcie_reg) == 0) {
         if (pcie_reg != 0) {
             BLOGD(sc, DBG_LOAD, "PCIe capability at 0x%04x\n", pcie_reg);
-            return (pci_read_config(sc->dev, (pcie_reg + reg), width));
+			switch (width) {
+				case 4:
+					return pcidev_read32(sc->pcidev, (pcie_reg + reg));
+				case 2:
+					return pcidev_read16(sc->pcidev, (pcie_reg + reg));
+				case 1:
+					return pcidev_read8(sc->pcidev, (pcie_reg + reg));
+				default:
+					BLOGE(sc, "Bad width %d in PCIE Cap read\n", width);
+			}
         }
     }
 #endif
@@ -13601,7 +13606,7 @@ bxe_probe_pci_caps(struct bxe_adapter *sc)
     int reg;
 
     /* check if PCI Power Management is enabled */
-    if (pci_find_cap(sc->dev, PCIY_PMG, &reg) == 0) {
+    if (pci_find_cap(sc->pcidev, PCIY_PMG, &reg) == 0) {
         if (reg != 0) {
             BLOGD(sc, DBG_LOAD, "Found PM capability at 0x%04x\n", reg);
 
@@ -13639,7 +13644,7 @@ bxe_probe_pci_caps(struct bxe_adapter *sc)
     sc->devinfo.pcie_pcie_cap_reg = (uint16_t)reg;
 
     /* check if MSI capability is enabled */
-    if (pci_find_cap(sc->dev, PCIY_MSI, &reg) == 0) {
+    if (pci_find_cap(sc->pcidev, PCIY_MSI, &reg) == 0) {
         if (reg != 0) {
             BLOGD(sc, DBG_LOAD, "Found MSI capability at 0x%04x\n", reg);
 
@@ -13649,7 +13654,7 @@ bxe_probe_pci_caps(struct bxe_adapter *sc)
     }
 
     /* check if MSI-X capability is enabled */
-    if (pci_find_cap(sc->dev, PCIY_MSIX, &reg) == 0) {
+    if (pci_find_cap(sc->pcidev, PCIY_MSIX, &reg) == 0) {
         if (reg != 0) {
             BLOGD(sc, DBG_LOAD, "Found MSI-X capability at 0x%04x\n", reg);
 
@@ -14386,10 +14391,10 @@ bxe_get_device_info(struct bxe_adapter *sc)
     int rc;
 
     /* Get the data for the device */
-    sc->devinfo.vendor_id    = pci_get_vendor(sc->dev);
-    sc->devinfo.device_id    = pci_get_device(sc->dev);
-    sc->devinfo.subvendor_id = pci_get_subvendor(sc->dev);
-    sc->devinfo.subdevice_id = pci_get_subdevice(sc->dev);
+    sc->devinfo.vendor_id    = pci_get_vendor(sc->pcidev);
+    sc->devinfo.device_id    = pci_get_device(sc->pcidev);
+    sc->devinfo.subvendor_id = pci_get_subvendor(sc->pcidev);
+    sc->devinfo.subdevice_id = pci_get_subdevice(sc->pcidev);
 
     /* get the chip revision (chip metal comes from pci config space) */
     sc->devinfo.chip_id     =
@@ -14496,7 +14501,7 @@ bxe_get_device_info(struct bxe_adapter *sc)
     BLOGD(sc, DBG_LOAD, "mf_cfg_base=0x08%x \n", sc->devinfo.mf_cfg_base);
 
     /* clean indirect addresses as they're not used */
-    pci_write_config(sc->dev, PCICFG_GRC_ADDRESS, 0, 4);
+    pcidev_write32(sc->pcidev, PCICFG_GRC_ADDRESS, 0);
     if (IS_PF(sc)) {
         REG_WR(sc, PXP2_REG_PGL_ADDR_88_F0, 0);
         REG_WR(sc, PXP2_REG_PGL_ADDR_8C_F0, 0);
@@ -14535,10 +14540,9 @@ bxe_get_device_info(struct bxe_adapter *sc)
 
     if (sc->devinfo.pcie_msix_cap_reg != 0) {
 	assert(0);
-//        val = pci_read_config(sc->dev,
+//        val = pcidev_read16(sc->pcidev,
 //                              (sc->devinfo.pcie_msix_cap_reg +
-//                               PCIR_MSIX_CTRL),
-//                              2);
+//                               PCIR_MSIX_CTRL));
 //        sc->igu_sb_cnt = (val & PCIM_MSIXCTRL_TABLE_SIZE);
     } else {
         sc->igu_sb_cnt = 1;
@@ -15038,7 +15042,7 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
     /* XXX zero out all vars here and call bxe_alloc_hsi_mem on error */
 #if 0
     /* allocate the parent bus DMA tag */
-    rc = bus_dma_tag_create(bus_get_dma_tag(sc->dev), /* parent tag */
+    rc = bus_dma_tag_create(bus_get_dma_tag(sc->pcidev), /* parent tag */
                             1,                        /* alignment */
                             0,                        /* boundary limit */
                             BUS_SPACE_MAXADDR,        /* restricted low */
@@ -16339,8 +16343,8 @@ bxe_add_sysctls(struct bxe_adapter *sc)
     uint32_t q_stat;
     int i, j;
 
-    ctx = device_get_sysctl_ctx(sc->dev);
-    children = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
+    ctx = device_get_sysctl_ctx(sc->pcidev);
+    children = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->pcidev));
 
     SYSCTL_ADD_STRING(ctx, children, OID_AUTO, "version",
                       CTLFLAG_RD, BXE_DRIVER_VERSION, 0,
@@ -16454,7 +16458,7 @@ bxe_attach(device_t dev)
 
     sc->state = BXE_STATE_CLOSED;
 
-    sc->dev  = dev;
+	// TODO: sc->pcidev  = /* SOMETHING */
     sc->unit = device_get_unit(dev);
 
     BLOGD(sc, DBG_LOAD, "softc = %p\n", sc);
