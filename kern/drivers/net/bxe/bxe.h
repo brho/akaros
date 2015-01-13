@@ -700,6 +700,7 @@ struct bxe_fastpath {
 #define FP_SB_MAX_E1x 16
 #define FP_SB_MAX_E2  HC_SB_MAX_SB_E2
 
+#define MAX_CONTEXT 16 /* XXX taken from other fbsd source. */
 union cdu_context {
     struct eth_context eth;
     char pad[1024];
@@ -916,8 +917,6 @@ struct bxe_fw_stats_data {
  * aligned.
  */
 struct bxe_slowpath {
-
-#if 0
     /*
      * The cdu_context array MUST be the first element in this
      * structure. It is used during the leading edge ramrod
@@ -928,7 +927,6 @@ struct bxe_slowpath {
     /* Used as a DMA source for MAC configuration. */
     struct mac_configuration_cmd    mac_config;
     struct mac_configuration_cmd    mcast_config;
-#endif
 
     /* used by the DMAE command executer */
     struct dmae_command dmae[MAX_DMAE_C];
@@ -1752,9 +1750,7 @@ struct eth_spe *spq;
 	int mtu;
 	
 	/* LLDP params */
-#if 0
 	struct bxe_config_lldp_params lldp_config_params;
-#endif
 	/* DCB support on/off */
 	int dcb_state;
 #define BXE_DCB_STATE_OFF 0
