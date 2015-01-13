@@ -137,8 +137,8 @@ typedef _Bool bool;
 #define ECORE_MEMCPY(_a, _b, _s) memcpy(_a, _b, _s)
 #define ECORE_MEMSET(_a, _c, _s) memset(_a, _c, _s)
 
-#define ECORE_CPU_TO_LE16(x) htole16(x)
-#define ECORE_CPU_TO_LE32(x) htole32(x)
+#define ECORE_CPU_TO_LE16(x) cpu_to_le16(x)
+#define ECORE_CPU_TO_LE32(x) cpu_to_le32(x)
 
 #define ECORE_WAIT(_s, _t) udelay(1000)
 #define ECORE_MSLEEP(_t)   udelay((_t) * 1000)

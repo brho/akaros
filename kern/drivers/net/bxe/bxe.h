@@ -2091,8 +2091,8 @@ static const uint32_t dmae_reg_go_c[] = {
 #define BXE_SWCID_SHIFT 17
 #define BXE_SWCID_MASK  ((0x1 << BXE_SWCID_SHIFT) - 1)
 
-#define SW_CID(x)  (le32toh(x) & BXE_SWCID_MASK)
-#define CQE_CMD(x) (le32toh(x) >> COMMON_RAMROD_ETH_RX_CQE_CMD_ID_SHIFT)
+#define SW_CID(x)  (le32_to_cpu(x) & BXE_SWCID_MASK)
+#define CQE_CMD(x) (le32_to_cpu(x) >> COMMON_RAMROD_ETH_RX_CQE_CMD_ID_SHIFT)
 
 #define CQE_TYPE(cqe_fp_flags)   ((cqe_fp_flags) & ETH_FAST_PATH_RX_CQE_TYPE)
 #define CQE_TYPE_START(cqe_type) ((cqe_type) == RX_ETH_CQE_TYPE_ETH_START_AGG)

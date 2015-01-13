@@ -483,12 +483,12 @@ struct bxe_fw_port_stats_old {
 
 /* The _force is for cases where high value is 0 */
 #define ADD_64_LE(s_hi, a_hi_le, s_lo, a_lo_le) \
-        ADD_64(s_hi, le32toh(a_hi_le),          \
-               s_lo, le32toh(a_lo_le))
+        ADD_64(s_hi, le32_to_cpu(a_hi_le),          \
+               s_lo, le32_to_cpu(a_lo_le))
 
 #define ADD_64_LE16(s_hi, a_hi_le, s_lo, a_lo_le) \
-        ADD_64(s_hi, le16toh(a_hi_le),            \
-               s_lo, le16toh(a_lo_le))
+        ADD_64(s_hi, le16_to_cpu(a_hi_le),            \
+               s_lo, le16_to_cpu(a_lo_le))
 #define UINT_MAX (0xffffffffffffffffull)
 /* difference = minuend - subtrahend */
 #define DIFF_64(d_hi, m_hi, s_hi, d_lo, m_lo, s_lo)  \
@@ -558,8 +558,8 @@ struct bxe_fw_port_stats_old {
 
 #define UPDATE_EXTEND_TSTAT_X(s, t, size)                    \
     do {                                                     \
-        diff = le##size##toh(tclient->s) -                   \
-               le##size##toh(old_tclient->s);                \
+        diff = le##size##_to_cpu(tclient->s) -                   \
+               le##size##_to_cpu(old_tclient->s);                \
         old_tclient->s = tclient->s;                         \
         ADD_EXTEND_64(qstats->t##_hi, qstats->t##_lo, diff); \
     } while (0)
@@ -574,7 +574,7 @@ struct bxe_fw_port_stats_old {
 
 #define UPDATE_EXTEND_USTAT(s, t)                             \
     do {                                                      \
-        diff = le32toh(uclient->s) - le32toh(old_uclient->s); \
+        diff = le32_to_cpu(uclient->s) - le32_to_cpu(old_uclient->s); \
         old_uclient->s = uclient->s;                          \
         ADD_EXTEND_64(qstats->t##_hi, qstats->t##_lo, diff);  \
     } while (0)
@@ -587,15 +587,15 @@ struct bxe_fw_port_stats_old {
 
 #define UPDATE_EXTEND_XSTAT(s, t)                             \
     do {                                                      \
-        diff = le32toh(xclient->s) - le32toh(old_xclient->s); \
+        diff = le32_to_cpu(xclient->s) - le32_to_cpu(old_xclient->s); \
         old_xclient->s = xclient->s;                          \
         ADD_EXTEND_64(qstats->t##_hi, qstats->t##_lo, diff);  \
     } while (0)
 
 #define UPDATE_QSTAT(s, t)                                   \
     do {                                                     \
-        qstats->t##_hi = qstats_old->t##_hi + le32toh(s.hi); \
-        qstats->t##_lo = qstats_old->t##_lo + le32toh(s.lo); \
+        qstats->t##_hi = qstats_old->t##_hi + le32_to_cpu(s.hi); \
+        qstats->t##_lo = qstats_old->t##_lo + le32_to_cpu(s.lo); \
     } while (0)
 
 #define UPDATE_QSTAT_OLD(f)        \
@@ -634,7 +634,7 @@ struct bxe_fw_port_stats_old {
 
 #define UPDATE_FW_STAT(s)                           \
     do {                                            \
-        estats->s = le32toh(tport->s) + fwstats->s; \
+        estats->s = le32_to_cpu(tport->s) + fwstats->s; \
     } while (0)
 
 #define UPDATE_FW_STAT_OLD(f)   \
@@ -666,7 +666,7 @@ struct bxe_fw_port_stats_old {
 
 #define SUB_EXTEND_USTAT(s, t)                                \
     do {                                                      \
-        diff = le32toh(uclient->s) - le32toh(old_uclient->s); \
+        diff = le32_to_cpu(uclient->s) - le32_to_cpu(old_uclient->s); \
         SUB_EXTEND_64(qstats->t##_hi, qstats->t##_lo, diff);  \
     } while (0)
 

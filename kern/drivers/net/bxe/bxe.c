@@ -2676,7 +2676,7 @@ bxe_tx_queue_has_work(struct bxe_fastpath *fp)
     uint16_t hw_cons;
 
     mb(); /* status block fields can change */
-    hw_cons = le16toh(*fp->tx_cons_sb);
+    hw_cons = le16_to_cpu(*fp->tx_cons_sb);
     return (hw_cons != fp->tx_pkt_cons);
 }
 
@@ -2693,7 +2693,7 @@ bxe_has_rx_work(struct bxe_fastpath *fp)
     uint16_t rx_cq_cons_sb;
 
     mb(); /* status block fields can change */
-    rx_cq_cons_sb = le16toh(*fp->rx_cq_cons_sb);
+    rx_cq_cons_sb = le16_to_cpu(*fp->rx_cq_cons_sb);
     if ((rx_cq_cons_sb & RCQ_MAX) == RCQ_MAX)
         rx_cq_cons_sb++;
     return (fp->rx_cq_cons != rx_cq_cons_sb);
@@ -2853,9 +2853,9 @@ bxe_tpa_start(struct bxe_adapter            *sc,
     /* change the TPA queue to the start state */
     tpa_info->state            = BXE_TPA_STATE_START;
     tpa_info->placement_offset = cqe->placement_offset;
-    tpa_info->parsing_flags    = le16toh(cqe->pars_flags.flags);
-    tpa_info->vlan_tag         = le16toh(cqe->vlan_tag);
-    tpa_info->len_on_bd        = le16toh(cqe->len_on_bd);
+    tpa_info->parsing_flags    = le16_to_cpu(cqe->pars_flags.flags);
+    tpa_info->vlan_tag         = le16_to_cpu(cqe->vlan_tag);
+    tpa_info->len_on_bd        = le16_to_cpu(cqe->len_on_bd);
 
     fp->rx_tpa_queue_used |= (1 << queue);
 
@@ -2893,8 +2893,8 @@ bxe_tpa_start(struct bxe_adapter            *sc,
 
     /* update the Rx BD with the empty mbuf phys address from the TPA pool */
     rx_bd = &fp->rx_chain[index];
-    rx_bd->addr_hi = htole32(U64_HI(tpa_info->seg.ds_addr));
-    rx_bd->addr_lo = htole32(U64_LO(tpa_info->seg.ds_addr));
+    rx_bd->addr_hi = cpu_to_le32(U64_HI(tpa_info->seg.ds_addr));
+    rx_bd->addr_lo = cpu_to_le32(U64_LO(tpa_info->seg.ds_addr));
 #endif
 }
 #if 0
@@ -2919,7 +2919,7 @@ bxe_fill_frag_mbuf(struct bxe_adapter          *sc,
     int rc = 0;
     int j;
 
-    frag_size = le16toh(cqe->pkt_len) - tpa_info->len_on_bd;
+    frag_size = le16_to_cpu(cqe->pkt_len) - tpa_info->len_on_bd;
 
     BLOGD(sc, DBG_LRO,
           "fp[%02d].tpa[%02d] TPA fill len_on_bd=%d frag_size=%d pages=%d\n",
@@ -2929,7 +2929,7 @@ bxe_fill_frag_mbuf(struct bxe_adapter          *sc,
     if (pages > 8 * PAGES_PER_SGE) {
         BLOGE(sc, "fp[%02d].sge[0x%04x] has too many pages (%d)! "
                   "pkt_len=%d len_on_bd=%d frag_size=%d\n",
-              fp->index, cqe_idx, pages, le16toh(cqe->pkt_len),
+              fp->index, cqe_idx, pages, le16_to_cpu(cqe->pkt_len),
               tpa_info->len_on_bd, frag_size);
         bxe_panic(sc, ("sge page count error\n"));
         return (EINVAL);
@@ -2940,7 +2940,7 @@ bxe_fill_frag_mbuf(struct bxe_adapter          *sc,
      * single mbuf for the host stack.
      */
     for (i = 0, j = 0; i < pages; i += PAGES_PER_SGE, j++) {
-        sge_idx = RX_SGE(le16toh(cqe->sgl_or_raw_data.sgl[j]));
+        sge_idx = RX_SGE(le16_to_cpu(cqe->sgl_or_raw_data.sgl[j]));
 
         /*
          * Firmware gives the indices of the SGE as if the ring is an array
@@ -3037,17 +3037,17 @@ bxe_update_sge_prod(struct bxe_adapter          *sc,
     /* first mark all used pages */
     for (i = 0; i < sge_len; i++) {
         BIT_VEC64_CLEAR_BIT(fp->sge_mask,
-                            RX_SGE(le16toh(cqe->sgl_or_raw_data.sgl[i])));
+                            RX_SGE(le16_to_cpu(cqe->sgl_or_raw_data.sgl[i])));
     }
 
     BLOGD(sc, DBG_LRO,
           "fp[%02d] fp_cqe->sgl[%d] = %d\n",
           fp->index, sge_len - 1,
-          le16toh(cqe->sgl_or_raw_data.sgl[sge_len - 1]));
+          le16_to_cpu(cqe->sgl_or_raw_data.sgl[sge_len - 1]));
 
     /* assume that the last SGE index is the biggest */
     bxe_update_last_max_sge(fp,
-                            le16toh(cqe->sgl_or_raw_data.sgl[sge_len - 1]));
+                            le16_to_cpu(cqe->sgl_or_raw_data.sgl[sge_len - 1]));
 
     last_max = RX_SGE(fp->last_max_sge);
     last_elem = last_max >> BIT_VEC64_ELEM_SHIFT;
@@ -3101,7 +3101,7 @@ bxe_tpa_stop(struct bxe_adapter          *sc,
     BLOGD(sc, DBG_LRO,
           "fp[%02d].tpa[%02d] pad=%d pkt_len=%d pages=%d vlan=%d\n",
           fp->index, queue, tpa_info->placement_offset,
-          le16toh(cqe->pkt_len), pages, tpa_info->vlan_tag);
+          le16_to_cpu(cqe->pkt_len), pages, tpa_info->vlan_tag);
 
     m = tpa_info->bd.m;
 
@@ -3178,7 +3178,7 @@ bxe_rxeof(struct bxe_adapter    *sc,
     BXE_FP_RX_LOCK(fp);
 
     /* CQ "next element" is of the size of the regular element */
-    hw_cq_cons = le16toh(*fp->rx_cq_cons_sb);
+    hw_cq_cons = le16_to_cpu(*fp->rx_cq_cons_sb);
     if ((hw_cq_cons & RCQ_USABLE_PER_PAGE) == RCQ_USABLE_PER_PAGE) {
         hw_cq_cons++;
     }
@@ -3229,9 +3229,9 @@ bxe_rxeof(struct bxe_adapter    *sc,
               CQE_TYPE(cqe_fp_flags),
               cqe_fp_flags,
               cqe_fp->status_flags,
-              le32toh(cqe_fp->rss_hash_result),
-              le16toh(cqe_fp->vlan_tag),
-              le16toh(cqe_fp->pkt_len_or_gro_seg_len));
+              le32_to_cpu(cqe_fp->rss_hash_result),
+              le16_to_cpu(cqe_fp->vlan_tag),
+              le16_to_cpu(cqe_fp->pkt_len_or_gro_seg_len));
 
         /* is this a slowpath msg? */
         if (__predict_false(CQE_TYPE_SLOW(cqe_fp_type))) {
@@ -3271,7 +3271,7 @@ bxe_rxeof(struct bxe_adapter    *sc,
             BLOGD(sc, DBG_LRO, "fp[%02d].tpa[%02d] TPA STOP\n",
                   fp->index, queue);
 
-            frag_size = (le16toh(cqe->end_agg_cqe.pkt_len) -
+            frag_size = (le16_to_cpu(cqe->end_agg_cqe.pkt_len) -
                          tpa_info->len_on_bd);
             pages = SGE_PAGE_ALIGN(frag_size) >> SGE_PAGE_SHIFT;
 
@@ -3293,7 +3293,7 @@ bxe_rxeof(struct bxe_adapter    *sc,
             goto next_rx;
         }
 
-        len = le16toh(cqe_fp->pkt_len_or_gro_seg_len);
+        len = le16_to_cpu(cqe_fp->pkt_len_or_gro_seg_len);
         pad = cqe_fp->placement_offset;
 
         m = rx_buf->m;
@@ -3442,7 +3442,7 @@ bxe_free_tx_pkt(struct bxe_adapter    *sc,
     bus_dmamap_unload(fp->tx_mbuf_tag, tx_buf->m_map);
 
     tx_start_bd = &fp->tx_chain[bd_idx].start_bd;
-    nbd = le16toh(tx_start_bd->nbd) - 1;
+    nbd = le16_to_cpu(tx_start_bd->nbd) - 1;
     // this #if 0 was already here in fbsd
 #if 0
     if ((nbd - 1) > (MAX_MBUF_FRAGS + 2)) {
@@ -3533,7 +3533,7 @@ bxe_txeof(struct bxe_adapter    *sc,
     BXE_FP_TX_LOCK_ASSERT(fp);
 
     bd_cons = fp->tx_bd_cons;
-    hw_cons = le16toh(*fp->tx_cons_sb);
+    hw_cons = le16_to_cpu(*fp->tx_cons_sb);
     sw_cons = fp->tx_pkt_cons;
 
     while (sw_cons != hw_cons) {
@@ -5036,7 +5036,7 @@ bxe_chktso_window(struct bxe_adapter  *sc,
     wnd_sum = 0;
     wnd_size = 10;
     num_wnds = nsegs - wnd_size;
-    lso_mss = htole16(m->m_pkthdr.tso_segsz);
+    lso_mss = cpu_to_le16(m->m_pkthdr.tso_segsz);
 
     /*
      * Total header lengths Eth+IP+TCP in first FreeBSD mbuf so calculate the
@@ -5044,7 +5044,7 @@ bxe_chktso_window(struct bxe_adapter  *sc,
      * header in FreeBSD.
      */
     for (frag_idx = 1; (frag_idx <= wnd_size); frag_idx++) {
-        wnd_sum += htole16(segs[frag_idx].ds_len);
+        wnd_sum += cpu_to_le16(segs[frag_idx].ds_len);
     }
 
     /* check the first 10 bd window size */
@@ -5055,9 +5055,9 @@ bxe_chktso_window(struct bxe_adapter  *sc,
     /* run through the windows */
     for (wnd_idx = 0; wnd_idx < num_wnds; wnd_idx++, frag_idx++) {
         /* subtract the first mbuf->m_len of the last wndw(-header) */
-        wnd_sum -= htole16(segs[wnd_idx+1].ds_len);
+        wnd_sum -= cpu_to_le16(segs[wnd_idx+1].ds_len);
         /* add the next mbuf len to the len of our new window */
-        wnd_sum += htole16(segs[frag_idx].ds_len);
+        wnd_sum += cpu_to_le16(segs[frag_idx].ds_len);
         if (wnd_sum < lso_mss) {
             return (1);
         }
@@ -5207,9 +5207,9 @@ bxe_set_pbd_csum(struct bxe_fastpath        *fp,
     /* note that rest of global_data is indirectly zeroed here */
     if (m->m_flags & M_VLANTAG) {
         pbd->global_data =
-            htole16(hlen | (1 << ETH_TX_PARSE_BD_E1X_LLC_SNAP_EN_SHIFT));
+            cpu_to_le16(hlen | (1 << ETH_TX_PARSE_BD_E1X_LLC_SNAP_EN_SHIFT));
     } else {
-        pbd->global_data = htole16(hlen);
+        pbd->global_data = cpu_to_le16(hlen);
     }
 
     pbd->ip_hlen_w = ip_hlen;
@@ -5233,7 +5233,7 @@ bxe_set_pbd_csum(struct bxe_fastpath        *fp,
         return (0);
     }
 
-    pbd->total_hlen_w = htole16(hlen);
+    pbd->total_hlen_w = cpu_to_le16(hlen);
 
     if (m->m_pkthdr.csum_flags & (CSUM_TCP |
                                   CSUM_TSO |
@@ -5311,7 +5311,7 @@ bxe_set_pbd_lso(struct mbuf                *m,
     ip = (struct ip *)(m->m_data + e_hlen);
     th = (struct tcphdr *)((caddr_t)ip + (ip->ip_hl << 2));
 
-    pbd->lso_mss = htole16(m->m_pkthdr.tso_segsz);
+    pbd->lso_mss = cpu_to_le16(m->m_pkthdr.tso_segsz);
     pbd->tcp_send_seq = ntohl(th->th_seq);
     pbd->tcp_flags = ((ntohl(((uint32_t *)th)[3]) >> 16) & 0xff);
 
@@ -5331,7 +5331,7 @@ bxe_set_pbd_lso(struct mbuf                *m,
 #endif
 
     pbd->global_data |=
-        htole16(ETH_TX_PARSE_BD_E1X_PSEUDO_CS_WITHOUT_LEN);
+        cpu_to_le16(ETH_TX_PARSE_BD_E1X_PSEUDO_CS_WITHOUT_LEN);
 }
 
 /*
@@ -5523,9 +5523,9 @@ bxe_tx_encap_continue:
           "sending pkt_prod=%u tx_buf=%p next_idx=%u bd=%u tx_start_bd=%p\n",
           pkt_prod, tx_buf, fp->tx_pkt_prod, bd_prod, tx_start_bd);
 
-    tx_start_bd->addr_lo = htole32(U64_LO(segs[0].ds_addr));
-    tx_start_bd->addr_hi = htole32(U64_HI(segs[0].ds_addr));
-    tx_start_bd->nbytes  = htole16(segs[0].ds_len);
+    tx_start_bd->addr_lo = cpu_to_le32(U64_LO(segs[0].ds_addr));
+    tx_start_bd->addr_hi = cpu_to_le32(U64_HI(segs[0].ds_addr));
+    tx_start_bd->nbytes  = cpu_to_le16(segs[0].ds_len);
     total_pkt_size += tx_start_bd->nbytes;
     tx_start_bd->bd_flags.as_bitfield = ETH_TX_BD_FLAGS_START_BD;
 
@@ -5533,10 +5533,10 @@ bxe_tx_encap_continue:
 
     /* all frames have at least Start BD + Parsing BD */
     nbds = nsegs + 1;
-    tx_start_bd->nbd = htole16(nbds);
+    tx_start_bd->nbd = cpu_to_le16(nbds);
 
     if (m0->m_flags & M_VLANTAG) {
-        tx_start_bd->vlan_or_ethertype = htole16(m0->m_pkthdr.ether_vtag);
+        tx_start_bd->vlan_or_ethertype = cpu_to_le16(m0->m_pkthdr.ether_vtag);
         tx_start_bd->bd_flags.as_bitfield |=
             (X_ETH_OUTBAND_VLAN << ETH_TX_BD_FLAGS_VLAN_MODE_SHIFT);
     } else {
@@ -5547,7 +5547,7 @@ bxe_tx_encap_continue:
             tx_start_bd->vlan_or_ethertype = eh->evl_encap_proto;
         } else {
             /* used by FW for packet accounting */
-            tx_start_bd->vlan_or_ethertype = htole16(fp->tx_pkt_prod);
+            tx_start_bd->vlan_or_ethertype = cpu_to_le16(fp->tx_pkt_prod);
 #if 0
             /*
              * If NPAR-SD is active then FW should do the tagging regardless
@@ -5631,7 +5631,7 @@ bxe_tx_encap_continue:
 
         SET_FLAG(global_data,
                  ETH_TX_PARSE_BD_E1X_ETH_ADDR_TYPE, mac_type);
-        pbd_e1x->global_data |= htole16(global_data);
+        pbd_e1x->global_data |= cpu_to_le16(global_data);
     }
 
     /* setup the parsing BD with TSO specific info */
@@ -5644,25 +5644,25 @@ bxe_tx_encap_continue:
 
             /* split the first BD into header/data making the fw job easy */
             nbds++;
-            tx_start_bd->nbd = htole16(nbds);
-            tx_start_bd->nbytes = htole16(hlen);
+            tx_start_bd->nbd = cpu_to_le16(nbds);
+            tx_start_bd->nbytes = cpu_to_le16(hlen);
 
             bd_prod = TX_BD_NEXT(bd_prod);
 
             /* new transmit BD after the tx_parse_bd */
             tx_data_bd = &fp->tx_chain[TX_BD(bd_prod)].reg_bd;
-            tx_data_bd->addr_hi = htole32(U64_HI(segs[0].ds_addr + hlen));
-            tx_data_bd->addr_lo = htole32(U64_LO(segs[0].ds_addr + hlen));
-            tx_data_bd->nbytes  = htole16(segs[0].ds_len - hlen);
+            tx_data_bd->addr_hi = cpu_to_le32(U64_HI(segs[0].ds_addr + hlen));
+            tx_data_bd->addr_lo = cpu_to_le32(U64_LO(segs[0].ds_addr + hlen));
+            tx_data_bd->nbytes  = cpu_to_le16(segs[0].ds_len - hlen);
             if (tx_total_pkt_size_bd == NULL) {
                 tx_total_pkt_size_bd = tx_data_bd;
             }
 
             BLOGD(sc, DBG_TX,
                   "TSO split header size is %d (%x:%x) nbds %d\n",
-                  le16toh(tx_start_bd->nbytes),
-                  le32toh(tx_start_bd->addr_hi),
-                  le32toh(tx_start_bd->addr_lo),
+                  le16_to_cpu(tx_start_bd->nbytes),
+                  le32_to_cpu(tx_start_bd->addr_hi),
+                  le32_to_cpu(tx_start_bd->addr_lo),
                   nbds);
         }
 
@@ -5674,16 +5674,16 @@ bxe_tx_encap_continue:
     }
 
     if (pbd_e2_parsing_data) {
-        pbd_e2->parsing_data = htole32(pbd_e2_parsing_data);
+        pbd_e2->parsing_data = cpu_to_le32(pbd_e2_parsing_data);
     }
 
     /* prepare remaining BDs, start tx bd contains first seg/frag */
     for (i = 1; i < nsegs ; i++) {
         bd_prod = TX_BD_NEXT(bd_prod);
         tx_data_bd = &fp->tx_chain[TX_BD(bd_prod)].reg_bd;
-        tx_data_bd->addr_lo = htole32(U64_LO(segs[i].ds_addr));
-        tx_data_bd->addr_hi = htole32(U64_HI(segs[i].ds_addr));
-        tx_data_bd->nbytes  = htole16(segs[i].ds_len);
+        tx_data_bd->addr_lo = cpu_to_le32(U64_LO(segs[i].ds_addr));
+        tx_data_bd->addr_hi = cpu_to_le32(U64_HI(segs[i].ds_addr));
+        tx_data_bd->nbytes  = cpu_to_le16(segs[i].ds_len);
         if (tx_total_pkt_size_bd == NULL) {
             tx_total_pkt_size_bd = tx_data_bd;
         }
@@ -5706,8 +5706,8 @@ bxe_tx_encap_continue:
                       "bd_flags=0x%x hdr_nbds=%d\n",
                       tx_start_bd,
                       tmp_bd,
-                      le16toh(tx_start_bd->nbd),
-                      le16toh(tx_start_bd->vlan_or_ethertype),
+                      le16_to_cpu(tx_start_bd->nbd),
+                      le16_to_cpu(tx_start_bd->vlan_or_ethertype),
                       tx_start_bd->bd_flags.as_bitfield,
                       (tx_start_bd->general_data & ETH_TX_START_BD_HDR_NBDS));
             } else if (i == 1) {
@@ -5725,7 +5725,7 @@ bxe_tx_encap_continue:
                           pbd_e1x->tcp_flags,
                           pbd_e1x->tcp_pseudo_csum,
                           pbd_e1x->tcp_send_seq,
-                          le16toh(pbd_e1x->total_hlen_w));
+                          le16_to_cpu(pbd_e1x->total_hlen_w));
                 } else { /* if (pbd_e2) */
                     BLOGD(sc, DBG_TX,
                           "-> Parse: %p bd=%d dst=%02x:%02x:%02x "
@@ -5748,9 +5748,9 @@ bxe_tx_encap_continue:
                       "-> Frag: %p bd=%d nbytes=%d hi=0x%x lo: 0x%x\n",
                       tx_data_bd,
                       tmp_bd,
-                      le16toh(tx_data_bd->nbytes),
-                      le32toh(tx_data_bd->addr_hi),
-                      le32toh(tx_data_bd->addr_lo));
+                      le16_to_cpu(tx_data_bd->nbytes),
+                      le32_to_cpu(tx_data_bd->addr_hi),
+                      le32_to_cpu(tx_data_bd->addr_lo));
             }
 
             tmp_bd = TX_BD_NEXT(tmp_bd);
@@ -6602,8 +6602,8 @@ bxe_alloc_rx_bd_mbuf(struct bxe_fastpath *fp,
     rx_buf->m = m;
 
     rx_bd = &fp->rx_chain[index];
-    rx_bd->addr_hi = htole32(U64_HI(segs[0].ds_addr));
-    rx_bd->addr_lo = htole32(U64_LO(segs[0].ds_addr));
+    rx_bd->addr_hi = cpu_to_le32(U64_HI(segs[0].ds_addr));
+    rx_bd->addr_lo = cpu_to_le32(U64_LO(segs[0].ds_addr));
 
     return (rc);
 #endif
@@ -6731,8 +6731,8 @@ bxe_alloc_rx_sge_mbuf(struct bxe_fastpath *fp,
     sge_buf->m = m;
 
     sge = &fp->rx_sge_chain[index];
-    sge->addr_hi = htole32(U64_HI(segs[0].ds_addr));
-    sge->addr_lo = htole32(U64_LO(segs[0].ds_addr));
+    sge->addr_hi = cpu_to_le32(U64_HI(segs[0].ds_addr));
+    sge->addr_lo = cpu_to_le32(U64_LO(segs[0].ds_addr));
 
     return (rc);
 #endif
@@ -8597,8 +8597,8 @@ static void
 bxe_attn_int(struct bxe_adapter *sc)
 {
     /* read local copy of bits */
-    uint32_t attn_bits = le32toh(sc->def_sb->atten_status_block.attn_bits);
-    uint32_t attn_ack = le32toh(sc->def_sb->atten_status_block.attn_bits_ack);
+    uint32_t attn_bits = le32_to_cpu(sc->def_sb->atten_status_block.attn_bits);
+    uint32_t attn_ack = le32_to_cpu(sc->def_sb->atten_status_block.attn_bits_ack);
     uint32_t attn_state = sc->attn_state;
 
     /* look for changed bits */
@@ -8697,7 +8697,7 @@ bxe_handle_classification_eqe(struct bxe_adapter      *sc,
     /* always push next commands out, don't wait here */
     bit_set(&ramrod_flags, RAMROD_CONT);
 
-    switch (le32toh(elem->message.data.eth_event.echo) >> BXE_SWCID_SHIFT) {
+    switch (le32_to_cpu(elem->message.data.eth_event.echo) >> BXE_SWCID_SHIFT) {
     case ECORE_FILTER_MAC_PENDING:
         BLOGD(sc, DBG_SP, "Got SETUP_MAC completions\n");
         vlan_mac_obj = &sc->sp_objs[cid].mac_obj;
@@ -8771,7 +8771,7 @@ bxe_eq_int(struct bxe_adapter *sc)
     struct ecore_func_sp_obj *f_obj = &sc->func_obj;
     struct ecore_raw_obj *rss_raw = &sc->rss_conf_obj.raw;
 
-    hw_cons = le16toh(*sc->eq_cons_sb);
+    hw_cons = le16_to_cpu(*sc->eq_cons_sb);
 
     /*
      * The hw_cons range is 1-255, 257 - the sw_cons range is 0-254, 256.
@@ -8989,7 +8989,7 @@ bxe_handle_sp_tq(void *context,
         BLOGD(sc, DBG_SP, "---> EQ INTR <---\n");
         bxe_eq_int(sc);
         bxe_ack_sb(sc, sc->igu_dsb_id, USTORM_ID,
-                   le16toh(sc->def_idx), IGU_INT_NOP, 1);
+                   le16_to_cpu(sc->def_idx), IGU_INT_NOP, 1);
         status &= ~BXE_DEF_SB_IDX;
     }
 
@@ -9000,7 +9000,7 @@ bxe_handle_sp_tq(void *context,
 
     /* ack status block only if something was actually handled */
     bxe_ack_sb(sc, sc->igu_dsb_id, ATTENTION_ID,
-               le16toh(sc->def_att_idx), IGU_INT_ENABLE, 1);
+               le16_to_cpu(sc->def_att_idx), IGU_INT_ENABLE, 1);
 
     /*
      * Must be called after the EQ processing (since eq leads to sriov
@@ -9066,7 +9066,7 @@ bxe_handle_fp_tq(void *context,
     }
 
     bxe_ack_sb(sc, fp->igu_sb_id, USTORM_ID,
-               le16toh(fp->fp_hc_idx), IGU_INT_ENABLE, 1);
+               le16_to_cpu(fp->fp_hc_idx), IGU_INT_ENABLE, 1);
 }
 
 static void
@@ -9107,7 +9107,7 @@ bxe_task_fp(struct bxe_fastpath *fp)
      * not do any work in.
      */
     bxe_ack_sb(sc, fp->igu_sb_id, USTORM_ID,
-               le16toh(fp->fp_hc_idx), IGU_INT_ENABLE, 1);
+               le16_to_cpu(fp->fp_hc_idx), IGU_INT_ENABLE, 1);
 }
 
 /*

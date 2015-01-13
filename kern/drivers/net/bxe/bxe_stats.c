@@ -152,11 +152,11 @@ bxe_storm_stats_post(struct bxe_adapter *sc)
         }
 
         sc->fw_stats_req->hdr.drv_stats_counter =
-            htole16(sc->stats_counter++);
+            cpu_to_le16(sc->stats_counter++);
 
         BLOGD(sc, DBG_STATS,
               "sending statistics ramrod %d\n",
-              le16toh(sc->fw_stats_req->hdr.drv_stats_counter));
+              le16_to_cpu(sc->fw_stats_req->hdr.drv_stats_counter));
 
         /* adjust the ramrod to include VF queues statistics */
         // XXX bxe_iov_adjust_stats_req(sc);
@@ -948,35 +948,35 @@ bxe_storm_stats_validate_counters(struct bxe_adapter *sc)
     BXE_STATS_UNLOCK(sc);
 
     /* are storm stats valid? */
-    if (le16toh(counters->xstats_counter) != cur_stats_counter) {
+    if (le16_to_cpu(counters->xstats_counter) != cur_stats_counter) {
         BLOGD(sc, DBG_STATS,
               "stats not updated by xstorm, "
               "counter 0x%x != stats_counter 0x%x\n",
-              le16toh(counters->xstats_counter), sc->stats_counter);
+              le16_to_cpu(counters->xstats_counter), sc->stats_counter);
         return (-EAGAIN);
     }
 
-    if (le16toh(counters->ustats_counter) != cur_stats_counter) {
+    if (le16_to_cpu(counters->ustats_counter) != cur_stats_counter) {
         BLOGD(sc, DBG_STATS,
               "stats not updated by ustorm, "
               "counter 0x%x != stats_counter 0x%x\n",
-              le16toh(counters->ustats_counter), sc->stats_counter);
+              le16_to_cpu(counters->ustats_counter), sc->stats_counter);
         return (-EAGAIN);
     }
 
-    if (le16toh(counters->cstats_counter) != cur_stats_counter) {
+    if (le16_to_cpu(counters->cstats_counter) != cur_stats_counter) {
         BLOGD(sc, DBG_STATS,
               "stats not updated by cstorm, "
               "counter 0x%x != stats_counter 0x%x\n",
-              le16toh(counters->cstats_counter), sc->stats_counter);
+              le16_to_cpu(counters->cstats_counter), sc->stats_counter);
         return (-EAGAIN);
     }
 
-    if (le16toh(counters->tstats_counter) != cur_stats_counter) {
+    if (le16_to_cpu(counters->tstats_counter) != cur_stats_counter) {
         BLOGD(sc, DBG_STATS,
               "stats not updated by tstorm, "
               "counter 0x%x != stats_counter 0x%x\n",
-              le16toh(counters->tstats_counter), sc->stats_counter);
+              le16_to_cpu(counters->tstats_counter), sc->stats_counter);
         return (-EAGAIN);
     }
 
@@ -1176,7 +1176,7 @@ bxe_net_stats_update(struct bxe_adapter *sc)
 
   //    for (int i = 0; i < sc->num_queues; i++)
   //        if_inc_counter(sc->ifp, IFCOUNTER_IQDROPS,
-  //	    le32toh(sc->fp[i].old_tclient.checksum_discard));
+  //	    le32_to_cpu(sc->fp[i].old_tclient.checksum_discard));
 }
 
 uint64_t
@@ -1580,8 +1580,8 @@ bxe_prep_fw_stats_req(struct bxe_adapter *sc)
         /* For FCoE query index is a DONT CARE */
         cur_query_entry->index = SC_PORT(sc);
         cur_query_entry->funcID = cpu_to_le16(SC_FUNC(sc));
-        cur_query_entry->address.hi = htole32(U64_HI(cur_data_offset));
-        cur_query_entry->address.lo = htole32(U64_LO(cur_data_offset));
+        cur_query_entry->address.hi = cpu_to_le32(U64_HI(cur_data_offset));
+        cur_query_entry->address.lo = cpu_to_le32(U64_LO(cur_data_offset));
     }
 #endif
 
@@ -1621,9 +1621,9 @@ bxe_prep_fw_stats_req(struct bxe_adapter *sc)
 
         cur_query_entry->kind = STATS_TYPE_QUEUE;
         cur_query_entry->index = bxe_stats_id(&sc->fp[FCOE_IDX(sc)]);
-        cur_query_entry->funcID = htole16(SC_FUNC(sc));
-        cur_query_entry->address.hi = htole32(U64_HI(cur_data_offset));
-        cur_query_entry->address.lo = htole32(U64_LO(cur_data_offset));
+        cur_query_entry->funcID = cpu_to_le16(SC_FUNC(sc));
+        cur_query_entry->address.hi = cpu_to_le32(U64_HI(cur_data_offset));
+        cur_query_entry->address.lo = cpu_to_le32(U64_LO(cur_data_offset));
     }
 #endif
 }
