@@ -443,5 +443,5 @@ static int bxepnp(struct ether *edev)
 
 linker_func_3(etherbxelink)
 {
-	addethercard("bxe", bxepnp);
+	//addethercard("bxe", bxepnp);
 }
