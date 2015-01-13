@@ -85,16 +85,12 @@ typedef _Bool bool;
 #define IRO sc->iro_array
 
 //typedef struct mtx ECORE_MUTEX;
-#define ECORE_MUTEX_INIT(_mutex) 
-//								\
-//    mtx_init(_mutex, "ecore_lock", "ECORE Lock", MTX_DEF)
+#define ECORE_MUTEX_INIT(_mutex) /*    mtx_init(_mutex, "ecore_lock", "ECORE Lock", MTX_DEF)*/
 #define ECORE_MUTEX_LOCK(_mutex)   mtx_lock(_mutex)
 #define ECORE_MUTEX_UNLOCK(_mutex) mtx_unlock(_mutex)
 
 //typedef struct mtx ECORE_MUTEX_SPIN;
-#define ECORE_SPIN_LOCK_INIT(_spin, _sc)
-//								\
-//    mtx_init(_spin, "ecore_lock", "ECORE Lock", MTX_DEF)
+#define ECORE_SPIN_LOCK_INIT(_spin, _sc) /*    mtx_init(_spin, "ecore_lock", "ECORE Lock", MTX_DEF)*/
 #define ECORE_SPIN_LOCK_BH(_spin)   mtx_lock(_spin) /* bh = bottom-half */
 #define ECORE_SPIN_UNLOCK_BH(_spin) mtx_unlock(_spin) /* bh = bottom-half */
 
@@ -205,14 +201,14 @@ typedef _Bool bool;
 
 uint32_t calc_crc32(uint8_t *crc32_packet, uint32_t crc32_length,
                     uint32_t crc32_seed, uint8_t complement);
-#warning "no bswap32"
+
 static inline uint32_t
 ECORE_CRC32_LE(uint32_t seed, uint8_t *mac, uint32_t len)
 {
     uint32_t packet_buf[2] = {0};
     memcpy(((uint8_t *)(&packet_buf[0]))+2, &mac[0], 2);
     memcpy(&packet_buf[1], &mac[2], 4);
-    return 0; //bswap32(calc_crc32((uint8_t *)packet_buf, 8, seed, 0));
+    return byte_swap32(calc_crc32((uint8_t *)packet_buf, 8, seed, 0));
 }
 
 #define ecore_sp_post(_sc, _a, _b, _c, _d) \

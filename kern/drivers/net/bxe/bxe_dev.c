@@ -22,52 +22,30 @@
 #include <arch/pci.h>
 #include <ip.h>
 #include <ns.h>
-
+#include "bxe.h"
 /* We're required to print out stats at some point.  Here are a couple from
  * igbe, as an example. */
-#define Nstatistics 2
+
 static char *statistics[Nstatistics] = {
 	"CRC Error",
 	"Alignment Error",
 };
 
-/* Some controller structure.  not mandatory, but probably desirable.
- *
- * Contains anything needed for the NIC device, such as send/receive
- * descriptors, interrupt masks, status flags, locks for sync, eeprom stuff,
- * statistics arrays, etc. */
-struct ctlr {
-	struct pci_device			*pci;
-	struct ether				*edev;
-	int							port;
-
-
-	/* e.g. */
-	bool						active;
-	void						*mmio;
-	spinlock_t					imlock;				/* interrupt mask lock */
-	spinlock_t					tlock;				/* transmit lock */
-	qlock_t						slock;				/* stats */
-	qlock_t						alock;				/* attach */
-	struct rendez				rrendez;			/* rproc rendez */
-	unsigned int				statistics[Nstatistics];
-};
-
 /* Most 9ns drivers have some form of helper to read from the IO space, whether
  * that's PIO or MMIO. */
-static inline uint32_t csr32r(struct ctlr *c, uintptr_t reg)
+static inline uint32_t csr32r(struct bxe_adapter *c, uintptr_t reg)
 {
 	return read_mmreg32((uintptr_t) (c->mmio + (reg / 4)));
 }
 
-static inline void csr32w(struct ctlr *c, uintptr_t reg, uint32_t val)
+static inline void csr32w(struct bxe_adapter *c, uintptr_t reg, uint32_t val)
 {
 	write_mmreg32((uintptr_t) (c->mmio + (reg / 4)), val);
 }
 
 static long bxeifstat(struct ether *edev, void *a, long n, uint32_t offset)
 {
-	struct ctlr *ctlr;
+	struct bxe_adapter *ctlr;
 	char *p, *s;
 	int i, l, r;
 	uint64_t tuvl, ruvl;
@@ -113,7 +91,7 @@ static long bxectl(struct ether *edev, void *buf, long n)
 	ERRSTACK(1);
 	int v;
 	char *p;
-	struct ctlr *ctlr;
+	struct bxe_adapter *ctlr;
 	struct cmdbuf *cb;
 	struct cmdtab *ct;
 
@@ -136,7 +114,7 @@ static long bxectl(struct ether *edev, void *buf, long n)
 static void bxepromiscuous(void *arg, int on)
 {
 	int rctl;
-	struct ctlr *ctlr;
+	struct bxe_adapter *ctlr;
 	struct ether *edev;
 
 	edev = arg;
@@ -147,7 +125,7 @@ static void bxepromiscuous(void *arg, int on)
 static void bxemulticast(void *arg, uint8_t * addr, int add)
 {
 	int bit, x;
-	struct ctlr *ctlr;
+	struct bxe_adapter *ctlr;
 	struct ether *edev;
 
 	edev = arg;
@@ -156,14 +134,14 @@ static void bxemulticast(void *arg, uint8_t * addr, int add)
 }
 
 /* Transmit initialization.  Not mandatory for 9ns, but a good idea */
-static void bxetxinit(struct ctlr *ctlr)
+static void bxetxinit(struct bxe_adapter *ctlr)
 {
 }
 
 static void bxetransmit(struct ether *edev)
 {
 	struct block *bp;
-	struct ctlr *ctlr;
+	struct bxe_adapter *ctlr;
 
 	ctlr = edev->ctlr;
 
@@ -192,7 +170,7 @@ static void bxetransmit(struct ether *edev)
 
 /* Not mandatory.  Called to make sure there are free blocks available for
  * incoming packets */
-static void bxereplenish(struct ctlr *ctlr)
+static void bxereplenish(struct bxe_adapter *ctlr)
 {
 	struct block *bp;
 
@@ -217,14 +195,14 @@ static void bxereplenish(struct ctlr *ctlr)
 }
 
 /* Not mandatory.  Device init. */
-static void bxerxinit(struct ctlr *ctlr)
+static void bxerxinit(struct bxe_adapter *ctlr)
 {
 	bxereplenish(ctlr);
 }
 
 static int bxerim(void* ctlr)
 {
-	//return ((struct ctlr*)ctlr)->rim != 0;
+	//return ((struct bxe_adapter*)ctlr)->rim != 0;
 	return 1;
 }
 
@@ -233,7 +211,7 @@ static int bxerim(void* ctlr)
 static void bxerproc(void *arg)
 {
 	struct block *bp;
-	struct ctlr *ctlr;
+	struct bxe_adapter *ctlr;
 	struct ether *edev;
 
 	edev = arg;
@@ -275,7 +253,7 @@ static void bxeattach(struct ether *edev)
 {
 	ERRSTACK(1);
 	struct block *bp;
-	struct ctlr *ctlr;
+	struct bxe_adapter *ctlr;
 	char *name;
 
 	ctlr = edev->ctlr;
@@ -298,7 +276,7 @@ static void bxeattach(struct ether *edev)
 /* Hard IRQ */
 static void bxeinterrupt(struct hw_trapframe *hw_tf, void *arg)
 {
-	struct ctlr *ctlr;
+	struct bxe_adapter *ctlr;
 	struct ether *edev;
 	int icr, im, txdw;
 
@@ -326,7 +304,7 @@ static void bxeshutdown(struct ether *ether)
 
 /* "reset", getting it back to the basic power-on state.  9ns drivers call this
  * during the initial setup (from the PCI func) */
-static int bxereset(struct ctlr *ctlr)
+static int bxereset(struct bxe_adapter *ctlr)
 {
 	int ctrl, i, pause, r, swdpio, txcw;
 
@@ -340,7 +318,7 @@ static void bxepci(void)
 {
 	int cls, id;
 	struct pci_device *pcidev;
-	struct ctlr *ctlr;
+	struct bxe_adapter *ctlr;
 	void *mem;
 	uintptr_t mmio_paddr;
 
@@ -384,7 +362,7 @@ static void bxepci(void)
 			case 0x10:
 				break;
 		}
-		ctlr = kzmalloc(sizeof(struct ctlr), 0);
+		ctlr = kzmalloc(sizeof(struct bxe_adapter), 0);
 		if (ctlr == NULL) {
 			vunmap_vmem((uintptr_t) mem, pcidev->bar[0].mmio_sz);
 			error(Enomem);
@@ -395,10 +373,7 @@ static void bxepci(void)
 		qlock_init(&ctlr->slock);
 		rendez_init(&ctlr->rrendez);
 
-		/* port seems to be unused, and only used for some comparison with edev.
-		 * plan9 just used the top of the raw bar, regardless of the type. */
-		ctlr->port = pcidev->bar[0].raw_bar & ~0x0f;
-		ctlr->pci = pcidev;
+		//ctlr->pci = pcidev;
 		ctlr->mmio = mem;
 		/* TODO: save 'mem' somewhere in the ctrl */
 		
@@ -417,7 +392,7 @@ static void bxepci(void)
  * any of your ctlrs. */
 static int bxepnp(struct ether *edev)
 {
-	struct ctlr *ctlr;
+	struct bxe_adapter *ctlr;
 
 	/* Allocs ctlrs for all PCI devices matching our IDs, does various PCI and
 	 * MMIO/port setup */
@@ -430,18 +405,21 @@ static int bxepnp(struct ether *edev)
 		/* only want inactive ones */
 		//if (ctlr->active)
 		//	continue;
+		// well, oop.s
+		/*
 		if (edev->port == 0 || edev->port == ctlr->port) {
 			ctlr->active = 1;
 			break;
 		}
+		*/
 	}
 	if (ctlr == NULL)
 		return -1;
 
 	edev->ctlr = ctlr;
-	edev->port = ctlr->port;
-	edev->irq = ctlr->pci->irqline;
-	edev->tbdf = MKBUS(BusPCI, ctlr->pci->bus, ctlr->pci->dev, ctlr->pci->func);
+	//edev->port = ctlr->port;
+	//	edev->irq = ctlr->pci->irqline;
+	//edev->tbdf = MKBUS(BusPCI, ctlr->pci->bus, ctlr->pci->dev, ctlr->pci->func);
 	edev->netif.mbps = 1000;
 	/* ea is the eth addr */
 	//memmove(edev->ea, ctlr->ra, Eaddrlen);

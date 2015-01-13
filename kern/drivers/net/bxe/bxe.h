@@ -1269,8 +1269,7 @@ struct bxe_devinfo {
     uint32_t bc_ver;
     char bc_ver_str[32];
     uint32_t mf_cfg_base; /* bootcode shmem address in BAR memory */
-#warning "bxe_mf_info"
-	struct bxe_mf_info mf_info;
+  struct bxe_mf_info mf_info;
 
     int flash_size;
 #define NVRAM_1MB_SIZE      0x20000
@@ -1318,7 +1317,7 @@ enum {
 };
 
 /* Top level device private data structure. */
-#warning "need to fix up device private"
+
 struct bxe_adapter {
 	/*
 	 * First entry must be a pointer to the BSD ifnet struct which
@@ -1328,6 +1327,19 @@ struct bxe_adapter {
 	/* OS defined structs */
 	struct net_device *netdev;
 	struct pci_device *pcidev;
+	/* commonly used Plan 9 driver struct members. */
+	struct ether				*edev;
+
+	bool						active;
+	void						*mmio;
+	spinlock_t					imlock;				/* interrupt mask lock */
+	spinlock_t					tlock;				/* transmit lock */
+	qlock_t						slock;				/* stats */
+	qlock_t						alock;				/* attach */
+	struct rendez				rrendez;			/* rproc rendez */
+#define Nstatistics 2
+	unsigned int				statistics[Nstatistics];
+
 	//struct net_device_stats net_stats;
 #warning "no ifmedia. "
 	// struct ifmedia  ifmedia; /* network interface media structure */
@@ -1496,8 +1508,6 @@ struct bxe_adapter {
 	int dmae_ready;
 #define DMAE_READY(sc) (sc->dmae_ready)
 	
-#warning "no credit ppools. "
-
 	struct ecore_credit_pool_obj vlans_pool;
 	struct ecore_credit_pool_obj macs_pool;
 	struct ecore_rx_mode_obj     rx_mode_obj;
@@ -1625,7 +1635,6 @@ struct eth_spe *spq;
 #define MAX_SPQ_PENDING 8
 	
 	uint16_t       spq_prod_idx;
-#warning "no eth_spe"
 	struct eth_spe *spq_prod_bd;
 	struct eth_spe *spq_last_bd;
 	uint16_t       *dsb_sp_prod;
@@ -1636,7 +1645,6 @@ struct eth_spe *spq;
 	atomic_t cq_spq_left; /* ETH_xxx ramrod credit */
 	
 	/* fw decompression buffer */
-#warning "no decmpress buffer"
 	struct bxe_dma gz_buf_dma;
 	void           *gz_buf;
 	//    z_streamp      gz_strm;
