@@ -3503,7 +3503,6 @@ static int
 bxe_watchdog(struct bxe_adapter    *sc,
              struct bxe_fastpath *fp)
 {
-#if 0
     BXE_FP_TX_LOCK(fp);
 
     if ((fp->watchdog_timer == 0) || (--fp->watchdog_timer)) {
@@ -3517,7 +3516,6 @@ bxe_watchdog(struct bxe_adapter    *sc,
 
     atomic_set(&sc->chip_tq_flags, CHIP_TQ_REINIT);
     taskqueue_enqueue(sc->chip_tq, &sc->chip_tq_task);
-#endif
     return (-1);
 }
 
@@ -9061,8 +9059,7 @@ bxe_handle_fp_tq(void *context,
 
     if (more_rx /*|| more_tx*/) {
         /* still more work to do */
-#warning "task queue"
-      //taskqueue_enqueue_fast(fp->tq, &fp->tq_task);
+        taskqueue_enqueue_fast(fp->tq, &fp->tq_task);
         return;
     }
 
@@ -9096,7 +9093,7 @@ bxe_task_fp(struct bxe_fastpath *fp)
 
     if (more_rx /*|| more_tx*/) {
         /* still more work to do, bail out if this ISR and process later */
-      //taskqueue_enqueue_fast(fp->tq, &fp->tq_task);
+        taskqueue_enqueue_fast(fp->tq, &fp->tq_task);
         return;
     }
 
@@ -9180,7 +9177,7 @@ bxe_intr_legacy(void *xsc)
         bxe_ack_sb(sc, sc->igu_dsb_id, USTORM_ID, 0, IGU_INT_DISABLE, 0);
 
         /* schedule slowpath handler */
-        //taskqueue_enqueue_fast(sc->sp_tq, &sc->sp_tq_task);
+        taskqueue_enqueue_fast(sc->sp_tq, &sc->sp_tq_task);
 
         status &= ~0x1;
     }
@@ -9202,7 +9199,7 @@ bxe_intr_sp(void *xsc)
     bxe_ack_sb(sc, sc->igu_dsb_id, USTORM_ID, 0, IGU_INT_DISABLE, 0);
 
     /* schedule slowpath handler */
-    //taskqueue_enqueue_fast(sc->sp_tq, &sc->sp_tq_task);
+    taskqueue_enqueue_fast(sc->sp_tq, &sc->sp_tq_task);
 }
 
 /* fastpath interrupt entry point */
@@ -9495,7 +9492,6 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
 static void
 bxe_interrupt_detach(struct bxe_adapter *sc)
 {
-#if 0
     struct bxe_fastpath *fp;
     int i;
 
@@ -9527,7 +9523,6 @@ bxe_interrupt_detach(struct bxe_adapter *sc)
         taskqueue_free(sc->sp_tq);
         sc->sp_tq = NULL;
     }
-#endif
 }
 
 /*
@@ -9542,7 +9537,6 @@ bxe_interrupt_detach(struct bxe_adapter *sc)
 static int
 bxe_interrupt_attach(struct bxe_adapter *sc)
 {
-#if 0
     struct bxe_fastpath *fp;
     int rc = 0;
     int i;
@@ -9586,7 +9580,7 @@ bxe_interrupt_attach(struct bxe_adapter *sc)
          * to the interrupt handler for the slowpath.
          */
         if ((rc = bus_setup_intr(sc->pcidev, sc->intr[0].resource,
-                                 (INTR_TYPE_NET | INTR_MPSAFE),
+                                 0, //(INTR_TYPE_NET | INTR_MPSAFE),
                                  NULL, bxe_intr_sp, sc,
                                  &sc->intr[0].tag)) != 0) {
             BLOGE(sc, "Failed to allocate MSI-X[0] vector (%d)\n", rc);
@@ -9609,7 +9603,7 @@ bxe_interrupt_attach(struct bxe_adapter *sc)
              * case.
              */
             if ((rc = bus_setup_intr(sc->pcidev, sc->intr[i + 1].resource,
-                                     (INTR_TYPE_NET | INTR_MPSAFE),
+                                     0, //(INTR_TYPE_NET | INTR_MPSAFE),
                                      NULL, bxe_intr_fp, fp,
                                      &sc->intr[i + 1].tag)) != 0) {
                 BLOGE(sc, "Failed to allocate MSI-X[%d] vector (%d)\n",
@@ -9636,7 +9630,7 @@ bxe_interrupt_attach(struct bxe_adapter *sc)
          * will handle both the slowpath and fastpath.
          */
         if ((rc = bus_setup_intr(sc->pcidev, sc->intr[0].resource,
-                                 (INTR_TYPE_NET | INTR_MPSAFE),
+                                 0, //(INTR_TYPE_NET | INTR_MPSAFE),
                                  NULL, bxe_intr_legacy, sc,
                                  &sc->intr[0].tag)) != 0) {
             BLOGE(sc, "Failed to allocate MSI[0] vector (%d)\n", rc);
@@ -9652,7 +9646,7 @@ bxe_interrupt_attach(struct bxe_adapter *sc)
          * will handle both the slowpath and fastpath.
          */
         if ((rc = bus_setup_intr(sc->pcidev, sc->intr[0].resource,
-                                 (INTR_TYPE_NET | INTR_MPSAFE),
+                                 0, //(INTR_TYPE_NET | INTR_MPSAFE),
                                  NULL, bxe_intr_legacy, sc,
                                  &sc->intr[0].tag)) != 0) {
             BLOGE(sc, "Failed to allocate INTx interrupt (%d)\n", rc);
@@ -9663,8 +9657,6 @@ bxe_interrupt_attach(struct bxe_adapter *sc)
 bxe_interrupt_attach_exit:
 
     return (rc);
-#endif
-    return -1;
 }
 
 static int  bxe_init_hw_common_chip(struct bxe_adapter *sc);
@@ -18885,4 +18877,3 @@ ecore_storm_memset_struct(struct bxe_adapter *sc,
         REG_WR(sc, addr + (i * 4), data[i]);
     }
 }
-

@@ -40,6 +40,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <bitmap.h>
+#include <taskqueue.h>
 
 
 /* MACROS for conversion to AKAROS. Might we want this stuff someday? */
@@ -64,8 +65,6 @@ typedef uint64_t uintmax_t;
 #define MA_OWNED 0
 #define mtx_assert(lock, thing) assert(1)
 #define device_printf(ignore, format, args...) printk(format, args)
-
-
 
 #if _BYTE_ORDER == _LITTLE_ENDIAN
 #ifndef LITTLE_ENDIAN
@@ -600,13 +599,10 @@ struct bxe_fastpath {
     uint8_t index; /* this is also the 'cid' */
 #define FP_IDX(fp) (fp->index)
 
-#warning "no interrupt taskqueue -- whatever that is"
     /* interrupt taskqueue (fast) */
-  /*
     struct task      tq_task;
     struct taskqueue *tq;
     char             tq_name[32];
-  */
 
     /* ethernet client ID (each fastpath set of RX/TX/CQE is a client) */
     uint8_t cl_id;
@@ -1386,8 +1382,6 @@ struct bxe_adapter {
 #define CHIP_TQ_STOP   2
 #define CHIP_TQ_REINIT 3
 	atomic_t chip_tq_flags;
-#warning "no chip_tq_task or other tasks from here on down"
-#if 0
 	struct task            chip_tq_task;
 	struct taskqueue       *chip_tq;
 	char                   chip_tq_name[32];
@@ -1401,7 +1395,6 @@ struct bxe_adapter {
 	struct task      rx_mode_tq_task;
 	struct taskqueue *rx_mode_tq;
 	char             rx_mode_tq_name[32];
-#endif	
 	struct bxe_fastpath fp[MAX_RSS_CHAINS];
 	struct bxe_sp_objs  sp_objs[MAX_RSS_CHAINS];
 	
