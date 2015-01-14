@@ -84,15 +84,13 @@ typedef _Bool bool;
 
 #define IRO sc->iro_array
 
-//typedef struct mtx ECORE_MUTEX;
-#define ECORE_MUTEX_INIT(_mutex) /*    mtx_init(_mutex, "ecore_lock", "ECORE Lock", MTX_DEF)*/
-#define ECORE_MUTEX_LOCK(_mutex)   mtx_lock(_mutex)
-#define ECORE_MUTEX_UNLOCK(_mutex) mtx_unlock(_mutex)
+#define ECORE_MUTEX_INIT(_mutex)   qlock_init(_mutex)
+#define ECORE_MUTEX_LOCK(_mutex)   qlock(_mutex)
+#define ECORE_MUTEX_UNLOCK(_mutex) qunlock(_mutex)
 
-//typedef struct mtx ECORE_MUTEX_SPIN;
-#define ECORE_SPIN_LOCK_INIT(_spin, _sc) /*    mtx_init(_spin, "ecore_lock", "ECORE Lock", MTX_DEF)*/
-#define ECORE_SPIN_LOCK_BH(_spin)   mtx_lock(_spin) /* bh = bottom-half */
-#define ECORE_SPIN_UNLOCK_BH(_spin) mtx_unlock(_spin) /* bh = bottom-half */
+#define ECORE_SPIN_LOCK_INIT(_spin, _sc) spinlock_init_irqsave(_spin)
+#define ECORE_SPIN_LOCK_BH(_spin)   spin_lock_irqsave(_spin) /* bh = bottom-half */
+#define ECORE_SPIN_UNLOCK_BH(_spin) spin_unlock_irqsave(_spin) /* bh = bottom-half */
 
 #define ECORE_SMP_MB_AFTER_CLEAR_BIT()  mb()
 #define ECORE_SMP_MB_BEFORE_CLEAR_BIT() mb()
@@ -641,7 +639,7 @@ struct ecore_exe_queue_obj {
 	/* Commands pending for an completion. */
 	ecore_list_t	pending_comp;
 
-	ECORE_MUTEX_SPIN		lock;
+	spinlock_t		lock;
 
 	/* Maximum length of commands' list for one execution */
 	int			exe_chunk_len;
@@ -1687,7 +1685,7 @@ struct ecore_func_sp_obj {
 	/* this mutex validates that when pending flag is taken, the next
 	 * ramrod to be sent will be the one set the pending bit
 	 */
-	ECORE_MUTEX		one_pending_mutex;
+	qlock_t		one_pending_mutex;
 
 	/* Driver interface */
 	struct ecore_func_sp_drv_ops	*drv;

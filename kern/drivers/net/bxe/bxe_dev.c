@@ -308,6 +308,7 @@ static int bxereset(struct bxe_adapter *ctlr)
 {
 	int ctrl, i, pause, r, swdpio, txcw;
 
+	run_once(qlock_init(&bxe_prev_mtx));
 //	if (igbedetach(ctlr))
 //		return -1;
 

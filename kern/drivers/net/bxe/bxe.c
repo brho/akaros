@@ -249,7 +249,8 @@ static device_method_t bxe_methods[] = {
 };
 
 #endif
-//MTX_SYSINIT(bxe_prev_mtx, &bxe_prev_mtx, "bxe_prev_lock", MTX_DEF);
+qlock_t bxe_prev_mtx;
+
 struct bxe_prev_list_node {
     LIST_ENTRY(bxe_prev_list_node) node;
     uint8_t bus;
@@ -15675,8 +15676,7 @@ bxe_prev_is_path_marked(struct bxe_adapter *sc)
 {
     struct bxe_prev_list_node *tmp;
     int rc = FALSE;
-#warning "TODO: figure out bxe_prev_mtx"
-    //    mtx_lock(&bxe_prev_mtx);
+    qlock(&bxe_prev_mtx);
 
     tmp = bxe_prev_path_get_entry(sc);
     if (tmp) {
@@ -15692,7 +15692,7 @@ bxe_prev_is_path_marked(struct bxe_adapter *sc)
         }
     }
 
-    //    mtx_unlock(&bxe_prev_mtx);
+    qunlock(&bxe_prev_mtx);
 
     return (rc);
 }
@@ -15703,7 +15703,7 @@ bxe_prev_mark_path(struct bxe_adapter *sc,
 {
     struct bxe_prev_list_node *tmp;
 
-    //    mtx_lock(&bxe_prev_mtx);
+    qlock(&bxe_prev_mtx);
 
     /* Check whether the entry for this path already exists */
     tmp = bxe_prev_path_get_entry(sc);
@@ -15719,11 +15719,11 @@ bxe_prev_mark_path(struct bxe_adapter *sc,
             tmp->aer = 0;
         }
 
-	//        mtx_unlock(&bxe_prev_mtx);
+		qunlock(&bxe_prev_mtx);
         return (0);
     }
 
-    //    mtx_unlock(&bxe_prev_mtx);
+    qunlock(&bxe_prev_mtx);
 
     /* Create an entry for this path and add it */
     tmp = kmalloc(sizeof(struct bxe_prev_list_node), 0); //M_DEVBUF,
@@ -15739,14 +15739,14 @@ bxe_prev_mark_path(struct bxe_adapter *sc,
     tmp->aer  = 0;
     tmp->undi = after_undi ? (1 << SC_PORT(sc)) : 0;
 
-    //    mtx_lock(&bxe_prev_mtx);
+    qlock(&bxe_prev_mtx);
 
     BLOGD(sc, DBG_LOAD,
           "Marked path %d/%d/%d - finished previous unload\n",
           sc->pcie_bus, sc->pcie_device, SC_PATH(sc));
     //    LIST_INSERT_HEAD(&bxe_prev_list, tmp, node);
 
-    //    mtx_unlock(&bxe_prev_mtx);
+    qunlock(&bxe_prev_mtx);
 
     return (0);
 }

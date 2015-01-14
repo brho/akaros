@@ -58,16 +58,11 @@ typedef uintptr_t bus_dmamap_t;
 typedef uintptr_t bus_dma_segment_t;
 typedef uintptr_t bus_space_tag_t;
 typedef uintptr_t vm_offset_t;
-typedef qlock_t ECORE_MUTEX_SPIN;
-typedef qlock_t ECORE_MUTEX;
-typedef qlock_t mtx;
 typedef int device_t;
 // WTF ...
 typedef uint64_t uintmax_t;
-#define mtx_lock(x) qlock(x)
-#define mtx_unlock(x) qunlock(x)
 #define MA_OWNED 0
-#define MTX_ASSERT(lock, thing) assert(0)
+#define mtx_assert(lock, thing) assert(1)
 #define device_printf(ignore, format, args...) printk(format, args)
 
 
@@ -523,18 +518,17 @@ struct bxe_sw_tpa_info {
 struct bxe_fastpath {
     /* pointer back to parent structure */
     struct bxe_adapter *sc;
-#warning "need to fix up the mtx"
     qlock_t tx_mtx;
     char       tx_mtx_name[32];
     qlock_t rx_mtx;
     char       rx_mtx_name[32];
-#define BXE_FP_TX_LOCK(fp)        mtx_lock(&fp->tx_mtx)
-#define BXE_FP_TX_UNLOCK(fp)      mtx_unlock(&fp->tx_mtx)
-#define BXE_FP_TX_LOCK_ASSERT(fp) assert(0) /*mtx_assert(&fp->tx_mtx, MA_OWNED)*/
+#define BXE_FP_TX_LOCK(fp)        qlock(&fp->tx_mtx)
+#define BXE_FP_TX_UNLOCK(fp)      qunlock(&fp->tx_mtx)
+#define BXE_FP_TX_LOCK_ASSERT(fp) mtx_assert(&fp->tx_mtx, MA_OWNED)
 
-#define BXE_FP_RX_LOCK(fp)        mtx_lock(&fp->rx_mtx)
-#define BXE_FP_RX_UNLOCK(fp)      mtx_unlock(&fp->rx_mtx)
-#define BXE_FP_RX_LOCK_ASSERT(fp) assert(0) /*mtx_assert(&fp->rx_mtx, MA_OWNED)*/
+#define BXE_FP_RX_LOCK(fp)        qlock(&fp->rx_mtx)
+#define BXE_FP_RX_UNLOCK(fp)      qunlock(&fp->rx_mtx)
+#define BXE_FP_RX_LOCK_ASSERT(fp) mtx_assert(&fp->rx_mtx, MA_OWNED)
 
     /* status block */
     struct bxe_dma                 sb_dma;
@@ -1029,8 +1023,8 @@ struct bxe_port {
 	qlock_t phy_mtx;
 	char        phy_mtx_name[32];
 
-#define BXE_PHY_LOCK(sc)          mtx_lock(&sc->port.phy_mtx)
-#define BXE_PHY_UNLOCK(sc)        mtx_unlock(&sc->port.phy_mtx)
+#define BXE_PHY_LOCK(sc)          qlock(&sc->port.phy_mtx)
+#define BXE_PHY_UNLOCK(sc)        qunlock(&sc->port.phy_mtx)
 #define BXE_PHY_LOCK_ASSERT(sc)   mtx_assert(&sc->port.phy_mtx, MA_OWNED)
 
     /*
@@ -1472,30 +1466,30 @@ struct bxe_adapter {
 #define BXE_CORE_UNLOCK(sc)       sx_xunlock(&sc->core_sx)
 #define BXE_CORE_LOCK_ASSERT(sc)  sx_assert(&sc->core_sx, SA_XLOCKED)
 #else
-#define BXE_CORE_TRYLOCK(sc)      mtx_trylock(&sc->core_mtx)
-#define BXE_CORE_LOCK(sc)         mtx_lock(&sc->core_mtx)
-#define BXE_CORE_UNLOCK(sc)       mtx_unlock(&sc->core_mtx)
+#define BXE_CORE_TRYLOCK(sc)      canqlock(&sc->core_mtx)
+#define BXE_CORE_LOCK(sc)         qlock(&sc->core_mtx)
+#define BXE_CORE_UNLOCK(sc)       qunlock(&sc->core_mtx)
 #define BXE_CORE_LOCK_ASSERT(sc)  mtx_assert(&sc->core_mtx, MA_OWNED)
 #endif
 
-#define BXE_SP_LOCK(sc)           mtx_lock(&sc->sp_mtx)
-#define BXE_SP_UNLOCK(sc)         mtx_unlock(&sc->sp_mtx)
+#define BXE_SP_LOCK(sc)           qlock(&sc->sp_mtx)
+#define BXE_SP_UNLOCK(sc)         qunlock(&sc->sp_mtx)
 #define BXE_SP_LOCK_ASSERT(sc)    mtx_assert(&sc->sp_mtx, MA_OWNED)
 
-#define BXE_DMAE_LOCK(sc)         mtx_lock(&sc->dmae_mtx)
-#define BXE_DMAE_UNLOCK(sc)       mtx_unlock(&sc->dmae_mtx)
+#define BXE_DMAE_LOCK(sc)         qlock(&sc->dmae_mtx)
+#define BXE_DMAE_UNLOCK(sc)       qunlock(&sc->dmae_mtx)
 #define BXE_DMAE_LOCK_ASSERT(sc)  mtx_assert(&sc->dmae_mtx, MA_OWNED)
 
-#define BXE_FWMB_LOCK(sc)         mtx_lock(&sc->fwmb_mtx)
-#define BXE_FWMB_UNLOCK(sc)       mtx_unlock(&sc->fwmb_mtx)
+#define BXE_FWMB_LOCK(sc)         qlock(&sc->fwmb_mtx)
+#define BXE_FWMB_UNLOCK(sc)       qunlock(&sc->fwmb_mtx)
 #define BXE_FWMB_LOCK_ASSERT(sc)  mtx_assert(&sc->fwmb_mtx, MA_OWNED)
 
-#define BXE_PRINT_LOCK(sc)        mtx_lock(&sc->print_mtx)
-#define BXE_PRINT_UNLOCK(sc)      mtx_unlock(&sc->print_mtx)
+#define BXE_PRINT_LOCK(sc)        qlock(&sc->print_mtx)
+#define BXE_PRINT_UNLOCK(sc)      qunlock(&sc->print_mtx)
 #define BXE_PRINT_LOCK_ASSERT(sc) mtx_assert(&sc->print_mtx, MA_OWNED)
 
-#define BXE_STATS_LOCK(sc)        mtx_lock(&sc->stats_mtx)
-#define BXE_STATS_UNLOCK(sc)      mtx_unlock(&sc->stats_mtx)
+#define BXE_STATS_LOCK(sc)        qlock(&sc->stats_mtx)
+#define BXE_STATS_UNLOCK(sc)      qunlock(&sc->stats_mtx)
 #define BXE_STATS_LOCK_ASSERT(sc) mtx_assert(&sc->stats_mtx, MA_OWNED)
 
 #warning "find outwhat IF_ADDR_LOCK is"
@@ -2277,6 +2271,9 @@ void bxe_dump_mem(struct bxe_adapter *sc, char *tag,
                   uint8_t *mem, uint32_t len);
 void bxe_dump_mbuf_data(struct bxe_adapter *sc, char *pTag,
                         struct mbuf *m, uint8_t contents);
+
+/* Defined in bxe.c, init'd in bxereset or something in bxe_dev.c */
+extern qlock_t bxe_prev_mtx;
 
 /***********/
 /* INLINES */

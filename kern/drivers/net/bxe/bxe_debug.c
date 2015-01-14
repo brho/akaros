@@ -179,7 +179,7 @@ bxe_dump_mem(struct bxe_adapter *sc,
     char c[32];
     int  xx;
 
-    mtx_lock(&bxe_prev_mtx);
+    qlock(&bxe_prev_mtx);
 
     BLOGI(sc, "++++++++++++ %s\n", tag);
     strcpy(buf, "** 000: ");
@@ -204,7 +204,7 @@ bxe_dump_mem(struct bxe_adapter *sc,
     BLOGI(sc, "%s\n", buf);
     BLOGI(sc, "------------ %s\n", tag);
 
-    mtx_unlock(&bxe_prev_mtx);
+    qunlock(&bxe_prev_mtx);
 }
 #endif
 #if 0
@@ -219,7 +219,7 @@ bxe_dump_mbuf_data(struct bxe_adapter *sc,
     uint8_t *memp;
     int i, xx = 0;
 
-    mtx_lock(&bxe_prev_mtx);
+    qlock(&bxe_prev_mtx);
 
     BLOGI(sc, "++++++++++++ %s\n", tag);
 
@@ -264,7 +264,7 @@ bxe_dump_mbuf_data(struct bxe_adapter *sc,
 
     BLOGI(sc, "------------ %s\n", tag);
 
-    mtx_unlock(&bxe_prev_mtx);
+    qunlock(&bxe_prev_mtx);
 }
 #endif
 
