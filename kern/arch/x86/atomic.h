@@ -127,6 +127,7 @@ static inline bool spin_locked(spinlock_t *lock)
 
 static inline void __spin_lock_raw(volatile uint32_t *rlock)
 {
+	uint8_t dicks = 0;
 	asm volatile(
 			"1:                       "
 			"	cmpb $0, %0;          "
@@ -134,11 +135,11 @@ static inline void __spin_lock_raw(volatile uint32_t *rlock)
 			"	pause;                "
 			"	jmp 1b;               "
 			"2:                       " 
-			"	movb $1, %%al;        "
-			"	xchgb %%al, %0;       "
-			"	cmpb $0, %%al;        "
+			"	movb $1, %1;          "
+			"	xchgb %1, %0;         "
+			"	cmpb $0, %1;          "
 			"	jne 1b;               "
-	        : : "m"(*rlock) : "eax", "cc");
+	        : : "m"(*rlock), "r"(dicks) : "cc");
 	cmb();	/* need cmb(), the CPU mb() was handled by the xchg */
 }
 
