@@ -1,5 +1,4 @@
-*.swp
-*.swo
+*.sw[op]
 *.pyc
 .bochsout
 bochs.out
@@ -10,7 +9,6 @@ mnt
 obj
 run_bochs.sh
 update*
-cscope.out
 hdd.img
 hdd.vdi
 *.*~
@@ -42,3 +40,4 @@ kern/include/config/*
 kern/include/generated/*
 tags
 TAGS
+cscope.*
