@@ -149,7 +149,7 @@ typedef _Bool bool;
 #define ECORE_FREE(_s, _buf, _size) kfree(_buf); /*, M_TEMP)*/
 
 #define SC_ILT(sc)  ((sc)->ilt)
-#define ILOG2(x)    bxe_ilog2(x)
+#define ILOG2(x)    LOG2_UP(x)
 
 #define ECORE_ILT_ZALLOC(x, y, size)                                       \
     do {                                                                   \

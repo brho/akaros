@@ -6117,7 +6117,7 @@ bxe_ilt_set_info(struct bxe_adapter *sc)
           ilt_client->start, ilt_client->end,
           ilt_client->page_size,
           ilt_client->flags,
-          ilog2(ilt_client->page_size >> 12));
+          LOG2_UP(ilt_client->page_size >> 12));
 
     /* QM */
     if (QM_INIT(sc->qm_cid_count)) {
@@ -6138,7 +6138,7 @@ bxe_ilt_set_info(struct bxe_adapter *sc)
               "psz 0x%x, flags 0x%x, hw psz %d\n",
               ilt_client->start, ilt_client->end,
               ilt_client->page_size, ilt_client->flags,
-              ilog2(ilt_client->page_size >> 12));
+              LOG2_UP(ilt_client->page_size >> 12));
     }
 
     if (CNIC_SUPPORT(sc)) {
@@ -6156,7 +6156,7 @@ bxe_ilt_set_info(struct bxe_adapter *sc)
               "psz 0x%x, flags 0x%x, hw psz %d\n",
               ilt_client->start, ilt_client->end,
               ilt_client->page_size, ilt_client->flags,
-              ilog2(ilt_client->page_size >> 12));
+              LOG2_UP(ilt_client->page_size >> 12));
 
         /* TM */
         ilt_client = &ilt->clients[ILT_CLIENT_TM];
@@ -6172,7 +6172,7 @@ bxe_ilt_set_info(struct bxe_adapter *sc)
               "psz 0x%x, flags 0x%x, hw psz %d\n",
               ilt_client->start, ilt_client->end,
               ilt_client->page_size, ilt_client->flags,
-              ilog2(ilt_client->page_size >> 12));
+              LOG2_UP(ilt_client->page_size >> 12));
     }
 
     //assert((line <= ILT_MAX_LINES), ("Invalid number of ILT lines!"));
@@ -16875,7 +16875,7 @@ bxe_iov_init_dq(struct bxe_adapter *sc)
 
     /* Set the DQ such that the CID reflect the abs_vfid */
     REG_WR(sc, DORQ_REG_VF_NORM_VF_BASE, 0);
-    REG_WR(sc, DORQ_REG_MAX_RVFID_SIZE, ilog2(BNX2X_MAX_NUM_OF_VFS));
+    REG_WR(sc, DORQ_REG_MAX_RVFID_SIZE, LOG2_UP(BNX2X_MAX_NUM_OF_VFS));
 
     /*
      * Set VFs starting CID. If its > 0 the preceding CIDs are belong to
