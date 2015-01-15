@@ -462,9 +462,12 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	     | grep -v "Only in ../glibc-$(GLIBC_VERSION)" \
 	     | patch -p2 
 
+# On occasion, include/pthread.h was getting installed in stage 2, clobbering
+# parlib's pthread.h.
 glibc-$(GLIBC_VERSION): glibc-$(GLIBC_VERSION).tar.bz2
 	rm -rf glibc-$(GLIBC_VERSION)
 	tar -jxf glibc-$(GLIBC_VERSION).tar.bz2
+	rm glibc-$(GLIBC_VERSION)/include/pthread.h
 	$(MAKE) .glibc-akaros-patch
 	patch --no-backup-if-mismatch -p0 < glibc-$(GLIBC_VERSION)-riscv.patch
 
