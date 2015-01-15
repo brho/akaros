@@ -37,4 +37,12 @@ int	atoi(const char*NTS s);
 int sigchecksum(void *address, int length);
 void *sigscan(uint8_t *address, int length, char *signature);
 
-#endif /* not ROS_INC_STRING_H */
+
+/* In arch/support64.S */
+void bcopy(const void *src, void *dst, size_t len);
+
+#ifdef CONFIG_RISCV
+#warning Implement bcopy
+#endif
+
+#endif /* ROS_INC_STRING_H */
