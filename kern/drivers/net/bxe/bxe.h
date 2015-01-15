@@ -224,7 +224,7 @@ struct bxe_device_type
 #define SGE_PAGE_SHIFT       BCM_PAGE_SHIFT
 #define SGE_PAGE_ALIGN(addr) BCM_PAGE_ALIGN(addr)
 #define SGE_PAGES            (SGE_PAGE_SIZE * PAGES_PER_SGE)
-#define TPA_AGG_SIZE         min((8 * SGE_PAGES), 0xffff)
+#define TPA_AGG_SIZE         MIN((8 * SGE_PAGES), 0xffff)
 
 /*****************/
 /* TX BD defines */

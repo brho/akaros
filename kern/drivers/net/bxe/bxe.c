@@ -2947,7 +2947,7 @@ bxe_fill_frag_mbuf(struct bxe_adapter          *sc,
          * Firmware gives the indices of the SGE as if the ring is an array
          * (meaning that the "next" element will consume 2 indices).
          */
-        frag_len = min(frag_size, (uint32_t)(SGE_PAGES));
+        frag_len = MIN(frag_size, (uint32_t)(SGE_PAGES));
 
         BLOGD(sc, DBG_LRO, "fp[%02d].tpa[%02d] TPA fill i=%d j=%d "
                            "sge_idx=%d frag_size=%d frag_len=%d\n",
@@ -6317,7 +6317,7 @@ bxe_alloc_mem(struct bxe_adapter *sc)
     context_size = (sizeof(union cdu_context) * BXE_L2_CID_COUNT(sc));
     for (i = 0, allocated = 0; allocated < context_size; i++) {
       /*
-        sc->context[i].size = min(CDU_ILT_PAGE_SZ,
+        sc->context[i].size = MIN(CDU_ILT_PAGE_SZ,
                                   (context_size - allocated));
 
         if (bxe_dma_alloc(sc, sc->context[i].size,
@@ -9330,7 +9330,7 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
         }
 
         /* ask for the necessary number of MSI-X vectors */
-        num_requested = min((sc->num_queues + 1), msix_count);
+        num_requested = MIN((sc->num_queues + 1), msix_count);
 
         BLOGD(sc, DBG_LOAD, "Requesting %d MSI-X vectors\n", num_requested);
 
@@ -10294,7 +10294,7 @@ bxe_init_eq_ring(struct bxe_adapter *sc)
     sc->eq_cons_sb = &sc->def_sb->sp_sb.index_values[HC_SP_INDEX_EQ_CONS];
 
     atomic_set(&sc->eq_spq_left,
-                          (min((MAX_SP_DESC_CNT - MAX_SPQ_PENDING),
+                          (MIN((MAX_SP_DESC_CNT - MAX_SPQ_PENDING),
                                NUM_EQ_DESC) - 1));
 }
 
@@ -11747,7 +11747,7 @@ bxe_pf_rx_q_prep(struct bxe_adapter              *sc,
         max_sge = SGE_PAGE_ALIGN(sc->mtu) >> SGE_PAGE_SHIFT;
         max_sge = ((max_sge + PAGES_PER_SGE - 1) &
                    (~(PAGES_PER_SGE - 1))) >> PAGES_PER_SGE_SHIFT;
-        sge_sz = (uint16_t)min(SGE_PAGES, 0xffff);
+        sge_sz = (uint16_t)MIN(SGE_PAGES, 0xffff);
     }
 
     /* pause - not for e1 */
@@ -14169,7 +14169,7 @@ bxe_get_tunable_params(struct bxe_adapter *sc)
         sc->num_queues = 1;
     } else { /* INTR_MODE_MSI or INTR_MODE_MSIX */
         sc->num_queues =
-		min((bxe_queue_count ? bxe_queue_count : 8) //mp_ncpus),
+		MIN((bxe_queue_count ? bxe_queue_count : 8) //mp_ncpus),
                 MAX_RSS_CHAINS);
         if (sc->num_queues > mp_ncpus) {
             sc->num_queues = mp_ncpus;
@@ -14304,7 +14304,7 @@ bxe_get_igu_cam_info(struct bxe_adapter *sc)
      * PCI. Driver should use the minimal value of both as the actual status
      * block count
      */
-    sc->igu_sb_cnt = min(sc->igu_sb_cnt, igu_sb_cnt);
+    sc->igu_sb_cnt = MIN(sc->igu_sb_cnt, igu_sb_cnt);
 
     if (igu_sb_cnt == 0) {
         BLOGE(sc, "CAM configuration error\n");
