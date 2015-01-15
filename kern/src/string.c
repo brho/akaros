@@ -272,10 +272,6 @@ memcpy(void* dst, const void* src, size_t _n)
 	return dst;
 }
 
-#ifdef CONFIG_X86
-void bcopy(const void *src, void *dst, size_t len);
-#endif
-
 void *
 memmove(void *COUNT(_n) dst, const void *COUNT(_n) src, size_t _n)
 {
