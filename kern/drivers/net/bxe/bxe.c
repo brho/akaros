@@ -216,7 +216,8 @@ static struct bxe_device_type bxe_devs[] = {
     }
 };
 
-#warning "MALLOC_DECLARE?"
+/* This is some sort of malloc zone for BSD.  The flag is passed later to
+ * various malloc invocations. */
 //MALLOC_DECLARE(M_BXE_ILT);
 //MALLOC_DEFINE(M_BXE_ILT, "bxe_ilt", "bxe ILT pointer");
 
@@ -2522,7 +2523,7 @@ bxe_probe(device_t dev)
         if ((vid == t->bxe_vid) && (did == t->bxe_did) &&
             ((svid == t->bxe_svid) || (t->bxe_svid == PCI_ANY_ID)) &&
             ((sdid == t->bxe_sdid) || (t->bxe_sdid == PCI_ANY_ID))) {
-            descbuf = malloc(BXE_DEVDESC_MAX, M_TEMP, M_NOWAIT);
+            descbuf = kmalloc(BXE_DEVDESC_MAX, 0); /* M_TEMP */
             if (descbuf == NULL)
                 return (ENOMEM);
 
@@ -2535,7 +2536,7 @@ bxe_probe(device_t dev)
                      BXE_DRIVER_VERSION);
 
             device_set_desc_copy(dev, descbuf);
-            free(descbuf, M_TEMP);
+            kfree(descbuf); /* M_TEMP */
             return (BUS_PROBE_DEFAULT);
         }
         t++;
@@ -4557,8 +4558,7 @@ bxe_ioctl_nvram(struct bxe_adapter *sc,
 
     if (len > sizeof(struct bxe_nvram_data)) {
         if ((nvdata = (struct bxe_nvram_data *)
-                 malloc(len, M_DEVBUF,
-                        (M_NOWAIT | M_ZERO))) == NULL) {
+                 kzmalloc(len, /*M_DEVBUF,*/ 0)) == NULL) {
             BLOGE(sc, "BXE_IOC_RD_NVRAM malloc failed\n");
             return (1);
         }
@@ -4586,7 +4586,7 @@ bxe_ioctl_nvram(struct bxe_adapter *sc,
     }
 
     if (len > sizeof(struct bxe_nvram_data)) {
-        free(nvdata, M_DEVBUF);
+        kfree(nvdata); /* M_DEVBUF */
     }
 
     return (error);
@@ -6212,14 +6212,11 @@ static int
 bxe_alloc_ilt_mem(struct bxe_adapter *sc)
 {
     int rc = 0;
-    /*
     if ((sc->ilt =
-         (struct ecore_ilt *)malloc(sizeof(struct ecore_ilt),
-                                    M_BXE_ILT,
-                                    (M_NOWAIT | M_ZERO))) == NULL) {
+         (struct ecore_ilt *)kzmalloc(sizeof(struct ecore_ilt),
+                                     /*M_BXE_ILT,*/ 0)) == NULL) {
         rc = 1;
     }
-    */
     return (rc);
 }
 
@@ -6227,14 +6224,11 @@ static int
 bxe_alloc_ilt_lines_mem(struct bxe_adapter *sc)
 {
     int rc = 0;
-    /*
     if ((sc->ilt->lines =
-         (struct ilt_line *)malloc((sizeof(struct ilt_line) * ILT_MAX_LINES),
-                                    M_BXE_ILT,
-                                    (M_NOWAIT | M_ZERO))) == NULL) {
+         (struct ilt_line *)kzmalloc((sizeof(struct ilt_line) * ILT_MAX_LINES),
+                                     /*M_BXE_ILT,*/ 0)) == NULL) {
         rc = 1;
     }
-    */
     return (rc);
 }
 
@@ -12507,8 +12501,8 @@ bxe_init_mcast_macs_list(struct bxe_adapter                 *sc,
         return (0);
     }
 
-    mta = malloc(sizeof(unsigned char) * ETH_ADDR_LEN *
-		 mc_count, 0); //M_DEVBUF, M_NOWAIT);
+    mta = kmalloc(sizeof(unsigned char) * ETH_ADDR_LEN * mc_count,
+	              0); //M_DEVBUF, M_NOWAIT);
     mta = NULL;
 
     if(mta == NULL) {
@@ -12516,10 +12510,9 @@ bxe_init_mcast_macs_list(struct bxe_adapter                 *sc,
         return (-1);
     }
     
-    mc_mac = kmalloc(sizeof(*mc_mac) * mc_count, 0); //M_DEVBUF,
-    //(M_NOWAIT | M_ZERO));
+    mc_mac = kzmalloc(sizeof(*mc_mac) * mc_count, 0); //M_DEVBUF,
     if (!mc_mac) {
-      free(mta); //, M_DEVBUF);
+        kfree(mta); //, M_DEVBUF);
         BLOGE(sc, "Failed to allocate temp mcast list\n");
         return (-1);
     }
@@ -15084,7 +15077,7 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
     sc->gz_buf = (void *)sc->gz_buf_dma.vaddr;
 
     if ((sc->gz_strm =
-         malloc(sizeof(*sc->gz_strm), M_DEVBUF, M_NOWAIT)) == NULL) {
+         kmalloc(sizeof(*sc->gz_strm), /*M_DEVBUF,*/ M_NOWAIT)) == NULL) {
         /* XXX */
         bxe_dma_free(sc, &sc->gz_buf_dma);
         sc->gz_buf = NULL;
@@ -15718,7 +15711,7 @@ bxe_prev_mark_path(struct bxe_adapter *sc,
     qunlock(&bxe_prev_mtx);
 
     /* Create an entry for this path and add it */
-    tmp = kmalloc(sizeof(struct bxe_prev_list_node), 0); //M_DEVBUF,
+    tmp = kzmalloc(sizeof(struct bxe_prev_list_node), 0); //M_DEVBUF,
 //                 (M_NOWAIT | M_ZERO));
     if (!tmp) {
         BLOGE(sc, "Failed to allocate 'bxe_prev_list_node'\n");

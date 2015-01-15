@@ -141,25 +141,25 @@ typedef _Bool bool;
 #define ECORE_UNLIKELY(x) (x)
 
 #define ECORE_ZALLOC(_size, _flags, _sc) \
-	kzmalloc(_size, KMALLOC_WAIT) /*M_TEMP, (M_NOWAIT | M_ZERO))*/
+	kzmalloc(_size, 0) /*M_TEMP, (M_NOWAIT | M_ZERO))*/
 
 #define ECORE_CALLOC(_len, _size, _flags, _sc) \
-    kzmalloc(_len * _size, KMALLOC_WAIT) /*M_TEMP, (M_NOWAIT | M_ZERO))*/
+    kzmalloc(_len * _size, 0) /*M_TEMP, (M_NOWAIT | M_ZERO))*/
 
 #define ECORE_FREE(_s, _buf, _size) kfree(_buf); /*, M_TEMP)*/
 
 #define SC_ILT(sc)  ((sc)->ilt)
 #define ILOG2(x)    bxe_ilog2(x)
-#if 0
 
 #define ECORE_ILT_ZALLOC(x, y, size)                                       \
     do {                                                                   \
-        x = malloc(sizeof(struct bxe_dma), M_DEVBUF, (M_NOWAIT | M_ZERO)); \
+        x = kzmalloc(sizeof(struct bxe_dma), 0);                           \
+        /* malloc args: M_DEVBUF, (M_NOWAIT | M_ZERO));*/                  \
         if (x) {                                                           \
             if (bxe_dma_alloc((struct bxe_adapter *)sc,                      \
                               size, (struct bxe_dma *)x,                   \
                               "ECORE_ILT") != 0) {                         \
-                free(x, M_DEVBUF);                                         \
+                kfree(x);                                                  \
                 x = NULL;                                                  \
                 *y = 0;                                                    \
             } else {                                                       \
@@ -172,12 +172,12 @@ typedef _Bool bool;
     do {                                             \
         if (x) {                                     \
             bxe_dma_free((struct bxe_adapter *)sc, x); \
-            free(x, M_DEVBUF);                       \
+            kfree(x);                                \
             x = NULL;                                \
             y = 0;                                   \
         }                                            \
     } while (0)
-#endif
+
 #define ECORE_IS_VALID_ETHER_ADDR(_mac) TRUE
 
 #define ECORE_IS_MF_SD_MODE   IS_MF_SD_MODE
