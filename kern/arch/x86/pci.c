@@ -501,3 +501,45 @@ uintptr_t pci_get_membar(struct pci_device *pcidev, int bir)
 	        pcidev->bar[bir].mmio_base64 :
 	        pcidev->bar[bir].mmio_base32);
 }
+
+uint16_t pci_get_vendor(struct pci_device *pcidev)
+{
+	return pcidev->ven_id;
+}
+
+uint16_t pci_get_device(struct pci_device *pcidev)
+{
+	return pcidev->dev_id;
+}
+
+uint16_t pci_get_subvendor(struct pci_device *pcidev)
+{
+	uint8_t header_type = pcidev_read8(pcidev, PCI_HEADER_REG) & 0x7c;
+	switch (header_type) {
+		case 0x00: /* STD_PCI_DEV */
+			return pcidev_read16(pcidev, PCI_SUBSYSVEN_STD);
+		case 0x01: /* PCI2PCI */
+			return -1;
+		case 0x02: /* PCI2CARDBUS */
+			return pcidev_read16(pcidev, PCI_SUBVENID_CB);
+		default:
+			warn("Unknown Header Type, %d", header_type);
+	}
+	return -1;
+}
+
+uint16_t pci_get_subdevice(struct pci_device *pcidev)
+{
+	uint8_t header_type = pcidev_read8(pcidev, PCI_HEADER_REG) & 0x7c;
+	switch (header_type) {
+		case 0x00: /* STD_PCI_DEV */
+			return pcidev_read16(pcidev, PCI_SUBSYSID_STD);
+		case 0x01: /* PCI2PCI */
+			return -1;
+		case 0x02: /* PCI2CARDBUS */
+			return pcidev_read16(pcidev, PCI_SUBDEVID_CB);
+		default:
+			warn("Unknown Header Type, %d", header_type);
+	}
+	return -1;
+}
