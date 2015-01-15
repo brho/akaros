@@ -408,6 +408,10 @@ void pci_set_bus_master(struct pci_device *pcidev);
 void pci_clr_bus_master(struct pci_device *pcidev);
 struct pci_device *pci_match_tbdf(int tbdf);
 uintptr_t pci_get_membar(struct pci_device *pcidev, int bir);
+uint16_t pci_get_vendor(struct pci_device *pcidev);
+uint16_t pci_get_device(struct pci_device *pcidev);
+uint16_t pci_get_subvendor(struct pci_device *pcidev);
+uint16_t pci_get_subdevice(struct pci_device *pcidev);
 
 /* MSI functions, msi.c */
 int pci_msi_enable(struct pci_device *p, uint64_t vec);
