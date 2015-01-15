@@ -828,20 +828,22 @@ bxe_dma_alloc(struct bxe_adapter *sc,
               struct bxe_dma   *dma,
               const char       *msg)
 {
-#if 0
-    int rc;
-
     if (dma->size > 0) {
         BLOGE(sc, "dma block '%s' already has size %lu\n", msg,
               (unsigned long)dma->size);
         return (1);
     }
 
-    memset(dma, 0, sizeof(*dma)); /* sanity */
+    memset(dma, 0, sizeof(*dma)); /* sanity, except for size. */
     dma->sc   = sc;
     dma->size = size;
     snprintf(dma->msg, sizeof(dma->msg), "%s", msg);
 
+	/* Akaros style */
+	dma->vaddr = kzmalloc(size, KMALLOC_WAIT);
+	dma->paddr = PADDR(dma->vaddr);
+
+#if 0 /* the BSD way */
     rc = bus_dma_tag_create(sc->parent_dma_tag, /* parent tag */
                             BCM_PAGE_SIZE,      /* alignment */
                             0,                  /* boundary limit */
@@ -895,7 +897,6 @@ void
 bxe_dma_free(struct bxe_adapter *sc,
              struct bxe_dma   *dma)
 {
-#if 0
     if (dma->size > 0) {
 #if 0
         BLOGD(sc, DBG_LOAD,
@@ -906,13 +907,15 @@ bxe_dma_free(struct bxe_adapter *sc,
 
         DBASSERT(sc, (dma->tag != NULL), ("dma tag is NULL"));
 
+		kfree(dma->vaddr);
+		#if 0 /* the BSD way */
         bus_dmamap_sync(dma->tag, dma->map,
                         (BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE));
         bus_dmamap_unload(dma->tag, dma->map);
         bus_dmamem_free(dma->tag, dma->vaddr, dma->map);
         bus_dma_tag_destroy(dma->tag);
+		#endif
     }
-#endif
     memset(dma, 0, sizeof(*dma));
 }
 
@@ -6255,17 +6258,15 @@ bxe_free_mem(struct bxe_adapter *sc)
 {
     int i;
 
-#if 0
     if (!CONFIGURE_NIC_MODE(sc)) {
         /* free searcher T2 table */
-        bxe_dma_free(sc, &sc->t2);
+        bxe_dma_free(sc, sc->t2);
     }
-#endif
 
     for (i = 0; i < L2_ILT_LINES(sc); i++) {
-      //bxe_dma_free(sc, &sc->context[i].vcxt_dma);
-      //sc->context[i].vcxt = NULL;
-      //sc->context[i].size = 0;
+        bxe_dma_free(sc, &sc->context[i].vcxt_dma);
+        sc->context[i].vcxt = NULL;
+        sc->context[i].size = 0;
     }
 
     ecore_ilt_mem_op(sc, ILT_MEMOP_FREE);
@@ -6284,15 +6285,13 @@ bxe_alloc_mem(struct bxe_adapter *sc)
     int allocated;
     int i;
 
-#if 0
     if (!CONFIGURE_NIC_MODE(sc)) {
         /* allocate searcher T2 table */
         if (bxe_dma_alloc(sc, SRC_T2_SZ,
-                          &sc->t2, "searcher t2 table") != 0) {
+                          sc->t2, "searcher t2 table") != 0) {
             return (-1);
         }
     }
-#endif
 
     /*
      * Allocate memory for CDU context:

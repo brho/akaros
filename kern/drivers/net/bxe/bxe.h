@@ -54,7 +54,7 @@ typedef uint64_t ift_counter;
 typedef uintptr_t bus_addr_t;
 typedef uintptr_t bus_size_t;
 typedef uintptr_t bus_space_handle_t;
-typedef uintptr_t bus_dma_tag_t;
+typedef void* bus_dma_tag_t;
 typedef uintptr_t bus_dmamap_t;
 typedef uintptr_t bus_dma_segment_t;
 typedef uintptr_t bus_space_tag_t;
@@ -62,6 +62,12 @@ typedef uintptr_t vm_offset_t;
 typedef int device_t;
 // WTF ...
 typedef uint64_t uintmax_t;
+
+#define bus_dma_tag_create(...) (0)
+#define bus_dma_tag_destroy(...)
+#define bus_dmamap_sync(...)
+#define bus_dmamap_unload(...)
+
 #define MA_OWNED 0
 #define mtx_assert(lock, thing) assert(1)
 #define device_printf(ignore, format, args...) printk(format, args)
@@ -1672,7 +1678,7 @@ struct eth_spe *spq;
 	 * context size we need 8 ILT entries.
 	 */
 #define ILT_MAX_L2_LINES 8
-	//    struct hw_context context[ILT_MAX_L2_LINES];
+	struct hw_context context[ILT_MAX_L2_LINES];
 	struct ecore_ilt *ilt;
 #define ILT_MAX_LINES 256
 	
@@ -2322,7 +2328,6 @@ bxe_igu_ack_sb_gen(struct bxe_adapter *sc,
     REG_WR(sc, igu_addr, cmd_data.sb_id_and_flags);
 
     /* Make sure that ACK is written */
-#warning "bus space barrier write"
     //    bus_space_barrier(sc->bar[0].tag, sc->bar[0].handle, 0, 0,
     //                BUS_SPACE_BARRIER_WRITE);
     mb();
