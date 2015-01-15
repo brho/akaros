@@ -4024,7 +4024,7 @@ bxe_wait_sp_comp(struct bxe_adapter *sc,
 
     while (tout--) {
         mb();
-        if (!(atomic_read(&sc->sp_state) & mask)) {
+        if (!(ACCESS_ONCE(sc->sp_state) & mask)) {
             return (TRUE);
         }
 
@@ -4033,7 +4033,7 @@ bxe_wait_sp_comp(struct bxe_adapter *sc,
 
     mb();
 
-    tmp = atomic_read(&sc->sp_state);
+    tmp = ACCESS_ONCE(sc->sp_state);
     if (tmp & mask) {
         BLOGE(sc, "Filtering completion timed out: "
                   "sp_state 0x%lx, mask 0x%lx\n",

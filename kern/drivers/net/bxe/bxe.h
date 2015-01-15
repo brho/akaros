@@ -1612,7 +1612,7 @@ struct bxe_adapter {
     /* slow path */
 	struct bxe_dma      sp_dma;
 	struct bxe_slowpath *sp;
-	atomic_t       sp_state;
+	unsigned long       sp_state;
 	
 	/* slow path queue */
 	struct bxe_dma spq_dma;
