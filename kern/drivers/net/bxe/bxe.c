@@ -3173,6 +3173,7 @@ static uint8_t
 bxe_rxeof(struct bxe_adapter    *sc,
           struct bxe_fastpath *fp)
 {
+	return 0xaa;
 #if 0
     if_t ifp = sc->ifp;
     uint16_t bd_cons, bd_prod, bd_prod_fw, comp_ring_cons;
@@ -3436,6 +3437,7 @@ bxe_free_tx_pkt(struct bxe_adapter    *sc,
                 struct bxe_fastpath *fp,
                 uint16_t            idx)
 {
+	return 0xaa;
 #if 0
     struct bxe_sw_tx_bd *tx_buf = &fp->tx_mbuf_chain[idx];
     struct eth_tx_start_bd *tx_start_bd;
@@ -3528,6 +3530,7 @@ static uint8_t
 bxe_txeof(struct bxe_adapter    *sc,
           struct bxe_fastpath *fp)
 {
+	return 0xaa;
 #if 0
     if_t ifp = sc->ifp;
     uint16_t bd_cons, hw_cons, sw_cons, pkt_cons;
@@ -3612,7 +3615,6 @@ bxe_drain_tx_queues(struct bxe_adapter *sc)
         }
     }
 #endif
-    return;
 }
 
 static int
@@ -3769,6 +3771,7 @@ bxe_set_q_rx_mode(struct bxe_adapter *sc,
 static int
 bxe_set_storm_rx_mode(struct bxe_adapter *sc)
 {
+	return 0xaa;
 #if 0
     unsigned long rx_mode_flags = 0, ramrod_flags = 0;
     unsigned long rx_accept_flags = 0, tx_accept_flags = 0;
@@ -3794,6 +3797,7 @@ bxe_set_storm_rx_mode(struct bxe_adapter *sc)
 static int
 bxe_nic_load_no_mcp(struct bxe_adapter *sc)
 {
+	return 0xaa;
 #if 0
     int path = SC_PATH(sc);
     int port = SC_PORT(sc);
@@ -3820,6 +3824,7 @@ bxe_nic_load_no_mcp(struct bxe_adapter *sc)
 static int
 bxe_nic_unload_no_mcp(struct bxe_adapter *sc)
 {
+	return 0xaa;
 #if 0
     int port = SC_PORT(sc);
     int path = SC_PATH(sc);
@@ -4602,6 +4607,7 @@ bxe_ioctl_stats_show(struct bxe_adapter *sc,
                      uint32_t         priv_op,
                      struct ifreq     *ifr)
 {
+	return 0xaa;
 #if 0
     const size_t str_size   = (BXE_NUM_ETH_STATS * STAT_NAME_LEN);
     const size_t stats_size = (BXE_NUM_ETH_STATS * sizeof(uint64_t));
@@ -10955,6 +10961,7 @@ bxe_init_objs(struct bxe_adapter *sc)
 static inline int
 bxe_func_start(struct bxe_adapter *sc)
 {
+	return 0xaa;
 #if 0
     struct ecore_func_state_params func_params = { NULL };
     struct ecore_func_start_params *start_params = &func_params.params.start;
@@ -11972,10 +11979,7 @@ bxe_config_rss_pf(struct bxe_adapter            *sc,
 
     if (config_hash) {
         /* RSS keys */
-        for (i = 0; i < sizeof(params.rss_key) / 4; i++) {
-            params.rss_key[i] = arc4random();
-        }
-
+		randomread(params.rss_key, sizeof(params.rss_key));
         bxe_set_bit(ECORE_RSS_SET_SRCH, &params.rss_flags);
     }
 
