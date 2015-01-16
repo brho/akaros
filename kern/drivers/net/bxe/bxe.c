@@ -16644,6 +16644,7 @@ bxe_igu_ack_sb(struct bxe_adapter *sc,
     bxe_igu_ack_sb_gen(sc, igu_sb_id, segment, index, op, update, igu_addr);
 }
 
+#endif
 static void
 bxe_igu_clear_sb_gen(struct bxe_adapter *sc,
                      uint8_t          func,
@@ -16709,7 +16710,6 @@ bxe_igu_clear_sb(struct bxe_adapter *sc,
 }
 
 
-#endif
 
 
 

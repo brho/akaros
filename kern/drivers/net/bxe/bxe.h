@@ -68,6 +68,30 @@ typedef uint64_t uintmax_t;
 #define bus_dmamap_sync(...)
 #define bus_dmamap_unload(...)
 
+/* FreeBSD x86/include/bus.h
+ * Bus read/write barrier methods.
+ *
+ *      void bus_space_barrier(bus_space_tag_t tag, bus_space_handle_t bsh,
+ *                             bus_size_t offset, bus_size_t len, int flags);
+ *
+ *
+ * Note that BUS_SPACE_BARRIER_WRITE doesn't do anything other than
+ * prevent reordering by the compiler; all Intel x86 processors currently
+ * retire operations outside the CPU in program order.
+ */
+#define BUS_SPACE_BARRIER_READ  0x01            /* force read barrier */
+#define BUS_SPACE_BARRIER_WRITE 0x02            /* force write barrier */
+
+static inline void
+bus_space_barrier(bus_space_tag_t tag, bus_space_handle_t bsh,
+                  bus_size_t offset, bus_size_t len, int flags)
+{
+	if (flags & BUS_SPACE_BARRIER_READ)
+		bus_rmb();
+	else
+		bus_wmb();
+}
+
 #define MA_OWNED 0
 #define mtx_assert(lock, thing) assert(1)
 #define device_printf(ignore, format, args...) printk(format, args)
@@ -2328,8 +2352,8 @@ bxe_igu_ack_sb_gen(struct bxe_adapter *sc,
     REG_WR(sc, igu_addr, cmd_data.sb_id_and_flags);
 
     /* Make sure that ACK is written */
-    //    bus_space_barrier(sc->bar[0].tag, sc->bar[0].handle, 0, 0,
-    //                BUS_SPACE_BARRIER_WRITE);
+    bus_space_barrier(sc->bar[0].tag, sc->bar[0].handle, 0, 0,
+                      BUS_SPACE_BARRIER_WRITE);
     mb();
 }
 
@@ -2355,8 +2379,8 @@ bxe_hc_ack_sb(struct bxe_adapter *sc,
     REG_WR(sc, hc_addr, (*(uint32_t *)&igu_ack));
 
     /* Make sure that ACK is written */
-    //    bus_space_barrier(sc->bar[0].tag, sc->bar[0].handle, 0, 0,
-    //                      BUS_SPACE_BARRIER_WRITE);
+    bus_space_barrier(sc->bar[0].tag, sc->bar[0].handle, 0, 0,
+                      BUS_SPACE_BARRIER_WRITE);
     mb();
 }
 

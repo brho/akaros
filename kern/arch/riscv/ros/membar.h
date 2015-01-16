@@ -20,4 +20,9 @@
 #define wrmb_f() wrmb()
 #define rwmb_f() rwmb()
 
+/* Bus memory barriers */
+#warning "Implement bus memory barriers"
+#define bus_wmb() mb()
+#define bus_rmb() mb()
+
 #endif /* ROS_INC_ARCH_MEMBAR_H */

@@ -20,4 +20,8 @@
 #define wrmb_f() mb_f()
 #define rwmb_f() mb_f()
 
+/* Bus memory barriers */
+#define bus_wmb() cmb()
+#define bus_rmb() asm volatile("lock; addl $0,0(%%rsp)" : : : "memory")
+
 #endif /* ROS_INC_ARCH_MEMBAR_H */
