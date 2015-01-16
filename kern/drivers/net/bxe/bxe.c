@@ -12481,7 +12481,9 @@ bxe_initial_phy_init(struct bxe_adapter *sc,
     return (rc);
 }
 
-/* must be called under IF_ADDR_LOCK */
+/* must be called with sc locked. We don't need finer grained locking,
+ * I think, because adding addresses is not that frequent.
+ */
 static int
 bxe_init_mcast_macs_list(struct bxe_adapter                 *sc,
                          struct ecore_mcast_ramrod_params *p)
@@ -12602,21 +12604,13 @@ bxe_set_uc_list(struct bxe_adapter *sc)
     unsigned long ramrod_flags = 0;
     int rc;
 
-#if __FreeBSD_version < 800000
-    IF_ADDR_LOCK(ifp);
-#else
-    if_addr_rlock(ifp);
-#endif
-
+	they used to lock the ifp. We could do that.
+	just lock the sc here. I see no reason to get finer grained for this one.
     /* first schedule a cleanup up of old configuration */
     rc = bxe_del_all_macs(sc, mac_obj, ECORE_UC_LIST_MAC, FALSE);
     if (rc < 0) {
+unlock ehre.
         BLOGE(sc, "Failed to schedule delete of all ETH MACs (%d)\n", rc);
-#if __FreeBSD_version < 800000
-        IF_ADDR_UNLOCK(ifp);
-#else
-        if_addr_runlock(ifp);
-#endif
         return (rc);
     }
 
@@ -12635,22 +12629,14 @@ bxe_set_uc_list(struct bxe_adapter *sc)
             rc = 0;
         } else if (rc < 0) {
             BLOGE(sc, "Failed to schedule ADD operations (%d)\n", rc);
-#if __FreeBSD_version < 800000
-            IF_ADDR_UNLOCK(ifp);
-#else
-            if_addr_runlock(ifp);
-#endif
+unlock ehre.
             return (rc);
         }
 
         ifa = TAILQ_NEXT(ifa, ifa_link);
     }
 
-#if __FreeBSD_version < 800000
-    IF_ADDR_UNLOCK(ifp);
-#else
-    if_addr_runlock(ifp);
-#endif
+unlock here.
 
     /* Execute the pending commands */
     __set_bit(RAMROD_CONT, &ramrod_flags);
@@ -12676,7 +12662,6 @@ bxe_handle_rx_mode_tq(void *context,
     }
 
     BLOGD(sc, DBG_SP, "if_flags(ifp)=0x%x\n", if_getflags(sc->ifp));
-#warning "FIX ALL FLAGS"
 #if 0
     if (if_getflags(ifp) & IFF_PROMISC) {
         rx_mode = BXE_RX_MODE_PROMISC;

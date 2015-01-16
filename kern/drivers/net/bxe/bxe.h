@@ -41,6 +41,7 @@
 #include <string.h>
 #include <bitmap.h>
 #include <taskqueue.h>
+#include <mii.h>
 
 
 /* MACROS for conversion to AKAROS. Might we want this stuff someday? */
@@ -1361,9 +1362,7 @@ struct bxe_adapter {
 	unsigned int				statistics[Nstatistics];
 
 	//struct net_device_stats net_stats;
-#warning "no ifmedia. "
-	// struct ifmedia  ifmedia; /* network interface media structure */
-	int             media;
+	struct mii_if_info             media; /* network interface media structure */
 	
 	int             state; /* device state */
 #define BXE_STATE_CLOSED                 0x0000
@@ -1515,10 +1514,9 @@ struct bxe_adapter {
 #define BXE_STATS_UNLOCK(sc)      qunlock(&sc->stats_mtx)
 #define BXE_STATS_LOCK_ASSERT(sc) mtx_assert(&sc->stats_mtx, MA_OWNED)
 
-#warning "find outwhat IF_ADDR_LOCK is"
 #define BXE_MCAST_LOCK(sc)        \
     do {                          \
-	    /*IF_ADDR_LOCK(sc->ifp);*/		\
+	    qlock(&sc->ifp->qlock); \
     } while (0)
 #define BXE_MCAST_LOCK_ASSERT(sc) mtx_assert(&sc->mcast_mtx, MA_OWNED)
 	
@@ -2277,13 +2275,13 @@ void ecore_storm_memset_struct(struct bxe_adapter *sc, uint32_t addr,
 
 #define bxe_panic(sc, msg) \
     do {                   \
-        panic msg;         \
+        panic(msg);         \
     } while (0)
 
 #else
 
 #define bxe_panic(sc, msg) \
-    /*device_printf((sc)->dev,*/printk( "%s (%s,%d)\n", __FUNCTION__, __FILE__, __LINE__);
+    panic( "%s (%s,%d)\n", __FUNCTION__, __FILE__, __LINE__);
 
 #endif
 
