@@ -321,6 +321,8 @@ static int bxe_udp_rss = 0;
 //SYSCTL_INT(_hw_bxe, OID_AUTO, udp_rss, CTLFLAG_RDTUN,
 //           &bxe_udp_rss, 0, "UDP RSS support");
 
+static int bxe_periodic_alarm = 60;
+
 #define STAT_NAME_LEN 32 /* no stat names below can be longer than this */
 
 #define STATS_OFFSET32(stat_name)                   \
@@ -660,7 +662,9 @@ static inline void bxe_update_rx_prod(struct bxe_adapter    *sc,
 static void    bxe_link_report_locked(struct bxe_adapter *sc);
 static void    bxe_link_report(struct bxe_adapter *sc);
 static void    bxe_link_status_update(struct bxe_adapter *sc);
-static void    bxe_periodic_callout_func(void *xsc);
+static void    bxe__alarm_handler(struct alarm_waiter *waiter,
+				  struct hw_trapframe *hw_tf);
+
 static void    bxe_periodic_start(struct bxe_adapter *sc);
 static void    bxe_periodic_stop(struct bxe_adapter *sc);
 static int     bxe_alloc_rx_bd_mbuf(struct bxe_fastpath *fp,
@@ -12756,9 +12760,12 @@ bxe_update_drv_flags(struct bxe_adapter *sc,
 /* periodic timer callout routine, only runs when the interface is up */
 
 static void
-bxe_periodic_callout_func(void *xsc)
+bxe_alarm_handler(struct alarm_waiter *waiter,
+                                struct hw_trapframe *hw_tf)
 {
-    struct bxe_adapter *sc = (struct bxe_adapter *)xsc;
+	struct timer_chain *tchain = &per_cpu_info[0].tchain;
+
+	struct bxe_adapter *sc = (struct bxe_adapter *) waiter->data;
     int i;
 
     if (!BXE_CORE_TRYLOCK(sc)) {
@@ -12766,9 +12773,8 @@ bxe_periodic_callout_func(void *xsc)
 
         if ((sc->state == BXE_STATE_OPEN) &&
             (atomic_read(&sc->periodic_flags) == PERIODIC_GO)) {
-            /* schedule the next periodic callout */
-		//callout_reset(&sc->periodic_callout, hz,
-		//        bxe_periodic_callout_func, sc);
+		goto done;
+
         }
 
         return;
@@ -12778,7 +12784,7 @@ bxe_periodic_callout_func(void *xsc)
         (atomic_read(&sc->periodic_flags) == PERIODIC_STOP)) {
         BLOGW(sc, "periodic callout exit (state=0x%x)\n", sc->state);
         BXE_CORE_UNLOCK(sc);
-        return;
+	goto done;
     }
 
     /* Check for TX timeouts on any fastpath. */
@@ -12843,24 +12849,31 @@ bxe_periodic_callout_func(void *xsc)
 
     if ((sc->state == BXE_STATE_OPEN) &&
         (atomic_read(&sc->periodic_flags) == PERIODIC_GO)) {
-        /* schedule the next periodic callout */
-//        callout_reset(&sc->periodic_callout, hz,
-//                      bxe_periodic_callout_func, sc);
+	    goto done;
     }
+    // we're not restarting it. That's how it ends.
+    return;
+    /* schedule the next periodic callout */
+done:
+    __reset_alarm_rel(tchain, waiter, bxe_periodic_alarm);
 }
 
 static void
 bxe_periodic_start(struct bxe_adapter *sc)
 {
-	//atomic_set(&sc->periodic_flags, PERIODIC_GO);
-    //  callout_reset(&sc->periodic_callout, hz, bxe_periodic_callout_func, sc);
+	struct timer_chain *tchain = &per_cpu_info[0].tchain;
+
+	if (! sc->waiter) {
+		sc->waiter = kzmalloc(sizeof(struct alarm_waiter), KMALLOC_WAIT);
+		init_awaiter_irq(sc->waiter, bxe_alarm_handler);
+	}
+	reset_alarm_rel(tchain, sc->waiter, bxe_periodic_alarm);
 }
 
 static void
 bxe_periodic_stop(struct bxe_adapter *sc)
 {
-//    atomic_set(&sc->periodic_flags, PERIODIC_STOP);
-//    callout_drain(&sc->periodic_callout);
+	atomic_set(&sc->periodic_flags, PERIODIC_STOP);
 }
 
 /* start the controller */
@@ -13085,7 +13098,7 @@ bxe_nic_load(struct bxe_adapter *sc,
         bxe_link_status_update(sc);
     }
 
-    /* start the periodic timer callout */
+    /* start the periodic timer alarm */
     bxe_periodic_start(sc);
 
     if (IS_PF(sc) && SHMEM2_HAS(sc, drv_capabilities_flag)) {
@@ -16390,9 +16403,6 @@ bxe_attach(device_t dev)
 
     /* initialize the mutexes */
     bxe_init_mutexes(sc);
-
-    /* prepare the periodic callout */
-    callout_init(&sc->periodic_callout, 0);
 
     /* prepare the chip taskqueue */
     sc->chip_tq_flags = CHIP_TQ_NONE;

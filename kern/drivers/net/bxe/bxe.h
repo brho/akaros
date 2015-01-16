@@ -1399,12 +1399,11 @@ struct bxe_adapter {
 	
 	uint16_t doorbell_size;
 	
-#warning "no timer callout"
-	/* periodic timer callout */
 #define PERIODIC_STOP 0
 #define PERIODIC_GO   1
 	atomic_t periodic_flags;
-	//      struct callout         periodic_callout;
+	struct alarm_waiter *waiter;
+
 	/* chip start/stop/reset taskqueue */
 #define CHIP_TQ_NONE   0
 #define CHIP_TQ_START  1
@@ -1517,6 +1516,10 @@ struct bxe_adapter {
 #define BXE_MCAST_LOCK(sc)        \
     do {                          \
 	    qlock(&sc->ifp->qlock); \
+    } while (0)
+#define BXE_MCAST_UNLOCK(sc)        \
+    do {                          \
+	    qunlock(&sc->ifp->qlock); \
     } while (0)
 #define BXE_MCAST_LOCK_ASSERT(sc) mtx_assert(&sc->mcast_mtx, MA_OWNED)
 	
