@@ -1182,6 +1182,7 @@ bxe_net_stats_update(struct bxe_adapter *sc)
 uint64_t
 bxe_get_counter(if_t ifp, ift_counter cnt)
 {
+	return 0xaa;
 #if 0
 	struct bxe_adapter *sc;
 	struct bxe_eth_stats *estats;

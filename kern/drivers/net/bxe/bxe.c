@@ -1243,7 +1243,7 @@ bxe_nvram_read_dword(struct bxe_adapter *sc,
              * but ethtool sees it as an array of bytes
              * converting to big-endian will do the work
              */
-            *ret_val = htobe32(val);
+            *ret_val = cpu_to_be32(val);
             rc = 0;
             break;
         }
@@ -1402,7 +1402,7 @@ bxe_nvram_write1(struct bxe_adapter *sc,
         /* nvram data is returned as an array of bytes
          * convert it back to cpu order
          */
-        val = be32toh(val);
+        val = be32_to_cpu(val);
 
         rc = bxe_nvram_write_dword(sc, align_offset, val, cmd_flags);
     }
@@ -8644,8 +8644,6 @@ bxe_update_dsb_idx(struct bxe_adapter *sc)
     return (rc);
 }
 
-#warning "fix"
-#if 0
 static inline struct ecore_queue_sp_obj *
 bxe_cid_to_q_obj(struct bxe_adapter *sc,
                  uint32_t         cid)
@@ -8653,7 +8651,6 @@ bxe_cid_to_q_obj(struct bxe_adapter *sc,
     BLOGD(sc, DBG_SP, "retrieving fp from cid %d\n", cid);
     return (&sc->sp_objs[CID_TO_FP(cid, sc)].q_obj);
 }
-#endif
 
 static void
 bxe_handle_mcast_eqe(struct bxe_adapter *sc)
@@ -8693,7 +8690,7 @@ bxe_handle_classification_eqe(struct bxe_adapter      *sc,
     struct ecore_vlan_mac_obj *vlan_mac_obj;
 
     /* always push next commands out, don't wait here */
-    bit_set(&ramrod_flags, RAMROD_CONT);
+    __set_bit(RAMROD_CONT, &ramrod_flags);
 
     switch (le32_to_cpu(elem->message.data.eth_event.echo) >> BXE_SWCID_SHIFT) {
     case ECORE_FILTER_MAC_PENDING:
@@ -9710,7 +9707,7 @@ bxe_init_hw(struct bxe_adapter *sc,
     int rc;
 
     /* prepare the parameters for function state transitions */
-    bit_set(&func_params.ramrod_flags, RAMROD_COMP_WAIT);
+    __set_bit(RAMROD_COMP_WAIT, &func_params.ramrod_flags);
 
     func_params.f_obj = &sc->func_obj;
     func_params.cmd = ECORE_F_CMD_HW_INIT;
@@ -10036,8 +10033,8 @@ bxe_init_eth_fp(struct bxe_adapter *sc,
     bxe_update_fp_sb_idx(fp);
 
     /* Configure Queue State object */
-    bit_set(&q_type, ECORE_Q_TYPE_HAS_RX);
-    bit_set(&q_type, ECORE_Q_TYPE_HAS_TX);
+    __set_bit(ECORE_Q_TYPE_HAS_RX, &q_type);
+    __set_bit(ECORE_Q_TYPE_HAS_TX, &q_type);
 
     ecore_init_queue_obj(sc,
                          &sc->sp_objs[idx].q_obj,
@@ -10603,7 +10600,7 @@ bxe_pf_init(struct bxe_adapter *sc)
      * This flag is relevant for E1x only.
      * E2 doesn't have a TPA configuration in a function level.
      */
-#warning "no getcapenable
+#warning "no getcapenable"
 //    flags |= (if_getcapenable(sc->ifp) & IFCAP_LRO) ? FUNC_FLG_TPA : 0;
 
     func_init.func_flgs = flags;
@@ -10967,7 +10964,7 @@ bxe_func_start(struct bxe_adapter *sc)
     struct ecore_func_start_params *start_params = &func_params.params.start;
 
     /* Prepare parameters for function state transitions */
-    bit_set(&func_params.ramrod_flags, RAMROD_COMP_WAIT);
+    __set_bit(RAMROD_COMP_WAIT, &func_params.ramrod_flags);
 
     func_params.f_obj = &sc->func_obj;
     func_params.cmd = ECORE_F_CMD_START;
@@ -12597,6 +12594,7 @@ bxe_set_mc_list(struct bxe_adapter *sc)
 static int
 bxe_set_uc_list(struct bxe_adapter *sc)
 {
+	return 0xaa;
 #if 0
     if_t ifp = sc->ifp;
     struct ecore_vlan_mac_obj *mac_obj = &sc->sp_objs->mac_obj;
@@ -12655,7 +12653,7 @@ bxe_set_uc_list(struct bxe_adapter *sc)
 #endif
 
     /* Execute the pending commands */
-    bit_set(&ramrod_flags, RAMROD_CONT);
+    __set_bit(RAMROD_CONT, &ramrod_flags);
     return (bxe_set_mac_one(sc, NULL, mac_obj, FALSE /* don't care */,
                             ECORE_UC_LIST_MAC, &ramrod_flags));
 #endif
@@ -13517,6 +13515,7 @@ bxe_pcie_capability_read(struct bxe_adapter *sc,
 static uint8_t
 bxe_is_pcie_pending(struct bxe_adapter *sc)
 {
+	return 0xaa;
 #if 0
     return (bxe_pcie_capability_read(sc, PCIR_EXPRESS_DEVICE_STA, 2) &
             PCIM_EXP_STA_TRANSACTION_PND);
