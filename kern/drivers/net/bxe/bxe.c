@@ -15072,27 +15072,9 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
         return (1);
     }
 
-#warning "what the hell is gz_strm"
-#if 0
+	// The compress/decompress shit never worked. But they use the buffer. */
     sc->gz_buf = (void *)sc->gz_buf_dma.vaddr;
 
-    if ((sc->gz_strm =
-         kmalloc(sizeof(*sc->gz_strm), /*M_DEVBUF,*/ M_NOWAIT)) == NULL) {
-        /* XXX */
-        bxe_dma_free(sc, &sc->gz_buf_dma);
-        sc->gz_buf = NULL;
-        bxe_dma_free(sc, &sc->spq_dma);
-        sc->spq = NULL;
-        bxe_dma_free(sc, &sc->sp_dma);
-        sc->sp = NULL;
-        bxe_dma_free(sc, &sc->eq_dma);
-        sc->eq = NULL;
-        bxe_dma_free(sc, &sc->def_sb_dma);
-        sc->def_sb = NULL;
-        bus_dma_tag_destroy(sc->parent_dma_tag);
-        return (1);
-    }
-#endif
     /*************/
     /* FASTPATHS */
     /*************/
