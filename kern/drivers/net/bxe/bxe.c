@@ -4492,42 +4492,6 @@ bxe_ifmedia_update(struct bxe_adapter *sc)
 	error("No media type change support in bxe");
 }
 
-/*
- * Called by the OS to get the current media status (i.e. link, speed, etc.).
- */
-static void
-bxe_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
-{
-#if 0
-    struct bxe_adapter *sc = if_getsoftc(ifp);
-
-    /* Report link down if the driver isn't running. */
-    if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) == 0) {
-        ifmr->ifm_active |= IFM_NONE;
-        return;
-    }
-
-    /* Setup the default interface info. */
-    ifmr->ifm_status = IFM_AVALID;
-    ifmr->ifm_active = IFM_ETHER;
-
-    if (sc->link_vars.link_up) {
-        ifmr->ifm_status |= IFM_ACTIVE;
-    } else {
-        ifmr->ifm_active |= IFM_NONE;
-        return;
-    }
-
-    ifmr->ifm_active |= sc->media;
-
-    if (sc->link_vars.duplex == DUPLEX_FULL) {
-        ifmr->ifm_active |= IFM_FDX;
-    } else {
-        ifmr->ifm_active |= IFM_HDX;
-    }
-#endif
-}
-
 // TODO: make this work as a write to ctl.
 static int
 bxe_ioctl_nvram(struct bxe_adapter *sc,
