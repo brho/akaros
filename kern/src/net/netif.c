@@ -287,6 +287,8 @@ netifread(struct netif *nif, struct chan *c, void *a, long n, uint32_t offset)
 				j += snprintf(p + j, READSTR - j, "sg ");
 			if (nif->feat & NETF_TSO)
 				j += snprintf(p + j, READSTR - j, "tso ");
+			if (nif->feat & NETF_LRO)
+				j += snprintf(p + j, READSTR - j, "lro ");
 			snprintf(p + j, READSTR - j, "\n");
 			n = readstr(offset, a, n, p);
 			kfree(p);

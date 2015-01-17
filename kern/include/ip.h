@@ -932,6 +932,7 @@ struct netaddr {
 #define NETF_BASE_SHIFT		(NS_SHIFT_MAX + 1)
 #define NETF_PADMIN_SHIFT	(NETF_BASE_SHIFT + 0)
 #define NETF_SG_SHIFT		(NETF_BASE_SHIFT + 1)
+#define NETF_LRO_SHIFT		(NETF_BASE_SHIFT + 2)
 enum {
 	NETF_IPCK = (1 << NS_IPCK_SHIFT),	/* xmit ip checksum */
 	NETF_UDPCK = (1 << NS_UDPCK_SHIFT),	/* xmit udp checksum */
@@ -939,6 +940,7 @@ enum {
 	NETF_PADMIN = (1 << NETF_PADMIN_SHIFT),	/* device pads to mintu */
 	NETF_SG	= (1 << NETF_SG_SHIFT),		/* device can do scatter/gather */
 	NETF_TSO = (1 << NS_TSO_SHIFT),		/* device can do TSO */
+	NETF_LRO = (1 << NETF_LRO_SHIFT),	/* device can do LRO */
 };
 /*
  *  a network interface
