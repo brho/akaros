@@ -4485,34 +4485,10 @@ bxe_nic_unload(struct bxe_adapter *sc,
  * the user runs "ifconfig bxe media ..." or "ifconfig bxe mediaopt ...".
  */
 static int
-bxe_ifmedia_update(struct ifnet  *ifp)
+bxe_ifmedia_update(struct bxe_adapter *sc)
 {
-#if 0
-    struct bxe_adapter *sc = (struct bxe_adapter *)if_getsoftc(ifp);
-    struct ifmedia *ifm;
-
-    ifm = &sc->ifmedia;
-
-    /* We only support Ethernet media type. */
-    if (IFM_TYPE(ifm->ifm_media) != IFM_ETHER) {
-        return (EINVAL);
-    }
-
-    switch (IFM_SUBTYPE(ifm->ifm_media)) {
-    case IFM_AUTO:
-         break;
-    case IFM_10G_CX4:
-    case IFM_10G_SR:
-    case IFM_10G_T:
-    case IFM_10G_TWINAX:
-    default:
-        /* We don't support changing the media type. */
-        BLOGD(sc, DBG_LOAD, "Invalid media type (%d)\n",
-              IFM_SUBTYPE(ifm->ifm_media));
-        return (EINVAL);
-    }
-#endif
-    return (0);
+	// and we don't support changing the media type anyway. Pointless.
+	error("No media type change support in bxe");
 }
 
 /*
