@@ -16000,7 +16000,6 @@ bxe_init_multi_cos(struct bxe_adapter *sc)
     }
 }
 
-#warning "move sysctl to write to ctl file"
 #if 0
 static int
 bxe_sysctl_state(SYSCTL_HANDLER_ARGS)
