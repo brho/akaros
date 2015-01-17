@@ -69,6 +69,10 @@ typedef uint64_t uintmax_t;
 #define bus_dmamap_sync(...)
 #define bus_dmamap_unload(...)
 
+// All the flag values are wrong for now; ignore them.
+#define if_getflags(netif) (netif)->feat
+#define if_setflags(sc)
+
 /* FreeBSD x86/include/bus.h
  * Bus read/write barrier methods.
  *
