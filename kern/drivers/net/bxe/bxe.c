@@ -2644,9 +2644,10 @@ bxe_tx_disable(struct bxe_adapter* sc)
     if_t ifp = sc->ifp;
 
     /* tell the stack the driver is stopped and TX queue is full */
-    if (ifp !=  NULL) {
-        if_setdrvflags(ifp, 0);
-    }
+	// TODO: is there a way to do this in this stack? I think it just pauses ...
+    //if (ifp !=  NULL) {
+        //if_setdrvflags(ifp, 0);
+    //}
 }
 
 static void
