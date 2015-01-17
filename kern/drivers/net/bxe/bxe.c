@@ -12494,11 +12494,11 @@ bxe_init_mcast_macs_list(struct bxe_adapter                 *sc,
 {
     if_t ifp = sc->ifp;
     int mc_count = 0;
-    int mcnt, i;
+    int i;
     struct ecore_mcast_list_elem *mc_mac;
     unsigned char *mta;
 
-    mc_count = if_multiaddr_count(ifp, -1);/* XXX they don't have a limit */
+    mc_count = ifp->nmaddr;
                                            /* should we enforce one? */
     ECORE_LIST_INIT(&p->mcast_list);
     p->mcast_list_len = 0;
@@ -12507,27 +12507,15 @@ bxe_init_mcast_macs_list(struct bxe_adapter                 *sc,
         return (0);
     }
 
-    mta = kmalloc(sizeof(unsigned char) * ETH_ADDR_LEN * mc_count,
-	              0); //M_DEVBUF, M_NOWAIT);
-    mta = NULL;
-
-    if(mta == NULL) {
-        BLOGE(sc, "Failed to allocate temp mcast list\n");
-        return (-1);
-    }
+    mta = ifp->maddr;
     
-    mc_mac = kzmalloc(sizeof(*mc_mac) * mc_count, 0); //M_DEVBUF,
+    mc_mac = kzmalloc(sizeof(*mc_mac) * mc_count, KMALLOC_WAIT);
     if (!mc_mac) {
-        kfree(mta); //, M_DEVBUF);
         BLOGE(sc, "Failed to allocate temp mcast list\n");
         return (-1);
     }
 
-    // BSD thing
-    //    if_multiaddr_array(ifp, mta, &mcnt, mc_count); /* mta and mcnt not expected 
-    //                                   to be  different */
-    for(i=0; i< mcnt; i++) {
-
+    for(i=0; i< mc_count; i++) {
         bcopy((mta + (i * ETH_ADDR_LEN)), mc_mac->mac, ETH_ADDR_LEN);
         ECORE_LIST_PUSH_TAIL(&mc_mac->link, &p->mcast_list);
 
@@ -12540,7 +12528,6 @@ bxe_init_mcast_macs_list(struct bxe_adapter                 *sc,
     }
 
     p->mcast_list_len = mc_count;
-    kfree(mta); //, M_DEVBUF);
 
     return (0);
 }
@@ -12555,7 +12542,7 @@ bxe_free_mcast_macs_list(struct ecore_mcast_ramrod_params *p)
 
     if (mc_mac) {
         /* only a single free as all mc_macs are in the same heap array */
-      kfree(mc_mac); //, M_DEVBUF);
+      kfree(mc_mac);
     }
 }
 
