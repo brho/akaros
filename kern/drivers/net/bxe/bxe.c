@@ -4538,7 +4538,7 @@ bxe_ioctl_nvram(struct bxe_adapter *sc,
     int len;
     int error = 0;
 
-    copyin(data, &nvdata_base, sizeof(nvdata_base));
+    memcpy_from_user(current, &nvdata_base, data, sizeof(nvdata_base));
 
     len = (sizeof(struct bxe_nvram_data) +
            nvdata_base.len -
@@ -4562,11 +4562,11 @@ bxe_ioctl_nvram(struct bxe_adapter *sc,
                                nvdata->offset,
                                (uint8_t *)nvdata->value,
                                nvdata->len);
-        copyout(nvdata, data, len);
+        memcpy_to_user(current, data, nvdata, len);
     } else { /* BXE_IOC_WR_NVRAM */
         BLOGD(sc, DBG_IOCTL, "IOC_WR_NVRAM 0x%x %d\n",
               nvdata->offset, nvdata->len);
-        copyin(data, nvdata, len);
+        memcpy_from_user(current, nvdata, data, len);
         error = bxe_nvram_write(sc,
                                 nvdata->offset,
                                 (uint8_t *)nvdata->value,

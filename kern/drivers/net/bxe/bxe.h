@@ -42,6 +42,7 @@
 #include <bitmap.h>
 #include <taskqueue.h>
 #include <mii.h>
+#include <umem.h>
 
 
 /* MACROS for conversion to AKAROS. Might we want this stuff someday? */
