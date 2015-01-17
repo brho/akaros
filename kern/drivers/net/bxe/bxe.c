@@ -10577,8 +10577,7 @@ bxe_pf_init(struct bxe_adapter *sc)
      * This flag is relevant for E1x only.
      * E2 doesn't have a TPA configuration in a function level.
      */
-#warning "no getcapenable"
-//    flags |= (if_getcapenable(sc->ifp) & IFCAP_LRO) ? FUNC_FLG_TPA : 0;
+    flags |= (sc->ifp->feat & NETF_LRO) ? FUNC_FLG_TPA : 0;
 
     func_init.func_flgs = flags;
     func_init.pf_id     = SC_FUNC(sc);
