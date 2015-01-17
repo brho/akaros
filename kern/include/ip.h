@@ -918,6 +918,7 @@ struct netfile {
 /*
  *  a network address
  */
+// TODO: make this one of the LIST types!
 struct netaddr {
 	struct netaddr *next;		/* allocation chain */
 	struct netaddr *hnext;

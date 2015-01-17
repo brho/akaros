@@ -12469,7 +12469,7 @@ bxe_init_mcast_macs_list(struct bxe_adapter                 *sc,
     int mc_count = 0;
     int i;
     struct ecore_mcast_list_elem *mc_mac;
-    unsigned char *mta;
+    struct netaddr *m = ifp->maddr;
 
     mc_count = ifp->nmaddr;
                                            /* should we enforce one? */
@@ -12480,8 +12480,6 @@ bxe_init_mcast_macs_list(struct bxe_adapter                 *sc,
         return (0);
     }
 
-    mta = ifp->maddr;
-    
     mc_mac = kzmalloc(sizeof(*mc_mac) * mc_count, KMALLOC_WAIT);
     if (!mc_mac) {
         BLOGE(sc, "Failed to allocate temp mcast list\n");
@@ -12489,7 +12487,7 @@ bxe_init_mcast_macs_list(struct bxe_adapter                 *sc,
     }
 
     for(i=0; i< mc_count; i++) {
-        bcopy((mta + (i * ETH_ADDR_LEN)), mc_mac->mac, ETH_ADDR_LEN);
+        bcopy(m->addr, mc_mac->mac, ETH_ADDR_LEN);
         ECORE_LIST_PUSH_TAIL(&mc_mac->link, &p->mcast_list);
 
         BLOGD(sc, DBG_LOAD,
@@ -12498,6 +12496,7 @@ bxe_init_mcast_macs_list(struct bxe_adapter                 *sc,
               mc_mac->mac[3], mc_mac->mac[4], mc_mac->mac[5]);
 
         mc_mac++;
+	m = m->next;
     }
 
     p->mcast_list_len = mc_count;
