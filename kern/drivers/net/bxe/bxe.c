@@ -4551,18 +4551,18 @@ bxe_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 #endif
 }
 
+// TODO: make this work as a write to ctl.
 static int
 bxe_ioctl_nvram(struct bxe_adapter *sc,
                 uint32_t         priv_op,
-                struct ifreq     *ifr)
+                void *data)
 {
-#if 0
     struct bxe_nvram_data nvdata_base;
     struct bxe_nvram_data *nvdata;
     int len;
     int error = 0;
 
-    copyin(ifr->ifr_data, &nvdata_base, sizeof(nvdata_base));
+    copyin(data, &nvdata_base, sizeof(nvdata_base));
 
     len = (sizeof(struct bxe_nvram_data) +
            nvdata_base.len -
@@ -4570,7 +4570,7 @@ bxe_ioctl_nvram(struct bxe_adapter *sc,
 
     if (len > sizeof(struct bxe_nvram_data)) {
         if ((nvdata = (struct bxe_nvram_data *)
-                 kzmalloc(len, /*M_DEVBUF,*/ 0)) == NULL) {
+                 kzmalloc(len, KMALLOC_WAIT)) == NULL) {
             BLOGE(sc, "BXE_IOC_RD_NVRAM malloc failed\n");
             return (1);
         }
@@ -4586,11 +4586,11 @@ bxe_ioctl_nvram(struct bxe_adapter *sc,
                                nvdata->offset,
                                (uint8_t *)nvdata->value,
                                nvdata->len);
-        copyout(nvdata, ifr->ifr_data, len);
+        copyout(nvdata, data, len);
     } else { /* BXE_IOC_WR_NVRAM */
         BLOGD(sc, DBG_IOCTL, "IOC_WR_NVRAM 0x%x %d\n",
               nvdata->offset, nvdata->len);
-        copyin(ifr->ifr_data, nvdata, len);
+        copyin(data, nvdata, len);
         error = bxe_nvram_write(sc,
                                 nvdata->offset,
                                 (uint8_t *)nvdata->value,
@@ -4598,18 +4598,16 @@ bxe_ioctl_nvram(struct bxe_adapter *sc,
     }
 
     if (len > sizeof(struct bxe_nvram_data)) {
-        kfree(nvdata); /* M_DEVBUF */
+        kfree(nvdata);
     }
 
     return (error);
-#endif
-    return -1;
 }
 
 static int
 bxe_ioctl_stats_show(struct bxe_adapter *sc,
                      uint32_t         priv_op,
-                     struct ifreq     *ifr)
+                     void *data)
 {
 	return 0xaa;
 #if 0
@@ -4728,7 +4726,6 @@ bxe_ioctl(if_t ifp,
 {
 #if 0
     struct bxe_adapter *sc = if_getsoftc(ifp);
-    struct ifreq *ifr = (struct ifreq *)data;
     struct bxe_nvram_data *nvdata;
     uint32_t priv_op;
     int mask = 0;
