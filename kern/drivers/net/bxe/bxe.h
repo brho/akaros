@@ -2423,11 +2423,11 @@ bxe_hc_ack_int(struct bxe_adapter *sc)
     return (result);
 }
 
-#warning "fix all igu stuff"
+
 static inline uint16_t
 bxe_igu_ack_int(struct bxe_adapter *sc)
 {
-#if 0
+
     uint32_t igu_addr = (BAR_IGU_INTMEM + IGU_REG_SISR_MDPC_WMASK_LSB_UPPER*8);
     uint32_t result = REG_RD(sc, igu_addr);
 
@@ -2436,7 +2436,7 @@ bxe_igu_ack_int(struct bxe_adapter *sc)
 
     mb();
     return (result);
-#endif
+
     return 0;
 }
 
@@ -2444,13 +2444,13 @@ static inline uint16_t
 bxe_ack_int(struct bxe_adapter *sc)
 {
     mb();
-#if 0
+
     if (sc->devinfo.int_block == INT_BLOCK_HC) {
         return (bxe_hc_ack_int(sc));
     } else {
         return (bxe_igu_ack_int(sc));
     }
-#endif
+
     return 0;
 }
 
