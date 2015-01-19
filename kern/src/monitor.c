@@ -884,12 +884,15 @@ int mon_monitor(int argc, char **argv, struct hw_trapframe *hw_tf)
 
 int onecmd(int argc, char *argv[], struct hw_trapframe *hw_tf) {
 	int i;
+	if (!argc)
+		return -1;
 	for (i = 0; i < NCOMMANDS; i++) {
 		if (strcmp(argv[0], commands[i].name) == 0)
 			return commands[i].func(argc, argv, hw_tf);
 	}
 	return -1;
 }
+
 static int runcmd(char *NTS real_buf, struct hw_trapframe *hw_tf) {
 	char * buf = NTEXPAND(real_buf);
 	int argc;

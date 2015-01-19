@@ -650,6 +650,7 @@ void closemount(struct mount *);
 void closepgrp(struct pgrp *);
 void closesigs(struct skeyset *);
 void cmderror(struct cmdbuf *, char *unused_char_p_t);
+void debugcmd(struct cmdbuf *cb);
 struct mhead *newmhead(struct chan *from);
 int cmount(struct chan *, struct chan *, int unused_int, char *unused_char_p_t);
 void cnameclose(struct cname *);

@@ -94,6 +94,14 @@ void cmderror(struct cmdbuf *cb, char *s)
 	error(get_cur_genbuf());
 }
 
+void debugcmd(struct cmdbuf *cb)
+{
+	printk("cb %p, nr %d\n", cb, cb->nf);
+	for (int i = 0; i < cb->nf; i++) {
+		printk("%d: %s\n", i, cb->f[i]);
+	}
+}
+
 /*
  * Look up entry in table
  */
