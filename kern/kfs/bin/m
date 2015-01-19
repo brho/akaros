@@ -6,4 +6,4 @@ then
 	exit
 fi
 
-echo $@ > "#Z/mondata"
+echo "$@" > "#Z/mondata"
