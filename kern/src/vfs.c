@@ -2458,12 +2458,15 @@ static int __get_fd(struct files_struct *open_files, int low_fd)
 	return slot;
 }
 
-/* Gets and claims a free FD, used by 9ns.  < 0 == error. */
-int get_fd(struct files_struct *open_files, int low_fd)
+/* Gets and claims a free FD, used by 9ns.  < 0 == error.  cloexec is tracked on
+ * the VFS FD.  It's value will be O_CLOEXEC (not 1) or 0. */
+int get_fd(struct files_struct *open_files, int low_fd, int cloexec)
 {
 	int slot;
 	spin_lock(&open_files->lock);
 	slot = __get_fd(open_files, low_fd);
+	if (cloexec && (slot >= 0))
+		open_files->fd[slot].fd_flags |= FD_CLOEXEC;
 	spin_unlock(&open_files->lock);
 	return slot;
 }
@@ -2495,7 +2498,8 @@ static int __claim_fd(struct files_struct *open_files, int file_desc)
 	return 0;
 }
 
-/* Claims a specific FD when duping FDs. used by 9ns.  < 0 == error. */
+/* Claims a specific FD when duping FDs. used by 9ns.  < 0 == error.  No need
+ * for cloexec here, since it's not used during dup. */
 int claim_fd(struct files_struct *open_files, int file_desc)
 {
 	int ret;
@@ -2506,9 +2510,12 @@ int claim_fd(struct files_struct *open_files, int file_desc)
 }
 
 /* Inserts the file in the files_struct, returning the corresponding new file
- * descriptor, or an error code.  We start looking for open fds from low_fd. */
+ * descriptor, or an error code.  We start looking for open fds from low_fd.
+ *
+ * Passing cloexec is a bit cheap, since we might want to expand it to support
+ * more FD options in the future. */
 int insert_file(struct files_struct *open_files, struct file *file, int low_fd,
-                bool must)
+                bool must, bool cloexec)
 {
 	int slot, ret;
 	spin_lock(&open_files->lock);
@@ -2533,12 +2540,14 @@ int insert_file(struct files_struct *open_files, struct file *file, int low_fd,
 	kref_get(&file->f_kref, 1);
 	open_files->fd[slot].fd_file = file;
 	open_files->fd[slot].fd_flags = 0;
+	if (cloexec)
+		open_files->fd[slot].fd_flags |= FD_CLOEXEC;
 	spin_unlock(&open_files->lock);
 	return slot;
 }
 
 /* Closes all open files.  Mostly just a "put" for all files.  If cloexec, it
- * will only close files that are opened with O_CLOEXEC. */
+ * will only close the FDs with FD_CLOEXEC (opened with O_CLOEXEC or fcntld). */
 void close_all_files(struct files_struct *open_files, bool cloexec)
 {
 	struct file *file;
@@ -2556,7 +2565,7 @@ void close_all_files(struct files_struct *open_files, bool cloexec)
 			/* no file == 9ns uses the FD.  they will deal with it */
 			if (!file)
 				continue;
-			if (cloexec && !(open_files->fd[i].fd_flags & O_CLOEXEC))
+			if (cloexec && !(open_files->fd[i].fd_flags & FD_CLOEXEC))
 				continue;
 			/* Actually close the file */
 			open_files->fd[i].fd_file = 0;

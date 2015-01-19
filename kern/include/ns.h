@@ -977,7 +977,7 @@ void cmderror(struct cmdbuf *cb, char *s);
 struct cmdtab *lookupcmd(struct cmdbuf *cb, struct cmdtab *ctab, int nctab);
 
 /* kern/src/ns/sysfile.c */
-int newfd(struct chan *c);
+int newfd(struct chan *c, bool oflags);
 struct chan *fdtochan(struct fgrp *f, int fd, int mode, int chkmnt, int iref);
 long kchanio(void *vc, void *buf, int n, int mode);
 int openmode(uint32_t o);

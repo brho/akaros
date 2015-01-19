@@ -486,7 +486,7 @@ void file_release(struct kref *kref);
 struct file *get_file_from_fd(struct files_struct *open_files, int fd);
 struct file *put_file_from_fd(struct files_struct *open_files, int file_desc);
 int insert_file(struct files_struct *open_files, struct file *file, int low_fd,
-                bool must);
+                bool must, bool cloexec);
 void close_all_files(struct files_struct *open_files, bool cloexec);
 void clone_files(struct files_struct *src, struct files_struct *dst);
 int do_chdir(struct fs_struct *fs_env, char *path);
@@ -500,7 +500,7 @@ extern struct inode_operations dummy_i_op;
 extern struct dentry_operations dummy_d_op;
 
 int put_fd(struct files_struct *open_files, int file_desc);
-int get_fd(struct files_struct *open_files, int low_fd);
+int get_fd(struct files_struct *open_files, int low_fd, int cloexec);
 int claim_fd(struct files_struct *open_files, int file_desc);
 
 #endif /* ROS_KERN_VFS_H */

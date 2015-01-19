@@ -1303,7 +1303,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	/* VFS */
 	if (file) {
 		/* stores the ref to file */
-		fd = insert_file(&p->open_files, file, 0, FALSE);
+		fd = insert_file(&p->open_files, file, 0, FALSE, oflag & O_CLOEXEC);
 		kref_put(&file->f_kref);	/* drop our ref */
 		if (fd < 0)
 			warn("File insertion failed");
@@ -1469,9 +1469,10 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 		return -1;
 	}
 
+	/* TODO: these are racy */
 	switch (cmd) {
 		case (F_DUPFD):
-			retval = insert_file(&p->open_files, file, arg, FALSE);
+			retval = insert_file(&p->open_files, file, arg, FALSE, FALSE);
 			if (retval < 0) {
 				set_errno(-retval);
 				retval = -1;
@@ -1481,8 +1482,13 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 			retval = p->open_files.fd[fd].fd_flags;
 			break;
 		case (F_SETFD):
-			if (arg == FD_CLOEXEC)
-				file->f_flags |= O_CLOEXEC;
+			/* I'm considering not supporting this at all.  They must do it at
+			 * open time or fix their buggy/racy code. */
+			spin_lock(&p->open_files.lock);
+			if (arg & FD_CLOEXEC)
+				p->open_files.fd[fd].fd_flags |= FD_CLOEXEC;
+			retval = p->open_files.fd[fd].fd_flags;
+			spin_unlock(&p->open_files.lock);
 			break;
 		case (F_GETFL):
 			retval = file->f_flags;
@@ -2174,7 +2180,8 @@ static intreg_t sys_dup_fds_to(struct proc *p, unsigned int pid,
 		map[i].ok = -1;
 		file = get_file_from_fd(&p->open_files, map[i].parentfd);
 		if (file) {
-			slot = insert_file(&child->open_files, file, map[i].childfd, TRUE);
+			slot = insert_file(&child->open_files, file, map[i].childfd, TRUE,
+			                   FALSE);
 			if (slot == map[i].childfd) {
 				map[i].ok = 0;
 				ret++;

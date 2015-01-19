@@ -53,7 +53,7 @@ static int growfd(struct fgrp *f, int fd)
 	return 0;
 }
 
-int newfd(struct chan *c)
+int newfd(struct chan *c, bool oflags)
 {
 	int i;
 	struct fgrp *f = current->fgrp;
@@ -68,7 +68,7 @@ int newfd(struct chan *c)
 	 * know if we closed anything.  Since we share the FD numbers with the VFS,
 	 * there is no way to know that. */
 #if 1	// VFS hack
-	i = get_fd(&current->open_files, 0);
+	i = get_fd(&current->open_files, 0, oflags & O_CLOEXEC);
 #else 	// 9ns style
 	/* TODO: use a unique integer allocator */
 	for (i = f->minfd; i < f->nfd; i++)
@@ -278,7 +278,7 @@ int syscreate(char *path, int mode, uint32_t perm)
 		cclose(c);
 		nexterror();
 	}
-	fd = newfd(c);
+	fd = newfd(c, mode);	/* 9ns mode is the O_FLAGS and perm is glibc mode */
 	if (fd < 0)
 		error(Enofd);
 	poperror();
@@ -339,7 +339,7 @@ int sysdup(int old, int new)
 			cclose(c);
 			nexterror();
 		}
-		fd = newfd(c);
+		fd = newfd(c, 0);
 		if (fd < 0)
 			error(Enofd);
 		poperror();
@@ -449,7 +449,7 @@ int sysfauth(int fd, char *aname)
 		nexterror();
 	}
 
-	fd = newfd(ac);
+	fd = newfd(ac, 0);
 	if (fd < 0)
 		error(Enofd);
 	poperror();	/* ac */
@@ -529,10 +529,10 @@ int syspipe(int fd[2])
 		error(Egreg);
 	c[0] = d->open(c[0], ORDWR);
 	c[1] = d->open(c[1], ORDWR);
-	fd[0] = newfd(c[0]);
+	fd[0] = newfd(c[0], 0);
 	if (fd[0] < 0)
 		error(Enofd);
-	fd[1] = newfd(c[1]);
+	fd[1] = newfd(c[1], 0);
 	if (fd[1] < 0)
 		error(Enofd);
 	poperror();
@@ -705,7 +705,7 @@ int sysopen(char *path, int vfs_flags)
 		cclose(c);
 		nexterror();
 	}
-	fd = newfd(c);
+	fd = newfd(c, vfs_flags);
 	if (fd < 0)
 		error(Enofd);
 	poperror();
