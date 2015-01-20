@@ -109,25 +109,13 @@ typedef unsigned long uintreg_t;
 #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 
 // Return the integer logarithm of the value provided rounded down
-#if __x86_64__ || __i386__
-// Should be __has_builtin(__builtin_clz) but gcc doesn't support it
-// x86 compiler intrinsic supported by both > gcc4.6 and LLVM > 1.5
 static inline uintptr_t LOG2_DOWN(uintptr_t value)
 {
-	value |= 1;
+	value |= 1;  // clz(0) is undefined, just or in a 1 bit and define it
+	// intrinsic __builtin_clz supported by both > gcc4.6 and LLVM > 1.5
 	return (sizeof(value) == 8) ? 63 - __builtin_clzll(value)
 	                            : 31 - __builtin_clz(value);
 }
-#else
-// TODO(gvdl): Does the gcc on riscv support __builtin_clz?
-#warning "Using loop based LOG2_DOWN, no __builtin_clz?"
-static inline uintptr_t LOG2_DOWN(uintptr_t value)
-{
-	uintptr_t l = 0;
-	while( (value >> l) > 1 ) ++l;
-	return l;
-}
-#endif
 
 // Return the integer logarithm of the value provided rounded up
 static inline uintptr_t LOG2_UP(uintptr_t value)
