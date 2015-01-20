@@ -22,10 +22,6 @@
 
 bool lapic_check_spurious(int trap_nr)
 {
-#ifndef CONFIG_ENABLE_MPTABLES
-	/* no MP tables doesn't use the new spurious vec */
-	return FALSE;
-#endif
 	/* FYI: lapic_spurious is 255 on qemu and 15 on the nehalem..  We actually
 	 * can set bits 4-7, and P6s have 0-3 hardwired to 0.  YMMV.  NxM seems to
 	 * say the lower 3 bits are usually 1.  We'll see if the assert trips.

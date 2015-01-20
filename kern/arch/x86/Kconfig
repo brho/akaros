@@ -55,13 +55,6 @@ config NOMTRRS
 		Old debug option from when we were having issues with MTRRs.  If your
 		machine won't boot, try turning this on.
 
-config ENABLE_MPTABLES
-	bool "Enable MP Tables"
-	default n
-	help
-		Turns on basic MP tables support.  If you want to route IRQs, you'll
-		need this, until we get around to parsing ACPI tables.
-
 config KB_CORE0_ONLY
 	bool "Keyboard from core0 only"
 	default n

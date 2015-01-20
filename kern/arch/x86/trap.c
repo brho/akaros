@@ -165,7 +165,6 @@ void idt_init(void)
 	pic_remap();
 	pic_mask_all();
 
-#ifdef CONFIG_ENABLE_MPTABLES
 	int ncleft = MAX_NUM_CPUS;
 
 	ncleft = mpsinit(ncleft);
@@ -174,12 +173,6 @@ void idt_init(void)
 
 	apiconline();
 	ioapiconline();
-#else
-	// set LINT0 to receive ExtINTs (KVM's default).  At reset they are 0x1000.
-	write_mmreg32(LAPIC_LVT_LINT0, 0x700);
-	lapic_enable();
-	unmask_lapic_lvt(LAPIC_LVT_LINT0);
-#endif
 
 	/* the lapic IRQs need to be unmasked on a per-core basis */
 	register_irq(IdtLAPIC_TIMER, timer_interrupt, NULL,

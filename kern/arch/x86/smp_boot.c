@@ -309,18 +309,7 @@ uintptr_t smp_main(void)
 	// Loads the same IDT used by the other cores
 	asm volatile("lidt %0" : : "m"(idt_pd));
 
-#ifdef CONFIG_ENABLE_MPTABLES
 	apiconline();
-#else
-	// APIC setup
-	// set LINT0 to receive ExtINTs (KVM's default).  At reset they are 0x1000.
-	write_mmreg32(LAPIC_LVT_LINT0, 0x700);
-	// mask it to shut it up for now.  Doesn't seem to matter yet, since both
-	// KVM and Bochs seem to only route the PIC to core0.
-	mask_lapic_lvt(LAPIC_LVT_LINT0);
-	// and then turn it on
-	lapic_enable();
-#endif
 
 	// set a default logical id for now
 	lapic_set_logid(lapic_get_id());
