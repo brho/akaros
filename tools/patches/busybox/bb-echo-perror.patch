@@ -8,20 +8,18 @@
  	const char *arg;
  #if !ENABLE_FEATURE_FANCY_ECHO
  	enum {
-@@ -101,7 +102,11 @@
+@@ -101,7 +102,9 @@
  
  		if (!eflag) {
  			/* optimization for very common case */
 -			fputs(arg, stdout);
-+			errno = 0;
-+			fputs(arg, stdout);
-+			if (errno)
++			ret = fputs(arg, stdout);
++			if (ret == EOF)
 +				perror("echo failed");
-+
  		} else while ((c = *arg++)) {
  			if (c == eflag) {	/* Check for escape seq. */
  				if (*arg == 'c') {
-@@ -141,7 +146,11 @@
+@@ -141,7 +144,11 @@
  		bb_putchar('\n');
  	}
   ret:
