@@ -61,7 +61,6 @@ typedef uintptr_t bus_dmamap_t;
 typedef uintptr_t bus_dma_segment_t;
 typedef uintptr_t bus_space_tag_t;
 typedef uintptr_t vm_offset_t;
-typedef int device_t;
 // WTF ...
 typedef uint64_t uintmax_t;
 

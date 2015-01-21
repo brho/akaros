@@ -225,10 +225,10 @@ static struct bxe_device_type bxe_devs[] = {
 /*
  * FreeBSD device entry points.
  */
-static int bxe_probe(device_t);
-static int bxe_attach(device_t);
-static int bxe_detach(device_t);
-static int bxe_shutdown(device_t);
+static int bxe_probe(struct pci_device *);
+static int bxe_attach(struct pci_device *);
+static int bxe_detach(struct pci_device *);
+static int bxe_shutdown(struct pci_device *);
 
 /*
  * FreeBSD KLD module/device interface event handler method.
@@ -2497,22 +2497,21 @@ bxe_debug_print_ind_table(struct bxe_adapter               *sc,
  * This is the driver entry function called from the "kldload" command.
  *
  * Returns:
- *   BUS_PROBE_DEFAULT on success, positive value on failure.
+ *   0 on success, positive value on failure.
  */
-#warning "no probe function"
 
-static int
-bxe_probe(device_t dev)
+int bxe_probe(struct pci_device *dev)
 {
-#if 0
     struct bxe_adapter *sc;
     struct bxe_device_type *t;
     char *descbuf;
     uint16_t did, sdid, svid, vid;
 
     /* Find our device structure */
-    sc = device_get_softc(dev);
-    sc->pcidev= dev;
+		// BSD had the controllers already alloced.  Plan 9 does it after they
+		// are probed
+//    sc = device_get_softc(dev);
+//    sc->pcidev= dev;
     t = bxe_devs;
 
     /* Get the data for the device to be probed. */
@@ -2520,10 +2519,6 @@ bxe_probe(device_t dev)
     did  = pci_get_device(dev);
     svid = pci_get_subvendor(dev);
     sdid = pci_get_subdevice(dev);
-
-    BLOGD(sc, DBG_LOAD,
-          "%s(); VID = 0x%04X, DID = 0x%04X, SVID = 0x%04X, "
-          "SDID = 0x%04X\n", __FUNCTION__, vid, did, svid, sdid);
 
     /* Look through the list of known devices for a match. */
     while (t->bxe_name != NULL) {
@@ -2537,18 +2532,19 @@ bxe_probe(device_t dev)
             /* Print out the device identity. */
             snprintf(descbuf, BXE_DEVDESC_MAX,
                      "%s (%c%d) BXE v:%s\n", t->bxe_name,
-                     (((pcidev_read32(dev, PCIR_REVID) &
+                     (((pcidev_read32(dev, PCI_REVID_REG) &
                         0xf0) >> 4) + 'A'),
-                     (pcidev_read32(dev, PCIR_REVID) & 0xf),
+                     (pcidev_read32(dev, PCI_REVID_REG) & 0xf),
                      BXE_DRIVER_VERSION);
 
-            device_set_desc_copy(dev, descbuf);
+			/* Could add this field to our pcidevs, might be useful */
+            //device_set_desc_copy(dev, descbuf);
+            printk(descbuf);
             kfree(descbuf); /* M_TEMP */
-            return (BUS_PROBE_DEFAULT);
+            return 0;
         }
         t++;
     }
-#endif
     return (ENXIO);
 }
 
@@ -16209,7 +16205,7 @@ bxe_add_sysctls(struct bxe_adapter *sc)
  *   0 = Success, >0 = Failure
  */
 static int
-bxe_attach(device_t dev)
+bxe_attach(struct bxe_adapter *sc)
 {
     struct bxe_adapter *sc;
 
@@ -16367,7 +16363,7 @@ bxe_attach(device_t dev)
  *   0 = Success, >0 = Failure
  */
 static int
-bxe_detach(device_t dev)
+bxe_detach(struct pcidev *dev)
 {
     struct bxe_adapter *sc;
     if_t ifp;
@@ -16442,7 +16438,7 @@ bxe_detach(device_t dev)
  *   Nothing
  */
 static int
-bxe_shutdown(device_t dev)
+bxe_shutdown(struct pcidev *dev)
 {
     struct bxe_adapter *sc;
 

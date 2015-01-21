@@ -328,13 +328,11 @@ static void bxepci(void)
 		if (pcidev->class != 0x02 || pcidev->subclass != 0x00)
 			continue;
 		id = pcidev->dev_id << 16 | pcidev->ven_id;
-		switch (id) {
-			default:
-				continue;
-			/* TODO: cases for the IDs this driver supports */
-			case 1:
-				break;
-		}
+
+		extern int bxe_probe(struct pci_device *dev);
+		if (bxe_probe(pcidev))
+			continue;
+
 		printk("bxe driver found 0x%04x:%04x at %02x:%02x.%x\n",
 			   pcidev->ven_id, pcidev->dev_id,
 			   pcidev->bus, pcidev->dev, pcidev->func);
@@ -399,6 +397,9 @@ static int bxepnp(struct ether *edev)
 	 * MMIO/port setup */
 	run_once(bxepci());
 
+
+return -1;
+
 	/* Any adapter matches if no edev->port is supplied, otherwise the ports
 	 * must match. */
 	for (;;) {	// check all ctlrs
@@ -444,5 +445,5 @@ static int bxepnp(struct ether *edev)
 
 linker_func_3(etherbxelink)
 {
-	//addethercard("bxe", bxepnp);
+	addethercard("bxe", bxepnp);
 }
