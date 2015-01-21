@@ -2555,7 +2555,6 @@ bxe_probe(device_t dev)
 static void
 bxe_init_mutexes(struct bxe_adapter *sc)
 {
-#if 0
 #ifdef BXE_CORE_LOCK_SX
     snprintf(sc->core_sx_name, sizeof(sc->core_sx_name),
              "bxe%d_core_lock", sc->unit);
@@ -2563,36 +2562,35 @@ bxe_init_mutexes(struct bxe_adapter *sc)
 #else
     snprintf(sc->core_mtx_name, sizeof(sc->core_mtx_name),
              "bxe%d_core_lock", sc->unit);
-    mtx_init(&sc->core_mtx, sc->core_mtx_name, NULL, MTX_DEF);
+    qlock_init(&sc->core_mtx);
 
     snprintf(sc->sp_mtx_name, sizeof(sc->sp_mtx_name),
              "bxe%d_sp_lock", sc->unit);
-    mtx_init(&sc->sp_mtx, sc->sp_mtx_name, NULL, MTX_DEF);
+    qlock_init(&sc->sp_mtx);
 
     snprintf(sc->dmae_mtx_name, sizeof(sc->dmae_mtx_name),
              "bxe%d_dmae_lock", sc->unit);
-    mtx_init(&sc->dmae_mtx, sc->dmae_mtx_name, NULL, MTX_DEF);
+    qlock_init(&sc->dmae_mtx);
 
     snprintf(sc->port.phy_mtx_name, sizeof(sc->port.phy_mtx_name),
              "bxe%d_phy_lock", sc->unit);
-    mtx_init(&sc->port.phy_mtx, sc->port.phy_mtx_name, NULL, MTX_DEF);
+    qlock_init(&sc->port.phy_mtx);
 
     snprintf(sc->fwmb_mtx_name, sizeof(sc->fwmb_mtx_name),
              "bxe%d_fwmb_lock", sc->unit);
-    mtx_init(&sc->fwmb_mtx, sc->fwmb_mtx_name, NULL, MTX_DEF);
+    qlock_init(&sc->fwmb_mtx);
 
     snprintf(sc->print_mtx_name, sizeof(sc->print_mtx_name),
              "bxe%d_print_lock", sc->unit);
-    mtx_init(&(sc->print_mtx), sc->print_mtx_name, NULL, MTX_DEF);
+    qlock_init(&(sc->print_mtx));
 
     snprintf(sc->stats_mtx_name, sizeof(sc->stats_mtx_name),
              "bxe%d_stats_lock", sc->unit);
-    mtx_init(&(sc->stats_mtx), sc->stats_mtx_name, NULL, MTX_DEF);
+    qlock_init(&(sc->stats_mtx));
 
     snprintf(sc->mcast_mtx_name, sizeof(sc->mcast_mtx_name),
              "bxe%d_mcast_lock", sc->unit);
-    mtx_init(&(sc->mcast_mtx), sc->mcast_mtx_name, NULL, MTX_DEF);
-#endif
+    qlock_init(&(sc->mcast_mtx));
 #endif
 }
 
@@ -9926,11 +9924,11 @@ bxe_init_eth_fp(struct bxe_adapter *sc,
 
     snprintf(fp->tx_mtx_name, sizeof(fp->tx_mtx_name),
              "bxe%d_fp%d_tx_lock", sc->unit, idx);
-    //mtx_init(&fp->tx_mtx, fp->tx_mtx_name, NULL, MTX_DEF);
+    qlock_init(&fp->tx_mtx);
 
     snprintf(fp->rx_mtx_name, sizeof(fp->rx_mtx_name),
              "bxe%d_fp%d_rx_lock", sc->unit, idx);
-    //mtx_init(&fp->rx_mtx, fp->rx_mtx_name, NULL, MTX_DEF);
+    qlock_init(&fp->rx_mtx);
 
     fp->igu_sb_id = (sc->igu_base_sb + idx + CNIC_SUPPORT(sc));
     fp->fw_sb_id = (sc->base_fw_ndsb + idx + CNIC_SUPPORT(sc));
