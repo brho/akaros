@@ -12451,6 +12451,10 @@ bxe_init_mcast_macs_list(struct bxe_adapter                 *sc,
     }
 
     for(i=0; i< mc_count; i++) {
+		if (!m) {
+			warn("Ran out of m's!");
+			break;
+		}
         bcopy(m->addr, mc_mac->mac, ETH_ADDR_LEN);
         ECORE_LIST_PUSH_TAIL(&mc_mac->link, &p->mcast_list);
 
