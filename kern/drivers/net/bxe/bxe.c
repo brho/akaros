@@ -12686,9 +12686,7 @@ bxe_update_drv_flags(struct bxe_adapter *sc,
 
 /* periodic timer callout routine, only runs when the interface is up */
 
-static void
-bxe_alarm_handler(struct alarm_waiter *waiter,
-                                struct hw_trapframe *hw_tf)
+static void bxe_alarm_handler(struct alarm_waiter *waiter)
 {
 	struct timer_chain *tchain = &per_cpu_info[0].tchain;
 
@@ -12792,7 +12790,7 @@ bxe_periodic_start(struct bxe_adapter *sc)
 
 	if (! sc->waiter) {
 		sc->waiter = kzmalloc(sizeof(struct alarm_waiter), KMALLOC_WAIT);
-		init_awaiter_irq(sc->waiter, bxe_alarm_handler);
+		init_awaiter(sc->waiter, bxe_alarm_handler);
 	}
 	reset_alarm_rel(tchain, sc->waiter, bxe_periodic_alarm);
 }
