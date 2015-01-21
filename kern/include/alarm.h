@@ -18,11 +18,18 @@
  * core's pcpu tchain (though it probably costs an extra IRQ).  Note there is a
  * lock ordering, tchains before awaiters (when they are grabbed together).
  *
+ * There are two options for pcpu alarms: hard IRQ and routine KMSG (RKM).
+ * IRQ alarms are run directly in the timer interrupt handler and take a hw_tf
+ * parameter in addition to the standard alarm_waiter.  RKM alarms are executed
+ * when kernel messages are executed, which is out of IRQ context.  RKMs are
+ * safer, since you can sleep (qlock, some kmalloc, etc) and you do not need
+ * irqsave locks.  To use an IRQ alarm, init the waiter with init_awaiter_irq().
+ *
  * Quick howto, using the pcpu tchains:
  * 	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
  * 1) To block your kthread on an alarm:
  * 	struct alarm_waiter a_waiter;
- * 	init_awaiter(&a_waiter, 0);
+ * 	init_awaiter(&a_waiter, 0); // or init_awaiter_irq() for IRQ ctx alarms
  * 	set_awaiter_rel(&a_waiter, USEC);
  * 	set_alarm(tchain, &a_waiter);
  * 	sleep_on_awaiter(&a_waiter);
