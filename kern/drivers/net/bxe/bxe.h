@@ -44,6 +44,7 @@
 #include <mii.h>
 #include <umem.h>
 
+#include "bsd_bus.h"
 
 /* MACROS for conversion to AKAROS. Might we want this stuff someday? */
 #define __predict_false(x) (x)
@@ -53,49 +54,14 @@
 /* TYPEDEFS for conversion to AKAROS. These are temporary, but it makes it easier to see what is in need of change. */
 typedef struct netif *if_t;
 typedef uint64_t ift_counter;
-typedef uintptr_t bus_addr_t;
-typedef uintptr_t bus_size_t;
-typedef uintptr_t bus_space_handle_t;
-typedef void* bus_dma_tag_t;
-typedef uintptr_t bus_dmamap_t;
-typedef uintptr_t bus_dma_segment_t;
-typedef uintptr_t bus_space_tag_t;
 typedef uintptr_t vm_offset_t;
 // WTF ...
 typedef uint64_t uintmax_t;
-
-#define bus_dma_tag_create(...) (0)
-#define bus_dma_tag_destroy(...)
-#define bus_dmamap_sync(...)
-#define bus_dmamap_unload(...)
 
 // All the flag values are wrong for now; ignore them.
 #define if_getflags(netif) (netif)->feat
 #define if_setflags(sc)
 
-/* FreeBSD x86/include/bus.h
- * Bus read/write barrier methods.
- *
- *      void bus_space_barrier(bus_space_tag_t tag, bus_space_handle_t bsh,
- *                             bus_size_t offset, bus_size_t len, int flags);
- *
- *
- * Note that BUS_SPACE_BARRIER_WRITE doesn't do anything other than
- * prevent reordering by the compiler; all Intel x86 processors currently
- * retire operations outside the CPU in program order.
- */
-#define BUS_SPACE_BARRIER_READ  0x01            /* force read barrier */
-#define BUS_SPACE_BARRIER_WRITE 0x02            /* force write barrier */
-
-static inline void
-bus_space_barrier(bus_space_tag_t tag, bus_space_handle_t bsh,
-                  bus_size_t offset, bus_size_t len, int flags)
-{
-	if (flags & BUS_SPACE_BARRIER_READ)
-		bus_rmb();
-	else
-		bus_wmb();
-}
 
 #define MA_OWNED 0
 #define mtx_assert(lock, thing) assert(1)
