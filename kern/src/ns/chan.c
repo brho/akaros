@@ -1386,7 +1386,7 @@ void validname(char *aname, int slashok)
 		} else {
 			if (isfrog[c])
 				if (!slashok || c != '/') {
-					error("%s: %q", Ebadchar, aname);
+					error("%s: %s (%p), at char %c", Ebadchar, aname, aname, c);
 				}
 			name++;
 		}
