@@ -640,8 +640,7 @@ rwalk(Job *job, Mfile *mf)
 				qid.path = Qcs;
 				goto Found;
 			}
-			err = malloc(4096);
-			snprintf(err, 4096,"%s:file does not exist", elems[i]);
+			err = "file does not exist";
 			break;
 		}
 	}
@@ -657,10 +656,6 @@ rwalk(Job *job, Mfile *mf)
 	if(err == NULL)
 		mf->qid = qid;
 	sendmsg(job, err);
-	free(err);
-	/* shoot me. */
-	/* we can fix this or we can get a real language. Guess how Ron votes? */
-	err = "file does not exist";
 	return err;
 }
 
