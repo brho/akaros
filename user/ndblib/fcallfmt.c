@@ -47,21 +47,21 @@ int printf_fcall(FILE * stream, const struct printf_info *info,
 	switch (type) {
 		case Tversion:	/* 100 */
 			retval +=
-				fprintf(stream, "Tversion tag %ud msize %ud version '%s'", tag,
+				fprintf(stream, "Tversion tag %u msize %u version '%s' ", tag,
 						f->msize, f->version);
 			break;
 		case Rversion:
 			retval +=
-				fprintf(stream, "Rversion tag %ud msize %ud version '%s'", tag,
+				fprintf(stream, "Rversion tag %u msize %u version '%s' ", tag,
 						f->msize, f->version);
 			break;
 		case Tauth:	/* 102 */
 			retval +=
-				fprintf(stream, "Tauth tag %ud afid %d uname %s aname %s", tag,
+				fprintf(stream, "Tauth tag %u afid %d uname %s aname %s ", tag,
 						f->afid, f->uname, f->aname);
 			break;
 		case Rauth:
-			retval += fprintf(stream, "Rauth tag %ud qid " QIDFMT, tag,
+			retval += fprintf(stream, "Rauth tag %u qid " QIDFMT, tag,
 							  f->aqid.path, f->aqid.vers, qidtype(tmp,
 																  f->aqid.
 																  type));
@@ -69,105 +69,105 @@ int printf_fcall(FILE * stream, const struct printf_info *info,
 		case Tattach:	/* 104 */
 			retval +=
 				fprintf(stream,
-						"Tattach tag %ud fid %d afid %d uname %s aname %s", tag,
+						"Tattach tag %u fid %d afid %d uname %s aname %s ", tag,
 						fid, f->afid, f->uname, f->aname);
 			break;
 		case Rattach:
-			retval += fprintf(stream, "Rattach tag %ud qid " QIDFMT, tag,
+			retval += fprintf(stream, "Rattach tag %u qid " QIDFMT, tag,
 							  f->qid.path, f->qid.vers, qidtype(tmp,
 																f->qid.type));
 			break;
 		case Rerror:	/* 107; 106 (Terror) illegal */
-			retval += fprintf(stream, "Rerror tag %ud ename %s", tag, f->ename);
+			retval += fprintf(stream, "Rerror tag %u ename %s ", tag, f->ename);
 			break;
 		case Tflush:	/* 108 */
 			retval +=
-				fprintf(stream, "Tflush tag %ud oldtag %ud", tag, f->oldtag);
+				fprintf(stream, "Tflush tag %u oldtag %u ", tag, f->oldtag);
 			break;
 		case Rflush:
-			retval += fprintf(stream, "Rflush tag %ud", tag);
+			retval += fprintf(stream, "Rflush tag %u ", tag);
 			break;
 		case Twalk:	/* 110 */
 			retval +=
-				fprintf(stream, "Twalk tag %ud fid %d newfid %d nwname %d ",
+				fprintf(stream, "Twalk tag %u fid %d newfid %d nwname %d  ",
 						tag, fid, f->newfid, f->nwname);
 			if (f->nwname <= MAXWELEM)
 				for (i = 0; i < f->nwname; i++)
-					retval += fprintf(stream, "%d:%s ", i, f->wname[i]);
+					retval += fprintf(stream, "%d:%s  ", i, f->wname[i]);
 			break;
 		case Rwalk:
 			retval +=
-				fprintf(stream, "Rwalk tag %ud nwqid %ud ", tag, f->nwqid);
+				fprintf(stream, "Rwalk tag %u nwqid %u  ", tag, f->nwqid);
 			if (f->nwqid <= MAXWELEM)
 				for (i = 0; i < f->nwqid; i++) {
 					q = &f->wqid[i];
-					retval += fprintf(stream, "%d:" QIDFMT " ", i,
+					retval += fprintf(stream, "%d:" QIDFMT "  ", i,
 									  q->path, q->vers, qidtype(tmp, q->type));
 				}
 			break;
 		case Topen:	/* 112 */
 			retval +=
-				fprintf(stream, "Topen tag %ud fid %ud mode %d", tag, fid,
+				fprintf(stream, "Topen tag %u fid %u mode %d ", tag, fid,
 						f->mode);
 			break;
 		case Ropen:
 			retval +=
-				fprintf(stream, "Ropen tag %ud qid " QIDFMT " iounit %ud ", tag,
+				fprintf(stream, "Ropen tag %u qid " QIDFMT " iounit %u  ", tag,
 						f->qid.path, f->qid.vers, qidtype(tmp, f->qid.type),
 						f->iounit);
 			break;
 		case Tcreate:	/* 114 */
 			retval +=
 				fprintf(stream,
-						"Tcreate tag %ud fid %ud name %s perm %d mode %d", tag,
+						"Tcreate tag %u fid %u name %s perm %d mode %d ", tag,
 						fid, f->name, (uint32_t) f->perm, f->mode);
 			break;
 		case Rcreate:
 			retval +=
-				fprintf(stream, "Rcreate tag %ud qid " QIDFMT " iounit %ud ",
+				fprintf(stream, "Rcreate tag %u qid " QIDFMT " iounit %u  ",
 						tag, f->qid.path, f->qid.vers, qidtype(tmp,
 															   f->qid.type),
 						f->iounit);
 			break;
 		case Tread:	/* 116 */
 			retval +=
-				fprintf(stream, "Tread tag %ud fid %d offset %lld count %ud",
+				fprintf(stream, "Tread tag %u fid %d offset %lld count %u ",
 						tag, fid, f->offset, f->count);
 			break;
 		case Rread:
 			retval +=
-				fprintf(stream, "Rread tag %ud count %ud ", tag, f->count);
+				fprintf(stream, "Rread tag %u count %u  ", tag, f->count);
 			retval += dumpsome(stream, f->data, f->count);
 			break;
 		case Twrite:	/* 118 */
 			retval +=
-				fprintf(stream, "Twrite tag %ud fid %d offset %lld count %ud ",
+				fprintf(stream, "Twrite tag %u fid %d offset %lld count %u  ",
 						tag, fid, f->offset, f->count);
 			retval += dumpsome(stream, f->data, f->count);
 			break;
 		case Rwrite:
 			retval +=
-				fprintf(stream, "Rwrite tag %ud count %ud", tag, f->count);
+				fprintf(stream, "Rwrite tag %u count %u ", tag, f->count);
 			break;
 		case Tclunk:	/* 120 */
-			retval += fprintf(stream, "Tclunk tag %ud fid %ud", tag, fid);
+			retval += fprintf(stream, "Tclunk tag %u fid %u ", tag, fid);
 			break;
 		case Rclunk:
-			retval += fprintf(stream, "Rclunk tag %ud", tag);
+			retval += fprintf(stream, "Rclunk tag %u ", tag);
 			break;
 		case Tremove:	/* 122 */
-			retval += fprintf(stream, "Tremove tag %ud fid %ud", tag, fid);
+			retval += fprintf(stream, "Tremove tag %u fid %u ", tag, fid);
 			break;
 		case Rremove:
-			retval += fprintf(stream, "Rremove tag %ud", tag);
+			retval += fprintf(stream, "Rremove tag %u ", tag);
 			break;
 		case Tstat:	/* 124 */
-			retval += fprintf(stream, "Tstat tag %ud fid %ud", tag, fid);
+			retval += fprintf(stream, "Tstat tag %u fid %u ", tag, fid);
 			break;
 		case Rstat:
-			retval += fprintf(stream, "Rstat tag %ud ", tag);
+			retval += fprintf(stream, "Rstat tag %u  ", tag);
 			if (f->nstat > sizeof tmp)
-				retval += fprintf(stream, " stat(%d bytes)", f->nstat);
+				retval += fprintf(stream, " stat(%d bytes) ", f->nstat);
 			else {
 				d = (struct dir *)tmp;
 				convM2D(f->stat, f->nstat, d, (char *)(d + 1));
@@ -176,9 +176,9 @@ int printf_fcall(FILE * stream, const struct printf_info *info,
 			}
 			break;
 		case Twstat:	/* 126 */
-			retval += fprintf(stream, "Twstat tag %ud fid %ud", tag, fid);
+			retval += fprintf(stream, "Twstat tag %u fid %u ", tag, fid);
 			if (f->nstat > sizeof tmp)
-				retval += fprintf(stream, " stat(%d bytes)", f->nstat);
+				retval += fprintf(stream, " stat(%d bytes) ", f->nstat);
 			else {
 				d = (struct dir *)tmp;
 				convM2D(f->stat, f->nstat, d, (char *)(d + 1));
@@ -187,10 +187,10 @@ int printf_fcall(FILE * stream, const struct printf_info *info,
 			}
 			break;
 		case Rwstat:
-			retval += fprintf(stream, "Rwstat tag %ud", tag);
+			retval += fprintf(stream, "Rwstat tag %u ", tag);
 			break;
 		default:
-			retval += fprintf(stream, "unknown type %d", type);
+			retval += fprintf(stream, "unknown type %d ", type);
 	}
 	return retval;
 }
@@ -228,7 +228,7 @@ static int fdirconv(FILE * stream, struct dir *d)
 	return fprintf(stream, "'%s' '%s' '%s' '%s' "
 				   "q " QIDFMT " m %#luo "
 				   "at %ld mt %ld l %lld "
-				   "t %d d %d",
+				   "t %d d %d ",
 				   d->name, d->uid, d->gid, d->muid,
 				   d->qid.path, d->qid.vers, qidtype(tmp, d->qid.type), d->mode,
 				   d->atime, d->mtime, d->length, d->type, d->dev);
@@ -257,12 +257,12 @@ static int dumpsome(FILE * stream, char *buf, long count)
 			printable = 0;
 	retval += fprintf(stream, "'");
 	if (printable) {
-		retval += fprintf(stream, "%s", buf);
+		retval += fprintf(stream, "%s ", buf);
 	} else {
 		for (i = 0; i < count; i++) {
 			if (i > 0 && i % 4 == 0)
 				retval += fprintf(stream, " ");
-			retval += fprintf(stream, "%2.2ux", buf[i]);
+			retval += fprintf(stream, "%2.2ux ", buf[i]);
 		}
 	}
 	retval += fprintf(stream, "'");
