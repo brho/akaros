@@ -502,6 +502,15 @@ uintptr_t pci_get_membar(struct pci_device *pcidev, int bir)
 	        pcidev->bar[bir].mmio_base32);
 }
 
+uintptr_t pci_get_iobar(struct pci_device *pcidev, int bir)
+{
+	if (bir >= pcidev->nr_bars)
+		return 0;
+	if (!pci_is_iobar(pcidev->bar[bir].raw_bar))
+		return 0;
+	return pci_getiobar32(pcidev->bar[bir].raw_bar);
+}
+
 uint16_t pci_get_vendor(struct pci_device *pcidev)
 {
 	return pcidev->ven_id;
