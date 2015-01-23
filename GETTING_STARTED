@@ -145,68 +145,29 @@ actually fill KFS properly.
 
 3.4 Busybox
 ---------
-If you don't care about busybox or just want to get started immediately, skip
-this section.
+Busybox provides our shell and some basic utilities.  You almost certainly want
+to build and install busybox.
 
-Other userspace programs, like busybox need to be compiled with the cross
-compiler and then have their binaries copied to kern/kfs/bin (I do this
-manually).
+Userspace programs like busybox need to be compiled with the cross compiler and
+then have their binaries copied to kern/kfs/bin.  Since most everyone wants
+busybox and we have a few patches of our own, we have support for automatically
+building and installing it to KFS.
 
-I'm running busybox 1.17.3, and the config file I use is in
-tools/patches/busybox.  Copy that to your busybox directory (once you download
-and untar it, etc) and name it ".config".  This config file assumes you want
-x86_64-ros-gcc.  If you are builidng for 32 bit x86 or riscv, you will need to
-edit the config file.
+For the default build (x86_64):
 
-You can get busybox from http://www.busybox.net/downloads/.  Eventually I'll
-upgrade, though it hasn't been a big deal yet.
+$ cd tools/apps/busybox
+$ make [x86_64|riscv]
+$ cd -
 
-$ cd BUSYBOXDIR/..
-$ wget http://www.busybox.net/downloads/busybox-1.17.3.tar.bz2
-$ tar -jxvf busybox-1.17.3.tar.bz2
-$ cd AKAROS-ROOT
-$ cp tools/patches/busybox/busybox-1.17.3.config BUSYBOXDIR/.config
+And you should be set.  Check kfs to make sure everything installed.  You
+should get sane results from:
 
-$ cd BUSYBOXDIR
+$ ls -l kern/kfs/bin | grep cat
+lrwxrwxrwx 1 brho brho       7 Jan 23 09:19 cat -> busybox
 
-You'll also want to apply any patches for busybox.  From the busybox directory:
-
-$ patch -p1 < AKAROS-ROOT/tools/patches/busybox/EACH_PATCH_FILE.patch
-$ make
-
-Then I copy the unstripped binary to KFS.
-
-$ cp busybox_unstripped AKAROS-ROOT/kern/kfs/bin/busybox
-
-Note I change the name to busybox (dropping the unstripped).  I want the
-unstripped binary for debugging reasons.
-
-Busybox can do core commands like ls and rm, as well as run a shell (ash), all
-from within one binary.  It can tell which command it should execute based on
-the name of the binary (or symlink to it).  I have a bunch of symlinks for
-whatever 'busybox' programs I want to run inside kern/kfs/bin.
-
-For instance, from my AKAROS-ROOT:
-$ ls -l kern/kfs/bin/ | grep busybox
-lrwxrwxrwx 1 brho brho      7 Aug 24  2010 ash -> busybox
--rwxr-xr-x 1 brho brho 337917 Dec 19 17:39 busybox
-lrwxrwxrwx 1 brho brho      7 Sep 29  2010 cat -> busybox
-lrwxrwxrwx 1 brho brho      7 Sep  1  2010 cp -> busybox
-lrwxrwxrwx 1 brho brho      7 Oct 18 13:12 kill -> busybox
-lrwxrwxrwx 1 brho brho      7 Sep  5  2010 ln -> busybox
-lrwxrwxrwx 1 brho brho      7 Aug 23  2010 ls -> busybox
-lrwxrwxrwx 1 brho brho      7 Sep  5  2010 mkdir -> busybox
-lrwxrwxrwx 1 brho brho      7 Sep  5  2010 rmdir -> busybox
-lrwxrwxrwx 1 brho brho      7 Apr  9  2012 stty -> busybox
-lrwxrwxrwx 1 brho brho      7 Apr  9  2012 tty -> busybox
-
-Note I don't need to update the symlinks (almost ever...).  I just recopy the
-busybox binary whenever I update it.
-
-I think some of the other devs build busybox so that it spits out the links
-into an install directory.  Feel free to do whatever.  I'll probably just add a
-bunch of symlinks to the repos default KFS contents one of these days.
-Incidentally, kern/kfs/* is ignored by git.
+You can customize your busybox installation, including the install prefix, the
+.config file, and make jobs.  Check out the makefile in tools/apps/busybox for
+details.
 
 Now that you've changed KFS, don't forget to remake the kernel.
 
