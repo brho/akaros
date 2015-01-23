@@ -552,3 +552,13 @@ uint16_t pci_get_subdevice(struct pci_device *pcidev)
 	}
 	return -1;
 }
+
+void pci_dump_config(struct pci_device *pcidev, size_t len)
+{
+	if (len > 256)
+		printk("FYI, printing more than 256 bytes of PCI space\n");
+	printk("PCI Config space for %02x:%02x:%02x\n---------------------\n",
+	       pcidev->bus, pcidev->dev, pcidev->func);
+	for (int i = 0; i < len; i += 4)
+		printk("0x%03x | %08x\n", i, pcidev_read32(pcidev, i));
+}
