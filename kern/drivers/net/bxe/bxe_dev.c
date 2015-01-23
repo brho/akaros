@@ -258,6 +258,10 @@ static void bxeattach(struct ether *edev)
 
 	ctlr = edev->ctlr;
 	ctlr->edev = edev;	/* point back to Ether* */
+
+	/* not sure if we'll need/want any of the 9ns stuff */
+	return;
+
 	qlock(&ctlr->alock);
 	/* TODO: make sure we haven't attached already.  If so, just return */
 
@@ -308,7 +312,12 @@ static int bxereset(struct bxe_adapter *ctlr)
 {
 	int ctrl, i, pause, r, swdpio, txcw;
 
-	run_once(qlock_init(&bxe_prev_mtx));
+	/* despite the name, we attach at reset time.  BXE attach has a lot of
+	 * mmio mappings that have to happen at boot (in akaros), instead of during
+	 * devether's attach (at runtime) */
+extern int bxe_attach(struct bxe_adapter *sc);
+	bxe_attach(ctlr);
+
 //	if (igbedetach(ctlr))
 //		return -1;
 
@@ -338,8 +347,10 @@ static void bxepci(void)
 			   pcidev->bus, pcidev->dev, pcidev->func);
 
 		/* Assuming MMIO */
-		mmio_paddr = pcidev->bar[0].mmio_base32 ? pcidev->bar[0].mmio_base32 :
-			pcidev->bar[0].mmio_base64;
+		/* Do this for each bar, based on whether it is mmio or not, and store
+		 * in the handles.  Move this to bxe_allocate_bars XME */
+		mmio_paddr = pci_get_membar(pcidev, 0);
+		assert(mmio_paddr);
 		mem = (void *)vmap_pmem_nocache(mmio_paddr, pcidev->bar[0].mmio_sz);
 		if (mem == NULL) {
 			printd("bxe: can't map %p\n", pcidev->bar[0].mmio_base32);
@@ -361,29 +372,38 @@ static void bxepci(void)
 			case 0x10:
 				break;
 		}
+
 		ctlr = kzmalloc(sizeof(struct bxe_adapter), 0);
 		if (ctlr == NULL) {
 			vunmap_vmem((uintptr_t) mem, pcidev->bar[0].mmio_sz);
 			error(Enomem);
 		}
+
+		/* TODO: Remove me */
+		ctlr->debug = 0xFFFFFFFF; /* flying monkeys     */
+
 		spinlock_init_irqsave(&ctlr->imlock);
 		spinlock_init_irqsave(&ctlr->tlock);
 		qlock_init(&ctlr->alock);
 		qlock_init(&ctlr->slock);
 		rendez_init(&ctlr->rrendez);
 
-		//ctlr->pci = pcidev;
+		ctlr->pcidev = pcidev;
 		ctlr->mmio = mem;
-		/* TODO: save 'mem' somewhere in the ctrl */
 		
 		if (bxereset(ctlr)) {
 			kfree(ctlr);
 			vunmap_vmem((uintptr_t) mem, pcidev->bar[0].mmio_sz);
 			continue;
 		}
+
+		/* this is done in bxe_attach too */ // XME
 		pci_set_bus_master(pcidev);
 
-		/* TODO Maybe ctlr add to list of devices */
+		/* BSD used mutexes for this list for other reasons */
+		qlock(&bxe_prev_mtx);
+		LIST_INSERT_HEAD(&bxe_prev_list, ctlr, node);
+		qunlock(&bxe_prev_mtx);
 	}
 }
 
@@ -393,39 +413,31 @@ static int bxepnp(struct ether *edev)
 {
 	struct bxe_adapter *ctlr;
 
+	run_once(qlock_init(&bxe_prev_mtx));
 	/* Allocs ctlrs for all PCI devices matching our IDs, does various PCI and
 	 * MMIO/port setup */
 	run_once(bxepci());
 
-
-return -1;
-
-	/* Any adapter matches if no edev->port is supplied, otherwise the ports
-	 * must match. */
-	for (;;) {	// check all ctlrs
-		ctlr = (void*)0xdeadbeef;
-		/* only want inactive ones */
-		//if (ctlr->active)
-		//	continue;
-		// well, oop.s
-		/*
-		if (edev->port == 0 || edev->port == ctlr->port) {
-			ctlr->active = 1;
-			break;
-		}
-		*/
+	qlock(&bxe_prev_mtx);
+	LIST_FOREACH(ctlr, &bxe_prev_list, node) {
+		/* just take the first inactive ctlr on the list */
+		if (ctlr->active)
+			continue;
+		ctlr->active = 1;
+		break;
 	}
+	qunlock(&bxe_prev_mtx);
 	if (ctlr == NULL)
 		return -1;
 
 	edev->ctlr = ctlr;
-	//edev->port = ctlr->port;
-	//	edev->irq = ctlr->pci->irqline;
-	//edev->tbdf = MKBUS(BusPCI, ctlr->pci->bus, ctlr->pci->dev, ctlr->pci->func);
+	//edev->port = ctlr->port;	/* might just remove this from devether */
+	edev->irq = ctlr->pcidev->irqline;
+	edev->tbdf = MKBUS(BusPCI, ctlr->pcidev->bus, ctlr->pcidev->dev,
+	                   ctlr->pcidev->func);
 	edev->netif.mbps = 1000;
-	/* ea is the eth addr */
-	//memmove(edev->ea, ctlr->ra, Eaddrlen);
-
+	memmove(edev->ea, ctlr->link_params.mac_addr, Eaddrlen);
+	
 	/*
 	 * Linkage to the generic ethernet driver.
 	 */

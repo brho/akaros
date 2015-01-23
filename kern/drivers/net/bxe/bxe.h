@@ -62,6 +62,8 @@ typedef uint64_t uintmax_t;
 #define if_getflags(netif) (netif)->feat
 #define if_setflags(sc)
 
+/* We don't do removal */
+#define ifmedia_removeall(x)
 
 #define MA_OWNED 0
 #define mtx_assert(lock, thing) assert(1)
@@ -417,7 +419,7 @@ struct bxe_device_type
 #define ETH_HLEN                  14
 #define ETH_OVERHEAD              (ETH_HLEN + 8 + 8)
 #define ETH_MIN_PACKET_SIZE       60
-#define ETH_MAX_PACKET_SIZE       ETHERMTU /* 1500 */
+#define ETH_MAX_PACKET_SIZE       ETHERMAXTU
 #define ETH_MAX_JUMBO_PACKET_SIZE 9600
 /* TCP with Timestamp Option (32) + IPv6 (40) */
 #define ETH_MAX_TPA_HEADER_SIZE   72
@@ -438,6 +440,9 @@ struct bxe_bar {
     bus_space_handle_t handle;
     vm_offset_t        kva;
 };
+
+/* Not sure what this is, just identity mapping it. */
+#define PCIR_BAR(i) (i)
 
 struct bxe_intr {
     struct resource *resource;
@@ -1117,8 +1122,8 @@ struct bxe_devinfo {
      *   B = Chip Bond ID  (bits 0-3)
      */
     uint32_t chip_id;
-#define CHIP_ID(sc)           0 /*((sc)->devinfo.chip_id & 0xffff0000)*/
-#define CHIP_NUM(sc)          0 /*((sc)->devinfo.chip_id >> 16)*/
+#define CHIP_ID(sc)           ((sc)->devinfo.chip_id & 0xffff0000)
+#define CHIP_NUM(sc)          ((sc)->devinfo.chip_id >> 16)
 /* device ids */
 #define CHIP_NUM_57710        0x164e
 #define CHIP_NUM_57711        0x164f
@@ -1315,6 +1320,7 @@ struct bxe_adapter {
 	 * has a first element of 'void *if_softc' (which is us). XXX
 	 */
 	if_t 	    ifp;
+	LIST_ENTRY(bxe_adapter)		node;
 	/* OS defined structs */
 	struct net_device *netdev;
 	struct pci_device *pcidev;
@@ -1936,6 +1942,7 @@ void bxe_reg_write32(struct bxe_adapter *sc, bus_size_t offset, uint32_t val);
 #error "Minimum DB doorbell stride is 8"
 #endif
 #define DPM_TRIGGER_TYPE 0x40
+/* This could be screwed up (BAR1 == 2) */
 #define DOORBELL(sc, cid, val)                                              \
     do {                                                                    \
         bus_space_write_4(sc->bar[BAR1].tag, sc->bar[BAR1].handle,          \
@@ -2268,6 +2275,8 @@ void bxe_dump_mbuf_data(struct bxe_adapter *sc, char *pTag,
 
 /* Defined in bxe.c, init'd in bxereset or something in bxe_dev.c */
 extern qlock_t bxe_prev_mtx;
+LIST_HEAD(bxe_prev_list, bxe_adapter);
+extern struct bxe_prev_list bxe_prev_list;
 
 /***********/
 /* INLINES */

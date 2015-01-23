@@ -251,6 +251,7 @@ static device_method_t bxe_methods[] = {
 
 #endif
 qlock_t bxe_prev_mtx;
+struct bxe_prev_list bxe_prev_list = LIST_HEAD_INITIALIZER(bxe_prev_list);
 
 struct bxe_prev_list_node {
     LIST_ENTRY(bxe_prev_list_node) node;
@@ -4845,7 +4846,7 @@ bxe_ioctl(if_t ifp,
         BLOGD(sc, DBG_IOCTL,
               "Received SIOCSIFMEDIA/SIOCGIFMEDIA ioctl (cmd=%lu)\n",
               (command & 0xff));
-        error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
+        error = ifmedia_ioctl(ifp, ifr, &sc->media, command);
         break;
 
     case SIOCGPRIVATE_0:
@@ -9228,6 +9229,8 @@ bxe_interrupt_free(struct bxe_adapter *sc)
 static int
 bxe_interrupt_alloc(struct bxe_adapter *sc)
 {
+		// XME
+    return 0;
 #if 0
     int msix_count = 0;
     int msi_count = 0;
@@ -9418,7 +9421,6 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
 
     return (rc);
 #endif
-    return -1;
 }
 
 static void
@@ -13298,7 +13300,6 @@ bxe_allocate_bars(struct bxe_adapter *sc)
 {
     unsigned int flags;
     int i;
-#if 0
     memset(sc->bar, 0, sizeof(sc->bar));
 
     for (i = 0; i < MAX_BARS; i++) {
@@ -13306,11 +13307,36 @@ bxe_allocate_bars(struct bxe_adapter *sc)
         /* memory resources reside at BARs 0, 2, 4 */
         /* Run `pciconf -lb` to see mappings */
         if ((i != 0) && (i != 2) && (i != 4)) {
+			/* i guess sc->bar[1] is just 0s */
             continue;
         }
 
         sc->bar[i].rid = PCIR_BAR(i);
 
+		/* The bar handles are supposed to be KVAs - they get dereferenced
+		 * later.  The addrs in the pcidev->bar are physical addrs.  For now,
+		 * we just map bar 0 and have it in sc->mmio. */
+		if (i == 0) {
+			sc->bar[i].tag = X86_BUS_SPACE_MEM;
+        	sc->bar[i].handle = (uintptr_t)sc->mmio;
+		} else {
+			sc->bar[i].tag = X86_BUS_SPACE_MEM;
+        	sc->bar[i].handle = 0xcafeface;
+		}
+
+		/* Maybe do something like this:
+        sc->bar[i].handle = pci_get_membar(sc->pcidev, i);
+		if (sc->bar[i].handle) {
+			sc->bar[i].tag = X86_BUS_SPACE_MEM;
+		} else {
+        	sc->bar[i].handle = pci_get_iobar(sc->pcidev, i);
+			if (sc->bar[i].handle) {
+				sc->bar[i].tag = X86_BUS_SPACE_IO;
+			}
+		}
+		*/
+
+#if 0 /* BSD way */
         flags = RF_ACTIVE;
         if (i == 0) {
             flags |= RF_SHAREABLE;
@@ -13339,8 +13365,8 @@ bxe_allocate_bars(struct bxe_adapter *sc)
               (void *)rman_get_end(sc->bar[i].resource),
               rman_get_size(sc->bar[i].resource),
               (void *)sc->bar[i].kva);
-    }
 #endif
+    }
     return (0);
 }
 
@@ -13447,6 +13473,7 @@ bxe_is_pcie_pending(struct bxe_adapter *sc)
 static void
 bxe_probe_pci_caps(struct bxe_adapter *sc)
 {
+		// XXX XME 
 #if 0
     uint16_t link_status;
     int reg;
@@ -13989,6 +14016,7 @@ bxe_get_shmem_info(struct bxe_adapter *sc)
         BLOGD(sc, DBG_LOAD, "Ethernet address: %s\n", sc->mac_addr_str);
     }
 
+	// XME
 #if 0
     if (!IS_MF(sc) &&
         ((sc->port.config & PORT_FEAT_CFG_STORAGE_PERSONALITY_MASK) ==
@@ -14005,6 +14033,7 @@ bxe_get_shmem_info(struct bxe_adapter *sc)
     return (0);
 }
 
+// TODO XME XME
 static void
 bxe_get_tunable_params(struct bxe_adapter *sc)
 {
@@ -14115,49 +14144,46 @@ bxe_get_tunable_params(struct bxe_adapter *sc)
 static void
 bxe_media_detect(struct bxe_adapter *sc)
 {
-#if 0
     uint32_t phy_idx = bxe_get_cur_phy_idx(sc);
     switch (sc->link_params.phy[phy_idx].media_type) {
     case ELINK_ETH_PHY_SFPP_10G_FIBER:
     case ELINK_ETH_PHY_XFP_FIBER:
         BLOGI(sc, "Found 10Gb Fiber media.\n");
-        sc->media = IFM_10G_SR;
+        //sc->media = IFM_10G_SR;
         break;
     case ELINK_ETH_PHY_SFP_1G_FIBER:
         BLOGI(sc, "Found 1Gb Fiber media.\n");
-        sc->media = IFM_1000_SX;
+        //sc->media = IFM_1000_SX;
         break;
     case ELINK_ETH_PHY_KR:
     case ELINK_ETH_PHY_CX4:
         BLOGI(sc, "Found 10GBase-CX4 media.\n");
-        sc->media = IFM_10G_CX4;
+        //sc->media = IFM_10G_CX4;
         break;
     case ELINK_ETH_PHY_DA_TWINAX:
         BLOGI(sc, "Found 10Gb Twinax media.\n");
-        sc->media = IFM_10G_TWINAX;
+        //sc->media = IFM_10G_TWINAX;
         break;
     case ELINK_ETH_PHY_BASE_T:
         if (sc->link_params.speed_cap_mask[0] &
             PORT_HW_CFG_SPEED_CAPABILITY_D0_10G) {
             BLOGI(sc, "Found 10GBase-T media.\n");
-            sc->media = IFM_10G_T;
+            //sc->media = IFM_10G_T;
         } else {
             BLOGI(sc, "Found 1000Base-T media.\n");
-            sc->media = IFM_1000_T;
+            //sc->media = IFM_1000_T;
         }
         break;
     case ELINK_ETH_PHY_NOT_PRESENT:
         BLOGI(sc, "Media not present.\n");
-        sc->media = 0;
+        //sc->media = 0;
         break;
     case ELINK_ETH_PHY_UNSPECIFIED:
     default:
         BLOGI(sc, "Unknown media!\n");
-        sc->media = 0;
+        //sc->media = 0;
         break;
     }
-#endif
-    assert(0);
 }
 
 #define GET_FIELD(value, fname)                     \
@@ -14376,7 +14402,7 @@ bxe_get_device_info(struct bxe_adapter *sc)
         (NVRAM_1MB_SIZE << (val & MCPR_NVM_CFG4_FLASH_SIZE));
     BLOGD(sc, DBG_LOAD, "nvram flash size: %d\n", sc->devinfo.flash_size);
 
-    /* get PCI capabilites */
+    /* get PCI capabilites */ // XME
     bxe_probe_pci_caps(sc);
 
     bxe_set_power_state(sc, PCI_PM_D0);
@@ -14385,6 +14411,7 @@ bxe_get_device_info(struct bxe_adapter *sc)
     bxe_get_shmem_info(sc);
 
     if (sc->devinfo.pcie_msix_cap_reg != 0) {
+			// XXX XME we need to do this XME
 	assert(0);
 //        val = pcidev_read16(sc->pcidev,
 //                              (sc->devinfo.pcie_msix_cap_reg +
@@ -14902,11 +14929,11 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                             NULL,                     /* lock() */
                             NULL,                     /* lock() arg */
                             &sc->parent_dma_tag);     /* returned dma tag */
-#endif
     if (rc != 0) {
         BLOGE(sc, "Failed to alloc parent DMA tag (%d)!\n", rc);
         return (1);
     }
+#endif
 
     /************************/
     /* DEFAULT STATUS BLOCK */
@@ -15938,6 +15965,12 @@ bxe_prev_unload_uncommon(struct bxe_adapter *sc)
     return (rc);
 }
 
+static int bxe_prev_unload(struct bxe_adapter *sc)
+{
+	warn("BXE unload not supported");
+	return 0;
+}
+
 void
 bxe_dcbx_set_state(struct bxe_adapter *sc,
                    uint8_t          dcb_on,
@@ -16193,6 +16226,7 @@ bxe_add_sysctls(struct bxe_adapter *sc)
         }
     }
 }
+#endif
 
 /*
  * Device attach function.
@@ -16204,28 +16238,25 @@ bxe_add_sysctls(struct bxe_adapter *sc)
  * Returns:
  *   0 = Success, >0 = Failure
  */
-static int
-bxe_attach(struct bxe_adapter *sc)
+int bxe_attach(struct bxe_adapter *sc)
 {
-    struct bxe_adapter *sc;
-
-    sc = device_get_softc(dev);
+	struct pci_device *dev = sc->pcidev;
 
     BLOGD(sc, DBG_LOAD, "Starting attach...\n");
 
     sc->state = BXE_STATE_CLOSED;
 
-	// TODO: sc->pcidev  = /* SOMETHING */
-    sc->unit = device_get_unit(dev);
+	/* what is this? */
+    //sc->unit = device_get_unit(dev);
 
     BLOGD(sc, DBG_LOAD, "softc = %p\n", sc);
 
-    sc->pcie_bus    = pci_get_bus(dev);
-    sc->pcie_device = pci_get_slot(dev);
-    sc->pcie_func   = pci_get_function(dev);
+    sc->pcie_bus    = dev->bus;
+    sc->pcie_device = dev->dev;
+    sc->pcie_func   = dev->func;
 
     /* enable bus master capability */
-    pci_enable_busmaster(dev);
+    pci_set_bus_master(dev);
 
     /* get the BARs */
     if (bxe_allocate_bars(sc) != 0) {
@@ -16249,16 +16280,15 @@ bxe_attach(struct bxe_adapter *sc)
     /* get device info and set params */
     if (bxe_get_device_info(sc) != 0) {
         BLOGE(sc, "getting device info\n");
-        bxe_deallocate_bars(sc);
-        pci_disable_busmaster(dev);
-        return (ENXIO);
+		/* assuming BSD wanted to free the mtx here too */
+		goto err_mux_bars_etc;
     }
 
     /* get final misc params */
     bxe_get_params(sc);
 
     /* set the default MTU (changed via ifconfig) */
-    sc->mtu = ETHERMTU;
+    sc->mtu = ETHERMAXTU;
 
     bxe_set_modes_bitmap(sc);
 
@@ -16271,51 +16301,21 @@ bxe_attach(struct bxe_adapter *sc)
     bxe_get_phy_info(sc);
 
     /* initialize the FreeBSD ifnet interface */
-    if (bxe_init_ifnet(sc) != 0) {
-        bxe_release_mutexes(sc);
-        bxe_deallocate_bars(sc);
-        pci_disable_busmaster(dev);
-        return (ENXIO);
-    }
+    if (bxe_init_ifnet(sc) != 0)
+		goto err_mux_bars_etc;
 
+	// TODO XME
     /* allocate device interrupts */
-    if (bxe_interrupt_alloc(sc) != 0) {
-        if (sc->ifp != NULL) {
-            ether_ifdetach(sc->ifp);
-        }
-        ifmedia_removeall(&sc->ifmedia);
-        bxe_release_mutexes(sc);
-        bxe_deallocate_bars(sc);
-        pci_disable_busmaster(dev);
-        return (ENXIO);
-    }
+    if (bxe_interrupt_alloc(sc) != 0)
+		goto err_media_etc;
 
     /* allocate ilt */
-    if (bxe_alloc_ilt_mem(sc) != 0) {
-        bxe_interrupt_free(sc);
-        if (sc->ifp != NULL) {
-            ether_ifdetach(sc->ifp);
-        }
-        ifmedia_removeall(&sc->ifmedia);
-        bxe_release_mutexes(sc);
-        bxe_deallocate_bars(sc);
-        pci_disable_busmaster(dev);
-        return (ENXIO);
-    }
+    if (bxe_alloc_ilt_mem(sc) != 0)
+		goto err_interrupt_etc;
 
     /* allocate the host hardware/software hsi structures */
-    if (bxe_alloc_hsi_mem(sc) != 0) {
-        bxe_free_ilt_mem(sc);
-        bxe_interrupt_free(sc);
-        if (sc->ifp != NULL) {
-            ether_ifdetach(sc->ifp);
-        }
-        ifmedia_removeall(&sc->ifmedia);
-        bxe_release_mutexes(sc);
-        bxe_deallocate_bars(sc);
-        pci_disable_busmaster(dev);
-        return (ENXIO);
-    }
+    if (bxe_alloc_hsi_mem(sc) != 0)
+		goto err_ilt_mem_etc;
 
     /* need to reset chip if UNDI was active */
     if (IS_PF(sc) && !BXE_NOMCP(sc)) {
@@ -16349,11 +16349,26 @@ bxe_attach(struct bxe_adapter *sc)
     sc->max_cos = 1;
     bxe_init_multi_cos(sc);
 
-    bxe_add_sysctls(sc);
-
     return (0);
+
+err_ilt_mem_etc:
+    bxe_free_ilt_mem(sc);
+err_interrupt_etc:
+    bxe_interrupt_free(sc);
+err_media_etc:
+    if (sc->ifp != NULL) {
+        //ether_ifdetach(sc->ifp);
+    }
+    ifmedia_removeall(&sc->media);
+err_mux_bars_etc:
+    bxe_release_mutexes(sc);
+    bxe_deallocate_bars(sc);
+    pci_clr_bus_master(dev);
+	warn("There was an error in attaching the BXE NIC");
+    return (ENXIO);
 }
 
+#if 0
 /*
  * Device detach function.
  *
@@ -16400,7 +16415,7 @@ bxe_detach(struct pcidev *dev)
     if (ifp != NULL) {
         ether_ifdetach(ifp);
     }
-    ifmedia_removeall(&sc->ifmedia);
+    ifmedia_removeall(&sc->media);
 
     /* XXX do the following based on driver state... */
 
