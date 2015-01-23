@@ -413,6 +413,7 @@ uint16_t pci_get_vendor(struct pci_device *pcidev);
 uint16_t pci_get_device(struct pci_device *pcidev);
 uint16_t pci_get_subvendor(struct pci_device *pcidev);
 uint16_t pci_get_subdevice(struct pci_device *pcidev);
+void pci_dump_config(struct pci_device *pcidev, size_t len);
 
 /* MSI functions, msi.c */
 int pci_msi_enable(struct pci_device *p, uint64_t vec);
