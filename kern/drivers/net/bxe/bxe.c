@@ -13436,10 +13436,9 @@ bxe_pcie_capability_read(struct bxe_adapter *sc,
                          int    reg,
                          int    width)
 {
-    int pcie_reg;
+    uint32_t pcie_reg;
 
     /* ensure PCIe capability is enabled */
-#if 0
     if (pci_find_cap(sc->pcidev, PCIY_EXPRESS, &pcie_reg) == 0) {
         if (pcie_reg != 0) {
             BLOGD(sc, DBG_LOAD, "PCIe capability at 0x%04x\n", pcie_reg);
@@ -13455,7 +13454,6 @@ bxe_pcie_capability_read(struct bxe_adapter *sc,
 			}
         }
     }
-#endif
     BLOGE(sc, "PCIe capability NOT FOUND!!!\n");
 
     return (0);
@@ -13464,11 +13462,8 @@ bxe_pcie_capability_read(struct bxe_adapter *sc,
 static uint8_t
 bxe_is_pcie_pending(struct bxe_adapter *sc)
 {
-	return 0xaa;
-#if 0
     return (bxe_pcie_capability_read(sc, PCIR_EXPRESS_DEVICE_STA, 2) &
             PCIM_EXP_STA_TRANSACTION_PND);
-#endif
 }
 
 /*
@@ -13479,10 +13474,8 @@ bxe_is_pcie_pending(struct bxe_adapter *sc)
 static void
 bxe_probe_pci_caps(struct bxe_adapter *sc)
 {
-		// XXX XME 
-#if 0
     uint16_t link_status;
-    int reg;
+	uint32_t reg;
 
     /* check if PCI Power Management is enabled */
     if (pci_find_cap(sc->pcidev, PCIY_PMG, &reg) == 0) {
@@ -13541,7 +13534,6 @@ bxe_probe_pci_caps(struct bxe_adapter *sc)
             sc->devinfo.pcie_msix_cap_reg = (uint16_t)reg;
         }
     }
-#endif
 }
 
 static int
@@ -14022,8 +14014,6 @@ bxe_get_shmem_info(struct bxe_adapter *sc)
         BLOGD(sc, DBG_LOAD, "Ethernet address: %s\n", sc->mac_addr_str);
     }
 
-	// XME
-#if 0
     if (!IS_MF(sc) &&
         ((sc->port.config & PORT_FEAT_CFG_STORAGE_PERSONALITY_MASK) ==
          PORT_FEAT_CFG_STORAGE_PERSONALITY_FCOE)) {
@@ -14032,19 +14022,16 @@ bxe_get_shmem_info(struct bxe_adapter *sc)
     if (!IS_MF(sc) &&
         ((sc->port.config & PORT_FEAT_CFG_STORAGE_PERSONALITY_MASK) ==
          PORT_FEAT_CFG_STORAGE_PERSONALITY_ISCSI)) {
-        sc->flags |= BXE_NO_FCOE_FLAG;
+        sc->flags |= BXE_NO_FCOE;
     }
-#endif
 
     return (0);
 }
 
-// TODO XME XME
 static void
 bxe_get_tunable_params(struct bxe_adapter *sc)
 {
     /* sanity checks */
-#if 0
     if ((bxe_interrupt_mode != INTR_MODE_INTX) &&
         (bxe_interrupt_mode != INTR_MODE_MSI)  &&
         (bxe_interrupt_mode != INTR_MODE_MSIX)) {
@@ -14102,7 +14089,6 @@ bxe_get_tunable_params(struct bxe_adapter *sc)
     }
 
     /* pull in user settings */
-#endif
     sc->interrupt_mode       = bxe_interrupt_mode;
     sc->max_rx_bufs          = bxe_max_rx_bufs;
     sc->hc_rx_ticks          = bxe_hc_rx_ticks;
@@ -14111,18 +14097,17 @@ bxe_get_tunable_params(struct bxe_adapter *sc)
     sc->mrrs                 = bxe_mrrs;
     sc->autogreeen           = bxe_autogreeen;
     sc->udp_rss              = bxe_udp_rss;
-#if 0
+
     if (bxe_interrupt_mode == INTR_MODE_INTX) {
         sc->num_queues = 1;
     } else { /* INTR_MODE_MSI or INTR_MODE_MSIX */
         sc->num_queues =
-		MIN((bxe_queue_count ? bxe_queue_count : 8) //mp_ncpus),
-                MAX_RSS_CHAINS);
-        if (sc->num_queues > mp_ncpus) {
-            sc->num_queues = mp_ncpus;
+		MIN((bxe_queue_count ? bxe_queue_count : num_cpus), MAX_RSS_CHAINS);
+        if (sc->num_queues > num_cpus) {
+            sc->num_queues = num_cpus;
         }
     }
-#endif
+
     BLOGD(sc, DBG_LOAD,
           "User Config: "
           "debug=0x%lx "
@@ -14408,7 +14393,7 @@ bxe_get_device_info(struct bxe_adapter *sc)
         (NVRAM_1MB_SIZE << (val & MCPR_NVM_CFG4_FLASH_SIZE));
     BLOGD(sc, DBG_LOAD, "nvram flash size: %d\n", sc->devinfo.flash_size);
 
-    /* get PCI capabilites */ // XME
+    /* get PCI capabilites */
     bxe_probe_pci_caps(sc);
 
     bxe_set_power_state(sc, PCI_PM_D0);
@@ -14417,12 +14402,10 @@ bxe_get_device_info(struct bxe_adapter *sc)
     bxe_get_shmem_info(sc);
 
     if (sc->devinfo.pcie_msix_cap_reg != 0) {
-			// XXX XME we need to do this XME
-	assert(0);
-//        val = pcidev_read16(sc->pcidev,
-//                              (sc->devinfo.pcie_msix_cap_reg +
-//                               PCIR_MSIX_CTRL));
-//        sc->igu_sb_cnt = (val & PCIM_MSIXCTRL_TABLE_SIZE);
+        val = pcidev_read16(sc->pcidev,
+                              (sc->devinfo.pcie_msix_cap_reg +
+                               PCIR_MSIX_CTRL));
+        sc->igu_sb_cnt = (val & PCIM_MSIXCTRL_TABLE_SIZE);
     } else {
         sc->igu_sb_cnt = 1;
     }
@@ -14919,7 +14902,6 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
     int i, j;
 
     /* XXX zero out all vars here and call bxe_alloc_hsi_mem on error */
-#if 0
     /* allocate the parent bus DMA tag */
     rc = bus_dma_tag_create(bus_get_dma_tag(sc->pcidev), /* parent tag */
                             1,                        /* alignment */
@@ -14939,7 +14921,6 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
         BLOGE(sc, "Failed to alloc parent DMA tag (%d)!\n", rc);
         return (1);
     }
-#endif
 
     /************************/
     /* DEFAULT STATUS BLOCK */
@@ -15178,7 +15159,6 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
             max_seg_size = 0; // ?? MCLBYTES;
 //        }
 
-#if 0
         /* create a dma tag for the tx mbufs */
         rc = bus_dma_tag_create(sc->parent_dma_tag, /* parent tag */
                                 1,                  /* alignment */
@@ -15194,8 +15174,6 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                                 NULL,               /* lock() */
                                 NULL,               /* lock() arg */
                                 &fp->tx_mbuf_tag);  /* returned dma tag */
-#endif
-	rc = 1;
         if (rc != 0) {
             /* XXX unwind and free previous fastpath allocations */
             BLOGE(sc, "Failed to create dma tag for "
@@ -15203,7 +15181,6 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                   i, rc);
             return (1);
         }
-#if 0
         /* create dma maps for each of the tx mbuf clusters */
         for (j = 0; j < TX_BD_TOTAL; j++) {
             if (bus_dmamap_create(fp->tx_mbuf_tag,
@@ -15236,8 +15213,6 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                                 NULL,               /* lock() */
                                 NULL,               /* lock() arg */
                                 &fp->rx_mbuf_tag);  /* returned dma tag */
-#endif
-	rc = 1;
         if (rc != 0) {
             /* XXX unwind and free previous fastpath allocations */
             BLOGE(sc, "Failed to create dma tag for "
@@ -15245,7 +15220,6 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                   i, rc);
             return (1);
         }
-#if 0
         /* create dma maps for each of the rx mbuf clusters */
         for (j = 0; j < RX_BD_TOTAL; j++) {
             if (bus_dmamap_create(fp->rx_mbuf_tag,
@@ -15269,11 +15243,9 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                   i, rc);
             return (1);
         }
-#endif
         /***************************/
         /* FP RX SGE MBUF DMA MAPS */
         /***************************/
-#if 0
         /* create a dma tag for the rx sge mbufs */
         rc = bus_dma_tag_create(sc->parent_dma_tag, /* parent tag */
                                 1,                  /* alignment */
@@ -15289,7 +15261,6 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                                 NULL,               /* lock() */
                                 NULL,               /* lock() arg */
                                 &fp->rx_sge_mbuf_tag); /* returned dma tag */
-#endif
         if (rc != 0) {
             /* XXX unwind and free previous fastpath allocations */
             BLOGE(sc, "Failed to create dma tag for "
@@ -15297,7 +15268,6 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                   i, rc);
             return (1);
         }
-#if 0
         /* create dma maps for the rx sge mbuf clusters */
         for (j = 0; j < RX_SGE_TOTAL; j++) {
             if (bus_dmamap_create(fp->rx_sge_mbuf_tag,
@@ -15321,14 +15291,12 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
                   i, rc);
             return (1);
         }
-#endif
         /***************************/
         /* FP RX TPA MBUF DMA MAPS */
         /***************************/
 
         /* create dma maps for the rx tpa mbuf clusters */
         max_agg_queues = MAX_AGG_QS(sc);
-#if 0
         for (j = 0; j < max_agg_queues; j++) {
             if (bus_dmamap_create(fp->rx_mbuf_tag,
                                   BUS_DMA_NOWAIT,
@@ -15353,7 +15321,6 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
         }
 
         bxe_init_sge_ring_bit_mask(fp);
-#endif
     }
 
     return (0);
@@ -15365,6 +15332,7 @@ bxe_free_hsi_mem(struct bxe_adapter *sc)
     struct bxe_fastpath *fp;
     int max_agg_queues;
     int i, j;
+	/* still a minor pita to free this */
 #if 0
     if (sc->parent_dma_tag == NULL) {
         return; /* assume nothing was allocated */
@@ -15973,6 +15941,7 @@ bxe_prev_unload_uncommon(struct bxe_adapter *sc)
 
 static int bxe_prev_unload(struct bxe_adapter *sc)
 {
+	/* this gets called during normal init.  Might be a problem. */
 	warn("BXE unload not supported");
 	return 0;
 }
@@ -16310,7 +16279,6 @@ int bxe_attach(struct bxe_adapter *sc)
     if (bxe_init_ifnet(sc) != 0)
 		goto err_mux_bars_etc;
 
-	// TODO XME
     /* allocate device interrupts */
     if (bxe_interrupt_alloc(sc) != 0)
 		goto err_media_etc;
@@ -16624,7 +16592,6 @@ bxe_init_pxp(struct bxe_adapter *sc)
 {
     uint16_t devctl;
     int r_order, w_order;
-#if 0
     devctl = bxe_pcie_capability_read(sc, PCIR_EXPRESS_DEVICE_CTL, 2);
 
     BLOGD(sc, DBG_LOAD, "read 0x%08x from devctl\n", devctl);
@@ -16639,7 +16606,6 @@ bxe_init_pxp(struct bxe_adapter *sc)
     }
 
     ecore_init_pxp_arb(sc, r_order, w_order);
-#endif
 }
 
 static uint32_t

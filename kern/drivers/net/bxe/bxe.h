@@ -99,7 +99,6 @@ typedef uint64_t uintmax_t;
 
 #include "bxe_elink.h"
 
-#if __FreeBSD_version >= 1000000
 #define PCIR_EXPRESS_DEVICE_STA        PCIER_DEVICE_STA
 #define PCIM_EXP_STA_TRANSACTION_PND   PCIEM_STA_TRANSACTION_PND
 #define PCIR_EXPRESS_LINK_STA          PCIER_LINK_STA
@@ -108,7 +107,6 @@ typedef uint64_t uintmax_t;
 #define PCIR_EXPRESS_DEVICE_CTL        PCIER_DEVICE_CTL
 #define PCIM_EXP_CTL_MAX_PAYLOAD       PCIEM_CTL_MAX_PAYLOAD
 #define PCIM_EXP_CTL_MAX_READ_REQUEST  PCIEM_CTL_MAX_READ_REQUEST
-#endif
 
 #include "ecore_sp.h"
 

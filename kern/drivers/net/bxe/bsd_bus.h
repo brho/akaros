@@ -112,6 +112,8 @@ typedef uintptr_t bus_space_tag_t;
 #define bus_dma_tag_destroy(...)
 #define bus_dmamap_sync(...)
 #define bus_dmamap_unload(...)
+#define bus_dmamap_create(...) (0)
+#define bus_dmamap_destroy(...)
 
 /* Bus read/write barrier methods.
  *
