@@ -1328,7 +1328,6 @@ struct bxe_adapter {
 	struct ether				*edev;
 
 	bool						active;
-	void						*mmio;
 	spinlock_t					imlock;				/* interrupt mask lock */
 	spinlock_t					tlock;				/* transmit lock */
 	qlock_t						slock;				/* stats */

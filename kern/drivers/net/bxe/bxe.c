@@ -13300,41 +13300,47 @@ bxe_allocate_bars(struct bxe_adapter *sc)
 {
     unsigned int flags;
     int i;
+	physaddr_t mmio_paddr;
+	uint16_t pio_port;
     memset(sc->bar, 0, sizeof(sc->bar));
 
     for (i = 0; i < MAX_BARS; i++) {
 
         /* memory resources reside at BARs 0, 2, 4 */
         /* Run `pciconf -lb` to see mappings */
-        if ((i != 0) && (i != 2) && (i != 4)) {
-			/* i guess sc->bar[1] is just 0s */
+        if ((i != 0) && (i != 2) && (i != 4))
             continue;
-        }
 
         sc->bar[i].rid = PCIR_BAR(i);
 
-		/* The bar handles are supposed to be KVAs - they get dereferenced
-		 * later.  The addrs in the pcidev->bar are physical addrs.  For now,
-		 * we just map bar 0 and have it in sc->mmio. */
-		if (i == 0) {
-			sc->bar[i].tag = X86_BUS_SPACE_MEM;
-        	sc->bar[i].handle = (uintptr_t)sc->mmio;
+		mmio_paddr = pci_get_membar(sc->pcidev, i);
+		if (!mmio_paddr) {
+			pio_port = pci_get_iobar(sc->pcidev, i);
+			if (!pio_port) {
+				/* This will trip on BAR 4.  1 and 3 were skipped earlier, since
+				 * they are the second-parts of the MMIO64 addr.  Not sure why 4
+				 * gets skipped.  BSD seemed to think there was a memory
+				 * resource there. */
+				printk("BXE, skipping BAR %d\n", i);
+				continue;
+			}
+			sc->bar[i].handle = pio_port;
+			sc->bar[i].tag = X86_BUS_SPACE_IO;
+			printk("BXE: PIO mapped BAR %d, 0x%x\n", i, sc->bar[i].handle);
 		} else {
 			sc->bar[i].tag = X86_BUS_SPACE_MEM;
-        	sc->bar[i].handle = 0xcafeface;
+			sc->bar[i].handle = vmap_pmem_nocache(mmio_paddr,
+			                                      sc->pcidev->bar[i].mmio_sz);
+			if (!sc->bar[i].handle) {
+				printk("BXE: can't map %p for BAR %d\n", mmio_paddr, i);
+				continue;
+			}
+			printk("BXE: MMIO mapped BAR %d, %p -> %p\n", i, sc->bar[i].handle,
+			       mmio_paddr);
+			/* Here's how to remove it, if you need to: */
+			//vunmap_vmem(sc->bar[i].handle, sc->pcidev->bar[i].mmio_sz);
 		}
 
-		/* Maybe do something like this:
-        sc->bar[i].handle = pci_get_membar(sc->pcidev, i);
-		if (sc->bar[i].handle) {
-			sc->bar[i].tag = X86_BUS_SPACE_MEM;
-		} else {
-        	sc->bar[i].handle = pci_get_iobar(sc->pcidev, i);
-			if (sc->bar[i].handle) {
-				sc->bar[i].tag = X86_BUS_SPACE_IO;
-			}
-		}
-		*/
 
 #if 0 /* BSD way */
         flags = RF_ACTIVE;

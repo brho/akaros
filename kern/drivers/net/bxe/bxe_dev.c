@@ -31,18 +31,6 @@ static char *statistics[Nstatistics] = {
 	"Alignment Error",
 };
 
-/* Most 9ns drivers have some form of helper to read from the IO space, whether
- * that's PIO or MMIO. */
-static inline uint32_t csr32r(struct bxe_adapter *c, uintptr_t reg)
-{
-	return read_mmreg32((uintptr_t) (c->mmio + (reg / 4)));
-}
-
-static inline void csr32w(struct bxe_adapter *c, uintptr_t reg, uint32_t val)
-{
-	write_mmreg32((uintptr_t) (c->mmio + (reg / 4)), val);
-}
-
 static long bxeifstat(struct ether *edev, void *a, long n, uint32_t offset)
 {
 	struct bxe_adapter *ctlr;
@@ -329,8 +317,6 @@ static void bxepci(void)
 	int cls, id;
 	struct pci_device *pcidev;
 	struct bxe_adapter *ctlr;
-	void *mem;
-	uintptr_t mmio_paddr;
 
 	STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
 		/* This checks that pcidev is a Network Controller for Ethernet */
@@ -346,16 +332,8 @@ static void bxepci(void)
 			   pcidev->ven_id, pcidev->dev_id,
 			   pcidev->bus, pcidev->dev, pcidev->func);
 
-		/* Assuming MMIO */
-		/* Do this for each bar, based on whether it is mmio or not, and store
-		 * in the handles.  Move this to bxe_allocate_bars XME */
-		mmio_paddr = pci_get_membar(pcidev, 0);
-		assert(mmio_paddr);
-		mem = (void *)vmap_pmem_nocache(mmio_paddr, pcidev->bar[0].mmio_sz);
-		if (mem == NULL) {
-			printd("bxe: can't map %p\n", pcidev->bar[0].mmio_base32);
-			continue;
-		}
+		/* MMIO, pci_bus_master, etc, are all done in bxe_attach */
+
 		cls = pcidev_read8(pcidev, PCI_CLSZ_REG);
 		switch (cls) {
 			default:
@@ -374,10 +352,8 @@ static void bxepci(void)
 		}
 
 		ctlr = kzmalloc(sizeof(struct bxe_adapter), 0);
-		if (ctlr == NULL) {
-			vunmap_vmem((uintptr_t) mem, pcidev->bar[0].mmio_sz);
+		if (ctlr == NULL)
 			error(Enomem);
-		}
 
 		/* TODO: Remove me */
 		ctlr->debug = 0xFFFFFFFF; /* flying monkeys     */
@@ -389,16 +365,11 @@ static void bxepci(void)
 		rendez_init(&ctlr->rrendez);
 
 		ctlr->pcidev = pcidev;
-		ctlr->mmio = mem;
 		
 		if (bxereset(ctlr)) {
 			kfree(ctlr);
-			vunmap_vmem((uintptr_t) mem, pcidev->bar[0].mmio_sz);
 			continue;
 		}
-
-		/* this is done in bxe_attach too */ // XME
-		pci_set_bus_master(pcidev);
 
 		/* BSD used mutexes for this list for other reasons */
 		qlock(&bxe_prev_mtx);
