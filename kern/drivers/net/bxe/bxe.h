@@ -45,6 +45,7 @@
 #include <umem.h>
 
 #include "bsd_bus.h"
+#include "bsd_pcireg.h"
 
 /* MACROS for conversion to AKAROS. Might we want this stuff someday? */
 #define __predict_false(x) (x)
@@ -440,9 +441,6 @@ struct bxe_bar {
     bus_space_handle_t handle;
     vm_offset_t        kva;
 };
-
-/* Not sure what this is, just identity mapping it. */
-#define PCIR_BAR(i) (i)
 
 struct bxe_intr {
     struct resource *resource;
