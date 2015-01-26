@@ -412,6 +412,7 @@ uint16_t pci_get_device(struct pci_device *pcidev);
 uint16_t pci_get_subvendor(struct pci_device *pcidev);
 uint16_t pci_get_subdevice(struct pci_device *pcidev);
 void pci_dump_config(struct pci_device *pcidev, size_t len);
+int pci_find_cap(struct pci_device *pcidev, uint8_t cap_id, uint32_t *cap_reg);
 
 /* MSI functions, msi.c */
 int pci_msi_enable(struct pci_device *p, uint64_t vec);

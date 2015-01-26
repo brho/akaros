@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <kmalloc.h>
 #include <arch/pci_defs.h>
+#include <ros/errno.h>
 
 /* List of all discovered devices */
 struct pcidev_stailq pci_devices = STAILQ_HEAD_INITIALIZER(pci_devices);
@@ -561,4 +562,17 @@ void pci_dump_config(struct pci_device *pcidev, size_t len)
 	       pcidev->bus, pcidev->dev, pcidev->func);
 	for (int i = 0; i < len; i += 4)
 		printk("0x%03x | %08x\n", i, pcidev_read32(pcidev, i));
+}
+
+int pci_find_cap(struct pci_device *pcidev, uint8_t cap_id, uint32_t *cap_reg)
+{
+	if (cap_id > PCI_CAP_ID_MAX)
+		return -EINVAL;
+	if (!pcidev->caps[cap_id])
+		return -ENOENT;
+	/* The actual value at caps[id] is the offset in the PCI config space where
+	 * that ID was stored.  That's needed for accessing the capability. */
+	if (cap_reg)
+		*cap_reg = pcidev->caps[cap_id];
+	return 0;
 }

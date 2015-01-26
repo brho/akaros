@@ -521,7 +521,8 @@ static void ioapic_unmask_irq(struct irq_handler *unused, int apic_vector)
  * appropriately.
  *
  * Callers init irq_h->dev_irq and ->tbdf.  tbdf encodes the bus type and the
- * classic PCI bus:dev:func.
+ * classic PCI bus:dev:func.  dev_irq may be ignored based on the bus type (e.g.
+ * PCI, esp MSI).
  *
  * In plan9, this was ioapicintrenable(), which also unmasked.  We don't have a
  * deinit/disable method that would tear down the route yet.  All the plan9 one

@@ -530,6 +530,7 @@ out_no_eoi:
 	assert(0);
 }
 
+/* The irq field may be ignored based on the type of Bus. */
 int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 {
 	struct irq_handler *irq_h;
