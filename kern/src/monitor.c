@@ -286,6 +286,10 @@ static void print_info_handler(struct hw_trapframe *hw_tf, void *data)
 	cprintf("MTRR Phys7 Base = 0x%016llx, Mask = 0x%016llx\n",
 	        read_msr(0x20e), read_msr(0x20f));
 #endif // CONFIG_X86
+#ifdef CONFIG_SYSCALL_STRING_SAVING
+       cprintf("syscall string: %s\n",
+               per_cpu_info[core_id()].cur_kthread->name);
+#endif
 	cprintf("----------------------------\n");
 	spin_unlock_irqsave(&print_info_lock);
 }

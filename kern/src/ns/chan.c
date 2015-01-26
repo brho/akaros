@@ -1382,6 +1382,8 @@ void validname(char *aname, int slashok)
 			name += chartorune(&r, name);
 #endif
 		if (c >= 0x7f) {
+			printk("Akaros doesn't do UTF-8");
+			monitor(NULL);
 			error("Akaros doesn't do UTF-8");
 		} else {
 			if (isfrog[c])

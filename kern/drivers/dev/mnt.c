@@ -834,6 +834,7 @@ void mountio(struct mnt *m, struct mntrpc *r)
 			nexterror();
 		}
 		r = mntflushalloc(r, m->msize);
+		printk("FL\n");
 		/* need one for every waserror call (so this plus one outside) */
 		poperror();
 	}
