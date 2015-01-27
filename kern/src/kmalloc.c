@@ -56,14 +56,6 @@ void *kmalloc(size_t size, int flags)
 	void *buf;
 	int cache_id;
 	// determine cache to pull from
-	if (0)
-	if ((size < 9 ) && (!printx_on)) {
-		extern bool printx_on;
-		printx_on = 1;
-		printk("alloc one lousy 64-bit int? \n");
-		monitor(NULL);
-		printx_on = 0;
-	}
 	if (ksize <= KMALLOC_SMALLEST)
 		cache_id = 0;
 	else

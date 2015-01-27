@@ -169,7 +169,7 @@ then
 		usleep 1000
 	done
 fi
-#mount -a \#s/cs /net
+mount -a \#s/cs /net
 
 # this is noisy, so it is off by default.
 #echo debug > /net/cs
