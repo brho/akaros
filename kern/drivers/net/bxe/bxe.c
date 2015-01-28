@@ -6669,7 +6669,9 @@ bxe_alloc_rx_sge_mbuf(struct bxe_fastpath *fp,
 static __noinline int
 bxe_alloc_fp_buffers(struct bxe_adapter *sc)
 {
-#if 0
+	// XME
+	return 0; // at least fake success so we can get through some of the init
+#if 0 // AKAROS_PORT
     struct bxe_fastpath *fp;
     int i, j, rc = 0;
     int ring_prod, cqe_ring_prod;
@@ -9040,8 +9042,7 @@ bxe_task_fp(struct bxe_fastpath *fp)
  * then calls a separate routine to handle the various
  * interrupt causes: link, RX, and TX.
  */
-static void
-bxe_intr_legacy(void *xsc)
+static void bxe_intr_legacy(struct hw_trapframe *hw_tf, void *xsc)
 {
     struct bxe_adapter *sc = (struct bxe_adapter *)xsc;
     struct bxe_fastpath *fp;
@@ -9113,8 +9114,7 @@ bxe_intr_legacy(void *xsc)
 }
 
 /* slowpath interrupt entry point */
-static void
-bxe_intr_sp(void *xsc)
+static void bxe_intr_sp(struct hw_trapframe *hw_tf, void *xsc)
 {
     struct bxe_adapter *sc = (struct bxe_adapter *)xsc;
 
@@ -9128,8 +9128,7 @@ bxe_intr_sp(void *xsc)
 }
 
 /* fastpath interrupt entry point */
-static void
-bxe_intr_fp(void *xfp)
+static void bxe_intr_fp(struct hw_trapframe *hw_tf, void *xfp)
 {
     struct bxe_fastpath *fp = (struct bxe_fastpath *)xfp;
     struct bxe_adapter *sc = fp->sc;
@@ -9221,7 +9220,13 @@ bxe_interrupt_free(struct bxe_adapter *sc)
 static int
 bxe_interrupt_alloc(struct bxe_adapter *sc)
 {
-		// XME
+	/* BSD did a bunch of allocs, with various fallbacks.  We don't bother.
+	 * When the NIC loads, we'll just register the irq, which also allocs the
+	 * vectors and whatnot.  Due to how the vmem mapping code works, we need to
+	 * do that at runtime.  If we get to be more flexible in the future, we
+	 * could do the vector and MMIO work here, with the actual registration
+	 * later. */
+	sc->intr_count = sc->num_queues + 1;
     return 0;
 #if 0
     int msix_count = 0;
@@ -9516,7 +9521,7 @@ bxe_interrupt_attach(struct bxe_adapter *sc)
         bus_describe_intr(sc->pcidev, sc->intr[0].resource,
                           sc->intr[0].tag, "sp");
 
-        /* bus_bind_intr(sc->pcidev, sc->intr[0].resource, 0); */
+        bus_bind_intr(sc->pcidev, sc->intr[0].resource, 0);
 
         /* initialize the fastpath vectors (note the first was used for sp) */
         for (i = 0; i < sc->num_queues; i++) {
@@ -13177,8 +13182,7 @@ bxe_stop_locked(struct bxe_adapter *sc)
  * Returns:
  *   void
  */
-static void
-bxe_init(void *xsc)
+void bxe_init(void *xsc)
 {
     struct bxe_adapter *sc = (struct bxe_adapter *)xsc;
 
@@ -16208,6 +16212,9 @@ bxe_add_sysctls(struct bxe_adapter *sc)
 int bxe_attach(struct bxe_adapter *sc)
 {
 	struct pci_device *dev = sc->pcidev;
+
+	/* XME: Remove me */
+	sc->debug = DBG_ALL & ~DBG_REGS;
 
     BLOGD(sc, DBG_LOAD, "Starting attach...\n");
 

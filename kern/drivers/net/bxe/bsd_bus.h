@@ -134,6 +134,16 @@ typedef uintptr_t bus_space_tag_t;
 #define bus_dmamap_create(...) (0)
 #define bus_dmamap_destroy(...)
 
+/* We should be fine with irq = 0.  When we use BusPCI, it is ignored.  We
+ * might need to deal with the filter too. */
+#define bus_setup_intr(pci, res, flags, filter, handler, arg, tag)             \
+	register_irq(0, (handler), (arg),                                          \
+                 MKBUS(BusPCI, (pci)->bus, (pci)->dev, (pci)->func))
+#define bus_teardown_intr(...)
+#define bus_describe_intr(...)
+#define bus_bind_intr(...)
+
+
 /* Bus read/write barrier methods.
  *
  *      void bus_space_barrier(bus_space_tag_t tag, bus_space_handle_t bsh,

@@ -306,6 +306,10 @@ static int bxereset(struct bxe_adapter *ctlr)
 extern int bxe_attach(struct bxe_adapter *sc);
 	bxe_attach(ctlr);
 
+	/* normally done during BSD's ifconfig */
+extern void bxe_init(void *xsc);
+	bxe_init(ctlr);
+
 //	if (igbedetach(ctlr))
 //		return -1;
 
@@ -354,9 +358,6 @@ static void bxepci(void)
 		ctlr = kzmalloc(sizeof(struct bxe_adapter), 0);
 		if (ctlr == NULL)
 			error(Enomem);
-
-		/* TODO: Remove me */
-		ctlr->debug = 0xFFFFFFFF; /* flying monkeys     */
 
 		spinlock_init_irqsave(&ctlr->imlock);
 		spinlock_init_irqsave(&ctlr->tlock);
@@ -422,7 +423,6 @@ static int bxepnp(struct ether *edev)
 	edev->netif.promiscuous = bxepromiscuous;
 	edev->netif.multicast = bxemulticast;
 
-	register_irq(edev->irq, bxeinterrupt, edev, edev->tbdf);
 	return 0;
 }
 
