@@ -312,7 +312,7 @@ static inline int ecore_state_wait(struct bxe_adapter *sc, int state,
 			return ECORE_SUCCESS;
 		}
 
-		ECORE_WAIT(sc, delay_us);
+		ECORE_WAIT(sc, 1000);
 
 		if (sc->panic)
 			return ECORE_IO;

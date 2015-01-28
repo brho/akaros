@@ -134,8 +134,10 @@ typedef _Bool bool;
 #define ECORE_CPU_TO_LE16(x) cpu_to_le16(x)
 #define ECORE_CPU_TO_LE32(x) cpu_to_le32(x)
 
-#define ECORE_WAIT(_s, _t) udelay(1000)
-#define ECORE_MSLEEP(_t)   udelay((_t) * 1000)
+/* On BSD wait is a udelay.  ECORE uses it to wait for a taskqueue, which won't
+ * run preemptively on Akaros. */
+#define ECORE_WAIT(_s, _t) kthread_usleep((_t))
+#define ECORE_MSLEEP(_t)   kthread_usleep((_t) * 1000)
 
 #define ECORE_LIKELY(x)   (x)
 #define ECORE_UNLIKELY(x) (x)
