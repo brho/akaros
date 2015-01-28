@@ -108,9 +108,28 @@ typedef uintptr_t bus_dmamap_t;
 typedef uintptr_t bus_dma_segment_t;
 typedef uintptr_t bus_space_tag_t;
 
-#define bus_dma_tag_create(...) (0)
+/* ret is the location of the tag we create, which is just the size */
+#define bus_get_dma_tag(pcidev) (0)
+#define bus_dma_tag_create(_tag, _align, _bound, _low, _hi, _fil, _filarg,     \
+                           _size, _num, _size2, _flag2, _lock, _lockarg, _ret) \
+({                                                                             \
+	*(size_t*)(_ret) = (size_t)(_size);                                        \
+	0;                                                                         \
+})
 #define bus_dma_tag_destroy(...)
+#define bus_dmamem_alloc(_tag, _vaddraddr, _flags, _map)                       \
+({                                                                             \
+	*(_vaddraddr) = kzmalloc((size_t)(_tag), KMALLOC_WAIT);                    \
+	0;                                                                         \
+})
+#define bus_dmamem_free(_tag, _vaddr, _map) kfree(_vaddr)
 #define bus_dmamap_sync(...)
+/* bxe_dma_map_addr is actually a callback tht does the paddr assignment */
+#define bus_dmamap_load(_tag, _map, _vaddr, _size, _map_addr, _dma, _flag)     \
+({                                                                             \
+	(_dma)->paddr = PADDR((_dma)->vaddr);                                      \
+	0;                                                                         \
+})
 #define bus_dmamap_unload(...)
 #define bus_dmamap_create(...) (0)
 #define bus_dmamap_destroy(...)

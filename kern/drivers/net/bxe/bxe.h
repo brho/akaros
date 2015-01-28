@@ -52,6 +52,7 @@
 #define __noinline 
 #define ETH_ADDR_LEN 6
 #define MCLBYTES 2048
+#define MJUM9BYTES (9 * 1024)	/* jumbo cluster 9k */
 /* TYPEDEFS for conversion to AKAROS. These are temporary, but it makes it easier to see what is in need of change. */
 typedef struct netif *if_t;
 typedef uint64_t ift_counter;

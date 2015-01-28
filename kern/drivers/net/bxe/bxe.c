@@ -844,11 +844,6 @@ bxe_dma_alloc(struct bxe_adapter *sc,
     dma->size = size;
     snprintf(dma->msg, sizeof(dma->msg), "%s", msg);
 
-	/* Akaros style */
-	dma->vaddr = kzmalloc(size, KMALLOC_WAIT);
-	dma->paddr = PADDR(dma->vaddr);
-
-#if 0 /* the BSD way */
     rc = bus_dma_tag_create(sc->parent_dma_tag, /* parent tag */
                             BCM_PAGE_SIZE,      /* alignment */
                             0,                  /* boundary limit */
@@ -894,7 +889,9 @@ bxe_dma_alloc(struct bxe_adapter *sc,
         memset(dma, 0, sizeof(*dma));
         return (1);
     }
-#endif
+
+	/* might catch buggy BSD-compat macros */
+	assert(dma->paddr == PADDR(dma->vaddr));
     return (0);
 }
 
@@ -903,23 +900,18 @@ bxe_dma_free(struct bxe_adapter *sc,
              struct bxe_dma   *dma)
 {
     if (dma->size > 0) {
-#if 0
         BLOGD(sc, DBG_LOAD,
               "DMA free '%s': vaddr=%p paddr=%p nseg=%d size=%lu\n",
               dma->msg, dma->vaddr, (void *)dma->paddr,
               dma->nseg, dma->size);
-#endif
 
         DBASSERT(sc, (dma->tag != NULL), ("dma tag is NULL"));
 
-		kfree(dma->vaddr);
-		#if 0 /* the BSD way */
         bus_dmamap_sync(dma->tag, dma->map,
                         (BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE));
         bus_dmamap_unload(dma->tag, dma->map);
         bus_dmamem_free(dma->tag, dma->vaddr, dma->map);
         bus_dma_tag_destroy(dma->tag);
-		#endif
     }
     memset(dma, 0, sizeof(*dma));
 }
