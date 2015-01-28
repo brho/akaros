@@ -99,7 +99,8 @@ upstream-patches := $(sort $(wildcard upstream-patches/$(busybox-version)/*))
 	$(Q)wget http://www.busybox.net/downloads/$@
 
 busybox-$(busybox-version)-akaros: busybox-$(busybox-version).tar.bz2 \
-                                   $(akaros-patches) $(upstream-patches)
+                                   $(akaros-patches) $(upstream-patches) \
+                                   $(BUSYBOX_CONFIG)
 	@echo "Extracting and patching Busybox $(busybox-version)"
 	$(Q)rm -rf $@
 	$(Q)tar -jxf $<
