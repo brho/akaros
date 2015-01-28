@@ -43,6 +43,7 @@ obj-y						+= rendez.o
 obj-y						+= rwlock.o
 obj-y						+= schedule.o
 obj-y						+= slab.o
+obj-y						+= smallidpool.o
 obj-y						+= smp.o
 obj-y						+= string.o
 obj-y						+= strstr.o
