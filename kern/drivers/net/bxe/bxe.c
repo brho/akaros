@@ -221,7 +221,7 @@ static struct bxe_device_type bxe_devs[] = {
 //MALLOC_DECLARE(M_BXE_ILT);
 //MALLOC_DEFINE(M_BXE_ILT, "bxe_ilt", "bxe ILT pointer");
 
-#if 0
+#if 0 // AKAROS_PORT
 /*
  * FreeBSD device entry points.
  */
@@ -678,9 +678,9 @@ static int     bxe_alloc_rx_sge_mbuf(struct bxe_fastpath *fp,
 static uint8_t bxe_txeof(struct bxe_adapter *sc,
                          struct bxe_fastpath *fp);
 static void    bxe_task_fp(struct bxe_fastpath *fp);
-//static __noinline void bxe_dump_mbuf(struct bxe_adapter *sc,
-//                                     struct mbuf      *m,
-//                                     uint8_t          contents);
+static __noinline void bxe_dump_mbuf(struct bxe_adapter *sc,
+                                     struct mbuf      *m,
+                                     uint8_t          contents);
 static int     bxe_alloc_mem(struct bxe_adapter *sc);
 static void    bxe_free_mem(struct bxe_adapter *sc);
 static int     bxe_alloc_fw_stats_mem(struct bxe_adapter *sc);
@@ -799,7 +799,7 @@ calc_crc32(uint8_t  *crc32_packet,
 static void
 bxe_dma_map_addr(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 {
-#if 0
+#if 0 // AKAROS_PORT
     struct bxe_dma *dma = arg;
 
     if (error) {
@@ -833,6 +833,12 @@ bxe_dma_alloc(struct bxe_adapter *sc,
               struct bxe_dma   *dma,
               const char       *msg)
 {
+	int rc;
+	if (!dma) {
+		warn("Null ptr for dma!, continuing");
+		backtrace();
+		return -1;
+	}
     if (dma->size > 0) {
         BLOGE(sc, "dma block '%s' already has size %lu\n", msg,
               (unsigned long)dma->size);
@@ -2330,8 +2336,8 @@ void bxe_sp_prod_update(struct bxe_adapter *sc)
     REG_WR16(sc, (BAR_XSTRORM_INTMEM + XSTORM_SPQ_PROD_OFFSET(func)),
              sc->spq_prod_idx);
 
-    //    bus_space_barrier(sc->bar[BAR0].tag, sc->bar[BAR0].handle, 0, 0,
-    //                      BUS_SPACE_BARRIER_WRITE);
+    bus_space_barrier(sc->bar[BAR0].tag, sc->bar[BAR0].handle, 0, 0,
+                      BUS_SPACE_BARRIER_WRITE);
 }
 
 /**
@@ -2586,7 +2592,7 @@ bxe_init_mutexes(struct bxe_adapter *sc)
 static void
 bxe_release_mutexes(struct bxe_adapter *sc)
 {
-#if 0
+#if 0 // AKAROS_PORT
 #ifdef BXE_CORE_LOCK_SX
     sx_destroy(&sc->core_sx);
 #else
@@ -2630,11 +2636,13 @@ bxe_tx_disable(struct bxe_adapter* sc)
 {
     if_t ifp = sc->ifp;
 
-    /* tell the stack the driver is stopped and TX queue is full */
 	// TODO: is there a way to do this in this stack? I think it just pauses ...
-    //if (ifp !=  NULL) {
-        //if_setdrvflags(ifp, 0);
-    //}
+#if 0 // AKAROS_PORT
+    /* tell the stack the driver is stopped and TX queue is full */
+    if (ifp !=  NULL) {
+        /if_setdrvflags(ifp, 0);
+    }
+#endif
 }
 
 static void
@@ -2701,7 +2709,6 @@ bxe_sp_event(struct bxe_adapter    *sc,
              struct bxe_fastpath *fp,
              union eth_rx_cqe    *rr_cqe)
 {
-#if 0
     int cid = SW_CID(rr_cqe->ramrod_cqe.conn_and_cmd_data);
     int command = CQE_CMD(rr_cqe->ramrod_cqe.conn_and_cmd_data);
     enum ecore_queue_cmd drv_cmd = ECORE_Q_CMD_MAX;
@@ -2799,7 +2806,6 @@ bxe_sp_event(struct bxe_adapter    *sc,
         bxe_schedule_sp_task(sc);
     }
 #endif
-#endif
 }
 
 /*
@@ -2815,7 +2821,7 @@ bxe_tpa_start(struct bxe_adapter            *sc,
               uint16_t                    prod,
               struct eth_fast_path_rx_cqe *cqe)
 {
-#if 0
+#if 0 // AKAROS_PORT
     struct bxe_sw_rx_bd tmp_bd;
     struct bxe_sw_rx_bd *rx_buf;
     struct eth_rx_bd *rx_bd;
@@ -2894,7 +2900,7 @@ bxe_tpa_start(struct bxe_adapter            *sc,
     rx_bd->addr_lo = cpu_to_le32(U64_LO(tpa_info->seg.ds_addr));
 #endif
 }
-#if 0
+#if 0 // AKAROS_PORT
 /*
  * When a TPA aggregation is completed, loop through the individual mbufs
  * of the aggregation, combining them into a single mbuf which will be sent
@@ -3090,7 +3096,7 @@ bxe_tpa_stop(struct bxe_adapter          *sc,
 			 struct eth_end_agg_rx_cqe *cqe,
              uint16_t                  cqe_idx)
 {
-#if 0
+#if 0 // AKAROS_PORT
     if_t ifp = sc->ifp;
     struct mbuf *m;
     int rc = 0;
@@ -3166,7 +3172,7 @@ bxe_rxeof(struct bxe_adapter    *sc,
           struct bxe_fastpath *fp)
 {
 	return 0xaa;
-#if 0
+#if 0 // AKAROS_PORT
     if_t ifp = sc->ifp;
     uint16_t bd_cons, bd_prod, bd_prod_fw, comp_ring_cons;
     uint16_t hw_cq_cons, sw_cq_cons, sw_cq_prod;
@@ -3430,7 +3436,7 @@ bxe_free_tx_pkt(struct bxe_adapter    *sc,
                 uint16_t            idx)
 {
 	return 0xaa;
-#if 0
+#if 0 // AKAROS_PORT
     struct bxe_sw_tx_bd *tx_buf = &fp->tx_mbuf_chain[idx];
     struct eth_tx_start_bd *tx_start_bd;
     uint16_t bd_idx = TX_BD(tx_buf->first_bd);
@@ -3523,7 +3529,7 @@ bxe_txeof(struct bxe_adapter    *sc,
           struct bxe_fastpath *fp)
 {
 	return 0xaa;
-#if 0
+#if 0 // AKAROS_PORT
     if_t ifp = sc->ifp;
     uint16_t bd_cons, hw_cons, sw_cons, pkt_cons;
     uint16_t tx_bd_avail;
@@ -3578,7 +3584,7 @@ bxe_txeof(struct bxe_adapter    *sc,
 static void
 bxe_drain_tx_queues(struct bxe_adapter *sc)
 {
-#if 0
+#if 0 // AKAROS_PORT
     struct bxe_fastpath *fp;
     int i, count;
 
@@ -3615,7 +3621,7 @@ bxe_del_all_macs(struct bxe_adapter          *sc,
                  int                       mac_type,
                  uint8_t                   wait_for_comp)
 {
-#if 0
+#if 0 // AKAROS_PORT
     unsigned long ramrod_flags = 0, vlan_mac_flags = 0;
     int rc;
 
@@ -3643,7 +3649,7 @@ bxe_fill_accept_flags(struct bxe_adapter *sc,
                       unsigned long    *rx_accept_flags,
                       unsigned long    *tx_accept_flags)
 {
-#if 0
+#if 0 // AKAROS_PORT
     /* Clear the flags first */
     *rx_accept_flags = 0;
     *tx_accept_flags = 0;
@@ -3725,7 +3731,7 @@ bxe_set_q_rx_mode(struct bxe_adapter *sc,
                   unsigned long    tx_accept_flags,
                   unsigned long    ramrod_flags)
 {
-#if 0
+#if 0 // AKAROS_PORT
     struct ecore_rx_mode_ramrod_params ramrod_param;
     int rc;
 
@@ -3764,7 +3770,7 @@ static int
 bxe_set_storm_rx_mode(struct bxe_adapter *sc)
 {
 	return 0xaa;
-#if 0
+#if 0 // AKAROS_PORT
     unsigned long rx_mode_flags = 0, ramrod_flags = 0;
     unsigned long rx_accept_flags = 0, tx_accept_flags = 0;
     int rc;
@@ -3790,7 +3796,7 @@ static int
 bxe_nic_load_no_mcp(struct bxe_adapter *sc)
 {
 	return 0xaa;
-#if 0
+#if 0 // AKAROS_PORT
     int path = SC_PATH(sc);
     int port = SC_PORT(sc);
 
@@ -3817,7 +3823,7 @@ static int
 bxe_nic_unload_no_mcp(struct bxe_adapter *sc)
 {
 	return 0xaa;
-#if 0
+#if 0 // AKAROS_PORT
     int port = SC_PORT(sc);
     int path = SC_PATH(sc);
 
@@ -3844,15 +3850,18 @@ static uint32_t
 bxe_send_unload_req(struct bxe_adapter *sc,
                     int              unload_mode)
 {
-#if 0
+#if 0 // AKAROS_PORT
     uint32_t reset_code = 0;
+#if 0
     int port = SC_PORT(sc);
     int path = SC_PATH(sc);
+#endif
 
     /* Select the UNLOAD request mode */
     if (unload_mode == UNLOAD_NORMAL) {
         reset_code = DRV_MSG_CODE_UNLOAD_REQ_WOL_DIS;
     }
+#if 0
     else if (sc->flags & BXE_NO_WOL_FLAG) {
         reset_code = DRV_MSG_CODE_UNLOAD_REQ_WOL_MCP;
     } else if (sc->wol) {
@@ -3884,6 +3893,7 @@ bxe_send_unload_req(struct bxe_adapter *sc,
 
         reset_code = DRV_MSG_CODE_UNLOAD_REQ_WOL_EN;
     }
+#endif
     else {
         reset_code = DRV_MSG_CODE_UNLOAD_REQ_WOL_DIS;
     }
@@ -3917,7 +3927,7 @@ bxe_send_unload_done(struct bxe_adapter *sc,
 static int
 bxe_func_wait_started(struct bxe_adapter *sc)
 {
-#if 0
+#if 0 // AKAROS_PORT
     int tout = 50;
 
     if (!sc->port.pmf) {
@@ -3977,7 +3987,7 @@ static int
 bxe_stop_queue(struct bxe_adapter *sc,
                int              index)
 {
-#if 0
+#if 0 // AKAROS_PORT
     struct bxe_fastpath *fp = &sc->fp[index];
     struct ecore_queue_state_params q_params = { NULL };
     int rc;
@@ -4048,7 +4058,7 @@ bxe_wait_sp_comp(struct bxe_adapter *sc,
 static int
 bxe_func_stop(struct bxe_adapter *sc)
 {
-#if 0
+#if 0 // AKAROS_PORT
     struct ecore_func_state_params func_params = { NULL };
     int rc;
 
@@ -4078,7 +4088,7 @@ static int
 bxe_reset_hw(struct bxe_adapter *sc,
              uint32_t         load_code)
 {
-#if 0
+#if 0 // AKAROS_PORT
     struct ecore_func_state_params func_params = { NULL };
 
     /* Prepare parameters for function state transitions */
@@ -4115,7 +4125,7 @@ bxe_chip_cleanup(struct bxe_adapter *sc,
                  uint32_t         unload_mode,
                  uint8_t          keep_link)
 {
-#if 0
+#if 0 // AKAROS_PORT
     int port = SC_PORT(sc);
     struct ecore_mcast_ramrod_params rparam = { NULL };
     uint32_t reset_code;
@@ -4229,7 +4239,7 @@ unload_error:
 static void
 bxe_disable_close_the_gate(struct bxe_adapter *sc)
 {
-#if 0
+#if 0 // AKAROS_PORT
     uint32_t val;
     int port = SC_PORT(sc);
 
@@ -4258,7 +4268,7 @@ bxe_disable_close_the_gate(struct bxe_adapter *sc)
 static void
 bxe_squeeze_objects(struct bxe_adapter *sc)
 {
-#if 0
+#if 0 // AKAROS_PORT
     unsigned long ramrod_flags = 0, vlan_mac_flags = 0;
     struct ecore_mcast_ramrod_params rparam = { NULL };
     struct ecore_vlan_mac_obj *mac_obj = &sc->sp_objs->mac_obj;
@@ -4319,7 +4329,7 @@ bxe_nic_unload(struct bxe_adapter *sc,
                uint32_t         unload_mode,
                uint8_t          keep_link)
 {
-#if 0
+#if 0 // AKAROS_PORT
     uint8_t global = FALSE;
     uint32_t val;
 
@@ -4538,7 +4548,7 @@ bxe_ioctl_stats_show(struct bxe_adapter *sc,
                      void *data)
 {
 	return 0xaa;
-#if 0
+#if 0 // AKAROS_PORT
     const size_t str_size   = (BXE_NUM_ETH_STATS * STAT_NAME_LEN);
     const size_t stats_size = (BXE_NUM_ETH_STATS * sizeof(uint64_t));
     caddr_t p_tmp;
@@ -4594,7 +4604,7 @@ static void
 bxe_handle_chip_tq(void *context,
                    int  pending)
 {
-#if 0
+#if 0 // AKAROS_PORT
     struct bxe_adapter *sc = (struct bxe_adapter *)context;
     long work = atomic_read(&sc->chip_tq_flags);
 
@@ -4652,7 +4662,7 @@ bxe_ioctl(if_t ifp,
           unsigned long       command,
           void *      data)
 {
-#if 0
+#if 0 // AKAROS_PORT
     struct bxe_adapter *sc = if_getsoftc(ifp);
     struct bxe_nvram_data *nvdata;
     uint32_t priv_op;
@@ -4895,7 +4905,7 @@ bxe_dump_mbuf(struct bxe_adapter *sc,
               struct mbuf      *m,
               uint8_t          contents)
 {
-#if 0
+#if 0 // AKAROS_PORT
     char * type;
     int i = 0;
 
@@ -4950,7 +4960,8 @@ bxe_dump_mbuf(struct bxe_adapter *sc,
     }
 #endif
 }
-#if 0
+/* this is a huge comment out! */
+#if 0 // AKAROS_PORT
 /*
  * Checks to ensure the 13 bd sliding window is >= MSS for TSO.
  * Check that (13 total bds - 3 bds) = 10 bd window >= MSS.
@@ -5737,7 +5748,7 @@ bxe_tx_start_locked(struct bxe_adapter *sc,
                     if_t ifp,
                     struct bxe_fastpath *fp)
 {
-#if 0
+#if 0 // AKAROS_PORT
     struct mbuf *m = NULL;
     int tx_count = 0;
     uint16_t tx_bd_avail;
@@ -5808,7 +5819,7 @@ bxe_tx_start_locked(struct bxe_adapter *sc,
 static void
 bxe_tx_start(if_t ifp)
 {
-#if 0
+#if 0 // AKAROS_PORT
     struct bxe_adapter *sc;
     struct bxe_fastpath *fp;
 
@@ -5837,7 +5848,7 @@ bxe_tx_start(if_t ifp)
 #endif
 }
 
-#if 0
+#if 0 // AKAROS_PORT
 #if __FreeBSD_version >= 800000
 
 static int
@@ -6116,7 +6127,7 @@ bxe_ilt_set_info(struct bxe_adapter *sc)
 static void
 bxe_set_fp_rx_buf_size(struct bxe_adapter *sc)
 {
-#if 0
+#if 0 // AKAROS_PORT
     int i;
 
     BLOGD(sc, DBG_LOAD, "mtu = %d\n", sc->mtu);
@@ -6193,10 +6204,12 @@ bxe_free_mem(struct bxe_adapter *sc)
 {
     int i;
 
+#if 0
     if (!CONFIGURE_NIC_MODE(sc)) {
         /* free searcher T2 table */
-        bxe_dma_free(sc, sc->t2);
+        bxe_dma_free(sc, &sc->t2);
     }
+#endif
 
     for (i = 0; i < L2_ILT_LINES(sc); i++) {
         bxe_dma_free(sc, &sc->context[i].vcxt_dma);
@@ -6220,13 +6233,15 @@ bxe_alloc_mem(struct bxe_adapter *sc)
     int allocated;
     int i;
 
+#if 0
     if (!CONFIGURE_NIC_MODE(sc)) {
         /* allocate searcher T2 table */
         if (bxe_dma_alloc(sc, SRC_T2_SZ,
-                          sc->t2, "searcher t2 table") != 0) {
+                          &sc->t2, "searcher t2 table") != 0) {
             return (-1);
         }
     }
+#endif
 
     /*
      * Allocate memory for CDU context:
@@ -6244,7 +6259,6 @@ bxe_alloc_mem(struct bxe_adapter *sc)
      */
     context_size = (sizeof(union cdu_context) * BXE_L2_CID_COUNT(sc));
     for (i = 0, allocated = 0; allocated < context_size; i++) {
-      /*
         sc->context[i].size = MIN(CDU_ILT_PAGE_SZ,
                                   (context_size - allocated));
 
@@ -6259,7 +6273,6 @@ bxe_alloc_mem(struct bxe_adapter *sc)
             (union cdu_context *)sc->context[i].vcxt_dma.vaddr;
 
         allocated += sc->context[i].size;
-      */
     }
 
     bxe_alloc_ilt_lines_mem(sc);
@@ -6306,7 +6319,7 @@ bxe_free_rx_bd_chain(struct bxe_fastpath *fp)
     if (fp->rx_mbuf_tag == NULL) {
         return;
     }
-#if 0
+#if 0 // AKAROS_PORT
     /* free all mbufs and unload all maps */
     for (i = 0; i < RX_BD_TOTAL; i++) {
         if (fp->rx_mbuf_chain[i].m_map != NULL) {
@@ -6339,7 +6352,7 @@ bxe_free_tpa_pool(struct bxe_fastpath *fp)
     }
 
     max_agg_queues = MAX_AGG_QS(sc);
-#if 0
+#if 0 // AKAROS_PORT
     /* release all mbufs and unload all DMA maps in the TPA pool */
     for (i = 0; i < max_agg_queues; i++) {
         if (fp->rx_tpa_info[i].bd.m_map != NULL) {
@@ -6370,7 +6383,7 @@ bxe_free_sge_chain(struct bxe_fastpath *fp)
     if (fp->rx_sge_mbuf_tag == NULL) {
         return;
     }
-#if 0
+#if 0 // AKAROS_PORT
     /* rree all mbufs and unload all maps */
     for (i = 0; i < RX_SGE_TOTAL; i++) {
         if (fp->rx_sge_mbuf_chain[i].m_map != NULL) {
@@ -6393,7 +6406,7 @@ bxe_free_sge_chain(struct bxe_fastpath *fp)
 static void
 bxe_free_fp_buffers(struct bxe_adapter *sc)
 {
-#if 0
+#if 0 // AKAROS_PORT
     struct bxe_fastpath *fp;
     int i;
 
@@ -6455,7 +6468,8 @@ bxe_alloc_rx_bd_mbuf(struct bxe_fastpath *fp,
                      uint16_t            prev_index,
                      uint16_t            index)
 {
-#if 0
+	// XME
+#if 0 // AKAROS_PORT
     struct bxe_sw_rx_bd *rx_buf;
     struct eth_rx_bd *rx_bd;
     bus_dma_segment_t segs[1];
@@ -6541,7 +6555,8 @@ static int
 bxe_alloc_rx_tpa_mbuf(struct bxe_fastpath *fp,
                       int                 queue)
 {
-#if 0
+	// XME
+#if 0 // AKAROS_PORT
     struct bxe_sw_tpa_info *tpa_info = &fp->rx_tpa_info[queue];
     bus_dma_segment_t segs[1];
     bus_dmamap_t map;
@@ -6605,7 +6620,8 @@ static int
 bxe_alloc_rx_sge_mbuf(struct bxe_fastpath *fp,
                       uint16_t            index)
 {
-#if 0
+	// XME
+#if 0 // AKAROS_PORT
     struct bxe_sw_rx_bd *sge_buf;
     struct eth_rx_sge *sge;
     bus_dma_segment_t segs[1];
@@ -6766,6 +6782,7 @@ bxe_alloc_fp_buffers_error:
 static void
 bxe_free_fw_stats_mem(struct bxe_adapter *sc)
 {
+// null XME
     bxe_dma_free(sc, &sc->fw_stats_dma);
 
     sc->fw_stats_num = 0;
@@ -6782,7 +6799,6 @@ bxe_free_fw_stats_mem(struct bxe_adapter *sc)
 static int
 bxe_alloc_fw_stats_mem(struct bxe_adapter *sc)
 {
-#if 0
     uint8_t num_queue_stats;
     int num_groups;
 
@@ -6850,7 +6866,6 @@ bxe_alloc_fw_stats_mem(struct bxe_adapter *sc)
 
     BLOGD(sc, DBG_LOAD, "statistics data base address set to %#jx\n",
           (uintmax_t)sc->fw_stats_data_mapping);
-#endif
     return (0);
 }
 
@@ -7156,7 +7171,7 @@ bxe_nic_load_pmf(struct bxe_adapter *sc,
 static void
 bxe_read_mf_cfg(struct bxe_adapter *sc)
 {
-#if 0
+#if 0 // AKAROS_PORT
     int n = (CHIP_IS_MODE_4_PORT(sc) ? 2 : 1);
     int abs_func;
     int vn;
@@ -7916,7 +7931,7 @@ bxe_handle_eee_event(struct bxe_adapter *sc)
 static void
 bxe_drv_info_ether_stat(struct bxe_adapter *sc)
 {
-#if 0
+#if 0 // AKAROS_PORT
     struct eth_stats_info *ether_stat =
         &sc->sp->drv_info_to_mcp.ether_stat;
 
@@ -9156,7 +9171,7 @@ static void bxe_intr_fp(struct hw_trapframe *hw_tf, void *xfp)
 static void
 bxe_interrupt_free(struct bxe_adapter *sc)
 {
-#if 0
+#if 0 // AKAROS_PORT
     int i;
 
     switch (sc->interrupt_mode) {
@@ -9228,7 +9243,7 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
 	 * later. */
 	sc->intr_count = sc->num_queues + 1;
     return 0;
-#if 0
+#if 0 // AKAROS_PORT
     int msix_count = 0;
     int msi_count = 0;
     int num_requested = 0;
@@ -10836,7 +10851,7 @@ bxe_nic_init(struct bxe_adapter *sc,
 static inline void
 bxe_init_objs(struct bxe_adapter *sc)
 {
-#if 0
+#if 0 // AKAROS_PORT
     /* mcast rules must be added to tx if tx switching is enabled */
     ecore_obj_type o_type =
         (sc->flags & BXE_TX_SWITCHING) ? ECORE_OBJ_TYPE_RX_TX :
@@ -10892,8 +10907,6 @@ bxe_init_objs(struct bxe_adapter *sc)
 static inline int
 bxe_func_start(struct bxe_adapter *sc)
 {
-	return 0xaa;
-#if 0
     struct ecore_func_state_params func_params = { NULL };
     struct ecore_func_start_params *start_params = &func_params.params.start;
 
@@ -10917,14 +10930,12 @@ bxe_func_start(struct bxe_adapter *sc)
     start_params->gre_tunnel_rss  = 0;
 
     return (ecore_func_state_change(sc, &func_params));
-#endif
 }
 
 static int
 bxe_set_power_state(struct bxe_adapter *sc,
                     uint8_t          state)
 {
-#if 0
     uint16_t pmcsr;
 
     /* If there is no power capability, silently succeed */
@@ -10979,7 +10990,6 @@ bxe_set_power_state(struct bxe_adapter *sc,
         return (-1);
     }
 
-#endif
     return (0);
 }
 
@@ -10989,7 +10999,6 @@ static uint8_t
 bxe_trylock_hw_lock(struct bxe_adapter *sc,
                     uint32_t         resource)
 {
-#if 0
     uint32_t lock_status;
     uint32_t resource_bit = (1 << resource);
     int func = SC_FUNC(sc);
@@ -11018,7 +11027,6 @@ bxe_trylock_hw_lock(struct bxe_adapter *sc,
         return (TRUE);
     }
 
-#endif
     BLOGE(sc, "Failed to get a resource lock 0x%x\n", resource);
 
     return (FALSE);
@@ -11554,8 +11562,7 @@ bxe_pf_q_prep_init(struct bxe_adapter               *sc,
         /* fp->txdata[cos]->cid */
         cxt_index = fp->index / ILT_PAGE_CIDS;
         cxt_offset = fp->index - (cxt_index * ILT_PAGE_CIDS);
-// FIX
-//        init_params->cxts[cos] = &sc->context[cxt_index].vcxt[cxt_offset].eth;
+        init_params->cxts[cos] = &sc->context[cxt_index].vcxt[cxt_offset].eth;
     }
 }
 
@@ -11599,7 +11606,7 @@ bxe_get_q_flags(struct bxe_adapter    *sc,
                 struct bxe_fastpath *fp,
                 uint8_t             leading)
 {
-#if 0
+#if 0 // AKAROS_PORT
     unsigned long flags = 0;
 
     if (IS_MF_SD(sc)) {
@@ -11653,7 +11660,7 @@ bxe_pf_rx_q_prep(struct bxe_adapter              *sc,
                  struct rxq_pause_params       *pause,
                  struct ecore_rxq_setup_params *rxq_init)
 {
-#if 0
+#if 0 // AKAROS_PORT
     uint8_t max_sge = 0;
     uint16_t sge_sz = 0;
     uint16_t tpa_agg_size = 0;
@@ -11755,7 +11762,7 @@ bxe_pf_tx_q_prep(struct bxe_adapter              *sc,
                  struct ecore_txq_setup_params *txq_init,
                  uint8_t                       cos)
 {
-#if 0
+#if 0 // AKAROS_PORT
     /*
      * XXX If multiple CoS is ever supported then each fastpath structure
      * will need to maintain tx producer/consumer/dma/etc values *per* CoS.
@@ -11798,8 +11805,7 @@ bxe_setup_queue(struct bxe_adapter    *sc,
 
     bxe_ack_sb(sc, fp->igu_sb_id, USTORM_ID, 0, IGU_INT_ENABLE, 0);
 
-    // FIX ME. 
-    //q_params.q_obj = &BXE_SP_OBJ(sc, fp).q_obj;
+    q_params.q_obj = &BXE_SP_OBJ(sc, fp).q_obj;
 
     /* we want to wait for completion in this context */
     bxe_set_bit(RAMROD_COMP_WAIT, &q_params.ramrod_flags);
@@ -12521,7 +12527,7 @@ static int
 bxe_set_uc_list(struct bxe_adapter *sc)
 {
 	return 0xaa;
-#if 0
+#if 0 // AKAROS_PORT
     if_t ifp = sc->ifp;
     struct ecore_vlan_mac_obj *mac_obj = &sc->sp_objs->mac_obj;
     struct ifaddr *ifa;
@@ -12586,7 +12592,7 @@ bxe_handle_rx_mode_tq(void *context,
     }
 
     BLOGD(sc, DBG_SP, "if_flags(ifp)=0x%x\n", if_getflags(sc->ifp));
-#if 0
+#if 0 // AKAROS_PORT
     if (if_getflags(ifp) & IFF_PROMISC) {
         rx_mode = BXE_RX_MODE_PROMISC;
     } else if ((if_getflags(ifp) & IFF_ALLMULTI) ||
@@ -12824,6 +12830,7 @@ bxe_nic_load(struct bxe_adapter *sc,
         rc = ENOMEM;
         goto bxe_nic_load_error0;
     }
+
 
     if (bxe_alloc_mem(sc) != 0) {
         sc->state = BXE_STATE_CLOSED;
@@ -13194,7 +13201,7 @@ void bxe_init(void *xsc)
 static int
 bxe_init_ifnet(struct bxe_adapter *sc)
 {
-#if 0
+#if 0 // AKAROS_PORT
     if_t ifp;
     int capabilities;
 
@@ -13277,7 +13284,7 @@ static void
 bxe_deallocate_bars(struct bxe_adapter *sc)
 {
     int i;
-#if 0
+#if 0 // AKAROS_PORT (brho: this is fine)
     for (i = 0; i < MAX_BARS; i++) {
         if (sc->bar[i].resource != NULL) {
             bus_release_resource(sc->pcidev,
@@ -13338,7 +13345,7 @@ bxe_allocate_bars(struct bxe_adapter *sc)
 		}
 
 
-#if 0 /* BSD way */
+#if 0 // AKAROS_PORT (brho: this is fine)
         flags = RF_ACTIVE;
         if (i == 0) {
             flags |= RF_SHAREABLE;
@@ -13535,7 +13542,7 @@ bxe_probe_pci_caps(struct bxe_adapter *sc)
 static int
 bxe_get_shmem_mf_cfg_info_sd(struct bxe_adapter *sc)
 {
-#if 0
+#if 0 // AKAROS_PORT
     struct bxe_mf_info *mf_info = &sc->devinfo.mf_info;
     uint32_t val;
 
@@ -14010,6 +14017,7 @@ bxe_get_shmem_info(struct bxe_adapter *sc)
         BLOGD(sc, DBG_LOAD, "Ethernet address: %s\n", sc->mac_addr_str);
     }
 
+#if 0
     if (!IS_MF(sc) &&
         ((sc->port.config & PORT_FEAT_CFG_STORAGE_PERSONALITY_MASK) ==
          PORT_FEAT_CFG_STORAGE_PERSONALITY_FCOE)) {
@@ -14020,6 +14028,7 @@ bxe_get_shmem_info(struct bxe_adapter *sc)
          PORT_FEAT_CFG_STORAGE_PERSONALITY_ISCSI)) {
         sc->flags |= BXE_NO_FCOE;
     }
+#endif
 
     return (0);
 }
@@ -15142,7 +15151,7 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
         /***********************/
         /* FP TX MBUF DMA MAPS */
         /***********************/
-#if 0
+#if 0 // AKAROS_PORT
         /* set required sizes before mapping to conserve resources */
         if (if_getcapenable(sc->ifp) & (IFCAP_TSO4 | IFCAP_TSO6)) {
             max_size     = BXE_TSO_MAX_SIZE;
@@ -15329,7 +15338,7 @@ bxe_free_hsi_mem(struct bxe_adapter *sc)
     int max_agg_queues;
     int i, j;
 	/* still a minor pita to free this */
-#if 0
+#if 0 // AKAROS_PORT
     if (sc->parent_dma_tag == NULL) {
         return; /* assume nothing was allocated */
     }
@@ -15542,7 +15551,7 @@ static struct bxe_prev_list_node *
 bxe_prev_path_get_entry(struct bxe_adapter *sc)
 {
     struct bxe_prev_list_node *tmp;
-#if 0
+#if 0 // AKAROS_PORT
     LIST_FOREACH(tmp, &bxe_prev_list, node) {
         if ((sc->pcie_bus == tmp->bus) &&
             (sc->pcie_device == tmp->slot) &&
@@ -16000,7 +16009,7 @@ bxe_init_multi_cos(struct bxe_adapter *sc)
     }
 }
 
-#if 0
+#if 0 // AKAROS_PORT
 static int
 bxe_sysctl_state(SYSCTL_HANDLER_ARGS)
 {
@@ -16092,7 +16101,7 @@ bxe_sysctl_eth_q_stat(SYSCTL_HANDLER_ARGS)
     return (sysctl_handle_64(oidp, &value, 0, req));
 }
 #endif
-#if 0
+#if 0 // AKAROS_PORT
 static void
 bxe_add_sysctls(struct bxe_adapter *sc)
 {
@@ -16341,7 +16350,7 @@ err_mux_bars_etc:
     return (ENXIO);
 }
 
-#if 0
+#if 0 // AKAROS_PORT
 /*
  * Device detach function.
  *
@@ -16443,6 +16452,7 @@ bxe_shutdown(struct pcidev *dev)
 
     return (0);
 }
+#endif
 
 void
 bxe_igu_ack_sb(struct bxe_adapter *sc,
@@ -16457,7 +16467,6 @@ bxe_igu_ack_sb(struct bxe_adapter *sc,
     bxe_igu_ack_sb_gen(sc, igu_sb_id, segment, index, op, update, igu_addr);
 }
 
-#endif
 static void
 bxe_igu_clear_sb_gen(struct bxe_adapter *sc,
                      uint8_t          func,

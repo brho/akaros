@@ -910,6 +910,8 @@ struct bxe_fw_stats_data {
  * aligned.
  */
 struct bxe_slowpath {
+
+#if 0
     /*
      * The cdu_context array MUST be the first element in this
      * structure. It is used during the leading edge ramrod
@@ -920,6 +922,7 @@ struct bxe_slowpath {
     /* Used as a DMA source for MAC configuration. */
     struct mac_configuration_cmd    mac_config;
     struct mac_configuration_cmd    mcast_config;
+#endif
 
     /* used by the DMAE command executer */
     struct dmae_command dmae[MAX_DMAE_C];
@@ -1703,7 +1706,9 @@ struct eth_spe *spq;
 	
 	uint8_t dropless_fc;
 
+#if 0
 	struct bxe_dma *t2;
+#endif
 
 	/* total number of FW statistics requests */
 	uint8_t fw_stats_num;
@@ -1896,7 +1901,7 @@ void bxe_reg_write32(struct bxe_adapter *sc, bus_size_t offset, uint32_t val);
     (sc->sp_dma.paddr + offsetof(struct bxe_slowpath, var))
 
 #define BXE_FP(sc, nr, var) ((sc)->fp[(nr)].var)
-#define BXE_SP_OBJ(sc, fp) (void *) 0 /*((sc)->sp_objs[(fp)->index])*/
+#define BXE_SP_OBJ(sc, fp) ((sc)->sp_objs[(fp)->index])
 
 #if 0
 #define bxe_fp(sc, nr, var)   ((sc)->fp[nr].var)
@@ -2368,7 +2373,6 @@ bxe_ack_sb(struct bxe_adapter *sc,
            uint8_t          op,
            uint8_t          update)
 {
-#if 0
     if (sc->devinfo.int_block == INT_BLOCK_HC)
         bxe_hc_ack_sb(sc, igu_sb_id, storm, index, op, update);
     else {
@@ -2384,7 +2388,6 @@ bxe_ack_sb(struct bxe_adapter *sc,
         }
         bxe_igu_ack_sb(sc, igu_sb_id, segment, index, op, update);
     }
-#endif
 }
 
 static inline uint16_t
@@ -2443,8 +2446,6 @@ func_by_vn(struct bxe_adapter *sc,
 static inline uint8_t
 bxe_stats_id(struct bxe_fastpath *fp)
 {
-  return 0;
-#if 0
     struct bxe_adapter *sc = fp->sc;
 
     if (!CHIP_IS_E1x(sc)) {
@@ -2458,7 +2459,6 @@ bxe_stats_id(struct bxe_fastpath *fp)
     }
 
     return (fp->cl_id + SC_PORT(sc) * FP_SB_MAX_E1x);
-#endif
 }
 
 #endif /* __BXE_H__ */
