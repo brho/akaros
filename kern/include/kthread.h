@@ -82,6 +82,7 @@ struct kthread *__kthread_zalloc(void);
 void restart_kthread(struct kthread *kthread);
 void kthread_runnable(struct kthread *kthread);
 void kthread_yield(void);
+void kthread_usleep(uint64_t usec);
 void ktask(char *name, void (*fn)(void*), void *arg);
 /* Debugging */
 void check_poison(char *msg);
