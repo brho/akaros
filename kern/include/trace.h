@@ -41,9 +41,10 @@
 #define ROS_INC_TRACE_H
 
 #include <ros/common.h>
+#include <assert.h>
 
 struct trace_ring {
-	void						*tr_buf;
+	unsigned char				*tr_buf;
 	size_t						tr_buf_sz;
 	unsigned int				tr_event_sz_shift;
 	unsigned int				tr_max;
@@ -67,12 +68,21 @@ void trace_ring_foreach(struct trace_ring *tr, trace_handler_t tr_func,
 /* Inlined funcs, declared above */
 
 /* Helper */
-static inline void *__get_tr_slot(struct trace_ring *tr, unsigned long slot)
+/* Get next trace ring slot with no wrapping */
+static inline void *__get_tr_slot(struct trace_ring *tr, unsigned long ind)
 {
-	/* tr_max is a power of 2, we're ignoring the upper bits of my_slot */
-	slot &= tr->tr_max - 1;
+	dassert(0 <= ind && ind < tr->tr_max);
 	/* event sizes are rounded up to the nearest power of 2 (sz_shift) */
-	return tr->tr_buf + (slot << tr->tr_event_sz_shift);
+	return (void *) (tr->tr_buf + (ind << tr->tr_event_sz_shift));
+}
+
+/* Get next trace ring slot with wrapping */
+static inline void *
+__get_tr_slot_overwrite(struct trace_ring *tr, unsigned long slot)
+{
+	/* tr_max is a power of 2, we're ignoring the upper bits of slot */
+	slot &= tr->tr_max - 1;
+	return __get_tr_slot(tr, slot);
 }
 
 static inline void *get_trace_slot(struct trace_ring *tr)
@@ -91,7 +101,7 @@ static inline void *get_trace_slot(struct trace_ring *tr)
 
 static inline void *get_trace_slot_overwrite(struct trace_ring *tr)
 {
-	return __get_tr_slot(tr, __sync_fetch_and_add(&tr->tr_next, 1));
+	return __get_tr_slot_overwrite(tr, __sync_fetch_and_add(&tr->tr_next, 1));
 }
 
 static inline void *get_trace_slot_racy(struct trace_ring *tr)
@@ -105,7 +115,7 @@ static inline void *get_trace_slot_racy(struct trace_ring *tr)
 
 static inline void *get_trace_slot_overwrite_racy(struct trace_ring *tr)
 {
-	return __get_tr_slot(tr, tr->tr_next++);
+	return __get_tr_slot_overwrite(tr, tr->tr_next++);
 }
 
 #endif /* ROS_INC_TRACE_H */

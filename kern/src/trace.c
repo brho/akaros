@@ -35,5 +35,5 @@ void trace_ring_foreach(struct trace_ring *tr, trace_handler_t tr_func,
                         void *data)
 {
 	for (int i = 0; i < tr->tr_max; i++)
-		tr_func(tr->tr_buf + (i << tr->tr_event_sz_shift), data);
+		tr_func(__get_tr_slot(tr, i), data);
 }

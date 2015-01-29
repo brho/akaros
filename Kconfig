@@ -123,6 +123,12 @@ config TRACE_LOCKS
 
 endmenu
 
+config DEVELOPMENT_ASSERTIONS
+	bool "dasserts"
+	default n
+	help
+		Turn on dassert() in code, dassert will compile to assert().
+
 config SPINLOCK_DEBUG
 	bool "Spinlock debugging"
 	default n
