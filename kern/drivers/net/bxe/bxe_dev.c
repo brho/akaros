@@ -371,11 +371,6 @@ static void bxepci(void)
 
 		ctlr->pcidev = pcidev;
 		
-		if (bxereset(ctlr)) {
-			kfree(ctlr);
-			continue;
-		}
-
 		spin_lock(&bxe_adapter_tq_lock);
 		TAILQ_INSERT_TAIL(&bxe_adapter_tq, ctlr, link9ns);
 		spin_unlock(&bxe_adapter_tq_lock);
@@ -406,6 +401,9 @@ static int bxepnp(struct ether *edev)
 		return -1;
 
 	edev->ctlr = ctlr;
+	ctlr->edev = edev;
+	ctlr->ifp = &edev->netif;
+
 	//edev->port = ctlr->port;	/* might just remove this from devether */
 	edev->irq = ctlr->pcidev->irqline;
 	edev->tbdf = MKBUS(BusPCI, ctlr->pcidev->bus, ctlr->pcidev->dev,
@@ -425,6 +423,8 @@ static int bxepnp(struct ether *edev)
 	edev->netif.arg = edev;
 	edev->netif.promiscuous = bxepromiscuous;
 	edev->netif.multicast = bxemulticast;
+
+	bxereset(ctlr);
 
 	return 0;
 }
