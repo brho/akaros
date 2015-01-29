@@ -43,6 +43,7 @@
 #include <rwlock.h>
 #include <rendez.h>
 #include <ktest.h>
+#include <smallidpool.h>
 #include <linker_func.h>
 
 KTEST_SUITE("POSTBOOT")
@@ -1992,6 +1993,99 @@ bool test_kmalloc_incref(void)
 	return TRUE;
 }
 
+/* Some ghetto things:
+ * - ASSERT_M only lets you have a string, not a format string.
+ * - put doesn't return, so we have a "loud" test for that.  alternatively, we
+ *   could have put panic, but then we couldn't test it at all.  and i don't
+ *   particularly want it to have a return value.
+ * - ASSERT_M just blindly returns.  we're leaking memory.
+ */
+bool test_u16pool(void)
+{
+	#define AMT 4096
+	int *t;
+	struct u16_pool *id = create_u16_pool(AMT);
+	int i, x, y;
+	int numalloc;
+	KT_ASSERT(id);
+
+	t = kzmalloc(sizeof(int) * (AMT + 1), KMALLOC_WAIT);
+	for (x = 0; x < 1024; x++) {
+		KT_ASSERT_M("Should be empty", id->tos == 0);
+		for (i = 0; i < id->size; i++) {
+			int p = get_u16(id);
+			if (p < 0)
+				KT_ASSERT_M("Couldn't get enough", 0);
+			t[i] = p;
+		}
+		numalloc = i;
+		// free them at random. With luck, we don't get too many duplicate
+		// hits.
+		for (y = i = 0; i < numalloc; y++) {
+			/* could read genrand, but that could be offline */
+			int f = (uint16_t)read_tsc() % numalloc;
+			if (!t[f])
+				continue;
+			put_u16(id, t[f]);
+			t[f] = 0;
+			i++;
+			/* that's long enough... */
+			if (y > 2 * id->size)
+				break;
+		}
+		/* grab the leftovers */
+		for (i = 0; i < id->size; i++) {
+			if (!t[i])
+				continue;
+			put_u16(id, t[i]);
+			t[i] = 0;
+		}
+		/* all of our previous checks failed to give back 0 */
+		put_u16(id, 0);
+	}
+
+	// pop too many.
+	bool we_broke = FALSE;
+	for (i = 0; i < id->size * 2; i++) {
+		x = get_u16(id);
+		if (x == -1) {
+			we_broke = TRUE;
+			break;
+		}
+		t[i] = x;
+	}
+	KT_ASSERT_M("Should have failed to get too many", we_broke);
+
+	numalloc = i;
+
+	printd("Allocated %d items\n", numalloc);
+	for (i = 0; i < numalloc; i++) {
+		put_u16(id, t[i]);
+		t[i] = 0;
+	}
+	KT_ASSERT_M("Should be empty", id->tos == 0);
+
+	printk("Ignore next BAD, testing bad alloc\n");
+	put_u16(id, 25);	// should get an error.
+	for (i = 0; i < id->size; i++) {
+		int v = get_u16(id);
+		if (t[v])
+			printd("BAD: %d pops twice!\n", v);
+		KT_ASSERT_M("Popped twice!", t[v] == 0);
+		t[v] = 1;
+		//printk("%d,", v);
+	}
+
+	for (i = 1; i < id->size; i++) {
+		if (!t[i])
+			printd("BAD: %d was not set\n", i);
+		KT_ASSERT_M("Wasn't set!", t[i]);
+	}
+
+	kfree(t);
+	return FALSE;
+}
+
 static struct ktest ktests[] = {
 #ifdef CONFIG_X86
 	KTEST_REG(ipi_sending,        CONFIG_TEST_ipi_sending),
@@ -2030,6 +2124,7 @@ static struct ktest ktests[] = {
 	KTEST_REG(rv,                 CONFIG_TEST_rv),
 	KTEST_REG(alarm,              CONFIG_TEST_alarm),
 	KTEST_REG(kmalloc_incref,     CONFIG_TEST_kmalloc_incref),
+	KTEST_REG(u16pool,            CONFIG_TEST_u16pool),
 };
 static int num_ktests = sizeof(ktests) / sizeof(struct ktest);
 linker_func_1(register_pb_ktests)
