@@ -1320,7 +1320,7 @@ struct bxe_adapter {
 	 * has a first element of 'void *if_softc' (which is us). XXX
 	 */
 	if_t 	    ifp;
-	LIST_ENTRY(bxe_adapter)		node;
+	TAILQ_ENTRY(bxe_adapter)		link9ns;
 	/* OS defined structs */
 	struct net_device *netdev;
 	struct pci_device *pcidev;
@@ -2274,10 +2274,8 @@ void bxe_dump_mem(struct bxe_adapter *sc, char *tag,
 void bxe_dump_mbuf_data(struct bxe_adapter *sc, char *pTag,
                         struct mbuf *m, uint8_t contents);
 
-/* Defined in bxe.c, init'd in bxereset or something in bxe_dev.c */
+/* Declared in bxe.c, init'd in pnp */
 extern qlock_t bxe_prev_mtx;
-LIST_HEAD(bxe_prev_list, bxe_adapter);
-extern struct bxe_prev_list bxe_prev_list;
 
 /***********/
 /* INLINES */

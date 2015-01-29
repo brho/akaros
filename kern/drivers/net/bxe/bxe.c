@@ -250,9 +250,9 @@ static device_method_t bxe_methods[] = {
 };
 
 #endif
-qlock_t bxe_prev_mtx;
-struct bxe_prev_list bxe_prev_list = LIST_HEAD_INITIALIZER(bxe_prev_list);
+#define BXE_PREV_WAIT_NEEDED 1
 
+qlock_t bxe_prev_mtx;
 struct bxe_prev_list_node {
     LIST_ENTRY(bxe_prev_list_node) node;
     uint8_t bus;
@@ -261,7 +261,7 @@ struct bxe_prev_list_node {
     uint8_t aer; /* XXX automatic error recovery */
     uint8_t undi;
 };
-//static LIST_HEAD(, bxe_prev_list_node) bxe_prev_list = LIST_HEAD_INITIALIZER(bxe_prev_list);
+static LIST_HEAD(, bxe_prev_list_node) bxe_prev_list = LIST_HEAD_INITIALIZER(bxe_prev_list);
 
 /* Tunable device values... */
 
@@ -15636,7 +15636,7 @@ bxe_prev_mark_path(struct bxe_adapter *sc,
     BLOGD(sc, DBG_LOAD,
           "Marked path %d/%d/%d - finished previous unload\n",
           sc->pcie_bus, sc->pcie_device, SC_PATH(sc));
-    //    LIST_INSERT_HEAD(&bxe_prev_list, tmp, node);
+          LIST_INSERT_HEAD(&bxe_prev_list, tmp, node);
 
     qunlock(&bxe_prev_mtx);
 

@@ -26,6 +26,10 @@
 /* We're required to print out stats at some point.  Here are a couple from
  * igbe, as an example. */
 
+spinlock_t bxe_adapter_tq_lock = SPINLOCK_INITIALIZER;
+TAILQ_HEAD(bxe_adapter_tq, bxe_adapter);
+struct bxe_adapter_tq bxe_adapter_tq = TAILQ_HEAD_INITIALIZER(bxe_adapter_tq);
+
 static char *statistics[Nstatistics] = {
 	"CRC Error",
 	"Alignment Error",
@@ -372,10 +376,9 @@ static void bxepci(void)
 			continue;
 		}
 
-		/* BSD used mutexes for this list for other reasons */
-		qlock(&bxe_prev_mtx);
-		LIST_INSERT_HEAD(&bxe_prev_list, ctlr, node);
-		qunlock(&bxe_prev_mtx);
+		spin_lock(&bxe_adapter_tq_lock);
+		TAILQ_INSERT_TAIL(&bxe_adapter_tq, ctlr, link9ns);
+		spin_unlock(&bxe_adapter_tq_lock);
 	}
 }
 
@@ -390,15 +393,15 @@ static int bxepnp(struct ether *edev)
 	 * MMIO/port setup */
 	run_once(bxepci());
 
-	qlock(&bxe_prev_mtx);
-	LIST_FOREACH(ctlr, &bxe_prev_list, node) {
+	spin_lock(&bxe_adapter_tq_lock);
+	TAILQ_FOREACH(ctlr, &bxe_adapter_tq, link9ns) {
 		/* just take the first inactive ctlr on the list */
 		if (ctlr->active)
 			continue;
 		ctlr->active = 1;
 		break;
 	}
-	qunlock(&bxe_prev_mtx);
+	spin_unlock(&bxe_adapter_tq_lock);
 	if (ctlr == NULL)
 		return -1;
 
