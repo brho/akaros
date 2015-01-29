@@ -221,7 +221,7 @@ static struct bxe_device_type bxe_devs[] = {
 //MALLOC_DECLARE(M_BXE_ILT);
 //MALLOC_DEFINE(M_BXE_ILT, "bxe_ilt", "bxe ILT pointer");
 
-#if 0 // AKAROS_PORT
+#if 0 // AKAROS_PORT brho: can ignore, BSD interface
 /*
  * FreeBSD device entry points.
  */
@@ -799,7 +799,7 @@ calc_crc32(uint8_t  *crc32_packet,
 static void
 bxe_dma_map_addr(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 {
-#if 0 // AKAROS_PORT
+#if 0 // AKAROS_PORT /* brho: don't uncomment this without checking bus_* */
     struct bxe_dma *dma = arg;
 
     if (error) {
@@ -2592,7 +2592,7 @@ bxe_init_mutexes(struct bxe_adapter *sc)
 static void
 bxe_release_mutexes(struct bxe_adapter *sc)
 {
-#if 0 // AKAROS_PORT
+#if 0 // AKAROS_PORT brho: no need to uncomment, we don't destroy qlocks
 #ifdef BXE_CORE_LOCK_SX
     sx_destroy(&sc->core_sx);
 #else
@@ -2636,6 +2636,7 @@ bxe_tx_disable(struct bxe_adapter* sc)
 {
     if_t ifp = sc->ifp;
 
+	assert(0);
 	// TODO: is there a way to do this in this stack? I think it just pauses ...
 #if 0 // AKAROS_PORT
     /* tell the stack the driver is stopped and TX queue is full */
@@ -2821,6 +2822,7 @@ bxe_tpa_start(struct bxe_adapter            *sc,
               uint16_t                    prod,
               struct eth_fast_path_rx_cqe *cqe)
 {
+	assert(0);
 #if 0 // AKAROS_PORT
     struct bxe_sw_rx_bd tmp_bd;
     struct bxe_sw_rx_bd *rx_buf;
@@ -3096,6 +3098,7 @@ bxe_tpa_stop(struct bxe_adapter          *sc,
 			 struct eth_end_agg_rx_cqe *cqe,
              uint16_t                  cqe_idx)
 {
+	assert(0);
 #if 0 // AKAROS_PORT
     if_t ifp = sc->ifp;
     struct mbuf *m;
@@ -3171,6 +3174,7 @@ static uint8_t
 bxe_rxeof(struct bxe_adapter    *sc,
           struct bxe_fastpath *fp)
 {
+	assert(0);
 	return 0xaa;
 #if 0 // AKAROS_PORT
     if_t ifp = sc->ifp;
@@ -3435,6 +3439,7 @@ bxe_free_tx_pkt(struct bxe_adapter    *sc,
                 struct bxe_fastpath *fp,
                 uint16_t            idx)
 {
+	assert(0);
 	return 0xaa;
 #if 0 // AKAROS_PORT
     struct bxe_sw_tx_bd *tx_buf = &fp->tx_mbuf_chain[idx];
@@ -3528,6 +3533,7 @@ static uint8_t
 bxe_txeof(struct bxe_adapter    *sc,
           struct bxe_fastpath *fp)
 {
+	assert(0);
 	return 0xaa;
 #if 0 // AKAROS_PORT
     if_t ifp = sc->ifp;
@@ -3584,6 +3590,7 @@ bxe_txeof(struct bxe_adapter    *sc,
 static void
 bxe_drain_tx_queues(struct bxe_adapter *sc)
 {
+	assert(0);
 #if 0 // AKAROS_PORT
     struct bxe_fastpath *fp;
     int i, count;
@@ -3621,6 +3628,7 @@ bxe_del_all_macs(struct bxe_adapter          *sc,
                  int                       mac_type,
                  uint8_t                   wait_for_comp)
 {
+	assert(0);
 #if 0 // AKAROS_PORT
     unsigned long ramrod_flags = 0, vlan_mac_flags = 0;
     int rc;
@@ -3649,7 +3657,6 @@ bxe_fill_accept_flags(struct bxe_adapter *sc,
                       unsigned long    *rx_accept_flags,
                       unsigned long    *tx_accept_flags)
 {
-#if 0 // AKAROS_PORT
     /* Clear the flags first */
     *rx_accept_flags = 0;
     *tx_accept_flags = 0;
@@ -3719,7 +3726,6 @@ bxe_fill_accept_flags(struct bxe_adapter *sc,
         bxe_set_bit(ECORE_ACCEPT_ANY_VLAN, rx_accept_flags);
         bxe_set_bit(ECORE_ACCEPT_ANY_VLAN, tx_accept_flags);
     }
-#endif
     return (0);
 }
 
@@ -3731,6 +3737,7 @@ bxe_set_q_rx_mode(struct bxe_adapter *sc,
                   unsigned long    tx_accept_flags,
                   unsigned long    ramrod_flags)
 {
+	assert(0);
 #if 0 // AKAROS_PORT
     struct ecore_rx_mode_ramrod_params ramrod_param;
     int rc;
@@ -3769,8 +3776,6 @@ bxe_set_q_rx_mode(struct bxe_adapter *sc,
 static int
 bxe_set_storm_rx_mode(struct bxe_adapter *sc)
 {
-	return 0xaa;
-#if 0 // AKAROS_PORT
     unsigned long rx_mode_flags = 0, ramrod_flags = 0;
     unsigned long rx_accept_flags = 0, tx_accept_flags = 0;
     int rc;
@@ -3788,13 +3793,13 @@ bxe_set_storm_rx_mode(struct bxe_adapter *sc)
     return (bxe_set_q_rx_mode(sc, sc->fp[0].cl_id, rx_mode_flags,
                               rx_accept_flags, tx_accept_flags,
                               ramrod_flags));
-#endif
 }
 
 /* returns the "mcp load_code" according to global load_count array */
 static int
 bxe_nic_load_no_mcp(struct bxe_adapter *sc)
 {
+	assert(0);
 	return 0xaa;
 #if 0 // AKAROS_PORT
     int path = SC_PATH(sc);
@@ -3822,6 +3827,7 @@ bxe_nic_load_no_mcp(struct bxe_adapter *sc)
 static int
 bxe_nic_unload_no_mcp(struct bxe_adapter *sc)
 {
+	assert(0);
 	return 0xaa;
 #if 0 // AKAROS_PORT
     int port = SC_PORT(sc);
@@ -3850,6 +3856,7 @@ static uint32_t
 bxe_send_unload_req(struct bxe_adapter *sc,
                     int              unload_mode)
 {
+	assert(0);
 #if 0 // AKAROS_PORT
     uint32_t reset_code = 0;
 #if 0
@@ -3927,6 +3934,7 @@ bxe_send_unload_done(struct bxe_adapter *sc,
 static int
 bxe_func_wait_started(struct bxe_adapter *sc)
 {
+	assert(0);
 #if 0 // AKAROS_PORT
     int tout = 50;
 
@@ -3987,6 +3995,7 @@ static int
 bxe_stop_queue(struct bxe_adapter *sc,
                int              index)
 {
+	assert(0);
 #if 0 // AKAROS_PORT
     struct bxe_fastpath *fp = &sc->fp[index];
     struct ecore_queue_state_params q_params = { NULL };
@@ -4058,6 +4067,7 @@ bxe_wait_sp_comp(struct bxe_adapter *sc,
 static int
 bxe_func_stop(struct bxe_adapter *sc)
 {
+	assert(0);
 #if 0 // AKAROS_PORT
     struct ecore_func_state_params func_params = { NULL };
     int rc;
@@ -4088,6 +4098,7 @@ static int
 bxe_reset_hw(struct bxe_adapter *sc,
              uint32_t         load_code)
 {
+	assert(0);
 #if 0 // AKAROS_PORT
     struct ecore_func_state_params func_params = { NULL };
 
@@ -4125,7 +4136,6 @@ bxe_chip_cleanup(struct bxe_adapter *sc,
                  uint32_t         unload_mode,
                  uint8_t          keep_link)
 {
-#if 0 // AKAROS_PORT
     int port = SC_PORT(sc);
     struct ecore_mcast_ramrod_params rparam = { NULL };
     uint32_t reset_code;
@@ -4233,13 +4243,11 @@ unload_error:
 
     /* Report UNLOAD_DONE to MCP */
     bxe_send_unload_done(sc, keep_link);
-#endif
 }
 
 static void
 bxe_disable_close_the_gate(struct bxe_adapter *sc)
 {
-#if 0 // AKAROS_PORT
     uint32_t val;
     int port = SC_PORT(sc);
 
@@ -4258,7 +4266,6 @@ bxe_disable_close_the_gate(struct bxe_adapter *sc)
                  MISC_AEU_GENERAL_MASK_REG_AEU_NIG_CLOSE_MASK);
         REG_WR(sc, MISC_REG_AEU_GENERAL_MASK, val);
     }
-#endif
 }
 
 /*
@@ -4268,7 +4275,6 @@ bxe_disable_close_the_gate(struct bxe_adapter *sc)
 static void
 bxe_squeeze_objects(struct bxe_adapter *sc)
 {
-#if 0 // AKAROS_PORT
     unsigned long ramrod_flags = 0, vlan_mac_flags = 0;
     struct ecore_mcast_ramrod_params rparam = { NULL };
     struct ecore_vlan_mac_obj *mac_obj = &sc->sp_objs->mac_obj;
@@ -4320,7 +4326,6 @@ bxe_squeeze_objects(struct bxe_adapter *sc)
 
         rc = ecore_config_mcast(sc, &rparam, ECORE_MCAST_CMD_CONT);
     }
-#endif
 }
 
 /* stop the controller */
@@ -4329,7 +4334,6 @@ bxe_nic_unload(struct bxe_adapter *sc,
                uint32_t         unload_mode,
                uint8_t          keep_link)
 {
-#if 0 // AKAROS_PORT
     uint8_t global = FALSE;
     uint32_t val;
 
@@ -4474,7 +4478,6 @@ bxe_nic_unload(struct bxe_adapter *sc,
     }
 
     BLOGD(sc, DBG_LOAD, "Ended NIC unload\n");
-#endif
     return (0);
 }
 
@@ -4547,6 +4550,7 @@ bxe_ioctl_stats_show(struct bxe_adapter *sc,
                      uint32_t         priv_op,
                      void *data)
 {
+	assert(0);
 	return 0xaa;
 #if 0 // AKAROS_PORT
     const size_t str_size   = (BXE_NUM_ETH_STATS * STAT_NAME_LEN);
@@ -4604,6 +4608,7 @@ static void
 bxe_handle_chip_tq(void *context,
                    int  pending)
 {
+	assert(0);
 #if 0 // AKAROS_PORT
     struct bxe_adapter *sc = (struct bxe_adapter *)context;
     long work = atomic_read(&sc->chip_tq_flags);
@@ -4662,6 +4667,7 @@ bxe_ioctl(if_t ifp,
           unsigned long       command,
           void *      data)
 {
+	assert(0);
 #if 0 // AKAROS_PORT
     struct bxe_adapter *sc = if_getsoftc(ifp);
     struct bxe_nvram_data *nvdata;
@@ -4905,6 +4911,7 @@ bxe_dump_mbuf(struct bxe_adapter *sc,
               struct mbuf      *m,
               uint8_t          contents)
 {
+	assert(0);
 #if 0 // AKAROS_PORT
     char * type;
     int i = 0;
@@ -5748,6 +5755,7 @@ bxe_tx_start_locked(struct bxe_adapter *sc,
                     if_t ifp,
                     struct bxe_fastpath *fp)
 {
+	assert(0);
 #if 0 // AKAROS_PORT
     struct mbuf *m = NULL;
     int tx_count = 0;
@@ -5819,6 +5827,7 @@ bxe_tx_start_locked(struct bxe_adapter *sc,
 static void
 bxe_tx_start(if_t ifp)
 {
+	assert(0);
 #if 0 // AKAROS_PORT
     struct bxe_adapter *sc;
     struct bxe_fastpath *fp;
@@ -6127,7 +6136,6 @@ bxe_ilt_set_info(struct bxe_adapter *sc)
 static void
 bxe_set_fp_rx_buf_size(struct bxe_adapter *sc)
 {
-#if 0 // AKAROS_PORT
     int i;
 
     BLOGD(sc, DBG_LOAD, "mtu = %d\n", sc->mtu);
@@ -6154,7 +6162,6 @@ bxe_set_fp_rx_buf_size(struct bxe_adapter *sc)
         BLOGD(sc, DBG_LOAD, "mbuf_alloc_size for fp[%02d] = %d\n",
               i, sc->fp[i].mbuf_alloc_size);
     }
-#endif
 }
 
 static int
@@ -6319,6 +6326,7 @@ bxe_free_rx_bd_chain(struct bxe_fastpath *fp)
     if (fp->rx_mbuf_tag == NULL) {
         return;
     }
+	assert(0);
 #if 0 // AKAROS_PORT
     /* free all mbufs and unload all maps */
     for (i = 0; i < RX_BD_TOTAL; i++) {
@@ -6351,6 +6359,7 @@ bxe_free_tpa_pool(struct bxe_fastpath *fp)
         return;
     }
 
+	assert(0);
     max_agg_queues = MAX_AGG_QS(sc);
 #if 0 // AKAROS_PORT
     /* release all mbufs and unload all DMA maps in the TPA pool */
@@ -6383,6 +6392,7 @@ bxe_free_sge_chain(struct bxe_fastpath *fp)
     if (fp->rx_sge_mbuf_tag == NULL) {
         return;
     }
+	assert(0);
 #if 0 // AKAROS_PORT
     /* rree all mbufs and unload all maps */
     for (i = 0; i < RX_SGE_TOTAL; i++) {
@@ -6406,6 +6416,7 @@ bxe_free_sge_chain(struct bxe_fastpath *fp)
 static void
 bxe_free_fp_buffers(struct bxe_adapter *sc)
 {
+	assert(0);
 #if 0 // AKAROS_PORT
     struct bxe_fastpath *fp;
     int i;
@@ -6469,6 +6480,7 @@ bxe_alloc_rx_bd_mbuf(struct bxe_fastpath *fp,
                      uint16_t            index)
 {
 	// XME
+	assert(0);
 #if 0 // AKAROS_PORT
     struct bxe_sw_rx_bd *rx_buf;
     struct eth_rx_bd *rx_bd;
@@ -6556,6 +6568,7 @@ bxe_alloc_rx_tpa_mbuf(struct bxe_fastpath *fp,
                       int                 queue)
 {
 	// XME
+	assert(0);
 #if 0 // AKAROS_PORT
     struct bxe_sw_tpa_info *tpa_info = &fp->rx_tpa_info[queue];
     bus_dma_segment_t segs[1];
@@ -6621,6 +6634,7 @@ bxe_alloc_rx_sge_mbuf(struct bxe_fastpath *fp,
                       uint16_t            index)
 {
 	// XME
+	assert(0);
 #if 0 // AKAROS_PORT
     struct bxe_sw_rx_bd *sge_buf;
     struct eth_rx_sge *sge;
@@ -7171,7 +7185,6 @@ bxe_nic_load_pmf(struct bxe_adapter *sc,
 static void
 bxe_read_mf_cfg(struct bxe_adapter *sc)
 {
-#if 0 // AKAROS_PORT
     int n = (CHIP_IS_MODE_4_PORT(sc) ? 2 : 1);
     int abs_func;
     int vn;
@@ -7204,7 +7217,6 @@ bxe_read_mf_cfg(struct bxe_adapter *sc)
         BLOGD(sc, DBG_LOAD, "mf_cfg function enabled\n");
         sc->flags &= ~BXE_MF_FUNC_DIS;
     }
-#endif
 }
 
 /* acquire split MCP access lock register */
@@ -7931,11 +7943,10 @@ bxe_handle_eee_event(struct bxe_adapter *sc)
 static void
 bxe_drv_info_ether_stat(struct bxe_adapter *sc)
 {
-#if 0 // AKAROS_PORT
     struct eth_stats_info *ether_stat =
         &sc->sp->drv_info_to_mcp.ether_stat;
 
-    strlcpy(ether_stat->version, BXE_DRIVER_VERSION,
+    strlcpy((char*)ether_stat->version, BXE_DRIVER_VERSION,
             ETH_STAT_INFO_VERSION_LEN);
 
     /* XXX (+ MAC_PAD) taken from other driver... verify this is right */
@@ -7957,7 +7968,6 @@ bxe_drv_info_ether_stat(struct bxe_adapter *sc)
 
     ether_stat->txq_size = sc->tx_ring_size;
     ether_stat->rxq_size = sc->rx_ring_size;
-#endif
 }
 
 static void
@@ -9171,7 +9181,7 @@ static void bxe_intr_fp(struct hw_trapframe *hw_tf, void *xfp)
 static void
 bxe_interrupt_free(struct bxe_adapter *sc)
 {
-#if 0 // AKAROS_PORT
+#if 0 // AKAROS_PORT brho: could deregister_irq, but we don't support that yet
     int i;
 
     switch (sc->interrupt_mode) {
@@ -9243,7 +9253,7 @@ bxe_interrupt_alloc(struct bxe_adapter *sc)
 	 * later. */
 	sc->intr_count = sc->num_queues + 1;
     return 0;
-#if 0 // AKAROS_PORT
+#if 0 // AKAROS_PORT brho: Akaros doesn't need this BSD MSI code
     int msix_count = 0;
     int msi_count = 0;
     int num_requested = 0;
@@ -10851,7 +10861,6 @@ bxe_nic_init(struct bxe_adapter *sc,
 static inline void
 bxe_init_objs(struct bxe_adapter *sc)
 {
-#if 0 // AKAROS_PORT
     /* mcast rules must be added to tx if tx switching is enabled */
     ecore_obj_type o_type =
         (sc->flags & BXE_TX_SWITCHING) ? ECORE_OBJ_TYPE_RX_TX :
@@ -10897,7 +10906,6 @@ bxe_init_objs(struct bxe_adapter *sc)
                               BXE_SP_MAPPING(sc, rss_rdata),
                               ECORE_FILTER_RSS_CONF_PENDING,
                               &sc->sp_state, ECORE_OBJ_TYPE_RX);
-#endif
 }
 
 /*
@@ -11606,7 +11614,6 @@ bxe_get_q_flags(struct bxe_adapter    *sc,
                 struct bxe_fastpath *fp,
                 uint8_t             leading)
 {
-#if 0 // AKAROS_PORT
     unsigned long flags = 0;
 
     if (IS_MF_SD(sc)) {
@@ -11638,8 +11645,6 @@ bxe_get_q_flags(struct bxe_adapter    *sc,
 
     /* merge with common flags */
     return (flags | bxe_get_common_flags(sc, fp, TRUE));
-#endif
-    return 0;
 }
 
 static void
@@ -11660,7 +11665,6 @@ bxe_pf_rx_q_prep(struct bxe_adapter              *sc,
                  struct rxq_pause_params       *pause,
                  struct ecore_rxq_setup_params *rxq_init)
 {
-#if 0 // AKAROS_PORT
     uint8_t max_sge = 0;
     uint16_t sge_sz = 0;
     uint16_t tpa_agg_size = 0;
@@ -11751,9 +11755,9 @@ bxe_pf_rx_q_prep(struct bxe_adapter              *sc,
     if (IS_MF_AFEX(sc)) {
         rxq_init->silent_removal_value =
             sc->devinfo.mf_info.afex_def_vlan_tag;
-        rxq_init->silent_removal_mask = EVL_VLID_MASK;
+        //rxq_init->silent_removal_mask = EVL_VLID_MASK; // BSD
+        rxq_init->silent_removal_mask = 0xfff;	// from bsd
     }
-#endif
 }
 
 static void
@@ -11762,7 +11766,6 @@ bxe_pf_tx_q_prep(struct bxe_adapter              *sc,
                  struct ecore_txq_setup_params *txq_init,
                  uint8_t                       cos)
 {
-#if 0 // AKAROS_PORT
     /*
      * XXX If multiple CoS is ever supported then each fastpath structure
      * will need to maintain tx producer/consumer/dma/etc values *per* CoS.
@@ -11778,7 +11781,6 @@ bxe_pf_tx_q_prep(struct bxe_adapter              *sc,
      * leading RSS client id
      */
     txq_init->tss_leading_cl_id = BXE_FP(sc, 0, cl_id);
-#endif
 }
 
 /*
@@ -12526,20 +12528,20 @@ bxe_set_mc_list(struct bxe_adapter *sc)
 static int
 bxe_set_uc_list(struct bxe_adapter *sc)
 {
-	return 0xaa;
-#if 0 // AKAROS_PORT
     if_t ifp = sc->ifp;
     struct ecore_vlan_mac_obj *mac_obj = &sc->sp_objs->mac_obj;
     struct ifaddr *ifa;
     unsigned long ramrod_flags = 0;
     int rc;
 
-	they used to lock the ifp. We could do that.
-	just lock the sc here. I see no reason to get finer grained for this one.
+assert(0);
+return -1;
+#if 0 // AKAROS_PORT we never call this
+	qlock(&sc->alock);
     /* first schedule a cleanup up of old configuration */
     rc = bxe_del_all_macs(sc, mac_obj, ECORE_UC_LIST_MAC, FALSE);
     if (rc < 0) {
-unlock ehre.
+		qunlock(&sc->alock);
         BLOGE(sc, "Failed to schedule delete of all ETH MACs (%d)\n", rc);
         return (rc);
     }
@@ -12559,14 +12561,14 @@ unlock ehre.
             rc = 0;
         } else if (rc < 0) {
             BLOGE(sc, "Failed to schedule ADD operations (%d)\n", rc);
-unlock ehre.
+			qunlock(&sc->alock);
             return (rc);
         }
 
         ifa = TAILQ_NEXT(ifa, ifa_link);
     }
 
-unlock here.
+	qunlock(&sc->alock);
 
     /* Execute the pending commands */
     __set_bit(RAMROD_CONT, &ramrod_flags);
@@ -12592,6 +12594,7 @@ bxe_handle_rx_mode_tq(void *context,
     }
 
     BLOGD(sc, DBG_SP, "if_flags(ifp)=0x%x\n", if_getflags(sc->ifp));
+	assert(0);
 #if 0 // AKAROS_PORT
     if (if_getflags(ifp) & IFF_PROMISC) {
         rx_mode = BXE_RX_MODE_PROMISC;
@@ -13201,7 +13204,7 @@ void bxe_init(void *xsc)
 static int
 bxe_init_ifnet(struct bxe_adapter *sc)
 {
-#if 0 // AKAROS_PORT
+#if 0 // AKAROS_PORT brho: can ignore, i think.  bsd attachment stuff
     if_t ifp;
     int capabilities;
 
@@ -13284,7 +13287,7 @@ static void
 bxe_deallocate_bars(struct bxe_adapter *sc)
 {
     int i;
-#if 0 // AKAROS_PORT (brho: this is fine)
+#if 0 // AKAROS_PORT brho: bsd bar code, can leave commented out
     for (i = 0; i < MAX_BARS; i++) {
         if (sc->bar[i].resource != NULL) {
             bus_release_resource(sc->pcidev,
@@ -13345,7 +13348,7 @@ bxe_allocate_bars(struct bxe_adapter *sc)
 		}
 
 
-#if 0 // AKAROS_PORT (brho: this is fine)
+#if 0 // AKAROS_PORT brho: bsd bar code, can leave commented out
         flags = RF_ACTIVE;
         if (i == 0) {
             flags |= RF_SHAREABLE;
@@ -13542,7 +13545,6 @@ bxe_probe_pci_caps(struct bxe_adapter *sc)
 static int
 bxe_get_shmem_mf_cfg_info_sd(struct bxe_adapter *sc)
 {
-#if 0 // AKAROS_PORT
     struct bxe_mf_info *mf_info = &sc->devinfo.mf_info;
     uint32_t val;
 
@@ -13571,7 +13573,6 @@ bxe_get_shmem_mf_cfg_info_sd(struct bxe_adapter *sc)
 
     mf_info->vnics_per_port =
         (CHIP_PORT_MODE(sc) == CHIP_4_PORT_MODE) ? 2 : 4;
-#endif
     return (0);
 }
 
@@ -15151,18 +15152,16 @@ bxe_alloc_hsi_mem(struct bxe_adapter *sc)
         /***********************/
         /* FP TX MBUF DMA MAPS */
         /***********************/
-#if 0 // AKAROS_PORT
         /* set required sizes before mapping to conserve resources */
         if (if_getcapenable(sc->ifp) & (IFCAP_TSO4 | IFCAP_TSO6)) {
             max_size     = BXE_TSO_MAX_SIZE;
             max_segments = BXE_TSO_MAX_SEGMENTS;
             max_seg_size = BXE_TSO_MAX_SEG_SIZE;
         } else {
-#endif
             max_size     = (MCLBYTES * BXE_MAX_SEGMENTS);
             max_segments = BXE_MAX_SEGMENTS;
-            max_seg_size = 0; // ?? MCLBYTES;
-//        }
+            max_seg_size = MCLBYTES;
+        }
 
         /* create a dma tag for the tx mbufs */
         rc = bus_dma_tag_create(sc->parent_dma_tag, /* parent tag */
@@ -15338,6 +15337,7 @@ bxe_free_hsi_mem(struct bxe_adapter *sc)
     int max_agg_queues;
     int i, j;
 	/* still a minor pita to free this */
+	assert(0);
 #if 0 // AKAROS_PORT
     if (sc->parent_dma_tag == NULL) {
         return; /* assume nothing was allocated */
@@ -15551,7 +15551,6 @@ static struct bxe_prev_list_node *
 bxe_prev_path_get_entry(struct bxe_adapter *sc)
 {
     struct bxe_prev_list_node *tmp;
-#if 0 // AKAROS_PORT
     LIST_FOREACH(tmp, &bxe_prev_list, node) {
         if ((sc->pcie_bus == tmp->bus) &&
             (sc->pcie_device == tmp->slot) &&
@@ -15559,7 +15558,6 @@ bxe_prev_path_get_entry(struct bxe_adapter *sc)
             return (tmp);
         }
     }
-#endif
     return (NULL);
 }
 
@@ -15938,7 +15936,7 @@ bxe_prev_unload_uncommon(struct bxe_adapter *sc)
     /* Close the MCP request, return failure*/
     rc = bxe_prev_mcp_done(sc);
     if (!rc) {
-      //        rc = BXE_PREV_WAIT_NEEDED;
+        rc = BXE_PREV_WAIT_NEEDED;
     }
 
     return (rc);
@@ -15946,9 +15944,69 @@ bxe_prev_unload_uncommon(struct bxe_adapter *sc)
 
 static int bxe_prev_unload(struct bxe_adapter *sc)
 {
-	/* this gets called during normal init.  Might be a problem. */
-	warn("BXE unload not supported");
-	return 0;
+    int time_counter = 10;
+    uint32_t fw, hw_lock_reg, hw_lock_val;
+    uint32_t rc = 0;
+
+    /*
+     * Clear HW from errors which may have resulted from an interrupted
+     * DMAE transaction.
+     */
+    bxe_prev_interrupted_dmae(sc);
+
+    /* Release previously held locks */
+    hw_lock_reg =
+        (SC_FUNC(sc) <= 5) ?
+            (MISC_REG_DRIVER_CONTROL_1 + SC_FUNC(sc) * 8) :
+            (MISC_REG_DRIVER_CONTROL_7 + (SC_FUNC(sc) - 6) * 8);
+
+    hw_lock_val = (REG_RD(sc, hw_lock_reg));
+    if (hw_lock_val) {
+        if (hw_lock_val & HW_LOCK_RESOURCE_NVRAM) {
+            BLOGD(sc, DBG_LOAD, "Releasing previously held NVRAM lock\n");
+            REG_WR(sc, MCP_REG_MCPR_NVM_SW_ARB,
+                   (MCPR_NVM_SW_ARB_ARB_REQ_CLR1 << SC_PORT(sc)));
+        }
+        BLOGD(sc, DBG_LOAD, "Releasing previously held HW lock\n");
+        REG_WR(sc, hw_lock_reg, 0xffffffff);
+    } else {
+        BLOGD(sc, DBG_LOAD, "No need to release HW/NVRAM locks\n");
+    }
+
+    if (MCPR_ACCESS_LOCK_LOCK & REG_RD(sc, MCP_REG_MCPR_ACCESS_LOCK)) {
+        BLOGD(sc, DBG_LOAD, "Releasing previously held ALR\n");
+        REG_WR(sc, MCP_REG_MCPR_ACCESS_LOCK, 0);
+    }
+
+    do {
+        /* Lock MCP using an unload request */
+        fw = bxe_fw_command(sc, DRV_MSG_CODE_UNLOAD_REQ_WOL_DIS, 0);
+        if (!fw) {
+            BLOGE(sc, "MCP response failure, aborting\n");
+            rc = -1;
+            break;
+        }
+
+        if (fw == FW_MSG_CODE_DRV_UNLOAD_COMMON) {
+            rc = bxe_prev_unload_common(sc);
+            break;
+        }
+
+        /* non-common reply from MCP night require looping */
+        rc = bxe_prev_unload_uncommon(sc);
+        if (rc != BXE_PREV_WAIT_NEEDED) {
+            break;
+        }
+
+        udelay(20000);
+    } while (--time_counter);
+
+    if (!time_counter || rc) {
+        BLOGE(sc, "Failed to unload previous driver!\n");
+        rc = -1;
+    }
+
+    return (rc);
 }
 
 void
@@ -16009,7 +16067,7 @@ bxe_init_multi_cos(struct bxe_adapter *sc)
     }
 }
 
-#if 0 // AKAROS_PORT
+#if 0 // AKAROS_PORT brho: prob can ignore
 static int
 bxe_sysctl_state(SYSCTL_HANDLER_ARGS)
 {
@@ -16101,7 +16159,7 @@ bxe_sysctl_eth_q_stat(SYSCTL_HANDLER_ARGS)
     return (sysctl_handle_64(oidp, &value, 0, req));
 }
 #endif
-#if 0 // AKAROS_PORT
+#if 0 // AKAROS_PORT brho: prob can ignore
 static void
 bxe_add_sysctls(struct bxe_adapter *sc)
 {
@@ -16350,7 +16408,7 @@ err_mux_bars_etc:
     return (ENXIO);
 }
 
-#if 0 // AKAROS_PORT
+#if 0 // AKAROS_PORT brho: prob can ignore
 /*
  * Device detach function.
  *

@@ -53,6 +53,19 @@
 #define ETH_ADDR_LEN 6
 #define MCLBYTES 2048
 #define MJUM9BYTES (9 * 1024)	/* jumbo cluster 9k */
+
+#define if_getcapenable(netif) ((netif)->feat)
+#define IFCAP_LRO NETF_LRO
+#define IFCAP_TSO4 NETF_TSO
+#define IFCAP_TSO6 NETF_TSO
+
+/* Will probably need these too */
+//	NETF_IPCK = (1 << NS_IPCK_SHIFT),	/* xmit ip checksum */
+//	NETF_UDPCK = (1 << NS_UDPCK_SHIFT),	/* xmit udp checksum */
+//	NETF_TCPCK = (1 << NS_TCPCK_SHIFT),	/* xmit tcp checksum */
+//	NETF_PADMIN = (1 << NETF_PADMIN_SHIFT),	/* device pads to mintu */
+//	NETF_SG	= (1 << NETF_SG_SHIFT),		/* device can do scatter/gather */
+
 /* TYPEDEFS for conversion to AKAROS. These are temporary, but it makes it easier to see what is in need of change. */
 typedef struct netif *if_t;
 typedef uint64_t ift_counter;
@@ -155,7 +168,8 @@ struct bxe_device_type
 
 #define BXE_MAX_SEGMENTS     12 /* 13-1 for parsing buffer */
 #define BXE_TSO_MAX_SEGMENTS 32
-#define BXE_TSO_MAX_SIZE     (65535 + sizeof(struct ether_vlan_header))
+//#define BXE_TSO_MAX_SIZE     (65535 + sizeof(struct ether_vlan_header))
+#define BXE_TSO_MAX_SIZE     (65535 + 8)
 #define BXE_TSO_MAX_SEG_SIZE 4096
 
 /* dropless fc FW/HW related params */
