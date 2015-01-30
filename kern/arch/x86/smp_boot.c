@@ -107,8 +107,6 @@ void smp_final_core_init(void)
 	waiton_barrier(&generic_barrier);
 	if (hw_core_id() == 0) {
 		core_id_ready = TRUE;
-		cmb();
-		pcpui->__lock_checking_enabled = 1;
 	}
 	/* being paranoid with this, it's all a bit ugly */
 	waiton_barrier(&generic_barrier);
