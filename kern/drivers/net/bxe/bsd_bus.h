@@ -119,10 +119,21 @@ typedef uintptr_t bus_space_tag_t;
 #define bus_dma_tag_destroy(...)
 #define bus_dmamem_alloc(_tag, _vaddraddr, _flags, _map)                       \
 ({                                                                             \
-	*(_vaddraddr) = kzmalloc((size_t)(_tag), KMALLOC_WAIT);                    \
-	0;                                                                         \
+	size_t order = LOG2_UP(nr_pages((size_t)(_tag)));                          \
+	int ret = -ENOMEM;                                                         \
+	void *vaddr = get_cont_pages(order, 0);                                    \
+	if (vaddr) {                                                               \
+		memset(vaddr, 0, (size_t)(_tag));                                      \
+		ret = 0;                                                               \
+		*(_vaddraddr) = vaddr;                                                 \
+	}                                                                          \
+	ret;                                                                       \
 })
-#define bus_dmamem_free(_tag, _vaddr, _map) kfree(_vaddr)
+#define bus_dmamem_free(_tag, _vaddr, _map)                                    \
+({                                                                             \
+	size_t order = LOG2_UP(nr_pages((size_t)(_tag)));                          \
+	free_cont_pages((_vaddr), order);                                          \
+})
 #define bus_dmamap_sync(...)
 /* bxe_dma_map_addr is actually a callback tht does the paddr assignment */
 #define bus_dmamap_load(_tag, _map, _vaddr, _size, _map_addr, _dma, _flag)     \
