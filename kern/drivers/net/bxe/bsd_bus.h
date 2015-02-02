@@ -104,7 +104,7 @@ typedef uintptr_t bus_addr_t;
 typedef uintptr_t bus_size_t;
 typedef uintptr_t bus_space_handle_t;
 typedef void *bus_dma_tag_t;
-typedef uintptr_t bus_dmamap_t;
+typedef void *bus_dmamap_t;
 typedef uintptr_t bus_dma_segment_t;
 typedef uintptr_t bus_space_tag_t;
 
@@ -154,6 +154,16 @@ typedef uintptr_t bus_space_tag_t;
 #define bus_describe_intr(...)
 #define bus_bind_intr(...)
 
+/* This is supposed to be an mbuf chain.  Just give them a blob for now */
+#define m_getjcl(ign1, ign2, ign3, _size) kzmalloc((_size), KMALLOC_WAIT)
+#define m_freem(m) kfree(m)
+#define m_free(m) kfree(m)
+#define bus_dmamap_load_mbuf_sg(_tag, _map, _mbuf, _segs, _nsegs, _flag)       \
+({                                                                             \
+	(_segs)[0] = PADDR((_mbuf));                                               \
+	*(_nsegs) = 1;                                                             \
+	0;                                                                         \
+})
 
 /* Bus read/write barrier methods.
  *

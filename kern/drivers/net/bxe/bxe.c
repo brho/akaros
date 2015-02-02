@@ -278,7 +278,7 @@ static int bxe_interrupt_mode = INTR_MODE_MSIX;
 //           &bxe_interrupt_mode, 0, "Interrupt (MSI-X/MSI/INTx) mode");
 
 /* Number of Queues: 0 (Auto) or 1 to 16 (fixed queue number) */
-static int bxe_queue_count = 4;
+static int bxe_queue_count = 0;
 //SYSCTL_INT(_hw_bxe, OID_AUTO, queue_count, CTLFLAG_RDTUN,
 //           &bxe_queue_count, 0, "Multi-Queue queue count");
 
@@ -6479,9 +6479,6 @@ bxe_alloc_rx_bd_mbuf(struct bxe_fastpath *fp,
                      uint16_t            prev_index,
                      uint16_t            index)
 {
-	// XME
-	assert(0);
-#if 0 // AKAROS_PORT
     struct bxe_sw_rx_bd *rx_buf;
     struct eth_rx_bd *rx_bd;
     bus_dma_segment_t segs[1];
@@ -6501,7 +6498,7 @@ bxe_alloc_rx_bd_mbuf(struct bxe_fastpath *fp,
     fp->eth_q_stats.mbuf_alloc_rx++;
 
     /* initialize the mbuf buffer length */
-    m->m_pkthdr.len = m->m_len = fp->rx_buf_size;
+    //m->m_pkthdr.len = m->m_len = fp->rx_buf_size;
 
     /* map the mbuf into non-paged pool */
     rc = bus_dmamap_load_mbuf_sg(fp->rx_mbuf_tag,
@@ -6515,7 +6512,7 @@ bxe_alloc_rx_bd_mbuf(struct bxe_fastpath *fp,
     }
 
     /* all mbufs must map to a single segment */
-    KASSERT((nsegs == 1), ("Too many segments, %d returned!", nsegs));
+    assert(nsegs == 1);
 
     /* release any existing RX BD mbuf mappings */
 
@@ -6555,21 +6552,16 @@ bxe_alloc_rx_bd_mbuf(struct bxe_fastpath *fp,
     rx_buf->m = m;
 
     rx_bd = &fp->rx_chain[index];
-    rx_bd->addr_hi = cpu_to_le32(U64_HI(segs[0].ds_addr));
-    rx_bd->addr_lo = cpu_to_le32(U64_LO(segs[0].ds_addr));
+    rx_bd->addr_hi = cpu_to_le32(U64_HI(segs));
+    rx_bd->addr_lo = cpu_to_le32(U64_LO(segs));
 
     return (rc);
-#endif
-    return -1;
 }
 
 static int
 bxe_alloc_rx_tpa_mbuf(struct bxe_fastpath *fp,
                       int                 queue)
 {
-	// XME
-	assert(0);
-#if 0 // AKAROS_PORT
     struct bxe_sw_tpa_info *tpa_info = &fp->rx_tpa_info[queue];
     bus_dma_segment_t segs[1];
     bus_dmamap_t map;
@@ -6587,7 +6579,7 @@ bxe_alloc_rx_tpa_mbuf(struct bxe_fastpath *fp,
     fp->eth_q_stats.mbuf_alloc_tpa++;
 
     /* initialize the mbuf buffer length */
-    m->m_pkthdr.len = m->m_len = fp->rx_buf_size;
+    //m->m_pkthdr.len = m->m_len = fp->rx_buf_size;
 
     /* map the mbuf into non-paged pool */
     rc = bus_dmamap_load_mbuf_sg(fp->rx_mbuf_tag,
@@ -6601,7 +6593,7 @@ bxe_alloc_rx_tpa_mbuf(struct bxe_fastpath *fp,
     }
 
     /* all mbufs must map to a single segment */
-    KASSERT((nsegs == 1), ("Too many segments, %d returned!", nsegs));
+    assert(nsegs == 1);
 
     /* release any existing TPA mbuf mapping */
     if (tpa_info->bd.m_map != NULL) {
@@ -6620,8 +6612,6 @@ bxe_alloc_rx_tpa_mbuf(struct bxe_fastpath *fp,
     tpa_info->seg = segs[0];
 
     return (rc);
-#endif
-    return 1;
 }
 
 /*
@@ -6633,9 +6623,6 @@ static int
 bxe_alloc_rx_sge_mbuf(struct bxe_fastpath *fp,
                       uint16_t            index)
 {
-	// XME
-	assert(0);
-#if 0 // AKAROS_PORT
     struct bxe_sw_rx_bd *sge_buf;
     struct eth_rx_sge *sge;
     bus_dma_segment_t segs[1];
@@ -6654,7 +6641,7 @@ bxe_alloc_rx_sge_mbuf(struct bxe_fastpath *fp,
     fp->eth_q_stats.mbuf_alloc_sge++;
 
     /* initialize the mbuf buffer length */
-    m->m_pkthdr.len = m->m_len = SGE_PAGE_SIZE;
+    //m->m_pkthdr.len = m->m_len = SGE_PAGE_SIZE;
 
     /* map the SGE mbuf into non-paged pool */
     rc = bus_dmamap_load_mbuf_sg(fp->rx_sge_mbuf_tag,
@@ -6668,7 +6655,7 @@ bxe_alloc_rx_sge_mbuf(struct bxe_fastpath *fp,
     }
 
     /* all mbufs must map to a single segment */
-    KASSERT((nsegs == 1), ("Too many segments, %d returned!", nsegs));
+    assert(nsegs == 1);
 
     sge_buf = &fp->rx_sge_mbuf_chain[index];
 
@@ -6688,20 +6675,15 @@ bxe_alloc_rx_sge_mbuf(struct bxe_fastpath *fp,
     sge_buf->m = m;
 
     sge = &fp->rx_sge_chain[index];
-    sge->addr_hi = cpu_to_le32(U64_HI(segs[0].ds_addr));
-    sge->addr_lo = cpu_to_le32(U64_LO(segs[0].ds_addr));
+    sge->addr_hi = cpu_to_le32(U64_HI(segs));
+    sge->addr_lo = cpu_to_le32(U64_LO(segs));
 
     return (rc);
-#endif
-    return -1;
 }
 
 static __noinline int
 bxe_alloc_fp_buffers(struct bxe_adapter *sc)
 {
-	// XME
-	return 0; // at least fake success so we can get through some of the init
-#if 0 // AKAROS_PORT
     struct bxe_fastpath *fp;
     int i, j, rc = 0;
     int ring_prod, cqe_ring_prod;
@@ -6789,8 +6771,6 @@ bxe_alloc_fp_buffers_error:
     bxe_free_sge_chain(fp);
 
     return (ENOBUFS);
-#endif
-    return -1;
 }
 
 static void
