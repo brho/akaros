@@ -17,7 +17,7 @@
 #ifndef BNX2X_STATS_H
 #define BNX2X_STATS_H
 
-#include <linux/types.h>
+#include "akaros_compat.h"
 
 struct nig_stats {
 	u32 brb_discard;

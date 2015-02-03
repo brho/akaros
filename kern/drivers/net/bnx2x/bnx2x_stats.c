@@ -15,7 +15,7 @@
  *
  */
 
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+#include "akaros_compat.h"
 
 #include "bnx2x_stats.h"
 #include "bnx2x_cmn.h"

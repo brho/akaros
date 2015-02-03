@@ -17,12 +17,12 @@
  *	       Ariel Elior <ariel.elior@qlogic.com>
  *
  */
+#include "akaros_compat.h"
+
 #include "bnx2x.h"
 #include "bnx2x_init.h"
 #include "bnx2x_cmn.h"
 #include "bnx2x_sp.h"
-#include <linux/crc32.h>
-#include <linux/if_vlan.h>
 
 static int bnx2x_vf_op_prep(struct bnx2x *bp, int vfidx,
 			    struct bnx2x_virtf **vf,

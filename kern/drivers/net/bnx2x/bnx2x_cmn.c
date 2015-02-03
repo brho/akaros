@@ -15,18 +15,8 @@
  *
  */
 
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+#include "akaros_compat.h"
 
-#include <linux/etherdevice.h>
-#include <linux/if_vlan.h>
-#include <linux/interrupt.h>
-#include <linux/ip.h>
-#include <linux/crash_dump.h>
-#include <net/tcp.h>
-#include <net/ipv6.h>
-#include <net/ip6_checksum.h>
-#include <net/busy_poll.h>
-#include <linux/prefetch.h>
 #include "bnx2x_cmn.h"
 #include "bnx2x_init.h"
 #include "bnx2x_sp.h"

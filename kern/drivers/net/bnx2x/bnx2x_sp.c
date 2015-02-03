@@ -17,13 +17,8 @@
  *
  */
 
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+#include "akaros_compat.h"
 
-#include <linux/module.h>
-#include <linux/crc32.h>
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/crc32c.h>
 #include "bnx2x.h"
 #include "bnx2x_cmn.h"
 #include "bnx2x_sp.h"
