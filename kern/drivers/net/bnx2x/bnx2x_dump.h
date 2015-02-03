@@ -34,34 +34,34 @@
 #define NUM_CHIPS 5
 
 struct	dump_header {
-	u32 header_size; /* Size in DWORDs excluding this field */
-	u32 version;
-	u32 preset;
-	u32 dump_meta_data; /* OR of CHIP and PATH. */
+	uint32_t header_size; /* Size in DWORDs excluding this field */
+	uint32_t version;
+	uint32_t preset;
+	uint32_t dump_meta_data; /* OR of CHIP and PATH. */
 };
 
 #define  BNX2X_DUMP_VERSION 0x61111111
 struct reg_addr {
-	u32 addr;
-	u32 size;
-	u32 chips;
-	u32 presets;
+	uint32_t addr;
+	uint32_t size;
+	uint32_t chips;
+	uint32_t presets;
 };
 
 struct wreg_addr {
-	u32 addr;
-	u32 size;
-	u32 read_regs_count;
-	const u32 *read_regs;
-	u32 chips;
-	u32 presets;
+	uint32_t addr;
+	uint32_t size;
+	uint32_t read_regs_count;
+	const uint32_t *read_regs;
+	uint32_t chips;
+	uint32_t presets;
 };
 
 #define PAGE_MODE_VALUES_E2 2
 #define PAGE_READ_REGS_E2 1
 #define PAGE_WRITE_REGS_E2 1
-static const u32 page_vals_e2[] = {0, 128};
-static const u32 page_write_regs_e2[] = {328476};
+static const uint32_t page_vals_e2[] = {0, 128};
+static const uint32_t page_write_regs_e2[] = {328476};
 static const struct reg_addr page_read_regs_e2[] = {
 	{0x58000, 4608, DUMP_CHIP_E2, 0x30}
 };
@@ -69,8 +69,8 @@ static const struct reg_addr page_read_regs_e2[] = {
 #define PAGE_MODE_VALUES_E3 2
 #define PAGE_READ_REGS_E3 1
 #define PAGE_WRITE_REGS_E3 1
-static const u32 page_vals_e3[] = {0, 128};
-static const u32 page_write_regs_e3[] = {328476};
+static const uint32_t page_vals_e3[] = {0, 128};
+static const uint32_t page_write_regs_e3[] = {328476};
 static const struct reg_addr page_read_regs_e3[] = {
 	{0x58000, 4608, DUMP_CHIP_E3A0 | DUMP_CHIP_E3B0, 0x30}
 };
@@ -2171,31 +2171,31 @@ static const struct reg_addr idle_reg_addrs[] = {
 
 #define IDLE_REGS_COUNT ARRAY_SIZE(idle_reg_addrs)
 
-static const u32 read_reg_e1[] = {
+static const uint32_t read_reg_e1[] = {
 	0x1b1000};
 
 static const struct wreg_addr wreg_addr_e1 = {
 	0x1b0c00, 192, 1, read_reg_e1, 0x1f, 0x1fff};
 
-static const u32 read_reg_e1h[] = {
+static const uint32_t read_reg_e1h[] = {
 	0x1b1040, 0x1b1000};
 
 static const struct wreg_addr wreg_addr_e1h = {
 	0x1b0c00, 256, 2, read_reg_e1h, 0x1f, 0x1fff};
 
-static const u32 read_reg_e2[] = {
+static const uint32_t read_reg_e2[] = {
 	0x1b1040, 0x1b1000};
 
 static const struct wreg_addr wreg_addr_e2 = {
 	0x1b0c00, 128, 2, read_reg_e2, 0x1f, 0x1fff};
 
-static const u32 read_reg_e3[] = {
+static const uint32_t read_reg_e3[] = {
 	0x1b1040, 0x1b1000};
 
 static const struct wreg_addr wreg_addr_e3 = {
 	0x1b0c00, 128, 2, read_reg_e3, 0x1f, 0x1fff};
 
-static const u32 read_reg_e3b0[] = {
+static const uint32_t read_reg_e3b0[] = {
 	0x1b1040, 0x1b1000};
 
 static const struct wreg_addr wreg_addr_e3b0 = {

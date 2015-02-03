@@ -26,7 +26,7 @@ static int bnx2x_vfpf_teardown_queue(struct bnx2x *bp, int qidx);
 
 /* place a given tlv on the tlv buffer at a given offset */
 static void bnx2x_add_tlv(struct bnx2x *bp, void *tlvs_list,
-			  u16 offset, u16 type, u16 length)
+			  uint16_t offset, uint16_t type, uint16_t length)
 {
 	struct channel_tlv *tl =
 		(struct channel_tlv *)(tlvs_list + offset);
@@ -37,7 +37,7 @@ static void bnx2x_add_tlv(struct bnx2x *bp, void *tlvs_list,
 
 /* Clear the mailbox and init the header of the first tlv */
 static void bnx2x_vfpf_prep(struct bnx2x *bp, struct vfpf_first_tlv *first_tlv,
-			    u16 type, u16 length)
+			    uint16_t type, uint16_t length)
 {
 	mutex_lock(&bp->vf2pf_mutex);
 
@@ -120,7 +120,7 @@ static void bnx2x_dp_tlv_list(struct bnx2x *bp, void *tlvs_list)
 }
 
 /* test whether we support a tlv type */
-bool bnx2x_tlv_supported(u16 tlvtype)
+bool bnx2x_tlv_supported(uint16_t tlvtype)
 {
 	return CHANNEL_TLV_NONE < tlvtype && tlvtype < CHANNEL_TLV_MAX;
 }
@@ -137,7 +137,8 @@ static inline int bnx2x_pfvf_status_codes(int rc)
 	}
 }
 
-static int bnx2x_send_msg2pf(struct bnx2x *bp, u8 *done, dma_addr_t msg_mapping)
+static int bnx2x_send_msg2pf(struct bnx2x *bp, uint8_t *done,
+			     dma_addr_t msg_mapping)
 {
 	struct cstorm_vf_zone_data __iomem *zone_data =
 		REG_ADDR(bp, PXP_VF_ADDR_CSDM_GLOBAL_START);
@@ -190,9 +191,9 @@ static int bnx2x_send_msg2pf(struct bnx2x *bp, u8 *done, dma_addr_t msg_mapping)
 	return 0;
 }
 
-static int bnx2x_get_vf_id(struct bnx2x *bp, u32 *vf_id)
+static int bnx2x_get_vf_id(struct bnx2x *bp, uint32_t *vf_id)
 {
-	u32 me_reg;
+	uint32_t me_reg;
 	int tout = 10, interval = 100; /* Wait for 1 sec */
 
 	do {
@@ -219,14 +220,14 @@ static int bnx2x_get_vf_id(struct bnx2x *bp, u32 *vf_id)
 	return 0;
 }
 
-int bnx2x_vfpf_acquire(struct bnx2x *bp, u8 tx_count, u8 rx_count)
+int bnx2x_vfpf_acquire(struct bnx2x *bp, uint8_t tx_count, uint8_t rx_count)
 {
 	int rc = 0, attempts = 0;
 	struct vfpf_acquire_tlv *req = &bp->vf2pf_mbox->req.acquire;
 	struct pfvf_acquire_resp_tlv *resp = &bp->vf2pf_mbox->resp.acquire_resp;
 	struct vfpf_port_phys_id_resp_tlv *phys_port_resp;
 	struct vfpf_fp_hsi_resp_tlv *fp_hsi_resp;
-	u32 vf_id;
+	uint32_t vf_id;
 	bool resources_acquired = false;
 
 	/* clear mailbox and prep first tlv */
@@ -391,7 +392,7 @@ int bnx2x_vfpf_release(struct bnx2x *bp)
 {
 	struct vfpf_release_tlv *req = &bp->vf2pf_mbox->req.release;
 	struct pfvf_general_resp_tlv *resp = &bp->vf2pf_mbox->resp.general_resp;
-	u32 rc, vf_id;
+	uint32_t rc, vf_id;
 
 	/* clear mailbox and prep first tlv */
 	bnx2x_vfpf_prep(bp, &req->first_tlv, CHANNEL_TLV_RELEASE, sizeof(*req));
@@ -485,7 +486,7 @@ void bnx2x_vfpf_close_vf(struct bnx2x *bp)
 	struct vfpf_close_tlv *req = &bp->vf2pf_mbox->req.close;
 	struct pfvf_general_resp_tlv *resp = &bp->vf2pf_mbox->resp.general_resp;
 	int i, rc;
-	u32 vf_id;
+	uint32_t vf_id;
 
 	/* If we haven't got a valid VF id, there is no sense to
 	 * continue with sending messages
@@ -536,8 +537,8 @@ free_irq:
 static void bnx2x_leading_vfq_init(struct bnx2x *bp, struct bnx2x_virtf *vf,
 				   struct bnx2x_vf_queue *q)
 {
-	u8 cl_id = vfq_cl_id(vf, q);
-	u8 func_id = FW_VF_HANDLE(vf->abs_vfid);
+	uint8_t cl_id = vfq_cl_id(vf, q);
+	uint8_t func_id = FW_VF_HANDLE(vf->abs_vfid);
 
 	/* mac */
 	bnx2x_init_mac_obj(bp, &q->mac_obj,
@@ -587,8 +588,8 @@ int bnx2x_vfpf_setup_q(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 {
 	struct vfpf_setup_q_tlv *req = &bp->vf2pf_mbox->req.setup_q;
 	struct pfvf_general_resp_tlv *resp = &bp->vf2pf_mbox->resp.general_resp;
-	u8 fp_idx = fp->index;
-	u16 tpa_agg_size = 0, flags = 0;
+	uint8_t fp_idx = fp->index;
+	uint16_t tpa_agg_size = 0, flags = 0;
 	int rc;
 
 	/* clear mailbox and prep first tlv */
@@ -707,7 +708,8 @@ out:
 }
 
 /* request pf to add a mac for the vf */
-int bnx2x_vfpf_config_mac(struct bnx2x *bp, u8 *addr, u8 vf_qid, bool set)
+int bnx2x_vfpf_config_mac(struct bnx2x *bp, uint8_t *addr, uint8_t vf_qid,
+			  bool set)
 {
 	struct vfpf_set_q_filters_tlv *req = &bp->vf2pf_mbox->req.set_q_filters;
 	struct pfvf_general_resp_tlv *resp = &bp->vf2pf_mbox->resp.general_resp;
@@ -962,24 +964,24 @@ int bnx2x_vfpf_storm_rx_mode(struct bnx2x *bp)
 }
 
 /* General service functions */
-static void storm_memset_vf_mbx_ack(struct bnx2x *bp, u16 abs_fid)
+static void storm_memset_vf_mbx_ack(struct bnx2x *bp, uint16_t abs_fid)
 {
-	u32 addr = BAR_CSTRORM_INTMEM +
+	uint32_t addr = BAR_CSTRORM_INTMEM +
 		   CSTORM_VF_PF_CHANNEL_STATE_OFFSET(abs_fid);
 
 	REG_WR8(bp, addr, VF_PF_CHANNEL_STATE_READY);
 }
 
-static void storm_memset_vf_mbx_valid(struct bnx2x *bp, u16 abs_fid)
+static void storm_memset_vf_mbx_valid(struct bnx2x *bp, uint16_t abs_fid)
 {
-	u32 addr = BAR_CSTRORM_INTMEM +
+	uint32_t addr = BAR_CSTRORM_INTMEM +
 		   CSTORM_VF_PF_CHANNEL_VALID_OFFSET(abs_fid);
 
 	REG_WR8(bp, addr, 1);
 }
 
 /* enable vf_pf mailbox (aka vf-pf-channel) */
-void bnx2x_vf_enable_mbx(struct bnx2x *bp, u8 abs_vfid)
+void bnx2x_vf_enable_mbx(struct bnx2x *bp, uint8_t abs_vfid)
 {
 	bnx2x_vf_flr_clnup_epilog(bp, abs_vfid);
 
@@ -992,9 +994,10 @@ void bnx2x_vf_enable_mbx(struct bnx2x *bp, u8 abs_vfid)
 }
 
 /* this works only on !E1h */
-static int bnx2x_copy32_vf_dmae(struct bnx2x *bp, u8 from_vf,
-				dma_addr_t pf_addr, u8 vfid, u32 vf_addr_hi,
-				u32 vf_addr_lo, u32 len32)
+static int bnx2x_copy32_vf_dmae(struct bnx2x *bp, uint8_t from_vf,
+				dma_addr_t pf_addr, uint8_t vfid,
+				uint32_t vf_addr_hi,
+				uint32_t vf_addr_lo, uint32_t len32)
 {
 	struct dmae_command dmae;
 
@@ -1044,7 +1047,7 @@ static void bnx2x_vf_mbx_resp_single_tlv(struct bnx2x *bp,
 					 struct bnx2x_virtf *vf)
 {
 	struct bnx2x_vf_mbx *mbx = BP_VF_MBX(bp, vf->index);
-	u16 length, type;
+	uint16_t length, type;
 
 	/* prepare response */
 	type = mbx->first_tlv.tl.type;
@@ -1063,7 +1066,7 @@ static void bnx2x_vf_mbx_resp_send_msg(struct bnx2x *bp,
 	struct bnx2x_vf_mbx *mbx = BP_VF_MBX(bp, vf->index);
 	struct pfvf_general_resp_tlv *resp = &mbx->msg->resp.general_resp;
 	dma_addr_t pf_addr;
-	u64 vf_addr;
+	uint64_t vf_addr;
 	int rc;
 
 	bnx2x_dp_tlv_list(bp, resp);
@@ -1081,19 +1084,19 @@ static void bnx2x_vf_mbx_resp_send_msg(struct bnx2x *bp,
 	/* Copy the response buffer. The first u64 is written afterwards, as
 	 * the vf is sensitive to the header being written
 	 */
-	vf_addr += sizeof(u64);
-	pf_addr += sizeof(u64);
+	vf_addr += sizeof(uint64_t);
+	pf_addr += sizeof(uint64_t);
 	rc = bnx2x_copy32_vf_dmae(bp, false, pf_addr, vf->abs_vfid,
 				  U64_HI(vf_addr),
 				  U64_LO(vf_addr),
-				  (sizeof(union pfvf_tlvs) - sizeof(u64))/4);
+				  (sizeof(union pfvf_tlvs) - sizeof(uint64_t))/4);
 	if (rc) {
 		BNX2X_ERR("Failed to copy response body to VF %d\n",
 			  vf->abs_vfid);
 		goto mbx_error;
 	}
-	vf_addr -= sizeof(u64);
-	pf_addr -= sizeof(u64);
+	vf_addr -= sizeof(uint64_t);
+	pf_addr -= sizeof(uint64_t);
 
 	/* ack the FW */
 	storm_memset_vf_mbx_ack(bp, vf->abs_vfid);
@@ -1105,7 +1108,7 @@ static void bnx2x_vf_mbx_resp_send_msg(struct bnx2x *bp,
 	rc = bnx2x_copy32_vf_dmae(bp, false, pf_addr, vf->abs_vfid,
 				  U64_HI(vf_addr),
 				  U64_LO(vf_addr),
-				  sizeof(u64)/4);
+				  sizeof(uint64_t)/4);
 
 	/* unlock channel mutex */
 	bnx2x_unlock_vf_pf_channel(bp, vf, mbx->first_tlv.tl.type);
@@ -1132,7 +1135,7 @@ static void bnx2x_vf_mbx_resp(struct bnx2x *bp,
 static void bnx2x_vf_mbx_resp_phys_port(struct bnx2x *bp,
 					struct bnx2x_virtf *vf,
 					void *buffer,
-					u16 *offset)
+					uint16_t *offset)
 {
 	struct vfpf_port_phys_id_resp_tlv *port_id;
 
@@ -1143,7 +1146,7 @@ static void bnx2x_vf_mbx_resp_phys_port(struct bnx2x *bp,
 		      sizeof(struct vfpf_port_phys_id_resp_tlv));
 
 	port_id = (struct vfpf_port_phys_id_resp_tlv *)
-		  (((u8 *)buffer) + *offset);
+		  (((uint8_t *)buffer) + *offset);
 	memcpy(port_id->id, bp->phys_port_id, ETH_ALEN);
 
 	/* Offset should continue representing the offset to the tail
@@ -1155,7 +1158,7 @@ static void bnx2x_vf_mbx_resp_phys_port(struct bnx2x *bp,
 static void bnx2x_vf_mbx_resp_fp_hsi_ver(struct bnx2x *bp,
 					 struct bnx2x_virtf *vf,
 					 void *buffer,
-					 u16 *offset)
+					 uint16_t *offset)
 {
 	struct vfpf_fp_hsi_resp_tlv *fp_hsi;
 
@@ -1163,7 +1166,7 @@ static void bnx2x_vf_mbx_resp_fp_hsi_ver(struct bnx2x *bp,
 		      sizeof(struct vfpf_fp_hsi_resp_tlv));
 
 	fp_hsi = (struct vfpf_fp_hsi_resp_tlv *)
-		 (((u8 *)buffer) + *offset);
+		 (((uint8_t *)buffer) + *offset);
 	fp_hsi->is_supported = (vf->fp_hsi > ETH_FP_HSI_VERSION) ? 0 : 1;
 
 	/* Offset should continue representing the offset to the tail
@@ -1178,8 +1181,8 @@ static void bnx2x_vf_mbx_acquire_resp(struct bnx2x *bp, struct bnx2x_virtf *vf,
 	int i;
 	struct pfvf_acquire_resp_tlv *resp = &mbx->msg->resp.acquire_resp;
 	struct pf_vf_resc *resc = &resp->resc;
-	u8 status = bnx2x_pfvf_status_codes(vfop_status);
-	u16 length;
+	uint8_t status = bnx2x_pfvf_status_codes(vfop_status);
+	uint16_t length;
 
 	memset(resp, 0, sizeof(*resp));
 
@@ -1347,7 +1350,7 @@ static void bnx2x_vf_mbx_acquire(struct bnx2x *bp, struct bnx2x_virtf *vf,
 	if (bnx2x_vf_mbx_is_windows_vm(bp, &mbx->msg->req.acquire))
 		vf->fp_hsi = acquire->vfdev_info.fp_hsi_ver;
 	else
-		vf->fp_hsi = max_t(u8, acquire->vfdev_info.fp_hsi_ver,
+		vf->fp_hsi = max_t(uint8_t, acquire->vfdev_info.fp_hsi_ver,
 				   ETH_FP_HSI_VER_2);
 	if (vf->fp_hsi > ETH_FP_HSI_VERSION) {
 		DP(BNX2X_MSG_IOV,
@@ -1401,7 +1404,7 @@ static void bnx2x_vf_mbx_init_vf(struct bnx2x *bp, struct bnx2x_virtf *vf,
 }
 
 /* convert MBX queue-flags to standard SP queue-flags */
-static void bnx2x_vf_mbx_set_q_flags(struct bnx2x *bp, u32 mbx_q_flags,
+static void bnx2x_vf_mbx_set_q_flags(struct bnx2x *bp, uint32_t mbx_q_flags,
 				     unsigned long *sp_q_flags)
 {
 	if (mbx_q_flags & VFPF_QUEUE_FLG_TPA)
@@ -1536,7 +1539,7 @@ static void bnx2x_vf_mbx_setup_q(struct bnx2x *bp, struct bnx2x_virtf *vf,
 
 			/* rx setup - multicast engine */
 			if (bnx2x_vfq_is_leading(q)) {
-				u8 mcast_id = FW_VF_HANDLE(vf->abs_vfid);
+				uint8_t mcast_id = FW_VF_HANDLE(vf->abs_vfid);
 
 				rxq_params->mcast_engine_id = mcast_id;
 				__set_bit(BNX2X_Q_FLG_MCAST, &setup_p->flags);
@@ -1560,7 +1563,7 @@ static int bnx2x_vf_mbx_macvlan_list(struct bnx2x *bp,
 				     struct bnx2x_virtf *vf,
 				     struct vfpf_set_q_filters_tlv *tlv,
 				     struct bnx2x_vf_mac_vlan_filters **pfl,
-				     u32 type_flag)
+				     uint32_t type_flag)
 {
 	int i, j;
 	struct bnx2x_vf_mac_vlan_filters *fl = NULL;
@@ -2049,7 +2052,7 @@ static void bnx2x_vf_mbx_request(struct bnx2x *bp, struct bnx2x_virtf *vf,
 void bnx2x_vf_mbx_schedule(struct bnx2x *bp,
 			   struct vf_pf_event_data *vfpf_event)
 {
-	u8 vf_idx;
+	uint8_t vf_idx;
 
 	DP(BNX2X_MSG_IOV,
 	   "vf pf event received: vfid %d, address_hi %x, address lo %x",
@@ -2080,8 +2083,8 @@ void bnx2x_vf_mbx_schedule(struct bnx2x *bp,
 void bnx2x_vf_mbx(struct bnx2x *bp)
 {
 	struct bnx2x_vfdb *vfdb = BP_VFDB(bp);
-	u64 events;
-	u8 vf_idx;
+	uint64_t events;
+	uint8_t vf_idx;
 	int rc;
 
 	if (!vfdb)

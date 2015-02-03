@@ -27,11 +27,11 @@
  * General service functions
  */
 
-static inline long bnx2x_hilo(u32 *hiref)
+static inline long bnx2x_hilo(uint32_t *hiref)
 {
-	u32 lo = *(hiref + 1);
+	uint32_t lo = *(hiref + 1);
 #if (BITS_PER_LONG == 64)
-	u32 hi = *hiref;
+	uint32_t hi = *hiref;
 
 	return HILO_U64(hi, lo);
 #else
@@ -39,13 +39,13 @@ static inline long bnx2x_hilo(u32 *hiref)
 #endif
 }
 
-static inline u16 bnx2x_get_port_stats_dma_len(struct bnx2x *bp)
+static inline uint16_t bnx2x_get_port_stats_dma_len(struct bnx2x *bp)
 {
-	u16 res = 0;
+	uint16_t res = 0;
 
 	/* 'newest' convention - shmem2 cotains the size of the port stats */
 	if (SHMEM2_HAS(bp, sizeof_port_stats)) {
-		u32 size = SHMEM2_RD(bp, sizeof_port_stats);
+		uint32_t size = SHMEM2_RD(bp, sizeof_port_stats);
 		if (size)
 			res = size;
 
@@ -158,7 +158,7 @@ static void bnx2x_storm_stats_post(struct bnx2x *bp)
 static void bnx2x_hw_stats_post(struct bnx2x *bp)
 {
 	struct dmae_command *dmae = &bp->stats_dmae;
-	u32 *stats_comp = bnx2x_sp(bp, stats_comp);
+	uint32_t *stats_comp = bnx2x_sp(bp, stats_comp);
 
 	*stats_comp = DMAE_COMP_VAL;
 	if (CHIP_REV_IS_SLOW(bp))
@@ -172,7 +172,7 @@ static void bnx2x_hw_stats_post(struct bnx2x *bp)
 	/* loader */
 	if (bp->executer_idx) {
 		int loader_idx = PMF_DMAE_C(bp);
-		u32 opcode =  bnx2x_dmae_opcode(bp, DMAE_SRC_PCI, DMAE_DST_GRC,
+		uint32_t opcode =  bnx2x_dmae_opcode(bp, DMAE_SRC_PCI, DMAE_DST_GRC,
 						 true, DMAE_COMP_GRC);
 		opcode = bnx2x_dmae_opcode_clr_src_reset(opcode);
 
@@ -202,7 +202,7 @@ static void bnx2x_hw_stats_post(struct bnx2x *bp)
 
 static void bnx2x_stats_comp(struct bnx2x *bp)
 {
-	u32 *stats_comp = bnx2x_sp(bp, stats_comp);
+	uint32_t *stats_comp = bnx2x_sp(bp, stats_comp);
 	int cnt = 10;
 
 	might_sleep();
@@ -224,9 +224,9 @@ static void bnx2x_stats_comp(struct bnx2x *bp)
 static void __bnx2x_stats_pmf_update(struct bnx2x *bp)
 {
 	struct dmae_command *dmae;
-	u32 opcode;
+	uint32_t opcode;
 	int loader_idx = PMF_DMAE_C(bp);
-	u32 *stats_comp = bnx2x_sp(bp, stats_comp);
+	uint32_t *stats_comp = bnx2x_sp(bp, stats_comp);
 
 	/* sanity */
 	if (!bp->port.pmf || !bp->port.port_stx) {
@@ -272,10 +272,10 @@ static void bnx2x_port_stats_init(struct bnx2x *bp)
 {
 	struct dmae_command *dmae;
 	int port = BP_PORT(bp);
-	u32 opcode;
+	uint32_t opcode;
 	int loader_idx = PMF_DMAE_C(bp);
-	u32 mac_addr;
-	u32 *stats_comp = bnx2x_sp(bp, stats_comp);
+	uint32_t mac_addr;
+	uint32_t *stats_comp = bnx2x_sp(bp, stats_comp);
 
 	/* sanity */
 	if (!bp->link_vars.link_up || !bp->port.pmf) {
@@ -368,8 +368,8 @@ static void bnx2x_port_stats_init(struct bnx2x *bp)
 		dmae->comp_addr_hi = 0;
 		dmae->comp_val = 1;
 	} else {
-		u32 tx_src_addr_lo, rx_src_addr_lo;
-		u16 rx_len, tx_len;
+		uint32_t tx_src_addr_lo, rx_src_addr_lo;
+		uint16_t rx_len, tx_len;
 
 		/* configure the params according to MAC type */
 		switch (bp->link_vars.mac_type) {
@@ -453,7 +453,7 @@ static void bnx2x_port_stats_init(struct bnx2x *bp)
 				offsetof(struct nig_stats, egress_mac_pkt0_lo));
 		dmae->dst_addr_hi = U64_HI(bnx2x_sp_mapping(bp, nig_stats) +
 				offsetof(struct nig_stats, egress_mac_pkt0_lo));
-		dmae->len = (2*sizeof(u32)) >> 2;
+		dmae->len = (2*sizeof(uint32_t)) >> 2;
 		dmae->comp_addr_lo = dmae_reg_go_c[loader_idx] >> 2;
 		dmae->comp_addr_hi = 0;
 		dmae->comp_val = 1;
@@ -467,7 +467,7 @@ static void bnx2x_port_stats_init(struct bnx2x *bp)
 				offsetof(struct nig_stats, egress_mac_pkt1_lo));
 		dmae->dst_addr_hi = U64_HI(bnx2x_sp_mapping(bp, nig_stats) +
 				offsetof(struct nig_stats, egress_mac_pkt1_lo));
-		dmae->len = (2*sizeof(u32)) >> 2;
+		dmae->len = (2*sizeof(uint32_t)) >> 2;
 		dmae->comp_addr_lo = dmae_reg_go_c[loader_idx] >> 2;
 		dmae->comp_addr_hi = 0;
 		dmae->comp_val = 1;
@@ -481,7 +481,7 @@ static void bnx2x_port_stats_init(struct bnx2x *bp)
 	dmae->src_addr_hi = 0;
 	dmae->dst_addr_lo = U64_LO(bnx2x_sp_mapping(bp, nig_stats));
 	dmae->dst_addr_hi = U64_HI(bnx2x_sp_mapping(bp, nig_stats));
-	dmae->len = (sizeof(struct nig_stats) - 4*sizeof(u32)) >> 2;
+	dmae->len = (sizeof(struct nig_stats) - 4*sizeof(uint32_t)) >> 2;
 
 	dmae->comp_addr_lo = U64_LO(bnx2x_sp_mapping(bp, stats_comp));
 	dmae->comp_addr_hi = U64_HI(bnx2x_sp_mapping(bp, stats_comp));
@@ -493,7 +493,7 @@ static void bnx2x_port_stats_init(struct bnx2x *bp)
 static void bnx2x_func_stats_init(struct bnx2x *bp)
 {
 	struct dmae_command *dmae = &bp->stats_dmae;
-	u32 *stats_comp = bnx2x_sp(bp, stats_comp);
+	uint32_t *stats_comp = bnx2x_sp(bp, stats_comp);
 
 	/* sanity */
 	if (!bp->func_stx) {
@@ -580,8 +580,8 @@ static void bnx2x_bmac_stats_update(struct bnx2x *bp)
 	struct host_port_stats *pstats = bnx2x_sp(bp, port_stats);
 	struct bnx2x_eth_stats *estats = &bp->eth_stats;
 	struct {
-		u32 lo;
-		u32 hi;
+		uint32_t lo;
+		uint32_t hi;
 	} diff;
 
 	if (CHIP_IS_E1x(bp)) {
@@ -835,8 +835,8 @@ static int bnx2x_hw_stats_update(struct bnx2x *bp)
 	struct host_port_stats *pstats = bnx2x_sp(bp, port_stats);
 	struct bnx2x_eth_stats *estats = &bp->eth_stats;
 	struct {
-		u32 lo;
-		u32 hi;
+		uint32_t lo;
+		uint32_t hi;
 	} diff;
 
 	switch (bp->link_vars.mac_type) {
@@ -884,13 +884,13 @@ static int bnx2x_hw_stats_update(struct bnx2x *bp)
 	pstats->host_port_stats_counter++;
 
 	if (CHIP_IS_E3(bp)) {
-		u32 lpi_reg = BP_PORT(bp) ? MISC_REG_CPMU_LP_SM_ENT_CNT_P1
+		uint32_t lpi_reg = BP_PORT(bp) ? MISC_REG_CPMU_LP_SM_ENT_CNT_P1
 					  : MISC_REG_CPMU_LP_SM_ENT_CNT_P0;
 		estats->eee_tx_lpi += REG_RD(bp, lpi_reg);
 	}
 
 	if (!BP_NOMCP(bp)) {
-		u32 nig_timer_max =
+		uint32_t nig_timer_max =
 			SHMEM_RD(bp, port_mb[BP_PORT(bp)].stat_nig_timer);
 		if (nig_timer_max != estats->nig_timer_max) {
 			estats->nig_timer_max = nig_timer_max;
@@ -905,7 +905,7 @@ static int bnx2x_hw_stats_update(struct bnx2x *bp)
 static int bnx2x_storm_stats_validate_counters(struct bnx2x *bp)
 {
 	struct stats_counter *counters = &bp->fw_stats_data->storm_counters;
-	u16 cur_stats_counter;
+	uint16_t cur_stats_counter;
 	/* Make sure we use the value of the counter
 	 * used for sending the last stats ramrod.
 	 */
@@ -982,7 +982,7 @@ static int bnx2x_storm_stats_update(struct bnx2x *bp)
 		struct bnx2x_eth_q_stats_old *qstats_old =
 			&bnx2x_fp_stats(bp, fp)->eth_q_stats_old;
 
-		u32 diff;
+		uint32_t diff;
 
 		DP(BNX2X_MSG_STATS, "queue[%d]: ucast_sent 0x%x, bcast_sent 0x%x mcast_sent 0x%x\n",
 		   i, xclient->ucast_pkts_sent,
@@ -1230,7 +1230,7 @@ static void bnx2x_drv_stats_update(struct bnx2x *bp)
 
 static bool bnx2x_edebug_stats_stopped(struct bnx2x *bp)
 {
-	u32 val;
+	uint32_t val;
 
 	if (SHMEM2_HAS(bp, edebug_driver_if[1])) {
 		val = SHMEM2_RD(bp, edebug_driver_if[1]);
@@ -1244,7 +1244,7 @@ static bool bnx2x_edebug_stats_stopped(struct bnx2x *bp)
 
 static void bnx2x_stats_update(struct bnx2x *bp)
 {
-	u32 *stats_comp = bnx2x_sp(bp, stats_comp);
+	uint32_t *stats_comp = bnx2x_sp(bp, stats_comp);
 
 	/* we run update from timer context, so give up
 	 * if somebody is in the middle of transition
@@ -1300,9 +1300,9 @@ out:
 static void bnx2x_port_stats_stop(struct bnx2x *bp)
 {
 	struct dmae_command *dmae;
-	u32 opcode;
+	uint32_t opcode;
 	int loader_idx = PMF_DMAE_C(bp);
-	u32 *stats_comp = bnx2x_sp(bp, stats_comp);
+	uint32_t *stats_comp = bnx2x_sp(bp, stats_comp);
 
 	bp->executer_idx = 0;
 
@@ -1431,7 +1431,7 @@ void bnx2x_stats_handle(struct bnx2x *bp, enum bnx2x_stats_event event)
 static void bnx2x_port_stats_base_init(struct bnx2x *bp)
 {
 	struct dmae_command *dmae;
-	u32 *stats_comp = bnx2x_sp(bp, stats_comp);
+	uint32_t *stats_comp = bnx2x_sp(bp, stats_comp);
 
 	/* sanity */
 	if (!bp->port.pmf || !bp->port.port_stx) {
@@ -1729,7 +1729,7 @@ void bnx2x_save_statistics(struct bnx2x *bp)
 }
 
 void bnx2x_afex_collect_stats(struct bnx2x *bp, void *void_afex_stats,
-			      u32 stats_type)
+			      uint32_t stats_type)
 {
 	int i;
 	struct afex_stats *afex_stats = (struct afex_stats *)void_afex_stats;

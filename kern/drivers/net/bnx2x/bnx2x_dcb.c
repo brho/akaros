@@ -27,33 +27,33 @@
 static void bnx2x_pfc_set_pfc(struct bnx2x *bp);
 static void bnx2x_dcbx_update_ets_params(struct bnx2x *bp);
 static void bnx2x_dcbx_get_ets_pri_pg_tbl(struct bnx2x *bp,
-					  u32 *set_configuration_ets_pg,
-					  u32 *pri_pg_tbl);
+					  uint32_t *set_configuration_ets_pg,
+					  uint32_t *pri_pg_tbl);
 static void bnx2x_dcbx_get_num_pg_traf_type(struct bnx2x *bp,
-					    u32 *pg_pri_orginal_spread,
+					    uint32_t *pg_pri_orginal_spread,
 					    struct pg_help_data *help_data);
 static void bnx2x_dcbx_fill_cos_params(struct bnx2x *bp,
 				       struct pg_help_data *help_data,
 				       struct dcbx_ets_feature *ets,
-				       u32 *pg_pri_orginal_spread);
+				       uint32_t *pg_pri_orginal_spread);
 static void bnx2x_dcbx_separate_pauseable_from_non(struct bnx2x *bp,
 				struct cos_help_data *cos_data,
-				u32 *pg_pri_orginal_spread,
+				uint32_t *pg_pri_orginal_spread,
 				struct dcbx_ets_feature *ets);
 static void bnx2x_dcbx_fw_struct(struct bnx2x *bp,
 				 struct bnx2x_func_tx_start_params*);
 
 /* helpers: read/write len bytes from addr into buff by REG_RD/REG_WR */
-static void bnx2x_read_data(struct bnx2x *bp, u32 *buff,
-				   u32 addr, u32 len)
+static void bnx2x_read_data(struct bnx2x *bp, uint32_t *buff,
+				   uint32_t addr, uint32_t len)
 {
 	int i;
 	for (i = 0; i < len; i += 4, buff++)
 		*buff = REG_RD(bp, addr + i);
 }
 
-static void bnx2x_write_data(struct bnx2x *bp, u32 *buff,
-				    u32 addr, u32 len)
+static void bnx2x_write_data(struct bnx2x *bp, uint32_t *buff,
+				    uint32_t addr, uint32_t len)
 {
 	int i;
 	for (i = 0; i < len; i += 4, buff++)
@@ -63,7 +63,7 @@ static void bnx2x_write_data(struct bnx2x *bp, u32 *buff,
 static void bnx2x_pfc_set(struct bnx2x *bp)
 {
 	struct bnx2x_nig_brb_pfc_port_params pfc_params = {0};
-	u32 pri_bit, val = 0;
+	uint32_t pri_bit, val = 0;
 	int i;
 
 	pfc_params.num_of_rx_cos_priority_mask =
@@ -117,9 +117,9 @@ static void bnx2x_pfc_clear(struct bnx2x *bp)
 
 static void  bnx2x_dump_dcbx_drv_param(struct bnx2x *bp,
 				       struct dcbx_features *features,
-				       u32 error)
+				       uint32_t error)
 {
-	u8 i = 0;
+	uint8_t i = 0;
 	DP(NETIF_MSG_LINK, "local_mib.error %x\n", error);
 
 	/* PG */
@@ -162,13 +162,13 @@ static void  bnx2x_dump_dcbx_drv_param(struct bnx2x *bp,
 }
 
 static void bnx2x_dcbx_get_ap_priority(struct bnx2x *bp,
-				       u8 pri_bitmap,
-				       u8 llfc_traf_type)
+				       uint8_t pri_bitmap,
+				       uint8_t llfc_traf_type)
 {
-	u32 pri = MAX_PFC_PRIORITIES;
-	u32 index = MAX_PFC_PRIORITIES - 1;
-	u32 pri_mask;
-	u32 *ttp = bp->dcbx_port_params.app.traffic_type_priority;
+	uint32_t pri = MAX_PFC_PRIORITIES;
+	uint32_t index = MAX_PFC_PRIORITIES - 1;
+	uint32_t pri_mask;
+	uint32_t *ttp = bp->dcbx_port_params.app.traffic_type_priority;
 
 	/* Choose the highest priority */
 	while ((MAX_PFC_PRIORITIES == pri) && (0 != index)) {
@@ -179,14 +179,15 @@ static void bnx2x_dcbx_get_ap_priority(struct bnx2x *bp,
 	}
 
 	if (pri < MAX_PFC_PRIORITIES)
-		ttp[llfc_traf_type] = max_t(u32, ttp[llfc_traf_type], pri);
+		ttp[llfc_traf_type] = max_t(uint32_t, ttp[llfc_traf_type],
+					    pri);
 }
 
 static void bnx2x_dcbx_get_ap_feature(struct bnx2x *bp,
 				   struct dcbx_app_priority_feature *app,
-				   u32 error) {
-	u8 index;
-	u32 *ttp = bp->dcbx_port_params.app.traffic_type_priority;
+				   uint32_t error) {
+	uint8_t index;
+	uint32_t *ttp = bp->dcbx_port_params.app.traffic_type_priority;
 
 	if (GET_FLAGS(error, DCBX_LOCAL_APP_ERROR))
 		DP(BNX2X_MSG_DCB, "DCBX_LOCAL_APP_ERROR\n");
@@ -236,9 +237,9 @@ static void bnx2x_dcbx_get_ap_feature(struct bnx2x *bp,
 
 static void bnx2x_dcbx_get_ets_feature(struct bnx2x *bp,
 				       struct dcbx_ets_feature *ets,
-				       u32 error) {
+				       uint32_t error) {
 	int i = 0;
-	u32 pg_pri_orginal_spread[DCBX_MAX_NUM_PG_BW_ENTRIES] = {0};
+	uint32_t pg_pri_orginal_spread[DCBX_MAX_NUM_PG_BW_ENTRIES] = {0};
 	struct pg_help_data pg_help_data;
 	struct bnx2x_dcbx_cos_params *cos_params =
 			bp->dcbx_port_params.ets.cos_params;
@@ -287,7 +288,8 @@ static void bnx2x_dcbx_get_ets_feature(struct bnx2x *bp,
 }
 
 static void  bnx2x_dcbx_get_pfc_feature(struct bnx2x *bp,
-					struct dcbx_pfc_feature *pfc, u32 error)
+					struct dcbx_pfc_feature *pfc,
+					uint32_t error)
 {
 	if (GET_FLAGS(error, DCBX_LOCAL_PFC_ERROR))
 		DP(BNX2X_MSG_DCB, "DCBX_LOCAL_PFC_ERROR\n");
@@ -311,9 +313,9 @@ static void  bnx2x_dcbx_get_pfc_feature(struct bnx2x *bp,
 static void bnx2x_dcbx_map_nw(struct bnx2x *bp)
 {
 	int i;
-	u32 unmapped = (1 << MAX_PFC_PRIORITIES) - 1; /* all ones */
-	u32 *ttp = bp->dcbx_port_params.app.traffic_type_priority;
-	u32 nw_prio = 1 << ttp[LLFC_TRAFFIC_TYPE_NW];
+	uint32_t unmapped = (1 << MAX_PFC_PRIORITIES) - 1; /* all ones */
+	uint32_t *ttp = bp->dcbx_port_params.app.traffic_type_priority;
+	uint32_t nw_prio = 1 << ttp[LLFC_TRAFFIC_TYPE_NW];
 	struct bnx2x_dcbx_cos_params *cos_params =
 			bp->dcbx_port_params.ets.cos_params;
 
@@ -335,7 +337,7 @@ static void bnx2x_dcbx_map_nw(struct bnx2x *bp)
 
 static void bnx2x_get_dcbx_drv_param(struct bnx2x *bp,
 				     struct dcbx_features *features,
-				     u32 error)
+				     uint32_t error)
 {
 	bnx2x_dcbx_get_ap_feature(bp, &features->app, error);
 
@@ -348,12 +350,12 @@ static void bnx2x_get_dcbx_drv_param(struct bnx2x *bp,
 
 #define DCBX_LOCAL_MIB_MAX_TRY_READ		(100)
 static int bnx2x_dcbx_read_mib(struct bnx2x *bp,
-			       u32 *base_mib_addr,
-			       u32 offset,
+			       uint32_t *base_mib_addr,
+			       uint32_t offset,
 			       int read_mib_type)
 {
 	int max_try_read = 0;
-	u32 mib_size, prefix_seq_num, suffix_seq_num;
+	uint32_t mib_size, prefix_seq_num, suffix_seq_num;
 	struct lldp_remote_mib *remote_mib ;
 	struct lldp_local_mib  *local_mib;
 
@@ -498,8 +500,8 @@ static void bnx2x_dcbx_2cos_limit_update_ets_config(struct bnx2x *bp)
 	/* If we join a group and there is bw_tbl and strict then bw rules */
 	if ((DCBX_INVALID_COS_BW != ets->cos_params[0].bw_tbl) &&
 	    (DCBX_INVALID_COS_BW != ets->cos_params[1].bw_tbl)) {
-		u32 bw_tbl_0 = ets->cos_params[0].bw_tbl;
-		u32 bw_tbl_1 = ets->cos_params[1].bw_tbl;
+		uint32_t bw_tbl_0 = ets->cos_params[0].bw_tbl;
+		uint32_t bw_tbl_1 = ets->cos_params[1].bw_tbl;
 		/* Do not allow 0-100 configuration
 		 * since PBF does not support it
 		 * force 1-99 instead
@@ -531,7 +533,7 @@ static void bnx2x_dcbx_update_ets_config(struct bnx2x *bp)
 {
 	struct bnx2x_dcbx_pg_params *ets = &(bp->dcbx_port_params.ets);
 	struct bnx2x_ets_params ets_params = { 0 };
-	u8 i;
+	uint8_t i;
 
 	ets_params.num_of_cos = ets->num_of_cos;
 
@@ -553,7 +555,7 @@ static void bnx2x_dcbx_update_ets_config(struct bnx2x *bp)
 			}
 			ets_params.cos[i].state = bnx2x_cos_state_bw;
 			ets_params.cos[i].params.bw_params.bw =
-						(u8)ets->cos_params[i].bw_tbl;
+						(uint8_t)ets->cos_params[i].bw_tbl;
 		}
 	}
 
@@ -587,7 +589,7 @@ static void bnx2x_dcbx_update_ets_params(struct bnx2x *bp)
 static int bnx2x_dcbx_read_shmem_remote_mib(struct bnx2x *bp)
 {
 	struct lldp_remote_mib remote_mib = {0};
-	u32 dcbx_remote_mib_offset = SHMEM2_RD(bp, dcbx_remote_mib_offset);
+	uint32_t dcbx_remote_mib_offset = SHMEM2_RD(bp, dcbx_remote_mib_offset);
 	int rc;
 
 	DP(BNX2X_MSG_DCB, "dcbx_remote_mib_offset 0x%x\n",
@@ -598,7 +600,8 @@ static int bnx2x_dcbx_read_shmem_remote_mib(struct bnx2x *bp)
 		return -EINVAL;
 	}
 
-	rc = bnx2x_dcbx_read_mib(bp, (u32 *)&remote_mib, dcbx_remote_mib_offset,
+	rc = bnx2x_dcbx_read_mib(bp, (uint32_t *)&remote_mib,
+				 dcbx_remote_mib_offset,
 				 DCBX_READ_REMOTE_MIB);
 
 	if (rc) {
@@ -616,7 +619,7 @@ static int bnx2x_dcbx_read_shmem_remote_mib(struct bnx2x *bp)
 static int bnx2x_dcbx_read_shmem_neg_results(struct bnx2x *bp)
 {
 	struct lldp_local_mib local_mib = {0};
-	u32 dcbx_neg_res_offset = SHMEM2_RD(bp, dcbx_neg_res_offset);
+	uint32_t dcbx_neg_res_offset = SHMEM2_RD(bp, dcbx_neg_res_offset);
 	int rc;
 
 	DP(BNX2X_MSG_DCB, "dcbx_neg_res_offset 0x%x\n", dcbx_neg_res_offset);
@@ -626,7 +629,8 @@ static int bnx2x_dcbx_read_shmem_neg_results(struct bnx2x *bp)
 		return -EINVAL;
 	}
 
-	rc = bnx2x_dcbx_read_mib(bp, (u32 *)&local_mib, dcbx_neg_res_offset,
+	rc = bnx2x_dcbx_read_mib(bp, (uint32_t *)&local_mib,
+				 dcbx_neg_res_offset,
 				 DCBX_READ_LOCAL_MIB);
 
 	if (rc) {
@@ -642,9 +646,9 @@ static int bnx2x_dcbx_read_shmem_neg_results(struct bnx2x *bp)
 
 #ifdef BCM_DCBNL
 static inline
-u8 bnx2x_dcbx_dcbnl_app_up(struct dcbx_app_priority_entry *ent)
+uint8_t bnx2x_dcbx_dcbnl_app_up(struct dcbx_app_priority_entry *ent)
 {
-	u8 pri;
+	uint8_t pri;
 
 	/* Choose the highest priority */
 	for (pri = MAX_PFC_PRIORITIES - 1; pri > 0; pri--)
@@ -654,7 +658,7 @@ u8 bnx2x_dcbx_dcbnl_app_up(struct dcbx_app_priority_entry *ent)
 }
 
 static inline
-u8 bnx2x_dcbx_dcbnl_app_idtype(struct dcbx_app_priority_entry *ent)
+uint8_t bnx2x_dcbx_dcbnl_app_idtype(struct dcbx_app_priority_entry *ent)
 {
 	return ((ent->appBitfield & DCBX_APP_ENTRY_SF_MASK) ==
 		DCBX_APP_SF_PORT) ? DCB_APP_IDTYPE_PORTNUM :
@@ -670,7 +674,7 @@ int bnx2x_dcbnl_update_applist(struct bnx2x *bp, bool delall)
 			&bp->dcbx_local_feat.app.app_pri_tbl[i];
 
 		if (ent->appBitfield & DCBX_APP_ENTRY_VALID) {
-			u8 up = bnx2x_dcbx_dcbnl_app_up(ent);
+			uint8_t up = bnx2x_dcbx_dcbnl_app_up(ent);
 
 			/* avoid invalid user-priority */
 			if (up) {
@@ -688,7 +692,7 @@ int bnx2x_dcbnl_update_applist(struct bnx2x *bp, bool delall)
 
 static inline void bnx2x_dcbx_update_tc_mapping(struct bnx2x *bp)
 {
-	u8 prio, cos;
+	uint8_t prio, cos;
 	for (cos = 0; cos < bp->dcbx_port_params.ets.num_of_cos; cos++) {
 		for (prio = 0; prio < BNX2X_MAX_PRIORITY; prio++) {
 			if (bp->dcbx_port_params.ets.cos_params[cos].pri_bitmask
@@ -707,7 +711,7 @@ static inline void bnx2x_dcbx_update_tc_mapping(struct bnx2x *bp)
 	bnx2x_schedule_sp_rtnl(bp, BNX2X_SP_RTNL_SETUP_TC, 0);
 }
 
-void bnx2x_dcbx_set_params(struct bnx2x *bp, u32 state)
+void bnx2x_dcbx_set_params(struct bnx2x *bp, uint32_t state)
 {
 	switch (state) {
 	case BNX2X_DCBX_STATE_NEG_RECEIVED:
@@ -788,11 +792,11 @@ void bnx2x_dcbx_set_params(struct bnx2x *bp, u32 state)
 				      BP_PORT(bp)*sizeof(struct lldp_admin_mib))
 
 static void bnx2x_dcbx_admin_mib_updated_params(struct bnx2x *bp,
-				u32 dcbx_lldp_params_offset)
+				uint32_t dcbx_lldp_params_offset)
 {
 	struct lldp_admin_mib admin_mib;
-	u32 i, other_traf_type = PREDEFINED_APP_IDX_MAX, traf_type = 0;
-	u32 offset = dcbx_lldp_params_offset + LLDP_ADMIN_MIB_OFFSET(bp);
+	uint32_t i, other_traf_type = PREDEFINED_APP_IDX_MAX, traf_type = 0;
+	uint32_t offset = dcbx_lldp_params_offset + LLDP_ADMIN_MIB_OFFSET(bp);
 
 	/*shortcuts*/
 	struct dcbx_features *af = &admin_mib.features;
@@ -801,7 +805,7 @@ static void bnx2x_dcbx_admin_mib_updated_params(struct bnx2x *bp,
 	memset(&admin_mib, 0, sizeof(struct lldp_admin_mib));
 
 	/* Read the data first */
-	bnx2x_read_data(bp, (u32 *)&admin_mib, offset,
+	bnx2x_read_data(bp, (uint32_t *)&admin_mib, offset,
 			sizeof(struct lldp_admin_mib));
 
 	if (bp->dcbx_enabled == BNX2X_DCBX_ENABLED_ON_NEG_ON)
@@ -816,9 +820,9 @@ static void bnx2x_dcbx_admin_mib_updated_params(struct bnx2x *bp,
 			(dp->admin_dcbx_version << DCBX_CEE_VERSION_SHIFT) &
 			 DCBX_CEE_VERSION_MASK;
 
-		af->ets.enabled = (u8)dp->admin_ets_enable;
+		af->ets.enabled = (uint8_t)dp->admin_ets_enable;
 
-		af->pfc.enabled = (u8)dp->admin_pfc_enable;
+		af->pfc.enabled = (uint8_t)dp->admin_pfc_enable;
 
 		/* FOR IEEE dp->admin_tc_supported_tx_enable */
 		if (dp->admin_ets_configuration_tx_enable)
@@ -859,7 +863,7 @@ static void bnx2x_dcbx_admin_mib_updated_params(struct bnx2x *bp,
 
 		for (i = 0 ; i < DCBX_MAX_NUM_PG_BW_ENTRIES; i++) {
 			DCBX_PG_BW_SET(af->ets.pg_bw_tbl, i,
-				(u8)dp->admin_configuration_bw_precentage[i]);
+				(uint8_t)dp->admin_configuration_bw_precentage[i]);
 
 			DP(BNX2X_MSG_DCB, "pg_bw_tbl[%d] = %02x\n",
 			   i, DCBX_PG_BW_GET(af->ets.pg_bw_tbl, i));
@@ -867,7 +871,7 @@ static void bnx2x_dcbx_admin_mib_updated_params(struct bnx2x *bp,
 
 		for (i = 0; i < DCBX_MAX_NUM_PRI_PG_ENTRIES; i++) {
 			DCBX_PRI_PG_SET(af->ets.pri_pg_tbl, i,
-					(u8)dp->admin_configuration_ets_pg[i]);
+					(uint8_t)dp->admin_configuration_ets_pg[i]);
 
 			DP(BNX2X_MSG_DCB, "pri_pg_tbl[%d] = %02x\n",
 			   i, DCBX_PRI_PG_GET(af->ets.pri_pg_tbl, i));
@@ -875,7 +879,7 @@ static void bnx2x_dcbx_admin_mib_updated_params(struct bnx2x *bp,
 
 		/*For IEEE admin_recommendation_bw_percentage
 		 *For IEEE admin_recommendation_ets_pg */
-		af->pfc.pri_en_bitmap = (u8)dp->admin_pfc_bitmap;
+		af->pfc.pri_en_bitmap = (uint8_t)dp->admin_pfc_bitmap;
 		for (i = 0; i < DCBX_CONFIG_MAX_APP_PROTOCOL; i++) {
 			if (dp->admin_priority_app_table[i].valid) {
 				struct bnx2x_admin_priority_app_table *table =
@@ -893,7 +897,7 @@ static void bnx2x_dcbx_admin_mib_updated_params(struct bnx2x *bp,
 					table[i].app_id;
 
 				af->app.app_pri_tbl[traf_type].pri_bitmap =
-					(u8)(1 << table[i].priority);
+					(uint8_t)(1 << table[i].priority);
 
 				af->app.app_pri_tbl[traf_type].appBitfield =
 				    (DCBX_APP_ENTRY_VALID);
@@ -904,15 +908,16 @@ static void bnx2x_dcbx_admin_mib_updated_params(struct bnx2x *bp,
 			}
 		}
 
-		af->app.default_pri = (u8)dp->admin_default_priority;
+		af->app.default_pri = (uint8_t)dp->admin_default_priority;
 	}
 
 	/* Write the data. */
-	bnx2x_write_data(bp, (u32 *)&admin_mib, offset,
+	bnx2x_write_data(bp, (uint32_t *)&admin_mib, offset,
 			 sizeof(struct lldp_admin_mib));
 }
 
-void bnx2x_dcbx_set_state(struct bnx2x *bp, bool dcb_on, u32 dcbx_enabled)
+void bnx2x_dcbx_set_state(struct bnx2x *bp, bool dcb_on,
+			  uint32_t dcbx_enabled)
 {
 	if (!CHIP_IS_E1x(bp)) {
 		bp->dcb_state = dcb_on;
@@ -985,7 +990,7 @@ void bnx2x_dcbx_init_params(struct bnx2x *bp)
 
 void bnx2x_dcbx_init(struct bnx2x *bp, bool update_shmem)
 {
-	u32 dcbx_lldp_params_offset = SHMEM_LLDP_DCBX_PARAMS_NONE;
+	uint32_t dcbx_lldp_params_offset = SHMEM_LLDP_DCBX_PARAMS_NONE;
 
 	/* only PMF can send ADMIN msg to MFW in old MFW versions */
 	if ((!bp->port.pmf) && (!(bp->flags & BC_SUPPORTS_DCBX_MSG_NON_PMF)))
@@ -1037,8 +1042,8 @@ static void
 bnx2x_dcbx_print_cos_params(struct bnx2x *bp,
 			    struct bnx2x_func_tx_start_params *pfc_fw_cfg)
 {
-	u8 pri = 0;
-	u8 cos = 0;
+	uint8_t pri = 0;
+	uint8_t cos = 0;
 
 	DP(BNX2X_MSG_DCB,
 	   "pfc_fw_cfg->dcb_version %x\n", pfc_fw_cfg->dcb_version);
@@ -1077,12 +1082,12 @@ bnx2x_dcbx_print_cos_params(struct bnx2x *bp,
 
 /* fills help_data according to pg_info */
 static void bnx2x_dcbx_get_num_pg_traf_type(struct bnx2x *bp,
-					    u32 *pg_pri_orginal_spread,
+					    uint32_t *pg_pri_orginal_spread,
 					    struct pg_help_data *help_data)
 {
 	bool pg_found  = false;
-	u32 i, traf_type, add_traf_type, add_pg;
-	u32 *ttp = bp->dcbx_port_params.app.traffic_type_priority;
+	uint32_t i, traf_type, add_traf_type, add_pg;
+	uint32_t *ttp = bp->dcbx_port_params.app.traffic_type_priority;
 	struct pg_entry_help_data *data = help_data->data; /*shortcut*/
 
 	/* Set to invalid */
@@ -1093,7 +1098,7 @@ static void bnx2x_dcbx_get_num_pg_traf_type(struct bnx2x *bp,
 	     add_traf_type < LLFC_DRIVER_TRAFFIC_TYPE_MAX; add_traf_type++) {
 		pg_found = false;
 		if (ttp[add_traf_type] < MAX_PFC_PRIORITIES) {
-			add_pg = (u8)pg_pri_orginal_spread[ttp[add_traf_type]];
+			add_pg = (uint8_t)pg_pri_orginal_spread[ttp[add_traf_type]];
 			for (traf_type = 0;
 			     traf_type < LLFC_DRIVER_TRAFFIC_TYPE_MAX;
 			     traf_type++) {
@@ -1125,7 +1130,7 @@ static void bnx2x_dcbx_get_num_pg_traf_type(struct bnx2x *bp,
 
 static void bnx2x_dcbx_ets_disabled_entry_data(struct bnx2x *bp,
 					       struct cos_help_data *cos_data,
-					       u32 pri_join_mask)
+					       uint32_t pri_join_mask)
 {
 	/* Only one priority than only one COS */
 	cos_data->data[0].pausable =
@@ -1137,7 +1142,7 @@ static void bnx2x_dcbx_ets_disabled_entry_data(struct bnx2x *bp,
 
 static inline void bnx2x_dcbx_add_to_cos_bw(struct bnx2x *bp,
 					    struct cos_entry_help_data *data,
-					    u8 pg_bw)
+					    uint8_t pg_bw)
 {
 	if (data->cos_bw == DCBX_INVALID_COS_BW)
 		data->cos_bw = pg_bw;
@@ -1147,14 +1152,14 @@ static inline void bnx2x_dcbx_add_to_cos_bw(struct bnx2x *bp,
 
 static void bnx2x_dcbx_separate_pauseable_from_non(struct bnx2x *bp,
 			struct cos_help_data *cos_data,
-			u32 *pg_pri_orginal_spread,
+			uint32_t *pg_pri_orginal_spread,
 			struct dcbx_ets_feature *ets)
 {
-	u32	pri_tested	= 0;
-	u8	i		= 0;
-	u8	entry		= 0;
-	u8	pg_entry	= 0;
-	u8	num_of_pri	= LLFC_DRIVER_TRAFFIC_TYPE_MAX;
+	uint32_t	pri_tested	= 0;
+	uint8_t	i		= 0;
+	uint8_t	entry		= 0;
+	uint8_t	pg_entry	= 0;
+	uint8_t	num_of_pri	= LLFC_DRIVER_TRAFFIC_TYPE_MAX;
 
 	cos_data->data[0].pausable = true;
 	cos_data->data[1].pausable = false;
@@ -1171,7 +1176,7 @@ static void bnx2x_dcbx_separate_pauseable_from_non(struct bnx2x *bp,
 			cos_data->data[0].pri_join_mask |= pri_tested;
 			entry = 0;
 		}
-		pg_entry = (u8)pg_pri_orginal_spread[bp->dcbx_port_params.
+		pg_entry = (uint8_t)pg_pri_orginal_spread[bp->dcbx_port_params.
 						app.traffic_type_priority[i]];
 		/* There can be only one strict pg */
 		if (pg_entry < DCBX_MAX_NUM_PG_BW_ENTRIES)
@@ -1196,13 +1201,13 @@ static void bnx2x_dcbx_separate_pauseable_from_non(struct bnx2x *bp,
 static void bnx2x_dcbx_2cos_limit_cee_single_pg_to_cos_params(struct bnx2x *bp,
 					      struct pg_help_data *pg_help_data,
 					      struct cos_help_data *cos_data,
-					      u32 pri_join_mask,
-					      u8 num_of_dif_pri)
+					      uint32_t pri_join_mask,
+					      uint8_t num_of_dif_pri)
 {
-	u8 i = 0;
-	u32 pri_tested = 0;
-	u32 pri_mask_without_pri = 0;
-	u32 *ttp = bp->dcbx_port_params.app.traffic_type_priority;
+	uint8_t i = 0;
+	uint32_t pri_tested = 0;
+	uint32_t pri_mask_without_pri = 0;
+	uint32_t *ttp = bp->dcbx_port_params.app.traffic_type_priority;
 	/*debug*/
 	if (num_of_dif_pri == 1) {
 		bnx2x_dcbx_ets_disabled_entry_data(bp, cos_data, pri_join_mask);
@@ -1252,7 +1257,7 @@ static void bnx2x_dcbx_2cos_limit_cee_single_pg_to_cos_params(struct bnx2x *bp,
 			cos_data->data[0].pausable = true;
 			/* All priorities except FCOE */
 			cos_data->data[0].pri_join_mask = (pri_join_mask &
-				((u8)~(1 << ttp[LLFC_TRAFFIC_TYPE_FCOE])));
+				((uint8_t)~(1 << ttp[LLFC_TRAFFIC_TYPE_FCOE])));
 			/* Only FCOE priority.*/
 			cos_data->data[1].pri_join_mask =
 				(1 << ttp[LLFC_TRAFFIC_TYPE_FCOE]);
@@ -1303,7 +1308,7 @@ static void bnx2x_dcbx_2cos_limit_cee_single_pg_to_cos_params(struct bnx2x *bp,
 					app.traffic_type_priority[i];
 				/* Remove priority tested */
 				pri_mask_without_pri =
-					(pri_join_mask & ((u8)(~pri_tested)));
+					(pri_join_mask & ((uint8_t)(~pri_tested)));
 				if (pri_mask_without_pri < pri_tested)
 					break;
 			}
@@ -1331,12 +1336,12 @@ static void bnx2x_dcbx_2cos_limit_cee_two_pg_to_cos_params(
 			    struct  pg_help_data	*pg_help_data,
 			    struct dcbx_ets_feature	*ets,
 			    struct cos_help_data	*cos_data,
-			    u32			*pg_pri_orginal_spread,
-			    u32				pri_join_mask,
-			    u8				num_of_dif_pri)
+			    uint32_t			*pg_pri_orginal_spread,
+			    uint32_t				pri_join_mask,
+			    uint8_t				num_of_dif_pri)
 {
-	u8 i = 0;
-	u8 pg[DCBX_COS_MAX_NUM_E2] = { 0 };
+	uint8_t i = 0;
+	uint8_t pg[DCBX_COS_MAX_NUM_E2] = { 0 };
 
 	/* If there are both pauseable and non-pauseable priorities,
 	 * the pauseable priorities go to the first queue and
@@ -1406,11 +1411,11 @@ static int bnx2x_dcbx_join_pgs(
 			      struct bnx2x            *bp,
 			      struct dcbx_ets_feature *ets,
 			      struct pg_help_data     *pg_help_data,
-			      u8                      required_num_of_pg)
+			      uint8_t                      required_num_of_pg)
 {
-	u8 entry_joined    = pg_help_data->num_of_pg - 1;
-	u8 entry_removed   = entry_joined + 1;
-	u8 pg_joined       = 0;
+	uint8_t entry_joined    = pg_help_data->num_of_pg - 1;
+	uint8_t entry_removed   = entry_joined + 1;
+	uint8_t pg_joined       = 0;
 
 	if (required_num_of_pg == 0 || ARRAY_SIZE(pg_help_data->data)
 						<= pg_help_data->num_of_pg) {
@@ -1458,16 +1463,16 @@ static void bnx2x_dcbx_2cos_limit_cee_three_pg_to_cos_params(
 			      struct pg_help_data	*pg_help_data,
 			      struct dcbx_ets_feature	*ets,
 			      struct cos_help_data	*cos_data,
-			      u32			*pg_pri_orginal_spread,
-			      u32			pri_join_mask,
-			      u8			num_of_dif_pri)
+			      uint32_t			*pg_pri_orginal_spread,
+			      uint32_t			pri_join_mask,
+			      uint8_t			num_of_dif_pri)
 {
-	u8 i = 0;
-	u32 pri_tested = 0;
-	u8 entry = 0;
-	u8 pg_entry = 0;
+	uint8_t i = 0;
+	uint32_t pri_tested = 0;
+	uint8_t entry = 0;
+	uint8_t pg_entry = 0;
 	bool b_found_strict = false;
-	u8 num_of_pri = LLFC_DRIVER_TRAFFIC_TYPE_MAX;
+	uint8_t num_of_pri = LLFC_DRIVER_TRAFFIC_TYPE_MAX;
 
 	cos_data->data[0].pri_join_mask = cos_data->data[1].pri_join_mask = 0;
 	/* If there are both pauseable and non-pauseable priorities,
@@ -1501,7 +1506,7 @@ static void bnx2x_dcbx_2cos_limit_cee_three_pg_to_cos_params(
 		for (i = 0 ; i < num_of_pri; i++) {
 			pri_tested = 1 << bp->dcbx_port_params.
 				app.traffic_type_priority[i];
-			pg_entry = (u8)pg_pri_orginal_spread[bp->
+			pg_entry = (uint8_t)pg_pri_orginal_spread[bp->
 				dcbx_port_params.app.traffic_type_priority[i]];
 
 			if (pg_entry < DCBX_MAX_NUM_PG_BW_ENTRIES) {
@@ -1537,9 +1542,9 @@ static void bnx2x_dcbx_2cos_limit_cee_fill_cos_params(struct bnx2x *bp,
 				       struct pg_help_data *help_data,
 				       struct dcbx_ets_feature *ets,
 				       struct cos_help_data *cos_data,
-				       u32 *pg_pri_orginal_spread,
-				       u32 pri_join_mask,
-				       u8 num_of_dif_pri)
+				       uint32_t *pg_pri_orginal_spread,
+				       uint32_t pri_join_mask,
+				       uint8_t num_of_dif_pri)
 {
 	/* default E2 settings */
 	cos_data->num_of_cos = DCBX_COS_MAX_NUM_E2;
@@ -1583,13 +1588,13 @@ static void bnx2x_dcbx_2cos_limit_cee_fill_cos_params(struct bnx2x *bp,
 
 static int bnx2x_dcbx_spread_strict_pri(struct bnx2x *bp,
 					struct cos_help_data *cos_data,
-					u8 entry,
-					u8 num_spread_of_entries,
-					u8 strict_app_pris)
+					uint8_t entry,
+					uint8_t num_spread_of_entries,
+					uint8_t strict_app_pris)
 {
-	u8 strict_pri = BNX2X_DCBX_STRICT_COS_HIGHEST;
-	u8 num_of_app_pri = MAX_PFC_PRIORITIES;
-	u8 app_pri_bit = 0;
+	uint8_t strict_pri = BNX2X_DCBX_STRICT_COS_HIGHEST;
+	uint8_t num_of_app_pri = MAX_PFC_PRIORITIES;
+	uint8_t app_pri_bit = 0;
 
 	while (num_spread_of_entries && num_of_app_pri > 0) {
 		app_pri_bit = 1 << (num_of_app_pri - 1);
@@ -1630,11 +1635,11 @@ static int bnx2x_dcbx_spread_strict_pri(struct bnx2x *bp,
 	return 0;
 }
 
-static u8 bnx2x_dcbx_cee_fill_strict_pri(struct bnx2x *bp,
+static uint8_t bnx2x_dcbx_cee_fill_strict_pri(struct bnx2x *bp,
 					 struct cos_help_data *cos_data,
-					 u8 entry,
-					 u8 num_spread_of_entries,
-					 u8 strict_app_pris)
+					 uint8_t entry,
+					 uint8_t num_spread_of_entries,
+					 uint8_t strict_app_pris)
 {
 	if (bnx2x_dcbx_spread_strict_pri(bp, cos_data, entry,
 					 num_spread_of_entries,
@@ -1657,12 +1662,12 @@ static void bnx2x_dcbx_cee_fill_cos_params(struct bnx2x *bp,
 					   struct pg_help_data *help_data,
 					   struct dcbx_ets_feature *ets,
 					   struct cos_help_data *cos_data,
-					   u32 pri_join_mask)
+					   uint32_t pri_join_mask)
 
 {
-	u8 need_num_of_entries = 0;
-	u8 i = 0;
-	u8 entry = 0;
+	uint8_t need_num_of_entries = 0;
+	uint8_t i = 0;
+	uint8_t entry = 0;
 
 	/*
 	 * if the number of requested PG-s in CEE is greater than 3
@@ -1693,9 +1698,9 @@ static void bnx2x_dcbx_cee_fill_cos_params(struct bnx2x *bp,
 
 			entry++;
 		} else {
-			need_num_of_entries =  min_t(u8,
-				(u8)pg->num_of_dif_pri,
-				(u8)DCBX_COS_MAX_NUM_E3B0 -
+			need_num_of_entries =  min_t(uint8_t,
+				(uint8_t)pg->num_of_dif_pri,
+				(uint8_t)DCBX_COS_MAX_NUM_E3B0 -
 						 help_data->num_of_pg + 1);
 			/*
 			 * If there are still VOQ-s which have no associated PG,
@@ -1713,12 +1718,12 @@ static void bnx2x_dcbx_cee_fill_cos_params(struct bnx2x *bp,
 static void bnx2x_dcbx_fill_cos_params(struct bnx2x *bp,
 				       struct pg_help_data *help_data,
 				       struct dcbx_ets_feature *ets,
-				       u32 *pg_pri_orginal_spread)
+				       uint32_t *pg_pri_orginal_spread)
 {
 	struct cos_help_data         cos_data;
-	u8                    i                           = 0;
-	u32                   pri_join_mask               = 0;
-	u8                    num_of_dif_pri              = 0;
+	uint8_t                    i                           = 0;
+	uint32_t                   pri_join_mask               = 0;
+	uint8_t                    num_of_dif_pri              = 0;
 
 	memset(&cos_data, 0, sizeof(cos_data));
 
@@ -1796,8 +1801,8 @@ static void bnx2x_dcbx_fill_cos_params(struct bnx2x *bp,
 }
 
 static void bnx2x_dcbx_get_ets_pri_pg_tbl(struct bnx2x *bp,
-				u32 *set_configuration_ets_pg,
-				u32 *pri_pg_tbl)
+				uint32_t *set_configuration_ets_pg,
+				uint32_t *pri_pg_tbl)
 {
 	int i;
 
@@ -1812,10 +1817,10 @@ static void bnx2x_dcbx_get_ets_pri_pg_tbl(struct bnx2x *bp,
 static void bnx2x_dcbx_fw_struct(struct bnx2x *bp,
 				 struct bnx2x_func_tx_start_params *pfc_fw_cfg)
 {
-	u16 pri_bit = 0;
-	u8 cos = 0, pri = 0;
+	uint16_t pri_bit = 0;
+	uint8_t cos = 0, pri = 0;
 	struct priority_cos *tt2cos;
-	u32 *ttp = bp->dcbx_port_params.app.traffic_type_priority;
+	uint32_t *ttp = bp->dcbx_port_params.app.traffic_type_priority;
 	int mfw_configured = SHMEM2_HAS(bp, drv_flags) &&
 			     GET_FLAGS(SHMEM2_RD(bp, drv_flags),
 				       1 << DRV_FLAGS_DCB_MFW_CONFIGURED);
@@ -1899,14 +1904,14 @@ static inline bool bnx2x_dcbnl_set_valid(struct bnx2x *bp)
 	return bp->dcb_state && bp->dcbx_mode_uset;
 }
 
-static u8 bnx2x_dcbnl_get_state(struct net_device *netdev)
+static uint8_t bnx2x_dcbnl_get_state(struct net_device *netdev)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "state = %d\n", bp->dcb_state);
 	return bp->dcb_state;
 }
 
-static u8 bnx2x_dcbnl_set_state(struct net_device *netdev, u8 state)
+static uint8_t bnx2x_dcbnl_set_state(struct net_device *netdev, uint8_t state)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "state = %s\n", state ? "on" : "off");
@@ -1923,7 +1928,7 @@ static u8 bnx2x_dcbnl_set_state(struct net_device *netdev, u8 state)
 }
 
 static void bnx2x_dcbnl_get_perm_hw_addr(struct net_device *netdev,
-					 u8 *perm_addr)
+					 uint8_t *perm_addr)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "GET-PERM-ADDR\n");
@@ -1938,8 +1943,9 @@ static void bnx2x_dcbnl_get_perm_hw_addr(struct net_device *netdev,
 }
 
 static void bnx2x_dcbnl_set_pg_tccfg_tx(struct net_device *netdev, int prio,
-					u8 prio_type, u8 pgid, u8 bw_pct,
-					u8 up_map)
+					uint8_t prio_type, uint8_t pgid,
+					uint8_t bw_pct,
+					uint8_t up_map)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 
@@ -1965,7 +1971,7 @@ static void bnx2x_dcbnl_set_pg_tccfg_tx(struct net_device *netdev, int prio,
 }
 
 static void bnx2x_dcbnl_set_pg_bwgcfg_tx(struct net_device *netdev,
-					 int pgid, u8 bw_pct)
+					 int pgid, uint8_t bw_pct)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "pgid[%d] = %d\n", pgid, bw_pct);
@@ -1978,23 +1984,25 @@ static void bnx2x_dcbnl_set_pg_bwgcfg_tx(struct net_device *netdev,
 }
 
 static void bnx2x_dcbnl_set_pg_tccfg_rx(struct net_device *netdev, int prio,
-					u8 prio_type, u8 pgid, u8 bw_pct,
-					u8 up_map)
+					uint8_t prio_type, uint8_t pgid,
+					uint8_t bw_pct,
+					uint8_t up_map)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "Nothing to set; No RX support\n");
 }
 
 static void bnx2x_dcbnl_set_pg_bwgcfg_rx(struct net_device *netdev,
-					 int pgid, u8 bw_pct)
+					 int pgid, uint8_t bw_pct)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "Nothing to set; No RX support\n");
 }
 
 static void bnx2x_dcbnl_get_pg_tccfg_tx(struct net_device *netdev, int prio,
-					u8 *prio_type, u8 *pgid, u8 *bw_pct,
-					u8 *up_map)
+					uint8_t *prio_type, uint8_t *pgid,
+					uint8_t *bw_pct,
+					uint8_t *up_map)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "prio = %d\n", prio);
@@ -2020,7 +2028,7 @@ static void bnx2x_dcbnl_get_pg_tccfg_tx(struct net_device *netdev, int prio,
 }
 
 static void bnx2x_dcbnl_get_pg_bwgcfg_tx(struct net_device *netdev,
-					 int pgid, u8 *bw_pct)
+					 int pgid, uint8_t *bw_pct)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "pgid = %d\n", pgid);
@@ -2034,8 +2042,9 @@ static void bnx2x_dcbnl_get_pg_bwgcfg_tx(struct net_device *netdev,
 }
 
 static void bnx2x_dcbnl_get_pg_tccfg_rx(struct net_device *netdev, int prio,
-					u8 *prio_type, u8 *pgid, u8 *bw_pct,
-					u8 *up_map)
+					uint8_t *prio_type, uint8_t *pgid,
+					uint8_t *bw_pct,
+					uint8_t *up_map)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "Nothing to get; No RX support\n");
@@ -2044,7 +2053,7 @@ static void bnx2x_dcbnl_get_pg_tccfg_rx(struct net_device *netdev, int prio,
 }
 
 static void bnx2x_dcbnl_get_pg_bwgcfg_rx(struct net_device *netdev,
-					 int pgid, u8 *bw_pct)
+					 int pgid, uint8_t *bw_pct)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "Nothing to get; No RX support\n");
@@ -2053,7 +2062,7 @@ static void bnx2x_dcbnl_get_pg_bwgcfg_rx(struct net_device *netdev,
 }
 
 static void bnx2x_dcbnl_set_pfc_cfg(struct net_device *netdev, int prio,
-				    u8 setting)
+				    uint8_t setting)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "prio[%d] = %d\n", prio, setting);
@@ -2070,7 +2079,7 @@ static void bnx2x_dcbnl_set_pfc_cfg(struct net_device *netdev, int prio,
 }
 
 static void bnx2x_dcbnl_get_pfc_cfg(struct net_device *netdev, int prio,
-				    u8 *setting)
+				    uint8_t *setting)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "prio = %d\n", prio);
@@ -2083,7 +2092,7 @@ static void bnx2x_dcbnl_get_pfc_cfg(struct net_device *netdev, int prio,
 	*setting = (bp->dcbx_local_feat.pfc.pri_en_bitmap >> prio) & 0x1;
 }
 
-static u8 bnx2x_dcbnl_set_all(struct net_device *netdev)
+static uint8_t bnx2x_dcbnl_set_all(struct net_device *netdev)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 
@@ -2108,10 +2117,11 @@ static u8 bnx2x_dcbnl_set_all(struct net_device *netdev)
 	return 0;
 }
 
-static u8 bnx2x_dcbnl_get_cap(struct net_device *netdev, int capid, u8 *cap)
+static uint8_t bnx2x_dcbnl_get_cap(struct net_device *netdev, int capid,
+				   uint8_t *cap)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
-	u8 rval = 0;
+	uint8_t rval = 0;
 
 	if (bp->dcb_state) {
 		switch (capid) {
@@ -2153,10 +2163,11 @@ static u8 bnx2x_dcbnl_get_cap(struct net_device *netdev, int capid, u8 *cap)
 	return rval;
 }
 
-static int bnx2x_dcbnl_get_numtcs(struct net_device *netdev, int tcid, u8 *num)
+static int bnx2x_dcbnl_get_numtcs(struct net_device *netdev, int tcid,
+				  uint8_t *num)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
-	u8 rval = 0;
+	uint8_t rval = 0;
 
 	DP(BNX2X_MSG_DCB, "tcid %d\n", tcid);
 
@@ -2183,14 +2194,15 @@ static int bnx2x_dcbnl_get_numtcs(struct net_device *netdev, int tcid, u8 *num)
 	return rval;
 }
 
-static int bnx2x_dcbnl_set_numtcs(struct net_device *netdev, int tcid, u8 num)
+static int bnx2x_dcbnl_set_numtcs(struct net_device *netdev, int tcid,
+				  uint8_t num)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "num tcs = %d; Not supported\n", num);
 	return -EINVAL;
 }
 
-static u8 bnx2x_dcbnl_get_pfc_state(struct net_device *netdev)
+static uint8_t bnx2x_dcbnl_get_pfc_state(struct net_device *netdev)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "state = %d\n", bp->dcbx_local_feat.pfc.enabled);
@@ -2201,7 +2213,8 @@ static u8 bnx2x_dcbnl_get_pfc_state(struct net_device *netdev)
 	return bp->dcbx_local_feat.pfc.enabled;
 }
 
-static void bnx2x_dcbnl_set_pfc_state(struct net_device *netdev, u8 state)
+static void bnx2x_dcbnl_set_pfc_state(struct net_device *netdev,
+				      uint8_t state)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "state = %s\n", state ? "on" : "off");
@@ -2215,7 +2228,7 @@ static void bnx2x_dcbnl_set_pfc_state(struct net_device *netdev, u8 state)
 
 static void bnx2x_admin_app_set_ent(
 	struct bnx2x_admin_priority_app_table *app_ent,
-	u8 idtype, u16 idval, u8 up)
+	uint8_t idtype, uint16_t idval, uint8_t up)
 {
 	app_ent->valid = 1;
 
@@ -2235,7 +2248,7 @@ static void bnx2x_admin_app_set_ent(
 
 static bool bnx2x_admin_app_is_equal(
 	struct bnx2x_admin_priority_app_table *app_ent,
-	u8 idtype, u16 idval)
+	uint8_t idtype, uint16_t idval)
 {
 	if (!app_ent->valid)
 		return false;
@@ -2258,7 +2271,8 @@ static bool bnx2x_admin_app_is_equal(
 	return true;
 }
 
-static int bnx2x_set_admin_app_up(struct bnx2x *bp, u8 idtype, u16 idval, u8 up)
+static int bnx2x_set_admin_app_up(struct bnx2x *bp, uint8_t idtype,
+				  uint16_t idval, uint8_t up)
 {
 	int i, ff;
 
@@ -2294,8 +2308,8 @@ static int bnx2x_set_admin_app_up(struct bnx2x *bp, u8 idtype, u16 idval, u8 up)
 	return 0;
 }
 
-static int bnx2x_dcbnl_set_app_up(struct net_device *netdev, u8 idtype,
-				  u16 idval, u8 up)
+static int bnx2x_dcbnl_set_app_up(struct net_device *netdev, uint8_t idtype,
+				  uint16_t idval, uint8_t up)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 
@@ -2319,10 +2333,10 @@ static int bnx2x_dcbnl_set_app_up(struct net_device *netdev, u8 idtype,
 	return bnx2x_set_admin_app_up(bp, idtype, idval, up);
 }
 
-static u8 bnx2x_dcbnl_get_dcbx(struct net_device *netdev)
+static uint8_t bnx2x_dcbnl_get_dcbx(struct net_device *netdev)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
-	u8 state;
+	uint8_t state;
 
 	state = DCB_CAP_DCBX_LLD_MANAGED | DCB_CAP_DCBX_VER_CEE;
 
@@ -2332,7 +2346,7 @@ static u8 bnx2x_dcbnl_get_dcbx(struct net_device *netdev)
 	return state;
 }
 
-static u8 bnx2x_dcbnl_set_dcbx(struct net_device *netdev, u8 state)
+static uint8_t bnx2x_dcbnl_set_dcbx(struct net_device *netdev, uint8_t state)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "state = %02x\n", state);
@@ -2359,11 +2373,11 @@ static u8 bnx2x_dcbnl_set_dcbx(struct net_device *netdev, u8 state)
 	return 0;
 }
 
-static u8 bnx2x_dcbnl_get_featcfg(struct net_device *netdev, int featid,
-				  u8 *flags)
+static uint8_t bnx2x_dcbnl_get_featcfg(struct net_device *netdev, int featid,
+				  uint8_t *flags)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
-	u8 rval = 0;
+	uint8_t rval = 0;
 
 	DP(BNX2X_MSG_DCB, "featid %d\n", featid);
 
@@ -2406,11 +2420,11 @@ static u8 bnx2x_dcbnl_get_featcfg(struct net_device *netdev, int featid,
 	return rval;
 }
 
-static u8 bnx2x_dcbnl_set_featcfg(struct net_device *netdev, int featid,
-				  u8 flags)
+static uint8_t bnx2x_dcbnl_set_featcfg(struct net_device *netdev, int featid,
+				  uint8_t flags)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
-	u8 rval = 0;
+	uint8_t rval = 0;
 
 	DP(BNX2X_MSG_DCB, "featid = %d flags = %02x\n", featid, flags);
 
@@ -2448,7 +2462,8 @@ static u8 bnx2x_dcbnl_set_featcfg(struct net_device *netdev, int featid,
 }
 
 static int bnx2x_peer_appinfo(struct net_device *netdev,
-			      struct dcb_peer_app_info *info, u16* app_count)
+			      struct dcb_peer_app_info *info,
+			      uint16_t* app_count)
 {
 	int i;
 	struct bnx2x *bp = netdev_priv(netdev);

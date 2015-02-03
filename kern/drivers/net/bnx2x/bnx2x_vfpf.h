@@ -22,17 +22,17 @@
 
 /* Common definitions for all HVs */
 struct vf_pf_resc_request {
-	u8  num_rxqs;
-	u8  num_txqs;
-	u8  num_sbs;
-	u8  num_mac_filters;
-	u8  num_vlan_filters;
-	u8  num_mc_filters; /* No limit  so superfluous */
+	uint8_t  num_rxqs;
+	uint8_t  num_txqs;
+	uint8_t  num_sbs;
+	uint8_t  num_mac_filters;
+	uint8_t  num_vlan_filters;
+	uint8_t  num_mc_filters; /* No limit  so superfluous */
 };
 
 struct hw_sb_info {
-	u8 hw_sb_id;	/* aka absolute igu id, used to ack the sb */
-	u8 sb_qid;	/* used to update DHC for sb */
+	uint8_t hw_sb_id;	/* aka absolute igu id, used to ack the sb */
+	uint8_t sb_qid;	/* used to update DHC for sb */
 };
 
 /* HW VF-PF channel definitions
@@ -80,8 +80,8 @@ enum {
 /* vf pf channel tlvs */
 /* general tlv header (used for both vf->pf request and pf->vf response) */
 struct channel_tlv {
-	u16 type;
-	u16 length;
+	uint16_t type;
+	uint16_t length;
 };
 
 /* header of first vf->pf tlv carries the offset used to calculate response
@@ -89,14 +89,14 @@ struct channel_tlv {
  */
 struct vfpf_first_tlv {
 	struct channel_tlv tl;
-	u32 resp_msg_offset;
+	uint32_t resp_msg_offset;
 };
 
 /* header of pf->vf tlvs, carries the status of handling the request */
 struct pfvf_tlv {
 	struct channel_tlv tl;
-	u8 status;
-	u8 padding[3];
+	uint8_t status;
+	uint8_t padding[3];
 };
 
 /* response tlv used for most tlvs */
@@ -107,7 +107,7 @@ struct pfvf_general_resp_tlv {
 /* used to terminate and pad a tlv list */
 struct channel_list_end_tlv {
 	struct channel_tlv tl;
-	u8 padding[4];
+	uint8_t padding[4];
 };
 
 /* Acquire */
@@ -116,16 +116,16 @@ struct vfpf_acquire_tlv {
 
 	struct vf_pf_vfdev_info {
 		/* the following fields are for debug purposes */
-		u8  vf_id;		/* ME register value */
-		u8  vf_os;		/* e.g. Linux, W2K8 */
+		uint8_t  vf_id;		/* ME register value */
+		uint8_t  vf_os;		/* e.g. Linux, W2K8 */
 #define VF_OS_SUBVERSION_MASK	(0x1f)
 #define VF_OS_MASK		(0xe0)
 #define VF_OS_SHIFT		(5)
 #define VF_OS_UNDEFINED		(0 << VF_OS_SHIFT)
 #define VF_OS_WINDOWS		(1 << VF_OS_SHIFT)
 
-		u8 fp_hsi_ver;
-		u8 caps;
+		uint8_t fp_hsi_ver;
+		uint8_t caps;
 #define VF_CAP_SUPPORT_EXT_BULLETIN	(1 << 0)
 	} vfdev_info;
 
@@ -137,14 +137,14 @@ struct vfpf_acquire_tlv {
 /* simple operation request on queue */
 struct vfpf_q_op_tlv {
 	struct vfpf_first_tlv	first_tlv;
-	u8 vf_qid;
-	u8 padding[3];
+	uint8_t vf_qid;
+	uint8_t padding[3];
 };
 
 /* receive side scaling tlv */
 struct vfpf_rss_tlv {
 	struct vfpf_first_tlv	first_tlv;
-	u32			rss_flags;
+	uint32_t			rss_flags;
 #define VFPF_RSS_MODE_DISABLED	(1 << 0)
 #define VFPF_RSS_MODE_REGULAR	(1 << 1)
 #define VFPF_RSS_SET_SRCH	(1 << 2)
@@ -154,28 +154,28 @@ struct vfpf_rss_tlv {
 #define VFPF_RSS_IPV6		(1 << 6)
 #define VFPF_RSS_IPV6_TCP	(1 << 7)
 #define VFPF_RSS_IPV6_UDP	(1 << 8)
-	u8			rss_result_mask;
-	u8			ind_table_size;
-	u8			rss_key_size;
-	u8			padding;
-	u8			ind_table[T_ETH_INDIRECTION_TABLE_SIZE];
-	u32			rss_key[T_ETH_RSS_KEY];	/* hash values */
+	uint8_t			rss_result_mask;
+	uint8_t			ind_table_size;
+	uint8_t			rss_key_size;
+	uint8_t			padding;
+	uint8_t			ind_table[T_ETH_INDIRECTION_TABLE_SIZE];
+	uint32_t			rss_key[T_ETH_RSS_KEY];	/* hash values */
 };
 
 /* acquire response tlv - carries the allocated resources */
 struct pfvf_acquire_resp_tlv {
 	struct pfvf_tlv hdr;
 	struct pf_vf_pfdev_info {
-		u32 chip_num;
-		u32 pf_cap;
+		uint32_t chip_num;
+		uint32_t pf_cap;
 #define PFVF_CAP_RSS		0x00000001
 #define PFVF_CAP_DHC		0x00000002
 #define PFVF_CAP_TPA		0x00000004
 #define PFVF_CAP_TPA_UPDATE	0x00000008
 		char fw_ver[32];
-		u16 db_size;
-		u8  indices_per_sb;
-		u8  padding;
+		uint16_t db_size;
+		uint8_t  indices_per_sb;
+		uint8_t  padding;
 	} pfdev_info;
 	struct pf_vf_resc {
 		/* in case of status NO_RESOURCE in message hdr, pf will fill
@@ -185,29 +185,29 @@ struct pfvf_acquire_resp_tlv {
 #define PFVF_MAX_QUEUES_PER_VF         16
 #define PFVF_MAX_SBS_PER_VF            16
 		struct hw_sb_info hw_sbs[PFVF_MAX_SBS_PER_VF];
-		u8	hw_qid[PFVF_MAX_QUEUES_PER_VF];
-		u8	num_rxqs;
-		u8	num_txqs;
-		u8	num_sbs;
-		u8	num_mac_filters;
-		u8	num_vlan_filters;
-		u8	num_mc_filters;
-		u8	permanent_mac_addr[ETH_ALEN];
-		u8	current_mac_addr[ETH_ALEN];
-		u8	padding[2];
+		uint8_t	hw_qid[PFVF_MAX_QUEUES_PER_VF];
+		uint8_t	num_rxqs;
+		uint8_t	num_txqs;
+		uint8_t	num_sbs;
+		uint8_t	num_mac_filters;
+		uint8_t	num_vlan_filters;
+		uint8_t	num_mc_filters;
+		uint8_t	permanent_mac_addr[ETH_ALEN];
+		uint8_t	current_mac_addr[ETH_ALEN];
+		uint8_t	padding[2];
 	} resc;
 };
 
 struct vfpf_port_phys_id_resp_tlv {
 	struct channel_tlv tl;
-	u8 id[ETH_ALEN];
-	u8 padding[2];
+	uint8_t id[ETH_ALEN];
+	uint8_t padding[2];
 };
 
 struct vfpf_fp_hsi_resp_tlv {
 	struct channel_tlv tl;
-	u8 is_supported;
-	u8 padding[3];
+	uint8_t is_supported;
+	uint8_t padding[3];
 };
 
 #define VFPF_INIT_FLG_STATS_COALESCE	(1 << 0) /* when set the VFs queues
@@ -221,9 +221,9 @@ struct vfpf_init_tlv {
 	aligned_u64 sb_addr[PFVF_MAX_SBS_PER_VF]; /* vf_sb based */
 	aligned_u64 spq_addr;
 	aligned_u64 stats_addr;
-	u16 stats_stride;
-	u32 flags;
-	u32 padding[2];
+	uint16_t stats_stride;
+	uint32_t flags;
+	uint32_t padding[2];
 };
 
 /* Setup Queue */
@@ -238,27 +238,27 @@ struct vfpf_setup_q_tlv {
 		aligned_u64 sge_addr;
 
 		/* sb + hc info */
-		u8  vf_sb;		/* index in hw_sbs[] */
-		u8  sb_index;		/* Index in the SB */
-		u16 hc_rate;		/* desired interrupts per sec. */
+		uint8_t  vf_sb;		/* index in hw_sbs[] */
+		uint8_t  sb_index;		/* Index in the SB */
+		uint16_t hc_rate;		/* desired interrupts per sec. */
 					/* valid iff VFPF_QUEUE_FLG_HC */
 		/* rx buffer info */
-		u16 mtu;
-		u16 buf_sz;
-		u16 flags;		/* VFPF_QUEUE_FLG_X flags */
-		u16 stat_id;		/* valid iff VFPF_QUEUE_FLG_STATS */
+		uint16_t mtu;
+		uint16_t buf_sz;
+		uint16_t flags;		/* VFPF_QUEUE_FLG_X flags */
+		uint16_t stat_id;		/* valid iff VFPF_QUEUE_FLG_STATS */
 
 		/* valid iff VFPF_QUEUE_FLG_TPA */
-		u16 sge_buf_sz;
-		u16 tpa_agg_sz;
-		u8 max_sge_pkt;
+		uint16_t sge_buf_sz;
+		uint16_t tpa_agg_sz;
+		uint8_t max_sge_pkt;
 
-		u8 drop_flags;		/* VFPF_QUEUE_DROP_X, for Linux VMs
+		uint8_t drop_flags;		/* VFPF_QUEUE_DROP_X, for Linux VMs
 					 * all the flags are turned off
 					 */
 
-		u8 cache_line_log;	/* VFPF_QUEUE_FLG_CACHE_ALIGN */
-		u8 padding;
+		uint8_t cache_line_log;	/* VFPF_QUEUE_FLG_CACHE_ALIGN */
+		uint8_t padding;
 	} rxq;
 
 	struct vf_pf_txq_params {
@@ -266,46 +266,46 @@ struct vfpf_setup_q_tlv {
 		aligned_u64 txq_addr;
 
 		/* sb + hc info */
-		u8  vf_sb;		/* index in hw_sbs[] */
-		u8  sb_index;		/* Index in the SB */
-		u16 hc_rate;		/* desired interrupts per sec. */
+		uint8_t  vf_sb;		/* index in hw_sbs[] */
+		uint8_t  sb_index;		/* Index in the SB */
+		uint16_t hc_rate;		/* desired interrupts per sec. */
 					/* valid iff VFPF_QUEUE_FLG_HC */
-		u32 flags;		/* VFPF_QUEUE_FLG_X flags */
-		u16 stat_id;		/* valid iff VFPF_QUEUE_FLG_STATS */
-		u8  traffic_type;	/* see in setup_context() */
-		u8  padding;
+		uint32_t flags;		/* VFPF_QUEUE_FLG_X flags */
+		uint16_t stat_id;		/* valid iff VFPF_QUEUE_FLG_STATS */
+		uint8_t  traffic_type;	/* see in setup_context() */
+		uint8_t  padding;
 	} txq;
 
-	u8 vf_qid;			/* index in hw_qid[] */
-	u8 param_valid;
+	uint8_t vf_qid;			/* index in hw_qid[] */
+	uint8_t param_valid;
 #define VFPF_RXQ_VALID		0x01
 #define VFPF_TXQ_VALID		0x02
-	u8 padding[2];
+	uint8_t padding[2];
 };
 
 /* Set Queue Filters */
 struct vfpf_q_mac_vlan_filter {
-	u32 flags;
+	uint32_t flags;
 #define VFPF_Q_FILTER_DEST_MAC_VALID	0x01
 #define VFPF_Q_FILTER_VLAN_TAG_VALID	0x02
 #define VFPF_Q_FILTER_SET_MAC		0x100	/* set/clear */
-	u8  mac[ETH_ALEN];
-	u16 vlan_tag;
+	uint8_t  mac[ETH_ALEN];
+	uint16_t vlan_tag;
 };
 
 /* configure queue filters */
 struct vfpf_set_q_filters_tlv {
 	struct vfpf_first_tlv first_tlv;
 
-	u32 flags;
+	uint32_t flags;
 #define VFPF_SET_Q_FILTERS_MAC_VLAN_CHANGED	0x01
 #define VFPF_SET_Q_FILTERS_MULTICAST_CHANGED	0x02
 #define VFPF_SET_Q_FILTERS_RX_MASK_CHANGED	0x04
 
-	u8 vf_qid;			/* index in hw_qid[] */
-	u8 n_mac_vlan_filters;
-	u8 n_multicast;
-	u8 padding;
+	uint8_t vf_qid;			/* index in hw_qid[] */
+	uint8_t n_mac_vlan_filters;
+	uint8_t n_multicast;
+	uint8_t padding;
 
 #define PFVF_MAX_MAC_FILTERS                   16
 #define PFVF_MAX_VLAN_FILTERS                  16
@@ -314,9 +314,9 @@ struct vfpf_set_q_filters_tlv {
 	struct vfpf_q_mac_vlan_filter filters[PFVF_MAX_FILTERS];
 
 #define PFVF_MAX_MULTICAST_PER_VF              32
-	u8  multicast[PFVF_MAX_MULTICAST_PER_VF][ETH_ALEN];
+	uint8_t  multicast[PFVF_MAX_MULTICAST_PER_VF][ETH_ALEN];
 
-	u32 rx_mask;	/* see mask constants at the top of the file */
+	uint32_t rx_mask;	/* see mask constants at the top of the file */
 };
 
 struct vfpf_tpa_tlv {
@@ -324,36 +324,36 @@ struct vfpf_tpa_tlv {
 
 	struct vf_pf_tpa_client_info {
 		aligned_u64 sge_addr[PFVF_MAX_QUEUES_PER_VF];
-		u8 update_ipv4;
-		u8 update_ipv6;
-		u8 max_tpa_queues;
-		u8 max_sges_for_packet;
-		u8 complete_on_both_clients;
-		u8 dont_verify_thr;
-		u8 tpa_mode;
-		u16 sge_buff_size;
-		u16 max_agg_size;
-		u16 sge_pause_thr_low;
-		u16 sge_pause_thr_high;
+		uint8_t update_ipv4;
+		uint8_t update_ipv6;
+		uint8_t max_tpa_queues;
+		uint8_t max_sges_for_packet;
+		uint8_t complete_on_both_clients;
+		uint8_t dont_verify_thr;
+		uint8_t tpa_mode;
+		uint16_t sge_buff_size;
+		uint16_t max_agg_size;
+		uint16_t sge_pause_thr_low;
+		uint16_t sge_pause_thr_high;
 	} tpa_client_info;
 };
 
 /* close VF (disable VF) */
 struct vfpf_close_tlv {
 	struct vfpf_first_tlv   first_tlv;
-	u16			vf_id;  /* for debug */
-	u8 padding[2];
+	uint16_t			vf_id;  /* for debug */
+	uint8_t padding[2];
 };
 
 /* release the VF's acquired resources */
 struct vfpf_release_tlv {
 	struct vfpf_first_tlv	first_tlv;
-	u16			vf_id;
-	u8 padding[2];
+	uint16_t			vf_id;
+	uint8_t padding[2];
 };
 
 struct tlv_buffer_size {
-	u8 tlv_buffer[TLV_BUFFER_SIZE];
+	uint8_t tlv_buffer[TLV_BUFFER_SIZE];
 };
 
 union vfpf_tlvs {
@@ -384,15 +384,15 @@ union pfvf_tlvs {
  * loss of data upon multiple updates (or the need for read modify write)).
  */
 struct pf_vf_bulletin_size {
-	u8 size[PF_VF_BULLETIN_SIZE];
+	uint8_t size[PF_VF_BULLETIN_SIZE];
 };
 
 struct pf_vf_bulletin_content {
-	u32 crc;			/* crc of structure to ensure is not in
+	uint32_t crc;			/* crc of structure to ensure is not in
 					 * mid-update
 					 */
-	u16 version;
-	u16 length;
+	uint16_t version;
+	uint16_t length;
 
 	aligned_u64 valid_bitmap;	/* bitmap indicating which fields
 					 * hold valid values
@@ -411,20 +411,20 @@ struct pf_vf_bulletin_content {
 #define LINK_VALID		3	/* alert the VF thet a new link status
 					 * update is available for it
 					 */
-	u8 mac[ETH_ALEN];
-	u8 mac_padding[2];
+	uint8_t mac[ETH_ALEN];
+	uint8_t mac_padding[2];
 
-	u16 vlan;
-	u8 vlan_padding[6];
+	uint16_t vlan;
+	uint8_t vlan_padding[6];
 
-	u16 link_speed;			 /* Effective line speed */
-	u8 link_speed_padding[6];
-	u32 link_flags;			 /* VFPF_LINK_REPORT_XXX flags */
+	uint16_t link_speed;			 /* Effective line speed */
+	uint8_t link_speed_padding[6];
+	uint32_t link_flags;			 /* VFPF_LINK_REPORT_XXX flags */
 #define VFPF_LINK_REPORT_LINK_DOWN	 (1 << 0)
 #define VFPF_LINK_REPORT_FULL_DUPLEX	 (1 << 1)
 #define VFPF_LINK_REPORT_RX_FC_ON	 (1 << 2)
 #define VFPF_LINK_REPORT_TX_FC_ON	 (1 << 3)
-	u8 link_flags_padding[4];
+	uint8_t link_flags_padding[4];
 };
 
 union pf_vf_bulletin {

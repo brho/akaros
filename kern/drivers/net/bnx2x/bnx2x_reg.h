@@ -7610,17 +7610,17 @@ Theotherbitsarereservedandshouldbezero*/
  *	   Code was translated from Verilog.
  * Return:
  *****************************************************************************/
-static inline u8 calc_crc8(u32 data, u8 crc)
+static inline uint8_t calc_crc8(uint32_t data, uint8_t crc)
 {
-	u8 D[32];
-	u8 NewCRC[8];
-	u8 C[8];
-	u8 crc_res;
-	u8 i;
+	uint8_t D[32];
+	uint8_t NewCRC[8];
+	uint8_t C[8];
+	uint8_t crc_res;
+	uint8_t i;
 
 	/* split the data into 31 bits */
 	for (i = 0; i < 32; i++) {
-		D[i] = (u8)(data & 1);
+		D[i] = (uint8_t)(data & 1);
 		data = data >> 1;
 	}
 

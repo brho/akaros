@@ -40,32 +40,33 @@
 #define ILOG2(x)	x
 #endif
 
-static int bnx2x_gunzip(struct bnx2x *bp, const u8 *zbuf, int len);
-static void bnx2x_reg_wr_ind(struct bnx2x *bp, u32 addr, u32 val);
+static int bnx2x_gunzip(struct bnx2x *bp, const uint8_t *zbuf, int len);
+static void bnx2x_reg_wr_ind(struct bnx2x *bp, uint32_t addr, uint32_t val);
 static void bnx2x_write_dmae_phys_len(struct bnx2x *bp,
-				      dma_addr_t phys_addr, u32 addr,
-				      u32 len);
+				      dma_addr_t phys_addr, uint32_t addr,
+				      uint32_t len);
 
-static void bnx2x_init_str_wr(struct bnx2x *bp, u32 addr,
-			      const u32 *data, u32 len)
+static void bnx2x_init_str_wr(struct bnx2x *bp, uint32_t addr,
+			      const uint32_t *data, uint32_t len)
 {
-	u32 i;
+	uint32_t i;
 
 	for (i = 0; i < len; i++)
 		REG_WR(bp, addr + i*4, data[i]);
 }
 
-static void bnx2x_init_ind_wr(struct bnx2x *bp, u32 addr,
-			      const u32 *data, u32 len)
+static void bnx2x_init_ind_wr(struct bnx2x *bp, uint32_t addr,
+			      const uint32_t *data, uint32_t len)
 {
-	u32 i;
+	uint32_t i;
 
 	for (i = 0; i < len; i++)
 		bnx2x_reg_wr_ind(bp, addr + i*4, data[i]);
 }
 
-static void bnx2x_write_big_buf(struct bnx2x *bp, u32 addr, u32 len,
-				u8 wb)
+static void bnx2x_write_big_buf(struct bnx2x *bp, uint32_t addr,
+				uint32_t len,
+				uint8_t wb)
 {
 	if (bp->dmae_ready)
 		bnx2x_write_dmae_phys_len(bp, GUNZIP_PHYS(bp), addr, len);
@@ -79,23 +80,24 @@ static void bnx2x_write_big_buf(struct bnx2x *bp, u32 addr, u32 len,
 		bnx2x_init_str_wr(bp, addr, GUNZIP_BUF(bp), len);
 }
 
-static void bnx2x_init_fill(struct bnx2x *bp, u32 addr, int fill,
-			    u32 len, u8 wb)
+static void bnx2x_init_fill(struct bnx2x *bp, uint32_t addr, int fill,
+			    uint32_t len, uint8_t wb)
 {
-	u32 buf_len = (((len*4) > FW_BUF_SIZE) ? FW_BUF_SIZE : (len*4));
-	u32 buf_len32 = buf_len/4;
-	u32 i;
+	uint32_t buf_len = (((len*4) > FW_BUF_SIZE) ? FW_BUF_SIZE : (len*4));
+	uint32_t buf_len32 = buf_len/4;
+	uint32_t i;
 
-	memset(GUNZIP_BUF(bp), (u8)fill, buf_len);
+	memset(GUNZIP_BUF(bp), (uint8_t)fill, buf_len);
 
 	for (i = 0; i < len; i += buf_len32) {
-		u32 cur_len = min(buf_len32, len - i);
+		uint32_t cur_len = min(buf_len32, len - i);
 
 		bnx2x_write_big_buf(bp, addr + i*4, cur_len, wb);
 	}
 }
 
-static void bnx2x_write_big_buf_wb(struct bnx2x *bp, u32 addr, u32 len)
+static void bnx2x_write_big_buf_wb(struct bnx2x *bp, uint32_t addr,
+				   uint32_t len)
 {
 	if (bp->dmae_ready)
 		bnx2x_write_dmae_phys_len(bp, GUNZIP_PHYS(bp), addr, len);
@@ -109,26 +111,26 @@ static void bnx2x_write_big_buf_wb(struct bnx2x *bp, u32 addr, u32 len)
 		bnx2x_init_str_wr(bp, addr, GUNZIP_BUF(bp), len);
 }
 
-static void bnx2x_init_wr_64(struct bnx2x *bp, u32 addr,
-			     const u32 *data, u32 len64)
+static void bnx2x_init_wr_64(struct bnx2x *bp, uint32_t addr,
+			     const uint32_t *data, uint32_t len64)
 {
-	u32 buf_len32 = FW_BUF_SIZE/4;
-	u32 len = len64*2;
-	u64 data64 = 0;
-	u32 i;
+	uint32_t buf_len32 = FW_BUF_SIZE/4;
+	uint32_t len = len64*2;
+	uint64_t data64 = 0;
+	uint32_t i;
 
 	/* 64 bit value is in a blob: first low DWORD, then high DWORD */
 	data64 = HILO_U64((*(data + 1)), (*data));
 
-	len64 = min((u32)(FW_BUF_SIZE/8), len64);
+	len64 = min((uint32_t)(FW_BUF_SIZE/8), len64);
 	for (i = 0; i < len64; i++) {
-		u64 *pdata = ((u64 *)(GUNZIP_BUF(bp))) + i;
+		uint64_t *pdata = ((uint64_t *)(GUNZIP_BUF(bp))) + i;
 
 		*pdata = data64;
 	}
 
 	for (i = 0; i < len; i += buf_len32) {
-		u32 cur_len = min(buf_len32, len - i);
+		uint32_t cur_len = min(buf_len32, len - i);
 
 		bnx2x_write_big_buf_wb(bp, addr + i*4, cur_len);
 	}
@@ -148,8 +150,8 @@ static void bnx2x_init_wr_64(struct bnx2x *bp, u32 addr,
 #define IF_IS_PRAM_ADDR(base, addr) \
 			if (((base) <= (addr)) && ((base) + 0x40000 >= (addr)))
 
-static const u8 *bnx2x_sel_blob(struct bnx2x *bp, u32 addr,
-				const u8 *data)
+static const uint8_t *bnx2x_sel_blob(struct bnx2x *bp, uint32_t addr,
+				const uint8_t *data)
 {
 	IF_IS_INT_TABLE_ADDR(TSEM_REG_INT_TABLE, addr)
 		data = INIT_TSEM_INT_TABLE_DATA(bp);
@@ -178,8 +180,8 @@ static const u8 *bnx2x_sel_blob(struct bnx2x *bp, u32 addr,
 	return data;
 }
 
-static void bnx2x_init_wr_wb(struct bnx2x *bp, u32 addr,
-			     const u32 *data, u32 len)
+static void bnx2x_init_wr_wb(struct bnx2x *bp, uint32_t addr,
+			     const uint32_t *data, uint32_t len)
 {
 	if (bp->dmae_ready)
 		VIRT_WR_DMAE_LEN(bp, data, addr, len, 0);
@@ -193,21 +195,21 @@ static void bnx2x_init_wr_wb(struct bnx2x *bp, u32 addr,
 		bnx2x_init_str_wr(bp, addr, data, len);
 }
 
-static void bnx2x_wr_64(struct bnx2x *bp, u32 reg, u32 val_lo,
-			u32 val_hi)
+static void bnx2x_wr_64(struct bnx2x *bp, uint32_t reg, uint32_t val_lo,
+			uint32_t val_hi)
 {
-	u32 wb_write[2];
+	uint32_t wb_write[2];
 
 	wb_write[0] = val_lo;
 	wb_write[1] = val_hi;
 	REG_WR_DMAE_LEN(bp, reg, wb_write, 2);
 }
-static void bnx2x_init_wr_zp(struct bnx2x *bp, u32 addr, u32 len,
-			     u32 blob_off)
+static void bnx2x_init_wr_zp(struct bnx2x *bp, uint32_t addr, uint32_t len,
+			     uint32_t blob_off)
 {
-	const u8 *data = NULL;
+	const uint8_t *data = NULL;
 	int rc;
-	u32 i;
+	uint32_t i;
 
 	data = bnx2x_sel_blob(bp, addr, data) + blob_off*4;
 
@@ -218,23 +220,24 @@ static void bnx2x_init_wr_zp(struct bnx2x *bp, u32 addr, u32 len,
 	/* gunzip_outlen is in dwords */
 	len = GUNZIP_OUTLEN(bp);
 	for (i = 0; i < len; i++)
-		((u32 *)GUNZIP_BUF(bp))[i] = (__force u32)
-				cpu_to_le32(((u32 *)GUNZIP_BUF(bp))[i]);
+		((uint32_t *)GUNZIP_BUF(bp))[i] = (__force uint32_t)
+				cpu_to_le32(((uint32_t *)GUNZIP_BUF(bp))[i]);
 
 	bnx2x_write_big_buf_wb(bp, addr, len);
 }
 
-static void bnx2x_init_block(struct bnx2x *bp, u32 block, u32 stage)
+static void bnx2x_init_block(struct bnx2x *bp, uint32_t block,
+			     uint32_t stage)
 {
-	u16 op_start =
+	uint16_t op_start =
 		INIT_OPS_OFFSETS(bp)[BLOCK_OPS_IDX(block, stage,
 						     STAGE_START)];
-	u16 op_end =
+	uint16_t op_end =
 		INIT_OPS_OFFSETS(bp)[BLOCK_OPS_IDX(block, stage,
 						     STAGE_END)];
 	const union init_op *op;
-	u32 op_idx, op_type, addr, len;
-	const u32 *data, *data_base;
+	uint32_t op_idx, op_type, addr, len;
+	const uint32_t *data, *data_base;
 
 	/* If empty block */
 	if (op_start == op_end)
@@ -473,7 +476,7 @@ static const struct arb_line write_arb_addr[NUM_WR_Q-1] = {
 static void bnx2x_init_pxp_arb(struct bnx2x *bp, int r_order,
 			       int w_order)
 {
-	u32 val, i;
+	uint32_t val, i;
 
 	if (r_order > MAX_RD_ORD) {
 		DP(NETIF_MSG_HW, "read order of %d  order adjusted to %d\n",
@@ -609,12 +612,13 @@ static void bnx2x_init_pxp_arb(struct bnx2x *bp, int r_order,
  * then since this is a wide register(TM)
  * we split it into two 32 bit writes
  */
-#define ILT_ADDR1(x)		((u32)(((u64)x >> 12) & 0xFFFFFFFF))
-#define ILT_ADDR2(x)		((u32)((1 << 20) | ((u64)x >> 44)))
+#define ILT_ADDR1(x)		((uint32_t)(((uint64_t)x >> 12) & 0xFFFFFFFF))
+#define ILT_ADDR2(x)		((uint32_t)((1 << 20) | ((uint64_t)x >> 44)))
 #define ILT_RANGE(f, l)		(((l) << 10) | f)
 
 static int bnx2x_ilt_line_mem_op(struct bnx2x *bp,
-				 struct ilt_line *line, u32 size, u8 memop)
+				 struct ilt_line *line, uint32_t size,
+				 uint8_t memop)
 {
 	if (memop == ILT_MEMOP_FREE) {
 		BNX2X_ILT_FREE(line->page, line->page_mapping, line->size);
@@ -629,7 +633,7 @@ static int bnx2x_ilt_line_mem_op(struct bnx2x *bp,
 
 
 static int bnx2x_ilt_client_mem_op(struct bnx2x *bp, int cli_num,
-				   u8 memop)
+				   uint8_t memop)
 {
 	int i, rc;
 	struct bnx2x_ilt *ilt = BP_ILT(bp);
@@ -648,7 +652,7 @@ static int bnx2x_ilt_client_mem_op(struct bnx2x *bp, int cli_num,
 	return rc;
 }
 
-static int bnx2x_ilt_mem_op_cnic(struct bnx2x *bp, u8 memop)
+static int bnx2x_ilt_mem_op_cnic(struct bnx2x *bp, uint8_t memop)
 {
 	int rc = 0;
 
@@ -660,7 +664,7 @@ static int bnx2x_ilt_mem_op_cnic(struct bnx2x *bp, u8 memop)
 	return rc;
 }
 
-static int bnx2x_ilt_mem_op(struct bnx2x *bp, u8 memop)
+static int bnx2x_ilt_mem_op(struct bnx2x *bp, uint8_t memop)
 {
 	int rc = bnx2x_ilt_client_mem_op(bp, ILT_CLIENT_CDU, memop);
 	if (!rc)
@@ -674,7 +678,7 @@ static int bnx2x_ilt_mem_op(struct bnx2x *bp, u8 memop)
 static void bnx2x_ilt_line_wr(struct bnx2x *bp, int abs_idx,
 			      dma_addr_t page_mapping)
 {
-	u32 reg;
+	uint32_t reg;
 
 	if (CHIP_IS_E1(bp))
 		reg = PXP2_REG_RQ_ONCHIP_AT + abs_idx*8;
@@ -685,7 +689,8 @@ static void bnx2x_ilt_line_wr(struct bnx2x *bp, int abs_idx,
 }
 
 static void bnx2x_ilt_line_init_op(struct bnx2x *bp,
-				   struct bnx2x_ilt *ilt, int idx, u8 initop)
+				   struct bnx2x_ilt *ilt, int idx,
+				   uint8_t initop)
 {
 	dma_addr_t	null_mapping;
 	int abs_idx = ilt->start_line + idx;
@@ -706,10 +711,10 @@ static void bnx2x_ilt_line_init_op(struct bnx2x *bp,
 
 static void bnx2x_ilt_boundry_init_op(struct bnx2x *bp,
 				      struct ilt_client_info *ilt_cli,
-				      u32 ilt_start, u8 initop)
+				      uint32_t ilt_start, uint8_t initop)
 {
-	u32 start_reg = 0;
-	u32 end_reg = 0;
+	uint32_t start_reg = 0;
+	uint32_t end_reg = 0;
 
 	/* The boundary is either SET or INIT,
 	   CLEAR => SET and for now SET ~~ INIT */
@@ -760,7 +765,7 @@ static void bnx2x_ilt_boundry_init_op(struct bnx2x *bp,
 static void bnx2x_ilt_client_init_op_ilt(struct bnx2x *bp,
 					 struct bnx2x_ilt *ilt,
 					 struct ilt_client_info *ilt_cli,
-					 u8 initop)
+					 uint8_t initop)
 {
 	int i;
 
@@ -775,7 +780,8 @@ static void bnx2x_ilt_client_init_op_ilt(struct bnx2x *bp,
 }
 
 static void bnx2x_ilt_client_init_op(struct bnx2x *bp,
-				     struct ilt_client_info *ilt_cli, u8 initop)
+				     struct ilt_client_info *ilt_cli,
+				     uint8_t initop)
 {
 	struct bnx2x_ilt *ilt = BP_ILT(bp);
 
@@ -783,7 +789,7 @@ static void bnx2x_ilt_client_init_op(struct bnx2x *bp,
 }
 
 static void bnx2x_ilt_client_id_init_op(struct bnx2x *bp,
-					int cli_num, u8 initop)
+					int cli_num, uint8_t initop)
 {
 	struct bnx2x_ilt *ilt = BP_ILT(bp);
 	struct ilt_client_info *ilt_cli = &ilt->clients[cli_num];
@@ -791,14 +797,14 @@ static void bnx2x_ilt_client_id_init_op(struct bnx2x *bp,
 	bnx2x_ilt_client_init_op(bp, ilt_cli, initop);
 }
 
-static void bnx2x_ilt_init_op_cnic(struct bnx2x *bp, u8 initop)
+static void bnx2x_ilt_init_op_cnic(struct bnx2x *bp, uint8_t initop)
 {
 	if (CONFIGURE_NIC_MODE(bp))
 		bnx2x_ilt_client_id_init_op(bp, ILT_CLIENT_SRC, initop);
 	bnx2x_ilt_client_id_init_op(bp, ILT_CLIENT_TM, initop);
 }
 
-static void bnx2x_ilt_init_op(struct bnx2x *bp, u8 initop)
+static void bnx2x_ilt_init_op(struct bnx2x *bp, uint8_t initop)
 {
 	bnx2x_ilt_client_id_init_op(bp, ILT_CLIENT_CDU, initop);
 	bnx2x_ilt_client_id_init_op(bp, ILT_CLIENT_QM, initop);
@@ -807,7 +813,7 @@ static void bnx2x_ilt_init_op(struct bnx2x *bp, u8 initop)
 }
 
 static void bnx2x_ilt_init_client_psz(struct bnx2x *bp, int cli_num,
-				      u32 psz_reg, u8 initop)
+				      uint32_t psz_reg, uint8_t initop)
 {
 	struct bnx2x_ilt *ilt = BP_ILT(bp);
 	struct ilt_client_info *ilt_cli = &ilt->clients[cli_num];
@@ -830,7 +836,7 @@ static void bnx2x_ilt_init_client_psz(struct bnx2x *bp, int cli_num,
  * called during init common stage, ilt clients should be initialized
  * prioir to calling this function
  */
-static void bnx2x_ilt_init_page_size(struct bnx2x *bp, u8 initop)
+static void bnx2x_ilt_init_page_size(struct bnx2x *bp, uint8_t initop)
 {
 	bnx2x_ilt_init_client_psz(bp, ILT_CLIENT_CDU,
 				  PXP2_REG_RQ_CDU_P_SIZE, initop);
@@ -851,7 +857,7 @@ static void bnx2x_ilt_init_page_size(struct bnx2x *bp, u8 initop)
 
 /* called during init port stage */
 static void bnx2x_qm_init_cid_count(struct bnx2x *bp, int qm_cid_count,
-				    u8 initop)
+				    uint8_t initop)
 {
 	int port = BP_PORT(bp);
 
@@ -870,10 +876,10 @@ static void bnx2x_qm_init_cid_count(struct bnx2x *bp, int qm_cid_count,
 }
 
 static void bnx2x_qm_set_ptr_table(struct bnx2x *bp, int qm_cid_count,
-				   u32 base_reg, u32 reg)
+				   uint32_t base_reg, uint32_t reg)
 {
 	int i;
-	u32 wb_data[2] = {0, 0};
+	uint32_t wb_data[2] = {0, 0};
 	for (i = 0; i < 4 * QM_QUEUES_PER_FUNC; i++) {
 		REG_WR(bp, base_reg + i*4,
 		       qm_cid_count * 4 * (i % QM_QUEUES_PER_FUNC));
@@ -883,7 +889,7 @@ static void bnx2x_qm_set_ptr_table(struct bnx2x *bp, int qm_cid_count,
 
 /* called during init common stage */
 static void bnx2x_qm_init_ptr_table(struct bnx2x *bp, int qm_cid_count,
-				    u8 initop)
+				    uint8_t initop)
 {
 	if (!QM_INIT(qm_cid_count))
 		return;
@@ -916,7 +922,7 @@ static void bnx2x_src_init_t2(struct bnx2x *bp, struct src_ent *t2,
 
 	/* Initialize T2 */
 	for (i = 0; i < src_cid_count-1; i++)
-		t2[i].next = (u64)(t2_mapping +
+		t2[i].next = (uint64_t)(t2_mapping +
 			     (i+1)*sizeof(struct src_ent));
 
 	/* tell the searcher where the T2 table is */
@@ -926,9 +932,9 @@ static void bnx2x_src_init_t2(struct bnx2x *bp, struct src_ent *t2,
 		    U64_LO(t2_mapping), U64_HI(t2_mapping));
 
 	bnx2x_wr_64(bp, SRC_REG_LASTFREE0 + port*16,
-		    U64_LO((u64)t2_mapping +
+		    U64_LO((uint64_t)t2_mapping +
 			   (src_cid_count-1) * sizeof(struct src_ent)),
-		    U64_HI((u64)t2_mapping +
+		    U64_HI((uint64_t)t2_mapping +
 			   (src_cid_count-1) * sizeof(struct src_ent)));
 }
 #endif /* BNX2X_INIT_OPS_H */

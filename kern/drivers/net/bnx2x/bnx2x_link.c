@@ -21,8 +21,9 @@
 
 typedef int (*read_sfp_module_eeprom_func_p)(struct bnx2x_phy *phy,
 					     struct link_params *params,
-					     u8 dev_addr, u16 addr, u8 byte_cnt,
-					     u8 *o_buf, u8);
+					     uint8_t dev_addr, uint16_t addr,
+					     uint8_t byte_cnt,
+					     uint8_t *o_buf, uint8_t);
 /********************************************************/
 #define ETH_HLEN			14
 /* L2 header size + 2*VLANs (8 bytes) + LLC SNAP (8 bytes) */
@@ -205,22 +206,22 @@ typedef int (*read_sfp_module_eeprom_func_p)(struct bnx2x_phy *phy,
 		_val)
 
 static int bnx2x_check_half_open_conn(struct link_params *params,
-				      struct link_vars *vars, u8 notify);
+				      struct link_vars *vars, uint8_t notify);
 static int bnx2x_sfp_module_detection(struct bnx2x_phy *phy,
 				      struct link_params *params);
 
-static u32 bnx2x_bits_en(struct bnx2x *bp, u32 reg, u32 bits)
+static uint32_t bnx2x_bits_en(struct bnx2x *bp, uint32_t reg, uint32_t bits)
 {
-	u32 val = REG_RD(bp, reg);
+	uint32_t val = REG_RD(bp, reg);
 
 	val |= bits;
 	REG_WR(bp, reg, val);
 	return val;
 }
 
-static u32 bnx2x_bits_dis(struct bnx2x *bp, u32 reg, u32 bits)
+static uint32_t bnx2x_bits_dis(struct bnx2x *bp, uint32_t reg, uint32_t bits)
 {
-	u32 val = REG_RD(bp, reg);
+	uint32_t val = REG_RD(bp, reg);
 
 	val &= ~bits;
 	REG_WR(bp, reg, val);
@@ -237,9 +238,9 @@ static u32 bnx2x_bits_dis(struct bnx2x *bp, u32 reg, u32 bits)
  */
 static int bnx2x_check_lfa(struct link_params *params)
 {
-	u32 link_status, cfg_idx, lfa_mask, cfg_size;
-	u32 cur_speed_cap_mask, cur_req_fc_auto_adv, additional_config;
-	u32 saved_val, req_val, eee_status;
+	uint32_t link_status, cfg_idx, lfa_mask, cfg_size;
+	uint32_t cur_speed_cap_mask, cur_req_fc_auto_adv, additional_config;
+	uint32_t saved_val, req_val, eee_status;
 	struct bnx2x *bp = params->bp;
 
 	additional_config =
@@ -332,7 +333,7 @@ static int bnx2x_check_lfa(struct link_params *params)
 		       offsetof(struct shmem_lfa, additional_config)) &
 		REQ_FC_AUTO_ADV_MASK;
 
-	if ((u16)cur_req_fc_auto_adv != params->req_fc_auto_adv) {
+	if ((uint16_t)cur_req_fc_auto_adv != params->req_fc_auto_adv) {
 		DP(NETIF_MSG_LINK, "Flow Ctrl AN mismatch %x vs. %x\n",
 			       cur_req_fc_auto_adv, params->req_fc_auto_adv);
 		return LFA_FLOW_CTRL_MISMATCH;
@@ -357,9 +358,9 @@ static int bnx2x_check_lfa(struct link_params *params)
 /******************************************************************/
 /*			EPIO/GPIO section			  */
 /******************************************************************/
-static void bnx2x_get_epio(struct bnx2x *bp, u32 epio_pin, u32 *en)
+static void bnx2x_get_epio(struct bnx2x *bp, uint32_t epio_pin, uint32_t *en)
 {
-	u32 epio_mask, gp_oenable;
+	uint32_t epio_mask, gp_oenable;
 	*en = 0;
 	/* Sanity check */
 	if (epio_pin > 31) {
@@ -374,9 +375,9 @@ static void bnx2x_get_epio(struct bnx2x *bp, u32 epio_pin, u32 *en)
 
 	*en = (REG_RD(bp, MCP_REG_MCPR_GP_INPUTS) & epio_mask) >> epio_pin;
 }
-static void bnx2x_set_epio(struct bnx2x *bp, u32 epio_pin, u32 en)
+static void bnx2x_set_epio(struct bnx2x *bp, uint32_t epio_pin, uint32_t en)
 {
-	u32 epio_mask, gp_output, gp_oenable;
+	uint32_t epio_mask, gp_output, gp_oenable;
 
 	/* Sanity check */
 	if (epio_pin > 31) {
@@ -399,28 +400,30 @@ static void bnx2x_set_epio(struct bnx2x *bp, u32 epio_pin, u32 en)
 	REG_WR(bp, MCP_REG_MCPR_GP_OENABLE, gp_oenable | epio_mask);
 }
 
-static void bnx2x_set_cfg_pin(struct bnx2x *bp, u32 pin_cfg, u32 val)
+static void bnx2x_set_cfg_pin(struct bnx2x *bp, uint32_t pin_cfg,
+			      uint32_t val)
 {
 	if (pin_cfg == PIN_CFG_NA)
 		return;
 	if (pin_cfg >= PIN_CFG_EPIO0) {
 		bnx2x_set_epio(bp, pin_cfg - PIN_CFG_EPIO0, val);
 	} else {
-		u8 gpio_num = (pin_cfg - PIN_CFG_GPIO0_P0) & 0x3;
-		u8 gpio_port = (pin_cfg - PIN_CFG_GPIO0_P0) >> 2;
-		bnx2x_set_gpio(bp, gpio_num, (u8)val, gpio_port);
+		uint8_t gpio_num = (pin_cfg - PIN_CFG_GPIO0_P0) & 0x3;
+		uint8_t gpio_port = (pin_cfg - PIN_CFG_GPIO0_P0) >> 2;
+		bnx2x_set_gpio(bp, gpio_num, (uint8_t)val, gpio_port);
 	}
 }
 
-static u32 bnx2x_get_cfg_pin(struct bnx2x *bp, u32 pin_cfg, u32 *val)
+static uint32_t bnx2x_get_cfg_pin(struct bnx2x *bp, uint32_t pin_cfg,
+				  uint32_t *val)
 {
 	if (pin_cfg == PIN_CFG_NA)
 		return -EINVAL;
 	if (pin_cfg >= PIN_CFG_EPIO0) {
 		bnx2x_get_epio(bp, pin_cfg - PIN_CFG_EPIO0, val);
 	} else {
-		u8 gpio_num = (pin_cfg - PIN_CFG_GPIO0_P0) & 0x3;
-		u8 gpio_port = (pin_cfg - PIN_CFG_GPIO0_P0) >> 2;
+		uint8_t gpio_num = (pin_cfg - PIN_CFG_GPIO0_P0) & 0x3;
+		uint8_t gpio_port = (pin_cfg - PIN_CFG_GPIO0_P0) >> 2;
 		*val = bnx2x_get_gpio(bp, gpio_num, gpio_port);
 	}
 	return 0;
@@ -487,9 +490,9 @@ static void bnx2x_ets_e2e3a0_disabled(struct link_params *params)
 *	Getting min_w_val will be set according to line speed .
 *.
 ******************************************************************************/
-static u32 bnx2x_ets_get_min_w_val_nig(const struct link_vars *vars)
+static uint32_t bnx2x_ets_get_min_w_val_nig(const struct link_vars *vars)
 {
-	u32 min_w_val = 0;
+	uint32_t min_w_val = 0;
 	/* Calculate min_w_val.*/
 	if (vars->link_up) {
 		if (vars->line_speed == SPEED_20000)
@@ -508,9 +511,9 @@ static u32 bnx2x_ets_get_min_w_val_nig(const struct link_vars *vars)
 *	Getting credit upper bound form min_w_val.
 *.
 ******************************************************************************/
-static u32 bnx2x_ets_get_credit_upper_bound(const u32 min_w_val)
+static uint32_t bnx2x_ets_get_credit_upper_bound(const uint32_t min_w_val)
 {
-	const u32 credit_upper_bound = (u32)MAXVAL((150 * min_w_val),
+	const uint32_t credit_upper_bound = (uint32_t)MAXVAL((150 * min_w_val),
 						MAX_PACKET_SIZE);
 	return credit_upper_bound;
 }
@@ -521,11 +524,11 @@ static u32 bnx2x_ets_get_credit_upper_bound(const u32 min_w_val)
 ******************************************************************************/
 static void bnx2x_ets_e3b0_set_credit_upper_bound_nig(
 	const struct link_params *params,
-	const u32 min_w_val)
+	const uint32_t min_w_val)
 {
 	struct bnx2x *bp = params->bp;
-	const u8 port = params->port;
-	const u32 credit_upper_bound =
+	const uint8_t port = params->port;
+	const uint32_t credit_upper_bound =
 	    bnx2x_ets_get_credit_upper_bound(min_w_val);
 
 	REG_WR(bp, (port) ? NIG_REG_P1_TX_ARB_CREDIT_UPPER_BOUND_0 :
@@ -562,8 +565,8 @@ static void bnx2x_ets_e3b0_nig_disabled(const struct link_params *params,
 					const struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	const u8 port = params->port;
-	const u32 min_w_val = bnx2x_ets_get_min_w_val_nig(vars);
+	const uint8_t port = params->port;
+	const uint32_t min_w_val = bnx2x_ets_get_min_w_val_nig(vars);
 	/* Mapping between entry  priority to client number (0,1,2 -debug and
 	 * management clients, 3 - COS0 client, 4 - COS1, ... 8 -
 	 * COS5)(HIGHEST) 4bits client num.TODO_ETS - Should be done by
@@ -643,15 +646,15 @@ static void bnx2x_ets_e3b0_nig_disabled(const struct link_params *params,
 ******************************************************************************/
 static void bnx2x_ets_e3b0_set_credit_upper_bound_pbf(
 	const struct link_params *params,
-	const u32 min_w_val)
+	const uint32_t min_w_val)
 {
 	struct bnx2x *bp = params->bp;
-	const u32 credit_upper_bound =
+	const uint32_t credit_upper_bound =
 	    bnx2x_ets_get_credit_upper_bound(min_w_val);
-	const u8 port = params->port;
-	u32 base_upper_bound = 0;
-	u8 max_cos = 0;
-	u8 i = 0;
+	const uint8_t port = params->port;
+	uint32_t base_upper_bound = 0;
+	uint8_t max_cos = 0;
+	uint8_t i = 0;
 	/* In 2 port mode port0 has COS0-5 that can be used for WFQ.In 4
 	 * port mode port1 has COS0-2 that can be used for WFQ.
 	 */
@@ -678,11 +681,11 @@ static void bnx2x_ets_e3b0_set_credit_upper_bound_pbf(
 static void bnx2x_ets_e3b0_pbf_disabled(const struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	const u8 port = params->port;
-	const u32 min_w_val_pbf = ETS_E3B0_PBF_MIN_W_VAL;
-	u8 i = 0;
-	u32 base_weight = 0;
-	u8 max_cos = 0;
+	const uint8_t port = params->port;
+	const uint32_t min_w_val_pbf = ETS_E3B0_PBF_MIN_W_VAL;
+	uint8_t i = 0;
+	uint32_t base_weight = 0;
+	uint8_t max_cos = 0;
 
 	/* Mapping between entry  priority to client number 0 - COS0
 	 * client, 2 - COS1, ... 5 - COS5)(HIGHEST) 4bits client num.
@@ -781,15 +784,15 @@ int bnx2x_ets_disabled(struct link_params *params,
 ******************************************************************************/
 static int bnx2x_ets_e3b0_cli_map(const struct link_params *params,
 				  const struct bnx2x_ets_params *ets_params,
-				  const u8 cos_sp_bitmap,
-				  const u8 cos_bw_bitmap)
+				  const uint8_t cos_sp_bitmap,
+				  const uint8_t cos_bw_bitmap)
 {
 	struct bnx2x *bp = params->bp;
-	const u8 port = params->port;
-	const u8 nig_cli_sp_bitmap = 0x7 | (cos_sp_bitmap << 3);
-	const u8 pbf_cli_sp_bitmap = cos_sp_bitmap;
-	const u8 nig_cli_subject2wfq_bitmap = cos_bw_bitmap << 3;
-	const u8 pbf_cli_subject2wfq_bitmap = cos_bw_bitmap;
+	const uint8_t port = params->port;
+	const uint8_t nig_cli_sp_bitmap = 0x7 | (cos_sp_bitmap << 3);
+	const uint8_t pbf_cli_sp_bitmap = cos_sp_bitmap;
+	const uint8_t nig_cli_subject2wfq_bitmap = cos_bw_bitmap << 3;
+	const uint8_t pbf_cli_subject2wfq_bitmap = cos_bw_bitmap;
 
 	REG_WR(bp, (port) ? NIG_REG_P1_TX_ARB_CLIENT_IS_STRICT :
 	       NIG_REG_P0_TX_ARB_CLIENT_IS_STRICT, nig_cli_sp_bitmap);
@@ -814,18 +817,18 @@ static int bnx2x_ets_e3b0_cli_map(const struct link_params *params,
 *	not continues and ARB_CREDIT_WEIGHT_0 + offset is suitable.
 ******************************************************************************/
 static int bnx2x_ets_e3b0_set_cos_bw(struct bnx2x *bp,
-				     const u8 cos_entry,
-				     const u32 min_w_val_nig,
-				     const u32 min_w_val_pbf,
-				     const u16 total_bw,
-				     const u8 bw,
-				     const u8 port)
+				     const uint8_t cos_entry,
+				     const uint32_t min_w_val_nig,
+				     const uint32_t min_w_val_pbf,
+				     const uint16_t total_bw,
+				     const uint8_t bw,
+				     const uint8_t port)
 {
-	u32 nig_reg_adress_crd_weight = 0;
-	u32 pbf_reg_adress_crd_weight = 0;
+	uint32_t nig_reg_adress_crd_weight = 0;
+	uint32_t pbf_reg_adress_crd_weight = 0;
 	/* Calculate and set BW for this COS - use 1 instead of 0 for BW */
-	const u32 cos_bw_nig = ((bw ? bw : 1) * min_w_val_nig) / total_bw;
-	const u32 cos_bw_pbf = ((bw ? bw : 1) * min_w_val_pbf) / total_bw;
+	const uint32_t cos_bw_nig = ((bw ? bw : 1) * min_w_val_nig) / total_bw;
+	const uint32_t cos_bw_pbf = ((bw ? bw : 1) * min_w_val_pbf) / total_bw;
 
 	switch (cos_entry) {
 	case 0:
@@ -888,11 +891,11 @@ static int bnx2x_ets_e3b0_set_cos_bw(struct bnx2x *bp,
 static int bnx2x_ets_e3b0_get_total_bw(
 	const struct link_params *params,
 	struct bnx2x_ets_params *ets_params,
-	u16 *total_bw)
+	uint16_t *total_bw)
 {
 	struct bnx2x *bp = params->bp;
-	u8 cos_idx = 0;
-	u8 is_bw_cos_exist = 0;
+	uint8_t cos_idx = 0;
+	uint8_t is_bw_cos_exist = 0;
 
 	*total_bw = 0 ;
 	/* Calculate total BW requested */
@@ -934,9 +937,9 @@ static int bnx2x_ets_e3b0_get_total_bw(
 *	Invalidate all the sp_pri_to_cos.
 *
 ******************************************************************************/
-static void bnx2x_ets_e3b0_sp_pri_to_cos_init(u8 *sp_pri_to_cos)
+static void bnx2x_ets_e3b0_sp_pri_to_cos_init(uint8_t *sp_pri_to_cos)
 {
-	u8 pri = 0;
+	uint8_t pri = 0;
 	for (pri = 0; pri < DCBX_MAX_NUM_COS; pri++)
 		sp_pri_to_cos[pri] = DCBX_INVALID_COS;
 }
@@ -947,12 +950,13 @@ static void bnx2x_ets_e3b0_sp_pri_to_cos_init(u8 *sp_pri_to_cos)
 *
 ******************************************************************************/
 static int bnx2x_ets_e3b0_sp_pri_to_cos_set(const struct link_params *params,
-					    u8 *sp_pri_to_cos, const u8 pri,
-					    const u8 cos_entry)
+					    uint8_t *sp_pri_to_cos,
+					    const uint8_t pri,
+					    const uint8_t cos_entry)
 {
 	struct bnx2x *bp = params->bp;
-	const u8 port = params->port;
-	const u8 max_num_of_cos = (port) ? DCBX_E3B0_MAX_NUM_COS_PORT1 :
+	const uint8_t port = params->port;
+	const uint8_t max_num_of_cos = (port) ? DCBX_E3B0_MAX_NUM_COS_PORT1 :
 		DCBX_E3B0_MAX_NUM_COS_PORT0;
 
 	if (pri >= max_num_of_cos) {
@@ -979,13 +983,14 @@ static int bnx2x_ets_e3b0_sp_pri_to_cos_set(const struct link_params *params,
 *	the sp_pri_cli register.
 *
 ******************************************************************************/
-static u64 bnx2x_e3b0_sp_get_pri_cli_reg(const u8 cos, const u8 cos_offset,
-					 const u8 pri_set,
-					 const u8 pri_offset,
-					 const u8 entry_size)
+static uint64_t bnx2x_e3b0_sp_get_pri_cli_reg(const uint8_t cos,
+					 const uint8_t cos_offset,
+					 const uint8_t pri_set,
+					 const uint8_t pri_offset,
+					 const uint8_t entry_size)
 {
-	u64 pri_cli_nig = 0;
-	pri_cli_nig = ((u64)(cos + cos_offset)) << (entry_size *
+	uint64_t pri_cli_nig = 0;
+	pri_cli_nig = ((uint64_t)(cos + cos_offset)) << (entry_size *
 						    (pri_set + pri_offset));
 
 	return pri_cli_nig;
@@ -996,11 +1001,12 @@ static u64 bnx2x_e3b0_sp_get_pri_cli_reg(const u8 cos, const u8 cos_offset,
 *	sp_pri_cli register for NIG.
 *
 ******************************************************************************/
-static u64 bnx2x_e3b0_sp_get_pri_cli_reg_nig(const u8 cos, const u8 pri_set)
+static uint64_t bnx2x_e3b0_sp_get_pri_cli_reg_nig(const uint8_t cos,
+					     const uint8_t pri_set)
 {
 	/* MCP Dbg0 and dbg1 are always with higher strict pri*/
-	const u8 nig_cos_offset = 3;
-	const u8 nig_pri_offset = 3;
+	const uint8_t nig_cos_offset = 3;
+	const uint8_t nig_pri_offset = 3;
 
 	return bnx2x_e3b0_sp_get_pri_cli_reg(cos, nig_cos_offset, pri_set,
 		nig_pri_offset, 4);
@@ -1012,10 +1018,11 @@ static u64 bnx2x_e3b0_sp_get_pri_cli_reg_nig(const u8 cos, const u8 pri_set)
 *	sp_pri_cli register for PBF.
 *
 ******************************************************************************/
-static u64 bnx2x_e3b0_sp_get_pri_cli_reg_pbf(const u8 cos, const u8 pri_set)
+static uint64_t bnx2x_e3b0_sp_get_pri_cli_reg_pbf(const uint8_t cos,
+					     const uint8_t pri_set)
 {
-	const u8 pbf_cos_offset = 0;
-	const u8 pbf_pri_offset = 0;
+	const uint8_t pbf_cos_offset = 0;
+	const uint8_t pbf_pri_offset = 0;
 
 	return bnx2x_e3b0_sp_get_pri_cli_reg(cos, pbf_cos_offset, pri_set,
 		pbf_pri_offset, 3);
@@ -1029,20 +1036,20 @@ static u64 bnx2x_e3b0_sp_get_pri_cli_reg_pbf(const u8 cos, const u8 pri_set)
 *
 ******************************************************************************/
 static int bnx2x_ets_e3b0_sp_set_pri_cli_reg(const struct link_params *params,
-					     u8 *sp_pri_to_cos)
+					     uint8_t *sp_pri_to_cos)
 {
 	struct bnx2x *bp = params->bp;
-	u8 i = 0;
-	const u8 port = params->port;
+	uint8_t i = 0;
+	const uint8_t port = params->port;
 	/* MCP Dbg0 and dbg1 are always with higher strict pri*/
-	u64 pri_cli_nig = 0x210;
-	u32 pri_cli_pbf = 0x0;
-	u8 pri_set = 0;
-	u8 pri_bitmask = 0;
-	const u8 max_num_of_cos = (port) ? DCBX_E3B0_MAX_NUM_COS_PORT1 :
+	uint64_t pri_cli_nig = 0x210;
+	uint32_t pri_cli_pbf = 0x0;
+	uint8_t pri_set = 0;
+	uint8_t pri_bitmask = 0;
+	const uint8_t max_num_of_cos = (port) ? DCBX_E3B0_MAX_NUM_COS_PORT1 :
 		DCBX_E3B0_MAX_NUM_COS_PORT0;
 
-	u8 cos_bit_to_set = (1 << max_num_of_cos) - 1;
+	uint8_t cos_bit_to_set = (1 << max_num_of_cos) - 1;
 
 	/* Set all the strict priority first */
 	for (i = 0; i < max_num_of_cos; i++) {
@@ -1099,13 +1106,13 @@ static int bnx2x_ets_e3b0_sp_set_pri_cli_reg(const struct link_params *params,
 	if (port) {
 		/* Only 6 usable clients*/
 		REG_WR(bp, NIG_REG_P1_TX_ARB_PRIORITY_CLIENT2_LSB,
-		       (u32)pri_cli_nig);
+		       (uint32_t)pri_cli_nig);
 
 		REG_WR(bp, PBF_REG_ETS_ARB_PRIORITY_CLIENT_P1 , pri_cli_pbf);
 	} else {
 		/* Only 9 usable clients*/
-		const u32 pri_cli_nig_lsb = (u32) (pri_cli_nig);
-		const u32 pri_cli_nig_msb = (u32) ((pri_cli_nig >> 32) & 0xF);
+		const uint32_t pri_cli_nig_lsb = (uint32_t) (pri_cli_nig);
+		const uint32_t pri_cli_nig_msb = (uint32_t) ((pri_cli_nig >> 32) & 0xF);
 
 		REG_WR(bp, NIG_REG_P0_TX_ARB_PRIORITY_CLIENT2_LSB,
 		       pri_cli_nig_lsb);
@@ -1127,16 +1134,16 @@ int bnx2x_ets_e3b0_config(const struct link_params *params,
 {
 	struct bnx2x *bp = params->bp;
 	int bnx2x_status = 0;
-	const u8 port = params->port;
-	u16 total_bw = 0;
-	const u32 min_w_val_nig = bnx2x_ets_get_min_w_val_nig(vars);
-	const u32 min_w_val_pbf = ETS_E3B0_PBF_MIN_W_VAL;
-	u8 cos_bw_bitmap = 0;
-	u8 cos_sp_bitmap = 0;
-	u8 sp_pri_to_cos[DCBX_MAX_NUM_COS] = {0};
-	const u8 max_num_of_cos = (port) ? DCBX_E3B0_MAX_NUM_COS_PORT1 :
+	const uint8_t port = params->port;
+	uint16_t total_bw = 0;
+	const uint32_t min_w_val_nig = bnx2x_ets_get_min_w_val_nig(vars);
+	const uint32_t min_w_val_pbf = ETS_E3B0_PBF_MIN_W_VAL;
+	uint8_t cos_bw_bitmap = 0;
+	uint8_t cos_sp_bitmap = 0;
+	uint8_t sp_pri_to_cos[DCBX_MAX_NUM_COS] = {0};
+	const uint8_t max_num_of_cos = (port) ? DCBX_E3B0_MAX_NUM_COS_PORT1 :
 		DCBX_E3B0_MAX_NUM_COS_PORT0;
-	u8 cos_entry = 0;
+	uint8_t cos_entry = 0;
 
 	if (!CHIP_IS_E3B0(bp)) {
 		DP(NETIF_MSG_LINK,
@@ -1267,14 +1274,15 @@ static void bnx2x_ets_bw_limit_common(const struct link_params *params)
 	       ETS_BW_LIMIT_CREDIT_UPPER_BOUND);
 }
 
-void bnx2x_ets_bw_limit(const struct link_params *params, const u32 cos0_bw,
-			const u32 cos1_bw)
+void bnx2x_ets_bw_limit(const struct link_params *params,
+			const uint32_t cos0_bw,
+			const uint32_t cos1_bw)
 {
 	/* ETS disabled configuration*/
 	struct bnx2x *bp = params->bp;
-	const u32 total_bw = cos0_bw + cos1_bw;
-	u32 cos0_credit_weight = 0;
-	u32 cos1_credit_weight = 0;
+	const uint32_t total_bw = cos0_bw + cos1_bw;
+	uint32_t cos0_credit_weight = 0;
+	uint32_t cos1_credit_weight = 0;
 
 	DP(NETIF_MSG_LINK, "ETS enabled BW limit configuration\n");
 
@@ -1299,11 +1307,12 @@ void bnx2x_ets_bw_limit(const struct link_params *params, const u32 cos0_bw,
 	REG_WR(bp, PBF_REG_COS1_WEIGHT, cos1_credit_weight);
 }
 
-int bnx2x_ets_strict(const struct link_params *params, const u8 strict_cos)
+int bnx2x_ets_strict(const struct link_params *params,
+		     const uint8_t strict_cos)
 {
 	/* ETS disabled configuration*/
 	struct bnx2x *bp = params->bp;
-	u32 val	= 0;
+	uint32_t val	= 0;
 
 	DP(NETIF_MSG_LINK, "ETS enabled strict configuration\n");
 	/* Bitmap of 5bits length. Each bit specifies whether the entry behaves
@@ -1344,11 +1353,11 @@ int bnx2x_ets_strict(const struct link_params *params, const u8 strict_cos)
 /******************************************************************/
 static void bnx2x_update_pfc_xmac(struct link_params *params,
 				  struct link_vars *vars,
-				  u8 is_lb)
+				  uint8_t is_lb)
 {
 	struct bnx2x *bp = params->bp;
-	u32 xmac_base;
-	u32 pause_val, pfc0_val, pfc1_val;
+	uint32_t xmac_base;
+	uint32_t pause_val, pfc0_val, pfc1_val;
 
 	/* XMAC base adrr */
 	xmac_base = (params->port) ? GRCBASE_XMAC1 : GRCBASE_XMAC0;
@@ -1406,11 +1415,11 @@ static void bnx2x_update_pfc_xmac(struct link_params *params,
 /******************************************************************/
 /*			MAC/PBF section				  */
 /******************************************************************/
-static void bnx2x_set_mdio_clk(struct bnx2x *bp, u32 chip_id,
-			       u32 emac_base)
+static void bnx2x_set_mdio_clk(struct bnx2x *bp, uint32_t chip_id,
+			       uint32_t emac_base)
 {
-	u32 new_mode, cur_mode;
-	u32 clc_cnt;
+	uint32_t new_mode, cur_mode;
+	uint32_t clc_cnt;
 	/* Set clause 45 mode, slow down the MDIO clock to 2.5MHz
 	 * (a value of 49==0x31) and make sure that the AUTO poll is off
 	 */
@@ -1439,7 +1448,7 @@ static void bnx2x_set_mdio_clk(struct bnx2x *bp, u32 chip_id,
 static void bnx2x_set_mdio_emac_per_phy(struct bnx2x *bp,
 					struct link_params *params)
 {
-	u8 phy_index;
+	uint8_t phy_index;
 	/* Set mdio clock per phy */
 	for (phy_index = INT_PHY; phy_index < params->num_phys;
 	      phy_index++)
@@ -1447,9 +1456,9 @@ static void bnx2x_set_mdio_emac_per_phy(struct bnx2x *bp,
 				   params->phy[phy_index].mdio_ctrl);
 }
 
-static u8 bnx2x_is_4_port_mode(struct bnx2x *bp)
+static uint8_t bnx2x_is_4_port_mode(struct bnx2x *bp)
 {
-	u32 port4mode_ovwr_val;
+	uint32_t port4mode_ovwr_val;
 	/* Check 4-port override enabled */
 	port4mode_ovwr_val = REG_RD(bp, MISC_REG_PORT4MODE_EN_OVWR);
 	if (port4mode_ovwr_val & (1<<0)) {
@@ -1457,7 +1466,7 @@ static u8 bnx2x_is_4_port_mode(struct bnx2x *bp)
 		return ((port4mode_ovwr_val & (1<<1)) == (1<<1));
 	}
 	/* Return 4-port mode from input pin */
-	return (u8)REG_RD(bp, MISC_REG_PORT4MODE_EN);
+	return (uint8_t)REG_RD(bp, MISC_REG_PORT4MODE_EN);
 }
 
 static void bnx2x_emac_init(struct link_params *params,
@@ -1465,10 +1474,10 @@ static void bnx2x_emac_init(struct link_params *params,
 {
 	/* reset and unreset the emac core */
 	struct bnx2x *bp = params->bp;
-	u8 port = params->port;
-	u32 emac_base = port ? GRCBASE_EMAC1 : GRCBASE_EMAC0;
-	u32 val;
-	u16 timeout;
+	uint8_t port = params->port;
+	uint32_t emac_base = port ? GRCBASE_EMAC1 : GRCBASE_EMAC0;
+	uint32_t val;
+	uint16_t timeout;
 
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_CLEAR,
 	       (MISC_REGISTERS_RESET_REG_2_RST_EMAC0_HARD_CORE << port));
@@ -1506,8 +1515,8 @@ static void bnx2x_emac_init(struct link_params *params,
 }
 
 static void bnx2x_set_xumac_nig(struct link_params *params,
-				u16 tx_pause_en,
-				u8 enable)
+				uint16_t tx_pause_en,
+				uint8_t enable)
 {
 	struct bnx2x *bp = params->bp;
 
@@ -1519,10 +1528,10 @@ static void bnx2x_set_xumac_nig(struct link_params *params,
 	       NIG_REG_P0_MAC_PAUSE_OUT_EN, tx_pause_en);
 }
 
-static void bnx2x_set_umac_rxtx(struct link_params *params, u8 en)
+static void bnx2x_set_umac_rxtx(struct link_params *params, uint8_t en)
 {
-	u32 umac_base = params->port ? GRCBASE_UMAC1 : GRCBASE_UMAC0;
-	u32 val;
+	uint32_t umac_base = params->port ? GRCBASE_UMAC1 : GRCBASE_UMAC0;
+	uint32_t val;
 	struct bnx2x *bp = params->bp;
 	if (!(REG_RD(bp, MISC_REG_RESET_REG_2) &
 		   (MISC_REGISTERS_RESET_REG_2_UMAC0 << params->port)))
@@ -1539,10 +1548,10 @@ static void bnx2x_set_umac_rxtx(struct link_params *params, u8 en)
 }
 
 static void bnx2x_umac_enable(struct link_params *params,
-			    struct link_vars *vars, u8 lb)
+			    struct link_vars *vars, uint8_t lb)
 {
-	u32 val;
-	u32 umac_base = params->port ? GRCBASE_UMAC1 : GRCBASE_UMAC0;
+	uint32_t val;
+	uint32_t umac_base = params->port ? GRCBASE_UMAC1 : GRCBASE_UMAC0;
 	struct bnx2x *bp = params->bp;
 	/* Reset UMAC */
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_CLEAR,
@@ -1637,10 +1646,10 @@ static void bnx2x_umac_enable(struct link_params *params,
 }
 
 /* Define the XMAC mode */
-static void bnx2x_xmac_init(struct link_params *params, u32 max_speed)
+static void bnx2x_xmac_init(struct link_params *params, uint32_t max_speed)
 {
 	struct bnx2x *bp = params->bp;
-	u32 is_port4mode = bnx2x_is_4_port_mode(bp);
+	uint32_t is_port4mode = bnx2x_is_4_port_mode(bp);
 
 	/* In 4-port mode, need to set the mode only once, so if XMAC is
 	 * already out of reset, it means the mode has already been set,
@@ -1699,12 +1708,12 @@ static void bnx2x_xmac_init(struct link_params *params, u32 max_speed)
 
 }
 
-static void bnx2x_set_xmac_rxtx(struct link_params *params, u8 en)
+static void bnx2x_set_xmac_rxtx(struct link_params *params, uint8_t en)
 {
-	u8 port = params->port;
+	uint8_t port = params->port;
 	struct bnx2x *bp = params->bp;
-	u32 pfc_ctrl, xmac_base = (port) ? GRCBASE_XMAC1 : GRCBASE_XMAC0;
-	u32 val;
+	uint32_t pfc_ctrl, xmac_base = (port) ? GRCBASE_XMAC1 : GRCBASE_XMAC0;
+	uint32_t val;
 
 	if (REG_RD(bp, MISC_REG_RESET_REG_2) &
 	    MISC_REGISTERS_RESET_REG_2_XMAC) {
@@ -1728,9 +1737,9 @@ static void bnx2x_set_xmac_rxtx(struct link_params *params, u8 en)
 }
 
 static int bnx2x_xmac_enable(struct link_params *params,
-			     struct link_vars *vars, u8 lb)
+			     struct link_vars *vars, uint8_t lb)
 {
-	u32 val, xmac_base;
+	uint32_t val, xmac_base;
 	struct bnx2x *bp = params->bp;
 	DP(NETIF_MSG_LINK, "enabling XMAC\n");
 
@@ -1798,12 +1807,12 @@ static int bnx2x_xmac_enable(struct link_params *params,
 }
 
 static int bnx2x_emac_enable(struct link_params *params,
-			     struct link_vars *vars, u8 lb)
+			     struct link_vars *vars, uint8_t lb)
 {
 	struct bnx2x *bp = params->bp;
-	u8 port = params->port;
-	u32 emac_base = port ? GRCBASE_EMAC1 : GRCBASE_EMAC0;
-	u32 val;
+	uint8_t port = params->port;
+	uint32_t emac_base = port ? GRCBASE_EMAC1 : GRCBASE_EMAC0;
+	uint32_t val;
 
 	DP(NETIF_MSG_LINK, "enabling EMAC\n");
 
@@ -1816,7 +1825,7 @@ static int bnx2x_emac_enable(struct link_params *params,
 
 	/* ASIC */
 	if (vars->phy_flags & PHY_XGXS_FLAG) {
-		u32 ser_lane = ((params->lane_config &
+		uint32_t ser_lane = ((params->lane_config &
 				 PORT_HW_CFG_LANE_SWAP_CFG_MASTER_MASK) >>
 				PORT_HW_CFG_LANE_SWAP_CFG_MASTER_SHIFT);
 
@@ -1933,12 +1942,12 @@ static int bnx2x_emac_enable(struct link_params *params,
 static void bnx2x_update_pfc_bmac1(struct link_params *params,
 				   struct link_vars *vars)
 {
-	u32 wb_data[2];
+	uint32_t wb_data[2];
 	struct bnx2x *bp = params->bp;
-	u32 bmac_addr =  params->port ? NIG_REG_INGRESS_BMAC1_MEM :
+	uint32_t bmac_addr =  params->port ? NIG_REG_INGRESS_BMAC1_MEM :
 		NIG_REG_INGRESS_BMAC0_MEM;
 
-	u32 val = 0x14;
+	uint32_t val = 0x14;
 	if ((!(params->feature_config_flags &
 	      FEATURE_CONFIG_PFC_ENABLED)) &&
 		(vars->flow_ctrl & BNX2X_FLOW_CTRL_RX))
@@ -1961,16 +1970,16 @@ static void bnx2x_update_pfc_bmac1(struct link_params *params,
 
 static void bnx2x_update_pfc_bmac2(struct link_params *params,
 				   struct link_vars *vars,
-				   u8 is_lb)
+				   uint8_t is_lb)
 {
 	/* Set rx control: Strip CRC and enable BigMAC to relay
 	 * control packets to the system as well
 	 */
-	u32 wb_data[2];
+	uint32_t wb_data[2];
 	struct bnx2x *bp = params->bp;
-	u32 bmac_addr = params->port ? NIG_REG_INGRESS_BMAC1_MEM :
+	uint32_t bmac_addr = params->port ? NIG_REG_INGRESS_BMAC1_MEM :
 		NIG_REG_INGRESS_BMAC0_MEM;
-	u32 val = 0x14;
+	uint32_t val = 0x14;
 
 	if ((!(params->feature_config_flags &
 	      FEATURE_CONFIG_PFC_ENABLED)) &&
@@ -2050,10 +2059,11 @@ static void bnx2x_update_pfc_bmac2(struct link_params *params,
 *  not continues and ARB_CREDIT_WEIGHT_0 + offset is suitable.
 ******************************************************************************/
 static int bnx2x_pfc_nig_rx_priority_mask(struct bnx2x *bp,
-					   u8 cos_entry,
-					   u32 priority_mask, u8 port)
+					   uint8_t cos_entry,
+					   uint32_t priority_mask,
+					  uint8_t port)
 {
-	u32 nig_reg_rx_priority_mask_add = 0;
+	uint32_t nig_reg_rx_priority_mask_add = 0;
 
 	switch (cos_entry) {
 	case 0:
@@ -2092,7 +2102,7 @@ static int bnx2x_pfc_nig_rx_priority_mask(struct bnx2x *bp,
 
 	return 0;
 }
-static void bnx2x_update_mng(struct link_params *params, u32 link_status)
+static void bnx2x_update_mng(struct link_params *params, uint32_t link_status)
 {
 	struct bnx2x *bp = params->bp;
 
@@ -2101,7 +2111,8 @@ static void bnx2x_update_mng(struct link_params *params, u32 link_status)
 			port_mb[params->port].link_status), link_status);
 }
 
-static void bnx2x_update_link_attr(struct link_params *params, u32 link_attr)
+static void bnx2x_update_link_attr(struct link_params *params,
+				   uint32_t link_attr)
 {
 	struct bnx2x *bp = params->bp;
 
@@ -2115,11 +2126,11 @@ static void bnx2x_update_pfc_nig(struct link_params *params,
 		struct link_vars *vars,
 		struct bnx2x_nig_brb_pfc_port_params *nig_params)
 {
-	u32 xcm_mask = 0, ppp_enable = 0, pause_enable = 0, llfc_out_en = 0;
-	u32 llfc_enable = 0, xcm_out_en = 0, hwpfc_enable = 0;
-	u32 pkt_priority_to_cos = 0;
+	uint32_t xcm_mask = 0, ppp_enable = 0, pause_enable = 0, llfc_out_en = 0;
+	uint32_t llfc_enable = 0, xcm_out_en = 0, hwpfc_enable = 0;
+	uint32_t pkt_priority_to_cos = 0;
 	struct bnx2x *bp = params->bp;
-	u8 port = params->port;
+	uint8_t port = params->port;
 
 	int set_pfc = params->feature_config_flags &
 		FEATURE_CONFIG_PFC_ENABLED;
@@ -2187,7 +2198,7 @@ static void bnx2x_update_pfc_nig(struct link_params *params,
 	       NIG_REG_P0_HWPFC_ENABLE, hwpfc_enable);
 
 	if (nig_params) {
-		u8 i = 0;
+		uint8_t i = 0;
 		pkt_priority_to_cos = nig_params->pkt_priority_to_cos;
 
 		for (i = 0; i < nig_params->num_of_rx_cos_priority_mask; i++)
@@ -2215,9 +2226,9 @@ int bnx2x_update_pfc(struct link_params *params,
 	 * PFC is enabled, the pause are disabled, and when PFC is
 	 * disabled, pause are set according to the pause result.
 	 */
-	u32 val;
+	uint32_t val;
 	struct bnx2x *bp = params->bp;
-	u8 bmac_loopback = (params->loopback_mode == LOOPBACK_BMAC);
+	uint8_t bmac_loopback = (params->loopback_mode == LOOPBACK_BMAC);
 
 	if (params->feature_config_flags & FEATURE_CONFIG_PFC_ENABLED)
 		vars->link_status |= LINK_STATUS_PFC_ENABLED;
@@ -2263,14 +2274,14 @@ int bnx2x_update_pfc(struct link_params *params,
 
 static int bnx2x_bmac1_enable(struct link_params *params,
 			      struct link_vars *vars,
-			      u8 is_lb)
+			      uint8_t is_lb)
 {
 	struct bnx2x *bp = params->bp;
-	u8 port = params->port;
-	u32 bmac_addr = port ? NIG_REG_INGRESS_BMAC1_MEM :
+	uint8_t port = params->port;
+	uint32_t bmac_addr = port ? NIG_REG_INGRESS_BMAC1_MEM :
 			       NIG_REG_INGRESS_BMAC0_MEM;
-	u32 wb_data[2];
-	u32 val;
+	uint32_t wb_data[2];
+	uint32_t val;
 
 	DP(NETIF_MSG_LINK, "Enabling BigMAC1\n");
 
@@ -2327,13 +2338,13 @@ static int bnx2x_bmac1_enable(struct link_params *params,
 
 static int bnx2x_bmac2_enable(struct link_params *params,
 			      struct link_vars *vars,
-			      u8 is_lb)
+			      uint8_t is_lb)
 {
 	struct bnx2x *bp = params->bp;
-	u8 port = params->port;
-	u32 bmac_addr = port ? NIG_REG_INGRESS_BMAC1_MEM :
+	uint8_t port = params->port;
+	uint32_t bmac_addr = port ? NIG_REG_INGRESS_BMAC1_MEM :
 			       NIG_REG_INGRESS_BMAC0_MEM;
-	u32 wb_data[2];
+	uint32_t wb_data[2];
 
 	DP(NETIF_MSG_LINK, "Enabling BigMAC2\n");
 
@@ -2392,12 +2403,12 @@ static int bnx2x_bmac2_enable(struct link_params *params,
 
 static int bnx2x_bmac_enable(struct link_params *params,
 			     struct link_vars *vars,
-			     u8 is_lb, u8 reset_bmac)
+			     uint8_t is_lb, uint8_t reset_bmac)
 {
 	int rc = 0;
-	u8 port = params->port;
+	uint8_t port = params->port;
 	struct bnx2x *bp = params->bp;
-	u32 val;
+	uint32_t val;
 	/* Reset and unreset the BigMac */
 	if (reset_bmac) {
 		REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_CLEAR,
@@ -2435,12 +2446,14 @@ static int bnx2x_bmac_enable(struct link_params *params,
 	return rc;
 }
 
-static void bnx2x_set_bmac_rx(struct bnx2x *bp, u32 chip_id, u8 port, u8 en)
+static void bnx2x_set_bmac_rx(struct bnx2x *bp, uint32_t chip_id,
+			      uint8_t port,
+			      uint8_t en)
 {
-	u32 bmac_addr = port ? NIG_REG_INGRESS_BMAC1_MEM :
+	uint32_t bmac_addr = port ? NIG_REG_INGRESS_BMAC1_MEM :
 			NIG_REG_INGRESS_BMAC0_MEM;
-	u32 wb_data[2];
-	u32 nig_bmac_enable = REG_RD(bp, NIG_REG_BMAC0_REGS_OUT_EN + port*4);
+	uint32_t wb_data[2];
+	uint32_t nig_bmac_enable = REG_RD(bp, NIG_REG_BMAC0_REGS_OUT_EN + port*4);
 
 	if (CHIP_IS_E2(bp))
 		bmac_addr += BIGMAC2_REGISTER_BMAC_CONTROL;
@@ -2461,13 +2474,13 @@ static void bnx2x_set_bmac_rx(struct bnx2x *bp, u32 chip_id, u8 port, u8 en)
 	}
 }
 
-static int bnx2x_pbf_update(struct link_params *params, u32 flow_ctrl,
-			    u32 line_speed)
+static int bnx2x_pbf_update(struct link_params *params, uint32_t flow_ctrl,
+			    uint32_t line_speed)
 {
 	struct bnx2x *bp = params->bp;
-	u8 port = params->port;
-	u32 init_crd, crd;
-	u32 count = 1000;
+	uint8_t port = params->port;
+	uint32_t init_crd, crd;
+	uint32_t count = 1000;
 
 	/* Disable port */
 	REG_WR(bp, PBF_REG_DISABLE_NEW_TASK_PROC_P0 + port*4, 0x1);
@@ -2501,7 +2514,7 @@ static int bnx2x_pbf_update(struct link_params *params, u32 flow_ctrl,
 		init_crd = 778;		/* (800-18-4) */
 
 	} else {
-		u32 thresh = (ETH_MAX_JUMBO_PACKET_SIZE +
+		uint32_t thresh = (ETH_MAX_JUMBO_PACKET_SIZE +
 			      ETH_OVREHEAD)/16;
 		REG_WR(bp, PBF_REG_P0_PAUSE_ENABLE + port*4, 0);
 		/* Update threshold */
@@ -2546,10 +2559,10 @@ static int bnx2x_pbf_update(struct link_params *params, u32 flow_ctrl,
  * configuration, is passed here as mdc_mdio_access and selects
  * the emac_base for the CL45 read/writes operations
  */
-static u32 bnx2x_get_emac_base(struct bnx2x *bp,
-			       u32 mdc_mdio_access, u8 port)
+static uint32_t bnx2x_get_emac_base(struct bnx2x *bp,
+			       uint32_t mdc_mdio_access, uint8_t port)
 {
-	u32 emac_base = 0;
+	uint32_t emac_base = 0;
 	switch (mdc_mdio_access) {
 	case SHARED_HW_CFG_MDC_MDIO_ACCESS1_PHY_TYPE:
 		break;
@@ -2583,10 +2596,10 @@ static u32 bnx2x_get_emac_base(struct bnx2x *bp,
 /******************************************************************/
 static int bnx2x_cl22_write(struct bnx2x *bp,
 				       struct bnx2x_phy *phy,
-				       u16 reg, u16 val)
+				       uint16_t reg, uint16_t val)
 {
-	u32 tmp, mode;
-	u8 i;
+	uint32_t tmp, mode;
+	uint8_t i;
 	int rc = 0;
 	/* Switch to CL22 */
 	mode = REG_RD(bp, phy->mdio_ctrl + EMAC_REG_EMAC_MDIO_MODE);
@@ -2618,10 +2631,10 @@ static int bnx2x_cl22_write(struct bnx2x *bp,
 
 static int bnx2x_cl22_read(struct bnx2x *bp,
 				      struct bnx2x_phy *phy,
-				      u16 reg, u16 *ret_val)
+				      uint16_t reg, uint16_t *ret_val)
 {
-	u32 val, mode;
-	u16 i;
+	uint32_t val, mode;
+	uint16_t i;
 	int rc = 0;
 
 	/* Switch to CL22 */
@@ -2640,7 +2653,7 @@ static int bnx2x_cl22_read(struct bnx2x *bp,
 
 		val = REG_RD(bp, phy->mdio_ctrl + EMAC_REG_EMAC_MDIO_COMM);
 		if (!(val & EMAC_MDIO_COMM_START_BUSY)) {
-			*ret_val = (u16)(val & EMAC_MDIO_COMM_DATA);
+			*ret_val = (uint16_t)(val & EMAC_MDIO_COMM_DATA);
 			udelay(5);
 			break;
 		}
@@ -2659,12 +2672,12 @@ static int bnx2x_cl22_read(struct bnx2x *bp,
 /*			CL45 access functions			  */
 /******************************************************************/
 static int bnx2x_cl45_read(struct bnx2x *bp, struct bnx2x_phy *phy,
-			   u8 devad, u16 reg, u16 *ret_val)
+			   uint8_t devad, uint16_t reg, uint16_t *ret_val)
 {
-	u32 val;
-	u16 i;
+	uint32_t val;
+	uint16_t i;
 	int rc = 0;
-	u32 chip_id;
+	uint32_t chip_id;
 	if (phy->flags & FLAGS_MDC_MDIO_WA_G) {
 		chip_id = (REG_RD(bp, MISC_REG_CHIP_NUM) << 16) |
 			  ((REG_RD(bp, MISC_REG_CHIP_REV) & 0xf) << 12);
@@ -2707,7 +2720,7 @@ static int bnx2x_cl45_read(struct bnx2x *bp, struct bnx2x_phy *phy,
 			val = REG_RD(bp, phy->mdio_ctrl +
 				     EMAC_REG_EMAC_MDIO_COMM);
 			if (!(val & EMAC_MDIO_COMM_START_BUSY)) {
-				*ret_val = (u16)(val & EMAC_MDIO_COMM_DATA);
+				*ret_val = (uint16_t)(val & EMAC_MDIO_COMM_DATA);
 				break;
 			}
 		}
@@ -2722,7 +2735,7 @@ static int bnx2x_cl45_read(struct bnx2x *bp, struct bnx2x_phy *phy,
 	if (phy->flags & FLAGS_MDC_MDIO_WA) {
 		phy->flags ^= FLAGS_DUMMY_READ;
 		if (phy->flags & FLAGS_DUMMY_READ) {
-			u16 temp_val;
+			uint16_t temp_val;
 			bnx2x_cl45_read(bp, phy, devad, 0xf, &temp_val);
 		}
 	}
@@ -2734,12 +2747,12 @@ static int bnx2x_cl45_read(struct bnx2x *bp, struct bnx2x_phy *phy,
 }
 
 static int bnx2x_cl45_write(struct bnx2x *bp, struct bnx2x_phy *phy,
-			    u8 devad, u16 reg, u16 val)
+			    uint8_t devad, uint16_t reg, uint16_t val)
 {
-	u32 tmp;
-	u8 i;
+	uint32_t tmp;
+	uint8_t i;
 	int rc = 0;
-	u32 chip_id;
+	uint32_t chip_id;
 	if (phy->flags & FLAGS_MDC_MDIO_WA_G) {
 		chip_id = (REG_RD(bp, MISC_REG_CHIP_NUM) << 16) |
 			  ((REG_RD(bp, MISC_REG_CHIP_REV) & 0xf) << 12);
@@ -2796,7 +2809,7 @@ static int bnx2x_cl45_write(struct bnx2x *bp, struct bnx2x_phy *phy,
 	if (phy->flags & FLAGS_MDC_MDIO_WA) {
 		phy->flags ^= FLAGS_DUMMY_READ;
 		if (phy->flags & FLAGS_DUMMY_READ) {
-			u16 temp_val;
+			uint16_t temp_val;
 			bnx2x_cl45_read(bp, phy, devad, 0xf, &temp_val);
 		}
 	}
@@ -2809,7 +2822,7 @@ static int bnx2x_cl45_write(struct bnx2x *bp, struct bnx2x_phy *phy,
 /******************************************************************/
 /*			EEE section				   */
 /******************************************************************/
-static u8 bnx2x_eee_has_cap(struct link_params *params)
+static uint8_t bnx2x_eee_has_cap(struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
 
@@ -2820,7 +2833,7 @@ static u8 bnx2x_eee_has_cap(struct link_params *params)
 	return 1;
 }
 
-static int bnx2x_eee_nvram_to_time(u32 nvram_mode, u32 *idle_timer)
+static int bnx2x_eee_nvram_to_time(uint32_t nvram_mode, uint32_t *idle_timer)
 {
 	switch (nvram_mode) {
 	case PORT_FEAT_CFG_EEE_POWER_MODE_BALANCED:
@@ -2840,7 +2853,7 @@ static int bnx2x_eee_nvram_to_time(u32 nvram_mode, u32 *idle_timer)
 	return 0;
 }
 
-static int bnx2x_eee_time_to_nvram(u32 idle_timer, u32 *nvram_mode)
+static int bnx2x_eee_time_to_nvram(uint32_t idle_timer, uint32_t *nvram_mode)
 {
 	switch (idle_timer) {
 	case EEE_MODE_NVRAM_BALANCED_TIME:
@@ -2860,9 +2873,9 @@ static int bnx2x_eee_time_to_nvram(u32 idle_timer, u32 *nvram_mode)
 	return 0;
 }
 
-static u32 bnx2x_eee_calc_timer(struct link_params *params)
+static uint32_t bnx2x_eee_calc_timer(struct link_params *params)
 {
-	u32 eee_mode, eee_idle;
+	uint32_t eee_mode, eee_idle;
 	struct bnx2x *bp = params->bp;
 
 	if (params->eee_mode & EEE_MODE_OVERRIDE_NVRAM) {
@@ -2895,7 +2908,7 @@ static u32 bnx2x_eee_calc_timer(struct link_params *params)
 static int bnx2x_eee_set_timers(struct link_params *params,
 				   struct link_vars *vars)
 {
-	u32 eee_idle = 0, eee_mode;
+	uint32_t eee_idle = 0, eee_mode;
 	struct bnx2x *bp = params->bp;
 
 	eee_idle = bnx2x_eee_calc_timer(params);
@@ -2926,9 +2939,9 @@ static int bnx2x_eee_set_timers(struct link_params *params,
 }
 
 static int bnx2x_eee_initial_config(struct link_params *params,
-				     struct link_vars *vars, u8 mode)
+				     struct link_vars *vars, uint8_t mode)
 {
-	vars->eee_status |= ((u32) mode) << SHMEM_EEE_SUPPORTED_SHIFT;
+	vars->eee_status |= ((uint32_t) mode) << SHMEM_EEE_SUPPORTED_SHIFT;
 
 	/* Propogate params' bits --> vars (for migration exposure) */
 	if (params->eee_mode & EEE_MODE_ENABLE_LPI)
@@ -2962,10 +2975,10 @@ static int bnx2x_eee_disable(struct bnx2x_phy *phy,
 
 static int bnx2x_eee_advertise(struct bnx2x_phy *phy,
 				  struct link_params *params,
-				  struct link_vars *vars, u8 modes)
+				  struct link_vars *vars, uint8_t modes)
 {
 	struct bnx2x *bp = params->bp;
-	u16 val = 0;
+	uint16_t val = 0;
 
 	/* Mask events preventing LPI generation */
 	REG_WR(bp, MISC_REG_CPMU_LP_MASK_EXT_P0 + (params->port << 2), 0xfc20);
@@ -2987,7 +3000,8 @@ static int bnx2x_eee_advertise(struct bnx2x_phy *phy,
 	return 0;
 }
 
-static void bnx2x_update_mng_eee(struct link_params *params, u32 eee_status)
+static void bnx2x_update_mng_eee(struct link_params *params,
+				 uint32_t eee_status)
 {
 	struct bnx2x *bp = params->bp;
 
@@ -3002,9 +3016,9 @@ static void bnx2x_eee_an_resolve(struct bnx2x_phy *phy,
 				  struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u16 adv = 0, lp = 0;
-	u32 lp_adv = 0;
-	u8 neg = 0;
+	uint16_t adv = 0, lp = 0;
+	uint32_t lp_adv = 0;
+	uint8_t neg = 0;
 
 	bnx2x_cl45_read(bp, phy, MDIO_AN_DEVAD, MDIO_AN_REG_EEE_ADV, &adv);
 	bnx2x_cl45_read(bp, phy, MDIO_AN_DEVAD, MDIO_AN_REG_LP_EEE_ADV, &lp);
@@ -3050,10 +3064,10 @@ static void bnx2x_eee_an_resolve(struct bnx2x_phy *phy,
 static void bnx2x_bsc_module_sel(struct link_params *params)
 {
 	int idx;
-	u32 board_cfg, sfp_ctrl;
-	u32 i2c_pins[I2C_SWITCH_WIDTH], i2c_val[I2C_SWITCH_WIDTH];
+	uint32_t board_cfg, sfp_ctrl;
+	uint32_t i2c_pins[I2C_SWITCH_WIDTH], i2c_val[I2C_SWITCH_WIDTH];
 	struct bnx2x *bp = params->bp;
-	u8 port = params->port;
+	uint8_t port = params->port;
 	/* Read I2C output PINs */
 	board_cfg = REG_RD(bp, params->shmem_base +
 			   offsetof(struct shmem_region,
@@ -3075,13 +3089,13 @@ static void bnx2x_bsc_module_sel(struct link_params *params)
 
 static int bnx2x_bsc_read(struct link_params *params,
 			  struct bnx2x *bp,
-			  u8 sl_devid,
-			  u16 sl_addr,
-			  u8 lc_addr,
-			  u8 xfer_cnt,
-			  u32 *data_array)
+			  uint8_t sl_devid,
+			  uint16_t sl_addr,
+			  uint8_t lc_addr,
+			  uint8_t xfer_cnt,
+			  uint32_t *data_array)
 {
-	u32 val, i;
+	uint32_t val, i;
 	int rc = 0;
 
 	if (xfer_cnt > 16) {
@@ -3161,26 +3175,28 @@ static int bnx2x_bsc_read(struct link_params *params,
 }
 
 static void bnx2x_cl45_read_or_write(struct bnx2x *bp, struct bnx2x_phy *phy,
-				     u8 devad, u16 reg, u16 or_val)
+				     uint8_t devad, uint16_t reg,
+				     uint16_t or_val)
 {
-	u16 val;
+	uint16_t val;
 	bnx2x_cl45_read(bp, phy, devad, reg, &val);
 	bnx2x_cl45_write(bp, phy, devad, reg, val | or_val);
 }
 
 static void bnx2x_cl45_read_and_write(struct bnx2x *bp,
 				      struct bnx2x_phy *phy,
-				      u8 devad, u16 reg, u16 and_val)
+				      uint8_t devad, uint16_t reg,
+				      uint16_t and_val)
 {
-	u16 val;
+	uint16_t val;
 	bnx2x_cl45_read(bp, phy, devad, reg, &val);
 	bnx2x_cl45_write(bp, phy, devad, reg, val & and_val);
 }
 
-int bnx2x_phy_read(struct link_params *params, u8 phy_addr,
-		   u8 devad, u16 reg, u16 *ret_val)
+int bnx2x_phy_read(struct link_params *params, uint8_t phy_addr,
+		   uint8_t devad, uint16_t reg, uint16_t *ret_val)
 {
-	u8 phy_index;
+	uint8_t phy_index;
 	/* Probe for the phy according to the given phy_addr, and execute
 	 * the read request on it
 	 */
@@ -3194,10 +3210,10 @@ int bnx2x_phy_read(struct link_params *params, u8 phy_addr,
 	return -EINVAL;
 }
 
-int bnx2x_phy_write(struct link_params *params, u8 phy_addr,
-		    u8 devad, u16 reg, u16 val)
+int bnx2x_phy_write(struct link_params *params, uint8_t phy_addr,
+		    uint8_t devad, uint16_t reg, uint16_t val)
 {
-	u8 phy_index;
+	uint8_t phy_index;
 	/* Probe for the phy according to the given phy_addr, and execute
 	 * the write request on it
 	 */
@@ -3210,19 +3226,19 @@ int bnx2x_phy_write(struct link_params *params, u8 phy_addr,
 	}
 	return -EINVAL;
 }
-static u8 bnx2x_get_warpcore_lane(struct bnx2x_phy *phy,
+static uint8_t bnx2x_get_warpcore_lane(struct bnx2x_phy *phy,
 				  struct link_params *params)
 {
-	u8 lane = 0;
+	uint8_t lane = 0;
 	struct bnx2x *bp = params->bp;
-	u32 path_swap, path_swap_ovr;
-	u8 path, port;
+	uint32_t path_swap, path_swap_ovr;
+	uint8_t path, port;
 
 	path = BP_PATH(bp);
 	port = params->port;
 
 	if (bnx2x_is_4_port_mode(bp)) {
-		u32 port_swap, port_swap_ovr;
+		uint32_t port_swap, port_swap_ovr;
 
 		/* Figure out path swap value */
 		path_swap_ovr = REG_RD(bp, MISC_REG_FOUR_PORT_PATH_SWAP_OVWR);
@@ -3267,8 +3283,8 @@ static u8 bnx2x_get_warpcore_lane(struct bnx2x_phy *phy,
 static void bnx2x_set_aer_mmd(struct link_params *params,
 			      struct bnx2x_phy *phy)
 {
-	u32 ser_lane;
-	u16 offset, aer_val;
+	uint32_t ser_lane;
+	uint16_t offset, aer_val;
 	struct bnx2x *bp = params->bp;
 	ser_lane = ((params->lane_config &
 		     PORT_HW_CFG_LANE_SWAP_CFG_MASTER_MASK) >>
@@ -3301,9 +3317,9 @@ static void bnx2x_set_aer_mmd(struct link_params *params,
 /*			Internal phy section			  */
 /******************************************************************/
 
-static void bnx2x_set_serdes_access(struct bnx2x *bp, u8 port)
+static void bnx2x_set_serdes_access(struct bnx2x *bp, uint8_t port)
 {
-	u32 emac_base = (port) ? GRCBASE_EMAC1 : GRCBASE_EMAC0;
+	uint32_t emac_base = (port) ? GRCBASE_EMAC1 : GRCBASE_EMAC0;
 
 	/* Set Clause 22 */
 	REG_WR(bp, NIG_REG_SERDES0_CTRL_MD_ST + port*0x10, 1);
@@ -3315,9 +3331,9 @@ static void bnx2x_set_serdes_access(struct bnx2x *bp, u8 port)
 	REG_WR(bp, NIG_REG_SERDES0_CTRL_MD_ST + port*0x10, 0);
 }
 
-static void bnx2x_serdes_deassert(struct bnx2x *bp, u8 port)
+static void bnx2x_serdes_deassert(struct bnx2x *bp, uint8_t port)
 {
-	u32 val;
+	uint32_t val;
 
 	DP(NETIF_MSG_LINK, "bnx2x_serdes_deassert\n");
 
@@ -3336,7 +3352,7 @@ static void bnx2x_serdes_deassert(struct bnx2x *bp, u8 port)
 
 static void bnx2x_xgxs_specific_func(struct bnx2x_phy *phy,
 				     struct link_params *params,
-				     u32 action)
+				     uint32_t action)
 {
 	struct bnx2x *bp = params->bp;
 	switch (action) {
@@ -3352,8 +3368,8 @@ static void bnx2x_xgxs_specific_func(struct bnx2x_phy *phy,
 static void bnx2x_xgxs_deassert(struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u8 port;
-	u32 val;
+	uint8_t port;
+	uint32_t val;
 	DP(NETIF_MSG_LINK, "bnx2x_xgxs_deassert\n");
 	port = params->port;
 
@@ -3368,7 +3384,8 @@ static void bnx2x_xgxs_deassert(struct link_params *params)
 }
 
 static void bnx2x_calc_ieee_aneg_adv(struct bnx2x_phy *phy,
-				     struct link_params *params, u16 *ieee_fc)
+				     struct link_params *params,
+				     uint16_t *ieee_fc)
 {
 	struct bnx2x *bp = params->bp;
 	*ieee_fc = MDIO_COMBO_IEEE0_AUTO_NEG_ADV_FULL_DUPLEX;
@@ -3412,8 +3429,8 @@ static void set_phy_vars(struct link_params *params,
 			 struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u8 actual_phy_idx, phy_index, link_cfg_idx;
-	u8 phy_config_swapped = params->multi_phy_config &
+	uint8_t actual_phy_idx, phy_index, link_cfg_idx;
+	uint8_t phy_config_swapped = params->multi_phy_config &
 			PORT_HW_CFG_PHY_SWAPPED_ENABLED;
 	for (phy_index = INT_PHY; phy_index < params->num_phys;
 	      phy_index++) {
@@ -3453,7 +3470,7 @@ static void bnx2x_ext_phy_set_pause(struct link_params *params,
 				    struct bnx2x_phy *phy,
 				    struct link_vars *vars)
 {
-	u16 val;
+	uint16_t val;
 	struct bnx2x *bp = params->bp;
 	/* Read modify write pause advertizing */
 	bnx2x_cl45_read(bp, phy, MDIO_AN_DEVAD, MDIO_AN_REG_ADV_PAUSE, &val);
@@ -3476,7 +3493,7 @@ static void bnx2x_ext_phy_set_pause(struct link_params *params,
 	bnx2x_cl45_write(bp, phy, MDIO_AN_DEVAD, MDIO_AN_REG_ADV_PAUSE, val);
 }
 
-static void bnx2x_pause_resolve(struct link_vars *vars, u32 pause_result)
+static void bnx2x_pause_resolve(struct link_vars *vars, uint32_t pause_result)
 {						/*  LD	    LP	 */
 	switch (pause_result) {			/* ASYM P ASYM P */
 	case 0xb:				/*   1  0   1  1 */
@@ -3508,17 +3525,17 @@ static void bnx2x_ext_phy_update_adv_fc(struct bnx2x_phy *phy,
 					struct link_params *params,
 					struct link_vars *vars)
 {
-	u16 ld_pause;		/* local */
-	u16 lp_pause;		/* link partner */
-	u16 pause_result;
+	uint16_t ld_pause;		/* local */
+	uint16_t lp_pause;		/* link partner */
+	uint16_t pause_result;
 	struct bnx2x *bp = params->bp;
 	if (phy->type == PORT_HW_CFG_XGXS_EXT_PHY_TYPE_BCM54618SE) {
 		bnx2x_cl22_read(bp, phy, 0x4, &ld_pause);
 		bnx2x_cl22_read(bp, phy, 0x5, &lp_pause);
 	} else if (CHIP_IS_E3(bp) &&
 		SINGLE_MEDIA_DIRECT(params)) {
-		u8 lane = bnx2x_get_warpcore_lane(phy, params);
-		u16 gp_status, gp_mask;
+		uint8_t lane = bnx2x_get_warpcore_lane(phy, params);
+		uint16_t gp_status, gp_mask;
 		bnx2x_cl45_read(bp, phy,
 				MDIO_AN_DEVAD, MDIO_WC_REG_GP2_STATUS_GP_2_4,
 				&gp_status);
@@ -3559,11 +3576,11 @@ static void bnx2x_ext_phy_update_adv_fc(struct bnx2x_phy *phy,
 
 }
 
-static u8 bnx2x_ext_phy_resolve_fc(struct bnx2x_phy *phy,
+static uint8_t bnx2x_ext_phy_resolve_fc(struct bnx2x_phy *phy,
 				   struct link_params *params,
 				   struct link_vars *vars)
 {
-	u8 ret = 0;
+	uint8_t ret = 0;
 	vars->flow_ctrl = BNX2X_FLOW_CTRL_NONE;
 	if (phy->req_flow_ctrl != BNX2X_FLOW_CTRL_AUTO) {
 		/* Update the advertised flow-controled of LD/LP in AN */
@@ -3602,7 +3619,7 @@ static void bnx2x_warpcore_enable_AN_KR2(struct bnx2x_phy *phy,
 					 struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u16 i;
+	uint16_t i;
 	static struct bnx2x_reg_set reg_set[] = {
 		/* Step 1 - Program the TX/RX alignment markers */
 		{MDIO_WC_DEVAD, MDIO_WC_REG_CL82_USERB1_TX_CTRL5, 0xa157},
@@ -3688,7 +3705,7 @@ static void bnx2x_warpcore_restart_AN_KR(struct bnx2x_phy *phy,
 {
 	/* Restart autoneg on the leading lane only */
 	struct bnx2x *bp = params->bp;
-	u16 lane = bnx2x_get_warpcore_lane(phy, params);
+	uint16_t lane = bnx2x_get_warpcore_lane(phy, params);
 	CL22_WR_OVER_CL45(bp, phy, MDIO_REG_BANK_AER_BLOCK,
 			  MDIO_AER_BLOCK_AER_REG, lane);
 	bnx2x_cl45_write(bp, phy, MDIO_AN_DEVAD,
@@ -3701,8 +3718,8 @@ static void bnx2x_warpcore_restart_AN_KR(struct bnx2x_phy *phy,
 static void bnx2x_warpcore_enable_AN_KR(struct bnx2x_phy *phy,
 					struct link_params *params,
 					struct link_vars *vars) {
-	u16 lane, i, cl72_ctrl, an_adv = 0, val;
-	u32 wc_lane_config;
+	uint16_t lane, i, cl72_ctrl, an_adv = 0, val;
+	uint32_t wc_lane_config;
 	struct bnx2x *bp = params->bp;
 	static struct bnx2x_reg_set reg_set[] = {
 		{MDIO_WC_DEVAD, MDIO_WC_REG_SERDESDIGITAL_CONTROL1000X2, 0x7},
@@ -3731,7 +3748,7 @@ static void bnx2x_warpcore_enable_AN_KR(struct bnx2x_phy *phy,
 	if (((vars->line_speed == SPEED_AUTO_NEG) &&
 	     (phy->speed_cap_mask & PORT_HW_CFG_SPEED_CAPABILITY_D0_1G)) ||
 	    (vars->line_speed == SPEED_1000)) {
-		u16 addr = MDIO_WC_REG_SERDESDIGITAL_CONTROL1000X2;
+		uint16_t addr = MDIO_WC_REG_SERDESDIGITAL_CONTROL1000X2;
 		an_adv |= (1<<5);
 
 		/* Enable CL37 1G Parallel Detect */
@@ -3855,7 +3872,7 @@ static void bnx2x_warpcore_set_10G_KR(struct bnx2x_phy *phy,
 				      struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u16 val16, i, lane;
+	uint16_t val16, i, lane;
 	static struct bnx2x_reg_set reg_set[] = {
 		/* Disable Autoneg */
 		{MDIO_WC_DEVAD, MDIO_WC_REG_SERDESDIGITAL_CONTROL1000X2, 0x7},
@@ -3920,11 +3937,11 @@ static void bnx2x_warpcore_set_10G_KR(struct bnx2x_phy *phy,
 
 static void bnx2x_warpcore_set_10G_XFI(struct bnx2x_phy *phy,
 				       struct link_params *params,
-				       u8 is_xfi)
+				       uint8_t is_xfi)
 {
 	struct bnx2x *bp = params->bp;
-	u16 misc1_val, tap_val, tx_driver_val, lane, val;
-	u32 cfg_tap_val, tx_drv_brdct, tx_equal;
+	uint16_t misc1_val, tap_val, tx_driver_val, lane, val;
+	uint32_t cfg_tap_val, tx_drv_brdct, tx_equal;
 
 	/* Hold rxSeqStart */
 	bnx2x_cl45_read_or_write(bp, phy, MDIO_WC_DEVAD,
@@ -3987,12 +4004,13 @@ static void bnx2x_warpcore_set_10G_XFI(struct bnx2x_phy *phy,
 
 		/* TAP values are controlled by nvram, if value there isn't 0 */
 		if (tx_equal)
-			tap_val = (u16)tx_equal;
+			tap_val = (uint16_t)tx_equal;
 		else
 			tap_val = WC_TX_FIR(0x0f, 0x2b, 0x02);
 
 		if (tx_drv_brdct)
-			tx_driver_val = WC_TX_DRIVER(0x03, (u16)tx_drv_brdct,
+			tx_driver_val = WC_TX_DRIVER(0x03,
+						     (uint16_t)tx_drv_brdct,
 						     0x06);
 		else
 			tx_driver_val = WC_TX_DRIVER(0x03, 0x02, 0x06);
@@ -4035,7 +4053,7 @@ static void bnx2x_warpcore_set_10G_XFI(struct bnx2x_phy *phy,
 static void bnx2x_warpcore_set_20G_force_KR2(struct bnx2x_phy *phy,
 					     struct link_params *params)
 {
-	u16 val;
+	uint16_t val;
 	struct bnx2x *bp = params->bp;
 	/* Set global registers, so set AER lane to 0 */
 	CL22_WR_OVER_CL45(bp, phy, MDIO_REG_BANK_AER_BLOCK,
@@ -4087,7 +4105,7 @@ static void bnx2x_warpcore_set_20G_force_KR2(struct bnx2x_phy *phy,
 
 static void bnx2x_warpcore_set_20G_DXGXS(struct bnx2x *bp,
 					 struct bnx2x_phy *phy,
-					 u16 lane)
+					 uint16_t lane)
 {
 	/* Rx0 anaRxControl1G */
 	bnx2x_cl45_write(bp, phy, MDIO_WC_DEVAD,
@@ -4141,11 +4159,11 @@ static void bnx2x_warpcore_set_20G_DXGXS(struct bnx2x *bp,
 
 static void bnx2x_warpcore_set_sgmii_speed(struct bnx2x_phy *phy,
 					   struct link_params *params,
-					   u8 fiber_mode,
-					   u8 always_autoneg)
+					   uint8_t fiber_mode,
+					   uint8_t always_autoneg)
 {
 	struct bnx2x *bp = params->bp;
-	u16 val16, digctrl_kx1, digctrl_kx2;
+	uint16_t val16, digctrl_kx1, digctrl_kx2;
 
 	/* Clear XFI clock comp in non-10G single lane mode. */
 	bnx2x_cl45_read_and_write(bp, phy, MDIO_WC_DEVAD,
@@ -4223,9 +4241,9 @@ static void bnx2x_warpcore_set_sgmii_speed(struct bnx2x_phy *phy,
 
 static void bnx2x_warpcore_reset_lane(struct bnx2x *bp,
 				      struct bnx2x_phy *phy,
-				      u8 reset)
+				      uint8_t reset)
 {
-	u16 val;
+	uint16_t val;
 	/* Take lane out of reset after configuration is finished */
 	bnx2x_cl45_read(bp, phy, MDIO_WC_DEVAD,
 			MDIO_WC_REG_DIGITAL5_MISC6, &val);
@@ -4241,10 +4259,10 @@ static void bnx2x_warpcore_reset_lane(struct bnx2x *bp,
 /* Clear SFI/XFI link settings registers */
 static void bnx2x_warpcore_clear_regs(struct bnx2x_phy *phy,
 				      struct link_params *params,
-				      u16 lane)
+				      uint16_t lane)
 {
 	struct bnx2x *bp = params->bp;
-	u16 i;
+	uint16_t i;
 	static struct bnx2x_reg_set wc_regs[] = {
 		{MDIO_AN_DEVAD, MDIO_AN_REG_CTRL, 0},
 		{MDIO_WC_DEVAD, MDIO_WC_REG_FX100_CTRL1, 0x014a},
@@ -4276,11 +4294,13 @@ static void bnx2x_warpcore_clear_regs(struct bnx2x_phy *phy,
 }
 
 static int bnx2x_get_mod_abs_int_cfg(struct bnx2x *bp,
-						u32 chip_id,
-						u32 shmem_base, u8 port,
-						u8 *gpio_num, u8 *gpio_port)
+						uint32_t chip_id,
+						uint32_t shmem_base,
+				     uint8_t port,
+						uint8_t *gpio_num,
+				     uint8_t *gpio_port)
 {
-	u32 cfg_pin;
+	uint32_t cfg_pin;
 	*gpio_num = 0;
 	*gpio_port = 0;
 	if (CHIP_IS_E3(bp)) {
@@ -4318,8 +4338,8 @@ static int bnx2x_is_sfp_module_plugged(struct bnx2x_phy *phy,
 				       struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u8 gpio_num, gpio_port;
-	u32 gpio_val;
+	uint8_t gpio_num, gpio_port;
+	uint32_t gpio_val;
 	if (bnx2x_get_mod_abs_int_cfg(bp, params->chip_id,
 				      params->shmem_base, params->port,
 				      &gpio_num, &gpio_port) != 0)
@@ -4335,7 +4355,7 @@ static int bnx2x_is_sfp_module_plugged(struct bnx2x_phy *phy,
 static int bnx2x_warpcore_get_sigdet(struct bnx2x_phy *phy,
 				     struct link_params *params)
 {
-	u16 gp2_status_reg0, lane;
+	uint16_t gp2_status_reg0, lane;
 	struct bnx2x *bp = params->bp;
 
 	lane = bnx2x_get_warpcore_lane(phy, params);
@@ -4351,8 +4371,8 @@ static void bnx2x_warpcore_config_runtime(struct bnx2x_phy *phy,
 					  struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u32 serdes_net_if;
-	u16 gp_status1 = 0, lnkup = 0, lnkup_kr = 0;
+	uint32_t serdes_net_if;
+	uint16_t gp_status1 = 0, lnkup = 0, lnkup_kr = 0;
 
 	vars->turn_to_run_wc_rt = vars->turn_to_run_wc_rt ? 0 : 1;
 
@@ -4360,7 +4380,7 @@ static void bnx2x_warpcore_config_runtime(struct bnx2x_phy *phy,
 		return;
 
 	if (vars->rx_tx_asic_rst) {
-		u16 lane = bnx2x_get_warpcore_lane(phy, params);
+		uint16_t lane = bnx2x_get_warpcore_lane(phy, params);
 		serdes_net_if = (REG_RD(bp, params->shmem_base +
 				offsetof(struct shmem_region, dev_info.
 				port_hw_config[params->port].default_cfg)) &
@@ -4402,7 +4422,7 @@ static void bnx2x_warpcore_config_runtime(struct bnx2x_phy *phy,
 static void bnx2x_warpcore_config_sfi(struct bnx2x_phy *phy,
 				      struct link_params *params)
 {
-	u16 lane = bnx2x_get_warpcore_lane(phy, params);
+	uint16_t lane = bnx2x_get_warpcore_lane(phy, params);
 	struct bnx2x *bp = params->bp;
 	bnx2x_warpcore_clear_regs(phy, params, lane);
 	if ((params->req_line_speed[LINK_CONFIG_IDX(INT_PHY)] ==
@@ -4418,11 +4438,11 @@ static void bnx2x_warpcore_config_sfi(struct bnx2x_phy *phy,
 
 static void bnx2x_sfp_e3_set_transmitter(struct link_params *params,
 					 struct bnx2x_phy *phy,
-					 u8 tx_en)
+					 uint8_t tx_en)
 {
 	struct bnx2x *bp = params->bp;
-	u32 cfg_pin;
-	u8 port = params->port;
+	uint32_t cfg_pin;
+	uint8_t port = params->port;
 
 	cfg_pin = REG_RD(bp, params->shmem_base +
 			 offsetof(struct shmem_region,
@@ -4442,9 +4462,9 @@ static void bnx2x_warpcore_config_init(struct bnx2x_phy *phy,
 				       struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u32 serdes_net_if;
-	u8 fiber_mode;
-	u16 lane = bnx2x_get_warpcore_lane(phy, params);
+	uint32_t serdes_net_if;
+	uint8_t fiber_mode;
+	uint16_t lane = bnx2x_get_warpcore_lane(phy, params);
 	serdes_net_if = (REG_RD(bp, params->shmem_base +
 			 offsetof(struct shmem_region, dev_info.
 				  port_hw_config[params->port].default_cfg)) &
@@ -4549,7 +4569,7 @@ static void bnx2x_warpcore_link_reset(struct bnx2x_phy *phy,
 				      struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u16 val16, lane;
+	uint16_t val16, lane;
 	bnx2x_sfp_e3_set_transmitter(params, phy, 0);
 	bnx2x_set_mdio_emac_per_phy(bp, params);
 	bnx2x_set_aer_mmd(params, phy);
@@ -4604,8 +4624,8 @@ static void bnx2x_set_warpcore_loopback(struct bnx2x_phy *phy,
 					struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u16 val16;
-	u32 lane;
+	uint16_t val16;
+	uint32_t lane;
 	DP(NETIF_MSG_LINK, "Setting Warpcore loopback type %x, speed %d\n",
 		       params->loopback_mode, phy->req_line_speed);
 
@@ -4649,7 +4669,7 @@ static void bnx2x_sync_link(struct link_params *params,
 			     struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u8 link_10g_plus;
+	uint8_t link_10g_plus;
 	if (vars->link_status & LINK_STATUS_PHYSICAL_LINK_FLAG)
 		vars->phy_flags |= PHY_PHYSICAL_LINK_FLAG;
 	vars->link_up = (vars->link_status & LINK_STATUS_LINK_UP);
@@ -4755,8 +4775,8 @@ void bnx2x_link_status_update(struct link_params *params,
 			      struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u8 port = params->port;
-	u32 sync_offset, media_types;
+	uint8_t port = params->port;
+	uint32_t sync_offset, media_types;
 	/* Update PHY configuration */
 	set_phy_vars(params, vars);
 
@@ -4822,7 +4842,7 @@ static void bnx2x_set_master_ln(struct link_params *params,
 				struct bnx2x_phy *phy)
 {
 	struct bnx2x *bp = params->bp;
-	u16 new_master_ln, ser_lane;
+	uint16_t new_master_ln, ser_lane;
 	ser_lane = ((params->lane_config &
 		     PORT_HW_CFG_LANE_SWAP_CFG_MASTER_MASK) >>
 		    PORT_HW_CFG_LANE_SWAP_CFG_MASTER_SHIFT);
@@ -4841,11 +4861,11 @@ static void bnx2x_set_master_ln(struct link_params *params,
 
 static int bnx2x_reset_unicore(struct link_params *params,
 			       struct bnx2x_phy *phy,
-			       u8 set_serdes)
+			       uint8_t set_serdes)
 {
 	struct bnx2x *bp = params->bp;
-	u16 mii_control;
-	u16 i;
+	uint16_t mii_control;
+	uint16_t i;
 	CL22_RD_OVER_CL45(bp, phy,
 			  MDIO_REG_BANK_COMBO_IEEE0,
 			  MDIO_COMBO_IEEE0_MII_CONTROL, &mii_control);
@@ -4890,7 +4910,7 @@ static void bnx2x_set_swap_lanes(struct link_params *params,
 	/* Each two bits represents a lane number:
 	 * No swap is 0123 => 0x1b no need to enable the swap
 	 */
-	u16 rx_lane_swap, tx_lane_swap;
+	uint16_t rx_lane_swap, tx_lane_swap;
 
 	rx_lane_swap = ((params->lane_config &
 			 PORT_HW_CFG_LANE_SWAP_CFG_RX_MASK) >>
@@ -4929,7 +4949,7 @@ static void bnx2x_set_parallel_detection(struct bnx2x_phy *phy,
 					 struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u16 control2;
+	uint16_t control2;
 	CL22_RD_OVER_CL45(bp, phy,
 			  MDIO_REG_BANK_SERDES_DIGITAL,
 			  MDIO_SERDES_DIGITAL_A_1000X_CONTROL2,
@@ -4981,10 +5001,10 @@ static void bnx2x_set_parallel_detection(struct bnx2x_phy *phy,
 static void bnx2x_set_autoneg(struct bnx2x_phy *phy,
 			      struct link_params *params,
 			      struct link_vars *vars,
-			      u8 enable_cl73)
+			      uint8_t enable_cl73)
 {
 	struct bnx2x *bp = params->bp;
-	u16 reg_val;
+	uint16_t reg_val;
 
 	/* CL37 Autoneg */
 	CL22_RD_OVER_CL45(bp, phy,
@@ -5087,7 +5107,7 @@ static void bnx2x_program_serdes(struct bnx2x_phy *phy,
 				 struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u16 reg_val;
+	uint16_t reg_val;
 
 	/* Program duplex, disable autoneg and sgmii*/
 	CL22_RD_OVER_CL45(bp, phy,
@@ -5135,7 +5155,7 @@ static void bnx2x_set_brcm_cl37_advertisement(struct bnx2x_phy *phy,
 					      struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u16 val = 0;
+	uint16_t val = 0;
 
 	/* Set extended capabilities */
 	if (phy->speed_cap_mask & PORT_HW_CFG_SPEED_CAPABILITY_D0_2_5G)
@@ -5153,10 +5173,10 @@ static void bnx2x_set_brcm_cl37_advertisement(struct bnx2x_phy *phy,
 
 static void bnx2x_set_ieee_aneg_advertisement(struct bnx2x_phy *phy,
 					      struct link_params *params,
-					      u16 ieee_fc)
+					      uint16_t ieee_fc)
 {
 	struct bnx2x *bp = params->bp;
-	u16 val;
+	uint16_t val;
 	/* For AN, we are always publishing full duplex */
 
 	CL22_WR_OVER_CL45(bp, phy,
@@ -5174,10 +5194,10 @@ static void bnx2x_set_ieee_aneg_advertisement(struct bnx2x_phy *phy,
 
 static void bnx2x_restart_autoneg(struct bnx2x_phy *phy,
 				  struct link_params *params,
-				  u8 enable_cl73)
+				  uint8_t enable_cl73)
 {
 	struct bnx2x *bp = params->bp;
-	u16 mii_control;
+	uint16_t mii_control;
 
 	DP(NETIF_MSG_LINK, "bnx2x_restart_autoneg\n");
 	/* Enable and restart BAM/CL37 aneg */
@@ -5217,7 +5237,7 @@ static void bnx2x_initialize_sgmii_process(struct bnx2x_phy *phy,
 					   struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u16 control1;
+	uint16_t control1;
 
 	/* In SGMII mode, the unicore is always slave */
 
@@ -5238,7 +5258,7 @@ static void bnx2x_initialize_sgmii_process(struct bnx2x_phy *phy,
 	/* If forced speed */
 	if (!(vars->line_speed == SPEED_AUTO_NEG)) {
 		/* Set speed, disable autoneg */
-		u16 mii_control;
+		uint16_t mii_control;
 
 		CL22_RD_OVER_CL45(bp, phy,
 				  MDIO_REG_BANK_COMBO_IEEE0,
@@ -5288,7 +5308,7 @@ static int bnx2x_direct_parallel_detect_used(struct bnx2x_phy *phy,
 					     struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u16 pd_10g, status2_1000x;
+	uint16_t pd_10g, status2_1000x;
 	if (phy->req_line_speed != SPEED_AUTO_NEG)
 		return 0;
 	CL22_RD_OVER_CL45(bp, phy,
@@ -5321,11 +5341,11 @@ static int bnx2x_direct_parallel_detect_used(struct bnx2x_phy *phy,
 static void bnx2x_update_adv_fc(struct bnx2x_phy *phy,
 				struct link_params *params,
 				struct link_vars *vars,
-				u32 gp_status)
+				uint32_t gp_status)
 {
-	u16 ld_pause;   /* local driver */
-	u16 lp_pause;   /* link partner */
-	u16 pause_result;
+	uint16_t ld_pause;   /* local driver */
+	uint16_t lp_pause;   /* link partner */
+	uint16_t pause_result;
 	struct bnx2x *bp = params->bp;
 	if ((gp_status &
 	     (MDIO_GP_STATUS_TOP_AN_STATUS1_CL73_AUTONEG_COMPLETE |
@@ -5368,7 +5388,7 @@ static void bnx2x_update_adv_fc(struct bnx2x_phy *phy,
 static void bnx2x_flow_ctrl_resolve(struct bnx2x_phy *phy,
 				    struct link_params *params,
 				    struct link_vars *vars,
-				    u32 gp_status)
+				    uint32_t gp_status)
 {
 	struct bnx2x *bp = params->bp;
 	vars->flow_ctrl = BNX2X_FLOW_CTRL_NONE;
@@ -5397,7 +5417,7 @@ static void bnx2x_check_fallback_to_cl37(struct bnx2x_phy *phy,
 					 struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u16 rx_status, ustat_val, cl37_fsm_received;
+	uint16_t rx_status, ustat_val, cl37_fsm_received;
 	DP(NETIF_MSG_LINK, "bnx2x_check_fallback_to_cl37\n");
 	/* Step 1: Make sure signal is detected */
 	CL22_RD_OVER_CL45(bp, phy,
@@ -5464,7 +5484,7 @@ static void bnx2x_check_fallback_to_cl37(struct bnx2x_phy *phy,
 static void bnx2x_xgxs_an_resolve(struct bnx2x_phy *phy,
 				  struct link_params *params,
 				  struct link_vars *vars,
-				  u32 gp_status)
+				  uint32_t gp_status)
 {
 	if (gp_status & MDIO_AN_CL73_OR_37_COMPLETE)
 		vars->link_status |=
@@ -5477,9 +5497,9 @@ static void bnx2x_xgxs_an_resolve(struct bnx2x_phy *phy,
 static int bnx2x_get_link_speed_duplex(struct bnx2x_phy *phy,
 				     struct link_params *params,
 				      struct link_vars *vars,
-				      u16 is_link_up,
-				      u16 speed_mask,
-				      u16 is_duplex)
+				      uint16_t is_link_up,
+				      uint16_t speed_mask,
+				      uint16_t is_duplex)
 {
 	struct bnx2x *bp = params->bp;
 	if (phy->req_line_speed == SPEED_AUTO_NEG)
@@ -5571,7 +5591,7 @@ static int bnx2x_link_settings_status(struct bnx2x_phy *phy,
 {
 	struct bnx2x *bp = params->bp;
 
-	u16 gp_status, duplex = DUPLEX_HALF, link_up = 0, speed_mask;
+	uint16_t gp_status, duplex = DUPLEX_HALF, link_up = 0, speed_mask;
 	int rc = 0;
 
 	/* Read gp_status */
@@ -5610,7 +5630,7 @@ static int bnx2x_link_settings_status(struct bnx2x_phy *phy,
 	/* Read LP advertised speeds*/
 	if (SINGLE_MEDIA_DIRECT(params) &&
 	    (vars->link_status & LINK_STATUS_AUTO_NEGOTIATE_COMPLETE)) {
-		u16 val;
+		uint16_t val;
 
 		CL22_RD_OVER_CL45(bp, phy, MDIO_REG_BANK_CL73_IEEEB1,
 				  MDIO_CL73_IEEEB1_AN_LP_ADV2, &val);
@@ -5644,8 +5664,8 @@ static int bnx2x_warpcore_read_status(struct bnx2x_phy *phy,
 				     struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u8 lane;
-	u16 gp_status1, gp_speed, link_up, duplex = DUPLEX_FULL;
+	uint8_t lane;
+	uint16_t gp_status1, gp_speed, link_up, duplex = DUPLEX_FULL;
 	int rc = 0;
 	lane = bnx2x_get_warpcore_lane(phy, params);
 	/* Read gp_status */
@@ -5658,7 +5678,7 @@ static int bnx2x_warpcore_read_status(struct bnx2x_phy *phy,
 		link_up &= 0x1;
 	} else if ((phy->req_line_speed > SPEED_10000) &&
 		(phy->supported & SUPPORTED_20000baseMLD2_Full)) {
-		u16 temp_link_up;
+		uint16_t temp_link_up;
 		bnx2x_cl45_read(bp, phy, MDIO_WC_DEVAD,
 				1, &temp_link_up);
 		bnx2x_cl45_read(bp, phy, MDIO_WC_DEVAD,
@@ -5679,7 +5699,7 @@ static int bnx2x_warpcore_read_status(struct bnx2x_phy *phy,
 			   (gp_status1)) &
 			(1 << lane);
 		if (phy->supported & SUPPORTED_20000baseKR2_Full) {
-			u16 an_link;
+			uint16_t an_link;
 			bnx2x_cl45_read(bp, phy, MDIO_AN_DEVAD,
 					MDIO_AN_REG_STATUS, &an_link);
 			bnx2x_cl45_read(bp, phy, MDIO_AN_DEVAD,
@@ -5687,7 +5707,7 @@ static int bnx2x_warpcore_read_status(struct bnx2x_phy *phy,
 			link_up |= (an_link & (1<<2));
 		}
 		if (link_up && SINGLE_MEDIA_DIRECT(params)) {
-			u16 pd, gp_status4;
+			uint16_t pd, gp_status4;
 			if (phy->req_line_speed == SPEED_AUTO_NEG) {
 				/* Check Autoneg complete */
 				bnx2x_cl45_read(bp, phy, MDIO_WC_DEVAD,
@@ -5712,7 +5732,7 @@ static int bnx2x_warpcore_read_status(struct bnx2x_phy *phy,
 
 	if ((vars->link_status & LINK_STATUS_AUTO_NEGOTIATE_COMPLETE) &&
 	    SINGLE_MEDIA_DIRECT(params)) {
-		u16 val;
+		uint16_t val;
 
 		bnx2x_cl45_read(bp, phy, MDIO_AN_DEVAD,
 				MDIO_AN_REG_LP_AUTO_NEG2, &val);
@@ -5768,9 +5788,9 @@ static void bnx2x_set_gmii_tx_driver(struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
 	struct bnx2x_phy *phy = &params->phy[INT_PHY];
-	u16 lp_up2;
-	u16 tx_driver;
-	u16 bank;
+	uint16_t lp_up2;
+	uint16_t tx_driver;
+	uint16_t bank;
 
 	/* Read precomp */
 	CL22_RD_OVER_CL45(bp, phy,
@@ -5807,8 +5827,8 @@ static int bnx2x_emac_program(struct link_params *params,
 			      struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u8 port = params->port;
-	u16 mode = 0;
+	uint8_t port = params->port;
+	uint16_t mode = 0;
 
 	DP(NETIF_MSG_LINK, "setting link speed & duplex\n");
 	bnx2x_bits_dis(bp, GRCBASE_EMAC0 + port*0x400 +
@@ -5854,7 +5874,7 @@ static void bnx2x_set_preemphasis(struct bnx2x_phy *phy,
 				  struct link_params *params)
 {
 
-	u16 bank, i = 0;
+	uint16_t bank, i = 0;
 	struct bnx2x *bp = params->bp;
 
 	for (bank = MDIO_REG_BANK_RX0, i = 0; bank <= MDIO_REG_BANK_RX3;
@@ -5879,7 +5899,7 @@ static void bnx2x_xgxs_config_init(struct bnx2x_phy *phy,
 				   struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u8 enable_cl73 = (SINGLE_MEDIA_DIRECT(params) ||
+	uint8_t enable_cl73 = (SINGLE_MEDIA_DIRECT(params) ||
 			  (params->loopback_mode == LOOPBACK_XGXS));
 	if (!(vars->phy_flags & PHY_SGMII_FLAG)) {
 		if (SINGLE_MEDIA_DIRECT(params) &&
@@ -5962,11 +5982,11 @@ static int bnx2x_prepare_xgxs(struct bnx2x_phy *phy,
 	return rc;
 }
 
-static u16 bnx2x_wait_reset_complete(struct bnx2x *bp,
+static uint16_t bnx2x_wait_reset_complete(struct bnx2x *bp,
 				     struct bnx2x_phy *phy,
 				     struct link_params *params)
 {
-	u16 cnt, ctrl;
+	uint16_t cnt, ctrl;
 	/* Wait for soft reset to get cleared up to 1 sec */
 	for (cnt = 0; cnt < 1000; cnt++) {
 		if (phy->type == PORT_HW_CFG_XGXS_EXT_PHY_TYPE_BCM54618SE)
@@ -5991,8 +6011,8 @@ static u16 bnx2x_wait_reset_complete(struct bnx2x *bp,
 
 static void bnx2x_link_int_enable(struct link_params *params)
 {
-	u8 port = params->port;
-	u32 mask;
+	uint8_t port = params->port;
+	uint32_t mask;
 	struct bnx2x *bp = params->bp;
 
 	/* Setting the status to report on link up for either XGXS or SerDes */
@@ -6037,10 +6057,10 @@ static void bnx2x_link_int_enable(struct link_params *params)
 	   REG_RD(bp, NIG_REG_XGXS0_STATUS_LINK_STATUS + port*0x68));
 }
 
-static void bnx2x_rearm_latch_signal(struct bnx2x *bp, u8 port,
-				     u8 exp_mi_int)
+static void bnx2x_rearm_latch_signal(struct bnx2x *bp, uint8_t port,
+				     uint8_t exp_mi_int)
 {
-	u32 latch_status = 0;
+	uint32_t latch_status = 0;
 
 	/* Disable the MI INT ( external phy int ) by writing 1 to the
 	 * status register. Link down indication is high-active-signal,
@@ -6072,11 +6092,11 @@ static void bnx2x_rearm_latch_signal(struct bnx2x *bp, u8 port,
 }
 
 static void bnx2x_link_int_ack(struct link_params *params,
-			       struct link_vars *vars, u8 is_10g_plus)
+			       struct link_vars *vars, uint8_t is_10g_plus)
 {
 	struct bnx2x *bp = params->bp;
-	u8 port = params->port;
-	u32 mask;
+	uint8_t port = params->port;
+	uint32_t mask;
 	/* First reset all status we assume only one line will be
 	 * change at a time
 	 */
@@ -6094,7 +6114,7 @@ static void bnx2x_link_int_ack(struct link_params *params,
 				/* Disable the link interrupt by writing 1 to
 				 * the relevant lane in the status register
 				 */
-				u32 ser_lane =
+				uint32_t ser_lane =
 					((params->lane_config &
 				    PORT_HW_CFG_LANE_SWAP_CFG_MASTER_MASK) >>
 				    PORT_HW_CFG_LANE_SWAP_CFG_MASTER_SHIFT);
@@ -6111,13 +6131,13 @@ static void bnx2x_link_int_ack(struct link_params *params,
 	}
 }
 
-static int bnx2x_format_ver(u32 num, u8 *str, u16 *len)
+static int bnx2x_format_ver(uint32_t num, uint8_t *str, uint16_t *len)
 {
-	u8 *str_ptr = str;
-	u32 mask = 0xf0000000;
-	u8 shift = 8*4;
-	u8 digit;
-	u8 remove_leading_zeros = 1;
+	uint8_t *str_ptr = str;
+	uint32_t mask = 0xf0000000;
+	uint8_t shift = 8*4;
+	uint8_t digit;
+	uint8_t remove_leading_zeros = 1;
 	if (*len < 10) {
 		/* Need more than 10chars for this format */
 		*str_ptr = '\0';
@@ -6150,21 +6170,22 @@ static int bnx2x_format_ver(u32 num, u8 *str, u16 *len)
 }
 
 
-static int bnx2x_null_format_ver(u32 spirom_ver, u8 *str, u16 *len)
+static int bnx2x_null_format_ver(uint32_t spirom_ver, uint8_t *str,
+				 uint16_t *len)
 {
 	str[0] = '\0';
 	(*len)--;
 	return 0;
 }
 
-int bnx2x_get_ext_phy_fw_version(struct link_params *params, u8 *version,
-				 u16 len)
+int bnx2x_get_ext_phy_fw_version(struct link_params *params, uint8_t *version,
+				 uint16_t len)
 {
 	struct bnx2x *bp;
-	u32 spirom_ver = 0;
+	uint32_t spirom_ver = 0;
 	int status = 0;
-	u8 *ver_p = version;
-	u16 remain_len = len;
+	uint8_t *ver_p = version;
+	uint16_t remain_len = len;
 	if (version == NULL || params == NULL)
 		return -EINVAL;
 	bp = params->bp;
@@ -6200,11 +6221,11 @@ int bnx2x_get_ext_phy_fw_version(struct link_params *params, u8 *version,
 static void bnx2x_set_xgxs_loopback(struct bnx2x_phy *phy,
 				    struct link_params *params)
 {
-	u8 port = params->port;
+	uint8_t port = params->port;
 	struct bnx2x *bp = params->bp;
 
 	if (phy->req_line_speed != SPEED_1000) {
-		u32 md_devad = 0;
+		uint32_t md_devad = 0;
 
 		DP(NETIF_MSG_LINK, "XGXS 10G loopback enable\n");
 
@@ -6238,7 +6259,7 @@ static void bnx2x_set_xgxs_loopback(struct bnx2x_phy *phy,
 			       md_devad);
 		}
 	} else {
-		u16 mii_ctrl;
+		uint16_t mii_ctrl;
 		DP(NETIF_MSG_LINK, "XGXS 1G loopback enable\n");
 		bnx2x_cl45_read(bp, phy, 5,
 				(MDIO_REG_BANK_COMBO_IEEE0 +
@@ -6253,14 +6274,14 @@ static void bnx2x_set_xgxs_loopback(struct bnx2x_phy *phy,
 }
 
 int bnx2x_set_led(struct link_params *params,
-		  struct link_vars *vars, u8 mode, u32 speed)
+		  struct link_vars *vars, uint8_t mode, uint32_t speed)
 {
-	u8 port = params->port;
-	u16 hw_led_mode = params->hw_led_mode;
+	uint8_t port = params->port;
+	uint16_t hw_led_mode = params->hw_led_mode;
 	int rc = 0;
-	u8 phy_idx;
-	u32 tmp;
-	u32 emac_base = port ? GRCBASE_EMAC1 : GRCBASE_EMAC0;
+	uint8_t phy_idx;
+	uint32_t tmp;
+	uint32_t emac_base = port ? GRCBASE_EMAC1 : GRCBASE_EMAC0;
 	struct bnx2x *bp = params->bp;
 	DP(NETIF_MSG_LINK, "bnx2x_set_led: port %x, mode %d\n", port, mode);
 	DP(NETIF_MSG_LINK, "speed 0x%x, hw_led_mode 0x%x\n",
@@ -6349,7 +6370,7 @@ int bnx2x_set_led(struct link_params *params,
 			 */
 			break;
 		} else {
-			u32 nig_led_mode = ((params->hw_led_mode <<
+			uint32_t nig_led_mode = ((params->hw_led_mode <<
 					     SHARED_HW_CFG_LED_MODE_SHIFT) ==
 					    SHARED_HW_CFG_LED_EXTPHY2) ?
 				(SHARED_HW_CFG_LED_PHY1 >>
@@ -6401,16 +6422,16 @@ int bnx2x_set_led(struct link_params *params,
  * HW
  */
 int bnx2x_test_link(struct link_params *params, struct link_vars *vars,
-		    u8 is_serdes)
+		    uint8_t is_serdes)
 {
 	struct bnx2x *bp = params->bp;
-	u16 gp_status = 0, phy_index = 0;
-	u8 ext_phy_link_up = 0, serdes_phy_type;
+	uint16_t gp_status = 0, phy_index = 0;
+	uint8_t ext_phy_link_up = 0, serdes_phy_type;
 	struct link_vars temp_vars;
 	struct bnx2x_phy *int_phy = &params->phy[INT_PHY];
 
 	if (CHIP_IS_E3(bp)) {
-		u16 link_up;
+		uint16_t link_up;
 		if (params->req_line_speed[LINK_CONFIG_IDX(INT_PHY)]
 		    > SPEED_10000) {
 			/* Check 20G link */
@@ -6421,7 +6442,7 @@ int bnx2x_test_link(struct link_params *params, struct link_vars *vars,
 			link_up &= (1<<2);
 		} else {
 			/* Check 10G link and below*/
-			u8 lane = bnx2x_get_warpcore_lane(int_phy, params);
+			uint8_t lane = bnx2x_get_warpcore_lane(int_phy, params);
 			bnx2x_cl45_read(bp, int_phy, MDIO_WC_DEVAD,
 					MDIO_WC_REG_GP2_STATUS_GP_2_1,
 					&gp_status);
@@ -6484,7 +6505,7 @@ int bnx2x_test_link(struct link_params *params, struct link_vars *vars,
 static int bnx2x_link_initialize(struct link_params *params,
 				 struct link_vars *vars)
 {
-	u8 phy_index, non_ext_phy;
+	uint8_t phy_index, non_ext_phy;
 	struct bnx2x *bp = params->bp;
 	/* In case of external phy existence, the line speed would be the
 	 * line speed linked up by the external phy. In case it is direct
@@ -6571,7 +6592,7 @@ static void bnx2x_common_ext_link_reset(struct bnx2x_phy *phy,
 					struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u8 gpio_port;
+	uint8_t gpio_port;
 	/* HW reset */
 	if (CHIP_IS_E2(bp))
 		gpio_port = BP_PATH(bp);
@@ -6590,7 +6611,7 @@ static int bnx2x_update_link_down(struct link_params *params,
 				  struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u8 port = params->port;
+	uint8_t port = params->port;
 
 	DP(NETIF_MSG_LINK, "Port %x: Link is down\n", port);
 	bnx2x_set_led(params, vars, LED_MODE_OFF, 0);
@@ -6635,10 +6656,10 @@ static int bnx2x_update_link_down(struct link_params *params,
 
 static int bnx2x_update_link_up(struct link_params *params,
 				struct link_vars *vars,
-				u8 link_10g)
+				uint8_t link_10g)
 {
 	struct bnx2x *bp = params->bp;
-	u8 phy_idx, port = params->port;
+	uint8_t phy_idx, port = params->port;
 	int rc = 0;
 
 	vars->link_status |= (LINK_STATUS_LINK_UP |
@@ -6739,13 +6760,13 @@ int bnx2x_link_update(struct link_params *params, struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
 	struct link_vars phy_vars[MAX_PHYS];
-	u8 port = params->port;
-	u8 link_10g_plus, phy_index;
-	u8 ext_phy_link_up = 0, cur_link_up;
+	uint8_t port = params->port;
+	uint8_t link_10g_plus, phy_index;
+	uint8_t ext_phy_link_up = 0, cur_link_up;
 	int rc = 0;
-	u8 is_mi_int = 0;
-	u16 ext_phy_line_speed = 0, prev_line_speed = vars->line_speed;
-	u8 active_external_phy = INT_PHY;
+	uint8_t is_mi_int = 0;
+	uint16_t ext_phy_line_speed = 0, prev_line_speed = vars->line_speed;
+	uint8_t active_external_phy = INT_PHY;
 	vars->phy_flags &= ~PHY_HALF_OPEN_CONN_FLAG;
 	vars->link_status &= ~LINK_UPDATE_MASK;
 	for (phy_index = INT_PHY; phy_index < params->num_phys;
@@ -6768,7 +6789,7 @@ int bnx2x_link_update(struct link_params *params, struct link_vars *vars)
 		 port, (vars->phy_flags & PHY_XGXS_FLAG),
 		 REG_RD(bp, NIG_REG_STATUS_INTERRUPT_PORT0 + port*4));
 
-	is_mi_int = (u8)(REG_RD(bp, NIG_REG_EMAC0_STATUS_MISC_MI_INT +
+	is_mi_int = (uint8_t)(REG_RD(bp, NIG_REG_EMAC0_STATUS_MISC_MI_INT +
 				port*0x18) > 0);
 	DP(NETIF_MSG_LINK, "int_mask 0x%x MI_INT %x, SERDES_LINK %x\n",
 		 REG_RD(bp, NIG_REG_MASK_INTERRUPT_PORT0 + port*4),
@@ -6990,7 +7011,7 @@ int bnx2x_link_update(struct link_params *params, struct link_vars *vars)
 /*****************************************************************************/
 /*			    External Phy section			     */
 /*****************************************************************************/
-void bnx2x_ext_phy_hw_reset(struct bnx2x *bp, u8 port)
+void bnx2x_ext_phy_hw_reset(struct bnx2x *bp, uint8_t port)
 {
 	bnx2x_set_gpio(bp, MISC_REGISTERS_GPIO_1,
 		       MISC_REGISTERS_GPIO_OUTPUT_LOW, port);
@@ -6999,11 +7020,11 @@ void bnx2x_ext_phy_hw_reset(struct bnx2x *bp, u8 port)
 		       MISC_REGISTERS_GPIO_OUTPUT_HIGH, port);
 }
 
-static void bnx2x_save_spirom_version(struct bnx2x *bp, u8 port,
-				      u32 spirom_ver, u32 ver_addr)
+static void bnx2x_save_spirom_version(struct bnx2x *bp, uint8_t port,
+				      uint32_t spirom_ver, uint32_t ver_addr)
 {
 	DP(NETIF_MSG_LINK, "FW version 0x%x:0x%x for port %d\n",
-		 (u16)(spirom_ver>>16), (u16)spirom_ver, port);
+		 (uint16_t)(spirom_ver>>16), (uint16_t)spirom_ver, port);
 
 	if (ver_addr)
 		REG_WR(bp, ver_addr, spirom_ver);
@@ -7011,15 +7032,15 @@ static void bnx2x_save_spirom_version(struct bnx2x *bp, u8 port,
 
 static void bnx2x_save_bcm_spirom_ver(struct bnx2x *bp,
 				      struct bnx2x_phy *phy,
-				      u8 port)
+				      uint8_t port)
 {
-	u16 fw_ver1, fw_ver2;
+	uint16_t fw_ver1, fw_ver2;
 
 	bnx2x_cl45_read(bp, phy, MDIO_PMA_DEVAD,
 			MDIO_PMA_REG_ROM_VER1, &fw_ver1);
 	bnx2x_cl45_read(bp, phy, MDIO_PMA_DEVAD,
 			MDIO_PMA_REG_ROM_VER2, &fw_ver2);
-	bnx2x_save_spirom_version(bp, port, (u32)(fw_ver1<<16 | fw_ver2),
+	bnx2x_save_spirom_version(bp, port, (uint32_t)(fw_ver1<<16 | fw_ver2),
 				  phy->ver_addr);
 }
 
@@ -7027,7 +7048,7 @@ static void bnx2x_ext_phy_10G_an_resolve(struct bnx2x *bp,
 				       struct bnx2x_phy *phy,
 				       struct link_vars *vars)
 {
-	u16 val;
+	uint16_t val;
 	bnx2x_cl45_read(bp, phy,
 			MDIO_AN_DEVAD,
 			MDIO_AN_REG_STATUS, &val);
@@ -7056,9 +7077,9 @@ static void bnx2x_8073_resolve_fc(struct bnx2x_phy *phy,
 
 	if (bnx2x_ext_phy_resolve_fc(phy, params, vars) &&
 	    (vars->flow_ctrl == BNX2X_FLOW_CTRL_NONE)) {
-		u16 pause_result;
-		u16 ld_pause;		/* local */
-		u16 lp_pause;		/* link partner */
+		uint16_t pause_result;
+		uint16_t ld_pause;		/* local */
+		uint16_t lp_pause;		/* link partner */
 		bnx2x_cl45_read(bp, phy,
 				MDIO_AN_DEVAD,
 				MDIO_AN_REG_CL37_FC_LD, &ld_pause);
@@ -7078,10 +7099,10 @@ static void bnx2x_8073_resolve_fc(struct bnx2x_phy *phy,
 }
 static int bnx2x_8073_8727_external_rom_boot(struct bnx2x *bp,
 					     struct bnx2x_phy *phy,
-					     u8 port)
+					     uint8_t port)
 {
-	u32 count = 0;
-	u16 fw_ver1, fw_msgout;
+	uint32_t count = 0;
+	uint16_t fw_ver1, fw_msgout;
 	int rc = 0;
 
 	/* Boot port from external ROM  */
@@ -7160,7 +7181,7 @@ static int bnx2x_8073_8727_external_rom_boot(struct bnx2x *bp,
 static int bnx2x_8073_is_snr_needed(struct bnx2x *bp, struct bnx2x_phy *phy)
 {
 	/* This is only required for 8073A1, version 102 only */
-	u16 val;
+	uint16_t val;
 
 	/* Read 8073 HW revision*/
 	bnx2x_cl45_read(bp, phy,
@@ -7185,7 +7206,7 @@ static int bnx2x_8073_is_snr_needed(struct bnx2x *bp, struct bnx2x_phy *phy)
 
 static int bnx2x_8073_xaui_wa(struct bnx2x *bp, struct bnx2x_phy *phy)
 {
-	u16 val, cnt, cnt1 ;
+	uint16_t val, cnt, cnt1 ;
 
 	bnx2x_cl45_read(bp, phy,
 			MDIO_PMA_DEVAD,
@@ -7256,7 +7277,7 @@ static void bnx2x_8073_set_pause_cl37(struct link_params *params,
 				      struct bnx2x_phy *phy,
 				      struct link_vars *vars)
 {
-	u16 cl37_val;
+	uint16_t cl37_val;
 	struct bnx2x *bp = params->bp;
 	bnx2x_cl45_read(bp, phy,
 			MDIO_AN_DEVAD, MDIO_AN_REG_CL37_FC_LD, &cl37_val);
@@ -7289,7 +7310,7 @@ static void bnx2x_8073_set_pause_cl37(struct link_params *params,
 
 static void bnx2x_8073_specific_func(struct bnx2x_phy *phy,
 				     struct link_params *params,
-				     u32 action)
+				     uint32_t action)
 {
 	struct bnx2x *bp = params->bp;
 	switch (action) {
@@ -7308,8 +7329,8 @@ static int bnx2x_8073_config_init(struct bnx2x_phy *phy,
 				  struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u16 val = 0, tmp1;
-	u8 gpio_port;
+	uint16_t val = 0, tmp1;
+	uint8_t gpio_port;
 	DP(NETIF_MSG_LINK, "Init 8073\n");
 
 	if (CHIP_IS_E2(bp))
@@ -7401,7 +7422,7 @@ static int bnx2x_8073_config_init(struct bnx2x_phy *phy,
 	if (((phy->speed_cap_mask & PORT_HW_CFG_SPEED_CAPABILITY_D0_2_5G) &&
 	     (phy->req_line_speed == SPEED_AUTO_NEG)) ||
 	    (phy->req_line_speed == SPEED_2500)) {
-		u16 phy_ver;
+		uint16_t phy_ver;
 		/* Allow 2.5G for A1 and above */
 		bnx2x_cl45_read(bp, phy,
 				MDIO_PMA_DEVAD, MDIO_PMA_REG_8073_CHIP_REV,
@@ -7451,15 +7472,15 @@ static int bnx2x_8073_config_init(struct bnx2x_phy *phy,
 	return 0;
 }
 
-static u8 bnx2x_8073_read_status(struct bnx2x_phy *phy,
+static uint8_t bnx2x_8073_read_status(struct bnx2x_phy *phy,
 				 struct link_params *params,
 				 struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u8 link_up = 0;
-	u16 val1, val2;
-	u16 link_status = 0;
-	u16 an1000_status = 0;
+	uint8_t link_up = 0;
+	uint16_t val1, val2;
+	uint16_t link_status = 0;
+	uint16_t an1000_status = 0;
 
 	bnx2x_cl45_read(bp, phy,
 			MDIO_PMA_DEVAD, MDIO_PMA_LASI_STAT, &val1);
@@ -7600,7 +7621,7 @@ static void bnx2x_8073_link_reset(struct bnx2x_phy *phy,
 				  struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u8 gpio_port;
+	uint8_t gpio_port;
 	if (CHIP_IS_E2(bp))
 		gpio_port = BP_PATH(bp);
 	else
@@ -7642,12 +7663,12 @@ static int bnx2x_8705_config_init(struct bnx2x_phy *phy,
 	return 0;
 }
 
-static u8 bnx2x_8705_read_status(struct bnx2x_phy *phy,
+static uint8_t bnx2x_8705_read_status(struct bnx2x_phy *phy,
 				 struct link_params *params,
 				 struct link_vars *vars)
 {
-	u8 link_up = 0;
-	u16 val1, rx_sd;
+	uint8_t link_up = 0;
+	uint16_t val1, rx_sd;
 	struct bnx2x *bp = params->bp;
 	DP(NETIF_MSG_LINK, "read status 8705\n");
 	bnx2x_cl45_read(bp, phy,
@@ -7680,7 +7701,7 @@ static u8 bnx2x_8705_read_status(struct bnx2x_phy *phy,
 /******************************************************************/
 static void bnx2x_set_disable_pmd_transmit(struct link_params *params,
 					   struct bnx2x_phy *phy,
-					   u8 pmd_dis)
+					   uint8_t pmd_dis)
 {
 	struct bnx2x *bp = params->bp;
 	/* Disable transmitter only for bootcodes which can enable it afterwards
@@ -7701,10 +7722,10 @@ static void bnx2x_set_disable_pmd_transmit(struct link_params *params,
 			 MDIO_PMA_REG_TX_DISABLE, pmd_dis);
 }
 
-static u8 bnx2x_get_gpio_port(struct link_params *params)
+static uint8_t bnx2x_get_gpio_port(struct link_params *params)
 {
-	u8 gpio_port;
-	u32 swap_val, swap_override;
+	uint8_t gpio_port;
+	uint32_t swap_val, swap_override;
 	struct bnx2x *bp = params->bp;
 	if (CHIP_IS_E2(bp))
 		gpio_port = BP_PATH(bp);
@@ -7717,12 +7738,12 @@ static u8 bnx2x_get_gpio_port(struct link_params *params)
 
 static void bnx2x_sfp_e1e2_set_transmitter(struct link_params *params,
 					   struct bnx2x_phy *phy,
-					   u8 tx_en)
+					   uint8_t tx_en)
 {
-	u16 val;
-	u8 port = params->port;
+	uint16_t val;
+	uint8_t port = params->port;
 	struct bnx2x *bp = params->bp;
-	u32 tx_en_mode;
+	uint32_t tx_en_mode;
 
 	/* Disable/Enable transmitter ( TX laser of the SFP+ module.)*/
 	tx_en_mode = REG_RD(bp, params->shmem_base +
@@ -7754,8 +7775,8 @@ static void bnx2x_sfp_e1e2_set_transmitter(struct link_params *params,
 	case PORT_HW_CFG_TX_LASER_GPIO2:
 	case PORT_HW_CFG_TX_LASER_GPIO3:
 	{
-		u16 gpio_pin;
-		u8 gpio_port, gpio_mode;
+		uint16_t gpio_pin;
+		uint8_t gpio_port, gpio_mode;
 		if (tx_en)
 			gpio_mode = MISC_REGISTERS_GPIO_OUTPUT_HIGH;
 		else
@@ -7774,7 +7795,7 @@ static void bnx2x_sfp_e1e2_set_transmitter(struct link_params *params,
 
 static void bnx2x_sfp_set_transmitter(struct link_params *params,
 				      struct bnx2x_phy *phy,
-				      u8 tx_en)
+				      uint8_t tx_en)
 {
 	struct bnx2x *bp = params->bp;
 	DP(NETIF_MSG_LINK, "Setting SFP+ transmitter to %d\n", tx_en);
@@ -7786,12 +7807,13 @@ static void bnx2x_sfp_set_transmitter(struct link_params *params,
 
 static int bnx2x_8726_read_sfp_module_eeprom(struct bnx2x_phy *phy,
 					     struct link_params *params,
-					     u8 dev_addr, u16 addr, u8 byte_cnt,
-					     u8 *o_buf, u8 is_init)
+					     uint8_t dev_addr, uint16_t addr,
+					     uint8_t byte_cnt,
+					     uint8_t *o_buf, uint8_t is_init)
 {
 	struct bnx2x *bp = params->bp;
-	u16 val = 0;
-	u16 i;
+	uint16_t val = 0;
+	uint16_t i;
 	if (byte_cnt > SFP_EEPROM_PAGE_SIZE) {
 		DP(NETIF_MSG_LINK,
 		   "Reading from eeprom is limited to 0xf\n");
@@ -7836,7 +7858,7 @@ static int bnx2x_8726_read_sfp_module_eeprom(struct bnx2x_phy *phy,
 		bnx2x_cl45_read(bp, phy,
 				MDIO_PMA_DEVAD,
 				MDIO_PMA_REG_8726_TWO_WIRE_DATA_BUF + i, &val);
-		o_buf[i] = (u8)(val & MDIO_PMA_REG_8726_TWO_WIRE_DATA_MASK);
+		o_buf[i] = (uint8_t)(val & MDIO_PMA_REG_8726_TWO_WIRE_DATA_MASK);
 	}
 
 	for (i = 0; i < 100; i++) {
@@ -7852,9 +7874,9 @@ static int bnx2x_8726_read_sfp_module_eeprom(struct bnx2x_phy *phy,
 }
 
 static void bnx2x_warpcore_power_module(struct link_params *params,
-					u8 power)
+					uint8_t power)
 {
-	u32 pin_cfg;
+	uint32_t pin_cfg;
 	struct bnx2x *bp = params->bp;
 
 	pin_cfg = (REG_RD(bp, params->shmem_base +
@@ -7874,14 +7896,16 @@ static void bnx2x_warpcore_power_module(struct link_params *params,
 }
 static int bnx2x_warpcore_read_sfp_module_eeprom(struct bnx2x_phy *phy,
 						 struct link_params *params,
-						 u8 dev_addr,
-						 u16 addr, u8 byte_cnt,
-						 u8 *o_buf, u8 is_init)
+						 uint8_t dev_addr,
+						 uint16_t addr,
+						 uint8_t byte_cnt,
+						 uint8_t *o_buf,
+						 uint8_t is_init)
 {
 	int rc = 0;
-	u8 i, j = 0, cnt = 0;
-	u32 data_array[4];
-	u16 addr32;
+	uint8_t i, j = 0, cnt = 0;
+	uint32_t data_array[4];
+	uint16_t addr32;
 	struct bnx2x *bp = params->bp;
 
 	if (byte_cnt > SFP_EEPROM_PAGE_SIZE) {
@@ -7905,7 +7929,7 @@ static int bnx2x_warpcore_read_sfp_module_eeprom(struct bnx2x_phy *phy,
 
 	if (rc == 0) {
 		for (i = (addr - addr32); i < byte_cnt + (addr - addr32); i++) {
-			o_buf[j] = *((u8 *)data_array + i);
+			o_buf[j] = *((uint8_t *)data_array + i);
 			j++;
 		}
 	}
@@ -7915,11 +7939,12 @@ static int bnx2x_warpcore_read_sfp_module_eeprom(struct bnx2x_phy *phy,
 
 static int bnx2x_8727_read_sfp_module_eeprom(struct bnx2x_phy *phy,
 					     struct link_params *params,
-					     u8 dev_addr, u16 addr, u8 byte_cnt,
-					     u8 *o_buf, u8 is_init)
+					     uint8_t dev_addr, uint16_t addr,
+					     uint8_t byte_cnt,
+					     uint8_t *o_buf, uint8_t is_init)
 {
 	struct bnx2x *bp = params->bp;
-	u16 val, i;
+	uint16_t val, i;
 
 	if (byte_cnt > SFP_EEPROM_PAGE_SIZE) {
 		DP(NETIF_MSG_LINK,
@@ -7993,7 +8018,7 @@ static int bnx2x_8727_read_sfp_module_eeprom(struct bnx2x_phy *phy,
 		bnx2x_cl45_read(bp, phy,
 				MDIO_PMA_DEVAD,
 				MDIO_PMA_REG_8727_TWO_WIRE_DATA_BUF + i, &val);
-		o_buf[i] = (u8)(val & MDIO_PMA_REG_8727_TWO_WIRE_DATA_MASK);
+		o_buf[i] = (uint8_t)(val & MDIO_PMA_REG_8727_TWO_WIRE_DATA_MASK);
 	}
 
 	for (i = 0; i < 100; i++) {
@@ -8009,13 +8034,14 @@ static int bnx2x_8727_read_sfp_module_eeprom(struct bnx2x_phy *phy,
 	return -EINVAL;
 }
 int bnx2x_read_sfp_module_eeprom(struct bnx2x_phy *phy,
-				 struct link_params *params, u8 dev_addr,
-				 u16 addr, u16 byte_cnt, u8 *o_buf)
+				 struct link_params *params, uint8_t dev_addr,
+				 uint16_t addr, uint16_t byte_cnt,
+				 uint8_t *o_buf)
 {
 	int rc = 0;
 	struct bnx2x *bp = params->bp;
-	u8 xfer_size;
-	u8 *user_data = o_buf;
+	uint8_t xfer_size;
+	uint8_t *user_data = o_buf;
 	read_sfp_module_eeprom_func_p read_func;
 
 	if ((dev_addr != 0xa0) && (dev_addr != 0xa2)) {
@@ -8052,11 +8078,11 @@ int bnx2x_read_sfp_module_eeprom(struct bnx2x_phy *phy,
 
 static int bnx2x_get_edc_mode(struct bnx2x_phy *phy,
 			      struct link_params *params,
-			      u16 *edc_mode)
+			      uint16_t *edc_mode)
 {
 	struct bnx2x *bp = params->bp;
-	u32 sync_offset = 0, phy_idx, media_types;
-	u8 val[SFP_EEPROM_FC_TX_TECH_ADDR + 1], check_limiting_mode = 0;
+	uint32_t sync_offset = 0, phy_idx, media_types;
+	uint8_t val[SFP_EEPROM_FC_TX_TECH_ADDR + 1], check_limiting_mode = 0;
 	*edc_mode = EDC_MODE_LIMITING;
 	phy->media_type = ETH_PHY_UNSPECIFIED;
 	/* First check for copper cable */
@@ -8065,7 +8091,7 @@ static int bnx2x_get_edc_mode(struct bnx2x_phy *phy,
 					 I2C_DEV_ADDR_A0,
 					 0,
 					 SFP_EEPROM_FC_TX_TECH_ADDR + 1,
-					 (u8 *)val) != 0) {
+					 (uint8_t *)val) != 0) {
 		DP(NETIF_MSG_LINK, "Failed to read from SFP+ module EEPROM\n");
 		return -EINVAL;
 	}
@@ -8076,7 +8102,7 @@ static int bnx2x_get_edc_mode(struct bnx2x_phy *phy,
 	switch (val[SFP_EEPROM_CON_TYPE_ADDR]) {
 	case SFP_EEPROM_CON_TYPE_VAL_COPPER:
 	{
-		u8 copper_module_type;
+		uint8_t copper_module_type;
 		phy->media_type = ETH_PHY_DA_TWINAX;
 		/* Check if its active cable (includes SFP+ module)
 		 * of passive cable
@@ -8119,7 +8145,7 @@ static int bnx2x_get_edc_mode(struct bnx2x_phy *phy,
 			DP(NETIF_MSG_LINK, "1G SFP module detected\n");
 			phy->media_type = ETH_PHY_SFP_1G_FIBER;
 			if (phy->req_line_speed != SPEED_1000) {
-				u8 gport = params->port;
+				uint8_t gport = params->port;
 				phy->req_line_speed = SPEED_1000;
 				if (!CHIP_IS_E1x(bp)) {
 					gport = BP_PATH(bp) +
@@ -8170,7 +8196,7 @@ static int bnx2x_get_edc_mode(struct bnx2x_phy *phy,
 	}
 	REG_WR(bp, sync_offset, media_types);
 	if (check_limiting_mode) {
-		u8 options[SFP_EEPROM_OPTIONS_SIZE];
+		uint8_t options[SFP_EEPROM_OPTIONS_SIZE];
 		if (bnx2x_read_sfp_module_eeprom(phy,
 						 params,
 						 I2C_DEV_ADDR_A0,
@@ -8196,8 +8222,8 @@ static int bnx2x_verify_sfp_module(struct bnx2x_phy *phy,
 				   struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u32 val, cmd;
-	u32 fw_resp, fw_cmd_param;
+	uint32_t val, cmd;
+	uint32_t fw_resp, fw_cmd_param;
 	char vendor_name[SFP_EEPROM_VENDOR_NAME_SIZE+1];
 	char vendor_pn[SFP_EEPROM_PART_NO_SIZE+1];
 	phy->flags &= ~FLAGS_SFP_NOT_APPROVED;
@@ -8243,7 +8269,7 @@ static int bnx2x_verify_sfp_module(struct bnx2x_phy *phy,
 					 I2C_DEV_ADDR_A0,
 					 SFP_EEPROM_VENDOR_NAME_ADDR,
 					 SFP_EEPROM_VENDOR_NAME_SIZE,
-					 (u8 *)vendor_name))
+					 (uint8_t *)vendor_name))
 		vendor_name[0] = '\0';
 	else
 		vendor_name[SFP_EEPROM_VENDOR_NAME_SIZE] = '\0';
@@ -8252,7 +8278,7 @@ static int bnx2x_verify_sfp_module(struct bnx2x_phy *phy,
 					 I2C_DEV_ADDR_A0,
 					 SFP_EEPROM_PART_NO_ADDR,
 					 SFP_EEPROM_PART_NO_SIZE,
-					 (u8 *)vendor_pn))
+					 (uint8_t *)vendor_pn))
 		vendor_pn[0] = '\0';
 	else
 		vendor_pn[SFP_EEPROM_PART_NO_SIZE] = '\0';
@@ -8270,10 +8296,10 @@ static int bnx2x_wait_for_sfp_module_initialized(struct bnx2x_phy *phy,
 						 struct link_params *params)
 
 {
-	u8 val;
+	uint8_t val;
 	int rc;
 	struct bnx2x *bp = params->bp;
-	u16 timeout;
+	uint16_t timeout;
 	/* Initialization time after hot-plug may take up to 300ms for
 	 * some phys type ( e.g. JDSU )
 	 */
@@ -8302,9 +8328,9 @@ static int bnx2x_wait_for_sfp_module_initialized(struct bnx2x_phy *phy,
 
 static void bnx2x_8727_power_module(struct bnx2x *bp,
 				    struct bnx2x_phy *phy,
-				    u8 is_power_up) {
+				    uint8_t is_power_up) {
 	/* Make sure GPIOs are not using for LED mode */
-	u16 val;
+	uint16_t val;
 	/* In the GPIO register, bit 4 is use to determine if the GPIOs are
 	 * operating as INPUT or as OUTPUT. Bit 1 is for input, and 0 for
 	 * output
@@ -8334,9 +8360,9 @@ static void bnx2x_8727_power_module(struct bnx2x *bp,
 
 static int bnx2x_8726_set_limiting_mode(struct bnx2x *bp,
 					struct bnx2x_phy *phy,
-					u16 edc_mode)
+					uint16_t edc_mode)
 {
-	u16 cur_limiting_mode;
+	uint16_t cur_limiting_mode;
 
 	bnx2x_cl45_read(bp, phy,
 			MDIO_PMA_DEVAD,
@@ -8383,10 +8409,10 @@ static int bnx2x_8726_set_limiting_mode(struct bnx2x *bp,
 
 static int bnx2x_8727_set_limiting_mode(struct bnx2x *bp,
 					struct bnx2x_phy *phy,
-					u16 edc_mode)
+					uint16_t edc_mode)
 {
-	u16 phy_identifier;
-	u16 rom_ver2_val;
+	uint16_t phy_identifier;
+	uint16_t rom_ver2_val;
 	bnx2x_cl45_read(bp, phy,
 			MDIO_PMA_DEVAD,
 			MDIO_PMA_REG_PHY_IDENTIFIER,
@@ -8417,10 +8443,10 @@ static int bnx2x_8727_set_limiting_mode(struct bnx2x *bp,
 
 static void bnx2x_8727_specific_func(struct bnx2x_phy *phy,
 				     struct link_params *params,
-				     u32 action)
+				     uint32_t action)
 {
 	struct bnx2x *bp = params->bp;
-	u16 val;
+	uint16_t val;
 	switch (action) {
 	case DISABLE_TX:
 		bnx2x_sfp_set_transmitter(params, phy, 0);
@@ -8462,11 +8488,11 @@ static void bnx2x_8727_specific_func(struct bnx2x_phy *phy,
 }
 
 static void bnx2x_set_e1e2_module_fault_led(struct link_params *params,
-					   u8 gpio_mode)
+					   uint8_t gpio_mode)
 {
 	struct bnx2x *bp = params->bp;
 
-	u32 fault_led_gpio = REG_RD(bp, params->shmem_base +
+	uint32_t fault_led_gpio = REG_RD(bp, params->shmem_base +
 			    offsetof(struct shmem_region,
 			dev_info.port_hw_config[params->port].sfp_ctrl)) &
 		PORT_HW_CFG_FAULT_MODULE_LED_MASK;
@@ -8478,8 +8504,8 @@ static void bnx2x_set_e1e2_module_fault_led(struct link_params *params,
 	case PORT_HW_CFG_FAULT_MODULE_LED_GPIO2:
 	case PORT_HW_CFG_FAULT_MODULE_LED_GPIO3:
 	{
-		u8 gpio_port = bnx2x_get_gpio_port(params);
-		u16 gpio_pin = fault_led_gpio -
+		uint8_t gpio_port = bnx2x_get_gpio_port(params);
+		uint16_t gpio_pin = fault_led_gpio -
 			PORT_HW_CFG_FAULT_MODULE_LED_GPIO0;
 		DP(NETIF_MSG_LINK, "Set fault module-detected led "
 				   "pin %x port %x mode %x\n",
@@ -8494,10 +8520,10 @@ static void bnx2x_set_e1e2_module_fault_led(struct link_params *params,
 }
 
 static void bnx2x_set_e3_module_fault_led(struct link_params *params,
-					  u8 gpio_mode)
+					  uint8_t gpio_mode)
 {
-	u32 pin_cfg;
-	u8 port = params->port;
+	uint32_t pin_cfg;
+	uint8_t port = params->port;
 	struct bnx2x *bp = params->bp;
 	pin_cfg = (REG_RD(bp, params->shmem_base +
 			 offsetof(struct shmem_region,
@@ -8510,7 +8536,7 @@ static void bnx2x_set_e3_module_fault_led(struct link_params *params,
 }
 
 static void bnx2x_set_sfp_module_fault_led(struct link_params *params,
-					   u8 gpio_mode)
+					   uint8_t gpio_mode)
 {
 	struct bnx2x *bp = params->bp;
 	DP(NETIF_MSG_LINK, "Setting SFP+ module fault LED to %d\n", gpio_mode);
@@ -8539,7 +8565,7 @@ static void bnx2x_warpcore_hw_reset(struct bnx2x_phy *phy,
 
 static void bnx2x_power_sfp_module(struct link_params *params,
 				   struct bnx2x_phy *phy,
-				   u8 power)
+				   uint8_t power)
 {
 	struct bnx2x *bp = params->bp;
 	DP(NETIF_MSG_LINK, "Setting SFP+ power to %x\n", power);
@@ -8558,13 +8584,13 @@ static void bnx2x_power_sfp_module(struct link_params *params,
 }
 static void bnx2x_warpcore_set_limiting_mode(struct link_params *params,
 					     struct bnx2x_phy *phy,
-					     u16 edc_mode)
+					     uint16_t edc_mode)
 {
-	u16 val = 0;
-	u16 mode = MDIO_WC_REG_UC_INFO_B1_FIRMWARE_MODE_DEFAULT;
+	uint16_t val = 0;
+	uint16_t mode = MDIO_WC_REG_UC_INFO_B1_FIRMWARE_MODE_DEFAULT;
 	struct bnx2x *bp = params->bp;
 
-	u8 lane = bnx2x_get_warpcore_lane(phy, params);
+	uint8_t lane = bnx2x_get_warpcore_lane(phy, params);
 	/* This is a global register which controls all lanes */
 	bnx2x_cl45_read(bp, phy, MDIO_WC_DEVAD,
 			MDIO_WC_REG_UC_INFO_B1_FIRMWARE_MODE, &val);
@@ -8598,7 +8624,7 @@ static void bnx2x_warpcore_set_limiting_mode(struct link_params *params,
 
 static void bnx2x_set_limiting_mode(struct link_params *params,
 				    struct bnx2x_phy *phy,
-				    u16 edc_mode)
+				    uint16_t edc_mode)
 {
 	switch (phy->type) {
 	case PORT_HW_CFG_XGXS_EXT_PHY_TYPE_BCM8726:
@@ -8618,10 +8644,10 @@ static int bnx2x_sfp_module_detection(struct bnx2x_phy *phy,
 				      struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u16 edc_mode;
+	uint16_t edc_mode;
 	int rc = 0;
 
-	u32 val = REG_RD(bp, params->shmem_base +
+	uint32_t val = REG_RD(bp, params->shmem_base +
 			     offsetof(struct shmem_region, dev_info.
 				     port_feature_config[params->port].config));
 	/* Enabled transmitter by default */
@@ -8673,8 +8699,8 @@ void bnx2x_handle_module_detect_int(struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
 	struct bnx2x_phy *phy;
-	u32 gpio_val;
-	u8 gpio_num, gpio_port;
+	uint32_t gpio_val;
+	uint8_t gpio_num, gpio_port;
 	if (CHIP_IS_E3(bp)) {
 		phy = &params->phy[INT_PHY];
 		/* Always enable TX laser,will be disabled in case of fault */
@@ -8707,7 +8733,7 @@ void bnx2x_handle_module_detect_int(struct link_params *params)
 		if (bnx2x_wait_for_sfp_module_initialized(phy, params) == 0) {
 			bnx2x_sfp_module_detection(phy, params);
 			if (CHIP_IS_E3(bp)) {
-				u16 rx_tx_in_reset;
+				uint16_t rx_tx_in_reset;
 				/* In case WC is out of reset, reconfigure the
 				 * link speed while taking into account 1G
 				 * module limitation.
@@ -8743,10 +8769,10 @@ void bnx2x_handle_module_detect_int(struct link_params *params)
 /******************************************************************/
 static void bnx2x_sfp_mask_fault(struct bnx2x *bp,
 				 struct bnx2x_phy *phy,
-				 u16 alarm_status_offset,
-				 u16 alarm_ctrl_offset)
+				 uint16_t alarm_status_offset,
+				 uint16_t alarm_ctrl_offset)
 {
-	u16 alarm_status, val;
+	uint16_t alarm_status, val;
 	bnx2x_cl45_read(bp, phy,
 			MDIO_PMA_DEVAD, alarm_status_offset,
 			&alarm_status);
@@ -8764,12 +8790,12 @@ static void bnx2x_sfp_mask_fault(struct bnx2x *bp,
 /******************************************************************/
 /*		common BCM8706/BCM8726 PHY SECTION		  */
 /******************************************************************/
-static u8 bnx2x_8706_8726_read_status(struct bnx2x_phy *phy,
+static uint8_t bnx2x_8706_8726_read_status(struct bnx2x_phy *phy,
 				      struct link_params *params,
 				      struct link_vars *vars)
 {
-	u8 link_up = 0;
-	u16 val1, val2, rx_sd, pcs_status;
+	uint8_t link_up = 0;
+	uint16_t val1, val2, rx_sd, pcs_status;
 	struct bnx2x *bp = params->bp;
 	DP(NETIF_MSG_LINK, "XGXS 8706/8726\n");
 	/* Clear RX Alarm*/
@@ -8826,12 +8852,12 @@ static u8 bnx2x_8706_8726_read_status(struct bnx2x_phy *phy,
 /******************************************************************/
 /*			BCM8706 PHY SECTION			  */
 /******************************************************************/
-static u8 bnx2x_8706_config_init(struct bnx2x_phy *phy,
+static uint8_t bnx2x_8706_config_init(struct bnx2x_phy *phy,
 				 struct link_params *params,
 				 struct link_vars *vars)
 {
-	u32 tx_en_mode;
-	u16 cnt, val, tmp1;
+	uint32_t tx_en_mode;
+	uint16_t cnt, val, tmp1;
 	struct bnx2x *bp = params->bp;
 
 	bnx2x_set_gpio(bp, MISC_REGISTERS_GPIO_2,
@@ -8852,8 +8878,8 @@ static u8 bnx2x_8706_config_init(struct bnx2x_phy *phy,
 	DP(NETIF_MSG_LINK, "XGXS 8706 is initialized after %d ms\n", cnt);
 	if ((params->feature_config_flags &
 	     FEATURE_CONFIG_OVERRIDE_PREEMPHASIS_ENABLED)) {
-		u8 i;
-		u16 reg;
+		uint8_t i;
+		uint16_t reg;
 		for (i = 0; i < 4; i++) {
 			reg = MDIO_XS_8706_REG_BANK_RX0 +
 				i*(MDIO_XS_8706_REG_BANK_RX1 -
@@ -8988,13 +9014,13 @@ static void bnx2x_8726_external_rom_boot(struct bnx2x_phy *phy,
 	bnx2x_save_bcm_spirom_ver(bp, phy, params->port);
 }
 
-static u8 bnx2x_8726_read_status(struct bnx2x_phy *phy,
+static uint8_t bnx2x_8726_read_status(struct bnx2x_phy *phy,
 				 struct link_params *params,
 				 struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u16 val1;
-	u8 link_up = bnx2x_8706_8726_read_status(phy, params, vars);
+	uint16_t val1;
+	uint8_t link_up = bnx2x_8706_8726_read_status(phy, params, vars);
 	if (link_up) {
 		bnx2x_cl45_read(bp, phy,
 				MDIO_PMA_DEVAD, MDIO_PMA_REG_PHY_IDENTIFIER,
@@ -9110,12 +9136,12 @@ static void bnx2x_8726_link_reset(struct bnx2x_phy *phy,
 /******************************************************************/
 
 static void bnx2x_8727_set_link_led(struct bnx2x_phy *phy,
-				    struct link_params *params, u8 mode)
+				    struct link_params *params, uint8_t mode)
 {
 	struct bnx2x *bp = params->bp;
-	u16 led_mode_bitmask = 0;
-	u16 gpio_pins_bitmask = 0;
-	u16 val;
+	uint16_t led_mode_bitmask = 0;
+	uint16_t gpio_pins_bitmask = 0;
+	uint16_t val;
 	/* Only NOC flavor requires to set the LED specifically */
 	if (!(phy->flags & FLAGS_NOC))
 		return;
@@ -9157,8 +9183,8 @@ static void bnx2x_8727_set_link_led(struct bnx2x_phy *phy,
 }
 static void bnx2x_8727_hw_reset(struct bnx2x_phy *phy,
 				struct link_params *params) {
-	u32 swap_val, swap_override;
-	u8 port;
+	uint32_t swap_val, swap_override;
+	uint8_t port;
 	/* The PHY reset is controlled by GPIO 1. Fake the port number
 	 * to cancel the swap done in set_gpio()
 	 */
@@ -9174,7 +9200,7 @@ static void bnx2x_8727_config_speed(struct bnx2x_phy *phy,
 				    struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u16 tmp1, val;
+	uint16_t tmp1, val;
 	/* Set option 1G speed */
 	if ((phy->req_line_speed == SPEED_1000) ||
 	    (phy->media_type == ETH_PHY_SFP_1G_FIBER)) {
@@ -9231,8 +9257,8 @@ static int bnx2x_8727_config_init(struct bnx2x_phy *phy,
 				  struct link_params *params,
 				  struct link_vars *vars)
 {
-	u32 tx_en_mode;
-	u16 tmp1, mod_abs, tmp2;
+	uint32_t tx_en_mode;
+	uint16_t tmp1, mod_abs, tmp2;
 	struct bnx2x *bp = params->bp;
 	/* Enable PMD link, MOD_ABS_FLT, and 1G link alarm */
 
@@ -9317,8 +9343,8 @@ static void bnx2x_8727_handle_mod_abs(struct bnx2x_phy *phy,
 				      struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u16 mod_abs, rx_alarm_status;
-	u32 val = REG_RD(bp, params->shmem_base +
+	uint16_t mod_abs, rx_alarm_status;
+	uint32_t val = REG_RD(bp, params->shmem_base +
 			     offsetof(struct shmem_region, dev_info.
 				      port_feature_config[params->port].
 				      config));
@@ -9398,15 +9424,15 @@ static void bnx2x_8727_handle_mod_abs(struct bnx2x_phy *phy,
 	/* No need to check link status in case of module plugged in/out */
 }
 
-static u8 bnx2x_8727_read_status(struct bnx2x_phy *phy,
+static uint8_t bnx2x_8727_read_status(struct bnx2x_phy *phy,
 				 struct link_params *params,
 				 struct link_vars *vars)
 
 {
 	struct bnx2x *bp = params->bp;
-	u8 link_up = 0, oc_port = params->port;
-	u16 link_status = 0;
-	u16 rx_alarm_status, lasi_ctrl, val1;
+	uint8_t link_up = 0, oc_port = params->port;
+	uint16_t link_status = 0;
+	uint16_t rx_alarm_status, lasi_ctrl, val1;
 
 	/* If PHY is not initialized, do not check link status */
 	bnx2x_cl45_read(bp, phy,
@@ -9577,9 +9603,9 @@ static void bnx2x_8727_link_reset(struct bnx2x_phy *phy,
 /******************************************************************/
 static void bnx2x_save_848xx_spirom_version(struct bnx2x_phy *phy,
 					    struct bnx2x *bp,
-					    u8 port)
+					    uint8_t port)
 {
-	u16 val, fw_ver2, cnt, i;
+	uint16_t val, fw_ver2, cnt, i;
 	static struct bnx2x_reg_set reg_set[] = {
 		{MDIO_PMA_DEVAD, 0xA819, 0x0014},
 		{MDIO_PMA_DEVAD, 0xA81A, 0xc200},
@@ -9587,7 +9613,7 @@ static void bnx2x_save_848xx_spirom_version(struct bnx2x_phy *phy,
 		{MDIO_PMA_DEVAD, 0xA81C, 0x0300},
 		{MDIO_PMA_DEVAD, 0xA817, 0x0009}
 	};
-	u16 fw_ver1;
+	uint16_t fw_ver1;
 
 	if ((phy->type == PORT_HW_CFG_XGXS_EXT_PHY_TYPE_BCM84833) ||
 	    (phy->type == PORT_HW_CFG_XGXS_EXT_PHY_TYPE_BCM84834)) {
@@ -9647,7 +9673,7 @@ static void bnx2x_save_848xx_spirom_version(struct bnx2x_phy *phy,
 static void bnx2x_848xx_set_led(struct bnx2x *bp,
 				struct bnx2x_phy *phy)
 {
-	u16 val, offset, i;
+	uint16_t val, offset, i;
 	static struct bnx2x_reg_set reg_set[] = {
 		{MDIO_PMA_DEVAD, MDIO_PMA_REG_8481_LED1_MASK, 0x0080},
 		{MDIO_PMA_DEVAD, MDIO_PMA_REG_8481_LED2_MASK, 0x0018},
@@ -9686,7 +9712,7 @@ static void bnx2x_848xx_set_led(struct bnx2x *bp,
 
 static void bnx2x_848xx_specific_func(struct bnx2x_phy *phy,
 				      struct link_params *params,
-				      u32 action)
+				      uint32_t action)
 {
 	struct bnx2x *bp = params->bp;
 	switch (action) {
@@ -9713,7 +9739,7 @@ static int bnx2x_848xx_cmn_config_init(struct bnx2x_phy *phy,
 				       struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u16 autoneg_val, an_1000_val, an_10_100_val;
+	uint16_t autoneg_val, an_1000_val, an_10_100_val;
 
 	bnx2x_848xx_specific_func(phy, params, PHY_INIT);
 	bnx2x_cl45_write(bp, phy,
@@ -9875,11 +9901,11 @@ static int bnx2x_8481_config_init(struct bnx2x_phy *phy,
 #define PHY84833_CMDHDLR_WAIT 300
 #define PHY84833_CMDHDLR_MAX_ARGS 5
 static int bnx2x_84833_cmd_hdlr(struct bnx2x_phy *phy,
-				struct link_params *params, u16 fw_cmd,
-				u16 cmd_args[], int argc)
+				struct link_params *params, uint16_t fw_cmd,
+				uint16_t cmd_args[], int argc)
 {
 	int idx;
-	u16 val;
+	uint16_t val;
 	struct bnx2x *bp = params->bp;
 	/* Write CMD_OPEN_OVERRIDE to STATUS reg */
 	bnx2x_cl45_write(bp, phy, MDIO_CTL_DEVAD,
@@ -9934,8 +9960,8 @@ static int bnx2x_84833_pair_swap_cfg(struct bnx2x_phy *phy,
 				   struct link_params *params,
 				   struct link_vars *vars)
 {
-	u32 pair_swap;
-	u16 data[PHY84833_CMDHDLR_MAX_ARGS];
+	uint32_t pair_swap;
+	uint16_t data[PHY84833_CMDHDLR_MAX_ARGS];
 	int status;
 	struct bnx2x *bp = params->bp;
 
@@ -9949,7 +9975,7 @@ static int bnx2x_84833_pair_swap_cfg(struct bnx2x_phy *phy,
 		return 0;
 
 	/* Only the second argument is used for this command */
-	data[1] = (u16)pair_swap;
+	data[1] = (uint16_t)pair_swap;
 
 	status = bnx2x_84833_cmd_hdlr(phy, params,
 		PHY84833_CMD_SET_PAIR_SWAP, data, PHY84833_CMDHDLR_MAX_ARGS);
@@ -9959,13 +9985,13 @@ static int bnx2x_84833_pair_swap_cfg(struct bnx2x_phy *phy,
 	return status;
 }
 
-static u8 bnx2x_84833_get_reset_gpios(struct bnx2x *bp,
-				      u32 shmem_base_path[],
-				      u32 chip_id)
+static uint8_t bnx2x_84833_get_reset_gpios(struct bnx2x *bp,
+				      uint32_t shmem_base_path[],
+				      uint32_t chip_id)
 {
-	u32 reset_pin[2];
-	u32 idx;
-	u8 reset_gpios;
+	uint32_t reset_pin[2];
+	uint32_t idx;
+	uint8_t reset_gpios;
 	if (CHIP_IS_E3(bp)) {
 		/* Assume that these will be GPIOs, not EPIOs. */
 		for (idx = 0; idx < 2; idx++) {
@@ -9979,7 +10005,7 @@ static u8 bnx2x_84833_get_reset_gpios(struct bnx2x *bp,
 			reset_pin[idx] -= PIN_CFG_GPIO0_P0;
 			reset_pin[idx] = (1 << reset_pin[idx]);
 		}
-		reset_gpios = (u8)(reset_pin[0] | reset_pin[1]);
+		reset_gpios = (uint8_t)(reset_pin[0] | reset_pin[1]);
 	} else {
 		/* E2, look from diff place of shmem. */
 		for (idx = 0; idx < 2; idx++) {
@@ -9991,7 +10017,7 @@ static u8 bnx2x_84833_get_reset_gpios(struct bnx2x *bp,
 			reset_pin[idx] >>= PORT_HW_CFG_EXT_PHY_GPIO_RST_SHIFT;
 			reset_pin[idx] = (1 << reset_pin[idx]);
 		}
-		reset_gpios = (u8)(reset_pin[0] | reset_pin[1]);
+		reset_gpios = (uint8_t)(reset_pin[0] | reset_pin[1]);
 	}
 
 	return reset_gpios;
@@ -10001,12 +10027,12 @@ static int bnx2x_84833_hw_reset_phy(struct bnx2x_phy *phy,
 				struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u8 reset_gpios;
-	u32 other_shmem_base_addr = REG_RD(bp, params->shmem2_base +
+	uint8_t reset_gpios;
+	uint32_t other_shmem_base_addr = REG_RD(bp, params->shmem2_base +
 				offsetof(struct shmem2_region,
 				other_shmem_base_addr));
 
-	u32 shmem_base_path[2];
+	uint32_t shmem_base_path[2];
 
 	/* Work around for 84833 LED failure inside RESET status */
 	bnx2x_cl45_write(bp, phy, MDIO_AN_DEVAD,
@@ -10036,7 +10062,7 @@ static int bnx2x_8483x_disable_eee(struct bnx2x_phy *phy,
 {
 	int rc;
 	struct bnx2x *bp = params->bp;
-	u16 cmd_args = 0;
+	uint16_t cmd_args = 0;
 
 	DP(NETIF_MSG_LINK, "Don't Advertise 10GBase-T EEE\n");
 
@@ -10057,7 +10083,7 @@ static int bnx2x_8483x_enable_eee(struct bnx2x_phy *phy,
 {
 	int rc;
 	struct bnx2x *bp = params->bp;
-	u16 cmd_args = 1;
+	uint16_t cmd_args = 1;
 
 	rc = bnx2x_84833_cmd_hdlr(phy, params,
 		PHY84833_CMD_SET_EEE_MODE, &cmd_args, 1);
@@ -10075,10 +10101,10 @@ static int bnx2x_848x3_config_init(struct bnx2x_phy *phy,
 				   struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u8 port, initialize = 1;
-	u16 val;
-	u32 actual_phy_selection;
-	u16 cmd_args[PHY84833_CMDHDLR_MAX_ARGS];
+	uint8_t port, initialize = 1;
+	uint16_t val;
+	uint32_t actual_phy_selection;
+	uint16_t cmd_args[PHY84833_CMDHDLR_MAX_ARGS];
 	int rc = 0;
 
 	usleep_range(1000, 2000);
@@ -10108,7 +10134,7 @@ static int bnx2x_848x3_config_init(struct bnx2x_phy *phy,
 		/* BCM84823 requires that XGXS links up first @ 10G for normal
 		 * behavior.
 		 */
-		u16 temp;
+		uint16_t temp;
 		temp = vars->line_speed;
 		vars->line_speed = SPEED_10000;
 		bnx2x_set_autoneg(&params->phy[INT_PHY], params, vars, 0);
@@ -10181,7 +10207,7 @@ static int bnx2x_848x3_config_init(struct bnx2x_phy *phy,
 		bnx2x_save_848xx_spirom_version(phy, bp, params->port);
 	/* 84833 PHY has a better feature and doesn't need to support this. */
 	if (phy->type == PORT_HW_CFG_XGXS_EXT_PHY_TYPE_BCM84823) {
-		u32 cms_enable = REG_RD(bp, params->shmem_base +
+		uint32_t cms_enable = REG_RD(bp, params->shmem_base +
 			offsetof(struct shmem_region,
 			dev_info.port_hw_config[params->port].default_cfg)) &
 			PORT_HW_CFG_ENABLE_CMS_MASK;
@@ -10231,18 +10257,18 @@ static int bnx2x_848x3_config_init(struct bnx2x_phy *phy,
 		bnx2x_cl45_read_and_write(bp, phy,
 					  MDIO_CTL_DEVAD,
 					  MDIO_84833_TOP_CFG_XGPHY_STRAP1,
-					  (u16)~MDIO_84833_SUPER_ISOLATE);
+					  (uint16_t)~MDIO_84833_SUPER_ISOLATE);
 	}
 	return rc;
 }
 
-static u8 bnx2x_848xx_read_status(struct bnx2x_phy *phy,
+static uint8_t bnx2x_848xx_read_status(struct bnx2x_phy *phy,
 				  struct link_params *params,
 				  struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u16 val, val1, val2;
-	u8 link_up = 0;
+	uint16_t val, val1, val2;
+	uint8_t link_up = 0;
 
 
 	/* Check 10G-BaseT link status */
@@ -10261,7 +10287,7 @@ static u8 bnx2x_848xx_read_status(struct bnx2x_phy *phy,
 		link_up = 1;
 		bnx2x_ext_phy_10G_an_resolve(bp, phy, vars);
 	} else { /* Check Legacy speed link */
-		u16 legacy_status, legacy_speed;
+		uint16_t legacy_status, legacy_speed;
 
 		/* Enable expansion register 0x42 (Operation mode status) */
 		bnx2x_cl45_write(bp, phy,
@@ -10366,10 +10392,11 @@ static u8 bnx2x_848xx_read_status(struct bnx2x_phy *phy,
 	return link_up;
 }
 
-static int bnx2x_848xx_format_ver(u32 raw_ver, u8 *str, u16 *len)
+static int bnx2x_848xx_format_ver(uint32_t raw_ver, uint8_t *str,
+				  uint16_t *len)
 {
 	int status = 0;
-	u32 spirom_ver;
+	uint32_t spirom_ver;
 	spirom_ver = ((raw_ver & 0xF80) >> 7) << 16 | (raw_ver & 0x7F);
 	status = bnx2x_format_ver(spirom_ver, str, len);
 	return status;
@@ -10397,8 +10424,8 @@ static void bnx2x_848x3_link_reset(struct bnx2x_phy *phy,
 				   struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u8 port;
-	u16 val16;
+	uint8_t port;
+	uint16_t val16;
 
 	if (!(CHIP_IS_E1x(bp)))
 		port = BP_PATH(bp);
@@ -10421,11 +10448,11 @@ static void bnx2x_848x3_link_reset(struct bnx2x_phy *phy,
 }
 
 static void bnx2x_848xx_set_link_led(struct bnx2x_phy *phy,
-				     struct link_params *params, u8 mode)
+				     struct link_params *params, uint8_t mode)
 {
 	struct bnx2x *bp = params->bp;
-	u16 val;
-	u8 port;
+	uint16_t val;
+	uint8_t port;
 
 	if (!(CHIP_IS_E1x(bp)))
 		port = BP_PATH(bp);
@@ -10698,10 +10725,10 @@ static void bnx2x_848xx_set_link_led(struct bnx2x_phy *phy,
 /******************************************************************/
 static void bnx2x_54618se_specific_func(struct bnx2x_phy *phy,
 					struct link_params *params,
-					u32 action)
+					uint32_t action)
 {
 	struct bnx2x *bp = params->bp;
-	u16 temp;
+	uint16_t temp;
 	switch (action) {
 	case PHY_INIT:
 		/* Configure LED4: set to INTR (0x6). */
@@ -10730,9 +10757,9 @@ static int bnx2x_54618se_config_init(struct bnx2x_phy *phy,
 					       struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u8 port;
-	u16 autoneg_val, an_1000_val, an_10_100_val, fc_val, temp;
-	u32 cfg_pin;
+	uint8_t port;
+	uint16_t autoneg_val, an_1000_val, an_10_100_val, fc_val, temp;
+	uint32_t cfg_pin;
 
 	DP(NETIF_MSG_LINK, "54618SE cfg init\n");
 	usleep_range(1000, 2000);
@@ -10933,10 +10960,11 @@ static int bnx2x_54618se_config_init(struct bnx2x_phy *phy,
 
 
 static void bnx2x_5461x_set_link_led(struct bnx2x_phy *phy,
-				       struct link_params *params, u8 mode)
+				       struct link_params *params,
+				     uint8_t mode)
 {
 	struct bnx2x *bp = params->bp;
-	u16 temp;
+	uint16_t temp;
 
 	bnx2x_cl22_write(bp, phy,
 		MDIO_REG_GPHY_SHADOW,
@@ -10972,8 +11000,8 @@ static void bnx2x_54618se_link_reset(struct bnx2x_phy *phy,
 				     struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u32 cfg_pin;
-	u8 port;
+	uint32_t cfg_pin;
+	uint8_t port;
 
 	/* In case of no EPIO routed to reset the GPHY, put it
 	 * in low power mode.
@@ -10993,14 +11021,14 @@ static void bnx2x_54618se_link_reset(struct bnx2x_phy *phy,
 	bnx2x_set_cfg_pin(bp, cfg_pin, 0);
 }
 
-static u8 bnx2x_54618se_read_status(struct bnx2x_phy *phy,
+static uint8_t bnx2x_54618se_read_status(struct bnx2x_phy *phy,
 				    struct link_params *params,
 				    struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u16 val;
-	u8 link_up = 0;
-	u16 legacy_status, legacy_speed;
+	uint16_t val;
+	uint8_t link_up = 0;
+	uint16_t legacy_status, legacy_speed;
 
 	/* Get speed operation status */
 	bnx2x_cl22_read(bp, phy,
@@ -11104,8 +11132,8 @@ static void bnx2x_54618se_config_loopback(struct bnx2x_phy *phy,
 					  struct link_params *params)
 {
 	struct bnx2x *bp = params->bp;
-	u16 val;
-	u32 umac_base = params->port ? GRCBASE_UMAC1 : GRCBASE_UMAC0;
+	uint16_t val;
+	uint32_t umac_base = params->port ? GRCBASE_UMAC1 : GRCBASE_UMAC0;
 
 	DP(NETIF_MSG_LINK, "2PMA/PMD ext_phy_loopback: 54618se\n");
 
@@ -11156,7 +11184,7 @@ static int bnx2x_7101_config_init(struct bnx2x_phy *phy,
 				  struct link_params *params,
 				  struct link_vars *vars)
 {
-	u16 fw_ver1, fw_ver2, val;
+	uint16_t fw_ver1, fw_ver2, val;
 	struct bnx2x *bp = params->bp;
 	DP(NETIF_MSG_LINK, "Setting the SFX7101 LASI indication\n");
 
@@ -11188,17 +11216,18 @@ static int bnx2x_7101_config_init(struct bnx2x_phy *phy,
 	bnx2x_cl45_read(bp, phy,
 			MDIO_PMA_DEVAD, MDIO_PMA_REG_7101_VER2, &fw_ver2);
 	bnx2x_save_spirom_version(bp, params->port,
-				  (u32)(fw_ver1<<16 | fw_ver2), phy->ver_addr);
+				  (uint32_t)(fw_ver1<<16 | fw_ver2),
+				  phy->ver_addr);
 	return 0;
 }
 
-static u8 bnx2x_7101_read_status(struct bnx2x_phy *phy,
+static uint8_t bnx2x_7101_read_status(struct bnx2x_phy *phy,
 				 struct link_params *params,
 				 struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u8 link_up;
-	u16 val1, val2;
+	uint8_t link_up;
+	uint16_t val1, val2;
 	bnx2x_cl45_read(bp, phy,
 			MDIO_PMA_DEVAD, MDIO_PMA_LASI_STAT, &val2);
 	bnx2x_cl45_read(bp, phy,
@@ -11232,7 +11261,8 @@ static u8 bnx2x_7101_read_status(struct bnx2x_phy *phy,
 	return link_up;
 }
 
-static int bnx2x_7101_format_ver(u32 spirom_ver, u8 *str, u16 *len)
+static int bnx2x_7101_format_ver(uint32_t spirom_ver, uint8_t *str,
+				 uint16_t *len)
 {
 	if (*len < 5)
 		return -EINVAL;
@@ -11247,7 +11277,7 @@ static int bnx2x_7101_format_ver(u32 spirom_ver, u8 *str, u16 *len)
 
 void bnx2x_sfx7101_sp_sw_reset(struct bnx2x *bp, struct bnx2x_phy *phy)
 {
-	u16 val, cnt;
+	uint16_t val, cnt;
 
 	bnx2x_cl45_read(bp, phy,
 			MDIO_PMA_DEVAD,
@@ -11281,9 +11311,9 @@ static void bnx2x_7101_hw_reset(struct bnx2x_phy *phy,
 }
 
 static void bnx2x_7101_set_link_led(struct bnx2x_phy *phy,
-				    struct link_params *params, u8 mode)
+				    struct link_params *params, uint8_t mode)
 {
-	u16 val = 0;
+	uint16_t val = 0;
 	struct bnx2x *bp = params->bp;
 	switch (mode) {
 	case LED_MODE_FRONT_PANEL_OFF:
@@ -11802,12 +11832,12 @@ static const struct bnx2x_phy phy_54618se = {
 /*                                                               */
 /*****************************************************************/
 
-static void bnx2x_populate_preemphasis(struct bnx2x *bp, u32 shmem_base,
-				     struct bnx2x_phy *phy, u8 port,
-				     u8 phy_index)
+static void bnx2x_populate_preemphasis(struct bnx2x *bp, uint32_t shmem_base,
+				     struct bnx2x_phy *phy, uint8_t port,
+				     uint8_t phy_index)
 {
 	/* Get the 4 lanes xgxs config rx and tx */
-	u32 rx = 0, tx = 0, i;
+	uint32_t rx = 0, tx = 0, i;
 	for (i = 0; i < 2; i++) {
 		/* INT_PHY and EXT_PHY1 share the same value location in
 		 * the shmem. When num_phys is greater than 1, than this value
@@ -11839,10 +11869,11 @@ static void bnx2x_populate_preemphasis(struct bnx2x *bp, u32 shmem_base,
 	}
 }
 
-static u32 bnx2x_get_ext_phy_config(struct bnx2x *bp, u32 shmem_base,
-				    u8 phy_index, u8 port)
+static uint32_t bnx2x_get_ext_phy_config(struct bnx2x *bp,
+					 uint32_t shmem_base,
+				    uint8_t phy_index, uint8_t port)
 {
-	u32 ext_phy_config = 0;
+	uint32_t ext_phy_config = 0;
 	switch (phy_index) {
 	case EXT_PHY1:
 		ext_phy_config = REG_RD(bp, shmem_base +
@@ -11861,12 +11892,13 @@ static u32 bnx2x_get_ext_phy_config(struct bnx2x *bp, u32 shmem_base,
 
 	return ext_phy_config;
 }
-static int bnx2x_populate_int_phy(struct bnx2x *bp, u32 shmem_base, u8 port,
+static int bnx2x_populate_int_phy(struct bnx2x *bp, uint32_t shmem_base,
+				  uint8_t port,
 				  struct bnx2x_phy *phy)
 {
-	u32 phy_addr;
-	u32 chip_id;
-	u32 switch_cfg = (REG_RD(bp, shmem_base +
+	uint32_t phy_addr;
+	uint32_t chip_id;
+	uint32_t switch_cfg = (REG_RD(bp, shmem_base +
 				       offsetof(struct shmem_region,
 			dev_info.port_feature_config[port].link_config)) &
 			  PORT_FEATURE_CONNECTED_SWITCH_MASK);
@@ -11875,7 +11907,7 @@ static int bnx2x_populate_int_phy(struct bnx2x *bp, u32 shmem_base, u8 port,
 
 	DP(NETIF_MSG_LINK, ":chip_id = 0x%x\n", chip_id);
 	if (USES_WARPCORE(bp)) {
-		u32 serdes_net_if;
+		uint32_t serdes_net_if;
 		phy_addr = REG_RD(bp,
 				  MISC_REG_WC0_CTRL_PHY_ADDR);
 		*phy = phy_warpcore;
@@ -11982,7 +12014,7 @@ static int bnx2x_populate_int_phy(struct bnx2x *bp, u32 shmem_base, u8 port,
 			return -EINVAL;
 		}
 	}
-	phy->addr = (u8)phy_addr;
+	phy->addr = (uint8_t)phy_addr;
 	phy->mdio_ctrl = bnx2x_get_emac_base(bp,
 					    SHARED_HW_CFG_MDC_MDIO_ACCESS1_BOTH,
 					    port);
@@ -11999,14 +12031,14 @@ static int bnx2x_populate_int_phy(struct bnx2x *bp, u32 shmem_base, u8 port,
 }
 
 static int bnx2x_populate_ext_phy(struct bnx2x *bp,
-				  u8 phy_index,
-				  u32 shmem_base,
-				  u32 shmem2_base,
-				  u8 port,
+				  uint8_t phy_index,
+				  uint32_t shmem_base,
+				  uint32_t shmem2_base,
+				  uint8_t port,
 				  struct bnx2x_phy *phy)
 {
-	u32 ext_phy_config, phy_type, config2;
-	u32 mdc_mdio_access = SHARED_HW_CFG_MDC_MDIO_ACCESS1_BOTH;
+	uint32_t ext_phy_config, phy_type, config2;
+	uint32_t mdc_mdio_access = SHARED_HW_CFG_MDC_MDIO_ACCESS1_BOTH;
 	ext_phy_config = bnx2x_get_ext_phy_config(bp, shmem_base,
 						  phy_index, port);
 	phy_type = XGXS_EXT_PHY_TYPE(ext_phy_config);
@@ -12088,7 +12120,7 @@ static int bnx2x_populate_ext_phy(struct bnx2x *bp,
 			mdc_mdio_access = config2 &
 			SHARED_HW_CFG_MDC_MDIO_ACCESS1_MASK;
 	} else {
-		u32 size = REG_RD(bp, shmem2_base);
+		uint32_t size = REG_RD(bp, shmem2_base);
 
 		if (size >
 		    offsetof(struct shmem2_region, ext_phy_fw_version2)) {
@@ -12111,7 +12143,7 @@ static int bnx2x_populate_ext_phy(struct bnx2x *bp,
 		/* Remove 100Mb link supported for BCM84833/4 when phy fw
 		 * version lower than or equal to 1.39
 		 */
-		u32 raw_ver = REG_RD(bp, phy->ver_addr);
+		uint32_t raw_ver = REG_RD(bp, phy->ver_addr);
 		if (((raw_ver & 0x7F) <= 39) &&
 		    (((raw_ver & 0xF80) >> 7) <= 1))
 			phy->supported &= ~(SUPPORTED_100baseT_Half |
@@ -12125,8 +12157,10 @@ static int bnx2x_populate_ext_phy(struct bnx2x *bp,
 	return 0;
 }
 
-static int bnx2x_populate_phy(struct bnx2x *bp, u8 phy_index, u32 shmem_base,
-			      u32 shmem2_base, u8 port, struct bnx2x_phy *phy)
+static int bnx2x_populate_phy(struct bnx2x *bp, uint8_t phy_index,
+			      uint32_t shmem_base,
+			      uint32_t shmem2_base, uint8_t port,
+			      struct bnx2x_phy *phy)
 {
 	int status = 0;
 	phy->type = PORT_HW_CFG_XGXS_EXT_PHY_TYPE_NOT_CONN;
@@ -12139,10 +12173,10 @@ static int bnx2x_populate_phy(struct bnx2x *bp, u8 phy_index, u32 shmem_base,
 
 static void bnx2x_phy_def_cfg(struct link_params *params,
 			      struct bnx2x_phy *phy,
-			      u8 phy_index)
+			      uint8_t phy_index)
 {
 	struct bnx2x *bp = params->bp;
-	u32 link_config;
+	uint32_t link_config;
 	/* Populate the default phy configuration for MF mode */
 	if (phy_index == EXT_PHY2) {
 		link_config = REG_RD(bp, params->shmem_base +
@@ -12210,10 +12244,10 @@ static void bnx2x_phy_def_cfg(struct link_params *params,
 	}
 }
 
-u32 bnx2x_phy_selection(struct link_params *params)
+uint32_t bnx2x_phy_selection(struct link_params *params)
 {
-	u32 phy_config_swapped, prio_cfg;
-	u32 return_cfg = PORT_HW_CFG_PHY_SELECTION_HARDWARE_DEFAULT;
+	uint32_t phy_config_swapped, prio_cfg;
+	uint32_t return_cfg = PORT_HW_CFG_PHY_SELECTION_HARDWARE_DEFAULT;
 
 	phy_config_swapped = params->multi_phy_config &
 		PORT_HW_CFG_PHY_SWAPPED_ENABLED;
@@ -12244,8 +12278,8 @@ u32 bnx2x_phy_selection(struct link_params *params)
 
 int bnx2x_phy_probe(struct link_params *params)
 {
-	u8 phy_index, actual_phy_idx;
-	u32 phy_config_swapped, sync_offset, media_types;
+	uint8_t phy_index, actual_phy_idx;
+	uint32_t phy_config_swapped, sync_offset, media_types;
 	struct bnx2x *bp = params->bp;
 	struct bnx2x_phy *phy;
 	params->num_phys = 0;
@@ -12435,7 +12469,7 @@ static void bnx2x_init_xgxs_loopback(struct link_params *params,
 		int_phy->config_loopback(int_phy, params);
 	} else {
 		/* Set external phy loopback */
-		u8 phy_index;
+		uint8_t phy_index;
 		for (phy_index = EXT_PHY1;
 		      phy_index < params->num_phys; phy_index++)
 			if (params->phy[phy_index].config_loopback)
@@ -12448,10 +12482,10 @@ static void bnx2x_init_xgxs_loopback(struct link_params *params,
 	bnx2x_set_led(params, vars, LED_MODE_OPER, vars->line_speed);
 }
 
-void bnx2x_set_rx_filter(struct link_params *params, u8 en)
+void bnx2x_set_rx_filter(struct link_params *params, uint8_t en)
 {
 	struct bnx2x *bp = params->bp;
-	u8 val = en * 0x1F;
+	uint8_t val = en * 0x1F;
 
 	/* Open / close the gate between the NIG and the BRB */
 	if (!CHIP_IS_E1x(bp))
@@ -12469,8 +12503,8 @@ void bnx2x_set_rx_filter(struct link_params *params, u8 en)
 static int bnx2x_avoid_link_flap(struct link_params *params,
 					    struct link_vars *vars)
 {
-	u32 phy_idx;
-	u32 dont_clear_stat, lfa_sts;
+	uint32_t phy_idx;
+	uint32_t dont_clear_stat, lfa_sts;
 	struct bnx2x *bp = params->bp;
 
 	bnx2x_set_mdio_emac_per_phy(bp, params);
@@ -12545,7 +12579,7 @@ static void bnx2x_cannot_avoid_link_flap(struct link_params *params,
 					 struct link_vars *vars,
 					 int lfa_status)
 {
-	u32 lfa_sts, cfg_idx, tmp_val;
+	uint32_t lfa_sts, cfg_idx, tmp_val;
 	struct bnx2x *bp = params->bp;
 
 	bnx2x_link_reset(params, vars, 1);
@@ -12690,10 +12724,10 @@ int bnx2x_phy_init(struct link_params *params, struct link_vars *vars)
 }
 
 int bnx2x_link_reset(struct link_params *params, struct link_vars *vars,
-		     u8 reset_ext_phy)
+		     uint8_t reset_ext_phy)
 {
 	struct bnx2x *bp = params->bp;
-	u8 phy_index, port = params->port, clear_latch_ind = 0;
+	uint8_t phy_index, port = params->port, clear_latch_ind = 0;
 	DP(NETIF_MSG_LINK, "Resetting the link of port %d\n", port);
 	/* Disable attentions */
 	vars->link_status = 0;
@@ -12768,7 +12802,7 @@ int bnx2x_link_reset(struct link_params *params, struct link_vars *vars,
 		REG_WR(bp, NIG_REG_BMAC0_IN_EN + port*4, 0);
 		REG_WR(bp, NIG_REG_EMAC0_IN_EN + port*4, 0);
 	} else {
-		u32 xmac_base = (params->port) ? GRCBASE_XMAC1 : GRCBASE_XMAC0;
+		uint32_t xmac_base = (params->port) ? GRCBASE_XMAC1 : GRCBASE_XMAC0;
 		bnx2x_set_xumac_nig(params, 0, 0);
 		if (REG_RD(bp, MISC_REG_RESET_REG_2) &
 		    MISC_REGISTERS_RESET_REG_2_XMAC)
@@ -12835,23 +12869,24 @@ int bnx2x_lfa_reset(struct link_params *params,
 /*				Common function				    */
 /****************************************************************************/
 static int bnx2x_8073_common_init_phy(struct bnx2x *bp,
-				      u32 shmem_base_path[],
-				      u32 shmem2_base_path[], u8 phy_index,
-				      u32 chip_id)
+				      uint32_t shmem_base_path[],
+				      uint32_t shmem2_base_path[],
+				      uint8_t phy_index,
+				      uint32_t chip_id)
 {
 	struct bnx2x_phy phy[PORT_MAX];
 	struct bnx2x_phy *phy_blk[PORT_MAX];
-	u16 val;
+	uint16_t val;
 	s8 port = 0;
 	s8 port_of_path = 0;
-	u32 swap_val, swap_override;
+	uint32_t swap_val, swap_override;
 	swap_val = REG_RD(bp,  NIG_REG_PORT_SWAP);
 	swap_override = REG_RD(bp,  NIG_REG_STRAP_OVERRIDE);
 	port ^= (swap_val && swap_override);
 	bnx2x_ext_phy_hw_reset(bp, port);
 	/* PART1 - Reset both phys */
 	for (port = PORT_MAX - 1; port >= PORT_0; port--) {
-		u32 shmem_base, shmem2_base;
+		uint32_t shmem_base, shmem2_base;
 		/* In E2, same phy is using for port0 of the two paths */
 		if (CHIP_IS_E1x(bp)) {
 			shmem_base = shmem_base_path[0];
@@ -12961,11 +12996,12 @@ static int bnx2x_8073_common_init_phy(struct bnx2x *bp,
 	return 0;
 }
 static int bnx2x_8726_common_init_phy(struct bnx2x *bp,
-				      u32 shmem_base_path[],
-				      u32 shmem2_base_path[], u8 phy_index,
-				      u32 chip_id)
+				      uint32_t shmem_base_path[],
+				      uint32_t shmem2_base_path[],
+				      uint8_t phy_index,
+				      uint32_t chip_id)
 {
-	u32 val;
+	uint32_t val;
 	s8 port;
 	struct bnx2x_phy phy;
 	/* Use port1 because of the static port-swap */
@@ -12978,7 +13014,7 @@ static int bnx2x_8726_common_init_phy(struct bnx2x *bp,
 	bnx2x_ext_phy_hw_reset(bp, 0);
 	usleep_range(5000, 10000);
 	for (port = 0; port < PORT_MAX; port++) {
-		u32 shmem_base, shmem2_base;
+		uint32_t shmem_base, shmem2_base;
 
 		/* In E2, same phy is using for port0 of the two paths */
 		if (CHIP_IS_E1x(bp)) {
@@ -13009,11 +13045,12 @@ static int bnx2x_8726_common_init_phy(struct bnx2x *bp,
 
 	return 0;
 }
-static void bnx2x_get_ext_phy_reset_gpio(struct bnx2x *bp, u32 shmem_base,
-					 u8 *io_gpio, u8 *io_port)
+static void bnx2x_get_ext_phy_reset_gpio(struct bnx2x *bp,
+					 uint32_t shmem_base,
+					 uint8_t *io_gpio, uint8_t *io_port)
 {
 
-	u32 phy_gpio_reset = REG_RD(bp, shmem_base +
+	uint32_t phy_gpio_reset = REG_RD(bp, shmem_base +
 					  offsetof(struct shmem_region,
 				dev_info.port_hw_config[PORT_0].default_cfg));
 	switch (phy_gpio_reset) {
@@ -13056,12 +13093,13 @@ static void bnx2x_get_ext_phy_reset_gpio(struct bnx2x *bp, u32 shmem_base,
 }
 
 static int bnx2x_8727_common_init_phy(struct bnx2x *bp,
-				      u32 shmem_base_path[],
-				      u32 shmem2_base_path[], u8 phy_index,
-				      u32 chip_id)
+				      uint32_t shmem_base_path[],
+				      uint32_t shmem2_base_path[],
+				      uint8_t phy_index,
+				      uint32_t chip_id)
 {
 	s8 port, reset_gpio;
-	u32 swap_val, swap_override;
+	uint32_t swap_val, swap_override;
 	struct bnx2x_phy phy[PORT_MAX];
 	struct bnx2x_phy *phy_blk[PORT_MAX];
 	s8 port_of_path;
@@ -13075,7 +13113,7 @@ static int bnx2x_8727_common_init_phy(struct bnx2x *bp,
 	 * Default is GPIO1, PORT1
 	 */
 	bnx2x_get_ext_phy_reset_gpio(bp, shmem_base_path[0],
-				     (u8 *)&reset_gpio, (u8 *)&port);
+				     (uint8_t *)&reset_gpio, (uint8_t *)&port);
 
 	/* Calculate the port based on port swap */
 	port ^= (swap_val && swap_override);
@@ -13091,7 +13129,7 @@ static int bnx2x_8727_common_init_phy(struct bnx2x *bp,
 
 	/* PART1 - Reset both phys */
 	for (port = PORT_MAX - 1; port >= PORT_0; port--) {
-		u32 shmem_base, shmem2_base;
+		uint32_t shmem_base, shmem2_base;
 
 		/* In E2, same phy is using for port0 of the two paths */
 		if (CHIP_IS_E1x(bp)) {
@@ -13155,12 +13193,12 @@ static int bnx2x_8727_common_init_phy(struct bnx2x *bp,
 }
 
 static int bnx2x_84833_common_init_phy(struct bnx2x *bp,
-						u32 shmem_base_path[],
-						u32 shmem2_base_path[],
-						u8 phy_index,
-						u32 chip_id)
+						uint32_t shmem_base_path[],
+						uint32_t shmem2_base_path[],
+						uint8_t phy_index,
+						uint32_t chip_id)
 {
-	u8 reset_gpios;
+	uint8_t reset_gpios;
 	reset_gpios = bnx2x_84833_get_reset_gpios(bp, shmem_base_path, chip_id);
 	bnx2x_set_mult_gpio(bp, reset_gpios, MISC_REGISTERS_GPIO_OUTPUT_LOW);
 	udelay(10);
@@ -13170,9 +13208,11 @@ static int bnx2x_84833_common_init_phy(struct bnx2x *bp,
 	return 0;
 }
 
-static int bnx2x_ext_phy_common_init(struct bnx2x *bp, u32 shmem_base_path[],
-				     u32 shmem2_base_path[], u8 phy_index,
-				     u32 ext_phy_type, u32 chip_id)
+static int bnx2x_ext_phy_common_init(struct bnx2x *bp,
+				     uint32_t shmem_base_path[],
+				     uint32_t shmem2_base_path[],
+				     uint8_t phy_index,
+				     uint32_t ext_phy_type, uint32_t chip_id)
 {
 	int rc = 0;
 
@@ -13224,13 +13264,13 @@ static int bnx2x_ext_phy_common_init(struct bnx2x *bp, u32 shmem_base_path[],
 	return rc;
 }
 
-int bnx2x_common_init_phy(struct bnx2x *bp, u32 shmem_base_path[],
-			  u32 shmem2_base_path[], u32 chip_id)
+int bnx2x_common_init_phy(struct bnx2x *bp, uint32_t shmem_base_path[],
+			  uint32_t shmem2_base_path[], uint32_t chip_id)
 {
 	int rc = 0;
-	u32 phy_ver, val;
-	u8 phy_index = 0;
-	u32 ext_phy_type, ext_phy_config;
+	uint32_t phy_ver, val;
+	uint8_t phy_index = 0;
+	uint32_t ext_phy_type, ext_phy_config;
 
 	bnx2x_set_mdio_clk(bp, chip_id, GRCBASE_EMAC0);
 	bnx2x_set_mdio_clk(bp, chip_id, GRCBASE_EMAC1);
@@ -13269,9 +13309,9 @@ static void bnx2x_check_over_curr(struct link_params *params,
 				  struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u32 cfg_pin;
-	u8 port = params->port;
-	u32 pin_val;
+	uint32_t cfg_pin;
+	uint8_t port = params->port;
+	uint32_t pin_val;
 
 	cfg_pin = (REG_RD(bp, params->shmem_base +
 			  offsetof(struct shmem_region,
@@ -13301,14 +13341,15 @@ static void bnx2x_check_over_curr(struct link_params *params,
 }
 
 /* Returns 0 if no change occured since last check; 1 otherwise. */
-static u8 bnx2x_analyze_link_error(struct link_params *params,
-				    struct link_vars *vars, u32 status,
-				    u32 phy_flag, u32 link_flag, u8 notify)
+static uint8_t bnx2x_analyze_link_error(struct link_params *params,
+				    struct link_vars *vars, uint32_t status,
+				    uint32_t phy_flag, uint32_t link_flag,
+					uint8_t notify)
 {
 	struct bnx2x *bp = params->bp;
 	/* Compare new value with previous value */
-	u8 led_mode;
-	u32 old_status = (vars->phy_flags & phy_flag) ? 1 : 0;
+	uint8_t led_mode;
+	uint32_t old_status = (vars->phy_flags & phy_flag) ? 1 : 0;
 
 	if ((status ^ old_status) == 0)
 		return 0;
@@ -13382,11 +13423,11 @@ static u8 bnx2x_analyze_link_error(struct link_params *params,
 ******************************************************************************/
 static int bnx2x_check_half_open_conn(struct link_params *params,
 				      struct link_vars *vars,
-				      u8 notify)
+				      uint8_t notify)
 {
 	struct bnx2x *bp = params->bp;
-	u32 lss_status = 0;
-	u32 mac_base;
+	uint32_t lss_status = 0;
+	uint32_t mac_base;
 	/* In case link status is physically up @ 10G do */
 	if (((vars->phy_flags & PHY_PHYSICAL_LINK_FLAG) == 0) ||
 	    (REG_RD(bp, NIG_REG_EGRESS_EMAC0_PORT + params->port*4)))
@@ -13416,8 +13457,8 @@ static int bnx2x_check_half_open_conn(struct link_params *params,
 	} else if (REG_RD(bp, MISC_REG_RESET_REG_2) &
 		   (MISC_REGISTERS_RESET_REG_2_RST_BMAC0 << params->port)) {
 		/* Check E1X / E2 BMAC */
-		u32 lss_status_reg;
-		u32 wb_data[2];
+		uint32_t lss_status_reg;
+		uint32_t wb_data[2];
 		mac_base = params->port ? NIG_REG_INGRESS_BMAC1_MEM :
 			NIG_REG_INGRESS_BMAC0_MEM;
 		/*  Read BIGMAC_REGISTER_RX_LSS_STATUS */
@@ -13440,8 +13481,8 @@ static void bnx2x_sfp_tx_fault_detection(struct bnx2x_phy *phy,
 					 struct link_vars *vars)
 {
 	struct bnx2x *bp = params->bp;
-	u32 cfg_pin, value = 0;
-	u8 led_change, port = params->port;
+	uint32_t cfg_pin, value = 0;
+	uint8_t led_change, port = params->port;
 
 	/* Get The SFP+ TX_Fault controlling pin ([eg]pio) */
 	cfg_pin = (REG_RD(bp, params->shmem_base + offsetof(struct shmem_region,
@@ -13460,7 +13501,7 @@ static void bnx2x_sfp_tx_fault_detection(struct bnx2x_phy *phy,
 
 	if (led_change) {
 		/* Change TX_Fault led, set link status for further syncs */
-		u8 led_mode;
+		uint8_t led_mode;
 
 		if (vars->phy_flags & PHY_SFP_TX_FAULT_FLAG) {
 			led_mode = MISC_REGISTERS_GPIO_HIGH;
@@ -13493,7 +13534,7 @@ static void bnx2x_check_kr2_wa(struct link_params *params,
 			       struct bnx2x_phy *phy)
 {
 	struct bnx2x *bp = params->bp;
-	u16 base_page, next_page, not_kr2_device, lane;
+	uint16_t base_page, next_page, not_kr2_device, lane;
 	int sigdet;
 
 	/* Once KR2 was disabled, wait 5 seconds before checking KR2 recovery
@@ -13563,7 +13604,7 @@ static void bnx2x_check_kr2_wa(struct link_params *params,
 
 void bnx2x_period_func(struct link_params *params, struct link_vars *vars)
 {
-	u16 phy_idx;
+	uint16_t phy_idx;
 	struct bnx2x *bp = params->bp;
 	for (phy_idx = INT_PHY; phy_idx < MAX_PHYS; phy_idx++) {
 		if (params->phy[phy_idx].flags & FLAGS_TX_ERROR_CHECK) {
@@ -13604,12 +13645,12 @@ void bnx2x_period_func(struct link_params *params, struct link_vars *vars)
 	}
 }
 
-u8 bnx2x_fan_failure_det_req(struct bnx2x *bp,
-			     u32 shmem_base,
-			     u32 shmem2_base,
-			     u8 port)
+uint8_t bnx2x_fan_failure_det_req(struct bnx2x *bp,
+			     uint32_t shmem_base,
+			     uint32_t shmem2_base,
+			     uint8_t port)
 {
-	u8 phy_index, fan_failure_det_req = 0;
+	uint8_t phy_index, fan_failure_det_req = 0;
 	struct bnx2x_phy phy;
 	for (phy_index = EXT_PHY1; phy_index < MAX_PHYS;
 	      phy_index++) {
@@ -13627,7 +13668,7 @@ u8 bnx2x_fan_failure_det_req(struct bnx2x *bp,
 
 void bnx2x_hw_reset_phy(struct link_params *params)
 {
-	u8 phy_index;
+	uint8_t phy_index;
 	struct bnx2x *bp = params->bp;
 	bnx2x_update_mng(params, 0);
 	bnx2x_bits_dis(bp, NIG_REG_MASK_INTERRUPT_PORT0 + params->port*4,
@@ -13648,12 +13689,13 @@ void bnx2x_hw_reset_phy(struct link_params *params)
 }
 
 void bnx2x_init_mod_abs_int(struct bnx2x *bp, struct link_vars *vars,
-			    u32 chip_id, u32 shmem_base, u32 shmem2_base,
-			    u8 port)
+			    uint32_t chip_id, uint32_t shmem_base,
+			    uint32_t shmem2_base,
+			    uint8_t port)
 {
-	u8 gpio_num = 0xff, gpio_port = 0xff, phy_index;
-	u32 val;
-	u32 offset, aeu_mask, swap_val, swap_override, sync_offset;
+	uint8_t gpio_num = 0xff, gpio_port = 0xff, phy_index;
+	uint32_t val;
+	uint32_t offset, aeu_mask, swap_val, swap_override, sync_offset;
 	if (CHIP_IS_E3(bp)) {
 		if (bnx2x_get_mod_abs_int_cfg(bp, chip_id,
 					      shmem_base,

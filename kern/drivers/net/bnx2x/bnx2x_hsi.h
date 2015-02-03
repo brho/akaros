@@ -15,23 +15,23 @@
 #define FW_ENCODE_32BIT_PATTERN         0x1e1e1e1e
 
 struct license_key {
-	u32 reserved[6];
+	uint32_t reserved[6];
 
-	u32 max_iscsi_conn;
+	uint32_t max_iscsi_conn;
 #define BNX2X_MAX_ISCSI_TRGT_CONN_MASK	0xFFFF
 #define BNX2X_MAX_ISCSI_TRGT_CONN_SHIFT	0
 #define BNX2X_MAX_ISCSI_INIT_CONN_MASK	0xFFFF0000
 #define BNX2X_MAX_ISCSI_INIT_CONN_SHIFT	16
 
-	u32 reserved_a;
+	uint32_t reserved_a;
 
-	u32 max_fcoe_conn;
+	uint32_t max_fcoe_conn;
 #define BNX2X_MAX_FCOE_TRGT_CONN_MASK	0xFFFF
 #define BNX2X_MAX_FCOE_TRGT_CONN_SHIFT	0
 #define BNX2X_MAX_FCOE_INIT_CONN_MASK	0xFFFF0000
 #define BNX2X_MAX_FCOE_INIT_CONN_SHIFT	16
 
-	u32 reserved_b[4];
+	uint32_t reserved_b[4];
 };
 
 /****************************************************************************
@@ -115,15 +115,15 @@ struct license_key {
 #define EPIO_CFG_EPIO31                     0x00000020
 
 struct mac_addr {
-	u32 upper;
-	u32 lower;
+	uint32_t upper;
+	uint32_t lower;
 };
 
 struct shared_hw_cfg {			 /* NVRAM Offset */
 	/* Up to 16 bytes of NULL-terminated string */
-	u8  part_num[16];		    /* 0x104 */
+	uint8_t  part_num[16];		    /* 0x104 */
 
-	u32 config;			/* 0x114 */
+	uint32_t config;			/* 0x114 */
 	#define SHARED_HW_CFG_MDIO_VOLTAGE_MASK             0x00000001
 		#define SHARED_HW_CFG_MDIO_VOLTAGE_SHIFT             0
 		#define SHARED_HW_CFG_MDIO_VOLTAGE_1_2V              0x00000000
@@ -192,7 +192,7 @@ struct shared_hw_cfg {			 /* NVRAM Offset */
 		#define SHARED_HW_CFG_ATC_DISABLED                   0x00000000
 		#define SHARED_HW_CFG_ATC_ENABLED                    0x80000000
 
-	u32 config2;			    /* 0x118 */
+	uint32_t config2;			    /* 0x118 */
 	/* one time auto detect grace period (in sec) */
 	#define SHARED_HW_CFG_GRACE_PERIOD_MASK             0x000000ff
 	#define SHARED_HW_CFG_GRACE_PERIOD_SHIFT                     0
@@ -280,13 +280,13 @@ struct shared_hw_cfg {			 /* NVRAM Offset */
 		#define SHARED_HW_CFG_MDC_MDIO_ACCESS2_BOTH          0x60000000
 		#define SHARED_HW_CFG_MDC_MDIO_ACCESS2_SWAPPED       0x80000000
 
-	u32 config_3;				/* 0x11C */
+	uint32_t config_3;				/* 0x11C */
 	#define SHARED_HW_CFG_EXTENDED_MF_MODE_MASK         0x00000F00
 		#define SHARED_HW_CFG_EXTENDED_MF_MODE_SHIFT              8
 		#define SHARED_HW_CFG_EXTENDED_MF_MODE_NPAR1_DOT_5        0x00000000
 		#define SHARED_HW_CFG_EXTENDED_MF_MODE_NPAR2_DOT_0        0x00000100
 
-	u32 ump_nc_si_config;			/* 0x120 */
+	uint32_t ump_nc_si_config;			/* 0x120 */
 	#define SHARED_HW_CFG_UMP_NC_SI_MII_MODE_MASK       0x00000003
 		#define SHARED_HW_CFG_UMP_NC_SI_MII_MODE_SHIFT       0
 		#define SHARED_HW_CFG_UMP_NC_SI_MII_MODE_MAC         0x00000000
@@ -302,7 +302,7 @@ struct shared_hw_cfg {			 /* NVRAM Offset */
 		#define SHARED_HW_CFG_UMP_NC_SI_EXT_PHY_TYPE_NONE    0x00000000
 		#define SHARED_HW_CFG_UMP_NC_SI_EXT_PHY_TYPE_BCM5221 0x00010000
 
-	u32 board;			/* 0x124 */
+	uint32_t board;			/* 0x124 */
 	#define SHARED_HW_CFG_E3_I2C_MUX0_MASK              0x0000003F
 	#define SHARED_HW_CFG_E3_I2C_MUX0_SHIFT                      0
 	#define SHARED_HW_CFG_E3_I2C_MUX1_MASK              0x00000FC0
@@ -317,7 +317,7 @@ struct shared_hw_cfg {			 /* NVRAM Offset */
 	#define SHARED_HW_CFG_BOARD_MINOR_VER_MASK          0xf0000000
 	#define SHARED_HW_CFG_BOARD_MINOR_VER_SHIFT                  28
 
-	u32 wc_lane_config;				    /* 0x128 */
+	uint32_t wc_lane_config;				    /* 0x128 */
 	#define SHARED_HW_CFG_LANE_SWAP_CFG_MASK            0x0000FFFF
 		#define SHARED_HW_CFG_LANE_SWAP_CFG_SHIFT            0
 		#define SHARED_HW_CFG_LANE_SWAP_CFG_32103210         0x00001b1b
@@ -357,15 +357,15 @@ struct shared_hw_cfg {			 /* NVRAM Offset */
  ****************************************************************************/
 struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 
-	u32 pci_id;
+	uint32_t pci_id;
 	#define PORT_HW_CFG_PCI_VENDOR_ID_MASK              0xffff0000
 	#define PORT_HW_CFG_PCI_DEVICE_ID_MASK              0x0000ffff
 
-	u32 pci_sub_id;
+	uint32_t pci_sub_id;
 	#define PORT_HW_CFG_PCI_SUBSYS_DEVICE_ID_MASK       0xffff0000
 	#define PORT_HW_CFG_PCI_SUBSYS_VENDOR_ID_MASK       0x0000ffff
 
-	u32 power_dissipated;
+	uint32_t power_dissipated;
 	#define PORT_HW_CFG_POWER_DIS_D0_MASK               0x000000ff
 	#define PORT_HW_CFG_POWER_DIS_D0_SHIFT                       0
 	#define PORT_HW_CFG_POWER_DIS_D1_MASK               0x0000ff00
@@ -375,7 +375,7 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 	#define PORT_HW_CFG_POWER_DIS_D3_MASK               0xff000000
 	#define PORT_HW_CFG_POWER_DIS_D3_SHIFT                       24
 
-	u32 power_consumed;
+	uint32_t power_consumed;
 	#define PORT_HW_CFG_POWER_CONS_D0_MASK              0x000000ff
 	#define PORT_HW_CFG_POWER_CONS_D0_SHIFT                      0
 	#define PORT_HW_CFG_POWER_CONS_D1_MASK              0x0000ff00
@@ -385,18 +385,18 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 	#define PORT_HW_CFG_POWER_CONS_D3_MASK              0xff000000
 	#define PORT_HW_CFG_POWER_CONS_D3_SHIFT                      24
 
-	u32 mac_upper;
+	uint32_t mac_upper;
 	#define PORT_HW_CFG_UPPERMAC_MASK                   0x0000ffff
 	#define PORT_HW_CFG_UPPERMAC_SHIFT                           0
-	u32 mac_lower;
+	uint32_t mac_lower;
 
-	u32 iscsi_mac_upper;  /* Upper 16 bits are always zeroes */
-	u32 iscsi_mac_lower;
+	uint32_t iscsi_mac_upper;  /* Upper 16 bits are always zeroes */
+	uint32_t iscsi_mac_lower;
 
-	u32 rdma_mac_upper;   /* Upper 16 bits are always zeroes */
-	u32 rdma_mac_lower;
+	uint32_t rdma_mac_upper;   /* Upper 16 bits are always zeroes */
+	uint32_t rdma_mac_lower;
 
-	u32 serdes_config;
+	uint32_t serdes_config;
 	#define PORT_HW_CFG_SERDES_TX_DRV_PRE_EMPHASIS_MASK 0x0000ffff
 	#define PORT_HW_CFG_SERDES_TX_DRV_PRE_EMPHASIS_SHIFT         0
 
@@ -405,7 +405,7 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 
 
 	/*  Default values: 2P-64, 4P-32 */
-	u32 pf_config;					    /* 0x158 */
+	uint32_t pf_config;					    /* 0x158 */
 	#define PORT_HW_CFG_PF_NUM_VF_MASK                  0x0000007F
 	#define PORT_HW_CFG_PF_NUM_VF_SHIFT                          0
 
@@ -416,19 +416,19 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 	#define PORT_HW_CFG_ENABLE_FLR_MASK                 0x00010000
 	#define PORT_HW_CFG_FLR_ENABLED                     0x00010000
 
-	u32 vf_config;					    /* 0x15C */
+	uint32_t vf_config;					    /* 0x15C */
 	#define PORT_HW_CFG_VF_NUM_MSIX_VECTORS_MASK        0x0000007F
 	#define PORT_HW_CFG_VF_NUM_MSIX_VECTORS_SHIFT                0
 
 	#define PORT_HW_CFG_VF_PCI_DEVICE_ID_MASK           0xFFFF0000
 	#define PORT_HW_CFG_VF_PCI_DEVICE_ID_SHIFT                   16
 
-	u32 mf_pci_id;					    /* 0x160 */
+	uint32_t mf_pci_id;					    /* 0x160 */
 	#define PORT_HW_CFG_MF_PCI_DEVICE_ID_MASK           0x0000FFFF
 	#define PORT_HW_CFG_MF_PCI_DEVICE_ID_SHIFT                   0
 
 	/*  Controls the TX laser of the SFP+ module */
-	u32 sfp_ctrl;					    /* 0x164 */
+	uint32_t sfp_ctrl;					    /* 0x164 */
 	#define PORT_HW_CFG_TX_LASER_MASK                   0x000000FF
 		#define PORT_HW_CFG_TX_LASER_SHIFT                   0
 		#define PORT_HW_CFG_TX_LASER_MDIO                    0x00000000
@@ -448,7 +448,7 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 
 	/*  The output pin TX_DIS that controls the TX laser of the SFP+
 	  module. Use the PIN_CFG_XXX defines on top */
-	u32 e3_sfp_ctrl;				    /* 0x168 */
+	uint32_t e3_sfp_ctrl;				    /* 0x168 */
 	#define PORT_HW_CFG_E3_TX_LASER_MASK                0x000000FF
 	#define PORT_HW_CFG_E3_TX_LASER_SHIFT                        0
 
@@ -470,7 +470,7 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 	 * The input pin which signals module transmit fault. Use the
 	 * PIN_CFG_XXX defines on top
 	 */
-	u32 e3_cmn_pin_cfg;				    /* 0x16C */
+	uint32_t e3_cmn_pin_cfg;				    /* 0x16C */
 	#define PORT_HW_CFG_E3_TX_FAULT_MASK                0x000000FF
 	#define PORT_HW_CFG_E3_TX_FAULT_SHIFT                        0
 
@@ -496,12 +496,12 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 	 * The input pin I_FAULT which indicate over-current has occurred.
 	 * Use the PIN_CFG_XXX defines on top
 	 */
-	u32 e3_cmn_pin_cfg1;				    /* 0x170 */
+	uint32_t e3_cmn_pin_cfg1;				    /* 0x170 */
 	#define PORT_HW_CFG_E3_OVER_CURRENT_MASK            0x000000FF
 	#define PORT_HW_CFG_E3_OVER_CURRENT_SHIFT                    0
 
 	/*  pause on host ring */
-	u32 generic_features;                               /* 0x174 */
+	uint32_t generic_features;                               /* 0x174 */
 	#define PORT_HW_CFG_PAUSE_ON_HOST_RING_MASK                   0x00000001
 	#define PORT_HW_CFG_PAUSE_ON_HOST_RING_SHIFT                  0
 	#define PORT_HW_CFG_PAUSE_ON_HOST_RING_DISABLED               0x00000000
@@ -511,7 +511,7 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 	 * LOM recommended and tested value is 0xBEB2. Using a different
 	 * value means using a value not tested by BRCM
 	 */
-	u32 sfi_tap_values;                                 /* 0x178 */
+	uint32_t sfi_tap_values;                                 /* 0x178 */
 	#define PORT_HW_CFG_TX_EQUALIZATION_MASK                      0x0000FFFF
 	#define PORT_HW_CFG_TX_EQUALIZATION_SHIFT                     0
 
@@ -522,11 +522,11 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 	#define PORT_HW_CFG_TX_DRV_BROADCAST_MASK                     0x000F0000
 	#define PORT_HW_CFG_TX_DRV_BROADCAST_SHIFT                    16
 
-	u32 reserved0[5];				    /* 0x17c */
+	uint32_t reserved0[5];				    /* 0x17c */
 
-	u32 aeu_int_mask;				    /* 0x190 */
+	uint32_t aeu_int_mask;				    /* 0x190 */
 
-	u32 media_type;					    /* 0x194 */
+	uint32_t media_type;					    /* 0x194 */
 	#define PORT_HW_CFG_MEDIA_TYPE_PHY0_MASK            0x000000FF
 	#define PORT_HW_CFG_MEDIA_TYPE_PHY0_SHIFT                    0
 
@@ -541,30 +541,30 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 	      lanes. For some external PHYs (such as 8706 and 8726) the values
 	      will be used to configure the external PHY  in those cases, not
 	      all 4 values are needed. */
-	u16 xgxs_config_rx[4];			/* 0x198 */
-	u16 xgxs_config_tx[4];			/* 0x1A0 */
+	uint16_t xgxs_config_rx[4];			/* 0x198 */
+	uint16_t xgxs_config_tx[4];			/* 0x1A0 */
 
 	/* For storing FCOE mac on shared memory */
-	u32 fcoe_fip_mac_upper;
+	uint32_t fcoe_fip_mac_upper;
 	#define PORT_HW_CFG_FCOE_UPPERMAC_MASK              0x0000ffff
 	#define PORT_HW_CFG_FCOE_UPPERMAC_SHIFT                      0
-	u32 fcoe_fip_mac_lower;
+	uint32_t fcoe_fip_mac_lower;
 
-	u32 fcoe_wwn_port_name_upper;
-	u32 fcoe_wwn_port_name_lower;
+	uint32_t fcoe_wwn_port_name_upper;
+	uint32_t fcoe_wwn_port_name_lower;
 
-	u32 fcoe_wwn_node_name_upper;
-	u32 fcoe_wwn_node_name_lower;
+	uint32_t fcoe_wwn_node_name_upper;
+	uint32_t fcoe_wwn_node_name_lower;
 
-	u32 Reserved1[49];				    /* 0x1C0 */
+	uint32_t Reserved1[49];				    /* 0x1C0 */
 
 	/*  Enable RJ45 magjack pair swapping on 10GBase-T PHY (0=default),
 	      84833 only */
-	u32 xgbt_phy_cfg;				    /* 0x284 */
+	uint32_t xgbt_phy_cfg;				    /* 0x284 */
 	#define PORT_HW_CFG_RJ45_PAIR_SWAP_MASK             0x000000FF
 	#define PORT_HW_CFG_RJ45_PAIR_SWAP_SHIFT                     0
 
-		u32 default_cfg;			    /* 0x288 */
+		uint32_t default_cfg;			    /* 0x288 */
 	#define PORT_HW_CFG_GPIO0_CONFIG_MASK               0x00000003
 		#define PORT_HW_CFG_GPIO0_CONFIG_SHIFT               0
 		#define PORT_HW_CFG_GPIO0_CONFIG_NA                  0x00000000
@@ -647,7 +647,7 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 	#define PORT_HW_CFG_NET_SERDES_IF_KR2                        0x05000000
 
 
-	u32 speed_capability_mask2;			    /* 0x28C */
+	uint32_t speed_capability_mask2;			    /* 0x28C */
 	#define PORT_HW_CFG_SPEED_CAPABILITY2_D3_MASK       0x0000FFFF
 		#define PORT_HW_CFG_SPEED_CAPABILITY2_D3_SHIFT       0
 		#define PORT_HW_CFG_SPEED_CAPABILITY2_D3_10M_FULL    0x00000001
@@ -675,7 +675,7 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 	      present and electrically active at the same time, PHY Selection
 	      will determine which of the two PHYs will be designated as the
 	      Active PHY and used for a connection to the network.  */
-	u32 multi_phy_config;				    /* 0x290 */
+	uint32_t multi_phy_config;				    /* 0x290 */
 	#define PORT_HW_CFG_PHY_SELECTION_MASK              0x00000007
 		#define PORT_HW_CFG_PHY_SELECTION_SHIFT              0
 		#define PORT_HW_CFG_PHY_SELECTION_HARDWARE_DEFAULT   0x00000000
@@ -693,7 +693,7 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 
 
 	/*  Address of the second external phy */
-	u32 external_phy_config2;			    /* 0x294 */
+	uint32_t external_phy_config2;			    /* 0x294 */
 	#define PORT_HW_CFG_XGXS_EXT_PHY2_ADDR_MASK         0x000000FF
 	#define PORT_HW_CFG_XGXS_EXT_PHY2_ADDR_SHIFT                 0
 
@@ -724,10 +724,10 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 
 	/*  4 times 16 bits for all 4 lanes. For some external PHYs (such as
 	      8706, 8726 and 8727) not all 4 values are needed. */
-	u16 xgxs_config2_rx[4];				    /* 0x296 */
-	u16 xgxs_config2_tx[4];				    /* 0x2A0 */
+	uint16_t xgxs_config2_rx[4];				    /* 0x296 */
+	uint16_t xgxs_config2_tx[4];				    /* 0x2A0 */
 
-	u32 lane_config;
+	uint32_t lane_config;
 	#define PORT_HW_CFG_LANE_SWAP_CFG_MASK              0x0000ffff
 		#define PORT_HW_CFG_LANE_SWAP_CFG_SHIFT              0
 		/* AN and forced */
@@ -751,7 +751,7 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 		#define PORT_HW_CFG_SWAP_PHY_POLARITY_ENABLED        0x00010000
 
 
-	u32 external_phy_config;
+	uint32_t external_phy_config;
 	#define PORT_HW_CFG_XGXS_EXT_PHY_ADDR_MASK          0x000000ff
 	#define PORT_HW_CFG_XGXS_EXT_PHY_ADDR_SHIFT                  0
 
@@ -789,7 +789,7 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 		#define PORT_HW_CFG_SERDES_EXT_PHY_TYPE_DIRECT_SD    0x02000000
 		#define PORT_HW_CFG_SERDES_EXT_PHY_TYPE_NOT_CONN     0xff000000
 
-	u32 speed_capability_mask;
+	uint32_t speed_capability_mask;
 	#define PORT_HW_CFG_SPEED_CAPABILITY_D3_MASK        0x0000ffff
 		#define PORT_HW_CFG_SPEED_CAPABILITY_D3_SHIFT        0
 		#define PORT_HW_CFG_SPEED_CAPABILITY_D3_10M_FULL     0x00000001
@@ -815,8 +815,8 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
 		#define PORT_HW_CFG_SPEED_CAPABILITY_D0_RESERVED     0xf0000000
 
 	/*  A place to hold the original MAC address as a backup */
-	u32 backup_mac_upper;			/* 0x2B4 */
-	u32 backup_mac_lower;			/* 0x2B8 */
+	uint32_t backup_mac_upper;			/* 0x2B4 */
+	uint32_t backup_mac_lower;			/* 0x2B8 */
 
 };
 
@@ -826,7 +826,7 @@ struct port_hw_cfg {		    /* port 0: 0x12c  port 1: 0x2bc */
  ****************************************************************************/
 struct shared_feat_cfg {		 /* NVRAM Offset */
 
-	u32 config;			/* 0x450 */
+	uint32_t config;			/* 0x450 */
 	#define SHARED_FEATURE_BMC_ECHO_MODE_EN             0x00000001
 
 	/* Use NVRAM values instead of HW default values */
@@ -873,7 +873,7 @@ struct shared_feat_cfg {		 /* NVRAM Offset */
  ****************************************************************************/
 struct port_feat_cfg {		    /* port 0: 0x454  port 1: 0x4c8 */
 
-	u32 config;
+	uint32_t config;
 	#define PORT_FEATURE_BAR1_SIZE_MASK                 0x0000000f
 		#define PORT_FEATURE_BAR1_SIZE_SHIFT                 0
 		#define PORT_FEATURE_BAR1_SIZE_DISABLED              0x00000000
@@ -941,7 +941,7 @@ struct port_feat_cfg {		    /* port 0: 0x454  port 1: 0x4c8 */
 		#define PORT_FEAT_CFG_OPT_MDL_ENFRCMNT_WARNING_MSG   0x40000000
 		#define PORT_FEAT_CFG_OPT_MDL_ENFRCMNT_POWER_DOWN    0x60000000
 
-	u32 wol_config;
+	uint32_t wol_config;
 	/* Default is used when driver sets to "auto" mode */
 	#define PORT_FEATURE_WOL_DEFAULT_MASK               0x00000003
 		#define PORT_FEATURE_WOL_DEFAULT_SHIFT               0
@@ -953,7 +953,7 @@ struct port_feat_cfg {		    /* port 0: 0x454  port 1: 0x4c8 */
 	#define PORT_FEATURE_WOL_RES_ASYM_PAUSE_CAP         0x00000008
 	#define PORT_FEATURE_WOL_ACPI_UPON_MGMT             0x00000010
 
-	u32 mba_config;
+	uint32_t mba_config;
 	#define PORT_FEATURE_MBA_BOOT_AGENT_TYPE_MASK       0x00000007
 		#define PORT_FEATURE_MBA_BOOT_AGENT_TYPE_SHIFT       0
 		#define PORT_FEATURE_MBA_BOOT_AGENT_TYPE_PXE         0x00000000
@@ -1009,28 +1009,28 @@ struct port_feat_cfg {		    /* port 0: 0x454  port 1: 0x4c8 */
 		#define PORT_FEATURE_MBA_LINK_SPEED_2_5GBPS          0x18000000
 		#define PORT_FEATURE_MBA_LINK_SPEED_10GBPS_CX4       0x1c000000
 		#define PORT_FEATURE_MBA_LINK_SPEED_20GBPS           0x20000000
-	u32 bmc_config;
+	uint32_t bmc_config;
 	#define PORT_FEATURE_BMC_LINK_OVERRIDE_MASK         0x00000001
 		#define PORT_FEATURE_BMC_LINK_OVERRIDE_DEFAULT       0x00000000
 		#define PORT_FEATURE_BMC_LINK_OVERRIDE_EN            0x00000001
 
-	u32 mba_vlan_cfg;
+	uint32_t mba_vlan_cfg;
 	#define PORT_FEATURE_MBA_VLAN_TAG_MASK              0x0000ffff
 	#define PORT_FEATURE_MBA_VLAN_TAG_SHIFT                      0
 	#define PORT_FEATURE_MBA_VLAN_EN                    0x00010000
 
-	u32 resource_cfg;
+	uint32_t resource_cfg;
 	#define PORT_FEATURE_RESOURCE_CFG_VALID             0x00000001
 	#define PORT_FEATURE_RESOURCE_CFG_DIAG              0x00000002
 	#define PORT_FEATURE_RESOURCE_CFG_L2                0x00000004
 	#define PORT_FEATURE_RESOURCE_CFG_ISCSI             0x00000008
 	#define PORT_FEATURE_RESOURCE_CFG_RDMA              0x00000010
 
-	u32 smbus_config;
+	uint32_t smbus_config;
 	#define PORT_FEATURE_SMBUS_ADDR_MASK                0x000000fe
 	#define PORT_FEATURE_SMBUS_ADDR_SHIFT                        1
 
-	u32 vf_config;
+	uint32_t vf_config;
 	#define PORT_FEAT_CFG_VF_BAR2_SIZE_MASK             0x0000000f
 		#define PORT_FEAT_CFG_VF_BAR2_SIZE_SHIFT             0
 		#define PORT_FEAT_CFG_VF_BAR2_SIZE_DISABLED          0x00000000
@@ -1050,7 +1050,7 @@ struct port_feat_cfg {		    /* port 0: 0x454  port 1: 0x4c8 */
 		#define PORT_FEAT_CFG_VF_BAR2_SIZE_32M               0x0000000e
 		#define PORT_FEAT_CFG_VF_BAR2_SIZE_64M               0x0000000f
 
-	u32 link_config;    /* Used as HW defaults for the driver */
+	uint32_t link_config;    /* Used as HW defaults for the driver */
 	#define PORT_FEATURE_CONNECTED_SWITCH_MASK          0x03000000
 		#define PORT_FEATURE_CONNECTED_SWITCH_SHIFT          24
 		/* (forced) low speed switch (< 10G) */
@@ -1082,19 +1082,19 @@ struct port_feat_cfg {		    /* port 0: 0x454  port 1: 0x4c8 */
 
 	/* The default for MCP link configuration,
 	   uses the same defines as link_config */
-	u32 mfw_wol_link_cfg;
+	uint32_t mfw_wol_link_cfg;
 
 	/* The default for the driver of the second external phy,
 	   uses the same defines as link_config */
-	u32 link_config2;				    /* 0x47C */
+	uint32_t link_config2;				    /* 0x47C */
 
 	/* The default for MCP of the second external phy,
 	   uses the same defines as link_config */
-	u32 mfw_wol_link_cfg2;				    /* 0x480 */
+	uint32_t mfw_wol_link_cfg2;				    /* 0x480 */
 
 
 	/*  EEE power saving mode */
-	u32 eee_power_mode;                                 /* 0x484 */
+	uint32_t eee_power_mode;                                 /* 0x484 */
 	#define PORT_FEAT_CFG_EEE_POWER_MODE_MASK                     0x000000FF
 	#define PORT_FEAT_CFG_EEE_POWER_MODE_SHIFT                    0
 	#define PORT_FEAT_CFG_EEE_POWER_MODE_DISABLED                 0x00000000
@@ -1103,7 +1103,7 @@ struct port_feat_cfg {		    /* port 0: 0x454  port 1: 0x4c8 */
 	#define PORT_FEAT_CFG_EEE_POWER_MODE_LOW_LATENCY              0x00000003
 
 
-	u32 Reserved2[16];                                  /* 0x488 */
+	uint32_t Reserved2[16];                                  /* 0x488 */
 };
 
 
@@ -1112,7 +1112,7 @@ struct port_feat_cfg {		    /* port 0: 0x454  port 1: 0x4c8 */
  ****************************************************************************/
 struct shm_dev_info {				/* size */
 
-	u32    bc_rev; /* 8 bits each: major, minor, build */	       /* 4 */
+	uint32_t    bc_rev; /* 8 bits each: major, minor, build */	       /* 4 */
 
 	struct shared_hw_cfg     shared_hw_config;	      /* 40 */
 
@@ -1172,7 +1172,7 @@ struct shm_dev_info {				/* size */
  ****************************************************************************/
 struct drv_port_mb {
 
-	u32 link_status;
+	uint32_t link_status;
 	/* Driver should update this field on any link change event */
 
 	#define LINK_STATUS_NONE				(0<<0)
@@ -1235,19 +1235,19 @@ struct drv_port_mb {
 	#define LINK_STATUS_PHYSICAL_LINK_FLAG			0x40000000
 	#define LINK_STATUS_SFP_TX_FAULT			0x80000000
 
-	u32 port_stx;
+	uint32_t port_stx;
 
-	u32 stat_nig_timer;
+	uint32_t stat_nig_timer;
 
 	/* MCP firmware does not use this field */
-	u32 ext_phy_fw_version;
+	uint32_t ext_phy_fw_version;
 
 };
 
 
 struct drv_func_mb {
 
-	u32 drv_mb_header;
+	uint32_t drv_mb_header;
 	#define DRV_MSG_CODE_MASK                       0xffff0000
 	#define DRV_MSG_CODE_LOAD_REQ                   0x10000000
 	#define DRV_MSG_CODE_LOAD_DONE                  0x11000000
@@ -1320,7 +1320,7 @@ struct drv_func_mb {
 
 	#define DRV_MSG_SEQ_NUMBER_MASK                 0x0000ffff
 
-	u32 drv_mb_param;
+	uint32_t drv_mb_param;
 	#define DRV_MSG_CODE_SET_MF_BW_MIN_MASK         0x00ff0000
 	#define DRV_MSG_CODE_SET_MF_BW_MAX_MASK         0xff000000
 
@@ -1329,7 +1329,7 @@ struct drv_func_mb {
 	#define DRV_MSG_CODE_LOAD_REQ_WITH_LFA          0x0000100a
 	#define DRV_MSG_CODE_LOAD_REQ_FORCE_LFA         0x00002000
 
-	u32 fw_mb_header;
+	uint32_t fw_mb_header;
 	#define FW_MSG_CODE_MASK                        0xffff0000
 	#define FW_MSG_CODE_DRV_LOAD_COMMON             0x10100000
 	#define FW_MSG_CODE_DRV_LOAD_PORT               0x10110000
@@ -1390,9 +1390,9 @@ struct drv_func_mb {
 
 	#define FW_MSG_SEQ_NUMBER_MASK                  0x0000ffff
 
-	u32 fw_mb_param;
+	uint32_t fw_mb_param;
 
-	u32 drv_pulse_mb;
+	uint32_t drv_pulse_mb;
 	#define DRV_PULSE_SEQ_MASK                      0x00007fff
 	#define DRV_PULSE_SYSTEM_TIME_MASK              0xffff0000
 	/*
@@ -1406,7 +1406,7 @@ struct drv_func_mb {
 	 * This is used for debugging as well for PXE(MBA).
 	 */
 
-	u32 mcp_pulse_mb;
+	uint32_t mcp_pulse_mb;
 	#define MCP_PULSE_SEQ_MASK                      0x00007fff
 	#define MCP_PULSE_ALWAYS_ALIVE                  0x00008000
 	/* Indicates to the driver not to assert due to lack
@@ -1414,10 +1414,10 @@ struct drv_func_mb {
 	#define MCP_EVENT_MASK                          0xffff0000
 	#define MCP_EVENT_OTHER_DRIVER_RESET_REQ        0x00010000
 
-	u32 iscsi_boot_signature;
-	u32 iscsi_boot_block_offset;
+	uint32_t iscsi_boot_signature;
+	uint32_t iscsi_boot_block_offset;
 
-	u32 drv_status;
+	uint32_t drv_status;
 	#define DRV_STATUS_PMF                          0x00000001
 	#define DRV_STATUS_VF_DISABLED                  0x00000002
 	#define DRV_STATUS_SET_MF_BW                    0x00000004
@@ -1449,10 +1449,10 @@ struct drv_func_mb {
 
 	#define DRV_STATUS_EEE_NEGOTIATION_RESULTS      0x08000000
 
-	u32 virt_mac_upper;
+	uint32_t virt_mac_upper;
 	#define VIRT_MAC_SIGN_MASK                      0xffff0000
 	#define VIRT_MAC_SIGNATURE                      0x564d0000
-	u32 virt_mac_lower;
+	uint32_t virt_mac_lower;
 
 };
 
@@ -1464,7 +1464,7 @@ struct drv_func_mb {
 #define MGMTFW_STATE_WORD_SIZE                          110
 
 struct mgmtfw_state {
-	u32 opaque[MGMTFW_STATE_WORD_SIZE];
+	uint32_t opaque[MGMTFW_STATE_WORD_SIZE];
 };
 
 
@@ -1473,7 +1473,7 @@ struct mgmtfw_state {
  ****************************************************************************/
 struct shared_mf_cfg {
 
-	u32 clp_mb;
+	uint32_t clp_mb;
 	#define SHARED_MF_CLP_SET_DEFAULT               0x00000000
 	/* set by CLP */
 	#define SHARED_MF_CLP_EXIT                      0x00000001
@@ -1484,18 +1484,18 @@ struct shared_mf_cfg {
 
 struct port_mf_cfg {
 
-	u32 dynamic_cfg;    /* device control channel */
+	uint32_t dynamic_cfg;    /* device control channel */
 	#define PORT_MF_CFG_E1HOV_TAG_MASK              0x0000ffff
 	#define PORT_MF_CFG_E1HOV_TAG_SHIFT             0
 	#define PORT_MF_CFG_E1HOV_TAG_DEFAULT         PORT_MF_CFG_E1HOV_TAG_MASK
 
-	u32 reserved[1];
+	uint32_t reserved[1];
 
 };
 
 struct func_mf_cfg {
 
-	u32 config;
+	uint32_t config;
 	/* E/R/I/D */
 	/* function 0 of each port cannot be hidden */
 	#define FUNC_MF_CFG_FUNC_HIDE                   0x00000001
@@ -1526,14 +1526,14 @@ struct func_mf_cfg {
 	#define FUNC_MF_CFG_MAX_BW_SHIFT                24
 	#define FUNC_MF_CFG_MAX_BW_DEFAULT              0x64000000
 
-	u32 mac_upper;	    /* MAC */
+	uint32_t mac_upper;	    /* MAC */
 	#define FUNC_MF_CFG_UPPERMAC_MASK               0x0000ffff
 	#define FUNC_MF_CFG_UPPERMAC_SHIFT              0
 	#define FUNC_MF_CFG_UPPERMAC_DEFAULT           FUNC_MF_CFG_UPPERMAC_MASK
-	u32 mac_lower;
+	uint32_t mac_lower;
 	#define FUNC_MF_CFG_LOWERMAC_DEFAULT            0xffffffff
 
-	u32 e1hov_tag;	/* VNI */
+	uint32_t e1hov_tag;	/* VNI */
 	#define FUNC_MF_CFG_E1HOV_TAG_MASK              0x0000ffff
 	#define FUNC_MF_CFG_E1HOV_TAG_SHIFT             0
 	#define FUNC_MF_CFG_E1HOV_TAG_DEFAULT         FUNC_MF_CFG_E1HOV_TAG_MASK
@@ -1542,7 +1542,7 @@ struct func_mf_cfg {
 	#define FUNC_MF_CFG_AFEX_VLAN_MASK              0x0fff0000
 	#define FUNC_MF_CFG_AFEX_VLAN_SHIFT             16
 
-	u32 afex_config;
+	uint32_t afex_config;
 	#define FUNC_MF_CFG_AFEX_COS_FILTER_MASK                     0x000000ff
 	#define FUNC_MF_CFG_AFEX_COS_FILTER_SHIFT                    0
 	#define FUNC_MF_CFG_AFEX_MBA_ENABLED_MASK                    0x0000ff00
@@ -1551,7 +1551,7 @@ struct func_mf_cfg {
 	#define FUNC_MF_CFG_AFEX_VLAN_MODE_MASK                      0x000f0000
 	#define FUNC_MF_CFG_AFEX_VLAN_MODE_SHIFT                     16
 
-	u32 reserved;
+	uint32_t reserved;
 };
 
 enum mf_cfg_afex_vlan_mode {
@@ -1562,7 +1562,7 @@ enum mf_cfg_afex_vlan_mode {
 
 /* This structure is not applicable and should not be accessed on 57711 */
 struct func_ext_cfg {
-	u32 func_cfg;
+	uint32_t func_cfg;
 	#define MACP_FUNC_CFG_FLAGS_MASK                0x0000007F
 	#define MACP_FUNC_CFG_FLAGS_SHIFT               0
 	#define MACP_FUNC_CFG_FLAGS_ENABLED             0x00000001
@@ -1571,19 +1571,19 @@ struct func_ext_cfg {
 	#define MACP_FUNC_CFG_FLAGS_FCOE_OFFLOAD        0x00000008
 	#define MACP_FUNC_CFG_PAUSE_ON_HOST_RING        0x00000080
 
-	u32 iscsi_mac_addr_upper;
-	u32 iscsi_mac_addr_lower;
+	uint32_t iscsi_mac_addr_upper;
+	uint32_t iscsi_mac_addr_lower;
 
-	u32 fcoe_mac_addr_upper;
-	u32 fcoe_mac_addr_lower;
+	uint32_t fcoe_mac_addr_upper;
+	uint32_t fcoe_mac_addr_lower;
 
-	u32 fcoe_wwn_port_name_upper;
-	u32 fcoe_wwn_port_name_lower;
+	uint32_t fcoe_wwn_port_name_upper;
+	uint32_t fcoe_wwn_port_name_lower;
 
-	u32 fcoe_wwn_node_name_upper;
-	u32 fcoe_wwn_node_name_lower;
+	uint32_t fcoe_wwn_node_name_upper;
+	uint32_t fcoe_wwn_node_name_lower;
 
-	u32 preserve_data;
+	uint32_t preserve_data;
 	#define MF_FUNC_CFG_PRESERVE_L2_MAC             (1<<0)
 	#define MF_FUNC_CFG_PRESERVE_ISCSI_MAC          (1<<1)
 	#define MF_FUNC_CFG_PRESERVE_FCOE_MAC           (1<<2)
@@ -1611,7 +1611,7 @@ struct mf_cfg {
  ****************************************************************************/
 struct shmem_region {		       /*   SharedMem Offset (size) */
 
-	u32         validity_map[PORT_MAX];  /* 0x0 (4*2 = 0x8) */
+	uint32_t         validity_map[PORT_MAX];  /* 0x0 (4*2 = 0x8) */
 	#define SHR_MEM_FORMAT_REV_MASK                     0xff000000
 	#define SHR_MEM_FORMAT_REV_ID                       ('A'<<24)
 	/* validity bits */
@@ -1637,7 +1637,7 @@ struct shmem_region {		       /*   SharedMem Offset (size) */
 	struct license_key       drv_lic_key[PORT_MAX]; /* 0x440 (52*2=0x68) */
 
 	/* FW information (for internal FW use) */
-	u32         fw_info_fio_offset;		/* 0x4a8       (0x4) */
+	uint32_t         fw_info_fio_offset;		/* 0x4a8       (0x4) */
 	struct mgmtfw_state mgmtfw_state;	/* 0x4ac     (0x1b8) */
 
 	struct drv_port_mb  port_mb[PORT_MAX];	/* 0x664 (16*2=0x20) */
@@ -1669,20 +1669,20 @@ struct shmem_region {		       /*   SharedMem Offset (size) */
 /* above                                                                    */
 /****************************************************************************/
 struct fw_flr_ack {
-	u32         pf_ack;
-	u32         vf_ack[1];
-	u32         iov_dis_ack;
+	uint32_t         pf_ack;
+	uint32_t         vf_ack[1];
+	uint32_t         iov_dis_ack;
 };
 
 struct fw_flr_mb {
-	u32         aggint;
-	u32         opgen_addr;
+	uint32_t         aggint;
+	uint32_t         opgen_addr;
 	struct fw_flr_ack ack;
 };
 
 struct eee_remote_vals {
-	u32         tx_tw;
-	u32         rx_tw;
+	uint32_t         tx_tw;
+	uint32_t         rx_tw;
 };
 
 /**** SUPPORT FOR SHMEM ARRRAYS ***
@@ -1766,15 +1766,15 @@ struct dcbx_ets_feature {
 	 * For Admin MIB - is this feature supported by the
 	 * driver | For Local MIB - should this feature be enabled.
 	 */
-	u32 enabled;
-	u32  pg_bw_tbl[2];
-	u32  pri_pg_tbl[1];
+	uint32_t enabled;
+	uint32_t  pg_bw_tbl[2];
+	uint32_t  pri_pg_tbl[1];
 };
 
 /* Driver structure in LE */
 struct dcbx_pfc_feature {
 #ifdef __BIG_ENDIAN
-	u8 pri_en_bitmap;
+	uint8_t pri_en_bitmap;
 	#define DCBX_PFC_PRI_0 0x01
 	#define DCBX_PFC_PRI_1 0x02
 	#define DCBX_PFC_PRI_2 0x04
@@ -1783,14 +1783,14 @@ struct dcbx_pfc_feature {
 	#define DCBX_PFC_PRI_5 0x20
 	#define DCBX_PFC_PRI_6 0x40
 	#define DCBX_PFC_PRI_7 0x80
-	u8 pfc_caps;
-	u8 reserved;
-	u8 enabled;
+	uint8_t pfc_caps;
+	uint8_t reserved;
+	uint8_t enabled;
 #elif defined(__LITTLE_ENDIAN)
-	u8 enabled;
-	u8 reserved;
-	u8 pfc_caps;
-	u8 pri_en_bitmap;
+	uint8_t enabled;
+	uint8_t reserved;
+	uint8_t pfc_caps;
+	uint8_t pri_en_bitmap;
 	#define DCBX_PFC_PRI_0 0x01
 	#define DCBX_PFC_PRI_1 0x02
 	#define DCBX_PFC_PRI_2 0x04
@@ -1804,23 +1804,23 @@ struct dcbx_pfc_feature {
 
 struct dcbx_app_priority_entry {
 #ifdef __BIG_ENDIAN
-	u16  app_id;
-	u8  pri_bitmap;
-	u8  appBitfield;
+	uint16_t  app_id;
+	uint8_t  pri_bitmap;
+	uint8_t  appBitfield;
 	#define DCBX_APP_ENTRY_VALID         0x01
 	#define DCBX_APP_ENTRY_SF_MASK       0x30
 	#define DCBX_APP_ENTRY_SF_SHIFT      4
 	#define DCBX_APP_SF_ETH_TYPE         0x10
 	#define DCBX_APP_SF_PORT             0x20
 #elif defined(__LITTLE_ENDIAN)
-	u8 appBitfield;
+	uint8_t appBitfield;
 	#define DCBX_APP_ENTRY_VALID         0x01
 	#define DCBX_APP_ENTRY_SF_MASK       0x30
 	#define DCBX_APP_ENTRY_SF_SHIFT      4
 	#define DCBX_APP_SF_ETH_TYPE         0x10
 	#define DCBX_APP_SF_PORT             0x20
-	u8  pri_bitmap;
-	u16  app_id;
+	uint8_t  pri_bitmap;
+	uint16_t  app_id;
 #endif
 };
 
@@ -1828,15 +1828,15 @@ struct dcbx_app_priority_entry {
 /* FW structure in BE */
 struct dcbx_app_priority_feature {
 #ifdef __BIG_ENDIAN
-	u8 reserved;
-	u8 default_pri;
-	u8 tc_supported;
-	u8 enabled;
+	uint8_t reserved;
+	uint8_t default_pri;
+	uint8_t tc_supported;
+	uint8_t enabled;
 #elif defined(__LITTLE_ENDIAN)
-	u8 enabled;
-	u8 tc_supported;
-	u8 default_pri;
-	u8 reserved;
+	uint8_t enabled;
+	uint8_t tc_supported;
+	uint8_t default_pri;
+	uint8_t reserved;
 #endif
 	struct dcbx_app_priority_entry  app_pri_tbl[DCBX_MAX_APP_PROTOCOL];
 };
@@ -1855,56 +1855,56 @@ struct dcbx_features {
 /* FW structure in BE */
 struct lldp_params {
 #ifdef __BIG_ENDIAN
-	u8  msg_fast_tx_interval;
-	u8  msg_tx_hold;
-	u8  msg_tx_interval;
-	u8  admin_status;
+	uint8_t  msg_fast_tx_interval;
+	uint8_t  msg_tx_hold;
+	uint8_t  msg_tx_interval;
+	uint8_t  admin_status;
 	#define LLDP_TX_ONLY  0x01
 	#define LLDP_RX_ONLY  0x02
 	#define LLDP_TX_RX    0x03
 	#define LLDP_DISABLED 0x04
-	u8  reserved1;
-	u8  tx_fast;
-	u8  tx_crd_max;
-	u8  tx_crd;
+	uint8_t  reserved1;
+	uint8_t  tx_fast;
+	uint8_t  tx_crd_max;
+	uint8_t  tx_crd;
 #elif defined(__LITTLE_ENDIAN)
-	u8  admin_status;
+	uint8_t  admin_status;
 	#define LLDP_TX_ONLY  0x01
 	#define LLDP_RX_ONLY  0x02
 	#define LLDP_TX_RX    0x03
 	#define LLDP_DISABLED 0x04
-	u8  msg_tx_interval;
-	u8  msg_tx_hold;
-	u8  msg_fast_tx_interval;
-	u8  tx_crd;
-	u8  tx_crd_max;
-	u8  tx_fast;
-	u8  reserved1;
+	uint8_t  msg_tx_interval;
+	uint8_t  msg_tx_hold;
+	uint8_t  msg_fast_tx_interval;
+	uint8_t  tx_crd;
+	uint8_t  tx_crd_max;
+	uint8_t  tx_fast;
+	uint8_t  reserved1;
 #endif
 	#define REM_CHASSIS_ID_STAT_LEN 4
 	#define REM_PORT_ID_STAT_LEN 4
 	/* Holds remote Chassis ID TLV header, subtype and 9B of payload. */
-	u32 peer_chassis_id[REM_CHASSIS_ID_STAT_LEN];
+	uint32_t peer_chassis_id[REM_CHASSIS_ID_STAT_LEN];
 	/* Holds remote Port ID TLV header, subtype and 9B of payload. */
-	u32 peer_port_id[REM_PORT_ID_STAT_LEN];
+	uint32_t peer_port_id[REM_PORT_ID_STAT_LEN];
 };
 
 struct lldp_dcbx_stat {
 	#define LOCAL_CHASSIS_ID_STAT_LEN 2
 	#define LOCAL_PORT_ID_STAT_LEN 2
 	/* Holds local Chassis ID 8B payload of constant subtype 4. */
-	u32 local_chassis_id[LOCAL_CHASSIS_ID_STAT_LEN];
+	uint32_t local_chassis_id[LOCAL_CHASSIS_ID_STAT_LEN];
 	/* Holds local Port ID 8B payload of constant subtype 3. */
-	u32 local_port_id[LOCAL_PORT_ID_STAT_LEN];
+	uint32_t local_port_id[LOCAL_PORT_ID_STAT_LEN];
 	/* Number of DCBX frames transmitted. */
-	u32 num_tx_dcbx_pkts;
+	uint32_t num_tx_dcbx_pkts;
 	/* Number of DCBX frames received. */
-	u32 num_rx_dcbx_pkts;
+	uint32_t num_rx_dcbx_pkts;
 };
 
 /* ADMIN MIB - DCBX local machine default configuration. */
 struct lldp_admin_mib {
-	u32     ver_cfg_flags;
+	uint32_t     ver_cfg_flags;
 	#define DCBX_ETS_CONFIG_TX_ENABLED       0x00000001
 	#define DCBX_PFC_CONFIG_TX_ENABLED       0x00000002
 	#define DCBX_APP_CONFIG_TX_ENABLED       0x00000004
@@ -1925,8 +1925,8 @@ struct lldp_admin_mib {
 
 /* REMOTE MIB - remote machine DCBX configuration. */
 struct lldp_remote_mib {
-	u32 prefix_seq_num;
-	u32 flags;
+	uint32_t prefix_seq_num;
+	uint32_t flags;
 	#define DCBX_ETS_TLV_RX                  0x00000001
 	#define DCBX_PFC_TLV_RX                  0x00000002
 	#define DCBX_APP_TLV_RX                  0x00000004
@@ -1939,14 +1939,14 @@ struct lldp_remote_mib {
 	#define DCBX_REMOTE_ETS_RECO_VALID       0x00001000
 	#define DCBX_REMOTE_MIB_VALID            0x00002000
 	struct dcbx_features features;
-	u32 suffix_seq_num;
+	uint32_t suffix_seq_num;
 };
 
 /* LOCAL MIB - operational DCBX configuration - transmitted on Tx LLDPDU. */
 struct lldp_local_mib {
-	u32 prefix_seq_num;
+	uint32_t prefix_seq_num;
 	/* Indicates if there is mismatch with negotiation results. */
-	u32 error;
+	uint32_t error;
 	#define DCBX_LOCAL_ETS_ERROR             0x00000001
 	#define DCBX_LOCAL_PFC_ERROR             0x00000002
 	#define DCBX_LOCAL_APP_ERROR             0x00000004
@@ -1957,7 +1957,7 @@ struct lldp_local_mib {
 	#define DCBX_REMOTE_PFC_TLV_NOT_FOUND    0x00000100
 	#define DCBX_REMOTE_APP_TLV_NOT_FOUND    0x00000200
 	struct dcbx_features   features;
-	u32 suffix_seq_num;
+	uint32_t suffix_seq_num;
 };
 /***END OF DCBX STRUCTURES DECLARATIONS***/
 
@@ -1966,27 +1966,27 @@ struct lldp_local_mib {
 /***********************************************************/
 #define SHMEM_LINK_CONFIG_SIZE 2
 struct shmem_lfa {
-	u32 req_duplex;
+	uint32_t req_duplex;
 	#define REQ_DUPLEX_PHY0_MASK        0x0000ffff
 	#define REQ_DUPLEX_PHY0_SHIFT       0
 	#define REQ_DUPLEX_PHY1_MASK        0xffff0000
 	#define REQ_DUPLEX_PHY1_SHIFT       16
-	u32 req_flow_ctrl;
+	uint32_t req_flow_ctrl;
 	#define REQ_FLOW_CTRL_PHY0_MASK     0x0000ffff
 	#define REQ_FLOW_CTRL_PHY0_SHIFT    0
 	#define REQ_FLOW_CTRL_PHY1_MASK     0xffff0000
 	#define REQ_FLOW_CTRL_PHY1_SHIFT    16
-	u32 req_line_speed; /* Also determine AutoNeg */
+	uint32_t req_line_speed; /* Also determine AutoNeg */
 	#define REQ_LINE_SPD_PHY0_MASK      0x0000ffff
 	#define REQ_LINE_SPD_PHY0_SHIFT     0
 	#define REQ_LINE_SPD_PHY1_MASK      0xffff0000
 	#define REQ_LINE_SPD_PHY1_SHIFT     16
-	u32 speed_cap_mask[SHMEM_LINK_CONFIG_SIZE];
-	u32 additional_config;
+	uint32_t speed_cap_mask[SHMEM_LINK_CONFIG_SIZE];
+	uint32_t additional_config;
 	#define REQ_FC_AUTO_ADV_MASK        0x0000ffff
 	#define REQ_FC_AUTO_ADV0_SHIFT      0
 	#define NO_LFA_DUE_TO_DCC_MASK      0x00010000
-	u32 lfa_sts;
+	uint32_t lfa_sts;
 	#define LFA_LINK_FLAP_REASON_OFFSET		0
 	#define LFA_LINK_FLAP_REASON_MASK		0x000000ff
 		#define LFA_LINK_DOWN			    0x1
@@ -2023,46 +2023,46 @@ struct os_drv_ver {
 
 	/* shmem2 struct is constant can't add more personalties here */
 #define MAX_DRV_PERS				3
-	u32 versions[MAX_DRV_PERS];
+	uint32_t versions[MAX_DRV_PERS];
 };
 
 struct ncsi_oem_fcoe_features {
-	u32 fcoe_features1;
+	uint32_t fcoe_features1;
 	#define FCOE_FEATURES1_IOS_PER_CONNECTION_MASK          0x0000FFFF
 	#define FCOE_FEATURES1_IOS_PER_CONNECTION_OFFSET        0
 
 	#define FCOE_FEATURES1_LOGINS_PER_PORT_MASK             0xFFFF0000
 	#define FCOE_FEATURES1_LOGINS_PER_PORT_OFFSET           16
 
-	u32 fcoe_features2;
+	uint32_t fcoe_features2;
 	#define FCOE_FEATURES2_EXCHANGES_MASK                   0x0000FFFF
 	#define FCOE_FEATURES2_EXCHANGES_OFFSET                 0
 
 	#define FCOE_FEATURES2_NPIV_WWN_PER_PORT_MASK           0xFFFF0000
 	#define FCOE_FEATURES2_NPIV_WWN_PER_PORT_OFFSET         16
 
-	u32 fcoe_features3;
+	uint32_t fcoe_features3;
 	#define FCOE_FEATURES3_TARGETS_SUPPORTED_MASK           0x0000FFFF
 	#define FCOE_FEATURES3_TARGETS_SUPPORTED_OFFSET         0
 
 	#define FCOE_FEATURES3_OUTSTANDING_COMMANDS_MASK        0xFFFF0000
 	#define FCOE_FEATURES3_OUTSTANDING_COMMANDS_OFFSET      16
 
-	u32 fcoe_features4;
+	uint32_t fcoe_features4;
 	#define FCOE_FEATURES4_FEATURE_SETTINGS_MASK            0x0000000F
 	#define FCOE_FEATURES4_FEATURE_SETTINGS_OFFSET          0
 };
 
 struct ncsi_oem_data {
-	u32 driver_version[4];
+	uint32_t driver_version[4];
 	struct ncsi_oem_fcoe_features ncsi_oem_fcoe_features;
 };
 
 struct shmem2_region {
 
-	u32 size;					/* 0x0000 */
+	uint32_t size;					/* 0x0000 */
 
-	u32 dcc_support;				/* 0x0004 */
+	uint32_t dcc_support;				/* 0x0004 */
 	#define SHMEM_DCC_SUPPORT_NONE                      0x00000000
 	#define SHMEM_DCC_SUPPORT_DISABLE_ENABLE_PF_TLV     0x00000001
 	#define SHMEM_DCC_SUPPORT_BANDWIDTH_ALLOCATION_TLV  0x00000004
@@ -2070,21 +2070,21 @@ struct shmem2_region {
 	#define SHMEM_DCC_SUPPORT_SET_PROTOCOL_TLV          0x00000040
 	#define SHMEM_DCC_SUPPORT_SET_PRIORITY_TLV          0x00000080
 
-	u32 ext_phy_fw_version2[PORT_MAX];		/* 0x0008 */
+	uint32_t ext_phy_fw_version2[PORT_MAX];		/* 0x0008 */
 	/*
 	 * For backwards compatibility, if the mf_cfg_addr does not exist
 	 * (the size filed is smaller than 0xc) the mf_cfg resides at the
 	 * end of struct shmem_region
 	 */
-	u32 mf_cfg_addr;				/* 0x0010 */
+	uint32_t mf_cfg_addr;				/* 0x0010 */
 	#define SHMEM_MF_CFG_ADDR_NONE                  0x00000000
 
 	struct fw_flr_mb flr_mb;			/* 0x0014 */
-	u32 dcbx_lldp_params_offset;			/* 0x0028 */
+	uint32_t dcbx_lldp_params_offset;			/* 0x0028 */
 	#define SHMEM_LLDP_DCBX_PARAMS_NONE             0x00000000
-	u32 dcbx_neg_res_offset;			/* 0x002c */
+	uint32_t dcbx_neg_res_offset;			/* 0x002c */
 	#define SHMEM_DCBX_NEG_RES_NONE			0x00000000
-	u32 dcbx_remote_mib_offset;			/* 0x0030 */
+	uint32_t dcbx_remote_mib_offset;			/* 0x0030 */
 	#define SHMEM_DCBX_REMOTE_MIB_NONE              0x00000000
 	/*
 	 * The other shmemX_base_addr holds the other path's shmem address
@@ -2092,21 +2092,21 @@ struct shmem2_region {
 	 * the address of mcp debug trace which is located in offset from shmem
 	 * of path0
 	 */
-	u32 other_shmem_base_addr;			/* 0x0034 */
-	u32 other_shmem2_base_addr;			/* 0x0038 */
+	uint32_t other_shmem_base_addr;			/* 0x0034 */
+	uint32_t other_shmem2_base_addr;			/* 0x0038 */
 	/*
 	 * mcp_vf_disabled is set by the MCP to indicate the driver about VFs
 	 * which were disabled/flred
 	 */
-	u32 mcp_vf_disabled[E2_VF_MAX / 32];		/* 0x003c */
+	uint32_t mcp_vf_disabled[E2_VF_MAX / 32];		/* 0x003c */
 
 	/*
 	 * drv_ack_vf_disabled is set by the PF driver to ack handled disabled
 	 * VFs
 	 */
-	u32 drv_ack_vf_disabled[E2_FUNC_MAX][E2_VF_MAX / 32]; /* 0x0044 */
+	uint32_t drv_ack_vf_disabled[E2_FUNC_MAX][E2_VF_MAX / 32]; /* 0x0044 */
 
-	u32 dcbx_lldp_dcbx_stat_offset;			/* 0x0064 */
+	uint32_t dcbx_lldp_dcbx_stat_offset;			/* 0x0064 */
 	#define SHMEM_LLDP_DCBX_STAT_NONE               0x00000000
 
 	/*
@@ -2118,39 +2118,39 @@ struct shmem2_region {
 	 * bits 3-5 -  op code / is_ack?
 	 * bits 6-63 - data
 	 */
-	u32 edebug_driver_if[2];			/* 0x0068 */
+	uint32_t edebug_driver_if[2];			/* 0x0068 */
 	#define EDEBUG_DRIVER_IF_OP_CODE_GET_PHYS_ADDR  1
 	#define EDEBUG_DRIVER_IF_OP_CODE_GET_BUS_ADDR   2
 	#define EDEBUG_DRIVER_IF_OP_CODE_DISABLE_STAT   3
 
-	u32 nvm_retain_bitmap_addr;			/* 0x0070 */
+	uint32_t nvm_retain_bitmap_addr;			/* 0x0070 */
 
 	/* afex support of that driver */
-	u32 afex_driver_support;			/* 0x0074 */
+	uint32_t afex_driver_support;			/* 0x0074 */
 	#define SHMEM_AFEX_VERSION_MASK                  0x100f
 	#define SHMEM_AFEX_SUPPORTED_VERSION_ONE         0x1001
 	#define SHMEM_AFEX_REDUCED_DRV_LOADED            0x8000
 
 	/* driver receives addr in scratchpad to which it should respond */
-	u32 afex_scratchpad_addr_to_write[E2_FUNC_MAX];
+	uint32_t afex_scratchpad_addr_to_write[E2_FUNC_MAX];
 
 	/* generic params from MCP to driver (value depends on the msg sent
 	 * to driver
 	 */
-	u32 afex_param1_to_driver[E2_FUNC_MAX];		/* 0x0088 */
-	u32 afex_param2_to_driver[E2_FUNC_MAX];		/* 0x0098 */
+	uint32_t afex_param1_to_driver[E2_FUNC_MAX];		/* 0x0088 */
+	uint32_t afex_param2_to_driver[E2_FUNC_MAX];		/* 0x0098 */
 
-	u32 swim_base_addr;				/* 0x0108 */
-	u32 swim_funcs;
-	u32 swim_main_cb;
+	uint32_t swim_base_addr;				/* 0x0108 */
+	uint32_t swim_funcs;
+	uint32_t swim_main_cb;
 
 	/* bitmap notifying which VIF profiles stored in nvram are enabled by
 	 * switch
 	 */
-	u32 afex_profiles_enabled[2];
+	uint32_t afex_profiles_enabled[2];
 
 	/* generic flags controlled by the driver */
-	u32 drv_flags;
+	uint32_t drv_flags;
 	#define DRV_FLAGS_DCB_CONFIGURED		0x0
 	#define DRV_FLAGS_DCB_CONFIGURATION_ABORTED	0x1
 	#define DRV_FLAGS_DCB_MFW_CONFIGURED	0x2
@@ -2159,44 +2159,44 @@ struct shmem2_region {
 			(1 << DRV_FLAGS_DCB_CONFIGURATION_ABORTED) | \
 			(1 << DRV_FLAGS_DCB_MFW_CONFIGURED))
 	/* pointer to extended dev_info shared data copied from nvm image */
-	u32 extended_dev_info_shared_addr;
-	u32 ncsi_oem_data_addr;
+	uint32_t extended_dev_info_shared_addr;
+	uint32_t ncsi_oem_data_addr;
 
-	u32 ocsd_host_addr; /* initialized by option ROM */
-	u32 ocbb_host_addr; /* initialized by option ROM */
-	u32 ocsd_req_update_interval; /* initialized by option ROM */
-	u32 temperature_in_half_celsius;
-	u32 glob_struct_in_host;
+	uint32_t ocsd_host_addr; /* initialized by option ROM */
+	uint32_t ocbb_host_addr; /* initialized by option ROM */
+	uint32_t ocsd_req_update_interval; /* initialized by option ROM */
+	uint32_t temperature_in_half_celsius;
+	uint32_t glob_struct_in_host;
 
-	u32 dcbx_neg_res_ext_offset;
+	uint32_t dcbx_neg_res_ext_offset;
 #define SHMEM_DCBX_NEG_RES_EXT_NONE			0x00000000
 
-	u32 drv_capabilities_flag[E2_FUNC_MAX];
+	uint32_t drv_capabilities_flag[E2_FUNC_MAX];
 #define DRV_FLAGS_CAPABILITIES_LOADED_SUPPORTED 0x00000001
 #define DRV_FLAGS_CAPABILITIES_LOADED_L2        0x00000002
 #define DRV_FLAGS_CAPABILITIES_LOADED_FCOE      0x00000004
 #define DRV_FLAGS_CAPABILITIES_LOADED_ISCSI     0x00000008
 
-	u32 extended_dev_info_shared_cfg_size;
+	uint32_t extended_dev_info_shared_cfg_size;
 
-	u32 dcbx_en[PORT_MAX];
+	uint32_t dcbx_en[PORT_MAX];
 
 	/* The offset points to the multi threaded meta structure */
-	u32 multi_thread_data_offset;
+	uint32_t multi_thread_data_offset;
 
 	/* address of DMAable host address holding values from the drivers */
-	u32 drv_info_host_addr_lo;
-	u32 drv_info_host_addr_hi;
+	uint32_t drv_info_host_addr_lo;
+	uint32_t drv_info_host_addr_hi;
 
 	/* general values written by the MFW (such as current version) */
-	u32 drv_info_control;
+	uint32_t drv_info_control;
 #define DRV_INFO_CONTROL_VER_MASK          0x000000ff
 #define DRV_INFO_CONTROL_VER_SHIFT         0
 #define DRV_INFO_CONTROL_OP_CODE_MASK      0x0000ff00
 #define DRV_INFO_CONTROL_OP_CODE_SHIFT     8
-	u32 ibft_host_addr; /* initialized by option ROM */
+	uint32_t ibft_host_addr; /* initialized by option ROM */
 	struct eee_remote_vals eee_remote_vals[PORT_MAX];
-	u32 reserved[E2_FUNC_MAX];
+	uint32_t reserved[E2_FUNC_MAX];
 
 
 	/* the status of EEE auto-negotiation
@@ -2213,7 +2213,7 @@ struct shmem2_region {
 	 * bit 31 when 1'b0 bits 15:0 contain a PORT_FEAT_CFG_EEE_ define as
 	 * value. When 1'b1 those bits contains a value times 16 microseconds.
 	 */
-	u32 eee_status[PORT_MAX];
+	uint32_t eee_status[PORT_MAX];
 	#define SHMEM_EEE_TIMER_MASK		   0x0000ffff
 	#define SHMEM_EEE_SUPPORTED_MASK	   0x000f0000
 	#define SHMEM_EEE_SUPPORTED_SHIFT	   16
@@ -2229,16 +2229,16 @@ struct shmem2_region {
 	#define SHMEM_EEE_ACTIVE_BIT		   0x40000000
 	#define SHMEM_EEE_TIME_OUTPUT_BIT	   0x80000000
 
-	u32 sizeof_port_stats;
+	uint32_t sizeof_port_stats;
 
 	/* Link Flap Avoidance */
-	u32 lfa_host_addr[PORT_MAX];
-	u32 reserved1;
+	uint32_t lfa_host_addr[PORT_MAX];
+	uint32_t reserved1;
 
-	u32 reserved2;				/* Offset 0x148 */
-	u32 reserved3;				/* Offset 0x14C */
-	u32 reserved4;				/* Offset 0x150 */
-	u32 link_attr_sync[PORT_MAX];		/* Offset 0x154 */
+	uint32_t reserved2;				/* Offset 0x148 */
+	uint32_t reserved3;				/* Offset 0x14C */
+	uint32_t reserved4;				/* Offset 0x150 */
+	uint32_t link_attr_sync[PORT_MAX];		/* Offset 0x154 */
 	#define LINK_ATTR_SYNC_KR2_ENABLE	0x00000001
 	#define LINK_SFP_EEPROM_COMP_CODE_MASK	0x0000ff00
 	#define LINK_SFP_EEPROM_COMP_CODE_SHIFT		 8
@@ -2246,14 +2246,14 @@ struct shmem2_region {
 	#define LINK_SFP_EEPROM_COMP_CODE_LR	0x00002000
 	#define LINK_SFP_EEPROM_COMP_CODE_LRM	0x00004000
 
-	u32 reserved5[2];
-	u32 reserved6[PORT_MAX];
+	uint32_t reserved5[2];
+	uint32_t reserved6[PORT_MAX];
 
 	/* driver version for each personality */
 	struct os_drv_ver func_os_drv_ver[E2_FUNC_MAX]; /* Offset 0x16c */
 
 	/* Flag to the driver that PF's drv_info_host_addr buffer was read  */
-	u32 mfw_drv_indication;
+	uint32_t mfw_drv_indication;
 
 	/* We use indication for each PF (0..3) */
 #define MFW_DRV_IND_READ_DONE_OFFSET(_pf_) (1 << (_pf_))
@@ -2261,275 +2261,275 @@ struct shmem2_region {
 
 
 struct emac_stats {
-	u32     rx_stat_ifhcinoctets;
-	u32     rx_stat_ifhcinbadoctets;
-	u32     rx_stat_etherstatsfragments;
-	u32     rx_stat_ifhcinucastpkts;
-	u32     rx_stat_ifhcinmulticastpkts;
-	u32     rx_stat_ifhcinbroadcastpkts;
-	u32     rx_stat_dot3statsfcserrors;
-	u32     rx_stat_dot3statsalignmenterrors;
-	u32     rx_stat_dot3statscarriersenseerrors;
-	u32     rx_stat_xonpauseframesreceived;
-	u32     rx_stat_xoffpauseframesreceived;
-	u32     rx_stat_maccontrolframesreceived;
-	u32     rx_stat_xoffstateentered;
-	u32     rx_stat_dot3statsframestoolong;
-	u32     rx_stat_etherstatsjabbers;
-	u32     rx_stat_etherstatsundersizepkts;
-	u32     rx_stat_etherstatspkts64octets;
-	u32     rx_stat_etherstatspkts65octetsto127octets;
-	u32     rx_stat_etherstatspkts128octetsto255octets;
-	u32     rx_stat_etherstatspkts256octetsto511octets;
-	u32     rx_stat_etherstatspkts512octetsto1023octets;
-	u32     rx_stat_etherstatspkts1024octetsto1522octets;
-	u32     rx_stat_etherstatspktsover1522octets;
+	uint32_t     rx_stat_ifhcinoctets;
+	uint32_t     rx_stat_ifhcinbadoctets;
+	uint32_t     rx_stat_etherstatsfragments;
+	uint32_t     rx_stat_ifhcinucastpkts;
+	uint32_t     rx_stat_ifhcinmulticastpkts;
+	uint32_t     rx_stat_ifhcinbroadcastpkts;
+	uint32_t     rx_stat_dot3statsfcserrors;
+	uint32_t     rx_stat_dot3statsalignmenterrors;
+	uint32_t     rx_stat_dot3statscarriersenseerrors;
+	uint32_t     rx_stat_xonpauseframesreceived;
+	uint32_t     rx_stat_xoffpauseframesreceived;
+	uint32_t     rx_stat_maccontrolframesreceived;
+	uint32_t     rx_stat_xoffstateentered;
+	uint32_t     rx_stat_dot3statsframestoolong;
+	uint32_t     rx_stat_etherstatsjabbers;
+	uint32_t     rx_stat_etherstatsundersizepkts;
+	uint32_t     rx_stat_etherstatspkts64octets;
+	uint32_t     rx_stat_etherstatspkts65octetsto127octets;
+	uint32_t     rx_stat_etherstatspkts128octetsto255octets;
+	uint32_t     rx_stat_etherstatspkts256octetsto511octets;
+	uint32_t     rx_stat_etherstatspkts512octetsto1023octets;
+	uint32_t     rx_stat_etherstatspkts1024octetsto1522octets;
+	uint32_t     rx_stat_etherstatspktsover1522octets;
 
-	u32     rx_stat_falsecarriererrors;
+	uint32_t     rx_stat_falsecarriererrors;
 
-	u32     tx_stat_ifhcoutoctets;
-	u32     tx_stat_ifhcoutbadoctets;
-	u32     tx_stat_etherstatscollisions;
-	u32     tx_stat_outxonsent;
-	u32     tx_stat_outxoffsent;
-	u32     tx_stat_flowcontroldone;
-	u32     tx_stat_dot3statssinglecollisionframes;
-	u32     tx_stat_dot3statsmultiplecollisionframes;
-	u32     tx_stat_dot3statsdeferredtransmissions;
-	u32     tx_stat_dot3statsexcessivecollisions;
-	u32     tx_stat_dot3statslatecollisions;
-	u32     tx_stat_ifhcoutucastpkts;
-	u32     tx_stat_ifhcoutmulticastpkts;
-	u32     tx_stat_ifhcoutbroadcastpkts;
-	u32     tx_stat_etherstatspkts64octets;
-	u32     tx_stat_etherstatspkts65octetsto127octets;
-	u32     tx_stat_etherstatspkts128octetsto255octets;
-	u32     tx_stat_etherstatspkts256octetsto511octets;
-	u32     tx_stat_etherstatspkts512octetsto1023octets;
-	u32     tx_stat_etherstatspkts1024octetsto1522octets;
-	u32     tx_stat_etherstatspktsover1522octets;
-	u32     tx_stat_dot3statsinternalmactransmiterrors;
+	uint32_t     tx_stat_ifhcoutoctets;
+	uint32_t     tx_stat_ifhcoutbadoctets;
+	uint32_t     tx_stat_etherstatscollisions;
+	uint32_t     tx_stat_outxonsent;
+	uint32_t     tx_stat_outxoffsent;
+	uint32_t     tx_stat_flowcontroldone;
+	uint32_t     tx_stat_dot3statssinglecollisionframes;
+	uint32_t     tx_stat_dot3statsmultiplecollisionframes;
+	uint32_t     tx_stat_dot3statsdeferredtransmissions;
+	uint32_t     tx_stat_dot3statsexcessivecollisions;
+	uint32_t     tx_stat_dot3statslatecollisions;
+	uint32_t     tx_stat_ifhcoutucastpkts;
+	uint32_t     tx_stat_ifhcoutmulticastpkts;
+	uint32_t     tx_stat_ifhcoutbroadcastpkts;
+	uint32_t     tx_stat_etherstatspkts64octets;
+	uint32_t     tx_stat_etherstatspkts65octetsto127octets;
+	uint32_t     tx_stat_etherstatspkts128octetsto255octets;
+	uint32_t     tx_stat_etherstatspkts256octetsto511octets;
+	uint32_t     tx_stat_etherstatspkts512octetsto1023octets;
+	uint32_t     tx_stat_etherstatspkts1024octetsto1522octets;
+	uint32_t     tx_stat_etherstatspktsover1522octets;
+	uint32_t     tx_stat_dot3statsinternalmactransmiterrors;
 };
 
 
 struct bmac1_stats {
-	u32	tx_stat_gtpkt_lo;
-	u32	tx_stat_gtpkt_hi;
-	u32	tx_stat_gtxpf_lo;
-	u32	tx_stat_gtxpf_hi;
-	u32	tx_stat_gtfcs_lo;
-	u32	tx_stat_gtfcs_hi;
-	u32	tx_stat_gtmca_lo;
-	u32	tx_stat_gtmca_hi;
-	u32	tx_stat_gtbca_lo;
-	u32	tx_stat_gtbca_hi;
-	u32	tx_stat_gtfrg_lo;
-	u32	tx_stat_gtfrg_hi;
-	u32	tx_stat_gtovr_lo;
-	u32	tx_stat_gtovr_hi;
-	u32	tx_stat_gt64_lo;
-	u32	tx_stat_gt64_hi;
-	u32	tx_stat_gt127_lo;
-	u32	tx_stat_gt127_hi;
-	u32	tx_stat_gt255_lo;
-	u32	tx_stat_gt255_hi;
-	u32	tx_stat_gt511_lo;
-	u32	tx_stat_gt511_hi;
-	u32	tx_stat_gt1023_lo;
-	u32	tx_stat_gt1023_hi;
-	u32	tx_stat_gt1518_lo;
-	u32	tx_stat_gt1518_hi;
-	u32	tx_stat_gt2047_lo;
-	u32	tx_stat_gt2047_hi;
-	u32	tx_stat_gt4095_lo;
-	u32	tx_stat_gt4095_hi;
-	u32	tx_stat_gt9216_lo;
-	u32	tx_stat_gt9216_hi;
-	u32	tx_stat_gt16383_lo;
-	u32	tx_stat_gt16383_hi;
-	u32	tx_stat_gtmax_lo;
-	u32	tx_stat_gtmax_hi;
-	u32	tx_stat_gtufl_lo;
-	u32	tx_stat_gtufl_hi;
-	u32	tx_stat_gterr_lo;
-	u32	tx_stat_gterr_hi;
-	u32	tx_stat_gtbyt_lo;
-	u32	tx_stat_gtbyt_hi;
+	uint32_t	tx_stat_gtpkt_lo;
+	uint32_t	tx_stat_gtpkt_hi;
+	uint32_t	tx_stat_gtxpf_lo;
+	uint32_t	tx_stat_gtxpf_hi;
+	uint32_t	tx_stat_gtfcs_lo;
+	uint32_t	tx_stat_gtfcs_hi;
+	uint32_t	tx_stat_gtmca_lo;
+	uint32_t	tx_stat_gtmca_hi;
+	uint32_t	tx_stat_gtbca_lo;
+	uint32_t	tx_stat_gtbca_hi;
+	uint32_t	tx_stat_gtfrg_lo;
+	uint32_t	tx_stat_gtfrg_hi;
+	uint32_t	tx_stat_gtovr_lo;
+	uint32_t	tx_stat_gtovr_hi;
+	uint32_t	tx_stat_gt64_lo;
+	uint32_t	tx_stat_gt64_hi;
+	uint32_t	tx_stat_gt127_lo;
+	uint32_t	tx_stat_gt127_hi;
+	uint32_t	tx_stat_gt255_lo;
+	uint32_t	tx_stat_gt255_hi;
+	uint32_t	tx_stat_gt511_lo;
+	uint32_t	tx_stat_gt511_hi;
+	uint32_t	tx_stat_gt1023_lo;
+	uint32_t	tx_stat_gt1023_hi;
+	uint32_t	tx_stat_gt1518_lo;
+	uint32_t	tx_stat_gt1518_hi;
+	uint32_t	tx_stat_gt2047_lo;
+	uint32_t	tx_stat_gt2047_hi;
+	uint32_t	tx_stat_gt4095_lo;
+	uint32_t	tx_stat_gt4095_hi;
+	uint32_t	tx_stat_gt9216_lo;
+	uint32_t	tx_stat_gt9216_hi;
+	uint32_t	tx_stat_gt16383_lo;
+	uint32_t	tx_stat_gt16383_hi;
+	uint32_t	tx_stat_gtmax_lo;
+	uint32_t	tx_stat_gtmax_hi;
+	uint32_t	tx_stat_gtufl_lo;
+	uint32_t	tx_stat_gtufl_hi;
+	uint32_t	tx_stat_gterr_lo;
+	uint32_t	tx_stat_gterr_hi;
+	uint32_t	tx_stat_gtbyt_lo;
+	uint32_t	tx_stat_gtbyt_hi;
 
-	u32	rx_stat_gr64_lo;
-	u32	rx_stat_gr64_hi;
-	u32	rx_stat_gr127_lo;
-	u32	rx_stat_gr127_hi;
-	u32	rx_stat_gr255_lo;
-	u32	rx_stat_gr255_hi;
-	u32	rx_stat_gr511_lo;
-	u32	rx_stat_gr511_hi;
-	u32	rx_stat_gr1023_lo;
-	u32	rx_stat_gr1023_hi;
-	u32	rx_stat_gr1518_lo;
-	u32	rx_stat_gr1518_hi;
-	u32	rx_stat_gr2047_lo;
-	u32	rx_stat_gr2047_hi;
-	u32	rx_stat_gr4095_lo;
-	u32	rx_stat_gr4095_hi;
-	u32	rx_stat_gr9216_lo;
-	u32	rx_stat_gr9216_hi;
-	u32	rx_stat_gr16383_lo;
-	u32	rx_stat_gr16383_hi;
-	u32	rx_stat_grmax_lo;
-	u32	rx_stat_grmax_hi;
-	u32	rx_stat_grpkt_lo;
-	u32	rx_stat_grpkt_hi;
-	u32	rx_stat_grfcs_lo;
-	u32	rx_stat_grfcs_hi;
-	u32	rx_stat_grmca_lo;
-	u32	rx_stat_grmca_hi;
-	u32	rx_stat_grbca_lo;
-	u32	rx_stat_grbca_hi;
-	u32	rx_stat_grxcf_lo;
-	u32	rx_stat_grxcf_hi;
-	u32	rx_stat_grxpf_lo;
-	u32	rx_stat_grxpf_hi;
-	u32	rx_stat_grxuo_lo;
-	u32	rx_stat_grxuo_hi;
-	u32	rx_stat_grjbr_lo;
-	u32	rx_stat_grjbr_hi;
-	u32	rx_stat_grovr_lo;
-	u32	rx_stat_grovr_hi;
-	u32	rx_stat_grflr_lo;
-	u32	rx_stat_grflr_hi;
-	u32	rx_stat_grmeg_lo;
-	u32	rx_stat_grmeg_hi;
-	u32	rx_stat_grmeb_lo;
-	u32	rx_stat_grmeb_hi;
-	u32	rx_stat_grbyt_lo;
-	u32	rx_stat_grbyt_hi;
-	u32	rx_stat_grund_lo;
-	u32	rx_stat_grund_hi;
-	u32	rx_stat_grfrg_lo;
-	u32	rx_stat_grfrg_hi;
-	u32	rx_stat_grerb_lo;
-	u32	rx_stat_grerb_hi;
-	u32	rx_stat_grfre_lo;
-	u32	rx_stat_grfre_hi;
-	u32	rx_stat_gripj_lo;
-	u32	rx_stat_gripj_hi;
+	uint32_t	rx_stat_gr64_lo;
+	uint32_t	rx_stat_gr64_hi;
+	uint32_t	rx_stat_gr127_lo;
+	uint32_t	rx_stat_gr127_hi;
+	uint32_t	rx_stat_gr255_lo;
+	uint32_t	rx_stat_gr255_hi;
+	uint32_t	rx_stat_gr511_lo;
+	uint32_t	rx_stat_gr511_hi;
+	uint32_t	rx_stat_gr1023_lo;
+	uint32_t	rx_stat_gr1023_hi;
+	uint32_t	rx_stat_gr1518_lo;
+	uint32_t	rx_stat_gr1518_hi;
+	uint32_t	rx_stat_gr2047_lo;
+	uint32_t	rx_stat_gr2047_hi;
+	uint32_t	rx_stat_gr4095_lo;
+	uint32_t	rx_stat_gr4095_hi;
+	uint32_t	rx_stat_gr9216_lo;
+	uint32_t	rx_stat_gr9216_hi;
+	uint32_t	rx_stat_gr16383_lo;
+	uint32_t	rx_stat_gr16383_hi;
+	uint32_t	rx_stat_grmax_lo;
+	uint32_t	rx_stat_grmax_hi;
+	uint32_t	rx_stat_grpkt_lo;
+	uint32_t	rx_stat_grpkt_hi;
+	uint32_t	rx_stat_grfcs_lo;
+	uint32_t	rx_stat_grfcs_hi;
+	uint32_t	rx_stat_grmca_lo;
+	uint32_t	rx_stat_grmca_hi;
+	uint32_t	rx_stat_grbca_lo;
+	uint32_t	rx_stat_grbca_hi;
+	uint32_t	rx_stat_grxcf_lo;
+	uint32_t	rx_stat_grxcf_hi;
+	uint32_t	rx_stat_grxpf_lo;
+	uint32_t	rx_stat_grxpf_hi;
+	uint32_t	rx_stat_grxuo_lo;
+	uint32_t	rx_stat_grxuo_hi;
+	uint32_t	rx_stat_grjbr_lo;
+	uint32_t	rx_stat_grjbr_hi;
+	uint32_t	rx_stat_grovr_lo;
+	uint32_t	rx_stat_grovr_hi;
+	uint32_t	rx_stat_grflr_lo;
+	uint32_t	rx_stat_grflr_hi;
+	uint32_t	rx_stat_grmeg_lo;
+	uint32_t	rx_stat_grmeg_hi;
+	uint32_t	rx_stat_grmeb_lo;
+	uint32_t	rx_stat_grmeb_hi;
+	uint32_t	rx_stat_grbyt_lo;
+	uint32_t	rx_stat_grbyt_hi;
+	uint32_t	rx_stat_grund_lo;
+	uint32_t	rx_stat_grund_hi;
+	uint32_t	rx_stat_grfrg_lo;
+	uint32_t	rx_stat_grfrg_hi;
+	uint32_t	rx_stat_grerb_lo;
+	uint32_t	rx_stat_grerb_hi;
+	uint32_t	rx_stat_grfre_lo;
+	uint32_t	rx_stat_grfre_hi;
+	uint32_t	rx_stat_gripj_lo;
+	uint32_t	rx_stat_gripj_hi;
 };
 
 struct bmac2_stats {
-	u32	tx_stat_gtpk_lo; /* gtpok */
-	u32	tx_stat_gtpk_hi; /* gtpok */
-	u32	tx_stat_gtxpf_lo; /* gtpf */
-	u32	tx_stat_gtxpf_hi; /* gtpf */
-	u32	tx_stat_gtpp_lo; /* NEW BMAC2 */
-	u32	tx_stat_gtpp_hi; /* NEW BMAC2 */
-	u32	tx_stat_gtfcs_lo;
-	u32	tx_stat_gtfcs_hi;
-	u32	tx_stat_gtuca_lo; /* NEW BMAC2 */
-	u32	tx_stat_gtuca_hi; /* NEW BMAC2 */
-	u32	tx_stat_gtmca_lo;
-	u32	tx_stat_gtmca_hi;
-	u32	tx_stat_gtbca_lo;
-	u32	tx_stat_gtbca_hi;
-	u32	tx_stat_gtovr_lo;
-	u32	tx_stat_gtovr_hi;
-	u32	tx_stat_gtfrg_lo;
-	u32	tx_stat_gtfrg_hi;
-	u32	tx_stat_gtpkt1_lo; /* gtpkt */
-	u32	tx_stat_gtpkt1_hi; /* gtpkt */
-	u32	tx_stat_gt64_lo;
-	u32	tx_stat_gt64_hi;
-	u32	tx_stat_gt127_lo;
-	u32	tx_stat_gt127_hi;
-	u32	tx_stat_gt255_lo;
-	u32	tx_stat_gt255_hi;
-	u32	tx_stat_gt511_lo;
-	u32	tx_stat_gt511_hi;
-	u32	tx_stat_gt1023_lo;
-	u32	tx_stat_gt1023_hi;
-	u32	tx_stat_gt1518_lo;
-	u32	tx_stat_gt1518_hi;
-	u32	tx_stat_gt2047_lo;
-	u32	tx_stat_gt2047_hi;
-	u32	tx_stat_gt4095_lo;
-	u32	tx_stat_gt4095_hi;
-	u32	tx_stat_gt9216_lo;
-	u32	tx_stat_gt9216_hi;
-	u32	tx_stat_gt16383_lo;
-	u32	tx_stat_gt16383_hi;
-	u32	tx_stat_gtmax_lo;
-	u32	tx_stat_gtmax_hi;
-	u32	tx_stat_gtufl_lo;
-	u32	tx_stat_gtufl_hi;
-	u32	tx_stat_gterr_lo;
-	u32	tx_stat_gterr_hi;
-	u32	tx_stat_gtbyt_lo;
-	u32	tx_stat_gtbyt_hi;
+	uint32_t	tx_stat_gtpk_lo; /* gtpok */
+	uint32_t	tx_stat_gtpk_hi; /* gtpok */
+	uint32_t	tx_stat_gtxpf_lo; /* gtpf */
+	uint32_t	tx_stat_gtxpf_hi; /* gtpf */
+	uint32_t	tx_stat_gtpp_lo; /* NEW BMAC2 */
+	uint32_t	tx_stat_gtpp_hi; /* NEW BMAC2 */
+	uint32_t	tx_stat_gtfcs_lo;
+	uint32_t	tx_stat_gtfcs_hi;
+	uint32_t	tx_stat_gtuca_lo; /* NEW BMAC2 */
+	uint32_t	tx_stat_gtuca_hi; /* NEW BMAC2 */
+	uint32_t	tx_stat_gtmca_lo;
+	uint32_t	tx_stat_gtmca_hi;
+	uint32_t	tx_stat_gtbca_lo;
+	uint32_t	tx_stat_gtbca_hi;
+	uint32_t	tx_stat_gtovr_lo;
+	uint32_t	tx_stat_gtovr_hi;
+	uint32_t	tx_stat_gtfrg_lo;
+	uint32_t	tx_stat_gtfrg_hi;
+	uint32_t	tx_stat_gtpkt1_lo; /* gtpkt */
+	uint32_t	tx_stat_gtpkt1_hi; /* gtpkt */
+	uint32_t	tx_stat_gt64_lo;
+	uint32_t	tx_stat_gt64_hi;
+	uint32_t	tx_stat_gt127_lo;
+	uint32_t	tx_stat_gt127_hi;
+	uint32_t	tx_stat_gt255_lo;
+	uint32_t	tx_stat_gt255_hi;
+	uint32_t	tx_stat_gt511_lo;
+	uint32_t	tx_stat_gt511_hi;
+	uint32_t	tx_stat_gt1023_lo;
+	uint32_t	tx_stat_gt1023_hi;
+	uint32_t	tx_stat_gt1518_lo;
+	uint32_t	tx_stat_gt1518_hi;
+	uint32_t	tx_stat_gt2047_lo;
+	uint32_t	tx_stat_gt2047_hi;
+	uint32_t	tx_stat_gt4095_lo;
+	uint32_t	tx_stat_gt4095_hi;
+	uint32_t	tx_stat_gt9216_lo;
+	uint32_t	tx_stat_gt9216_hi;
+	uint32_t	tx_stat_gt16383_lo;
+	uint32_t	tx_stat_gt16383_hi;
+	uint32_t	tx_stat_gtmax_lo;
+	uint32_t	tx_stat_gtmax_hi;
+	uint32_t	tx_stat_gtufl_lo;
+	uint32_t	tx_stat_gtufl_hi;
+	uint32_t	tx_stat_gterr_lo;
+	uint32_t	tx_stat_gterr_hi;
+	uint32_t	tx_stat_gtbyt_lo;
+	uint32_t	tx_stat_gtbyt_hi;
 
-	u32	rx_stat_gr64_lo;
-	u32	rx_stat_gr64_hi;
-	u32	rx_stat_gr127_lo;
-	u32	rx_stat_gr127_hi;
-	u32	rx_stat_gr255_lo;
-	u32	rx_stat_gr255_hi;
-	u32	rx_stat_gr511_lo;
-	u32	rx_stat_gr511_hi;
-	u32	rx_stat_gr1023_lo;
-	u32	rx_stat_gr1023_hi;
-	u32	rx_stat_gr1518_lo;
-	u32	rx_stat_gr1518_hi;
-	u32	rx_stat_gr2047_lo;
-	u32	rx_stat_gr2047_hi;
-	u32	rx_stat_gr4095_lo;
-	u32	rx_stat_gr4095_hi;
-	u32	rx_stat_gr9216_lo;
-	u32	rx_stat_gr9216_hi;
-	u32	rx_stat_gr16383_lo;
-	u32	rx_stat_gr16383_hi;
-	u32	rx_stat_grmax_lo;
-	u32	rx_stat_grmax_hi;
-	u32	rx_stat_grpkt_lo;
-	u32	rx_stat_grpkt_hi;
-	u32	rx_stat_grfcs_lo;
-	u32	rx_stat_grfcs_hi;
-	u32	rx_stat_gruca_lo;
-	u32	rx_stat_gruca_hi;
-	u32	rx_stat_grmca_lo;
-	u32	rx_stat_grmca_hi;
-	u32	rx_stat_grbca_lo;
-	u32	rx_stat_grbca_hi;
-	u32	rx_stat_grxpf_lo; /* grpf */
-	u32	rx_stat_grxpf_hi; /* grpf */
-	u32	rx_stat_grpp_lo;
-	u32	rx_stat_grpp_hi;
-	u32	rx_stat_grxuo_lo; /* gruo */
-	u32	rx_stat_grxuo_hi; /* gruo */
-	u32	rx_stat_grjbr_lo;
-	u32	rx_stat_grjbr_hi;
-	u32	rx_stat_grovr_lo;
-	u32	rx_stat_grovr_hi;
-	u32	rx_stat_grxcf_lo; /* grcf */
-	u32	rx_stat_grxcf_hi; /* grcf */
-	u32	rx_stat_grflr_lo;
-	u32	rx_stat_grflr_hi;
-	u32	rx_stat_grpok_lo;
-	u32	rx_stat_grpok_hi;
-	u32	rx_stat_grmeg_lo;
-	u32	rx_stat_grmeg_hi;
-	u32	rx_stat_grmeb_lo;
-	u32	rx_stat_grmeb_hi;
-	u32	rx_stat_grbyt_lo;
-	u32	rx_stat_grbyt_hi;
-	u32	rx_stat_grund_lo;
-	u32	rx_stat_grund_hi;
-	u32	rx_stat_grfrg_lo;
-	u32	rx_stat_grfrg_hi;
-	u32	rx_stat_grerb_lo; /* grerrbyt */
-	u32	rx_stat_grerb_hi; /* grerrbyt */
-	u32	rx_stat_grfre_lo; /* grfrerr */
-	u32	rx_stat_grfre_hi; /* grfrerr */
-	u32	rx_stat_gripj_lo;
-	u32	rx_stat_gripj_hi;
+	uint32_t	rx_stat_gr64_lo;
+	uint32_t	rx_stat_gr64_hi;
+	uint32_t	rx_stat_gr127_lo;
+	uint32_t	rx_stat_gr127_hi;
+	uint32_t	rx_stat_gr255_lo;
+	uint32_t	rx_stat_gr255_hi;
+	uint32_t	rx_stat_gr511_lo;
+	uint32_t	rx_stat_gr511_hi;
+	uint32_t	rx_stat_gr1023_lo;
+	uint32_t	rx_stat_gr1023_hi;
+	uint32_t	rx_stat_gr1518_lo;
+	uint32_t	rx_stat_gr1518_hi;
+	uint32_t	rx_stat_gr2047_lo;
+	uint32_t	rx_stat_gr2047_hi;
+	uint32_t	rx_stat_gr4095_lo;
+	uint32_t	rx_stat_gr4095_hi;
+	uint32_t	rx_stat_gr9216_lo;
+	uint32_t	rx_stat_gr9216_hi;
+	uint32_t	rx_stat_gr16383_lo;
+	uint32_t	rx_stat_gr16383_hi;
+	uint32_t	rx_stat_grmax_lo;
+	uint32_t	rx_stat_grmax_hi;
+	uint32_t	rx_stat_grpkt_lo;
+	uint32_t	rx_stat_grpkt_hi;
+	uint32_t	rx_stat_grfcs_lo;
+	uint32_t	rx_stat_grfcs_hi;
+	uint32_t	rx_stat_gruca_lo;
+	uint32_t	rx_stat_gruca_hi;
+	uint32_t	rx_stat_grmca_lo;
+	uint32_t	rx_stat_grmca_hi;
+	uint32_t	rx_stat_grbca_lo;
+	uint32_t	rx_stat_grbca_hi;
+	uint32_t	rx_stat_grxpf_lo; /* grpf */
+	uint32_t	rx_stat_grxpf_hi; /* grpf */
+	uint32_t	rx_stat_grpp_lo;
+	uint32_t	rx_stat_grpp_hi;
+	uint32_t	rx_stat_grxuo_lo; /* gruo */
+	uint32_t	rx_stat_grxuo_hi; /* gruo */
+	uint32_t	rx_stat_grjbr_lo;
+	uint32_t	rx_stat_grjbr_hi;
+	uint32_t	rx_stat_grovr_lo;
+	uint32_t	rx_stat_grovr_hi;
+	uint32_t	rx_stat_grxcf_lo; /* grcf */
+	uint32_t	rx_stat_grxcf_hi; /* grcf */
+	uint32_t	rx_stat_grflr_lo;
+	uint32_t	rx_stat_grflr_hi;
+	uint32_t	rx_stat_grpok_lo;
+	uint32_t	rx_stat_grpok_hi;
+	uint32_t	rx_stat_grmeg_lo;
+	uint32_t	rx_stat_grmeg_hi;
+	uint32_t	rx_stat_grmeb_lo;
+	uint32_t	rx_stat_grmeb_hi;
+	uint32_t	rx_stat_grbyt_lo;
+	uint32_t	rx_stat_grbyt_hi;
+	uint32_t	rx_stat_grund_lo;
+	uint32_t	rx_stat_grund_hi;
+	uint32_t	rx_stat_grfrg_lo;
+	uint32_t	rx_stat_grfrg_hi;
+	uint32_t	rx_stat_grerb_lo; /* grerrbyt */
+	uint32_t	rx_stat_grerb_hi; /* grerrbyt */
+	uint32_t	rx_stat_grfre_lo; /* grfrerr */
+	uint32_t	rx_stat_grfre_hi; /* grfrerr */
+	uint32_t	rx_stat_gripj_lo;
+	uint32_t	rx_stat_gripj_hi;
 };
 
 struct mstat_stats {
@@ -2537,124 +2537,124 @@ struct mstat_stats {
 		/* OTE MSTAT on E3 has a bug where this register's contents are
 		 * actually tx_gtxpok + tx_gtxpf + (possibly)tx_gtxpp
 		 */
-		u32 tx_gtxpok_lo;
-		u32 tx_gtxpok_hi;
-		u32 tx_gtxpf_lo;
-		u32 tx_gtxpf_hi;
-		u32 tx_gtxpp_lo;
-		u32 tx_gtxpp_hi;
-		u32 tx_gtfcs_lo;
-		u32 tx_gtfcs_hi;
-		u32 tx_gtuca_lo;
-		u32 tx_gtuca_hi;
-		u32 tx_gtmca_lo;
-		u32 tx_gtmca_hi;
-		u32 tx_gtgca_lo;
-		u32 tx_gtgca_hi;
-		u32 tx_gtpkt_lo;
-		u32 tx_gtpkt_hi;
-		u32 tx_gt64_lo;
-		u32 tx_gt64_hi;
-		u32 tx_gt127_lo;
-		u32 tx_gt127_hi;
-		u32 tx_gt255_lo;
-		u32 tx_gt255_hi;
-		u32 tx_gt511_lo;
-		u32 tx_gt511_hi;
-		u32 tx_gt1023_lo;
-		u32 tx_gt1023_hi;
-		u32 tx_gt1518_lo;
-		u32 tx_gt1518_hi;
-		u32 tx_gt2047_lo;
-		u32 tx_gt2047_hi;
-		u32 tx_gt4095_lo;
-		u32 tx_gt4095_hi;
-		u32 tx_gt9216_lo;
-		u32 tx_gt9216_hi;
-		u32 tx_gt16383_lo;
-		u32 tx_gt16383_hi;
-		u32 tx_gtufl_lo;
-		u32 tx_gtufl_hi;
-		u32 tx_gterr_lo;
-		u32 tx_gterr_hi;
-		u32 tx_gtbyt_lo;
-		u32 tx_gtbyt_hi;
-		u32 tx_collisions_lo;
-		u32 tx_collisions_hi;
-		u32 tx_singlecollision_lo;
-		u32 tx_singlecollision_hi;
-		u32 tx_multiplecollisions_lo;
-		u32 tx_multiplecollisions_hi;
-		u32 tx_deferred_lo;
-		u32 tx_deferred_hi;
-		u32 tx_excessivecollisions_lo;
-		u32 tx_excessivecollisions_hi;
-		u32 tx_latecollisions_lo;
-		u32 tx_latecollisions_hi;
+		uint32_t tx_gtxpok_lo;
+		uint32_t tx_gtxpok_hi;
+		uint32_t tx_gtxpf_lo;
+		uint32_t tx_gtxpf_hi;
+		uint32_t tx_gtxpp_lo;
+		uint32_t tx_gtxpp_hi;
+		uint32_t tx_gtfcs_lo;
+		uint32_t tx_gtfcs_hi;
+		uint32_t tx_gtuca_lo;
+		uint32_t tx_gtuca_hi;
+		uint32_t tx_gtmca_lo;
+		uint32_t tx_gtmca_hi;
+		uint32_t tx_gtgca_lo;
+		uint32_t tx_gtgca_hi;
+		uint32_t tx_gtpkt_lo;
+		uint32_t tx_gtpkt_hi;
+		uint32_t tx_gt64_lo;
+		uint32_t tx_gt64_hi;
+		uint32_t tx_gt127_lo;
+		uint32_t tx_gt127_hi;
+		uint32_t tx_gt255_lo;
+		uint32_t tx_gt255_hi;
+		uint32_t tx_gt511_lo;
+		uint32_t tx_gt511_hi;
+		uint32_t tx_gt1023_lo;
+		uint32_t tx_gt1023_hi;
+		uint32_t tx_gt1518_lo;
+		uint32_t tx_gt1518_hi;
+		uint32_t tx_gt2047_lo;
+		uint32_t tx_gt2047_hi;
+		uint32_t tx_gt4095_lo;
+		uint32_t tx_gt4095_hi;
+		uint32_t tx_gt9216_lo;
+		uint32_t tx_gt9216_hi;
+		uint32_t tx_gt16383_lo;
+		uint32_t tx_gt16383_hi;
+		uint32_t tx_gtufl_lo;
+		uint32_t tx_gtufl_hi;
+		uint32_t tx_gterr_lo;
+		uint32_t tx_gterr_hi;
+		uint32_t tx_gtbyt_lo;
+		uint32_t tx_gtbyt_hi;
+		uint32_t tx_collisions_lo;
+		uint32_t tx_collisions_hi;
+		uint32_t tx_singlecollision_lo;
+		uint32_t tx_singlecollision_hi;
+		uint32_t tx_multiplecollisions_lo;
+		uint32_t tx_multiplecollisions_hi;
+		uint32_t tx_deferred_lo;
+		uint32_t tx_deferred_hi;
+		uint32_t tx_excessivecollisions_lo;
+		uint32_t tx_excessivecollisions_hi;
+		uint32_t tx_latecollisions_lo;
+		uint32_t tx_latecollisions_hi;
 	} stats_tx;
 
 	struct {
-		u32 rx_gr64_lo;
-		u32 rx_gr64_hi;
-		u32 rx_gr127_lo;
-		u32 rx_gr127_hi;
-		u32 rx_gr255_lo;
-		u32 rx_gr255_hi;
-		u32 rx_gr511_lo;
-		u32 rx_gr511_hi;
-		u32 rx_gr1023_lo;
-		u32 rx_gr1023_hi;
-		u32 rx_gr1518_lo;
-		u32 rx_gr1518_hi;
-		u32 rx_gr2047_lo;
-		u32 rx_gr2047_hi;
-		u32 rx_gr4095_lo;
-		u32 rx_gr4095_hi;
-		u32 rx_gr9216_lo;
-		u32 rx_gr9216_hi;
-		u32 rx_gr16383_lo;
-		u32 rx_gr16383_hi;
-		u32 rx_grpkt_lo;
-		u32 rx_grpkt_hi;
-		u32 rx_grfcs_lo;
-		u32 rx_grfcs_hi;
-		u32 rx_gruca_lo;
-		u32 rx_gruca_hi;
-		u32 rx_grmca_lo;
-		u32 rx_grmca_hi;
-		u32 rx_grbca_lo;
-		u32 rx_grbca_hi;
-		u32 rx_grxpf_lo;
-		u32 rx_grxpf_hi;
-		u32 rx_grxpp_lo;
-		u32 rx_grxpp_hi;
-		u32 rx_grxuo_lo;
-		u32 rx_grxuo_hi;
-		u32 rx_grovr_lo;
-		u32 rx_grovr_hi;
-		u32 rx_grxcf_lo;
-		u32 rx_grxcf_hi;
-		u32 rx_grflr_lo;
-		u32 rx_grflr_hi;
-		u32 rx_grpok_lo;
-		u32 rx_grpok_hi;
-		u32 rx_grbyt_lo;
-		u32 rx_grbyt_hi;
-		u32 rx_grund_lo;
-		u32 rx_grund_hi;
-		u32 rx_grfrg_lo;
-		u32 rx_grfrg_hi;
-		u32 rx_grerb_lo;
-		u32 rx_grerb_hi;
-		u32 rx_grfre_lo;
-		u32 rx_grfre_hi;
+		uint32_t rx_gr64_lo;
+		uint32_t rx_gr64_hi;
+		uint32_t rx_gr127_lo;
+		uint32_t rx_gr127_hi;
+		uint32_t rx_gr255_lo;
+		uint32_t rx_gr255_hi;
+		uint32_t rx_gr511_lo;
+		uint32_t rx_gr511_hi;
+		uint32_t rx_gr1023_lo;
+		uint32_t rx_gr1023_hi;
+		uint32_t rx_gr1518_lo;
+		uint32_t rx_gr1518_hi;
+		uint32_t rx_gr2047_lo;
+		uint32_t rx_gr2047_hi;
+		uint32_t rx_gr4095_lo;
+		uint32_t rx_gr4095_hi;
+		uint32_t rx_gr9216_lo;
+		uint32_t rx_gr9216_hi;
+		uint32_t rx_gr16383_lo;
+		uint32_t rx_gr16383_hi;
+		uint32_t rx_grpkt_lo;
+		uint32_t rx_grpkt_hi;
+		uint32_t rx_grfcs_lo;
+		uint32_t rx_grfcs_hi;
+		uint32_t rx_gruca_lo;
+		uint32_t rx_gruca_hi;
+		uint32_t rx_grmca_lo;
+		uint32_t rx_grmca_hi;
+		uint32_t rx_grbca_lo;
+		uint32_t rx_grbca_hi;
+		uint32_t rx_grxpf_lo;
+		uint32_t rx_grxpf_hi;
+		uint32_t rx_grxpp_lo;
+		uint32_t rx_grxpp_hi;
+		uint32_t rx_grxuo_lo;
+		uint32_t rx_grxuo_hi;
+		uint32_t rx_grovr_lo;
+		uint32_t rx_grovr_hi;
+		uint32_t rx_grxcf_lo;
+		uint32_t rx_grxcf_hi;
+		uint32_t rx_grflr_lo;
+		uint32_t rx_grflr_hi;
+		uint32_t rx_grpok_lo;
+		uint32_t rx_grpok_hi;
+		uint32_t rx_grbyt_lo;
+		uint32_t rx_grbyt_hi;
+		uint32_t rx_grund_lo;
+		uint32_t rx_grund_hi;
+		uint32_t rx_grfrg_lo;
+		uint32_t rx_grfrg_hi;
+		uint32_t rx_grerb_lo;
+		uint32_t rx_grerb_hi;
+		uint32_t rx_grfre_lo;
+		uint32_t rx_grfre_hi;
 
-		u32 rx_alignmenterrors_lo;
-		u32 rx_alignmenterrors_hi;
-		u32 rx_falsecarrier_lo;
-		u32 rx_falsecarrier_hi;
-		u32 rx_llfcmsgcnt_lo;
-		u32 rx_llfcmsgcnt_hi;
+		uint32_t rx_alignmenterrors_lo;
+		uint32_t rx_alignmenterrors_hi;
+		uint32_t rx_falsecarrier_lo;
+		uint32_t rx_falsecarrier_hi;
+		uint32_t rx_llfcmsgcnt_lo;
+		uint32_t rx_llfcmsgcnt_hi;
 	} stats_rx;
 };
 
@@ -2668,178 +2668,178 @@ union mac_stats {
 
 struct mac_stx {
 	/* in_bad_octets */
-	u32     rx_stat_ifhcinbadoctets_hi;
-	u32     rx_stat_ifhcinbadoctets_lo;
+	uint32_t     rx_stat_ifhcinbadoctets_hi;
+	uint32_t     rx_stat_ifhcinbadoctets_lo;
 
 	/* out_bad_octets */
-	u32     tx_stat_ifhcoutbadoctets_hi;
-	u32     tx_stat_ifhcoutbadoctets_lo;
+	uint32_t     tx_stat_ifhcoutbadoctets_hi;
+	uint32_t     tx_stat_ifhcoutbadoctets_lo;
 
 	/* crc_receive_errors */
-	u32     rx_stat_dot3statsfcserrors_hi;
-	u32     rx_stat_dot3statsfcserrors_lo;
+	uint32_t     rx_stat_dot3statsfcserrors_hi;
+	uint32_t     rx_stat_dot3statsfcserrors_lo;
 	/* alignment_errors */
-	u32     rx_stat_dot3statsalignmenterrors_hi;
-	u32     rx_stat_dot3statsalignmenterrors_lo;
+	uint32_t     rx_stat_dot3statsalignmenterrors_hi;
+	uint32_t     rx_stat_dot3statsalignmenterrors_lo;
 	/* carrier_sense_errors */
-	u32     rx_stat_dot3statscarriersenseerrors_hi;
-	u32     rx_stat_dot3statscarriersenseerrors_lo;
+	uint32_t     rx_stat_dot3statscarriersenseerrors_hi;
+	uint32_t     rx_stat_dot3statscarriersenseerrors_lo;
 	/* false_carrier_detections */
-	u32     rx_stat_falsecarriererrors_hi;
-	u32     rx_stat_falsecarriererrors_lo;
+	uint32_t     rx_stat_falsecarriererrors_hi;
+	uint32_t     rx_stat_falsecarriererrors_lo;
 
 	/* runt_packets_received */
-	u32     rx_stat_etherstatsundersizepkts_hi;
-	u32     rx_stat_etherstatsundersizepkts_lo;
+	uint32_t     rx_stat_etherstatsundersizepkts_hi;
+	uint32_t     rx_stat_etherstatsundersizepkts_lo;
 	/* jabber_packets_received */
-	u32     rx_stat_dot3statsframestoolong_hi;
-	u32     rx_stat_dot3statsframestoolong_lo;
+	uint32_t     rx_stat_dot3statsframestoolong_hi;
+	uint32_t     rx_stat_dot3statsframestoolong_lo;
 
 	/* error_runt_packets_received */
-	u32     rx_stat_etherstatsfragments_hi;
-	u32     rx_stat_etherstatsfragments_lo;
+	uint32_t     rx_stat_etherstatsfragments_hi;
+	uint32_t     rx_stat_etherstatsfragments_lo;
 	/* error_jabber_packets_received */
-	u32     rx_stat_etherstatsjabbers_hi;
-	u32     rx_stat_etherstatsjabbers_lo;
+	uint32_t     rx_stat_etherstatsjabbers_hi;
+	uint32_t     rx_stat_etherstatsjabbers_lo;
 
 	/* control_frames_received */
-	u32     rx_stat_maccontrolframesreceived_hi;
-	u32     rx_stat_maccontrolframesreceived_lo;
-	u32     rx_stat_mac_xpf_hi;
-	u32     rx_stat_mac_xpf_lo;
-	u32     rx_stat_mac_xcf_hi;
-	u32     rx_stat_mac_xcf_lo;
+	uint32_t     rx_stat_maccontrolframesreceived_hi;
+	uint32_t     rx_stat_maccontrolframesreceived_lo;
+	uint32_t     rx_stat_mac_xpf_hi;
+	uint32_t     rx_stat_mac_xpf_lo;
+	uint32_t     rx_stat_mac_xcf_hi;
+	uint32_t     rx_stat_mac_xcf_lo;
 
 	/* xoff_state_entered */
-	u32     rx_stat_xoffstateentered_hi;
-	u32     rx_stat_xoffstateentered_lo;
+	uint32_t     rx_stat_xoffstateentered_hi;
+	uint32_t     rx_stat_xoffstateentered_lo;
 	/* pause_xon_frames_received */
-	u32     rx_stat_xonpauseframesreceived_hi;
-	u32     rx_stat_xonpauseframesreceived_lo;
+	uint32_t     rx_stat_xonpauseframesreceived_hi;
+	uint32_t     rx_stat_xonpauseframesreceived_lo;
 	/* pause_xoff_frames_received */
-	u32     rx_stat_xoffpauseframesreceived_hi;
-	u32     rx_stat_xoffpauseframesreceived_lo;
+	uint32_t     rx_stat_xoffpauseframesreceived_hi;
+	uint32_t     rx_stat_xoffpauseframesreceived_lo;
 	/* pause_xon_frames_transmitted */
-	u32     tx_stat_outxonsent_hi;
-	u32     tx_stat_outxonsent_lo;
+	uint32_t     tx_stat_outxonsent_hi;
+	uint32_t     tx_stat_outxonsent_lo;
 	/* pause_xoff_frames_transmitted */
-	u32     tx_stat_outxoffsent_hi;
-	u32     tx_stat_outxoffsent_lo;
+	uint32_t     tx_stat_outxoffsent_hi;
+	uint32_t     tx_stat_outxoffsent_lo;
 	/* flow_control_done */
-	u32     tx_stat_flowcontroldone_hi;
-	u32     tx_stat_flowcontroldone_lo;
+	uint32_t     tx_stat_flowcontroldone_hi;
+	uint32_t     tx_stat_flowcontroldone_lo;
 
 	/* ether_stats_collisions */
-	u32     tx_stat_etherstatscollisions_hi;
-	u32     tx_stat_etherstatscollisions_lo;
+	uint32_t     tx_stat_etherstatscollisions_hi;
+	uint32_t     tx_stat_etherstatscollisions_lo;
 	/* single_collision_transmit_frames */
-	u32     tx_stat_dot3statssinglecollisionframes_hi;
-	u32     tx_stat_dot3statssinglecollisionframes_lo;
+	uint32_t     tx_stat_dot3statssinglecollisionframes_hi;
+	uint32_t     tx_stat_dot3statssinglecollisionframes_lo;
 	/* multiple_collision_transmit_frames */
-	u32     tx_stat_dot3statsmultiplecollisionframes_hi;
-	u32     tx_stat_dot3statsmultiplecollisionframes_lo;
+	uint32_t     tx_stat_dot3statsmultiplecollisionframes_hi;
+	uint32_t     tx_stat_dot3statsmultiplecollisionframes_lo;
 	/* deferred_transmissions */
-	u32     tx_stat_dot3statsdeferredtransmissions_hi;
-	u32     tx_stat_dot3statsdeferredtransmissions_lo;
+	uint32_t     tx_stat_dot3statsdeferredtransmissions_hi;
+	uint32_t     tx_stat_dot3statsdeferredtransmissions_lo;
 	/* excessive_collision_frames */
-	u32     tx_stat_dot3statsexcessivecollisions_hi;
-	u32     tx_stat_dot3statsexcessivecollisions_lo;
+	uint32_t     tx_stat_dot3statsexcessivecollisions_hi;
+	uint32_t     tx_stat_dot3statsexcessivecollisions_lo;
 	/* late_collision_frames */
-	u32     tx_stat_dot3statslatecollisions_hi;
-	u32     tx_stat_dot3statslatecollisions_lo;
+	uint32_t     tx_stat_dot3statslatecollisions_hi;
+	uint32_t     tx_stat_dot3statslatecollisions_lo;
 
 	/* frames_transmitted_64_bytes */
-	u32     tx_stat_etherstatspkts64octets_hi;
-	u32     tx_stat_etherstatspkts64octets_lo;
+	uint32_t     tx_stat_etherstatspkts64octets_hi;
+	uint32_t     tx_stat_etherstatspkts64octets_lo;
 	/* frames_transmitted_65_127_bytes */
-	u32     tx_stat_etherstatspkts65octetsto127octets_hi;
-	u32     tx_stat_etherstatspkts65octetsto127octets_lo;
+	uint32_t     tx_stat_etherstatspkts65octetsto127octets_hi;
+	uint32_t     tx_stat_etherstatspkts65octetsto127octets_lo;
 	/* frames_transmitted_128_255_bytes */
-	u32     tx_stat_etherstatspkts128octetsto255octets_hi;
-	u32     tx_stat_etherstatspkts128octetsto255octets_lo;
+	uint32_t     tx_stat_etherstatspkts128octetsto255octets_hi;
+	uint32_t     tx_stat_etherstatspkts128octetsto255octets_lo;
 	/* frames_transmitted_256_511_bytes */
-	u32     tx_stat_etherstatspkts256octetsto511octets_hi;
-	u32     tx_stat_etherstatspkts256octetsto511octets_lo;
+	uint32_t     tx_stat_etherstatspkts256octetsto511octets_hi;
+	uint32_t     tx_stat_etherstatspkts256octetsto511octets_lo;
 	/* frames_transmitted_512_1023_bytes */
-	u32     tx_stat_etherstatspkts512octetsto1023octets_hi;
-	u32     tx_stat_etherstatspkts512octetsto1023octets_lo;
+	uint32_t     tx_stat_etherstatspkts512octetsto1023octets_hi;
+	uint32_t     tx_stat_etherstatspkts512octetsto1023octets_lo;
 	/* frames_transmitted_1024_1522_bytes */
-	u32     tx_stat_etherstatspkts1024octetsto1522octets_hi;
-	u32     tx_stat_etherstatspkts1024octetsto1522octets_lo;
+	uint32_t     tx_stat_etherstatspkts1024octetsto1522octets_hi;
+	uint32_t     tx_stat_etherstatspkts1024octetsto1522octets_lo;
 	/* frames_transmitted_1523_9022_bytes */
-	u32     tx_stat_etherstatspktsover1522octets_hi;
-	u32     tx_stat_etherstatspktsover1522octets_lo;
-	u32     tx_stat_mac_2047_hi;
-	u32     tx_stat_mac_2047_lo;
-	u32     tx_stat_mac_4095_hi;
-	u32     tx_stat_mac_4095_lo;
-	u32     tx_stat_mac_9216_hi;
-	u32     tx_stat_mac_9216_lo;
-	u32     tx_stat_mac_16383_hi;
-	u32     tx_stat_mac_16383_lo;
+	uint32_t     tx_stat_etherstatspktsover1522octets_hi;
+	uint32_t     tx_stat_etherstatspktsover1522octets_lo;
+	uint32_t     tx_stat_mac_2047_hi;
+	uint32_t     tx_stat_mac_2047_lo;
+	uint32_t     tx_stat_mac_4095_hi;
+	uint32_t     tx_stat_mac_4095_lo;
+	uint32_t     tx_stat_mac_9216_hi;
+	uint32_t     tx_stat_mac_9216_lo;
+	uint32_t     tx_stat_mac_16383_hi;
+	uint32_t     tx_stat_mac_16383_lo;
 
 	/* internal_mac_transmit_errors */
-	u32     tx_stat_dot3statsinternalmactransmiterrors_hi;
-	u32     tx_stat_dot3statsinternalmactransmiterrors_lo;
+	uint32_t     tx_stat_dot3statsinternalmactransmiterrors_hi;
+	uint32_t     tx_stat_dot3statsinternalmactransmiterrors_lo;
 
 	/* if_out_discards */
-	u32     tx_stat_mac_ufl_hi;
-	u32     tx_stat_mac_ufl_lo;
+	uint32_t     tx_stat_mac_ufl_hi;
+	uint32_t     tx_stat_mac_ufl_lo;
 };
 
 
 #define MAC_STX_IDX_MAX                     2
 
 struct host_port_stats {
-	u32            host_port_stats_counter;
+	uint32_t            host_port_stats_counter;
 
 	struct mac_stx mac_stx[MAC_STX_IDX_MAX];
 
-	u32            brb_drop_hi;
-	u32            brb_drop_lo;
+	uint32_t            brb_drop_hi;
+	uint32_t            brb_drop_lo;
 
-	u32            not_used; /* obsolete */
-	u32            pfc_frames_tx_hi;
-	u32            pfc_frames_tx_lo;
-	u32            pfc_frames_rx_hi;
-	u32            pfc_frames_rx_lo;
+	uint32_t            not_used; /* obsolete */
+	uint32_t            pfc_frames_tx_hi;
+	uint32_t            pfc_frames_tx_lo;
+	uint32_t            pfc_frames_rx_hi;
+	uint32_t            pfc_frames_rx_lo;
 
-	u32            eee_lpi_count_hi;
-	u32            eee_lpi_count_lo;
+	uint32_t            eee_lpi_count_hi;
+	uint32_t            eee_lpi_count_lo;
 };
 
 
 struct host_func_stats {
-	u32     host_func_stats_start;
+	uint32_t     host_func_stats_start;
 
-	u32     total_bytes_received_hi;
-	u32     total_bytes_received_lo;
+	uint32_t     total_bytes_received_hi;
+	uint32_t     total_bytes_received_lo;
 
-	u32     total_bytes_transmitted_hi;
-	u32     total_bytes_transmitted_lo;
+	uint32_t     total_bytes_transmitted_hi;
+	uint32_t     total_bytes_transmitted_lo;
 
-	u32     total_unicast_packets_received_hi;
-	u32     total_unicast_packets_received_lo;
+	uint32_t     total_unicast_packets_received_hi;
+	uint32_t     total_unicast_packets_received_lo;
 
-	u32     total_multicast_packets_received_hi;
-	u32     total_multicast_packets_received_lo;
+	uint32_t     total_multicast_packets_received_hi;
+	uint32_t     total_multicast_packets_received_lo;
 
-	u32     total_broadcast_packets_received_hi;
-	u32     total_broadcast_packets_received_lo;
+	uint32_t     total_broadcast_packets_received_hi;
+	uint32_t     total_broadcast_packets_received_lo;
 
-	u32     total_unicast_packets_transmitted_hi;
-	u32     total_unicast_packets_transmitted_lo;
+	uint32_t     total_unicast_packets_transmitted_hi;
+	uint32_t     total_unicast_packets_transmitted_lo;
 
-	u32     total_multicast_packets_transmitted_hi;
-	u32     total_multicast_packets_transmitted_lo;
+	uint32_t     total_multicast_packets_transmitted_hi;
+	uint32_t     total_multicast_packets_transmitted_lo;
 
-	u32     total_broadcast_packets_transmitted_hi;
-	u32     total_broadcast_packets_transmitted_lo;
+	uint32_t     total_broadcast_packets_transmitted_hi;
+	uint32_t     total_broadcast_packets_transmitted_lo;
 
-	u32     valid_bytes_received_hi;
-	u32     valid_bytes_received_lo;
+	uint32_t     valid_bytes_received_hi;
+	uint32_t     valid_bytes_received_lo;
 
-	u32     host_func_stats_end;
+	uint32_t     host_func_stats_end;
 };
 
 /* VIC definitions */
@@ -2851,39 +2851,39 @@ struct host_func_stats {
  *       order must remain exactly as is unless protocol changes !
  */
 struct afex_stats {
-	u32 tx_unicast_frames_hi;
-	u32 tx_unicast_frames_lo;
-	u32 tx_unicast_bytes_hi;
-	u32 tx_unicast_bytes_lo;
-	u32 tx_multicast_frames_hi;
-	u32 tx_multicast_frames_lo;
-	u32 tx_multicast_bytes_hi;
-	u32 tx_multicast_bytes_lo;
-	u32 tx_broadcast_frames_hi;
-	u32 tx_broadcast_frames_lo;
-	u32 tx_broadcast_bytes_hi;
-	u32 tx_broadcast_bytes_lo;
-	u32 tx_frames_discarded_hi;
-	u32 tx_frames_discarded_lo;
-	u32 tx_frames_dropped_hi;
-	u32 tx_frames_dropped_lo;
+	uint32_t tx_unicast_frames_hi;
+	uint32_t tx_unicast_frames_lo;
+	uint32_t tx_unicast_bytes_hi;
+	uint32_t tx_unicast_bytes_lo;
+	uint32_t tx_multicast_frames_hi;
+	uint32_t tx_multicast_frames_lo;
+	uint32_t tx_multicast_bytes_hi;
+	uint32_t tx_multicast_bytes_lo;
+	uint32_t tx_broadcast_frames_hi;
+	uint32_t tx_broadcast_frames_lo;
+	uint32_t tx_broadcast_bytes_hi;
+	uint32_t tx_broadcast_bytes_lo;
+	uint32_t tx_frames_discarded_hi;
+	uint32_t tx_frames_discarded_lo;
+	uint32_t tx_frames_dropped_hi;
+	uint32_t tx_frames_dropped_lo;
 
-	u32 rx_unicast_frames_hi;
-	u32 rx_unicast_frames_lo;
-	u32 rx_unicast_bytes_hi;
-	u32 rx_unicast_bytes_lo;
-	u32 rx_multicast_frames_hi;
-	u32 rx_multicast_frames_lo;
-	u32 rx_multicast_bytes_hi;
-	u32 rx_multicast_bytes_lo;
-	u32 rx_broadcast_frames_hi;
-	u32 rx_broadcast_frames_lo;
-	u32 rx_broadcast_bytes_hi;
-	u32 rx_broadcast_bytes_lo;
-	u32 rx_frames_discarded_hi;
-	u32 rx_frames_discarded_lo;
-	u32 rx_frames_dropped_hi;
-	u32 rx_frames_dropped_lo;
+	uint32_t rx_unicast_frames_hi;
+	uint32_t rx_unicast_frames_lo;
+	uint32_t rx_unicast_bytes_hi;
+	uint32_t rx_unicast_bytes_lo;
+	uint32_t rx_multicast_frames_hi;
+	uint32_t rx_multicast_frames_lo;
+	uint32_t rx_multicast_bytes_hi;
+	uint32_t rx_multicast_bytes_lo;
+	uint32_t rx_broadcast_frames_hi;
+	uint32_t rx_broadcast_frames_lo;
+	uint32_t rx_broadcast_bytes_hi;
+	uint32_t rx_broadcast_bytes_lo;
+	uint32_t rx_frames_discarded_hi;
+	uint32_t rx_frames_discarded_lo;
+	uint32_t rx_frames_dropped_hi;
+	uint32_t rx_frames_dropped_lo;
 };
 
 #define BCM_5710_FW_MAJOR_VERSION			7
@@ -2899,8 +2899,8 @@ struct afex_stats {
 struct atten_sp_status_block {
 	__le32 attn_bits;
 	__le32 attn_bits_ack;
-	u8 status_block_id;
-	u8 reserved0;
+	uint8_t status_block_id;
+	uint8_t reserved0;
 	__le16 attn_bits_index;
 	__le32 reserved1;
 };
@@ -2910,7 +2910,7 @@ struct atten_sp_status_block {
  * The eth aggregative context of Cstorm
  */
 struct cstorm_eth_ag_context {
-	u32 __reserved0[10];
+	uint32_t __reserved0[10];
 };
 
 
@@ -2918,7 +2918,7 @@ struct cstorm_eth_ag_context {
  * dmae command structure
  */
 struct dmae_command {
-	u32 opcode;
+	uint32_t opcode;
 #define DMAE_COMMAND_SRC (0x1<<0)
 #define DMAE_COMMAND_SRC_SHIFT 0
 #define DMAE_COMMAND_DST (0x3<<1)
@@ -2951,12 +2951,12 @@ struct dmae_command {
 #define DMAE_COMMAND_ERR_POLICY_SHIFT 20
 #define DMAE_COMMAND_RESERVED0 (0x3FF<<22)
 #define DMAE_COMMAND_RESERVED0_SHIFT 22
-	u32 src_addr_lo;
-	u32 src_addr_hi;
-	u32 dst_addr_lo;
-	u32 dst_addr_hi;
+	uint32_t src_addr_lo;
+	uint32_t src_addr_hi;
+	uint32_t dst_addr_lo;
+	uint32_t dst_addr_hi;
 #if defined(__BIG_ENDIAN)
-	u16 opcode_iov;
+	uint16_t opcode_iov;
 #define DMAE_COMMAND_SRC_VFID (0x3F<<0)
 #define DMAE_COMMAND_SRC_VFID_SHIFT 0
 #define DMAE_COMMAND_SRC_VFPF (0x1<<6)
@@ -2969,10 +2969,10 @@ struct dmae_command {
 #define DMAE_COMMAND_DST_VFPF_SHIFT 14
 #define DMAE_COMMAND_RESERVED2 (0x1<<15)
 #define DMAE_COMMAND_RESERVED2_SHIFT 15
-	u16 len;
+	uint16_t len;
 #elif defined(__LITTLE_ENDIAN)
-	u16 len;
-	u16 opcode_iov;
+	uint16_t len;
+	uint16_t opcode_iov;
 #define DMAE_COMMAND_SRC_VFID (0x3F<<0)
 #define DMAE_COMMAND_SRC_VFID_SHIFT 0
 #define DMAE_COMMAND_SRC_VFPF (0x1<<6)
@@ -2986,31 +2986,31 @@ struct dmae_command {
 #define DMAE_COMMAND_RESERVED2 (0x1<<15)
 #define DMAE_COMMAND_RESERVED2_SHIFT 15
 #endif
-	u32 comp_addr_lo;
-	u32 comp_addr_hi;
-	u32 comp_val;
-	u32 crc32;
-	u32 crc32_c;
+	uint32_t comp_addr_lo;
+	uint32_t comp_addr_hi;
+	uint32_t comp_val;
+	uint32_t crc32;
+	uint32_t crc32_c;
 #if defined(__BIG_ENDIAN)
-	u16 crc16_c;
-	u16 crc16;
+	uint16_t crc16_c;
+	uint16_t crc16;
 #elif defined(__LITTLE_ENDIAN)
-	u16 crc16;
-	u16 crc16_c;
+	uint16_t crc16;
+	uint16_t crc16_c;
 #endif
 #if defined(__BIG_ENDIAN)
-	u16 reserved3;
-	u16 crc_t10;
+	uint16_t reserved3;
+	uint16_t crc_t10;
 #elif defined(__LITTLE_ENDIAN)
-	u16 crc_t10;
-	u16 reserved3;
+	uint16_t crc_t10;
+	uint16_t reserved3;
 #endif
 #if defined(__BIG_ENDIAN)
-	u16 xsum8;
-	u16 xsum16;
+	uint16_t xsum8;
+	uint16_t xsum16;
 #elif defined(__LITTLE_ENDIAN)
-	u16 xsum16;
-	u16 xsum8;
+	uint16_t xsum16;
+	uint16_t xsum8;
 #endif
 };
 
@@ -3019,7 +3019,7 @@ struct dmae_command {
  * common data for all protocols
  */
 struct doorbell_hdr {
-	u8 header;
+	uint8_t header;
 #define DOORBELL_HDR_RX (0x1<<0)
 #define DOORBELL_HDR_RX_SHIFT 0
 #define DOORBELL_HDR_DB_TYPE (0x1<<1)
@@ -3035,8 +3035,8 @@ struct doorbell_hdr {
  */
 struct eth_tx_doorbell {
 #if defined(__BIG_ENDIAN)
-	u16 npackets;
-	u8 params;
+	uint16_t npackets;
+	uint8_t params;
 #define ETH_TX_DOORBELL_NUM_BDS (0x3F<<0)
 #define ETH_TX_DOORBELL_NUM_BDS_SHIFT 0
 #define ETH_TX_DOORBELL_RESERVED_TX_FIN_FLAG (0x1<<6)
@@ -3046,14 +3046,14 @@ struct eth_tx_doorbell {
 	struct doorbell_hdr hdr;
 #elif defined(__LITTLE_ENDIAN)
 	struct doorbell_hdr hdr;
-	u8 params;
+	uint8_t params;
 #define ETH_TX_DOORBELL_NUM_BDS (0x3F<<0)
 #define ETH_TX_DOORBELL_NUM_BDS_SHIFT 0
 #define ETH_TX_DOORBELL_RESERVED_TX_FIN_FLAG (0x1<<6)
 #define ETH_TX_DOORBELL_RESERVED_TX_FIN_FLAG_SHIFT 6
 #define ETH_TX_DOORBELL_SPARE (0x1<<7)
 #define ETH_TX_DOORBELL_SPARE_SHIFT 7
-	u16 npackets;
+	uint16_t npackets;
 #endif
 };
 
@@ -3099,7 +3099,7 @@ struct hc_sp_status_block {
 	__le16 index_values[HC_SP_SB_MAX_INDICES];
 	__le16 running_index;
 	__le16 rsrv;
-	u32 rsrv1;
+	uint32_t rsrv1;
 };
 
 /*
@@ -3116,7 +3116,7 @@ struct host_sp_status_block {
  */
 struct igu_ack_register {
 #if defined(__BIG_ENDIAN)
-	u16 sb_id_and_flags;
+	uint16_t sb_id_and_flags;
 #define IGU_ACK_REGISTER_STATUS_BLOCK_ID (0x1F<<0)
 #define IGU_ACK_REGISTER_STATUS_BLOCK_ID_SHIFT 0
 #define IGU_ACK_REGISTER_STORM_ID (0x7<<5)
@@ -3127,10 +3127,10 @@ struct igu_ack_register {
 #define IGU_ACK_REGISTER_INTERRUPT_MODE_SHIFT 9
 #define IGU_ACK_REGISTER_RESERVED (0x1F<<11)
 #define IGU_ACK_REGISTER_RESERVED_SHIFT 11
-	u16 status_block_index;
+	uint16_t status_block_index;
 #elif defined(__LITTLE_ENDIAN)
-	u16 status_block_index;
-	u16 sb_id_and_flags;
+	uint16_t status_block_index;
+	uint16_t sb_id_and_flags;
 #define IGU_ACK_REGISTER_STATUS_BLOCK_ID (0x1F<<0)
 #define IGU_ACK_REGISTER_STATUS_BLOCK_ID_SHIFT 0
 #define IGU_ACK_REGISTER_STORM_ID (0x7<<5)
@@ -3149,7 +3149,7 @@ struct igu_ack_register {
  * IGU driver acknowledgement register
  */
 struct igu_backward_compatible {
-	u32 sb_id_and_flags;
+	uint32_t sb_id_and_flags;
 #define IGU_BACKWARD_COMPATIBLE_SB_INDEX (0xFFFF<<0)
 #define IGU_BACKWARD_COMPATIBLE_SB_INDEX_SHIFT 0
 #define IGU_BACKWARD_COMPATIBLE_SB_SELECT (0x1F<<16)
@@ -3162,7 +3162,7 @@ struct igu_backward_compatible {
 #define IGU_BACKWARD_COMPATIBLE_ENABLE_INT_SHIFT 25
 #define IGU_BACKWARD_COMPATIBLE_RESERVED_0 (0x1F<<27)
 #define IGU_BACKWARD_COMPATIBLE_RESERVED_0_SHIFT 27
-	u32 reserved_2;
+	uint32_t reserved_2;
 };
 
 
@@ -3170,7 +3170,7 @@ struct igu_backward_compatible {
  * IGU driver acknowledgement register
  */
 struct igu_regular {
-	u32 sb_id_and_flags;
+	uint32_t sb_id_and_flags;
 #define IGU_REGULAR_SB_INDEX (0xFFFFF<<0)
 #define IGU_REGULAR_SB_INDEX_SHIFT 0
 #define IGU_REGULAR_RESERVED0 (0x1<<20)
@@ -3189,7 +3189,7 @@ struct igu_regular {
 #define IGU_REGULAR_CLEANUP_SET_SHIFT 30
 #define IGU_REGULAR_BCLEANUP (0x1<<31)
 #define IGU_REGULAR_BCLEANUP_SHIFT 31
-	u32 reserved_2;
+	uint32_t reserved_2;
 };
 
 /*
@@ -3215,7 +3215,7 @@ enum igu_ctrl_cmd {
  * Control register for the IGU command register
  */
 struct igu_ctrl_reg {
-	u32 ctrl_data;
+	uint32_t ctrl_data;
 #define IGU_CTRL_REG_ADDRESS (0xFFF<<0)
 #define IGU_CTRL_REG_ADDRESS_SHIFT 0
 #define IGU_CTRL_REG_FID (0x7F<<12)
@@ -3351,10 +3351,10 @@ struct sdm_op_gen {
  * Timers connection context
  */
 struct timers_block_context {
-	u32 __reserved_0;
-	u32 __reserved_1;
-	u32 __reserved_2;
-	u32 flags;
+	uint32_t __reserved_0;
+	uint32_t __reserved_1;
+	uint32_t __reserved_2;
+	uint32_t flags;
 #define __TIMERS_BLOCK_CONTEXT_NUM_OF_ACTIVE_TIMERS (0x3<<0)
 #define __TIMERS_BLOCK_CONTEXT_NUM_OF_ACTIVE_TIMERS_SHIFT 0
 #define TIMERS_BLOCK_CONTEXT_CONN_VALID_FLG (0x1<<2)
@@ -3368,7 +3368,7 @@ struct timers_block_context {
  * The eth aggregative context of Tstorm
  */
 struct tstorm_eth_ag_context {
-	u32 __reserved0[14];
+	uint32_t __reserved0[14];
 };
 
 
@@ -3376,17 +3376,17 @@ struct tstorm_eth_ag_context {
  * The eth aggregative context of Ustorm
  */
 struct ustorm_eth_ag_context {
-	u32 __reserved0;
+	uint32_t __reserved0;
 #if defined(__BIG_ENDIAN)
-	u8 cdu_usage;
-	u8 __reserved2;
-	u16 __reserved1;
+	uint8_t cdu_usage;
+	uint8_t __reserved2;
+	uint16_t __reserved1;
 #elif defined(__LITTLE_ENDIAN)
-	u16 __reserved1;
-	u8 __reserved2;
-	u8 cdu_usage;
+	uint16_t __reserved1;
+	uint8_t __reserved2;
+	uint8_t cdu_usage;
 #endif
-	u32 __reserved3[6];
+	uint32_t __reserved3[6];
 };
 
 
@@ -3394,17 +3394,17 @@ struct ustorm_eth_ag_context {
  * The eth aggregative context of Xstorm
  */
 struct xstorm_eth_ag_context {
-	u32 reserved0;
+	uint32_t reserved0;
 #if defined(__BIG_ENDIAN)
-	u8 cdu_reserved;
-	u8 reserved2;
-	u16 reserved1;
+	uint8_t cdu_reserved;
+	uint8_t reserved2;
+	uint16_t reserved1;
 #elif defined(__LITTLE_ENDIAN)
-	u16 reserved1;
-	u8 reserved2;
-	u8 cdu_reserved;
+	uint16_t reserved1;
+	uint8_t reserved2;
+	uint8_t cdu_reserved;
 #endif
-	u32 reserved3[30];
+	uint32_t reserved3[30];
 };
 
 
@@ -3413,13 +3413,13 @@ struct xstorm_eth_ag_context {
  */
 struct doorbell {
 #if defined(__BIG_ENDIAN)
-	u16 zero_fill2;
-	u8 zero_fill1;
+	uint16_t zero_fill2;
+	uint8_t zero_fill1;
 	struct doorbell_hdr header;
 #elif defined(__LITTLE_ENDIAN)
 	struct doorbell_hdr header;
-	u8 zero_fill1;
-	u16 zero_fill2;
+	uint8_t zero_fill1;
+	uint16_t zero_fill2;
 #endif
 };
 
@@ -3429,13 +3429,13 @@ struct doorbell {
  */
 struct doorbell_set_prod {
 #if defined(__BIG_ENDIAN)
-	u16 prod;
-	u8 zero_fill1;
+	uint16_t prod;
+	uint8_t zero_fill1;
 	struct doorbell_hdr header;
 #elif defined(__LITTLE_ENDIAN)
 	struct doorbell_hdr header;
-	u8 zero_fill1;
-	u16 prod;
+	uint8_t zero_fill1;
+	uint16_t prod;
 #endif
 };
 
@@ -3446,8 +3446,8 @@ struct regpair {
 };
 
 struct regpair_native {
-	u32 lo;
-	u32 hi;
+	uint32_t lo;
+	uint32_t hi;
 };
 
 /*
@@ -3476,19 +3476,19 @@ enum classify_rule_action_type {
  * client init ramrod data
  */
 struct client_init_general_data {
-	u8 client_id;
-	u8 statistics_counter_id;
-	u8 statistics_en_flg;
-	u8 is_fcoe_flg;
-	u8 activate_flg;
-	u8 sp_client_id;
+	uint8_t client_id;
+	uint8_t statistics_counter_id;
+	uint8_t statistics_en_flg;
+	uint8_t is_fcoe_flg;
+	uint8_t activate_flg;
+	uint8_t sp_client_id;
 	__le16 mtu;
-	u8 statistics_zero_flg;
-	u8 func_id;
-	u8 cos;
-	u8 traffic_type;
-	u8 fp_hsi_ver;
-	u8 reserved0[3];
+	uint8_t statistics_zero_flg;
+	uint8_t func_id;
+	uint8_t cos;
+	uint8_t traffic_type;
+	uint8_t fp_hsi_ver;
+	uint8_t reserved0[3];
 };
 
 
@@ -3496,7 +3496,7 @@ struct client_init_general_data {
  * client init rx data
  */
 struct client_init_rx_data {
-	u8 tpa_en;
+	uint8_t tpa_en;
 #define CLIENT_INIT_RX_DATA_TPA_EN_IPV4 (0x1<<0)
 #define CLIENT_INIT_RX_DATA_TPA_EN_IPV4_SHIFT 0
 #define CLIENT_INIT_RX_DATA_TPA_EN_IPV6 (0x1<<1)
@@ -3505,32 +3505,32 @@ struct client_init_rx_data {
 #define CLIENT_INIT_RX_DATA_TPA_MODE_SHIFT 2
 #define CLIENT_INIT_RX_DATA_RESERVED5 (0x1F<<3)
 #define CLIENT_INIT_RX_DATA_RESERVED5_SHIFT 3
-	u8 vmqueue_mode_en_flg;
-	u8 extra_data_over_sgl_en_flg;
-	u8 cache_line_alignment_log_size;
-	u8 enable_dynamic_hc;
-	u8 max_sges_for_packet;
-	u8 client_qzone_id;
-	u8 drop_ip_cs_err_flg;
-	u8 drop_tcp_cs_err_flg;
-	u8 drop_ttl0_flg;
-	u8 drop_udp_cs_err_flg;
-	u8 inner_vlan_removal_enable_flg;
-	u8 outer_vlan_removal_enable_flg;
-	u8 status_block_id;
-	u8 rx_sb_index_number;
-	u8 dont_verify_rings_pause_thr_flg;
-	u8 max_tpa_queues;
-	u8 silent_vlan_removal_flg;
+	uint8_t vmqueue_mode_en_flg;
+	uint8_t extra_data_over_sgl_en_flg;
+	uint8_t cache_line_alignment_log_size;
+	uint8_t enable_dynamic_hc;
+	uint8_t max_sges_for_packet;
+	uint8_t client_qzone_id;
+	uint8_t drop_ip_cs_err_flg;
+	uint8_t drop_tcp_cs_err_flg;
+	uint8_t drop_ttl0_flg;
+	uint8_t drop_udp_cs_err_flg;
+	uint8_t inner_vlan_removal_enable_flg;
+	uint8_t outer_vlan_removal_enable_flg;
+	uint8_t status_block_id;
+	uint8_t rx_sb_index_number;
+	uint8_t dont_verify_rings_pause_thr_flg;
+	uint8_t max_tpa_queues;
+	uint8_t silent_vlan_removal_flg;
 	__le16 max_bytes_on_bd;
 	__le16 sge_buff_size;
-	u8 approx_mcast_engine_id;
-	u8 rss_engine_id;
+	uint8_t approx_mcast_engine_id;
+	uint8_t rss_engine_id;
 	struct regpair bd_page_base;
 	struct regpair sge_page_base;
 	struct regpair cqe_page_base;
-	u8 is_leading_rss;
-	u8 is_approx_mcast;
+	uint8_t is_leading_rss;
+	uint8_t is_approx_mcast;
 	__le16 max_agg_size;
 	__le16 state;
 #define CLIENT_INIT_RX_DATA_UCAST_DROP_ALL (0x1<<0)
@@ -3558,8 +3558,8 @@ struct client_init_rx_data {
 	__le16 rx_cos_mask;
 	__le16 silent_vlan_value;
 	__le16 silent_vlan_mask;
-	u8 handle_ptp_pkts_flg;
-	u8 reserved6[3];
+	uint8_t handle_ptp_pkts_flg;
+	uint8_t reserved6[3];
 	__le32 reserved7;
 };
 
@@ -3567,12 +3567,12 @@ struct client_init_rx_data {
  * client init tx data
  */
 struct client_init_tx_data {
-	u8 enforce_security_flg;
-	u8 tx_status_block_id;
-	u8 tx_sb_index_number;
-	u8 tss_leading_client_id;
-	u8 tx_switching_flg;
-	u8 anti_spoofing_flg;
+	uint8_t enforce_security_flg;
+	uint8_t tx_status_block_id;
+	uint8_t tx_sb_index_number;
+	uint8_t tss_leading_client_id;
+	uint8_t tx_switching_flg;
+	uint8_t anti_spoofing_flg;
 	__le16 default_vlan;
 	struct regpair tx_bd_page_base;
 	__le16 state;
@@ -3586,12 +3586,12 @@ struct client_init_tx_data {
 #define CLIENT_INIT_TX_DATA_ACCEPT_ANY_VLAN_SHIFT 3
 #define CLIENT_INIT_TX_DATA_RESERVED0 (0xFFF<<4)
 #define CLIENT_INIT_TX_DATA_RESERVED0_SHIFT 4
-	u8 default_vlan_flg;
-	u8 force_default_pri_flg;
-	u8 tunnel_lso_inc_ip_id;
-	u8 refuse_outband_vlan_flg;
-	u8 tunnel_non_lso_pcsum_location;
-	u8 tunnel_non_lso_outer_ip_csum_location;
+	uint8_t default_vlan_flg;
+	uint8_t force_default_pri_flg;
+	uint8_t tunnel_lso_inc_ip_id;
+	uint8_t refuse_outband_vlan_flg;
+	uint8_t tunnel_non_lso_pcsum_location;
+	uint8_t tunnel_non_lso_outer_ip_csum_location;
 };
 
 /*
@@ -3608,29 +3608,29 @@ struct client_init_ramrod_data {
  * client update ramrod data
  */
 struct client_update_ramrod_data {
-	u8 client_id;
-	u8 func_id;
-	u8 inner_vlan_removal_enable_flg;
-	u8 inner_vlan_removal_change_flg;
-	u8 outer_vlan_removal_enable_flg;
-	u8 outer_vlan_removal_change_flg;
-	u8 anti_spoofing_enable_flg;
-	u8 anti_spoofing_change_flg;
-	u8 activate_flg;
-	u8 activate_change_flg;
+	uint8_t client_id;
+	uint8_t func_id;
+	uint8_t inner_vlan_removal_enable_flg;
+	uint8_t inner_vlan_removal_change_flg;
+	uint8_t outer_vlan_removal_enable_flg;
+	uint8_t outer_vlan_removal_change_flg;
+	uint8_t anti_spoofing_enable_flg;
+	uint8_t anti_spoofing_change_flg;
+	uint8_t activate_flg;
+	uint8_t activate_change_flg;
 	__le16 default_vlan;
-	u8 default_vlan_enable_flg;
-	u8 default_vlan_change_flg;
+	uint8_t default_vlan_enable_flg;
+	uint8_t default_vlan_change_flg;
 	__le16 silent_vlan_value;
 	__le16 silent_vlan_mask;
-	u8 silent_vlan_removal_flg;
-	u8 silent_vlan_change_flg;
-	u8 refuse_outband_vlan_flg;
-	u8 refuse_outband_vlan_change_flg;
-	u8 tx_switching_flg;
-	u8 tx_switching_change_flg;
-	u8 handle_ptp_pkts_flg;
-	u8 handle_ptp_pkts_change_flg;
+	uint8_t silent_vlan_removal_flg;
+	uint8_t silent_vlan_change_flg;
+	uint8_t refuse_outband_vlan_flg;
+	uint8_t refuse_outband_vlan_change_flg;
+	uint8_t tx_switching_flg;
+	uint8_t tx_switching_change_flg;
+	uint8_t handle_ptp_pkts_flg;
+	uint8_t handle_ptp_pkts_change_flg;
 	__le16 reserved1;
 	__le32 echo;
 };
@@ -3640,15 +3640,15 @@ struct client_update_ramrod_data {
  * The eth storm context of Cstorm
  */
 struct cstorm_eth_st_context {
-	u32 __reserved0[4];
+	uint32_t __reserved0[4];
 };
 
 
 struct double_regpair {
-	u32 regpair0_lo;
-	u32 regpair0_hi;
-	u32 regpair1_lo;
-	u32 regpair1_hi;
+	uint32_t regpair0_lo;
+	uint32_t regpair0_hi;
+	uint32_t regpair1_lo;
+	uint32_t regpair1_hi;
 };
 
 /* 2nd parse bd type used in ethernet tx BDs */
@@ -3673,7 +3673,7 @@ enum eth_addr_type {
  *
  */
 struct eth_classify_cmd_header {
-	u8 cmd_general_data;
+	uint8_t cmd_general_data;
 #define ETH_CLASSIFY_CMD_HEADER_RX_CMD (0x1<<0)
 #define ETH_CLASSIFY_CMD_HEADER_RX_CMD_SHIFT 0
 #define ETH_CLASSIFY_CMD_HEADER_TX_CMD (0x1<<1)
@@ -3684,9 +3684,9 @@ struct eth_classify_cmd_header {
 #define ETH_CLASSIFY_CMD_HEADER_IS_ADD_SHIFT 4
 #define ETH_CLASSIFY_CMD_HEADER_RESERVED0 (0x7<<5)
 #define ETH_CLASSIFY_CMD_HEADER_RESERVED0_SHIFT 5
-	u8 func_id;
-	u8 client_id;
-	u8 reserved1;
+	uint8_t func_id;
+	uint8_t client_id;
+	uint8_t reserved1;
 };
 
 
@@ -3694,8 +3694,8 @@ struct eth_classify_cmd_header {
  * header for eth classification config ramrod
  */
 struct eth_classify_header {
-	u8 rule_cnt;
-	u8 reserved0;
+	uint8_t rule_cnt;
+	uint8_t reserved0;
 	__le16 reserved1;
 	__le32 echo;
 };
@@ -3784,21 +3784,21 @@ struct eth_common_ramrod_data {
  * The eth storm context of Ustorm
  */
 struct ustorm_eth_st_context {
-	u32 reserved0[52];
+	uint32_t reserved0[52];
 };
 
 /*
  * The eth storm context of Tstorm
  */
 struct tstorm_eth_st_context {
-	u32 __reserved0[28];
+	uint32_t __reserved0[28];
 };
 
 /*
  * The eth storm context of Xstorm
  */
 struct xstorm_eth_st_context {
-	u32 reserved0[60];
+	uint32_t reserved0[60];
 };
 
 /*
@@ -3822,28 +3822,28 @@ struct eth_context {
  */
 union eth_sgl_or_raw_data {
 	__le16 sgl[8];
-	u32 raw_data[4];
+	uint32_t raw_data[4];
 };
 
 /*
  * eth FP end aggregation CQE parameters struct
  */
 struct eth_end_agg_rx_cqe {
-	u8 type_error_flags;
+	uint8_t type_error_flags;
 #define ETH_END_AGG_RX_CQE_TYPE (0x3<<0)
 #define ETH_END_AGG_RX_CQE_TYPE_SHIFT 0
 #define ETH_END_AGG_RX_CQE_SGL_RAW_SEL (0x1<<2)
 #define ETH_END_AGG_RX_CQE_SGL_RAW_SEL_SHIFT 2
 #define ETH_END_AGG_RX_CQE_RESERVED0 (0x1F<<3)
 #define ETH_END_AGG_RX_CQE_RESERVED0_SHIFT 3
-	u8 reserved1;
-	u8 queue_index;
-	u8 reserved2;
+	uint8_t reserved1;
+	uint8_t queue_index;
+	uint8_t reserved2;
 	__le32 timestamp_delta;
 	__le16 num_of_coalesced_segs;
 	__le16 pkt_len;
-	u8 pure_ack_count;
-	u8 reserved3;
+	uint8_t pure_ack_count;
+	uint8_t reserved3;
 	__le16 reserved4;
 	union eth_sgl_or_raw_data sgl_or_raw_data;
 	__le32 reserved5[8];
@@ -3854,7 +3854,7 @@ struct eth_end_agg_rx_cqe {
  * regular eth FP CQE parameters struct
  */
 struct eth_fast_path_rx_cqe {
-	u8 type_error_flags;
+	uint8_t type_error_flags;
 #define ETH_FAST_PATH_RX_CQE_TYPE (0x3<<0)
 #define ETH_FAST_PATH_RX_CQE_TYPE_SHIFT 0
 #define ETH_FAST_PATH_RX_CQE_SGL_RAW_SEL (0x1<<2)
@@ -3869,7 +3869,7 @@ struct eth_fast_path_rx_cqe {
 #define ETH_FAST_PATH_RX_CQE_PTP_PKT_SHIFT 6
 #define ETH_FAST_PATH_RX_CQE_RESERVED0 (0x1<<7)
 #define ETH_FAST_PATH_RX_CQE_RESERVED0_SHIFT 7
-	u8 status_flags;
+	uint8_t status_flags;
 #define ETH_FAST_PATH_RX_CQE_RSS_HASH_TYPE (0x7<<0)
 #define ETH_FAST_PATH_RX_CQE_RSS_HASH_TYPE_SHIFT 0
 #define ETH_FAST_PATH_RX_CQE_RSS_HASH_FLG (0x1<<3)
@@ -3882,8 +3882,8 @@ struct eth_fast_path_rx_cqe {
 #define ETH_FAST_PATH_RX_CQE_IP_XSUM_NO_VALIDATION_FLG_SHIFT 6
 #define ETH_FAST_PATH_RX_CQE_L4_XSUM_NO_VALIDATION_FLG (0x1<<7)
 #define ETH_FAST_PATH_RX_CQE_L4_XSUM_NO_VALIDATION_FLG_SHIFT 7
-	u8 queue_index;
-	u8 placement_offset;
+	uint8_t queue_index;
+	uint8_t placement_offset;
 	__le32 rss_hash_result;
 	__le16 vlan_tag;
 	__le16 pkt_len_or_gro_seg_len;
@@ -3891,7 +3891,7 @@ struct eth_fast_path_rx_cqe {
 	struct parsing_flags pars_flags;
 	union eth_sgl_or_raw_data sgl_or_raw_data;
 	__le32 reserved1[7];
-	u32 marker;
+	uint32_t marker;
 };
 
 
@@ -3899,16 +3899,16 @@ struct eth_fast_path_rx_cqe {
  * Command for setting classification flags for a client
  */
 struct eth_filter_rules_cmd {
-	u8 cmd_general_data;
+	uint8_t cmd_general_data;
 #define ETH_FILTER_RULES_CMD_RX_CMD (0x1<<0)
 #define ETH_FILTER_RULES_CMD_RX_CMD_SHIFT 0
 #define ETH_FILTER_RULES_CMD_TX_CMD (0x1<<1)
 #define ETH_FILTER_RULES_CMD_TX_CMD_SHIFT 1
 #define ETH_FILTER_RULES_CMD_RESERVED0 (0x3F<<2)
 #define ETH_FILTER_RULES_CMD_RESERVED0_SHIFT 2
-	u8 func_id;
-	u8 client_id;
-	u8 reserved1;
+	uint8_t func_id;
+	uint8_t client_id;
+	uint8_t reserved1;
 	__le16 state;
 #define ETH_FILTER_RULES_CMD_UCAST_DROP_ALL (0x1<<0)
 #define ETH_FILTER_RULES_CMD_UCAST_DROP_ALL_SHIFT 0
@@ -3999,8 +3999,8 @@ struct eth_tunnel_data {
 	__le16 dst_hi;
 	__le16 fw_ip_hdr_csum;
 	__le16 pseudo_csum;
-	u8 ip_hdr_start_inner_w;
-	u8 flags;
+	uint8_t ip_hdr_start_inner_w;
+	uint8_t flags;
 #define ETH_TUNNEL_DATA_IP_HDR_TYPE_OUTER (0x1<<0)
 #define ETH_TUNNEL_DATA_IP_HDR_TYPE_OUTER_SHIFT 0
 #define ETH_TUNNEL_DATA_RESERVED (0x7F<<1)
@@ -4017,7 +4017,7 @@ union eth_mac_addr_or_tunnel_data {
 
 /*Command for setting multicast classification for a client */
 struct eth_multicast_rules_cmd {
-	u8 cmd_general_data;
+	uint8_t cmd_general_data;
 #define ETH_MULTICAST_RULES_CMD_RX_CMD (0x1<<0)
 #define ETH_MULTICAST_RULES_CMD_RX_CMD_SHIFT 0
 #define ETH_MULTICAST_RULES_CMD_TX_CMD (0x1<<1)
@@ -4026,9 +4026,9 @@ struct eth_multicast_rules_cmd {
 #define ETH_MULTICAST_RULES_CMD_IS_ADD_SHIFT 2
 #define ETH_MULTICAST_RULES_CMD_RESERVED0 (0x1F<<3)
 #define ETH_MULTICAST_RULES_CMD_RESERVED0_SHIFT 3
-	u8 func_id;
-	u8 bin_id;
-	u8 engine_id;
+	uint8_t func_id;
+	uint8_t bin_id;
+	uint8_t engine_id;
 	__le32 reserved2;
 	struct regpair reserved3;
 };
@@ -4090,8 +4090,8 @@ enum eth_rss_mode {
  * parameters for RSS update ramrod (E2)
  */
 struct eth_rss_update_ramrod_data {
-	u8 rss_engine_id;
-	u8 rss_mode;
+	uint8_t rss_engine_id;
+	uint8_t rss_mode;
 	__le16 capabilities;
 #define ETH_RSS_UPDATE_RAMROD_DATA_IPV4_CAPABILITY (0x1<<0)
 #define ETH_RSS_UPDATE_RAMROD_DATA_IPV4_CAPABILITY_SHIFT 0
@@ -4119,10 +4119,10 @@ struct eth_rss_update_ramrod_data {
 #define ETH_RSS_UPDATE_RAMROD_DATA_UPDATE_RSS_KEY_SHIFT 11
 #define ETH_RSS_UPDATE_RAMROD_DATA_RESERVED (0xF<<12)
 #define ETH_RSS_UPDATE_RAMROD_DATA_RESERVED_SHIFT 12
-	u8 rss_result_mask;
-	u8 reserved3;
+	uint8_t rss_result_mask;
+	uint8_t reserved3;
 	__le16 reserved4;
-	u8 indirection_table[T_ETH_INDIRECTION_TABLE_SIZE];
+	uint8_t indirection_table[T_ETH_INDIRECTION_TABLE_SIZE];
 	__le32 rss_key[T_ETH_RSS_KEY];
 	__le32 echo;
 	__le32 reserved5;
@@ -4142,14 +4142,14 @@ struct eth_rx_bd {
  * Eth Rx Cqe structure- general structure for ramrods
  */
 struct common_ramrod_eth_rx_cqe {
-	u8 ramrod_type;
+	uint8_t ramrod_type;
 #define COMMON_RAMROD_ETH_RX_CQE_TYPE (0x3<<0)
 #define COMMON_RAMROD_ETH_RX_CQE_TYPE_SHIFT 0
 #define COMMON_RAMROD_ETH_RX_CQE_ERROR (0x1<<2)
 #define COMMON_RAMROD_ETH_RX_CQE_ERROR_SHIFT 2
 #define COMMON_RAMROD_ETH_RX_CQE_RESERVED0 (0x1F<<3)
 #define COMMON_RAMROD_ETH_RX_CQE_RESERVED0_SHIFT 3
-	u8 conn_type;
+	uint8_t conn_type;
 	__le16 reserved1;
 	__le32 conn_and_cmd_data;
 #define COMMON_RAMROD_ETH_RX_CQE_CID (0xFFFFFF<<0)
@@ -4233,7 +4233,7 @@ struct spe_hdr {
  * specific data for ethernet slow path element
  */
 union eth_specific_data {
-	u8 protocol_data[8];
+	uint8_t protocol_data[8];
 	struct regpair client_update_ramrod_data;
 	struct regpair client_init_ramrod_init_data;
 	struct eth_halt_ramrod_data halt_ramrod_data;
@@ -4311,7 +4311,7 @@ struct eth_tx_bd {
 	__le32 addr_hi;
 	__le16 total_pkt_bytes;
 	__le16 nbytes;
-	u8 reserved[4];
+	uint8_t reserved[4];
 };
 
 
@@ -4319,7 +4319,7 @@ struct eth_tx_bd {
  * structure for easy accessibility to assembler
  */
 struct eth_tx_bd_flags {
-	u8 as_bitfield;
+	uint8_t as_bitfield;
 #define ETH_TX_BD_FLAGS_IP_CSUM (0x1<<0)
 #define ETH_TX_BD_FLAGS_IP_CSUM_SHIFT 0
 #define ETH_TX_BD_FLAGS_L4_CSUM (0x1<<1)
@@ -4346,7 +4346,7 @@ struct eth_tx_start_bd {
 	__le16 nbytes;
 	__le16 vlan_or_ethertype;
 	struct eth_tx_bd_flags bd_flags;
-	u8 general_data;
+	uint8_t general_data;
 #define ETH_TX_START_BD_HDR_NBDS (0x7<<0)
 #define ETH_TX_START_BD_HDR_NBDS_SHIFT 0
 #define ETH_TX_START_BD_NO_ADDED_TAGS (0x1<<3)
@@ -4376,7 +4376,7 @@ struct eth_tx_parse_bd_e1x {
 #define ETH_TX_PARSE_BD_E1X_NS_FLG_SHIFT 8
 #define ETH_TX_PARSE_BD_E1X_RESERVED0 (0x7F<<9)
 #define ETH_TX_PARSE_BD_E1X_RESERVED0_SHIFT 9
-	u8 tcp_flags;
+	uint8_t tcp_flags;
 #define ETH_TX_PARSE_BD_E1X_FIN_FLG (0x1<<0)
 #define ETH_TX_PARSE_BD_E1X_FIN_FLG_SHIFT 0
 #define ETH_TX_PARSE_BD_E1X_SYN_FLG (0x1<<1)
@@ -4393,7 +4393,7 @@ struct eth_tx_parse_bd_e1x {
 #define ETH_TX_PARSE_BD_E1X_ECE_FLG_SHIFT 6
 #define ETH_TX_PARSE_BD_E1X_CWR_FLG (0x1<<7)
 #define ETH_TX_PARSE_BD_E1X_CWR_FLG_SHIFT 7
-	u8 ip_hlen_w;
+	uint8_t ip_hlen_w;
 	__le16 total_hlen_w;
 	__le16 tcp_pseudo_csum;
 	__le16 lso_mss;
@@ -4438,13 +4438,13 @@ struct eth_tx_parse_2nd_bd {
 #define ETH_TX_PARSE_2ND_BD_IP_HDR_LEN_OUTER_W_SHIFT 8
 #define ETH_TX_PARSE_2ND_BD_RESERVED1 (0x7<<13)
 #define ETH_TX_PARSE_2ND_BD_RESERVED1_SHIFT 13
-	u8 bd_type;
+	uint8_t bd_type;
 #define ETH_TX_PARSE_2ND_BD_TYPE (0xF<<0)
 #define ETH_TX_PARSE_2ND_BD_TYPE_SHIFT 0
 #define ETH_TX_PARSE_2ND_BD_RESERVED2 (0xF<<4)
 #define ETH_TX_PARSE_2ND_BD_RESERVED2_SHIFT 4
-	u8 reserved3;
-	u8 tcp_flags;
+	uint8_t reserved3;
+	uint8_t tcp_flags;
 #define ETH_TX_PARSE_2ND_BD_FIN_FLG (0x1<<0)
 #define ETH_TX_PARSE_2ND_BD_FIN_FLG_SHIFT 0
 #define ETH_TX_PARSE_2ND_BD_SYN_FLG (0x1<<1)
@@ -4461,9 +4461,9 @@ struct eth_tx_parse_2nd_bd {
 #define ETH_TX_PARSE_2ND_BD_ECE_FLG_SHIFT 6
 #define ETH_TX_PARSE_2ND_BD_CWR_FLG (0x1<<7)
 #define ETH_TX_PARSE_2ND_BD_CWR_FLG_SHIFT 7
-	u8 reserved4;
-	u8 tunnel_udp_hdr_start_w;
-	u8 fw_ip_hdr_to_payload_w;
+	uint8_t reserved4;
+	uint8_t tunnel_udp_hdr_start_w;
+	uint8_t fw_ip_hdr_to_payload_w;
 	__le16 fw_ip_csum_wo_len_flags_frag;
 	__le16 hw_ip_id;
 	__le32 tcp_send_seq;
@@ -4473,7 +4473,7 @@ struct eth_tx_parse_2nd_bd {
 struct eth_tx_next_bd {
 	__le32 addr_lo;
 	__le32 addr_hi;
-	u8 reserved[8];
+	uint8_t reserved[8];
 };
 
 /*
@@ -4523,8 +4523,8 @@ enum eth_vlan_filter_mode {
  * MAC filtering configuration command header
  */
 struct mac_configuration_hdr {
-	u8 length;
-	u8 offset;
+	uint8_t length;
+	uint8_t offset;
 	__le16 client_id;
 	__le32 echo;
 };
@@ -4537,8 +4537,8 @@ struct mac_configuration_entry {
 	__le16 middle_mac_addr;
 	__le16 msb_mac_addr;
 	__le16 vlan_id;
-	u8 pf_id;
-	u8 flags;
+	uint8_t pf_id;
+	uint8_t flags;
 #define MAC_CONFIGURATION_ENTRY_ACTION_TYPE (0x1<<0)
 #define MAC_CONFIGURATION_ENTRY_ACTION_TYPE_SHIFT 0
 #define MAC_CONFIGURATION_ENTRY_RDMA_MAC (0x1<<1)
@@ -4587,14 +4587,14 @@ enum tpa_mode {
  * tpa update ramrod data
  */
 struct tpa_update_ramrod_data {
-	u8 update_ipv4;
-	u8 update_ipv6;
-	u8 client_id;
-	u8 max_tpa_queues;
-	u8 max_sges_for_packet;
-	u8 complete_on_both_clients;
-	u8 dont_verify_rings_pause_thr_flg;
-	u8 tpa_mode;
+	uint8_t update_ipv4;
+	uint8_t update_ipv6;
+	uint8_t client_id;
+	uint8_t max_tpa_queues;
+	uint8_t max_sges_for_packet;
+	uint8_t complete_on_both_clients;
+	uint8_t dont_verify_rings_pause_thr_flg;
+	uint8_t tpa_mode;
 	__le16 sge_buff_size;
 	__le16 max_agg_size;
 	__le32 sge_page_base_lo;
@@ -4608,7 +4608,7 @@ struct tpa_update_ramrod_data {
  * approximate-match multicast filtering for E1H per function in Tstorm
  */
 struct tstorm_eth_approximate_match_multicast_filtering {
-	u32 mcast_add_hash_bit_array[8];
+	uint32_t mcast_add_hash_bit_array[8];
 };
 
 
@@ -4631,8 +4631,8 @@ struct tstorm_eth_function_common_config {
 #define TSTORM_ETH_FUNCTION_COMMON_CONFIG_VLAN_FILTERING_ENABLE_SHIFT 7
 #define __TSTORM_ETH_FUNCTION_COMMON_CONFIG_RESERVED0 (0xFF<<8)
 #define __TSTORM_ETH_FUNCTION_COMMON_CONFIG_RESERVED0_SHIFT 8
-	u8 rss_result_mask;
-	u8 reserved1;
+	uint8_t rss_result_mask;
+	uint8_t reserved1;
 	__le16 vlan_id[2];
 };
 
@@ -4641,13 +4641,13 @@ struct tstorm_eth_function_common_config {
  * MAC filtering configuration parameters per port in Tstorm
  */
 struct tstorm_eth_mac_filter_config {
-	u32 ucast_drop_all;
-	u32 ucast_accept_all;
-	u32 mcast_drop_all;
-	u32 mcast_accept_all;
-	u32 bcast_accept_all;
-	u32 vlan_filter[2];
-	u32 unmatched_unicast;
+	uint32_t ucast_drop_all;
+	uint32_t ucast_accept_all;
+	uint32_t mcast_drop_all;
+	uint32_t mcast_accept_all;
+	uint32_t bcast_accept_all;
+	uint32_t vlan_filter[2];
+	uint32_t unmatched_unicast;
 };
 
 
@@ -4665,18 +4665,18 @@ struct tx_queue_init_ramrod_data {
  */
 struct ustorm_eth_rx_producers {
 #if defined(__BIG_ENDIAN)
-	u16 bd_prod;
-	u16 cqe_prod;
+	uint16_t bd_prod;
+	uint16_t cqe_prod;
 #elif defined(__LITTLE_ENDIAN)
-	u16 cqe_prod;
-	u16 bd_prod;
+	uint16_t cqe_prod;
+	uint16_t bd_prod;
 #endif
 #if defined(__BIG_ENDIAN)
-	u16 reserved;
-	u16 sge_prod;
+	uint16_t reserved;
+	uint16_t sge_prod;
 #elif defined(__LITTLE_ENDIAN)
-	u16 sge_prod;
-	u16 reserved;
+	uint16_t sge_prod;
+	uint16_t reserved;
 #endif
 };
 
@@ -4739,11 +4739,11 @@ struct fcoe_statistics_params {
  * The data afex vif list ramrod need
  */
 struct afex_vif_list_ramrod_data {
-	u8 afex_vif_list_command;
-	u8 func_bit_map;
+	uint8_t afex_vif_list_command;
+	uint8_t func_bit_map;
 	__le16 vif_list_index;
-	u8 func_to_clear;
-	u8 echo;
+	uint8_t func_to_clear;
+	uint8_t echo;
 	__le16 reserved1;
 };
 
@@ -4752,9 +4752,9 @@ struct afex_vif_list_ramrod_data {
  * cfc delete event data
  */
 struct cfc_del_event_data {
-	u32 cid;
-	u32 reserved0;
-	u32 reserved1;
+	uint32_t cid;
+	uint32_t reserved0;
+	uint32_t reserved1;
 };
 
 
@@ -4762,7 +4762,7 @@ struct cfc_del_event_data {
  * per-port SAFC demo variables
  */
 struct cmng_flags_per_port {
-	u32 cmng_enables;
+	uint32_t cmng_enables;
 #define CMNG_FLAGS_PER_PORT_FAIRNESS_VN (0x1<<0)
 #define CMNG_FLAGS_PER_PORT_FAIRNESS_VN_SHIFT 0
 #define CMNG_FLAGS_PER_PORT_RATE_SHAPING_VN (0x1<<1)
@@ -4773,7 +4773,7 @@ struct cmng_flags_per_port {
 #define CMNG_FLAGS_PER_PORT_FAIRNESS_COS_MODE_SHIFT 3
 #define __CMNG_FLAGS_PER_PORT_RESERVED0 (0xFFFFFFF<<4)
 #define __CMNG_FLAGS_PER_PORT_RESERVED0_SHIFT 4
-	u32 __reserved1;
+	uint32_t __reserved1;
 };
 
 
@@ -4781,18 +4781,18 @@ struct cmng_flags_per_port {
  * per-port rate shaping variables
  */
 struct rate_shaping_vars_per_port {
-	u32 rs_periodic_timeout;
-	u32 rs_threshold;
+	uint32_t rs_periodic_timeout;
+	uint32_t rs_threshold;
 };
 
 /*
  * per-port fairness variables
  */
 struct fairness_vars_per_port {
-	u32 upper_bound;
-	u32 fair_threshold;
-	u32 fairness_timeout;
-	u32 reserved0;
+	uint32_t upper_bound;
+	uint32_t fair_threshold;
+	uint32_t fairness_timeout;
+	uint32_t reserved0;
 };
 
 /*
@@ -4800,16 +4800,16 @@ struct fairness_vars_per_port {
  */
 struct safc_struct_per_port {
 #if defined(__BIG_ENDIAN)
-	u16 __reserved1;
-	u8 __reserved0;
-	u8 safc_timeout_usec;
+	uint16_t __reserved1;
+	uint8_t __reserved0;
+	uint8_t safc_timeout_usec;
 #elif defined(__LITTLE_ENDIAN)
-	u8 safc_timeout_usec;
-	u8 __reserved0;
-	u16 __reserved1;
+	uint8_t safc_timeout_usec;
+	uint8_t __reserved0;
+	uint16_t __reserved1;
 #endif
-	u8 cos_to_traffic_types[MAX_COS_NUMBER];
-	u16 cos_to_pause_mask[NUM_OF_SAFC_BITS];
+	uint8_t cos_to_traffic_types[MAX_COS_NUMBER];
+	uint16_t cos_to_pause_mask[NUM_OF_SAFC_BITS];
 };
 
 /*
@@ -4826,13 +4826,13 @@ struct cmng_struct_per_port {
  * a single rate shaping counter. can be used as protocol or vnic counter
  */
 struct rate_shaping_counter {
-	u32 quota;
+	uint32_t quota;
 #if defined(__BIG_ENDIAN)
-	u16 __reserved0;
-	u16 rate;
+	uint16_t __reserved0;
+	uint16_t rate;
 #elif defined(__LITTLE_ENDIAN)
-	u16 rate;
-	u16 __reserved0;
+	uint16_t rate;
+	uint16_t __reserved0;
 #endif
 };
 
@@ -4847,9 +4847,9 @@ struct rate_shaping_vars_per_vn {
  * per-vnic fairness variables
  */
 struct fairness_vars_per_vn {
-	u32 cos_credit_delta[MAX_COS_NUMBER];
-	u32 vn_credit_delta;
-	u32 __reserved0;
+	uint32_t cos_credit_delta[MAX_COS_NUMBER];
+	uint32_t vn_credit_delta;
+	uint32_t __reserved0;
 };
 
 /*
@@ -4873,11 +4873,11 @@ struct cmng_init {
  * driver parameters for congestion management init, all rates are in Mbps
  */
 struct cmng_init_input {
-	u32 port_rate;
-	u16 vnic_min_rate[4];
-	u16 vnic_max_rate[4];
-	u16 cos_min_rate[MAX_COS_NUMBER];
-	u16 cos_to_pause_mask[MAX_COS_NUMBER];
+	uint32_t port_rate;
+	uint16_t vnic_min_rate[4];
+	uint16_t vnic_max_rate[4];
+	uint16_t cos_min_rate[MAX_COS_NUMBER];
+	uint16_t cos_to_pause_mask[MAX_COS_NUMBER];
 	struct cmng_flags_per_port flags;
 };
 
@@ -4932,7 +4932,7 @@ enum cos_mode {
  * Dynamic HC counters set by the driver
  */
 struct hc_dynamic_drv_counter {
-	u32 val[HC_SB_MAX_DYNAMIC_INDICES];
+	uint32_t val[HC_SB_MAX_DYNAMIC_INDICES];
 };
 
 /*
@@ -4948,8 +4948,8 @@ struct cstorm_queue_zone_data {
  * Vf-PF channel data in cstorm ram (non-triggered zone)
  */
 struct vf_pf_channel_zone_data {
-	u32 msg_addr_lo;
-	u32 msg_addr_hi;
+	uint32_t msg_addr_lo;
+	uint32_t msg_addr_hi;
 };
 
 /*
@@ -4963,7 +4963,7 @@ struct non_trigger_vf_zone {
  * Vf-PF channel trigger zone in cstorm ram
  */
 struct vf_pf_channel_zone_trigger {
-	u8 addr_valid;
+	uint8_t addr_valid;
 };
 
 /*
@@ -4971,15 +4971,15 @@ struct vf_pf_channel_zone_trigger {
  */
 struct trigger_vf_zone {
 #if defined(__BIG_ENDIAN)
-	u16 reserved1;
-	u8 reserved0;
+	uint16_t reserved1;
+	uint8_t reserved0;
 	struct vf_pf_channel_zone_trigger vf_pf_channel;
 #elif defined(__LITTLE_ENDIAN)
 	struct vf_pf_channel_zone_trigger vf_pf_channel;
-	u8 reserved0;
-	u16 reserved1;
+	uint8_t reserved0;
+	uint16_t reserved1;
 #endif
-	u32 reserved2;
+	uint32_t reserved2;
 };
 
 /*
@@ -4995,12 +4995,12 @@ struct cstorm_vf_zone_data {
  * Dynamic host coalescing init parameters, per state machine
  */
 struct dynamic_hc_sm_config {
-	u32 threshold[3];
-	u8 shift_per_protocol[HC_SB_MAX_DYNAMIC_INDICES];
-	u8 hc_timeout0[HC_SB_MAX_DYNAMIC_INDICES];
-	u8 hc_timeout1[HC_SB_MAX_DYNAMIC_INDICES];
-	u8 hc_timeout2[HC_SB_MAX_DYNAMIC_INDICES];
-	u8 hc_timeout3[HC_SB_MAX_DYNAMIC_INDICES];
+	uint32_t threshold[3];
+	uint8_t shift_per_protocol[HC_SB_MAX_DYNAMIC_INDICES];
+	uint8_t hc_timeout0[HC_SB_MAX_DYNAMIC_INDICES];
+	uint8_t hc_timeout1[HC_SB_MAX_DYNAMIC_INDICES];
+	uint8_t hc_timeout2[HC_SB_MAX_DYNAMIC_INDICES];
+	uint8_t hc_timeout3[HC_SB_MAX_DYNAMIC_INDICES];
 };
 
 /*
@@ -5013,7 +5013,7 @@ struct dynamic_hc_config {
 
 struct e2_integ_data {
 #if defined(__BIG_ENDIAN)
-	u8 flags;
+	uint8_t flags;
 #define E2_INTEG_DATA_TESTING_EN (0x1<<0)
 #define E2_INTEG_DATA_TESTING_EN_SHIFT 0
 #define E2_INTEG_DATA_LB_TX (0x1<<1)
@@ -5026,14 +5026,14 @@ struct e2_integ_data {
 #define E2_INTEG_DATA_DPMTESTRELEASEDQ_SHIFT 4
 #define E2_INTEG_DATA_RESERVED (0x7<<5)
 #define E2_INTEG_DATA_RESERVED_SHIFT 5
-	u8 cos;
-	u8 voq;
-	u8 pbf_queue;
+	uint8_t cos;
+	uint8_t voq;
+	uint8_t pbf_queue;
 #elif defined(__LITTLE_ENDIAN)
-	u8 pbf_queue;
-	u8 voq;
-	u8 cos;
-	u8 flags;
+	uint8_t pbf_queue;
+	uint8_t voq;
+	uint8_t cos;
+	uint8_t flags;
 #define E2_INTEG_DATA_TESTING_EN (0x1<<0)
 #define E2_INTEG_DATA_TESTING_EN_SHIFT 0
 #define E2_INTEG_DATA_LB_TX (0x1<<1)
@@ -5048,13 +5048,13 @@ struct e2_integ_data {
 #define E2_INTEG_DATA_RESERVED_SHIFT 5
 #endif
 #if defined(__BIG_ENDIAN)
-	u16 reserved3;
-	u8 reserved2;
-	u8 ramEn;
+	uint16_t reserved3;
+	uint8_t reserved2;
+	uint8_t ramEn;
 #elif defined(__LITTLE_ENDIAN)
-	u8 ramEn;
-	u8 reserved2;
-	u16 reserved3;
+	uint8_t ramEn;
+	uint8_t reserved2;
+	uint16_t reserved3;
 #endif
 };
 
@@ -5063,9 +5063,9 @@ struct e2_integ_data {
  * set mac event data
  */
 struct eth_event_data {
-	u32 echo;
-	u32 reserved0;
-	u32 reserved1;
+	uint32_t echo;
+	uint32_t reserved0;
+	uint32_t reserved1;
 };
 
 
@@ -5073,41 +5073,41 @@ struct eth_event_data {
  * pf-vf event data
  */
 struct vf_pf_event_data {
-	u8 vf_id;
-	u8 reserved0;
-	u16 reserved1;
-	u32 msg_addr_lo;
-	u32 msg_addr_hi;
+	uint8_t vf_id;
+	uint8_t reserved0;
+	uint16_t reserved1;
+	uint32_t msg_addr_lo;
+	uint32_t msg_addr_hi;
 };
 
 /*
  * VF FLR event data
  */
 struct vf_flr_event_data {
-	u8 vf_id;
-	u8 reserved0;
-	u16 reserved1;
-	u32 reserved2;
-	u32 reserved3;
+	uint8_t vf_id;
+	uint8_t reserved0;
+	uint16_t reserved1;
+	uint32_t reserved2;
+	uint32_t reserved3;
 };
 
 /*
  * malicious VF event data
  */
 struct malicious_vf_event_data {
-	u8 vf_id;
-	u8 err_id;
-	u16 reserved1;
-	u32 reserved2;
-	u32 reserved3;
+	uint8_t vf_id;
+	uint8_t err_id;
+	uint16_t reserved1;
+	uint32_t reserved2;
+	uint32_t reserved3;
 };
 
 /*
  * vif list event data
  */
 struct vif_list_event_data {
-	u8 func_bit_map;
-	u8 echo;
+	uint8_t func_bit_map;
+	uint8_t echo;
 	__le16 reserved0;
 	__le32 reserved1;
 	__le32 reserved2;
@@ -5115,8 +5115,8 @@ struct vif_list_event_data {
 
 /* function update event data */
 struct function_update_event_data {
-	u8 echo;
-	u8 reserved;
+	uint8_t echo;
+	uint8_t reserved;
 	__le16 reserved0;
 	__le32 reserved1;
 	__le32 reserved2;
@@ -5141,15 +5141,15 @@ union event_data {
 struct event_ring_data {
 	struct regpair_native base_addr;
 #if defined(__BIG_ENDIAN)
-	u8 index_id;
-	u8 sb_id;
-	u16 producer;
+	uint8_t index_id;
+	uint8_t sb_id;
+	uint16_t producer;
 #elif defined(__LITTLE_ENDIAN)
-	u16 producer;
-	u8 sb_id;
-	u8 index_id;
+	uint16_t producer;
+	uint8_t sb_id;
+	uint8_t index_id;
 #endif
-	u32 reserved0;
+	uint32_t reserved0;
 };
 
 
@@ -5157,9 +5157,9 @@ struct event_ring_data {
  * event ring message element (each element is 128 bits)
  */
 struct event_ring_msg {
-	u8 opcode;
-	u8 error;
-	u16 reserved1;
+	uint8_t opcode;
+	uint8_t error;
+	uint16_t reserved1;
 	union event_data data;
 };
 
@@ -5168,7 +5168,7 @@ struct event_ring_msg {
  */
 struct event_ring_next {
 	struct regpair addr;
-	u32 reserved[2];
+	uint32_t reserved[2];
 };
 
 /*
@@ -5220,8 +5220,8 @@ enum fairness_mode {
  * Priority and cos
  */
 struct priority_cos {
-	u8 priority;
-	u8 cos;
+	uint8_t priority;
+	uint8_t cos;
 	__le16 reserved1;
 };
 
@@ -5230,10 +5230,10 @@ struct priority_cos {
  */
 struct flow_control_configuration {
 	struct priority_cos traffic_type_to_priority_cos[MAX_TRAFFIC_TYPES];
-	u8 dcb_enabled;
-	u8 dcb_version;
-	u8 dont_add_pri_0_en;
-	u8 reserved1;
+	uint8_t dcb_enabled;
+	uint8_t dcb_version;
+	uint8_t dont_add_pri_0_en;
+	uint8_t reserved1;
 	__le32 reserved2;
 };
 
@@ -5242,53 +5242,53 @@ struct flow_control_configuration {
  *
  */
 struct function_start_data {
-	u8 function_mode;
-	u8 allow_npar_tx_switching;
+	uint8_t function_mode;
+	uint8_t allow_npar_tx_switching;
 	__le16 sd_vlan_tag;
 	__le16 vif_id;
-	u8 path_id;
-	u8 network_cos_mode;
-	u8 dmae_cmd_id;
-	u8 tunnel_mode;
-	u8 gre_tunnel_type;
-	u8 tunn_clss_en;
-	u8 inner_gre_rss_en;
-	u8 sd_accept_mf_clss_fail;
+	uint8_t path_id;
+	uint8_t network_cos_mode;
+	uint8_t dmae_cmd_id;
+	uint8_t tunnel_mode;
+	uint8_t gre_tunnel_type;
+	uint8_t tunn_clss_en;
+	uint8_t inner_gre_rss_en;
+	uint8_t sd_accept_mf_clss_fail;
 	__le16 vxlan_dst_port;
 	__le16 sd_accept_mf_clss_fail_ethtype;
 	__le16 sd_vlan_eth_type;
-	u8 sd_vlan_force_pri_flg;
-	u8 sd_vlan_force_pri_val;
-	u8 sd_accept_mf_clss_fail_match_ethtype;
-	u8 no_added_tags;
+	uint8_t sd_vlan_force_pri_flg;
+	uint8_t sd_vlan_force_pri_val;
+	uint8_t sd_accept_mf_clss_fail_match_ethtype;
+	uint8_t no_added_tags;
 };
 
 struct function_update_data {
-	u8 vif_id_change_flg;
-	u8 afex_default_vlan_change_flg;
-	u8 allowed_priorities_change_flg;
-	u8 network_cos_mode_change_flg;
+	uint8_t vif_id_change_flg;
+	uint8_t afex_default_vlan_change_flg;
+	uint8_t allowed_priorities_change_flg;
+	uint8_t network_cos_mode_change_flg;
 	__le16 vif_id;
 	__le16 afex_default_vlan;
-	u8 allowed_priorities;
-	u8 network_cos_mode;
-	u8 lb_mode_en_change_flg;
-	u8 lb_mode_en;
-	u8 tx_switch_suspend_change_flg;
-	u8 tx_switch_suspend;
-	u8 echo;
-	u8 update_tunn_cfg_flg;
-	u8 tunnel_mode;
-	u8 gre_tunnel_type;
-	u8 tunn_clss_en;
-	u8 inner_gre_rss_en;
+	uint8_t allowed_priorities;
+	uint8_t network_cos_mode;
+	uint8_t lb_mode_en_change_flg;
+	uint8_t lb_mode_en;
+	uint8_t tx_switch_suspend_change_flg;
+	uint8_t tx_switch_suspend;
+	uint8_t echo;
+	uint8_t update_tunn_cfg_flg;
+	uint8_t tunnel_mode;
+	uint8_t gre_tunnel_type;
+	uint8_t tunn_clss_en;
+	uint8_t inner_gre_rss_en;
 	__le16 vxlan_dst_port;
-	u8 sd_vlan_force_pri_change_flg;
-	u8 sd_vlan_force_pri_flg;
-	u8 sd_vlan_force_pri_val;
-	u8 sd_vlan_tag_change_flg;
-	u8 sd_vlan_eth_type_change_flg;
-	u8 reserved1;
+	uint8_t sd_vlan_force_pri_change_flg;
+	uint8_t sd_vlan_force_pri_flg;
+	uint8_t sd_vlan_force_pri_val;
+	uint8_t sd_vlan_tag_change_flg;
+	uint8_t sd_vlan_eth_type_change_flg;
+	uint8_t reserved1;
 	__le16 sd_vlan_tag;
 	__le16 sd_vlan_eth_type;
 };
@@ -5298,17 +5298,17 @@ struct function_update_data {
  */
 struct fw_version {
 #if defined(__BIG_ENDIAN)
-	u8 engineering;
-	u8 revision;
-	u8 minor;
-	u8 major;
+	uint8_t engineering;
+	uint8_t revision;
+	uint8_t minor;
+	uint8_t major;
 #elif defined(__LITTLE_ENDIAN)
-	u8 major;
-	u8 minor;
-	u8 revision;
-	u8 engineering;
+	uint8_t major;
+	uint8_t minor;
+	uint8_t revision;
+	uint8_t engineering;
 #endif
-	u32 flags;
+	uint32_t flags;
 #define FW_VERSION_OPTIMIZED (0x1<<0)
 #define FW_VERSION_OPTIMIZED_SHIFT 0
 #define FW_VERSION_BIG_ENDIEN (0x1<<1)
@@ -5332,7 +5332,7 @@ enum gre_tunnel_type {
  * Dynamic Host-Coalescing - Driver(host) counters
  */
 struct hc_dynamic_sb_drv_counters {
-	u32 dynamic_hc_drv_counter[HC_SB_MAX_DYNAMIC_INDICES];
+	uint32_t dynamic_hc_drv_counter[HC_SB_MAX_DYNAMIC_INDICES];
 };
 
 
@@ -5341,7 +5341,7 @@ struct hc_dynamic_sb_drv_counters {
  */
 struct hc_index_data {
 #if defined(__BIG_ENDIAN)
-	u8 flags;
+	uint8_t flags;
 #define HC_INDEX_DATA_SM_ID (0x1<<0)
 #define HC_INDEX_DATA_SM_ID_SHIFT 0
 #define HC_INDEX_DATA_HC_ENABLED (0x1<<1)
@@ -5350,10 +5350,10 @@ struct hc_index_data {
 #define HC_INDEX_DATA_DYNAMIC_HC_ENABLED_SHIFT 2
 #define HC_INDEX_DATA_RESERVE (0x1F<<3)
 #define HC_INDEX_DATA_RESERVE_SHIFT 3
-	u8 timeout;
+	uint8_t timeout;
 #elif defined(__LITTLE_ENDIAN)
-	u8 timeout;
-	u8 flags;
+	uint8_t timeout;
+	uint8_t flags;
 #define HC_INDEX_DATA_SM_ID (0x1<<0)
 #define HC_INDEX_DATA_SM_ID_SHIFT 0
 #define HC_INDEX_DATA_HC_ENABLED (0x1<<1)
@@ -5371,17 +5371,17 @@ struct hc_index_data {
  */
 struct hc_status_block_sm {
 #if defined(__BIG_ENDIAN)
-	u8 igu_seg_id;
-	u8 igu_sb_id;
-	u8 timer_value;
-	u8 __flags;
+	uint8_t igu_seg_id;
+	uint8_t igu_sb_id;
+	uint8_t timer_value;
+	uint8_t __flags;
 #elif defined(__LITTLE_ENDIAN)
-	u8 __flags;
-	u8 timer_value;
-	u8 igu_sb_id;
-	u8 igu_seg_id;
+	uint8_t __flags;
+	uint8_t timer_value;
+	uint8_t igu_sb_id;
+	uint8_t igu_seg_id;
 #endif
-	u32 time_to_expire;
+	uint32_t time_to_expire;
 };
 
 /*
@@ -5389,15 +5389,15 @@ struct hc_status_block_sm {
  */
 struct pci_entity {
 #if defined(__BIG_ENDIAN)
-	u8 vf_valid;
-	u8 vf_id;
-	u8 vnic_id;
-	u8 pf_id;
+	uint8_t vf_valid;
+	uint8_t vf_id;
+	uint8_t vnic_id;
+	uint8_t pf_id;
 #elif defined(__LITTLE_ENDIAN)
-	u8 pf_id;
-	u8 vnic_id;
-	u8 vf_id;
-	u8 vf_valid;
+	uint8_t pf_id;
+	uint8_t vnic_id;
+	uint8_t vf_id;
+	uint8_t vf_valid;
 #endif
 };
 
@@ -5409,15 +5409,15 @@ struct hc_sb_data {
 	struct hc_status_block_sm state_machine[HC_SB_MAX_SM];
 	struct pci_entity p_func;
 #if defined(__BIG_ENDIAN)
-	u8 rsrv0;
-	u8 state;
-	u8 dhc_qzone_id;
-	u8 same_igu_sb_1b;
+	uint8_t rsrv0;
+	uint8_t state;
+	uint8_t dhc_qzone_id;
+	uint8_t same_igu_sb_1b;
 #elif defined(__LITTLE_ENDIAN)
-	u8 same_igu_sb_1b;
-	u8 dhc_qzone_id;
-	u8 state;
-	u8 rsrv0;
+	uint8_t same_igu_sb_1b;
+	uint8_t dhc_qzone_id;
+	uint8_t state;
+	uint8_t rsrv0;
 #endif
 	struct regpair_native rsrv1[2];
 };
@@ -5439,15 +5439,15 @@ enum hc_segment {
 struct hc_sp_status_block_data {
 	struct regpair_native host_sb_addr;
 #if defined(__BIG_ENDIAN)
-	u8 rsrv1;
-	u8 state;
-	u8 igu_seg_id;
-	u8 igu_sb_id;
+	uint8_t rsrv1;
+	uint8_t state;
+	uint8_t igu_seg_id;
+	uint8_t igu_sb_id;
 #elif defined(__LITTLE_ENDIAN)
-	u8 igu_sb_id;
-	u8 igu_seg_id;
-	u8 state;
-	u8 rsrv1;
+	uint8_t igu_sb_id;
+	uint8_t igu_seg_id;
+	uint8_t state;
+	uint8_t rsrv1;
 #endif
 	struct pci_entity p_func;
 };
@@ -5619,11 +5619,11 @@ struct per_queue_stats {
  * FW version stored in first line of pram
  */
 struct pram_fw_version {
-	u8 major;
-	u8 minor;
-	u8 revision;
-	u8 engineering;
-	u8 flags;
+	uint8_t major;
+	uint8_t minor;
+	uint8_t revision;
+	uint8_t engineering;
+	uint8_t flags;
 #define PRAM_FW_VERSION_OPTIMIZED (0x1<<0)
 #define PRAM_FW_VERSION_OPTIMIZED_SHIFT 0
 #define PRAM_FW_VERSION_STORM_ID (0x3<<1)
@@ -5641,7 +5641,7 @@ struct pram_fw_version {
  * Ethernet slow path element
  */
 union protocol_common_specific_data {
-	u8 protocol_data[8];
+	uint8_t protocol_data[8];
 	struct regpair phy_address;
 	struct regpair mac_config_addr;
 	struct afex_vif_list_ramrod_data afex_vif_list_data;
@@ -5657,11 +5657,11 @@ struct protocol_common_spe {
 
 /* The data for the Set Timesync Ramrod */
 struct set_timesync_ramrod_data {
-	u8 drift_adjust_cmd;
-	u8 offset_cmd;
-	u8 add_sub_drift_adjust_value;
-	u8 drift_adjust_value;
-	u32 drift_adjust_period;
+	uint8_t drift_adjust_cmd;
+	uint8_t offset_cmd;
+	uint8_t add_sub_drift_adjust_value;
+	uint8_t drift_adjust_value;
+	uint32_t drift_adjust_period;
 	struct regpair offset_delta;
 };
 
@@ -5697,8 +5697,8 @@ struct stats_counter {
  *
  */
 struct stats_query_entry {
-	u8 kind;
-	u8 index;
+	uint8_t kind;
+	uint8_t index;
 	__le16 funcID;
 	__le32 reserved;
 	struct regpair address;
@@ -5716,8 +5716,8 @@ struct stats_query_cmd_group {
  * statistic command header
  */
 struct stats_query_header {
-	u8 cmd_num;
-	u8 reserved0;
+	uint8_t cmd_num;
+	uint8_t reserved0;
 	__le16 drv_stats_counter;
 	__le32 reserved1;
 	struct regpair stats_counters_addrs;
@@ -5838,15 +5838,15 @@ struct ustorm_vf_zone_data {
  */
 struct vf_pf_channel_data {
 #if defined(__BIG_ENDIAN)
-	u16 reserved0;
-	u8 valid;
-	u8 state;
+	uint16_t reserved0;
+	uint8_t valid;
+	uint8_t state;
 #elif defined(__LITTLE_ENDIAN)
-	u8 state;
-	u8 valid;
-	u16 reserved0;
+	uint8_t state;
+	uint8_t valid;
+	uint16_t reserved0;
 #endif
-	u32 reserved1;
+	uint32_t reserved1;
 };
 
 
