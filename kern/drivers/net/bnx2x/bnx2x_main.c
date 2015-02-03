@@ -3355,7 +3355,7 @@ static void bnx2x_drv_info_ether_stat(struct bnx2x *bp)
 	mac_obj->get_n_elements(bp, &bp->sp_objs[0].mac_obj,
 				DRV_INFO_ETH_STAT_NUM_MACS_REQUIRED,
 				ether_stat->mac_local + MAC_PAD, MAC_PAD,
-				ETH_ALEN);
+				Eaddrlen);
 	ether_stat->mtu_size = bp->dev->mtu;
 	if (bp->dev->features & NETIF_F_RXCSUM)
 		ether_stat->feature_flags |= FEATURE_ETH_CHKSUM_OFFLOAD_MASK;
@@ -3382,7 +3382,7 @@ static void bnx2x_drv_info_fcoe_stat(struct bnx2x *bp)
 	if (!CNIC_LOADED(bp))
 		return;
 
-	memcpy(fcoe_stat->mac_local + MAC_PAD, bp->fip_mac, ETH_ALEN);
+	memcpy(fcoe_stat->mac_local + MAC_PAD, bp->fip_mac, Eaddrlen);
 
 	fcoe_stat->qos_priority =
 		app->traffic_type_priority[LLFC_TRAFFIC_TYPE_FCOE];
@@ -3485,7 +3485,7 @@ static void bnx2x_drv_info_iscsi_stat(struct bnx2x *bp)
 		return;
 
 	memcpy(iscsi_stat->mac_local + MAC_PAD, bp->cnic_eth_dev.iscsi_mac,
-	       ETH_ALEN);
+	       Eaddrlen);
 
 	iscsi_stat->qos_priority =
 		app->traffic_type_priority[LLFC_TRAFFIC_TYPE_ISCSI];
@@ -8330,7 +8330,7 @@ int bnx2x_set_mac_one(struct bnx2x *bp, uint8_t *mac,
 
 	/* Fill a user request section if needed */
 	if (!test_bit(RAMROD_CONT, ramrod_flags)) {
-		memcpy(ramrod_param.user_req.u.mac.mac, mac, ETH_ALEN);
+		memcpy(ramrod_param.user_req.u.mac.mac, mac, Eaddrlen);
 
 		__set_bit(mac_type, &ramrod_param.user_req.vlan_mac_flags);
 
@@ -11479,14 +11479,14 @@ static void bnx2x_get_cnic_mac_hwinfo(struct bnx2x *bp)
 		} else { /* SD MODE */
 			if (BNX2X_IS_MF_SD_PROTOCOL_ISCSI(bp)) {
 				/* use primary mac as iscsi mac */
-				memcpy(iscsi_mac, bp->dev->dev_addr, ETH_ALEN);
+				memcpy(iscsi_mac, bp->dev->dev_addr, Eaddrlen);
 
 				BNX2X_DEV_INFO("SD ISCSI MODE\n");
 				BNX2X_DEV_INFO
 					("Read iSCSI MAC: %pM\n", iscsi_mac);
 			} else if (BNX2X_IS_MF_SD_PROTOCOL_FCOE(bp)) {
 				/* use primary mac as fip mac */
-				memcpy(fip_mac, bp->dev->dev_addr, ETH_ALEN);
+				memcpy(fip_mac, bp->dev->dev_addr, Eaddrlen);
 				BNX2X_DEV_INFO("SD FCoE MODE\n");
 				BNX2X_DEV_INFO
 					("Read FIP MAC: %pM\n", fip_mac);
@@ -11498,7 +11498,7 @@ static void bnx2x_get_cnic_mac_hwinfo(struct bnx2x *bp)
 		 * as the SAN mac was copied from the primary MAC.
 		 */
 		if (IS_MF_FCOE_AFEX(bp))
-			memcpy(bp->dev->dev_addr, fip_mac, ETH_ALEN);
+			memcpy(bp->dev->dev_addr, fip_mac, Eaddrlen);
 	} else {
 		val2 = SHMEM_RD(bp, dev_info.port_hw_config[port].
 				iscsi_mac_upper);
@@ -11516,13 +11516,13 @@ static void bnx2x_get_cnic_mac_hwinfo(struct bnx2x *bp)
 	/* Disable iSCSI OOO if MAC configuration is invalid. */
 	if (!is_valid_ether_addr(iscsi_mac)) {
 		bp->flags |= NO_ISCSI_OOO_FLAG | NO_ISCSI_FLAG;
-		memset(iscsi_mac, 0, ETH_ALEN);
+		memset(iscsi_mac, 0, Eaddrlen);
 	}
 
 	/* Disable FCoE if MAC configuration is invalid. */
 	if (!is_valid_ether_addr(fip_mac)) {
 		bp->flags |= NO_FCOE_FLAG;
-		memset(bp->fip_mac, 0, ETH_ALEN);
+		memset(bp->fip_mac, 0, Eaddrlen);
 	}
 }
 
@@ -11533,7 +11533,7 @@ static void bnx2x_get_mac_hwinfo(struct bnx2x *bp)
 	int port = BP_PORT(bp);
 
 	/* Zero primary MAC configuration */
-	memset(bp->dev->dev_addr, 0, ETH_ALEN);
+	memset(bp->dev->dev_addr, 0, Eaddrlen);
 
 	if (BP_NOMCP(bp)) {
 		BNX2X_ERROR("warning: random MAC workaround active\n");
@@ -11565,7 +11565,7 @@ static void bnx2x_get_mac_hwinfo(struct bnx2x *bp)
 		bp->flags |= HAS_PHYS_PORT_ID;
 	}
 
-	memcpy(bp->link_params.mac_addr, bp->dev->dev_addr, ETH_ALEN);
+	memcpy(bp->link_params.mac_addr, bp->dev->dev_addr, Eaddrlen);
 
 	if (!is_valid_ether_addr(bp->dev->dev_addr))
 		dev_err(&bp->pdev->dev,

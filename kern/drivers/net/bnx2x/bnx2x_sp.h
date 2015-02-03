@@ -98,7 +98,7 @@ struct bnx2x_raw_obj {
 
 /************************* VLAN-MAC commands related parameters ***************/
 struct bnx2x_mac_ramrod_data {
-	uint8_t mac[ETH_ALEN];
+	uint8_t mac[Eaddrlen];
 	uint8_t is_inner_mac;
 };
 
@@ -107,7 +107,7 @@ struct bnx2x_vlan_ramrod_data {
 };
 
 struct bnx2x_vlan_mac_ramrod_data {
-	uint8_t mac[ETH_ALEN];
+	uint8_t mac[Eaddrlen];
 	uint8_t is_inner_mac;
 	uint16_t vlan;
 };
@@ -855,7 +855,7 @@ enum bnx2x_q_type {
 #define BNX2X_MULTI_TX_COS_E3B0			3
 #define BNX2X_MULTI_TX_COS			3 /* Maximum possible */
 
-#define MAC_PAD (ALIGN(ETH_ALEN, sizeof(uint32_t)) - ETH_ALEN)
+#define MAC_PAD (ALIGN(Eaddrlen, sizeof(uint32_t)) - Eaddrlen)
 /* DMAE channel to be used by FW for timesync workaroun. A driver that sends
  * timesync-related ramrods must not use this DMAE command ID.
  */

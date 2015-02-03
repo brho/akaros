@@ -338,7 +338,7 @@ int bnx2x_vfpf_acquire(struct bnx2x *bp, uint8_t tx_count, uint8_t rx_count)
 			 bnx2x_search_tlv_list(bp, resp,
 					       CHANNEL_TLV_PHYS_PORT_ID);
 	if (phys_port_resp) {
-		memcpy(bp->phys_port_id, phys_port_resp->id, ETH_ALEN);
+		memcpy(bp->phys_port_id, phys_port_resp->id, Eaddrlen);
 		bp->flags |= HAS_PHYS_PORT_ID;
 	}
 
@@ -381,7 +381,7 @@ int bnx2x_vfpf_acquire(struct bnx2x *bp, uint8_t tx_count, uint8_t rx_count)
 	if (is_valid_ether_addr(bp->acquire_resp.resc.current_mac_addr))
 		memcpy(bp->dev->dev_addr,
 		       bp->acquire_resp.resc.current_mac_addr,
-		       ETH_ALEN);
+		       Eaddrlen);
 
 out:
 	bnx2x_vfpf_finalize(bp, &req->first_tlv);
@@ -732,7 +732,7 @@ int bnx2x_vfpf_config_mac(struct bnx2x *bp, uint8_t *addr, uint8_t vf_qid,
 	bnx2x_sample_bulletin(bp);
 
 	/* copy mac from device to request */
-	memcpy(req->filters[0].mac, addr, ETH_ALEN);
+	memcpy(req->filters[0].mac, addr, Eaddrlen);
 
 	/* add list termination tlv */
 	bnx2x_add_tlv(bp, req, req->first_tlv.tl.length, CHANNEL_TLV_LIST_END,
@@ -754,13 +754,13 @@ int bnx2x_vfpf_config_mac(struct bnx2x *bp, uint8_t *addr, uint8_t vf_qid,
 		   "vfpf SET MAC failed. Check bulletin board for new posts\n");
 
 		/* copy mac from bulletin to device */
-		memcpy(bp->dev->dev_addr, bulletin.mac, ETH_ALEN);
+		memcpy(bp->dev->dev_addr, bulletin.mac, Eaddrlen);
 
 		/* check if bulletin board was updated */
 		if (bnx2x_sample_bulletin(bp) == PFVF_BULLETIN_UPDATED) {
 			/* copy mac from device to request */
 			memcpy(req->filters[0].mac, bp->dev->dev_addr,
-			       ETH_ALEN);
+			       Eaddrlen);
 
 			/* send message to pf */
 			rc = bnx2x_send_msg2pf(bp, &resp->hdr.status,
@@ -873,7 +873,7 @@ int bnx2x_vfpf_set_mcast(struct net_device *dev)
 	netdev_for_each_mc_addr(ha, dev) {
 		DP(NETIF_MSG_IFUP, "Adding mcast MAC: %pM\n",
 		   bnx2x_mc_addr(ha));
-		memcpy(req->multicast[i], bnx2x_mc_addr(ha), ETH_ALEN);
+		memcpy(req->multicast[i], bnx2x_mc_addr(ha), Eaddrlen);
 		i++;
 	}
 
@@ -1147,7 +1147,7 @@ static void bnx2x_vf_mbx_resp_phys_port(struct bnx2x *bp,
 
 	port_id = (struct vfpf_port_phys_id_resp_tlv *)
 		  (((uint8_t *)buffer) + *offset);
-	memcpy(port_id->id, bp->phys_port_id, ETH_ALEN);
+	memcpy(port_id->id, bp->phys_port_id, Eaddrlen);
 
 	/* Offset should continue representing the offset to the tail
 	 * of TLV data (outside this function scope)
@@ -1227,7 +1227,7 @@ static void bnx2x_vf_mbx_acquire_resp(struct bnx2x *bp, struct bnx2x_virtf *vf,
 			/* if a mac has been set for this vf, supply it */
 			if (bulletin->valid_bitmap & 1 << MAC_ADDR_VALID) {
 				memcpy(resc->current_mac_addr, bulletin->mac,
-				       ETH_ALEN);
+				       Eaddrlen);
 			}
 		}
 	}

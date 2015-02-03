@@ -593,7 +593,7 @@ static int bnx2x_get_n_elements(struct bnx2x *bp, struct bnx2x_vlan_mac_obj *o,
 		bnx2x_vlan_mac_h_read_unlock(bp, o);
 	}
 
-	return counter * ETH_ALEN;
+	return counter * Eaddrlen;
 }
 
 /* check_add() callbacks */
@@ -2347,12 +2347,12 @@ void bnx2x_init_rx_mode_obj(struct bnx2x *bp,
 /********************* Multicast verbs: SET, CLEAR ****************************/
 static inline uint8_t bnx2x_mcast_bin_from_mac(uint8_t *mac)
 {
-	return (crc32c_le(0, mac, ETH_ALEN) >> 24) & 0xff;
+	return (crc32c_le(0, mac, Eaddrlen) >> 24) & 0xff;
 }
 
 struct bnx2x_mcast_mac_elem {
 	struct list_head link;
-	uint8_t mac[ETH_ALEN];
+	uint8_t mac[Eaddrlen];
 	uint8_t pad[2]; /* For a natural alignment of the following buffer */
 };
 
@@ -2425,7 +2425,7 @@ static int bnx2x_mcast_enqueue_cmd(struct bnx2x *bp,
 		 * MACs list: FIFO
 		 */
 		list_for_each_entry(pos, &p->mcast_list, link) {
-			memcpy(cur_mac->mac, pos->mac, ETH_ALEN);
+			memcpy(cur_mac->mac, pos->mac, Eaddrlen);
 			list_add_tail(&cur_mac->link, &new_cmd->data.macs_head);
 			cur_mac++;
 		}

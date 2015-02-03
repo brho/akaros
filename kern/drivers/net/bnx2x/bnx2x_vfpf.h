@@ -192,15 +192,15 @@ struct pfvf_acquire_resp_tlv {
 		uint8_t	num_mac_filters;
 		uint8_t	num_vlan_filters;
 		uint8_t	num_mc_filters;
-		uint8_t	permanent_mac_addr[ETH_ALEN];
-		uint8_t	current_mac_addr[ETH_ALEN];
+		uint8_t	permanent_mac_addr[Eaddrlen];
+		uint8_t	current_mac_addr[Eaddrlen];
 		uint8_t	padding[2];
 	} resc;
 };
 
 struct vfpf_port_phys_id_resp_tlv {
 	struct channel_tlv tl;
-	uint8_t id[ETH_ALEN];
+	uint8_t id[Eaddrlen];
 	uint8_t padding[2];
 };
 
@@ -289,7 +289,7 @@ struct vfpf_q_mac_vlan_filter {
 #define VFPF_Q_FILTER_DEST_MAC_VALID	0x01
 #define VFPF_Q_FILTER_VLAN_TAG_VALID	0x02
 #define VFPF_Q_FILTER_SET_MAC		0x100	/* set/clear */
-	uint8_t  mac[ETH_ALEN];
+	uint8_t  mac[Eaddrlen];
 	uint16_t vlan_tag;
 };
 
@@ -314,7 +314,7 @@ struct vfpf_set_q_filters_tlv {
 	struct vfpf_q_mac_vlan_filter filters[PFVF_MAX_FILTERS];
 
 #define PFVF_MAX_MULTICAST_PER_VF              32
-	uint8_t  multicast[PFVF_MAX_MULTICAST_PER_VF][ETH_ALEN];
+	uint8_t  multicast[PFVF_MAX_MULTICAST_PER_VF][Eaddrlen];
 
 	uint32_t rx_mask;	/* see mask constants at the top of the file */
 };
@@ -411,7 +411,7 @@ struct pf_vf_bulletin_content {
 #define LINK_VALID		3	/* alert the VF thet a new link status
 					 * update is available for it
 					 */
-	uint8_t mac[ETH_ALEN];
+	uint8_t mac[Eaddrlen];
 	uint8_t mac_padding[2];
 
 	uint16_t vlan;

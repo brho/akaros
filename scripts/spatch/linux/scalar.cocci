@@ -25,3 +25,13 @@ typedef uint64_t;
 @@
 -u64
 +uint64_t
+
+@@
+@@
+-ETH_ALEN
++Eaddrlen
+
+@@
+@@
+-ETH_HLEN
++ETHERHDRSIZE

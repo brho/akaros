@@ -504,7 +504,7 @@ static void bnx2x_set_gro_params(struct sk_buff *skb, uint16_t parsing_flags,
 	/* TPA aggregation won't have either IP options or TCP options
 	 * other than timestamp or IPv6 extension headers.
 	 */
-	uint16_t hdrs_len = ETH_HLEN + sizeof(struct tcphdr);
+	uint16_t hdrs_len = ETHERHDRSIZE + sizeof(struct tcphdr);
 
 	if (GET_FLAG(parsing_flags, PARSING_FLAGS_OVER_ETHERNET_PROTOCOL) ==
 	    PRS_FLAG_OVERETH_IPV6) {
@@ -4783,7 +4783,7 @@ int bnx2x_change_mtu(struct net_device *dev, int new_mtu)
 	}
 
 	if ((new_mtu > ETH_MAX_JUMBO_PACKET_SIZE) ||
-	    ((new_mtu + ETH_HLEN) < ETH_MIN_PACKET_SIZE)) {
+	    ((new_mtu + ETHERHDRSIZE) < ETH_MIN_PACKET_SIZE)) {
 		BNX2X_ERR("Can't support requested MTU size\n");
 		return -EINVAL;
 	}

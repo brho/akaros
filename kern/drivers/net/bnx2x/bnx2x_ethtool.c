@@ -2441,7 +2441,7 @@ static int bnx2x_run_loopback(struct bnx2x *bp, int loopback_mode)
 
 	/* prepare the loopback packet */
 	pkt_size = (((bp->dev->mtu < ETH_MAX_PACKET_SIZE) ?
-		     bp->dev->mtu : ETH_MAX_PACKET_SIZE) + ETH_HLEN);
+		     bp->dev->mtu : ETH_MAX_PACKET_SIZE) + ETHERHDRSIZE);
 	skb = netdev_alloc_skb(bp->dev, fp_rx->rx_buf_size);
 	if (!skb) {
 		DP(BNX2X_MSG_ETHTOOL, "Can't allocate skb\n");
@@ -2449,10 +2449,10 @@ static int bnx2x_run_loopback(struct bnx2x *bp, int loopback_mode)
 		goto test_loopback_exit;
 	}
 	packet = skb_put(skb, pkt_size);
-	memcpy(packet, bp->dev->dev_addr, ETH_ALEN);
-	memset(packet + ETH_ALEN, 0, ETH_ALEN);
-	memset(packet + 2*ETH_ALEN, 0x77, (ETH_HLEN - 2*ETH_ALEN));
-	for (i = ETH_HLEN; i < pkt_size; i++)
+	memcpy(packet, bp->dev->dev_addr, Eaddrlen);
+	memset(packet + Eaddrlen, 0, Eaddrlen);
+	memset(packet + 2*Eaddrlen, 0x77, (ETHERHDRSIZE - 2*Eaddrlen));
+	for (i = ETHERHDRSIZE; i < pkt_size; i++)
 		packet[i] = (unsigned char) (i & 0xff);
 	mapping = dma_map_single(&bp->pdev->dev, skb->data,
 				 skb_headlen(skb), DMA_TO_DEVICE);
@@ -2562,7 +2562,7 @@ static int bnx2x_run_loopback(struct bnx2x *bp, int loopback_mode)
 				   dma_unmap_addr(rx_buf, mapping),
 				   fp_rx->rx_buf_size, DMA_FROM_DEVICE);
 	data = rx_buf->data + NET_SKB_PAD + cqe->fast_path_cqe.placement_offset;
-	for (i = ETH_HLEN; i < pkt_size; i++)
+	for (i = ETHERHDRSIZE; i < pkt_size; i++)
 		if (*(data + i) != (unsigned char) (i & 0xff))
 			goto test_loopback_rx_exit;
 

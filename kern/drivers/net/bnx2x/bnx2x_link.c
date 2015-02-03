@@ -27,7 +27,7 @@ typedef int (*read_sfp_module_eeprom_func_p)(struct bnx2x_phy *phy,
 /********************************************************/
 #define ETH_HLEN			14
 /* L2 header size + 2*VLANs (8 bytes) + LLC SNAP (8 bytes) */
-#define ETH_OVREHEAD			(ETH_HLEN + 8 + 8)
+#define ETH_OVREHEAD			(ETHERHDRSIZE + 8 + 8)
 #define ETH_MIN_PACKET_SIZE		60
 #define ETH_MAX_PACKET_SIZE		1500
 #define ETH_MAX_JUMBO_PACKET_SIZE	9600

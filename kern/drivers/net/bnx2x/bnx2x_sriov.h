@@ -406,7 +406,7 @@ void bnx2x_vf_mbx_schedule(struct bnx2x *bp,
 void bnx2x_vf_enable_mbx(struct bnx2x *bp, uint8_t abs_vfid);
 
 /* CORE VF API */
-typedef uint8_t bnx2x_mac_addr_t[ETH_ALEN];
+typedef uint8_t bnx2x_mac_addr_t[Eaddrlen];
 
 /* acquire */
 int bnx2x_vf_acquire(struct bnx2x *bp, struct bnx2x_virtf *vf,

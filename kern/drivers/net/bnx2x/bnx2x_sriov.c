@@ -425,7 +425,7 @@ static int bnx2x_vf_mac_vlan_config(struct bnx2x *bp,
 	} else {
 		set_bit(BNX2X_ETH_MAC, &ramrod.user_req.vlan_mac_flags);
 		ramrod.vlan_mac_obj = &bnx2x_vfq(vf, qid, mac_obj);
-		memcpy(&ramrod.user_req.u.mac.mac, filter->mac, ETH_ALEN);
+		memcpy(&ramrod.user_req.u.mac.mac, filter->mac, Eaddrlen);
 	}
 	ramrod.user_req.cmd = filter->add ? BNX2X_VLAN_MAC_ADD :
 					    BNX2X_VLAN_MAC_DEL;
@@ -2684,7 +2684,7 @@ int bnx2x_get_vf_config(struct net_device *dev, int vfidx,
 		if (bnx2x_validate_vf_sp_objs(bp, vf, false)) {
 			mac_obj->get_n_elements(bp, mac_obj, 1,
 						(uint8_t *)&ivi->mac,
-						0, ETH_ALEN);
+						0, Eaddrlen);
 			vlan_obj->get_n_elements(bp, vlan_obj, 1,
 						 (uint8_t *)&ivi->vlan, 0,
 						 VLAN_HLEN);
@@ -2694,10 +2694,10 @@ int bnx2x_get_vf_config(struct net_device *dev, int vfidx,
 		/* mac */
 		if (bulletin->valid_bitmap & (1 << MAC_ADDR_VALID))
 			/* mac configured by ndo so its in bulletin board */
-			memcpy(&ivi->mac, bulletin->mac, ETH_ALEN);
+			memcpy(&ivi->mac, bulletin->mac, Eaddrlen);
 		else
 			/* function has not been loaded yet. Show mac as 0s */
-			memset(&ivi->mac, 0, ETH_ALEN);
+			memset(&ivi->mac, 0, Eaddrlen);
 
 		/* vlan */
 		if (bulletin->valid_bitmap & (1 << VLAN_VALID))
@@ -2753,7 +2753,7 @@ int bnx2x_set_vf_mac(struct net_device *dev, int vfidx, uint8_t *mac)
 	 * configuration requests from vf unless match this mac
 	 */
 	bulletin->valid_bitmap |= 1 << MAC_ADDR_VALID;
-	memcpy(bulletin->mac, mac, ETH_ALEN);
+	memcpy(bulletin->mac, mac, Eaddrlen);
 
 	/* Post update on VF's bulletin board */
 	rc = bnx2x_post_vf_bulletin(bp, vfidx);
@@ -3014,7 +3014,7 @@ enum sample_bulletin_result bnx2x_sample_bulletin(struct bnx2x *bp)
 	if (bulletin->valid_bitmap & 1 << MAC_ADDR_VALID &&
 	    !ether_addr_equal(bulletin->mac, bp->old_bulletin.mac)) {
 		/* update new mac to net device */
-		memcpy(bp->dev->dev_addr, bulletin->mac, ETH_ALEN);
+		memcpy(bp->dev->dev_addr, bulletin->mac, Eaddrlen);
 	}
 
 	if (bulletin->valid_bitmap & (1 << LINK_VALID)) {
