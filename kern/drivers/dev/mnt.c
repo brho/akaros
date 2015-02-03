@@ -12,6 +12,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <ip.h>
+#include <smallidpool.h>
 
 /*
  * References are managed as follows:
@@ -25,6 +26,7 @@
  */
 
 #define MAXRPC (IOHDRSZ+8192)
+#define MAXTAG MAX_U16_POOL_SZ
 
 static __inline int isxdigit(int c)
 {
@@ -54,12 +56,6 @@ struct mntrpc {
 	struct mntrpc *flushed;		/* message this one flushes */
 };
 
-enum {
-	TAGSHIFT = 5,				/* uint32_t has to be 32 bits */
-	TAGMASK = (1 << TAGSHIFT) - 1,
-	NMASK = (64 * 1024) >> TAGSHIFT,
-};
-
 /* Our TRUNC and remove on close differ from 9ps, so we'll need to translate.
  * I got these flags from http://man.cat-v.org/plan_9/5/open */
 #define MNT_9P_OPEN_OTRUNC		0x10
@@ -73,7 +69,7 @@ struct Mntalloc {
 	int nrpcfree;
 	int nrpcused;
 	uint32_t id;
-	uint32_t tagmask[NMASK];
+	struct u16_pool *tags;
 } mntalloc;
 
 void mattach(struct mnt *, struct chan *, char *unused_char_p_t);
@@ -102,8 +98,8 @@ void (*mntstats) (int unused_int, struct chan *, uint64_t, uint32_t);
 static void mntinit(void)
 {
 	mntalloc.id = 1;
-	mntalloc.tagmask[0] = 1;	/* don't allow 0 as a tag */
-	mntalloc.tagmask[NMASK - 1] = 0x80000000UL;	/* don't allow NOTAG */
+	mntalloc.tags = create_u16_pool(MAXTAG);
+	(void) get_u16(mntalloc.tags);	/* don't allow 0 as a tag */
 	//fmtinstall('F', fcallfmt);
 /*	fmtinstall('D', dirfmt); */
 /*	fmtinstall('M', dirmodefmt);  */
@@ -1069,26 +1065,12 @@ void mntflushfree(struct mnt *m, struct mntrpc *r)
 
 static int alloctag(void)
 {
-	int i, j;
-	uint32_t v;
-
-	for (i = 0; i < NMASK; i++) {
-		v = mntalloc.tagmask[i];
-		if (v == ~0UL)
-			continue;
-		for (j = 0; j < 1 << TAGSHIFT; j++)
-			if ((v & (1 << j)) == 0) {
-				mntalloc.tagmask[i] |= 1 << j;
-				return (i << TAGSHIFT) + j;
-			}
-	}
-	/* panic("no devmnt tags left"); */
-	return NOTAG;
+	return get_u16(mntalloc.tags);
 }
 
 static void freetag(int t)
 {
-	mntalloc.tagmask[t >> TAGSHIFT] &= ~(1 << (t & TAGMASK));
+	put_u16(mntalloc.tags, t);
 }
 
 struct mntrpc *mntralloc(struct chan *c, uint32_t msize)
