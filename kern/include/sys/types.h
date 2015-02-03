@@ -18,4 +18,11 @@ typedef __off64_t off64_t;
 typedef int32_t __blksize_t;
 typedef int64_t __blkcnt64_t;
 
+typedef uint64_t __le64;
+typedef uint64_t __be64;
+typedef uint32_t __le32;
+typedef uint32_t __be32;
+typedef uint16_t __le16;
+typedef uint16_t __be16;
+
 #endif /* _ROS_SYS_TYPES_H */

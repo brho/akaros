@@ -16,6 +16,9 @@
 #define l64get(p)	(((uint64_t)l32get(p+4)<<32)|l32get(p))
 
 #ifdef LITTLE_ENDIAN
+
+#define __LITTLE_ENDIAN
+
 #define cpu_to_le16(x) ((uint16_t)(x))
 #define cpu_to_le32(x) ((uint32_t)(x))
 #define cpu_to_le64(x) ((uint64_t)(x))
@@ -43,6 +46,8 @@
 # ifndef BIG_ENDIAN
 # error "Need an endianness defined"
 # endif
+
+#define __BIG_ENDIAN
 
 #define cpu_to_le16(x) byte_swap16((x))
 #define cpu_to_le32(x) byte_swap32((x))
