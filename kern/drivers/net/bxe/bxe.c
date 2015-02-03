@@ -2308,6 +2308,7 @@ struct eth_spe *bxe_sp_get_next(struct bxe_adapter *sc)
 {
     struct eth_spe *next_spe = sc->spq_prod_bd;
 
+static int cnt = 0;
     if (sc->spq_prod_bd == sc->spq_last_bd) {
         /* wrap back to the first eth_spq */
         sc->spq_prod_bd = sc->spq;
@@ -2317,6 +2318,7 @@ struct eth_spe *bxe_sp_get_next(struct bxe_adapter *sc)
         sc->spq_prod_idx++;
     }
 
+printk("SP_GET_NEXT, cnt %d, ret %p, spq %p\n", cnt++, next_spe, sc->spq);
     return (next_spe);
 }
 
@@ -2333,6 +2335,8 @@ void bxe_sp_prod_update(struct bxe_adapter *sc)
      */
     mb();
 
+printk("ABOUT TO WRITE %p to reg %p\n", sc->spq_prod_idx,
+       (BAR_XSTRORM_INTMEM + XSTORM_SPQ_PROD_OFFSET(func)));
     REG_WR16(sc, (BAR_XSTRORM_INTMEM + XSTORM_SPQ_PROD_OFFSET(func)),
              sc->spq_prod_idx);
 
@@ -2389,6 +2393,7 @@ bxe_sp_post(struct bxe_adapter *sc,
     uint16_t type;
     int common;
 
+printk("SP POST, cmd %d, cid %d hi %08x lo %08x\n", command, cid, data_hi, data_lo);
     common = bxe_is_contextless_ramrod(command, cmd_type);
 
     BXE_SP_LOCK(sc);
@@ -2435,8 +2440,8 @@ bxe_sp_post(struct bxe_adapter *sc,
         atomic_add(&sc->cq_spq_left, -1);
     }
 
-    BLOGD(sc, DBG_SP, "SPQE -> %#jx\n", (uintmax_t)sc->spq_dma.paddr);
-    BLOGD(sc, DBG_SP, "FUNC_RDATA -> %p / %#jx\n",
+    BLOGD(sc, DBG_SP, "SPE %p, SPQE -> %p\n", spe, (uintmax_t)sc->spq_dma.paddr);
+    BLOGD(sc, DBG_SP, "FUNC_RDATA -> %p / %p\n",
           BXE_SP(sc, func_rdata), (uintmax_t)BXE_SP_MAPPING(sc, func_rdata));
     BLOGD(sc, DBG_SP,
           "SPQE[%x] (%x:%x) (cmd, common?) (%d,%d) hw_cid %x data (%x:%x) type(0x%x) left (CQ, EQ) (%lx,%lx)\n",
@@ -11789,6 +11794,7 @@ bxe_setup_queue(struct bxe_adapter    *sc,
 
     q_params.q_obj = &BXE_SP_OBJ(sc, fp).q_obj;
 
+I_AM_HERE;
     /* we want to wait for completion in this context */
     bxe_set_bit(RAMROD_COMP_WAIT, &q_params.ramrod_flags);
 
@@ -11798,8 +11804,10 @@ bxe_setup_queue(struct bxe_adapter    *sc,
     /* Set the command */
     q_params.cmd = ECORE_Q_CMD_INIT;
 
+I_AM_HERE;
     /* Change the state to INIT */
     rc = ecore_queue_state_change(sc, &q_params);
+I_AM_HERE;  // made it here
     if (rc) {
         BLOGE(sc, "Queue(%d) INIT failed\n", fp->index);
         return (rc);
@@ -11813,23 +11821,28 @@ bxe_setup_queue(struct bxe_adapter    *sc,
     /* set Queue flags */
     setup_params->flags = bxe_get_q_flags(sc, fp, leading);
 
+I_AM_HERE;
     /* set general SETUP parameters */
     bxe_pf_q_prep_general(sc, fp, &setup_params->gen_params,
                           FIRST_TX_COS_INDEX);
+I_AM_HERE;
 
     bxe_pf_rx_q_prep(sc, fp,
                      &setup_params->pause_params,
                      &setup_params->rxq_params);
 
+I_AM_HERE;
     bxe_pf_tx_q_prep(sc, fp,
                      &setup_params->txq_params,
                      FIRST_TX_COS_INDEX);
 
+I_AM_HERE;
     /* Set the command */
     q_params.cmd = ECORE_Q_CMD_SETUP;
 
-    /* change the state to SETUP */
+    /* change the state to SETUP */// XME GO IN HERE
     rc = ecore_queue_state_change(sc, &q_params);
+I_AM_HERE; // never get here
     if (rc) {
         BLOGE(sc, "Queue(%d) SETUP failed\n", fp->index);
         return (rc);
@@ -12335,8 +12348,10 @@ bxe_initial_phy_init(struct bxe_adapter *sc,
     uint16_t req_line_speed = sc->link_params.req_line_speed[cfg_idx];
     struct elink_params *lp = &sc->link_params;
 
+I_AM_HERE;
     bxe_set_requested_fc(sc);
 
+I_AM_HERE;
     if (CHIP_REV_IS_SLOW(sc)) {
         uint32_t bond = CHIP_BOND_ID(sc);
         uint32_t feat = 0;
@@ -12366,6 +12381,7 @@ bxe_initial_phy_init(struct bxe_adapter *sc,
     }
 
     BXE_PHY_LOCK(sc);
+I_AM_HERE;
 
     if (load_mode == LOAD_DIAG) {
         lp->loopback_mode = ELINK_LOOPBACK_XGXS;
@@ -12384,12 +12400,15 @@ bxe_initial_phy_init(struct bxe_adapter *sc,
         lp->loopback_mode = ELINK_LOOPBACK_EXT;
     }
 
+I_AM_HERE;
     rc = elink_phy_init(&sc->link_params, &sc->link_vars);
 
+I_AM_HERE;
     BXE_PHY_UNLOCK(sc);
 
     bxe_calc_fc_adv(sc);
 
+I_AM_HERE;
     if (sc->link_vars.link_up) {
         bxe_stats_handle(sc, STATS_EVENT_LINK_UP);
         bxe_link_report(sc);
@@ -12803,6 +12822,8 @@ bxe_nic_load(struct bxe_adapter *sc,
         bxe_ilt_set_info(sc);
     }
 
+I_AM_HERE;
+
 //    sc->last_reported_link_state = LINK_STATE_UNKNOWN;
 
     bxe_set_fp_rx_buf_size(sc);
@@ -12815,21 +12836,25 @@ bxe_nic_load(struct bxe_adapter *sc,
     }
 
 
+I_AM_HERE;
     if (bxe_alloc_mem(sc) != 0) {
         sc->state = BXE_STATE_CLOSED;
         rc = ENOMEM;
         goto bxe_nic_load_error0;
     }
 
+I_AM_HERE;
     if (bxe_alloc_fw_stats_mem(sc) != 0) {
         sc->state = BXE_STATE_CLOSED;
         rc = ENOMEM;
         goto bxe_nic_load_error0;
     }
 
+I_AM_HERE;
     if (IS_PF(sc)) {
         /* set pf load just before approaching the MCP */
         bxe_set_pf_load(sc);
+I_AM_HERE;
 
         /* if MCP exists send load request and analyze response */
         if (!BXE_NOMCP(sc)) {
@@ -12840,6 +12865,7 @@ bxe_nic_load(struct bxe_adapter *sc,
                 goto bxe_nic_load_error1;
             }
 
+I_AM_HERE;
             /* what did the MCP say? */
             if (bxe_nic_load_analyze_req(sc, load_code) != 0) {
                 bxe_fw_command(sc, DRV_MSG_CODE_LOAD_DONE, 0);
@@ -12851,13 +12877,16 @@ bxe_nic_load(struct bxe_adapter *sc,
             BLOGI(sc, "Device has no MCP!\n");
             load_code = bxe_nic_load_no_mcp(sc);
         }
+I_AM_HERE;
 
         /* mark PMF if applicable */
         bxe_nic_load_pmf(sc, load_code);
+I_AM_HERE;
 
         /* Init Function state controlling object */
         bxe_init_func_obj(sc);
 
+I_AM_HERE;
         /* Initialize HW */
         if (bxe_init_hw(sc, load_code) != 0) {
             BLOGE(sc, "HW init failed\n");
@@ -12866,6 +12895,7 @@ bxe_nic_load(struct bxe_adapter *sc,
             rc = ENXIO;
             goto bxe_nic_load_error2;
         }
+I_AM_HERE;
     }
 
     /* attach interrupts */
@@ -12875,8 +12905,10 @@ bxe_nic_load(struct bxe_adapter *sc,
         goto bxe_nic_load_error2;
     }
 
+I_AM_HERE;
     bxe_nic_init(sc, load_code);
 
+I_AM_HERE;
     /* Init per-function objects */
     if (IS_PF(sc)) {
         bxe_init_objs(sc);
@@ -12886,8 +12918,10 @@ bxe_nic_load(struct bxe_adapter *sc,
         sc->devinfo.mf_info.afex_def_vlan_tag = -1;
         // XXX bxe_nic_load_afex_dcc(sc, load_code);
 
+I_AM_HERE;
         sc->state = BXE_STATE_OPENING_WAITING_PORT;
         rc = bxe_func_start(sc);
+I_AM_HERE;
         if (rc) {
             BLOGE(sc, "Function start failed!\n");
             bxe_fw_command(sc, DRV_MSG_CODE_LOAD_DONE, 0);
@@ -12895,8 +12929,9 @@ bxe_nic_load(struct bxe_adapter *sc,
             goto bxe_nic_load_error3;
         }
 
+I_AM_HERE;
         /* send LOAD_DONE command to MCP */
-        if (!BXE_NOMCP(sc)) {
+        if (!BXE_NOMCP(sc)) {// lllllllllllllllll
             load_code = bxe_fw_command(sc, DRV_MSG_CODE_LOAD_DONE, 0);
             if (!load_code) {
                 BLOGE(sc, "MCP response failure, aborting\n");
@@ -12906,6 +12941,7 @@ bxe_nic_load(struct bxe_adapter *sc,
             }
         }
 
+I_AM_HERE;
         rc = bxe_setup_leading(sc);
         if (rc) {
             BLOGE(sc, "Setup leading failed!\n");
@@ -12913,6 +12949,7 @@ bxe_nic_load(struct bxe_adapter *sc,
             goto bxe_nic_load_error3;
         }
 
+I_AM_HERE;
         FOR_EACH_NONDEFAULT_ETH_QUEUE(sc, i) {
             rc = bxe_setup_queue(sc, &sc->fp[i], FALSE);
             if (rc) {
@@ -12922,6 +12959,7 @@ bxe_nic_load(struct bxe_adapter *sc,
             }
         }
 
+I_AM_HERE;
         rc = bxe_init_rss_pf(sc);
         if (rc) {
             BLOGE(sc, "PF RSS init failed\n");
@@ -12945,6 +12983,7 @@ bxe_nic_load(struct bxe_adapter *sc,
 
     /* now when Clients are configured we are ready to work */
     sc->state = BXE_STATE_OPEN;
+I_AM_HERE;
 
     /* Configure a ucast MAC */
     if (IS_PF(sc)) {
@@ -12968,6 +13007,7 @@ bxe_nic_load(struct bxe_adapter *sc,
         sc->pending_max = 0;
     }
 #endif
+I_AM_HERE;
 
     if (sc->port.pmf) {
         rc = bxe_initial_phy_init(sc, /* XXX load_mode */LOAD_OPEN);
@@ -12979,6 +13019,7 @@ bxe_nic_load(struct bxe_adapter *sc,
 
     sc->link_params.feature_config_flags &=
         ~ELINK_FEATURE_CONFIG_BOOT_FROM_SAN;
+I_AM_HERE;
 
     /* start fast path */
 
@@ -12999,6 +13040,7 @@ bxe_nic_load(struct bxe_adapter *sc,
     default:
         break;
     }
+I_AM_HERE;
 
     if (sc->port.pmf) {
         bxe_update_drv_flags(sc, 1 << DRV_FLAGS_PORT_MASK, 0);
@@ -13008,6 +13050,7 @@ bxe_nic_load(struct bxe_adapter *sc,
 
     /* start the periodic timer alarm */
     bxe_periodic_start(sc);
+I_AM_HERE;
 
     if (IS_PF(sc) && SHMEM2_HAS(sc, drv_capabilities_flag)) {
         /* mark driver is loaded in shmem2 */
@@ -16267,7 +16310,7 @@ int bxe_attach(struct bxe_adapter *sc)
 
     sc->state = BXE_STATE_CLOSED;
 
-	/* what is this? */
+	/* what is this? brho: seems like the device id number.  used in prints */
     //sc->unit = device_get_unit(dev);
 
     BLOGD(sc, DBG_LOAD, "softc = %p\n", sc);

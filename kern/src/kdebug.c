@@ -62,6 +62,16 @@ static const char *blacklist[] = {
 	"limborexmit",
 	"rangecompare",
 	"walkadd",
+	"bxe_read_dmae",
+	"bxe_write_dmae",
+	"bxe_prep_dmae_with_comp",
+	"bxe_dmae_opcode",
+	"bxe_dmae_opcode_add_comp",
+	"bxe_issue_dmae_with_comp",
+	"bxe_post_dmae",
+	"ecore_write_dmae_phys_len",
+	"bxe_write_dmae_phys_len",
+	"bxe_dma_alloc",
 };
 
 static bool is_blacklisted(const char *s)

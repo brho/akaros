@@ -4507,17 +4507,21 @@ int ecore_queue_state_change(struct bxe_adapter *sc,
 		return ECORE_INVAL;
 	}
 
+I_AM_HERE;
 	/* Set "pending" bit */
 	ECORE_MSG(sc, "pending bit was=%lx\n", o->pending);
 	pending_bit = o->set_pending(o, params);
 	ECORE_MSG(sc, "pending bit now=%lx\n", o->pending);
 
+I_AM_HERE;
 	/* Don't send a command if only driver cleanup was requested */
 	if (ECORE_TEST_BIT(RAMROD_DRV_CLR_ONLY, &params->ramrod_flags))
 		o->complete_cmd(sc, o, pending_bit);
 	else {
 		/* Send a ramrod */
+I_AM_HERE;
 		rc = o->send_cmd(sc, params);
+I_AM_HERE;
 		if (rc) {
 			o->next_state = ECORE_Q_STATE_MAX;
 			ECORE_CLEAR_BIT(pending_bit, pending);
@@ -4525,8 +4529,11 @@ int ecore_queue_state_change(struct bxe_adapter *sc,
 			return rc;
 		}
 
+I_AM_HERE;
 		if (ECORE_TEST_BIT(RAMROD_COMP_WAIT, &params->ramrod_flags)) {
+I_AM_HERE;
 			rc = o->wait_comp(sc, o, pending_bit);
+I_AM_HERE;
 			if (rc)
 				return rc;
 
@@ -4892,7 +4899,7 @@ static inline int ecore_q_init(struct bxe_adapter *sc,
 
 static inline int ecore_q_send_setup_e1x(struct bxe_adapter *sc,
 					struct ecore_queue_state_params *params)
-{
+{ // sending this fails XME
 	struct ecore_queue_sp_obj *o = params->q_obj;
 	struct client_init_ramrod_data *rdata =
 		(struct client_init_ramrod_data *)o->rdata;
@@ -5216,28 +5223,40 @@ static inline int ecore_q_send_empty(struct bxe_adapter *sc,
 static inline int ecore_queue_send_cmd_cmn(struct bxe_adapter *sc,
 					struct ecore_queue_state_params *params)
 {
+I_AM_HERE;
 	switch (params->cmd) {
 	case ECORE_Q_CMD_INIT:
+I_AM_HERE;
 		return ecore_q_init(sc, params);
 	case ECORE_Q_CMD_SETUP_TX_ONLY:
+I_AM_HERE;
 		return ecore_q_send_setup_tx_only(sc, params);
 	case ECORE_Q_CMD_DEACTIVATE:
+I_AM_HERE;
 		return ecore_q_send_deactivate(sc, params);
 	case ECORE_Q_CMD_ACTIVATE:
+I_AM_HERE;
 		return ecore_q_send_activate(sc, params);
 	case ECORE_Q_CMD_UPDATE:
+I_AM_HERE;
 		return ecore_q_send_update(sc, params);
 	case ECORE_Q_CMD_UPDATE_TPA:
+I_AM_HERE;
 		return ecore_q_send_update_tpa(sc, params);
 	case ECORE_Q_CMD_HALT:
+I_AM_HERE;
 		return ecore_q_send_halt(sc, params);
 	case ECORE_Q_CMD_CFC_DEL:
+I_AM_HERE;
 		return ecore_q_send_cfc_del(sc, params);
 	case ECORE_Q_CMD_TERMINATE:
+I_AM_HERE;
 		return ecore_q_send_terminate(sc, params);
 	case ECORE_Q_CMD_EMPTY:
+I_AM_HERE;
 		return ecore_q_send_empty(sc, params);
 	default:
+I_AM_HERE;
 		ECORE_ERR("Unknown command: %d\n", params->cmd);
 		return ECORE_INVAL;
 	}
@@ -5246,8 +5265,10 @@ static inline int ecore_queue_send_cmd_cmn(struct bxe_adapter *sc,
 static int ecore_queue_send_cmd_e1x(struct bxe_adapter *sc,
 				    struct ecore_queue_state_params *params)
 {
+I_AM_HERE;
 	switch (params->cmd) {
 	case ECORE_Q_CMD_SETUP:
+I_AM_HERE;
 		return ecore_q_send_setup_e1x(sc, params);
 	case ECORE_Q_CMD_INIT:
 	case ECORE_Q_CMD_SETUP_TX_ONLY:
@@ -5259,6 +5280,7 @@ static int ecore_queue_send_cmd_e1x(struct bxe_adapter *sc,
 	case ECORE_Q_CMD_CFC_DEL:
 	case ECORE_Q_CMD_TERMINATE:
 	case ECORE_Q_CMD_EMPTY:
+I_AM_HERE;
 		return ecore_queue_send_cmd_cmn(sc, params);
 	default:
 		ECORE_ERR("Unknown command: %d\n", params->cmd);
@@ -5269,6 +5291,7 @@ static int ecore_queue_send_cmd_e1x(struct bxe_adapter *sc,
 static int ecore_queue_send_cmd_e2(struct bxe_adapter *sc,
 				   struct ecore_queue_state_params *params)
 {
+I_AM_HERE;
 	switch (params->cmd) {
 	case ECORE_Q_CMD_SETUP:
 		return ecore_q_send_setup_e2(sc, params);
@@ -5539,6 +5562,7 @@ void ecore_init_queue_obj(struct bxe_adapter *sc,
 {
 	ECORE_MEMSET(obj, 0, sizeof(*obj));
 
+I_AM_HERE;
 	/* We support only ECORE_MULTI_TX_COS Tx CoS at the moment */
 	ECORE_BUG_ON(ECORE_MULTI_TX_COS < cid_cnt);
 
@@ -5564,6 +5588,7 @@ void ecore_init_queue_obj(struct bxe_adapter *sc,
 	obj->complete_cmd = ecore_queue_comp_cmd;
 	obj->wait_comp = ecore_queue_wait_comp;
 	obj->set_pending = ecore_queue_set_pending;
+printk("INIT QUEU OBJ, obj %p rdata %p mapping %p\n", obj, obj->rdata, obj->rdata_mapping);
 }
 
 /* return a queue object's logical state*/
@@ -6005,7 +6030,7 @@ static inline int ecore_func_hw_reset(struct bxe_adapter *sc,
 
 static inline int ecore_func_send_start(struct bxe_adapter *sc,
 					struct ecore_func_state_params *params)
-{
+{ // sending this works XME
 	struct ecore_func_sp_obj *o = params->f_obj;
 	struct function_start_data *rdata =
 		(struct function_start_data *)o->rdata;
@@ -6171,26 +6196,37 @@ static inline int ecore_func_send_tx_start(struct bxe_adapter *sc,
 static int ecore_func_send_cmd(struct bxe_adapter *sc,
 			       struct ecore_func_state_params *params)
 {
+	I_AM_HERE;
 	switch (params->cmd) {
 	case ECORE_F_CMD_HW_INIT:
+	I_AM_HERE;
 		return ecore_func_hw_init(sc, params);
 	case ECORE_F_CMD_START:
+	I_AM_HERE; // w
 		return ecore_func_send_start(sc, params);
 	case ECORE_F_CMD_STOP:
+	I_AM_HERE;
 		return ecore_func_send_stop(sc, params);
 	case ECORE_F_CMD_HW_RESET:
+	I_AM_HERE;
 		return ecore_func_hw_reset(sc, params);
 	case ECORE_F_CMD_AFEX_UPDATE:
+	I_AM_HERE;
 		return ecore_func_send_afex_update(sc, params);
 	case ECORE_F_CMD_AFEX_VIFLISTS:
+	I_AM_HERE;
 		return ecore_func_send_afex_viflists(sc, params);
 	case ECORE_F_CMD_TX_STOP:
+	I_AM_HERE;
 		return ecore_func_send_tx_stop(sc, params);
 	case ECORE_F_CMD_TX_START:
+	I_AM_HERE;
 		return ecore_func_send_tx_start(sc, params);
 	case ECORE_F_CMD_SWITCH_UPDATE:
+	I_AM_HERE;
 		return ecore_func_send_switch_update(sc, params);
 	default:
+	I_AM_HERE;
 		ECORE_ERR("Unknown command: %d\n", params->cmd);
 		return ECORE_INVAL;
 	}
@@ -6206,6 +6242,7 @@ void ecore_init_func_obj(struct bxe_adapter *sc,
 
 	ECORE_MUTEX_INIT(&obj->one_pending_mutex);
 
+I_AM_HERE;
 	obj->rdata = rdata;
 	obj->rdata_mapping = rdata_mapping;
 	obj->afex_rdata = afex_rdata;
@@ -6215,6 +6252,7 @@ void ecore_init_func_obj(struct bxe_adapter *sc,
 	obj->complete_cmd = ecore_func_comp_cmd;
 	obj->wait_comp = ecore_func_wait_comp;
 	obj->drv = drv_iface;
+printk("INIT FUNC OBJ, obj %p rdata %p mapping %p\n", obj, obj->rdata, obj->rdata_mapping);
 }
 
 /**

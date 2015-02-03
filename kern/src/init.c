@@ -90,6 +90,8 @@ void kernel_init(multiboot_info_t *mboot_info)
 	kb_buf_init(&cons_buf);
 	arch_init();
 	block_init();
+
+	printx_on = TRUE;
 	enable_irq();
 	run_linker_funcs();
 	/* reset/init devtab after linker funcs 3 and 4.  these run NIC and medium
