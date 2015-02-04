@@ -3,7 +3,7 @@
 
 if [ $# -lt 3 ]
 then
-	echo Usage: $0 cocci_file yes/no dir
+	echo "Usage: $0 cocci_file yes/no dir [other args to spatch]"
 	exit -1
 fi
 
@@ -18,10 +18,11 @@ fi
 
 DIR=$3
 
+shift 3
 
 FILES=`find $DIR -name '*.[ch]'`
 
 for i in $FILES
 do
-	spatch -sp-file $COCCI $i $INPLACE
+	spatch -sp-file $COCCI $i $INPLACE $*
 done
