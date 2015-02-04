@@ -1,9 +1,10 @@
 #ifndef __LITEVM_H
 #define __LITEVM_H
 #include <page_alloc.h>
-#include <sys/queue.h>
 #include <pmap.h>
 #include "vmx.h"
+
+struct list_head { int fake; };
 
 #define CR0_PE_MASK (1ULL << 0)
 #define CR0_TS_MASK (1ULL << 3)
@@ -79,7 +80,7 @@ typedef uint64_t hpa_t;
 typedef unsigned long hfn_t;
 
 struct litevm_mmu_page {
-	LIST_ENTRY(litevm_mmu_page) link;
+	struct list_head link;
 	hpa_t page_hpa;
 	unsigned long slot_bitmap;	/* One bit set per slot which has memory
 								 * in this shadow page.
@@ -160,8 +161,7 @@ struct litevm_vcpu {
 	int nmsrs;
 	struct vmx_msr_entry *guest_msrs;
 	struct vmx_msr_entry *host_msrs;
-	 LIST_HEAD(free_pages, litevm_mmu_page) link;
-	//struct list_head free_pages;
+	struct list_head free_pages;
 	struct litevm_mmu_page page_header_buf[LITEVM_NUM_MMU_PAGES];
 	struct litevm_mmu mmu;
 
@@ -202,8 +202,7 @@ struct litevm {
 	spinlock_t lock;			/* protects everything except vcpus */
 	int nmemslots;
 	struct litevm_memory_slot memslots[LITEVM_MEMORY_SLOTS];
-	 LIST_HEAD(active_mmu_pages, litevm_mmu_page) link;
-	//struct list_head active_mmu_pages;
+	struct list_head active_mmu_pages;
 	struct litevm_vcpu vcpus[LITEVM_MAX_VCPUS];
 	int memory_config_version;
 	int busy;
