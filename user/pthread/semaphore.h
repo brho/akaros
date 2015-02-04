@@ -39,6 +39,7 @@ extern sem_t *sem_open (__const char *__name, int __oflag, ...);
 extern int sem_close (sem_t *__sem);
 extern int sem_unlink (__const char *__name);
 extern int sem_wait (sem_t *__sem);
+extern int sem_timedwait(sem_t *sem, const struct timespec *abs_timeout);
 extern int sem_trywait (sem_t *__sem);
 extern int sem_post (sem_t *__sem);
 extern int sem_getvalue (sem_t *__restrict __sem, int *__restrict __sval);
