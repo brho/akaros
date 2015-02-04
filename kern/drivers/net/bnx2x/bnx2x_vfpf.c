@@ -39,7 +39,7 @@ static void bnx2x_add_tlv(struct bnx2x *bp, void *tlvs_list,
 static void bnx2x_vfpf_prep(struct bnx2x *bp, struct vfpf_first_tlv *first_tlv,
 			    uint16_t type, uint16_t length)
 {
-	mutex_lock(&bp->vf2pf_mutex);
+	qlock(&bp->vf2pf_mutex);
 
 	DP(BNX2X_MSG_IOV, "preparing to send %d tlv over vf pf channel\n",
 	   type);
@@ -61,7 +61,7 @@ static void bnx2x_vfpf_finalize(struct bnx2x *bp,
 	DP(BNX2X_MSG_IOV, "done sending [%d] tlv over vf pf channel\n",
 	   first_tlv->tl.type);
 
-	mutex_unlock(&bp->vf2pf_mutex);
+	qunlock(&bp->vf2pf_mutex);
 }
 
 /* Finds a TLV by type in a TLV buffer; If found, returns pointer to the TLV */
@@ -2070,11 +2070,11 @@ void bnx2x_vf_mbx_schedule(struct bnx2x *bp,
 	vf_idx = bnx2x_vf_idx_by_abs_fid(bp, vfpf_event->vf_id);
 
 	/* Update VFDB with current message and schedule its handling */
-	mutex_lock(&BP_VFDB(bp)->event_mutex);
+	qlock(&BP_VFDB(bp)->event_mutex);
 	BP_VF_MBX(bp, vf_idx)->vf_addr_hi = vfpf_event->msg_addr_hi;
 	BP_VF_MBX(bp, vf_idx)->vf_addr_lo = vfpf_event->msg_addr_lo;
 	BP_VFDB(bp)->event_occur |= (1ULL << vf_idx);
-	mutex_unlock(&BP_VFDB(bp)->event_mutex);
+	qunlock(&BP_VFDB(bp)->event_mutex);
 
 	bnx2x_schedule_iov_task(bp, BNX2X_IOV_HANDLE_VF_MSG);
 }
@@ -2090,10 +2090,10 @@ void bnx2x_vf_mbx(struct bnx2x *bp)
 	if (!vfdb)
 		return;
 
-	mutex_lock(&vfdb->event_mutex);
+	qlock(&vfdb->event_mutex);
 	events = vfdb->event_occur;
 	vfdb->event_occur = 0;
-	mutex_unlock(&vfdb->event_mutex);
+	qunlock(&vfdb->event_mutex);
 
 	for_each_vf(bp, vf_idx) {
 		struct bnx2x_vf_mbx *mbx = BP_VF_MBX(bp, vf_idx);

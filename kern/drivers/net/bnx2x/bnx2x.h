@@ -1139,7 +1139,7 @@ struct bnx2x_port {
 	uint32_t			phy_addr;
 
 	/* used to synchronize phy accesses */
-	struct mutex		phy_mutex;
+	qlock_t		phy_mutex;
 
 	uint32_t			port_stx;
 

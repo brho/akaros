@@ -2971,7 +2971,7 @@ uint32_t bnx2x_fw_command(struct bnx2x *bp, uint32_t command, uint32_t param)
 	uint32_t cnt = 1;
 	uint8_t delay = CHIP_REV_IS_SLOW(bp) ? 100 : 10;
 
-	mutex_lock(&bp->fw_mb_mutex);
+	qlock(&bp->fw_mb_mutex);
 	seq = ++bp->fw_seq;
 	SHMEM_WR(bp, func_mb[mb_idx].drv_mb_param, param);
 	SHMEM_WR(bp, func_mb[mb_idx].drv_mb_header, (command | seq));
@@ -3000,7 +3000,7 @@ uint32_t bnx2x_fw_command(struct bnx2x *bp, uint32_t command, uint32_t param)
 		bnx2x_fw_dump(bp);
 		rc = 0;
 	}
-	mutex_unlock(&bp->fw_mb_mutex);
+	qunlock(&bp->fw_mb_mutex);
 
 	return rc;
 }
@@ -3540,7 +3540,7 @@ static void bnx2x_handle_drv_info_req(struct bnx2x *bp)
 		  DRV_INFO_CONTROL_OP_CODE_SHIFT;
 
 	/* Must prevent other flows from accessing drv_info_to_mcp */
-	mutex_lock(&bp->drv_info_mutex);
+	qlock(&bp->drv_info_mutex);
 
 	memset(&bp->slowpath->drv_info_to_mcp, 0,
 	       sizeof(union drv_info_to_mcp));
@@ -3600,7 +3600,7 @@ static void bnx2x_handle_drv_info_req(struct bnx2x *bp)
 	}
 
 out:
-	mutex_unlock(&bp->drv_info_mutex);
+	qunlock(&bp->drv_info_mutex);
 }
 
 static uint32_t bnx2x_update_mng_version_utility(uint8_t *version,
@@ -3636,7 +3636,7 @@ void bnx2x_update_mng_version(struct bnx2x *bp)
 	if (!SHMEM2_HAS(bp, func_os_drv_ver))
 		return;
 
-	mutex_lock(&bp->drv_info_mutex);
+	qlock(&bp->drv_info_mutex);
 	/* Must not proceed when `bnx2x_handle_drv_info_req' is feasible */
 	if (bp->drv_info_mng_owner)
 		goto out;
@@ -3667,7 +3667,7 @@ out:
 	SHMEM2_WR(bp, func_os_drv_ver[idx].versions[DRV_PERS_ISCSI], iscsiver);
 	SHMEM2_WR(bp, func_os_drv_ver[idx].versions[DRV_PERS_FCOE], fcoever);
 
-	mutex_unlock(&bp->drv_info_mutex);
+	qunlock(&bp->drv_info_mutex);
 
 	DP(BNX2X_MSG_MCP, "Setting driver version: ETH [%08x] iSCSI [%08x] FCoE [%08x]\n",
 	   ethver, iscsiver, fcoever);
@@ -14059,12 +14059,12 @@ static int bnx2x_cnic_ctl_send(struct bnx2x *bp, struct cnic_ctl_info *ctl)
 	struct cnic_ops *c_ops;
 	int rc = 0;
 
-	mutex_lock(&bp->cnic_mutex);
+	qlock(&bp->cnic_mutex);
 	c_ops = rcu_dereference_protected(bp->cnic_ops,
 					  lockdep_is_held(&bp->cnic_mutex));
 	if (c_ops)
 		rc = c_ops->cnic_ctl(bp->cnic_data, ctl);
-	mutex_unlock(&bp->cnic_mutex);
+	qunlock(&bp->cnic_mutex);
 
 	return rc;
 }
@@ -14412,10 +14412,10 @@ static int bnx2x_unregister_cnic(struct net_device *dev)
 	struct bnx2x *bp = netdev_priv(dev);
 	struct cnic_eth_dev *cp = &bp->cnic_eth_dev;
 
-	mutex_lock(&bp->cnic_mutex);
+	qlock(&bp->cnic_mutex);
 	cp->drv_state = 0;
 	RCU_INIT_POINTER(bp->cnic_ops, NULL);
-	mutex_unlock(&bp->cnic_mutex);
+	qunlock(&bp->cnic_mutex);
 	synchronize_rcu();
 	bp->cnic_enabled = false;
 	kfree(bp->cnic_kwq);

@@ -1322,7 +1322,7 @@ struct bnx2x_func_sp_obj {
 	/* this mutex validates that when pending flag is taken, the next
 	 * ramrod to be sent will be the one set the pending bit
 	 */
-	struct mutex		one_pending_mutex;
+	qlock_t		one_pending_mutex;
 
 	/* Driver interface */
 	struct bnx2x_func_sp_drv_ops	*drv;

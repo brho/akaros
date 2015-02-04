@@ -6013,25 +6013,25 @@ int bnx2x_func_state_change(struct bnx2x *bp,
 	enum bnx2x_func_cmd cmd = params->cmd;
 	unsigned long *pending = &o->pending;
 
-	mutex_lock(&o->one_pending_mutex);
+	qlock(&o->one_pending_mutex);
 
 	/* Check that the requested transition is legal */
 	rc = o->check_transition(bp, o, params);
 	if ((rc == -EBUSY) &&
 	    (test_bit(RAMROD_RETRY, &params->ramrod_flags))) {
 		while ((rc == -EBUSY) && (--cnt > 0)) {
-			mutex_unlock(&o->one_pending_mutex);
+			qunlock(&o->one_pending_mutex);
 			msleep(10);
-			mutex_lock(&o->one_pending_mutex);
+			qlock(&o->one_pending_mutex);
 			rc = o->check_transition(bp, o, params);
 		}
 		if (rc == -EBUSY) {
-			mutex_unlock(&o->one_pending_mutex);
+			qunlock(&o->one_pending_mutex);
 			BNX2X_ERR("timeout waiting for previous ramrod completion\n");
 			return rc;
 		}
 	} else if (rc) {
-		mutex_unlock(&o->one_pending_mutex);
+		qunlock(&o->one_pending_mutex);
 		return rc;
 	}
 
@@ -6041,12 +6041,12 @@ int bnx2x_func_state_change(struct bnx2x *bp,
 	/* Don't send a command if only driver cleanup was requested */
 	if (test_bit(RAMROD_DRV_CLR_ONLY, &params->ramrod_flags)) {
 		bnx2x_func_state_change_comp(bp, o, cmd);
-		mutex_unlock(&o->one_pending_mutex);
+		qunlock(&o->one_pending_mutex);
 	} else {
 		/* Send a ramrod */
 		rc = o->send_cmd(bp, params);
 
-		mutex_unlock(&o->one_pending_mutex);
+		qunlock(&o->one_pending_mutex);
 
 		if (rc) {
 			o->next_state = BNX2X_F_STATE_MAX;

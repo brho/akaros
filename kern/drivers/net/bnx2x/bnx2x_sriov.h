@@ -203,7 +203,7 @@ struct bnx2x_virtf {
 	struct bnx2x_rss_config_obj     rss_conf_obj;
 
 	/* slow-path operations */
-	struct mutex			op_mutex; /* one vfop at a time mutex */
+	qlock_t			op_mutex; /* one vfop at a time mutex */
 	enum channel_tlvs		op_current;
 
 	uint8_t fp_hsi;
@@ -341,11 +341,11 @@ struct bnx2x_vfdb {
 	uint16_t first_vf_igu_entry;
 
 	/* sp_rtnl synchronization */
-	struct mutex			event_mutex;
+	qlock_t			event_mutex;
 	uint64_t				event_occur;
 
 	/* bulletin board update synchronization */
-	struct mutex			bulletin_mutex;
+	qlock_t			bulletin_mutex;
 };
 
 /* queue access */

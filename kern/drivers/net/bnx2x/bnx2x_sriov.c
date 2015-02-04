@@ -1506,7 +1506,7 @@ int bnx2x_iov_link_update_vf(struct bnx2x *bp, int idx)
 	if (rc)
 		return rc;
 
-	mutex_lock(&bp->vfdb->bulletin_mutex);
+	qlock(&bp->vfdb->bulletin_mutex);
 
 	if (vf->link_cfg == IFLA_VF_LINK_STATE_AUTO) {
 		bulletin->valid_bitmap |= 1 << LINK_VALID;
@@ -1552,7 +1552,7 @@ int bnx2x_iov_link_update_vf(struct bnx2x *bp, int idx)
 	}
 
 out:
-	mutex_unlock(&bp->vfdb->bulletin_mutex);
+	qunlock(&bp->vfdb->bulletin_mutex);
 	return rc;
 }
 
@@ -2362,7 +2362,7 @@ void bnx2x_lock_vf_pf_channel(struct bnx2x *bp, struct bnx2x_virtf *vf,
 	}
 
 	/* lock the channel */
-	mutex_lock(&vf->op_mutex);
+	qlock(&vf->op_mutex);
 
 	/* record the locking op */
 	vf->op_current = tlv;
@@ -2396,7 +2396,7 @@ void bnx2x_unlock_vf_pf_channel(struct bnx2x *bp, struct bnx2x_virtf *vf,
 	vf->op_current = CHANNEL_TLV_NONE;
 
 	/* lock the channel */
-	mutex_unlock(&vf->op_mutex);
+	qunlock(&vf->op_mutex);
 
 	/* log the unlock */
 	DP(BNX2X_MSG_IOV, "VF[%d]: vf pf channel unlocked by %d\n",
@@ -2690,7 +2690,7 @@ int bnx2x_get_vf_config(struct net_device *dev, int vfidx,
 						 VLAN_HLEN);
 		}
 	} else {
-		mutex_lock(&bp->vfdb->bulletin_mutex);
+		qlock(&bp->vfdb->bulletin_mutex);
 		/* mac */
 		if (bulletin->valid_bitmap & (1 << MAC_ADDR_VALID))
 			/* mac configured by ndo so its in bulletin board */
@@ -2707,7 +2707,7 @@ int bnx2x_get_vf_config(struct net_device *dev, int vfidx,
 			/* function has not been loaded yet. Show vlans as 0s */
 			memset(&ivi->vlan, 0, VLAN_HLEN);
 
-		mutex_unlock(&bp->vfdb->bulletin_mutex);
+		qunlock(&bp->vfdb->bulletin_mutex);
 	}
 
 	return 0;
@@ -2747,7 +2747,7 @@ int bnx2x_set_vf_mac(struct net_device *dev, int vfidx, uint8_t *mac)
 	if (rc)
 		return rc;
 
-	mutex_lock(&bp->vfdb->bulletin_mutex);
+	qlock(&bp->vfdb->bulletin_mutex);
 
 	/* update PF's copy of the VF's bulletin. Will no longer accept mac
 	 * configuration requests from vf unless match this mac
@@ -2759,7 +2759,7 @@ int bnx2x_set_vf_mac(struct net_device *dev, int vfidx, uint8_t *mac)
 	rc = bnx2x_post_vf_bulletin(bp, vfidx);
 
 	/* release lock before checking return code */
-	mutex_unlock(&bp->vfdb->bulletin_mutex);
+	qunlock(&bp->vfdb->bulletin_mutex);
 
 	if (rc) {
 		BNX2X_ERR("failed to update VF[%d] bulletin\n", vfidx);
@@ -2846,7 +2846,7 @@ int bnx2x_set_vf_vlan(struct net_device *dev, int vfidx, uint16_t vlan,
 	 * configure the vlan later when it does. Treat vlan id 0 as remove the
 	 * Host tag.
 	 */
-	mutex_lock(&bp->vfdb->bulletin_mutex);
+	qlock(&bp->vfdb->bulletin_mutex);
 
 	if (vlan > 0)
 		bulletin->valid_bitmap |= 1 << VLAN_VALID;
@@ -2854,7 +2854,7 @@ int bnx2x_set_vf_vlan(struct net_device *dev, int vfidx, uint16_t vlan,
 		bulletin->valid_bitmap &= ~(1 << VLAN_VALID);
 	bulletin->vlan = vlan;
 
-	mutex_unlock(&bp->vfdb->bulletin_mutex);
+	qunlock(&bp->vfdb->bulletin_mutex);
 
 	/* is vf initialized and queue set up? */
 	if (vf->state != VF_ENABLED ||
