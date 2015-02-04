@@ -148,16 +148,13 @@ do {						\
 
 #define REG_ADDR(bp, offset)		((bp->regview) + (offset))
 
-#define REG_RD(bp, offset)		readl(REG_ADDR(bp, offset))
-#define REG_RD8(bp, offset)		readb(REG_ADDR(bp, offset))
-#define REG_RD16(bp, offset)		readw(REG_ADDR(bp, offset))
+#define REG_RD(bp, offset)		read32(REG_ADDR(bp, offset))
+#define REG_RD8(bp, offset)		read8(REG_ADDR(bp, offset))
+#define REG_RD16(bp, offset)		read16(REG_ADDR(bp, offset))
 
-#define REG_WR(bp, offset, val)		writel((uint32_t)val,
-						      REG_ADDR(bp, offset))
-#define REG_WR8(bp, offset, val)	writeb((uint8_t)val,
-					       REG_ADDR(bp, offset))
-#define REG_WR16(bp, offset, val)	writew((uint16_t)val,
-						REG_ADDR(bp, offset))
+#define REG_WR(bp, offset, val)		write32((uint32_t)val, REG_ADDR(bp, offset))
+#define REG_WR8(bp, offset, val)	write8((uint8_t)val, REG_ADDR(bp, offset))
+#define REG_WR16(bp, offset, val)	write16((uint16_t)val, REG_ADDR(bp, offset))
 
 #define REG_RD_IND(bp, offset)		bnx2x_reg_rd_ind(bp, offset)
 #define REG_WR_IND(bp, offset, val)	bnx2x_reg_wr_ind(bp, offset, val)
@@ -890,7 +887,7 @@ static inline bool bnx2x_fp_ll_disable(struct bnx2x_fastpath *fp)
 #endif
 #define DOORBELL(bp, cid, val) \
 	do { \
-		writel((uint32_t)(val), bp->doorbells + (bp->db_size * (cid))); \
+		write32((uint32_t)(val), bp->doorbells + (bp->db_size * (cid))); \
 	} while (0)
 
 /* TX CSUM helpers */

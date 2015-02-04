@@ -20,6 +20,7 @@
 #include <bitmap.h>
 #include <mii.h>
 #include <umem.h>
+#include <mmio.h>
 
 #define __rcu
 typedef unsigned long dma_addr_t;
