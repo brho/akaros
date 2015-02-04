@@ -63,8 +63,8 @@ static void __page_init(struct page *page)
 	}                                                                       \
 	/* Allocate a page from that color */                                   \
 	if(i < (base_color+range)) {                                            \
-		*page = LIST_FIRST(&colored_page_free_list[i]);                     \
-		LIST_REMOVE(*page, pg_link);                                        \
+		*page = BSD_LIST_FIRST(&colored_page_free_list[i]);                 \
+		BSD_LIST_REMOVE(*page, pg_link);                                    \
 		__page_init(*page);                                                 \
 		return i;                                                           \
 	}                                                                       \
@@ -75,14 +75,15 @@ static ssize_t __page_alloc_from_color_range(page_t** page,
                                            uint16_t range) 
 {
 	__PAGE_ALLOC_FROM_RANGE_GENERIC(page, base_color, range, 
-	                 !LIST_EMPTY(&colored_page_free_list[i]));
+	                 !BSD_LIST_EMPTY(&colored_page_free_list[i]));
 }
 
 static ssize_t __page_alloc_from_color_map_range(page_t** page, uint8_t* map, 
                                               size_t base_color, size_t range)
 {  
 	__PAGE_ALLOC_FROM_RANGE_GENERIC(page, base_color, range, 
-		    GET_BITMASK_BIT(map, i) && !LIST_EMPTY(&colored_page_free_list[i]))
+		    GET_BITMASK_BIT(map, i) &&
+			!BSD_LIST_EMPTY(&colored_page_free_list[i]))
 }
 
 static ssize_t __colored_page_alloc(uint8_t* map, page_t** page, 
@@ -97,7 +98,7 @@ static ssize_t __colored_page_alloc(uint8_t* map, page_t** page,
 
 static void __real_page_alloc(struct page *page)
 {
-	LIST_REMOVE(page, pg_link);
+	BSD_LIST_REMOVE(page, pg_link);
 	__page_init(page);
 }
 
@@ -357,7 +358,7 @@ static void page_release(struct kref *kref)
 		free_bhs(page);
 	/* Give our page back to the free list.  The protections for this are that
 	 * the list lock is grabbed by page_decref. */
-	LIST_INSERT_HEAD(
+	BSD_LIST_INSERT_HEAD(
 	   &(colored_page_free_list[get_page_color(page2ppn(page), llc_cache)]),
 	   page,
 	   pg_link

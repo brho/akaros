@@ -28,15 +28,15 @@ static void page_alloc_bootstrap() {
 	    (page_list_t*)boot_alloc(list_size,PGSIZE);
 	colored_page_free_list = SINIT(tmp);
 	for (int i = 0; i < llc_cache->num_colors; i++)
-		LIST_INIT(&colored_page_free_list[i]);
+		BSD_LIST_INIT(&colored_page_free_list[i]);
 }
 
 /* Can do whatever here.  For now, our page allocator just works with colors,
  * not NUMA zones or anything. */
 static void track_free_page(struct page *page)
 {
-	LIST_INSERT_HEAD(&colored_page_free_list[get_page_color(page2ppn(page),
-	                                                        llc_cache)],
+	BSD_LIST_INSERT_HEAD(&colored_page_free_list[get_page_color(page2ppn(page),
+	                                                            llc_cache)],
 	                 page, pg_link);
 	nr_free_pages++;
 	/* Page was previous marked as busy, need to set it free explicitly */

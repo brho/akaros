@@ -24,8 +24,8 @@ struct page_map;		/* preprocessor games */
 struct page;
 typedef size_t ppn_t;
 typedef struct page page_t;
-typedef LIST_HEAD(PageList, page) page_list_t;
-typedef LIST_ENTRY(page) page_list_entry_t;
+typedef BSD_LIST_HEAD(PageList, page) page_list_t;
+typedef BSD_LIST_ENTRY(page) page_list_entry_t;
 
 /* Per-page flag bits related to their state in the page cache */
 #define PG_LOCKED		0x001	/* involved in an IO op */
@@ -41,7 +41,7 @@ typedef LIST_ENTRY(page) page_list_entry_t;
  * an issue, we can dynamically allocate some of these things when we're a
  * buffer page (in a page mapping) */
 struct page {
-	LIST_ENTRY(page)			pg_link;	/* membership in various lists */
+	BSD_LIST_ENTRY(page)		pg_link;	/* membership in various lists */
 	struct kref					pg_kref;
 	atomic_t					pg_flags;
 	struct page_map				*pg_mapping; /* for debugging... */

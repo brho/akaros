@@ -38,7 +38,7 @@ void page_alloc_init(struct multiboot_info *mbi)
 
 	size_t num_colors = llc_cache->num_colors;
 	for (size_t i = 0; i < num_colors; i++)
-		LIST_INIT(&lists[i]);
+		BSD_LIST_INIT(&lists[i]);
 	
 	uintptr_t first_free_page = ROUNDUP(boot_freemem, PGSIZE);
 	uintptr_t first_invalid_page = LA2PPN(boot_freelimit);
@@ -52,7 +52,8 @@ void page_alloc_init(struct multiboot_info *mbi)
 	for (uintptr_t page = first_free_page; page < first_invalid_page; page++)
 	{
 		page_setref(&pages[page], 0);
-		LIST_INSERT_HEAD(&lists[page & (num_colors-1)], &pages[page], pg_link);
+		BSD_LIST_INSERT_HEAD(&lists[page & (num_colors-1)], &pages[page],
+		                     pg_link);
 	}
 	nr_free_pages = first_invalid_page - first_free_page;
 
