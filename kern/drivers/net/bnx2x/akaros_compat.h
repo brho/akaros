@@ -23,6 +23,7 @@
 
 #define __rcu
 typedef unsigned long dma_addr_t;
+typedef int pci_power_t;
 
 #define DEFINE_SEMAPHORE(name)  \
     struct semaphore name = SEMAPHORE_INITIALIZER_IRQSAVE(name, 1)
@@ -35,5 +36,49 @@ typedef unsigned long dma_addr_t;
 #define down_interruptible(sem) ({sem_down(sem); 0;})
 #define down_timeout(sem, timeout) ({sem_down(sem); 0;})
 
+
+/* I'd like to spatch all of the pci methods, but I don't know how to do the
+ * reads.  Since we're not doing the reads, then no sense doing the writes. */
+static inline int pci_read_config_byte(struct pci_device *dev, uint32_t off,
+                                       uint8_t *val)
+{
+	*val = pcidev_read8(dev, off);
+	return 0;
+}
+                                       
+static inline int pci_read_config_word(struct pci_device *dev, uint32_t off,
+                                       uint16_t *val)
+{
+	*val = pcidev_read16(dev, off);
+	return 0;
+}
+                                       
+static inline int pci_read_config_dword(struct pci_device *dev, uint32_t off,
+                                        uint32_t *val)
+{
+	*val = pcidev_read32(dev, off);
+	return 0;
+}
+                                       
+static inline int pci_write_config_byte(struct pci_device *dev, uint32_t off,
+                                        uint8_t val)
+{
+	pcidev_write8(dev, off, val);
+	return 0;
+}
+
+static inline int pci_write_config_word(struct pci_device *dev, uint32_t off,
+                                        uint16_t val)
+{
+	pcidev_write16(dev, off, val);
+	return 0;
+}
+
+static inline int pci_write_config_dword(struct pci_device *dev, uint32_t off,
+                                         uint32_t val)
+{
+	pcidev_write32(dev, off, val);
+	return 0;
+}
 
 #endif /* ROS_KERN_AKAROS_COMPAT_H */

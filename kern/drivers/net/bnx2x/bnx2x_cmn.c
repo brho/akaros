@@ -4881,7 +4881,7 @@ void bnx2x_tx_timeout(struct net_device *dev)
 	bnx2x_schedule_sp_rtnl(bp, BNX2X_SP_RTNL_TX_TIMEOUT, 0);
 }
 
-int bnx2x_suspend(struct pci_dev *pdev, pm_message_t state)
+int bnx2x_suspend(struct pci_device *pdev, pm_message_t state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp;
@@ -4912,7 +4912,7 @@ int bnx2x_suspend(struct pci_dev *pdev, pm_message_t state)
 	return 0;
 }
 
-int bnx2x_resume(struct pci_dev *pdev)
+int bnx2x_resume(struct pci_device *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp;

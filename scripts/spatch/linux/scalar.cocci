@@ -35,3 +35,10 @@ typedef uint64_t;
 @@
 -ETH_HLEN
 +ETHERHDRSIZE
+
+// doesn't catch all occurrences...
+@@
+@@
+ struct
+-pci_dev
++pci_device

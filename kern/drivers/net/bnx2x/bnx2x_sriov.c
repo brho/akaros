@@ -825,7 +825,7 @@ static void bnx2x_vf_enable_traffic(struct bnx2x *bp, struct bnx2x_virtf *vf)
 
 static uint8_t bnx2x_vf_is_pcie_pending(struct bnx2x *bp, uint8_t abs_vfid)
 {
-	struct pci_dev *dev;
+	struct pci_device *dev;
 	struct bnx2x_virtf *vf = bnx2x_vf_by_abs_fid(bp, abs_vfid);
 
 	if (!vf)
@@ -1091,7 +1091,7 @@ void bnx2x_iov_init_dmae(struct bnx2x *bp)
 
 static int bnx2x_vf_bus(struct bnx2x *bp, int vfid)
 {
-	struct pci_dev *dev = bp->pdev;
+	struct pci_device *dev = bp->pdev;
 	struct bnx2x_sriov *iov = &bp->vfdb->sriov;
 
 	return dev->bus->number + ((dev->devfn + iov->offset +
@@ -1100,7 +1100,7 @@ static int bnx2x_vf_bus(struct bnx2x *bp, int vfid)
 
 static int bnx2x_vf_devfn(struct bnx2x *bp, int vfid)
 {
-	struct pci_dev *dev = bp->pdev;
+	struct pci_device *dev = bp->pdev;
 	struct bnx2x_sriov *iov = &bp->vfdb->sriov;
 
 	return (dev->devfn + iov->offset + iov->stride * vfid) & 0xff;
@@ -1109,7 +1109,7 @@ static int bnx2x_vf_devfn(struct bnx2x *bp, int vfid)
 static void bnx2x_vf_set_bars(struct bnx2x *bp, struct bnx2x_virtf *vf)
 {
 	int i, n;
-	struct pci_dev *dev = bp->pdev;
+	struct pci_device *dev = bp->pdev;
 	struct bnx2x_sriov *iov = &bp->vfdb->sriov;
 
 	for (i = 0, n = 0; i < PCI_SRIOV_NUM_BARS; i += 2, n++) {
@@ -1122,7 +1122,7 @@ static void bnx2x_vf_set_bars(struct bnx2x *bp, struct bnx2x_virtf *vf)
 	}
 }
 
-static int bnx2x_ari_enabled(struct pci_dev *dev)
+static int bnx2x_ari_enabled(struct pci_device *dev)
 {
 	return dev->bus->self && dev->bus->self->ari_enabled;
 }
@@ -1168,7 +1168,7 @@ static void __bnx2x_iov_free_vfdb(struct bnx2x *bp)
 static int bnx2x_sriov_pci_cfg_info(struct bnx2x *bp, struct bnx2x_sriov *iov)
 {
 	int pos;
-	struct pci_dev *dev = bp->pdev;
+	struct pci_device *dev = bp->pdev;
 
 	pos = pci_find_ext_capability(dev, PCI_EXT_CAP_ID_SRIOV);
 	if (!pos) {
@@ -1224,7 +1224,7 @@ int bnx2x_iov_init_one(struct bnx2x *bp, int int_mode_param,
 {
 	int err, i;
 	struct bnx2x_sriov *iov;
-	struct pci_dev *dev = bp->pdev;
+	struct pci_device *dev = bp->pdev;
 
 	bp->vfdb = NULL;
 
@@ -2457,7 +2457,7 @@ static int bnx2x_set_pf_tx_switching(struct bnx2x *bp, bool enable)
 	return 0;
 }
 
-int bnx2x_sriov_configure(struct pci_dev *dev, int num_vfs_param)
+int bnx2x_sriov_configure(struct pci_device *dev, int num_vfs_param)
 {
 	struct bnx2x *bp = netdev_priv(pci_get_drvdata(dev));
 

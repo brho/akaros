@@ -526,7 +526,7 @@ static inline int bnx2x_vf_headroom(struct bnx2x *bp)
 	return bp->vfdb->sriov.nr_virtfn * BNX2X_CIDS_PER_VF;
 }
 void bnx2x_pf_set_vfs_vlan(struct bnx2x *bp);
-int bnx2x_sriov_configure(struct pci_dev *dev, int num_vfs);
+int bnx2x_sriov_configure(struct pci_device *dev, int num_vfs);
 void bnx2x_iov_channel_down(struct bnx2x *bp);
 
 void bnx2x_iov_task(struct work_struct *work);
@@ -592,7 +592,7 @@ static inline void __iomem *bnx2x_vf_doorbells(struct bnx2x *bp)
 static inline void bnx2x_vf_pci_dealloc(struct bnx2x *bp) {}
 static inline int bnx2x_vf_pci_alloc(struct bnx2x *bp) {return 0; }
 static inline void bnx2x_pf_set_vfs_vlan(struct bnx2x *bp) {}
-static inline int bnx2x_sriov_configure(struct pci_dev *dev, int num_vfs) {return 0; }
+static inline int bnx2x_sriov_configure(struct pci_device *dev, int num_vfs) {return 0; }
 static inline void bnx2x_iov_channel_down(struct bnx2x *bp) {}
 
 static inline void bnx2x_iov_task(struct work_struct *work) {}

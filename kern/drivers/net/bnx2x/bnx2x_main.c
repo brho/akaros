@@ -1369,7 +1369,7 @@ int bnx2x_send_final_clnup(struct bnx2x *bp, uint8_t clnup_func,
 	return ret;
 }
 
-uint8_t bnx2x_is_pcie_pending(struct pci_dev *dev)
+uint8_t bnx2x_is_pcie_pending(struct pci_device *dev)
 {
 	uint16_t status;
 
@@ -8980,7 +8980,7 @@ uint32_t bnx2x_send_unload_req(struct bnx2x *bp, int unload_mode)
 	else if (bp->wol) {
 		uint32_t emac_base = port ? GRCBASE_EMAC1 : GRCBASE_EMAC0;
 		uint8_t *mac_addr = bp->dev->dev_addr;
-		struct pci_dev *pdev = bp->pdev;
+		struct pci_device *pdev = bp->pdev;
 		uint32_t val;
 		uint16_t pmc;
 
@@ -10379,7 +10379,7 @@ static int bnx2x_prev_mark_path(struct bnx2x *bp, bool after_undi)
 
 static int bnx2x_do_flr(struct bnx2x *bp)
 {
-	struct pci_dev *dev = bp->pdev;
+	struct pci_device *dev = bp->pdev;
 
 	if (CHIP_IS_E1x(bp)) {
 		BNX2X_DEV_INFO("FLR not supported in E1/E1H\n");
@@ -12586,7 +12586,7 @@ static void bnx2x_disable_pcie_error_reporting(struct bnx2x *bp)
 	}
 }
 
-static int bnx2x_init_dev(struct bnx2x *bp, struct pci_dev *pdev,
+static int bnx2x_init_dev(struct bnx2x *bp, struct pci_device *pdev,
 			  struct net_device *dev, unsigned long board_type)
 {
 	int rc;
@@ -13058,7 +13058,7 @@ static int bnx2x_set_qm_cid_count(struct bnx2x *bp)
  * @dev:	pci device
  *
  */
-static int bnx2x_get_num_non_def_sbs(struct pci_dev *pdev, int cnic_cnt)
+static int bnx2x_get_num_non_def_sbs(struct pci_device *pdev, int cnic_cnt)
 {
 	int index;
 	uint16_t control = 0;
@@ -13320,7 +13320,7 @@ void bnx2x_register_phc(struct bnx2x *bp)
 	}
 }
 
-static int bnx2x_init_one(struct pci_dev *pdev,
+static int bnx2x_init_one(struct pci_device *pdev,
 				    const struct pci_device_id *ent)
 {
 	struct net_device *dev = NULL;
@@ -13514,7 +13514,7 @@ init_one_exit:
 	return rc;
 }
 
-static void __bnx2x_remove(struct pci_dev *pdev,
+static void __bnx2x_remove(struct pci_device *pdev,
 			   struct net_device *dev,
 			   struct bnx2x *bp,
 			   bool remove_netdev)
@@ -13609,7 +13609,7 @@ static void __bnx2x_remove(struct pci_dev *pdev,
 	}
 }
 
-static void bnx2x_remove_one(struct pci_dev *pdev)
+static void bnx2x_remove_one(struct pci_device *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp;
@@ -13663,7 +13663,7 @@ static int bnx2x_eeh_nic_unload(struct bnx2x *bp)
  * This function is called after a PCI bus error affecting
  * this device has been detected.
  */
-static pci_ers_result_t bnx2x_io_error_detected(struct pci_dev *pdev,
+static pci_ers_result_t bnx2x_io_error_detected(struct pci_device *pdev,
 						pci_channel_state_t state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
@@ -13699,7 +13699,7 @@ static pci_ers_result_t bnx2x_io_error_detected(struct pci_dev *pdev,
  *
  * Restart the card from scratch, as if from a cold-boot.
  */
-static pci_ers_result_t bnx2x_io_slot_reset(struct pci_dev *pdev)
+static pci_ers_result_t bnx2x_io_slot_reset(struct pci_device *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp = netdev_priv(dev);
@@ -13781,7 +13781,7 @@ static pci_ers_result_t bnx2x_io_slot_reset(struct pci_dev *pdev)
  * This callback is called when the error recovery driver tells us that
  * its OK to resume normal operation.
  */
-static void bnx2x_io_resume(struct pci_dev *pdev)
+static void bnx2x_io_resume(struct pci_device *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp = netdev_priv(dev);
@@ -13810,7 +13810,7 @@ static const struct pci_error_handlers bnx2x_err_handler = {
 	.resume         = bnx2x_io_resume,
 };
 
-static void bnx2x_shutdown(struct pci_dev *pdev)
+static void bnx2x_shutdown(struct pci_device *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp;

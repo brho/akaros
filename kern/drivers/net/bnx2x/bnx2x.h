@@ -1492,7 +1492,7 @@ struct bnx2x {
 #endif /* CONFIG_BNX2X_SRIOV */
 
 	struct net_device	*dev;
-	struct pci_dev		*pdev;
+	struct pci_device		*pdev;
 
 	const struct iro	*iro_arr;
 #define IRO (bp->iro_arr)
@@ -2155,7 +2155,7 @@ uint32_t bnx2x_flr_clnup_poll_count(struct bnx2x *bp);
 void bnx2x_tx_hw_flushed(struct bnx2x *bp, uint32_t poll_count);
 int bnx2x_send_final_clnup(struct bnx2x *bp, uint8_t clnup_func,
 			   uint32_t poll_cnt);
-uint8_t bnx2x_is_pcie_pending(struct pci_dev *dev);
+uint8_t bnx2x_is_pcie_pending(struct pci_device *dev);
 int bnx2x_flr_clnup_poll_hw_counter(struct bnx2x *bp, uint32_t reg,
 				    char *msg, uint32_t poll_cnt);
 
