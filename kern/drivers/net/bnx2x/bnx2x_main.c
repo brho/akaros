@@ -12909,12 +12909,12 @@ static void be16_to_cpu_n(const uint8_t *_source, uint8_t *_target,
 
 #define BNX2X_ALLOC_AND_SET(arr, lbl, func)				\
 do {									\
-	u32 len = be32_to_cpu(fw_hdr->arr.len);				\
+	uint32_t len = be32_to_cpu(fw_hdr->arr.len);				\
 	bp->arr = kmalloc(len, GFP_KERNEL);				\
 	if (!bp->arr)							\
 		goto lbl;						\
 	func(bp->firmware->data + be32_to_cpu(fw_hdr->arr.offset),	\
-	     (u8 *)bp->arr, len);					\
+	     (uint8_t *)bp->arr, len);					\
 } while (0)
 
 static int bnx2x_init_firmware(struct bnx2x *bp)

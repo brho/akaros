@@ -27,6 +27,12 @@ typedef uint64_t;
 +uint64_t
 
 @@
+typedef uint;
+@@
+-uint
++unsigned int
+
+@@
 @@
 -ETH_ALEN
 +Eaddrlen
@@ -36,7 +42,6 @@ typedef uint64_t;
 -ETH_HLEN
 +ETHERHDRSIZE
 
-// doesn't catch all occurrences...
 @@
 @@
  struct
