@@ -55,6 +55,23 @@ struct semaphore {
 #endif
 };
 
+/* omitted elements (the sem debug stuff) are initialized to 0 */
+#define SEMAPHORE_INITIALIZER(name, n)                                         \
+{                                                                              \
+    .waiters    = TAILQ_HEAD_INITIALIZER((name).waiters),                      \
+	.nr_signals = (n),                                                         \
+    .lock       = SPINLOCK_INITIALIZER,                                        \
+    .irq_okay   = FALSE,                                                       \
+}
+
+#define SEMAPHORE_INITIALIZER_IRQSAVE(name, n)                                 \
+{                                                                              \
+    .waiters    = TAILQ_HEAD_INITIALIZER((name).waiters),                      \
+	.nr_signals = (n),                                                         \
+    .lock       = SPINLOCK_INITIALIZER_IRQSAVE,                                \
+    .irq_okay   = TRUE,                                                        \
+}
+
 struct cond_var {
 	struct semaphore			sem;
 	spinlock_t 					*lock;		/* usually points to internal_ */
@@ -122,11 +139,13 @@ void __reg_abortable_cv(struct cv_lookup_elm *cle, struct cond_var *cv);
 void dereg_abortable_cv(struct cv_lookup_elm *cle);
 bool should_abort(struct cv_lookup_elm *cle);
 
-/* qlocks are plan9's binary sempahore, which are wrappers around our sems */
+/* qlocks are plan9's binary sempahore, which are wrappers around our sems.
+ * Not sure if they'll need irqsave or normal sems. */
 typedef struct semaphore qlock_t;
 #define qlock_init(x) sem_init((x), 1)
 #define qlock(x) sem_down(x)
 #define qunlock(x) sem_up(x)
 #define canqlock(x) sem_trydown(x)
+#define QLOCK_INITIALIZER(name) SEMAPHORE_INITIALIZER(name, 1)
 
 #endif /* ROS_KERN_KTHREAD_H */

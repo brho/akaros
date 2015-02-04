@@ -1337,8 +1337,7 @@ static void __test_up_sem(uint32_t srcid, long a0, long a1, long a2)
 // TODO: Add assertions.
 bool test_kthreads(void)
 {
-	struct semaphore sem;
-	sem_init(&sem, 1);		/* set to 1 to test the unwind */
+	struct semaphore sem = SEMAPHORE_INITIALIZER(sem, 1);
 	printk("We're a kthread!  Stacktop is %p.  Testing suspend, etc...\n",
 	       get_stack_top());
 	/* So we have something that will wake us up.  Routine messages won't get
