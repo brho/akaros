@@ -305,7 +305,7 @@ int bnx2x_tx_int(struct bnx2x *bp, struct bnx2x_fp_txdata *txdata)
 	 * ordering of bit testing in the following
 	 * netif_tx_queue_stopped(txq) call.
 	 */
-	smp_mb();
+	mb();
 
 	if (unlikely(netif_tx_queue_stopped(txq))) {
 		/* Taking tx_lock() is needed to prevent re-enabling the queue
@@ -2400,7 +2400,7 @@ static void bnx2x_nic_load_pmf(struct bnx2x *bp, uint32_t load_code)
 		 * writing to bp->port.pmf here and reading it from the
 		 * bnx2x_periodic_task().
 		 */
-		smp_mb();
+		mb();
 	} else {
 		bp->port.pmf = 0;
 	}
@@ -2816,7 +2816,7 @@ int bnx2x_nic_load(struct bnx2x *bp, int load_mode)
 
 	case LOAD_OPEN:
 		netif_tx_start_all_queues(bp->dev);
-		smp_mb__after_atomic();
+		cmb();
 		break;
 
 	case LOAD_DIAG:
@@ -2950,7 +2950,7 @@ int bnx2x_nic_unload(struct bnx2x *bp, int unload_mode, bool keep_link)
 		bp->recovery_state = BNX2X_RECOVERY_DONE;
 		bp->is_leader = 0;
 		bnx2x_release_leader_lock(bp);
-		smp_mb();
+		mb();
 
 		DP(NETIF_MSG_IFDOWN, "Releasing a leadership...\n");
 		BNX2X_ERR("Can't unload in closed or error state\n");
@@ -2971,7 +2971,7 @@ int bnx2x_nic_unload(struct bnx2x *bp, int unload_mode, bool keep_link)
 	 * may restart the Tx from the NAPI context (see bnx2x_tx_int()).
 	 */
 	bp->state = BNX2X_STATE_CLOSING_WAIT4_HALT;
-	smp_mb();
+	mb();
 
 	/* indicate to VFs that the PF is going down */
 	bnx2x_iov_channel_down(bp);
@@ -3046,7 +3046,7 @@ int bnx2x_nic_unload(struct bnx2x *bp, int unload_mode, bool keep_link)
 
 	/* clear pending work in rtnl task */
 	bp->sp_rtnl_state = 0;
-	smp_mb();
+	mb();
 
 	/* Free SKBs, SGEs, TPA pool and driver internals */
 	bnx2x_free_skbs(bp);
@@ -4127,7 +4127,7 @@ netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct ether *dev)
 	wmb();
 
 	txdata->tx_db.data.prod += nbd;
-	barrier();
+	cmb();
 
 	DOORBELL(bp, txdata->cid, txdata->tx_db.raw);
 
@@ -4141,7 +4141,7 @@ netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct ether *dev)
 		/* paired memory barrier is in bnx2x_tx_int(), we have to keep
 		 * ordering of set_bit() in netif_tx_stop_queue() and read of
 		 * fp->bd_tx_cons */
-		smp_mb();
+		mb();
 
 		bnx2x_fp_qstats(bp, txdata->parent_fp)->driver_xoff++;
 		if (bnx2x_tx_avail(bp, txdata) >= MAX_DESC_PER_TX_PKT)
@@ -5011,9 +5011,9 @@ void bnx2x_update_coalesce_sb_index(struct bnx2x *bp, uint8_t fw_sb_id,
 void bnx2x_schedule_sp_rtnl(struct bnx2x *bp, enum sp_rtnl_flag flag,
 			    uint32_t verbose)
 {
-	smp_mb__before_atomic();
+	cmb();
 	set_bit(flag, &bp->sp_rtnl_state);
-	smp_mb__after_atomic();
+	cmb();
 	DP((BNX2X_MSG_SP | verbose), "Scheduling sp_rtnl task [Flag: %d]\n",
 	   flag);
 	schedule_delayed_work(&bp->sp_rtnl_task, 0);

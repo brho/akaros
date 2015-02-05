@@ -253,16 +253,16 @@ static bool bnx2x_raw_check_pending(struct bnx2x_raw_obj *o)
 
 static void bnx2x_raw_clear_pending(struct bnx2x_raw_obj *o)
 {
-	smp_mb__before_atomic();
+	cmb();
 	clear_bit(o->state, o->pstate);
-	smp_mb__after_atomic();
+	cmb();
 }
 
 static void bnx2x_raw_set_pending(struct bnx2x_raw_obj *o)
 {
-	smp_mb__before_atomic();
+	cmb();
 	set_bit(o->state, o->pstate);
-	smp_mb__after_atomic();
+	cmb();
 }
 
 /**
@@ -2134,7 +2134,7 @@ static int bnx2x_set_rx_mode_e1x(struct bnx2x *bp,
 
 	/* The operation is completed */
 	clear_bit(p->state, p->pstate);
-	smp_mb__after_atomic();
+	cmb();
 
 	return 0;
 }
@@ -3579,16 +3579,16 @@ error_exit1:
 
 static void bnx2x_mcast_clear_sched(struct bnx2x_mcast_obj *o)
 {
-	smp_mb__before_atomic();
+	cmb();
 	clear_bit(o->sched_state, o->raw.pstate);
-	smp_mb__after_atomic();
+	cmb();
 }
 
 static void bnx2x_mcast_set_sched(struct bnx2x_mcast_obj *o)
 {
-	smp_mb__before_atomic();
+	cmb();
 	set_bit(o->sched_state, o->raw.pstate);
-	smp_mb__after_atomic();
+	cmb();
 }
 
 static bool bnx2x_mcast_check_sched(struct bnx2x_mcast_obj *o)
@@ -3749,9 +3749,9 @@ static bool bnx2x_credit_pool_get(struct bnx2x_credit_pool_obj *o, int cnt)
 {
 	bool rc;
 
-	smp_mb();
+	mb();
 	rc = __atomic_dec_ifmoe(&o->credit, cnt, 0);
-	smp_mb();
+	mb();
 
 	return rc;
 }
@@ -3760,12 +3760,12 @@ static bool bnx2x_credit_pool_put(struct bnx2x_credit_pool_obj *o, int cnt)
 {
 	bool rc;
 
-	smp_mb();
+	mb();
 
 	/* Don't let to refill if credit + cnt > pool_sz */
 	rc = __atomic_add_ifless(&o->credit, cnt, o->pool_sz + 1);
 
-	smp_mb();
+	mb();
 
 	return rc;
 }
@@ -3774,7 +3774,7 @@ static int bnx2x_credit_pool_check(struct bnx2x_credit_pool_obj *o)
 {
 	int cur_credit;
 
-	smp_mb();
+	mb();
 	cur_credit = atomic_read(&o->credit);
 
 	return cur_credit;
@@ -3877,7 +3877,7 @@ static inline void bnx2x_init_credit_pool(struct bnx2x_credit_pool_obj *p,
 	p->base_pool_offset = base;
 
 	/* Commit the change */
-	smp_mb();
+	mb();
 
 	p->check = bnx2x_credit_pool_check;
 
@@ -4207,7 +4207,7 @@ int bnx2x_queue_state_change(struct bnx2x *bp,
 		if (rc) {
 			o->next_state = BNX2X_Q_STATE_MAX;
 			clear_bit(pending_bit, pending);
-			smp_mb__after_atomic();
+			cmb();
 			return rc;
 		}
 
@@ -4295,7 +4295,7 @@ static int bnx2x_queue_comp_cmd(struct bnx2x *bp,
 	wmb();
 
 	clear_bit(cmd, &o->pending);
-	smp_mb__after_atomic();
+	cmb();
 
 	return 0;
 }
@@ -4567,7 +4567,7 @@ static inline int bnx2x_q_init(struct bnx2x *bp,
 	o->complete_cmd(bp, o, BNX2X_Q_CMD_INIT);
 
 	bus_wmb();
-	smp_mb();
+	mb();
 
 	return 0;
 }
@@ -5296,7 +5296,7 @@ static inline int bnx2x_func_state_change_comp(struct bnx2x *bp,
 	wmb();
 
 	clear_bit(cmd, &o->pending);
-	smp_mb__after_atomic();
+	cmb();
 
 	return 0;
 }
@@ -6051,7 +6051,7 @@ int bnx2x_func_state_change(struct bnx2x *bp,
 		if (rc) {
 			o->next_state = BNX2X_F_STATE_MAX;
 			clear_bit(cmd, pending);
-			smp_mb__after_atomic();
+			cmb();
 			return rc;
 		}
 

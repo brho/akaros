@@ -622,7 +622,7 @@ void bnx2x_tx_timeout(struct ether *dev);
 /*********************** Fast path ********************************/
 static inline void bnx2x_update_fpsb_idx(struct bnx2x_fastpath *fp)
 {
-	barrier(); /* status block is written to by the chip */
+	cmb(); /* status block is written to by the chip */
 	fp->fp_hc_idx = fp->sb_running_index[SM_RX_ID];
 }
 
@@ -645,7 +645,7 @@ static inline void bnx2x_igu_ack_sb_gen(struct bnx2x *bp, uint8_t igu_sb_id,
 
 	/* Make sure that ACK is written */
 	bus_wmb();
-	barrier();
+	cmb();
 }
 
 static inline void bnx2x_hc_ack_sb(struct bnx2x *bp, uint8_t sb_id,
@@ -667,7 +667,7 @@ static inline void bnx2x_hc_ack_sb(struct bnx2x *bp, uint8_t sb_id,
 
 	/* Make sure that ACK is written */
 	bus_wmb();
-	barrier();
+	cmb();
 }
 
 static inline void bnx2x_ack_sb(struct bnx2x *bp, uint8_t igu_sb_id,
@@ -697,7 +697,7 @@ static inline uint16_t bnx2x_hc_ack_int(struct bnx2x *bp)
 		       COMMAND_REG_SIMD_MASK);
 	uint32_t result = REG_RD(bp, hc_addr);
 
-	barrier();
+	cmb();
 	return result;
 }
 
@@ -709,13 +709,13 @@ static inline uint16_t bnx2x_igu_ack_int(struct bnx2x *bp)
 	DP(NETIF_MSG_INTR, "read 0x%08x from IGU addr 0x%x\n",
 	   result, igu_addr);
 
-	barrier();
+	cmb();
 	return result;
 }
 
 static inline uint16_t bnx2x_ack_int(struct bnx2x *bp)
 {
-	barrier();
+	cmb();
 	if (bp->common.int_block == INT_BLOCK_HC)
 		return bnx2x_hc_ack_int(bp);
 	else
@@ -725,7 +725,7 @@ static inline uint16_t bnx2x_ack_int(struct bnx2x *bp)
 static inline int bnx2x_has_tx_work_unload(struct bnx2x_fp_txdata *txdata)
 {
 	/* Tell compiler that consumer and producer can change */
-	barrier();
+	cmb();
 	return txdata->tx_pkt_prod != txdata->tx_pkt_cons;
 }
 
@@ -755,7 +755,7 @@ static inline int bnx2x_tx_queue_has_work(struct bnx2x_fp_txdata *txdata)
 	uint16_t hw_cons;
 
 	/* Tell compiler that status block fields can change */
-	barrier();
+	cmb();
 	hw_cons = le16_to_cpu(*txdata->tx_cons_sb);
 	return hw_cons != txdata->tx_pkt_cons;
 }
@@ -1180,7 +1180,7 @@ static inline bool bnx2x_wait_sp_comp(struct bnx2x *bp, unsigned long mask)
 	int tout = 5000; /* Wait for 5 secs tops */
 
 	while (tout--) {
-		smp_mb();
+		mb();
 		netif_addr_lock_bh(bp->dev);
 		if (!(bp->sp_state & mask)) {
 			netif_addr_unlock_bh(bp->dev);
@@ -1191,7 +1191,7 @@ static inline bool bnx2x_wait_sp_comp(struct bnx2x *bp, unsigned long mask)
 		kthread_usleep(1000);
 	}
 
-	smp_mb();
+	mb();
 
 	netif_addr_lock_bh(bp->dev);
 	if (bp->sp_state & mask) {

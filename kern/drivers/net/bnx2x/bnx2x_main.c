@@ -1547,7 +1547,7 @@ static void bnx2x_hc_int_enable(struct bnx2x *bp)
 	 * Ensure that HC_CONFIG is written before leading/trailing edge config
 	 */
 	bus_wmb();
-	barrier();
+	cmb();
 
 	if (!CHIP_IS_E1(bp)) {
 		/* init leading/trailing edge */
@@ -1612,7 +1612,7 @@ static void bnx2x_igu_int_enable(struct bnx2x *bp)
 	if (val & IGU_PF_CONF_INT_LINE_EN)
 		pci_intx(bp->pdev, true);
 
-	barrier();
+	cmb();
 
 	/* init leading/trailing edge */
 	if (IS_MF(bp)) {
@@ -1749,7 +1749,7 @@ static int bnx2x_schedule_sp_task(struct bnx2x *bp)
 	 * is set, otherwise we will get out of sync and miss all
 	 * further interrupts. Hence, the barrier.
 	 */
-	smp_wmb();
+	wmb();
 
 	/* schedule sp_task to workqueue */
 	return queue_delayed_work(bnx2x_wq, &bp->sp_task, 0);
@@ -1832,10 +1832,10 @@ void bnx2x_sp_event(struct bnx2x_fastpath *fp, union eth_rx_cqe *rr_cqe)
 		return;
 #endif
 
-	smp_mb__before_atomic();
+	cmb();
 	atomic_inc(&bp->cq_spq_left);
 	/* push the change in bp->spq_left and towards the memory */
-	smp_mb__after_atomic();
+	cmb();
 
 	DP(BNX2X_MSG_SP, "bp->cq_spq_left %x\n", atomic_read(&bp->cq_spq_left));
 
@@ -1850,11 +1850,11 @@ void bnx2x_sp_event(struct bnx2x_fastpath *fp, union eth_rx_cqe *rr_cqe)
 		 * sp_state is cleared, and this order prevents
 		 * races
 		 */
-		smp_mb__before_atomic();
+		cmb();
 		set_bit(BNX2X_AFEX_PENDING_VIFSET_MCP_ACK, &bp->sp_state);
 		wmb();
 		clear_bit(BNX2X_AFEX_FCOE_Q_UPDATE_PENDING, &bp->sp_state);
-		smp_mb__after_atomic();
+		cmb();
 
 		/* schedule the sp task as mcp ack is required */
 		bnx2x_schedule_sp_task(bp);
@@ -2934,7 +2934,7 @@ static void bnx2x_pmf_update(struct bnx2x *bp)
 	 * We need the mb() to ensure the ordering between the writing to
 	 * bp->port.pmf here and reading it from the bnx2x_periodic_task().
 	 */
-	smp_mb();
+	mb();
 
 	/* queue a periodic task */
 	queue_delayed_work(bnx2x_wq, &bp->period_task, 0);
@@ -3911,7 +3911,7 @@ static uint16_t bnx2x_update_dsb_idx(struct bnx2x *bp)
 	struct host_sp_status_block *def_sb = bp->def_status_blk;
 	uint16_t rc = 0;
 
-	barrier(); /* status block is written to by the chip */
+	cmb(); /* status block is written to by the chip */
 	if (bp->def_att_idx != def_sb->atten_status_block.attn_bits_index) {
 		bp->def_att_idx = def_sb->atten_status_block.attn_bits_index;
 		rc |= BNX2X_DEF_SB_ATT_IDX;
@@ -3923,7 +3923,7 @@ static uint16_t bnx2x_update_dsb_idx(struct bnx2x *bp)
 	}
 
 	/* Do not reorder: indices reading should complete before handling */
-	barrier();
+	cmb();
 	return rc;
 }
 
@@ -4046,7 +4046,7 @@ static void bnx2x_attn_int_asserted(struct bnx2x *bp, uint32_t asserted)
 			if (!igu_acked)
 				DP(NETIF_MSG_HW,
 				   "Failed to verify IGU ack on time\n");
-			barrier();
+			cmb();
 		}
 		REG_WR(bp, nig_int_mask_addr, nig_mask);
 		bnx2x_release_phy_lock(bp);
@@ -5339,9 +5339,9 @@ static void bnx2x_after_function_update(struct bnx2x *bp)
 		__clear_bit(RAMROD_COMP_WAIT, &queue_params.ramrod_flags);
 
 		/* mark latest Q bit */
-		smp_mb__before_atomic();
+		cmb();
 		set_bit(BNX2X_AFEX_FCOE_Q_UPDATE_PENDING, &bp->sp_state);
-		smp_mb__after_atomic();
+		cmb();
 
 		/* send Q update ramrod for FCoE Q */
 		rc = bnx2x_queue_state_change(bp, &queue_params);
@@ -5575,13 +5575,13 @@ next_spqe:
 		spqe_cnt++;
 	} /* for */
 
-	smp_mb__before_atomic();
+	cmb();
 	atomic_add(spqe_cnt, &bp->eq_spq_left);
 
 	bp->eq_cons = sw_cons;
 	bp->eq_prod = sw_prod;
 	/* Make sure that above mem writes were issued towards the memory */
-	smp_wmb();
+	wmb();
 
 	/* update producer */
 	bnx2x_update_eq_prod(bp, bp->eq_prod);
@@ -5594,7 +5594,7 @@ static void bnx2x_sp_task(struct work_struct *work)
 	DP(BNX2X_MSG_SP, "sp task invoked\n");
 
 	/* make sure the atomic interrupt_occurred has been written */
-	smp_rmb();
+	rmb();
 	if (atomic_read(&bp->interrupt_occurred)) {
 
 		/* what work needs to be performed? */
@@ -7678,12 +7678,12 @@ void bnx2x_igu_clear_sb_gen(struct bnx2x *bp, uint8_t func,
 			 data, igu_addr_data);
 	REG_WR(bp, igu_addr_data, data);
 	bus_wmb();
-	barrier();
+	cmb();
 	DP(NETIF_MSG_HW, "write 0x%08x to IGU(via GRC) addr 0x%x\n",
 			  ctl, igu_addr_ctl);
 	REG_WR(bp, igu_addr_ctl, ctl);
 	bus_wmb();
-	barrier();
+	cmb();
 
 	/* wait for clean up to finish */
 	while (!(REG_RD(bp, igu_addr_ack) & sb_bit) && --cnt)
@@ -9572,13 +9572,13 @@ static void bnx2x_process_kill_chip_reset(struct bnx2x *bp, bool global)
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_1_CLEAR,
 	       reset_mask1 & (~not_reset_mask1));
 
-	barrier();
+	cmb();
 	bus_wmb();
 
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_SET,
 	       reset_mask2 & (~stay_reset2));
 
-	barrier();
+	cmb();
 	bus_wmb();
 
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_1_SET, reset_mask1);
@@ -9651,7 +9651,7 @@ static int bnx2x_process_kill(struct bnx2x *bp, bool global)
 		return -EAGAIN;
 	}
 
-	barrier();
+	cmb();
 
 	/* Close gates #2, #3 and #4 */
 	bnx2x_set_234_gates(bp, true);
@@ -9664,7 +9664,7 @@ static int bnx2x_process_kill(struct bnx2x *bp, bool global)
 
 	/* Clear "unprepared" bit */
 	REG_WR(bp, MISC_REG_UNPREPARED, 0);
-	barrier();
+	cmb();
 
 	/* Make sure all is written to the chip before the reset */
 	bus_wmb();
@@ -9681,11 +9681,11 @@ static int bnx2x_process_kill(struct bnx2x *bp, bool global)
 
 	/* PXP */
 	bnx2x_pxp_prep(bp);
-	barrier();
+	cmb();
 
 	/* reset the chip */
 	bnx2x_process_kill_chip_reset(bp, global);
-	barrier();
+	cmb();
 
 	/* clear errors in PGB */
 	if (!CHIP_IS_E1x(bp))
@@ -9763,7 +9763,7 @@ exit_leader_reset2:
 exit_leader_reset:
 	bp->is_leader = 0;
 	bnx2x_release_leader_lock(bp);
-	smp_mb();
+	mb();
 	return rc;
 }
 
@@ -9785,7 +9785,7 @@ static void bnx2x_recovery_failed(struct bnx2x *bp)
 
 	bp->recovery_state = BNX2X_RECOVERY_FAILED;
 
-	smp_mb();
+	mb();
 }
 
 /*
@@ -9833,7 +9833,7 @@ static void bnx2x_parity_recover(struct bnx2x *bp)
 			 * "recovery_state" update values are seen on other
 			 * CPUs.
 			 */
-			smp_mb();
+			mb();
 			break;
 
 		case BNX2X_RECOVERY_WAIT:
@@ -9927,12 +9927,12 @@ static void bnx2x_parity_recover(struct bnx2x *bp)
 						/* Shut down the power */
 						bnx2x_set_power_state(
 							bp, PCI_D3hot);
-						smp_mb();
+						mb();
 					} else {
 						bp->recovery_state =
 							BNX2X_RECOVERY_DONE;
 						error_recovered++;
-						smp_mb();
+						mb();
 					}
 					bp->eth_stats.recoverable_error =
 						error_recovered;
@@ -9975,7 +9975,7 @@ static void bnx2x_sp_rtnl_task(struct work_struct *work)
 		 * function anyway.
 		 */
 		bp->sp_rtnl_state = 0;
-		smp_mb();
+		mb();
 
 		bnx2x_parity_recover(bp);
 
@@ -9995,7 +9995,7 @@ static void bnx2x_sp_rtnl_task(struct work_struct *work)
 		 * function anyway.
 		 */
 		bp->sp_rtnl_state = 0;
-		smp_mb();
+		mb();
 
 		bnx2x_nic_unload(bp, UNLOAD_NORMAL, true);
 		bnx2x_nic_load(bp, LOAD_NORMAL);
@@ -10085,7 +10085,7 @@ static void bnx2x_period_task(struct work_struct *work)
 	 * the bp->port.pmf in the bnx2x_nic_load() or bnx2x_pmf_update() and
 	 * the reading here.
 	 */
-	smp_mb();
+	mb();
 	if (bp->port.pmf) {
 		bnx2x_period_func(&bp->link_params, &bp->link_vars);
 
@@ -14190,7 +14190,7 @@ static int bnx2x_drv_ctl(struct ether *dev, struct drv_ctl_info *ctl)
 			break;
 
 		bus_wmb();
-		barrier();
+		cmb();
 
 		/* Start accepting on iSCSI L2 ring */
 
@@ -14225,7 +14225,7 @@ static int bnx2x_drv_ctl(struct ether *dev, struct drv_ctl_info *ctl)
 			BNX2X_ERR("rx_mode completion timed out!\n");
 
 		bus_wmb();
-		barrier();
+		cmb();
 
 		/* Unset iSCSI L2 MAC */
 		rc = bnx2x_del_all_macs(bp, &bp->iscsi_l2_mac_obj,
@@ -14235,9 +14235,9 @@ static int bnx2x_drv_ctl(struct ether *dev, struct drv_ctl_info *ctl)
 	case DRV_CTL_RET_L2_SPQ_CREDIT_CMD: {
 		int count = ctl->data.credit.credit_count;
 
-		smp_mb__before_atomic();
+		cmb();
 		atomic_add(count, &bp->cq_spq_left);
-		smp_mb__after_atomic();
+		cmb();
 		break;
 	}
 	case DRV_CTL_ULP_REGISTER_CMD: {

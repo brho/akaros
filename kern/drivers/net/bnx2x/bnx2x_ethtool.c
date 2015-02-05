@@ -2514,11 +2514,11 @@ static int bnx2x_run_loopback(struct bnx2x *bp, int loopback_mode)
 	wmb();
 
 	txdata->tx_db.data.prod += 2;
-	barrier();
+	cmb();
 	DOORBELL(bp, txdata->cid, txdata->tx_db.raw);
 
 	bus_wmb();
-	barrier();
+	cmb();
 
 	num_pkts++;
 	txdata->tx_bd_prod += 2; /* start + pbd */
