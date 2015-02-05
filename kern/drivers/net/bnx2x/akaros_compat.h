@@ -21,9 +21,19 @@
 #include <mii.h>
 #include <umem.h>
 #include <mmio.h>
+#include <taskqueue.h>
 
 #define __rcu
+#define unlikely(x) (x)
+
 typedef unsigned long dma_addr_t;
+/* these dma funcs are empty in linux with !CONFIG_NEED_DMA_MAP_STATE */
+#define DEFINE_DMA_UNMAP_ADDR(ADDR_NAME)
+#define DEFINE_DMA_UNMAP_LEN(LEN_NAME)
+#define dma_unmap_addr(PTR, ADDR_NAME)           (0)
+#define dma_unmap_addr_set(PTR, ADDR_NAME, VAL)  do { } while (0)
+#define dma_unmap_len(PTR, LEN_NAME)             (0)
+#define dma_unmap_len_set(PTR, LEN_NAME, VAL)    do { } while (0)
 typedef int pci_power_t;
 
 #define DEFINE_SEMAPHORE(name)  \
