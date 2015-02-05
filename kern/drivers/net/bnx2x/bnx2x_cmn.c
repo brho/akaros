@@ -3302,7 +3302,8 @@ static uint16_t bnx2x_tx_split(struct bnx2x *bp,
 
 #define bswab32(b32) ((__force __le32) swab32((__force __u32) (b32)))
 #define bswab16(b16) ((__force __le16) swab16((__force __u16) (b16)))
-static __le16 bnx2x_csum_fix(unsigned char *t_header, uint16_t csum, s8 fix)
+static __le16 bnx2x_csum_fix(unsigned char *t_header, uint16_t csum,
+			     int8_t fix)
 {
 	__sum16 tsum = (__force __sum16) csum;
 
@@ -3593,7 +3594,7 @@ static uint8_t bnx2x_set_pbd_csum(struct bnx2x *bp, struct sk_buff *skb,
 		pbd->tcp_pseudo_csum = bswab16(tcp_hdr(skb)->check);
 
 	} else {
-		s8 fix = SKB_CS_OFF(skb); /* signed! */
+		int8_t fix = SKB_CS_OFF(skb); /* signed! */
 
 		DP(NETIF_MSG_TX_QUEUED,
 		   "hlen %d  fix %d  csum before fix %x\n",

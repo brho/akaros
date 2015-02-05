@@ -865,8 +865,8 @@ static inline bool bnx2x_fp_ll_disable(struct bnx2x_fastpath *fp)
 #define RCQ_TH_HI(bp)		(RCQ_TH_LO(bp) + DROPLESS_FC_HEADROOM)
 
 /* This is needed for determining of last_max */
-#define SUB_S16(a, b)		(s16)((s16)(a) - (s16)(b))
-#define SUB_S32(a, b)		(s32)((s32)(a) - (s32)(b))
+#define SUB_S16(a, b)		(int16_t)((int16_t)(a) - (int16_t)(b))
+#define SUB_S32(a, b)		(int32_t)((int32_t)(a) - (int32_t)(b))
 
 #define BNX2X_SWCID_SHIFT	17
 #define BNX2X_SWCID_MASK	((0x1 << BNX2X_SWCID_SHIFT) - 1)

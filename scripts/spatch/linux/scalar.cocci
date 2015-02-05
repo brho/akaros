@@ -27,6 +27,34 @@ typedef uint64_t;
 +uint64_t
 
 @@
+typedef s8;
+typedef int8_t;
+@@
+-s8
++int8_t
+
+@@
+typedef s16;
+typedef int16_t;
+@@
+-s16
++int16_t
+
+@@
+typedef s32;
+typedef int32_t;
+@@
+-s32
++int32_t
+
+@@
+typedef s64;
+typedef int64_t;
+@@
+-s64
++int64_t
+
+@@
 typedef uint;
 @@
 -uint

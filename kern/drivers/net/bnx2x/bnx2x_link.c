@@ -12877,8 +12877,8 @@ static int bnx2x_8073_common_init_phy(struct bnx2x *bp,
 	struct bnx2x_phy phy[PORT_MAX];
 	struct bnx2x_phy *phy_blk[PORT_MAX];
 	uint16_t val;
-	s8 port = 0;
-	s8 port_of_path = 0;
+	int8_t port = 0;
+	int8_t port_of_path = 0;
 	uint32_t swap_val, swap_override;
 	swap_val = REG_RD(bp,  NIG_REG_PORT_SWAP);
 	swap_override = REG_RD(bp,  NIG_REG_STRAP_OVERRIDE);
@@ -13002,7 +13002,7 @@ static int bnx2x_8726_common_init_phy(struct bnx2x *bp,
 				      uint32_t chip_id)
 {
 	uint32_t val;
-	s8 port;
+	int8_t port;
 	struct bnx2x_phy phy;
 	/* Use port1 because of the static port-swap */
 	/* Enable the module detection interrupt */
@@ -13098,11 +13098,11 @@ static int bnx2x_8727_common_init_phy(struct bnx2x *bp,
 				      uint8_t phy_index,
 				      uint32_t chip_id)
 {
-	s8 port, reset_gpio;
+	int8_t port, reset_gpio;
 	uint32_t swap_val, swap_override;
 	struct bnx2x_phy phy[PORT_MAX];
 	struct bnx2x_phy *phy_blk[PORT_MAX];
-	s8 port_of_path;
+	int8_t port_of_path;
 	swap_val = REG_RD(bp, NIG_REG_PORT_SWAP);
 	swap_override = REG_RD(bp, NIG_REG_STRAP_OVERRIDE);
 

@@ -13171,7 +13171,7 @@ static int bnx2x_send_update_drift_ramrod(struct bnx2x *bp, int drift_dir,
 	return bnx2x_func_state_change(bp, &func_params);
 }
 
-static int bnx2x_ptp_adjfreq(struct ptp_clock_info *ptp, s32 ppb)
+static int bnx2x_ptp_adjfreq(struct ptp_clock_info *ptp, int32_t ppb)
 {
 	struct bnx2x *bp = container_of(ptp, struct bnx2x, ptp_clock_info);
 	int rc;
@@ -13239,7 +13239,7 @@ static int bnx2x_ptp_adjfreq(struct ptp_clock_info *ptp, s32 ppb)
 	return 0;
 }
 
-static int bnx2x_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
+static int bnx2x_ptp_adjtime(struct ptp_clock_info *ptp, int64_t delta)
 {
 	struct bnx2x *bp = container_of(ptp, struct bnx2x, ptp_clock_info);
 	uint64_t now;

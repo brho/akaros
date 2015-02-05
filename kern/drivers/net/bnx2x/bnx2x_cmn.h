@@ -732,7 +732,7 @@ static inline int bnx2x_has_tx_work_unload(struct bnx2x_fp_txdata *txdata)
 static inline uint16_t bnx2x_tx_avail(struct bnx2x *bp,
 				 struct bnx2x_fp_txdata *txdata)
 {
-	s16 used;
+	int16_t used;
 	uint16_t prod;
 	uint16_t cons;
 
@@ -747,7 +747,7 @@ static inline uint16_t bnx2x_tx_avail(struct bnx2x *bp,
 	WARN_ON((txdata->tx_ring_size - used) > MAX_TX_AVAIL);
 #endif
 
-	return (s16)(txdata->tx_ring_size) - used;
+	return (int16_t)(txdata->tx_ring_size) - used;
 }
 
 static inline int bnx2x_tx_queue_has_work(struct bnx2x_fp_txdata *txdata)
