@@ -497,7 +497,7 @@ int bnx2x_vfpf_config_mac(struct bnx2x *bp, uint8_t *addr, uint8_t vf_qid,
 			  bool set);
 int bnx2x_vfpf_config_rss(struct bnx2x *bp,
 			  struct bnx2x_config_rss_params *params);
-int bnx2x_vfpf_set_mcast(struct net_device *dev);
+int bnx2x_vfpf_set_mcast(struct ether *dev);
 int bnx2x_vfpf_storm_rx_mode(struct bnx2x *bp);
 
 static inline void bnx2x_vf_fill_fw_str(struct bnx2x *bp, char *buf,
@@ -536,7 +536,7 @@ void bnx2x_schedule_iov_task(struct bnx2x *bp, enum bnx2x_iov_flag flag);
 void bnx2x_iov_link_update(struct bnx2x *bp);
 int bnx2x_iov_link_update_vf(struct bnx2x *bp, int idx);
 
-int bnx2x_set_vf_link_state(struct net_device *dev, int vf, int link_state);
+int bnx2x_set_vf_link_state(struct ether *dev, int vf, int link_state);
 
 #else /* CONFIG_BNX2X_SRIOV */
 
@@ -569,7 +569,7 @@ static inline int bnx2x_vfpf_config_mac(struct bnx2x *bp, uint8_t *addr,
 					uint8_t vf_qid, bool set) {return 0; }
 static inline int bnx2x_vfpf_config_rss(struct bnx2x *bp,
 					struct bnx2x_config_rss_params *params) {return 0; }
-static inline int bnx2x_vfpf_set_mcast(struct net_device *dev) {return 0; }
+static inline int bnx2x_vfpf_set_mcast(struct ether *dev) {return 0; }
 static inline int bnx2x_vfpf_storm_rx_mode(struct bnx2x *bp) {return 0; }
 static inline int bnx2x_iov_nic_init(struct bnx2x *bp) {return 0; }
 static inline int bnx2x_vf_headroom(struct bnx2x *bp) {return 0; }
@@ -600,7 +600,7 @@ static inline void bnx2x_schedule_iov_task(struct bnx2x *bp, enum bnx2x_iov_flag
 static inline void bnx2x_iov_link_update(struct bnx2x *bp) {}
 static inline int bnx2x_iov_link_update_vf(struct bnx2x *bp, int idx) {return 0; }
 
-static inline int bnx2x_set_vf_link_state(struct net_device *dev, int vf,
+static inline int bnx2x_set_vf_link_state(struct ether *dev, int vf,
 					  int link_state) {return 0; }
 struct pf_vf_bulletin_content;
 static inline void bnx2x_vf_bulletin_finalize(struct pf_vf_bulletin_content *bulletin,

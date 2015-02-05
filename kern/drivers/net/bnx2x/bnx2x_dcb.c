@@ -1904,14 +1904,14 @@ static inline bool bnx2x_dcbnl_set_valid(struct bnx2x *bp)
 	return bp->dcb_state && bp->dcbx_mode_uset;
 }
 
-static uint8_t bnx2x_dcbnl_get_state(struct net_device *netdev)
+static uint8_t bnx2x_dcbnl_get_state(struct ether *netdev)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "state = %d\n", bp->dcb_state);
 	return bp->dcb_state;
 }
 
-static uint8_t bnx2x_dcbnl_set_state(struct net_device *netdev, uint8_t state)
+static uint8_t bnx2x_dcbnl_set_state(struct ether *netdev, uint8_t state)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "state = %s\n", state ? "on" : "off");
@@ -1927,7 +1927,7 @@ static uint8_t bnx2x_dcbnl_set_state(struct net_device *netdev, uint8_t state)
 	return 0;
 }
 
-static void bnx2x_dcbnl_get_perm_hw_addr(struct net_device *netdev,
+static void bnx2x_dcbnl_get_perm_hw_addr(struct ether *netdev,
 					 uint8_t *perm_addr)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -1942,7 +1942,7 @@ static void bnx2x_dcbnl_get_perm_hw_addr(struct net_device *netdev,
 		       netdev->addr_len);
 }
 
-static void bnx2x_dcbnl_set_pg_tccfg_tx(struct net_device *netdev, int prio,
+static void bnx2x_dcbnl_set_pg_tccfg_tx(struct ether *netdev, int prio,
 					uint8_t prio_type, uint8_t pgid,
 					uint8_t bw_pct,
 					uint8_t up_map)
@@ -1970,7 +1970,7 @@ static void bnx2x_dcbnl_set_pg_tccfg_tx(struct net_device *netdev, int prio,
 	bp->dcbx_config_params.admin_ets_configuration_tx_enable = 1;
 }
 
-static void bnx2x_dcbnl_set_pg_bwgcfg_tx(struct net_device *netdev,
+static void bnx2x_dcbnl_set_pg_bwgcfg_tx(struct ether *netdev,
 					 int pgid, uint8_t bw_pct)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -1983,7 +1983,7 @@ static void bnx2x_dcbnl_set_pg_bwgcfg_tx(struct net_device *netdev,
 	bp->dcbx_config_params.admin_ets_configuration_tx_enable = 1;
 }
 
-static void bnx2x_dcbnl_set_pg_tccfg_rx(struct net_device *netdev, int prio,
+static void bnx2x_dcbnl_set_pg_tccfg_rx(struct ether *netdev, int prio,
 					uint8_t prio_type, uint8_t pgid,
 					uint8_t bw_pct,
 					uint8_t up_map)
@@ -1992,14 +1992,14 @@ static void bnx2x_dcbnl_set_pg_tccfg_rx(struct net_device *netdev, int prio,
 	DP(BNX2X_MSG_DCB, "Nothing to set; No RX support\n");
 }
 
-static void bnx2x_dcbnl_set_pg_bwgcfg_rx(struct net_device *netdev,
+static void bnx2x_dcbnl_set_pg_bwgcfg_rx(struct ether *netdev,
 					 int pgid, uint8_t bw_pct)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "Nothing to set; No RX support\n");
 }
 
-static void bnx2x_dcbnl_get_pg_tccfg_tx(struct net_device *netdev, int prio,
+static void bnx2x_dcbnl_get_pg_tccfg_tx(struct ether *netdev, int prio,
 					uint8_t *prio_type, uint8_t *pgid,
 					uint8_t *bw_pct,
 					uint8_t *up_map)
@@ -2027,7 +2027,7 @@ static void bnx2x_dcbnl_get_pg_tccfg_tx(struct net_device *netdev, int prio,
 	*pgid = DCBX_PRI_PG_GET(bp->dcbx_local_feat.ets.pri_pg_tbl, prio);
 }
 
-static void bnx2x_dcbnl_get_pg_bwgcfg_tx(struct net_device *netdev,
+static void bnx2x_dcbnl_get_pg_bwgcfg_tx(struct ether *netdev,
 					 int pgid, uint8_t *bw_pct)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -2041,7 +2041,7 @@ static void bnx2x_dcbnl_get_pg_bwgcfg_tx(struct net_device *netdev,
 	*bw_pct = DCBX_PG_BW_GET(bp->dcbx_local_feat.ets.pg_bw_tbl, pgid);
 }
 
-static void bnx2x_dcbnl_get_pg_tccfg_rx(struct net_device *netdev, int prio,
+static void bnx2x_dcbnl_get_pg_tccfg_rx(struct ether *netdev, int prio,
 					uint8_t *prio_type, uint8_t *pgid,
 					uint8_t *bw_pct,
 					uint8_t *up_map)
@@ -2052,7 +2052,7 @@ static void bnx2x_dcbnl_get_pg_tccfg_rx(struct net_device *netdev, int prio,
 	*prio_type = *pgid = *bw_pct = *up_map = 0;
 }
 
-static void bnx2x_dcbnl_get_pg_bwgcfg_rx(struct net_device *netdev,
+static void bnx2x_dcbnl_get_pg_bwgcfg_rx(struct ether *netdev,
 					 int pgid, uint8_t *bw_pct)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -2061,7 +2061,7 @@ static void bnx2x_dcbnl_get_pg_bwgcfg_rx(struct net_device *netdev,
 	*bw_pct = 0;
 }
 
-static void bnx2x_dcbnl_set_pfc_cfg(struct net_device *netdev, int prio,
+static void bnx2x_dcbnl_set_pfc_cfg(struct ether *netdev, int prio,
 				    uint8_t setting)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -2078,7 +2078,7 @@ static void bnx2x_dcbnl_set_pfc_cfg(struct net_device *netdev, int prio,
 	}
 }
 
-static void bnx2x_dcbnl_get_pfc_cfg(struct net_device *netdev, int prio,
+static void bnx2x_dcbnl_get_pfc_cfg(struct ether *netdev, int prio,
 				    uint8_t *setting)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -2092,7 +2092,7 @@ static void bnx2x_dcbnl_get_pfc_cfg(struct net_device *netdev, int prio,
 	*setting = (bp->dcbx_local_feat.pfc.pri_en_bitmap >> prio) & 0x1;
 }
 
-static uint8_t bnx2x_dcbnl_set_all(struct net_device *netdev)
+static uint8_t bnx2x_dcbnl_set_all(struct ether *netdev)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 
@@ -2117,7 +2117,7 @@ static uint8_t bnx2x_dcbnl_set_all(struct net_device *netdev)
 	return 0;
 }
 
-static uint8_t bnx2x_dcbnl_get_cap(struct net_device *netdev, int capid,
+static uint8_t bnx2x_dcbnl_get_cap(struct ether *netdev, int capid,
 				   uint8_t *cap)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -2163,7 +2163,7 @@ static uint8_t bnx2x_dcbnl_get_cap(struct net_device *netdev, int capid,
 	return rval;
 }
 
-static int bnx2x_dcbnl_get_numtcs(struct net_device *netdev, int tcid,
+static int bnx2x_dcbnl_get_numtcs(struct ether *netdev, int tcid,
 				  uint8_t *num)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -2194,7 +2194,7 @@ static int bnx2x_dcbnl_get_numtcs(struct net_device *netdev, int tcid,
 	return rval;
 }
 
-static int bnx2x_dcbnl_set_numtcs(struct net_device *netdev, int tcid,
+static int bnx2x_dcbnl_set_numtcs(struct ether *netdev, int tcid,
 				  uint8_t num)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -2202,7 +2202,7 @@ static int bnx2x_dcbnl_set_numtcs(struct net_device *netdev, int tcid,
 	return -EINVAL;
 }
 
-static uint8_t bnx2x_dcbnl_get_pfc_state(struct net_device *netdev)
+static uint8_t bnx2x_dcbnl_get_pfc_state(struct ether *netdev)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "state = %d\n", bp->dcbx_local_feat.pfc.enabled);
@@ -2213,7 +2213,7 @@ static uint8_t bnx2x_dcbnl_get_pfc_state(struct net_device *netdev)
 	return bp->dcbx_local_feat.pfc.enabled;
 }
 
-static void bnx2x_dcbnl_set_pfc_state(struct net_device *netdev,
+static void bnx2x_dcbnl_set_pfc_state(struct ether *netdev,
 				      uint8_t state)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -2308,7 +2308,7 @@ static int bnx2x_set_admin_app_up(struct bnx2x *bp, uint8_t idtype,
 	return 0;
 }
 
-static int bnx2x_dcbnl_set_app_up(struct net_device *netdev, uint8_t idtype,
+static int bnx2x_dcbnl_set_app_up(struct ether *netdev, uint8_t idtype,
 				  uint16_t idval, uint8_t up)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -2333,7 +2333,7 @@ static int bnx2x_dcbnl_set_app_up(struct net_device *netdev, uint8_t idtype,
 	return bnx2x_set_admin_app_up(bp, idtype, idval, up);
 }
 
-static uint8_t bnx2x_dcbnl_get_dcbx(struct net_device *netdev)
+static uint8_t bnx2x_dcbnl_get_dcbx(struct ether *netdev)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	uint8_t state;
@@ -2346,7 +2346,7 @@ static uint8_t bnx2x_dcbnl_get_dcbx(struct net_device *netdev)
 	return state;
 }
 
-static uint8_t bnx2x_dcbnl_set_dcbx(struct net_device *netdev, uint8_t state)
+static uint8_t bnx2x_dcbnl_set_dcbx(struct ether *netdev, uint8_t state)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
 	DP(BNX2X_MSG_DCB, "state = %02x\n", state);
@@ -2373,7 +2373,7 @@ static uint8_t bnx2x_dcbnl_set_dcbx(struct net_device *netdev, uint8_t state)
 	return 0;
 }
 
-static uint8_t bnx2x_dcbnl_get_featcfg(struct net_device *netdev, int featid,
+static uint8_t bnx2x_dcbnl_get_featcfg(struct ether *netdev, int featid,
 				  uint8_t *flags)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -2420,7 +2420,7 @@ static uint8_t bnx2x_dcbnl_get_featcfg(struct net_device *netdev, int featid,
 	return rval;
 }
 
-static uint8_t bnx2x_dcbnl_set_featcfg(struct net_device *netdev, int featid,
+static uint8_t bnx2x_dcbnl_set_featcfg(struct ether *netdev, int featid,
 				  uint8_t flags)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -2461,7 +2461,7 @@ static uint8_t bnx2x_dcbnl_set_featcfg(struct net_device *netdev, int featid,
 	return rval;
 }
 
-static int bnx2x_peer_appinfo(struct net_device *netdev,
+static int bnx2x_peer_appinfo(struct ether *netdev,
 			      struct dcb_peer_app_info *info,
 			      uint16_t* app_count)
 {
@@ -2481,7 +2481,7 @@ static int bnx2x_peer_appinfo(struct net_device *netdev,
 	return 0;
 }
 
-static int bnx2x_peer_apptable(struct net_device *netdev,
+static int bnx2x_peer_apptable(struct ether *netdev,
 			       struct dcb_app *table)
 {
 	int i, j;
@@ -2502,7 +2502,7 @@ static int bnx2x_peer_apptable(struct net_device *netdev,
 	return 0;
 }
 
-static int bnx2x_cee_peer_getpg(struct net_device *netdev, struct cee_pg *pg)
+static int bnx2x_cee_peer_getpg(struct ether *netdev, struct cee_pg *pg)
 {
 	int i;
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -2518,7 +2518,7 @@ static int bnx2x_cee_peer_getpg(struct net_device *netdev, struct cee_pg *pg)
 	return 0;
 }
 
-static int bnx2x_cee_peer_getpfc(struct net_device *netdev,
+static int bnx2x_cee_peer_getpfc(struct ether *netdev,
 				 struct cee_pfc *pfc)
 {
 	struct bnx2x *bp = netdev_priv(netdev);

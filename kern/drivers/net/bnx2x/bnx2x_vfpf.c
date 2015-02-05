@@ -850,7 +850,7 @@ out:
 	return rc;
 }
 
-int bnx2x_vfpf_set_mcast(struct net_device *dev)
+int bnx2x_vfpf_set_mcast(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	struct vfpf_set_q_filters_tlv *req = &bp->vf2pf_mbox->req.set_q_filters;

@@ -476,19 +476,19 @@ int bnx2x_nic_unload(struct bnx2x *bp, int unload_mode, bool keep_link);
 int bnx2x_nic_load(struct bnx2x *bp, int load_mode);
 
 /* hard_xmit callback */
-netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct net_device *dev);
+netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct ether *dev);
 
 /* setup_tc callback */
-int bnx2x_setup_tc(struct net_device *dev, uint8_t num_tc);
+int bnx2x_setup_tc(struct ether *dev, uint8_t num_tc);
 
-int bnx2x_get_vf_config(struct net_device *dev, int vf,
+int bnx2x_get_vf_config(struct ether *dev, int vf,
 			struct ifla_vf_info *ivi);
-int bnx2x_set_vf_mac(struct net_device *dev, int queue, uint8_t *mac);
-int bnx2x_set_vf_vlan(struct net_device *netdev, int vf, uint16_t vlan,
+int bnx2x_set_vf_mac(struct ether *dev, int queue, uint8_t *mac);
+int bnx2x_set_vf_vlan(struct ether *netdev, int vf, uint16_t vlan,
 		      uint8_t qos);
 
 /* select_queue callback */
-uint16_t bnx2x_select_queue(struct net_device *dev, struct sk_buff *skb,
+uint16_t bnx2x_select_queue(struct ether *dev, struct sk_buff *skb,
 		       void *accel_priv, select_queue_fallback_t fallback);
 
 static inline void bnx2x_update_rx_prod(struct bnx2x *bp,
@@ -526,9 +526,9 @@ static inline void bnx2x_update_rx_prod(struct bnx2x *bp,
 }
 
 /* reload helper */
-int bnx2x_reload_if_running(struct net_device *dev);
+int bnx2x_reload_if_running(struct ether *dev);
 
-int bnx2x_change_mac_addr(struct net_device *dev, void *p);
+int bnx2x_change_mac_addr(struct ether *dev, void *p);
 
 /* NAPI poll Tx part */
 int bnx2x_tx_int(struct bnx2x *bp, struct bnx2x_fp_txdata *txdata);
@@ -593,7 +593,7 @@ void bnx2x_free_mem_bp(struct bnx2x *bp);
  * @new_mtu:	requested mtu
  *
  */
-int bnx2x_change_mtu(struct net_device *dev, int new_mtu);
+int bnx2x_change_mtu(struct ether *dev, int new_mtu);
 
 #ifdef NETDEV_FCOE_WWNN
 /**
@@ -604,19 +604,19 @@ int bnx2x_change_mtu(struct net_device *dev, int new_mtu);
  * @type:	WWN type: NETDEV_FCOE_WWNN (node) or NETDEV_FCOE_WWPN (port)
  *
  */
-int bnx2x_fcoe_get_wwn(struct net_device *dev, uint64_t *wwn, int type);
+int bnx2x_fcoe_get_wwn(struct ether *dev, uint64_t *wwn, int type);
 #endif
 
-netdev_features_t bnx2x_fix_features(struct net_device *dev,
+netdev_features_t bnx2x_fix_features(struct ether *dev,
 				     netdev_features_t features);
-int bnx2x_set_features(struct net_device *dev, netdev_features_t features);
+int bnx2x_set_features(struct ether *dev, netdev_features_t features);
 
 /**
  * bnx2x_tx_timeout - tx timeout netdev callback
  *
  * @dev:	net device
  */
-void bnx2x_tx_timeout(struct net_device *dev);
+void bnx2x_tx_timeout(struct ether *dev);
 
 /*********************** Inlines **********************************/
 /*********************** Fast path ********************************/

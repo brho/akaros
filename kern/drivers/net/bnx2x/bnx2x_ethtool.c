@@ -211,7 +211,7 @@ static int bnx2x_get_port_type(struct bnx2x *bp)
 	return port_type;
 }
 
-static int bnx2x_get_vf_settings(struct net_device *dev,
+static int bnx2x_get_vf_settings(struct ether *dev,
 				 struct ethtool_cmd *cmd)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -248,7 +248,7 @@ static int bnx2x_get_vf_settings(struct net_device *dev,
 	return 0;
 }
 
-static int bnx2x_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+static int bnx2x_get_settings(struct ether *dev, struct ethtool_cmd *cmd)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	int cfg_idx = bnx2x_get_link_cfg_idx(bp);
@@ -332,7 +332,7 @@ static int bnx2x_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 	return 0;
 }
 
-static int bnx2x_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+static int bnx2x_set_settings(struct ether *dev, struct ethtool_cmd *cmd)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	uint32_t advertising, cfg_idx, old_multi_phy_config, new_multi_phy_config;
@@ -665,7 +665,7 @@ static int __bnx2x_get_regs_len(struct bnx2x *bp)
 	return regdump_len;
 }
 
-static int bnx2x_get_regs_len(struct net_device *dev)
+static int bnx2x_get_regs_len(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	int regdump_len = 0;
@@ -909,7 +909,7 @@ static void __bnx2x_get_regs(struct bnx2x *bp, uint32_t *p)
 	}
 }
 
-static void bnx2x_get_regs(struct net_device *dev,
+static void bnx2x_get_regs(struct ether *dev,
 			   struct ethtool_regs *regs, void *_p)
 {
 	uint32_t *p = _p;
@@ -960,7 +960,7 @@ static void bnx2x_get_regs(struct net_device *dev,
 	bnx2x_enable_blocks_parity(bp);
 }
 
-static int bnx2x_get_preset_regs_len(struct net_device *dev, uint32_t preset)
+static int bnx2x_get_preset_regs_len(struct ether *dev, uint32_t preset)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	int regdump_len = 0;
@@ -972,7 +972,7 @@ static int bnx2x_get_preset_regs_len(struct net_device *dev, uint32_t preset)
 	return regdump_len;
 }
 
-static int bnx2x_set_dump(struct net_device *dev, struct ethtool_dump *val)
+static int bnx2x_set_dump(struct ether *dev, struct ethtool_dump *val)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -984,7 +984,7 @@ static int bnx2x_set_dump(struct net_device *dev, struct ethtool_dump *val)
 	return 0;
 }
 
-static int bnx2x_get_dump_flag(struct net_device *dev,
+static int bnx2x_get_dump_flag(struct ether *dev,
 			       struct ethtool_dump *dump)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -998,7 +998,7 @@ static int bnx2x_get_dump_flag(struct net_device *dev,
 	return 0;
 }
 
-static int bnx2x_get_dump_data(struct net_device *dev,
+static int bnx2x_get_dump_data(struct ether *dev,
 			       struct ethtool_dump *dump,
 			       void *buffer)
 {
@@ -1048,7 +1048,7 @@ static int bnx2x_get_dump_data(struct net_device *dev,
 	return 0;
 }
 
-static void bnx2x_get_drvinfo(struct net_device *dev,
+static void bnx2x_get_drvinfo(struct ether *dev,
 			      struct ethtool_drvinfo *info)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -1065,7 +1065,7 @@ static void bnx2x_get_drvinfo(struct net_device *dev,
 	info->regdump_len = bnx2x_get_regs_len(dev);
 }
 
-static void bnx2x_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
+static void bnx2x_get_wol(struct ether *dev, struct ethtool_wolinfo *wol)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -1082,7 +1082,7 @@ static void bnx2x_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 	memset(&wol->sopass, 0, sizeof(wol->sopass));
 }
 
-static int bnx2x_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
+static int bnx2x_set_wol(struct ether *dev, struct ethtool_wolinfo *wol)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -1103,14 +1103,14 @@ static int bnx2x_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 	return 0;
 }
 
-static uint32_t bnx2x_get_msglevel(struct net_device *dev)
+static uint32_t bnx2x_get_msglevel(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
 	return bp->msg_enable;
 }
 
-static void bnx2x_set_msglevel(struct net_device *dev, uint32_t level)
+static void bnx2x_set_msglevel(struct ether *dev, uint32_t level)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -1122,7 +1122,7 @@ static void bnx2x_set_msglevel(struct net_device *dev, uint32_t level)
 	}
 }
 
-static int bnx2x_nway_reset(struct net_device *dev)
+static int bnx2x_nway_reset(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -1138,7 +1138,7 @@ static int bnx2x_nway_reset(struct net_device *dev)
 	return 0;
 }
 
-static uint32_t bnx2x_get_link(struct net_device *dev)
+static uint32_t bnx2x_get_link(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -1152,7 +1152,7 @@ static uint32_t bnx2x_get_link(struct net_device *dev)
 	return bp->link_vars.link_up;
 }
 
-static int bnx2x_get_eeprom_len(struct net_device *dev)
+static int bnx2x_get_eeprom_len(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -1392,7 +1392,7 @@ static bool bnx2x_is_nvm_accessible(struct bnx2x *bp)
 {
 	int rc = 1;
 	uint16_t pm = 0;
-	struct net_device *dev = pci_get_drvdata(bp->pdev);
+	struct ether *dev = pci_get_drvdata(bp->pdev);
 
 	if (bp->pdev->pm_cap)
 		rc = pci_read_config_word(bp->pdev,
@@ -1405,7 +1405,7 @@ static bool bnx2x_is_nvm_accessible(struct bnx2x *bp)
 	return true;
 }
 
-static int bnx2x_get_eeprom(struct net_device *dev,
+static int bnx2x_get_eeprom(struct ether *dev,
 			    struct ethtool_eeprom *eeprom, uint8_t *eebuf)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -1426,7 +1426,7 @@ static int bnx2x_get_eeprom(struct net_device *dev,
 	return bnx2x_nvram_read(bp, eeprom->offset, eebuf, eeprom->len);
 }
 
-static int bnx2x_get_module_eeprom(struct net_device *dev,
+static int bnx2x_get_module_eeprom(struct ether *dev,
 				   struct ethtool_eeprom *ee,
 				   uint8_t *data)
 {
@@ -1491,7 +1491,7 @@ static int bnx2x_get_module_eeprom(struct net_device *dev,
 	return rc;
 }
 
-static int bnx2x_get_module_info(struct net_device *dev,
+static int bnx2x_get_module_info(struct ether *dev,
 				 struct ethtool_modinfo *modinfo)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -1704,7 +1704,7 @@ static int bnx2x_nvram_write(struct bnx2x *bp, uint32_t offset,
 	return rc;
 }
 
-static int bnx2x_set_eeprom(struct net_device *dev,
+static int bnx2x_set_eeprom(struct ether *dev,
 			    struct ethtool_eeprom *eeprom, uint8_t *eebuf)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -1789,7 +1789,7 @@ static int bnx2x_set_eeprom(struct net_device *dev,
 	return rc;
 }
 
-static int bnx2x_get_coalesce(struct net_device *dev,
+static int bnx2x_get_coalesce(struct ether *dev,
 			      struct ethtool_coalesce *coal)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -1802,7 +1802,7 @@ static int bnx2x_get_coalesce(struct net_device *dev,
 	return 0;
 }
 
-static int bnx2x_set_coalesce(struct net_device *dev,
+static int bnx2x_set_coalesce(struct ether *dev,
 			      struct ethtool_coalesce *coal)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -1821,7 +1821,7 @@ static int bnx2x_set_coalesce(struct net_device *dev,
 	return 0;
 }
 
-static void bnx2x_get_ringparam(struct net_device *dev,
+static void bnx2x_get_ringparam(struct ether *dev,
 				struct ethtool_ringparam *ering)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -1837,7 +1837,7 @@ static void bnx2x_get_ringparam(struct net_device *dev,
 	ering->tx_pending = bp->tx_ring_size;
 }
 
-static int bnx2x_set_ringparam(struct net_device *dev,
+static int bnx2x_set_ringparam(struct ether *dev,
 			       struct ethtool_ringparam *ering)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -1867,7 +1867,7 @@ static int bnx2x_set_ringparam(struct net_device *dev,
 	return bnx2x_reload_if_running(dev);
 }
 
-static void bnx2x_get_pauseparam(struct net_device *dev,
+static void bnx2x_get_pauseparam(struct ether *dev,
 				 struct ethtool_pauseparam *epause)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -1892,7 +1892,7 @@ static void bnx2x_get_pauseparam(struct net_device *dev,
 	   epause->cmd, epause->autoneg, epause->rx_pause, epause->tx_pause);
 }
 
-static int bnx2x_set_pauseparam(struct net_device *dev,
+static int bnx2x_set_pauseparam(struct ether *dev,
 				struct ethtool_pauseparam *epause)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -1997,7 +1997,7 @@ static uint32_t bnx2x_adv_to_eee(uint32_t modes, uint32_t shift)
 	return eee_adv << shift;
 }
 
-static int bnx2x_get_eee(struct net_device *dev, struct ethtool_eee *edata)
+static int bnx2x_get_eee(struct ether *dev, struct ethtool_eee *edata)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	uint32_t eee_cfg;
@@ -2030,7 +2030,7 @@ static int bnx2x_get_eee(struct net_device *dev, struct ethtool_eee *edata)
 	return 0;
 }
 
-static int bnx2x_set_eee(struct net_device *dev, struct ethtool_eee *edata)
+static int bnx2x_set_eee(struct ether *dev, struct ethtool_eee *edata)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	uint32_t eee_cfg;
@@ -2898,7 +2898,7 @@ static int bnx2x_test_intr(struct bnx2x *bp)
 	return bnx2x_queue_state_change(bp, &params);
 }
 
-static void bnx2x_self_test(struct net_device *dev,
+static void bnx2x_self_test(struct ether *dev,
 			    struct ethtool_test *etest, uint64_t *buf)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -3029,7 +3029,7 @@ static int bnx2x_num_stat_queues(struct bnx2x *bp)
 	return BNX2X_NUM_ETH_QUEUES(bp);
 }
 
-static int bnx2x_get_sset_count(struct net_device *dev, int stringset)
+static int bnx2x_get_sset_count(struct ether *dev, int stringset)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	int i, num_strings = 0;
@@ -3061,7 +3061,7 @@ static int bnx2x_get_sset_count(struct net_device *dev, int stringset)
 	}
 }
 
-static uint32_t bnx2x_get_private_flags(struct net_device *dev)
+static uint32_t bnx2x_get_private_flags(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	uint32_t flags = 0;
@@ -3073,7 +3073,7 @@ static uint32_t bnx2x_get_private_flags(struct net_device *dev)
 	return flags;
 }
 
-static void bnx2x_get_strings(struct net_device *dev, uint32_t stringset,
+static void bnx2x_get_strings(struct ether *dev, uint32_t stringset,
 			      uint8_t *buf)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -3123,7 +3123,7 @@ static void bnx2x_get_strings(struct net_device *dev, uint32_t stringset,
 	}
 }
 
-static void bnx2x_get_ethtool_stats(struct net_device *dev,
+static void bnx2x_get_ethtool_stats(struct ether *dev,
 				    struct ethtool_stats *stats,
 				    uint64_t *buf)
 {
@@ -3177,7 +3177,7 @@ static void bnx2x_get_ethtool_stats(struct net_device *dev,
 	}
 }
 
-static int bnx2x_set_phys_id(struct net_device *dev,
+static int bnx2x_set_phys_id(struct ether *dev,
 			     enum ethtool_phys_id_state state)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -3251,7 +3251,7 @@ static int bnx2x_get_rss_flags(struct bnx2x *bp, struct ethtool_rxnfc *info)
 	return 0;
 }
 
-static int bnx2x_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *info,
+static int bnx2x_get_rxnfc(struct ether *dev, struct ethtool_rxnfc *info,
 			   uint32_t *rules __always_unused)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -3348,7 +3348,7 @@ static int bnx2x_set_rss_flags(struct bnx2x *bp, struct ethtool_rxnfc *info)
 	}
 }
 
-static int bnx2x_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *info)
+static int bnx2x_set_rxnfc(struct ether *dev, struct ethtool_rxnfc *info)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -3361,12 +3361,12 @@ static int bnx2x_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *info)
 	}
 }
 
-static uint32_t bnx2x_get_rxfh_indir_size(struct net_device *dev)
+static uint32_t bnx2x_get_rxfh_indir_size(struct ether *dev)
 {
 	return T_ETH_INDIRECTION_TABLE_SIZE;
 }
 
-static int bnx2x_get_rxfh(struct net_device *dev, uint32_t *indir,
+static int bnx2x_get_rxfh(struct ether *dev, uint32_t *indir,
 			  uint8_t *key,
 			  uint8_t *hfunc)
 {
@@ -3397,7 +3397,7 @@ static int bnx2x_get_rxfh(struct net_device *dev, uint32_t *indir,
 	return 0;
 }
 
-static int bnx2x_set_rxfh(struct net_device *dev, const uint32_t *indir,
+static int bnx2x_set_rxfh(struct ether *dev, const uint32_t *indir,
 			  const uint8_t *key, const uint8_t hfunc)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -3435,7 +3435,7 @@ static int bnx2x_set_rxfh(struct net_device *dev, const uint32_t *indir,
  * @dev:		net device
  * @channels:		returns the number of max / current queues
  */
-static void bnx2x_get_channels(struct net_device *dev,
+static void bnx2x_get_channels(struct ether *dev,
 			       struct ethtool_channels *channels)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -3467,7 +3467,7 @@ static void bnx2x_change_num_queues(struct bnx2x *bp, int num_rss)
  * @dev:		net device
  * @channels:		includes the number of queues requested
  */
-static int bnx2x_set_channels(struct net_device *dev,
+static int bnx2x_set_channels(struct ether *dev,
 			      struct ethtool_channels *channels)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -3506,7 +3506,7 @@ static int bnx2x_set_channels(struct net_device *dev,
 	return bnx2x_nic_load(bp, LOAD_NORMAL);
 }
 
-static int bnx2x_get_ts_info(struct net_device *dev,
+static int bnx2x_get_ts_info(struct ether *dev,
 			     struct ethtool_ts_info *info)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -3611,7 +3611,7 @@ static const struct ethtool_ops bnx2x_vf_ethtool_ops = {
 	.set_channels		= bnx2x_set_channels,
 };
 
-void bnx2x_set_ethtool_ops(struct bnx2x *bp, struct net_device *netdev)
+void bnx2x_set_ethtool_ops(struct bnx2x *bp, struct ether *netdev)
 {
 	netdev->ethtool_ops = (IS_PF(bp)) ?
 		&bnx2x_ethtool_ops : &bnx2x_vf_ethtool_ops;

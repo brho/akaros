@@ -1898,7 +1898,7 @@ void bnx2x_netif_stop(struct bnx2x *bp, int disable_hw)
 		bnx2x_napi_disable_cnic(bp);
 }
 
-uint16_t bnx2x_select_queue(struct net_device *dev, struct sk_buff *skb,
+uint16_t bnx2x_select_queue(struct ether *dev, struct sk_buff *skb,
 		       void *accel_priv, select_queue_fallback_t fallback)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -3705,7 +3705,7 @@ static inline void bnx2x_set_ipv6_ext_e2(struct sk_buff *skb,
  * bnx2x_tx_int() runs without netif_tx_lock unless it needs to call
  * netif_wake_queue()
  */
-netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct net_device *dev)
+netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -4160,7 +4160,7 @@ netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct net_device *dev)
  *
  * callback connected to the ndo_setup_tc function pointer
  */
-int bnx2x_setup_tc(struct net_device *dev, uint8_t num_tc)
+int bnx2x_setup_tc(struct ether *dev, uint8_t num_tc)
 {
 	int cos, prio, count, offset;
 	struct bnx2x *bp = netdev_priv(dev);
@@ -4219,7 +4219,7 @@ int bnx2x_setup_tc(struct net_device *dev, uint8_t num_tc)
 }
 
 /* called with rtnl_lock */
-int bnx2x_change_mac_addr(struct net_device *dev, void *p)
+int bnx2x_change_mac_addr(struct ether *dev, void *p)
 {
 	struct sockaddr *addr = p;
 	struct bnx2x *bp = netdev_priv(dev);
@@ -4689,7 +4689,7 @@ alloc_err:
 	return -ENOMEM;
 }
 
-int bnx2x_reload_if_running(struct net_device *dev)
+int bnx2x_reload_if_running(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -4749,7 +4749,7 @@ int bnx2x_get_link_cfg_idx(struct bnx2x *bp)
 }
 
 #ifdef NETDEV_FCOE_WWNN
-int bnx2x_fcoe_get_wwn(struct net_device *dev, uint64_t *wwn, int type)
+int bnx2x_fcoe_get_wwn(struct ether *dev, uint64_t *wwn, int type)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	struct cnic_eth_dev *cp = &bp->cnic_eth_dev;
@@ -4773,7 +4773,7 @@ int bnx2x_fcoe_get_wwn(struct net_device *dev, uint64_t *wwn, int type)
 #endif
 
 /* called with rtnl_lock */
-int bnx2x_change_mtu(struct net_device *dev, int new_mtu)
+int bnx2x_change_mtu(struct ether *dev, int new_mtu)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -4797,7 +4797,7 @@ int bnx2x_change_mtu(struct net_device *dev, int new_mtu)
 	return bnx2x_reload_if_running(dev);
 }
 
-netdev_features_t bnx2x_fix_features(struct net_device *dev,
+netdev_features_t bnx2x_fix_features(struct ether *dev,
 				     netdev_features_t features)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -4815,7 +4815,7 @@ netdev_features_t bnx2x_fix_features(struct net_device *dev,
 	return features;
 }
 
-int bnx2x_set_features(struct net_device *dev, netdev_features_t features)
+int bnx2x_set_features(struct ether *dev, netdev_features_t features)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	uint32_t flags = bp->flags;
@@ -4868,7 +4868,7 @@ int bnx2x_set_features(struct net_device *dev, netdev_features_t features)
 	return 0;
 }
 
-void bnx2x_tx_timeout(struct net_device *dev)
+void bnx2x_tx_timeout(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -4883,7 +4883,7 @@ void bnx2x_tx_timeout(struct net_device *dev)
 
 int bnx2x_suspend(struct pci_device *pdev, pm_message_t state)
 {
-	struct net_device *dev = pci_get_drvdata(pdev);
+	struct ether *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp;
 
 	if (!dev) {
@@ -4914,7 +4914,7 @@ int bnx2x_suspend(struct pci_device *pdev, pm_message_t state)
 
 int bnx2x_resume(struct pci_device *pdev)
 {
-	struct net_device *dev = pci_get_drvdata(pdev);
+	struct ether *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp;
 	int rc;
 

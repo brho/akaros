@@ -241,7 +241,7 @@ static DEFINE_SEMAPHORE(bnx2x_prev_sem);
 static LINUX_LIST_HEAD(bnx2x_prev_list);
 
 /* Forward declaration */
-static struct cnic_eth_dev *bnx2x_cnic_probe(struct net_device *dev);
+static struct cnic_eth_dev *bnx2x_cnic_probe(struct ether *dev);
 static uint32_t bnx2x_rx_ustorm_prods_offset(struct bnx2x_fastpath *fp);
 static int bnx2x_set_storm_rx_mode(struct bnx2x *bp);
 
@@ -5652,7 +5652,7 @@ static void bnx2x_sp_task(struct work_struct *work)
 
 irqreturn_t bnx2x_msix_sp_int(int irq, void *dev_instance)
 {
-	struct net_device *dev = dev_instance;
+	struct ether *dev = dev_instance;
 	struct bnx2x *bp = netdev_priv(dev);
 
 	bnx2x_ack_sb(bp, bp->igu_dsb_id, USTORM_ID, 0,
@@ -9948,7 +9948,7 @@ static void bnx2x_parity_recover(struct bnx2x *bp)
 	}
 }
 
-static int bnx2x_close(struct net_device *dev);
+static int bnx2x_close(struct ether *dev);
 
 /* bnx2x_nic_unload() flushes the bnx2x_wq, thus reset task is
  * scheduled on a general queue in order to prevent a dead lock.
@@ -12149,7 +12149,7 @@ static int bnx2x_init_bp(struct bnx2x *bp)
  */
 
 /* called with rtnl_lock */
-static int bnx2x_open(struct net_device *dev)
+static int bnx2x_open(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	int rc;
@@ -12218,7 +12218,7 @@ static int bnx2x_open(struct net_device *dev)
 }
 
 /* called with rtnl_lock */
-static int bnx2x_close(struct net_device *dev)
+static int bnx2x_close(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -12273,7 +12273,7 @@ static void bnx2x_free_mcast_macs_list(
 static int bnx2x_set_uc_list(struct bnx2x *bp)
 {
 	int rc;
-	struct net_device *dev = bp->dev;
+	struct ether *dev = bp->dev;
 	struct netdev_hw_addr *ha;
 	struct bnx2x_vlan_mac_obj *mac_obj = &bp->sp_objs->mac_obj;
 	unsigned long ramrod_flags = 0;
@@ -12310,7 +12310,7 @@ static int bnx2x_set_uc_list(struct bnx2x *bp)
 
 static int bnx2x_set_mc_list(struct bnx2x *bp)
 {
-	struct net_device *dev = bp->dev;
+	struct ether *dev = bp->dev;
 	struct bnx2x_mcast_ramrod_params rparam = {NULL};
 	int rc = 0;
 
@@ -12346,7 +12346,7 @@ static int bnx2x_set_mc_list(struct bnx2x *bp)
 }
 
 /* If bp->state is OPEN, should be called with netif_addr_lock_bh() */
-static void bnx2x_set_rx_mode(struct net_device *dev)
+static void bnx2x_set_rx_mode(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -12420,7 +12420,7 @@ void bnx2x_set_rx_mode_inner(struct bnx2x *bp)
 }
 
 /* called with rtnl_lock */
-static int bnx2x_mdio_read(struct net_device *netdev, int prtad,
+static int bnx2x_mdio_read(struct ether *netdev, int prtad,
 			   int devad, uint16_t addr)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -12444,7 +12444,7 @@ static int bnx2x_mdio_read(struct net_device *netdev, int prtad,
 }
 
 /* called with rtnl_lock */
-static int bnx2x_mdio_write(struct net_device *netdev, int prtad, int devad,
+static int bnx2x_mdio_write(struct ether *netdev, int prtad, int devad,
 			    uint16_t addr, uint16_t value)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -12464,7 +12464,7 @@ static int bnx2x_mdio_write(struct net_device *netdev, int prtad, int devad,
 }
 
 /* called with rtnl_lock */
-static int bnx2x_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+static int bnx2x_ioctl(struct ether *dev, struct ifreq *ifr, int cmd)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	struct mii_ioctl_data *mdio = if_mii(ifr);
@@ -12483,7 +12483,7 @@ static int bnx2x_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 }
 
 #ifdef CONFIG_NET_POLL_CONTROLLER
-static void poll_bnx2x(struct net_device *dev)
+static void poll_bnx2x(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	int i;
@@ -12495,7 +12495,7 @@ static void poll_bnx2x(struct net_device *dev)
 }
 #endif
 
-static int bnx2x_validate_addr(struct net_device *dev)
+static int bnx2x_validate_addr(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -12510,7 +12510,7 @@ static int bnx2x_validate_addr(struct net_device *dev)
 	return 0;
 }
 
-static int bnx2x_get_phys_port_id(struct net_device *netdev,
+static int bnx2x_get_phys_port_id(struct ether *netdev,
 				  struct netdev_phys_item_id *ppid)
 {
 	struct bnx2x *bp = netdev_priv(netdev);
@@ -12525,7 +12525,7 @@ static int bnx2x_get_phys_port_id(struct net_device *netdev,
 }
 
 static netdev_features_t bnx2x_features_check(struct sk_buff *skb,
-					      struct net_device *dev,
+					      struct ether *dev,
 					      netdev_features_t features)
 {
 	return vxlan_features_check(skb, features);
@@ -12587,7 +12587,7 @@ static void bnx2x_disable_pcie_error_reporting(struct bnx2x *bp)
 }
 
 static int bnx2x_init_dev(struct bnx2x *bp, struct pci_device *pdev,
-			  struct net_device *dev, unsigned long board_type)
+			  struct ether *dev, unsigned long board_type)
 {
 	int rc;
 	uint32_t pci_cfg_dword;
@@ -13323,7 +13323,7 @@ void bnx2x_register_phc(struct bnx2x *bp)
 static int bnx2x_init_one(struct pci_device *pdev,
 				    const struct pci_device_id *ent)
 {
-	struct net_device *dev = NULL;
+	struct ether *dev = NULL;
 	struct bnx2x *bp;
 	enum pcie_link_width pcie_width;
 	enum pci_bus_speed pcie_speed;
@@ -13515,7 +13515,7 @@ init_one_exit:
 }
 
 static void __bnx2x_remove(struct pci_device *pdev,
-			   struct net_device *dev,
+			   struct ether *dev,
 			   struct bnx2x *bp,
 			   bool remove_netdev)
 {
@@ -13611,7 +13611,7 @@ static void __bnx2x_remove(struct pci_device *pdev,
 
 static void bnx2x_remove_one(struct pci_device *pdev)
 {
-	struct net_device *dev = pci_get_drvdata(pdev);
+	struct ether *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp;
 
 	if (!dev) {
@@ -13666,7 +13666,7 @@ static int bnx2x_eeh_nic_unload(struct bnx2x *bp)
 static pci_ers_result_t bnx2x_io_error_detected(struct pci_device *pdev,
 						pci_channel_state_t state)
 {
-	struct net_device *dev = pci_get_drvdata(pdev);
+	struct ether *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp = netdev_priv(dev);
 
 	rtnl_lock();
@@ -13701,7 +13701,7 @@ static pci_ers_result_t bnx2x_io_error_detected(struct pci_device *pdev,
  */
 static pci_ers_result_t bnx2x_io_slot_reset(struct pci_device *pdev)
 {
-	struct net_device *dev = pci_get_drvdata(pdev);
+	struct ether *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp = netdev_priv(dev);
 	int i;
 
@@ -13783,7 +13783,7 @@ static pci_ers_result_t bnx2x_io_slot_reset(struct pci_device *pdev)
  */
 static void bnx2x_io_resume(struct pci_device *pdev)
 {
-	struct net_device *dev = pci_get_drvdata(pdev);
+	struct ether *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp = netdev_priv(dev);
 
 	if (bp->recovery_state != BNX2X_RECOVERY_DONE) {
@@ -13812,7 +13812,7 @@ static const struct pci_error_handlers bnx2x_err_handler = {
 
 static void bnx2x_shutdown(struct pci_device *pdev)
 {
-	struct net_device *dev = pci_get_drvdata(pdev);
+	struct ether *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp;
 
 	if (!dev)
@@ -14003,7 +14003,7 @@ static void bnx2x_cnic_sp_post(struct bnx2x *bp, int count)
 	spin_unlock_bh(&bp->spq_lock);
 }
 
-static int bnx2x_cnic_sp_queue(struct net_device *dev,
+static int bnx2x_cnic_sp_queue(struct ether *dev,
 			       struct kwqe_16 *kwqes[], uint32_t count)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -14148,7 +14148,7 @@ static void bnx2x_set_iscsi_eth_rx_mode(struct bnx2x *bp, bool start)
 	}
 }
 
-static int bnx2x_drv_ctl(struct net_device *dev, struct drv_ctl_info *ctl)
+static int bnx2x_drv_ctl(struct ether *dev, struct drv_ctl_info *ctl)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	int rc = 0;
@@ -14351,7 +14351,7 @@ void bnx2x_setup_cnic_info(struct bnx2x *bp)
 		cp->drv_state |= CNIC_DRV_STATE_NO_ISCSI_OOO;
 }
 
-static int bnx2x_register_cnic(struct net_device *dev, struct cnic_ops *ops,
+static int bnx2x_register_cnic(struct ether *dev, struct cnic_ops *ops,
 			       void *data)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -14407,7 +14407,7 @@ static int bnx2x_register_cnic(struct net_device *dev, struct cnic_ops *ops,
 	return 0;
 }
 
-static int bnx2x_unregister_cnic(struct net_device *dev)
+static int bnx2x_unregister_cnic(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	struct cnic_eth_dev *cp = &bp->cnic_eth_dev;
@@ -14424,7 +14424,7 @@ static int bnx2x_unregister_cnic(struct net_device *dev)
 	return 0;
 }
 
-static struct cnic_eth_dev *bnx2x_cnic_probe(struct net_device *dev)
+static struct cnic_eth_dev *bnx2x_cnic_probe(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	struct cnic_eth_dev *cp = &bp->cnic_eth_dev;

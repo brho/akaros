@@ -1556,7 +1556,7 @@ out:
 	return rc;
 }
 
-int bnx2x_set_vf_link_state(struct net_device *dev, int idx, int link_state)
+int bnx2x_set_vf_link_state(struct ether *dev, int idx, int link_state)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	struct bnx2x_virtf *vf = BP_VF(bp, idx);
@@ -2652,7 +2652,7 @@ static int bnx2x_vf_op_prep(struct bnx2x *bp, int vfidx,
 	return 0;
 }
 
-int bnx2x_get_vf_config(struct net_device *dev, int vfidx,
+int bnx2x_get_vf_config(struct ether *dev, int vfidx,
 			struct ifla_vf_info *ivi)
 {
 	struct bnx2x *bp = netdev_priv(dev);
@@ -2730,7 +2730,7 @@ int bnx2x_get_vf_config(struct net_device *dev, int vfidx,
  * mac configuration request, the PF will simply fail the request and VF can try
  * again after consulting its bulletin board.
  */
-int bnx2x_set_vf_mac(struct net_device *dev, int vfidx, uint8_t *mac)
+int bnx2x_set_vf_mac(struct ether *dev, int vfidx, uint8_t *mac)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 	int rc, q_logical_state;
@@ -2811,7 +2811,7 @@ out:
 	return rc;
 }
 
-int bnx2x_set_vf_vlan(struct net_device *dev, int vfidx, uint16_t vlan,
+int bnx2x_set_vf_vlan(struct ether *dev, int vfidx, uint16_t vlan,
 		      uint8_t qos)
 {
 	struct bnx2x_queue_state_params q_params = {NULL};

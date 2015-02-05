@@ -47,3 +47,9 @@ typedef uint;
  struct
 -pci_dev
 +pci_device
+
+@@
+@@
+ struct
+-net_device
++ether

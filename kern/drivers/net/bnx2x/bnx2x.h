@@ -597,7 +597,7 @@ struct bnx2x_fastpath {
 	     sizeof name field from netdev structure +
 	     4 ('-Xx-' string) +
 	     4 (for the digits and to make it DWORD aligned) */
-#define FP_NAME_SIZE		(sizeof(((struct net_device *)0)->name) + 8)
+#define FP_NAME_SIZE		(sizeof(((struct ether *)0)->name) + 8)
 	char			name[FP_NAME_SIZE];
 };
 
@@ -1488,7 +1488,7 @@ struct bnx2x {
 	uint16_t requested_nr_virtfn;
 #endif /* CONFIG_BNX2X_SRIOV */
 
-	struct net_device	*dev;
+	struct ether	*dev;
 	struct pci_device		*pdev;
 
 	const struct iro	*iro_arr;
@@ -2527,7 +2527,7 @@ static const uint32_t dmae_reg_go_c[] = {
 	DMAE_REG_GO_C12, DMAE_REG_GO_C13, DMAE_REG_GO_C14, DMAE_REG_GO_C15
 };
 
-void bnx2x_set_ethtool_ops(struct bnx2x *bp, struct net_device *netdev);
+void bnx2x_set_ethtool_ops(struct bnx2x *bp, struct ether *netdev);
 void bnx2x_notify_link_changed(struct bnx2x *bp);
 
 #define BNX2X_MF_SD_PROTOCOL(bp) \
