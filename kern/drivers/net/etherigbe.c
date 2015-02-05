@@ -2054,7 +2054,7 @@ igbepnp(struct ether* edev)
 	edev->port = ctlr->port;
 	edev->irq = ctlr->pci->irqline;
 	edev->tbdf = pci_to_tbdf(ctlr->pci);
-	edev->netif.mbps = 1000;
+	edev->mbps = 1000;
 	memmove(edev->ea, ctlr->ra, Eaddrlen);
 
 	/*
@@ -2066,9 +2066,9 @@ igbepnp(struct ether* edev)
 	edev->ctl = igbectl;
 	edev->shutdown = igbeshutdown;
 
-	edev->netif.arg = edev;
-	edev->netif.promiscuous = igbepromiscuous;
-	edev->netif.multicast = igbemulticast;
+	edev->arg = edev;
+	edev->promiscuous = igbepromiscuous;
+	edev->multicast = igbemulticast;
 
 	register_irq(edev->irq, igbeinterrupt, edev, edev->tbdf);
 	return 0;

@@ -516,11 +516,11 @@ rtl8169ifstat(struct ether* edev, void* a, long n, uint32_t offset)
 		error(Eio);
 	dtcc = ctlr->dtcc;
 
-	edev->netif.oerrs = dtcc->txer;
-	edev->netif.crcs = dtcc->rxer;
-	edev->netif.frames = dtcc->fae;
-	edev->netif.buffs = dtcc->misspkt;
-	edev->netif.overflows = ctlr->txdu+ctlr->rdu;
+	edev->oerrs = dtcc->txer;
+	edev->crcs = dtcc->rxer;
+	edev->frames = dtcc->fae;
+	edev->buffs = dtcc->misspkt;
+	edev->overflows = ctlr->txdu+ctlr->rdu;
 
 	if(n == 0){
 		qunlock(&ctlr->slock);
@@ -857,7 +857,8 @@ rtl8169attach(struct ether* edev)
 	}
 	phy = ctlr->mii->curphy;
 	printd("%s: speed %d fd %d link %d rfc %d tfc %d\n",
-		edev->netif.name, phy->speed, phy->fd, phy->link, phy->rfc, phy->tfc);
+		edev->name, phy->speed, phy->fd, phy->link, phy->rfc,
+	       phy->tfc);
 }
 
 static void
@@ -880,24 +881,24 @@ rtl8169link(struct ether* edev)
 	if(miistatus(ctlr->mii) < 0){
 		// TODO : no name here
 		printk("%slink n: speed %d fd %d link %d rfc %d tfc %d\n",
-			edev->netif.name, phy->speed, phy->fd, phy->link,
+			edev->name, phy->speed, phy->fd, phy->link,
 			phy->rfc, phy->tfc);
-		edev->netif.link = 0;
+		edev->link = 0;
 		return;
 	}
-	edev->netif.link = 1;
+	edev->link = 1;
 
 	limit = 256*1024;
 	if(phy->speed == 10){
-		edev->netif.mbps = 10;
+		edev->mbps = 10;
 		limit = 65*1024;
 	}
 	else if(phy->speed == 100)
-		edev->netif.mbps = 100;
+		edev->mbps = 100;
 	else if(phy->speed == 1000)
-		edev->netif.mbps = 1000;
+		edev->mbps = 1000;
 	printk("%slink y: speed %d fd %d link %d rfc %d tfc %d\n",
-		edev->netif.name, phy->speed, phy->fd, phy->link,
+		edev->name, phy->speed, phy->fd, phy->link,
 		phy->rfc, phy->tfc);
 
 	if(edev->oq != NULL)
@@ -1198,7 +1199,7 @@ rtl8169pnp(struct ether* edev)
 	edev->ctlr = ctlr;
 	edev->port = ctlr->port;
 	edev->irq = ctlr->pci->irqline;
-	edev->netif.mbps = 100;
+	edev->mbps = 100;
 
 	/*
 	 * Check if the adapter's station address is to be overridden.
@@ -1221,9 +1222,9 @@ rtl8169pnp(struct ether* edev)
 	edev->transmit = rtl8169transmit;
 	edev->ifstat = rtl8169ifstat;
 
-	edev->netif.arg = edev;
-	edev->netif.promiscuous = rtl8169promiscuous;
-	edev->netif.multicast = rtl8169multicast;
+	edev->arg = edev;
+	edev->promiscuous = rtl8169promiscuous;
+	edev->multicast = rtl8169multicast;
 //	edev->netif.shutdown = rtl8169shutdown;
 
 	rtl8169link(edev);

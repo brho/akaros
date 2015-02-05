@@ -480,11 +480,11 @@ static void rtl8139receive(struct ether *edev)
 		status = (*(p + 1) << 8) | *p;
 		if (!(status & Rcok)) {
 			if (status & (Ise | Fae))
-				edev->netif.frames++;
+				edev->frames++;
 			if (status & Crc)
-				edev->netif.crcs++;
+				edev->crcs++;
 			if (status & (Runt | Long))
-				edev->netif.buffs++;
+				edev->buffs++;
 
 			/*
 			 * Reset the receiver.
@@ -565,7 +565,7 @@ static void rtl8139interrupt(struct hw_trapframe *tf, void *arg)
 						if (ctlr->etxth < ETHERMAXTU / 32)
 							ctlr->etxth++;
 					}
-					edev->netif.oerrs++;
+					edev->oerrs++;
 				}
 
 				if (td->bp != NULL) {
@@ -587,11 +587,11 @@ static void rtl8139interrupt(struct hw_trapframe *tf, void *arg)
 			 */
 			msr = csr8r(ctlr, Msr);
 			if (!(msr & Linkb)) {
-				if (!(msr & Speed10) && edev->netif.mbps != 100) {
-					edev->netif.mbps = 100;
+				if (!(msr & Speed10) && edev->mbps != 100) {
+					edev->mbps = 100;
 					qsetlimit(edev->oq, 256 * 1024);
-				} else if ((msr & Speed10) && edev->netif.mbps != 10) {
-					edev->netif.mbps = 10;
+				} else if ((msr & Speed10) && edev->mbps != 10) {
+					edev->mbps = 10;
 					qsetlimit(edev->oq, 65 * 1024);
 				}
 			}
@@ -755,14 +755,14 @@ static int rtl8139pnp(struct ether *edev)
 	edev->transmit = rtl8139transmit;
 	edev->ifstat = rtl8139ifstat;
 
-	edev->netif.arg = edev;
-	edev->netif.promiscuous = rtl8139promiscuous;
+	edev->arg = edev;
+	edev->promiscuous = rtl8139promiscuous;
 
 	/*
 	 * This should be much more dynamic but will do for now.
 	 */
 	if ((csr8r(ctlr, Msr) & (Speed10 | Linkb)) == 0)
-		edev->netif.mbps = 100;
+		edev->mbps = 100;
 
 	register_irq(edev->irq, rtl8139interrupt, edev, edev->tbdf);
 	return 0;

@@ -97,7 +97,7 @@ static struct walkqid *etherwalk(struct chan *chan, struct chan *nchan,
 		runlock(&ether->rwlock);
 		nexterror();
 	}
-	wq = netifwalk(&ether->netif, chan, nchan, name, nname);
+	wq = netifwalk(ether, chan, nchan, name, nname);
 	if (wq && wq->clone != NULL && wq->clone != chan)
 		wq->clone->aux = ether;
 	poperror();
@@ -117,7 +117,7 @@ static int etherstat(struct chan *chan, uint8_t * dp, int n)
 		runlock(&ether->rwlock);
 		nexterror();
 	}
-	s = netifstat(&ether->netif, chan, dp, n);
+	s = netifstat(ether, chan, dp, n);
 	poperror();
 	runlock(&ether->rwlock);
 	return s;
@@ -135,7 +135,7 @@ static struct chan *etheropen(struct chan *chan, int omode)
 		runlock(&ether->rwlock);
 		nexterror();
 	}
-	c = netifopen(&ether->netif, chan, omode);
+	c = netifopen(ether, chan, omode);
 	poperror();
 	runlock(&ether->rwlock);
 	return c;
@@ -152,7 +152,7 @@ static void etherclose(struct chan *chan)
 		runlock(&ether->rwlock);
 		nexterror();
 	}
-	netifclose(&ether->netif, chan);
+	netifclose(ether, chan);
 	poperror();
 	runlock(&ether->rwlock);
 }
@@ -182,7 +182,7 @@ static long etherread(struct chan *chan, void *buf, long n, int64_t off)
 		if (NETTYPE(chan->qid.path) == Nstatqid)
 			ether->ifstat(ether, buf, 0, offset);
 	}
-	r = netifread(&ether->netif, chan, buf, n, offset);
+	r = netifread(ether, chan, buf, n, offset);
 out:
 	poperror();
 	runlock(&ether->rwlock);
@@ -201,7 +201,7 @@ static struct block *etherbread(struct chan *chan, long n, uint32_t offset)
 		runlock(&ether->rwlock);
 		nexterror();
 	}
-	b = netifbread(&ether->netif, chan, n, offset);
+	b = netifbread(ether, chan, n, offset);
 	poperror();
 	runlock(&ether->rwlock);
 	return b;
@@ -219,7 +219,7 @@ static int etherwstat(struct chan *chan, uint8_t * dp, int n)
 		runlock(&ether->rwlock);
 		nexterror();
 	}
-	r = netifwstat(&ether->netif, chan, dp, n);
+	r = netifwstat(ether, chan, dp, n);
 	poperror();
 	runlock(&ether->rwlock);
 	return r;
@@ -277,7 +277,7 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 	struct block *xbp;
 	struct ether *vlan;
 
-	ether->netif.inpackets++;
+	ether->inpackets++;
 
 	pkt = (struct etherpkt *)bp->rp;
 	len = BLEN(bp);
@@ -298,13 +298,13 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 	}
 
 	fx = 0;
-	ep = &ether->netif.f[Ntypes];
+	ep = &ether->f[Ntypes];
 
 	multi = pkt->d[0] & 1;
 	/* check for valid multcast addresses */
-	if (multi && eaddrcmp(pkt->d, ether->netif.bcast) != 0
-		&& ether->netif.prom == 0) {
-		if (!activemulti(&ether->netif, pkt->d, sizeof(pkt->d))) {
+	if (multi && eaddrcmp(pkt->d, ether->bcast) != 0
+		&& ether->prom == 0) {
+		if (!activemulti(ether, pkt->d, sizeof(pkt->d))) {
 			if (fromwire) {
 				freeb(bp);
 				bp = 0;
@@ -323,7 +323,7 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 	 * attempt to simply pass it into one of the connections, thereby
 	 * saving a copy of the data (usual case hopefully).
 	 */
-	for (fp = ether->netif.f; fp < ep; fp++) {
+	for (fp = ether->f; fp < ep; fp++) {
 		if ((f = *fp) && (f->type == type || f->type < 0))
 			if (tome || multi || f->prom) {
 				/* Don't want to hear bridged packets */
@@ -336,9 +336,9 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 						memmove(xbp->wp, pkt, len);
 						xbp->wp += len;
 						if (qpass(f->in, xbp) < 0)
-							ether->netif.soverflows++;
+							ether->soverflows++;
 					} else
-						ether->netif.soverflows++;
+						ether->soverflows++;
 				} else
 					etherrtrace(f, pkt, len);
 			}
@@ -346,7 +346,7 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 
 	if (fx) {
 		if (qpass(fx->in, bp) < 0)
-			ether->netif.soverflows++;
+			ether->soverflows++;
 		return 0;
 	}
 	if (fromwire) {
@@ -363,11 +363,11 @@ static int etheroq(struct ether *ether, struct block *bp)
 	struct etherpkt *pkt;
 	int8_t irq_state = 0;
 
-	ether->netif.outpackets++;
+	ether->outpackets++;
 
-	if (!(ether->netif.feat & NETF_SG))
+	if (!(ether->feat & NETF_SG))
 		bp = linearizeblock(bp);
-	ptclcsum_finalize(bp, ether->netif.feat);
+	ptclcsum_finalize(bp, ether->feat);
 	/*
 	 * Check if the packet has to be placed back onto the input queue,
 	 * i.e. if it's a loopback or broadcast packet or the interface is
@@ -380,8 +380,8 @@ static int etheroq(struct ether *ether, struct block *bp)
 	pkt = (struct etherpkt *)bp->rp;
 	len = BLEN(bp);
 	loopback = eaddrcmp(pkt->d, ether->ea) == 0;
-	if (loopback || eaddrcmp(pkt->d, ether->netif.bcast) == 0
-		|| ether->netif.prom) {
+	if (loopback || eaddrcmp(pkt->d, ether->bcast) == 0
+		|| ether->prom) {
 		disable_irqsave(&irq_state);
 		etheriq(ether, bp, 0);
 		enable_irqsave(&irq_state);
@@ -397,7 +397,7 @@ static int etheroq(struct ether *ether, struct block *bp)
 			ether = ether->ctlr;
 		}
 
-		if ((ether->netif.feat & NETF_PADMIN) == 0 && BLEN(bp) < ether->minmtu)
+		if ((ether->feat & NETF_PADMIN) == 0 && BLEN(bp) < ether->minmtu)
 			bp = adjustblock(bp, ether->minmtu);
 
 		qbwrite(ether->oq, bp);
@@ -425,7 +425,7 @@ static long etherwrite(struct chan *chan, void *buf, long n, int64_t unused)
 		nexterror();
 	}
 	if (NETTYPE(chan->qid.path) != Ndataqid) {
-		l = netifwrite(&ether->netif, chan, buf, n);
+		l = netifwrite(ether, chan, buf, n);
 		if (l >= 0)
 			goto out;
 		cb = parsecmd(buf, n);
@@ -515,7 +515,7 @@ static long vlanctl(struct ether *ether, void *buf, long n)
 		&& strcmp(cb->f[0], "ea") == 0 && parseether(ea, cb->f[1]) == 0) {
 		kfree(cb);
 		memmove(ether->ea, ea, Eaddrlen);
-		memmove(ether->netif.addr, ether->ea, Eaddrlen);
+		memmove(ether->addr, ether->ea, Eaddrlen);
 		return 0;
 	}
 	if (cb->nf == 1 && strcmp(cb->f[0], "disable") == 0) {
@@ -569,28 +569,28 @@ static struct ether *vlanalloc(struct ether *ether, int id)
 			error(Enovmem);
 		rwinit(&vlan->rwlock);
 		qlock_init(&vlan->vlq);
-		netifinit(&vlan->netif, name, Ntypes, ether->netif.limit);
+		netifinit(vlan, name, Ntypes, ether->limit);
 		ether->vlans[fid] = vlan;	/* id is still zero, can't be matched */
 		ether->nvlan++;
 	} else
-		memmove(vlan->netif.name, name, KNAMELEN - 1);
+		memmove(vlan->name, name, KNAMELEN - 1);
 	vlan->attach = nop;
 	vlan->transmit = NULL;
 	vlan->ctl = vlanctl;
 	vlan->irq = -1;
-	vlan->netif.promiscuous = ether->netif.promiscuous;
-	vlan->netif.multicast = ether->netif.multicast;
-	vlan->netif.arg = vlan;
-	vlan->netif.mbps = ether->netif.mbps;
+	vlan->promiscuous = ether->promiscuous;
+	vlan->multicast = ether->multicast;
+	vlan->arg = vlan;
+	vlan->mbps = ether->mbps;
 	vlan->fullduplex = ether->fullduplex;
 	vlan->encry = ether->encry;
 	vlan->minmtu = ether->minmtu;
 	vlan->maxmtu = ether->maxmtu;
 	vlan->ctlrno = ether->ctlrno;
 	vlan->vlanid = id;
-	vlan->netif.alen = Eaddrlen;
-	memmove(vlan->netif.addr, ether->netif.addr, sizeof(vlan->netif.addr));
-	memmove(vlan->netif.bcast, ether->netif.bcast, sizeof(ether->netif.bcast));
+	vlan->alen = Eaddrlen;
+	memmove(vlan->addr, ether->addr, sizeof(vlan->addr));
+	memmove(vlan->bcast, ether->bcast, sizeof(ether->bcast));
 	vlan->oq = NULL;
 	vlan->ctlr = ether;
 	vlan->vlanid = id;
@@ -650,7 +650,7 @@ static void etherreset(void)
 		rwinit(&ether->rwlock);
 		qlock_init(&ether->vlq);
 		ether->ctlrno = ctlrno;
-		ether->netif.mbps = 10;
+		ether->mbps = 10;
 		ether->minmtu = ETHERMINTU;
 		ether->maxmtu = ETHERMAXTU;
 		/* looked like irq type, we don't have these yet */
@@ -687,7 +687,8 @@ static void etherreset(void)
 
 			i = snprintf(buf, sizeof(buf),
 						 "#l%d: %s: %dMbps port 0x%x irq %u", ctlrno,
-						 ether->type, ether->netif.mbps, ether->port,
+						 ether->type, ether->mbps,
+				     ether->port,
 						 ether->irq);
 			/* Looks like this is for printing MMIO addrs */
 #if 0
@@ -705,7 +706,7 @@ static void etherreset(void)
 			snprintf(buf + i, sizeof(buf) - i, "\n");
 			printk(buf);
 
-			switch (ether->netif.mbps) {
+			switch (ether->mbps) {
 
 			case 1 ... 99:
 				qsize = 64 * 1024;
@@ -719,14 +720,14 @@ static void etherreset(void)
 			default:
 				qsize = 8 * 1024 * 1024;
 			}
-			netifinit(&ether->netif, name, Ntypes, qsize);
+			netifinit(ether, name, Ntypes, qsize);
 			if (ether->oq == 0)
 				ether->oq = qopen(qsize, Qmsg, 0, 0);
 			if (ether->oq == 0)
 				panic("etherreset %s", name);
-			ether->netif.alen = Eaddrlen;
-			memmove(ether->netif.addr, ether->ea, Eaddrlen);
-			memset(ether->netif.bcast, 0xFF, Eaddrlen);
+			ether->alen = Eaddrlen;
+			memmove(ether->addr, ether->ea, Eaddrlen);
+			memset(ether->bcast, 0xFF, Eaddrlen);
 
 			etherxx[ctlrno] = ether;
 			ether = 0;

@@ -14,16 +14,16 @@
 #include <ip.h>
 
 static int netown(struct netfile *, char *unused_char_p_t, int);
-static int openfile(struct netif *, int);
+static int openfile(struct ether *, int);
 static char *matchtoken(char *unused_char_p_t, char *);
-static char *netmulti(struct netif *, struct netfile *,
+static char *netmulti(struct ether *, struct netfile *,
 					  uint8_t * unused_uint8_p_t, int);
 static int parseaddr(uint8_t * unused_uint8_p_t, char *unused_char_p_t, int);
 
 /*
  *  set up a new network interface
  */
-void netifinit(struct netif *nif, char *name, int nfile, uint32_t limit)
+void netifinit(struct ether *nif, char *name, int nfile, uint32_t limit)
 {
 	qlock_init(&nif->qlock);
 	strncpy(nif->name, name, KNAMELEN - 1);
@@ -45,7 +45,7 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp,
 		 int unused_int, int i, struct dir *dp)
 {
 	struct qid q;
-	struct netif *nif = (struct netif *)vp;
+	struct ether *nif = (struct ether *)vp;
 	struct netfile *f;
 	int perm;
 	char *o;
@@ -190,13 +190,13 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp,
 	return 1;
 }
 
-struct walkqid *netifwalk(struct netif *nif, struct chan *c, struct chan *nc,
+struct walkqid *netifwalk(struct ether *nif, struct chan *c, struct chan *nc,
 						  char **name, int nname)
 {
 	return devwalk(c, nc, name, nname, (struct dirtab *)nif, 0, netifgen);
 }
 
-struct chan *netifopen(struct netif *nif, struct chan *c, int omode)
+struct chan *netifopen(struct ether *nif, struct chan *c, int omode)
 {
 	int id;
 	struct netfile *f;
@@ -237,7 +237,8 @@ struct chan *netifopen(struct netif *nif, struct chan *c, int omode)
 }
 
 long
-netifread(struct netif *nif, struct chan *c, void *a, long n, uint32_t offset)
+netifread(struct ether *nif, struct chan *c, void *a, long n,
+	  uint32_t offset)
 {
 	int i, j;
 	struct netfile *f;
@@ -313,7 +314,7 @@ netifread(struct netif *nif, struct chan *c, void *a, long n, uint32_t offset)
 	return -1;	/* not reached */
 }
 
-struct block *netifbread(struct netif *nif, struct chan *c, long n,
+struct block *netifbread(struct ether *nif, struct chan *c, long n,
 						 uint32_t offset)
 {
 	if ((c->qid.type & QTDIR) || NETTYPE(c->qid.path) != Ndataqid)
@@ -325,7 +326,7 @@ struct block *netifbread(struct netif *nif, struct chan *c, long n,
 /*
  *  make sure this type isn't already in use on this device
  */
-static int typeinuse(struct netif *nif, int type)
+static int typeinuse(struct ether *nif, int type)
 {
 	struct netfile *f, **fp, **efp;
 
@@ -346,7 +347,7 @@ static int typeinuse(struct netif *nif, int type)
 /*
  *  the devxxx.c that calls us handles writing data, it knows best
  */
-long netifwrite(struct netif *nif, struct chan *c, void *a, long n)
+long netifwrite(struct ether *nif, struct chan *c, void *a, long n)
 {
 	ERRSTACK(1);
 	struct netfile *f;
@@ -417,7 +418,7 @@ long netifwrite(struct netif *nif, struct chan *c, void *a, long n)
 	return n;
 }
 
-int netifwstat(struct netif *nif, struct chan *c, uint8_t * db, int n)
+int netifwstat(struct ether *nif, struct chan *c, uint8_t * db, int n)
 {
 	struct dir *dir;
 	struct netfile *f;
@@ -446,12 +447,12 @@ int netifwstat(struct netif *nif, struct chan *c, uint8_t * db, int n)
 	return m;
 }
 
-int netifstat(struct netif *nif, struct chan *c, uint8_t * db, int n)
+int netifstat(struct ether *nif, struct chan *c, uint8_t * db, int n)
 {
 	return devstat(c, db, n, (struct dirtab *)nif, 0, netifgen);
 }
 
-void netifclose(struct netif *nif, struct chan *c)
+void netifclose(struct ether *nif, struct chan *c)
 {
 	struct netfile *f;
 	int t;
@@ -542,7 +543,7 @@ static int netown(struct netfile *p, char *o, int omode)
  *  Increment the reference count of a network device.
  *  If id < 0, return an unused ether device.
  */
-static int openfile(struct netif *nif, int id)
+static int openfile(struct ether *nif, int id)
 {
 	ERRSTACK(1);
 	struct netfile *f, **fp, **efp;
@@ -628,7 +629,7 @@ static uint32_t hash(uint8_t * a, int len)
 	return sum % Nmhash;
 }
 
-int activemulti(struct netif *nif, uint8_t * addr, int alen)
+int activemulti(struct ether *nif, uint8_t * addr, int alen)
 {
 	struct netaddr *hp;
 
@@ -667,7 +668,7 @@ static int parseaddr(uint8_t * to, char *from, int alen)
 /*
  *  keep track of multicast addresses
  */
-static char *netmulti(struct netif *nif, struct netfile *f, uint8_t * addr,
+static char *netmulti(struct ether *nif, struct netfile *f, uint8_t * addr,
 					  int add)
 {
 	struct netaddr **l, *ap;

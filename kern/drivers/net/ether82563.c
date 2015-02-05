@@ -1184,7 +1184,7 @@ phywrite(struct ctlr *c, unsigned int phyno, unsigned int reg, uint16_t v)
 
 static void phyerrata(struct ether *e, struct ctlr *c, unsigned int phyno)
 {
-	if (e->netif.mbps == 0) {
+	if (e->mbps == 0) {
 		if (c->phyerrata == 0) {
 			c->phyerrata++;
 			phywrite(c, phyno, Phyprst, Prst);	/* try a port reset */
@@ -1219,11 +1219,11 @@ static void phyl79proc(void *v)
 			phywrite(c, phyno, Phyctl, r | Ran | Ean);
 		}
 next:
-		e->netif.link = i != 3 && (phy & Link) != 0;
-		if (e->netif.link == 0)
+		e->link = i != 3 && (phy & Link) != 0;
+		if (e->link == 0)
 			i = 3;
 		c->speeds[i]++;
-		e->netif.mbps = speedtab[i];
+		e->mbps = speedtab[i];
 		c->lim = 0;
 		i82563im(c, Lsc);
 		c->lsleep++;
@@ -1273,11 +1273,11 @@ static void phylproc(void *v)
 		if (a)
 			phywrite(c, phyno, Phyctl, phyread(c, phyno, Phyctl) | Ran | Ean);
 next:
-		e->netif.link = (phy & Rtlink) != 0;
-		if (e->netif.link == 0)
+		e->link = (phy & Rtlink) != 0;
+		if (e->link == 0)
 			i = 3;
 		c->speeds[i]++;
-		e->netif.mbps = speedtab[i];
+		e->mbps = speedtab[i];
 		if (c->type == i82563)
 			phyerrata(e, c, phyno);
 		c->lim = 0;
@@ -1300,14 +1300,14 @@ static void pcslproc(void *v)
 		csr32w(c, Connsw, Enrgirq);
 	for (;;) {
 		phy = csr32r(c, Pcsstat);
-		e->netif.link = phy & Linkok;
+		e->link = phy & Linkok;
 		i = 3;
-		if (e->netif.link)
+		if (e->link)
 			i = (phy & 6) >> 1;
 		else if (phy & Anbad)
 			csr32w(c, Pcsctl, csr32r(c, Pcsctl) | Pan | Prestart);
 		c->speeds[i]++;
-		e->netif.mbps = speedtab[i];
+		e->mbps = speedtab[i];
 		c->lim = 0;
 		i82563im(c, Lsc | Omed);
 		c->lsleep++;
@@ -1327,13 +1327,13 @@ static void serdeslproc(void *v)
 	for (;;) {
 		rx = csr32r(c, Rxcw);
 		tx = csr32r(c, Txcw);
-		e->netif.link = (rx & 1 << 31) != 0;
+		e->link = (rx & 1 << 31) != 0;
 //      e->netif.link = (csr32r(c, Status) & Lu) != 0;
 		i = 3;
-		if (e->netif.link)
+		if (e->link)
 			i = 2;
 		c->speeds[i]++;
-		e->netif.mbps = speedtab[i];
+		e->mbps = speedtab[i];
 		c->lim = 0;
 		i82563im(c, Lsc);
 		c->lsleep++;
@@ -1923,7 +1923,7 @@ static int pnp(struct ether *edev, int type)
 	edev->port = ctlr->mmio_paddr;
 	edev->irq = ctlr->pcidev->irqline;
 	edev->tbdf = pci_to_tbdf(ctlr->pcidev);
-	edev->netif.mbps = 1000;
+	edev->mbps = 1000;
 	edev->maxmtu = ctlr->rbsz;
 	memmove(edev->ea, ctlr->ra, Eaddrlen);
 
@@ -1934,10 +1934,10 @@ static int pnp(struct ether *edev, int type)
 	edev->ifstat = i82563ifstat;
 	edev->ctl = i82563ctl;
 
-	edev->netif.arg = edev;
-	edev->netif.promiscuous = i82563promiscuous;
+	edev->arg = edev;
+	edev->promiscuous = i82563promiscuous;
 	edev->shutdown = i82563shutdown;
-	edev->netif.multicast = i82563multicast;
+	edev->multicast = i82563multicast;
 
 	register_irq(edev->irq, i82563interrupt, edev, edev->tbdf);
 	return 0;

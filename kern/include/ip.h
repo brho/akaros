@@ -945,6 +945,7 @@ enum {
 /*
  *  a network interface
  */
+struct ether;
 struct netif {
 	qlock_t qlock;
 
@@ -986,17 +987,18 @@ struct netif {
 	void (*scanbs) (void *, unsigned nt);	/* scan for base stations */
 };
 
-void netifinit(struct netif *, char *, int, uint32_t);
-struct walkqid *netifwalk(struct netif *, struct chan *, struct chan *, char **,
+void netifinit(struct ether *, char *, int, uint32_t);
+struct walkqid *netifwalk(struct ether *, struct chan *, struct chan *,
+			  char **,
 						  int);
-struct chan *netifopen(struct netif *, struct chan *, int);
-void netifclose(struct netif *, struct chan *);
-long netifread(struct netif *, struct chan *, void *, long, uint32_t);
-struct block *netifbread(struct netif *, struct chan *, long, uint32_t);
-long netifwrite(struct netif *, struct chan *, void *, long);
-int netifwstat(struct netif *, struct chan *, uint8_t *, int);
-int netifstat(struct netif *, struct chan *, uint8_t *, int);
-int activemulti(struct netif *, uint8_t *, int);
+struct chan *netifopen(struct ether *, struct chan *, int);
+void netifclose(struct ether *, struct chan *);
+long netifread(struct ether *, struct chan *, void *, long, uint32_t);
+struct block *netifbread(struct ether *, struct chan *, long, uint32_t);
+long netifwrite(struct ether *, struct chan *, void *, long);
+int netifwstat(struct ether *, struct chan *, uint8_t *, int);
+int netifstat(struct ether *, struct chan *, uint8_t *, int);
+int activemulti(struct ether *, uint8_t *, int);
 
 /*
  *  Ethernet specific
@@ -1052,8 +1054,7 @@ struct ether {
 	int nvlan;
 	struct ether *vlans[MaxFID];
 
-	/* another case where we wish we had anon struct members. */
-	struct netif netif;
+	struct netif;
 };
 
 extern struct block *etheriq(struct ether *, struct block *, int);
