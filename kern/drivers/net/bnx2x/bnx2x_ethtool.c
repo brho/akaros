@@ -1778,9 +1778,9 @@ static int bnx2x_set_eeprom(struct ether *dev,
 						&bp->link_params.phy[EXT_PHY1]);
 
 			/* wait 0.5 sec to allow it to run */
-			msleep(500);
+			kthread_usleep(1000 * 500);
 			bnx2x_ext_phy_hw_reset(bp, port);
-			msleep(500);
+			kthread_usleep(1000 * 500);
 			bnx2x_release_phy_lock(bp);
 		}
 	} else
@@ -2366,14 +2366,14 @@ static void bnx2x_wait_for_link(struct bnx2x *bp, uint8_t link_up,
 
 	if (link_up) {
 		while (bnx2x_link_test(bp, is_serdes) && cnt--)
-			msleep(20);
+			kthread_usleep(1000 * 20);
 
 		if (cnt <= 0 && bnx2x_link_test(bp, is_serdes))
 			DP(BNX2X_MSG_ETHTOOL, "Timeout waiting for link up\n");
 
 		cnt = 1400;
 		while (!bp->link_vars.link_up && cnt--)
-			msleep(20);
+			kthread_usleep(1000 * 20);
 
 		if (cnt <= 0 && !bp->link_vars.link_up)
 			DP(BNX2X_MSG_ETHTOOL,
@@ -3002,7 +3002,7 @@ static void bnx2x_self_test(struct ether *dev,
 	if (link_up) {
 		cnt = 100;
 		while (bnx2x_link_test(bp, is_serdes) && --cnt)
-			msleep(20);
+			kthread_usleep(1000 * 20);
 	}
 
 	if (!cnt) {

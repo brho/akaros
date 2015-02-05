@@ -1480,7 +1480,7 @@ static int bnx2x_pf_flr_clnup(struct bnx2x *bp)
 	bnx2x_tx_hw_flushed(bp, poll_cnt);
 
 	/* Wait 100ms (not adjusted according to platform) */
-	msleep(100);
+	kthread_usleep(1000 * 100);
 
 	/* Verify no pending pci transactions */
 	if (bnx2x_is_pcie_pending(bp->pdev))
@@ -1976,7 +1976,7 @@ int bnx2x_acquire_hw_lock(struct bnx2x *bp, uint32_t resource)
 		if (lock_status & resource_bit)
 			return 0;
 
-		usleep_range(5000, 10000);
+		kthread_usleep(5000);
 	}
 	BNX2X_ERR("Timeout\n");
 	return -EAGAIN;
@@ -2981,7 +2981,7 @@ uint32_t bnx2x_fw_command(struct bnx2x *bp, uint32_t command, uint32_t param)
 
 	do {
 		/* let the FW do it's magic ... */
-		msleep(delay);
+		kthread_usleep(1000 * delay);
 
 		rc = SHMEM_RD(bp, func_mb[mb_idx].fw_mb_header);
 
@@ -3591,7 +3591,7 @@ static void bnx2x_handle_drv_info_req(struct bnx2x *bp)
 				break;
 			}
 
-			msleep(BNX2X_UPDATE_DRV_INFO_IND_LENGTH);
+			kthread_usleep(1000 * BNX2X_UPDATE_DRV_INFO_IND_LENGTH);
 		}
 	}
 	if (!release) {
@@ -3887,7 +3887,7 @@ static int bnx2x_acquire_alr(struct bnx2x *bp)
 		if (val & MCPR_ACCESS_LOCK_LOCK)
 			break;
 
-		usleep_range(5000, 10000);
+		kthread_usleep(5000);
 	}
 	if (!(val & MCPR_ACCESS_LOCK_LOCK)) {
 		BNX2X_ERR("Cannot acquire MCP access lock register\n");
@@ -6626,7 +6626,7 @@ static int bnx2x_int_mem_test(struct bnx2x *bp)
 		if (val == 0x10)
 			break;
 
-		usleep_range(10000, 20000);
+		kthread_usleep(10000);
 		count--;
 	}
 	if (val != 0x10) {
@@ -6641,7 +6641,7 @@ static int bnx2x_int_mem_test(struct bnx2x *bp)
 		if (val == 1)
 			break;
 
-		usleep_range(10000, 20000);
+		kthread_usleep(10000);
 		count--;
 	}
 	if (val != 0x1) {
@@ -6651,9 +6651,9 @@ static int bnx2x_int_mem_test(struct bnx2x *bp)
 
 	/* Reset and init BRB, PRS */
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_1_CLEAR, 0x03);
-	msleep(50);
+	kthread_usleep(1000 * 50);
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_1_SET, 0x03);
-	msleep(50);
+	kthread_usleep(1000 * 50);
 	bnx2x_init_block(bp, BLOCK_BRB1, PHASE_COMMON);
 	bnx2x_init_block(bp, BLOCK_PRS, PHASE_COMMON);
 
@@ -6682,7 +6682,7 @@ static int bnx2x_int_mem_test(struct bnx2x *bp)
 		if (val == 0xb0)
 			break;
 
-		usleep_range(10000, 20000);
+		kthread_usleep(10000);
 		count--;
 	}
 	if (val != 0xb0) {
@@ -6699,7 +6699,7 @@ static int bnx2x_int_mem_test(struct bnx2x *bp)
 	REG_WR(bp, PRS_REG_CFC_SEARCH_INITIAL_CREDIT, 0x1);
 
 	/* Wait until PRS register shows 3 packets */
-	msleep(10 * factor);
+	kthread_usleep(1000 * (10 * factor));
 	/* Wait until NIG register shows 1 packet of size 0x10 */
 	val = REG_RD(bp, PRS_REG_NUM_OF_PACKETS);
 	if (val != 3)
@@ -6716,9 +6716,9 @@ static int bnx2x_int_mem_test(struct bnx2x *bp)
 
 	/* Reset and init BRB, PRS, NIG */
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_1_CLEAR, 0x03);
-	msleep(50);
+	kthread_usleep(1000 * 50);
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_1_SET, 0x03);
-	msleep(50);
+	kthread_usleep(1000 * 50);
 	bnx2x_init_block(bp, BLOCK_BRB1, PHASE_COMMON);
 	bnx2x_init_block(bp, BLOCK_PRS, PHASE_COMMON);
 	if (!CNIC_SUPPORT(bp))
@@ -7021,7 +7021,7 @@ static int bnx2x_init_hw_common(struct bnx2x *bp)
 		REG_WR(bp, PXP2_REG_PGL_TAGS_LIMIT, 0x1);
 
 	/* let the HW do it's magic ... */
-	msleep(100);
+	kthread_usleep(1000 * 100);
 	/* finish PXP init */
 	val = REG_RD(bp, PXP2_REG_RQ_CFG_DONE);
 	if (val != 1) {
@@ -7144,7 +7144,7 @@ static int bnx2x_init_hw_common(struct bnx2x *bp)
 
 		/* let the HW do it's magic ... */
 		do {
-			msleep(200);
+			kthread_usleep(1000 * 200);
 			val = REG_RD(bp, ATC_REG_ATC_INIT_DONE);
 		} while (factor-- && (val != 1));
 
@@ -7234,7 +7234,7 @@ static int bnx2x_init_hw_common(struct bnx2x *bp)
 			   VFC_MEMORIES_RST_REG_CAM_RST |
 			   VFC_MEMORIES_RST_REG_RAM_RST);
 
-		msleep(20);
+		kthread_usleep(1000 * 20);
 	}
 
 	bnx2x_init_block(bp, BLOCK_TSEM, PHASE_COMMON);
@@ -7341,7 +7341,7 @@ static int bnx2x_init_hw_common(struct bnx2x *bp)
 		REG_WR(bp, NIG_REG_LLH_E1HOV_MODE, IS_MF_SD(bp));
 
 	if (CHIP_REV_IS_SLOW(bp))
-		msleep(200);
+		kthread_usleep(1000 * 200);
 
 	/* finish CFC init */
 	val = reg_poll(bp, CFC_REG_LL_INIT_DONE, 1, 100, 10);
@@ -7687,7 +7687,7 @@ void bnx2x_igu_clear_sb_gen(struct bnx2x *bp, uint8_t func,
 
 	/* wait for clean up to finish */
 	while (!(REG_RD(bp, igu_addr_ack) & sb_bit) && --cnt)
-		msleep(20);
+		kthread_usleep(1000 * 20);
 
 	if (!(REG_RD(bp, igu_addr_ack) & sb_bit)) {
 		DP(NETIF_MSG_HW,
@@ -7911,7 +7911,7 @@ static int bnx2x_init_hw_func(struct bnx2x *bp)
 		 * needed to make sure there are no requests in
 		 * one of the PXP internal queues with "old" ILT addresses
 		 */
-		msleep(20);
+		kthread_usleep(1000 * 20);
 		/*
 		 * Master enable - Due to WB DMAE writes performed before this
 		 * register is re-initialized as part of the regular function
@@ -8854,7 +8854,7 @@ static void bnx2x_reset_func(struct bnx2x *bp)
 		 * scan to complete
 		 */
 		for (i = 0; i < 200; i++) {
-			usleep_range(10000, 20000);
+			kthread_usleep(10000);
 			if (!REG_RD(bp, TM_REG_LIN0_SCAN_ON + port*4))
 				break;
 		}
@@ -8902,7 +8902,7 @@ static void bnx2x_reset_port(struct bnx2x *bp)
 	/* Configure AEU */
 	REG_WR(bp, MISC_REG_AEU_MASK_ATTN_FUNC_0 + port*4, 0);
 
-	msleep(100);
+	kthread_usleep(1000 * 100);
 	/* Check for BRB port occupancy */
 	val = REG_RD(bp, BRB1_REG_PORT_NUM_OCC_BLOCKS_0 + port*4);
 	if (val)
@@ -9079,7 +9079,7 @@ static int bnx2x_func_wait_started(struct bnx2x *bp)
 
 	while (bnx2x_func_get_state(bp, &bp->func_obj) !=
 				BNX2X_F_STATE_STARTED && tout--)
-		msleep(20);
+		kthread_usleep(1000 * 20);
 
 	if (bnx2x_func_get_state(bp, &bp->func_obj) !=
 						BNX2X_F_STATE_STARTED) {
@@ -9176,7 +9176,7 @@ void bnx2x_chip_cleanup(struct bnx2x *bp, int unload_mode, bool keep_link)
 	}
 
 	/* Give HW time to discard old tx messages */
-	usleep_range(1000, 2000);
+	kthread_usleep(1000);
 
 	/* Clean all ETH MACs */
 	rc = bnx2x_del_all_macs(bp, &bp->sp_objs[0].mac_obj, BNX2X_ETH_MAC,
@@ -9427,9 +9427,9 @@ static void bnx2x_mcp_wait_one(struct bnx2x *bp)
 	/* special handling for emulation and FPGA,
 	   wait 10 times longer */
 	if (CHIP_REV_IS_SLOW(bp))
-		msleep(MCP_ONE_TIMEOUT*10);
+		kthread_usleep(1000 * (MCP_ONE_TIMEOUT * 10));
 	else
-		msleep(MCP_ONE_TIMEOUT);
+		kthread_usleep(1000 * MCP_ONE_TIMEOUT);
 }
 
 /*
@@ -9605,7 +9605,7 @@ static int bnx2x_er_poll_igu_vq(struct bnx2x *bp)
 		if (pend_bits == 0)
 			break;
 
-		usleep_range(1000, 2000);
+		kthread_usleep(1000);
 	} while (cnt-- > 0);
 
 	if (cnt <= 0) {
@@ -9640,7 +9640,7 @@ static int bnx2x_process_kill(struct bnx2x *bp, bool global)
 		    (pgl_exp_rom2 == 0xffffffff) &&
 		    (!CHIP_IS_E3(bp) || (tags_63_32 == 0xffffffff)))
 			break;
-		usleep_range(1000, 2000);
+		kthread_usleep(1000);
 	} while (cnt-- > 0);
 
 	if (cnt <= 0) {
@@ -9672,7 +9672,7 @@ static int bnx2x_process_kill(struct bnx2x *bp, bool global)
 	/* Wait for 1ms to empty GLUE and PCI-E core queues,
 	 * PSWHST, GRC and PSWRD Tetris buffer.
 	 */
-	usleep_range(1000, 2000);
+	kthread_usleep(1000);
 
 	/* Prepare to chip reset: */
 	/* MCP */
@@ -10181,7 +10181,7 @@ static void bnx2x_prev_unload_close_mac(struct bnx2x *bp,
 	}
 
 	if (mac_stopped)
-		msleep(20);
+		kthread_usleep(1000 * 20);
 }
 
 #define BNX2X_PREV_UNDI_PROD_ADDR(p) (BAR_TSTRORM_INTMEM + 0x1508 + ((p) << 4))
@@ -10624,7 +10624,7 @@ static int bnx2x_prev_unload(struct bnx2x *bp)
 		if (rc != BNX2X_PREV_WAIT_NEEDED)
 			break;
 
-		msleep(20);
+		kthread_usleep(1000 * 20);
 	} while (--time_counter);
 
 	if (!time_counter || rc) {
@@ -11649,7 +11649,7 @@ static int bnx2x_get_hwinfo(struct bnx2x *bp)
 
 			while (tout && REG_RD(bp, IGU_REG_RESET_MEMORIES)) {
 				tout--;
-				usleep_range(1000, 2000);
+				kthread_usleep(1000);
 			}
 
 			if (REG_RD(bp, IGU_REG_RESET_MEMORIES)) {

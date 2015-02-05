@@ -174,7 +174,7 @@ static int bnx2x_send_msg2pf(struct bnx2x *bp, uint8_t *done,
 
 	/* Wait for PF to complete */
 	while ((tout >= 0) && (!*done)) {
-		msleep(interval);
+		kthread_usleep(1000 * interval);
 		tout -= 1;
 
 		/* progress indicator - HV can take its own sweet time in
@@ -202,7 +202,7 @@ static int bnx2x_get_vf_id(struct bnx2x *bp, uint32_t *vf_id)
 		if (GOOD_ME_REG(me_reg))
 			break;
 
-		msleep(interval);
+		kthread_usleep(1000 * interval);
 
 		BNX2X_ERR("Invalid ME register value: 0x%08x\n. Is pf driver up?",
 			  me_reg);

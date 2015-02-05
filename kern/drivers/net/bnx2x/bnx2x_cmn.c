@@ -1863,7 +1863,7 @@ static void bnx2x_napi_disable_cnic(struct bnx2x *bp)
 	for_each_rx_queue_cnic(bp, i) {
 		napi_disable(&bnx2x_fp(bp, i, napi));
 		while (!bnx2x_fp_ll_disable(&bp->fp[i]))
-			usleep_range(1000, 2000);
+			kthread_usleep(1000);
 	}
 }
 
@@ -1874,7 +1874,7 @@ static void bnx2x_napi_disable(struct bnx2x *bp)
 	for_each_eth_queue(bp, i) {
 		napi_disable(&bnx2x_fp(bp, i, napi));
 		while (!bnx2x_fp_ll_disable(&bp->fp[i]))
-			usleep_range(1000, 2000);
+			kthread_usleep(1000);
 	}
 }
 
@@ -3116,7 +3116,7 @@ int bnx2x_set_power_state(struct bnx2x *bp, pci_power_t state)
 
 		if (pmcsr & PCI_PM_CTRL_STATE_MASK)
 			/* delay required during transition out of D3hot */
-			msleep(20);
+			kthread_usleep(1000 * 20);
 		break;
 
 	case PCI_D3hot:

@@ -212,7 +212,7 @@ static void bnx2x_stats_comp(struct bnx2x *bp)
 			break;
 		}
 		cnt--;
-		usleep_range(1000, 2000);
+		kthread_usleep(1000);
 	}
 }
 

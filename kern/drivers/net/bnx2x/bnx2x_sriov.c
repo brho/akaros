@@ -1596,7 +1596,7 @@ int bnx2x_iov_nic_init(struct bnx2x *bp)
 	DP(BNX2X_MSG_IOV, "num of vfs: %d\n", (bp)->vfdb->sriov.nr_virtfn);
 
 	/* let FLR complete ... */
-	msleep(100);
+	kthread_usleep(1000 * 100);
 
 	/* initialize vf database */
 	for_each_vf(bp, vfid) {
@@ -2154,7 +2154,7 @@ int bnx2x_vf_init(struct bnx2x *bp, struct bnx2x_virtf *vf, dma_addr_t *sb_map)
 	}
 
 	/* let FLR complete ... */
-	msleep(100);
+	kthread_usleep(1000 * 100);
 
 	/* FLR cleanup epilogue */
 	if (bnx2x_vf_flr_clnup_epilog(bp, vf->abs_vfid))

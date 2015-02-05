@@ -293,7 +293,7 @@ static inline int bnx2x_state_wait(struct bnx2x *bp, int state,
 			return 0;
 		}
 
-		usleep_range(1000, 2000);
+		kthread_usleep(1000);
 
 		if (bp->panic)
 			return -EIO;
@@ -1381,7 +1381,7 @@ static int bnx2x_wait_vlan_mac(struct bnx2x *bp,
 
 		/* Wait until there are no pending commands */
 		if (!bnx2x_exe_queue_empty(exeq))
-			usleep_range(1000, 2000);
+			kthread_usleep(1000);
 		else
 			return 0;
 	}
@@ -6021,7 +6021,7 @@ int bnx2x_func_state_change(struct bnx2x *bp,
 	    (test_bit(RAMROD_RETRY, &params->ramrod_flags))) {
 		while ((rc == -EBUSY) && (--cnt > 0)) {
 			qunlock(&o->one_pending_mutex);
-			msleep(10);
+			kthread_usleep(1000 * 10);
 			qlock(&o->one_pending_mutex);
 			rc = o->check_transition(bp, o, params);
 		}

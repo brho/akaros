@@ -2175,7 +2175,7 @@ static inline uint32_t reg_poll(struct bnx2x *bp, uint32_t reg,
 		if (val == expected)
 			break;
 		ms -= wait;
-		msleep(wait);
+		kthread_usleep(1000 * wait);
 
 	} while (ms > 0);
 

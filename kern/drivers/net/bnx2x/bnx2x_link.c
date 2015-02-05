@@ -1556,7 +1556,7 @@ static void bnx2x_umac_enable(struct link_params *params,
 	/* Reset UMAC */
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_CLEAR,
 	       (MISC_REGISTERS_RESET_REG_2_UMAC0 << params->port));
-	usleep_range(1000, 2000);
+	kthread_usleep(1000);
 
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_SET,
 	       (MISC_REGISTERS_RESET_REG_2_UMAC0 << params->port));
@@ -1671,7 +1671,7 @@ static void bnx2x_xmac_init(struct link_params *params, uint32_t max_speed)
 	/* Hard reset */
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_CLEAR,
 	       MISC_REGISTERS_RESET_REG_2_XMAC);
-	usleep_range(1000, 2000);
+	kthread_usleep(1000);
 
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_SET,
 	       MISC_REGISTERS_RESET_REG_2_XMAC);
@@ -1701,7 +1701,7 @@ static void bnx2x_xmac_init(struct link_params *params, uint32_t max_speed)
 	/* Soft reset */
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_CLEAR,
 	       MISC_REGISTERS_RESET_REG_2_XMAC_SOFT);
-	usleep_range(1000, 2000);
+	kthread_usleep(1000);
 
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_SET,
 	       MISC_REGISTERS_RESET_REG_2_XMAC_SOFT);
@@ -2413,7 +2413,7 @@ static int bnx2x_bmac_enable(struct link_params *params,
 	if (reset_bmac) {
 		REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_CLEAR,
 		       (MISC_REGISTERS_RESET_REG_2_RST_BMAC0 << port));
-		usleep_range(1000, 2000);
+		kthread_usleep(1000);
 	}
 
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_SET,
@@ -2470,7 +2470,7 @@ static void bnx2x_set_bmac_rx(struct bnx2x *bp, uint32_t chip_id,
 		else
 			wb_data[0] &= ~BMAC_CONTROL_RX_ENABLE;
 		REG_WR_DMAE(bp, bmac_addr, wb_data, 2);
-		usleep_range(1000, 2000);
+		kthread_usleep(1000);
 	}
 }
 
@@ -2491,7 +2491,7 @@ static int bnx2x_pbf_update(struct link_params *params, uint32_t flow_ctrl,
 	DP(NETIF_MSG_LINK, "init_crd 0x%x  crd 0x%x\n", init_crd, crd);
 
 	while ((init_crd != crd) && count) {
-		usleep_range(5000, 10000);
+		kthread_usleep(5000);
 		crd = REG_RD(bp, PBF_REG_P0_CREDIT + port*8);
 		count--;
 	}
@@ -2536,7 +2536,7 @@ static int bnx2x_pbf_update(struct link_params *params, uint32_t flow_ctrl,
 
 	/* Probe the credit changes */
 	REG_WR(bp, PBF_REG_INIT_P0 + port*4, 0x1);
-	usleep_range(5000, 10000);
+	kthread_usleep(5000);
 	REG_WR(bp, PBF_REG_INIT_P0 + port*4, 0x0);
 
 	/* Enable port */
@@ -5998,7 +5998,7 @@ static uint16_t bnx2x_wait_reset_complete(struct bnx2x *bp,
 				MDIO_PMA_REG_CTRL, &ctrl);
 		if (!(ctrl & (1<<15)))
 			break;
-		usleep_range(1000, 2000);
+		kthread_usleep(1000);
 	}
 
 	if (cnt == 1000)
@@ -6249,7 +6249,7 @@ static void bnx2x_set_xgxs_loopback(struct bnx2x_phy *phy,
 				 (MDIO_REG_BANK_CL73_IEEEB0 +
 				  (MDIO_CL73_IEEEB0_CL73_AN_CONTROL & 0xf)),
 				 0x6041);
-		msleep(200);
+		kthread_usleep(1000 * 200);
 		/* Set aer mmd back */
 		bnx2x_set_aer_mmd(params, phy);
 
@@ -6631,7 +6631,7 @@ static int bnx2x_update_link_down(struct link_params *params,
 	if (!CHIP_IS_E3(bp))
 		REG_WR(bp, NIG_REG_NIG_EMAC0_EN + port*4, 0);
 
-	usleep_range(10000, 20000);
+	kthread_usleep(10000);
 	/* Reset BigMac/Xmac */
 	if (CHIP_IS_E1x(bp) ||
 	    CHIP_IS_E2(bp))
@@ -6741,7 +6741,7 @@ static int bnx2x_update_link_up(struct link_params *params,
 			break;
 		}
 	}
-	msleep(20);
+	kthread_usleep(1000 * 20);
 	return rc;
 }
 /* The bnx2x_link_update function should be called upon link
@@ -6945,7 +6945,7 @@ int bnx2x_link_update(struct link_params *params, struct link_vars *vars)
 		} else if (prev_line_speed != vars->line_speed) {
 			REG_WR(bp, NIG_REG_EGRESS_DRAIN0_MODE + params->port*4,
 			       0);
-			usleep_range(1000, 2000);
+			kthread_usleep(1000);
 		}
 	}
 
@@ -7015,7 +7015,7 @@ void bnx2x_ext_phy_hw_reset(struct bnx2x *bp, uint8_t port)
 {
 	bnx2x_set_gpio(bp, MISC_REGISTERS_GPIO_1,
 		       MISC_REGISTERS_GPIO_OUTPUT_LOW, port);
-	usleep_range(1000, 2000);
+	kthread_usleep(1000);
 	bnx2x_set_gpio(bp, MISC_REGISTERS_GPIO_1,
 		       MISC_REGISTERS_GPIO_OUTPUT_HIGH, port);
 }
@@ -7135,7 +7135,7 @@ static int bnx2x_8073_8727_external_rom_boot(struct bnx2x *bp,
 			 MDIO_PMA_REG_GEN_CTRL_ROM_RESET_INTERNAL_MP);
 
 	/* Delay 100ms per the PHY specifications */
-	msleep(100);
+	kthread_usleep(1000 * 100);
 
 	/* 8073 sometimes taking longer to download */
 	do {
@@ -7156,7 +7156,7 @@ static int bnx2x_8073_8727_external_rom_boot(struct bnx2x *bp,
 				MDIO_PMA_DEVAD,
 				MDIO_PMA_REG_M8051_MSGOUT_REG, &fw_msgout);
 
-		usleep_range(1000, 2000);
+		kthread_usleep(1000);
 	} while (fw_ver1 == 0 || fw_ver1 == 0x4321 ||
 			((fw_msgout & 0xff) != 0x03 && (phy->type ==
 			PORT_HW_CFG_XGXS_EXT_PHY_TYPE_BCM8073)));
@@ -7250,11 +7250,11 @@ static int bnx2x_8073_xaui_wa(struct bnx2x *bp, struct bnx2x_phy *phy)
 					  "XAUI workaround has completed\n");
 					return 0;
 				 }
-				 usleep_range(3000, 6000);
+				 kthread_usleep(3000);
 			}
 			break;
 		}
-		usleep_range(3000, 6000);
+		kthread_usleep(3000);
 	}
 	DP(NETIF_MSG_LINK, "Warning: XAUI work-around timeout !!!\n");
 	return -EINVAL;
@@ -7305,7 +7305,7 @@ static void bnx2x_8073_set_pause_cl37(struct link_params *params,
 
 	bnx2x_cl45_write(bp, phy,
 			 MDIO_AN_DEVAD, MDIO_AN_REG_CL37_FC_LD, cl37_val);
-	msleep(500);
+	kthread_usleep(1000 * 500);
 }
 
 static void bnx2x_8073_specific_func(struct bnx2x_phy *phy,
@@ -7465,7 +7465,7 @@ static int bnx2x_8073_config_init(struct bnx2x_phy *phy,
 	bnx2x_ext_phy_set_pause(params, phy, vars);
 
 	/* Restart autoneg */
-	msleep(500);
+	kthread_usleep(1000 * 500);
 	bnx2x_cl45_write(bp, phy, MDIO_AN_DEVAD, MDIO_AN_REG_CTRL, 0x1200);
 	DP(NETIF_MSG_LINK, "807x Autoneg Restart: Advertise 1G=%x, 10G=%x\n",
 		   ((val & (1<<5)) > 0), ((val & (1<<7)) > 0));
@@ -7868,7 +7868,7 @@ static int bnx2x_8726_read_sfp_module_eeprom(struct bnx2x_phy *phy,
 		if ((val & MDIO_PMA_REG_SFP_TWO_WIRE_CTRL_STATUS_MASK) ==
 		    MDIO_PMA_REG_SFP_TWO_WIRE_STATUS_IDLE)
 			return 0;
-		usleep_range(1000, 2000);
+		kthread_usleep(1000);
 	}
 	return -EINVAL;
 }
@@ -7920,7 +7920,7 @@ static int bnx2x_warpcore_read_sfp_module_eeprom(struct bnx2x_phy *phy,
 		if ((!is_init) && (cnt == I2C_WA_PWR_ITER)) {
 			bnx2x_warpcore_power_module(params, 0);
 			/* Note that 100us are not enough here */
-			usleep_range(1000, 2000);
+			kthread_usleep(1000);
 			bnx2x_warpcore_power_module(params, 1);
 		}
 		rc = bnx2x_bsc_read(params, bp, dev_addr, addr32, 0, byte_cnt,
@@ -7992,7 +7992,7 @@ static int bnx2x_8727_read_sfp_module_eeprom(struct bnx2x_phy *phy,
 	/* Wait appropriate time for two-wire command to finish before
 	 * polling the status register
 	 */
-	usleep_range(1000, 2000);
+	kthread_usleep(1000);
 
 	/* Wait up to 500us for command complete status */
 	for (i = 0; i < 100; i++) {
@@ -8028,7 +8028,7 @@ static int bnx2x_8727_read_sfp_module_eeprom(struct bnx2x_phy *phy,
 		if ((val & MDIO_PMA_REG_SFP_TWO_WIRE_CTRL_STATUS_MASK) ==
 		    MDIO_PMA_REG_SFP_TWO_WIRE_STATUS_IDLE)
 			return 0;
-		usleep_range(1000, 2000);
+		kthread_usleep(1000);
 	}
 
 	return -EINVAL;
@@ -8158,7 +8158,7 @@ static int bnx2x_get_edc_mode(struct bnx2x_phy *phy,
 			if (val[SFP_EEPROM_1G_COMP_CODE_ADDR] &
 			    SFP_EEPROM_1G_COMP_CODE_BASE_T) {
 				bnx2x_sfp_set_transmitter(params, phy, 0);
-				msleep(40);
+				kthread_usleep(1000 * 40);
 				bnx2x_sfp_set_transmitter(params, phy, 1);
 			}
 		} else {
@@ -8319,7 +8319,7 @@ static int bnx2x_wait_for_sfp_module_initialized(struct bnx2x_phy *phy,
 			   timeout * 5);
 			return 0;
 		}
-		usleep_range(5000, 10000);
+		kthread_usleep(5000);
 	}
 	rc = bnx2x_read_sfp_module_eeprom(phy, params, I2C_DEV_ADDR_A0,
 					  1, 1, &val);
@@ -8873,7 +8873,7 @@ static uint8_t bnx2x_8706_config_init(struct bnx2x_phy *phy,
 				MDIO_PMA_DEVAD, MDIO_PMA_REG_ROM_VER1, &val);
 		if (val)
 			break;
-		usleep_range(10000, 20000);
+		kthread_usleep(10000);
 	}
 	DP(NETIF_MSG_LINK, "XGXS 8706 is initialized after %d ms\n", cnt);
 	if ((params->feature_config_flags &
@@ -8981,7 +8981,7 @@ static void bnx2x_8726_external_rom_boot(struct bnx2x_phy *phy,
 {
 	struct bnx2x *bp = params->bp;
 	/* Need to wait 100ms after reset */
-	msleep(100);
+	kthread_usleep(1000 * 100);
 
 	/* Micro controller re-boot */
 	bnx2x_cl45_write(bp, phy,
@@ -9003,14 +9003,14 @@ static void bnx2x_8726_external_rom_boot(struct bnx2x_phy *phy,
 			 MDIO_PMA_REG_GEN_CTRL_ROM_RESET_INTERNAL_MP);
 
 	/* Wait for 150ms for microcode load */
-	msleep(150);
+	kthread_usleep(1000 * 150);
 
 	/* Disable serial boot control, tristates pins SS_N, SCK, MOSI, MISO */
 	bnx2x_cl45_write(bp, phy,
 			 MDIO_PMA_DEVAD,
 			 MDIO_PMA_REG_MISC_CTRL1, 0x0000);
 
-	msleep(200);
+	kthread_usleep(1000 * 200);
 	bnx2x_save_bcm_spirom_ver(bp, phy, params->port);
 }
 
@@ -9916,7 +9916,7 @@ static int bnx2x_84833_cmd_hdlr(struct bnx2x_phy *phy,
 				MDIO_84833_CMD_HDLR_STATUS, &val);
 		if (val == PHY84833_STATUS_CMD_OPEN_FOR_CMDS)
 			break;
-		usleep_range(1000, 2000);
+		kthread_usleep(1000);
 	}
 	if (idx >= PHY84833_CMDHDLR_WAIT) {
 		DP(NETIF_MSG_LINK, "FW cmd: FW not ready.\n");
@@ -9937,7 +9937,7 @@ static int bnx2x_84833_cmd_hdlr(struct bnx2x_phy *phy,
 		if ((val == PHY84833_STATUS_CMD_COMPLETE_PASS) ||
 			(val == PHY84833_STATUS_CMD_COMPLETE_ERROR))
 			break;
-		usleep_range(1000, 2000);
+		kthread_usleep(1000);
 	}
 	if ((idx >= PHY84833_CMDHDLR_WAIT) ||
 		(val == PHY84833_STATUS_CMD_COMPLETE_ERROR)) {
@@ -10107,7 +10107,7 @@ static int bnx2x_848x3_config_init(struct bnx2x_phy *phy,
 	uint16_t cmd_args[PHY84833_CMDHDLR_MAX_ARGS];
 	int rc = 0;
 
-	usleep_range(1000, 2000);
+	kthread_usleep(1000);
 
 	if (!(CHIP_IS_E1x(bp)))
 		port = BP_PATH(bp);
@@ -10128,7 +10128,7 @@ static int bnx2x_848x3_config_init(struct bnx2x_phy *phy,
 	bnx2x_wait_reset_complete(bp, phy, params);
 
 	/* Wait for GPHY to come out of reset */
-	msleep(50);
+	kthread_usleep(1000 * 50);
 	if ((phy->type != PORT_HW_CFG_XGXS_EXT_PHY_TYPE_BCM84833) &&
 	    (phy->type != PORT_HW_CFG_XGXS_EXT_PHY_TYPE_BCM84834)) {
 		/* BCM84823 requires that XGXS links up first @ 10G for normal
@@ -10762,7 +10762,7 @@ static int bnx2x_54618se_config_init(struct bnx2x_phy *phy,
 	uint32_t cfg_pin;
 
 	DP(NETIF_MSG_LINK, "54618SE cfg init\n");
-	usleep_range(1000, 2000);
+	kthread_usleep(1000);
 
 	/* This works with E3 only, no need to check the chip
 	 * before determining the port.
@@ -10779,7 +10779,7 @@ static int bnx2x_54618se_config_init(struct bnx2x_phy *phy,
 	bnx2x_set_cfg_pin(bp, cfg_pin, 1);
 
 	/* wait for GPHY to reset */
-	msleep(50);
+	kthread_usleep(1000 * 50);
 
 	/* reset phy */
 	bnx2x_cl22_write(bp, phy,
@@ -10787,7 +10787,7 @@ static int bnx2x_54618se_config_init(struct bnx2x_phy *phy,
 	bnx2x_wait_reset_complete(bp, phy, params);
 
 	/* Wait for GPHY to reset */
-	msleep(50);
+	kthread_usleep(1000 * 50);
 
 
 	bnx2x_54618se_specific_func(phy, params, PHY_INIT);
@@ -11284,7 +11284,7 @@ void bnx2x_sfx7101_sp_sw_reset(struct bnx2x *bp, struct bnx2x_phy *phy)
 			MDIO_PMA_REG_7101_RESET, &val);
 
 	for (cnt = 0; cnt < 10; cnt++) {
-		msleep(50);
+		kthread_usleep(1000 * 50);
 		/* Writes a self-clearing reset */
 		bnx2x_cl45_write(bp, phy,
 				 MDIO_PMA_DEVAD,
@@ -12713,7 +12713,7 @@ int bnx2x_phy_init(struct link_params *params, struct link_vars *vars)
 				bnx2x_serdes_deassert(bp, params->port);
 		}
 		bnx2x_link_initialize(params, vars);
-		msleep(30);
+		kthread_usleep(1000 * 30);
 		bnx2x_link_int_enable(params);
 		break;
 	}
@@ -12760,7 +12760,7 @@ int bnx2x_link_reset(struct link_params *params, struct link_vars *vars,
 	if (!CHIP_IS_E3(bp))
 		REG_WR(bp, NIG_REG_NIG_EMAC0_EN + port*4, 0);
 
-	usleep_range(10000, 20000);
+	kthread_usleep(10000);
 	/* The PHY reset is controlled by GPIO 1
 	 * Hold it as vars low
 	 */
@@ -12840,7 +12840,7 @@ int bnx2x_lfa_reset(struct link_params *params,
 		bnx2x_set_umac_rxtx(params, 0);
 	}
 	/* Wait 10ms for the pipe to clean up*/
-	usleep_range(10000, 20000);
+	kthread_usleep(10000);
 
 	/* Clean the NIG-BRB using the network filters in a way that will
 	 * not cut a packet in the middle.
@@ -12928,7 +12928,7 @@ static int bnx2x_8073_common_init_phy(struct bnx2x *bp,
 	}
 
 	/* Add delay of 150ms after reset */
-	msleep(150);
+	kthread_usleep(1000 * 150);
 
 	if (phy[PORT_0].addr & 0x1) {
 		phy_blk[PORT_0] = &(phy[PORT_1]);
@@ -12966,7 +12966,7 @@ static int bnx2x_8073_common_init_phy(struct bnx2x *bp,
 	/* Toggle Transmitter: Power down and then up with 600ms delay
 	 * between
 	 */
-	msleep(600);
+	kthread_usleep(1000 * 600);
 
 	/* PART3 - complete TX_POWER_DOWN process, and set GPIO2 back to low */
 	for (port = PORT_MAX - 1; port >= PORT_0; port--) {
@@ -12979,7 +12979,7 @@ static int bnx2x_8073_common_init_phy(struct bnx2x *bp,
 		bnx2x_cl45_write(bp, phy_blk[port],
 				MDIO_PMA_DEVAD,
 				MDIO_PMA_REG_TX_POWER_DOWN, (val & (~(1<<10))));
-		usleep_range(15000, 30000);
+		kthread_usleep(15000);
 
 		/* Read modify write the SPI-ROM version select register */
 		bnx2x_cl45_read(bp, phy_blk[port],
@@ -13012,7 +13012,7 @@ static int bnx2x_8726_common_init_phy(struct bnx2x *bp,
 	REG_WR(bp, MISC_REG_GPIO_EVENT_EN, val);
 
 	bnx2x_ext_phy_hw_reset(bp, 0);
-	usleep_range(5000, 10000);
+	kthread_usleep(5000);
 	for (port = 0; port < PORT_MAX; port++) {
 		uint32_t shmem_base, shmem2_base;
 
@@ -13121,11 +13121,11 @@ static int bnx2x_8727_common_init_phy(struct bnx2x *bp,
 	/* Initiate PHY reset*/
 	bnx2x_set_gpio(bp, reset_gpio, MISC_REGISTERS_GPIO_OUTPUT_LOW,
 		       port);
-	usleep_range(1000, 2000);
+	kthread_usleep(1000);
 	bnx2x_set_gpio(bp, reset_gpio, MISC_REGISTERS_GPIO_OUTPUT_HIGH,
 		       port);
 
-	usleep_range(5000, 10000);
+	kthread_usleep(5000);
 
 	/* PART1 - Reset both phys */
 	for (port = PORT_MAX - 1; port >= PORT_0; port--) {
@@ -13164,7 +13164,7 @@ static int bnx2x_8727_common_init_phy(struct bnx2x *bp,
 	}
 
 	/* Add delay of 150ms after reset */
-	msleep(150);
+	kthread_usleep(1000 * 150);
 	if (phy[PORT_0].addr & 0x1) {
 		phy_blk[PORT_0] = &(phy[PORT_1]);
 		phy_blk[PORT_1] = &(phy[PORT_0]);
