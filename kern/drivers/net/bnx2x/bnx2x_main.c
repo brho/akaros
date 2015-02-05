@@ -820,7 +820,7 @@ static void bnx2x_hc_int_disable(struct bnx2x *bp)
 	   val, port, addr);
 
 	/* flush all outstanding writes */
-	mmiowb();
+	bus_wmb();
 
 	REG_WR(bp, addr, val);
 	if (REG_RD(bp, addr) != val)
@@ -838,7 +838,7 @@ static void bnx2x_igu_int_disable(struct bnx2x *bp)
 	DP(NETIF_MSG_IFDOWN, "write %x to IGU\n", val);
 
 	/* flush all outstanding writes */
-	mmiowb();
+	bus_wmb();
 
 	REG_WR(bp, IGU_REG_PF_CONFIGURATION, val);
 	if (REG_RD(bp, IGU_REG_PF_CONFIGURATION) != val)
@@ -1546,7 +1546,7 @@ static void bnx2x_hc_int_enable(struct bnx2x *bp)
 	/*
 	 * Ensure that HC_CONFIG is written before leading/trailing edge config
 	 */
-	mmiowb();
+	bus_wmb();
 	barrier();
 
 	if (!CHIP_IS_E1(bp)) {
@@ -1564,7 +1564,7 @@ static void bnx2x_hc_int_enable(struct bnx2x *bp)
 	}
 
 	/* Make sure that interrupts are indeed enabled from here on */
-	mmiowb();
+	bus_wmb();
 }
 
 static void bnx2x_igu_int_enable(struct bnx2x *bp)
@@ -1627,7 +1627,7 @@ static void bnx2x_igu_int_enable(struct bnx2x *bp)
 	REG_WR(bp, IGU_REG_LEADING_EDGE_LATCH, val);
 
 	/* Make sure that interrupts are indeed enabled from here on */
-	mmiowb();
+	bus_wmb();
 }
 
 void bnx2x_int_enable(struct bnx2x *bp)
@@ -3759,7 +3759,7 @@ static void bnx2x_sp_prod_update(struct bnx2x *bp)
 
 	REG_WR16(bp, BAR_XSTRORM_INTMEM + XSTORM_SPQ_PROD_OFFSET(func),
 		 bp->spq_prod_idx);
-	mmiowb();
+	bus_wmb();
 }
 
 /**
@@ -5161,7 +5161,7 @@ static void bnx2x_update_eq_prod(struct bnx2x *bp, uint16_t prod)
 {
 	/* No memory barriers */
 	storm_memset_eq_prod(bp, prod, BP_FUNC(bp));
-	mmiowb(); /* keep prod updates ordered */
+	bus_wmb(); /* keep prod updates ordered */
 }
 
 static int  bnx2x_cnic_handle_cfc_del(struct bnx2x *bp, uint32_t cid,
@@ -6420,7 +6420,7 @@ void bnx2x_nic_init_cnic(struct bnx2x *bp)
 
 	/* flush all */
 	mb();
-	mmiowb();
+	bus_wmb();
 }
 
 void bnx2x_pre_irq_nic_init(struct bnx2x *bp)
@@ -6460,7 +6460,7 @@ void bnx2x_post_irq_nic_init(struct bnx2x *bp, uint32_t load_code)
 
 	/* flush all before enabling interrupts */
 	mb();
-	mmiowb();
+	bus_wmb();
 
 	bnx2x_int_enable(bp);
 
@@ -7677,12 +7677,12 @@ void bnx2x_igu_clear_sb_gen(struct bnx2x *bp, uint8_t func,
 	DP(NETIF_MSG_HW, "write 0x%08x to IGU(via GRC) addr 0x%x\n",
 			 data, igu_addr_data);
 	REG_WR(bp, igu_addr_data, data);
-	mmiowb();
+	bus_wmb();
 	barrier();
 	DP(NETIF_MSG_HW, "write 0x%08x to IGU(via GRC) addr 0x%x\n",
 			  ctl, igu_addr_ctl);
 	REG_WR(bp, igu_addr_ctl, ctl);
-	mmiowb();
+	bus_wmb();
 	barrier();
 
 	/* wait for clean up to finish */
@@ -9358,7 +9358,7 @@ static void bnx2x_set_234_gates(struct bnx2x *bp, bool close)
 
 	DP(NETIF_MSG_HW | NETIF_MSG_IFUP, "%s gates #2, #3 and #4\n",
 		close ? "closing" : "opening");
-	mmiowb();
+	bus_wmb();
 }
 
 #define SHARED_MF_CLP_MAGIC  0x80000000 /* `magic' bit */
@@ -9473,7 +9473,7 @@ static void bnx2x_pxp_prep(struct bnx2x *bp)
 	if (!CHIP_IS_E1(bp)) {
 		REG_WR(bp, PXP2_REG_RD_START_INIT, 0);
 		REG_WR(bp, PXP2_REG_RQ_RBC_DONE, 0);
-		mmiowb();
+		bus_wmb();
 	}
 }
 
@@ -9573,16 +9573,16 @@ static void bnx2x_process_kill_chip_reset(struct bnx2x *bp, bool global)
 	       reset_mask1 & (~not_reset_mask1));
 
 	barrier();
-	mmiowb();
+	bus_wmb();
 
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_SET,
 	       reset_mask2 & (~stay_reset2));
 
 	barrier();
-	mmiowb();
+	bus_wmb();
 
 	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_1_SET, reset_mask1);
-	mmiowb();
+	bus_wmb();
 }
 
 /**
@@ -9667,7 +9667,7 @@ static int bnx2x_process_kill(struct bnx2x *bp, bool global)
 	barrier();
 
 	/* Make sure all is written to the chip before the reset */
-	mmiowb();
+	bus_wmb();
 
 	/* Wait for 1ms to empty GLUE and PCI-E core queues,
 	 * PSWHST, GRC and PSWRD Tetris buffer.
@@ -14189,7 +14189,7 @@ static int bnx2x_drv_ctl(struct net_device *dev, struct drv_ctl_info *ctl)
 		if (rc)
 			break;
 
-		mmiowb();
+		bus_wmb();
 		barrier();
 
 		/* Start accepting on iSCSI L2 ring */
@@ -14224,7 +14224,7 @@ static int bnx2x_drv_ctl(struct net_device *dev, struct drv_ctl_info *ctl)
 		if (!bnx2x_wait_sp_comp(bp, sp_bits))
 			BNX2X_ERR("rx_mode completion timed out!\n");
 
-		mmiowb();
+		bus_wmb();
 		barrier();
 
 		/* Unset iSCSI L2 MAC */

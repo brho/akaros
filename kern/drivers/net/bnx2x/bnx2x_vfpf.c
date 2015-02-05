@@ -1100,7 +1100,7 @@ static void bnx2x_vf_mbx_resp_send_msg(struct bnx2x *bp,
 
 	/* ack the FW */
 	storm_memset_vf_mbx_ack(bp, vf->abs_vfid);
-	mmiowb();
+	bus_wmb();
 
 	/* copy the response header including status-done field,
 	 * must be last dmae, must be after FW is acked
@@ -2044,7 +2044,7 @@ static void bnx2x_vf_mbx_request(struct bnx2x *bp, struct bnx2x_virtf *vf,
 		 */
 		storm_memset_vf_mbx_ack(bp, vf->abs_vfid);
 		/* Firmware ack should be written before unlocking channel */
-		mmiowb();
+		bus_wmb();
 		bnx2x_unlock_vf_pf_channel(bp, vf, mbx->first_tlv.tl.type);
 	}
 }

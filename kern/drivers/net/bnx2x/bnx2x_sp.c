@@ -4566,7 +4566,7 @@ static inline int bnx2x_q_init(struct bnx2x *bp,
 	/* As no ramrod is sent, complete the command immediately  */
 	o->complete_cmd(bp, o, BNX2X_Q_CMD_INIT);
 
-	mmiowb();
+	bus_wmb();
 	smp_mb();
 
 	return 0;

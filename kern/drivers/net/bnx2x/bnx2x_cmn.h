@@ -518,7 +518,7 @@ static inline void bnx2x_update_rx_prod(struct bnx2x *bp,
 		REG_WR(bp, fp->ustorm_rx_prods_offset + i*4,
 		       ((uint32_t *)&rx_prods)[i]);
 
-	mmiowb(); /* keep prod updates ordered */
+	bus_wmb(); /* keep prod updates ordered */
 
 	DP(NETIF_MSG_RX_STATUS,
 	   "queue[%d]:  wrote  bd_prod %u  cqe_prod %u  sge_prod %u\n",
@@ -644,7 +644,7 @@ static inline void bnx2x_igu_ack_sb_gen(struct bnx2x *bp, uint8_t igu_sb_id,
 	REG_WR(bp, igu_addr, cmd_data.sb_id_and_flags);
 
 	/* Make sure that ACK is written */
-	mmiowb();
+	bus_wmb();
 	barrier();
 }
 
@@ -666,7 +666,7 @@ static inline void bnx2x_hc_ack_sb(struct bnx2x *bp, uint8_t sb_id,
 	REG_WR(bp, hc_addr, (*(uint32_t *)&igu_ack));
 
 	/* Make sure that ACK is written */
-	mmiowb();
+	bus_wmb();
 	barrier();
 }
 

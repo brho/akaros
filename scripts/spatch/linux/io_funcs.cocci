@@ -96,3 +96,8 @@
 +__raw_read64(
  ...)
 
+@@
+@@
+-mmiowb(
++bus_wmb(
+ ...)

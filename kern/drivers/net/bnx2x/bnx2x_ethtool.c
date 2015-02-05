@@ -2517,7 +2517,7 @@ static int bnx2x_run_loopback(struct bnx2x *bp, int loopback_mode)
 	barrier();
 	DOORBELL(bp, txdata->cid, txdata->tx_db.raw);
 
-	mmiowb();
+	bus_wmb();
 	barrier();
 
 	num_pkts++;

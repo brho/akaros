@@ -4131,7 +4131,7 @@ netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	DOORBELL(bp, txdata->cid, txdata->tx_db.raw);
 
-	mmiowb();
+	bus_wmb();
 
 	txdata->tx_bd_prod += nbd;
 
