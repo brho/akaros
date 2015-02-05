@@ -4,7 +4,18 @@
  *
  * Hacked BSD taskqueues.  In lieu of actually running a kproc or something that
  * sleeps on a queue of tasks, we'll just blast out a kmsg.  We can always
- * change the implementation if we need more control. */
+ * change the implementation if we need more control.
+ * 
+ * 
+ * Linux workqueue wrappers:
+ *
+ * Caveats:
+ * - Workqueues have no core affinity or anything.  queued work goes to the
+ * calling core.  Scheduled work goes to core 0.
+ * - There are no extra delays in time.  All work are RKMs.
+ * - You can't cancel a message.  The differences btw work and delayed_work
+ * aren't entirely clear.
+ */
 
 #ifndef ROS_KERN_TASKQUEUE_H
 #define ROS_KERN_TASKQUEUE_H
@@ -28,5 +39,38 @@ int taskqueue_enqueue(struct taskqueue *queue, struct task *task);
 #define TASK_INIT(str, dummy, func, arg)                                       \
 	(str)->ta_func = func;                                                     \
 	(str)->ta_context = (void*)arg;
+
+struct workqueue_struct {
+};
+
+struct work_struct {
+	void (*func)(struct work_struct *);
+	/* TODO: args and bookkeeping to support cancel{,_sync}. */
+	void *arg;
+};
+
+/* Delayed work is embedded in other structs.  Handlers will expect to get a
+ * work_struct pointer. */
+struct delayed_work {
+	struct work_struct 			work;
+	/* TODO: support for the actual alarm / timer */
+};
+
+#define INIT_DELAYED_WORK(dwp, funcp) (dwp)->work.func = (funcp)
+#define INIT_WORK(wp, funcp) (wp)->func = (funcp)
+void flush_workqueue(struct workqueue_struct *wq);
+void destroy_workqueue(struct workqueue_struct *wq);
+struct workqueue_struct *create_singlethread_workqueue(char *name);
+
+bool queue_work(struct workqueue_struct *wq, struct work_struct *dwork);
+bool schedule_work(struct work_struct *dwork);
+bool cancel_work(struct work_struct *dwork);
+bool cancel_work_sync(struct work_struct *dwork);
+
+bool queue_delayed_work(struct workqueue_struct *wq, struct delayed_work *dwork,
+                        unsigned long delay);
+bool schedule_delayed_work(struct delayed_work *dwork, unsigned long delay);
+bool cancel_delayed_work(struct delayed_work *dwork);
+bool cancel_delayed_work_sync(struct delayed_work *dwork);
 
 #endif /* ROS_KERN_TASKQUEUE_H */
