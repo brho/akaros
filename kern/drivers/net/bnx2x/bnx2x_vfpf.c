@@ -1573,7 +1573,7 @@ static int bnx2x_vf_mbx_macvlan_list(struct bnx2x *bp,
 	      sizeof(struct bnx2x_vf_mac_vlan_filter) +
 	      sizeof(struct bnx2x_vf_mac_vlan_filters);
 
-	fl = kzalloc(fsz, GFP_KERNEL);
+	fl = kzmalloc(fsz, KMALLOC_WAIT);
 	if (!fl)
 		return -ENOMEM;
 

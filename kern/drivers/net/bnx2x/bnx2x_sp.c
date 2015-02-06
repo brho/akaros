@@ -242,7 +242,7 @@ static inline struct bnx2x_exeq_elem *bnx2x_exe_queue_alloc_elem(
 	struct bnx2x *bp)
 {
 	DP(BNX2X_MSG_SP, "Allocating a new exe_queue element\n");
-	return kzalloc(sizeof(struct bnx2x_exeq_elem), GFP_ATOMIC);
+	return kzmalloc(sizeof(struct bnx2x_exeq_elem), 0);
 }
 
 /************************ raw_obj functions ***********************************/
@@ -1546,7 +1546,7 @@ static inline int bnx2x_vlan_mac_get_registry_elem(
 	/* Allocate a new registry element if needed. */
 	if (!restore &&
 	    ((cmd == BNX2X_VLAN_MAC_ADD) || (cmd == BNX2X_VLAN_MAC_MOVE))) {
-		reg_elem = kzalloc(sizeof(*reg_elem), GFP_ATOMIC);
+		reg_elem = kzmalloc(sizeof(*reg_elem), 0);
 		if (!reg_elem)
 			return -ENOMEM;
 
@@ -2403,7 +2403,7 @@ static int bnx2x_mcast_enqueue_cmd(struct bnx2x *bp,
 		macs_list_len * sizeof(struct bnx2x_mcast_mac_elem);
 
 	/* Add mcast is called under spin_lock, thus calling with GFP_ATOMIC */
-	new_cmd = kzalloc(total_sz, GFP_ATOMIC);
+	new_cmd = kzmalloc(total_sz, 0);
 
 	if (!new_cmd)
 		return -ENOMEM;
@@ -3382,7 +3382,7 @@ static inline int bnx2x_mcast_refresh_registry_e1(struct bnx2x *bp,
 		if (!list_empty(&o->registry.exact_match.macs))
 			return 0;
 
-		elem = kcalloc(len, sizeof(*elem), GFP_ATOMIC);
+		elem = kzmalloc((len) * (sizeof(*elem)), 0);
 		if (!elem) {
 			BNX2X_ERR("Failed to allocate registry memory\n");
 			return -ENOMEM;

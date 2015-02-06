@@ -2833,7 +2833,7 @@ static int bnx2x_test_nvram(struct bnx2x *bp)
 	if (BP_NOMCP(bp))
 		return 0;
 
-	buf = kmalloc(CRC_BUFF_SIZE, GFP_KERNEL);
+	buf = kmalloc(CRC_BUFF_SIZE, KMALLOC_WAIT);
 	if (!buf) {
 		DP(BNX2X_MSG_ETHTOOL | BNX2X_MSG_NVM, "kmalloc failed\n");
 		rc = -ENOMEM;

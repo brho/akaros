@@ -534,7 +534,7 @@ static void bnx2x_set_gro_params(struct sk_buff *skb, uint16_t parsing_flags,
 static int bnx2x_alloc_rx_sge(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 			      uint16_t index, gfp_t gfp_mask)
 {
-	struct page *page = alloc_pages(gfp_mask, PAGES_PER_SGE_SHIFT);
+	struct page *page = get_cont_pages(PAGES_PER_SGE_SHIFT, gfp_mask);
 	struct sw_rx_page *sw_buf = &fp->rx_page_ring[index];
 	struct eth_rx_sge *sge = &fp->rx_sge_ring[index];
 	dma_addr_t mapping;
@@ -547,7 +547,7 @@ static int bnx2x_alloc_rx_sge(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 	mapping = dma_map_page(&bp->pdev->dev, page, 0,
 			       SGE_PAGES, DMA_FROM_DEVICE);
 	if (unlikely(dma_mapping_error(&bp->pdev->dev, mapping))) {
-		__free_pages(page, PAGES_PER_SGE_SHIFT);
+		free_cont_pages(page, PAGES_PER_SGE_SHIFT);
 		BNX2X_ERR("Can't map sge\n");
 		return -ENOMEM;
 	}
@@ -615,7 +615,7 @@ static int bnx2x_fill_frag_skb(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 
 		/* If we fail to allocate a substitute page, we simply stop
 		   where we are and drop the whole packet */
-		err = bnx2x_alloc_rx_sge(bp, fp, sge_idx, GFP_ATOMIC);
+		err = bnx2x_alloc_rx_sge(bp, fp, sge_idx, 0);
 		if (unlikely(err)) {
 			bnx2x_fp_qstats(bp, fp)->rx_skb_alloc_failed++;
 			return err;
@@ -636,7 +636,7 @@ static int bnx2x_fill_frag_skb(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 				skb_fill_page_desc(skb, frag_id++,
 						   old_rx_pg.page, offset, len);
 				if (offset)
-					get_page(old_rx_pg.page);
+					page_incref(old_rx_pg.page);
 				offset += len;
 			}
 		}
@@ -654,7 +654,7 @@ static int bnx2x_fill_frag_skb(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 static void bnx2x_frag_free(const struct bnx2x_fastpath *fp, void *data)
 {
 	if (fp->rx_frag_size)
-		put_page(virt_to_head_page(data));
+		page_decref(kva2page(data));
 	else
 		kfree(data);
 }
@@ -663,8 +663,8 @@ static void *bnx2x_frag_alloc(const struct bnx2x_fastpath *fp, gfp_t gfp_mask)
 {
 	if (fp->rx_frag_size) {
 		/* GFP_KERNEL allocations are used only during initialization */
-		if (unlikely(gfp_mask & __GFP_WAIT))
-			return (void *)__get_free_page(gfp_mask);
+		if (unlikely(gfp_mask & KMALLOC_WAIT))
+			return (void *)kpage_alloc_addr();
 
 		return netdev_alloc_frag(fp->rx_frag_size);
 	}
@@ -750,7 +750,7 @@ static void bnx2x_tpa_stop(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 		goto drop;
 
 	/* Try to allocate the new data */
-	new_data = bnx2x_frag_alloc(fp, GFP_ATOMIC);
+	new_data = bnx2x_frag_alloc(fp, 0);
 	/* Unmap skb in the pool anyway, as we are going to change
 	   pool entry status to BNX2X_TPA_STOP even if new skb allocation
 	   fails. */
@@ -1018,7 +1018,7 @@ static int bnx2x_rx_int(struct bnx2x_fastpath *fp, int budget)
 			bnx2x_reuse_rx_data(fp, bd_cons, bd_prod);
 		} else {
 			if (likely(bnx2x_alloc_rx_data(bp, fp, bd_prod,
-						       GFP_ATOMIC) == 0)) {
+						       0) == 0)) {
 				dma_unmap_single(&bp->pdev->dev,
 						 dma_unmap_addr(rx_buf, mapping),
 						 fp->rx_buf_size,
@@ -1397,7 +1397,7 @@ void bnx2x_init_rx_rings(struct bnx2x *bp)
 					&tpa_info->first_buf;
 
 				first_buf->data =
-					bnx2x_frag_alloc(fp, GFP_KERNEL);
+					bnx2x_frag_alloc(fp, KMALLOC_WAIT);
 				if (!first_buf->data) {
 					BNX2X_ERR("Failed to allocate TPA skb pool for queue[%d] - disabling TPA on this queue!\n",
 						  j);
@@ -1420,7 +1420,7 @@ void bnx2x_init_rx_rings(struct bnx2x *bp)
 			     i < MAX_RX_SGE_CNT*NUM_RX_SGE_PAGES; i++) {
 
 				if (bnx2x_alloc_rx_sge(bp, fp, ring_prod,
-						       GFP_KERNEL) < 0) {
+						       KMALLOC_WAIT) < 0) {
 					BNX2X_ERR("was only able to allocate %d rx sges\n",
 						  i);
 					BNX2X_ERR("disabling TPA for queue[%d]\n",
@@ -4361,7 +4361,7 @@ static int bnx2x_alloc_rx_bds(struct bnx2x_fastpath *fp,
 	 * fp->eth_q_stats.rx_skb_alloc_failed = 0
 	 */
 	for (i = 0; i < rx_ring_size; i++) {
-		if (bnx2x_alloc_rx_data(bp, fp, ring_prod, GFP_KERNEL) < 0) {
+		if (bnx2x_alloc_rx_data(bp, fp, ring_prod, KMALLOC_WAIT) < 0) {
 			failure_cnt++;
 			continue;
 		}
@@ -4473,9 +4473,8 @@ static int bnx2x_alloc_fp_mem_at(struct bnx2x *bp, int index)
 			   "allocating tx memory of fp %d cos %d\n",
 			   index, cos);
 
-			txdata->tx_buf_ring = kcalloc(NUM_TX_BD,
-						      sizeof(struct sw_tx_bd),
-						      GFP_KERNEL);
+			txdata->tx_buf_ring = kzmalloc((NUM_TX_BD) * (sizeof(struct sw_tx_bd)),
+						       KMALLOC_WAIT);
 			if (!txdata->tx_buf_ring)
 				goto alloc_mem_err;
 			txdata->tx_desc_ring = BNX2X_PCI_ALLOC(&txdata->tx_desc_mapping,
@@ -4489,7 +4488,8 @@ static int bnx2x_alloc_fp_mem_at(struct bnx2x *bp, int index)
 	if (!skip_rx_queue(bp, index)) {
 		/* fastpath rx rings: rx_buf rx_desc rx_comp */
 		bnx2x_fp(bp, index, rx_buf_ring) =
-			kcalloc(NUM_RX_BD, sizeof(struct sw_rx_bd), GFP_KERNEL);
+			kzmalloc((NUM_RX_BD) * (sizeof(struct sw_rx_bd)),
+				 KMALLOC_WAIT);
 		if (!bnx2x_fp(bp, index, rx_buf_ring))
 			goto alloc_mem_err;
 		bnx2x_fp(bp, index, rx_desc_ring) =
@@ -4507,8 +4507,8 @@ static int bnx2x_alloc_fp_mem_at(struct bnx2x *bp, int index)
 
 		/* SGE ring */
 		bnx2x_fp(bp, index, rx_page_ring) =
-			kcalloc(NUM_RX_SGE, sizeof(struct sw_rx_page),
-				GFP_KERNEL);
+			kzmalloc((NUM_RX_SGE) * (sizeof(struct sw_rx_page)),
+				 KMALLOC_WAIT);
 		if (!bnx2x_fp(bp, index, rx_page_ring))
 			goto alloc_mem_err;
 		bnx2x_fp(bp, index, rx_sge_ring) =
@@ -4638,13 +4638,13 @@ int bnx2x_alloc_mem_bp(struct bnx2x *bp)
 	bp->fp_array_size = fp_array_size;
 	BNX2X_DEV_INFO("fp_array_size %d\n", bp->fp_array_size);
 
-	fp = kcalloc(bp->fp_array_size, sizeof(*fp), GFP_KERNEL);
+	fp = kzmalloc((bp->fp_array_size) * (sizeof(*fp)), KMALLOC_WAIT);
 	if (!fp)
 		goto alloc_err;
 	for (i = 0; i < bp->fp_array_size; i++) {
 		fp[i].tpa_info =
-			kcalloc(ETH_MAX_AGGREGATION_QUEUES_E1H_E2,
-				sizeof(struct bnx2x_agg_info), GFP_KERNEL);
+			kzmalloc((ETH_MAX_AGGREGATION_QUEUES_E1H_E2) * (sizeof(struct bnx2x_agg_info)),
+				 KMALLOC_WAIT);
 		if (!(fp[i].tpa_info))
 			goto alloc_err;
 	}
@@ -4652,14 +4652,14 @@ int bnx2x_alloc_mem_bp(struct bnx2x *bp)
 	bp->fp = fp;
 
 	/* allocate sp objs */
-	bp->sp_objs = kcalloc(bp->fp_array_size, sizeof(struct bnx2x_sp_objs),
-			      GFP_KERNEL);
+	bp->sp_objs = kzmalloc((bp->fp_array_size) * (sizeof(struct bnx2x_sp_objs)),
+			       KMALLOC_WAIT);
 	if (!bp->sp_objs)
 		goto alloc_err;
 
 	/* allocate fp_stats */
-	bp->fp_stats = kcalloc(bp->fp_array_size, sizeof(struct bnx2x_fp_stats),
-			       GFP_KERNEL);
+	bp->fp_stats = kzmalloc((bp->fp_array_size) * (sizeof(struct bnx2x_fp_stats)),
+				KMALLOC_WAIT);
 	if (!bp->fp_stats)
 		goto alloc_err;
 
@@ -4668,19 +4668,19 @@ int bnx2x_alloc_mem_bp(struct bnx2x *bp)
 		BNX2X_MAX_RSS_COUNT(bp) * BNX2X_MULTI_TX_COS + CNIC_SUPPORT(bp);
 	BNX2X_DEV_INFO("txq_array_size %d", txq_array_size);
 
-	bp->bnx2x_txq = kcalloc(txq_array_size, sizeof(struct bnx2x_fp_txdata),
-				GFP_KERNEL);
+	bp->bnx2x_txq = kzmalloc((txq_array_size) * (sizeof(struct bnx2x_fp_txdata)),
+				 KMALLOC_WAIT);
 	if (!bp->bnx2x_txq)
 		goto alloc_err;
 
 	/* msix table */
-	tbl = kcalloc(msix_table_size, sizeof(*tbl), GFP_KERNEL);
+	tbl = kzmalloc((msix_table_size) * (sizeof(*tbl)), KMALLOC_WAIT);
 	if (!tbl)
 		goto alloc_err;
 	bp->msix_table = tbl;
 
 	/* ilt */
-	ilt = kzalloc(sizeof(*ilt), GFP_KERNEL);
+	ilt = kzmalloc(sizeof(*ilt), KMALLOC_WAIT);
 	if (!ilt)
 		goto alloc_err;
 	bp->ilt = ilt;
