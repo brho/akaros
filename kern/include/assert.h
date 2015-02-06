@@ -9,12 +9,10 @@ void ( _panic)(const char* NTS, int, const char* NTS, ...)
 
 #define warn(...) _warn(__FILE__, __LINE__, __VA_ARGS__)
 #define warn_once(...) run_once_racy(warn(__VA_ARGS__))
+#define warn_on(x) do { if (x) warn(#x);} while (0)
+#define warn_on_once(x) do { if (x) warn_once(#x);} while (0)
 #define panic(...) _panic(__FILE__, __LINE__, __VA_ARGS__)
 #define exhausted(...) _panic(__FILE__, __LINE__, __VA_ARGS__)
-
-
-#define check(x)		\
-	do { if (!(x)) warn("warning failed: %s", #x); } while (0)
 
 #define assert(x)		\
 	do { if (!(x)) panic("assertion failed: %s", #x); } while (0)
