@@ -2682,7 +2682,7 @@ static int bnx2x_nvram_crc(struct bnx2x *bp,
 	   "NVRAM CRC from 0x%08x to 0x%08x\n", offset, offset + size);
 
 	while (done < size) {
-		int count = min_t(int, size - done, CRC_BUFF_SIZE);
+		int count = MIN_T(int, size - done, CRC_BUFF_SIZE);
 
 		rc = bnx2x_nvram_read(bp, offset + done, buff, count);
 

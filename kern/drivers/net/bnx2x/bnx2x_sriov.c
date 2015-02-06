@@ -1293,7 +1293,7 @@ int bnx2x_iov_init_one(struct bnx2x *bp, int int_mode_param,
 	if (iov->total == 0)
 		goto failed;
 
-	iov->nr_virtfn = min_t(uint16_t, iov->total, num_vfs_param);
+	iov->nr_virtfn = MIN_T(uint16_t, iov->total, num_vfs_param);
 
 	DP(BNX2X_MSG_IOV, "num_vfs_param was %d, nr_virtfn was %d\n",
 	   num_vfs_param, iov->nr_virtfn);
@@ -1412,7 +1412,7 @@ int bnx2x_iov_alloc_mem(struct bnx2x *bp)
 
 	for (i = 0; i < BNX2X_VF_CIDS/ILT_PAGE_CIDS; i++) {
 		struct hw_dma *cxt = BP_VF_CXT_PAGE(bp, i);
-		cxt->size = min_t(size_t, tot_size, CDU_ILT_PAGE_SZ);
+		cxt->size = MIN_T(size_t, tot_size, CDU_ILT_PAGE_SZ);
 
 		if (cxt->size) {
 			cxt->addr = BNX2X_PCI_ALLOC(&cxt->mapping, cxt->size);
@@ -2023,8 +2023,8 @@ static void bnx2x_vf_igu_disable(struct bnx2x *bp, struct bnx2x_virtf *vf)
 
 uint8_t bnx2x_vf_max_queue_cnt(struct bnx2x *bp, struct bnx2x_virtf *vf)
 {
-	return min_t(uint8_t,
-		     min_t(uint8_t, vf_sb_count(vf), BNX2X_CIDS_PER_VF),
+	return MIN_T(uint8_t,
+		     MIN_T(uint8_t, vf_sb_count(vf), BNX2X_CIDS_PER_VF),
 		     BNX2X_VF_MAX_QUEUES);
 }
 
@@ -2507,7 +2507,7 @@ int bnx2x_enable_sriov(struct bnx2x *bp)
 	first_vf = bp->vfdb->sriov.first_vf_in_pf;
 
 	/* statically distribute vf sb pool between VFs */
-	num_vf_queues = min_t(uint16_t, BNX2X_VF_MAX_QUEUES,
+	num_vf_queues = MIN_T(uint16_t, BNX2X_VF_MAX_QUEUES,
 			      BP_VFDB(bp)->vf_sbs_pool / req_vfs);
 
 	/* zero previous values learned from igu cam */

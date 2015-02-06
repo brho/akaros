@@ -26,6 +26,13 @@
 #define __rcu
 #define unlikely(x) (x)
 
+/* Wanted to keep the _t variants in the code, in case that's useful in the
+ * future */
+#define MIN_T(t, a, b) MIN(a, b)
+#define MAX_T(t, a, b) MAX(a, b)
+#define CLAMP(val, lo, hi) MIN((typeof(val))MAX(val, lo), hi)
+#define CLAMP_T(t, val, lo, hi) CLAMP(val, lo, hi)
+
 typedef unsigned long dma_addr_t;
 /* these dma funcs are empty in linux with !CONFIG_NEED_DMA_MAP_STATE */
 #define DEFINE_DMA_UNMAP_ADDR(ADDR_NAME)
@@ -86,15 +93,22 @@ typedef int pci_power_t;
 #define pr_cont(fmt, ...) \
 	printk(KERN_CONT fmt, ##__VA_ARGS__)
 
-/* pr_devel() should produce zero code unless DEBUG is defined */
+
 #ifdef DEBUG
+
+#define might_sleep() assert(can_block(&per_cpu_info[core_id()]))
 #define pr_devel(fmt, ...) \
 	printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
+
 #else
+
+#define might_sleep()
 #define pr_devel(fmt, ...) \
 	printd(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
+
 #endif
 #define pr_debug pr_devel
+
 
 enum {
 	NETIF_MSG_DRV		= 0x0001,

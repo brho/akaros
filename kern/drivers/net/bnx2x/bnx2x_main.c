@@ -3155,7 +3155,7 @@ static void bnx2x_pf_rx_q_prep(struct bnx2x *bp,
 			SGE_PAGE_SHIFT;
 		max_sge = ((max_sge + PAGES_PER_SGE - 1) &
 			  (~(PAGES_PER_SGE-1))) >> PAGES_PER_SGE_SHIFT;
-		sge_sz = (uint16_t)min_t(uint32_t, SGE_PAGES, 0xffff);
+		sge_sz = (uint16_t)MIN_T(uint32_t, SGE_PAGES, 0xffff);
 	}
 
 	/* pause - not for e1 */
@@ -6063,7 +6063,7 @@ static void bnx2x_init_eq_ring(struct bnx2x *bp)
 	bp->eq_cons_sb = BNX2X_EQ_INDEX;
 	/* we want a warning message before it gets wrought... */
 	atomic_set(&bp->eq_spq_left,
-		min_t(int, MAX_SP_DESC_CNT - MAX_SPQ_PENDING, NUM_EQ_DESC) - 1);
+		MIN_T(int, MAX_SP_DESC_CNT - MAX_SPQ_PENDING, NUM_EQ_DESC) - 1);
 }
 
 /* called with netif_addr_lock_bh() */
@@ -8273,7 +8273,7 @@ int bnx2x_alloc_mem(struct bnx2x *bp)
 	context_size = sizeof(union cdu_context) * BNX2X_L2_CID_COUNT(bp);
 
 	for (i = 0, allocated = 0; allocated < context_size; i++) {
-		bp->context[i].size = min(CDU_ILT_PAGE_SZ,
+		bp->context[i].size = MIN(CDU_ILT_PAGE_SZ,
 					  (context_size - allocated));
 		bp->context[i].vcxt = BNX2X_PCI_ALLOC(&bp->context[i].cxt_mapping,
 						      bp->context[i].size);
@@ -10879,7 +10879,7 @@ static int bnx2x_get_igu_cam_info(struct bnx2x *bp)
 	 * Driver should use the minimal value of both as the actual status
 	 * block count
 	 */
-	bp->igu_sb_cnt = min_t(int, bp->igu_sb_cnt, igu_sb_cnt);
+	bp->igu_sb_cnt = MIN_T(int, bp->igu_sb_cnt, igu_sb_cnt);
 #endif
 
 	if (igu_sb_cnt == 0) {
@@ -11851,7 +11851,7 @@ static int bnx2x_get_hwinfo(struct bnx2x *bp)
 
 	/* adjust igu_sb_cnt to MF for E1H */
 	if (CHIP_IS_E1H(bp) && IS_MF(bp))
-		bp->igu_sb_cnt = min_t(uint8_t, bp->igu_sb_cnt,
+		bp->igu_sb_cnt = MIN_T(uint8_t, bp->igu_sb_cnt,
 				       E1H_MAX_MF_SB_COUNT);
 
 	/* port info */

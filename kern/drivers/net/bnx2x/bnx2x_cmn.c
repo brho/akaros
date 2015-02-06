@@ -58,7 +58,7 @@ static int bnx2x_calc_num_queues(struct bnx2x *bp)
 	if (is_kdump_kernel())
 		nq = 1;
 
-	nq = clamp(nq, 1, BNX2X_MAX_QUEUES(bp));
+	nq = CLAMP(nq, 1, BNX2X_MAX_QUEUES(bp));
 	return nq;
 }
 
@@ -588,7 +588,7 @@ static int bnx2x_fill_frag_skb(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 				     le16_to_cpu(cqe->num_of_coalesced_segs));
 
 #ifdef BNX2X_STOP_ON_ERROR
-	if (pages > min_t(uint32_t, 8, MAX_SKB_FRAGS) * SGE_PAGES) {
+	if (pages > MIN_T(uint32_t, 8, MAX_SKB_FRAGS) * SGE_PAGES) {
 		BNX2X_ERR("SGL length is too long: %d. CQE index is %d\n",
 			  pages, cqe_idx);
 		BNX2X_ERR("cqe->pkt_len = %d\n", cqe->pkt_len);
@@ -604,10 +604,10 @@ static int bnx2x_fill_frag_skb(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 		/* FW gives the indices of the SGE as if the ring is an array
 		   (meaning that "next" element will consume 2 indices) */
 		if (fp->mode == TPA_MODE_GRO)
-			frag_len = min_t(uint32_t, frag_size,
+			frag_len = MIN_T(uint32_t, frag_size,
 					 (uint32_t)full_page);
 		else /* LRO */
-			frag_len = min_t(uint32_t, frag_size,
+			frag_len = MIN_T(uint32_t, frag_size,
 					 (uint32_t)SGE_PAGES);
 
 		rx_pg = &fp->rx_page_ring[sge_idx];
@@ -4376,8 +4376,8 @@ static int bnx2x_alloc_rx_bds(struct bnx2x_fastpath *fp,
 
 	fp->rx_bd_prod = ring_prod;
 	/* Limit the CQE producer by the CQE ring size */
-	fp->rx_comp_prod = min_t(uint16_t, NUM_RCQ_RINGS*RCQ_DESC_CNT,
-			       cqe_ring_prod);
+	fp->rx_comp_prod = MIN_T(uint16_t, NUM_RCQ_RINGS * RCQ_DESC_CNT,
+				 cqe_ring_prod);
 	fp->rx_pkt = fp->rx_calls = 0;
 
 	bnx2x_fp_stats(bp, fp)->eth_q_stats.rx_skb_alloc_failed += failure_cnt;
@@ -4429,8 +4429,9 @@ static int bnx2x_alloc_fp_mem_at(struct bnx2x *bp, int index)
 		}
 
 		/* allocate at least number of buffers required by FW */
-		rx_ring_size = max_t(int, bp->disable_tpa ? MIN_RX_SIZE_NONTPA :
-				     MIN_RX_SIZE_TPA, rx_ring_size);
+		rx_ring_size = MAX_T(int,
+				     bp->disable_tpa ? MIN_RX_SIZE_NONTPA : MIN_RX_SIZE_TPA,
+				     rx_ring_size);
 
 		bp->rx_ring_size = rx_ring_size;
 	} else /* if rx_ring_size specified - use it */

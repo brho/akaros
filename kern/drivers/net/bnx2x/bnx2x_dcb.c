@@ -179,7 +179,7 @@ static void bnx2x_dcbx_get_ap_priority(struct bnx2x *bp,
 	}
 
 	if (pri < MAX_PFC_PRIORITIES)
-		ttp[llfc_traf_type] = max_t(uint32_t, ttp[llfc_traf_type],
+		ttp[llfc_traf_type] = MAX_T(uint32_t, ttp[llfc_traf_type],
 					    pri);
 }
 
@@ -1698,10 +1698,9 @@ static void bnx2x_dcbx_cee_fill_cos_params(struct bnx2x *bp,
 
 			entry++;
 		} else {
-			need_num_of_entries =  min_t(uint8_t,
-				(uint8_t)pg->num_of_dif_pri,
-				(uint8_t)DCBX_COS_MAX_NUM_E3B0 -
-						 help_data->num_of_pg + 1);
+			need_num_of_entries =  MIN_T(uint8_t,
+						     (uint8_t)pg->num_of_dif_pri,
+						     (uint8_t)DCBX_COS_MAX_NUM_E3B0 - help_data->num_of_pg + 1);
 			/*
 			 * If there are still VOQ-s which have no associated PG,
 			 * then associate these VOQ-s to PG15. These PG-s will

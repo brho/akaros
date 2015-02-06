@@ -373,7 +373,7 @@ union db_prod {
 #define SGE_PAGE_SHIFT		PAGE_SHIFT
 #define SGE_PAGE_ALIGN(addr)	PAGE_ALIGN((typeof(PAGE_SIZE))(addr))
 #define SGE_PAGES		(SGE_PAGE_SIZE * PAGES_PER_SGE)
-#define TPA_AGG_SIZE		min_t(uint32_t, (min_t(uint32_t, 8, MAX_SKB_FRAGS) * \
+#define TPA_AGG_SIZE		MIN_T(uint32_t, (MIN_T(uint32_t, 8, MAX_SKB_FRAGS) * \
 					    SGE_PAGES), 0xffff)
 
 /* SGE ring related macros */
@@ -822,8 +822,8 @@ static inline bool bnx2x_fp_ll_disable(struct bnx2x_fastpath *fp)
 					ETH_MIN_RX_CQES_WITH_TPA_E1 : \
 					ETH_MIN_RX_CQES_WITH_TPA_E1H_E2)
 #define MIN_RX_SIZE_NONTPA_HW   ETH_MIN_RX_CQES_WITHOUT_TPA
-#define MIN_RX_SIZE_TPA		(max_t(uint32_t, MIN_RX_SIZE_TPA_HW, MIN_RX_AVAIL))
-#define MIN_RX_SIZE_NONTPA	(max_t(uint32_t, MIN_RX_SIZE_NONTPA_HW,\
+#define MIN_RX_SIZE_TPA		(MAX_T(uint32_t, MIN_RX_SIZE_TPA_HW, MIN_RX_AVAIL))
+#define MIN_RX_SIZE_NONTPA	(MAX_T(uint32_t, MIN_RX_SIZE_NONTPA_HW,\
 								MIN_RX_AVAIL))
 
 #define NEXT_RX_IDX(x)		((((x) & RX_DESC_MASK) == \
@@ -1511,7 +1511,7 @@ struct bnx2x {
 	/* Max supported alignment is 256 (8 shift)
 	 * minimal alignment shift 6 is optimal for 57xxx HW performance
 	 */
-#define BNX2X_RX_ALIGN_SHIFT		max(6, min(8, L1_CACHE_SHIFT))
+#define BNX2X_RX_ALIGN_SHIFT		MAX(6, MIN(8, L1_CACHE_SHIFT))
 
 	/* FW uses 2 Cache lines Alignment for start packet and size
 	 *
@@ -1522,7 +1522,7 @@ struct bnx2x {
 #define BNX2X_FW_RX_ALIGN_START	(1UL << BNX2X_RX_ALIGN_SHIFT)
 
 #define BNX2X_FW_RX_ALIGN_END					\
-	max_t(uint64_t, 1UL << BNX2X_RX_ALIGN_SHIFT,			\
+	MAX_T(uint64_t, 1UL << BNX2X_RX_ALIGN_SHIFT,			\
 	    SKB_DATA_ALIGN(sizeof(struct skb_shared_info)))
 
 #define BNX2X_PXP_DRAM_ALIGN		(BNX2X_RX_ALIGN_SHIFT - 5)

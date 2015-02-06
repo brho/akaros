@@ -298,22 +298,22 @@ int bnx2x_vfpf_acquire(struct bnx2x *bp, uint8_t tx_count, uint8_t rx_count)
 
 			/* humble our request */
 			req->resc_request.num_txqs =
-				min(req->resc_request.num_txqs,
+				MIN(req->resc_request.num_txqs,
 				    bp->acquire_resp.resc.num_txqs);
 			req->resc_request.num_rxqs =
-				min(req->resc_request.num_rxqs,
+				MIN(req->resc_request.num_rxqs,
 				    bp->acquire_resp.resc.num_rxqs);
 			req->resc_request.num_sbs =
-				min(req->resc_request.num_sbs,
+				MIN(req->resc_request.num_sbs,
 				    bp->acquire_resp.resc.num_sbs);
 			req->resc_request.num_mac_filters =
-				min(req->resc_request.num_mac_filters,
+				MIN(req->resc_request.num_mac_filters,
 				    bp->acquire_resp.resc.num_mac_filters);
 			req->resc_request.num_vlan_filters =
-				min(req->resc_request.num_vlan_filters,
+				MIN(req->resc_request.num_vlan_filters,
 				    bp->acquire_resp.resc.num_vlan_filters);
 			req->resc_request.num_mc_filters =
-				min(req->resc_request.num_mc_filters,
+				MIN(req->resc_request.num_mc_filters,
 				    bp->acquire_resp.resc.num_mc_filters);
 
 			/* Clear response buffer */
@@ -1350,7 +1350,7 @@ static void bnx2x_vf_mbx_acquire(struct bnx2x *bp, struct bnx2x_virtf *vf,
 	if (bnx2x_vf_mbx_is_windows_vm(bp, &mbx->msg->req.acquire))
 		vf->fp_hsi = acquire->vfdev_info.fp_hsi_ver;
 	else
-		vf->fp_hsi = max_t(uint8_t, acquire->vfdev_info.fp_hsi_ver,
+		vf->fp_hsi = MAX_T(uint8_t, acquire->vfdev_info.fp_hsi_ver,
 				   ETH_FP_HSI_VER_2);
 	if (vf->fp_hsi > ETH_FP_HSI_VERSION) {
 		DP(BNX2X_MSG_IOV,
