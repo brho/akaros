@@ -33,7 +33,9 @@
 #define CLAMP(val, lo, hi) MIN((typeof(val))MAX(val, lo), hi)
 #define CLAMP_T(t, val, lo, hi) CLAMP(val, lo, hi)
 
-typedef unsigned long dma_addr_t;
+typedef physaddr_t dma_addr_t;
+typedef int gfp_t;
+
 /* these dma funcs are empty in linux with !CONFIG_NEED_DMA_MAP_STATE */
 #define DEFINE_DMA_UNMAP_ADDR(ADDR_NAME)
 #define DEFINE_DMA_UNMAP_LEN(LEN_NAME)
@@ -41,6 +43,84 @@ typedef unsigned long dma_addr_t;
 #define dma_unmap_addr_set(PTR, ADDR_NAME, VAL)  do { } while (0)
 #define dma_unmap_len(PTR, LEN_NAME)             (0)
 #define dma_unmap_len_set(PTR, LEN_NAME, VAL)    do { } while (0)
+#define DMA_NONE				0
+#define DMA_TO_DEVICE			1
+#define DMA_FROM_DEVICE			2
+#define DMA_BIDIRECTIONAL		3
+
+static inline void *__dma_alloc_coherent(size_t size, dma_addr_t *dma_handle,
+                                         gfp_t flags)
+{
+	size_t order = LOG2_UP(nr_pages(size));
+	void *vaddr = get_cont_pages(order, flags);
+	if (!vaddr) {
+		*dma_handle = 0;
+		return 0;
+	}
+	*dma_handle = PADDR(vaddr);
+	return vaddr;
+}
+
+static inline void *__dma_zalloc_coherent(size_t size, dma_addr_t *dma_handle,
+                                          gfp_t flags)
+{
+	void *vaddr = __dma_alloc_coherent(size, dma_handle, flags);
+	if (vaddr)
+		memset(vaddr, 0, size);
+	return vaddr;
+}
+
+static inline void __dma_free_coherent(size_t size, void *cpu_addr,
+                                       dma_addr_t dma_handle)
+{
+	size_t order = LOG2_UP(nr_pages(size));
+	free_cont_pages(cpu_addr, order);
+}
+
+static inline dma_addr_t __dma_map_single(void *cpu_addr, size_t size,
+                                          int direction)
+{
+	return PADDR(cpu_addr);
+}
+
+static inline dma_addr_t __dma_map_page(struct page *page,
+                                        unsigned long offset, size_t size,
+                                        int direction)
+{
+	assert(offset == 0);
+	return page2pa(page);
+}
+
+static inline int __dma_mapping_error(dma_addr_t dma_addr)
+{
+	return (dma_addr == 0);
+}
+
+#define dma_unmap_single(...)
+#define dma_unmap_page(...)
+#define dma_set_mask_and_coherent(...) (0)
+#define dma_sync_single_for_cpu(...)
+
+/* Wrappers to avoid struct device.  Might want that one of these days */
+#define dma_alloc_coherent(dev, size, dma_handlep, flag)                       \
+	__dma_alloc_coherent(size, dma_handlep, flag)
+
+#define dma_zalloc_coherent(dev, size, dma_handlep, flag)                      \
+	__dma_zalloc_coherent(size, dma_handlep, flag)
+
+#define dma_free_coherent(dev, size, dma_handle, flag)                         \
+	__dma_free_coherent(size, dma_handle, flag)
+
+#define dma_map_single(dev, addr, size, direction)                             \
+	__dma_map_single(addr, size, direction)
+
+#define dma_map_page(dev, page, offset, size, direction)                       \
+	__dma_map_page(page, offset, size, direction)
+
+#define dma_mapping_error(dev, handle)                                         \
+	__dma_mapping_error(handle)
+
+
 typedef int pci_power_t;
 
 #define DEFINE_SEMAPHORE(name)  \
