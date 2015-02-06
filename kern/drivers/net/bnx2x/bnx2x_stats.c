@@ -126,10 +126,10 @@ static void bnx2x_storm_stats_post(struct bnx2x *bp)
 	if (!bp->stats_pending) {
 		int rc;
 
-		spin_lock_bh(&bp->stats_lock);
+		spin_lock(&bp->stats_lock);
 
 		if (bp->stats_pending) {
-			spin_unlock_bh(&bp->stats_lock);
+			spin_unlock(&bp->stats_lock);
 			return;
 		}
 
@@ -151,7 +151,7 @@ static void bnx2x_storm_stats_post(struct bnx2x *bp)
 		if (rc == 0)
 			bp->stats_pending = 1;
 
-		spin_unlock_bh(&bp->stats_lock);
+		spin_unlock(&bp->stats_lock);
 	}
 }
 
@@ -1415,11 +1415,11 @@ void bnx2x_stats_handle(struct bnx2x *bp, enum bnx2x_stats_event event)
 	if (unlikely(bp->panic))
 		return;
 
-	spin_lock_bh(&bp->stats_lock);
+	spin_lock(&bp->stats_lock);
 	state = bp->stats_state;
 	bp->stats_state = bnx2x_stats_stm[state][event].next_state;
 	action = bnx2x_stats_stm[state][event].action;
-	spin_unlock_bh(&bp->stats_lock);
+	spin_unlock(&bp->stats_lock);
 
 	action(bp);
 

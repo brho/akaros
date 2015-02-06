@@ -485,7 +485,7 @@ int bnx2x_issue_dmae_with_comp(struct bnx2x *bp, struct dmae_command *dmae,
 	 * from ndo_set_rx_mode() flow that may be called from BH.
 	 */
 
-	spin_lock_bh(&bp->dmae_lock);
+	spin_lock(&bp->dmae_lock);
 
 	/* reset completion */
 	*comp = 0;
@@ -514,7 +514,7 @@ int bnx2x_issue_dmae_with_comp(struct bnx2x *bp, struct dmae_command *dmae,
 
 unlock:
 
-	spin_unlock_bh(&bp->dmae_lock);
+	spin_unlock(&bp->dmae_lock);
 
 	return rc;
 }
@@ -3810,18 +3810,18 @@ int bnx2x_sp_post(struct bnx2x *bp, int command, int cid,
 	}
 #endif
 
-	spin_lock_bh(&bp->spq_lock);
+	spin_lock(&bp->spq_lock);
 
 	if (common) {
 		if (!atomic_read(&bp->eq_spq_left)) {
 			BNX2X_ERR("BUG! EQ ring full!\n");
-			spin_unlock_bh(&bp->spq_lock);
+			spin_unlock(&bp->spq_lock);
 			bnx2x_panic();
 			return -EBUSY;
 		}
 	} else if (!atomic_read(&bp->cq_spq_left)) {
 			BNX2X_ERR("BUG! SPQ ring full!\n");
-			spin_unlock_bh(&bp->spq_lock);
+			spin_unlock(&bp->spq_lock);
 			bnx2x_panic();
 			return -EBUSY;
 	}
@@ -3870,7 +3870,7 @@ int bnx2x_sp_post(struct bnx2x *bp, int command, int cid,
 	   atomic_read(&bp->cq_spq_left), atomic_read(&bp->eq_spq_left));
 
 	bnx2x_sp_prod_update(bp);
-	spin_unlock_bh(&bp->spq_lock);
+	spin_unlock(&bp->spq_lock);
 	return 0;
 }
 
@@ -6035,7 +6035,7 @@ void bnx2x_update_coalesce(struct bnx2x *bp)
 
 static void bnx2x_init_sp_ring(struct bnx2x *bp)
 {
-	spin_lock_init(&bp->spq_lock);
+	spinlock_init_irqsave(&bp->spq_lock);
 	atomic_set(&bp->cq_spq_left, MAX_SPQ_PENDING);
 
 	bp->spq_prod_idx = 0;
@@ -6815,7 +6815,7 @@ static void bnx2x_reset_common(struct bnx2x *bp)
 static void bnx2x_setup_dmae(struct bnx2x *bp)
 {
 	bp->dmae_ready = 0;
-	spin_lock_init(&bp->dmae_lock);
+	spinlock_init_irqsave(&bp->dmae_lock);
 }
 
 static void bnx2x_init_pxp(struct bnx2x *bp)
@@ -12009,7 +12009,7 @@ static int bnx2x_init_bp(struct bnx2x *bp)
 	mutex_init(&bp->fw_mb_mutex);
 	mutex_init(&bp->drv_info_mutex);
 	bp->drv_info_mng_owner = false;
-	spin_lock_init(&bp->stats_lock);
+	spinlock_init_irqsave(&bp->stats_lock);
 	sema_init(&bp->stats_sema, 1);
 
 	INIT_DELAYED_WORK(&bp->sp_task, bnx2x_sp_task);
@@ -13644,9 +13644,9 @@ static int bnx2x_eeh_nic_unload(struct bnx2x *bp)
 	cancel_delayed_work_sync(&bp->sp_task);
 	cancel_delayed_work_sync(&bp->period_task);
 
-	spin_lock_bh(&bp->stats_lock);
+	spin_lock(&bp->stats_lock);
 	bp->stats_state = STATS_STATE_DISABLED;
-	spin_unlock_bh(&bp->stats_lock);
+	spin_unlock(&bp->stats_lock);
 
 	bnx2x_save_statistics(bp);
 
@@ -13932,7 +13932,7 @@ static void bnx2x_cnic_sp_post(struct bnx2x *bp, int count)
 		return;
 #endif
 
-	spin_lock_bh(&bp->spq_lock);
+	spin_lock(&bp->spq_lock);
 	BUG_ON(bp->cnic_spq_pending < count);
 	bp->cnic_spq_pending -= count;
 
@@ -14000,7 +14000,7 @@ static void bnx2x_cnic_sp_post(struct bnx2x *bp, int count)
 			bp->cnic_kwq_cons++;
 	}
 	bnx2x_sp_prod_update(bp);
-	spin_unlock_bh(&bp->spq_lock);
+	spin_unlock(&bp->spq_lock);
 }
 
 static int bnx2x_cnic_sp_queue(struct ether *dev,
@@ -14022,7 +14022,7 @@ static int bnx2x_cnic_sp_queue(struct ether *dev,
 		return -EAGAIN;
 	}
 
-	spin_lock_bh(&bp->spq_lock);
+	spin_lock(&bp->spq_lock);
 
 	for (i = 0; i < count; i++) {
 		struct eth_spe *spe = (struct eth_spe *)kwqes[i];
@@ -14046,7 +14046,7 @@ static int bnx2x_cnic_sp_queue(struct ether *dev,
 			bp->cnic_kwq_prod++;
 	}
 
-	spin_unlock_bh(&bp->spq_lock);
+	spin_unlock(&bp->spq_lock);
 
 	if (bp->cnic_spq_pending < bp->cnic_eth_dev.max_kwqe_pending)
 		bnx2x_cnic_sp_post(bp, 0);

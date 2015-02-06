@@ -53,7 +53,7 @@ static inline void bnx2x_exe_queue_init(struct bnx2x *bp,
 	INIT_LIST_HEAD(&o->exe_queue);
 	INIT_LIST_HEAD(&o->pending_comp);
 
-	spin_lock_init(&o->lock);
+	spinlock_init_irqsave(&o->lock);
 
 	o->exe_chunk_len = exe_len;
 	o->owner         = owner;
@@ -81,12 +81,12 @@ static inline int bnx2x_exe_queue_length(struct bnx2x_exe_queue_obj *o)
 	struct bnx2x_exeq_elem *elem;
 	int cnt = 0;
 
-	spin_lock_bh(&o->lock);
+	spin_lock(&o->lock);
 
 	list_for_each_entry(elem, &o->exe_queue, link)
 		cnt++;
 
-	spin_unlock_bh(&o->lock);
+	spin_unlock(&o->lock);
 
 	return cnt;
 }
@@ -108,7 +108,7 @@ static inline int bnx2x_exe_queue_add(struct bnx2x *bp,
 {
 	int rc;
 
-	spin_lock_bh(&o->lock);
+	spin_lock(&o->lock);
 
 	if (!restore) {
 		/* Try to cancel this element queue */
@@ -127,14 +127,14 @@ static inline int bnx2x_exe_queue_add(struct bnx2x *bp,
 	/* If so, add it to the execution queue */
 	list_add_tail(&elem->link, &o->exe_queue);
 
-	spin_unlock_bh(&o->lock);
+	spin_unlock(&o->lock);
 
 	return 0;
 
 free_and_exit:
 	bnx2x_exe_queue_free_elem(bp, elem);
 
-	spin_unlock_bh(&o->lock);
+	spin_unlock(&o->lock);
 
 	return rc;
 }
@@ -503,9 +503,9 @@ int bnx2x_vlan_mac_h_read_lock(struct bnx2x *bp,
 {
 	int rc;
 
-	spin_lock_bh(&o->exe_queue.lock);
+	spin_lock(&o->exe_queue.lock);
 	rc = __bnx2x_vlan_mac_h_read_lock(bp, o);
-	spin_unlock_bh(&o->exe_queue.lock);
+	spin_unlock(&o->exe_queue.lock);
 
 	return rc;
 }
@@ -558,9 +558,9 @@ static void __bnx2x_vlan_mac_h_read_unlock(struct bnx2x *bp,
 void bnx2x_vlan_mac_h_read_unlock(struct bnx2x *bp,
 				  struct bnx2x_vlan_mac_obj *o)
 {
-	spin_lock_bh(&o->exe_queue.lock);
+	spin_lock(&o->exe_queue.lock);
 	__bnx2x_vlan_mac_h_read_unlock(bp, o);
-	spin_unlock_bh(&o->exe_queue.lock);
+	spin_unlock(&o->exe_queue.lock);
 }
 
 static int bnx2x_get_n_elements(struct bnx2x *bp, struct bnx2x_vlan_mac_obj *o,
@@ -1395,7 +1395,7 @@ static int __bnx2x_vlan_mac_execute_step(struct bnx2x *bp,
 {
 	int rc = 0;
 
-	spin_lock_bh(&o->exe_queue.lock);
+	spin_lock(&o->exe_queue.lock);
 
 	DP(BNX2X_MSG_SP, "vlan_mac_execute_step - trying to take writer lock\n");
 	rc = __bnx2x_vlan_mac_h_write_trylock(bp, o);
@@ -1410,7 +1410,7 @@ static int __bnx2x_vlan_mac_execute_step(struct bnx2x *bp,
 	} else {
 		rc = bnx2x_exe_queue_step(bp, &o->exe_queue, ramrod_flags);
 	}
-	spin_unlock_bh(&o->exe_queue.lock);
+	spin_unlock(&o->exe_queue.lock);
 
 	return rc;
 }
@@ -1435,7 +1435,7 @@ static int bnx2x_complete_vlan_mac(struct bnx2x *bp,
 	/* Clearing the pending list & raw state should be made
 	 * atomically (as execution flow assumes they represent the same).
 	 */
-	spin_lock_bh(&o->exe_queue.lock);
+	spin_lock(&o->exe_queue.lock);
 
 	/* Reset pending list */
 	__bnx2x_exe_queue_reset_pending(bp, &o->exe_queue);
@@ -1443,7 +1443,7 @@ static int bnx2x_complete_vlan_mac(struct bnx2x *bp,
 	/* Clear pending */
 	r->clear_pending(r);
 
-	spin_unlock_bh(&o->exe_queue.lock);
+	spin_unlock(&o->exe_queue.lock);
 
 	/* If ramrod failed this is most likely a SW bug */
 	if (cqe->message.error)
@@ -1842,7 +1842,7 @@ static int bnx2x_vlan_mac_del_all(struct bnx2x *bp,
 
 	/* Clear pending commands first */
 
-	spin_lock_bh(&exeq->lock);
+	spin_lock(&exeq->lock);
 
 	list_for_each_entry_safe(exeq_pos, exeq_pos_n, &exeq->exe_queue, link) {
 		flags = exeq_pos->cmd_data.vlan_mac.vlan_mac_flags;
@@ -1851,7 +1851,7 @@ static int bnx2x_vlan_mac_del_all(struct bnx2x *bp,
 			rc = exeq->remove(bp, exeq->owner, exeq_pos);
 			if (rc) {
 				BNX2X_ERR("Failed to remove command\n");
-				spin_unlock_bh(&exeq->lock);
+				spin_unlock(&exeq->lock);
 				return rc;
 			}
 			list_del(&exeq_pos->link);
@@ -1859,7 +1859,7 @@ static int bnx2x_vlan_mac_del_all(struct bnx2x *bp,
 		}
 	}
 
-	spin_unlock_bh(&exeq->lock);
+	spin_unlock(&exeq->lock);
 
 	/* Prepare a command request */
 	memset(&p, 0, sizeof(p));

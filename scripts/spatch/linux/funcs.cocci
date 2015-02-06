@@ -90,3 +90,36 @@ type T;
 @@
 -clamp_t(T, V, LO, HI)
 +CLAMP_T(T, V, LO, HI)
+
+
+// locking
+// being conservative: they might not need irqsave
+@@
+expression E;
+@@
+-spin_lock_init(E)
++spinlock_init_irqsave(E)
+
+@@
+expression E;
+@@
+-spin_lock_bh(E)
++spin_lock(E)
+
+@@
+expression E;
+@@
+-spin_unlock_bh(E)
++spin_unlock(E)
+@@
+
+expression E;
+@@
+-spin_lock_irq(E)
++spin_lock_irqsave(E)
+
+@@
+expression E;
+@@
+-spin_unlock_irq(E)
++spin_unlock_irqsave(E)
