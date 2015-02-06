@@ -25,6 +25,9 @@
 
 #define __rcu
 #define unlikely(x) (x)
+#define likely(x) (x)
+#define UINT_MAX UINT64_MAX
+#define L1_CACHE_SHIFT (LOG2_UP(ARCH_CL_SIZE))
 
 /* Wanted to keep the _t variants in the code, in case that's useful in the
  * future */
@@ -32,6 +35,14 @@
 #define MAX_T(t, a, b) MAX(a, b)
 #define CLAMP(val, lo, hi) MIN((typeof(val))MAX(val, lo), hi)
 #define CLAMP_T(t, val, lo, hi) CLAMP(val, lo, hi)
+
+/* I'm okay with these versions of the asserts. */
+#define WARN(args...) warn(args)
+#define WARN_ONCE(args...) warn_once(args)
+#define WARN_ON(x) warn_on(x)
+#define WARN_ON_ONCE(x) warn_on_once(x)
+#define BUG(args...) panic(args)
+#define BUG_ON(x) assert(x)
 
 typedef physaddr_t dma_addr_t;
 typedef int gfp_t;
@@ -122,6 +133,7 @@ static inline int __dma_mapping_error(dma_addr_t dma_addr)
 
 
 typedef int pci_power_t;
+typedef int pm_message_t;
 
 #define DEFINE_SEMAPHORE(name)  \
     struct semaphore name = SEMAPHORE_INITIALIZER_IRQSAVE(name, 1)
@@ -172,6 +184,8 @@ typedef int pci_power_t;
 	printk(KERN_INFO pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_cont(fmt, ...) \
 	printk(KERN_CONT fmt, ##__VA_ARGS__)
+#define netdev_printk(lvl, dev, fmt, ...) \
+	printk(fmt, ##__VA_ARGS__)
 
 
 #ifdef DEBUG
@@ -207,6 +221,15 @@ enum {
 	NETIF_MSG_HW		= 0x2000,
 	NETIF_MSG_WOL		= 0x4000,
 };
+
+#define MODULE_AUTHOR(...)
+#define MODULE_DESCRIPTION(...)
+#define MODULE_LICENSE(...)
+#define MODULE_VERSION(...)
+#define MODULE_FIRMWARE(...)
+#define MODULE_PARM_DESC(...)
+#define MODULE_DEVICE_TABLE(...)
+#define THIS_MODULE ((void*)0)
 
 /* I'd like to spatch all of the pci methods, but I don't know how to do the
  * reads.  Since we're not doing the reads, then no sense doing the writes. */
