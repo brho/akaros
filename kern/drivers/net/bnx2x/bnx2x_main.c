@@ -8483,7 +8483,7 @@ void bnx2x_ilt_set_info(struct bnx2x *bp)
 	   ilt_client->end,
 	   ilt_client->page_size,
 	   ilt_client->flags,
-	   ilog2(ilt_client->page_size >> 12));
+	   LOG2_UP(ilt_client->page_size >> 12));
 
 	/* QM */
 	if (QM_INIT(bp->qm_cid_count)) {
@@ -8505,7 +8505,7 @@ void bnx2x_ilt_set_info(struct bnx2x *bp)
 		   ilt_client->end,
 		   ilt_client->page_size,
 		   ilt_client->flags,
-		   ilog2(ilt_client->page_size >> 12));
+		   LOG2_UP(ilt_client->page_size >> 12));
 	}
 
 	if (CNIC_SUPPORT(bp)) {
@@ -8524,7 +8524,7 @@ void bnx2x_ilt_set_info(struct bnx2x *bp)
 		   ilt_client->end,
 		   ilt_client->page_size,
 		   ilt_client->flags,
-		   ilog2(ilt_client->page_size >> 12));
+		   LOG2_UP(ilt_client->page_size >> 12));
 
 		/* TM */
 		ilt_client = &ilt->clients[ILT_CLIENT_TM];
@@ -8541,7 +8541,7 @@ void bnx2x_ilt_set_info(struct bnx2x *bp)
 		   ilt_client->end,
 		   ilt_client->page_size,
 		   ilt_client->flags,
-		   ilog2(ilt_client->page_size >> 12));
+		   LOG2_UP(ilt_client->page_size >> 12));
 	}
 
 	BUG_ON(line > ILT_MAX_LINES);

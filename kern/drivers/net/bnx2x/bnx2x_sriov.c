@@ -888,7 +888,7 @@ bnx2x_iov_static_resc(struct bnx2x *bp, struct bnx2x_virtf *vf)
 	/* divvy up vlan rules */
 	bnx2x_iov_re_set_vlan_filters(bp, vf, 0);
 	vlan_count = bp->vlans_pool.check(&bp->vlans_pool);
-	vlan_count = 1 << ilog2(vlan_count);
+	vlan_count = 1 << LOG2_UP(vlan_count);
 	bnx2x_iov_re_set_vlan_filters(bp, vf,
 				      vlan_count / BNX2X_NR_VIRTFN(bp));
 
@@ -1053,7 +1053,7 @@ void bnx2x_iov_init_dq(struct bnx2x *bp)
 
 	/* Set the DQ such that the CID reflect the abs_vfid */
 	REG_WR(bp, DORQ_REG_VF_NORM_VF_BASE, 0);
-	REG_WR(bp, DORQ_REG_MAX_RVFID_SIZE, ilog2(BNX2X_MAX_NUM_OF_VFS));
+	REG_WR(bp, DORQ_REG_MAX_RVFID_SIZE, LOG2_UP(BNX2X_MAX_NUM_OF_VFS));
 
 	/* Set VFs starting CID. If its > 0 the preceding CIDs are belong to
 	 * the PF L2 queues

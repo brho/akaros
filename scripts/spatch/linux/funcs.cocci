@@ -123,3 +123,9 @@ expression E;
 @@
 -spin_unlock_irq(E)
 +spin_unlock_irqsave(E)
+
+@@
+expression E;
+@@
+-ilog2(E)
++LOG2_UP(E)

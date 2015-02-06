@@ -2198,7 +2198,7 @@ void bnx2x_igu_clear_sb_gen(struct bnx2x *bp, uint8_t func,
 		} \
 	} while (0)
 
-#define ILOG2(x)	(ilog2((x)))
+#define ILOG2(x)	(LOG2_UP((x)))
 
 #define ILT_NUM_PAGE_ENTRIES	(3072)
 /* In 57710/11 we use whole table since we have 8 func
