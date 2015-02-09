@@ -180,3 +180,8 @@ expression E;
 @@
 -ntohs(E)
 +be16_to_cpu(E)
+
+@@
+@@
+-smp_processor_id()
++core_id()

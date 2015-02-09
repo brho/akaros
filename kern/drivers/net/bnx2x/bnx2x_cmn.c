@@ -318,7 +318,7 @@ int bnx2x_tx_int(struct bnx2x *bp, struct bnx2x_fp_txdata *txdata)
 		 * stops the queue
 		 */
 
-		__netif_tx_lock(txq, smp_processor_id());
+		__netif_tx_lock(txq, core_id());
 
 		if ((netif_tx_queue_stopped(txq)) &&
 		    (bp->state == BNX2X_STATE_OPEN) &&
