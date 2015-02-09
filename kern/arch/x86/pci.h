@@ -321,6 +321,7 @@ struct pci_device {
 	STAILQ_ENTRY(pci_device)	all_dev;	/* list of all devices */
 	SLIST_ENTRY(pci_device)		irq_dev;	/* list of all devs off an irq */
 	spinlock_t					lock;
+	void						*dev_data;	/* device private pointer */
 	bool						in_use;		/* prevent double discovery */
 	uint8_t						bus;
 	uint8_t						dev;
@@ -413,6 +414,8 @@ uint16_t pci_get_subvendor(struct pci_device *pcidev);
 uint16_t pci_get_subdevice(struct pci_device *pcidev);
 void pci_dump_config(struct pci_device *pcidev, size_t len);
 int pci_find_cap(struct pci_device *pcidev, uint8_t cap_id, uint32_t *cap_reg);
+static inline void pci_set_drvdata(struct pci_device *pcidev, void *data);
+static inline void *pci_get_drvdata(struct pci_device *pcidev);
 
 /* MSI functions, msi.c */
 int pci_msi_enable(struct pci_device *p, uint64_t vec);
@@ -428,5 +431,15 @@ void pci_msix_route_vector(struct msix_irq_vector *linkage, int dest);
 #define explode_tbdf(tbdf) {pcidev.bus = tbdf >> 16;\
 		pcidev.dev = (tbdf>>11)&0x1f;\
 		pcidev.func = (tbdf>>8)&3;}
+
+static inline void pci_set_drvdata(struct pci_device *pcidev, void *data)
+{
+	pcidev->dev_data = data;
+}
+
+static inline void *pci_get_drvdata(struct pci_device *pcidev)
+{
+	return pcidev->dev_data;
+}
 
 #endif /* ROS_ARCH_PCI_H */
