@@ -14738,7 +14738,7 @@ static int bnx2x_hwtstamp_ioctl(struct bnx2x *bp, struct ifreq *ifr)
 
 	DP(BNX2X_MSG_PTP, "HWTSTAMP IOCTL called\n");
 
-	if (copy_from_user(&config, ifr->ifr_data, sizeof(config)))
+	if (memcpy_from_user(current, &config, ifr->ifr_data, sizeof(config)))
 		return -EFAULT;
 
 	DP(BNX2X_MSG_PTP, "Requested tx_type: %d, requested rx_filters = %d\n",
@@ -14759,7 +14759,7 @@ static int bnx2x_hwtstamp_ioctl(struct bnx2x *bp, struct ifreq *ifr)
 
 	config.rx_filter = bp->rx_filter;
 
-	return copy_to_user(ifr->ifr_data, &config, sizeof(config)) ?
+	return memcpy_to_user(current, ifr->ifr_data, &config, sizeof(config)) ?
 		-EFAULT : 0;
 }
 

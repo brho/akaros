@@ -129,3 +129,19 @@ expression E;
 @@
 -ilog2(E)
 +LOG2_UP(E)
+
+@@
+expression DST;
+expression SRC;
+expression LEN;
+@@
+-copy_from_user(DST, SRC, LEN)
++memcpy_from_user(current, DST, SRC, LEN)
+
+@@
+expression DST;
+expression SRC;
+expression LEN;
+@@
+-copy_to_user(DST, SRC, LEN)
++memcpy_to_user(current, DST, SRC, LEN)
