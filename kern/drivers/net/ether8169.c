@@ -1216,8 +1216,7 @@ rtl8169pnp(struct ether* edev)
 		edev->ea[5] = r>>8;
 	}
 
-	edev->tbdf = MKBUS(BusPCI, ctlr->pci->bus, ctlr->pci->dev,
-	                   ctlr->pci->func);
+	edev->tbdf = pci_to_tbdf(ctlr->pci);
 	edev->attach = rtl8169attach;
 	edev->transmit = rtl8169transmit;
 	edev->ifstat = rtl8169ifstat;

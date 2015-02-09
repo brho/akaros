@@ -750,8 +750,7 @@ static int rtl8139pnp(struct ether *edev)
 		edev->ea[4] = i;
 		edev->ea[5] = i >> 8;
 	}
-	edev->tbdf = MKBUS(BusPCI, ctlr->pcidev->bus, ctlr->pcidev->dev,
-	                   ctlr->pcidev->func);
+	edev->tbdf = pci_to_tbdf(ctlr->pcidev);
 	edev->attach = rtl8139attach;
 	edev->transmit = rtl8139transmit;
 	edev->ifstat = rtl8139ifstat;

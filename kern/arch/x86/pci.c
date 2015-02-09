@@ -576,3 +576,8 @@ int pci_find_cap(struct pci_device *pcidev, uint8_t cap_id, uint32_t *cap_reg)
 		*cap_reg = pcidev->caps[cap_id];
 	return 0;
 }
+
+unsigned int pci_to_tbdf(struct pci_device *pcidev)
+{
+	return MKBUS(BusPCI, pcidev->bus, pcidev->dev, pcidev->func);
+}

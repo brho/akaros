@@ -1922,8 +1922,7 @@ static int pnp(struct ether *edev, int type)
 	edev->ctlr = ctlr;
 	edev->port = ctlr->mmio_paddr;
 	edev->irq = ctlr->pcidev->irqline;
-	edev->tbdf = MKBUS(BusPCI, ctlr->pcidev->bus, ctlr->pcidev->dev,
-	                   ctlr->pcidev->func);
+	edev->tbdf = pci_to_tbdf(ctlr->pcidev);
 	edev->netif.mbps = 1000;
 	edev->maxmtu = ctlr->rbsz;
 	memmove(edev->ea, ctlr->ra, Eaddrlen);

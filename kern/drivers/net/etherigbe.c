@@ -2053,7 +2053,7 @@ igbepnp(struct ether* edev)
 	edev->ctlr = ctlr;
 	edev->port = ctlr->port;
 	edev->irq = ctlr->pci->irqline;
-	edev->tbdf = MKBUS(BusPCI, ctlr->pci->bus, ctlr->pci->dev, ctlr->pci->func);
+	edev->tbdf = pci_to_tbdf(ctlr->pci);
 	edev->netif.mbps = 1000;
 	memmove(edev->ea, ctlr->ra, Eaddrlen);
 

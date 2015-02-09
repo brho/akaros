@@ -414,6 +414,7 @@ uint16_t pci_get_subvendor(struct pci_device *pcidev);
 uint16_t pci_get_subdevice(struct pci_device *pcidev);
 void pci_dump_config(struct pci_device *pcidev, size_t len);
 int pci_find_cap(struct pci_device *pcidev, uint8_t cap_id, uint32_t *cap_reg);
+unsigned int pci_to_tbdf(struct pci_device *pcidev);
 static inline void pci_set_drvdata(struct pci_device *pcidev, void *data);
 static inline void *pci_get_drvdata(struct pci_device *pcidev);
 
