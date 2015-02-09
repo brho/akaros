@@ -145,3 +145,15 @@ expression LEN;
 @@
 -copy_to_user(DST, SRC, LEN)
 +memcpy_to_user(current, DST, SRC, LEN)
+
+@@
+@@
+-ktime_get_real()
++epoch_nsec()
+
+@@
+expression E;
+@@
+-ktime_to_ns(E)
++E
+

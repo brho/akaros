@@ -14830,7 +14830,7 @@ void bnx2x_init_ptp(struct bnx2x *bp)
 	if (!bp->timecounter_init_done) {
 		bnx2x_init_cyclecounter(bp);
 		timecounter_init(&bp->timecounter, &bp->cyclecounter,
-				 ktime_to_ns(ktime_get_real()));
+				 epoch_nsec());
 		bp->timecounter_init_done = 1;
 	}
 
