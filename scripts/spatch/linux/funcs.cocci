@@ -185,3 +185,16 @@ expression E;
 @@
 -smp_processor_id()
 +core_id()
+
+// This is a little half-assed.  Any fix will need to be manually edited to
+// provide a pointer to the pci device.  And you'll need to fix your handler to
+// be the correct type.
+@@
+expression IRQ;
+expression HANDLER;
+expression FLAGS;
+expression NAME;
+expression ARG;
+@@
+-request_irq(IRQ, HANDLER, FLAGS, NAME, ARG)
++register_irq(IRQ, HANDLER, ARG, pci_to_tbdf(PCIDEV))

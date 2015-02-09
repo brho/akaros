@@ -1730,9 +1730,9 @@ static int bnx2x_req_msix_irqs(struct bnx2x *bp)
 
 	/* no default status block for vf */
 	if (IS_PF(bp)) {
-		rc = request_irq(bp->msix_table[offset++].vector,
-				 bnx2x_msix_sp_int, 0,
-				 bp->dev->name, bp->dev);
+		rc = register_irq(bp->msix_table[offset++].vector,
+				  bnx2x_msix_sp_int, bp->dev,
+				  pci_to_tbdf(bp->pdev));
 		if (rc) {
 			BNX2X_ERR("request sp irq failed\n");
 			return -EBUSY;
@@ -1747,8 +1747,8 @@ static int bnx2x_req_msix_irqs(struct bnx2x *bp)
 		snprintf(fp->name, sizeof(fp->name), "%s-fp-%d",
 			 bp->dev->name, i);
 
-		rc = request_irq(bp->msix_table[offset].vector,
-				 bnx2x_msix_fp_int, 0, fp->name, fp);
+		rc = register_irq(bp->msix_table[offset].vector,
+				  bnx2x_msix_fp_int, fp, pci_to_tbdf(bp->pdev));
 		if (rc) {
 			BNX2X_ERR("request fp #%d irq (%d) failed  rc %d\n", i,
 			      bp->msix_table[offset].vector, rc);
@@ -1806,7 +1806,8 @@ static int bnx2x_req_irq(struct bnx2x *bp)
 	else
 		irq = bp->pdev->irq;
 
-	return request_irq(irq, bnx2x_interrupt, flags, bp->dev->name, bp->dev);
+	return register_irq(irq, bnx2x_interrupt, bp->dev,
+			    pci_to_tbdf(bp->pdev));
 }
 
 static int bnx2x_setup_irqs(struct bnx2x *bp)

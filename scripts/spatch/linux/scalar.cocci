@@ -81,3 +81,9 @@ typedef uint;
  struct
 -net_device
 +ether
+
+@@
+struct pci_device *p;
+@@
+-p->irq
++p->irqline

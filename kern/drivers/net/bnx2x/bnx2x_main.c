@@ -1658,7 +1658,7 @@ void bnx2x_int_disable_sync(struct bnx2x *bp, int disable_hw)
 		for_each_eth_queue(bp, i)
 			synchronize_irq(bp->msix_table[offset++].vector);
 	} else
-		synchronize_irq(bp->pdev->irq);
+		synchronize_irq(bp->pdev->irqline);
 
 	/* make sure sp_task is not running */
 	cancel_delayed_work(&bp->sp_task);
@@ -9074,7 +9074,7 @@ static int bnx2x_func_wait_started(struct bnx2x *bp)
 	if (msix)
 		synchronize_irq(bp->msix_table[0].vector);
 	else
-		synchronize_irq(bp->pdev->irq);
+		synchronize_irq(bp->pdev->irqline);
 
 	flush_workqueue(bnx2x_wq);
 	flush_workqueue(bnx2x_iov_wq);
@@ -12665,7 +12665,7 @@ static int bnx2x_init_dev(struct bnx2x *bp, struct pci_device *pdev,
 	dev->base_addr = dev->mem_start;
 	dev->mem_end = pci_resource_end(pdev, 0);
 
-	dev->irq = pdev->irq;
+	dev->irq = pdev->irqline;
 
 	bp->regview = pci_ioremap_bar(pdev, 0);
 	if (!bp->regview) {
@@ -13491,7 +13491,7 @@ static int bnx2x_init_one(struct pci_device *pdev,
 		       pcie_speed == PCIE_SPEED_5_0GT ? "5.0GHz" :
 		       pcie_speed == PCIE_SPEED_8_0GT ? "8.0GHz" :
 		       "Unknown",
-		       dev->base_addr, bp->pdev->irq, dev->dev_addr);
+		       dev->base_addr, bp->pdev->irqline, dev->dev_addr);
 
 	bnx2x_register_phc(bp);
 

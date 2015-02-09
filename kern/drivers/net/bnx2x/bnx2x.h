@@ -1609,7 +1609,7 @@ struct bnx2x {
 	uint8_t			cnic_support;
 	bool			cnic_enabled;
 	bool			cnic_loaded;
-	struct cnic_eth_dev	*(*cnic_probe)(struct net_device *);
+	struct cnic_eth_dev	*(*cnic_probe)(struct ether *);
 
 	/* Flag that indicates that we can start looking for FCoE L2 queue
 	 * completions in the default status block.
