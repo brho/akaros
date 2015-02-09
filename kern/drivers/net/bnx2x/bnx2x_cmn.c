@@ -2159,7 +2159,7 @@ void bnx2x_squeeze_objects(struct bnx2x *bp)
 	 * we take a lock surrounding both the initial send and the CONTs,
 	 * as we don't want a true completion to disrupt us in the middle.
 	 */
-	netif_addr_lock_bh(bp->dev);
+	qlock(&bp->dev->qlock);
 	rc = bnx2x_config_mcast(bp, &rparam, BNX2X_MCAST_CMD_DEL);
 	if (rc < 0)
 		BNX2X_ERR("Failed to add a new DEL command to a multi-cast object: %d\n",
@@ -2171,13 +2171,13 @@ void bnx2x_squeeze_objects(struct bnx2x *bp)
 		if (rc < 0) {
 			BNX2X_ERR("Failed to clean multi-cast object: %d\n",
 				  rc);
-			netif_addr_unlock_bh(bp->dev);
+			qunlock(&bp->dev->qlock);
 			return;
 		}
 
 		rc = bnx2x_config_mcast(bp, &rparam, BNX2X_MCAST_CMD_CONT);
 	}
-	netif_addr_unlock_bh(bp->dev);
+	qunlock(&bp->dev->qlock);
 }
 
 #ifndef BNX2X_STOP_ON_ERROR

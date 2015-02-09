@@ -1181,26 +1181,26 @@ static inline bool bnx2x_wait_sp_comp(struct bnx2x *bp, unsigned long mask)
 
 	while (tout--) {
 		mb();
-		netif_addr_lock_bh(bp->dev);
+		qlock(&bp->dev->qlock);
 		if (!(bp->sp_state & mask)) {
-			netif_addr_unlock_bh(bp->dev);
+			qunlock(&bp->dev->qlock);
 			return true;
 		}
-		netif_addr_unlock_bh(bp->dev);
+		qunlock(&bp->dev->qlock);
 
 		kthread_usleep(1000);
 	}
 
 	mb();
 
-	netif_addr_lock_bh(bp->dev);
+	qlock(&bp->dev->qlock);
 	if (bp->sp_state & mask) {
 		BNX2X_ERR("Filtering completion timed out. sp_state 0x%lx, mask 0x%lx\n",
 			  bp->sp_state, mask);
-		netif_addr_unlock_bh(bp->dev);
+		qunlock(&bp->dev->qlock);
 		return false;
 	}
-	netif_addr_unlock_bh(bp->dev);
+	qunlock(&bp->dev->qlock);
 
 	return true;
 }

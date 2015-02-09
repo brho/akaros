@@ -5197,7 +5197,7 @@ static void bnx2x_handle_mcast_eqe(struct bnx2x *bp)
 
 	rparam.mcast_obj = &bp->mcast_obj;
 
-	netif_addr_lock_bh(bp->dev);
+	qlock(&bp->dev->qlock);
 
 	/* Clear pending state for the last command */
 	bp->mcast_obj.raw.clear_pending(&bp->mcast_obj.raw);
@@ -5210,7 +5210,7 @@ static void bnx2x_handle_mcast_eqe(struct bnx2x *bp)
 				  rc);
 	}
 
-	netif_addr_unlock_bh(bp->dev);
+	qunlock(&bp->dev->qlock);
 }
 
 static void bnx2x_handle_classification_eqe(struct bnx2x *bp,
@@ -5259,7 +5259,7 @@ static void bnx2x_set_iscsi_eth_rx_mode(struct bnx2x *bp, bool start);
 
 static void bnx2x_handle_rx_mode_eqe(struct bnx2x *bp)
 {
-	netif_addr_lock_bh(bp->dev);
+	qlock(&bp->dev->qlock);
 
 	clear_bit(BNX2X_FILTER_RX_MODE_PENDING, &bp->sp_state);
 
@@ -5273,7 +5273,7 @@ static void bnx2x_handle_rx_mode_eqe(struct bnx2x *bp)
 				    &bp->sp_state))
 		bnx2x_set_iscsi_eth_rx_mode(bp, false);
 
-	netif_addr_unlock_bh(bp->dev);
+	qunlock(&bp->dev->qlock);
 }
 
 static void bnx2x_after_afex_vif_lists(struct bnx2x *bp,
@@ -9201,7 +9201,7 @@ void bnx2x_chip_cleanup(struct bnx2x *bp, int unload_mode, bool keep_link)
 	 * We need to take a netif_addr_lock() here in order to prevent
 	 * a race between the completion code and this code.
 	 */
-	netif_addr_lock_bh(bp->dev);
+	qlock(&bp->dev->qlock);
 	/* Schedule the rx_mode command */
 	if (test_bit(BNX2X_FILTER_RX_MODE_PENDING, &bp->sp_state))
 		set_bit(BNX2X_FILTER_RX_MODE_SCHED, &bp->sp_state);
@@ -9214,7 +9214,7 @@ void bnx2x_chip_cleanup(struct bnx2x *bp, int unload_mode, bool keep_link)
 	if (rc < 0)
 		BNX2X_ERR("Failed to send DEL multicast command: %d\n", rc);
 
-	netif_addr_unlock_bh(bp->dev);
+	qunlock(&bp->dev->qlock);
 
 	bnx2x_iov_chip_cleanup(bp);
 
@@ -12368,7 +12368,7 @@ void bnx2x_set_rx_mode_inner(struct bnx2x *bp)
 
 	DP(NETIF_MSG_IFUP, "dev->flags = %x\n", bp->dev->flags);
 
-	netif_addr_lock_bh(bp->dev);
+	qlock(&bp->dev->qlock);
 
 	if (bp->dev->flags & IFF_PROMISC) {
 		rx_mode = BNX2X_RX_MODE_PROMISC;
@@ -12383,10 +12383,10 @@ void bnx2x_set_rx_mode_inner(struct bnx2x *bp)
 				rx_mode = BNX2X_RX_MODE_ALLMULTI;
 
 			/* release bh lock, as bnx2x_set_uc_list might sleep */
-			netif_addr_unlock_bh(bp->dev);
+			qunlock(&bp->dev->qlock);
 			if (bnx2x_set_uc_list(bp) < 0)
 				rx_mode = BNX2X_RX_MODE_PROMISC;
-			netif_addr_lock_bh(bp->dev);
+			qlock(&bp->dev->qlock);
 		} else {
 			/* configuring mcast to a vf involves sleeping (when we
 			 * wait for the pf's response).
@@ -12404,19 +12404,19 @@ void bnx2x_set_rx_mode_inner(struct bnx2x *bp)
 	/* Schedule the rx_mode command */
 	if (test_bit(BNX2X_FILTER_RX_MODE_PENDING, &bp->sp_state)) {
 		set_bit(BNX2X_FILTER_RX_MODE_SCHED, &bp->sp_state);
-		netif_addr_unlock_bh(bp->dev);
+		qunlock(&bp->dev->qlock);
 		return;
 	}
 
 	if (IS_PF(bp)) {
 		bnx2x_set_storm_rx_mode(bp);
-		netif_addr_unlock_bh(bp->dev);
+		qunlock(&bp->dev->qlock);
 	} else {
 		/* VF will need to request the PF to make this change, and so
 		 * the VF needs to release the bottom-half lock prior to the
 		 * request (as it will likely require sleep on the VF side)
 		 */
-		netif_addr_unlock_bh(bp->dev);
+		qunlock(&bp->dev->qlock);
 		bnx2x_vfpf_storm_rx_mode(bp);
 	}
 }
@@ -14196,9 +14196,9 @@ static int bnx2x_drv_ctl(struct ether *dev, struct drv_ctl_info *ctl)
 
 		/* Start accepting on iSCSI L2 ring */
 
-		netif_addr_lock_bh(dev);
+		qlock(&dev->qlock);
 		bnx2x_set_iscsi_eth_rx_mode(bp, true);
-		netif_addr_unlock_bh(dev);
+		qunlock(&dev->qlock);
 
 		/* bits to wait on */
 		__set_bit(BNX2X_FILTER_RX_MODE_PENDING, &sp_bits);
@@ -14215,9 +14215,9 @@ static int bnx2x_drv_ctl(struct ether *dev, struct drv_ctl_info *ctl)
 		unsigned long sp_bits = 0;
 
 		/* Stop accepting on iSCSI L2 ring */
-		netif_addr_lock_bh(dev);
+		qlock(&dev->qlock);
 		bnx2x_set_iscsi_eth_rx_mode(bp, false);
-		netif_addr_unlock_bh(dev);
+		qunlock(&dev->qlock);
 
 		/* bits to wait on */
 		__set_bit(BNX2X_FILTER_RX_MODE_PENDING, &sp_bits);
