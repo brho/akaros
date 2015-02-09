@@ -769,7 +769,8 @@ void bnx2x_fw_dump_lvl(struct bnx2x *bp, const char *lvl)
 	/* dump buffer after the mark */
 	for (offset = mark; offset < trace_shmem_base; offset += 0x8*4) {
 		for (word = 0; word < 8; word++)
-			data[word] = htonl(REG_RD(bp, offset + 4*word));
+			data[word] = cpu_to_be32(REG_RD(bp,
+						 offset + 4 * word));
 		data[8] = 0x0;
 		pr_cont("%s", (char *)data);
 	}
@@ -777,7 +778,8 @@ void bnx2x_fw_dump_lvl(struct bnx2x *bp, const char *lvl)
 	/* dump buffer before the mark */
 	for (offset = addr + 4; offset <= mark; offset += 0x8*4) {
 		for (word = 0; word < 8; word++)
-			data[word] = htonl(REG_RD(bp, offset + 4*word));
+			data[word] = cpu_to_be32(REG_RD(bp,
+						 offset + 4 * word));
 		data[8] = 0x0;
 		pr_cont("%s", (char *)data);
 	}

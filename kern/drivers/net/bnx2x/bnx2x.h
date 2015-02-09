@@ -896,7 +896,7 @@ static inline bool bnx2x_fp_ll_disable(struct bnx2x_fastpath *fp)
 #define SKB_CS(skb)		(*(uint16_t *)(skb_transport_header(skb) + \
 					  skb->csum_offset))
 
-#define pbd_tcp_flags(tcp_hdr)	(ntohl(tcp_flag_word(tcp_hdr))>>16 & 0xff)
+#define pbd_tcp_flags(tcp_hdr)	(be32_to_cpu(tcp_flag_word(tcp_hdr))>>16 & 0xff)
 
 #define XMIT_PLAIN		0
 #define XMIT_CSUM_V4		(1 << 0)

@@ -157,3 +157,26 @@ expression E;
 -ktime_to_ns(E)
 +E
 
+@@
+expression E;
+@@
+-htonl(E)
++cpu_to_be32(E)
+
+@@
+expression E;
+@@
+-htons(E)
++cpu_to_be16(E)
+
+@@
+expression E;
+@@
+-ntohl(E)
++be32_to_cpu(E)
+
+@@
+expression E;
+@@
+-ntohs(E)
++be16_to_cpu(E)
