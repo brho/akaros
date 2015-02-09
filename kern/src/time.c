@@ -128,11 +128,32 @@ uint64_t nsec2tsc(uint64_t nsec)
 		return (nsec * system_timing.tsc_freq) / 1000000000;
 }
 
-uint64_t epoch_seconds(void)
+/* TODO: figure out what epoch time TSC == 0 is and store that as boot_tsc */
+static uint64_t boot_sec = 1242129600; /* nanwan's birthday */
+
+uint64_t epoch_tsc(void)
 {
-	/* TODO: figure out what epoch time TSC == 0 is */
-	uint64_t boot_sec = 1242129600; /* nanwan's birthday */
-	return tsc2sec(read_tsc()) + boot_sec;
+	return read_tsc() + sec2tsc(boot_sec);
+}
+
+uint64_t epoch_sec(void)
+{
+	return tsc2sec(epoch_tsc());
+}
+
+uint64_t epoch_msec(void)
+{
+	return tsc2msec(epoch_tsc());
+}
+
+uint64_t epoch_usec(void)
+{
+	return tsc2usec(epoch_tsc());
+}
+
+uint64_t epoch_nsec(void)
+{
+	return tsc2nsec(epoch_tsc());
 }
 
 void tsc2timespec(uint64_t tsc_time, struct timespec *ts)

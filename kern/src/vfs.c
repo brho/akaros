@@ -989,7 +989,7 @@ void load_inode(struct dentry *dentry, unsigned long ino)
  * note we don't pass this an nd, like Linux does... */
 static struct inode *create_inode(struct dentry *dentry, int mode)
 {
-	uint64_t now = epoch_seconds();
+	uint64_t now = epoch_sec();
 	/* note it is the i_ino that uniquely identifies a file in the specific
 	 * filesystem.  there's a diff between creating an inode (even for an in-use
 	 * ino) and then filling it in, and vs creating a brand new one.
@@ -2151,7 +2151,7 @@ int do_rename(char *old_path, char *new_path)
 	dcache_put(old_dir_d->d_sb, old_d);
 
 	/* TODO could have a helper for this, but it's going away soon */
-	now = epoch_seconds();
+	now = epoch_sec();
 	old_dir_i->i_ctime.tv_sec = now;
 	old_dir_i->i_mtime.tv_sec = now;
 	old_dir_i->i_ctime.tv_nsec = 0;
@@ -2201,7 +2201,7 @@ int do_truncate(struct inode *inode, off64_t len)
 		pm_remove_contig(inode->i_mapping, old_len >> PGSHIFT,
 		                 (len >> PGSHIFT) - (old_len >> PGSHIFT));
 	}
-	now = epoch_seconds();
+	now = epoch_sec();
 	inode->i_ctime.tv_sec = now;
 	inode->i_mtime.tv_sec = now;
 	inode->i_ctime.tv_nsec = 0;
