@@ -2280,7 +2280,7 @@ static void bnx2x_set_requested_fc(struct bnx2x *bp)
 	 * It is recommended to turn off RX FC for jumbo frames
 	 *  for better performance
 	 */
-	if (CHIP_IS_E1x(bp) && (bp->dev->mtu > 5000))
+	if (CHIP_IS_E1x(bp) && (bp->dev->maxmtu > 5000))
 		bp->link_params.req_fc_auto_adv = BNX2X_FLOW_CTRL_TX;
 	else
 		bp->link_params.req_fc_auto_adv = BNX2X_FLOW_CTRL_BOTH;
@@ -3128,7 +3128,7 @@ static void bnx2x_pf_q_prep_general(struct bnx2x *bp,
 	if (IS_FCOE_FP(fp))
 		gen_init->mtu = BNX2X_FCOE_MINI_JUMBO_MTU;
 	else
-		gen_init->mtu = bp->dev->mtu;
+		gen_init->mtu = bp->dev->maxmtu;
 
 	gen_init->cos = cos;
 
@@ -3153,7 +3153,7 @@ static void bnx2x_pf_rx_q_prep(struct bnx2x *bp,
 				MAX_RX_SGE_CNT * NUM_RX_SGE_PAGES);
 
 		tpa_agg_size = TPA_AGG_SIZE;
-		max_sge = SGE_PAGE_ALIGN(bp->dev->mtu) >>
+		max_sge = SGE_PAGE_ALIGN(bp->dev->maxmtu) >>
 			SGE_PAGE_SHIFT;
 		max_sge = ((max_sge + PAGES_PER_SGE - 1) &
 			  (~(PAGES_PER_SGE-1))) >> PAGES_PER_SGE_SHIFT;
@@ -3358,7 +3358,7 @@ static void bnx2x_drv_info_ether_stat(struct bnx2x *bp)
 				DRV_INFO_ETH_STAT_NUM_MACS_REQUIRED,
 				ether_stat->mac_local + MAC_PAD, MAC_PAD,
 				Eaddrlen);
-	ether_stat->mtu_size = bp->dev->mtu;
+	ether_stat->mtu_size = bp->dev->maxmtu;
 	if (bp->dev->feat & NETIF_F_RXCSUM)
 		ether_stat->feature_flags |= FEATURE_ETH_CHKSUM_OFFLOAD_MASK;
 	if (bp->dev->feat & NETIF_F_TSO)
@@ -7462,11 +7462,11 @@ static int bnx2x_init_hw_port(struct bnx2x *bp)
 
 		if (IS_MF(bp))
 			low = ((bp->flags & ONE_PORT_FLAG) ? 160 : 246);
-		else if (bp->dev->mtu > 4096) {
+		else if (bp->dev->maxmtu > 4096) {
 			if (bp->flags & ONE_PORT_FLAG)
 				low = 160;
 			else {
-				val = bp->dev->mtu;
+				val = bp->dev->maxmtu;
 				/* (24*1024 + val*4)/256 */
 				low = 96 + (val/64) +
 						((val % 64) ? 1 : 0);

@@ -2440,8 +2440,8 @@ static int bnx2x_run_loopback(struct bnx2x *bp, int loopback_mode)
 	}
 
 	/* prepare the loopback packet */
-	pkt_size = (((bp->dev->mtu < ETH_MAX_PACKET_SIZE) ?
-		     bp->dev->mtu : ETH_MAX_PACKET_SIZE) + ETHERHDRSIZE);
+	pkt_size = (((bp->dev->maxmtu < ETH_MAX_PACKET_SIZE) ?
+		     bp->dev->maxmtu : ETH_MAX_PACKET_SIZE) + ETHERHDRSIZE);
 	skb = netdev_alloc_skb(bp->dev, fp_rx->rx_buf_size);
 	if (!skb) {
 		DP(BNX2X_MSG_ETHTOOL, "Can't allocate skb\n");
