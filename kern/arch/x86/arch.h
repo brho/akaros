@@ -33,6 +33,8 @@ static inline int irq_is_enabled(void) __attribute__((always_inline));
 static inline void cache_flush(void) __attribute__((always_inline));
 static inline void reboot(void)
               __attribute__((always_inline)) __attribute__((noreturn));
+static inline void prefetch(void *addr);
+static inline void prefetchw(void *addr);
 
 /* in trap.c */
 void send_ipi(uint32_t os_coreid, uint8_t vector);
@@ -170,6 +172,16 @@ static inline void reboot(void)
 	while (1);
 }
 
+static inline void prefetch(void *addr)
+{
+	asm volatile("prefetchnta (%0)" : : "r"(addr));
+}
+
+static inline void prefetchw(void *addr)
+{
+	asm volatile("prefetchw (%0)" : : "r"(addr));
+}
+
 /* Guest VMs have a maximum physical address they can use.  Guest
  * physical addresses are mapped into this MCP 1:1, but limited to
  * this max address *in hardware*.  I.e., the MCP process can address
@@ -186,4 +198,5 @@ static inline uint64_t max_guest_pa(void)
 {
 	return (1ULL<<40) - 1;
 }
+
 #endif /* !ROS_INC_ARCH_H */

@@ -159,4 +159,12 @@ static __inline void reboot(void)
 
 extern void cpu_halt(void);
 
+static inline void prefetch(void *addr)
+{
+}
+
+static inline void prefetchw(void *addr)
+{
+}
+
 #endif /* !ROS_INC_ARCH_H */
