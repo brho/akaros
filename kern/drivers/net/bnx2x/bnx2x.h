@@ -1932,19 +1932,6 @@ struct bnx2x {
 
 	uint8_t					phys_port_id[Eaddrlen];
 
-	/* PTP related context */
-	struct ptp_clock *ptp_clock;
-	struct ptp_clock_info ptp_clock_info;
-	struct work_struct ptp_task;
-	struct cyclecounter cyclecounter;
-	struct timecounter timecounter;
-	bool timecounter_init_done;
-	struct sk_buff *ptp_tx_skb;
-	unsigned long ptp_tx_start;
-	bool hwtstamp_ioctl_called;
-	uint16_t tx_type;
-	uint16_t rx_filter;
-
 	struct bnx2x_link_report_data		vf_link_vars;
 };
 
@@ -2607,10 +2594,6 @@ void bnx2x_update_mng_version(struct bnx2x *bp);
 	(CHIP_IS_E1x(bp) ? MCP_REG_MCPR_SCRATCH : MCP_A_REG_MCPR_SCRATCH)
 
 #define E1H_MAX_MF_SB_COUNT (HC_SB_MAX_SB_E1X/(E1HVN_MAX * PORT_MAX))
-
-void bnx2x_init_ptp(struct bnx2x *bp);
-int bnx2x_configure_ptp_filters(struct bnx2x *bp);
-void bnx2x_set_rx_ts(struct bnx2x *bp, struct sk_buff *skb);
 
 #define BNX2X_MAX_PHC_DRIFT 31000000
 #define BNX2X_PTP_TX_TIMEOUT

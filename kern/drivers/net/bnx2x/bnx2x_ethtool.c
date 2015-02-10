@@ -3511,38 +3511,6 @@ static int bnx2x_get_ts_info(struct ether *dev,
 {
 	struct bnx2x *bp = netdev_priv(dev);
 
-	if (bp->flags & PTP_SUPPORTED) {
-		info->so_timestamping = SOF_TIMESTAMPING_TX_SOFTWARE |
-					SOF_TIMESTAMPING_RX_SOFTWARE |
-					SOF_TIMESTAMPING_SOFTWARE |
-					SOF_TIMESTAMPING_TX_HARDWARE |
-					SOF_TIMESTAMPING_RX_HARDWARE |
-					SOF_TIMESTAMPING_RAW_HARDWARE;
-
-		if (bp->ptp_clock)
-			info->phc_index = ptp_clock_index(bp->ptp_clock);
-		else
-			info->phc_index = -1;
-
-		info->rx_filters = (1 << HWTSTAMP_FILTER_NONE) |
-				   (1 << HWTSTAMP_FILTER_PTP_V1_L4_EVENT) |
-				   (1 << HWTSTAMP_FILTER_PTP_V1_L4_SYNC) |
-				   (1 << HWTSTAMP_FILTER_PTP_V1_L4_DELAY_REQ) |
-				   (1 << HWTSTAMP_FILTER_PTP_V2_L4_EVENT) |
-				   (1 << HWTSTAMP_FILTER_PTP_V2_L4_SYNC) |
-				   (1 << HWTSTAMP_FILTER_PTP_V2_L4_DELAY_REQ) |
-				   (1 << HWTSTAMP_FILTER_PTP_V2_L2_EVENT) |
-				   (1 << HWTSTAMP_FILTER_PTP_V2_L2_SYNC) |
-				   (1 << HWTSTAMP_FILTER_PTP_V2_L2_DELAY_REQ) |
-				   (1 << HWTSTAMP_FILTER_PTP_V2_EVENT) |
-				   (1 << HWTSTAMP_FILTER_PTP_V2_SYNC) |
-				   (1 << HWTSTAMP_FILTER_PTP_V2_DELAY_REQ);
-
-		info->tx_types = (1 << HWTSTAMP_TX_OFF)|(1 << HWTSTAMP_TX_ON);
-
-		return 0;
-	}
-
 	return ethtool_op_get_ts_info(dev, info);
 }
 
