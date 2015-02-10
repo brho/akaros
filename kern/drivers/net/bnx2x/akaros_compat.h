@@ -41,7 +41,7 @@
 #define WARN_ONCE(args...) warn_once(args)
 #define WARN_ON(x) warn_on(x)
 #define WARN_ON_ONCE(x) warn_on_once(x)
-#define BUG(args...) panic(args)
+#define BUG() panic("BUG")
 #define BUG_ON(x) assert(x)
 
 typedef physaddr_t dma_addr_t;
@@ -151,15 +151,15 @@ typedef int pm_message_t;
 #define pr_fmt(fmt) fmt
 #endif
 
-#define KERN_EMERG
-#define KERN_ALERT
-#define KERN_CRIT
-#define KERN_ERR
-#define KERN_WARNING
-#define KERN_NOTICE
-#define KERN_INFO
-#define KERN_CONT
-#define KERN_DEBUG
+#define KERN_EMERG ""
+#define KERN_ALERT ""
+#define KERN_CRIT ""
+#define KERN_ERR ""
+#define KERN_WARNING ""
+#define KERN_NOTICE ""
+#define KERN_INFO ""
+#define KERN_CONT ""
+#define KERN_DEBUG ""
 
 /*
  * These can be used to print at the various log levels.
@@ -185,6 +185,12 @@ typedef int pm_message_t;
 #define pr_cont(fmt, ...) \
 	printk(KERN_CONT fmt, ##__VA_ARGS__)
 #define netdev_printk(lvl, dev, fmt, ...) \
+	printk(fmt, ##__VA_ARGS__)
+#define netdev_err(dev, fmt, ...) \
+	printk(fmt, ##__VA_ARGS__)
+#define dev_err(dev, fmt, ...) \
+	printk(fmt, ##__VA_ARGS__)
+#define dev_info(dev, fmt, ...) \
 	printk(fmt, ##__VA_ARGS__)
 
 
@@ -227,9 +233,158 @@ enum {
 #define MODULE_LICENSE(...)
 #define MODULE_VERSION(...)
 #define MODULE_FIRMWARE(...)
+#define module_param(...)
+#define module_param_named(...)
 #define MODULE_PARM_DESC(...)
 #define MODULE_DEVICE_TABLE(...)
 #define THIS_MODULE ((void*)0)
+#define EXPORT_SYMBOL(...)
+#define __init
+#define __exit
+#define module_init(...)
+#define module_exit(...)
+
+#define is_kdump_kernel() (0)
+
+/* from Linux's ethtool.h.  We probably won't use any of this code, but at
+ * least we can keep it quiet during porting. */
+#define SPEED_10        10
+#define SPEED_100       100
+#define SPEED_1000      1000
+#define SPEED_2500      2500
+#define SPEED_10000     10000
+#define SPEED_20000     20000
+#define SPEED_40000     40000
+#define SPEED_56000     56000
+#define SPEED_UNKNOWN   -1
+
+/* Duplex, half or full. */
+#define DUPLEX_HALF     0x00
+#define DUPLEX_FULL     0x01
+#define DUPLEX_UNKNOWN  0xff
+
+#define SUPPORTED_10baseT_Half      (1 << 0)
+#define SUPPORTED_10baseT_Full      (1 << 1)
+#define SUPPORTED_100baseT_Half     (1 << 2)
+#define SUPPORTED_100baseT_Full     (1 << 3)
+#define SUPPORTED_1000baseT_Half    (1 << 4)
+#define SUPPORTED_1000baseT_Full    (1 << 5)
+#define SUPPORTED_Autoneg       (1 << 6)
+#define SUPPORTED_TP            (1 << 7)
+#define SUPPORTED_AUI           (1 << 8)
+#define SUPPORTED_MII           (1 << 9)
+#define SUPPORTED_FIBRE         (1 << 10)
+#define SUPPORTED_BNC           (1 << 11)
+#define SUPPORTED_10000baseT_Full   (1 << 12)
+#define SUPPORTED_Pause         (1 << 13)
+#define SUPPORTED_Asym_Pause        (1 << 14)
+#define SUPPORTED_2500baseX_Full    (1 << 15)
+#define SUPPORTED_Backplane     (1 << 16)
+#define SUPPORTED_1000baseKX_Full   (1 << 17)
+#define SUPPORTED_10000baseKX4_Full (1 << 18)
+#define SUPPORTED_10000baseKR_Full  (1 << 19)
+#define SUPPORTED_10000baseR_FEC    (1 << 20)
+#define SUPPORTED_20000baseMLD2_Full    (1 << 21)
+#define SUPPORTED_20000baseKR2_Full (1 << 22)
+#define SUPPORTED_40000baseKR4_Full (1 << 23)
+#define SUPPORTED_40000baseCR4_Full (1 << 24)
+#define SUPPORTED_40000baseSR4_Full (1 << 25)
+#define SUPPORTED_40000baseLR4_Full (1 << 26)
+#define SUPPORTED_56000baseKR4_Full (1 << 27)
+#define SUPPORTED_56000baseCR4_Full (1 << 28)
+#define SUPPORTED_56000baseSR4_Full (1 << 29)
+#define SUPPORTED_56000baseLR4_Full (1 << 30)
+
+#define ADVERTISED_10baseT_Half     (1 << 0)
+#define ADVERTISED_10baseT_Full     (1 << 1)
+#define ADVERTISED_100baseT_Half    (1 << 2)
+#define ADVERTISED_100baseT_Full    (1 << 3)
+#define ADVERTISED_1000baseT_Half   (1 << 4)
+#define ADVERTISED_1000baseT_Full   (1 << 5)
+#define ADVERTISED_Autoneg      (1 << 6)
+#define ADVERTISED_TP           (1 << 7)
+#define ADVERTISED_AUI          (1 << 8)
+#define ADVERTISED_MII          (1 << 9)
+#define ADVERTISED_FIBRE        (1 << 10)
+#define ADVERTISED_BNC          (1 << 11)
+#define ADVERTISED_10000baseT_Full  (1 << 12)
+#define ADVERTISED_Pause        (1 << 13)
+#define ADVERTISED_Asym_Pause       (1 << 14)
+#define ADVERTISED_2500baseX_Full   (1 << 15)
+#define ADVERTISED_Backplane        (1 << 16)
+#define ADVERTISED_1000baseKX_Full  (1 << 17)
+#define ADVERTISED_10000baseKX4_Full    (1 << 18)
+#define ADVERTISED_10000baseKR_Full (1 << 19)
+#define ADVERTISED_10000baseR_FEC   (1 << 20)
+#define ADVERTISED_20000baseMLD2_Full   (1 << 21)
+#define ADVERTISED_20000baseKR2_Full    (1 << 22)
+#define ADVERTISED_40000baseKR4_Full    (1 << 23)
+#define ADVERTISED_40000baseCR4_Full    (1 << 24)
+#define ADVERTISED_40000baseSR4_Full    (1 << 25)
+#define ADVERTISED_40000baseLR4_Full    (1 << 26)
+#define ADVERTISED_56000baseKR4_Full    (1 << 27)
+#define ADVERTISED_56000baseCR4_Full    (1 << 28)
+#define ADVERTISED_56000baseSR4_Full    (1 << 29)
+#define ADVERTISED_56000baseLR4_Full    (1 << 30)
+
+enum ethtool_test_flags {
+	ETH_TEST_FL_OFFLINE = (1 << 0),
+	ETH_TEST_FL_FAILED  = (1 << 1),
+	ETH_TEST_FL_EXTERNAL_LB = (1 << 2),
+	ETH_TEST_FL_EXTERNAL_LB_DONE    = (1 << 3),
+};
+
+enum ethtool_stringset {
+	ETH_SS_TEST     = 0,
+	ETH_SS_STATS,
+	ETH_SS_PRIV_FLAGS,
+	ETH_SS_NTUPLE_FILTERS,
+	ETH_SS_FEATURES,
+	ETH_SS_RSS_HASH_FUNCS,
+};
+
+enum {
+	ETH_RSS_HASH_TOP_BIT, /* Configurable RSS hash function - Toeplitz */
+	ETH_RSS_HASH_XOR_BIT, /* Configurable RSS hash function - Xor */
+
+	ETH_RSS_HASH_FUNCS_COUNT
+};
+
+#define __ETH_RSS_HASH_BIT(bit) ((uint32_t)1 << (bit))
+#define __ETH_RSS_HASH(name)    __ETH_RSS_HASH_BIT(ETH_RSS_HASH_##name##_BIT)
+
+#define ETH_RSS_HASH_TOP    __ETH_RSS_HASH(TOP)
+#define ETH_RSS_HASH_XOR    __ETH_RSS_HASH(XOR)
+
+#define ETH_RSS_HASH_UNKNOWN    0
+#define ETH_RSS_HASH_NO_CHANGE  0
+
+
+/* EEPROM Standards for plug in modules */
+#define ETH_MODULE_SFF_8079     0x1
+#define ETH_MODULE_SFF_8079_LEN     256
+#define ETH_MODULE_SFF_8472     0x2
+#define ETH_MODULE_SFF_8472_LEN     512
+#define ETH_MODULE_SFF_8636     0x3
+#define ETH_MODULE_SFF_8636_LEN     256
+#define ETH_MODULE_SFF_8436     0x4
+#define ETH_MODULE_SFF_8436_LEN     256
+
+#define ETH_GSTRING_LEN     32
+
+/* ethernet protocol ids.  the plan 9 equivalent enum only exists in
+ * ethermedium.c. */
+#define ETH_P_IP    0x0800      /* Internet Protocol packet */
+#define ETH_P_IPV6  0x86DD      /* IPv6 over bluebook       */
+#define ETH_P_ARP   0x0806      /* Address Resolution packet    */
+#define ETH_P_FIP   0x8914      /* FCoE Initialization Protocol */
+#define ETH_P_8021Q 0x8100          /* 802.1Q VLAN Extended Header  */
+
+/* Common way to go from netdev (ether / netif) to driver-private ctlr */
+static inline void *netdev_priv(struct ether *dev)
+{
+	return dev->ctlr;
+}
 
 /* u64 on linux, but a u32 on plan 9.  the typedef is probably a good idea */
 typedef unsigned int netdev_features_t;
@@ -262,6 +417,34 @@ typedef unsigned int netdev_features_t;
 #define NETIF_F_HW_VLAN_CTAG_TX		0
 #define NETIF_F_HIGHDMA				0
 #define NETIF_F_HW_VLAN_CTAG_RX		0
+
+/* Global mutex in linux for "routing netlink".  Not sure if we have an
+ * equivalent or not in Plan 9. */
+#define rtnl_lock()
+#define rtnl_unlock()
+
+#define synchronize_irq(x) warn_once("Asked to sync IRQ %d, unsupported", x)
+#define HZ 100
+
+/* Linux has a PCI device id struct.  Drivers make tables of their supported
+ * devices, and this table is handled by higher level systems.  We don't have
+ * those systems, but we probably want the table still for our own parsing. */
+struct pci_device_id {
+	uint32_t vendor, device;		/* Vendor and device ID or PCI_ANY_ID*/
+	uint32_t subvendor, subdevice;	/* Subsystem ID's or PCI_ANY_ID */
+	uint32_t class, class_mask;		/* (class,subclass,prog-if) triplet */
+	unsigned long driver_data;		/* Data private to the driver */
+};
+
+#define PCI_ANY_ID (~0)
+/* This macro is used in setting device_id entries */
+#define PCI_VDEVICE(vend, dev) \
+    .vendor = PCI_VENDOR_ID_##vend, .device = (dev), \
+    .subvendor = PCI_ANY_ID, .subdevice = PCI_ANY_ID, 0, 0
+
+/* Linux also has its own table of vendor ids.  We have the pci_defs table, but
+ * this is a bootstrap issue. */
+#define PCI_VENDOR_ID_BROADCOM      0x14e4
 
 /* I'd like to spatch all of the pci methods, but I don't know how to do the
  * reads.  Since we're not doing the reads, then no sense doing the writes. */
