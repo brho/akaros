@@ -231,6 +231,38 @@ enum {
 #define MODULE_DEVICE_TABLE(...)
 #define THIS_MODULE ((void*)0)
 
+/* u64 on linux, but a u32 on plan 9.  the typedef is probably a good idea */
+typedef unsigned int netdev_features_t;
+
+/* Linux has features, hw_features, and a couple others.  Plan 9 just has
+ * features.  This #define should work for merging hw and regular features.  We
+ * spatched away the hw_enc and vlan feats. */
+#define hw_features feat
+
+/* Attempted conversions for plan 9 features.  For some things, like rx
+ * checksums, the driver flags the block (e.g. Budpck) to say if a receive
+ * checksum was already done.  There is no flag for saying the device can do
+ * it.  For transmits, the stack needs to know in advance if the device can
+ * handle the checksum or not. */
+#define NETIF_F_RXHASH				0
+#define NETIF_F_RXCSUM				0
+#define NETIF_F_LRO					NETF_LRO
+#define NETIF_F_GRO					0
+#define NETIF_F_LOOPBACK			0
+#define NETIF_F_TSO					NETF_TSO
+#define NETIF_F_SG					NETF_SG
+#define NETIF_F_IP_CSUM				(NETF_IPCK | NETF_UDPCK | NETF_TCPCK)
+#define NETIF_F_IPV6_CSUM			(NETF_IPCK | NETF_UDPCK | NETF_TCPCK)
+#define NETIF_F_GSO_GRE				0
+#define NETIF_F_GSO_UDP_TUNNEL		0
+#define NETIF_F_GSO_IPIP			0
+#define NETIF_F_GSO_SIT				0
+#define NETIF_F_TSO_ECN				0
+#define NETIF_F_TSO6				0
+#define NETIF_F_HW_VLAN_CTAG_TX		0
+#define NETIF_F_HIGHDMA				0
+#define NETIF_F_HW_VLAN_CTAG_RX		0
+
 /* I'd like to spatch all of the pci methods, but I don't know how to do the
  * reads.  Since we're not doing the reads, then no sense doing the writes. */
 static inline int pci_read_config_byte(struct pci_device *dev, uint32_t off,

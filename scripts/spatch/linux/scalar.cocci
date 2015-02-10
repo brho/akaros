@@ -87,3 +87,21 @@ struct pci_device *p;
 @@
 -p->irq
 +p->irqline
+
+@@
+struct ether *p;
+@@
+-p->features
++p->feat
+
+@@
+struct ether *p;
+expression E;
+@@
+-p->vlan_features = E;
+
+@@
+struct ether *p;
+expression E;
+@@
+-p->hw_enc_features = E;

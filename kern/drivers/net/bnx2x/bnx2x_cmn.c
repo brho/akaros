@@ -400,7 +400,7 @@ static uint32_t bnx2x_get_rxhash(const struct bnx2x *bp,
 			    enum pkt_hash_types *rxhash_type)
 {
 	/* Get Toeplitz hash from CQE */
-	if ((bp->dev->features & NETIF_F_RXHASH) &&
+	if ((bp->dev->feat & NETIF_F_RXHASH) &&
 	    (cqe->status_flags & ETH_FAST_PATH_RX_CQE_RSS_HASH_FLG)) {
 		enum eth_rss_hash_type htype;
 
@@ -1052,7 +1052,7 @@ reuse_rx:
 
 		skb_checksum_none_assert(skb);
 
-		if (bp->dev->features & NETIF_F_RXCSUM)
+		if (bp->dev->feat & NETIF_F_RXCSUM)
 			bnx2x_csum_validate(skb, cqe, fp,
 					    bnx2x_fp_qstats(bp, fp));
 

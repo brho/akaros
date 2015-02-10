@@ -3359,9 +3359,9 @@ static void bnx2x_drv_info_ether_stat(struct bnx2x *bp)
 				ether_stat->mac_local + MAC_PAD, MAC_PAD,
 				Eaddrlen);
 	ether_stat->mtu_size = bp->dev->mtu;
-	if (bp->dev->features & NETIF_F_RXCSUM)
+	if (bp->dev->feat & NETIF_F_RXCSUM)
 		ether_stat->feature_flags |= FEATURE_ETH_CHKSUM_OFFLOAD_MASK;
-	if (bp->dev->features & NETIF_F_TSO)
+	if (bp->dev->feat & NETIF_F_TSO)
 		ether_stat->feature_flags |= FEATURE_ETH_LSO_MASK;
 	ether_stat->feature_flags |= bp->common.boot_mode;
 
@@ -12065,10 +12065,10 @@ static int bnx2x_init_bp(struct bnx2x *bp)
 	/* Set TPA flags */
 	if (bp->disable_tpa) {
 		bp->flags &= ~(TPA_ENABLE_FLAG | GRO_ENABLE_FLAG);
-		bp->dev->features &= ~NETIF_F_LRO;
+		bp->dev->feat &= ~NETIF_F_LRO;
 	} else {
 		bp->flags |= (TPA_ENABLE_FLAG | GRO_ENABLE_FLAG);
-		bp->dev->features |= NETIF_F_LRO;
+		bp->dev->feat |= NETIF_F_LRO;
 	}
 
 	if (CHIP_IS_E1(bp))
@@ -12742,19 +12742,10 @@ static int bnx2x_init_dev(struct bnx2x *bp, struct pci_device *pdev,
 	if (!CHIP_IS_E1x(bp)) {
 		dev->hw_features |= NETIF_F_GSO_GRE | NETIF_F_GSO_UDP_TUNNEL |
 				    NETIF_F_GSO_IPIP | NETIF_F_GSO_SIT;
-		dev->hw_enc_features =
-			NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM | NETIF_F_SG |
-			NETIF_F_TSO | NETIF_F_TSO_ECN | NETIF_F_TSO6 |
-			NETIF_F_GSO_IPIP |
-			NETIF_F_GSO_SIT |
-			NETIF_F_GSO_GRE | NETIF_F_GSO_UDP_TUNNEL;
 	}
 
-	dev->vlan_features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
-		NETIF_F_TSO | NETIF_F_TSO_ECN | NETIF_F_TSO6 | NETIF_F_HIGHDMA;
-
-	dev->features |= dev->hw_features | NETIF_F_HW_VLAN_CTAG_RX;
-	dev->features |= NETIF_F_HIGHDMA;
+	dev->feat |= dev->hw_features | NETIF_F_HW_VLAN_CTAG_RX;
+	dev->feat |= NETIF_F_HIGHDMA;
 
 	/* Add Loopback capability to the device */
 	dev->hw_features |= NETIF_F_LOOPBACK;
