@@ -7,6 +7,8 @@
 #include <ros/common.h>
 #include <arch/types.h>
 
+#define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
+
 typedef uint64_t __dev_t;
 typedef uint64_t __ino64_t;
 typedef uint32_t __mode_t;
