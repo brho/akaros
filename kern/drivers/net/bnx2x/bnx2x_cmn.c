@@ -2487,7 +2487,7 @@ int bnx2x_load_cnic(struct bnx2x *bp)
 
 	DP(NETIF_MSG_IFUP, "Starting CNIC-related load\n");
 
-	mutex_init(&bp->cnic_mutex);
+	qlock_init(&bp->cnic_mutex);
 
 	if (IS_PF(bp)) {
 		rc = bnx2x_alloc_mem_cnic(bp);

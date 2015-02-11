@@ -24,6 +24,14 @@
 #include <taskqueue.h>
 
 #define __rcu
+#define rcu_read_lock()
+#define rcu_read_unlock()
+#define rcu_dereference(x) (x)
+#define rcu_dereference_protected(x, y) (x)
+#define rcu_assign_pointer(dst, src) (dst) = (src)
+#define RCU_INIT_POINTER(dst, src) rcu_assign_pointer(dst, src)
+#define synchronize_rcu()
+
 #define unlikely(x) (x)
 #define likely(x) (x)
 #define UINT_MAX UINT64_MAX
@@ -380,6 +388,35 @@ enum {
 #define ETH_P_FIP   0x8914      /* FCoE Initialization Protocol */
 #define ETH_P_8021Q 0x8100          /* 802.1Q VLAN Extended Header  */
 
+/* Sockaddr structs */
+struct sockaddr {
+	uint16_t				sa_family;
+	char					sa_data[14];
+};
+
+struct in_addr {
+	uint32_t		s_addr;
+};
+struct sockaddr_in {
+	uint16_t				sin_family;
+	uint16_t				sin_port;
+	struct in_addr			sin_addr;
+	uint8_t					sin_zero[8]; /* padding */
+};
+
+struct in6_addr {
+	/* this is actually a weird union in glibc */
+	uint8_t					s6_addr[16];
+};
+
+struct sockaddr_in6 {
+	uint16_t				sin6_family;
+	uint16_t				sin6_port;
+	uint32_t				sin6_flowinfo;
+	struct in6_addr			sin6_addr;
+	uint32_t				sin6_scope_id;
+};
+
 /* Common way to go from netdev (ether / netif) to driver-private ctlr */
 static inline void *netdev_priv(struct ether *dev)
 {
@@ -422,6 +459,7 @@ typedef unsigned int netdev_features_t;
  * equivalent or not in Plan 9. */
 #define rtnl_lock()
 #define rtnl_unlock()
+#define ASSERT_RTNL(...)
 
 #define synchronize_irq(x) warn_once("Asked to sync IRQ %d, unsupported", x)
 #define HZ 100
