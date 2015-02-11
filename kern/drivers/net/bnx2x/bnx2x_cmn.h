@@ -232,7 +232,7 @@ uint16_t bnx2x_get_mf_speed(struct bnx2x *bp);
  * @irq:		irq number
  * @dev_instance:	private instance
  */
-irqreturn_t bnx2x_msix_sp_int(int irq, void *dev_instance);
+void bnx2x_msix_sp_int(struct hw_trapframe *hw_tf, void *dev_instance);
 
 /**
  * bnx2x_interrupt - non MSI-X interrupt handler
@@ -240,7 +240,7 @@ irqreturn_t bnx2x_msix_sp_int(int irq, void *dev_instance);
  * @irq:		irq number
  * @dev_instance:	private instance
  */
-irqreturn_t bnx2x_interrupt(int irq, void *dev_instance);
+void bnx2x_interrupt(struct hw_trapframe *hw_tf, void *dev_instance);
 
 /**
  * bnx2x_cnic_notify - send command to cnic driver

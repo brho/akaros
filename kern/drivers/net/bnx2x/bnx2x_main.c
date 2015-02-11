@@ -1865,7 +1865,7 @@ void bnx2x_sp_event(struct bnx2x_fastpath *fp, union eth_rx_cqe *rr_cqe)
 	return;
 }
 
-irqreturn_t bnx2x_interrupt(int irq, void *dev_instance)
+void bnx2x_interrupt(struct hw_trapframe *hw_tf, void *dev_instance)
 {
 	struct bnx2x *bp = netdev_priv(dev_instance);
 	uint16_t status = bnx2x_ack_int(bp);
@@ -1876,13 +1876,13 @@ irqreturn_t bnx2x_interrupt(int irq, void *dev_instance)
 	/* Return here if interrupt is shared and it's not for us */
 	if (unlikely(status == 0)) {
 		DP(NETIF_MSG_INTR, "not our interrupt!\n");
-		return IRQ_NONE;
+		return;
 	}
 	DP(NETIF_MSG_INTR, "got an interrupt  status 0x%x\n", status);
 
 #ifdef BNX2X_STOP_ON_ERROR
 	if (unlikely(bp->panic))
-		return IRQ_HANDLED;
+		return;
 #endif
 
 	for_each_eth_queue(bp, i) {
@@ -1924,14 +1924,14 @@ irqreturn_t bnx2x_interrupt(int irq, void *dev_instance)
 
 		status &= ~0x1;
 		if (!status)
-			return IRQ_HANDLED;
+			return;
 	}
 
 	if (unlikely(status))
 		DP(NETIF_MSG_INTR, "got an unknown interrupt! (status 0x%x)\n",
 		   status);
 
-	return IRQ_HANDLED;
+	return;
 }
 
 /* Link */
@@ -5652,7 +5652,7 @@ static void bnx2x_sp_task(struct work_struct *work)
 	}
 }
 
-irqreturn_t bnx2x_msix_sp_int(int irq, void *dev_instance)
+void bnx2x_msix_sp_int(struct hw_trapframe *hw_tf, void *dev_instance)
 {
 	struct ether *dev = dev_instance;
 	struct bnx2x *bp = netdev_priv(dev);
@@ -5662,7 +5662,7 @@ irqreturn_t bnx2x_msix_sp_int(int irq, void *dev_instance)
 
 #ifdef BNX2X_STOP_ON_ERROR
 	if (unlikely(bp->panic))
-		return IRQ_HANDLED;
+		return;
 #endif
 
 	if (CNIC_LOADED(bp)) {
@@ -5680,7 +5680,7 @@ irqreturn_t bnx2x_msix_sp_int(int irq, void *dev_instance)
 	 */
 	bnx2x_schedule_sp_task(bp);
 
-	return IRQ_HANDLED;
+	return;
 }
 
 /* end of slow path */

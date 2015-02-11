@@ -198,3 +198,52 @@ expression ARG;
 @@
 -request_irq(IRQ, HANDLER, FLAGS, NAME, ARG)
 +register_irq(IRQ, HANDLER, ARG, pci_to_tbdf(PCIDEV))
+
+// There are 3 return types for the irq handlers, IRQ_NONE, IRQ_HANDLED, and
+// IRQ_WAKE_THREAD.  We can change the first two to just return.  The latter
+// will need manual attention, since they want a thread to handle the rest.
+@@
+identifier HANDLER;
+typedef irqreturn_t;
+@@
+irqreturn_t HANDLER(...) {
+<...
+-return IRQ_NONE;
++return;
+...>
+}
+
+// Need to comment out irqreturn_t, I guess because it's in a previous rule
+@@
+identifier HANDLER;
+//typedef irqreturn_t;
+@@
+irqreturn_t HANDLER(...) {
+<...
+-return IRQ_HANDLED;
++return;
+...>
+}
+
+// There should be a way to catch both decl and def at once...
+// Changes the definition
+@@
+identifier HANDLER;
+//typedef irqreturn_t;
+identifier IRQ;
+identifier ARG;
+@@
+-irqreturn_t HANDLER(int IRQ, void *ARG
++void HANDLER(struct hw_trapframe *hw_tf, void *ARG
+ ) { ... }
+
+// Changes the declaration
+@@
+identifier HANDLER;
+//typedef irqreturn_t;
+identifier IRQ;
+identifier ARG;
+@@
+-irqreturn_t HANDLER(int IRQ, void *ARG
++void HANDLER(struct hw_trapframe *hw_tf, void *ARG
+ );

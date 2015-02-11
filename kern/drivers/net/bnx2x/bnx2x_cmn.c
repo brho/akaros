@@ -1111,7 +1111,7 @@ next_cqe:
 	return rx_pkt;
 }
 
-static irqreturn_t bnx2x_msix_fp_int(int irq, void *fp_cookie)
+static void bnx2x_msix_fp_int(struct hw_trapframe *hw_tf, void *fp_cookie)
 {
 	struct bnx2x_fastpath *fp = fp_cookie;
 	struct bnx2x *bp = fp->bp;
@@ -1125,7 +1125,7 @@ static irqreturn_t bnx2x_msix_fp_int(int irq, void *fp_cookie)
 
 #ifdef BNX2X_STOP_ON_ERROR
 	if (unlikely(bp->panic))
-		return IRQ_HANDLED;
+		return;
 #endif
 
 	/* Handle Rx and Tx according to MSI-X vector */
@@ -1135,7 +1135,7 @@ static irqreturn_t bnx2x_msix_fp_int(int irq, void *fp_cookie)
 	prefetch(&fp->sb_running_index[SM_RX_ID]);
 	napi_schedule_irqoff(&bnx2x_fp(bp, fp->index, napi));
 
-	return IRQ_HANDLED;
+	return;
 }
 
 /* HW Lock for shared dual port PHYs */
