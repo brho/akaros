@@ -245,8 +245,7 @@ void bnx2x_unlock_vf_pf_channel(struct bnx2x *bp, struct bnx2x_virtf *vf,
  */
 
 #define MBX_MSG_ALIGN	8
-#define MBX_MSG_ALIGNED_SIZE	(roundup(sizeof(struct bnx2x_vf_mbx_msg), \
-				MBX_MSG_ALIGN))
+#define MBX_MSG_ALIGNED_SIZE	(ROUNDUP(sizeof(struct bnx2x_vf_mbx_msg), MBX_MSG_ALIGN))
 
 struct bnx2x_vf_mbx_msg {
 	union vfpf_tlvs req;

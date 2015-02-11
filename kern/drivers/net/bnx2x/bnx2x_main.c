@@ -12993,7 +12993,7 @@ static int bnx2x_set_qm_cid_count(struct bnx2x *bp)
 	if (CNIC_SUPPORT(bp))
 		cid_count += CNIC_CID_MAX;
 
-	return roundup(cid_count, QM_CID_ROUND);
+	return ROUNDUP(cid_count, QM_CID_ROUND);
 }
 
 /**

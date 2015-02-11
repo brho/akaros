@@ -264,8 +264,7 @@ enum {
 /* amount of cids traversed by UIO's DPM addition to doorbell */
 #define UIO_DPM				8
 /* roundup to DPM offset */
-#define UIO_ROUNDUP(bp)			(roundup(BNX2X_1st_NON_L2_ETH_CID(bp), \
-					 UIO_DPM))
+#define UIO_ROUNDUP(bp)			(ROUNDUP(BNX2X_1st_NON_L2_ETH_CID(bp), UIO_DPM))
 /* offset to nearest value which has lsb nibble matching DPM */
 #define UIO_CID_OFFSET(bp)		((UIO_ROUNDUP(bp) + UIO_DPM) % \
 					 (UIO_DPM * 2))

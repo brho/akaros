@@ -247,3 +247,18 @@ identifier ARG;
 -irqreturn_t HANDLER(int IRQ, void *ARG
 +void HANDLER(struct hw_trapframe *hw_tf, void *ARG
  );
+
+@@
+expression VAL;
+expression UP;
+@@
+-roundup(VAL, UP)
++ROUNDUP(VAL, UP)
+
+
+@@
+expression VAL;
+expression DOWN;
+@@
+-rounddown(VAL, DOWN)
++ROUNDDOWN(VAL, DOWN)
