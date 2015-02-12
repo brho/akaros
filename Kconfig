@@ -131,14 +131,6 @@ config TTRACE
 		(meaning it'll clobber older events).  Always enables scheduling timed
 		tracing.
 
-config TTRACE_SEMAPHORES
-	bool "Timed Trace Semaphores"
-	depends on TTRACE
-	default n
-	help
-		Turn on timestamp based thread tracing recording a timestamp, a
-		semaphore up/down event type thread_id(gvdl?) in the TTRACE buffer.
-
 config TTRACE_CV
 	bool "Timed Trace Condition Vars"
 	depends on TTRACE
@@ -148,14 +140,30 @@ config TTRACE_CV
 		condition waits and signals and underlying semaphore up/down event
 		types thread_id(gvdl?) in the TTRACE buffer.
 
+config TTRACE_PROCESS
+	bool "Timed Trace Process spawn, exec and death"
+	depends on TTRACE
+	default n
+	help
+		Turn on timestamp based processtracing recording the timestamp,
+		of interesting process related events such as proc creation,
+                destruction and execing.
+
 config TTRACE_RWLOCK
 	bool "Timed Trace Readers/Writers locking"
 	depends on TTRACE
 	default n
 	help
-		Turn on timestamp based thread tracing recording the timestamp,
-		reader/writer lock type, thread_id, number of readers waiting, number
-		of writes waiting.
+		Turn on timestamp based tracing recording timestamp and other
+                data for reader/writer lock interactions.
+
+config TTRACE_SEMAPHORES
+	bool "Timed Trace Semaphores"
+	depends on TTRACE
+	default n
+	help
+		Turn on timestamp based thread tracing recording a timestamp, a
+		semaphore up/down event type thread_id(gvdl?) in the TTRACE buffer.
 
 endmenu
 

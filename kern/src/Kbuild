@@ -52,6 +52,7 @@ obj-y						+= syscall.o
 obj-y						+= taskqueue.o
 obj-y						+= time.o
 obj-y						+= trace.o
+obj-$(CONFIG_TTRACE)        += ttrace.o
 obj-y						+= trap.o
 obj-y						+= ucq.o
 obj-y						+= umem.o

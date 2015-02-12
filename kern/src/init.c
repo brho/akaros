@@ -43,6 +43,7 @@
 #include <ip.h>
 #include <acpi.h>
 #include <coreboot_tables.h>
+#include <ros/ttrace.h>
 
 int booting = 1;
 struct sysinfo_t sysinfo;
@@ -65,6 +66,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 
 	cache_init();					// Determine systems's cache properties
 	pmem_init(multiboot_kaddr);
+	ttrace_init();                  // Setup timed tracer, depends on pmem
 	kmem_cache_init();              // Sets up slab allocator
 	kmalloc_init();
 	hashtable_init();
@@ -85,6 +87,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	kb_buf_init(&cons_buf);
 	arch_init();
 	block_init();
+	ttrace_cleanup(); // Must be called after arch_init()
 	enable_irq();
 	run_linker_funcs();
 	/* reset/init devtab after linker funcs 3 and 4.  these run NIC and medium

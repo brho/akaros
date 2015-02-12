@@ -28,10 +28,11 @@
  * 		}
  * 		trace_ring_foreach(my_trace_ring_ptr, trace_handler, optional_blob);
  *
- * Rings can be racy or not, and can overwrite entries or not.  If you are not
- * overwriting, the ring will stop giving you slots.  You need to reset the ring
- * to get fresh slots again.  If you are overwriting, you don't need to check
- * the return value of get_trace_slot_overwrite().
+ * Rings can be smp safe, per cpu or racy, and can overwrite entries or not.
+ * If you are not overwriting, the ring will stop giving you slots.  You need
+ * to reset the ring to get fresh slots again.  If you are overwriting, you
+ * don't need to check the return value of get_trace_slot_overwrite().  Per cpu
+ * rings are interrupt safe.
  *
  * Given there is overwrite, tr_next doesn't really tell us which ones were
  * used.  So your handler should check for a flag or something.  Timestamps
@@ -41,10 +42,11 @@
 #define ROS_INC_TRACE_H
 
 #include <ros/common.h>
+#include <arch/arch.h>
 #include <assert.h>
 
 struct trace_ring {
-	unsigned char				*tr_buf;
+	uint8_t						*tr_buf;
 	size_t						tr_buf_sz;
 	unsigned int				tr_event_sz_shift;
 	unsigned int				tr_max;
@@ -85,6 +87,18 @@ __get_tr_slot_overwrite(struct trace_ring *tr, unsigned long slot)
 	return __get_tr_slot(tr, slot);
 }
 
+/* Interrupt safe modification of tr_next */
+static inline unsigned int
+__get_next_percpu_and_add(struct trace_ring *tr, int8_t n)
+{
+	int8_t irq_state = 0;
+	disable_irqsave(&irq_state);
+	unsigned int ret = tr->tr_next;
+	tr->tr_next += n;
+	enable_irqsave(&irq_state);
+	return ret;
+}
+
 static inline void *get_trace_slot(struct trace_ring *tr)
 {
 	/* Using syncs, instead of atomics, since we access tr_next as both atomic
@@ -102,6 +116,22 @@ static inline void *get_trace_slot(struct trace_ring *tr)
 static inline void *get_trace_slot_overwrite(struct trace_ring *tr)
 {
 	return __get_tr_slot_overwrite(tr, __sync_fetch_and_add(&tr->tr_next, 1));
+}
+
+static inline void *get_trace_slot_percpu(struct trace_ring *tr)
+{
+	unsigned long my_slot = __get_next_percpu_and_add(tr, 1);
+	if (my_slot >= tr->tr_max) {
+		/* See comment in get_trace_slot. */
+	    __get_next_percpu_and_add(tr, -1);
+		return 0;
+	}
+	return __get_tr_slot(tr, my_slot);
+}
+
+static inline void *get_trace_slot_overwrite_percpu(struct trace_ring *tr)
+{
+	return __get_tr_slot_overwrite(tr, __get_next_percpu_and_add(tr, 1));
 }
 
 static inline void *get_trace_slot_racy(struct trace_ring *tr)

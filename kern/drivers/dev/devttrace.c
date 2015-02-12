@@ -7,9 +7,9 @@
  * in the LICENSE file.
  */
 
-//
-// This file implements the #T device and was based upon the UCB Plan 9 kprof.c
-//
+/*
+ * This file implements the #T device and was based upon the UCB Plan 9 kprof.c
+ */
 
 #include <assert.h>
 #include <atomic.h>
@@ -19,14 +19,11 @@
 #include <smp.h>
 #include <stdio.h>
 #include <string.h>
-#include <syscall.h>
+#include <trace.h>
+#include <ttrace.h>
 #include <umem.h>
 
 #include <ros/fs.h>
-#include <ros/ttrace.h>
-
-#warning Remove this scaffold when ttrace profiling is going
-uint64_t ttrace_type_mask;
 
 /*
  * ttrace macros and constant data
@@ -41,10 +38,10 @@ uint64_t ttrace_type_mask;
 #define TTRACE_NUM_OPENERS 8
 #define TT_SAFE_GENBUF_SZ  (GENBUF_SZ-1)  // Leave room for newline
 
-// TODO(gvdl): I don't get plan 9's permissions, why do directories get group
-// rx permissions, and what's with the DMDIR. Some devices use it and others
-// don't. In theory the DMDIR is copied over by a higher layer but I have no
-// idea why two copies seems necessary.
+/* TODO(gvdl): I don't get plan 9's permissions, why do directories get group
+ * rx permissions, and what's with the DMDIR. Some devices use it and others
+ * don't. In theory the DMDIR is copied over by a higher layer but I have no
+ * idea why two copies seems necessary. */
 #define TTPERMDIR    (S_IRUSR|S_IXUSR|S_IRGRP|S_IXGRP|DMDIR)
 #define TTPERMRWFILE (S_IRUSR|S_IWUSR)
 #define TTPERMROFILE (S_IRUSR)
@@ -53,7 +50,7 @@ enum {
 	Ttdevdirqid = 0,
 	Ttdevbase,
 	Ttdevctlqid = Ttdevbase,	// 1
-	Ttdevdataqid,				// 2
+	Ttdevauxqid,				// 2
 	Ttdevcpudataqid,			// 3
 
 	Logtype = 4,  // Enough for 16 unique qids types
@@ -64,8 +61,8 @@ enum {
 	Maskcpu = (1 << Logcpu) - 1,
 	Shiftcpu = Shifttype + Logtype,
 
-	// ttrace timestamp id, used by data file readers
-	Logtsid = 13 + 3, // 4096 ttrace/cpus + a ttrace/data file by 8 opened
+	/* ttrace timestamp id, used by data file readers */
+	Logtsid = 12 + 3, // 4096 cpus by 8 simultaneous opened
 	Masktsid = (1 << Logtsid) - 1,
 	Shifttsid = Shiftcpu + Logcpu,
 };
@@ -77,34 +74,42 @@ enum {
 #define TTTSIDQID(q, i)	( ((i) << Shifttsid) | (q).path )
 
 /*
- * ttrace static data
+ * ttrace timestamp pool and accessor
  */
 static uintptr_t *ttdevtimestamp;		// array of open file timestamps
-static struct u16_pool *ttdevtspool;		// pool of timestamp indices
+static struct u16_pool *ttdevtspool;	// pool of timestamp indices
+static inline int get_tsid(void) {
+	return (ttdevtspool)? get_u16(ttdevtspool) : -1;
+}
+static inline put_tsid(int tsid) {
+	dassert(tsid >= 1 && ttdevtspool);
+	put_u16(ttdevtspool, tsid);
+}
 
-//
-// ttrace device gen implementation
-//
-// #T directory layout
-// [-1]        {".",      {Ttdevdirqid, 0, QTDIR},    0, TTPERMDIR},
-// [0..ncpu-1] {"cpunnn", {Ttdevcpudataqid|core_id},  0, TTPERMRWFILE},
-// [ncpu]      {"ctl",    {Ttdevctlqid}, TTRACE_CTL_LEN, TTPERMRWFILE},
-// [ncpu+1]    {"data",   {Ttdevdataqid},             0, TTPERMRWFILE},
+/*
+ * ttrace device gen implementation
+ *
+ * #T directory layout
+ * [-1]        {".",      {Ttdevdirqid, 0, QTDIR},    0, TTPERMDIR},
+ * [0..ncpu-1] {"cpunnn", {Ttdevcpudataqid|coreid},   0, TTPERMRWFILE},
+ * [ncpu]      {"ctl",    {Ttdevctlqid}, TTRACE_CTL_LEN, TTPERMROFILE},
+ * [ncpu+1]    {"aux",    {Ttdevauxqid},              0, TTPERMRWFILE},
+ */
 
-// Generate qids for the top level directory
+/* Generate qids for the top level directory */
 static inline int ttdev1gen(const struct chan *c, int s, struct qid *qp)
 {
 	int ret = 1;
 	int path = -1;
-	// Must only be called to decode top level dir channel
+	/* Must only be called to decode top level dir channel */
 	dassert(TTYPE(c->qid) == Ttdevdirqid);
 
 	if (s < num_cpus) // "cpunnn" data files
 		path = TTCPUQID(s, Ttdevcpudataqid);
 	else {
 		switch (s - num_cpus) {
-		case 0:  path = Ttdevctlqid;  break; // "ctl"
-		case 1:  path = Ttdevdataqid; break; // "data"
+		case 0:  path = Ttdevctlqid; break;		// "ctl"
+		case 1:  path = Ttdevauxqid; break;		// "aux"
 		default: return -1;
 		}
 	}
@@ -130,9 +135,10 @@ static int ttdevgen(struct chan *c, char *unused_name,
 		return -1;
 
 	const char *name = NULL;
+	long perm = TTPERMRWFILE;
 	switch (TTYPE(q)) {
-	case Ttdevctlqid:  name = "ctl";  break;
-	case Ttdevdataqid: name = "data"; break;
+	case Ttdevctlqid: name = "ctl"; break;
+	case Ttdevauxqid: name = "aux"; perm = TTPERMROFILE; break;
 	case Ttdevcpudataqid:
 		snprintf(get_cur_genbuf(), GENBUF_SZ, "cpu%03d", TTCPU(q));
 		name = get_cur_genbuf();
@@ -144,7 +150,7 @@ static int ttdevgen(struct chan *c, char *unused_name,
 		panic("devttrace: What happened to ttdev1gen decode?\n");
 	}
 	dassert(name);
-	devdir(c, q, (char *) name, 0, eve, TTPERMRWFILE, dp);
+	devdir(c, q, (char *) name, 0, eve, perm, dp);
 	return 1;
 }
 
@@ -160,6 +166,7 @@ static size_t ttdevcopyout(char *va, long n, size_t offset,
 	if (!current)
 		memcpy(&va[offset], buf, len);
 	else if (ESUCCESS != memcpy_to_user(current, &va[offset], buf, len)) {
+		/* UMEM */
 		// TODO(gvdl): No p9 equivalent to EFAULT, determine causes of failure.
 		error(Enovmem);
 	}
@@ -167,124 +174,72 @@ static size_t ttdevcopyout(char *va, long n, size_t offset,
 	return len;
 }
 
-static inline int ttdevputchar(char *buf, int len, char c)
+/* Context for trace_ring_foreach call of ttdevread_cpu_entry() */
+#define TTRACE_ENTRY_QUADS (sizeof(struct ttrace_entry) / sizeof(uint64_t))
+/* #quads * (whitespace + len(hex(quad))) */
+#define CTXT_GENBUF_SZ     (TTRACE_ENTRY_QUADS * (1 + 2 * sizeof(uint64_t)))
+
+struct ttdevread_cpu_ctxt {
+	int64_t c;
+	uintptr_t min_timestamp;
+	char *va;
+	long n;
+	char genbuf[CTXT_GENBUF_SZ];
+};
+
+static inline int ttdevhexdigit(uint8_t x)
 {
-	dassert(len >= 1);
-	*buf = c;
-	return 1;
+	return "0123456789abcdef"[x];
 }
 
-static inline int ttdevputhex8(char* buf, int len, uint8_t x)
+static void ttdevread_cpu_entry(void *ventry, void *vctxt)
 {
-	static const char hex_digits[] = "0123456789abcdef";
-	int c = 0;
-	c += ttdevputchar(&buf[c], len-c, hex_digits[x >> 4]);
-	c += ttdevputchar(&buf[c], len-c, hex_digits[x & 0xf]);
-	return c;
-}
+	struct ttdevread_cpu_ctxt *ctxt = (struct ttdevread_cpu_ctxt *) vctxt;
+	/* A cache line aligned copy of the input entry, should make partial entrys
+	 * less likely. Still an entry is bracketted with timestamp == -1 */
+	uint8_t buf[2 * sizeof(struct ttrace_entry)];  // 128 byte buffer
+	const uintptr_t size_mask = sizeof(struct ttrace_entry) - 1;
+	struct ttrace_entry* entry = (struct ttrace_entry *)
+		(((uintptr_t) buf + size_mask) & ~size_mask); // align to cache line
+	*entry = *((struct ttrace_entry *) ventry);  // Grab the entry
 
-static inline int ttdevputhex16(char *buf, int len, uint16_t x)
-{
-	int c = ttdevputhex8(&buf[0], len, x >> 8);
-	ttdevputhex8(&buf[c], len-c, (uint8_t) x);
-	return sizeof(uint16_t) * 2;
-}
+	/* If time stamp == -1 (i.e. entry is a partial) or is less than
+	 * the minimum then ignore this entry */
+	if (!(entry->timestamp + 1) || entry->timestamp < ctxt->min_timestamp)
+		return;
 
-static int ttdevputhex32(char *buf, int len, uint32_t x)
-{
-	int c = ttdevputhex16(&buf[0], len, x >> 16);
-	ttdevputhex16(&buf[c], len-c, (uint16_t) x);
-	return sizeof(uint32_t) * 2;
-}
-
-static int ttdevputhex64(char *buf, int len, uint64_t x)
-{
-	int c = ttdevputhex32(&buf[0], len, x >> 32);
-	ttdevputhex32(&buf[c], len-c, (uint32_t) x);
-	return sizeof(uint64_t) * 2;
-}
-
-static inline int ttdevputmem(char *buf, int len, const void *mem, int mem_len)
-{
-	dassert(mem_len <= len);
-	memcpy(buf, mem, mem_len);
-	return mem_len;
-}
-
-static int ttdevputhdr(char *buf, int len,
-					   uint8_t rec_len, uint8_t tag, uintptr_t timestamp)
-{
-	int c = 0;
-	c += ttdevputhex8(&buf[c], len-c, rec_len);
-	c += ttdevputhex8(&buf[c], len-c, tag);
-	c += ttdevputhex64(&buf[c], len-c, timestamp);
-	return c;
-}
-
-static size_t ttdev_readnamerec(void *va, long n, uint8_t tag,
-								uintptr_t timestamp, uint64_t id,
-								const char *name)
-{
-	const int len = TT_SAFE_GENBUF_SZ; // Always leave room for newline
-	char * const buffer = get_cur_genbuf();
-	int remaining = strlen(name);
-	size_t out_len = 0;
-
-	/* Output first header */
-	int nc = min(len - TTRACEH_NAME_LEN, remaining);
-	int rec_len = TTRACEH_NAME_LEN + nc; dassert(rec_len <= len);
-	int c = 0;
-	c += ttdevputhdr(&buffer[c], len-c, rec_len, tag, timestamp);
-	c += ttdevputhex64(&buffer[c], len-c, id);
-	c += ttdevputmem(&buffer[c], len-c, name, nc);
-	c += ttdevputchar(&buffer[c], len+1-c, '\n');
-	out_len = ttdevcopyout(va, n, out_len, buffer, c);
-
-	tag |= TTRACEH_TAG_CONT;
-	const int buf_nm_len = len - TTRACEH_CONT_LEN;
-	while ((remaining -= nc) > 0) {
-		name += nc;
-
-		nc = min(buf_nm_len, remaining);
-		rec_len = TTRACEH_CONT_LEN + nc; dassert(rec_len <= len);
-		c = 0;
-		c += ttdevputhex8(&buffer[c], len-c, rec_len);
-		c += ttdevputhex8(&buffer[c], len-c, tag);
-		c += ttdevputmem(&buffer[c], len-c, name, nc);
-		c += ttdevputchar(&buffer[c], len+1-c, '\n');
-		out_len += ttdevcopyout(va, n, out_len, buffer, c);
+	uint64_t *sqp = (uint64_t *) entry;
+	char *dcp = ctxt->genbuf;
+	for (int i = 0; i < TTRACE_ENTRY_QUADS; i++) {
+		const uint64_t quad = sqp[i];
+		dcp[0] = ttdevhexdigit((quad >> 28) & 0xf);
+		dcp[1] = ttdevhexdigit((quad >> 24) & 0xf);
+		dcp[2] = ttdevhexdigit((quad >> 20) & 0xf);
+		dcp[3] = ttdevhexdigit((quad >> 16) & 0xf);
+		dcp[4] = ttdevhexdigit((quad >> 12) & 0xf);
+		dcp[5] = ttdevhexdigit((quad >>  8) & 0xf);
+		dcp[6] = ttdevhexdigit((quad >>  4) & 0xf);
+		dcp[7] = ttdevhexdigit((quad >>  0) & 0xf);
+		dcp[8] = ' ';
+		dcp += 9;
 	}
-	return out_len;
+	dassert(&ctxt->genbuf[sizeof(ctxt->genbuf)] == dcp);
+	dcp[-1] = '\n';  // Replace trailing space with a newline
+
+	ctxt->c += ttdevcopyout(ctxt->va, ctxt->n, ctxt->c,
+			                ctxt->genbuf, sizeof(ctxt->genbuf));
 }
 
-static size_t ttdevread_info(void *va, long n, uintptr_t timestamp)
-{
-	char * const buffer = get_cur_genbuf();
-	const int len = TT_SAFE_GENBUF_SZ; /* Room for new line */
-	const int rec_len = TTRACEH_LEN + 12;  /* header + 3*h[4] versions */
-	dassert(rec_len <= len);
-	int c = 0;
-
-	c += ttdevputhdr(&buffer[c], len-c, rec_len, TTRACEH_TAG_INFO, timestamp);
-	c += ttdevputhex16(&buffer[c], len-c, TTRACEH_V1);
-	c += ttdevputhex16(&buffer[c], len-c, TTRACEE_V1);
-	c += ttdevputhex16(&buffer[c], len-c, num_cpus);
-	dassert(c == rec_len); // Don't count '\n' in rec_len
-	c += ttdevputchar(&buffer[c], len+1-c, '\n'); // Always have room for newline
-
-	return ttdevcopyout(va, n, /* offset */ 0, buffer, c);
-}
-
-// iotimestamp takes the timestamp pointer and the I/Os offset and returns the
-// minimum timestamp last requested in a write. In the case where the channel
-// has been opened readonly we will complete the offset == 0 request and return
-// end of file for all subsequent (offset > 0) requests; this allows cat to
-// return one page of data.
+/* iotimestamp takes the timestamp pointer and the I/Os offset and returns the
+ * minimum timestamp last requested in a write. In the case where the channel
+ * has been opened readonly we will complete the offset == 0 request and return
+ * end of file for all subsequent (offset > 0) requests; this allows cat to
+ * return one page of data. */
 static inline uintptr_t ttdevread_mintimestamp(const int tsid, int64_t offset)
 {
-	// If we don't have a timestamp, then only satisfy a single I/O, that is
-	// anything with an offset of 0
-	if (!tsid && offset)
+	/* ttdevread_cpu code can not deal sensibly with offsets without making the
+	 * code much more complicated, probably not worth it. */ 
+	if (offset)
 		return 0;
 
 	const uintptr_t min_timestamp = ttdevtimestamp[tsid];
@@ -296,13 +251,42 @@ static inline uintptr_t ttdevread_mintimestamp(const int tsid, int64_t offset)
 	return min_timestamp;
 }
 
+static inline long ttdevread_cpu(const int tsid,
+								 int coreid, void *va, long n, int64_t offset)
+{
+	ERRSTACK(1);
+	const uintptr_t min_timestamp = ttdevread_mintimestamp(tsid, offset);
+	if (!min_timestamp)
+		return 0;
+
+	struct ttdevread_cpu_ctxt *ctxt = kzalloc(sizeof(*ctxt), KMALLOC_WAIT);
+	if (!ctxt)
+		error(Enomem);
+	else if (waserror()) {
+		kfree(ctxt);
+		nexterror();
+	}
+
+	ctxt->min_timestamp = min_timestamp
+	ctxt->va = va;
+	ctxt->n = n;
+
+	struct trace_ring * const ring = get_ttrace_ring_for_core(coreid);
+	trace_ring_foreach(ring, &ttdevread_cpu_entry, ctxt);
+
+	kfree(ctxt);
+	poperror();
+	return ctxt->c;
+}
+
 static inline long ttdevread_ctl(void *va, long n, int64_t offset)
 {
-	// Read the ttrace_type_mask and create a 'setmask' ctl command
-	//
-	// cmd     ttrace_bits       bit mask
-	// setmask 0x0123456789abcdef 0x0123456789abcdef\n"
-	// 123456789012345678901234567890123456789012345 6  len 46 bytes
+	/* Read the ttrace_type_mask and create a 'setmask' ctl command
+	 *
+	 * cmd     ttrace_bits       bit mask
+	 * setmask 0x0123456789abcdef 0x0123456789abcdef\n"
+	 * 123456789012345678901234567890123456789012345 6  len 46 bytes
+	 */
 	char * const buffer = get_cur_genbuf();
 	static_assert(TTRACE_CTL_LEN <= GENBUF_SZ);
 
@@ -313,51 +297,50 @@ static inline long ttdevread_ctl(void *va, long n, int64_t offset)
 	return readstr(offset, va, n, buffer);
 }
 
-static inline long ttdevread_data(const int tsid,
-								  uint8_t *va, long n, int64_t offset)
+/* This code will be more efficient if the user data is page aligned, but
+ * should work no matter which alignment the use gives.
+ * Output:
+ *   Page 0:   struct ttrace_version
+ *   Page 1-n: Auxillary buffer.
+ */
+static inline long ttdevread_aux(uint8_t *va, long n, int64_t offset)
 {
-	const int min_timestamp = ttdevread_mintimestamp(tsid, offset);
-	if (!min_timestamp)
-		return 0;
+	ptrdiff_t dummy_offset;
+	struct ttrace_version vers;
+	fill_ttrace_version(&vers);
 
-	// All data requested, Copy out basic data: version ids and syscall table
-	size_t c = 0;  // Number of characters output
-	if (min_timestamp == 1) {
-		c += ttdevread_info(&va[c], n - c, min_timestamp);
-		for (size_t i = 0; i < max_syscall; i++) {
-			const char * const name = syscall_table[i].name;
-			if (!name) continue;
+	const long buffer_length = vers.buffer_mask + 1;
+	if (offset)
+		return 0; // Only allow single reads at offset 0, all others are empty
+	else if (n < PGSIZE + buffer_length)
+		error(Etoosmall);
 
-			c += ttdev_readnamerec(&va[c], n - c, TTRACEH_TAG_SYSC,
-								   min_timestamp, i, name);
-		}
-	}
+	size_t c = PGSIZE; // Advance count to second page
 
-	// Read ttrace data file, contains names and other data, this data is slow
-	// to store and generate and is expected to be done only rarely. Such as at
-	// process, semaphore, ktask creation.
+	/* Implements reader side of auxillary buffer protocol, see
+	 * _ttrace_point_string comment in ttrace.c
+	 *
+	 * Touch memory to get any page faults out of the way now, hopefully we
+	 * will not be under paging pressure. Note that I'm accumulating into the
+	 * vers.last_offset so that the compiler doesn't throw out the memory touch
+	 * loop, the vers.last_offset is reset when we take a buffer snapshot.
+	 *
+	 * TODO(gvdl): formalise memory pinning for later I/O.
+	 */
+	vers.last_offset = 0;
+	size_t t = PGSIZE + ((uintptr_t) va & (sizeof(long) - 1));
+	for (t = 0; t < n, t += PGSIZE)
+		vers.last_offset += atomic_read((atomic_t *) va[t]);
+
+	get_ttrace_aux_buffer_snapshot(&dummy_offset, &vers.last_offset);
+	const uint8_t * const aux_buffer = get_ttrace_aux_buffer();
+	c += ttdevcopyout(va, n, c, aux_buffer, buffer_length);
+	get_ttrace_aux_buffer_snapshot(&vers.first_offset, &dummy_ffset);
+
+	/* Output version with buffer offsets last */
+	ttdevcopyout(va, n, 0, &vers, sizeof(vers));
+
 	return c;
-}
-
-static inline long ttdevread_cpu(const int tsid,
-								 int core_id, void *va, long n, int64_t offset)
-{
-	const int min_timestamp = ttdevread_mintimestamp(tsid, offset);
-	if (!min_timestamp)
-		return 0;
-
-#warning Scaffolding, test cpu timestamp reading
-	// Read the timestamp and output it in decimal (max 20 digits).
-	// cmd   timestamp
-	// setts 12345678901234567890\n"
-	// 12345678901234567890123456 7  len 27
-	char * const buffer = get_cur_genbuf();
-	static_assert(27 <= GENBUF_SZ);
-
-	int c = snprintf(buffer, GENBUF_SZ, "setts %lld\n", min_timestamp);
-	dassert(c <= 27);
-
-	return readstr(offset, va, n, buffer);
 }
 
 /*
@@ -372,8 +355,6 @@ static uint64_t parseul(const char * const num_str, int base)
 	return ret;
 }
 
-#define CONST_STRNCMP(vp, conststr) strncmp((vp), conststr, sizeof(conststr)-1)
-
 /*
  * ttrace devtab entry points
  */
@@ -381,29 +362,32 @@ static void ttdevinit(void)
 {
 	static_assert(MAX_NUM_CPUS <= Maskcpu);  // Assert encoding is still good
 
-	// Support upto 8 simultaneous opens on the ttrace/{data,cpu*} files.
+	/* Support upto 8 simultaneous opens on the ttrace/cpunnn files. */
 	const int pool_size
-		= min(TTRACE_MAX_TSID, TTRACE_NUM_OPENERS * (1 + num_cpus));
-	// Test for too many cpus for our tsid mechanism, re-implement.
-	dassert(1 + num_cpus <= pool_size);
-	if (1 + num_cpus > pool_size) return;
+		= min(TTRACE_MAX_TSID, TTRACE_NUM_OPENERS * num_cpus);
+	/* Test for too many cpus for our tsid mechanism, re-implement. */
+	dassert(num_cpus <= pool_size);
+	if (num_cpus > pool_size) {
+		printk("Insufficient ids for ttrace timestamp pool");
+		return;
+	}
 
 	const size_t ts_size = pool_size * sizeof(*ttdevtimestamp);
 	ttdevtimestamp = kmalloc(ts_size, KMALLOC_WAIT);
 	memset(ttdevtimestamp, 0xff, ts_size);
 	ttdevtspool = create_u16_pool(pool_size);
 
-	// Always allocate 0 as a unused/NULL sentinel
-	int tsidnull = get_u16(ttdevtspool);
+	/* Always allocate 0 as a unused/NULL sentinel */
+	int tsidnull = get_tsid(ttdevtspool);
 	assert(!tsidnull);
-	ttdevtimestamp[tsidnull] = 1;  // tsid==0 always has a 1 minimum timestamp.
+	ttdevtimestamp[tsidnull] = 1;  // tsid[0] is set to timestamp of 1.
 }
 
-#define kfree_and_null(x) do { kfree(x); x = NULL; } while(false)
+#define KFREE_AND_NULL(x) do { kfree(x); x = NULL; } while(false)
 static void ttdevshutdown(void)
 {
-	kfree_and_null(ttdevtspool);
-	kfree_and_null(ttdevtimestamp);
+	KFREE_AND_NULL(ttdevtspool);
+	KFREE_AND_NULL(ttdevtimestamp);
 }
 
 static struct chan *ttdevattach(char *spec)
@@ -437,14 +421,12 @@ static struct chan *ttdevopen(struct chan *c, int omode)
 			error(Eperm);
 		break;
 
-	case Ttdevdataqid:
 	case Ttdevcpudataqid:
 		if (tsid)
 			break; // Already allocated, reopen
 
-		// Allocate a timestamp from the pool
 		if (o == O_RDWR) {
-			tsid = get_u16(ttdevtspool);
+			tsid = get_tsid(ttdevtspool);
 			if (tsid < 0)
 				error(Enoenv);
 			else
@@ -457,6 +439,7 @@ static struct chan *ttdevopen(struct chan *c, int omode)
 			error(Eperm);
 		break;
 
+	case Ttdevauxqid:
 	case Ttdevctlqid:
 		break;
 	}
@@ -475,14 +458,14 @@ static void ttdevclose(struct chan *c)
 
 	const int tsid = TTTSID(c->qid);
 	switch (TTYPE(c->qid)) {
-	case Ttdevdataqid:
 	case Ttdevcpudataqid:
-		// Release timestamp
+		/* Release timestamp */
 		if (tsid) {
 			ttdevtimestamp[tsid] = -1;
-			put_u16(ttdevtspool, tsid);
+			put_tsid(ttdevtspool, tsid);
 		}
 		break;
+	case Ttdevauxqid:
 	case Ttdevctlqid:
 	case Ttdevdirqid:
 		break;
@@ -501,14 +484,15 @@ static long ttdevread(struct chan *c, void *va, long n, int64_t offset)
 		return devdirread(c, va, n, NULL, 0, ttdevgen);
 	case Ttdevctlqid:
 		return ttdevread_ctl(va, n, offset);
-	case Ttdevdataqid:
-		return ttdevread_data(tsid, va, n, offset);
+	case Ttdevauxqid:
+		return ttdevread_aux(va, n, offset);
 	case Ttdevcpudataqid:
 		return ttdevread_cpu(tsid, TTCPU(c->qid), va, n, offset);
 	}
 	return 0; // Not us
 }
 
+#define CONST_STRNCMP(vp, conststr) strncmp((vp), conststr, sizeof(conststr)-1)
 static long ttdevwrite(struct chan *c, void *a, long n, int64_t unused_off)
 {
 	ERRSTACK(1);
@@ -516,7 +500,7 @@ static long ttdevwrite(struct chan *c, void *a, long n, int64_t unused_off)
 	struct cmdbuf *cb;
 	static const char ctlstring[]
 		= "setmask <value> <mask>|setbits <value>|clrbits <mask>";
-	static const char tsstring[] = "setts <minimum timestamp>";
+	static const char tsstring[] = "settimestamp <minimum timestamp>";
 
 	cb = parsecmd(a, n);
 	if (waserror()) {
@@ -545,10 +529,10 @@ static long ttdevwrite(struct chan *c, void *a, long n, int64_t unused_off)
 		else
 			error(ctlstring);
 
-		// Thread safe, but... lets face it if we have competing controllers
-		// setting anc clearing mask bits then the behaviour is going to be
-		// unexpected. Perhaps I should enforce exclusive open of the ctl
-		// channel.
+		/* Thread safe, but... lets face it if we have competing controllers
+		 * setting and clearing mask bits then the behaviour is going to be
+		 * unexpected. Perhaps we could enforce exclusive open of the ctl
+		 * channel. */
 		{
 			uint64_t cur_mask, new_mask;
 			do {
@@ -560,8 +544,7 @@ static long ttdevwrite(struct chan *c, void *a, long n, int64_t unused_off)
 		break;
 
 	case Ttdevcpudataqid:
-	case Ttdevdataqid:
-		if (cb->nf == 2 && !CONST_STRNCMP(cb->f[0], "setts")) {
+		if (cb->nf == 2 && !CONST_STRNCMP(cb->f[0], "settimestamp")) {
 			if (!tsid) error(Ebadfd);
 
 			const char *endptr = NULL;
