@@ -1550,6 +1550,8 @@ static void bnx2x_set_umac_rxtx(struct link_params *params, uint8_t en)
 static void bnx2x_umac_enable(struct link_params *params,
 			    struct link_vars *vars, uint8_t lb)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t val;
 	uint32_t umac_base = params->port ? GRCBASE_UMAC1 : GRCBASE_UMAC0;
 	struct bnx2x *bp = params->bp;
@@ -1643,6 +1645,7 @@ static void bnx2x_umac_enable(struct link_params *params,
 			    ((vars->flow_ctrl & BNX2X_FLOW_CTRL_TX) != 0), 1);
 	vars->mac_type = MAC_TYPE_UMAC;
 
+#endif
 }
 
 /* Define the XMAC mode */
@@ -1739,6 +1742,8 @@ static void bnx2x_set_xmac_rxtx(struct link_params *params, uint8_t en)
 static int bnx2x_xmac_enable(struct link_params *params,
 			     struct link_vars *vars, uint8_t lb)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t val, xmac_base;
 	struct bnx2x *bp = params->bp;
 	DP(NETIF_MSG_LINK, "enabling XMAC\n");
@@ -1804,6 +1809,7 @@ static int bnx2x_xmac_enable(struct link_params *params,
 	vars->mac_type = MAC_TYPE_XMAC;
 
 	return 0;
+#endif
 }
 
 static int bnx2x_emac_enable(struct link_params *params,
@@ -4162,6 +4168,8 @@ static void bnx2x_warpcore_set_sgmii_speed(struct bnx2x_phy *phy,
 					   uint8_t fiber_mode,
 					   uint8_t always_autoneg)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint16_t val16, digctrl_kx1, digctrl_kx2;
 
@@ -4237,6 +4245,7 @@ static void bnx2x_warpcore_set_sgmii_speed(struct bnx2x_phy *phy,
 	bnx2x_cl45_write(bp, phy, MDIO_WC_DEVAD,
 			MDIO_WC_REG_SERDESDIGITAL_CONTROL1000X1,
 			(digctrl_kx1 | 0x10));
+#endif
 }
 
 static void bnx2x_warpcore_reset_lane(struct bnx2x *bp,
@@ -4623,6 +4632,8 @@ static void bnx2x_warpcore_link_reset(struct bnx2x_phy *phy,
 static void bnx2x_set_warpcore_loopback(struct bnx2x_phy *phy,
 					struct link_params *params)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint16_t val16;
 	uint32_t lane;
@@ -4661,6 +4672,7 @@ static void bnx2x_set_warpcore_loopback(struct bnx2x_phy *phy,
 		bnx2x_cl45_read_or_write(bp, phy, MDIO_WC_DEVAD,
 					 MDIO_WC_REG_IEEE0BLK_MIICNTL, 0x1);
 	}
+#endif
 }
 
 
@@ -4668,6 +4680,8 @@ static void bnx2x_set_warpcore_loopback(struct bnx2x_phy *phy,
 static void bnx2x_sync_link(struct link_params *params,
 			     struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint8_t link_10g_plus;
 	if (vars->link_status & LINK_STATUS_PHYSICAL_LINK_FLAG)
@@ -4769,6 +4783,7 @@ static void bnx2x_sync_link(struct link_params *params,
 		if (vars->link_status & LINK_STATUS_SFP_TX_FAULT)
 			vars->phy_flags |= PHY_SFP_TX_FAULT_FLAG;
 	}
+#endif
 }
 
 void bnx2x_link_status_update(struct link_params *params,
@@ -5106,6 +5121,8 @@ static void bnx2x_program_serdes(struct bnx2x_phy *phy,
 				 struct link_params *params,
 				 struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint16_t reg_val;
 
@@ -5149,6 +5166,7 @@ static void bnx2x_program_serdes(struct bnx2x_phy *phy,
 			  MDIO_REG_BANK_SERDES_DIGITAL,
 			  MDIO_SERDES_DIGITAL_MISC1, reg_val);
 
+#endif
 }
 
 static void bnx2x_set_brcm_cl37_advertisement(struct bnx2x_phy *phy,
@@ -5236,6 +5254,8 @@ static void bnx2x_initialize_sgmii_process(struct bnx2x_phy *phy,
 					   struct link_params *params,
 					   struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint16_t control1;
 
@@ -5300,6 +5320,7 @@ static void bnx2x_initialize_sgmii_process(struct bnx2x_phy *phy,
 		/* Enable and restart AN */
 		bnx2x_restart_autoneg(phy, params, 0);
 	}
+#endif
 }
 
 /* Link management
@@ -5501,6 +5522,8 @@ static int bnx2x_get_link_speed_duplex(struct bnx2x_phy *phy,
 				      uint16_t speed_mask,
 				      uint16_t is_duplex)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	if (phy->req_line_speed == SPEED_AUTO_NEG)
 		vars->link_status |= LINK_STATUS_AUTO_NEGOTIATE_ENABLED;
@@ -5583,12 +5606,15 @@ static int bnx2x_get_link_speed_duplex(struct bnx2x_phy *phy,
 	DP(NETIF_MSG_LINK, " phy_link_up %x line_speed %d\n",
 		    vars->phy_link_up, vars->line_speed);
 	return 0;
+#endif
 }
 
 static int bnx2x_link_settings_status(struct bnx2x_phy *phy,
 				      struct link_params *params,
 				      struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 
 	uint16_t gp_status, duplex = DUPLEX_HALF, link_up = 0, speed_mask;
@@ -5657,12 +5683,15 @@ static int bnx2x_link_settings_status(struct bnx2x_phy *phy,
 	DP(NETIF_MSG_LINK, "duplex %x  flow_ctrl 0x%x link_status 0x%x\n",
 		   vars->duplex, vars->flow_ctrl, vars->link_status);
 	return rc;
+#endif
 }
 
 static int bnx2x_warpcore_read_status(struct bnx2x_phy *phy,
 				     struct link_params *params,
 				     struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint8_t lane;
 	uint16_t gp_status1, gp_speed, link_up, duplex = DUPLEX_FULL;
@@ -5783,6 +5812,7 @@ static int bnx2x_warpcore_read_status(struct bnx2x_phy *phy,
 	DP(NETIF_MSG_LINK, "duplex %x  flow_ctrl 0x%x link_status 0x%x\n",
 		   vars->duplex, vars->flow_ctrl, vars->link_status);
 	return rc;
+#endif
 }
 static void bnx2x_set_gmii_tx_driver(struct link_params *params)
 {
@@ -5826,6 +5856,8 @@ static void bnx2x_set_gmii_tx_driver(struct link_params *params)
 static int bnx2x_emac_program(struct link_params *params,
 			      struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint8_t port = params->port;
 	uint16_t mode = 0;
@@ -5868,6 +5900,7 @@ static int bnx2x_emac_program(struct link_params *params,
 
 	bnx2x_set_led(params, vars, LED_MODE_OPER, vars->line_speed);
 	return 0;
+#endif
 }
 
 static void bnx2x_set_preemphasis(struct bnx2x_phy *phy,
@@ -6505,6 +6538,8 @@ int bnx2x_test_link(struct link_params *params, struct link_vars *vars,
 static int bnx2x_link_initialize(struct link_params *params,
 				 struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint8_t phy_index, non_ext_phy;
 	struct bnx2x *bp = params->bp;
 	/* In case of external phy existence, the line speed would be the
@@ -6578,6 +6613,7 @@ static int bnx2x_link_initialize(struct link_params *params,
 			NIG_STATUS_SERDES0_LINK_STATUS |
 			NIG_MASK_MI_INT));
 	return 0;
+#endif
 }
 
 static void bnx2x_int_link_reset(struct bnx2x_phy *phy,
@@ -6758,6 +6794,8 @@ static int bnx2x_update_link_up(struct link_params *params,
  */
 int bnx2x_link_update(struct link_params *params, struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	struct link_vars phy_vars[MAX_PHYS];
 	uint8_t port = params->port;
@@ -7006,6 +7044,7 @@ int bnx2x_link_update(struct link_params *params, struct link_vars *vars)
 		bnx2x_fw_command(bp, DRV_MSG_CODE_LINK_STATUS_CHANGED, 0);
 
 	return rc;
+#endif
 }
 
 /*****************************************************************************/
@@ -7312,6 +7351,8 @@ static void bnx2x_8073_specific_func(struct bnx2x_phy *phy,
 				     struct link_params *params,
 				     uint32_t action)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	switch (action) {
 	case PHY_INIT:
@@ -7322,12 +7363,15 @@ static void bnx2x_8073_specific_func(struct bnx2x_phy *phy,
 				 MDIO_PMA_DEVAD, MDIO_PMA_LASI_CTRL,  0x0004);
 		break;
 	}
+#endif
 }
 
 static int bnx2x_8073_config_init(struct bnx2x_phy *phy,
 				  struct link_params *params,
 				  struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint16_t val = 0, tmp1;
 	uint8_t gpio_port;
@@ -7470,12 +7514,15 @@ static int bnx2x_8073_config_init(struct bnx2x_phy *phy,
 	DP(NETIF_MSG_LINK, "807x Autoneg Restart: Advertise 1G=%x, 10G=%x\n",
 		   ((val & (1<<5)) > 0), ((val & (1<<7)) > 0));
 	return 0;
+#endif
 }
 
 static uint8_t bnx2x_8073_read_status(struct bnx2x_phy *phy,
 				 struct link_params *params,
 				 struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint8_t link_up = 0;
 	uint16_t val1, val2;
@@ -7615,6 +7662,7 @@ static uint8_t bnx2x_8073_read_status(struct bnx2x_phy *phy,
 	}
 
 	return link_up;
+#endif
 }
 
 static void bnx2x_8073_link_reset(struct bnx2x_phy *phy,
@@ -8445,6 +8493,8 @@ static void bnx2x_8727_specific_func(struct bnx2x_phy *phy,
 				     struct link_params *params,
 				     uint32_t action)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint16_t val;
 	switch (action) {
@@ -8485,6 +8535,7 @@ static void bnx2x_8727_specific_func(struct bnx2x_phy *phy,
 		   action);
 		return;
 	}
+#endif
 }
 
 static void bnx2x_set_e1e2_module_fault_led(struct link_params *params,
@@ -8794,6 +8845,8 @@ static uint8_t bnx2x_8706_8726_read_status(struct bnx2x_phy *phy,
 				      struct link_params *params,
 				      struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint8_t link_up = 0;
 	uint16_t val1, val2, rx_sd, pcs_status;
 	struct bnx2x *bp = params->bp;
@@ -8847,6 +8900,7 @@ static uint8_t bnx2x_8706_8726_read_status(struct bnx2x_phy *phy,
 	}
 
 	return link_up;
+#endif
 }
 
 /******************************************************************/
@@ -8856,6 +8910,8 @@ static uint8_t bnx2x_8706_config_init(struct bnx2x_phy *phy,
 				 struct link_params *params,
 				 struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t tx_en_mode;
 	uint16_t cnt, val, tmp1;
 	struct bnx2x *bp = params->bp;
@@ -8956,6 +9012,7 @@ static uint8_t bnx2x_8706_config_init(struct bnx2x_phy *phy,
 	}
 
 	return 0;
+#endif
 }
 
 static int bnx2x_8706_read_status(struct bnx2x_phy *phy,
@@ -9039,6 +9096,8 @@ static int bnx2x_8726_config_init(struct bnx2x_phy *phy,
 				  struct link_params *params,
 				  struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	DP(NETIF_MSG_LINK, "Initializing BCM8726\n");
 
@@ -9118,17 +9177,21 @@ static int bnx2x_8726_config_init(struct bnx2x_phy *phy,
 
 	return 0;
 
+#endif
 }
 
 static void bnx2x_8726_link_reset(struct bnx2x_phy *phy,
 				  struct link_params *params)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	DP(NETIF_MSG_LINK, "bnx2x_8726_link_reset port %d\n", params->port);
 	/* Set serial boot control for external load */
 	bnx2x_cl45_write(bp, phy,
 			 MDIO_PMA_DEVAD,
 			 MDIO_PMA_REG_GEN_CTRL, 0x0001);
+#endif
 }
 
 /******************************************************************/
@@ -9257,6 +9320,8 @@ static int bnx2x_8727_config_init(struct bnx2x_phy *phy,
 				  struct link_params *params,
 				  struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t tx_en_mode;
 	uint16_t tmp1, mod_abs, tmp2;
 	struct bnx2x *bp = params->bp;
@@ -9337,11 +9402,14 @@ static int bnx2x_8727_config_init(struct bnx2x_phy *phy,
 	}
 
 	return 0;
+#endif
 }
 
 static void bnx2x_8727_handle_mod_abs(struct bnx2x_phy *phy,
 				      struct link_params *params)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint16_t mod_abs, rx_alarm_status;
 	uint32_t val = REG_RD(bp, params->shmem_base +
@@ -9422,6 +9490,7 @@ static void bnx2x_8727_handle_mod_abs(struct bnx2x_phy *phy,
 	DP(NETIF_MSG_LINK, "8727 RX_ALARM_STATUS 0x%x\n",
 		   rx_alarm_status);
 	/* No need to check link status in case of module plugged in/out */
+#endif
 }
 
 static uint8_t bnx2x_8727_read_status(struct bnx2x_phy *phy,
@@ -9429,6 +9498,8 @@ static uint8_t bnx2x_8727_read_status(struct bnx2x_phy *phy,
 				 struct link_vars *vars)
 
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint8_t link_up = 0, oc_port = params->port;
 	uint16_t link_status = 0;
@@ -9581,11 +9652,14 @@ static uint8_t bnx2x_8727_read_status(struct bnx2x_phy *phy,
 				 MDIO_PMA_REG_8727_PCS_GP, val1);
 	}
 	return link_up;
+#endif
 }
 
 static void bnx2x_8727_link_reset(struct bnx2x_phy *phy,
 				  struct link_params *params)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 
 	/* Enable/Disable PHY transmitter output */
@@ -9596,6 +9670,7 @@ static void bnx2x_8727_link_reset(struct bnx2x_phy *phy,
 	/* Clear LASI */
 	bnx2x_cl45_write(bp, phy, MDIO_PMA_DEVAD, MDIO_PMA_LASI_CTRL, 0);
 
+#endif
 }
 
 /******************************************************************/
@@ -9605,6 +9680,8 @@ static void bnx2x_save_848xx_spirom_version(struct bnx2x_phy *phy,
 					    struct bnx2x *bp,
 					    uint8_t port)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint16_t val, fw_ver2, cnt, i;
 	static struct bnx2x_reg_set reg_set[] = {
 		{MDIO_PMA_DEVAD, 0xA819, 0x0014},
@@ -9669,10 +9746,13 @@ static void bnx2x_save_848xx_spirom_version(struct bnx2x_phy *phy,
 					  phy->ver_addr);
 	}
 
+#endif
 }
 static void bnx2x_848xx_set_led(struct bnx2x *bp,
 				struct bnx2x_phy *phy)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint16_t val, offset, i;
 	static struct bnx2x_reg_set reg_set[] = {
 		{MDIO_PMA_DEVAD, MDIO_PMA_REG_8481_LED1_MASK, 0x0080},
@@ -9708,6 +9788,7 @@ static void bnx2x_848xx_set_led(struct bnx2x *bp,
 	bnx2x_cl45_read_or_write(bp, phy,
 				 MDIO_PMA_DEVAD, offset,
 				 MDIO_PMA_REG_84823_LED3_STRETCH_EN);
+#endif
 }
 
 static void bnx2x_848xx_specific_func(struct bnx2x_phy *phy,
@@ -9738,6 +9819,8 @@ static int bnx2x_848xx_cmn_config_init(struct bnx2x_phy *phy,
 				       struct link_params *params,
 				       struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint16_t autoneg_val, an_1000_val, an_10_100_val;
 
@@ -9879,12 +9962,15 @@ static int bnx2x_848xx_cmn_config_init(struct bnx2x_phy *phy,
 				 1);
 
 	return 0;
+#endif
 }
 
 static int bnx2x_8481_config_init(struct bnx2x_phy *phy,
 				  struct link_params *params,
 				  struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	/* Restore normal power mode*/
 	bnx2x_set_gpio(bp, MISC_REGISTERS_GPIO_2,
@@ -9896,6 +9982,7 @@ static int bnx2x_8481_config_init(struct bnx2x_phy *phy,
 
 	bnx2x_cl45_write(bp, phy, MDIO_PMA_DEVAD, MDIO_PMA_REG_CTRL, 1<<15);
 	return bnx2x_848xx_cmn_config_init(phy, params, vars);
+#endif
 }
 
 #define PHY84833_CMDHDLR_WAIT 300
@@ -9904,6 +9991,8 @@ static int bnx2x_84833_cmd_hdlr(struct bnx2x_phy *phy,
 				struct link_params *params, uint16_t fw_cmd,
 				uint16_t cmd_args[], int argc)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int idx;
 	uint16_t val;
 	struct bnx2x *bp = params->bp;
@@ -9954,12 +10043,15 @@ static int bnx2x_84833_cmd_hdlr(struct bnx2x_phy *phy,
 			MDIO_84833_CMD_HDLR_STATUS,
 			PHY84833_STATUS_CMD_CLEAR_COMPLETE);
 	return 0;
+#endif
 }
 
 static int bnx2x_84833_pair_swap_cfg(struct bnx2x_phy *phy,
 				   struct link_params *params,
 				   struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t pair_swap;
 	uint16_t data[PHY84833_CMDHDLR_MAX_ARGS];
 	int status;
@@ -9983,6 +10075,7 @@ static int bnx2x_84833_pair_swap_cfg(struct bnx2x_phy *phy,
 		DP(NETIF_MSG_LINK, "Pairswap OK, val=0x%x\n", data[1]);
 
 	return status;
+#endif
 }
 
 static uint8_t bnx2x_84833_get_reset_gpios(struct bnx2x *bp,
@@ -10100,6 +10193,8 @@ static int bnx2x_848x3_config_init(struct bnx2x_phy *phy,
 				   struct link_params *params,
 				   struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint8_t port, initialize = 1;
 	uint16_t val;
@@ -10260,12 +10355,15 @@ static int bnx2x_848x3_config_init(struct bnx2x_phy *phy,
 					  (uint16_t)~MDIO_84833_SUPER_ISOLATE);
 	}
 	return rc;
+#endif
 }
 
 static uint8_t bnx2x_848xx_read_status(struct bnx2x_phy *phy,
 				  struct link_params *params,
 				  struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint16_t val, val1, val2;
 	uint8_t link_up = 0;
@@ -10390,6 +10488,7 @@ static uint8_t bnx2x_848xx_read_status(struct bnx2x_phy *phy,
 	}
 
 	return link_up;
+#endif
 }
 
 static int bnx2x_848xx_format_ver(uint32_t raw_ver, uint8_t *str,
@@ -10414,10 +10513,13 @@ static void bnx2x_8481_hw_reset(struct bnx2x_phy *phy,
 static void bnx2x_8481_link_reset(struct bnx2x_phy *phy,
 					struct link_params *params)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	bnx2x_cl45_write(params->bp, phy,
 			 MDIO_AN_DEVAD, MDIO_AN_REG_CTRL, 0x0000);
 	bnx2x_cl45_write(params->bp, phy,
 			 MDIO_PMA_DEVAD, MDIO_PMA_REG_CTRL, 1);
+#endif
 }
 
 static void bnx2x_848x3_link_reset(struct bnx2x_phy *phy,
@@ -10756,6 +10858,8 @@ static int bnx2x_54618se_config_init(struct bnx2x_phy *phy,
 					       struct link_params *params,
 					       struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint8_t port;
 	uint16_t autoneg_val, an_1000_val, an_10_100_val, fc_val, temp;
@@ -10956,6 +11060,7 @@ static int bnx2x_54618se_config_init(struct bnx2x_phy *phy,
 			MDIO_PMA_REG_CTRL, autoneg_val);
 
 	return 0;
+#endif
 }
 
 
@@ -11025,6 +11130,8 @@ static uint8_t bnx2x_54618se_read_status(struct bnx2x_phy *phy,
 				    struct link_params *params,
 				    struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint16_t val;
 	uint8_t link_up = 0;
@@ -11126,6 +11233,7 @@ static uint8_t bnx2x_54618se_read_status(struct bnx2x_phy *phy,
 		}
 	}
 	return link_up;
+#endif
 }
 
 static void bnx2x_54618se_config_loopback(struct bnx2x_phy *phy,
@@ -11184,6 +11292,8 @@ static int bnx2x_7101_config_init(struct bnx2x_phy *phy,
 				  struct link_params *params,
 				  struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint16_t fw_ver1, fw_ver2, val;
 	struct bnx2x *bp = params->bp;
 	DP(NETIF_MSG_LINK, "Setting the SFX7101 LASI indication\n");
@@ -11219,12 +11329,15 @@ static int bnx2x_7101_config_init(struct bnx2x_phy *phy,
 				  (uint32_t)(fw_ver1<<16 | fw_ver2),
 				  phy->ver_addr);
 	return 0;
+#endif
 }
 
 static uint8_t bnx2x_7101_read_status(struct bnx2x_phy *phy,
 				 struct link_params *params,
 				 struct link_vars *vars)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = params->bp;
 	uint8_t link_up;
 	uint16_t val1, val2;
@@ -11259,6 +11372,7 @@ static uint8_t bnx2x_7101_read_status(struct bnx2x_phy *phy,
 				LINK_STATUS_LINK_PARTNER_10GXFD_CAPABLE;
 	}
 	return link_up;
+#endif
 }
 
 static int bnx2x_7101_format_ver(uint32_t spirom_ver, uint8_t *str,
@@ -11277,6 +11391,8 @@ static int bnx2x_7101_format_ver(uint32_t spirom_ver, uint8_t *str,
 
 void bnx2x_sfx7101_sp_sw_reset(struct bnx2x *bp, struct bnx2x_phy *phy)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint16_t val, cnt;
 
 	bnx2x_cl45_read(bp, phy,
@@ -11298,6 +11414,7 @@ void bnx2x_sfx7101_sp_sw_reset(struct bnx2x *bp, struct bnx2x_phy *phy)
 		if ((val & (1<<15)) == 0)
 			break;
 	}
+#endif
 }
 
 static void bnx2x_7101_hw_reset(struct bnx2x_phy *phy,

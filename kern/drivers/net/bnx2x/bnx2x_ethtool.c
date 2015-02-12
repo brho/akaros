@@ -1051,6 +1051,8 @@ static int bnx2x_get_dump_data(struct ether *dev,
 static void bnx2x_get_drvinfo(struct ether *dev,
 			      struct ethtool_drvinfo *info)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(dev);
 
 	strlcpy(info->driver, DRV_MODULE_NAME, sizeof(info->driver));
@@ -1063,6 +1065,7 @@ static void bnx2x_get_drvinfo(struct ether *dev,
 	info->testinfo_len = BNX2X_NUM_TESTS(bp);
 	info->eedump_len = bp->common.flash_size;
 	info->regdump_len = bnx2x_get_regs_len(dev);
+#endif
 }
 
 static void bnx2x_get_wol(struct ether *dev, struct ethtool_wolinfo *wol)
@@ -1390,6 +1393,8 @@ static int bnx2x_nvram_read32(struct bnx2x *bp, uint32_t offset,
 
 static bool bnx2x_is_nvm_accessible(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int rc = 1;
 	uint16_t pm = 0;
 	struct ether *dev = pci_get_drvdata(bp->pdev);
@@ -1403,6 +1408,7 @@ static bool bnx2x_is_nvm_accessible(struct bnx2x *bp)
 		return false;
 
 	return true;
+#endif
 }
 
 static int bnx2x_get_eeprom(struct ether *dev,
@@ -2383,6 +2389,8 @@ static void bnx2x_wait_for_link(struct bnx2x *bp, uint8_t link_up,
 
 static int bnx2x_run_loopback(struct bnx2x *bp, int loopback_mode)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	unsigned int pkt_size, num_pkts, i;
 	struct sk_buff *skb;
 	unsigned char *packet;
@@ -2583,6 +2591,7 @@ test_loopback_exit:
 	bp->link_params.loopback_mode = LOOPBACK_NONE;
 
 	return rc;
+#endif
 }
 
 static int bnx2x_test_loopback(struct bnx2x *bp)
@@ -3076,6 +3085,8 @@ static uint32_t bnx2x_get_private_flags(struct ether *dev)
 static void bnx2x_get_strings(struct ether *dev, uint32_t stringset,
 			      uint8_t *buf)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(dev);
 	int i, j, k, start;
 	char queue_name[MAX_QUEUE_NAME_LEN+1];
@@ -3121,6 +3132,7 @@ static void bnx2x_get_strings(struct ether *dev, uint32_t stringset,
 		       ETH_GSTRING_LEN * BNX2X_PRI_FLAG_LEN);
 		break;
 	}
+#endif
 }
 
 static void bnx2x_get_ethtool_stats(struct ether *dev,
@@ -3180,6 +3192,8 @@ static void bnx2x_get_ethtool_stats(struct ether *dev,
 static int bnx2x_set_phys_id(struct ether *dev,
 			     enum ethtool_phys_id_state state)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(dev);
 
 	if (!bnx2x_is_nvm_accessible(bp)) {
@@ -3215,10 +3229,13 @@ static int bnx2x_set_phys_id(struct ether *dev,
 	}
 
 	return 0;
+#endif
 }
 
 static int bnx2x_get_rss_flags(struct bnx2x *bp, struct ethtool_rxnfc *info)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	switch (info->flow_type) {
 	case TCP_V4_FLOW:
 	case TCP_V6_FLOW:
@@ -3249,6 +3266,7 @@ static int bnx2x_get_rss_flags(struct bnx2x *bp, struct ethtool_rxnfc *info)
 	}
 
 	return 0;
+#endif
 }
 
 static int bnx2x_get_rxnfc(struct ether *dev, struct ethtool_rxnfc *info,
@@ -3270,6 +3288,8 @@ static int bnx2x_get_rxnfc(struct ether *dev, struct ethtool_rxnfc *info,
 
 static int bnx2x_set_rss_flags(struct bnx2x *bp, struct ethtool_rxnfc *info)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int udp_rss_requested;
 
 	DP(BNX2X_MSG_ETHTOOL,
@@ -3346,6 +3366,7 @@ static int bnx2x_set_rss_flags(struct bnx2x *bp, struct ethtool_rxnfc *info)
 	default:
 		return -EINVAL;
 	}
+#endif
 }
 
 static int bnx2x_set_rxnfc(struct ether *dev, struct ethtool_rxnfc *info)

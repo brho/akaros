@@ -28,6 +28,8 @@ static int bnx2x_poll(struct napi_struct *napi, int budget);
 
 static void bnx2x_add_all_napi_cnic(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int i;
 
 	/* Add NAPI objects */
@@ -36,10 +38,13 @@ static void bnx2x_add_all_napi_cnic(struct bnx2x *bp)
 			       bnx2x_poll, NAPI_POLL_WEIGHT);
 		napi_hash_add(&bnx2x_fp(bp, i, napi));
 	}
+#endif
 }
 
 static void bnx2x_add_all_napi(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int i;
 
 	/* Add NAPI objects */
@@ -48,10 +53,13 @@ static void bnx2x_add_all_napi(struct bnx2x *bp)
 			       bnx2x_poll, NAPI_POLL_WEIGHT);
 		napi_hash_add(&bnx2x_fp(bp, i, napi));
 	}
+#endif
 }
 
 static int bnx2x_calc_num_queues(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int nq = bnx2x_num_queues ? : netif_get_num_default_rss_queues();
 
 	/* Reduce memory usage in kdump environment by using only one queue */
@@ -60,6 +68,7 @@ static int bnx2x_calc_num_queues(struct bnx2x *bp)
 
 	nq = CLAMP(nq, 1, BNX2X_MAX_QUEUES(bp));
 	return nq;
+#endif
 }
 
 /**
@@ -186,6 +195,8 @@ static uint16_t bnx2x_free_tx_pkt(struct bnx2x *bp, struct bnx2x_fp_txdata *txda
 			     uint16_t idx, unsigned int *pkts_compl,
 			     unsigned int *bytes_compl)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct sw_tx_bd *tx_buf = &txdata->tx_buf_ring[idx];
 	struct eth_tx_start_bd *tx_start_bd;
 	struct eth_tx_bd *tx_data_bd;
@@ -259,10 +270,13 @@ static uint16_t bnx2x_free_tx_pkt(struct bnx2x *bp, struct bnx2x_fp_txdata *txda
 	tx_buf->skb = NULL;
 
 	return new_cons;
+#endif
 }
 
 int bnx2x_tx_int(struct bnx2x *bp, struct bnx2x_fp_txdata *txdata)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct netdev_queue *txq;
 	uint16_t hw_cons, sw_cons, bd_cons = txdata->tx_bd_cons;
 	unsigned int pkts_compl = 0, bytes_compl = 0;
@@ -328,6 +342,7 @@ int bnx2x_tx_int(struct bnx2x *bp, struct bnx2x_fp_txdata *txdata)
 		__netif_tx_unlock(txq);
 	}
 	return 0;
+#endif
 }
 
 static inline void bnx2x_update_last_max_sge(struct bnx2x_fastpath *fp,
@@ -399,6 +414,8 @@ static uint32_t bnx2x_get_rxhash(const struct bnx2x *bp,
 			    const struct eth_fast_path_rx_cqe *cqe,
 			    enum pkt_hash_types *rxhash_type)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	/* Get Toeplitz hash from CQE */
 	if ((bp->dev->feat & NETIF_F_RXHASH) &&
 	    (cqe->status_flags & ETH_FAST_PATH_RX_CQE_RSS_HASH_FLG)) {
@@ -413,12 +430,15 @@ static uint32_t bnx2x_get_rxhash(const struct bnx2x *bp,
 	}
 	*rxhash_type = PKT_HASH_TYPE_NONE;
 	return 0;
+#endif
 }
 
 static void bnx2x_tpa_start(struct bnx2x_fastpath *fp, uint16_t queue,
 			    uint16_t cons, uint16_t prod,
 			    struct eth_fast_path_rx_cqe *cqe)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = fp->bp;
 	struct sw_rx_bd *cons_rx_buf = &fp->rx_buf_ring[cons];
 	struct sw_rx_bd *prod_rx_buf = &fp->rx_buf_ring[prod];
@@ -477,6 +497,7 @@ static void bnx2x_tpa_start(struct bnx2x_fastpath *fp, uint16_t queue,
 	DP(NETIF_MSG_RX_STATUS, "fp->tpa_queue_used = 0x%llx\n",
 	   fp->tpa_queue_used);
 #endif
+#endif
 }
 
 /* Timestamp option length allowed for TPA aggregation:
@@ -501,6 +522,8 @@ static void bnx2x_set_gro_params(struct sk_buff *skb, uint16_t parsing_flags,
 				 uint16_t len_on_bd, unsigned int pkt_len,
 				 uint16_t num_of_coalesced_segs)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	/* TPA aggregation won't have either IP options or TCP options
 	 * other than timestamp or IPv6 extension headers.
 	 */
@@ -529,6 +552,7 @@ static void bnx2x_set_gro_params(struct sk_buff *skb, uint16_t parsing_flags,
 	 * to skb_shinfo(skb)->gso_segs
 	 */
 	NAPI_GRO_CB(skb)->count = num_of_coalesced_segs;
+#endif
 }
 
 static int bnx2x_alloc_rx_sge(struct bnx2x *bp, struct bnx2x_fastpath *fp,
@@ -568,6 +592,8 @@ static int bnx2x_fill_frag_skb(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 			       struct eth_end_agg_rx_cqe *cqe,
 			       uint16_t cqe_idx)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct sw_rx_page *rx_pg, old_rx_pg;
 	uint32_t i, frag_len, frag_size;
 	int err, j, frag_id = 0;
@@ -649,6 +675,7 @@ static int bnx2x_fill_frag_skb(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 	}
 
 	return 0;
+#endif
 }
 
 static void bnx2x_frag_free(const struct bnx2x_fastpath *fp, void *data)
@@ -661,6 +688,8 @@ static void bnx2x_frag_free(const struct bnx2x_fastpath *fp, void *data)
 
 static void *bnx2x_frag_alloc(const struct bnx2x_fastpath *fp, gfp_t gfp_mask)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	if (fp->rx_frag_size) {
 		/* GFP_KERNEL allocations are used only during initialization */
 		if (unlikely(gfp_mask & KMALLOC_WAIT))
@@ -670,6 +699,7 @@ static void *bnx2x_frag_alloc(const struct bnx2x_fastpath *fp, gfp_t gfp_mask)
 	}
 
 	return kmalloc(fp->rx_buf_size + NET_SKB_PAD, gfp_mask);
+#endif
 }
 
 #ifdef CONFIG_INET
@@ -709,6 +739,8 @@ static void bnx2x_gro_csum(struct bnx2x *bp, struct sk_buff *skb,
 static void bnx2x_gro_receive(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 			       struct sk_buff *skb)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 #ifdef CONFIG_INET
 	if (skb_shinfo(skb)->gso_size) {
 		switch (be16_to_cpu(skb->protocol)) {
@@ -726,6 +758,7 @@ static void bnx2x_gro_receive(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 #endif
 	skb_record_rx_queue(skb, fp->rx_queue);
 	napi_gro_receive(&fp->napi, skb);
+#endif
 }
 
 static void bnx2x_tpa_stop(struct bnx2x *bp, struct bnx2x_fastpath *fp,
@@ -734,6 +767,8 @@ static void bnx2x_tpa_stop(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 			   struct eth_end_agg_rx_cqe *cqe,
 			   uint16_t cqe_idx)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct sw_rx_bd *rx_buf = &tpa_info->first_buf;
 	uint8_t pad = tpa_info->placement_offset;
 	uint16_t len = tpa_info->len_on_bd;
@@ -801,11 +836,14 @@ drop:
 	DP(NETIF_MSG_RX_STATUS,
 	   "Failed to allocate or map a new skb - dropping packet!\n");
 	bnx2x_fp_stats(bp, fp)->eth_q_stats.rx_skb_alloc_failed++;
+#endif
 }
 
 static int bnx2x_alloc_rx_data(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 			       uint16_t index, gfp_t gfp_mask)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint8_t *data;
 	struct sw_rx_bd *rx_buf = &fp->rx_buf_ring[index];
 	struct eth_rx_bd *rx_bd = &fp->rx_desc_ring[index];
@@ -831,6 +869,7 @@ static int bnx2x_alloc_rx_data(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 	rx_bd->addr_lo = cpu_to_le32(U64_LO(mapping));
 
 	return 0;
+#endif
 }
 
 static
@@ -838,6 +877,8 @@ void bnx2x_csum_validate(struct sk_buff *skb, union eth_rx_cqe *cqe,
 				 struct bnx2x_fastpath *fp,
 				 struct bnx2x_eth_q_stats *qstats)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	/* Do nothing if no L4 csum validation was done.
 	 * We do not check whether IP csum was validated. For IPv4 we assume
 	 * that if the card got as far as validating the L4 csum, it also
@@ -855,10 +896,13 @@ void bnx2x_csum_validate(struct sk_buff *skb, union eth_rx_cqe *cqe,
 		qstats->hw_csum_err++;
 	else
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
+#endif
 }
 
 static int bnx2x_rx_int(struct bnx2x_fastpath *fp, int budget)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = fp->bp;
 	uint16_t bd_cons, bd_prod, bd_prod_fw, comp_ring_cons;
 	uint16_t sw_comp_cons, sw_comp_prod;
@@ -1104,10 +1148,13 @@ next_cqe:
 	fp->rx_calls++;
 
 	return rx_pkt;
+#endif
 }
 
 static void bnx2x_msix_fp_int(struct hw_trapframe *hw_tf, void *fp_cookie)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x_fastpath *fp = fp_cookie;
 	struct bnx2x *bp = fp->bp;
 	uint8_t cos;
@@ -1131,6 +1178,7 @@ static void bnx2x_msix_fp_int(struct hw_trapframe *hw_tf, void *fp_cookie)
 	napi_schedule_irqoff(&bnx2x_fp(bp, fp->index, napi));
 
 	return;
+#endif
 }
 
 /* HW Lock for shared dual port PHYs */
@@ -1183,6 +1231,8 @@ uint16_t bnx2x_get_mf_speed(struct bnx2x *bp)
 static void bnx2x_fill_report_data(struct bnx2x *bp,
 				   struct bnx2x_link_report_data *data)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	memset(data, 0, sizeof(*data));
 
 	if (IS_PF(bp)) {
@@ -1215,6 +1265,7 @@ static void bnx2x_fill_report_data(struct bnx2x *bp,
 	} else { /* VF */
 		*data = bp->vf_link_vars;
 	}
+#endif
 }
 
 /**
@@ -1244,6 +1295,8 @@ void bnx2x_link_report(struct bnx2x *bp)
  */
 void __bnx2x_link_report(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x_link_report_data cur_data;
 
 	/* reread mf_cfg */
@@ -1310,6 +1363,7 @@ void __bnx2x_link_report(struct bnx2x *bp)
 		netdev_info(bp->dev, "NIC Link is Up, %d Mbps %s duplex, Flow control: %s\n",
 			    cur_data.line_speed, duplex, flow);
 	}
+#endif
 }
 
 static void bnx2x_set_next_page_sgl(struct bnx2x_fastpath *fp)
@@ -1467,6 +1521,8 @@ void bnx2x_init_rx_rings(struct bnx2x *bp)
 
 static void bnx2x_free_tx_skbs_queue(struct bnx2x_fastpath *fp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint8_t cos;
 	struct bnx2x *bp = fp->bp;
 
@@ -1487,6 +1543,7 @@ static void bnx2x_free_tx_skbs_queue(struct bnx2x_fastpath *fp)
 			netdev_get_tx_queue(bp->dev,
 					    txdata->txq_index));
 	}
+#endif
 }
 
 static void bnx2x_free_tx_skbs_cnic(struct bnx2x *bp)
@@ -1591,6 +1648,8 @@ void bnx2x_update_max_mf_config(struct bnx2x *bp, uint32_t value)
  */
 static void bnx2x_free_msix_irqs(struct bnx2x *bp, int nvecs)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int i, offset = 0;
 
 	if (nvecs == offset)
@@ -1618,10 +1677,13 @@ static void bnx2x_free_msix_irqs(struct bnx2x *bp, int nvecs)
 
 		free_irq(bp->msix_table[offset++].vector, &bp->fp[i]);
 	}
+#endif
 }
 
 void bnx2x_free_irq(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	if (bp->flags & USING_MSIX_FLAG &&
 	    !(bp->flags & USING_SINGLE_MSIX_FLAG)) {
 		int nvecs = BNX2X_NUM_ETH_QUEUES(bp) + CNIC_SUPPORT(bp);
@@ -1634,12 +1696,14 @@ void bnx2x_free_irq(struct bnx2x *bp)
 	} else {
 		free_irq(bp->dev->irq, bp->dev);
 	}
+#endif
 }
 
 int bnx2x_enable_msix(struct bnx2x *bp)
 {
 	int msix_vec = 0, i, rc;
-
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	/* VFs don't have a default status block */
 	if (IS_PF(bp)) {
 		bp->msix_table[msix_vec].entry = msix_vec;
@@ -1717,10 +1781,13 @@ no_msix:
 		bp->flags |= DISABLE_MSI_FLAG;
 
 	return rc;
+#endif
 }
 
 static int bnx2x_req_msix_irqs(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int i, rc, offset = 0;
 
 	/* no default status block for vf */
@@ -1770,10 +1837,13 @@ static int bnx2x_req_msix_irqs(struct bnx2x *bp)
 			    i - 1, bp->msix_table[offset + i - 1].vector);
 	}
 	return 0;
+#endif
 }
 
 int bnx2x_enable_msi(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int rc;
 
 	rc = pci_enable_msi(bp->pdev);
@@ -1784,11 +1854,14 @@ int bnx2x_enable_msi(struct bnx2x *bp)
 	bp->flags |= USING_MSI_FLAG;
 
 	return 0;
+#endif
 }
 
 static int bnx2x_req_irq(struct bnx2x *bp)
 {
 	unsigned long flags;
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	unsigned int irq;
 
 	if (bp->flags & (USING_MSI_FLAG | USING_MSIX_FLAG))
@@ -1803,11 +1876,14 @@ static int bnx2x_req_irq(struct bnx2x *bp)
 
 	return register_irq(irq, bnx2x_interrupt, bp->dev,
 			    pci_to_tbdf(bp->pdev));
+#endif
 }
 
 static int bnx2x_setup_irqs(struct bnx2x *bp)
 {
 	int rc = 0;
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	if (bp->flags & USING_MSIX_FLAG &&
 	    !(bp->flags & USING_SINGLE_MSIX_FLAG)) {
 		rc = bnx2x_req_msix_irqs(bp);
@@ -1832,30 +1908,39 @@ static int bnx2x_setup_irqs(struct bnx2x *bp)
 	}
 
 	return 0;
+#endif
 }
 
 static void bnx2x_napi_enable_cnic(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int i;
 
 	for_each_rx_queue_cnic(bp, i) {
 		bnx2x_fp_init_lock(&bp->fp[i]);
 		napi_enable(&bnx2x_fp(bp, i, napi));
 	}
+#endif
 }
 
 static void bnx2x_napi_enable(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int i;
 
 	for_each_eth_queue(bp, i) {
 		bnx2x_fp_init_lock(&bp->fp[i]);
 		napi_enable(&bnx2x_fp(bp, i, napi));
 	}
+#endif
 }
 
 static void bnx2x_napi_disable_cnic(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int i;
 
 	for_each_rx_queue_cnic(bp, i) {
@@ -1863,10 +1948,13 @@ static void bnx2x_napi_disable_cnic(struct bnx2x *bp)
 		while (!bnx2x_fp_ll_disable(&bp->fp[i]))
 			kthread_usleep(1000);
 	}
+#endif
 }
 
 static void bnx2x_napi_disable(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int i;
 
 	for_each_eth_queue(bp, i) {
@@ -1874,10 +1962,13 @@ static void bnx2x_napi_disable(struct bnx2x *bp)
 		while (!bnx2x_fp_ll_disable(&bp->fp[i]))
 			kthread_usleep(1000);
 	}
+#endif
 }
 
 void bnx2x_netif_start(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	if (netif_running(bp->dev)) {
 		bnx2x_napi_enable(bp);
 		if (CNIC_LOADED(bp))
@@ -1886,6 +1977,7 @@ void bnx2x_netif_start(struct bnx2x *bp)
 		if (bp->state == BNX2X_STATE_OPEN)
 			netif_tx_wake_all_queues(bp->dev);
 	}
+#endif
 }
 
 void bnx2x_netif_stop(struct bnx2x *bp, int disable_hw)
@@ -1899,6 +1991,8 @@ void bnx2x_netif_stop(struct bnx2x *bp, int disable_hw)
 uint16_t bnx2x_select_queue(struct ether *dev, struct sk_buff *skb,
 		       void *accel_priv, select_queue_fallback_t fallback)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(dev);
 
 	if (CNIC_LOADED(bp) && !NO_FCOE(bp)) {
@@ -1920,10 +2014,13 @@ uint16_t bnx2x_select_queue(struct ether *dev, struct sk_buff *skb,
 
 	/* select a non-FCoE queue */
 	return fallback(dev, skb) % BNX2X_NUM_ETH_QUEUES(bp);
+#endif
 }
 
 void bnx2x_set_num_queues(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	/* RSS queues */
 	bp->num_ethernet_queues = bnx2x_calc_num_queues(bp);
 
@@ -1936,6 +2033,7 @@ void bnx2x_set_num_queues(struct bnx2x *bp)
 	bp->num_queues = bp->num_ethernet_queues + bp->num_cnic_queues;
 
 	BNX2X_DEV_INFO("set number of queues to %d\n", bp->num_queues);
+#endif
 }
 
 /**
@@ -1962,6 +2060,8 @@ void bnx2x_set_num_queues(struct bnx2x *bp)
  */
 static int bnx2x_set_real_num_queues(struct bnx2x *bp, int include_cnic)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int rc, tx, rx;
 
 	tx = BNX2X_NUM_ETH_QUEUES(bp) * bp->max_cos;
@@ -1988,10 +2088,13 @@ static int bnx2x_set_real_num_queues(struct bnx2x *bp, int include_cnic)
 			  tx, rx);
 
 	return rc;
+#endif
 }
 
 static void bnx2x_set_rx_buf_size(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int i;
 
 	for_each_queue(bp, i) {
@@ -2020,10 +2123,13 @@ static void bnx2x_set_rx_buf_size(struct bnx2x *bp)
 		else
 			fp->rx_frag_size = 0;
 	}
+#endif
 }
 
 static int bnx2x_init_rss(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int i;
 	uint8_t num_eth_queues = BNX2X_NUM_ETH_QUEUES(bp);
 
@@ -2044,11 +2150,14 @@ static int bnx2x_init_rss(struct bnx2x *bp)
 	 * configuration.
 	 */
 	return bnx2x_config_rss_eth(bp, bp->port.pmf || !CHIP_IS_E1x(bp));
+#endif
 }
 
 int bnx2x_rss(struct bnx2x *bp, struct bnx2x_rss_config_obj *rss_obj,
 	      bool config_hash, bool enable)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x_config_rss_params params = {NULL};
 
 	/* Although RSS is meaningless when there is a single HW queue we
@@ -2097,6 +2206,7 @@ int bnx2x_rss(struct bnx2x *bp, struct bnx2x_rss_config_obj *rss_obj,
 		return bnx2x_config_rss(bp, &params);
 	else
 		return bnx2x_vfpf_config_rss(bp, &params);
+#endif
 }
 
 static int bnx2x_init_hw(struct bnx2x *bp, uint32_t load_code)
@@ -2292,6 +2402,8 @@ alloc_mem_err:
 /* send load request to mcp and analyze response */
 static int bnx2x_nic_load_request(struct bnx2x *bp, uint32_t *load_code)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t param;
 
 	/* init fw_seq */
@@ -2328,6 +2440,7 @@ static int bnx2x_nic_load_request(struct bnx2x *bp, uint32_t *load_code)
 		return -EBUSY;
 	}
 	return 0;
+#endif
 }
 
 /* check whether another PF has already loaded FW to chip. In
@@ -2337,6 +2450,8 @@ static int bnx2x_nic_load_request(struct bnx2x *bp, uint32_t *load_code)
 int bnx2x_compare_fw_ver(struct bnx2x *bp, uint32_t load_code,
 			 bool print_err)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	/* is another pf loaded on this engine? */
 	if (load_code != FW_MSG_CODE_DRV_LOAD_COMMON_CHIP &&
 	    load_code != FW_MSG_CODE_DRV_LOAD_COMMON) {
@@ -2364,6 +2479,7 @@ int bnx2x_compare_fw_ver(struct bnx2x *bp, uint32_t load_code,
 		}
 	}
 	return 0;
+#endif
 }
 
 /* returns the "mcp load_code" according to global load_count array */
@@ -2571,8 +2687,11 @@ load_error_cnic0:
 /* must be called with rtnl_lock */
 int bnx2x_nic_load(struct bnx2x *bp, int load_mode)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int port = BP_PORT(bp);
-	int i, rc = 0, load_code = 0;
+	int i, rc = 0;
+	uint32_t load_code = 0;
 
 	DP(NETIF_MSG_IFUP, "Starting NIC load\n");
 	DP(NETIF_MSG_IFUP,
@@ -2774,11 +2893,14 @@ int bnx2x_nic_load(struct bnx2x *bp, int load_mode)
 	bp->state = BNX2X_STATE_OPEN;
 
 	/* Configure a ucast MAC */
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	if (IS_PF(bp))
 		rc = bnx2x_set_eth_mac(bp, true);
 	else /* vf */
 		rc = bnx2x_vfpf_config_mac(bp, bp->dev->dev_addr, bp->fp->index,
 					   true);
+#endif
 	if (rc) {
 		BNX2X_ERR("Setting Ethernet MAC failed\n");
 		LOAD_ERROR_EXIT(bp, load_error3);
@@ -2897,6 +3019,7 @@ load_error0:
 
 	return rc;
 #endif /* ! BNX2X_STOP_ON_ERROR */
+#endif
 }
 
 int bnx2x_drain_tx_queues(struct bnx2x *bp)
@@ -2918,6 +3041,8 @@ int bnx2x_drain_tx_queues(struct bnx2x *bp)
 /* must be called with rtnl_lock */
 int bnx2x_nic_unload(struct bnx2x *bp, int unload_mode, bool keep_link)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int i;
 	bool global = false;
 
@@ -3088,11 +3213,14 @@ int bnx2x_nic_unload(struct bnx2x *bp, int unload_mode, bool keep_link)
 	DP(NETIF_MSG_IFUP, "Ending NIC unload\n");
 
 	return 0;
+#endif
 }
 
 int bnx2x_set_power_state(struct bnx2x *bp, pci_power_t state)
 {
 	uint16_t pmcsr;
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 
 	/* If there is no power capability, silently succeed */
 	if (!bp->pdev->pm_cap) {
@@ -3141,6 +3269,7 @@ int bnx2x_set_power_state(struct bnx2x *bp, pci_power_t state)
 		return -EINVAL;
 	}
 	return 0;
+#endif
 }
 
 /*
@@ -3148,6 +3277,8 @@ int bnx2x_set_power_state(struct bnx2x *bp, pci_power_t state)
  */
 static int bnx2x_poll(struct napi_struct *napi, int budget)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int work_done = 0;
 	uint8_t cos;
 	struct bnx2x_fastpath *fp = container_of(napi, struct bnx2x_fastpath,
@@ -3220,6 +3351,7 @@ static int bnx2x_poll(struct napi_struct *napi, int budget)
 	}
 
 	return work_done;
+#endif
 }
 
 #ifdef CONFIG_NET_RX_BUSY_POLL
@@ -3299,6 +3431,8 @@ static uint16_t bnx2x_tx_split(struct bnx2x *bp,
 static __le16 bnx2x_csum_fix(unsigned char *t_header, uint16_t csum,
 			     int8_t fix)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	__sum16 tsum = (__force __sum16) csum;
 
 	if (fix > 0)
@@ -3310,10 +3444,13 @@ static __le16 bnx2x_csum_fix(unsigned char *t_header, uint16_t csum,
 				  csum_partial(t_header, -fix, 0)));
 
 	return bswab16(tsum);
+#endif
 }
 
 static uint32_t bnx2x_xmit_type(struct bnx2x *bp, struct sk_buff *skb)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t rc;
 	__u8 prot = 0;
 	__be16 protocol;
@@ -3357,6 +3494,7 @@ static uint32_t bnx2x_xmit_type(struct bnx2x *bp, struct sk_buff *skb)
 	}
 
 	return rc;
+#endif
 }
 
 #if (MAX_SKB_FRAGS >= MAX_FETCH_BD - 3)
@@ -3366,6 +3504,8 @@ static uint32_t bnx2x_xmit_type(struct bnx2x *bp, struct sk_buff *skb)
 static int bnx2x_pkt_req_lin(struct bnx2x *bp, struct sk_buff *skb,
 			     uint32_t xmit_type)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int to_copy = 0;
 	int hlen = 0;
 	int first_bd_sz = 0;
@@ -3436,6 +3576,7 @@ exit_lbl:
 		   skb_shinfo(skb)->nr_frags, hlen, first_bd_sz);
 
 	return to_copy;
+#endif
 }
 #endif
 
@@ -3450,6 +3591,8 @@ static void bnx2x_set_pbd_gso(struct sk_buff *skb,
 			      struct eth_tx_parse_bd_e1x *pbd,
 			      uint32_t xmit_type)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	pbd->lso_mss = cpu_to_le16(skb_shinfo(skb)->gso_size);
 	pbd->tcp_send_seq = bswab32(tcp_hdr(skb)->seq);
 	pbd->tcp_flags = pbd_tcp_flags(tcp_hdr(skb));
@@ -3469,6 +3612,7 @@ static void bnx2x_set_pbd_gso(struct sk_buff *skb,
 
 	pbd->global_data |=
 		cpu_to_le16(ETH_TX_PARSE_BD_E1X_PSEUDO_CS_WITHOUT_LEN);
+#endif
 }
 
 /**
@@ -3484,6 +3628,8 @@ static void bnx2x_set_pbd_gso(struct sk_buff *skb,
 static uint8_t bnx2x_set_pbd_csum_enc(struct bnx2x *bp, struct sk_buff *skb,
 				 uint32_t *parsing_data, uint32_t xmit_type)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	*parsing_data |=
 		((((uint8_t *)skb_inner_transport_header(skb) - skb->data) >> 1) <<
 		ETH_TX_PARSE_BD_E2_L4_HDR_START_OFFSET_W_SHIFT) &
@@ -3503,6 +3649,7 @@ static uint8_t bnx2x_set_pbd_csum_enc(struct bnx2x *bp, struct sk_buff *skb,
 	 */
 	return skb_inner_transport_header(skb) +
 		sizeof(struct udphdr) - skb->data;
+#endif
 }
 
 /**
@@ -3518,6 +3665,8 @@ static uint8_t bnx2x_set_pbd_csum_enc(struct bnx2x *bp, struct sk_buff *skb,
 static uint8_t bnx2x_set_pbd_csum_e2(struct bnx2x *bp, struct sk_buff *skb,
 				uint32_t *parsing_data, uint32_t xmit_type)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	*parsing_data |=
 		((((uint8_t *)skb_transport_header(skb) - skb->data) >> 1) <<
 		ETH_TX_PARSE_BD_E2_L4_HDR_START_OFFSET_W_SHIFT) &
@@ -3534,6 +3683,7 @@ static uint8_t bnx2x_set_pbd_csum_e2(struct bnx2x *bp, struct sk_buff *skb,
 	 * No need to pass the UDP header length - it's a constant.
 	 */
 	return skb_transport_header(skb) + sizeof(struct udphdr) - skb->data;
+#endif
 }
 
 /* set FW indication according to inner or outer protocols if tunneled */
@@ -3562,6 +3712,8 @@ static uint8_t bnx2x_set_pbd_csum(struct bnx2x *bp, struct sk_buff *skb,
 			     struct eth_tx_parse_bd_e1x *pbd,
 			     uint32_t xmit_type)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint8_t hlen = (skb_network_header(skb) - skb->data) >> 1;
 
 	/* for now NS flag is not used in Linux */
@@ -3604,6 +3756,7 @@ static uint8_t bnx2x_set_pbd_csum(struct bnx2x *bp, struct sk_buff *skb,
 	}
 
 	return hlen;
+#endif
 }
 
 static void bnx2x_update_pbds_gso_enc(struct sk_buff *skb,
@@ -3612,6 +3765,8 @@ static void bnx2x_update_pbds_gso_enc(struct sk_buff *skb,
 				      uint16_t *global_data,
 				      uint32_t xmit_type)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint16_t hlen_w = 0;
 	uint8_t outerip_off, outerip_len = 0;
 
@@ -3676,12 +3831,15 @@ static void bnx2x_update_pbds_gso_enc(struct sk_buff *skb,
 		SET_FLAG(*global_data, ETH_TX_PARSE_2ND_BD_TUNNEL_UDP_EXIST, 1);
 		pbd2->tunnel_udp_hdr_start_w = skb_transport_offset(skb) >> 1;
 	}
+#endif
 }
 
 static inline void bnx2x_set_ipv6_ext_e2(struct sk_buff *skb,
 					 uint32_t *parsing_data,
 					 uint32_t xmit_type)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct ipv6hdr *ipv6;
 
 	if (!(xmit_type & (XMIT_GSO_ENC_V6 | XMIT_GSO_V6)))
@@ -3694,6 +3852,7 @@ static inline void bnx2x_set_ipv6_ext_e2(struct sk_buff *skb,
 
 	if (ipv6->nexthdr == NEXTHDR_IPV6)
 		*parsing_data |= ETH_TX_PARSE_BD_E2_IPV6_WITH_EXT_HDR;
+#endif
 }
 
 /* called with netif_tx_lock
@@ -3702,6 +3861,8 @@ static inline void bnx2x_set_ipv6_ext_e2(struct sk_buff *skb,
  */
 netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct ether *dev)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(dev);
 
 	struct netdev_queue *txq;
@@ -4131,6 +4292,7 @@ netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct ether *dev)
 	txdata->tx_pkt++;
 
 	return NETDEV_TX_OK;
+#endif
 }
 
 /**
@@ -4143,6 +4305,8 @@ netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct ether *dev)
  */
 int bnx2x_setup_tc(struct ether *dev, uint8_t num_tc)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int cos, prio, count, offset;
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -4197,11 +4361,14 @@ int bnx2x_setup_tc(struct ether *dev, uint8_t num_tc)
 	}
 
 	return 0;
+#endif
 }
 
 /* called with rtnl_lock */
 int bnx2x_change_mac_addr(struct ether *dev, void *p)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct sockaddr *addr = p;
 	struct bnx2x *bp = netdev_priv(dev);
 	int rc = 0;
@@ -4228,6 +4395,7 @@ int bnx2x_change_mac_addr(struct ether *dev, void *p)
 		rc = bnx2x_set_eth_mac(bp, true);
 
 	return rc;
+#endif
 }
 
 static void bnx2x_free_fp_mem_at(struct bnx2x *bp, int fp_index)
@@ -4597,6 +4765,8 @@ void bnx2x_free_mem_bp(struct bnx2x *bp)
 
 int bnx2x_alloc_mem_bp(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x_fastpath *fp;
 	struct msix_entry *tbl;
 	struct bnx2x_ilt *ilt;
@@ -4669,10 +4839,13 @@ int bnx2x_alloc_mem_bp(struct bnx2x *bp)
 alloc_err:
 	bnx2x_free_mem_bp(bp);
 	return -ENOMEM;
+#endif
 }
 
 int bnx2x_reload_if_running(struct ether *dev)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(dev);
 
 	if (unlikely(!netif_running(dev)))
@@ -4680,10 +4853,13 @@ int bnx2x_reload_if_running(struct ether *dev)
 
 	bnx2x_nic_unload(bp, UNLOAD_NORMAL, true);
 	return bnx2x_nic_load(bp, LOAD_NORMAL);
+#endif
 }
 
 int bnx2x_get_cur_phy_idx(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t sel_phy_idx = 0;
 	if (bp->link_params.num_phys <= 1)
 		return INT_PHY;
@@ -4710,6 +4886,7 @@ int bnx2x_get_cur_phy_idx(struct bnx2x *bp)
 	}
 
 	return sel_phy_idx;
+#endif
 }
 int bnx2x_get_link_cfg_idx(struct bnx2x *bp)
 {
@@ -4865,6 +5042,8 @@ void bnx2x_tx_timeout(struct ether *dev)
 
 int bnx2x_suspend(struct pci_device *pdev, pm_message_t state)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct ether *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp;
 
@@ -4892,10 +5071,13 @@ int bnx2x_suspend(struct pci_device *pdev, pm_message_t state)
 	rtnl_unlock();
 
 	return 0;
+#endif
 }
 
 int bnx2x_resume(struct pci_device *pdev)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct ether *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp;
 	int rc;
@@ -4928,6 +5110,7 @@ int bnx2x_resume(struct pci_device *pdev)
 	rtnl_unlock();
 
 	return rc;
+#endif
 }
 
 void bnx2x_set_ctx_validation(struct bnx2x *bp, struct eth_context *cxt,

@@ -1373,10 +1373,13 @@ int bnx2x_send_final_clnup(struct bnx2x *bp, uint8_t clnup_func,
 
 uint8_t bnx2x_is_pcie_pending(struct pci_device *dev)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint16_t status;
 
 	pcie_capability_read_word(dev, PCI_EXP_DEVSTA, &status);
 	return status & PCI_EXP_DEVSTA_TRPND;
+#endif
 }
 
 /* PF FLR specific routines
@@ -1571,6 +1574,8 @@ static void bnx2x_hc_int_enable(struct bnx2x *bp)
 
 static void bnx2x_igu_int_enable(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t val;
 	bool msix = (bp->flags & USING_MSIX_FLAG) ? true : false;
 	bool single_msix = (bp->flags & USING_SINGLE_MSIX_FLAG) ? true : false;
@@ -1630,6 +1635,7 @@ static void bnx2x_igu_int_enable(struct bnx2x *bp)
 
 	/* Make sure that interrupts are indeed enabled from here on */
 	bus_wmb();
+#endif
 }
 
 void bnx2x_int_enable(struct bnx2x *bp)
@@ -1867,6 +1873,8 @@ void bnx2x_sp_event(struct bnx2x_fastpath *fp, union eth_rx_cqe *rr_cqe)
 
 void bnx2x_interrupt(struct hw_trapframe *hw_tf, void *dev_instance)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(dev_instance);
 	uint16_t status = bnx2x_ack_int(bp);
 	uint16_t mask;
@@ -1932,6 +1940,7 @@ void bnx2x_interrupt(struct hw_trapframe *hw_tf, void *dev_instance)
 		   status);
 
 	return;
+#endif
 }
 
 /* Link */
@@ -2250,6 +2259,8 @@ static int bnx2x_set_spio(struct bnx2x *bp, int spio, uint32_t mode)
 
 void bnx2x_calc_fc_adv(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint8_t cfg_idx = bnx2x_get_link_cfg_idx(bp);
 	switch (bp->link_vars.ieee_fc &
 		MDIO_COMBO_IEEE0_AUTO_NEG_ADV_PAUSE_MASK) {
@@ -2272,6 +2283,7 @@ void bnx2x_calc_fc_adv(struct bnx2x *bp)
 						   ADVERTISED_Pause);
 		break;
 	}
+#endif
 }
 
 static void bnx2x_set_requested_fc(struct bnx2x *bp)
@@ -2630,6 +2642,8 @@ static void bnx2x_link_attn(struct bnx2x *bp)
 
 void bnx2x__link_status_update(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	if (bp->state != BNX2X_STATE_OPEN)
 		return;
 
@@ -2685,6 +2699,7 @@ void bnx2x__link_status_update(struct bnx2x *bp)
 		 */
 		bnx2x_stats_handle(bp, STATS_EVENT_LINK_UP);
 	}
+#endif
 }
 
 static int bnx2x_afex_func_update(struct bnx2x *bp, uint16_t vifid,
@@ -2753,6 +2768,8 @@ static int bnx2x_afex_handle_vif_list_cmd(struct bnx2x *bp, uint8_t cmd_type,
 
 static void bnx2x_handle_afex_cmd(struct bnx2x *bp, uint32_t cmd)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct afex_stats afex_stats;
 	uint32_t func = BP_ABS_FUNC(bp);
 	uint32_t mf_config;
@@ -2871,6 +2888,7 @@ static void bnx2x_handle_afex_cmd(struct bnx2x *bp, uint32_t cmd)
 			bp->afex_def_vlan_tag = -1;
 		}
 	}
+#endif
 }
 
 static void bnx2x_handle_update_svid_cmd(struct bnx2x *bp)
@@ -3139,6 +3157,8 @@ static void bnx2x_pf_rx_q_prep(struct bnx2x *bp,
 	struct bnx2x_fastpath *fp, struct rxq_pause_params *pause,
 	struct bnx2x_rxq_setup_params *rxq_init)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint8_t max_sge = 0;
 	uint16_t sge_sz = 0;
 	uint16_t tpa_agg_size = 0;
@@ -3221,6 +3241,7 @@ static void bnx2x_pf_rx_q_prep(struct bnx2x *bp,
 		rxq_init->silent_removal_value = bp->afex_def_vlan_tag;
 		rxq_init->silent_removal_mask = VLAN_VID_MASK;
 	}
+#endif
 }
 
 static void bnx2x_pf_tx_q_prep(struct bnx2x *bp,
@@ -3316,6 +3337,8 @@ static void bnx2x_e1h_disable(struct bnx2x *bp)
 
 static void bnx2x_e1h_enable(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int port = BP_PORT(bp);
 
 	if (!(IS_MF_UFP(bp) && BNX2X_IS_MF_SD_PROTOCOL_FCOE(bp)))
@@ -3328,12 +3351,15 @@ static void bnx2x_e1h_enable(struct bnx2x *bp)
 	 * Should not call netif_carrier_on since it will be called if the link
 	 * is up when checking for link state
 	 */
+#endif
 }
 
 #define DRV_INFO_ETH_STAT_NUM_MACS_REQUIRED 3
 
 static void bnx2x_drv_info_ether_stat(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct eth_stats_info *ether_stat =
 		&bp->slowpath->drv_info_to_mcp.ether_stat;
 	struct bnx2x_vlan_mac_obj *mac_obj =
@@ -3365,13 +3391,16 @@ static void bnx2x_drv_info_ether_stat(struct bnx2x *bp)
 		ether_stat->feature_flags |= FEATURE_ETH_LSO_MASK;
 	ether_stat->feature_flags |= bp->common.boot_mode;
 
+#if 0 // AKAROS_PORT
 	ether_stat->promiscuous_mode = (bp->dev->flags & IFF_PROMISC) ? 1 : 0;
+#endif
 
 	ether_stat->txq_size = bp->tx_ring_size;
 	ether_stat->rxq_size = bp->rx_ring_size;
 
 #ifdef CONFIG_BNX2X_SRIOV
 	ether_stat->vf_cnt = IS_SRIOV(bp) ? bp->vfdb->sriov.nr_virtfn : 0;
+#endif
 #endif
 }
 
@@ -3608,6 +3637,8 @@ out:
 static uint32_t bnx2x_update_mng_version_utility(uint8_t *version,
 					    bool bnx2x_format)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint8_t vals[4];
 	int i = 0;
 
@@ -3625,10 +3656,13 @@ static uint32_t bnx2x_update_mng_version_utility(uint8_t *version,
 		vals[i++] = 0;
 
 	return (vals[0] << 24) | (vals[1] << 16) | (vals[2] << 8) | vals[3];
+#endif
 }
 
 void bnx2x_update_mng_version(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t iscsiver = DRV_VER_NOT_LOADED;
 	uint32_t fcoever = DRV_VER_NOT_LOADED;
 	uint32_t ethver = DRV_VER_NOT_LOADED;
@@ -3673,6 +3707,7 @@ out:
 
 	DP(BNX2X_MSG_MCP, "Setting driver version: ETH [%08x] iSCSI [%08x] FCoE [%08x]\n",
 	   ethver, iscsiver, fcoever);
+#endif
 }
 
 static void bnx2x_oem_event(struct bnx2x *bp, uint32_t event)
@@ -5295,6 +5330,8 @@ static void bnx2x_after_afex_vif_lists(struct bnx2x *bp,
 /* called with rtnl_lock */
 static void bnx2x_after_function_update(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int q, rc;
 	struct bnx2x_fastpath *fp;
 	struct bnx2x_queue_state_params queue_params = {NULL};
@@ -5355,6 +5392,7 @@ static void bnx2x_after_function_update(struct bnx2x *bp)
 		bnx2x_link_report(bp);
 		bnx2x_fw_command(bp, DRV_MSG_CODE_AFEX_VIFSET_ACK, 0);
 	}
+#endif
 }
 
 static struct bnx2x_queue_sp_obj *bnx2x_cid_to_q_obj(
@@ -5370,6 +5408,8 @@ static struct bnx2x_queue_sp_obj *bnx2x_cid_to_q_obj(
 
 static void bnx2x_eq_int(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint16_t hw_cons, sw_cons, sw_prod;
 	union event_ring_elem *elem;
 	uint8_t echo;
@@ -5587,10 +5627,13 @@ next_spqe:
 
 	/* update producer */
 	bnx2x_update_eq_prod(bp, bp->eq_prod);
+#endif
 }
 
 static void bnx2x_sp_task(struct work_struct *work)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = container_of(work, struct bnx2x, sp_task.work);
 
 	DP(BNX2X_MSG_SP, "sp task invoked\n");
@@ -5650,6 +5693,7 @@ static void bnx2x_sp_task(struct work_struct *work)
 		bnx2x_link_report(bp);
 		bnx2x_fw_command(bp, DRV_MSG_CODE_AFEX_VIFSET_ACK, 0);
 	}
+#endif
 }
 
 void bnx2x_msix_sp_int(struct hw_trapframe *hw_tf, void *dev_instance)
@@ -5693,6 +5737,8 @@ void bnx2x_drv_pulse(struct bnx2x *bp)
 
 static void bnx2x_timer(unsigned long data)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = (struct bnx2x *) data;
 
 	if (!netif_running(bp->dev))
@@ -5729,6 +5775,7 @@ static void bnx2x_timer(unsigned long data)
 		bnx2x_timer_sriov(bp);
 
 	mod_timer(&bp->timer, jiffies + bp->current_interval);
+#endif
 }
 
 /* end of Statistics */
@@ -5841,6 +5888,8 @@ static void bnx2x_setup_ndsb_state_machine(struct hc_status_block_sm *hc_sm,
 /* allocates state machine ids. */
 static void bnx2x_map_sb_state_machines(struct hc_index_data *index_data)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	/* zero out state machine indices */
 	/* rx indices */
 	index_data[HC_INDEX_ETH_RX_CQ_CONS].flags &= ~HC_INDEX_DATA_SM_ID;
@@ -5865,6 +5914,7 @@ static void bnx2x_map_sb_state_machines(struct hc_index_data *index_data)
 		SM_TX_ID << HC_INDEX_DATA_SM_ID_SHIFT;
 	index_data[HC_INDEX_ETH_TX_CQ_CONS_COS2].flags |=
 		SM_TX_ID << HC_INDEX_DATA_SM_ID_SHIFT;
+#endif
 }
 
 void bnx2x_init_sb(struct bnx2x *bp, dma_addr_t mapping, int vfid,
@@ -6367,6 +6417,8 @@ static void bnx2x_init_tx_rings(struct bnx2x *bp)
 
 static void bnx2x_init_fcoe_fp(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x_fastpath *fp = bnx2x_fcoe_fp(bp);
 	unsigned long q_type = 0;
 
@@ -6404,6 +6456,7 @@ static void bnx2x_init_fcoe_fp(struct bnx2x *bp)
 	   "queue[%d]: bnx2x_init_sb(%p,%p) cl_id %d fw_sb %d igu_sb %d\n",
 	   fp->index, bp, fp->status_blk.e2_sb, fp->cl_id, fp->fw_sb_id,
 	   fp->igu_sb_id);
+#endif
 }
 
 void bnx2x_nic_init_cnic(struct bnx2x *bp)
@@ -6475,6 +6528,8 @@ void bnx2x_post_irq_nic_init(struct bnx2x *bp, uint32_t load_code)
 /* gzip service functions */
 static int bnx2x_gunzip_init(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	bp->gunzip_buf = dma_alloc_coherent(&bp->pdev->dev, FW_BUF_SIZE,
 					    &bp->gunzip_mapping, KMALLOC_WAIT);
 	if (bp->gunzip_buf  == NULL)
@@ -6502,10 +6557,13 @@ gunzip_nomem2:
 gunzip_nomem1:
 	BNX2X_ERR("Cannot allocate firmware buffer for un-compression\n");
 	return -ENOMEM;
+#endif
 }
 
 static void bnx2x_gunzip_end(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	if (bp->strm) {
 		vfree(bp->strm->workspace);
 		kfree(bp->strm);
@@ -6517,10 +6575,13 @@ static void bnx2x_gunzip_end(struct bnx2x *bp)
 				  bp->gunzip_mapping);
 		bp->gunzip_buf = NULL;
 	}
+#endif
 }
 
 static int bnx2x_gunzip(struct bnx2x *bp, const uint8_t *zbuf, int len)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int n, rc;
 
 	/* check gzip header */
@@ -6563,6 +6624,7 @@ static int bnx2x_gunzip(struct bnx2x *bp, const uint8_t *zbuf, int len)
 		return 0;
 
 	return rc;
+#endif
 }
 
 /* nic load/unload */
@@ -6822,6 +6884,8 @@ static void bnx2x_setup_dmae(struct bnx2x *bp)
 
 static void bnx2x_init_pxp(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint16_t devctl;
 	int r_order, w_order;
 
@@ -6836,6 +6900,7 @@ static void bnx2x_init_pxp(struct bnx2x *bp)
 	}
 
 	bnx2x_init_pxp_arb(bp, r_order, w_order);
+#endif
 }
 
 static void bnx2x_setup_fan_failure_detection(struct bnx2x *bp)
@@ -6957,6 +7022,8 @@ static void bnx2x_reset_endianity(struct bnx2x *bp)
  */
 static int bnx2x_init_hw_common(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t val;
 
 	DP(NETIF_MSG_HW, "starting common init  func %d\n", BP_ABS_FUNC(bp));
@@ -7391,6 +7458,7 @@ static int bnx2x_init_hw_common(struct bnx2x *bp)
 		BNX2X_ERR("Bootcode is missing - can not initialize link\n");
 
 	return 0;
+#endif
 }
 
 /**
@@ -8378,6 +8446,8 @@ int bnx2x_del_all_macs(struct bnx2x *bp,
 
 int bnx2x_set_eth_mac(struct bnx2x *bp, bool set)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	if (IS_PF(bp)) {
 		unsigned long ramrod_flags = 0;
 
@@ -8390,6 +8460,7 @@ int bnx2x_set_eth_mac(struct bnx2x *bp, bool set)
 		return bnx2x_vfpf_config_mac(bp, bp->dev->dev_addr,
 					     bp->fp->index, true);
 	}
+#endif
 }
 
 int bnx2x_setup_leading(struct bnx2x *bp)
@@ -8409,6 +8480,8 @@ int bnx2x_setup_leading(struct bnx2x *bp)
  */
 int bnx2x_set_int_mode(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int rc = 0;
 
 	if (IS_VF(bp) && int_mode != BNX2X_INT_MODE_MSIX) {
@@ -8449,6 +8522,7 @@ int bnx2x_set_int_mode(struct bnx2x *bp)
 		return -EINVAL;
 	}
 	return 0;
+#endif
 }
 
 /* must be called prior to any HW initializations */
@@ -8969,6 +9043,8 @@ static int bnx2x_func_stop(struct bnx2x *bp)
  */
 uint32_t bnx2x_send_unload_req(struct bnx2x *bp, int unload_mode)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t reset_code = 0;
 	int port = BP_PORT(bp);
 
@@ -9031,6 +9107,7 @@ uint32_t bnx2x_send_unload_req(struct bnx2x *bp, int unload_mode)
 	}
 
 	return reset_code;
+#endif
 }
 
 /**
@@ -9050,6 +9127,8 @@ void bnx2x_send_unload_done(struct bnx2x *bp, bool keep_link)
 
 static int bnx2x_func_wait_started(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int tout = 50;
 	int msix = (bp->flags & USING_MSIX_FLAG) ? 1 : 0;
 
@@ -9113,6 +9192,7 @@ static int bnx2x_func_wait_started(struct bnx2x *bp)
 	}
 
 	return 0;
+#endif
 }
 
 void bnx2x_chip_cleanup(struct bnx2x *bp, int unload_mode, bool keep_link)
@@ -9722,6 +9802,8 @@ exit_leader_reset:
 
 static void bnx2x_recovery_failed(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	netdev_err(bp->dev, "Recovery has failed. Power cycle is needed.\n");
 
 	/* Disconnect this device */
@@ -9739,6 +9821,7 @@ static void bnx2x_recovery_failed(struct bnx2x *bp)
 	bp->recovery_state = BNX2X_RECOVERY_FAILED;
 
 	mb();
+#endif
 }
 
 /*
@@ -9748,6 +9831,8 @@ static void bnx2x_recovery_failed(struct bnx2x *bp)
  */
 static void bnx2x_parity_recover(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	bool global = false;
 	uint32_t error_recovered, error_unrecovered;
 	bool is_parity;
@@ -9899,6 +9984,7 @@ static void bnx2x_parity_recover(struct bnx2x *bp)
 			return;
 		}
 	}
+#endif
 }
 
 static int bnx2x_close(struct ether *dev);
@@ -9908,6 +9994,8 @@ static int bnx2x_close(struct ether *dev);
  */
 static void bnx2x_sp_rtnl_task(struct work_struct *work)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = container_of(work, struct bnx2x, sp_rtnl_task.work);
 
 	rtnl_lock();
@@ -10018,10 +10106,13 @@ sp_rtnl_not_reset:
 		bnx2x_disable_sriov(bp);
 		bnx2x_enable_sriov(bp);
 	}
+#endif
 }
 
 static void bnx2x_period_task(struct work_struct *work)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = container_of(work, struct bnx2x, period_task.work);
 
 	if (!netif_running(bp->dev))
@@ -10049,6 +10140,7 @@ static void bnx2x_period_task(struct work_struct *work)
 	bnx2x_release_phy_lock(bp);
 period_task_exit:
 	return;
+#endif
 }
 
 /*
@@ -10057,9 +10149,12 @@ period_task_exit:
 
 static uint32_t bnx2x_get_pretend_reg(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t base = PXP2_REG_PGL_PRETEND_FUNC_F0;
 	uint32_t stride = PXP2_REG_PGL_PRETEND_FUNC_F1 - base;
 	return base + (BP_ABS_FUNC(bp)) * stride;
+#endif
 }
 
 static void bnx2x_prev_unload_close_mac(struct bnx2x *bp,
@@ -10202,7 +10297,8 @@ static struct bnx2x_prev_path_list *
 		bnx2x_prev_path_get_entry(struct bnx2x *bp)
 {
 	struct bnx2x_prev_path_list *tmp_list;
-
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	list_for_each_entry(tmp_list, &bnx2x_prev_list, list)
 		if (PCI_SLOT(bp->pdev->devfn) == tmp_list->slot &&
 		    bp->pdev->bus->number == tmp_list->bus &&
@@ -10210,6 +10306,7 @@ static struct bnx2x_prev_path_list *
 			return tmp_list;
 
 	return NULL;
+#endif
 }
 
 static int bnx2x_prev_path_mark_eeh(struct bnx2x *bp)
@@ -10279,6 +10376,8 @@ bool bnx2x_port_after_undi(struct bnx2x *bp)
 
 static int bnx2x_prev_mark_path(struct bnx2x *bp, bool after_undi)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x_prev_path_list *tmp_list;
 	int rc;
 
@@ -10328,10 +10427,13 @@ static int bnx2x_prev_mark_path(struct bnx2x *bp, bool after_undi)
 	}
 
 	return rc;
+#endif
 }
 
 static int bnx2x_do_flr(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct pci_device *dev = bp->pdev;
 
 	if (CHIP_IS_E1x(bp)) {
@@ -10353,6 +10455,7 @@ static int bnx2x_do_flr(struct bnx2x *bp)
 	bnx2x_fw_command(bp, DRV_MSG_CODE_INITIATE_FLR, 0);
 
 	return 0;
+#endif
 }
 
 static int bnx2x_prev_unload_uncommon(struct bnx2x *bp)
@@ -10514,6 +10617,8 @@ static void bnx2x_prev_interrupted_dmae(struct bnx2x *bp)
 
 static int bnx2x_prev_unload(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int time_counter = 10;
 	uint32_t rc, fw, hw_lock_reg, hw_lock_val;
 	BNX2X_DEV_INFO("Entering Previous Unload Flow\n");
@@ -10593,10 +10698,13 @@ static int bnx2x_prev_unload(struct bnx2x *bp)
 	BNX2X_DEV_INFO("Finished Previous Unload Flow [%d]\n", rc);
 
 	return rc;
+#endif
 }
 
 static void bnx2x_get_common_hwinfo(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t val, val2, val3, val4, id, boot_mode;
 	uint16_t pmc;
 
@@ -10779,6 +10887,7 @@ static void bnx2x_get_common_hwinfo(struct bnx2x *bp)
 
 	dev_info(&bp->pdev->dev, "part number %X-%X-%X-%X\n",
 		 val, val2, val3, val4);
+#endif
 }
 
 #define IGU_FID(val)	GET_FIELD((val), IGU_REG_MAPPING_MEMORY_FID)
@@ -11142,6 +11251,8 @@ static void bnx2x_set_mac_buf(uint8_t *mac_buf, uint32_t mac_lo,
 
 static void bnx2x_get_port_hwinfo(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int port = BP_PORT(bp);
 	uint32_t config;
 	uint32_t ext_phy_type, ext_phy_config, eee_mode;
@@ -11222,6 +11333,7 @@ static void bnx2x_get_port_hwinfo(struct bnx2x *bp)
 	} else {
 		bp->link_params.eee_mode = 0;
 	}
+#endif
 }
 
 void bnx2x_get_iscsi_info(struct bnx2x *bp)
@@ -11389,6 +11501,8 @@ static void bnx2x_get_cnic_info(struct bnx2x *bp)
 
 static void bnx2x_get_cnic_mac_hwinfo(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t val, val2;
 	int func = BP_ABS_FUNC(bp);
 	int port = BP_PORT(bp);
@@ -11477,10 +11591,13 @@ static void bnx2x_get_cnic_mac_hwinfo(struct bnx2x *bp)
 		bp->flags |= NO_FCOE_FLAG;
 		memset(bp->fip_mac, 0, Eaddrlen);
 	}
+#endif
 }
 
 static void bnx2x_get_mac_hwinfo(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t val, val2;
 	int func = BP_ABS_FUNC(bp);
 	int port = BP_PORT(bp);
@@ -11525,6 +11642,7 @@ static void bnx2x_get_mac_hwinfo(struct bnx2x *bp)
 			"bad Ethernet MAC address configuration: %pM\n"
 			"change it manually before bringing up the appropriate network interface\n",
 			bp->dev->dev_addr);
+#endif
 }
 
 static bool bnx2x_get_dropless_info(struct bnx2x *bp)
@@ -11820,6 +11938,8 @@ static int bnx2x_get_hwinfo(struct bnx2x *bp)
 
 static void bnx2x_read_fwinfo(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int cnt, i, block_end, rodi;
 	char vpd_start[BNX2X_VPD_LEN+1];
 	char str_id_reg[VENDOR_ID_LEN+1];
@@ -11901,6 +12021,7 @@ static void bnx2x_read_fwinfo(struct bnx2x *bp)
 out_not_found:
 	kfree(vpd_extended_data);
 	return;
+#endif
 }
 
 static void bnx2x_set_modes_bitmap(struct bnx2x *bp)
@@ -11955,15 +12076,17 @@ static void bnx2x_set_modes_bitmap(struct bnx2x *bp)
 
 static int bnx2x_init_bp(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int func;
 	int rc;
 
-	mutex_init(&bp->port.phy_mutex);
-	mutex_init(&bp->fw_mb_mutex);
-	mutex_init(&bp->drv_info_mutex);
+	qlock_init(&bp->port.phy_mutex);
+	qlock_init(&bp->fw_mb_mutex);
+	qlock_init(&bp->drv_info_mutex);
 	bp->drv_info_mng_owner = false;
 	spinlock_init_irqsave(&bp->stats_lock);
-	sema_init(&bp->stats_sema, 1);
+	sem_init(&bp->stats_sema, 1);
 
 	INIT_DELAYED_WORK(&bp->sp_task, bnx2x_sp_task);
 	INIT_DELAYED_WORK(&bp->sp_rtnl_task, bnx2x_sp_rtnl_task);
@@ -12091,6 +12214,7 @@ static int bnx2x_init_bp(struct bnx2x *bp)
 		bp->flags |= PTP_SUPPORTED;
 
 	return rc;
+#endif
 }
 
 /****************************************************************************
@@ -12104,6 +12228,8 @@ static int bnx2x_init_bp(struct bnx2x *bp)
 /* called with rtnl_lock */
 static int bnx2x_open(struct ether *dev)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(dev);
 	int rc;
 
@@ -12168,6 +12294,7 @@ static int bnx2x_open(struct ether *dev)
 	if (rc)
 		return rc;
 	return 0;
+#endif
 }
 
 /* called with rtnl_lock */
@@ -12184,6 +12311,8 @@ static int bnx2x_close(struct ether *dev)
 static int bnx2x_init_mcast_macs_list(struct bnx2x *bp,
 				      struct bnx2x_mcast_ramrod_params *p)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int mc_count = netdev_mc_count(bp->dev);
 	struct bnx2x_mcast_list_elem *mc_mac =
 		kzmalloc((mc_count) * (sizeof(*mc_mac)), 0);
@@ -12203,6 +12332,7 @@ static int bnx2x_init_mcast_macs_list(struct bnx2x *bp,
 	p->mcast_list_len = mc_count;
 
 	return 0;
+#endif
 }
 
 static void bnx2x_free_mcast_macs_list(
@@ -12225,6 +12355,8 @@ static void bnx2x_free_mcast_macs_list(
  */
 static int bnx2x_set_uc_list(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int rc;
 	struct ether *dev = bp->dev;
 	struct netdev_hw_addr *ha;
@@ -12259,10 +12391,13 @@ static int bnx2x_set_uc_list(struct bnx2x *bp)
 	__set_bit(RAMROD_CONT, &ramrod_flags);
 	return bnx2x_set_mac_one(bp, NULL, mac_obj, false /* don't care */,
 				 BNX2X_UC_LIST_MAC, &ramrod_flags);
+#endif
 }
 
 static int bnx2x_set_mc_list(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct ether *dev = bp->dev;
 	struct bnx2x_mcast_ramrod_params rparam = {NULL};
 	int rc = 0;
@@ -12296,6 +12431,7 @@ static int bnx2x_set_mc_list(struct bnx2x *bp)
 	}
 
 	return rc;
+#endif
 }
 
 /* If bp->state is OPEN, should be called with netif_addr_lock_bh() */
@@ -12315,6 +12451,8 @@ static void bnx2x_set_rx_mode(struct ether *dev)
 
 void bnx2x_set_rx_mode_inner(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t rx_mode = BNX2X_RX_MODE_NORMAL;
 
 	DP(NETIF_MSG_IFUP, "dev->flags = %x\n", bp->dev->flags);
@@ -12370,12 +12508,15 @@ void bnx2x_set_rx_mode_inner(struct bnx2x *bp)
 		qunlock(&bp->dev->qlock);
 		bnx2x_vfpf_storm_rx_mode(bp);
 	}
+#endif
 }
 
 /* called with rtnl_lock */
 static int bnx2x_mdio_read(struct ether *netdev, int prtad,
 			   int devad, uint16_t addr)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(netdev);
 	uint16_t value;
 	int rc;
@@ -12394,12 +12535,15 @@ static int bnx2x_mdio_read(struct ether *netdev, int prtad,
 	if (!rc)
 		rc = value;
 	return rc;
+#endif
 }
 
 /* called with rtnl_lock */
 static int bnx2x_mdio_write(struct ether *netdev, int prtad, int devad,
 			    uint16_t addr, uint16_t value)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(netdev);
 	int rc;
 
@@ -12414,11 +12558,14 @@ static int bnx2x_mdio_write(struct ether *netdev, int prtad, int devad,
 	rc = bnx2x_phy_write(&bp->link_params, prtad, devad, addr, value);
 	bnx2x_release_phy_lock(bp);
 	return rc;
+#endif
 }
 
 /* called with rtnl_lock */
 static int bnx2x_ioctl(struct ether *dev, struct ifreq *ifr, int cmd)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(dev);
 	struct mii_ioctl_data *mdio = if_mii(ifr);
 
@@ -12433,11 +12580,14 @@ static int bnx2x_ioctl(struct ether *dev, struct ifreq *ifr, int cmd)
 		   mdio->phy_id, mdio->reg_num, mdio->val_in);
 		return mdio_mii_ioctl(&bp->mdio, mdio, cmd);
 	}
+#endif
 }
 
 #ifdef CONFIG_NET_POLL_CONTROLLER
 static void poll_bnx2x(struct ether *dev)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(dev);
 	int i;
 
@@ -12445,11 +12595,14 @@ static void poll_bnx2x(struct ether *dev)
 		struct bnx2x_fastpath *fp = &bp->fp[i];
 		napi_schedule(&bnx2x_fp(bp, fp->index, napi));
 	}
+#endif
 }
 #endif
 
 static int bnx2x_validate_addr(struct ether *dev)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(dev);
 
 	/* query the bulletin board for mac address configured by the PF */
@@ -12461,11 +12614,14 @@ static int bnx2x_validate_addr(struct ether *dev)
 		return -EADDRNOTAVAIL;
 	}
 	return 0;
+#endif
 }
 
 static int bnx2x_get_phys_port_id(struct ether *netdev,
 				  struct netdev_phys_item_id *ppid)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(netdev);
 
 	if (!(bp->flags & HAS_PHYS_PORT_ID))
@@ -12475,15 +12631,20 @@ static int bnx2x_get_phys_port_id(struct ether *netdev,
 	memcpy(ppid->id, bp->phys_port_id, ppid->id_len);
 
 	return 0;
+#endif
 }
 
 static netdev_features_t bnx2x_features_check(struct sk_buff *skb,
 					      struct ether *dev,
 					      netdev_features_t features)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	return vxlan_features_check(skb, features);
+#endif
 }
 
+#if 0 // AKAROS_PORT
 static const struct net_device_ops bnx2x_netdev_ops = {
 	.ndo_open		= bnx2x_open,
 	.ndo_stop		= bnx2x_close,
@@ -12517,9 +12678,12 @@ static const struct net_device_ops bnx2x_netdev_ops = {
 	.ndo_set_vf_link_state	= bnx2x_set_vf_link_state,
 	.ndo_features_check	= bnx2x_features_check,
 };
+#endif
 
 static int bnx2x_set_coherency_mask(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct device *dev = &bp->pdev->dev;
 
 	if (dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64)) != 0 &&
@@ -12529,19 +12693,25 @@ static int bnx2x_set_coherency_mask(struct bnx2x *bp)
 	}
 
 	return 0;
+#endif
 }
 
 static void bnx2x_disable_pcie_error_reporting(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	if (bp->flags & AER_ENABLED) {
 		pci_disable_pcie_error_reporting(bp->pdev);
 		bp->flags &= ~AER_ENABLED;
 	}
+#endif
 }
 
 static int bnx2x_init_dev(struct bnx2x *bp, struct pci_device *pdev,
 			  struct ether *dev, unsigned long board_type)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int rc;
 	uint32_t pci_cfg_dword;
 	bool chip_is_e1x = (board_type == BCM57710 ||
@@ -12724,10 +12894,13 @@ err_out_disable:
 
 err_out:
 	return rc;
+#endif
 }
 
 static int bnx2x_check_firmware(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	const struct firmware *firmware = bp->firmware;
 	struct bnx2x_fw_file_hdr *fw_hdr;
 	struct bnx2x_fw_file_section *sections;
@@ -12784,6 +12957,7 @@ static int bnx2x_check_firmware(struct bnx2x *bp)
 	}
 
 	return 0;
+#endif
 }
 
 static void be32_to_cpu_n(const uint8_t *_source, uint8_t *_target,
@@ -12863,6 +13037,8 @@ do {									\
 
 static int bnx2x_init_firmware(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	const char *fw_file_name;
 	struct bnx2x_fw_file_hdr *fw_hdr;
 	int rc;
@@ -12941,15 +13117,19 @@ request_firmware_exit:
 	bp->firmware = NULL;
 
 	return rc;
+#endif
 }
 
 static void bnx2x_release_firmware(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	kfree(bp->init_ops_offsets);
 	kfree(bp->init_ops);
 	kfree(bp->init_data);
 	release_firmware(bp->firmware);
 	bp->firmware = NULL;
+#endif
 }
 
 static struct bnx2x_func_sp_drv_ops bnx2x_func_sp_drv = {
@@ -13004,6 +13184,8 @@ static int bnx2x_set_qm_cid_count(struct bnx2x *bp)
  */
 static int bnx2x_get_num_non_def_sbs(struct pci_device *pdev, int cnic_cnt)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int index;
 	uint16_t control = 0;
 
@@ -13029,6 +13211,7 @@ static int bnx2x_get_num_non_def_sbs(struct pci_device *pdev, int cnic_cnt)
 	index = control & PCI_MSIX_FLAGS_QSIZE;
 
 	return index;
+#endif
 }
 
 static int set_max_cos_est(int chip_id)
@@ -13118,6 +13301,8 @@ static int bnx2x_send_update_drift_ramrod(struct bnx2x *bp, int drift_dir,
 static int bnx2x_init_one(struct pci_device *pdev,
 				    const struct pci_device_id *ent)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct ether *dev = NULL;
 	struct bnx2x *bp;
 	enum pcie_link_width pcie_width;
@@ -13307,6 +13492,7 @@ init_one_exit:
 	pci_disable_device(pdev);
 
 	return rc;
+#endif
 }
 
 static void __bnx2x_remove(struct pci_device *pdev,
@@ -13314,6 +13500,8 @@ static void __bnx2x_remove(struct pci_device *pdev,
 			   struct bnx2x *bp,
 			   bool remove_netdev)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	/* Delete storage MAC address */
 	if (!NO_FCOE(bp)) {
 		rtnl_lock();
@@ -13397,10 +13585,13 @@ static void __bnx2x_remove(struct pci_device *pdev,
 
 		pci_disable_device(pdev);
 	}
+#endif
 }
 
 static void bnx2x_remove_one(struct pci_device *pdev)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct ether *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp;
 
@@ -13411,10 +13602,13 @@ static void bnx2x_remove_one(struct pci_device *pdev)
 	bp = netdev_priv(dev);
 
 	__bnx2x_remove(pdev, dev, bp, true);
+#endif
 }
 
 static int bnx2x_eeh_nic_unload(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	bp->state = BNX2X_STATE_CLOSING_WAIT4_HALT;
 
 	bp->rx_mode = BNX2X_RX_MODE_NONE;
@@ -13443,8 +13637,9 @@ static int bnx2x_eeh_nic_unload(struct bnx2x *bp)
 	netif_carrier_off(bp->dev);
 
 	return 0;
+#endif
 }
-
+#if 0 // AKAROS_PORT
 /**
  * bnx2x_io_error_detected - called when PCI error is detected
  * @pdev: Pointer to PCI device
@@ -13563,6 +13758,7 @@ static pci_ers_result_t bnx2x_io_slot_reset(struct pci_device *pdev)
 
 	return PCI_ERS_RESULT_RECOVERED;
 }
+#endif
 
 /**
  * bnx2x_io_resume - called when traffic can start flowing again
@@ -13573,6 +13769,8 @@ static pci_ers_result_t bnx2x_io_slot_reset(struct pci_device *pdev)
  */
 static void bnx2x_io_resume(struct pci_device *pdev)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct ether *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp = netdev_priv(dev);
 
@@ -13592,16 +13790,20 @@ static void bnx2x_io_resume(struct pci_device *pdev)
 	netif_device_attach(dev);
 
 	rtnl_unlock();
+#endif
 }
-
+#if 0 // AKAROS_PORT
 static const struct pci_error_handlers bnx2x_err_handler = {
 	.error_detected = bnx2x_io_error_detected,
 	.slot_reset     = bnx2x_io_slot_reset,
 	.resume         = bnx2x_io_resume,
 };
+#endif
 
 static void bnx2x_shutdown(struct pci_device *pdev)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct ether *dev = pci_get_drvdata(pdev);
 	struct bnx2x *bp;
 
@@ -13621,8 +13823,9 @@ static void bnx2x_shutdown(struct pci_device *pdev)
 	 * rootfs is mounted from SAN.
 	 */
 	__bnx2x_remove(pdev, dev, bp, false);
+#endif
 }
-
+#if 0 // AKAROS_PORT
 static struct pci_driver bnx2x_pci_driver = {
 	.name        = DRV_MODULE_NAME,
 	.id_table    = bnx2x_pci_tbl,
@@ -13636,9 +13839,12 @@ static struct pci_driver bnx2x_pci_driver = {
 #endif
 	.shutdown    = bnx2x_shutdown,
 };
+#endif
 
 static int __init bnx2x_init(void)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int ret;
 
 	pr_info("%s", version);
@@ -13662,10 +13868,13 @@ static int __init bnx2x_init(void)
 		destroy_workqueue(bnx2x_iov_wq);
 	}
 	return ret;
+#endif
 }
 
 static void __exit bnx2x_cleanup(void)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct list_head *pos, *q;
 
 	pci_unregister_driver(&bnx2x_pci_driver);
@@ -13680,6 +13889,7 @@ static void __exit bnx2x_cleanup(void)
 		list_del(pos);
 		kfree(tmp);
 	}
+#endif
 }
 
 void bnx2x_notify_link_changed(struct bnx2x *bp)
@@ -13940,6 +14150,8 @@ static void bnx2x_set_iscsi_eth_rx_mode(struct bnx2x *bp, bool start)
 
 static int bnx2x_drv_ctl(struct ether *dev, struct drv_ctl_info *ctl)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(dev);
 	int rc = 0;
 
@@ -14095,6 +14307,7 @@ static int bnx2x_drv_ctl(struct ether *dev, struct drv_ctl_info *ctl)
 	}
 
 	return rc;
+#endif
 }
 
 void bnx2x_setup_cnic_irq_info(struct bnx2x *bp)

@@ -1143,6 +1143,8 @@ static int bnx2x_storm_stats_update(struct bnx2x *bp)
 static void bnx2x_net_stats_update(struct bnx2x *bp)
 {
 	struct bnx2x_eth_stats *estats = &bp->eth_stats;
+panic("NOT IMPLEMENTED");
+#if 0 // AKAROS_PORT
 	struct net_device_stats *nstats = &bp->dev->stats;
 	unsigned long tmp;
 	int i;
@@ -1208,6 +1210,7 @@ static void bnx2x_net_stats_update(struct bnx2x *bp)
 	nstats->tx_errors = nstats->tx_aborted_errors +
 			    nstats->tx_carrier_errors +
 	    bnx2x_hilo(&estats->tx_stat_dot3statsinternalmactransmiterrors_hi);
+#endif
 }
 
 static void bnx2x_drv_stats_update(struct bnx2x *bp)
@@ -1244,6 +1247,8 @@ static bool bnx2x_edebug_stats_stopped(struct bnx2x *bp)
 
 static void bnx2x_stats_update(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	uint32_t *stats_comp = bnx2x_sp(bp, stats_comp);
 
 	/* we run update from timer context, so give up
@@ -1295,6 +1300,7 @@ static void bnx2x_stats_update(struct bnx2x *bp)
 
 out:
 	up(&bp->stats_sema);
+#endif
 }
 
 static void bnx2x_port_stats_stop(struct bnx2x *bp)
@@ -1410,6 +1416,8 @@ static const struct {
 
 void bnx2x_stats_handle(struct bnx2x *bp, enum bnx2x_stats_event event)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	enum bnx2x_stats_state state;
 	void (*action)(struct bnx2x *bp);
 	if (unlikely(bp->panic))
@@ -1426,6 +1434,7 @@ void bnx2x_stats_handle(struct bnx2x *bp, enum bnx2x_stats_event event)
 	if ((event != STATS_EVENT_UPDATE) || netif_msg_timer(bp))
 		DP(BNX2X_MSG_STATS, "state %d -> event %d -> state %d\n",
 		   state, event, bp->stats_state);
+#endif
 }
 
 static void bnx2x_port_stats_base_init(struct bnx2x *bp)
@@ -1605,7 +1614,9 @@ void bnx2x_memset_stats(struct bnx2x *bp)
 		}
 	}
 
+#if 0 // AKAROS_PORT
 	memset(&bp->dev->stats, 0, sizeof(bp->dev->stats));
+#endif
 
 	if (bp->stats_init) {
 		memset(&bp->net_stats_old, 0, sizeof(bp->net_stats_old));
@@ -1688,6 +1699,8 @@ void bnx2x_stats_init(struct bnx2x *bp)
 void bnx2x_save_statistics(struct bnx2x *bp)
 {
 	int i;
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct net_device_stats *nstats = &bp->dev->stats;
 
 	/* save queue statistics */
@@ -1726,6 +1739,7 @@ void bnx2x_save_statistics(struct bnx2x *bp)
 		UPDATE_FW_STAT_OLD(brb_truncate_discard);
 		UPDATE_FW_STAT_OLD(mac_discard);
 	}
+#endif
 }
 
 void bnx2x_afex_collect_stats(struct bnx2x *bp, void *void_afex_stats,
@@ -2000,11 +2014,15 @@ void bnx2x_afex_collect_stats(struct bnx2x *bp, void *void_afex_stats,
 
 void bnx2x_stats_safe_exec(struct bnx2x *bp,
 			   void (func_to_exec)(void *cookie),
-			   void *cookie){
+			   void *cookie)
+{
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	if (down_timeout(&bp->stats_sema, HZ/10))
 		BNX2X_ERR("Unable to acquire stats lock\n");
 	bnx2x_stats_comp(bp);
 	func_to_exec(cookie);
 	__bnx2x_stats_start(bp);
 	up(&bp->stats_sema);
+#endif
 }

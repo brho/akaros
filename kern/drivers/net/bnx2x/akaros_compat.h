@@ -23,6 +23,9 @@
 #include <mmio.h>
 #include <taskqueue.h>
 
+/* temporary dumping ground */
+#include "compat_todo.h"
+
 #define __rcu
 #define rcu_read_lock()
 #define rcu_read_unlock()

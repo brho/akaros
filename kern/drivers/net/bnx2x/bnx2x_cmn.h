@@ -790,8 +790,11 @@ static inline int bnx2x_has_rx_work(struct bnx2x_fastpath *fp)
  */
 static inline void bnx2x_tx_disable(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	netif_tx_disable(bp->dev);
 	netif_carrier_off(bp->dev);
+#endif
 }
 
 static inline void bnx2x_free_rx_sge(struct bnx2x *bp,
@@ -817,28 +820,36 @@ static inline void bnx2x_free_rx_sge(struct bnx2x *bp,
 
 static inline void bnx2x_del_all_napi_cnic(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int i;
 
 	for_each_rx_queue_cnic(bp, i) {
 		napi_hash_del(&bnx2x_fp(bp, i, napi));
 		netif_napi_del(&bnx2x_fp(bp, i, napi));
 	}
+#endif
 }
 
 static inline void bnx2x_del_all_napi(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int i;
 
 	for_each_eth_queue(bp, i) {
 		napi_hash_del(&bnx2x_fp(bp, i, napi));
 		netif_napi_del(&bnx2x_fp(bp, i, napi));
 	}
+#endif
 }
 
 int bnx2x_set_int_mode(struct bnx2x *bp);
 
 static inline void bnx2x_disable_msi(struct bnx2x *bp)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	if (bp->flags & USING_MSIX_FLAG) {
 		pci_disable_msix(bp->pdev);
 		bp->flags &= ~(USING_MSIX_FLAG | USING_SINGLE_MSIX_FLAG);
@@ -846,6 +857,7 @@ static inline void bnx2x_disable_msi(struct bnx2x *bp)
 		pci_disable_msi(bp->pdev);
 		bp->flags &= ~USING_MSI_FLAG;
 	}
+#endif
 }
 
 static inline void bnx2x_clear_sge_mask_next_elems(struct bnx2x_fastpath *fp)
@@ -1244,6 +1256,8 @@ static inline uint16_t bnx2x_extract_max_cfg(struct bnx2x *bp,
 /* checks if HW supports GRO for given MTU */
 static inline bool bnx2x_mtu_allows_gro(int mtu)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	/* gro frags per page */
 	int fpp = SGE_PAGE_SIZE / (mtu - ETH_MAX_TPA_HEADER_SIZE);
 
@@ -1252,6 +1266,7 @@ static inline bool bnx2x_mtu_allows_gro(int mtu)
 	 * 2. Frag must fit the page
 	 */
 	return mtu <= SGE_PAGE_SIZE && (U_ETH_SGL_SIZE * fpp) <= MAX_SKB_FRAGS;
+#endif
 }
 
 /**

@@ -116,11 +116,7 @@ do {								\
 	pr_err("[%s:%d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
 
 /* before we have a dev->name use dev_info() */
-#define BNX2X_DEV_INFO(fmt, ...)				 \
-do {								 \
-	if (unlikely(netif_msg_probe(bp)))			 \
-		dev_info(&bp->pdev->dev, fmt, ##__VA_ARGS__);	 \
-} while (0)
+#define BNX2X_DEV_INFO(fmt, ...) printk(fmt, ##__VA_ARGS__);
 
 /* Error handling */
 void bnx2x_panic_dump(struct bnx2x *bp, bool disable_int);

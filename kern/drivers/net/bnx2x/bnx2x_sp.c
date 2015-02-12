@@ -601,6 +601,8 @@ static int bnx2x_check_mac_add(struct bnx2x *bp,
 			       struct bnx2x_vlan_mac_obj *o,
 			       union bnx2x_classification_ramrod_data *data)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x_vlan_mac_registry_elem *pos;
 
 	DP(BNX2X_MSG_SP, "Checking MAC %pM for ADD command\n", data->mac.mac);
@@ -615,6 +617,7 @@ static int bnx2x_check_mac_add(struct bnx2x *bp,
 			return -EEXIST;
 
 	return 0;
+#endif
 }
 
 static int bnx2x_check_vlan_add(struct bnx2x *bp,
@@ -638,6 +641,8 @@ static struct bnx2x_vlan_mac_registry_elem *
 			    struct bnx2x_vlan_mac_obj *o,
 			    union bnx2x_classification_ramrod_data *data)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x_vlan_mac_registry_elem *pos;
 
 	DP(BNX2X_MSG_SP, "Checking MAC %pM for DEL command\n", data->mac.mac);
@@ -648,6 +653,7 @@ static struct bnx2x_vlan_mac_registry_elem *
 			return pos;
 
 	return NULL;
+#endif
 }
 
 static struct bnx2x_vlan_mac_registry_elem *
@@ -2347,7 +2353,10 @@ void bnx2x_init_rx_mode_obj(struct bnx2x *bp,
 /********************* Multicast verbs: SET, CLEAR ****************************/
 static inline uint8_t bnx2x_mcast_bin_from_mac(uint8_t *mac)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	return (crc32c_le(0, mac, Eaddrlen) >> 24) & 0xff;
+#endif
 }
 
 struct bnx2x_mcast_mac_elem {
@@ -3701,6 +3710,8 @@ void bnx2x_init_mcast_obj(struct bnx2x *bp,
  */
 static inline bool __atomic_add_ifless(atomic_t *v, int a, int u)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int c, old;
 
 	c = atomic_read(v);
@@ -3715,6 +3726,7 @@ static inline bool __atomic_add_ifless(atomic_t *v, int a, int u)
 	}
 
 	return true;
+#endif
 }
 
 /**
@@ -3729,6 +3741,8 @@ static inline bool __atomic_add_ifless(atomic_t *v, int a, int u)
  */
 static inline bool __atomic_dec_ifmoe(atomic_t *v, int a, int u)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	int c, old;
 
 	c = atomic_read(v);
@@ -3743,10 +3757,13 @@ static inline bool __atomic_dec_ifmoe(atomic_t *v, int a, int u)
 	}
 
 	return true;
+#endif
 }
 
 static bool bnx2x_credit_pool_get(struct bnx2x_credit_pool_obj *o, int cnt)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	bool rc;
 
 	mb();
@@ -3754,10 +3771,13 @@ static bool bnx2x_credit_pool_get(struct bnx2x_credit_pool_obj *o, int cnt)
 	mb();
 
 	return rc;
+#endif
 }
 
 static bool bnx2x_credit_pool_put(struct bnx2x_credit_pool_obj *o, int cnt)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	bool rc;
 
 	mb();
@@ -3768,6 +3788,7 @@ static bool bnx2x_credit_pool_put(struct bnx2x_credit_pool_obj *o, int cnt)
 	mb();
 
 	return rc;
+#endif
 }
 
 static int bnx2x_credit_pool_check(struct bnx2x_credit_pool_obj *o)
@@ -4021,6 +4042,8 @@ static inline void bnx2x_debug_print_ind_table(struct bnx2x *bp,
 static int bnx2x_setup_rss(struct bnx2x *bp,
 			   struct bnx2x_config_rss_params *p)
 {
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct bnx2x_rss_config_obj *o = p->rss_obj;
 	struct bnx2x_raw_obj *r = &o->raw;
 	struct eth_rss_update_ramrod_data *data =
@@ -4114,6 +4137,7 @@ static int bnx2x_setup_rss(struct bnx2x *bp,
 		return rc;
 
 	return 1;
+#endif
 }
 
 void bnx2x_get_rss_ind_table(struct bnx2x_rss_config_obj *rss_obj,
@@ -5978,7 +6002,7 @@ void bnx2x_init_func_obj(struct bnx2x *bp,
 {
 	memset(obj, 0, sizeof(*obj));
 
-	mutex_init(&obj->one_pending_mutex);
+	qlock_init(&obj->one_pending_mutex);
 
 	obj->rdata = rdata;
 	obj->rdata_mapping = rdata_mapping;
