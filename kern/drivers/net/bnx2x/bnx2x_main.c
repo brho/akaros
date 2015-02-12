@@ -233,6 +233,25 @@ static const struct pci_device_id bnx2x_pci_tbl[] = {
 	{ 0 }
 };
 
+const struct pci_device_id *srch_linux_pci_tbl(const struct pci_device_id *tbl,
+                                               struct pci_device *needle)
+{
+	const struct pci_device_id *i;
+	for (i = tbl; i->vendor; i++) {
+		if ((needle->ven_id == i->vendor) && (needle->dev_id == i->device))
+			break;
+	}
+	if (i->vendor)
+		return i;
+	return 0;
+}
+
+const struct pci_device_id *srch_bnx2x_pci_tbl(struct pci_device *needle)
+{
+	const struct pci_device_id *tbl = bnx2x_pci_tbl;
+	return srch_linux_pci_tbl(tbl, needle);
+}
+
 MODULE_DEVICE_TABLE(pci, bnx2x_pci_tbl);
 
 /* Global resources for unloading a previously loaded device */
@@ -13298,8 +13317,8 @@ static int bnx2x_send_update_drift_ramrod(struct bnx2x *bp, int drift_dir,
 	return bnx2x_func_state_change(bp, &func_params);
 }
 
-static int bnx2x_init_one(struct pci_device *pdev,
-				    const struct pci_device_id *ent)
+int bnx2x_init_one(struct ether *dev, struct bnx2x *bp,
+                   struct pci_device *pdev, const struct pci_device_id *ent)
 {
 panic("Not implemented");
 #if 0 // AKAROS_PORT
@@ -13841,10 +13860,8 @@ static struct pci_driver bnx2x_pci_driver = {
 };
 #endif
 
-static int __init bnx2x_init(void)
+int __init bnx2x_init(void)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int ret;
 
 	pr_info("%s", version);
@@ -13861,6 +13878,8 @@ panic("Not implemented");
 		return -ENOMEM;
 	}
 
+	return 0;
+#if 0 // AKAROS_PORT pci registration.  we call it directly
 	ret = pci_register_driver(&bnx2x_pci_driver);
 	if (ret) {
 		pr_err("Cannot register driver\n");

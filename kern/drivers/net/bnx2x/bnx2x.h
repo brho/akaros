@@ -1439,6 +1439,24 @@ enum {
 };
 
 struct bnx2x {
+/* COMPAT GARBAGE */
+	struct pci_device			*pcidev;
+	struct ether				*edev;
+	TAILQ_ENTRY(bnx2x) 			link9ns;
+	const struct pci_device_id	*pci_id;			/* for navigating pci/pnp */
+
+
+	/* e.g. */
+	bool						active;
+	void						*mmio;
+	spinlock_t					imlock;				/* interrupt mask lock */
+	spinlock_t					tlock;				/* transmit lock */
+	qlock_t						slock;				/* stats */
+	qlock_t						alock;				/* attach */
+	struct rendez				rrendez;			/* rproc rendez */
+#define Nstatistics 2
+	unsigned int				statistics[Nstatistics];
+
 	/* Fields used in the tx and intr/napi performance paths
 	 * are grouped together in the beginning of the structure
 	 */
