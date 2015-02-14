@@ -682,7 +682,7 @@ void oprofile_add_backtrace(uintptr_t pc, uintptr_t fp)
 	uint64_t event = nsec();
 
 	uintptr_t bt_pcs[oprofile_backtrace_depth];
-	
+
 	int nr_pcs;
 	nr_pcs = backtrace_list(pc, fp, bt_pcs, oprofile_backtrace_depth);
 
