@@ -1,5 +1,5 @@
 # Default target is to just make
-PHONY += all fill-kfs unfill-kfs clean
+PHONY += all install uninstall clean
 all:
 
 # TODO: when we clean this up, if we ditch OBJDIR, change the root makefile
