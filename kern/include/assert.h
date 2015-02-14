@@ -5,7 +5,7 @@
 
 void ( _warn)(const char* NTS, int, const char* NTS, ...);
 void ( _panic)(const char* NTS, int, const char* NTS, ...)
-    __attribute__((noreturn));
+	__attribute__((noreturn));
 
 #define warn(...) _warn(__FILE__, __LINE__, __VA_ARGS__)
 #define warn_once(...) run_once_racy(warn(__VA_ARGS__))
@@ -25,7 +25,7 @@ void ( _panic)(const char* NTS, int, const char* NTS, ...)
 #ifdef CONFIG_DEVELOPMENT_ASSERTIONS
 #define dassert(x) assert(x)
 #else
-#define dassert(x)
+#define dassert(x) ((void) (x))  // 'Use' value, stop compile warnings
 #endif /* DEVELOPMENT_ASSERTIONS */
 
 #endif /* !ROS_INC_ASSERT_H */
