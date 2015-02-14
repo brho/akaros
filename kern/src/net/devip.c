@@ -67,6 +67,23 @@ extern char *eve;
 static long ndbwrite(struct Fs *, char *unused_char_p_t, uint32_t, int);
 static void closeconv(struct conv *);
 
+static inline int founddevdir(struct chan *c, struct qid q, char *n,
+							  int64_t length, char *user, long perm,
+							  struct dir *db)
+{
+	devdir(c, q, n, length, user, perm, db);
+	return 1;
+}
+
+static int topdirgen(struct chan *c, struct dir *dp)
+{
+	struct qid q;
+	mkqid(&q, QID(0, 0, Qtopdir), 0, QTDIR);
+	snprintf(get_cur_genbuf(), GENBUF_SZ, "#I%lu", c->dev);
+	return founddevdir(c, q, get_cur_genbuf(), 0, network, 0555, dp);
+}
+
+
 static int ip3gen(struct chan *c, int i, struct dir *dp)
 {
 	struct qid q;
@@ -82,17 +99,16 @@ static int ip3gen(struct chan *c, int i, struct dir *dp)
 		default:
 			return -1;
 		case Qctl:
-			devdir(c, q, "ctl", 0, cv->owner, cv->perm, dp);
-			return 1;
+			return founddevdir(c, q, "ctl", 0,
+					           cv->owner, cv->perm, dp);
 		case Qdata:
-			devdir(c, q, "data", qlen(cv->rq), cv->owner, cv->perm, dp);
-			return 1;
+			return founddevdir(c, q, "data", qlen(cv->rq),
+							   cv->owner, cv->perm, dp);
 		case Qerr:
-			devdir(c, q, "err", qlen(cv->eq), cv->owner, cv->perm, dp);
-			return 1;
+			return founddevdir(c, q, "err", qlen(cv->eq),
+							   cv->owner, cv->perm, dp);
 		case Qlisten:
-			devdir(c, q, "listen", 0, cv->owner, cv->perm, dp);
-			return 1;
+			return founddevdir(c, q, "listen", 0, cv->owner, cv->perm, dp);
 		case Qlocal:
 			p = "local";
 			break;
@@ -102,29 +118,24 @@ static int ip3gen(struct chan *c, int i, struct dir *dp)
 		case Qsnoop:
 			if (strcmp(cv->p->name, "ipifc") != 0)
 				return -1;
-			devdir(c, q, "snoop", qlen(cv->sq), cv->owner, 0400, dp);
-			return 1;
+			return founddevdir(c, q, "snoop", qlen(cv->sq),
+							   cv->owner, 0400, dp);
 		case Qstatus:
 			p = "status";
 			break;
 	}
-	devdir(c, q, p, 0, cv->owner, 0444, dp);
-	return 1;
+	return founddevdir(c, q, p, 0, cv->owner, 0444, dp);
 }
 
 static int ip2gen(struct chan *c, int i, struct dir *dp)
 {
 	struct qid q;
-
+	mkqid(&q, QID(PROTO(c->qid), 0, i), 0, QTFILE);
 	switch (i) {
 		case Qclone:
-			mkqid(&q, QID(PROTO(c->qid), 0, Qclone), 0, QTFILE);
-			devdir(c, q, "clone", 0, network, 0666, dp);
-			return 1;
+			return founddevdir(c, q, "clone", 0, network, 0666, dp);
 		case Qstats:
-			mkqid(&q, QID(PROTO(c->qid), 0, Qstats), 0, QTFILE);
-			devdir(c, q, "stats", 0, network, 0444, dp);
-			return 1;
+			return founddevdir(c, q, "stats", 0, network, 0444, dp);
 	}
 	return -1;
 }
@@ -149,9 +160,9 @@ static int ip1gen(struct chan *c, int i, struct dir *dp)
 			p = "arp";
 			break;
 		case Qbootp:
-			p = "bootp";
 			if (bootp == NULL)
 				return 0;
+			p = "bootp";
 			break;
 		case Qndb:
 			p = "ndb";
@@ -190,18 +201,13 @@ ipgen(struct chan *c, char *unused_char_p_t, struct dirtab *d, int unused_int,
 
 	switch (TYPE(c->qid)) {
 		case Qtopdir:
-			if (s == DEVDOTDOT) {
-				mkqid(&q, QID(0, 0, Qtopdir), 0, QTDIR);
-				snprintf(get_cur_genbuf(), GENBUF_SZ, "#I%lu", c->dev);
-				devdir(c, q, get_cur_genbuf(), 0, network, 0555, dp);
-				return 1;
-			}
+			if (s == DEVDOTDOT)
+				return topdirgen(c, dp);
 			if (s < f->np) {
 				if (f->p[s]->connect == NULL)
 					return 0;	/* protocol with no user interface */
 				mkqid(&q, QID(s, 0, Qprotodir), 0, QTDIR);
-				devdir(c, q, f->p[s]->name, 0, network, 0555, dp);
-				return 1;
+				return founddevdir(c, q, f->p[s]->name, 0, network, 0555, dp);
 			}
 			s -= f->np;
 			return ip1gen(c, s + Qtopbase, dp);
@@ -214,18 +220,14 @@ ipgen(struct chan *c, char *unused_char_p_t, struct dirtab *d, int unused_int,
 		case Qipselftab:
 			return ip1gen(c, TYPE(c->qid), dp);
 		case Qprotodir:
-			if (s == DEVDOTDOT) {
-				mkqid(&q, QID(0, 0, Qtopdir), 0, QTDIR);
-				snprintf(get_cur_genbuf(), GENBUF_SZ, "#I%lu", c->dev);
-				devdir(c, q, get_cur_genbuf(), 0, network, 0555, dp);
-				return 1;
-			}
-			if (s < f->p[PROTO(c->qid)]->ac) {
+			if (s == DEVDOTDOT)
+				return topdirgen(c, dp);
+			else if (s < f->p[PROTO(c->qid)]->ac) {
 				cv = f->p[PROTO(c->qid)]->conv[s];
 				snprintf(get_cur_genbuf(), GENBUF_SZ, "%d", s);
 				mkqid(&q, QID(PROTO(c->qid), s, Qconvdir), 0, QTDIR);
-				devdir(c, q, get_cur_genbuf(), 0, cv->owner, 0555, dp);
-				return 1;
+				return
+					founddevdir(c, q, get_cur_genbuf(), 0, cv->owner, 0555, dp);
 			}
 			s -= f->p[PROTO(c->qid)]->ac;
 			return ip2gen(c, s + Qprotobase, dp);
