@@ -59,6 +59,9 @@ devdir(struct chan *c, struct qid qid, char *n,
 
 /*
  * the zeroth element of the table MUST be the directory itself for ..
+ * Any entry with qid vers of -1 will return 0, indicating that the value is
+ * valid but there is nothing there continue walk.
+ * TODO(gvdl): Update akaros devgen man page.
 */
 int
 devgen(struct chan *c, char *unused_char_p_t, struct dirtab *tab, int ntab,
@@ -73,8 +76,10 @@ devgen(struct chan *c, char *unused_char_p_t, struct dirtab *tab, int ntab,
 			return -1;
 		tab += i;
 	}
-	devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
-	return 1;
+	int ret = (tab->qid.vers == -1)? 0 : 1;
+	if (ret)
+		devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
+	return ret;
 }
 
 void devreset(void)
