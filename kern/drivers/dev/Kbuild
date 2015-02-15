@@ -4,11 +4,12 @@ obj-y						+= coreboot.o
 obj-y						+= cons.o
 obj-y						+= ether.o
 obj-y						+= kprof.o
+obj-$(CONFIG_TTRACE)		+= devttrace.o
 obj-y						+= mnt.o
 #obj-y						+= pci.o
 obj-y						+= pipe.o
 obj-y						+= proc.o
-obj-$(CONFIG_REGRESS)				+= regress.o
+obj-$(CONFIG_REGRESS)		+= regress.o
 obj-y						+= root.o
 obj-y						+= srv.o
 
