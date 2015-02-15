@@ -257,7 +257,7 @@ void unset_errno(void)
 	pcpui->cur_kthread->sysc->errstr[0] = '\0';
 }
 
-void set_errstr(char *fmt, ...)
+void set_errstr(const char *fmt, ...)
 {
 	va_list ap;
 	int rc;

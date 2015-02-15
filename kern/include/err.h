@@ -15,13 +15,13 @@ struct errbuf {
 #define waserror() (errpush(errstack, ARRAY_SIZE(errstack), &curindex,         \
                             &prev_errbuf) ||                                   \
                     setjmp(&(get_cur_errbuf()->jmpbuf)))
-#define error(x,...) {set_errstr(x, ##__VA_ARGS__);                            \
-                      longjmp(&get_cur_errbuf()->jmpbuf, 1);}
-#define nexterror() {errpop(errstack, ARRAY_SIZE(errstack), &curindex,         \
+#define error(x,...) do {set_errstr(x, ##__VA_ARGS__);                         \
+	                     longjmp(&get_cur_errbuf()->jmpbuf, 1);} while(0)
+#define nexterror() do {errpop(errstack, ARRAY_SIZE(errstack), &curindex,      \
                             prev_errbuf);                                      \
-                     longjmp(&(get_cur_errbuf())->jmpbuf, 1);}
-#define poperror() {errpop(errstack, ARRAY_SIZE(errstack), &curindex,          \
-                           prev_errbuf);}
+                     longjmp(&(get_cur_errbuf())->jmpbuf, 1);} while (0)
+#define poperror() do {errpop(errstack, ARRAY_SIZE(errstack), &curindex,       \
+                       prev_errbuf);} while (0)
 
 int errpush(struct errbuf *errstack, int stacksize, int *curindex,
             struct errbuf **prev_errbuf);

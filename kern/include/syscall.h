@@ -59,7 +59,7 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 void set_errno(int errno);
 int get_errno(void);
 void unset_errno(void);
-void set_errstr(char *errstr, ...);
+void set_errstr(const char *errstr, ...);
 char *current_errstr(void);
 struct errbuf *get_cur_errbuf(void);
 void set_cur_errbuf(struct errbuf *ebuf);
