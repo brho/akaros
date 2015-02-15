@@ -7,7 +7,7 @@
  * in the LICENSE file.
  */
 
-// get_fn_name is slowing down the kprocread 
+// get_fn_name is slowing down the kprocread
 // 	have an array of translated fns
 // 	or a "next" iterator, since we're walking in order
 //
@@ -18,7 +18,7 @@
 // 		big it is
 //
 // 		will also want more files in the kprof dir for each cpu or something
-// 		
+//
 // maybe don't use slot 0 and 1 as total and 'not kernel' ticks
 //
 // fix the failed assert XXX
@@ -105,33 +105,10 @@ static void oprof_alarm_handler(struct alarm_waiter *waiter,
 static struct chan*
 kprofattach(char *spec)
 {
-	uint32_t n;
+	// Did we initialise completely?
+	if ( !(oprof_alarms && kprof.buf && kprof.systrace) )
+		error(Enomem);
 
-	/* allocate when first used */
-	kprof.minpc = 0xffffffffc2000000; //KERN_LOAD_ADDR;
-	kprof.maxpc = (uintptr_t)&etext;
-	kprof.nbuf = (kprof.maxpc-kprof.minpc) >> LRES;
-	n = kprof.nbuf*CELLSIZE;
-	if(kprof.buf == 0) {
-		kprof.buf = kzmalloc(n, KMALLOC_WAIT);
-		if(kprof.buf == 0)
-			error(Enomem);
-	}
-	kproftab[Kprofdataqid].length = kprof.nbuf * FORMATSIZE;
-	kprof.buf_sz = n;
-	/* NO, I'm not sure how we should do this yet. */
-	int alloc_cpu_buffers(void);
-	alloc_cpu_buffers();
-	oprof_alarms = kzmalloc(sizeof(struct alarm_waiter) * num_cpus,
-	                        KMALLOC_WAIT);
-	for (int i = 0; i < num_cpus; i++)
-		init_awaiter_irq(&oprof_alarms[i], oprof_alarm_handler);
-
-	kprof.systrace = qopen(2 << 20, 0, 0, 0);
-	if (! kprof.systrace) {
-		printk("systrace allocate failed. No system call tracing\n");
-	}
-	kprof.mpstat_ipi = TRUE;
 	return devattach('K', spec);
 }
 
@@ -187,13 +164,50 @@ static void setup_timers(void)
 	set_alarm(tchain, waiter);
 }
 
-static void
-kprofinit(void)
+static void kprofinit(void)
 {
-	if(CELLSIZE != sizeof kprof.buf[0])
-		panic("kprof size");
+	uint32_t n;
+
+	static_assert(CELLSIZE == sizeof kprof.buf[0]); // kprof size
+
+	/* allocate when first used */
+	kprof.minpc = KERN_LOAD_ADDR;
+	kprof.maxpc = (uintptr_t) &etext;
+	kprof.nbuf = (kprof.maxpc-kprof.minpc) >> LRES;
+	n = kprof.nbuf*CELLSIZE;
+	kprof.buf = kzmalloc(n, KMALLOC_WAIT);
+	if (kprof.buf)
+		kprof.buf_sz = n;
+
+	/* no, i'm not sure how we should do this yet. */
+	int alloc_cpu_buffers(void);
+	alloc_cpu_buffers();
+	oprof_alarms = kzmalloc(sizeof(struct alarm_waiter) * num_cpus,
+	                        KMALLOC_WAIT);
+	if (!oprof_alarms)
+		error(Enomem);
+
+	for (int i = 0; i < num_cpus; i++)
+		init_awaiter_irq(&oprof_alarms[i], oprof_alarm_handler);
+
+	kprof.systrace = qopen(2 << 20, 0, 0, 0);
+	if (!kprof.systrace) {
+		printk("systrace allocate failed. No system call tracing\n");
+	}
+	kprof.mpstat_ipi = TRUE;
+
+	kproftab[Kprofdataqid].length = kprof.nbuf * FORMATSIZE;
 	kproftab[Kmpstatqid].length = mpstat_len();
 	kproftab[Kmpstatrawqid].length = mpstatraw_len();
+}
+
+static void kprofshutdown(void)
+{
+	kfree(oprof_alarms); oprof_alarms = NULL;
+	kfree(kprof.buf); kprof.buf = NULL;
+	qfree(kprof.systrace); kprof.systrace = NULL;
+	void free_cpu_buffers(void);
+	free_cpu_buffers();
 }
 
 static struct walkqid*
@@ -459,7 +473,7 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 	case Kprofctlqid:
 		if (cb->nf < 1)
 			error(ctlstring);
-			
+
 		/* Kprof: a "which kaddr are we at when the timer goes off".  not used
 		 * much anymore */
 		if (!strcmp(cb->f[0], "startclr")) {
@@ -596,7 +610,7 @@ struct dev kprofdevtab __devtab = {
 
 	devreset,
 	kprofinit,
-	devshutdown,
+	kprofshutdown,
 	kprofattach,
 	kprofwalk,
 	kprofstat,
