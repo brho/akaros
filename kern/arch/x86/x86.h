@@ -55,8 +55,6 @@
 /* Arch Constants */
 #define MAX_NUM_CPUS				255
 
-#ifdef CONFIG_X86_64
-
 #define X86_REG_BP					"rbp"
 #define X86_REG_SP					"rsp"
 #define X86_REG_IP					"rip"
@@ -65,17 +63,6 @@
 #define X86_REG_CX					"rcx"
 #define X86_REG_DX					"rdx"
 
-#else /* 32 bit */
-
-#define X86_REG_BP					"ebp"
-#define X86_REG_SP					"esp"
-#define X86_REG_IP					"eip"
-#define X86_REG_AX					"eax"
-#define X86_REG_BX					"ebx"
-#define X86_REG_CX					"ecx"
-#define X86_REG_DX					"edx"
-
-#endif /* 64bit / 32bit */
 
 /* Various flags defined: can be included from assembler. */
 

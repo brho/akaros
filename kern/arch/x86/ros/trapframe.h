@@ -15,11 +15,7 @@
 #define PF_ERROR_USER 			0x04
 #define PF_VMR_BACKED 			(1 << 31)
 
-#ifdef __x86_64__
 #include <ros/arch/trapframe64.h>
-#else
-#include <ros/arch/trapframe32.h>
-#endif
 
 /* FP state and whatever else the kernel won't muck with automatically.  For
  * now, it's the Non-64-bit-mode layout of FP and XMM registers, as used by

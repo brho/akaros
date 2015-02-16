@@ -26,8 +26,6 @@ typedef int pid_t;
 typedef int uid_t;
 typedef int gid_t;
 
-#ifdef CONFIG_X86_64
-
 #define NUM_ADDR_BITS 64
 #define BITS_PER_LONG 64
 #define MAX_VADDR     ((uint64_t)(~0) >> (64-NUM_ADDR_BITS))
@@ -35,17 +33,5 @@ typedef uint64_t uintptr_t;
 #define PAGE_SHIFT 12
 #define PAGE_SIZE (1<<PAGE_SHIFT)
 #define PAGE_MASK 0xFFFFFFFFfffff000
-#else /* 32 bit */
-
-#define NUM_ADDR_BITS 32
-#define BITS_PER_LONG 32
-#define MAX_VADDR     ((uint64_t)(~0) >> (64-NUM_ADDR_BITS))
-typedef uint32_t uintptr_t;
-
-#define PAGE_SHIFT 12
-#define PAGE_SIZE (1<<PAGE_SHIFT)
-#define PAGE_MASK 0xFFFFF000
-#endif /* 64bit / 32bit */
-
 
 #endif /* !ROS_INC_TYPES_H */

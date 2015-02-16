@@ -90,14 +90,12 @@ void smp_final_core_init(void)
 		wait = FALSE;
 	while (wait)
 		cpu_relax();
-#ifdef CONFIG_X86_64
 	/* at this point, it is safe to get the OS coreid */
 	int coreid = get_os_coreid(hw_core_id());
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	pcpui->coreid = coreid;
 	write_msr(MSR_GS_BASE, (uint64_t)pcpui);
 	write_msr(MSR_KERN_GS_BASE, (uint64_t)pcpui);
-#endif
 	/* don't need this for the kernel anymore, but userspace can still use it */
 	setup_rdtscp(coreid);
 	/* After this point, all cores have set up their segmentation and whatnot to
@@ -173,13 +171,8 @@ void smp_boot(void)
 	memcpy(KADDR(trampoline_pg), (void *COUNT(PGSIZE))TC(smp_entry),
            smp_entry_end - smp_entry);
 
-	/* 64 bit already has the tramp pg mapped (1 GB of lowmem)  */
-#ifndef CONFIG_X86_64
-	// This mapping allows access to the trampoline with paging on and off
-	// via trampoline_pg
-	page_insert(boot_pgdir, pa2page(trampoline_pg), (void*SNT)trampoline_pg,
-	            PTE_W);
-#endif
+	/* Make sure the trampoline page is mapped.  64 bit already has the tramp pg
+	 * mapped (1 GB of lowmem), so this is a nop. */
 
 	// Allocate a stack for the cores starting up.  One for all, must share
 	if (kpage_alloc(&smp_stack))
@@ -346,10 +339,8 @@ void __arch_pcpu_init(uint32_t coreid)
 		pcpui->gdt = (segdesc_t*)(*my_stack_bot +
 		                          sizeof(taskstate_t) + sizeof(pseudodesc_t));
 	}
-#ifdef CONFIG_X86_64
 	assert(read_msr(MSR_GS_BASE) == (uint64_t)pcpui);
 	assert(read_msr(MSR_KERN_GS_BASE) == (uint64_t)pcpui);
-#endif
 	/* Don't try setting up til after setting GS */
 	x86_sysenter_init(x86_get_stacktop_tss(pcpui->tss));
 	/* need to init perfctr before potentiall using it in timer handler */

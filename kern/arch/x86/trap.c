@@ -278,21 +278,12 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 		       hw_tf->tf_rip, core_id(), err);
 		print_trapframe(hw_tf);
 		/* Turn this on to help debug bad function pointers */
-#ifdef CONFIG_X86_64
 		printd("rsp %p\n\t 0(rsp): %p\n\t 8(rsp): %p\n\t 16(rsp): %p\n"
 		       "\t24(rsp): %p\n", hw_tf->tf_rsp,
 		       *(uintptr_t*)(hw_tf->tf_rsp +  0),
 		       *(uintptr_t*)(hw_tf->tf_rsp +  8),
 		       *(uintptr_t*)(hw_tf->tf_rsp + 16),
 		       *(uintptr_t*)(hw_tf->tf_rsp + 24));
-#else
-		printd("esp %p\n\t 0(esp): %p\n\t 4(esp): %p\n\t 8(esp): %p\n"
-		       "\t12(esp): %p\n", hw_tf->tf_esp,
-		       *(uintptr_t*)(hw_tf->tf_esp +  0),
-		       *(uintptr_t*)(hw_tf->tf_esp +  4),
-		       *(uintptr_t*)(hw_tf->tf_esp +  8),
-		       *(uintptr_t*)(hw_tf->tf_esp + 12));
-#endif
 	}
 	return TRUE;
 }
@@ -618,7 +609,6 @@ int route_irqs(int apic_vec, int os_coreid)
 
 /* It's a moderate pain in the ass to put these in bit-specific files (header
  * hell with the set_current_ helpers) */
-#ifdef CONFIG_X86_64
 void sysenter_callwrapper(struct syscall *sysc, unsigned long count,
                           struct sw_trapframe *sw_tf)
 {
@@ -634,30 +624,6 @@ void sysenter_callwrapper(struct syscall *sysc, unsigned long count,
 	/* If you use pcpui again, reread it, since you might have migrated */
 	proc_restartcore();
 }
-
-#else
-
-/* This is called from sysenter's asm, with the tf on the kernel stack. */
-/* TODO: use a sw_tf for sysenter */
-void sysenter_callwrapper(struct hw_trapframe *hw_tf)
-{
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	assert(!in_kernel(hw_tf));
-	set_current_ctx_hw(pcpui, hw_tf);
-	__set_cpu_state(pcpui, CPU_STATE_KERNEL);
-	/* Once we've set_current_ctx, we can enable interrupts.  This used to be
-	 * mandatory (we had immediate KMSGs that would muck with cur_ctx).  Now it
-	 * should only help for sanity/debugging. */
-	enable_irq();
-
-	/* Set up and run the async calls */
-	prep_syscalls(current,
-				  (struct syscall*)x86_get_sysenter_arg0(hw_tf),
-				  (unsigned int)x86_get_sysenter_arg1(hw_tf));
-	/* If you use pcpui again, reread it, since you might have migrated */
-	proc_restartcore();
-}
-#endif
 
 /* Declared in x86/arch.h */
 void send_ipi(uint32_t os_coreid, uint8_t vector)

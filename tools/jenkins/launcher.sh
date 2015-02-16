@@ -69,7 +69,6 @@ fi
 
 function add_cross_compiler_to_path() {
 	export PATH=$WORKSPACE/install/riscv-ros-gcc/bin:$PATH
-	export PATH=$WORKSPACE/install/i686-ros-gcc/bin:$PATH
 	export PATH=$WORKSPACE/install/x86_64-ros-gcc/bin:$PATH
 }
 
@@ -88,12 +87,6 @@ function build_config() {
 	# Begin with default configuration.
 	case "$COMPILATION_ARCH" in
 	RISCV)  make ARCH=riscv defconfig
-	    ;;
-	I686)  make ARCH=x86 defconfig
-		   sed -i -e 's/CONFIG_64BIT=y/# CONFIG_64BIT is not set/' \
-		          -e 's/# CONFIG_X86_32 is not set/CONFIG_X86_32=y/' \
-		          -e 's/CONFIG_X86_64=y/# CONFIG_X86_64 is not set/' \
-		          .config
 	    ;;
 	X86_64)  make ARCH=x86 defconfig
 	    ;;
@@ -114,7 +107,6 @@ function build_config() {
 
 function build_cross_compiler() {
 	declare -A ARCH_SUBDIRS=( ["RISCV"]="riscv-ros-gcc" \
-	                          ["I686"]="i686-ros-gcc" \
 	                          ["X86_64"]="x86_64-ros-gcc" )
 
 	echo -e "\n[BUILD_CROSS_COMPILER]: Begin"
@@ -130,7 +122,6 @@ function build_cross_compiler() {
 	echo "# Number of make jobs to spawn.  
 MAKE_JOBS := 3
 RISCV_INSTDIR         := $WORKSPACE/install/${ARCH_SUBDIRS["RISCV"]}/
-I686_INSTDIR          := $WORKSPACE/install/${ARCH_SUBDIRS["I686"]}/
 X86_64_INSTDIR        := $WORKSPACE/install/${ARCH_SUBDIRS["X86_64"]}/
 " > Makelocal
 
@@ -141,8 +132,6 @@ X86_64_INSTDIR        := $WORKSPACE/install/${ARCH_SUBDIRS["X86_64"]}/
 	# Compile cross compiler.
 	case "$COMPILATION_ARCH" in
 	RISCV)  make riscv
-	    ;;
-	I686)  make i686
 	    ;;
 	X86_64)  make x86_64
 	    ;;

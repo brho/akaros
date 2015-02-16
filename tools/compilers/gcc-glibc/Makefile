@@ -5,17 +5,14 @@ MAKE_JOBS :=
 -include Makelocal
 
 ifndef RISCV_INSTDIR
-ifndef I686_INSTDIR
 ifndef X86_64_INSTDIR
 ifndef X86_64_NATIVE_INSTDIR
 busted: 
-	@echo "You need to setup either a RISCV_INSTDIR, an I686_INSTDIR, or an X86_64_INSTDIR to point to where you want the tools installed. The best way to do this is to create a 'Makelocal' file in the current directory and put it in there."; false
+	@echo "You need to setup either a RISCV_INSTDIR or an X86_64_INSTDIR to point to where you want the tools installed. The best way to do this is to create a 'Makelocal' file in the current directory and put it in there."; false
 riscv: busted
-i686: busted
 x86_64: busted
 x86_64-native: busted
 endif
-endif 
 endif 
 endif 
 
@@ -51,14 +48,6 @@ RISCV_GLIBC_CONFIGURE_FLAGS :=
 RISCV_GCC_BUILD_FLAGS := 
 RISCV_CFLAGS :=
 
-# Configuration parameters for x86
-I686_ARCH := i686
-I686_BINARY_PREFIX := $(I686_ARCH)-ucb-akaros-
-I686_SYSROOT := $(I686_INSTDIR)/$(I686_ARCH)-ucb-akaros/sysroot
-I686_GLIBC_CONFIGURE_FLAGS := 
-I686_GCC_BUILD_FLAGS := 
-I686_CFLAGS := -march=i486
-
 # Configuration parameters for x86_64
 X86_64_ARCH := x86_64
 X86_64_BINARY_PREFIX := $(X86_64_ARCH)-ucb-akaros-
@@ -88,17 +77,6 @@ error:
 riscv: error
 endif
 endif
-ifneq (,$(filter i686,$(MAKECMDGOALS)))
-ifeq (,$(shell grep "CONFIG_X86_32=y" $(ROSDIR)/.config))
-error: 
-	@echo "Akaros tree not configured for i686"
-	@echo "Make sure you have configured ROSDIR for this architecture before proceeding"
-	@echo "e.g. cd \$$ROSDIR"
-	@echo "     make ARCH=x86 defconfig"
-	@false
-i686: error
-endif
-endif
 ifneq (,$(filter x86_64,$(MAKECMDGOALS)))
 ifeq (,$(shell grep "CONFIG_X86_64=y" $(ROSDIR)/.config))
 error: 
@@ -126,15 +104,12 @@ all:
 	@echo "You need to run one of the following commands, "
 	@echo "depending on which version of the cross compiler you are trying to generate:"
 	@echo "  make riscv"
-	@echo "  make i686"
 	@echo "  make x86_64"
 	@echo "  make x86-64-native"
 	@echo "  make riscv-revert"
-	@echo "  make i686-revert"
 	@echo "  make x86_64-revert"
 	@echo "  make x86_64-native-revert"
 	@echo "  make riscv-uninstall"
-	@echo "  make i686-uninstall"
 	@echo "  make x86_64-uninstall"
 	@echo "  make x86_64-native-uninstall"
 	@echo "  make clean"
@@ -151,20 +126,6 @@ riscv:
 	export BINARY_PREFIX=$(RISCV_BINARY_PREFIX);\
 	export GLIBC_CONFIGURE_FLAGS=$(RISCV_GLIBC_CONFIGURE_FLAGS);\
 	export GCC_BUILD_FLAGS=$(RISCV_GCC_BUILD_FLAGS);\
-	$(MAKE) make-all
-
-i686:
-	export LD_LIBRARY_PATH=; \
-	export DESTDIR=$(DESTDIR);\
-	export INSTDIR=$(I686_INSTDIR);\
-	export SYSROOT=$(I686_SYSROOT);\
-	export PATH=$(DESTDIR)$(I686_INSTDIR)/bin:$(PATH);\
-	export ARCH=$(I686_ARCH);\
-	export ARCH_CFLAGS=$(I686_CFLAGS);\
-	export ROS_ARCH_DIR=x86;\
-	export BINARY_PREFIX=$(I686_BINARY_PREFIX);\
-	export GLIBC_CONFIGURE_FLAGS=$(I686_GLIBC_CONFIGURE_FLAGS);\
-	export GCC_BUILD_FLAGS=$(I686_GCC_BUILD_FLAGS);\
 	$(MAKE) make-all
 
 x86_64:
@@ -214,9 +175,6 @@ make-native-all:
 riscv-uninstall:
 	-rm -rf $(RISCV_INSTDIR)
 
-i686-uninstall:
-	-rm -rf $(I686_INSTDIR)
-
 x86_64-uninstall:
 	-rm -rf $(X86_64_INSTDIR)
 
@@ -226,10 +184,6 @@ x86_64-native-uninstall:
 riscv-revert:
 	rm -rf $(RISCV_INSTDIR)
 	cp -r $(RISCV_BINARY_PREFIX)install.bak $(RISCV_INSTDIR)
-
-i686-revert: 
-	rm -rf $(I686_INSTDIR)
-	cp -r $(I686_BINARY_PREFIX)install.bak $(I686_INSTDIR)
 
 x86_64-revert: 
 	rm -rf $(X86_64_INSTDIR)

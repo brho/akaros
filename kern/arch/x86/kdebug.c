@@ -328,32 +328,15 @@ size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
 
 void backtrace_frame(uintptr_t eip, uintptr_t ebp)
 { 
-	extern char (SNT RO _start)[];
-	eipdebuginfo_t debuginfo;
-	char buf[256];
 	char *func_name;
 	#define MAX_BT_DEPTH 20
 	uintptr_t pcs[MAX_BT_DEPTH];
 	size_t nr_pcs = backtrace_list(eip, ebp, pcs, MAX_BT_DEPTH);
 
 	for (int i = 0; i < nr_pcs; i++) {
-		#ifdef CONFIG_X86_64
 		func_name = get_fn_name(pcs[i]);
 		printk("#%02d [<%p>] in %s\n", i + 1,  pcs[i], func_name);
 		kfree(func_name);
-		#else
-		debuginfo_eip(pcs[i], &debuginfo);
-		memset(buf, 0, 256);
-		strncpy(buf, debuginfo.eip_fn_name, MIN(debuginfo.eip_fn_namelen, 256));
-		buf[MIN(debuginfo.eip_fn_namelen, 255)] = 0;
-		cprintf("#%02d [<%p>] in %s+%x(%p) from %s:%d\n", i + 1,  pcs[i], buf, 
-		        debuginfo.eip_fn_addr - (uintptr_t)_start,
-		        debuginfo.eip_fn_addr, debuginfo.eip_file, debuginfo.eip_line);
-		cprintf("    ebp: %x   Args:", ebp);
-		for (int j = 0; j < MIN(debuginfo.eip_fn_narg, 5); j++)
-			cprintf(" %08x", *(uintptr_t*)(ebp + 2 + j));
-		cprintf("\n");
-		#endif /* CONFIG_X86_64 */
 	}
 }
 

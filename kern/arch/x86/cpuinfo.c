@@ -159,13 +159,11 @@ void print_cpuinfo(void)
 	lcr4(rcr4() & ~CR4_TSD);
 	printk("1 GB Jumbo pages %ssupported\n", edx & (1 << 26) ? "" : "not ");
 	printk("FS/GS MSRs %ssupported\n", edx & (1 << 29) ? "" : "not ");
-	#ifdef CONFIG_X86_64
 	if (!(edx & (1 << 29))) {
 		printk("Can't handle no FS/GS MSRs!\n");
 		while (1)
 			asm volatile ("hlt");
 	}
-	#endif
 	cpuid(0x00000006, 0x0, &eax, 0, 0, 0);
 	if (eax & (1 << 2))
 		printk("Always running APIC detected\n");
@@ -173,13 +171,8 @@ void print_cpuinfo(void)
 		printk("Always running APIC *not* detected\n");
 }
 
-#ifdef CONFIG_X86_64
 #define BIT_SPACING "        "
 #define BIT_DASHES "----------------"
-#else
-#define BIT_SPACING ""
-#define BIT_DASHES ""
-#endif
 
 void show_mapping(pde_t *pgdir, uintptr_t start, size_t size)
 {

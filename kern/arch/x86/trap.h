@@ -196,11 +196,7 @@ set_frame_pointer(uintptr_t fp)
 
 extern segdesc_t *gdt;
 
-#ifdef CONFIG_X86_64
 #include <arch/trap64.h>
-#else
-#include <arch/trap32.h>
-#endif
 
 #endif /* !__ASSEMBLER__ */
 

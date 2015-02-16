@@ -4,11 +4,7 @@
 #ifndef ROS_INC_ARCH_MMU_H
 #define ROS_INC_ARCH_MMU_H
 
-#ifdef __x86_64__
 #include <ros/arch/mmu64.h>
-#else
-#include <ros/arch/mmu32.h>
-#endif
 
 /* **************************************** */
 /* Control Registers */

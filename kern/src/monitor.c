@@ -218,7 +218,7 @@ int mon_sm(int argc, char **argv, struct hw_trapframe *hw_tf)
 
 int mon_setmapperm(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-#ifndef CONFIG_X86_32
+#if 1 // was x86-32 only.
 	cprintf("I don't support this call yet!\n");
 	return 1;
 #else
@@ -1212,7 +1212,7 @@ int mon_kpfret(int argc, char **argv, struct hw_trapframe *hw_tf)
 		return -1;
 	}
 
-#ifdef CONFIG_X86_64
+#ifdef CONFIG_X86
 	hw_tf->tf_rip = (uintptr_t)smp_idle;
 	dec_ktrap_depth(pcpui);
 
@@ -1240,7 +1240,7 @@ int mon_kpfret(int argc, char **argv, struct hw_trapframe *hw_tf)
 #else
 	printk("KPF return not supported\n");
 	return -1;
-#endif /* CONFIG_X86_64 */
+#endif /* CONFIG_X86 */
 }
 
 int mon_ks(int argc, char **argv, struct hw_trapframe *hw_tf)

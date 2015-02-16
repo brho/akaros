@@ -80,7 +80,9 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 		goto fail;
 	}
 	#endif
-	#ifdef CONFIG_X86_64
+	/* Not sure what RISCV's 64 bit kernel can do here, so this check is x86
+	 * only */
+	#ifdef CONFIG_X86
 	if (elf32) {
 		printk("[kernel] load_one_elf: 32 bit elf on 64 bit kernel\n");
 		goto fail;

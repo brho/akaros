@@ -5,11 +5,7 @@
 
 #ifndef ROS_KERNEL
 
-#ifdef __x86_64__
 #include <ros/arch/syscall64.h>
-#else
-#include <ros/arch/syscall32.h>
-#endif
 
 static inline long __ros_arch_syscall(long _a0, long _a1)
 {

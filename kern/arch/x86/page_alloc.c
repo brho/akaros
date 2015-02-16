@@ -200,7 +200,6 @@ static void account_for_pages(physaddr_t boot_freemem_paddr)
 	 * array either (and accidentally run off the end of the array).
 	 *
 	 * Additionally, 32 bit doesn't acknowledge pmem above the 4GB mark. */
-#ifdef CONFIG_X86_64
 	start_of_free_2 = 0x0000000100000000;
 	if (max_paddr < start_of_free_2)
 		return;
@@ -208,7 +207,6 @@ static void account_for_pages(physaddr_t boot_freemem_paddr)
 		assert(kref_refcnt(&pa64_to_page(i)->pg_kref) == 1);
 	for (physaddr_t i = start_of_free_2; i < max_paddr; i += PGSIZE)
 		track_free_page(pa64_to_page(i));
-#endif /* CONFIG_X86_64 */
 }
 
 /* Initialize the memory free lists.  After this, do not use boot_alloc. */

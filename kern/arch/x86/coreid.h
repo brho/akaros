@@ -37,7 +37,6 @@ static inline int node_id(void)
 	return 0;
 }
 
-#ifdef CONFIG_X86_64
 static inline int core_id(void)
 {
 	int coreid;
@@ -47,17 +46,6 @@ static inline int core_id(void)
 	asm volatile ("movl %%gs:8, %0" : "=r"(coreid));
 	return coreid;
 }
-#else
-/* 32 bit code just uses the old crap.  could use rdtscp, but not worth the
- * hassle. */
-/* core_id() returns the OS core number, not to be confused with the
- * hardware-specific core identifier (such as the lapic id) returned by
- * hw_core_id() */
-static inline int core_id(void)
-{
-	return get_os_coreid(hw_core_id());
-}
-#endif /* CONFIG_X86_64 */
 
 /* Tracks whether it is safe to execute core_id() or not. */
 extern bool core_id_ready;

@@ -11,9 +11,9 @@ config SRCARCH
 
 config 64BIT
 	bool "64-bit kernel"
-	default n
+	default y
 	help
-		Say yes to build a 64-bit kernel, amd64 / x86_64, riscv64, etc.
+		Say yes to build a 64-bit kernel.  Must be 'y' for x86.
 
 menuconfig RUN_INIT_SCRIPT
 	bool "Run init script after boot"

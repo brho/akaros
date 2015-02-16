@@ -18,7 +18,7 @@
 #include <syscall.h>
 #include <alarm.h>
 #include <trace.h>
-#ifdef CONFIG_X86_64
+#ifdef CONFIG_X86
 #include <arch/vm.h>
 #endif
 
@@ -41,7 +41,7 @@ static char *cpu_state_names[NR_CPU_STATES] =
 };
 
 struct per_cpu_info {
-#ifdef CONFIG_X86_64
+#ifdef CONFIG_X86
 	uintptr_t stacktop;			/* must be first */
 	int coreid;					/* must be second */
 	/* virtual machines */

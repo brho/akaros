@@ -79,10 +79,6 @@ my path contains:
 
 /home/brho/classes/ros/ros-gcc-glibc/install-x86_64-ros-gcc/bin
 
-	and
-
-/home/brho/classes/ros/ros-gcc-glibc/install-i686-ros-gcc/bin
-
 You can also set up MAKE_JOBS, so you don't over or under load your system when
 building.  I have a 2 core laptop, so I use MAKE_JOBS := 3
 
