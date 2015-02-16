@@ -116,7 +116,7 @@ do {								\
 	pr_err("[%s:%d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
 
 /* before we have a dev->name use dev_info() */
-#define BNX2X_DEV_INFO(fmt, ...) printk(fmt, ##__VA_ARGS__);
+#define BNX2X_DEV_INFO(fmt, ...) printk(fmt, ##__VA_ARGS__)
 
 /* Error handling */
 void bnx2x_panic_dump(struct bnx2x *bp, bool disable_int);
@@ -1445,6 +1445,10 @@ struct bnx2x {
 	TAILQ_ENTRY(bnx2x) 			link9ns;
 	const struct pci_device_id	*pci_id;			/* for navigating pci/pnp */
 
+	/* These are in Linux's net_device */
+	void						*mem_start;
+	void						*mem_end;
+	void						*base_addr;
 
 	/* e.g. */
 	bool						active;

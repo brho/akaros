@@ -531,4 +531,67 @@ static inline int pci_write_config_dword(struct pci_device *dev, uint32_t off,
 	return 0;
 }
 
+static inline void pci_disable_device(struct pci_device *dev)
+{
+	pci_clr_bus_master(dev);
+}
+
+static inline int pci_enable_device(struct pci_device *dev)
+{
+	pci_set_bus_master(dev);
+	return 0;
+}
+
+
+
+// TODO: maybe spatch these
+
+static inline uint32_t pci_resource_len(struct pci_device *dev, int bir)
+{
+	return pci_get_membar_sz(dev, bir);
+}
+
+static inline void *pci_resource_start(struct pci_device *dev, int bir)
+{
+	return (void*)pci_get_membar(dev, bir);
+}
+
+static inline void *pci_resource_end(struct pci_device *dev, int bir)
+{
+	return (void*)(pci_get_membar(dev, bir) + pci_resource_len(dev, bir));
+}
+
+#define ioremap_nocache(paddr, sz) \
+        (void*)vmap_pmem_nocache((uintptr_t)paddr, sz)
+#define ioremap(paddr, sz) (void*)vmap_pmem(paddr, sz)
+#define pci_ioremap_bar(dev, bir) (void*)pci_map_membar(dev, bir)
+#define pci_set_master(x) pci_set_bus_master(x)
+
+#define dev_addr_add(dev, addr, type) ({memcpy((dev)->ea, addr, Eaddrlen); 0;})
+#define dev_addr_del(...)
+
+#define SET_NETDEV_DEV(...)
+#define netif_carrier_off(...)
+#define netif_carrier_on(...)
+/* May need to do something with edev's queues or flags. */
+#define netif_tx_wake_all_queues(...)
+#define netif_tx_wake_queue(...)
+#define netif_tx_start_all_queues(...)
+#define netif_tx_start_queue(...)
+/* picks a random, valid mac addr for dev */
+#define eth_hw_addr_random(...)
+/* checks if the MAC is not 0 and not multicast (all 1s) */
+#define is_valid_ether_addr(...) (TRUE)
+
+#define EPROBE_DEFER 1
+/* Could spatch this:
+	if (!(pci_resource_flags(pdev, 0) & IORESOURCE_MEM)) {
+	to:
+	if (!pci_get_membar(pdev, 0)) {
+
+	eth_zero_addr(bp->dev->ea);
+	to:
+	memset(bp->dev->ea, 0, Eaddrlen);
+*/
+
 #endif /* ROS_KERN_AKAROS_COMPAT_H */

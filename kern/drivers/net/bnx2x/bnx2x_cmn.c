@@ -58,9 +58,8 @@ panic("Not implemented");
 
 static int bnx2x_calc_num_queues(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
-	int nq = bnx2x_num_queues ? : netif_get_num_default_rss_queues();
+	/* default is min(8, num_cpus) in Linux.  we'll set it elsewhere */
+	int nq = bnx2x_num_queues ? : 8;
 
 	/* Reduce memory usage in kdump environment by using only one queue */
 	if (is_kdump_kernel())
@@ -68,7 +67,6 @@ panic("Not implemented");
 
 	nq = CLAMP(nq, 1, BNX2X_MAX_QUEUES(bp));
 	return nq;
-#endif
 }
 
 /**
@@ -2019,8 +2017,6 @@ panic("Not implemented");
 
 void bnx2x_set_num_queues(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	/* RSS queues */
 	bp->num_ethernet_queues = bnx2x_calc_num_queues(bp);
 
@@ -2033,7 +2029,6 @@ panic("Not implemented");
 	bp->num_queues = bp->num_ethernet_queues + bp->num_cnic_queues;
 
 	BNX2X_DEV_INFO("set number of queues to %d\n", bp->num_queues);
-#endif
 }
 
 /**
@@ -4766,8 +4761,6 @@ void bnx2x_free_mem_bp(struct bnx2x *bp)
 
 int bnx2x_alloc_mem_bp(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	struct bnx2x_fastpath *fp;
 	struct msix_entry *tbl;
 	struct bnx2x_ilt *ilt;
@@ -4824,6 +4817,7 @@ panic("Not implemented");
 	if (!bp->bnx2x_txq)
 		goto alloc_err;
 
+	// AKAROS_PORT: we probably won't use this table */
 	/* msix table */
 	tbl = kzmalloc((msix_table_size) * (sizeof(*tbl)), KMALLOC_WAIT);
 	if (!tbl)
@@ -4840,7 +4834,6 @@ panic("Not implemented");
 alloc_err:
 	bnx2x_free_mem_bp(bp);
 	return -ENOMEM;
-#endif
 }
 
 int bnx2x_reload_if_running(struct ether *dev)

@@ -8507,7 +8507,12 @@ int bnx2x_setup_leading(struct bnx2x *bp)
  */
 int bnx2x_set_int_mode(struct bnx2x *bp)
 {
-panic("Not implemented");
+	/* This tries to set up MSIX in advance, registering vectors and whatnot.
+	 * The bulk is in bnx2x_enable_msix.
+	 *
+	 * We can check later if it worked after register_irq() */
+	// XME: when do we register the handler?
+	return 0;
 #if 0 // AKAROS_PORT
 	int rc = 0;
 
@@ -10324,16 +10329,13 @@ static struct bnx2x_prev_path_list *
 		bnx2x_prev_path_get_entry(struct bnx2x *bp)
 {
 	struct bnx2x_prev_path_list *tmp_list;
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	list_for_each_entry(tmp_list, &bnx2x_prev_list, list)
-		if (PCI_SLOT(bp->pdev->devfn) == tmp_list->slot &&
-		    bp->pdev->bus->number == tmp_list->bus &&
+		if (bp->pdev->dev== tmp_list->slot &&
+		    bp->pdev->bus == tmp_list->bus &&
 		    BP_PATH(bp) == tmp_list->path)
 			return tmp_list;
 
 	return NULL;
-#endif
 }
 
 static int bnx2x_prev_path_mark_eeh(struct bnx2x *bp)
@@ -10403,8 +10405,6 @@ bool bnx2x_port_after_undi(struct bnx2x *bp)
 
 static int bnx2x_prev_mark_path(struct bnx2x *bp, bool after_undi)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	struct bnx2x_prev_path_list *tmp_list;
 	int rc;
 
@@ -10436,8 +10436,8 @@ panic("Not implemented");
 		return -ENOMEM;
 	}
 
-	tmp_list->bus = bp->pdev->bus->number;
-	tmp_list->slot = PCI_SLOT(bp->pdev->devfn);
+	tmp_list->bus = bp->pdev->bus;
+	tmp_list->slot = bp->pdev->dev;
 	tmp_list->path = BP_PATH(bp);
 	tmp_list->aer = 0;
 	tmp_list->undi = after_undi ? (1 << BP_PORT(bp)) : 0;
@@ -10454,7 +10454,6 @@ panic("Not implemented");
 	}
 
 	return rc;
-#endif
 }
 
 static int bnx2x_do_flr(struct bnx2x *bp)
@@ -10644,8 +10643,6 @@ static void bnx2x_prev_interrupted_dmae(struct bnx2x *bp)
 
 static int bnx2x_prev_unload(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int time_counter = 10;
 	uint32_t rc, fw, hw_lock_reg, hw_lock_val;
 	BNX2X_DEV_INFO("Entering Previous Unload Flow\n");
@@ -10725,13 +10722,10 @@ panic("Not implemented");
 	BNX2X_DEV_INFO("Finished Previous Unload Flow [%d]\n", rc);
 
 	return rc;
-#endif
 }
 
 static void bnx2x_get_common_hwinfo(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint32_t val, val2, val3, val4, id, boot_mode;
 	uint16_t pmc;
 
@@ -10901,8 +10895,10 @@ panic("Not implemented");
 		break;
 	}
 
+#if 0 // AKAROS_PORT no power mgmt cap
 	pci_read_config_word(bp->pdev, bp->pdev->pm_cap + PCI_PM_PMC, &pmc);
 	bp->flags |= (pmc & PCI_PM_CAP_PME_D3cold) ? 0 : NO_WOL_FLAG;
+#endif
 
 	BNX2X_DEV_INFO("%sWoL capable\n",
 		       (bp->flags & NO_WOL_FLAG) ? "not " : "");
@@ -10914,7 +10910,6 @@ panic("Not implemented");
 
 	dev_info(&bp->pdev->dev, "part number %X-%X-%X-%X\n",
 		 val, val2, val3, val4);
-#endif
 }
 
 #define IGU_FID(val)	GET_FIELD((val), IGU_REG_MAPPING_MEMORY_FID)
@@ -11278,8 +11273,6 @@ static void bnx2x_set_mac_buf(uint8_t *mac_buf, uint32_t mac_lo,
 
 static void bnx2x_get_port_hwinfo(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int port = BP_PORT(bp);
 	uint32_t config;
 	uint32_t ext_phy_type, ext_phy_config, eee_mode;
@@ -11340,6 +11333,7 @@ panic("Not implemented");
 		SHMEM_RD(bp,
 			 dev_info.port_hw_config[port].external_phy_config);
 	ext_phy_type = XGXS_EXT_PHY_TYPE(ext_phy_config);
+#if 0 // AKAROS_PORT MII MDIO XME
 	if (ext_phy_type == PORT_HW_CFG_XGXS_EXT_PHY_TYPE_DIRECT)
 		bp->mdio.prtad = bp->port.phy_addr;
 
@@ -11347,6 +11341,7 @@ panic("Not implemented");
 		 (ext_phy_type != PORT_HW_CFG_XGXS_EXT_PHY_TYPE_NOT_CONN))
 		bp->mdio.prtad =
 			XGXS_EXT_PHY_ADDR(ext_phy_config);
+#endif
 
 	/* Configure link feature according to nvram value */
 	eee_mode = (((SHMEM_RD(bp, dev_info.
@@ -11360,7 +11355,6 @@ panic("Not implemented");
 	} else {
 		bp->link_params.eee_mode = 0;
 	}
-#endif
 }
 
 void bnx2x_get_iscsi_info(struct bnx2x *bp)
@@ -11528,8 +11522,6 @@ static void bnx2x_get_cnic_info(struct bnx2x *bp)
 
 static void bnx2x_get_cnic_mac_hwinfo(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint32_t val, val2;
 	int func = BP_ABS_FUNC(bp);
 	int port = BP_PORT(bp);
@@ -11618,13 +11610,10 @@ panic("Not implemented");
 		bp->flags |= NO_FCOE_FLAG;
 		memset(bp->fip_mac, 0, Eaddrlen);
 	}
-#endif
 }
 
 static void bnx2x_get_mac_hwinfo(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint32_t val, val2;
 	int func = BP_ABS_FUNC(bp);
 	int port = BP_PORT(bp);
@@ -11669,7 +11658,6 @@ panic("Not implemented");
 			"bad Ethernet MAC address configuration: %pM\n"
 			"change it manually before bringing up the appropriate network interface\n",
 			bp->dev->ea);
-#endif
 }
 
 static bool bnx2x_get_dropless_info(struct bnx2x *bp)
@@ -11965,7 +11953,8 @@ static int bnx2x_get_hwinfo(struct bnx2x *bp)
 
 static void bnx2x_read_fwinfo(struct bnx2x *bp)
 {
-panic("Not implemented");
+	/* our hardware doesn't have any VPD when booted under linux */
+	return;
 #if 0 // AKAROS_PORT
 	int cnt, i, block_end, rodi;
 	char vpd_start[BNX2X_VPD_LEN+1];
@@ -12103,8 +12092,6 @@ static void bnx2x_set_modes_bitmap(struct bnx2x *bp)
 
 static int bnx2x_init_bp(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int func;
 	int rc;
 
@@ -12124,7 +12111,7 @@ panic("Not implemented");
 		if (rc)
 			return rc;
 	} else {
-		eth_zero_addr(bp->dev->ea);
+		memset(bp->dev->ea, 0, Eaddrlen);
 	}
 
 	bnx2x_set_modes_bitmap(bp);
@@ -12238,7 +12225,6 @@ panic("Not implemented");
 		bp->flags |= PTP_SUPPORTED;
 
 	return rc;
-#endif
 }
 
 /****************************************************************************
@@ -12706,7 +12692,7 @@ static const struct net_device_ops bnx2x_netdev_ops = {
 
 static int bnx2x_set_coherency_mask(struct bnx2x *bp)
 {
-panic("Not implemented");
+	return 0;
 #if 0 // AKAROS_PORT
 	struct device *dev = &bp->pdev->dev;
 
@@ -12734,8 +12720,6 @@ panic("Not implemented");
 static int bnx2x_init_dev(struct bnx2x *bp, struct pci_device *pdev,
 			  struct ether *dev, unsigned long board_type)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int rc;
 	uint32_t pci_cfg_dword;
 	bool chip_is_e1x = (board_type == BCM57710 ||
@@ -12754,14 +12738,14 @@ panic("Not implemented");
 		goto err_out;
 	}
 
-	if (!(pci_resource_flags(pdev, 0) & IORESOURCE_MEM)) {
+	if (!pci_get_membar(pdev, 0)) {
 		dev_err(&bp->pdev->dev,
 			"Cannot find PCI device base address, aborting\n");
 		rc = -ENODEV;
 		goto err_out_disable;
 	}
 
-	if (IS_PF(bp) && !(pci_resource_flags(pdev, 2) & IORESOURCE_MEM)) {
+	if (IS_PF(bp) && !pci_get_membar(pdev, 2)) {
 		dev_err(&bp->pdev->dev, "Cannot find second PCI device base address, aborting\n");
 		rc = -ENODEV;
 		goto err_out_disable;
@@ -12775,6 +12759,7 @@ panic("Not implemented");
 		goto err_out_disable;
 	}
 
+#if 0 // AKAROS_PORT
 	if (atomic_read(&pdev->enable_cnt) == 1) {
 		rc = pci_request_regions(pdev, DRV_MODULE_NAME);
 		if (rc) {
@@ -12786,7 +12771,11 @@ panic("Not implemented");
 		pci_set_master(pdev);
 		pci_save_state(pdev);
 	}
+#else
+		pci_set_master(pdev);
+#endif
 
+#if 0 // AKAROS_PORT  We can probably do these
 	if (IS_PF(bp)) {
 		if (!pdev->pm_cap) {
 			dev_err(&bp->pdev->dev,
@@ -12801,14 +12790,15 @@ panic("Not implemented");
 		rc = -EIO;
 		goto err_out_release;
 	}
+#endif
 
 	rc = bnx2x_set_coherency_mask(bp);
 	if (rc)
 		goto err_out_release;
 
-	dev->mem_start = pci_resource_start(pdev, 0);
-	dev->base_addr = dev->mem_start;
-	dev->mem_end = pci_resource_end(pdev, 0);
+	bp->mem_start = pci_resource_start(pdev, 0);
+	bp->base_addr = bp->mem_start;
+	bp->mem_end = pci_resource_end(pdev, 0);
 
 	dev->irq = pdev->irqline;
 
@@ -12826,7 +12816,7 @@ panic("Not implemented");
 	 * (depending on hypervisor).
 	 */
 	if (chip_is_e1x) {
-		bp->pf_num = PCI_FUNC(pdev->devfn);
+		bp->pf_num = pdev->func;
 	} else {
 		/* chip is E2/3*/
 		pci_read_config_dword(bp->pdev,
@@ -12840,12 +12830,14 @@ panic("Not implemented");
 	pci_write_config_dword(bp->pdev, PCICFG_GRC_ADDRESS,
 			       PCICFG_VENDOR_ID_OFFSET);
 
+#if 0 // AKAROS_PORT
 	/* AER (Advanced Error reporting) configuration */
 	rc = pci_enable_pcie_error_reporting(pdev);
 	if (!rc)
 		bp->flags |= AER_ENABLED;
 	else
 		BNX2X_DEV_INFO("Failed To configure PCIe AER [%d]\n", rc);
+#endif
 
 	/*
 	 * Clean the following indirect addresses for all functions since it
@@ -12873,12 +12865,14 @@ panic("Not implemented");
 			       PGLUE_B_REG_INTERNAL_PFID_ENABLE_TARGET_READ, 1);
 	}
 
+#if 0 // AKAROS_PORT
 	dev->watchdog_timeo = TX_TIMEOUT;
 
 	dev->netdev_ops = &bnx2x_netdev_ops;
 	bnx2x_set_ethtool_ops(bp, dev);
 
 	dev->priv_flags |= IFF_UNICAST_FLT;
+#endif
 
 	dev->hw_features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
 		NETIF_F_TSO | NETIF_F_TSO_ECN | NETIF_F_TSO6 |
@@ -12899,6 +12893,8 @@ panic("Not implemented");
 	dev->dcbnl_ops = &bnx2x_dcbnl_ops;
 #endif
 
+	warn("NEED TO DO MII STUFF");
+#if 0 // AKAROS_PORT MII XME
 	/* get_port_hwinfo() will set prtad and mmds properly */
 	bp->mdio.prtad = MDIO_PRTAD_NONE;
 	bp->mdio.mmds = 0;
@@ -12906,19 +12902,21 @@ panic("Not implemented");
 	bp->mdio.dev = dev;
 	bp->mdio.mdio_read = bnx2x_mdio_read;
 	bp->mdio.mdio_write = bnx2x_mdio_write;
+#endif
 
 	return 0;
 
 err_out_release:
+#if 0 // AKAROS_PORT
 	if (atomic_read(&pdev->enable_cnt) == 1)
 		pci_release_regions(pdev);
+#endif
 
 err_out_disable:
 	pci_disable_device(pdev);
 
 err_out:
 	return rc;
-#endif
 }
 
 static int bnx2x_check_firmware(struct bnx2x *bp)
@@ -13205,19 +13203,19 @@ static int bnx2x_set_qm_cid_count(struct bnx2x *bp)
  *
  * @dev:	pci device
  *
+ * AKAROS PORT: suspect function.
  */
 static int bnx2x_get_num_non_def_sbs(struct pci_device *pdev, int cnic_cnt)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int index;
 	uint16_t control = 0;
+	uint32_t msix_cap;
 
 	/*
 	 * If MSI-X is not supported - return number of SBs needed to support
 	 * one fast path queue: one FP queue + SB for CNIC
 	 */
-	if (!pdev->msix_cap) {
+	if (pci_find_cap(pdev, PCI_CAP_ID_MSIX, &msix_cap)) {
 		dev_info(&pdev->dev, "no msix capability found\n");
 		return 1 + cnic_cnt;
 	}
@@ -13230,12 +13228,11 @@ panic("Not implemented");
 	 * without the default SB.
 	 * For VFs there is no default SB, then we return (index+1).
 	 */
-	pci_read_config_word(pdev, pdev->msix_cap + PCI_MSIX_FLAGS, &control);
+	pci_read_config_word(pdev, msix_cap + PCI_MSIX_FLAGS, &control);
 
 	index = control & PCI_MSIX_FLAGS_QSIZE;
 
 	return index;
-#endif
 }
 
 static int set_max_cos_est(int chip_id)
@@ -13325,12 +13322,8 @@ static int bnx2x_send_update_drift_ramrod(struct bnx2x *bp, int drift_dir,
 int bnx2x_init_one(struct ether *dev, struct bnx2x *bp,
                    struct pci_device *pdev, const struct pci_device_id *ent)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
-	struct ether *dev = NULL;
-	struct bnx2x *bp;
-	enum pcie_link_width pcie_width;
-	enum pci_bus_speed pcie_speed;
+//	enum pcie_link_width pcie_width;
+//	enum pci_bus_speed pcie_speed;
 	int rc, max_non_def_sbs;
 	int rx_count, tx_count, rss_count, doorbell_size;
 	int max_cos_est;
@@ -13370,12 +13363,15 @@ panic("Not implemented");
 	 */
 	tx_count = rss_count * max_cos_est + cnic_cnt;
 
+#if 0 // AKAROS_PORT alloced in pnp.  XME Queues aren't alloced yet!
 	/* dev zeroed in init_etherdev */
 	dev = alloc_etherdev_mqs(sizeof(*bp), tx_count, rx_count);
 	if (!dev)
 		return -ENOMEM;
+#endif
 
-	bp = netdev_priv(dev);
+	/* double check Akaros's stitching of edev <-> bp */
+	assert(bp == netdev_priv(dev));
 
 	bp->flags = 0;
 	if (is_vf)
@@ -13390,8 +13386,9 @@ panic("Not implemented");
 	pci_set_drvdata(pdev, dev);
 
 	rc = bnx2x_init_dev(bp, pdev, dev, ent->driver_data);
+
 	if (rc < 0) {
-		free_netdev(dev);
+		//free_netdev(dev); // AKAROS alloc'd already
 		return rc;
 	}
 
@@ -13465,12 +13462,14 @@ panic("Not implemented");
 	}
 	BNX2X_DEV_INFO("set interrupts successfully\n");
 
+#if 0 // AKAROS PORT
 	/* register the net device */
 	rc = register_netdev(dev);
 	if (rc) {
 		dev_err(&pdev->dev, "Cannot register net device\n");
 		goto init_one_exit;
 	}
+#endif
 	BNX2X_DEV_INFO("device name after netdev register %s\n", dev->name);
 
 	if (!NO_FCOE(bp)) {
@@ -13479,6 +13478,7 @@ panic("Not implemented");
 		dev_addr_add(bp->dev, bp->fip_mac, NETDEV_HW_ADDR_T_SAN);
 		rtnl_unlock();
 	}
+#if 0 // AKAROS PORT
 	if (pcie_get_minimum_link(bp->pdev, &pcie_speed, &pcie_width) ||
 	    pcie_speed == PCI_SPEED_UNKNOWN ||
 	    pcie_width == PCIE_LNK_WIDTH_UNKNOWN)
@@ -13494,12 +13494,19 @@ panic("Not implemented");
 		       pcie_speed == PCIE_SPEED_8_0GT ? "8.0GHz" :
 		       "Unknown",
 		       dev->base_addr, bp->pdev->irqline, dev->ea);
-
-	bnx2x_register_phc(bp);
+#else
+	BNX2X_DEV_INFO(
+	       "%s (%c%d) PCI-E found at mem %lx, IRQ %d, node addr %pM\n",
+	       board_info[ent->driver_data].name,
+	       (CHIP_REV(bp) >> 12) + 'A', (CHIP_METAL(bp) >> 4),
+	       bp->base_addr, bp->pdev->irqline, dev->ea);
+#endif
 
 	return 0;
 
 init_one_exit:
+	BNX2X_ERROR("bnx2x init one failed");
+#if 0 // AKAROS_PORT
 	bnx2x_disable_pcie_error_reporting(bp);
 
 	if (bp->regview)
@@ -13514,9 +13521,9 @@ init_one_exit:
 		pci_release_regions(pdev);
 
 	pci_disable_device(pdev);
+#endif
 
 	return rc;
-#endif
 }
 
 static void __bnx2x_remove(struct pci_device *pdev,
