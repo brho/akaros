@@ -8472,11 +8472,11 @@ panic("Not implemented");
 
 		DP(NETIF_MSG_IFUP, "Adding Eth MAC\n");
 		__set_bit(RAMROD_COMP_WAIT, &ramrod_flags);
-		return bnx2x_set_mac_one(bp, bp->dev->dev_addr,
+		return bnx2x_set_mac_one(bp, bp->dev->ea,
 					 &bp->sp_objs->mac_obj, set,
 					 BNX2X_ETH_MAC, &ramrod_flags);
 	} else { /* vf */
-		return bnx2x_vfpf_config_mac(bp, bp->dev->dev_addr,
+		return bnx2x_vfpf_config_mac(bp, bp->dev->ea,
 					     bp->fp->index, true);
 	}
 #endif
@@ -9076,7 +9076,7 @@ panic("Not implemented");
 
 	else if (bp->wol) {
 		uint32_t emac_base = port ? GRCBASE_EMAC1 : GRCBASE_EMAC0;
-		uint8_t *mac_addr = bp->dev->dev_addr;
+		uint8_t *mac_addr = bp->dev->ea;
 		struct pci_device *pdev = bp->pdev;
 		uint32_t val;
 		uint16_t pmc;
@@ -11565,14 +11565,14 @@ panic("Not implemented");
 		} else { /* SD MODE */
 			if (BNX2X_IS_MF_SD_PROTOCOL_ISCSI(bp)) {
 				/* use primary mac as iscsi mac */
-				memcpy(iscsi_mac, bp->dev->dev_addr, Eaddrlen);
+				memcpy(iscsi_mac, bp->dev->ea, Eaddrlen);
 
 				BNX2X_DEV_INFO("SD ISCSI MODE\n");
 				BNX2X_DEV_INFO
 					("Read iSCSI MAC: %pM\n", iscsi_mac);
 			} else if (BNX2X_IS_MF_SD_PROTOCOL_FCOE(bp)) {
 				/* use primary mac as fip mac */
-				memcpy(fip_mac, bp->dev->dev_addr, Eaddrlen);
+				memcpy(fip_mac, bp->dev->ea, Eaddrlen);
 				BNX2X_DEV_INFO("SD FCoE MODE\n");
 				BNX2X_DEV_INFO
 					("Read FIP MAC: %pM\n", fip_mac);
@@ -11584,7 +11584,7 @@ panic("Not implemented");
 		 * as the SAN mac was copied from the primary MAC.
 		 */
 		if (IS_MF_FCOE_AFEX(bp))
-			memcpy(bp->dev->dev_addr, fip_mac, Eaddrlen);
+			memcpy(bp->dev->ea, fip_mac, Eaddrlen);
 	} else {
 		val2 = SHMEM_RD(bp, dev_info.port_hw_config[port].
 				iscsi_mac_upper);
@@ -11622,7 +11622,7 @@ panic("Not implemented");
 	int port = BP_PORT(bp);
 
 	/* Zero primary MAC configuration */
-	memset(bp->dev->dev_addr, 0, Eaddrlen);
+	memset(bp->dev->ea, 0, Eaddrlen);
 
 	if (BP_NOMCP(bp)) {
 		BNX2X_ERROR("warning: random MAC workaround active\n");
@@ -11632,7 +11632,7 @@ panic("Not implemented");
 		val = MF_CFG_RD(bp, func_mf_config[func].mac_lower);
 		if ((val2 != FUNC_MF_CFG_UPPERMAC_DEFAULT) &&
 		    (val != FUNC_MF_CFG_LOWERMAC_DEFAULT))
-			bnx2x_set_mac_buf(bp->dev->dev_addr, val, val2);
+			bnx2x_set_mac_buf(bp->dev->ea, val, val2);
 
 		if (CNIC_SUPPORT(bp))
 			bnx2x_get_cnic_mac_hwinfo(bp);
@@ -11640,7 +11640,7 @@ panic("Not implemented");
 		/* in SF read MACs from port configuration */
 		val2 = SHMEM_RD(bp, dev_info.port_hw_config[port].mac_upper);
 		val = SHMEM_RD(bp, dev_info.port_hw_config[port].mac_lower);
-		bnx2x_set_mac_buf(bp->dev->dev_addr, val, val2);
+		bnx2x_set_mac_buf(bp->dev->ea, val, val2);
 
 		if (CNIC_SUPPORT(bp))
 			bnx2x_get_cnic_mac_hwinfo(bp);
@@ -11654,13 +11654,13 @@ panic("Not implemented");
 		bp->flags |= HAS_PHYS_PORT_ID;
 	}
 
-	memcpy(bp->link_params.mac_addr, bp->dev->dev_addr, Eaddrlen);
+	memcpy(bp->link_params.mac_addr, bp->dev->ea, Eaddrlen);
 
-	if (!is_valid_ether_addr(bp->dev->dev_addr))
+	if (!is_valid_ether_addr(bp->dev->ea))
 		dev_err(&bp->pdev->dev,
 			"bad Ethernet MAC address configuration: %pM\n"
 			"change it manually before bringing up the appropriate network interface\n",
-			bp->dev->dev_addr);
+			bp->dev->ea);
 #endif
 }
 
@@ -12116,7 +12116,7 @@ panic("Not implemented");
 		if (rc)
 			return rc;
 	} else {
-		eth_zero_addr(bp->dev->dev_addr);
+		eth_zero_addr(bp->dev->ea);
 	}
 
 	bnx2x_set_modes_bitmap(bp);
@@ -12628,7 +12628,7 @@ panic("Not implemented");
 	if (IS_VF(bp))
 		bnx2x_sample_bulletin(bp);
 
-	if (!is_valid_ether_addr(dev->dev_addr)) {
+	if (!is_valid_ether_addr(dev->ea)) {
 		BNX2X_ERR("Non-valid Ethernet address\n");
 		return -EADDRNOTAVAIL;
 	}
@@ -13488,7 +13488,7 @@ panic("Not implemented");
 		       pcie_speed == PCIE_SPEED_5_0GT ? "5.0GHz" :
 		       pcie_speed == PCIE_SPEED_8_0GT ? "8.0GHz" :
 		       "Unknown",
-		       dev->base_addr, bp->pdev->irqline, dev->dev_addr);
+		       dev->base_addr, bp->pdev->irqline, dev->ea);
 
 	bnx2x_register_phc(bp);
 

@@ -112,3 +112,9 @@ struct ether *p;
 @@
 -p->mtu
 +p->maxmtu
+
+@@
+struct ether *p;
+@@
+-p->dev_addr
++p->ea

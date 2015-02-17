@@ -1933,7 +1933,7 @@ static void bnx2x_dcbnl_get_perm_hw_addr(struct ether *netdev,
 	DP(BNX2X_MSG_DCB, "GET-PERM-ADDR\n");
 
 	/* first the HW mac address */
-	memcpy(perm_addr, netdev->dev_addr, netdev->addr_len);
+	memcpy(perm_addr, netdev->ea, netdev->addr_len);
 
 	if (CNIC_LOADED(bp))
 		/* second SAN address */
