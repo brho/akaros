@@ -1639,7 +1639,7 @@ struct bnx2x {
 	struct delayed_work	sp_rtnl_task;
 
 	struct delayed_work	period_task;
-	struct timer_list	timer;
+	struct alarm_waiter timer;
 	int			current_interval;
 
 	uint16_t			fw_seq;

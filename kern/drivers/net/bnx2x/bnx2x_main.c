@@ -5793,8 +5793,16 @@ panic("Not implemented");
 	if (IS_VF(bp))
 		bnx2x_timer_sriov(bp);
 
-	mod_timer(&bp->timer, jiffies + bp->current_interval);
 #endif
+}
+
+/* RKM style, set_alarm directly */
+static void bnx2x_timer_wrapper(struct alarm_waiter *waiter)
+{
+	struct bnx2x *bp = container_of(waiter, struct bnx2x, timer);
+	bnx2x_timer((unsigned long)bp);
+	set_awaiter_rel(waiter, bp->current_interval * 1000); // fudge
+	set_alarm(&per_cpu_info[0].tchain, waiter);
 }
 
 /* end of Statistics */
@@ -12181,10 +12189,7 @@ panic("Not implemented");
 
 	bp->current_interval = CHIP_REV_IS_SLOW(bp) ? 5*HZ : HZ;
 
-	init_timer(&bp->timer);
-	bp->timer.expires = jiffies + bp->current_interval;
-	bp->timer.data = (unsigned long) bp;
-	bp->timer.function = bnx2x_timer;
+	init_awaiter(&bp->timer, bnx2x_timer_wrapper);
 
 	if (SHMEM2_HAS(bp, dcbx_lldp_params_offset) &&
 	    SHMEM2_HAS(bp, dcbx_lldp_dcbx_stat_offset) &&

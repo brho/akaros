@@ -2950,7 +2950,8 @@ panic("Not implemented");
 		bnx2x__link_status_update(bp);
 
 	/* start the timer */
-	mod_timer(&bp->timer, jiffies + bp->current_interval);
+	set_awaiter_rel(&bp->timer, bp->current_interval * 1000); // fudge
+	set_alarm(&per_cpu_info[0].tchain, &bp->timer);
 
 	if (CNIC_ENABLED(bp))
 		bnx2x_load_cnic(bp);
