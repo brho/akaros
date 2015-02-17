@@ -31,7 +31,6 @@ obj-y						+= trap.o trap64.o
 obj-y						+= trapentry64.o
 obj-y						+= usb.o
 
-# Virtual machine support. Optional.
-obj-$(CONFIG_VM)				+= emulate.o
-obj-$(CONFIG_VM)				+= vmx.o
-obj-$(CONFIG_VM)				+= vmx_mmu.o
+# VMM support. Always leave this in to ensure we don't break anything.
+obj-y						+= vmm/
+
