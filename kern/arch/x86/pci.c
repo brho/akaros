@@ -11,6 +11,7 @@
 #include <string.h>
 #include <assert.h>
 #include <kmalloc.h>
+#include <mm.h>
 #include <arch/pci_defs.h>
 #include <ros/errno.h>
 
@@ -496,20 +497,37 @@ uintptr_t pci_get_membar(struct pci_device *pcidev, int bir)
 {
 	if (bir >= pcidev->nr_bars)
 		return 0;
-	if (pci_is_iobar(pcidev->bar[bir].raw_bar))
-		return 0;
-	return (pci_is_membar64(pcidev->bar[bir].raw_bar) ?
-	        pcidev->bar[bir].mmio_base64 :
-	        pcidev->bar[bir].mmio_base32);
+	if (pcidev->bar[bir].mmio_base64) {
+		assert(pci_is_membar64(pcidev->bar[bir].raw_bar));
+		return pcidev->bar[bir].mmio_base64;
+	}
+	/* we can just return mmio_base32, even if it's 0.  but i'd like to do the
+	 * assert too. */
+	if (pcidev->bar[bir].mmio_base32) {
+		assert(pci_is_membar32(pcidev->bar[bir].raw_bar));
+		return pcidev->bar[bir].mmio_base32;
+	}
+	return 0;
 }
 
 uintptr_t pci_get_iobar(struct pci_device *pcidev, int bir)
 {
 	if (bir >= pcidev->nr_bars)
 		return 0;
-	if (!pci_is_iobar(pcidev->bar[bir].raw_bar))
+	/* we can just return pio_base, even if it's 0.  but i'd like to do the
+	 * assert too. */
+	if (pcidev->bar[bir].pio_base) {
+		assert(pci_is_iobar(pcidev->bar[bir].raw_bar));
+		return pcidev->bar[bir].pio_base;
+	}
+	return 0;
+}
+
+uint32_t pci_get_membar_sz(struct pci_device *pcidev, int bir)
+{
+	if (bir >= pcidev->nr_bars)
 		return 0;
-	return pci_getiobar32(pcidev->bar[bir].raw_bar);
+	return pcidev->bar[bir].mmio_sz;
 }
 
 uint16_t pci_get_vendor(struct pci_device *pcidev)
@@ -580,4 +598,13 @@ int pci_find_cap(struct pci_device *pcidev, uint8_t cap_id, uint32_t *cap_reg)
 unsigned int pci_to_tbdf(struct pci_device *pcidev)
 {
 	return MKBUS(BusPCI, pcidev->bus, pcidev->dev, pcidev->func);
+}
+
+uintptr_t pci_map_membar(struct pci_device *dev, int bir)
+{
+	uintptr_t paddr = pci_get_membar(dev, bir);
+	size_t sz = pci_get_membar_sz(dev, bir);
+	if (!paddr || !sz)
+		return 0;
+	return vmap_pmem_nocache(paddr, sz);
 }
