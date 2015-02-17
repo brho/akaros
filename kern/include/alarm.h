@@ -103,13 +103,13 @@ void set_awaiter_inc(struct alarm_waiter *waiter, uint64_t usleep);
 void __set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
 void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
 bool unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
-void __reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
+bool __reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
                        uint64_t abs_time);
-void __reset_alarm_rel(struct timer_chain *tchain, struct alarm_waiter *waiter,
+bool __reset_alarm_rel(struct timer_chain *tchain, struct alarm_waiter *waiter,
                        uint64_t usleep);
-void reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
+bool reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
                      uint64_t abs_time);
-void reset_alarm_rel(struct timer_chain *tchain, struct alarm_waiter *waiter,
+bool reset_alarm_rel(struct timer_chain *tchain, struct alarm_waiter *waiter,
                      uint64_t usleep);
 
 /* Blocks on the alarm waiter */
