@@ -28,8 +28,6 @@ static int bnx2x_poll(struct napi_struct *napi, int budget);
 
 static void bnx2x_add_all_napi_cnic(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int i;
 
 	/* Add NAPI objects */
@@ -38,13 +36,10 @@ panic("Not implemented");
 			       bnx2x_poll, NAPI_POLL_WEIGHT);
 		napi_hash_add(&bnx2x_fp(bp, i, napi));
 	}
-#endif
 }
 
 static void bnx2x_add_all_napi(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int i;
 
 	/* Add NAPI objects */
@@ -53,7 +48,6 @@ panic("Not implemented");
 			       bnx2x_poll, NAPI_POLL_WEIGHT);
 		napi_hash_add(&bnx2x_fp(bp, i, napi));
 	}
-#endif
 }
 
 static int bnx2x_calc_num_queues(struct bnx2x *bp)
@@ -686,18 +680,19 @@ static void bnx2x_frag_free(const struct bnx2x_fastpath *fp, void *data)
 
 static void *bnx2x_frag_alloc(const struct bnx2x_fastpath *fp, gfp_t gfp_mask)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	if (fp->rx_frag_size) {
 		/* GFP_KERNEL allocations are used only during initialization */
 		if (unlikely(gfp_mask & KMALLOC_WAIT))
 			return (void *)kpage_alloc_addr();
 
+#if 0 // AKAROS_PORT
 		return netdev_alloc_frag(fp->rx_frag_size);
+#else
+		return (void *)kpage_alloc_addr();
+#endif
 	}
 
 	return kmalloc(fp->rx_buf_size + NET_SKB_PAD, gfp_mask);
-#endif
 }
 
 #ifdef CONFIG_INET
@@ -840,8 +835,6 @@ drop:
 static int bnx2x_alloc_rx_data(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 			       uint16_t index, gfp_t gfp_mask)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint8_t *data;
 	struct sw_rx_bd *rx_buf = &fp->rx_buf_ring[index];
 	struct eth_rx_bd *rx_bd = &fp->rx_desc_ring[index];
@@ -867,7 +860,6 @@ panic("Not implemented");
 	rx_bd->addr_lo = cpu_to_le32(U64_LO(mapping));
 
 	return 0;
-#endif
 }
 
 static
@@ -1911,34 +1903,26 @@ panic("Not implemented");
 
 static void bnx2x_napi_enable_cnic(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int i;
 
 	for_each_rx_queue_cnic(bp, i) {
 		bnx2x_fp_init_lock(&bp->fp[i]);
 		napi_enable(&bnx2x_fp(bp, i, napi));
 	}
-#endif
 }
 
 static void bnx2x_napi_enable(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int i;
 
 	for_each_eth_queue(bp, i) {
 		bnx2x_fp_init_lock(&bp->fp[i]);
 		napi_enable(&bnx2x_fp(bp, i, napi));
 	}
-#endif
 }
 
 static void bnx2x_napi_disable_cnic(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int i;
 
 	for_each_rx_queue_cnic(bp, i) {
@@ -1946,13 +1930,10 @@ panic("Not implemented");
 		while (!bnx2x_fp_ll_disable(&bp->fp[i]))
 			kthread_usleep(1000);
 	}
-#endif
 }
 
 static void bnx2x_napi_disable(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int i;
 
 	for_each_eth_queue(bp, i) {
@@ -1960,7 +1941,6 @@ panic("Not implemented");
 		while (!bnx2x_fp_ll_disable(&bp->fp[i]))
 			kthread_usleep(1000);
 	}
-#endif
 }
 
 void bnx2x_netif_start(struct bnx2x *bp)
@@ -2055,8 +2035,6 @@ void bnx2x_set_num_queues(struct bnx2x *bp)
  */
 static int bnx2x_set_real_num_queues(struct bnx2x *bp, int include_cnic)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int rc, tx, rx;
 
 	tx = BNX2X_NUM_ETH_QUEUES(bp) * bp->max_cos;
@@ -2068,6 +2046,7 @@ panic("Not implemented");
 		tx++;
 	}
 
+#if 0 // AKAROS_PORT XME: set queues in ether
 	rc = netif_set_real_num_tx_queues(bp->dev, tx);
 	if (rc) {
 		BNX2X_ERR("Failed to set real number of Tx queues: %d\n", rc);
@@ -2078,18 +2057,18 @@ panic("Not implemented");
 		BNX2X_ERR("Failed to set real number of Rx queues: %d\n", rc);
 		return rc;
 	}
+#else
+	rc = 0;
+#endif
 
 	DP(NETIF_MSG_IFUP, "Setting real num queues to (tx, rx) (%d, %d)\n",
 			  tx, rx);
 
 	return rc;
-#endif
 }
 
 static void bnx2x_set_rx_buf_size(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int i;
 
 	for_each_queue(bp, i) {
@@ -2107,6 +2086,7 @@ panic("Not implemented");
 			mtu = BNX2X_FCOE_MINI_JUMBO_MTU;
 		else
 			mtu = bp->dev->maxmtu;
+		/* AKAROS_PORT XME struct block alignment and size issues? */
 		fp->rx_buf_size = BNX2X_FW_RX_ALIGN_START +
 				  IP_HEADER_ALIGNMENT_PADDING +
 				  ETH_OVREHEAD +
@@ -2118,7 +2098,6 @@ panic("Not implemented");
 		else
 			fp->rx_frag_size = 0;
 	}
-#endif
 }
 
 static int bnx2x_init_rss(struct bnx2x *bp)
@@ -2397,8 +2376,6 @@ alloc_mem_err:
 /* send load request to mcp and analyze response */
 static int bnx2x_nic_load_request(struct bnx2x *bp, uint32_t *load_code)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint32_t param;
 
 	/* init fw_seq */
@@ -2435,7 +2412,6 @@ panic("Not implemented");
 		return -EBUSY;
 	}
 	return 0;
-#endif
 }
 
 /* check whether another PF has already loaded FW to chip. In
@@ -2445,8 +2421,6 @@ panic("Not implemented");
 int bnx2x_compare_fw_ver(struct bnx2x *bp, uint32_t load_code,
 			 bool print_err)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	/* is another pf loaded on this engine? */
 	if (load_code != FW_MSG_CODE_DRV_LOAD_COMMON_CHIP &&
 	    load_code != FW_MSG_CODE_DRV_LOAD_COMMON) {
@@ -2474,7 +2448,6 @@ panic("Not implemented");
 		}
 	}
 	return 0;
-#endif
 }
 
 /* returns the "mcp load_code" according to global load_count array */
@@ -2557,6 +2530,7 @@ static void bnx2x_bz_fp(struct bnx2x *bp, int index)
 		       sizeof(struct bnx2x_agg_info));
 	memset(fp, 0, sizeof(*fp));
 
+	/* AKAROS_PORT: let the code set up whatever fake napi stuff it needs */
 	/* Restore the NAPI object as it has been already initialized */
 	fp->napi = orig_napi;
 	fp->tpa_info = orig_tpa_info;
@@ -2682,8 +2656,6 @@ load_error_cnic0:
 /* must be called with rtnl_lock */
 int bnx2x_nic_load(struct bnx2x *bp, int load_mode)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int port = BP_PORT(bp);
 	int i, rc = 0;
 	uint32_t load_code = 0;
@@ -2814,6 +2786,7 @@ panic("Not implemented");
 
 	bnx2x_pre_irq_nic_init(bp);
 
+// XME HERE
 	/* Connect to IRQs */
 	rc = bnx2x_setup_irqs(bp);
 	if (rc) {
@@ -3015,7 +2988,6 @@ load_error0:
 
 	return rc;
 #endif /* ! BNX2X_STOP_ON_ERROR */
-#endif
 }
 
 int bnx2x_drain_tx_queues(struct bnx2x *bp)
@@ -4300,7 +4272,8 @@ panic("Not implemented");
  */
 int bnx2x_setup_tc(struct ether *dev, uint8_t num_tc)
 {
-panic("Not implemented");
+	/* XME skipping traffic classes */
+	return 0;
 #if 0 // AKAROS_PORT
 	int cos, prio, count, offset;
 	struct bnx2x *bp = netdev_priv(dev);

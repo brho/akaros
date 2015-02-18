@@ -116,7 +116,7 @@ do {								\
 	pr_err("[%s:%d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
 
 /* before we have a dev->name use dev_info() */
-#define BNX2X_DEV_INFO(fmt, ...) printk(fmt, ##__VA_ARGS__)
+#define BNX2X_DEV_INFO(fmt, ...) pr_info(fmt, ##__VA_ARGS__)
 
 /* Error handling */
 void bnx2x_panic_dump(struct bnx2x *bp, bool disable_int);
@@ -1539,9 +1539,14 @@ struct bnx2x {
 	 */
 #define BNX2X_FW_RX_ALIGN_START	(1UL << BNX2X_RX_ALIGN_SHIFT)
 
+#if 0 // AKAROS_PORT might have issues with block sizes
 #define BNX2X_FW_RX_ALIGN_END					\
 	MAX_T(uint64_t, 1UL << BNX2X_RX_ALIGN_SHIFT,			\
 	    SKB_DATA_ALIGN(sizeof(struct skb_shared_info)))
+#else
+#define BNX2X_FW_RX_ALIGN_END					\
+	MAX_T(uint64_t, 1UL << BNX2X_RX_ALIGN_SHIFT, 0)
+#endif
 
 #define BNX2X_PXP_DRAM_ALIGN		(BNX2X_RX_ALIGN_SHIFT - 5)
 

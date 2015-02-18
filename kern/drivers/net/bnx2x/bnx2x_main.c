@@ -1392,13 +1392,10 @@ int bnx2x_send_final_clnup(struct bnx2x *bp, uint8_t clnup_func,
 
 uint8_t bnx2x_is_pcie_pending(struct pci_device *dev)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint16_t status;
 
 	pcie_capability_read_word(dev, PCI_EXP_DEVSTA, &status);
 	return status & PCI_EXP_DEVSTA_TRPND;
-#endif
 }
 
 /* PF FLR specific routines
@@ -5678,7 +5675,7 @@ panic("Not implemented");
 		if (status & BNX2X_DEF_SB_IDX) {
 			struct bnx2x_fastpath *fp = bnx2x_fcoe_fp(bp);
 
-		if (FCOE_INIT(bp) &&
+			if (FCOE_INIT(bp) &&
 			    (bnx2x_has_rx_work(fp) || bnx2x_has_tx_work(fp))) {
 				/* Prevent local bottom-halves from running as
 				 * we are going to change the local NAPI list.
@@ -5915,8 +5912,6 @@ static void bnx2x_setup_ndsb_state_machine(struct hc_status_block_sm *hc_sm,
 /* allocates state machine ids. */
 static void bnx2x_map_sb_state_machines(struct hc_index_data *index_data)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	/* zero out state machine indices */
 	/* rx indices */
 	index_data[HC_INDEX_ETH_RX_CQ_CONS].flags &= ~HC_INDEX_DATA_SM_ID;
@@ -5941,7 +5936,6 @@ panic("Not implemented");
 		SM_TX_ID << HC_INDEX_DATA_SM_ID_SHIFT;
 	index_data[HC_INDEX_ETH_TX_CQ_CONS_COS2].flags |=
 		SM_TX_ID << HC_INDEX_DATA_SM_ID_SHIFT;
-#endif
 }
 
 void bnx2x_init_sb(struct bnx2x *bp, dma_addr_t mapping, int vfid,
@@ -6555,8 +6549,6 @@ void bnx2x_post_irq_nic_init(struct bnx2x *bp, uint32_t load_code)
 /* gzip service functions */
 static int bnx2x_gunzip_init(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	bp->gunzip_buf = dma_alloc_coherent(&bp->pdev->dev, FW_BUF_SIZE,
 					    &bp->gunzip_mapping, KMALLOC_WAIT);
 	if (bp->gunzip_buf  == NULL)
@@ -6584,15 +6576,12 @@ gunzip_nomem2:
 gunzip_nomem1:
 	BNX2X_ERR("Cannot allocate firmware buffer for un-compression\n");
 	return -ENOMEM;
-#endif
 }
 
 static void bnx2x_gunzip_end(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	if (bp->strm) {
-		vfree(bp->strm->workspace);
+		vfree(bp->strm->workspace, zlib_inflate_workspacesize());
 		kfree(bp->strm);
 		bp->strm = NULL;
 	}
@@ -6602,13 +6591,10 @@ panic("Not implemented");
 				  bp->gunzip_mapping);
 		bp->gunzip_buf = NULL;
 	}
-#endif
 }
 
 static int bnx2x_gunzip(struct bnx2x *bp, const uint8_t *zbuf, int len)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int n, rc;
 
 	/* check gzip header */
@@ -6651,7 +6637,6 @@ panic("Not implemented");
 		return 0;
 
 	return rc;
-#endif
 }
 
 /* nic load/unload */
@@ -6911,8 +6896,6 @@ static void bnx2x_setup_dmae(struct bnx2x *bp)
 
 static void bnx2x_init_pxp(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint16_t devctl;
 	int r_order, w_order;
 
@@ -6927,7 +6910,6 @@ panic("Not implemented");
 	}
 
 	bnx2x_init_pxp_arb(bp, r_order, w_order);
-#endif
 }
 
 static void bnx2x_setup_fan_failure_detection(struct bnx2x *bp)
@@ -7049,8 +7031,6 @@ static void bnx2x_reset_endianity(struct bnx2x *bp)
  */
 static int bnx2x_init_hw_common(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint32_t val;
 
 	DP(NETIF_MSG_HW, "starting common init  func %d\n", BP_ABS_FUNC(bp));
@@ -7485,7 +7465,6 @@ panic("Not implemented");
 		BNX2X_ERR("Bootcode is missing - can not initialize link\n");
 
 	return 0;
-#endif
 }
 
 /**
@@ -12458,14 +12437,13 @@ static void bnx2x_set_rx_mode(struct ether *dev)
 
 void bnx2x_set_rx_mode_inner(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint32_t rx_mode = BNX2X_RX_MODE_NORMAL;
 
-	DP(NETIF_MSG_IFUP, "dev->flags = %x\n", bp->dev->flags);
+	//DP(NETIF_MSG_IFUP, "dev->flags = %x\n", bp->dev->flags);
 
 	qlock(&bp->dev->qlock);
 
+#if 0 // AKAROS_PORT skip promisc and multicast
 	if (bp->dev->flags & IFF_PROMISC) {
 		rx_mode = BNX2X_RX_MODE_PROMISC;
 	} else if ((bp->dev->flags & IFF_ALLMULTI) ||
@@ -12473,6 +12451,9 @@ panic("Not implemented");
 		    CHIP_IS_E1(bp))) {
 		rx_mode = BNX2X_RX_MODE_ALLMULTI;
 	} else {
+#else
+	{
+#endif
 		if (IS_PF(bp)) {
 			/* some multicasts */
 			if (bnx2x_set_mc_list(bp) < 0)
@@ -12515,7 +12496,6 @@ panic("Not implemented");
 		qunlock(&bp->dev->qlock);
 		bnx2x_vfpf_storm_rx_mode(bp);
 	}
-#endif
 }
 
 /* called with rtnl_lock */
@@ -13367,7 +13347,7 @@ int bnx2x_init_one(struct ether *dev, struct bnx2x *bp,
 
 	bp->igu_sb_cnt = max_non_def_sbs;
 	bp->igu_base_addr = IS_VF(bp) ? PXP_VF_ADDR_IGU_START : BAR_IGU_INTMEM;
-	bp->msg_enable = debug;
+	bp->msg_enable = 0xffffffff & ~BNX2X_MSG_DMAE;
 	bp->cnic_support = cnic_cnt;
 	bp->cnic_probe = bnx2x_cnic_probe;
 

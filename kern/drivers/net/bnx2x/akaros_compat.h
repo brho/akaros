@@ -22,6 +22,7 @@
 #include <umem.h>
 #include <mmio.h>
 #include <taskqueue.h>
+#include <zlib.h>
 
 /* temporary dumping ground */
 #include "compat_todo.h"
@@ -135,6 +136,20 @@ static inline int __dma_mapping_error(dma_addr_t dma_addr)
 #define dma_mapping_error(dev, handle)                                         \
 	__dma_mapping_error(handle)
 
+static void *vmalloc(size_t size)
+{
+	void *vaddr = get_cont_pages(LOG2_UP(nr_pages(size)), KMALLOC_WAIT);
+	/* zalloc, to be safe */
+	if (vaddr)
+		memset(vaddr, 0, size);
+	return vaddr;
+}
+
+/* Akaros needs to know the size, for now.  So it's not quite compatible */
+static void vfree(void *vaddr, size_t size)
+{
+	free_cont_pages(vaddr, LOG2_UP(nr_pages(size)));
+}
 
 typedef int pci_power_t;
 typedef int pm_message_t;
@@ -152,7 +167,7 @@ typedef int pm_message_t;
 
 /* Linux printk front ends */
 #ifndef pr_fmt
-#define pr_fmt(fmt) fmt
+#define pr_fmt(fmt) "bnx2x:" fmt
 #endif
 
 #define KERN_EMERG ""
@@ -187,18 +202,19 @@ typedef int pm_message_t;
 #define pr_info(fmt, ...) \
 	printk(KERN_INFO pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_cont(fmt, ...) \
-	printk(KERN_CONT fmt, ##__VA_ARGS__)
+	printk(KERN_CONT pr_fmt(fmt), ##__VA_ARGS__)
 #define netdev_printk(lvl, dev, fmt, ...) \
-	printk(fmt, ##__VA_ARGS__)
+	printk("[netdev]: " fmt, ##__VA_ARGS__)
 #define netdev_err(dev, fmt, ...) \
-	printk(fmt, ##__VA_ARGS__)
+	printk("[netdev]: " fmt, ##__VA_ARGS__)
 #define netdev_info(dev, fmt, ...) \
-	printk(fmt, ##__VA_ARGS__)
+	printk("[netdev]: " fmt, ##__VA_ARGS__)
 #define dev_err(dev, fmt, ...) \
-	printk(fmt, ##__VA_ARGS__)
+	printk("[dev]: " fmt, ##__VA_ARGS__)
 #define dev_info(dev, fmt, ...) \
-	printk(fmt, ##__VA_ARGS__)
-
+	printk("[dev]: " fmt, ##__VA_ARGS__)
+#define dev_alert(dev, fmt, ...) \
+	printk("[dev]: " fmt, ##__VA_ARGS__)
 
 #ifdef DEBUG
 
@@ -537,10 +553,6 @@ static inline int pci_enable_device(struct pci_device *dev)
 	return 0;
 }
 
-
-
-// TODO: maybe spatch these
-
 static inline uint32_t pci_resource_len(struct pci_device *dev, int bir)
 {
 	return pci_get_membar_sz(dev, bir);
@@ -554,6 +566,20 @@ static inline void *pci_resource_start(struct pci_device *dev, int bir)
 static inline void *pci_resource_end(struct pci_device *dev, int bir)
 {
 	return (void*)(pci_get_membar(dev, bir) + pci_resource_len(dev, bir));
+}
+
+/* Hacked up version of Linux's.  Assuming reg's are implemented and
+ * read_config never fails. */
+static int pcie_capability_read_word(struct pci_device *dev, int pos,
+                                     uint16_t *val)
+{
+	uint32_t pcie_cap;
+	if (pos & 1)
+		return -EINVAL;
+	if (pci_find_cap(dev, PCI_CAP_ID_EXP, &pcie_cap))
+		return -EINVAL;
+	pci_read_config_word(dev, pcie_cap + pos, val);
+	return 0;
 }
 
 #define ioremap_nocache(paddr, sz) \
@@ -573,12 +599,17 @@ static inline void *pci_resource_end(struct pci_device *dev, int bir)
 #define netif_tx_wake_queue(...)
 #define netif_tx_start_all_queues(...)
 #define netif_tx_start_queue(...)
+#define netif_napi_add(...)
+#define napi_hash_add(...)
+#define napi_enable(...)
+#define napi_disable(...)
 /* picks a random, valid mac addr for dev */
 #define eth_hw_addr_random(...)
 /* checks if the MAC is not 0 and not multicast (all 1s) */
 #define is_valid_ether_addr(...) (TRUE)
 
 #define EPROBE_DEFER 1
+#define NET_SKB_PAD 32 // we'll probably delete code using this
 
 /* Could spatch this:
 	if (!(pci_resource_flags(pdev, 0) & IORESOURCE_MEM)) {

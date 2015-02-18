@@ -1,6 +1,7 @@
 config BNX2X
 	bool "Broadcom BNX2X NIC driver"
 	default n
+	select ZLIB_INFLATE
 	help
 		Broadcom Everest 10 Gb network driver (NetXtremeII).
 

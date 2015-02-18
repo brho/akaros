@@ -49,7 +49,7 @@ extern int bnx2x_num_queues;
 	void *x = dma_zalloc_coherent(&bp->pdev->dev, size, y, KMALLOC_WAIT); \
 	if (x)								\
 		DP(NETIF_MSG_HW,					\
-		   "BNX2X_PCI_ALLOC: Physical %Lx Virtual %p\n",	\
+		   "BNX2X_PCI_ALLOC: Physical %p Virtual %p\n",	\
 		   (unsigned long long)(*y), x);			\
 	x;								\
 })
@@ -59,7 +59,7 @@ extern int bnx2x_num_queues;
 	if (x) {							\
 		memset(x, 0xff, size);					\
 		DP(NETIF_MSG_HW,					\
-		   "BNX2X_PCI_FALLOC: Physical %Lx Virtual %p\n",	\
+		   "BNX2X_PCI_FALLOC: Physical %p Virtual %p\n",	\
 		   (unsigned long long)(*y), x);			\
 	}								\
 	x;								\
