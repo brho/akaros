@@ -32,6 +32,7 @@ extern const struct pci_device_id *
 extern int bnx2x_init_one(struct ether *dev, struct bnx2x *bp,
                           struct pci_device *pdev,
                           const struct pci_device_id *ent);
+extern int bnx2x_open(struct ether *dev);
 
 spinlock_t bnx2x_tq_lock = SPINLOCK_INITIALIZER;
 TAILQ_HEAD(bnx2x_tq, bnx2x);
@@ -314,6 +315,7 @@ static int bnx2x_reset(struct bnx2x *ctlr)
 	int ctrl, i, pause, r, swdpio, txcw;
 
 	bnx2x_init_one(ctlr->edev, ctlr, ctlr->pcidev, ctlr->pci_id);
+	bnx2x_open(ctlr->edev);
 	/* despite the name, we attach at reset time.  BXE attach has a lot of
 	 * mmio mappings that have to happen at boot (in akaros), instead of during
 	 * devether's attach (at runtime) */

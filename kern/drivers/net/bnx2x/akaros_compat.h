@@ -199,6 +199,8 @@ typedef int pm_message_t;
 	printk(fmt, ##__VA_ARGS__)
 #define netdev_err(dev, fmt, ...) \
 	printk(fmt, ##__VA_ARGS__)
+#define netdev_info(dev, fmt, ...) \
+	printk(fmt, ##__VA_ARGS__)
 #define dev_err(dev, fmt, ...) \
 	printk(fmt, ##__VA_ARGS__)
 #define dev_info(dev, fmt, ...) \
@@ -584,6 +586,7 @@ static inline void *pci_resource_end(struct pci_device *dev, int bir)
 #define is_valid_ether_addr(...) (TRUE)
 
 #define EPROBE_DEFER 1
+
 /* Could spatch this:
 	if (!(pci_resource_flags(pdev, 0) & IORESOURCE_MEM)) {
 	to:

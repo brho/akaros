@@ -457,7 +457,8 @@ void bnx2x_dcbx_init(struct bnx2x *bp, bool update_shmem);
  *
  * Currently only D0 and D3hot are supported.
  */
-int bnx2x_set_power_state(struct bnx2x *bp, pci_power_t state);
+//int bnx2x_set_power_state(struct bnx2x *bp, pci_power_t state);
+#define bnx2x_set_power_state(...)
 
 /**
  * bnx2x_update_max_mf_config - update MAX part of MF configuration in HW.

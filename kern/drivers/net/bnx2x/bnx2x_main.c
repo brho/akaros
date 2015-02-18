@@ -12236,10 +12236,8 @@ static int bnx2x_init_bp(struct bnx2x *bp)
  */
 
 /* called with rtnl_lock */
-static int bnx2x_open(struct ether *dev)
+int bnx2x_open(struct ether *dev)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(dev);
 	int rc;
 
@@ -12304,7 +12302,6 @@ panic("Not implemented");
 	if (rc)
 		return rc;
 	return 0;
-#endif
 }
 
 /* called with rtnl_lock */

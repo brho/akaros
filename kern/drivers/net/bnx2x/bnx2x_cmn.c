@@ -3212,11 +3212,10 @@ panic("Not implemented");
 #endif
 }
 
+#if 0 // AKAROS_PORT
 int bnx2x_set_power_state(struct bnx2x *bp, pci_power_t state)
 {
 	uint16_t pmcsr;
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 
 	/* If there is no power capability, silently succeed */
 	if (!bp->pdev->pm_cap) {
@@ -3265,8 +3264,8 @@ panic("Not implemented");
 		return -EINVAL;
 	}
 	return 0;
-#endif
 }
+#endif
 
 /*
  * net_device service functions
