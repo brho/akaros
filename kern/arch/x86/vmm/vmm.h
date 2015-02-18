@@ -358,7 +358,6 @@ struct vmm {
 	// we have a VMMCP. N.B. only for the sie of the EPT
 	// address space, which is limited to much less than
 	// the virtual address space.
-	struct vmr_tailq vm_regions;
 	physaddr_t eptpt;
 
 	// The VMCS is intel-specific. But, maybe, someday, AMD will

@@ -170,4 +170,20 @@ static inline void reboot(void)
 	while (1);
 }
 
+/* Guest VMs have a maximum physical address they can use.  Guest
+ * physical addresses are mapped into this MCP 1:1, but limited to
+ * this max address *in hardware*.  I.e., the MCP process can address
+ * more memory than the VMMCP can.  This is great; it means that
+ * keeping VM management stuff separate from the VM is trivial: just
+ * map it above max_vm_address. There's no need, as in other systems,
+ * to tweak the page table or root pointer to protect management
+ * memory from VM memory.
+ *
+ * TODO: read a register the first time this is called and save it
+ * away.  But this is more than enough for now.
+ */
+static inline uint64_t max_guest_pa(void)
+{
+	return (1ULL<<40) - 1;
+}
 #endif /* !ROS_INC_ARCH_H */

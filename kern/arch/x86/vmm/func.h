@@ -61,4 +61,7 @@ void vm_inject_pf(void *vm, int vcpuid, int error_code, uint64_t cr2);
 
 int vm_restart_instruction(void *vm, int vcpuid);
 
+/* Intel functions */
+void vminit(struct proc *p);
+
 #endif	/* _VMM_FUNC_H_ */

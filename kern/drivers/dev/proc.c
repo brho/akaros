@@ -29,6 +29,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
+#include <arch/vmm/vmm.h>
 
 enum {
 	Qdir,
@@ -74,6 +75,9 @@ enum {
 	CMwired,
 	CMtrace,
 	CMcore,
+	CMvminit,
+	CMvmstart,
+	CMvmkill,
 };
 
 enum {
@@ -130,6 +134,11 @@ struct cmdtab proccmd[] = {
 	{CMwired, "wired", 2},
 	{CMtrace, "trace", 0},
 	{CMcore, "core", 2},
+	{CMcore, "core", 2},
+	{CMcore, "core", 2},
+	{CMvminit, "vminit", 0},
+	{CMvmstart, "vmstart", 0},
+	{CMvmkill, "vmkill", 0},
 };
 
 /*
@@ -1427,7 +1436,7 @@ void procctlclosefiles(struct proc *p, int all, int fd)
 
 static void procctlreq(struct proc *p, char *va, int n)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int8_t irq_state = 0;
 	int npc, pri, core;
 	struct cmdbuf *cb;
@@ -1444,6 +1453,8 @@ static void procctlreq(struct proc *p, char *va, int n)
 	ct = lookupcmd(cb, proccmd, ARRAY_SIZE(proccmd));
 
 	switch (ct->index) {
+		case CMvmstart:
+		case CMvmkill:
 		default:
 			error("nope\n");
 			break;
@@ -1473,6 +1484,9 @@ static void procctlreq(struct proc *p, char *va, int n)
 			 * slowing it down by messing with it, esp with the busy waiting on a
 			 * hyperthreaded core. */
 			spin_on(p->env_cr3);
+			break;
+		case CMvminit:
+			vminit(current);
 			break;
 	}
 	poperror();

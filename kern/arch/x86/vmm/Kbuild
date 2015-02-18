@@ -1,1 +1,2 @@
 obj-y						+= vmm.o
+obj-y						+= intel/
