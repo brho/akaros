@@ -109,7 +109,7 @@ static void bnx2x_dp_tlv_list(struct bnx2x *bp, void *tlvs_list)
 
 		/* break condition for this loop */
 		if (i > MAX_TLVS_IN_LIST) {
-			WARN(true, "corrupt tlvs");
+			warn(true, "corrupt tlvs");
 			return;
 		}
 	}
@@ -146,7 +146,7 @@ static int bnx2x_send_msg2pf(struct bnx2x *bp, uint8_t *done,
 
 	if (*done) {
 		BNX2X_ERR("done was non zero before message to pf was sent\n");
-		WARN_ON(true);
+		warn_on(true);
 		return -EINVAL;
 	}
 

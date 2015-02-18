@@ -255,10 +255,40 @@ expression UP;
 -roundup(VAL, UP)
 +ROUNDUP(VAL, UP)
 
-
 @@
 expression VAL;
 expression DOWN;
 @@
 -rounddown(VAL, DOWN)
 +ROUNDDOWN(VAL, DOWN)
+
+@@
+expression STMT;
+@@
+-BUG_ON(STMT)
++assert(!(STMT))
+
+@@
+@@
+-BUG()
++panic("BUG")
+
+@@
+@@
+-WARN
++warn
+
+@@
+@@
+-WARN_ONCE
++warn_once
+
+@@
+@@
+-WARN_ON
++warn_on
+
+@@
+@@
+-WARN_ON_ONCE
++warn_on-once

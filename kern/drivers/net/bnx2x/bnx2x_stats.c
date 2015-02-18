@@ -71,7 +71,7 @@ static inline uint16_t bnx2x_get_port_stats_dma_len(struct bnx2x *bp)
 
 	res >>= 2;
 
-	WARN_ON(res > 2 * DMAE_LEN32_RD_MAX);
+	warn_on(res > 2 * DMAE_LEN32_RD_MAX);
 	return res;
 }
 

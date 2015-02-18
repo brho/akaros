@@ -2344,7 +2344,7 @@ int bnx2x_vf_release(struct bnx2x *bp, struct bnx2x_virtf *vf)
 
 	rc = bnx2x_vf_free(bp, vf);
 	if (rc)
-		WARN(rc,
+		warn(rc,
 		     "VF[%d] Failed to allocate resources for release op- rc=%d\n",
 		     vf->abs_vfid, rc);
 	bnx2x_unlock_vf_pf_channel(bp, vf, CHANNEL_TLV_PF_RELEASE_VF);
@@ -2387,7 +2387,7 @@ void bnx2x_unlock_vf_pf_channel(struct bnx2x *bp, struct bnx2x_virtf *vf,
 	if (!bnx2x_tlv_supported(expected_tlv))
 		return;
 
-	WARN(expected_tlv != vf->op_current,
+	warn(expected_tlv != vf->op_current,
 	     "lock mismatch: expected %d found %d", expected_tlv,
 	     vf->op_current);
 

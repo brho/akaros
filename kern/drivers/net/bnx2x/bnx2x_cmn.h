@@ -743,9 +743,9 @@ static inline uint16_t bnx2x_tx_avail(struct bnx2x *bp,
 	used = SUB_S16(prod, cons);
 
 #ifdef BNX2X_STOP_ON_ERROR
-	WARN_ON(used < 0);
-	WARN_ON(used > txdata->tx_ring_size);
-	WARN_ON((txdata->tx_ring_size - used) > MAX_TX_AVAIL);
+	warn_on(used < 0);
+	warn_on(used > txdata->tx_ring_size);
+	warn_on((txdata->tx_ring_size - used) > MAX_TX_AVAIL);
 #endif
 
 	return (int16_t)(txdata->tx_ring_size) - used;
@@ -1072,7 +1072,7 @@ static inline uint8_t bnx2x_get_path_func_num(struct bnx2x *bp)
 		}
 	}
 
-	WARN_ON(!func_num);
+	warn_on(!func_num);
 
 	return func_num;
 }

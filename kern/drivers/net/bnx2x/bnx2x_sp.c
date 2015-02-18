@@ -193,7 +193,7 @@ static inline int bnx2x_exe_queue_step(struct bnx2x *bp,
 	while (!list_empty(&o->exe_queue)) {
 		elem = list_first_entry(&o->exe_queue, struct bnx2x_exeq_elem,
 					link);
-		WARN_ON(!elem->cmd_len);
+		warn_on(!elem->cmd_len);
 
 		if (cur_len + elem->cmd_len <= o->exe_chunk_len) {
 			cur_len += elem->cmd_len;
@@ -319,7 +319,7 @@ static bool bnx2x_get_cam_offset_mac(struct bnx2x_vlan_mac_obj *o, int *offset)
 {
 	struct bnx2x_credit_pool_obj *mp = o->macs_pool;
 
-	WARN_ON(!mp);
+	warn_on(!mp);
 
 	return mp->get_entry(mp, offset);
 }
@@ -328,7 +328,7 @@ static bool bnx2x_get_credit_mac(struct bnx2x_vlan_mac_obj *o)
 {
 	struct bnx2x_credit_pool_obj *mp = o->macs_pool;
 
-	WARN_ON(!mp);
+	warn_on(!mp);
 
 	return mp->get(mp, 1);
 }
@@ -337,7 +337,7 @@ static bool bnx2x_get_cam_offset_vlan(struct bnx2x_vlan_mac_obj *o, int *offset)
 {
 	struct bnx2x_credit_pool_obj *vp = o->vlans_pool;
 
-	WARN_ON(!vp);
+	warn_on(!vp);
 
 	return vp->get_entry(vp, offset);
 }
@@ -346,7 +346,7 @@ static bool bnx2x_get_credit_vlan(struct bnx2x_vlan_mac_obj *o)
 {
 	struct bnx2x_credit_pool_obj *vp = o->vlans_pool;
 
-	WARN_ON(!vp);
+	warn_on(!vp);
 
 	return vp->get(vp, 1);
 }
@@ -1561,7 +1561,7 @@ static inline int bnx2x_vlan_mac_get_registry_elem(
 			/* This shall never happen, because we have checked the
 			 * CAM availability in the 'validate'.
 			 */
-			WARN_ON(1);
+			warn_on(1);
 			kfree(reg_elem);
 			return -EINVAL;
 		}
@@ -1610,7 +1610,7 @@ static int bnx2x_execute_vlan_mac(struct bnx2x *bp,
 	 * and exit. Otherwise send a ramrod to FW.
 	 */
 	if (!drv_only) {
-		WARN_ON(r->check_pending(r));
+		warn_on(r->check_pending(r));
 
 		/* Set pending */
 		r->set_pending(r);
@@ -1632,7 +1632,7 @@ static int bnx2x_execute_vlan_mac(struct bnx2x *bp,
 			if (rc)
 				goto error_exit;
 
-			WARN_ON(!reg_elem);
+			warn_on(!reg_elem);
 
 			/* Push a new entry into the registry */
 			if (!restore &&
@@ -1674,7 +1674,7 @@ static int bnx2x_execute_vlan_mac(struct bnx2x *bp,
 			reg_elem = o->check_del(bp, o,
 						&elem->cmd_data.vlan_mac.u);
 
-			WARN_ON(!reg_elem);
+			warn_on(!reg_elem);
 
 			o->put_cam_offset(o, reg_elem->cam_offset);
 			list_del(&reg_elem->link);
@@ -2030,7 +2030,7 @@ void bnx2x_init_vlan_obj(struct bnx2x *bp,
 
 	if (CHIP_IS_E1x(bp)) {
 		BNX2X_ERR("Do not support chips others than E2 and newer\n");
-		BUG();
+		panic("BUG");
 	} else {
 		vlan_obj->set_one_rule      = bnx2x_set_one_vlan_e2;
 		vlan_obj->check_del         = bnx2x_check_vlan_del;
@@ -2964,8 +2964,8 @@ static int bnx2x_mcast_setup_e2(struct bnx2x *bp,
 	o->total_pending_num -= cnt;
 
 	/* send a ramrod */
-	WARN_ON(o->total_pending_num < 0);
-	WARN_ON(cnt > o->max_cmd_len);
+	warn_on(o->total_pending_num < 0);
+	warn_on(cnt > o->max_cmd_len);
 
 	bnx2x_mcast_set_rdata_hdr_e2(bp, p, (uint8_t)cnt);
 
@@ -3456,7 +3456,7 @@ static int bnx2x_mcast_setup_e1(struct bnx2x *bp,
 
 	/* send a ramrod */
 
-	WARN_ON(cnt > o->max_cmd_len);
+	warn_on(cnt > o->max_cmd_len);
 
 	/* Set ramrod header (in particular, a number of entries to update) */
 	bnx2x_mcast_set_rdata_hdr_e1(bp, p, (uint8_t)cnt);
@@ -5217,7 +5217,7 @@ void bnx2x_init_queue_obj(struct bnx2x *bp,
 	memset(obj, 0, sizeof(*obj));
 
 	/* We support only BNX2X_MULTI_TX_COS Tx CoS at the moment */
-	BUG_ON(BNX2X_MULTI_TX_COS < cid_cnt);
+	assert(!(BNX2X_MULTI_TX_COS < cid_cnt));
 
 	memcpy(obj->cids, cids, sizeof(obj->cids[0]) * cid_cnt);
 	obj->max_cos = cid_cnt;

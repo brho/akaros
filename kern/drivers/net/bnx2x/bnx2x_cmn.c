@@ -257,7 +257,7 @@ panic("Not implemented");
 	}
 
 	/* release skb */
-	WARN_ON(!skb);
+	warn_on(!skb);
 	if (likely(skb)) {
 		(*pkts_compl)++;
 		(*bytes_compl) += skb->len;
@@ -3887,7 +3887,7 @@ panic("Not implemented");
 	txq_index = skb_get_queue_mapping(skb);
 	txq = netdev_get_tx_queue(dev, txq_index);
 
-	BUG_ON(txq_index >= MAX_ETH_TXQ_IDX(bp) + (CNIC_LOADED(bp) ? 1 : 0));
+	assert(!(txq_index >= MAX_ETH_TXQ_IDX(bp) + (CNIC_LOADED(bp) ? 1 : 0)));
 
 	txdata = &bp->bnx2x_txq[txq_index];
 
@@ -4510,7 +4510,7 @@ static int bnx2x_alloc_rx_bds(struct bnx2x_fastpath *fp,
 		}
 		ring_prod = NEXT_RX_IDX(ring_prod);
 		cqe_ring_prod = NEXT_RCQ_IDX(cqe_ring_prod);
-		WARN_ON(ring_prod <= (i - failure_cnt));
+		warn_on(ring_prod <= (i - failure_cnt));
 	}
 
 	if (failure_cnt)
@@ -4724,7 +4724,7 @@ static int bnx2x_alloc_fp_mem(struct bnx2x *bp)
 	if (i != BNX2X_NUM_ETH_QUEUES(bp)) {
 		int delta = BNX2X_NUM_ETH_QUEUES(bp) - i;
 
-		WARN_ON(delta < 0);
+		warn_on(delta < 0);
 		bnx2x_shrink_eth_fp(bp, delta);
 		if (CNIC_SUPPORT(bp))
 			/* move non eth FPs next to last eth FP

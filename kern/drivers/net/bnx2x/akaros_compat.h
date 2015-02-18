@@ -47,14 +47,6 @@
 #define CLAMP(val, lo, hi) MIN((typeof(val))MAX(val, lo), hi)
 #define CLAMP_T(t, val, lo, hi) CLAMP(val, lo, hi)
 
-/* I'm okay with these versions of the asserts. */
-#define WARN(args...) warn(args)
-#define WARN_ONCE(args...) warn_once(args)
-#define WARN_ON(x) warn_on(x)
-#define WARN_ON_ONCE(x) warn_on_once(x)
-#define BUG() panic("BUG")
-#define BUG_ON(x) assert(x)
-
 typedef physaddr_t dma_addr_t;
 typedef int gfp_t;
 

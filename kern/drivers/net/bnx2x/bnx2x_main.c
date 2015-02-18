@@ -3187,7 +3187,7 @@ panic("Not implemented");
 		pause->sge_th_hi = SGE_TH_HI(bp);
 
 		/* validate SGE ring has enough to cross high threshold */
-		WARN_ON(bp->dropless_fc &&
+		warn_on(bp->dropless_fc &&
 				pause->sge_th_hi + FW_PREFETCH_CNT >
 				MAX_RX_SGE_CNT * NUM_RX_SGE_PAGES);
 
@@ -3210,10 +3210,10 @@ panic("Not implemented");
 		 * validate that rings have enough entries to cross
 		 * high thresholds
 		 */
-		WARN_ON(bp->dropless_fc &&
+		warn_on(bp->dropless_fc &&
 				pause->bd_th_hi + FW_PREFETCH_CNT >
 				bp->rx_ring_size);
-		WARN_ON(bp->dropless_fc &&
+		warn_on(bp->dropless_fc &&
 				pause->rcq_th_hi + FW_PREFETCH_CNT >
 				NUM_RCQ_RINGS * MAX_RCQ_DESC_CNT);
 
@@ -6362,7 +6362,7 @@ static void bnx2x_init_eth_fp(struct bnx2x *bp, int fp_idx)
 	__set_bit(BNX2X_Q_TYPE_HAS_RX, &q_type);
 	__set_bit(BNX2X_Q_TYPE_HAS_TX, &q_type);
 
-	BUG_ON(fp->max_cos > BNX2X_MULTI_TX_COS);
+	assert(!(fp->max_cos > BNX2X_MULTI_TX_COS));
 
 	/* init tx data */
 	for_each_cos_in_tx_queue(fp, cos) {
@@ -6473,7 +6473,7 @@ panic("Not implemented");
 	__set_bit(BNX2X_Q_TYPE_HAS_TX, &q_type);
 
 	/* No multi-CoS for FCoE L2 client */
-	BUG_ON(fp->max_cos != 1);
+	assert(!(fp->max_cos != 1));
 
 	bnx2x_init_queue_obj(bp, &bnx2x_sp_obj(bp, fp).q_obj, fp->cl_id,
 			     &fp->cid, 1, BP_FUNC(bp), bnx2x_sp(bp, q_rdata),
@@ -8652,7 +8652,7 @@ void bnx2x_ilt_set_info(struct bnx2x *bp)
 		   LOG2_UP(ilt_client->page_size >> 12));
 	}
 
-	BUG_ON(line > ILT_MAX_LINES);
+	assert(!(line > ILT_MAX_LINES));
 }
 
 /**
@@ -9875,7 +9875,7 @@ panic("Not implemented");
 		case BNX2X_RECOVERY_INIT:
 			DP(NETIF_MSG_HW, "State is BNX2X_RECOVERY_INIT\n");
 			is_parity = bnx2x_chk_parity_attn(bp, &global, false);
-			WARN_ON(!is_parity);
+			warn_on(!is_parity);
 
 			/* Try to get a LEADER_LOCK HW lock */
 			if (bnx2x_trylock_leader_lock(bp)) {
@@ -12349,7 +12349,7 @@ static void bnx2x_free_mcast_macs_list(
 		list_first_entry(&p->mcast_list, struct bnx2x_mcast_list_elem,
 				 link);
 
-	WARN_ON(!mc_mac);
+	warn_on(!mc_mac);
 	kfree(mc_mac);
 }
 
@@ -13961,7 +13961,7 @@ static void bnx2x_cnic_sp_post(struct bnx2x *bp, int count)
 #endif
 
 	spin_lock(&bp->spq_lock);
-	BUG_ON(bp->cnic_spq_pending < count);
+	assert(!(bp->cnic_spq_pending < count));
 	bp->cnic_spq_pending -= count;
 
 	for (; bp->cnic_kwq_pending; bp->cnic_kwq_pending--) {
