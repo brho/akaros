@@ -12918,8 +12918,6 @@ err_out:
 
 static int bnx2x_check_firmware(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	const struct firmware *firmware = bp->firmware;
 	struct bnx2x_fw_file_hdr *fw_hdr;
 	struct bnx2x_fw_file_section *sections;
@@ -12976,7 +12974,6 @@ panic("Not implemented");
 	}
 
 	return 0;
-#endif
 }
 
 static void be32_to_cpu_n(const uint8_t *_source, uint8_t *_target,
@@ -13056,8 +13053,6 @@ do {									\
 
 static int bnx2x_init_firmware(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	const char *fw_file_name;
 	struct bnx2x_fw_file_hdr *fw_hdr;
 	int rc;
@@ -13136,19 +13131,15 @@ request_firmware_exit:
 	bp->firmware = NULL;
 
 	return rc;
-#endif
 }
 
 static void bnx2x_release_firmware(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	kfree(bp->init_ops_offsets);
 	kfree(bp->init_ops);
 	kfree(bp->init_data);
 	release_firmware(bp->firmware);
 	bp->firmware = NULL;
-#endif
 }
 
 static struct bnx2x_func_sp_drv_ops bnx2x_func_sp_drv = {

@@ -39,6 +39,7 @@
 #define likely(x) (x)
 #define UINT_MAX UINT64_MAX
 #define L1_CACHE_SHIFT (LOG2_UP(ARCH_CL_SIZE))
+#define __stringify(x...) STRINGIFY(x)
 
 /* Wanted to keep the _t variants in the code, in case that's useful in the
  * future */
@@ -588,5 +589,50 @@ static inline void *pci_resource_end(struct pci_device *dev, int bir)
 	to:
 	memset(bp->dev->ea, 0, Eaddrlen);
 */
+
+struct firmware {
+	const uint8_t *data;
+	size_t size;
+};
+
+/* the ignored param is a &pcidev->dev in linux, which is a struct dev.  our
+ * pcidev->dev is the "slot" */
+static inline int request_firmware(const struct firmware **fwp,
+                                   const char *file_name, uint8_t *ignored)
+{
+	struct firmware *ret_fw;
+	struct file *fw_file;
+	void *fw_data;
+	char dirname[] = "/lib/firmware/";
+	/* could dynamically allocate the min of this and some MAX */
+	char fullpath[sizeof(dirname) + strlen(file_name) + 1];
+
+	snprintf(fullpath, sizeof(fullpath), "%s%s", dirname, file_name);
+	fw_file = do_file_open(fullpath, 0, 0);
+	if (!fw_file) {
+		printk("Unable to find firmware file %s!\n", fullpath);
+		return -1;
+	}
+	fw_data = kread_whole_file(fw_file);
+	if (!fw_data) {
+		printk("Unable to load firmware file %s!\n", fullpath);
+		kref_put(&fw_file->f_kref);
+		return -1;
+	}
+	ret_fw = kmalloc(sizeof(struct firmware), KMALLOC_WAIT);
+	ret_fw->data = fw_data;
+	ret_fw->size = fw_file->f_dentry->d_inode->i_size;
+	*fwp = ret_fw;
+	kref_put(&fw_file->f_kref);
+	return 0;
+}
+
+static inline void release_firmware(const struct firmware *fw)
+{
+	if (fw) {
+		kfree((void*)fw->data);
+		kfree((void*)fw);
+	}
+}
 
 #endif /* ROS_KERN_AKAROS_COMPAT_H */
