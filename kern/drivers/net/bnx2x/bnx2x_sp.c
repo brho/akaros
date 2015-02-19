@@ -293,6 +293,7 @@ static inline int bnx2x_state_wait(struct bnx2x *bp, int state,
 			return 0;
 		}
 
+/* HANGING HERE FOR SOME STATES */
 		kthread_usleep(1000);
 
 		if (bp->panic)

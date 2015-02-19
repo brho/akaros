@@ -165,6 +165,9 @@ typedef int pm_message_t;
 #define down_interruptible(sem) ({sem_down(sem); 0;})
 #define down_timeout(sem, timeout) ({sem_down(sem); 0;})
 
+#define local_bh_disable() cmb()
+#define local_bh_enable() cmb()
+
 /* Linux printk front ends */
 #ifndef pr_fmt
 #define pr_fmt(fmt) "bnx2x:" fmt
@@ -603,13 +606,17 @@ static int pcie_capability_read_word(struct pci_device *dev, int pos,
 #define napi_hash_add(...)
 #define napi_enable(...)
 #define napi_disable(...)
+#define napi_schedule(...)
+#define napi_schedule_irqoff(...)
 /* picks a random, valid mac addr for dev */
 #define eth_hw_addr_random(...)
 /* checks if the MAC is not 0 and not multicast (all 1s) */
 #define is_valid_ether_addr(...) (TRUE)
 
 #define EPROBE_DEFER 1
-#define NET_SKB_PAD 32 // we'll probably delete code using this
+#define NET_SKB_PAD 32		/* we'll probably delete code using this */
+#define MAX_SKB_FRAGS 16	/* we'll probably delete code using this */
+#define VLAN_VID_MASK 0x0fff /* VLAN Identifier */
 
 /* Could spatch this:
 	if (!(pci_resource_flags(pdev, 0) & IORESOURCE_MEM)) {

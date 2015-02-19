@@ -3173,8 +3173,6 @@ static void bnx2x_pf_rx_q_prep(struct bnx2x *bp,
 	struct bnx2x_fastpath *fp, struct rxq_pause_params *pause,
 	struct bnx2x_rxq_setup_params *rxq_init)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint8_t max_sge = 0;
 	uint16_t sge_sz = 0;
 	uint16_t tpa_agg_size = 0;
@@ -3188,6 +3186,7 @@ panic("Not implemented");
 				pause->sge_th_hi + FW_PREFETCH_CNT >
 				MAX_RX_SGE_CNT * NUM_RX_SGE_PAGES);
 
+		/* TODO XME this is based on MAX_SKB_FRAGS */
 		tpa_agg_size = TPA_AGG_SIZE;
 		max_sge = SGE_PAGE_ALIGN(bp->dev->maxmtu) >>
 			SGE_PAGE_SHIFT;
@@ -3257,7 +3256,6 @@ panic("Not implemented");
 		rxq_init->silent_removal_value = bp->afex_def_vlan_tag;
 		rxq_init->silent_removal_mask = VLAN_VID_MASK;
 	}
-#endif
 }
 
 static void bnx2x_pf_tx_q_prep(struct bnx2x *bp,
@@ -5424,8 +5422,6 @@ static struct bnx2x_queue_sp_obj *bnx2x_cid_to_q_obj(
 
 static void bnx2x_eq_int(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint16_t hw_cons, sw_cons, sw_prod;
 	union event_ring_elem *elem;
 	uint8_t echo;
@@ -5643,13 +5639,10 @@ next_spqe:
 
 	/* update producer */
 	bnx2x_update_eq_prod(bp, bp->eq_prod);
-#endif
 }
 
 static void bnx2x_sp_task(struct work_struct *work)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	struct bnx2x *bp = container_of(work, struct bnx2x, sp_task.work);
 
 	DP(BNX2X_MSG_SP, "sp task invoked\n");
@@ -5681,6 +5674,8 @@ panic("Not implemented");
 				 * we are going to change the local NAPI list.
 				 */
 				local_bh_disable();
+				/* TODO XME: wake a ktask or o/w poll the device.  we're already
+				 * an RKM at this point */
 				napi_schedule(&bnx2x_fcoe(bp, napi));
 				local_bh_enable();
 			}
@@ -5709,7 +5704,6 @@ panic("Not implemented");
 		bnx2x_link_report(bp);
 		bnx2x_fw_command(bp, DRV_MSG_CODE_AFEX_VIFSET_ACK, 0);
 	}
-#endif
 }
 
 void bnx2x_msix_sp_int(struct hw_trapframe *hw_tf, void *dev_instance)
@@ -8489,8 +8483,11 @@ int bnx2x_set_int_mode(struct bnx2x *bp)
 	/* This tries to set up MSIX in advance, registering vectors and whatnot.
 	 * The bulk is in bnx2x_enable_msix.
 	 *
-	 * We can check later if it worked after register_irq() */
-	// XME: when do we register the handler?
+	 * We can check later if it worked after register_irq()
+	 *
+	 * We're going to try and use MSIX, so lets set it now.  Code in a few
+	 * places checks this. */
+	bp->flags |= USING_MSIX_FLAG;
 	return 0;
 #if 0 // AKAROS_PORT
 	int rc = 0;

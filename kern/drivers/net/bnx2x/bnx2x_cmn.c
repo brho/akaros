@@ -1143,8 +1143,6 @@ next_cqe:
 
 static void bnx2x_msix_fp_int(struct hw_trapframe *hw_tf, void *fp_cookie)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	struct bnx2x_fastpath *fp = fp_cookie;
 	struct bnx2x *bp = fp->bp;
 	uint8_t cos;
@@ -1165,10 +1163,10 @@ panic("Not implemented");
 		prefetch(fp->txdata_ptr[cos]->tx_cons_sb);
 
 	prefetch(&fp->sb_running_index[SM_RX_ID]);
+	/* TODO XME: wake a ktask or o/w poll the device.  we're in hard IRQ */
 	napi_schedule_irqoff(&bnx2x_fp(bp, fp->index, napi));
 
 	return;
-#endif
 }
 
 /* HW Lock for shared dual port PHYs */
@@ -1774,10 +1772,13 @@ no_msix:
 #endif
 }
 
+static void bullshit_handler(struct hw_trapframe *hw_tf, void *cnic_turd)
+{
+	printk("bnx2x CNIC IRQ fired.  Probably a bug!\n");
+}
+
 static int bnx2x_req_msix_irqs(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int i, rc, offset = 0;
 
 	/* no default status block for vf */
@@ -1791,8 +1792,15 @@ panic("Not implemented");
 		}
 	}
 
-	if (CNIC_SUPPORT(bp))
+	if (CNIC_SUPPORT(bp)) {
 		offset++;
+		// AKAROS_PORT
+		rc = register_irq(0, bullshit_handler, 0, pci_to_tbdf(bp->pdev));
+		if (rc) {
+			BNX2X_ERR("Fucked up getting a CNIC MSIX vector!");
+			return -EBUSY;
+		}
+	}
 
 	for_each_eth_queue(bp, i) {
 		struct bnx2x_fastpath *fp = &bp->fp[i];
@@ -1827,7 +1835,6 @@ panic("Not implemented");
 			    i - 1, bp->msix_table[offset + i - 1].vector);
 	}
 	return 0;
-#endif
 }
 
 int bnx2x_enable_msi(struct bnx2x *bp)
@@ -1871,9 +1878,8 @@ panic("Not implemented");
 
 static int bnx2x_setup_irqs(struct bnx2x *bp)
 {
-	int rc = 0;
-panic("Not implemented");
-#if 0 // AKAROS_PORT
+	return bnx2x_req_msix_irqs(bp);
+#if 0 // AKAROS_PORT we just register_irq
 	if (bp->flags & USING_MSIX_FLAG &&
 	    !(bp->flags & USING_SINGLE_MSIX_FLAG)) {
 		rc = bnx2x_req_msix_irqs(bp);
@@ -2239,6 +2245,7 @@ void bnx2x_squeeze_objects(struct bnx2x *bp)
 	 * we take a lock surrounding both the initial send and the CONTs,
 	 * as we don't want a true completion to disrupt us in the middle.
 	 */
+// KPF HERE (prob not init) XME (devether qlock. really the first time?)
 	qlock(&bp->dev->qlock);
 	rc = bnx2x_config_mcast(bp, &rparam, BNX2X_MCAST_CMD_DEL);
 	if (rc < 0)
