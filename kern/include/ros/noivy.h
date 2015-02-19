@@ -132,8 +132,6 @@
 #define RACY
 #define PRIVATE
 
-#define BASE(p)
-
 #define SGROUP(g)
 #define SNOGROUP
 #define SRETGROUP

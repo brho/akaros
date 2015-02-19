@@ -310,4 +310,6 @@ config BSD_ON_CORE0
 
 endmenu
 
+source "kern/lib/Kconfig"
+
 source "kern/src/ktest/Kconfig"

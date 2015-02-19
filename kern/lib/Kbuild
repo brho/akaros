@@ -1,0 +1,2 @@
+obj-y						+= zlib_deflate/
+obj-y						+= zlib_inflate/
