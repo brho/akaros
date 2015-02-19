@@ -275,7 +275,8 @@ binutils-clean:
 	     ../gcc-$(GCC_VERSION) \
 	     ../gcc-$(GCC_VERSION)-akaros \
 	     | grep -v "Only in ../gcc-$(GCC_VERSION)" \
-	     | patch -p2 
+	     > ../.gcc-$(GCC_VERSION)-akaros.patch; \
+	     patch -p2 < ../.gcc-$(GCC_VERSION)-akaros.patch
 
 gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2
 	rm -rf gcc-$(GCC_VERSION)
@@ -414,7 +415,8 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	     ../glibc-$(GLIBC_VERSION) \
 	     ../glibc-$(GLIBC_VERSION)-akaros \
 	     | grep -v "Only in ../glibc-$(GLIBC_VERSION)" \
-	     | patch -p2 
+	     > ../.glibc-$(GLIBC_VERSION)-akaros.patch; \
+	     patch -p2 < ../.glibc-$(GLIBC_VERSION)-akaros.patch
 
 # On occasion, include/pthread.h was getting installed in stage 2, clobbering
 # parlib's pthread.h.
@@ -708,4 +710,5 @@ clean:
 	rm -rf *-builddir
 	rm -rf .*-configure
 	rm -rf *$(BINARY_PREFIX)install.bak
-
+	rm -rf .glibc-$(GLIBC_VERSION)-akaros.patch
+	rm -rf .gcc-$(GCC_VERSION)-akaros.patch
