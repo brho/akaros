@@ -3710,8 +3710,6 @@ void bnx2x_init_mcast_obj(struct bnx2x *bp,
  */
 static inline bool __atomic_add_ifless(atomic_t *v, int a, int u)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int c, old;
 
 	c = atomic_read(v);
@@ -3719,14 +3717,13 @@ panic("Not implemented");
 		if (unlikely(c + a >= u))
 			return false;
 
-		old = atomic_cmpxchg((v), c, c + a);
+		old = atomic_cas((v), c, c + a);
 		if (likely(old == c))
 			break;
 		c = old;
 	}
 
 	return true;
-#endif
 }
 
 /**
@@ -3741,8 +3738,6 @@ panic("Not implemented");
  */
 static inline bool __atomic_dec_ifmoe(atomic_t *v, int a, int u)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int c, old;
 
 	c = atomic_read(v);
@@ -3750,14 +3745,13 @@ panic("Not implemented");
 		if (unlikely(c - a < u))
 			return false;
 
-		old = atomic_cmpxchg((v), c, c - a);
+		old = atomic_cas((v), c, c - a);
 		if (likely(old == c))
 			break;
 		c = old;
 	}
 
 	return true;
-#endif
 }
 
 static bool bnx2x_credit_pool_get(struct bnx2x_credit_pool_obj *o, int cnt)

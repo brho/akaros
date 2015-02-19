@@ -5634,7 +5634,7 @@ next_spqe:
 	} /* for */
 
 	cmb();
-	atomic_add(spqe_cnt, &bp->eq_spq_left);
+	atomic_add(&bp->eq_spq_left, spqe_cnt);
 
 	bp->eq_cons = sw_cons;
 	bp->eq_prod = sw_prod;
