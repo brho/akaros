@@ -2294,6 +2294,41 @@ void file_release(struct kref *kref)
 	kmem_cache_free(file_kcache, file);
 }
 
+ssize_t kread_file(struct file *file, void *buf, size_t sz)
+{
+	/* TODO: (KFOP) (VFS kernel read/writes need to have no proc current) */
+	struct proc *old_proc = switch_to(0);
+	off64_t dummy = 0;
+	ssize_t cpy_amt = file->f_op->read(file, buf, sz, &dummy);
+	switch_back(0, old_proc);
+	return cpy_amt;
+}
+
+/* Reads the contents of an entire file into a buffer, returning that buffer.
+ * On error, prints something useful and returns 0 */
+void *kread_whole_file(struct file *file)
+{
+	size_t size;
+	void *contents;
+	ssize_t cpy_amt;
+
+	size = file->f_dentry->d_inode->i_size;
+	contents = kmalloc(size, KMALLOC_WAIT);
+	cpy_amt = kread_file(file, contents, size);
+	if (cpy_amt < 0) {
+		printk("Error %d reading file %s\n", get_errno(), file_name(file));
+		kfree(contents);
+		return 0;
+	}
+	if (cpy_amt != size) {
+		printk("Read %d, needed %d for file %s\n", cpy_amt, size,
+		       file_name(file));
+		kfree(contents);
+		return 0;
+	}
+	return contents;
+}
+
 /* Process-related File management functions */
 
 /* Given any FD, get the appropriate file, 0 o/w */

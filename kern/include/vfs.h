@@ -481,6 +481,8 @@ int do_rename(char *old_path, char *new_path);
 int do_truncate(struct inode *inode, off64_t len);
 struct file *dentry_open(struct dentry *dentry, int flags);
 void file_release(struct kref *kref);
+ssize_t kread_file(struct file *file, void *buf, size_t sz);
+void *kread_whole_file(struct file *file);
 
 /* Process-related File management functions */
 struct file *get_file_from_fd(struct files_struct *open_files, int fd);
