@@ -8725,6 +8725,95 @@ static int bnx2x_setup_tx_only(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 	return bnx2x_queue_state_change(bp, q_params);
 }
 
+static void bnx2x_dump_q_state_params(struct bnx2x_queue_state_params *q_params)
+{
+	pr_info("qsp obj %p\n",
+	        q_params->q_obj);
+	pr_info("qsp cmd %d\n",
+	        q_params->cmd);
+	pr_info("qsp rrfl %p\n",
+	        q_params->ramrod_flags);
+	pr_info("qsp setup.gen.stat_id %p\n",
+	        q_params->params.setup.gen_params.stat_id);
+	pr_info("qsp setup.gen.spcl_id %p\n",
+	        q_params->params.setup.gen_params.spcl_id);
+	pr_info("qsp setup.gen.mtu     %p\n",
+	        q_params->params.setup.gen_params.mtu    );
+	pr_info("qsp setup.gen.cos     %p\n",
+	        q_params->params.setup.gen_params.cos    );
+	pr_info("qsp setup.gen.fp_hsi  %p\n",
+	        q_params->params.setup.gen_params.fp_hsi );
+	
+	pr_info("qsp setup.rxq.dscr_map             %p\n",
+	        q_params->params.setup.rxq_params.dscr_map             );
+	pr_info("qsp setup.rxq.sge_map              %p\n",
+	        q_params->params.setup.rxq_params.sge_map              );
+	pr_info("qsp setup.rxq.rcq_map              %p\n",
+	        q_params->params.setup.rxq_params.rcq_map              );
+	pr_info("qsp setup.rxq.rcq_np_map           %p\n",
+	        q_params->params.setup.rxq_params.rcq_np_map           );
+	pr_info("qsp setup.rxq.drop_flags           %p\n",
+	        q_params->params.setup.rxq_params.drop_flags           );
+	pr_info("qsp setup.rxq.buf_sz               %p\n",
+	        q_params->params.setup.rxq_params.buf_sz               );
+	pr_info("qsp setup.rxq.fw_sb_id             %p\n",
+	        q_params->params.setup.rxq_params.fw_sb_id             );
+	pr_info("qsp setup.rxq.cl_qzone_id          %p\n",
+	        q_params->params.setup.rxq_params.cl_qzone_id          );
+	pr_info("qsp setup.rxq.tpa_agg_sz           %p\n",
+	        q_params->params.setup.rxq_params.tpa_agg_sz           );
+	pr_info("qsp setup.rxq.sge_buf_sz           %p\n",
+	        q_params->params.setup.rxq_params.sge_buf_sz           );
+	pr_info("qsp setup.rxq.max_sges_pkt         %p\n",
+	        q_params->params.setup.rxq_params.max_sges_pkt         );
+	pr_info("qsp setup.rxq.max_tpa_queues       %p\n",
+	        q_params->params.setup.rxq_params.max_tpa_queues       );
+	pr_info("qsp setup.rxq.rss_engine_id        %p\n",
+	        q_params->params.setup.rxq_params.rss_engine_id        );
+	pr_info("qsp setup.rxq.mcast_engine_id      %p\n",
+	        q_params->params.setup.rxq_params.mcast_engine_id      );
+	pr_info("qsp setup.rxq.cache_line_log       %p\n",
+	        q_params->params.setup.rxq_params.cache_line_log       );
+	pr_info("qsp setup.rxq.sb_cq_index          %p\n",
+	        q_params->params.setup.rxq_params.sb_cq_index          );
+	pr_info("qsp setup.rxq.silent_removal_value %p\n",
+	        q_params->params.setup.rxq_params.silent_removal_value );
+	pr_info("qsp setup.rxq.silent_removal_mask  %p\n",
+	        q_params->params.setup.rxq_params.silent_removal_mask  );
+	
+	pr_info("qsp setup.txq.dscr_map          %p\n",
+	        q_params->params.setup.txq_params.dscr_map          );
+	pr_info("qsp setup.txq.fw_sb_id          %p\n",
+	        q_params->params.setup.txq_params.fw_sb_id          );
+	pr_info("qsp setup.txq.sb_cq_index       %p\n",
+	        q_params->params.setup.txq_params.sb_cq_index       );
+	pr_info("qsp setup.txq.cos               %p\n",
+	        q_params->params.setup.txq_params.cos               );
+	pr_info("qsp setup.txq.traffic_type      %p\n",
+	        q_params->params.setup.txq_params.traffic_type      );
+	pr_info("qsp setup.txq.tss_leading_cl_id %p\n",
+	        q_params->params.setup.txq_params.tss_leading_cl_id );
+	pr_info("qsp setup.txq.default_vlan      %p\n",
+	        q_params->params.setup.txq_params.default_vlan      );
+	
+	pr_info("qsp setup.pau.bd_th_lo  %p\n",
+	        q_params->params.setup.pause_params.bd_th_lo  );
+	pr_info("qsp setup.pau.bd_th_hi  %p\n",
+	        q_params->params.setup.pause_params.bd_th_hi  );
+	pr_info("qsp setup.pau.rcq_th_lo %p\n",
+	        q_params->params.setup.pause_params.rcq_th_lo );
+	pr_info("qsp setup.pau.rcq_th_hi %p\n",
+	        q_params->params.setup.pause_params.rcq_th_hi );
+	pr_info("qsp setup.pau.sge_th_lo %p\n",
+	        q_params->params.setup.pause_params.sge_th_lo );
+	pr_info("qsp setup.pau.sge_th_hi %p\n",
+	        q_params->params.setup.pause_params.sge_th_hi );
+	pr_info("qsp setup.pau.pri_map   %p\n",
+	        q_params->params.setup.pause_params.pri_map   );
+	pr_info("qsp setup.fl %p\n",
+	        q_params->params.setup.flags);
+}
+
 /**
  * bnx2x_setup_queue - setup queue
  *
@@ -8735,7 +8824,6 @@ static int bnx2x_setup_tx_only(struct bnx2x *bp, struct bnx2x_fastpath *fp,
  * This function performs 2 steps in a Queue state machine
  *      actually: 1) RESET->INIT 2) INIT->SETUP
  */
-
 int bnx2x_setup_queue(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 		       bool leading)
 {
