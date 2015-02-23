@@ -60,6 +60,9 @@ static int bnx2x_calc_num_queues(struct bnx2x *bp)
 		nq = 1;
 
 	nq = CLAMP(nq, 1, BNX2X_MAX_QUEUES(bp));
+	/* AKAROS_PORT XME.  For some reason, we can't handle 8 queues.  The linux
+	 * driver can...  We can handle 4 *total* queues, one per function. */
+	nq = MIN(nq, 2);
 	return nq;
 }
 

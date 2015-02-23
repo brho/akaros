@@ -27,6 +27,12 @@
 /* temporary dumping ground */
 #include "compat_todo.h"
 
+//#define CONFIG_DCB
+//#define CONFIG_NET_RX_BUSY_POLL 1
+//#define CONFIG_NET_POLL_CONTROLLER 1
+//#define CONFIG_INET 1 	// will deal with this manually
+#define CONFIG_PCI_MSI 1
+
 #define __rcu
 #define rcu_read_lock()
 #define rcu_read_unlock()

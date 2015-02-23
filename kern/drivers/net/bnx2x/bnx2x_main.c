@@ -10962,6 +10962,8 @@ static void bnx2x_get_common_hwinfo(struct bnx2x *bp)
 #if 0 // AKAROS_PORT no power mgmt cap
 	pci_read_config_word(bp->pdev, bp->pdev->pm_cap + PCI_PM_PMC, &pmc);
 	bp->flags |= (pmc & PCI_PM_CAP_PME_D3cold) ? 0 : NO_WOL_FLAG;
+#else
+	bp->flags |= NO_WOL_FLAG;
 #endif
 
 	BNX2X_DEV_INFO("%sWoL capable\n",
@@ -12892,7 +12894,7 @@ static int bnx2x_init_dev(struct bnx2x *bp, struct pci_device *pdev,
 	pci_write_config_dword(bp->pdev, PCICFG_GRC_ADDRESS,
 			       PCICFG_VENDOR_ID_OFFSET);
 
-#if 0 // AKAROS_PORT
+#if 0 // AKAROS_PORT Linux fails this too.
 	/* AER (Advanced Error reporting) configuration */
 	rc = pci_enable_pcie_error_reporting(pdev);
 	if (!rc)

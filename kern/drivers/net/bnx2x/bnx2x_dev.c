@@ -320,6 +320,9 @@ static int bnx2x_reset(struct bnx2x *ctlr)
 	 * mmio mappings that have to happen at boot (in akaros), instead of during
 	 * devether's attach (at runtime) */
 
+	/* shut it up for now.  too much stats output */
+	ctlr->msg_enable = 0;
+
 //extern int bnx2x_attach(struct bnx2x *sc);
 //	bnx2x_attach(ctlr);
 //
