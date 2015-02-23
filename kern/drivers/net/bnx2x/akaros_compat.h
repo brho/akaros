@@ -608,6 +608,7 @@ static int pcie_capability_read_word(struct pci_device *dev, int pos,
 #define napi_disable(...)
 #define napi_schedule(...)
 #define napi_schedule_irqoff(...)
+#define napi_complete(...)
 /* picks a random, valid mac addr for dev */
 #define eth_hw_addr_random(...)
 /* checks if the MAC is not 0 and not multicast (all 1s) */

@@ -24,7 +24,7 @@
 static void bnx2x_free_fp_mem_cnic(struct bnx2x *bp);
 static int bnx2x_alloc_fp_mem_cnic(struct bnx2x *bp);
 static int bnx2x_alloc_fp_mem(struct bnx2x *bp);
-static int bnx2x_poll(struct napi_struct *napi, int budget);
+static void bnx2x_poll(uint32_t srcid, long a0, long a1, long a2);
 
 static void bnx2x_add_all_napi_cnic(struct bnx2x *bp)
 {
@@ -891,8 +891,6 @@ panic("Not implemented");
 
 static int bnx2x_rx_int(struct bnx2x_fastpath *fp, int budget)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	struct bnx2x *bp = fp->bp;
 	uint16_t bd_cons, bd_prod, bd_prod_fw, comp_ring_cons;
 	uint16_t sw_comp_cons, sw_comp_prod;
@@ -922,13 +920,11 @@ panic("Not implemented");
 
 	while (BNX2X_IS_CQE_COMPLETED(cqe_fp)) {
 		struct sw_rx_bd *rx_buf = NULL;
-		struct sk_buff *skb;
 		uint8_t cqe_fp_flags;
 		enum eth_rx_cqe_type cqe_fp_type;
 		uint16_t len, pad, queue;
 		uint8_t *data;
 		uint32_t rxhash;
-		enum pkt_hash_types rxhash_type;
 
 #ifdef BNX2X_STOP_ON_ERROR
 		if (unlikely(bp->panic))
@@ -967,6 +963,8 @@ panic("Not implemented");
 			goto next_cqe;
 		}
 
+panic("Not implemented");
+#if 0 // AKAROS_PORT
 		rx_buf = &fp->rx_buf_ring[bd_cons];
 		data = rx_buf->data;
 
@@ -1110,6 +1108,7 @@ next_rx:
 		bd_prod = NEXT_RX_IDX(bd_prod);
 		bd_prod_fw = NEXT_RX_IDX(bd_prod_fw);
 		rx_pkt++;
+#endif
 next_cqe:
 		sw_comp_prod = NEXT_RCQ_IDX(sw_comp_prod);
 		sw_comp_cons = NEXT_RCQ_IDX(sw_comp_cons);
@@ -1138,7 +1137,6 @@ next_cqe:
 	fp->rx_calls++;
 
 	return rx_pkt;
-#endif
 }
 
 static void bnx2x_msix_fp_int(struct hw_trapframe *hw_tf, void *fp_cookie)
@@ -1163,7 +1161,8 @@ static void bnx2x_msix_fp_int(struct hw_trapframe *hw_tf, void *fp_cookie)
 		prefetch(fp->txdata_ptr[cos]->tx_cons_sb);
 
 	prefetch(&fp->sb_running_index[SM_RX_ID]);
-	/* TODO XME: wake a ktask or o/w poll the device.  we're in hard IRQ */
+	// AKAROS_PORT
+	send_kernel_message(core_id(), bnx2x_poll, (long)fp, 0, 0, KMSG_ROUTINE);
 	napi_schedule_irqoff(&bnx2x_fp(bp, fp->index, napi));
 
 	return;
@@ -3249,14 +3248,12 @@ int bnx2x_set_power_state(struct bnx2x *bp, pci_power_t state)
 /*
  * net_device service functions
  */
-static int bnx2x_poll(struct napi_struct *napi, int budget)
+static void bnx2x_poll(uint32_t srcid, long a0, long a1, long a2)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
+	struct bnx2x_fastpath *fp = (struct bnx2x_fastpath*)a0;
 	int work_done = 0;
+	int budget = INT32_MAX;	// AKAROS_PORT  comes from napi; just let it run
 	uint8_t cos;
-	struct bnx2x_fastpath *fp = container_of(napi, struct bnx2x_fastpath,
-						 napi);
 	struct bnx2x *bp = fp->bp;
 
 	while (1) {
@@ -3267,7 +3264,7 @@ panic("Not implemented");
 		}
 #endif
 		if (!bnx2x_fp_lock_napi(fp))
-			return budget;
+			return;
 
 		for_each_cos_in_tx_queue(fp, cos)
 			if (bnx2x_tx_queue_has_work(fp->txdata_ptr[cos]))
@@ -3323,9 +3320,6 @@ panic("Not implemented");
 			}
 		}
 	}
-
-	return work_done;
-#endif
 }
 
 #ifdef CONFIG_NET_RX_BUSY_POLL
