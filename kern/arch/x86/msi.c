@@ -360,6 +360,18 @@ struct msix_irq_vector *pci_msix_enable(struct pci_device *p, uint64_t vec)
 	return linkage;
 }
 
+void pci_dump_msix_table(struct pci_device *p)
+{
+	struct msix_entry *entry;
+	void *tbl = (void*)p->msix_tbl_vaddr;
+
+	hexdump(tbl, p->msix_nr_vec * sizeof(struct msix_entry));
+	entry = (struct msix_entry*)p->msix_tbl_vaddr;
+	for (int i = 0; i < p->msix_nr_vec; i++, entry++)
+		printk("Entry %d, addr hi:lo 0x%08x:%08x data 0x%08x\n", i,
+		       entry->addr_hi, entry->addr_lo, entry->data);
+}
+
 void pci_msi_mask(struct pci_device *p)
 {
 	unsigned int c, f;
