@@ -42,6 +42,16 @@
 #define RCU_INIT_POINTER(dst, src) rcu_assign_pointer(dst, src)
 #define synchronize_rcu()
 
+#define atomic_cmpxchg(_addr, _old, _new)                                      \
+({                                                                             \
+	typeof(_old) _ret;                                                         \
+	if (atomic_cas((_addr), (_old), (_new)))                                   \
+		_ret = _old;                                                           \
+	else                                                                       \
+		_ret = atomic_read(_addr);                                             \
+	_ret;                                                                      \
+})
+
 #define unlikely(x) (x)
 #define likely(x) (x)
 #define UINT_MAX UINT64_MAX

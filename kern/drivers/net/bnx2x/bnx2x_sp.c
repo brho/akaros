@@ -3718,7 +3718,7 @@ static inline bool __atomic_add_ifless(atomic_t *v, int a, int u)
 		if (unlikely(c + a >= u))
 			return false;
 
-		old = atomic_cas((v), c, c + a);
+		old = atomic_cmpxchg((v), c, c + a);
 		if (likely(old == c))
 			break;
 		c = old;
@@ -3746,7 +3746,7 @@ static inline bool __atomic_dec_ifmoe(atomic_t *v, int a, int u)
 		if (unlikely(c - a < u))
 			return false;
 
-		old = atomic_cas((v), c, c - a);
+		old = atomic_cmpxchg((v), c, c - a);
 		if (likely(old == c))
 			break;
 		c = old;

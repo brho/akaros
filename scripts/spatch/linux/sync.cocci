@@ -50,11 +50,3 @@ expression VARP;
 @@
 -atomic_add(AMT, VARP)
 +atomic_add(VARP, AMT)
-
-@@
-expression VARP;
-expression OLD;
-expression NEW;
-@@
--atomic_cmpxchg(VARP, OLD, NEW)
-+atomic_cas(VARP, OLD, NEW)
