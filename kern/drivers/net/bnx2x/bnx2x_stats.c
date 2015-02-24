@@ -1142,9 +1142,8 @@ static int bnx2x_storm_stats_update(struct bnx2x *bp)
 
 static void bnx2x_net_stats_update(struct bnx2x *bp)
 {
+#if 0 // AKAROS_PORT XME skipping net_stats_update
 	struct bnx2x_eth_stats *estats = &bp->eth_stats;
-panic("NOT IMPLEMENTED");
-#if 0 // AKAROS_PORT
 	struct net_device_stats *nstats = &bp->dev->stats;
 	unsigned long tmp;
 	int i;
@@ -1247,8 +1246,6 @@ static bool bnx2x_edebug_stats_stopped(struct bnx2x *bp)
 
 static void bnx2x_stats_update(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint32_t *stats_comp = bnx2x_sp(bp, stats_comp);
 
 	/* we run update from timer context, so give up
@@ -1300,7 +1297,6 @@ panic("Not implemented");
 
 out:
 	up(&bp->stats_sema);
-#endif
 }
 
 static void bnx2x_port_stats_stop(struct bnx2x *bp)
@@ -1416,8 +1412,6 @@ static const struct {
 
 void bnx2x_stats_handle(struct bnx2x *bp, enum bnx2x_stats_event event)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	enum bnx2x_stats_state state;
 	void (*action)(struct bnx2x *bp);
 	if (unlikely(bp->panic))
@@ -1434,7 +1428,6 @@ panic("Not implemented");
 	if ((event != STATS_EVENT_UPDATE) || netif_msg_timer(bp))
 		DP(BNX2X_MSG_STATS, "state %d -> event %d -> state %d\n",
 		   state, event, bp->stats_state);
-#endif
 }
 
 static void bnx2x_port_stats_base_init(struct bnx2x *bp)
@@ -2016,13 +2009,10 @@ void bnx2x_stats_safe_exec(struct bnx2x *bp,
 			   void (func_to_exec)(void *cookie),
 			   void *cookie)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	if (down_timeout(&bp->stats_sema, HZ/10))
 		BNX2X_ERR("Unable to acquire stats lock\n");
 	bnx2x_stats_comp(bp);
 	func_to_exec(cookie);
 	__bnx2x_stats_start(bp);
 	up(&bp->stats_sema);
-#endif
 }

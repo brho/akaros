@@ -1221,8 +1221,6 @@ uint16_t bnx2x_get_mf_speed(struct bnx2x *bp)
 static void bnx2x_fill_report_data(struct bnx2x *bp,
 				   struct bnx2x_link_report_data *data)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	memset(data, 0, sizeof(*data));
 
 	if (IS_PF(bp)) {
@@ -1255,7 +1253,6 @@ panic("Not implemented");
 	} else { /* VF */
 		*data = bp->vf_link_vars;
 	}
-#endif
 }
 
 /**
@@ -1285,8 +1282,6 @@ void bnx2x_link_report(struct bnx2x *bp)
  */
 void __bnx2x_link_report(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	struct bnx2x_link_report_data cur_data;
 
 	/* reread mf_cfg */
@@ -1353,7 +1348,6 @@ panic("Not implemented");
 		netdev_info(bp->dev, "NIC Link is Up, %d Mbps %s duplex, Flow control: %s\n",
 			    cur_data.line_speed, duplex, flow);
 	}
-#endif
 }
 
 static void bnx2x_set_next_page_sgl(struct bnx2x_fastpath *fp)
@@ -2110,8 +2104,6 @@ static void bnx2x_set_rx_buf_size(struct bnx2x *bp)
 
 static int bnx2x_init_rss(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	int i;
 	uint8_t num_eth_queues = BNX2X_NUM_ETH_QUEUES(bp);
 
@@ -2132,14 +2124,11 @@ panic("Not implemented");
 	 * configuration.
 	 */
 	return bnx2x_config_rss_eth(bp, bp->port.pmf || !CHIP_IS_E1x(bp));
-#endif
 }
 
 int bnx2x_rss(struct bnx2x *bp, struct bnx2x_rss_config_obj *rss_obj,
 	      bool config_hash, bool enable)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	struct bnx2x_config_rss_params params = {NULL};
 
 	/* Although RSS is meaningless when there is a single HW queue we
@@ -2180,7 +2169,12 @@ panic("Not implemented");
 
 	if (config_hash) {
 		/* RSS keys */
+		#if 0 // AKAROS_PORT
 		netdev_rss_key_fill(params.rss_key, T_ETH_RSS_KEY * 4);
+		#else
+		/* linux picks a random, once, then uses it here.  it could be 5a! */
+		memset(params.rss_key, 0x5a, T_ETH_RSS_KEY * 4);
+		#endif
 		__set_bit(BNX2X_RSS_SET_SRCH, &params.rss_flags);
 	}
 
@@ -2188,7 +2182,6 @@ panic("Not implemented");
 		return bnx2x_config_rss(bp, &params);
 	else
 		return bnx2x_vfpf_config_rss(bp, &params);
-#endif
 }
 
 static int bnx2x_init_hw(struct bnx2x *bp, uint32_t load_code)
@@ -2247,7 +2240,6 @@ void bnx2x_squeeze_objects(struct bnx2x *bp)
 	 * we take a lock surrounding both the initial send and the CONTs,
 	 * as we don't want a true completion to disrupt us in the middle.
 	 */
-// KPF HERE (prob not init) XME (devether qlock. really the first time?)
 	qlock(&bp->dev->qlock);
 	rc = bnx2x_config_mcast(bp, &rparam, BNX2X_MCAST_CMD_DEL);
 	if (rc < 0)
@@ -2795,7 +2787,6 @@ int bnx2x_nic_load(struct bnx2x *bp, int load_mode)
 
 	bnx2x_pre_irq_nic_init(bp);
 
-// XME HERE
 	/* Connect to IRQs */
 	rc = bnx2x_setup_irqs(bp);
 	if (rc) {
@@ -2870,14 +2861,11 @@ int bnx2x_nic_load(struct bnx2x *bp, int load_mode)
 	bp->state = BNX2X_STATE_OPEN;
 
 	/* Configure a ucast MAC */
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	if (IS_PF(bp))
 		rc = bnx2x_set_eth_mac(bp, true);
 	else /* vf */
-		rc = bnx2x_vfpf_config_mac(bp, bp->dev->dev_addr, bp->fp->index,
+		rc = bnx2x_vfpf_config_mac(bp, bp->dev->ea, bp->fp->index,
 					   true);
-#endif
 	if (rc) {
 		BNX2X_ERR("Setting Ethernet MAC failed\n");
 		LOAD_ERROR_EXIT(bp, load_error3);
@@ -4828,8 +4816,6 @@ panic("Not implemented");
 
 int bnx2x_get_cur_phy_idx(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint32_t sel_phy_idx = 0;
 	if (bp->link_params.num_phys <= 1)
 		return INT_PHY;
@@ -4856,8 +4842,8 @@ panic("Not implemented");
 	}
 
 	return sel_phy_idx;
-#endif
 }
+
 int bnx2x_get_link_cfg_idx(struct bnx2x *bp)
 {
 	uint32_t sel_phy_idx = bnx2x_get_cur_phy_idx(bp);

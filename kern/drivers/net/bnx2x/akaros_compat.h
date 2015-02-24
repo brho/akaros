@@ -228,6 +228,8 @@ typedef int pm_message_t;
 	printk("[netdev]: " fmt, ##__VA_ARGS__)
 #define netdev_info(dev, fmt, ...) \
 	printk("[netdev]: " fmt, ##__VA_ARGS__)
+#define netdev_dbg(dev, fmt, ...) \
+	printk("[netdev]: " fmt, ##__VA_ARGS__)
 #define dev_err(dev, fmt, ...) \
 	printk("[dev]: " fmt, ##__VA_ARGS__)
 #define dev_info(dev, fmt, ...) \
@@ -488,6 +490,30 @@ typedef unsigned int netdev_features_t;
 #define NETIF_F_HIGHDMA				0
 #define NETIF_F_HW_VLAN_CTAG_RX		0
 
+#define netif_msg_drv(p)		((p)->msg_enable & NETIF_MSG_DRV)
+#define netif_msg_probe(p)		((p)->msg_enable & NETIF_MSG_PROBE)
+#define netif_msg_link(p)		((p)->msg_enable & NETIF_MSG_LINK)
+#define netif_msg_timer(p)		((p)->msg_enable & NETIF_MSG_TIMER)
+#define netif_msg_ifdown(p)		((p)->msg_enable & NETIF_MSG_IFDOWN)
+#define netif_msg_ifup(p)		((p)->msg_enable & NETIF_MSG_IFUP)
+#define netif_msg_rx_err(p)		((p)->msg_enable & NETIF_MSG_RX_ERR)
+#define netif_msg_tx_err(p)		((p)->msg_enable & NETIF_MSG_TX_ERR)
+#define netif_msg_tx_queued(p)	((p)->msg_enable & NETIF_MSG_TX_QUEUED)
+#define netif_msg_intr(p)		((p)->msg_enable & NETIF_MSG_INTR)
+#define netif_msg_tx_done(p)	((p)->msg_enable & NETIF_MSG_TX_DONE)
+#define netif_msg_rx_status(p)	((p)->msg_enable & NETIF_MSG_RX_STATUS)
+#define netif_msg_pktdata(p)	((p)->msg_enable & NETIF_MSG_PKTDATA)
+#define netif_msg_hw(p)			((p)->msg_enable & NETIF_MSG_HW)
+#define netif_msg_wol(p)		((p)->msg_enable & NETIF_MSG_WOL)
+
+enum netdev_state_t {                       
+	__LINK_STATE_START,                                       
+	__LINK_STATE_PRESENT,                                     
+	__LINK_STATE_NOCARRIER,                          
+	__LINK_STATE_LINKWATCH_PENDING,                  
+	__LINK_STATE_DORMANT,  
+};
+
 /* Global mutex in linux for "routing netlink".  Not sure if we have an
  * equivalent or not in Plan 9. */
 #define rtnl_lock()
@@ -629,6 +655,8 @@ static int pcie_capability_read_word(struct pci_device *dev, int pos,
 #define eth_hw_addr_random(...)
 /* checks if the MAC is not 0 and not multicast (all 1s) */
 #define is_valid_ether_addr(...) (TRUE)
+/* The flag this checks is set on before open.  Turned off on failure, etc. */
+#define netif_running(dev) (TRUE)
 
 #define EPROBE_DEFER 1
 #define NET_SKB_PAD 32		/* we'll probably delete code using this */
@@ -689,5 +717,29 @@ static inline void release_firmware(const struct firmware *fw)
 		kfree((void*)fw);
 	}
 }
+
+static inline uint32_t ethtool_rxfh_indir_default(uint32_t index,
+                                                  uint32_t n_rx_rings)
+{
+	return index % n_rx_rings;
+}
+
+/* Plan 9 does a memcmp for this.  We should probably have a helper, like for
+ * IP addrs. */
+static inline bool ether_addr_equal(const uint8_t *addr1, const uint8_t *addr2)
+{
+#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+	uint32_t fold = ((*(const uint32_t *)addr1) ^ (*(const uint32_t *)addr2)) |
+	((*(const uint16_t *)(addr1 + 4)) ^ (*(const uint16_t *)(addr2 + 4)));
+
+	return fold == 0;
+#else
+	const uint16_t *a = (const uint16_t *)addr1;
+	const uint16_t *b = (const uint16_t *)addr2;
+
+	return ((a[0] ^ b[0]) | (a[1] ^ b[1]) | (a[2] ^ b[2])) == 0;
+#endif
+}
+
 
 #endif /* ROS_KERN_AKAROS_COMPAT_H */

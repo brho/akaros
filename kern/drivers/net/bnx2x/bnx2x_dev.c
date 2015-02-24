@@ -316,6 +316,7 @@ static int bnx2x_reset(struct bnx2x *ctlr)
 
 	bnx2x_init_one(ctlr->edev, ctlr, ctlr->pcidev, ctlr->pci_id);
 	bnx2x_open(ctlr->edev);
+	//next ndo_set_rx_mode
 	/* despite the name, we attach at reset time.  BXE attach has a lot of
 	 * mmio mappings that have to happen at boot (in akaros), instead of during
 	 * devether's attach (at runtime) */
@@ -418,6 +419,15 @@ static int bnx2x_pnp(struct ether *edev)
 	spin_unlock(&bnx2x_tq_lock);
 	if (ctlr == NULL)
 		return -1;
+
+	/* TODO: super-dirty hack.  This lock is normally not init'd until after
+	 * reset reset/pnp.  But we want to use it earlier, since we call open
+	 * during reset, instead of attach.  And that happens because we register
+	 * IRQs in open, and MSIX IRQs need to be done at init time (Akaros could
+	 * fix this).
+	 *
+	 * Anyway, we init the qlock here *and* in netifinit.  Good luck. */
+	qlock_init(&edev->qlock);
 
 	edev->ctlr = ctlr;
 	ctlr->edev = edev;

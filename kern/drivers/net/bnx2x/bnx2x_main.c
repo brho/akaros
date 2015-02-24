@@ -2275,8 +2275,6 @@ static int bnx2x_set_spio(struct bnx2x *bp, int spio, uint32_t mode)
 
 void bnx2x_calc_fc_adv(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint8_t cfg_idx = bnx2x_get_link_cfg_idx(bp);
 	switch (bp->link_vars.ieee_fc &
 		MDIO_COMBO_IEEE0_AUTO_NEG_ADV_PAUSE_MASK) {
@@ -2299,7 +2297,6 @@ panic("Not implemented");
 						   ADVERTISED_Pause);
 		break;
 	}
-#endif
 }
 
 static void bnx2x_set_requested_fc(struct bnx2x *bp)
@@ -3648,11 +3645,9 @@ out:
 	qunlock(&bp->drv_info_mutex);
 }
 
-static uint32_t bnx2x_update_mng_version_utility(uint8_t *version,
+static uint32_t bnx2x_update_mng_version_utility(char *version,
 					    bool bnx2x_format)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint8_t vals[4];
 	int i = 0;
 
@@ -3670,18 +3665,15 @@ panic("Not implemented");
 		vals[i++] = 0;
 
 	return (vals[0] << 24) | (vals[1] << 16) | (vals[2] << 8) | vals[3];
-#endif
 }
 
 void bnx2x_update_mng_version(struct bnx2x *bp)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint32_t iscsiver = DRV_VER_NOT_LOADED;
 	uint32_t fcoever = DRV_VER_NOT_LOADED;
 	uint32_t ethver = DRV_VER_NOT_LOADED;
 	int idx = BP_FW_MB_IDX(bp);
-	uint8_t *version;
+	char *version; // AKAROS_PORT (type conversion issues)
 
 	if (!SHMEM2_HAS(bp, func_os_drv_ver))
 		return;
@@ -3703,13 +3695,13 @@ panic("Not implemented");
 	memset(&bp->slowpath->drv_info_to_mcp, 0,
 	       sizeof(union drv_info_to_mcp));
 	bnx2x_drv_info_iscsi_stat(bp);
-	version = bp->slowpath->drv_info_to_mcp.iscsi_stat.version;
+	version = (char*)bp->slowpath->drv_info_to_mcp.iscsi_stat.version;
 	iscsiver = bnx2x_update_mng_version_utility(version, false);
 
 	memset(&bp->slowpath->drv_info_to_mcp, 0,
 	       sizeof(union drv_info_to_mcp));
 	bnx2x_drv_info_fcoe_stat(bp);
-	version = bp->slowpath->drv_info_to_mcp.fcoe_stat.version;
+	version = (char*)bp->slowpath->drv_info_to_mcp.fcoe_stat.version;
 	fcoever = bnx2x_update_mng_version_utility(version, false);
 
 out:
@@ -3721,7 +3713,6 @@ out:
 
 	DP(BNX2X_MSG_MCP, "Setting driver version: ETH [%08x] iSCSI [%08x] FCoE [%08x]\n",
 	   ethver, iscsiver, fcoever);
-#endif
 }
 
 static void bnx2x_oem_event(struct bnx2x *bp, uint32_t event)
@@ -5747,8 +5738,6 @@ void bnx2x_drv_pulse(struct bnx2x *bp)
 
 static void bnx2x_timer(unsigned long data)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	struct bnx2x *bp = (struct bnx2x *) data;
 
 	if (!netif_running(bp->dev))
@@ -5784,7 +5773,6 @@ panic("Not implemented");
 	if (IS_VF(bp))
 		bnx2x_timer_sriov(bp);
 
-#endif
 }
 
 /* RKM style, set_alarm directly */
@@ -8446,8 +8434,6 @@ int bnx2x_del_all_macs(struct bnx2x *bp,
 
 int bnx2x_set_eth_mac(struct bnx2x *bp, bool set)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	if (IS_PF(bp)) {
 		unsigned long ramrod_flags = 0;
 
@@ -8460,7 +8446,6 @@ panic("Not implemented");
 		return bnx2x_vfpf_config_mac(bp, bp->dev->ea,
 					     bp->fp->index, true);
 	}
-#endif
 }
 
 int bnx2x_setup_leading(struct bnx2x *bp)
@@ -10090,8 +10075,6 @@ static int bnx2x_close(struct ether *dev);
  */
 static void bnx2x_sp_rtnl_task(struct work_struct *work)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	struct bnx2x *bp = container_of(work, struct bnx2x, sp_rtnl_task.work);
 
 	rtnl_lock();
@@ -10154,7 +10137,9 @@ sp_rtnl_not_reset:
 	 */
 	if (test_and_clear_bit(BNX2X_SP_RTNL_FAN_FAILURE, &bp->sp_rtnl_state)) {
 		DP(NETIF_MSG_HW, "fan failure detected. Unloading driver\n");
+		#if 0 // AKAROS_PORT
 		netif_device_detach(bp->dev);
+		#endif
 		bnx2x_close(bp->dev);
 		rtnl_unlock();
 		return;
@@ -10167,10 +10152,13 @@ sp_rtnl_not_reset:
 	}
 	if (test_and_clear_bit(BNX2X_SP_RTNL_VFPF_CHANNEL_DOWN,
 			       &bp->sp_rtnl_state)){
+		panic("Not implemented");
+		#if 0 // AKAROS_PORT
 		if (!test_bit(__LINK_STATE_NOCARRIER, &bp->dev->state)) {
 			bnx2x_tx_disable(bp);
 			BNX2X_ERR("PF indicated channel is not servicable anymore. This means this VF device is no longer operational\n");
 		}
+		#endif
 	}
 
 	if (test_and_clear_bit(BNX2X_SP_RTNL_RX_MODE, &bp->sp_rtnl_state)) {
@@ -10202,13 +10190,10 @@ sp_rtnl_not_reset:
 		bnx2x_disable_sriov(bp);
 		bnx2x_enable_sriov(bp);
 	}
-#endif
 }
 
 static void bnx2x_period_task(struct work_struct *work)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	struct bnx2x *bp = container_of(work, struct bnx2x, period_task.work);
 
 	if (!netif_running(bp->dev))
@@ -10236,7 +10221,6 @@ panic("Not implemented");
 	bnx2x_release_phy_lock(bp);
 period_task_exit:
 	return;
-#endif
 }
 
 /*
@@ -12530,7 +12514,7 @@ void bnx2x_set_rx_mode_inner(struct bnx2x *bp)
 
 	qlock(&bp->dev->qlock);
 
-#if 0 // AKAROS_PORT skip promisc and multicast
+#if 0 // AKAROS_PORT skip promisc, multicast, unicast XME
 	if (bp->dev->flags & IFF_PROMISC) {
 		rx_mode = BNX2X_RX_MODE_PROMISC;
 	} else if ((bp->dev->flags & IFF_ALLMULTI) ||
@@ -12538,9 +12522,6 @@ void bnx2x_set_rx_mode_inner(struct bnx2x *bp)
 		    CHIP_IS_E1(bp))) {
 		rx_mode = BNX2X_RX_MODE_ALLMULTI;
 	} else {
-#else
-	{
-#endif
 		if (IS_PF(bp)) {
 			/* some multicasts */
 			if (bnx2x_set_mc_list(bp) < 0)
@@ -12559,6 +12540,7 @@ void bnx2x_set_rx_mode_inner(struct bnx2x *bp)
 					       BNX2X_SP_RTNL_VFPF_MCAST, 0);
 		}
 	}
+#endif
 
 	bp->rx_mode = rx_mode;
 	/* handle ISCSI SD mode */

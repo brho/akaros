@@ -1660,7 +1660,7 @@ struct bnx2x {
 	uint32_t			link_cnt;
 	struct bnx2x_link_report_data last_reported_link;
 
-	struct mdio_if_info	mdio;
+	//struct mdio_if_info	mdio;
 
 	struct bnx2x_common	common;
 	struct bnx2x_port	port;

@@ -602,11 +602,9 @@ static int bnx2x_check_mac_add(struct bnx2x *bp,
 			       struct bnx2x_vlan_mac_obj *o,
 			       union bnx2x_classification_ramrod_data *data)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	struct bnx2x_vlan_mac_registry_elem *pos;
 
-	DP(BNX2X_MSG_SP, "Checking MAC %pM for ADD command\n", data->mac.mac);
+	DP(BNX2X_MSG_SP, "Checking MAC %E for ADD command\n", data->mac.mac);
 
 	if (!is_valid_ether_addr(data->mac.mac))
 		return -EINVAL;
@@ -618,7 +616,6 @@ panic("Not implemented");
 			return -EEXIST;
 
 	return 0;
-#endif
 }
 
 static int bnx2x_check_vlan_add(struct bnx2x *bp,
@@ -3757,8 +3754,6 @@ static inline bool __atomic_dec_ifmoe(atomic_t *v, int a, int u)
 
 static bool bnx2x_credit_pool_get(struct bnx2x_credit_pool_obj *o, int cnt)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	bool rc;
 
 	mb();
@@ -3766,13 +3761,10 @@ panic("Not implemented");
 	mb();
 
 	return rc;
-#endif
 }
 
 static bool bnx2x_credit_pool_put(struct bnx2x_credit_pool_obj *o, int cnt)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	bool rc;
 
 	mb();
@@ -3783,7 +3775,6 @@ panic("Not implemented");
 	mb();
 
 	return rc;
-#endif
 }
 
 static int bnx2x_credit_pool_check(struct bnx2x_credit_pool_obj *o)
@@ -4037,8 +4028,6 @@ static inline void bnx2x_debug_print_ind_table(struct bnx2x *bp,
 static int bnx2x_setup_rss(struct bnx2x *bp,
 			   struct bnx2x_config_rss_params *p)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	struct bnx2x_rss_config_obj *o = p->rss_obj;
 	struct bnx2x_raw_obj *r = &o->raw;
 	struct eth_rss_update_ramrod_data *data =
@@ -4112,7 +4101,9 @@ panic("Not implemented");
 	memcpy(o->ind_table, p->ind_table, T_ETH_INDIRECTION_TABLE_SIZE);
 
 	/* Print the indirection table */
+	#if 0 // AKAROS_PORT
 	if (netif_msg_ifup(bp))
+	#endif
 		bnx2x_debug_print_ind_table(bp, p);
 
 	/* No need for an explicit memory barrier here as long as we
@@ -4132,7 +4123,6 @@ panic("Not implemented");
 		return rc;
 
 	return 1;
-#endif
 }
 
 void bnx2x_get_rss_ind_table(struct bnx2x_rss_config_obj *rss_obj,
