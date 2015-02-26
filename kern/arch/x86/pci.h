@@ -269,6 +269,7 @@ static inline void *pci_get_drvdata(struct pci_device *pcidev);
 
 /* MSI functions, msi.c */
 int pci_msi_enable(struct pci_device *p, uint64_t vec);
+int pci_msix_init(struct pci_device *p);
 struct msix_irq_vector *pci_msix_enable(struct pci_device *p, uint64_t vec);
 void pci_msi_mask(struct pci_device *p);
 void pci_msi_unmask(struct pci_device *p);

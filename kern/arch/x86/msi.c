@@ -262,6 +262,8 @@ static int __pci_msix_init(struct pci_device *p)
 	int tbl_bir, tbl_off, pba_bir, pba_off;
 	struct msix_entry *entry;
 
+	if (p->msix_ready)
+		return 0;
 	if (p->msi_ready) {
 		printk("MSI-X: MSI is already on, aborting\n");
 		return -1;
@@ -314,7 +316,21 @@ static int __pci_msix_init(struct pci_device *p)
 	/* unmask the device, now that all the vectors are masked */
 	f &= ~Msixmask;
 	pcidev_write16(p, c + 2, f);
+	p->msix_ready = TRUE;
 	return 0;
+}
+
+/* Some parts of msix init need to happen during boot.  Devices can call this
+ * during their reset methods, and then later register their IRQs during attach.
+ * Other OS's also alloc the vector around this time, though we'll hold off on
+ * that for now. */
+int pci_msix_init(struct pci_device *p)
+{
+	int ret;
+	spin_lock_irqsave(&p->lock);
+	ret = __pci_msix_init(p);
+	spin_unlock_irqsave(&p->lock);
+	return ret;
 }
 
 /* Enables an MSI-X vector for a PCI device.  vec is formatted like an ioapic
@@ -329,12 +345,11 @@ struct msix_irq_vector *pci_msix_enable(struct pci_device *p, uint64_t vec)
 	unsigned int c, datao;
 
 	spin_lock_irqsave(&p->lock);
-	if (!p->msix_ready) {
-		if (__pci_msix_init(p) < 0) {
-			spin_unlock_irqsave(&p->lock);
-			return 0;
-		}
-		p->msix_ready = TRUE;
+	/* Ensure we're init'd.  We could remove this in the future, though not
+	 * everyone calls the extern pci_msix_init. */
+	if (__pci_msix_init(p) < 0) {
+		spin_unlock_irqsave(&p->lock);
+		return 0;
 	}
 	/* find an unused slot (no apic_vector assigned).  later, we might want to
 	 * point back to the irq_hs for each entry.  not a big deal now. */
