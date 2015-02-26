@@ -659,7 +659,7 @@ static int pcie_capability_read_word(struct pci_device *dev, int pos,
 #define netif_running(dev) (TRUE)
 
 #define EPROBE_DEFER 1
-#define NET_SKB_PAD 32		/* we'll probably delete code using this */
+#define NET_SKB_PAD 0 		/* padding for SKBs.  Ignoring it for now */
 #define MAX_SKB_FRAGS 16	/* we'll probably delete code using this */
 #define VLAN_VID_MASK 0x0fff /* VLAN Identifier */
 

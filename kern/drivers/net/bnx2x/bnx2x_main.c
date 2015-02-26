@@ -12498,7 +12498,7 @@ panic("Not implemented");
 }
 
 /* If bp->state is OPEN, should be called with netif_addr_lock_bh() */
-static void bnx2x_set_rx_mode(struct ether *dev)
+void bnx2x_set_rx_mode(struct ether *dev)
 {
 	struct bnx2x *bp = netdev_priv(dev);
 

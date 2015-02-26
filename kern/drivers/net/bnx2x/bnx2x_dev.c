@@ -33,6 +33,7 @@ extern int bnx2x_init_one(struct ether *dev, struct bnx2x *bp,
                           struct pci_device *pdev,
                           const struct pci_device_id *ent);
 extern int bnx2x_open(struct ether *dev);
+extern void bnx2x_set_rx_mode(struct ether *dev);
 
 spinlock_t bnx2x_tq_lock = SPINLOCK_INITIALIZER;
 TAILQ_HEAD(bnx2x_tq, bnx2x);
@@ -268,8 +269,7 @@ static void bnx2x_attach(struct ether *edev)
 	}
 
 	bnx2x_open(ctlr->edev);
-
-	//do this next: ndo_set_rx_mode
+	bnx2x_set_rx_mode(edev);
 
 	/* shut it up for now.  too much stats output */
 	ctlr->msg_enable = 0;

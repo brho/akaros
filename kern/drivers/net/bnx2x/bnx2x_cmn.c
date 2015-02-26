@@ -901,6 +901,8 @@ static int bnx2x_rx_int(struct bnx2x_fastpath *fp, int budget)
 	union eth_rx_cqe *cqe;
 	struct eth_fast_path_rx_cqe *cqe_fp;
 
+	struct block *block;
+
 #ifdef BNX2X_STOP_ON_ERROR
 	if (unlikely(bp->panic))
 		return 0;
@@ -966,8 +968,6 @@ static int bnx2x_rx_int(struct bnx2x_fastpath *fp, int budget)
 			goto next_cqe;
 		}
 
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 		rx_buf = &fp->rx_buf_ring[bd_cons];
 		data = rx_buf->data;
 
@@ -1042,16 +1042,19 @@ panic("Not implemented");
 		/* Since we don't have a jumbo ring
 		 * copy small packets if mtu > 1500
 		 */
-		if ((bp->dev->maxmtu > ETH_MAX_PACKET_SIZE) &&
-		    (len <= RX_COPY_THRESH)) {
-			skb = napi_alloc_skb(&fp->napi, len);
-			if (skb == NULL) {
+		/* TODO: AKAROS_PORT always copy out the packet for now. */
+		if (1) {
+//		if ((bp->dev->maxmtu > ETH_MAX_PACKET_SIZE) &&
+//		    (len <= RX_COPY_THRESH)) {
+			block = iallocb(len);
+			if (block == NULL) {
 				DP(NETIF_MSG_RX_ERR | NETIF_MSG_RX_STATUS,
 				   "ERROR  packet dropped because of alloc failure\n");
 				bnx2x_fp_qstats(bp, fp)->rx_skb_alloc_failed++;
 				goto reuse_rx;
 			}
-			memcpy(skb->data, data + pad, len);
+			memcpy(block->wp, data + pad, len);
+			block->wp += len;
 			bnx2x_reuse_rx_data(fp, bd_cons, bd_prod);
 		} else {
 			if (likely(bnx2x_alloc_rx_data(bp, fp, bd_prod,
@@ -1060,6 +1063,9 @@ panic("Not implemented");
 						 dma_unmap_addr(rx_buf, mapping),
 						 fp->rx_buf_size,
 						 DMA_FROM_DEVICE);
+				/* TODO: block extra data here */
+				panic("Extra-data not implemented");
+				#if 0 // AKAROS_PORT
 				skb = build_skb(data, fp->rx_frag_size);
 				if (unlikely(!skb)) {
 					bnx2x_frag_free(fp, data);
@@ -1068,6 +1074,7 @@ panic("Not implemented");
 					goto next_rx;
 				}
 				skb_reserve(skb, pad);
+				#endif
 			} else {
 				DP(NETIF_MSG_RX_ERR | NETIF_MSG_RX_STATUS,
 				   "ERROR  packet dropped because of alloc failure\n");
@@ -1078,6 +1085,8 @@ reuse_rx:
 			}
 		}
 
+		// AKAROS_PORT TODO: set hash and checksum stuff
+#if 0
 		skb_put(skb, len);
 		skb->protocol = eth_type_trans(skb, bp->dev);
 
@@ -1104,6 +1113,8 @@ reuse_rx:
 			netif_receive_skb(skb);
 		else
 			napi_gro_receive(&fp->napi, skb);
+#endif
+		etheriq(bp->edev, block, TRUE);
 next_rx:
 		rx_buf->data = NULL;
 
@@ -1111,7 +1122,6 @@ next_rx:
 		bd_prod = NEXT_RX_IDX(bd_prod);
 		bd_prod_fw = NEXT_RX_IDX(bd_prod_fw);
 		rx_pkt++;
-#endif
 next_cqe:
 		sw_comp_prod = NEXT_RCQ_IDX(sw_comp_prod);
 		sw_comp_cons = NEXT_RCQ_IDX(sw_comp_cons);
