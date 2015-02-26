@@ -8465,13 +8465,19 @@ int bnx2x_setup_leading(struct bnx2x *bp)
  */
 int bnx2x_set_int_mode(struct bnx2x *bp)
 {
+	int ret;
 	/* This tries to set up MSIX in advance, registering vectors and whatnot.
 	 * The bulk is in bnx2x_enable_msix.
 	 *
-	 * We can check later if it worked after register_irq()
+	 * Since we're in devreset now, we're still part of the bootup process and
+	 * can init msix, and later at attach time we can register the irqs.
 	 *
-	 * We're going to try and use MSIX, so lets set it now.  Code in a few
-	 * places checks this. */
+	 * We can check later if getting apic vectors worked after register_irq().
+	 *
+	 * We're going to try and use MSIX, so let's set it now.  Code in a few
+	 * places checks the flag. */
+	if ((ret = pci_msix_init(bp->pdev)))
+		return ret;
 	bp->flags |= USING_MSIX_FLAG;
 	return 0;
 #if 0 // AKAROS_PORT

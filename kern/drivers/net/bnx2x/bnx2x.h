@@ -1444,6 +1444,7 @@ struct bnx2x {
 	struct ether				*edev;
 	TAILQ_ENTRY(bnx2x) 			link9ns;
 	const struct pci_device_id	*pci_id;			/* for navigating pci/pnp */
+	bool						attached;
 
 	/* These are in Linux's net_device */
 	void						*mem_start;

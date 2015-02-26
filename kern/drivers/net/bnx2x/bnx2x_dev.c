@@ -261,11 +261,23 @@ static void bnx2x_attach(struct ether *edev)
 	ctlr = edev->ctlr;
 	ctlr->edev = edev;	/* point back to Ether* */
 
-	/* not sure if we'll need/want any of the 9ns stuff */
-	return;
-
 	qlock(&ctlr->alock);
-	/* TODO: make sure we haven't attached already.  If so, just return */
+	if (ctlr->attached) {
+		qunlock(&ctlr->alock);
+		return;
+	}
+
+	bnx2x_open(ctlr->edev);
+
+	//do this next: ndo_set_rx_mode
+
+	/* shut it up for now.  too much stats output */
+	ctlr->msg_enable = 0;
+
+	ctlr->attached = TRUE;
+	qunlock(&ctlr->alock);
+	/* not sure if we'll need/want any of the other 9ns stuff */
+	return;
 
 	/* Alloc all your ctrl crap. */
 
@@ -315,25 +327,6 @@ static int bnx2x_reset(struct bnx2x *ctlr)
 	int ctrl, i, pause, r, swdpio, txcw;
 
 	bnx2x_init_one(ctlr->edev, ctlr, ctlr->pcidev, ctlr->pci_id);
-	bnx2x_open(ctlr->edev);
-	//next ndo_set_rx_mode
-	/* despite the name, we attach at reset time.  BXE attach has a lot of
-	 * mmio mappings that have to happen at boot (in akaros), instead of during
-	 * devether's attach (at runtime) */
-
-	/* shut it up for now.  too much stats output */
-	ctlr->msg_enable = 0;
-
-//extern int bnx2x_attach(struct bnx2x *sc);
-//	bnx2x_attach(ctlr);
-//
-//	/* normally done during BSD's ifconfig */
-//extern void bnx2x_init(void *xsc);
-//	bnx2x_init(ctlr);
-
-//	if (igbedetach(ctlr))
-//		return -1;
-
 	return 0;
 }
 
@@ -419,15 +412,6 @@ static int bnx2x_pnp(struct ether *edev)
 	spin_unlock(&bnx2x_tq_lock);
 	if (ctlr == NULL)
 		return -1;
-
-	/* TODO: super-dirty hack.  This lock is normally not init'd until after
-	 * reset reset/pnp.  But we want to use it earlier, since we call open
-	 * during reset, instead of attach.  And that happens because we register
-	 * IRQs in open, and MSIX IRQs need to be done at init time (Akaros could
-	 * fix this).
-	 *
-	 * Anyway, we init the qlock here *and* in netifinit.  Good luck. */
-	qlock_init(&edev->qlock);
 
 	edev->ctlr = ctlr;
 	ctlr->edev = edev;
