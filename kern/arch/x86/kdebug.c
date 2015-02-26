@@ -314,6 +314,7 @@ size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
 	while (fp && nr_pcs < nr_slots) {
 		/* could put some sanity checks in here... */
 		pcs[nr_pcs++] = pc;
+		printd("PC %p FP %p\n", pc, fp);
 		if (!is_kaddr((void*)fp))
 			break;
 		/* PC becomes the retaddr - 1.  the -1 is to put our PC back inside the
