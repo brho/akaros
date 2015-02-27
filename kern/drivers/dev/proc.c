@@ -1486,7 +1486,6 @@ static void procctlreq(struct proc *p, char *va, int n)
 			spin_on(p->env_cr3);
 			break;
 		case CMvminit:
-			vminit(current);
 			break;
 	}
 	poperror();

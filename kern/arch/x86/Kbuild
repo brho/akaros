@@ -31,6 +31,3 @@ obj-y						+= trap.o trap64.o
 obj-y						+= trapentry64.o
 obj-y						+= usb.o
 
-# VMM support. Always leave this in to ensure we don't break anything.
-obj-y						+= vmm/
-
