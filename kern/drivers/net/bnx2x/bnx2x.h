@@ -502,6 +502,9 @@ struct bnx2x_fp_txdata {
 	int			txq_index;
 	struct bnx2x_fastpath	*parent_fp;
 	int			tx_ring_size;
+
+	struct poke_tracker			poker;
+	struct queue				*oq;
 };
 
 enum bnx2x_tpa_mode_t {

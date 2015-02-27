@@ -1123,6 +1123,12 @@ static inline void bnx2x_init_txdata(struct bnx2x *bp,
 	txdata->parent_fp = fp;
 	txdata->tx_ring_size = IS_FCOE_FP(fp) ? MAX_TX_AVAIL : bp->tx_ring_size;
 
+	/* Poke function - ghetto extern from bnx2x_dev.c */
+	extern void __bnx2x_tx_queue(void *txdata_arg);
+	poke_init(&txdata->poker, __bnx2x_tx_queue);
+	/* TODO: AKAROS_PORT multi queue: assign proper oq */
+	txdata->oq = bp->edev->oq;
+
 	DP(NETIF_MSG_IFUP, "created tx data cid %d, txq %d\n",
 	   txdata->cid, txdata->txq_index);
 }

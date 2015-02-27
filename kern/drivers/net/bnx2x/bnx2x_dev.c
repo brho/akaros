@@ -34,7 +34,8 @@ extern int bnx2x_init_one(struct ether *dev, struct bnx2x *bp,
                           const struct pci_device_id *ent);
 extern int bnx2x_open(struct ether *dev);
 extern void bnx2x_set_rx_mode(struct ether *dev);
-extern netdev_tx_t bnx2x_start_xmit(struct block *block, struct ether *dev);
+extern netdev_tx_t bnx2x_start_xmit(struct block *block,
+                                    struct bnx2x_fp_txdata *txdata);
 
 spinlock_t bnx2x_tq_lock = SPINLOCK_INITIALIZER;
 TAILQ_HEAD(bnx2x_tq, bnx2x);
@@ -137,40 +138,83 @@ static void bnx2x_multicast(void *arg, uint8_t * addr, int add)
 	/* TODO: add or remove a multicast addr */
 }
 
-/* Transmit initialization.  Not mandatory for 9ns, but a good idea */
-static void bnx2x_txinit(struct bnx2x *ctlr)
+/* The poke function: we are guaranteed that only one copy of this func runs
+ * per poke tracker (per queue).  Both transmit and tx_int will poke, and after
+ * any pokes, the func will run at least once.
+ *
+ * Some notes for optimizing and synchronization:
+ *
+ * If we want a flag or something to keep us from checking the oq and attempting
+ * the xmit, all that will do is speed up xmit when the tx rings are full.
+ * You'd need to be careful.  The post/poke makes sure that this'll run after
+ * work was posted, but if this function sets an abort flag and later checks it,
+ * you need to check tx_avail *after* setting the flag (check, signal, check
+ * again).  Consider this:
+ *
+ * this func:
+ * 		calls start_xmit, fails with BUSY.  wants to set ABORT flag
+ *
+ *      PAUSE - meanwhile:
+ *
+ * tx_int clears the ABORT flag, then pokes:
+ * 		drain so there is room;
+ * 		clear flag (combo of these is "post work");
+ * 		poke;.  guaranteed that poke will happen after we cleared flag.
+ * 		        but it is concurrent with this function
+ *
+ * 		RESUME this func:
+ *
+ * 		sets ABORT flag
+ * 		returns.
+ * 		tx_int's poke ensures we run again
+ * 		we run again and see ABORT, then return
+ * 		never try again til the next tx_int, if ever
+ *
+ * Instead, in this func, we must set ABORT flag, then check tx_avail.  Or
+ * have two flags, one set by us, another set by tx_int, where this func only
+ * clears the tx_int flag when it will attempt a start_xmit.
+ *
+ * It's probably easier to just check tx_avail before entering the while loop,
+ * if you're really concerned.  If you want to do the flag thing, probably use
+ * two flags (atomically), and be careful. */
+void __bnx2x_tx_queue(void *txdata_arg)
 {
+	struct bnx2x_fp_txdata *txdata = txdata_arg;
+	struct block *block;
+	struct queue *oq = txdata->oq;
+
+	/* TODO: avoid bugs til multi-queue is working */
+	assert(oq);
+	assert(txdata->txq_index == 0);
+
+	while ((block = qget(oq))) {
+		if ((bnx2x_start_xmit(block, txdata) != NETDEV_TX_OK)) {
+			/* all queue readers are sync'd by the poke, so we can putback
+			 * without fear of going out of order. */
+
+			/* TODO: q code has methods that should be called with the spinlock
+			 * held, but no methods to do the locking... */
+			//spin_unlock_irqsave(&oq->lock);
+			qputback(oq, block);
+			//spin_lock_irqsave(&oq->lock);
+
+			/* device can't handle any more, we're done for now.  tx_int will
+			 * poke when space frees up.  it may be poking concurrently, and in
+			 * which case, we'll run again immediately. */
+			break;
+		}
+	}
 }
 
 static void bnx2x_transmit(struct ether *edev)
 {
-	struct block *bp;
-	struct bnx2x *ctlr;
+	struct bnx2x *ctlr = edev->ctlr;
+	struct bnx2x_fp_txdata *txdata;
+	/* TODO: determine the tx queue we're supposed to work on */
+	int txq_index = 0;
 
-	ctlr = edev->ctlr;
-
-	/* Don't forget to spin_lock_irqsave */
-
-	/* TODO: Free any completed packets */
-
-	/* Try to fill the ring back up.  While there is space, yank from the output
-	 * queue (oq) and put them in the Tx desc. */
-	while (1) {
-	//while (NEXT_RING(tdt, ctlr->ntd) != tdh) {
-		if ((bp = qget(edev->oq)) == NULL)
-			break;
-		bnx2x_start_xmit(bp, edev);
-		//td = &ctlr->tdba[tdt];
-		//td->addr[0] = paddr_low32(bp->rp);
-		//td->addr[1] = paddr_high32(bp->rp);
-		/* if we're breaking out, make sure to set the IRQ mask */
-		//if (NEXT_RING(tdt, ctlr->ntd) == tdh) {
-		//	// other stuff removed
-		//	csr32w(ctlr, Tdt, tdt);
-		//	igbeim(ctlr, Txdw);
-		//	break;
-		//}
-	}
+	txdata = &ctlr->bnx2x_txq[txq_index];
+	poke(&txdata->poker, txdata);
 }
 
 /* Not mandatory.  Called to make sure there are free blocks available for
@@ -287,8 +331,6 @@ static void bnx2x_attach(struct ether *edev)
 	name = kmalloc(KNAMELEN, KMALLOC_WAIT);
 	snprintf(name, KNAMELEN, "#l%d-bnx2x_rproc", edev->ctlrno);
 	ktask(name, bnx2x_rproc, edev);
-
-	bnx2x_txinit(ctlr);
 
 	qunlock(&ctlr->alock);
 }

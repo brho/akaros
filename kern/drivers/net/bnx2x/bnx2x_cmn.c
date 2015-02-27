@@ -267,7 +267,6 @@ static uint16_t bnx2x_free_tx_pkt(struct bnx2x *bp, struct bnx2x_fp_txdata *txda
 
 int bnx2x_tx_int(struct bnx2x *bp, struct bnx2x_fp_txdata *txdata)
 {
-	//struct netdev_queue *txq; // AKAROS_PORT
 	uint16_t hw_cons, sw_cons, bd_cons = txdata->tx_bd_cons;
 	unsigned int pkts_compl = 0, bytes_compl = 0;
 
@@ -276,7 +275,6 @@ int bnx2x_tx_int(struct bnx2x *bp, struct bnx2x_fp_txdata *txdata)
 		return -1;
 #endif
 
-	//txq = netdev_get_tx_queue(bp->dev, txdata->txq_index); // AKAROS_PORT
 	hw_cons = le16_to_cpu(*txdata->tx_cons_sb);
 	sw_cons = txdata->tx_pkt_cons;
 
@@ -295,48 +293,11 @@ int bnx2x_tx_int(struct bnx2x *bp, struct bnx2x_fp_txdata *txdata)
 		sw_cons++;
 	}
 
-	//netdev_tx_completed_queue(txq, pkts_compl, bytes_compl); // AKAROS_PORT
-
 	txdata->tx_pkt_cons = sw_cons;
 	txdata->tx_bd_cons = bd_cons;
 
-	/* Need to make the tx_bd_cons update visible to start_xmit()
-	 * before checking for netif_tx_queue_stopped().  Without the
-	 * memory barrier, there is a small possibility that
-	 * start_xmit() will miss it and cause the queue to be stopped
-	 * forever.
-	 * On the other hand we need an rmb() here to ensure the proper
-	 * ordering of bit testing in the following
-	 * netif_tx_queue_stopped(txq) call.
-	 */
-	mb();
-
-	/* TODO: AKAROS_PORT XME restart transmit */
-
+	poke(&txdata->poker, txdata);
 	return 0;
-#if 0 // AKAROS_PORT netif queue stuff on tx_int
-	if (unlikely(netif_tx_queue_stopped(txq))) {
-		/* Taking tx_lock() is needed to prevent re-enabling the queue
-		 * while it's empty. This could have happen if rx_action() gets
-		 * suspended in bnx2x_tx_int() after the condition before
-		 * netif_tx_wake_queue(), while tx_action (bnx2x_start_xmit()):
-		 *
-		 * stops the queue->sees fresh tx_bd_cons->releases the queue->
-		 * sends some packets consuming the whole queue again->
-		 * stops the queue
-		 */
-
-		__netif_tx_lock(txq, core_id());
-
-		if ((netif_tx_queue_stopped(txq)) &&
-		    (bp->state == BNX2X_STATE_OPEN) &&
-		    (bnx2x_tx_avail(bp, txdata) >= MAX_DESC_PER_TX_PKT))
-			netif_tx_wake_queue(txq);
-
-		__netif_tx_unlock(txq);
-	}
-	return 0;
-#endif
 }
 
 static inline void bnx2x_update_last_max_sge(struct bnx2x_fastpath *fp,
@@ -3829,11 +3790,11 @@ panic("Not implemented");
  * bnx2x_tx_int() runs without netif_tx_lock unless it needs to call
  * netif_wake_queue()
  */
-netdev_tx_t bnx2x_start_xmit(struct block *block, struct ether *dev)
+netdev_tx_t bnx2x_start_xmit(struct block *block,
+                             struct bnx2x_fp_txdata *txdata)
 {
-	struct bnx2x *bp = netdev_priv(dev);
+	struct bnx2x *bp = txdata->parent_fp->bp;
 
-	struct bnx2x_fp_txdata *txdata;
 	struct sw_tx_bd *tx_buf;
 	struct eth_tx_start_bd *tx_start_bd, *first_bd;
 	struct eth_tx_bd *tx_data_bd, *total_pkt_bd = NULL;
@@ -3856,16 +3817,12 @@ netdev_tx_t bnx2x_start_xmit(struct block *block, struct ether *dev)
 		return NETDEV_TX_BUSY;
 #endif
 
-#if 0 // AKAROS_PORT TODO: pick a queue
-	txq_index = skb_get_queue_mapping(skb);
-	txq = netdev_get_tx_queue(dev, txq_index);
-#else
-	txq_index = 0;
-#endif
+	txq_index = txdata->txq_index;
+	assert(txq_index == 0);	// AKAROS_PORT til we get multi-queue working
+	assert(txdata == &bp->bnx2x_txq[txq_index]);
 
 	assert(!(txq_index >= MAX_ETH_TXQ_IDX(bp) + (CNIC_LOADED(bp) ? 1 : 0)));
 
-	txdata = &bp->bnx2x_txq[txq_index];
 
 	/* enable this debug print to view the transmission queue being used
 	DP(NETIF_MSG_TX_QUEUED, "indices: txq %d, fp %d, txdata %d\n",
@@ -3911,7 +3868,7 @@ netdev_tx_t bnx2x_start_xmit(struct block *block, struct ether *dev)
 
 	/* set flag according to packet type (UNICAST_ADDRESS is default)*/
 	if (unlikely(is_multicast_ether_addr(eth->d))) {
-		if (eaddrcmp(eth->d, dev->bcast))
+		if (eaddrcmp(eth->d, bp->edev->bcast))
 			mac_type = BROADCAST_ADDRESS;
 		else
 			mac_type = MULTICAST_ADDRESS;
@@ -4273,18 +4230,6 @@ netdev_tx_t bnx2x_start_xmit(struct block *block, struct ether *dev)
 
 	txdata->tx_bd_prod += nbd;
 
-	if (unlikely(bnx2x_tx_avail(bp, txdata) < MAX_DESC_PER_TX_PKT)) {
-		netif_tx_stop_queue(txq);
-
-		/* paired memory barrier is in bnx2x_tx_int(), we have to keep
-		 * ordering of set_bit() in netif_tx_stop_queue() and read of
-		 * fp->bd_tx_cons */
-		mb();
-
-		bnx2x_fp_qstats(bp, txdata->parent_fp)->driver_xoff++;
-		if (bnx2x_tx_avail(bp, txdata) >= MAX_DESC_PER_TX_PKT)
-			netif_tx_wake_queue(txq);
-	}
 	txdata->tx_pkt++;
 
 	return NETDEV_TX_OK;
