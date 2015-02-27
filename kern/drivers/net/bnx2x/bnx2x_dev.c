@@ -34,6 +34,7 @@ extern int bnx2x_init_one(struct ether *dev, struct bnx2x *bp,
                           const struct pci_device_id *ent);
 extern int bnx2x_open(struct ether *dev);
 extern void bnx2x_set_rx_mode(struct ether *dev);
+extern netdev_tx_t bnx2x_start_xmit(struct block *block, struct ether *dev);
 
 spinlock_t bnx2x_tq_lock = SPINLOCK_INITIALIZER;
 TAILQ_HEAD(bnx2x_tq, bnx2x);
@@ -158,6 +159,7 @@ static void bnx2x_transmit(struct ether *edev)
 	//while (NEXT_RING(tdt, ctlr->ntd) != tdh) {
 		if ((bp = qget(edev->oq)) == NULL)
 			break;
+		bnx2x_start_xmit(bp, edev);
 		//td = &ctlr->tdba[tdt];
 		//td->addr[0] = paddr_low32(bp->rp);
 		//td->addr[1] = paddr_high32(bp->rp);

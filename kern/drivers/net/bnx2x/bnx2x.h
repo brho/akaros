@@ -330,7 +330,7 @@ struct sw_rx_bd {
 };
 
 struct sw_tx_bd {
-	struct sk_buff	*skb;
+	struct block	*block;
 	uint16_t		first_bd;
 	uint8_t		flags;
 /* Set on the first BD descriptor when there is a split BD */

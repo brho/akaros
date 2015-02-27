@@ -190,21 +190,19 @@ static uint16_t bnx2x_free_tx_pkt(struct bnx2x *bp, struct bnx2x_fp_txdata *txda
 			     uint16_t idx, unsigned int *pkts_compl,
 			     unsigned int *bytes_compl)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	struct sw_tx_bd *tx_buf = &txdata->tx_buf_ring[idx];
 	struct eth_tx_start_bd *tx_start_bd;
 	struct eth_tx_bd *tx_data_bd;
-	struct sk_buff *skb = tx_buf->skb;
+	struct block *block = tx_buf->block;
 	uint16_t bd_idx = TX_BD(tx_buf->first_bd), new_cons;
 	int nbd;
 	uint16_t split_bd_len = 0;
 
 	/* prefetch skb end pointer to speedup dev_kfree_skb() */
-	prefetch(&skb->end);
+	//prefetch(&skb->end); // AKAROS_PORT
 
-	DP(NETIF_MSG_TX_DONE, "fp[%d]: pkt_idx %d  buff @(%p)->skb %p\n",
-	   txdata->txq_index, idx, tx_buf, skb);
+	DP(NETIF_MSG_TX_DONE, "fp[%d]: pkt_idx %d  buff @(%p)->block %p\n",
+	   txdata->txq_index, idx, tx_buf, block);
 
 	tx_start_bd = &txdata->tx_desc_ring[bd_idx].start_bd;
 
@@ -253,26 +251,23 @@ panic("Not implemented");
 			bd_idx = TX_BD(NEXT_TX_IDX(bd_idx));
 	}
 
-	/* release skb */
-	warn_on(!skb);
-	if (likely(skb)) {
+	/* release block */
+	warn_on(!block);
+	if (likely(block)) {
 		(*pkts_compl)++;
-		(*bytes_compl) += skb->len;
+		(*bytes_compl) += BLEN(block);
 	}
 
-	dev_kfree_skb_any(skb);
+	freeb(block);
 	tx_buf->first_bd = 0;
-	tx_buf->skb = NULL;
+	tx_buf->block = NULL;
 
 	return new_cons;
-#endif
 }
 
 int bnx2x_tx_int(struct bnx2x *bp, struct bnx2x_fp_txdata *txdata)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
-	struct netdev_queue *txq;
+	//struct netdev_queue *txq; // AKAROS_PORT
 	uint16_t hw_cons, sw_cons, bd_cons = txdata->tx_bd_cons;
 	unsigned int pkts_compl = 0, bytes_compl = 0;
 
@@ -281,7 +276,7 @@ panic("Not implemented");
 		return -1;
 #endif
 
-	txq = netdev_get_tx_queue(bp->dev, txdata->txq_index);
+	//txq = netdev_get_tx_queue(bp->dev, txdata->txq_index); // AKAROS_PORT
 	hw_cons = le16_to_cpu(*txdata->tx_cons_sb);
 	sw_cons = txdata->tx_pkt_cons;
 
@@ -300,7 +295,7 @@ panic("Not implemented");
 		sw_cons++;
 	}
 
-	netdev_tx_completed_queue(txq, pkts_compl, bytes_compl);
+	//netdev_tx_completed_queue(txq, pkts_compl, bytes_compl); // AKAROS_PORT
 
 	txdata->tx_pkt_cons = sw_cons;
 	txdata->tx_bd_cons = bd_cons;
@@ -316,6 +311,10 @@ panic("Not implemented");
 	 */
 	mb();
 
+	/* TODO: AKAROS_PORT XME restart transmit */
+
+	return 0;
+#if 0 // AKAROS_PORT netif queue stuff on tx_int
 	if (unlikely(netif_tx_queue_stopped(txq))) {
 		/* Taking tx_lock() is needed to prevent re-enabling the queue
 		 * while it's empty. This could have happen if rx_action() gets
@@ -3416,14 +3415,16 @@ panic("Not implemented");
 #endif
 }
 
-static uint32_t bnx2x_xmit_type(struct bnx2x *bp, struct sk_buff *skb)
+static uint32_t bnx2x_xmit_type(struct bnx2x *bp, struct block *block)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	uint32_t rc;
 	__u8 prot = 0;
 	__be16 protocol;
 
+	/* TODO: AKAROS_PORT ask for checksums */
+	return XMIT_PLAIN;
+
+#if 0 // AKAROS_PORT
 	if (skb->ip_summed != CHECKSUM_PARTIAL)
 		return XMIT_PLAIN;
 
@@ -3656,7 +3657,7 @@ panic("Not implemented");
 }
 
 /* set FW indication according to inner or outer protocols if tunneled */
-static void bnx2x_set_sbd_csum(struct bnx2x *bp, struct sk_buff *skb,
+static void bnx2x_set_sbd_csum(struct bnx2x *bp, void *ignored_skb,
 			       struct eth_tx_start_bd *tx_start_bd,
 			       uint32_t xmit_type)
 {
@@ -3677,7 +3678,7 @@ static void bnx2x_set_sbd_csum(struct bnx2x *bp, struct sk_buff *skb,
  * @pbd:	parse BD to be updated
  * @xmit_type:	xmit flags
  */
-static uint8_t bnx2x_set_pbd_csum(struct bnx2x *bp, struct sk_buff *skb,
+static uint8_t bnx2x_set_pbd_csum(struct bnx2x *bp, struct block *block,
 			     struct eth_tx_parse_bd_e1x *pbd,
 			     uint32_t xmit_type)
 {
@@ -3828,13 +3829,10 @@ panic("Not implemented");
  * bnx2x_tx_int() runs without netif_tx_lock unless it needs to call
  * netif_wake_queue()
  */
-netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct ether *dev)
+netdev_tx_t bnx2x_start_xmit(struct block *block, struct ether *dev)
 {
-panic("Not implemented");
-#if 0 // AKAROS_PORT
 	struct bnx2x *bp = netdev_priv(dev);
 
-	struct netdev_queue *txq;
 	struct bnx2x_fp_txdata *txdata;
 	struct sw_tx_bd *tx_buf;
 	struct eth_tx_start_bd *tx_start_bd, *first_bd;
@@ -3846,11 +3844,11 @@ panic("Not implemented");
 	uint16_t pkt_prod, bd_prod;
 	int nbd, txq_index;
 	dma_addr_t mapping;
-	uint32_t xmit_type = bnx2x_xmit_type(bp, skb);
+	uint32_t xmit_type = bnx2x_xmit_type(bp, block);
 	int i;
 	uint8_t hlen = 0;
 	__le16 pkt_size = 0;
-	struct ethhdr *eth;
+	struct etherpkt *eth;
 	uint8_t mac_type = UNICAST_ADDRESS;
 
 #ifdef BNX2X_STOP_ON_ERROR
@@ -3858,8 +3856,12 @@ panic("Not implemented");
 		return NETDEV_TX_BUSY;
 #endif
 
+#if 0 // AKAROS_PORT TODO: pick a queue
 	txq_index = skb_get_queue_mapping(skb);
 	txq = netdev_get_tx_queue(dev, txq_index);
+#else
+	txq_index = 0;
+#endif
 
 	assert(!(txq_index >= MAX_ETH_TXQ_IDX(bp) + (CNIC_LOADED(bp) ? 1 : 0)));
 
@@ -3875,7 +3877,11 @@ panic("Not implemented");
 	   txdata->cid, fp_index, txdata_index, txdata, fp); */
 
 	if (unlikely(bnx2x_tx_avail(bp, txdata) <
+#if 0 // AKAROS_PORT TODO: block extra
 			skb_shinfo(skb)->nr_frags +
+#else
+			1 +
+#endif
 			BDS_PER_TX_PKT +
 			NEXT_CNT_PER_TX_PKT(MAX_BDS_PER_TX_PKT))) {
 		/* Handle special storage cases separately */
@@ -3883,7 +3889,7 @@ panic("Not implemented");
 			struct bnx2x_eth_q_stats *q_stats =
 				bnx2x_fp_qstats(bp, txdata->parent_fp);
 			q_stats->driver_filtered_tx_pkt++;
-			dev_kfree_skb(skb);
+			freeb(block);
 			return NETDEV_TX_OK;
 		}
 		bnx2x_fp_qstats(bp, txdata->parent_fp)->driver_xoff++;
@@ -3893,22 +3899,25 @@ panic("Not implemented");
 		return NETDEV_TX_BUSY;
 	}
 
+#if 0 // AKAROS_PORT
 	DP(NETIF_MSG_TX_QUEUED,
 	   "queue[%d]: SKB: summed %x  protocol %x protocol(%x,%x) gso type %x  xmit_type %x len %d\n",
 	   txq_index, skb->ip_summed, skb->protocol, ipv6_hdr(skb)->nexthdr,
 	   ip_hdr(skb)->protocol, skb_shinfo(skb)->gso_type, xmit_type,
 	   skb->len);
+#endif
 
-	eth = (struct ethhdr *)skb->data;
+	eth = (struct etherpkt *)block->rp;
 
 	/* set flag according to packet type (UNICAST_ADDRESS is default)*/
-	if (unlikely(is_multicast_ether_addr(eth->h_dest))) {
-		if (is_broadcast_ether_addr(eth->h_dest))
+	if (unlikely(is_multicast_ether_addr(eth->d))) {
+		if (eaddrcmp(eth->d, dev->bcast))
 			mac_type = BROADCAST_ADDRESS;
 		else
 			mac_type = MULTICAST_ADDRESS;
 	}
 
+#if 0 // AKAROS_PORT TODO block extra
 #if (MAX_SKB_FRAGS >= MAX_FETCH_BD - BDS_PER_TX_PKT)
 	/* First, check if we need to linearize the skb (due to FW
 	   restrictions). No need to check fragmentation if page size > 8K
@@ -3924,13 +3933,14 @@ panic("Not implemented");
 		}
 	}
 #endif
+#endif
 	/* Map skb linear data for DMA */
-	mapping = dma_map_single(&bp->pdev->dev, skb->data,
-				 skb_headlen(skb), DMA_TO_DEVICE);
+	mapping = dma_map_single(&bp->pdev->dev, block->rp,
+				 BLEN(block), DMA_TO_DEVICE);
 	if (unlikely(dma_mapping_error(&bp->pdev->dev, mapping))) {
 		DP(NETIF_MSG_TX_QUEUED,
 		   "SKB mapping failed - silently dropping this SKB\n");
-		dev_kfree_skb_any(skb);
+		freeb(block);
 		return NETDEV_TX_OK;
 	}
 	/*
@@ -3963,27 +3973,32 @@ panic("Not implemented");
 
 	/* remember the first BD of the packet */
 	tx_buf->first_bd = txdata->tx_bd_prod;
-	tx_buf->skb = skb;
+	tx_buf->block = block;
 	tx_buf->flags = 0;
 
 	DP(NETIF_MSG_TX_QUEUED,
 	   "sending pkt %u @%p  next_idx %u  bd %u @%p\n",
 	   pkt_prod, tx_buf, txdata->tx_pkt_prod, bd_prod, tx_start_bd);
 
+#if 0 // AKAROS_PORT skipping vlan stuff
 	if (vlan_tx_tag_present(skb)) {
 		tx_start_bd->vlan_or_ethertype =
 		    cpu_to_le16(vlan_tx_tag_get(skb));
 		tx_start_bd->bd_flags.as_bitfield |=
 		    (X_ETH_OUTBAND_VLAN << ETH_TX_BD_FLAGS_VLAN_MODE_SHIFT);
 	} else {
+#else
+	{
+#endif
 		/* when transmitting in a vf, start bd must hold the ethertype
 		 * for fw to enforce it
 		 */
+		uint16_t type_le16 = (eth->type[0] << 8) | eth->type[1];// AKAROS_PORT
 #ifndef BNX2X_STOP_ON_ERROR
 		if (IS_VF(bp))
 #endif
 			tx_start_bd->vlan_or_ethertype =
-				cpu_to_le16(be16_to_cpu(eth->h_proto));
+				cpu_to_le16(type_le16);
 #ifndef BNX2X_STOP_ON_ERROR
 		else
 			/* used by FW for packet accounting */
@@ -3997,9 +4012,11 @@ panic("Not implemented");
 	bd_prod = TX_BD(NEXT_TX_IDX(bd_prod));
 
 	if (xmit_type & XMIT_CSUM)
-		bnx2x_set_sbd_csum(bp, skb, tx_start_bd, xmit_type);
+		bnx2x_set_sbd_csum(bp, block, tx_start_bd, xmit_type);
 
 	if (!CHIP_IS_E1x(bp)) {
+		panic("Not implemented");
+		#if 0 // AKAROS_PORT
 		pbd_e2 = &txdata->tx_desc_ring[bd_prod].parse_bd_e2;
 		memset(pbd_e2, 0, sizeof(struct eth_tx_parse_bd_e2));
 
@@ -4081,13 +4098,18 @@ panic("Not implemented");
 
 		SET_FLAG(pbd_e2_parsing_data,
 			 ETH_TX_PARSE_BD_E2_ETH_ADDR_TYPE, mac_type);
+		#endif
 	} else {
 		uint16_t global_data = 0;
 		pbd_e1x = &txdata->tx_desc_ring[bd_prod].parse_bd_e1x;
 		memset(pbd_e1x, 0, sizeof(struct eth_tx_parse_bd_e1x));
 		/* Set PBD in checksum offload case */
-		if (xmit_type & XMIT_CSUM)
-			hlen = bnx2x_set_pbd_csum(bp, skb, pbd_e1x, xmit_type);
+		if (xmit_type & XMIT_CSUM) {
+			panic("Not implemented");
+			#if 0 // AKAROS_PORT (xsum offload)
+			hlen = bnx2x_set_pbd_csum(bp, block, pbd_e1x, xmit_type);
+			#endif
+		}
 
 		SET_FLAG(global_data,
 			 ETH_TX_PARSE_BD_E1X_ETH_ADDR_TYPE, mac_type);
@@ -4097,7 +4119,7 @@ panic("Not implemented");
 	/* Setup the data pointer of the first BD of the packet */
 	tx_start_bd->addr_hi = cpu_to_le32(U64_HI(mapping));
 	tx_start_bd->addr_lo = cpu_to_le32(U64_LO(mapping));
-	tx_start_bd->nbytes = cpu_to_le16(skb_headlen(skb));
+	tx_start_bd->nbytes = cpu_to_le16(BLEN(block));
 	pkt_size = tx_start_bd->nbytes;
 
 	DP(NETIF_MSG_TX_QUEUED,
@@ -4108,6 +4130,8 @@ panic("Not implemented");
 	   le16_to_cpu(tx_start_bd->vlan_or_ethertype));
 
 	if (xmit_type & XMIT_GSO) {
+		panic("Not implemented");
+		#if 0 // AKAROS_PORT
 
 		DP(NETIF_MSG_TX_QUEUED,
 		   "TSO packet len %d  hlen %d  total len %d  tso size %d\n",
@@ -4129,6 +4153,7 @@ panic("Not implemented");
 				 ETH_TX_PARSE_BD_E2_LSO_MSS;
 		else
 			bnx2x_set_pbd_gso(skb, pbd_e1x, xmit_type);
+		#endif
 	}
 
 	/* Set the PBD's parsing_data field if not zero
@@ -4139,6 +4164,7 @@ panic("Not implemented");
 
 	tx_data_bd = (struct eth_tx_bd *)tx_start_bd;
 
+#if 0 // AKAROS_PORT TODO block extra
 	/* Handle fragmented skb */
 	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
@@ -4179,6 +4205,7 @@ panic("Not implemented");
 		   i, tx_data_bd, tx_data_bd->addr_hi, tx_data_bd->addr_lo,
 		   le16_to_cpu(tx_data_bd->nbytes));
 	}
+#endif
 
 	DP(NETIF_MSG_TX_QUEUED, "last bd @%p\n", tx_data_bd);
 
@@ -4261,7 +4288,6 @@ panic("Not implemented");
 	txdata->tx_pkt++;
 
 	return NETDEV_TX_OK;
-#endif
 }
 
 /**

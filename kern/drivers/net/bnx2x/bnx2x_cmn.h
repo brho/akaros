@@ -476,9 +476,6 @@ int bnx2x_nic_unload(struct bnx2x *bp, int unload_mode, bool keep_link);
 /* dev_open main block */
 int bnx2x_nic_load(struct bnx2x *bp, int load_mode);
 
-/* hard_xmit callback */
-netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct ether *dev);
-
 /* setup_tc callback */
 int bnx2x_setup_tc(struct ether *dev, uint8_t num_tc);
 

@@ -12938,6 +12938,10 @@ static int bnx2x_init_dev(struct bnx2x *bp, struct pci_device *pdev,
 	dev->feat |= dev->hw_features | NETIF_F_HW_VLAN_CTAG_RX;
 	dev->feat |= NETIF_F_HIGHDMA;
 
+	/* AKAROS_PORT XME turn off all unsupported features */
+	dev->feat &= ~(NETF_LRO | NETF_TSO | NETF_SG | NETF_IPCK | NETF_UDPCK |
+	               NETF_TCPCK);
+
 	/* Add Loopback capability to the device */
 	dev->hw_features |= NETIF_F_LOOPBACK;
 

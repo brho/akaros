@@ -514,6 +514,14 @@ enum netdev_state_t {
 	__LINK_STATE_DORMANT,  
 };
 
+enum netdev_tx {
+	__NETDEV_TX_MIN	 = INT32_MIN,	/* make sure enum is signed */
+	NETDEV_TX_OK	 = 0x00,		/* driver took care of packet */
+	NETDEV_TX_BUSY	 = 0x10,		/* driver tx path was busy*/
+	NETDEV_TX_LOCKED = 0x20,		/* driver tx lock was already taken */
+};
+typedef enum netdev_tx netdev_tx_t;
+
 /* Global mutex in linux for "routing netlink".  Not sure if we have an
  * equivalent or not in Plan 9. */
 #define rtnl_lock()
@@ -644,6 +652,7 @@ static int pcie_capability_read_word(struct pci_device *dev, int pos,
 #define netif_tx_wake_queue(...)
 #define netif_tx_start_all_queues(...)
 #define netif_tx_start_queue(...)
+#define netif_tx_stop_queue(...)
 #define netif_napi_add(...)
 #define napi_hash_add(...)
 #define napi_enable(...)
@@ -657,6 +666,8 @@ static int pcie_capability_read_word(struct pci_device *dev, int pos,
 #define is_valid_ether_addr(...) (TRUE)
 /* The flag this checks is set on before open.  Turned off on failure, etc. */
 #define netif_running(dev) (TRUE)
+#define netdev_tx_sent_queue(...)
+#define skb_tx_timestamp(...)
 
 #define EPROBE_DEFER 1
 #define NET_SKB_PAD 0 		/* padding for SKBs.  Ignoring it for now */
@@ -740,6 +751,5 @@ static inline bool ether_addr_equal(const uint8_t *addr1, const uint8_t *addr2)
 	return ((a[0] ^ b[0]) | (a[1] ^ b[1]) | (a[2] ^ b[2])) == 0;
 #endif
 }
-
 
 #endif /* ROS_KERN_AKAROS_COMPAT_H */
