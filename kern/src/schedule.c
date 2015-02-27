@@ -68,7 +68,7 @@ static uint32_t get_cores_needed(struct proc *p);
  *
  * As the ksched gets smarter, we'll probably embedd this poker in a bigger
  * struct that can handle the posting of different types of work. */
-struct poke_tracker ksched_poker = {0, 0, __run_mcp_ksched};
+struct poke_tracker ksched_poker = POKE_INITIALIZER(__run_mcp_ksched);
 
 /* this 'big ksched lock' protects a bunch of things, which i may make fine
  * grained: */

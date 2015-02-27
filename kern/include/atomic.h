@@ -157,6 +157,14 @@ struct poke_tracker {
 };
 void poke(struct poke_tracker *tracker, void *arg);
 
+static inline void poke_init(struct poke_tracker *tracker, void (*func)(void*))
+{
+	tracker->need_to_run = 0;
+	tracker->run_in_progress = 0;
+	tracker->func = func;
+}
+#define POKE_INITIALIZER(f) {.func = f}
+
 /* Arch-specific implementations / declarations go here */
 #include <arch/atomic.h>
 
