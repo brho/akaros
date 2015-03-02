@@ -12206,6 +12206,9 @@ static int bnx2x_init_bp(struct bnx2x *bp)
 	/* Reduce memory usage in kdump environment by disabling TPA */
 	bp->disable_tpa |= is_kdump_kernel();
 
+	// AKAROS_PORT disable TPA (TODO extra data)
+	bp->disable_tpa |= TRUE;
+
 	/* Set TPA flags */
 	if (bp->disable_tpa) {
 		bp->flags &= ~(TPA_ENABLE_FLAG | GRO_ENABLE_FLAG);
