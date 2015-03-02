@@ -23,7 +23,20 @@
  * parameter in addition to the standard alarm_waiter.  RKM alarms are executed
  * when kernel messages are executed, which is out of IRQ context.  RKMs are
  * safer, since you can sleep (qlock, some kmalloc, etc) and you do not need
- * irqsave locks.  To use an IRQ alarm, init the waiter with init_awaiter_irq().
+ * irqsave locks.
+ *
+ * Another important difference between IRQ and RKM alarms comes when cancelling
+ * or unsetting an alarm.  When you cancel (unset or reset) an alarm, the alarm
+ * is yanked off the tchain.  If the waiter was on the chain, then it will not
+ * fire for both IRQ and RKM alarms.  If the waiter was not on the chain, then
+ * for IRQ alarms, this means that the alarm has already fired.  However, for
+ * RKM alarms, the alarm may have already fired or it may still be waiting to
+ * fire (sitting in an RKM queue).  It will fire at some point, but perhaps it
+ * has not fired yet.  It is also possibly (though extremely unlikely) that if
+ * you reset an RKM alarm that the new alarm actually happens before the old one
+ * (if the new RKM was sent to another core).  
+ * 
+ * To use an IRQ alarm, init the waiter with init_awaiter_irq().
  *
  * Quick howto, using the pcpu tchains:
  * 	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
@@ -39,9 +52,11 @@
  * 	set_awaiter_rel(waiter, USEC);
  * 	set_alarm(tchain, waiter);
  * If you want the HANDLER to run again, do this at the end of it:
- * 	set_awaiter_rel(waiter, USEC);
- * 	__set_alarm(tchain, waiter);
- * Do not call set_alarm() from within an alarm handler; you'll deadlock.
+ * 	set_awaiter_rel(waiter, USEC);	// or whenever you want it to fire
+ * 	set_alarm(tchain, waiter);
+ * or:
+ * 	reset_alarm_rel(tchain, waiter, USEC);
+ *
  * Don't forget to manage your memory at some (safe) point:
  * 	kfree(waiter);
  * In the future, we might have a slab for these.  You can get it from wherever
@@ -76,6 +91,7 @@ struct alarm_waiter {
 	TAILQ_ENTRY(alarm_waiter)	next;
 	bool						on_tchain;
 	bool						irq_ok;
+	bool						holds_tchain_lock;
 	bool						has_func;
 };
 TAILQ_HEAD(awaiters_tailq, alarm_waiter);		/* ideally not a LL */
@@ -106,14 +122,9 @@ void init_awaiter_irq(struct alarm_waiter *waiter,
 void set_awaiter_abs(struct alarm_waiter *waiter, uint64_t abs_time);
 void set_awaiter_rel(struct alarm_waiter *waiter, uint64_t usleep);
 void set_awaiter_inc(struct alarm_waiter *waiter, uint64_t usleep);
-/* Arms/disarms the alarm.  Hold the lock when calling __methods.  */
-void __set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
+/* Arms/disarms the alarm. */
 void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
 bool unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
-bool __reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
-                       uint64_t abs_time);
-bool __reset_alarm_rel(struct timer_chain *tchain, struct alarm_waiter *waiter,
-                       uint64_t usleep);
 bool reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
                      uint64_t abs_time);
 bool reset_alarm_rel(struct timer_chain *tchain, struct alarm_waiter *waiter,

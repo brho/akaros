@@ -98,8 +98,7 @@ static void oprof_alarm_handler(struct alarm_waiter *waiter,
 		oprofile_add_backtrace(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf));
 	else
 		oprofile_add_userpc(get_hwtf_pc(hw_tf));
-	/* we're an IRQ handler, so the tchain is locked */
-	__reset_alarm_rel(tchain, waiter, oprof_timer_period);
+	reset_alarm_rel(tchain, waiter, oprof_timer_period);
 }
 
 static struct chan*
@@ -155,7 +154,7 @@ static void setup_timers(void)
 		struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
 		kproftimer(get_hwtf_pc(hw_tf));
 		set_awaiter_rel(waiter, 1000);
-		__set_alarm(tchain, waiter);
+		set_alarm(tchain, waiter);
 	}
 	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
 	struct alarm_waiter *waiter = kmalloc(sizeof(struct alarm_waiter), 0);
