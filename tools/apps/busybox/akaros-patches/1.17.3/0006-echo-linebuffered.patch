@@ -1,0 +1,14 @@
+diff -ur busybox-1.17.3-akaros-orig/coreutils/echo.c busybox-1.17.3-akaros/coreutils/echo.c
+--- busybox-1.17.3-akaros-orig/coreutils/echo.c	2015-03-02 11:35:58.782323515 -0500
++++ busybox-1.17.3-akaros/coreutils/echo.c	2015-03-02 11:37:31.122641120 -0500
+@@ -96,6 +96,10 @@
+ 	}
+  just_echo:
+ #endif
++	/* brho: need to buffer a full line at a time.  not sure if glibc should
++	 * have this set for stdout or not. */
++	if (setvbuf(stdout, 0, _IOLBF, 0))
++		perror("Failed to setvbuf");
+ 	while (1) {
+ 		/* arg is already == *argv and isn't NULL */
+ 		int c;
