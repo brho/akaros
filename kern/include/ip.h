@@ -1006,7 +1006,7 @@ int activemulti(struct ether *, uint8_t *, int);
 enum {
 	Eaddrlen = 6,
 	ETHERMINTU = 60,	/* minimum transmit size */
-	ETHERMAXTU = 1514,	/* maximum transmit size */
+	ETHERMAXTU = 1500,	/* maximum transmit size */
 	ETHERHDRSIZE = 14,	/* size of an ethernet header */
 };
 

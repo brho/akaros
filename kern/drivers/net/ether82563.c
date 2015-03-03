@@ -1924,7 +1924,7 @@ static int pnp(struct ether *edev, int type)
 	edev->irq = ctlr->pcidev->irqline;
 	edev->tbdf = pci_to_tbdf(ctlr->pcidev);
 	edev->mbps = 1000;
-	edev->maxmtu = ctlr->rbsz;
+	edev->maxmtu = ctlr->rbsz - ETHERHDRSIZE;	/* MTU doesn't include header */
 	memmove(edev->ea, ctlr->ra, Eaddrlen);
 
 	/*

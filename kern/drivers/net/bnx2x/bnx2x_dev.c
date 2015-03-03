@@ -480,15 +480,6 @@ static int bnx2x_pnp(struct ether *edev)
 	edev->promiscuous = bnx2x_promiscuous;
 	edev->multicast = bnx2x_multicast;
 
-	/* Plan 9's MTU includes the header (e.g. 1514, instead of 1500).  Linux
-	 * drivers expect just the payload and not the header, and will add in the
-	 * 14 whenever it is needed.
-	 *
-	 * There might be issues when plan 9 code accesses maxmtu, now that it's
-	 * 1500 instead of 1514.  Keep a lookout for Etoobig in etherwrite.  What a
-	 * mess. */
-	edev->maxmtu -= ETHERHDRSIZE;
-
 	bnx2x_reset(ctlr);
 
 	return 0;

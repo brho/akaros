@@ -447,7 +447,7 @@ static long etherwrite(struct chan *chan, void *buf, long n, int64_t unused)
 		error(Ebadctl);
 	}
 
-	if (n > ether->maxmtu)
+	if (n > ether->maxmtu + ETHERHDRSIZE)
 		error(Etoobig);
 	bp = allocb(n);
 	if (waserror()) {
@@ -489,7 +489,7 @@ static long etherbwrite(struct chan *chan, struct block *bp, uint32_t unused)
 		runlock(&ether->rwlock);
 		nexterror();
 	}
-	if (n > ether->maxmtu && (bp->flag & Btso) == 0) {
+	if (n > ether->maxmtu + ETHERHDRSIZE && (bp->flag & Btso) == 0) {
 		freeb(bp);
 		error(Etoobig);
 	}
