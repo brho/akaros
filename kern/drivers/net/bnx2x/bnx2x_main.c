@@ -53,7 +53,7 @@ MODULE_FIRMWARE(FW_FILE_NAME_E1);
 MODULE_FIRMWARE(FW_FILE_NAME_E1H);
 MODULE_FIRMWARE(FW_FILE_NAME_E2);
 
-int bnx2x_num_queues;
+int bnx2x_num_queues = 16;	// AKAROS_PORT try for the max
 module_param_named(num_queues, bnx2x_num_queues, int, S_IRUGO);
 MODULE_PARM_DESC(num_queues,
 		 " Set number of queues (default is as a number of CPUs)");
@@ -75,7 +75,8 @@ static int mrrs = -1;
 module_param(mrrs, int, S_IRUGO);
 MODULE_PARM_DESC(mrrs, " Force Max Read Req Size (0..3) (for debug)");
 
-static int debug;
+/* Set this for debugging during boot */
+static int debug; // = 0xffffffff & ~BNX2X_MSG_DMAE;
 module_param(debug, int, S_IRUGO);
 MODULE_PARM_DESC(debug, " Default debug msglevel");
 
@@ -10964,8 +10965,7 @@ static void bnx2x_get_common_hwinfo(struct bnx2x *bp)
 	val3 = SHMEM_RD(bp, dev_info.shared_hw_config.part_num[8]);
 	val4 = SHMEM_RD(bp, dev_info.shared_hw_config.part_num[12]);
 
-	dev_info(&bp->pdev->dev, "part number %X-%X-%X-%X\n",
-		 val, val2, val3, val4);
+	BNX2X_DEV_INFO("part number %x-%x-%x-%x\n", val, val2, val3, val4);
 }
 
 #define IGU_FID(val)	GET_FIELD((val), IGU_REG_MAPPING_MEMORY_FID)
@@ -12952,7 +12952,6 @@ static int bnx2x_init_dev(struct bnx2x *bp, struct pci_device *pdev,
 	dev->dcbnl_ops = &bnx2x_dcbnl_ops;
 #endif
 
-	warn("NEED TO DO MII STUFF");
 #if 0 // AKAROS_PORT MII XME
 	/* get_port_hwinfo() will set prtad and mmds properly */
 	bp->mdio.prtad = MDIO_PRTAD_NONE;
@@ -13269,7 +13268,6 @@ static int bnx2x_get_num_non_def_sbs(struct pci_device *pdev, int cnic_cnt)
 		dev_info(&pdev->dev, "no msix capability found\n");
 		return 1 + cnic_cnt;
 	}
-	dev_info(&pdev->dev, "msix capability found\n");
 
 	/*
 	 * The value in the PCI configuration space is the index of the last
@@ -13429,7 +13427,7 @@ int bnx2x_init_one(struct ether *dev, struct bnx2x *bp,
 
 	bp->igu_sb_cnt = max_non_def_sbs;
 	bp->igu_base_addr = IS_VF(bp) ? PXP_VF_ADDR_IGU_START : BAR_IGU_INTMEM;
-	bp->msg_enable = 0xffffffff & ~BNX2X_MSG_DMAE;
+	bp->msg_enable = debug;
 	bp->cnic_support = cnic_cnt;
 	bp->cnic_probe = bnx2x_cnic_probe;
 

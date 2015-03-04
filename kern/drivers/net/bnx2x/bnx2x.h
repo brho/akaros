@@ -62,6 +62,7 @@ enum bnx2x_int_mode {
 #define BNX2X_MSG_DMAE			0x0080000 /* was: NETIF_MSG_HW */
 #define BNX2X_MSG_SP			0x0100000 /* was: NETIF_MSG_INTR */
 #define BNX2X_MSG_FP			0x0200000 /* was: NETIF_MSG_INTR */
+#define BNX2X_MSG_INFO			0x0400000
 #define BNX2X_MSG_IOV			0x0800000
 #define BNX2X_MSG_PTP			0x1000000
 #define BNX2X_MSG_IDLE			0x2000000 /* used for idle check*/
@@ -116,7 +117,7 @@ do {								\
 	pr_err("[%s:%d]" fmt, __func__, __LINE__, ##__VA_ARGS__)
 
 /* before we have a dev->name use dev_info() */
-#define BNX2X_DEV_INFO(fmt, ...) pr_info(fmt, ##__VA_ARGS__)
+#define BNX2X_DEV_INFO(fmt, ...) DP(BNX2X_MSG_INFO, fmt, ##__VA_ARGS__)
 
 /* Error handling */
 void bnx2x_panic_dump(struct bnx2x *bp, bool disable_int);

@@ -317,9 +317,6 @@ static void bnx2x_attach(struct ether *edev)
 	bnx2x_open(ctlr->edev);
 	bnx2x_set_rx_mode(edev);
 
-	/* shut it up for now.  too much stats output */
-	ctlr->msg_enable = 0;
-
 	ctlr->attached = TRUE;
 	qunlock(&ctlr->alock);
 	/* not sure if we'll need/want any of the other 9ns stuff */
@@ -381,8 +378,6 @@ static void bnx2x_pci(void)
 	struct bnx2x *ctlr;
 	const struct pci_device_id *pci_id;
 
-	bnx2x_init();
-
 	STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
 		/* This checks that pcidev is a Network Controller for Ethernet */
 		if (pcidev->class != 0x02 || pcidev->subclass != 0x00)
@@ -392,6 +387,9 @@ static void bnx2x_pci(void)
 		pci_id = srch_bnx2x_pci_tbl(pcidev);
 		if (!pci_id)
 			continue;
+
+		/* only run bnx2x's __init method once we know we have one */
+		run_once(bnx2x_init());
 
 		printk("bnx2x driver found 0x%04x:%04x at %02x:%02x.%x\n",
 			   pcidev->ven_id, pcidev->dev_id,
