@@ -113,6 +113,24 @@ static size_t img_size = CONFIG_NIX_IMG_SIZE;
 
 static atomic_t nixid = 0;
 
+/* initial guest program. */
+/*
+.code64
+	pushq	%rax
+	pushq	%rdx
+	movb	$0x30, %al
+	movw	$0x3f8, %dx
+	outb	%al, %dx
+	popq	%rdx
+	popq	%rax
+	ret
+*/
+unsigned char it[] = {
+  0x50, 0x52, 0xb0, 0x30, 0x66, 0xba, 0xf8, 0x03, 0xee, 0x5a, 0x58, 0xc3
+};
+unsigned int it_len = 12;
+
+
 /* The index is not the id, for now.  The index is the spot in nixs[].  The id
  * is an increasing integer, regardless of struct nix* reuse. */
 static inline struct nix *QID2NIX(struct qid q)
@@ -326,6 +344,7 @@ static struct chan *nixopen(struct chan *c, int omode)
 		printk("nix image is %p with %d bytes\n", v->image, v->imagesize);
 		c->aux = v;
 		bitmap_zero(v->cpus, MAX_NUM_CPUS);
+		memcpy(v->image, it, sizeof(it));
 		break;
 	case Qstat:
 		break;
@@ -417,6 +436,7 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 	struct cmdbuf *cb;
 	struct nix *nix;
 	uint64_t hexval;
+
 	switch (TYPE(c->qid)) {
 	case Qtopdir:
 	case Qnixdir:
