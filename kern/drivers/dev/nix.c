@@ -130,6 +130,11 @@ static inline int QID(int index, int type)
 	return ((index << INDEX_SHIFT) | type);
 }
 
+static inline int QID2ID(struct qid q)
+{
+	return q.path >> INDEX_SHIFT;
+}
+
 /* TODO: (MGMT) not called yet.  -- we have to unlink the nix */
 static void nix_release(struct kref *kref)
 {
@@ -205,11 +210,11 @@ static int nixgen(struct chan *c, char *entry_name,
 		s += Qctl;	/* first time through, start on Qctl */
 		switch (s) {
 		case Qctl:
-			mkqid(&q, QID(s-Qctl, Qctl), 0, QTFILE);
+			mkqid(&q, QID(QID2ID(c->qid), Qctl), 0, QTFILE);
 			devdir(c, q, "ctl", 0, eve, 0666, dp);
 			return 1;
 		case Qimage:
-			mkqid(&q, QID(s-Qctl, Qimage), 0, QTFILE);
+			mkqid(&q, QID(QID2ID(c->qid), Qimage), 0, QTFILE);
 			devdir(c, q, "image", 0, eve, 0666, dp);
 			return 1;
 		}
