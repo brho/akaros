@@ -446,6 +446,8 @@ static long vmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 				kfree(cb);
 				nexterror();
 			}
+			if (cb->nf < 1)
+				error("short control request");
 			if (!strcmp(cb->f[0], "run")) {
 				int ret;
 				if (cb->nf != 4)

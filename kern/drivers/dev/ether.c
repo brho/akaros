@@ -429,6 +429,10 @@ static long etherwrite(struct chan *chan, void *buf, long n, int64_t unused)
 		if (l >= 0)
 			goto out;
 		cb = parsecmd(buf, n);
+		if (cb->nf < 1) {
+			kfree(cb);
+			error("short control request");
+		}
 		if (strcmp(cb->f[0], "nonblocking") == 0) {
 			if (cb->nf <= 1)
 				onoff = 1;

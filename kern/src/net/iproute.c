@@ -793,6 +793,8 @@ long routewrite(struct Fs *f, struct chan *c, char *p, int n)
 		kfree(cb);
 		nexterror();
 	}
+	if (cb->nf < 1)
+		error("short control request");
 
 	if (strcmp(cb->f[0], "flush") == 0) {
 		tag = cb->f[1];

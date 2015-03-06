@@ -107,6 +107,8 @@ static long bnx2x_ctl(struct ether *edev, void *buf, long n)
 		kfree(cb);
 		nexterror();
 	}
+	if (cb->nf < 1)
+		error("short control request");
 
 	/* TODO: handle ctl command somehow.  igbe did the following: */
 	//ct = lookupcmd(cb, igbectlmsg, ARRAY_SIZE(igbectlmsg));
