@@ -1,0 +1,65 @@
+diff -ru busybox-1.17.3-orig/coreutils/echo.c busybox-1.17.3-akaros/coreutils/echo.c
+--- busybox-1.17.3-orig/coreutils/echo.c	2015-03-06 12:06:11.732280338 -0500
++++ busybox-1.17.3-akaros/coreutils/echo.c	2015-03-06 12:34:12.607118758 -0500
+@@ -33,6 +33,12 @@
+ {
+ 	int ret;
+ 	const char *arg;
++	/* In lieu of using fputs/fflush, Akaros works better with raw writes.  The
++	 * main issue is that we want to have the entire echo sent as one write.
++	 * using setvbuf for line buffered mode seems to work, but fflush won't
++	 * propagate errors from the kernel. */
++	char write_buf[4096];
++	size_t buf_idx = 0;
+ #if !ENABLE_FEATURE_FANCY_ECHO
+ 	enum {
+ 		eflag = '\\',
+@@ -100,12 +106,7 @@
+ 		/* arg is already == *argv and isn't NULL */
+ 		int c;
+ 
+-		if (!eflag) {
+-			/* optimization for very common case */
+-			ret = fputs(arg, stdout);
+-			if (ret == EOF)
+-				perror("echo failed");
+-		} else while ((c = *arg++)) {
++		while ((c = *arg++)) {
+ 			if (c == eflag) {	/* Check for escape seq. */
+ 				if (*arg == 'c') {
+ 					/* '\c' means cancel newline and
+@@ -130,25 +131,27 @@
+ 					c = bb_process_escape_sequence(&arg);
+ 				}
+ 			}
+-			bb_putchar(c);
++			write_buf[buf_idx++] = c;
+ 		}
+ 
+ 		arg = *++argv;
+ 		if (!arg)
+ 			break;
+-		bb_putchar(' ');
++		write_buf[buf_idx++] = ' ';
+ 	}
+ 
+  newline_ret:
+ 	if (nflag) {
+-		bb_putchar('\n');
++		write_buf[buf_idx++] = '\n';
+ 	}
+  ret:
+-	errno = 0;
+-	ret = fflush_all();
+-	if (errno)
++	ret = write(1, write_buf, buf_idx);
++	if (ret == -1) {
+ 		perror("echo failed");
+-	return ret;
++		return EOF;
++	} else {
++		return 0;
++	}
+ }
+ 
+ /*-
