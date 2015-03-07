@@ -30,4 +30,4 @@ obj-y						+= time.o
 obj-y						+= trap.o trap64.o
 obj-y						+= trapentry64.o
 obj-y						+= usb.o
-
+obj-y						+= vmm/

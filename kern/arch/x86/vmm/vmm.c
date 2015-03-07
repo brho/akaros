@@ -11,15 +11,98 @@
  */
 #include <assert.h>
 #include <pmap.h>
+#include <smp.h>
+#include <kmalloc.h>
 
-// NO . FILES HERE INCLUDE .h
-// That forces us to make the includes visible.
-#include "intel/vmx_cpufunc.h"
-#include "intel/vmcs.h"
 #include "intel/vmx.h"
-#include "x86.h"
+#include "intel/compat.h"
 #include "vmm.h"
-#include "func.h"
 
-/* this will be the init function for vmm. For now, it just ensures we
-   don't break things. */
+/* Figure out what kind of CPU we are on, and if it supports any reasonable
+ * virtualization. For now, if we're not some sort of newer intel, don't
+ * bother. This does all cores. Again, note, we make these decisions at runtime,
+ * to avoid getting into the problems that compile-time decisions can cause. 
+ * At this point, of course, it's still all intel.
+ */
+void vmm_init(void)
+{
+	int ret;
+	/* Check first for intel capabilities. This is hence two back-to-back
+	 * implementationd-dependent checks. That's ok, it's all msr dependent.
+	 */
+	ret = intel_vmm_init();
+	if (! ret) {
+		printd("intel_vmm_init worked\n");
+		return;
+	}
+
+	/* TODO: AMD. Will we ever care? It's not clear. */
+	printk("vmm_init failed, ret %d\n", ret);
+	return;
+}
+
+void vmm_pcpu_init(void)
+{
+	if (! intel_vmm_pcpu_init()) {
+		printd("vmm_pcpu_init worked\n");
+		return;
+	}
+	/* TODO: AMD. Will we ever care? It's not clear. */
+	printk("vmm_pcpu_init failed\n");
+}
+
+int vm_run(uint64_t rip, uint64_t rsp, uint64_t cr3)
+{
+	struct dune_config d = {rip, rsp, cr3};
+	int vmx_launch(struct dune_config *conf);	
+	if (current->vmm.amd) {
+		return -1;
+	} else {
+		return vmx_launch(&d);
+	}
+	return -1;
+}
+
+/* Initializes a process to run virtual machine contexts, returning the number
+ * initialized, optionally setting errno */
+int vmm_struct_init(struct vmm *vmm, unsigned int nr_guest_pcores)
+{
+	unsigned int i;
+	qlock(&vmm->qlock);
+	if (vmm->vmmcp) {
+		set_errno(EINVAL);
+		qunlock(&vmm->qlock);
+		return 0;
+	}
+	nr_guest_pcores = MIN(nr_guest_pcores, num_cpus);
+	vmm->amd = 0;
+	vmm->guest_pcores = kzmalloc(sizeof(void*) * nr_guest_pcores, KMALLOC_WAIT);
+	for (i = 0; i < nr_guest_pcores; i++) {
+		vmm->guest_pcores[i] = vmx_create_vcpu();
+		/* If we failed, we'll clean it up when the process dies */
+		if (!vmm->guest_pcores[i]) {
+			set_errno(ENOMEM);
+			break;
+		}
+	}
+	vmm->nr_guest_pcores = i;
+	vmm->vmmcp = TRUE;
+	qunlock(&vmm->qlock);
+	return i;
+}
+
+void vmm_struct_cleanup(struct vmm *vmm)
+{
+	qlock(&vmm->qlock);
+	if (!vmm->vmmcp) {
+		qunlock(&vmm->qlock);
+		return;
+	}
+	for (int i = 0; i < vmm->nr_guest_pcores; i++) {
+		if (vmm->guest_pcores[i])
+			vmx_destroy_vcpu(vmm->guest_pcores[i]);
+	}
+	kfree(vmm->guest_pcores);
+	vmm->vmmcp = FALSE;
+	qunlock(&vmm->qlock);
+}
