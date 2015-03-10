@@ -419,9 +419,9 @@ static void check_syms_va(void)
 void vm_init(void)
 {
 	uint32_t edx;
-	boot_cr3 = (physaddr_t)boot_pml4;
-	boot_pgdir = KADDR((uintptr_t)boot_pml4);
-	gdt = KADDR((uintptr_t)gdt64);
+	boot_cr3 = get_boot_pml4();
+	boot_pgdir = KADDR(get_boot_pml4());
+	gdt = KADDR(get_gdt64());
 
 	/* We need to limit our mappings on machines that don't support 1GB pages */
 	cpuid(0x80000001, 0x0, 0, 0, 0, &edx);

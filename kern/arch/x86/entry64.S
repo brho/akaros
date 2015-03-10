@@ -157,7 +157,7 @@ map_2mb_pages:
 	# arg5 and 7 on stack.  other args already in regs.
 	movl	0x1c(%esp), %ebx	# arg7 (4 pushes, 1 retaddr, arg 5, arg6)
 	push	%ebx
-	movl	0x18(%esp), %ebx	# arg5 (5 pushes, 1 retaddr)
+	movl	0x18(%esp), %ebx	# arg6 (5 pushes, 1 retaddr)
 	push	%ebx
 	call	fill_pml3
 	add		$0x8, %esp 			# pop args frame
@@ -266,7 +266,7 @@ insert_pml3:
 	andl	$0x1ff, %esi
 	orl		$(PTE_P | PTE_W), %edi
 	movl	%edi, (%ecx, %esi, 8)
-	movl	$0x0, 4(%ecx, %esi, 8)
+	movl	$0x0, 4(%ecx, %esi, 8)	# being clever, i know upper bits are 0
 	ret
 
 # Inserts a pml2 into pml3, so that it handles mapping for vaddr
@@ -280,7 +280,7 @@ insert_pml2:
 	andl	$0x1ff, %esi
 	orl		$(PTE_P | PTE_W), %edi
 	movl	%edi, (%ecx, %esi, 8)
-	movl	$0x0, 4(%ecx, %esi, 8)
+	movl	$0x0, 4(%ecx, %esi, 8)	# being clever, i know upper bits are 0
 	ret
 
 .globl		_start
@@ -452,6 +452,15 @@ boot_pml2_kb: 		# 512 pml2s in the kb pml3
 	.space  PGSIZE * 512
 
 # From here down is linked for KERNBASE
+.text
+	.globl get_boot_pml4
+get_boot_pml4:
+	movabs	$(boot_pml4), %rax
+	ret
+	.globl get_gdt64
+get_gdt64:
+	movabs	$(gdt64), %rax
+	ret
 .data
 	.p2align	PGSHIFT		# force page alignment
 	.globl		bootstack
