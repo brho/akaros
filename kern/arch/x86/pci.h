@@ -253,6 +253,7 @@ void pcidev_write8(struct pci_device *pcidev, uint32_t offset, uint8_t value);
 void pci_set_bus_master(struct pci_device *pcidev);
 void pci_clr_bus_master(struct pci_device *pcidev);
 struct pci_device *pci_match_tbdf(int tbdf);
+struct pci_device *pci_match_vd(struct pci_device *start, int ven_id, int dev_id);
 uintptr_t pci_get_membar(struct pci_device *pcidev, int bir);
 uintptr_t pci_get_iobar(struct pci_device *pcidev, int bir);
 uint32_t pci_get_membar_sz(struct pci_device *pcidev, int bir);
@@ -282,6 +283,14 @@ void pci_msix_route_vector(struct msix_irq_vector *linkage, int dest);
 #define explode_tbdf(tbdf) {pcidev.bus = tbdf >> 16;\
 		pcidev.dev = (tbdf>>11)&0x1f;\
 		pcidev.func = (tbdf>>8)&3;}
+/* Other plan 9 functions to compose and decompose */
+#define MKBUS(t,b,d,f)	(((t)<<24)|(((b)&0xFF)<<16)|(((d)&0x1F)<<11)|(((f)&0x07)<<8))
+#define BUSFNO(tbdf)	(((tbdf)>>8)&0x07)
+#define BUSDNO(tbdf)	(((tbdf)>>11)&0x1F)
+#define BUSBNO(tbdf)	(((tbdf)>>16)&0xFF)
+#define BUSTYPE(tbdf)	((tbdf)>>24)
+#define BUSBDF(tbdf)	((tbdf)&0x00FFFF00)
+
 
 static inline void pci_set_drvdata(struct pci_device *pcidev, void *data)
 {

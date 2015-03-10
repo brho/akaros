@@ -492,6 +492,30 @@ struct pci_device *pci_match_tbdf(int tbdf)
 	return NULL;
 }
 
+// The plan 9 semantics we use here are actually very handy for iterators on
+// pci devices.
+struct pci_device *pci_match_vd(struct pci_device *start, int ven_id, int dev_id)
+{
+	struct pci_device *search;
+	struct pcidev_stailq *first = &pci_devices;
+	int bus, dev, func;
+	
+	// TODO: teach ron about these macros.
+	if (start) {
+		first = (struct pcidev_stailq *)(&start->all_dev);
+	}
+
+	STAILQ_FOREACH(search, first, all_dev) {
+		if (ven_id == 0 && dev_id == 0)
+			return search;
+
+		if ((search->ven_id == ven_id) &&
+		    (search->dev_id == dev_id))
+			return search;
+	}
+	return NULL;
+}
+
 /* Helper to get the membar value for BAR index bir */
 uintptr_t pci_get_membar(struct pci_device *pcidev, int bir)
 {

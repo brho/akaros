@@ -62,11 +62,11 @@ static int pcidirgen(struct chan *c, int t, int tbdf, struct dir *dp)
 }
 
 static int
-pcigen(struct chan *c, char *, struct dirtab *, int unused_int, int s,
+pcigen(struct chan *c, char *unused, struct dirtab *unuseddirtab, int unused_int, int s,
 	   struct dir *dp)
 {
 	int tbdf;
-	Pcidev *p;
+	struct pci_device *p = NULL;
 	struct qid q;
 
 	switch (TYPE(c->qid)) {
@@ -87,18 +87,18 @@ pcigen(struct chan *c, char *, struct dirtab *, int unused_int, int s,
 				devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
 				return 1;
 			}
-			p = pcimatch(NULL, 0, 0);
+			p = pci_match_vd(NULL, 0, 0);
 			while (s >= 2 && p != NULL) {
-				p = pcimatch(p, 0, 0);
+				p = pci_match_vd(p, 0, 0);
 				s -= 2;
 			}
 			if (p == NULL)
 				return -1;
-			return pcidirgen(c, s + Qpcictl, p->tbdf, dp);
+			return pcidirgen(c, s + Qpcictl, MKBUS(0,p->bus,p->dev,p->func), dp);
 		case Qpcictl:
 		case Qpciraw:
 			tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
-			p = pcimatchtbdf(tbdf);
+			p = pci_match_tbdf(tbdf);
 			if (p == NULL)
 				return -1;
 			return pcidirgen(c, TYPE(c->qid), tbdf, dp);
@@ -118,7 +118,7 @@ struct walkqid *pciwalk(struct chan *c, struct chan *nc, char **name, int nname)
 	return devwalk(c, nc, name, nname, (struct dirtab *)0, 0, pcigen);
 }
 
-static long pcistat(struct chan *c, uint8_t * dp, long n)
+static int pcistat(struct chan *c, uint8_t * dp, int n)
 {
 	return devstat(c, dp, n, (struct dirtab *)0, 0L, pcigen);
 }
@@ -133,7 +133,7 @@ static struct chan *pciopen(struct chan *c, int omode)
 	return c;
 }
 
-static void pciclose(struct chan *)
+static void pciclose(struct chan *unused)
 {
 }
 
@@ -142,7 +142,7 @@ static long pciread(struct chan *c, void *va, long n, int64_t offset)
 	char buf[256], *ebuf, *w, *a;
 	int i, tbdf, r;
 	uint32_t x;
-	Pcidev *p;
+	struct pci_device *p;
 
 	a = va;
 	switch (TYPE(c->qid)) {
@@ -151,24 +151,22 @@ static long pciread(struct chan *c, void *va, long n, int64_t offset)
 			return devdirread(c, a, n, (struct dirtab *)0, 0L, pcigen);
 		case Qpcictl:
 			tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
-			p = pcimatchtbdf(tbdf);
+			p = pci_match_tbdf(tbdf);
 			if (p == NULL)
 				error(Egreg);
 			ebuf = buf + sizeof buf - 1;	/* -1 for newline */
 			w = seprintf(buf, ebuf, "%.2x.%.2x.%.2x %.4x/%.4x %3d",
-						 p->ccrb, p->ccru, p->ccrp, p->vid, p->did, p->intl);
-			for (i = 0; i < ARRAY_SIZE(p->mem); i++) {
-				if (p->mem[i].size == 0)
-					continue;
-				w = seprintf(w, ebuf, " %d:%.8lux %d", i, p->mem[i].bar,
-							 p->mem[i].size);
+						 p->class, p->subclass, p->progif, p->ven_id, p->dev_id, p->irqline);
+			for (i = 0; i < p->nr_bars; i++) {
+				w = seprintf(w, ebuf, " %d:%.8lux %d", i, p->bar[i].raw_bar,
+					     p->bar[i].mmio_sz);
 			}
 			*w++ = '\n';
 			*w = '\0';
 			return readstr(offset, a, n, buf);
 		case Qpciraw:
 			tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
-			p = pcimatchtbdf(tbdf);
+			p = pci_match_tbdf(tbdf);
 			if (p == NULL)
 				error(Egreg);
 			if (n + offset > 256)
@@ -177,17 +175,17 @@ static long pciread(struct chan *c, void *va, long n, int64_t offset)
 				return 0;
 			r = offset;
 			if (!(r & 3) && n == 4) {
-				x = pcicfgr32(p, r);
+				x = pcidev_read32(p, r);
 				PBIT32(a, x);
 				return 4;
 			}
 			if (!(r & 1) && n == 2) {
-				x = pcicfgr16(p, r);
+				x = pcidev_read16(p, r);
 				PBIT16(a, x);
 				return 2;
 			}
 			for (i = 0; i < n; i++) {
-				x = pcicfgr8(p, r);
+				x = pcidev_read8(p, r);
 				PBIT8(a, x);
 				a++;
 				r++;
@@ -205,18 +203,18 @@ static long pciwrite(struct chan *c, void *va, long n, int64_t offset)
 	uint8_t *a;
 	int i, r, tbdf;
 	uint32_t x;
-	Pcidev *p;
+	struct pci_device *p;
 
 	if (n >= sizeof(buf))
 		n = sizeof(buf) - 1;
 	a = va;
-	strncpy(buf, (char *unused_char_p_t)a, n);
+	strncpy(buf, (char *)a, n);
 	buf[n] = 0;
 
 	switch (TYPE(c->qid)) {
 		case Qpciraw:
 			tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
-			p = pcimatchtbdf(tbdf);
+			p = pci_match_tbdf(tbdf);
 			if (p == NULL)
 				error(Egreg);
 			if (offset > 256)
@@ -226,17 +224,17 @@ static long pciwrite(struct chan *c, void *va, long n, int64_t offset)
 			r = offset;
 			if (!(r & 3) && n == 4) {
 				x = GBIT32(a);
-				pcicfgw32(p, r, x);
+				pcidev_write32(p, r, x);
 				return 4;
 			}
 			if (!(r & 1) && n == 2) {
 				x = GBIT16(a);
-				pcicfgw16(p, r, x);
+				pcidev_write16(p, r, x);
 				return 2;
 			}
 			for (i = 0; i < n; i++) {
 				x = GBIT8(a);
-				pcicfgw8(p, r, x);
+				pcidev_write8(p, r, x);
 				a++;
 				r++;
 			}
@@ -247,7 +245,7 @@ static long pciwrite(struct chan *c, void *va, long n, int64_t offset)
 	return n;
 }
 
-struct dev pcidevtab = {
+struct dev pcidevtab __devtab = {
 	'$',
 	"pci",
 
