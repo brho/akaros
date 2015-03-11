@@ -41,8 +41,7 @@ struct per_cpu_info {
 #ifdef CONFIG_X86
 	uintptr_t stacktop;			/* must be first */
 	int coreid;					/* must be second */
-	/* virtual machines */
- 	//struct vmcs *vmxarea;
+	struct vmcs *vmxarea;
 	pseudodesc_t host_gdt;
 	int vmx_enabled;
 	void *local_vcpu;

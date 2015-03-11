@@ -28,6 +28,8 @@
 #include <trap.h>
 #include <kmalloc.h>
 
+#include "vmm/vmm.h"
+
 extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
 volatile uint32_t num_cpus = 0xee;
 uintptr_t RO smp_stack_top;
@@ -345,4 +347,5 @@ void __arch_pcpu_init(uint32_t coreid)
 	x86_sysenter_init(x86_get_stacktop_tss(pcpui->tss));
 	/* need to init perfctr before potentiall using it in timer handler */
 	perfmon_init();
+	vmm_pcpu_init();
 }
