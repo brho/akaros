@@ -1,0 +1,51 @@
+Get the isc-dhcp-server.
+
+
+a config file.
+ddns-update-style none;
+
+
+default-lease-time 600;
+max-lease-time 7200;
+
+subnet 192.168.28.0 netmask 255.255.255.0 {
+range 192.168.28.15 192.168.28.17;
+}
+
+host passacaglia {
+  hardware ethernet 00:0c:29:cf:de:0;
+   fixed-address 192.168.28.16;   
+}
+allow booting;
+allow bootp;
+option option-128 code 128 = string;
+option option-129 code 129 = text;
+#next-server 192.168.28.250;
+filename "pxelinux.0";
+
+
+The pxelinux file
+
+
+]0;root@rminnich-virtual-machine: ~/projects/akarosroot@rminnich-virtual-machine:~/projects/akaros# cat /var/lib/tftpboot/pxelinux.cfg/defaullt 
+label akaros 
+	kernel mboot.c32
+	append akaros
+
+default akaros
+      
+]0;root@rminnich-virtual-machine: ~/projects/akarosroot@rminnich-virtual-machine:~/projects/akaros# du -a /var/lib/tftpboot/
+68	/var/lib/tftpboot/ldlinux.bin
+68	/var/lib/tftpboot/ldlinux.sys
+4	/var/lib/tftpboot/pxelinux.cfg/default
+8	/var/lib/tftpboot/pxelinux.cfg
+4	/var/lib/tftpboot/ldlinux.bss
+184	/var/lib/tftpboot/libcom32.c32
+80000	/var/lib/tftpboot/akaros
+120	/var/lib/tftpboot/ldlinux.c32
+48	/var/lib/tftpboot/pxelinux.0
+12	/var/lib/tftpboot/mboot.c32
+80516	/var/lib/tftpboot/
+]0;root@rminnich-virtual-machine: ~/projects/akarosroot@rminnich-virtual-machine:~/projects/akaros# exit
+
+Script done on Wed 04 Mar 2015 08:34:44 PM PST

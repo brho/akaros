@@ -88,7 +88,7 @@ void cmderror(struct cmdbuf *cb, char *s)
 	for (i = 0; i < cb->nf; i++) {
 		if (i > 0)
 			p = seprintf(p, e, " ");
-		p = seprintf(p, e, "%q", cb->f[i]);
+		p = seprintf(p, e, "%s", cb->f[i]);
 	}
 	strncpy(p, "\"", sizeof(p));
 	error(get_cur_genbuf());
@@ -117,8 +117,11 @@ struct cmdtab *lookupcmd(struct cmdbuf *cb, struct cmdtab *ctab, int nctab)
 		if (strcmp(ct->cmd, "*") != 0)	/* wildcard always matches */
 			if (strcmp(ct->cmd, cb->f[0]) != 0)
 				continue;
-		if (ct->narg != 0 && ct->narg != cb->nf)
-			cmderror(cb, Ecmdargs);
+		if (ct->narg != 0 && ct->narg != cb->nf) {
+			// oh how I hate plan 9 error handling sometimes.
+			printk("%s for %s have %d want %d", Ecmdargs, cb->f[0], cb->nf, ct->narg);
+			cmderror(cb, "bring me another fucking rock");
+		}
 		return ct;
 	}
 

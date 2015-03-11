@@ -137,8 +137,8 @@ static struct kmalloc_tag *__get_km_tag(void *buf)
 	struct kmalloc_tag *tag = (struct kmalloc_tag*)(buf -
 	                                            sizeof(struct kmalloc_tag));
 	if (tag->canary != KMALLOC_CANARY){
-		printk("__get_km_tag bad canary: %08lx, expected %08lx\n", tag->canary,
-		       KMALLOC_CANARY);
+		printk("__get_km_tag bad canary: %08lx@%p, buf %p, expected %08lx\n",
+		       tag->canary, &tag->canary, buf, KMALLOC_CANARY);
 		hexdump((void *)(buf - sizeof(struct kmalloc_tag)), 256);
 		panic("Bad canary");
 	}

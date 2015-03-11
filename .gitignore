@@ -41,3 +41,5 @@ kern/include/generated/*
 tags
 TAGS
 cscope.*
+*~
+#*

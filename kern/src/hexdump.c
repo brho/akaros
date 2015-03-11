@@ -25,6 +25,7 @@
 #include <string.h>
 #include <assert.h>
 #include <smp.h>
+#include <pmap.h>
 
 static int isprint(int c)
 {
