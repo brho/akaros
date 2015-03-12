@@ -15,10 +15,15 @@
 
 extern char *eve;
 /* much stuff not ready yet. */
-#if 0
-extern int cflag;
-extern int keepbroken;
 
+extern int cflag;
+
+/* this would be good to have; when processes die, keep them around so we can
+ * debug them.
+ */
+int keepbroken;
+
+#if 0
 void (*serwrite) (char *, int);
 
 struct queue *kscanq;			/* keyboard raw scancodes (when needed) */
@@ -60,6 +65,7 @@ enum {
 	CMbroken,
 	CMnobroken,
 	CMconsole,
+	CMV,
 };
 
 static struct cmdtab sysctlcmd[] = {
@@ -69,6 +75,7 @@ static struct cmdtab sysctlcmd[] = {
 	{CMconsole, "console", 1},
 	{CMbroken, "broken", 0},
 	{CMnobroken, "nobroken", 0},
+	{CMV, "V", 4},
 };
 
 void printinit(void)
@@ -510,7 +517,7 @@ static struct dirtab consdir[] = {
 	{".", {Qdir, 0, QTDIR}, 0, DMDIR | 0555},
 	{"cons", {Qcons}, 0, 0660},
 	{"consctl", {Qconsctl}, 0, 0220},
-	{"sysctl", {Qsysctl}, 0, 0644},
+	{"sysctl", {Qsysctl}, 0, 0666},
 	{"drivers", {Qdrivers}, 0, 0444},
 	{"hostowner", {Qhostowner}, 0, 0644},
 	{"keyboard", {Qkeyboard}, 0, 0666},
@@ -875,12 +882,15 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 {
 	ERRSTACK(1);
 	int64_t t;
+	uint64_t ip;
 	long l, bp;
 	char *a = va;
 	struct cmdbuf *cb;
 	struct cmdtab *ct;
 	char buf[256];
 	int x;
+	uint64_t rip, rsp, cr3, flags, vcpu;
+	int ret;
 
 	switch ((uint32_t) c->qid.path) {
 #if 0
@@ -995,11 +1005,12 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 				buf[n - 1] = 0;
 			kstrdup(&sysname, buf);
 			break;
-
+#endif
 		case Qsysctl:
-			if (!iseve())
-				error(Eperm);
+			//if (!iseve()) error(Eperm);
 			cb = parsecmd(a, n);
+			if (cb->nf > 1) 
+			printk("cons sysctl cmd %s\n", cb->f[0]);
 			if (waserror()) {
 				kfree(cb);
 				nexterror();
@@ -1010,12 +1021,12 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 					reboot();
 					break;
 				case CMhalt:
-					halt();
+					cpu_halt();
 					break;
 				case CMpanic:
 					panic("sysctl");
-				case CMconsole:
-					consoleprint = strcmp(cb->f[1], "off") != 0;
+					//case CMconsole:
+					//consoleprint = strcmp(cb->f[1], "off") != 0;
 					break;
 				case CMbroken:
 					keepbroken = 1;
@@ -1023,11 +1034,23 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 				case CMnobroken:
 					keepbroken = 0;
 					break;
+				case CMV:
+					rip =  strtoul(cb->f[1], NULL, 0);
+					rsp =  strtoul(cb->f[2], NULL, 0);
+					cr3 =  strtoul(cb->f[3], NULL, 0);
+					disable_irq();
+					ret = vm_run(rip, rsp, cr3);
+					enable_irq();
+					printk("vm_run returns %d\n", ret);
+					return ret;
+	
+					ip = strtoul(cb->f[1], 0, 0);
+					//			vm_run(ip);
+					break;
 			}
 			poperror();
 			kfree(cb);
 			break;
-#endif
 		default:
 			printd("conswrite: %llu\n", c->qid.path);
 			error(Egreg);
