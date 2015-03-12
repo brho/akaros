@@ -1151,6 +1151,13 @@ static int sys_change_to_m(struct proc *p)
 	return retval;
 }
 
+/* Initializes a process to run virtual machine contexts, returning the number
+ * initialized, optionally setting errno */
+static int sys_setup_vmm(struct proc *p, unsigned int nr_guest_pcores)
+{
+	return vmm_struct_init(&p->vmm, nr_guest_pcores);
+}
+
 /* Pokes the ksched for the given resource for target_pid.  If the target pid
  * == 0, we just poke for the calling process.  The common case is poking for
  * self, so we avoid the lookup. 
@@ -2231,6 +2238,7 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_init_arsc] = {(syscall_t)sys_init_arsc, "init_arsc"},
 #endif
 	[SYS_change_to_m] = {(syscall_t)sys_change_to_m, "change_to_m"},
+	[SYS_setup_vmm] = {(syscall_t)sys_setup_vmm, "setup_vmm"},
 	[SYS_poke_ksched] = {(syscall_t)sys_poke_ksched, "poke_ksched"},
 	[SYS_abort_sysc] = {(syscall_t)sys_abort_sysc, "abort_sysc"},
 	[SYS_abort_sysc_fd] = {(syscall_t)sys_abort_sysc_fd, "abort_sysc_fd"},
