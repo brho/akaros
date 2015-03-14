@@ -223,7 +223,7 @@ native-binutils-configure:
 		--prefix=$(INSTDIR) \
 		--disable-werror \
 		--enable-ld=yes \
-		--enable-gold=no \
+		--enable-gold=yes \
 		--with-pkgversion="akaros-repo" \
 		--disable-multilib \
 		--disable-nls
@@ -238,7 +238,7 @@ cross-binutils-configure:
 		--prefix=$(INSTDIR) \
 		--disable-werror \
 		--enable-ld=yes \
-		--enable-gold=no \
+		--enable-gold=yes \
 		--with-pkgversion="akaros-repo" \
 		--disable-multilib \
 		--disable-nls \
