@@ -24,6 +24,7 @@
 #include <arsc_server.h>
 #include <devfs.h>
 #include <kmalloc.h>
+#include <ros/ttrace.h>
 
 struct kmem_cache *proc_cache;
 
@@ -167,6 +168,7 @@ int __proc_set_state(struct proc *p, uint32_t state)
 	}
 	#endif
 	p->state = state;
+	TTRACE_PROC_SETSTATE(p->pid, state, curstate);
 	return 0;
 }
 
@@ -257,6 +259,7 @@ void proc_set_progname(struct proc *p, char *name)
 	 * extra junk up to progname_sz. */
 	strncpy(p->progname, name, PROC_PROGNAME_SZ);
 	p->progname[PROC_PROGNAME_SZ - 1] = '\0';
+	TTRACE_PROC_SETNAME(p->pid, p->progname);
 }
 
 /* Be sure you init'd the vcore lists before calling this. */
@@ -335,9 +338,11 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 	} else {
 		p->ppid = 0;
 	}
+	TTRACE_PROC_ALLOC(p->pid, p->ppid);
 	TAILQ_INIT(&p->children);
 	cv_init(&p->child_wait);
 	p->state = PROC_CREATED; /* shouldn't go through state machine for init */
+	TTRACE_PROC_SETSTATE(p->pid, PROC_CREATED, 0);
 	p->env_flags = 0;
 	p->env_entry = 0; // cheating.  this really gets set later
 	p->heap_top = 0;
@@ -417,6 +422,7 @@ void __proc_ready(struct proc *p)
 {
 	/* Tell the ksched about us.  TODO: do we need to worry about the ksched
 	 * doing stuff to us before we're added to the pid_hash? */
+	TTRACE_PROC_READY(p->pid);
 	__sched_proc_register(p);
 	spin_lock(&pid_hash_lock);
 	hashtable_insert(pid_hash, (void*)(long)p->pid, p);
@@ -453,7 +459,10 @@ static void __proc_free(struct kref *kref)
 	void *hash_ret;
 	physaddr_t pa;
 
-	printd("[PID %d] freeing proc: %d\n", current ? current->pid : 0, p->pid);
+	const pid_t pid = p->pid;
+	const pid_t cpid = current ? current->pid : 0;
+	printd("[PID %d] freeing proc: %d\n", cpid : 0, pid);
+
 	// All parts of the kernel should have decref'd before __proc_free is called
 	assert(kref_refcnt(&p->p_kref) == 0);
 	assert(TAILQ_EMPTY(&p->alarmset.list));
@@ -479,13 +488,13 @@ static void __proc_free(struct kref *kref)
 	}
 	/* Remove us from the pid_hash and give our PID back (in that order). */
 	spin_lock(&pid_hash_lock);
-	hash_ret = hashtable_remove(pid_hash, (void*)(long)p->pid);
+	hash_ret = hashtable_remove(pid_hash, (void*)(long)pid);
 	spin_unlock(&pid_hash_lock);
 	/* might not be in the hash/ready, if we failed during proc creation */
 	if (hash_ret)
-		put_free_pid(p->pid);
+		put_free_pid(pid);
 	else
-		printd("[kernel] pid %d not in the PID hash in %s\n", p->pid,
+		printd("[kernel] pid %d not in the PID hash in %s\n", pid,
 		       __FUNCTION__);
 	/* all memory below UMAPTOP should have been freed via the VMRs.  the stuff
 	 * above is the global page and procinfo/procdata */
@@ -503,6 +512,7 @@ static void __proc_free(struct kref *kref)
 
 	/* Dealloc the struct proc */
 	kmem_cache_free(proc_cache, p);
+	TTRACE_PROC_FREE(pid, cpid);
 }
 
 /* Whether or not actor can control target.  TODO: do something reasonable here.
