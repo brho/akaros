@@ -18,9 +18,6 @@
 #include <syscall.h>
 #include <alarm.h>
 #include <trace.h>
-#ifdef CONFIG_X86
-#include <arch/vm.h>
-#endif
 
 #ifdef __SHARC__
 typedef sharC_env_t;
@@ -45,11 +42,7 @@ struct per_cpu_info {
 	uintptr_t stacktop;			/* must be first */
 	int coreid;					/* must be second */
 	/* virtual machines */
-	/* this is all kind of gross, but so it goes. Kmalloc
-	 * the vmxarea. It varies in size depending on the architecture.
-	 */
-	struct vmcs *vmxarea;
-	struct vmcs *vmcs;
+ 	//struct vmcs *vmxarea;
 	pseudodesc_t host_gdt;
 	int vmx_enabled;
 	void *local_vcpu;

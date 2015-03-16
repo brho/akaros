@@ -12,6 +12,4 @@ obj-$(CONFIG_REGRESS)				+= regress.o
 obj-y						+= root.o
 obj-y						+= srv.o
 
-# VM support. Optional.
-obj-$(CONFIG_VM)				+= vm.o
 obj-$(CONFIG_NIX)				+= nix.o
