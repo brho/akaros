@@ -15,7 +15,8 @@
 #include <kmalloc.h>
 #include <page_alloc.h>
 
-pde_t* boot_pgdir;		// Virtual address of boot time page directory
+#warning "convert pgdir* to pgdir_t"
+pgdir_t* boot_pgdir;		// Virtual address of boot time page directory
 physaddr_t boot_cr3;		// Physical address of boot time page directory
 
 // --------------------------------------------------------------
@@ -46,7 +47,7 @@ vm_init(void)
 // This is boot_pgdir_walk, but using page_alloc() instead of boot_alloc().
 // Unlike boot_pgdir_walk, pgdir_walk can fail.
 pte_t*
-pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
+pgdir_walk(pgdir_t *pgdir, const void *SNT va, int create)
 {
 	pte_t* ppte;
 	pte_t* pt;
@@ -86,7 +87,7 @@ pgdir_walk(pde_t *pgdir, const void *SNT va, int create)
 
 /* Returns the effective permissions for PTE_U, PTE_W, and PTE_P on a given
  * virtual address. */
-int get_va_perms(pde_t *pgdir, const void *SNT va)
+int get_va_perms(pgdir_t *pgdir, const void *SNT va)
 {
 	pte_t* pte = pgdir_walk(pgdir, va, 0);
 	return pte == NULL ? 0 : (*pte & (PTE_PERM | PTE_E));
@@ -95,4 +96,27 @@ int get_va_perms(pde_t *pgdir, const void *SNT va)
 void
 page_check(void)
 {
+}
+
+int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd)
+{
+	pte_t *kpt = kpage_alloc_addr();
+	if (!kpt)
+		return -ENOMEM;
+	memcpy(kpt, (pte_t*)boot_copy, PGSIZE);
+
+	/* TODO: VPT/UVPT mappings */
+
+	*new_pd = (pgdir_t)kpt;
+	return 0;
+}
+
+physaddr_t arch_pgdir_get_cr3(pgdir_t pd)
+{
+	return PADDR((pte_t*)pd);
+}
+
+void arch_pgdir_clear(pgdir_t *pd)
+{
+	*pd = 0;
 }

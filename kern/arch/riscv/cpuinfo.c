@@ -24,7 +24,8 @@ print_cpuinfo(void)
 	cprintf("CPU Info: RISC-V %s\n", name);
 }
 
-void show_mapping(pde_t *pt, uintptr_t start, size_t size)
+#warning "convert pgdir* to pgdir_t"
+void show_mapping(pgdir_t *pt, uintptr_t start, size_t size)
 {
 	pte_t* pte;
 	uintptr_t i;

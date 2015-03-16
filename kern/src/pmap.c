@@ -209,7 +209,7 @@ void *boot_zalloc(size_t amt, size_t align)
  *                   into which the page should be inserted
  *
  */
-int page_insert(pde_t *pgdir, struct page *page, void *va, int perm) 
+int page_insert(pgdir_t pgdir, struct page *page, void *va, int perm) 
 {
 	pte_t pte = pgdir_walk(pgdir, va, 1);
 	if (!pte_walk_okay(pte))
@@ -244,7 +244,7 @@ int page_insert(pde_t *pgdir, struct page *page, void *va, int perm)
  * @return PAGE the page mapped at virtual address 'va'
  * @return NULL No mapping exists at virtual address 'va', or it's paged out
  */
-page_t *page_lookup(pde_t *pgdir, void *va, pte_t *pte_store)
+page_t *page_lookup(pgdir_t pgdir, void *va, pte_t *pte_store)
 {
 	pte_t pte = pgdir_walk(pgdir, va, 0);
 	if (!pte_walk_okay(pte) || !pte_is_present(pte))
@@ -276,7 +276,7 @@ page_t *page_lookup(pde_t *pgdir, void *va, pte_t *pte_store)
  * TODO: consider deprecating this, or at least changing how it works with TLBs.
  * Might want to have the caller need to manage the TLB.  Also note it is used
  * in env_user_mem_free, minus the walk. */
-void page_remove(pde_t *pgdir, void *va)
+void page_remove(pgdir_t pgdir, void *va)
 {
 	pte_t pte;
 	page_t *page;
@@ -311,7 +311,7 @@ void page_remove(pde_t *pgdir, void *va)
  * @param va    the virtual address associated with the tlb entry
  *              we are trying to invalidate
  */
-void tlb_invalidate(pde_t *pgdir, void *va)
+void tlb_invalidate(pgdir_t pgdir, void *va)
 {
 	// Flush the entry only if we're modifying the current address space.
 	// For now, there is only one address space, so always invalidate.

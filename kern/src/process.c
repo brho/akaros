@@ -503,7 +503,7 @@ static void __proc_free(struct kref *kref)
 	free_cont_pages(p->procdata, LOG2_UP(PROCDATA_NUM_PAGES));
 
 	env_pagetable_free(p);
-	p->env_pgdir = 0;
+	arch_pgdir_clear(&p->env_pgdir);
 	p->env_cr3 = 0;
 
 	atomic_dec(&num_envs);

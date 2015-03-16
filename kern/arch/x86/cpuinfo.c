@@ -174,7 +174,7 @@ void print_cpuinfo(void)
 #define BIT_SPACING "        "
 #define BIT_DASHES "----------------"
 
-void show_mapping(pde_t *pgdir, uintptr_t start, size_t size)
+void show_mapping(pgdir_t pgdir, uintptr_t start, size_t size)
 {
 	pte_t pte;
 	int perm;

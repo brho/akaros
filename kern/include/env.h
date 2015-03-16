@@ -67,7 +67,7 @@ struct proc {
 	void* heap_top;
 
 	// Address space
-	pde_t *COUNT(NPDENTRIES) env_pgdir;			// Kernel virtual address of page dir
+	pgdir_t env_pgdir;			// Kernel virtual address of page dir
 	physaddr_t env_cr3;			// Physical address of page dir
 	spinlock_t vmr_lock;		/* Protects VMR tree (mem mgmt) */
 	spinlock_t pte_lock;		/* Protects page tables (mem mgmt) */

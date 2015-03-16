@@ -177,7 +177,7 @@ static int __showmapping(int argc, char **argv, struct hw_trapframe *hw_tf)
 	struct proc *p;
 	uintptr_t start;
 	size_t size;
-	pde_t *pgdir;
+	pgdir_t pgdir;
 	pid_t pid;
 	if (argc < 3) {
 		printk("Shows virtual -> physical mappings for a virt addr range.\n");

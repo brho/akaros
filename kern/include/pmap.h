@@ -73,7 +73,7 @@ extern uintptr_t boot_freelimit;
 extern struct page *pages;
 
 extern physaddr_t RO boot_cr3;
-extern pde_t *CT(NPDENTRIES) RO boot_pgdir;
+extern pgdir_t boot_pgdir;
 
 bool enable_pse(void);
 void vm_init(void);
@@ -83,20 +83,24 @@ void *boot_alloc(size_t amt, size_t align);
 void *boot_zalloc(size_t amt, size_t align);
 
 void page_check(void);
-int	 page_insert(pde_t *pgdir, struct page *page, void *SNT va, int perm);
-void page_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
-page_t* page_lookup(pde_t *pgdir, void *va, pte_t *pte_store);
-error_t	pagetable_remove(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
+int	 page_insert(pgdir_t pgdir, struct page *page, void *SNT va,
+			int perm);
+void page_remove(pgdir_t pgdir, void *SNT va);
+page_t* page_lookup(pgdir_t pgdir, void *va, pte_t *pte_store);
+error_t	pagetable_remove(pgdir_t pgdir, void *SNT va);
 void	page_decref(page_t *COUNT(1) pp);
 
-void	tlb_invalidate(pde_t *COUNT(NPDENTRIES) pgdir, void *SNT va);
+void	tlb_invalidate(pgdir_t pgdir, void *SNT va);
 void tlb_flush_global(void);
 bool regions_collide_unsafe(uintptr_t start1, uintptr_t end1, 
                             uintptr_t start2, uintptr_t end2);
 
 /* Arch specific implementations for these */
-pte_t pgdir_walk(pde_t *pgdir, const void *va, int create);
-int get_va_perms(pde_t *pgdir, const void *va);
+pte_t pgdir_walk(pgdir_t pgdir, const void *va, int create);
+int get_va_perms(pgdir_t pgdir, const void *va);
+int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd);
+physaddr_t arch_pgdir_get_cr3(pgdir_t pd);
+void arch_pgdir_clear(pgdir_t *pd);
 
 static inline page_t *SAFE ppn2page(size_t ppn)
 {

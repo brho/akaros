@@ -9,7 +9,7 @@
 #include <ros/common.h>
 typedef unsigned long kpte_t;
 typedef unsigned long pte_t;
-typedef unsigned long pde_t;
+typedef unsigned long pgdir_t;
 #endif
 
 /* Virtual memory map:                                  Virt Addresses

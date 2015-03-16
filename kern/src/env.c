@@ -39,42 +39,13 @@ atomic_t num_envs;
 int env_setup_vm(env_t *e)
 WRITES(e->env_pgdir, e->env_cr3, e->procinfo, e->procdata)
 {
-	int i, r;
-	page_t *pgdir = NULL;
+	int i, ret;
 	static page_t * RO shared_page = 0;
 
-	/* Get a page for the pgdir.  Storing the ref in pgdir/env_pgdir */
-	r = kpage_alloc(&pgdir);
-	if (r < 0)
-		return r;
-
-	/*
-	 * Next, set up the e->env_pgdir and e->env_cr3 pointers to point
-	 * to this newly allocated page and clear its contents
-	 */
-	memset(page2kva(pgdir), 0, PGSIZE);
-	e->env_pgdir = (pde_t *COUNT(NPDENTRIES)) TC(page2kva(pgdir));
-	e->env_cr3 =   (physaddr_t) TC(page2pa(pgdir));
-
-	/*
-	 * Now start filling in the pgdir with mappings required by all newly
-	 * created address spaces
-	 */
-
-	// Map in the kernel to the top of every address space
-	// should be able to do this so long as boot_pgdir never has
-	// anything put below ULIM
-	// TODO check on this!  had a nasty bug because of it
-	// this is a bit wonky, since if it's not PGSIZE, lots of other things are
-	// screwed up...
-	memcpy(e->env_pgdir, boot_pgdir, NPDENTRIES*sizeof(pde_t));
-
-	// VPT and UVPT map the env's own page table, with
-	// different permissions.
-	#ifndef NOVPT
-	e->env_pgdir[PDX(VPT)]  = PTE(LA2PPN(e->env_cr3), PTE_P | PTE_KERN_RW);
-	e->env_pgdir[PDX(UVPT)] = PTE(LA2PPN(e->env_cr3), PTE_P | PTE_USER_RO);
-	#endif
+	if ((ret = arch_pgdir_setup(boot_pgdir, &e->env_pgdir)))
+		return ret;
+	/* TODO: verify there is nothing below ULIM */
+	e->env_cr3 = arch_pgdir_get_cr3(e->env_pgdir);
 
 	/* These need to be contiguous, so the kernel can alias them.  Note the
 	 * pages return with a refcnt, but it's okay to insert them since we free

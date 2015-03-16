@@ -151,7 +151,7 @@
 
 #ifndef __ASSEMBLER__
 typedef unsigned long pte_t;
-typedef unsigned long pde_t;
+typedef unsigned long pgdir_t;
 #endif
 
 /* Same as VPT but read-only for users */

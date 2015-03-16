@@ -32,7 +32,7 @@
 #include <page_alloc.h>
 
 extern char boot_pml4[], gdt64[], gdt64desc[];
-pde_t *boot_pgdir;
+pgdir_t boot_pgdir;
 physaddr_t boot_cr3;
 segdesc_t *gdt;
 pseudodesc_t gdt_pd;
@@ -42,13 +42,19 @@ unsigned int max_jumbo_shift;
 #define PG_WALK_CREATE 			0x0100
 
 kpte_t *pml_walk(kpte_t *pml, uintptr_t va, int flags);
-void map_segment(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa,
+void map_segment(pgdir_t pgdir, uintptr_t va, size_t size, physaddr_t pa,
                  int perm, int pml_shift);
 typedef int (*kpte_cb_t)(kpte_t *kpte, uintptr_t kva, int pml_shift,
                         bool visited_subs, void *arg);
 int pml_for_each(kpte_t *pml, uintptr_t start, size_t len, kpte_cb_t callback,
                  void *arg);
-int unmap_segment(pde_t *pgdir, uintptr_t va, size_t size);
+int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size);
+
+/* Helper: gets the kpte_t pointer which is the base of the PML4 from pgdir */
+static kpte_t *pgdir_get_kpt(pgdir_t pgdir)
+{
+	return (kpte_t*)pgdir;
+}
 
 /* Helper: returns true if we do not need to walk the page table any further.
  *
@@ -233,7 +239,7 @@ static int max_possible_shift(uintptr_t va, uintptr_t pa)
  *
  * Don't use this to set the PAT flag on jumbo pages in perm, unless you are
  * absolultely sure you won't map regular pages.  */
-void map_segment(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa,
+void map_segment(pgdir_t pgdir, uintptr_t va, size_t size, physaddr_t pa,
                  int perm, int pml_shift)
 {
 	int max_shift_possible;
@@ -253,7 +259,7 @@ void map_segment(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa,
 	assert((pml_shift == PML1_SHIFT) ||
 	       (pml_shift == PML2_SHIFT) ||
 	       (pml_shift == PML3_SHIFT));
-	__map_segment(pgdir, va, size, pa, perm, pml_shift);
+	__map_segment(pgdir_get_kpt(pgdir), va, size, pa, perm, pml_shift);
 }
 
 /* For every PTE in [start, start + len), call callback(kpte, shift,
@@ -322,7 +328,7 @@ int pml_for_each(kpte_t *pml, uintptr_t start, size_t len, kpte_cb_t callback,
 /* Unmaps [va, va + size) from pgdir, freeing any intermediate page tables.
  * This does not free the actual memory pointed to by the page tables, nor does
  * it flush the TLB. */
-int unmap_segment(pde_t *pgdir, uintptr_t va, size_t size)
+int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size)
 {
 	int pt_free_cb(kpte_t *kpte, uintptr_t kva, int shift, bool visited_subs,
 	               void *data)
@@ -348,7 +354,7 @@ int unmap_segment(pde_t *pgdir, uintptr_t va, size_t size)
 		return 0;
 	}
 
-	return pml_for_each(pgdir, va, size, pt_free_cb, 0);
+	return pml_for_each(pgdir_get_kpt(pgdir), va, size, pt_free_cb, 0);
 }
 
 /* Older interface for page table walks - will return the PTE corresponding to
@@ -356,12 +362,12 @@ int unmap_segment(pde_t *pgdir, uintptr_t va, size_t size)
  * PTEs, but only if they already exist.  Otherwise, (with create), it'll walk
  * to the lowest PML.  If the walk fails due to a lack of intermediate tables or
  * memory, this returns 0 (subject to change based on pte_t). */
-pte_t pgdir_walk(pde_t *pgdir, const void *va, int create)
+pte_t pgdir_walk(pgdir_t pgdir, const void *va, int create)
 {
 	int flags = PML1_SHIFT;
 	if (create == 1)
 		flags |= PG_WALK_CREATE;
-	return (pte_t)pml_walk(pgdir, (uintptr_t)va, flags);
+	return (pte_t)pml_walk(pgdir_get_kpt(pgdir), (uintptr_t)va, flags);
 }
 
 static int pml_perm_walk(kpte_t *pml, const void *va, int pml_shift)
@@ -382,9 +388,9 @@ static int pml_perm_walk(kpte_t *pml, const void *va, int pml_shift)
 /* Returns the effective permissions for PTE_U, PTE_W, and PTE_P on a given
  * virtual address.  Note we need to consider the composition of every PTE in
  * the page table walk (we bit-and all of them together) */
-int get_va_perms(pde_t *pgdir, const void *va)
+int get_va_perms(pgdir_t pgdir, const void *va)
 {
-	return pml_perm_walk(pgdir, va, PML4_SHIFT);
+	return pml_perm_walk(pgdir_get_kpt(pgdir), va, PML4_SHIFT);
 }
 
 #define check_sym_va(sym, addr)                                                \
@@ -419,8 +425,10 @@ static void check_syms_va(void)
 void vm_init(void)
 {
 	uint32_t edx;
+	kpte_t *boot_kpt = KADDR(get_boot_pml4());
+
 	boot_cr3 = get_boot_pml4();
-	boot_pgdir = KADDR(get_boot_pml4());
+	boot_pgdir = (pgdir_t)boot_kpt;
 	gdt = KADDR(get_gdt64());
 
 	/* We need to limit our mappings on machines that don't support 1GB pages */
@@ -441,9 +449,9 @@ void vm_init(void)
 	map_segment(boot_pgdir, IOAPIC_BASE, APIC_SIZE, IOAPIC_PBASE,
 	            PTE_PCD | PTE_PWT | PTE_W | PTE_G, max_jumbo_shift);
 	/* VPT mapping: recursive PTE inserted at the VPT spot */
-	boot_pgdir[PDX(VPT)] = PADDR(boot_pgdir) | PTE_W | PTE_P;
+	boot_kpt[PDX(VPT)] = PADDR(boot_kpt) | PTE_W | PTE_P;
 	/* same for UVPT, accessible by userspace (RO). */
-	boot_pgdir[PDX(UVPT)] = PADDR(boot_pgdir) | PTE_U | PTE_P;
+	boot_kpt[PDX(UVPT)] = PADDR(boot_kpt) | PTE_U | PTE_P;
 	/* set up core0s now (mostly for debugging) */
 	setup_default_mtrrs(0);
 	/* Our current gdt_pd (gdt64desc) is pointing to a physical address for the
@@ -519,13 +527,38 @@ void env_pagetable_free(struct proc *p)
 
 /* Remove the inner page tables along va's walk.  The internals are more
  * powerful.  We'll eventually want better arch-indep VM functions. */
-error_t	pagetable_remove(pde_t *pgdir, void *va)
+error_t	pagetable_remove(pgdir_t pgdir, void *va)
 {
 	return unmap_segment(pgdir, (uintptr_t)va, PGSIZE);
 }
 
 void page_check(void)
 {
+}
+
+int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd)
+{
+	kpte_t *kpt = kpage_alloc_addr();
+	if (!kpt)
+		return -ENOMEM;
+	memcpy(kpt, (kpte_t*)boot_copy, PGSIZE);
+
+	/* VPT and UVPT map the proc's page table, with different permissions. */
+	kpt[PDX(VPT)]  = PTE(LA2PPN(PADDR(kpt)), PTE_P | PTE_KERN_RW);
+	kpt[PDX(UVPT)] = PTE(LA2PPN(PADDR(kpt)), PTE_P | PTE_USER_RO);
+
+	*new_pd = (pgdir_t)kpt;
+	return 0;
+}
+
+physaddr_t arch_pgdir_get_cr3(pgdir_t pd)
+{
+	return PADDR((kpte_t*)pd);
+}
+
+void arch_pgdir_clear(pgdir_t *pd)
+{
+	*pd = 0;
 }
 
 /* Debugging */
