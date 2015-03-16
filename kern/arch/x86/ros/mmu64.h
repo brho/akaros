@@ -7,6 +7,7 @@
 
 #ifndef __ASSEMBLER__
 #include <ros/common.h>
+typedef unsigned long kpte_t;
 typedef unsigned long pte_t;
 typedef unsigned long pde_t;
 #endif

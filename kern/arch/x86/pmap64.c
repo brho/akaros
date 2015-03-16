@@ -41,12 +41,12 @@ unsigned int max_jumbo_shift;
 #define PG_WALK_SHIFT_MASK		0x00ff 		/* first byte = target shift */
 #define PG_WALK_CREATE 			0x0100
 
-pte_t *pml_walk(pte_t *pml, uintptr_t va, int flags);
+kpte_t *pml_walk(kpte_t *pml, uintptr_t va, int flags);
 void map_segment(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa,
                  int perm, int pml_shift);
-typedef int (*pte_cb_t)(pte_t *pte, uintptr_t kva, int pml_shift,
+typedef int (*kpte_cb_t)(kpte_t *kpte, uintptr_t kva, int pml_shift,
                         bool visited_subs, void *arg);
-int pml_for_each(pte_t *pml, uintptr_t start, size_t len, pte_cb_t callback,
+int pml_for_each(kpte_t *pml, uintptr_t start, size_t len, kpte_cb_t callback,
                  void *arg);
 int unmap_segment(pde_t *pgdir, uintptr_t va, size_t size);
 
@@ -58,29 +58,29 @@ int unmap_segment(pde_t *pgdir, uintptr_t va, size_t size);
  *
  * Regardless of the desired target, if we find a jumbo page, we're also done.
  */
-static bool walk_is_complete(pte_t *pte, int pml_shift, int flags)
+static bool walk_is_complete(kpte_t *kpte, int pml_shift, int flags)
 {
-	if ((pml_shift == (flags & PG_WALK_SHIFT_MASK)) || (*pte & PTE_PS))
+	if ((pml_shift == (flags & PG_WALK_SHIFT_MASK)) || (*kpte & PTE_PS))
 		return TRUE;
 	return FALSE;
 }
 
 /* PTE_ADDR should only be used on a PTE that has a physical address of the next
  * PML inside.  i.e., not a final PTE in the page table walk. */
-static pte_t *pte2pml(pte_t pte)
+static kpte_t *kpte2pml(kpte_t kpte)
 {
-	return (pte_t*)KADDR(PTE_ADDR(pte));
+	return (kpte_t*)KADDR(PTE_ADDR(kpte));
 }
 
-static pte_t *__pml_walk(pte_t *pml, uintptr_t va, int flags, int pml_shift)
+static kpte_t *__pml_walk(kpte_t *pml, uintptr_t va, int flags, int pml_shift)
 {
-	pte_t *pte;
+	kpte_t *kpte;
 	void *new_pml_kva;
 
-	pte = &pml[PMLx(va, pml_shift)];
-	if (walk_is_complete(pte, pml_shift, flags))
-		return pte;
-	if (!(*pte & PTE_P)) {
+	kpte = &pml[PMLx(va, pml_shift)];
+	if (walk_is_complete(kpte, pml_shift, flags))
+		return kpte;
+	if (!(*kpte & PTE_P)) {
 		if (!(flags & PG_WALK_CREATE))
 			return NULL;
 		new_pml_kva = kpage_zalloc_addr();
@@ -91,9 +91,9 @@ static pte_t *__pml_walk(pte_t *pml, uintptr_t va, int flags, int pml_shift)
 		 * page table walks are anded together (if any of them are !User, the
 		 * translation is !User).  We put the perms on the last entry, not the
 		 * intermediates. */
-		*pte = PADDR(new_pml_kva) | PTE_P | PTE_U | PTE_W;
+		*kpte = PADDR(new_pml_kva) | PTE_P | PTE_U | PTE_W;
 	}
-	return __pml_walk(pte2pml(*pte), va, flags, pml_shift - BITS_PER_PML);
+	return __pml_walk(kpte2pml(*kpte), va, flags, pml_shift - BITS_PER_PML);
 }
 
 /* Returns a pointer to the page table entry corresponding to va.  Flags has
@@ -108,7 +108,7 @@ static pte_t *__pml_walk(pte_t *pml, uintptr_t va, int flags, int pml_shift)
  * for the PTE to insert a page), pass in PG_WALK_CREATE with flags.
  *
  * Returns 0 on error or absence of a PTE for va. */
-pte_t *pml_walk(pte_t *pml, uintptr_t va, int flags)
+kpte_t *pml_walk(kpte_t *pml, uintptr_t va, int flags)
 {
 	return __pml_walk(pml, va, flags, PML4_SHIFT);
 }
@@ -131,9 +131,9 @@ static uintptr_t amt_of_aligned_bytes(uintptr_t size, int pml_shift)
 	return (~((1UL << pml_shift) - 1)) & size;
 }
 
-/* Helper: Advance pte, given old_pte.  Will do pml walks when necessary. */
-static pte_t *get_next_pte(pte_t *old_pte, pte_t *pgdir, uintptr_t va,
-                           int flags)
+/* Helper: Advance kpte, given old_pte.  Will do pml walks when necessary. */
+static kpte_t *get_next_pte(kpte_t *old_pte, kpte_t *pgdir, uintptr_t va,
+                            int flags)
 {
 	/* PTEs (undereferenced) are addresses within page tables.  so long as we
 	 * stay inside the PML, we can just advance via pointer arithmetic.  if we
@@ -146,28 +146,28 @@ static pte_t *get_next_pte(pte_t *old_pte, pte_t *pgdir, uintptr_t va,
 }
 
 /* Helper: maps pages from va to pa for size bytes, all for a given page size */
-static void map_my_pages(pte_t *pgdir, uintptr_t va, size_t size,
+static void map_my_pages(kpte_t *pgdir, uintptr_t va, size_t size,
                          physaddr_t pa, int perm, int pml_shift)
 {
 	/* set to trigger a pml walk on the first get_next */
-	pte_t *pte = (pte_t*)PGSIZE - 1;
+	kpte_t *kpte = (kpte_t*)PGSIZE - 1;
 	size_t pgsize = 1UL << pml_shift;
 
 	for (size_t i = 0; i < size; i += pgsize, va += pgsize,
 	     pa += pgsize) {
-		pte = get_next_pte(pte, pgdir, va, PG_WALK_CREATE | pml_shift);
-		assert(pte);
-		*pte = PTE_ADDR(pa) | PTE_P | perm |
-		       (pml_shift != PML1_SHIFT ? PTE_PS : 0);
-		printd("Wrote *pte %p, for va %p to pa %p tried to cover %p\n",
-		       *pte, va, pa, amt_mapped);
+		kpte = get_next_pte(kpte, pgdir, va, PG_WALK_CREATE | pml_shift);
+		assert(kpte);
+		*kpte = PTE_ADDR(pa) | PTE_P | perm |
+		        (pml_shift != PML1_SHIFT ? PTE_PS : 0);
+		printd("Wrote *kpte %p, for va %p to pa %p tried to cover %p\n",
+		       *kpte, va, pa, amt_mapped);
 	}
 }
 
 /* Maps all pages possible from va->pa, up to size, preferring to use pages of
  * type pml_shift (size == (1 << shift)).  Assumes that it is possible to map va
  * to pa at the given shift. */
-static uintptr_t __map_segment(pte_t *pgdir, uintptr_t va, size_t size,
+static uintptr_t __map_segment(kpte_t *pgdir, uintptr_t va, size_t size,
                                physaddr_t pa, int perm, int pml_shift)
 {
 	printd("__map_segment, va %p, size %p, pa %p, shift %d\n", va, size,
@@ -256,7 +256,7 @@ void map_segment(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa,
 	__map_segment(pgdir, va, size, pa, perm, pml_shift);
 }
 
-/* For every PTE in [start, start + len), call callback(pte, shift,
+/* For every PTE in [start, start + len), call callback(kpte, shift,
  * etc), including the not present PTEs.  pml_shift is the shift/size of pml.
  *
  * This will recurse down into sub PMLs, and perform the CB in a
@@ -266,40 +266,40 @@ void map_segment(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa,
  * The CB will also run on intermediate PTEs: meaning, PTEs that point to page
  * tables (and not (jumbo) pages) will be executed.  If the CB returns anything
  * other than 0, we'll abort and propagate that back out from for_each. */
-static int __pml_for_each(pte_t *pml,  uintptr_t start, size_t len,
-                          pte_cb_t callback, void *arg, int pml_shift)
+static int __pml_for_each(kpte_t *pml,  uintptr_t start, size_t len,
+                          kpte_cb_t callback, void *arg, int pml_shift)
 {
 	int ret;
 	bool visited_all_subs;
-	pte_t *pte_s, *pte_e, *pte_i;
+	kpte_t *kpte_s, *kpte_e, *kpte_i;
 	uintptr_t kva, pgsize = 1UL << pml_shift;
 
 	if (!len)
 		return 0;
-	pte_s = &pml[PMLx(start, pml_shift)];
-	/* Later, we'll loop up to and including pte_e.  Since start + len might not
-	 * be page aligned, we'll need to include the final pte.  If it is aligned,
-	 * we don't want to visit, so we subtract one so that the aligned case maps
-	 * to the index below it's normal pte. */
-	pte_e = &pml[PMLx(start + len - 1, pml_shift)];
-	/* tracks the virt addr pte_i works on, rounded for this PML */
+	kpte_s = &pml[PMLx(start, pml_shift)];
+	/* Later, we'll loop up to and including kpte_e.  Since start + len might
+	 * not be page aligned, we'll need to include the final kpte.  If it is
+	 * aligned, we don't want to visit, so we subtract one so that the aligned
+	 * case maps to the index below its normal kpte. */
+	kpte_e = &pml[PMLx(start + len - 1, pml_shift)];
+	/* tracks the virt addr kpte_i works on, rounded for this PML */
 	kva = ROUNDDOWN(start, pgsize);
 	printd("PFE, start %p PMLx(S) %d, end-inc %p PMLx(E) %d shift %d, kva %p\n",
 	       start, PMLx(start, pml_shift), start + len - 1,
 	       PMLx(start + len - 1, pml_shift), pml_shift, kva);
-	for (pte_i = pte_s; pte_i <= pte_e; pte_i++, kva += pgsize) {
+	for (kpte_i = kpte_s; kpte_i <= kpte_e; kpte_i++, kva += pgsize) {
 		visited_all_subs = FALSE;
 		/* Complete only on the last level (PML1_SHIFT) or on a jumbo */
-		if ((*pte_i & PTE_P) &&
-		    (!walk_is_complete(pte_i, pml_shift, PML1_SHIFT))) {
+		if ((*kpte_i & PTE_P) &&
+		    (!walk_is_complete(kpte_i, pml_shift, PML1_SHIFT))) {
 			/* only pass truncated end points (e.g. start may not be page
 			 * aligned) when we're on the first (or last) item.  For the middle
 			 * entries, we want the subpmls to process the full range they are
 			 * responsible for: [kva, kva + pgsize). */
 			uintptr_t sub_start = MAX(kva, start);
 			size_t sub_len = MIN(start + len, kva + pgsize) - sub_start;
-			ret = __pml_for_each(pte2pml(*pte_i), sub_start, sub_len, callback,
-			                     arg, pml_shift - BITS_PER_PML);
+			ret = __pml_for_each(kpte2pml(*kpte_i), sub_start, sub_len,
+			                     callback, arg, pml_shift - BITS_PER_PML);
 			if (ret)
 				return ret;
 			/* based on sub_{start,end}, we can tell if our sub visited all of
@@ -307,13 +307,13 @@ static int __pml_for_each(pte_t *pml,  uintptr_t start, size_t len,
 			if ((sub_start == kva) && (sub_len == pgsize))
 				visited_all_subs = TRUE;
 		}
-		if ((ret = callback(pte_i, kva, pml_shift, visited_all_subs, arg)))
+		if ((ret = callback(kpte_i, kva, pml_shift, visited_all_subs, arg)))
 			return ret;
 	}
 	return 0;
 }
 
-int pml_for_each(pte_t *pml, uintptr_t start, size_t len, pte_cb_t callback,
+int pml_for_each(kpte_t *pml, uintptr_t start, size_t len, kpte_cb_t callback,
                  void *arg)
 {
 	return __pml_for_each(pml, start, len, callback, arg, PML4_SHIFT);
@@ -324,27 +324,27 @@ int pml_for_each(pte_t *pml, uintptr_t start, size_t len, pte_cb_t callback,
  * it flush the TLB. */
 int unmap_segment(pde_t *pgdir, uintptr_t va, size_t size)
 {
-	int pt_free_cb(pte_t *pte, uintptr_t kva, int shift, bool visited_subs,
+	int pt_free_cb(kpte_t *kpte, uintptr_t kva, int shift, bool visited_subs,
 	               void *data)
 	{
-		if (!(*pte & PTE_P))
+		if (!(*kpte & PTE_P))
 			return 0;
-		if ((shift == PML1_SHIFT) || (*pte & PTE_PS)) {
-			*pte = 0;
+		if ((shift == PML1_SHIFT) || (*kpte & PTE_PS)) {
+			*kpte = 0;
 			return 0;
 		}
 		/* If we haven't visited all of our subs, we might still have some
 		 * mappings hanging our this page table. */
 		if (!visited_subs) {
-			pte_t *pte_i = pte2pml(*pte);	/* first pte == pml */
+			kpte_t *kpte_i = kpte2pml(*kpte);	/* first kpte == pml */
 			/* make sure we have no PTEs in use */
-			for (int i = 0; i < NPTENTRIES; i++, pte_i++) {
-				if (*pte_i)
+			for (int i = 0; i < NPTENTRIES; i++, kpte_i++) {
+				if (*kpte_i)
 					return 0;
 			}
 		}
-		page_decref(ppn2page(LA2PPN(*pte)));
-		*pte = 0;
+		page_decref(ppn2page(LA2PPN(*kpte)));
+		*kpte = 0;
 		return 0;
 	}
 
@@ -355,27 +355,27 @@ int unmap_segment(pde_t *pgdir, uintptr_t va, size_t size)
  * VA.  If create is 1, it'll create intermediate tables.  This can return jumbo
  * PTEs, but only if they already exist.  Otherwise, (with create), it'll walk
  * to the lowest PML.  If the walk fails due to a lack of intermediate tables or
- * memory, this returns 0. */
-pte_t *pgdir_walk(pde_t *pgdir, const void *va, int create)
+ * memory, this returns 0 (subject to change based on pte_t). */
+pte_t pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
 	int flags = PML1_SHIFT;
 	if (create == 1)
 		flags |= PG_WALK_CREATE;
-	return pml_walk(pgdir, (uintptr_t)va, flags);
+	return (pte_t)pml_walk(pgdir, (uintptr_t)va, flags);
 }
 
-static int pml_perm_walk(pte_t *pml, const void *va, int pml_shift)
+static int pml_perm_walk(kpte_t *pml, const void *va, int pml_shift)
 {
-	pte_t *pte;
+	kpte_t *kpte;
 	int perms_here;
 
-	pte = &pml[PMLx(va, pml_shift)];
-	if (!(*pte & PTE_P))
+	kpte = &pml[PMLx(va, pml_shift)];
+	if (!(*kpte & PTE_P))
 		return 0;
-	perms_here = *pte & (PTE_PERM | PTE_P);
-	if (walk_is_complete(pte, pml_shift, PML1_SHIFT))
+	perms_here = *kpte & (PTE_PERM | PTE_P);
+	if (walk_is_complete(kpte, pml_shift, PML1_SHIFT))
 		return perms_here;
-	return pml_perm_walk(pte2pml(*pte), va, pml_shift - BITS_PER_PML) &
+	return pml_perm_walk(kpte2pml(*kpte), va, pml_shift - BITS_PER_PML) &
 	       perms_here;
 }
 
@@ -474,7 +474,7 @@ int env_user_mem_walk(struct proc *p, void *start, size_t len,
 		mem_walk_callback_t cb;
 		void *cb_arg;
 	};
-	int trampoline_cb(pte_t *pte, uintptr_t kva, int shift, bool visited_subs,
+	int trampoline_cb(kpte_t *kpte, uintptr_t kva, int shift, bool visited_subs,
 	                  void *data)
 	{
 		struct tramp_package *tp = (struct tramp_package*)data;
@@ -482,36 +482,36 @@ int env_user_mem_walk(struct proc *p, void *start, size_t len,
 		/* memwalk CBs don't know how to handle intermediates or jumbos */
 		if (shift != PML1_SHIFT)
 			return 0;
-		return tp->cb(tp->p, pte, (void*)kva, tp->cb_arg);
+		return tp->cb(tp->p, (pte_t)kpte, (void*)kva, tp->cb_arg);
 	}
 
 	struct tramp_package local_tp;
 	local_tp.p = p;
 	local_tp.cb = callback;
 	local_tp.cb_arg = arg;
-	return pml_for_each(p->env_pgdir, (uintptr_t)start, len, trampoline_cb,
-	                    &local_tp);
+	return pml_for_each((kpte_t*)p->env_pgdir, (uintptr_t)start, len,
+	                    trampoline_cb, &local_tp);
 }
 
 /* Frees (decrefs) all pages of the process's page table, including the page
  * directory.  Does not free the memory that is actually mapped. */
 void env_pagetable_free(struct proc *p)
 {
-	/* callback: given an intermediate pte (not a final one), removes the page
+	/* callback: given an intermediate kpte (not a final one), removes the page
 	 * table the PTE points to */
-	int pt_free_cb(pte_t *pte, uintptr_t kva, int shift, bool visited_subs,
+	int pt_free_cb(kpte_t *kpte, uintptr_t kva, int shift, bool visited_subs,
 	               void *data)
 	{
-		if (!(*pte & PTE_P))
+		if (!(*kpte & PTE_P))
 			return 0;
-		if ((shift == PML1_SHIFT) || (*pte & PTE_PS))
+		if ((shift == PML1_SHIFT) || (*kpte & PTE_PS))
 			return 0;
-		page_decref(ppn2page(LA2PPN(*pte)));
+		page_decref(ppn2page(LA2PPN(*kpte)));
 		return 0;
 	}
 		
 	assert(p->env_cr3 != rcr3());
-	pml_for_each(p->env_pgdir, 0, UVPT, pt_free_cb, 0);
+	pml_for_each((kpte_t*)p->env_pgdir, 0, UVPT, pt_free_cb, 0);
 	/* the page directory is not a PTE, so it never was freed */
 	page_decref(pa2page(p->env_cr3));
 	tlbflush();
@@ -529,10 +529,10 @@ void page_check(void)
 }
 
 /* Debugging */
-static int print_pte(pte_t *pte, uintptr_t kva, int shift, bool visited_subs,
+static int print_pte(kpte_t *kpte, uintptr_t kva, int shift, bool visited_subs,
                      void *data)
 {
-	if (!(*pte & PTE_P))
+	if (!(*kpte & PTE_P))
 		return 0;
 	switch (shift) {
 		case (PML1_SHIFT):
@@ -544,12 +544,12 @@ static int print_pte(pte_t *pte, uintptr_t kva, int shift, bool visited_subs,
 		case (PML3_SHIFT):
 			printk("\t");
 	}
-	printk("KVA: %p, PTE val %p, shift %d, visit %d%s\n", kva, *pte, shift,
-	       visited_subs, (*pte & PTE_PS ? " (jumbo)" : ""));
+	printk("KVA: %p, PTE val %p, shift %d, visit %d%s\n", kva, *kpte, shift,
+	       visited_subs, (*kpte & PTE_PS ? " (jumbo)" : ""));
 	return 0;
 }
 
-void debug_print_pgdir(pte_t *pgdir)
+void debug_print_pgdir(kpte_t *pgdir)
 {
 	printk("Printing the entire page table set for %p, DFS\n", pgdir);
 	/* Need to be careful we avoid VPT/UVPT, o/w we'll recurse */
