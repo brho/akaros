@@ -117,8 +117,6 @@
 
 // x86 equivalencies
 #define PTE_P      PTE_E
-#define NPDENTRIES NPTENTRIES
-#define PDX(la)    L1X(la)			// for env stuff
 
 // address in page table entry
 #define PTE_ADDR(pte)	((physaddr_t) (pte) & ~(PGSIZE-1))

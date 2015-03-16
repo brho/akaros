@@ -449,9 +449,9 @@ void vm_init(void)
 	map_segment(boot_pgdir, IOAPIC_BASE, APIC_SIZE, IOAPIC_PBASE,
 	            PTE_PCD | PTE_PWT | PTE_W | PTE_G, max_jumbo_shift);
 	/* VPT mapping: recursive PTE inserted at the VPT spot */
-	boot_kpt[PDX(VPT)] = PADDR(boot_kpt) | PTE_W | PTE_P;
+	boot_kpt[PML4(VPT)] = PADDR(boot_kpt) | PTE_W | PTE_P;
 	/* same for UVPT, accessible by userspace (RO). */
-	boot_kpt[PDX(UVPT)] = PADDR(boot_kpt) | PTE_U | PTE_P;
+	boot_kpt[PML4(UVPT)] = PADDR(boot_kpt) | PTE_U | PTE_P;
 	/* set up core0s now (mostly for debugging) */
 	setup_default_mtrrs(0);
 	/* Our current gdt_pd (gdt64desc) is pointing to a physical address for the
@@ -544,8 +544,8 @@ int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd)
 	memcpy(kpt, (kpte_t*)boot_copy, PGSIZE);
 
 	/* VPT and UVPT map the proc's page table, with different permissions. */
-	kpt[PDX(VPT)]  = PTE(LA2PPN(PADDR(kpt)), PTE_P | PTE_KERN_RW);
-	kpt[PDX(UVPT)] = PTE(LA2PPN(PADDR(kpt)), PTE_P | PTE_USER_RO);
+	kpt[PML4(VPT)]  = PTE(LA2PPN(PADDR(kpt)), PTE_P | PTE_KERN_RW);
+	kpt[PML4(UVPT)] = PTE(LA2PPN(PADDR(kpt)), PTE_P | PTE_USER_RO);
 
 	*new_pd = (pgdir_t)kpt;
 	return 0;

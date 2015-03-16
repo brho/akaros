@@ -243,9 +243,6 @@ typedef unsigned long pgdir_t;
                                            ((p2) << PML2_SHIFT) |              \
                                            ((p1) << PML1_SHIFT) |(o)))
 
-/* These are used in older code, referring to the outer-most page table */
-#define PDX(la)			PML4(la)
-#define NPDENTRIES		512
 /* This is used in places (procinfo) meaning "size of smallest jumbo page" */
 #define PTSIZE PML2_PTE_REACH
 
