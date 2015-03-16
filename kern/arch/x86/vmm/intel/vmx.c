@@ -129,7 +129,7 @@
  * either a failed vm startup or an exit for lots of many reasons.
  *
  */
-void monitor(void *);
+
 /* basically: only rename those globals that might conflict
  * with existing names. Leave all else the same.
  * this code is more modern than the other code, yet still
@@ -164,6 +164,18 @@ void monitor(void *);
  * then you failed.
  */
 static bool has_vmx = FALSE;
+
+/*
+ * Keep MSR_STAR at the end, as setup_msrs() will try to optimize it
+ * away by decrementing the array size.
+ */
+static const uint32_t vmx_msr_index[] = {
+#ifdef CONFIG_X86_64
+	MSR_SYSCALL_MASK, MSR_LSTAR, MSR_CSTAR,
+#endif
+	MSR_EFER, MSR_TSC_AUX, MSR_STAR,
+};
+#define NR_VMX_MSR ARRAY_SIZE(vmx_msr_index)
 
 /* TEMPORARY TEST HACK EPT */
 void *ept;
@@ -395,10 +407,6 @@ void vmwrite_error(unsigned long field, unsigned long value)
 {
 	printk("vmwrite error: reg %lx value %lx (err %d)\n",
 	       field, value, vmcs_read32(VM_INSTRUCTION_ERROR));
-	/* not available so ...
-	dump_stack();
-	*/
-	monitor(NULL);
 }
 
 void vmcs_writel(unsigned long field, unsigned long value)
@@ -424,12 +432,7 @@ static void vmcs_write32(unsigned long field, uint32_t value)
 static void vmcs_write64(unsigned long field, uint64_t value)
 {
 	vmcs_writel(field, value);
-#ifndef CONFIG_X86_64
-	asm volatile ("");
-	vmcs_writel(field+1, value >> 32);
-#endif
 }
-
 
 static int adjust_vmx_controls(uint32_t ctl_min, uint32_t ctl_opt,
 				      uint32_t msr, uint32_t *result)
@@ -684,15 +687,10 @@ static void vmx_setup_constant_host_state(void)
 	vmcs_write16(HOST_GS_SELECTOR, 0);            /* 22.2.4 */
 
 	/* TODO: This (at least gs) is per cpu */
-#ifdef CONFIG_X86_64
 	rdmsrl(MSR_FS_BASE, tmpl);
 	vmcs_writel(HOST_FS_BASE, tmpl); /* 22.2.4 */
 	rdmsrl(MSR_GS_BASE, tmpl);
 	vmcs_writel(HOST_GS_BASE, tmpl); /* 22.2.4 */
-#else
-	vmcs_writel(HOST_FS_BASE, 0); /* 22.2.4 */
-	vmcs_writel(HOST_GS_BASE, 0); /* 22.2.4 */
-#endif
 }
 
 static inline uint16_t vmx_read_ldt(void)
@@ -786,22 +784,19 @@ static void vmx_get_cpu(struct vmx_vcpu *vcpu)
 	int cur_cpu = core_id();
 	handler_wrapper_t *w;
 
-	//printk("currentcpu->local_vcpu %p vcpu %p\n",
-		//currentcpu->local_vcpu, vcpu);
+	if (currentcpu->local_vcpu)
+		panic("get_cpu: currentcpu->localvcpu was non-NULL");
 	if (currentcpu->local_vcpu != vcpu) {
 		currentcpu->local_vcpu = vcpu;
 
 		if (vcpu->cpu != cur_cpu) {
 			if (vcpu->cpu >= 0) {
-				smp_call_function_single(vcpu->cpu,
-							 __vmx_get_cpu_helper, (void *) vcpu, &w);
-				if (smp_call_wait(w))
-					printk("litevm_init. smp_call_wait failed. Expect a panic.\n");
+				panic("vcpu->cpu is not -1, it's %d\n", vcpu->cpu);
 			} else
 				vmcs_clear(vcpu->vmcs);
 
-//			vpid_sync_context(vcpu->vpid);
-//			ept_sync_context(current->vmm->
+			vpid_sync_context(vcpu->vpid);
+			ept_sync_context(eptp);
 
 			vcpu->launched = 0;
 			vmcs_load(vcpu->vmcs);
@@ -819,6 +814,19 @@ static void vmx_get_cpu(struct vmx_vcpu *vcpu)
  */
 static void vmx_put_cpu(struct vmx_vcpu *vcpu)
 {
+	if (core_id() != vcpu->cpu)
+		panic("%s: core_id() %d != vcpu->cpu %d\n",
+		      __func__, core_id(), vcpu->cpu);
+
+	if (currentcpu->local_vcpu != vcpu)
+		panic("vmx_put_cpu: asked to clear something not ours");
+
+
+	vpid_sync_context(vcpu->vpid);
+	ept_sync_context(eptp);
+	vmcs_clear(vcpu->vmcs);
+	vcpu->cpu = -1;
+	currentcpu->local_vcpu = NULL;
 	//put_cpu();
 }
 
@@ -826,7 +834,7 @@ static void __vmx_sync_helper(struct hw_trapframe *hw_tf, void *ptr)
 {
 	struct vmx_vcpu *vcpu = ptr;
 
-//	ept_sync_context(current);
+	ept_sync_context(eptp);
 }
 
 struct sync_addr_args {
@@ -1127,16 +1135,19 @@ static void vmx_setup_vmcs(struct vmx_vcpu *vcpu)
 		/* Keep arch.pat sync with GUEST_IA32_PAT */
 		vmx->vcpu.arch.pat = host_pat;
 	}
-
-	for (i = 0; i < NR_VMX_MSR; ++i) {
+#endif
+#if 0
+	for (int i = 0; i < NR_VMX_MSR; ++i) {
 		uint32_t index = vmx_msr_index[i];
 		uint32_t data_low, data_high;
 		int j = vmx->nmsrs;
-
+		// TODO we should have read/writemsr_safe
+#if 0
 		if (rdmsr_safe(index, &data_low, &data_high) < 0)
 			continue;
 		if (wrmsr_safe(index, data_low, data_high) < 0)
 			continue;
+#endif
 		vmx->guest_msrs[j].index = i;
 		vmx->guest_msrs[j].data = 0;
 		vmx->guest_msrs[j].mask = -1ull;
@@ -1247,11 +1258,9 @@ fail_vmcs:
  */
 void vmx_destroy_vcpu(struct vmx_vcpu *vcpu)
 {
-	// needs to be done when we tear down the gv. vmx_destroy_ept(vcpu->gv);
 	vmx_get_cpu(vcpu);
-//	ept_sync_context
-	vmcs_clear(vcpu->vmcs);
-	currentcpu->local_vcpu = NULL;
+	ept_sync_context(eptp);
+	memset(ept, 0, PGSIZE);
 	vmx_put_cpu(vcpu);
 	vmx_free_vpid(vcpu);
 	vmx_free_vmcs(vcpu->vmcs);
@@ -1357,8 +1366,7 @@ static int vmx_run_vcpu(struct vmx_vcpu *vcpu)
 
 		"pop  %%rbp; pop  %%rdx \n\t"
 		"setbe %c[fail](%0) \n\t"
-
-		"mov $" /*__stringify(GD_UD) */"16"", %%rax \n\t"
+		"mov $" STRINGIFY(GD_UD) ", %%rax \n\t"
 		"mov %%rax, %%ds \n\t"
 		"mov %%rax, %%es \n\t"
 	      : : "c"(vcpu), "d"((unsigned long)HOST_RSP),
@@ -1394,7 +1402,6 @@ static int vmx_run_vcpu(struct vmx_vcpu *vcpu)
 	/* FIXME: do we need to set up other flags? */
 	vcpu->regs.tf_rflags = (vmcs_readl(GUEST_RFLAGS) & 0xFF) |
 		      X86_EFLAGS_IF | 0x2;
-	//monitor(NULL);
 
 	vcpu->regs.tf_cs = GD_UT;
 	vcpu->regs.tf_ss = GD_UD;
@@ -1584,15 +1591,10 @@ int vmx_launch(struct dune_config *conf)
 		disable_irq();
 		ret = vmx_run_vcpu(vcpu);
 		enable_irq();
-
-		if (ret == EXIT_REASON_VMCALL ||
-		    ret == EXIT_REASON_CPUID) {
-			vmx_step_instruction();
-		}
-
 		vmx_put_cpu(vcpu);
 
 		if (ret == EXIT_REASON_VMCALL) {
+			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
 			printk("system call! WTF\n");
 		} else if (ret == EXIT_REASON_CPUID)
 			vmx_handle_cpuid(vcpu);
@@ -1621,7 +1623,6 @@ int vmx_launch(struct dune_config *conf)
 
 	printk("RETURN. ip %016lx sp %016lx\n",
 		vcpu->regs.tf_rip, vcpu->regs.tf_rsp);
-	monitor(NULL);
 	current->virtinfo = NULL;
 
 	/*

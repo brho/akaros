@@ -1038,14 +1038,9 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 					rip =  strtoul(cb->f[1], NULL, 0);
 					rsp =  strtoul(cb->f[2], NULL, 0);
 					cr3 =  strtoul(cb->f[3], NULL, 0);
-					disable_irq();
 					ret = vm_run(rip, rsp, cr3);
-					enable_irq();
 					printk("vm_run returns %d\n", ret);
-					return ret;
-	
-					ip = strtoul(cb->f[1], 0, 0);
-					//			vm_run(ip);
+					n = ret;
 					break;
 			}
 			poperror();
