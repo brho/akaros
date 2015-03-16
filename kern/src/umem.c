@@ -33,7 +33,7 @@ int memcpy_from_user(struct proc *p, void *dest, const void *DANGEROUS va,
 {
 	const void *DANGEROUS start, *DANGEROUS end;
 	size_t num_pages, i;
-	pte_t *pte;
+	pte_t pte;
 	uintptr_t perm = PTE_P | PTE_USER_RO;
 	size_t bytes_copied = 0;
 
@@ -48,15 +48,15 @@ int memcpy_from_user(struct proc *p, void *dest, const void *DANGEROUS va,
 	num_pages = LA2PPN(end - start);
 	for (i = 0; i < num_pages; i++) {
 		pte = pgdir_walk(p->env_pgdir, start + i * PGSIZE, 0);
-		if (!pte)
+		if (!pte_walk_okay(pte))
 			return -EFAULT;
-		if ((*pte & PTE_P) && (*pte & PTE_USER_RO) != PTE_USER_RO)
+		if (pte_is_present(pte) && !pte_has_perm_ur(pte))
 			return -EFAULT;
-		if (!(*pte & PTE_P))
+		if (!pte_is_present(pte))
 			if (handle_page_fault(p, (uintptr_t)start + i * PGSIZE, PROT_READ))
 				return -EFAULT;
 
-		void *kpage = KADDR(PTE_ADDR(*pte));
+		void *kpage = KADDR(pte_get_paddr(pte));
 		const void *src_start = i > 0 ? kpage : kpage + (va - start);
 		void *dst_start = dest + bytes_copied;
 		size_t copy_len = PGSIZE;
@@ -99,7 +99,7 @@ int memcpy_to_user(struct proc *p, void *va, const void *src, size_t len)
 {
 	const void *DANGEROUS start, *DANGEROUS end;
 	size_t num_pages, i;
-	pte_t *pte;
+	pte_t pte;
 	uintptr_t perm = PTE_P | PTE_USER_RW;
 	size_t bytes_copied = 0;
 
@@ -114,14 +114,14 @@ int memcpy_to_user(struct proc *p, void *va, const void *src, size_t len)
 	num_pages = LA2PPN(end - start);
 	for (i = 0; i < num_pages; i++) {
 		pte = pgdir_walk(p->env_pgdir, start + i * PGSIZE, 0);
-		if (!pte)
+		if (!pte_walk_okay(pte))
 			return -EFAULT;
-		if ((*pte & PTE_P) && (*pte & PTE_USER_RW) != PTE_USER_RW)
+		if (pte_is_present(pte) && !pte_has_perm_urw(pte))
 			return -EFAULT;
-		if (!(*pte & PTE_P))
+		if (!pte_is_present(pte))
 			if (handle_page_fault(p, (uintptr_t)start + i * PGSIZE, PROT_WRITE))
 				return -EFAULT;
-		void *kpage = KADDR(PTE_ADDR(*pte));
+		void *kpage = KADDR(pte_get_paddr(pte));
 		void *dst_start = i > 0 ? kpage : kpage + (va - start);
 		const void *src_start = src + bytes_copied;
 		size_t copy_len = PGSIZE;

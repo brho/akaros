@@ -27,7 +27,7 @@
 
 struct kmem_cache *vmr_kcache;
 
-static int __vmr_free_pgs(struct proc *p, pte_t *pte, void *va, void *arg);
+static int __vmr_free_pgs(struct proc *p, pte_t pte, void *va, void *arg);
 /* minor helper, will ease the file->chan transition */
 static struct page_map *file2pm(struct file *file)
 {
@@ -267,7 +267,7 @@ void unmap_and_destroy_vmrs(struct proc *p)
 
 /* Helper: copies the contents of pages from p to new p.  For pages that aren't
  * present, once we support swapping or CoW, we can do something more
- * intelligent.  0 on success, -ERROR on failure. */
+ * intelligent.  0 on success, -ERROR on failure.  Can't handle jumbos. */
 static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
                       uintptr_t va_end)
 {
@@ -281,30 +281,30 @@ static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
 		     va_end);
 		return -EINVAL;
 	}
-	int copy_page(struct proc *p, pte_t *pte, void *va, void *arg) {
+	int copy_page(struct proc *p, pte_t pte, void *va, void *arg) {
 		struct proc *new_p = (struct proc*)arg;
 		struct page *pp;
-		if (PAGE_UNMAPPED(*pte))
+		if (pte_is_unmapped(pte))
 			return 0;
 		/* pages could be !P, but right now that's only for file backed VMRs
 		 * undergoing page removal, which isn't the caller of copy_pages. */
-		if (PAGE_PRESENT(*pte)) {
+		if (pte_is_present(pte)) {
 			/* TODO: check for jumbos */
 			if (upage_alloc(new_p, &pp, 0))
 				return -ENOMEM;
-			if (page_insert(new_p->env_pgdir, pp, va, *pte & PTE_PERM)) {
+			if (page_insert(new_p->env_pgdir, pp, va, pte_get_perm(pte))) {
 				page_decref(pp);
 				return -ENOMEM;
 			}
-			memcpy(page2kva(pp), ppn2kva(PTE2PPN(*pte)), PGSIZE);
+			memcpy(page2kva(pp), KADDR(pte_get_paddr(pte)), PGSIZE);
 			page_decref(pp);
-		} else if (PAGE_PAGED_OUT(*pte)) {
+		} else if (pte_is_paged_out(pte)) {
 			/* TODO: (SWAP) will need to either make a copy or CoW/refcnt the
 			 * backend store.  For now, this PTE will be the same as the
 			 * original PTE */
 			panic("Swapping not supported!");
 		} else {
-			panic("Weird PTE %p in %s!", *pte, __FUNCTION__);
+			panic("Weird PTE %p in %s!", pte_print(pte), __FUNCTION__);
 		}
 		return 0;
 	}
@@ -465,28 +465,28 @@ out_error:	/* for debugging */
 static int map_page_at_addr(struct proc *p, struct page *page, uintptr_t addr,
                             int prot)
 {
-	pte_t *pte;
+	pte_t pte;
 	spin_lock(&p->pte_lock);	/* walking and changing PTEs */
 	/* find offending PTE (prob don't read this in).  This might alloc an
 	 * intermediate page table page. */
 	pte = pgdir_walk(p->env_pgdir, (void*)addr, TRUE);
-	if (!pte) {
+	if (!pte_walk_okay(pte)) {
 		spin_unlock(&p->pte_lock);
 		return -ENOMEM;
 	}
 	/* a spurious, valid PF is possible due to a legit race: the page might have
 	 * been faulted in by another core already (and raced on the memory lock),
 	 * in which case we should just return. */
-	if (PAGE_PRESENT(*pte)) {
+	if (pte_is_present(pte)) {
 		spin_unlock(&p->pte_lock);
 		/* callers expect us to eat the ref if we succeed. */
 		page_decref(page);
 		return 0;
 	}
 	/* preserve the dirty bit - pm removal could be looking concurrently */
-	prot |= (*pte & PTE_D ? PTE_D : 0);
+	prot |= (pte_is_dirty(pte) ? PTE_D : 0);
 	/* We have a ref to page, which we are storing in the PTE */
-	*pte = PTE(page2ppn(page), PTE_P | prot);
+	pte_write(pte, page2pa(page), PTE_P | prot);
 	spin_unlock(&p->pte_lock);
 	return 0;
 }
@@ -702,7 +702,7 @@ int mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 {
 	struct vm_region *vmr, *next_vmr;
-	pte_t *pte;
+	pte_t pte;
 	bool shootdown_needed = FALSE;
 	int pte_prot = (prot & PROT_WRITE) ? PTE_USER_RW :
 	               (prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
@@ -723,8 +723,8 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 		/* TODO: use a memwalk */
 		for (uintptr_t va = vmr->vm_base; va < vmr->vm_end; va += PGSIZE) { 
 			pte = pgdir_walk(p->env_pgdir, (void*)va, 0);
-			if (pte && PAGE_PRESENT(*pte)) {
-				*pte = (*pte & ~PTE_PERM) | pte_prot;
+			if (pte_walk_okay(pte) && pte_is_present(pte)) {
+				pte_replace_perm(pte, pte_prot);
 				shootdown_needed = TRUE;
 			}
 		}
@@ -761,16 +761,16 @@ int munmap(struct proc *p, uintptr_t addr, size_t len)
 	return ret;
 }
 
-static int __munmap_mark_not_present(struct proc *p, pte_t *pte, void *va,
+static int __munmap_mark_not_present(struct proc *p, pte_t pte, void *va,
                                      void *arg)
 {
 	bool *shootdown_needed = (bool*)arg;
 	struct page *page;
 	/* could put in some checks here for !P and also !0 */
-	if (!PAGE_PRESENT(*pte))	/* unmapped (== 0) *ptes are also not PTE_P */
+	if (!pte_is_present(pte))	/* unmapped (== 0) *ptes are also not PTE_P */
 		return 0;
-	page = ppn2page(PTE2PPN(*pte));
-	*pte &= ~PTE_P;
+	page = pa2page(pte_get_paddr(pte));
+	pte_clear_present(pte);
 	*shootdown_needed = TRUE;
 	return 0;
 }
@@ -788,13 +788,13 @@ static int __munmap_mark_not_present(struct proc *p, pte_t *pte, void *va,
  * 0 or not.  If it isn't, then we're still okay to look at the page.  Consider
  * the PTE a weak ref on the page.  So long as you hold the mm lock, you can
  * look at the PTE and know the page isn't being freed. */
-static int __vmr_free_pgs(struct proc *p, pte_t *pte, void *va, void *arg)
+static int __vmr_free_pgs(struct proc *p, pte_t pte, void *va, void *arg)
 {
 	struct page *page;
-	if (!*pte)
+	if (pte_is_unmapped(pte))
 		return 0;
-	page = ppn2page(PTE2PPN(*pte));
-	*pte = 0;
+	page = pa2page(pte_get_paddr(pte));
+	pte_clear(pte);
 	if (!(atomic_read(&page->pg_flags) & PG_PAGEMAP))
 		page_decref(page);
 	return 0;
@@ -803,7 +803,6 @@ static int __vmr_free_pgs(struct proc *p, pte_t *pte, void *va, void *arg)
 int __do_munmap(struct proc *p, uintptr_t addr, size_t len)
 {
 	struct vm_region *vmr, *next_vmr, *first_vmr;
-	pte_t *pte;
 	bool shootdown_needed = FALSE;
 
 	/* TODO: this will be a bit slow, since we end up doing three linear
@@ -913,7 +912,6 @@ int handle_page_fault(struct proc *p, uintptr_t va, int prot)
 	struct vm_region *vmr;
 	struct page *a_page;
 	unsigned int f_idx;	/* index of the missing page in the file */
-	pte_t *pte;
 	int ret = 0;
 	bool first = TRUE;
 	va = ROUNDDOWN(va,PGSIZE);
@@ -1109,20 +1107,20 @@ int map_vmap_segment(uintptr_t vaddr, uintptr_t paddr, unsigned long num_pages,
 	 * isn't enough, since there might be a race on outer levels of page tables.
 	 * For now, we'll just use the dyn_vmap_lock (which technically works). */
 	spin_lock(&dyn_vmap_lock);
-	pte_t *pte;
+	pte_t pte;
 #ifdef CONFIG_X86
 	perm |= PTE_G;
 #endif
 	for (int i = 0; i < num_pages; i++) {
 		pte = pgdir_walk(boot_pgdir, (void*)(vaddr + i * PGSIZE), 1);
-		if (!pte) {
+		if (!pte_walk_okay(pte)) {
 			spin_unlock(&dyn_vmap_lock);
 			return -ENOMEM;
 		}
 		/* You probably should have unmapped first */
-		if (*pte)
-			warn("Existing PTE value %p\n", *pte);
-		*pte = PTE(pa2ppn(paddr + i * PGSIZE), perm);
+		if (pte_is_mapped(pte))
+			warn("Existing PTE value %p\n", pte_print(pte));
+		pte_write(pte, paddr + i * PGSIZE, perm);
 	}
 	spin_unlock(&dyn_vmap_lock);
 	return 0;
@@ -1135,10 +1133,11 @@ int unmap_vmap_segment(uintptr_t vaddr, unsigned long num_pages)
 	warn("Incomplete, don't call this yet.");
 	spin_lock(&dyn_vmap_lock);
 	/* TODO: For all pgdirs */
-	pte_t *pte;
+	pte_t pte;
 	for (int i = 0; i < num_pages; i++) {
 		pte = pgdir_walk(boot_pgdir, (void*)(vaddr + i * PGSIZE), 1);
-		*pte = 0;
+		if (pte_walk_okay(pte))
+			pte_clear(pte);
 	}
 	/* TODO: TLB shootdown.  Also note that the global flag is set on the PTE
 	 * (for x86 for now), which requires a global shootdown.  bigger issue is

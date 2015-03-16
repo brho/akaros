@@ -176,8 +176,8 @@ void print_cpuinfo(void)
 
 void show_mapping(pde_t *pgdir, uintptr_t start, size_t size)
 {
-	pte_t *pte;
-	pte_t *pde;
+	pte_t pte;
+	int perm;
 	page_t *page;
 	uintptr_t i;
 
@@ -187,14 +187,26 @@ void show_mapping(pde_t *pgdir, uintptr_t start, size_t size)
 	for(i = 0; i < size; i += PGSIZE, start += PGSIZE) {
 		pte = pgdir_walk(pgdir, (void*)start, 0);
 		printk("%p  ", start);
-		if (pte) {
-			pde = &pgdir[PDX(start)];
-			/* for a jumbo, pde = pte and PTE_PS (better be) = 1 */
+		if (pte_walk_okay(pte)) {
+			/* A note on PTE perms.  If you look at just the PTE, you don't get
+			 * the full picture for W and U.  Those are the intersection of all
+			 * bits.  In Akaros, we do U or not at the earliest point (PML4
+			 * entries).  All other PTEs have U set.  For W, it's the opposite.
+			 * The PTE for the actual page has W or not, and all others has W
+			 * set.  W needs to be more fine-grained, but U doesn't.  Plus the
+			 * UVPT mapping requires the U to see interior pages (but have W
+			 * off). */
+			perm = get_va_perms(pgdir, (void*)start);
 			printk("%p  %1d  %1d  %1d  %1d  %1d  %1d %1d %1d\n",
-			       PTE_ADDR(*pte), (*pte & PTE_PS) >> 7, (*pte & PTE_D) >> 6,
-			       (*pte & PTE_A) >> 5, (*pte & PTE_PCD) >> 4,
-			       (*pte & PTE_PWT) >> 3, (*pte & *pde & PTE_U) >> 2,
-			       (*pte & *pde & PTE_W) >> 1, (*pte & PTE_P));
+			       pte_get_paddr(pte),
+			       pte_is_jumbo(pte),
+			       pte_is_dirty(pte),
+			       pte_is_accessed(pte),
+			       (pte_print(pte) & PTE_PCD) / PTE_PCD,
+			       (pte_print(pte) & PTE_PWT) / PTE_PWT,
+			       (perm & PTE_U) / PTE_U,
+			       (perm & PTE_W) / PTE_W,
+			       pte_is_present(pte));
 		} else {
 			printk("%p\n", 0);
 		}

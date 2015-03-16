@@ -445,9 +445,9 @@ struct proc *proc_create(struct file *prog, char **argv, char **envp)
 	return p;
 }
 
-static int __cb_assert_no_pg(struct proc *p, pte_t *pte, void *va, void *arg)
+static int __cb_assert_no_pg(struct proc *p, pte_t pte, void *va, void *arg)
 {
-	assert(!*pte);
+	assert(pte_is_unmapped(pte));
 	return 0;
 }
 

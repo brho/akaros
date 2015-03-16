@@ -303,45 +303,45 @@ static void vmr_for_each(struct vm_region *vmr, unsigned long pg_idx,
  * at to determine if the underlying page is dirty.  We need to make sure no one
  * clears dirty bits unless they handle the WB (or discard).  HPF preserves the
  * dirty bit for this reason. */
-static int __pm_mark_not_present(struct proc *p, pte_t *pte, void *va, void *arg)
+static int __pm_mark_not_present(struct proc *p, pte_t pte, void *va, void *arg)
 {
 	struct page *page;
-	if (!PAGE_PRESENT(*pte))
+	if (!pte_is_present(pte))
 		return 0;
-	page = ppn2page(PTE2PPN(*pte));
+	page = pa2page(pte_get_paddr(pte));
 	if (atomic_read(&page->pg_flags) & PG_REMOVAL)
-		*pte &= ~PTE_P;
+		pte_clear_present(pte);
 	return 0;
 }
 
-static int __pm_mark_dirty_pgs_unmap(struct proc *p, pte_t *pte, void *va,
+static int __pm_mark_dirty_pgs_unmap(struct proc *p, pte_t pte, void *va,
                                      void *arg)
 {
 	struct page *page;
 	/* we're not checking for 'present' or not, since we marked them !P earlier.
 	 * but the CB is still called on everything in the range.  we can tell the
 	 * formerly-valid PTEs from the completely unmapped, since the latter are
-	 * == 0, while the former have other things in them, but just are !P. */
-	if (!(*pte))
+	 * unmapped, while the former have other things in them, but just are !P. */
+	if (pte_is_unmapped(pte))
 		return 0;
-	page = ppn2page(PTE2PPN(*pte));
+	page = pa2page(pte_get_paddr(pte));
 	/* need to check for removal again, just like in mark_not_present */
 	if (atomic_read(&page->pg_flags) & PG_REMOVAL) {
-		if (*pte & PTE_D)
+		if (pte_is_dirty(pte))
 			atomic_or(&page->pg_flags, PG_DIRTY);
-		*pte = 0;
+		pte_clear(pte);
 	}
 	return 0;
 }
 
-static int __pm_mark_unmap(struct proc *p, pte_t *pte, void *va, void *arg)
+static int __pm_mark_unmap(struct proc *p, pte_t pte, void *va, void *arg)
 {
 	struct page *page;
-	if (!(*pte))
+	if (pte_is_unmapped(pte))
 		return 0;
-	page = ppn2page(PTE2PPN(*pte));
+	page = pa2page(pte_get_paddr(pte));
 	if (atomic_read(&page->pg_flags) & PG_REMOVAL)
-		*pte = 0;
+		pte_clear(pte);
 	return 0;
 }
 

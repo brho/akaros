@@ -211,18 +211,19 @@ void *boot_zalloc(size_t amt, size_t align)
  */
 int page_insert(pde_t *pgdir, struct page *page, void *va, int perm) 
 {
-	pte_t* pte = pgdir_walk(pgdir, va, 1);
-	if (!pte)
+	pte_t pte = pgdir_walk(pgdir, va, 1);
+	if (!pte_walk_okay(pte))
 		return -ENOMEM;
 	/* Two things here:  First, we need to up the ref count of the page we want
 	 * to insert in case it is already mapped at va.  In that case we don't want
 	 * page_remove to ultimately free it, and then for us to continue as if pp
 	 * wasn't freed. (moral = up the ref asap) */
 	kref_get(&page->pg_kref, 1);
-	/* Careful, page remove handles the cases where the page is PAGED_OUT. */
-	if (!PAGE_UNMAPPED(*pte))
+	/* Careful, page remove handles the cases where the page is PAGED_OUT and
+	 * any other state. (TODO: review all other states, maybe rm only for P) */
+	if (pte_is_mapped(pte))
 		page_remove(pgdir, va);
-	*pte = PTE(page2ppn(page), PTE_P | perm);
+	pte_write(pte, page2pa(page), PTE_P | perm);
 	return 0;
 }
 
@@ -243,14 +244,14 @@ int page_insert(pde_t *pgdir, struct page *page, void *va, int perm)
  * @return PAGE the page mapped at virtual address 'va'
  * @return NULL No mapping exists at virtual address 'va', or it's paged out
  */
-page_t *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
+page_t *page_lookup(pde_t *pgdir, void *va, pte_t *pte_store)
 {
-	pte_t* pte = pgdir_walk(pgdir, va, 0);
-	if (!pte || !PAGE_PRESENT(*pte))
+	pte_t pte = pgdir_walk(pgdir, va, 0);
+	if (!pte_walk_okay(pte) || !pte_is_present(pte))
 		return 0;
 	if (pte_store)
 		*pte_store = pte;
-	return pa2page(PTE_ADDR(*pte));
+	return pa2page(pte_get_paddr(pte));
 }
 
 /**
@@ -277,25 +278,25 @@ page_t *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
  * in env_user_mem_free, minus the walk. */
 void page_remove(pde_t *pgdir, void *va)
 {
-	pte_t *pte;
+	pte_t pte;
 	page_t *page;
 
 	pte = pgdir_walk(pgdir,va,0);
-	if (!pte || PAGE_UNMAPPED(*pte))
+	if (!pte_walk_okay(pte) || pte_is_unmapped(pte))
 		return;
 
-	if (PAGE_PRESENT(*pte)) {
+	if (pte_is_present(pte)) {
 		/* TODO: (TLB) need to do a shootdown, inval sucks.  And might want to
 		 * manage the TLB / free pages differently. (like by the caller).
 		 * Careful about the proc/memory lock here. */
-		page = ppn2page(PTE2PPN(*pte));
-		*pte = 0;
+		page = pa2page(pte_get_paddr(pte));
+		pte_clear(pte);
 		tlb_invalidate(pgdir, va);
 		page_decref(page);
-	} else if (PAGE_PAGED_OUT(*pte)) {
+	} else if (pte_is_paged_out(pte)) {
 		/* TODO: (SWAP) need to free this from the swap */
 		panic("Swapping not supported!");
-		*pte = 0;
+		pte_clear(pte);
 	}
 }
 

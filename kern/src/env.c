@@ -135,12 +135,12 @@ type SLOCKED(name##_lock) *\
 void env_user_mem_free(env_t* e, void* start, size_t len)
 {
 	assert((uintptr_t)start + len <= UVPT); //since this keeps fucking happening
-	int user_page_free(env_t* e, pte_t* pte, void* va, void* arg)
+	int user_page_free(env_t* e, pte_t pte, void* va, void* arg)
 	{
-		if (!PAGE_PRESENT(*pte))
+		if (!pte_is_present(pte))
 			return 0;
-		page_t *page = ppn2page(PTE2PPN(*pte));
-		*pte = 0;
+		page_t *page = pa2page(pte_get_paddr(pte));
+		pte_clear(pte);
 		page_decref(page);
 		/* TODO: consider other states here (like !P, yet still tracking a page,
 		 * for VM tricks, page map stuff, etc.  Should be okay: once we're
