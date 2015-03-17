@@ -224,6 +224,7 @@ native-binutils-configure:
 		--disable-werror \
 		--enable-ld=yes \
 		--enable-gold=yes \
+		--enable-plugins=yes \
 		--with-pkgversion="akaros-repo" \
 		--disable-multilib \
 		--disable-nls
@@ -239,6 +240,7 @@ cross-binutils-configure:
 		--disable-werror \
 		--enable-ld=yes \
 		--enable-gold=yes \
+		--enable-plugins=yes \
 		--with-pkgversion="akaros-repo" \
 		--disable-multilib \
 		--disable-nls \
