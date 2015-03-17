@@ -15,7 +15,10 @@ typedef struct x86_pte {
 	epte_t 	*epte;
 } pte_t;
 
-typedef unsigned long pgdir_t;
+typedef struct x86_pgdir {
+	kpte_t 	*kpte;
+	epte_t 	*epte;
+} pgdir_t;
 #endif
 
 /* Virtual memory map:                                  Virt Addresses

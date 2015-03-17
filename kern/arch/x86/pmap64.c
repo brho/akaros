@@ -53,7 +53,7 @@ int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size);
 /* Helper: gets the kpte_t pointer which is the base of the PML4 from pgdir */
 static kpte_t *pgdir_get_kpt(pgdir_t pgdir)
 {
-	return (kpte_t*)pgdir;
+	return pgdir.kpte;
 }
 
 /* Helper: returns true if we do not need to walk the page table any further.
@@ -432,7 +432,8 @@ void vm_init(void)
 	kpte_t *boot_kpt = KADDR(get_boot_pml4());
 
 	boot_cr3 = get_boot_pml4();
-	boot_pgdir = (pgdir_t)boot_kpt;
+	boot_pgdir.kpte = boot_kpt;
+	boot_pgdir.epte = 0;
 	gdt = KADDR(get_gdt64());
 
 	/* We need to limit our mappings on machines that don't support 1GB pages */
@@ -503,14 +504,13 @@ int env_user_mem_walk(struct proc *p, void *start, size_t len,
 	local_tp.p = p;
 	local_tp.cb = callback;
 	local_tp.cb_arg = arg;
-	/* TODO: walk the EPT too.
-	 *
-	 * Walking both in parallel and making a joint PTE is a pain.  instead, we
+	/* Walking both in parallel and making a joint PTE is a pain.  instead, we
 	 * walk one at a time, each with only a half_pte.  Most all of the pmap_ops
 	 * need to deal with a getting half PTE.  Ideally, we'd combine the two
 	 * walks and then know that we always have a kpte. */
-	ret = pml_for_each((kpte_t*)p->env_pgdir, (uintptr_t)start, len,
+	ret = pml_for_each(pgdir_get_kpt(p->env_pgdir), (uintptr_t)start, len,
 	                   trampoline_cb, &local_tp);
+	/* TODO: walk the EPT, combine with ret */
 	return ret;
 }
 
@@ -532,7 +532,7 @@ void env_pagetable_free(struct proc *p)
 	}
 		
 	assert(p->env_cr3 != rcr3());
-	pml_for_each((kpte_t*)p->env_pgdir, 0, UVPT, pt_free_cb, 0);
+	pml_for_each(pgdir_get_kpt(p->env_pgdir), 0, UVPT, pt_free_cb, 0);
 	/* the page directory is not a PTE, so it never was freed */
 	page_decref(pa2page(p->env_cr3));
 	tlbflush();
@@ -554,24 +554,27 @@ int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd)
 	kpte_t *kpt = kpage_alloc_addr();
 	if (!kpt)
 		return -ENOMEM;
-	memcpy(kpt, (kpte_t*)boot_copy, PGSIZE);
+	memcpy(kpt, boot_copy.kpte, PGSIZE);
 
 	/* VPT and UVPT map the proc's page table, with different permissions. */
 	kpt[PML4(VPT)]  = PTE(LA2PPN(PADDR(kpt)), PTE_P | PTE_KERN_RW);
 	kpt[PML4(UVPT)] = PTE(LA2PPN(PADDR(kpt)), PTE_P | PTE_USER_RO);
 
-	*new_pd = (pgdir_t)kpt;
+	new_pd->kpte = kpt;
+	/* Processes do not have EPTs by default, only once they are VMMs */
+	new_pd->epte = 0;
 	return 0;
 }
 
 physaddr_t arch_pgdir_get_cr3(pgdir_t pd)
 {
-	return PADDR((kpte_t*)pd);
+	return PADDR(pd.kpte);
 }
 
 void arch_pgdir_clear(pgdir_t *pd)
 {
-	*pd = 0;
+	pd->kpte = 0;
+	pd->epte = 0;
 }
 
 /* Debugging */
