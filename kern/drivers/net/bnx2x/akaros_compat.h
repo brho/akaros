@@ -22,6 +22,7 @@
 #include <mmio.h>
 #include <taskqueue.h>
 #include <zlib.h>
+#include <list.h>
 
 /* temporary dumping ground */
 #include "compat_todo.h"
