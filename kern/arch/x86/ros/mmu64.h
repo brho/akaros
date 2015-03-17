@@ -8,7 +8,13 @@
 #ifndef __ASSEMBLER__
 #include <ros/common.h>
 typedef unsigned long kpte_t;
-typedef unsigned long pte_t;
+typedef unsigned long epte_t;
+
+typedef struct x86_pte {
+	kpte_t 	*kpte;
+	epte_t 	*epte;
+} pte_t;
+
 typedef unsigned long pgdir_t;
 #endif
 

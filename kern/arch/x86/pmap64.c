@@ -364,10 +364,14 @@ int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size)
  * memory, this returns 0 (subject to change based on pte_t). */
 pte_t pgdir_walk(pgdir_t pgdir, const void *va, int create)
 {
+	pte_t ret;
 	int flags = PML1_SHIFT;
 	if (create == 1)
 		flags |= PG_WALK_CREATE;
-	return (pte_t)pml_walk(pgdir_get_kpt(pgdir), (uintptr_t)va, flags);
+	ret.kpte = pml_walk(pgdir_get_kpt(pgdir), (uintptr_t)va, flags);
+	/* TODO: (EPT) walk the EPT */
+	ret.epte = 0;
+	return ret;
 }
 
 static int pml_perm_walk(kpte_t *pml, const void *va, int pml_shift)
@@ -486,19 +490,28 @@ int env_user_mem_walk(struct proc *p, void *start, size_t len,
 	                  void *data)
 	{
 		struct tramp_package *tp = (struct tramp_package*)data;
+		pte_t half_pte = {.kpte = kpte, .epte = 0};
 		assert(tp->cb);
 		/* memwalk CBs don't know how to handle intermediates or jumbos */
 		if (shift != PML1_SHIFT)
 			return 0;
-		return tp->cb(tp->p, (pte_t)kpte, (void*)kva, tp->cb_arg);
+		return tp->cb(tp->p, half_pte, (void*)kva, tp->cb_arg);
 	}
 
+	int ret;
 	struct tramp_package local_tp;
 	local_tp.p = p;
 	local_tp.cb = callback;
 	local_tp.cb_arg = arg;
-	return pml_for_each((kpte_t*)p->env_pgdir, (uintptr_t)start, len,
-	                    trampoline_cb, &local_tp);
+	/* TODO: walk the EPT too.
+	 *
+	 * Walking both in parallel and making a joint PTE is a pain.  instead, we
+	 * walk one at a time, each with only a half_pte.  Most all of the pmap_ops
+	 * need to deal with a getting half PTE.  Ideally, we'd combine the two
+	 * walks and then know that we always have a kpte. */
+	ret = pml_for_each((kpte_t*)p->env_pgdir, (uintptr_t)start, len,
+	                   trampoline_cb, &local_tp);
+	return ret;
 }
 
 /* Frees (decrefs) all pages of the process's page table, including the page
