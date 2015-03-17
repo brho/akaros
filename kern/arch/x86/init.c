@@ -1,9 +1,5 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 #include <smp.h>
 
 #include <arch/pci.h>

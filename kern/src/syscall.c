@@ -1,9 +1,5 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 //#define DEBUG
 #include <ros/common.h>
 #include <arch/types.h>
@@ -420,7 +416,7 @@ static int sys_cache_invalidate(void)
 /* sys_reboot(): called directly from dispatch table. */
 
 /* Print a string to the system console. */
-static ssize_t sys_cputs(struct proc *p, const char *DANGEROUS string,
+static ssize_t sys_cputs(struct proc *p, const char *string,
                          size_t strlen)
 {
 	char *t_string;
@@ -975,7 +971,7 @@ static intreg_t sys_munmap(struct proc *p, void *addr, size_t len)
 }
 
 static ssize_t sys_shared_page_alloc(env_t* p1,
-                                     void**DANGEROUS _addr, pid_t p2_id,
+                                     void **_addr, pid_t p2_id,
                                      int p1_flags, int p2_flags
                                     )
 {
@@ -983,7 +979,7 @@ static ssize_t sys_shared_page_alloc(env_t* p1,
 	return -1;
 }
 
-static int sys_shared_page_free(env_t* p1, void*DANGEROUS addr, pid_t p2)
+static int sys_shared_page_free(env_t* p1, void *addr, pid_t p2)
 {
 	return -1;
 }

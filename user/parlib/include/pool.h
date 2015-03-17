@@ -11,7 +11,7 @@ typedef struct struct_##p {                                                     
 	uint32_t size;                                                         \
 	uint32_t free;                                                         \
 	uint32_t index;                                                        \
-	_type*COUNT(1) queue[(sz)];                                                       \
+	_type *queue[(sz)];                                                       \
 	_type pool[(sz)];                                                         \
 } p##_t;
 

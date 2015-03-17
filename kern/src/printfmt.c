@@ -1,11 +1,6 @@
 // Stripped-down primitive printf-style formatting routines,
 // used in common by printf, sprintf, fprintf, etc.
 // This code is also used by both the kernel and user programs.
-
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 #include <ros/common.h>
 #include <error.h>
 #include <stdio.h>
@@ -40,21 +35,12 @@ void printnum(void (*putch)(int, void**), void **putdat,
 	}
 }
 
-// Main function to format and print a string.
-#ifdef __DEPUTY__
-void printfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *fmt, ...);
-#else
 void printfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...);
-#endif
 
-#ifdef __DEPUTY__
-void vprintfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *fmt, va_list ap)
-#else
 void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_list ap)
-#endif
 {
-	register const char *NTS p;
-	const char *NTS last_fmt;
+	register const char *p;
+	const char *last_fmt;
 	register int ch, err;
 	unsigned long long num;
 	int base, lflag, width, precision, altflag;
@@ -275,11 +261,7 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 	}
 }
 
-#ifdef __DEPUTY__
-void printfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *fmt, ...)
-#else
 void printfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...)
-#endif
 {
 	va_list ap;
 
@@ -290,12 +272,12 @@ void printfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...)
 }
 
 typedef struct sprintbuf {
-	char *BND(__this,ebuf) buf;
-	char *SNT ebuf;
+	char *buf;
+	char *ebuf;
 	int cnt;
 } sprintbuf_t;
 
-static void sprintputch(int ch, sprintbuf_t *NONNULL *NONNULL b)
+static void sprintputch(int ch, sprintbuf_t **b)
 {
 	if ((*b)->buf < (*b)->ebuf) {
 		*((*b)->buf++) = ch;
@@ -306,7 +288,7 @@ static void sprintputch(int ch, sprintbuf_t *NONNULL *NONNULL b)
 int vsnprintf(char *buf, int n, const char *fmt, va_list ap)
 {
 	sprintbuf_t b;// = {buf, buf+n-1, 0};
-	sprintbuf_t *COUNT(1) NONNULL bp = &b;
+	sprintbuf_t *bp = &b;
 
 	/* this isn't quite the snprintf 'spec', but errors aren't helpful */
 	if (buf == NULL || n < 1)
@@ -317,12 +299,7 @@ int vsnprintf(char *buf, int n, const char *fmt, va_list ap)
 	b.cnt = 0;
 	b.buf = buf;
 
-	// print the string to the buffer
-	#ifdef __DEPUTY__
-	vprintfmt((void*)sprintputch, (sprintbuf_t *NONNULL*NONNULL)&bp, fmt, ap);
-	#else
 	vprintfmt((void*)sprintputch, (void*)&bp, fmt, ap);
-	#endif
 
 	// null terminate the buffer
 	*b.buf = '\0';

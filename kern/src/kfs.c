@@ -5,15 +5,6 @@
  * Implementation of the KFS file system.  It is a RAM based, read-only FS
  * consisting of files that are added to the kernel binary image.  Might turn
  * this into a read/write FS with directories someday. */
-
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>

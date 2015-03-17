@@ -1,7 +1,3 @@
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 #include <error.h>
 #include <stdio.h>
 #include <assert.h>

@@ -1,10 +1,5 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
-
 #include <ros/common.h>
 #include <ros/ring_syscall.h>
 #include <arch/types.h>

@@ -5,11 +5,6 @@
  * Barret Rhoden <brho@cs.berkeley.edu>
  * Kevin Klues <klueska@cs.berkeley.edu> */
 
-#ifdef __SHARC__
-#pragma nosharc
-#define SINIT(x) x
-#endif
-
 #include <sys/queue.h>
 #include <page_alloc.h>
 #include <pmap.h>
@@ -18,15 +13,13 @@
 
 spinlock_t colored_page_free_list_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
-page_list_t LCKD(&colored_page_free_list_lock) * CT(llc_cache->num_colors) RO
-  colored_page_free_list = NULL;
+page_list_t *colored_page_free_list = NULL;
 
 static void page_alloc_bootstrap() {
 	// Allocate space for the array required to manage the free lists
 	size_t list_size = llc_cache->num_colors*sizeof(page_list_t);
-	page_list_t LCKD(&colored_page_free_list_lock)*tmp =
-	    (page_list_t*)boot_alloc(list_size,PGSIZE);
-	colored_page_free_list = SINIT(tmp);
+	page_list_t *tmp = (page_list_t*)boot_alloc(list_size,PGSIZE);
+	colored_page_free_list = tmp;
 	for (int i = 0; i < llc_cache->num_colors; i++)
 		BSD_LIST_INIT(&colored_page_free_list[i]);
 }

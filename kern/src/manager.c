@@ -5,10 +5,6 @@
  */
 
 
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 #include <ros/common.h>
 #include <smp.h>
 #include <arch/init.h>
@@ -285,7 +281,7 @@ void manager_waterman()
 void manager_yuzhu()
 {
 	
-	static uint8_t RACY progress = 0;
+	static uint8_t progress = 0;
 	static struct proc *p;
 
 	// for testing taking cores, check in case 1 for usage

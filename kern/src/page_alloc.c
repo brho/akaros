@@ -5,10 +5,6 @@
  * Kevin Klues <klueska@cs.berkeley.edu>    
  * Barret Rhoden <brho@cs.berkeley.edu> */
 
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 #include <sys/queue.h>
 #include <bitmask.h>
 #include <page_alloc.h>
@@ -21,8 +17,8 @@
 #define l2 (available_caches.l2)
 #define l3 (available_caches.l3)
 
-static void __page_decref(page_t *CT(1) page);
-static error_t __page_alloc_specific(page_t** page, size_t ppn);
+static void __page_decref(page_t *page);
+static error_t __page_alloc_specific(page_t **page, size_t ppn);
 
 #ifdef CONFIG_PAGE_COLORING
 #define NUM_KERNEL_COLORS 8

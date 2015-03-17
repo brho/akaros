@@ -1,9 +1,5 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 #ifdef CONFIG_BSD_ON_CORE0
 #error "Yeah, it's not possible to build ROS with BSD on Core 0, sorry......"
 #else
@@ -48,7 +44,6 @@
 #include <acpi.h>
 #include <coreboot_tables.h>
 
-// zra: flag for Ivy
 int booting = 1;
 struct sysinfo_t sysinfo;
 static void run_linker_funcs(void);
@@ -56,7 +51,7 @@ static int run_init_script(void);
 
 void kernel_init(multiboot_info_t *mboot_info)
 {
-	extern char (RO BND(__this, end) edata)[], (RO SNT end)[];
+	extern char edata[], end[];
 
 	memset(edata, 0, end - edata);
 	/* mboot_info is a physical address.  while some arches currently have the
@@ -104,7 +99,6 @@ void kernel_init(multiboot_info_t *mboot_info)
 	eth_audio_init();
 #endif /* CONFIG_ETH_AUDIO */
 	get_coreboot_info(&sysinfo);
-	// zra: let's Ivy know we're done booting
 	booting = 0;
 
 #ifdef CONFIG_RUN_INIT_SCRIPT

@@ -47,7 +47,7 @@ vm_init(void)
 // This is boot_pgdir_walk, but using page_alloc() instead of boot_alloc().
 // Unlike boot_pgdir_walk, pgdir_walk can fail.
 pte_t*
-pgdir_walk(pgdir_t *pgdir, const void *SNT va, int create)
+pgdir_walk(pgdir_t *pgdir, const void *va, int create)
 {
 	pte_t* ppte;
 	pte_t* pt;
@@ -87,7 +87,7 @@ pgdir_walk(pgdir_t *pgdir, const void *SNT va, int create)
 
 /* Returns the effective permissions for PTE_U, PTE_W, and PTE_P on a given
  * virtual address. */
-int get_va_perms(pgdir_t *pgdir, const void *SNT va)
+int get_va_perms(pgdir_t *pgdir, const void *va)
 {
 	pte_t* pte = pgdir_walk(pgdir, va, 0);
 	return pte == NULL ? 0 : (*pte & (PTE_PERM | PTE_E));

@@ -17,8 +17,8 @@ static inline bool atomic_cas(atomic_t *addr, long exp_val, long new_val);
 static inline bool atomic_cas_ptr(void **addr, void *exp_val, void *new_val);
 static inline bool atomic_cas_u32(uint32_t *addr, uint32_t exp_val,
                                   uint32_t new_val);
-static inline void atomic_andb(volatile uint8_t RACY* number, uint8_t mask);
-static inline void atomic_orb(volatile uint8_t RACY* number, uint8_t mask);
+static inline void atomic_andb(volatile uint8_t *number, uint8_t mask);
+static inline void atomic_orb(volatile uint8_t *number, uint8_t mask);
 
 /* Inlined functions declared above */
 static inline void atomic_init(atomic_t *number, long val)

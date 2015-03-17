@@ -1,9 +1,5 @@
 // Basic string routines.  Not hardware optimized, but not shabby.
 
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 #include <stdio.h>
 #include <string.h>
 #include <ros/memlayout.h>
@@ -56,7 +52,6 @@ strncpy(char *dst, const char *src, size_t size) {
 
 	ret = dst;
 	for (i = 0; i < size; i++) {
-		// TODO: ivy bitches about this
 		*dst++ = *src;
 		// If strlen(src) < size, null-pad 'dst' out to 'size' chars
 		if (*src != '\0')
@@ -201,9 +196,9 @@ memsetw(long* _v, long c, size_t n)
   } while(0)
 
 void *
-memset(void *COUNT(_n) v, int c, size_t _n)
+memset(void *v, int c, size_t _n)
 {
-	char *BND(v,v+_n) p;
+	char *p;
 	size_t n0;
 	size_t n = _n;
 
@@ -273,14 +268,14 @@ memcpy(void* dst, const void* src, size_t _n)
 }
 
 void *
-memmove(void *COUNT(_n) dst, const void *COUNT(_n) src, size_t _n)
+memmove(void *dst, const void *src, size_t _n)
 {
 #ifdef CONFIG_X86
 	bcopy(src, dst, _n);
 	return dst;
 #else
-	const char *BND(src,src+_n) s;
-	char *BND(dst,dst+_n) d;
+	const char *s;
+	char *d;
 	size_t n = _n;
 	
 	s = src;
@@ -299,10 +294,10 @@ memmove(void *COUNT(_n) dst, const void *COUNT(_n) src, size_t _n)
 }
 
 int
-memcmp(const void *COUNT(n) v1, const void *COUNT(n) v2, size_t n)
+memcmp(const void *v1, const void *v2, size_t n)
 {
-	const uint8_t *BND(v1,v1+n) s1 = (const uint8_t *) v1;
-	const uint8_t *BND(v2,v2+n) s2 = (const uint8_t *) v2;
+	const uint8_t *s1 = (const uint8_t *) v1;
+	const uint8_t *s2 = (const uint8_t *) v2;
 
 	while (n-- > 0) {
 		if (*s1 != *s2)
@@ -314,14 +309,14 @@ memcmp(const void *COUNT(n) v1, const void *COUNT(n) v2, size_t n)
 }
 
 void *
-memfind(const void *COUNT(n) _s, int c, size_t n)
+memfind(const void *_s, int c, size_t n)
 {
-	const void *SNT ends = (const char *) _s + n;
-	const void *BND(_s,_s + n) s = _s;
+	const void *ends = (const char *) _s + n;
+	const void *s = _s;
 	for (; s < ends; s++)
 		if (*(const unsigned char *) s == (unsigned char) c)
 			break;
-	return (void *BND(_s,_s+n)) s;
+	return (void *)s;
 }
 
 long

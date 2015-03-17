@@ -388,7 +388,7 @@ bool test_bitmasks(void)
 	return true;
 }
 
-checklist_t *RO the_global_list;
+checklist_t *the_global_list;
 
 static void test_checklist_handler(struct hw_trapframe *hw_tf, void *data)
 {

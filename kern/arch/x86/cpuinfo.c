@@ -4,10 +4,6 @@
  * See LICENSE for details.
  */
 
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 #include <arch/arch.h>
 #include <arch/x86.h>
 #include <arch/mmu.h>
@@ -26,7 +22,7 @@ void print_cpuinfo(void)
 	uint64_t msr_val;
 	char vendor_id[13];
 	int max_std_lvl, max_extd_lvl;
-	extern char (SNT RO _start)[];
+	extern char _start[];
 	bool is_intel;
 
 	if (sizeof(long) == 8)

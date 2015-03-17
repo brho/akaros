@@ -1,8 +1,3 @@
-#ifdef __SHARC__
-#pragma nosharc
-#define SINIT(x) x
-#endif
-
 #include <arch/mmu.h>
 #include <arch/x86.h>
 #include <arch/arch.h>
@@ -23,7 +18,7 @@
 #include <kmalloc.h>
 #include <arch/mptables.h>
 
-taskstate_t RO ts;
+taskstate_t ts;
 
 /* Interrupt descriptor table.  64 bit needs 16 byte alignment (i think). */
 gatedesc_t __attribute__((aligned (16))) idt[256] = { { 0 } };
@@ -36,8 +31,7 @@ spinlock_t irq_handler_wlock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 const char *x86_trapname(int trapno)
 {
-    // zra: excnames is SREADONLY because Ivy doesn't trust const
-	static const char *NT const (RO excnames)[] = {
+	static const char *const excnames[] = {
 		"Divide error",
 		"Debug",
 		"Non-Maskable Interrupt",
@@ -135,8 +129,8 @@ void idt_init(void)
 	        (uintptr_t)idt[T_SYSCALL].gd_off_15_0));
 	/* turn on trap-based syscall handling and other user-accessible ints
 	 * DPL 3 means this can be triggered by the int instruction */
-	idt[T_SYSCALL].gd_dpl = SINIT(3);
-	idt[T_BRKPT].gd_dpl = SINIT(3);
+	idt[T_SYSCALL].gd_dpl = 3;
+	idt[T_BRKPT].gd_dpl = 3;
 
 	/* Set up our kernel stack when changing rings */
 	/* Note: we want 16 byte aligned kernel stack frames (AMD 2:8.9.3) */

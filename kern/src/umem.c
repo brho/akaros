@@ -28,10 +28,10 @@
  * @return -EFAULT  the page assocaited with 'va' is not present, the user 
  *                  lacks the proper permissions, or there was an invalid 'va'
  */
-int memcpy_from_user(struct proc *p, void *dest, const void *DANGEROUS va,
+int memcpy_from_user(struct proc *p, void *dest, const void *va,
                      size_t len)
 {
-	const void *DANGEROUS start, *DANGEROUS end;
+	const void *start, *end;
 	size_t num_pages, i;
 	pte_t pte;
 	uintptr_t perm = PTE_P | PTE_USER_RO;
@@ -42,7 +42,7 @@ int memcpy_from_user(struct proc *p, void *dest, const void *DANGEROUS va,
 	start = (void*)ROUNDDOWN((uintptr_t)va, PGSIZE);
 	end = (void*)ROUNDUP((uintptr_t)va + len, PGSIZE);
 
-	if (start >= (void*SNT)ULIM || end > (void*SNT)ULIM)
+	if (start >= (void*)ULIM || end > (void*)ULIM)
 		return -EFAULT;
 
 	num_pages = LA2PPN(end - start);
@@ -97,7 +97,7 @@ int memcpy_from_user_errno(struct proc *p, void *dst, const void *src, int len)
  */
 int memcpy_to_user(struct proc *p, void *va, const void *src, size_t len)
 {
-	const void *DANGEROUS start, *DANGEROUS end;
+	const void *start, *end;
 	size_t num_pages, i;
 	pte_t pte;
 	uintptr_t perm = PTE_P | PTE_USER_RW;
@@ -108,7 +108,7 @@ int memcpy_to_user(struct proc *p, void *va, const void *src, size_t len)
 	start = (void*)ROUNDDOWN((uintptr_t)va, PGSIZE);
 	end = (void*)ROUNDUP((uintptr_t)va + len, PGSIZE);
 
-	if (start >= (void*SNT)ULIM || end > (void*SNT)ULIM)
+	if (start >= (void*)ULIM || end > (void*)ULIM)
 		return -EFAULT;
 
 	num_pages = LA2PPN(end - start);

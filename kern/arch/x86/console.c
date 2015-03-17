@@ -249,7 +249,7 @@ lpt_putc(int c)
 
 static spinlock_t console_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
-static unsigned SREADONLY addr_6845;
+static unsigned addr_6845;
 static uint16_t *crt_buf;
 static uint16_t crt_pos;
 
@@ -264,15 +264,15 @@ cga_init(void)
 	uint16_t was;
 	unsigned pos;
 
-	cp = (uint16_t *COUNT(CRT_SIZE)) TC(KERNBASE + CGA_BUF);
+	cp = (uint16_t *)(KERNBASE + CGA_BUF);
 	was = *cp;
 	*cp = (uint16_t) 0xA55A;
 	if (*cp != 0xA55A) {
-		cp = (uint16_t *COUNT(CRT_SIZE)) TC(KERNBASE + MONO_BUF);
-		addr_6845 = SINIT(MONO_BASE);
+		cp = (uint16_t *)(KERNBASE + MONO_BUF);
+		addr_6845 = MONO_BASE;
 	} else {
 		*cp = was;
-		addr_6845 = SINIT(CGA_BASE);
+		addr_6845 = CGA_BASE;
 	}
 	
 	/* Extract cursor location */
@@ -407,7 +407,7 @@ cga_putc(int c)
 
 #define E0ESC		(1<<6)
 
-static uint8_t (SREADONLY shiftcode)[256] = 
+static uint8_t shiftcode[256] = 
 {
 	[0x1D] CTL,
 	[0x2A] SHIFT,
@@ -417,7 +417,7 @@ static uint8_t (SREADONLY shiftcode)[256] =
 	[0xB8] ALT
 };
 
-static uint8_t (SREADONLY togglecode)[256] = 
+static uint8_t togglecode[256] = 
 {
 	[0x3A] CAPSLOCK,
 	[0x45] NUMLOCK,
@@ -485,7 +485,7 @@ static uint8_t ctlmap[256] =
 	[0xD2] KEY_INS,		[0xD3] KEY_DEL
 };
 
-static uint8_t * COUNT(256) (SREADONLY charcode)[4] = {
+static uint8_t *charcode[4] = {
 	normalmap,
 	shiftmap,
 	ctlmap,
@@ -682,7 +682,7 @@ cputchar(int c)
 }
 
 void
-cputbuf(const char*COUNT(len) buf, int len)
+cputbuf(const char*buf, int len)
 {
 	int i;
 	for(i = 0; i < len; i++)

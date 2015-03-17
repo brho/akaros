@@ -17,8 +17,8 @@
 #define KMALLOC_LARGEST KMALLOC_SMALLEST << NUM_KMALLOC_CACHES
 
 void kmalloc_init(void);
-void* (DALLOC(size) kmalloc)(size_t size, int flags);
-void* (DALLOC(size) kzmalloc)(size_t size, int flags);
+void* kmalloc(size_t size, int flags);
+void* kzmalloc(size_t size, int flags);
 void *kmalloc_align(size_t size, int flags, size_t align);
 void *kzmalloc_align(size_t size, int flags, size_t align);
 void *krealloc(void *buf, size_t size, int flags);
@@ -50,8 +50,8 @@ void *debug_canary;
  * struct, and that it is not padded. */
 struct kmalloc_tag {
 	union {
-		struct kmem_cache *my_cache WHEN(flags == KMALLOC_TAG_CACHE);
-		size_t num_pages WHEN(flags == KMALLOC_TAG_PAGES);
+		struct kmem_cache *my_cache;
+		size_t num_pages;
 		uint64_t unused_force_align;
 	};
 	struct kref kref;

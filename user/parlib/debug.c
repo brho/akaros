@@ -36,7 +36,7 @@ static void putch(int ch, debugbuf_t **b)
 int ros_vdebug(const char *fmt, va_list ap)
 {
 	debugbuf_t b;
-	debugbuf_t *COUNT(1) bp = &b;
+	debugbuf_t *bp = &b;
 
 	b.idx = 0;
 	b.cnt = 0;

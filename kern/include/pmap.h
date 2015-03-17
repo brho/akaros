@@ -51,13 +51,13 @@
 	size_t __m_ppn = LA2PPN(__m_pa);			\
 	if (__m_ppn > max_nr_pages)					\
 		warn("KADDR called with invalid pa %p", __m_pa);\
-	(void*TRUSTED) (__m_pa + KERNBASE);				\
+	(void*) (__m_pa + KERNBASE);				\
 })
 
 #define KADDR_NOCHECK(pa) ((void*)(pa + KERNBASE))
 #define KBASEADDR(kla) KADDR(PADDR(kla))
 
-extern char (SNT RO bootstacktop)[], (SNT RO bootstack)[];
+extern char bootstacktop[], bootstack[];
 
 extern physaddr_t max_pmem;		/* Total amount of physical memory */
 extern size_t max_nr_pages;		/* Total number of physical memory pages */
@@ -72,7 +72,7 @@ extern uintptr_t boot_freelimit;
  * counted, and free pages are kept on a linked list. */
 extern struct page *pages;
 
-extern physaddr_t RO boot_cr3;
+extern physaddr_t boot_cr3;
 extern pgdir_t boot_pgdir;
 
 bool enable_pse(void);
@@ -83,14 +83,14 @@ void *boot_alloc(size_t amt, size_t align);
 void *boot_zalloc(size_t amt, size_t align);
 
 void page_check(void);
-int	 page_insert(pgdir_t pgdir, struct page *page, void *SNT va,
+int	 page_insert(pgdir_t pgdir, struct page *page, void *va,
 			int perm);
-void page_remove(pgdir_t pgdir, void *SNT va);
+void page_remove(pgdir_t pgdir, void *va);
 page_t* page_lookup(pgdir_t pgdir, void *va, pte_t *pte_store);
-error_t	pagetable_remove(pgdir_t pgdir, void *SNT va);
-void	page_decref(page_t *COUNT(1) pp);
+error_t	pagetable_remove(pgdir_t pgdir, void *va);
+void	page_decref(page_t *pp);
 
-void	tlb_invalidate(pgdir_t pgdir, void *SNT va);
+void	tlb_invalidate(pgdir_t pgdir, void *ga);
 void tlb_flush_global(void);
 bool regions_collide_unsafe(uintptr_t start1, uintptr_t end1, 
                             uintptr_t start2, uintptr_t end2);
@@ -102,7 +102,7 @@ int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd);
 physaddr_t arch_pgdir_get_cr3(pgdir_t pd);
 void arch_pgdir_clear(pgdir_t *pd);
 
-static inline page_t *SAFE ppn2page(size_t ppn)
+static inline page_t *ppn2page(size_t ppn)
 {
 	if (ppn >= max_nr_pages)
 		warn("ppn2page called with ppn (%08lu) larger than max_nr_pages", ppn);
@@ -119,7 +119,7 @@ static inline physaddr_t page2pa(page_t *pp)
 	return page2ppn(pp) << PGSHIFT;
 }
 
-static inline page_t*COUNT(1) pa2page(physaddr_t pa)
+static inline page_t *pa2page(physaddr_t pa)
 {
 	if (LA2PPN(pa) >= max_nr_pages)
 		warn("pa2page called with pa (%p) larger than max_nr_pages", pa);
@@ -131,12 +131,12 @@ static inline ppn_t pa2ppn(physaddr_t pa)
 	return pa >> PGSHIFT;
 }
 
-static inline void*COUNT(PGSIZE) page2kva(page_t *pp)
+static inline void *page2kva(page_t *pp)
 {
 	return KADDR(page2pa(pp));
 }
 
-static inline void*COUNT(PGSIZE) ppn2kva(size_t pp)
+static inline void *ppn2kva(size_t pp)
 {
 	return page2kva(ppn2page(pp));
 }

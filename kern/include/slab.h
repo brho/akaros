@@ -59,10 +59,8 @@ struct kmem_slab {
 	size_t num_busy_obj;
 	size_t num_total_obj;
 	union {
-		struct kmem_bufctl_list bufctl_freelist
-		    WHEN(obj_size > SLAB_LARGE_CUTOFF);
-		void *free_small_obj
-		    WHEN(obj_size <= SLAB_LARGE_CUTOFF);
+		struct kmem_bufctl_list bufctl_freelist;
+		void *free_small_obj;
 	};
 };
 TAILQ_HEAD(kmem_slab_list, kmem_slab);
@@ -71,7 +69,7 @@ TAILQ_HEAD(kmem_slab_list, kmem_slab);
 struct kmem_cache {
 	SLIST_ENTRY(kmem_cache) link;
 	spinlock_t cache_lock;
-	const char *NTS name;
+	const char *name;
 	size_t obj_size;
 	int align;
 	int flags;
@@ -88,7 +86,7 @@ SLIST_HEAD(kmem_cache_list, kmem_cache);
 extern struct kmem_cache_list kmem_caches;
 
 /* Cache management */
-struct kmem_cache *kmem_cache_create(const char *NTS name, size_t obj_size,
+struct kmem_cache *kmem_cache_create(const char *name, size_t obj_size,
                                      int align, int flags,
                                      void (*ctor)(void *, size_t),
                                      void (*dtor)(void *, size_t));

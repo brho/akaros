@@ -40,7 +40,7 @@ extern inline bool atomic_sub_and_test(atomic_t *number, long val);
 
 /* Spin locks */
 struct spinlock {
-	volatile uint32_t RACY rlock;
+	volatile uint32_t rlock;
 #ifdef CONFIG_SPINLOCK_DEBUG
 	uintptr_t call_site;
 	uint32_t calling_core;
@@ -184,7 +184,7 @@ static inline void poke_init(struct poke_tracker *tracker, void (*func)(void*))
 typedef struct checklist_mask {
 	// only need an uint8_t, but we need the bits[] to be word aligned
 	uint32_t size;
-	volatile uint8_t (COUNT(BYTES_FOR_BITMASK(size)) bits)[MAX_NUM_CPUS];
+	volatile uint8_t bits[MAX_NUM_CPUS];
 } checklist_mask_t;
 
 // mask contains an unspecified array, so it needs to be at the bottom
@@ -194,7 +194,7 @@ struct checklist {
 	// eagle-eyed readers may know why this might have been needed. 2009-09-04
 	//volatile uint8_t (COUNT(BYTES_FOR_BITMASK(size)) bits)[];
 };
-typedef struct checklist RACY checklist_t;
+typedef struct checklist checklist_t;
 
 #define ZEROS_ARRAY(size) {[0 ... ((size)-1)] 0}
 
@@ -234,9 +234,9 @@ struct barrier {
 	volatile uint8_t ready;
 };
 
-typedef struct barrier RACY barrier_t;
+typedef struct barrier barrier_t;
 
-void init_barrier(barrier_t*COUNT(1) barrier, uint32_t count);
+void init_barrier(barrier_t *barrier, uint32_t count);
 void reset_barrier(barrier_t* barrier);
 void waiton_barrier(barrier_t* barrier);
 
@@ -265,7 +265,7 @@ static inline void spinlock_init_irqsave(spinlock_t *lock)
 
 // If ints are enabled, disable them and note it in the top bit of the lock
 // There is an assumption about releasing locks in order here...
-static inline void spin_lock_irqsave(spinlock_t *SAFE lock)
+static inline void spin_lock_irqsave(spinlock_t *lock)
 {
 	uint32_t irq_en;
 	irq_en = irq_is_enabled();
@@ -277,7 +277,7 @@ static inline void spin_lock_irqsave(spinlock_t *SAFE lock)
 
 // if the high bit of the lock is set, then re-enable interrupts
 // (note from asw: you're lucky this works, you little-endian jerks)
-static inline void spin_unlock_irqsave(spinlock_t *SAFE lock)
+static inline void spin_unlock_irqsave(spinlock_t *lock)
 {
 	if (spin_lock_irq_enabled(lock)) {
 		spin_unlock(lock);
@@ -288,7 +288,7 @@ static inline void spin_unlock_irqsave(spinlock_t *SAFE lock)
 
 /* Returns whether or not unlocking this lock should enable interrupts or not.
  * Is meaningless on locks that weren't locked with irqsave. */
-static inline bool spin_lock_irq_enabled(spinlock_t *SAFE lock)
+static inline bool spin_lock_irq_enabled(spinlock_t *lock)
 {
 	return lock->rlock & SPINLOCK_IRQ_EN;
 }

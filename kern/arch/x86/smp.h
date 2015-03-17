@@ -17,6 +17,6 @@ struct HandlerWrapper {
 	uint8_t vector;
 };
 
-typedef struct HandlerWrapper LCKD(&cpu_list->lock) handler_wrapper_t;
+typedef struct HandlerWrapper handler_wrapper_t;
 
 #endif /* !ROS_ARCH_SMP_H */

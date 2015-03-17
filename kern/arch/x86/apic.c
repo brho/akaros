@@ -4,11 +4,6 @@
  * See LICENSE for details.
  */
 
-#ifdef __SHARC__
-#pragma nosharc
-#define SINIT(x) x
-#endif
-
 #include <arch/mmu.h>
 #include <arch/x86.h>
 #include <arch/arch.h>

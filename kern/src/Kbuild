@@ -49,7 +49,6 @@ obj-y						+= smp.o
 obj-y						+= string.o
 obj-y						+= strstr.o
 obj-y						+= syscall.o
-obj-y						+= sysevent.o
 obj-y						+= taskqueue.o
 obj-y						+= time.o
 obj-y						+= trace.o

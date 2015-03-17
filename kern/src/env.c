@@ -1,9 +1,5 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 #include <arch/arch.h>
 #include <arch/mmu.h>
 #include <bitmask.h>
@@ -37,10 +33,9 @@ atomic_t num_envs;
 //	-ENOMEM if page directory or table could not be allocated.
 //
 int env_setup_vm(env_t *e)
-WRITES(e->env_pgdir, e->env_cr3, e->procinfo, e->procdata)
 {
 	int i, ret;
-	static page_t * RO shared_page = 0;
+	static page_t *shared_page = 0;
 
 	if ((ret = arch_pgdir_setup(boot_pgdir, &e->env_pgdir)))
 		return ret;
@@ -58,12 +53,12 @@ WRITES(e->env_pgdir, e->env_cr3, e->procinfo, e->procdata)
 	 * start the process without calling those. */
 	for (int i = 0; i < PROCINFO_NUM_PAGES; i++) {
 		if (page_insert(e->env_pgdir, kva2page((void*)e->procinfo + i *
-		                PGSIZE), (void*SNT)(UINFO + i*PGSIZE), PTE_USER_RO) < 0)
+		                PGSIZE), (void*)(UINFO + i*PGSIZE), PTE_USER_RO) < 0)
 			goto env_setup_vm_error;
 	}
 	for (int i = 0; i < PROCDATA_NUM_PAGES; i++) {
 		if (page_insert(e->env_pgdir, kva2page((void*)e->procdata + i *
-		                PGSIZE), (void*SNT)(UDATA + i*PGSIZE), PTE_USER_RW) < 0)
+		                PGSIZE), (void*)(UDATA + i*PGSIZE), PTE_USER_RW) < 0)
 			goto env_setup_vm_error;
 	}
 	/* Finally, set up the Global Shared Data page for all processes.  Can't be

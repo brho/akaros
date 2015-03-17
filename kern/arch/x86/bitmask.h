@@ -1,10 +1,6 @@
 #ifndef ROS_ARCH_BITMASK_H
 #define ROS_ARCH_BITMASK_H
 
-#ifndef __IVY__
-#include <ros/noivy.h>
-#endif
-
 #include <string.h>
 #include <sys/types.h>
 #include <atomic.h>
@@ -52,26 +48,20 @@ static void SET_BITMASK_BIT_ATOMIC(uint8_t* name, size_t bit)
 
 #define CLR_BITMASK(name, size) \
 ({ \
-	{TRUSTEDBLOCK \
 	memset((void*)((uintptr_t)(name)), 0, BYTES_FOR_BITMASK((size))); \
-	} \
 })
 
 #define FILL_BITMASK(name, size) \
 ({ \
-	{TRUSTEDBLOCK \
 	memset((void*)((uintptr_t)(name)), 255, BYTES_FOR_BITMASK((size))); \
-	} \
 	(name)[BYTES_FOR_BITMASK((size))-1] >>= (((size) % 8) ? (8 - ((size) % 8)) : 0 ); \
 }) 
 
 #define COPY_BITMASK(newmask, oldmask, size) \
 ({ \
-	{TRUSTEDBLOCK \
 	memcpy((void*)((uintptr_t)(newmask)), \
            (void*)((uintptr_t)(oldmask)), \
            BYTES_FOR_BITMASK((size))); \
-	} \
 })
 
 // this checks the entire last byte, so keep it 0 in the other macros

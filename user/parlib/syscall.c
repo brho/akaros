@@ -72,7 +72,7 @@ int sys_proc_run(int pid)
 	return ros_syscall(SYS_proc_run, pid, 0, 0, 0, 0, 0);
 }
 
-void *CT(length) sys_mmap(void *SNT addr, size_t length, int prot, int flags,
+void *sys_mmap(void *SNT addr, size_t length, int prot, int flags,
                           int fd, size_t offset)
 {
 	return (void*)ros_syscall(SYS_mmap, addr, length, prot, flags, fd, offset);

@@ -56,28 +56,27 @@ struct page {
 /******** Externally visible global variables ************/
 extern uint8_t* global_cache_colors_map;
 extern spinlock_t colored_page_free_list_lock;
-extern page_list_t LCKD(&colored_page_free_list_lock) * RO CT(llc_num_colors)
-    colored_page_free_list;
+extern page_list_t *colored_page_free_list;
 
 /*************** Functional Interface *******************/
 void page_alloc_init(struct multiboot_info *mbi);
 void colored_page_alloc_init(void);
 
-error_t upage_alloc(struct proc* p, page_t *SAFE *page, int zero);
-error_t kpage_alloc(page_t *SAFE *page);
+error_t upage_alloc(struct proc* p, page_t **page, int zero);
+error_t kpage_alloc(page_t **page);
 void *kpage_alloc_addr(void);
 void *kpage_zalloc_addr(void);
-error_t upage_alloc_specific(struct proc* p, page_t *SAFE *page, size_t ppn);
-error_t kpage_alloc_specific(page_t *SAFE *page, size_t ppn);
+error_t upage_alloc_specific(struct proc* p, page_t **page, size_t ppn);
+error_t kpage_alloc_specific(page_t **page, size_t ppn);
 
-void *CT(1 << order) get_cont_pages(size_t order, int flags);
-void *CT(1 << order) get_cont_pages_node(int node, size_t order, int flags);
+void *get_cont_pages(size_t order, int flags);
+void *get_cont_pages_node(int node, size_t order, int flags);
 void *get_cont_phys_pages_at(size_t order, physaddr_t at, int flags);
 void free_cont_pages(void *buf, size_t order);
 
-void page_incref(page_t *SAFE page);
-void page_decref(page_t *SAFE page);
-void page_setref(page_t *SAFE page, size_t val);
+void page_incref(page_t *page);
+void page_decref(page_t *page);
+void page_setref(page_t *page, size_t val);
 
 int page_is_free(size_t ppn);
 void lock_page(struct page *page);

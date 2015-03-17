@@ -1,10 +1,6 @@
 // Simple command-line kernel monitor useful for
 // controlling the kernel and exploring the system interactively.
 
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 #include <arch/arch.h>
 #include <stab.h>
 #include <smp.h>
@@ -35,13 +31,13 @@
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
 typedef struct command {
-	const char *NTS name;
-	const char *NTS desc;
+	const char *name;
+	const char *desc;
 	// return -1 to force monitor to exit
 	int (*func)(int argc, char **argv, struct hw_trapframe *hw_tf);
 } command_t;
 
-static command_t (RO commands)[] = {
+static command_t commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "backtrace", "Dump a backtrace", mon_backtrace },
@@ -95,7 +91,7 @@ int mon_ps(int argc, char** argv, struct hw_trapframe *hw_tf)
 
 int mon_kerninfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-	extern char (RO SNT _start)[], (RO SNT etext)[], (RO SNT edata)[], (RO SNT end)[];
+	extern char _start[], etext[], edata[], end[];
 
 	cprintf("Special kernel symbols:\n");
 	cprintf("  _start %016x (virt)  %016x (phys)\n", _start, (uintptr_t)(_start - KERNBASE));
@@ -106,33 +102,6 @@ int mon_kerninfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 		(uint32_t)(end-_start+1023)/1024);
 	return 0;
 }
-
-#if 0
-zra: not called
-static char RO* function_of(uint32_t address)
-{
-	extern stab_t (RO stab)[], (RO estab)[];
-	extern char (RO stabstr)[];
-	stab_t* symtab;
-	stab_t* best_symtab = 0;
-	uint32_t best_func = 0;
-
-	// ugly and unsorted
-	for (symtab = stab; symtab < estab; symtab++) {
-		// only consider functions, type = N_FUN
-		if ((symtab->n_type == N_FUN) &&
-		    (symtab->n_value <= address) &&
-			(symtab->n_value > best_func)) {
-			best_func = symtab->n_value;
-			best_symtab = symtab;
-		}
-	}
-	// maybe the first stab really is the right one...  we'll see.
-	if (best_symtab == 0)
-		return "Function not found!";
-	return stabstr + best_symtab->n_strx;
-}
-#endif
 
 static int __backtrace(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
@@ -893,10 +862,10 @@ int onecmd(int argc, char *argv[], struct hw_trapframe *hw_tf) {
 	return -1;
 }
 
-static int runcmd(char *NTS real_buf, struct hw_trapframe *hw_tf) {
-	char * buf = NTEXPAND(real_buf);
+static int runcmd(char *real_buf, struct hw_trapframe *hw_tf) {
+	char * buf = real_buf;
 	int argc;
-	char *NTS argv[MAXARGS];
+	char *argv[MAXARGS];
 	int i;
 
 	// Parse the command buffer into whitespace-separated arguments

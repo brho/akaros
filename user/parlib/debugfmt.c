@@ -7,13 +7,8 @@
  * Print a number (base <= 16) in reverse order,
  * using specified putch function and associated pointer putdat.
  */
-#ifdef __DEPUTY__
-static void printnum(void (*putch)(int, TV(t)), TV(t) putdat,
-	                 unsigned long long num, unsigned base, int width, int padc)
-#else
 static void printnum(void (*putch)(int, void**), void **putdat,
 	                 unsigned long long num, unsigned base, int width, int padc)
-#endif
 {
 	// first recursively print all preceding (more significant) digits
 	if (num >= base) {
@@ -29,16 +24,11 @@ static void printnum(void (*putch)(int, void**), void **putdat,
 }
 
 // Main function to format and print a string.
-#ifdef __DEPUTY__
-void ros_debugfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *fmt, ...);
-void ros_vdebugfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *fmt, va_list ap)
-#else
 void ros_debugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...);
 void ros_vdebugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_list ap)
-#endif
 {
-	register const char *NTS p;
-	const char *NTS last_fmt;
+	register const char *p;
+	const char *last_fmt;
 	register int ch, err;
 	unsigned long long num;
 	int base, lflag, width, precision, altflag;
@@ -127,7 +117,7 @@ void ros_vdebugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, v
 			goto putstring;
 */
 		case 's':
-			if ((p = va_arg(ap, char *NT)) == NULL)
+			if ((p = va_arg(ap, char *)) == NULL)
 				p = "(null)";
 //putstring:
 			if (width > 0 && padc != '-')
@@ -205,11 +195,7 @@ void ros_vdebugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, v
 	}
 }
 
-#ifdef __DEPUTY__
-void ros_debugfmt(void (*putch)(int, TV(t)), TV(t) putdat, const char *fmt, ...)
-#else
 void ros_debugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...)
-#endif
 {
 	va_list ap;
 

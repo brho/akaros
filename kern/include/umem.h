@@ -16,11 +16,11 @@ static inline bool is_user_rwaddr(void *addr, size_t len);
 static inline bool is_user_raddr(void *addr, size_t len);
 
 /* Copy from proc p into the kernel's dest from src */
-int memcpy_from_user(struct proc *p, void *dest, const void *DANGEROUS va,
+int memcpy_from_user(struct proc *p, void *dest, const void *va,
                      size_t len);
 
 /* Copy to proc p into va from the kernel's src */
-int memcpy_to_user(struct proc *p, void *DANGEROUS va, const void *src,
+int memcpy_to_user(struct proc *p, void *a, const void *src,
                    size_t len);
 /* Same as above, but sets errno */
 int memcpy_from_user_errno(struct proc *p, void *dst, const void *src, int len);

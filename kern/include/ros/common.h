@@ -2,9 +2,6 @@
 #define ROS_COMMON_H
 
 #ifndef __ASSEMBLER__
-#ifndef __IVY__
-#include <ros/noivy.h>
-#endif
 
 #include <stddef.h>
 #include <stdint.h>

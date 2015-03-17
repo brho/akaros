@@ -4,11 +4,6 @@
  * See LICENSE for details.
  */
 
-#ifdef __SHARC__
-#pragma nosharc
-#define SINIT(x) x
-#endif
-
 #include <arch/x86.h>
 #include <arch/arch.h>
 #include <smp.h>
@@ -30,9 +25,9 @@
 
 #include "vmm/vmm.h"
 
-extern handler_wrapper_t (RO handler_wrappers)[NUM_HANDLER_WRAPPERS];
+extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
 volatile uint32_t num_cpus = 0xee;
-uintptr_t RO smp_stack_top;
+uintptr_t smp_stack_top;
 barrier_t generic_barrier;
 
 #define DECLARE_HANDLER_CHECKLISTS(vector)                          \
@@ -117,10 +112,10 @@ void smp_final_core_init(void)
 
 // this needs to be set in smp_entry too...
 #define trampoline_pg 0x00001000UL
-extern char (SNT SREADONLY smp_entry)[];
-extern char (SNT SREADONLY smp_entry_end)[];
-extern char (SNT SREADONLY smp_boot_lock)[];
-extern char (SNT SREADONLY smp_semaphore)[];
+extern char smp_entry[];
+extern char smp_entry_end[];
+extern char smp_boot_lock[];
+extern char smp_semaphore[];
 
 static inline uint16_t *get_smp_semaphore()
 {
@@ -170,7 +165,7 @@ void smp_boot(void)
 	// NEED TO GRAB A LOWMEM FREE PAGE FOR AP BOOTUP CODE
 	// page1 (2nd page) is reserved, hardcoded in pmap.c
 	memset(KADDR(trampoline_pg), 0, PGSIZE);
-	memcpy(KADDR(trampoline_pg), (void *COUNT(PGSIZE))TC(smp_entry),
+	memcpy(KADDR(trampoline_pg), (void *)smp_entry,
            smp_entry_end - smp_entry);
 
 	/* Make sure the trampoline page is mapped.  64 bit already has the tramp pg
@@ -179,7 +174,7 @@ void smp_boot(void)
 	// Allocate a stack for the cores starting up.  One for all, must share
 	if (kpage_alloc(&smp_stack))
 		panic("No memory for SMP boot stack!");
-	smp_stack_top = SINIT((uintptr_t)(page2kva(smp_stack) + PGSIZE));
+	smp_stack_top = (uintptr_t)(page2kva(smp_stack) + PGSIZE);
 
 	/* During SMP boot, core_id_early() returns 0, so all of the cores, which
 	 * grab locks concurrently, share the same pcpui and thus the same

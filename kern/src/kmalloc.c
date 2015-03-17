@@ -5,16 +5,6 @@
  * Barret Rhoden <brho@cs.berkeley.edu>
  * Kevin Klues <klueska@cs.berkeley.edu>    
  */
-
-#ifdef __SHARC__
-#pragma nosharc
-#define SINIT(x) x
-#endif
-
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <ros/common.h>
 #include <error.h>
 #include <pmap.h>
@@ -27,7 +17,7 @@
 
 //List of physical pages used by kmalloc
 static spinlock_t pages_list_lock = SPINLOCK_INITIALIZER;
-static page_list_t LCKD(&pages_list_lock)pages_list;
+static page_list_t pages_list;
 
 struct kmem_cache *kmalloc_caches[NUM_KMALLOC_CACHES];
 

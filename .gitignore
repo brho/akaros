@@ -12,7 +12,6 @@ update*
 hdd.img
 hdd.vdi
 *.*~
-ivy_errordb.sql
 Makelocal
 .textmate*
 .DS_*

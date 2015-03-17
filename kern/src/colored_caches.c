@@ -5,11 +5,6 @@
  * Kevin Klues <klueska@cs.berkeley.edu>    
  */
 
-#ifdef __SHARC__
-#pragma nosharc
-#define SINIT(x) x
-#endif
-
 #include <ros/common.h>
 #include <arch/mmu.h>
 #include <bitmask.h>
@@ -27,14 +22,14 @@ spinlock_t cache_colors_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 /************** Cache Related Functions  *****************/
 inline void init_cache_properties(cache_t *c, size_t sz_k, size_t wa, size_t clsz) {
-	c->wa = SINIT(wa);
-	c->sz_k = SINIT(sz_k);
-	c->clsz = SINIT(clsz);
+	c->wa = wa;
+	c->sz_k = sz_k;
+	c->clsz = clsz;
 
 #ifdef CONFIG_PAGE_COLORING
 	//Added as optimization (derived from above);
 	size_t nc = get_cache_num_page_colors(c);
-	c->num_colors = SINIT(nc);
+	c->num_colors = nc;
 #else
 	c->num_colors = 1;
 #endif
@@ -51,7 +46,7 @@ inline size_t get_offset_in_cache_line(uintptr_t addr, cache_t *c) {
     return (addr % get_cache_bytes_per_line(c));
 }
 
-void print_cache_properties(char *NT lstring, cache_t *c)
+void print_cache_properties(char *lstring, cache_t *c)
 {
 	printk("%s_WAYS_ASSOCIATIVE: %ld\n", lstring, get_cache_ways_associative(c));
 	printk("%s_LINE_SIZE_BYTES: %ld\n", lstring, get_cache_line_size_bytes(c));

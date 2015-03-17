@@ -38,8 +38,8 @@ int main(int argc, char** argv)
 		switch (test) {
 			case TEST_MMAP:
 				printf("Testing MMAP\n");
-				void *CT(8*PGSIZE) addr;
-				addr = sys_mmap((void*SNT)USTACKTOP - 20*PGSIZE, 8*PGSIZE, 3,
+				void *addr;
+				addr = sys_mmap((void*)USTACKTOP - 20*PGSIZE, 8*PGSIZE, 3,
 				                MAP_FIXED | MAP_ANONYMOUS, -1, 0);
 				printf("got addr = 0x%08x\n", addr);
 				*(int*)addr = 0xdeadbeef;
@@ -49,9 +49,7 @@ int main(int argc, char** argv)
 				printf("reading addr+3pg: 0x%08x\n", *(int*)(addr + 3*PGSIZE));
 				// this should fault
 				printf("Should page fault and die now.\n");
-				{ TRUSTEDBLOCK
 				*(int*)(addr - 3*PGSIZE) = 0xdeadbeef;
-				}
 				printf("Should not see me!!!!!!!!!!!!!!!!!!\n");
 				while(1);
 			case TEST_ONE_CORE:

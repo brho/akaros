@@ -75,8 +75,8 @@ struct proc {
 	int vmr_history;
 
 	// Per process info and data pages
- 	procinfo_t *SAFE procinfo;       // KVA of per-process shared info table (RO)
-	procdata_t *SAFE procdata;       // KVA of per-process shared data table (RW)
+ 	procinfo_t *procinfo;       // KVA of per-process shared info table (RO)
+	procdata_t *procdata;       // KVA of per-process shared data table (RW)
 	
 	// The backring pointers for processing asynchronous system calls from the user
 	// Note this is the actual backring, not a pointer to it somewhere else

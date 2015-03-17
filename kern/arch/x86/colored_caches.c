@@ -5,24 +5,19 @@
  * Kevin Klues <klueska@cs.berkeley.edu>    
  */
 
-#ifdef __SHARC__
-#pragma nosharc
-#define SINIT(x) x
-#endif
-
 #include <error.h>
 #include <bitmask.h>
 #include <colored_caches.h>
 #include <process.h>
 
 // Static global variable of caches to assign to the available caches struct
-static cache_t RO l1,l2,l3;
+static cache_t l1,l2,l3;
 
 // Convenient global variable for accessing the last level cache
 cache_t* llc_cache;
 
 // Global variables
-available_caches_t RO available_caches;
+available_caches_t available_caches;
 
 /************** Cache Related Functions  *****************/
 void cache_init() 
@@ -30,9 +25,9 @@ void cache_init()
 	// Initialize the caches available on this system.
 	// TODO: Should call out to something reading the acpi tables from 
 	// memory, or something similar.  For now, just initialize them inline
-	available_caches.l1 = SINIT(&l1);
-	available_caches.l2 = SINIT(&l2);
-	available_caches.l3 = SINIT(&l3);
+	available_caches.l1 = &l1;
+	available_caches.l2 = &l2;
+	available_caches.l3 = &l3;
 	llc_cache = &l3;
 #ifdef CONFIG_BOXBORO
 	/* level (ignoring L1I), size, ways, CL size) */

@@ -4,10 +4,6 @@
  *
  * Scheduling and dispatching. */
 
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 #include <schedule.h>
 #include <process.h>
 #include <monitor.h>

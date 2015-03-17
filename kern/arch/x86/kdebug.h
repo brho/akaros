@@ -24,7 +24,7 @@ typedef struct eipdebuginfo {
 	int eip_fn_narg;			// Number of function arguments
 } eipdebuginfo_t;
 
-int debuginfo_eip(uintptr_t eip, eipdebuginfo_t *NONNULL info);
+int debuginfo_eip(uintptr_t eip, eipdebuginfo_t *info);
 void *debug_get_fn_addr(char *fn_name);
 
 /* Returns a PC/EIP in the function that called us, preferably near the call

@@ -1,10 +1,6 @@
 // Simple implementation of cprintf console output for the kernel,
 // based on printfmt() and the kernel console's cputchar().
 
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 #include <arch/arch.h>
 #include <ros/common.h>
 
@@ -27,8 +23,8 @@ void putch(int ch, int **cnt)
 void buffered_putch(int ch, int **cnt)
 {
 	#define buffered_putch_bufsize 64
-	static char LCKD(&output_lock) (RO buf)[buffered_putch_bufsize];
-	static int LCKD(&output_lock) buflen = 0;
+	static char buf[buffered_putch_bufsize];
+	static int buflen = 0;
 
 	if(ch != -1)
 	{
@@ -72,11 +68,7 @@ int vcprintf(const char *fmt, va_list ap)
 	}
 
 	// do the buffered printf
-	#ifdef __DEPUTY__
-	vprintfmt(buffered_putch, &cntp, fmt, ap);
-	#else
 	vprintfmt((void*)buffered_putch, (void*)&cntp, fmt, ap);
-	#endif
 
 	// write out remaining chars in the buffer
 	buffered_putch(-1,&cntp);

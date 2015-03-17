@@ -2,10 +2,6 @@
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details. */
 
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 #include <event.h>
 #include <arch/arch.h>
 #include <bitmask.h>
@@ -311,8 +307,6 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 	/* zero everything by default, other specific items are set below */
 	memset(p, 0, sizeof(struct proc));
 
-	{ INITSTRUCT(*p)
-
 	/* only one ref, which we pass back.  the old 'existence' ref is managed by
 	 * the ksched */
 	kref_init(&p->p_kref, __proc_free, 1);
@@ -411,7 +405,6 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 	memset(&p->vmm, 0, sizeof(struct vmm));
 	qlock_init(&p->vmm.qlock);
 	printd("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
-	} // INIT_STRUCT
 	*pp = p;
 	return 0;
 }
@@ -1125,7 +1118,7 @@ void __proc_save_context_s(struct proc *p, struct user_context *ctx)
  * We disable interrupts for most of it too, since we need to protect
  * current_ctx and not race with __notify (which doesn't play well with
  * concurrent yielders). */
-void proc_yield(struct proc *SAFE p, bool being_nice)
+void proc_yield(struct proc *p, bool being_nice)
 {
 	uint32_t vcoreid, pcoreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[pcoreid];
@@ -2065,7 +2058,7 @@ void __startcore(uint32_t srcid, long a0, long a1, long a2)
 	uint32_t vcoreid = (uint32_t)a1;
 	uint32_t coreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
-	struct proc *p_to_run = (struct proc *CT(1))a0;
+	struct proc *p_to_run = (struct proc *)a0;
 	uint32_t old_nr_preempts_sent = (uint32_t)a2;
 
 	assert(p_to_run);

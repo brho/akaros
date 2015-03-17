@@ -5,14 +5,6 @@
  * Kevin Klues <klueska@cs.berkeley.edu>    
  */
  
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <sys/queue.h>
 #include <page_alloc.h>
 #include <pmap.h>

@@ -19,10 +19,6 @@
 #include <alarm.h>
 #include <trace.h>
 
-#ifdef __SHARC__
-typedef sharC_env_t;
-#endif
-
 #define CPU_STATE_IRQ			0
 #define CPU_STATE_KERNEL		1
 #define CPU_STATE_USER			2
@@ -64,12 +60,6 @@ struct per_cpu_info {
 	int cpu_state;
 	uint64_t last_tick_cnt;
 	uint64_t state_ticks[NR_CPU_STATES];
-#ifdef __SHARC__
-	// held spin-locks. this will have to go elsewhere if multiple kernel
-	// threads can share a CPU.
-	// zra: Used by Ivy. Let me know if this should go elsewhere.
-	sharC_env_t sharC_env;
-#endif
 	/* TODO: 64b (not sure if we'll need these at all */
 #ifdef CONFIG_X86
 	taskstate_t *tss;
@@ -77,9 +67,9 @@ struct per_cpu_info {
 #endif
 	/* KMSGs */
 	spinlock_t immed_amsg_lock;
-	struct kernel_msg_list NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) immed_amsgs;
+	struct kernel_msg_list immed_amsgs;
 	spinlock_t routine_amsg_lock;
-	struct kernel_msg_list NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) routine_amsgs;
+	struct kernel_msg_list routine_amsgs;
 	/* profiling -- opaque to all but the profiling code. */
 	void *profiling;
 }__attribute__((aligned(ARCH_CL_SIZE)));
@@ -93,10 +83,10 @@ struct per_cpu_info {
  * interrupted contexts via iret/etc.  We never do that for user contexts. */
 #define current_ctx per_cpu_info[core_id()].cur_ctx
 
-typedef struct per_cpu_info NTPTV(t) NTPTV(a0t) NTPTV(a1t) NTPTV(a2t) per_cpu_info_t;
+typedef struct per_cpu_info  per_cpu_info_t;
 
-extern per_cpu_info_t (RO per_cpu_info)[MAX_NUM_CPUS];
-extern volatile uint32_t RO num_cpus;
+extern per_cpu_info_t per_cpu_info[MAX_NUM_CPUS];
+extern volatile uint32_t num_cpus;
 
 /* SMP bootup functions */
 void smp_boot(void);

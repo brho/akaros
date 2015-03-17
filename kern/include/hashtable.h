@@ -12,14 +12,6 @@
 #ifndef __ROS_KERN_HASHTABLE_H__
 #define __ROS_KERN_HASHTABLE_H__
 
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 #include <ros/common.h>
 
 /*****************************************************************************/

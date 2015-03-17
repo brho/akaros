@@ -26,7 +26,7 @@ void timer_init(void){
 	tscval[0] = read_tsc();
 	udelay_pit(1000000);
 	tscval[1] = read_tsc();
-	system_timing.tsc_freq = SINIT(tscval[1] - tscval[0]);
+	system_timing.tsc_freq = tscval[1] - tscval[0];
 	cprintf("TSC Frequency: %llu\n", system_timing.tsc_freq);
 	__lapic_set_timer(0xffffffff, IdtLAPIC_TIMER, FALSE,
 	                  LAPIC_TIMER_DIVISOR_BITS);
@@ -52,8 +52,8 @@ void pit_set_timer(uint32_t divisor, uint32_t mode)
 	outb(TIMER_MODE, mode); 
 	outb(TIMER_CNTR0, divisor & 0xff);
 	outb(TIMER_CNTR0, (divisor >> 8) );
-	system_timing.pit_mode = SINIT(mode);
-	system_timing.pit_divisor = SINIT(divisor);
+	system_timing.pit_mode = mode;
+	system_timing.pit_divisor = divisor;
 	// cprintf("timer mode set to %d, divisor %d\n",mode, divisor);
 }
 

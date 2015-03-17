@@ -1,11 +1,3 @@
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
-#ifdef __DEPUTY__
-#pragma nodeputy
-#endif
-
 #include <atomic.h>
 #include <process.h>
 #include <kmalloc.h>
@@ -19,7 +11,7 @@
 volatile int magic_mem[10];
 
 void
-frontend_proc_init(struct proc *SAFE p)
+frontend_proc_init(struct proc *p)
 {
 #ifdef CONFIG_APPSERVER
 	pid_t parent_id = p->ppid, id = p->pid;
@@ -30,7 +22,7 @@ frontend_proc_init(struct proc *SAFE p)
 }
 
 void
-frontend_proc_free(struct proc *SAFE p)
+frontend_proc_free(struct proc *p)
 {
 #ifdef CONFIG_APPSERVER
 	int32_t errno;

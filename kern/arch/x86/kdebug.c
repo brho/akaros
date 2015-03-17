@@ -1,7 +1,3 @@
-#ifdef __SHARC__
-#pragma nosharc
-#endif
-
 #include <stab.h>
 #include <string.h>
 #include <assert.h>
@@ -13,22 +9,22 @@
 #include <ros/memlayout.h>
 
 // Beginning of stabs table
-extern const stab_t (RO BND(__this,__STAB_END__) __STAB_BEGIN__)[];
+extern const stab_t __STAB_BEGIN__[];
 
 // End of stabs table
-extern const stab_t (RO SNT __STAB_END__)[];
+extern const stab_t __STAB_END__[];
 
 // Beginning of string table
-extern const char (RO NT BND(__this,__STABSTR_END__) __STABSTR_BEGIN__)[];
+extern const char __STABSTR_BEGIN__[];
 
  // End of string table
-extern const char (RO SNT __STABSTR_END__)[];
+extern const char __STABSTR_END__[];
 
 typedef struct UserStabData {
-	const stab_t *BND(__this,stab_end) stabs;
-	const stab_t *SNT stab_end;
-	const char *NT BND(__this, stabstr_end) stabstr;
-	const char *SNT stabstr_end;
+	const stab_t *stabs;
+	const stab_t *stab_end;
+	const char *stabstr;
+	const char *stabstr_end;
 } user_stab_data_t;
 
 
@@ -82,8 +78,8 @@ static bool stab_table_valid(const char *stabstr, const char *stabstr_end)
 //	will exit setting left = 118, right = 554.
 //
 static void
-stab_binsearch(const stab_t *BND(__this, stab_end) stabs,
-           const stab_t *SNT stab_end,
+stab_binsearch(const stab_t *stabs,
+           const stab_t *stab_end,
            int *region_left, int *region_right,
 	       int type, uintptr_t addr)
 {
@@ -138,12 +134,12 @@ stab_binsearch(const stab_t *BND(__this, stab_end) stabs,
 //	information into '*info'.
 //
 int
-debuginfo_eip(uintptr_t addr, eipdebuginfo_t *NONNULL info)
+debuginfo_eip(uintptr_t addr, eipdebuginfo_t *info)
 {
-	const stab_t *SNT stab_end;
-	const stab_t *BND(__this,stab_end) stabs;
-	const char *SNT stabstr_end;
-	const char *NT BND(__this,stabstr_end) stabstr;
+	const stab_t *stab_end;
+	const stab_t *stabs;
+	const char *stabstr_end;
+	const char *stabstr;
 	int lfile, rfile, lfun, rfun, lline, rline;
 
 	// Initialize *info
@@ -170,7 +166,7 @@ debuginfo_eip(uintptr_t addr, eipdebuginfo_t *NONNULL info)
 		// to __STAB_BEGIN__, __STAB_END__, __STABSTR_BEGIN__, and
 		// __STABSTR_END__) in a structure located at virtual address
 		// USTABDATA.
-		const user_stab_data_t *usd = (const user_stab_data_t *COUNT(1))TC(USTABDATA);
+		const user_stab_data_t *usd = (const user_stab_data_t *)USTABDATA;
 
 		// Make sure this memory is valid.
 		// Return -1 if it is not.  Hint: Call user_mem_check.
@@ -272,10 +268,10 @@ debuginfo_eip(uintptr_t addr, eipdebuginfo_t *NONNULL info)
 /* Returns a function pointer for a function name matching the given string. */
 void *debug_get_fn_addr(char *fn_name)
 {
-	const struct stab *SNT stab_end = __STAB_END__;
-	const struct stab *BND(__this,stab_end) stabs = __STAB_BEGIN__;
-	const char *SNT stabstr_end = __STABSTR_END__;
-	const char *NT BND(__this,stabstr_end) stabstr = __STABSTR_BEGIN__;
+	const struct stab *stab_end = __STAB_END__;
+	const struct stab *stabs = __STAB_BEGIN__;
+	const char *stabstr_end = __STABSTR_END__;
+	const char *stabstr = __STABSTR_BEGIN__;
 
 	static int first_fn_idx = 0;
 	int i = first_fn_idx;
