@@ -23,6 +23,8 @@
 #include <fcallfmt.h>
 #include <fcall.h>
 
+#define ARRAY_SIZE(x) (sizeof((x))/sizeof((x)[0]))
+
 enum
 {
 	Nreply=			20,

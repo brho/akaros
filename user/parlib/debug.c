@@ -65,6 +65,7 @@ static const char *blacklist[] = {
 
 static bool is_blacklisted(const char *s)
 {
+	#define ARRAY_SIZE(x) (sizeof((x))/sizeof((x)[0]))
 	for (int i = 0; i < ARRAY_SIZE(blacklist); i++) {
 		if (!strcmp(blacklist[i], s))
 			return TRUE;

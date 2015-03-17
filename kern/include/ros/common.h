@@ -34,10 +34,6 @@ typedef unsigned long uintreg_t;
 #define PiB	1125899906842624ull
 #define EiB	1152921504606846976ull
 
-#define ARRAY_SIZE(x) (sizeof((x))/sizeof((x)[0]))
-
-#define CHECK_FLAG(flags,bit)   ((flags) & (1 << (bit)))
-
 #define FOR_CIRC_BUFFER(next, size, var) \
 	for (int _var = 0, var = (next); _var < (size); _var++, var = (var + 1) % (size))
 
@@ -53,7 +49,7 @@ typedef unsigned long uintreg_t;
 #define is_defined___(_, v, ...) v
 
 // Efficient min and max operations
-#ifdef ROS_KERNEL /* Glibc has their own */
+#ifdef ROS_KERNEL /* Glibc or other user libs have their own */
 #define MIN(_a, _b)						\
 ({								\
 	typeof(_a) __a = (_a);					\
@@ -77,6 +73,8 @@ typedef unsigned long uintreg_t;
 #define ALIGN(x, a) ((typeof(x)) __ALIGN_MASK(x, (a) - 1))
 /* Will return false for 0.  Debatable, based on what you want. */
 #define IS_PWR2(x) ((x) && !((x) & (x - 1)))
+
+#define ARRAY_SIZE(x) (sizeof((x))/sizeof((x)[0]))
 
 #endif
 
