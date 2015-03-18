@@ -510,7 +510,8 @@ panic("Not implemented");
 static int bnx2x_alloc_rx_sge(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 			      uint16_t index, gfp_t gfp_mask)
 {
-	struct page *page = get_cont_pages(PAGES_PER_SGE_SHIFT, gfp_mask);
+	/* AKAROS_PORT: our get_cont_pages returns KVAs, not struct page * */
+	struct page *page = kva2page(get_cont_pages(PAGES_PER_SGE_SHIFT, gfp_mask));
 	struct sw_rx_page *sw_buf = &fp->rx_page_ring[index];
 	struct eth_rx_sge *sge = &fp->rx_sge_ring[index];
 	dma_addr_t mapping;
@@ -523,7 +524,7 @@ static int bnx2x_alloc_rx_sge(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 	mapping = dma_map_page(&bp->pdev->dev, page, 0,
 			       SGE_PAGES, DMA_FROM_DEVICE);
 	if (unlikely(dma_mapping_error(&bp->pdev->dev, mapping))) {
-		free_cont_pages(page, PAGES_PER_SGE_SHIFT);
+		free_cont_pages(page2kva(page), PAGES_PER_SGE_SHIFT);
 		BNX2X_ERR("Can't map sge\n");
 		return -ENOMEM;
 	}

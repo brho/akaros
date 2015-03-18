@@ -33,19 +33,21 @@ expression FL;
 -kcalloc(CNT, SZ, FL)
 +kzmalloc((CNT) * (SZ), FL)
 
+# These are dangerous in Akaros.  If someone is using a page* for multiple
+# pages, it's probably okay, but we should look closely.
 @@
 expression ADDR;
 expression ORDER;
 @@
 -__free_pages(ADDR, ORDER)
-+free_cont_pages(ADDR, ORDER)
++free_cont_pages(page2kva(ADDR), ORDER)
 
 @@
 expression FLAGS;
 expression ORDER;
 @@
 -alloc_pages(FLAGS, ORDER)
-+get_cont_pages(ORDER, FLAGS)
++kva2page(get_cont_pages(ORDER, FLAGS))
 
 @@
 expression FLAGS;

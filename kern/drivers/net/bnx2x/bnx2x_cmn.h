@@ -809,7 +809,7 @@ static inline void bnx2x_free_rx_sge(struct bnx2x *bp,
 
 	dma_unmap_page(&bp->pdev->dev, dma_unmap_addr(sw_buf, mapping),
 		       SGE_PAGES, DMA_FROM_DEVICE);
-	free_cont_pages(page, PAGES_PER_SGE_SHIFT);
+	free_cont_pages(page2kva(page), PAGES_PER_SGE_SHIFT);
 
 	sw_buf->page = NULL;
 	sge->addr_hi = 0;
