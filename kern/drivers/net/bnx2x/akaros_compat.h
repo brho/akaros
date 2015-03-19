@@ -84,11 +84,17 @@ static inline void *__dma_alloc_coherent(size_t size, dma_addr_t *dma_handle,
                                          gfp_t flags)
 {
 	size_t order = LOG2_UP(nr_pages(size));
-	void *vaddr = get_cont_pages(order, flags);
+	/* our shitty allocator doesn't align the higher order allocations, so we
+	 * go 2x, and align manually.  we don't save the original pointer, so we
+	 * can't free them later. */
+	void *vaddr = get_cont_pages(order > 0 ?  order + 1 : order,
+	                             flags);
 	if (!vaddr) {
 		*dma_handle = 0;
 		return 0;
 	}
+	/* manual alignment.  order 0 allocs are already page aligned */
+	vaddr = ALIGN(vaddr, PGSIZE << order);
 	*dma_handle = PADDR(vaddr);
 	return vaddr;
 }
@@ -106,6 +112,10 @@ static inline void __dma_free_coherent(size_t size, void *cpu_addr,
                                        dma_addr_t dma_handle)
 {
 	size_t order = LOG2_UP(nr_pages(size));
+	if (order > 0) {
+		warn("Not freeing high order alloc!  Fix the allocator!");
+		return;
+	}
 	free_cont_pages(cpu_addr, order);
 }
 
