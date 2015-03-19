@@ -17,7 +17,7 @@ export CFLAGS_USER CFLAGS_TESTS
 #$(OBJDIR)/kern/.usb.touch: $(KERNEL_OBJ)
 #	@echo "  (USB) Copying to /dev/sdc4"
 #	$(Q)mount /dev/sdc4
-#	$(Q)cp $^ /mnt/pornstick/texas
+#	$(Q)cp $^ /mnt/pornstick/akaros
 #	@sync
 #	$(Q)umount /mnt/pornstick
 #	@touch $@

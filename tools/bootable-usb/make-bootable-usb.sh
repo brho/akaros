@@ -4,14 +4,29 @@ USBDRIVE=/dev/sdwhatever
 MNTPOINT=/mnt/wherever
 # rootdir contains the files from an existing image.  minimum of /extlinux.conf,
 # /boot/, and /boot/mboot.c32
-ROOTDIR=/path/to/rootdir/files/
+ROOTDIR=/path/to/tools/bootable-usb/rootdir-files/
 USER=username
 GROUP=usergroup
+
+SANITY=`mount | grep $USBDRIVE`
+
+if [ "x$SANITY" != "x" ]
+then
+	echo "$USBDRIVE might be mounted, aborting!"
+	exit -1
+fi
 
 # comment this once you're done
 exit
 
-echo "make one partition, bootable and type 83 (linux)"
+echo ""
+echo "Make one partition, bootable and type 83 (linux).  Reminder:"
+echo "	d (delete old partitions)"
+echo "	n (make new partitions)"
+echo "	t, 83 (set type 83)"
+echo "	a (toggle bootable)"
+echo "	p (print, make sure it's okay)"
+echo "	w (save)"
 
 fdisk $USBDRIVE
 mke2fs ${USBDRIVE}1
@@ -54,3 +69,6 @@ dd if=$ROOTDIR/mbr.bin of=${USBDRIVE}
 #    MENU DEFAULT
 #    KERNEL /boot/mboot.c32
 #    APPEND /boot/akaros
+
+# You can test without booting with:
+# $ qemu-system-x86_64 -hda /dev/sdb
