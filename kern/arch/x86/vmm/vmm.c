@@ -18,6 +18,9 @@
 #include "intel/compat.h"
 #include "vmm.h"
 
+/* TODO: have better cpuid info storage and checks */
+bool x86_supports_vmx = FALSE;
+
 /* Figure out what kind of CPU we are on, and if it supports any reasonable
  * virtualization. For now, if we're not some sort of newer intel, don't
  * bother. This does all cores. Again, note, we make these decisions at runtime,
@@ -33,6 +36,7 @@ void vmm_init(void)
 	ret = intel_vmm_init();
 	if (! ret) {
 		printd("intel_vmm_init worked\n");
+		x86_supports_vmx = TRUE;
 		return;
 	}
 
@@ -43,6 +47,8 @@ void vmm_init(void)
 
 void vmm_pcpu_init(void)
 {
+	if (!x86_supports_vmx)
+		return;
 	if (! intel_vmm_pcpu_init()) {
 		printd("vmm_pcpu_init worked\n");
 		return;

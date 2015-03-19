@@ -1730,7 +1730,7 @@ static bool probe_cpu_vmx(void)
 		printk("Machine does not support VT-x\n");
 		return FALSE;
 	} else {
-		printk("Machine has vmx\n");
+		printk("Machine supports VT-x\n");
 		return TRUE;
 	}
 }
@@ -1758,7 +1758,6 @@ int intel_vmm_init(void)
 	int r, cpu, ret;
 
 	if (! probe_cpu_vmx()) {
-		printk("CPU does not have VMX\n");
 		return -EOPNOTSUPP;
 	}
 
