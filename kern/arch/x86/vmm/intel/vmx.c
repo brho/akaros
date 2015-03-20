@@ -659,7 +659,7 @@ static void vmx_setup_constant_host_state(void)
 	vmcs_write16(HOST_DS_SELECTOR, GD_KD);  /* 22.2.4 */
 	vmcs_write16(HOST_ES_SELECTOR, GD_KD);  /* 22.2.4 */
 	vmcs_write16(HOST_SS_SELECTOR, GD_KD);  /* 22.2.4 */
-	vmcs_write16(HOST_TR_SELECTOR, GD_TSS*8);  /* 22.2.4 */
+	vmcs_write16(HOST_TR_SELECTOR, GD_TSS);  /* 22.2.4 */
 
 	native_store_idt(&dt);
 	vmcs_writel(HOST_IDTR_BASE, dt.pd_base);   /* 22.2.4 */
@@ -683,6 +683,7 @@ static void vmx_setup_constant_host_state(void)
 	vmcs_write16(HOST_FS_SELECTOR, 0);            /* 22.2.4 */
 	vmcs_write16(HOST_GS_SELECTOR, 0);            /* 22.2.4 */
 
+	/* TODO: This (at least gs) is per cpu */
 #ifdef CONFIG_X86_64
 	rdmsrl(MSR_FS_BASE, tmpl);
 	vmcs_writel(HOST_FS_BASE, tmpl); /* 22.2.4 */
