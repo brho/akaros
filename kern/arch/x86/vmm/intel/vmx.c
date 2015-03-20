@@ -573,7 +573,7 @@ static  void setup_vmcs_config(void *p)
 	}
 
 	vmcs_conf->size = vmx_msr_high & 0x1fff;
-	vmcs_conf->order = LOG2_UP(vmcs_config.size>> PAGE_SHIFT);
+	vmcs_conf->order = LOG2_UP(nr_pages(vmcs_config.size));
 	vmcs_conf->revision_id = vmx_msr_low;
 	printk("vmcs_conf size %d order %d rev %d\n",
 	       vmcs_conf->size, vmcs_conf->order,
