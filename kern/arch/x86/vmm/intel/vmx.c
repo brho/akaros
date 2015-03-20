@@ -353,6 +353,15 @@ static void vmcs_load(struct vmcs *vmcs)
 		       vmcs, phys_addr);
 }
 
+/* Returns the paddr pointer of the current CPU's VMCS region, or -1 if none. */
+static physaddr_t vmcs_get_current(void)
+{
+	physaddr_t vmcs_paddr;
+	/* RAX contains the addr of the location to store the VMCS pointer.  The
+	 * compiler doesn't know the ASM will deref that pointer, hence the =m */
+	asm volatile (ASM_VMX_VMPTRST_RAX : "=m"(vmcs_paddr) : "a"(&vmcs_paddr));
+	return vmcs_paddr;
+}
 
 __always_inline unsigned long vmcs_readl(unsigned long field)
 {
