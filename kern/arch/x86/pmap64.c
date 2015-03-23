@@ -600,6 +600,8 @@ static int print_pte(kpte_t *kpte, uintptr_t kva, int shift, bool visited_subs,
 
 void debug_print_pgdir(kpte_t *pgdir)
 {
+	if (! pgdir)
+		pgdir = KADDR(rcr3());
 	printk("Printing the entire page table set for %p, DFS\n", pgdir);
 	/* Need to be careful we avoid VPT/UVPT, o/w we'll recurse */
 	pml_for_each(pgdir, 0, UVPT, print_pte, 0);
