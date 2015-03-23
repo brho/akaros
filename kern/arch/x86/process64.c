@@ -76,25 +76,27 @@ static void enforce_user_canon(uintptr_t *addr)
 		*addr = 0x5a5a5a5a;
 }
 
-/* TODO: consider using a SW context */
 void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
                    uintptr_t stack_top, uintptr_t tls_desc)
 {
-	struct hw_trapframe *tf = &ctx->tf.hw_tf;
+	struct sw_trapframe *sw_tf = &ctx->tf.sw_tf;
 	/* zero the entire structure for any type, prevent potential disclosure */
 	memset(ctx, 0, sizeof(struct user_context));
-	ctx->type = ROS_HW_CTX;
+	ctx->type = ROS_SW_CTX;
 	/* Stack pointers in a fresh stackframe need to be such that adding or
 	 * subtracting 8 will result in 16 byte alignment (AMD64 ABI).  The reason
 	 * is so that input arguments (on the stack) are 16 byte aligned.  The
 	 * extra 8 bytes is the retaddr, pushed on the stack.  Compilers know they
 	 * can subtract 8 to get 16 byte alignment for instructions like movaps. */
-	tf->tf_rsp = ROUNDDOWN(stack_top, 16) - 8;
-	tf->tf_rip = entryp;
+	sw_tf->tf_rsp = ROUNDDOWN(stack_top, 16) - 8;
+	sw_tf->tf_rip = entryp;
+	sw_tf->tf_rbp = 0;	/* for potential backtraces */
+	sw_tf->tf_mxcsr = 0x00001f80;	/* x86 default mxcsr */
+	sw_tf->tf_fpucw = 0x037f;		/* x86 default FP CW */
 	/* Coupled closely with user's entry.S.  id is the vcoreid, which entry.S
 	 * uses to determine what to do.  vcoreid == 0 is the main core/context. */
-	tf->tf_rbx = vcoreid;
-	tf->tf_fsbase = tls_desc;
+	sw_tf->tf_rbx = vcoreid;
+	sw_tf->tf_fsbase = tls_desc;
 	proc_secure_ctx(ctx);
 }
 
