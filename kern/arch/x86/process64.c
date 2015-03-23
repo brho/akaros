@@ -93,7 +93,7 @@ void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
 	tf->tf_rip = entryp;
 	/* Coupled closely with user's entry.S.  id is the vcoreid, which entry.S
 	 * uses to determine what to do.  vcoreid == 0 is the main core/context. */
-	tf->tf_rax = vcoreid;
+	tf->tf_rbx = vcoreid;
 	tf->tf_fsbase = tls_desc;
 	proc_secure_ctx(ctx);
 }

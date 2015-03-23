@@ -316,7 +316,7 @@ static inline void init_user_ctx(struct user_context *ctx, uint32_t entry_pt,
 // this is how we get our thread id on entry.
 #define __vcore_id_on_entry \
 ({ \
-	register int temp asm ("eax"); \
+	register int temp asm ("ebx"); \
 	temp; \
 })
 
