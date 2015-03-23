@@ -81,29 +81,21 @@ void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
                    uintptr_t stack_top, uintptr_t tls_desc)
 {
 	struct hw_trapframe *tf = &ctx->tf.hw_tf;
+	/* zero the entire structure for any type, prevent potential disclosure */
+	memset(ctx, 0, sizeof(struct user_context));
 	ctx->type = ROS_HW_CTX;
-	memset(tf, 0, sizeof(*tf));
-	/* Set up appropriate initial values for the segment registers.
-	 * GD_UD is the user data segment selector in the GDT, and
-	 * GD_UT is the user text segment selector (see inc/memlayout.h).
-	 * The low 2 bits of each segment register contains the
-	 * Requestor Privilege Level (RPL); 3 means user mode. */
-	tf->tf_ss = GD_UD | 3;
 	/* Stack pointers in a fresh stackframe need to be such that adding or
 	 * subtracting 8 will result in 16 byte alignment (AMD64 ABI).  The reason
 	 * is so that input arguments (on the stack) are 16 byte aligned.  The
 	 * extra 8 bytes is the retaddr, pushed on the stack.  Compilers know they
 	 * can subtract 8 to get 16 byte alignment for instructions like movaps. */
 	tf->tf_rsp = ROUNDDOWN(stack_top, 16) - 8;
-	tf->tf_cs = GD_UT | 3;
-	/* set the env's EFLAGSs to have interrupts enabled */
-	tf->tf_rflags |= 0x00000200; // bit 9 is the interrupts-enabled
 	tf->tf_rip = entryp;
 	/* Coupled closely with user's entry.S.  id is the vcoreid, which entry.S
 	 * uses to determine what to do.  vcoreid == 0 is the main core/context. */
 	tf->tf_rax = vcoreid;
 	tf->tf_fsbase = tls_desc;
-	enforce_user_canon(&tf->tf_fsbase);
+	proc_secure_ctx(ctx);
 }
 
 void proc_secure_ctx(struct user_context *ctx)
@@ -112,6 +104,7 @@ void proc_secure_ctx(struct user_context *ctx)
 		struct sw_trapframe *tf = &ctx->tf.sw_tf;
 		enforce_user_canon(&tf->tf_gsbase);
 		enforce_user_canon(&tf->tf_fsbase);
+		enforce_user_canon(&tf->tf_rip);
 	} else {
 		/* If we aren't SW, we're assuming (and forcing) a HW ctx.  If this is
 		 * somehow fucked up, userspace should die rather quickly. */
@@ -119,9 +112,13 @@ void proc_secure_ctx(struct user_context *ctx)
 		ctx->type = ROS_HW_CTX;
 		enforce_user_canon(&tf->tf_gsbase);
 		enforce_user_canon(&tf->tf_fsbase);
+		/* GD_UD is the user data segment selector in the GDT, and
+		 * GD_UT is the user text segment selector (see inc/memlayout.h).
+		 * The low 2 bits of each segment register contains the
+		 * Requestor Privilege Level (RPL); 3 means user mode. */
 		tf->tf_ss = GD_UD | 3;
 		tf->tf_cs = GD_UT | 3;
-		tf->tf_rflags |= 0x00000200; // bit 9 is the interrupts-enabled
+		tf->tf_rflags |= FL_IF;
 	}
 }
 
