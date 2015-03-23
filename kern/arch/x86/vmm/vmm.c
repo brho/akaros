@@ -80,6 +80,8 @@ int vmm_struct_init(struct vmm *vmm, unsigned int nr_guest_pcores)
 		qunlock(&vmm->qlock);
 		return 0;
 	}
+	/* Set this early, so cleanup checks the gpc array */
+	vmm->vmmcp = TRUE;
 	nr_guest_pcores = MIN(nr_guest_pcores, num_cpus);
 	vmm->amd = 0;
 	vmm->guest_pcores = kzmalloc(sizeof(void*) * nr_guest_pcores, KMALLOC_WAIT);
@@ -92,23 +94,21 @@ int vmm_struct_init(struct vmm *vmm, unsigned int nr_guest_pcores)
 		}
 	}
 	vmm->nr_guest_pcores = i;
-	vmm->vmmcp = TRUE;
 	qunlock(&vmm->qlock);
 	return i;
 }
 
-void vmm_struct_cleanup(struct vmm *vmm)
+/* Has no concurrency protection - only call this when you know you have the
+ * only ref to vmm.  For instance, from __proc_free, where there is only one ref
+ * to the proc (and thus proc.vmm). */
+void __vmm_struct_cleanup(struct vmm *vmm)
 {
-	qlock(&vmm->qlock);
-	if (!vmm->vmmcp) {
-		qunlock(&vmm->qlock);
+	if (!vmm->vmmcp)
 		return;
-	}
 	for (int i = 0; i < vmm->nr_guest_pcores; i++) {
 		if (vmm->guest_pcores[i])
 			vmx_destroy_vcpu(vmm->guest_pcores[i]);
 	}
 	kfree(vmm->guest_pcores);
 	vmm->vmmcp = FALSE;
-	qunlock(&vmm->qlock);
 }

@@ -458,7 +458,7 @@ static void __proc_free(struct kref *kref)
 	assert(kref_refcnt(&p->p_kref) == 0);
 	assert(TAILQ_EMPTY(&p->alarmset.list));
 
-	vmm_struct_cleanup(&p->vmm);
+	__vmm_struct_cleanup(&p->vmm);
 	p->progname[0] = 0;
 	cclose(p->dot);
 	cclose(p->slash);
