@@ -43,7 +43,7 @@ ssize_t     sys_shared_page_alloc(void **addr, pid_t p2,
                                   int p1_flags, int p2_flags);
 ssize_t     sys_shared_page_free(void *addr, pid_t p2);
 void        sys_reboot();
-void 		*sys_mmap(void *SNT addr, size_t length, int prot, int flags,
+void 		*sys_mmap(void *addr, size_t length, int prot, int flags,
                       int fd, size_t offset);
 int			sys_provision(int pid, unsigned int res_type, long res_val);
 int         sys_notify(int pid, unsigned int ev_type, struct event_msg *u_msg);
