@@ -174,7 +174,7 @@ static inline unsigned long read_sp(void) __attribute__((always_inline));
 static inline void cpuid(uint32_t info1, uint32_t info2, uint32_t *eaxp,
                          uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp)
 						               __attribute__((always_inline));
-static inline uint32_t cpuid_ecx(int op) __attribute__((always_inline));
+static inline uint32_t cpuid_ecx(uint32_t op) __attribute__((always_inline));
 static inline uint64_t read_msr(uint32_t reg) __attribute__((always_inline));
 static inline void write_msr(uint32_t reg, uint64_t val)
               __attribute__((always_inline));
@@ -379,10 +379,10 @@ static inline void cpuid(uint32_t info1, uint32_t info2, uint32_t *eaxp,
 		*edxp = edx;
 }
 
-static inline uint32_t cpuid_ecx(int opcode)
+static inline uint32_t cpuid_ecx(uint32_t op)
 {
 	uint32_t ecx;
-	cpuid(1, 0, NULL, NULL, &ecx, NULL);
+	cpuid(op, 0, NULL, NULL, &ecx, NULL);
 	return ecx;
 }
 
