@@ -124,6 +124,7 @@ typedef struct
 
 typedef struct 
 {
+	void *stackaddr;
 	size_t stacksize;
 	int detachstate;
 } pthread_attr_t;
@@ -207,6 +208,25 @@ int pthread_key_create(pthread_key_t *key, void (*destructor)(void*));
 int pthread_key_delete(pthread_key_t key);
 void *pthread_getspecific(pthread_key_t key);
 int pthread_setspecific(pthread_key_t key, const void *value);
+
+/* Common stuff. */
+int pthread_equal(pthread_t __thread1, pthread_t __thread2);
+int pthread_getattr_np(pthread_t __th, pthread_attr_t *__attr);
+int pthread_attr_getstack(const pthread_attr_t *__attr,
+                           void **__stackaddr, size_t *__stacksize);
+
+/* Unsupported Stuff */
+typedef void *upthread_once_t;
+extern int pthread_mutex_timedlock (pthread_mutex_t *__restrict __mutex,
+                    const struct timespec *__restrict
+                    __abstime) __THROWNL __nonnull ((1, 2));
+extern int pthread_cond_timedwait (pthread_cond_t *__restrict __cond,
+                   pthread_mutex_t *__restrict __mutex,
+                   const struct timespec *__restrict __abstime)
+     __nonnull ((1, 2, 3));
+extern int pthread_once (pthread_once_t *__once_control,
+             void (*__init_routine) (void)) __nonnull ((1, 2));
+extern int pthread_cancel (pthread_t __th);
 
 #ifdef __cplusplus
   }

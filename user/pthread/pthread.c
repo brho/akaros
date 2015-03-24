@@ -545,6 +545,25 @@ int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)
 	return 0;
 }
 
+int pthread_attr_getstack(const pthread_attr_t *__restrict __attr,
+						   void **__stackaddr, size_t *__stacksize)
+{
+	*__stackaddr = __attr->stackaddr;
+	*__stacksize = __attr->stacksize;
+	return 0;
+}
+
+int pthread_getattr_np(pthread_t __th, pthread_attr_t *__attr)
+{
+	__attr->stackaddr = __th->stacktop - __th->stacksize;
+	__attr->stacksize = __th->stacksize;
+	if (__th->detached)
+		__attr->detachstate = PTHREAD_CREATE_DETACHED;
+	else
+		__attr->detachstate = PTHREAD_CREATE_JOINABLE;
+	return 0;
+}
+
 /* Do whatever init you want.  At some point call uthread_lib_init() and pass it
  * a uthread representing thread0 (int main()) */
 void pthread_lib_init(void)
@@ -1263,3 +1282,26 @@ int pthread_setspecific(pthread_key_t key, const void *value)
 	return 0;
 }
 
+int pthread_mutex_timedlock (pthread_mutex_t *__restrict __mutex,
+					const struct timespec *__restrict
+					__abstime)
+{
+	fprintf(stderr, "Unsupported %s!", __FUNCTION__);
+	abort();
+	return -1;
+}
+int pthread_cond_timedwait (pthread_cond_t *__restrict __cond,
+				   pthread_mutex_t *__restrict __mutex,
+				   const struct timespec *__restrict __abstime)
+{
+	fprintf(stderr, "Unsupported %s!", __FUNCTION__);
+	abort();
+	return -1;
+}
+
+int pthread_cancel (pthread_t __th)
+{
+	fprintf(stderr, "Unsupported %s!", __FUNCTION__);
+	abort();
+	return -1;
+}
