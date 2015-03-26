@@ -160,11 +160,6 @@
 
 #define currentcpu (&per_cpu_info[core_id()])
 
-/* this is always 1, and only ever incremented. If it's more than 1,
- * then you failed.
- */
-static bool has_vmx = FALSE;
-
 /*
  * Keep MSR_STAR at the end, as setup_msrs() will try to optimize it
  * away by decrementing the array size.
@@ -176,11 +171,6 @@ static const uint32_t vmx_msr_index[] = {
 	MSR_EFER, MSR_TSC_AUX, MSR_STAR,
 };
 #define NR_VMX_MSR ARRAY_SIZE(vmx_msr_index)
-
-/* TEMPORARY TEST HACK EPT */
-void *ept;
-uint64_t eptp;
-/* END HACKQUE */
 
 static DECLARE_BITMAP(vmx_vpid_bitmap, /*VMX_NR_VPIDS*/ 65536);
 static spinlock_t vmx_vpid_lock;
@@ -234,6 +224,12 @@ static inline bool cpu_has_vmx_ept(void)
 		SECONDARY_EXEC_ENABLE_EPT;
 }
 
+static inline bool cpu_has_vmx_invept(void)
+{
+	return vmx_capability.ept & VMX_EPT_INVEPT_BIT;
+}
+
+/* the SDM (2015-01) doesn't mention this ability (still?) */
 static inline bool cpu_has_vmx_invept_individual_addr(void)
 {
 	return vmx_capability.ept & VMX_EPT_EXTENT_INDIVIDUAL_BIT;
@@ -254,6 +250,36 @@ static inline bool cpu_has_vmx_ept_ad_bits(void)
 	return vmx_capability.ept & VMX_EPT_AD_BIT;
 }
 
+static inline bool cpu_has_vmx_ept_execute_only(void)
+{
+	return vmx_capability.ept & VMX_EPT_EXECUTE_ONLY_BIT;
+}
+
+static inline bool cpu_has_vmx_eptp_uncacheable(void)
+{
+	return vmx_capability.ept & VMX_EPTP_UC_BIT;
+}
+
+static inline bool cpu_has_vmx_eptp_writeback(void)
+{
+	return vmx_capability.ept & VMX_EPTP_WB_BIT;
+}
+
+static inline bool cpu_has_vmx_ept_2m_page(void)
+{
+	return vmx_capability.ept & VMX_EPT_2MB_PAGE_BIT;
+}
+
+static inline bool cpu_has_vmx_ept_1g_page(void)
+{
+	return vmx_capability.ept & VMX_EPT_1GB_PAGE_BIT;
+}
+
+static inline bool cpu_has_vmx_ept_4levels(void)
+{
+	return vmx_capability.ept & VMX_EPT_PAGE_WALK_4_BIT;
+}
+
 static inline void __invept(int ext, uint64_t eptp, gpa_t gpa)
 {
 	struct {
@@ -266,10 +292,10 @@ static inline void __invept(int ext, uint64_t eptp, gpa_t gpa)
 			: : "a" (&operand), "c" (ext) : "cc", "memory");
 }
 
+/* We assert support for the global flush during ept_init() */
 static inline void ept_sync_global(void)
 {
-	if (cpu_has_vmx_invept_global())
-		__invept(VMX_EPT_EXTENT_GLOBAL, 0, 0);
+	__invept(VMX_EPT_EXTENT_GLOBAL, 0, 0);
 }
 
 static inline void ept_sync_context(uint64_t eptp)
@@ -278,6 +304,11 @@ static inline void ept_sync_context(uint64_t eptp)
 		__invept(VMX_EPT_EXTENT_CONTEXT, eptp, 0);
 	else
 		ept_sync_global();
+}
+
+void ept_flush(uint64_t eptp)
+{
+	ept_sync_context(eptp);
 }
 
 static inline void ept_sync_individual_addr(uint64_t eptp, gpa_t gpa)
@@ -337,6 +368,11 @@ static inline void vpid_sync_context(uint16_t vpid)
 		vpid_sync_vcpu_single(vpid);
 	else
 		vpid_sync_vcpu_global();
+}
+
+static inline uint64_t vcpu_get_eptp(struct vmx_vcpu *vcpu)
+{
+	return vcpu->proc->env_pgdir.eptp;
 }
 
 static void vmcs_clear(struct vmcs *vmcs)
@@ -605,7 +641,6 @@ static  void setup_vmcs_config(void *p)
 		return;
 	}
 
-	printk("CPU has all needed capabilities\n");
 	*ret = 0;
 }
 
@@ -760,19 +795,6 @@ static void __vmx_setup_cpu(void)
 	vmcs_writel(HOST_GS_BASE, tmpl); /* 22.2.4 */
 }
 
-static void __vmx_get_cpu_helper(struct hw_trapframe *hw_tf, void *ptr)
-{
-	struct vmx_vcpu *vcpu = ptr;
-
-	if (core_id() != vcpu->cpu)
-		panic("%s: core_id() %d != vcpu->cpu %d\n",
-		      __func__, core_id(), vcpu->cpu);
-
-	vmcs_clear(vcpu->vmcs);
-	if (currentcpu->local_vcpu == vcpu)
-		currentcpu->local_vcpu = NULL;
-}
-
 /**
  * vmx_get_cpu - called before using a cpu
  * @vcpu: VCPU that will be loaded.
@@ -796,7 +818,7 @@ static void vmx_get_cpu(struct vmx_vcpu *vcpu)
 				vmcs_clear(vcpu->vmcs);
 
 			vpid_sync_context(vcpu->vpid);
-			ept_sync_context(eptp);
+			ept_sync_context(vcpu_get_eptp(vcpu));
 
 			vcpu->launched = 0;
 			vmcs_load(vcpu->vmcs);
@@ -823,7 +845,7 @@ static void vmx_put_cpu(struct vmx_vcpu *vcpu)
 
 
 	vpid_sync_context(vcpu->vpid);
-	ept_sync_context(eptp);
+	ept_sync_context(vcpu_get_eptp(vcpu));
 	vmcs_clear(vcpu->vmcs);
 	vcpu->cpu = -1;
 	currentcpu->local_vcpu = NULL;
@@ -834,7 +856,7 @@ static void __vmx_sync_helper(struct hw_trapframe *hw_tf, void *ptr)
 {
 	struct vmx_vcpu *vcpu = ptr;
 
-	ept_sync_context(eptp);
+	ept_sync_context(vcpu_get_eptp(vcpu));
 }
 
 struct sync_addr_args {
@@ -930,13 +952,13 @@ static void vmx_dump_cpu(struct vmx_vcpu *vcpu)
 
 }
 
-uint64_t construct_eptp(unsigned long root_hpa)
+uint64_t construct_eptp(physaddr_t root_hpa)
 {
 	uint64_t eptp;
 
-	/* TODO write the value reading from MSR */
-	eptp = VMX_EPT_DEFAULT_MT |
-		VMX_EPT_DEFAULT_GAW << VMX_EPT_GAW_EPTP_SHIFT;
+	/* set WB memory and 4 levels of walk.  we checked these in ept_init */
+	eptp = VMX_EPT_MEM_TYPE_WB |
+	       (VMX_EPT_GAW_4_LVL << VMX_EPT_GAW_EPTP_SHIFT);
 	if (cpu_has_vmx_ept_ad_bits())
 		eptp |= VMX_EPT_AD_ENABLE_BIT;
 	eptp |= (root_hpa & PAGE_MASK);
@@ -1117,7 +1139,7 @@ static void vmx_setup_vmcs(struct vmx_vcpu *vcpu)
 			     vmcs_config.cpu_based_2nd_exec_ctrl);
 	}
 
-	vmcs_write64(EPT_POINTER, eptp);
+	vmcs_write64(EPT_POINTER, vcpu_get_eptp(vcpu));
 
 	vmcs_write32(PAGE_FAULT_ERROR_CODE_MASK, 0);
 	vmcs_write32(PAGE_FAULT_ERROR_CODE_MATCH, 0);
@@ -1233,15 +1255,6 @@ struct vmx_vcpu *vmx_create_vcpu(struct proc *p)
 	vmx_setup_initial_guest_state();
 	vmx_put_cpu(vcpu);
 
-#if 0
-	if (cpu_has_vmx_ept_ad_bits()) {
-		vcpu->ept_ad_enabled = true;
-		printk("vmx: enabled EPT A/D bits");
-	}
-	if (vmx_create_ept(vcpu->gv))
-		goto fail_ept;
-#endif
-
 	return vcpu;
 
 fail_ept:
@@ -1259,10 +1272,6 @@ fail_vmcs:
  */
 void vmx_destroy_vcpu(struct vmx_vcpu *vcpu)
 {
-	vmx_get_cpu(vcpu);
-	ept_sync_context(eptp);
-	memset(ept, 0, PGSIZE);
-	vmx_put_cpu(vcpu);
 	vmx_free_vpid(vcpu);
 	vmx_free_vmcs(vcpu->vmcs);
 	kfree(vcpu);
@@ -1454,7 +1463,7 @@ static int vmx_handle_ept_violation(struct vmx_vcpu *vcpu)
 	if (page) {
 		uint64_t hpa = page2pa(page);
 		printk("hpa for %p is %p\n", gpa, hpa);
-		ret = vmx_do_ept_fault(ept, gpa, hpa, exit_qual);
+		ret = vmx_do_ept_fault(vcpu->proc->env_pgdir.epte, gpa, hpa, exit_qual);
 		printk("vmx_do_ept_fault returns %d\n", ret);
 	}
 
@@ -1560,8 +1569,10 @@ int vmx_launch(struct dune_config *conf)
 
 	printk("RUNNING: %s: rip %p rsp %p cr3 %p \n",
 	       __func__, rip, rsp, cr3);
-	vcpu = vmx_create_vcpu();
+	/* TODO: dirty hack til we have VMM contexts */
+	vcpu = current->vmm.guest_pcores[0];
 	if (!vcpu) {
+		printk("Failed to get a CPU!\n");
 		return -ENOMEM;
 	}
 
@@ -1570,9 +1581,6 @@ int vmx_launch(struct dune_config *conf)
 	vmcs_writel(GUEST_RSP, rsp);
 	vmcs_writel(GUEST_CR3, cr3);
 	vmx_put_cpu(vcpu);
-
-	printk("created VCPU (VPID %d): pid %d\n",
-	       vcpu->vpid, current->pid);
 
 	vcpu->ret_code = -1;
 
@@ -1633,11 +1641,6 @@ int vmx_launch(struct dune_config *conf)
 	 * return more information for one of the other shutdown reasons.
 	 */
 	ret = (vcpu->shutdown << 16) | (vcpu->ret_code & 0xffff);
-
-	printk("destroying VCPU (VPID %d): pid %d\n",
-			vcpu->vpid, current->pid);
-
-	vmx_destroy_vcpu(vcpu);
 
 	return ret;
 }
@@ -1708,8 +1711,7 @@ static void vmx_enable(void)
 	return;
 
 failed:
-	has_vmx = FALSE;
-	printk("failed to enable VMX on core %d, err = %d\n", core_id(), ret);
+	printk("Failed to enable VMX on core %d, err = %d\n", core_id(), ret);
 }
 
 /**
@@ -1759,6 +1761,50 @@ static void setup_vmxarea(void)
 		currentcpu->vmxarea = vmxon_buf;
 }
 
+static int ept_init(void)
+{
+	if (!cpu_has_vmx_ept()) {
+		printk("VMX doesn't support EPT!\n");
+		return -1;
+	}
+	if (!cpu_has_vmx_eptp_writeback()) {
+		printk("VMX EPT doesn't support WB memory!\n");
+		return -1;
+	}
+	if (!cpu_has_vmx_ept_4levels()) {
+		printk("VMX EPT doesn't support 4 level walks!\n");
+		return -1;
+	}
+	switch (arch_max_jumbo_page_shift()) {
+		case PML3_SHIFT:
+			if (!cpu_has_vmx_ept_1g_page()) {
+				printk("VMX EPT doesn't support 1 GB pages!\n");
+				return -1;
+			}
+			break;
+		case PML2_SHIFT:
+			if (!cpu_has_vmx_ept_2m_page()) {
+				printk("VMX EPT doesn't support 2 MB pages!\n");
+				return -1;
+			}
+			break;
+		default:
+			printk("Unexpected jumbo page size %d\n",
+			       arch_max_jumbo_page_shift());
+			return -1;
+	}
+	if (!cpu_has_vmx_ept_ad_bits()) {
+		printk("VMX EPT doesn't support accessed/dirty!\n");
+		/* TODO: set the pmap_ops accordingly */
+	}
+	if (!cpu_has_vmx_invept() || !cpu_has_vmx_invept_global()) {
+		printk("VMX EPT can't invalidate PTEs/TLBs!\n");
+		return -1;
+	}
+
+	return 0;
+}
+
 /**
  * vmx_init sets up physical core data areas that are required to run a vm at all.
  * These data areas are not connected to a specific user process in any way. Instead,
@@ -1793,12 +1839,12 @@ int intel_vmm_init(void)
 
 	set_bit(0, vmx_vpid_bitmap); /* 0 is reserved for host */
 
-	/* TEMPORARY hack so we can do some basic VM testing. Create an ept and look for faults on it.
-	 */
-	ept = kpage_zalloc_addr();
-	eptp = construct_eptp(PADDR(ept));
-	printk("ept is %p and eptp is %p\n", ept, eptp);
-	return ret;
+	if ((ret = ept_init())) {
+		printk("EPT init failed, %d\n", ret);
+		return ret;
+	}
+	printk("VMX setup succeeded\n");
+	return 0;
 }
 
 int intel_vmm_pcpu_init(void)

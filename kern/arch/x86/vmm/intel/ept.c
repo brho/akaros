@@ -48,36 +48,6 @@
 #define HUGE_PAGE_SIZE	2097152
 #define PageHuge(x) (0)
 
-static inline bool cpu_has_vmx_ept_execute_only(void)
-{
-	return vmx_capability.ept & VMX_EPT_EXECUTE_ONLY_BIT;
-}
-
-static inline bool cpu_has_vmx_eptp_uncacheable(void)
-{
-	return vmx_capability.ept & VMX_EPTP_UC_BIT;
-}
-
-static inline bool cpu_has_vmx_eptp_writeback(void)
-{
-	return vmx_capability.ept & VMX_EPTP_WB_BIT;
-}
-
-static inline bool cpu_has_vmx_ept_2m_page(void)
-{
-	return vmx_capability.ept & VMX_EPT_2MB_PAGE_BIT;
-}
-
-static inline bool cpu_has_vmx_ept_1g_page(void)
-{
-	return vmx_capability.ept & VMX_EPT_1GB_PAGE_BIT;
-}
-
-static inline bool cpu_has_vmx_ept_4levels(void)
-{
-	return vmx_capability.ept & VMX_EPT_PAGE_WALK_4_BIT;
-}
-
 #define VMX_EPT_FAULT_READ	0x01
 #define VMX_EPT_FAULT_WRITE	0x02
 #define VMX_EPT_FAULT_INS	0x04

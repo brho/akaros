@@ -462,6 +462,7 @@ enum vmcs_field {
 #define VMX_EPTP_WB_BIT				(1ull << 14)
 #define VMX_EPT_2MB_PAGE_BIT			(1ull << 16)
 #define VMX_EPT_1GB_PAGE_BIT			(1ull << 17)
+#define VMX_EPT_INVEPT_BIT				(1ull << 20)
 #define VMX_EPT_AD_BIT				    (1ull << 21)
 #define VMX_EPT_EXTENT_CONTEXT_BIT		(1ull << 25)
 #define VMX_EPT_EXTENT_GLOBAL_BIT		(1ull << 26)
@@ -469,12 +470,12 @@ enum vmcs_field {
 #define VMX_VPID_EXTENT_SINGLE_CONTEXT_BIT      (1ull << 9) /* (41 - 32) */
 #define VMX_VPID_EXTENT_GLOBAL_CONTEXT_BIT      (1ull << 10) /* (42 - 32) */
 
-#define VMX_EPT_DEFAULT_GAW			3
-#define VMX_EPT_MAX_GAW				0x4
+#define VMX_EPT_GAW_4_LVL				3 	/* LVL - 1 */
+#define VMX_EPT_MAX_GAW					0x4
 #define VMX_EPT_MT_EPTE_SHIFT			3
 #define VMX_EPT_GAW_EPTP_SHIFT			3
 #define VMX_EPT_AD_ENABLE_BIT			(1ull << 6)
-#define VMX_EPT_DEFAULT_MT			0x6ull
+#define VMX_EPT_MEM_TYPE_WB				0x6ull
 #define VMX_EPT_READABLE_MASK			0x1ull
 #define VMX_EPT_WRITABLE_MASK			0x2ull
 #define VMX_EPT_EXECUTABLE_MASK			0x4ull
