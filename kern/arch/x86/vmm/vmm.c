@@ -71,8 +71,9 @@ int vm_run(uint64_t rip, uint64_t rsp, uint64_t cr3)
 
 /* Initializes a process to run virtual machine contexts, returning the number
  * initialized, optionally setting errno */
-int vmm_struct_init(struct vmm *vmm, unsigned int nr_guest_pcores)
+int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores)
 {
+	struct vmm *vmm = &p->vmm;
 	unsigned int i;
 	qlock(&vmm->qlock);
 	if (vmm->vmmcp) {
@@ -86,7 +87,7 @@ int vmm_struct_init(struct vmm *vmm, unsigned int nr_guest_pcores)
 	vmm->amd = 0;
 	vmm->guest_pcores = kzmalloc(sizeof(void*) * nr_guest_pcores, KMALLOC_WAIT);
 	for (i = 0; i < nr_guest_pcores; i++) {
-		vmm->guest_pcores[i] = vmx_create_vcpu();
+		vmm->guest_pcores[i] = vmx_create_vcpu(p);
 		/* If we failed, we'll clean it up when the process dies */
 		if (!vmm->guest_pcores[i]) {
 			set_errno(ENOMEM);
@@ -101,8 +102,9 @@ int vmm_struct_init(struct vmm *vmm, unsigned int nr_guest_pcores)
 /* Has no concurrency protection - only call this when you know you have the
  * only ref to vmm.  For instance, from __proc_free, where there is only one ref
  * to the proc (and thus proc.vmm). */
-void __vmm_struct_cleanup(struct vmm *vmm)
+void __vmm_struct_cleanup(struct proc *p)
 {
+	struct vmm *vmm = &p->vmm;
 	if (!vmm->vmmcp)
 		return;
 	for (int i = 0; i < vmm->nr_guest_pcores; i++) {

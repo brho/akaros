@@ -40,14 +40,14 @@ struct vmm {
 void vmm_init(void);
 void vmm_pcpu_init(void);
 
-int vmm_struct_init(struct vmm *vmm, unsigned int nr_guest_pcores);
-void __vmm_struct_cleanup(struct vmm *vmm);
+int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores);
+void __vmm_struct_cleanup(struct proc *p);
 
 int vm_run(uint64_t,uint64_t, uint64_t);
 int intel_vmx_start(int id);
 int intel_vmx_setup(int nvmcs);
 
-struct vmx_vcpu *vmx_create_vcpu(void);
+struct vmx_vcpu *vmx_create_vcpu(struct proc *p);
 void vmx_destroy_vcpu(struct vmx_vcpu *vcpu);
 
 #endif	/* _VMM_H_ */

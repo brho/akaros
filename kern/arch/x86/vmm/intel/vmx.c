@@ -1207,7 +1207,7 @@ static void vmx_free_vpid(struct vmx_vcpu *vmx)
  *
  * Returns: A new VCPU structure
  */
-struct vmx_vcpu *vmx_create_vcpu(void)
+struct vmx_vcpu *vmx_create_vcpu(struct proc *p)
 {
 	struct vmx_vcpu *vcpu = kmalloc(sizeof(struct vmx_vcpu), KMALLOC_WAIT);
 	if (!vcpu) {
@@ -1216,6 +1216,7 @@ struct vmx_vcpu *vmx_create_vcpu(void)
 
 	memset(vcpu, 0, sizeof(*vcpu));
 
+	vcpu->proc = p;	/* uncounted (weak) reference */
 	vcpu->vmcs = vmx_alloc_vmcs();
 	printd("%d: vcpu->vmcs is %p\n", core_id(), vcpu->vmcs);
 	if (!vcpu->vmcs)

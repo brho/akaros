@@ -1151,7 +1151,7 @@ static int sys_change_to_m(struct proc *p)
  * initialized, optionally setting errno */
 static int sys_setup_vmm(struct proc *p, unsigned int nr_guest_pcores)
 {
-	return vmm_struct_init(&p->vmm, nr_guest_pcores);
+	return vmm_struct_init(p, nr_guest_pcores);
 }
 
 /* Pokes the ksched for the given resource for target_pid.  If the target pid

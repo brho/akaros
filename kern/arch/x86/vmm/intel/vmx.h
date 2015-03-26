@@ -625,7 +625,7 @@ struct vmx_vcpu {
 
 	int shutdown;
 	int ret_code;
-	struct dune_guest *guest;
+	struct proc *proc;
 
 	struct msr_autoload {
 		unsigned nr;
