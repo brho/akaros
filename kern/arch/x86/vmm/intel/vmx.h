@@ -61,6 +61,7 @@
 #define CPU_BASED_MOV_DR_EXITING                0x00800000
 #define CPU_BASED_UNCOND_IO_EXITING             0x01000000
 #define CPU_BASED_USE_IO_BITMAPS                0x02000000
+#define CPU_BASED_MONITOR_TRAP                  0x08000000
 #define CPU_BASED_USE_MSR_BITMAPS               0x10000000
 #define CPU_BASED_MONITOR_EXITING               0x20000000
 #define CPU_BASED_PAUSE_EXITING                 0x40000000
@@ -70,19 +71,30 @@
  */
 #define SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES 0x00000001
 #define SECONDARY_EXEC_ENABLE_EPT               0x00000002
+#define SECONDARY_EXEC_DESCRIPTOR_EXITING       0x00000004
 #define SECONDARY_EXEC_RDTSCP			0x00000008
+#define SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE   0x00000010
 #define SECONDARY_EXEC_ENABLE_VPID              0x00000020
 #define SECONDARY_EXEC_WBINVD_EXITING		0x00000040
 #define SECONDARY_EXEC_UNRESTRICTED_GUEST	0x00000080
+#define SECONDARY_EXEC_APIC_REGISTER_VIRT       0x00000100
+#define SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY    0x00000200
 #define SECONDARY_EXEC_PAUSE_LOOP_EXITING	0x00000400
+#define SECONDARY_EXEC_RDRAND_EXITING	        0x00000800
 #define SECONDARY_EXEC_ENABLE_INVPCID		0x00001000
-
+#define SECONDARY_EXEC_ENABLE_VMFUNC		0x00002000
+#define SECONDARY_EXEC_SHADOW_VMCS              0x00004000
+#define SECONDARY_EXEC_RDSEED_EXITING           0x00010000
+#define SECONDARY_EPT_VE                        0x00040000
+#define SECONDARY_ENABLE_XSAV_RESTORE           0x00100000
 
 #define PIN_BASED_EXT_INTR_MASK                 0x00000001
 #define PIN_BASED_NMI_EXITING                   0x00000008
 #define PIN_BASED_VIRTUAL_NMIS                  0x00000020
+#define PIN_BASED_VMX_PREEMPTION_TIMER          0x00000040
+#define PIN_BASED_POSTED_INTR                   0x00000080
 
-#define VM_EXIT_SAVE_DEBUG_CONTROLS             0x00000002
+#define VM_EXIT_SAVE_DEBUG_CONTROLS             0x00000004
 #define VM_EXIT_HOST_ADDR_SPACE_SIZE            0x00000200
 #define VM_EXIT_LOAD_IA32_PERF_GLOBAL_CTRL      0x00001000
 #define VM_EXIT_ACK_INTR_ON_EXIT                0x00008000
@@ -92,7 +104,7 @@
 #define VM_EXIT_LOAD_IA32_EFER                  0x00200000
 #define VM_EXIT_SAVE_VMX_PREEMPTION_TIMER       0x00400000
 
-#define VM_ENTRY_LOAD_DEBUG_CONTROLS            0x00000002
+#define VM_ENTRY_LOAD_DEBUG_CONTROLS            0x00000004
 #define VM_ENTRY_IA32E_MODE                     0x00000200
 #define VM_ENTRY_SMM                            0x00000400
 #define VM_ENTRY_DEACT_DUAL_MONITOR             0x00000800
@@ -592,7 +604,6 @@ typedef uint64_t gva_t;
 struct vmx_capability {
 	uint32_t ept;
 	uint32_t vpid;
-	int has_load_efer:1;
 };
 
 extern struct vmx_capability vmx_capability;
@@ -899,5 +910,30 @@ static inline uint64_t vcpu_get_eptp(struct vmx_vcpu *vcpu)
 {
 	return vcpu->proc->env_pgdir.eptp;
 }
+
+/*
+ * VMX Execution Controls (vmxec)
+ * Some bits can be set, others can not (i.e. they are reserved).
+ *
+ * o all bits listed in here must set or clear all the bits in a word
+ *   that are not reserved (coverage).
+ * o no bits listed in one of these elements is listed in
+ *   another element (conflict)
+ * o you are allowed to specify a bit that matches a reserved value
+ *   (because it might be settable at some future time).
+ * o do your best to find symbolic names for the set_to_1 and set_to_0 values.
+ *   In the one case we could not find a name, it turned out to be an
+ *   error in kvm constants that went back to the earliest days.
+ * We're hoping you almost never have to change this. It's painful.
+ * The assumption going in is that the 5 MSRs that define the vmxec
+ * values are relatively static. This has been the case for a while.
+ */
+struct vmxec {
+	char *name;
+	uint32_t msr;
+	uint32_t truemsr;
+	uint32_t set_to_1;
+	uint32_t set_to_0;
+};
 
 #endif

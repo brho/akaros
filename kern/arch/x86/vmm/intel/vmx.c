@@ -278,175 +278,341 @@ static void vmcs_write64(unsigned long field, uint64_t value)
 	vmcs_writel(field, value);
 }
 
-static int adjust_vmx_controls(uint32_t ctl_min, uint32_t ctl_opt,
-				      uint32_t msr, uint32_t *result)
+/*
+ * A note on Things You Can't Make Up.
+ * or
+ * "George, you can type this shit, but you can't say it" -- Harrison Ford
+ *
+ * There are 5 VMCS 32-bit words that control guest permissions. If
+ * you set these correctly, you've got a guest that will behave. If
+ * you get even one bit wrong, you've got a guest that will chew your
+ * leg off. Some bits must be 1, some must be 0, and some can be set
+ * either way. To add to the fun, the docs are sort of a docudrama or,
+ * as the quote goes, "interesting if true."
+ *
+ * To determine what bit can be set in what VMCS 32-bit control word,
+ * there are 5 corresponding 64-bit MSRs.  And, to make it even more
+ * fun, the standard set of MSRs have errors in them, i.e. report
+ * incorrect values, for legacy reasons, and so you are supposed to
+ * "look around" to another set, which have correct bits in
+ * them. There are four such 'correct' registers, and they have _TRUE_
+ * in the names as you can see below. We test for the value of VMCS
+ * control bits in the _TRUE_ registers if possible. The fifth
+ * register, CPU Secondary Exec Controls, which came later, needs no
+ * _TRUE_ variant.
+ *
+ * For each MSR, the high 32 bits tell you what bits can be "1" by a
+ * "1" in that position; the low 32 bits tell you what bit can be "0"
+ * by a "0" in that position. So, for each of 32 bits in a given VMCS
+ * control word, there is a pair of bits in an MSR that tells you what
+ * values it can take. The two bits, of which there are *four*
+ * combinations, describe the *three* possible operations on a
+ * bit. The two bits, taken together, form an untruth table: There are
+ * three possibilities: The VMCS bit can be set to 0 or 1, or it can
+ * only be 0, or only 1. The fourth combination is not supposed to
+ * happen.
+ *
+ * So: there is the 1 bit from the upper 32 bits of the msr.
+ * If this bit is set, then the bit can be 1. If clear, it can not be 1.
+ *
+ * Then there is the 0 bit, from low 32 bits. If clear, the VMCS bit
+ * can be 0. If 1, the VMCS bit can not be 0.
+ *
+ * SO, let's call the 1 bit R1, and the 0 bit R0, we have:
+ *  R1 R0
+ *  0 0 -> must be 0
+ *  1 0 -> can be 1, can be 0
+ *  0 1 -> can not be 1, can not be 0. --> JACKPOT! Not seen yet.
+ *  1 1 -> must be one.
+ *
+ * It's also pretty hard to know what you can and can't set, and
+ * that's led to inadvertant opening of permissions at times.  Because
+ * of this complexity we've decided on the following: the driver must
+ * define EVERY bit, UNIQUELY, for each of the 5 registers, that it wants
+ * set. Further, for any bit that's settable, the driver must specify
+ * a setting; for any bit that's reserved, the driver settings must
+ * match that bit. If there are reserved bits we don't specify, that's
+ * ok; we'll take them as is.
+ *
+ * We use a set-means-set, and set-means-clear model, i.e. we use a
+ * 32-bit word to contain the bits we want to be 1, indicated by one;
+ * and another 32-bit word in which a bit we want to be 0 is indicated
+ * by a 1. This allows us to easily create masks of all bits we're
+ * going to set, for example.
+ *
+ * We have two 32-bit numbers for each 32-bit VMCS field: bits we want
+ * set and bits we want clear.  If you read the MSR for that field,
+ * compute the reserved 0 and 1 settings, and | them together, they
+ * need to result in 0xffffffff. You can see that we can create other
+ * tests for conflicts (i.e. overlap).
+ *
+ * At this point, I've tested check_vmx_controls in every way
+ * possible, beause I kept screwing the bitfields up. You'll get a nice
+ * error it won't work at all, which is what we want: a
+ * failure-prone setup, where even errors that might result in correct
+ * values are caught -- "right answer, wrong method, zero credit." If there's
+ * weirdness in the bits, we don't want to run.
+ */
+
+static bool check_vmxec_controls(struct vmxec const *v, bool have_true_msr,
+                                 uint32_t *result)
 {
+	bool err = false;
 	uint32_t vmx_msr_low, vmx_msr_high;
-	uint32_t ctl = ctl_min | ctl_opt;
-	uint64_t vmx_msr = read_msr(msr);
-	vmx_msr_low = vmx_msr;
-	vmx_msr_high = vmx_msr>>32;
+	uint32_t reserved_0, reserved_1, changeable_bits;
 
-	ctl &= vmx_msr_high; /* bit == 0 in high word ==> must be zero */
-	ctl |= vmx_msr_low;  /* bit == 1 in low word  ==> must be one  */
+	if (have_true_msr)
+		rdmsr(v->truemsr, vmx_msr_low, vmx_msr_high);
+	else
+		rdmsr(v->msr, vmx_msr_low, vmx_msr_high);
 
-	/* Ensure minimum (required) set of control bits are supported. */
-	if (ctl_min & ~ctl) {
-		return -EIO;
+	if (vmx_msr_low & ~vmx_msr_high)
+		warn("JACKPOT: Conflicting VMX ec ctls for %s, high 0x%08x low 0x%08x",
+		     v->name, vmx_msr_high, vmx_msr_low);
+
+	reserved_0 = (~vmx_msr_low) & (~vmx_msr_high);
+	reserved_1 = vmx_msr_low & vmx_msr_high;
+	changeable_bits = ~(reserved_0 | reserved_1);
+
+	/*
+	 * this is very much as follows:
+	 * accept the things I cannot change,
+	 * change the things I can,
+	 * know the difference.
+	 */
+
+	/* Conflict. Don't try to both set and reset bits. */
+	if (v->set_to_0 & v->set_to_1) {
+		printk("%s: set to 0 (0x%x) and set to 1 (0x%x) overlap: 0x%x\n",
+		       v->name, v->set_to_0, v->set_to_1, v->set_to_0 & v->set_to_1);
+		err = true;
 	}
 
-	*result = ctl;
-	return 0;
+	/* coverage */
+	if (((v->set_to_0 | v->set_to_1) & changeable_bits) !=
+	    changeable_bits) {
+		printk("%s: Need to cover 0x%x and have 0x%x,0x%x\n",
+		       v->name, changeable_bits, v->set_to_0,  v->set_to_1);
+		err = true;
+	}
+
+	if ((v->set_to_0 | v->set_to_1 | reserved_0 | reserved_1) !=
+	    0xffffffff) {
+		printk("%s: incomplete coverage: have 0x%x, want 0x%x\n",
+		       v->name, v->set_to_0 | v->set_to_1 |
+		       reserved_0 | reserved_1, 0xffffffff);
+		err = true;
+	}
+
+	/* Don't try to change bits that can't be changed. */
+	if ((v->set_to_0 & (reserved_0 | changeable_bits)) != v->set_to_0) {
+		printk("%s: set to 0 (0x%x) can't be done\n", v->name,
+			v->set_to_0);
+		err = true;
+	}
+
+	if ((v->set_to_1 & (reserved_1 | changeable_bits)) != v->set_to_1) {
+		printk("%s: set to 1 (0x%x) can't be done\n",
+		       v->name, v->set_to_1);
+		err = true;
+	}
+
+	/* If there's been any error at all, spill our guts and return. */
+	if (err) {
+		printk("%s: vmx_msr_high 0x%x, vmx_msr_low 0x%x, ",
+		       v->name, vmx_msr_high, vmx_msr_low);
+		printk("set_to_1 0x%x,set_to_0 0x%x,reserved_1 0x%x",
+		       v->set_to_1, v->set_to_0, reserved_1);
+		printk(" reserved_0 0x%x", reserved_0);
+		printk(" changeable_bits 0x%x\n", changeable_bits);
+		return false;
+	}
+
+	*result = v->set_to_1 | reserved_1;
+
+	printd("%s: check_vmxec_controls succeeds with result 0x%x\n",
+	       v->name, *result);
+	return true;
 }
 
-static  bool allow_1_setting(uint32_t msr, uint32_t ctl)
-{
-	uint32_t vmx_msr_low, vmx_msr_high;
+/*
+ * We're trying to make this as readable as possible. Realistically, it will
+ * rarely if ever change, if the past is any guide.
+ */
+static const struct vmxec pbec = {
+	.name = "Pin Based Execution Controls",
+	.msr = MSR_IA32_VMX_PINBASED_CTLS,
+	.truemsr = MSR_IA32_VMX_TRUE_PINBASED_CTLS,
 
-	rdmsr(msr, vmx_msr_low, vmx_msr_high);
-	return vmx_msr_high & ctl;
-}
+	.set_to_1 = (PIN_BASED_EXT_INTR_MASK |
+		     PIN_BASED_NMI_EXITING |
+		     PIN_BASED_VIRTUAL_NMIS),
 
-static  void setup_vmcs_config(void *p)
+	.set_to_0 = (PIN_BASED_VMX_PREEMPTION_TIMER |
+		     PIN_BASED_POSTED_INTR),
+};
+
+static const struct vmxec cbec = {
+	.name = "CPU Based Execution Controls",
+	.msr = MSR_IA32_VMX_PROCBASED_CTLS,
+	.truemsr = MSR_IA32_VMX_TRUE_PROCBASED_CTLS,
+
+	.set_to_1 = (CPU_BASED_HLT_EXITING |
+		     CPU_BASED_INVLPG_EXITING |
+		     CPU_BASED_MWAIT_EXITING |
+		     CPU_BASED_RDPMC_EXITING |
+		     CPU_BASED_CR8_LOAD_EXITING |
+		     CPU_BASED_CR8_STORE_EXITING |
+		     CPU_BASED_MOV_DR_EXITING |
+		     CPU_BASED_UNCOND_IO_EXITING |
+		     CPU_BASED_USE_MSR_BITMAPS |
+		     CPU_BASED_MONITOR_EXITING |
+		     CPU_BASED_ACTIVATE_SECONDARY_CONTROLS),
+
+	.set_to_0 = (CPU_BASED_VIRTUAL_INTR_PENDING |
+		     CPU_BASED_USE_TSC_OFFSETING |
+		     CPU_BASED_RDTSC_EXITING |
+		     CPU_BASED_CR3_LOAD_EXITING |
+		     CPU_BASED_CR3_STORE_EXITING |
+		     CPU_BASED_TPR_SHADOW |
+		     CPU_BASED_VIRTUAL_NMI_PENDING |
+		     CPU_BASED_MONITOR_TRAP |
+		     CPU_BASED_PAUSE_EXITING |
+		     CPU_BASED_USE_IO_BITMAPS),
+};
+
+static const struct vmxec cb2ec = {
+	.name = "CPU Based 2nd Execution Controls",
+	.msr = MSR_IA32_VMX_PROCBASED_CTLS2,
+	.truemsr = MSR_IA32_VMX_PROCBASED_CTLS2,
+
+	.set_to_1 = (SECONDARY_EXEC_ENABLE_EPT |
+		     SECONDARY_EXEC_RDTSCP |
+		     SECONDARY_EXEC_WBINVD_EXITING),
+
+	.set_to_0 = (SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
+		     SECONDARY_EXEC_DESCRIPTOR_EXITING |
+		     SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE |
+		     SECONDARY_EXEC_ENABLE_VPID |
+		     SECONDARY_EXEC_UNRESTRICTED_GUEST |
+		     SECONDARY_EXEC_APIC_REGISTER_VIRT |
+		     SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
+		     SECONDARY_EXEC_PAUSE_LOOP_EXITING |
+		     SECONDARY_EXEC_RDRAND_EXITING |
+		     SECONDARY_EXEC_ENABLE_INVPCID |
+		     SECONDARY_EXEC_ENABLE_VMFUNC |
+		     SECONDARY_EXEC_SHADOW_VMCS |
+		     SECONDARY_EXEC_RDSEED_EXITING |
+		     SECONDARY_EPT_VE |
+		     SECONDARY_ENABLE_XSAV_RESTORE)
+};
+
+static const struct vmxec vmentry = {
+	.name = "VMENTRY controls",
+	.msr = MSR_IA32_VMX_ENTRY_CTLS,
+	.truemsr = MSR_IA32_VMX_TRUE_ENTRY_CTLS,
+	/* exact order from vmx.h; only the first two are enabled. */
+
+	.set_to_1 =  (VM_ENTRY_LOAD_DEBUG_CONTROLS | /* can't set to 0 */
+		      VM_ENTRY_IA32E_MODE),
+
+	.set_to_0 = (VM_ENTRY_SMM |
+		     VM_ENTRY_DEACT_DUAL_MONITOR |
+		     VM_ENTRY_LOAD_IA32_PERF_GLOBAL_CTRL |
+		     VM_ENTRY_LOAD_IA32_PAT |
+		     VM_ENTRY_LOAD_IA32_EFER),
+};
+
+static const struct vmxec vmexit = {
+	.name = "VMEXIT controls",
+	.msr = MSR_IA32_VMX_EXIT_CTLS,
+	.truemsr = MSR_IA32_VMX_TRUE_EXIT_CTLS,
+
+	.set_to_1 = (VM_EXIT_SAVE_DEBUG_CONTROLS | /* can't set to 0 */
+		     VM_EXIT_HOST_ADDR_SPACE_SIZE), /* 64 bit */
+
+	.set_to_0 = (VM_EXIT_LOAD_IA32_PERF_GLOBAL_CTRL |
+		     VM_EXIT_ACK_INTR_ON_EXIT |
+		     VM_EXIT_SAVE_IA32_PAT |
+		     VM_EXIT_LOAD_IA32_PAT |
+		     VM_EXIT_SAVE_IA32_EFER |
+		     VM_EXIT_LOAD_IA32_EFER |
+		     VM_EXIT_SAVE_VMX_PREEMPTION_TIMER),
+};
+
+static void setup_vmcs_config(void *p)
 {
 	int *ret = p;
 	struct vmcs_config *vmcs_conf = &vmcs_config;
-	uint32_t vmx_msr_low, vmx_msr_high;
-	uint32_t min, opt, min2, opt2;
-	uint32_t _pin_based_exec_control = 0;
-	uint32_t _cpu_based_exec_control = 0;
-	uint32_t _cpu_based_2nd_exec_control = 0;
-	uint32_t _vmexit_control = 0;
-	uint32_t _vmentry_control = 0;
+	uint32_t vmx_msr_high;
+	uint64_t vmx_msr;
+	bool have_true_msrs = false;
+	bool ok;
 
 	*ret = -EIO;
-	min = PIN_BASED_EXT_INTR_MASK | PIN_BASED_NMI_EXITING;
-	opt = PIN_BASED_VIRTUAL_NMIS;
-	if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_PINBASED_CTLS,
-				&_pin_based_exec_control) < 0) {
+
+	vmx_msr = read_msr(MSR_IA32_VMX_BASIC);
+	vmx_msr_high = vmx_msr >> 32;
+
+	/*
+	 * If bit 55 (VMX_BASIC_HAVE_TRUE_MSRS) is set, then we
+	 * can go for the true MSRs.  Else, we ask you to get a better CPU.
+	 */
+	if (vmx_msr & VMX_BASIC_TRUE_CTLS) {
+		have_true_msrs = true;
+		printd("Running with TRUE MSRs\n");
+	} else {
+		printk("Running with non-TRUE MSRs, this is old hardware\n");
+	}
+
+	/*
+	 * Don't worry that one or more of these might fail and leave
+	 * the VMCS in some kind of incomplete state. If one of these
+	 * fails, the caller is going to discard the VMCS.
+	 * It is written this way to ensure we get results of all tests and avoid
+	 * BMAFR behavior.
+	 */
+	ok = check_vmxec_controls(&pbec, have_true_msrs,
+	                          &vmcs_conf->pin_based_exec_ctrl);
+	ok = check_vmxec_controls(&cbec, have_true_msrs,
+	                          &vmcs_conf->cpu_based_exec_ctrl) && ok;
+	ok = check_vmxec_controls(&cb2ec, have_true_msrs,
+	                          &vmcs_conf->cpu_based_2nd_exec_ctrl) && ok;
+	ok = check_vmxec_controls(&vmentry, have_true_msrs,
+	                          &vmcs_conf->vmentry_ctrl) && ok;
+	ok = check_vmxec_controls(&vmexit, have_true_msrs,
+	                          &vmcs_conf->vmexit_ctrl) && ok;
+	if (! ok) {
+		printk("vmxexec controls is no good.\n");
 		return;
 	}
-
-	min =
-	      CPU_BASED_CR8_LOAD_EXITING |
-	      CPU_BASED_CR8_STORE_EXITING |
-	      CPU_BASED_CR3_LOAD_EXITING |
-	      CPU_BASED_CR3_STORE_EXITING |
-	      CPU_BASED_MOV_DR_EXITING |
-	      CPU_BASED_USE_TSC_OFFSETING |
-	      CPU_BASED_MWAIT_EXITING |
-	      CPU_BASED_MONITOR_EXITING |
-	      CPU_BASED_INVLPG_EXITING;
-
-	min |= CPU_BASED_HLT_EXITING;
-
-	opt = CPU_BASED_TPR_SHADOW |
-	      CPU_BASED_USE_MSR_BITMAPS |
-	      CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
-	if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_PROCBASED_CTLS,
-				&_cpu_based_exec_control) < 0) {
-		return;
-	}
-
-	if ((_cpu_based_exec_control & CPU_BASED_TPR_SHADOW))
-		_cpu_based_exec_control &= ~CPU_BASED_CR8_LOAD_EXITING &
-					   ~CPU_BASED_CR8_STORE_EXITING;
-
-	if (_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS) {
-		min2 = 
-			SECONDARY_EXEC_ENABLE_EPT |
-			SECONDARY_EXEC_UNRESTRICTED_GUEST;
-		opt2 =  SECONDARY_EXEC_WBINVD_EXITING |
-			SECONDARY_EXEC_RDTSCP |
-			SECONDARY_EXEC_ENABLE_INVPCID;
-		if (adjust_vmx_controls(min2, opt2,
-					MSR_IA32_VMX_PROCBASED_CTLS2,
-					&_cpu_based_2nd_exec_control) < 0) {
-						return;
-					}
-	}
-
-	if (!(_cpu_based_2nd_exec_control &
-				SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES))
-		_cpu_based_exec_control &= ~CPU_BASED_TPR_SHADOW;
-
-	if (_cpu_based_2nd_exec_control & SECONDARY_EXEC_ENABLE_EPT) {
-		/* CR3 accesses and invlpg don't need to cause VM Exits when EPT
-		   enabled */
-		_cpu_based_exec_control &= ~(CPU_BASED_CR3_LOAD_EXITING |
-					     CPU_BASED_CR3_STORE_EXITING |
-					     CPU_BASED_INVLPG_EXITING);
-		rdmsr(MSR_IA32_VMX_EPT_VPID_CAP,
-		      vmx_capability.ept, vmx_capability.vpid);
-	}
-
-	min = 0;
-
-	min |= VM_EXIT_HOST_ADDR_SPACE_SIZE;
-
-//	opt = VM_EXIT_SAVE_IA32_PAT | VM_EXIT_LOAD_IA32_PAT;
-	opt = 0;
-	if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_EXIT_CTLS,
-				&_vmexit_control) < 0) {
-		return;
-	}
-
-	min = 0;
-//	opt = VM_ENTRY_LOAD_IA32_PAT;
-	opt = 0;
-	if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_ENTRY_CTLS,
-				&_vmentry_control) < 0) {
-		return;
-	}
-
-	rdmsr(MSR_IA32_VMX_BASIC, vmx_msr_low, vmx_msr_high);
 
 	/* IA-32 SDM Vol 3B: VMCS size is never greater than 4kB. */
-	if ((vmx_msr_high & 0x1fff) > PAGE_SIZE) {
+	if ((vmx_msr_high & 0x1fff) > PGSIZE) {
+		printk("vmx_msr_high & 0x1fff) is 0x%x, > PAGE_SIZE 0x%x\n",
+		       vmx_msr_high & 0x1fff, PGSIZE);
 		return;
 	}
 
 	/* IA-32 SDM Vol 3B: 64-bit CPUs always have VMX_BASIC_MSR[48]==0. */
-	if (vmx_msr_high & (1u<<16)) {
-		printk("64-bit CPUs always have VMX_BASIC_MSR[48]==0. FAILS!\n");
+	if (vmx_msr & VMX_BASIC_64) {
+		printk("VMX doesn't support 64 bit width!\n");
 		return;
 	}
 
-	/* Require Write-Back (WB) memory type for VMCS accesses. */
-	if (((vmx_msr_high >> 18) & 15) != 6) {
-		printk("NO WB!\n");
+	if (((vmx_msr & VMX_BASIC_MEM_TYPE_MASK) >> VMX_BASIC_MEM_TYPE_SHIFT)
+	    != VMX_BASIC_MEM_TYPE_WB) {
+		printk("VMX doesn't support WB memory for VMCS accesses!\n");
 		return;
 	}
 
 	vmcs_conf->size = vmx_msr_high & 0x1fff;
 	vmcs_conf->order = LOG2_UP(nr_pages(vmcs_config.size));
-	vmcs_conf->revision_id = vmx_msr_low;
-	printk("vmcs_conf size %d order %d rev %d\n",
-	       vmcs_conf->size, vmcs_conf->order,
-	       vmcs_conf->revision_id);
+	vmcs_conf->revision_id = (uint32_t)vmx_msr;
 
-	vmcs_conf->pin_based_exec_ctrl = _pin_based_exec_control;
-	vmcs_conf->cpu_based_exec_ctrl = _cpu_based_exec_control;
-	vmcs_conf->cpu_based_2nd_exec_ctrl = _cpu_based_2nd_exec_control;
-	vmcs_conf->vmexit_ctrl         = _vmexit_control;
-	vmcs_conf->vmentry_ctrl        = _vmentry_control;
-
-	vmx_capability.has_load_efer =
-		allow_1_setting(MSR_IA32_VMX_ENTRY_CTLS,
-				VM_ENTRY_LOAD_IA32_EFER)
-		&& allow_1_setting(MSR_IA32_VMX_EXIT_CTLS,
-				   VM_EXIT_LOAD_IA32_EFER);
-
-	/* Now that we've done all the setup we can do, verify
-	 * that we have all the capabilities we need. These tests
-	 * are done last presumably because all the work done above
-	 * affects some of them.
-	 */
-
-	if (!vmx_capability.has_load_efer) {
-		printk("CPU lacks ability to load EFER register\n");
-		return;
-	}
+	/* Read in the caps for runtime checks.  This MSR is only available if
+	 * secondary controls and ept or vpid is on, which we check earlier */
+	rdmsr(MSR_IA32_VMX_EPT_VPID_CAP, vmx_capability.ept, vmx_capability.vpid);
 
 	*ret = 0;
 }
