@@ -120,3 +120,10 @@ void arch_pgdir_clear(pgdir_t *pd)
 {
 	*pd = 0;
 }
+
+/* Returns the page shift of the largest jumbo supported */
+int arch_max_jumbo_page_shift(void)
+{
+	#warning "What jumbo page sizes does RISC support?"
+	return PGSHIFT;
+}

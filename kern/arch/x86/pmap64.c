@@ -36,7 +36,6 @@ pgdir_t boot_pgdir;
 physaddr_t boot_cr3;
 segdesc_t *gdt;
 pseudodesc_t gdt_pd;
-unsigned int max_jumbo_shift;
 
 #define PG_WALK_SHIFT_MASK		0x00ff 		/* first byte = target shift */
 #define PG_WALK_CREATE 			0x0100
@@ -428,7 +427,7 @@ static void check_syms_va(void)
  * have a slimmed down page table. */
 void vm_init(void)
 {
-	uint32_t edx;
+	int max_jumbo_shift;
 	kpte_t *boot_kpt = KADDR(get_boot_pml4());
 
 	boot_cr3 = get_boot_pml4();
@@ -437,8 +436,7 @@ void vm_init(void)
 	gdt = KADDR(get_gdt64());
 
 	/* We need to limit our mappings on machines that don't support 1GB pages */
-	cpuid(0x80000001, 0x0, 0, 0, 0, &edx);
-	max_jumbo_shift = edx & (1 << 26) ? PML3_SHIFT : PML2_SHIFT;
+	max_jumbo_shift = arch_max_jumbo_page_shift();
 	check_syms_va();
 	/* KERNBASE mapping: we already have 512 GB complete (one full PML3_REACH).
 	 * It's okay if we have extra, just need to make sure we reach max_paddr. */
@@ -577,6 +575,14 @@ void arch_pgdir_clear(pgdir_t *pd)
 	pd->epte = 0;
 }
 
+/* Returns the page shift of the largest jumbo supported */
+int arch_max_jumbo_page_shift(void)
+{
+	uint32_t edx;
+	cpuid(0x80000001, 0x0, 0, 0, 0, &edx);
+	return edx & (1 << 26) ? PML3_SHIFT : PML2_SHIFT;
+}
+
 /* Debugging */
 static int print_pte(kpte_t *kpte, uintptr_t kva, int shift, bool visited_subs,
                      void *data)
@@ -605,7 +611,7 @@ void debug_print_pgdir(kpte_t *pgdir)
 	printk("Printing the entire page table set for %p, DFS\n", pgdir);
 	/* Need to be careful we avoid VPT/UVPT, o/w we'll recurse */
 	pml_for_each(pgdir, 0, UVPT, print_pte, 0);
-	if (max_jumbo_shift < PML3_SHIFT)
+	if (arch_max_jumbo_page_shift() < PML3_SHIFT)
 		printk("(skipping kernbase mapping - too many entries)\n");
 	else
 		pml_for_each(pgdir, KERNBASE, VPT - KERNBASE, print_pte, 0);
