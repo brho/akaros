@@ -615,7 +615,6 @@ struct dune_struct {
 struct vmx_vcpu {
 
 	int cpu;
-	int vpid;
 	int launched;
 	struct hw_trapframe regs;
 	uint8_t  fail;

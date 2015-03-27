@@ -172,9 +172,6 @@ static const uint32_t vmx_msr_index[] = {
 };
 #define NR_VMX_MSR ARRAY_SIZE(vmx_msr_index)
 
-static DECLARE_BITMAP(vmx_vpid_bitmap, /*VMX_NR_VPIDS*/ 65536);
-static spinlock_t vmx_vpid_lock;
-
 static unsigned long *msr_bitmap;
 
 static struct vmcs_config {
@@ -546,7 +543,6 @@ static  void setup_vmcs_config(void *p)
 
 	if (_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS) {
 		min2 = 
-			SECONDARY_EXEC_ENABLE_VPID |
 			SECONDARY_EXEC_ENABLE_EPT |
 			SECONDARY_EXEC_UNRESTRICTED_GUEST;
 		opt2 =  SECONDARY_EXEC_WBINVD_EXITING |
@@ -817,7 +813,6 @@ static void vmx_get_cpu(struct vmx_vcpu *vcpu)
 			} else
 				vmcs_clear(vcpu->vmcs);
 
-			vpid_sync_context(vcpu->vpid);
 			ept_sync_context(vcpu_get_eptp(vcpu));
 
 			vcpu->launched = 0;
@@ -843,8 +838,6 @@ static void vmx_put_cpu(struct vmx_vcpu *vcpu)
 	if (currentcpu->local_vcpu != vcpu)
 		panic("vmx_put_cpu: asked to clear something not ours");
 
-
-	vpid_sync_context(vcpu->vpid);
 	ept_sync_context(vcpu_get_eptp(vcpu));
 	vmcs_clear(vcpu->vmcs);
 	vcpu->cpu = -1;
@@ -929,7 +922,7 @@ static void vmx_dump_cpu(struct vmx_vcpu *vcpu)
 	vmx_put_cpu(vcpu);
 
 	printk("--- Begin VCPU Dump ---\n");
-	printk("CPU %d VPID %d\n", vcpu->cpu, vcpu->vpid);
+	printk("CPU %d VPID %d\n", vcpu->cpu, 0);
 	printk("RIP 0x%016lx RFLAGS 0x%08lx\n",
 	       vcpu->regs.tf_rip, flags);
 	printk("RAX 0x%016lx RCX 0x%016lx\n",
@@ -1124,7 +1117,7 @@ static void setup_msr(struct vmx_vcpu *vcpu)
  */
 static void vmx_setup_vmcs(struct vmx_vcpu *vcpu)
 {
-	vmcs_write16(VIRTUAL_PROCESSOR_ID, vcpu->vpid);
+	vmcs_write16(VIRTUAL_PROCESSOR_ID, 0);
 	vmcs_write64(VMCS_LINK_POINTER, -1ull); /* 22.3.1.5 */
 
 	/* Control */
@@ -1192,39 +1185,6 @@ static void vmx_setup_vmcs(struct vmx_vcpu *vcpu)
 }
 
 /**
- * vmx_allocate_vpid - reserves a vpid and sets it in the VCPU
- * @vmx: the VCPU
- */
-static int vmx_allocate_vpid(struct vmx_vcpu *vmx)
-{
-	int vpid;
-
-	vmx->vpid = 0;
-
-	spin_lock(&vmx_vpid_lock);
-	vpid = find_first_zero_bit(vmx_vpid_bitmap, VMX_NR_VPIDS);
-	if (vpid < VMX_NR_VPIDS) {
-		vmx->vpid = vpid;
-		__set_bit(vpid, vmx_vpid_bitmap);
-	}
-	spin_unlock(&vmx_vpid_lock);
-
-	return vpid >= VMX_NR_VPIDS;
-}
-
-/**
- * vmx_free_vpid - frees a vpid
- * @vmx: the VCPU
- */
-static void vmx_free_vpid(struct vmx_vcpu *vmx)
-{
-	spin_lock(&vmx_vpid_lock);
-	if (vmx->vpid != 0)
-		__clear_bit(vmx->vpid, vmx_vpid_bitmap);
-	spin_unlock(&vmx_vpid_lock);
-}
-
-/**
  * vmx_create_vcpu - allocates and initializes a new virtual cpu
  *
  * Returns: A new VCPU structure
@@ -1244,10 +1204,6 @@ struct vmx_vcpu *vmx_create_vcpu(struct proc *p)
 	if (!vcpu->vmcs)
 		goto fail_vmcs;
 
-	if (vmx_allocate_vpid(vcpu))
-		goto fail_vpid;
-
-	printd("%d: vmx_create_vcpu: vpid %d\n", core_id(), vcpu->vpid);
 	vcpu->cpu = -1;
 
 	vmx_get_cpu(vcpu);
@@ -1257,10 +1213,6 @@ struct vmx_vcpu *vmx_create_vcpu(struct proc *p)
 
 	return vcpu;
 
-fail_ept:
-	vmx_free_vpid(vcpu);
-fail_vpid:
-	vmx_free_vmcs(vcpu->vmcs);
 fail_vmcs:
 	kfree(vcpu);
 	return NULL;
@@ -1272,7 +1224,6 @@ fail_vmcs:
  */
 void vmx_destroy_vcpu(struct vmx_vcpu *vcpu)
 {
-	vmx_free_vpid(vcpu);
 	vmx_free_vmcs(vcpu->vmcs);
 	kfree(vcpu);
 }
@@ -1498,9 +1449,8 @@ static int vmx_handle_nmi_exception(struct vmx_vcpu *vcpu)
 	intr_info = vmcs_read32(VM_EXIT_INTR_INFO);
 	vmx_put_cpu(vcpu);
 
-	printk("vmx (VPID %d): got an exception\n", vcpu->vpid);
-	printk("vmx (VPID %d): pid %d\n", vcpu->vpid,
-			 current->pid);
+	printk("vmx (vcpu %p): got an exception\n", vcpu);
+	printk("vmx (vcpu %p): pid %d\n", vcpu, vcpu->proc->pid);
 	if ((intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI_INTR) {
 		return 0;
 	}
@@ -1682,7 +1632,7 @@ static  int __vmx_enable(struct vmcs *vmxon_buf)
 	lcr4(rcr4() | X86_CR4_VMXE);
 
 	__vmxon(phys_addr);
-	vpid_sync_vcpu_global();
+	vpid_sync_vcpu_global();	/* good idea, even if we aren't using vpids */
 	ept_sync_global();
 
 	return 0;
@@ -1836,8 +1786,6 @@ int intel_vmm_init(void)
 	memset(msr_bitmap, 0xff, PAGE_SIZE);
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE);
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE);
-
-	set_bit(0, vmx_vpid_bitmap); /* 0 is reserved for host */
 
 	if ((ret = ept_init())) {
 		printk("EPT init failed, %d\n", ret);
