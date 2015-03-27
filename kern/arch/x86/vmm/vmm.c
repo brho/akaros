@@ -59,12 +59,11 @@ void vmm_pcpu_init(void)
 
 int vm_run(uint64_t rip, uint64_t rsp, uint64_t cr3)
 {
-	struct dune_config d = {rip, rsp, cr3};
-	int vmx_launch(struct dune_config *conf);	
+	int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3);
 	if (current->vmm.amd) {
 		return -1;
 	} else {
-		return vmx_launch(&d);
+		return vmx_launch(rip, rsp, cr3);
 	}
 	return -1;
 }

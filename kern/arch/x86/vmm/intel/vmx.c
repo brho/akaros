@@ -1229,28 +1229,17 @@ void vmx_destroy_vcpu(struct vmx_vcpu *vcpu)
 }
 
 /**
- * vmx_task_vcpu - returns a pointer to the task's vcpu or NULL.
- * @task: the task
- */
-static inline struct vmx_vcpu *vmx_task_vcpu(struct proc *p)
-{
-	struct dune_struct *dune = current->virtinfo;
-	return dune ? dune->vcpu : NULL;
-}
-
-/**
  * vmx_current_vcpu - returns a pointer to the vcpu for the current task.
  *
  * In the contexts where this is used the vcpu pointer should never be NULL.
  */
 static inline struct vmx_vcpu *vmx_current_vcpu(void)
 {
-	struct vmx_vcpu *vcpu = vmx_task_vcpu(current);
-	if (! vcpu)
-		panic("%s: core_id %d: no vcpu", __func__, core_id());
+	struct vmx_vcpu *vcpu = currentcpu->local_vcpu;
+	if (!vcpu)
+		panic("Core has no vcpu!");
 	return vcpu;
 }
-
 
 /**
  * vmx_run_vcpu - launches the CPU into non-root mode
@@ -1473,20 +1462,16 @@ static unsigned long stack[512];
  * vmx_launch - the main loop for a VMX Dune process
  * @conf: the launch configuration
  */
-int vmx_launch(struct dune_config *conf)
+int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 {
 	int ret;
-	struct dune_struct dune;
 	struct vmx_vcpu *vcpu;
 	int i = 0;
-	unsigned long rip = conf->rip;
-	unsigned long rsp = conf->rsp;
-	unsigned long cr3 = conf->cr3;
 	int errors = 0;
 
-	if (conf->rip < 4096 ) {
+	if (rip < 4096 ) {
 		// testing.
-		switch(conf->rip) {
+		switch(rip) {
 		default:
 			rip = (uint64_t)noop + 4;
 			break;
@@ -1496,7 +1481,7 @@ int vmx_launch(struct dune_config *conf)
 		}
 	}
 
-	if (conf->cr3 == 0) {
+	if (cr3 == 0) {
 		cr3 = rcr3();
 	}
 
@@ -1533,13 +1518,6 @@ int vmx_launch(struct dune_config *conf)
 	vmx_put_cpu(vcpu);
 
 	vcpu->ret_code = -1;
-
-	if (current->virtinfo)
-		printk("vmx_launch: current->virtinfo is NOT NULL (%p)\n", current->virtinfo);
-	//WARN_ON(current->virtinfo != NULL);
-	dune.vcpu = vcpu;
-
-	current->virtinfo = &dune;
 
 	while (1) {
 		vmx_get_cpu(vcpu);
@@ -1582,7 +1560,6 @@ int vmx_launch(struct dune_config *conf)
 
 	printk("RETURN. ip %016lx sp %016lx\n",
 		vcpu->regs.tf_rip, vcpu->regs.tf_rsp);
-	current->virtinfo = NULL;
 
 	/*
 	 * Return both the reason for the shutdown and a status value.

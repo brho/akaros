@@ -608,10 +608,6 @@ struct ldttss_desc64 {
 	uint32_t zero1;
 } __attribute__((packed));
 
-struct dune_struct {
-        struct vmx_vcpu *vcpu;
-};
-
 struct vmx_vcpu {
 
 	int cpu;
