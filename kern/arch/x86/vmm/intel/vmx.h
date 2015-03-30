@@ -466,6 +466,23 @@ enum vmcs_field {
 #define VMX_EPT_AD_BIT				    (1ull << 21)
 #define VMX_EPT_EXTENT_CONTEXT_BIT		(1ull << 25)
 #define VMX_EPT_EXTENT_GLOBAL_BIT		(1ull << 26)
+#define VMX_EPT_EXTENT_INDIVIDUAL_BIT           (1ull << 24)
+
+/*
+ * shutdown reasons
+ */
+enum shutdown_reason {
+	SHUTDOWN_SYS_EXIT = 1,
+	SHUTDOWN_SYS_EXIT_GROUP,
+	SHUTDOWN_SYS_EXECVE,
+	SHUTDOWN_FATAL_SIGNAL,
+	SHUTDOWN_EPT_VIOLATION,
+	SHUTDOWN_NMI_EXCEPTION,
+	SHUTDOWN_UNHANDLED_EXIT_REASON,
+};
+
+#define SHUTDOWN_REASON(r)	((r) >> 16)
+#define SHUTDOWN_STATUS(r)	((r) & 0xffff)
 
 #define VMX_VPID_EXTENT_SINGLE_CONTEXT_BIT      (1ull << 9) /* (41 - 32) */
 #define VMX_VPID_EXTENT_GLOBAL_CONTEXT_BIT      (1ull << 10) /* (42 - 32) */
@@ -550,9 +567,6 @@ enum vm_instruction_error_number {
 #define MSR_IA32_VMX_EXIT_CTLS_MSR		0x483
 #define MSR_IA32_VMX_ENTRY_CTLS_MSR		0x484
 
-int intel_vmm_init(void);
-int intel_vmm_pcpu_init(void);
-
 /* Additional bits for VMMCPs, originally from the Dune version of kvm. */
 /*
  * vmx.h - header file for USM VMX driver.
@@ -579,6 +593,19 @@ struct vmx_capability {
 };
 
 extern struct vmx_capability vmx_capability;
+
+struct vmcs_config {
+	int size;
+	int order;
+	uint32_t revision_id;
+	uint32_t pin_based_exec_ctrl;
+	uint32_t cpu_based_exec_ctrl;
+	uint32_t cpu_based_2nd_exec_ctrl;
+	uint32_t vmexit_ctrl;
+	uint32_t vmentry_ctrl;
+};
+
+extern struct vmcs_config vmcs_config;
 
 #define NR_AUTOLOAD_MSRS 8
 
@@ -632,11 +659,46 @@ struct vmx_vcpu {
 	struct vmcs *vmcs;
 };
 
-extern int vmx_init(void);
-extern void vmx_exit(void);
+int vmx_init(void);
+void vmx_exit(void);
+int intel_vmm_init(void);
+int intel_vmm_pcpu_init(void);
 int ept_fault_pages(void *dir, uint32_t start, uint32_t end);
 int ept_check_page(void *dir, unsigned long addr);
 int vmx_do_ept_fault(void *dir, unsigned long gpa, unsigned long gva, int fault_flags);
+
+static inline void native_store_idt(pseudodesc_t *dtr);
+static inline unsigned long get_desc_base(const struct desc_struct *desc);
+static inline void native_store_gdt(pseudodesc_t *dtr);
+static inline bool cpu_has_secondary_exec_ctrls(void);
+static inline bool cpu_has_vmx_vpid(void);
+static inline bool cpu_has_vmx_invpcid(void);
+static inline bool cpu_has_vmx_invvpid_single(void);
+static inline bool cpu_has_vmx_invvpid_global(void);
+static inline bool cpu_has_vmx_ept(void);
+static inline bool cpu_has_vmx_invept(void);
+static inline bool cpu_has_vmx_invept_individual_addr(void);
+static inline bool cpu_has_vmx_invept_context(void);
+static inline bool cpu_has_vmx_invept_global(void);
+static inline bool cpu_has_vmx_ept_ad_bits(void);
+static inline bool cpu_has_vmx_ept_execute_only(void);
+static inline bool cpu_has_vmx_eptp_uncacheable(void);
+static inline bool cpu_has_vmx_eptp_writeback(void);
+static inline bool cpu_has_vmx_ept_2m_page(void);
+static inline bool cpu_has_vmx_ept_1g_page(void);
+static inline bool cpu_has_vmx_ept_4levels(void);
+static inline void __invept(int ext, uint64_t eptp, gpa_t gpa);
+static inline void ept_sync_global(void);
+static inline void ept_sync_context(uint64_t eptp);
+static inline void ept_sync_individual_addr(uint64_t eptp, gpa_t gpa);
+static inline void __vmxon(uint64_t addr);
+static inline void __vmxoff(void);
+static inline void __invvpid(int ext, uint16_t vpid, gva_t gva);
+static inline void vpid_sync_vcpu_single(uint16_t vpid);
+static inline void vpid_sync_vcpu_global(void);
+static inline void vpid_sync_context(uint16_t vpid);
+static inline uint64_t vcpu_get_eptp(struct vmx_vcpu *vcpu);
+
 /* no way to get around some of this stuff. */
 /* we will do the bare minimum required. */
 static inline void native_store_idt(pseudodesc_t *dtr)
@@ -653,6 +715,186 @@ static inline unsigned long get_desc_base(const struct desc_struct *desc)
 static inline void native_store_gdt(pseudodesc_t *dtr)
 {
         asm volatile("sgdt %0":"=m" (*dtr));
+}
+
+static inline bool cpu_has_secondary_exec_ctrls(void)
+{
+	return vmcs_config.cpu_based_exec_ctrl &
+		CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
+}
+
+static inline bool cpu_has_vmx_vpid(void)
+{
+	return vmcs_config.cpu_based_2nd_exec_ctrl &
+		SECONDARY_EXEC_ENABLE_VPID;
+}
+
+static inline bool cpu_has_vmx_invpcid(void)
+{
+	return vmcs_config.cpu_based_2nd_exec_ctrl &
+		SECONDARY_EXEC_ENABLE_INVPCID;
+}
+
+static inline bool cpu_has_vmx_invvpid_single(void)
+{
+	return vmx_capability.vpid & VMX_VPID_EXTENT_SINGLE_CONTEXT_BIT;
+}
+
+static inline bool cpu_has_vmx_invvpid_global(void)
+{
+	return vmx_capability.vpid & VMX_VPID_EXTENT_GLOBAL_CONTEXT_BIT;
+}
+
+static inline bool cpu_has_vmx_ept(void)
+{
+	return vmcs_config.cpu_based_2nd_exec_ctrl &
+		SECONDARY_EXEC_ENABLE_EPT;
+}
+
+static inline bool cpu_has_vmx_invept(void)
+{
+	return vmx_capability.ept & VMX_EPT_INVEPT_BIT;
+}
+
+/* the SDM (2015-01) doesn't mention this ability (still?) */
+static inline bool cpu_has_vmx_invept_individual_addr(void)
+{
+	return vmx_capability.ept & VMX_EPT_EXTENT_INDIVIDUAL_BIT;
+}
+
+static inline bool cpu_has_vmx_invept_context(void)
+{
+	return vmx_capability.ept & VMX_EPT_EXTENT_CONTEXT_BIT;
+}
+
+static inline bool cpu_has_vmx_invept_global(void)
+{
+	return vmx_capability.ept & VMX_EPT_EXTENT_GLOBAL_BIT;
+}
+
+static inline bool cpu_has_vmx_ept_ad_bits(void)
+{
+	return vmx_capability.ept & VMX_EPT_AD_BIT;
+}
+
+static inline bool cpu_has_vmx_ept_execute_only(void)
+{
+	return vmx_capability.ept & VMX_EPT_EXECUTE_ONLY_BIT;
+}
+
+static inline bool cpu_has_vmx_eptp_uncacheable(void)
+{
+	return vmx_capability.ept & VMX_EPTP_UC_BIT;
+}
+
+static inline bool cpu_has_vmx_eptp_writeback(void)
+{
+	return vmx_capability.ept & VMX_EPTP_WB_BIT;
+}
+
+static inline bool cpu_has_vmx_ept_2m_page(void)
+{
+	return vmx_capability.ept & VMX_EPT_2MB_PAGE_BIT;
+}
+
+static inline bool cpu_has_vmx_ept_1g_page(void)
+{
+	return vmx_capability.ept & VMX_EPT_1GB_PAGE_BIT;
+}
+
+static inline bool cpu_has_vmx_ept_4levels(void)
+{
+	return vmx_capability.ept & VMX_EPT_PAGE_WALK_4_BIT;
+}
+
+static inline void __invept(int ext, uint64_t eptp, gpa_t gpa)
+{
+	struct {
+		uint64_t eptp, gpa;
+	} operand = {eptp, gpa};
+
+	asm volatile (ASM_VMX_INVEPT
+			/* CF==1 or ZF==1 --> rc = -1 */
+			"; ja 1f ; ud2 ; 1:\n"
+			: : "a" (&operand), "c" (ext) : "cc", "memory");
+}
+
+/* We assert support for the global flush during ept_init() */
+static inline void ept_sync_global(void)
+{
+	__invept(VMX_EPT_EXTENT_GLOBAL, 0, 0);
+}
+
+static inline void ept_sync_context(uint64_t eptp)
+{
+	if (cpu_has_vmx_invept_context())
+		__invept(VMX_EPT_EXTENT_CONTEXT, eptp, 0);
+	else
+		ept_sync_global();
+}
+
+static inline void ept_sync_individual_addr(uint64_t eptp, gpa_t gpa)
+{
+	if (cpu_has_vmx_invept_individual_addr())
+		__invept(VMX_EPT_EXTENT_INDIVIDUAL_ADDR,
+				eptp, gpa);
+	else
+		ept_sync_context(eptp);
+}
+
+static inline void __vmxon(uint64_t addr)
+{
+	asm volatile (ASM_VMX_VMXON_RAX
+			: : "a"(&addr), "m"(addr)
+			: "memory", "cc");
+}
+
+static inline void __vmxoff(void)
+{
+	asm volatile (ASM_VMX_VMXOFF : : : "cc");
+}
+
+static inline void __invvpid(int ext, uint16_t vpid, gva_t gva)
+{
+    struct {
+	uint64_t vpid : 16;
+	uint64_t rsvd : 48;
+	uint64_t gva;
+    } operand = { vpid, 0, gva };
+
+    asm volatile (ASM_VMX_INVVPID
+		  /* CF==1 or ZF==1 --> rc = -1 */
+		  "; ja 1f ; ud2 ; 1:"
+		  : : "a"(&operand), "c"(ext) : "cc", "memory");
+}
+
+static inline void vpid_sync_vcpu_single(uint16_t vpid)
+{
+	if (vpid == 0) {
+		return;
+	}
+
+	if (cpu_has_vmx_invvpid_single())
+		__invvpid(VMX_VPID_EXTENT_SINGLE_CONTEXT, vpid, 0);
+}
+
+static inline void vpid_sync_vcpu_global(void)
+{
+	if (cpu_has_vmx_invvpid_global())
+		__invvpid(VMX_VPID_EXTENT_ALL_CONTEXT, 0, 0);
+}
+
+static inline void vpid_sync_context(uint16_t vpid)
+{
+	if (cpu_has_vmx_invvpid_single())
+		vpid_sync_vcpu_single(vpid);
+	else
+		vpid_sync_vcpu_global();
+}
+
+static inline uint64_t vcpu_get_eptp(struct vmx_vcpu *vcpu)
+{
+	return vcpu->proc->env_pgdir.eptp;
 }
 
 #endif

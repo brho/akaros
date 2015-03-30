@@ -15,7 +15,6 @@
 #include <kmalloc.h>
 
 #include "intel/vmx.h"
-#include "intel/compat.h"
 #include "vmm.h"
 
 /* TODO: have better cpuid info storage and checks */

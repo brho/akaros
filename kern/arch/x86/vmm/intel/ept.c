@@ -41,7 +41,6 @@
 #include "vmx.h"
 #include "../vmm.h"
 
-#include "compat.h"
 #include "cpufeature.h"
 
 #define EPT_LEVELS	4	/* 0 through 3 */
