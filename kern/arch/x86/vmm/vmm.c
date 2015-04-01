@@ -73,7 +73,6 @@ int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores)
 {
 	struct vmm *vmm = &p->vmm;
 	unsigned int i;
-	epte_t *ept_pml4;
 	if (!x86_supports_vmx) {
 		set_errno(ENODEV);
 		return 0;
@@ -86,13 +85,6 @@ int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores)
 	}
 	/* Set this early, so cleanup checks the gpc array */
 	vmm->vmmcp = TRUE;
-	ept_pml4 = kpage_zalloc_addr();
-	if (!ept_pml4) {
-		set_errno(ENOMEM);
-		return 0;
-	}
-	p->env_pgdir.epte = ept_pml4;
-	p->env_pgdir.eptp = construct_eptp(PADDR(ept_pml4));
 	nr_guest_pcores = MIN(nr_guest_pcores, num_cpus);
 	vmm->amd = 0;
 	vmm->guest_pcores = kzmalloc(sizeof(void*) * nr_guest_pcores, KMALLOC_WAIT);
@@ -123,6 +115,5 @@ void __vmm_struct_cleanup(struct proc *p)
 	}
 	kfree(vmm->guest_pcores);
 	ept_flush(p->env_pgdir.eptp);
-	page_decref(kva2page(p->env_pgdir.epte));
 	vmm->vmmcp = FALSE;
 }

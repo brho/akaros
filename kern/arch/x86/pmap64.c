@@ -88,7 +88,8 @@ static kpte_t *__pml_walk(kpte_t *pml, uintptr_t va, int flags, int pml_shift)
 	if (!(*kpte & PTE_P)) {
 		if (!(flags & PG_WALK_CREATE))
 			return NULL;
-		new_pml_kva = kpage_zalloc_addr();
+		new_pml_kva = get_cont_pages(1, KMALLOC_WAIT);
+		memset(new_pml_kva, 0, PGSIZE * 2);
 		/* Might want better error handling (we're probably out of memory) */
 		if (!new_pml_kva)
 			return NULL;
@@ -339,7 +340,7 @@ int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size)
 			return 0;
 		}
 		/* If we haven't visited all of our subs, we might still have some
-		 * mappings hanging our this page table. */
+		 * mappings hanging off this page table. */
 		if (!visited_subs) {
 			kpte_t *kpte_i = kpte2pml(*kpte);	/* first kpte == pml */
 			/* make sure we have no PTEs in use */
@@ -348,11 +349,12 @@ int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size)
 					return 0;
 			}
 		}
-		page_decref(ppn2page(LA2PPN(*kpte)));
+		free_cont_pages(KADDR(PTE_ADDR(*kpte)), 1);
 		*kpte = 0;
 		return 0;
 	}
-
+	/* Don't accidentally unmap the boot mappings */
+	assert((va < KERNBASE) && (va + size < KERNBASE));
 	return pml_for_each(pgdir_get_kpt(pgdir), va, size, pt_free_cb, 0);
 }
 
@@ -467,7 +469,11 @@ void vm_init(void)
 
 void x86_cleanup_bootmem(void)
 {
-	unmap_segment(boot_pgdir, 0, PML3_PTE_REACH);
+	/* the boot page tables weren't alloc'd the same as other pages, so we'll
+	 * need to do some hackery to 'free' them.  This doesn't actually free
+	 * anything - it just unmaps but leave 2 KPTs (4 pages) sitting around. */
+	//unmap_segment(boot_pgdir, 0, PML3_PTE_REACH);	// want to do this
+	boot_pgdir.kpte[0] = 0;
 	tlbflush();
 }
 
@@ -525,14 +531,14 @@ void env_pagetable_free(struct proc *p)
 			return 0;
 		if ((shift == PML1_SHIFT) || (*kpte & PTE_PS))
 			return 0;
-		page_decref(ppn2page(LA2PPN(*kpte)));
+		free_cont_pages(KADDR(PTE_ADDR(*kpte)), 1);
 		return 0;
 	}
 		
 	assert(p->env_cr3 != rcr3());
 	pml_for_each(pgdir_get_kpt(p->env_pgdir), 0, UVPT, pt_free_cb, 0);
 	/* the page directory is not a PTE, so it never was freed */
-	page_decref(pa2page(p->env_cr3));
+	free_cont_pages(pgdir_get_kpt(p->env_pgdir), 1);
 	tlbflush();
 }
 
@@ -547,12 +553,45 @@ void page_check(void)
 {
 }
 
+/* Sets up the page directory, based on boot_copy.
+ *
+ * For x86, to support VMs, all processes will have an EPT and a KPT.  Ideally,
+ * we'd use the same actual PT for both, but we can't thanks to the EPT design.
+ * Although they are not the same actual PT, they have the same contents.
+ *
+ * The KPT-EPT invariant is that the KPT and EPT hold the same mappings from
+ * [0,UVPT), so long as some lock is held.  Right now, the lock is the pte_lock,
+ * but it could be a finer-grained lock (e.g. on lower level PTs) in the future.
+ *
+ * Part of the reason for the invariant is so that a pgdir walk on the process's
+ * address space will get the 'same' PTE for both the KPT and the EPT.  For
+ * instance, if a page is present in the KPT, a pte is present and points to the
+ * same physical page in the EPT.  Likewise, both the KPT and EPT agree on jumbo
+ * mappings.
+ *
+ * I went with UVPT for the upper limit of equality btw the KPT and EPT for a
+ * couple reasons: I wanted something static (technically the physaddr width is
+ * runtime dependent), and we'll never actually PF high enough for it to make a
+ * difference.  Plus, the UVPT is something that would need to be changed for
+ * the EPT too, if we supported it at all.
+ *
+ * Each page table page is actually two contiguous pages.  The lower is the KPT.
+ * The upper is the EPT.  Order-1 page allocs are a little harder, but the
+ * tradeoff is simplicity in all of the pm code.  Given a KPTE, we can find an
+ * EPTE with no hassle.  Note that this two-page business is a tax on *all*
+ * processes, which is less than awesome.
+ *
+ * Another note is that the boot page tables are *not* double-pages.  The EPT
+ * won't cover those spaces (e.g. kernbase mapping), so it's not necessary, and
+ * it's a pain in the ass to get it to work (can't align to 2*PGSIZE without
+ * grub complaining, and we might run into issues with freeing memory in the
+ * data segment). */
 int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd)
 {
-	kpte_t *kpt = kpage_alloc_addr();
-	if (!kpt)
-		return -ENOMEM;
+	kpte_t *kpt = get_cont_pages(1, KMALLOC_WAIT);
 	memcpy(kpt, boot_copy.kpte, PGSIZE);
+	epte_t *ept = kpte_to_epte(kpt);
+	memset(ept, 0, PGSIZE);
 
 	/* VPT and UVPT map the proc's page table, with different permissions. */
 	kpt[PML4(VPT)]  = PTE(LA2PPN(PADDR(kpt)), PTE_P | PTE_KERN_RW);
@@ -560,7 +599,8 @@ int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd)
 
 	new_pd->kpte = kpt;
 	/* Processes do not have EPTs by default, only once they are VMMs */
-	new_pd->epte = 0;
+	new_pd->epte = ept;	/* TODO: remove this soon */
+	new_pd->eptp = construct_eptp(PADDR(ept));
 	return 0;
 }
 
