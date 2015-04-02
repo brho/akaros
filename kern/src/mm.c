@@ -58,7 +58,7 @@ struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
 	vm_i = TAILQ_FIRST(&p->vm_regions);
 	/* This works for now, but if all we have is BRK_END ones, we'll start
 	 * growing backwards (TODO) */
-	if (!vm_i || (va + len < vm_i->vm_base)) {
+	if (!vm_i || (va + len <= vm_i->vm_base)) {
 		vmr = kmem_cache_alloc(vmr_kcache, 0);
 		if (!vmr)
 			panic("EOM!");
