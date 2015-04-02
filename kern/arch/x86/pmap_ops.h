@@ -20,7 +20,7 @@
 
 static inline bool pte_walk_okay(pte_t pte)
 {
-	return pte.kpte ? TRUE : FALSE;
+	return pte ? TRUE : FALSE;
 }
 
 /* PTE states:
@@ -43,69 +43,69 @@ static inline bool pte_walk_okay(pte_t pte)
  * 	- unmapped: completely unused. (0 value) */
 static inline bool pte_is_present(pte_t pte)
 {
-	return kpte_is_present(pte.kpte);
+	return kpte_is_present(pte);
 }
 
 static inline bool pte_is_unmapped(pte_t pte)
 {
-	return kpte_is_unmapped(pte.kpte);
+	return kpte_is_unmapped(pte);
 }
 
 static inline bool pte_is_mapped(pte_t pte)
 {
-	return kpte_is_mapped(pte.kpte);
+	return kpte_is_mapped(pte);
 }
 
 static inline bool pte_is_paged_out(pte_t pte)
 {
-	return kpte_is_paged_out(pte.kpte);
+	return kpte_is_paged_out(pte);
 }
 
 static inline bool pte_is_dirty(pte_t pte)
 {
-	return kpte_is_dirty(pte.kpte) ||
-	       epte_is_dirty(kpte_to_epte(pte.kpte));
+	return kpte_is_dirty(pte) ||
+	       epte_is_dirty(kpte_to_epte(pte));
 }
 
 static inline bool pte_is_accessed(pte_t pte)
 {
-	return kpte_is_accessed(pte.kpte) ||
-	       epte_is_accessed(kpte_to_epte(pte.kpte));
+	return kpte_is_accessed(pte) ||
+	       epte_is_accessed(kpte_to_epte(pte));
 }
 
 /* Used in debugging code - want something better involving the walk */
 static inline bool pte_is_jumbo(pte_t pte)
 {
-	return kpte_is_jumbo(pte.kpte);
+	return kpte_is_jumbo(pte);
 }
 
 static inline physaddr_t pte_get_paddr(pte_t pte)
 {
-	return kpte_get_paddr(pte.kpte);
+	return kpte_get_paddr(pte);
 }
 
 /* Returns the PTE in an unsigned long, for debugging mostly. */
 static inline unsigned long pte_print(pte_t pte)
 {
-	return kpte_print(pte.kpte);
+	return kpte_print(pte);
 }
 
 static inline void pte_write(pte_t pte, physaddr_t pa, int perm)
 {
-	kpte_write(pte.kpte, pa, perm);
-	epte_write(kpte_to_epte(pte.kpte), pa, perm);
+	kpte_write(pte, pa, perm);
+	epte_write(kpte_to_epte(pte), pa, perm);
 }
 
 static inline void pte_clear_present(pte_t pte)
 {
-	kpte_clear_present(pte.kpte);
-	epte_clear_present(kpte_to_epte(pte.kpte));
+	kpte_clear_present(pte);
+	epte_clear_present(kpte_to_epte(pte));
 }
 
 static inline void pte_clear(pte_t pte)
 {
-	kpte_clear(pte.kpte);
-	epte_clear(kpte_to_epte(pte.kpte));
+	kpte_clear(pte);
+	epte_clear(kpte_to_epte(pte));
 }
 
 /* These are used by memcpy_*_user, but are very dangerous (and possibly used
@@ -116,25 +116,25 @@ static inline void pte_clear(pte_t pte)
  * to an intermediate PTE, we'd miss that. */
 static inline bool pte_has_perm_ur(pte_t pte)
 {
-	return kpte_has_perm_ur(pte.kpte);
+	return kpte_has_perm_ur(pte);
 }
 
 static inline bool pte_has_perm_urw(pte_t pte)
 {
-	return kpte_has_perm_urw(pte.kpte);
+	return kpte_has_perm_urw(pte);
 }
 
 /* return the arch-independent format for prots - whatever you'd expect to
  * receive for pte_write.  Careful with the ret, since a valid type is 0. */
 static inline int pte_get_perm(pte_t pte)
 {
-	return kpte_get_perm(pte.kpte);
+	return kpte_get_perm(pte);
 }
 
 static inline void pte_replace_perm(pte_t pte, int perm)
 {
-	kpte_replace_perm(pte.kpte, perm);
-	epte_replace_perm(kpte_to_epte(pte.kpte), perm);
+	kpte_replace_perm(pte, perm);
+	epte_replace_perm(kpte_to_epte(pte), perm);
 }
 
 #endif /* ROS_ARCH_PMAPS_OPS_H */

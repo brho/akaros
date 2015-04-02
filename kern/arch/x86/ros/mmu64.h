@@ -10,14 +10,10 @@
 typedef unsigned long kpte_t;
 typedef unsigned long epte_t;
 
-typedef struct x86_pte {
-	kpte_t 	*kpte;
-	epte_t 	*epte;
-} pte_t;
+typedef kpte_t* pte_t;
 
 typedef struct x86_pgdir {
 	kpte_t 	*kpte;
-	epte_t 	*epte;
 	uint64_t eptp;
 } pgdir_t;
 #endif

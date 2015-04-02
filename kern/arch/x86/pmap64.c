@@ -379,10 +379,7 @@ pte_t pgdir_walk(pgdir_t pgdir, const void *va, int create)
 	int flags = PML1_SHIFT;
 	if (create == 1)
 		flags |= PG_WALK_CREATE;
-	ret.kpte = pml_walk(pgdir_get_kpt(pgdir), (uintptr_t)va, flags);
-	/* TODO: (EPT) walk the EPT */
-	ret.epte = 0;
-	return ret;
+	return pml_walk(pgdir_get_kpt(pgdir), (uintptr_t)va, flags);
 }
 
 static int pml_perm_walk(kpte_t *pml, const void *va, int pml_shift)
@@ -444,7 +441,7 @@ void vm_init(void)
 
 	boot_cr3 = get_boot_pml4();
 	boot_pgdir.kpte = boot_kpt;
-	boot_pgdir.epte = 0;
+	boot_pgdir.eptp = 0;
 	gdt = KADDR(get_gdt64());
 
 	/* We need to limit our mappings on machines that don't support 1GB pages */
@@ -505,12 +502,11 @@ int env_user_mem_walk(struct proc *p, void *start, size_t len,
 	                  void *data)
 	{
 		struct tramp_package *tp = (struct tramp_package*)data;
-		pte_t half_pte = {.kpte = kpte, .epte = 0};
 		assert(tp->cb);
 		/* memwalk CBs don't know how to handle intermediates or jumbos */
 		if (shift != PML1_SHIFT)
 			return 0;
-		return tp->cb(tp->p, half_pte, (void*)kva, tp->cb_arg);
+		return tp->cb(tp->p, kpte, (void*)kva, tp->cb_arg);
 	}
 
 	int ret;
@@ -608,8 +604,6 @@ int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd)
 	kpt[PML4(UVPT)] = PTE(LA2PPN(PADDR(kpt)), PTE_USER_RO);
 
 	new_pd->kpte = kpt;
-	/* Processes do not have EPTs by default, only once they are VMMs */
-	new_pd->epte = ept;	/* TODO: remove this soon */
 	new_pd->eptp = construct_eptp(PADDR(ept));
 	return 0;
 }
@@ -622,7 +616,7 @@ physaddr_t arch_pgdir_get_cr3(pgdir_t pd)
 void arch_pgdir_clear(pgdir_t *pd)
 {
 	pd->kpte = 0;
-	pd->epte = 0;
+	pd->eptp = 0;
 }
 
 /* Returns the page shift of the largest jumbo supported */
