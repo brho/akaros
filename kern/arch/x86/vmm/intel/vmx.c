@@ -1140,27 +1140,17 @@ static int vmx_handle_ept_violation(struct vmx_vcpu *vcpu)
 	exit_qual = vmcs_read32(EXIT_QUALIFICATION);
 	gva = vmcs_readl(GUEST_LINEAR_ADDRESS);
 	gpa = vmcs_read64(GUEST_PHYSICAL_ADDRESS);
-	printk("ept: gva %016lx, gpa %016lx\n", gva, gpa);
 
 	vmx_put_cpu(vcpu);
 
-	// this is a total hack, for testing things.
-	// note that we only care about the gpa, and the
-	// gpa is our process virtual address. 
-	// Confused yet?
-	page = page_lookup(current->env_pgdir, (void *)gpa, NULL);
-	printk("Lookup %p returns %p\n", gpa, page);
-	if (page) {
-		uint64_t hpa = page2pa(page);
-		printk("hpa for %p is %p\n", gpa, hpa);
-		ret = -1;
-		printk("vmx_do_ept_fault returns %d\n", ret);
-	}
+	int prot = 0;
+	prot |= exit_qual & VMX_EPT_FAULT_READ ? PROT_READ : 0;
+	prot |= exit_qual & VMX_EPT_FAULT_WRITE ? PROT_WRITE : 0;
+	prot |= exit_qual & VMX_EPT_FAULT_INS ? PROT_EXEC : 0;
+	ret = handle_page_fault(current, gpa, prot);
 
 	if (ret) {
-		printk("page fault failure "
-		       "GPA: 0x%lx, GVA: 0x%lx\n",
-		       gpa, gva);
+		printk("EPT page fault failure GPA: %p, GVA: %p\n", gpa, gva);
 		vmx_dump_cpu(vcpu);
 	}
 
@@ -1294,7 +1284,7 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 		} else if (ret == EXIT_REASON_EXTERNAL_INTERRUPT) {
 			printk("External interrupt\n");
 		} else {
-			printk("unhandled exit: reason %x, exit qualification %x\n",
+			printk("unhandled exit: reason 0x%x, exit qualification 0x%x\n",
 			       ret, vmcs_read32(EXIT_QUALIFICATION));
 			vmx_dump_cpu(vcpu);
 			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;

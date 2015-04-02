@@ -10,7 +10,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ros/syscall.h>
+#include <sys/mman.h>
 
+int *mmap_blob;
 unsigned long long stack[1024];
 volatile int shared = 0;
 int mcp = 1;
@@ -19,6 +21,7 @@ int mcp = 1;
 static void *fail(void*arg)
 {
 
+	*mmap_blob = 1337;
 	if (mcp)
 	while (V(&shared, int) < 31) {
 		if (! (V(&shared, int) & 1))
@@ -43,7 +46,7 @@ void *talk_thread(void *arg)
 		}
 		cpu_relax();
 	}
-	printf("All done\n");
+	printf("All done, read %d\n", *mmap_blob);
 	return NULL;
 }
 
@@ -63,6 +66,15 @@ int main(int argc, char **argv)
 	}
 	if (ros_syscall(SYS_setup_vmm, nr_gpcs, 0, 0, 0, 0, 0) != nr_gpcs) {
 		perror("Guest pcore setup failed");
+		exit(1);
+	}
+	/* blob that is faulted in from the EPT first.  we need this to be in low
+	 * memory (not above the normal mmap_break), so the EPT can look it up.
+	 * Note that we won't get 4096.  The min is 1MB now, and ld is there. */
+	mmap_blob = mmap((int*)4096, PGSIZE, PROT_READ | PROT_WRITE,
+	                 MAP_ANONYMOUS, -1, 0);
+	if (mmap_blob == MAP_FAILED) {
+		perror("Unable to mmap");
 		exit(1);
 	}
 
@@ -127,7 +139,7 @@ int main(int argc, char **argv)
 	if (ret != strlen(cmd)) {
 		perror(cmd);
 	}
-	printf("shared is %d\n", shared);
+	printf("shared is %d, blob is %d\n", shared, *mmap_blob);
 
 	return 0;
 }
