@@ -1,2 +1,1 @@
 obj-y						+= vmx.o
-obj-y						+= ept.o

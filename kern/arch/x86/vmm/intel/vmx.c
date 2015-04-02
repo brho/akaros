@@ -173,6 +173,8 @@ static const uint32_t vmx_msr_index[] = {
 
 static unsigned long *msr_bitmap;
 
+int x86_ept_pte_fix_ups = 0;
+
 struct vmx_capability vmx_capability;
 struct vmcs_config vmcs_config;
 
@@ -652,67 +654,6 @@ static void vmx_put_cpu(struct vmx_vcpu *vcpu)
 	vcpu->cpu = -1;
 	currentcpu->local_vcpu = NULL;
 	//put_cpu();
-}
-
-static void __vmx_sync_helper(struct hw_trapframe *hw_tf, void *ptr)
-{
-	struct vmx_vcpu *vcpu = ptr;
-
-	ept_sync_context(vcpu_get_eptp(vcpu));
-}
-
-struct sync_addr_args {
-	struct vmx_vcpu *vcpu;
-	gpa_t gpa;
-};
-
-static void __vmx_sync_individual_addr_helper(struct hw_trapframe *hw_tf, void *ptr)
-{
-	struct sync_addr_args *args = ptr;
-
-//	ept_sync_individual_addr(
-
-}
-
-/**
- * vmx_ept_sync_global - used to evict everything in the EPT
- * @vcpu: the vcpu
- */
-void vmx_ept_sync_vcpu(struct vmx_vcpu *vcpu)
-{
-	handler_wrapper_t *w;
-
-	smp_call_function_single(vcpu->cpu,
-		__vmx_sync_helper, (void *) vcpu, &w);
-
-	if (smp_call_wait(w)) {
-		printk("litevm_init. smp_call_wait failed. Expect a panic.\n");
-	}
-
-
-}
-
-/**
- * vmx_ept_sync_individual_addr - used to evict an individual address
- * @vcpu: the vcpu
- * @gpa: the guest-physical address
- */
-void vmx_ept_sync_individual_addr(struct vmx_vcpu *vcpu, gpa_t gpa)
-{
-	struct sync_addr_args args;
-	args.vcpu = vcpu;
-	args.gpa = gpa;
-
-	handler_wrapper_t *w;
-
-
-	smp_call_function_single(vcpu->cpu,
-				 __vmx_sync_individual_addr_helper, (void *) &args, &w);
-
-	if (smp_call_wait(w)) {
-		printk("litevm_init. smp_call_wait failed. Expect a panic.\n");
-	}
-
 }
 
 /**
@@ -1212,7 +1153,7 @@ static int vmx_handle_ept_violation(struct vmx_vcpu *vcpu)
 	if (page) {
 		uint64_t hpa = page2pa(page);
 		printk("hpa for %p is %p\n", gpa, hpa);
-		ret = vmx_do_ept_fault(vcpu->proc->env_pgdir.epte, gpa, hpa, exit_qual);
+		ret = -1;
 		printk("vmx_do_ept_fault returns %d\n", ret);
 	}
 
@@ -1531,7 +1472,7 @@ static int ept_init(void)
 	}
 	if (!cpu_has_vmx_ept_ad_bits()) {
 		printk("VMX EPT doesn't support accessed/dirty!\n");
-		/* TODO: set the pmap_ops accordingly */
+		x86_ept_pte_fix_ups |= EPTE_A | EPTE_D;
 	}
 	if (!cpu_has_vmx_invept() || !cpu_has_vmx_invept_global()) {
 		printk("VMX EPT can't invalidate PTEs/TLBs!\n");

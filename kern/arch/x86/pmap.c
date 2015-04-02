@@ -99,6 +99,22 @@ void setup_default_mtrrs(barrier_t* smp_barrier)
 	enable_irqsave(&state);
 }
 
+void invlpg(void *addr)
+{
+	asm volatile("invlpg (%0)" : : "r" (addr) : "memory");
+	if (per_cpu_info[core_id()].vmx_enabled)
+		ept_inval_addr((uintptr_t)addr);
+}
+
+void tlbflush(void)
+{
+	unsigned long cr3;
+	asm volatile("mov %%cr3,%0" : "=r" (cr3));
+	asm volatile("mov %0,%%cr3" : : "r" (cr3));
+	if (per_cpu_info[core_id()].vmx_enabled)
+		ept_inval_context();
+}
+
 /* Flushes a TLB, including global pages.  We should always have the CR4_PGE
  * flag set, but just in case, we'll check.  Toggling this bit flushes the TLB.
  */
@@ -108,6 +124,9 @@ void tlb_flush_global(void)
 	if (cr4 & CR4_PGE) {
 		lcr4(cr4 & ~CR4_PGE);
 		lcr4(cr4);
-	} else 
+	} else {
 		lcr3(rcr3());
+	}
+	if (per_cpu_info[core_id()].vmx_enabled)
+		ept_inval_global();
 }

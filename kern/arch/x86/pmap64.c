@@ -80,9 +80,11 @@ static kpte_t *kpte2pml(kpte_t kpte)
 static kpte_t *__pml_walk(kpte_t *pml, uintptr_t va, int flags, int pml_shift)
 {
 	kpte_t *kpte;
+	epte_t *epte;
 	void *new_pml_kva;
 
 	kpte = &pml[PMLx(va, pml_shift)];
+	epte = kpte_to_epte(kpte);
 	if (walk_is_complete(kpte, pml_shift, flags))
 		return kpte;
 	if (!(*kpte & PTE_P)) {
@@ -98,6 +100,14 @@ static kpte_t *__pml_walk(kpte_t *pml, uintptr_t va, int flags, int pml_shift)
 		 * translation is !User).  We put the perms on the last entry, not the
 		 * intermediates. */
 		*kpte = PADDR(new_pml_kva) | PTE_P | PTE_U | PTE_W;
+		/* The physaddr of the new_pml is one page higher than the KPT page.  A
+		 * few other things:
+		 * - for the same reason that we have U and X set on all intermediate
+		 * PTEs, we now set R, X, and W for the EPTE.
+		 * - All EPTEs have U perms
+		 * - We can't use epte_write since we're workin on intermediate PTEs,
+		 * and they don't have the memory type set. */
+		*epte = (PADDR(new_pml_kva) + PGSIZE) | EPTE_R | EPTE_X | EPTE_W;
 	}
 	return __pml_walk(kpte2pml(*kpte), va, flags, pml_shift - BITS_PER_PML);
 }

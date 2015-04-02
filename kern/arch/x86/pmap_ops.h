@@ -12,14 +12,14 @@
 #ifndef ROS_ARCH_PMAPS_OPS_H
 #define ROS_ARCH_PMAPS_OPS_H
 
+#include <arch/vmm/ept.h>
+#include <arch/kpt.h>
+
 /* TODO: (EPT)  build a CONFIG mode where we assert the EPT agrees with the KPT
  * for all of the read ops */
 
 static inline bool pte_walk_okay(pte_t pte)
 {
-	/* walk_okay should only be called after a walk, when we have both a KPTE
-	 * and an EPTE */
-	dassert(pte.kpte ? TRUE : !pte.epte);
 	return pte.kpte ? TRUE : FALSE;
 }
 
@@ -43,92 +43,69 @@ static inline bool pte_walk_okay(pte_t pte)
  * 	- unmapped: completely unused. (0 value) */
 static inline bool pte_is_present(pte_t pte)
 {
-#if 0 	/* could do some debuggin like this.  painful. */
-	bool ret_kpte, ret_epte;
-	assert(pte.kpte || pte.epte);
-	ret_kpte = pte.kpte ? (*pte.kpte & PTE_P ? TRUE : FALSE) : 0;
-	/* TODO: EPT check */
-	ret_epte = pte.epte ? (*pte.epte & PTE_P ? TRUE : FALSE) : 0;
-	if (pte.kpte && pte.epte)
-		assert(ret_kpte == ret_epte);
-	return pte.kpte ? ret_kpte : ret_epte;
-#endif
-	return pte.kpte ? (*pte.kpte & PTE_P ? TRUE : FALSE)
-	                : 0; /* TODO: EPT check */
+	return kpte_is_present(pte.kpte);
 }
 
 static inline bool pte_is_unmapped(pte_t pte)
 {
-	return pte.kpte ? PAGE_UNMAPPED(*pte.kpte)
-	                : 0; /* TODO: EPT check */
+	return kpte_is_unmapped(pte.kpte);
 }
 
 static inline bool pte_is_mapped(pte_t pte)
 {
-	return pte.kpte ? !PAGE_UNMAPPED(*pte.kpte)
-	                : 0; /* TODO: EPT check */
+	return kpte_is_mapped(pte.kpte);
 }
 
 static inline bool pte_is_paged_out(pte_t pte)
 {
-	return pte.kpte ? PAGE_PAGED_OUT(*pte.kpte)
-	                : 0; /* TODO: EPT check */
+	return kpte_is_paged_out(pte.kpte);
 }
 
 static inline bool pte_is_dirty(pte_t pte)
 {
-	return pte.kpte ? (*pte.kpte & PTE_D ? TRUE : FALSE)
-	                : 0; /* TODO: EPT check */
+	return kpte_is_dirty(pte.kpte) ||
+	       epte_is_dirty(kpte_to_epte(pte.kpte));
 }
 
 static inline bool pte_is_accessed(pte_t pte)
 {
-	return pte.kpte ? (*pte.kpte & PTE_A ? TRUE : FALSE)
-	                : 0; /* TODO: EPT check */
+	return kpte_is_accessed(pte.kpte) ||
+	       epte_is_accessed(kpte_to_epte(pte.kpte));
 }
 
 /* Used in debugging code - want something better involving the walk */
 static inline bool pte_is_jumbo(pte_t pte)
 {
-	return pte.kpte ? (*pte.kpte & PTE_PS ? TRUE : FALSE)
-	                : 0; /* TODO: EPT check */
+	return kpte_is_jumbo(pte.kpte);
 }
 
 static inline physaddr_t pte_get_paddr(pte_t pte)
 {
-	return pte.kpte ? PTE_ADDR(*pte.kpte)
-	                : 0; /* TODO: EPT check */
+	return kpte_get_paddr(pte.kpte);
 }
 
 /* Returns the PTE in an unsigned long, for debugging mostly. */
 static inline unsigned long pte_print(pte_t pte)
 {
-	return pte.kpte ? *pte.kpte
-	                : 0; /* TODO: EPT check */
+	return kpte_print(pte.kpte);
 }
 
 static inline void pte_write(pte_t pte, physaddr_t pa, int perm)
 {
-	if (pte.kpte)
-		*pte.kpte = PTE(pa2ppn(pa), perm);
-	if (pte.epte)
-		/* TODO: EPT write (if EPT) */;
+	kpte_write(pte.kpte, pa, perm);
+	epte_write(kpte_to_epte(pte.kpte), pa, perm);
 }
 
 static inline void pte_clear_present(pte_t pte)
 {
-	if (pte.kpte)
-		*pte.kpte &= ~PTE_P;
-	if (pte.epte)
-		/* TODO: EPT write (if EPT) */;
+	kpte_clear_present(pte.kpte);
+	epte_clear_present(kpte_to_epte(pte.kpte));
 }
 
 static inline void pte_clear(pte_t pte)
 {
-	if (pte.kpte)
-		*pte.kpte = 0;
-	if (pte.epte)
-		/* TODO: EPT write (if EPT) */;
+	kpte_clear(pte.kpte);
+	epte_clear(kpte_to_epte(pte.kpte));
 }
 
 /* These are used by memcpy_*_user, but are very dangerous (and possibly used
@@ -139,30 +116,25 @@ static inline void pte_clear(pte_t pte)
  * to an intermediate PTE, we'd miss that. */
 static inline bool pte_has_perm_ur(pte_t pte)
 {
-	return pte.kpte ? (*pte.kpte & PTE_USER_RO ? TRUE : FALSE)
-	                : 0; /* TODO: EPT check */
+	return kpte_has_perm_ur(pte.kpte);
 }
 
 static inline bool pte_has_perm_urw(pte_t pte)
 {
-	return pte.kpte ? (*pte.kpte & PTE_USER_RW ? TRUE : FALSE)
-	                : 0; /* TODO: EPT check */
+	return kpte_has_perm_urw(pte.kpte);
 }
 
 /* return the arch-independent format for prots - whatever you'd expect to
  * receive for pte_write.  Careful with the ret, since a valid type is 0. */
 static inline int pte_get_perm(pte_t pte)
 {
-	return pte.kpte ? *pte.kpte & PTE_PERM
-	                : 0; /* TODO: EPT check */
+	return kpte_get_perm(pte.kpte);
 }
 
 static inline void pte_replace_perm(pte_t pte, int perm)
 {
-	if (pte.kpte)
-		*pte.kpte = (*pte.kpte & ~PTE_PERM) | perm;
-	if (pte.epte)
-		/* TODO: EPT write (if EPT) */;
+	kpte_replace_perm(pte.kpte, perm);
+	epte_replace_perm(kpte_to_epte(pte.kpte), perm);
 }
 
 #endif /* ROS_ARCH_PMAPS_OPS_H */

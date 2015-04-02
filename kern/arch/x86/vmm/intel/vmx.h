@@ -502,6 +502,9 @@ enum shutdown_reason {
 
 #define VMX_EPT_IDENTITY_PAGETABLE_ADDR		0xfffbc000ul
 
+#define VMX_EPT_FAULT_READ	0x01
+#define VMX_EPT_FAULT_WRITE	0x02
+#define VMX_EPT_FAULT_INS	0x04
 
 #define ASM_VMX_VMCLEAR_RAX       ".byte 0x66, 0x0f, 0xc7, 0x30"
 #define ASM_VMX_VMLAUNCH          ".byte 0x0f, 0x01, 0xc2"

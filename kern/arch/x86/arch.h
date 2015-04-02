@@ -14,8 +14,6 @@
 #define __always_inline inline __attribute__((always_inline))
 
 static inline void breakpoint(void) __attribute__((always_inline));
-static inline void invlpg(void *addr) __attribute__((always_inline));  
-static inline void tlbflush(void) __attribute__((always_inline));
 static inline void icache_flush_page(void *va, void *kva)
               __attribute__((always_inline));
 static inline uint64_t read_tsc(void) __attribute__((always_inline));
@@ -42,22 +40,14 @@ void send_ipi(uint32_t os_coreid, uint8_t vector);
 void print_cpuinfo(void);
 void show_mapping(pgdir_t pgdir, uintptr_t start, size_t size);
 int vendor_id(char *);
+/* pmap.c */
+void invlpg(void *addr);
+void tlbflush(void);
+void tlb_flush_global(void);
 
 static inline void breakpoint(void)
 {
 	asm volatile("int3");
-}
-
-static inline void invlpg(void *addr)
-{ 
-	asm volatile("invlpg (%0)" : : "r" (addr) : "memory");
-}  
-
-static inline void tlbflush(void)
-{
-	unsigned long cr3;
-	asm volatile("mov %%cr3,%0" : "=r" (cr3));
-	asm volatile("mov %0,%%cr3" : : "r" (cr3));
 }
 
 static inline void icache_flush_page(void *va, void *kva)
