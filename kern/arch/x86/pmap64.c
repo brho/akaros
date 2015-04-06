@@ -681,7 +681,8 @@ int debug_check_kpt_ept(void)
 			reason = "paddr";
 			goto fail;
 		}
-		if (kpte_get_perm(kpte) != epte_get_perm(epte)) {
+		if ((kpte_get_settings(kpte) & PTE_PERM) !=
+		    (epte_get_settings(epte) & PTE_PERM)) {
 			reason = "permissions";
 			goto fail;
 		}

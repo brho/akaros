@@ -134,24 +134,26 @@ static inline bool epte_has_perm_urw(epte_t *epte)
 	return (*epte & (EPTE_R | EPTE_W | EPTE_X)) == (EPTE_R | EPTE_W | EPTE_X);
 }
 
-/* We want to know User and Writable, in the 'PTE' sense.  All present epte
- * entries are User PTEs. */
-static inline int epte_get_perm(epte_t *epte)
+static inline int epte_get_settings(epte_t *epte)
 {
 	int settings = 0;
 	if (*epte & EPTE_P) {
+		/* We want to know User and Writable, in the 'PTE' sense.  All present
+		 * epte entries are User PTEs. */
 		settings |= PTE_P | PTE_U;
 		settings |= *epte & EPTE_W ? PTE_W : 0;
 	}
-	//settings |= *epte & EPTE_PS ? PTE_PS : 0; /* TODO */
+	settings |= *epte & EPTE_PS ? PTE_PS : 0;
+	settings |= *epte & EPTE_A ? PTE_A : 0;
+	settings |= *epte & EPTE_D ? PTE_D : 0;
 	return settings;
 }
 
 /* Again, we're replacing the old perms with U and/or W.  Any non-U are ignored,
- * as with epte_write.  R (and X) are implied. */
-static inline void epte_replace_perm(epte_t *epte, int settings)
+ * as with epte_write.  */
+static inline void epte_replace_perm(epte_t *epte, int perm)
 {
-	*epte = (*epte & ~EPTE_P) | __pte_to_epte_perm(settings & PTE_PERM);
+	*epte = (*epte & ~EPTE_P) | __pte_to_epte_perm(perm & PTE_PERM);
 }
 
 /* These ops might be the same for AMD as Intel; in which case we can move the

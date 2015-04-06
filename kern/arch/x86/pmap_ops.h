@@ -90,10 +90,10 @@ static inline unsigned long pte_print(pte_t pte)
 	return kpte_print(pte);
 }
 
-static inline void pte_write(pte_t pte, physaddr_t pa, int perm)
+static inline void pte_write(pte_t pte, physaddr_t pa, int settings)
 {
-	kpte_write(pte, pa, perm);
-	epte_write(kpte_to_epte(pte), pa, perm);
+	kpte_write(pte, pa, settings);
+	epte_write(kpte_to_epte(pte), pa, settings);
 }
 
 static inline void pte_clear_present(pte_t pte)
@@ -124,11 +124,15 @@ static inline bool pte_has_perm_urw(pte_t pte)
 	return kpte_has_perm_urw(pte);
 }
 
-/* return the arch-independent format for prots - whatever you'd expect to
- * receive for pte_write.  Careful with the ret, since a valid type is 0. */
-static inline int pte_get_perm(pte_t pte)
+/* Settings includes protection (maskable via PTE_PROT) and other bits, such as
+ * jumbo, dirty, accessed, etc.  Whatever this returns can get fed back to
+ * pte_write.
+ *
+ * Arch-indep settings include: PTE_PERM (U, W, P, etc), PTE_D, PTE_A, PTE_PS.
+ * Other OSs (x86) may include others. */
+static inline int pte_get_settings(pte_t pte)
 {
-	return kpte_get_perm(pte);
+	return kpte_get_settings(pte);
 }
 
 static inline void pte_replace_perm(pte_t pte, int perm)

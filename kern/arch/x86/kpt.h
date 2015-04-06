@@ -55,10 +55,11 @@ static inline unsigned long kpte_print(kpte_t *kpte)
 	return *kpte;
 }
 
-static inline void kpte_write(kpte_t *kpte, physaddr_t pa, int perm)
+static inline void kpte_write(kpte_t *kpte, physaddr_t pa, int settings)
 {
 	assert(!PGOFF(pa));
-	*kpte = pa | perm;
+	/* The arch-bits like PTE_D, PTE_PS, etc are all in the native KPT format */
+	*kpte = pa | settings;
 }
 
 static inline void kpte_clear_present(kpte_t *kpte)
@@ -81,9 +82,9 @@ static inline bool kpte_has_perm_urw(kpte_t *kpte)
 	return (*kpte & PTE_USER_RW) == PTE_USER_RW;
 }
 
-static inline int kpte_get_perm(kpte_t *kpte)
+static inline int kpte_get_settings(kpte_t *kpte)
 {
-	return *kpte & PTE_PERM;
+	return *kpte & 0xfff;
 }
 
 static inline void kpte_replace_perm(kpte_t *kpte, int perm)

@@ -292,7 +292,7 @@ static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
 			/* TODO: check for jumbos */
 			if (upage_alloc(new_p, &pp, 0))
 				return -ENOMEM;
-			if (page_insert(new_p->env_pgdir, pp, va, pte_get_perm(pte))) {
+			if (page_insert(new_p->env_pgdir, pp, va, pte_get_settings(pte))) {
 				page_decref(pp);
 				return -ENOMEM;
 			}
