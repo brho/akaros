@@ -45,7 +45,6 @@ static command_t commands[] = {
 	{ "reboot", "Take a ride to the South Bay", mon_reboot },
 	{ "showmapping", "Shows VA->PA mappings", mon_showmapping},
 	{ "sm", "Shows VA->PA mappings", mon_sm},
-	{ "setmapperm", "Sets permissions on a VA->PA mapping", mon_setmapperm},
 	{ "cpuinfo", "Prints CPU diagnostics", mon_cpuinfo},
 	{ "ps", "Prints process list", mon_ps},
 	{ "nanwan", "Meet Nanwan!!", mon_nanwan},
@@ -183,46 +182,6 @@ int mon_showmapping(int argc, char **argv, struct hw_trapframe *hw_tf)
 int mon_sm(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	return __showmapping(argc, argv, hw_tf);
-}
-
-int mon_setmapperm(int argc, char **argv, struct hw_trapframe *hw_tf)
-{
-#if 1 // was x86-32 only.
-	cprintf("I don't support this call yet!\n");
-	return 1;
-#else
-	if (argc < 3) {
-		cprintf("Sets VIRT_ADDR's mapping's permissions to PERMS (in hex)\n");
-		cprintf("Only affects the lowest level PTE.  To adjust the PDE, do the math.\n");
-		cprintf("Be careful with this around UVPT, VPT, and friends.\n");
-		cprintf("Usage: setmapperm VIRT_ADDR PERMS\n");
-		return 1;
-	}
-	pde_t*COUNT(PTSIZE) pgdir = (pde_t*COUNT(PTSIZE))vpd;
-	pte_t *pte, *pde;
-	page_t* page;
-	uintptr_t va;
-	va = ROUNDDOWN(strtol(argv[1], 0, 16), PGSIZE);
-	page = page_lookup(pgdir, (void*SNT)va, &pte);
-	if (!page) {
-		cprintf("No such mapping\n");
-		return 1;
-	}
-	pde = &pgdir[PDX(va)];
-	cprintf("   Virtual    Physical  Ps Dr Ac CD WT U W\n");
-	cprintf("------------------------------------------\n");
-	cprintf("%p  %p  %1d  %1d  %1d  %1d  %1d  %1d %1d\n", va, page2pa(page),
-	       (*pte & PTE_PS) >> 7, (*pte & PTE_D) >> 6, (*pte & PTE_A) >> 5,
-	       (*pte & PTE_PCD) >> 4, (*pte & PTE_PWT) >> 3, (*pte & *pde & PTE_U) >> 2,
-	       (*pte & *pde & PTE_W) >> 1);
-	*pte = PTE_ADDR(*pte) | (*pte & PTE_PS) |
-	       (PGOFF(strtol(argv[2], 0, 16)) & ~PTE_PS ) | PTE_P;
-	cprintf("%p  %p  %1d  %1d  %1d  %1d  %1d  %1d %1d\n", va, page2pa(page),
-	       (*pte & PTE_PS) >> 7, (*pte & PTE_D) >> 6, (*pte & PTE_A) >> 5,
-	       (*pte & PTE_PCD) >> 4, (*pte & PTE_PWT) >> 3, (*pte & *pde & PTE_U) >> 2,
-	       (*pte & *pde & PTE_W) >> 1);
-	return 0;
-#endif
 }
 
 static spinlock_t print_info_lock = SPINLOCK_INITIALIZER_IRQSAVE;
