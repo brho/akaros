@@ -43,11 +43,22 @@ pseudodesc_t gdt_pd;
 kpte_t *pml_walk(kpte_t *pml, uintptr_t va, int flags);
 void map_segment(pgdir_t pgdir, uintptr_t va, size_t size, physaddr_t pa,
                  int perm, int pml_shift);
+int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size);
+
 typedef int (*kpte_cb_t)(kpte_t *kpte, uintptr_t kva, int pml_shift,
                         bool visited_subs, void *arg);
 int pml_for_each(kpte_t *pml, uintptr_t start, size_t len, kpte_cb_t callback,
                  void *arg);
-int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size);
+/* Helpers for PML for-each walks */
+static inline bool pte_is_final(pte_t pte, int pml_shift)
+{
+	return (pml_shift == PML1_SHIFT) || pte_is_jumbo(pte);
+}
+
+static inline bool pte_is_intermediate(pte_t pte, int pml_shift)
+{
+	return !pte_is_final(pte, pml_shift);
+}
 
 /* Helper: gets the kpte_t pointer which is the base of the PML4 from pgdir */
 static kpte_t *pgdir_get_kpt(pgdir_t pgdir)
@@ -660,4 +671,47 @@ void debug_print_pgdir(kpte_t *pgdir)
 	else
 		pml_for_each(pgdir, KERNBASE, VPT - KERNBASE, print_pte, 0);
 	pml_for_each(pgdir, VPT_TOP, MAX_VADDR - VPT_TOP, print_pte, 0);
+}
+
+/* Debug helper - makes sure the KPT == EPT for [0, UVPT) */
+int debug_check_kpt_ept(void)
+{
+	int db_cb(kpte_t *kpte, uintptr_t kva, int shift, bool visited_subs,
+	          void *data)
+	{
+		epte_t *epte = kpte_to_epte(kpte);
+		char *reason;
+		int pa_offset = 0;
+
+		if (kpte_is_present(kpte) != epte_is_present(epte)) {
+			reason = "present bit";
+			goto fail;
+		}
+		if (kpte_is_mapped(kpte) != epte_is_mapped(epte)) {
+			reason = "mapped or not";
+			goto fail;
+		}
+		if (kpte_is_jumbo(kpte) != epte_is_jumbo(epte)) {
+			reason = "jumbo";
+			goto fail;
+		}
+		/* Intermediate PTEs have the EPTE pointing to PADDR + PGSIZE */
+		if (pte_is_present(kpte) && pte_is_intermediate(kpte, shift))
+			pa_offset = PGSIZE;
+		if (kpte_get_paddr(kpte) + pa_offset != epte_get_paddr(epte)) {
+			reason = "paddr";
+			goto fail;
+		}
+		if (kpte_get_perm(kpte) != epte_get_perm(epte)) {
+			reason = "permissions";
+			goto fail;
+		}
+		return 0;
+
+fail:
+		panic("kpte %p (%p) epte %p (%p) kva %p shift %d: %s",
+		       kpte, *kpte, epte, *epte, kva, shift, reason);
+		return -1;
+	}
+	return pml_for_each(current->env_pgdir.kpte, 0, UVPT - 0, db_cb, 0);
 }
