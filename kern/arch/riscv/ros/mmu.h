@@ -110,11 +110,18 @@
 #define PTE_NOCACHE	0 // PTE bits to turn off caching, if possible
 
 // commly used access modes
+
+#warning "Review RISCV PTEs.  Maybe want PTE_E/PTE_R?"
+	/* arch-indep code doesn't set PTE_P, it just sets a perm */
+
+
 #define PTE_KERN_RW	(PTE_SR | PTE_SW | PTE_SX)
 #define PTE_KERN_RO	(PTE_SR | PTE_SX)
 #define PTE_USER_RW	(PTE_SR | PTE_SW | PTE_UR | PTE_UW | PTE_UX)
 #define PTE_USER_RO	(PTE_SR | PTE_UR | PTE_UX)
+#define PTE_NONE	0
 
+#warning "probably remove this"
 // x86 equivalencies
 #define PTE_P      PTE_E
 

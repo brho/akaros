@@ -163,7 +163,7 @@ static void map_my_pages(kpte_t *pgdir, uintptr_t va, size_t size,
 	     pa += pgsize) {
 		kpte = get_next_pte(kpte, pgdir, va, PG_WALK_CREATE | pml_shift);
 		assert(kpte);
-		*kpte = PTE_ADDR(pa) | PTE_P | perm |
+		*kpte = PTE_ADDR(pa) | perm |
 		        (pml_shift != PML1_SHIFT ? PTE_PS : 0);
 		printd("Wrote *kpte %p, for va %p to pa %p tried to cover %p\n",
 		       *kpte, va, pa, amt_mapped);
@@ -230,8 +230,8 @@ static int max_possible_shift(uintptr_t va, uintptr_t pa)
 
 /* Map [va, va+size) of virtual (linear) address space to physical [pa, pa+size)
  * in the page table rooted at pgdir.  Size is a multiple of PGSIZE.  Use
- * permission bits perm|PTE_P for the entries.  Set pml_shift to the shift of
- * the largest page size you're willing to use.
+ * permission bits perm for the entries.  Set pml_shift to the shift of the
+ * largest page size you're willing to use.
  *
  * Doesn't handle having pages currently mapped yet, and while supporting that
  * is relatively easy, doing an insertion of small pages into an existing jumbo
@@ -383,7 +383,7 @@ static int pml_perm_walk(kpte_t *pml, const void *va, int pml_shift)
 	kpte = &pml[PMLx(va, pml_shift)];
 	if (!(*kpte & PTE_P))
 		return 0;
-	perms_here = *kpte & (PTE_PERM | PTE_P);
+	perms_here = *kpte & PTE_PERM;
 	if (walk_is_complete(kpte, pml_shift, PML1_SHIFT))
 		return perms_here;
 	return pml_perm_walk(kpte2pml(*kpte), va, pml_shift - BITS_PER_PML) &
@@ -450,9 +450,9 @@ void vm_init(void)
 	/* For the LAPIC and IOAPIC, we use PAT (but not *the* PAT flag) to make
 	 * these type UC */
 	map_segment(boot_pgdir, LAPIC_BASE, APIC_SIZE, LAPIC_PBASE,
-	            PTE_PCD | PTE_PWT | PTE_W | PTE_G, max_jumbo_shift);
+	            PTE_PCD | PTE_PWT | PTE_KERN_RW | PTE_G, max_jumbo_shift);
 	map_segment(boot_pgdir, IOAPIC_BASE, APIC_SIZE, IOAPIC_PBASE,
-	            PTE_PCD | PTE_PWT | PTE_W | PTE_G, max_jumbo_shift);
+	            PTE_PCD | PTE_PWT | PTE_KERN_RW | PTE_G, max_jumbo_shift);
 	/* VPT mapping: recursive PTE inserted at the VPT spot */
 	boot_kpt[PML4(VPT)] = PADDR(boot_kpt) | PTE_W | PTE_P;
 	/* same for UVPT, accessible by userspace (RO). */
@@ -594,8 +594,8 @@ int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd)
 	memset(ept, 0, PGSIZE);
 
 	/* VPT and UVPT map the proc's page table, with different permissions. */
-	kpt[PML4(VPT)]  = PTE(LA2PPN(PADDR(kpt)), PTE_P | PTE_KERN_RW);
-	kpt[PML4(UVPT)] = PTE(LA2PPN(PADDR(kpt)), PTE_P | PTE_USER_RO);
+	kpt[PML4(VPT)]  = PTE(LA2PPN(PADDR(kpt)), PTE_KERN_RW);
+	kpt[PML4(UVPT)] = PTE(LA2PPN(PADDR(kpt)), PTE_USER_RO);
 
 	new_pd->kpte = kpt;
 	/* Processes do not have EPTs by default, only once they are VMMs */
@@ -627,7 +627,7 @@ int arch_max_jumbo_page_shift(void)
 static int print_pte(kpte_t *kpte, uintptr_t kva, int shift, bool visited_subs,
                      void *data)
 {
-	if (!(*kpte & PTE_P))
+	if (kpte_is_unmapped(kpte))
 		return 0;
 	switch (shift) {
 		case (PML1_SHIFT):

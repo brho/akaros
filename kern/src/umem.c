@@ -34,7 +34,7 @@ int memcpy_from_user(struct proc *p, void *dest, const void *va,
 	const void *start, *end;
 	size_t num_pages, i;
 	pte_t pte;
-	uintptr_t perm = PTE_P | PTE_USER_RO;
+	uintptr_t perm = PTE_USER_RO;
 	size_t bytes_copied = 0;
 
 	static_assert(ULIM % PGSIZE == 0 && ULIM != 0); // prevent wrap-around
@@ -100,7 +100,7 @@ int memcpy_to_user(struct proc *p, void *va, const void *src, size_t len)
 	const void *start, *end;
 	size_t num_pages, i;
 	pte_t pte;
-	uintptr_t perm = PTE_P | PTE_USER_RW;
+	uintptr_t perm = PTE_USER_RW;
 	size_t bytes_copied = 0;
 
 	static_assert(ULIM % PGSIZE == 0 && ULIM != 0); // prevent wrap-around

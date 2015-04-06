@@ -288,7 +288,7 @@ static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
 			return 0;
 		/* pages could be !P, but right now that's only for file backed VMRs
 		 * undergoing page removal, which isn't the caller of copy_pages. */
-		if (pte_is_present(pte)) {
+		if (pte_is_mapped(pte)) {
 			/* TODO: check for jumbos */
 			if (upage_alloc(new_p, &pp, 0))
 				return -ENOMEM;
@@ -459,7 +459,7 @@ out_error:	/* for debugging */
 	return FALSE;
 }
 
-/* Helper, maps in page at addr, but only if nothing is present there.  Returns
+/* Helper, maps in page at addr, but only if nothing is mapped there.  Returns
  * 0 on success.  If this is called by non-PM code, we'll store your ref in the
  * PTE. */
 static int map_page_at_addr(struct proc *p, struct page *page, uintptr_t addr,
@@ -483,10 +483,19 @@ static int map_page_at_addr(struct proc *p, struct page *page, uintptr_t addr,
 		page_decref(page);
 		return 0;
 	}
+	if (pte_is_mapped(pte)) {
+		/* we're clobbering an old entry.  if we're just updating the prot, then
+		 * it's no big deal.  o/w, there might be an issue. */
+		if (page2pa(page) != pte_get_paddr(pte)) {
+			warn_once("Clobbered a PTE mapping (%p -> %p)\n", pte_print(pte),
+			          page2pa(page) | prot);
+		}
+		page_decref(pa2page(pte_get_paddr(pte)));
+	}
 	/* preserve the dirty bit - pm removal could be looking concurrently */
 	prot |= (pte_is_dirty(pte) ? PTE_D : 0);
 	/* We have a ref to page, which we are storing in the PTE */
-	pte_write(pte, page2pa(page), PTE_P | prot);
+	pte_write(pte, page2pa(page), prot);
 	spin_unlock(&p->pte_lock);
 	return 0;
 }
@@ -705,7 +714,7 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 	pte_t pte;
 	bool shootdown_needed = FALSE;
 	int pte_prot = (prot & PROT_WRITE) ? PTE_USER_RW :
-	               (prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
+	               (prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : PTE_NONE;
 	/* TODO: this is aggressively splitting, when we might not need to if the
 	 * prots are the same as the previous.  Plus, there are three excessive
 	 * scans.  Finally, we might be able to merge when we are done. */
@@ -720,10 +729,14 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 		}
 		vmr->vm_prot = prot;
 		spin_lock(&p->pte_lock);	/* walking and changing PTEs */
-		/* TODO: use a memwalk */
+		/* TODO: use a memwalk.  At a minimum, we need to change every existing
+		 * PTE that won't trigger a PF (meaning, present PTEs) to have the new
+		 * prot.  The others will fault on access, and we'll change the PTE
+		 * then.  In the off chance we have a mapped but not present PTE, we
+		 * might as well change it too, since we're already here. */
 		for (uintptr_t va = vmr->vm_base; va < vmr->vm_end; va += PGSIZE) { 
 			pte = pgdir_walk(p->env_pgdir, (void*)va, 0);
-			if (pte_walk_okay(pte) && pte_is_present(pte)) {
+			if (pte_walk_okay(pte) && pte_is_mapped(pte)) {
 				pte_replace_perm(pte, pte_prot);
 				shootdown_needed = TRUE;
 			}
@@ -765,11 +778,9 @@ static int __munmap_mark_not_present(struct proc *p, pte_t pte, void *va,
                                      void *arg)
 {
 	bool *shootdown_needed = (bool*)arg;
-	struct page *page;
 	/* could put in some checks here for !P and also !0 */
 	if (!pte_is_present(pte))	/* unmapped (== 0) *ptes are also not PTE_P */
 		return 0;
-	page = pa2page(pte_get_paddr(pte));
 	pte_clear_present(pte);
 	*shootdown_needed = TRUE;
 	return 0;
@@ -1164,7 +1175,7 @@ static uintptr_t vmap_pmem_flags(uintptr_t paddr, size_t nr_bytes, int flags)
 	/* it's not strictly necessary to drop paddr's pgoff, but it might save some
 	 * vmap heartache in the future. */
 	if (map_vmap_segment(vaddr, PG_ADDR(paddr), nr_pages,
-	                     PTE_P | PTE_KERN_RW | flags)) {
+	                     PTE_KERN_RW | flags)) {
 		warn("Unable to map a vmap segment");	/* probably a bug */
 		return 0;
 	}

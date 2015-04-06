@@ -223,7 +223,7 @@ int page_insert(pgdir_t pgdir, struct page *page, void *va, int perm)
 	 * any other state. (TODO: review all other states, maybe rm only for P) */
 	if (pte_is_mapped(pte))
 		page_remove(pgdir, va);
-	pte_write(pte, page2pa(page), PTE_P | perm);
+	pte_write(pte, page2pa(page), perm);
 	return 0;
 }
 
@@ -247,7 +247,7 @@ int page_insert(pgdir_t pgdir, struct page *page, void *va, int perm)
 page_t *page_lookup(pgdir_t pgdir, void *va, pte_t *pte_store)
 {
 	pte_t pte = pgdir_walk(pgdir, va, 0);
-	if (!pte_walk_okay(pte) || !pte_is_present(pte))
+	if (!pte_walk_okay(pte) || !pte_is_mapped(pte))
 		return 0;
 	if (pte_store)
 		*pte_store = pte;
@@ -285,7 +285,7 @@ void page_remove(pgdir_t pgdir, void *va)
 	if (!pte_walk_okay(pte) || pte_is_unmapped(pte))
 		return;
 
-	if (pte_is_present(pte)) {
+	if (pte_is_mapped(pte)) {
 		/* TODO: (TLB) need to do a shootdown, inval sucks.  And might want to
 		 * manage the TLB / free pages differently. (like by the caller).
 		 * Careful about the proc/memory lock here. */

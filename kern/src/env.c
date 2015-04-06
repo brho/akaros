@@ -103,7 +103,7 @@ void env_user_mem_free(env_t* e, void* start, size_t len)
 	assert((uintptr_t)start + len <= UVPT); //since this keeps fucking happening
 	int user_page_free(env_t* e, pte_t pte, void* va, void* arg)
 	{
-		if (!pte_is_present(pte))
+		if (!pte_is_mapped(pte))
 			return 0;
 		page_t *page = pa2page(pte_get_paddr(pte));
 		pte_clear(pte);

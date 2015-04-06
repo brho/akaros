@@ -286,11 +286,12 @@ typedef struct x86_pgdir {
 
 /* Permissions fields and common access modes.  These should be read as 'just
  * kernel or user too' and 'RO or RW'.  USER_RO means read-only for everyone. */
-#define PTE_PERM		(PTE_W | PTE_U)
-#define PTE_KERN_RW		PTE_W		// Kernel Read/Write
-#define PTE_KERN_RO		0		// Kernel Read-Only
-#define PTE_USER_RW		(PTE_W | PTE_U)	// Kernel/User Read/Write
-#define PTE_USER_RO		PTE_U		// Kernel/User Read-Only
+#define PTE_PERM		(PTE_W | PTE_U | PTE_P)
+#define PTE_KERN_RW		(PTE_W | PTE_P)
+#define PTE_KERN_RO		PTE_P
+#define PTE_USER_RW		(PTE_W | PTE_U | PTE_P)
+#define PTE_USER_RO		(PTE_U | PTE_P)
+#define PTE_NONE		0
 
 /* The PTE/translation part of a PTE/virtual(linear) address.  It's used
  * frequently to be the page address of a virtual address.  Note this doesn't
@@ -303,7 +304,7 @@ typedef struct x86_pgdir {
 /* we must guarantee that for any PTE, exactly one of the following is true */
 #define PAGE_PRESENT(pte) ((pte) & PTE_P)
 #define PAGE_UNMAPPED(pte) ((pte) == 0)
-#define PAGE_PAGED_OUT(pte) (!PAGE_PRESENT(pte) && !PAGE_UNMAPPED(pte))
+#define PAGE_PAGED_OUT(pte) (0)	/* Need to use an OS reserved PTE bit */
 
 
 /* **************************************** */

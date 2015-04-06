@@ -306,7 +306,11 @@ static void vmr_for_each(struct vm_region *vmr, unsigned long pg_idx,
 static int __pm_mark_not_present(struct proc *p, pte_t pte, void *va, void *arg)
 {
 	struct page *page;
-	if (!pte_is_present(pte))
+	/* mapped includes present.  Any PTE pointing to a page (mapped) will get
+	 * flagged for removal and have its access prots revoked.  We need to deal
+	 * with mapped-but-maybe-not-present in case of a dirtied file that was
+	 * mprotected to PROT_NONE (which is not present) */
+	if (pte_is_unmapped(pte))
 		return 0;
 	page = pa2page(pte_get_paddr(pte));
 	if (atomic_read(&page->pg_flags) & PG_REMOVAL)
