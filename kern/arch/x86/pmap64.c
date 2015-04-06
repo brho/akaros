@@ -98,7 +98,7 @@ static kpte_t *__pml_walk(kpte_t *pml, uintptr_t va, int flags, int pml_shift)
 	epte = kpte_to_epte(kpte);
 	if (walk_is_complete(kpte, pml_shift, flags))
 		return kpte;
-	if (!(*kpte & PTE_P)) {
+	if (!kpte_is_present(kpte)) {
 		if (!(flags & PG_WALK_CREATE))
 			return NULL;
 		new_pml_kva = get_cont_pages(1, KMALLOC_WAIT);
@@ -271,8 +271,8 @@ void map_segment(pgdir_t pgdir, uintptr_t va, size_t size, physaddr_t pa,
 	 * largest possible jumbo page, up to whatever we were asked for. */
 	if (pml_shift != PGSHIFT) {
 		max_shift_possible = max_possible_shift(va, pa);
-		/* arch-specific limitation (can't have jumbos beyond PML3) */
-		max_shift_possible = MIN(max_shift_possible, PML3_SHIFT);
+		max_shift_possible = MIN(max_shift_possible,
+		                         arch_max_jumbo_page_shift());
 		/* Assumes we were given a proper PML shift 12, 21, 30, etc */
 		while (pml_shift > max_shift_possible)
 			pml_shift -= BITS_PER_PML;
@@ -317,7 +317,7 @@ static int __pml_for_each(kpte_t *pml,  uintptr_t start, size_t len,
 	for (kpte_i = kpte_s; kpte_i <= kpte_e; kpte_i++, kva += pgsize) {
 		visited_all_subs = FALSE;
 		/* Complete only on the last level (PML1_SHIFT) or on a jumbo */
-		if ((*kpte_i & PTE_P) &&
+		if (kpte_is_present(kpte_i) &&
 		    (!walk_is_complete(kpte_i, pml_shift, PML1_SHIFT))) {
 			/* only pass truncated end points (e.g. start may not be page
 			 * aligned) when we're on the first (or last) item.  For the middle
@@ -354,9 +354,9 @@ int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size)
 	int pt_free_cb(kpte_t *kpte, uintptr_t kva, int shift, bool visited_subs,
 	               void *data)
 	{
-		if (!(*kpte & PTE_P))
+		if (!kpte_is_present(kpte))
 			return 0;
-		if ((shift == PML1_SHIFT) || (*kpte & PTE_PS)) {
+		if (pte_is_final(kpte, shift)) {
 			*kpte = 0;
 			return 0;
 		}
@@ -399,7 +399,7 @@ static int pml_perm_walk(kpte_t *pml, const void *va, int pml_shift)
 	int perms_here;
 
 	kpte = &pml[PMLx(va, pml_shift)];
-	if (!(*kpte & PTE_P))
+	if (!kpte_is_present(kpte))
 		return 0;
 	perms_here = *kpte & PTE_PERM;
 	if (walk_is_complete(kpte, pml_shift, PML1_SHIFT))
@@ -520,40 +520,19 @@ int env_user_mem_walk(struct proc *p, void *start, size_t len,
 		return tp->cb(tp->p, kpte, (void*)kva, tp->cb_arg);
 	}
 
-	int ret;
 	struct tramp_package local_tp;
 	local_tp.p = p;
 	local_tp.cb = callback;
 	local_tp.cb_arg = arg;
-	/* Walking both in parallel and making a joint PTE is a pain.  instead, we
-	 * walk one at a time, each with only a half_pte.  Most all of the pmap_ops
-	 * need to deal with a getting half PTE.  Ideally, we'd combine the two
-	 * walks and then know that we always have a kpte. */
-	ret = pml_for_each(pgdir_get_kpt(p->env_pgdir), (uintptr_t)start, len,
+	return pml_for_each(pgdir_get_kpt(p->env_pgdir), (uintptr_t)start, len,
 	                   trampoline_cb, &local_tp);
-	/* TODO: walk the EPT, combine with ret */
-	return ret;
 }
 
 /* Frees (decrefs) all pages of the process's page table, including the page
  * directory.  Does not free the memory that is actually mapped. */
 void env_pagetable_free(struct proc *p)
 {
-	/* callback: given an intermediate kpte (not a final one), removes the page
-	 * table the PTE points to */
-	int pt_free_cb(kpte_t *kpte, uintptr_t kva, int shift, bool visited_subs,
-	               void *data)
-	{
-		if (!(*kpte & PTE_P))
-			return 0;
-		if ((shift == PML1_SHIFT) || (*kpte & PTE_PS))
-			return 0;
-		free_cont_pages(KADDR(PTE_ADDR(*kpte)), 1);
-		return 0;
-	}
-		
-	assert(p->env_cr3 != rcr3());
-	pml_for_each(pgdir_get_kpt(p->env_pgdir), 0, UVPT, pt_free_cb, 0);
+	unmap_segment(p->env_pgdir, 0, UVPT - 0);
 	/* the page directory is not a PTE, so it never was freed */
 	free_cont_pages(pgdir_get_kpt(p->env_pgdir), 1);
 	tlbflush();
