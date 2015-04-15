@@ -1354,16 +1354,6 @@ static int vmx_handle_nmi_exception(struct vmx_vcpu *vcpu)
 	return -EIO;
 }
 
-
-static void noop(void) {
-	__asm__ __volatile__ ("1: jmp 1b");
-}
-
-static void fail(void) {
-	__asm__ __volatile__ ("movq $0xdeadbeef, %rbx; movq 0, %rax");
-}
-
-static unsigned long stack[512];
 /**
  * vmx_launch - the main loop for a VMX Dune process
  * @conf: the launch configuration
@@ -1375,39 +1365,6 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 	int i = 0;
 	int errors = 0;
 
-	if (rip < 4096 ) {
-		// testing.
-		switch(rip) {
-		default:
-			rip = (uint64_t)noop + 4;
-			break;
-		case 1:
-			rip = (uint64_t)fail + 4;
-			break;
-		}
-	}
-
-	if (cr3 == 0) {
-		cr3 = rcr3();
-	}
-
-	/* sanity checking.  -- later
-	ret = ept_check_page(ept, rip);
-	if (ret) {
-		printk("0x%x is not mapped in the ept!\n", rip);
-		errors++;
-	}
-	ret = ept_check_page(ept, rsp);
-	if (ret) {
-		printk("0x%x is not mapped in the ept!\n", rsp);
-		errors++;
-	}
-	*/
-	if (errors) {
-		return -EINVAL;
-	}
-
-
 	printk("RUNNING: %s: rip %p rsp %p cr3 %p \n",
 	       __func__, rip, rsp, cr3);
 	/* TODO: dirty hack til we have VMM contexts */
@@ -1417,11 +1374,14 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 		return -ENOMEM;
 	}
 
-	vmx_get_cpu(vcpu);
-	vmcs_writel(GUEST_RIP, rip);
-	vmcs_writel(GUEST_RSP, rsp);
-	vmcs_writel(GUEST_CR3, cr3);
-	vmx_put_cpu(vcpu);
+	/* if cr3 is set, means 'set everything', else means 'start where you left off' */
+	if (cr3) {
+		vmx_get_cpu(vcpu);
+		vmcs_writel(GUEST_RIP, rip);
+		vmcs_writel(GUEST_RSP, rsp);
+		vmcs_writel(GUEST_CR3, cr3);
+		vmx_put_cpu(vcpu);
+	}
 
 	vcpu->ret_code = -1;
 
