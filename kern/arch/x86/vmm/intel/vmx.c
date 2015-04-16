@@ -1263,7 +1263,7 @@ static int vmx_run_vcpu(struct vmx_vcpu *vcpu)
 
 	vcpu->regs.tf_rip = vmcs_readl(GUEST_RIP);
 	vcpu->regs.tf_rsp = vmcs_readl(GUEST_RSP);
-	printk("RETURN. ip %016lx sp %016lx cr2 %016lx\n",
+	printd("RETURN. ip %016lx sp %016lx cr2 %016lx\n",
 	       vcpu->regs.tf_rip, vcpu->regs.tf_rsp, vcpu->cr2);
 	/* FIXME: do we need to set up other flags? */
 	vcpu->regs.tf_rflags = (vmcs_readl(GUEST_RFLAGS) & 0xFF) |
@@ -1316,7 +1316,7 @@ static int vmx_handle_ept_violation(struct vmx_vcpu *vcpu)
 	ret = handle_page_fault(current, gpa, prot);
 
 	if (ret) {
-		printk("EPT page fault failure GPA: %p, GVA: %p\n", gpa, gva);
+		printk("EPT page fault failure %d, GPA: %p, GVA: %p\n", ret, gpa, gva);
 		vmx_dump_cpu(vcpu);
 	}
 
@@ -1365,7 +1365,7 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 	int i = 0;
 	int errors = 0;
 
-	printk("RUNNING: %s: rip %p rsp %p cr3 %p \n",
+	printd("RUNNING: %s: rip %p rsp %p cr3 %p \n",
 	       __func__, rip, rsp, cr3);
 	/* TODO: dirty hack til we have VMM contexts */
 	vcpu = current->vmm.guest_pcores[0];
@@ -1398,7 +1398,7 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 
 		if (ret == EXIT_REASON_VMCALL) {
 			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
-			printk("system call! WTF\n");
+			printd("system call! WTF\n");
 		} else if (ret == EXIT_REASON_CPUID)
 			vmx_handle_cpuid(vcpu);
 		else if (ret == EXIT_REASON_EPT_VIOLATION) {
@@ -1408,7 +1408,7 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 			if (vmx_handle_nmi_exception(vcpu))
 				vcpu->shutdown = SHUTDOWN_NMI_EXCEPTION;
 		} else if (ret == EXIT_REASON_EXTERNAL_INTERRUPT) {
-			printk("External interrupt\n");
+			printd("External interrupt\n");
 			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
 		} else {
 			printk("unhandled exit: reason 0x%x, exit qualification 0x%x\n",
@@ -1425,7 +1425,7 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 			break;
 	}
 
-	printk("RETURN. ip %016lx sp %016lx\n",
+	printd("RETURN. ip %016lx sp %016lx\n",
 		vcpu->regs.tf_rip, vcpu->regs.tf_rsp);
 
 	/*

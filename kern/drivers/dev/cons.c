@@ -1010,7 +1010,7 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 			//if (!iseve()) error(Eperm);
 			cb = parsecmd(a, n);
 			if (cb->nf > 1) 
-			printk("cons sysctl cmd %s\n", cb->f[0]);
+			printd("cons sysctl cmd %s\n", cb->f[0]);
 			if (waserror()) {
 				kfree(cb);
 				nexterror();
@@ -1039,7 +1039,7 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 					rsp =  strtoul(cb->f[2], NULL, 0);
 					cr3 =  strtoul(cb->f[3], NULL, 0);
 					ret = vm_run(rip, rsp, cr3);
-					printk("vm_run returns %d\n", ret);
+					printd("vm_run returns %d\n", ret);
 					n = ret;
 					break;
 			}
