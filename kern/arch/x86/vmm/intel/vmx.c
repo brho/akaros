@@ -1409,6 +1409,7 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 				vcpu->shutdown = SHUTDOWN_NMI_EXCEPTION;
 		} else if (ret == EXIT_REASON_EXTERNAL_INTERRUPT) {
 			printk("External interrupt\n");
+			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
 		} else {
 			printk("unhandled exit: reason 0x%x, exit qualification 0x%x\n",
 			       ret, vmcs_read32(EXIT_QUALIFICATION));
