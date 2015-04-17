@@ -208,12 +208,14 @@ static inline uint64_t vcore_account_uptime_nsec(uint32_t vcoreid)
  * address of TLS variables across loads/stores of the TLS descriptor, in lieu
  * of a "TLS cmb()". */
 #define begin_safe_access_tls_vars()                                           \
+{                                                                              \
 	void __attribute__((noinline, optimize("O0")))                             \
 	safe_access_tls_var_internal() {                                           \
 		asm("");                                                               \
 
 #define end_safe_access_tls_vars()                                             \
 	} safe_access_tls_var_internal();                                          \
+}
 
 #else
 

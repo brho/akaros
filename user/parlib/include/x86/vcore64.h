@@ -275,7 +275,7 @@ static inline void save_user_ctx(struct user_context *ctx)
 	asm volatile ("fnstcw %0" : "=m"(sw_tf->tf_fpucw));
 	/* Pretty simple: save all the regs, IAW the sys-v ABI */
 	asm volatile("mov %%rsp, 0x48(%0);   " /* save rsp in its slot*/
-	             "leaq 1f, %%rax;        " /* get future rip */
+	             "leaq 1f(%%rip), %%rax; " /* get future rip */
 	             "mov %%rax, 0x40(%0);   " /* save rip in its slot*/
 	             "mov %%r15, 0x38(%0);   "
 	             "mov %%r14, 0x30(%0);   "

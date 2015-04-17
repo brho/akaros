@@ -62,14 +62,18 @@ static void uthread_manage_thread0(struct uthread *uthread)
 	 * (right before vcore_entry(), don't try and take the address of any of
 	 * its TLS vars. */
 	set_tls_desc(get_vcpd_tls_desc(0), 0);
+	begin_safe_access_tls_vars();
 	/* We might have a basic uthread already installed (from slim_init), so
 	 * free it before installing the new one. */
 	if (current_uthread)
 		free(current_uthread);
 	current_uthread = uthread;
+	end_safe_access_tls_vars();
 	set_tls_desc(uthread->tls_desc, 0);
+	begin_safe_access_tls_vars();
 	__vcoreid = 0;	/* setting the uthread's TLS var */
 	assert(!in_vcore_context());
+	end_safe_access_tls_vars();
 }
 
 /* The real 2LS calls this, passing in a uthread representing thread0.  When it
@@ -358,8 +362,10 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
 	/* Change to the transition context (both TLS (if applicable) and stack). */
 	if (__uthread_has_tls(uthread)) {
 		set_tls_desc(get_vcpd_tls_desc(vcoreid), vcoreid);
+		begin_safe_access_tls_vars();
 		assert(current_uthread == uthread);
 		assert(in_vcore_context());
+		end_safe_access_tls_vars();
 	} else {
 		/* Since uthreads and vcores share TLS (it's always the vcore's TLS, the
 		 * uthread one just bootstraps from it), we need to change our state at
@@ -475,7 +481,9 @@ void highjack_current_uthread(struct uthread *uthread)
 	if (__uthread_has_tls(uthread)) {
 		assert(uthread->tls_desc);
 		set_tls_desc(uthread->tls_desc, vcoreid);
+		begin_safe_access_tls_vars();
 		__vcoreid = vcoreid;	/* setting the uthread's TLS var */
+		end_safe_access_tls_vars();
 	}
 }
 
@@ -486,7 +494,9 @@ static void set_uthread_tls(struct uthread *uthread, uint32_t vcoreid)
 {
 	if (__uthread_has_tls(uthread)) {
 		set_tls_desc(uthread->tls_desc, vcoreid);
+		begin_safe_access_tls_vars();
 		__vcoreid = vcoreid;	/* setting the uthread's TLS var */
+		end_safe_access_tls_vars();
 	} else {
 		__vcore_context = FALSE;
 	}
