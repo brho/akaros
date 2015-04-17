@@ -879,6 +879,17 @@ case ${target} in
   use_gcc_stdint=wrap
   ;;
 *-*-akaros*)
+  # brho 2015-04-17
+  # We need this for the shared libgcc_s.so
+  tmake_file="t-slibgcc"
+  # Linux has these options (among others that I removed).  I think it's saying
+  # to use the glibc targetcm, which needs glibc-c.o to be built, which needs
+  # the t-glibc makefrag
+  c_target_objs="${c_target_objs} glibc-c.o"
+  cxx_target_objs="${cxx_target_objs} glibc-c.o"
+  tmake_file="${tmake_file} t-glibc"
+  target_has_targetcm=yes
+  # We've had these options for a while, linux also has them (and tgmath=no)
   default_use_cxa_atexit=yes
   use_gcc_stdint=wrap
   gas=yes
@@ -1363,13 +1374,21 @@ x86_64-*-rdos*)
     tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h i386/rdos.h i386/rdos64.h"
     tmake_file="i386/t-i386elf t-svr4"
     ;;
+# hasn't been compiled in a long time (2015-04-17)
 i[34567]86-*-akaros*)
+	# i386 linux, plus akaros/h i386/akaros.h
+	# consider adding i386/gnu-user-common.h i386/gnu-user.h etc
 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h glibc-stdint.h gnu-user.h akaros.h i386/akaros.h"
+	# linux doesn't use the tmake_file here, but a subset of these is still
+	# needed (probably the FP stuff)
 	tmake_file="${tmake_file} t-slibgcc-elf-ver t-linux i386/t-fprules-softfp soft-fp/t-softfp i386/t-linux"
 	;;
 x86_64-*-akaros*)
-	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h gnu-user.h akaros.h glibc-stdint.h i386/x86-64.h i386/akaros64.h"
+	# similar to linux, but minus some gnu bits.  gnu-user64 wants an x32 ld
+	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h gnu-user.h glibc-stdint.h i386/x86-64.h akaros.h i386/akaros64.h"
 	tmake_file="${tmake_file} i386/t-linux64"
+	# linux does not need these tmake files, but we need at least some of them.
+	# without these, compilation failed.
 	tmake_file="${tmake_file} i386/t-fprules-softfp soft-fp/t-softfp i386/t-linux"
 	;;
 riscv*-*-akaros*)
