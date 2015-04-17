@@ -578,10 +578,12 @@ utestclean:
 
 # KFS related stuff
 PHONY += fill-kfs unfill-kfs
-XCC_SO_FILES = $(addprefix $(XCC_TARGET_LIB), *.so*)
+xcc-gcc-libs = $(XCC_TARGET_ROOT)/../lib/
+xcc-so-files = $(addprefix $(XCC_TARGET_LIB), *.so*) \
+               $(addprefix $(xcc-gcc-libs), *.so*)
 
 $(OBJDIR)/.dont-force-fill-kfs:
-	$(Q)rm -rf $(addprefix $(FIRST_KFS_PATH)/lib/, $(notdir $(XCC_SO_FILES)))
+	$(Q)rm -rf $(addprefix $(FIRST_KFS_PATH)/lib/, $(notdir $(xcc-so-files)))
 	@echo "Cross Compiler 'so' files removed from KFS"
 	@$(MAKE) -f tests/Makefile uninstall
 	@echo "Apps from /test removed from KFS"
@@ -591,7 +593,7 @@ $(OBJDIR)/.dont-force-fill-kfs:
 
 fill-kfs: $(OBJDIR)/.dont-force-fill-kfs install-libs
 	@mkdir -p $(FIRST_KFS_PATH)/lib
-	$(Q)cp -uP $(XCC_SO_FILES) $(FIRST_KFS_PATH)/lib
+	$(Q)cp -uP $(xcc-so-files) $(FIRST_KFS_PATH)/lib
 	@echo "Cross Compiler 'so' files installed to KFS"
 	@$(MAKE) -f tests/Makefile install
 	@echo "Apps from /test installed to KFS"
