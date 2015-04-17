@@ -1,5 +1,5 @@
 ARCH ?= none	# catch bugs
-CFLAGS_USER += -static -fomit-frame-pointer -g
+CFLAGS_USER += $(CFLAGS_USER_LIBS)
 LIBNAME = benchutil
 # DEPLIBS passed in from the top-level Makefile
 DEPLIBS := $(DEPLIBS)
