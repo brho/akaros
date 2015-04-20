@@ -3,9 +3,8 @@
 
 #include <sys/types.h>
 #include <time.h>
+#include <ros/limits.h>
 
-/* Keep this 255 to stay in sync with glibc (expects d_name[256]) */
-#define MAX_FILENAME_SZ 255
 /* This will change once we have a decent readdir / getdents syscall, and
  * send the strlen along with the d_name.  The sizes need rechecked too, since
  * they are probably wrong. */
