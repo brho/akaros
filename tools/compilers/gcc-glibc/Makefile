@@ -23,12 +23,6 @@ ifneq ($(AWK),GNU)
 $(error You need to have 'gawk' installed on your system!)
 endif
 
-# Check to make sure that we have the GMP, MPFR, and MPC libraries installed
-GMP_OK := $(shell echo "int main() {return 0;}" | gcc -x c - -lgmp -lmpfr -lmpc -o /dev/null > /dev/null && echo OK)
-ifneq ($(GMP_OK),OK)
-$(error You need to have the libraries GMP, MPFR, and MPC installed on your system!)
-endif
-
 BINUTILS_VERSION := 2.24
 GCC_VERSION := 4.9.2
 GLIBC_VERSION := 2.19
@@ -280,11 +274,18 @@ binutils-clean:
 	     > ../.gcc-$(GCC_VERSION)-akaros.patch; \
 	     patch -p2 < ../.gcc-$(GCC_VERSION)-akaros.patch
 
-gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2
+gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2 \
+		    gmp-$(GMP_VERSION) \
+		    mpfr-$(MPFR_VERSION) \
+		    mpc-$(MPC_VERSION)
 	rm -rf gcc-$(GCC_VERSION)
 	tar -jxf gcc-$(GCC_VERSION).tar.bz2
 	$(MAKE) .gcc-akaros-patch
 	patch --no-backup-if-mismatch -p0 < gcc-$(GCC_VERSION)-riscv.patch
+	(cd gcc-$(GCC_VERSION) && \
+	 ln -s ../gmp-$(GMP_VERSION) gmp && \
+	 ln -s ../mpfr-$(MPFR_VERSION) mpfr && \
+	 ln -s ../mpc-$(MPC_VERSION) mpc)
 
 $(BINARY_PREFIX)gcc-stage1-builddir: gcc-$(GCC_VERSION)
 	rm -rf $@
