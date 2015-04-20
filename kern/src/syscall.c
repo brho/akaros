@@ -313,6 +313,29 @@ static struct proc *get_controllable_proc(struct proc *p, pid_t pid)
 	return target;
 }
 
+/* Helper, copies a pathname from the process into the kernel.  Returns a string
+ * on success, which you must free with free_path.  Returns 0 on failure and
+ * sets errno. */
+static char *copy_in_path(struct proc *p, const char *path, size_t path_l)
+{
+	char *t_path;
+	/* PATH_MAX includes the \0 */
+	if (path_l > PATH_MAX) {
+		set_errno(ENAMETOOLONG);
+		return 0;
+	}
+	t_path = user_strdup_errno(p, path, path_l);
+	if (!t_path)
+		return 0;
+	return t_path;
+}
+
+/* Helper, frees a path that was allocated with copy_in_path. */
+static void free_path(struct proc *p, char *t_path)
+{
+	user_memdup_free(p, t_path);
+}
+
 /************** Utility Syscalls **************/
 
 static int sys_null(void)
@@ -475,13 +498,12 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	struct file *program;
 	struct proc *new_p;
 
-	/* Copy in the path.  Consider putting an upper bound on path_l. */
-	t_path = user_strdup_errno(p, path, path_l);
+	t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
 		return -1;
 	/* TODO: 9ns support */
 	program = do_file_open(t_path, 0, 0);
-	user_memdup_free(p, t_path);
+	free_path(p, t_path);
 	if (!program)
 		return -1;			/* presumably, errno is already set */
 	/* TODO: need to split the proc creation, since you must load after setting
@@ -698,8 +720,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 		set_errno(EINVAL);
 		return -1;
 	}
-	/* Copy in the path.  Consider putting an upper bound on path_l. */
-	t_path = user_strdup_errno(p, path, path_l);
+	t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
 		return -1;
 	disable_irqsave(&state);	/* protect cur_ctx */
@@ -725,7 +746,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	/* This could block: */
 	/* TODO: 9ns support */
 	program = do_file_open(t_path, 0, 0);
-	user_memdup_free(p, t_path);
+	free_path(p, t_path);
 	if (!program)
 		goto early_error;
 	if (!is_valid_elf(program)) {
@@ -1278,7 +1299,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	struct file *file;
 
 	printd("File %s Open attempt oflag %x mode %x\n", path, oflag, mode);
-	char *t_path = user_strdup_errno(p, path, path_l);
+	char *t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
 		return -1;
 	if (t) {
@@ -1291,7 +1312,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	    ((oflag & (O_RDONLY | O_WRONLY | O_RDWR)) != O_WRONLY) &&
 	    ((oflag & (O_RDONLY | O_WRONLY | O_RDWR)) != O_RDWR)) {
 		set_errno(EINVAL);
-		user_memdup_free(p, t_path);
+		free_path(p, t_path);
 		return -1;
 	}
 
@@ -1313,7 +1334,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 			if ((oflag & O_CREATE) && (oflag & O_EXCL)) {
 				set_errno(EEXIST);
 				sysclose(fd);
-				user_memdup_free(p, t_path);
+				free_path(p, t_path);
 				return -1;
 			}
 		} else {
@@ -1323,7 +1344,7 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 			}
 		}
 	}
-	user_memdup_free(p, t_path);
+	free_path(p, t_path);
 	printd("File %s Open, fd=%d\n", path, fd);
 	return fd;
 }
@@ -1392,7 +1413,7 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 {
 	struct kstat *kbuf;
 	struct dentry *path_d;
-	char *t_path = user_strdup_errno(p, path, path_l);
+	char *t_path = copy_in_path(p, path, path_l);
 	int retval = 0;
 	if (!t_path)
 		return -1;
@@ -1423,7 +1444,7 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 out_with_kbuf:
 	kfree(kbuf);
 out_with_path:
-	user_memdup_free(p, t_path);
+	free_path(p, t_path);
 	return retval;
 }
 
@@ -1507,12 +1528,12 @@ static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,
                            int mode)
 {
 	int retval;
-	char *t_path = user_strdup_errno(p, path, path_l);
+	char *t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
 		return -1;
 	/* TODO: 9ns support */
 	retval = do_access(t_path, mode);
-	user_memdup_free(p, t_path);
+	free_path(p, t_path);
 	printd("Access for path: %s retval: %d\n", path, retval);
 	if (retval < 0) {
 		set_errno(-retval);
@@ -1563,24 +1584,24 @@ intreg_t sys_link(struct proc *p, char *old_path, size_t old_l,
                   char *new_path, size_t new_l)
 {
 	int ret;
-	char *t_oldpath = user_strdup_errno(p, old_path, old_l);
+	char *t_oldpath = copy_in_path(p, old_path, old_l);
 	if (t_oldpath == NULL)
 		return -1;
-	char *t_newpath = user_strdup_errno(p, new_path, new_l);
+	char *t_newpath = copy_in_path(p, new_path, new_l);
 	if (t_newpath == NULL) {
-		user_memdup_free(p, t_oldpath);
+		free_path(p, t_oldpath);
 		return -1;
 	}
 	ret = do_link(t_oldpath, t_newpath);
-	user_memdup_free(p, t_oldpath);
-	user_memdup_free(p, t_newpath);
+	free_path(p, t_oldpath);
+	free_path(p, t_newpath);
 	return ret;
 }
 
 intreg_t sys_unlink(struct proc *p, const char *path, size_t path_l)
 {
 	int retval;
-	char *t_path = user_strdup_errno(p, path, path_l);
+	char *t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
 		return -1;
 	retval = do_unlink(t_path);
@@ -1588,7 +1609,7 @@ intreg_t sys_unlink(struct proc *p, const char *path, size_t path_l)
 		unset_errno();
 		retval = sysremove(t_path);
 	}
-	user_memdup_free(p, t_path);
+	free_path(p, t_path);
 	return retval;
 }
 
@@ -1596,17 +1617,17 @@ intreg_t sys_symlink(struct proc *p, char *old_path, size_t old_l,
                      char *new_path, size_t new_l)
 {
 	int ret;
-	char *t_oldpath = user_strdup_errno(p, old_path, old_l);
+	char *t_oldpath = copy_in_path(p, old_path, old_l);
 	if (t_oldpath == NULL)
 		return -1;
-	char *t_newpath = user_strdup_errno(p, new_path, new_l);
+	char *t_newpath = copy_in_path(p, new_path, new_l);
 	if (t_newpath == NULL) {
-		user_memdup_free(p, t_oldpath);
+		free_path(p, t_oldpath);
 		return -1;
 	}
 	ret = do_symlink(t_newpath, t_oldpath, S_IRWXU | S_IRWXG | S_IRWXO);
-	user_memdup_free(p, t_oldpath);
-	user_memdup_free(p, t_newpath);
+	free_path(p, t_oldpath);
+	free_path(p, t_newpath);
 	return ret;
 }
 
@@ -1618,7 +1639,7 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 	ssize_t copy_amt;
 	int ret = -1;
 	struct dentry *path_d;
-	char *t_path = user_strdup_errno(p, path, path_l);
+	char *t_path = copy_in_path(p, path, path_l);
 	if (t_path == NULL)
 		return -1;
 	/* TODO: 9ns support */
@@ -1637,7 +1658,7 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 	} else
 		symname = path_d->d_inode->i_op->readlink(path_d);
 
-	user_memdup_free(p, t_path);
+	free_path(p, t_path);
 
 	if (symname){
 		copy_amt = strnlen(symname, buf_l - 1) + 1;
@@ -1652,21 +1673,22 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 	return ret;
 }
 
-static intreg_t sys_chdir(struct proc *p, pid_t pid, const char *path, size_t path_l)
+static intreg_t sys_chdir(struct proc *p, pid_t pid, const char *path,
+                          size_t path_l)
 {
 	int retval;
 	char *t_path;
 	struct proc *target = get_controllable_proc(p, pid);
 	if (!target)
 		return -1;
-	t_path = user_strdup_errno(p, path, path_l);
+	t_path = copy_in_path(p, path, path_l);
 	if (!t_path) {
 		proc_decref(target);
 		return -1;
 	}
 	/* TODO: 9ns support */
 	retval = do_chdir(&target->fs_env, t_path);
-	user_memdup_free(p, t_path);
+	free_path(p, t_path);
 	proc_decref(target);
 	return retval;
 }
@@ -1696,7 +1718,12 @@ intreg_t sys_getcwd(struct proc *p, char *u_cwd, size_t cwd_l)
 {
 	int retval = 0;
 	char *kfree_this;
-	char *k_cwd = do_getcwd(&p->fs_env, &kfree_this, cwd_l);
+	char *k_cwd;
+	if (cwd_l > PATH_MAX) {
+		set_errno(ENAMETOOLONG);
+		return -1;
+	}
+	k_cwd = do_getcwd(&p->fs_env, &kfree_this, cwd_l);
 	if (!k_cwd)
 		return -1;		/* errno set by do_getcwd */
 	if (memcpy_to_user_errno(p, u_cwd, k_cwd, strnlen(k_cwd, cwd_l - 1) + 1))
@@ -1709,7 +1736,7 @@ intreg_t sys_getcwd(struct proc *p, char *u_cwd, size_t cwd_l)
 intreg_t sys_mkdir(struct proc *p, const char *path, size_t path_l, int mode)
 {
 	int retval;
-	char *t_path = user_strdup_errno(p, path, path_l);
+	char *t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
 		return -1;
 	mode &= S_PMASK;
@@ -1722,19 +1749,19 @@ intreg_t sys_mkdir(struct proc *p, const char *path, size_t path_l, int mode)
 		static_assert(!(S_PMASK & DMDIR));
 		retval = syscreate(t_path, O_RDWR, DMDIR | mode);
 	}
-	user_memdup_free(p, t_path);
+	free_path(p, t_path);
 	return retval;
 }
 
 intreg_t sys_rmdir(struct proc *p, const char *path, size_t path_l)
 {
 	int retval;
-	char *t_path = user_strdup_errno(p, path, path_l);
+	char *t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
 		return -1;
 	/* TODO: 9ns support */
 	retval = do_rmdir(t_path);
-	user_memdup_free(p, t_path);
+	free_path(p, t_path);
 	return retval;
 }
 
@@ -1864,21 +1891,21 @@ intreg_t sys_nbind(struct proc *p,
 
 {
 	int ret;
-	char *t_srcpath = user_strdup_errno(p, src_path, src_l);
+	char *t_srcpath = copy_in_path(p, src_path, src_l);
 	if (t_srcpath == NULL) {
 		printd("srcpath dup failed ptr %p size %d\n", src_path, src_l);
 		return -1;
 	}
-	char *t_ontopath = user_strdup_errno(p, onto_path, onto_l);
+	char *t_ontopath = copy_in_path(p, onto_path, onto_l);
 	if (t_ontopath == NULL) {
-		user_memdup_free(p, t_srcpath);
+		free_path(p, t_srcpath);
 		printd("ontopath dup failed ptr %p size %d\n", onto_path, onto_l);
 		return -1;
 	}
 	printd("sys_nbind: %s -> %s flag %d\n", t_srcpath, t_ontopath, flag);
 	ret = sysbind(t_srcpath, t_ontopath, flag);
-	user_memdup_free(p, t_srcpath);
-	user_memdup_free(p, t_ontopath);
+	free_path(p, t_srcpath);
+	free_path(p, t_ontopath);
 	return ret;
 }
 
@@ -1896,11 +1923,11 @@ intreg_t sys_nmount(struct proc *p,
 	int afd;
 
 	afd = -1;
-	char *t_ontopath = user_strdup_errno(p, onto_path, onto_l);
+	char *t_ontopath = copy_in_path(p, onto_path, onto_l);
 	if (t_ontopath == NULL)
 		return -1;
 	ret = sysmount(fd, afd, t_ontopath, flag, /* spec or auth */"");
-	user_memdup_free(p, t_ontopath);
+	free_path(p, t_ontopath);
 	return ret;
 }
 
@@ -1908,18 +1935,18 @@ intreg_t sys_nmount(struct proc *p,
 intreg_t sys_nunmount(struct proc *p, char *name, int name_l, char *old_path, int old_l)
 {
 	int ret;
-	char *t_oldpath = user_strdup_errno(p, old_path, old_l);
+	char *t_oldpath = copy_in_path(p, old_path, old_l);
 	if (t_oldpath == NULL)
 		return -1;
-	char *t_name = user_strdup_errno(p, name, name_l);
+	char *t_name = copy_in_path(p, name, name_l);
 	if (t_name == NULL) {
-		user_memdup_free(p, t_oldpath);
+		free_path(p, t_oldpath);
 		return -1;
 	}
 	ret = sysunmount(t_name, t_oldpath);
 	printd("go do it\n");
-	user_memdup_free(p, t_oldpath);
-	user_memdup_free(p, t_name);
+	free_path(p, t_oldpath);
+	free_path(p, t_name);
 	return ret;
 }
 
@@ -1996,19 +2023,19 @@ intreg_t sys_wstat(struct proc *p, char *path, size_t path_l,
                    uint8_t *stat_m, size_t stat_sz, int flags)
 {
 	int retval = 0;
-	char *t_path = user_strdup_errno(p, path, path_l);
+	char *t_path = copy_in_path(p, path, path_l);
 	struct file *file;
 
 	if (!t_path)
 		return -1;
 	retval = syswstat(t_path, stat_m, stat_sz);
 	if (retval == stat_sz) {
-		user_memdup_free(p, t_path);
+		free_path(p, t_path);
 		return stat_sz;
 	}
 	/* 9ns failed, we'll need to check the VFS */
 	file = do_file_open(t_path, 0, 0);
-	user_memdup_free(p, t_path);
+	free_path(p, t_path);
 	if (!file)
 		return -1;
 	retval = vfs_wstat(file, stat_m, stat_sz, flags);
@@ -2041,8 +2068,8 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 	struct systrace_record *t = pcpui->cur_kthread->trace;
 	ERRSTACK(1);
 	int mountpointlen = 0;
-	char *from_path = user_strdup_errno(p, old_path, old_path_l);
-	char *to_path = user_strdup_errno(p, new_path, new_path_l);
+	char *from_path = copy_in_path(p, old_path, old_path_l);
+	char *to_path = copy_in_path(p, new_path, new_path_l);
 	struct chan *oldchan = 0, *newchan = NULL;
 	int retval = -1;
 
@@ -2063,8 +2090,8 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 	poperror();
 	if (!oldchan) {
 		retval = do_rename(from_path, to_path);
-		user_memdup_free(p, from_path);
-		user_memdup_free(p, to_path);
+		free_path(p, from_path);
+		free_path(p, to_path);
 		return retval;
 	}
 
@@ -2152,8 +2179,8 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 	printk("syswstat returns %d\n", retval);
 
 done: 
-	user_memdup_free(p, from_path);
-	user_memdup_free(p, to_path);
+	free_path(p, from_path);
+	free_path(p, to_path);
 	cclose(oldchan);
 	cclose(newchan);
 	return retval;
