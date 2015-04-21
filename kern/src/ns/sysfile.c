@@ -651,7 +651,7 @@ int sysmount(int fd, int afd, char *old, int flags, char *spec)
 	return r;
 }
 
-int sysunmount(char *old, char *new)
+int sysunmount(char *src_path, char *onto_path)
 {
 	ERRSTACK(1);
 	volatile struct {
@@ -670,15 +670,15 @@ int sysunmount(char *old, char *new)
 		return -1;
 	}
 
-	cmount.c = namec(new, Amount, 0, 0);
-	if (old != NULL && old[0] != '\0') {
+	cmount.c = namec(onto_path, Amount, 0, 0);
+	if (src_path != NULL && src_path[0] != '\0') {
 		/*
 		 * This has to be namec(..., Aopen, ...) because
 		 * if arg[0] is something like /srv/cs or /fd/0,
 		 * opening it is the only way to get at the real
 		 * Chan underneath.
 		 */
-		cmounted.c = namec(old, Aopen, OREAD, 0);
+		cmounted.c = namec(src_path, Aopen, OREAD, 0);
 	}
 
 	cunmount(cmount.c, cmounted.c);

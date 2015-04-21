@@ -288,7 +288,8 @@ main(int argc, char *argv[])
 
 	snprintf(servefile, sizeof(servefile), "#s/cs%s", ext);
 	snprintf(netndb, sizeof(netndb), "%s/ndb", mntpt);
-	syscall(SYS_nunmount, (unsigned long)servefile, (unsigned long)mntpt);
+	syscall(SYS_nunmount, (unsigned long)servefile, strlen(servefile),
+	        (unsigned long)mntpt, strlen(mntpt));
 	remove(servefile);
 
 	ndbinit();

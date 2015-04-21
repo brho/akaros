@@ -1931,22 +1931,34 @@ intreg_t sys_nmount(struct proc *p,
 	return ret;
 }
 
-/* int mount(int fd, int afd, char* old, int flag, char* aname); */
-intreg_t sys_nunmount(struct proc *p, char *name, int name_l, char *old_path, int old_l)
+/* Unmount undoes the operation of a bind or mount.  Check out
+ * http://plan9.bell-labs.com/magic/man2html/1/bind .  Though our mount takes an
+ * FD, not servename (aka src_path), so it's not quite the same.
+ *
+ * To translate between Plan 9 and Akaros, old -> onto_path.  new -> src_path.
+ *
+ * For unmount, src_path / new is optional.  If set, we only unmount the
+ * bindmount that came from src_path. */
+intreg_t sys_nunmount(struct proc *p, char *src_path, int src_l,
+                      char *onto_path, int onto_l)
 {
 	int ret;
-	char *t_oldpath = copy_in_path(p, old_path, old_l);
-	if (t_oldpath == NULL)
+	char *t_ontopath, *t_srcpath;
+	t_ontopath = copy_in_path(p, onto_path, onto_l);
+	if (t_ontopath == NULL)
 		return -1;
-	char *t_name = copy_in_path(p, name, name_l);
-	if (t_name == NULL) {
-		free_path(p, t_oldpath);
-		return -1;
+	if (src_path) {
+		t_srcpath = copy_in_path(p, src_path, src_l);
+		if (t_srcpath == NULL) {
+			free_path(p, t_ontopath);
+			return -1;
+		}
+	} else {
+		t_srcpath = 0;
 	}
-	ret = sysunmount(t_name, t_oldpath);
-	printd("go do it\n");
-	free_path(p, t_oldpath);
-	free_path(p, t_name);
+	ret = sysunmount(t_srcpath, t_ontopath);
+	free_path(p, t_ontopath);
+	free_path(p, t_srcpath);	/* you can free a null path */
 	return ret;
 }
 
