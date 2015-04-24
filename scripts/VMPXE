@@ -1,0 +1,7 @@
+#!/bin/bash
+make tests && make fill-kfs &&make  && sudo cp obj/kern/akaros-kernel /var/lib/tftpboot/akaros && \
+	sudo service isc-dhcp-server restart && echo "OK" && exit
+
+
+echo " IT WENT WRONG"
+
