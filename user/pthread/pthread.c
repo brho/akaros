@@ -498,8 +498,13 @@ void pthread_need_tls(bool need)
 
 int pthread_attr_init(pthread_attr_t *a)
 {
+	a->stackaddr = 0;
  	a->stacksize = PTHREAD_STACK_SIZE;
 	a->detachstate = PTHREAD_CREATE_JOINABLE;
+	/* priority and policy should be set by anyone changing inherit. */
+	a->sched_priority = 0;
+	a->sched_policy = 0;
+	a->sched_inherit = PTHREAD_INHERIT_SCHED;
   	return 0;
 }
 
@@ -591,6 +596,8 @@ void pthread_lib_init(void)
 	__sigemptyset(&t->sigmask);
 	__sigemptyset(&t->sigpending);
 	assert(t->id == 0);
+	t->sched_policy = SCHED_FIFO;
+	t->sched_priority = 0;
 	/* Put the new pthread (thread0) on the active queue */
 	mcs_pdr_lock(&queue_lock);
 	threads_active++;
@@ -661,6 +668,7 @@ int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	struct uth_thread_attr uth_attr = {0};
 	run_once(pthread_lib_init());
 	/* Create the actual thread */
+	struct pthread_tcb *parent = (struct pthread_tcb*)current_uthread;
 	struct pthread_tcb *pthread;
 	int ret = posix_memalign((void**)&pthread, __alignof__(struct pthread_tcb),
 	                         sizeof(struct pthread_tcb));
@@ -674,12 +682,19 @@ int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	pthread->sigmask = ((pthread_t)current_uthread)->sigmask;
 	__sigemptyset(&pthread->sigpending);
 	pthread->sigdata = NULL;
+	/* Might override these later, based on attr && EXPLICIT_SCHED */
+	pthread->sched_policy = parent->sched_policy;
+	pthread->sched_priority = parent->sched_priority;
 	/* Respect the attributes */
 	if (attr) {
 		if (attr->stacksize)					/* don't set a 0 stacksize */
 			pthread->stacksize = attr->stacksize;
 		if (attr->detachstate == PTHREAD_CREATE_DETACHED)
 			pthread->detached = TRUE;
+		if (attr->sched_inherit == PTHREAD_EXPLICIT_SCHED) {
+			pthread->sched_policy = attr->sched_policy;
+			pthread->sched_priority = attr->sched_priority;
+		}
 	}
 	/* allocate a stack */
 	if (__pthread_allocate_stack(pthread))
@@ -1282,6 +1297,111 @@ int pthread_setspecific(pthread_key_t key, const void *value)
 	return 0;
 }
 
+
+/* Scheduling Stuff */
+
+static bool policy_is_supported(int policy)
+{
+	/* As our scheduler changes, we can add more policies here */
+	switch (policy) {
+		case SCHED_FIFO:
+			return TRUE;
+		default:
+			return FALSE;
+	}
+}
+
+int pthread_attr_setschedparam(pthread_attr_t *attr,
+                               const struct sched_param *param)
+{
+	/* The set of acceptable priorities are based on the scheduling policy.
+	 * We'll just accept any old number, since we might not know the policy
+	 * yet.  I didn't see anything in the man pages saying attr had to have a
+	 * policy set before setting priority. */
+	attr->sched_priority = param->sched_priority;
+	return 0;
+}
+
+int pthread_attr_getschedparam(pthread_attr_t *attr,
+                               struct sched_param *param)
+{
+	param->sched_priority = attr->sched_priority;
+	return 0;
+}
+
+int pthread_attr_setschedpolicy(pthread_attr_t *attr, int policy)
+{
+	if (!policy_is_supported(policy))
+		return -EINVAL;
+	attr->sched_policy = policy;
+	return 0;
+}
+
+int pthread_attr_getschedpolicy(pthread_attr_t *attr, int *policy)
+{
+	*policy = attr->sched_policy;
+	return 0;
+}
+
+/* We only support SCOPE_PROCESS, so we don't even use the attr. */
+int pthread_attr_setscope(pthread_attr_t *attr, int scope)
+{
+	if (scope != PTHREAD_SCOPE_PROCESS)
+		return -ENOTSUP;
+	return 0;
+}
+
+int pthread_attr_getscope(pthread_attr_t *attr, int *scope)
+{
+	*scope = PTHREAD_SCOPE_PROCESS;
+	return 0;
+}
+
+/* Inheritance refers to policy, priority, scope */
+int pthread_attr_setinheritsched(pthread_attr_t *attr,
+                                 int inheritsched)
+{
+	switch (inheritsched) {
+		case PTHREAD_INHERIT_SCHED:
+		case PTHREAD_EXPLICIT_SCHED:
+			break;
+		default:
+			return -EINVAL;
+	}
+	attr->sched_inherit = inheritsched;
+	return 0;
+}
+
+int pthread_attr_getinheritsched(const pthread_attr_t *attr,
+                                 int *inheritsched)
+{
+	*inheritsched = attr->sched_inherit;
+	return 0;
+}
+
+int pthread_setschedparam(pthread_t thread, int policy,
+                           const struct sched_param *param)
+{
+	if (!policy_is_supported(policy))
+		return -EINVAL;
+	thread->sched_policy = policy;
+	/* We actually could check if the priority falls in the range of the
+	 * specified policy here, since we have both policy and priority. */
+	thread->sched_priority = param->sched_priority;
+	return 0;
+}
+
+int pthread_getschedparam(pthread_t thread, int *policy,
+                           struct sched_param *param)
+{
+	*policy = thread->sched_policy;
+	param->sched_priority = thread->sched_priority;
+	return 0;
+}
+
+
+/* Unsupported Stuff */
+
 int pthread_mutex_timedlock (pthread_mutex_t *__restrict __mutex,
 					const struct timespec *__restrict
 					__abstime)
@@ -1290,6 +1410,7 @@ int pthread_mutex_timedlock (pthread_mutex_t *__restrict __mutex,
 	abort();
 	return -1;
 }
+
 int pthread_cond_timedwait (pthread_cond_t *__restrict __cond,
 				   pthread_mutex_t *__restrict __mutex,
 				   const struct timespec *__restrict __abstime)

@@ -8,6 +8,8 @@
 #include <mcs.h>
 #include <dtls.h>
 #include <spinlock.h>
+/* GNU / POSIX scheduling crap */
+#include <sched.h>
 
 #ifdef __cplusplus
   extern "C" {
@@ -42,6 +44,8 @@ struct pthread_tcb {
 	sigset_t sigmask;
 	sigset_t sigpending;
 	struct sigdata *sigdata;
+	int sched_policy;
+	int sched_priority;		/* careful, GNU #defines this to __sched_priority */
 };
 typedef struct pthread_tcb* pthread_t;
 TAILQ_HEAD(pthread_queue, pthread_tcb);
@@ -103,6 +107,7 @@ enum
 // more space if we go too far.
 #define PTHREAD_STACK_PAGES 4
 #define PTHREAD_STACK_SIZE (PTHREAD_STACK_PAGES*PGSIZE)
+#define PTHREAD_STACK_MIN PTHREAD_STACK_SIZE
 
 typedef int clockid_t;
 typedef struct
@@ -127,6 +132,9 @@ typedef struct
 	void *stackaddr;
 	size_t stacksize;
 	int detachstate;
+	int sched_priority;
+	int sched_policy;
+	int sched_inherit;
 } pthread_attr_t;
 typedef int pthread_barrierattr_t;
 typedef int pthread_once_t;
@@ -214,6 +222,32 @@ int pthread_equal(pthread_t __thread1, pthread_t __thread2);
 int pthread_getattr_np(pthread_t __th, pthread_attr_t *__attr);
 int pthread_attr_getstack(const pthread_attr_t *__attr,
                            void **__stackaddr, size_t *__stacksize);
+
+/* Scheduling Stuff, mostly ignored by the actual 2LS */
+int pthread_attr_setschedparam(pthread_attr_t *attr,
+                               const struct sched_param *param);
+int pthread_attr_getschedparam(pthread_attr_t *attr,
+                               struct sched_param *param);
+/* Policies are from sched.h. */
+int pthread_attr_setschedpolicy(pthread_attr_t *attr, int policy);
+int pthread_attr_getschedpolicy(pthread_attr_t *attr, int *policy);
+
+#define PTHREAD_SCOPE_SYSTEM	1
+#define PTHREAD_SCOPE_PROCESS	2
+int pthread_attr_setscope(pthread_attr_t *attr, int scope);
+int pthread_attr_getscope(pthread_attr_t *attr, int *scope);
+
+#define PTHREAD_INHERIT_SCHED	1
+#define PTHREAD_EXPLICIT_SCHED	2
+int pthread_attr_setinheritsched(pthread_attr_t *attr,
+                                 int inheritsched);
+int pthread_attr_getinheritsched(const pthread_attr_t *attr,
+                                 int *inheritsched);
+
+int pthread_setschedparam(pthread_t thread, int policy,
+                          const struct sched_param *param);
+int pthread_getschedparam(pthread_t thread, int *policy,
+                          struct sched_param *param);
 
 /* Unsupported Stuff */
 typedef void *upthread_once_t;
