@@ -52,33 +52,6 @@ static inline uint64_t read_tsc(void)
 	return (uint64_t)edx << 32 | eax;
 }
 
-/* non-core-id reporting style (it is in ecx) */
-static inline uint64_t read_tscp(void)
-{
-	uint32_t edx, eax;
-	asm volatile("rdtscp" : "=d"(edx), "=a"(eax) : : X86_REG_CX);
-	return (uint64_t)edx << 32 | eax;
-}
-
-static inline void cpuid(uint32_t info1, uint32_t info2, uint32_t *eaxp,
-                         uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp)
-{
-	uint32_t eax, ebx, ecx, edx;
-	/* Can select with both eax (info1) and ecx (info2) */
-	asm volatile("cpuid" 
-		: "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
-		: "a" (info1), "c" (info2));
-	if (eaxp)
-		*eaxp = eax;
-	if (ebxp)
-		*ebxp = ebx;
-	if (ecxp)
-		*ecxp = ecx;
-	if (edxp)
-		*edxp = edx;
-}
-
-
 /* Check out k/a/x86/rdtsc_test.c for more info */
 static inline uint64_t read_tsc_serialized(void)
 {
@@ -89,13 +62,6 @@ static inline uint64_t read_tsc_serialized(void)
 static inline void cpu_relax(void)
 {
 	asm volatile("pause" : : : "memory");
-}
-
-static inline uint64_t read_pmc(uint32_t index)
-{
-	uint32_t edx, eax;
-	asm volatile("rdpmc" : "=d"(edx), "=a"(eax) : "c"(index));
-	return (uint64_t)edx << 32 | eax;
 }
 
 static inline void save_fp_state(struct ancillary_state *silly)
