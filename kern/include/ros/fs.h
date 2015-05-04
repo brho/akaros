@@ -2,8 +2,8 @@
 #define _ROS_INC_STAT_H
 
 #include <sys/types.h>
-#include <time.h>
 #include <ros/limits.h>
+#include <ros/time.h>
 
 /* This will change once we have a decent readdir / getdents syscall, and
  * send the strlen along with the d_name.  The sizes need rechecked too, since
@@ -30,18 +30,11 @@ struct kstat {
 	__dev_t						st_rdev;	/* Device number, if device.  */
 	__off64_t					st_size;	/* Size of file, in bytes.  */
 	__blksize_t					st_blksize;	/* Optimal block size for I/O.  */
-	__blkcnt64_t				st_blocks;	/* Number 512-byte blocks allocated. */
-	struct timespec				st_atime;	/* Time of last access.  */
-	struct timespec				st_mtime;	/* Time of last modification.  */
-	struct timespec				st_ctime;	/* Time of last status change.  */
+	__blkcnt64_t				st_blocks;	/* Number 512-byte blocks allocd. */
+	struct timespec				st_atim;	/* Time of last access.  */
+	struct timespec				st_mtim;	/* Time of last modification.  */
+	struct timespec				st_ctim;	/* Time of last status change.  */
 };
-
-/* There are a bunch of things that glibc expects, which are part of the kernel
- * interface, but that we don't want to clobber or otherwise conflict with
- * glibc. */
-#ifdef ROS_KERNEL
-#define stat kstat
-#define dirent kdirent 
 
 /* File access modes for open and fcntl. */
 #define O_RDONLY		0x00		/* Open read-only */
@@ -82,6 +75,20 @@ struct kstat {
 #define OEXCL   		O_EXCL
 #define ORCLOSE			O_REMCLO
 
+/* fcntl flags that we support, keep in sync with glibc */
+#define F_DUPFD		0	/* Duplicate file descriptor */
+#define F_GETFD		1	/* Get file descriptor flags */
+#define F_SETFD		2	/* Set file descriptor flags */
+#define F_GETFL		3	/* Get file status flags */
+#define F_SETFL		4	/* Set file status flags */
+/* For F_[GET|SET]FD */
+#define FD_CLOEXEC	1
+
+/* TODO: have userpsace use our stuff from bits/stats.h */
+#ifdef ROS_KERNEL
+#define stat kstat
+#define dirent kdirent 
+
 /* File creation modes (access controls) */
 #define S_IRWXU 00700	/* user (file owner) has read, write and execute perms */
 #define S_IRUSR 00400	/* user has read permission */
@@ -96,15 +103,6 @@ struct kstat {
 #define S_IWOTH 00002	/* others have write permission */
 #define S_IXOTH 00001	/* others have execute permission */
 #define S_PMASK 00777	/* mask for all perms */
-
-/* fcntl flags that we support, keep in sync with glibc */
-#define F_DUPFD		0	/* Duplicate file descriptor */
-#define F_GETFD		1	/* Get file descriptor flags */
-#define F_SETFD		2	/* Set file descriptor flags */
-#define F_GETFL		3	/* Get file status flags */
-#define F_SETFL		4	/* Set file status flags */
-/* For F_[GET|SET]FD */
-#define FD_CLOEXEC	1
 
 /* File type is encoded in the file mode */
 #define __S_IFMT	0170000	/* These bits determine file type */

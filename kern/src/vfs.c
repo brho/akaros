@@ -1113,9 +1113,9 @@ void stat_inode(struct inode *inode, struct kstat *kstat)
 	kstat->st_size = inode->i_size;
 	kstat->st_blksize = inode->i_blksize;
 	kstat->st_blocks = inode->i_blocks;
-	kstat->st_atime = inode->i_atime;
-	kstat->st_mtime = inode->i_mtime;
-	kstat->st_ctime = inode->i_ctime;
+	kstat->st_atim = inode->i_atime;
+	kstat->st_mtim = inode->i_mtime;
+	kstat->st_ctim = inode->i_ctime;
 }
 
 void print_kstat(struct kstat *kstat)
@@ -1131,9 +1131,9 @@ void print_kstat(struct kstat *kstat)
 	printk("\tst_size   : %p\n", kstat->st_size);
 	printk("\tst_blksize: %p\n", kstat->st_blksize);
 	printk("\tst_blocks : %p\n", kstat->st_blocks);
-	printk("\tst_atime  : %p\n", kstat->st_atime);
-	printk("\tst_mtime  : %p\n", kstat->st_mtime);
-	printk("\tst_ctime  : %p\n", kstat->st_ctime);
+	printk("\tst_atime  : %p\n", kstat->st_atim);
+	printk("\tst_mtime  : %p\n", kstat->st_mtim);
+	printk("\tst_ctime  : %p\n", kstat->st_ctim);
 }
 
 /* Inode Cache management.  In general, search on the ino, get a refcnt'd value

@@ -131,9 +131,9 @@ unsigned int convM2kstat(uint8_t * buf, unsigned int nbuf, struct kstat *ks)
 		ks->st_mode |= __S_IFREG;
 	}
 	p += BIT32SZ;
-	ks->st_atime.tv_sec = GBIT32(p);
+	ks->st_atim.tv_sec = GBIT32(p);
 	p += BIT32SZ;
-	ks->st_mtime.tv_sec = GBIT32(p);
+	ks->st_mtim.tv_sec = GBIT32(p);
 	p += BIT32SZ;
 	ks->st_size = GBIT64(p);
 	p += BIT64SZ;
