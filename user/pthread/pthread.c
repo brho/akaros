@@ -1426,3 +1426,15 @@ int pthread_cancel (pthread_t __th)
 	abort();
 	return -1;
 }
+
+void pthread_cleanup_push(void (*routine)(void *), void *arg)
+{
+	fprintf(stderr, "Unsupported %s!", __FUNCTION__);
+	abort();
+}
+
+void pthread_cleanup_pop(int execute)
+{
+	fprintf(stderr, "Unsupported %s!", __FUNCTION__);
+	abort();
+}

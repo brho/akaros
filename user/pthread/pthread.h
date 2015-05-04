@@ -261,6 +261,8 @@ extern int pthread_cond_timedwait (pthread_cond_t *__restrict __cond,
 extern int pthread_once (pthread_once_t *__once_control,
              void (*__init_routine) (void)) __nonnull ((1, 2));
 extern int pthread_cancel (pthread_t __th);
+void pthread_cleanup_push(void (*routine)(void *), void *arg);
+void pthread_cleanup_pop(int execute);
 
 #ifdef __cplusplus
   }
