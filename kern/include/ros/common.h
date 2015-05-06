@@ -24,13 +24,6 @@ typedef unsigned long uintreg_t;
 #define FALSE	0
 #endif
 
-#define KiB	1024u
-#define MiB	1048576u
-#define GiB	1073741824u
-#define TiB	1099511627776ull
-#define PiB	1125899906842624ull
-#define EiB	1152921504606846976ull
-
 #define FOR_CIRC_BUFFER(next, size, var) \
 	for (int _var = 0, var = (next); _var < (size); _var++, var = (var + 1) % (size))
 

@@ -27,4 +27,11 @@ typedef uint32_t __be32;
 typedef uint16_t __le16;
 typedef uint16_t __be16;
 
+#define KiB	1024u
+#define MiB	1048576u
+#define GiB	1073741824u
+#define TiB	1099511627776ull
+#define PiB	1125899906842624ull
+#define EiB	1152921504606846976ull
+
 #endif /* _ROS_SYS_TYPES_H */
