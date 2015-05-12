@@ -131,6 +131,7 @@ typedef struct
 {
 	void *stackaddr;
 	size_t stacksize;
+	size_t guardsize;
 	int detachstate;
 	int sched_priority;
 	int sched_policy;
@@ -160,6 +161,8 @@ int pthread_yield(void);
 int pthread_attr_setdetachstate(pthread_attr_t *__attr,int __detachstate);
 int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize);
 int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize);
+int pthread_attr_setguardsize(pthread_attr_t *attr, size_t guardsize);
+int pthread_attr_getguardsize(pthread_attr_t *attr, size_t *guardsize);
 
 int pthread_mutex_destroy(pthread_mutex_t *);
 int pthread_mutex_init(pthread_mutex_t *, const pthread_mutexattr_t *);

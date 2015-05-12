@@ -550,6 +550,18 @@ int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)
 	return 0;
 }
 
+int pthread_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)
+{
+	attr->guardsize = guardsize;
+	return 0;
+}
+
+int pthread_attr_getguardsize(pthread_attr_t *attr, size_t *guardsize)
+{
+	*guardsize = attr->guardsize;
+	return 0;
+}
+
 int pthread_attr_getstack(const pthread_attr_t *__restrict __attr,
 						   void **__stackaddr, size_t *__stacksize)
 {
