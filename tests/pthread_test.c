@@ -18,6 +18,10 @@
 #include <sys/time.h>
 #include "misc-compat.h" /* OS dependent #incs */
 
+/* These are here just to have the compiler test the _INITIALIZERS */
+pthread_cond_t dummy_cond = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t dummy_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 #define printf_safe(...) {}
 //#define printf_safe(...) \

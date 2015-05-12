@@ -223,8 +223,8 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 		mcs_pdr_lock(&queue_lock);
 		new_thread = TAILQ_FIRST(&ready_queue);
 		if (new_thread) {
-			TAILQ_REMOVE(&ready_queue, new_thread, next);
-			TAILQ_INSERT_TAIL(&active_queue, new_thread, next);
+			TAILQ_REMOVE(&ready_queue, new_thread, tq_next);
+			TAILQ_INSERT_TAIL(&active_queue, new_thread, tq_next);
 			threads_active++;
 			threads_ready--;
 			mcs_pdr_unlock(&queue_lock);
@@ -287,7 +287,7 @@ void pth_thread_runnable(struct uthread *uthread)
 	 * It will be removed from this queue later when vcore_entry() comes up */
 	mcs_pdr_lock(&queue_lock);
 	/* Again, GIANT WARNING: if you change this, change batch wakeup code */
-	TAILQ_INSERT_TAIL(&ready_queue, pthread, next);
+	TAILQ_INSERT_TAIL(&ready_queue, pthread, tq_next);
 	threads_ready++;
 	mcs_pdr_unlock(&queue_lock);
 	/* Smarter schedulers should look at the num_vcores() and how much work is
@@ -314,7 +314,7 @@ void pth_thread_paused(struct uthread *uthread)
 	 * honest.  After all, some 2LS may want an active list */
 	mcs_pdr_lock(&queue_lock);
 	threads_active--;
-	TAILQ_REMOVE(&active_queue, pthread, next);
+	TAILQ_REMOVE(&active_queue, pthread, tq_next);
 	mcs_pdr_unlock(&queue_lock);
 	/* communicate to pth_thread_runnable */
 	pthread->state = PTH_BLK_PAUSED;
@@ -374,7 +374,7 @@ void pth_thread_blockon_sysc(struct uthread *uthread, void *syscall)
 	pthread->state = PTH_BLK_SYSC;
 	mcs_pdr_lock(&queue_lock);
 	threads_active--;
-	TAILQ_REMOVE(&active_queue, pthread, next);
+	TAILQ_REMOVE(&active_queue, pthread, tq_next);
 	mcs_pdr_unlock(&queue_lock);
 	/* Set things up so we can wake this thread up later */
 	sysc->u_data = uthread;
@@ -445,7 +445,7 @@ void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
 	pthread->state = PTH_BLK_SYSC;
 	mcs_pdr_lock(&queue_lock);
 	threads_active--;
-	TAILQ_REMOVE(&active_queue, pthread, next);
+	TAILQ_REMOVE(&active_queue, pthread, tq_next);
 	mcs_pdr_unlock(&queue_lock);
 
 	/* TODO: RISCV/x86 issue! (0 is divby0, 14 is PF, etc) */
@@ -613,7 +613,7 @@ void pthread_lib_init(void)
 	/* Put the new pthread (thread0) on the active queue */
 	mcs_pdr_lock(&queue_lock);
 	threads_active++;
-	TAILQ_INSERT_TAIL(&active_queue, t, next);
+	TAILQ_INSERT_TAIL(&active_queue, t, tq_next);
 	mcs_pdr_unlock(&queue_lock);
 	/* Tell the kernel where and how we want to receive events.  This is just an
 	 * example of what to do to have a notification turned on.  We're turning on
@@ -742,7 +742,7 @@ void __pthread_generic_yield(struct pthread_tcb *pthread)
 {
 	mcs_pdr_lock(&queue_lock);
 	threads_active--;
-	TAILQ_REMOVE(&active_queue, pthread, next);
+	TAILQ_REMOVE(&active_queue, pthread, tq_next);
 	mcs_pdr_unlock(&queue_lock);
 }
 
@@ -963,7 +963,7 @@ int pthread_mutex_destroy(pthread_mutex_t* m)
 
 int pthread_cond_init(pthread_cond_t *c, const pthread_condattr_t *a)
 {
-	TAILQ_INIT(&c->waiters);
+	SLIST_INIT(&c->waiters);
 	spin_pdr_init(&c->spdr_lock);
 	if (a) {
 		c->attr_pshared = a->pshared;
@@ -980,29 +980,41 @@ int pthread_cond_destroy(pthread_cond_t *c)
 	return 0;
 }
 
-int pthread_cond_broadcast(pthread_cond_t *c)
+static void swap_slists(struct pthread_list *a, struct pthread_list *b)
+{
+	struct pthread_list temp;
+	temp = *a;
+	*a = *b;
+	*b = temp;
+}
+
+static void wake_slist(struct pthread_list *to_wake)
 {
 	unsigned int nr_woken = 0;	/* assuming less than 4 bil threads */
-	struct pthread_queue restartees = TAILQ_HEAD_INITIALIZER(restartees);
-	struct pthread_tcb *pthread_i;
-	spin_pdr_lock(&c->spdr_lock);
-	/* moves all items from waiters onto the end of restartees */
-	TAILQ_CONCAT(&restartees, &c->waiters, next);
-	spin_pdr_unlock(&c->spdr_lock);
+	struct pthread_tcb *pthread_i, *pth_temp;
+	/* Amortize the lock grabbing over all restartees */
+	mcs_pdr_lock(&queue_lock);
 	/* Do the work of pth_thread_runnable().  We're in uth context here, but I
 	 * think it's okay.  When we need to (when locking) we drop into VC ctx, as
 	 * far as the kernel and other cores are concerned. */
-	TAILQ_FOREACH(pthread_i, &restartees, next) {
+	SLIST_FOREACH_SAFE(pthread_i, to_wake, sl_next, pth_temp) {
 		pthread_i->state = PTH_RUNNABLE;
 		nr_woken++;
+		TAILQ_INSERT_TAIL(&ready_queue, pthread_i, tq_next);
 	}
-	/* Amortize the lock grabbing over all restartees */
-	mcs_pdr_lock(&queue_lock);
 	threads_ready += nr_woken;
-	TAILQ_CONCAT(&ready_queue, &restartees, next);
 	mcs_pdr_unlock(&queue_lock);
 	if (can_adjust_vcores)
 		vcore_request(threads_ready);
+}
+
+int pthread_cond_broadcast(pthread_cond_t *c)
+{
+	struct pthread_list restartees = SLIST_HEAD_INITIALIZER(restartees);
+	spin_pdr_lock(&c->spdr_lock);
+	swap_slists(&restartees, &c->waiters);
+	spin_pdr_unlock(&c->spdr_lock);
+	wake_slist(&restartees);
 	return 0;
 }
 
@@ -1012,12 +1024,12 @@ int pthread_cond_signal(pthread_cond_t *c)
 {
 	struct pthread_tcb *pthread;
 	spin_pdr_lock(&c->spdr_lock);
-	pthread = TAILQ_FIRST(&c->waiters);
+	pthread = SLIST_FIRST(&c->waiters);
 	if (!pthread) {
 		spin_pdr_unlock(&c->spdr_lock);
 		return 0;
 	}
-	TAILQ_REMOVE(&c->waiters, pthread, next);
+	SLIST_REMOVE_HEAD(&c->waiters, sl_next);
 	spin_pdr_unlock(&c->spdr_lock);
 	pth_thread_runnable((struct uthread*)pthread);
 	return 0;
@@ -1041,7 +1053,7 @@ static void __pth_wait_cb(struct uthread *uthread, void *junk)
 	__pthread_generic_yield(pthread);
 	pthread->state = PTH_BLK_MUTEX;
 	spin_pdr_lock(&c->spdr_lock);
-	TAILQ_INSERT_TAIL(&c->waiters, pthread, next);
+	SLIST_INSERT_HEAD(&c->waiters, pthread, sl_next);
 	spin_pdr_unlock(&c->spdr_lock);
 	pthread_mutex_unlock(m);
 }
@@ -1120,7 +1132,7 @@ int pthread_barrier_init(pthread_barrier_t *b,
 	b->sense = 0;
 	atomic_set(&b->count, count);
 	spin_pdr_init(&b->lock);
-	TAILQ_INIT(&b->waiters);
+	SLIST_INIT(&b->waiters);
 	b->nr_waiters = 0;
 	return 0;
 }
@@ -1150,7 +1162,7 @@ static void __pth_barrier_cb(struct uthread *uthread, void *junk)
 	}
 	/* otherwise, we sleep */
 	pthread->state = PTH_BLK_MUTEX;	/* TODO: consider ignoring this */
-	TAILQ_INSERT_TAIL(&b->waiters, pthread, next);
+	SLIST_INSERT_HEAD(&b->waiters, pthread, sl_next);
 	b->nr_waiters++;
 	spin_pdr_unlock(&b->lock);
 }
@@ -1173,8 +1185,7 @@ int pthread_barrier_wait(pthread_barrier_t *b)
 {
 	unsigned int spin_state = 0;
 	int ls = !b->sense;	/* when b->sense is the value we read, then we're free*/
-	int nr_waiters;
-	struct pthread_queue restartees = TAILQ_HEAD_INITIALIZER(restartees);
+	struct pthread_list restartees = SLIST_HEAD_INITIALIZER(restartees);
 	struct pthread_tcb *pthread_i;
 	struct barrier_junk local_junk;
 	
@@ -1198,20 +1209,10 @@ int pthread_barrier_wait(pthread_barrier_t *b)
 			spin_pdr_unlock(&b->lock);
 			return PTHREAD_BARRIER_SERIAL_THREAD;
 		}
-		TAILQ_CONCAT(&restartees, &b->waiters, next);
-		nr_waiters = b->nr_waiters;
+		swap_slists(&restartees, &b->waiters);
 		b->nr_waiters = 0;
 		spin_pdr_unlock(&b->lock);
-		/* TODO: do we really need this state tracking? */
-		TAILQ_FOREACH(pthread_i, &restartees, next)
-			pthread_i->state = PTH_RUNNABLE;
-		/* bulk restart waiters (skipping pth_thread_runnable()) */
-		mcs_pdr_lock(&queue_lock);
-		threads_ready += nr_waiters;
-		TAILQ_CONCAT(&ready_queue, &restartees, next);
-		mcs_pdr_unlock(&queue_lock);
-		if (can_adjust_vcores)
-			vcore_request(threads_ready);
+		wake_slist(&restartees);
 		return PTHREAD_BARRIER_SERIAL_THREAD;
 	} else {
 		/* Spin if there are no other threads to run.  No sense sleeping */
@@ -1232,7 +1233,7 @@ int pthread_barrier_wait(pthread_barrier_t *b)
 
 int pthread_barrier_destroy(pthread_barrier_t *b)
 {
-	assert(TAILQ_EMPTY(&b->waiters));
+	assert(SLIST_EMPTY(&b->waiters));
 	assert(!b->nr_waiters);
 	/* Free any locks (if we end up using an MCS) */
 	return 0;

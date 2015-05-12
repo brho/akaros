@@ -31,7 +31,11 @@
 struct pthread_tcb;
 struct pthread_tcb {
 	struct uthread uthread;
-	TAILQ_ENTRY(pthread_tcb) next;
+	union {
+		/* Only on one list at a time */
+		TAILQ_ENTRY(pthread_tcb) tq_next;
+		SLIST_ENTRY(pthread_tcb) sl_next;
+	};
 	int state;
 	bool detached;
 	struct pthread_tcb *joiner;			/* raced on by exit and join */
@@ -48,6 +52,7 @@ struct pthread_tcb {
 	int sched_priority;		/* careful, GNU #defines this to __sched_priority */
 };
 typedef struct pthread_tcb* pthread_t;
+SLIST_HEAD(pthread_list, pthread_tcb);
 TAILQ_HEAD(pthread_queue, pthread_tcb);
 
 /* Per-vcore data structures to manage syscalls.  The ev_q is where we tell the
@@ -64,7 +69,8 @@ struct sysc_mgmt {
 #define PTHREAD_MUTEX_DEFAULT PTHREAD_MUTEX_NORMAL
 #define PTHREAD_MUTEX_SPINS 100 // totally arbitrary
 #define PTHREAD_BARRIER_SPINS 100 // totally arbitrary
-#define PTHREAD_COND_INITIALIZER {0,{0},{0},0}
+#define PTHREAD_COND_INITIALIZER {/* SLIST_HEAD_INITIALIZER */ {NULL},         \
+                                  SPINPDR_INITIALIZER, 0, 0}
 #define PTHREAD_PROCESS_PRIVATE 0
 #define PTHREAD_PROCESS_SHARED 1
 
@@ -85,7 +91,7 @@ typedef struct
 	volatile int				sense;	/* state of barrier, flips btw runs */
 	atomic_t					count;
 	struct spin_pdr_lock		lock;
-	struct pthread_queue		waiters;
+	struct pthread_list			waiters;
 	int							nr_waiters;
 } pthread_barrier_t;
 
@@ -121,7 +127,7 @@ typedef struct
  * with the cond var. */
 typedef struct
 {
-	struct pthread_queue		waiters;
+	struct pthread_list			waiters;
 	struct spin_pdr_lock 		spdr_lock;
 	int 						attr_pshared;
 	int 						attr_clock;
