@@ -459,6 +459,7 @@ $(BINARY_PREFIX)glibc-stage1-builddir: glibc-$(GLIBC_VERSION)
 		--with-pkgversion="akaros-repo" \
 		--with-elf \
 		--enable-hacker-mode \
+		--enable-static-nss \
 		$(GLIBC_CONFIGURE_FLAGS);
 	touch $@
 
@@ -507,6 +508,7 @@ $(BINARY_PREFIX)glibc-stage2-builddir: glibc-$(GLIBC_VERSION)
 		--with-pkgversion="akaros-repo" \
 		--with-elf \
 		--enable-hacker-mode \
+		--enable-static-nss \
 		$(GLIBC_CONFIGURE_FLAGS);
 	touch $@
 
