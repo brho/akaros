@@ -1,7 +1,9 @@
-#ifndef _FUTEX_H
-#define _FUTEX_H
+#ifndef PTHREAD_FUTEX_H
+#define PTHREAD_FUTEX_H
 
 #include <sys/time.h>
+
+__BEGIN_DECLS
 
 enum {
 	FUTEX_WAIT,
@@ -11,4 +13,6 @@ enum {
 int futex(int *uaddr, int op, int val, const struct timespec *timeout,
           int *uaddr2, int val3);
 
-#endif	/* _FUTEX_H */
+__END_DECLS
+
+#endif	/* PTHREAD_FUTEX_H */

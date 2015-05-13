@@ -2,10 +2,12 @@
  * Kevin Klues <klueska@cs.berkeley.edu>
  * See LICENSE for details. */
 
-#ifndef _PVCALARM_H
-#define _PVCALARM_H
+#ifndef BENCHUTIL_PVCALARM_H
+#define BENCHUTIL_PVCALARM_H
 
 #include <stdint.h>
+ 
+__BEGIN_DECLS
 
 /* Types of per-vcore alarms that can be set */
 enum {
@@ -27,4 +29,6 @@ int enable_pvcalarms(int policy, uint64_t interval, void (*callback) (void));
 /* Disable the currently active per-vcore alarm service */
 int disable_pvcalarms();
 
-#endif // _PVCALARM_H
+__END_DECLS
+
+#endif /* BENCHUTIL_PVCALARM_H */

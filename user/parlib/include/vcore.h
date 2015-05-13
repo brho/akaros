@@ -1,15 +1,13 @@
-#ifndef _VCORE_H
-#define _VCORE_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifndef PARLIB_VCORE_H
+#define PARLIB_VCORE_H
 
 #include <arch/vcore.h>
 #include <arch/atomic.h>
 #include <sys/param.h>
 #include <string.h>
 #include <timing.h>
+
+__BEGIN_DECLS
 
 /*****************************************************************************/
 /* TODO: This is a complete hack, but necessary for vcore stuff to work for now
@@ -311,8 +309,6 @@ static inline uint64_t vcore_account_uptime_nsec(uint32_t vcoreid)
 	val;                                                                       \
 })
 
-#ifdef __cplusplus
-}
-#endif
+__END_DECLS
 
-#endif
+#endif /* PARLIB_VCORE_H */

@@ -19,15 +19,13 @@
  * See COPYING.LESSER for details on the GNU Lesser General Public License.
  * See COPYING for details on the GNU General Public License. */
 
-#ifndef SPINLOCK_H
-#define SPINLOCK_H
+#ifndef PARLIB_SPINLOCK_H
+#define PARLIB_SPINLOCK_H
 
 #include <arch/arch.h>
 #include <arch/atomic.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__BEGIN_DECLS
 
 #define SPINLOCK_INITIALIZER {0}
 
@@ -77,9 +75,6 @@ void spin_pdr_init(struct spin_pdr_lock *pdr_lock);
 void spin_pdr_lock(struct spin_pdr_lock *pdr_lock);
 void spin_pdr_unlock(struct spin_pdr_lock *pdr_lock);
 
-#ifdef __cplusplus
-}
-#endif
+__END_DECLS
 
-
-#endif // SPINLOCK_H
+#endif /* PARLIB_SPINLOCK_H */

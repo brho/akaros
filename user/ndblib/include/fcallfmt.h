@@ -1,8 +1,10 @@
-#ifndef _NDB_FCALLFMT_H
-#define _NDB_FCALLFMT_H
+#ifndef NDBLIB_FCALLFMT_H
+#define NDBLIB_FCALLFMT_H
 
 #include <printf-ext.h>
 #include <fcall.h>
+
+__BEGIN_DECLS
 
 int printf_fcall(FILE *stream, const struct printf_info *info,
                  const void *const *args);
@@ -15,4 +17,6 @@ int printf_dir_info(const struct printf_info* info, size_t n, int *argtypes,
 
 int read9pmsg(int, void *, unsigned int);
 
-#endif /* _NDB_FCALLFMT_H */
+__END_DECLS
+
+#endif /* NDBLIB_FCALLFMT_H */

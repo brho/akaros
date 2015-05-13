@@ -1,13 +1,11 @@
-#ifndef PARLIB_INC_DEBUG_H
-#define PARLIB_INC_DEBUG_H
+#ifndef PARLIB_ROS_DEBUG_H
+#define PARLIB_ROS_DEBUG_H
 
 #include <ros/common.h>
 #include <stdio.h>
 #include <stdarg.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__BEGIN_DECLS
 
 void ros_debugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...);
 void ros_vdebugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_list);
@@ -28,8 +26,6 @@ void __print_func_exit(const char *func, const char *file);
 #define print_func_entry() __print_func_entry(__FUNCTION__, __FILE__)
 #define print_func_exit() __print_func_exit(__FUNCTION__, __FILE__)
 
-#ifdef __cplusplus
-}
-#endif
+__END_DECLS
 
-#endif /* !PARLIB_INC_DEBUG_H */
+#endif /* PARLIB_ROS_DEBUG_H */

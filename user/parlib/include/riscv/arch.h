@@ -5,6 +5,8 @@
 #include <ros/trapframe.h>
 #include <ros/arch/arch.h>
 
+__BEGIN_DECLS
+
 #define internal_function
 
 #define ARCH_CL_SIZE 64
@@ -89,5 +91,7 @@ static inline void restore_fp_state(struct ancillary_state* silly)
 
 	write_fsr(fsr);
 }
+
+__END_DECLS
 
 #endif /* PARLIB_ARCH_H */

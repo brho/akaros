@@ -6,11 +6,12 @@
  * modified, propagated, or distributed except according to the terms contained
  * in the LICENSE file.
  */
-#ifndef ROS_INC_IPLIB_H
-
-#define ROS_INC_IPLIB_H
+#ifndef IPLIB_IPLIB_H
+#define IPLIB_IPLIB_H
 
 #include <ros/common.h>
+
+__BEGIN_DECLS
 
 enum 
 {
@@ -230,5 +231,6 @@ int listen(char *dir, char *newdir);
 int accept(int ctl, char *dir);
 int reject(int ctl, char *dir, char *cause);
 
+__END_DECLS
 
-#endif /* ROS_INC_IPLIB_H */
+#endif /* IPLIB_IPLIB_H */

@@ -24,13 +24,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+__BEGIN_DECLS
+
 #ifndef __GNUC__
   #error "You need to be using gcc to compile this library..."
 #endif 
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /* Declaration of types needed for dynamically allocatable tls */
 typedef struct dtls_key *dtls_key_t;
@@ -52,9 +50,6 @@ void *get_dtls(dtls_key_t key);
 /* Destroy all dtls storage associated with the current uthread or vcore. */
 void destroy_dtls();
 
-#ifdef __cplusplus
-}
-#endif
+__END_DECLS
 
 #endif /* PARLIB_DTLS_H */
-

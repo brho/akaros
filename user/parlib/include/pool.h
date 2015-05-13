@@ -1,10 +1,12 @@
 /* See COPYRIGHT for copyright information. */
 /* Kevin Klues <klueska@cs.berkeley.edu>	*/
 
-#ifndef ROS_INC_POOL_H
-#define ROS_INC_POOL_H
+#ifndef PARLIB_POOL_H
+#define PARLIB_POOL_H
 
 #include <string.h>
+
+__BEGIN_DECLS
 
 #define POOL_TYPE_DEFINE(_type, p, sz)                                                \
 typedef struct struct_##p {                                                             \
@@ -72,4 +74,6 @@ typedef struct struct_##p {                                                     
 #define POOL_SIZE(p) ((p)->free)
 #define POOL_MAX_SIZE(p) ((p)->size)
 
-#endif //ROS_INC_POOL_H
+__END_DECLS
+
+#endif /* PARLIB_POOL_H */

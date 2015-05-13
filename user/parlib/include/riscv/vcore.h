@@ -9,6 +9,8 @@
 #include <assert.h>
 #include <sys/vcore-tls.h>
 
+__BEGIN_DECLS
+
 #ifdef __riscv64
 # define REG_L "ld"
 # define REG_S "sd"
@@ -135,5 +137,7 @@ static unsigned long __arch_refl_get_aux(struct user_context *ctx)
 {
 	return 0;
 }
+
+__END_DECLS
 
 #endif /* PARLIB_ARCH_VCORE_H */

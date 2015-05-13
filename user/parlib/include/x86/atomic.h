@@ -4,6 +4,8 @@
 #include <ros/common.h>
 #include <ros/atomic.h>
 
+__BEGIN_DECLS
+
 static inline void atomic_init(atomic_t *number, long val);
 static inline long atomic_read(atomic_t *number);
 static inline void atomic_set(atomic_t *number, long val);
@@ -95,4 +97,6 @@ static inline void atomic_orb(volatile uint8_t *number, uint8_t mask)
 	__sync_fetch_and_or(number, mask);
 }
 
-#endif /* !PARLIB_ARCH_ATOMIC_H */
+__END_DECLS
+
+#endif /* PARLIB_ARCH_ATOMIC_H */

@@ -1,12 +1,10 @@
-#ifndef _MCS_H
-#define _MCS_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifndef PARLIB_MCS_H
+#define PARLIB_MCS_H
 
 #include <vcore.h>
 #include <arch/arch.h>
+
+__BEGIN_DECLS
 
 #define MCS_LOCK_INIT {0}
 #define MCS_QNODE_INIT {0, 0}
@@ -113,8 +111,6 @@ void mcs_pdr_fini(struct mcs_pdr_lock *lock);
 void mcs_pdr_lock(struct mcs_pdr_lock *lock);
 void mcs_pdr_unlock(struct mcs_pdr_lock *lock);
 
-#ifdef __cplusplus
-}
-#endif
+__END_DECLS
 
-#endif
+#endif /* PARLIB_MCS_H */

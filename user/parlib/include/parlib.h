@@ -4,8 +4,8 @@
 // and is intended to be linked into all user-mode applications
 // (NOT the kernel or boot loader).
 
-#ifndef ROS_INC_PARLIB_H
-#define ROS_INC_PARLIB_H 1
+#ifndef PARLIB_PARLIB_H
+#define PARLIB_PARLIB_H
 
 #ifndef __ASSEMBLER__
 
@@ -19,14 +19,12 @@
 #include <errno.h>
 #include <ros_debug.h>
 
+__BEGIN_DECLS
+
 enum {
 	PG_RDONLY = 4,
 	PG_RDWR   = 6,
 };
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 ssize_t     sys_cputs(const uint8_t *s, size_t len);
 uint16_t    sys_cgetc(void);
@@ -72,10 +70,8 @@ struct sigdata *alloc_sigdata();
 void free_sigdata(struct sigdata *sigdata);
 void trigger_posix_signal(int sig_nr, struct siginfo *info, void *aux);
 
-#ifdef __cplusplus
-}
-#endif
+__END_DECLS
 
 #endif	// !ASSEMBLER
 
-#endif	// !ROS_INC_PARLIB_H
+#endif /* PARLIB_PARLIB_H */

@@ -1,5 +1,5 @@
-#ifndef _PTHREAD_H
-#define _PTHREAD_H
+#ifndef PTHREAD_PTHREAD_H
+#define PTHREAD_PTHREAD_H
 
 #include <sys/queue.h>
 #include <signal.h>
@@ -11,9 +11,7 @@
 /* GNU / POSIX scheduling crap */
 #include <sched.h>
 
-#ifdef __cplusplus
-  extern "C" {
-#endif
+__BEGIN_DECLS
 
 /* Pthread states.  These are mostly examples for other 2LSs */
 #define PTH_CREATED			1
@@ -273,8 +271,6 @@ extern int pthread_cancel (pthread_t __th);
 void pthread_cleanup_push(void (*routine)(void *), void *arg);
 void pthread_cleanup_pop(int execute);
 
-#ifdef __cplusplus
-  }
-#endif
+__END_DECLS
 
-#endif
+#endif /* PTHREAD_PTHREAD_H */

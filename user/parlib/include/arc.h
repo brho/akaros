@@ -1,10 +1,6 @@
 // Header for Asynch Remote Call, currently only support remote syscalls.
-#ifndef _ARC_H
-#define _ARC_H
-
-#ifdef __cplusplus
-  extern "C" {
-#endif
+#ifndef PARLIB_ARC_H
+#define PARLIB_ARC_H
 
 #include <parlib.h>
 #include <error.h>
@@ -14,6 +10,8 @@
 #include <ros/syscall.h>
 #include <ros/ring_syscall.h>
 #include <mcs.h>
+
+__BEGIN_DECLS
 
 struct arsc_channel {
 	mcs_lock_t aclock;
@@ -95,8 +93,6 @@ int get_all_desc(async_desc_t** a_desc, syscall_desc_t** s_desc);
 
 syscall_desc_t* arc_call(long int num, ...);
 
-#ifdef __cplusplus
-  }
-#endif
+__END_DECLS
 
-#endif
+#endif /* PARLIB_ARC_H */

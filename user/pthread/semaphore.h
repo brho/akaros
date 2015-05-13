@@ -16,12 +16,14 @@
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  */
 
-#ifndef _SEMAPHORE_H
-#define _SEMAPHORE_H
+#ifndef PTHREAD_SEMAPHORE_H
+#define PTHREAD_SEMAPHORE_H
 
 #include <sys/queue.h>
 #include <pthread.h>
 #include <mcs.h>
+
+__BEGIN_DECLS
 
 /* Value returned if `sem_open' failed.  */
 #define SEM_FAILED      ((sem_t *) 0)
@@ -44,4 +46,6 @@ extern int sem_trywait (sem_t *__sem);
 extern int sem_post (sem_t *__sem);
 extern int sem_getvalue (sem_t *__restrict __sem, int *__restrict __sval);
 
-#endif	/* semaphore.h */
+__END_DECLS
+
+#endif /* PTHREAD_SEMAPHORE_H */

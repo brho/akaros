@@ -7,6 +7,8 @@
 #include <arch/atomic.h>
 #include <stdio.h>
 
+__BEGIN_DECLS
+
 #define DECL_BITMASK(name, size) \
 	uint8_t (name)[BYTES_FOR_BITMASK((size))]
 
@@ -88,5 +90,7 @@ static inline bool BITMASK_IS_FULL(uint8_t* map, size_t size)
 	}
 	return TRUE;
 }
+
+__END_DECLS
 
 #endif /* PARLIB_ARCH_BITMASK_H */

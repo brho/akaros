@@ -5,6 +5,8 @@
 #include <ros/atomic.h>
 #include <ros/arch/membar.h>
 
+__BEGIN_DECLS
+
 #define SPINLOCK_INITIALIZER {0}
 
 static inline void atomic_init(atomic_t *number, long val);
@@ -114,4 +116,6 @@ static inline void atomic_or_int(volatile int *number, int mask)
 	__sync_fetch_and_or(number, mask);
 }
 
-#endif /* !PARLIB_ARCH_ATOMIC_H */
+__END_DECLS
+
+#endif /* PARLIB_ARCH_ATOMIC_H */

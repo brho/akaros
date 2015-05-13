@@ -9,11 +9,13 @@
  * 		register_printf_specifier('i', printf_ipaddr, printf_ipaddr_info);
  */
 
-#ifndef _PRINTF_EXT_H
-#define _PRINTF_EXT_H
+#ifndef PARLIB_PRINTF_EXT_H
+#define PARLIB_PRINTF_EXT_H
 
 #include <ros/common.h>
 #include <printf.h>
+
+__BEGIN_DECLS
 
 /* Commonly used as %i, will print out a 16-byte plan9 IP address */
 int printf_ipaddr(FILE *stream, const struct printf_info *info,
@@ -39,4 +41,6 @@ int printf_errstr(FILE *stream, const struct printf_info *info,
 int printf_errstr_info(const struct printf_info* info, size_t n, int *argtypes,
                        int *size);
 
-#endif /* _PRINTF_EXT_H */
+__END_DECLS
+
+#endif /* PARLIB_PRINTF_EXT_H */

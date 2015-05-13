@@ -5,11 +5,13 @@
  * Userspace utility functions for receiving events and notifications (IPIs).
  * Some are higher level than others; just use what you need. */ 
 
-#ifndef _EVENT_H
-#define _EVENT_H
+#ifndef PARLIB_EVENT_H
+#define PARLIB_EVENT_H
 
 #include <ros/event.h>
 #include <ros/common.h>
+
+__BEGIN_DECLS
 
 /********* Event_q Setup / Registration  ***********/
 struct event_queue *get_big_event_q_raw(void);
@@ -58,4 +60,6 @@ void ev_we_returned(bool were_handling_remotes);
 /* Debugging */
 void print_ev_msg(struct event_msg *msg);
 
-#endif /* _EVENT_H */
+__END_DECLS
+
+#endif /* PARLIB_EVENT_H */

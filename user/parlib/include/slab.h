@@ -36,6 +36,8 @@
 #include <arch/atomic.h>
 #include <spinlock.h>
 
+__BEGIN_DECLS
+
 /* Back in the day, their cutoff for "large objects" was 512B, based on
  * measurements and on not wanting more than 1/8 of internal fragmentation. */
 #define NUM_BUF_PER_SLAB 8
@@ -103,5 +105,7 @@ void kmem_cache_reap(struct kmem_cache *cp);
 /* Debug */
 void print_kmem_cache(struct kmem_cache *kc);
 void print_kmem_slab(struct kmem_slab *slab);
+
+__END_DECLS
 
 #endif /* PARLIB_SLAB_H */

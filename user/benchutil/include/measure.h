@@ -16,6 +16,11 @@
  * chronological order.  Ultimately, the sample needs to produce a uint64_t
  * (e.g. TSC tick). */
 
+#ifndef BENCHUTIL_MEASURE_H
+#define BENCHUTIL_MEASURE_H
+
+__BEGIN_DECLS
+
 struct sample_stats {
 	int (*get_sample)(void **data, int i, int j, uint64_t *sample);
 	uint64_t					avg_time;
@@ -38,3 +43,7 @@ void print_throughput(void **data, unsigned int nr_steps, uint64_t interval,
                       int nr_i, int nr_j,
                       int (*get_sample)(void **data, int i, int j,
                                         uint64_t *sample));
+
+__END_DECLS
+
+#endif /* BENCHUTIL_MEASURE_H */

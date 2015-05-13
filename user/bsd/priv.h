@@ -6,6 +6,9 @@
  * modified, propagated, or distributed except according to the terms contained
  * in the LICENSE file.
  */
+#ifndef BSD_PRIV_H
+#define BSD_PRIV_H
+
 #include <parlib.h>
 
 #include <sys/types.h>
@@ -15,6 +18,7 @@
 
 #include <netinet/in.h>
 
+__BEGIN_DECLS
 
 typedef struct Rock Rock;
 
@@ -62,3 +66,7 @@ extern int	_sock_ipattr(const char*);
 extern void	_sock_ingetaddr(Rock*, struct sockaddr_in*, int*, char*);
 
 extern void	_syserrno(void);
+
+__END_DECLS
+
+#endif /* BSD_PRIV_H */

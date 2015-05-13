@@ -3,6 +3,8 @@
 
 #include <arch/bitmask.h>
 
+__BEGIN_DECLS
+
 static inline bool BITMASK_IS_SET_IN_RANGE(uint8_t* m, size_t beg, size_t end)
 {
 	for(size_t i=beg; i<end; i++) {
@@ -54,4 +56,6 @@ static inline void CLR_BITMASK_RANGE(uint8_t* m, size_t beg, size_t end)
 	}                                                                          \
 }                                                                              
                                                                                
+__END_DECLS
+
 #endif /* PARLIB_BITMASK_H */

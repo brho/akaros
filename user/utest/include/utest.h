@@ -15,6 +15,8 @@
 #include <timing.h>
 #include <execinfo.h>
 
+__BEGIN_DECLS
+
 /* 
  * Macros for assertions. 
  */
@@ -101,4 +103,6 @@ static int run_utests(char *suite_name, struct utest tests[], int num_tests) {
 	printf("<-- END_USERSPACE_%s_TESTS -->\n", suite_name);
 }
 
-#endif // UTEST_UTEST_H
+__END_DECLS
+
+#endif /* UTEST_UTEST_H */

@@ -6,11 +6,12 @@
  * modified, propagated, or distributed except according to the terms contained
  * in the LICENSE file.
  */
-#ifndef ROS_INC_NDB_H
-
-#define ROS_INC_NDB_H
+#ifndef NDBLIB_NDB_H
+#define NDBLIB_NDB_H
 
 #include <fcall.h>
+
+__BEGIN_DECLS
 
 enum
 {
@@ -177,4 +178,6 @@ void _ndbcacheflush(struct ndb *db);
 /* No implementation for this, dumped into a garbage file */
 void setnetmtpt(char *net, int n, char *x);
 
-#endif /* ROS_INC_NDB_H */
+__END_DECLS
+
+#endif /* NDBLIB_NDB_H */

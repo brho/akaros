@@ -7,10 +7,12 @@
  * 
  */
 
-#ifndef _PARLIB_WAITFREELIST_H
-#define _PARLIB_WAITFREELIST_H
+#ifndef PARLIB_WAITFREELIST_H
+#define PARLIB_WAITFREELIST_H
 
 #include <string.h>
+
+__BEGIN_DECLS
 
 struct wfl_entry {
   struct wfl_entry *next;
@@ -23,10 +25,6 @@ struct wfl {
 };
 
 #define WFL_INITIALIZER(list) {&(list).first, {0, 0}}
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 void wfl_init(struct wfl *list);
 void wfl_destroy(struct wfl *list);
@@ -43,8 +41,6 @@ size_t wfl_remove_all(struct wfl *list, void *data);
        _p = _p->next) \
     if (elm)
 
-#ifdef __cplusplus
-}
-#endif
+__END_DECLS
 
-#endif
+#endif /* PARLIB_WAITFREELIST_H */

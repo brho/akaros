@@ -8,6 +8,11 @@
  */
 /* a hash file */
 
+#ifndef NDBLIB_NDBHF_H
+#define NDBLIB_NDBHF_H
+
+__BEGIN_DECLS
+
 struct ndbhf
 {
 	struct ndbhf	*next;
@@ -36,3 +41,7 @@ int	_ndbcachesearch(struct ndb *db, struct ndbs *s, char *attr, char *val,
 			   struct ndbtuple **t);
 struct ndbtuple* _ndbcacheadd(struct ndb *db, struct ndbs *s, char *attr, char *val,
 			      struct ndbtuple *t);
+
+__END_DECLS
+
+#endif /* NDBLIB_NDBHF_H */

@@ -12,6 +12,8 @@
 #include <ros/arch/mmu.h>
 #include <sys/vcore-tls.h>
 
+__BEGIN_DECLS
+
 /* Here's how the HW popping works:  It sets up the future stack pointer to
  * have extra stuff after it, and then it pops the registers, then pops the new
  * context's stack pointer.  Then it uses the extra stuff (the new PC is on the
@@ -393,5 +395,7 @@ static unsigned long __arch_refl_get_aux(struct user_context *ctx)
 {
 	return ctx->tf.hw_tf.tf_regs.reg_oesp;
 }
+
+__END_DECLS
 
 #endif /* PARLIB_ARCH_VCORE32_H */

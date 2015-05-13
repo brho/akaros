@@ -6,6 +6,8 @@
 #include <ros/common.h>
 #include <string.h>
 
+__BEGIN_DECLS
+
 #define ARCH_CL_SIZE 64
 #ifdef __x86_64__
 
@@ -73,5 +75,7 @@ static inline void restore_fp_state(struct ancillary_state *silly)
 {
 	asm volatile("fxrstor %0" : : "m"(*silly));
 }
+
+__END_DECLS
 
 #endif /* PARLIB_ARCH_H */

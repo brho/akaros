@@ -1,11 +1,14 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef ROS_INC_ASSERT_H
-#define ROS_INC_ASSERT_H
+#ifndef PARLIB_RASSERT_H
+#define PARLIB_RASSERT_H
 
 #include <assert.h>
 #include <vcore.h>
 #include <ros_debug.h>
+
+__BEGIN_DECLS
+
 #undef assert
 
 void _warn(const char*, int, const char*, ...);
@@ -27,4 +30,6 @@ void _panic(const char*, int, const char*, ...) __attribute__((noreturn));
 // static_assert(x) will generate a compile-time error if 'x' is false.
 #define static_assert(x)	switch (x) case 0: case (x):
 
-#endif /* !ROS_INC_ASSERT_H */
+__END_DECLS
+
+#endif /* PARLIB_RASSERT_H */

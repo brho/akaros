@@ -8,17 +8,15 @@
  * changes, this will need to change as well.  You'll know when this doesn't
  * compile (say, if timing_overhead moves).  */
 
-#ifndef _TSC_COMPAT_H
-#define _TSC_COMPAT_H
+#ifndef PARLIB_TSC_COMPAT_H
+#define PARLIB_TSC_COMPAT_H
 
 #if defined(__i386__) || defined(__x86_64__)
 #else
 #error "Platform not supported for read_tsc()"
 #endif
 
-#ifdef __cplusplus
-	extern "C" {
-#endif
+__BEGIN_DECLS
 
 #ifdef __ros__
 
@@ -173,8 +171,6 @@ static inline uint64_t nsec2tsc(uint64_t nsec)
 
 #endif /* ! _ros_ */
 
-#ifdef __cplusplus
-	}
-#endif
+__END_DECLS
 
-#endif /* _TSC_COMPAT_H */
+#endif /* PARLIB_TSC_COMPAT_H */

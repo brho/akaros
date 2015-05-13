@@ -28,13 +28,15 @@
  * Don't forget to manage your memory at some (safe) point:
  * 	free(waiter); */
 
-#ifndef _ALARM_H
-#define _ALARM_H
+#ifndef BENCHUTIL_ALARM_H
+#define BENCHUTIL_ALARM_H
 
 #include <ros/common.h>
 #include <sys/queue.h>
 #include <spinlock.h>
 #include <event.h>
+
+__BEGIN_DECLS
 
 /* Specifc waiter, per alarm */
 struct alarm_waiter {
@@ -81,4 +83,6 @@ void alarm_abort_sysc(struct alarm_waiter *awaiter);
 #define ALARM_POISON_TIME 12345
 void print_chain(struct timer_chain *tchain);
 
-#endif /* _ALARM_H */
+__END_DECLS
+
+#endif /* BENCHUTIL_ALARM_H */

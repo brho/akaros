@@ -4,8 +4,10 @@
  *
  * Networking helpers for dealing with the plan 9 interface. */
 
-#ifndef _NET_H
-#define _NET_H
+#ifndef PARLIB_NET_H
+#define PARLIB_NET_H
+
+__BEGIN_DECLS
 
 static inline int snprintf_overflow(int ret, char *buf, size_t buf_len)
 {
@@ -14,4 +16,6 @@ static inline int snprintf_overflow(int ret, char *buf, size_t buf_len)
 
 int cheap_dial(char *addr, char *local, char *dir, int *cfdp);
 
-#endif /* _NET_H */
+__END_DECLS
+
+#endif /* PARLIB_NET_H */

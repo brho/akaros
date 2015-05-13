@@ -8,6 +8,11 @@
  */
 /* ICMP for IP v4 and v6 */
 
+#ifndef IPLIB_ICMP_H
+#define IPLIB_ICMP_H
+
+__BEGIN_DECLS
+
 enum
 {
 	/* Packet Types, icmp v4 (rfc 792) */
@@ -80,3 +85,7 @@ struct icmphdr {
 };
 
 // #define ICMPHDRSZ offsetof(Icmphdr, data[0])
+
+__END_DECLS
+
+#endif /* IPLIB_ICMP_H */

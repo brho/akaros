@@ -2,11 +2,14 @@
  * Kevin Klues <klueska@cs.berkeley.edu>
  * See LICENSE for details. */
 
-#ifndef _PROFALARM_H
-#define _PROFALARM_H
+#ifndef PTHREAD_PROFALARM_H
+#define PTHREAD_PROFALARM_H
+
+__BEGIN_DECLS
 
 void enable_profalarm(int hz);
 void disable_profalarm();
 
-#endif	/* _PROFALARM_H */
+__END_DECLS
 
+#endif	/* PTHREAD_PROFALARM_H */

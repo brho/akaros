@@ -1,8 +1,10 @@
-#ifndef _UTHREAD_H
-#define _UTHREAD_H
+#ifndef PARLIB_UTHREAD_H
+#define PARLIB_UTHREAD_H
 
 #include <vcore.h>
 #include <ros/syscall.h>
+
+__BEGIN_DECLS
 
 #define UTHREAD_DONT_MIGRATE		0x001 /* don't move to another vcore */
 #define UTHREAD_SAVED				0x002 /* uthread's state is in utf */
@@ -126,4 +128,6 @@ static inline struct uthread **get_cur_uth_addr(uint32_t vcoreid)
 	return (struct uthread**)(vc_tls_desc + cur_uth_off);
 }
 
-#endif /* _UTHREAD_H */
+__END_DECLS
+
+#endif /* PARLIB_UTHREAD_H */

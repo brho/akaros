@@ -1,7 +1,10 @@
-#ifndef __PARLIB_TIMING_H__
-#define __PARLIB_TIMING_H__
+#ifndef PARLIB_TIMING_H
+#define PARLIB_TIMING_H
+
 #include <stdint.h>
 #include <tsc-compat.h>
+
+__BEGIN_DECLS
 
 void udelay(uint64_t usec);
 void ndelay(uint64_t nsec);
@@ -18,4 +21,6 @@ uint64_t msec2tsc(uint64_t msec);
 uint64_t usec2tsc(uint64_t usec);
 uint64_t nsec2tsc(uint64_t nsec);
 
-#endif /* __PARLIB_TIMING_H__ */
+__END_DECLS
+
+#endif /* PARLIB_TIMING_H */
