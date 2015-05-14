@@ -2,10 +2,12 @@ CPPFLAGS += -DHAVE_MMAP=1
 CPPFLAGS += -DHAVE_MUNMAP=1
 CPPFLAGS += -D_LIBC_REENTRANT=1
 
-CFLAGS-fork.c = -D_IO_MTSAFE_IO
-CFLAGS-flockfile.c = -D_IO_MTSAFE_IO
-CFLAGS-ftrylockfile.c = -D_IO_MTSAFE_IO
-CFLAGS-funlockfile.c = -D_IO_MTSAFE_IO
+# from nptl/sysdeps/unix/sysv/linux/Makefile
+CFLAGS-fork.c = $(libio-mtsafe)
+# From nptl/Makefile
+CFLAGS-flockfile.c = $(libio-mtsafe)
+CFLAGS-ftrylockfile.c = $(libio-mtsafe)
+CFLAGS-funlockfile.c = $(libio-mtsafe)
 
 # Any sysdep .c file you want needs to be added here, if it's not somewhere
 # else already.  Many posix-ish .c files already are taken care of.  We also
