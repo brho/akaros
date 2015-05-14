@@ -858,6 +858,12 @@ static void __pth_yield_cb(struct uthread *uthread, void *junk)
 /* Cooperative yielding of the processor, to allow other threads to run */
 int pthread_yield(void)
 {
+	if (!in_multi_mode()) {
+		/* Some apps will call pthread_yield before becoming an MCP.  In these
+		 * cases, we just want to yield the processor. */
+		sched_yield();
+		return 0;
+	}
 	uthread_yield(TRUE, __pth_yield_cb, 0);
 	return 0;
 }
