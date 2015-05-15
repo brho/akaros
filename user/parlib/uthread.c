@@ -68,6 +68,13 @@ static void uthread_manage_thread0(struct uthread *uthread)
 	if (current_uthread)
 		free(current_uthread);
 	current_uthread = uthread;
+	/* We could consider setting __vcore_context = TRUE here, since this is
+	 * probably the first time we're initializing vcore 0's TLS.  However, when
+	 * we actually turn into an MCP, VC 0 will come up and set __vcore_context.
+	 * I actually want it cleared until then, so that various asserts will catch
+	 * if we call other uthread functions before the 2LS is set up (before we're
+	 * an MCP).  For example, if someone calls uthread_yield from thread0 (which
+	 * has TLS), we'll panic since VC 0's TLS doesn't know it's a VC yet. */
 	end_safe_access_tls_vars();
 	set_tls_desc(uthread->tls_desc, 0);
 	begin_safe_access_tls_vars();
@@ -364,6 +371,7 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
 		set_tls_desc(get_vcpd_tls_desc(vcoreid), vcoreid);
 		begin_safe_access_tls_vars();
 		assert(current_uthread == uthread);
+		/* If this assert fails, see the note in uthread_manage_thread0 */
 		assert(in_vcore_context());
 		end_safe_access_tls_vars();
 	} else {
@@ -955,7 +963,7 @@ static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type,
 	/* At this point, we're clear to try and steal the uthread.  We used to
 	 * switch to their TLS to steal the uthread, but we can access their
 	 * current_uthread directly. */
-	rem_cur_uth = get_cur_uth_addr(rem_vcoreid);
+	rem_cur_uth = get_tlsvar_linaddr(rem_vcoreid, current_uthread);
 	uthread_to_steal = *rem_cur_uth;
 	if (uthread_to_steal) {
 		/* Extremely rare: they have a uthread, but it can't migrate.  So we'll

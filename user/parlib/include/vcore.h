@@ -67,6 +67,14 @@ void cpu_relax_vc(uint32_t vcoreid);
 uint32_t get_vcoreid(void);
 bool check_vcoreid(const char *str, uint32_t vcoreid);
 
+/* This works so long as we don't dlopen parlib (which we never do) */
+#define get_tlsvar_linaddr(_vcoreid, _var)                                     \
+({                                                                             \
+	uintptr_t vc_tls_desc = (uintptr_t)get_vcpd_tls_desc(_vcoreid);            \
+	uintptr_t var_off = (uintptr_t)&_var - (uintptr_t)get_tls_desc(vcore_id());\
+	(typeof(_var) *)(vc_tls_desc + var_off);                                   \
+})
+
 /* Static inlines */
 static inline uint32_t max_vcores(void)
 {
