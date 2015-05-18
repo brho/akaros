@@ -1032,10 +1032,12 @@ endif
 # These are the subdirectories containing the library source.  The order
 # is more or less arbitrary.  The sorting step will take care of the
 # dependencies.
+#
+# AKAROS_PORT removed gshadow.  relies on NSS, has no man interface
 all-subdirs = csu assert ctype locale intl catgets math setjmp signal	    \
 	      stdlib stdio-common libio malloc string wcsmbs time dirent    \
 	      grp pwd posix io termios resource misc socket sysvipc gmon    \
-	      gnulib iconv iconvdata wctype manual shadow gshadow po argp   \
+	      gnulib iconv iconvdata wctype manual shadow po argp   \
 	      crypt localedata timezone rt conform debug		    \
 	      $(add-on-subdirs) dlfcn elf
 
