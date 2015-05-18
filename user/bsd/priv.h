@@ -17,6 +17,7 @@
 #include <sys/socket.h>
 
 #include <netinet/in.h>
+#include <netdb.h>
 
 __BEGIN_DECLS
 

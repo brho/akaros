@@ -17,6 +17,14 @@ sysdep_routines += sa_len
 endif
 sysdep_headers += sys/syscall.h sys/vcore-tls.h
 
+# We don't have the resolv subdir, but we still want parts of it.  Since we
+# lack the subdir, we need to include the C files and headers manually.
+ifeq ($(subdir),inet)
+sysdep_routines += inet_addr inet_ntop inet_pton
+endif
+sysdep_headers += netdb.h resolv.h
+sysdep_headers += arpa/nameser.h arpa/nameser_compat.h sys/bitypes.h
+
 # plan 9 conversion routines.  all C files need to be in exactly one directory.
 # stdlib seems like a reasonable place. */
 ifeq ($(subdir),stdlib)
