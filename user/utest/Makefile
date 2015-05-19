@@ -18,7 +18,7 @@ LIBUCNAME := $(call uc, $(LIBNAME))
 SCRIPTS := $(wildcard $(SRCDIR)*.sh)
 SRCS_C := $(wildcard $(SRCDIR)*.c)
 SRCS_CPP := $(wildcard $(SRCDIR)*.cc)
-HEADERS := $(shell find $(INCDIR) -name *.h)
+HEADERS := $(shell find $(INCDIR) -name "*.h")
 
 EXECS_C = $(patsubst $(SRCDIR)%.c, $(OBJDIR)/%, $(SRCS_C))
 EXECS_CPP = $(patsubst $(SRCDIR)%.cc, $(OBJDIR)/%, $(SRCS_CPP))

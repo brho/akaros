@@ -16,7 +16,7 @@ FINALLIB-INSTALL = $(XCC_TARGET_LIB)/lib$(LIBNAME).a
 uc = $(shell echo $(1) | tr a-z A-Z)
 
 LIBUCNAME := $(call uc, $(LIBNAME))
-HEADERS := $(wildcard $(SRCDIR)*.h)
+HEADERS := $(shell find $(INCDIR) -name "*.h")
 CFILES  := $(wildcard $(SRCDIR)*.c)
 OBJS    := $(patsubst %.c, $(OBJDIR)/%.o, $(CFILES))
 
