@@ -201,3 +201,12 @@ void debug_addr_pid(int pid, unsigned long addr)
 	debug_addr_proc(p, addr);
 	proc_decref(p);
 }
+
+void backtrace_kframe(struct hw_trapframe *hw_tf)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	pcpui->__lock_checking_enabled--;
+	printk("\nBacktrace of kernel context on Core %d:\n", core_id());
+	backtrace_frame(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf));
+	pcpui->__lock_checking_enabled++;
+}

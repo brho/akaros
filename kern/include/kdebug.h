@@ -2,6 +2,7 @@
 #define ROS_KERN_KDEBUG_H
 
 #include <ros/common.h>
+#include <ros/trapframe.h>
 #include <arch/kdebug.h>
 
 struct symtab_entry {
@@ -13,6 +14,7 @@ void backtrace(void);
 void backtrace_frame(uintptr_t pc, uintptr_t fp);
 size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
                       size_t nr_slots);
+void backtrace_kframe(struct hw_trapframe *hw_tf);
 
 /* Arch dependent, listed here for ease-of-use */
 static inline uintptr_t get_caller_pc(void);

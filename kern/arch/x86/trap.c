@@ -213,15 +213,6 @@ static void handle_fperr(struct hw_trapframe *hw_tf)
 	proc_destroy(current);
 }
 
-void backtrace_kframe(struct hw_trapframe *hw_tf)
-{
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	pcpui->__lock_checking_enabled--;
-	printk("\nBacktrace of faulting kernel context on Core %d:\n", core_id());
-	backtrace_frame(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf));
-	pcpui->__lock_checking_enabled++;
-}
-
 static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 {
 	uintptr_t fault_va = rcr2();
