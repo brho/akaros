@@ -210,3 +210,23 @@ void backtrace_kframe(struct hw_trapframe *hw_tf)
 	backtrace_frame(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf));
 	pcpui->__lock_checking_enabled++;
 }
+
+void backtrace_user_ctx(struct proc *p, struct user_context *ctx)
+{
+	#define MAX_BT_DEPTH 20
+	uintptr_t pcs[MAX_BT_DEPTH];
+	size_t nr_pcs;
+
+	if (!ctx) {
+		printk("Null user context!\n");
+		return;
+	}
+	nr_pcs = backtrace_list(get_user_ctx_pc(ctx), get_user_ctx_fp(ctx), pcs,
+	                        MAX_BT_DEPTH);
+	printk("User context backtrace:\n");
+	printk("\tOffsets only matter for shared libraries\n");
+	for (int i = 0; i < nr_pcs; i++) {
+		printk("#%02d ", i + 1);
+		debug_addr_proc(p, pcs[i]);
+	}
+}

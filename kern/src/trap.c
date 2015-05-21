@@ -54,6 +54,32 @@ error_out:
 	proc_destroy(p);
 }
 
+uintptr_t get_user_ctx_pc(struct user_context *ctx)
+{
+	switch (ctx->type) {
+		case ROS_HW_CTX:
+			return get_hwtf_pc(&ctx->tf.hw_tf);
+		case ROS_SW_CTX:
+			return get_swtf_pc(&ctx->tf.sw_tf);
+		default:
+			warn("Bad context type %d for ctx %p\n", ctx->type, ctx);
+			return 0;
+	}
+}
+
+uintptr_t get_user_ctx_fp(struct user_context *ctx)
+{
+	switch (ctx->type) {
+		case ROS_HW_CTX:
+			return get_hwtf_fp(&ctx->tf.hw_tf);
+		case ROS_SW_CTX:
+			return get_swtf_fp(&ctx->tf.sw_tf);
+		default:
+			warn("Bad context type %d for ctx %p\n", ctx->type, ctx);
+			return 0;
+	}
+}
+
 struct kmem_cache *kernel_msg_cache;
 
 void kernel_msg_init(void)

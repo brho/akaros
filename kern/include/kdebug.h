@@ -15,6 +15,8 @@ void backtrace_frame(uintptr_t pc, uintptr_t fp);
 size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
                       size_t nr_slots);
 void backtrace_kframe(struct hw_trapframe *hw_tf);
+/* for includes */ struct proc;
+void backtrace_user_ctx(struct proc *p, struct user_context *ctx);
 
 /* Arch dependent, listed here for ease-of-use */
 static inline uintptr_t get_caller_pc(void);

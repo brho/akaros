@@ -36,6 +36,9 @@ void reflect_unhandled_trap(unsigned int trap_nr, unsigned int err,
 void __arch_reflect_trap_hwtf(struct hw_trapframe *hw_tf, unsigned int trap_nr,
                               unsigned int err, unsigned long aux);
 
+uintptr_t get_user_ctx_pc(struct user_context *ctx);
+uintptr_t get_user_ctx_fp(struct user_context *ctx);
+
 /* Kernel messages.  This is an in-order 'active message' style messaging
  * subsystem, where you can instruct other cores (including your own) to execute
  * a function (with arguments), either immediately or whenever the kernel is

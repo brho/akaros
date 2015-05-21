@@ -308,11 +308,10 @@ size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
 {
 	size_t nr_pcs = 0;
 	while (fp && nr_pcs < nr_slots) {
-		/* could put some sanity checks in here... */
+		/* could put some sanity checks in here...  i used to at least check for
+		 * kernel addrs, but now we also bt user stacks. (dangerous!) */
 		pcs[nr_pcs++] = pc;
 		printd("PC %p FP %p\n", pc, fp);
-		if (!is_kaddr((void*)fp))
-			break;
 		/* PC becomes the retaddr - 1.  the -1 is to put our PC back inside the
 		 * function that called us.  this was necessary in case we called as the
 		 * last instruction in a function (would have to never return).  not

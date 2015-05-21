@@ -31,6 +31,16 @@ static inline uintptr_t get_hwtf_fp(struct hw_trapframe *hw_tf)
 	return hw_tf->tf_rbp;
 }
 
+static inline uintptr_t get_swtf_pc(struct sw_trapframe *sw_tf)
+{
+	return sw_tf->tf_rip;
+}
+
+static inline uintptr_t get_swtf_fp(struct sw_trapframe *sw_tf)
+{
+	return sw_tf->tf_rbp;
+}
+
 static inline uintptr_t x86_get_ip_hw(struct hw_trapframe *hw_tf)
 {
 	return hw_tf->tf_rip;
