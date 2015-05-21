@@ -1,6 +1,7 @@
 CPPFLAGS += -DHAVE_MMAP=1
 CPPFLAGS += -DHAVE_MUNMAP=1
 CPPFLAGS += -D_LIBC_REENTRANT=1
+CPPFLAGS += -fno-omit-frame-pointer
 
 # from nptl/sysdeps/unix/sysv/linux/Makefile
 CFLAGS-fork.c = $(libio-mtsafe)

@@ -349,7 +349,7 @@ export KBUILD_BUILTIN KBUILD_CHECKSRC
 
 CFLAGS_USER += -O2 -std=gnu99 -fno-stack-protector -fgnu89-inline
 CXXFLAGS_USER += -O2
-CFLAGS_USER_LIBS += -fPIC -static -fomit-frame-pointer -g
+CFLAGS_USER_LIBS += -fPIC -static -fno-omit-frame-pointer -g
 
 export CFLAGS_USER CXXFLAGS_USER CFLAGS_USER_LIBS
 
