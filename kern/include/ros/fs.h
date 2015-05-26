@@ -75,14 +75,22 @@ struct kstat {
 #define OEXCL   		O_EXCL
 #define ORCLOSE			O_REMCLO
 
-/* fcntl flags that we support, keep in sync with glibc */
 #define F_DUPFD		0	/* Duplicate file descriptor */
 #define F_GETFD		1	/* Get file descriptor flags */
 #define F_SETFD		2	/* Set file descriptor flags */
 #define F_GETFL		3	/* Get file status flags */
 #define F_SETFL		4	/* Set file status flags */
+#define F_SYNC		101	/* fsync() */
+#define F_ADVISE	102	/* posix_fadvise{,64}() */
 /* For F_[GET|SET]FD */
 #define FD_CLOEXEC	1
+/* Advise to `posix_fadvise'.  */
+#define POSIX_FADV_NORMAL		0	/* No further special treatment */
+#define POSIX_FADV_RANDOM		1	/* Expect random page references */
+#define POSIX_FADV_SEQUENTIAL	2	/* Expect sequential page references */
+#define POSIX_FADV_WILLNEED		3	/* Will need these pages */
+#define POSIX_FADV_DONTNEED		4	/* Don't need these pages */
+#define POSIX_FADV_NOREUSE		5	/* Data will be accessed once */
 
 /* TODO: have userpsace use our stuff from bits/stats.h */
 #ifdef ROS_KERNEL

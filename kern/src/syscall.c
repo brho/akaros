@@ -1462,7 +1462,8 @@ static intreg_t sys_lstat(struct proc *p, const char *path, size_t path_l,
 	return stat_helper(p, path, path_l, u_stat, 0);
 }
 
-intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
+intreg_t sys_fcntl(struct proc *p, int fd, int cmd, unsigned long arg1,
+                   unsigned long arg2, unsigned long arg3, unsigned long arg4)
 {
 	int retval = 0;
 	int newfd;
@@ -1475,11 +1476,14 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 				return sysdup(fd, -1);
 			case (F_GETFD):
 			case (F_SETFD):
+			case (F_SYNC):
+			case (F_ADVISE):
+				/* TODO: 9ns versions */
 				return 0;
 			case (F_GETFL):
 				return fd_getfl(fd);
 			case (F_SETFL):
-				return fd_setfl(fd, arg);
+				return fd_setfl(fd, arg1);
 			default:
 				warn("Unsupported fcntl cmd %d\n", cmd);
 		}
@@ -1491,7 +1495,7 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 	/* TODO: these are racy */
 	switch (cmd) {
 		case (F_DUPFD):
-			retval = insert_file(&p->open_files, file, arg, FALSE, FALSE);
+			retval = insert_file(&p->open_files, file, arg1, FALSE, FALSE);
 			if (retval < 0) {
 				set_errno(-retval);
 				retval = -1;
@@ -1504,7 +1508,7 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 			/* I'm considering not supporting this at all.  They must do it at
 			 * open time or fix their buggy/racy code. */
 			spin_lock(&p->open_files.lock);
-			if (arg & FD_CLOEXEC)
+			if (arg1 & FD_CLOEXEC)
 				p->open_files.fd[fd].fd_flags |= FD_CLOEXEC;
 			retval = p->open_files.fd[fd].fd_flags;
 			spin_unlock(&p->open_files.lock);
@@ -1514,8 +1518,16 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, int arg)
 			break;
 		case (F_SETFL):
 			/* only allowed to set certain flags. */
-			arg &= O_FCNTL_FLAGS;
-			file->f_flags = (file->f_flags & ~O_FCNTL_FLAGS) | arg;
+			arg1 &= O_FCNTL_FLAGS;
+			file->f_flags = (file->f_flags & ~O_FCNTL_FLAGS) | arg1;
+			break;
+		case (F_SYNC):
+			/* TODO (if we keep the VFS) */
+			retval = 0;
+			break;
+		case (F_ADVISE):
+			/* TODO  (if we keep the VFS)*/
+			retval = 0;
 			break;
 		default:
 			warn("Unsupported fcntl cmd %d\n", cmd);
