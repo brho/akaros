@@ -32,5 +32,8 @@ libc {
     convM2D;
     convD2M;
     sizeD2M;
+
+    # helper functions from resolv (which we don't build)
+    __h_errno_location;
   }
 }
