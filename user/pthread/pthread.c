@@ -27,6 +27,12 @@ int threads_active = 0;
 atomic_t threads_total;
 bool can_adjust_vcores = TRUE;
 bool need_tls = TRUE;
+/* Libraries can call into pthreads before pthreads initializes.  Since our
+ * init turns us into an MCP and since those calls can come very early in a
+ * process's lifetime, we don't want to fully init the library, but we want to
+ * handle the functions.  That is the purpose of the "pre_2ls" variables and
+ * functions. */
+sigset_t pre_2ls_sigmask = 0;
 
 /* Array of per-vcore structs to manage waiting on syscalls and handling
  * overflow.  Init'd in pth_init(). */
@@ -605,7 +611,8 @@ void pthread_lib_init(void)
 	t->detached = TRUE;
 	t->state = PTH_RUNNING;
 	t->joiner = 0;
-	__sigemptyset(&t->sigmask);
+	/* implies that sigmasks are longs, which they are. */
+	t->sigmask = pre_2ls_sigmask;
 	__sigemptyset(&t->sigpending);
 	assert(t->id == 0);
 	t->sched_policy = SCHED_FIFO;
@@ -1259,26 +1266,31 @@ int pthread_kill(pthread_t thread, int signo)
 	return sigaddset(&thread->sigpending, signo);
 }
 
-
 int pthread_sigmask(int how, const sigset_t *set, sigset_t *oset)
 {
+	sigset_t *sigmask;
 	if (how != SIG_BLOCK && how != SIG_SETMASK && how != SIG_UNBLOCK) {
 		errno = EINVAL;
 		return -1;
 	}
+	/* Some libraries call sigmask before we've initialized the 2LS.  We'll
+	 * fake signal masking and delivery until then. */
+	if (in_multi_mode())
+		sigmask = &((struct pthread_tcb*)current_uthread)->sigmask;
+	else
+		sigmask = &pre_2ls_sigmask;
 
-	pthread_t pthread = ((struct pthread_tcb*)current_uthread);
 	if (oset)
-		*oset = pthread->sigmask;
+		*oset = *sigmask;
 	switch (how) {
 		case SIG_BLOCK:
-			pthread->sigmask = pthread->sigmask | *set;
+			*sigmask = *sigmask | *set;
 			break;
 		case SIG_SETMASK:
-			pthread->sigmask = *set;
+			*sigmask = *set;
 			break;
 		case SIG_UNBLOCK:
-			pthread->sigmask = pthread->sigmask & ~(*set);
+			*sigmask = *sigmask & ~(*set);
 			break;
 	}
 	// Ensures any signals we just unmasked get processed if they are pending
