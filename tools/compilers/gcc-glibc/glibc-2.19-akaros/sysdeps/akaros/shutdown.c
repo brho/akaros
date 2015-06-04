@@ -6,32 +6,19 @@
  * modified, propagated, or distributed except according to the terms contained
  * in the LICENSE file.
  */
-/* posix */
 #include <sys/types.h>
 #include <unistd.h>
 
-/* bsd extensions */
-#include <sys/uio.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-
 #include "plan9_sockets.h"
 
-struct hostent *gethostbyaddr(const void *addr, socklen_t len, int type)
+/* Supposed to shut down all or part of the connection open on socket FD.
+   HOW determines what to shut down:
+     0 = No more receptions;
+     1 = No more transmissions;
+     2 = No more receptions or transmissions.
+   Returns 0 on success, -1 for errors.  */
+int shutdown(int fd, int how)
 {
-	unsigned long a, y;
-	struct in_addr x;
-	__const unsigned char *p = addr;
-
-	if (type != AF_INET || len != 4) {
-		h_errno = NO_RECOVERY;
-		return 0;
-	}
-
-	y = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
-	x.s_addr = htonl(y);
-
-	return gethostbyname(inet_ntoa(x));
+	/* plan 9 doesn't do a shutdown.  if you shut it down, it's now closed. */
+	return close(fd);
 }

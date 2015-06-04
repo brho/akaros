@@ -6,29 +6,24 @@
  * modified, propagated, or distributed except according to the terms contained
  * in the LICENSE file.
  */
-
+/* posix */
 #include <sys/types.h>
 #include <unistd.h>
-#include <stdlib.h>
 #include <fcntl.h>
-#include <string.h>
+#include <errno.h>
 
-/* Unlike the glibc version, this ensures that name is null-terminated.*/
-int __gethostname(char *name, size_t namelen)
+/* bsd extensions */
+#include <sys/uio.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+
+#include "plan9_sockets.h"
+
+/* Send N bytes of BUF to socket FD.  Returns the number sent or -1.  */
+ssize_t __send(int fd, __const void *buf, size_t n, int flags)
 {
-	int n, fd;
-	char buf[128];
-
-	fd = open("/dev/sysname", O_RDONLY);
-	if (fd < 0)
-		return -1;
-	n = read(fd, buf, sizeof(buf) - 1);
-	close(fd);
-	if (n <= 0)
-		return -1;
-	buf[n] = 0;
-	strncpy(name, buf, namelen);
-	name[namelen - 1] = 0;
-	return 0;
+	return sendto(fd, buf, n, flags, 0, 0);
 }
-weak_alias(__gethostname, gethostname)
+
+libc_hidden_def(__send)
+weak_alias(__send, send)

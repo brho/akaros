@@ -14,7 +14,7 @@ CFLAGS-funlockfile.c = $(libio-mtsafe)
 # else already.  Many posix-ish .c files already are taken care of.  We also
 # need to be careful to only include some of them for specific subdirs.
 ifeq ($(subdir),socket)
-sysdep_routines += sa_len
+sysdep_routines += sa_len plan9_sockets
 endif
 sysdep_headers += sys/syscall.h sys/vcore-tls.h
 

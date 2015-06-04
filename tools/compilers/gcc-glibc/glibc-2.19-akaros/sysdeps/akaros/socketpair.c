@@ -9,29 +9,26 @@
 /* posix */
 #include <sys/types.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <errno.h>
 
 /* bsd extensions */
 #include <sys/uio.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <arpa/inet.h>
 
 #include "plan9_sockets.h"
 
-struct hostent *gethostbyaddr(const void *addr, socklen_t len, int type)
+/* Create two new sockets, of type TYPE in domain DOMAIN and using
+   protocol PROTOCOL, which are connected to each other, and put file
+   descriptors for them in FDS[0] and FDS[1].  If PROTOCOL is zero,
+   one will be chosen automatically.  Returns 0 on success, -1 for errors.  */
+int socketpair(int domain, int type, int protocol, int *sv)
 {
-	unsigned long a, y;
-	struct in_addr x;
-	__const unsigned char *p = addr;
-
-	if (type != AF_INET || len != 4) {
-		h_errno = NO_RECOVERY;
-		return 0;
+	switch (domain) {
+		case PF_UNIX:
+			return pipe(sv);
+		default:
+			errno = EOPNOTSUPP;
+			return -1;
 	}
-
-	y = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
-	x.s_addr = htonl(y);
-
-	return gethostbyname(inet_ntoa(x));
 }

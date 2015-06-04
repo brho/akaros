@@ -23,14 +23,13 @@
 
 #include "plan9_sockets.h"
 
-/* Put the address of the peer connected to socket FD into *ADDR
-   (which is *LEN bytes long), and its actual length into *LEN.  */
-int __getpeername(int fd, __SOCKADDR_ARG addr, socklen_t * __restrict alen)
+/* Put the local address of FD into *ADDR and its length in *LEN.  */
+int __getsockname(int fd, __SOCKADDR_ARG addr, socklen_t * __restrict alen)
 {
 	Rock *r;
 	int i;
-	struct sockaddr_in *rip;
-	struct sockaddr_un *runix;
+	struct sockaddr_in *lip;
+	struct sockaddr_un *lunix;
 
 	r = _sock_findrock(fd, 0);
 	if (r == 0) {
@@ -40,14 +39,13 @@ int __getpeername(int fd, __SOCKADDR_ARG addr, socklen_t * __restrict alen)
 
 	switch (r->domain) {
 		case PF_INET:
-			rip = (struct sockaddr_in *)&r->raddr;
-			memmove(addr.__sockaddr_in__, rip, sizeof(struct sockaddr_in));
-			*alen = sizeof(struct sockaddr_in);
+			lip = addr.__sockaddr_in__;
+			_sock_ingetaddr(r, lip, alen, "local");
 			break;
 		case PF_UNIX:
-			runix = (struct sockaddr_un *)&r->raddr;
-			i = &runix->sun_path[strlen(runix->sun_path)] - (char *)runix;
-			memmove(addr.__sockaddr_un__, runix, i);
+			lunix = (struct sockaddr_un *)&r->addr;
+			i = &lunix->sun_path[strlen(lunix->sun_path)] - (char *)lunix;
+			memmove(addr.__sockaddr_un__, lunix, i);
 			*alen = i;
 			break;
 		default:
@@ -57,4 +55,4 @@ int __getpeername(int fd, __SOCKADDR_ARG addr, socklen_t * __restrict alen)
 	return 0;
 }
 
-weak_alias(__getpeername, getpeername)
+weak_alias(__getsockname, getsockname)
