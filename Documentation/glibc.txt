@@ -83,6 +83,15 @@ Putting it in the -ros/sys/ folder did it (though ultimately I didn't want the
 change).  The point is, sysdeps doesn't mirror and override the main tree for
 all files - it is behind some others in the search/include path.
 
+Another situation requiring a change outside of the sysdeps directory was
+sunrpc/netname.c.  I wanted to change the functions (stub out the ones that
+used NSS).  Adding the sysdep worked, but it turns out that *both* the sysdep
+netname.c and the original sunrpc/netname.c were being compiled.  The root
+cause seems to be compat-netname.os.  There are make rules in sunrpc to
+generate some compatibility routines.  Grep for rpc-compat-routines.os.  The
+rule seems to ignore sysdeps and just use the normal C file - in this case
+netname.c.
+
 Subdirs
 --------------------------
 As a note, these 'subdirectories' are the "primary folders" (i.e. addons),

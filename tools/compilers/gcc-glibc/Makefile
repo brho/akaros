@@ -460,6 +460,9 @@ $(BINARY_PREFIX)glibc-stage1-builddir: glibc-$(GLIBC_VERSION)
 		--with-elf \
 		--enable-hacker-mode \
 		--enable-static-nss \
+		--enable-obsolete-rpc \
+		--disable-build-nscd \
+		--disable-nscd \
 		$(GLIBC_CONFIGURE_FLAGS);
 	touch $@
 
@@ -509,6 +512,9 @@ $(BINARY_PREFIX)glibc-stage2-builddir: glibc-$(GLIBC_VERSION)
 		--with-elf \
 		--enable-hacker-mode \
 		--enable-static-nss \
+		--enable-obsolete-rpc \
+		--disable-build-nscd \
+		--disable-nscd \
 		$(GLIBC_CONFIGURE_FLAGS);
 	touch $@
 
