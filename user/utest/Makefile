@@ -10,7 +10,7 @@ SRCDIR :=
 OBJDIR := $(SRCDIR)obj
 INCDIR = $(SRCDIR)include
 
-LDLIBS := -lpthread -lbenchutil -lm -liplib -lndb -lbsd
+LDLIBS := -lpthread -lbenchutil -lm -liplib -lndb
 
 uc = $(shell echo $(1) | tr a-z A-Z)
 

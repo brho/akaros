@@ -1,11 +1,13 @@
 /* Echo server, runs on port 23.  Main purpose is low-level network debugging
- * and to show how networking commands in plan 9 correspond to BSD sockets. 
+ * and to show how networking commands in plan 9 correspond to BSD sockets
+ * (which are now a part of our sysdeps in glibc). 
  *
- * if you want to build the BSD version, you need to change the #define and link
- * with -lbsd instead of -liplib.  easiest way is to build manually:
+ * if you want to build the BSD sockets version, you need to change the #define
+ * and link with just glibc instead of -liplib.  easiest way is to build
+ * manually:
  *
  * $ x86_64-ros-gcc   -O2 -std=gnu99 -fno-stack-protector -fgnu89-inline -g 
- * -o obj/tests/listener tests/listener.c -lpthread -lbenchutil -lm -lbsd
+ * -o obj/tests/listener tests/listener.c -lpthread -lbenchutil -lm
  *
  * based off http://www2.informatik.hu-berlin.de/~apolze/LV/plan9.docs/net.V
  * and http://en.wikibooks.org/wiki/C_Programming/Networking_in_UNIX */
