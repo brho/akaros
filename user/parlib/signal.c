@@ -38,7 +38,7 @@
 #include <waitfreelist.h>
 
 /* This is list of sigactions associated with each posix signal. */
-static struct sigaction sigactions[_NSIG - 1];
+static struct sigaction sigactions[_NSIG];
 
 /* This is a wait-free-list used to hold the data necessary to execute signal
  * handlers inside a 2LS. We are able to store them in a wfl because all
@@ -123,7 +123,8 @@ static __sigacthandler_t default_handlers[] = {
 	[SIGWINCH]  = SIGACT_IGN,
 	[SIGIO]     = default_term_handler, 
 	[SIGPWR]    = SIGACT_IGN,
-	[SIGSYS]    = default_core_handler
+	[SIGSYS]    = default_core_handler,
+	[SIGSYS+1 ... _NSIG-1] = SIGACT_IGN
 };
 
 /* This function allocates a sigdata struct for use when running signal
@@ -157,7 +158,7 @@ void free_sigdata(struct sigdata *sigdata)
 void trigger_posix_signal(int sig_nr, struct siginfo *info, void *aux)
 {
 	struct sigaction *action;
-	if (sig_nr > _NSIG - 1 || sig_nr < 0)
+	if (sig_nr >= _NSIG || sig_nr < 0)
 		return;
 	action = &sigactions[sig_nr];
 	/* Would like a switch/case here, but they are pointers.  We can also get
@@ -223,7 +224,7 @@ void init_posix_signals(void)
 
 int sigaddset(sigset_t *__set, int __signo)
 {
-	if (__signo == 0 || __signo > _NSIG) {
+	if (__signo == 0 || __signo >= _NSIG) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -233,7 +234,7 @@ int sigaddset(sigset_t *__set, int __signo)
 
 int sigdelset(sigset_t *__set, int __signo)
 {
-	if (__signo == 0 || __signo > _NSIG) {
+	if (__signo == 0 || __signo >= _NSIG) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -243,7 +244,7 @@ int sigdelset(sigset_t *__set, int __signo)
 
 int sigismember(__const sigset_t *__set, int __signo)
 {
-	if (__signo == 0 || __signo > _NSIG) {
+	if (__signo == 0 || __signo >= _NSIG) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -272,7 +273,7 @@ int sigsuspend(__const sigset_t *__set)
 int sigaction(int __sig, __const struct sigaction *__restrict __act,
               struct sigaction *__restrict __oact)
 {
-	if (__sig > _NSIG - 1 || __sig < 0)
+	if (__sig >= _NSIG || __sig < 0)
 		return -1;
 	if (__oact) {
 		*__oact = sigactions[__sig];

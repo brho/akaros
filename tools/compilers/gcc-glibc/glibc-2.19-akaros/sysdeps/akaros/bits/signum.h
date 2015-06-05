@@ -66,9 +66,20 @@
 #define SIGSYS		31	/* Bad system call.  */
 #define SIGUNUSED	31
 
-#define	_NSIG		65	/* Biggest signal number + 1
-				   (including real-time signals).  */
+/* _NSIG represents the biggest signal number + 1 (including real-time
+ * signals).  We choose 42 in homage to h2g2, but also to show that it's not a
+ * magic number, like 32 or 64.  It just happens to be the number of rt signals
+ * that we may (probably won't support in the future).  At any rate, this
+ * number must ALWAYS be <= 64 because we are using a long to represent a
+ * sigset.  In Akaros we will likely implment all necessary real-time stuff (if
+ * we need it) using events directly, so this point is moot.  Leaving it at 65
+ * was problematic though because you can't represent all signals (based 1) in
+ * a single long, adding to weird bugs that we would like to avoid in the
+ * future.  */
+#define	_NSIG		42
 
+/* We leave these arround incase we decide to imlplement them later, but
+ * currently these __libc* functions are not implemented anywhere on akaros. */
 #define SIGRTMIN        (__libc_current_sigrtmin ())
 #define SIGRTMAX        (__libc_current_sigrtmax ())
 

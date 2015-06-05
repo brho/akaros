@@ -39,7 +39,7 @@
 #define SIGSYS		31
 #define SIGUNUSED	31
 
-#define	_NSIG		65
+#define	_NSIG		42
 
 #define __SIGRTMIN	32
 #define __SIGRTMAX	(_NSIG - 1)
