@@ -67,9 +67,13 @@ struct schedule_ops pthread_sched_ops = {
 	0, /* pth_preempt_pending, */
 	0, /* pth_spawn_thread, */
 };
+struct signal_ops pthread_signal_ops = {
+	.sigprocmask = pthread_sigmask,
+};
 
-/* Publish our sched_ops, overriding the weak defaults */
+/* Publish our sched_ops and signal_ops, overriding the weak defaults */
 struct schedule_ops *sched_ops = &pthread_sched_ops;
+struct signal_ops *signal_ops = &pthread_signal_ops;
 
 /* Static helpers */
 static void __pthread_free_stack(struct pthread_tcb *pt);

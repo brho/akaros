@@ -40,6 +40,16 @@
 /* This is list of sigactions associated with each posix signal. */
 static struct sigaction sigactions[_NSIG];
 
+/* Forward declare some functions. */
+static int __sigprocmask(int __how, __const sigset_t *__restrict __set,
+                         sigset_t *__restrict __oset);
+
+/* The default definition of signal_ops (similar to sched_ops in uthread.c) */
+struct signal_ops default_signal_ops = {
+	.sigprocmask = __sigprocmask,
+};
+struct signal_ops *signal_ops __attribute__((weak)) = &default_signal_ops;
+
 /* This is a wait-free-list used to hold the data necessary to execute signal
  * handlers inside a 2LS. We are able to store them in a wfl because all
  * sigdata structs are created equal, and reuse is encouraged as uthreads
@@ -252,15 +262,18 @@ int sigismember(__const sigset_t *__set, int __signo)
 	return 0;
 }
 
-/* Would need a layer/interposition to ignore blocked signals when they come in,
- * and then to manually play them when they are unblocked, like how x86 does
- * with the IRR and the ISR for interrupt delivery. */
-int sigprocmask(int __how, __const sigset_t *__restrict __set,
-                sigset_t *__restrict __oset)
+static int __sigprocmask(int __how, __const sigset_t *__restrict __set,
+                         sigset_t *__restrict __oset)
 {
 	printf("Function not supported generically! "
            "Use 2LS specific function e.g. pthread_sigmask\n");
 	return 0;
+}
+
+int sigprocmask(int __how, __const sigset_t *__restrict __set,
+                sigset_t *__restrict __oset)
+{
+	return signal_ops->sigprocmask(__how, __set, __oset);
 }
 
 /* Could do this with a loop on delivery of the signal, sleeping and getting
