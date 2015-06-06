@@ -2,7 +2,7 @@
 #define _GNU_SOURCE
 
 #include <ros/trapframe.h>
-#include <pthread.h>
+#include "pthread.h"
 #include <vcore.h>
 #include <mcs.h>
 #include <stdlib.h>
