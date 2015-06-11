@@ -364,7 +364,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 		--disable-libgomp \
 		--disable-libmudflap \
 		--disable-nls \
-		--enable-languages=c \
+		--enable-languages=c,c++,fortran \
 		--disable-multilib \
 		$(GCC_BUILD_FLAGS);
 	echo "MAKEINFO = :" >> $(BINARY_PREFIX)gcc-stage2-builddir/Makefile;
@@ -553,7 +553,7 @@ native-gcc-stage3-configure: native-gcc-stage3-prep
 		--with-gmp=$(CXXROOT) \
 		--with-mpfr=$(CXXROOT) \
 		--with-mpc=$(CXXROOT) \
-		--enable-languages=c,c++ \
+		--enable-languages=c,c++,fortran \
 		--with-pkgversion="akaros-repo" \
 		--disable-__cxa_atexit \
 		--disable-mudflap \
@@ -583,7 +583,7 @@ cross-gcc-stage3-configure:
 		--target=$(ARCH)-ucb-akaros \
 		--prefix=$(INSTDIR) \
 		--with-sysroot=$(SYSROOT) \
-		--enable-languages=c,c++ \
+		--enable-languages=c,c++,fortran \
 		--with-pkgversion="akaros-repo" \
 		--disable-__cxa_atexit \
 		--disable-mudflap \
