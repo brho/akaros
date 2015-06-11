@@ -1,7 +1,7 @@
 #sudo qemu-system-x86_64 -s -cpu core2duo,+hypervisor,+vmx -smp 3 -m 2048 -nographic  \
 sudo qemu-system-x86_64 -s -cpu kvm64,+vmx -smp 8 -m 4096 -nographic  \
 --machine pc,accel=kvm \
--net nic,model=rtl8139 \
+-net nic,model=e1000 \
 -net user,hostfwd=tcp::5555-:23 \
 -kernel obj/kern/akaros-kernel $*
 
