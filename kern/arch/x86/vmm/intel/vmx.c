@@ -1389,8 +1389,21 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 		vmx_put_cpu(vcpu);
 
 		if (ret == EXIT_REASON_VMCALL) {
-			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
-			printd("system call! WTF\n");
+			// hacque. vmcall is now putchar.
+			if (0) {
+				vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
+				uint8_t byte = vcpu->regs.tf_rdi;
+				printk("%p %c\n", byte, vcpu->regs.tf_rdi);
+				vmx_dump_cpu(vcpu);
+				printd("system call! WTF\n");
+			} else {
+				uint8_t byte = vcpu->regs.tf_rdi;
+				printk("%c", byte);
+				// adjust the RIP
+				vmx_get_cpu(vcpu);
+				vmcs_writel(GUEST_RIP, vcpu->regs.tf_rip + 3);
+				vmx_put_cpu(vcpu);
+			}
 		} else if (ret == EXIT_REASON_CPUID)
 			vmx_handle_cpuid(vcpu);
 		else if (ret == EXIT_REASON_EPT_VIOLATION) {
@@ -1622,6 +1635,7 @@ int intel_vmm_init(void)
 	memset(msr_bitmap, 0xff, PAGE_SIZE);
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE);
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE);
+	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_KERN_GS_BASE);
 
 	if ((ret = ept_init())) {
 		printk("EPT init failed, %d\n", ret);
