@@ -164,9 +164,7 @@
  * away by decrementing the array size.
  */
 static const uint32_t vmx_msr_index[] = {
-#ifdef CONFIG_X86_64
 	MSR_SYSCALL_MASK, MSR_LSTAR, MSR_CSTAR,
-#endif
 	MSR_EFER, MSR_TSC_AUX, MSR_STAR,
 };
 #define NR_VMX_MSR ARRAY_SIZE(vmx_msr_index)
@@ -240,11 +238,7 @@ static __always_inline uint32_t vmcs_read32(unsigned long field)
 
 static __always_inline uint64_t vmcs_read64(unsigned long field)
 {
-#ifdef CONFIG_X86_64
 	return vmcs_readl(field);
-#else
-	return vmcs_readl(field) | ((uint64_t)vmcs_readl(field+1) << 32);
-#endif
 }
 
 void vmwrite_error(unsigned long field, unsigned long value)
@@ -732,10 +726,8 @@ static unsigned long segment_base(uint16_t selector)
 	}
 	d = (struct desc_struct *)(table_base + (selector & ~7));
 	v = get_desc_base(d);
-#ifdef CONFIG_X86_64
-       if (d->s == 0 && (d->type == 2 || d->type == 9 || d->type == 11))
-               v |= ((unsigned long)((struct ldttss_desc64 *)d)->base3) << 32;
-#endif
+	if (d->s == 0 && (d->type == 2 || d->type == 9 || d->type == 11))
+		v |= ((unsigned long)((struct ldttss_desc64 *)d)->base3) << 32;
 	return v;
 }
 
