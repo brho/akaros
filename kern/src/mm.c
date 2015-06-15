@@ -927,10 +927,6 @@ int handle_page_fault(struct proc *p, uintptr_t va, int prot)
 	bool first = TRUE;
 	va = ROUNDDOWN(va,PGSIZE);
 
-	if (prot != PROT_READ && prot != PROT_WRITE && prot != PROT_EXEC) {
-		panic("Bad prot: va %p, prot 0x%x: not one of %x, %x, or %x\n",
-		      va, prot, PROT_READ, PROT_WRITE, PROT_EXEC);
-	}
 refault:
 	/* read access to the VMRs TODO: RCU */
 	spin_lock(&p->vmr_lock);
