@@ -24,9 +24,10 @@ TESTS_EXECS_CPP  = $(patsubst $(TESTS_DIR)/%.cc, \
                               $(OBJDIR)/$(TESTS_DIR)/%, \
                               $(TESTS_SRCS_CPP))
 
-TESTS_EXECS = $(TESTS_EXECS_C) $(TESTS_EXECS_CPP)
-
 include $(TESTS_DIR)/openmp/Makefrag
+include $(TESTS_DIR)/vmm/Makefrag
+
+TESTS_EXECS = $(TESTS_EXECS_C) $(TESTS_EXECS_CPP)
 
 STATIC := $(findstring static,$(CFLAGS_TESTS))
 $(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS_C)
