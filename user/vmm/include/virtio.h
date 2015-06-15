@@ -1,8 +1,13 @@
 #ifndef VIRTIO_VIRTIO_H
 #define VIRTIO_VIRTIO_H
 
+#include <ros/arch/membar.h>
+#include <ros/arch/mmu.h>
+#include <ros/virtio_ring.h>
+
 #include <stddef.h>
-#include "virtio_ring.h"
+#include <stdbool.h>
+
 /* this is just an iov but we're going to keep the type for now, in case
  * we want it at some point.
  */
@@ -11,13 +16,11 @@ struct scatterlist {
 	int length;
 };
 
-#ifndef __AKAROS_KERNEL__
-#define cpu_relax()
 #define unlikely(x) (x)
-#define virtio_rmb(x)
-#define virtio_wmb(x)
-#define virtio_mb(x)
-#endif
+#define virtio_rmb(x) rmb()
+#define virtio_wmb(x) wmb()
+#define virtio_mb(x) mb()
+
 #define sg_phys(x) ((uintptr_t)x)
 #define virt_to_phys(x) ((uintptr_t)x)
 
@@ -44,7 +47,6 @@ int virtqueue_add_inbuf_avail(struct virtqueue *vq,
 #define __user
 #define __force
 #define __cold
-#define ACCESS_ONCE(x) (*(volatile typeof(x) *)&(x))
 
 int avail(struct virtqueue *_vq);
 void showvq(struct virtqueue *_vq);
@@ -58,7 +60,6 @@ unsigned int wait_for_vq_desc(struct virtqueue *vq,
 				 unsigned int *out_num, unsigned int *in_num);
 void add_used(struct virtqueue *vq, unsigned int head, int len);
 
-#include "virtio_ring.h"
 /**
  * virtqueue - a queue to register buffers for sending or receiving.
  * @list: the chain of virtqueues for this device
