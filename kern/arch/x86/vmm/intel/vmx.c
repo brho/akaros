@@ -1,3 +1,4 @@
+//#define DEBUG
 /**
  *  vmx.c - The Intel VT-x driver for Dune
  *
@@ -175,6 +176,13 @@ int x86_ept_pte_fix_ups = 0;
 
 struct vmx_capability vmx_capability;
 struct vmcs_config vmcs_config;
+
+static int autoloaded_msrs[] = {
+	MSR_KERNEL_GS_BASE,
+	MSR_LSTAR,
+	MSR_STAR,
+	MSR_SFMASK,
+};
 
 void ept_flush(uint64_t eptp)
 {
@@ -983,18 +991,63 @@ static void __vmx_disable_intercept_for_msr(unsigned long *msr_bitmap, uint32_t 
 	}
 }
 
+static void vcpu_print_autoloads(struct vmx_vcpu *vcpu)
+{
+	struct vmx_msr_entry *e;
+	int sz = sizeof(autoloaded_msrs) / sizeof(*autoloaded_msrs);
+	printk("Host Autoloads:\n-------------------\n");
+	for (int i = 0; i < sz; i++) {
+		e = &vcpu->msr_autoload.host[i];
+		printk("\tMSR 0x%08x: %p\n", e->index, e->value);
+	}
+	printk("Guest Autoloads:\n-------------------\n");
+	for (int i = 0; i < sz; i++) {
+		e = &vcpu->msr_autoload.guest[i];
+		printk("\tMSR 0x%08x %p\n", e->index, e->value);
+	}
+}
+
+static void dumpmsrs(void)
+{
+	int i;
+	int set[] = {
+		MSR_LSTAR,
+		MSR_FS_BASE,
+		MSR_GS_BASE,
+		MSR_KERNEL_GS_BASE,
+		MSR_SFMASK,
+		MSR_IA32_PEBS_ENABLE
+	};
+	for(i = 0; i < ARRAY_SIZE(set); i++) {
+		printk("%p: %p\n", set[i], read_msr(set[i]));
+	}
+	printk("core id %d\n", hw_core_id());
+}
+
+/* Notes on autoloading.  We can't autoload FS_BASE or GS_BASE, according to the
+ * manual, but that's because they are automatically saved and restored when all
+ * of the other architectural registers are saved and restored, such as cs, ds,
+ * es, and other fun things. (See 24.4.1).  We need to make sure we don't
+ * accidentally intercept them too, since they are magically autloaded..
+ *
+ * We'll need to be careful of any MSR we neither autoload nor intercept
+ * whenever we vmenter/vmexit, and we intercept by default.
+ *
+ * Other MSRs, such as MSR_IA32_PEBS_ENABLE only work on certain architectures
+ * only work on certain architectures. */
 static void setup_msr(struct vmx_vcpu *vcpu)
 {
-	int set[] = { MSR_LSTAR };
 	struct vmx_msr_entry *e;
-	int sz = sizeof(set) / sizeof(*set);
+	int sz = sizeof(autoloaded_msrs) / sizeof(*autoloaded_msrs);
 	int i;
 
-	//BUILD_BUG_ON(sz > NR_AUTOLOAD_MSRS);
+	static_assert((sizeof(autoloaded_msrs) / sizeof(*autoloaded_msrs)) <=
+	              NR_AUTOLOAD_MSRS);
 
 	vcpu->msr_autoload.nr = sz;
 
-	/* XXX enable only MSRs in set */
+	/* Since PADDR(msr_bitmap) is non-zero, and the bitmap is all 0xff, we now
+	 * intercept all MSRs */
 	vmcs_write64(MSR_BITMAP, PADDR(msr_bitmap));
 
 	vmcs_write32(VM_EXIT_MSR_STORE_COUNT, vcpu->msr_autoload.nr);
@@ -1009,13 +1062,13 @@ static void setup_msr(struct vmx_vcpu *vcpu)
 		uint64_t val;
 
 		e = &vcpu->msr_autoload.host[i];
-		e->index = set[i];
+		e->index = autoloaded_msrs[i];
 		__vmx_disable_intercept_for_msr(msr_bitmap, e->index);
 		rdmsrl(e->index, val);
 		e->value = val;
 
 		e = &vcpu->msr_autoload.guest[i];
-		e->index = set[i];
+		e->index = autoloaded_msrs[i];
 		e->value = 0xDEADBEEF;
 	}
 }
@@ -1354,7 +1407,6 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 {
 	int ret;
 	struct vmx_vcpu *vcpu;
-	int i = 0;
 	int errors = 0;
 
 	printd("RUNNING: %s: rip %p rsp %p cr3 %p \n",
@@ -1366,6 +1418,10 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 		return -ENOMEM;
 	}
 
+	/* We need to prep the host's autoload region for our current core.  Right
+	 * now, the only autoloaded MSR that varies at runtime (in this case per
+	 * core is the KERN_GS_BASE). */
+	rdmsrl(MSR_KERNEL_GS_BASE, vcpu->msr_autoload.host[0].value);
 	/* if cr3 is set, means 'set everything', else means 'start where you left off' */
 	if (cr3) {
 		vmx_get_cpu(vcpu);
@@ -1633,9 +1689,9 @@ int intel_vmm_init(void)
 	/* FIXME: do we need APIC virtualization (flexpriority?) */
 
 	memset(msr_bitmap, 0xff, PAGE_SIZE);
+	/* These are the only MSRs that are not autoloaded and not intercepted */
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE);
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE);
-	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_KERN_GS_BASE);
 
 	if ((ret = ept_init())) {
 		printk("EPT init failed, %d\n", ret);

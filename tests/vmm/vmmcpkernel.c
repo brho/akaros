@@ -21,10 +21,15 @@ int mcp = 1;
 
 uint8_t _kernel[64*1048576];
 
-static void *fail(void*arg)
+void *fail(void*arg)
 {
 
-	__asm__ __volatile__("vmcall\n");
+	__asm__ __volatile__(
+			"MOVl $0xc0000082, %ecx\nrdmsr\naddl $1, %eax\nwrmsr\n"
+			"MOVl $0xc0000100, %ecx\nrdmsr\naddl $1, %eax\nwrmsr\n"
+			"MOVl $0xc0000101, %ecx\nrdmsr\naddl $1, %eax\nwrmsr\n"
+			"MOVl $0xc0000102, %ecx\nrdmsr\naddl $1, %eax\nwrmsr\n"
+			"mov $0x30, %rdi\nvmcall\nhlt\n");
 	*mmap_blob = 1337;
 	if (mcp)
 	while (V(&shared, int) < 31) {
@@ -151,7 +156,8 @@ int main(int argc, char **argv)
 	uint64_t entry = kernbase + (uint64_t) fail;
 	uint8_t *kernel = (void *)(16*1048576);
 	uint8_t program[] = {0x0f, 0x1, 0xc1, 0xeb, 0xfe};
-	memmove(kernel, program, sizeof(program));
+	printf("memmove(%p, %p, %d\n", kernel, fail, 4096);
+	memmove(kernel, fail, 4096);
 	entry = (uint64_t)kernel;
 	printf("kernbase for pml4 is 0x%llx and entry is %llx\n", kernbase, entry);
 	printf("p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
