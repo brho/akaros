@@ -1,6 +1,6 @@
 ARCH ?= none	# catch bugs
 CFLAGS_USER += $(CFLAGS_USER_LIBS)
-LIBNAME = ndb
+LIBNAME = ndblib
 # DEPLIBS passed in from the top-level Makefile
 DEPLIBS := $(DEPLIBS)
 DEPLIBAS = $(patsubst %, $(XCC_TARGET_LIB)/lib%.a, $(DEPLIBS))
