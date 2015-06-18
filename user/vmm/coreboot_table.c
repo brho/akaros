@@ -19,40 +19,19 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
  * MA 02110-1301 USA
  */
+#include <ros/common.h>
 
-#include <console/console.h>
-#include <console/uart.h>
-#include <ip_checksum.h>
-#include <boot/coreboot_tables.h>
+#include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
-#include <version.h>
-#include <boardid.h>
-#include <device/device.h>
-#include <stdlib.h>
-#include <cbfs.h>
-#include <cbmem.h>
-#include <bootmem.h>
-#include <spi_flash.h>
-#if CONFIG_CHROMEOS
-#if CONFIG_HAVE_ACPI_TABLES
-#include <arch/acpi.h>
-#endif
-#include <vendorcode/google/chromeos/chromeos.h>
-#include <vendorcode/google/chromeos/gnvs.h>
-#endif
-#if CONFIG_ARCH_X86
-#include <cpu/x86/mtrr.h>
-#endif
+#include <vmm/coreboot_tables.h>
 
-static struct lb_header *lb_table_init(unsigned long addr)
+static struct lb_header *lb_table_init(void *addr)
 {
 	struct lb_header *header;
 
 	/* 16 byte align the address */
-	addr += 15;
-	addr &= ~15;
-
-	header = (void *)addr;
+	header = (void *)(((unsigned long)addr + 15) & ~15);
 	header->signature[0] = 'L';
 	header->signature[1] = 'B';
 	header->signature[2] = 'I';
@@ -131,7 +110,7 @@ void lb_add_console(uint16_t consoletype, void *data)
 
 static void lb_framebuffer(struct lb_header *header)
 {
-#if CONFIG_FRAMEBUFFER_KEEP_VESA_MODE || CONFIG_MAINBOARD_DO_NATIVE_VGA_INIT
+#if 0 //CONFIG_FRAMEBUFFER_KEEP_VESA_MODE || CONFIG_MAINBOARD_DO_NATIVE_VGA_INIT
 	void fill_lb_framebuffer(struct lb_framebuffer *framebuffer);
 	int vbe_mode_info_valid(void);
 
@@ -218,7 +197,7 @@ static inline void lb_vboot_handoff(struct lb_header *header) {}
 
 static void lb_board_id(struct lb_header *header)
 {
-#if CONFIG_BOARD_ID_AUTO || CONFIG_BOARD_ID_MANUAL
+#if 0 // CONFIG_BOARD_ID_AUTO || CONFIG_BOARD_ID_MANUAL
 	struct lb_board_id  *bid;
 
 	bid = (struct lb_board_id *)lb_new_record(header);
@@ -229,92 +208,16 @@ static void lb_board_id(struct lb_header *header)
 #endif
 }
 
-static void lb_ram_code(struct lb_header *header)
-{
-#if IS_ENABLED(CONFIG_RAM_CODE_SUPPORT)
-	struct lb_ram_code *code;
-
-	code = (struct lb_ram_code *)lb_new_record(header);
-
-	code->tag = LB_TAG_RAM_CODE;
-	code->size = sizeof(*code);
-	code->ram_code = ram_code();
-#endif
-}
-
-static void add_cbmem_pointers(struct lb_header *header)
-{
-	/*
-	 * These CBMEM sections' addresses are included in the coreboot table
-	 * with the appropriate tags.
-	 */
-	const struct section_id {
-		int cbmem_id;
-		int table_tag;
-	} section_ids[] = {
-		{CBMEM_ID_TIMESTAMP, LB_TAG_TIMESTAMPS},
-		{CBMEM_ID_CONSOLE, LB_TAG_CBMEM_CONSOLE},
-		{CBMEM_ID_ACPI_GNVS, LB_TAG_ACPI_GNVS},
-		{CBMEM_ID_WIFI_CALIBRATION, LB_TAG_WIFI_CALIBRATION}
-	};
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(section_ids); i++) {
-		const struct section_id *sid = section_ids + i;
-		struct lb_cbmem_ref *cbmem_ref;
-		void *cbmem_addr = cbmem_find(sid->cbmem_id);
-
-		if (!cbmem_addr)
-			continue;  /* This section is not present */
-
-		cbmem_ref = (struct lb_cbmem_ref *)lb_new_record(header);
-		if (!cbmem_ref) {
-			printk(BIOS_ERR, "No more room in coreboot table!\n");
-			break;
-		}
-		cbmem_ref->tag = sid->table_tag;
-		cbmem_ref->size = sizeof(*cbmem_ref);
-		cbmem_ref->cbmem_addr = (unsigned long)cbmem_addr;
-	}
-}
-
-static struct lb_mainboard *lb_mainboard(struct lb_header *header)
-{
-	struct lb_record *rec;
-	struct lb_mainboard *mainboard;
-	rec = lb_new_record(header);
-	mainboard = (struct lb_mainboard *)rec;
-	mainboard->tag = LB_TAG_MAINBOARD;
-
-	mainboard->size = (sizeof(*mainboard) +
-		strlen(mainboard_vendor) + 1 +
-		strlen(mainboard_part_number) + 1 +
-		3) & ~3;
-
-	mainboard->vendor_idx = 0;
-	mainboard->part_number_idx = strlen(mainboard_vendor) + 1;
-
-	memcpy(mainboard->strings + mainboard->vendor_idx,
-		mainboard_vendor,      strlen(mainboard_vendor) + 1);
-	memcpy(mainboard->strings + mainboard->part_number_idx,
-		mainboard_part_number, strlen(mainboard_part_number) + 1);
-
-	return mainboard;
-}
-
 static void lb_strings(struct lb_header *header)
 {
 	static const struct {
 		uint32_t tag;
 		const char *string;
 	} strings[] = {
-		{ LB_TAG_VERSION,        coreboot_version,        },
-		{ LB_TAG_EXTRA_VERSION,  coreboot_extra_version,  },
-		{ LB_TAG_BUILD,          coreboot_build,          },
-		{ LB_TAG_COMPILE_TIME,   coreboot_compile_time,   },
+		// we may want this at some point.
 	};
 	unsigned int i;
-	for(i = 0; i < ARRAY_SIZE(strings); i++) {
+	for(i = 0; i < sizeof(strings)/sizeof(strings[0]); i++) {
 		struct lb_string *rec;
 		size_t len;
 		rec = (struct lb_string *)lb_new_record(header);
@@ -332,7 +235,8 @@ static void lb_record_version_timestamp(struct lb_header *header)
 	rec = (struct lb_timestamp *)lb_new_record(header);
 	rec->tag = LB_TAG_VERSION_TIMESTAMP;
 	rec->size = sizeof(*rec);
-	rec->timestamp = coreboot_version_timestamp;
+	// TODO
+	//rec->timestamp = coreboot_version_timestamp;
 }
 
 void __attribute__((weak)) lb_board(struct lb_header *header) { /* NOOP */ }
@@ -349,7 +253,27 @@ static struct lb_forward *lb_forward(struct lb_header *header, struct lb_header 
 	return forward;
 }
 
-static unsigned long lb_table_fini(struct lb_header *head)
+/* enough with the ip dependency already. This is a trivial checksum. */
+static inline uint16_t cb_checksum(const void *ptr, unsigned len)
+{
+	uint32_t sum;
+	const uint8_t *addr = ptr;
+
+	sum = 0;
+
+	while(len > 0) {
+		sum += addr[0]<<8 | addr[1] ;
+		len -= 2;
+		addr += 2;
+	}
+
+	sum = (sum & 0xffff) + (sum >> 16);
+	sum = (sum & 0xffff) + (sum >> 16);
+
+	return (sum^0xffff);
+}
+
+static void *lb_table_fini(struct lb_header *head)
 {
 	struct lb_record *rec, *first_rec;
 	rec = lb_last_record(head);
@@ -358,132 +282,31 @@ static unsigned long lb_table_fini(struct lb_header *head)
 	}
 
 	first_rec = lb_first_record(head);
-	head->table_checksum = compute_ip_checksum(first_rec, head->table_bytes);
+	head->table_checksum = cb_checksum((void *)first_rec, head->table_bytes);
 	head->header_checksum = 0;
-	head->header_checksum = compute_ip_checksum(head, sizeof(*head));
-	printk(BIOS_DEBUG,
-	       "Wrote coreboot table at: %p, 0x%x bytes, checksum %x\n",
+	head->header_checksum = cb_checksum((void *)head, sizeof(*head));
+	printf("Wrote coreboot table at: %p, 0x%x bytes, checksum %x\n",
 	       head, head->table_bytes, head->table_checksum);
-	return (unsigned long)rec + rec->size;
+	printf("header checksum (not worth using in a kernel) 0x%x\n", head->header_checksum);
+	return rec + rec->size;
 }
 
-unsigned long write_coreboot_table(
-	unsigned long low_table_start, unsigned long low_table_end,
-	unsigned long rom_table_start, unsigned long rom_table_end)
+void * write_coreboot_table(void *where, void *base, uint64_t len)
 {
 	struct lb_header *head;
+	struct lb_memory *m;
+	struct lb_memory_range *mem;
 
-	if (low_table_start || low_table_end) {
-		printk(BIOS_DEBUG, "Writing table forward entry at 0x%08lx\n",
-				low_table_end);
-		head = lb_table_init(low_table_end);
-		lb_forward(head, (struct lb_header*)rom_table_end);
+	printf("Writing coreboot table at %p with mem %p len 0x%lx\n", where, base, len);
 
-		low_table_end = (unsigned long) lb_table_fini(head);
-		printk(BIOS_DEBUG, "Table forward entry ends at 0x%08lx.\n",
-			low_table_end);
-		low_table_end = ALIGN(low_table_end, 4096);
-		printk(BIOS_DEBUG, "... aligned to 0x%08lx\n", low_table_end);
-	}
-
-	printk(BIOS_DEBUG, "Writing coreboot table at 0x%08lx\n",
-		rom_table_end);
-
-	head = lb_table_init(rom_table_end);
-	rom_table_end = (unsigned long)head;
-	printk(BIOS_DEBUG, "rom_table_end = 0x%08lx\n", rom_table_end);
-	rom_table_end = ALIGN(rom_table_end, (64 * 1024));
-	printk(BIOS_DEBUG, "... aligned to 0x%08lx\n", rom_table_end);
-
-#if CONFIG_USE_OPTION_TABLE
-	{
-		struct cmos_option_table *option_table = cbfs_get_file_content(
-				CBFS_DEFAULT_MEDIA, "cmos_layout.bin",
-				CBFS_COMPONENT_CMOS_LAYOUT, NULL);
-		if (option_table) {
-			struct lb_record *rec_dest = lb_new_record(head);
-			/* Copy the option config table, it's already a lb_record... */
-			memcpy(rec_dest,  option_table, option_table->size);
-		} else {
-			printk(BIOS_ERR, "cmos_layout.bin could not be found!\n");
-		}
-	}
-#endif
-
-	/* Initialize the memory map at boot time. */
-	bootmem_init();
-
-	if (low_table_start || low_table_end) {
-		uint64_t size = low_table_end - low_table_start;
-		/* Record the mptable and the the lb_table.
-		 * (This will be adjusted later)  */
-		bootmem_add_range(low_table_start, size, LB_MEM_TABLE);
-	}
-
-	/* Record the pirq table, acpi tables, and maybe the mptable. However,
-	 * these only need to be added when the rom_table is sitting below
-	 * 1MiB. If it isn't that means high tables are being written.
-	 * The code below handles high tables correctly. */
-	if (rom_table_end <= (1 << 20)) {
-		uint64_t size = rom_table_end - rom_table_start;
-		bootmem_add_range(rom_table_start, size, LB_MEM_TABLE);
-	}
-
-	/* No other memory areas can be added after the memory table has been
-	 * committed as the entries won't show up in the serialize mem table. */
-	bootmem_write_memory_table(lb_memory(head));
-
-	/* Record our motherboard */
-	lb_mainboard(head);
-
-	/* Record the serial ports and consoles */
-#if CONFIG_CONSOLE_SERIAL
-	uart_fill_lb(head);
-#endif
-#if CONFIG_CONSOLE_USB
-	lb_add_console(LB_TAG_CONSOLE_EHCI, head);
-#endif
-
-	/* Record our various random string information */
-	lb_strings(head);
-	lb_record_version_timestamp(head);
-	/* Record our framebuffer */
-	lb_framebuffer(head);
-
-#if CONFIG_CHROMEOS
-	/* Record our GPIO settings (ChromeOS specific) */
-	lb_gpios(head);
-
-	/* pass along the VDAT buffer address */
-	lb_vdat(head);
-
-	/* pass along VBNV offsets in CMOS */
-	lb_vbnv(head);
-
-	/* pass along the vboot_handoff address. */
-	lb_vboot_handoff(head);
-#endif
-
-	/* Add board ID if available */
-	lb_board_id(head);
-
-	/* Add RAM config if available */
-	lb_ram_code(head);
-
-#if IS_ENABLED(CONFIG_SPI_FLASH)
-	/* Add SPI flash description if available */
-	lb_spi_flash(head);
-#endif
-
-	add_cbmem_pointers(head);
-
-	/* Add board-specific table entries, if any. */
-	lb_board(head);
-
-#if IS_ENABLED(CONFIG_CHROMEOS_RAMOOPS)
-	lb_ramoops(head);
-#endif
-
-	/* Remember where my valid memory ranges are */
+	head = lb_table_init(where);
+	m = lb_memory(head);
+	mem = (void *)(&m[1]);
+	mem->start = pack_lb64((uint64_t) base);
+	mem->size = pack_lb64((uint64_t) len);
+	mem->type = LB_MEM_RAM;
+	m->size += sizeof(*mem);
+	printf("Head is %p, mem is %p, m is %p, m->size is %d, mem->size is %d\n",
+		head, mem, m, m->size, mem->size);
 	return lb_table_fini(head);
 }

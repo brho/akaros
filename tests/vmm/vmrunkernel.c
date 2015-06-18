@@ -11,7 +11,7 @@
 #include <string.h>
 #include <ros/syscall.h>
 #include <sys/mman.h>
-
+#include <vmm/coreboot_tables.h>
 /* this test will run the "kernel" in the negative address space. We hope. */
 int *mmap_blob;
 unsigned long long stack[1024];
@@ -50,6 +50,7 @@ int main(int argc, char **argv)
 	void * x;
 	int kfd = -1;
 	static char cmd[512];
+	void *coreboot_tables;
 	/* kernel has to be in the range 16M to 64M for now. */
 	// mmap is not working for us at present.
 	if ((uint64_t)_kernel > 16*1048576) {
@@ -64,13 +65,14 @@ int main(int argc, char **argv)
 	}
 	argc--,argv++;
 	if (argc < 1) {
-		fprintf(stderr, "Usage: %s vmimage [loadaddress [entrypoint]]\n", argv[0]);
+		fprintf(stderr, "Usage: %s vmimage coreboot_tables [loadaddress [entrypoint]]\n", argv[0]);
 		exit(1);
 	}
-	if (argc > 1)
-		kerneladdress = strtoull(argv[1], 0, 0);
+	coreboot_tables = (void *) strtoull(argv[1], 0, 0);
 	if (argc > 2)
-		entry = strtoull(argv[2], 0, 0);
+		kerneladdress = strtoull(argv[2], 0, 0);
+	if (argc > 3)
+		entry = strtoull(argv[3], 0, 0);
 	kfd = open(argv[0], O_RDONLY);
 	if (kfd < 0) {
 		perror(argv[0]);
@@ -165,8 +167,8 @@ int main(int argc, char **argv)
 	kernbase >>= (0+12);
 	kernbase <<= (0 + 12);
 	uint8_t *kernel = (void *)(16*1048576);
-	uint8_t program[] = {0x0f, 0x1, 0xc1, 0xeb, 0xfe};
-	memmove(kernel, program, sizeof(program));
+	write_coreboot_table(coreboot_tables, kernel, 16*1048576);
+	hexdump(stdout, coreboot_tables, 128);
 	printf("kernbase for pml4 is 0x%llx and entry is %llx\n", kernbase, entry);
 	printf("p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
 	sprintf(cmd, "V 0x%llx 0x%llx 0x%llx", entry, (unsigned long long) &stack[1024], (unsigned long long) p512);
