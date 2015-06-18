@@ -9,12 +9,12 @@
 #include <stdlib.h>
 
 #include <stdio.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
-#include <iplib.h>
-#include <ndb.h>
+#include <iplib/iplib.h>
+#include <ndblib/ndb.h>
 
 /* replace a in t with b, the line structure in b is lost, c'est la vie */
 struct ndbtuple*

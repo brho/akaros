@@ -9,13 +9,13 @@
 #include <stdlib.h>
 
 #include <stdio.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
-#include <iplib.h>
-#include <ndb.h>
-#include <ndbhf.h>
+#include <iplib/iplib.h>
+#include <ndblib/ndb.h>
+#include <ndblib/ndbhf.h>
 
 enum {
 	Dptr,	/* pointer to database file */

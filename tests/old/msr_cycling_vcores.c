@@ -5,12 +5,12 @@
  * kernel, so we hold on to vcore0 to do the thinking. */
 
 #include <ros/resource.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <stdio.h>
-#include <vcore.h>
-#include <timing.h>
-#include <mcs.h>
-#include <uthread.h>
+#include <parlib/vcore.h>
+#include <parlib/timing.h>
+#include <parlib/mcs.h>
+#include <parlib/uthread.h>
 
 mcs_barrier_t b;
 uint64_t begin = 0, end = 0;

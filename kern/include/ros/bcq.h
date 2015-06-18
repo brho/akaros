@@ -18,7 +18,7 @@
 #ifdef ROS_KERNEL
 #include <atomic.h>
 #else
-#include <arch/atomic.h>
+#include <parlib/arch/atomic.h>
 #endif /* ROS_KERNEL */
 
 /* Bounded Concurrent Queues, untrusted consumer

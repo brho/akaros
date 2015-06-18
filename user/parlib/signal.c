@@ -27,15 +27,15 @@
 #include <signal.h>
 #include <stdio.h>
 
-#include <parlib.h>
-#include <event.h>
+#include <parlib/parlib.h>
+#include <parlib/event.h>
 #include <errno.h>
 #include <assert.h>
 #include <ros/procinfo.h>
 #include <ros/syscall.h>
 #include <sys/mman.h>
-#include <vcore.h> /* for print_user_context() */
-#include <waitfreelist.h>
+#include <parlib/vcore.h> /* for print_user_context() */
+#include <parlib/waitfreelist.h>
 
 /* This is list of sigactions associated with each posix signal. */
 static struct sigaction sigactions[_NSIG];

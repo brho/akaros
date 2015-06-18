@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <argp.h>
 
-#include <parlib.h>
-#include <vcore.h>
+#include <parlib/parlib.h>
+#include <parlib/vcore.h>
 
 const char *argp_program_version = "prov v0.1475263";
 const char *argp_program_bug_address = "<akaros@lists.eecs.berkeley.edu>";

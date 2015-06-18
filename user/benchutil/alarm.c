@@ -23,7 +23,7 @@
 
 #include <sys/queue.h>
 #include <sys/time.h>
-#include <alarm.h>
+#include <benchutil/alarm.h>
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -31,12 +31,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <parlib.h>
-#include <event.h>
-#include <measure.h>
-#include <uthread.h>
-#include <spinlock.h>
-#include <timing.h>
+#include <parlib/parlib.h>
+#include <parlib/event.h>
+#include <benchutil/measure.h>
+#include <parlib/uthread.h>
+#include <parlib/spinlock.h>
+#include <parlib/timing.h>
 
 /* Helpers, basically renamed kernel interfaces, with the *tchain. */
 static void __tc_locked_set_alarm(struct timer_chain *tchain,

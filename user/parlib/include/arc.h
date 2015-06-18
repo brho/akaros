@@ -2,14 +2,14 @@
 #ifndef PARLIB_ARC_H
 #define PARLIB_ARC_H
 
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <error.h>
-#include <pool.h>
+#include <parlib/pool.h>
 #include <assert.h>
 #include <sys/queue.h>
 #include <ros/syscall.h>
 #include <ros/ring_syscall.h>
-#include <mcs.h>
+#include <parlib/mcs.h>
 
 __BEGIN_DECLS
 

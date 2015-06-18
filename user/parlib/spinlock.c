@@ -23,9 +23,9 @@
 #include <errno.h>
 #include <assert.h>
 
-#include <spinlock.h>
-#include <vcore.h>
-#include <uthread.h>
+#include <parlib/spinlock.h>
+#include <parlib/vcore.h>
+#include <parlib/uthread.h>
 
 void spinlock_init(spinlock_t *lock)
 {

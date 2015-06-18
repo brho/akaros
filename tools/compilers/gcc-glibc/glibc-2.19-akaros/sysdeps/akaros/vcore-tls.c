@@ -1,5 +1,5 @@
 #include <sys/vcore-tls.h>
-#include <vcore.h>
+#include <parlib/vcore.h>
 #include <ldsodefs.h>
 
 void set_tls_desc(void* addr, int vcoreid)

@@ -3,7 +3,7 @@
  * See LICENSE for details. */
 
 #include <pthread.h>
-#include <pvcalarm.h>
+#include <benchutil/pvcalarm.h>
 
 void pvcalarm_callback(void)
 {

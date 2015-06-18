@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <arch/arch.h>
+#include <parlib/arch/arch.h>
 
 int main(int argc, char** argv)
 {

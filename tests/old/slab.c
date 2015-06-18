@@ -1,4 +1,4 @@
-#include <slab.h>
+#include <parlib/slab.h>
 #include <stdio.h>
 
 static void test_single_cache(int iters, size_t size, int align, int flags,

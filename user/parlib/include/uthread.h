@@ -1,7 +1,7 @@
 #ifndef PARLIB_UTHREAD_H
 #define PARLIB_UTHREAD_H
 
-#include <vcore.h>
+#include <parlib/vcore.h>
 #include <ros/syscall.h>
 
 __BEGIN_DECLS

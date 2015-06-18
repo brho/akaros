@@ -1,6 +1,6 @@
 #include <abort-instr.h>
 #include <string.h>
-#include <vcore.h>
+#include <parlib/vcore.h>
 #include <stdio.h>
 #include <ros/syscall.h>
 #include <ros/procinfo.h>

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <stdlib.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
 #include <sys/time.h>
 

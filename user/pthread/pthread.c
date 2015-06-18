@@ -3,21 +3,21 @@
 
 #include <ros/trapframe.h>
 #include "pthread.h"
-#include <vcore.h>
-#include <mcs.h>
+#include <parlib/vcore.h>
+#include <parlib/mcs.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <stdio.h>
 #include <errno.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <ros/event.h>
-#include <arch/atomic.h>
-#include <arch/arch.h>
+#include <parlib/arch/atomic.h>
+#include <parlib/arch/arch.h>
 #include <sys/queue.h>
 #include <sys/mman.h>
-#include <event.h>
-#include <ucq.h>
+#include <parlib/event.h>
+#include <parlib/ucq.h>
 
 struct pthread_queue ready_queue = TAILQ_HEAD_INITIALIZER(ready_queue);
 struct pthread_queue active_queue = TAILQ_HEAD_INITIALIZER(active_queue);

@@ -42,9 +42,9 @@
 #include <sys/time.h>
 
 /* OS dependent #incs */
-#include <parlib.h>
-#include <vcore.h>
-#include <timing.h>
+#include <parlib/parlib.h>
+#include <parlib/vcore.h>
+#include <parlib/timing.h>
 
 static uint32_t __get_pcoreid(void)
 {

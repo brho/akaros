@@ -9,14 +9,14 @@
 #include <stdlib.h>
 
 #include <stdio.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
-#include <iplib.h>
+#include <iplib/iplib.h>
 #include <fcall.h>
-#include <fcallfmt.h>
-#include <ndb.h>
+#include <ndblib/fcallfmt.h>
+#include <ndblib/ndb.h>
 
 long
 readn(int f, void *av, long n)

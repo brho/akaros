@@ -1,8 +1,8 @@
 #ifndef PARLIB_MCS_H
 #define PARLIB_MCS_H
 
-#include <vcore.h>
-#include <arch/arch.h>
+#include <parlib/vcore.h>
+#include <parlib/arch/arch.h>
 
 __BEGIN_DECLS
 

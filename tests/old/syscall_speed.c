@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include <parlib.h>
-#include <arch/arch.h>
+#include <parlib/parlib.h>
+#include <parlib/arch/arch.h>
 
 int main()
 {

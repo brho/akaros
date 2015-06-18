@@ -3,19 +3,19 @@
  * Like msr_get_cores.c, but it only gets one core. */
 
 
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <ros/mman.h>
 #include <ros/resource.h>
 #include <ros/procdata.h>
 #include <ros/bcq.h>
-#include <arch/arch.h>
+#include <parlib/arch/arch.h>
 #include <stdio.h>
-#include <vcore.h>
-#include <mcs.h>
-#include <timing.h>
-#include <rassert.h>
-#include <uthread.h>
-#include <event.h>
+#include <parlib/vcore.h>
+#include <parlib/mcs.h>
+#include <parlib/timing.h>
+#include <parlib/rassert.h>
+#include <parlib/uthread.h>
+#include <parlib/event.h>
 
 mcs_barrier_t b;
 

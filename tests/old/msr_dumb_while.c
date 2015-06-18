@@ -4,10 +4,10 @@
  * If you send it an NE_ALARM, it'll print its TSC. */
 
 #include <stdio.h>
-#include <vcore.h>
-#include <arch/arch.h>
-#include <event.h>
-#include <uthread.h>
+#include <parlib/vcore.h>
+#include <parlib/arch/arch.h>
+#include <parlib/event.h>
+#include <parlib/uthread.h>
 
 int main(int argc, char** argv)
 {

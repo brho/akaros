@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <parlib.h>
-#include <vcore.h>
+#include <parlib/parlib.h>
+#include <parlib/vcore.h>
 #include <futex.h>
 #include <pthread.h>
 

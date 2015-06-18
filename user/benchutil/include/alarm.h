@@ -33,8 +33,8 @@
 
 #include <ros/common.h>
 #include <sys/queue.h>
-#include <spinlock.h>
-#include <event.h>
+#include <parlib/spinlock.h>
+#include <parlib/event.h>
 
 __BEGIN_DECLS
 

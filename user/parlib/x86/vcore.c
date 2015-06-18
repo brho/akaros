@@ -1,5 +1,5 @@
 #include <ros/syscall.h>
-#include <arch/vcore.h>
+#include <parlib/arch/vcore.h>
 
 struct syscall vc_entry = {
 	.num = SYS_vc_entry,

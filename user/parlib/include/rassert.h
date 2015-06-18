@@ -4,8 +4,8 @@
 #define PARLIB_RASSERT_H
 
 #include <assert.h>
-#include <vcore.h>
-#include <ros_debug.h>
+#include <parlib/vcore.h>
+#include <parlib/ros_debug.h>
 
 __BEGIN_DECLS
 

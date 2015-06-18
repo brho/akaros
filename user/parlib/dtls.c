@@ -20,15 +20,15 @@
 
 #include <stddef.h>
 #include <assert.h>
-#include <spinlock.h>
-#include <dtls.h>
-#include <slab.h>
+#include <parlib/spinlock.h>
+#include <parlib/dtls.h>
+#include <parlib/slab.h>
 
 /* The current dymamic tls implementation uses a locked linked list
  * to find the key for a given thread. We should probably find a better way to
  * do this based on a custom lock-free hash table or something. */
 #include <sys/queue.h>
-#include <spinlock.h>
+#include <parlib/spinlock.h>
 
 /* The dynamic tls key structure */
 struct dtls_key {

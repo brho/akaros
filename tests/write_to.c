@@ -9,7 +9,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <assert.h>
-#include <net.h>
+#include <parlib/net.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>

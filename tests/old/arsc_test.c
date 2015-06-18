@@ -1,8 +1,8 @@
 #ifdef CONFIG_ARSC_SERVER
-#include <parlib.h>
-#include <vcore.h>
+#include <parlib/parlib.h>
+#include <parlib/vcore.h>
 #include <ros/syscall.h>
-#include <arc.h>
+#include <parlib/arc.h>
 #include <stdio.h>
 
 syscall_desc_t* sys_cputs_async(const char *s, size_t len,                                             

@@ -22,8 +22,8 @@
 #ifndef PARLIB_SPINLOCK_H
 #define PARLIB_SPINLOCK_H
 
-#include <arch/arch.h>
-#include <arch/atomic.h>
+#include <parlib/arch/arch.h>
+#include <parlib/arch/atomic.h>
 
 __BEGIN_DECLS
 

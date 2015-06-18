@@ -2,7 +2,7 @@
 #define PARLIB_TIMING_H
 
 #include <stdint.h>
-#include <tsc-compat.h>
+#include <parlib/tsc-compat.h>
 
 __BEGIN_DECLS
 

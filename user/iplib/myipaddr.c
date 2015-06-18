@@ -9,10 +9,10 @@
 #include <stdlib.h>
 
 #include <stdio.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
 #include <signal.h>
-#include <iplib.h>
+#include <iplib/iplib.h>
 
 static uint8_t loopbacknet[IPaddrlen] = {
 	0, 0, 0, 0,

@@ -9,10 +9,10 @@
 #include <stdlib.h>
 
 #include <stdio.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
 #include <signal.h>
-#include <iplib.h>
+#include <iplib/iplib.h>
 
 static uint8_t classmask[4][16] = {
 	0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0x00,0x00,0x00,

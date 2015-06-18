@@ -7,15 +7,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-#include <parlib.h>
-#include <vcore.h>
-#include <event.h>
-#include <spinlock.h>
-#include <arch/atomic.h>
-#include <arch/bitmask.h>
+#include <parlib/parlib.h>
+#include <parlib/vcore.h>
+#include <parlib/event.h>
+#include <parlib/spinlock.h>
+#include <parlib/arch/atomic.h>
+#include <parlib/arch/bitmask.h>
 #include <sys/queue.h>
 #include <fcntl.h>
-#include <pvcalarm.h>
+#include <benchutil/pvcalarm.h>
 
 /* Different states for enabling/disabling the per-vcore alarms. */
 enum {

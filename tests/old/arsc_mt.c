@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <unistd.h>
-#include <vcore.h>
-#include <parlib.h>
+#include <parlib/vcore.h>
+#include <parlib/parlib.h>
 #include <ros/syscall.h>
-#include <arc.h>
+#include <parlib/arc.h>
 #include <stdio.h>
 
 #define NUM_THREADS 4

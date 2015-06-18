@@ -1,11 +1,11 @@
 #ifndef PARLIB_VCORE_H
 #define PARLIB_VCORE_H
 
-#include <arch/vcore.h>
-#include <arch/atomic.h>
+#include <parlib/arch/vcore.h>
+#include <parlib/arch/atomic.h>
 #include <sys/param.h>
 #include <string.h>
-#include <timing.h>
+#include <parlib/timing.h>
 
 __BEGIN_DECLS
 

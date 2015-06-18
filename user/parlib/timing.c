@@ -1,8 +1,8 @@
 #include <ros/common.h>
 #include <ros/procinfo.h>
-#include <arch/arch.h>
+#include <parlib/arch/arch.h>
 #include <stdio.h>
-#include <tsc-compat.h>
+#include <parlib/tsc-compat.h>
 
 void udelay(uint64_t usec)
 {

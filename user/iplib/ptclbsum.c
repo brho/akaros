@@ -9,10 +9,10 @@
 #include <stdlib.h>
 
 #include <stdio.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
 #include <signal.h>
-#include <iplib.h>
+#include <iplib/iplib.h>
 
 static	short	endian	= 1;
 static	uint8_t*	aendian	= (uint8_t*)&endian;

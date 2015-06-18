@@ -3,8 +3,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <assert.h>
-#include <iplib.h>
-#include <net.h>
+#include <iplib/iplib.h>
+#include <parlib/net.h>
 
 /* simple test, gets a single web page.  no url parsing, no timeout detection,
  * etc.  pass it the IP addr and page to fetch.

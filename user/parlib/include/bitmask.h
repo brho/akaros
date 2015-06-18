@@ -1,7 +1,7 @@
 #ifndef PARLIB_BITMASK_H
 #define PARLIB_BITMASK_H
 
-#include <arch/bitmask.h>
+#include <parlib/arch/bitmask.h>
 
 __BEGIN_DECLS
 

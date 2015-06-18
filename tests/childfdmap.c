@@ -4,14 +4,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <arch/arch.h>
+#include <parlib/arch/arch.h>
 #include <unistd.h>
 #include <errno.h>
 #include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ros/syscall.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 
 /* Test the childfdmap system call.
  * Create a pipe, start the spawn, dup the pipes over fd 0 and 1, write

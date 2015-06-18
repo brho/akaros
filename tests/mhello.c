@@ -1,17 +1,17 @@
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <ros/mman.h>
 #include <ros/resource.h>
 #include <ros/procdata.h>
 #include <ros/event.h>
 #include <ros/bcq.h>
-#include <arch/arch.h>
+#include <parlib/arch/arch.h>
 #include <stdio.h>
-#include <vcore.h>
-#include <mcs.h>
-#include <timing.h>
-#include <rassert.h>
-#include <event.h>
-#include <uthread.h>
+#include <parlib/vcore.h>
+#include <parlib/mcs.h>
+#include <parlib/timing.h>
+#include <parlib/rassert.h>
+#include <parlib/event.h>
+#include <parlib/uthread.h>
 
 mcs_barrier_t b;
 

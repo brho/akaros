@@ -2,23 +2,23 @@
 #include <ros/procdata.h>
 #include <ros/event.h>
 #include <ros/bcq.h>
-#include <parlib.h>
-#include <vcore.h>
+#include <parlib/parlib.h>
+#include <parlib/vcore.h>
 
 #include <stdio.h> 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <arch/arch.h>
+#include <parlib/arch/arch.h>
 #include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
-#include <timing.h>
+#include <parlib/timing.h>
 #include <assert.h>
-#include <event.h>
-#include <uthread.h>
+#include <parlib/event.h>
+#include <parlib/uthread.h>
 
 void *core0_tls = 0;
 void *in_buf, *out_buf;

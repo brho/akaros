@@ -21,7 +21,7 @@
 #include <errno.h>
 #include <sys/sysinfo.h>
 #include <ros/memlayout.h>
-#include <vcore.h>
+#include <parlib/vcore.h>
 
 int
 __get_nprocs_conf ()

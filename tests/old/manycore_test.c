@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <assert.h>
-#include <vcore.h>
-#include <parlib.h>
-#include <mcs.h>
-#include <uthread.h>
+#include <parlib/vcore.h>
+#include <parlib/parlib.h>
+#include <parlib/mcs.h>
+#include <parlib/uthread.h>
 
 mcs_barrier_t b;
 

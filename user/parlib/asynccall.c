@@ -4,12 +4,12 @@
 #include <ros/syscall.h>
 #include <ros/ring_syscall.h>
 #include <ros/sysevent.h>
-#include <arc.h>
+#include <parlib/arc.h>
 #include <errno.h>
-#include <arch/arch.h>
+#include <parlib/arch/arch.h>
 #include <sys/param.h>
-#include <arch/atomic.h>
-#include <vcore.h>
+#include <parlib/arch/atomic.h>
+#include <parlib/vcore.h>
 
 syscall_desc_pool_t syscall_desc_pool;
 async_desc_pool_t async_desc_pool;

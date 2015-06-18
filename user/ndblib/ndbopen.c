@@ -9,14 +9,14 @@
 #include <stdlib.h>
 
 #include <stdio.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
-#include <iplib.h>
-#include <ndb.h>
+#include <iplib/iplib.h>
+#include <ndblib/ndb.h>
 #include "ndbhf.h"
 
 static struct ndb*	doopen(char*);

@@ -10,10 +10,10 @@
 
 #include <stdio.h>
 #include <fcntl.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
 #include <signal.h>
-#include <iplib.h>
+#include <iplib/iplib.h>
 
 static int	nettrans(char*, char*, int na, char*, int);
 

@@ -5,11 +5,11 @@
  * preemption. */
 
 #include <stdlib.h>
-#include <vcore.h>
+#include <parlib/vcore.h>
 #include <pthread.h>
-#include <rassert.h>
-#include <event.h>
-#include <uthread.h>
+#include <parlib/rassert.h>
+#include <parlib/event.h>
+#include <parlib/uthread.h>
 
 void *while_thread(void *arg)
 {

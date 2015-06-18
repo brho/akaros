@@ -3,11 +3,11 @@
 
 #include <sys/queue.h>
 #include <signal.h>
-#include <vcore.h>
-#include <uthread.h>
-#include <mcs.h>
-#include <dtls.h>
-#include <spinlock.h>
+#include <parlib/vcore.h>
+#include <parlib/uthread.h>
+#include <parlib/mcs.h>
+#include <parlib/dtls.h>
+#include <parlib/spinlock.h>
 /* GNU / POSIX scheduling crap */
 #include <sched.h>
 

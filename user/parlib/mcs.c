@@ -1,10 +1,10 @@
-#include <vcore.h>
-#include <mcs.h>
-#include <arch/atomic.h>
+#include <parlib/vcore.h>
+#include <parlib/mcs.h>
+#include <parlib/arch/atomic.h>
 #include <string.h>
 #include <stdlib.h>
-#include <uthread.h>
-#include <parlib.h>
+#include <parlib/uthread.h>
+#include <parlib/parlib.h>
 #include <malloc.h>
 
 // MCS locks

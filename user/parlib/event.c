@@ -7,17 +7,17 @@
 
 #include <ros/event.h>
 #include <ros/procdata.h>
-#include <ucq.h>
-#include <bitmask.h>
-#include <vcore.h>
+#include <parlib/ucq.h>
+#include <parlib/bitmask.h>
+#include <parlib/vcore.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <errno.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <event.h>
-#include <uthread.h>
-#include <spinlock.h>
+#include <parlib/uthread.h>
+#include <parlib/spinlock.h>
 
 /* For remote VCPD mbox event handling */
 __thread bool __vc_handle_an_mbox = FALSE;

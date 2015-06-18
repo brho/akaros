@@ -1,7 +1,6 @@
 #ifndef ROS_INC_SYSCALL_H
 #define ROS_INC_SYSCALL_H
 
-#include <arch/arch.h>
 #include <ros/bits/syscall.h>
 #include <ros/arch/syscall.h>
 #include <ros/event.h>

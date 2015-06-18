@@ -1,10 +1,10 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <sys/mman.h>
-#include <ucq.h>
+#include <parlib/ucq.h>
 #include <assert.h>
-#include <arch/atomic.h>
+#include <parlib/arch/atomic.h>
 
 int main(int argc, char** argv)
 {

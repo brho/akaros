@@ -12,7 +12,7 @@
  *
  * Ported directly from the kernel's slab allocator. */
 
-#include <slab.h>
+#include <parlib/slab.h>
 #include <stdio.h>
 #include <assert.h>
 #include <sys/mman.h>

@@ -1,11 +1,11 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <parlib.h>
-#include <event.h>
-#include <vcore.h>
-#include <rassert.h>
+#include <parlib/parlib.h>
+#include <parlib/event.h>
+#include <parlib/vcore.h>
+#include <parlib/rassert.h>
 #include <ros/bcq.h>
-#include <uthread.h>
+#include <parlib/uthread.h>
 
 /* Deprecated, don't use this in any serious way */
 

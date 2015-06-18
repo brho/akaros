@@ -20,7 +20,7 @@ __BEGIN_DECLS
 
 #ifdef __ros__
 
-#include <arch/arch.h>
+#include <parlib/arch/arch.h>
 #include <ros/procinfo.h>
 
 static inline uint64_t get_tsc_freq(void)

@@ -1,6 +1,6 @@
-#include <utest.h>
+#include <utest/utest.h>
 #include <pthread.h>
-#include <pvcalarm.h>
+#include <benchutil/pvcalarm.h>
 
 TEST_SUITE("PVCALARMS");
 

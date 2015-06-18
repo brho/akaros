@@ -33,8 +33,8 @@
 #include <ros/common.h>
 #include <ros/arch/mmu.h>
 #include <sys/queue.h>
-#include <arch/atomic.h>
-#include <spinlock.h>
+#include <parlib/arch/atomic.h>
+#include <parlib/spinlock.h>
 
 __BEGIN_DECLS
 

@@ -9,12 +9,12 @@
 #include <stdlib.h>
 
 #include <stdio.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
-#include <iplib.h>
-#include <ndb.h>
+#include <iplib/iplib.h>
+#include <ndblib/ndb.h>
 
 /*
  *  look up the ip attributes 'list' for an entry that has the

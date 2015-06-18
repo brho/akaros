@@ -1,6 +1,6 @@
 // program to cause a breakpoint trap
 
-#include <arch/arch.h>
+#include <parlib/arch/arch.h>
 
 int main(int argc, char** argv)
 {

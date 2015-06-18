@@ -6,9 +6,9 @@
 // debugging file descriptor code!
 
 #include <ros/common.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <stdio.h>
-#include <spinlock.h>
+#include <parlib/spinlock.h>
 
 // Collect up to BUF_SIZE characters into a buffer
 // and perform ONE system call to print all of them,

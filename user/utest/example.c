@@ -1,4 +1,4 @@
-#include <utest.h>
+#include <utest/utest.h>
 
 TEST_SUITE("EXAMPLE");
 

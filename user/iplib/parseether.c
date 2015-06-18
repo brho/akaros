@@ -9,10 +9,10 @@
 #include <stdlib.h>
 
 #include <stdio.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
 #include <signal.h>
-#include <iplib.h>
+#include <iplib/iplib.h>
 
 int
 parseether(uint8_t *to, char *from)

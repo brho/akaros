@@ -1,4 +1,4 @@
-#include <utest.h>
+#include <utest/utest.h>
 #include <pthread.h>
 
 TEST_SUITE("SIGNALS");

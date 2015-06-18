@@ -9,13 +9,13 @@
 #include <stdlib.h>
 
 #include <stdio.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
 #include <ctype.h>
-#include <iplib.h>
-#include <ndb.h>
+#include <iplib/iplib.h>
+#include <ndblib/ndb.h>
 
 /*
  *  Parse a data base entry.  Entries may span multiple

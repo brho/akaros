@@ -4,7 +4,7 @@
 #include <unistd.h>
 
 /* OS dependent #incs */
-#include <parlib.h>
+#include <parlib/parlib.h>
 
 #define NR_TEST_THREADS 10
 #define NUM_PTHREAD_KEYS 10

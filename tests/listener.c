@@ -16,12 +16,12 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
-#include <event.h>
-#include <measure.h>
-#include <uthread.h>
-#include <timing.h>
+#include <parlib/event.h>
+#include <benchutil/measure.h>
+#include <parlib/uthread.h>
+#include <parlib/timing.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -29,7 +29,7 @@
 
 #ifdef PLAN9NET
 
-#include <iplib.h>
+#include <iplib/iplib.h>
 
 #else
 

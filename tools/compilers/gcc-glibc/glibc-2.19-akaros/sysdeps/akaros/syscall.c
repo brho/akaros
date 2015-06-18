@@ -21,7 +21,7 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include <sys/syscall.h>
-#include <arch/atomic.h>
+#include <parlib/arch/atomic.h>
 #include <ros/procdata.h>
 
 /* This is a simple ev_q that routes notifs to vcore0's public mbox.  This

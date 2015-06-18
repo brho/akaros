@@ -1,9 +1,9 @@
 #include <ros/arch/membar.h>
-#include <arch/atomic.h>
-#include <parlib.h>
-#include <vcore.h>
-#include <uthread.h>
-#include <event.h>
+#include <parlib/arch/atomic.h>
+#include <parlib/parlib.h>
+#include <parlib/vcore.h>
+#include <parlib/uthread.h>
+#include <parlib/event.h>
 #include <stdlib.h>
 
 /* Which operations we'll call for the 2LS.  Will change a bit with Lithe.  For

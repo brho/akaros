@@ -5,8 +5,8 @@
 
 #include <sys/mman.h>
 #include <fcntl.h>
-#include <parlib.h>
-#include <timing.h>
+#include <parlib/parlib.h>
+#include <parlib/timing.h>
 	
 int main(void)
 {

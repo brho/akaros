@@ -2,13 +2,13 @@
 #include <futex.h>
 #include <sys/queue.h>
 #include <pthread.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <assert.h>
 #include <stdio.h>
 #include <errno.h>
-#include <slab.h>
-#include <mcs.h>
-#include <alarm.h>
+#include <parlib/slab.h>
+#include <parlib/mcs.h>
+#include <benchutil/alarm.h>
 
 static inline int futex_wake(int *uaddr, int count);
 static inline int futex_wait(int *uaddr, int val, uint64_t ms_timeout);

@@ -2,7 +2,7 @@
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <vcore.h>
+#include <parlib/vcore.h>
 
 int main (int argc, char *argv[]) 
 {

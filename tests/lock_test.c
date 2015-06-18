@@ -26,16 +26,16 @@
 /* OS dependent #incs */
 #ifdef __ros__
 
-#include <parlib.h>
-#include <vcore.h>
-#include <timing.h>
-#include <spinlock.h>
-#include <mcs.h>
-#include <arch/arch.h>
-#include <event.h>
+#include <parlib/parlib.h>
+#include <parlib/vcore.h>
+#include <parlib/timing.h>
+#include <parlib/spinlock.h>
+#include <parlib/mcs.h>
+#include <parlib/arch/arch.h>
+#include <parlib/event.h>
 
-#include <tsc-compat.h>
-#include <measure.h>
+#include <parlib/tsc-compat.h>
+#include <benchutil/measure.h>
 
 #else
 

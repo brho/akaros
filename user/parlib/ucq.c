@@ -6,15 +6,15 @@
  * Documentation for more info. */
 
 #include <ros/arch/membar.h>
-#include <arch/atomic.h>
-#include <arch/arch.h>
-#include <ucq.h>
-#include <spinlock.h>
+#include <parlib/arch/atomic.h>
+#include <parlib/arch/arch.h>
+#include <parlib/ucq.h>
+#include <parlib/spinlock.h>
 #include <sys/mman.h>
 #include <assert.h>
 #include <stdio.h>
-#include <rassert.h> /* for the static_assert() */
-#include <vcore.h>
+#include <parlib/rassert.h> /* for the static_assert() */
+#include <parlib/vcore.h>
 
 /* Initializes a ucq.  You pass in addresses of mmaped pages for the main page
  * (prod_idx) and the spare page.  I recommend mmaping a big chunk and breaking

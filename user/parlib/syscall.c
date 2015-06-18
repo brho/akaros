@@ -1,7 +1,7 @@
 // System call stubs.
 
-#include <parlib.h>
-#include <vcore.h>
+#include <parlib/parlib.h>
+#include <parlib/vcore.h>
 
 int sys_proc_destroy(int pid, int exitcode)
 {

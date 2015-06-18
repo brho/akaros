@@ -6,8 +6,8 @@
 
 #include <assert.h>
 #include <stdlib.h>
-#include <arch/atomic.h>
-#include <waitfreelist.h>
+#include <parlib/arch/atomic.h>
+#include <parlib/waitfreelist.h>
 
 void wfl_init(struct wfl *list)
 {

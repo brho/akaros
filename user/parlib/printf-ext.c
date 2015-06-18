@@ -13,7 +13,7 @@
  * __printf_ipaddr, printf_ipmask, and printf_ethaddr adapted from INFERNO's
  * eipconvtest.c. */
 
-#include <printf-ext.h>
+#include <parlib/printf-ext.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>

@@ -1,19 +1,19 @@
-#include <arch/arch.h>
+#include <parlib/arch/arch.h>
 #include <stdbool.h>
 #include <errno.h>
-#include <vcore.h>
-#include <mcs.h>
+#include <parlib/vcore.h>
+#include <parlib/mcs.h>
 #include <sys/param.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <stdio.h>
-#include <event.h>
-#include <uthread.h>
-#include <ucq.h>
+#include <parlib/event.h>
+#include <parlib/uthread.h>
+#include <parlib/ucq.h>
 #include <ros/arch/membar.h>
-#include <printf-ext.h>
+#include <parlib/printf-ext.h>
 
 /* starting with 1 since we alloc vcore0's stacks and TLS in vcore_init(). */
 static size_t _max_vcores_ever_wanted = 1;

@@ -12,7 +12,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include <timing.h>
+#include <parlib/timing.h>
 #include <execinfo.h>
 
 __BEGIN_DECLS

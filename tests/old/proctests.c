@@ -1,4 +1,4 @@
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <stdio.h>
 
 /* This runs a variety of process tests.  For now, it just tests single-core

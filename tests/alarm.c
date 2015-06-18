@@ -6,12 +6,12 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
-#include <event.h>
-#include <measure.h>
-#include <uthread.h>
-#include <timing.h>
+#include <parlib/event.h>
+#include <benchutil/measure.h>
+#include <parlib/uthread.h>
+#include <parlib/timing.h>
 
 /* Am I the only one annoyed at how open has different includes than
  * close/read/write? */

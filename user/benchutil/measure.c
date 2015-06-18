@@ -12,8 +12,8 @@
 #include <stdlib.h>
 #include <sys/param.h>
 #ifdef __ros__
-#include <tsc-compat.h>
-#include <measure.h>
+#include <parlib/tsc-compat.h>
+#include <benchutil/measure.h>
 #endif /* __ros__ */
 
 /* Basic stats computation and printing.

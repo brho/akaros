@@ -9,7 +9,7 @@
 #include <stdlib.h>
 
 #include <stdio.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -18,9 +18,9 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <error.h>
-#include <iplib.h>
-#include <ndb.h>
-#include <fcallfmt.h>
+#include <iplib/iplib.h>
+#include <ndblib/ndb.h>
+#include <ndblib/fcallfmt.h>
 #include <fcall.h>
 
 #define ARRAY_SIZE(x) (sizeof((x))/sizeof((x)[0]))

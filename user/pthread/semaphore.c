@@ -1,8 +1,8 @@
-#include <uthread.h>
+#include <parlib/uthread.h>
 #include <semaphore.h>
-#include <mcs.h>
+#include <parlib/mcs.h>
 #include <stdio.h>
-#include <alarm.h>
+#include <benchutil/alarm.h>
 #include <errno.h>
 
 struct sem_queue_element {

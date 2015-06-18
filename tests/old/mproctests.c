@@ -1,13 +1,13 @@
-#include <arch/arch.h>
-#include <parlib.h>
-#include <rassert.h>
+#include <parlib/arch/arch.h>
+#include <parlib/parlib.h>
+#include <parlib/rassert.h>
 #include <stdlib.h>
-#include <vcore.h>
+#include <parlib/vcore.h>
 #include <ros/mman.h>
 #include <ros/resource.h>
 #include <stdio.h>
-#include <timing.h>
-#include <uthread.h>
+#include <parlib/timing.h>
+#include <parlib/uthread.h>
 
 #define TEST_MMAP					 1
 #define TEST_ONE_CORE				 2

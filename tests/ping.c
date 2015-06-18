@@ -7,19 +7,19 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
 #include <signal.h>
-#include <iplib.h>
-#include <icmp.h>
+#include <iplib/iplib.h>
+#include <iplib/icmp.h>
 #include <ctype.h>
 #include <pthread.h>
-#include <spinlock.h>
-#include <timing.h>
-#include <tsc-compat.h>
-#include <printf-ext.h>
-#include <alarm.h>
-#include <ndb.h>
+#include <parlib/spinlock.h>
+#include <parlib/timing.h>
+#include <parlib/tsc-compat.h>
+#include <parlib/printf-ext.h>
+#include <benchutil/alarm.h>
+#include <ndblib/ndb.h>
 
 #define NR_MSG				4
 #define SLEEPMS				1000

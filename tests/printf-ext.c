@@ -2,10 +2,10 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <parlib.h>
+#include <parlib/parlib.h>
 #include <unistd.h>
 #include <signal.h>
-#include <printf-ext.h>
+#include <parlib/printf-ext.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>

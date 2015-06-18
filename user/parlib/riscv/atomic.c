@@ -1,6 +1,6 @@
 #include <ros/atomic.h>
 #include <stdint.h>
-#include <spinlock.h>
+#include <parlib/spinlock.h>
 
 static spinlock_t lock = SPINLOCK_INITIALIZER;
 

@@ -3,7 +3,7 @@
 
 #include <ros/common.h>
 #include <ros/trapframe.h>
-#include <arch/arch.h>
+#include <parlib/arch/arch.h>
 #include <ros/syscall.h>
 #include <ros/procdata.h>
 #include <assert.h>
