@@ -160,16 +160,6 @@
 
 #define currentcpu (&per_cpu_info[core_id()])
 
-/*
- * Keep MSR_STAR at the end, as setup_msrs() will try to optimize it
- * away by decrementing the array size.
- */
-static const uint32_t vmx_msr_index[] = {
-	MSR_SYSCALL_MASK, MSR_LSTAR, MSR_CSTAR,
-	MSR_EFER, MSR_TSC_AUX, MSR_STAR,
-};
-#define NR_VMX_MSR ARRAY_SIZE(vmx_msr_index)
-
 static unsigned long *msr_bitmap;
 
 int x86_ept_pte_fix_ups = 0;
@@ -1021,7 +1011,7 @@ static void dumpmsrs(void)
 	for(i = 0; i < ARRAY_SIZE(set); i++) {
 		printk("%p: %p\n", set[i], read_msr(set[i]));
 	}
-	printk("core id %d\n", hw_core_id());
+	printk("core id %d\n", core_id());
 }
 
 /* Notes on autoloading.  We can't autoload FS_BASE or GS_BASE, according to the
@@ -1066,10 +1056,12 @@ static void setup_msr(struct vmx_vcpu *vcpu)
 		__vmx_disable_intercept_for_msr(msr_bitmap, e->index);
 		rdmsrl(e->index, val);
 		e->value = val;
+		printk("host index %p val %p\n", e->index, e->value);
 
 		e = &vcpu->msr_autoload.guest[i];
 		e->index = autoloaded_msrs[i];
 		e->value = 0xDEADBEEF;
+		printk("guest index %p val %p\n", e->index, e->value);
 	}
 }
 
@@ -1100,36 +1092,6 @@ static void vmx_setup_vmcs(struct vmx_vcpu *vcpu)
 	vmcs_write32(CR3_TARGET_COUNT, 0);           /* 22.2.1 */
 
 	setup_msr(vcpu);
-#if 0
-	if (vmcs_config.vmentry_ctrl & VM_ENTRY_LOAD_IA32_PAT) {
-		uint32_t msr_low, msr_high;
-		uint64_t host_pat;
-		rdmsr(MSR_IA32_CR_PAT, msr_low, msr_high);
-		host_pat = msr_low | ((uint64_t) msr_high << 32);
-		/* Write the default value follow host pat */
-		vmcs_write64(GUEST_IA32_PAT, host_pat);
-		/* Keep arch.pat sync with GUEST_IA32_PAT */
-		vmx->vcpu.arch.pat = host_pat;
-	}
-#endif
-#if 0
-	for (int i = 0; i < NR_VMX_MSR; ++i) {
-		uint32_t index = vmx_msr_index[i];
-		uint32_t data_low, data_high;
-		int j = vmx->nmsrs;
-		// TODO we should have read/writemsr_safe
-#if 0
-		if (rdmsr_safe(index, &data_low, &data_high) < 0)
-			continue;
-		if (wrmsr_safe(index, data_low, data_high) < 0)
-			continue;
-#endif
-		vmx->guest_msrs[j].index = i;
-		vmx->guest_msrs[j].data = 0;
-		vmx->guest_msrs[j].mask = -1ull;
-		++vmx->nmsrs;
-	}
-#endif
 
 	vmcs_config.vmentry_ctrl |= VM_ENTRY_IA32E_MODE;
 
@@ -1440,7 +1402,9 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 
 		// TODO: see if we need to exit before we go much further.
 		disable_irq();
+		//dumpmsrs();
 		ret = vmx_run_vcpu(vcpu);
+		//dumpmsrs();
 		enable_irq();
 		vmx_put_cpu(vcpu);
 
@@ -1460,9 +1424,12 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 				vmcs_writel(GUEST_RIP, vcpu->regs.tf_rip + 3);
 				vmx_put_cpu(vcpu);
 			}
-		} else if (ret == EXIT_REASON_CPUID)
+		} else if (ret == EXIT_REASON_CPUID) {
 			vmx_handle_cpuid(vcpu);
-		else if (ret == EXIT_REASON_EPT_VIOLATION) {
+			vmx_get_cpu(vcpu);
+			vmcs_writel(GUEST_RIP, vcpu->regs.tf_rip + 2);
+			vmx_put_cpu(vcpu);
+		} else if (ret == EXIT_REASON_EPT_VIOLATION) {
 			if (vmx_handle_ept_violation(vcpu))
 				vcpu->shutdown = SHUTDOWN_EPT_VIOLATION;
 		} else if (ret == EXIT_REASON_EXCEPTION_NMI) {
@@ -1608,7 +1575,7 @@ static void setup_vmxarea(void)
 {
 		struct vmcs *vmxon_buf;
 		printd("Set up vmxarea for cpu %d\n", core_id());
-		vmxon_buf = __vmx_alloc_vmcs(node_id());
+		vmxon_buf = __vmx_alloc_vmcs(core_id());
 		if (!vmxon_buf) {
 			printk("setup_vmxarea failed on node %d\n", core_id());
 			return;
