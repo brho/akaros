@@ -107,6 +107,7 @@ all:
 	@echo "  make x86_64-uninstall"
 	@echo "  make x86_64-native-uninstall"
 	@echo "  make clean"
+	@echo "  make inst-clean"
 
 riscv:
 	export LD_LIBRARY_PATH=; \
@@ -167,13 +168,16 @@ make-native-all:
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage3-install
 
 riscv-uninstall:
-	-rm -rf $(RISCV_INSTDIR)
+	@rm -rf $(RISCV_INSTDIR)
+	@echo "Removed $(RISCV_INSTDIR) (riscv-inst)"
 
 x86_64-uninstall:
-	-rm -rf $(X86_64_INSTDIR)
+	@rm -rf $(X86_64_INSTDIR)
+	@echo "Removed $(X86_64_INSTDIR) (x86_64-inst)"
 
 x86_64-native-uninstall:
-	-rm -rf $(X86_64_NATIVE_INSTDIR)
+	@rm -rf $(X86_64_NATIVE_INSTDIR)
+	@echo "Removed $(X86_64_NATIVE_INSTDIR) (x86_64-native-inst)"
 
 riscv-revert:
 	rm -rf $(RISCV_INSTDIR)
@@ -710,14 +714,17 @@ $(BINARY_PREFIX)mpc-builddir: mpc-$(MPC_VERSION)
 ######## Clean it all up! ########
 ##################################
 clean:
-	rm -rf binutils-$(BINUTILS_VERSION) 
-	rm -rf gcc-$(GCC_VERSION) 
-	rm -rf glibc-$(GLIBC_VERSION) 
-	rm -rf gmp-$(GMP_VERSION)
-	rm -rf mpfr-$(MPFR_VERSION)
-	rm -rf mpc-$(MPC_VERSION)
-	rm -rf *-builddir
-	rm -rf .*-configure
-	rm -rf *$(BINARY_PREFIX)install.bak
-	rm -rf .glibc-$(GLIBC_VERSION)-akaros.patch
-	rm -rf .gcc-$(GCC_VERSION)-akaros.patch
+	@rm -rf binutils-$(BINUTILS_VERSION)
+	@rm -rf gcc-$(GCC_VERSION)
+	@rm -rf glibc-$(GLIBC_VERSION)
+	@rm -rf gmp-$(GMP_VERSION)
+	@rm -rf mpfr-$(MPFR_VERSION)
+	@rm -rf mpc-$(MPC_VERSION)
+	@rm -rf *-builddir
+	@rm -rf .*-configure
+	@rm -rf *$(BINARY_PREFIX)install.bak
+	@rm -rf .glibc-$(GLIBC_VERSION)-akaros.patch
+	@rm -rf .gcc-$(GCC_VERSION)-akaros.patch
+	@echo "Removed configs, build dirs, and extracted sources"
+
+inst-clean: clean riscv-uninstall x86_64-uninstall x86_64-native-uninstall
