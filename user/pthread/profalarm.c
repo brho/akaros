@@ -5,7 +5,7 @@
 #include <pthread.h>
 #include <pvcalarm.h>
 
-void pvcalarm_callback()
+void pvcalarm_callback(void)
 {
 	if (current_uthread)
 		pthread_kill((pthread_t)current_uthread, SIGPROF);
@@ -16,7 +16,7 @@ void enable_profalarm(uint64_t usecs)
 	enable_pvcalarms(PVCALARM_PROF, usecs, pvcalarm_callback);
 }
 
-void disable_profalarm()
+void disable_profalarm(void)
 {
 	disable_pvcalarms();
 }

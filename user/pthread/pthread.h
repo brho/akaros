@@ -151,6 +151,10 @@ void pthread_need_tls(bool need);			/* default is TRUE */
 void pthread_lib_init(void);
 void __pthread_generic_yield(struct pthread_tcb *pthread);
 
+/* Profiling alarms for pthreads.  (profalarm.c) */
+void enable_profalarm(uint64_t usecs);
+void disable_profalarm(void);
+
 /* The pthreads API */
 int pthread_attr_init(pthread_attr_t *);
 int pthread_attr_destroy(pthread_attr_t *);
