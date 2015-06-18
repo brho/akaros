@@ -44,11 +44,13 @@ $(FINALLIB): $(OBJS)
 	@mkdir -p $(@D)
 	$(Q)$(AR) rc $@ $(OBJS)
 
+# The last rm is for the symlink
 $(FINALLIB-INSTALL): $(FINALLIB)
 	@cp $(FINALLIB) $@
-	@cp -R $(INCDIR)/* $(XCC_TARGET_INCLUDE)/
 	@rm -rf $(XCC_TARGET_INCLUDE)/$(LIBNAME)
-	@ln -fs . $(XCC_TARGET_INCLUDE)/$(LIBNAME)
+	@mkdir $(XCC_TARGET_INCLUDE)/$(LIBNAME)
+	@cp -r $(INCDIR)/* $(XCC_TARGET_INCLUDE)/$(LIBNAME)/
+	@rm $(XCC_TARGET_INCLUDE)/$(LIBNAME)/$(LIBNAME)
 
 install: $(FINALLIB-INSTALL)
 	@echo > /dev/null

@@ -396,8 +396,9 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	mkdir $(SYSROOT)/usr/include/ros/arch
 	cp -r $(ROSDIR)/kern/arch/$(ROS_ARCH_DIR)/ros/* \
 	    $(SYSROOT)/usr/include/ros/arch/
+	mkdir -p $(SYSROOT)/usr/include/parlib
 	cp -r $(ROSDIR)/user/parlib/include/* \
-	    $(SYSROOT)/usr/include/
+	    $(SYSROOT)/usr/include/parlib/
 	cp -r $(ROSDIR)/user/pthread/*.h \
 	    $(SYSROOT)/usr/include/
 	rm -rf $(SYSROOT)/usr/include/arch
