@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <parlib/arch/arch.h>
+#include <parlib/ros_debug.h>
 #include <unistd.h>
 #include <errno.h>
 #include <dirent.h>
@@ -12,6 +13,7 @@
 #include <ros/syscall.h>
 #include <sys/mman.h>
 #include <vmm/coreboot_tables.h>
+
 /* this test will run the "kernel" in the negative address space. We hope. */
 int *mmap_blob;
 unsigned long long stack[1024];

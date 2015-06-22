@@ -26,6 +26,9 @@ void __print_func_exit(const char *func, const char *file);
 #define print_func_entry() __print_func_entry(__FUNCTION__, __FILE__)
 #define print_func_exit() __print_func_exit(__FUNCTION__, __FILE__)
 
+/* user/parlib/hexdump.c */
+void hexdump(FILE *f, void *v, int length);
+
 __END_DECLS
 
 #endif /* PARLIB_ROS_DEBUG_H */
