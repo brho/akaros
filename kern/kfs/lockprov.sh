@@ -9,6 +9,8 @@
 # timing.  When we do this, pull in the vcore shuffling code from prov.c and
 # have that be an option.
 # TODO: have better options for the two preempt styles (periodic, vs total)
+#
+# Run this from looper.sh for multiple runs.
 
 if [ $# -lt 2 ]
 then
@@ -41,20 +43,41 @@ echo Launch lock_test, pid was $LOCKPID
 RET=0
 INC=0
 
-# This is the preempt, return, preempt return cycle
+# This is the preempt and never return, hoping to catch deadlocks
+prov -tc -p$LOCKPID -m >> tmpfile 2>&1
+
+usleep $PREEMPT_DELAY
+
+prov -tc -p$PTHPID -v1 >> tmpfile 2>&1
+prov -tc -p$PTHPID -v2 >> tmpfile 2>&1
+
+# giving it vc3, which it already has.  this is just a test on process existence
 while [ $RET -eq 0 ]; do
-	prov -tc -p$LOCKPID -m >> tmpfile 2>&1
+	prov -tc -p$LOCKPID -v3 >> tmpfile 2>&1
 	RET=$?
-
 	usleep $PREEMPT_DELAY
-	
-	prov -tc -p$PTHPID -v1 >> tmpfile 2>&1
-	prov -tc -p$PTHPID -v2 >> tmpfile 2>&1
-
-	usleep $PREEMPT_DELAY
-
-	let INC=$INC+1
 done
+
+## This is the preempt, return, preempt return cycle
+#while [ $RET -eq 0 ]; do
+#	prov -tc -p$LOCKPID -m >> tmpfile 2>&1
+#	RET=$?
+#
+#	usleep $PREEMPT_DELAY
+#
+#	prov -tc -p$PTHPID -v1 >> tmpfile 2>&1
+#	prov -tc -p$PTHPID -v2 >> tmpfile 2>&1
+#
+#	# the extra preempts here are to make us wait longer, to see gaps where we
+#	# "locked up" more clearly.
+#	usleep $PREEMPT_DELAY
+#	usleep $PREEMPT_DELAY
+#	usleep $PREEMPT_DELAY
+#	usleep $PREEMPT_DELAY
+#	usleep $PREEMPT_DELAY
+#
+#	let INC=$INC+1
+#done
 
 ## This is the 'run for a bit, preempt a lot just once, then return all style
 #prov -tc -p$LOCKPID -m >> tmpfile 2>&1
