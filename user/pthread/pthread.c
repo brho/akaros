@@ -678,7 +678,7 @@ void pthread_lib_init(void)
 #endif
 	/* Initialize the uthread code (we're in _M mode after this).  Doing this
 	 * last so that all the event stuff is ready when we're in _M mode.  Not a
-	 * big deal one way or the other.  Note that vcore_init() probably has
+	 * big deal one way or the other.  Note that vcore_lib_init() probably has
 	 * happened, but don't rely on this.  Careful if your 2LS somehow wants to
 	 * have its init stuff use things like vcore stacks or TLSs, we'll need to
 	 * change this. */

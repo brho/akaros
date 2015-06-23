@@ -53,7 +53,7 @@ static inline void *get_vcpd_tls_desc(uint32_t vcoreid);
 static inline void set_vcpd_tls_desc(uint32_t vcoreid, void *tls_desc);
 static inline uint64_t vcore_account_resume_nsec(uint32_t vcoreid);
 static inline uint64_t vcore_account_total_nsec(uint32_t vcoreid);
-void vcore_init(void);
+void vcore_lib_init(void);
 void vcore_event_init(void);
 void vcore_change_to_m(void);
 int vcore_request(long nr_new_vcores);

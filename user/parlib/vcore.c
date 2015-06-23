@@ -15,7 +15,7 @@
 #include <ros/arch/membar.h>
 #include <parlib/printf-ext.h>
 
-/* starting with 1 since we alloc vcore0's stacks and TLS in vcore_init(). */
+/* starting with 1 since we alloc vcore0's stacks and TLS in vcore_lib_init(). */
 static size_t _max_vcores_ever_wanted = 1;
 atomic_t nr_new_vcores_wanted;
 atomic_t vc_req_being_handled;
@@ -78,7 +78,7 @@ static int allocate_transition_stack(int id)
 	return 0;
 }
 
-void vcore_init(void)
+void vcore_lib_init(void)
 {
 	uintptr_t mmap_block;
 	/* Note this is racy, but okay.  The first time through, we are _S */
@@ -88,7 +88,7 @@ void vcore_init(void)
 	 * so that schedulers can use vcore0's transition TLS before it comes up in
 	 * vcore_entry() */
 	if(allocate_transition_stack(0) || allocate_transition_tls(0))
-		goto vcore_init_fail;
+		goto vcore_lib_init_fail;
 
 	/* Initialize our VCPD event queues' ucqs, two pages per ucq, 4 per vcore */
 	mmap_block = (uintptr_t)mmap(0, PGSIZE * 4 * max_vcores(),
@@ -116,7 +116,7 @@ void vcore_init(void)
 	 * _M) */
 	vc_initialized = TRUE;
 	return;
-vcore_init_fail:
+vcore_lib_init_fail:
 	assert(0);
 }
 

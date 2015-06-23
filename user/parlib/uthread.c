@@ -89,7 +89,7 @@ static void uthread_manage_thread0(struct uthread *uthread)
 void uthread_lib_init(struct uthread *uthread)
 {
 	init_once_racy(return);
-	vcore_init();
+	vcore_lib_init();
 	uthread_manage_thread0(uthread);
 	register_ev_handler(EV_EVENT, handle_ev_ev, 0);
 	/* Receive preemption events.  Note that this merely tells the kernel how to
@@ -164,7 +164,7 @@ void uthread_slim_init(void)
 	assert(!ret);
 	memset(uthread, 0, sizeof(struct uthread));	/* aggressively 0 for bugs */
 	/* TODO: consider a vcore_init_vc0 call. */
-	vcore_init();
+	vcore_lib_init();
 	uthread_manage_thread0(uthread);
 	scp_vcctx_ready();
 	init_posix_signals();

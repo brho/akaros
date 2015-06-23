@@ -28,7 +28,7 @@ int main(int argc, char** argv)
 {
 	uint32_t vcoreid;
 	int retval;
-	vcore_init();
+	vcore_lib_init();
 
 	if ((vcoreid = vcore_id())) {
 		printf("Should never see me! (from vcore %d)\n", vcoreid);

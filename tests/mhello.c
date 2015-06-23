@@ -65,7 +65,7 @@ int main(int argc, char** argv)
 		register_ev_handler(i, handle_generic, 0);
 	/* Want to use the default ev_ev (which we just overwrote) */
 	register_ev_handler(EV_EVENT, handle_ev_ev, 0);
-	/* vcore_init() done in vcore_request() now. */
+	/* vcore_lib_init() done in vcore_request() now. */
 	/* Set up event reception.  For example, this will allow us to receive an
 	 * event and IPI for USER_IPIs on vcore 0.  Check event.c for more stuff.
 	 * Note you don't have to register for USER_IPIs to receive ones you send
