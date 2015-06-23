@@ -302,6 +302,11 @@ void * write_coreboot_table(void *where, void *base, uint64_t len)
 	head = lb_table_init(where);
 	m = lb_memory(head);
 	mem = (void *)(&m[1]);
+	mem->start = pack_lb64((uint64_t) 0);
+	mem->size = pack_lb64((uint64_t) base-1);
+	mem->type = LB_MEM_RESERVED;
+	m->size += sizeof(*mem);
+	mem = (void *)(&mem[1]);
 	mem->start = pack_lb64((uint64_t) base);
 	mem->size = pack_lb64((uint64_t) len);
 	mem->type = LB_MEM_RAM;
