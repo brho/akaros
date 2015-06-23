@@ -30,13 +30,12 @@
 #define SYS_mlock
 #define SYS_msync
 */
-/* sys_brk removed */
+/* was SYS_brk						21 */
 #define SYS_shared_page_alloc		22
 #define SYS_shared_page_free		23
 #define SYS_provision				24
 #define SYS_notify					25
 #define SYS_self_notify				26
-#define SYS_vc_entry				31
 #define SYS_halt_core				27
 #define SYS_init_arsc				28
 #define SYS_change_to_m				29
@@ -45,6 +44,7 @@
 #define SYS_populate_va				32
 #define SYS_abort_sysc_fd			33
 #define SYS_setup_vmm				34
+#define SYS_vc_entry				35
 
 /* FS Syscalls */
 #define SYS_read				100
@@ -86,6 +86,7 @@
 #define SYS_nbind				145
 #define SYS_nmount				146
 #define SYS_nunmount			147
+/* was SYS_something			148 */
 #define SYS_fd2path				149
 
 /* Syscalls we plan to remove someday */
