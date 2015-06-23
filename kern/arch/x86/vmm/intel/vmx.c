@@ -155,6 +155,7 @@
 
 #include "vmx.h"
 #include "../vmm.h"
+#include <ros/vmm.h>
 
 #include "cpufeature.h"
 
@@ -1409,20 +1410,19 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 		vmx_put_cpu(vcpu);
 
 		if (ret == EXIT_REASON_VMCALL) {
-			// hacque. vmcall is now putchar.
-			if (0) {
-				vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
-				uint8_t byte = vcpu->regs.tf_rdi;
-				printk("%p %c\n", byte, vcpu->regs.tf_rdi);
-				vmx_dump_cpu(vcpu);
-				printd("system call! WTF\n");
-			} else {
+			if (current->vmm.flags & VMM_VMCALL_PRINTF) {
 				uint8_t byte = vcpu->regs.tf_rdi;
 				printk("%c", byte);
 				// adjust the RIP
 				vmx_get_cpu(vcpu);
 				vmcs_writel(GUEST_RIP, vcpu->regs.tf_rip + 3);
 				vmx_put_cpu(vcpu);
+			} else {
+				vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
+				uint8_t byte = vcpu->regs.tf_rdi;
+				printk("%p %c\n", byte, vcpu->regs.tf_rdi);
+				vmx_dump_cpu(vcpu);
+				printd("system call! WTF\n");
 			}
 		} else if (ret == EXIT_REASON_CPUID) {
 			vmx_handle_cpuid(vcpu);

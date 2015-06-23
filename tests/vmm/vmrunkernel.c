@@ -13,6 +13,7 @@
 #include <ros/syscall.h>
 #include <sys/mman.h>
 #include <vmm/coreboot_tables.h>
+#include <ros/vmm.h>
 
 /* this test will run the "kernel" in the negative address space. We hope. */
 int *mmap_blob;
@@ -46,6 +47,7 @@ int nr_threads = 2;
 int main(int argc, char **argv)
 {
 	int amt;
+	int vmmflags = VMM_VMCALL_PRINTF;
 	uint64_t entry = 0x101000c, kerneladdress = 0x1010000;
 	int nr_gpcs = 1;
 	int fd = open("#c/sysctl", O_RDWR), ret;
@@ -66,6 +68,20 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 	argc--,argv++;
+	// switches ...
+	while (1) {
+		if (*argv[0] != '-')
+			break;
+		switch(argv[0][1]) {
+		case 'n':
+			vmmflags &= ~VMM_VMCALL_PRINTF;
+			break;
+		default:
+			printf("BMAFR\n");
+			break;
+		}
+		argc--,argv++;
+	}
 	if (argc < 1) {
 		fprintf(stderr, "Usage: %s vmimage coreboot_tables [loadaddress [entrypoint]]\n", argv[0]);
 		exit(1);
@@ -95,7 +111,8 @@ int main(int argc, char **argv)
 	}
 	fprintf(stderr, "Read in %d bytes\n", x-kerneladdress);
 
-	if (ros_syscall(SYS_setup_vmm, nr_gpcs, 0, 0, 0, 0, 0) != nr_gpcs) {
+	fprintf(stderr, "Run with %d cores and vmmflags 0x%x\n", nr_gpcs, vmmflags);
+	if (ros_syscall(SYS_setup_vmm, nr_gpcs, vmmflags, 0, 0, 0, 0) != nr_gpcs) {
 		perror("Guest pcore setup failed");
 		exit(1);
 	}

@@ -20,6 +20,8 @@ struct vmm {
 	// true if this is a VMMCP.
 	bool vmmcp;
 
+	int flags;
+
 	// Number of cores in this VMMCP.
 	int nr_guest_pcores;
 
@@ -40,7 +42,7 @@ struct vmm {
 void vmm_init(void);
 void vmm_pcpu_init(void);
 
-int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores);
+int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores, int flags);
 void __vmm_struct_cleanup(struct proc *p);
 
 int vm_run(uint64_t,uint64_t, uint64_t);

@@ -16,6 +16,7 @@
 
 #include "intel/vmx.h"
 #include "vmm.h"
+#include <ros/vmm.h>
 
 /* TODO: have better cpuid info storage and checks */
 bool x86_supports_vmx = FALSE;
@@ -69,10 +70,18 @@ int vm_run(uint64_t rip, uint64_t rsp, uint64_t cr3)
 
 /* Initializes a process to run virtual machine contexts, returning the number
  * initialized, optionally setting errno */
-int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores)
+int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores, int flags)
 {
 	struct vmm *vmm = &p->vmm;
 	unsigned int i;
+	if (flags & ~VMM_ALL_FLAGS) {
+		set_errstr("%s: flags is 0x%lx, VMM_ALL_FLAGS is 0x%lx\n", __func__,
+		           flags, VMM_ALL_FLAGS);
+		set_errno(EINVAL);
+		return 0;
+	}
+	vmm->flags = flags;
+
 	if (!x86_supports_vmx) {
 		set_errno(ENODEV);
 		return 0;
