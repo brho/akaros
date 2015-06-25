@@ -8,9 +8,9 @@
 # You can also source this (hit ctrl-D, to abort the while read line loop) and
 # then call print_glb_func directly.
 
-S0LIBS_PREFIX=~/akaros/ros-kernel/kern/kfs/lib/
-SO_REGEX=.*so$ 
-BIN_PREFIX=~/akaros/ros-kernel/kern/kfs/bin/
+: ${SOLIBS_PREFIX:=~/akaros/ros-kernel/kern/kfs/lib/}
+: ${SO_REGEX:=.*so$}
+: ${BIN_PREFIX:=~/akaros/ros-kernel/kern/kfs/bin/}
 
 # takes the path to the binary and offset (offset in hex), prints the 'greatest
 # lower bound' of the functions, which is probably the function where the
@@ -45,7 +45,7 @@ do
 	if [[ $binary =~ $SO_REGEX ]]
 	then
 		# could also do addr=$(print_glb_func $lib $off)
-		print_glb_func $S0LIBS_PREFIX/$binary $lib_off
+		print_glb_func $SOLIBS_PREFIX/$binary $lib_off
 	else
 		print_glb_func $BIN_PREFIX/$binary $app_off
 	fi
