@@ -18,7 +18,6 @@ void ghetto_vcore_entry(void);
 struct schedule_ops ghetto_sched_ops = {
 	.sched_entry = ghetto_vcore_entry,
 };
-struct schedule_ops *sched_ops = &ghetto_sched_ops;
 
 /* All MCP syscalls will spin instead of blocking */
 static void __ros_syscall_spinon(struct syscall *sysc)
@@ -36,6 +35,9 @@ int main(int argc, char** argv)
 		nr_vcores = max_vcores();
 	else
 		nr_vcores = atoi(argv[1]);
+
+	/* set up our sched ops. */
+	sched_ops = &ghetto_sched_ops;
 
 	/* Inits a thread for us, though we won't use it.  Just a hack to get into
 	 * _M mode.  Note this requests one vcore for us */

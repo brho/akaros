@@ -6,10 +6,11 @@
 #include <parlib/event.h>
 #include <stdlib.h>
 
-/* Which operations we'll call for the 2LS.  Will change a bit with Lithe.  For
- * now, there are no defaults.  2LSs can override sched_ops. */
+/* By default there is no 2LS, but we still want sched_ops set so we can check
+ * its individual function pointers. A 2LS should override sched_ops in its
+ * init code. */
 struct schedule_ops default_2ls_ops = {0};
-struct schedule_ops *sched_ops __attribute__((weak)) = &default_2ls_ops;
+struct schedule_ops *sched_ops = &default_2ls_ops;
 
 __thread struct uthread *current_uthread = 0;
 /* ev_q for all preempt messages (handled here to keep 2LSs from worrying

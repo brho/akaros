@@ -27,7 +27,6 @@ void ghetto_vcore_entry(void);
 struct schedule_ops ghetto_sched_ops = {
 	.sched_entry = ghetto_vcore_entry,
 };
-struct schedule_ops *sched_ops = &ghetto_sched_ops;
 
 /* Extreme ghetto */
 static void __ros_syscall_spinon(struct syscall *sysc)
@@ -42,6 +41,10 @@ int main(int argc, char** argv)
 	uint32_t vcoreid;
 	int retval;
 
+	/* set up our sched ops. */
+	sched_ops = &ghetto_sched_ops;
+
+	/* Initialize our barrier. */
 	mcs_barrier_init(&b, max_vcores());
 
 	/* vcore_context test */

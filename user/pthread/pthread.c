@@ -71,10 +71,6 @@ struct signal_ops pthread_signal_ops = {
 	.sigprocmask = pthread_sigmask,
 };
 
-/* Publish our sched_ops and signal_ops, overriding the weak defaults */
-struct schedule_ops *sched_ops = &pthread_sched_ops;
-struct signal_ops *signal_ops = &pthread_signal_ops;
-
 /* Static helpers */
 static void __pthread_free_stack(struct pthread_tcb *pt);
 static int __pthread_allocate_stack(struct pthread_tcb *pt);
@@ -598,6 +594,11 @@ void pthread_lib_init(void)
 	uintptr_t mmap_block;
 	struct pthread_tcb *t;
 	int ret;
+
+	/* Publish our sched_ops and signal_ops, overriding the defaults */
+	sched_ops = &pthread_sched_ops;
+	signal_ops = &pthread_signal_ops;
+
 	/* Some testing code might call this more than once (once for a slimmed down
 	 * pth 2LS, and another from pthread_create().  Also, this is racy, but the
 	 * first time through we are an SCP. */

@@ -48,7 +48,7 @@ static int __sigprocmask(int __how, __const sigset_t *__restrict __set,
 struct signal_ops default_signal_ops = {
 	.sigprocmask = __sigprocmask,
 };
-struct signal_ops *signal_ops __attribute__((weak)) = &default_signal_ops;
+struct signal_ops *signal_ops = &default_signal_ops;
 
 /* This is a wait-free-list used to hold the data necessary to execute signal
  * handlers inside a 2LS. We are able to store them in a wfl because all
