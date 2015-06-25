@@ -31,22 +31,7 @@ void __vcore_entry(void)
 }
 weak_alias(__vcore_entry, vcore_entry)
 
-void __vcore_event_init(void)
-{
-	fputs("Build your application with -lparlib\n", stderr);
-	abort();
-}
-weak_alias(__vcore_event_init, vcore_event_init)
-
 #define failmsg(str) write(2,str"\n",sizeof(str"\n")-1)
-
-void __ros_libc_csu_init(int argc, char **argv, char **envp)
-{
-	vcore_event_init();
-	// Note that we want the ctors to be called after vcore_event_init.
-	// (They are invoked by the next line.)
-	__libc_csu_init(argc, argv, envp);
-}
 
 void
 _start(void)
@@ -112,7 +97,7 @@ _start(void)
 	extern char** _environ;
 	_environ = argv+argc+1;
 
-	__libc_start_main(&main, argc, argv, &__ros_libc_csu_init, &__libc_csu_fini,
+	__libc_start_main(&main, argc, argv, &__libc_csu_init, &__libc_csu_fini,
 	                  0, 0);
 
 	failmsg("why did main() return?");

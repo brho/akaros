@@ -78,10 +78,25 @@ static int allocate_transition_stack(int id)
 	return 0;
 }
 
-void vcore_lib_init(void)
+/* This gets called in glibc before calling the programs 'main'.  Need to set
+ * ourselves up so that thread0 is a uthread, and then register basic signals to
+ * go to vcore 0. */
+static void vcore_libc_init(void)
+{
+	register_printf_specifier('r', printf_errstr, printf_errstr_info);
+	/* TODO: register for other kevents/signals and whatnot (can probably reuse
+	 * the simple ev_q).  Could also do this via explicit functions from the
+	 * program. */
+}
+
+void __attribute__((constructor)) vcore_lib_init(void)
 {
 	uintptr_t mmap_block;
-	/* Note this is racy, but okay.  The first time through, we are _S */
+
+	/* Note this is racy, but okay.  The first time through, we are _S.
+	 * Also, this is the "lowest" level constructor for now, so we don't need
+	 * to call any other init functions after our run_once() call. This may
+	 * change in the future. */
 	init_once_racy(return);
 
 	/* Need to alloc vcore0's transition stuff here (technically, just the TLS)
@@ -111,6 +126,7 @@ void vcore_lib_init(void)
 	}
 	atomic_init(&vc_req_being_handled, 0);
 	assert(!in_vcore_context());
+	vcore_libc_init();
 	/* no longer need to enable notifs on vcore 0, it is set like that by
 	 * default (so you drop into vcore context immediately on transtioning to
 	 * _M) */
@@ -138,19 +154,6 @@ void vcore_reenter(void (*entry_func)(void))
   set_stack_pointer((void*)vcpd->transition_stack);
   cmb();
   __vcore_reenter();
-}
-
-/* This gets called in glibc before calling the programs 'main'.  Need to set
- * ourselves up so that thread0 is a uthread, and then register basic signals to
- * go to vcore 0. */
-void vcore_event_init(void)
-{
-	register_printf_specifier('r', printf_errstr, printf_errstr_info);
-	/* set up our thread0 as a uthread */
-	uthread_slim_init();
-	/* TODO: register for other kevents/signals and whatnot (can probably reuse
-	 * the simple ev_q).  Could also do this via explicit functions from the
-	 * program. */
 }
 
 /* Helper, picks some sane defaults and changes the process into an MCP */

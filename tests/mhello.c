@@ -80,7 +80,8 @@ int main(int argc, char** argv)
 	/* Inits a thread for us, though we won't use it.  Just a hack to get into
 	 * _M mode.  Note this requests one vcore for us */
 	struct uthread dummy = {0};
-	uthread_lib_init(&dummy);
+	uthread_2ls_init(&dummy);
+	uthread_mcp_init();
 	/* Reset the blockon to be the spinner...  This is really shitty.  Any
 	 * blocking calls after we become an MCP and before this will fail.  This is
 	 * just mhello showing its warts due to trying to work outside uthread.c */

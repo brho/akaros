@@ -73,7 +73,7 @@ int main(int argc, char **argv)
 	# ifdef __ros__
 	if (argc == 4) {
 		pthread_can_vcore_request(FALSE);
-		pthread_lib_init();				
+		pthread_mcp_init();
 		printf("Vcore %d mapped to pcore %d\n", 0, __procinfo.vcoremap[0].pcoreid);
 	}
 	# endif

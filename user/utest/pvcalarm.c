@@ -14,8 +14,8 @@ bool test_pvcalarms(void) {
 		__sync_fetch_and_add(&count[vcore_id()], 1);
 	}
 
-	pthread_lib_init();
 	pthread_can_vcore_request(FALSE);
+	pthread_mcp_init();
 	vcore_request(max_vcores() - num_vcores());
 	for (int i=0; i<max_vcores(); i++)
 		count[i] = 0;

@@ -70,7 +70,7 @@ int main(int argc, char** argv)
 
 	pthread_can_vcore_request(FALSE);	/* 2LS won't manage vcores */
 	pthread_need_tls(FALSE);
-	pthread_lib_init();					/* gives us one vcore */
+	pthread_mcp_init();					/* gives us one vcore */
 
 	/* each is passed the other's pthread_t.  th1 starts the switching. */
 	if (pthread_create(&th1, NULL, &switch_thread, &th2))

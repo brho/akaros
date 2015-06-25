@@ -35,8 +35,8 @@ static void __ros_mcp_syscall_blockon(struct syscall *sysc);
 
 /* Helper, make the uthread code manage thread0.  This sets up uthread such
  * that the calling code and its TLS are tracked by the uthread struct, and
- * vcore0 thinks the uthread is running there.  Called only by slim_init (early
- * _S code) and lib_init.
+ * vcore0 thinks the uthread is running there.  Called only by lib_init (early
+ * _S code) and 2ls_init (when initializing thread0 for use in a 2LS).
  *
  * Whether or not uthreads have TLS, thread0 has TLS, given to it by glibc.
  * This TLS will get set whenever we use thread0, regardless of whether or not
@@ -64,18 +64,18 @@ static void uthread_manage_thread0(struct uthread *uthread)
 	 * its TLS vars. */
 	set_tls_desc(get_vcpd_tls_desc(0), 0);
 	begin_safe_access_tls_vars();
-	/* We might have a basic uthread already installed (from slim_init), so
+	/* We might have a basic uthread already installed (from lib_init), so
 	 * free it before installing the new one. */
 	if (current_uthread)
 		free(current_uthread);
 	current_uthread = uthread;
-	/* We could consider setting __vcore_context = TRUE here, since this is
-	 * probably the first time we're initializing vcore 0's TLS.  However, when
-	 * we actually turn into an MCP, VC 0 will come up and set __vcore_context.
-	 * I actually want it cleared until then, so that various asserts will catch
-	 * if we call other uthread functions before the 2LS is set up (before we're
-	 * an MCP).  For example, if someone calls uthread_yield from thread0 (which
-	 * has TLS), we'll panic since VC 0's TLS doesn't know it's a VC yet. */
+	/* We may not be an MCP at this point (and thus not really working with
+	 * vcores), but there is still the notion of something vcore_context-like
+	 * even when running as an SCP (i.e. its more of a scheduler_context than a
+	 * vcore_context).  Threfore we need to set __vcore_context to TRUE here to
+	 * represent this (otherwise we will hit some asserts of not being in
+	 * vcore_context when running in scheduler_context for the SCP. */
+	__vcore_context = TRUE;
 	end_safe_access_tls_vars();
 	set_tls_desc(uthread->tls_desc, 0);
 	begin_safe_access_tls_vars();
@@ -84,14 +84,13 @@ static void uthread_manage_thread0(struct uthread *uthread)
 	end_safe_access_tls_vars();
 }
 
-/* The real 2LS calls this, passing in a uthread representing thread0.  When it
+/* The real 2LS calls this to transition us into mcp mode.  When it
  * returns, you're in _M mode, still running thread0, on vcore0 */
-void uthread_lib_init(struct uthread *uthread)
+void uthread_mcp_init()
 {
+	/* Prevent this from happening more than once. */
 	init_once_racy(return);
-	vcore_lib_init();
-	uthread_manage_thread0(uthread);
-	register_ev_handler(EV_EVENT, handle_ev_ev, 0);
+
 	/* Receive preemption events.  Note that this merely tells the kernel how to
 	 * send the messages, and does not necessarily provide storage space for the
 	 * messages.  What we're doing is saying that all PREEMPT and CHECK_MSGS
@@ -115,6 +114,16 @@ void uthread_lib_init(struct uthread *uthread)
 	       preempt_ev_q, preempt_ev_q->ev_flags);
 	/* Get ourselves into _M mode.  Could consider doing this elsewhere... */
 	vcore_change_to_m();
+}
+
+/* The real 2LS calls this, passing in a uthread representing thread0. */
+void uthread_2ls_init(struct uthread *uthread)
+{
+	/* All we need to do is set up thread0 to run with our new 2LS specific
+	 * uthread pointer. Under the hood, this function will free any previously
+	 * allocated uthread structs representing thread0 (e.g. the one set up by
+	 * uthread_lib_init() previously). */
+	uthread_manage_thread0(uthread);
 }
 
 /* Helper: tells the kernel our SCP is capable of going into vcore context on
@@ -153,18 +162,22 @@ static char *__ros_errstr_loc(void)
 		return current_uthread->err_str;
 }
 
-/* Slim-init - sets up basic uthreading for when we are in _S mode and before
- * we set up the 2LS.  Some apps may not have a 2LS and thus never do the full
+/* Sets up basic uthreading for when we are in _S mode and before we set up the
+ * 2LS.  Some apps may not have a 2LS and thus never do the full
  * vcore/2LS/uthread init. */
-void uthread_slim_init(void)
+void __attribute__((constructor)) uthread_lib_init(void)
 {
 	struct uthread *uthread;
-	int ret = posix_memalign((void**)&uthread, __alignof__(struct uthread),
+	int ret;
+
+	/* Only run once, but make sure that vcore_lib_init() has run already. */
+	init_once_racy(return);
+	vcore_lib_init();
+
+	ret = posix_memalign((void**)&uthread, __alignof__(struct uthread),
 	                         sizeof(struct uthread));
 	assert(!ret);
 	memset(uthread, 0, sizeof(struct uthread));	/* aggressively 0 for bugs */
-	/* TODO: consider a vcore_init_vc0 call. */
-	vcore_lib_init();
 	uthread_manage_thread0(uthread);
 	scp_vcctx_ready();
 	init_posix_signals();
@@ -177,6 +190,7 @@ void uthread_slim_init(void)
 	 * errno.c for more info. */
 	ros_errno_loc = __ros_errno_loc;
 	ros_errstr_loc = __ros_errstr_loc;
+	register_ev_handler(EV_EVENT, handle_ev_ev, 0);
 }
 
 /* 2LSs shouldn't call uthread_vcore_entry directly */

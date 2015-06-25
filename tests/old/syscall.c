@@ -57,7 +57,8 @@ int main(int argc, char** argv)
 	/* Inits a thread for us, though we won't use it.  Just a hack to get into
 	 * _M mode.  Note this requests one vcore for us */
 	struct uthread dummy = {0};
-	uthread_lib_init(&dummy);
+	uthread_2ls_init(&dummy);
+	uthread_mcs_init();
 	/* Need to save our floating point state somewhere (like in the
 	 * user_thread_tcb so it can be restarted too */
 	enable_notifs(0);

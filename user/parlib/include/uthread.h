@@ -55,9 +55,13 @@ struct schedule_ops {
 };
 extern struct schedule_ops *sched_ops;
 
+/* Low-level _S code calls this for basic uthreading without a 2LS */
+void uthread_lib_init(void);
 /* Call this, passing it a uthread representing thread0, from your 2LS init
  * routines.  When it returns, you're in _M mode (thread0 on vcore0) */
-void uthread_lib_init(struct uthread *uthread);
+void uthread_2ls_init(struct uthread *uthread);
+/* Call this to become an mcp capable of worling with uthreads. */
+void uthread_mcp_init(void);
 
 /* Functions to make/manage uthreads.  Can be called by functions such as
  * pthread_create(), which can wrap these with their own stuff (like attrs,
@@ -70,8 +74,6 @@ struct uth_thread_attr {
 	bool want_tls;		/* default, no */
 };
 void uthread_init(struct uthread *new_thread, struct uth_thread_attr *attr);
-/* Low-level _S code calls this for basic uthreading without a 2LS */
-void uthread_slim_init(void);
 /* Call this when you are done with a uthread, forever, but before you free it */
 void uthread_cleanup(struct uthread *uthread);
 void uthread_runnable(struct uthread *uthread);

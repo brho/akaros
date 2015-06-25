@@ -734,7 +734,7 @@ static void os_prep_work(pthread_t *worker_threads, int nr_threads)
 	atomic_init(&indir_cnt, 0);
 	pthread_can_vcore_request(FALSE);	/* 2LS won't manage vcores */
 	pthread_need_tls(FALSE);
-	pthread_lib_init();					/* gives us one vcore */
+	pthread_mcp_init();					/* gives us one vcore */
 	register_ev_handler(EV_VCORE_PREEMPT, trace_preempt, 0);
 	register_ev_handler(EV_CHECK_MSGS, trace_indir, 0);
 	if (pargs.fake_vc_ctx) {

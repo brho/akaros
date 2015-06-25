@@ -587,13 +587,17 @@ int pthread_getattr_np(pthread_t __th, pthread_attr_t *__attr)
 	return 0;
 }
 
-/* Do whatever init you want.  At some point call uthread_lib_init() and pass it
+/* Do whatever init you want.  At some point call uthread_2ls_init() and pass it
  * a uthread representing thread0 (int main()) */
-void pthread_lib_init(void)
+void __attribute__((constructor)) pthread_lib_init(void)
 {
 	uintptr_t mmap_block;
 	struct pthread_tcb *t;
 	int ret;
+
+	/* Only run once, but make sure that uthread_lib_init() has run already. */
+	init_once_racy(return);
+	uthread_lib_init();
 
 	/* Publish our sched_ops and signal_ops, overriding the defaults */
 	sched_ops = &pthread_sched_ops;
@@ -602,7 +606,6 @@ void pthread_lib_init(void)
 	/* Some testing code might call this more than once (once for a slimmed down
 	 * pth 2LS, and another from pthread_create().  Also, this is racy, but the
 	 * first time through we are an SCP. */
-	init_once_racy(return);
 	assert(!in_multi_mode());
 	mcs_pdr_init(&queue_lock);
 	/* Create a pthread_tcb for the main thread */
@@ -676,26 +679,38 @@ void pthread_lib_init(void)
 		sysc_mgmt[i].ev_q->ev_mbox = sysc_mbox;
 	}
 #endif
-	/* Initialize the uthread code (we're in _M mode after this).  Doing this
-	 * last so that all the event stuff is ready when we're in _M mode.  Not a
-	 * big deal one way or the other.  Note that vcore_lib_init() probably has
-	 * happened, but don't rely on this.  Careful if your 2LS somehow wants to
-	 * have its init stuff use things like vcore stacks or TLSs, we'll need to
-	 * change this. */
-	uthread_lib_init((struct uthread*)t);
+	uthread_2ls_init((struct uthread*)t);
 	atomic_init(&threads_total, 1);			/* one for thread0 */
+}
+
+/* Make sure our scheduler runs inside an MCP rather than an SCP. */
+void pthread_mcp_init()
+{
+	/* Prevent this from happening more than once. */
+	init_once_racy(return);
+
+	uthread_mcp_init();
+	/* From here forward we are an MCP running on vcore 0. Could consider doing
+	 * other pthread specific initialization based on knowing we are an mcp
+	 * after this point. */
 }
 
 int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
                      void *(*start_routine)(void *), void *arg)
 {
 	struct uth_thread_attr uth_attr = {0};
-	run_once(pthread_lib_init());
-	/* Create the actual thread */
-	struct pthread_tcb *parent = (struct pthread_tcb*)current_uthread;
+	struct pthread_tcb *parent;
 	struct pthread_tcb *pthread;
-	int ret = posix_memalign((void**)&pthread, __alignof__(struct pthread_tcb),
-	                         sizeof(struct pthread_tcb));
+	int ret;
+
+	/* For now, unconditionally become an mcp when creating a pthread (if not
+	 * one already). This may change in the future once we support 2LSs in an
+	 * SCP. */
+	pthread_mcp_init();
+
+	parent = (struct pthread_tcb*)current_uthread;
+	ret = posix_memalign((void**)&pthread, __alignof__(struct pthread_tcb),
+	                     sizeof(struct pthread_tcb));
 	assert(!ret);
 	memset(pthread, 0, sizeof(struct pthread_tcb));	/* aggressively 0 for bugs*/
 	pthread->stacksize = PTHREAD_STACK_SIZE;	/* default */
@@ -849,7 +864,7 @@ void pthread_exit(void *ret)
 	struct pthread_tcb *pthread = pthread_self();
 	/* Some apps could call pthread_exit before initing.  This will slow down
 	 * our pthread exits slightly. */
-	pthread_lib_init();
+	pthread_mcs_init();
 	pthread->retval = ret;
 	destroy_dtls();
 	uthread_yield(FALSE, __pth_exit_cb, 0);
