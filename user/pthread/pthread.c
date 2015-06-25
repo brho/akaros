@@ -27,12 +27,6 @@ int threads_active = 0;
 atomic_t threads_total;
 bool can_adjust_vcores = TRUE;
 bool need_tls = TRUE;
-/* Libraries can call into pthreads before pthreads initializes.  Since our
- * init turns us into an MCP and since those calls can come very early in a
- * process's lifetime, we don't want to fully init the library, but we want to
- * handle the functions.  That is the purpose of the "pre_2ls" variables and
- * functions. */
-sigset_t pre_2ls_sigmask = 0;
 
 /* Array of per-vcore structs to manage waiting on syscalls and handling
  * overflow.  Init'd in pth_init(). */
@@ -620,7 +614,7 @@ void __attribute__((constructor)) pthread_lib_init(void)
 	t->state = PTH_RUNNING;
 	t->joiner = 0;
 	/* implies that sigmasks are longs, which they are. */
-	t->sigmask = pre_2ls_sigmask;
+	t->sigmask = 0;
 	__sigemptyset(&t->sigpending);
 	assert(t->id == 0);
 	t->sched_policy = SCHED_FIFO;
@@ -862,9 +856,6 @@ static void __pth_exit_cb(struct uthread *uthread, void *junk)
 void pthread_exit(void *ret)
 {
 	struct pthread_tcb *pthread = pthread_self();
-	/* Some apps could call pthread_exit before initing.  This will slow down
-	 * our pthread exits slightly. */
-	pthread_mcs_init();
 	pthread->retval = ret;
 	destroy_dtls();
 	uthread_yield(FALSE, __pth_exit_cb, 0);
@@ -885,12 +876,6 @@ static void __pth_yield_cb(struct uthread *uthread, void *junk)
 /* Cooperative yielding of the processor, to allow other threads to run */
 int pthread_yield(void)
 {
-	if (!in_multi_mode()) {
-		/* Some apps will call pthread_yield before becoming an MCP.  In these
-		 * cases, we just want to yield the processor. */
-		sched_yield();
-		return 0;
-	}
 	uthread_yield(TRUE, __pth_yield_cb, 0);
 	return 0;
 }
@@ -1293,12 +1278,7 @@ int pthread_sigmask(int how, const sigset_t *set, sigset_t *oset)
 		errno = EINVAL;
 		return -1;
 	}
-	/* Some libraries call sigmask before we've initialized the 2LS.  We'll
-	 * fake signal masking and delivery until then. */
-	if (in_multi_mode())
-		sigmask = &((struct pthread_tcb*)current_uthread)->sigmask;
-	else
-		sigmask = &pre_2ls_sigmask;
+	sigmask = &((struct pthread_tcb*)current_uthread)->sigmask;
 
 	if (oset)
 		*oset = *sigmask;
