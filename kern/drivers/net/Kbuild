@@ -1,6 +1,7 @@
 # need at least one obj file to build for Kbuild
 obj-y							+= dummy.o
 obj-$(CONFIG_BNX2X)				+= bnx2x/
+obj-$(CONFIG_MLX4_CORE)					+= mlx4/
 obj-y							+= ether8139.o
 obj-y							+= ether8169.o
 obj-y							+= ether82563.o
