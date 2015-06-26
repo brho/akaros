@@ -69,6 +69,13 @@ static inline unsigned long hweight_long(unsigned long w)
 	//return sizeof(w) == 4 ? hweight32(w) : hweight64(w);
 }
 
+static inline unsigned fls_long(unsigned long l)
+{
+	if (sizeof(l) == 4)
+		return fls(l);
+	return fls64(l);
+}
+
 // not used yet and I have other things I'm trying to do
 #if 0
 static inline bool BITMASK_IS_SET_IN_RANGE(uint8_t* m, size_t beg, size_t end)
