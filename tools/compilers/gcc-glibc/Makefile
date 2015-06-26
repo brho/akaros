@@ -401,8 +401,6 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	    $(SYSROOT)/usr/include/parlib/
 	cp -r $(ROSDIR)/user/pthread/*.h \
 	    $(SYSROOT)/usr/include/
-	rm -rf $(SYSROOT)/usr/include/arch
-	ln -s $(ROS_ARCH_DIR) $(SYSROOT)/usr/include/arch
 
 #################################
 ###### Dummy Libs Install #######
