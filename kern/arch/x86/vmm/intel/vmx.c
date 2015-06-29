@@ -549,13 +549,13 @@ static const struct vmxec vmentry = {
 	/* exact order from vmx.h; only the first two are enabled. */
 
 	.set_to_1 =  (VM_ENTRY_LOAD_DEBUG_CONTROLS | /* can't set to 0 */
+		      VM_ENTRY_LOAD_IA32_EFER |
 		      VM_ENTRY_IA32E_MODE),
 
 	.set_to_0 = (VM_ENTRY_SMM |
 		     VM_ENTRY_DEACT_DUAL_MONITOR |
 		     VM_ENTRY_LOAD_IA32_PERF_GLOBAL_CTRL |
-		     VM_ENTRY_LOAD_IA32_PAT |
-		     VM_ENTRY_LOAD_IA32_EFER),
+		     VM_ENTRY_LOAD_IA32_PAT),
 };
 
 static const struct vmxec vmexit = {
@@ -564,14 +564,14 @@ static const struct vmxec vmexit = {
 	.truemsr = MSR_IA32_VMX_TRUE_EXIT_CTLS,
 
 	.set_to_1 = (VM_EXIT_SAVE_DEBUG_CONTROLS | /* can't set to 0 */
+		     VM_EXIT_SAVE_IA32_EFER |
+		     VM_EXIT_LOAD_IA32_EFER |
 		     VM_EXIT_HOST_ADDR_SPACE_SIZE), /* 64 bit */
 
 	.set_to_0 = (VM_EXIT_LOAD_IA32_PERF_GLOBAL_CTRL |
 		     VM_EXIT_ACK_INTR_ON_EXIT |
 		     VM_EXIT_SAVE_IA32_PAT |
 		     VM_EXIT_LOAD_IA32_PAT |
-		     VM_EXIT_SAVE_IA32_EFER |
-		     VM_EXIT_LOAD_IA32_EFER |
 		     VM_EXIT_SAVE_VMX_PREEMPTION_TIMER),
 };
 
@@ -938,7 +938,7 @@ static void vmx_setup_initial_guest_state(void)
 	vmcs_writel(GUEST_CR4, cr4);
 	vmcs_writel(CR4_READ_SHADOW, cr4);
 	vmcs_writel(GUEST_IA32_EFER, EFER_LME | EFER_LMA |
-				     EFER_SCE | EFER_FFXSR);
+		    EFER_SCE /*| EFER_FFXSR*/);
 	vmcs_writel(GUEST_GDTR_BASE, 0);
 	vmcs_writel(GUEST_GDTR_LIMIT, 0);
 	vmcs_writel(GUEST_IDTR_BASE, 0);
@@ -1141,7 +1141,7 @@ static void vmx_setup_vmcs(struct vmx_vcpu *vcpu)
 	vmcs_write32(VM_EXIT_CONTROLS, vmcs_config.vmexit_ctrl);
 	vmcs_write32(VM_ENTRY_CONTROLS, vmcs_config.vmentry_ctrl);
 
-	vmcs_writel(CR0_GUEST_HOST_MASK, ~0ul);
+	vmcs_writel(CR0_GUEST_HOST_MASK, 0); // ~0ul);
 	vmcs_writel(CR4_GUEST_HOST_MASK, ~0ul);
 
 	//kvm_write_tsc(&vmx->vcpu, 0);
@@ -1472,6 +1472,8 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 			}
 		} else if (ret == EXIT_REASON_CR_ACCESS) {
 			show_cr_access(vmcs_read32(EXIT_QUALIFICATION));
+			vmx_dump_cpu(vcpu);
+			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
 		} else if (ret == EXIT_REASON_CPUID) {
 			vmx_handle_cpuid(vcpu);
 			vmx_get_cpu(vcpu);
@@ -1707,6 +1709,7 @@ int intel_vmm_init(void)
 	/* These are the only MSRs that are not autoloaded and not intercepted */
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE);
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE);
+	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_EFER);
 
 	if ((ret = ept_init())) {
 		printk("EPT init failed, %d\n", ret);
