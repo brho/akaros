@@ -175,6 +175,46 @@ static int autoloaded_msrs[] = {
 	MSR_SFMASK,
 };
 
+static char *cr_access_type[] = {
+	"move to cr",
+	"move from cr",
+	"clts",
+	"lmsw"
+};
+
+static char *cr_gpr[] = {
+	"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi",
+	"r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"
+};
+
+static int guest_cr_num[16] = {
+	GUEST_CR0,
+	-1,
+	-1,
+	GUEST_CR3,
+	GUEST_CR4,
+	-1,
+	-1,
+	-1,
+	-1, /* 8? */
+	-1, -1, -1, -1, -1, -1, -1
+};
+__always_inline unsigned long vmcs_readl(unsigned long field);
+/* See section 24-3 of The Good Book */
+void show_cr_access(uint64_t val) {
+	int crnr = val & 0xf;
+	int type = (val>>4) & 3;
+	int reg = (val >> 11) & 0xf;
+	printk("%s: %d: ", cr_access_type[type], crnr);
+	if (type < 2) {
+		printk("%s", cr_gpr[reg]);
+		if (guest_cr_num[crnr] > -1) {
+			printk(": 0x%x", vmcs_readl(guest_cr_num[crnr]));
+		}
+	}
+	printk("\n");
+}
+
 void ept_flush(uint64_t eptp)
 {
 	ept_sync_context(eptp);
@@ -1430,6 +1470,8 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 				vmx_dump_cpu(vcpu);
 				printd("system call! WTF\n");
 			}
+		} else if (ret == EXIT_REASON_CR_ACCESS) {
+			show_cr_access(vmcs_read32(EXIT_QUALIFICATION));
 		} else if (ret == EXIT_REASON_CPUID) {
 			vmx_handle_cpuid(vcpu);
 			vmx_get_cpu(vcpu);
