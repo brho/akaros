@@ -1414,6 +1414,10 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 		if (ret == EXIT_REASON_VMCALL) {
 			if (current->vmm.flags & VMM_VMCALL_PRINTF) {
 				uint8_t byte = vcpu->regs.tf_rdi;
+				printd("System call\n");
+#ifdef DEBUG
+				vmx_dump_cpu(vcpu);
+#endif
 				printk("%c", byte);
 				// adjust the RIP
 				vmx_get_cpu(vcpu);
@@ -1457,7 +1461,7 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 
 	printd("RETURN. ip %016lx sp %016lx\n",
 		vcpu->regs.tf_rip, vcpu->regs.tf_rsp);
-
+//	hexdump((void *)vcpu->regs.tf_rsp, 128 * 8);
 	/*
 	 * Return both the reason for the shutdown and a status value.
 	 * The exit() and exit_group() system calls only need 8 bits for

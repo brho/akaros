@@ -48,13 +48,13 @@ int main(int argc, char **argv)
 {
 	int amt;
 	int vmmflags = VMM_VMCALL_PRINTF;
-	uint64_t entry = 0x101000c, kerneladdress = 0x1010000;
+	uint64_t entry = 0x1000000, kerneladdress = 0x1000000;
 	int nr_gpcs = 1;
 	int fd = open("#cons/sysctl", O_RDWR), ret;
 	void * x;
 	int kfd = -1;
 	static char cmd[512];
-	void *coreboot_tables;
+	void *coreboot_tables = (void *) 0x1165000;
 	/* kernel has to be in the range 16M to 64M for now. */
 	// mmap is not working for us at present.
 	if ((uint64_t)_kernel > 16*1048576) {
@@ -69,6 +69,7 @@ int main(int argc, char **argv)
 	}
 	argc--,argv++;
 	// switches ...
+	// Sorry, I don't much like the gnu opt parsing code.
 	while (1) {
 		if (*argv[0] != '-')
 			break;
@@ -83,10 +84,11 @@ int main(int argc, char **argv)
 		argc--,argv++;
 	}
 	if (argc < 1) {
-		fprintf(stderr, "Usage: %s vmimage coreboot_tables [loadaddress [entrypoint]]\n", argv[0]);
+		fprintf(stderr, "Usage: %s vmimage [-n (no vmcall printf)] [coreboot_tables [loadaddress [entrypoint]]]\n", argv[0]);
 		exit(1);
 	}
-	coreboot_tables = (void *) strtoull(argv[1], 0, 0);
+	if (argc > 1)
+		coreboot_tables = (void *) strtoull(argv[1], 0, 0);
 	if (argc > 2)
 		kerneladdress = strtoull(argv[2], 0, 0);
 	if (argc > 3)
@@ -175,8 +177,11 @@ int main(int argc, char **argv)
 	p1 = &p512[512];
 	p2m = &p512[1024];
 	uint64_t kernbase = 0; //0xffffffff80000000;
+	uint64_t highkernbase = 0xffffffff80000000;
 	p512[PML4(kernbase)] = (unsigned long long)p1 | 7;
 	p1[PML3(kernbase)] = /*0x87; */(unsigned long long)p2m | 7;
+	p512[PML4(highkernbase)] = (unsigned long long)p1 | 7;
+	p1[PML3(highkernbase)] = /*0x87; */(unsigned long long)p2m | 7;
 #define _2MiB (0x200000)
 	int i;
 	for (i = 0; i < 512; i++) {
