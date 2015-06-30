@@ -1057,6 +1057,11 @@ static void dumpmsrs(void)
 	printk("core id %d\n", core_id());
 }
 
+int
+msrio(struct vmx_vcpu *vcpu, int opcode, int qual)
+{
+	return -1;
+}
 /* Notes on autoloading.  We can't autoload FS_BASE or GS_BASE, according to the
  * manual, but that's because they are automatically saved and restored when all
  * of the other architectural registers are saved and restored, such as cs, ds,
@@ -1488,6 +1493,12 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 		} else if (ret == EXIT_REASON_EXTERNAL_INTERRUPT) {
 			printd("External interrupt\n");
 			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
+		} else if (ret == EXIT_REASON_MSR_READ) {
+			printd("msr read\n");
+			vcpu->shutdown = msrio(vcpu, ret, vmcs_read32(EXIT_QUALIFICATION));
+		} else if (ret == EXIT_REASON_MSR_WRITE) {
+			printd("msr write\n");
+			vcpu->shutdown = msrio(vcpu, ret, vmcs_read32(EXIT_QUALIFICATION));
 		} else {
 			printk("unhandled exit: reason 0x%x, exit qualification 0x%x\n",
 			       ret, vmcs_read32(EXIT_QUALIFICATION));
