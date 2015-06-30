@@ -480,7 +480,6 @@ static const struct vmxec cb2ec = {
 	.truemsr = MSR_IA32_VMX_PROCBASED_CTLS2,
 
 	.set_to_1 = (SECONDARY_EXEC_ENABLE_EPT |
-		     SECONDARY_EXEC_RDTSCP |
 		     SECONDARY_EXEC_WBINVD_EXITING),
 
 	.set_to_0 = (SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
@@ -497,6 +496,9 @@ static const struct vmxec cb2ec = {
 		     SECONDARY_EXEC_SHADOW_VMCS |
 		     SECONDARY_EXEC_RDSEED_EXITING |
 		     SECONDARY_EPT_VE |
+		     /* TODO: re enable this via a "Want" struct
+			member at some point */
+		     SECONDARY_EXEC_RDTSCP |
 		     SECONDARY_ENABLE_XSAV_RESTORE)
 };
 
