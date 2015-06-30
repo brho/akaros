@@ -1939,7 +1939,7 @@ intreg_t sys_nmount(struct proc *p,
 	char *t_ontopath = copy_in_path(p, onto_path, onto_l);
 	if (t_ontopath == NULL)
 		return -1;
-	ret = sysmount(fd, afd, t_ontopath, flag, /* spec or auth */"");
+	ret = sysmount(fd, afd, t_ontopath, flag, /* spec or auth */"/");
 	free_path(p, t_ontopath);
 	return ret;
 }
