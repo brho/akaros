@@ -1142,7 +1142,7 @@ static void vmx_setup_vmcs(struct vmx_vcpu *vcpu)
 	vmcs_write32(VM_ENTRY_CONTROLS, vmcs_config.vmentry_ctrl);
 
 	vmcs_writel(CR0_GUEST_HOST_MASK, 0); // ~0ul);
-	vmcs_writel(CR4_GUEST_HOST_MASK, ~0ul);
+	vmcs_writel(CR4_GUEST_HOST_MASK, 0); // ~0ul);
 
 	//kvm_write_tsc(&vmx->vcpu, 0);
 	vmcs_writel(TSC_OFFSET, 0);
@@ -1379,7 +1379,7 @@ static void vmx_handle_cpuid(struct vmx_vcpu *vcpu)
 
 	eax = vcpu->regs.tf_rax;
 	ecx = vcpu->regs.tf_rcx;
-	cpuid(0, 2, &eax, &ebx, &ecx, &edx);
+	cpuid(eax, ecx, &eax, &ebx, &ecx, &edx);
 	vcpu->regs.tf_rax = eax;
 	vcpu->regs.tf_rbx = ebx;
 	vcpu->regs.tf_rcx = ecx;
