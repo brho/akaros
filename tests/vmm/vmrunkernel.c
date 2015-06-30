@@ -128,7 +128,7 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	mcp = 1; //argc - 1;
+	mcp = 0; //argc - 1;
 	if (mcp) {
 		my_threads = malloc(sizeof(pthread_t) * nr_threads);
 		my_retvals = malloc(sizeof(void*) * nr_threads);
