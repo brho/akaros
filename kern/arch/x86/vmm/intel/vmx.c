@@ -611,8 +611,9 @@ static void setup_vmcs_config(void *p)
 	                          &vmcs_conf->pin_based_exec_ctrl);
 	ok = check_vmxec_controls(&cbec, have_true_msrs,
 	                          &vmcs_conf->cpu_based_exec_ctrl) && ok;
-	ok = check_vmxec_controls(&cb2ec, have_true_msrs,
-	                          &vmcs_conf->cpu_based_2nd_exec_ctrl) && ok;
+	/* Only check cb2ec if we're still ok, o/w we may GPF */
+	ok = ok && check_vmxec_controls(&cb2ec, have_true_msrs,
+	                                &vmcs_conf->cpu_based_2nd_exec_ctrl);
 	ok = check_vmxec_controls(&vmentry, have_true_msrs,
 	                          &vmcs_conf->vmentry_ctrl) && ok;
 	ok = check_vmxec_controls(&vmexit, have_true_msrs,
