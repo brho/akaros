@@ -1,4 +1,4 @@
-#define DEBUG
+//#define DEBUG
 /**
  *  vmx.c - The Intel VT-x driver for Dune
  *
@@ -1063,14 +1063,17 @@ static void dumpmsrs(void)
 struct emmsr {
 	uint32_t reg;
 	int (*f)(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t, uint32_t);
+	bool written;
+	uint32_t edx, eax;
 };
 
 int emsr_misc_enable(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t, uint32_t);
 int emsr_readonly(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t, uint32_t);
+int emsr_fakewrite(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t, uint32_t);
 
 struct emmsr emmsrs[] = {
 	{MSR_IA32_MISC_ENABLE, emsr_misc_enable},
-	{MSR_IA32_UCODE_REV, emsr_readonly},
+	{MSR_IA32_UCODE_REV, emsr_fakewrite},
 };
 
 #define set_low32(hi,lo) (((hi) & 0xffffffff00000000ULL ) | (lo))
@@ -1105,8 +1108,36 @@ int emsr_readonly(struct vmx_vcpu *vcpu, struct emmsr *msr, uint32_t opcode, uin
 		/* if they are writing what is already written, that's ok. */
 		if (((uint32_t)vcpu->regs.tf_rax == eax) && ((uint32_t)vcpu->regs.tf_rdx == edx))
 			return 0;
+		printk("%s write 0x%lx failed: msr is (0x%lx,0x%lx) and wanted (0x%lx,0x%lx)\n",
+			__func__, vcpu->regs.tf_rcx, edx, eax, (uint32_t)vcpu->regs.tf_rdx, (uint32_t)vcpu->regs.tf_rax);
 	}
 	return SHUTDOWN_UNHANDLED_EXIT_REASON;
+}
+
+/* pretend to write it, but don't write it. */
+int emsr_fakewrite(struct vmx_vcpu *vcpu, struct emmsr *msr, uint32_t opcode, uint32_t qual)
+{
+	uint32_t eax, edx;
+	if (! msr->written) {
+		rdmsr(MSR_IA32_MISC_ENABLE, eax, edx);
+	} else {
+		edx = msr->edx;
+		eax = msr->eax;
+	}
+	/* we just let them read the misc msr for now. */
+	if (opcode == EXIT_REASON_MSR_READ) {
+		vcpu->regs.tf_rax = set_low32(vcpu->regs.tf_rax, eax);
+		vcpu->regs.tf_rdx = set_low32(vcpu->regs.tf_rdx, edx);
+		return 0;
+	} else {
+		/* if they are writing what is already written, that's ok. */
+		if (((uint32_t)vcpu->regs.tf_rax == eax) && ((uint32_t)vcpu->regs.tf_rdx == edx))
+			return 0;
+		msr->edx = vcpu->regs.tf_rdx;
+		msr->eax = vcpu->regs.tf_rax;
+		msr->written = true;
+	}
+	return 0;
 }
 
 int
@@ -1118,6 +1149,7 @@ msrio(struct vmx_vcpu *vcpu, uint32_t opcode, uint32_t qual)
 			continue;
 		return emmsrs[i].f(vcpu, &emmsrs[i], opcode, qual);
 	}
+	printk("msrio for 0x%lx failed\n", vcpu->regs.tf_rcx);
 	return SHUTDOWN_UNHANDLED_EXIT_REASON;
 }
 /* Notes on autoloading.  We can't autoload FS_BASE or GS_BASE, according to the
