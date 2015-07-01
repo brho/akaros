@@ -1,4 +1,4 @@
-//#define DEBUG
+#define DEBUG
 /**
  *  vmx.c - The Intel VT-x driver for Dune
  *
@@ -1057,10 +1057,68 @@ static void dumpmsrs(void)
 	printk("core id %d\n", core_id());
 }
 
-int
-msrio(struct vmx_vcpu *vcpu, int opcode, int qual)
+/* emulated msr. For now, an msr value and a pointer to a helper that
+ * performs the requested operation.
+ */
+struct emmsr {
+	uint32_t reg;
+	int (*f)(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t, uint32_t);
+};
+
+int emsr_misc_enable(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t, uint32_t);
+int emsr_readonly(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t, uint32_t);
+
+struct emmsr emmsrs[] = {
+	{MSR_IA32_MISC_ENABLE, emsr_misc_enable},
+	{MSR_IA32_UCODE_REV, emsr_readonly},
+};
+
+#define set_low32(hi,lo) (((hi) & 0xffffffff00000000ULL ) | (lo))
+int emsr_misc_enable(struct vmx_vcpu *vcpu, struct emmsr *msr, uint32_t opcode, uint32_t qual)
 {
-	return -1;
+	uint32_t eax, edx;
+	rdmsr(MSR_IA32_MISC_ENABLE, eax, edx);
+	/* we just let them read the misc msr for now. */
+	if (opcode == EXIT_REASON_MSR_READ) {
+		vcpu->regs.tf_rax = set_low32(vcpu->regs.tf_rax, eax);
+		vcpu->regs.tf_rdx = set_low32(vcpu->regs.tf_rdx, edx);
+		return 0;
+	} else {
+		/* if they are writing what is already written, that's ok. */
+		if (((uint32_t)vcpu->regs.tf_rax == eax) && ((uint32_t)vcpu->regs.tf_rdx == edx))
+			return 0;
+	}
+	return SHUTDOWN_UNHANDLED_EXIT_REASON;
+}
+
+/* return what's there. Let them think they are writing it if they are not changing anything. */
+int emsr_readonly(struct vmx_vcpu *vcpu, struct emmsr *msr, uint32_t opcode, uint32_t qual)
+{
+	uint32_t eax, edx;
+	rdmsr((uint32_t)vcpu->regs.tf_rcx, eax, edx);
+	/* we just let them read the misc msr for now. */
+	if (opcode == EXIT_REASON_MSR_READ) {
+		vcpu->regs.tf_rax = set_low32(vcpu->regs.tf_rax, eax);
+		vcpu->regs.tf_rdx = set_low32(vcpu->regs.tf_rdx, edx);
+		return 0;
+	} else {
+		/* if they are writing what is already written, that's ok. */
+		if (((uint32_t)vcpu->regs.tf_rax == eax) && ((uint32_t)vcpu->regs.tf_rdx == edx))
+			return 0;
+	}
+	return SHUTDOWN_UNHANDLED_EXIT_REASON;
+}
+
+int
+msrio(struct vmx_vcpu *vcpu, uint32_t opcode, uint32_t qual)
+{
+	int i;
+	for (i = 0; i < ARRAY_SIZE(emmsrs); i++) {
+		if (emmsrs[i].reg != vcpu->regs.tf_rcx)
+			continue;
+		return emmsrs[i].f(vcpu, &emmsrs[i], opcode, qual);
+	}
+	return SHUTDOWN_UNHANDLED_EXIT_REASON;
 }
 /* Notes on autoloading.  We can't autoload FS_BASE or GS_BASE, according to the
  * manual, but that's because they are automatically saved and restored when all
@@ -1418,6 +1476,7 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 	int ret;
 	struct vmx_vcpu *vcpu;
 	int errors = 0;
+	int advance;
 
 	printd("RUNNING: %s: rip %p rsp %p cr3 %p \n",
 	       __func__, rip, rsp, cr3);
@@ -1444,6 +1503,7 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 	vcpu->ret_code = -1;
 
 	while (1) {
+		advance = 0;
 		vmx_get_cpu(vcpu);
 
 		// TODO: manage the fpu when we restart.
@@ -1463,11 +1523,9 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 #ifdef DEBUG
 				vmx_dump_cpu(vcpu);
 #endif
+				advance = 3;
 				printk("%c", byte);
 				// adjust the RIP
-				vmx_get_cpu(vcpu);
-				vmcs_writel(GUEST_RIP, vcpu->regs.tf_rip + 3);
-				vmx_put_cpu(vcpu);
 			} else {
 				vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
 				uint8_t byte = vcpu->regs.tf_rdi;
@@ -1495,10 +1553,14 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
 		} else if (ret == EXIT_REASON_MSR_READ) {
 			printd("msr read\n");
+			vmx_dump_cpu(vcpu);
 			vcpu->shutdown = msrio(vcpu, ret, vmcs_read32(EXIT_QUALIFICATION));
+			advance = 2;
 		} else if (ret == EXIT_REASON_MSR_WRITE) {
 			printd("msr write\n");
+			vmx_dump_cpu(vcpu);
 			vcpu->shutdown = msrio(vcpu, ret, vmcs_read32(EXIT_QUALIFICATION));
+			advance = 2;
 		} else {
 			printk("unhandled exit: reason 0x%x, exit qualification 0x%x\n",
 			       ret, vmcs_read32(EXIT_QUALIFICATION));
@@ -1509,9 +1571,14 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3)
 		/* TODO: we can't just return and relaunch the VMCS, in case we blocked.
 		 * similar to how proc_restartcore/smp_idle only restart the pcpui
 		 * cur_ctx, we need to do the same, via the VMCS resume business. */
-
 		if (vcpu->shutdown)
 			break;
+
+		if (advance) {
+			vmx_get_cpu(vcpu);
+			vmcs_writel(GUEST_RIP, vcpu->regs.tf_rip + advance);
+			vmx_put_cpu(vcpu);
+		}
 	}
 
 	printd("RETURN. ip %016lx sp %016lx\n",
