@@ -1,28 +1,6 @@
 # Number of make jobs to spawn.  Define it in Makelocal
 MAKE_JOBS :=
 
-# Defines where to install the toolchain
--include Makelocal
-
-ifndef RISCV_INSTDIR
-ifndef X86_64_INSTDIR
-ifndef X86_64_NATIVE_INSTDIR
-busted: 
-	@echo "You need to setup either a RISCV_INSTDIR or an X86_64_INSTDIR to point to where you want the tools installed. The best way to do this is to create a 'Makelocal' file in the current directory and put it in there."; false
-riscv: busted
-x86_64: busted
-x86_64-native: busted
-endif
-endif 
-endif 
-
-# Check to make sure that we have gawk installed on our system and not some
-# other version of awk
-AWK := $(shell awk -W version 2>&1 | head -n 1 | awk '{print $$1}')
-ifneq ($(AWK),GNU)
-$(error You need to have 'gawk' installed on your system!)
-endif
-
 BINUTILS_VERSION := 2.24
 GCC_VERSION := 4.9.2
 GLIBC_VERSION := 2.19
@@ -30,126 +8,178 @@ GMP_VERSION := 5.1.3
 MPFR_VERSION := 3.1.2
 MPC_VERSION := 1.0.2
 
+# Defines where to install the toolchain
+-include Makelocal
+
+define print-usage
+	@echo "Usage: make <arch> [ <config> ] [ <subcmd> ] "
+	@echo "    Valid archs are: 'x86_64', 'riscv'"
+	@echo "    Valid configs are: 'cross', 'native'"
+	@echo "    Valid subcommands are: 'build', 'uninstall'"
+	@echo "    If no config is specified, the 'cross' config is assumed by default."
+	@echo "    If no subcommand is specified, the 'build' subcommand is assumed by default."
+	@echo ""
+	@echo "Additional pseudo targets exist for:"
+	@echo "    make clean"
+	@echo "        Cleanup the build environment"
+	@echo "    make inst-clean"
+	@echo "        Cleanup the build environment and uninstall all compilers for all archs."
+endef
+
+# Make sure the list of targets is sane!
+ifndef AKAROS_COMPILER_REAL_BUILD
+VALID_ARCHS := x86_64 riscv
+VALID_CONFIGS := cross native
+VALID_SUBCMDS := build uninstall
+VALID_CLEANS := clean inst-clean
+VALID_TARGETS := $(VALID_ARCHS) $(VALID_CONFIGS) \
+                 $(VALID_SUBCMDS) $(VALID_CLEANS)
+ARCH := $(filter $(VALID_ARCHS),$(MAKECMDGOALS))
+CONFIG := $(filter $(VALID_CONFIGS),$(MAKECMDGOALS))
+SUBCMDS := $(filter $(VALID_SUBCMDS),$(MAKECMDGOALS))
+CLEANS := $(filter $(VALID_CLEANS),$(MAKECMDGOALS))
+INVALID_TARGETS := $(filter-out $(VALID_TARGETS),$(MAKECMDGOALS))
+NONCLEANGOALS := $(filter-out $(CLEANS),$(MAKECMDGOALS))
+ifeq ($(words $(CONFIG)),0)
+    CONFIG := cross
+endif
+ifeq ($(words $(SUBCMDS)),0)
+    SUBCMDS := build
+endif
+
+.PHONY: $(VALID_TARGETS)
+
+OK_TO_BUILD :=
+ifeq ($(words $(ARCH)),1)
+    ifeq ($(words $(CONFIG)),1)
+        ifeq ($(INVALID_TARGETS),)
+            OK_TO_BUILD := 1
+        endif
+    endif
+endif
+ifeq ($(OK_TO_BUILD),)
+all $(NONCLEANGOALS): make-real
+	@echo "" > /dev/null
+make-real:
+	$(print-usage)
+else
+all $(NONCLEANGOALS): make-real
+	@echo "" > /dev/null
+make-real:
+	@export AKAROS_COMPILER_REAL_BUILD=true; \
+	 export ARCH=$(ARCH); \
+	 export CONFIG=$(CONFIG); \
+	 $(MAKE) --no-print-directory $(patsubst %, %-real, $(SUBCMDS))
+endif
+
+clean:
+	@rm -rf binutils-$(BINUTILS_VERSION)
+	@rm -rf gcc-$(GCC_VERSION)
+	@rm -rf glibc-$(GLIBC_VERSION)
+	@rm -rf gmp-$(GMP_VERSION)
+	@rm -rf mpfr-$(MPFR_VERSION)
+	@rm -rf mpc-$(MPC_VERSION)
+	@rm -rf *-builddir
+	@rm -rf .*-configure
+	@rm -rf .glibc-$(GLIBC_VERSION)-akaros.patch
+	@rm -rf .gcc-$(GCC_VERSION)-akaros.patch
+	@echo "    Removed configs, build dirs, and extracted sources"
+
+inst-clean: clean
+	@for a in $(VALID_ARCHS); do \
+		for c in $(VALID_CONFIGS); do \
+			$(MAKE) --no-print-directory $$a $$c uninstall > /dev/null; \
+			echo "    Removed $$a-$$c-inst"; \
+		done \
+	done
+
+else # AKAROS_COMPILER_REAL_BUILD
+
+# Set up some global variables to help us through the make based on the
+# platform we are building for.
+ifeq ($(ARCH),x86_64)
+    AKAROS_ARCH_DIR := x86
+    ARCH_CFLAGS :=
+    GLIBC_CONFIGURE_FLAGS := "--disable-multi-arch"
+    GCC_BUILD_FLAGS := CFLAGS="-fPIC"
+endif
+ifeq ($(ARCH),riscv)
+    AKAROS_ARCH_DIR := riscv
+    ARCH_CFLAGS :=
+    GLIBC_CONFIGURE_FLAGS := 
+    GCC_BUILD_FLAGS :=
+endif
+ifeq ($(CONFIG),cross)
+    INSTDIR_STRING := $(shell echo $(ARCH) | tr 'a-z' 'A-Z')_INSTDIR
+else
+    INSTDIR_STRING := $(shell echo $(ARCH) | tr 'a-z' 'A-Z')_NATIVE_INSTDIR
+    CXXROOT := $(shell dirname $(shell which $(ARCH)-ucb-akaros-gcc) 2>/dev/null)/..
+endif
 BUILDDIR ?= $(shell pwd)/
-ROSDIR ?= $(BUILDDIR)/../../../
-DESTDIR ?= /
+AKAROSDIR ?= $(BUILDDIR)/../../../
+INSTDIR := $($(INSTDIR_STRING))
+BINARY_PREFIX := $(ARCH)-ucb-akaros-
+SYSROOT := $(INSTDIR)/$(ARCH)-ucb-akaros/sysroot
+PATH := /$(INSTDIR)/bin:$(PATH)
 
-# Configuration parameters for make-riscv
-RISCV_ARCH := riscv
-RISCV_BINARY_PREFIX := $(RISCV_ARCH)-ucb-akaros-
-RISCV_SYSROOT := $(RISCV_INSTDIR)/$(RISCV_ARCH)-ucb-akaros/sysroot
-RISCV_GLIBC_CONFIGURE_FLAGS := 
-RISCV_GCC_BUILD_FLAGS := 
-RISCV_CFLAGS :=
-
-# Configuration parameters for x86_64
-X86_64_ARCH := x86_64
-X86_64_BINARY_PREFIX := $(X86_64_ARCH)-ucb-akaros-
-X86_64_SYSROOT := $(X86_64_INSTDIR)/$(X86_64_ARCH)-ucb-akaros/sysroot
-X86_64_GLIBC_CONFIGURE_FLAGS := "--disable-multi-arch"
-X86_64_GCC_BUILD_FLAGS := CFLAGS="-fPIC"
-X86_64_CFLAGS :=
-
-# Configuration parameters for x86_64-native
-X86_64_NATIVE_ARCH := x86_64
-X86_64_NATIVE_BINARY_PREFIX := 
-X86_64_NATIVE_SYSROOT := $(X86_64_NATIVE_INSTDIR)
-X86_64_NATIVE_GCC_BUILD_FLAGS := CFLAGS="-fPIC"
-X86_64_NATIVE_CFLAGS :=
-
-#If actually building the cross compiler, make sure that the akaros tree is
-#properly configured for the architecture we are creating the cross compiler
-#for.
-ifneq (,$(filter riscv,$(MAKECMDGOALS)))
-ifeq (,$(shell grep "CONFIG_RISCV=y" $(ROSDIR)/.config))
-error: 
-	@echo "Akaros tree not configured for riscv"
-	@echo "Make sure you have configured ROSDIR for this architecture before proceeding"
-	@echo "e.g. cd \$$ROSDIR"
-	@echo "     make ARCH=riscv defconfig"
-	@false
-riscv: error
+# Check for additional errors before building
+AWK := $(shell awk -W version 2>&1 | head -n 1 | awk '{print $$1}')
+ifneq ($(AWK),GNU)
+define BUILD_ERROR
+    You need to have 'gawk' installed on your system before proceeding!"
+endef
+endif
+ifeq ($(INSTDIR),)
+define BUILD_ERROR
+    You need to setup $(INSTDIR_STRING), to point to where you
+    want your compiler installed. The best way to do this is to create
+    a 'Makelocal' file in the current directory and put a definition
+    for this variable in there.
+endef
+endif 
+ifeq ($(CONFIG),native)
+ifeq ($(shell which $(ARCH)-ucb-akaros-gcc),)
+define BUILD_ERROR
+    No $(ARCH) Akaros cross-compiler installed in path. Make sure you have
+    built and installed the $(ARCH) cross-compiler using 'make $(ARCH)'
+    before trying to build the crossed-native compiler.
+endef
 endif
 endif
-ifneq (,$(filter x86_64,$(MAKECMDGOALS)))
-ifeq (,$(shell grep "CONFIG_X86_64=y" $(ROSDIR)/.config))
-error: 
-	@echo "Akaros tree not configured for x86_64"
-	@echo "Make sure you have configured ROSDIR for this architecture before proceeding"
-	@echo "e.g. cd \$$ROSDIR"
-	@echo "     make ARCH=x86 defconfig"
-	@echo "     make ARCH=x86 menuconfig -> Set 64 bit option"
-	@false
-x86_64: error
+ifeq ($(ARCH),riscv)
+ifeq ($(shell grep "CONFIG_RISCV=y" $(AKAROSDIR)/.config),)
+define BUILD_ERROR
+    Akaros tree not configured for $(ARCH)
+    Make sure you have configured AKAROSDIR for this architecture before proceeding
+    e.g. cd \$$AKAROSDIR
+         make ARCH=riscv defconfig
+endef
 endif
 endif
-ifneq (,$(filter x86_64-native,$(MAKECMDGOALS)))
-ifeq (,$(shell which x86_64-ucb-akaros-gcc))
-error: 
-	@echo "No x86_64 Akaros cross-compiler installed in path"
-	@echo "Make sure you have built and installed the x86_64 cross-compiler using 'make x86_64'
-	@echo "before trying to build the crossed-native compiler.
-	@false
-x86_64: error
+ifeq ($(ARCH),x86_64)
+ifeq ($(shell grep "CONFIG_X86_64=y" $(AKAROSDIR)/.config),)
+define BUILD_ERROR
+    Akaros tree not configured for x86_64
+    Make sure you have configured AKAROSDIR for this architecture before proceeding
+    e.g. cd \$$AKAROSDIR
+         make ARCH=x86 defconfig
+         make ARCH=x86 menuconfig -> Set 64 bit option
+endef
 endif
 endif
 
-all:
-	@echo "You need to run one of the following commands, "
-	@echo "depending on which version of the cross compiler you are trying to generate:"
-	@echo "  make riscv"
-	@echo "  make x86_64"
-	@echo "  make x86-64-native"
-	@echo "  make riscv-revert"
-	@echo "  make x86_64-revert"
-	@echo "  make x86_64-native-revert"
-	@echo "  make riscv-uninstall"
-	@echo "  make x86_64-uninstall"
-	@echo "  make x86_64-native-uninstall"
-	@echo "  make clean"
-	@echo "  make inst-clean"
+ifdef BUILD_ERROR
 
-riscv:
-	export LD_LIBRARY_PATH=; \
-	export DESTDIR=$(DESTDIR);\
-	export INSTDIR=$(RISCV_INSTDIR);\
-	export SYSROOT=$(RISCV_SYSROOT);\
-	export PATH=$(DESTDIR)$(RISCV_INSTDIR)/bin:$(PATH);\
-	export ARCH=$(RISCV_ARCH);\
-	export ARCH_CFLAGS=$(RISCV_CFLAGS);\
-	export ROS_ARCH_DIR=$(RISCV_ARCH);\
-	export BINARY_PREFIX=$(RISCV_BINARY_PREFIX);\
-	export GLIBC_CONFIGURE_FLAGS=$(RISCV_GLIBC_CONFIGURE_FLAGS);\
-	export GCC_BUILD_FLAGS=$(RISCV_GCC_BUILD_FLAGS);\
-	$(MAKE) make-all
+export BUILD_ERROR
+$(MAKECMDGOALS): make-real
+	@echo "" > /dev/null
+make-real:
+	@echo "$${BUILD_ERROR}"
 
-x86_64:
-	export LD_LIBRARY_PATH=; \
-	export DESTDIR=$(DESTDIR);\
-	export INSTDIR=$(X86_64_INSTDIR);\
-	export SYSROOT=$(X86_64_SYSROOT);\
-	export PATH=$(DESTDIR)$(X86_64_INSTDIR)/bin:$(PATH);\
-	export ARCH=$(X86_64_ARCH);\
-	export ARCH_CFLAGS=$(X86_64_CFLAGS);\
-	export ROS_ARCH_DIR=x86;\
-	export BINARY_PREFIX=$(X86_64_BINARY_PREFIX);\
-	export GLIBC_CONFIGURE_FLAGS=$(X86_64_GLIBC_CONFIGURE_FLAGS);\
-	export GCC_BUILD_FLAGS=$(X86_64_GCC_BUILD_FLAGS);\
-	$(MAKE) make-all
+else # BUILD_ERROR
 
-x86_64-native:
-	export NATIVE_BUILD=true; \
-	export LD_LIBRARY_PATH=; \
-	export DESTDIR=$(DESTDIR);\
-	export INSTDIR=$(X86_64_NATIVE_INSTDIR);\
-	export SYSROOT=$(X86_64_NATIVE_SYSROOT);\
-	export ARCH=$(X86_64_NATIVE_ARCH);\
-	export BINARY_PREFIX=$(X86_64_NATIVE_BINARY_PREFIX);\
-	export GCC_BUILD_FLAGS=$(X86_64_NATIVE_GCC_BUILD_FLAGS);\
-	export CXXROOT=$(shell dirname $(shell which $(X86_64_NATIVE_ARCH)-ucb-akaros-gcc))/..; \
-	$(MAKE) make-native-all
-
-make-all: 
+ifeq ($(CONFIG),cross)
+build-real:
 	$(MAKE) .$(BINARY_PREFIX)binutils-install
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage1-install
 	$(MAKE) .$(BINARY_PREFIX)akaros-headers-install
@@ -162,34 +192,15 @@ make-all:
 	$(MAKE) .$(BINARY_PREFIX)gmp-install
 	$(MAKE) .$(BINARY_PREFIX)mpfr-install
 	$(MAKE) .$(BINARY_PREFIX)mpc-install
-
-make-native-all:
+else
+build-real:
 	$(MAKE) .$(BINARY_PREFIX)binutils-install
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage3-install
+endif
 
-riscv-uninstall:
-	@rm -rf $(RISCV_INSTDIR)
-	@echo "Removed $(RISCV_INSTDIR) (riscv-inst)"
-
-x86_64-uninstall:
-	@rm -rf $(X86_64_INSTDIR)
-	@echo "Removed $(X86_64_INSTDIR) (x86_64-inst)"
-
-x86_64-native-uninstall:
-	@rm -rf $(X86_64_NATIVE_INSTDIR)
-	@echo "Removed $(X86_64_NATIVE_INSTDIR) (x86_64-native-inst)"
-
-riscv-revert:
-	rm -rf $(RISCV_INSTDIR)
-	cp -r $(RISCV_BINARY_PREFIX)install.bak $(RISCV_INSTDIR)
-
-x86_64-revert: 
-	rm -rf $(X86_64_INSTDIR)
-	cp -r $(X86_64_BINARY_PREFIX)install.bak $(X86_64_INSTDIR)
-
-x86_64-native-revert: 
-	rm -rf $(X86_64_NATIVE_INSTDIR)
-	cp -r $(X86_64_NATIVE_BINARY_PREFIX)install.bak $(X86_64_NATIVE_INSTDIR)
+uninstall-real:
+	@rm -rf $(INSTDIR)
+	@echo "    Removed $(INSTDIR) ($(ARCH)-$(CONFIG)-inst)"
 
 %.tar.bz2:
 	wget http://akaros.cs.berkeley.edu/xcc/$@
@@ -246,7 +257,7 @@ cross-binutils-configure:
 
 .$(BINARY_PREFIX)binutils-configure: 
 	$(MAKE) $(BINARY_PREFIX)binutils-builddir 
-	if [ "$(NATIVE_BUILD)" = "true" ]; then \
+	if [ "$(CONFIG)" = "native" ]; then \
 		$(MAKE) native-binutils-configure; \
 	else \
 		$(MAKE) cross-binutils-configure; \
@@ -387,19 +398,19 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 ####################################
 ######### AKAROS Headers ###########
 ####################################
-.$(BINARY_PREFIX)akaros-headers-install: $(ROSDIR)
+.$(BINARY_PREFIX)akaros-headers-install: $(AKAROSDIR)
 	rm -rf $(SYSROOT)/usr/include/*
 	mkdir -p $(SYSROOT)/usr/include
-	cp -r $(ROSDIR)/kern/include/ros \
+	cp -r $(AKAROSDIR)/kern/include/ros \
 	    $(SYSROOT)/usr/include/
 	rm -f $(SYSROOT)/usr/include/ros/arch
 	mkdir $(SYSROOT)/usr/include/ros/arch
-	cp -r $(ROSDIR)/kern/arch/$(ROS_ARCH_DIR)/ros/* \
+	cp -r $(AKAROSDIR)/kern/arch/$(AKAROS_ARCH_DIR)/ros/* \
 	    $(SYSROOT)/usr/include/ros/arch/
 	mkdir -p $(SYSROOT)/usr/include/parlib
-	cp -r $(ROSDIR)/user/parlib/include/* \
+	cp -r $(AKAROSDIR)/user/parlib/include/* \
 	    $(SYSROOT)/usr/include/parlib/
-	cp -r $(ROSDIR)/user/pthread/*.h \
+	cp -r $(AKAROSDIR)/user/pthread/*.h \
 	    $(SYSROOT)/usr/include/
 
 #################################
@@ -533,9 +544,9 @@ $(BINARY_PREFIX)glibc-stage2-builddir: glibc-$(GLIBC_VERSION)
 ####### AKAROS Libs Install #######
 ###################################
 .$(BINARY_PREFIX)akaros-libs-install:
-	cd $(ROSDIR); \
-	make ARCH=$(ROS_ARCH_DIR) userclean; \
-	make ARCH=$(ROS_ARCH_DIR) -j $(MAKE_JOBS) install-libs
+	cd $(AKAROSDIR); \
+	make ARCH=$(AKAROS_ARCH_DIR) userclean; \
+	make ARCH=$(AKAROS_ARCH_DIR) -j $(MAKE_JOBS) install-libs
 
 ##################################
 ########### Gcc Stage 3 ##########
@@ -609,7 +620,7 @@ cross-gcc-stage3-configure:
 
 .$(BINARY_PREFIX)gcc-stage3-configure:
 	$(MAKE) $(BINARY_PREFIX)gcc-stage3-builddir
-	if [ "$(NATIVE_BUILD)" = "true" ]; then \
+	if [ "$(CONFIG)" = "native" ]; then \
 		$(MAKE) native-gcc-stage3-configure; \
 	else \
 		$(MAKE) cross-gcc-stage3-configure; \
@@ -709,21 +720,5 @@ $(BINARY_PREFIX)mpc-builddir: mpc-$(MPC_VERSION)
 	cd $(BINARY_PREFIX)mpc-builddir; \
 	make -j $(MAKE_JOBS) install
 
-##################################
-######## Clean it all up! ########
-##################################
-clean:
-	@rm -rf binutils-$(BINUTILS_VERSION)
-	@rm -rf gcc-$(GCC_VERSION)
-	@rm -rf glibc-$(GLIBC_VERSION)
-	@rm -rf gmp-$(GMP_VERSION)
-	@rm -rf mpfr-$(MPFR_VERSION)
-	@rm -rf mpc-$(MPC_VERSION)
-	@rm -rf *-builddir
-	@rm -rf .*-configure
-	@rm -rf *$(BINARY_PREFIX)install.bak
-	@rm -rf .glibc-$(GLIBC_VERSION)-akaros.patch
-	@rm -rf .gcc-$(GCC_VERSION)-akaros.patch
-	@echo "Removed configs, build dirs, and extracted sources"
-
-inst-clean: clean riscv-uninstall x86_64-uninstall x86_64-native-uninstall
+endif # BUILD_ERROR
+endif # AKAROS_COMPILER_REAL_BUILD
