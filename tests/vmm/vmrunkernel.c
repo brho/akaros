@@ -22,7 +22,11 @@ volatile int shared = 0;
 int mcp = 1;
 #define V(x, t) (*((volatile t*)(x)))
 
-uint8_t _kernel[64*1048576];
+#define MiB 0x100000u
+#define GiB (1u<<30)
+#define GKERNBASE (16*MiB)
+#define KERNSIZE (128*MiB+GKERNBASE)
+uint8_t _kernel[KERNSIZE];
 
 unsigned long long *p512, *p1, *p2m;
 
@@ -55,10 +59,10 @@ int main(int argc, char **argv)
 	int kfd = -1;
 	static char cmd[512];
 	void *coreboot_tables = (void *) 0x1165000;
-	/* kernel has to be in the range 16M to 64M for now. */
+	/* kernel has to be in the range GKERNBASE to KERNSIZE+GKERNBASE for now. */
 	// mmap is not working for us at present.
-	if ((uint64_t)_kernel > 16*1048576) {
-		printf("kernel array is above 16M, sucks\n");
+	if ((uint64_t)_kernel > GKERNBASE) {
+		printf("kernel array @%p is above , GKERNBASE@%p sucks\n", _kernel, GKERNBASE);
 		exit(1);
 	}
 	memset(_kernel, 0, sizeof(_kernel));
@@ -190,8 +194,8 @@ int main(int argc, char **argv)
 
 	kernbase >>= (0+12);
 	kernbase <<= (0 + 12);
-	uint8_t *kernel = (void *)(16*1048576);
-	write_coreboot_table(coreboot_tables, kernel, 16*1048576);
+	uint8_t *kernel = (void *)GKERNBASE;
+	write_coreboot_table(coreboot_tables, kernel, KERNSIZE);
 	hexdump(stdout, coreboot_tables, 128);
 	printf("kernbase for pml4 is 0x%llx and entry is %llx\n", kernbase, entry);
 	printf("p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
