@@ -109,7 +109,7 @@ int sem_wait (sem_t *__sem)
 	}
 	else {
 		/* We unlock in the body of __sem_block */
-		uthread_yield(TRUE, __sem_block, __sem);
+		uthread_yield(TRUE, __sem_block, &e);
 	}
 	return 0;
 }
