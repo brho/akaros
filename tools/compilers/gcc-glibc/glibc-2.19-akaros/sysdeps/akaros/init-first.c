@@ -34,6 +34,7 @@
 #include <sys/time.h>
 #include <elf.h>
 #include <ctype.h>
+#include <errno.h>
 
 /* Set nonzero if we have to be prepared for more then one libc being
    used in the process.  Safe assumption if initializer never runs.  */
