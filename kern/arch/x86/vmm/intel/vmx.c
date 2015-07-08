@@ -1075,6 +1075,7 @@ int emsr_fakewrite(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t, uint32_t);
 struct emmsr emmsrs[] = {
 	{MSR_IA32_MISC_ENABLE, emsr_misc_enable},
 	{MSR_IA32_UCODE_REV, emsr_fakewrite},
+	{MSR_CSTAR, emsr_fakewrite},
 };
 
 #define set_low32(hi,lo) (((hi) & 0xffffffff00000000ULL ) | (lo))
