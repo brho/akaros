@@ -1063,26 +1063,31 @@ static void dumpmsrs(void)
  */
 struct emmsr {
 	uint32_t reg;
+	char *name;
 	int (*f)(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t, uint32_t);
 	bool written;
 	uint32_t edx, eax;
 };
 
-int emsr_misc_enable(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t, uint32_t);
+int emsr_mustmatch(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t, uint32_t);
 int emsr_readonly(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t, uint32_t);
 int emsr_fakewrite(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t, uint32_t);
+int emsr_ok(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t, uint32_t);
 
 struct emmsr emmsrs[] = {
-	{MSR_IA32_MISC_ENABLE, emsr_misc_enable},
-	{MSR_IA32_UCODE_REV, emsr_fakewrite},
-	{MSR_CSTAR, emsr_fakewrite},
+	{MSR_IA32_MISC_ENABLE, "MSR_IA32_MISC_ENABLE", emsr_mustmatch},
+	{MSR_IA32_SYSENTER_CS, "MSR_IA32_SYSENTER_CS", emsr_ok},
+	{MSR_IA32_SYSENTER_EIP, "MSR_IA32_SYSENTER_EIP", emsr_ok},
+	{MSR_IA32_SYSENTER_ESP, "MSR_IA32_SYSENTER_ESP", emsr_ok},
+	{MSR_IA32_UCODE_REV, "MSR_IA32_UCODE_REV", emsr_fakewrite},
+	{MSR_CSTAR, "MSR_CSTAR", emsr_fakewrite},
 };
 
 #define set_low32(hi,lo) (((hi) & 0xffffffff00000000ULL ) | (lo))
-int emsr_misc_enable(struct vmx_vcpu *vcpu, struct emmsr *msr, uint32_t opcode, uint32_t qual)
+int emsr_mustmatch(struct vmx_vcpu *vcpu, struct emmsr *msr, uint32_t opcode, uint32_t qual)
 {
 	uint32_t eax, edx;
-	rdmsr(MSR_IA32_MISC_ENABLE, eax, edx);
+	rdmsr(msr->reg, eax, edx);
 	/* we just let them read the misc msr for now. */
 	if (opcode == EXIT_REASON_MSR_READ) {
 		vcpu->regs.tf_rax = set_low32(vcpu->regs.tf_rax, eax);
@@ -1093,7 +1098,20 @@ int emsr_misc_enable(struct vmx_vcpu *vcpu, struct emmsr *msr, uint32_t opcode, 
 		if (((uint32_t)vcpu->regs.tf_rax == eax) && ((uint32_t)vcpu->regs.tf_rdx == edx))
 			return 0;
 	}
+	printk("%s: Wanted to write 0x%x:0x%x, but could not; value was 0x%x:0x%x\n",
+		msr->name, (uint32_t)vcpu->regs.tf_rdx, (uint32_t)vcpu->regs.tf_rax, edx, eax);
 	return SHUTDOWN_UNHANDLED_EXIT_REASON;
+}
+
+int emsr_ok(struct vmx_vcpu *vcpu, struct emmsr *msr, uint32_t opcode, uint32_t qual)
+{
+	if (opcode == EXIT_REASON_MSR_READ) {
+		rdmsr(msr->reg, vcpu->regs.tf_rdx, vcpu->regs.tf_rax);
+	} else {
+		uint64_t val = (uint64_t)vcpu->regs.tf_rdx<<32 | vcpu->regs.tf_rax;
+		write_msr(msr->reg, val);
+	}
+	return 0;
 }
 
 /* return what's there. Let them think they are writing it if they are not changing anything. */
@@ -1121,7 +1139,7 @@ int emsr_fakewrite(struct vmx_vcpu *vcpu, struct emmsr *msr, uint32_t opcode, ui
 {
 	uint32_t eax, edx;
 	if (! msr->written) {
-		rdmsr(MSR_IA32_MISC_ENABLE, eax, edx);
+		rdmsr(msr->reg, eax, edx);
 	} else {
 		edx = msr->edx;
 		eax = msr->eax;
