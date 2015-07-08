@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
 	int dfd, ret;
 	char buf[256];
 	char addr[256];
-	host = "128.32.37.180";
+	host = "146.148.59.222";
 	page = "files/test.html";
 	port = "80";
 
