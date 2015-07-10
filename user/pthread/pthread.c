@@ -597,10 +597,6 @@ void __attribute__((constructor)) pthread_lib_init(void)
 	sched_ops = &pthread_sched_ops;
 	signal_ops = &pthread_signal_ops;
 
-	/* Some testing code might call this more than once (once for a slimmed down
-	 * pth 2LS, and another from pthread_create().  Also, this is racy, but the
-	 * first time through we are an SCP. */
-	assert(!in_multi_mode());
 	mcs_pdr_init(&queue_lock);
 	/* Create a pthread_tcb for the main thread */
 	ret = posix_memalign((void**)&t, __alignof__(struct pthread_tcb),

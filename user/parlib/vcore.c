@@ -20,7 +20,6 @@ static size_t _max_vcores_ever_wanted = 1;
 atomic_t nr_new_vcores_wanted;
 atomic_t vc_req_being_handled;
 
-bool vc_initialized = FALSE;
 __thread struct syscall __vcore_one_sysc = {.flags = (atomic_t)SC_DONE, 0};
 
 /* Per vcore entery function used when reentering at the top of a vcore's stack */
@@ -127,10 +126,6 @@ void __attribute__((constructor)) vcore_lib_init(void)
 	atomic_init(&vc_req_being_handled, 0);
 	assert(!in_vcore_context());
 	vcore_libc_init();
-	/* no longer need to enable notifs on vcore 0, it is set like that by
-	 * default (so you drop into vcore context immediately on transtioning to
-	 * _M) */
-	vc_initialized = TRUE;
 	return;
 vcore_lib_init_fail:
 	assert(0);
@@ -219,7 +214,6 @@ int vcore_request(long nr_new_vcores)
 {
 	long nr_to_prep_now, nr_vcores_wanted;
 
-	assert(vc_initialized);
 	/* Early sanity checks */
 	if ((nr_new_vcores < 0) || (nr_new_vcores + num_vcores() > max_vcores()))
 		return -1;	/* consider ERRNO */
