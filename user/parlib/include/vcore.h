@@ -278,8 +278,7 @@ static inline uint64_t vcore_account_uptime_nsec(uint32_t vcoreid)
 		 * enabling notifs.  See 6c7fb12 and 5e4825eb4 for details. */         \
 		caller->flags &= ~UTHREAD_DONT_MIGRATE;                                \
 		cmb();	/* turn off DONT_MIGRATE before enabling notifs */             \
-		if (in_multi_mode())                                                   \
-			enable_notifs(vcoreid);                                            \
+		enable_notifs(vcoreid);                                                \
 	}                                                                          \
 }
 

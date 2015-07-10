@@ -754,7 +754,7 @@ bool __check_preempt_pending(uint32_t vcoreid)
  * uth_enable_notifs() unless you know what you're doing. */
 void uth_disable_notifs(void)
 {
-	if (!in_vcore_context() && in_multi_mode()) {
+	if (!in_vcore_context()) {
 		assert(current_uthread);
 		if (current_uthread->notif_disabled_depth++)
 			goto out;
@@ -763,14 +763,13 @@ void uth_disable_notifs(void)
 		disable_notifs(vcore_id());
 	}
 out:
-	if (in_multi_mode())
-		assert(!notif_is_enabled(vcore_id()));
+	assert(!notif_is_enabled(vcore_id()));
 }
 
 /* Helper: Pair this with uth_disable_notifs(). */
 void uth_enable_notifs(void)
 {
-	if (!in_vcore_context() && in_multi_mode()) {
+	if (!in_vcore_context()) {
 		assert(current_uthread);
 		if (--current_uthread->notif_disabled_depth)
 			return;
