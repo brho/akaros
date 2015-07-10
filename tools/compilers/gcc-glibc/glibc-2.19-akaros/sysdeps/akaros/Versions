@@ -33,6 +33,9 @@ libc {
     convD2M;
     sizeD2M;
 
+    serialize_argv_envp;
+    free_serialized_data;
+
     # helper functions from resolv (which we don't build)
     __h_errno_location;
   }

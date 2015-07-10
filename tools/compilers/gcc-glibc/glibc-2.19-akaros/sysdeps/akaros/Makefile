@@ -35,3 +35,8 @@ sysdep_routines += convM2S
 sysdep_routines += convS2M
 endif
 sysdep_headers += fcall.h
+
+# Syscall pack arg routines
+ifeq ($(subdir),stdlib)
+sysdep_routines += serialize
+endif
