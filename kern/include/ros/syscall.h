@@ -37,6 +37,19 @@ struct childfdmap {
 	int							ok;
 };
 
+struct argenv {
+	size_t argc;
+	size_t envc;
+	char buf[];
+	/* The buf array is laid out as follows:
+	 * buf {
+	 *   char *argv[argc]; // Offset of arg relative to &argbuf[0]
+	 *   char *envp[envc]; // Offset of envvar relative to &argbuf[0]
+	 *   char argbuf[sum(map(strlen + 1, argv + envp))];
+	 * }
+	 */
+};
+
 #ifndef ROS_KERNEL
 
 /* Temp hack, til the rest of glibc/userspace uses sys/syscall.h */
