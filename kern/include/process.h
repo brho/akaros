@@ -50,6 +50,8 @@
                               (state)==PROC_RUNNING_M  ? "RUNNING_M"  : \
                                                          "UNKNOWN")
 
+#define DEFAULT_PROGNAME ""
+
 #include <env.h>
 
 /* Can use a htable iterator to iterate through all active procs */

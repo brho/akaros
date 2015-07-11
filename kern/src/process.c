@@ -253,6 +253,9 @@ void proc_init(void)
 
 void proc_set_progname(struct proc *p, char *name)
 {
+	if (name == NULL)
+		name = DEFAULT_PROGNAME;
+
 	/* might have an issue if a dentry name isn't null terminated, and we'd get
 	 * extra junk up to progname_sz. */
 	strncpy(p->progname, name, PROC_PROGNAME_SZ);
