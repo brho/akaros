@@ -23,8 +23,8 @@
 #include <string.h>
 #include <fcntl.h>
 #include <elf/elf.h>
-#include <ros/procinfo.h>
 #include <assert.h>
+#include <parlib/serialize.h>
 
 /* Replace the current process, executing PATH with arguments ARGV and
    environment ENVP.  ARGV and ENVP are terminated by NULL pointers.  */
@@ -34,18 +34,16 @@ __execve (path, argv, envp)
      char *const argv[];
      char *const envp[];
 {
-  procinfo_t pi;
-  if(procinfo_pack_args(&pi,argv,envp))
-  {
+  struct serialized_data *sd = serialize_argv_envp(argv, envp);
+  if (!sd) {
     errno = ENOMEM;
     return -1;
   }
 
-  int ret = ros_syscall(SYS_exec, path, strlen(path), (uintptr_t)&pi, 0, 0, 0);
-
+  int ret = ros_syscall(SYS_exec, path, strlen(path), sd->buf, sd->len, 0, 0);
   // if we got here, then exec better have failed...
   assert(ret == -1);
-
+  free_serialized_data(sd);
   return ret;
 }
 weak_alias (__execve, execve)

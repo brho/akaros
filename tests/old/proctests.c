@@ -15,7 +15,7 @@ int main(int argc, char** argv)
 	int child_pid[NUM_KIDS];
 	if (pid == 0x1000) {
 		for (int i = 0; i < NUM_KIDS; i++)
-			child_pid[i] = sys_proc_create(FILENAME, strlen(FILENAME), 0, 0);
+			child_pid[i] = sys_proc_create(FILENAME, strlen(FILENAME), NULL, NULL, 0);
 		for (int i = 0; i < NUM_KIDS; i++) {
 			printf("U: attempting to spawn yielders (pid: %d)\n", child_pid[i]);
 			sys_proc_run(child_pid[i]);

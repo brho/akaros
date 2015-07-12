@@ -149,6 +149,7 @@ typedef long elf_aux_t[2];
 
 struct file;
 bool is_valid_elf(struct file *f);
-int load_elf(struct proc* p, struct file* f);
+int load_elf(struct proc* p, struct file* f,
+             int argc, char *argv[], int envc, char *envp[]);
 
 #endif /* !ROS_INC_ELF_H */

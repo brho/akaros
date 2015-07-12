@@ -2,6 +2,7 @@
 
 #include <parlib/parlib.h>
 #include <parlib/vcore.h>
+#include <parlib/serialize.h>
 
 int sys_proc_destroy(int pid, int exitcode)
 {
@@ -59,12 +60,15 @@ void sys_yield(bool being_nice)
 int sys_proc_create(char *path, size_t path_l, char *argv[], char *envp[],
                     int flags)
 {
-	struct procinfo pi;
-	if (procinfo_pack_args(&pi, argv, envp)) {
+	struct serialized_data *sd = serialize_argv_envp(argv, envp);
+	if (!sd) {
 		errno = ENOMEM;
 		return -1;
 	}
-	return ros_syscall(SYS_proc_create, path, path_l, &pi, flags, 0, 0);
+	int ret = ros_syscall(SYS_proc_create, path, path_l,
+	                      sd->buf, sd->len, flags, 0);
+	free_serialized_data(sd);
+	return ret;
 }
 
 int sys_proc_run(int pid)

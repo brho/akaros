@@ -2,6 +2,7 @@
 
 //#define DEBUG
 #include <ros/common.h>
+#include <ros/limits.h>
 #include <arch/types.h>
 #include <arch/arch.h>
 #include <arch/mmu.h>
@@ -330,6 +331,44 @@ static char *copy_in_path(struct proc *p, const char *path, size_t path_l)
 	return t_path;
 }
 
+static int unpack_argenv(struct argenv *argenv, size_t argenv_l,
+                         int *argc_p, char ***argv_p,
+                         int *envc_p, char ***envp_p)
+{
+	int argc = argenv->argc;
+	int envc = argenv->envc;
+	char **argv = (char**)argenv->buf;
+	char **envp = argv + argc;
+	char *argbuf = (char*)(envp + envc);
+	uintptr_t argbuf_offset = (uintptr_t)(argbuf - (char*)(argenv));
+
+	if (((char*)argv - (char*)argenv) > argenv_l)
+		return -1;
+	if (((char*)argv + (argc * sizeof(char**)) - (char*)argenv) > argenv_l)
+		return -1;
+	if (((char*)envp - (char*)argenv) > argenv_l)
+		return -1;
+	if (((char*)envp + (envc * sizeof(char**)) - (char*)argenv) > argenv_l)
+		return -1;
+	if (((char*)argbuf - (char*)argenv) > argenv_l)
+		return -1;
+	for (int i = 0; i < argc; i++) {
+		if ((uintptr_t)(argv[i] + argbuf_offset) > argenv_l)
+			return -1;
+		argv[i] += (uintptr_t)argbuf;
+	}
+	for (int i = 0; i < envc; i++) {
+		if ((uintptr_t)(envp[i] + argbuf_offset) > argenv_l)
+			return -1;
+		envp[i] += (uintptr_t)argbuf;
+	}
+	*argc_p = argc;
+	*argv_p = argv;
+	*envc_p = envc;
+	*envp_p = envp;
+	return 0;
+}
+
 /* Helper, frees a path that was allocated with copy_in_path. */
 static void free_path(struct proc *p, char *t_path)
 {
@@ -489,14 +528,17 @@ static pid_t sys_getpid(struct proc *p)
 
 /* Creates a process from the file 'path'.  The process is not runnable by
  * default, so it needs it's status to be changed so that the next call to
- * schedule() will try to run it.  TODO: take args/envs from userspace. */
+ * schedule() will try to run it. */
 static int sys_proc_create(struct proc *p, char *path, size_t path_l,
-                           struct procinfo *pi, int flags)
+                           char *argenv, size_t argenv_l, int flags)
 {
 	int pid = 0;
 	char *t_path;
 	struct file *program;
 	struct proc *new_p;
+	int argc, envc;
+	char **argv, **envp;
+	struct argenv *kargenv;
 
 	t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
@@ -506,6 +548,27 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	free_path(p, t_path);
 	if (!program)
 		return -1;			/* presumably, errno is already set */
+
+	/* Check the size of the argenv array, error out if too large. */
+	if ((argenv_l < sizeof(struct argenv)) || (argenv_l > ARG_MAX)) {
+		set_errno(EINVAL);
+		set_errstr("The argenv array has an invalid size: %lu\n", argenv_l);
+		return -1;
+	}
+	/* Copy the argenv array into a kernel buffer. Delay processing of the
+	 * array to load_elf(). */
+	kargenv = user_memdup_errno(p, argenv, argenv_l);
+	if (!kargenv) {
+		set_errstr("Failed to copy in the args");
+		return -1;
+	}
+	/* Unpack the argenv array into more usable variables. Integrity checking
+	 * done along side this as well. */
+	if (unpack_argenv(kargenv, argenv_l, &argc, &argv, &envc, &envp)) {
+		set_errstr("Failed to unpack the args");
+		goto early_error;
+	}
+
 	/* TODO: need to split the proc creation, since you must load after setting
 	 * args/env, since auxp gets set up there. */
 	//new_p = proc_create(program, 0, 0);
@@ -516,24 +579,15 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	/* close the CLOEXEC ones, even though this isn't really an exec */
 	close_9ns_files(new_p, TRUE);
 	close_all_files(&new_p->open_files, TRUE);
-	/* Set the argument stuff needed by glibc */
-	if (memcpy_from_user_errno(p, new_p->procinfo->argp, pi->argp,
-	                           sizeof(pi->argp))) {
-		set_errstr("Failed to memcpy argp");
-		goto late_error;
-	}
-	if (memcpy_from_user_errno(p, new_p->procinfo->argbuf, pi->argbuf,
-	                           sizeof(pi->argbuf))) {
-		set_errstr("Failed to memcpy argbuf");
-		goto late_error;
-	}
-	if (load_elf(new_p, program)) {
+	/* Load the elf. */
+	if (load_elf(new_p, program, argc, argv, envc, envp)) {
 		set_errstr("Failed to load elf");
 		goto late_error;
 	}
 	/* progname is argv0, which accounts for symlinks */
-	proc_set_progname(p, p->procinfo->argbuf);
+	proc_set_progname(p, argc ? argv[0] : NULL);
 	kref_put(&program->f_kref);
+	user_memdup_free(p, kargenv);
 	__proc_ready(new_p);
 	pid = new_p->pid;
 	proc_decref(new_p);	/* give up the reference created in proc_create() */
@@ -547,6 +601,8 @@ late_error:
 	proc_destroy(new_p);
 mid_error:
 	kref_put(&program->f_kref);
+early_error:
+	user_memdup_free(p, kargenv);
 	return -1;
 }
 
@@ -703,13 +759,16 @@ static ssize_t sys_fork(env_t* e)
  * Note: if someone batched syscalls with this call, they could clobber their
  * old memory (and will likely PF and die).  Don't do it... */
 static int sys_exec(struct proc *p, char *path, size_t path_l,
-                    struct procinfo *pi)
+                    char *argenv, size_t argenv_l)
 {
 	int ret = -1;
 	char *t_path;
 	struct file *program;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	int8_t state = 0;
+	int argc, envc;
+	char **argv, **envp;
+	struct argenv *kargenv;
 
 	/* We probably want it to never be allowed to exec if it ever was _M */
 	if (p->state != PROC_RUNNING_S) {
@@ -723,6 +782,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
 		return -1;
+
 	disable_irqsave(&state);	/* protect cur_ctx */
 	/* Can't exec if we don't have a current_ctx to restart (if we fail).  This
 	 * isn't 100% true, but I'm okay with it. */
@@ -743,6 +803,28 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	 * userspace and then asynchronously finish the exec later. */
 	clear_owning_proc(core_id());
 	enable_irqsave(&state);
+
+	/* Check the size of the argenv array, error out if too large. */
+	if ((argenv_l < sizeof(struct argenv)) || (argenv_l > ARG_MAX)) {
+		set_errno(EINVAL);
+		set_errstr("The argenv array has an invalid size: %lu\n", argenv_l);
+		return -1;
+	}
+	/* Copy the argenv array into a kernel buffer. */
+	kargenv = user_memdup_errno(p, argenv, argenv_l);
+	if (!kargenv) {
+		set_errstr("Failed to copy in the args and environment");
+		return -1;
+	}
+	/* Unpack the argenv array into more usable variables. Integrity checking
+	 * done along side this as well. */
+	if (unpack_argenv(kargenv, argenv_l, &argc, &argv, &envc, &envp)) {
+		user_memdup_free(p, kargenv);
+		set_errno(EINVAL);
+		set_errstr("Failed to unpack the args");
+		return -1;
+	}
+
 	/* This could block: */
 	/* TODO: 9ns support */
 	program = do_file_open(t_path, 0, 0);
@@ -751,18 +833,11 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 		goto early_error;
 	if (!is_valid_elf(program)) {
 		set_errno(ENOEXEC);
-		goto early_error;
+		goto mid_error;
 	}
-	/* Set the argument stuff needed by glibc */
-	if (memcpy_from_user_errno(p, p->procinfo->argp, pi->argp,
-	                           sizeof(pi->argp)))
-		goto mid_error;
-	if (memcpy_from_user_errno(p, p->procinfo->argbuf, pi->argbuf,
-	                           sizeof(pi->argbuf)))
-		goto mid_error;
 	/* This is the point of no return for the process. */
 	/* progname is argv0, which accounts for symlinks */
-	proc_set_progname(p, p->procinfo->argbuf);
+	proc_set_progname(p, argc ? argv[0] : NULL);
 	#ifdef CONFIG_X86
 	/* clear this, so the new program knows to get an LDT */
 	p->procdata->ldt = 0;
@@ -774,8 +849,9 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	close_9ns_files(p, TRUE);
 	close_all_files(&p->open_files, TRUE);
 	env_user_mem_free(p, 0, UMAPTOP);
-	if (load_elf(p, program)) {
+	if (load_elf(p, program, argc, argv, envc, envp)) {
 		kref_put(&program->f_kref);
+		user_memdup_free(p, kargenv);
 		/* Note this is an inedible reference, but proc_destroy now returns */
 		proc_destroy(p);
 		/* We don't want to do anything else - we just need to not accidentally
@@ -797,6 +873,7 @@ early_error:
 	finish_current_sysc(-1);
 	systrace_finish_trace(pcpui->cur_kthread, -1);
 success:
+	user_memdup_free(p, kargenv);
 	free_sysc_str(pcpui->cur_kthread);
 	/* Here's how we restart the new (on success) or old (on failure) proc: */
 	spin_lock(&p->proc_lock);

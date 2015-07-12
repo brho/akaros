@@ -258,7 +258,8 @@ fail:
 	return ret;
 }
 
-int load_elf(struct proc* p, struct file* f)
+int load_elf(struct proc* p, struct file* f,
+             int argc, char *argv[], int envc, char *envp[])
 {
 	elf_info_t ei, interp_ei;
 	if (load_one_elf(p, f, 0, &ei, FALSE))
@@ -279,6 +280,32 @@ int load_elf(struct proc* p, struct file* f)
 		if (error)
 			return -1;
 	}
+
+	/* Copy the contents of the argenv array into procinfo. This is only
+	 * temporary so that we can verify everything works with the new structure
+	 * up to this point.  Soon we will map this stuff on the stack properly, as
+	 * per the SYSV ABI. */
+	if (argc + 1 + envc + 1 > PROCINFO_MAX_ARGP)
+		return -1;
+	int pos = 0;
+	for(int i = 0; i < argc; i++) {
+		int len = strlen(argv[i]) + 1;
+		if(pos + len > PROCINFO_ARGBUF_SIZE)
+			return -1;
+		p->procinfo->argp[i] = ((procinfo_t*)UINFO)->argbuf + pos;
+		memcpy(p->procinfo->argbuf + pos, argv[i], len);
+		pos += len;
+	}
+	p->procinfo->argp[argc] = NULL;
+	for(int i = 0; i < envc; i++) {
+		int len = strlen(envp[i]) + 1;
+		if(pos + len > PROCINFO_ARGBUF_SIZE)
+			return -1;
+		p->procinfo->argp[argc + 1 + i] = ((procinfo_t*)UINFO)->argbuf + pos;
+		memcpy(p->procinfo->argbuf + pos, envp[i], len);
+		pos += len;
+	}
+	p->procinfo->argp[argc + 1 + envc] = NULL;
 
 	// fill in auxiliary info for dynamic linker/runtime
 	elf_aux_t auxp[] = {{ELF_AUX_PHDR, ei.phdr},

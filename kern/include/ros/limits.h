@@ -8,4 +8,7 @@
 
 #define PATH_MAX 4096 /* includes null-termination */
 
+/* # bytes of args + environ for exec()  (i.e. max size of argenv) */
+#define ARG_MAX (32 * 4096) /* Good chunk of our 256 page stack */
+
 #endif /* ROS_INC_LIMITS_H */
