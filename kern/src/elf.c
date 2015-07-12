@@ -7,6 +7,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <arch/arch.h>
+#include <umem.h>
 
 #ifdef CONFIG_64BIT
 # define elf_field(obj, field) (elf64 ? (obj##64)->field : (obj##32)->field)
@@ -34,6 +35,88 @@ success:
 fail:
 	switch_back(0, c);
 	return FALSE;
+}
+
+static uintptr_t populate_stack(struct proc *p, int argc, char *argv[],
+                                                int envc, char *envp[],
+                                                int auxc, elf_aux_t auxv[])
+{
+	/* Map in pages for p's stack. */
+	int flags = MAP_FIXED | MAP_ANONYMOUS;
+	uintptr_t stacksz = USTACK_NUM_PAGES*PGSIZE;
+	if (do_mmap(p, USTACKTOP-stacksz, stacksz, PROT_READ | PROT_WRITE,
+	            flags, NULL, 0) == MAP_FAILED)
+		return 0;
+
+	/* Function to get the lengths of the argument and environment strings. */
+	int get_lens(int argc, char *argv[], int arg_lens[])
+	{
+		int total = 0;
+		for (int i = 0; i < argc; i++) {
+			arg_lens[i] = strlen(argv[i]) + 1;
+			total += arg_lens[i];
+		}
+		return total;
+	}
+
+	/* Function to help map the argument and environment strings, to their
+	 * final location. */
+	int remap(int argc, char *argv[], char *new_argv[],
+              char new_argbuf[], int arg_lens[])
+	{
+		int offset = 0;
+		char *temp_argv[argc + 1];
+		for(int i = 0; i < argc; i++) {
+			if (memcpy_to_user(p, new_argbuf + offset, argv[i], arg_lens[i]))
+				return -1;
+			temp_argv[i] = new_argbuf + offset;
+			offset += arg_lens[i];
+		}
+		temp_argv[argc] = NULL;
+		if (memcpy_to_user(p, new_argv, temp_argv, sizeof(temp_argv)))
+			return -1;
+		return offset;
+	}
+
+	/* Get the size of the env and arg strings. */ 
+	int bufsize = 0;
+	int arg_lens[argc];
+	int env_lens[envc];
+	bufsize += get_lens(argc, argv, arg_lens);
+	bufsize += get_lens(envc, envp, env_lens);
+
+	/* Set up pointers to all of the appropriate data regions we map to. */
+	char **new_argv = (char**)(((procinfo_t*)UINFO)->argp);
+	char **new_envp = new_argv + argc + 1;
+	elf_aux_t *new_auxv = (elf_aux_t*)(new_envp + envc + 1);
+	char *new_argbuf = ((procinfo_t*)UINFO)->argbuf;
+
+	/* Verify that all data associated with our argv, envp, and auxv arrays
+	 * (and any corresponding strings they point to) will fit in the space
+	 * alloted. */
+	int psize = argc+1 + envc+1 + sizeof(elf_aux_t)/sizeof(char**)*(auxc+1);
+	if (psize > PROCINFO_MAX_ARGP)
+		return 0;
+	if (bufsize > PROCINFO_ARGBUF_SIZE)
+		return 0;
+
+	/* Map all data for argv and envp into its final location. */
+	int offset = 0;
+	offset = remap(argc, argv, new_argv, new_argbuf, arg_lens);
+	if (offset == -1)
+		return 0;
+	offset = remap(envc, envp, new_envp, new_argbuf + offset, env_lens);
+	if (offset == -1)
+		return 0;
+
+	/* Map auxv into its final location. */
+	elf_aux_t null_aux = {0, 0};
+	if (memcpy_to_user(p, new_auxv, auxv, auxc * sizeof(elf_aux_t)))
+		return 0;
+	if (memcpy_to_user(p, new_auxv + auxc, &null_aux, sizeof(elf_aux_t)))
+		return 0;
+
+	return USTACKTOP;
 }
 
 /* We need the writable flag for ld.  Even though the elf header says it wants
@@ -281,62 +364,25 @@ int load_elf(struct proc* p, struct file* f,
 			return -1;
 	}
 
-	/* Copy the contents of the argenv array into procinfo. This is only
-	 * temporary so that we can verify everything works with the new structure
-	 * up to this point.  Soon we will map this stuff on the stack properly, as
-	 * per the SYSV ABI. */
-	if (argc + 1 + envc + 1 > PROCINFO_MAX_ARGP)
-		return -1;
-	int pos = 0;
-	for(int i = 0; i < argc; i++) {
-		int len = strlen(argv[i]) + 1;
-		if(pos + len > PROCINFO_ARGBUF_SIZE)
-			return -1;
-		p->procinfo->argp[i] = ((procinfo_t*)UINFO)->argbuf + pos;
-		memcpy(p->procinfo->argbuf + pos, argv[i], len);
-		pos += len;
-	}
-	p->procinfo->argp[argc] = NULL;
-	for(int i = 0; i < envc; i++) {
-		int len = strlen(envp[i]) + 1;
-		if(pos + len > PROCINFO_ARGBUF_SIZE)
-			return -1;
-		p->procinfo->argp[argc + 1 + i] = ((procinfo_t*)UINFO)->argbuf + pos;
-		memcpy(p->procinfo->argbuf + pos, envp[i], len);
-		pos += len;
-	}
-	p->procinfo->argp[argc + 1 + envc] = NULL;
-
-	// fill in auxiliary info for dynamic linker/runtime
-	elf_aux_t auxp[] = {{ELF_AUX_PHDR, ei.phdr},
+	/* Set up the auxiliary info for dynamic linker/runtime */
+	elf_aux_t auxv[] = {{ELF_AUX_PHDR, ei.phdr},
 	                    {ELF_AUX_PHENT, sizeof(proghdr32_t)},
 	                    {ELF_AUX_PHNUM, ei.phnum},
-	                    {ELF_AUX_ENTRY, ei.entry},
-	                    {0, 0}};
+	                    {ELF_AUX_ENTRY, ei.entry}};
+	int auxc = sizeof(auxv)/sizeof(auxv[0]);
 
-	// put auxp after argv, envp in procinfo
-	int auxp_pos = -1;
-	for (int i = 0, zeros = 0; i < PROCINFO_MAX_ARGP; i++)
-		if (p->procinfo->argp[i] == NULL)
-			if (++zeros == 2)
-				auxp_pos = i + 1;
-	if (auxp_pos == -1 ||
-	    auxp_pos + sizeof(auxp) / sizeof(char*) >= PROCINFO_MAX_ARGP)
+	/* Populate the stack with the required info. */
+	uintptr_t stack_top = populate_stack(p, argc, argv, envc, envp, auxc, auxv);
+	if (!stack_top)
 		return -1;
-	memcpy(p->procinfo->argp+auxp_pos,auxp,sizeof(auxp));
 
+	/* Initialize the process as an SCP. */
 	uintptr_t core0_entry = ei.dynamic ? interp_ei.entry : ei.entry;
-	proc_init_ctx(&p->scp_ctx, 0, core0_entry, USTACKTOP, 0);
+	proc_init_ctx(&p->scp_ctx, 0, core0_entry, stack_top, 0);
 	p->env_entry = ei.entry;
 
-	int flags = MAP_FIXED | MAP_ANONYMOUS;
-	uintptr_t stacksz = USTACK_NUM_PAGES*PGSIZE;
-	if (do_mmap(p, USTACKTOP-stacksz, stacksz, PROT_READ | PROT_WRITE,
-	            flags, NULL, 0) == MAP_FAILED)
-		return -1;
-
-	// Set the heap bottom and top to just past where the text 
-	// region has been loaded
+	/* Set the heap bottom and top to just past where the text region has been
+	 * loaded. */
 	p->heap_top = (void*)ei.highest_addr;
 	p->procinfo->heap_bottom = p->heap_top;
 

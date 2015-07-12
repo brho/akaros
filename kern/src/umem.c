@@ -116,7 +116,12 @@ int memcpy_to_user(struct proc *p, void *va, const void *src, size_t len)
 		pte = pgdir_walk(p->env_pgdir, start + i * PGSIZE, 0);
 		if (!pte_walk_okay(pte))
 			return -EFAULT;
-		if (pte_is_present(pte) && !pte_has_perm_urw(pte))
+		/* Temporarily change the permissions here to 'ur' instead of 'urw'
+		 * for testing our temporary method of mapping args/envs/aux info
+		 * into user-space.  We still map this into procinfo (which is
+		 * read-only), but will soon map it to the stack (which is
+		 * read-write), so these permissions can change back to normal. */
+		if (pte_is_present(pte) && !pte_has_perm_ur(pte))
 			return -EFAULT;
 		if (!pte_is_present(pte))
 			if (handle_page_fault(p, (uintptr_t)start + i * PGSIZE, PROT_WRITE))
