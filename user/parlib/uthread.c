@@ -170,18 +170,19 @@ static char *__ros_errstr_loc(void)
  * vcore/2LS/uthread init. */
 void __attribute__((constructor)) uthread_lib_init(void)
 {
-	struct uthread *uthread;
+	/* Use the thread0 sched's uth */
+	extern struct uthread *thread0_uth;
 	int ret;
 
 	/* Only run once, but make sure that vcore_lib_init() has run already. */
 	init_once_racy(return);
 	vcore_lib_init();
 
-	ret = posix_memalign((void**)&uthread, __alignof__(struct uthread),
-	                         sizeof(struct uthread));
+	ret = posix_memalign((void**)&thread0_uth, __alignof__(struct uthread),
+	                     sizeof(struct uthread));
 	assert(!ret);
-	memset(uthread, 0, sizeof(struct uthread));	/* aggressively 0 for bugs */
-	uthread_manage_thread0(uthread);
+	memset(thread0_uth, 0, sizeof(struct uthread));	/* aggressively 0 for bugs*/
+	uthread_manage_thread0(thread0_uth);
 	scp_vcctx_ready();
 	init_posix_signals();
 	/* change our blockon from glibc's internal one to the mcp one (which can

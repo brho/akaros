@@ -22,9 +22,14 @@ struct schedule_ops thread0_2ls_ops = {
 	.sched_entry = thread0_sched_entry,
 };
 
+/* externed into uthread.c */
+struct uthread *thread0_uth;
+
 /* Thread0 scheduler ops (for processes that haven't linked in a full 2LS) */
 static void thread0_sched_entry(void)
 {
 	if (current_uthread)
 		run_current_uthread();
+	else
+		run_uthread(thread0_uth);
 }
