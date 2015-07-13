@@ -53,9 +53,6 @@ typedef struct procinfo {
 	uint64_t tsc_freq;
 	uint64_t timing_overhead;
 	void *heap_bottom;
-	/* for traditional forks, these two need to be memcpy'd over: */
-	char *argp[PROCINFO_MAX_ARGP];
-	char argbuf[PROCINFO_ARGBUF_SIZE];
 	/* glibc relies on stuff above this point.  if you change it, you need to
 	 * rebuild glibc. */
 	bool is_mcp;			/* is in multi mode */

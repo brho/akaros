@@ -272,8 +272,6 @@ static void proc_init_procinfo(struct proc* p)
 	p->procinfo->timing_overhead = system_timing.timing_overhead;
 	p->procinfo->heap_bottom = 0;
 	/* 0'ing the arguments.  Some higher function will need to set them */
-	memset(p->procinfo->argp, 0, sizeof(p->procinfo->argp));
-	memset(p->procinfo->argbuf, 0, sizeof(p->procinfo->argbuf));
 	memset(p->procinfo->res_grant, 0, sizeof(p->procinfo->res_grant));
 	/* 0'ing the vcore/pcore map.  Will link the vcores later. */
 	memset(&p->procinfo->vcoremap, 0, sizeof(p->procinfo->vcoremap));

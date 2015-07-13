@@ -727,10 +727,6 @@ static ssize_t sys_fork(env_t* e)
 
 	/* In general, a forked process should be a fresh process, and we copy over
 	 * whatever stuff is needed between procinfo/procdata. */
-	/* Copy over the procinfo argument stuff in case they don't exec */
-	memcpy(env->procinfo->argp, e->procinfo->argp, sizeof(e->procinfo->argp));
-	memcpy(env->procinfo->argbuf, e->procinfo->argbuf,
-	       sizeof(e->procinfo->argbuf));
 	#ifdef CONFIG_X86
 	/* new guy needs to know about ldt (everything else in procdata is fresh */
 	env->procdata->ldt = e->procdata->ldt;
