@@ -1,3 +1,7 @@
+/* Copyright (c) 2011-2014 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details. */
+
 #include <ros/arch/membar.h>
 #include <parlib/arch/atomic.h>
 #include <parlib/parlib.h>
@@ -6,16 +10,15 @@
 #include <parlib/event.h>
 #include <stdlib.h>
 
-/* By default there is no 2LS, but we still want sched_ops set so we can check
- * its individual function pointers. A 2LS should override sched_ops in its
- * init code. */
-struct schedule_ops default_2ls_ops = {0};
-struct schedule_ops *sched_ops = &default_2ls_ops;
+/* SCPs have a default 2LS that only manages thread 0.  Any other 2LS, such as
+ * pthreads, should override sched_ops in its init code. */
+extern struct schedule_ops thread0_2ls_ops;
+struct schedule_ops *sched_ops = &thread0_2ls_ops;
 
 __thread struct uthread *current_uthread = 0;
 /* ev_q for all preempt messages (handled here to keep 2LSs from worrying
  * extensively about the details.  Will call out when necessary. */
-struct event_queue *preempt_ev_q;
+static struct event_queue *preempt_ev_q;
 
 /* Helpers: */
 #define UTH_TLSDESC_NOTLS (void*)(-1)
@@ -227,17 +230,8 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
 	handle_events(vcoreid);
 	__check_preempt_pending(vcoreid);
 	assert(in_vcore_context());	/* double check, in case an event changed it */
-	/* Consider using the default_2ls_op for this, though it's a bit weird. */
-	if (sched_ops->sched_entry) {
-		sched_ops->sched_entry();
-	} else if (current_uthread) {
-		run_current_uthread();
-	}
-	/* 2LS sched_entry should never return */
-	/* Either the 2LS sched_entry returned, run_cur_uth() returned, or we
-	 * didn't have a current_uthread.  If we didn't have a 2LS op, we should be
-	 * in _S mode and always have a current_uthread. */
-	assert(0);
+	sched_ops->sched_entry();
+	assert(0); /* 2LS sched_entry should never return */
 }
 
 /* Does the uthread initialization of a uthread that the caller created.  Call
