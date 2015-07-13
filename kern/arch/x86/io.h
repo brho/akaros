@@ -46,6 +46,11 @@ enum {
 	CfgEISA = 0xC80,
 };
 
+/* IO Ports */
+
+#define CMOS_RAM_IDX			0x70
+#define CMOS_RAM_DATA			0x71
+
 /*
  * PCI support code.
  */

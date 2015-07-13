@@ -152,6 +152,7 @@
 #include <bitops.h>
 #include <arch/types.h>
 #include <syscall.h>
+#include <arch/io.h>
 
 #include "vmx.h"
 #include "../vmm.h"
@@ -162,6 +163,9 @@
 #define currentcpu (&per_cpu_info[core_id()])
 
 static unsigned long *msr_bitmap;
+#define VMX_IO_BITMAP_ORDER		4	/* 64 KB */
+#define VMX_IO_BITMAP_SZ		(1 << (VMX_IO_BITMAP_ORDER + PGSHIFT))
+static unsigned long *io_bitmap;
 
 int x86_ept_pte_fix_ups = 0;
 
@@ -495,10 +499,9 @@ static const struct vmxec cbec = {
 		     CPU_BASED_RDPMC_EXITING |
 		     CPU_BASED_CR8_LOAD_EXITING |
 		     CPU_BASED_CR8_STORE_EXITING |
-		     CPU_BASED_MOV_DR_EXITING |
-		     CPU_BASED_UNCOND_IO_EXITING |
 		     CPU_BASED_USE_MSR_BITMAPS |
 		     CPU_BASED_MONITOR_EXITING |
+		     CPU_BASED_USE_IO_BITMAPS |
 		     CPU_BASED_ACTIVATE_SECONDARY_CONTROLS),
 
 	.set_to_0 = (CPU_BASED_VIRTUAL_INTR_PENDING |
@@ -508,10 +511,11 @@ static const struct vmxec cbec = {
 		     CPU_BASED_CR3_LOAD_EXITING |
 		     CPU_BASED_CR3_STORE_EXITING |
 		     CPU_BASED_TPR_SHADOW |
+		     CPU_BASED_MOV_DR_EXITING |
 		     CPU_BASED_VIRTUAL_NMI_PENDING |
 		     CPU_BASED_MONITOR_TRAP |
 		     CPU_BASED_PAUSE_EXITING |
-		     CPU_BASED_USE_IO_BITMAPS),
+		     CPU_BASED_UNCOND_IO_EXITING),
 };
 
 static const struct vmxec cb2ec = {
@@ -1025,6 +1029,12 @@ static void __vmx_disable_intercept_for_msr(unsigned long *msr_bitmap, uint32_t 
 	}
 }
 
+/* note the io_bitmap is big enough for the 64K port space. */
+static void __vmx_disable_intercept_for_io(unsigned long *io_bitmap, uint16_t port)
+{
+	__clear_bit(port, io_bitmap);
+}
+
 static void vcpu_print_autoloads(struct vmx_vcpu *vcpu)
 {
 	struct vmx_msr_entry *e;
@@ -1081,6 +1091,14 @@ struct emmsr emmsrs[] = {
 	{MSR_IA32_SYSENTER_ESP, "MSR_IA32_SYSENTER_ESP", emsr_ok},
 	{MSR_IA32_UCODE_REV, "MSR_IA32_UCODE_REV", emsr_fakewrite},
 	{MSR_CSTAR, "MSR_CSTAR", emsr_fakewrite},
+	{MSR_IA32_VMX_BASIC_MSR, "MSR_IA32_VMX_BASIC_MSR", emsr_fakewrite},
+	{MSR_IA32_VMX_PINBASED_CTLS_MSR, "MSR_IA32_VMX_PINBASED_CTLS_MSR", emsr_fakewrite},
+	{MSR_IA32_VMX_PROCBASED_CTLS_MSR, "MSR_IA32_VMX_PROCBASED_CTLS_MSR", emsr_fakewrite},
+	{MSR_IA32_VMX_PROCBASED_CTLS2, "MSR_IA32_VMX_PROCBASED_CTLS2", emsr_fakewrite},
+	{MSR_IA32_VMX_EXIT_CTLS_MSR, "MSR_IA32_VMX_EXIT_CTLS_MSR", emsr_fakewrite},
+	{MSR_IA32_VMX_ENTRY_CTLS_MSR, "MSR_IA32_VMX_ENTRY_CTLS_MSR", emsr_fakewrite},
+	{MSR_IA32_ENERGY_PERF_BIAS, "MSR_IA32_ENERGY_PERF_BIAS", emsr_fakewrite},
+
 };
 
 #define set_low32(hi,lo) (((hi) & 0xffffffff00000000ULL ) | (lo))
@@ -1197,6 +1215,10 @@ static void setup_msr(struct vmx_vcpu *vcpu)
 	/* Since PADDR(msr_bitmap) is non-zero, and the bitmap is all 0xff, we now
 	 * intercept all MSRs */
 	vmcs_write64(MSR_BITMAP, PADDR(msr_bitmap));
+
+	vmcs_write64(IO_BITMAP_A, PADDR(io_bitmap));
+	vmcs_write64(IO_BITMAP_B, PADDR((uintptr_t)io_bitmap +
+	                                (VMX_IO_BITMAP_SZ / 2)));
 
 	vmcs_write32(VM_EXIT_MSR_STORE_COUNT, vcpu->msr_autoload.nr);
 	vmcs_write32(VM_EXIT_MSR_LOAD_COUNT, vcpu->msr_autoload.nr);
@@ -1833,13 +1855,27 @@ int intel_vmm_init(void)
 		printk("Could not allocate msr_bitmap\n");
 		return -ENOMEM;
 	}
+	io_bitmap = (unsigned long *)get_cont_pages(VMX_IO_BITMAP_ORDER,
+	                                            KMALLOC_WAIT);
+	if (!io_bitmap) {
+		printk("Could not allocate msr_bitmap\n");
+		kfree(msr_bitmap);
+		return -ENOMEM;
+	}
 	/* FIXME: do we need APIC virtualization (flexpriority?) */
 
 	memset(msr_bitmap, 0xff, PAGE_SIZE);
+	memset(io_bitmap, 0xff, VMX_IO_BITMAP_SZ);
+
 	/* These are the only MSRs that are not autoloaded and not intercepted */
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE);
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE);
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_EFER);
+
+	/* TODO: this might be dangerous, since they can do more than just read the
+	 * CMOS */
+	__vmx_disable_intercept_for_io(io_bitmap, CMOS_RAM_IDX);
+	__vmx_disable_intercept_for_io(io_bitmap, CMOS_RAM_DATA);
 
 	if ((ret = ept_init())) {
 		printk("EPT init failed, %d\n", ret);
