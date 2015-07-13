@@ -83,12 +83,16 @@ void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
 	/* zero the entire structure for any type, prevent potential disclosure */
 	memset(ctx, 0, sizeof(struct user_context));
 	ctx->type = ROS_SW_CTX;
-	/* Stack pointers in a fresh stackframe need to be such that adding or
-	 * subtracting 8 will result in 16 byte alignment (AMD64 ABI).  The reason
-	 * is so that input arguments (on the stack) are 16 byte aligned.  The
-	 * extra 8 bytes is the retaddr, pushed on the stack.  Compilers know they
-	 * can subtract 8 to get 16 byte alignment for instructions like movaps. */
-	sw_tf->tf_rsp = ROUNDDOWN(stack_top, 16) - 8;
+	/* Stack pointers in a fresh stack frame need to be 16 byte aligned
+	 * (AMD64 ABI). If we call this function from within load_elf(), it
+	 * should already be aligned properly, but we round again here for good
+	 * measure. We used to subtract an extra 8 bytes here to allow us to
+	 * write our _start() function in C instead of assembly. This was
+	 * necessary to account for a preamble inserted the compiler which
+	 * assumed a return address was pushed on the stack. Now that we properly
+	 * pass our arguments on the stack, we will have to rewrite our _start()
+	 * function in assembly to handle things properly. */
+	sw_tf->tf_rsp = ROUNDDOWN(stack_top, 16);
 	sw_tf->tf_rip = entryp;
 	sw_tf->tf_rbp = 0;	/* for potential backtraces */
 	sw_tf->tf_mxcsr = 0x00001f80;	/* x86 default mxcsr */

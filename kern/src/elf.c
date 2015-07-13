@@ -78,26 +78,39 @@ static uintptr_t populate_stack(struct proc *p, int argc, char *argv[],
 		return offset;
 	}
 
-	/* Get the size of the env and arg strings. */ 
+	/* Start tracking the size of the buffer necessary to hold all of our data
+	 * on the stack. Preallocate space for argc, argv, envp, and auxv in this
+	 * buffer. */
 	int bufsize = 0;
+	bufsize += 1 * sizeof(size_t);
+	bufsize += (auxc + 1) * sizeof(elf_aux_t);
+	bufsize += (envc + 1) * sizeof(char**);
+	bufsize += (argc + 1) * sizeof(char**);
+
+	/* Add in the size of the env and arg strings. */
 	int arg_lens[argc];
 	int env_lens[envc];
 	bufsize += get_lens(argc, argv, arg_lens);
 	bufsize += get_lens(envc, envp, env_lens);
 
+	/* Adjust bufsize so that our buffer will ultimately be 16 byte aligned. */
+	bufsize = ROUNDUP(bufsize, 16);
+
 	/* Set up pointers to all of the appropriate data regions we map to. */
-	char **new_argv = (char**)(((procinfo_t*)UINFO)->argp);
+	size_t *new_argc = (size_t*)(USTACKTOP - bufsize);
+	char **new_argv = (char**)(new_argc + 1);
 	char **new_envp = new_argv + argc + 1;
 	elf_aux_t *new_auxv = (elf_aux_t*)(new_envp + envc + 1);
-	char *new_argbuf = ((procinfo_t*)UINFO)->argbuf;
+	char *new_argbuf = (char*)(new_auxv + auxc + 1);
 
 	/* Verify that all data associated with our argv, envp, and auxv arrays
 	 * (and any corresponding strings they point to) will fit in the space
 	 * alloted. */
-	int psize = argc+1 + envc+1 + sizeof(elf_aux_t)/sizeof(char**)*(auxc+1);
-	if (psize > PROCINFO_MAX_ARGP)
+	if (bufsize > ARG_MAX)
 		return 0;
-	if (bufsize > PROCINFO_ARGBUF_SIZE)
+
+	/* Map argc into its final location. */
+	if (memcpy_to_user(p, new_argc, &argc, sizeof(size_t)))
 		return 0;
 
 	/* Map all data for argv and envp into its final location. */
@@ -116,7 +129,7 @@ static uintptr_t populate_stack(struct proc *p, int argc, char *argv[],
 	if (memcpy_to_user(p, new_auxv + auxc, &null_aux, sizeof(elf_aux_t)))
 		return 0;
 
-	return USTACKTOP;
+	return USTACKTOP - bufsize;
 }
 
 /* We need the writable flag for ld.  Even though the elf header says it wants
