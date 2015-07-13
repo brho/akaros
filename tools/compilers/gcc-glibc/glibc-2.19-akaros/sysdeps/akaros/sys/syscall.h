@@ -53,7 +53,7 @@ extern void (*ros_syscall_blockon)(struct syscall *sysc);
 
 /* Glibc initial blockon, usable before parlib code can init things (or if it
  * never can, like for RTLD).  MCPs will need the 'uthread-aware' blockon. */
-void __ros_scp_syscall_blockon(struct syscall *sysc);
+void __ros_early_syscall_blockon(struct syscall *sysc);
 
 #ifdef __cplusplus
 }

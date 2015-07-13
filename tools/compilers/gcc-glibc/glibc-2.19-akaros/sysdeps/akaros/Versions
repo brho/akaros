@@ -9,7 +9,7 @@ libc {
     werrstr;
     ros_syscall_blockon;
     ros_syscall_sync;
-    __ros_scp_syscall_blockon;
+    __ros_early_syscall_blockon;
     __ros_scp_simple_evq;
     __ros_syscall_noerrno;
     __ros_syscall_errno;

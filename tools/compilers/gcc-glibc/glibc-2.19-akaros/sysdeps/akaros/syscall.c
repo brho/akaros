@@ -62,31 +62,39 @@ static bool register_evq(struct syscall *sysc, struct event_queue *ev_q)
 }
 
 /* Glibc initial blockon, usable before parlib code can init things (or if it
- * never can, like for RTLD).  MCPs will need the 'uthread-aware' blockon. */
-void __ros_scp_syscall_blockon(struct syscall *sysc)
+ * never can, like for RTLD).  As processes initialize further, they will use
+ * different functions.
+ *
+ * In essence, we're in vcore context already.  For one, this function could be
+ * called from a full SCP in vcore context.  For early processes, we are not
+ * vcctx_ready.  Either way, we don't need to worry about the kernel forcing us
+ * into vcore context and otherwise clearing notif_pending.  For those curious,
+ * the old race was that the kernel sets notif pending after we register, then
+ * we drop into VC ctx, clear notif pending, and yield. */
+void __ros_early_syscall_blockon(struct syscall *sysc)
 {
-	/* Need to disable notifs before registering, so we don't take an __notify
-	 * that drops us into VC ctx and forces us to eat the notif_pending that was
-	 * meant to prevent us from yielding if the syscall completed early. */
-	__procdata.vcore_preempt_data[0].notif_disabled = TRUE;
+	/* For early SCPs, notif_pending will probably be false anyways.  For SCPs
+	 * in VC ctx, it might be set.  Regardless, when we pop back up,
+	 * notif_pending will be set (for a full SCP in VC ctx). */
+	__procdata.vcore_preempt_data[0].notif_pending = FALSE;
+	/* order register after clearing notif_pending, handled by register_evq */
 	/* Ask for a SYSCALL event when the sysc is done.  We don't need a handler,
 	 * we just need the kernel to restart us from proc_yield.  If register
 	 * fails, we're already done. */
 	if (register_evq(sysc, &__ros_scp_simple_evq)) {
 		/* Sending false for now - we want to signal proc code that we want to
-		 * wait (piggybacking on the MCP meaning of this variable) */
+		 * wait (piggybacking on the MCP meaning of this variable).  If
+		 * notif_pending is set, the kernel will immediately return us. */
 		__ros_syscall_noerrno(SYS_yield, FALSE, 0, 0, 0, 0, 0);
 	}
-	/* Manually doing an enable_notifs for VC 0 */
-	__procdata.vcore_preempt_data[0].notif_disabled = FALSE;
-	wrmb();	/* need to read after the write that enabled notifs */
-	if (__procdata.vcore_preempt_data[0].notif_pending)
-		__ros_syscall_noerrno(SYS_self_notify, 0, EV_NONE, 0, TRUE, 0, 0);
+	/* For early SCPs, the kernel turns off notif_pending for us.  For SCPs in
+	 * vcore context that blocked (should be rare!), it'll still be set.  Other
+	 * VC ctx code must handle it later. (could have coalesced notifs) */
 }
 
 /* Function pointer for the blockon function.  MCPs need to switch to the parlib
  * blockon before becoming an MCP.  Default is the glibc SCP handler */
-void (*ros_syscall_blockon)(struct syscall *sysc) = __ros_scp_syscall_blockon;
+void (*ros_syscall_blockon)(struct syscall *sysc) = __ros_early_syscall_blockon;
 
 /* Issue a single syscall and block into the 2LS until it completes */
 static inline void __ros_syscall_sync(struct syscall *sysc)
