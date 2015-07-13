@@ -40,3 +40,9 @@ sysdep_headers += fcall.h
 ifeq ($(subdir),stdlib)
 sysdep_routines += serialize
 endif
+
+# Vcore initialization functions. We want this in ctr1.o so we have to build
+# them in the csu subdir and place them in a spcial file called 'init'. */
+ifeq ($(subdir),csu)
+sysdep_routines += init
+endif
