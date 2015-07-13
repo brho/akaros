@@ -76,6 +76,9 @@ struct sigdata *alloc_sigdata();
 void free_sigdata(struct sigdata *sigdata);
 void trigger_posix_signal(int sig_nr, struct siginfo *info, void *aux);
 
+/* Control variables */
+extern bool parlib_wants_to_be_mcp;	/* instructs the 2LS to be an MCP */
+
 __END_DECLS
 
 #endif	// !ASSEMBLER
