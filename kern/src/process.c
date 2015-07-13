@@ -1348,6 +1348,12 @@ bool __proc_is_mcp(struct proc *p)
 	return p->procinfo->is_mcp;
 }
 
+bool proc_is_vcctx_ready(struct proc *p)
+{
+	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
+	return scp_is_vcctx_ready(vcpd);
+}
+
 /************************  Preemption Functions  ******************************
  * Don't rely on these much - I'll be sure to change them up a bit.
  *

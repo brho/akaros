@@ -13,6 +13,31 @@
 #include <kdebug.h>
 #include <kmalloc.h>
 
+static void print_unhandled_trap(struct proc *p, struct user_context *ctx,
+                                 unsigned int trap_nr, unsigned int err,
+                                 unsigned long aux)
+{
+	print_user_ctx(ctx);
+	printk("err 0x%x (for PFs: User 4, Wr 2, Rd 1), aux %p\n", err, aux);
+	debug_addr_proc(p, get_user_ctx_pc(ctx));
+	print_vmrs(p);
+	backtrace_user_ctx(p, ctx);
+}
+
+/* Traps that are considered normal operations. */
+static bool benign_trap(unsigned int err)
+{
+	return err & PF_VMR_BACKED;
+}
+
+static void printx_unhandled_trap(struct proc *p, struct user_context *ctx,
+                                  unsigned int trap_nr, unsigned int err,
+                                  unsigned long aux)
+{
+	if (printx_on && !benign_trap(err))
+		print_unhandled_trap(p, ctx, trap_nr, err, aux);
+}
+
 void reflect_unhandled_trap(unsigned int trap_nr, unsigned int err,
                             unsigned long aux)
 {
@@ -24,14 +49,15 @@ void reflect_unhandled_trap(unsigned int trap_nr, unsigned int err,
 	struct hw_trapframe *hw_tf = &pcpui->cur_ctx->tf.hw_tf;
 	assert(p);
 	assert(pcpui->cur_ctx && (pcpui->cur_ctx->type == ROS_HW_CTX));
-	if (!(p->procinfo->is_mcp)) {
-		printk("Unhandled SCP trap\n");
+	if (!proc_is_vcctx_ready(p)) {
+		printk("Unhandled user trap from early SCP\n");
 		goto error_out;
 	}
 	if (vcpd->notif_disabled) {
-		printk("Unhandled MCP trap in vcore context\n");
+		printk("Unhandled user trap in vcore context\n");
 		goto error_out;
 	}
+	printx_unhandled_trap(p, pcpui->cur_ctx, trap_nr, err, aux);
 	/* need to store trap_nr, err code, and aux into the tf so that it can get
 	 * extracted on the other end, and we need to flag the TF in some way so we
 	 * can tell it was reflected.  for example, on a PF, we need some number (14
@@ -46,11 +72,8 @@ void reflect_unhandled_trap(unsigned int trap_nr, unsigned int err,
 	              vcpd->transition_stack, vcpd->vcore_tls_desc);
 	return;
 error_out:
-	print_trapframe(hw_tf);
+	print_unhandled_trap(p, pcpui->cur_ctx, trap_nr, err, aux);
 	enable_irq();
-	printk("err 0x%x (for PFs: User 4, Wr 2, Rd 1), aux %p\n", err, aux);
-	debug_addr_proc(p, get_hwtf_pc(hw_tf));
-	print_vmrs(p);
 	proc_destroy(p);
 }
 

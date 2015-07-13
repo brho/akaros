@@ -463,9 +463,12 @@ void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
 			handle_page_fault(uthread, err, aux);
 			break;
 		default:
-			printf("Pthread has unhandled fault: %d\n", trap_nr);
-			/* Note that uthread.c already copied out our ctx into the uth struct */
+			printf("Pthread has unhandled fault: %d, err: %d, aux: %p\n",
+			       trap_nr, err, aux);
+			/* Note that uthread.c already copied out our ctx into the uth
+			 * struct */
 			print_user_context(&uthread->u_ctx);
+			printf("Turn on printx to spew unhandled, malignant trap info\n");
 			exit(-1);
 	}
 #else

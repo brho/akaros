@@ -17,11 +17,15 @@
 
 static void thread0_sched_entry(void);
 static void thread0_thread_blockon_sysc(struct uthread *uthread, void *sysc);
+static void thread0_thread_refl_fault(struct uthread *uthread,
+                                      unsigned int trap_nr, unsigned int err,
+                                      unsigned long aux);
 
 /* externed into uthread.c */
 struct schedule_ops thread0_2ls_ops = {
 	.sched_entry = thread0_sched_entry,
 	.thread_blockon_sysc = thread0_thread_blockon_sysc,
+	.thread_refl_fault = thread0_thread_refl_fault,
 };
 
 /* externed into uthread.c */
@@ -63,4 +67,15 @@ static void thread0_thread_blockon_sysc(struct uthread *uthread, void *arg)
 		 * notif_pending is set, the kernel will immediately return us. */
 		__ros_syscall_noerrno(SYS_yield, FALSE, 0, 0, 0, 0, 0);
 	}
+}
+
+static void thread0_thread_refl_fault(struct uthread *uthread,
+                                      unsigned int trap_nr, unsigned int err,
+                                      unsigned long aux)
+{
+	printf("SCP has unhandled fault: %d, err: %d, aux: %p\n", trap_nr, err,
+	       aux);
+	print_user_context(&uthread->u_ctx);
+	printf("Turn on printx to spew unhandled, malignant trap info\n");
+	exit(-1);
 }
