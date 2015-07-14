@@ -37,29 +37,25 @@ static int get_next_pid(void);
 static inline void spin_to_sleep(unsigned int spins, unsigned int *spun);
 
 /* Pthread 2LS operations */
-void pth_sched_entry(void);
-void pth_thread_runnable(struct uthread *uthread);
-void pth_thread_paused(struct uthread *uthread);
-void pth_thread_blockon_sysc(struct uthread *uthread, void *sysc);
-void pth_thread_has_blocked(struct uthread *uthread, int flags);
-void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
-                           unsigned int err, unsigned long aux);
-void pth_preempt_pending(void);
-void pth_spawn_thread(uintptr_t pc_start, void *data);
+static void pth_sched_entry(void);
+static void pth_thread_runnable(struct uthread *uthread);
+static void pth_thread_paused(struct uthread *uthread);
+static void pth_thread_blockon_sysc(struct uthread *uthread, void *sysc);
+static void pth_thread_has_blocked(struct uthread *uthread, int flags);
+static void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
+                                  unsigned int err, unsigned long aux);
 
 /* Event Handlers */
 static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
                                void *data);
 
 struct schedule_ops pthread_sched_ops = {
-	pth_sched_entry,
-	pth_thread_runnable,
-	pth_thread_paused,
-	pth_thread_blockon_sysc,
-	pth_thread_has_blocked,
-	pth_thread_refl_fault,
-	0, /* pth_preempt_pending, */
-	0, /* pth_spawn_thread, */
+	.sched_entry = pth_sched_entry,
+	.thread_runnable = pth_thread_runnable,
+	.thread_paused = pth_thread_paused,
+	.thread_blockon_sysc = pth_thread_blockon_sysc,
+	.thread_has_blocked = pth_thread_has_blocked,
+	.thread_refl_fault = pth_thread_refl_fault,
 };
 struct signal_ops pthread_signal_ops = {
 	.sigprocmask = pthread_sigmask,
@@ -201,7 +197,7 @@ static void __pthread_prep_for_pending_posix_signals(pthread_t pthread)
 /* Called from vcore entry.  Options usually include restarting whoever was
  * running there before or running a new thread.  Events are handled out of
  * event.c (table of function pointers, stuff like that). */
-void __attribute__((noreturn)) pth_sched_entry(void)
+static void __attribute__((noreturn)) pth_sched_entry(void)
 {
 	uint32_t vcoreid = vcore_id();
 	if (current_uthread) {
@@ -264,7 +260,7 @@ static void __pthread_run(void)
 
 /* GIANT WARNING: if you make any changes to this, also change the broadcast
  * wakeups (cond var, barrier, etc) */
-void pth_thread_runnable(struct uthread *uthread)
+static void pth_thread_runnable(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 	/* At this point, the 2LS can see why the thread blocked and was woken up in
@@ -308,7 +304,7 @@ void pth_thread_runnable(struct uthread *uthread)
  * vcore that is losing the uthread.  If that vcore is running, it'll be in a
  * preempt-event handling loop (not in your 2LS code).  If this is a big
  * problem, I'll change it. */
-void pth_thread_paused(struct uthread *uthread)
+static void pth_thread_paused(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 	/* Remove from the active list.  Note that I don't particularly care about
@@ -366,7 +362,7 @@ static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
  * and is trying to block on sysc.  Need to put it somewhere were we can wake it
  * up when the sysc is done.  For now, we'll have the kernel send us an event
  * when the syscall is done. */
-void pth_thread_blockon_sysc(struct uthread *uthread, void *syscall)
+static void pth_thread_blockon_sysc(struct uthread *uthread, void *syscall)
 {
 	struct syscall *sysc = (struct syscall*)syscall;
 	int old_flags;
@@ -389,7 +385,7 @@ void pth_thread_blockon_sysc(struct uthread *uthread, void *syscall)
 	/* GIANT WARNING: do not touch the thread after this point. */
 }
 
-void pth_thread_has_blocked(struct uthread *uthread, int flags)
+static void pth_thread_has_blocked(struct uthread *uthread, int flags)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 	/* could imagine doing something with the flags.  For now, we just treat all
@@ -440,8 +436,8 @@ static void handle_page_fault(struct uthread *uthread, unsigned int err,
 	}
 }
 
-void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
-                           unsigned int err, unsigned long aux)
+static void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
+                                  unsigned int err, unsigned long aux)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 	pthread->state = PTH_BLK_SYSC;
@@ -474,14 +470,6 @@ void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
 #else
 	#error "Handling hardware faults is currently only supported on x86"
 #endif
-}
-
-void pth_preempt_pending(void)
-{
-}
-
-void pth_spawn_thread(uintptr_t pc_start, void *data)
-{
 }
 
 /* Akaros pthread extensions / hacks */
