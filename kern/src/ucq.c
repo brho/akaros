@@ -21,7 +21,7 @@ void send_ucq_msg(struct ucq *ucq, struct proc *p, struct event_msg *msg)
 	assert(is_user_rwaddr(ucq, sizeof(struct ucq)));
 	/* So we can try to send ucqs to _Ss before they initialize */
 	if (!ucq->ucq_ready) {
-		if (p->state & (PROC_RUNNING_M | PROC_RUNNABLE_M))
+		if (__proc_is_mcp(p))
 			warn("proc %d is _M with an uninitialized ucq %p\n", p->pid, ucq);
 		return;
 	}
