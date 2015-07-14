@@ -15,7 +15,7 @@ define print-usage
 	@echo "Usage: make <arch> [ <config> ] [ <subcmd> ] "
 	@echo "    Valid archs are: 'x86_64', 'riscv'"
 	@echo "    Valid configs are: 'cross', 'native'"
-	@echo "    Valid subcommands are: 'build', 'uninstall'"
+	@echo "    Valid subcommands are: 'build', 'uninstall', check-env'"
 	@echo "    If no config is specified, the 'cross' config is assumed by default."
 	@echo "    If no subcommand is specified, the 'build' subcommand is assumed by default."
 	@echo ""
@@ -30,7 +30,7 @@ endef
 ifndef AKAROS_COMPILER_REAL_BUILD
 VALID_ARCHS := x86_64 riscv
 VALID_CONFIGS := cross native
-VALID_SUBCMDS := build uninstall
+VALID_SUBCMDS := build uninstall check-env
 VALID_CLEANS := clean inst-clean
 VALID_TARGETS := $(VALID_ARCHS) $(VALID_CONFIGS) \
                  $(VALID_SUBCMDS) $(VALID_CLEANS)
@@ -196,6 +196,9 @@ make-real:
 	@exit 2
 
 else # BUILD_ERROR
+
+check-env-real:
+	@echo "    Your environment checks out. Build away!"
 
 ifeq ($(CONFIG),cross)
 build-real:
