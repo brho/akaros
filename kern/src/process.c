@@ -585,17 +585,15 @@ void proc_run_s(struct proc *p)
 			return;
 		case (PROC_RUNNABLE_S):
 			__proc_set_state(p, PROC_RUNNING_S);
-			/* We will want to know where this process is running, even if it is
-			 * only in RUNNING_S.  can use the vcoremap, which makes death easy.
-			 * Also, this is the signal used in trap.c to know to save the tf in
-			 * scp_ctx. */
+			/* SCPs don't have full vcores, but they act like they have vcore 0.
+			 * We map the vcore, since we will want to know where this process
+			 * is running, even if it is only in RUNNING_S.  We can use the
+			 * vcoremap, which makes death easy.  num_vcores is still 0, and we
+			 * do account the time online and offline. */
 			__seq_start_write(&p->procinfo->coremap_seqctr);
-			p->procinfo->num_vcores = 0;	/* TODO (VC#) */
-			/* TODO: For now, we won't count this as an active vcore (on the
-			 * lists).  This gets unmapped in resource.c and yield_s, and needs
-			 * work. */
-			__map_vcore(p, 0, coreid); /* not treated like a true vcore */
-			vcore_account_online(p, 0); /* VC# */
+			p->procinfo->num_vcores = 0;
+			__map_vcore(p, 0, coreid);
+			vcore_account_online(p, 0);
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			/* incref, since we're saving a reference in owning proc later */
 			proc_incref(p, 1);
@@ -607,7 +605,7 @@ void proc_run_s(struct proc *p)
 			 * for now.  can simply clear_owning if we want to. */
 			assert(!pcpui->owning_proc);
 			pcpui->owning_proc = p;
-			pcpui->owning_vcoreid = 0; /* TODO (VC#) */
+			pcpui->owning_vcoreid = 0;
 			restore_vc_fp_state(vcpd);
 			/* similar to the old __startcore, start them in vcore context if
 			 * they have notifs and aren't already in vcore context.  o/w, start
@@ -846,8 +844,7 @@ void proc_destroy(struct proc *p)
 			send_kernel_message(get_pcoreid(p, 0), __death, 0, 0, 0,
 			                    KMSG_ROUTINE);
 			__seq_start_write(&p->procinfo->coremap_seqctr);
-			// TODO: might need to sort num_vcores too later (VC#)
-			/* vcore is unmapped on the receive side */
+			__unmap_vcore(p, 0);
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			/* If we ever have RUNNING_S run on non-mgmt cores, we'll need to
 			 * tell the ksched about this now-idle core (after unlocking) */
@@ -943,8 +940,7 @@ int proc_change_to_m(struct proc *p)
 	switch (p->state) {
 		case (PROC_RUNNING_S):
 			/* issue with if we're async or not (need to preempt it)
-			 * either of these should trip it. TODO: (ACR) async core req
-			 * TODO: relies on vcore0 being the caller (VC#) */
+			 * either of these should trip it. TODO: (ACR) async core req */
 			if ((current != p) || (get_pcoreid(p, 0) != core_id()))
 				panic("We don't handle async RUNNING_S core requests yet.");
 			struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
@@ -965,10 +961,9 @@ int proc_change_to_m(struct proc *p)
 			/* this process no longer runs on its old location (which is
 			 * this core, for now, since we don't handle async calls) */
 			__seq_start_write(&p->procinfo->coremap_seqctr);
-			// TODO: (VC#) might need to adjust num_vcores
 			// TODO: (ACR) will need to unmap remotely (receive-side)
-			__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run_s */
-			vcore_account_offline(p, 0); /* VC# */
+			__unmap_vcore(p, 0);
+			vcore_account_offline(p, 0);
 			__seq_end_write(&p->procinfo->coremap_seqctr);
 			/* change to runnable_m (it's TF is already saved) */
 			__proc_set_state(p, PROC_RUNNABLE_M);
@@ -1094,8 +1089,10 @@ void __proc_save_fpu_s(struct proc *p)
 void __proc_save_context_s(struct proc *p, struct user_context *ctx)
 {
 	p->scp_ctx = *ctx;
-	__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run_s */
-	vcore_account_offline(p, 0); /* VC# */
+	__seq_start_write(&p->procinfo->coremap_seqctr);
+	__unmap_vcore(p, 0);
+	__seq_end_write(&p->procinfo->coremap_seqctr);
+	vcore_account_offline(p, 0);
 }
 
 /* Yields the calling core.  Must be called locally (not async) for now.

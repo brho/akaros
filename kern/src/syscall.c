@@ -873,7 +873,9 @@ success:
 	free_sysc_str(pcpui->cur_kthread);
 	/* Here's how we restart the new (on success) or old (on failure) proc: */
 	spin_lock(&p->proc_lock);
-	__unmap_vcore(p, 0);	/* VC# keep in sync with proc_run_s */
+	__seq_start_write(&p->procinfo->coremap_seqctr);
+	__unmap_vcore(p, 0);
+	__seq_end_write(&p->procinfo->coremap_seqctr);
 	__proc_set_state(p, PROC_WAITING);	/* fake a yield */
 	spin_unlock(&p->proc_lock);
 	proc_wakeup(p);

@@ -390,7 +390,10 @@ static bool __schedule_scp(void)
 			 * IRQ and has a HW ctx, in which case we must save. */
 			__proc_save_fpu_s(pcpui->owning_proc);
 			__proc_save_context_s(pcpui->owning_proc, pcpui->cur_ctx);
-			vcore_account_offline(pcpui->owning_proc, 0); /* VC# */
+			vcore_account_offline(pcpui->owning_proc, 0);
+			__seq_start_write(&p->procinfo->coremap_seqctr);
+			__unmap_vcore(p, 0);
+			__seq_end_write(&p->procinfo->coremap_seqctr);
 			spin_unlock(&pcpui->owning_proc->proc_lock);
 			/* round-robin the SCPs (inserts at the end of the queue) */
 			switch_lists(pcpui->owning_proc, &unrunnable_scps, &runnable_scps);
