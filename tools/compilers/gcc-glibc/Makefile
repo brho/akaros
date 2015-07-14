@@ -122,12 +122,19 @@ BINARY_PREFIX := $(ARCH)-ucb-akaros-
 SYSROOT := $(INSTDIR)/$(ARCH)-ucb-akaros/sysroot
 PATH := /$(INSTDIR)/bin:$(PATH)
 
+BUILD_ERRORS :=
+BUILD_ERROR_DELIMITER := <\#\#>
+define add_error
+$(BUILD_ERRORS)$(1)$(BUILD_ERROR_DELIMITER)
+endef
+
 # Check for additional errors before building
 AWK := $(shell awk -W version 2>&1 | head -n 1 | awk '{print $$1}')
 ifneq ($(AWK),GNU)
 define BUILD_ERROR
     You need to have 'gawk' installed on your system before proceeding!"
 endef
+BUILD_ERRORS := $(call add_error, $(BUILD_ERROR))
 endif
 ifeq ($(INSTDIR),)
 define BUILD_ERROR
@@ -136,6 +143,7 @@ define BUILD_ERROR
     a 'Makelocal' file in the current directory and put a definition
     for this variable in there.
 endef
+BUILD_ERRORS := $(call add_error, $(BUILD_ERROR))
 endif 
 ifeq ($(CONFIG),native)
 ifeq ($(shell which $(ARCH)-ucb-akaros-gcc),)
@@ -144,6 +152,7 @@ define BUILD_ERROR
     built and installed the $(ARCH) cross-compiler using 'make $(ARCH)'
     before trying to build the crossed-native compiler.
 endef
+BUILD_ERRORS := $(call add_error, $(BUILD_ERROR))
 endif
 endif
 ifeq ($(ARCH),riscv)
@@ -154,6 +163,7 @@ define BUILD_ERROR
     e.g. cd $$AKAROSDIR
          make ARCH=riscv defconfig
 endef
+BUILD_ERRORS := $(call add_error, $(BUILD_ERROR))
 endif
 endif
 ifeq ($(ARCH),x86_64)
@@ -165,16 +175,25 @@ define BUILD_ERROR
          make ARCH=x86 defconfig
          make ARCH=x86 menuconfig -> Set 64 bit option
 endef
+BUILD_ERRORS := $(call add_error, $(BUILD_ERROR))
 endif
 endif
 
-ifdef BUILD_ERROR
+ifdef BUILD_ERRORS
 
-export BUILD_ERROR
+export BUILD_ERRORS
 $(MAKECMDGOALS): make-real
 	@echo "" > /dev/null
 make-real:
-	@echo "$${BUILD_ERROR}"
+	@echo "$${BUILD_ERRORS}" |\
+	awk '\
+		BEGIN { RS="<##>"; FS="<##>"; }\
+		{ str[NR] = $$i; }\
+		END { for (i = 1; i < NR; i++) {\
+				print "Error Detected:";\
+				print substr(str[i], 2); }}\
+	'
+	@exit 2
 
 else # BUILD_ERROR
 
