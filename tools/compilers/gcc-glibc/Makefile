@@ -151,7 +151,7 @@ ifeq ($(shell grep "CONFIG_RISCV=y" $(AKAROSDIR)/.config),)
 define BUILD_ERROR
     Akaros tree not configured for $(ARCH)
     Make sure you have configured AKAROSDIR for this architecture before proceeding
-    e.g. cd \$$AKAROSDIR
+    e.g. cd $$AKAROSDIR
          make ARCH=riscv defconfig
 endef
 endif
@@ -161,7 +161,7 @@ ifeq ($(shell grep "CONFIG_X86_64=y" $(AKAROSDIR)/.config),)
 define BUILD_ERROR
     Akaros tree not configured for x86_64
     Make sure you have configured AKAROSDIR for this architecture before proceeding
-    e.g. cd \$$AKAROSDIR
+    e.g. cd $$AKAROSDIR
          make ARCH=x86 defconfig
          make ARCH=x86 menuconfig -> Set 64 bit option
 endef
