@@ -1,0 +1,90 @@
+#
+# Automatically generated file; DO NOT EDIT.
+# Akaros/x86 Kernel Configuration
+#
+CONFIG_64BIT=y
+# CONFIG_RUN_INIT_SCRIPT is not set
+CONFIG_X86=y
+CONFIG_X86_64=y
+
+#
+# x86 Options
+#
+# CONFIG_PCI_VERBOSE is not set
+# CONFIG_NOFASTCALL_FSBASE is not set
+
+#
+# x86 Hacks
+#
+# CONFIG_POLL_CONSOLE is not set
+# CONFIG_LOUSY_LAPIC_TIMER is not set
+CONFIG_NOMTRRS=y
+# CONFIG_KB_CORE0_ONLY is not set
+# CONFIG_X86_DISABLE_KEYBOARD is not set
+CONFIG_NETWORKING=y
+
+#
+# Drivers
+#
+# CONFIG_BNX2X is not set
+CONFIG_REGRESS=y
+
+#
+# Filesystems
+#
+CONFIG_KFS=y
+CONFIG_KFS_PATHS="kern/kfs"
+CONFIG_KFS_CPIO_BIN=""
+# CONFIG_EXT2FS is not set
+
+#
+# Memory Management
+#
+# CONFIG_PAGE_COLORING is not set
+
+#
+# Kernel Debugging
+#
+
+#
+# Per-cpu Tracers
+#
+# CONFIG_TRACE_KMSGS is not set
+CONFIG_DEVELOPMENT_ASSERTIONS=y
+# CONFIG_SPINLOCK_DEBUG is not set
+# CONFIG_SEQLOCK_DEBUG is not set
+# CONFIG_SEMAPHORE_DEBUG is not set
+# CONFIG_SEM_SPINWAIT is not set
+# CONFIG_SEM_TRACE_BLOCKERS is not set
+CONFIG_RESET_STACKS=y
+CONFIG_LARGE_KSTACKS=y
+# CONFIG_KTHREAD_POISON is not set
+# CONFIG_DISABLE_SMT is not set
+# CONFIG_PRINTK_NO_BACKSPACE is not set
+# CONFIG_SYSCALL_STRING_SAVING is not set
+CONFIG_BLOCK_EXTRAS=y
+# CONFIG_VM is not set
+CONFIG_NIX=y
+CONFIG_NIX_IMG_PADDR=0x40000000
+CONFIG_NIX_IMG_SIZE=0x40000000
+
+#
+# Misc/Old Options
+#
+# CONFIG_ARSC_SERVER is not set
+# CONFIG_APPSERVER is not set
+# CONFIG_SERIAL_IO is not set
+# CONFIG_SINGLE_CORE is not set
+# CONFIG_BSD_ON_CORE0 is not set
+
+#
+# Libraries
+#
+CONFIG_ZLIB_DEFLATE=y
+CONFIG_ZLIB_INFLATE=y
+
+#
+# Testing
+#
+# CONFIG_KERNEL_TESTING is not set
+# CONFIG_USERSPACE_TESTING is not set
