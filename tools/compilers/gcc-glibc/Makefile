@@ -113,7 +113,7 @@ ifeq ($(CONFIG),cross)
     INSTDIR_STRING := $(shell echo $(ARCH) | tr 'a-z' 'A-Z')_INSTDIR
 else
     INSTDIR_STRING := $(shell echo $(ARCH) | tr 'a-z' 'A-Z')_NATIVE_INSTDIR
-    CXXROOT := $(shell dirname $(shell which $(ARCH)-ucb-akaros-gcc) 2>/dev/null)/..
+    XCCROOT := $(shell dirname $(shell which $(ARCH)-ucb-akaros-gcc) 2>/dev/null)/..
 endif
 BUILDDIR ?= $(shell pwd)/
 AKAROSDIR ?= $(BUILDDIR)/../../../
@@ -564,9 +564,9 @@ native-gcc-stage3-configure: native-gcc-stage3-prep
 		--target=$(ARCH)-ucb-akaros \
 		--host=$(ARCH)-ucb-akaros \
 		--prefix=$(INSTDIR) \
-		--with-gmp=$(CXXROOT) \
-		--with-mpfr=$(CXXROOT) \
-		--with-mpc=$(CXXROOT) \
+		--with-gmp=$(XCCROOT) \
+		--with-mpfr=$(XCCROOT) \
+		--with-mpc=$(XCCROOT) \
 		--enable-languages=c,c++,fortran \
 		--with-pkgversion="akaros-repo" \
 		--disable-__cxa_atexit \
