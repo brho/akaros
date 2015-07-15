@@ -36,6 +36,20 @@
 #
 #	- There are a few other TODOs sprinkled throughout the makefile.
 
+# Save the ability to export the parent's original environment for future use
+export_parent_env := $(shell export | sed 's/$$/;/')
+
+# Save the ability to clear the current environment for future use
+clear_current_env := for c in $$(env | cut -d '=' -f 1); do unset $$c; done;
+
+# Define a set of commands to reset the environment to the parent's environment
+# and then run a local make target
+define make_as_parent
+	$(clear_current_env)\
+	$(export_parent_env)\
+	$(MAKE) --no-print-directory $(1)
+endef
+
 # Do not:
 # o  use make's built-in rules and variables
 #    (this increases performance and avoids hard-to-debug behaviour);
@@ -621,6 +635,37 @@ objclean:
 	@rm -rf $(OBJDIR)
 
 realclean: userclean mrproper doxyclean objclean
+
+# Cross Compiler
+# =========================================================================
+
+xcc_build_dir := tools/compilers/gcc-glibc
+xcc_target := $(ARCH)
+ifeq ($(xcc_target),x86)
+    xcc_target := $(xcc_target)_64
+endif
+xcc_cleans := $(shell $(MAKE) -C $(xcc_build_dir) -pn |\
+                      grep "VALID_CLEANS := " |\
+                      sed -e 's/VALID_CLEANS := //')
+xcc_subcmds := $(shell $(MAKE) -C $(xcc_build_dir) -pn |\
+                       grep "VALID_SUBCMDS := " |\
+                       sed -e 's/VALID_SUBCMDS := //')
+xcc_clean_goals := $(patsubst %, xcc-%, $(xcc_cleans))
+xcc_subcmd_goals := $(patsubst %, xcc-%, $(xcc_subcmds))
+
+PHONY += xcc
+xcc: xcc-build
+
+PHONY += $(xcc_clean_goals)
+$(xcc_clean_goals):
+	@target="$(patsubst xcc-%,%,$(@))";\
+	$(call make_as_parent, -C $(xcc_build_dir) $${target})
+
+PHONY += $(xcc_subcmd_goals)
+$(xcc_subcmd_goals):
+	@subcmd="$(patsubst xcc-%,%,$(@))";\
+	target="$(xcc_target) $${subcmd}";\
+	$(call make_as_parent, -C $(xcc_build_dir) $${target})
 
 # Cleaning
 # =========================================================================
