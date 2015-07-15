@@ -636,6 +636,17 @@ objclean:
 
 realclean: userclean mrproper doxyclean objclean
 
+# Bundled apps
+# =========================================================================
+
+PHONY += apps-install
+apps-install:
+	@$(call make_as_parent, -C tools/apps/busybox)
+
+PHONY += apps-clean
+apps-clean:
+	@$(call make_as_parent, -C tools/apps/busybox clean)
+
 # Cross Compiler
 # =========================================================================
 
