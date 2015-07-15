@@ -15,7 +15,7 @@ define print-usage
 	@echo "Usage: make <arch> [ <config> ] [ <subcmd> ] "
 	@echo "    Valid archs are: 'x86_64', 'riscv'"
 	@echo "    Valid configs are: 'cross', 'native'"
-	@echo "    Valid subcommands are: 'build', 'uninstall', check-env'"
+	@echo "    Valid subcommands are: 'build', 'uninstall', check-env' 'install-headers'"
 	@echo "    If no config is specified, the 'cross' config is assumed by default."
 	@echo "    If no subcommand is specified, the 'build' subcommand is assumed by default."
 	@echo ""
@@ -30,7 +30,7 @@ endef
 ifndef AKAROS_COMPILER_REAL_BUILD
 VALID_ARCHS := x86_64 riscv
 VALID_CONFIGS := cross native
-VALID_SUBCMDS := build uninstall check-env
+VALID_SUBCMDS := build uninstall check-env install-headers
 VALID_CLEANS := clean inst-clean
 VALID_TARGETS := $(VALID_ARCHS) $(VALID_CONFIGS) \
                  $(VALID_SUBCMDS) $(VALID_CLEANS)
@@ -211,6 +211,7 @@ ifeq ($(CONFIG),cross)
 build-real:
 	$(MAKE) .$(BINARY_PREFIX)binutils-install
 	$(MAKE) .$(BINARY_PREFIX)gcc-stage1-install
+	$(MAKE) .$(BINARY_PREFIX)headers-clean
 	$(MAKE) .$(BINARY_PREFIX)akaros-headers-install
 	$(MAKE) .$(BINARY_PREFIX)dummy-libs-install
 	$(MAKE) .$(BINARY_PREFIX)glibc-stage1-install
@@ -233,6 +234,8 @@ uninstall-real:
 		rm -rf $${dir};\
 		echo "    Removed $${dir} ($(ARCH)-$(CONFIG)-inst)";\
 	fi
+
+install-headers-real: .$(BINARY_PREFIX)akaros-headers-install
 
 %.tar.bz2:
 	wget http://akaros.cs.berkeley.edu/xcc/$@
@@ -427,16 +430,19 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
 	make -j $(MAKE_JOBS) install-gcc install-target-libgcc;
 
-####################################
-######### AKAROS Headers ###########
-####################################
-.$(BINARY_PREFIX)akaros-headers-install: $(AKAROSDIR)
+#################################
+############ Headers ############
+#################################
+.$(BINARY_PREFIX)headers-clean:
 	rm -rf $(SYSROOT)/usr/include/*
+
+.$(BINARY_PREFIX)akaros-headers-install: $(AKAROSDIR)
 	mkdir -p $(SYSROOT)/usr/include
+	rm -rf $(SYSROOT)/usr/include/ros
 	cp -r $(AKAROSDIR)/kern/include/ros \
 	    $(SYSROOT)/usr/include/
-	rm -f $(SYSROOT)/usr/include/ros/arch
-	mkdir $(SYSROOT)/usr/include/ros/arch
+	rm -rf $(SYSROOT)/usr/include/ros/arch
+	mkdir -p $(SYSROOT)/usr/include/ros/arch
 	cp -r $(AKAROSDIR)/kern/arch/$(AKAROS_ARCH_DIR)/ros/* \
 	    $(SYSROOT)/usr/include/ros/arch/
 	mkdir -p $(SYSROOT)/usr/include/parlib
