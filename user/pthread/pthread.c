@@ -243,6 +243,8 @@ void __attribute__((noreturn)) pth_sched_entry(void)
 		 * bit before yielding (or not at all if you want to be greedy). */
 		if (can_adjust_vcores)
 			vcore_yield(FALSE);
+		if (!parlib_wants_to_be_mcp)
+			sys_yield(FALSE);
 	} while (1);
 	assert(new_thread->state == PTH_RUNNABLE);
 	/* Prep the pthread to run any pending posix signal handlers registered
@@ -679,6 +681,13 @@ void pthread_mcp_init()
 	/* Prevent this from happening more than once. */
 	init_once_racy(return);
 
+	if (!parlib_wants_to_be_mcp) {
+		/* sign to whether or not we ask for more vcores.  actually, if we're
+		 * an SCP, the current kernel will ignore our requests, but best to not
+		 * rely on that. */
+		can_adjust_vcores = FALSE;
+		return;
+	}
 	uthread_mcp_init();
 	/* From here forward we are an MCP running on vcore 0. Could consider doing
 	 * other pthread specific initialization based on knowing we are an mcp
