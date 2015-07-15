@@ -456,8 +456,10 @@ $(kern_cpio) initramfs: $(kern_initramfs_files)
         cd $$OLDPWD; \
     done;
 
-ld_emulation = $(shell $(OBJDUMP) -i | grep -v BFD | grep ^[a-z] |head -n1)
-ld_arch = $(shell $(OBJDUMP) -i | grep -v BFD | grep "^  [a-z]" | head -n1)
+ld_emulation = $(shell $(OBJDUMP) -i 2>/dev/null | \
+                       grep -v BFD | grep ^[a-z] | head -n1)
+ld_arch = $(shell $(OBJDUMP) -i 2>/dev/null |\
+                  grep -v BFD | grep "^  [a-z]" | head -n1)
 
 # Our makefile doesn't detect a change in subarch, and old binary objects that
 # don't need to be updated won't get rebuilt, but they also can't link with the
