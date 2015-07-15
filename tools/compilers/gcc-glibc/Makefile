@@ -88,8 +88,7 @@ clean:
 inst-clean: clean
 	@for a in $(VALID_ARCHS); do \
 		for c in $(VALID_CONFIGS); do \
-			$(MAKE) --no-print-directory $$a $$c uninstall > /dev/null; \
-			echo "    Removed $$a-$$c-inst"; \
+			$(MAKE) --no-print-directory $$a $$c uninstall; \
 		done \
 	done
 
@@ -146,7 +145,7 @@ endef
 BUILD_ERRORS := $(call add_error, $(BUILD_ERROR))
 endif 
 ifeq ($(CONFIG),native)
-ifeq ($(shell which $(ARCH)-ucb-akaros-gcc),)
+ifeq ($(shell which $(ARCH)-ucb-akaros-gcc 2>/dev/null),)
 define BUILD_ERROR
     No $(ARCH) Akaros cross-compiler installed in path. Make sure you have
     built and installed the $(ARCH) cross-compiler using 'make $(ARCH)'
@@ -177,6 +176,11 @@ define BUILD_ERROR
 endef
 BUILD_ERRORS := $(call add_error, $(BUILD_ERROR))
 endif
+endif
+
+ROBUST_SUBCMDS := uninstall
+ifeq ($(filter-out $(patsubst %, %-real, $(ROBUST_SUBCMDS)), $(MAKECMDGOALS)),)
+    BUILD_ERRORS :=
 endif
 
 ifdef BUILD_ERRORS
@@ -221,8 +225,11 @@ build-real:
 endif
 
 uninstall-real:
-	@rm -rf $(INSTDIR)
-	@echo "    Removed $(INSTDIR) ($(ARCH)-$(CONFIG)-inst)"
+	@dir=$(INSTDIR);\
+	if [ "$${dir}" != "" ]; then\
+		rm -rf $${dir};\
+		echo "    Removed $${dir} ($(ARCH)-$(CONFIG)-inst)";\
+	fi
 
 %.tar.bz2:
 	wget http://akaros.cs.berkeley.edu/xcc/$@
