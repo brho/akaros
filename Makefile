@@ -678,6 +678,21 @@ $(xcc_subcmd_goals):
 	target="$(xcc_target) $${subcmd}";\
 	$(call make_as_parent, -C $(xcc_build_dir) $${target})
 
+PHONY += xcc-upgrade
+xcc-upgrade: xcc
+	@$(MAKE) userclean
+	@$(MAKE) install-libs
+	@$(MAKE) testclean utestclean
+	@$(MAKE) tests utest
+	@$(call make_as_parent, apps-clean)
+	@$(call make_as_parent, apps-install)
+	@$(MAKE) fill-kfs
+	@$(MAKE) akaros-kernel
+
+PHONY += xcc-upgrade-from-scratch
+xcc-upgrade-from-scratch: xcc-clean xcc-uninstall
+	@$(call make_as_parent, xcc-upgrade)
+
 # Cleaning
 # =========================================================================
 # This is mostly the Linux kernel cleaning.  We could hook in to the userspace
