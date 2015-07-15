@@ -41,16 +41,6 @@ void train_timing()
 	printk("TSC overhead (Min: %llu, Max: %llu)\n", min_overhead, max_overhead);
 }
 
-void udelay_sched(uint64_t usec)
-{
-	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
-	struct alarm_waiter a_waiter;
-	init_awaiter(&a_waiter, 0);
-	set_awaiter_rel(&a_waiter, usec);
-	set_alarm(tchain, &a_waiter);
-	sleep_on_awaiter(&a_waiter);
-}
-
 /* Convenience wrapper called when a core's timer interrupt goes off.  Not to be
  * confused with global timers (like the PIC).  Do not put your code here.  If
  * you want something to happen in the future, set an alarm. */

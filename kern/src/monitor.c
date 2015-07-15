@@ -899,7 +899,7 @@ static void pm_flusher(void *unused)
 	/* could also put the delay between calls, or even within remove, during the
 	 * WB phase. */
 	while (1) {
-		udelay_sched(5000);
+		kthread_usleep(5000);
 		TAILQ_FOREACH(sb, &super_blocks, s_list) {
 			TAILQ_FOREACH(inode, &sb->s_inodes, i_sb_list) {
 				nr_pages = ROUNDUP(inode->i_size, PGSIZE) >> PGSHIFT;

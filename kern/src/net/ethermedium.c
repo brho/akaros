@@ -301,8 +301,9 @@ static void etherunbind(struct Ipifc *ifc)
 #endif
 
 	/* wait for readers to die */
-	while (er->arpp != 0 || er->read4p != 0 || er->read6p != 0) ;
-	udelay_sched(300 * 1000);
+	while (er->arpp != 0 || er->read4p != 0 || er->read6p != 0)
+		cpu_relax();
+	kthread_usleep(300 * 1000);
 
 	if (er->mchan4 != NULL)
 		cclose(er->mchan4);

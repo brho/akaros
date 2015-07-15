@@ -269,7 +269,7 @@ almost certainly not needed.void resrcwait(char *reason)
 		printd("%s\n", reason);
 	}
 
-	udelay_sched(300 * 1000);
+	kthread_usleep(300 * 1000);
 	up->psstate = p;
 }
 #endif

@@ -853,7 +853,7 @@ rtl8169attach(struct ether* edev)
 	for(timeo = 0; timeo < 350; timeo++){
 		if(miistatus(ctlr->mii) == 0)
 			break;
-		udelay_sched(10000);
+		kthread_usleep(10000);
 	}
 	phy = ctlr->mii->curphy;
 	printd("%s: speed %d fd %d link %d rfc %d tfc %d\n",

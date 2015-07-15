@@ -54,7 +54,7 @@ static void loopbackunbind(struct Ipifc *ifc)
 
 	/* wait for reader to die */
 	while (lb->readp != 0)
-		udelay_sched(300 * 1000);
+		kthread_usleep(300 * 1000);
 
 	/* clean up */
 	qfree(lb->q);

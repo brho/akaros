@@ -681,7 +681,7 @@ static void rxmitproc(void *v)
 		if (wakeupat == 0)
 			rendez_sleep(&arp->rxmtq, rxready, v);
 		else if (wakeupat > ReTransTimer / 4)
-			udelay_sched(wakeupat * 1000);
+			kthread_usleep(wakeupat * 1000);
 	}
 	poperror();
 }

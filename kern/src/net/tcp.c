@@ -649,7 +649,7 @@ void tcpackproc(void *a)
 	priv = tcp->priv;
 
 	for (;;) {
-		udelay_sched(MSPTICK * 1000);
+		kthread_usleep(MSPTICK * 1000);
 
 		qlock(&priv->tl);
 		timeo = NULL;

@@ -54,7 +54,7 @@ static void irq_console(struct hw_trapframe *hw_tf, void *data)
 static void cons_poller(void *arg)
 {
 	while (1) {
-		udelay_sched(10000);
+		kthread_usleep(10000);
 		irq_console(0, arg);
 	}
 }

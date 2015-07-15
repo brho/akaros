@@ -13,7 +13,7 @@ expression RV;
 expression RVTO;
 @@
 -tsleep(RV, return0, 0, RVTO);
-+udelay_sched(RVTO * 1000);
++kthread_usleep(RVTO * 1000);
 
 // and then this one catches all real usage of rendez_sleep_timeout
 @@
