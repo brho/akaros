@@ -1143,7 +1143,20 @@ struct emmsr emmsrs[] = {
 	{MSR_RAPL_POWER_UNIT, "MSR_RAPL_POWER_UNIT", emsr_readzero},
 };
 
-#define set_low32(hi,lo) (((hi) & 0xffffffff00000000ULL ) | (lo))
+static uint64_t set_low32(uint64_t hi, uint32_t lo)
+{
+	return (hi & 0xffffffff00000000ULL) | lo;
+}
+
+static uint64_t set_low16(uint64_t hi, uint16_t lo)
+{
+	return (hi & 0xffffffffffff0000ULL) | lo;
+}
+
+static uint64_t set_low8(uint64_t hi, uint8_t lo)
+{
+	return (hi & 0xffffffffffffff00ULL) | lo;
+}
 
 /* this may be the only register that needs special handling.
  * If there others then we might want to extend teh emmsr struct.
@@ -1259,7 +1272,7 @@ int emsr_fakewrite(struct vmx_vcpu *vcpu, struct emmsr *msr,
 	return 0;
 }
 
-int
+static int
 msrio(struct vmx_vcpu *vcpu, uint32_t opcode, uint32_t qual) {
 	int i;
 	for (i = 0; i < ARRAY_SIZE(emmsrs); i++) {
@@ -1270,6 +1283,172 @@ msrio(struct vmx_vcpu *vcpu, uint32_t opcode, uint32_t qual) {
 	printk("msrio for 0x%lx failed\n", vcpu->regs.tf_rcx);
 	return SHUTDOWN_UNHANDLED_EXIT_REASON;
 }
+
+/* crude PCI bus. Just enough to get virtio working. I would rather not add to this. */
+struct pciconfig {
+	uint32_t registers[256];
+};
+
+/* just index by devfn, i.e. 8 bits */
+struct pciconfig pcibus[] = {
+	/* linux requires that devfn 0 be a bridge. 
+	 * 00:00.0 Host bridge: Intel Corporation 440BX/ZX/DX - 82443BX/ZX/DX Host bridge (rev 01)
+	 */
+	{
+		{0x71908086, 0x02000006, 0x06000001},
+	},
+};
+/* cf8 is a single-threaded resource. */
+static uint32_t cf8;
+static uint32_t allones = (uint32_t)-1;
+
+/* Return a pointer to the 32-bit "register" in the "pcibus" give an address. Use cf8.
+ * only for readonly access.
+ * this will fail if we ever want to do writes, but we don't.
+ */
+void regp(uint32_t **reg)
+{
+	*reg = &allones;
+	int devfn = (cf8>>8) & 0xff;
+	printk("devfn %d\n", devfn);
+	if (devfn < ARRAY_SIZE(pcibus))
+		*reg = &pcibus[devfn].registers[(cf8>>2)&0x3f];
+	printk("-->regp *reg 0x%lx\n", **reg);
+}
+
+static uint32_t configaddr(uint32_t val)
+{
+	printk("%s 0x%lx\n", __func__, val);
+	cf8 = val;
+	return 0;
+}
+
+static uint32_t configread32(uint32_t edx, uint64_t *reg)
+{
+	uint32_t *r = &cf8;
+	regp(&r);
+	*reg = set_low32(*reg, *r);
+	printk("%s: 0x%lx 0x%lx, 0x%lx 0x%lx\n", __func__, cf8, edx, r, *reg);
+	return 0;
+}
+
+static uint32_t configread16(uint32_t edx, uint64_t *reg)
+{
+	uint64_t val;
+	int which = ((edx&2)>>1) * 16;
+	configread32(edx, &val);
+	val >>= which;
+	*reg = set_low16(*reg, val);
+	printk("%s: 0x%lx, 0x%lx 0x%lx\n", __func__, edx, val, *reg);
+	return 0;
+}
+
+static uint32_t configread8(uint32_t edx, uint64_t *reg)
+{
+	uint64_t val;
+	int which = (edx&3) * 8;
+	configread32(edx, &val);
+	val >>= which;
+	*reg = set_low16(*reg, val);
+	printk("%s: 0x%lx, 0x%lx 0x%lx\n", __func__, edx, val, *reg);
+	return 0;
+}
+
+static int configwrite32(uint32_t addr, uint32_t val)
+{
+	printk("%s 0x%lx 0x%lx\n", __func__, addr, val);
+	return 0;
+}
+
+static int configwrite16(uint32_t addr, uint16_t val)
+{
+	printk("%s 0x%lx 0x%lx\n", __func__, addr, val);
+	return 0;
+}
+
+static int configwrite8(uint32_t addr, uint8_t val)
+{
+	printk("%s 0x%lx 0x%lx\n", __func__, addr, val);
+	return 0;
+}
+
+/* this is very minimal. It needs to move to vmm/io.c but we don't
+ * know if this minimal approach will even be workable. It only (for
+ * now) handles pci config space. We'd like to hope that's all we will
+ * need.
+ * It would have been nice had intel encoded the IO exit info as nicely as they
+ * encoded, some of the other exits.
+ */
+static int io(struct vmx_vcpu *vcpu, int *advance)
+{
+
+	/* Get a pointer to the memory at %rip. This is quite messy and part of the
+	 * reason we don't want to do this at all. It sucks. Would have been nice
+	 * had linux had an option to ONLY do mmio config space access, but no such
+	 * luck.
+	 */
+	uint8_t *ip8 = NULL;
+	uint16_t *ip16;
+	uintptr_t ip;
+	uint32_t edx;
+	/* for now, we're going to be a bit crude. In kernel, p is about v, so we just blow away
+	 * the upper 34 bits and take the rest as our address
+	 */
+	ip = vcpu->regs.tf_rip & 0x3fffffff;
+	edx = vcpu->regs.tf_rdx;
+	ip8 = (void *)ip;
+	ip16 = (void *)ip;
+	printk("io: ip16 %p\n", *ip16, edx);
+
+	if (*ip8 == 0xef) {
+		*advance = 1;
+		/* out at %edx */
+		if (edx == 0xcf8) {
+			printk("Set cf8 ");
+			return configaddr(vcpu->regs.tf_rax);
+		}
+		printk("unhandled IO address dx @%p is 0x%x\n", ip8, edx);
+		return SHUTDOWN_UNHANDLED_EXIT_REASON;
+	}
+	// out %al, %dx
+	if (*ip8 == 0xee) {
+		*advance = 1;
+		/* out al %edx */
+		if (edx == 0xcfb) { // special!
+			printk("Just ignore the damned cfb write\n");
+			return 0;
+		}
+		if ((edx&~3) == 0xcfc) {
+			printk("configwrite8 ");
+			return configwrite8(edx, vcpu->regs.tf_rax);
+		}
+		printk("unhandled IO address dx @%p is 0x%x\n", ip8, edx);
+		return SHUTDOWN_UNHANDLED_EXIT_REASON;
+	}
+	if (*ip8 == 0xec) {
+		*advance = 1;
+		printk("configread8 ");
+		return configread8(edx, &vcpu->regs.tf_rax);
+	}
+	if (*ip8 == 0xed) {
+		*advance = 1;
+		if (edx == 0xcf8) {
+			printk("read cf8 0x%lx\n", vcpu->regs.tf_rax);
+			vcpu->regs.tf_rax = cf8;
+			return 0;
+		}
+		printk("configread32 ");
+		return configread32(edx, &vcpu->regs.tf_rax);
+	}
+	if (*ip16 == 0xed66) {
+		*advance = 2;
+		printk("configread16 ");
+		return configread16(edx, &vcpu->regs.tf_rax);
+	}
+	printk("unknown IO %p %x %x\n", ip8, *ip8, *ip16);
+	return SHUTDOWN_UNHANDLED_EXIT_REASON;
+}
+
 /* Notes on autoloading.  We can't autoload FS_BASE or GS_BASE, according to the
  * manual, but that's because they are automatically saved and restored when all
  * of the other architectural registers are saved and restored, such as cs, ds,
@@ -1707,6 +1886,10 @@ int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3) {
 			vcpu->shutdown =
 				msrio(vcpu, ret, vmcs_read32(EXIT_QUALIFICATION));
 			advance = 2;
+		} else if (ret == EXIT_REASON_IO_INSTRUCTION) {
+			/* we never wanted to do this. But virtio
+			 * requires pci config space emulation. */
+			vcpu->shutdown = io(vcpu, &advance);
 		} else {
 			printk("unhandled exit: reason 0x%x, exit qualification 0x%x\n",
 			       ret, vmcs_read32(EXIT_QUALIFICATION));
