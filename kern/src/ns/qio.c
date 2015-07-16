@@ -1189,11 +1189,12 @@ static int notempty(void *a)
 	return (q->state & Qclosed) || q->bfirst != 0;
 }
 
-/* wait for the queue to be non-empty or closed.
+/* Wait for the queue to be non-empty or closed.  Returns TRUE for a successful
+ * wait, FALSE on Qclose (without error)
  *
- * called with q ilocked.  rendez may error out, back through the caller, with
+ * Called with q ilocked.  May error out, back through the caller, with
  * the irqsave lock unlocked.  */
-static int qwait(struct queue *q)
+static bool qwait(struct queue *q)
 {
 	/* wait for data */
 	for (;;) {
@@ -1201,20 +1202,24 @@ static int qwait(struct queue *q)
 			break;
 
 		if (q->state & Qclosed) {
-			if (++q->eof > 3)
-				return -1;
-			if (*q->err && strcmp(q->err, Ehungup) != 0)
-				return -1;
-			return 0;
+			if (++q->eof > 3) {
+				spin_unlock_irqsave(&q->lock);
+				error("multiple reads on a closed queue");
+			}
+			if (*q->err && strcmp(q->err, Ehungup) != 0) {
+				spin_unlock_irqsave(&q->lock);
+				error(q->err);
+			}
+			return FALSE;
 		}
-
+		}
 		q->state |= Qstarve;	/* flag requesting producer to wake me */
 		spin_unlock_irqsave(&q->lock);
 		/* may throw an error() */
 		rendez_sleep(&q->rr, notempty, q);
 		spin_lock_irqsave(&q->lock);
 	}
-	return 1;
+	return TRUE;
 }
 
 /*
@@ -1408,17 +1413,12 @@ struct block *qbread(struct queue *q, int len)
 	}
 
 	spin_lock_irqsave(&q->lock);
-	switch (qwait(q)) {
-		case 0:
-			/* queue closed */
-			spin_unlock_irqsave(&q->lock);
-			qunlock(&q->rlock);
-			poperror();
-			return NULL;
-		case -1:
-			/* multiple reads on a closed queue */
-			spin_unlock_irqsave(&q->lock);
-			error(q->err);
+	if (!qwait(q)) {
+		/* queue closed */
+		spin_unlock_irqsave(&q->lock);
+		qunlock(&q->rlock);
+		poperror();
+		return NULL;
 	}
 
 	/* if we get here, there's at least one block in the queue */
@@ -1465,17 +1465,12 @@ long qread(struct queue *q, void *vp, int len)
 
 	spin_lock_irqsave(&q->lock);
 again:
-	switch (qwait(q)) {
-		case 0:
-			/* queue closed */
-			spin_unlock_irqsave(&q->lock);
-			qunlock(&q->rlock);
-			poperror();
-			return 0;
-		case -1:
-			/* multiple reads on a closed queue */
-			spin_unlock_irqsave(&q->lock);
-			error(q->err);
+	if (!qwait(q)) {
+		/* queue closed */
+		spin_unlock_irqsave(&q->lock);
+		qunlock(&q->rlock);
+		poperror();
+		return 0;
 	}
 
 	/* if we get here, there's at least one block in the queue */
