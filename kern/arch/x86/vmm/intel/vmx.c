@@ -1407,6 +1407,10 @@ static int io(struct vmx_vcpu *vcpu, int *advance)
 			printk("Set cf8 ");
 			return configaddr(vcpu->regs.tf_rax);
 		}
+		if (edx == 0xcf8) {
+			printk("IGNORE Set cf8 ");
+			return configaddr(vcpu->regs.tf_rax);
+		}
 		printk("unhandled IO address dx @%p is 0x%x\n", ip8, edx);
 		return SHUTDOWN_UNHANDLED_EXIT_REASON;
 	}
@@ -1419,8 +1423,8 @@ static int io(struct vmx_vcpu *vcpu, int *advance)
 			return 0;
 		}
 		if ((edx&~3) == 0xcfc) {
-			printk("configwrite8 ");
-			return configwrite8(edx, vcpu->regs.tf_rax);
+			printk("ignoring write to cfc ");
+			return 0;
 		}
 		printk("unhandled IO address dx @%p is 0x%x\n", ip8, edx);
 		return SHUTDOWN_UNHANDLED_EXIT_REASON;
