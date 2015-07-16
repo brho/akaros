@@ -46,7 +46,6 @@ struct queue {
 	int limit;					/* max bytes in queue */
 	int inilim;				/* initial limit */
 	int state;
-	int noblock;				/* true if writes return immediately when q full */
 	int eof;					/* number of eofs read by user */
 
 	void (*kick) (void *);		/* restart output */
@@ -1161,7 +1160,6 @@ struct queue *qopen(int limit, int msg, void (*kick) (void *), void *arg)
 	q->state = msg;
 	q->state |= Qstarve;
 	q->eof = 0;
-	q->noblock = 0;
 
 	return q;
 }
@@ -1544,7 +1542,7 @@ static int qnotfull(void *a)
 	return q->len < q->limit || (q->state & Qclosed);
 }
 
-uint32_t noblockcnt;
+uint32_t dropcnt;
 
 /*
  *  add a block to a queue obeying flow control
@@ -1581,10 +1579,10 @@ long qbwrite(struct queue *q, struct block *b)
 
 	/* if nonblocking, don't queue over the limit */
 	if (q->len >= q->limit) {
-		if (q->noblock) {
+		if (q->state & Qdropoverflow) {
 			spin_unlock_irqsave(&q->lock);
 			freeb(b);
-			noblockcnt += n;
+			dropcnt += n;
 			qunlock(&q->wlock);
 			poperror();
 			return n;
@@ -1632,7 +1630,7 @@ long qbwrite(struct queue *q, struct block *b)
 	 *  queue infinite crud.
 	 */
 	for (;;) {
-		if (q->noblock || qnotfull(q))
+		if ((q->state & Qdropoverflow) || qnotfull(q))
 			break;
 
 		spin_lock_irqsave(&q->lock);
@@ -1789,13 +1787,12 @@ void qclose(struct queue *q)
 	/* mark it */
 	spin_lock_irqsave(&q->lock);
 	q->state |= Qclosed;
-	q->state &= ~(Qflow | Qstarve);
+	q->state &= ~(Qflow | Qstarve | Qdropoverflow);
 	strncpy(q->err, Ehungup, sizeof(q->err));
 	bfirst = q->bfirst;
 	q->bfirst = 0;
 	q->len = 0;
 	q->dlen = 0;
-	q->noblock = 0;
 	spin_unlock_irqsave(&q->lock);
 
 	/* free queued blocks */
@@ -1889,7 +1886,10 @@ void qsetlimit(struct queue *q, int limit)
  */
 void qdropoverflow(struct queue *q, bool onoff)
 {
-	q->noblock = onoff;
+	if (onoff)
+		q->state |= Qdropoverflow;
+	else
+		q->state &= ~Qdropoverflow;
 }
 
 /*
