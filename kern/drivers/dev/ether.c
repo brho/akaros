@@ -439,7 +439,7 @@ static long etherwrite(struct chan *chan, void *buf, long n, int64_t unused)
 			else
 				onoff = atoi(cb->f[1]);
 			if (ether->oq != NULL)
-				qnoblock(ether->oq, onoff);
+				qdropoverflow(ether->oq, onoff);
 			kfree(cb);
 			goto out;
 		}

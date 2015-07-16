@@ -84,7 +84,7 @@ void printinit(void)
 	lineq = qopen(2 * 1024, 0, NULL, NULL);
 	if (lineq == NULL)
 		panic("printinit");
-	qnoblock(lineq, 1);
+	qdropoverflow(lineq, 1);
 #endif
 }
 
@@ -642,7 +642,7 @@ static struct chan *consopen(struct chan *c, int omode)
 					wunlock(&(&kprintq)->rwlock);
 					error(Enomem);
 				}
-				qnoblock(kprintq.q, 1);
+				qdropoverflow(kprintq.q, 1);
 				wunlock(&(&kprintq)->rwlock);
 				c->iounit = qiomaxatomic;
 			}

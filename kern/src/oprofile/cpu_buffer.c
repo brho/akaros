@@ -143,7 +143,7 @@ int alloc_cpu_buffers(void)
 		goto fail;
 
 	/* we *really* don't want to block. Losing data is better. */
-	qnoblock(opq, 1);
+	qdropoverflow(opq, 1);
 	if (!op_cpu_buffer) {
 		op_cpu_buffer =
 			kzmalloc(sizeof(*op_cpu_buffer) * num_cores, KMALLOC_WAIT);

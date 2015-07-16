@@ -1885,9 +1885,9 @@ void qsetlimit(struct queue *q, int limit)
 }
 
 /*
- *  set blocking/nonblocking
+ *  set whether writes drop overflowing blocks, or if we sleep
  */
-void qnoblock(struct queue *q, int onoff)
+void qdropoverflow(struct queue *q, bool onoff)
 {
 	q->noblock = onoff;
 }

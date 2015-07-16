@@ -22,6 +22,12 @@
 +sysread(
 ...)
 
+@ qnoblock@
+@@
+-qnoblock(
++qdropoverflow(
+...)
+
 @ channel @
 identifier d;
 @@

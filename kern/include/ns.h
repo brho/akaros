@@ -815,7 +815,7 @@ void qhangup(struct queue *, char *unused_char_p_t);
 int qisclosed(struct queue *);
 int qiwrite(struct queue *, void *, int);
 int qlen(struct queue *);
-void qnoblock(struct queue *, int);
+void qdropoverflow(struct queue *, bool);
 struct queue *qopen(int unused_int, int, void (*)(void *), void *);
 int qpass(struct queue *, struct block *);
 int qpassnolim(struct queue *, struct block *);
