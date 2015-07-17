@@ -1310,10 +1310,10 @@ void regp(uint32_t **reg)
 {
 	*reg = &allones;
 	int devfn = (cf8>>8) & 0xff;
-	printk("devfn %d\n", devfn);
+	//printk("devfn %d\n", devfn);
 	if (devfn < ARRAY_SIZE(pcibus))
 		*reg = &pcibus[devfn].registers[(cf8>>2)&0x3f];
-	printk("-->regp *reg 0x%lx\n", **reg);
+	//printk("-->regp *reg 0x%lx\n", **reg);
 }
 
 static uint32_t configaddr(uint32_t val)
@@ -1356,6 +1356,9 @@ static uint32_t configread8(uint32_t edx, uint64_t *reg)
 
 static int configwrite32(uint32_t addr, uint32_t val)
 {
+	uint32_t *r = &cf8;
+	regp(&r);
+	*r = val;
 	printk("%s 0x%lx 0x%lx\n", __func__, addr, val);
 	return 0;
 }
@@ -1398,18 +1401,18 @@ static int io(struct vmx_vcpu *vcpu, int *advance)
 	edx = vcpu->regs.tf_rdx;
 	ip8 = (void *)ip;
 	ip16 = (void *)ip;
-	printk("io: ip16 %p\n", *ip16, edx);
+	//printk("io: ip16 %p\n", *ip16, edx);
 
 	if (*ip8 == 0xef) {
 		*advance = 1;
 		/* out at %edx */
 		if (edx == 0xcf8) {
-			printk("Set cf8 ");
+			//printk("Set cf8 ");
 			return configaddr(vcpu->regs.tf_rax);
 		}
-		if (edx == 0xcf8) {
-			printk("IGNORE Set cf8 ");
-			return configaddr(vcpu->regs.tf_rax);
+		if (edx == 0xcfc) {
+			//printk("Set cfc ");
+			return configwrite32(edx, vcpu->regs.tf_rax);
 		}
 		printk("unhandled IO address dx @%p is 0x%x\n", ip8, edx);
 		return SHUTDOWN_UNHANDLED_EXIT_REASON;
@@ -1423,7 +1426,7 @@ static int io(struct vmx_vcpu *vcpu, int *advance)
 			return 0;
 		}
 		if ((edx&~3) == 0xcfc) {
-			printk("ignoring write to cfc ");
+			//printk("ignoring write to cfc ");
 			return 0;
 		}
 		printk("unhandled IO address dx @%p is 0x%x\n", ip8, edx);
@@ -1431,22 +1434,22 @@ static int io(struct vmx_vcpu *vcpu, int *advance)
 	}
 	if (*ip8 == 0xec) {
 		*advance = 1;
-		printk("configread8 ");
+		//printk("configread8 ");
 		return configread8(edx, &vcpu->regs.tf_rax);
 	}
 	if (*ip8 == 0xed) {
 		*advance = 1;
 		if (edx == 0xcf8) {
-			printk("read cf8 0x%lx\n", vcpu->regs.tf_rax);
+			//printk("read cf8 0x%lx\n", vcpu->regs.tf_rax);
 			vcpu->regs.tf_rax = cf8;
 			return 0;
 		}
-		printk("configread32 ");
+		//printk("configread32 ");
 		return configread32(edx, &vcpu->regs.tf_rax);
 	}
 	if (*ip16 == 0xed66) {
 		*advance = 2;
-		printk("configread16 ");
+		//printk("configread16 ");
 		return configread16(edx, &vcpu->regs.tf_rax);
 	}
 	printk("unknown IO %p %x %x\n", ip8, *ip8, *ip16);
