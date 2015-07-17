@@ -144,6 +144,22 @@ endef
 BUILD_ERRORS := $(call add_error, $(BUILD_ERROR))
 endif
 
+FLEXEXISTS := $(shell which flex > /dev/null 2>&1 ; echo $$?)
+ifneq ($(FLEXEXISTS),0)
+define BUILD_ERROR
+    You need to have 'flex' installed on your system before proceeding!"
+endef
+BUILD_ERRORS := $(call add_error, $(BUILD_ERROR))
+endif
+
+BISONEXISTS := $(shell which bison > /dev/null 2>&1 ; echo $$?)
+ifneq ($(BISONEXISTS),0)
+define BUILD_ERROR
+    You need to have 'bison' installed on your system before proceeding!"
+endef
+BUILD_ERRORS := $(call add_error, $(BUILD_ERROR))
+endif
+
 ifeq ($(INSTDIR),)
 define BUILD_ERROR
     You need to setup $(INSTDIR_STRING), to point to where you
