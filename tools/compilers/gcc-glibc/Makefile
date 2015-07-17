@@ -135,6 +135,15 @@ define BUILD_ERROR
 endef
 BUILD_ERRORS := $(call add_error, $(BUILD_ERROR))
 endif
+
+GPPEXISTS := $(shell which g++ > /dev/null 2>&1 ; echo $$?)
+ifneq ($(GPPEXISTS),0)
+define BUILD_ERROR
+    You need to have 'g++' installed on your system before proceeding!"
+endef
+BUILD_ERRORS := $(call add_error, $(BUILD_ERROR))
+endif
+
 ifeq ($(INSTDIR),)
 define BUILD_ERROR
     You need to setup $(INSTDIR_STRING), to point to where you
@@ -144,6 +153,7 @@ define BUILD_ERROR
 endef
 BUILD_ERRORS := $(call add_error, $(BUILD_ERROR))
 endif 
+
 ifeq ($(CONFIG),native)
 ifeq ($(shell which $(ARCH)-ucb-akaros-gcc 2>/dev/null),)
 define BUILD_ERROR
@@ -165,6 +175,7 @@ endef
 BUILD_ERRORS := $(call add_error, $(BUILD_ERROR))
 endif
 endif
+
 ifeq ($(ARCH),x86_64)
 ifeq ($(shell grep "CONFIG_X86_64=y" $(AKAROSDIR)/.config),)
 define BUILD_ERROR
