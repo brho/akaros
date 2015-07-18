@@ -38,5 +38,9 @@ libc {
 
     # helper functions from resolv (which we don't build)
     __h_errno_location;
+
+	# Normally not exported by glibc, but we do all of our threading in
+	# userspace and need to set this up for each of our uthreads that have TLS.
+	__ctype_init;
   }
 }
