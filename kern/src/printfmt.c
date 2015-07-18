@@ -279,10 +279,9 @@ typedef struct sprintbuf {
 
 static void sprintputch(int ch, sprintbuf_t **b)
 {
-	if ((*b)->buf < (*b)->ebuf) {
+	if ((*b)->buf < (*b)->ebuf)
 		*((*b)->buf++) = ch;
-		(*b)->cnt++;
-	}
+	(*b)->cnt++;
 }
 
 int vsnprintf(char *buf, int n, const char *fmt, va_list ap)
