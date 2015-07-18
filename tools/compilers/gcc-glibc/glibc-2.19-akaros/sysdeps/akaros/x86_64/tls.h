@@ -404,13 +404,13 @@ extern void _dl_x86_64_restore_sse (void);
   } while (0)
 # endif
 
-static inline void *__get_tls_desc(uint32_t vcoreid)
+static inline void *__get_tls_desc(void)
 {
 	/* the tcb->self pointer is set to the TLS base address */
 	return THREAD_SELF;
 }
 
-static inline void __set_tls_desc(void *tls_desc, uint32_t vcoreid)
+static inline void __set_tls_desc(void *tls_desc)
 {
 	/* TODO: check for and use WRFSBASE */
 	__fastcall_setfsbase((uintptr_t)tls_desc);
@@ -424,7 +424,7 @@ static inline const char* tls_init_tp(void* thrdescr)
   head->tcb = thrdescr;
   head->self = thrdescr;
 
-  __set_tls_desc(thrdescr, 0x00dead00);	/* we ignore vcoreid, pass gibberish */
+  __set_tls_desc(thrdescr);
   return NULL;
 }
 

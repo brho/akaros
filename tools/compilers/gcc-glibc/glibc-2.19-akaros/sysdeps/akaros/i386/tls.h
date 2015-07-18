@@ -429,16 +429,18 @@ union user_desc_init
  * rely on it too much.  The intent of it is vcoreid is the caller's vcoreid,
  * and that vcoreid might be in the TLS of the caller (it will be for transition
  * stacks) and we could avoid a trap on x86 to sys_getvcoreid(). */
-static inline void *__get_tls_desc(uint32_t vcoreid)
+static inline void *__get_tls_desc(void)
 {
+	int vcoreid = vcore_id();
 	return (void*)(__procdata.ldt[vcoreid].sd_base_31_24 << 24 |
 	               __procdata.ldt[vcoreid].sd_base_23_16 << 16 |
 	               __procdata.ldt[vcoreid].sd_base_15_0);
 }
 
 /* passing in the vcoreid, since it'll be in TLS of the caller */
-static inline void __set_tls_desc(void *tls_desc, uint32_t vcoreid)
+static inline void __set_tls_desc(void *tls_desc)
 {
+	int vcoreid = vcore_id();
 	/* Keep this technique in sync with sysdeps/akaros/i386/tls.h */
 	segdesc_t tmp = SEG(STA_W, (uint32_t)tls_desc, 0xffffffff, 3);
 	__procdata.ldt[vcoreid] = tmp;

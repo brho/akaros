@@ -2,14 +2,14 @@
 #include <parlib/vcore.h>
 #include <ldsodefs.h>
 
-void set_tls_desc(void* addr, int vcoreid)
+void set_tls_desc(void* addr)
 {
-	__set_tls_desc(addr, vcoreid);
+	__set_tls_desc(addr);
 }
 
-void *get_tls_desc(int vcoreid)
+void *get_tls_desc(void)
 {
-	return __get_tls_desc(vcoreid);
+	return __get_tls_desc();
 }
 
 /* Get a TLS, returns 0 on failure.  Vcores have their own TLS, and any thread

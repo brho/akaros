@@ -164,12 +164,12 @@ typedef struct rthread {
 #define THREAD_GSCOPE_WAIT() \
   GL(dl_wait_lookup_done) ()
 
-static inline void *__get_tls_desc(uint32_t vcoreid)
+static inline void *__get_tls_desc(void)
 {
 	return READ_THREAD_POINTER() - TLS_TCB_OFFSET;
 }
 
-static inline void __set_tls_desc(void *tls_desc, uint32_t vcoreid)
+static inline void __set_tls_desc(void *tls_desc)
 {
 	TLS_INIT_TP(tls_desc, 0);
 }

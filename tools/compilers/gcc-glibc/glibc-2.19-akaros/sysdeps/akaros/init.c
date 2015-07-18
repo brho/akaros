@@ -53,8 +53,7 @@ void __libc_vcore_entry(int id)
 		 * AFAIK, riscv's TLS changes are really cheap, and they don't do it in
 		 * the kernel (yet/ever), so they can set their TLS here too. */
 		#ifndef __x86_64__
-		set_tls_desc((void*)__procdata.vcore_preempt_data[id].vcore_tls_desc,
-		             id);
+		set_tls_desc((void*)__procdata.vcore_preempt_data[id].vcore_tls_desc);
 		#endif
 		/* These TLS setters actually only need to happen once, at init time */
 		__vcoreid = id;

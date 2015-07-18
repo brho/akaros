@@ -70,7 +70,7 @@ bool check_vcoreid(const char *str, uint32_t vcoreid);
 #define get_tlsvar_linaddr(_vcoreid, _var)                                     \
 ({                                                                             \
 	uintptr_t vc_tls_desc = (uintptr_t)get_vcpd_tls_desc(_vcoreid);            \
-	uintptr_t var_off = (uintptr_t)&_var - (uintptr_t)get_tls_desc(vcore_id());\
+	uintptr_t var_off = (uintptr_t)&_var - (uintptr_t)get_tls_desc();          \
 	(typeof(_var) *)(vc_tls_desc + var_off);                                   \
 })
 
@@ -265,13 +265,13 @@ static inline uint64_t vcore_account_uptime_nsec(uint32_t vcoreid)
 	} else { /* vcore context */                                               \
 		vcoreid = vcore_id();                                                  \
 	}                                                                          \
-	temp_tls_desc = get_tls_desc(vcoreid);                                     \
-	set_tls_desc(tls_desc, vcoreid);                                           \
+	temp_tls_desc = get_tls_desc();                                            \
+	set_tls_desc(tls_desc);                                                    \
 	begin_safe_access_tls_vars();
 
 #define end_access_tls_vars()                                                  \
 	end_safe_access_tls_vars();                                                \
-	set_tls_desc(temp_tls_desc, vcoreid);                                      \
+	set_tls_desc(temp_tls_desc);                                               \
 	if (!invcore) {                                                            \
 		/* Note we reenable migration before enabling notifs, which is reverse
 		 * from how we disabled notifs.  We must enabling migration before

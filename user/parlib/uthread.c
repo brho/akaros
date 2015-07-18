@@ -48,7 +48,7 @@ static void uthread_manage_thread0(struct uthread *uthread)
 {
 	assert(uthread);
 	/* Save a pointer to thread0's tls region (the glibc one) into its tcb */
-	uthread->tls_desc = get_tls_desc(0);
+	uthread->tls_desc = get_tls_desc();
 	/* Save a pointer to the uthread in its own TLS */
 	current_uthread = uthread;
 	/* Thread is currently running (it is 'us') */
@@ -63,7 +63,7 @@ static void uthread_manage_thread0(struct uthread *uthread)
 	 * issue is that vcore0's transition-TLS isn't TLS_INITed yet.  Until it is
 	 * (right before vcore_entry(), don't try and take the address of any of
 	 * its TLS vars. */
-	set_tls_desc(get_vcpd_tls_desc(0), 0);
+	set_tls_desc(get_vcpd_tls_desc(0));
 	begin_safe_access_tls_vars();
 	/* We might have a basic uthread already installed (from lib_init), so
 	 * free it before installing the new one. */
@@ -78,7 +78,7 @@ static void uthread_manage_thread0(struct uthread *uthread)
 	 * vcore_context when running in scheduler_context for the SCP. */
 	__vcore_context = TRUE;
 	end_safe_access_tls_vars();
-	set_tls_desc(uthread->tls_desc, 0);
+	set_tls_desc(uthread->tls_desc);
 	begin_safe_access_tls_vars();
 	__vcoreid = 0;	/* setting the uthread's TLS var */
 	assert(!in_vcore_context());
@@ -393,7 +393,7 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
 	}
 	/* Change to the transition context (both TLS (if applicable) and stack). */
 	if (__uthread_has_tls(uthread)) {
-		set_tls_desc(get_vcpd_tls_desc(vcoreid), vcoreid);
+		set_tls_desc(get_vcpd_tls_desc(vcoreid));
 		begin_safe_access_tls_vars();
 		assert(current_uthread == uthread);
 		/* If this assert fails, see the note in uthread_manage_thread0 */
@@ -513,7 +513,7 @@ void highjack_current_uthread(struct uthread *uthread)
 	/* and make sure we are using the correct TLS for the new uthread */
 	if (__uthread_has_tls(uthread)) {
 		assert(uthread->tls_desc);
-		set_tls_desc(uthread->tls_desc, vcoreid);
+		set_tls_desc(uthread->tls_desc);
 		begin_safe_access_tls_vars();
 		__vcoreid = vcoreid;	/* setting the uthread's TLS var */
 		end_safe_access_tls_vars();
@@ -526,7 +526,7 @@ void highjack_current_uthread(struct uthread *uthread)
 static void set_uthread_tls(struct uthread *uthread, uint32_t vcoreid)
 {
 	if (__uthread_has_tls(uthread)) {
-		set_tls_desc(uthread->tls_desc, vcoreid);
+		set_tls_desc(uthread->tls_desc);
 		begin_safe_access_tls_vars();
 		__vcoreid = vcoreid;	/* setting the uthread's TLS var */
 		end_safe_access_tls_vars();

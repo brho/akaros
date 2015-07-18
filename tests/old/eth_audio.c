@@ -58,7 +58,7 @@ int main()
 
 	/* Need to save this somewhere that you can find it again when restarting
 	 * core0 */
-	core0_tls = get_tls_desc(0);
+	core0_tls = get_tls_desc();
 	/* Need to save our floating point state somewhere (like in the
 	 * user_thread_tcb so it can be restarted too */
 
@@ -118,7 +118,7 @@ void vcore_entry(void)
 	 * entry for this vcore to point to the TCB of the new user-thread. */
 	if (vcoreid == 0) {
 		handle_events(vcoreid);
-		set_tls_desc(core0_tls, 0);
+		set_tls_desc(core0_tls);
 		assert(__vcoreid == 0); /* in case anyone uses this */
 		/* Load silly state (Floating point) too */
 		pop_user_ctx(&vcpd->uthread_ctx, vcoreid);

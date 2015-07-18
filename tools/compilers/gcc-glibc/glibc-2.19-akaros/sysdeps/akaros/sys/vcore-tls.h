@@ -11,8 +11,8 @@
 extern "C" {
 #endif
 
-void set_tls_desc(void* addr, int vcoreid);
-void *get_tls_desc(int vcoreid);
+void set_tls_desc(void* addr);
+void *get_tls_desc(void);
 
 void *allocate_tls(void);
 void free_tls(void *tcb);

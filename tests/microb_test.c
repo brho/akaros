@@ -57,7 +57,7 @@ void set_tlsdesc_test(unsigned long nr_loops)
 {
 #ifdef __i386__
 	uint32_t vcoreid = vcore_id();
-	void *mytls = get_tls_desc(vcoreid);
+	void *mytls = get_tls_desc();
 	void *vctls = get_vcpd_tls_desc(vcoreid);
 	segdesc_t tmp = SEG(STA_W, (uint32_t)vctls, 0xffffffff, 3);
 	uint32_t gs = (vcoreid << 3) | 0x07;
@@ -66,7 +66,7 @@ void set_tlsdesc_test(unsigned long nr_loops)
 		cmb();
 		asm volatile("movl %0,%%gs" : : "r" (gs) : "memory");
     }
-	set_tls_desc(mytls, vcoreid);
+	set_tls_desc(mytls);
 #endif
 }
 
