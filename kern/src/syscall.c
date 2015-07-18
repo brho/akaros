@@ -1807,16 +1807,18 @@ intreg_t sys_getcwd(struct proc *p, char *u_cwd, size_t cwd_l)
 	int retval = 0;
 	char *kfree_this;
 	char *k_cwd;
-	if (cwd_l > PATH_MAX) {
-		set_errno(ENAMETOOLONG);
-		return -1;
-	}
 	k_cwd = do_getcwd(&p->fs_env, &kfree_this, cwd_l);
 	if (!k_cwd)
 		return -1;		/* errno set by do_getcwd */
-	if (memcpy_to_user_errno(p, u_cwd, k_cwd, strnlen(k_cwd, cwd_l - 1) + 1))
+	if (strlen(k_cwd) + 1 > cwd_l) {
+		set_errno(ERANGE);
+		set_errstr("getcwd buf too small, needed %d", strlen(k_cwd) + 1);
 		retval = -1;
-	retval = strnlen(k_cwd, cwd_l - 1);
+		goto out;
+	}
+	if (memcpy_to_user_errno(p, u_cwd, k_cwd, strlen(k_cwd) + 1))
+		retval = -1;
+out:
 	kfree(kfree_this);
 	return retval;
 }
@@ -2052,7 +2054,7 @@ intreg_t sys_nunmount(struct proc *p, char *src_path, int src_l,
 
 intreg_t sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
 {
-	int ret;
+	int ret = 0;
 	struct chan *ch;
 	ERRSTACK(1);
 	/* UMEM: Check the range, can PF later and kill if the page isn't present */
@@ -2067,7 +2069,11 @@ intreg_t sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
 		return -1;
 	}
 	ch = fdtochan(current->fgrp, fd, -1, FALSE, TRUE);
-	ret = snprintf(u_buf, len, "%s", channame(ch));
+	if (snprintf(u_buf, len, "%s", channame(ch)) >= len) {
+		set_errno(ERANGE);
+		set_errstr("fd2path buf too small, needed %d", ret);
+		ret = -1;
+	}
 	cclose(ch);
 	poperror();
 	return ret;
