@@ -58,12 +58,12 @@ struct serialized_data* serialize_argv_envp(char* const* argv,
 	*sd_argc = argc;
 	*sd_envc = envc;
 	for (int i = 0; i < argc; i++) {
-		ppos[i] = vpos - vpos_base;
+		ppos[i] = (char*)(vpos - vpos_base);
 		memcpy(vpos, argv[i], arglens[i]);
 		vpos += arglens[i];
 	}
 	for(int i = 0; i < envc; i++) {
-		ppos[argc + i] = vpos - vpos_base;
+		ppos[argc + i] = (char*)(vpos - vpos_base);
 		memcpy(vpos, envp[i], envlens[i]);
 		vpos += envlens[i];
 	}
