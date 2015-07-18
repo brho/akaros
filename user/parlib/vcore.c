@@ -15,6 +15,9 @@
 #include <ros/arch/membar.h>
 #include <parlib/printf-ext.h>
 
+__thread int __vcoreid = 0;
+__thread bool __vcore_context = FALSE;
+
 /* starting with 1 since we alloc vcore0's stacks and TLS in vcore_lib_init(). */
 static size_t _max_vcores_ever_wanted = 1;
 atomic_t nr_new_vcores_wanted;
@@ -24,6 +27,48 @@ __thread struct syscall __vcore_one_sysc = {.flags = (atomic_t)SC_DONE, 0};
 
 /* Per vcore entery function used when reentering at the top of a vcore's stack */
 static __thread void (*__vcore_reentry_func)(void) = NULL;
+
+/* The default user vcore_entry function. */
+void __attribute__((noreturn)) __vcore_entry(void)
+{
+	extern void uthread_vcore_entry(void);
+	uthread_vcore_entry();
+	fprintf(stderr, "vcore_entry() should never return!\n");
+	abort();
+	__builtin_unreachable();
+}
+void vcore_entry(void) __attribute__((weak, alias ("__vcore_entry")));
+
+/* The lowest level function jumped to by the kernel on every vcore_entry.
+ * Currently, this function is only necessary so we can set the tls_desc from
+ * the vcpd for non x86_64 architectures. We should consider removing this and
+ * making it mandatory to set the tls_desc in the kernel. We wouldn't even
+ * need to pass the vcore id to user space at all if we did this.  It would
+ * already be set in the preinstalled TLS as __vcore_id. */
+static void __attribute__((noreturn)) __kernel_vcore_entry(void)
+{
+	/* The kernel sets the TLS desc for us, based on whatever is in VCPD.
+	 *
+	 * x86 32-bit TLS is pretty jacked up, so the kernel doesn't set the TLS
+	 * desc for us.  it's a little more expensive to do it here, esp for
+	 * amd64.  Can remove this when/if we overhaul 32 bit TLS.
+	 *
+	 * AFAIK, riscv's TLS changes are really cheap, and they don't do it in
+	 * the kernel (yet/ever), so they can set their TLS here too. */
+	int id = __vcore_id_on_entry;
+	#ifndef __x86_64__
+	set_tls_desc(vcpd_of(id)->vcore_tls_desc);
+	#endif
+	/* Every time the vcore comes up, it must set that it is in vcore context.
+	 * uthreads may share the same TLS as their vcore (when uthreads do not have
+	 * their own TLS), and if a uthread was preempted, __vcore_context == FALSE,
+	 * and that will continue to be true the next time the vcore pops up. */
+	__vcore_context = TRUE;
+	vcore_entry();
+	fprintf(stderr, "vcore_entry() should never return!\n");
+	abort();
+	__builtin_unreachable();
+}
 
 /* TODO: probably don't want to dealloc.  Considering caching */
 static void free_transition_tls(int id)
@@ -38,6 +83,9 @@ static void free_transition_tls(int id)
 
 static int allocate_transition_tls(int id)
 {
+	/* Libc function to initialize TLS-based locale info for ctype functions. */
+	extern void __ctype_init(void);
+
 	/* We want to free and then reallocate the tls rather than simply 
 	 * reinitializing it because its size may have changed.  TODO: not sure if
 	 * this is right.  0-ing is one thing, but freeing and reallocating can be
@@ -50,6 +98,18 @@ static int allocate_transition_tls(int id)
 		errno = ENOMEM;
 		return -1;
 	}
+
+	/* Setup some intitial TLS data for the newly allocated transition tls. */
+	void *temp_tcb = get_tls_desc();
+	set_tls_desc(tcb);
+	begin_safe_access_tls_vars();
+	__vcoreid = id;
+	__vcore_context = TRUE;
+	__ctype_init();
+	end_safe_access_tls_vars();
+	set_tls_desc(temp_tcb);
+
+	/* Install the new tls into the vcpd. */
 	set_vcpd_tls_desc(id, tcb);
 	return 0;
 }
@@ -77,9 +137,7 @@ static int allocate_transition_stack(int id)
 	return 0;
 }
 
-/* This gets called in glibc before calling the programs 'main'.  Need to set
- * ourselves up so that thread0 is a uthread, and then register basic signals to
- * go to vcore 0. */
+/* Run libc specific early setup code. */
 static void vcore_libc_init(void)
 {
 	register_printf_specifier('r', printf_errstr, printf_errstr_info);
@@ -122,6 +180,8 @@ void __attribute__((constructor)) vcore_lib_init(void)
 		ucq_init_raw(&vcpd_of(i)->ev_mbox_private.ev_msgs,
 		             mmap_block + (4 * i + 2) * PGSIZE,
 		             mmap_block + (4 * i + 3) * PGSIZE);
+		/* Set the lowest level entry point for each vcore. */
+		vcpd_of(i)->vcore_entry = (uintptr_t)__kernel_vcore_entry;
 	}
 	atomic_init(&vc_req_being_handled, 0);
 	assert(!in_vcore_context());
