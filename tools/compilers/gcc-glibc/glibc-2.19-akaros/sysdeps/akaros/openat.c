@@ -38,7 +38,7 @@ __openat (fd, file, oflag)
      const char *file;
      int oflag;
 {
-  int mode;
+  int mode = 0;
 
   if (file == NULL)
     {

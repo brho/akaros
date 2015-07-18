@@ -29,7 +29,7 @@
 int
 __libc_open (const char* file, int oflag, ...)
 {
-  int mode;
+  int mode = 0;
 
   if (file == NULL)
     {
