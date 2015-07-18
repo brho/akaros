@@ -1164,8 +1164,6 @@ Open:
 
 					if (omode == OEXEC)
 						c->flag &= ~CCACHE;
-
-					c = devtab[c->type].open(c, omode & ~OCEXEC);
 					/* here is where convert omode/vfs flags to c->flags */
 					if (omode & O_APPEND)
 						c->flag |= CAPPEND;
@@ -1174,6 +1172,7 @@ Open:
 						c->flag |= CCEXEC;
 					if (omode & ORCLOSE)
 						c->flag |= CRCLOSE;
+					c = devtab[c->type].open(c, omode & ~OCEXEC);
 					break;
 			}
 			break;
