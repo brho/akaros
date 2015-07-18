@@ -191,7 +191,7 @@ $(MAKECMDGOALS): make-real
 make-real:
 	@echo "$${BUILD_ERRORS}" |\
 	awk '\
-		BEGIN { RS="<##>"; FS="<##>"; }\
+		BEGIN { RS="$(BUILD_ERROR_DELIMITER)"; FS="$(BUILD_ERROR_DELIMITER)"; }\
 		{ str[NR] = $$i; }\
 		END { for (i = 1; i < NR; i++) {\
 				print "Error Detected:";\
