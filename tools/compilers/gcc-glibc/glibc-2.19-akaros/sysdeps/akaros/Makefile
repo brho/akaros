@@ -16,7 +16,7 @@ CFLAGS-funlockfile.c = $(libio-mtsafe)
 ifeq ($(subdir),socket)
 sysdep_routines += sa_len plan9_sockets
 endif
-sysdep_headers += sys/syscall.h sys/vcore-tls.h
+sysdep_headers += sys/syscall.h sys/tls.h
 
 # We don't have the resolv subdir, but we still want parts of it.  Since we
 # lack the subdir, we need to include the C files and headers manually.

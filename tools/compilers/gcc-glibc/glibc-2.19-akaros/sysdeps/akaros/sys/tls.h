@@ -4,8 +4,8 @@
  *
  * glibc syscall functions / tools for working with Akaros */
 
-#ifndef _GLIBC_AKAROS_VCORE_TLS_H
-#define _GLIBC_AKAROS_VCORE_TLS_H
+#ifndef _GLIBC_AKAROS_SYS_TLS_H
+#define _GLIBC_AKAROS_SYS_TLS_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,4 +22,4 @@ void *reinit_tls(void *tcb);
 }
 #endif
 
-#endif /* _GLIBC_AKAROS_SYSCALL_H */
+#endif /* _GLIBC_AKAROS_SYS_TLS_H */

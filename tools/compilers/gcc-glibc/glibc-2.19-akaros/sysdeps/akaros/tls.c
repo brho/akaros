@@ -1,4 +1,4 @@
-#include <sys/vcore-tls.h>
+#include <sys/tls.h>
 #include <parlib/vcore.h>
 #include <ldsodefs.h>
 

@@ -10,7 +10,7 @@
 #include <ros/procdata.h>
 #include <ros/syscall.h>
 #include <ros/arch/mmu.h>
-#include <sys/vcore-tls.h>
+#include <sys/tls.h>
 
 __BEGIN_DECLS
 

@@ -5,7 +5,7 @@
 #include <ros/syscall.h>
 #include <ros/procinfo.h>
 #include <unistd.h>
-#include <vcore-tls.c>
+#include <tls.c>
 #include <ctype.h>
 
 __thread int __vcoreid = 0;
