@@ -971,6 +971,8 @@ struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 	char *name;
 	// Rune r;
 
+	static_assert(!(CINTERNAL_FLAGS & CEXTERNAL_FLAGS));
+
 	name = aname;
 	if (name[0] == '\0')
 		error("empty file name");
@@ -1164,14 +1166,10 @@ Open:
 
 					if (omode == OEXEC)
 						c->flag &= ~CCACHE;
-					/* here is where convert omode/vfs flags to c->flags */
-					if (omode & O_APPEND)
-						c->flag |= CAPPEND;
-					// CEXEC should be in the FD, not the chan, right?
-					if (omode & OCEXEC)
-						c->flag |= CCEXEC;
-					if (omode & ORCLOSE)
-						c->flag |= CRCLOSE;
+					/* here is where convert omode/vfs flags to c->flags.
+					 * careful, O_CLOEXEC and O_REMCLO are in there.  might need
+					 * to change that. */
+					c->flag |= omode & CEXTERNAL_FLAGS;
 					c = devtab[c->type].open(c, omode & ~OCEXEC);
 					break;
 			}

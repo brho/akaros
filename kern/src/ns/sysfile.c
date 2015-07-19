@@ -1614,12 +1614,17 @@ int fd_getfl(int fd)
 	c = fdtochan(current->fgrp, fd, -1, 0, 1);
 
 	ret = c->mode;
-	if (c->flag & CAPPEND)
-		ret |= O_APPEND;
+	ret |= c->flag & CEXTERNAL_FLAGS;
 
 	cclose(c);
 	poperror();
 	return ret;
+}
+
+static bool cexternal_flags_differ(int set1, int set2, int flags)
+{
+	flags &= CEXTERNAL_FLAGS;
+	return (set1 & flags) ^ (set2 & flags);
 }
 
 int fd_setfl(int fd, int flags)
@@ -1632,10 +1637,12 @@ int fd_setfl(int fd, int flags)
 		return -1;
 	}
 	c = fdtochan(current->fgrp, fd, -1, 0, 1);
-
-	if (flags & O_APPEND)
-		c->flag |= CAPPEND;
-
+	if (cexternal_flags_differ(flags, c->flag, O_CLOEXEC)) {
+		/* TODO: The whole CCEXEC / O_CLOEXEC on 9ns needs work */
+		set_errno(EINVAL);
+		error("can't toggle O_CLOEXEC with setfl");
+	}
+	c->flag = (c->flag & ~CEXTERNAL_FLAGS) | (flags & CEXTERNAL_FLAGS);
 	cclose(c);
 	poperror();
 	return 0;

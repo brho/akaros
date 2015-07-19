@@ -303,14 +303,19 @@ enum {
 	Aremove,					/* will be removed by caller */
 	Acreatechan,					/* return a chan for a create request. for sysrename. */
 
-	COPEN = 0x0001,				/* for i/o */
-	CMSG = 0x0002,	/* the message channel for a mount */
-	CCEXEC = 0x0008,	/* close on exec */
-	CFREE = 0x0010,	/* not in use */
-	CRCLOSE = 0x0020,	/* remove on close */
-	CCACHE = 0x0080,	/* client cache */
-	/* file/chan status flags, affected by setfl and reported in getfl */
-	CAPPEND = 0x0100,	/* append on write */
+	/* internal chan flags, used by the kernel only */
+	COPEN = 		0x0001,	/* for i/o */
+	CMSG = 			0x0002,	/* the message channel for a mount */
+	CFREE = 		0x0004,	/* not in use */
+	CCACHE = 		0x0008,	/* client cache */
+	CINTERNAL_FLAGS = (COPEN | CMSG | CFREE | CCACHE),
+
+	/* chan/file flags, setably via open and sometimes fcntl/setfl.  these are
+	 * the internal names used in some parts of 9ns */
+	CCEXEC = 		O_CLOEXEC,	/* (prob should be on the FD, 9ns has it here) */
+	CRCLOSE = 		O_REMCLO,	/* remove on close (also, maybe should be on FD) */
+	CAPPEND = 		O_APPEND,	/* append on write */
+	CEXTERNAL_FLAGS = (CCEXEC | CRCLOSE | CAPPEND),
 };
 
 #define NS_IPCK_SHIFT  2
