@@ -315,7 +315,8 @@ enum {
 	CCEXEC = 		O_CLOEXEC,	/* (prob should be on the FD, 9ns has it here) */
 	CRCLOSE = 		O_REMCLO,	/* remove on close (also, maybe should be on FD) */
 	CAPPEND = 		O_APPEND,	/* append on write */
-	CEXTERNAL_FLAGS = (CCEXEC | CRCLOSE | CAPPEND),
+	CNONBLOCK = 	O_NONBLOCK,	/* don't block, can't be set via setfl */
+	CEXTERNAL_FLAGS = (CCEXEC | CRCLOSE | CAPPEND | CNONBLOCK),
 };
 
 #define NS_IPCK_SHIFT  2

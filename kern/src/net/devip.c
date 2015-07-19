@@ -432,6 +432,9 @@ static struct chan *ipopen(struct chan *c, int omode)
 				error(Enodev);
 				break;
 			}
+			/* we only honor nonblock on a clone */
+			if (c->flag & CNONBLOCK)
+				Fsconvnonblock(cv, TRUE);
 			mkqid(&c->qid, QID(p->x, cv->x, Qctl), 0, QTFILE);
 			break;
 		case Qdata:
@@ -741,6 +744,8 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 			x = f->p[PROTO(ch->qid)];
 			c = x->conv[CONV(ch->qid)];
 			sofar = (*x->state) (c, buf, Statelen - 2);
+			sofar += snprintf(buf + sofar, Statelen - 2 - sofar, "nonblock %s\n",
+			                  c->nonblock ? "on" : "off");
 			rv = readstr(offset, p, n, buf);
 			kfree(buf);
 			return rv;
@@ -1081,6 +1086,13 @@ char *Fsstdbind(struct conv *c, char *argv[], int argc)
 	}
 }
 
+void Fsconvnonblock(struct conv *cv, bool onoff)
+{
+	qnonblock(cv->wq, onoff);
+	qnonblock(cv->rq, onoff);
+	cv->nonblock = onoff;
+}
+
 static void bindctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 {
 	char *p;
@@ -1091,6 +1103,22 @@ static void bindctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 		p = x->bind(c, cb->f, cb->nf);
 	if (p != NULL)
 		error(p);
+}
+
+static void nonblockctlmsg(struct conv *c, struct cmdbuf *cb)
+{
+	if (cb->nf < 2)
+		goto err;
+	if (!strcmp(cb->f[1], "on"))
+		Fsconvnonblock(c, TRUE);
+	else if (!strcmp(cb->f[1], "off"))
+		Fsconvnonblock(c, FALSE);
+	else
+		goto err;
+	return;
+err:
+	set_errno(EINVAL);
+	error("nonblock [on|off]");
 }
 
 static void tosctlmsg(struct conv *c, struct cmdbuf *cb)
@@ -1163,6 +1191,8 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 				announcectlmsg(x, c, cb);
 			else if (strcmp(cb->f[0], "bind") == 0)
 				bindctlmsg(x, c, cb);
+			else if (strcmp(cb->f[0], "nonblock") == 0)
+				nonblockctlmsg(c, cb);
 			else if (strcmp(cb->f[0], "ttl") == 0)
 				ttlctlmsg(c, cb);
 			else if (strcmp(cb->f[0], "tos") == 0)
@@ -1356,6 +1386,7 @@ retry:
 	c->restricted = 0;
 	c->ttl = MAXTTL;
 	c->tos = DFLTTOS;
+	c->nonblock = FALSE;
 	qreopen(c->rq);
 	qreopen(c->wq);
 	qreopen(c->eq);
