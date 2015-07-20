@@ -14,6 +14,8 @@
 #include <sys/mman.h>
 #include <vmm/coreboot_tables.h>
 #include <ros/vmm.h>
+#include <vmm/virtio_mmio.h>
+#include <vmm/virtio_ids.h>
 
 /* this test will run the "kernel" in the negative address space. We hope. */
 int *mmap_blob;
@@ -24,6 +26,7 @@ int mcp = 1;
 
 #define MiB 0x100000u
 #define GiB (1u<<30)
+#define VIRTIOBASE (15*MiB)
 #define GKERNBASE (16*MiB)
 #define KERNSIZE (128*MiB+GKERNBASE)
 uint8_t _kernel[KERNSIZE];
@@ -48,6 +51,14 @@ pthread_t *my_threads;
 void **my_retvals;
 int nr_threads = 2;
 
+static void setupconsole(uint32_t *v)
+{
+	// try to make linux happy.
+	// this is not really endian safe but ... well ... WE'RE ON THE SAME MACHINE
+	v[VIRTIO_MMIO_MAGIC_VALUE/4] = ('v' | 'i' << 8 | 'r' << 16 | 't' << 24);
+	v[VIRTIO_MMIO_VERSION] = 35;
+	v[VIRTIO_MMIO_DEVICE_ID] = VIRTIO_ID_CONSOLE;
+}
 int main(int argc, char **argv)
 {
 	int amt;
@@ -59,10 +70,10 @@ int main(int argc, char **argv)
 	int kfd = -1;
 	static char cmd[512];
 	void *coreboot_tables = (void *) 0x1165000;
-	/* kernel has to be in the range GKERNBASE to KERNSIZE+GKERNBASE for now. */
+	/* kernel has to be in the range VIRTIOBASE to KERNSIZE+GKERNBASE for now. */
 	// mmap is not working for us at present.
-	if ((uint64_t)_kernel > GKERNBASE) {
-		printf("kernel array @%p is above , GKERNBASE@%p sucks\n", _kernel, GKERNBASE);
+	if ((uint64_t)_kernel > VIRTIOBASE) {
+		printf("kernel array @%p is above , VIRTIOBASE@%p sucks\n", _kernel, VIRTIOBASE);
 		exit(1);
 	}
 	memset(_kernel, 0, sizeof(_kernel));
@@ -195,8 +206,10 @@ int main(int argc, char **argv)
 	kernbase >>= (0+12);
 	kernbase <<= (0 + 12);
 	uint8_t *kernel = (void *)GKERNBASE;
-	write_coreboot_table(coreboot_tables, kernel, KERNSIZE);
+	write_coreboot_table(coreboot_tables, ((void *)VIRTIOBASE) /*kernel*/, KERNSIZE + 1048576);
 	hexdump(stdout, coreboot_tables, 128);
+	setupconsole((void *)VIRTIOBASE);
+	hexdump(stdout, (void *)VIRTIOBASE, 128);
 	printf("kernbase for pml4 is 0x%llx and entry is %llx\n", kernbase, entry);
 	printf("p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
 	sprintf(cmd, "V 0x%llx 0x%llx 0x%llx", entry, (unsigned long long) &stack[1024], (unsigned long long) p512);
@@ -217,6 +230,7 @@ int main(int argc, char **argv)
 			perror(cmd);
 		}
 	}
+	hexdump(stdout, (void *)VIRTIOBASE, 128);
 	printf("shared is %d, blob is %d\n", shared, *mmap_blob);
 
 	return 0;
