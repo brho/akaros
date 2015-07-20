@@ -46,12 +46,12 @@ announce(char *addr, char *dir)
 	 */
 	ctl = open(netdir, O_RDWR);
 	if(ctl<0){
-		fprintf(stderr,"announce opening %s: %r", netdir);
+		fprintf(stderr,"announce opening %s: %r\n", netdir);
 		return -1;
 	}
 	cp = strrchr(netdir, '/');
 	if(cp == NULL){
-		fprintf(stderr,"announce arg format %s", netdir);
+		fprintf(stderr,"announce arg format %s\n", netdir);
 		close(ctl);
 		return -1;
 	}
@@ -63,7 +63,7 @@ announce(char *addr, char *dir)
 	n = snprintf(buf, sizeof(buf), "%s/", netdir);
 	m = read(ctl, &buf[n], sizeof(buf)-n-1);
 	if(m <= 0){
-		fprintf(stderr,"announce reading %s: %r", netdir);
+		fprintf(stderr,"announce reading %s: %r\n", netdir);
 		close(ctl);
 		return -1;
 	}
@@ -74,7 +74,7 @@ announce(char *addr, char *dir)
 	 */
 	n = snprintf(buf2, sizeof(buf2), "announce %s", naddr);
 	if(write(ctl, buf2, n)!=n){
-		fprintf(stderr,"announce writing %s: %r", netdir);
+		fprintf(stderr,"announce writing %s: %r\n", netdir);
 		close(ctl);
 		return -1;
 	}
@@ -105,7 +105,7 @@ listen(char *dir, char *newdir)
 	snprintf(buf, sizeof(buf), "%s/listen", dir);
 	ctl = open(buf, O_RDWR);
 	if(ctl < 0){
-		fprintf(stderr,"listen opening %s: %r", buf);
+		fprintf(stderr,"listen opening %s: %r\n", buf);
 		return -1;
 	}
 
@@ -117,7 +117,7 @@ listen(char *dir, char *newdir)
 	cp = strrchr(buf, '/');
 	if(cp == NULL){
 		close(ctl);
-		fprintf(stderr,"listen arg format %s", dir);
+		fprintf(stderr,"listen arg format %s\n", dir);
 		return -1;
 	}
 	*++cp = 0;
@@ -125,7 +125,7 @@ listen(char *dir, char *newdir)
 	m = read(ctl, cp, sizeof(buf) - n - 1);
 	if(m <= 0){
 		close(ctl);
-		fprintf(stderr,"listen reading %s/listen: %r", dir);
+		fprintf(stderr,"listen reading %s/listen: %r\n", dir);
 		return -1;
 	}
 	buf[n+m] = 0;
@@ -226,7 +226,7 @@ nettrans(char *addr, char *naddr, int na, char *file, int nf)
 	 */
 	p = strchr(addr, '!');
 	if(p == 0){
-		fprintf(stderr,"bad dial string: %s", addr);
+		fprintf(stderr,"bad dial string: %s\n", addr);
 		return -1;
 	}
 	if(*addr != '/'){
@@ -237,7 +237,7 @@ nettrans(char *addr, char *naddr, int na, char *file, int nf)
 			;
 		i = p2 - addr;
 		if(i == 0 || i >= sizeof(netdir)){
-			fprintf(stderr,"bad dial string: %s", addr);
+			fprintf(stderr,"bad dial string: %s\n", addr);
 			return -1;
 		}
 		strncpy(netdir, addr, i);
