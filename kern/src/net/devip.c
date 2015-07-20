@@ -497,7 +497,13 @@ static struct chan *ipopen(struct chan *c, int omode)
 					qunlock(&cv->listenq);
 					nexterror();
 				}
-
+				/* we can peek at incall without grabbing the cv qlock.  if
+				 * anything is there, it'll remain there until we dequeue it.
+				 * no one else can, since we hold the listenq lock */
+				if (cv->nonblock && !cv->incall) {
+					set_errno(EAGAIN);
+					error("listen queue empty");
+				}
 				/* wait for a connect */
 				rendez_sleep(&cv->listenr, should_wake, cv);
 
@@ -509,6 +515,9 @@ static struct chan *ipopen(struct chan *c, int omode)
 					cv->incall = nc->next;
 					mkqid(&c->qid, QID(PROTO(c->qid), nc->x, Qctl), 0, QTFILE);
 					kstrdup(&cv->owner, ATTACHER(c));
+					/* TODO: If we want to support something like accept4(),
+					 * where the new conversations are nonblocking right away,
+					 * we can do so here. */
 				}
 				qunlock(&cv->qlock);
 
