@@ -43,7 +43,8 @@ struct Rock {
 	unsigned long dev;			/* inode & dev of data file */
 	unsigned long inode;		/* ... */
 	int domain;					/* from socket call */
-	int stype;					/* ... */
+	int stype;					/* socket type, from socket()'s type field */
+	int sopts;					/* socket options, from socket()'s type field */
 	int protocol;				/* ... */
 	struct sockaddr addr;		/* address from bind */
 	int reserved;				/* use a priveledged port # (< 1024) */
@@ -60,6 +61,8 @@ extern int _sock_data(int, char *, int, int, int, Rock **);
 extern int _sock_ipattr(const char *);
 extern void _sock_ingetaddr(Rock *, struct sockaddr_in *, socklen_t *,
 							const char *);
+extern int _sock_strip_opts(int type);
+extern int _sock_get_opts(int type);
 
 extern void _syserrno(void);
 

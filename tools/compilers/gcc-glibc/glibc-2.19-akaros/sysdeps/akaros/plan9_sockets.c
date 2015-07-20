@@ -177,7 +177,7 @@ Rock *_sock_newrock(int fd)
 /* For a ctlfd and a few other settings, it opens and returns the corresponding
  * datafd.  This will close cfd for you. */
 int
-_sock_data(int cfd, char *net, int domain, int stype, int protocol, Rock ** rp)
+_sock_data(int cfd, char *net, int domain, int type, int protocol, Rock ** rp)
 {
 	int n, fd;
 	Rock *r;
@@ -215,7 +215,8 @@ _sock_data(int cfd, char *net, int domain, int stype, int protocol, Rock ** rp)
 	memset(&r->raddr, 0, sizeof(r->raddr));
 	memset(&r->addr, 0, sizeof(r->addr));
 	r->domain = domain;
-	r->stype = stype;
+	r->stype = _sock_strip_opts(type);
+	r->sopts = _sock_get_opts(type);
 	r->protocol = protocol;
 	strcpy(r->ctl, name);
 	return fd;
@@ -256,4 +257,15 @@ Rock *udp_sock_get_rock(int fd)
 		return r;
 	else
 		return 0;
+}
+
+/* In Linux, socket options are multiplexed in the socket type. */
+int _sock_strip_opts(int type)
+{
+	return type & ~(SOCK_NONBLOCK | SOCK_CLOEXEC);
+}
+
+int _sock_get_opts(int type)
+{
+	return type & (SOCK_NONBLOCK | SOCK_CLOEXEC);
 }

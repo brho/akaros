@@ -71,7 +71,8 @@ int accept(int fd, __SOCKADDR_ARG addr, socklen_t * __restrict alen)
 			 * our lcfd for the data file fd.  even if it fails, sock_data will
 			 * close our lcfd for us.  when it succeeds, it'll open the data file
 			 * before closing lcfd, which will keep the converstation alive. */
-			nfd = _sock_data(lcfd, net, r->domain, r->stype, r->protocol, &nr);
+			nfd = _sock_data(lcfd, net, r->domain, r->stype | r->sopts,
+			                 r->protocol, &nr);
 			if (nfd < 0)
 				return -1;
 
