@@ -105,7 +105,8 @@ listen(char *dir, char *newdir)
 	snprintf(buf, sizeof(buf), "%s/listen", dir);
 	ctl = open(buf, O_RDWR);
 	if(ctl < 0){
-		fprintf(stderr,"listen opening %s: %r\n", buf);
+		if ((errno != EAGAIN) && (errno != EWOULDBLOCK))
+			fprintf(stderr,"listen opening %s: %r\n", buf);
 		return -1;
 	}
 
