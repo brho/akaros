@@ -23,5 +23,5 @@ int
 fsync (fd)
      int fd;
 {
-  return fcntl(fd, F_SYNC);
+  return __fcntl(fd, F_SYNC);
 }

@@ -23,5 +23,5 @@
 int
 posix_fadvise (int fd, __off_t offset, __off_t len, int advise)
 {
-  return fcntl(fd, F_ADVISE, (__off64_t)offset, (__off64_t)len, advise);
+  return __fcntl(fd, F_ADVISE, (__off64_t)offset, (__off64_t)len, advise);
 }
