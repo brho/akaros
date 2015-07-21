@@ -18,8 +18,8 @@
 #include <trap.h>
 
 /* Lookup table for core_id and per_cpu_inf, indexed by real __core_id() */
-int hw_coreid_lookup[MAX_NUM_CPUS] = {[0 ... (MAX_NUM_CPUS - 1)] -1};
-int os_coreid_lookup[MAX_NUM_CPUS] = {[0 ... (MAX_NUM_CPUS - 1)] -1};
+int hw_coreid_lookup[MAX_NUM_CORES] = {[0 ... (MAX_NUM_CORES - 1)] -1};
+int os_coreid_lookup[MAX_NUM_CORES] = {[0 ... (MAX_NUM_CORES - 1)] -1};
 
 /*************************** IPI Wrapper Stuff ********************************/
 // checklists to protect the global interrupt_handlers for 0xf0, f1, f2, f3, f4
@@ -44,22 +44,22 @@ static int smp_call_function(uint8_t type, uint32_t dest, isr_t handler,
 	}
 
 	// assumes our cores are numbered in order
-	if ((type == 4) && (dest >= num_cpus))
+	if ((type == 4) && (dest >= num_cores))
 		panic("Destination CPU %d does not exist!", dest);
 
 	// build the mask based on the type and destination
-	INIT_CHECKLIST_MASK(cpu_mask, MAX_NUM_CPUS);
+	INIT_CHECKLIST_MASK(cpu_mask, MAX_NUM_CORES);
 	// set checklist mask's size dynamically to the num cpus actually present
-	cpu_mask.size = num_cpus;
+	cpu_mask.size = num_cores;
 	switch (type) {
 		case 1: // self
 			SET_BITMASK_BIT(cpu_mask.bits, core_id());
 			break;
 		case 2: // all
-			FILL_BITMASK(cpu_mask.bits, num_cpus);
+			FILL_BITMASK(cpu_mask.bits, num_cores);
 			break;
 		case 3: // all but self
-			FILL_BITMASK(cpu_mask.bits, num_cpus);
+			FILL_BITMASK(cpu_mask.bits, num_cores);
 			CLR_BITMASK_BIT(cpu_mask.bits, core_id());
 			break;
 		case 4: // physical mode

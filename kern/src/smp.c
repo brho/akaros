@@ -19,7 +19,7 @@
 #include <kdebug.h>
 #include <kmalloc.h>
 
-struct per_cpu_info per_cpu_info[MAX_NUM_CPUS];
+struct per_cpu_info per_cpu_info[MAX_NUM_CORES];
 
 // tracks number of global waits on smp_calls, must be <= NUM_HANDLER_WRAPPERS
 atomic_t outstanding_calls = 0;
@@ -148,7 +148,7 @@ void reset_cpu_state_ticks(int coreid)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	uint64_t now_ticks;
-	if (coreid >= num_cpus)
+	if (coreid >= num_cores)
 		return;
 	/* need to update last_tick_cnt, so the current value doesn't get added in
 	 * next time we update */
@@ -220,18 +220,18 @@ void pcpui_tr_foreach(int coreid, int type)
 
 void pcpui_tr_foreach_all(int type)
 {
-	for (int i = 0; i < num_cpus; i++)
+	for (int i = 0; i < num_cores; i++)
 		pcpui_tr_foreach(i, type);
 }
 
 void pcpui_tr_reset_all(void)
 {
-	for (int i = 0; i < num_cpus; i++)
+	for (int i = 0; i < num_cores; i++)
 		trace_ring_reset(&per_cpu_info[i].traces);
 }
 
 void pcpui_tr_reset_and_clear_all(void)
 {
-	for (int i = 0; i < num_cpus; i++)
+	for (int i = 0; i < num_cores; i++)
 		trace_ring_reset_and_clear(&per_cpu_info[i].traces);
 }

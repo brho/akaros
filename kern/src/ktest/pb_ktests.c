@@ -251,7 +251,7 @@ barrier_t test_cpu_array;
 bool test_barrier(void)
 {
 	cprintf("Core 0 initializing barrier\n");
-	init_barrier(&test_cpu_array, num_cpus);
+	init_barrier(&test_cpu_array, num_cores);
 	cprintf("Core 0 asking all cores to print ids, barrier, rinse, repeat\n");
 	smp_call_function_all(test_barrier_handler, NULL, 0);
 
@@ -400,7 +400,7 @@ static void test_checklist_handler(struct hw_trapframe *hw_tf, void *data)
 // TODO: Add assertions
 bool test_checklists(void)
 {
-	INIT_CHECKLIST(a_list, MAX_NUM_CPUS);
+	INIT_CHECKLIST(a_list, MAX_NUM_CORES);
 	the_global_list = &a_list;
 	printk("Checklist Build, mask size: %d\n", sizeof(a_list.mask.bits));
 	printk("mask\n");
@@ -410,12 +410,12 @@ bool test_checklists(void)
 	PRINT_BITMASK(a_list.mask.bits, a_list.mask.size);
 
 	CLR_BITMASK(a_list.mask.bits, a_list.mask.size);
-	INIT_CHECKLIST_MASK(a_mask, MAX_NUM_CPUS);
-	FILL_BITMASK(a_mask.bits, num_cpus);
+	INIT_CHECKLIST_MASK(a_mask, MAX_NUM_CORES);
+	FILL_BITMASK(a_mask.bits, num_cores);
 	//CLR_BITMASK_BIT(a_mask.bits, core_id());
 	//SET_BITMASK_BIT(a_mask.bits, 1);
 	//printk("New mask (1, 17, 25):\n");
-	printk("Created new mask, filled up to num_cpus\n");
+	printk("Created new mask, filled up to num_cores\n");
 	PRINT_BITMASK(a_mask.bits, a_mask.size);
 	printk("committing new mask\n");
 	commit_checklist_wait(&a_list, &a_mask);
@@ -471,7 +471,7 @@ bool test_smp_call_functions(void)
 	smp_call_wait(waiter0);
 	printk("\nCore %d: SMP Call All-Else Individually, in order (nowait):\n", me);
 	printk("---------------------\n");
-	for(i = 1; i < num_cpus; i++)
+	for(i = 1; i < num_cores; i++)
 		smp_call_function_single(i, test_hello_world_handler, NULL, 0);
 	printk("\nCore %d: SMP Call Self (wait):\n", me);
 	printk("---------------------\n");
@@ -479,7 +479,7 @@ bool test_smp_call_functions(void)
 	smp_call_wait(waiter0);
 	printk("\nCore %d: SMP Call All-Else Individually, in order (wait):\n", me);
 	printk("---------------------\n");
-	for(i = 1; i < num_cpus; i++)
+	for(i = 1; i < num_cores; i++)
 	{
 		smp_call_function_single(i, test_hello_world_handler, NULL, &waiter0);
 		smp_call_wait(waiter0);
@@ -490,18 +490,18 @@ bool test_smp_call_functions(void)
 	smp_call_function_all(test_incrementer_handler, &b, 0);
 	smp_call_function_all(test_incrementer_handler, &c, 0);
 	// if i can clobber a previous IPI, the interleaving might do it
-	smp_call_function_single(1 % num_cpus, test_incrementer_handler, &a, 0);
-	smp_call_function_single(2 % num_cpus, test_incrementer_handler, &b, 0);
-	smp_call_function_single(3 % num_cpus, test_incrementer_handler, &c, 0);
-	smp_call_function_single(4 % num_cpus, test_incrementer_handler, &a, 0);
-	smp_call_function_single(5 % num_cpus, test_incrementer_handler, &b, 0);
-	smp_call_function_single(6 % num_cpus, test_incrementer_handler, &c, 0);
+	smp_call_function_single(1 % num_cores, test_incrementer_handler, &a, 0);
+	smp_call_function_single(2 % num_cores, test_incrementer_handler, &b, 0);
+	smp_call_function_single(3 % num_cores, test_incrementer_handler, &c, 0);
+	smp_call_function_single(4 % num_cores, test_incrementer_handler, &a, 0);
+	smp_call_function_single(5 % num_cores, test_incrementer_handler, &b, 0);
+	smp_call_function_single(6 % num_cores, test_incrementer_handler, &c, 0);
 	smp_call_function_all(test_incrementer_handler, &a, 0);
-	smp_call_function_single(3 % num_cpus, test_incrementer_handler, &c, 0);
+	smp_call_function_single(3 % num_cores, test_incrementer_handler, &c, 0);
 	smp_call_function_all(test_incrementer_handler, &b, 0);
-	smp_call_function_single(1 % num_cpus, test_incrementer_handler, &a, 0);
+	smp_call_function_single(1 % num_cores, test_incrementer_handler, &a, 0);
 	smp_call_function_all(test_incrementer_handler, &c, 0);
-	smp_call_function_single(2 % num_cpus, test_incrementer_handler, &b, 0);
+	smp_call_function_single(2 % num_cores, test_incrementer_handler, &b, 0);
 	// wait, so we're sure the others finish before printing.
 	// without this, we could (and did) get 19,18,19, since the B_inc
 	// handler didn't finish yet
@@ -1529,9 +1529,9 @@ bool test_cv(void)
 	printk("test_cv: signal without waiting complete\n");
 
 	/* Test 1: single / minimal shit */
-	nr_msgs = num_cpus - 1; /* not using cpu 0 */
+	nr_msgs = num_cores - 1; /* not using cpu 0 */
 	atomic_init(&counter, nr_msgs);
-	for (int i = 1; i < num_cpus; i++)
+	for (int i = 1; i < num_cores; i++)
 		send_kernel_message(i, __test_cv_waiter, 0, 0, 0, KMSG_ROUTINE);
 	udelay(1000000);
 	cv_signal(cv);
@@ -1551,7 +1551,7 @@ bool test_cv(void)
 	nr_msgs = 0x500;	/* any more than 0x20000 could go OOM */
 	atomic_init(&counter, nr_msgs);
 	for (int i = 0; i < nr_msgs; i++) {
-		int cpu = (i % (num_cpus - 1)) + 1;
+		int cpu = (i % (num_cores - 1)) + 1;
 		if (atomic_read(&counter) % 5)
 			send_kernel_message(cpu, __test_cv_waiter, 0, 0, 0, KMSG_ROUTINE);
 		else
@@ -1811,8 +1811,8 @@ bool test_rwlock(void)
 	}
 		
 	/* send 4 messages to each non core 0 */
-	atomic_init(&rwlock_counter, (num_cpus - 1) * 4);
-	for (int i = 1; i < num_cpus; i++)
+	atomic_init(&rwlock_counter, (num_cores - 1) * 4);
+	for (int i = 1; i < num_cores; i++)
 		for (int j = 0; j < 4; j++)
 			send_kernel_message(i, __test_rwlock, 0, 0, 0, KMSG_ROUTINE);
 	while (atomic_read(&rwlock_counter))
@@ -1866,10 +1866,10 @@ bool test_rv(void)
 	printk("test_rv: wakeup without sleeping complete\n");
 
 	/* Test 1: a few sleepers */
-	nr_msgs = num_cpus - 1; /* not using cpu 0 */
+	nr_msgs = num_cores - 1; /* not using cpu 0 */
 	atomic_init(&counter, nr_msgs);
 	state = FALSE;
-	for (int i = 1; i < num_cpus; i++)
+	for (int i = 1; i < num_cores; i++)
 		send_kernel_message(i, __test_rv_sleeper, 0, 0, 0, KMSG_ROUTINE);
 	udelay(1000000);
 	cmb();
@@ -1887,7 +1887,7 @@ bool test_rv(void)
 	nr_msgs = 0x500;	/* any more than 0x20000 could go OOM */
 	atomic_init(&counter, nr_msgs);
 	for (int i = 0; i < nr_msgs; i++) {
-		int cpu = (i % (num_cpus - 1)) + 1;
+		int cpu = (i % (num_cores - 1)) + 1;
 		/* timeouts from 0ms ..5000ms (enough that they should wake via cond */
 		if (atomic_read(&counter) % 5)
 			send_kernel_message(cpu, __test_rv_sleeper_timeout, i * 4, 0, 0,

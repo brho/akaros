@@ -69,12 +69,12 @@ _start:
 
 notcore0:
   // wait for core 0 to boot
-  la     a8, num_cpus_booted - KERN_LOAD_ADDR
+  la     a8, num_cores_booted - KERN_LOAD_ADDR
 1:lw     a9, 0(a8)
   beqz   a9, 1b
 
-  // if for some reason coreid >= num_cpus, don't boot this core
-  la     a8, num_cpus - KERN_LOAD_ADDR
+  // if for some reason coreid >= num_cores, don't boot this core
+  la     a8, num_cores - KERN_LOAD_ADDR
   lw     a8, 0(a8)
 1:bgeu   a6, a8, 1b
 
@@ -120,4 +120,4 @@ l2pt:
 
   .global percore_stacks
 percore_stacks:
-  .space  KSTKSIZE*MAX_NUM_CPUS
+  .space  KSTKSIZE*MAX_NUM_CORES

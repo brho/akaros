@@ -280,7 +280,7 @@ void kmsg_queue_stat(void)
 {
 	struct kernel_message *kmsg;
 	bool immed_emp, routine_emp;
-	for (int i = 0; i < num_cpus; i++) {
+	for (int i = 0; i < num_cores; i++) {
 		spin_lock_irqsave(&per_cpu_info[i].immed_amsg_lock);
 		immed_emp = STAILQ_EMPTY(&per_cpu_info[i].immed_amsgs);
 		spin_unlock_irqsave(&per_cpu_info[i].immed_amsg_lock);

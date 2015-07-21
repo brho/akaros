@@ -846,7 +846,7 @@ int pickcore(int mycolor, int index)
 	if (slit == NULL) {
 		return 0;
 	}
-	ncorepercol = num_cpus / slit->rowlen;
+	ncorepercol = num_cores / slit->rowlen;
 	color = slit->e[mycolor][index / ncorepercol].dom;
 	return color * ncorepercol + index % ncorepercol;
 }

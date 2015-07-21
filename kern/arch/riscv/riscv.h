@@ -41,8 +41,8 @@ static __inline void
 send_broadcast_ipi(uint8_t vector)
 {
 #warning "broadcast ipi?"
-	/* num_cpus might not be visible here */
-	for (int i = 0; i < num_cpus; i++)
+	/* num_cores might not be visible here */
+	for (int i = 0; i < num_cores; i++)
 		send_ipi(i, vector);
 }
 

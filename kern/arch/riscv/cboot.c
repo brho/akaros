@@ -9,7 +9,7 @@
 
 #define MAX_KERNBASE_SIZE (KERN_VMAP_TOP - KERNBASE)
 
-uint32_t num_cpus = 1;   // this must not be in BSS
+uint32_t num_cores = 1;   // this must not be in BSS
 
 static uint64_t
 mem_size(uint64_t sz_mb)
@@ -55,14 +55,14 @@ void pagetable_init(uint32_t memsize_mb, pte_t* l1pt, pte_t* l1pt_boot,
 }
 
 void
-cmain(uint32_t memsize_mb, uint32_t num_cores)
+cmain(uint32_t memsize_mb, uint32_t nc)
 {
 	multiboot_info_t mbi;
 	memset(&mbi, 0, sizeof(mbi));
 	mbi.flags = 0x00000001;
 	mbi.mem_lower = mem_size(memsize_mb) / 1024;
 
-	num_cpus = num_cores;
+	num_cores = nc;
 
 	extern void kernel_init(multiboot_info_t *mboot_info);
 	// kernel_init expects a pre-relocation mbi address

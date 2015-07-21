@@ -146,11 +146,11 @@ int alloc_cpu_buffers(void)
 	qnoblock(opq, 1);
 	if (!op_cpu_buffer) {
 		op_cpu_buffer =
-			kzmalloc(sizeof(*op_cpu_buffer) * num_cpus, KMALLOC_WAIT);
+			kzmalloc(sizeof(*op_cpu_buffer) * num_cores, KMALLOC_WAIT);
 		if (!op_cpu_buffer)
 			goto fail;
 
-		for (i = 0; i < num_cpus; i++) {
+		for (i = 0; i < num_cores; i++) {
 			struct oprofile_cpu_buffer *b = &op_cpu_buffer[i];
 			b->last_proc = NULL;
 			b->last_is_kernel = -1;
@@ -423,7 +423,7 @@ void oprofile_cpubuf_flushall(int alloc)
 	//print_func_entry();
 	int core;
 
-	for(core = 0; core < num_cpus; core++) {
+	for(core = 0; core < num_cores; core++) {
 		oprofile_cpubuf_flushone(core, alloc);
 	}
 	//print_func_exit();
@@ -435,7 +435,7 @@ void oprofile_control_trace(int onoff)
 	int core;
 	struct oprofile_cpu_buffer *cpu_buf;
 
-	for(core = 0; core < num_cpus; core++) {
+	for(core = 0; core < num_cores; core++) {
 		cpu_buf = &op_cpu_buffer[core];
 		cpu_buf->tracing = onoff;
 

@@ -52,7 +52,7 @@ static void bnx2x_add_all_napi(struct bnx2x *bp)
 
 static int bnx2x_calc_num_queues(struct bnx2x *bp)
 {
-	/* default is min(8, num_cpus) in Linux.  we'll set it elsewhere */
+	/* default is min(8, num_cores) in Linux.  we'll set it elsewhere */
 	int nq = bnx2x_num_queues ? : 8;
 
 	/* Reduce memory usage in kdump environment by using only one queue */

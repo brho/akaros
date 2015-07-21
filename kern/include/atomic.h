@@ -184,7 +184,7 @@ static inline void poke_init(struct poke_tracker *tracker, void (*func)(void*))
 typedef struct checklist_mask {
 	// only need an uint8_t, but we need the bits[] to be word aligned
 	uint32_t size;
-	volatile uint8_t bits[MAX_NUM_CPUS];
+	volatile uint8_t bits[MAX_NUM_CORES];
 } checklist_mask_t;
 
 // mask contains an unspecified array, so it needs to be at the bottom

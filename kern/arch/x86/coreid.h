@@ -12,8 +12,8 @@ static inline int node_id(void) __attribute__((always_inline));
 static inline int core_id_early(void) __attribute__((always_inline));
 
 /* declared in smp.c */
-extern int hw_coreid_lookup[MAX_NUM_CPUS];
-extern int os_coreid_lookup[MAX_NUM_CPUS];
+extern int hw_coreid_lookup[MAX_NUM_CORES];
+extern int os_coreid_lookup[MAX_NUM_CORES];
 
 /* os_coreid -> hw_coreid */
 static inline int get_hw_coreid(uint32_t coreid)

@@ -400,7 +400,7 @@ long_mode:
 	# Clear the frame pointer for proper backtraces
 	movq	$0x0, %rbp
 	movabs	$(bootstacktop), %rsp
-	movabs	$(num_cpus), %rax
+	movabs	$(num_cores), %rax
 	movl	$0x1, (%rax)
 	# Pass multiboot info to kernel_init (%rdi == arg1)
 	movq 	%rbx, %rdi

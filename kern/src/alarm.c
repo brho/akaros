@@ -456,7 +456,7 @@ void print_pcpu_chains(void)
 	struct timer_chain *pcpu_chain;
 	printk("PCPU Chains:  It is now %llu\n", read_tsc());
 
-	for (int i = 0; i < num_cpus; i++) {
+	for (int i = 0; i < num_cores; i++) {
 		pcpu_chain = &per_cpu_info[i].tchain;
 		print_chain(pcpu_chain);
 	}

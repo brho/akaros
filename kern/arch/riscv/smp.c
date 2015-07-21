@@ -8,15 +8,15 @@
 #include <atomic.h>
 #include <pmap.h>
 
-volatile uint32_t num_cpus_booted = 0;
+volatile uint32_t num_cores_booted = 0;
 
 void
 smp_boot(void)
 {
 	smp_percpu_init();
-	num_cpus_booted = 1;
-	while(num_cpus_booted < num_cpus);
-	printd("%d cores reporting!\n", num_cpus);
+	num_cores_booted = 1;
+	while(num_cores_booted < num_cores);
+	printd("%d cores reporting!\n", num_cores);
 }
 
 void
@@ -24,7 +24,7 @@ smp_init(void)
 {
 	smp_percpu_init();
 
-	__sync_fetch_and_add(&num_cpus_booted, 1);
+	__sync_fetch_and_add(&num_cores_booted, 1);
 	printd("Good morning, Vietnam! (core id = %d)\n",core_id());
 
 	smp_idle();
@@ -34,7 +34,7 @@ handler_wrapper_t*
 smp_make_wrapper()
 {
 	static handler_wrapper_t
-	wrapper_pool[MAX_NUM_CPUS*8] = {{{0},SPINLOCK_INITIALIZER}};
+	wrapper_pool[MAX_NUM_CORES*8] = {{{0},SPINLOCK_INITIALIZER}};
 
 	size_t i;
 	for(i = 0; i < sizeof(wrapper_pool)/sizeof(wrapper_pool[0]); i++)
@@ -69,14 +69,14 @@ int smp_call_function_all(isr_t handler, void* data,
 		if(!wrapper)
 			return -ENOMEM;
 
-		for(i = 0; i < num_cpus; i++)
+		for(i = 0; i < num_cores; i++)
 			wrapper->wait_list[i] = 1;
 	}
 
 	enable_irqsave(&state);
 
 	// send to others
-	for(i = 0, me = core_id(); i < num_cpus; i++)
+	for(i = 0, me = core_id(); i < num_cores; i++)
 	{
 		if(i == me)
 			continue;
@@ -124,7 +124,7 @@ int smp_call_function_single(uint32_t dest, isr_t handler, void* data,
 int smp_call_wait(handler_wrapper_t* wrapper)
 {
 	int i;
-	for(i = 0; i < num_cpus; i++)
+	for(i = 0; i < num_cores; i++)
 		while(wrapper->wait_list[i]);
 
 	spin_unlock(&wrapper->lock);

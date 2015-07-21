@@ -181,12 +181,12 @@ static void kprofinit(void)
 	/* no, i'm not sure how we should do this yet. */
 	int alloc_cpu_buffers(void);
 	alloc_cpu_buffers();
-	oprof_alarms = kzmalloc(sizeof(struct alarm_waiter) * num_cpus,
+	oprof_alarms = kzmalloc(sizeof(struct alarm_waiter) * num_cores,
 	                        KMALLOC_WAIT);
 	if (!oprof_alarms)
 		error(Enomem);
 
-	for (int i = 0; i < num_cpus; i++)
+	for (int i = 0; i < num_cores; i++)
 		init_awaiter_irq(&oprof_alarms[i], oprof_alarm_handler);
 
 	kprof.systrace = qopen(2 << 20, 0, 0, 0);
@@ -248,7 +248,7 @@ kprofclose(struct chan*unused)
 static size_t mpstat_len(void)
 {
 	size_t each_row = 7 + NR_CPU_STATES * 26;
-	return each_row * (num_cpus + 1) + 1;
+	return each_row * (num_cores + 1) + 1;
 }
 
 static long mpstat_read(void *va, long n, int64_t off)
@@ -269,7 +269,7 @@ static long mpstat_read(void *va, long n, int64_t off)
 		len += snprintf(buf + len, bufsz - len, "%23s%s", cpu_state_names[j],
 		                j != NR_CPU_STATES - 1 ? "   " : "  \n");
 
-	for (int i = 0; i < num_cpus; i++) {
+	for (int i = 0; i < num_cores; i++) {
 		pcpui = &per_cpu_info[i];
 		cpu_total = 0;
 		len += snprintf(buf + len, bufsz - len, "%5d: ", i);
@@ -293,7 +293,7 @@ static size_t mpstatraw_len(void)
 {
 	size_t header_row = 27 + NR_CPU_STATES * 7 + 1;
 	size_t cpu_row = 7 + NR_CPU_STATES * 17;
-	return header_row + cpu_row * num_cpus + 1;
+	return header_row + cpu_row * num_cores + 1;
 }
 
 static long mpstatraw_read(void *va, long n, int64_t off)
@@ -306,14 +306,14 @@ static long mpstatraw_read(void *va, long n, int64_t off)
 	/* could spit it all out in binary, though then it'd be harder to process
 	 * the data across a mnt (if we export #K).  probably not a big deal. */
 
-	/* header line: version, num_cpus, tsc freq, state names */
-	len += snprintf(buf + len, bufsz - len, "v%03d %5d %16llu", 1, num_cpus,
+	/* header line: version, num_cores, tsc freq, state names */
+	len += snprintf(buf + len, bufsz - len, "v%03d %5d %16llu", 1, num_cores,
 	                system_timing.tsc_freq);
 	for (int j = 0; j < NR_CPU_STATES; j++)
 		len += snprintf(buf + len, bufsz - len, " %6s", cpu_state_names[j]);
 	len += snprintf(buf + len, bufsz - len, "\n");
 
-	for (int i = 0; i < num_cpus; i++) {
+	for (int i = 0; i < num_cores; i++) {
 		pcpui = &per_cpu_info[i];
 		len += snprintf(buf + len, bufsz - len, "%5d: ", i);
 		for (int j = 0; j < NR_CPU_STATES; j++) {
@@ -495,11 +495,11 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 			if (!strcmp(cb->f[1], "period")) {
 				oprof_timer_period = strtoul(cb->f[2], 0, 10);
 			} else if (!strcmp(cb->f[1], "all")) {
-				for (int i = 0; i < num_cpus; i++)
+				for (int i = 0; i < num_cores; i++)
 					manage_oprof_timer(i, cb);
 			} else {
 				int pcoreid = strtoul(cb->f[1], 0, 10);
-				if (pcoreid >= num_cpus)
+				if (pcoreid >= num_cores)
 					error("no such coreid %d", pcoreid);
 				manage_oprof_timer(pcoreid, cb);
 			}
@@ -534,7 +534,7 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 		if (cb->nf < 1)
 			error("mpstat bad option (reset|ipi|on|off)");
 		if (!strcmp(cb->f[0], "reset")) {
-			for (int i = 0; i < num_cpus; i++)
+			for (int i = 0; i < num_cores; i++)
 				reset_cpu_state_ticks(i);
 		} else if (!strcmp(cb->f[0], "on")) {
 			/* TODO: enable the ticks */ ;

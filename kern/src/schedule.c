@@ -119,8 +119,8 @@ void schedule_init(void)
 {
 	spin_lock(&sched_lock);
 	/* init provisioning stuff */
-	all_pcores = kmalloc(sizeof(struct sched_pcore) * num_cpus, 0);
-	memset(all_pcores, 0, sizeof(struct sched_pcore) * num_cpus);
+	all_pcores = kmalloc(sizeof(struct sched_pcore) * num_cores, 0);
+	memset(all_pcores, 0, sizeof(struct sched_pcore) * num_cores);
 	assert(!core_id());		/* want the alarm on core0 for now */
 	init_awaiter(&ksched_waiter, __ksched_tick);
 	set_ksched_alarm();
@@ -128,11 +128,11 @@ void schedule_init(void)
 	 * odds from 1..max-1.  otherwise, give them everything by 0 (default mgmt
 	 * core).  TODO: (CG/LL) better LL/CG mgmt */
 #ifndef CONFIG_DISABLE_SMT
-	for (int i = 1; i < num_cpus; i++)
+	for (int i = 1; i < num_cores; i++)
 		TAILQ_INSERT_TAIL(&idlecores, pcoreid2spc(i), alloc_next);
 #else
-	assert(!(num_cpus % 2));
-	for (int i = 1; i < num_cpus; i += 2)
+	assert(!(num_cores % 2));
+	for (int i = 1; i < num_cores; i += 2)
 		TAILQ_INSERT_TAIL(&idlecores, pcoreid2spc(i), alloc_next);
 #endif /* CONFIG_DISABLE_SMT */
 	spin_unlock(&sched_lock);
@@ -611,7 +611,7 @@ int get_this_idle_core(int coreid)
 {
 	struct sched_pcore *spc = pcoreid2spc(coreid);
 	int ret = -1;
-	assert((0 <= coreid) && (coreid < num_cpus));
+	assert((0 <= coreid) && (coreid < num_cores));
 	spin_lock(&sched_lock);
 	if (__spc_is_idle(pcoreid2spc(coreid)) && !spc->prov_proc) {
 		assert(!spc->alloc_proc);
@@ -626,7 +626,7 @@ int get_this_idle_core(int coreid)
 void put_idle_core(int coreid)
 {
 	struct sched_pcore *spc = pcoreid2spc(coreid);
-	assert((0 <= coreid) && (coreid < num_cpus));
+	assert((0 <= coreid) && (coreid < num_cores));
 	spin_lock(&sched_lock);
 	TAILQ_INSERT_TAIL(&idlecores, spc, alloc_next);
 	spin_unlock(&sched_lock);
@@ -637,9 +637,9 @@ uint32_t max_vcores(struct proc *p)
 {
 /* TODO: (CG/LL) */
 #ifdef CONFIG_DISABLE_SMT
-	return num_cpus >> 1;
+	return num_cores >> 1;
 #else
-	return num_cpus - 1;	/* reserving core 0 */
+	return num_cores - 1;	/* reserving core 0 */
 #endif /* CONFIG_DISABLE_SMT */
 }
 
@@ -655,7 +655,7 @@ uint32_t max_vcores(struct proc *p)
 static void __core_request(struct proc *p, uint32_t amt_needed)
 {
 	uint32_t nr_to_grant = 0;
-	uint32_t corelist[num_cpus];
+	uint32_t corelist[num_cores];
 	struct sched_pcore *spc_i, *temp;
 	struct proc *proc_to_preempt;
 	bool success;
@@ -805,7 +805,7 @@ static bool is_ll_core(uint32_t pcoreid)
 static void __prov_track_alloc(struct proc *p, uint32_t pcoreid)
 {
 	struct sched_pcore *spc;
-	assert(pcoreid < num_cpus);		/* catch bugs */
+	assert(pcoreid < num_cores);	/* catch bugs */
 	spc = pcoreid2spc(pcoreid);
 	assert(spc->alloc_proc != p);	/* corruption or double-alloc */
 	spc->alloc_proc = p;
@@ -821,7 +821,7 @@ static void __prov_track_alloc(struct proc *p, uint32_t pcoreid)
 static void __prov_track_dealloc(struct proc *p, uint32_t pcoreid)
 {
 	struct sched_pcore *spc;
-	assert(pcoreid < num_cpus);		/* catch bugs */
+	assert(pcoreid < num_cores);	/* catch bugs */
 	spc = pcoreid2spc(pcoreid);
 	spc->alloc_proc = 0;
 	/* if the pcore is prov to them and now deallocated, move lists */
@@ -850,7 +850,7 @@ int provision_core(struct proc *p, uint32_t pcoreid)
 	struct sched_pcore_tailq *prov_list;
 	/* Make sure we aren't asking for something that doesn't exist (bounds check
 	 * on the pcore array) */
-	if (!(pcoreid < num_cpus)) {
+	if (!(pcoreid < num_cores)) {
 		set_errno(ENXIO);
 		return -1;
 	}
@@ -945,7 +945,7 @@ void print_prov_map(void)
 	struct sched_pcore *spc_i;
 	/* Doing this unlocked, which is dangerous, but won't deadlock */
 	printk("Which cores are provisioned to which procs:\n------------------\n");
-	for (int i = 0; i < num_cpus; i++) {
+	for (int i = 0; i < num_cores; i++) {
 		spc_i = pcoreid2spc(i);
 		printk("Core %02d, prov: %d(%p) alloc: %d(%p)\n", i,
 		       spc_i->prov_proc ? spc_i->prov_proc->pid : 0, spc_i->prov_proc,

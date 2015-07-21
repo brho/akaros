@@ -190,7 +190,7 @@ void __diediedie(uint32_t srcid, uint32_t code, uint32_t a1, uint32_t a2)
 void appserver_die(uintptr_t code)
 {
 	int i;
-	for(i = 0; i < num_cpus; i++)
+	for(i = 0; i < num_cores; i++)
 		if(i != core_id())
 			while(send_kernel_message(i, (amr_t)&__diediedie, code, 0, 0,
 			                          KMSG_IMMEDIATE));

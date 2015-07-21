@@ -135,7 +135,7 @@ void manager_brho(void)
 
 #if 0 /* ancient tests below: (keeping around til we ditch the manager) */
 	// for testing taking cores, check in case 1 for usage
-	uint32_t corelist[MAX_NUM_CPUS];
+	uint32_t corelist[MAX_NUM_CORES];
 	uint32_t num = 3;
 	struct file *temp_f;
 	static struct proc *p;
@@ -285,7 +285,7 @@ void manager_yuzhu()
 	static struct proc *p;
 
 	// for testing taking cores, check in case 1 for usage
-	uint32_t corelist[MAX_NUM_CPUS];
+	uint32_t corelist[MAX_NUM_CORES];
 	uint32_t num = 3;
 
 	//create_server(init_num_cores, loop);

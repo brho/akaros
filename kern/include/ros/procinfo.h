@@ -57,9 +57,9 @@ typedef struct procinfo {
 	 * rebuild glibc. */
 	bool is_mcp;			/* is in multi mode */
 	unsigned long 		res_grant[MAX_NUM_RESOURCES];
-	struct vcore		vcoremap[MAX_NUM_CPUS];
+	struct vcore		vcoremap[MAX_NUM_CORES];
 	uint32_t			num_vcores;
-	struct pcore		pcoremap[MAX_NUM_CPUS];
+	struct pcore		pcoremap[MAX_NUM_CORES];
 	seq_ctr_t			coremap_seqctr;
 } procinfo_t;
 #define PROCINFO_NUM_PAGES  ((sizeof(procinfo_t)-1)/PGSIZE + 1)	

@@ -1,6 +1,6 @@
 NETWORK_CARD ?= rtl8139
 CPU_MODEL ?= Nehalem
-NUM_CPUS ?= 8
+NUM_CORES ?= 8
 MEMORY_SIZE ?= 1024
 KERNEL_BIN ?= obj/kern/akaros-kernel
 ENABLE_KVM ?= #-enable-kvm
@@ -13,4 +13,4 @@ qemu: all qemu-run
 # See http://www.tuxation.com/setuid-on-shell-scripts.html
 qemu-run:
 	qemu_launcher -s $(ENABLE_KVM) $(QEMU_NETWORK) -cpu $(CPU_MODEL) \
-	-smp $(NUM_CPUS) -m $(MEMORY_SIZE) -kernel $(KERNEL_BIN) -nographic
+	-smp $(NUM_CORES) -m $(MEMORY_SIZE) -kernel $(KERNEL_BIN) -nographic

@@ -5,7 +5,7 @@
 #include <arch/arch.h>
 #include <atomic.h>
 
-typedef volatile uint8_t wait_list_t[MAX_NUM_CPUS];
+typedef volatile uint8_t wait_list_t[MAX_NUM_CORES];
 
 typedef struct
 {

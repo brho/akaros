@@ -26,18 +26,18 @@
 #include "vmm/vmm.h"
 
 extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
-volatile uint32_t num_cpus = 0xee;
+volatile uint32_t num_cores = 0xee;
 uintptr_t smp_stack_top;
 barrier_t generic_barrier;
 
 #define DECLARE_HANDLER_CHECKLISTS(vector)                          \
-	INIT_CHECKLIST(f##vector##_cpu_list, MAX_NUM_CPUS);
+	INIT_CHECKLIST(f##vector##_cpu_list, MAX_NUM_CORES);
 
 #define INIT_HANDLER_WRAPPER(v)                                     \
 {                                                                   \
 	handler_wrappers[(v)].vector = 0xe##v;                          \
 	handler_wrappers[(v)].cpu_list = &f##v##_cpu_list;              \
-	handler_wrappers[(v)].cpu_list->mask.size = num_cpus;           \
+	handler_wrappers[(v)].cpu_list->mask.size = num_cores;          \
 }
 
 DECLARE_HANDLER_CHECKLISTS(0);
@@ -139,12 +139,12 @@ static void __spin_bootlock_raw(void)
  * in hw_coreid_lookup, jumping over gaps of -1's. */
 static void smp_remap_coreids(void)
 {
-	for (int i = 0, hw_step = 0; i < num_cpus; i++, hw_step++) {
+	for (int i = 0, hw_step = 0; i < num_cores; i++, hw_step++) {
 		if (hw_coreid_lookup[i] == -1) {
 			while (hw_coreid_lookup[hw_step] == -1) {
 				hw_step++;
-				if (hw_step == MAX_NUM_CPUS)
-					panic("Mismatch in num_cpus and hw_step");
+				if (hw_step == MAX_NUM_CORES)
+					panic("Mismatch in num_cores and hw_step");
 			}
 			hw_coreid_lookup[i] = hw_coreid_lookup[hw_step];
 			hw_coreid_lookup[hw_step] = -1;
@@ -210,10 +210,10 @@ void smp_boot(void)
 	// mapping pulled out from under them.  Now, if a core loses, it will spin
 	// on the trampoline (which we must be careful to not deallocate)
 	__spin_bootlock_raw();
-	printk("Number of Cores Detected: %d\n", num_cpus);
+	printk("Number of Cores Detected: %d\n", num_cores);
 #ifdef CONFIG_DISABLE_SMT
-	assert(!(num_cpus % 2));
-	printk("Using only %d Idlecores (SMT Disabled)\n", num_cpus >> 1);
+	assert(!(num_cores % 2));
+	printk("Using only %d Idlecores (SMT Disabled)\n", num_cores >> 1);
 #endif /* CONFIG_DISABLE_SMT */
 	smp_remap_coreids();
 
@@ -222,7 +222,7 @@ void smp_boot(void)
 	// It had a refcount of 2 earlier, so we need to dec once more to free it
 	// but only if all cores are in (or we reset / reinit those that failed)
 	// TODO after we parse ACPI tables
-	if (num_cpus == 8) // TODO - ghetto coded for our 8 way SMPs
+	if (num_cores == 8) // TODO - ghetto coded for our 8 way SMPs
 		page_decref(pa2page(trampoline_pg));
 	// Dealloc the temp shared stack
 	page_decref(smp_stack);
@@ -231,7 +231,7 @@ void smp_boot(void)
 	init_smp_call_function();
 
 	/* Final core initialization */
-	init_barrier(&generic_barrier, num_cpus);
+	init_barrier(&generic_barrier, num_cores);
 	/* This will break the cores out of their hlt in smp_entry.S */
 	send_broadcast_ipi(I_POKE_CORE);
 	smp_final_core_init();	/* need to init ourselves as well */
@@ -255,7 +255,7 @@ uintptr_t smp_main(void)
 		cprintf("I am the Boot Strap Processor\n");
 	else
 		cprintf("I am an Application Processor\n");
-	cprintf("Num_Cpus: %d\n\n", num_cpus);
+	cprintf("Num_Cores: %d\n\n", num_cores);
 	*/
 	/* set up initial mappings.  core0 will adjust it later */
 	unsigned long my_hw_id = lapic_get_id();

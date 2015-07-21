@@ -23,8 +23,8 @@
  * address wrap-around. */
 static bool vcoreid_is_safe(uint32_t vcoreid)
 {
-	/* MAX_NUM_VCORES == MAX_NUM_CPUS (check procinfo/procdata) */
-	return vcoreid < MAX_NUM_CPUS;
+	/* MAX_NUM_VCORES == MAX_NUM_CORES (check procinfo/procdata) */
+	return vcoreid < MAX_NUM_CORES;
 }
 
 /* Note these three helpers return the user address of the mbox, not the KVA.

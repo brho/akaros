@@ -94,7 +94,7 @@ int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores, int flags)
 	}
 	/* Set this early, so cleanup checks the gpc array */
 	vmm->vmmcp = TRUE;
-	nr_guest_pcores = MIN(nr_guest_pcores, num_cpus);
+	nr_guest_pcores = MIN(nr_guest_pcores, num_cores);
 	vmm->amd = 0;
 	vmm->guest_pcores = kzmalloc(sizeof(void*) * nr_guest_pcores, KMALLOC_WAIT);
 	for (i = 0; i < nr_guest_pcores; i++) {

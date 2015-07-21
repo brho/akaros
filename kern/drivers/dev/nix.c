@@ -97,8 +97,8 @@ struct nix {
 	void *image;
 	unsigned long imagesize;
 	int id;
-	/* we could dynamically alloc one of these with num_cpus */
-	DECLARE_BITMAP(cpus, MAX_NUM_CPUS);
+	/* we could dynamically alloc one of these with num_cores */
+	DECLARE_BITMAP(cpus, MAX_NUM_CORES);
 };
 
 static spinlock_t nixlock = SPINLOCK_INITIALIZER_IRQSAVE;
@@ -342,7 +342,7 @@ static struct chan *nixopen(struct chan *c, int omode)
 		v->imagesize = img_size;
 		printk("nix image is %p with %d bytes\n", v->image, v->imagesize);
 		c->aux = v;
-		bitmap_zero(v->cpus, MAX_NUM_CPUS);
+		bitmap_zero(v->cpus, MAX_NUM_CORES);
 		memcpy(v->image, it, sizeof(it));
 		break;
 	case Qstat:
@@ -486,7 +486,7 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 			set_bit(core, nix->cpus);
 		} else if (!strcmp(cb->f[0], "check")) {
 			int i;
-			for(i = 0; i < MAX_NUM_CPUS; i++) {
+			for(i = 0; i < MAX_NUM_CORES; i++) {
 				if (!test_bit(i, nix->cpus))
 					continue;
 				printk("Core %d is available to nix%d\n", i, nix->id);

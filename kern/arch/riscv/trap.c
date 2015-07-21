@@ -24,7 +24,7 @@
  *
  * TODO: if these end up becoming contended cache lines, move this to
  * per_cpu_info. */
-uintptr_t core_stacktops[MAX_NUM_CPUS] = {0xcafebabe, 0};
+uintptr_t core_stacktops[MAX_NUM_CORES] = {0xcafebabe, 0};
 
 void
 advance_pc(struct hw_trapframe *state)

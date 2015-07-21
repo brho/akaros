@@ -159,11 +159,11 @@ void idt_init(void)
 	pic_remap();
 	pic_mask_all();
 
-	int ncleft = MAX_NUM_CPUS;
+	int ncleft = MAX_NUM_CORES;
 
 	ncleft = mpsinit(ncleft);
 	ncleft = mpacpi(ncleft);
-	printk("MP and ACPI found %d cores\n", MAX_NUM_CPUS - ncleft);
+	printk("MP and ACPI found %d cores\n", MAX_NUM_CORES - ncleft);
 
 	apiconline();
 	ioapiconline();
@@ -560,7 +560,7 @@ static int route_irq_h(struct irq_handler *irq_h, int os_coreid)
 		       irq_h->apic_vector, irq_h->type);
 		return -1;
 	}
-	if (os_coreid >= MAX_NUM_CPUS) {
+	if (os_coreid >= MAX_NUM_CORES) {
 		printk("[kernel] os_coreid %d out of range!\n", os_coreid);
 		return -1;
 	}

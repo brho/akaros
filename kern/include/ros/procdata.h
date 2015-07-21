@@ -28,8 +28,8 @@ typedef struct procdata {
 	struct resource_req		res_req[MAX_NUM_RESOURCES];
 	struct event_queue		*kernel_evts[MAX_NR_EVENT];
 	/* Long range, would like these to be mapped in lazily, as the vcores are
-	 * requested.  Sharing MAX_NUM_CPUS is a bit weird too. */
-	struct preempt_data		vcore_preempt_data[MAX_NUM_CPUS];
+	 * requested.  Sharing MAX_NUM_CORES is a bit weird too. */
+	struct preempt_data		vcore_preempt_data[MAX_NUM_CORES];
 } procdata_t;
 
 #define PROCDATA_NUM_PAGES  ((sizeof(procdata_t)-1)/PGSIZE + 1)

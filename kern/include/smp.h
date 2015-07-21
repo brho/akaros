@@ -85,8 +85,8 @@ struct per_cpu_info {
 
 typedef struct per_cpu_info  per_cpu_info_t;
 
-extern per_cpu_info_t per_cpu_info[MAX_NUM_CPUS];
-extern volatile uint32_t num_cpus;
+extern per_cpu_info_t per_cpu_info[MAX_NUM_CORES];
+extern volatile uint32_t num_cores;
 
 /* SMP bootup functions */
 void smp_boot(void);

@@ -228,7 +228,7 @@ static bool print_all_info(void)
 
 int mon_cpuinfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-	cprintf("Number of CPUs detected: %d\n", num_cpus);
+	cprintf("Number of Cores detected: %d\n", num_cores);
 	cprintf("Calling CPU's ID: 0x%08x\n", core_id());
 
 	if (argc < 2)
@@ -736,11 +736,11 @@ int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 		core = strtol(argv[2], 0, 0);
 		if (core < 0) {
 			printk("Sending NMIs to all cores:\n");
-			for (int i = 0; i < num_cpus; i++)
+			for (int i = 0; i < num_cores; i++)
 				send_nmi(i);
 		} else {
 			printk("Sending NMI core %d:\n", core);
-			if (core >= num_cpus) {
+			if (core >= num_cores) {
 				printk("No such core!  Maybe it's in another cell...\n");
 				return 1;
 			}
@@ -796,7 +796,7 @@ int mon_monitor(int argc, char **argv, struct hw_trapframe *hw_tf)
 		return 1;
 	}
 	uint32_t core = strtol(argv[1], 0, 0);
-	if (core >= num_cpus) {
+	if (core >= num_cores) {
 		printk("No such core!  Maybe it's in another cell...\n");
 		return 1;
 	}

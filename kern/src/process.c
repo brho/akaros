@@ -1603,7 +1603,7 @@ static void __proc_give_cores_running(struct proc *p, uint32_t *pc_arr,
 int __proc_give_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
 {
 	/* should never happen: */
-	assert(num + p->procinfo->num_vcores <= MAX_NUM_CPUS);
+	assert(num + p->procinfo->num_vcores <= MAX_NUM_CORES);
 	switch (p->state) {
 		case (PROC_RUNNABLE_S):
 		case (PROC_RUNNING_S):
