@@ -1,36 +1,48 @@
-/* Copyright (C) 1991-2014 Free Software Foundation, Inc.
-   This file is part of the GNU C Library.
-
-   The GNU C Library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation; either
-   version 2.1 of the License, or (at your option) any later version.
-
-   The GNU C Library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-
-   You should have received a copy of the GNU Lesser General Public
-   License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+/* Copyright (c) 2015 Google, Inc.
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details. */
 
 #include <errno.h>
 #include <sys/socket.h>
 
-/* Set socket FD's option OPTNAME at protocol level LEVEL
-   to *OPTVAL (which is OPTLEN bytes long).
-   Returns 0 on success, -1 for errors.  */
-int
-__setsockopt (fd, level, optname, optval, optlen)
-     int fd;
-     int level;
-     int optname;
-     const __ptr_t optval;
-     socklen_t optlen;
+#include "plan9_sockets.h"
+
+static int sol_socket_sso(Rock *r, int optname, void *optval, socklen_t optlen)
 {
-	__set_errno (ENOPROTOOPT);
-	return -1;
+	switch (optname) {
+		#if 0
+		/* We don't support setting any options yet */
+		case (SO_FOO):
+			if (optlen < foo_len) {
+				__set_errno(EINVAL);
+				return -1;
+			}
+			r->foo = *optval;
+			break;
+		#endif
+		default:
+			__set_errno(ENOPROTOOPT);
+			return -1;
+	};
+	return 0;
 }
 
+int __setsockopt(int sockfd, int level, int optname, const __ptr_t __optval,
+                 socklen_t optlen)
+{
+	Rock *r = _sock_findrock(sockfd, 0);
+	void *optval = (void*)__optval;
+	if (!r) {
+		/* could be EBADF too, we can't tell */
+		__set_errno(ENOTSOCK);
+		return -1;
+	}
+	switch (level) {
+		case (SOL_SOCKET):
+			return sol_socket_sso(r, optname, optval, optlen);
+		default:
+			__set_errno(ENOPROTOOPT);
+			return -1;
+	};
+}
 weak_alias (__setsockopt, setsockopt)

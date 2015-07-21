@@ -1,34 +1,44 @@
-/* Copyright (C) 1991-2014 Free Software Foundation, Inc.
-   This file is part of the GNU C Library.
-
-   The GNU C Library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation; either
-   version 2.1 of the License, or (at your option) any later version.
-
-   The GNU C Library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-
-   You should have received a copy of the GNU Lesser General Public
-   License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
+/* Copyright (c) 2015 Google, Inc.
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details. */
 
 #include <errno.h>
 #include <sys/socket.h>
 
-/* Put the current value for socket FD's option OPTNAME at protocol level LEVEL
-   into OPTVAL (which is *OPTLEN bytes long), and set *OPTLEN to the value's
-   actual length.  Returns 0 on success, -1 for errors.  */
-int
-getsockopt (fd, level, optname, optval, optlen)
-     int fd;
-     int level;
-     int optname;
-     void *optval;
-     socklen_t *optlen;
+#include "plan9_sockets.h"
+
+static int sol_socket_gso(Rock *r, int optname, void *optval, socklen_t *optlen)
 {
-	__set_errno (ENOPROTOOPT);
-	return -1;
+	switch (optname) {
+		case (SO_TYPE):
+			if (*optlen < 4) {
+				__set_errno(EINVAL);
+				return -1;
+			}
+			*(int*)optval = r->stype;
+			*optlen = 4;
+			break;
+		default:
+			__set_errno(ENOPROTOOPT);
+			return -1;
+	};
+	return 0;
+}
+
+int getsockopt(int sockfd, int level, int optname, void *optval,
+               socklen_t *optlen)
+{
+	Rock *r = _sock_findrock(sockfd, 0);
+	if (!r) {
+		/* could be EBADF too, we can't tell */
+		__set_errno(ENOTSOCK);
+		return -1;
+	}
+	switch (level) {
+		case (SOL_SOCKET):
+			return sol_socket_gso(r, optname, optval, optlen);
+		default:
+			__set_errno(ENOPROTOOPT);
+			return -1;
+	};
 }
