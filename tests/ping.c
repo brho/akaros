@@ -592,7 +592,7 @@ int main(int argc, char **argv)
 		proto = &v6pr;
 	ds = netmkaddr(argv[0], proto->net, "1");
 	printf("ping: dial %s\n", ds);
-	fd = dial(ds, 0, 0, 0);
+	fd = dial9(ds, 0, 0, 0, 0);
 	if(fd < 0){
 		fprintf(stderr, "%s: couldn't dial %s: %r\n", argv0, ds);
 		exit(1);

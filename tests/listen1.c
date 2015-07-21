@@ -79,14 +79,14 @@ main(int argc, char **argv)
 
 	argc--, argv++;
 	printf("listen started\n");
-	ctl = announce(argv[0], dir);
+	ctl = announce9(argv[0], dir, 0);
 	if(ctl < 0){
 		fprintf(stderr, "announce %s: %r", argv[0]);
 		exit(1);
 	}
 
 	for(;;){
-		nctl = listen(dir, ndir);
+		nctl = listen9(dir, ndir, 0);
 		if(nctl < 0){
 			fprintf(stderr, "listen %s: %r", argv[0]);
 			exit(1);
@@ -95,11 +95,11 @@ main(int argc, char **argv)
 		//switch(rfork(RFFDG|RFPROC|RFNOWAIT|RFENVG|RFNAMEG|RFNOTEG)){
 		switch(fork()){
 		case -1:
-			reject(nctl, ndir, "host overloaded");
+			reject9(nctl, ndir, "host overloaded");
 			close(nctl);
 			continue;
 		case 0:
-			fd = accept(nctl, ndir);
+			fd = accept9(nctl, ndir);
 			if(fd < 0){
 				fprintf(stderr, "accept %s: can't open  %s/data: %r\n",
 					argv[0], ndir);

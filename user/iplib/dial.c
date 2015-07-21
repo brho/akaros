@@ -68,8 +68,7 @@ call(char *clone, char *dest, int *cfdp, char *dir, char *local)
 	return fd;
 }
 
-int
-dial(char *dest, char *local, char *dir, int *cfdp)
+int dial9(char *dest, char *local, char *dir, int *cfdp, int flags)
 {
 	char net[128];
 	char netdir[128], csname[NETPATHLEN], *slp;

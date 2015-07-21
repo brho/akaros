@@ -2,12 +2,7 @@
  * and to show how networking commands in plan 9 correspond to BSD sockets
  * (which are now a part of our sysdeps in glibc). 
  *
- * if you want to build the BSD sockets version, you need to change the #define
- * and link with just glibc instead of -liplib.  easiest way is to build
- * manually:
- *
- * $ x86_64-ros-gcc   -O2 -std=gnu99 -fno-stack-protector -fgnu89-inline -g 
- * -o obj/tests/listener tests/listener.c -lpthread -lbenchutil -lm
+ * if you want to build the BSD sockets version, you need to change the #define.
  *
  * based off http://www2.informatik.hu-berlin.de/~apolze/LV/plan9.docs/net.V
  * and http://en.wikibooks.org/wiki/C_Programming/Networking_in_UNIX */
@@ -55,7 +50,7 @@ int main()
 	 * writes "announce [addr]" into ctl.  This "announce" command often has a
 	 * "bind" in it too.  plan9 bind just sets the local addr/port.  TCP
 	 * announce also does this.  Returns the ctlfd. */
-	afd = announce("tcp!*!23", adir);
+	afd = announce9("tcp!*!23", adir, 0);
 
 	if (afd < 0) {
 		perror("Announce failure");
@@ -103,7 +98,7 @@ int main()
 	 * for the new conv's ctl.  listen() reads that to find out the conv number
 	 * (the line) for this new conv.  listen() returns the ctl for this new
 	 * conv. */
-	lcfd = listen(adir, ldir);
+	lcfd = listen9(adir, ldir, 0);
 
 	if (lcfd < 0) {
 		perror("Listen failure");
@@ -114,7 +109,7 @@ int main()
 	/* Writes "accept [NUM]" into the ctlfd, then opens the conv's data file and
 	 * returns that fd.  Writing "accept" is a noop for most of our protocols.
 	 * */
-	dfd = accept(lcfd, ldir);
+	dfd = accept9(lcfd, ldir);
 	if (dfd < 0) {
 		perror("Accept failure");
 		return -1;

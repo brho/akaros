@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 	dialstring = argv[1];
 	srvname = argv[2];
 
-	dfd = dial(dialstring, 0, 0, 0);
+	dfd = dial9(dialstring, 0, 0, 0, 0);
 	if (dfd < 0) {
 		perror("Unable to dial!");
 		exit(-1);

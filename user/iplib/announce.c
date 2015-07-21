@@ -25,8 +25,7 @@ enum
 /*
  *  announce a network service.
  */
-int
-announce(char *addr, char *dir)
+int announce9(char *addr, char *dir, int flags)
 {
 	int ctl, n, m;
 	char buf[Maxpath];
@@ -92,8 +91,7 @@ announce(char *addr, char *dir)
 /*
  *  listen for an incoming call
  */
-int
-listen(char *dir, char *newdir)
+int listen9(char *dir, char *newdir, int flags)
 {
 	int ctl, n, m;
 	char buf[Maxpath];
@@ -145,8 +143,7 @@ listen(char *dir, char *newdir)
 /*
  *  accept a call, return an fd to the open data file
  */
-int
-accept(int ctl, char *dir)
+int accept9(int ctl, char *dir)
 {
 	char buf[Maxpath];
 	char *num;
@@ -168,8 +165,7 @@ accept(int ctl, char *dir)
 /*
  *  reject a call, tell device the reason for the rejection
  */
-int
-reject(int ctl, char *dir, char *cause)
+int reject9(int ctl, char *dir, char *cause)
 {
 	char buf[Maxpath];
 	char *num;

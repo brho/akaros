@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 		perror("Addr string too long");
 		exit(-1);
 	}
-	dfd = dial(addr, 0, 0, 0);
+	dfd = dial9(addr, 0, 0, 0, 0);
 	if (dfd < 0) {
 		perror("Bad Data FD");
 		exit(-1);
