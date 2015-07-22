@@ -49,7 +49,6 @@ struct proc {
 	uint32_t state;				// Status of the process
 	struct kref p_kref;		/* Refcnt */
 	uint32_t env_flags;
-	uintptr_t env_entry;
 	/* Lists of vcores */
 	struct vcore_tailq online_vcs;
 	struct vcore_tailq bulk_preempted_vcs;

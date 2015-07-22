@@ -392,7 +392,6 @@ int load_elf(struct proc* p, struct file* f,
 	/* Initialize the process as an SCP. */
 	uintptr_t core0_entry = ei.dynamic ? interp_ei.entry : ei.entry;
 	proc_init_ctx(&p->scp_ctx, 0, core0_entry, stack_top, 0);
-	p->env_entry = ei.entry;
 
 	/* Set the heap bottom and top to just past where the text region has been
 	 * loaded. */
