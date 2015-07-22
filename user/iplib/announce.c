@@ -43,7 +43,7 @@ int announce9(char *addr, char *dir, int flags)
 	/*
 	 * get a control channel
 	 */
-	ctl = open(netdir, O_RDWR);
+	ctl = open(netdir, O_RDWR | (flags & O_NONBLOCK));
 	if(ctl<0){
 		fprintf(stderr,"announce opening %s: %r\n", netdir);
 		return -1;
@@ -101,7 +101,7 @@ int listen9(char *dir, char *newdir, int flags)
 	 *  open listen, wait for a call
 	 */
 	snprintf(buf, sizeof(buf), "%s/listen", dir);
-	ctl = open(buf, O_RDWR);
+	ctl = open(buf, O_RDWR | (flags & O_NONBLOCK));
 	if(ctl < 0){
 		if ((errno != EAGAIN) && (errno != EWOULDBLOCK))
 			fprintf(stderr,"listen opening %s: %r\n", buf);

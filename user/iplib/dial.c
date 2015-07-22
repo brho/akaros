@@ -18,8 +18,8 @@
 #define NETPATHLEN 40
 static int isdigit(int c) {return ((c >= '0' && c <= '9'));}
 
-static int
-call(char *clone, char *dest, int *cfdp, char *dir, char *local)
+static int call(char *clone, char *dest, int *cfdp, char *dir, char *local,
+                int flags)
 {
 	int fd, cfd;
 	int n;
@@ -27,7 +27,7 @@ call(char *clone, char *dest, int *cfdp, char *dir, char *local)
 	char data[3*NAMELEN+10];
 	char *p;
 
-	cfd = open(clone, O_RDWR);
+	cfd = open(clone, O_RDWR | (flags & O_NONBLOCK));
 	if(cfd < 0)
 		return -1;
 
@@ -106,7 +106,7 @@ int dial9(char *dest, char *local, char *dir, int *cfdp, int flags)
 		if (q && isdigit(q[1])) {
 			*p++ = 0;
 			sprintf(clone, "%s/%s/clone", netdir, net);
-			return call(clone, p, cfdp, dir, local);
+			return call(clone, p, cfdp, dir, local, flags);
 		}
 	}
 	/* call the connection server */
@@ -117,7 +117,7 @@ int dial9(char *dest, char *local, char *dir, int *cfdp, int flags)
 		p = strchr(net, '!');
 		*p++ = 0;
 		sprintf(clone, "%s/%s/clone", netdir, net);
-		return call(clone, p, cfdp, dir, local);
+		return call(clone, p, cfdp, dir, local, flags);
 	}
 
 	/*
@@ -140,7 +140,7 @@ int dial9(char *dest, char *local, char *dir, int *cfdp, int flags)
 		if(p == 0)
 			continue;
 		*p++ = 0;
-		rv = call(net, p, cfdp, dir, local);
+		rv = call(net, p, cfdp, dir, local, flags);
 		if(rv >= 0)
 			break;
 	}
