@@ -515,9 +515,10 @@ static struct chan *ipopen(struct chan *c, int omode)
 					cv->incall = nc->next;
 					mkqid(&c->qid, QID(PROTO(c->qid), nc->x, Qctl), 0, QTFILE);
 					kstrdup(&cv->owner, ATTACHER(c));
-					/* TODO: If we want to support something like accept4(),
-					 * where the new conversations are nonblocking right away,
-					 * we can do so here. */
+					/* O_NONBLOCK/CNONBLOCK when opening listen means the *new*
+					 * conv is already non-blocking, like accept4() in Linux */
+					if (c->flag & CNONBLOCK)
+						Fsconvnonblock(nc, TRUE);
 				}
 				qunlock(&cv->qlock);
 
