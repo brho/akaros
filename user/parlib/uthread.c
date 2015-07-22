@@ -412,7 +412,7 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
 	 * as you need to any local vars that might be pushed before calling the
 	 * next function, or for whatever other reason the compiler/hardware might
 	 * walk up the stack a bit when calling a noreturn function. */
-	set_stack_pointer((void*)vcpd->transition_stack);
+	set_stack_pointer((void*)vcpd->vcore_stack);
 	/* Finish exiting in another function. */
 	__uthread_yield();
 	/* Should never get here */
@@ -572,7 +572,7 @@ void run_current_uthread(void)
 		uth->flags |= UTHREAD_SAVED | UTHREAD_FPSAVED;
 		handle_refl_fault(uth, &vcpd->uthread_ctx);
 		/* we abort no matter what.  up to the 2LS to reschedule the thread */
-		set_stack_pointer((void*)vcpd->transition_stack);
+		set_stack_pointer((void*)vcpd->vcore_stack);
 		vcore_entry();
 	}
 	/* Go ahead and start the uthread */
@@ -613,7 +613,7 @@ void run_uthread(struct uthread *uthread)
 		clear_refl_fault(&uthread->u_ctx);
 		handle_refl_fault(uthread, &uthread->u_ctx);
 		/* we abort no matter what.  up to the 2LS to reschedule the thread */
-		set_stack_pointer((void*)vcpd->transition_stack);
+		set_stack_pointer((void*)vcpd->vcore_stack);
 		vcore_entry();
 	}
 	uthread->state = UT_RUNNING;

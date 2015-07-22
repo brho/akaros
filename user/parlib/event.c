@@ -386,7 +386,7 @@ void handle_vcpd_mbox(uint32_t rem_vcoreid)
 	__vc_handle_an_mbox = TRUE;
 	__vc_rem_vcoreid = rem_vcoreid;
 	/* Reset the stack and start over in vcore context */
-	set_stack_pointer((void*)vcpd->transition_stack);
+	set_stack_pointer((void*)vcpd->vcore_stack);
 	vcore_entry();
 	assert(0);
 }

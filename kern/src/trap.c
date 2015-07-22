@@ -69,7 +69,7 @@ void reflect_unhandled_trap(unsigned int trap_nr, unsigned int err,
 	vcpd->uthread_ctx = *pcpui->cur_ctx;
 	memset(pcpui->cur_ctx, 0, sizeof(struct user_context));
 	proc_init_ctx(pcpui->cur_ctx, vcoreid, vcpd->vcore_entry,
-	              vcpd->transition_stack, vcpd->vcore_tls_desc);
+	              vcpd->vcore_stack, vcpd->vcore_tls_desc);
 	return;
 error_out:
 	print_unhandled_trap(p, pcpui->cur_ctx, trap_nr, err, aux);

@@ -114,15 +114,15 @@ static int allocate_transition_tls(int id)
 	return 0;
 }
 
-static void free_transition_stack(int id)
+static void free_vcore_stack(int id)
 {
 	// don't actually free stacks
 }
 
-static int allocate_transition_stack(int id)
+static int allocate_vcore_stack(int id)
 {
 	struct preempt_data *vcpd = vcpd_of(id);
-	if (vcpd->transition_stack)
+	if (vcpd->vcore_stack)
 		return 0; // reuse old stack
 
 	void* stackbot = mmap(0, TRANSITION_STACK_SIZE,
@@ -132,7 +132,7 @@ static int allocate_transition_stack(int id)
 	if(stackbot == MAP_FAILED)
 		return -1; // errno set by mmap
 
-	vcpd->transition_stack = (uintptr_t)stackbot + TRANSITION_STACK_SIZE;
+	vcpd->vcore_stack = (uintptr_t)stackbot + TRANSITION_STACK_SIZE;
 
 	return 0;
 }
@@ -159,7 +159,7 @@ void __attribute__((constructor)) vcore_lib_init(void)
 	/* Need to alloc vcore0's transition stuff here (technically, just the TLS)
 	 * so that schedulers can use vcore0's transition TLS before it comes up in
 	 * vcore_entry() */
-	if(allocate_transition_stack(0) || allocate_transition_tls(0))
+	if (allocate_vcore_stack(0) || allocate_transition_tls(0))
 		goto vcore_lib_init_fail;
 
 	/* Initialize our VCPD event queues' ucqs, two pages per ucq, 4 per vcore */
@@ -206,7 +206,7 @@ void vcore_reenter(void (*entry_func)(void))
   struct preempt_data *vcpd = vcpd_of(vcore_id());
 
   __vcore_reentry_func = entry_func;
-  set_stack_pointer((void*)vcpd->transition_stack);
+  set_stack_pointer((void*)vcpd->vcore_stack);
   cmb();
   __vcore_reenter();
 }
@@ -302,7 +302,7 @@ try_handle_it:
 		nr_vcores_wanted = MIN(nr_vcores_wanted, max_vcores());
 		/* Make sure all we might ask for are prepped */
 		for (long i = _max_vcores_ever_wanted; i < nr_vcores_wanted; i++) {
-			if (allocate_transition_stack(i) || allocate_transition_tls(i)) {
+			if (allocate_vcore_stack(i) || allocate_transition_tls(i)) {
 				atomic_set(&vc_req_being_handled, 0);	/* unlock and bail out*/
 				return -1;
 			}
