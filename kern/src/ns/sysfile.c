@@ -56,7 +56,7 @@ static int growfd(struct fgrp *f, int fd)
 int newfd(struct chan *c, bool oflags)
 {
 	int i;
-	struct fgrp *f = current->fgrp;
+	struct fgrp *f = current->open_files.fgrp;
 
 	spin_lock(&f->lock);
 	if (f->closed) {
@@ -88,8 +88,10 @@ int newfd(struct chan *c, bool oflags)
 	return i;
 }
 
-struct chan *fdtochan(struct fgrp *f, int fd, int mode, int chkmnt, int iref)
+struct chan *fdtochan(struct fd_table *fdt, int fd, int mode, int chkmnt,
+                      int iref)
 {
+	struct fgrp *f = fdt->fgrp;
 	
 	struct chan *c;
 
@@ -189,8 +191,9 @@ int openmode(uint32_t omode)
 	return omode & O_ACCMODE;
 }
 
-void fdclose(struct fgrp *f, int fd)
+void fdclose(struct fd_table *fdt, int fd)
 {
+	struct fgrp *f = fdt->fgrp;
 	
 	int i;
 	struct chan *c;
@@ -237,7 +240,7 @@ int syschdir(char *path)
 	return 0;
 }
 
-int fgrpclose(struct fgrp *f, int fd)
+int fgrpclose(struct fd_table *fdt, int fd)
 {
 	ERRSTACK(1);
 	if (waserror()) {
@@ -250,15 +253,15 @@ int fgrpclose(struct fgrp *f, int fd)
 	 * data structure, and are calling fdtochan only for error checks.
 	 * fdclose takes care of processes racing through here.
 	 */
-	fdtochan(f, fd, -1, 0, 0);
-	fdclose(f, fd);
+	fdtochan(fdt, fd, -1, 0, 0);
+	fdclose(fdt, fd);
 	poperror();
 	return 0;
 }
 
 int sysclose(int fd)
 {
-	return fgrpclose(current->fgrp, fd);
+	return fgrpclose(&current->open_files, fd);
 }
 
 int syscreate(char *path, int mode, uint32_t perm)
@@ -293,14 +296,14 @@ int sysdup(int old, int new)
 	ERRSTACK(2);
 	int fd;
 	struct chan *c, *oc;
-	struct fgrp *f = current->fgrp;
+	struct fgrp *f = current->open_files.fgrp;
 
 	if (waserror()) {
 		poperror();
 		return -1;
 	}
 
-	c = fdtochan(current->fgrp, old, -1, 0, 1);
+	c = fdtochan(&current->open_files, old, -1, 0, 1);
 	if (c->qid.type & QTAUTH) {
 		cclose(c);
 		error(Eperm);
@@ -355,14 +358,14 @@ int sys_dup_to(struct proc *from_proc, unsigned int from_fd,
 {
 	ERRSTACK(1);
 	struct chan *c, *old_chan;
-	struct fgrp *to_fgrp = to_proc->fgrp;
+	struct fgrp *to_fgrp = to_proc->open_files.fgrp;
 
 	if (waserror()) {
 		poperror();
 		return -1;
 	}
 
-	c = fdtochan(from_proc->fgrp, from_fd, -1, 0, 1);
+	c = fdtochan(&from_proc->open_files, from_fd, -1, 0, 1);
 	if (c->qid.type & QTAUTH) {
 		cclose(c);
 		error(Eperm);
@@ -406,7 +409,7 @@ char *sysfd2path(int fd)
 		poperror();
 		return NULL;
 	}
-	c = fdtochan(current->fgrp, fd, -1, 0, 1);
+	c = fdtochan(&current->open_files, fd, -1, 0, 1);
 	s = NULL;
 	if (c->name != NULL) {
 		s = kzmalloc(c->name->len + 1, 0);
@@ -432,7 +435,7 @@ int sysfauth(int fd, char *aname)
 	}
 
 	validname(aname, 0);
-	c = fdtochan(current->fgrp, fd, ORDWR, 0, 1);
+	c = fdtochan(&current->open_files, fd, ORDWR, 0, 1);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -474,7 +477,7 @@ int sysfversion(int fd, unsigned int msize, char *vers, unsigned int arglen)
 	if (arglen == 0 || memchr(vers, 0, arglen) == 0)
 		error(Ebadarg);
 
-	c = fdtochan(current->fgrp, fd, ORDWR, 0, 1);
+	c = fdtochan(&current->open_files, fd, ORDWR, 0, 1);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -497,7 +500,7 @@ int syspipe(int fd[2])
 	struct chan *c[2];
 	static char *names[] = { "data", "data1" };
 
-	f = current->fgrp;
+	f = current->open_files.fgrp;
 
 	d = &devtab[devno('|', 0)];
 	c[0] = namec("#|", Atodir, 0, 0);
@@ -550,7 +553,7 @@ int sysfwstat(int fd, uint8_t * buf, int n)
 	}
 
 	validstat(buf, n, 0);
-	c = fdtochan(current->fgrp, fd, -1, 1, 1);
+	c = fdtochan(&current->open_files, fd, -1, 1, 1);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -633,9 +636,9 @@ int sysmount(int fd, int afd, char *old, int flags, char *spec)
 		poperror();
 		return -1;
 	}
-	bc.c = fdtochan(current->fgrp, fd, ORDWR, 0, 1);
+	bc.c = fdtochan(&current->open_files, fd, ORDWR, 0, 1);
 	if (afd >= 0)
-		ac.c = fdtochan(current->fgrp, afd, ORDWR, 0, 1);
+		ac.c = fdtochan(&current->open_files, afd, ORDWR, 0, 1);
 	mntparam.chan = bc.c;
 	mntparam.authchan = ac.c;
 	mntparam.spec = spec;
@@ -798,7 +801,7 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 		return -1;
 	}
 
-	c = fdtochan(current->fgrp, fd, OREAD, 1, 1);
+	c = fdtochan(&current->open_files, fd, OREAD, 1, 1);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -966,7 +969,7 @@ int64_t sysseek(int fd, int64_t off, int whence)
 		return -1;
 	}
 
-	c = fdtochan(current->fgrp, fd, -1, 1, 1);
+	c = fdtochan(&current->open_files, fd, -1, 1, 1);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -1065,7 +1068,7 @@ int sysfstat(int fd, uint8_t *buf, int n)
 		return -1;
 	}
 
-	c = fdtochan(current->fgrp, fd, -1, 0, 1);
+	c = fdtochan(&current->open_files, fd, -1, 0, 1);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -1145,7 +1148,7 @@ static long rwrite(int fd, void *va, long n, int64_t * offp)
 		poperror();
 		return -1;
 	}
-	c = fdtochan(current->fgrp, fd, OWRITE, 1, 1);
+	c = fdtochan(&current->open_files, fd, OWRITE, 1, 1);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -1304,7 +1307,7 @@ struct dir *sysdirfstat(int fd)
 		return NULL;
 	}
 
-	c = fdtochan(current->fgrp, fd, -1, 0, 1);
+	c = fdtochan(&current->open_files, fd, -1, 0, 1);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -1428,7 +1431,7 @@ int sysiounit(int fd)
 	struct chan *c;
 	int n;
 
-	c = fdtochan(current->fgrp, fd, -1, 0, 1);
+	c = fdtochan(&current->open_files, fd, -1, 0, 1);
 	if (waserror()) {
 		cclose(c);
 		poperror();
@@ -1454,7 +1457,7 @@ int sysiounit(int fd)
 void close_9ns_files(struct proc *p, bool only_cloexec)
 {
 	
-	struct fgrp *f = p->fgrp;
+	struct fgrp *f = p->open_files.fgrp;
 
 	spin_lock(&f->lock);
 	if (f->closed) {
@@ -1499,7 +1502,7 @@ void print_chaninfo(struct chan *c)
 void print_9ns_files(struct proc *p)
 {
 	
-	struct fgrp *f = p->fgrp;
+	struct fgrp *f = p->open_files.fgrp;
 	spin_lock(&f->lock);
 	printk("9ns files for proc %d:\n", p->pid);
 	/* maxfd is a legit val, not a +1 */
@@ -1532,7 +1535,7 @@ int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 		 * TODO: One problem is namec wants a current set for things like
 		 * genbuf.  So we'll use new_proc for this bootstrapping.  Note
 		 * switch_to() also loads the cr3. */
-		new_proc->fgrp = newfgrp();
+		new_proc->open_files.fgrp = newfgrp();
 		new_proc->pgrp = newpgrp();
 		old_current = switch_to(new_proc);
 		new_proc->slash = namec("#r", Atodir, 0, 0);
@@ -1549,9 +1552,9 @@ int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 	/* When we use the old fgrp, we have copy semantics: do not change this
 	 * without revisiting proc_destroy, close_9ns_files, and closefgrp. */
 	if (flags & PROC_DUP_FGRP)
-		new_proc->fgrp = dupfgrp(new_proc, parent->fgrp);
+		new_proc->open_files.fgrp = dupfgrp(new_proc, parent->open_files.fgrp);
 	else
-		new_proc->fgrp = newfgrp();
+		new_proc->open_files.fgrp = newfgrp();
 	/* Shared semantics */
 	kref_get(&parent->pgrp->ref, 1);
 	new_proc->pgrp = parent->pgrp;
@@ -1611,7 +1614,7 @@ int fd_getfl(int fd)
 		poperror();
 		return -1;
 	}
-	c = fdtochan(current->fgrp, fd, -1, 0, 1);
+	c = fdtochan(&current->open_files, fd, -1, 0, 1);
 
 	ret = c->mode;
 	ret |= c->flag & CEXTERNAL_FLAGS;
@@ -1636,7 +1639,7 @@ int fd_setfl(int fd, int flags)
 		poperror();
 		return -1;
 	}
-	c = fdtochan(current->fgrp, fd, -1, 0, 1);
+	c = fdtochan(&current->open_files, fd, -1, 0, 1);
 	if (cexternal_flags_differ(flags, c->flag, O_CLOEXEC)) {
 		/* TODO: The whole CCEXEC / O_CLOEXEC on 9ns needs work */
 		set_errno(EINVAL);

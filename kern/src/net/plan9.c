@@ -24,7 +24,7 @@ char *commonuser(void)
 
 struct chan *commonfdtochan(int fd, int mode, int a, int b)
 {
-	return fdtochan(current->fgrp, fd, mode, a, b);
+	return fdtochan(&current->open_files, fd, mode, a, b);
 }
 
 char *commonerror(void)

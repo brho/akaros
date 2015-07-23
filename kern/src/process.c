@@ -466,8 +466,8 @@ static void __proc_free(struct kref *kref)
 	cclose(p->slash);
 	p->dot = p->slash = 0; /* catch bugs */
 	/* can safely free the fgrp, now that no one is accessing it */
-	kfree(p->fgrp->fd);
-	kfree(p->fgrp);
+	kfree(p->open_files.fgrp->fd);
+	kfree(p->open_files.fgrp);
 	kref_put(&p->fs_env.root->d_kref);
 	kref_put(&p->fs_env.pwd->d_kref);
 	/* now we'll finally decref files for the file-backed vmrs */

@@ -90,7 +90,6 @@ struct proc {
 	struct fs_struct			fs_env;
 	struct fd_table				open_files;
 	struct pgrp					*pgrp;
-	struct fgrp					*fgrp;
 	struct chan					*slash;
 	struct chan					*dot;
 

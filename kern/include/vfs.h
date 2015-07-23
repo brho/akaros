@@ -388,6 +388,8 @@ struct fd_table {
 	struct fd_set				*open_fds;		/* init, pts to open_fds_init */
 	struct small_fd_set			open_fds_init;
 	struct file_desc			fd_array[NR_OPEN_FILES_DEFAULT];
+
+	struct fgrp					*fgrp;			/* 9ns compat hack */
 };
 
 /* Process specific filesystem info */

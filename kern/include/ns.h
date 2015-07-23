@@ -743,7 +743,7 @@ int kbdcr2nl(struct queue *, int);
 int kbdputc(struct queue *, int);
 void kbdrepeat(int);
 void kproc(char *unused_char_p_t, void (*)(void *), void *, int);
-int fgrpclose(struct fgrp *, int);
+int fgrpclose(struct fd_table *, int);
 void kprocchild(struct proc *, void (*)(void *), void *);
 void (*kproftick) (uint32_t);
 void ksetenv(char *unused_char_p_t, char *, int);
@@ -974,12 +974,13 @@ struct cmdtab *lookupcmd(struct cmdbuf *cb, struct cmdtab *ctab, int nctab);
 
 /* kern/src/ns/sysfile.c */
 int newfd(struct chan *c, bool oflags);
-struct chan *fdtochan(struct fgrp *f, int fd, int mode, int chkmnt, int iref);
+struct chan *fdtochan(struct fd_table *fdt, int fd, int mode, int chkmnt,
+                      int iref);
 long kchanio(void *vc, void *buf, int n, int mode);
 int openmode(uint32_t o);
-void fdclose(struct fgrp *f, int fd);
+void fdclose(struct fd_table *fdt, int fd);
 int syschdir(char *path);
-int grpclose(struct fgrp *f, int fd);
+int grpclose(struct fd_table *fdt, int fd);
 int sysclose(int fd);
 int syscreate(char *path, int mode, uint32_t perm);
 int sysdup(int old, int new);

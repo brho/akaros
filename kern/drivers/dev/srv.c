@@ -310,7 +310,7 @@ static long srvwrite(struct chan *c, void *va, long count, int64_t offset)
 	fd = strtoul(kbuf, 0, 10);
 	/* the magic of srv: srv stores the chan corresponding to the fd.  -1 for
 	 * mode, so we just get the chan with no checks (RDWR would work too). */
-	new_chan = fdtochan(current->fgrp, fd, -1, FALSE, TRUE);
+	new_chan = fdtochan(&current->open_files, fd, -1, FALSE, TRUE);
 	/* fdtochan already increffed for us */
 	if (!__sync_bool_compare_and_swap(&srv->chan, 0, new_chan)) {
 		cclose(new_chan);

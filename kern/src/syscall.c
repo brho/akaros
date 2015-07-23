@@ -2068,7 +2068,7 @@ intreg_t sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
 		poperror();
 		return -1;
 	}
-	ch = fdtochan(current->fgrp, fd, -1, FALSE, TRUE);
+	ch = fdtochan(&current->open_files, fd, -1, FALSE, TRUE);
 	if (snprintf(u_buf, len, "%s", channame(ch)) >= len) {
 		set_errno(ERANGE);
 		set_errstr("fd2path buf too small, needed %d", ret);
