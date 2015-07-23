@@ -2332,7 +2332,7 @@ void *kread_whole_file(struct file *file)
 /* Process-related File management functions */
 
 /* Given any FD, get the appropriate file, 0 o/w */
-struct file *get_file_from_fd(struct files_struct *open_files, int file_desc)
+struct file *get_file_from_fd(struct fd_table *open_files, int file_desc)
 {
 	struct file *retval = 0;
 	if (file_desc < 0)
@@ -2358,7 +2358,7 @@ struct file *get_file_from_fd(struct files_struct *open_files, int file_desc)
 }
 
 /* Grow the vfs fd set */
-static int grow_fd_set(struct files_struct *open_files)
+static int grow_fd_set(struct fd_table *open_files)
 {
 	int n;
 	struct file_desc *nfd, *ofd;
@@ -2396,7 +2396,7 @@ static int grow_fd_set(struct files_struct *open_files)
 }
 
 /* Free the vfs fd set if necessary */
-static void free_fd_set(struct files_struct *open_files)
+static void free_fd_set(struct fd_table *open_files)
 {
 	void *free_me;
 	if (open_files->open_fds != (struct fd_set*)&open_files->open_fds_init) {
@@ -2418,7 +2418,7 @@ static void free_fd_set(struct files_struct *open_files)
 }
 
 /* 9ns: puts back an FD from the VFS-FD-space. */
-int put_fd(struct files_struct *open_files, int file_desc)
+int put_fd(struct fd_table *open_files, int file_desc)
 {
 	if (file_desc < 0) {
 		warn("Negative FD!\n");
@@ -2440,7 +2440,7 @@ int put_fd(struct files_struct *open_files, int file_desc)
 /* Remove FD from the open files, if it was there, and return f.  Currently,
  * this decref's f, so the return value is not consumable or even usable.  This
  * hasn't been thought through yet. */
-struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
+struct file *put_file_from_fd(struct fd_table *open_files, int file_desc)
 {
 	struct file *file = 0;
 	if (file_desc < 0)
@@ -2462,7 +2462,7 @@ struct file *put_file_from_fd(struct files_struct *open_files, int file_desc)
 	return file;
 }
 
-static int __get_fd(struct files_struct *open_files, int low_fd)
+static int __get_fd(struct fd_table *open_files, int low_fd)
 {
 	int slot = -1;
 	int error;
@@ -2495,7 +2495,7 @@ static int __get_fd(struct files_struct *open_files, int low_fd)
 
 /* Gets and claims a free FD, used by 9ns.  < 0 == error.  cloexec is tracked on
  * the VFS FD.  It's value will be O_CLOEXEC (not 1) or 0. */
-int get_fd(struct files_struct *open_files, int low_fd, int cloexec)
+int get_fd(struct fd_table *open_files, int low_fd, int cloexec)
 {
 	int slot;
 	spin_lock(&open_files->lock);
@@ -2506,7 +2506,7 @@ int get_fd(struct files_struct *open_files, int low_fd, int cloexec)
 	return slot;
 }
 
-static int __claim_fd(struct files_struct *open_files, int file_desc)
+static int __claim_fd(struct fd_table *open_files, int file_desc)
 {
 	int error;
 	if ((file_desc < 0) || (file_desc > NR_FILE_DESC_MAX))
@@ -2535,7 +2535,7 @@ static int __claim_fd(struct files_struct *open_files, int file_desc)
 
 /* Claims a specific FD when duping FDs. used by 9ns.  < 0 == error.  No need
  * for cloexec here, since it's not used during dup. */
-int claim_fd(struct files_struct *open_files, int file_desc)
+int claim_fd(struct fd_table *open_files, int file_desc)
 {
 	int ret;
 	spin_lock(&open_files->lock);
@@ -2544,12 +2544,12 @@ int claim_fd(struct files_struct *open_files, int file_desc)
 	return ret;
 }
 
-/* Inserts the file in the files_struct, returning the corresponding new file
+/* Inserts the file in the fd_table, returning the corresponding new file
  * descriptor, or an error code.  We start looking for open fds from low_fd.
  *
  * Passing cloexec is a bit cheap, since we might want to expand it to support
  * more FD options in the future. */
-int insert_file(struct files_struct *open_files, struct file *file, int low_fd,
+int insert_file(struct fd_table *open_files, struct file *file, int low_fd,
                 bool must, bool cloexec)
 {
 	int slot, ret;
@@ -2583,7 +2583,7 @@ int insert_file(struct files_struct *open_files, struct file *file, int low_fd,
 
 /* Closes all open files.  Mostly just a "put" for all files.  If cloexec, it
  * will only close the FDs with FD_CLOEXEC (opened with O_CLOEXEC or fcntld). */
-void close_all_files(struct files_struct *open_files, bool cloexec)
+void close_all_files(struct fd_table *open_files, bool cloexec)
 {
 	struct file *file;
 	spin_lock(&open_files->lock);
@@ -2617,7 +2617,7 @@ void close_all_files(struct files_struct *open_files, bool cloexec)
 }
 
 /* Inserts all of the files from src into dst, used by sys_fork(). */
-void clone_files(struct files_struct *src, struct files_struct *dst)
+void clone_files(struct fd_table *src, struct fd_table *dst)
 {
 	struct file *file;
 	spin_lock(&src->lock);

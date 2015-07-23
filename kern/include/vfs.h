@@ -378,7 +378,7 @@ struct file_desc {
 };
 
 /* All open files for a process */
-struct files_struct {
+struct fd_table {
 	spinlock_t					lock;
 	bool						closed;
 	int							max_files;		/* max files ptd to by fd */
@@ -485,12 +485,12 @@ ssize_t kread_file(struct file *file, void *buf, size_t sz);
 void *kread_whole_file(struct file *file);
 
 /* Process-related File management functions */
-struct file *get_file_from_fd(struct files_struct *open_files, int fd);
-struct file *put_file_from_fd(struct files_struct *open_files, int file_desc);
-int insert_file(struct files_struct *open_files, struct file *file, int low_fd,
+struct file *get_file_from_fd(struct fd_table *open_files, int fd);
+struct file *put_file_from_fd(struct fd_table *open_files, int file_desc);
+int insert_file(struct fd_table *open_files, struct file *file, int low_fd,
                 bool must, bool cloexec);
-void close_all_files(struct files_struct *open_files, bool cloexec);
-void clone_files(struct files_struct *src, struct files_struct *dst);
+void close_all_files(struct fd_table *open_files, bool cloexec);
+void clone_files(struct fd_table *src, struct fd_table *dst);
 int do_chdir(struct fs_struct *fs_env, char *path);
 int do_fchdir(struct fs_struct *fs_env, struct file *file);
 char *do_getcwd(struct fs_struct *fs_env, char **kfree_this, size_t cwd_l);
@@ -501,8 +501,8 @@ int ls_dash_r(char *path);
 extern struct inode_operations dummy_i_op;
 extern struct dentry_operations dummy_d_op;
 
-int put_fd(struct files_struct *open_files, int file_desc);
-int get_fd(struct files_struct *open_files, int low_fd, int cloexec);
-int claim_fd(struct files_struct *open_files, int file_desc);
+int put_fd(struct fd_table *open_files, int file_desc);
+int get_fd(struct fd_table *open_files, int low_fd, int cloexec);
+int claim_fd(struct fd_table *open_files, int file_desc);
 
 #endif /* ROS_KERN_VFS_H */

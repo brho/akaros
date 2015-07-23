@@ -2290,7 +2290,7 @@ void print_proc_info(pid_t pid)
 		printk("\tRes type: %02d, amt wanted: %08d, amt granted: %08d\n", i,
 		       p->procdata->res_req[i].amt_wanted, p->procinfo->res_grant[i]);
 	printk("Open Files:\n");
-	struct files_struct *files = &p->open_files;
+	struct fd_table *files = &p->open_files;
 	if (spin_locked(&files->lock)) {
 		spinlock_debug(&files->lock);
 		printk("FILE LOCK HELD, ABORTING\n");

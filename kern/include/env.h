@@ -88,7 +88,7 @@ struct proc {
 	/* Filesystem info */
 	struct namespace			*ns;
 	struct fs_struct			fs_env;
-	struct files_struct			open_files;
+	struct fd_table				open_files;
 	struct pgrp					*pgrp;
 	struct fgrp					*fgrp;
 	struct chan					*slash;
