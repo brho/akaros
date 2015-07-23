@@ -163,7 +163,8 @@ void idt_init(void)
 
 	ncleft = mpsinit(ncleft);
 	ncleft = mpacpi(ncleft);
-	printk("MP and ACPI found %d cores\n", MAX_NUM_CORES - ncleft);
+	num_cores = MAX_NUM_CORES - ncleft;
+	printk("MP and ACPI found %d cores\n", num_cores);
 
 	apiconline();
 	ioapiconline();

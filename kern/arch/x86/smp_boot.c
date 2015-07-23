@@ -26,7 +26,8 @@
 #include "vmm/vmm.h"
 
 extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
-volatile uint32_t num_cores = 0xee;
+int num_cores = 1;
+int x86_num_cores_booted = 1;
 uintptr_t smp_stack_top;
 barrier_t generic_barrier;
 
@@ -210,7 +211,7 @@ void smp_boot(void)
 	// mapping pulled out from under them.  Now, if a core loses, it will spin
 	// on the trampoline (which we must be careful to not deallocate)
 	__spin_bootlock_raw();
-	printk("Number of Cores Detected: %d\n", num_cores);
+	printk("Number of Cores Detected: %d\n", x86_num_cores_booted);
 #ifdef CONFIG_DISABLE_SMT
 	assert(!(num_cores % 2));
 	printk("Using only %d Idlecores (SMT Disabled)\n", num_cores >> 1);
@@ -219,11 +220,15 @@ void smp_boot(void)
 
 	/* cleans up the trampoline page, and any other low boot mem mappings */
 	x86_cleanup_bootmem();
-	// It had a refcount of 2 earlier, so we need to dec once more to free it
-	// but only if all cores are in (or we reset / reinit those that failed)
-	// TODO after we parse ACPI tables
-	if (num_cores == 8) // TODO - ghetto coded for our 8 way SMPs
+	/* trampoline_pg had a refcount of 2 earlier, so we need to dec once more to free it
+	 * but only if all cores are in (or we reset / reinit those that failed) */
+	if (x86_num_cores_booted == num_cores) {
 		page_decref(pa2page(trampoline_pg));
+	} else {
+		warn("ACPI/MP found %d cores, smp_boot initialized %d, using %d\n",
+		     num_cores, x86_num_cores_booted, x86_num_cores_booted);
+		num_cores = x86_num_cores_booted;
+	}
 	// Dealloc the temp shared stack
 	page_decref(smp_stack);
 

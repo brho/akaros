@@ -78,7 +78,7 @@ long_mode:
 	mov		%ax, %fs
 	mov		%ax, %gs
 	lldt	%ax
-	incl	num_cores		# uint32_t
+	incl	x86_num_cores_booted		# an int
 	movq	(smp_stack_top), %rsp
 	movq	$0, %rbp		# so backtrace works
 	# We're on the trampoline, but want to be in the real location of the smp
