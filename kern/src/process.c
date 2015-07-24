@@ -2298,14 +2298,19 @@ void print_proc_info(pid_t pid)
 		return;
 	}
 	spin_lock(&files->lock);
-	for (int i = 0; i < files->max_files; i++)
-		if (GET_BITMASK_BIT(files->open_fds->fds_bits, i) &&
-		    (files->fd[i].fd_file)) {
-			printk("\tFD: %02d, File: %p, File name: %s\n", i,
-			       files->fd[i].fd_file, file_name(files->fd[i].fd_file));
+	for (int i = 0; i < files->max_files; i++) {
+		if (GET_BITMASK_BIT(files->open_fds->fds_bits, i)) {
+			printk("\tFD: %02d, ", i);
+			if (files->fd[i].fd_file) {
+				printk("File: %p, File name: %s\n", files->fd[i].fd_file,
+				       file_name(files->fd[i].fd_file));
+			} else {
+				assert(files->fd[i].fd_chan);
+				print_chaninfo(files->fd[i].fd_chan);
+			}
 		}
+	}
 	spin_unlock(&files->lock);
-	print_9ns_files(p);
 	printk("Children: (PID (struct proc *))\n");
 	TAILQ_FOREACH(child, &p->children, sibling_link)
 		printk("\t%d (%p)\n", child->pid, child);

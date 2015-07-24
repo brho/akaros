@@ -2705,11 +2705,10 @@ void clone_fdt(struct fd_table *src, struct fd_table *dst)
 			SET_BITMASK_BIT(dst->open_fds->fds_bits, i);
 			dst->fd[i].fd_file = file;
 			dst->fd[i].fd_chan = chan;
-			/* no file means 9ns is using it, they clone separately (TODO) */
 			if (file)
 				kref_get(&file->f_kref, 1);
-		//	else
-		//		chan_incref(chan);
+			else
+				chan_incref(chan);
 			if (i >= dst->next_fd)
 				dst->next_fd = i + 1;
 		}

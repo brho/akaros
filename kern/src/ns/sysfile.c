@@ -55,61 +55,26 @@ static int growfd(struct fgrp *f, int fd)
 
 int newfd(struct chan *c, int oflags)
 {
-	int i;
-	struct fgrp *f = current->open_files.fgrp;
-
-	spin_lock(&f->lock);
-	if (f->closed) {
-		spin_unlock(&f->lock);
-		return -1;
-	}
-	/* VFS hack */
-	/* We'd like to ask it to start at f->minfd, but that would require us to
-	 * know if we closed anything.  Since we share the FD numbers with the VFS,
-	 * there is no way to know that. */
-#if 1	// VFS hack
-	i = get_fd(&current->open_files, 0, oflags & O_CLOEXEC);
-#else 	// 9ns style
-	/* TODO: use a unique integer allocator */
-	for (i = f->minfd; i < f->nfd; i++)
-		if (f->fd[i] == 0)
-			break;
-#endif
-	if (growfd(f, i) < 0) {
-		spin_unlock(&f->lock);
-		return -1;
-	}
-	assert(f->fd[i] == 0);
-	f->minfd = i + 1;
-	if (i > f->maxfd)
-		f->maxfd = i;
-	f->fd[i] = c;
-	spin_unlock(&f->lock);
-	return i;
+	int ret = insert_obj_fdt(&current->open_files, c, 0,
+	                         oflags & O_CLOEXEC ? FD_CLOEXEC : 0,
+	                         FALSE, FALSE);
+	if (ret >= 0)
+		cclose(c);
+	return ret;
 }
 
 struct chan *fdtochan(struct fd_table *fdt, int fd, int mode, int chkmnt,
                       int iref)
 {
-	struct fgrp *f = fdt->fgrp;
-	
 	struct chan *c;
 
-	c = 0;
-
-	spin_lock(&f->lock);
-	if (f->closed) {
-		spin_unlock(&f->lock);
-		error("File group closed");
-	}
-	if (fd < 0 || f->maxfd < fd || (c = f->fd[fd]) == 0) {
-		spin_unlock(&f->lock);
+	c = lookup_fd(fdt, fd, iref, FALSE);
+	if (!c) {
+		/* We lost the info about why there was a problem (we used to track file
+		 * group closed too, can add that in later). */
 		set_errno(EBADF);
 		error("Bad FD %d\n", fd);
 	}
-	if (iref)
-		chan_incref(c);
-	spin_unlock(&f->lock);
 
 	if (chkmnt && (c->flag & CMSG)) {
 		if (iref)
@@ -193,32 +158,7 @@ int openmode(uint32_t omode)
 
 void fdclose(struct fd_table *fdt, int fd)
 {
-	struct fgrp *f = fdt->fgrp;
-	
-	int i;
-	struct chan *c;
-
-	spin_lock(&f->lock);
-	if (f->closed) {
-		spin_unlock(&f->lock);
-		return;
-	}
-	c = f->fd[fd];
-	if (c == 0) {
-		/* can happen for users with shared fd tables */
-		spin_unlock(&f->lock);
-		return;
-	}
-	f->fd[fd] = 0;
-	if (fd == f->maxfd)
-		for (i = fd; --i >= 0 && f->fd[i] == 0;)
-			f->maxfd = i;
-	if (fd < f->minfd)
-		f->minfd = fd;
-	/* VFS hack: give the FD back to VFS */
-	put_fd(&current->open_files, fd);
-	spin_unlock(&f->lock);
-	cclose(c);
+	close_fd(fdt, fd);
 }
 
 int syschdir(char *path)
@@ -314,50 +254,30 @@ int sysdup(int old)
 	return fd;
 }
 
-/* Could pass in the fgrp instead of the proc, but we need the to_proc for now
- * so we can claim a VFS FD */
+/* Could pass in the fdt instead of the proc, but we used to need the to_proc
+ * for now so we can claim a VFS FD.  Careful, we don't close the old chan. */
 int sys_dup_to(struct proc *from_proc, unsigned int from_fd,
                struct proc *to_proc, unsigned int to_fd)
 {
 	ERRSTACK(1);
-	struct chan *c, *old_chan;
-	struct fgrp *to_fgrp = to_proc->open_files.fgrp;
+	int ret;
+	struct chan *c;
 
 	if (waserror()) {
 		poperror();
 		return -1;
 	}
-
 	c = fdtochan(&from_proc->open_files, from_fd, -1, 0, 1);
 	if (c->qid.type & QTAUTH) {
 		cclose(c);
 		error(Eperm);
 	}
-
-	spin_lock(&to_fgrp->lock);
-	if (to_fgrp->closed) {
-		spin_unlock(&to_fgrp->lock);
-		cclose(c);
-		error("Can't dup, FGRP closed");
-	}
-	if (claim_fd(&to_proc->open_files, to_fd)) {
-		spin_unlock(&to_fgrp->lock);
-		cclose(c);
-		error("Can't claim FD %d", to_fd);
-	}
-	if (growfd(to_fgrp, to_fd) < 0) {
-		spin_unlock(&to_fgrp->lock);
-		cclose(c);
-		error(current_errstr());
-	}
-	if (to_fd > to_fgrp->maxfd)
-		to_fgrp->maxfd = to_fd;
-	old_chan = to_fgrp->fd[to_fd];
-	to_fgrp->fd[to_fd] = c;
-	spin_unlock(&to_fgrp->lock);
-	if (old_chan)
-		cclose(old_chan);
-
+	ret = insert_obj_fdt(&to_proc->open_files, c, to_fd, 0, TRUE, FALSE);
+	/* drop the ref from fdtochan.  if insert succeeded, there is one other ref
+	 * stored in the FDT */
+	cclose(c);
+	if (ret < 0)
+		error("Can't insert FD %d into FDG", to_fd);
 	poperror();
 	return 0;
 }
@@ -459,11 +379,8 @@ int syspipe(int fd[2])
 {
 	ERRSTACK(1);
 	struct dev *d;
-	struct fgrp *f;
 	struct chan *c[2];
 	static char *names[] = { "data", "data1" };
-
-	f = current->open_files.fgrp;
 
 	d = &devtab[devno('|', 0)];
 	c[0] = namec("#|", Atodir, 0, 0);
@@ -471,20 +388,18 @@ int syspipe(int fd[2])
 	fd[0] = -1;
 	fd[1] = -1;
 	if (waserror()) {
-		if (c[0] != 0)
+		/* need to remove from the fd table and make sure the chan is closed
+		 * exactly once.  if fd[i] >= 0, then the fd is valid (or it was!) and
+		 * the fd table has the only ref (newfd() currently decrefs/consumes the
+		 * reference).  cclose() doesn't care if you pass it 0 (like kfree()). */
+		if (fd[0] >= 0)
+			close_fd(&current->open_files, fd[0]);
+		else
 			cclose(c[0]);
-		if (c[1] != 0)
+		if (fd[1] >= 0)
+			close_fd(&current->open_files, fd[1]);
+		else
 			cclose(c[1]);
-		if (fd[0] >= 0) {
-			/* VFS hack */
-			f->fd[fd[0]] = 0;
-			put_fd(&current->open_files, fd[0]);
-		}
-		if (fd[1] >= 0) {
-			/* VFS hack */
-			f->fd[fd[1]] = 0;
-			put_fd(&current->open_files, fd[1]);
-		}
 		poperror();
 		return -1;
 	}

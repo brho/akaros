@@ -2292,6 +2292,7 @@ done:
 	return retval;
 }
 
+/* Careful: if an FD is busy, we don't close the old object, it just fails */
 static intreg_t sys_dup_fds_to(struct proc *p, unsigned int pid,
                                struct childfdmap *map, unsigned int nentries)
 {
