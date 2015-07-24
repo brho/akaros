@@ -53,7 +53,7 @@ static int growfd(struct fgrp *f, int fd)
 	return 0;
 }
 
-int newfd(struct chan *c, bool oflags)
+int newfd(struct chan *c, int oflags)
 {
 	int i;
 	struct fgrp *f = current->open_files.fgrp;
