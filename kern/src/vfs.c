@@ -2457,8 +2457,8 @@ int put_fd(struct fd_table *open_files, int file_desc)
 /* If FD is in the group, remove it, decref it, and return TRUE. */
 bool close_fd(struct fd_table *fdt, int fd)
 {
-	struct file *file;
-	struct chan *chan;
+	struct file *file = 0;
+	struct chan *chan = 0;
 	bool ret = FALSE;
 	if (fd < 0)
 		return FALSE;
@@ -2470,18 +2470,18 @@ bool close_fd(struct fd_table *fdt, int fd)
 			assert(fd < fdt->max_files);
 			file = fdt->fd[fd].fd_file;
 			chan = fdt->fd[fd].fd_chan;
-			if (file) {
-				kref_put(&file->f_kref);
-				fdt->fd[fd].fd_file = 0;
-			} else {
-				cclose(chan);
-				fdt->fd[fd].fd_chan = 0;
-			}
+			fdt->fd[fd].fd_file = 0;
+			fdt->fd[fd].fd_chan = 0;
 			CLR_BITMASK_BIT(fdt->open_fds->fds_bits, fd);
 			ret = TRUE;
 		}
 	}
 	spin_unlock(&fdt->lock);
+	/* Need to decref/cclose outside of the lock; they could sleep */
+	if (file)
+		kref_put(&file->f_kref);
+	else
+		cclose(chan);
 	return ret;
 }
 
@@ -2630,9 +2630,15 @@ void close_fdt(struct fd_table *fdt, bool cloexec)
 {
 	struct file *file;
 	struct chan *chan;
+	struct file_desc *to_close;
+	int idx = 0;
+
+	to_close = kzmalloc(sizeof(struct file_desc) * fdt->max_files,
+	                    KMALLOC_WAIT);
 	spin_lock(&fdt->lock);
 	if (fdt->closed) {
 		spin_unlock(&fdt->lock);
+		kfree(to_close);
 		return;
 	}
 	for (int i = 0; i < fdt->max_fdset; i++) {
@@ -2646,10 +2652,10 @@ void close_fdt(struct fd_table *fdt, bool cloexec)
 			chan = fdt->fd[i].fd_chan;
 			if (file) {
 				fdt->fd[i].fd_file = 0;
-				kref_put(&file->f_kref);
+				to_close[idx++].fd_file = file;
 			} else {
 				fdt->fd[i].fd_chan = 0;
-				cclose(chan);
+				to_close[idx++].fd_chan = chan;
 			}
 			CLR_BITMASK_BIT(fdt->open_fds->fds_bits, i);
 		}
@@ -2659,6 +2665,16 @@ void close_fdt(struct fd_table *fdt, bool cloexec)
 		fdt->closed = TRUE;
 	}
 	spin_unlock(&fdt->lock);
+	/* We go through some hoops to close/decref outside the lock.  Nice for not
+	 * holding the lock for a while; critical in case the decref/cclose sleeps
+	 * (it can) */
+	for (int i = 0; i < idx; i++) {
+		if (to_close[i].fd_file)
+			kref_put(&to_close[i].fd_file->f_kref);
+		else
+			cclose(to_close[i].fd_chan);
+	}
+	kfree(to_close);
 }
 
 /* Inserts all of the files from src into dst, used by sys_fork(). */
