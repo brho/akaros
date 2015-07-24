@@ -527,16 +527,6 @@ struct pgrp {
 	int pin;
 };
 
-struct fgrp {
-	spinlock_t lock;
-	struct kref ref;
-	struct chan **fd;
-	int nfd;					/* number of fd slots */
-	int maxfd;					/* highest fd in use */
-	int minfd;					/* lower bound on free fd */
-	int closed;
-};
-
 struct evalue {
 	char *var;
 	char *val;
@@ -651,7 +641,6 @@ void cinit(void);
 struct chan *cclone(struct chan *);
 void cclose(struct chan *);
 void closeegrp(struct egrp *);
-void closefgrp(struct fgrp *);
 void closemount(struct mount *);
 void closepgrp(struct pgrp *);
 void closesigs(struct skeyset *);
@@ -707,7 +696,6 @@ int domount(struct chan **, struct mhead **);
 void drawactive(int);
 void drawcmap(void);
 void dumpstack(void);
-struct fgrp *dupfgrp(struct proc *, struct fgrp *);
 void egrpcpy(struct egrp *, struct egrp *);
 int emptystr(char *unused_char_p_t);
 int eqchan(struct chan *, struct chan *, int);
@@ -743,7 +731,6 @@ int kbdcr2nl(struct queue *, int);
 int kbdputc(struct queue *, int);
 void kbdrepeat(int);
 void kproc(char *unused_char_p_t, void (*)(void *), void *, int);
-int fgrpclose(struct fd_table *, int);
 void kprocchild(struct proc *, void (*)(void *), void *);
 void (*kproftick) (uint32_t);
 void ksetenv(char *unused_char_p_t, char *, int);
@@ -766,7 +753,6 @@ void muxclose(struct mnt *);
 struct chan *namec(char *unused_char_p_t, int unused_int, int, uint32_t);
 struct chan *newchan(void);
 struct egrp *newegrp(void);
-struct fgrp *newfgrp(void);
 struct mount *newmount(struct mhead *, struct chan *, int unused_int,
 					   char *unused_char_p_t);
 struct pgrp *newpgrp(void);
@@ -1017,9 +1003,7 @@ int sysdirwstat(char *name, struct dir *dir);
 int sysdirfwstat(int fd, struct dir *dir);
 long sysdirread(int fd, struct kdirent **d);
 int sysiounit(int fd);
-void close_9ns_files(struct proc *p, bool only_cloexec);
 void print_chaninfo(struct chan *ch);
-void print_9ns_files(struct proc *p);
 int plan9setup(struct proc *new_proc, struct proc *parent, int flags);
 int iseve(void);
 int fd_getfl(int fd);

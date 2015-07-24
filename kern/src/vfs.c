@@ -2625,7 +2625,17 @@ int insert_file(struct fd_table *open_files, struct file *file, int low_fd,
 }
 
 /* Closes all open files.  Mostly just a "put" for all files.  If cloexec, it
- * will only close the FDs with FD_CLOEXEC (opened with O_CLOEXEC or fcntld). */
+ * will only close the FDs with FD_CLOEXEC (opened with O_CLOEXEC or fcntld).
+ *
+ * Notes on concurrency:
+ * - Can't hold spinlocks while we call cclose, since it might sleep eventually.
+ * - We're called from proc_destroy, so we could have concurrent openers trying
+ *   to add to the group (other syscalls), hence the "closed" flag.
+ * - dot and slash chans are dealt with in proc_free.  its difficult to close
+ *   and zero those with concurrent syscalls, since those are a source of krefs.
+ * - Once we lock and set closed, no further additions can happen.  To simplify
+ *   our closes, we also allow multiple calls to this func (though that should
+ *   never happen with the current code). */
 void close_fdt(struct fd_table *fdt, bool cloexec)
 {
 	struct file *file;

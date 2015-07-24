@@ -21,38 +21,6 @@ enum {
 				 * let's not yet exceed a common MSIZE. */
 };
 
-static int growfd(struct fgrp *f, int fd)
-{
-	int n;
-	struct chan **nfd, **ofd;
-
-	if (fd < f->nfd) {
-		return 0;
-	}
-	/* want to grow by a reasonable amount (delta), but also make sure we can
-	 * handle the fd we're asked for */
-	n = MAX(f->nfd, fd + 1) + DELTAFD;
-	if (n > MAXNFD)
-		n = MAXNFD;
-	if (fd >= n) {
-		set_errno(EMFILE);
-		set_errstr("Asked for FD %d, more than %d\n", fd, MAXNFD);
-		return -1;
-	}
-	nfd = kzmalloc(n * sizeof(struct chan *), 0);
-	if (nfd == NULL) {
-		set_errno(ENOMEM);
-		set_errstr("Failed to growfd for FD %d, OOM\n", fd);
-		return -1;
-	}
-	ofd = f->fd;
-	memmove(nfd, ofd, f->nfd * sizeof(struct chan *));
-	f->fd = nfd;
-	f->nfd = n;
-	kfree(ofd);
-	return 0;
-}
-
 int newfd(struct chan *c, int oflags)
 {
 	int ret = insert_obj_fdt(&current->open_files, c, 0,
@@ -180,14 +148,15 @@ int syschdir(char *path)
 	return 0;
 }
 
-int fgrpclose(struct fd_table *fdt, int fd)
+int sysclose(int fd)
 {
 	ERRSTACK(1);
+	struct fd_table *fdt = &current->open_files;
+
 	if (waserror()) {
 		poperror();
 		return -1;
 	}
-
 	/*
 	 * Take no reference on the chan because we don't really need the
 	 * data structure, and are calling fdtochan only for error checks.
@@ -197,11 +166,6 @@ int fgrpclose(struct fd_table *fdt, int fd)
 	fdclose(fdt, fd);
 	poperror();
 	return 0;
-}
-
-int sysclose(int fd)
-{
-	return fgrpclose(&current->open_files, fd);
 }
 
 int syscreate(char *path, int mode, uint32_t perm)
@@ -1321,43 +1285,6 @@ int sysiounit(int fd)
 	return n;
 }
 
-/* Notes on concurrency:
- * - Can't hold spinlocks while we call cclose, since it might sleep eventually.
- * - We're called from proc_destroy, so we could have concurrent openers trying
- *   to add to the group (other syscalls), hence the "closed" flag.
- * - dot and slash chans are dealt with in proc_free.  its difficult to close
- *   and zero those with concurrent syscalls, since those are a source of krefs.
- * - the memory is freed in proc_free().  need to wait to do it, since we can
- *   have concurrent accesses to fgrp before free.
- * - Once we lock and set closed, no further additions can happen.  To simplify
- *   our closes, we also allow multiple calls to this func (though that should
- *   never happen with the current code). */
-void close_9ns_files(struct proc *p, bool only_cloexec)
-{
-	
-	struct fgrp *f = p->open_files.fgrp;
-
-	spin_lock(&f->lock);
-	if (f->closed) {
-		spin_unlock(&f->lock);
-		warn("Unexpected double-close");
-		return;
-	}
-	if (!only_cloexec)
-		f->closed = TRUE;
-	spin_unlock(&f->lock);
-
-	/* maxfd is a legit val, not a +1 */
-	for (int i = 0; i <= f->maxfd; i++) {
-		if (!f->fd[i])
-			continue;
-		if (only_cloexec && !(f->fd[i]->flag & CCEXEC))
-			continue;
-		cclose(f->fd[i]);
-		f->fd[i] = 0;
-	}
-}
-
 void print_chaninfo(struct chan *c)
 {
 	
@@ -1377,24 +1304,9 @@ void print_chaninfo(struct chan *c)
 	printk("\n");
 }
 
-void print_9ns_files(struct proc *p)
-{
-	
-	struct fgrp *f = p->open_files.fgrp;
-	spin_lock(&f->lock);
-	printk("9ns files for proc %d:\n", p->pid);
-	/* maxfd is a legit val, not a +1 */
-	for (int i = 0; i <= f->maxfd; i++) {
-		if (!f->fd[i])
-			continue;
-		printk("\t9fs %4d, ", i);
-		print_chaninfo(f->fd[i]);
-	}
-	spin_unlock(&f->lock);
-}
-
-/* TODO: 9ns ns inheritance flags: Shared, copied, or empty.  Looks like we're
- * copying the fgrp, and sharing the pgrp. */
+/* TODO: 9ns ns inheritance flags: Shared, copied, or empty.  The old fgrp is
+ * managed by the fd_table, which is handled outside this function.  We share
+ * the pgrp. */
 int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 {
 	
@@ -1408,12 +1320,11 @@ int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 	}
 	if (!parent) {
 		/* We are probably spawned by the kernel directly, and have no parent to
-		 * inherit from.  Be sure to set up fgrp/pgrp before calling namec().
+		 * inherit from.
 		 *
 		 * TODO: One problem is namec wants a current set for things like
 		 * genbuf.  So we'll use new_proc for this bootstrapping.  Note
 		 * switch_to() also loads the cr3. */
-		new_proc->open_files.fgrp = newfgrp();
 		new_proc->pgrp = newpgrp();
 		old_current = switch_to(new_proc);
 		new_proc->slash = namec("#r", Atodir, 0, 0);
@@ -1427,12 +1338,6 @@ int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 		poperror();
 		return 0;
 	}
-	/* When we use the old fgrp, we have copy semantics: do not change this
-	 * without revisiting proc_destroy, close_9ns_files, and closefgrp. */
-	if (flags & PROC_DUP_FGRP)
-		new_proc->open_files.fgrp = dupfgrp(new_proc, parent->open_files.fgrp);
-	else
-		new_proc->open_files.fgrp = newfgrp();
 	/* Shared semantics */
 	kref_get(&parent->pgrp->ref, 1);
 	new_proc->pgrp = parent->pgrp;
