@@ -1549,7 +1549,7 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, unsigned long arg1,
 		/* 9ns hack */
 		switch (cmd) {
 			case (F_DUPFD):
-				return sysdup(fd, -1);
+				return sysdup(fd);
 			case (F_GETFD):
 			case (F_SETFD):
 			case (F_SYNC):

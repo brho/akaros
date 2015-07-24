@@ -290,62 +290,25 @@ int syscreate(char *path, int mode, uint32_t perm)
 	return fd;
 }
 
-// This is in need of rework but for now just copy and convert.
-int sysdup(int old, int new)
+int sysdup(int old)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int fd;
-	struct chan *c, *oc;
-	struct fgrp *f = current->open_files.fgrp;
+	struct chan *c;
 
 	if (waserror()) {
 		poperror();
 		return -1;
 	}
-
 	c = fdtochan(&current->open_files, old, -1, 0, 1);
 	if (c->qid.type & QTAUTH) {
 		cclose(c);
 		error(Eperm);
 	}
-	fd = new;
-	if (fd != -1) {
-		/* ideally we'll be done with the VFS before we fix this */
-		/* double check the ccloses when you fix this */
-		panic("Need to sync with the VFS");
-		spin_lock(&f->lock);
-		if (f->closed) {
-			spin_unlock(&f->lock);
-			cclose(c);
-			return -1;
-		}
-		if (fd < 0) {
-			spin_unlock(&f->lock);
-			cclose(c);
-			set_errno(EBADF);
-			error("Bad FD %d\n", fd);
-		}
-		if (growfd(f, fd) < 0) {
-			spin_unlock(&f->lock);
-			cclose(c);
-			error(current_errstr());
-		}
-		if (fd > f->maxfd)
-			f->maxfd = fd;
-		oc = f->fd[fd];
-		f->fd[fd] = c;
-		spin_unlock(&f->lock);
-		if (oc)
-			cclose(oc);
-	} else {
-		if (waserror()) {
-			cclose(c);
-			nexterror();
-		}
-		fd = newfd(c, 0);
-		if (fd < 0)
-			error(Enofd);
-		poperror();
+	fd = newfd(c, 0);
+	if (fd < 0) {
+		cclose(c);
+		error(Enofd);
 	}
 	poperror();
 	return fd;
