@@ -16,6 +16,7 @@
 #include <pmap.h>
 #include <umem.h>
 #include <smp.h>
+#include <ns.h>
 
 struct sb_tailq super_blocks = TAILQ_HEAD_INITIALIZER(super_blocks);
 spinlock_t super_blocks_lock = SPINLOCK_INITIALIZER;
@@ -2331,30 +2332,46 @@ void *kread_whole_file(struct file *file)
 
 /* Process-related File management functions */
 
+/* Given any FD, get the appropriate object, 0 o/w.  Set vfs if you're looking
+ * for a file, o/w a chan.  Set incref if you want a reference count (which is a
+ * 9ns thing, you can't use the pointer if you didn't incref). */
+void *lookup_fd(struct fd_table *fdt, int fd, bool incref, bool vfs)
+{
+	void *retval = 0;
+	if (fd < 0)
+		return 0;
+	spin_lock(&fdt->lock);
+	if (fdt->closed) {
+		spin_unlock(&fdt->lock);
+		return 0;
+	}
+	if (fd < fdt->max_fdset) {
+		if (GET_BITMASK_BIT(fdt->open_fds->fds_bits, fd)) {
+			/* while max_files and max_fdset might not line up, we should never
+			 * have a valid fdset higher than files */
+			assert(fd < fdt->max_files);
+			if (vfs)
+				retval = fdt->fd[fd].fd_file;
+			else
+				retval = fdt->fd[fd].fd_chan;
+			/* retval could be 0 if we asked for the wrong one (e.g. it's a
+			 * file, but we asked for a chan) */
+			if (retval && incref) {
+				if (vfs)
+					kref_get(&((struct file*)retval)->f_kref, 1);
+				else
+					chan_incref((struct chan*)retval);
+			}
+		}
+	}
+	spin_unlock(&fdt->lock);
+	return retval;
+}
+
 /* Given any FD, get the appropriate file, 0 o/w */
 struct file *get_file_from_fd(struct fd_table *open_files, int file_desc)
 {
-	struct file *retval = 0;
-	if (file_desc < 0)
-		return 0;
-	spin_lock(&open_files->lock);
-	if (open_files->closed) {
-		spin_unlock(&open_files->lock);
-		return 0;
-	}
-	if (file_desc < open_files->max_fdset) {
-		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc)) {
-			/* while max_files and max_fdset might not line up, we should never
-			 * have a valid fdset higher than files */
-			assert(file_desc < open_files->max_files);
-			retval = open_files->fd[file_desc].fd_file;
-			/* 9ns might be using this one, in which case file == 0 */
-			if (retval)
-				kref_get(&retval->f_kref, 1);
-		}
-	}
-	spin_unlock(&open_files->lock);
-	return retval;
+	return lookup_fd(open_files, file_desc, TRUE, TRUE);
 }
 
 /* Grow the vfs fd set */
@@ -2437,29 +2454,40 @@ int put_fd(struct fd_table *open_files, int file_desc)
 	return 0;
 }
 
-/* Remove FD from the open files, if it was there, and return f.  Currently,
- * this decref's f, so the return value is not consumable or even usable.  This
- * hasn't been thought through yet. */
-struct file *put_file_from_fd(struct fd_table *open_files, int file_desc)
+/* If FD is in the group, remove it, decref it, and return TRUE. */
+bool close_fd(struct fd_table *fdt, int fd)
 {
-	struct file *file = 0;
-	if (file_desc < 0)
-		return 0;
-	spin_lock(&open_files->lock);
-	if (file_desc < open_files->max_fdset) {
-		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc)) {
+	struct file *file;
+	struct chan *chan;
+	bool ret = FALSE;
+	if (fd < 0)
+		return FALSE;
+	spin_lock(&fdt->lock);
+	if (fd < fdt->max_fdset) {
+		if (GET_BITMASK_BIT(fdt->open_fds->fds_bits, fd)) {
 			/* while max_files and max_fdset might not line up, we should never
 			 * have a valid fdset higher than files */
-			assert(file_desc < open_files->max_files);
-			file = open_files->fd[file_desc].fd_file;
-			open_files->fd[file_desc].fd_file = 0;
-			assert(file);	/* 9ns shouldn't call this put */
-			kref_put(&file->f_kref);
-			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc);
+			assert(fd < fdt->max_files);
+			file = fdt->fd[fd].fd_file;
+			chan = fdt->fd[fd].fd_chan;
+			if (file) {
+				kref_put(&file->f_kref);
+				fdt->fd[fd].fd_file = 0;
+			} else {
+				cclose(chan);
+				fdt->fd[fd].fd_chan = 0;
+			}
+			CLR_BITMASK_BIT(fdt->open_fds->fds_bits, fd);
+			ret = TRUE;
 		}
 	}
-	spin_unlock(&open_files->lock);
-	return file;
+	spin_unlock(&fdt->lock);
+	return ret;
+}
+
+void put_file_from_fd(struct fd_table *open_files, int file_desc)
+{
+	close_fd(open_files, file_desc);
 }
 
 static int __get_fd(struct fd_table *open_files, int low_fd)
@@ -2544,6 +2572,46 @@ int claim_fd(struct fd_table *open_files, int file_desc)
 	return ret;
 }
 
+/* Insert a file or chan (obj, chosen by vfs) into the fd group with fd_flags.
+ * If must_use_low, then we have to insert at FD = low_fd.  o/w we start looking
+ * for empty slots at low_fd. */
+int insert_obj_fdt(struct fd_table *fdt, void *obj, int low_fd, int fd_flags,
+                   bool must_use_low, bool vfs)
+{
+	int slot, ret;
+	spin_lock(&fdt->lock);
+	if (must_use_low) {
+		ret = __claim_fd(fdt, low_fd);
+		if (ret < 0) {
+			spin_unlock(&fdt->lock);
+			return ret;
+		}
+		assert(!ret);	/* issues with claim_fd returning status, not the fd */
+		slot = low_fd;
+	} else {
+		slot = __get_fd(fdt, low_fd);
+	}
+
+	if (slot < 0) {
+		spin_unlock(&fdt->lock);
+		return slot;
+	}
+	assert(slot < fdt->max_files &&
+	       fdt->fd[slot].fd_file == 0);
+	if (vfs) {
+		kref_get(&((struct file*)obj)->f_kref, 1);
+		fdt->fd[slot].fd_file = obj;
+		fdt->fd[slot].fd_chan = 0;
+	} else {
+		chan_incref((struct chan*)obj);
+		fdt->fd[slot].fd_file = 0;
+		fdt->fd[slot].fd_chan = obj;
+	}
+	fdt->fd[slot].fd_flags = fd_flags;
+	spin_unlock(&fdt->lock);
+	return slot;
+}
+
 /* Inserts the file in the fd_table, returning the corresponding new file
  * descriptor, or an error code.  We start looking for open fds from low_fd.
  *
@@ -2552,74 +2620,52 @@ int claim_fd(struct fd_table *open_files, int file_desc)
 int insert_file(struct fd_table *open_files, struct file *file, int low_fd,
                 bool must, bool cloexec)
 {
-	int slot, ret;
-	spin_lock(&open_files->lock);
-	if (must) {
-		ret = __claim_fd(open_files, low_fd);
-		if (ret < 0) {
-			spin_unlock(&open_files->lock);
-			return ret;
-		}
-		assert(!ret);	/* issues with claim_fd returning status, not the fd */
-		slot = low_fd;
-	} else {
-		slot = __get_fd(open_files, low_fd);
-	}
-
-	if (slot < 0) {
-		spin_unlock(&open_files->lock);
-		return slot;
-	}
-	assert(slot < open_files->max_files &&
-	       open_files->fd[slot].fd_file == 0);
-	kref_get(&file->f_kref, 1);
-	open_files->fd[slot].fd_file = file;
-	open_files->fd[slot].fd_flags = 0;
-	if (cloexec)
-		open_files->fd[slot].fd_flags |= FD_CLOEXEC;
-	spin_unlock(&open_files->lock);
-	return slot;
+	return insert_obj_fdt(open_files, file, low_fd, cloexec ? FD_CLOEXEC : 0,
+	                      must, TRUE);
 }
 
 /* Closes all open files.  Mostly just a "put" for all files.  If cloexec, it
  * will only close the FDs with FD_CLOEXEC (opened with O_CLOEXEC or fcntld). */
-void close_all_files(struct fd_table *open_files, bool cloexec)
+void close_fdt(struct fd_table *fdt, bool cloexec)
 {
 	struct file *file;
-	spin_lock(&open_files->lock);
-	if (open_files->closed) {
-		spin_unlock(&open_files->lock);
+	struct chan *chan;
+	spin_lock(&fdt->lock);
+	if (fdt->closed) {
+		spin_unlock(&fdt->lock);
 		return;
 	}
-	for (int i = 0; i < open_files->max_fdset; i++) {
-		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, i)) {
+	for (int i = 0; i < fdt->max_fdset; i++) {
+		if (GET_BITMASK_BIT(fdt->open_fds->fds_bits, i)) {
 			/* while max_files and max_fdset might not line up, we should never
 			 * have a valid fdset higher than files */
-			assert(i < open_files->max_files);
-			file = open_files->fd[i].fd_file;
-			/* no file == 9ns uses the FD.  they will deal with it */
-			if (!file)
+			assert(i < fdt->max_files);
+			if (cloexec && !(fdt->fd[i].fd_flags & FD_CLOEXEC))
 				continue;
-			if (cloexec && !(open_files->fd[i].fd_flags & FD_CLOEXEC))
-				continue;
-			/* Actually close the file */
-			open_files->fd[i].fd_file = 0;
-			assert(file);
-			kref_put(&file->f_kref);
-			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, i);
+			file = fdt->fd[i].fd_file;
+			chan = fdt->fd[i].fd_chan;
+			if (file) {
+				fdt->fd[i].fd_file = 0;
+				kref_put(&file->f_kref);
+			} else {
+				fdt->fd[i].fd_chan = 0;
+				cclose(chan);
+			}
+			CLR_BITMASK_BIT(fdt->open_fds->fds_bits, i);
 		}
 	}
 	if (!cloexec) {
-		free_fd_set(open_files);
-		open_files->closed = TRUE;
+		free_fd_set(fdt);
+		fdt->closed = TRUE;
 	}
-	spin_unlock(&open_files->lock);
+	spin_unlock(&fdt->lock);
 }
 
 /* Inserts all of the files from src into dst, used by sys_fork(). */
-void clone_files(struct fd_table *src, struct fd_table *dst)
+void clone_fdt(struct fd_table *src, struct fd_table *dst)
 {
 	struct file *file;
+	struct chan *chan;
 	spin_lock(&src->lock);
 	if (src->closed) {
 		spin_unlock(&src->lock);
@@ -2638,12 +2684,16 @@ void clone_files(struct fd_table *src, struct fd_table *dst)
 			 * have a valid fdset higher than files */
 			assert(i < src->max_files);
 			file = src->fd[i].fd_file;
+			chan = src->fd[i].fd_chan;
 			assert(i < dst->max_files && dst->fd[i].fd_file == 0);
 			SET_BITMASK_BIT(dst->open_fds->fds_bits, i);
 			dst->fd[i].fd_file = file;
-			/* no file means 9ns is using it, they clone separately */
+			dst->fd[i].fd_chan = chan;
+			/* no file means 9ns is using it, they clone separately (TODO) */
 			if (file)
 				kref_get(&file->f_kref, 1);
+		//	else
+		//		chan_incref(chan);
 			if (i >= dst->next_fd)
 				dst->next_fd = i + 1;
 		}

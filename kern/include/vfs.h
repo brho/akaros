@@ -372,8 +372,10 @@ struct small_fd_set {
 
 /* Describes an open file.  We need this, since the FD flags are supposed to be
  * per file descriptor, not per file (like the file status flags). */
+struct chan;	/* from 9ns */
 struct file_desc {
 	struct file					*fd_file;
+	struct chan					*fd_chan;
 	unsigned int				fd_flags;
 };
 
@@ -487,12 +489,17 @@ ssize_t kread_file(struct file *file, void *buf, size_t sz);
 void *kread_whole_file(struct file *file);
 
 /* Process-related File management functions */
+void *lookup_fd(struct fd_table *fdt, int fd, bool incref, bool vfs);
+int insert_obj_fdt(struct fd_table *fdt, void *obj, int low_fd, int fd_flags,
+                   bool must_use_low, bool vfs);
+bool close_fd(struct fd_table *fdt, int fd);
+void close_fdt(struct fd_table *open_files, bool cloexec);
+void clone_fdt(struct fd_table *src, struct fd_table *dst);
+
 struct file *get_file_from_fd(struct fd_table *open_files, int fd);
-struct file *put_file_from_fd(struct fd_table *open_files, int file_desc);
+void put_file_from_fd(struct fd_table *open_files, int file_desc);
 int insert_file(struct fd_table *open_files, struct file *file, int low_fd,
                 bool must, bool cloexec);
-void close_all_files(struct fd_table *open_files, bool cloexec);
-void clone_files(struct fd_table *src, struct fd_table *dst);
 int do_chdir(struct fs_struct *fs_env, char *path);
 int do_fchdir(struct fs_struct *fs_env, struct file *file);
 char *do_getcwd(struct fs_struct *fs_env, char **kfree_this, size_t cwd_l);

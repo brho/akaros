@@ -379,7 +379,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 	p->open_files.open_fds = (struct fd_set*)&p->open_files.open_fds_init;
 	if (parent) {
 		if (flags & PROC_DUP_FGRP)
-			clone_files(&parent->open_files, &p->open_files);
+			clone_fdt(&parent->open_files, &p->open_files);
 	} else {
 		/* no parent, we're created from the kernel */
 		int fd;
@@ -886,7 +886,7 @@ void proc_destroy(struct proc *p)
 	 * Also note that any mmap'd files will still be mmapped.  You can close the
 	 * file after mmapping, with no effect. */
 	close_9ns_files(p, FALSE);
-	close_all_files(&p->open_files, FALSE);
+	close_fdt(&p->open_files, FALSE);
 	/* Tell the ksched about our death, and which cores we freed up */
 	__sched_proc_destroy(p, pc_arr, nr_cores_revoked);
 	/* Tell our parent about our state change (to DYING) */

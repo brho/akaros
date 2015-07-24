@@ -578,7 +578,7 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	}
 	/* close the CLOEXEC ones, even though this isn't really an exec */
 	close_9ns_files(new_p, TRUE);
-	close_all_files(&new_p->open_files, TRUE);
+	close_fdt(&new_p->open_files, TRUE);
 	/* Load the elf. */
 	if (load_elf(new_p, program, argc, argv, envc, envp)) {
 		set_errstr("Failed to load elf");
@@ -843,7 +843,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	unmap_and_destroy_vmrs(p);
 	/* close the CLOEXEC ones */
 	close_9ns_files(p, TRUE);
-	close_all_files(&p->open_files, TRUE);
+	close_fdt(&p->open_files, TRUE);
 	env_user_mem_free(p, 0, UMAPTOP);
 	if (load_elf(p, program, argc, argv, envc, envp)) {
 		kref_put(&program->f_kref);
