@@ -415,13 +415,13 @@ static void *sigsearch(char *signature)
 int mpsinit(int maxcores)
 {
 	uint8_t *p;
-	int i, n, ncleft = 254;
+	int i, n;
 	_MP_ *mp;
 	PCMP *pcmp;
 
 	if ((mp = sigsearch("_MP_")) == NULL) {
 		printk("No mp tables found, might have issues!\n");
-		return ncleft;
+		return maxcores;
 	}
 	/* TODO: if an IMCR exists, we should set it to 1, though i've heard that
 	 * ACPI-capable HW doesn't have the IMCR anymore. */
@@ -434,19 +434,19 @@ int mpsinit(int maxcores)
 		printk("\n");
 	}
 	if (mp->revision != 1 && mp->revision != 4)
-		return ncleft;
+		return maxcores;
 	if (sigchecksum(mp, mp->length * 16) != 0)
-		return ncleft;
+		return maxcores;
 	if ((pcmp = KADDR_NOCHECK(l32get(mp->addr))) == NULL)
-		return ncleft;
+		return maxcores;
 	if (pcmp->revision != 1 && pcmp->revision != 4) {
-		return ncleft;
+		return maxcores;
 	}
 	n = l16get(pcmp->length) + l16get(pcmp->xlength);
 	if ((pcmp = KADDR_NOCHECK(l32get(mp->addr))) == NULL)
-		return ncleft;
+		return maxcores;
 	if (sigchecksum(pcmp, l16get(pcmp->length)) != 0) {
-		return ncleft;
+		return maxcores;
 	}
 	if (MP_VERBOSE_DEBUG) {
 		printk("PCMP @ %#p length %p revision %d\n",
@@ -465,7 +465,7 @@ int mpsinit(int maxcores)
 		i = sigchecksum(p, l16get(pcmp->xlength));
 		if (((i + pcmp->xchecksum) & 0xff) != 0) {
 			printd("extended table checksums to %p\n", i);
-			return ncleft;
+			return maxcores;
 		}
 	}
 
@@ -474,10 +474,5 @@ int mpsinit(int maxcores)
 	 * for later interrupt enabling and application processor
 	 * startup.
 	 */
-	ncleft = mpparse(pcmp, maxcores);
-	return ncleft;
-//  mpacpi(ncleft);
-
-//  apicdump();
-//  ioapicdump();
+	return mpparse(pcmp, maxcores);
 }
