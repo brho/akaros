@@ -58,7 +58,6 @@ static void freepipe(Pipe * p)
 static void pipe_release(struct kref *kref)
 {
 	Pipe *pipe = container_of(kref, Pipe, ref);
-	qunlock(&pipe->qlock);
 	freepipe(pipe);
 }
 
@@ -286,11 +285,11 @@ static void pipeclose(struct chan *c)
 		qreopen(p->q[1]);
 	}
 
+	qunlock(&p->qlock);
 	/*
 	 *  free the structure on last close
 	 */
 	kref_put(&p->ref);
-	qunlock(&p->qlock);
 }
 
 static long piperead(struct chan *c, void *va, long n, int64_t ignored)
