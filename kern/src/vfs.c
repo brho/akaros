@@ -2434,26 +2434,6 @@ static void free_fd_set(struct fd_table *open_files)
 	}
 }
 
-/* 9ns: puts back an FD from the VFS-FD-space. */
-int put_fd(struct fd_table *open_files, int file_desc)
-{
-	if (file_desc < 0) {
-		warn("Negative FD!\n");
-		return 0;
-	}
-	spin_lock(&open_files->lock);
-	if (file_desc < open_files->max_fdset) {
-		if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc)) {
-			/* while max_files and max_fdset might not line up, we should never
-			 * have a valid fdset higher than files */
-			assert(file_desc < open_files->max_files);
-			CLR_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc);
-		}
-	}
-	spin_unlock(&open_files->lock);
-	return 0;
-}
-
 /* If FD is in the group, remove it, decref it, and return TRUE. */
 bool close_fd(struct fd_table *fdt, int fd)
 {
@@ -2490,7 +2470,7 @@ void put_file_from_fd(struct fd_table *open_files, int file_desc)
 	close_fd(open_files, file_desc);
 }
 
-static int __get_fd(struct fd_table *open_files, int low_fd)
+static int __get_fd(struct fd_table *open_files, int low_fd, bool must_use_low)
 {
 	int slot = -1;
 	int error;
@@ -2498,7 +2478,8 @@ static int __get_fd(struct fd_table *open_files, int low_fd)
 		return -EINVAL;
 	if (open_files->closed)
 		return -EINVAL;	/* won't matter, they are dying */
-
+	if (must_use_low && GET_BITMASK_BIT(open_files->open_fds->fds_bits, low_fd))
+		return -ENFILE;
 	/* Loop until we have a valid slot (we grow the fd_array at the bottom of
  	 * the loop if we haven't found a slot in the current array */
 	while (slot == -1) {
@@ -2521,77 +2502,15 @@ static int __get_fd(struct fd_table *open_files, int low_fd)
 	return slot;
 }
 
-/* Gets and claims a free FD, used by 9ns.  < 0 == error.  cloexec is tracked on
- * the VFS FD.  It's value will be O_CLOEXEC (not 1) or 0. */
-int get_fd(struct fd_table *open_files, int low_fd, int cloexec)
-{
-	int slot;
-	spin_lock(&open_files->lock);
-	slot = __get_fd(open_files, low_fd);
-	if (cloexec && (slot >= 0))
-		open_files->fd[slot].fd_flags |= FD_CLOEXEC;
-	spin_unlock(&open_files->lock);
-	return slot;
-}
-
-static int __claim_fd(struct fd_table *open_files, int file_desc)
-{
-	int error;
-	if ((file_desc < 0) || (file_desc > NR_FILE_DESC_MAX))
-		return -EINVAL;
-	if (open_files->closed)
-		return -EINVAL;	/* won't matter, they are dying */
-
-	/* Grow the open_files->fd_set until the file_desc can fit inside it */
-	while(file_desc >= open_files->max_files) {
-		if ((error = grow_fd_set(open_files)))
-			return error;
-		cpu_relax();
-	}
-
-	/* If we haven't grown, this could be a problem, so check for it */
-	if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc))
-		return -ENFILE; /* Should never really happen. Here to catch bugs. */
-
-	SET_BITMASK_BIT(open_files->open_fds->fds_bits, file_desc);
-	assert(file_desc < open_files->max_files &&
-	       open_files->fd[file_desc].fd_file == 0);
-	if (file_desc >= open_files->next_fd)
-		open_files->next_fd = file_desc + 1;
-	return 0;
-}
-
-/* Claims a specific FD when duping FDs. used by 9ns.  < 0 == error.  No need
- * for cloexec here, since it's not used during dup. */
-int claim_fd(struct fd_table *open_files, int file_desc)
-{
-	int ret;
-	spin_lock(&open_files->lock);
-	ret = __claim_fd(open_files, file_desc);
-	spin_unlock(&open_files->lock);
-	return ret;
-}
-
 /* Insert a file or chan (obj, chosen by vfs) into the fd group with fd_flags.
  * If must_use_low, then we have to insert at FD = low_fd.  o/w we start looking
  * for empty slots at low_fd. */
 int insert_obj_fdt(struct fd_table *fdt, void *obj, int low_fd, int fd_flags,
                    bool must_use_low, bool vfs)
 {
-	int slot, ret;
+	int slot;
 	spin_lock(&fdt->lock);
-	if (must_use_low) {
-		ret = __claim_fd(fdt, low_fd);
-		if (ret < 0) {
-			spin_unlock(&fdt->lock);
-			return ret;
-		}
-		assert(!ret);	/* issues with claim_fd returning status, not the fd */
-		slot = low_fd;
-	} else {
-		slot = __get_fd(fdt, low_fd);
-	}
-
+	slot = __get_fd(fdt, low_fd, must_use_low);
 	if (slot < 0) {
 		spin_unlock(&fdt->lock);
 		return slot;
