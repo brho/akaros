@@ -228,8 +228,8 @@ make-real:
 
 else # BUILD_ERROR
 
-# Make sure that LD_LIBARY_PATH is not set during the build process
-unexport LD_LIBARY_PATH
+# Make sure that LD_LIBRARY_PATH is not set during the build process
+unexport LD_LIBRARY_PATH
 
 check-env-real:
 	@echo "    Your environment checks out. Build away!"
