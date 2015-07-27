@@ -2453,6 +2453,8 @@ bool close_fd(struct fd_table *fdt, int fd)
 			fdt->fd[fd].fd_file = 0;
 			fdt->fd[fd].fd_chan = 0;
 			CLR_BITMASK_BIT(fdt->open_fds->fds_bits, fd);
+			if (fd < fdt->hint_min_fd)
+				fdt->hint_min_fd = fd;
 			ret = TRUE;
 		}
 	}
@@ -2474,12 +2476,17 @@ static int __get_fd(struct fd_table *open_files, int low_fd, bool must_use_low)
 {
 	int slot = -1;
 	int error;
+	bool update_hint = TRUE;
 	if ((low_fd < 0) || (low_fd > NR_FILE_DESC_MAX))
 		return -EINVAL;
 	if (open_files->closed)
 		return -EINVAL;	/* won't matter, they are dying */
 	if (must_use_low && GET_BITMASK_BIT(open_files->open_fds->fds_bits, low_fd))
 		return -ENFILE;
+	if (low_fd > open_files->hint_min_fd)
+		update_hint = FALSE;
+	else
+		low_fd = open_files->hint_min_fd;
 	/* Loop until we have a valid slot (we grow the fd_array at the bottom of
  	 * the loop if we haven't found a slot in the current array */
 	while (slot == -1) {
@@ -2490,8 +2497,9 @@ static int __get_fd(struct fd_table *open_files, int low_fd, bool must_use_low)
 			SET_BITMASK_BIT(open_files->open_fds->fds_bits, slot);
 			assert(slot < open_files->max_files &&
 			       open_files->fd[slot].fd_file == 0);
-			if (slot >= open_files->next_fd)
-				open_files->next_fd = slot + 1;
+			/* We know slot >= hint, since we started with the hint */
+			if (update_hint)
+				open_files->hint_min_fd = slot + 1;
 			break;
 		}
 		if (slot == -1)	{
@@ -2589,6 +2597,8 @@ void close_fdt(struct fd_table *fdt, bool cloexec)
 			CLR_BITMASK_BIT(fdt->open_fds->fds_bits, i);
 		}
 	}
+	/* it's just a hint, we can build back up from being 0 */
+	fdt->hint_min_fd = 0;
 	if (!cloexec) {
 		free_fd_set(fdt);
 		fdt->closed = TRUE;
@@ -2638,10 +2648,9 @@ void clone_fdt(struct fd_table *src, struct fd_table *dst)
 				kref_get(&file->f_kref, 1);
 			else
 				chan_incref(chan);
-			if (i >= dst->next_fd)
-				dst->next_fd = i + 1;
 		}
 	}
+	dst->hint_min_fd = src->hint_min_fd;
 	spin_unlock(&dst->lock);
 	spin_unlock(&src->lock);
 }

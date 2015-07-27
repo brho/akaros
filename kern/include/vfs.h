@@ -385,7 +385,7 @@ struct fd_table {
 	bool						closed;
 	int							max_files;		/* max files ptd to by fd */
 	int							max_fdset;		/* max of the current fd_set */
-	int							next_fd;		/* next number available */
+	int							hint_min_fd;	/* <= min available fd */
 	struct file_desc			*fd;			/* initially pts to fd_array */
 	struct fd_set				*open_fds;		/* init, pts to open_fds_init */
 	struct small_fd_set			open_fds_init;
