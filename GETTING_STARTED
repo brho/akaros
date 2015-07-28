@@ -223,10 +223,11 @@ Now, make kvm.  You should be able to see the new kernel in mnt/hdd/ (do an ls
 Here is the command I use to run qemu/kvm.  It's evolved over the years, and it
 will vary based on your linux distribution.  Don't run it just yet:
 
-$ qemu-system-i386 -s -enable-kvm -cpu phenom -smp 8 -m 2048 -nographic -monitor /dev/pts/3 -net nic,model=e1000 -net tap,ifname=tap0,script=no mnt/hdd.img
+$ qemu-system-x86_64 -s -enable-kvm -cpu kvm64 -smp 8 -m 4096 -nographic -monitor /dev/pts/3 -net nic,model=e1000 -net user,hostfwd=tcp::5555-:23 -net dump,file=/tmp/vm.pcap -drive file=mnt/hdd.img,index=0,media=disk,format=raw
 
-If you skipped making a virtual machine image, replace "mnt/hdd.img" with
-"-kernel obj/kern/akaros-kernel".
+If you skipped making a virtual machine image or want to run the kernel
+directly without emulating a disk, replace the "-drive" parameter (all the way
+to format=raw) with "-kernel obj/kern/akaros-kernel".
 
 The -monitor is the qemu monitor, which is a CLI for qemu.  Pick a
 tab/terminal/pty in Linux that you will only use for qemu monitoring, and enter
@@ -238,16 +239,36 @@ your inputs.
 -nographic allows qemu to work in the terminal you run qemu from, instead of
 spawning off a fake cpu crt/monitor.
 
-If you don't have networking set up (including the tun/tap stuff from
-kvm-up.sh), remove the -net commands/options.
+The command as written uses QEMU's user networking.  It's emulated and a little
+slow.  The example I have alo forwards port 5555 on the host to port 23 on the
+guest.  Customize it according to your needs.
 
-Fell free to pick different values for the number of cpus and RAM (8 and 1024
+Another option for networking is to set up a tun/tap device.  I use this on
+some machines, and the kvm-up script has some commands to set it up.  It's
+tricky, and may vary for your distribution.  If you do use the tun/tap
+networking, replace the "-net user" section with:
+
+	-net tap,ifname=tap0,script=no
+
+The "-net dump" option saves a pcap trace of the network traffic.  This is very
+useful for debugging, but probably not needed for most people.
+
+Feel free to pick different values for the number of cpus and RAM (8 and 4096
 in the example).
 
 Once you finally run it, you can stop the VM by entering 'q' to the qemu
 monitor (or just killing the process)..  Other help commands from the monitor
 include 'info cpus', 'info registers', 'x', and 'help'.
 
+In more recent versions of qemu, CTRL-C will not get sent to the guest; instead
+it will kill the VM.  If this gets annoying, you can remap "interrupt" to
+something other than CTRL-C in the terminal where you run qemu:
+
+$ stty intr ^]
+
+To change it back:
+
+$ stty intr ^c
 
 3.7 Running on Hardware
 ---------
