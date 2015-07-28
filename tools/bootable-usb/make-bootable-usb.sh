@@ -48,7 +48,7 @@ dd if=$ROOTDIR/mbr.bin of=${USBDRIVE}
 #   on a monitor, you'll see the boot: prompt
 
 # put something like this in your Akaros Makelocal:
-#$(OBJDIR)/kern/.usb.touch: $(KERNEL_OBJ)
+#$(OBJDIR)/kern/.usb.touch: $(CMP_KERNEL_OBJ)
 #	@echo "  (USB) Copying to /dev/sdb1"
 #	$(Q)mount /dev/sdb1
 #	$(Q)sudo cp $^ /mnt/wherever/boot/akaros

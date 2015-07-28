@@ -6,7 +6,7 @@
 export CFLAGS_USER CFLAGS_TESTS
 
 # brho's custom targets.  Customize to your system.
-#$(OBJDIR)/kern/.kvm.touch: $(KERNEL_OBJ)
+#$(OBJDIR)/kern/.kvm.touch: $(CMP_KERNEL_OBJ)
 #	@echo "  (KVM) Copying to mnt/hdd"
 #	$(Q)cp $^ mnt/hdd/kernel
 #	@sync
@@ -14,7 +14,7 @@ export CFLAGS_USER CFLAGS_TESTS
 #
 #kvm: $(OBJDIR)/kern/.kvm.touch ;
 #
-#$(OBJDIR)/kern/.usb.touch: $(KERNEL_OBJ)
+#$(OBJDIR)/kern/.usb.touch: $(CMP_KERNEL_OBJ)
 #	@echo "  (USB) Copying to /dev/sdc4"
 #	$(Q)mount /dev/sdc4
 #	$(Q)cp $^ /mnt/pornstick/akaros
