@@ -1810,13 +1810,14 @@ intreg_t sys_getcwd(struct proc *p, char *u_cwd, size_t cwd_l)
 	k_cwd = do_getcwd(&p->fs_env, &kfree_this, cwd_l);
 	if (!k_cwd)
 		return -1;		/* errno set by do_getcwd */
-	if (strlen(k_cwd) + 1 > cwd_l) {
+	retval = strlen(k_cwd) + 1;
+	if (retval > cwd_l) {
 		set_errno(ERANGE);
-		set_errstr("getcwd buf too small, needed %d", strlen(k_cwd) + 1);
+		set_errstr("getcwd buf too small, needed %d", retval);
 		retval = -1;
 		goto out;
 	}
-	if (memcpy_to_user_errno(p, u_cwd, k_cwd, strlen(k_cwd) + 1))
+	if (memcpy_to_user_errno(p, u_cwd, k_cwd, retval))
 		retval = -1;
 out:
 	kfree(kfree_this);
