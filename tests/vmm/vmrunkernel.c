@@ -14,6 +14,7 @@
 #include <sys/mman.h>
 #include <vmm/coreboot_tables.h>
 #include <ros/vmm.h>
+#include <vmm/virtio.h>
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_ids.h>
 
@@ -22,7 +23,6 @@ int *mmap_blob;
 unsigned long long stack[1024];
 volatile int shared = 0;
 int mcp = 1;
-#define V(x, t) (*((volatile t*)(x)))
 
 #define MiB 0x100000u
 #define GiB (1u<<30)
@@ -33,32 +33,117 @@ uint8_t _kernel[KERNSIZE];
 
 unsigned long long *p512, *p1, *p2m;
 
-void *talk_thread(void *arg)
-{
-	printf("talk thread ..\n");
-	for(; V(&shared, int) < 32; ){
-		if (V(&shared, int) & 1) {
-			printf("shared %d\n", V(&shared, int) );
-			V(&shared, int) = V(&shared, int) + 1;
-		}
-		cpu_relax();
-	}
-	printf("All done, read %d\n", *mmap_blob);
-	return NULL;
-}
-
 pthread_t *my_threads;
 void **my_retvals;
 int nr_threads = 2;
+char *line, *consline, *outline;
+struct scatterlist iov[32];
+unsigned int inlen, outlen, conslen;
+/* unlike Linux, this shared struct is for both host and guest. */
+//	struct virtqueue *constoguest = 
+//		vring_new_virtqueue(0, 512, 8192, 0, inpages, NULL, NULL, "test");
+volatile int gaveit = 0, gotitback = 0;
+struct virtqueue *guesttocons;
+struct scatterlist out[] = { {NULL, sizeof(outline)}, };
+struct scatterlist in[] = { {NULL, sizeof(line)}, };
 
-static void setupconsole(uint32_t *v)
+static inline uint32_t read32(const volatile void *addr)
+{
+	return *(const volatile uint32_t *)addr;
+}
+
+static inline void write32(volatile void *addr, uint32_t value)
+{
+	*(volatile uint32_t *)addr = value;
+}
+
+static void setupconsole(void *v)
 {
 	// try to make linux happy.
 	// this is not really endian safe but ... well ... WE'RE ON THE SAME MACHINE
-	v[VIRTIO_MMIO_MAGIC_VALUE/4] = ('v' | 'i' << 8 | 'r' << 16 | 't' << 24);
-	v[VIRTIO_MMIO_VERSION] = 35;
-	v[VIRTIO_MMIO_DEVICE_ID] = VIRTIO_ID_CONSOLE;
+	write32(v+VIRTIO_MMIO_MAGIC_VALUE, ('v' | 'i' << 8 | 'r' << 16 | 't' << 24));
+	// no constant for this is defined anywhere. It's just 1.
+	write32(v+VIRTIO_MMIO_VERSION, 1);
+	write32(v+VIRTIO_MMIO_DEVICE_ID, VIRTIO_ID_CONSOLE);
+	write32(v+VIRTIO_MMIO_QUEUE_NUM_MAX, 1);
+	write32(v+VIRTIO_MMIO_QUEUE_PFN, 0);
 }
+
+int debug = 1;
+
+struct ttargs {
+	void *virtio;
+};
+
+void *talk_thread(void *arg)
+{
+	struct ttargs *a = arg;
+	void *v = a->virtio;
+	fprintf(stderr, "talk thread ..\n");
+	uint16_t head;
+	uint32_t vv;
+	int i;
+	int num;
+	printf("Sleep 15 seconds\n");
+	uthread_sleep(15);
+	printf("----------------------- TT a %p\n", a);
+	printf("talk thread ttargs %x v %x\n", a, v);
+	
+	if (debug) printf("Spin on console being read, print num queues, halt\n");
+	while ((vv = read32(v+VIRTIO_MMIO_DRIVER_FEATURES)) == 0) {
+		printf("no ready ... \n");
+		if (debug) {
+			hexdump(stdout, v, 128);
+		}
+		printf("sleep 1 second\n");
+		uthread_sleep(1);
+	}
+	if (debug)printf("vv %x, set selector %x\n", vv, read32(v + VIRTIO_MMIO_DRIVER_FEATURES_SEL));
+	if (debug) printf("loop forever");
+	while (1)
+		;
+	for(num = 0;;num++) {
+		/* host: use any buffers we should have been sent. */
+		head = wait_for_vq_desc(guesttocons, iov, &outlen, &inlen);
+		if (debug)
+			printf("vq desc head %d, gaveit %d gotitback %d\n", head, gaveit, gotitback);
+		for(i = 0; debug && i < outlen + inlen; i++)
+			printf("v[%d/%d] v %p len %d\n", i, outlen + inlen, iov[i].v, iov[i].length);
+		/* host: if we got an output buffer, just output it. */
+		for(i = 0; i < outlen; i++) {
+			num++;
+			printf("Host:%s:\n", (char *)iov[i].v);
+		}
+		
+		if (debug)
+			printf("outlen is %d; inlen is %d\n", outlen, inlen);
+		/* host: fill in the writeable buffers. */
+		for (i = outlen; i < outlen + inlen; i++) {
+			/* host: read a line. */
+			memset(consline, 0, 128);
+			if (1) {
+				if (fgets(consline, 4096-256, stdin) == NULL) {
+					exit(0);
+				} 
+				if (debug) printf("GOT A LINE:%s:\n", consline);
+			} else {
+				sprintf(consline, "hi there. %d\n", i);
+			}
+			memmove(iov[i].v, consline, strlen(consline)+ 1);
+			iov[i].length = strlen(consline) + 1;
+		}
+		if (debug) printf("call add_used\n");
+		/* host: now ack that we used them all. */
+		add_used(guesttocons, head, outlen+inlen);
+		if (debug) printf("DONE call add_used\n");
+	}
+	fprintf(stderr, "All done\n");
+	return NULL;
+}
+
+struct ttargs t;
+	
+
 int main(int argc, char **argv)
 {
 	int amt;
@@ -143,7 +228,7 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	mcp = 0; //argc - 1;
+	mcp = 1;
 	if (mcp) {
 		my_threads = malloc(sizeof(pthread_t) * nr_threads);
 		my_retvals = malloc(sizeof(void*) * nr_threads);
@@ -162,21 +247,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (mcp) {
-		if (pthread_create(&my_threads[0], NULL, &talk_thread, NULL))
-			perror("pth_create failed");
-//		if (pthread_create(&my_threads[1], NULL, &fail, NULL))
-//			perror("pth_create failed");
-	}
-	printf("threads started\n");
-
-	if (0) for (int i = 0; i < nr_threads-1; i++) {
-		int ret;
-		if (pthread_join(my_threads[i], &my_retvals[i]))
-			perror("pth_join failed");
-		printf("%d %d\n", i, ret);
-	}
-	
+	t.virtio = (void *)VIRTIOBASE;
 
 	ret = syscall(33, 1);
 	if (ret < 0) {
@@ -207,13 +278,19 @@ int main(int argc, char **argv)
 	kernbase <<= (0 + 12);
 	uint8_t *kernel = (void *)GKERNBASE;
 	write_coreboot_table(coreboot_tables, ((void *)VIRTIOBASE) /*kernel*/, KERNSIZE + 1048576);
-	hexdump(stdout, coreboot_tables, 128);
+	hexdump(stdout, coreboot_tables, 512);
 	setupconsole((void *)VIRTIOBASE);
 	hexdump(stdout, (void *)VIRTIOBASE, 128);
 	printf("kernbase for pml4 is 0x%llx and entry is %llx\n", kernbase, entry);
 	printf("p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
 	sprintf(cmd, "V 0x%llx 0x%llx 0x%llx", entry, (unsigned long long) &stack[1024], (unsigned long long) p512);
+	if (mcp) {
+		if (pthread_create(&my_threads[0], NULL, &talk_thread, &t))
+			perror("pth_create failed");
+	}
+	printf("threads started\n");
 	printf("Writing command :%s:\n", cmd);
+	// sys_getpcoreid
 	ret = write(fd, cmd, strlen(cmd));
 	if (ret != strlen(cmd)) {
 		perror(cmd);
@@ -230,8 +307,15 @@ int main(int argc, char **argv)
 			perror(cmd);
 		}
 	}
-	hexdump(stdout, (void *)VIRTIOBASE, 128);
+	hexdump(stdout, (void *)VIRTIOBASE, 512);
 	printf("shared is %d, blob is %d\n", shared, *mmap_blob);
+
+	for (int i = 0; i < nr_threads-1; i++) {
+		int ret;
+		if (pthread_join(my_threads[i], &my_retvals[i]))
+			perror("pth_join failed");
+		printf("%d %d\n", i, ret);
+	}
 
 	return 0;
 }
