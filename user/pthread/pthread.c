@@ -514,13 +514,17 @@ static void __pthread_free_stack(struct pthread_tcb *pt)
 
 static int __pthread_allocate_stack(struct pthread_tcb *pt)
 {
+	int force_a_page_fault;
 	assert(pt->stacksize);
 	void* stackbot = mmap(0, pt->stacksize,
 	                      PROT_READ|PROT_WRITE|PROT_EXEC,
-	                      MAP_POPULATE|MAP_ANONYMOUS, -1, 0);
+	                      MAP_ANONYMOUS, -1, 0);
 	if (stackbot == MAP_FAILED)
 		return -1; // errno set by mmap
 	pt->stacktop = stackbot + pt->stacksize;
+	/* Want the top of the stack populated, but not the rest of the stack;
+	 * that'll grow on demand (up to pt->stacksize) */
+	force_a_page_fault = ACCESS_ONCE(*(int*)(pt->stacktop - sizeof(int)));
 	return 0;
 }
 

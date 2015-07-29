@@ -107,9 +107,7 @@ enum
 #define PTHREAD_CREATE_DETACHED	PTHREAD_CREATE_DETACHED
 };
 
-// TODO: how big do we want these?  ideally, we want to be able to guard and map
-// more space if we go too far.
-#define PTHREAD_STACK_PAGES 4
+#define PTHREAD_STACK_PAGES 1024
 #define PTHREAD_STACK_SIZE (PTHREAD_STACK_PAGES*PGSIZE)
 #define PTHREAD_STACK_MIN PTHREAD_STACK_SIZE
 
