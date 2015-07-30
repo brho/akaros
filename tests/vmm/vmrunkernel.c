@@ -57,6 +57,35 @@ static inline void write32(volatile void *addr, uint32_t value)
 	*(volatile uint32_t *)addr = value;
 }
 
+void dumpvirtio_mmio(FILE *f, void *v)
+{
+	fprintf(f, "VIRTIO_MMIO_MAGIC_VALUE: 0x%x\n", read32(v+VIRTIO_MMIO_MAGIC_VALUE));
+	fprintf(f, "VIRTIO_MMIO_VERSION: 0x%x\n", read32(v+VIRTIO_MMIO_VERSION));
+	fprintf(f, "VIRTIO_MMIO_DEVICE_ID: 0x%x\n", read32(v+VIRTIO_MMIO_DEVICE_ID));
+	fprintf(f, "VIRTIO_MMIO_VENDOR_ID: 0x%x\n", read32(v+VIRTIO_MMIO_VENDOR_ID));
+	fprintf(f, "VIRTIO_MMIO_DEVICE_FEATURES: 0x%x\n", read32(v+VIRTIO_MMIO_DEVICE_FEATURES));
+	fprintf(f, "VIRTIO_MMIO_DEVICE_FEATURES_SEL: 0x%x\n", read32(v+VIRTIO_MMIO_DEVICE_FEATURES_SEL));
+	fprintf(f, "VIRTIO_MMIO_DRIVER_FEATURES: 0x%x\n", read32(v+VIRTIO_MMIO_DRIVER_FEATURES));
+	fprintf(f, "VIRTIO_MMIO_DRIVER_FEATURES_SEL: 0x%x\n", read32(v+VIRTIO_MMIO_DRIVER_FEATURES_SEL));
+	fprintf(f, "VIRTIO_MMIO_GUEST_PAGE_SIZE: 0x%x\n", read32(v+VIRTIO_MMIO_GUEST_PAGE_SIZE));
+	fprintf(f, "VIRTIO_MMIO_QUEUE_SEL: 0x%x\n", read32(v+VIRTIO_MMIO_QUEUE_SEL));
+	fprintf(f, "VIRTIO_MMIO_QUEUE_NUM_MAX: 0x%x\n", read32(v+VIRTIO_MMIO_QUEUE_NUM_MAX));
+	fprintf(f, "VIRTIO_MMIO_QUEUE_NUM: 0x%x\n", read32(v+VIRTIO_MMIO_QUEUE_NUM));
+	fprintf(f, "VIRTIO_MMIO_QUEUE_ALIGN: 0x%x\n", read32(v+VIRTIO_MMIO_QUEUE_ALIGN));
+	fprintf(f, "VIRTIO_MMIO_QUEUE_PFN: 0x%x\n", read32(v+VIRTIO_MMIO_QUEUE_PFN));
+	fprintf(f, "VIRTIO_MMIO_QUEUE_READY: 0x%x\n", read32(v+VIRTIO_MMIO_QUEUE_READY));
+	fprintf(f, "VIRTIO_MMIO_QUEUE_NOTIFY: 0x%x\n", read32(v+VIRTIO_MMIO_QUEUE_NOTIFY));
+	fprintf(f, "VIRTIO_MMIO_INTERRUPT_STATUS: 0x%x\n", read32(v+VIRTIO_MMIO_INTERRUPT_STATUS));
+	fprintf(f, "VIRTIO_MMIO_INTERRUPT_ACK: 0x%x\n", read32(v+VIRTIO_MMIO_INTERRUPT_ACK));
+	fprintf(f, "VIRTIO_MMIO_STATUS: 0x%x\n", read32(v+VIRTIO_MMIO_STATUS));
+	fprintf(f, "VIRTIO_MMIO_QUEUE_DESC_LOW: 0x%x\n", read32(v+VIRTIO_MMIO_QUEUE_DESC_LOW));
+	fprintf(f, "VIRTIO_MMIO_QUEUE_DESC_HIGH: 0x%x\n", read32(v+VIRTIO_MMIO_QUEUE_DESC_HIGH));
+	fprintf(f, "VIRTIO_MMIO_QUEUE_AVAIL_LOW: 0x%x\n", read32(v+VIRTIO_MMIO_QUEUE_AVAIL_LOW));
+	fprintf(f, "VIRTIO_MMIO_QUEUE_AVAIL_HIGH: 0x%x\n", read32(v+VIRTIO_MMIO_QUEUE_AVAIL_HIGH));
+	fprintf(f, "VIRTIO_MMIO_QUEUE_USED_LOW: 0x%x\n", read32(v+VIRTIO_MMIO_QUEUE_USED_LOW));
+	fprintf(f, "VIRTIO_MMIO_QUEUE_USED_HIGH: 0x%x\n", read32(v+VIRTIO_MMIO_QUEUE_USED_HIGH));
+	fprintf(f, "VIRTIO_MMIO_CONFIG_GENERATION: 0x%x\n", read32(v+VIRTIO_MMIO_CONFIG_GENERATION));
+}
 static void setupconsole(void *v)
 {
 	// try to make linux happy.
@@ -93,7 +122,7 @@ void *talk_thread(void *arg)
 	while ((vv = read32(v+VIRTIO_MMIO_DRIVER_FEATURES)) == 0) {
 		printf("no ready ... \n");
 		if (debug) {
-			hexdump(stdout, v, 128);
+			dumpvirtio_mmio(stdout, v);
 		}
 		printf("sleep 1 second\n");
 		uthread_sleep(1);
@@ -307,7 +336,7 @@ int main(int argc, char **argv)
 			perror(cmd);
 		}
 	}
-	hexdump(stdout, (void *)VIRTIOBASE, 512);
+	dumpvirtio_mmio(stdout, (void *)VIRTIOBASE);
 	printf("shared is %d, blob is %d\n", shared, *mmap_blob);
 
 	for (int i = 0; i < nr_threads-1; i++) {
