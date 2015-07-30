@@ -23,6 +23,7 @@
 #include <hashtable.h>
 #include <pagemap.h>
 #include <blockdev.h>
+#include <fdtap.h>
 
 /* ghetto preprocessor hacks (since proc includes vfs) */
 struct page;
@@ -377,6 +378,7 @@ struct file_desc {
 	struct file					*fd_file;
 	struct chan					*fd_chan;
 	unsigned int				fd_flags;
+	struct fd_tap				*fd_tap;
 };
 
 /* All open files for a process */

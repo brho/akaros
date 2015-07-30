@@ -15,6 +15,7 @@ obj-y						+= err.o
 obj-$(CONFIG_ETH_AUDIO)		+= eth_audio.o
 obj-y						+= event.o
 obj-y						+= ext2fs.o
+obj-y						+= fdtap.o
 obj-y						+= find_next_bit.o
 obj-y						+= find_last_bit.o
 obj-y						+= frontend.o

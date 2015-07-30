@@ -17,6 +17,7 @@
 #include <umem.h>
 #include <smp.h>
 #include <ns.h>
+#include <fdtap.h>
 
 struct sb_tailq super_blocks = TAILQ_HEAD_INITIALIZER(super_blocks);
 spinlock_t super_blocks_lock = SPINLOCK_INITIALIZER;
@@ -2441,6 +2442,7 @@ bool close_fd(struct fd_table *fdt, int fd)
 {
 	struct file *file = 0;
 	struct chan *chan = 0;
+	struct fd_tap *tap = 0;
 	bool ret = FALSE;
 	if (fd < 0)
 		return FALSE;
@@ -2452,8 +2454,10 @@ bool close_fd(struct fd_table *fdt, int fd)
 			assert(fd < fdt->max_files);
 			file = fdt->fd[fd].fd_file;
 			chan = fdt->fd[fd].fd_chan;
+			tap = fdt->fd[fd].fd_tap;
 			fdt->fd[fd].fd_file = 0;
 			fdt->fd[fd].fd_chan = 0;
+			fdt->fd[fd].fd_tap = 0;
 			CLR_BITMASK_BIT(fdt->open_fds->fds_bits, fd);
 			if (fd < fdt->hint_min_fd)
 				fdt->hint_min_fd = fd;
@@ -2466,6 +2470,8 @@ bool close_fd(struct fd_table *fdt, int fd)
 		kref_put(&file->f_kref);
 	else
 		cclose(chan);
+	if (tap)
+		kref_put(&tap->kref);
 	return ret;
 }
 
@@ -2589,6 +2595,8 @@ void close_fdt(struct fd_table *fdt, bool cloexec)
 				continue;
 			file = fdt->fd[i].fd_file;
 			chan = fdt->fd[i].fd_chan;
+			to_close[idx].fd_tap = fdt->fd[i].fd_tap;
+			fdt->fd[i].fd_tap = 0;
 			if (file) {
 				fdt->fd[i].fd_file = 0;
 				to_close[idx++].fd_file = file;
@@ -2614,6 +2622,8 @@ void close_fdt(struct fd_table *fdt, bool cloexec)
 			kref_put(&to_close[i].fd_file->f_kref);
 		else
 			cclose(to_close[i].fd_chan);
+		if (to_close[i].fd_tap)
+			kref_put(&to_close[i].fd_tap->kref);
 	}
 	kfree(to_close);
 }

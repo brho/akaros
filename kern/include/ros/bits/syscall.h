@@ -74,6 +74,7 @@
 #define SYS_rename				123
 #define SYS_fchdir				124
 #define SYS_dup_fds_to			125
+#define SYS_tap_fds				126
 
 /* Misc syscalls */
 #define SYS_gettimeofday		140

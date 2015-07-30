@@ -7,6 +7,7 @@
 #include <rendez.h>
 #include <rwlock.h>
 #include <linker_func.h>
+#include <fdtap.h>
 
 /*
  * functions (possibly) linked in, complete, from libc.
@@ -433,6 +434,7 @@ struct dev {
 	void (*power) (int);		/* power mgt: power(1) → on, power (0) → off */
 //  int (*config)( int unused_int, char *unused_char_p_t, DevConf*);
 	char *(*chaninfo) (struct chan *, char *, size_t);
+	int (*tapfd) (struct chan *, struct fd_tap *, int);
 	/* we need to be aligned, we think to 64 bytes, for the linker tables. */
 } __attribute__ ((aligned(64)));
 

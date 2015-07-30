@@ -18,6 +18,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include <parlib/ros_debug.h>
+#include <ros/fdtap.h>
 
 __BEGIN_DECLS
 
@@ -55,6 +56,7 @@ int         sys_change_to_m(void);
 int         sys_poke_ksched(int pid, unsigned int res_type);
 int         sys_abort_sysc(struct syscall *sysc);
 int         sys_abort_sysc_fd(int fd);
+int         sys_tap_fds(struct fd_tap_req *tap_reqs, size_t nr_reqs);
 
 long		syscall_async(struct syscall *sysc, unsigned long num, ...);
 

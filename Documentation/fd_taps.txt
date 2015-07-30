@@ -1,0 +1,172 @@
+FD Taps
+===========================
+2015-07-27 Barret Rhoden (brho)
+
+Contents
+---------------------------
+What are FD Taps?
+Where are the FD Taps?
+
+
+What are FD Taps?
+---------------------------
+
+Where are the FD Taps?
+---------------------------
+### Basics ###
+In Linux, the epoll blob is attached to the File (I think, this is the struct
+eventpoll).  Linux can get from a sock -> socket -> file -> eventpoll.  From the
+lower levels of the networking stack, you can get all the way to the accounting
+info for epoll.
+
+In Akaros, and in Plan 9, the analogous object to the file is the chan.
+However, in the networking stack, the conversation (like a struct sock) does not
+keep a pointer to it's chan.  Further, there is not a 1:1 correspondence between
+convs and chans: there could be several chans using the same conv, similar to
+using several OS files for the same underlying disk file (inode).  Although that
+might be a bad idea for network connections, it'd be nice to not have FD Taps
+assume anything about the underlying device.  So for Akaros, we want to have the
+tap somewhere within the device.  For #I, that probably means hanging off the
+conversation.  For #M (devmnt), it would be some other struct, where the tap is
+translated into a 9p message.
+
+Another aspect of this issue is that these are "FD" taps, not "file/chan" taps.
+If you read through the Q&A for epoll's man page, there are a bunch of weird
+conditions that result from having the tap on the file.  This is due to having
+multiple FDs point to the same file.
+
+The approach I took in Akaros was to have the tap in both the FD and within the
+device (the conversation).  If we're declaring interest in an FD, the FD is a
+reasonable place to track that interest.  We also need to track the tap within
+the device, as mentioned above.  Now we need to sort out the registration of
+taps and avoid any concurrency issues.
+
+### Code Issues ###
+We need to worry about a few things.  Overall, we want to register a tap on an
+FD (struct file_desc), and that registration needs to go through the device.
+Perhaps the device doesn't support taps, or it doesn't support the event filters
+we requested.  So we need to handle registration failure.  We also need to
+handle concurrent deregistrations, re-registrations, opens, and and closes.
+
+A basic approach would be to lock the FD table, make sure there's only one tap,
+register the new one with the device, insert into the table, and unlock.  The
+lock protects adding the tap (can only have one, racing on the FD's tap
+pointer), concurrent tap removals, enforces the FD points to a file, and
+protects against FD closes.
+
+But the problem is the FD table lock is a spinlock, and we don't want it to be
+more than that.  Device registration could be a blocking call.  So we need to
+come up with something else.  Part of the problem involves syncing with two
+places: the FD and the conv.
+
+At this point I thought about putting the tap in the device, and not the FD at
+all.  Deregistration becomes tricky.  We want to destroy the tap when the FD
+closes, or at least turn it off.  Say we do something like "after closing,
+deregister the tap".  We could come up with enough info to the device to make it
+work - we'd probably want to pass in the FD (integer), proc*, and probably the
+chan.  However, once we closed, the FD is now free, and we could have something
+like:
+	Trying to close:						User opens and taps a conv:
+	close(5) (FD 5 was 1/data with a tap)
+											open(/net/tcp/1/data) (get 5 back)
+											register_fd_tap(5) (two taps on 5, might fail!)
+	deregister_fd_tap(5)
+	cclose (needed to keep the chan alive)
+At the end, we might have no taps on 5.  Or if we opened 2/data instead of
+1/data, the deregister_fd_tap call will accidentally deregister from the new FD
+5 instead of the old one, and the old one will still be active!
+
+Maybe we deregister first, then close, to avoid FD reuse problems.  Remember
+that the only locking goes on in close.  Now consider:
+	Trying to close:						User tries to add (another) tap:
+	deregister_fd_tap(5)
+											register_fd_tap(5)
+	close(5) (was 1/data with a tap)
+Now we just closed with a tap still registered.  Eventually, that FD tap might
+fire.  Spurious events are okay, but we could run into issues.  Say the evq in
+the original tap is no longer valid.  It was buggy for the user to perform this
+operation, but there are probably other issues.  And we didn't even get in to
+how registration works (register before putting it in the FD table?  After?
+What about concurrent ops?)
+
+We could flag the FD as 'untappable'.  But it seems that we're going to need to
+sync with the FD table regardless of where the tap exists.  We might as well go
+back to the original plan of having the tap hang off the FD in some manner.  It
+makes the most sense, aesthetically, since the FD tap is an attribute of the FD.
+
+One trick that would help with FD reuse is to have the device op for
+register/deregister take the fd_tap pointer.  Not only can we squeeze more info
+in the tap without mucking with the function signature, but the main benefit is
+that so long as the FD tap is allocated, it is unique.  FD = 5 can be reused.
+FD_tap = 0xffff800012345678 is unique.
+
+However, simply adding the tap pointer to register() isn't enough.  Say we did
+the basic "lock the FD table, (basic checks), attach the pointer, unlock, call
+device register, then free it if register fails", and a dereg locks the table,
+yanks it out, then call device dereg, then frees.  We still have some issues:
+
+- What if a deregister occurs while we are still trying to register and failed?
+  Who actually frees the FD tap?  We can't completely free it while the other op
+  is in progress.  That sounds like a job for a kref on the FD tap.
+
+- What if we added the tap, then go to register, then it fails, then we have a
+  concurrent close try to deregister it.  Now we have concurrent deregisters.
+  We can deal with this by having the device op accept spurious deregisters, but
+  that's ugly (and unnecessary, see below).
+
+- What if a legit deregister occurs while we are registering and eventually will
+  succeed?  Say:
+											sys_register_fd_tap(0xf00)
+											adds to fdset, unlocks
+	close(5)
+	yanks 0xf00 from the fd
+	deregister tap 0xf00 (fails, spurious)
+											register tap(chan, 0xf00)
+	free 0xf00?
+The deregister fails, since it was never there (remember we said it could have
+spurious deregister calls).  Then register happens.  But the FD is closed!  And
+then who is freeing the tap?  Hopefully we don't free it while the device still
+has a pointer...
+
+The issue here is the assumption that the tap would have been registered.  Since
+we unlock the FD table, we can violate those assumptions.  We want to guarantee
+the order of register/deregister operations, such that register happens before
+deregister.
+
+It turns out that the kref can do this too!  The trick is to use the release
+operation to do the deregistration.  That ensures that so long as a reference is
+held, we won't call deregister *and* that deregister will happen exactly once.
+close() simply becomes "lock the FDT, remove the tap, unlock, decref": extremely
+simple.  Note that decref could trigger the release method which could then
+sleep (since it calls into a device), so we decref outside the lock.  register()
+ups the refcnt by two, one for itself to keep the tap alive (and preventing a
+concurrent dereg) and one for the pointer in the FD table.
+
+Note that as soon as we unlock, our tap could be decref'd and a completely new
+tap could be added and registered for that FD.  That means the following can
+happen:
+	lock FDT
+	add tap 0xf00 to FD 5
+	unlock FDT
+											lock FDT
+											remove tap from FD 5
+											unlock FDT
+											decref 0xf00
+											(new syscall)
+											lock FDT
+											add tap 0xbar to FD 5
+											unlock FDT
+											register tap 0xbar for FD 5
+	register tap 0xf00 for FD 5
+	decref and trigger a deregister of f00
+
+In this case the device could see two separate taps (0xf00 and 0xbar) for the
+same FD (5).  It just so happens that one of them will deregister soon.  It is
+also possible for an event to fire between the left column's register and
+decref, at which point two events would be created (possibly with the same evq
+and event id).
+
+The final case to consider is when registration fails.  To keep things simple
+for the device, we can make sure that we only deregister a tap if our register
+succeeded.  To do this nicely with krefs, we can simply change the release
+method, based on whether or not registration succeeds.

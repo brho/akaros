@@ -2331,6 +2331,40 @@ static intreg_t sys_dup_fds_to(struct proc *p, unsigned int pid,
 	return ret;
 }
 
+/* 0 on success, anything else is an error, with errno/errstr set */
+static int handle_tap_req(struct proc *p, struct fd_tap_req *req)
+{
+	switch (req->cmd) {
+		case (FDTAP_CMD_ADD):
+			return add_fd_tap(p, req);
+		case (FDTAP_CMD_REM):
+			return remove_fd_tap(p, req->fd);
+		default:
+			set_errno(ENOSYS);
+			set_errstr("FD Tap Command %d not supported", req->cmd);
+			return -1;
+	}
+}
+
+/* Processes up to nr_reqs tap requests.  If a request errors out, we stop
+ * immediately.  Returns the number processed.  If done != nr_reqs, check errno
+ * and errstr for the last failure, which is for tap_reqs[done]. */
+static intreg_t sys_tap_fds(struct proc *p, struct fd_tap_req *tap_reqs,
+                            size_t nr_reqs)
+{
+	struct fd_tap_req *req_i = tap_reqs;
+	int done;
+	if (!is_user_rwaddr(tap_reqs, sizeof(struct fd_tap_req) * nr_reqs)) {
+		set_errno(EINVAL);
+		return 0;
+	}
+	for (done = 0; done < nr_reqs; done++, req_i++) {
+		if (handle_tap_req(p, req_i))
+			break;
+	}
+	return done;
+}
+
 /************** Syscall Invokation **************/
 
 const struct sys_table_entry syscall_table[] = {
@@ -2407,6 +2441,7 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_fwstat] ={(syscall_t)sys_fwstat, "fwstat"},
 	[SYS_rename] ={(syscall_t)sys_rename, "rename"},
 	[SYS_dup_fds_to] = {(syscall_t)sys_dup_fds_to, "dup_fds_to"},
+	[SYS_tap_fds] = {(syscall_t)sys_tap_fds, "tap_fds"},
 };
 const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
 /* Executes the given syscall.
