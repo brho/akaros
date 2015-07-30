@@ -22,6 +22,7 @@
 int *mmap_blob;
 unsigned long long stack[1024];
 volatile int shared = 0;
+volatile int quit = 0;
 int mcp = 1;
 
 #define MiB 0x100000u
@@ -113,6 +114,7 @@ void *talk_thread(void *arg)
 	uint32_t vv;
 	int i;
 	int num;
+	return;
 	printf("Sleep 15 seconds\n");
 	uthread_sleep(15);
 	printf("----------------------- TT a %p\n", a);
@@ -129,7 +131,7 @@ void *talk_thread(void *arg)
 	}
 	if (debug)printf("vv %x, set selector %x\n", vv, read32(v + VIRTIO_MMIO_DRIVER_FEATURES_SEL));
 	if (debug) printf("loop forever");
-	while (1)
+	while (! quit)
 		;
 	for(num = 0;;num++) {
 		/* host: use any buffers we should have been sent. */
@@ -175,11 +177,12 @@ struct ttargs t;
 
 int main(int argc, char **argv)
 {
+	struct vmctl vmctl;
 	int amt;
 	int vmmflags = VMM_VMCALL_PRINTF;
 	uint64_t entry = 0x1000000, kerneladdress = 0x1000000;
 	int nr_gpcs = 1;
-	int fd = open("#cons/sysctl", O_RDWR), ret;
+	int fd = open("#c/vmctl", O_RDWR), ret;
 	void * x;
 	int kfd = -1;
 	static char cmd[512];
@@ -312,7 +315,10 @@ int main(int argc, char **argv)
 	hexdump(stdout, (void *)VIRTIOBASE, 128);
 	printf("kernbase for pml4 is 0x%llx and entry is %llx\n", kernbase, entry);
 	printf("p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
-	sprintf(cmd, "V 0x%llx 0x%llx 0x%llx", entry, (unsigned long long) &stack[1024], (unsigned long long) p512);
+	vmctl.command = REG_RSP_RIP_CR3;
+	vmctl.cr3 = (uint64_t) p512;
+	vmctl.regs.tf_rip = entry;
+	vmctl.regs.tf_rsp = (uint64_t) &stack[1024];
 	if (mcp) {
 		if (pthread_create(&my_threads[0], NULL, &talk_thread, &t))
 			perror("pth_create failed");
@@ -320,25 +326,27 @@ int main(int argc, char **argv)
 	printf("threads started\n");
 	printf("Writing command :%s:\n", cmd);
 	// sys_getpcoreid
-	ret = write(fd, cmd, strlen(cmd));
-	if (ret != strlen(cmd)) {
+	ret = write(fd, &vmctl, sizeof(vmctl));
+	if (ret != sizeof(vmctl)) {
 		perror(cmd);
 	}
-	sprintf(cmd, "V 0 0 0");
+	vmctl.command = RESUME;
 	while (1) {
 		int c;
 		printf("RESUME?\n");
 		c = getchar();
 		if (c == 'q')
 			break;
-		ret = write(fd, cmd, strlen(cmd));
-		if (ret != strlen(cmd)) {
+		ret = write(fd, &vmctl, sizeof(vmctl));
+		if (ret != sizeof(vmctl)) {
 			perror(cmd);
 		}
+		printf("RIP %p\n", vmctl.regs.tf_rip);
 	}
 	dumpvirtio_mmio(stdout, (void *)VIRTIOBASE);
 	printf("shared is %d, blob is %d\n", shared, *mmap_blob);
 
+	quit = 1;
 	for (int i = 0; i < nr_threads-1; i++) {
 		int ret;
 		if (pthread_join(my_threads[i], &my_retvals[i]))

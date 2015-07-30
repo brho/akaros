@@ -1,6 +1,8 @@
 #ifndef _VMM_H_
 #define	_VMM_H_
 
+#include <ros/vmm.h>
+
 static inline int cpu_has_vmx(void)
 {
 	unsigned long ecx = cpuid_ecx(1);
@@ -45,7 +47,7 @@ void vmm_pcpu_init(void);
 int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores, int flags);
 void __vmm_struct_cleanup(struct proc *p);
 
-int vm_run(uint64_t,uint64_t, uint64_t);
+int vm_run(struct vmctl *);
 int intel_vmx_start(int id);
 int intel_vmx_setup(int nvmcs);
 

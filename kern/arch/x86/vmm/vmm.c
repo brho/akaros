@@ -57,13 +57,13 @@ void vmm_pcpu_init(void)
 	printk("vmm_pcpu_init failed\n");
 }
 
-int vm_run(uint64_t rip, uint64_t rsp, uint64_t cr3)
+int vm_run(struct vmctl *v)
 {
-	int vmx_launch(uint64_t rip, uint64_t rsp, uint64_t cr3);
+	int vmx_launch(struct vmctl *v);
 	if (current->vmm.amd) {
 		return -1;
 	} else {
-		return vmx_launch(rip, rsp, cr3);
+		return vmx_launch(v);
 	}
 	return -1;
 }

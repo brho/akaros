@@ -1,0 +1,5 @@
+echo optimer period 1000000 > /prof/kpctl
+echo optimer all on > /prof/kpctl
+
+
+

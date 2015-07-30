@@ -39,6 +39,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <ip.h>
+#include <ros/vmm.h>
 
 struct dev consdevtab;
 
@@ -529,6 +530,7 @@ enum {
 	Qdir,
 	Qcons,
 	Qsysctl,
+	Qvmctl,
 	Qconsctl,
 	Qdrivers,
 	Qhostowner,
@@ -552,6 +554,7 @@ static struct dirtab consdir[] = {
 	{"cons", {Qcons}, 0, 0660},
 	{"consctl", {Qconsctl}, 0, 0220},
 	{"sysctl", {Qsysctl}, 0, 0666},
+	{"vmctl", {Qvmctl}, 0, 0666},
 	{"drivers", {Qdrivers}, 0, 0444},
 	{"hostowner", {Qhostowner}, 0, 0644},
 	{"keyboard", {Qkeyboard}, 0, 0666},
@@ -872,7 +875,7 @@ static long consread(struct chan *c, void *buf, long n, int64_t offset)
 			poperror();
 			return n;
 		case Qklog:
-			//return qread(klogq, buf, n);  
+			//return qread(klogq, buf, n);
 			/* the queue gives us some elasticity for log reading. */
 			if (!logqueue)
 				logqueue = qopen(1 << 20, 0, 0, 0);
@@ -919,6 +922,7 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 	int x;
 	uint64_t rip, rsp, cr3, flags, vcpu;
 	int ret;
+	struct vmctl vmctl;
 
 	switch ((uint32_t) c->qid.path) {
 #if 0
@@ -1034,10 +1038,17 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 			kstrdup(&sysname, buf);
 			break;
 #endif
+		case Qvmctl:
+			memmove(&vmctl, a, sizeof(vmctl));
+			ret = vm_run(&vmctl);
+			printd("vm_run returns %d\n", ret);
+			n = ret;
+			memmove(a, &vmctl, sizeof(vmctl));
+			break;
 		case Qsysctl:
 			//if (!iseve()) error(EPERM, NULL);
 			cb = parsecmd(a, n);
-			if (cb->nf > 1) 
+			if (cb->nf > 1)
 			printd("cons sysctl cmd %s\n", cb->f[0]);
 			if (waserror()) {
 				kfree(cb);
@@ -1063,10 +1074,23 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 					keepbroken = 0;
 					break;
 				case CMV:
+					/* it's ok to throw away this struct each time;
+					 * this is stateless and going away soon anyway.
+					 * we only kept it here until we can rewrite all the
+					 * tests
+					 */
 					rip =  strtoul(cb->f[1], NULL, 0);
 					rsp =  strtoul(cb->f[2], NULL, 0);
 					cr3 =  strtoul(cb->f[3], NULL, 0);
-					ret = vm_run(rip, rsp, cr3);
+					if (cr3) {
+						vmctl.command = REG_RSP_RIP_CR3;
+						vmctl.cr3 = cr3;
+						vmctl.regs.tf_rip = rip;
+						vmctl.regs.tf_rsp = rsp;
+					} else {
+						vmctl.command = RESUME;
+					}
+					ret = vm_run(&vmctl);
 					printd("vm_run returns %d\n", ret);
 					n = ret;
 					break;
