@@ -25,6 +25,12 @@ enum {
 struct vmctl {
 	uint64_t command;
 	uint64_t cr3;
+	uint64_t gva;
+	uint64_t gpa;
+	uint64_t exit_qual;
+	int shutdown;
+	int ret_code;
+	int core;
 	struct hw_trapframe regs;
 };
 

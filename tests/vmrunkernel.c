@@ -27,6 +27,7 @@ int mcp = 1;
 
 #define MiB 0x100000u
 #define GiB (1u<<30)
+#define VIRTIOBASE (15*MiB)
 #define GKERNBASE (16*MiB)
 #define KERNSIZE (128*MiB+GKERNBASE)
 uint8_t _kernel[KERNSIZE];
@@ -86,6 +87,18 @@ void dumpvirtio_mmio(FILE *f, void *v)
 	fprintf(f, "VIRTIO_MMIO_QUEUE_USED_HIGH: 0x%x\n", read32(v+VIRTIO_MMIO_QUEUE_USED_HIGH));
 	fprintf(f, "VIRTIO_MMIO_CONFIG_GENERATION: 0x%x\n", read32(v+VIRTIO_MMIO_CONFIG_GENERATION));
 }
+static void setupconsole(void *v)
+{
+	// try to make linux happy.
+	// this is not really endian safe but ... well ... WE'RE ON THE SAME MACHINE
+	write32(v+VIRTIO_MMIO_MAGIC_VALUE, ('v' | 'i' << 8 | 'r' << 16 | 't' << 24));
+	// no constant for this is defined anywhere. It's just 1.
+	write32(v+VIRTIO_MMIO_VERSION, 1);
+	write32(v+VIRTIO_MMIO_DEVICE_ID, VIRTIO_ID_CONSOLE);
+	write32(v+VIRTIO_MMIO_QUEUE_NUM_MAX, 1);
+	write32(v+VIRTIO_MMIO_QUEUE_PFN, 0);
+}
+
 int debug = 1;
 
 struct ttargs {
@@ -101,7 +114,6 @@ void *talk_thread(void *arg)
 	uint32_t vv;
 	int i;
 	int num;
-	return NULL;
 	printf("Sleep 15 seconds\n");
 	uthread_sleep(15);
 	printf("----------------------- TT a %p\n", a);
@@ -164,7 +176,6 @@ struct ttargs t;
 
 int main(int argc, char **argv)
 {
-	uint64_t virtiobase = 0x100000000ULL;
 	struct vmctl vmctl;
 	int amt;
 	int vmmflags = VMM_VMCALL_PRINTF;
@@ -175,16 +186,16 @@ int main(int argc, char **argv)
 	int kfd = -1;
 	static char cmd[512];
 	void *coreboot_tables = (void *) 0x1165000;
-
+	/* kernel has to be in the range VIRTIOBASE to KERNSIZE+GKERNBASE for now. */
 	// mmap is not working for us at present.
-	if ((uint64_t)_kernel > GKERNBASE) {
-		printf("kernel array @%p is above , GKERNBASE@%p sucks\n", _kernel, GKERNBASE);
+	if ((uint64_t)_kernel > VIRTIOBASE) {
+		printf("kernel array @%p is above , VIRTIOBASE@%p sucks\n", _kernel, VIRTIOBASE);
 		exit(1);
 	}
 	memset(_kernel, 0, sizeof(_kernel));
 
 	if (fd < 0) {
-		perror("#cons/sysctl");
+		perror("#c/sysctl");
 		exit(1);
 	}
 	argc--,argv++;
@@ -267,7 +278,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	//t.virtio = (void *)VIRTIOBASE;
+	t.virtio = (void *)VIRTIOBASE;
 
 	ret = syscall(33, 1);
 	if (ret < 0) {
@@ -297,8 +308,10 @@ int main(int argc, char **argv)
 	kernbase >>= (0+12);
 	kernbase <<= (0 + 12);
 	uint8_t *kernel = (void *)GKERNBASE;
-	//write_coreboot_table(coreboot_tables, ((void *)VIRTIOBASE) /*kernel*/, KERNSIZE + 1048576);
+	write_coreboot_table(coreboot_tables, ((void *)VIRTIOBASE) /*kernel*/, KERNSIZE + 1048576);
 	hexdump(stdout, coreboot_tables, 512);
+	setupconsole((void *)VIRTIOBASE);
+	hexdump(stdout, (void *)VIRTIOBASE, 128);
 	printf("kernbase for pml4 is 0x%llx and entry is %llx\n", kernbase, entry);
 	printf("p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
 	vmctl.command = REG_RSP_RIP_CR3;
@@ -312,33 +325,20 @@ int main(int argc, char **argv)
 	printf("threads started\n");
 	printf("Writing command :%s:\n", cmd);
 	// sys_getpcoreid
-	ret = write(fd, &vmctl, sizeof(vmctl));
-	if (ret != sizeof(vmctl)) {
-		perror(cmd);
-	}
-	vmctl.command = RESUME;
 	while (1) {
-		void showstatus(FILE *f, struct vmctl *v);
 		int c;
-		printf("RESUME?\n");
-		c = getchar();
-		if (c == 'q')
-			break;
 		ret = write(fd, &vmctl, sizeof(vmctl));
 		if (ret != sizeof(vmctl)) {
 			perror(cmd);
 		}
+		printf("RESUME?\n");
+		c = getchar();
+		if (c == 'q')
+			break;
 		printf("RIP %p\n", vmctl.regs.tf_rip);
-		showstatus(stdout, &vmctl);
-		// this will be in a function, someday.
-		// A rough check: is the GPA 
-		if (vmctl.gpa == virtiobase) {
-			int virtio(struct vmctl *v, uint64_t);
-			if (virtio(&vmctl, virtiobase))
-				break;
-		}
+		vmctl.command = RESUME;
 	}
-
+	dumpvirtio_mmio(stdout, (void *)VIRTIOBASE);
 	printf("shared is %d, blob is %d\n", shared, *mmap_blob);
 
 	quit = 1;
