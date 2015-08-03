@@ -186,7 +186,7 @@ static bool spam_list_member(struct vcore_tailq *list, struct proc *p,
 
 /* This makes sure ev_msg is sent to some vcore, preferring vcoreid.
  *
- * One of the goals of FALLBACK (and this func) is to allow processes to yield
+ * One of the goals of SPAM_INDIR (and this func) is to allow processes to yield
  * cores without fear of losing messages.  Even when yielding and getting
  * preempted, if your message is spammed, it will get to some vcore.  If
  * MUST_RUN is set, it'll get to a running vcore.  Messages that you send like
@@ -323,16 +323,21 @@ static void send_indir(struct proc *p, struct event_queue *ev_q,
 	wmb();	/* force this write to happen before any event writes */
 	local_msg.ev_type = EV_EVENT;
 	local_msg.ev_arg3 = ev_q;
-	/* Don't care about FALLBACK, just send and be done with it.  TODO:
-	 * considering getting rid of FALLBACK as an option and making it mandatory
-	 * when you want an INDIR.  Having trouble thinking of when you'd want an
-	 * INDIR but not a FALLBACK. */
-	if (!(ev_q->ev_flags & EVENT_FALLBACK)) {
-		printk("[kernel] INDIR requested without FALLBACK, prob a bug.\n");
+	/* If we're not spamming indirs, just send and be done with it.
+	 *
+	 * It's possible that the user does not want to poll their evq and wants an
+	 * INDIR, but also doesn't care about sleeping or otherwise not getting the
+	 * message right away.  The INDIR could sit in the VCPD of a vcore that
+	 * doesn't run for a while.  Perhaps if the app always made sure VC 0 was
+	 * on when it was running at all, and sent the INDIR there.  Or there was a
+	 * per-vc evq that only needed to be handled when the VC turned on.  This
+	 * gets at another aspect of INDIRs, other than it's need for "only once"
+	 * operation: maybe the mbox type isn't a UCQ (like the VCPD mboxes). */
+	if (!(ev_q->ev_flags & EVENT_SPAM_INDIR)) {
 		spam_vcore(p, vcoreid, &local_msg, ev_q->ev_flags);
 		return;
 	}
-	/* At this point, we actually want to send an INDIR (with FALLBACK).
+	/* At this point, we actually want to send and spam an INDIR.
 	 * This will guarantee the message makes it to some vcore.  For flags, we
 	 * only want to send flags relevant to spamming messages. */
 	spam_public_msg(p, &local_msg, vcoreid, ev_q->ev_flags & EVENT_SPAM_FLAGS);

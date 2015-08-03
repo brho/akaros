@@ -19,7 +19,7 @@
 #define EVENT_INDIR				0x008	/* send an indirection event to vcore */
 #define EVENT_VCORE_PRIVATE		0x010	/* Will go to the private VCPD mbox */
 /* Delivery style flags */
-#define EVENT_FALLBACK			0x020	/* spam INDIRs if the vcore's offline */
+#define EVENT_SPAM_INDIR		0x020	/* spam INDIRs if the vcore's offline */
 #define EVENT_VCORE_MUST_RUN	0x040	/* Alerts go to a vcore that will run */
 #define EVENT_NOTHROTTLE		0x080	/* send all INDIRs (no throttling) */
 /* Not seriously used flags */
@@ -30,7 +30,7 @@
 #define EVENT_JUSTHANDLEIT		0x400	/* 2LS should handle the ev_q */
 #define EVENT_THREAD			0x800	/* spawn thread to handle ev_q */
 
-/* Certain event flags apply to spam/fallback messages */
+/* Certain event flags apply to spam messages */
 #define EVENT_SPAM_FLAGS 		(EVENT_IPI | EVENT_VCORE_MUST_RUN)
 
 /* Event Message Types */
@@ -101,7 +101,7 @@ struct event_queue_big {
 /* Vcore state flags.  K_LOCK means the kernel is writing */
 #define VC_K_LOCK				0x001				/* CASing with the kernel */
 #define VC_PREEMPTED			0x002				/* VC is preempted */
-#define VC_CAN_RCV_MSG			0x004 				/* can receive FALLBACK */
+#define VC_CAN_RCV_MSG			0x004 				/* someone will get msg */
 #define VC_UTHREAD_STEALING		0x008				/* Uthread being stolen */
 #define VC_SCP_NOVCCTX			0x010				/* can't go into vc ctx */
 

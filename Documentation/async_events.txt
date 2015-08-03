@@ -335,19 +335,20 @@ There are also interfaces in the kernel to put a message in an ev_mbox
 regardless of the process's wishes (post_vcore_event()), and can send an IPI
 at any time (proc_notify()).
 
-3.3 IPIs, Indirection Events, and Fallback
+3.3 IPIs, Indirection Events, and Fallback (Spamming Indirs)
 ----------------------------------------------
-An ev_q can ask for an IPI, an indirection event, and a fallback in case a vcore
-is offline.  Or any combination of these.  Note that these have little to do
-with the actual message being sent.  The actual message is dropped in the
-ev_mbox pointed to by the ev_q.
+An ev_q can ask for an IPI, for an indirection event, and for an indirection
+event to be spammed in case a vcore is offline (sometimes called the 'fallback'
+option.  Or any combination of these.  Note that these have little to do with
+the actual message being sent.  The actual message is dropped in the ev_mbox
+pointed to by the ev_q.
 
 The main use for all of this is for syscalls.  If you want to receive an event
 when a syscall completes or has a change in status, simply allocate an event_q,
 and point the syscall at it.  syscall: ev_q* -> "vcore for IPI, syscall message
 in the ev_q mbox", etc.  You can also point it to an existing ev_q.  Pthread
 code has examples of two ways to do this.  Both have per vcore ev_qs, requesting
-IPIs, INDIRS, and FALLBACK.  One way is to have an ev_mbox per vcore, and
+IPIs, INDIRS, and SPAM_INDIR.  One way is to have an ev_mbox per vcore, and
 another is to have a global ev_mbox that all ev_qs point to.  As a side note, if
 you do the latter, you don't need to worry about a vcore's ev_q if it gets
 preempted: just check the global ev_mbox (which is done by checking your own
@@ -376,41 +377,41 @@ to make sure you get the message on a vcore that didn't yield.)
 
 Never use a VCPD mbox (public or private) for messages you might want to receive
 if that vcore is offline.  If you want to be sure to get a message, create your
-own ev_q and set flags for INDIR, FALLBACK, and IPI.  There's no guarantee a
+own ev_q and set flags for INDIR, SPAM_INDIR, and IPI.  There's no guarantee a
 *specific* message will get looked at.  In cases where it won't, the kernel will
 send that message to another vcore.  For example, if the kernel posts an INDIR
 to a VCPD mbox (the public one btw) and it loses a race with the vcore yielding,
 the vcore might never see that message.  However, the kernel knows it lost the
 race, and will find another vcore to send it to.
 
-3.3.2: Fallback
+3.3.2: Spamming Indirs / Fallback
 ---------------
 Both IPI and INDIR need an actual vcore.  If that vcore is unavailable and if
-EVENT_FALLBACK is set, the kernel will pick another vcore and send the messages
-there.  This allows an ev_q to be set up to handle work when the vcore is
-online, while allowing the program to handle events when that core yields,
+EVENT_SPAM_INDIR is set, the kernel will pick another vcore and send the
+messages there.  This allows an ev_q to be set up to handle work when the vcore
+is online, while allowing the program to handle events when that core yields,
 without having to reset all of its ev_qs to point to "known" available vcores
 (and avoiding those races).  Note 'online' is synonymous with 'mapped', when
-talking about vcores.  A vcore technically isn't always online, only destined to
-be online, when it is mapped to a pcore (kmsg on the way, etc).  It's easiest to
-think of it being online for the sake of this discussion.
+talking about vcores.  A vcore technically isn't always online, only destined
+to be online, when it is mapped to a pcore (kmsg on the way, etc).  It's
+easiest to think of it being online for the sake of this discussion.
 
-One question is whether or not 2LSs need a FALLBACK flag for their ev_qs.  The
-main use for FALLBACK is so that vcores can yield.  (Note that fallback won't
-help you *miss* INDIR messages in the event of a preemption; you can always lose
-that race due to it taking too long to process the messages).  An alternative
-would be for vcores to pick another vcore and change all of its ev_qs to that
-vcore.  There are a couple problems with this.  One is that it'll be a pain to
-get those ev_qs back when the vcore comes back online (if ever).  Another issue
-is that other vcores will build up a list of ev_qs that they aren't aware of,
-which will be hard to deal with when *they* yield.  FALLBACK avoids all of those
-problems.
+One question is whether or not 2LSs need a SPAM_INDIR flag for their ev_qs.
+The main use for SPAM_INDIR is so that vcores can yield.  (Note that fallback
+won't help you *miss* INDIR messages in the event of a preemption; you can
+always lose that race due to it taking too long to process the messages).  An
+alternative would be for vcores to pick another vcore and change all of its
+ev_qs to that vcore.  There are a couple problems with this.  One is that it'll
+be a pain to get those ev_qs back when the vcore comes back online (if ever).
+Another issue is that other vcores will build up a list of ev_qs that they
+aren't aware of, which will be hard to deal with when *they* yield.  SPAM_INDIR
+avoids all of those problems.
 
-An important aspect of FALLBACK is that it works with yielded vcores, not
-preempted vcores.  It could be that there are no cores that are online, but
+An important aspect of spamming indirs is that it works with yielded vcores,
+not preempted vcores.  It could be that there are no cores that are online, but
 there should always be at least one core that *will* be online in the future, a
 core that the process didn't want to lose and will deal with in the future.  If
-not for this distinction, FALLBACK could fail.  An older idea would be to have
+not for this distinction, SPAM_INDIR could fail.  An older idea would be to have
 fallback send the msg to the desired vcore if there were no others.  This would
 not work if the vcore yielded and then the entire process was preempted or
 otherwise not running.  Another way to put this is that we need a field to
@@ -418,7 +419,7 @@ determine whether a vcore is offline temporarily or permanently.
 
 This is why we have the VCPD flag 'VC_CAN_RCV_MSG'.  It tells the kernel's event
 delivery code that the vcore will check the messages: it is an acceptable
-destination for a FALLBACK.  There are two reasons to put this in VCPD:
+destination for a spammed indir.  There are two reasons to put this in VCPD:
 1) Userspace can remotely turn off a vcore's msg reception.  This is necessary
 for handling preemption of a vcore that was in uthread context, so that we can
 remotely 'yield' the core without having to sys_change_vcore() (which I discuss
@@ -453,7 +454,7 @@ this can be a bit tricky if you have multiple places pointing to the same ev_q
 
 3.3.3: Fallback and Preemption
 ---------------
-FALLBACK doesn't protect you from preemptions.  A vcore can be preempted and
+SPAM_INDIR doesn't protect you from preemptions.  A vcore can be preempted and
 have INDIRs in its VCPD.
 
 It is tempting to just use sys_change_vcore(), which will change the calling
@@ -481,7 +482,7 @@ offline vcore.  There could be INDIRS in the VCPD that are just lying there.
 The 2LS knows which ev_qs these are (such as for completed syscalls), and for
 many things, this will be a common ev_q (such as for 'vcore-x-was-preempted').
 However, this is a huge pain in the ass, since a preempted vcore could have the
-FALLBACK INDIR for an ev_q associated with another vcore.  To deal with this,
+spammed INDIR for an ev_q associated with another vcore.  To deal with this,
 the 2LS would need to check *every* ev_q that requests INDIRs.  We don't do
 this.
 

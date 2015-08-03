@@ -344,8 +344,9 @@ void vcore_yield(bool preempt_pending)
 	 * to avoid the yield syscall if we have an event pending.  If there is one,
 	 * we want to unwind and return to the 2LS loop, where we may not want to
 	 * yield anymore.
-	 * Note that the kernel only cares about CAN_RCV_MSG for the desired vcore,
-	 * not for a FALLBACK.  */
+	 * Note that the kernel only cares about CAN_RCV_MSG for the desired vcore;
+	 * when spamming, it relies on membership of lists within the kernel.  Look
+	 * at spam_list_member() for more info (k/s/event.c). */
 	if (handle_events(vcoreid)) {
 		__sync_fetch_and_or(&vcpd->flags, VC_CAN_RCV_MSG);
 		return;

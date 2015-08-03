@@ -109,8 +109,8 @@ void uthread_mcp_init()
 	 * events should be spammed to vcores that are running, preferring whatever
 	 * the kernel thinks is appropriate.  And IPI them.
 	 *
-	 * It is critical that these are either SPAM_PUB or INDIR|FALLBACK, so that
-	 * yielding vcores do not miss the preemption messages. */
+	 * It is critical that these are either SPAM_PUB or INDIR|SPAM_INDIR, so
+	 * that yielding vcores do not miss the preemption messages. */
 	register_ev_handler(EV_VCORE_PREEMPT, handle_vc_preempt, 0);
 	register_ev_handler(EV_CHECK_MSGS, handle_vc_indir, 0);
 	preempt_ev_q = get_event_q();	/* small ev_q, mostly a vehicle for flags */
@@ -841,8 +841,8 @@ static void handle_indirs(uint32_t rem_vcoreid)
 	struct preempt_data *rem_vcpd = vcpd_of(rem_vcoreid);
 	/* Turn off their message reception if they are still preempted.  If they
 	 * are no longer preempted, we do nothing - they will handle their own
-	 * messages.  Turning on CAN_RCV will route this vcore's messages to
-	 * fallback vcores (if applicable). */
+	 * messages.  Turning off CAN_RCV will route this vcore's messages to
+	 * fallback vcores (if those messages were 'spammed'). */
 	do {
 		old_flags = atomic_read(&rem_vcpd->flags);
 		while (old_flags & VC_K_LOCK)

@@ -637,7 +637,8 @@ void __attribute__((constructor)) pthread_lib_init(void)
 	for (int i = 0; i < max_vcores(); i++) {
 		/* Each vcore needs to point to a non-VCPD ev_q */
 		sysc_mgmt[i].ev_q = get_big_event_q_raw();
-		sysc_mgmt[i].ev_q->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_FALLBACK;
+		sysc_mgmt[i].ev_q->ev_flags = EVENT_IPI | EVENT_INDIR |
+		                              EVENT_SPAM_INDIR;
 		sysc_mgmt[i].ev_q->ev_vcore = i;
 		ucq_init_raw(&sysc_mgmt[i].ev_q->ev_mbox->ev_msgs, 
 		             mmap_block + (2 * i    ) * PGSIZE, 
@@ -657,7 +658,8 @@ void __attribute__((constructor)) pthread_lib_init(void)
 	ucq_init_raw(&sysc_mbox->ev_msgs, two_pages, two_pages + PGSIZE);
 	for (int i = 0; i < max_vcores(); i++) {
 		sysc_mgmt[i].ev_q = get_event_q();
-		sysc_mgmt[i].ev_q->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_FALLBACK;
+		sysc_mgmt[i].ev_q->ev_flags = EVENT_IPI | EVENT_INDIR |
+		                              EVENT_SPAM_INDIR;
 		sysc_mgmt[i].ev_q->ev_vcore = i;
 		sysc_mgmt[i].ev_q->ev_mbox = sysc_mbox;
 	}

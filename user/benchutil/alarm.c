@@ -130,7 +130,7 @@ static void init_alarm_service(void)
 	ev_q->ev_vcore = 0;
 	/* We could get multiple events for a single alarm.  It's okay, since
 	 * __trigger can handle spurious upcalls.  If it ever is not okay, then use
-	 * an INDIR/FALLBACK instead of SPAM_PUBLIC. */
+	 * an INDIR (probably with SPAM_INDIR too) instead of SPAM_PUBLIC. */
 	ev_q->ev_flags = EVENT_IPI | EVENT_SPAM_PUBLIC;
 	ret = snprintf(path, sizeof(path), "evq %llx", ev_q);
 	ret = write(ctlfd, path, ret);
