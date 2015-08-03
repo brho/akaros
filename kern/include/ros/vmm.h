@@ -28,9 +28,9 @@ struct vmctl {
 	uint64_t gva;
 	uint64_t gpa;
 	uint64_t exit_qual;
-	int shutdown;
-	int ret_code;
-	int core;
+	uint64_t shutdown;
+	uint64_t ret_code;
+	uint64_t core;
 	struct hw_trapframe regs;
 };
 

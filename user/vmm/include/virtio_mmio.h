@@ -129,13 +129,57 @@
  * the per-driver configuration space - Read Write */
 #define VIRTIO_MMIO_CONFIG		0x100
 
-
-
 /*
  * Interrupt flags (re: interrupt status & acknowledge registers)
  */
 
 #define VIRTIO_MMIO_INT_VRING		(1 << 0)
 #define VIRTIO_MMIO_INT_CONFIG		(1 << 1)
+
+// A vq defines on queue attached to a device. It has a function, started as a thread;
+// an arg, for arbitrary use; qnum, which is an indicator of how much memory is given
+// to the queue; a pointer to the thread that gets started when the queue is notified;
+// a physical frame number, which is process virtual to the vmm; an isr (not used yet);
+// status; and a pointer to the virtio struct.
+struct vq {
+	char *name;
+	void *(*f)(void *arg); // Start this as a thread when a matching virtio is discovered.
+	void *arg;
+	int maxqnum; // how many things the q gets? or something. 
+	int qnum; 
+	int qalign;
+	pthread_t thread;
+	/* filled in by virtio probing. */
+	uint64_t pfn;
+	uint32_t isr; // not used yet but ...
+	uint32_t status;
+	uint64_t qdesc;
+	uint64_t qavail;
+	uint64_t qused;
+	void *virtio;
+};
+
+// a vqdev has a name; magic number; features ( we MUST have features);
+// and an array of vqs.
+struct vqdev {
+	/* Set up usually as a static initializer */
+	char *name;
+	uint32_t dev; // e.g. VIRTIO_ID_CONSOLE);
+	uint32_t features;
+	int numvqs;
+	struct vq vqs[];
+};
+
+
+/* This struct is passed to a virtio thread when it is started. It includes
+ * needed info and the vqdev arg. This seems overkill but we may need to add to it.
+ */
+struct virtio_threadarg {
+	struct vq *arg;
+};
+
+void dumpvirtio_mmio(FILE *f, uint64_t gpa);
+void register_virtio_mmio(struct vqdev *v, uint64_t virtio_base);
+void virtio_mmio(struct vmctl *v);
 
 #endif

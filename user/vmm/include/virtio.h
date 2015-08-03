@@ -125,4 +125,14 @@ unsigned int virtqueue_get_vring_size(struct virtqueue *vq);
 bool virtqueue_is_broken(struct virtqueue *vq);
 void virtqueue_close(struct virtqueue *vq);
 
+static inline uint32_t read32(const volatile void *addr)
+{
+	return *(const volatile uint32_t *)addr;
+}
+
+static inline void write32(volatile void *addr, uint32_t value)
+{
+	*(volatile uint32_t *)addr = value;
+}
+
 #endif /* VIRTIO_VIRTIO_H */

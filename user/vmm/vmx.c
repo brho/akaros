@@ -114,7 +114,8 @@ void showstatus(FILE *f, struct vmctl *v)
 	char *reason = "UNKNOWN";
 	if (v->shutdown < ARRAY_SIZE(vmxexit) && vmxexit[v->shutdown])
 		reason = vmxexit[v->shutdown];
-	fprintf(f, "Shutdown: core %d, %s due to %s(0x%x); ret code 0x%x", v->core, when, reason, v->shutdown, v->ret_code);
+	fprintf(f, "Shutdown: core %d, %s due to %s(0x%x); ret code 0x%x\n", v->core, when, reason, v->shutdown, v->ret_code);
+	fprintf(f, "  gva %p gpa %p cr3 %p\n", (void *)v->gva, (void *)v->gpa, (void *)v->cr3);
 
 	fprintf(f, "  rax  0x%016lx\n",           v->regs.tf_rax);
 	fprintf(f, "  rbx  0x%016lx\n",           v->regs.tf_rbx);
