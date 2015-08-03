@@ -81,6 +81,9 @@ struct conv {
 	struct queue *sq;			/* snooping queue */
 	atomic_t snoopers;			/* number of processes with snoop open */
 
+	struct fdtap_slist data_taps;
+	spinlock_t tap_lock;
+
 	struct rendez cr;
 	char cerr[ERRMAX];
 

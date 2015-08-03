@@ -1270,27 +1270,119 @@ static long ipbwrite(struct chan *ch, struct block *bp, uint32_t offset)
 	}
 }
 
-struct dev ipdevtab __devtab = {
-	'I',
-	"ip",
+static void ip_wake_cb(struct queue *q, void *data, int filter)
+{
+	struct conv *conv = (struct conv*)data;
+	struct fd_tap *tap_i;
+	/* For these two, we want to ignore events on the opposite end of the
+	 * queues.  For instance, we want to know when the WQ is writable.  Our
+	 * writes will actually make it readable - we don't want to trigger a tap
+	 * for that.  However, qio doesn't know how/why we are using a queue, or
+	 * even who the ends are (hence the callbacks) */
+	if ((filter & FDTAP_FILT_READABLE) && (q == conv->wq))
+		return;
+	if ((filter & FDTAP_FILT_WRITABLE) && (q == conv->rq))
+		return;
+	/* At this point, we have an event we want to send to our taps (if any).
+	 * The lock protects list integrity and the existence of the tap.
+	 *
+	 * Previously, I thought of using the conv qlock.  That actually breaks, due
+	 * to weird usages of the qlock (someone holds it for a long time, blocking
+	 * the inbound wakeup from etherread4).
+	 *
+	 * I opted for a spinlock for a couple reasons:
+	 * - fire_tap should not block.  ideally it'll be fast too (it's mostly a
+	 * send_event).
+	 * - our callers might not want to block.  A lot of network wakeups will
+	 * come network processes (etherread4) or otherwise unrelated to this
+	 * particular conversation.  I'd rather do something like fire off a KMSG
+	 * than block those.
+	 * - if fire_tap takes a while, holding the lock only slows down other
+	 * events on this *same* conversation, or other tap registration.  not a
+	 * huge deal. */
+	spin_lock(&conv->tap_lock);
+	SLIST_FOREACH(tap_i, &conv->data_taps, link)
+		fire_tap(tap_i, filter);
+	spin_unlock(&conv->tap_lock);
+}
 
-	ipreset,
-	ipinit,
-	devshutdown,
-	ipattach,
-	ipwalk,
-	ipstat,
-	ipopen,
-	devcreate,
-	ipclose,
-	ipread,
-	ipbread,
-	ipwrite,
-	ipbwrite,
-	devremove,
-	ipwstat,
-	devpower,
-	ipchaninfo,
+int iptapfd(struct chan *chan, struct fd_tap *tap, int cmd)
+{
+	struct conv *conv;
+	struct Proto *x;
+	struct Fs *f;
+	int ret;
+
+	#define DEVIP_LEGAL_DATA_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_WRITABLE | \
+	                               FDTAP_FILT_HANGUP)
+
+	/* That's a lot of pointers to get to the conv! */
+	f = ipfs[chan->dev];
+	x = f->p[PROTO(chan->qid)];
+	conv = x->conv[CONV(chan->qid)];
+
+	switch (TYPE(chan->qid)) {
+		case Qdata:
+			if (tap->filter & ~DEVIP_LEGAL_DATA_TAPS) {
+				set_errno(ENOSYS);
+				set_errstr("Unsupported #I data tap, must be %p",
+				           DEVIP_LEGAL_DATA_TAPS);
+				return -1;
+			}
+			spin_lock(&conv->tap_lock);
+			switch (cmd) {
+				case (FDTAP_CMD_ADD):
+					if (SLIST_EMPTY(&conv->data_taps)) {
+						qio_set_wake_cb(conv->rq, ip_wake_cb, conv);
+						qio_set_wake_cb(conv->wq, ip_wake_cb, conv);
+					}
+					SLIST_INSERT_HEAD(&conv->data_taps, tap, link);
+					ret = 0;
+					break;
+				case (FDTAP_CMD_REM):
+					SLIST_REMOVE(&conv->data_taps, tap, fd_tap, link);
+					if (SLIST_EMPTY(&conv->data_taps)) {
+						qio_set_wake_cb(conv->rq, 0, conv);
+						qio_set_wake_cb(conv->wq, 0, conv);
+					}
+					ret = 0;
+					break;
+				default:
+					set_errno(ENOSYS);
+					set_errstr("Unsupported #I data tap command");
+					ret = -1;
+			}
+			spin_unlock(&conv->tap_lock);
+			return ret;
+		default:
+			set_errno(ENOSYS);
+			set_errstr("Can't tap #I file type %d", TYPE(chan->qid));
+			return -1;
+	}
+}
+
+struct dev ipdevtab __devtab = {
+	.dc = 'I',
+	.name = "ip",
+
+	.reset = ipreset,
+	.init = ipinit,
+	.shutdown = devshutdown,
+	.attach = ipattach,
+	.walk = ipwalk,
+	.stat = ipstat,
+	.open = ipopen,
+	.create = devcreate,
+	.close = ipclose,
+	.read = ipread,
+	.bread = ipbread,
+	.write = ipwrite,
+	.bwrite = ipbwrite,
+	.remove = devremove,
+	.wstat = ipwstat,
+	.power = devpower,
+	.chaninfo = ipchaninfo,
+	.tapfd = iptapfd,
 };
 
 int Fsproto(struct Fs *f, struct Proto *p)
@@ -1350,6 +1442,8 @@ retry:
 			qlock_init(&c->listenq);
 			rendez_init(&c->cr);
 			rendez_init(&c->listenr);
+			SLIST_INIT(&c->data_taps);	/* already = 0; set to be futureproof */
+			spinlock_init(&c->tap_lock);
 			qlock(&c->qlock);
 			c->p = p;
 			c->x = pp - p->conv;
