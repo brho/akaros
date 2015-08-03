@@ -1167,10 +1167,6 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 		case Qdata:
 			x = f->p[PROTO(ch->qid)];
 			c = x->conv[CONV(ch->qid)];
-
-			if (c->wq == NULL)
-				error(Eperm);
-
 			qwrite(c->wq, a, n);
 			break;
 		case Qarp:
@@ -1256,10 +1252,6 @@ static long ipbwrite(struct chan *ch, struct block *bp, uint32_t offset)
 			f = ipfs[ch->dev];
 			x = f->p[PROTO(ch->qid)];
 			c = x->conv[CONV(ch->qid)];
-
-			if (c->wq == NULL)
-				error(Eperm);
-
 			if (bp->next)
 				bp = concatblock(bp);
 			n = BLEN(bp);
@@ -1458,6 +1450,7 @@ retry:
 			p->ac++;
 			c->eq = qopen(1024, Qmsg, 0, 0);
 			(*p->create) (c);
+			assert(c->rq && c->wq);
 			break;
 		}
 		if (canqlock(&c->qlock)) {
