@@ -607,7 +607,7 @@ $(OBJDIR)/.dont-force-fill-kfs:
 	@echo "User space tests removed from KFS"
 	@touch $(OBJDIR)/.dont-force-fill-kfs
 
-fill-kfs: $(OBJDIR)/.dont-force-fill-kfs install-libs
+fill-kfs: $(OBJDIR)/.dont-force-fill-kfs install-libs tests
 	@mkdir -p $(FIRST_KFS_PATH)/lib
 	$(Q)cp -uP $(xcc-so-files) $(FIRST_KFS_PATH)/lib
 	@echo "Cross Compiler 'so' files installed to KFS"
