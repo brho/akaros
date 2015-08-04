@@ -634,7 +634,7 @@ static struct vmcs *__vmx_alloc_vmcs(int node)
  */
 static struct vmcs *vmx_alloc_vmcs(void)
 {
-	return __vmx_alloc_vmcs(node_id());
+	return __vmx_alloc_vmcs(numa_id());
 }
 
 /**

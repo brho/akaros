@@ -8,7 +8,7 @@ static inline int get_hw_coreid(uint32_t coreid) __attribute__((always_inline));
 static inline int hw_core_id(void) __attribute__((always_inline));
 static inline int get_os_coreid(int hw_coreid) __attribute__((always_inline));
 static inline int core_id(void) __attribute__((always_inline));
-static inline int node_id(void) __attribute__((always_inline));
+static inline int numa_id(void) __attribute__((always_inline));
 static inline int core_id_early(void) __attribute__((always_inline));
 
 /* declared in smp.c */
@@ -32,7 +32,7 @@ static inline int get_os_coreid(int hw_coreid)
 	return os_coreid_lookup[hw_coreid];
 }
 
-static inline int node_id(void)
+static inline int numa_id(void)
 {
 	return 0;
 }
