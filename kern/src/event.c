@@ -110,7 +110,7 @@ static void try_notify(struct proc *p, uint32_t vcoreid, int ev_flags)
 }
 
 /* Helper: sends the message and an optional IPI to the vcore.  Sends to the
- * public mbox.  This is meant for spammy messages. */
+ * public mbox. */
 static void spam_vcore(struct proc *p, uint32_t vcoreid,
                        struct event_msg *ev_msg, int ev_flags)
 {
@@ -339,8 +339,8 @@ static void send_indir(struct proc *p, struct event_queue *ev_q,
 	}
 	/* At this point, we actually want to send and spam an INDIR.
 	 * This will guarantee the message makes it to some vcore.  For flags, we
-	 * only want to send flags relevant to spamming messages. */
-	spam_public_msg(p, &local_msg, vcoreid, ev_q->ev_flags & EVENT_SPAM_FLAGS);
+	 * can't send NOMSG - that applied to the original ev_msg. */
+	spam_public_msg(p, &local_msg, vcoreid, ev_q->ev_flags & ~EVENT_NOMSG);
 }
 
 /* Send an event to ev_q, based on the parameters in ev_q's flag.  We don't
@@ -412,7 +412,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	 * we'll prefer to send it to whatever vcoreid we determined at this point
 	 * (via APPRO or whatever). */
 	if (ev_q->ev_flags & EVENT_SPAM_PUBLIC) {
-		spam_public_msg(p, msg, vcoreid, ev_q->ev_flags & EVENT_SPAM_FLAGS);
+		spam_public_msg(p, msg, vcoreid, ev_q->ev_flags);
 		goto out;
 	}
 	/* We aren't spamming and we know the default vcore, and now we need to
