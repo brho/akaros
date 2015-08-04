@@ -127,6 +127,6 @@ void tlb_flush_global(void)
 	} else {
 		lcr3(rcr3());
 	}
-	if (per_cpu_info[core_id()].vmx_enabled)
+	if (per_cpu_info[core_id_early()].vmx_enabled)
 		ept_inval_global();
 }
