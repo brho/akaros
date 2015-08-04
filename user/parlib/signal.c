@@ -227,7 +227,8 @@ void init_posix_signals(void)
 	register_ev_handler(EV_POSIX_SIGNAL, handle_event, 0);
 	posix_sig_ev_q = get_big_event_q();
 	assert(posix_sig_ev_q);
-	posix_sig_ev_q->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_SPAM_INDIR;
+	posix_sig_ev_q->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_SPAM_INDIR |
+	                           EVENT_WAKEUP;
 	register_kevent_q(posix_sig_ev_q, EV_POSIX_SIGNAL);
 	wfl_init(&sigdata_list);
 }

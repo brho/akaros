@@ -115,7 +115,7 @@ void uthread_mcp_init()
 	register_ev_handler(EV_CHECK_MSGS, handle_vc_indir, 0);
 	preempt_ev_q = get_event_q();	/* small ev_q, mostly a vehicle for flags */
 	preempt_ev_q->ev_flags = EVENT_IPI | EVENT_SPAM_PUBLIC | EVENT_VCORE_APPRO |
-							 EVENT_VCORE_MUST_RUN;
+							 EVENT_VCORE_MUST_RUN | EVENT_WAKEUP;
 	/* Tell the kernel to use the ev_q (it's settings) for the two types.  Note
 	 * that we still have two separate handlers.  We just want the events
 	 * delivered in the same way.  If we ever want to have a big_event_q with

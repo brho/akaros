@@ -242,13 +242,11 @@ static void spam_public_msg(struct proc *p, struct event_msg *ev_msg,
 	vc = TAILQ_FIRST(&p->inactive_vcs);
 	if (vc) {	/* might be none in rare circumstances */
 		if (try_spam_vcore(p, vcore2vcoreid(p, vc), ev_msg, ev_flags)) {
-			/* Need to ensure the proc wakes up, but only if it was WAITING.
-			 * One way for this to happen is if a normal vcore was preempted
-			 * right as another vcore was yielding, and the preempted
-			 * message was sent after the last vcore yielded (which caused
-			 * us to be WAITING */
-			if (p->state == PROC_WAITING)
-				proc_wakeup(p);	/* internally, this double-checks WAITING */
+			/* It's possible that we're WAITING here.  EVENT_WAKEUP will handle
+			 * it.  One way for this to happen is if a normal vcore was
+			 * preempted right as another vcore was yielding, and the preempted
+			 * message was sent after the last vcore yielded (which caused us to
+			 * be WAITING). */
 			return;
 		}
 	}
@@ -261,8 +259,8 @@ ultimate_fallback:
 	 * grabs the vmr_lock and pte_lock. */
 	spin_lock(&p->proc_lock);
 	if (p->state != PROC_WAITING) {
-		/* We need to check the online and bulk_preempt lists again, now that we are
-		 * sure no one is messing with them.  If we're WAITING, we can skip
+		/* We need to check the online and bulk_preempt lists again, now that we
+		 * are sure no one is messing with them.  If we're WAITING, we can skip
 		 * these (or assert they are empty!). */
 		vc = TAILQ_FIRST(&p->online_vcs);
 		if (vc) {
@@ -290,12 +288,10 @@ ultimate_fallback:
 	 * above */
 	set_vcore_msgable(vcore2vcoreid(p, vc));
 	/* The first event to catch the process with no online/bp vcores will need
-	 * to wake it up.  (We could be RUNNABLE_M here if another event already woke
-	 * us.) and we didn't get lucky with the penultimate fallback.
-	 * proc_wakeup (and __proc_wakeup()) will check for WAITING. */
+	 * to wake it up, which is handled elsewhere if they requested EVENT_WAKEUP.
+	 * We could be RUNNABLE_M here if another event already woke us and we
+	 * didn't get lucky with the penultimate fallback. */
 	spin_unlock(&p->proc_lock);
-	proc_wakeup(p);
-	return;
 }
 
 /* Helper: sends an indirection event for an ev_q, preferring vcoreid */
@@ -413,7 +409,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	 * (via APPRO or whatever). */
 	if (ev_q->ev_flags & EVENT_SPAM_PUBLIC) {
 		spam_public_msg(p, msg, vcoreid, ev_q->ev_flags);
-		goto out;
+		goto wakeup;
 	}
 	/* We aren't spamming and we know the default vcore, and now we need to
 	 * figure out which mbox to use.  If they provided an mbox, we'll use it.
@@ -450,6 +446,9 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 		/* they may want an IPI despite not wanting an INDIR */
 		try_notify(p, vcoreid, ev_q->ev_flags);
 	}
+wakeup:
+	if ((ev_q->ev_flags & EVENT_WAKEUP) && (p->state == PROC_WAITING))
+		proc_wakeup(p);
 	/* Fall through */
 out:
 	/* Return to the old address space. */

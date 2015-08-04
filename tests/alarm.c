@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 	/* I think this is all the flags we need; gotta write that dissertation
 	 * chapter (and event how-to)!  We may get more than one event per alarm, if
 	 * we have concurrent preempts/yields. */
-	ev_q->ev_flags = EVENT_IPI | EVENT_SPAM_PUBLIC;
+	ev_q->ev_flags = EVENT_IPI | EVENT_SPAM_PUBLIC | EVENT_WAKEUP;
 	/* Register the ev_q for our alarm */
 	ret = snprintf(path, sizeof(path), "evq %llx", ev_q);
 	ret = write(ctlfd, path, ret);
