@@ -873,11 +873,6 @@ again.
 
 4.3 Extra Tidbits:
 ---------------------------------------
-One minor point: SCPs can't receive INDIRs, at least for now.  The kernel event
-code short circuits all the fallback business and just spams vcore0's public
-mbox.  If we ever change that, we need to be sure to post a notif_pending to
-vcore0 (that's the signal to trigger a wakeup).
-
 If we receive an event right as we transition from SCP to MCP, vcore0 could get
 spammed with a message that is never received.  Right now, it's not a problem,
 since vcore0 is the first vcore that will get woken up as an MCP.  This could be

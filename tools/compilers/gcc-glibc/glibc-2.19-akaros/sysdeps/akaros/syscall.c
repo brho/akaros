@@ -27,12 +27,10 @@
 /* This is a simple ev_q that routes notifs to vcore0's public mbox.  This
  * should work for any bit messages, even if the process hasn't done any set up
  * yet, since the memory for the mbox is allocted by the kernel (procdata).
- * Don't send full messages to it, since the UCQ won't be initialized.  Note
- * that the kernel will actually ignore your ev_mbox and just about everything
- * other than flags if you're an SCP, but that might change later. */
+ * Don't send full messages to it, since the UCQ won't be initialized. */
 struct event_queue __ros_scp_simple_evq =
                   { .ev_mbox = &__procdata.vcore_preempt_data[0].ev_mbox_public,
-                    .ev_flags = EVENT_IPI | EVENT_NOMSG, 
+                    .ev_flags = EVENT_NOMSG | EVENT_WAKEUP,
                     .ev_alert_pending = FALSE,
                     .ev_vcore = 0,
                     .ev_handler = 0 };
