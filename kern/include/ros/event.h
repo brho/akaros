@@ -81,6 +81,7 @@ struct event_queue {
 	bool						ev_alert_pending;
 	uint32_t					ev_vcore;
 	void						(*ev_handler)(struct event_queue *);
+	void						*ev_udata;
 };
 
 /* Big version, contains storage space for the ev_mbox.  Never access the
@@ -91,6 +92,7 @@ struct event_queue_big {
 	bool						ev_alert_pending;
 	uint32_t					ev_vcore;
 	void						(*ev_handler)(struct event_queue *);
+	void						*ev_udata;
 	struct event_mbox 			ev_imbox;
 };
 
