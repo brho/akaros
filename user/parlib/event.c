@@ -15,7 +15,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <parlib/parlib.h>
-#include <event.h>
+#include <parlib/event.h>
 #include <parlib/uthread.h>
 #include <parlib/spinlock.h>
 
@@ -148,10 +148,9 @@ struct event_queue *disable_kevent(unsigned int ev_type)
 unsigned int get_event_type(struct event_mbox *ev_mbox)
 {
 	struct event_msg local_msg = {0};
-	/* UCQ returns 0 on success, so this will dequeue and return the type. */
-	if (!get_ucq_msg(&ev_mbox->ev_msgs, &local_msg)) {
+
+	if (extract_one_mbox_msg(ev_mbox, &local_msg))
 		return local_msg.ev_type;
-	}
 	if (BITMASK_IS_CLEAR(&ev_mbox->ev_bitmap, MAX_NR_EVENT))
 		return EV_NONE;	/* aka, 0 */
 	for (int i = 0; i < MAX_NR_EVENT; i++) {
@@ -204,13 +203,21 @@ static void run_ev_handlers(unsigned int ev_type, struct event_msg *ev_msg)
 	}
 }
 
+/* Attempts to extract a message from an mbox, copying it into ev_msg.
+ * Returns TRUE on success. */
+bool extract_one_mbox_msg(struct event_mbox *ev_mbox, struct event_msg *ev_msg)
+{
+	/* get_ucq returns 0 on success, -1 on empty */
+	return get_ucq_msg(&ev_mbox->ev_msgs, ev_msg) == 0;
+}
+
 /* Attempts to handle a message.  Returns 1 if we dequeued a msg, 0 o/w. */
 int handle_one_mbox_msg(struct event_mbox *ev_mbox)
 {
 	struct event_msg local_msg;
 	unsigned int ev_type;
-	/* get_ucq returns 0 on success, -1 on empty */
-	if (get_ucq_msg(&ev_mbox->ev_msgs, &local_msg) == -1)
+	/* extract returns TRUE on success, we return 1. */
+	if (!extract_one_mbox_msg(ev_mbox, &local_msg))
 		return 0;
 	ev_type = local_msg.ev_type;
 	assert(ev_type < MAX_NR_EVENT);

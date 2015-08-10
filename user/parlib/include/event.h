@@ -46,6 +46,7 @@ void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type, void *data);
 
 int handle_events(uint32_t vcoreid);
 void handle_event_q(struct event_queue *ev_q);
+bool extract_one_mbox_msg(struct event_mbox *ev_mbox, struct event_msg *ev_msg);
 int handle_one_mbox_msg(struct event_mbox *ev_mbox);
 int handle_mbox(struct event_mbox *ev_mbox);
 bool mbox_is_empty(struct event_mbox *ev_mbox);
