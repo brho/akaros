@@ -2,9 +2,10 @@
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
- * Userspace alarm service, based off a slimmed down version of the kernel
- * alarms.  Under the hood, it uses the kernel alarm service for the root of
- * the alarm chain.
+ * Userspace alarms.  There are lower level helpers to build your own alarms
+ * from the #A device and an alarm service, based off a slimmed down version of
+ * the kernel alarms.  Under the hood, the user alarm uses the #A service for
+ * the root of the alarm chain.
  *
  * This is (was) hanging out in benchutil so as to not create a dependency from
  * parlib on benchutil (usec2tsc and friends).
@@ -37,6 +38,15 @@
 #include <parlib/event.h>
 
 __BEGIN_DECLS
+
+/* Low-level alarm interface */
+
+int devalarm_get_fds(int *ctlfd_r, int *timerfd_r, int *alarmid_r);
+int devalarm_set_evq(int ctlfd, struct event_queue *ev_q);
+int devalarm_set_time(int timerfd, uint64_t tsc_time);
+int devalarm_disable(int ctlfd);
+
+/* Alarm service */
 
 /* Specifc waiter, per alarm */
 struct alarm_waiter {

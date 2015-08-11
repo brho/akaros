@@ -2,9 +2,10 @@
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
- * Userspace alarm service, based off a slimmed down version of the kernel
- * alarms.  Under the hood, it uses the kernel alarm service for the root of
- * the alarm chain.
+ * Userspace alarms.  There are lower level helpers to build your own alarms
+ * from the #A device and an alarm service, based off a slimmed down version of
+ * the kernel alarms.  Under the hood, the user alarm uses the #A service for
+ * the root of the alarm chain.
  *
  * There's only one timer chain, unlike in the kernel, for the entire process.
  * If you want one-off timers unrelated to the chain (and sent to other vcores),
@@ -37,6 +38,69 @@
 #include <parlib/uthread.h>
 #include <parlib/spinlock.h>
 #include <parlib/timing.h>
+
+/* Helper to get your own alarm.   If you don't care about a return value, pass
+ * 0 and it'll be ignored.  The alarm is built, but has no evq or timer set. */
+int devalarm_get_fds(int *ctlfd_r, int *timerfd_r, int *alarmid_r)
+{
+	int ctlfd, timerfd, alarmid, ret;
+	char buf[20];
+	char path[32];
+
+	ctlfd = open("#A/clone", O_RDWR | O_CLOEXEC);
+	if (ctlfd < 0)
+		return -1;
+	ret = read(ctlfd, buf, sizeof(buf) - 1);
+	if (ret <= 0)
+		return -1;
+	buf[ret] = 0;
+	alarmid = atoi(buf);
+	snprintf(path, sizeof(path), "#A/a%s/timer", buf);
+	timerfd = open(path, O_RDWR | O_CLOEXEC);
+	if (timerfd < 0)
+		return -1;
+	if (ctlfd_r)
+		*ctlfd_r = ctlfd;
+	else
+		close(ctlfd);
+	if (timerfd_r)
+		*timerfd_r = timerfd;
+	else
+		close(timerfd);
+	if (alarmid_r)
+		*alarmid_r = alarmid;
+	return 0;
+}
+
+int devalarm_set_evq(int ctlfd, struct event_queue *ev_q)
+{
+	int ret;
+	char path[32];
+	ret = snprintf(path, sizeof(path), "evq %llx", ev_q);
+	ret = write(ctlfd, path, ret);
+	if (ret <= 0)
+		return -1;
+	return 0;
+}
+
+int devalarm_set_time(int timerfd, uint64_t tsc_time)
+{
+	int ret;
+	char buf[20];
+	ret = snprintf(buf, sizeof(buf), "%llx", tsc_time);
+	ret = write(timerfd, buf, ret);
+	if (ret <= 0)
+		return -1;
+	return 0;
+}
+
+int devalarm_disable(int ctlfd)
+{
+	int ret = write(ctlfd, "cancel", sizeof("cancel"));
+	if (ret <= 0)
+		return -1;
+	return 0;
+}
 
 /* Helpers, basically renamed kernel interfaces, with the *tchain. */
 static void __tc_locked_set_alarm(struct timer_chain *tchain,
@@ -86,9 +150,7 @@ static void reset_tchain_times(struct timer_chain *tchain)
 
 static void init_alarm_service(void)
 {
-	int ctlfd, timerfd, alarmid, ret;
-	char buf[20];
-	char path[32];
+	int ctlfd, timerfd, alarmid;
 	struct event_queue *ev_q;
 
 	/* Initialize the unixtime_offsets */
@@ -99,25 +161,8 @@ static void init_alarm_service(void)
 	TAILQ_INIT(&global_tchain.waiters);
 	reset_tchain_times(&global_tchain);
 
-	ctlfd = open("#A/clone", O_RDWR | O_CLOEXEC);
-	if (ctlfd < 0) {
-		perror("Useralarm: Can't clone an alarm");
-		return;
-	}
-	ret = read(ctlfd, buf, sizeof(buf) - 1);
-	if (ret <= 0) {
-		if (!ret)
-			printf("Useralarm: Got early EOF from ctl\n");
-		else
-			perror("Useralarm: Can't read ctl");
-		return;
-	}
-	buf[ret] = 0;
-	alarmid = atoi(buf);
-	snprintf(path, sizeof(path), "#A/a%s/timer", buf);
-	timerfd = open(path, O_RDWR | O_CLOEXEC);
-	if (timerfd < 0) {
-		perror("Useralarm: Can't open timer");
+	if (devalarm_get_fds(&ctlfd, &timerfd, &alarmid)) {
+		perror("devalarm_get_fds");
 		return;
 	}
 	/* Since we're doing SPAM_PUBLIC later, we actually don't need a big ev_q.
@@ -132,10 +177,8 @@ static void init_alarm_service(void)
 	 * __trigger can handle spurious upcalls.  If it ever is not okay, then use
 	 * an INDIR (probably with SPAM_INDIR too) instead of SPAM_PUBLIC. */
 	ev_q->ev_flags = EVENT_IPI | EVENT_SPAM_PUBLIC | EVENT_WAKEUP;
-	ret = snprintf(path, sizeof(path), "evq %llx", ev_q);
-	ret = write(ctlfd, path, ret);
-	if (ret <= 0) {
-		perror("Useralarm: Failed to write ev_q");
+	if (devalarm_set_evq(ctlfd, ev_q)) {
+		perror("set_alarm_evq");
 		return;
 	}
 	/* now the alarm is all set, just need to write the timer whenever we want
@@ -219,13 +262,10 @@ void reset_alarm_abs(struct alarm_waiter *waiter, uint64_t abs_time)
 /* Helper, makes sure the kernel alarm is turned on at the right time. */
 static void reset_tchain_interrupt(struct timer_chain *tchain)
 {
-	int ret;
-	char buf[20];
 	if (TAILQ_EMPTY(&tchain->waiters)) {
 		/* Turn it off */
 		printd("Turning alarm off\n");
-		ret = write(tchain->ctlfd, "cancel", sizeof("cancel"));
-		if (ret <= 0) {
+		if (devalarm_disable(tchain->ctlfd)) {
 			printf("Useralarm: unable to disarm alarm!\n");
 			return;
 		}
@@ -234,9 +274,7 @@ static void reset_tchain_interrupt(struct timer_chain *tchain)
 		assert(tchain->earliest_time != ALARM_POISON_TIME);
 		/* TODO: check for times in the past or very close to now */
 		printd("Turning alarm on for %llu\n", tchain->earliest_time);
-		ret = snprintf(buf, sizeof(buf), "%llx", tchain->earliest_time);
-		ret = write(tchain->timerfd, buf, ret);
-		if (ret <= 0) {
+		if (devalarm_set_time(tchain->timerfd, tchain->earliest_time)) {
 			perror("Useralarm: Failed to set timer");
 			return;
 		}
