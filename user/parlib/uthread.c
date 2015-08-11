@@ -321,8 +321,8 @@ void uthread_runnable(struct uthread *uthread)
  * AKA: obviously_a_uthread_has_blocked_in_lincoln_park() */
 void uthread_has_blocked(struct uthread *uthread, int flags)
 {
-	if (sched_ops->thread_has_blocked)
-		sched_ops->thread_has_blocked(uthread, flags);
+	assert(sched_ops->thread_has_blocked);
+	sched_ops->thread_has_blocked(uthread, flags);
 }
 
 /* Need to have this as a separate, non-inlined function since we clobber the
