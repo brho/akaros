@@ -20,24 +20,50 @@ static void thread0_thread_blockon_sysc(struct uthread *uthread, void *sysc);
 static void thread0_thread_refl_fault(struct uthread *uthread,
                                       unsigned int trap_nr, unsigned int err,
                                       unsigned long aux);
+static void thread0_thread_runnable(struct uthread *uth);
+static void thread0_thread_has_blocked(struct uthread *uth, int flags);
 
 /* externed into uthread.c */
 struct schedule_ops thread0_2ls_ops = {
 	.sched_entry = thread0_sched_entry,
 	.thread_blockon_sysc = thread0_thread_blockon_sysc,
 	.thread_refl_fault = thread0_thread_refl_fault,
+	.thread_runnable = thread0_thread_runnable,
+	.thread_has_blocked = thread0_thread_has_blocked,
 };
 
 /* externed into uthread.c */
 struct uthread *thread0_uth;
 
+/* Our thread0 is actually allocated in uthread as just a struct uthread, so we
+ * don't actually attach this mgmt info to it.  But since we just have one
+ * thread, it doesn't matter. */
+struct thread0_info {
+	bool						is_blocked;
+};
+static struct thread0_info thread0_info;
+
+void thread0_lib_init(void)
+{
+	memset(&thread0_info, 0, sizeof(thread0_info));
+}
+
 /* Thread0 scheduler ops (for processes that haven't linked in a full 2LS) */
 static void thread0_sched_entry(void)
 {
-	if (current_uthread)
+	/* TODO: support signal handling whenever we run a uthread */
+	if (current_uthread) {
 		run_current_uthread();
-	else
-		run_uthread(thread0_uth);
+		assert(0);
+	}
+	while (1) {
+		if (!thread0_info.is_blocked) {
+			run_uthread(thread0_uth);
+			assert(0);
+		}
+		sys_yield(FALSE);
+		handle_events(0);
+	}
 }
 
 static void thread0_thread_blockon_sysc(struct uthread *uthread, void *arg)
@@ -78,4 +104,14 @@ static void thread0_thread_refl_fault(struct uthread *uthread,
 	print_user_context(&uthread->u_ctx);
 	printf("Turn on printx to spew unhandled, malignant trap info\n");
 	exit(-1);
+}
+
+static void thread0_thread_runnable(struct uthread *uth)
+{
+	thread0_info.is_blocked = FALSE;
+}
+
+static void thread0_thread_has_blocked(struct uthread *uth, int flags)
+{
+	thread0_info.is_blocked = TRUE;
 }

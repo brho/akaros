@@ -200,6 +200,7 @@ void __attribute__((constructor)) uthread_lib_init(void)
 {
 	/* Use the thread0 sched's uth */
 	extern struct uthread *thread0_uth;
+	extern void thread0_lib_init(void);
 	int ret;
 
 	/* Only run once, but make sure that vcore_lib_init() has run already. */
@@ -210,7 +211,9 @@ void __attribute__((constructor)) uthread_lib_init(void)
 	                     sizeof(struct uthread));
 	assert(!ret);
 	memset(thread0_uth, 0, sizeof(struct uthread));	/* aggressively 0 for bugs*/
+	/* Init the 2LS, which sets up current_uthread, before thread0 lib */
 	uthread_2ls_init(thread0_uth, &thread0_2ls_ops);
+	thread0_lib_init();
 	scp_vcctx_ready();
 	/* Change our blockon from glibc's internal one to the regular one, which
 	 * uses vcore context and works for SCPs (with or without 2LS) and MCPs.
