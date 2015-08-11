@@ -17,7 +17,8 @@ __BEGIN_DECLS
 
 /* Externally blocked thread reasons (for uthread_has_blocked()) */
 #define UTH_EXT_BLK_MUTEX			1
-#define UTH_EXT_BLK_JUSTICE			2	/* whatever.  might need more options */
+#define UTH_EXT_BLK_EVENTQ			2
+#define UTH_EXT_BLK_JUSTICE			3	/* whatever.  might need more options */
 
 /* Bare necessities of a user thread.  2LSs should allocate a bigger struct and
  * cast their threads to uthreads when talking with vcore code.  Vcore/default

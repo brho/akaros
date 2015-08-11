@@ -1,4 +1,5 @@
-/* Copyright (c) 2011 The Regents of the University of California
+/* Copyright (c) 2011-2014 The Regents of the University of California
+ * Copyright (c) 2015 Google Inc
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
@@ -60,6 +61,21 @@ void ev_we_returned(bool were_handling_remotes);
 
 /* Debugging */
 void print_ev_msg(struct event_msg *msg);
+
+/* Uthreads blocking on event queues.  M uthreads can block on subsets of N
+ * event queues.  The structs and details are buried in event.c.  We can move
+ * some of them here if users need greater control over their evqs. */
+void evq_attach_wakeup_ctlr(struct event_queue *ev_q);
+void evq_remove_wakeup_ctlr(struct event_queue *ev_q);
+/* Handler, attaches to the ev_q.  Most people won't need this directly. */
+void evq_wakeup_handler(struct event_queue *ev_q);
+void uth_blockon_evqs_arr(struct event_msg *ev_msg,
+                          struct event_queue **which_evq,
+                          struct event_queue *evqs[], size_t nr_evqs);
+void uth_blockon_evqs(struct event_msg *ev_msg, struct event_queue **which_evq,
+                      size_t nr_evqs, ...);
+bool uth_check_evqs(struct event_msg *ev_msg, struct event_queue **which_evq,
+                    size_t nr_evqs, ...);
 
 __END_DECLS
 
