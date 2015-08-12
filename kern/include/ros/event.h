@@ -25,9 +25,6 @@
 #define EVENT_VCORE_APPRO		0x00200	/* send to where the kernel wants */
 #define EVENT_WAKEUP			0x00400	/* wake up the process after sending */
 
-/* Flags from the program to the 2LS */
-#define EVENT_JUSTHANDLEIT		0x10000	/* 2LS should handle the ev_q */
-
 /* Event Message Types */
 #define EV_NONE					 0
 #define EV_PREEMPT_PENDING		 1

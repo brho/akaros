@@ -316,19 +316,16 @@ int handle_events(uint32_t vcoreid)
  * application specific, then this will dispatch/handle based on its flags. */
 void handle_event_q(struct event_queue *ev_q)
 {
+	printd("[event] handling ev_q %08p on vcore %d\n", ev_q, vcore_id());
 	/* If the program wants to handle the ev_q on its own: */
-	if (ev_q->ev_flags & EVENT_JUSTHANDLEIT) {
-		if (!ev_q->ev_handler) {
-			printf("No ev_handler installed for ev_q %08p, aborting!\n", ev_q);
-			return;
-		}
+	if (ev_q->ev_handler) {
 		/* Remember this can't block or page fault */
 		ev_q->ev_handler(ev_q);
 		return;
 	}
-	printd("[event] handling ev_q %08p on vcore %d\n", ev_q, vcore_id());
 	/* Raw ev_qs that haven't been connected to an mbox, user bug: */
 	assert(ev_q->ev_mbox);
+	/* The "default" ev_handler, common enough that I don't want a func ptr */
 	handle_mbox(ev_q->ev_mbox);
 }
 

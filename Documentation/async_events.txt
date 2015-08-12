@@ -554,9 +554,10 @@ blocking u_threads).
 
 There are a couple ways to handle this.  Ultimately, the application is supposed
 to handle the event.  If it asked for an IPI, it is because something ought to
-be done, which really means running a handler.  If the application sets
-EVENT_THREAD in the ev_q's flags, the 2LS ought to spawn a thread to run the
-ev_q's handler.  If EVENT_JUSTHANDLEIT is set, the vcore will execute the
+be done, which really means running a handler.  We used to support the
+application setting EVENT_THREAD in the ev_q's flags, and the 2LS would spawn a
+thread to run the ev_q's handler.  Now we just have the application block a
+uthread on the evq.  If an ev_handler is set, the vcore will execute the
 handler itself.  Careful with this, since the only memory it touches must be
 pinned, the function must not block (this is only true for the handlers called
 directly out of vcore context), and it should return quickly.

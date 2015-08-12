@@ -32,10 +32,8 @@ int main(int argc, char **argv)
 	/* these need to just exist somewhere.  don't free them. */
 	struct event_queue *evq1 = get_ectlr_evq();
 	struct event_queue *evq2 = get_ectlr_evq();
-	evq1->ev_flags |= EVENT_JUSTHANDLEIT | EVENT_INDIR | EVENT_SPAM_INDIR |
-	                  EVENT_WAKEUP;
-	evq2->ev_flags |= EVENT_JUSTHANDLEIT | EVENT_INDIR | EVENT_SPAM_INDIR |
-	                  EVENT_WAKEUP;
+	evq1->ev_flags |= EVENT_INDIR | EVENT_SPAM_INDIR | EVENT_WAKEUP;
+	evq2->ev_flags |= EVENT_INDIR | EVENT_SPAM_INDIR | EVENT_WAKEUP;
 	/* hack in our own handler for debugging */
 	evq1->ev_handler = trampoline_handler;
 	evq2->ev_handler = trampoline_handler;
