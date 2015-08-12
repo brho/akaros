@@ -11,6 +11,7 @@
 #include <ros/atomic.h>
 #include <ros/trapframe.h>
 /* #include <ros/ucq.h> included below */
+/* #include <ros/evbitmap.h> included below */
 
 /* Event Delivery Flags from the process to the kernel */
 #define EVENT_IPI				0x00001	/* IPI the vcore (usually with INDIR) */
@@ -57,16 +58,22 @@ struct event_msg {
 	uint64_t					ev_arg4;
 };
 
-/* Including here since ucq.h needs to know about struct event_msg */
+/* Include here since the mboxes need to know event.h basics (e.g. event_msg) */
 #include <ros/ucq.h>
+#include <ros/evbitmap.h>
+
+#define EV_MBOX_UCQ				1
+#define EV_MBOX_BITMAP			2
 
 /* Structure for storing / receiving event messages.  An overflow causes the
  * bit of the event to get set in the bitmap.  You can also have just the bit
  * sent (and no message). */
 struct event_mbox {
-	struct ucq 					ev_msgs;
-	bool						ev_check_bits;
-	uint8_t						ev_bitmap[(MAX_NR_EVENT - 1) / 8 + 1];
+	int 						type;
+	union {
+		struct ucq				ucq;
+		struct evbitmap			evbm;
+	};
 };
 
 /* The kernel sends messages to this structure, which describes how and where

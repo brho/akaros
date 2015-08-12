@@ -9,7 +9,7 @@
 #include <ros/event.h>
 #include <ros/procdata.h>
 #include <parlib/ucq.h>
-#include <parlib/bitmask.h>
+#include <parlib/evbitmap.h>
 #include <parlib/vcore.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,11 +35,11 @@ __thread uint32_t __vc_rem_vcoreid;
  * these stitch up the big_q so its ev_mbox points to its internal mbox.  Never
  * access the internal mbox directly.
  *
- * Raw ones need to have their UCQs initialized.  If you're making a lot of
- * these, you can do one big mmap and init the ucqs on your own, which ought to
- * perform better.
+ * Raw ones need to have their mailboxes initialized.  If you're making a lot of
+ * these and they perform their own mmaps (e.g. UCQs), you can do one big mmap
+ * and init the ucqs on your own, which ought to perform better.
  *
- * Use the 'regular' one for big_qs if you don't want to worry about the ucq
+ * Use the 'regular' one for big_qs if you don't want to worry about the mbox
  * initalization */
 struct event_queue *get_big_event_q_raw(void)
 {
@@ -53,9 +53,28 @@ struct event_queue *get_big_event_q_raw(void)
 struct event_queue *get_big_event_q(void)
 {
 	struct event_queue *big_q = get_big_event_q_raw();
-	/* uses the simpler, internally mmapping ucq_init() */
-	ucq_init(&big_q->ev_mbox->ev_msgs);
+	event_mbox_init(big_q->ev_mbox, EV_MBOX_UCQ);
 	return big_q;
+}
+
+/* Basic initialization of a single mbox.  If you know the type, you can set up
+ * the mbox manually with possibly better performance.  For instance, ucq_init()
+ * calls mmap internally.  You could mmap a huge blob on your own and call
+ * ucq_raw_init (don't forget to set the mbox_type!) */
+void event_mbox_init(struct event_mbox *ev_mbox, int mbox_type)
+{
+	ev_mbox->type = mbox_type;
+	switch (ev_mbox->type) {
+		case (EV_MBOX_UCQ):
+			ucq_init(&ev_mbox->ucq);
+			break;
+		case (EV_MBOX_BITMAP):
+			evbitmap_init(&ev_mbox->evbm);
+			break;
+		default:
+			printf("Unknown mbox type %d!\n", ev_mbox->type);
+			break;
+	}
 }
 
 /* Give it up.  I don't recommend calling these unless you're sure the queues
@@ -70,8 +89,23 @@ void put_big_event_q_raw(struct event_queue *ev_q)
 
 void put_big_event_q(struct event_queue *ev_q)
 {
-	ucq_free_pgs(&ev_q->ev_mbox->ev_msgs);
+	event_mbox_cleanup(ev_q->ev_mbox);
 	put_big_event_q_raw(ev_q);
+}
+
+void event_mbox_cleanup(struct event_mbox *ev_mbox)
+{
+	switch (ev_mbox->type) {
+		case (EV_MBOX_UCQ):
+			ucq_free_pgs(&ev_mbox->ucq);
+			break;
+		case (EV_MBOX_BITMAP):
+			evbitmap_cleanup(&ev_mbox->evbm);
+			break;
+		default:
+			printf("Unknown mbox type %d!\n", ev_mbox->type);
+			break;
+	}
 }
 
 /* Need to point this event_q to an mbox - usually to a vcpd */
@@ -156,14 +190,6 @@ unsigned int get_event_type(struct event_mbox *ev_mbox)
 
 	if (extract_one_mbox_msg(ev_mbox, &local_msg))
 		return local_msg.ev_type;
-	if (BITMASK_IS_CLEAR(&ev_mbox->ev_bitmap, MAX_NR_EVENT))
-		return EV_NONE;	/* aka, 0 */
-	for (int i = 0; i < MAX_NR_EVENT; i++) {
-		if (GET_BITMASK_BIT(ev_mbox->ev_bitmap, i)) {
-			CLR_BITMASK_BIT_ATOMIC(ev_mbox->ev_bitmap, i);
-			return i;
-		}
-	}
 	return EV_NONE;
 }
 
@@ -212,8 +238,16 @@ static void run_ev_handlers(unsigned int ev_type, struct event_msg *ev_msg)
  * Returns TRUE on success. */
 bool extract_one_mbox_msg(struct event_mbox *ev_mbox, struct event_msg *ev_msg)
 {
-	/* get_ucq returns 0 on success, -1 on empty */
-	return get_ucq_msg(&ev_mbox->ev_msgs, ev_msg) == 0;
+	switch (ev_mbox->type) {
+		case (EV_MBOX_UCQ):
+			/* get_ucq returns 0 on success, -1 on empty */
+			return get_ucq_msg(&ev_mbox->ucq, ev_msg) == 0;
+		case (EV_MBOX_BITMAP):
+			return get_evbitmap_msg(&ev_mbox->evbm, ev_msg);
+		default:
+			printf("Unknown mbox type %d!\n", ev_mbox->type);
+			return FALSE;
+	}
 }
 
 /* Attempts to handle a message.  Returns 1 if we dequeued a msg, 0 o/w. */
@@ -237,39 +271,27 @@ int handle_one_mbox_msg(struct event_mbox *ev_mbox)
 int handle_mbox(struct event_mbox *ev_mbox)
 {
 	int retval = 0;
-	uint32_t vcoreid = vcore_id();
-	void bit_handler(unsigned int bit) {
-		printd("[event] Bit: ev_type: %d\n", bit);
-		run_ev_handlers(bit, 0);
-		retval = 1;
-		/* Consider checking the queue for incoming messages while we're here */
-	}
 	printd("[event] handling ev_mbox %08p on vcore %d\n", ev_mbox, vcore_id());
 	/* Some stack-smashing bugs cause this to fail */
 	assert(ev_mbox);
 	/* Handle all full messages, tracking if we do at least one. */
 	while (handle_one_mbox_msg(ev_mbox))
 		retval = 1;
-	/* Process all bits, if the kernel tells us any bit is set.  We don't clear
-	 * the flag til after we check everything, in case one of the handlers
-	 * doesn't return.  After we clear it, we recheck. */
-	if (ev_mbox->ev_check_bits) {
-		do {
-			ev_mbox->ev_check_bits = TRUE;	/* in case we don't return */
-			cmb();
-			BITMASK_FOREACH_SET(ev_mbox->ev_bitmap, MAX_NR_EVENT, bit_handler,
-			                    TRUE);
-			ev_mbox->ev_check_bits = FALSE;
-			wrmb();	/* check_bits written before we check for it being clear */
-		} while (!BITMASK_IS_CLEAR(ev_mbox->ev_bitmap, MAX_NR_EVENT));
-	}
 	return retval;
 }
 
 /* Empty if the UCQ is empty and the bits don't need checked */
 bool mbox_is_empty(struct event_mbox *ev_mbox)
 {
-	return (ucq_is_empty(&ev_mbox->ev_msgs) && (!ev_mbox->ev_check_bits));
+	switch (ev_mbox->type) {
+		case (EV_MBOX_UCQ):
+			return ucq_is_empty(&ev_mbox->ucq);
+		case (EV_MBOX_BITMAP):
+			return evbitmap_is_empty(&ev_mbox->evbm);
+		default:
+			printf("Unknown mbox type %d!\n", ev_mbox->type);
+			return FALSE;
+	}
 }
 
 /* The EV_EVENT handler - extract the ev_q from the message. */

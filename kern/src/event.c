@@ -63,6 +63,13 @@ static void set_vcore_msgable(uint32_t vcoreid)
 	atomic_or(&vcpd->flags, VC_CAN_RCV_MSG);
 }
 
+static void send_evbitmap_msg(struct evbitmap *evbm, struct event_msg *msg)
+{
+	SET_BITMASK_BIT_ATOMIC(evbm->bitmap, msg->ev_type);
+	wmb();
+	evbm->check_bits = TRUE;
+}
+
 /* Posts a message to the mbox, subject to flags.  Feel free to send 0 for the
  * flags if you don't want to give them the option of EVENT_NOMSG (which is what
  * we do when sending an indirection event).  Make sure that if mbox is a user
@@ -74,13 +81,15 @@ static void post_ev_msg(struct proc *p, struct event_mbox *mbox,
 	printd("[kernel] Sending event type %d to mbox %p\n", msg->ev_type, mbox);
 	/* Sanity check */
 	assert(p);
-	/* If they just want a bit (NOMSG), just set the bit */
-	if (ev_flags & EVENT_NOMSG) {
-		SET_BITMASK_BIT_ATOMIC(mbox->ev_bitmap, msg->ev_type);
-		wmb();
-		mbox->ev_check_bits = TRUE;
-	} else {
-		send_ucq_msg(&mbox->ev_msgs, p, msg);
+	switch (mbox->type) {
+		case (EV_MBOX_UCQ):
+			send_ucq_msg(&mbox->ucq, p, msg);
+			break;
+		case (EV_MBOX_BITMAP):
+			send_evbitmap_msg(&mbox->evbm, msg);
+			break;
+		default:
+			printk("[kernel] Unknown mbox type %d!\n", mbox->type);
 	}
 }
 

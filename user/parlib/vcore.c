@@ -174,10 +174,12 @@ void __attribute__((constructor)) vcore_lib_init(void)
 	 * separate ev_q for that. */
 	for (int i = 0; i < max_vcores(); i++) {
 		/* four pages total for both ucqs from the big block (2 pages each) */
-		ucq_init_raw(&vcpd_of(i)->ev_mbox_public.ev_msgs,
+		vcpd_of(i)->ev_mbox_public.type = EV_MBOX_UCQ;
+		ucq_init_raw(&vcpd_of(i)->ev_mbox_public.ucq,
 		             mmap_block + (4 * i    ) * PGSIZE,
 		             mmap_block + (4 * i + 1) * PGSIZE);
-		ucq_init_raw(&vcpd_of(i)->ev_mbox_private.ev_msgs,
+		vcpd_of(i)->ev_mbox_private.type = EV_MBOX_UCQ;
+		ucq_init_raw(&vcpd_of(i)->ev_mbox_private.ucq,
 		             mmap_block + (4 * i + 2) * PGSIZE,
 		             mmap_block + (4 * i + 3) * PGSIZE);
 		/* Set the lowest level entry point for each vcore. */

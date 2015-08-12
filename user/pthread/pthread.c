@@ -640,7 +640,8 @@ void __attribute__((constructor)) pthread_lib_init(void)
 		sysc_mgmt[i].ev_q->ev_flags = EVENT_IPI | EVENT_INDIR |
 		                              EVENT_SPAM_INDIR | EVENT_WAKEUP;
 		sysc_mgmt[i].ev_q->ev_vcore = i;
-		ucq_init_raw(&sysc_mgmt[i].ev_q->ev_mbox->ev_msgs, 
+		sysc_mgmt[i].ev_q->ev_mbox->type = EV_MBOX_UCQ;
+		ucq_init_raw(&sysc_mgmt[i].ev_q->ev_mbox->ucq,
 		             mmap_block + (2 * i    ) * PGSIZE, 
 		             mmap_block + (2 * i + 1) * PGSIZE); 
 	}
@@ -655,7 +656,8 @@ void __attribute__((constructor)) pthread_lib_init(void)
 	assert(sysc_mbox);
 	assert(two_pages);
 	memset(sysc_mbox, 0, sizeof(struct event_mbox));
-	ucq_init_raw(&sysc_mbox->ev_msgs, two_pages, two_pages + PGSIZE);
+	sysc_mbox->type = EV_MBOX_UCQ;
+	ucq_init_raw(&sysc_mbox->ucq, two_pages, two_pages + PGSIZE);
 	for (int i = 0; i < max_vcores(); i++) {
 		sysc_mgmt[i].ev_q = get_event_q();
 		sysc_mgmt[i].ev_q->ev_flags = EVENT_IPI | EVENT_INDIR |
