@@ -68,9 +68,9 @@ int main(int argc, char** argv)
 	 * Note you don't have to register for USER_IPIs to receive ones you send
 	 * yourself with sys_self_notify(). */
 	enable_kevent(EV_USER_IPI, 0, EVENT_IPI | EVENT_VCORE_PRIVATE);
-	/* Receive pending preemption events.  Can also get a MSG if you want. */
-	struct event_queue *ev_q = get_event_q();
-	ev_q->ev_flags = EVENT_IPI | EVENT_NOMSG | EVENT_VCORE_APPRO;
+	/* Receive pending preemption events.  (though there's no PP handler) */
+	struct event_queue *ev_q = get_event_q_vcpd(0, EVENT_VCORE_PRIVATE);
+	ev_q->ev_flags = EVENT_IPI | EVENT_VCORE_APPRO;
 	register_kevent_q(ev_q, EV_PREEMPT_PENDING);
 	/* We also receive preemption events, it is set up in uthread.c */
 

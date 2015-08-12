@@ -15,16 +15,15 @@
 
 /* Event Delivery Flags from the process to the kernel */
 #define EVENT_IPI				0x00001	/* IPI the vcore (usually with INDIR) */
-#define EVENT_NOMSG				0x00002	/* just send the bit, not the msg */
-#define EVENT_SPAM_PUBLIC		0x00004	/* spam the msg to public vcpd mboxes */
-#define EVENT_INDIR				0x00008	/* send an indirection event to vcore */
-#define EVENT_VCORE_PRIVATE		0x00010	/* Will go to the private VCPD mbox */
-#define EVENT_SPAM_INDIR		0x00020	/* spam INDIRs if the vcore's offline */
-#define EVENT_VCORE_MUST_RUN	0x00040	/* spams go to a vcore that will run */
-#define EVENT_NOTHROTTLE		0x00080	/* send all INDIRs (no throttling) */
-#define EVENT_ROUNDROBIN		0x00100	/* pick a vcore, RR style */
-#define EVENT_VCORE_APPRO		0x00200	/* send to where the kernel wants */
-#define EVENT_WAKEUP			0x00400	/* wake up the process after sending */
+#define EVENT_SPAM_PUBLIC		0x00002	/* spam the msg to public vcpd mboxes */
+#define EVENT_INDIR				0x00004	/* send an indirection event to vcore */
+#define EVENT_VCORE_PRIVATE		0x00008	/* Will go to the private VCPD mbox */
+#define EVENT_SPAM_INDIR		0x00010	/* spam INDIRs if the vcore's offline */
+#define EVENT_VCORE_MUST_RUN	0x00020	/* spams go to a vcore that will run */
+#define EVENT_NOTHROTTLE		0x00040	/* send all INDIRs (no throttling) */
+#define EVENT_ROUNDROBIN		0x00080	/* pick a vcore, RR style */
+#define EVENT_VCORE_APPRO		0x00100	/* send to where the kernel wants */
+#define EVENT_WAKEUP			0x00200	/* wake up the process after sending */
 
 /* Event Message Types */
 #define EV_NONE					 0

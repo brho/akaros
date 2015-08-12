@@ -23,8 +23,8 @@ int main(int argc, char** argv)
 	/* set up to receive the PREEMPT_PENDING event.  EVENT_VCORE_APPRO tells the
 	 * kernel to send the msg to whichever vcore is appropriate.  Pthread code
 	 * will see the preemption and yield. */
-	struct event_queue *ev_q = get_event_q();
-	ev_q->ev_flags = EVENT_IPI | EVENT_NOMSG | EVENT_VCORE_APPRO;
+	struct event_queue *ev_q = get_event_q_vcpd(0, EVENT_VCORE_PRIVATE);
+	ev_q->ev_flags = EVENT_IPI | EVENT_VCORE_APPRO;
 	register_kevent_q(ev_q, EV_PREEMPT_PENDING);
 
 	/* actually only need one less, since the _S will be pthread 0 */

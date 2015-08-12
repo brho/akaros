@@ -70,9 +70,7 @@ static void send_evbitmap_msg(struct evbitmap *evbm, struct event_msg *msg)
 	evbm->check_bits = TRUE;
 }
 
-/* Posts a message to the mbox, subject to flags.  Feel free to send 0 for the
- * flags if you don't want to give them the option of EVENT_NOMSG (which is what
- * we do when sending an indirection event).  Make sure that if mbox is a user
+/* Posts a message to the mbox.  Make sure that if mbox is a user
  * pointer, that you've checked it *and* have that processes address space
  * loaded.  This can get called with a KVA for mbox. */
 static void post_ev_msg(struct proc *p, struct event_mbox *mbox,
@@ -347,9 +345,8 @@ static void send_indir(struct proc *p, struct event_queue *ev_q,
 		return;
 	}
 	/* At this point, we actually want to send and spam an INDIR.
-	 * This will guarantee the message makes it to some vcore.  For flags, we
-	 * can't send NOMSG - that applied to the original ev_msg. */
-	spam_public_msg(p, &local_msg, vcoreid, ev_q->ev_flags & ~EVENT_NOMSG);
+	 * This will guarantee the message makes it to some vcore. */
+	spam_public_msg(p, &local_msg, vcoreid, ev_q->ev_flags);
 }
 
 /* Send an event to ev_q, based on the parameters in ev_q's flag.  We don't
@@ -435,10 +432,6 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 		printk("[kernel] Illegal addr for ev_mbox\n");
 		goto out;
 	}
-	/* We used to support no msgs, but quit being lazy and send a 'msg'.  If the
-	 * ev_q is a NOMSG, we won't actually memcpy or anything, it'll just be a
-	 * vehicle for sending the ev_type. */
-	assert(msg);
 	post_ev_msg(p, ev_mbox, msg, ev_q->ev_flags);
 	wmb();	/* ensure ev_msg write is before alerting the vcore */
 	/* Prod/alert a vcore with an IPI or INDIR, if desired.  INDIR will also

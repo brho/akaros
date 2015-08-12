@@ -28,9 +28,10 @@
  * should work for any bit messages, even if the process hasn't done any set up
  * yet, since the memory for the mbox is allocted by the kernel (procdata).
  * Don't send full messages to it, since the UCQ won't be initialized. */
+struct event_mbox __simple_evbitmap = { .type = EV_MBOX_BITMAP, };
 struct event_queue __ros_scp_simple_evq =
-                  { .ev_mbox = &__procdata.vcore_preempt_data[0].ev_mbox_public,
-                    .ev_flags = EVENT_NOMSG | EVENT_WAKEUP,
+                  { .ev_mbox = &__simple_evbitmap,
+                    .ev_flags = EVENT_WAKEUP,
                     .ev_alert_pending = FALSE,
                     .ev_vcore = 0,
                     .ev_handler = 0 };
