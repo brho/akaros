@@ -165,7 +165,7 @@ struct vqdev {
 	/* Set up usually as a static initializer */
 	char *name;
 	uint32_t dev; // e.g. VIRTIO_ID_CONSOLE);
-	uint32_t features;
+	uint64_t features;
 	int numvqs;
 	struct vq vqs[];
 };

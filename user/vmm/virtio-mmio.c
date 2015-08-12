@@ -57,7 +57,7 @@ typedef struct {
 	int qsel; // queue we are on.
 	int pagesize;
 	int page_shift;
-	int host_features_sel;
+	int device_features_word; // if this is 1, use the high 32 bits. 
 	int guest_features_sel;
 	struct vqdev *vqdev;
 } mmiostate;
@@ -169,12 +169,8 @@ fprintf(stderr, "FUCK2 0x%x\n", offset);
     case VIRTIO_MMIO_VENDOR_ID:
 	    return VIRT_VENDOR;
     case VIRTIO_MMIO_DEVICE_FEATURES:
-// ???	    if (proxy->host_features_sel) {
-//	    return 0;
-//	    }
-	printf("FUCK %x\n", mmio.vqdev->features);
 	DPRINTF("RETURN 0x%x \n", mmio.vqdev->features);
-	    return mmio.vqdev->features;
+	    return mmio.vqdev->features >> (mmio.device_features_word) ? 32 : 0;
     case VIRTIO_MMIO_QUEUE_NUM_MAX:
 	    DPRINTF("For q %d, qnum is %d\n", mmio.qsel, mmio.vqdev->vqs[mmio.qsel].qnum);
 	    return mmio.vqdev->vqs[mmio.qsel].maxqnum;
@@ -205,6 +201,7 @@ fprintf(stderr, "FUCK2 0x%x\n", offset);
 static void virtio_mmio_write(uint64_t gpa, uint32_t value)
 {
 	uint64_t val64;
+	uint32_t low, high;
 	unsigned int offset = gpa - mmio.bar;
 	
 	DPRINTF("virtio_mmio_write offset %s 0x%x value 0x%x\n", virtio_names[offset], (int)offset, value);
@@ -237,8 +234,21 @@ static void virtio_mmio_write(uint64_t gpa, uint32_t value)
 #endif
     switch (offset) {
     case VIRTIO_MMIO_DEVICE_FEATURES_SEL:
-        mmio.host_features_sel = value;
+        mmio.device_features_word = value;
         break;
+    case VIRTIO_MMIO_DEVICE_FEATURES:
+	if (mmio.device_features_word) {
+	    /* changing the high word. */
+	    low = mmio.vqdev->features;
+	    high = value;
+	} else {
+	    /* changing the low word. */
+	    high = (mmio.vqdev->features >> 32);
+	    low = value;
+	}
+	mmio.vqdev->features = ((uint64_t)high << 32) | low;
+	DPRINTF("Set VIRTIO_MMIO_DEVICE_FEATURES to %p\n", mmio.vqdev->features);
+	break;
 	/* what's the difference here? Maybe FEATURES is the one you offer. */
     case VIRTIO_MMIO_DRIVER_FEATURES:
         if (!mmio.guest_features_sel) {
