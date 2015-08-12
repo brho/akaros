@@ -52,7 +52,6 @@ struct schedule_ops {
 							  unsigned long);
 	/* Functions event handling wants */
 	void (*preempt_pending)(void);
-	void (*spawn_thread)(uintptr_t pc_start, void *data);	/* don't run yet */
 };
 extern struct schedule_ops *sched_ops;
 

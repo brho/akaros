@@ -317,22 +317,13 @@ int handle_events(uint32_t vcoreid)
 void handle_event_q(struct event_queue *ev_q)
 {
 	/* If the program wants to handle the ev_q on its own: */
-	if (ev_q->ev_flags & (EVENT_JUSTHANDLEIT | EVENT_THREAD)) {
+	if (ev_q->ev_flags & EVENT_JUSTHANDLEIT) {
 		if (!ev_q->ev_handler) {
 			printf("No ev_handler installed for ev_q %08p, aborting!\n", ev_q);
 			return;
 		}
-		if (ev_q->ev_flags & EVENT_JUSTHANDLEIT) {
-			/* Remember this can't block or page fault */
-			ev_q->ev_handler(ev_q);
-		} else if (ev_q->ev_flags & EVENT_THREAD) {
-			/* 2LS sched op.  The 2LS can use an existing thread if it wants,
-			 * but do so inside spawn_thread() */
-			if (sched_ops->spawn_thread)
-				sched_ops->spawn_thread((uintptr_t)ev_q->ev_handler, ev_q);
-			else
-				printf("2LS can't spawn a thread for ev_q %08p\n", ev_q);
-		}
+		/* Remember this can't block or page fault */
+		ev_q->ev_handler(ev_q);
 		return;
 	}
 	printd("[event] handling ev_q %08p on vcore %d\n", ev_q, vcore_id());

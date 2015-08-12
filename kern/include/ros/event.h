@@ -27,7 +27,6 @@
 
 /* Flags from the program to the 2LS */
 #define EVENT_JUSTHANDLEIT		0x10000	/* 2LS should handle the ev_q */
-#define EVENT_THREAD			0x20000	/* spawn thread to handle ev_q */
 
 /* Event Message Types */
 #define EV_NONE					 0
