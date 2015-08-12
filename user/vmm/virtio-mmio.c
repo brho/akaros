@@ -46,7 +46,10 @@ int debug_virtio_mmio = 1;
 
 
 #define VIRT_MAGIC 0x74726976 /* 'virt' */
-#define VIRT_VERSION 2
+/* version is a real mess. A real mess. I don't understand it at all. Let's stick with 1, which sucks, 
+ * instead of 2, which seems to be not supported right. I think.
+ */
+#define VIRT_VERSION 1
 #define VIRT_VENDOR 0x554D4551 /* 'QEMU' */
 
 
@@ -58,7 +61,7 @@ typedef struct {
 	int pagesize;
 	int page_shift;
 	int device_features_word; // if this is 1, use the high 32 bits. 
-	int guest_features_sel;
+	int driver_features_word;
 	struct vqdev *vqdev;
 } mmiostate;
 
@@ -107,6 +110,7 @@ static uint32_t virtio_mmio_read(uint64_t gpa)
 {
 
 	unsigned int offset = gpa - mmio.bar;
+	uint32_t low;
 	
 	DPRINTF("virtio_mmio_read offset %s 0x%x\n", virtio_names[offset],(int)offset);
 
@@ -169,8 +173,10 @@ fprintf(stderr, "FUCK2 0x%x\n", offset);
     case VIRTIO_MMIO_VENDOR_ID:
 	    return VIRT_VENDOR;
     case VIRTIO_MMIO_DEVICE_FEATURES:
-	DPRINTF("RETURN 0x%x \n", mmio.vqdev->features);
-	    return mmio.vqdev->features >> (mmio.device_features_word) ? 32 : 0;
+	low = mmio.vqdev->device_features >> ((mmio.device_features_word) ? 32 : 0);
+	DPRINTF("RETURN from 0x%x 32 bits of word %s : 0x%x \n", mmio.vqdev->device_features, 
+				mmio.device_features_word ? "high" : "low", low);
+	    return low;
     case VIRTIO_MMIO_QUEUE_NUM_MAX:
 	    DPRINTF("For q %d, qnum is %d\n", mmio.qsel, mmio.vqdev->vqs[mmio.qsel].qnum);
 	    return mmio.vqdev->vqs[mmio.qsel].maxqnum;
@@ -239,24 +245,31 @@ static void virtio_mmio_write(uint64_t gpa, uint32_t value)
     case VIRTIO_MMIO_DEVICE_FEATURES:
 	if (mmio.device_features_word) {
 	    /* changing the high word. */
-	    low = mmio.vqdev->features;
+	    low = mmio.vqdev->device_features;
 	    high = value;
 	} else {
 	    /* changing the low word. */
-	    high = (mmio.vqdev->features >> 32);
+	    high = (mmio.vqdev->device_features >> 32);
 	    low = value;
 	}
-	mmio.vqdev->features = ((uint64_t)high << 32) | low;
-	DPRINTF("Set VIRTIO_MMIO_DEVICE_FEATURES to %p\n", mmio.vqdev->features);
+	mmio.vqdev->device_features = ((uint64_t)high << 32) | low;
+	DPRINTF("Set VIRTIO_MMIO_DEVICE_FEATURES to %p\n", mmio.vqdev->device_features);
 	break;
-	/* what's the difference here? Maybe FEATURES is the one you offer. */
     case VIRTIO_MMIO_DRIVER_FEATURES:
-        if (!mmio.guest_features_sel) {
-            mmio.guest_features_sel = value;
-        }
+	if (mmio.driver_features_word) {
+	    /* changing the high word. */
+	    low = mmio.vqdev->driver_features;
+	    high = value;
+	} else {
+	    /* changing the low word. */
+	    high = (mmio.vqdev->driver_features >> 32);
+	    low = value;
+	}
+	mmio.vqdev->driver_features = ((uint64_t)high << 32) | low;
+	DPRINTF("Set VIRTIO_MMIO_DRIVER_FEATURES to %p\n", mmio.vqdev->driver_features);
         break;
     case VIRTIO_MMIO_DRIVER_FEATURES_SEL:
-	    mmio.guest_features_sel = value;
+	    mmio.driver_features_word = value;
         break;
 
     case VIRTIO_MMIO_GUEST_PAGE_SIZE:
