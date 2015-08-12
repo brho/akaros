@@ -1135,6 +1135,7 @@ struct emmsr emmsrs[] = {
 	// aaaaaahhhhhhhhhhhhhhhhhhhhh
 	{MSR_ARCH_PERFMON_EVENTSEL0, "MSR_ARCH_PERFMON_EVENTSEL0", emsr_ok},
 	{MSR_ARCH_PERFMON_EVENTSEL1, "MSR_ARCH_PERFMON_EVENTSEL0", emsr_ok},
+	{MSR_IA32_PERF_CAPABILITIES, "MSR_IA32_PERF_CAPABILITIES", emsr_ok},
 	// unsafe.
 	{MSR_IA32_APICBASE, "MSR_IA32_APICBASE", emsr_fakewrite},
 
