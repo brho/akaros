@@ -16,7 +16,7 @@ __BEGIN_DECLS
 
 /********* Event_q Setup / Registration  ***********/
 struct event_queue *get_big_event_q_raw(void);
-struct event_queue *get_big_event_q(void);
+struct event_queue *get_big_event_q(int mbox_type);
 void event_mbox_init(struct event_mbox *ev_mbox, int mbox_type);
 void put_big_event_q_raw(struct event_queue *ev_q);
 void put_big_event_q(struct event_queue *ev_q);

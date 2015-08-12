@@ -50,10 +50,10 @@ struct event_queue *get_big_event_q_raw(void)
 	return (struct event_queue*)big_q;
 }
 
-struct event_queue *get_big_event_q(void)
+struct event_queue *get_big_event_q(int mbox_type)
 {
 	struct event_queue *big_q = get_big_event_q_raw();
-	event_mbox_init(big_q->ev_mbox, EV_MBOX_UCQ);
+	event_mbox_init(big_q->ev_mbox, mbox_type);
 	return big_q;
 }
 

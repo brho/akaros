@@ -168,7 +168,7 @@ static void init_alarm_service(void)
 	/* Since we're doing SPAM_PUBLIC later, we actually don't need a big ev_q.
 	 * But someone might copy/paste this and change a flag. */
 	register_ev_handler(EV_ALARM, handle_user_alarm, 0);
-	if (!(ev_q = get_big_event_q())) {
+	if (!(ev_q = get_big_event_q(EV_MBOX_UCQ))) {
 		perror("Useralarm: Failed ev_q");
 		return;
 	}

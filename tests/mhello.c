@@ -48,7 +48,7 @@ int main(int argc, char** argv)
 	assert(!in_vcore_context());
 	
 	/* prep indirect ev_q.  Note we grab a big one */
-	indirect_q = get_big_event_q();
+	indirect_q = get_big_event_q(EV_MBOX_UCQ);
 	indirect_q->ev_flags = EVENT_IPI;
 	indirect_q->ev_vcore = 1;			/* IPI core 1 */
 	indirect_q->ev_handler = 0;
