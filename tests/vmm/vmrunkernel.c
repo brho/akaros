@@ -66,28 +66,29 @@ void *consout(void *arg)
 	for(num = 0;;num++) {
 		/* host: use any buffers we should have been sent. */
 		head = wait_for_vq_desc(v, iov, &outlen, &inlen);
+		(void) getchar();
 		if (debug)
-			printf("vq desc head %d, gaveit %d gotitback %d\n", head, gaveit, gotitback);
+			printf("CCC: vq desc head %d, gaveit %d gotitback %d\n", head, gaveit, gotitback);
 		for(i = 0; debug && i < outlen + inlen; i++)
-			printf("v[%d/%d] v %p len %d\n", i, outlen + inlen, iov[i].v, iov[i].length);
+			printf("CCC: v[%d/%d] v %p len %d\n", i, outlen + inlen, iov[i].v, iov[i].length);
 		/* host: if we got an output buffer, just output it. */
 		for(i = 0; i < outlen; i++) {
 			num++;
-			printf("Host:%s:\n", (char *)iov[i].v);
+			printf("CCC: Host:%s:\n", (char *)iov[i].v);
 		}
 		
 		if (debug)
-			printf("outlen is %d; inlen is %d\n", outlen, inlen);
+			printf("CCC: outlen is %d; inlen is %d\n", outlen, inlen);
 		/* host: fill in the writeable buffers. */
 		/* why we're getting these I don't know. */
 		for (i = outlen; i < outlen + inlen; i++) {
-			if (debug) fprintf(stderr, "send back empty writeable");
+			if (debug) fprintf(stderr, "CCC: send back empty writeable");
 			iov[i].length = 0;
 		}
-		if (debug) printf("call add_used\n");
+		if (debug) printf("CCC: call add_used\n");
 		/* host: now ack that we used them all. */
 		add_used(v, head, outlen+inlen);
-		if (debug) printf("DONE call add_used\n");
+		if (debug) printf("CCC: DONE call add_used\n");
 	}
 	fprintf(stderr, "All done\n");
 	return NULL;
@@ -330,9 +331,9 @@ int main(int argc, char **argv)
 		int c;
 		vmctl.command = REG_RIP;
 		printf("RESUME?\n");
-		c = getchar();
-		if (c == 'q')
-			break;
+		//c = getchar();
+		//if (c == 'q')
+			//break;
 		printf("RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
 		//showstatus(stdout, &vmctl);
 		// this will be in a function, someday.

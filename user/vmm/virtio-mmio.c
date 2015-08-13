@@ -301,7 +301,7 @@ static void virtio_mmio_write(uint64_t gpa, uint32_t value)
 							  mmio.vqdev->vqs[mmio.qsel].qnum,
 							  mmio.vqdev->vqs[mmio.qsel].qalign,
 							  false, // weak_barriers
-							  mmio.vqdev->vqs[mmio.qsel].pfn,
+							  mmio.vqdev->vqs[mmio.qsel].pfn * mmio.vqdev->vqs[mmio.qsel].qalign,
 							  NULL, NULL, /* callbacks */
  							  mmio.vqdev->vqs[mmio.qsel].name);
 		    fprintf(stderr, "START THE THREAD. pfn is 0x%x, virtio is %p\n", mmio.pagesize, va->arg->virtio);

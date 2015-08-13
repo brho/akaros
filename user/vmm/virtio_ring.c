@@ -688,15 +688,12 @@ struct virtqueue *vring_new_virtqueue(unsigned int index,
 		exit(1);
 	}
 
-#if 0 // pretty sure this is wrong? Or not? 
 	vq = mmap((int*)4096, sizeof(*vq) + sizeof(void *) * num + 2*PGSIZE, PROT_READ | PROT_WRITE,
 		  MAP_ANONYMOUS, -1, 0);
 	if (vq == MAP_FAILED) {
 		perror("Unable to mmap vq");
 		exit(1);
 	}
-#endif
-	vq = pages;
 	fprintf(stderr, "VQ %p %d bytes \n", vq, num * vring_align); /* really? */
 	if (!vq)
 		return NULL;
@@ -978,16 +975,11 @@ unsigned int wait_for_vq_desc(struct virtqueue *_vq,
 	}
 	*out_num = *in_num = 0;
 	/* There's nothing available? */
-fprintf(stderr, "last_avail %d\n"); 
-	while (! vq->vring.avail) {
-		uthread_sleep(1);
-		fprintf(stderr, "last_avail %p\n", vq->vring.avail); 
-		hexdump(stderr, &(vq->vring), 96);
-	}
+fprintf(stderr, "last_avail %d\n", last_avail);  
 		;
-fprintf(stderr, "vq %p vq->vring.avail %p idx %d\n", vq, vq->vring.avail, vq->vring.avail);
+fprintf(stderr, "vq %p vq->vring.avail %p idx %d\n", vq, vq->vring.avail, vq->vring.avail); (void)getchar();
+j = 0;
 	while (last_avail == vq->vring.avail->idx) {
-fprintf(stderr, "%d.", j++);
 		//uint64_t event;
 		if (virtqueue_is_broken(_vq)) {
 			return 0;
@@ -998,35 +990,31 @@ fprintf(stderr, "%d.", j++);
 		 * Guest about what we've used up to now.
 
 		trigger_irq(vq);
-fprintf(stderr, "%d.", j++);
 		 */
 		/* OK, now we need to know about added descriptors. */
 		vq->vring.used->flags &= ~VRING_USED_F_NO_NOTIFY;
 
-fprintf(stderr, "%d.", j++);
 		/*
 		 * They could have slipped one in as we were doing that: make
 		 * sure it's written, then check again.
 		 */
 		mb();
-fprintf(stderr, "%d.", j++);
 		if (last_avail != vq->vring.avail->idx) {
 			vq->vring.used->flags |= VRING_USED_F_NO_NOTIFY;
 			break;
 		}
 
-fprintf(stderr, "%d.", j++);
 		/* Nothing new?  Wait for eventfd to tell us they refilled. *
 		if (read(vq->eventfd, &event, sizeof(event)) != sizeof(event))
 			errx(1, "Event read failed?");
 		*/
 		/* We don't need to be notified again. */
 		vq->vring.used->flags |= VRING_USED_F_NO_NOTIFY;
-fprintf(stderr, "%d.", j++);
 	}
 
 	/* Check it isn't doing very strange things with descriptor numbers. */
-fprintf(stderr, "out of loop %d.", j++);
+//showvq(_vq);
+//fprintf(stderr, "out of loop %d.", j++); (void)getchar();
 	if ((uint16_t)(vq->vring.avail->idx - last_avail) > vq->vring.num)
 		errx(1, "Guest moved used index from %u to %u",
 		     last_avail, vq->vring.avail->idx);
@@ -1037,7 +1025,6 @@ fprintf(stderr, "out of loop %d.", j++);
 	 */
 	rmb();
 
-fprintf(stderr, "out of loop %d.", j++);
 	/*
 	 * Grab the next descriptor number they're advertising, and increment
 	 * the index we've seen.
@@ -1045,16 +1032,13 @@ fprintf(stderr, "out of loop %d.", j++);
 	head = vq->vring.avail->ring[last_avail % vq->vring.num];
 	lg_last_avail(vq)++;
 
-fprintf(stderr, "out of loop %d.", j++);
 	/* If their number is silly, that's a fatal mistake. */
 	if (head >= vq->vring.num)
 		errx(1, "Guest says index %u is available", head);
 
-fprintf(stderr, "out of loop %d.", j++);
 	/* When we start there are none of either input nor output. */
 	*out_num = *in_num = 0;
 
-fprintf(stderr, "out of loop %d.", j++);
 	max = vq->vring.num;
 	desc = vq->vring.desc;
 	i = head;
@@ -1080,9 +1064,7 @@ fprintf(stderr, "out of loop %d.", j++);
 	}
 
 
-fprintf(stderr, "out of loop %d.", j++);
 	do {
-fprintf(stderr, "do loop %d.", j++);
 		/* Grab the first descriptor, and check it's OK. */
 		iov[*out_num + *in_num].length = desc[i].len;
 		iov[*out_num + *in_num].v
@@ -1105,7 +1087,7 @@ fprintf(stderr, "do loop %d.", j++);
 			errx(1, "Looped descriptor");
 	} while ((i = next_desc(desc, i, max)) != max);
 
-fprintf(stderr, "RETURN head %d\n", head);
+fprintf(stderr, "RETURN head %d\n", head); (void)getchar();
 	return head;
 }
 
