@@ -51,6 +51,8 @@
 #define END_USE(_vq) \
 	do { BUG_ON(!(_vq)->in_use); (_vq)->in_use = 0; } while(0)
 
+int vringdebug = 0;
+
 struct vring_virtqueue {
 	struct virtqueue vq;
 
@@ -232,7 +234,7 @@ static inline int virtqueue_add_avail(struct virtqueue *_vq,
 	canary = vq->vq.num_free;
 
 	if (vq->vq.num_free < total_sg) {
-		if (1) fprintf(stderr, "Can't add buf len %i - avail = %i\n",
+		if (vringdebug) fprintf(stderr, "Can't add buf len %i - avail = %i\n",
 				 total_sg, vq->vq.num_free);
 		/* FIXME: for historical reasons, we force a notify here if
 		 * there are outgoing parts to the buffer.  Presumably the
@@ -288,7 +290,7 @@ add_head:
 	if (unlikely(vq->num_added == (1 << 16) - 1))
 		virtqueue_kick(_vq);
 
-	if (1) fprintf(stderr, "Added buffer head %i to %p\n", head, vq);
+	if (vringdebug) fprintf(stderr, "Added buffer head %i to %p\n", head, vq);
 	END_USE(vq);
 	BUG_ON(vq->vq.num_free > canary);
 	return 0;
@@ -478,7 +480,7 @@ void *virtqueue_get_buf_used(struct virtqueue *_vq, unsigned int *len)
 	}
 
 	if (!more_used(vq)) {
-		if (1) fprintf(stderr, "No more buffers in queue\n");
+		if (vringdebug) fprintf(stderr, "No more buffers in queue\n");
 		END_USE(vq);
 		return NULL;
 	}
@@ -684,7 +686,7 @@ struct virtqueue *vring_new_virtqueue(unsigned int index,
 
 	/* We assume num is a power of 2. */
 	if (num & (num - 1)) {
-		if (1) fprintf(stderr, "Bad virtqueue length %u\n", num);
+		if (vringdebug) fprintf(stderr, "Bad virtqueue length %u\n", num);
 		exit(1);
 	}
 
@@ -856,7 +858,7 @@ int virtio_get_buf_avail_start(struct virtqueue *_vq, uint16_t *last_avail_idx, 
 	head = vq->vring.avail->ring[i];
 
 	if (head >= vq->vring.num) {
-		if (1) fprintf(stderr, "Guest says index %u > %u is available",
+		if (vringdebug) fprintf(stderr, "Guest says index %u > %u is available",
 			   head, vq->vring.num);
 		return -EINVAL;
 	}
@@ -870,7 +872,7 @@ int virtio_get_buf_avail_start(struct virtqueue *_vq, uint16_t *last_avail_idx, 
 	}
 
 	if (sgp) {
-		if (1) fprintf(stderr, "entry @%d is %d long\n", head, sglen);
+		if (vringdebug) fprintf(stderr, "entry @%d is %d long\n", head, sglen);
 
 		sg = calloc(sglen, sizeof(*sg));
 		*sgp = sg;
@@ -969,16 +971,13 @@ unsigned int wait_for_vq_desc(struct virtqueue *_vq,
 	uint16_t last_avail = lg_last_avail(vq);
 	int j = 0;
 
-	if (1){
-		 fprintf(stderr, "out_num %p in_num %p\n", out_num, in_num);
+	if (vringdebug){
+		fprintf(stderr, "out_num %p in_num %p\n", out_num, in_num);
 		fprintf(stderr, "va %p vq->vring %p\n", vq, vq->vring);
 	}
 	*out_num = *in_num = 0;
 	/* There's nothing available? */
-fprintf(stderr, "last_avail %d\n", last_avail);  
-		;
-fprintf(stderr, "vq %p vq->vring.avail %p idx %d\n", vq, vq->vring.avail, vq->vring.avail); (void)getchar();
-j = 0;
+	j = 0;
 	while (last_avail == vq->vring.avail->idx) {
 		//uint64_t event;
 		if (virtqueue_is_broken(_vq)) {
@@ -1087,7 +1086,7 @@ j = 0;
 			errx(1, "Looped descriptor");
 	} while ((i = next_desc(desc, i, max)) != max);
 
-fprintf(stderr, "RETURN head %d\n", head); (void)getchar();
+	if (vringdebug) fprintf(stderr, "RETURN head %d\n", head); 
 	return head;
 }
 

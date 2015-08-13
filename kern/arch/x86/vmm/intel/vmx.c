@@ -472,7 +472,8 @@ check_vmxec_controls(struct vmxec const *v, bool have_true_msr,
 			   v->set_to_1, v->set_to_0, reserved_1);
 		printk(" reserved_0 0x%x", reserved_0);
 		printk(" changeable_bits 0x%x\n", changeable_bits);
-		return false;
+		printk(" TOO BAD MAX ... we're going ahead .... no error .... \n");
+		//return false;
 	}
 
 	*result = v->set_to_1 | reserved_1;
@@ -1660,23 +1661,23 @@ int vmx_launch(struct vmctl *v) {
 	vmx_get_cpu(vcpu);
 	switch(v->command) {
 	case REG_ALL:
-		printk("REG_ALL\n");
+		printd("REG_ALL\n");
 		// fallthrough
 		vcpu->regs = v->regs;
 		vmcs_writel(GUEST_RSP, v->regs.tf_rsp);
 		vmcs_writel(GUEST_RIP, v->regs.tf_rip);
 		break;
 	case REG_RSP_RIP_CR3:
-		printk("REG_RSP_RIP_CR3\n");
+		printd("REG_RSP_RIP_CR3\n");
 		vmcs_writel(GUEST_RSP, v->regs.tf_rsp);
 		vmcs_writel(GUEST_CR3, v->cr3);
 		// fallthrough
 	case REG_RIP:
-		printk("REG_RIP %p\n", v->regs.tf_rip);
+		printd("REG_RIP %p\n", v->regs.tf_rip);
 		vmcs_writel(GUEST_RIP, v->regs.tf_rip);
 		break;
 	case RESUME:
-		printk("RESUME\n");
+		printd("RESUME\n");
 		break;
 	default: 
 		error(EINVAL, "Bad command in vmx_launch");
@@ -1769,7 +1770,7 @@ int vmx_launch(struct vmctl *v) {
 		}
 	}
 
-	printk("RETURN. ip %016lx sp %016lx, shutdown 0x%lx ret 0x%lx\n",
+	printd("RETURN. ip %016lx sp %016lx, shutdown 0x%lx ret 0x%lx\n",
 	       vcpu->regs.tf_rip, vcpu->regs.tf_rsp, vcpu->shutdown, vcpu->shutdown);
 	v->regs = vcpu->regs;
 	v->shutdown = vcpu->shutdown;

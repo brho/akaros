@@ -40,7 +40,7 @@ int nr_threads = 3;
 char *line, *consline, *outline;
 struct scatterlist iov[32];
 unsigned int inlen, outlen, conslen;
-int debug = 1;
+int debug = 0;
 /* unlike Linux, this shared struct is for both host and guest. */
 //	struct virtqueue *constoguest = 
 //		vring_new_virtqueue(0, 512, 8192, 0, inpages, NULL, NULL, "test");
@@ -58,15 +58,14 @@ void *consout(void *arg)
 	uint32_t vv;
 	int i;
 	int num;
-	printf("Sleep 15 seconds\n");
-	uthread_sleep(15);
-	printf("----------------------- TT a %p\n", a);
-	printf("talk thread ttargs %x v %x\n", a, v);
+	if (debug) {
+		printf("----------------------- TT a %p\n", a);
+		printf("talk thread ttargs %x v %x\n", a, v);
+	}
 	
 	for(num = 0;;num++) {
 		/* host: use any buffers we should have been sent. */
 		head = wait_for_vq_desc(v, iov, &outlen, &inlen);
-		(void) getchar();
 		if (debug)
 			printf("CCC: vq desc head %d, gaveit %d gotitback %d\n", head, gaveit, gotitback);
 		for(i = 0; debug && i < outlen + inlen; i++)
@@ -74,7 +73,9 @@ void *consout(void *arg)
 		/* host: if we got an output buffer, just output it. */
 		for(i = 0; i < outlen; i++) {
 			num++;
-			printf("CCC: Host:%s:\n", (char *)iov[i].v);
+			int j;
+			for (j = 0; j < iov[i].length; j++)
+				printf("%c", ((char *)iov[i].v)[j]);
 		}
 		
 		if (debug)
@@ -330,22 +331,22 @@ int main(int argc, char **argv)
 		void showstatus(FILE *f, struct vmctl *v);
 		int c;
 		vmctl.command = REG_RIP;
-		printf("RESUME?\n");
+		if (debug) printf("RESUME?\n");
 		//c = getchar();
 		//if (c == 'q')
 			//break;
-		printf("RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
+		if (debug) printf("RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
 		//showstatus(stdout, &vmctl);
 		// this will be in a function, someday.
 		// A rough check: is the GPA 
 		if ((vmctl.shutdown == 5/*EXIT_REASON_EPT_VIOLATION*/) && ((vmctl.gpa & ~0xfffULL) == virtiobase)) {
-			printf("DO SOME VIRTIO\n");
+			if (debug) printf("DO SOME VIRTIO\n");
 			virtio_mmio(&vmctl);
 			vmctl.shutdown = 0;
 			vmctl.gpa = 0;
 			vmctl.command = REG_ALL;
 		}
-		printf("NOW DO A RESUME\n");
+		if (debug) printf("NOW DO A RESUME\n");
 		ret = write(fd, &vmctl, sizeof(vmctl));
 		if (ret != sizeof(vmctl)) {
 			perror(cmd);

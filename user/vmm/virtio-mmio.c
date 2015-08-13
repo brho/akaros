@@ -40,7 +40,7 @@
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
 
-int debug_virtio_mmio = 1;
+int debug_virtio_mmio = 0;
 #define DPRINTF(fmt, ...) \
 	if (debug_virtio_mmio) { printf("virtio_mmio: " fmt , ## __VA_ARGS__); }
 
@@ -161,8 +161,6 @@ static uint32_t virtio_mmio_read(uint64_t gpa)
         return 0;
     }
 #endif
-DPRINTF("FUCK 0x%x\n", offset);
-fprintf(stderr, "FUCK2 0x%x\n", offset);
     switch (offset) {
     case VIRTIO_MMIO_MAGIC_VALUE:
 	    return VIRT_MAGIC;
@@ -301,7 +299,7 @@ static void virtio_mmio_write(uint64_t gpa, uint32_t value)
 							  mmio.vqdev->vqs[mmio.qsel].qnum,
 							  mmio.vqdev->vqs[mmio.qsel].qalign,
 							  false, // weak_barriers
-							  mmio.vqdev->vqs[mmio.qsel].pfn * mmio.vqdev->vqs[mmio.qsel].qalign,
+							  (void *)(mmio.vqdev->vqs[mmio.qsel].pfn * mmio.vqdev->vqs[mmio.qsel].qalign),
 							  NULL, NULL, /* callbacks */
  							  mmio.vqdev->vqs[mmio.qsel].name);
 		    fprintf(stderr, "START THE THREAD. pfn is 0x%x, virtio is %p\n", mmio.pagesize, va->arg->virtio);
