@@ -169,8 +169,8 @@ dev: VIRTIO_ID_CONSOLE,
 device_features: 0, /* Can't do it: linux console device does not support it. VIRTIO_F_VERSION_1*/
 numvqs: 2,
 vqs: {
-		{name: "consin", maxqnum: 2, f: &consin, arg: (void *)0},
-		{name: "consout", maxqnum: 2, f: consout, arg: (void *)0},
+		{name: "consin", maxqnum: 64, f: &consin, arg: (void *)0},
+		{name: "consout", maxqnum: 64, f: consout, arg: (void *)0},
 	}
 };
 

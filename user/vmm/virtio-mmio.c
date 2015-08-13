@@ -296,7 +296,14 @@ static void virtio_mmio_write(uint64_t gpa, uint32_t value)
 		    // let's kick off the thread and see how it goes?
 		    struct virtio_threadarg *va = malloc(sizeof(*va));
 		    va->arg = &mmio.vqdev->vqs[mmio.qsel];
-		    va->arg->virtio = (void *)(va->arg->pfn * mmio.pagesize);
+
+		    va->arg->virtio = vring_new_virtqueue(mmio.qsel, 
+							  mmio.vqdev->vqs[mmio.qsel].qnum,
+							  mmio.vqdev->vqs[mmio.qsel].qalign,
+							  false, // weak_barriers
+							  mmio.vqdev->vqs[mmio.qsel].pfn,
+							  NULL, NULL, /* callbacks */
+ 							  mmio.vqdev->vqs[mmio.qsel].name);
 		    fprintf(stderr, "START THE THREAD. pfn is 0x%x, virtio is %p\n", mmio.pagesize, va->arg->virtio);
 		    if (pthread_create(&va->arg->thread, NULL, va->arg->f, va)) {
 			    fprintf(stderr, "pth_create failed for vq %s", va->arg->name);

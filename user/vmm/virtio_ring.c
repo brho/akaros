@@ -688,17 +688,20 @@ struct virtqueue *vring_new_virtqueue(unsigned int index,
 		exit(1);
 	}
 
+#if 0 // pretty sure this is wrong? Or not? 
 	vq = mmap((int*)4096, sizeof(*vq) + sizeof(void *) * num + 2*PGSIZE, PROT_READ | PROT_WRITE,
 		  MAP_ANONYMOUS, -1, 0);
 	if (vq == MAP_FAILED) {
 		perror("Unable to mmap vq");
 		exit(1);
 	}
-
-	fprintf(stderr, "VQ %p %d bytes \n", vq, sizeof(*vq) + sizeof(void *) * num + 2*PGSIZE);
+#endif
+	vq = pages;
+	fprintf(stderr, "VQ %p %d bytes \n", vq, num * vring_align); /* really? */
 	if (!vq)
 		return NULL;
 
+	// I *think* they correctly offset from vq for the vring? 
 	vring_init(&vq->vring, num, pages, vring_align);
 	fprintf(stderr, "done vring init\n");
 	vq->vq.callback = callback;
