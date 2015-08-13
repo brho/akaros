@@ -37,24 +37,23 @@ unsigned long long *p512, *p1, *p2m;
 
 void **my_retvals;
 int nr_threads = 3;
-char *line, *consline, *outline;
-struct scatterlist iov[32];
-unsigned int inlen, outlen, conslen;
 int debug = 0;
 /* unlike Linux, this shared struct is for both host and guest. */
 //	struct virtqueue *constoguest = 
 //		vring_new_virtqueue(0, 512, 8192, 0, inpages, NULL, NULL, "test");
-volatile int gaveit = 0, gotitback = 0;
-struct scatterlist out[] = { {NULL, sizeof(outline)}, };
-struct scatterlist in[] = { {NULL, sizeof(line)}, };
 uint64_t virtio_mmio_base = 0x100000000;
 
 void *consout(void *arg)
 {
+	char *line, *consline, *outline;
+	static struct scatterlist out[] = { {NULL, sizeof(outline)}, };
+	static struct scatterlist in[] = { {NULL, sizeof(line)}, };
+	static struct scatterlist iov[32];
 	struct virtio_threadarg *a = arg;
+	static unsigned int inlen, outlen, conslen;
 	struct virtqueue *v = a->arg->virtio;
 	fprintf(stderr, "talk thread ..\n");
-	uint16_t head;
+	uint16_t head, gaveit = 0, gotitback = 0;
 	uint32_t vv;
 	int i;
 	int num;
@@ -97,70 +96,49 @@ void *consout(void *arg)
 
 void *consin(void *arg)
 {
+	struct virtio_threadarg *a = arg;
+	char *line, *outline;
+	static char consline[128];
+	static struct scatterlist iov[32];
+	static struct scatterlist out[] = { {NULL, sizeof(outline)}, };
+	static struct scatterlist in[] = { {NULL, sizeof(line)}, };
 
-	fprintf(stderr, "consinput; nothing to do\n");
-#if 0
-	struct ttargs *a = arg;
-	void *v = a->virtio;
-	fprintf(stderr, "talk thread ..\n");
-	uint16_t head;
+	static unsigned int inlen, outlen, conslen;
+	struct virtqueue *v = a->arg->virtio;
+	fprintf(stderr, "consin thread ..\n");
+	uint16_t head, gaveit = 0, gotitback = 0;
 	uint32_t vv;
 	int i;
 	int num;
-	printf("Sleep 15 seconds\n");
-	uthread_sleep(15);
-	printf("----------------------- TT a %p\n", a);
-	printf("talk thread ttargs %x v %x\n", a, v);
 	
 	if (debug) printf("Spin on console being read, print num queues, halt\n");
-	while ((vv = read32(v+VIRTIO_MMIO_DRIVER_FEATURES)) == 0) {
-		printf("no ready ... \n");
-		if (debug) {
-			dumpvirtio_mmio(stdout, v);
-		}
-		printf("sleep 1 second\n");
-		uthread_sleep(1);
-	}
-	if (debug)printf("vv %x, set selector %x\n", vv, read32(v + VIRTIO_MMIO_DRIVER_FEATURES_SEL));
-	if (debug) printf("loop forever");
-	while (! quit)
-		;
+
 	for(num = 0;;num++) {
+		int debug = 1;
 		/* host: use any buffers we should have been sent. */
-		head = wait_for_vq_desc(guesttocons, iov, &outlen, &inlen);
+		head = wait_for_vq_desc(v, iov, &outlen, &inlen);
 		if (debug)
 			printf("vq desc head %d, gaveit %d gotitback %d\n", head, gaveit, gotitback);
 		for(i = 0; debug && i < outlen + inlen; i++)
 			printf("v[%d/%d] v %p len %d\n", i, outlen + inlen, iov[i].v, iov[i].length);
-		/* host: if we got an output buffer, just output it. */
-		for(i = 0; i < outlen; i++) {
-			num++;
-			printf("Host:%s:\n", (char *)iov[i].v);
-		}
-		
 		if (debug)
 			printf("outlen is %d; inlen is %d\n", outlen, inlen);
 		/* host: fill in the writeable buffers. */
 		for (i = outlen; i < outlen + inlen; i++) {
 			/* host: read a line. */
 			memset(consline, 0, 128);
-			if (1) {
-				if (fgets(consline, 4096-256, stdin) == NULL) {
-					exit(0);
-				} 
-				if (debug) printf("GOT A LINE:%s:\n", consline);
-			} else {
-				sprintf(consline, "hi there. %d\n", i);
-			}
+			if (fgets(consline, 4096-256, stdin) == NULL) {
+				exit(0);
+			} 
+			if (debug) printf("GOT A LINE:%s:\n", consline);
 			memmove(iov[i].v, consline, strlen(consline)+ 1);
 			iov[i].length = strlen(consline) + 1;
 		}
 		if (debug) printf("call add_used\n");
 		/* host: now ack that we used them all. */
-		add_used(guesttocons, head, outlen+inlen);
+		add_used(v, head, outlen+inlen);
 		if (debug) printf("DONE call add_used\n");
 	}
-#endif
 	fprintf(stderr, "All done\n");
 	return NULL;
 }
