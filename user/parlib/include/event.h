@@ -15,15 +15,18 @@
 __BEGIN_DECLS
 
 /********* Event_q Setup / Registration  ***********/
-struct event_queue *get_big_event_q_raw(void);
 struct event_queue *get_big_event_q(int mbox_type);
-void event_mbox_init(struct event_mbox *ev_mbox, int mbox_type);
-void put_big_event_q_raw(struct event_queue *ev_q);
-void put_big_event_q(struct event_queue *ev_q);
-void event_mbox_cleanup(struct event_mbox *ev_mbox);
+struct event_queue *get_big_event_q_raw(void);
 struct event_queue *get_event_q(void);
 struct event_queue *get_event_q_vcpd(uint32_t vcoreid, int ev_flags);
+void put_big_event_q(struct event_queue *ev_q);
+void put_big_event_q_raw(struct event_queue *ev_q);
 void put_event_q(struct event_queue *ev_q);
+void put_event_q_vcpd(struct event_queue *ev_q);
+
+void event_mbox_init(struct event_mbox *ev_mbox, int mbox_type);
+void event_mbox_cleanup(struct event_mbox *ev_mbox);
+
 void register_kevent_q(struct event_queue *ev_q, unsigned int ev_type);
 struct event_queue *clear_kevent_q(unsigned int ev_type);
 void enable_kevent(unsigned int ev_type, uint32_t vcoreid, int ev_flags);

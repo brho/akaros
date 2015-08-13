@@ -137,6 +137,11 @@ void put_event_q(struct event_queue *ev_q)
 	free(ev_q);
 }
 
+void put_event_q_vcpd(struct event_queue *ev_q)
+{
+	put_event_q(ev_q);
+}
+
 /* Sets ev_q to be the receiving end for kernel event ev_type */
 void register_kevent_q(struct event_queue *ev_q, unsigned int ev_type)
 {
