@@ -29,7 +29,7 @@ int main(int argc, char** argv)
 
 	printf("Trying to block\n");
 	/* Not doing anything else to it: no EVENT_IPI yet, etc. */
-	ev_q = get_big_event_q();
+	ev_q = get_eventq();
 	/* issue the diagnostic block syscall */
 	sysc.num = SYS_block;
 	sysc.arg0 = 5000;	/* 5ms */
@@ -84,7 +84,7 @@ int main(int argc, char** argv)
 	printf("Syscall unblocked, IPI broke me out of the loop.\n");
 
 	/* done */
-	put_big_event_q(ev_q);
+	put_eventq(ev_q);
 	printf("Syscall test exiting\n");
 	return 0;
 }

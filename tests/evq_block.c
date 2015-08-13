@@ -13,7 +13,7 @@
 
 static struct event_queue *get_ectlr_evq(void)
 {
-	struct event_queue *ev_q = get_big_event_q(EV_MBOX_UCQ);
+	struct event_queue *ev_q = get_eventq(EV_MBOX_UCQ);
 	evq_attach_wakeup_ctlr(ev_q);
 	return ev_q;
 }

@@ -41,7 +41,7 @@ __thread uint32_t __vc_rem_vcoreid;
  *
  * Use the 'regular' one for big_qs if you don't want to worry about the mbox
  * initalization */
-struct event_queue *get_big_event_q_raw(void)
+struct event_queue *get_eventq_raw(void)
 {
 	/* TODO: (PIN) should be pinned memory */
 	struct event_queue_big *big_q = malloc(sizeof(struct event_queue_big));
@@ -50,9 +50,9 @@ struct event_queue *get_big_event_q_raw(void)
 	return (struct event_queue*)big_q;
 }
 
-struct event_queue *get_big_event_q(int mbox_type)
+struct event_queue *get_eventq(int mbox_type)
 {
-	struct event_queue *big_q = get_big_event_q_raw();
+	struct event_queue *big_q = get_eventq_raw();
 	event_mbox_init(big_q->ev_mbox, mbox_type);
 	return big_q;
 }
@@ -79,7 +79,7 @@ void event_mbox_init(struct event_mbox *ev_mbox, int mbox_type)
 
 /* Give it up.  I don't recommend calling these unless you're sure the queues
  * aren't in use (unregistered, etc). (TODO: consider some checks for this) */
-void put_big_event_q_raw(struct event_queue *ev_q)
+void put_eventq_raw(struct event_queue *ev_q)
 {
 	/* if we use something other than malloc, we'll need to be aware that ev_q
 	 * is actually an event_queue_big.  One option is to use the flags, though
@@ -87,10 +87,10 @@ void put_big_event_q_raw(struct event_queue *ev_q)
 	free(ev_q);
 }
 
-void put_big_event_q(struct event_queue *ev_q)
+void put_eventq(struct event_queue *ev_q)
 {
 	event_mbox_cleanup(ev_q->ev_mbox);
-	put_big_event_q_raw(ev_q);
+	put_eventq_raw(ev_q);
 }
 
 void event_mbox_cleanup(struct event_mbox *ev_mbox)
@@ -109,7 +109,7 @@ void event_mbox_cleanup(struct event_mbox *ev_mbox)
 }
 
 /* Need to point this event_q to an mbox - usually to a vcpd */
-struct event_queue *get_event_q(void)
+struct event_queue *get_eventq_slim(void)
 {
 	/* TODO: (PIN) should be pinned memory */
 	struct event_queue *ev_q = malloc(sizeof(struct event_queue));
@@ -120,9 +120,9 @@ struct event_queue *get_event_q(void)
 /* Gets a small ev_q, with ev_mbox pointing to the vcpd mbox of vcoreid.  If
  * ev_flags has EVENT_VCORE_PRIVATE set, it'll give you the private mbox.  o/w,
  * you'll get the public one. */
-struct event_queue *get_event_q_vcpd(uint32_t vcoreid, int ev_flags)
+struct event_queue *get_eventq_vcpd(uint32_t vcoreid, int ev_flags)
 {
-	struct event_queue *ev_q = get_event_q();
+	struct event_queue *ev_q = get_eventq_slim();
 	if (ev_flags & EVENT_VCORE_PRIVATE)
 		ev_q->ev_mbox = &vcpd_of(vcoreid)->ev_mbox_private;
 	else
@@ -130,16 +130,16 @@ struct event_queue *get_event_q_vcpd(uint32_t vcoreid, int ev_flags)
 	return ev_q;
 }
 
-void put_event_q(struct event_queue *ev_q)
+void put_eventq_slim(struct event_queue *ev_q)
 {
 	/* if we use something other than malloc, we'll need to be aware that ev_q
 	 * is not an event_queue_big. */
 	free(ev_q);
 }
 
-void put_event_q_vcpd(struct event_queue *ev_q)
+void put_eventq_vcpd(struct event_queue *ev_q)
 {
-	put_event_q(ev_q);
+	put_eventq_slim(ev_q);
 }
 
 /* Sets ev_q to be the receiving end for kernel event ev_type */
@@ -166,7 +166,7 @@ struct event_queue *clear_kevent_q(unsigned int ev_type)
  * the other event functions together to get similar things done. */
 void enable_kevent(unsigned int ev_type, uint32_t vcoreid, int ev_flags)
 {
-	struct event_queue *ev_q = get_event_q_vcpd(vcoreid, ev_flags);
+	struct event_queue *ev_q = get_eventq_vcpd(vcoreid, ev_flags);
 	ev_q->ev_flags = ev_flags;
 	ev_q->ev_vcore = vcoreid;
 	ev_q->ev_handler = 0;

@@ -113,7 +113,7 @@ void uthread_mcp_init()
 	 * that yielding vcores do not miss the preemption messages. */
 	register_ev_handler(EV_VCORE_PREEMPT, handle_vc_preempt, 0);
 	register_ev_handler(EV_CHECK_MSGS, handle_vc_indir, 0);
-	preempt_ev_q = get_event_q();	/* small ev_q, mostly a vehicle for flags */
+	preempt_ev_q = get_eventq_slim();	/* small ev_q, mostly a vehicle for flags */
 	preempt_ev_q->ev_flags = EVENT_IPI | EVENT_SPAM_PUBLIC | EVENT_VCORE_APPRO |
 							 EVENT_VCORE_MUST_RUN | EVENT_WAKEUP;
 	/* Tell the kernel to use the ev_q (it's settings) for the two types.  Note

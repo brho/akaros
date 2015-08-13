@@ -54,7 +54,7 @@ void thread0_lib_init(void)
 {
 	memset(&thread0_info, 0, sizeof(thread0_info));
 	/* we don't care about the message, so don't bother with a UCQ */
-	sysc_evq = get_big_event_q(EV_MBOX_BITMAP);
+	sysc_evq = get_eventq(EV_MBOX_BITMAP);
 	sysc_evq->ev_flags = EVENT_INDIR | EVENT_WAKEUP;
 	register_ev_handler(EV_SYSCALL, thread0_handle_syscall, 0);
 }

@@ -62,7 +62,7 @@ int main(int argc, char **argv)
 	/* Since we're doing SPAM_PUBLIC later, we actually don't need a big ev_q.
 	 * But someone might copy/paste this and change a flag. */
 	register_ev_handler(EV_ALARM, handle_alarm, 0);
-	if (!(ev_q = get_big_event_q(EV_MBOX_UCQ))) {
+	if (!(ev_q = get_eventq(EV_MBOX_UCQ))) {
 		perror("Failed ev_q");	/* it'll actually PF if malloc fails */
 		exit(-1);
 	}

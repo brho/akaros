@@ -15,14 +15,14 @@
 __BEGIN_DECLS
 
 /********* Event_q Setup / Registration  ***********/
-struct event_queue *get_big_event_q(int mbox_type);
-struct event_queue *get_big_event_q_raw(void);
-struct event_queue *get_event_q(void);
-struct event_queue *get_event_q_vcpd(uint32_t vcoreid, int ev_flags);
-void put_big_event_q(struct event_queue *ev_q);
-void put_big_event_q_raw(struct event_queue *ev_q);
-void put_event_q(struct event_queue *ev_q);
-void put_event_q_vcpd(struct event_queue *ev_q);
+struct event_queue *get_eventq(int mbox_type);
+struct event_queue *get_eventq_raw(void);
+struct event_queue *get_eventq_slim(void);
+struct event_queue *get_eventq_vcpd(uint32_t vcoreid, int ev_flags);
+void put_eventq(struct event_queue *ev_q);
+void put_eventq_raw(struct event_queue *ev_q);
+void put_eventq_slim(struct event_queue *ev_q);
+void put_eventq_vcpd(struct event_queue *ev_q);
 
 void event_mbox_init(struct event_mbox *ev_mbox, int mbox_type);
 void event_mbox_cleanup(struct event_mbox *ev_mbox);

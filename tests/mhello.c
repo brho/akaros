@@ -48,7 +48,7 @@ int main(int argc, char** argv)
 	assert(!in_vcore_context());
 	
 	/* prep indirect ev_q.  Note we grab a big one */
-	indirect_q = get_big_event_q(EV_MBOX_UCQ);
+	indirect_q = get_eventq(EV_MBOX_UCQ);
 	indirect_q->ev_flags = EVENT_IPI;
 	indirect_q->ev_vcore = 1;			/* IPI core 1 */
 	indirect_q->ev_handler = 0;
@@ -69,7 +69,7 @@ int main(int argc, char** argv)
 	 * yourself with sys_self_notify(). */
 	enable_kevent(EV_USER_IPI, 0, EVENT_IPI | EVENT_VCORE_PRIVATE);
 	/* Receive pending preemption events.  (though there's no PP handler) */
-	struct event_queue *ev_q = get_event_q_vcpd(0, EVENT_VCORE_PRIVATE);
+	struct event_queue *ev_q = get_eventq_vcpd(0, EVENT_VCORE_PRIVATE);
 	ev_q->ev_flags = EVENT_IPI | EVENT_VCORE_APPRO;
 	register_kevent_q(ev_q, EV_PREEMPT_PENDING);
 	/* We also receive preemption events, it is set up in uthread.c */

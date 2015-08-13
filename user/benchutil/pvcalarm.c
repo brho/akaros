@@ -205,7 +205,7 @@ static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data, int vcoreid)
 	}
 	register_ev_handler(EV_ALARM, handle_pvcalarm, 0);
 	ev_flags = EVENT_IPI | EVENT_VCORE_PRIVATE;
-	ev_q = get_event_q_vcpd(vcoreid, ev_flags);
+	ev_q = get_eventq_vcpd(vcoreid, ev_flags);
 	if (!ev_q) {
 		perror("Pvcalarm: Failed ev_q");
 		return;
