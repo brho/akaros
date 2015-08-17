@@ -154,9 +154,9 @@
 #include <syscall.h>
 #include <arch/io.h>
 
+#include <ros/vmm.h>
 #include "vmx.h"
 #include "../vmm.h"
-#include <ros/vmm.h>
 
 #include "cpufeature.h"
 

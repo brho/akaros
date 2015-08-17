@@ -14,9 +14,9 @@
 #include <smp.h>
 #include <kmalloc.h>
 
+#include <ros/vmm.h>
 #include "intel/vmx.h"
 #include "vmm.h"
-#include <ros/vmm.h>
 
 /* TODO: have better cpuid info storage and checks */
 bool x86_supports_vmx = FALSE;

@@ -14,6 +14,8 @@
 #include <sys/mman.h>
 #include <vmm/coreboot_tables.h>
 #include <ros/vmm.h>
+#include <ros/arch/mmu.h>
+#include <ros/vmx.h>
 #include <parlib/uthread.h>
 #include <vmm/virtio.h>
 #include <vmm/virtio_mmio.h>
@@ -317,7 +319,7 @@ int main(int argc, char **argv)
 		//showstatus(stdout, &vmctl);
 		// this will be in a function, someday.
 		// A rough check: is the GPA 
-		if ((vmctl.shutdown == 5/*EXIT_REASON_EPT_VIOLATION*/) && ((vmctl.gpa & ~0xfffULL) == virtiobase)) {
+		if ((vmctl.shutdown == SHUTDOWN_EPT_VIOLATION) && ((vmctl.gpa & ~0xfffULL) == virtiobase)) {
 			if (debug) printf("DO SOME VIRTIO\n");
 			virtio_mmio(&vmctl);
 			vmctl.shutdown = 0;
