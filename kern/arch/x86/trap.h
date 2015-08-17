@@ -1,7 +1,7 @@
 #ifndef ROS_KERN_ARCH_TRAP_H
 #define ROS_KERN_ARCH_TRAP_H
 
-#include "msr-index.h"
+#include <ros/arch/msr-index.h>
 
 #define NUM_IRQS					256
 
