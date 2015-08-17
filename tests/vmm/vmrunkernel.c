@@ -161,7 +161,7 @@ int main(int argc, char **argv)
 	uint64_t virtiobase = 0x100000000ULL;
 	struct vmctl vmctl;
 	int amt;
-	int vmmflags = VMM_VMCALL_PRINTF;
+	int vmmflags = 0; // Disabled probably forever. VMM_VMCALL_PRINTF;
 	uint64_t entry = 0x1000000, kerneladdress = 0x1000000;
 	int nr_gpcs = 1;
 	int fd = open("#c/vmctl", O_RDWR), ret;
@@ -188,8 +188,8 @@ int main(int argc, char **argv)
 		if (*argv[0] != '-')
 			break;
 		switch(argv[0][1]) {
-		case 'n':
-			vmmflags &= ~VMM_VMCALL_PRINTF;
+		case 'v':
+			vmmflags |= VMM_VMCALL_PRINTF;
 			break;
 		default:
 			printf("BMAFR\n");
@@ -310,6 +310,7 @@ int main(int argc, char **argv)
 	while (1) {
 		void showstatus(FILE *f, struct vmctl *v);
 		int c;
+		uint8_t byte;
 		vmctl.command = REG_RIP;
 		if (debug) printf("RESUME?\n");
 		//c = getchar();
@@ -326,6 +327,22 @@ int main(int argc, char **argv)
 			vmctl.gpa = 0;
 			vmctl.command = REG_ALL;
 		}
+		if (vmctl.shutdown == SHUTDOWN_UNHANDLED_EXIT_REASON) {
+			switch(vmctl.ret_code){
+			case  EXIT_REASON_VMCALL:
+				byte = vmctl.regs.tf_rdi;
+				printf("%c", byte);
+				if (byte == '\n') printf("%c", 'V');
+				vmctl.regs.tf_rip += 3;
+				break;
+			default:
+				fprintf(stderr, "Don't know how to handle exit %d\n", vmctl.ret_code);
+				quit = 1;
+				break;
+			}
+		}
+		if (quit)
+			break;
 		if (debug) printf("NOW DO A RESUME\n");
 		ret = write(fd, &vmctl, sizeof(vmctl));
 		if (ret != sizeof(vmctl)) {

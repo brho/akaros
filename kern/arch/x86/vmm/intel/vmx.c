@@ -1712,10 +1712,10 @@ int vmx_launch(struct vmctl *v) {
 				// adjust the RIP
 			} else {
 				vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
-				uint8_t byte = vcpu->regs.tf_rdi;
-				printk("%p %c\n", byte, vcpu->regs.tf_rdi);
+#ifdef DEBUG
 				vmx_dump_cpu(vcpu);
 				printd("system call! WTF\n");
+#endif
 			}
 		} else if (ret == EXIT_REASON_CR_ACCESS) {
 			show_cr_access(vmcs_read32(EXIT_QUALIFICATION));
