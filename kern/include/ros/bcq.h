@@ -17,8 +17,11 @@
  * will have to deal with the clobbering. */
 #ifdef ROS_KERNEL
 #include <atomic.h>
+/* dequeue uses relax_vc, which is user-only.  Some kernel tests call dequeue.*/
+#define cpu_relax_vc(x) cpu_relax()
 #else
 #include <parlib/arch/atomic.h>
+#include <parlib/vcore.h>
 #endif /* ROS_KERNEL */
 
 /* Bounded Concurrent Queues, untrusted consumer
@@ -82,9 +85,6 @@
  * They both return 0 on success, or some error code on failure.
  *
  * TODO later:
- * How about an atomic_add_return for the prod?  Now that we use powers of two,
- * CAS is probably overkill.
- *
  * Automatically round up.
  *
  * Watch out for ABA.  Could use ctrs in the top of the indexes.  Not really an
@@ -184,7 +184,7 @@ struct bcq_header {
 		(_bcq)->wraps[__cons_pvt & ((_num_elems)-1)].rdy_for_cons = FALSE;     \
 		/* wait til we're the cons_pub, then advance it by one */              \
 		while ((_bcq)->hdr.cons_pub_idx != __cons_pvt)                         \
-			cpu_relax();                                                       \
+			cpu_relax_vc(vcore_id());                                          \
 		(_bcq)->hdr.cons_pub_idx = __cons_pvt + 1;                             \
 	}                                                                          \
 	__retval;                                                                  \
