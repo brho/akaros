@@ -25,13 +25,13 @@ int main(int argc, char** argv)
 	/* try to get a simple message */
 	struct event_msg msg;
 	/* 1: Spin til we can get a message (0 on success breaks) */
-	while (get_ucq_msg(ucq, &msg))
+	while (!get_ucq_msg(ucq, &msg))
 		cpu_relax();
 	printf("[user] Got simple message type %d(7) with A2 %08p(0xdeadbeef)\n",
 	       msg.ev_type, msg.ev_arg2);
 	/* 2: get a bunch */
 	for (int i = 0; i < 5000; i++) {
-		while (get_ucq_msg(ucq, &msg))
+		while (!get_ucq_msg(ucq, &msg))
 			cpu_relax();
 		assert(msg.ev_type == i);
 	}
@@ -45,13 +45,13 @@ int main(int argc, char** argv)
 	       atomic_read(&ucq->nr_extra_pgs));
 	/* this assumes 1000 is enough for a couple pages */
 	for (int i = 0; i < 1000; i++) {
-		while (get_ucq_msg(ucq, &msg))
+		while (!get_ucq_msg(ucq, &msg))
 			cpu_relax();
 		assert(msg.ev_type == i);
 	}
 	printf("[user] Done, extra pages: %d(0)\n", atomic_read(&ucq->nr_extra_pgs));
 	int extra = 0;
-	while (!get_ucq_msg(ucq, &msg)) {
+	while (get_ucq_msg(ucq, &msg)) {
 		printf("[user] got %d extra messages in the ucq, type %d\n", ++extra,
 		       msg.ev_type);
 	}

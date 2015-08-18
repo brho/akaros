@@ -245,8 +245,7 @@ bool extract_one_mbox_msg(struct event_mbox *ev_mbox, struct event_msg *ev_msg)
 {
 	switch (ev_mbox->type) {
 		case (EV_MBOX_UCQ):
-			/* get_ucq returns 0 on success, -1 on empty */
-			return get_ucq_msg(&ev_mbox->ucq, ev_msg) == 0;
+			return get_ucq_msg(&ev_mbox->ucq, ev_msg);
 		case (EV_MBOX_BITMAP):
 			return get_evbitmap_msg(&ev_mbox->evbm, ev_msg);
 		default:

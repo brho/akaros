@@ -59,9 +59,10 @@ void ucq_free_pgs(struct ucq *ucq)
 	munmap((void*)pg2, PGSIZE);
 }
 
-/* Consumer side, returns 0 on success and fills *msg with the ev_msg.  If the
- * ucq is empty, it will return -1. */
-int get_ucq_msg(struct ucq *ucq, struct event_msg *msg)
+/* Consumer side, returns TRUE on success and fills *msg with the ev_msg.  If
+ * the ucq appears empty, it will return FALSE.  Messages may have arrived after
+ * we started getting that we do not receive. */
+bool get_ucq_msg(struct ucq *ucq, struct event_msg *msg)
 {
 	uintptr_t my_idx;
 	struct ucq_page *old_page, *other_page;
@@ -75,7 +76,7 @@ loop_top:
 		/* The ucq is empty if the consumer and producer are on the same 'next'
 		 * slot. */
 		if (my_idx == atomic_read(&ucq->prod_idx))
-			return -1;
+			return FALSE;
 		/* Is the slot we want good?  If not, we're going to need to try and
 		 * move on to the next page.  If it is, we bypass all of this and try to
 		 * CAS on us getting my_idx. */
@@ -91,7 +92,7 @@ loop_top:
 			spin_pdr_unlock(ucq_lock);
 			/* Make sure this new slot has a producer (ucq isn't empty) */
 			if (my_idx == atomic_read(&ucq->prod_idx))
-				return -1;
+				return FALSE;
 			goto claim_slot;
 		}
 		/* At this point, the slot is bad, and all other possible consumers are
@@ -153,7 +154,7 @@ claim_slot:
 	wmb();	/* post the ready write before incrementing */
 	/* Increment nr_cons, showing we're done */
 	atomic_inc(&((struct ucq_page*)PTE_ADDR(my_idx))->header.nr_cons);
-	return 0;
+	return TRUE;
 }
 
 bool ucq_is_empty(struct ucq *ucq)
