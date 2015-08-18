@@ -890,6 +890,8 @@ vmx_dump_cpu(struct vmx_vcpu *vcpu)
 	unsigned long flags;
 
 	vmx_get_cpu(vcpu);
+	printk("GUEST_INTERRUPTIBILITY_INFO: 0x%08x\n",  vmcs_readl(GUEST_INTERRUPTIBILITY_INFO));
+	printk("VM_ENTRY_INTR_INFO_FIELD 0x%08x\n", vmcs_readl(VM_ENTRY_INTR_INFO_FIELD));
 	vcpu->regs.tf_rip = vmcs_readl(GUEST_RIP);
 	vcpu->regs.tf_rsp = vmcs_readl(GUEST_RSP);
 	flags = vmcs_readl(GUEST_RFLAGS);
@@ -1677,6 +1679,14 @@ int vmx_launch(struct vmctl *v) {
 		vmcs_writel(GUEST_RIP, v->regs.tf_rip);
 		break;
 	case RESUME:
+		/* If v->interrupt is non-zero, set it in the vmcs and
+		 * zero it in the vmctl. Else set RIP.
+		 */
+		if (v->interrupt) {
+			printk("Set GUEST_INTERRUPTIBILITY_INFO to 0x%x\n", v->interrupt);
+			vmcs_writel(GUEST_INTERRUPTIBILITY_INFO, v->interrupt);
+			v->interrupt = 0;
+		}
 		printd("RESUME\n");
 		break;
 	default: 
@@ -1733,7 +1743,16 @@ int vmx_launch(struct vmctl *v) {
 			if (vmx_handle_nmi_exception(vcpu)) 
 				vcpu->shutdown = SHUTDOWN_NMI_EXCEPTION;
 		} else if (ret == EXIT_REASON_EXTERNAL_INTERRUPT) {
-			printd("External interrupt\n");
+			printk("External interrupt\n");
+			vmx_dump_cpu(vcpu);
+			vmx_get_cpu(vcpu);
+			v->intrinfo1 = vmcs_readl(GUEST_INTERRUPTIBILITY_INFO);
+			v->intrinfo2 = vmcs_readl(VM_ENTRY_INTR_INFO_FIELD);
+			vmcs_write32(GUEST_INTERRUPTIBILITY_INFO, 0);
+			vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);
+			vmx_put_cpu(vcpu);
+			printk("GUEST_INTERRUPTIBILITY_INFO: 0x%08x\n",  v->intrinfo1);
+			printk("VM_ENTRY_INTR_INFO_FIELD 0x%08x\n", v->intrinfo2);
 			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
 		} else if (ret == EXIT_REASON_MSR_READ) {
 			printd("msr read\n");
@@ -1753,7 +1772,10 @@ int vmx_launch(struct vmctl *v) {
 		} else {
 			printk("unhandled exit: reason 0x%x, exit qualification 0x%x\n",
 			       ret, vmcs_read32(EXIT_QUALIFICATION));
-			//vmx_dump_cpu(vcpu);
+			if (ret & 0x80000000) {
+				printk("entry failed.\n");
+				vmx_dump_cpu(vcpu);
+			}
 			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
 		}
 

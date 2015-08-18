@@ -31,6 +31,9 @@ struct vmctl {
 	uint64_t shutdown;
 	uint64_t ret_code;
 	uint64_t core;
+	uint32_t interrupt;
+	uint32_t intrinfo1;
+	uint32_t intrinfo2;
 	struct hw_trapframe regs;
 };
 

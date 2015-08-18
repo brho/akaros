@@ -326,14 +326,19 @@ int main(int argc, char **argv)
 			vmctl.shutdown = 0;
 			vmctl.gpa = 0;
 			vmctl.command = REG_ALL;
-		}
-		if (vmctl.shutdown == SHUTDOWN_UNHANDLED_EXIT_REASON) {
+		} else if (vmctl.shutdown == SHUTDOWN_UNHANDLED_EXIT_REASON) {
 			switch(vmctl.ret_code){
 			case  EXIT_REASON_VMCALL:
 				byte = vmctl.regs.tf_rdi;
 				printf("%c", byte);
 				if (byte == '\n') printf("%c", 'V');
 				vmctl.regs.tf_rip += 3;
+				break;
+			case EXIT_REASON_EXTERNAL_INTERRUPT:
+				fprintf(stderr, "XINT\n");
+				// Just inject a GPF for now. See what shakes.
+				vmctl.interrupt = 0;//x8000080d;
+				vmctl.command = RESUME;
 				break;
 			default:
 				fprintf(stderr, "Don't know how to handle exit %d\n", vmctl.ret_code);
