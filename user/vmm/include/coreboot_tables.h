@@ -2,7 +2,7 @@
 #define COREBOOT_TABLES_H
 
 #include <stdint.h>
-#include <ros/common.h>
+#include <parlib/common.h>
 
 // NOTE: the first part of this file is for producers of tables.
 // It is used when we are starting a guest. 

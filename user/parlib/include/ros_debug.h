@@ -1,7 +1,7 @@
 #ifndef PARLIB_ROS_DEBUG_H
 #define PARLIB_ROS_DEBUG_H
 
-#include <ros/common.h>
+#include <parlib/common.h>
 #include <stdio.h>
 #include <stdarg.h>
 

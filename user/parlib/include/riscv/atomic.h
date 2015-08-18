@@ -1,7 +1,7 @@
 #ifndef PARLIB_ARCH_ATOMIC_H
 #define PARLIB_ARCH_ATOMIC_H
 
-#include <ros/common.h>
+#include <parlib/common.h>
 #include <ros/atomic.h>
 #include <ros/arch/membar.h>
 

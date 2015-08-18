@@ -12,7 +12,7 @@
 #ifndef PARLIB_PRINTF_EXT_H
 #define PARLIB_PRINTF_EXT_H
 
-#include <ros/common.h>
+#include <parlib/common.h>
 #include <printf.h>
 
 __BEGIN_DECLS

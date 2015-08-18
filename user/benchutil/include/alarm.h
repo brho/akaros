@@ -32,7 +32,7 @@
 #ifndef BENCHUTIL_ALARM_H
 #define BENCHUTIL_ALARM_H
 
-#include <ros/common.h>
+#include <parlib/common.h>
 #include <sys/queue.h>
 #include <parlib/spinlock.h>
 #include <parlib/event.h>

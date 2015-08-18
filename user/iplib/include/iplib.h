@@ -9,7 +9,7 @@
 #ifndef IPLIB_IPLIB_H
 #define IPLIB_IPLIB_H
 
-#include <ros/common.h>
+#include <parlib/common.h>
 
 __BEGIN_DECLS
 

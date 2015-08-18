@@ -1,7 +1,7 @@
 #ifndef PARLIB_ARCH_H
 #define PARLIB_ARCH_H
 
-#include <ros/common.h>
+#include <parlib/common.h>
 #include <ros/trapframe.h>
 #include <ros/arch/arch.h>
 

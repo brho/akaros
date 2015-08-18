@@ -30,7 +30,7 @@
 #ifndef PARLIB_SLAB_H
 #define PARLIB_SLAB_H
 
-#include <ros/common.h>
+#include <parlib/common.h>
 #include <ros/arch/mmu.h>
 #include <sys/queue.h>
 #include <parlib/arch/atomic.h>

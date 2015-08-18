@@ -9,7 +9,7 @@
 
 #ifndef __ASSEMBLER__
 
-#include <ros/common.h>
+#include <parlib/common.h>
 #include <ros/memlayout.h>
 #include <ros/syscall.h>
 #include <ros/procinfo.h>

@@ -1,7 +1,7 @@
 #ifndef PARLIB_ARCH_VCORE_H
 #define PARLIB_ARCH_VCORE_H
 
-#include <ros/common.h>
+#include <parlib/common.h>
 #include <ros/trapframe.h>
 #include <parlib/arch/arch.h>
 #include <ros/syscall.h>

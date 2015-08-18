@@ -5,7 +5,7 @@
 #error "Do not include include vcore32.h directly"
 #endif
 
-#include <ros/common.h>
+#include <parlib/common.h>
 #include <ros/trapframe.h>
 #include <ros/procdata.h>
 #include <ros/syscall.h>
