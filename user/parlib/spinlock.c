@@ -50,6 +50,11 @@ void spinlock_unlock(spinlock_t *lock)
 	__sync_lock_release(&lock->lock, 0);
 }
 
+bool spinlock_locked(spinlock_t *lock)
+{
+	return lock->lock != 0;
+}
+
 /* Two different versions, with and without CAS.  Default is with CAS. */
 #ifndef CONFIG_SPINPDR_NO_CAS /* CAS version */
 
@@ -80,6 +85,11 @@ void __spin_pdr_unlock(struct spin_pdr_lock *pdr_lock)
 	wmb();	/* Need to prevent the compiler from reordering older stores. */
 	rwmb();	/* And no old reads passing either.   x86 makes both mbs a cmb() */
 	pdr_lock->lock = SPINPDR_UNLOCKED;
+}
+
+bool spin_pdr_locked(struct spin_pdr_lock *pdr_lock)
+{
+	return pdr_lock->lock != SPINPDR_UNLOCKED;
 }
 
 #else /* NON-CAS version */
@@ -113,6 +123,11 @@ void __spin_pdr_unlock(struct spin_pdr_lock *pdr_lock)
 {
 	pdr_lock->lockholder = SPINPDR_VCOREID_UNKNOWN;
 	spinlock_unlock(&pdr_lock->spinlock);
+}
+
+bool spin_pdr_locked(struct spin_pdr_lock *pdr_lock)
+{
+	return spinlock_locked(&pdr_lock->spinlock);
 }
 
 #endif /* CONFIG_SPINPDR_NO_CAS */

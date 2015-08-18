@@ -37,6 +37,7 @@ void spinlock_init(spinlock_t *lock);
 int spinlock_trylock(spinlock_t *lock);
 void spinlock_lock(spinlock_t *lock);
 void spinlock_unlock(spinlock_t *lock);
+bool spinlock_locked(spinlock_t *lock);
 
 /* RISCV doesn't support CAS, so til it does, we use the NO_CAS, even if they
  * didn't ask for it in their config. */
@@ -74,6 +75,7 @@ typedef struct spin_pdr_lock spinpdrlock_t;
 void spin_pdr_init(struct spin_pdr_lock *pdr_lock);
 void spin_pdr_lock(struct spin_pdr_lock *pdr_lock);
 void spin_pdr_unlock(struct spin_pdr_lock *pdr_lock);
+bool spin_pdr_locked(struct spin_pdr_lock *pdr_lock);
 
 __END_DECLS
 
