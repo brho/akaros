@@ -563,6 +563,7 @@ benchutil: parlib
 pthread: parlib benchutil
 iplib: parlib
 ndblib: iplib
+vmm: parlib
 
 PHONY += install-libs $(user-dirs)
 install-libs: $(user-dirs) symlinks cc-exists
