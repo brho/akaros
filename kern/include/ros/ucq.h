@@ -34,13 +34,13 @@
  * etc. */
 struct ucq {
 	atomic_t					prod_idx;		/* both pg and slot nr */
-	bool						prod_overflow;	/* flag to prevent wraparound */
 	atomic_t					spare_pg;		/* mmaped, unused page */
 	atomic_t					nr_extra_pgs;	/* nr pages mmaped */
 	atomic_t					cons_idx;		/* cons pg and slot nr */
+	bool						prod_overflow;	/* flag to prevent wraparound */
 	bool						ucq_ready;		/* ucq is ready to be used */
 	/* Userspace lock for modifying the UCQ */
-	uint64_t					u_lock[2 * ARCH_CL_SIZE / 8];
+	uint32_t					u_lock[2];
 };
 
 /* Struct at the beginning of every page/buffer, tracking consumers and
