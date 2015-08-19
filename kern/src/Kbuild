@@ -4,6 +4,7 @@ obj-y						+= arsc.o
 obj-y						+= atomic.o
 obj-y						+= bitmap.o
 obj-y						+= blockdev.o
+obj-y						+= ceq.o
 obj-y						+= colored_caches.o
 obj-y						+= console.o
 obj-y						+= ctype.o
