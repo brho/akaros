@@ -60,9 +60,11 @@ struct event_msg {
 /* Include here since the mboxes need to know event.h basics (e.g. event_msg) */
 #include <ros/ucq.h>
 #include <ros/evbitmap.h>
+#include <ros/ceq.h>
 
 #define EV_MBOX_UCQ				1
 #define EV_MBOX_BITMAP			2
+#define EV_MBOX_CEQ				3
 
 /* Structure for storing / receiving event messages.  An overflow causes the
  * bit of the event to get set in the bitmap.  You can also have just the bit
@@ -72,6 +74,7 @@ struct event_mbox {
 	union {
 		struct ucq				ucq;
 		struct evbitmap			evbm;
+		struct ceq				ceq;
 	};
 };
 

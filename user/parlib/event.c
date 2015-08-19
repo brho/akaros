@@ -10,6 +10,7 @@
 #include <ros/procdata.h>
 #include <parlib/ucq.h>
 #include <parlib/evbitmap.h>
+#include <parlib/ceq.h>
 #include <parlib/vcore.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,6 +72,9 @@ void event_mbox_init(struct event_mbox *ev_mbox, int mbox_type)
 		case (EV_MBOX_BITMAP):
 			evbitmap_init(&ev_mbox->evbm);
 			break;
+		case (EV_MBOX_CEQ):
+			ceq_init(&ev_mbox->ceq, CEQ_OR, CEQ_DEFAULT_SZ, CEQ_DEFAULT_SZ);
+			break;
 		default:
 			printf("Unknown mbox type %d!\n", ev_mbox->type);
 			break;
@@ -101,6 +105,9 @@ void event_mbox_cleanup(struct event_mbox *ev_mbox)
 			break;
 		case (EV_MBOX_BITMAP):
 			evbitmap_cleanup(&ev_mbox->evbm);
+			break;
+		case (EV_MBOX_CEQ):
+			ceq_cleanup(&ev_mbox->ceq);
 			break;
 		default:
 			printf("Unknown mbox type %d!\n", ev_mbox->type);
@@ -248,6 +255,8 @@ bool extract_one_mbox_msg(struct event_mbox *ev_mbox, struct event_msg *ev_msg)
 			return get_ucq_msg(&ev_mbox->ucq, ev_msg);
 		case (EV_MBOX_BITMAP):
 			return get_evbitmap_msg(&ev_mbox->evbm, ev_msg);
+		case (EV_MBOX_CEQ):
+			return get_ceq_msg(&ev_mbox->ceq, ev_msg);
 		default:
 			printf("Unknown mbox type %d!\n", ev_mbox->type);
 			return FALSE;
@@ -292,6 +301,8 @@ bool mbox_is_empty(struct event_mbox *ev_mbox)
 			return ucq_is_empty(&ev_mbox->ucq);
 		case (EV_MBOX_BITMAP):
 			return evbitmap_is_empty(&ev_mbox->evbm);
+		case (EV_MBOX_CEQ):
+			return ceq_is_empty(&ev_mbox->ceq);
 		default:
 			printf("Unknown mbox type %d!\n", ev_mbox->type);
 			return FALSE;

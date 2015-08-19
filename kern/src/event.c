@@ -6,6 +6,7 @@
  * processes. */
 
 #include <ucq.h>
+#include <ceq.h>
 #include <bitmask.h>
 #include <event.h>
 #include <atomic.h>
@@ -70,9 +71,9 @@ static void send_evbitmap_msg(struct evbitmap *evbm, struct event_msg *msg)
 	evbm->check_bits = TRUE;
 }
 
-/* Posts a message to the mbox.  Make sure that if mbox is a user
- * pointer, that you've checked it *and* have that processes address space
- * loaded.  This can get called with a KVA for mbox. */
+/* Posts a message to the mbox.  mbox is a pointer to user-accessible memory.
+ * If mbox is a user-provided pointer, make sure that you've checked it.
+ * Regardless make sure you have that process's address space loaded. */
 static void post_ev_msg(struct proc *p, struct event_mbox *mbox,
                         struct event_msg *msg, int ev_flags)
 {
@@ -85,6 +86,9 @@ static void post_ev_msg(struct proc *p, struct event_mbox *mbox,
 			break;
 		case (EV_MBOX_BITMAP):
 			send_evbitmap_msg(&mbox->evbm, msg);
+			break;
+		case (EV_MBOX_CEQ):
+			send_ceq_msg(&mbox->ceq, p, msg);
 			break;
 		default:
 			printk("[kernel] Unknown mbox type %d!\n", mbox->type);
