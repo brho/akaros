@@ -14,6 +14,7 @@
 #define ROS_KERN_VFS_H
 
 #include <ros/common.h>
+#include <ros/limits.h>
 #include <sys/queue.h>
 #include <sys/uio.h>
 #include <bitmask.h>
@@ -348,8 +349,6 @@ struct pipe_inode_info
 /* Per-process structs */
 #define NR_OPEN_FILES_DEFAULT 32
 #define NR_FILE_DESC_DEFAULT 32
-/* this is not in sync with glibc, sysdeps/ros/bits/typesizes.h */
-#define NR_FILE_DESC_MAX (512 * 1024)
 
 /* Bitmask for file descriptors, big for when we exceed the initial small.  We
  * could just use the fd_array to check for openness instead of the bitmask,
