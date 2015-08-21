@@ -1684,7 +1684,7 @@ int vmx_launch(struct vmctl *v) {
 		 */
 		if (v->interrupt) {
 			printk("Set GUEST_INTERRUPTIBILITY_INFO to 0x%x\n", v->interrupt);
-			vmcs_writel(GUEST_INTERRUPTIBILITY_INFO, v->interrupt);
+			vmcs_writel(VM_ENTRY_INTR_INFO_FIELD, v->interrupt);
 			v->interrupt = 0;
 		}
 		printd("RESUME\n");
