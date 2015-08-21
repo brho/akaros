@@ -898,7 +898,7 @@ static char *dumpmadt(char *start, char *end, struct Madt *apics)
 			case ASiosapic:
 				start =
 					seprintf(start, end,
-							 "\tioapic id %d addr %#llux ibase %d\n",
+							 "\tioapic id %d addr %p ibase %d\n",
 							 st->ioapic.id, st->ioapic.addr, st->ioapic.ibase);
 				break;
 			case ASintovr:
