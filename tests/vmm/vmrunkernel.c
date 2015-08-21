@@ -115,7 +115,7 @@ void *consin(void *arg)
 	
 	if (debug) printf("Spin on console being read, print num queues, halt\n");
 
-	for(num = 0;;num++) {
+	for(num = 0;! quit;num++) {
 		int debug = 1;
 		/* host: use any buffers we should have been sent. */
 		head = wait_for_vq_desc(v, iov, &outlen, &inlen);
@@ -133,6 +133,11 @@ void *consin(void *arg)
 				exit(0);
 			} 
 			if (debug) printf("GOT A LINE:%s:\n", consline);
+			if (strlen(consline) < 3 && consline[0] == 'q' ) {
+				quit = 1;
+				break;
+			}
+
 			memmove(iov[i].v, consline, strlen(consline)+ 1);
 			iov[i].length = strlen(consline) + 1;
 		}
@@ -337,8 +342,12 @@ int main(int argc, char **argv)
 			case EXIT_REASON_EXTERNAL_INTERRUPT:
 				fprintf(stderr, "XINT\n");
 				// Just inject a GPF for now. See what shakes.
-				vmctl.interrupt = 0;//x8000080d;
+				vmctl.interrupt = 0;//x8000030e; // b0d;
 				vmctl.command = RESUME;
+				break;
+			case EXIT_REASON_HLT:
+				printf("\n================== Guest halted. RIP. =======================\n");
+				quit = 1;
 				break;
 			default:
 				fprintf(stderr, "Don't know how to handle exit %d\n", vmctl.ret_code);
