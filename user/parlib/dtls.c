@@ -62,8 +62,29 @@ struct kmem_cache *__dtls_values_cache;
 static __thread dtls_data_t __dtls_data;
 static __thread bool __dtls_initialized = false;
 
+/* Initialize the slab caches for allocating dtls keys and values. */
+int dtls_cache_init()
+{
+  /* Make sure this only runs once */
+  static bool initialized = false;
+  if (initialized)
+      return 0;
+  initialized = true;
+
+  /* Initialize the global cache of dtls_keys */
+  __dtls_keys_cache = kmem_cache_create("dtls_keys_cache",
+    sizeof(struct dtls_key), __alignof__(struct dtls_key), 0, NULL, NULL);
+
+  /* Initialize the global cache of dtls_values */
+  __dtls_values_cache = kmem_cache_create("dtls_values_cache",
+    sizeof(struct dtls_value), __alignof__(struct dtls_value), 0, NULL, NULL);
+
+  return 0;
+}
+
 static dtls_key_t __allocate_dtls_key() 
 {
+  dtls_cache_init();
   dtls_key_t key = kmem_cache_alloc(__dtls_keys_cache, 0);
   assert(key);
   key->ref_count = 1;
@@ -90,28 +111,8 @@ static void __free_dtls_value(struct dtls_value *v)
   kmem_cache_free(__dtls_values_cache, v);
 }
 
-/* Constructor to get a reference to the main thread's TLS descriptor */
-int dtls_lib_init()
-{
-  /* Make sure this only runs once */
-  static bool initialized = false;
-  if (initialized)
-      return 0;
-  initialized = true;
-  
-  /* Initialize the global cache of dtls_keys */
-  __dtls_keys_cache = kmem_cache_create("dtls_keys_cache", 
-    sizeof(struct dtls_key), __alignof__(struct dtls_key), 0, NULL, NULL);
-  
-  __dtls_values_cache = kmem_cache_create("dtls_values_cache", 
-    sizeof(struct dtls_value), __alignof__(struct dtls_value), 0, NULL, NULL);
-  
-  return 0;
-}
-
 dtls_key_t dtls_key_create(dtls_dtor_t dtor)
 {
-  dtls_lib_init();
   dtls_key_t key = __allocate_dtls_key();
   key->valid = true;
   key->dtor = dtor;
