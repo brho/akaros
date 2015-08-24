@@ -32,7 +32,6 @@
 
 /* The dynamic tls key structure */
 struct dtls_key {
-  spinpdrlock_t lock;
   int ref_count;
   bool valid;
   void (*dtor)(void*);
@@ -60,29 +59,22 @@ static struct kmem_cache *__dtls_keys_cache;
 /* A slab of values for use when mapping a dtls_key to its per-thread value */
 struct kmem_cache *__dtls_values_cache;
   
-/* A lock protecting access to the caches above */
-static spinpdrlock_t __dtls_lock;
-
 static __thread dtls_data_t __dtls_data;
 static __thread bool __dtls_initialized = false;
 
 static dtls_key_t __allocate_dtls_key() 
 {
-  spin_pdr_lock(&__dtls_lock);
   dtls_key_t key = kmem_cache_alloc(__dtls_keys_cache, 0);
   assert(key);
   key->ref_count = 1;
-  spin_pdr_unlock(&__dtls_lock);
   return key;
 }
 
 static void __maybe_free_dtls_key(dtls_key_t key)
 {
-  if(key->ref_count == 0) {
-    spin_pdr_lock(&__dtls_lock);
+  int ref_count = __sync_add_and_fetch(&key->ref_count, -1);
+  if (ref_count == 0)
     kmem_cache_free(__dtls_keys_cache, key);
-    spin_pdr_unlock(&__dtls_lock);
-  }
 }
 
 /* Constructor to get a reference to the main thread's TLS descriptor */
@@ -101,8 +93,6 @@ int dtls_lib_init()
   __dtls_values_cache = kmem_cache_create("dtls_values_cache", 
     sizeof(struct dtls_value), __alignof__(struct dtls_value), 0, NULL, NULL);
   
-  /* Initialize the lock that protects the cache */
-  spin_pdr_init(&__dtls_lock);
   return 0;
 }
 
@@ -110,7 +100,6 @@ dtls_key_t dtls_key_create(dtls_dtor_t dtor)
 {
   dtls_lib_init();
   dtls_key_t key = __allocate_dtls_key();
-  spin_pdr_init(&key->lock);
   key->valid = true;
   key->dtor = dtor;
   return key;
@@ -119,30 +108,21 @@ dtls_key_t dtls_key_create(dtls_dtor_t dtor)
 void dtls_key_delete(dtls_key_t key)
 {
   assert(key);
-
-  spin_pdr_lock(&key->lock);
   key->valid = false;
-  key->ref_count--;
-  spin_pdr_unlock(&key->lock);
   __maybe_free_dtls_key(key);
 }
 
 static inline void __set_dtls(dtls_data_t *dtls_data, dtls_key_t key, void *dtls)
 {
   assert(key);
-
-  spin_pdr_lock(&key->lock);
-  key->ref_count++;
-  spin_pdr_unlock(&key->lock);
+  __sync_fetch_and_add(&key->ref_count, 1);
 
   struct dtls_value *v = NULL;
   TAILQ_FOREACH(v, &dtls_data->list, link)
     if(v->key == key) break;
 
   if(!v) {
-    spin_pdr_lock(&__dtls_lock);
     v = kmem_cache_alloc(__dtls_values_cache, 0);
-    spin_pdr_unlock(&__dtls_lock);
     assert(v);
     v->key = key;
     TAILQ_INSERT_HEAD(&dtls_data->list, v, link);
@@ -166,15 +146,8 @@ static inline void __destroy_dtls(dtls_data_t *dtls_data)
   v = TAILQ_FIRST(&dtls_data->list);
   while(v != NULL) {
     dtls_key_t key = v->key;
-    bool run_dtor = false;
   
-    spin_pdr_lock(&key->lock);
-    if(key->valid)
-      if(key->dtor)
-        run_dtor = true;
-    spin_pdr_unlock(&key->lock);
-
-	// MUST run the dtor outside the spinlock if we want it to be able to call
+	// The dtor must be called outside of a spinlock so that it can call
 	// code that may deschedule it for a while (i.e. a mutex). Probably a
 	// good idea anyway since it can be arbitrarily long and is written by the
 	// user. Note, there is a small race here on the valid field, whereby we
@@ -182,22 +155,16 @@ static inline void __destroy_dtls(dtls_data_t *dtls_data)
 	// be deleted though, as protected by the ref count. Any reasonable usage
 	// of this interface should safeguard that a key is never destroyed before
 	// all of the threads that use it have exited anyway.
-    if(run_dtor) {
+    if (key->valid && key->dtor) {
 	  void *dtls = v->dtls;
       v->dtls = NULL;
       key->dtor(dtls);
     }
-
-    spin_pdr_lock(&key->lock);
-    key->ref_count--;
-    spin_pdr_unlock(&key->lock);
     __maybe_free_dtls_key(key);
 
     n = TAILQ_NEXT(v, link);
     TAILQ_REMOVE(&dtls_data->list, v, link);
-    spin_pdr_lock(&__dtls_lock);
     kmem_cache_free(__dtls_values_cache, v);
-    spin_pdr_unlock(&__dtls_lock);
     v = n;
   }
 }
