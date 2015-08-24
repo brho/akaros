@@ -134,13 +134,14 @@ void uthread_mcp_init()
 }
 
 /* The real 2LS calls this, passing in a uthread representing thread0. */
-void uthread_2ls_init(struct uthread *uthread)
+void uthread_2ls_init(struct uthread *uthread, struct schedule_ops *ops)
 {
 	/* All we need to do is set up thread0 to run with our new 2LS specific
 	 * uthread pointer. Under the hood, this function will free any previously
 	 * allocated uthread structs representing thread0 (e.g. the one set up by
 	 * uthread_lib_init() previously). */
 	uthread_manage_thread0(uthread);
+	sched_ops = ops;
 }
 
 /* Helper: tells the kernel our SCP is capable of going into vcore context on
@@ -196,7 +197,7 @@ void __attribute__((constructor)) uthread_lib_init(void)
 	                     sizeof(struct uthread));
 	assert(!ret);
 	memset(thread0_uth, 0, sizeof(struct uthread));	/* aggressively 0 for bugs*/
-	uthread_manage_thread0(thread0_uth);
+	uthread_2ls_init(thread0_uth, &thread0_2ls_ops);
 	scp_vcctx_ready();
 	/* Change our blockon from glibc's internal one to the regular one, which
 	 * uses vcore context and works for SCPs (with or without 2LS) and MCPs.

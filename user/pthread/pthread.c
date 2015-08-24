@@ -590,10 +590,6 @@ void __attribute__((constructor)) pthread_lib_init(void)
 	init_once_racy(return);
 	uthread_lib_init();
 
-	/* Publish our sched_ops and signal_ops, overriding the defaults */
-	sched_ops = &pthread_sched_ops;
-	signal_ops = &pthread_signal_ops;
-
 	mcs_pdr_init(&queue_lock);
 	/* Create a pthread_tcb for the main thread */
 	ret = posix_memalign((void**)&t, __alignof__(struct pthread_tcb),
@@ -666,7 +662,9 @@ void __attribute__((constructor)) pthread_lib_init(void)
 		sysc_mgmt[i].ev_q->ev_mbox = sysc_mbox;
 	}
 #endif
-	uthread_2ls_init((struct uthread*)t);
+	/* Publish our signal_ops.  Sched ops is set by 2ls_init */
+	signal_ops = &pthread_signal_ops;
+	uthread_2ls_init((struct uthread*)t, &pthread_sched_ops);
 	atomic_init(&threads_total, 1);			/* one for thread0 */
 }
 

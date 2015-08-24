@@ -41,9 +41,6 @@ int main(int argc, char** argv)
 	uint32_t vcoreid;
 	int retval;
 
-	/* set up our sched ops. */
-	sched_ops = &ghetto_sched_ops;
-
 	/* Initialize our barrier. */
 	mcs_barrier_init(&b, max_vcores());
 
@@ -80,7 +77,7 @@ int main(int argc, char** argv)
 	/* Inits a thread for us, though we won't use it.  Just a hack to get into
 	 * _M mode.  Note this requests one vcore for us */
 	struct uthread dummy = {0};
-	uthread_2ls_init(&dummy);
+	uthread_2ls_init(&dummy, &ghetto_sched_ops);
 	uthread_mcp_init();
 	/* Reset the blockon to be the spinner...  This is really shitty.  Any
 	 * blocking calls after we become an MCP and before this will fail.  This is

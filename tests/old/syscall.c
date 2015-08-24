@@ -18,7 +18,6 @@ void ghetto_vcore_entry(void);
 struct schedule_ops ghetto_sched_ops = {
 	.sched_entry = ghetto_vcore_entry,
 };
-struct schedule_ops *sched_ops = &ghetto_sched_ops;
 
 int main(int argc, char** argv)
 {
@@ -57,7 +56,7 @@ int main(int argc, char** argv)
 	/* Inits a thread for us, though we won't use it.  Just a hack to get into
 	 * _M mode.  Note this requests one vcore for us */
 	struct uthread dummy = {0};
-	uthread_2ls_init(&dummy);
+	uthread_2ls_init(&dummy, &ghetto_sched_ops);
 	uthread_mcs_init();
 	/* Need to save our floating point state somewhere (like in the
 	 * user_thread_tcb so it can be restarted too */

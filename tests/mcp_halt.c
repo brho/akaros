@@ -36,13 +36,10 @@ int main(int argc, char** argv)
 	else
 		nr_vcores = atoi(argv[1]);
 
-	/* set up our sched ops. */
-	sched_ops = &ghetto_sched_ops;
-
 	/* Inits a thread for us, though we won't use it.  Just a hack to get into
 	 * _M mode.  Note this requests one vcore for us */
 	struct uthread dummy = {0};
-	uthread_2ls_init(&dummy);
+	uthread_2ls_init(&dummy, &ghetto_sched_ops);
 	uthread_mcp_init();
 
 	/* Reset the blockon to be the spinner...  This is really shitty.  Any
