@@ -77,6 +77,19 @@ static void __maybe_free_dtls_key(dtls_key_t key)
     kmem_cache_free(__dtls_keys_cache, key);
 }
 
+static struct dtls_value *__allocate_dtls_value()
+{
+  struct dtls_value *v;
+  v = kmem_cache_alloc(__dtls_values_cache, 0);
+  assert(v);
+  return v;
+}
+
+static void __free_dtls_value(struct dtls_value *v)
+{
+  kmem_cache_free(__dtls_values_cache, v);
+}
+
 /* Constructor to get a reference to the main thread's TLS descriptor */
 int dtls_lib_init()
 {
@@ -121,9 +134,8 @@ static inline void __set_dtls(dtls_data_t *dtls_data, dtls_key_t key, void *dtls
   TAILQ_FOREACH(v, &dtls_data->list, link)
     if(v->key == key) break;
 
-  if(!v) {
-    v = kmem_cache_alloc(__dtls_values_cache, 0);
-    assert(v);
+  if (!v) {
+    v = __allocate_dtls_value();
     v->key = key;
     TAILQ_INSERT_HEAD(&dtls_data->list, v, link);
   }
@@ -164,7 +176,7 @@ static inline void __destroy_dtls(dtls_data_t *dtls_data)
 
     n = TAILQ_NEXT(v, link);
     TAILQ_REMOVE(&dtls_data->list, v, link);
-    kmem_cache_free(__dtls_values_cache, v);
+    __free_dtls_value(v);
     v = n;
   }
 }
