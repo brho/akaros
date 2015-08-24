@@ -14,7 +14,7 @@
 #include <sys/mman.h>
 #include <vmm/coreboot_tables.h>
 #include <ros/common.h>
-#include <ros/vmm.h>
+#include <vmm/vmm.h>
 #include <vmm/virtio.h>
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_ids.h>
@@ -120,7 +120,7 @@ static int configwrite8(uint32_t addr, uint8_t val)
  * It would have been nice had intel encoded the IO exit info as nicely as they
  * encoded, some of the other exits.
  */
-static int io(struct vmctl *v)
+int io(struct vmctl *v)
 {
 
 	/* Get a pointer to the memory at %rip. This is quite messy and part of the
@@ -133,7 +133,8 @@ static int io(struct vmctl *v)
 	uintptr_t ip;
 	uint32_t edx;
 	/* for now, we're going to be a bit crude. In kernel, p is about v, so we just blow away
-	 * the upper 34 bits and take the rest as our address
+	 * the upper 34 bits and take the rest + 1M as our address
+	 * TODO: put this in vmctl somewhere?
 	 */
 	ip = v->regs.tf_rip & 0x3fffffff;
 	edx = v->regs.tf_rdx;

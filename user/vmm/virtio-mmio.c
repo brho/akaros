@@ -34,7 +34,7 @@
 #include <stdint.h>
 #include <err.h>
 #include <sys/mman.h>
-#include <ros/vmm.h>
+#include <vmm/vmm.h>
 #include <vmm/virtio.h>
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_ids.h>
@@ -402,104 +402,14 @@ static void virtio_mmio_write(uint64_t gpa, uint32_t value)
 
 }
 
-static char *modrmreg[] = {"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi"};
-
-void virtio_mmio(struct vmctl *v)
+int virtio_mmio(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store)
 {
-	int advance = 3; /* how much to move the IP forward at the end. 3 is a good default. */
-	// All virtio accesses seem to be 32 bits.
-	// valp points to a place to get or put the value. 
-	uint32_t *valp;
-	//DPRINTF("v is %p\n", v);
-	// regp points to the register in hw_trapframe from which
-	// to load or store a result.
-	uint64_t *regp;
-
-	// Duh, which way did he go George? Which way did he go? 
-	// First hit on Google gets you there!
-	// This is the guest physical address of the access.
-	// This is nice, because if we ever go with more complete
-	// instruction decode, knowing this gpa reduces our work:
-	// we don't have to find the source address in registers,
-	// only the register holding or receiving the value.
-	uint64_t gpa = v->gpa;
-	//DPRINTF("gpa is %p\n", gpa);
-
-	// To find out what to do, we have to look at
-	// RIP. Technically, we should read RIP, walk the page tables
-	// to find the PA, and read that. But we're in the kernel, so
-	// we take a shortcut for now: read the low 30 bits and use
-	// that as the kernel PA, or our VA, and see what's
-	// there. Hokey. Works.
-	uint8_t *kva = (void *)(v->regs.tf_rip & 0x3fffffff);
-	//DPRINTF("kva is %p\n", kva);
-
-	if ((kva[0] != 0x8b) && (kva[0] != 0x89)) {
-		fprintf(stderr, "%s: can't handle instruction 0x%x\n", kva[0]);
-		return;
-	}
-
-	uint16_t ins = *(uint16_t *)kva;
-	//DPRINTF("ins is %04x\n", ins);
-	
-	int write = (kva[0] == 0x8b) ? 0 : 1;
-	if (write)
-		valp = (uint32_t *)gpa;
-
-	int mod = kva[1]>>6;
-	switch (mod) {
-		case 0: 
-		case 3:
-			advance = 2;
-			break;
-		case 1:
-			advance = 3;
-			break;
-		case 2: 
-			advance = 6;
-			break;
-	}
-	/* the dreaded mod/rm byte. */
-	int destreg = (ins>>11) & 7;
-	// Our primitive approach wins big here.
-	// We don't have to decode the register or the offset used
-	// in the computation; that was done by the CPU and is the gpa.
-	// All we need to know is which destination or source register it is.
-	switch (destreg) {
-	case 0:
-		regp = &v->regs.tf_rax;
-		break;
-	case 1:
-		regp = &v->regs.tf_rcx;
-		break;
-	case 2:
-		regp = &v->regs.tf_rdx;
-		break;
-	case 3:
-		regp = &v->regs.tf_rbx;
-		break;
-	case 4:
-		regp = &v->regs.tf_rsp; // uh, right.
-		break;
-	case 5:
-		regp = &v->regs.tf_rbp;
-		break;
-	case 6:
-		regp = &v->regs.tf_rsi;
-		break;
-	case 7:
-		regp = &v->regs.tf_rdi;
-		break;
-	}
-
-	if (write) {
+	if (store) {
 		virtio_mmio_write(gpa, *regp);
-		DPRINTF("Write: mov %s to %s @%p val %p\n", modrmreg[destreg], virtio_names[(uint8_t)gpa], gpa, *regp);
+		DPRINTF("Write: mov %s to %s @%p val %p\n", regname(destreg), virtio_names[(uint8_t)gpa], gpa, *regp);
 	} else {
 		*regp = virtio_mmio_read(gpa);
-		DPRINTF("Read: Set %s from %s @%p to %p\n", modrmreg[destreg], virtio_names[(uint8_t)gpa], gpa, *regp);
+		DPRINTF("Read: Set %s from %s @%p to %p\n", regname(destreg), virtio_names[(uint8_t)gpa], gpa, *regp);
 	}
 
-	DPRINTF("Advance rip by %d bytes to %p\n", advance, v->regs.tf_rip);
-	v->regs.tf_rip += advance;
 }

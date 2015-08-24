@@ -13,7 +13,7 @@
 #include <ros/syscall.h>
 #include <sys/mman.h>
 #include <vmm/coreboot_tables.h>
-#include <ros/vmm.h>
+#include <vmm/vmm.h>
 #include <ros/arch/mmu.h>
 #include <ros/vmx.h>
 #include <parlib/uthread.h>
@@ -28,6 +28,9 @@ unsigned long long stack[1024];
 volatile int shared = 0;
 volatile int quit = 0;
 int mcp = 1;
+
+/* total hack. If the vm runs away we want to get control again. */
+unsigned int maxresume = (unsigned int) -1;
 
 #define MiB 0x100000u
 #define GiB (1u<<30)
@@ -164,6 +167,7 @@ vqs: {
 int main(int argc, char **argv)
 {
 	uint64_t virtiobase = 0x100000000ULL;
+	void *rsdp = (void *)0;
 	struct vmctl vmctl;
 	int amt;
 	int vmmflags = 0; // Disabled probably forever. VMM_VMCALL_PRINTF;
@@ -193,8 +197,15 @@ int main(int argc, char **argv)
 		if (*argv[0] != '-')
 			break;
 		switch(argv[0][1]) {
+		case 'd':
+			debug++;
+			break;
 		case 'v':
 			vmmflags |= VMM_VMCALL_PRINTF;
+			break;
+		case 'm':
+			argc--,argv++;
+			maxresume = strtoull(argv[0], 0, 0);
 			break;
 		default:
 			printf("BMAFR\n");
@@ -317,17 +328,35 @@ int main(int argc, char **argv)
 		int c;
 		uint8_t byte;
 		vmctl.command = REG_RIP;
-		if (debug) printf("RESUME?\n");
-		//c = getchar();
-		//if (c == 'q')
-			//break;
-		if (debug) printf("RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
-		//showstatus(stdout, &vmctl);
-		// this will be in a function, someday.
-		// A rough check: is the GPA 
-		if ((vmctl.shutdown == SHUTDOWN_EPT_VIOLATION) && ((vmctl.gpa & ~0xfffULL) == virtiobase)) {
-			if (debug) printf("DO SOME VIRTIO\n");
-			virtio_mmio(&vmctl);
+		if (maxresume-- == 0)
+			debug = 1;
+		if (debug) {
+			printf("RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
+			showstatus(stdout, &vmctl);
+			printf("RESUME?\n");
+			c = getchar();
+			if (c == 'q')
+				break;
+		}
+		if (vmctl.shutdown == SHUTDOWN_EPT_VIOLATION) {
+			uint64_t gpa;
+			uint64_t *regp;
+			uint8_t regx;
+			int store;
+			if (decode(&vmctl, &gpa, &regx, &regp, &store)) {
+				quit = 1;
+				break;
+			}
+			if ((gpa & ~0xfffULL) == virtiobase) {
+				if (debug) printf("DO SOME VIRTIO\n");
+				virtio_mmio(&vmctl, gpa, regx, regp, store);
+			} else if (gpa == 0x40e) {
+				*regp = (uint64_t) rsdp;
+			} else {
+				printf("EPT violation: can't handle %p\n", gpa);
+				quit = 1;
+				break;
+			}
 			vmctl.shutdown = 0;
 			vmctl.gpa = 0;
 			vmctl.command = REG_ALL;
@@ -345,6 +374,10 @@ int main(int argc, char **argv)
 				vmctl.interrupt = 0;//x8000030e; // b0d;
 				vmctl.command = RESUME;
 				break;
+			case EXIT_REASON_IO_INSTRUCTION:
+				printf("IO @ %p\n", vmctl.regs.tf_rip);
+				io(&vmctl);
+				break;
 			case EXIT_REASON_HLT:
 				printf("\n================== Guest halted. RIP. =======================\n");
 				quit = 1;
@@ -355,6 +388,7 @@ int main(int argc, char **argv)
 				break;
 			}
 		}
+		if (debug) printf("at bottom of switch, quit is %d\n", quit);
 		if (quit)
 			break;
 		if (debug) printf("NOW DO A RESUME\n");
@@ -364,9 +398,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	printf("shared is %d, blob is %d\n", shared, *mmap_blob);
-
-	quit = 1;
 	/* later. 
 	for (int i = 0; i < nr_threads-1; i++) {
 		int ret;

@@ -14,7 +14,7 @@
 #include <sys/mman.h>
 #include <vmm/coreboot_tables.h>
 #include <ros/common.h>
-#include <ros/vmm.h>
+#include <vmm/vmm.h>
 #include <vmm/virtio.h>
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_ids.h>

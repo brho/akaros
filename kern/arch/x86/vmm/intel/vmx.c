@@ -1647,7 +1647,6 @@ int vmx_launch(struct vmctl *v) {
 	int errors = 0;
 	int advance;
 
-	printd("RUNNING: %s: rip %p rsp %p cr3 %p \n", __func__, rip, rsp, cr3);
 	/* TODO: dirty hack til we have VMM contexts */
 	vcpu = current->vmm.guest_pcores[0];
 	if (!vcpu) {
@@ -1767,8 +1766,7 @@ int vmx_launch(struct vmctl *v) {
 				msrio(vcpu, ret, vmcs_read32(EXIT_QUALIFICATION));
 			advance = 2;
 		} else if (ret == EXIT_REASON_IO_INSTRUCTION) {
-			/* the VMM does this now. */
-			vcpu->shutdown = ret; 
+			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
 		} else {
 			printk("unhandled exit: reason 0x%x, exit qualification 0x%x\n",
 			       ret, vmcs_read32(EXIT_QUALIFICATION));
