@@ -34,17 +34,8 @@ static void handle_vc_indir(struct event_msg *ev_msg, unsigned int ev_type,
                             void *data);
 static void __ros_uth_syscall_blockon(struct syscall *sysc);
 
-/* Helper, make the uthread code manage thread0.  This sets up uthread such
- * that the calling code and its TLS are tracked by the uthread struct, and
- * vcore0 thinks the uthread is running there.  Called only by lib_init (early
- * _S code) and 2ls_init (when initializing thread0 for use in a 2LS).
- *
- * Whether or not uthreads have TLS, thread0 has TLS, given to it by glibc.
- * This TLS will get set whenever we use thread0, regardless of whether or not
- * we use TLS for uthreads in general.  glibc cares about this TLS and will use
- * it at exit.  We can't simply use that TLS for VC0 either, since we don't know
- * where thread0 will be running when the program ends. */
-static void uthread_manage_thread0(struct uthread *uthread)
+/* Helper, initializes a fresh uthread to be thread0. */
+static void uthread_init_thread0(struct uthread *uthread)
 {
 	assert(uthread);
 	/* Save a pointer to thread0's tls region (the glibc one) into its tcb */
@@ -58,14 +49,22 @@ static void uthread_manage_thread0(struct uthread *uthread)
 	/* need to track thread0 for TLS deallocation */
 	uthread->flags |= UTHREAD_IS_THREAD0;
 	uthread->notif_disabled_depth = 0;
-	/* Change temporarily to vcore0s tls region so we can save the newly created
-	 * tcb into its current_uthread variable and then restore it.  One minor
-	 * issue is that vcore0's transition-TLS isn't TLS_INITed yet.  Until it is
-	 * (right before vcore_entry(), don't try and take the address of any of
-	 * its TLS vars. */
+	/* setting the uthread's TLS var.  this is idempotent for SCPs (us) */
+	__vcoreid = 0;
+}
+
+/* Helper, makes VC ctx tracks uthread as its current_uthread in its TLS.
+ *
+ * Whether or not uthreads have TLS, thread0 has TLS, given to it by glibc.
+ * This TLS will get set whenever we use thread0, regardless of whether or not
+ * we use TLS for uthreads in general.  glibc cares about this TLS and will use
+ * it at exit.  We can't simply use that TLS for VC0 either, since we don't know
+ * where thread0 will be running when the program ends. */
+static void uthread_track_thread0(struct uthread *uthread)
+{
 	set_tls_desc(get_vcpd_tls_desc(0));
 	begin_safe_access_tls_vars();
-	/* We might have a basic uthread already installed (from lib_init), so
+	/* We might have a basic uthread already installed (from a prior call), so
 	 * free it before installing the new one. */
 	if (current_uthread)
 		free(current_uthread);
@@ -79,10 +78,6 @@ static void uthread_manage_thread0(struct uthread *uthread)
 	__vcore_context = TRUE;
 	end_safe_access_tls_vars();
 	set_tls_desc(uthread->tls_desc);
-	begin_safe_access_tls_vars();
-	__vcoreid = 0;	/* setting the uthread's TLS var */
-	assert(!in_vcore_context());
-	end_safe_access_tls_vars();
 }
 
 /* The real 2LS calls this to transition us into mcp mode.  When it
@@ -136,12 +131,30 @@ void uthread_mcp_init()
 /* The real 2LS calls this, passing in a uthread representing thread0. */
 void uthread_2ls_init(struct uthread *uthread, struct schedule_ops *ops)
 {
-	/* All we need to do is set up thread0 to run with our new 2LS specific
-	 * uthread pointer. Under the hood, this function will free any previously
-	 * allocated uthread structs representing thread0 (e.g. the one set up by
-	 * uthread_lib_init() previously). */
-	uthread_manage_thread0(uthread);
+	uthread_init_thread0(uthread);
+	/* We need to *atomically* change the current_uthread and the schedule_ops
+	 * to the new 2LSs thread0 and ops, such that there is no moment when only
+	 * one is changed and that we call a sched_ops.  There are sources of
+	 * implicit calls to sched_ops.  Two big ones are sched_entry, called
+	 * whenever we receive a notif (so we need to disable notifs), and
+	 * syscall_blockon, called whenver we had a syscall that blocked (so we say
+	 * tell the *uthread* that *it* is in vc ctx (TLS var).
+	 *
+	 * When disabling notifs, don't use a helper.  We're changing
+	 * current_uthread under the hood, which messes with the helpers.  When
+	 * setting __vcore_context, we're in thread0's TLS.  Even when we change
+	 * current_uthread, we're still in the *same* TLS. */
+	__disable_notifs(0);
+	__vcore_context = TRUE;
+	cmb();
+	/* Under the hood, this function will free any previously allocated uthread
+	 * structs representing thread0 (e.g. the one set up by uthread_lib_init()
+	 * previously). */
+	uthread_track_thread0(uthread);
 	sched_ops = ops;
+	cmb();
+	__vcore_context = FALSE;
+	enable_notifs(0);	/* will trigger a self_notif if we missed a notif */
 }
 
 /* Helper: tells the kernel our SCP is capable of going into vcore context on
@@ -397,7 +410,7 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
 		set_tls_desc(get_vcpd_tls_desc(vcoreid));
 		begin_safe_access_tls_vars();
 		assert(current_uthread == uthread);
-		/* If this assert fails, see the note in uthread_manage_thread0 */
+		/* If this assert fails, see the note in uthread_track_thread0 */
 		assert(in_vcore_context());
 		end_safe_access_tls_vars();
 	} else {
