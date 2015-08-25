@@ -371,7 +371,7 @@ int main(int argc, char **argv)
 			case EXIT_REASON_EXTERNAL_INTERRUPT:
 				fprintf(stderr, "XINT\n");
 				// Just inject a GPF for now. See what shakes.
-				vmctl.interrupt = 0;//x8000030e; // b0d;
+				vmctl.interrupt = 0x80000302; // b0d;
 				vmctl.command = RESUME;
 				break;
 			case EXIT_REASON_IO_INSTRUCTION:
