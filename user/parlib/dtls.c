@@ -126,23 +126,6 @@ void dtls_key_delete(dtls_key_t key)
   __maybe_free_dtls_key(key);
 }
 
-static inline void __set_dtls(dtls_data_t *dtls_data, dtls_key_t key, void *dtls)
-{
-  assert(key);
-  __sync_fetch_and_add(&key->ref_count, 1);
-
-  struct dtls_value *v = NULL;
-  TAILQ_FOREACH(v, &dtls_data->list, link)
-    if(v->key == key) break;
-
-  if (!v) {
-    v = __allocate_dtls_value();
-    v->key = key;
-    TAILQ_INSERT_HEAD(&dtls_data->list, v, link);
-  }
-  v->dtls = dtls;
-}
-
 static inline void *__get_dtls(dtls_data_t *dtls_data, dtls_key_t key)
 {
   assert(key);
@@ -151,6 +134,20 @@ static inline void *__get_dtls(dtls_data_t *dtls_data, dtls_key_t key)
   TAILQ_FOREACH(v, &dtls_data->list, link)
     if(v->key == key) return v->dtls;
   return v;
+}
+
+static inline void __set_dtls(dtls_data_t *dtls_data, dtls_key_t key, void *dtls)
+{
+  assert(key);
+  __sync_fetch_and_add(&key->ref_count, 1);
+
+  struct dtls_value *v = __get_dtls(dtls_data, key);
+  if (!v) {
+    v = __allocate_dtls_value();
+    v->key = key;
+    TAILQ_INSERT_HEAD(&dtls_data->list, v, link);
+  }
+  v->dtls = dtls;
 }
 
 static inline void __destroy_dtls(dtls_data_t *dtls_data)
