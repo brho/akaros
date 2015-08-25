@@ -2,6 +2,8 @@
 #define PARLIB_ROS_DEBUG_H
 
 #include <parlib/common.h>
+#include <parlib/parlib.h>
+#include <parlib/vcore.h>
 #include <stdio.h>
 #include <stdarg.h>
 
@@ -19,6 +21,9 @@ int	ros_vdebug(const char *fmt, va_list);
 #else
 #define printd(args...) {}
 #endif
+
+#define I_AM_HERE printf("Vcore %d is in %s() at %s:%d\n", vcore_id(), \
+                         __FUNCTION__, __FILE__, __LINE__);
 
 /* For a poor-mans function tracer (can add these with spatch) */
 void __print_func_entry(const char *func, const char *file);
