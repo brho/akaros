@@ -42,5 +42,8 @@ libc {
 	# Normally not exported by glibc, but we do all of our threading in
 	# userspace and need to set this up for each of our uthreads that have TLS.
 	__ctype_init;
+
+    ufd_get_fd;
+    ufd_lookup;
   }
 }

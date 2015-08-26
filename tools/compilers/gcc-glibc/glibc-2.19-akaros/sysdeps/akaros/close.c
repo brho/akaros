@@ -21,12 +21,16 @@
 #include <unistd.h>
 #include <stddef.h>
 #include <ros/syscall.h>
+#include <sys/user_fd.h>
 
 /* Write NBYTES of BUF to FD.  Return the number written, or -1.  */
 int
 __close (int fd)
 {
-  return ros_syscall(SYS_close, fd, 0, 0, 0, 0, 0);
+	if (fd >= USER_FD_BASE)
+		return glibc_close_helper(fd);
+	else
+		return ros_syscall(SYS_close, fd, 0, 0, 0, 0, 0);
 }
 libc_hidden_def (__close)
 weak_alias (__close, close)

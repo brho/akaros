@@ -46,3 +46,9 @@ endif
 ifeq ($(subdir),stdlib)
 sysdep_routines += tls
 endif
+
+# User FDs
+ifeq ($(subdir),stdlib)
+sysdep_routines += user_fd
+endif
+sysdep_headers += sys/user_fd.h
