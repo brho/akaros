@@ -171,7 +171,7 @@ int main(int argc, char **argv)
 	struct vmctl vmctl;
 	int amt;
 	int vmmflags = 0; // Disabled probably forever. VMM_VMCALL_PRINTF;
-	uint64_t entry = 0x1000000, kerneladdress = 0x1000000;
+	uint64_t entry = 0x1200000, kerneladdress = 0x1200000;
 	int nr_gpcs = 1;
 	int fd = open("#c/vmctl", O_RDWR), ret;
 	void * x;
