@@ -1648,18 +1648,20 @@ int do_mkdir(char *path, int mode)
 	int error;
 	int retval = -1;
 
+	/* The dir might exist and might be /, so we can't look for the parent */
+	nd->intent = LOOKUP_OPEN;
+	error = path_lookup(path, LOOKUP_FOLLOW, nd);
+	path_release(nd);
+	if (!error) {
+		set_errno(EEXIST);
+		return -1;
+	}
 	nd->intent = LOOKUP_CREATE;
 	/* get the parent, but don't follow links */
 	error = path_lookup(path, LOOKUP_PARENT, nd);
 	if (error) {
 		set_errno(-error);
 		goto out_path_only;
-	}
-	/* see if the target is already there, handle accordingly */
-	dentry = do_lookup(nd->dentry, nd->last.name); 
-	if (dentry) {
-		set_errno(EEXIST);
-		goto out_dentry;
 	}
 	/* Doesn't already exist, let's try to make it: */
 	dentry = get_dentry(nd->dentry->d_sb, nd->dentry, nd->last.name);
