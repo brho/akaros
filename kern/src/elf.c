@@ -371,7 +371,8 @@ int load_elf(struct proc* p, struct file* f,
 		 * helped us waste a full day debugging a bug in the Go runtime. True!
 		 * Note that MMAP_LOWEST_VA also has this value but we want to make this
 		 * explicit. */
-		int error = load_one_elf(p, interp, MiB>>12, &interp_ei, TRUE);
+		int error = load_one_elf(p, interp, MMAP_LD_FIXED_VA >> PGSHIFT,
+		                         &interp_ei, TRUE);
 		kref_put(&interp->f_kref);
 		if (error)
 			return -1;
