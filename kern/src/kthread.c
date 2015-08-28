@@ -182,13 +182,22 @@ void kthread_yield(void)
 
 void kthread_usleep(uint64_t usec)
 {
+	ERRSTACK(1);
 	/* TODO: classic ksched issue: where do we want the wake up to happen? */
 	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
-	struct alarm_waiter a_waiter;
-	init_awaiter(&a_waiter, 0);
-	set_awaiter_rel(&a_waiter, usec);
-	set_alarm(tchain, &a_waiter);
-	sleep_on_awaiter(&a_waiter);
+	struct rendez rv;
+
+	int ret_zero(void *ignored)
+	{
+		return 0;
+	}
+
+	/* "discard the error" style (we run the conditional code) */
+	if (!waserror()) {
+		rendez_init(&rv);
+		rendez_sleep_timeout(&rv, ret_zero, 0, usec);
+	}
+	poperror();
 }
 
 static void __ktask_wrapper(uint32_t srcid, long a0, long a1, long a2)
