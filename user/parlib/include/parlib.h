@@ -58,7 +58,7 @@ int         sys_abort_sysc(struct syscall *sysc);
 int         sys_abort_sysc_fd(int fd);
 int         sys_tap_fds(struct fd_tap_req *tap_reqs, size_t nr_reqs);
 
-long		syscall_async(struct syscall *sysc, unsigned long num, ...);
+void		syscall_async(struct syscall *sysc, unsigned long num, ...);
 
 /* Posix signal related stuff */
 struct sigdata {

@@ -182,7 +182,7 @@ int sys_tap_fds(struct fd_tap_req *tap_reqs, size_t nr_reqs)
 	return ros_syscall(SYS_tap_fds, tap_reqs, nr_reqs, 0, 0, 0, 0);
 }
 
-long syscall_async(struct syscall *sysc, unsigned long num, ...)
+void syscall_async(struct syscall *sysc, unsigned long num, ...)
 {
 	va_list args;
 
