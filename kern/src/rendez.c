@@ -59,16 +59,16 @@ static void rendez_alarm_handler(struct alarm_waiter *awaiter)
 	rendez_wakeup(rv);
 }
 
-/* Like sleep, but it will timeout in 'msec' milliseconds. */
+/* Like sleep, but it will timeout in 'usec' microseconds. */
 void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
-                          unsigned int msec)
+                          uint64_t usec)
 {
 	int8_t irq_state = 0;
 	struct alarm_waiter awaiter;
 	struct cv_lookup_elm cle;
 	struct timer_chain *pcpui_tchain = &per_cpu_info[core_id()].tchain;
 
-	assert((int)msec > 0);
+	assert(usec > 0);
 	/* Doing this cond check early, but then unlocking again.  Mostly just to
 	 * avoid weird issues with the CV lock and the alarm tchain lock. */
 	cv_lock_irqsave(&rv->cv, &irq_state);
@@ -81,7 +81,7 @@ void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
 	 * state.  It's enough to break us out of cv_wait() to see .on_tchain. */
 	init_awaiter(&awaiter, rendez_alarm_handler);
 	awaiter.data = rv;
-	set_awaiter_rel(&awaiter, msec * 1000);
+	set_awaiter_rel(&awaiter, usec);
 	/* Set our alarm on this cpu's tchain.  Note that when we sleep in cv_wait,
 	 * we could be migrated, and later on we could be unsetting the alarm
 	 * remotely. */

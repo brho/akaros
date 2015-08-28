@@ -12,7 +12,7 @@
  * Sleeper usage:
  * 		rendez_sleep(&rv, some_func_taking_void*, void *arg);
  * 			or
- * 		rendez_sleep_timeout(&rv, some_func_taking_void*, void *arg, msec);
+ * 		rendez_sleep_timeout(&rv, some_func_taking_void*, void *arg, usec);
  *
  * Waker usage: (can be used from IRQ context)
  * 		// set the condition to TRUE, then:
@@ -48,7 +48,7 @@ struct rendez {
 void rendez_init(struct rendez *rv);
 void rendez_sleep(struct rendez *rv, int (*cond)(void*), void *arg);
 void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
-                          unsigned int msec);
+                          uint64_t usec);
 bool rendez_wakeup(struct rendez *rv);
 
 #endif /* ROS_KERN_RENDEZ_H */

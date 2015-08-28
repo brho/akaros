@@ -1890,7 +1890,7 @@ bool test_rv(void)
 		int cpu = (i % (num_cores - 1)) + 1;
 		/* timeouts from 0ms ..5000ms (enough that they should wake via cond */
 		if (atomic_read(&counter) % 5)
-			send_kernel_message(cpu, __test_rv_sleeper_timeout, i * 4, 0, 0,
+			send_kernel_message(cpu, __test_rv_sleeper_timeout, i * 4000, 0, 0,
 			                    KMSG_ROUTINE);
 		else
 			send_kernel_message(cpu, __test_rv_sleeper, 0, 0, 0, KMSG_ROUTINE);

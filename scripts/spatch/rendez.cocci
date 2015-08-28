@@ -23,7 +23,7 @@ expression RVFA;
 expression RVTO;
 @@
 -tsleep(RV, RVF, RVFA, RVTO);
-+rendez_sleep_timeout(RV, RVF, RVFA, RVTO);
++rendez_sleep_timeout(RV, RVF, RVFA, RVTO * 1000);
 
 @@
 expression RV;
