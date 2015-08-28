@@ -307,7 +307,7 @@ size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
                       size_t nr_slots)
 {
 	size_t nr_pcs = 0;
-	while (fp && nr_pcs < nr_slots) {
+	while ((fp > MMAP_LOWEST_VA) && (nr_pcs < nr_slots)) {
 		/* could put some sanity checks in here...  i used to at least check for
 		 * kernel addrs, but now we also bt user stacks. (dangerous!) */
 		pcs[nr_pcs++] = pc;
