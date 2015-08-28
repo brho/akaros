@@ -64,6 +64,7 @@ static struct dirtab acpidir[] = {
 	{"acpipretty", {Qpretty}, 0, 0444},
 	{"ioapic", {Qioapic}, 0, 0444},
 	{"apic", {Qapic}, 0, 0444},
+	{"raw", {Qraw}, 0, 0444},
 };
 
 /*
@@ -884,7 +885,7 @@ static char *dumpmadt(char *start, char *end, struct Madt *apics)
 	struct Apicst *st;
 
 	start =
-		seprintf(start, end, "acpi: madt lapic paddr %llux pcat %d:\n",
+		seprintf(start, end, "acpi: madt lapic paddr %p pcat %d:\n",
 				 apics->lapicpa, apics->pcat);
 	for (st = apics->st; st != NULL; st = st->next)
 
@@ -1178,10 +1179,16 @@ static void acpirsdptr(void)
 	uintptr_t sdtpa;
 
 	if ((rsd = rsdsearch("RSD PTR ")) == NULL) {
+		printk("NO RSDP\n");
 		return;
 	}
 
+
 	assert(sizeof(struct Sdthdr) == 36);
+	printd("/* RSDP */ struct Rsdp = {%08c, %x, %06c, %x, %p, %d, %p, %x}\n",
+	       rsd->signature, rsd->rchecksum, rsd->oemid, rsd->revision,
+	       *(uint32_t *)rsd->raddr, *(uint32_t *)rsd->length,
+	       *(uint32_t *)rsd->xaddr, rsd->xchecksum);
 
 	printd("acpi: RSD PTR@ %#p, physaddr $%p length %ud %#llux rev %d\n",
 		   rsd, l32get(rsd->raddr), l32get(rsd->length),
@@ -1567,6 +1574,9 @@ static long acpiread(struct chan *c, void *a, long n, int64_t off)
 	switch (q) {
 		case Qdir:
 			return devdirread(c, a, n, acpidir, ARRAY_SIZE(acpidir), acpigen);
+		case Qraw:
+			return readmem(off, a, n, ttext, tlen);
+			break;
 		case Qtbl:
 			s = ttext;
 			e = ttext + tlen;

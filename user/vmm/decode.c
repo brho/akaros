@@ -43,23 +43,127 @@ int debug_decode = 0;
 
 static char *modrmreg[] = {"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi"};
 
+// Since we at most have to decode less than half of each instruction, I'm trying to be dumb here.
+// Fortunately, for me, what's not hard.
+
+// Target size -- 1, 2, 4, or 8 bytes. We have yet to see 64 bytes. 
+// TODO: if we ever see it, test the prefix. Since this only supports the low 1M,
+// that's not likely.
+static int target(void *insn, int *store) 
+{
+	*store = 0;
+	int s = -1;
+	uint8_t *byte = insn;
+	uint16_t *word = insn;
+
+	if (*byte == 0x66) {
+		s = target(insn+1,store);
+		// flip the sense of s.
+		s = s == 4 ? 2 : 4;
+		return s;
+	}
+	switch(*byte) {
+	case 0x3a:
+	case 0x8a:
+	case 0x88:
+		s = 1;
+		break;
+	case 0x89:
+	case 0x8b:
+		s = 2;
+		break;
+	case 0x81:
+		s = 4;	
+		break;
+	case 0x0f:
+	switch(*word) {
+		case 0xb70f:
+			s = 4;
+			break;
+		default:
+			fprintf(stderr, "can't get size of %02x/%04x @ %p\n", *byte, *word, byte);
+			return -1;
+			break;
+		}
+		break;
+	default:
+		fprintf(stderr, "can't get size of %02x @ %p\n", *byte, byte);
+		return -1;
+		break;
+	}
+
+	switch(*byte) {
+	case 0x3a:
+	case 0x8a:
+	case 0x88:
+	case 0x89:
+	case 0x8b:
+	case 0x81:
+		*store = !(*byte & 2);
+	}
+	return s;
+}
+
 char *regname(uint8_t reg)
 {
 	return modrmreg[reg];
 }
 
-// This is a very limited function. It's only here to manage virtio-mmio and acpi root
+static int insize(void *rip)
+{
+	uint8_t *kva = rip;
+	int advance = 3;
+	/* the dreaded mod/rm byte. */
+	int mod = kva[1]>>6;
+	int rm = kva[1] & 7;
+
+	switch(kva[0]) {
+	default: 
+		fprintf(stderr, "BUG! %s got 0x%x\n", __func__, kva[0]);
+	case 0x0f: 
+		break;
+	case 0x81:
+		advance = 6;
+		break;
+	case 0x3a:
+	case 0x8a:
+	case 0x88:
+	case 0x89:
+	case 0x8b:
+		switch (mod) {
+		case 0: 
+			advance = 2 + (rm == 4);
+			break;
+		case 1:
+			advance = 3 + (rm == 4);
+			break;
+		case 2: 
+			advance = 6 + (rm == 4);
+			break;
+		case 3:
+			advance = 2;
+			break;
+		}
+		break;
+	}
+	return advance;
+}
+
+// This is a very limited function. It's only here to manage virtio-mmio and low memory
 // pointer loads. I am hoping it won't grow with time. The intent is that we enter it with
 // and EPT fault from a region that is deliberately left unbacked by any memory. We return
-// enough info to let you emulate the operation if you want.
+// enough info to let you emulate the operation if you want. Because we have the failing physical
+// address (gpa) the decode is far simpler because we only need to find the register, how many bytes
+// to move, and how big the instruction is. I thought about bringing in emulate.c from kvm from xen,
+// but it has way more stuff than we need.
 // gpa is a pointer to the gpa. 
 // int is the reg index which we can use for printing info.
 // regp points to the register in hw_trapframe from which
 // to load or store a result.
-int decode(struct vmctl *v, uint64_t *gpa, uint8_t *destreg, uint64_t **regp, int *store)
+int decode(struct vmctl *v, uint64_t *gpa, uint8_t *destreg, uint64_t **regp, int *store, int *size, int *advance)
 {
-	int advance = 3; /* how much to move the IP forward at the end. 3 is a good default. */
-	//DPRINTF("v is %p\n", v);
+
+	DPRINTF("v is %p\n", v);
 
 	// Duh, which way did he go George? Which way did he go? 
 	// First hit on Google gets you there!
@@ -69,7 +173,7 @@ int decode(struct vmctl *v, uint64_t *gpa, uint8_t *destreg, uint64_t **regp, in
 	// we don't have to find the source address in registers,
 	// only the register holding or receiving the value.
 	*gpa = v->gpa;
-	//DPRINTF("gpa is %p\n", *gpa);
+	DPRINTF("gpa is %p\n", *gpa);
 
 	// To find out what to do, we have to look at
 	// RIP. Technically, we should read RIP, walk the page tables
@@ -78,36 +182,17 @@ int decode(struct vmctl *v, uint64_t *gpa, uint8_t *destreg, uint64_t **regp, in
 	// that as the kernel PA, or our VA, and see what's
 	// there. Hokey. Works.
 	uint8_t *kva = (void *)(v->regs.tf_rip & 0x3fffffff);
-	//DPRINTF("kva is %p\n", kva);
+	DPRINTF("kva is %p\n", kva);
 
-	// If this gets any longer we'll have to make a smarter loop. I'm betting it
-	// won't
-	if ((kva[0] != 0x8b) && (kva[0] != 0x89) && (kva[0] != 0x0f || kva[1] != 0xb7)) {
-		fprintf(stderr, "%s: can't handle instruction 0x%x\n", kva[0]);
+	// fail fast. If we can't get the size we're done.
+	*size = target(kva, store);
+	if (*size < 0)
 		return -1;
-	}
 
 	uint16_t ins = *(uint16_t *)kva;
-	//DPRINTF("ins is %04x\n", ins);
+	DPRINTF("ins is %04x\n", ins);
 	
-	*store = (kva[0] == 0x8b) ? 0 : 1;
-
-	if (kva[0] != 0x0f) {
-		/* the dreaded mod/rm byte. */
-		int mod = kva[1]>>6;
-		switch (mod) {
-		case 0: 
-		case 3:
-			advance = 2;
-			break;
-		case 1:
-			advance = 3;
-			break;
-		case 2: 
-			advance = 6;
-			break;
-		}
-	}
+	*advance = insize(kva);
 
 	*destreg = (ins>>11) & 7;
 	// Our primitive approach wins big here.
@@ -140,8 +225,21 @@ int decode(struct vmctl *v, uint64_t *gpa, uint8_t *destreg, uint64_t **regp, in
 		*regp = &v->regs.tf_rdi;
 		break;
 	}
-	v->regs.tf_rip += advance;
-	DPRINTF("Advance rip by %d bytes to %p\n", advance, v->regs.tf_rip);
 	return 0;
 }
 
+#if 0
+// stupid emulator since what we need is so limited.
+int emu(struct vmctl *v, uint64_t gpa, uint8_t destreg, uint64_t *regp, int store, int size, int advance)
+{
+	uint8_t *kva = f->regs.tf_rip;
+
+	if (
+	switch(kva[0]) {
+
+				val = *(uint64_t*) (lowmem + gpa); 
+				printf("val %p ", val);
+				memcpy(regp, &val, size);
+
+}
+#endif

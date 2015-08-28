@@ -892,6 +892,7 @@ vmx_dump_cpu(struct vmx_vcpu *vcpu)
 	vmx_get_cpu(vcpu);
 	printk("GUEST_INTERRUPTIBILITY_INFO: 0x%08x\n",  vmcs_readl(GUEST_INTERRUPTIBILITY_INFO));
 	printk("VM_ENTRY_INTR_INFO_FIELD 0x%08x\n", vmcs_readl(VM_ENTRY_INTR_INFO_FIELD));
+	printk("EXIT_QUALIFICATION 0x%08x\n", vmcs_read32(EXIT_QUALIFICATION));
 	vcpu->regs.tf_rip = vmcs_readl(GUEST_RIP);
 	vcpu->regs.tf_rsp = vmcs_readl(GUEST_RSP);
 	flags = vmcs_readl(GUEST_RFLAGS);

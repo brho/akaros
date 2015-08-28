@@ -153,7 +153,7 @@ int io(struct vmctl *v)
 			//printf("Set cfc ");
 			return configwrite32(edx, v->regs.tf_rax);
 		}
-		printf("unhandled IO address dx @%p is 0x%x\n", ip8, edx);
+		printf("(out rax, edx): unhandled IO address dx @%p is 0x%x\n", ip8, edx);
 		return -1;
 	}
 	// out %al, %dx
@@ -168,7 +168,7 @@ int io(struct vmctl *v)
 			//printf("ignoring write to cfc ");
 			return 0;
 		}
-		printf("unhandled IO address dx @%p is 0x%x\n", ip8, edx);
+		printf("out al, dx: unhandled IO address dx @%p is 0x%x\n", ip8, edx);
 		return -1;
 	}
 	if (*ip8 == 0xec) {

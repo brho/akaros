@@ -54,9 +54,9 @@ enum {
 	Qiow,
 	Qiol,
 	Qgdb,
-	Qbase,
 	Qmapram,
 	Qrealmem,
+	Qbase,
 
 	Qmax = 16,
 };
@@ -74,7 +74,7 @@ static struct dirtab archdir[Qmax] = {
 	{"iol", {Qiol, 0}, 0, 0666},
 	{"gdb", {Qgdb, 0}, 0, 0660},
 	{"mapram", {Qmapram, 0}, 0, 0444},
-	{"realmodemem", {Qrealmem, 0}, 0, 0660},
+	{"realmodemem", {Qrealmem, 0}, 0, 0664},
 };
 
 spinlock_t archwlock;			/* the lock is only for changing archdir */
@@ -389,6 +389,11 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			return n;
 
 		case Qioalloc:
+			break;
+
+		case Qrealmem:
+			printk("readmem %p %p %p %p %p\n",offset, a, n, KADDR(0), 1048576);
+			return readmem(offset, a, n, KADDR(0), 1048576);
 			break;
 
 		default:

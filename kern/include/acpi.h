@@ -80,6 +80,7 @@ enum {
 	Qpretty,
 	Qioapic,
 	Qapic,
+	Qraw,
 };
 
 /*
