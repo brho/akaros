@@ -100,6 +100,10 @@ static int target(void *insn, int *store)
 	case 0x8b:
 	case 0x81:
 		*store = !(*byte & 2);
+		break;
+	default:
+		fprintf(stderr, "%s: Can't happen\n", __func__);
+		break;
 	}
 	return s;
 }

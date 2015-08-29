@@ -498,6 +498,7 @@ static char *dumpfadt(char *start, char *end, struct Fadt *fp)
 		return NULL;
 	}
 
+	start = seprintf(start, end, "acpi: FADT@%p\n", fp);
 	start = seprintf(start, end, "acpi: fadt: facs: $%p\n", fp->facs);
 	start = seprintf(start, end, "acpi: fadt: dsdt: $%p\n", fp->dsdt);
 	start = seprintf(start, end, "acpi: fadt: pmprofile: $%p\n", fp->pmprofile);
@@ -684,7 +685,7 @@ static struct Atable *acpimsct(uint8_t * p, int len)
 
 static char *dumpsrat(char *start, char *end, struct Srat *st)
 {
-	start = seprintf(start, end, "acpi: srat:\n");
+	start = seprintf(start, end, "acpi: START@%p:\n", st);
 	for (; st != NULL; st = st->next)
 		switch (st->type) {
 			case SRlapic:
@@ -885,8 +886,8 @@ static char *dumpmadt(char *start, char *end, struct Madt *apics)
 	struct Apicst *st;
 
 	start =
-		seprintf(start, end, "acpi: madt lapic paddr %p pcat %d:\n",
-				 apics->lapicpa, apics->pcat);
+		seprintf(start, end, "acpi: MADT@%p: lapic paddr %p pcat %d:\n",
+				apics, apics->lapicpa, apics->pcat);
 	for (st = apics->st; st != NULL; st = st->next)
 
 		switch (st->type) {
