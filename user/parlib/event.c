@@ -205,6 +205,62 @@ unsigned int get_event_type(struct event_mbox *ev_mbox)
 	return EV_NONE;
 }
 
+/* Attempts to register ev_q with sysc, so long as sysc is not done/progress.
+ * Returns true if it succeeded, and false otherwise.  False means that the
+ * syscall is done, and does not need an event set (and should be handled
+ * accordingly).
+ *
+ * A copy of this is in glibc/sysdeps/akaros/syscall.c.  Keep them in sync. */
+bool register_evq(struct syscall *sysc, struct event_queue *ev_q)
+{
+	int old_flags;
+	sysc->ev_q = ev_q;
+	wrmb();	/* don't let that write pass any future reads (flags) */
+	/* Try and set the SC_UEVENT flag (so the kernel knows to look at ev_q) */
+	do {
+		/* no cmb() needed, the atomic_read will reread flags */
+		old_flags = atomic_read(&sysc->flags);
+		/* Spin if the kernel is mucking with syscall flags */
+		while (old_flags & SC_K_LOCK)
+			old_flags = atomic_read(&sysc->flags);
+		/* If the kernel finishes while we are trying to sign up for an event,
+		 * we need to bail out */
+		if (old_flags & (SC_DONE | SC_PROGRESS)) {
+			sysc->ev_q = 0;		/* not necessary, but might help with bugs */
+			return FALSE;
+		}
+	} while (!atomic_cas(&sysc->flags, old_flags, old_flags | SC_UEVENT));
+	return TRUE;
+}
+
+/* De-registers a syscall, so that the kernel will not send an event when it is
+ * done.  The call could already be SC_DONE, or could even finish while we try
+ * to unset SC_UEVENT.
+ *
+ * There is a chance the kernel sent an event if you didn't do this in time, but
+ * once this returns, the kernel won't send a message.
+ *
+ * If the kernel is trying to send a message right now, this will spin (on
+ * SC_K_LOCK).  We need to make sure we deregistered, and that if a message
+ * is coming, that it already was sent (and possibly overflowed), before
+ * returning. */
+void deregister_evq(struct syscall *sysc)
+{
+	int old_flags;
+	sysc->ev_q = 0;
+	wrmb();	/* don't let that write pass any future reads (flags) */
+	/* Try and unset the SC_UEVENT flag */
+	do {
+		/* no cmb() needed, the atomic_read will reread flags */
+		old_flags = atomic_read(&sysc->flags);
+		/* Spin if the kernel is mucking with syscall flags */
+		while (old_flags & SC_K_LOCK)
+			old_flags = atomic_read(&sysc->flags);
+		/* Note we don't care if the SC_DONE flag is getting set.  We just need
+		 * to avoid clobbering flags */
+	} while (!atomic_cas(&sysc->flags, old_flags, old_flags & ~SC_UEVENT));
+}
+
 /* Actual Event Handling */
 
 /* List of handler lists, process-wide.  They all must return (don't context

@@ -36,7 +36,7 @@ struct event_queue __ros_scp_simple_evq =
                     .ev_vcore = 0,
                     .ev_handler = 0 };
 
-/* Helper, from u/p/uthread.c.  Keep it in sync.  (don't want to move this into
+/* Helper, from u/p/event.c.  Keep it in sync.  (don't want to move this into
  * glibc yet). */
 static bool register_evq(struct syscall *sysc, struct event_queue *ev_q)
 {

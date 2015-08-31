@@ -34,6 +34,8 @@ struct event_queue *disable_kevent(unsigned int ev_type);
 
 /********* Event Handling / Reception ***********/
 unsigned int get_event_type(struct event_mbox *ev_mbox);
+bool register_evq(struct syscall *sysc, struct event_queue *ev_q);
+void deregister_evq(struct syscall *sysc);
 
 typedef void (*handle_event_t)(struct event_msg *ev_msg, unsigned int ev_type,
                                void *data);

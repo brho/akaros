@@ -88,9 +88,6 @@ bool __check_preempt_pending(uint32_t vcoreid);	/* careful: check the code */
 void uth_disable_notifs(void);
 void uth_enable_notifs(void);
 
-bool register_evq(struct syscall *sysc, struct event_queue *ev_q);
-void deregister_evq(struct syscall *sysc);
-
 /* Helpers, which sched_entry() can call */
 void highjack_current_uthread(struct uthread *uthread);
 void run_current_uthread(void);
