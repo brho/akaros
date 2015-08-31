@@ -138,7 +138,7 @@ static uint32_t virtio_mmio_read(uint64_t gpa)
 
     // WTF? Does this happen? 
     if (offset >= VIRTIO_MMIO_CONFIG) {
-	    fprintf(stderr, "Whoa. Reading past mmio config space? What gives?\n");
+	    fprintf(stderr, "Whoa. %p Reading past mmio config space? What gives?\n", gpa);
 	    return -1;
 #if 0
 	    offset -= VIRTIO_MMIO_CONFIG;
@@ -211,7 +211,7 @@ static void virtio_mmio_write(uint64_t gpa, uint32_t value)
 	DPRINTF("virtio_mmio_write offset %s 0x%x value 0x%x\n", virtio_names[offset], (int)offset, value);
 
     if (offset >= VIRTIO_MMIO_CONFIG) {
-	    fprintf(stderr, "Whoa. Writing past mmio config space? What gives?\n");
+	    fprintf(stderr, "Whoa. %p Writing past mmio config space? What gives?\n", gpa);
 #if 0
         offset -= VIRTIO_MMIO_CONFIG;
         switch (size) {
