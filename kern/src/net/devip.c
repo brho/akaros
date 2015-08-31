@@ -1318,6 +1318,7 @@ int iptapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 
 	#define DEVIP_LEGAL_DATA_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_WRITABLE | \
 	                               FDTAP_FILT_HANGUP)
+	#define DEVIP_LEGAL_LISTEN_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_HANGUP)
 
 	/* That's a lot of pointers to get to the conv! */
 	f = ipfs[chan->dev];
@@ -1348,6 +1349,30 @@ int iptapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 						qio_set_wake_cb(conv->rq, 0, conv);
 						qio_set_wake_cb(conv->wq, 0, conv);
 					}
+					ret = 0;
+					break;
+				default:
+					set_errno(ENOSYS);
+					set_errstr("Unsupported #I data tap command");
+					ret = -1;
+			}
+			spin_unlock(&conv->tap_lock);
+			return ret;
+		case Qlisten:
+			if (tap->filter & ~DEVIP_LEGAL_LISTEN_TAPS) {
+				set_errno(ENOSYS);
+				set_errstr("Unsupported #I listen tap, must be %p",
+				           DEVIP_LEGAL_LISTEN_TAPS);
+				return -1;
+			}
+			spin_lock(&conv->tap_lock);
+			switch (cmd) {
+				case (FDTAP_CMD_ADD):
+					SLIST_INSERT_HEAD(&conv->listen_taps, tap, link);
+					ret = 0;
+					break;
+				case (FDTAP_CMD_REM):
+					SLIST_REMOVE(&conv->listen_taps, tap, fd_tap, link);
 					ret = 0;
 					break;
 				default:
@@ -1446,6 +1471,7 @@ retry:
 			rendez_init(&c->cr);
 			rendez_init(&c->listenr);
 			SLIST_INIT(&c->data_taps);	/* already = 0; set to be futureproof */
+			SLIST_INIT(&c->listen_taps);
 			spinlock_init(&c->tap_lock);
 			qlock(&c->qlock);
 			c->p = p;
@@ -1536,6 +1562,17 @@ struct Proto *Fsrcvpcolx(struct Fs *f, uint8_t proto)
 	return f->t2p[proto];
 }
 
+static void fire_listener_taps(struct conv *conv)
+{
+	struct fd_tap *tap_i;
+	if (SLIST_EMPTY(&conv->listen_taps))
+		return;
+	spin_lock(&conv->tap_lock);
+	SLIST_FOREACH(tap_i, &conv->listen_taps, link)
+		fire_tap(tap_i, FDTAP_FILT_READABLE);
+	spin_unlock(&conv->tap_lock);
+}
+
 /*
  *  called with protocol locked
  */
@@ -1573,6 +1610,7 @@ struct conv *Fsnewcall(struct conv *c, uint8_t * raddr, uint16_t rport,
 	qunlock(&c->qlock);
 
 	rendez_wakeup(&c->listenr);
+	fire_listener_taps(c);
 
 	return nc;
 }

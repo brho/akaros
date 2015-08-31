@@ -82,6 +82,7 @@ struct conv {
 	atomic_t snoopers;			/* number of processes with snoop open */
 
 	struct fdtap_slist data_taps;
+	struct fdtap_slist listen_taps;
 	spinlock_t tap_lock;
 
 	struct rendez cr;
