@@ -1234,12 +1234,14 @@ static bool qwait(struct queue *q)
 			}
 			return FALSE;
 		}
+		/* We set Qstarve regardless of whether we are non-blocking or not.
+		 * Qstarve tracks the edge detection of the queue being empty. */
+		q->state |= Qstarve;
 		if (q->state & Qnonblock) {
 			spin_unlock_irqsave(&q->lock);
 			set_errno(EAGAIN);
 			error("queue empty");
 		}
-		q->state |= Qstarve;	/* flag requesting producer to wake me */
 		spin_unlock_irqsave(&q->lock);
 		/* may throw an error() */
 		rendez_sleep(&q->rr, notempty, q);
