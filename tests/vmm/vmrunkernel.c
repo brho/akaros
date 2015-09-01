@@ -590,12 +590,18 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 				vmctl.gpa = 0;
 				vmctl.command = REG_ALL;
 				break;
+			case EXIT_REASON_INTERRUPT_WINDOW:
+				vmctl.interrupt = 0x80000220;
+				vmctl.command = RESUME;
+				break;
 			case EXIT_REASON_HLT:
 				printf("\n================== Guest halted. RIP. =======================\n");
 				quit = 1;
 				break;
 			default:
 				fprintf(stderr, "Don't know how to handle exit %d\n", vmctl.ret_code);
+				fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
+				showstatus(stderr, &vmctl);
 				quit = 1;
 				break;
 			}
