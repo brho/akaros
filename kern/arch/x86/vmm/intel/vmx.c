@@ -406,6 +406,7 @@ vmcs_write64(unsigned long field, uint64_t value)
  * failure-prone setup, where even errors that might result in correct
  * values are caught -- "right answer, wrong method, zero credit." If there's
  * weirdness in the bits, we don't want to run.
+ * The try_set stuff adds particular ugliness but we have to have it.
  */
 
 static bool
@@ -414,7 +415,7 @@ check_vmxec_controls(struct vmxec const *v, bool have_true_msr,
 {
 	bool err = false;
 	uint32_t vmx_msr_low, vmx_msr_high;
-	uint32_t reserved_0, reserved_1, changeable_bits;
+	uint32_t reserved_0, reserved_1, changeable_bits, try0, try1;
 
 	if (have_true_msr)
 		rdmsr(v->truemsr, vmx_msr_low, vmx_msr_high);
@@ -437,52 +438,59 @@ check_vmxec_controls(struct vmxec const *v, bool have_true_msr,
 	 */
 
 	/* Conflict. Don't try to both set and reset bits. */
-	if (v->set_to_0 & v->set_to_1) {
-		printk("%s: set to 0 (0x%x) and set to 1 (0x%x) overlap: 0x%x\n",
-			   v->name, v->set_to_0, v->set_to_1, v->set_to_0 & v->set_to_1);
+	if ((v->must_be_1 & (v->must_be_0 | v->try_set_1 | v->try_set_0)) ||
+	    (v->must_be_0 & (v->try_set_1 | v->try_set_0)) ||
+	    (v->try_set_1 & v->try_set_0)) {
+		printk("%s: must 0 (0x%x) and must be 1 (0x%x) and try_set_0 (0x%x) and try_set_1 (0x%x) overlap\n",
+		       v->name, v->must_be_0, v->must_be_1, v->try_set_0, v->try_set_1);
 		err = true;
 	}
 
 	/* coverage */
-	if (((v->set_to_0 | v->set_to_1) & changeable_bits) != changeable_bits) {
+	if (((v->must_be_0 | v->must_be_1 | v->try_set_0 | v->try_set_1) & changeable_bits) != changeable_bits) {
 		printk("%s: Need to cover 0x%x and have 0x%x,0x%x\n",
-			   v->name, changeable_bits, v->set_to_0, v->set_to_1);
+		       v->name, changeable_bits, v->must_be_0, v->must_be_1, v->try_set_0, v->try_set_1);
 		err = true;
 	}
 
-	if ((v->set_to_0 | v->set_to_1 | reserved_0 | reserved_1) != 0xffffffff) {
+	if ((v->must_be_0 | v->must_be_1 | v->try_set_0 | v->try_set_1 | reserved_0 | reserved_1) != 0xffffffff) {
 		printk("%s: incomplete coverage: have 0x%x, want 0x%x\n",
-			   v->name, v->set_to_0 | v->set_to_1 |
-			   reserved_0 | reserved_1, 0xffffffff);
+		       v->name, v->must_be_0 | v->must_be_1 | v->try_set_0 | v->try_set_1 |
+		       reserved_0 | reserved_1, 0xffffffff);
 		err = true;
 	}
 
 	/* Don't try to change bits that can't be changed. */
-	if ((v->set_to_0 & (reserved_0 | changeable_bits)) != v->set_to_0) {
-		printk("%s: set to 0 (0x%x) can't be done\n", v->name, v->set_to_0);
+	if ((v->must_be_0 & (reserved_0 | changeable_bits)) != v->must_be_0) {
+		printk("%s: set to 0 (0x%x) can't be done\n", v->name, v->must_be_0);
 		err = true;
 	}
 
-	if ((v->set_to_1 & (reserved_1 | changeable_bits)) != v->set_to_1) {
-		printk("%s: set to 1 (0x%x) can't be done\n", v->name, v->set_to_1);
+	if ((v->must_be_1 & (reserved_1 | changeable_bits)) != v->must_be_1) {
+		printk("%s: set to 1 (0x%x) can't be done\n", v->name, v->must_be_1);
 		err = true;
 	}
+	// Note we don't REQUIRE that try_set_0 or try_set_0 be possible. We just want to try it.
+
+	// Clear bits in try_set that can't be set.
+	try1 = v->try_set_1 & (reserved_1 | changeable_bits);
 
 	/* If there's been any error at all, spill our guts and return. */
 	if (err) {
 		printk("%s: vmx_msr_high 0x%x, vmx_msr_low 0x%x, ",
 			   v->name, vmx_msr_high, vmx_msr_low);
-		printk("set_to_1 0x%x,set_to_0 0x%x,reserved_1 0x%x",
-			   v->set_to_1, v->set_to_0, reserved_1);
+		printk("must_be_0 0x%x, try_set_0 0x%x,reserved_0 0x%x",
+			   v->must_be_0, v->try_set_0, reserved_0);
+		printk("must_be_1 0x%x, try_set_1 0x%x,reserved_1 0x%x",
+			   v->must_be_1, v->try_set_1, reserved_1);
 		printk(" reserved_0 0x%x", reserved_0);
 		printk(" changeable_bits 0x%x\n", changeable_bits);
-		//printk(" TOO BAD MAX ... we're going ahead .... no error .... \n");
 		return false;
 	}
 
-	*result = v->set_to_1 | reserved_1;
+	*result = v->must_be_1 | try1 | reserved_1;
 
-	printd("%s: check_vmxec_controls succeeds with result 0x%x\n",
+	printk("%s: check_vmxec_controls succeeds with result 0x%x\n",
 		   v->name, *result);
 	return true;
 }
@@ -496,11 +504,11 @@ static const struct vmxec pbec = {
 	.msr = MSR_IA32_VMX_PINBASED_CTLS,
 	.truemsr = MSR_IA32_VMX_TRUE_PINBASED_CTLS,
 
-	.set_to_1 = (PIN_BASED_EXT_INTR_MASK |
+	.must_be_1 = (PIN_BASED_EXT_INTR_MASK |
 		     PIN_BASED_NMI_EXITING |
 		     PIN_BASED_VIRTUAL_NMIS),
 
-	.set_to_0 = (PIN_BASED_VMX_PREEMPTION_TIMER |
+	.must_be_0 = (PIN_BASED_VMX_PREEMPTION_TIMER |
 		     PIN_BASED_POSTED_INTR),
 };
 
@@ -509,7 +517,7 @@ static const struct vmxec cbec = {
 	.msr = MSR_IA32_VMX_PROCBASED_CTLS,
 	.truemsr = MSR_IA32_VMX_TRUE_PROCBASED_CTLS,
 
-	.set_to_1 = (CPU_BASED_HLT_EXITING |
+	.must_be_1 = (CPU_BASED_HLT_EXITING |
 		     CPU_BASED_MWAIT_EXITING |
 		     CPU_BASED_RDPMC_EXITING |
 		     CPU_BASED_CR8_LOAD_EXITING |
@@ -519,7 +527,7 @@ static const struct vmxec cbec = {
 		     CPU_BASED_USE_IO_BITMAPS |
 		     CPU_BASED_ACTIVATE_SECONDARY_CONTROLS),
 
-	.set_to_0 = (CPU_BASED_VIRTUAL_INTR_PENDING |
+	.must_be_0 = (CPU_BASED_VIRTUAL_INTR_PENDING |
 		     CPU_BASED_INVLPG_EXITING |
 		     CPU_BASED_USE_TSC_OFFSETING |
 		     CPU_BASED_RDTSC_EXITING |
@@ -540,13 +548,13 @@ static const struct vmxec cb2ec = {
 	.msr = MSR_IA32_VMX_PROCBASED_CTLS2,
 	.truemsr = MSR_IA32_VMX_PROCBASED_CTLS2,
 
-	.set_to_1 = (SECONDARY_EXEC_ENABLE_EPT |
-			SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
+	.must_be_1 = (SECONDARY_EXEC_ENABLE_EPT |
 		     //SECONDARY_EXEC_APIC_REGISTER_VIRT |
 		     //SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
 		     SECONDARY_EXEC_WBINVD_EXITING),
 
-	.set_to_0 = (
+	.must_be_0 = (
+			SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
 		     SECONDARY_EXEC_APIC_REGISTER_VIRT |
 		     SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
 		     SECONDARY_EXEC_DESCRIPTOR_EXITING |
@@ -560,10 +568,10 @@ static const struct vmxec cb2ec = {
 		     SECONDARY_EXEC_SHADOW_VMCS |
 		     SECONDARY_EXEC_RDSEED_EXITING |
 		     SECONDARY_EPT_VE |
-		     /* TODO: re enable this via a "Want" struct
-			member at some point */
-		     SECONDARY_EXEC_RDTSCP |
-		     SECONDARY_ENABLE_XSAV_RESTORE)
+		     SECONDARY_ENABLE_XSAV_RESTORE),
+
+	.try_set_1 = SECONDARY_EXEC_RDTSCP
+
 };
 
 static const struct vmxec vmentry = {
@@ -572,11 +580,11 @@ static const struct vmxec vmentry = {
 	.truemsr = MSR_IA32_VMX_TRUE_ENTRY_CTLS,
 	/* exact order from vmx.h; only the first two are enabled. */
 
-	.set_to_1 =  (VM_ENTRY_LOAD_DEBUG_CONTROLS | /* can't set to 0 */
+	.must_be_1 =  (VM_ENTRY_LOAD_DEBUG_CONTROLS | /* can't set to 0 */
 		      VM_ENTRY_LOAD_IA32_EFER |
 		      VM_ENTRY_IA32E_MODE),
 
-	.set_to_0 = (VM_ENTRY_SMM |
+	.must_be_0 = (VM_ENTRY_SMM |
 		     VM_ENTRY_DEACT_DUAL_MONITOR |
 		     VM_ENTRY_LOAD_IA32_PERF_GLOBAL_CTRL |
 		     VM_ENTRY_LOAD_IA32_PAT),
@@ -587,10 +595,10 @@ static const struct vmxec vmexit = {
 	.msr = MSR_IA32_VMX_EXIT_CTLS,
 	.truemsr = MSR_IA32_VMX_TRUE_EXIT_CTLS,
 
-	.set_to_1 = (VM_EXIT_SAVE_DEBUG_CONTROLS |	/* can't set to 0 */
+	.must_be_1 = (VM_EXIT_SAVE_DEBUG_CONTROLS |	/* can't set to 0 */
 				 VM_EXIT_SAVE_IA32_EFER | VM_EXIT_LOAD_IA32_EFER | VM_EXIT_HOST_ADDR_SPACE_SIZE),	/* 64 bit */
 
-	.set_to_0 = (VM_EXIT_LOAD_IA32_PERF_GLOBAL_CTRL |
+	.must_be_0 = (VM_EXIT_LOAD_IA32_PERF_GLOBAL_CTRL |
 				 VM_EXIT_ACK_INTR_ON_EXIT |
 				 VM_EXIT_SAVE_IA32_PAT |
 				 VM_EXIT_LOAD_IA32_PAT | VM_EXIT_SAVE_VMX_PREEMPTION_TIMER),
@@ -1140,7 +1148,7 @@ struct emmsr emmsrs[] = {
 	{MSR_LBR_CORE_FROM, "MSR_LBR_CORE_FROM", emsr_ok},
 	{MSR_LBR_CORE_TO, "MSR_LBR_CORE_TO", emsr_ok},
 
-	// grumble. 
+	// grumble.
 	{MSR_OFFCORE_RSP_0, "MSR_OFFCORE_RSP_0", emsr_ok},
 	{MSR_OFFCORE_RSP_1, "MSR_OFFCORE_RSP_1", emsr_ok},
 	// louder.
@@ -1808,7 +1816,7 @@ int vmx_launch(struct vmctl *v) {
 			if (vmx_handle_ept_violation(vcpu, v))
 				vcpu->shutdown = SHUTDOWN_EPT_VIOLATION;
 		} else if (ret == EXIT_REASON_EXCEPTION_NMI) {
-			if (vmx_handle_nmi_exception(vcpu)) 
+			if (vmx_handle_nmi_exception(vcpu))
 				vcpu->shutdown = SHUTDOWN_NMI_EXCEPTION;
 		} else if (ret == EXIT_REASON_EXTERNAL_INTERRUPT) {
 			printk("External interrupt\n");

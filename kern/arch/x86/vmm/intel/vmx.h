@@ -284,8 +284,10 @@ struct vmxec {
 	char *name;
 	uint32_t msr;
 	uint32_t truemsr;
-	uint32_t set_to_1;
-	uint32_t set_to_0;
+	uint32_t must_be_1;
+	uint32_t must_be_0;
+	uint32_t try_set_1;
+	uint32_t try_set_0;
 };
 
 #endif
