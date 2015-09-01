@@ -23,6 +23,7 @@
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
 
+int msrio(struct vmctl *vcpu, uint32_t opcode);
 /* Kind of sad what a total clusterf the pc world is. By 1999, you could just scan the hardware 
  * and work it out. But 2005, that was no longer possible. How sad. 
  * so we have to fake acpi to make it all work. !@#$!@#$#.
@@ -593,6 +594,15 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 			case EXIT_REASON_INTERRUPT_WINDOW:
 				vmctl.interrupt = 0x80000220;
 				vmctl.command = RESUME;
+				break;
+			case EXIT_REASON_MSR_WRITE:
+			case EXIT_REASON_MSR_READ:
+				fprintf(stderr, "Do an msr\n");
+				quit = msrio(&vmctl, vmctl.ret_code);
+				if (quit) {
+					fprintf(stderr, "MSR FAILED: RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
+					showstatus(stderr, &vmctl);
+				}
 				break;
 			case EXIT_REASON_HLT:
 				printf("\n================== Guest halted. RIP. =======================\n");
