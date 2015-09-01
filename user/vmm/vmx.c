@@ -28,7 +28,7 @@
 #define EXIT_REASON_EXTERNAL_INTERRUPT  1
 #define EXIT_REASON_TRIPLE_FAULT        2
 
-#define EXIT_REASON_PENDING_INTERRUPT   7
+#define EXIT_REASON_INTERRUPT_WINDOW    7
 #define EXIT_REASON_NMI_WINDOW          8
 #define EXIT_REASON_TASK_SWITCH         9
 #define EXIT_REASON_CPUID               10
@@ -72,7 +72,7 @@ char *vmxexit[] = {
 	[EXIT_REASON_EXCEPTION_NMI]        "EXCEPTION_NMI",
 	[EXIT_REASON_EXTERNAL_INTERRUPT]   "EXTERNAL_INTERRUPT",
 	[EXIT_REASON_TRIPLE_FAULT]         "TRIPLE_FAULT",
-	[EXIT_REASON_PENDING_INTERRUPT]    "PENDING_INTERRUPT",
+	[EXIT_REASON_INTERRUPT_WINDOW]    "INTERRUPT WINDOW (i.e. ok to send interrupts",
 	[EXIT_REASON_NMI_WINDOW]           "NMI_WINDOW",
 	[EXIT_REASON_TASK_SWITCH]          "TASK_SWITCH",
 	[EXIT_REASON_CPUID]                "CPUID",
@@ -108,13 +108,13 @@ char *vmxexit[] = {
 
 void showstatus(FILE *f, struct vmctl *v)
 {
-	int shutdown;
+	int shutdown = v->ret_code;
 	char *when = shutdown & VMX_EXIT_REASONS_FAILED_VMENTRY ? "entry" : "exit";
 	shutdown &= 0xff;
 	char *reason = "UNKNOWN";
-	if (v->shutdown < ARRAY_SIZE(vmxexit) && vmxexit[v->shutdown])
-		reason = vmxexit[v->shutdown];
-	fprintf(f, "Shutdown: core %d, %s due to %s(0x%x); ret code 0x%x\n", v->core, when, reason, v->shutdown, v->ret_code);
+	if (shutdown < ARRAY_SIZE(vmxexit) && vmxexit[shutdown])
+		reason = vmxexit[shutdown];
+	fprintf(f, "Shutdown: core %d, %s due to %s(0x%x); ret code 0x%x\n", v->core, when, reason, shutdown, v->ret_code);
 	fprintf(f, "  gva %p gpa %p cr3 %p\n", (void *)v->gva, (void *)v->gpa, (void *)v->cr3);
 
 	fprintf(f, "  rax  0x%016lx\n",           v->regs.tf_rax);
