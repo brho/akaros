@@ -662,6 +662,22 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 					showstatus(stderr, &vmctl);
 				}
 				break;
+			case EXIT_REASON_MWAIT_INSTRUCTION:
+			  fflush(stdout);
+				if (debug)fprintf(stderr, "\n================== Guest MWAIT. =======================\n");
+				if (debug)fprintf(stderr, "Wait for cons data\n");
+				while (!consdata)
+					;
+				//debug = 1;
+				if (debug)fprintf(stderr, "Resume with consdata ...\n");
+				vmctl.regs.tf_rip += 3;
+				ret = write(fd, &vmctl, sizeof(vmctl));
+				if (ret != sizeof(vmctl)) {
+					perror(cmd);
+				}
+				//fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
+				//showstatus(stderr, &vmctl);
+				break;
 			case EXIT_REASON_HLT:
 				fflush(stdout);
 				if (debug)fprintf(stderr, "\n================== Guest halted. =======================\n");
