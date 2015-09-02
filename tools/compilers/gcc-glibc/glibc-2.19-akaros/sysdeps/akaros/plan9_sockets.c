@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
+#include <assert.h>
 
 /* bsd extensions */
 #include <sys/uio.h>
@@ -166,16 +167,20 @@ Rock *_sock_newrock(int fd)
 			return 0;
 		r->dev = d.st_dev;
 		r->inode = d.st_ino;
-		r->other = -1;
 		/* TODO: this is not thread-safe! */
 		r->next = _sock_rock;
 		_sock_rock = r;
 	}
-	memset(&r->raddr, 0, sizeof(r->raddr));
+	assert(r->dev == d.st_dev);
+	assert(r->inode == d.st_ino);
+	r->domain = 0;
+	r->stype = 0;
+	r->sopts = 0;
+	r->protocol = 0;
 	memset(&r->addr, 0, sizeof(r->addr));
 	r->reserved = 0;
-	r->dev = d.st_dev;
-	r->inode = d.st_ino;
+	memset(&r->raddr, 0, sizeof(r->raddr));
+	r->ctl[0] = '\0';
 	r->other = -1;
 	return r;
 }
