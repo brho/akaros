@@ -138,9 +138,14 @@ Rock *_sock_findrock(int fd, struct stat * dp)
 	Rock *r;
 	struct stat d;
 
-	if (dp == 0)
+	/* Skip the fstat if there are no socket rocks */
+	if (!_sock_rock)
+		return 0;
+	/* If they pass us a struct stat, then they already did an fstat */
+	if (dp == 0) {
 		dp = &d;
-	fstat(fd, dp);
+		fstat(fd, dp);
+	}
 	for (r = _sock_rock; r; r = r->next) {
 		if (r->inode == dp->st_ino && r->dev == dp->st_dev)
 			break;
@@ -153,6 +158,7 @@ Rock *_sock_newrock(int fd)
 	Rock *r;
 	struct stat d;
 
+	fstat(fd, &d);
 	r = _sock_findrock(fd, &d);
 	if (r == 0) {
 		r = malloc(sizeof(Rock));
