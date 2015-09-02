@@ -70,9 +70,12 @@ int accept(int fd, __SOCKADDR_ARG addr, socklen_t * __restrict alen)
 			 * nfd will be the FD for that conv's data file.  sock_data will trade
 			 * our lcfd for the data file fd.  even if it fails, sock_data will
 			 * close our lcfd for us.  when it succeeds, it'll open the data file
-			 * before closing lcfd, which will keep the converstation alive. */
-			nfd = _sock_data(lcfd, net, r->domain, r->stype | r->sopts,
-			                 r->protocol, &nr);
+			 * before closing lcfd, which will keep the converstation alive.
+			 *
+			 * Note, we pass the listen socket's stype, but not it's sopts.  If
+			 * we implement something like accept4, that's where those sopts
+			 * (e.g. O_CLOEXEC, O_NONBLOCK) will come from. */
+			nfd = _sock_data(lcfd, net, r->domain, r->stype, r->protocol, &nr);
 			if (nfd < 0)
 				return -1;
 
