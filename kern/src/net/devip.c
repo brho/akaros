@@ -611,6 +611,12 @@ static char *ipchaninfo(struct chan *ch, char *ret, size_t ret_l)
 		case Qiproute:
 			ret = "Qiproute";
 			break;
+		case Qlisten:
+			proto = f->p[PROTO(ch->qid)];
+			conv = proto->conv[CONV(ch->qid)];
+			snprintf(ret, ret_l, "Qlisten, proto %s, conv idx %d", proto->name,
+					 conv->x);
+			break;
 		case Qlog:
 			ret = "Qlog";
 			break;
