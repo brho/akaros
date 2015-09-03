@@ -50,7 +50,7 @@ void devfs_init(void)
 struct file *make_device(char *path, int mode, int type,
                          struct file_operations *fop)
 {
-	struct file *f_dev = do_file_open(path, O_CREAT, mode);
+	struct file *f_dev = do_file_open(path, O_CREAT | O_RDWR, mode);
 	assert(f_dev);
 	/* Overwrite the f_op with our own f_ops */
 	f_dev->f_dentry->d_inode->i_fop = fop;

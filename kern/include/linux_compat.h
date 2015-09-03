@@ -716,7 +716,7 @@ static inline int request_firmware(const struct firmware **fwp,
 	char fullpath[sizeof(dirname) + strlen(file_name) + 1];
 
 	snprintf(fullpath, sizeof(fullpath), "%s%s", dirname, file_name);
-	fw_file = do_file_open(fullpath, 0, 0);
+	fw_file = do_file_open(fullpath, O_READ, 0);
 	if (!fw_file) {
 		printk("Unable to find firmware file %s!\n", fullpath);
 		return -1;

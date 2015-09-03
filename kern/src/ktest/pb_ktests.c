@@ -1038,7 +1038,7 @@ bool test_ucq(void)
 	set_alarm(tchain, waiter);
 	/* Just spawn the program */
 	struct file *program;
-	program = do_file_open("/bin/ucq", 0, 0);
+	program = do_file_open("/bin/ucq", O_READ, 0);
 	
 	KT_ASSERT_M("We should be able to find /bin/ucq", 
 	            program);

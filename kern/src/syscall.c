@@ -544,7 +544,7 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	if (!t_path)
 		return -1;
 	/* TODO: 9ns support */
-	program = do_file_open(t_path, 0, 0);
+	program = do_file_open(t_path, O_READ, 0);
 	free_path(p, t_path);
 	if (!program)
 		return -1;			/* presumably, errno is already set */
@@ -822,7 +822,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 
 	/* This could block: */
 	/* TODO: 9ns support */
-	program = do_file_open(t_path, 0, 0);
+	program = do_file_open(t_path, O_READ, 0);
 	free_path(p, t_path);
 	if (!program)
 		goto early_error;
@@ -2128,7 +2128,7 @@ intreg_t sys_wstat(struct proc *p, char *path, size_t path_l,
 		return stat_sz;
 	}
 	/* 9ns failed, we'll need to check the VFS */
-	file = do_file_open(t_path, 0, 0);
+	file = do_file_open(t_path, O_READ, 0);
 	free_path(p, t_path);
 	if (!file)
 		return -1;

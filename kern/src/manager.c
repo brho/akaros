@@ -59,7 +59,7 @@ char *p_argv[] = {0, 0, 0};
 /* Helper macro for quickly running a process.  Pass it a string, *file, and a
  * *proc. */
 #define quick_proc_run(x, p, f)                                                  \
-	(f) = do_file_open((x), 0, 0);                                               \
+	(f) = do_file_open((x), O_READ, 0);                                          \
 	assert((f));                                                                 \
 	p_argv[0] = file_name((f));                                                  \
 	(p) = proc_create((f), p_argv, NULL);                                        \
@@ -71,7 +71,7 @@ char *p_argv[] = {0, 0, 0};
 	proc_decref((p));
 
 #define quick_proc_create(x, p, f)                                               \
-	(f) = do_file_open((x), 0, 0);                                               \
+	(f) = do_file_open((x), O_READ, 0);                                          \
 	assert((f));                                                                 \
 	p_argv[0] = file_name((f));                                                  \
 	(p) = proc_create((f), p_argv, NULL);                                        \
@@ -81,7 +81,7 @@ char *p_argv[] = {0, 0, 0};
 	spin_unlock(&(p)->proc_lock);
 
 #define quick_proc_color_run(x, p, c, f)                                         \
-	(f) = do_file_open((x), 0, 0);                                               \
+	(f) = do_file_open((x), O_READ, 0);                                          \
 	assert((f));                                                                 \
 	p_argv[0] = file_name((f));                                                  \
 	(p) = proc_create((f), p_argv, NULL);                                        \
@@ -96,7 +96,7 @@ char *p_argv[] = {0, 0, 0};
 	proc_decref((p));
 
 #define quick_proc_color_create(x, p, c, f)                                      \
-	(f) = do_file_open((x), 0, 0);                                               \
+	(f) = do_file_open((x), O_READ, 0);                                          \
 	assert((f));                                                                 \
 	p_argv[0] = file_name((f));                                                  \
 	(p) = proc_create((f), p_argv, NULL);                                        \
@@ -236,7 +236,7 @@ void manager_jenkins()
 		char exec[] = "/bin/ash";
 		char *p_argv[] = {exec, CONFIG_USERSPACE_TESTING_SCRIPT, 0};
 
-		struct file *program = do_file_open(exec, 0, 0);
+		struct file *program = do_file_open(exec, O_READ, 0);
 		struct proc *p = proc_create(program, p_argv, NULL);
 		proc_wakeup(p);
 		proc_decref(p); /* let go of the reference created in proc_create() */
