@@ -1380,16 +1380,6 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 		t->datalen = MIN(sizeof(t->data), path_l);
 		memmove(t->data, t_path, path_l);
 	}
-
-	/* Make sure only one of O_RDONLY, O_WRONLY, O_RDWR is specified in flag */
-	if (((oflag & (O_RDONLY | O_WRONLY | O_RDWR)) != O_RDONLY) &&
-	    ((oflag & (O_RDONLY | O_WRONLY | O_RDWR)) != O_WRONLY) &&
-	    ((oflag & (O_RDONLY | O_WRONLY | O_RDWR)) != O_RDWR)) {
-		set_errno(EINVAL);
-		free_path(p, t_path);
-		return -1;
-	}
-
 	sysc_save_str("open %s", t_path);
 	mode &= ~p->fs_env.umask;
 	file = do_file_open(t_path, oflag, mode);

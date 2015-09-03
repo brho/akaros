@@ -37,13 +37,13 @@ struct kstat {
 };
 
 /* File access modes for open and fcntl. */
-#define O_RDONLY		0x00		/* Open read-only */
-#define O_WRONLY		0x01		/* Open write-only */
-#define O_RDWR			0x02		/* Open read/write */
-#define O_EXEC			0x04		/* Open for exec (unsupported) */
+#define O_READ			0x01		/* Open for reading */
+#define O_WRITE			0x02		/* Open for writing */
+#define O_EXEC			0x04		/* Open for exec */
+#define O_RDONLY		O_READ		/* Open read-only */
+#define O_WRONLY		O_WRITE		/* Open write-only */
+#define O_RDWR			(O_READ | O_WRITE)		/* Open read/write */
 #define O_ACCMODE		0x07
-/* Thanks to read-only being 0, we can't just check the flag... */
-#define IS_RDONLY(x) (!((x) & (O_WRONLY | O_RDWR)))
 
 /* Bits OR'd into the second argument to open */
 #define O_CREAT			00000100	/* not fcntl */
