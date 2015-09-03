@@ -30,6 +30,11 @@
  * 	process won't deadlock, but it will busy wait on something like an RPC,
  * 	depending on the device being tapped.
  * 	- You can't dup an epoll fd (same as other user FDs).
+ * 	- If you add a BSD socket FD to an epoll set before calling listen(), you'll
+ * 	only epoll on the data (which is inactive) instead of on the accept().
+ * 	- If you add the same BSD socket listener to multiple epoll sets, you will
+ * 	likely fail.  This is in addition to being able to tap only one FD at a
+ * 	time.
  * */
 
 #include <sys/epoll.h>
@@ -64,6 +69,7 @@ struct ep_fd_data {
 	struct epoll_event			ep_event;
 	int							fd;
 	int							filter;
+	int							sock_listen_fd;
 };
 
 /* Converts epoll events to FD taps. */
@@ -180,6 +186,14 @@ static void epoll_close(struct user_fd *ufd)
 		ep_fd_i = (struct ep_fd_data*)ceq_ev_i->user_data;
 		if (!ep_fd_i)
 			continue;
+		if (ep_fd_i->sock_listen_fd >= 0) {
+			/* This tap is using a listen_fd, opened by __epoll_ctl_add, so the
+			 * user doesn't know about this FD.  We need to remove the tap and
+			 * close the FD; the kernel will remove the tap when we close it. */
+			close(ep_fd_i->sock_listen_fd);
+			free(ep_fd_i);
+			continue;
+		}
 		tap_req_i = &tap_reqs[nr_tap_req++];
 		tap_req_i->fd = i;
 		tap_req_i->cmd = FDTAP_CMD_REM;
@@ -243,7 +257,7 @@ static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
 	struct ceq_event *ceq_ev;
 	struct ep_fd_data *ep_fd;
 	struct fd_tap_req tap_req = {0};
-	int ret, filter;
+	int ret, filter, sock_listen_fd;
 
 	/* Only support ET.  Also, we just ignore EPOLLONESHOT.  That might work,
 	 * logically, just with spurious events firing. */
@@ -252,6 +266,30 @@ static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
 		werrstr("Epoll level-triggered not supported");
 		return -1;
 	}
+	/* The sockets-to-plan9 networking shims are a bit inconvenient.  The user
+	 * asked us to epoll on an FD, but that FD is actually a Qdata FD.  We need
+	 * to actually epoll on the listen_fd.  We'll store this in the ep_fd, so
+	 * that later on we can close it.
+	 *
+	 * As far as tracking the FD goes for epoll_wait() reporting, if the app
+	 * wants to track the FD they think we are using, then they already passed
+	 * that in event->data.
+	 *
+	 * But before we get too far, we need to make sure we aren't already tapping
+	 * this FD's listener (hence the lookup).
+	 *
+	 * This all assumes that this socket is only added to one epoll set at a
+	 * time.  The _sock calls are racy, and once one epoller set up a listen_fd
+	 * in the Rock, we'll think that it was us. */
+	extern int _sock_lookup_listen_fd(int sock_fd);	/* in glibc */
+	extern int _sock_get_listen_fd(int sock_fd);
+	if (_sock_lookup_listen_fd(fd) >= 0) {
+		errno = EEXIST;
+		return -1;
+	}
+	sock_listen_fd = _sock_get_listen_fd(fd);
+	if (sock_listen_fd >= 0)
+		fd = sock_listen_fd;
 	ceq_ev = ep_get_ceq_ev(ep, fd);
 	if (!ceq_ev) {
 		errno = ENOMEM;
@@ -278,6 +316,7 @@ static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
 	ep_fd->filter = filter;
 	ep_fd->ep_event = *event;
 	ep_fd->ep_event.events |= EPOLLHUP;
+	ep_fd->sock_listen_fd = sock_listen_fd;
 	ceq_ev->user_data = (uint64_t)ep_fd;
 	return 0;
 }
@@ -288,8 +327,14 @@ static int __epoll_ctl_del(struct epoll_ctlr *ep, int fd,
 	struct ceq_event *ceq_ev;
 	struct ep_fd_data *ep_fd;
 	struct fd_tap_req tap_req = {0};
-	int ret;
+	int ret, sock_listen_fd;
 
+	/* They could be asking to clear an epoll for a listener.  We need to remove
+	 * the tap for the real FD we tapped */
+	extern int _sock_lookup_listen_fd(int sock_fd);	/* in glibc */
+	sock_listen_fd = _sock_lookup_listen_fd(fd);
+	if (sock_listen_fd >= 0)
+		fd = sock_listen_fd;
 	ceq_ev = ep_get_ceq_ev(ep, fd);
 	if (!ceq_ev) {
 		errno = ENOENT;
@@ -307,6 +352,11 @@ static int __epoll_ctl_del(struct epoll_ctlr *ep, int fd,
 	 * has already closed and the kernel removed the tap. */
 	sys_tap_fds(&tap_req, 1);
 	ceq_ev->user_data = 0;
+	assert(ep_fd->sock_listen_fd == sock_listen_fd);
+	if (ep_fd->sock_listen_fd >= 0) {
+		assert(ep_fd->sock_listen_fd == sock_listen_fd);
+		close(ep_fd->sock_listen_fd);
+	}
 	free(ep_fd);
 	return 0;
 }
