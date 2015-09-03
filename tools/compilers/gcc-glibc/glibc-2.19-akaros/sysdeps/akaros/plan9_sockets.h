@@ -51,6 +51,8 @@ struct Rock {
 	struct sockaddr raddr;		/* peer address */
 	char ctl[Ctlsize];			/* name of control file (if any) */
 	int other;					/* fd of the remote end for Unix domain */
+	bool is_listener;			/* has called listen() and will accept() */
+	int listen_fd;				/* fd of the listen file, if any */
 };
 
 extern Rock *_sock_findrock(int, struct stat *);

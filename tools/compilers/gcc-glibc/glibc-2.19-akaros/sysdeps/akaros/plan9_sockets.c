@@ -182,6 +182,8 @@ Rock *_sock_newrock(int fd)
 	memset(&r->raddr, 0, sizeof(r->raddr));
 	r->ctl[0] = '\0';
 	r->other = -1;
+	r->is_listener = FALSE;
+	r->listen_fd = -1;
 	return r;
 }
 
@@ -279,4 +281,55 @@ int _sock_strip_opts(int type)
 int _sock_get_opts(int type)
 {
 	return type & (SOCK_NONBLOCK | SOCK_CLOEXEC);
+}
+
+/* Used by user/iplib (e.g. epoll).  Opens and returns the FD for the
+ * conversation's listen fd, which the caller needs to close.  Returns -1 if the
+ * FD is not a listener. */
+int _sock_get_listen_fd(int sock_fd)
+{
+	char listen_file[Ctlsize + 3];
+	char *x, *last_ctl;
+	Rock *r = _sock_findrock(sock_fd, 0);
+	int ret;
+
+	if (!r)
+		return -1;
+	if (!r->is_listener)
+		return -1;
+	/* We want an FD for the "listen" file.  This is for epoll.  We
+	 * could optimize and only do this on demand, but whatever. */
+	strncpy(listen_file, r->ctl, sizeof(listen_file));
+	/* We want the conversation directory.  We can find the last "ctl"
+	 * in the CTL name (they could have mounted at /ctlfoo/net/) */
+	x = listen_file;
+	do {
+		last_ctl = x;
+		x++;	/* move forward enough to not find the same "ctl" */
+		x = strstr(x, "ctl");
+	} while (x);
+	/* last_ctl is either listen_file (if we never found ctl, which should never
+	 * happen) or it points at the 'c' in the last "ctl". */
+	assert(last_ctl != listen_file);
+	strcpy(last_ctl, "listen");
+	ret = open(listen_file, O_PATH);
+	/* Probably a bug in the rock code (or the kernel!) if we couldn't walk to
+	 * our listen. */
+	assert(ret >= 0);
+	r->listen_fd = ret;
+	return ret;
+}
+
+/* Used by user/iplib (e.g. epoll).  Looks up a previously opened FD for the
+ * listen file for this conversation.  Returns -1 if the FD is not a listener
+ * with an already-opened listen FD. */
+int _sock_lookup_listen_fd(int sock_fd)
+{
+	Rock *r = _sock_findrock(sock_fd, 0);
+
+	if (!r)
+		return -1;
+	if (!r->is_listener)
+		return -1;
+	return r->listen_fd;
 }

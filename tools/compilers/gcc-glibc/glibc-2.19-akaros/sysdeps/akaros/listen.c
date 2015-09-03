@@ -66,9 +66,8 @@ int __listen(int fd, int backlog)
 				return -1;
 			}
 			close(cfd);
-
+			r->is_listener = TRUE;
 			return 0;
-
 		case PF_UNIX:
 			if (r->other < 0) {
 				errno = EINVAL;	//EGREG;

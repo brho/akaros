@@ -45,5 +45,8 @@ libc {
 
     ufd_get_fd;
     ufd_lookup;
+
+    _sock_get_listen_fd;
+    _sock_lookup_listen_fd;
   }
 }
