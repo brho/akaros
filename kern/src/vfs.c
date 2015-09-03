@@ -2232,21 +2232,9 @@ struct file *dentry_open(struct dentry *dentry, int flags)
 	struct file *file;
 	int desired_mode;
 	inode = dentry->d_inode;
-	/* Do the mode first, since we can still error out.  f_mode stores how the
-	 * OS file is open, which can be more restrictive than the i_mode */
-	switch (flags & (O_RDONLY | O_WRONLY | O_RDWR)) {
-		case O_RDONLY:
-			desired_mode = S_IRUSR;
-			break;
-		case O_WRONLY:
-			desired_mode = S_IWUSR;
-			break;
-		case O_RDWR:
-			desired_mode = S_IRUSR | S_IWUSR;
-			break;
-		default:
-			goto error_access;
-	}
+	/* f_mode stores how the OS file is open, which can be more restrictive than
+	 * the i_mode */
+	desired_mode = omode_to_rwx(flags & O_ACCMODE);
 	if (check_perms(inode, desired_mode))
 		goto error_access;
 	file = alloc_file();

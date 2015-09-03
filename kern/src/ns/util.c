@@ -35,3 +35,16 @@ int readstr(unsigned long offset, char *buf, unsigned long n, char *str)
 	/* always include the \0 */
 	return readmem(offset, buf, n, str, strlen(str) + 1);
 }
+
+/* Converts open mode flags, e.g. O_RDWR, to a rwx------ value, e.g. S_IRUSR */
+int omode_to_rwx(int open_flags)
+{
+	static int rwx_opts[] = { [O_RDWR | O_EXEC] = 0700,
+	                          [O_RDWR] = 0600,
+	                          [O_READ | O_EXEC] = 0500,
+	                          [O_READ] = 0400,
+	                          [O_WRITE | O_EXEC] = 0300,
+	                          [O_WRITE] = 0200,
+	                          [O_EXEC] = 0100 };
+	return rwx_opts[open_flags & O_ACCMODE];
+}

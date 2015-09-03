@@ -333,18 +333,20 @@ devdirread(struct chan *c, char *d, long n,
  */
 void devpermcheck(char *fileuid, uint32_t perm, int omode)
 {
-	uint32_t t;
-	static int access[] = { 0400, 0200, 0600, 0100 };
-
+	int rwx;
+	/* select user, group, or other from the traditional rwxrwxrwx, shifting
+	 * into the upper-most position */
 	if (strcmp(current->user, fileuid) == 0)
 		perm <<= 0;
 	else if (strcmp(current->user, eve) == 0)
 		perm <<= 3;
 	else
 		perm <<= 6;
-
-	t = access[omode & 3];
-	if ((t & perm) != t)
+	/* translate omode into things like S_IRUSR (just one set of rwx------).
+	 * Plan 9 originally only returned 0400 0200 0600 and 0100 here; it didn't
+	 * seem to handle O_EXEC being mixed readable or writable. */
+	rwx = omode_to_rwx(omode);
+	if ((rwx & perm) != rwx)
 		error("%s: devpermcheck(%s,0x%x,0x%x) failed", Eperm, fileuid, perm,
 			  omode);
 }

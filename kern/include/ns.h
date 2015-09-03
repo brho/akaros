@@ -769,6 +769,7 @@ void notkilled(void);
 int nrand(int);
 uint64_t ns2fastticks(uint64_t);
 int okaddr(uint32_t, uint32_t, int);
+int omode_to_rwx(int);
 struct block *packblock(struct block *);
 struct block *padblock(struct block *, int);
 
