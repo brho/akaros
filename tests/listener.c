@@ -1,13 +1,19 @@
-/* Echo server, runs on port 23.  Main purpose is low-level network debugging
+/* Copyright (c) 2014 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details.
+ *
+ * Echo server, runs on port 23.  Main purpose is low-level network debugging
  * and to show how networking commands in plan 9 correspond to BSD sockets
  * (which are now a part of our sysdeps in glibc). 
  *
- * if you want to build the BSD sockets version, you need to change the #define.
+ * If you want to build the BSD sockets version, you need to comment out the
+ * #define for PLAN9NET.
  *
  * based off http://www2.informatik.hu-berlin.de/~apolze/LV/plan9.docs/net.V
  * and http://en.wikibooks.org/wiki/C_Programming/Networking_in_UNIX */
 
-#define PLAN9NET 1
+/* Comment this out for BSD sockets */
+#define PLAN9NET
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -45,6 +51,7 @@ int main()
 	char debugbuf[256];
 
 #ifdef PLAN9NET
+	printf("Using Plan 9's networking stack\n");
 	/* This clones a conversation (opens /net/tcp/clone), then reads the cloned
 	 * fd (which is the ctl) to givure out the conv number (the line), then
 	 * writes "announce [addr]" into ctl.  This "announce" command often has a
@@ -58,6 +65,7 @@ int main()
 	}
 	printf("Announced on line %s\n", adir);
 #else
+	printf("Using the BSD socket shims over Plan 9's networking stack\n");
 	int srv_socket, con_socket;
 	struct sockaddr_in dest, srv = {0};
 	srv.sin_family = AF_INET;
@@ -127,6 +135,7 @@ int main()
 	while ((n = read(dfd, buf, sizeof(buf))) > 0) {
 		snprintf(debugbuf, n, "%s", buf);
 		printf("Server read: %s", debugbuf);
+		fflush(stdout);
 		write(dfd, buf, n);
 	}
 

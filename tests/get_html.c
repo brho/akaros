@@ -1,3 +1,9 @@
+/* Copyright (c) 2014 The Regents of the University of California
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * See LICENSE for details.
+ *
+ * Simple web client, gets a single page.  Used for debugging mostly. */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
