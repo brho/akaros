@@ -261,7 +261,6 @@ int pthread_getschedparam(pthread_t thread, int *policy,
                           struct sched_param *param);
 
 /* Unsupported Stuff */
-typedef void *upthread_once_t;
 extern int pthread_mutex_timedlock (pthread_mutex_t *__restrict __mutex,
                     const struct timespec *__restrict
                     __abstime) __THROWNL __nonnull ((1, 2));
@@ -269,8 +268,6 @@ extern int pthread_cond_timedwait (pthread_cond_t *__restrict __cond,
                    pthread_mutex_t *__restrict __mutex,
                    const struct timespec *__restrict __abstime)
      __nonnull ((1, 2, 3));
-extern int pthread_once (pthread_once_t *__once_control,
-             void (*__init_routine) (void)) __nonnull ((1, 2));
 extern int pthread_cancel (pthread_t __th);
 void pthread_cleanup_push(void (*routine)(void *), void *arg);
 void pthread_cleanup_pop(int execute);
