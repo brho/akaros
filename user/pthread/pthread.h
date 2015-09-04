@@ -24,6 +24,14 @@ __BEGIN_DECLS
 #define PTH_BLK_MUTEX		8	/* blocked externally, possibly on a mutex */
 #define PTH_BLK_PAUSED		9	/* handed back to us from uthread code */
 
+/* Entry for a pthread_cleanup_routine on the stack of cleanup handlers. */
+struct pthread_cleanup_routine {
+	SLIST_ENTRY(pthread_cleanup_routine) cr_next;
+	void (*routine)(void *);
+	void *arg;
+};
+SLIST_HEAD(pthread_cleanup_stack, pthread_cleanup_routine);
+
 /* Pthread struct.  First has to be the uthread struct, which the vcore code
  * will access directly (as if pthread_tcb is a struct uthread). */
 struct pthread_tcb;
@@ -48,6 +56,7 @@ struct pthread_tcb {
 	struct sigdata *sigdata;
 	int sched_policy;
 	int sched_priority;		/* careful, GNU #defines this to __sched_priority */
+	struct pthread_cleanup_stack cr_stack;
 };
 typedef struct pthread_tcb* pthread_t;
 SLIST_HEAD(pthread_list, pthread_tcb);
@@ -233,6 +242,9 @@ int pthread_equal(pthread_t __thread1, pthread_t __thread2);
 int pthread_getattr_np(pthread_t __th, pthread_attr_t *__attr);
 int pthread_attr_getstack(const pthread_attr_t *__attr,
                            void **__stackaddr, size_t *__stacksize);
+int pthread_cancel(pthread_t __th);
+void pthread_cleanup_push(void (*routine)(void *), void *arg);
+void pthread_cleanup_pop(int execute);
 
 /* Scheduling Stuff, mostly ignored by the actual 2LS */
 int pthread_attr_setschedparam(pthread_attr_t *attr,
@@ -268,9 +280,6 @@ extern int pthread_cond_timedwait (pthread_cond_t *__restrict __cond,
                    pthread_mutex_t *__restrict __mutex,
                    const struct timespec *__restrict __abstime)
      __nonnull ((1, 2, 3));
-extern int pthread_cancel (pthread_t __th);
-void pthread_cleanup_push(void (*routine)(void *), void *arg);
-void pthread_cleanup_pop(int execute);
 
 __END_DECLS
 

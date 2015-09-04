@@ -35,6 +35,7 @@ struct sysc_mgmt *sysc_mgmt = 0;
 /* Helper / local functions */
 static int get_next_pid(void);
 static inline void spin_to_sleep(unsigned int spins, unsigned int *spun);
+static inline void pthread_exit_no_cleanup(void *ret);
 
 /* Pthread 2LS operations */
 static void pth_sched_entry(void);
@@ -255,7 +256,7 @@ static void __attribute__((noreturn)) pth_sched_entry(void)
 static void __pthread_run(void)
 {
 	struct pthread_tcb *me = pthread_self();
-	pthread_exit(me->start_routine(me->arg));
+	pthread_exit_no_cleanup(me->start_routine(me->arg));
 }
 
 /* GIANT WARNING: if you make any changes to this, also change the broadcast
@@ -608,6 +609,7 @@ void __attribute__((constructor)) pthread_lib_init(void)
 	assert(t->id == 0);
 	t->sched_policy = SCHED_FIFO;
 	t->sched_priority = 0;
+	SLIST_INIT(&t->cr_stack);
 	/* Put the new pthread (thread0) on the active queue */
 	mcs_pdr_lock(&queue_lock);
 	threads_active++;
@@ -720,6 +722,7 @@ int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	/* Might override these later, based on attr && EXPLICIT_SCHED */
 	pthread->sched_policy = parent->sched_policy;
 	pthread->sched_priority = parent->sched_priority;
+	SLIST_INIT(&pthread->cr_stack);
 	/* Respect the attributes */
 	if (attr) {
 		if (attr->stacksize)					/* don't set a 0 stacksize */
@@ -855,12 +858,22 @@ static void __pth_exit_cb(struct uthread *uthread, void *junk)
 		exit(0);
 }
 
-void pthread_exit(void *ret)
+static inline void pthread_exit_no_cleanup(void *ret)
 {
 	struct pthread_tcb *pthread = pthread_self();
 	pthread->retval = ret;
 	destroy_dtls();
+	while (SLIST_FIRST(&pthread->cr_stack))
+		pthread_cleanup_pop(FALSE);
 	uthread_yield(FALSE, __pth_exit_cb, 0);
+}
+
+void pthread_exit(void *ret)
+{
+	struct pthread_tcb *pthread = pthread_self();
+	while (SLIST_FIRST(&pthread->cr_stack))
+		pthread_cleanup_pop(TRUE);
+	pthread_exit_no_cleanup(ret);
 }
 
 /* Callback/bottom half of yield.  For those writing these pth callbacks, the
@@ -880,6 +893,34 @@ int pthread_yield(void)
 {
 	uthread_yield(TRUE, __pth_yield_cb, 0);
 	return 0;
+}
+
+int pthread_cancel(pthread_t __th)
+{
+	fprintf(stderr, "Unsupported %s!", __FUNCTION__);
+	abort();
+	return -1;
+}
+
+void pthread_cleanup_push(void (*routine)(void *), void *arg)
+{
+	struct pthread_tcb *p = pthread_self();
+	struct pthread_cleanup_routine *r = malloc(sizeof(*r));
+	r->routine = routine;
+	r->arg = arg;
+	SLIST_INSERT_HEAD(&p->cr_stack, r, cr_next);
+}
+
+void pthread_cleanup_pop(int execute)
+{
+	struct pthread_tcb *p = pthread_self();
+	struct pthread_cleanup_routine *r = SLIST_FIRST(&p->cr_stack);
+	if (r) {
+		SLIST_REMOVE_HEAD(&p->cr_stack, cr_next);
+		if (execute)
+			r->routine(r->arg);
+		free(r);
+	}
 }
 
 int pthread_mutexattr_init(pthread_mutexattr_t* attr)
@@ -1451,23 +1492,4 @@ int pthread_cond_timedwait (pthread_cond_t *__restrict __cond,
 	fprintf(stderr, "Unsupported %s!", __FUNCTION__);
 	abort();
 	return -1;
-}
-
-int pthread_cancel (pthread_t __th)
-{
-	fprintf(stderr, "Unsupported %s!", __FUNCTION__);
-	abort();
-	return -1;
-}
-
-void pthread_cleanup_push(void (*routine)(void *), void *arg)
-{
-	fprintf(stderr, "Unsupported %s!", __FUNCTION__);
-	abort();
-}
-
-void pthread_cleanup_pop(int execute)
-{
-	fprintf(stderr, "Unsupported %s!", __FUNCTION__);
-	abort();
 }
