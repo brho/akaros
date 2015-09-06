@@ -708,7 +708,7 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 		if (consdata) {
 			if (debug) fprintf(stderr, "inject an interrupt\n");
 			fprintf(stderr, "XINT 0x%x 0x%x\n", vmctl.intrinfo1, vmctl.intrinfo2);
-			if ((vmctl.intrinfo1 == 0) && (vmctl.regs.tf_rflags & 0x200)) {
+			if (1 || (vmctl.intrinfo1 == 0) && (vmctl.regs.tf_rflags & 0x200)) {
 				vmctl.interrupt = 0x80000000 | virtioirq;
 				virtio_mmio_set_vring_irq();
 				consdata = 0;
