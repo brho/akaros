@@ -100,9 +100,6 @@ extern int parseether(uint8_t * unused_uint8_p_t, char *unused_char_p_t);
 #define DMWRITE		0x2	/* mode bit for write permission */
 #define DMEXEC		0x1	/* mode bit for execute permission */
 
-/* Helper for mode checks.  It's poorly named since it's really "not writable"*/
-#define IS_RDONLY(x) (!((x) & O_WRITE))
-
 struct qid {
 	uint64_t path;
 	uint32_t vers;

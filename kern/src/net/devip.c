@@ -406,11 +406,11 @@ static struct chan *ipopen(struct chan *c, int omode)
 		case Qstats:
 		case Qbootp:
 		case Qipselftab:
-			if (!IS_RDONLY(omode))
+			if (omode & O_WRITE)
 				error(Eperm);
 			break;
 		case Qsnoop:
-			if (!IS_RDONLY(omode))
+			if (omode & O_WRITE)
 				error(Eperm);
 			p = f->p[PROTO(c->qid)];
 			cv = p->conv[CONV(c->qid)];

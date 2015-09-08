@@ -203,7 +203,7 @@ struct chan *netifopen(struct ether *nif, struct chan *c, int omode)
 
 	id = 0;
 	if (c->qid.type & QTDIR) {
-		if (!IS_RDONLY(omode))
+		if (omode & O_WRITE)
 			error(Eperm);
 	} else {
 		switch (NETTYPE(c->qid.path)) {
@@ -217,7 +217,7 @@ struct chan *netifopen(struct ether *nif, struct chan *c, int omode)
 				c->qid.path = NETQID(id, Nctlqid);
 				break;
 			default:
-				if (!IS_RDONLY(omode))
+				if (omode & O_WRITE)
 					error(Ebadarg);
 		}
 		switch (NETTYPE(c->qid.path)) {

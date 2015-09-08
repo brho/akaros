@@ -239,7 +239,7 @@ static struct chan *alarmopen(struct chan *c, int omode)
 		case Qalarmdir:
 			if (omode & ORCLOSE)
 				error(Eperm);
-			if (!IS_RDONLY(omode))
+			if (omode & O_WRITE)
 				error(Eisdir);
 			break;
 		case Qclone:

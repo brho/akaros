@@ -374,7 +374,7 @@ struct chan *devopen(struct chan *c, int omode, struct dirtab *tab, int ntab,
 	}
 Return:
 	c->offset = 0;
-	if ((c->qid.type & QTDIR) && !IS_RDONLY(omode))
+	if ((c->qid.type & QTDIR) && (omode & O_WRITE))
 		error("Tried opening dir with non-read-only mode %o", omode);
 	c->mode = openmode(omode);
 	c->flag |= COPEN;

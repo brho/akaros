@@ -54,7 +54,7 @@ struct chan *fdtochan(struct fd_table *fdt, int fd, int mode, int chkmnt,
 		return c;
 	}
 
-	if ((mode & OTRUNC) && IS_RDONLY(c->mode)) {
+	if ((mode & OTRUNC) && !(c->mode & O_WRITE)) {
 		if (iref)
 			cclose(c);
 		error(Ebadusefd);
@@ -86,10 +86,12 @@ long kchanio(void *vc, void *buf, int n, int mode)
 		return -1;
 	}
 
-	if (IS_RDONLY(mode))
+	if (mode == O_READ)
 		r = devtab[c->type].read(c, buf, n, c->offset);
-	else
+	else if (mode == O_WRITE)
 		r = devtab[c->type].write(c, buf, n, c->offset);
+	else
+		error("kchanio: use only O_READ xor O_WRITE");
 
 	spin_lock(&c->lock);
 	c->offset += r;

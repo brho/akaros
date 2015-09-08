@@ -1375,12 +1375,7 @@ struct file *do_file_open(char *path, int flags, int mode)
 	nd->intent = LOOKUP_OPEN;
 	error = path_lookup(path, LOOKUP_FOLLOW, nd);
 	if (!error) {
-		/* If this is a directory, make sure we are opening with O_RDONLY.
-		 * Unfortunately we can't just check for O_RDONLY directly because its
-		 * value is 0x0.  We instead have to make sure it's not O_WRONLY and
-		 * not O_RDWR explicitly. */
-		if (S_ISDIR(nd->dentry->d_inode->i_mode) &&
-		    ((flags & O_WRONLY) || (flags & O_RDWR))) {
+		if (S_ISDIR(nd->dentry->d_inode->i_mode) && (flags & O_WRITE)) {
 			set_errno(EISDIR);
 			goto out_path_only;
 		}

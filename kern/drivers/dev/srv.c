@@ -182,7 +182,7 @@ static struct chan *srvopen(struct chan *c, int omode)
 	struct srvfile *srv;
 	openmode(omode);	/* used as an error checker in plan9, does little now */
 	if (c->qid.type & QTDIR) {
-		if (!IS_RDONLY(omode))
+		if (omode & O_WRITE)
 			error(Eisdir);
 		c->mode = openmode(omode);
 		c->flag |= COPEN;
