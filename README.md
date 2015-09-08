@@ -63,4 +63,36 @@ Contributing
 
 Instructions on contributing can be found in
 [Documentation/Contributing.md](Documentation/Contributing.md).
-All contributed code is governed by the licenses detailed below.
+
+License
+============
+The Akaros repository contains a mix of code from different projects across a
+few top-level directories.  The kernel is in `kern/`, userspace libraries are
+in `user/`, and a variety of tools can be found in `tools/`, including the
+toolchain.
+
+The Akaros kernel is licensed under the [GNU General Public License, version
+2](http://www.gnu.org/licenses/gpl-2.0.txt).  Our kernel is made up of code
+from a number of other systems.  Anything written for the Akaros kernel is
+licensed "GPLv2 or later".  However, other code, such as from Linux and Plan 9,
+are licensed GPLv2, without the "or later" clause.  There is also code from
+BSD, Xen, JOS, and Plan 9 derivatives.  As a whole, the kernel is licensed
+GPLv2.
+
+Note that the Plan 9 code that is a part of Akaros is also licensed under the
+Lucent Public License.  The University of California, Berkeley, has been
+authorised by Alcatel-Lucent to release all Plan 9 software previously governed
+by the Lucent Public License, Version 1.02 under the GNU General Public
+License, Version 2.  Akaros derives its Plan 9 code from this UCB release.  For
+more information, see [LICENSE-PLAN9](LICENSE-PLAN9) or
+[here](http://akaros.cs.berkeley.edu/files/Plan9License).
+
+Our user code is likewise from a mix of sources.  All code written for Akaros,
+such as `user/parlib/`, is licensed under the [GNU
+LGPLv2.1](http://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt), or later.
+Plan 9 libraries, including `user/iplib` and `user/ndblib` are licensed under
+the LGPLv2.1, but without the "or later".  See each library for details.
+
+Likewise, `tools/` is a collection of various code.  All of our contributions
+to existing code bases, such as GCC, glibc, and busybox, are licensed under
+their respective projects' licenses.
