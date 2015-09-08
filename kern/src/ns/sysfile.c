@@ -108,7 +108,10 @@ int openmode(uint32_t omode)
 	/* this is the old plan9 style.  i think they want to turn exec into read,
 	 * and strip off anything higher, and just return the RD/WR style bits.  not
 	 * stuff like ORCLOSE.  the lack of OEXCL might be a bug on their part (it's
-	 * the only one of their non-RW-related flags that isn't masked out) */
+	 * the only one of their non-RW-related flags that isn't masked out).
+	 *
+	 * Note that we no longer convert OEXEC/O_EXEC to O_READ, and instead return
+	 * just the O_ACCMODE bits. */
 	if (o >= (OTRUNC | OCEXEC | ORCLOSE | OEXEC))
 		error(Ebadarg);
 	o &= ~(OTRUNC | OCEXEC | ORCLOSE);
@@ -120,9 +123,6 @@ int openmode(uint32_t omode)
 #endif
 	/* no error checking (we have a shitload of flags anyway), and we return the
 	 * basic access modes (RD/WR/ETC) */
-	if (omode == O_EXEC) {
-	return O_RDONLY;
-	}
 	return omode & O_ACCMODE;
 }
 
