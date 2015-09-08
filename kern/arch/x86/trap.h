@@ -60,6 +60,7 @@
 #define I_SMP_CALL3				(I_SMP_CALL0 + 3)
 #define I_SMP_CALL4				(I_SMP_CALL0 + 4)
 #define I_SMP_CALL_LAST			I_SMP_CALL4
+#define I_VMMCP_POSTED				(I_SMP_CALL_LAST + 1)
 #define I_TESTING				237 	/* Testing IPI (used in testing.c) */
 #define I_POKE_CORE				238
 #define I_KERNEL_MSG			239

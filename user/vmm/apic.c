@@ -27,6 +27,7 @@
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
 
+
 #define APIC_CONFIG 0x100
 
 int debug_apic = 1;
@@ -186,4 +187,21 @@ int apic(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store)
 		DPRINTF("Read: Set %s from %s @%p to %p\n", regname(destreg), apicregs[offset].name, gpa, *regp);
 	}
 
+}
+
+void vapic_status_dump(FILE *f, void *vapic)
+{
+	uint32_t *p = (uint32_t *)vapic;
+	int i;
+	fprintf(f, "-- BEGIN APIC STATUS DUMP --\n");
+	for (i = 0x100/sizeof(*p); i < 0x180/sizeof(*p); i+=4) {
+		fprintf(f, "VISR : 0x%x: 0x%08x\n", i, p[i]);
+	}
+	for (i = 0x200/sizeof(*p); i < 0x280/sizeof(*p); i+=4) {
+		fprintf(f, "VIRR : 0x%x: 0x%08x\n", i, p[i]);
+	}
+	i = 0x0B0/sizeof(*p);
+	fprintf(f, "EOI FIELD : 0x%x, 0x%08x\n", i, p[i]);
+
+	fprintf(f, "-- END APIC STATUS DUMP --\n");
 }

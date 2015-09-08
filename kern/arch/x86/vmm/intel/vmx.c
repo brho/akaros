@@ -160,6 +160,10 @@
 
 #include "cpufeature.h"
 
+#include <trap.h>
+
+#include <smp.h>
+
 #define currentcpu (&per_cpu_info[core_id()])
 
 /* debug stuff == remove later. It's not even multivm safe. */
@@ -331,6 +335,8 @@ vmcs_write64(unsigned long field, uint64_t value)
 {
 	vmcs_writel(field, value);
 }
+
+void vapic_status_dump_kernel(void *vapic);
 
 /*
  * A note on Things You Can't Make Up.
@@ -506,10 +512,10 @@ static const struct vmxec pbec = {
 
 	.must_be_1 = (PIN_BASED_EXT_INTR_MASK |
 		     PIN_BASED_NMI_EXITING |
-		     PIN_BASED_VIRTUAL_NMIS),
-
-	.must_be_0 = (PIN_BASED_VMX_PREEMPTION_TIMER |
+		     PIN_BASED_VIRTUAL_NMIS |
 		     PIN_BASED_POSTED_INTR),
+
+	.must_be_0 = (PIN_BASED_VMX_PREEMPTION_TIMER),
 };
 
 static const struct vmxec cbec = {
@@ -517,7 +523,7 @@ static const struct vmxec cbec = {
 	.msr = MSR_IA32_VMX_PROCBASED_CTLS,
 	.truemsr = MSR_IA32_VMX_TRUE_PROCBASED_CTLS,
 
-	.must_be_1 = (CPU_BASED_MWAIT_EXITING |
+	.must_be_1 = (//CPU_BASED_MWAIT_EXITING |
 			CPU_BASED_HLT_EXITING |
 		     CPU_BASED_TPR_SHADOW |
 		     CPU_BASED_RDPMC_EXITING |
@@ -528,6 +534,7 @@ static const struct vmxec cbec = {
 		     CPU_BASED_ACTIVATE_SECONDARY_CONTROLS),
 
 	.must_be_0 = (
+			CPU_BASED_MWAIT_EXITING |
 			CPU_BASED_VIRTUAL_INTR_PENDING |
 		     CPU_BASED_INVLPG_EXITING |
 		     CPU_BASED_USE_TSC_OFFSETING |
@@ -599,12 +606,16 @@ static const struct vmxec vmexit = {
 	.truemsr = MSR_IA32_VMX_TRUE_EXIT_CTLS,
 
 	.must_be_1 = (VM_EXIT_SAVE_DEBUG_CONTROLS |	/* can't set to 0 */
-				 VM_EXIT_SAVE_IA32_EFER | VM_EXIT_LOAD_IA32_EFER | VM_EXIT_HOST_ADDR_SPACE_SIZE),	/* 64 bit */
+				 VM_EXIT_ACK_INTR_ON_EXIT |
+				 VM_EXIT_SAVE_IA32_EFER | 
+				VM_EXIT_LOAD_IA32_EFER | 
+				VM_EXIT_HOST_ADDR_SPACE_SIZE),	/* 64 bit */
 
 	.must_be_0 = (VM_EXIT_LOAD_IA32_PERF_GLOBAL_CTRL |
-				 VM_EXIT_ACK_INTR_ON_EXIT |
+				// VM_EXIT_ACK_INTR_ON_EXIT |
 				 VM_EXIT_SAVE_IA32_PAT |
-				 VM_EXIT_LOAD_IA32_PAT | VM_EXIT_SAVE_VMX_PREEMPTION_TIMER),
+				 VM_EXIT_LOAD_IA32_PAT | 
+				VM_EXIT_SAVE_VMX_PREEMPTION_TIMER),
 };
 
 static void
@@ -913,6 +924,7 @@ vmx_dump_cpu(struct vmx_vcpu *vcpu)
 	printk("GUEST_INTERRUPTIBILITY_INFO: 0x%08x\n",  vmcs_readl(GUEST_INTERRUPTIBILITY_INFO));
 	printk("VM_ENTRY_INTR_INFO_FIELD 0x%08x\n", vmcs_readl(VM_ENTRY_INTR_INFO_FIELD));
 	printk("EXIT_QUALIFICATION 0x%08x\n", vmcs_read32(EXIT_QUALIFICATION));
+	printk("VM_EXIT_REASON 0x%08x\n", vmcs_read32(VM_EXIT_REASON));
 	vcpu->regs.tf_rip = vmcs_readl(GUEST_RIP);
 	vcpu->regs.tf_rsp = vmcs_readl(GUEST_RSP);
 	flags = vmcs_readl(GUEST_RFLAGS);
@@ -1044,6 +1056,9 @@ vmx_setup_initial_guest_state(void)
 	vmcs_write32(GUEST_PENDING_DBG_EXCEPTIONS, 0);
 	vmcs_write64(GUEST_IA32_DEBUGCTL, 0);
 	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);	/* 22.2.1 */
+
+	/* Initialize posted interrupt notification vector */
+	vmcs_write16(POSTED_NOTIFICATION_VEC, I_VMMCP_POSTED);
 	}
 
 static void __vmx_disable_intercept_for_msr(unsigned long *msr_bitmap,
@@ -1685,14 +1700,39 @@ static void vmx_set_rvi(int vector)
 	uint8_t old;
 
 	status = vmcs_read16(GUEST_INTR_STATUS);
+	printk("%s: Status is %04x", __func__, status);
 	old = (uint8_t)status & 0xff;
 	if ((uint8_t)vector != old) {
 		status &= ~0xff;
 		status |= (uint8_t)vector;
 		printk("%s: SET 0x%x\n", __func__, status);
+
+		// Clear SVI
+		status &= 0xff;
 		vmcs_write16(GUEST_INTR_STATUS, status);
 	}
+	printk("%s: Status is %04x after RVI", __func__,
+			vmcs_read16(GUEST_INTR_STATUS));
 }
+
+/*
+static void vmx_set_posted_interrupt(int vector)
+{
+	unsigned long *bit_vec;
+	unsigned long *pir = vmcs_readl(POSTED_INTR_DESC_ADDR_HIGH);
+	pir = pir << 32;
+	pir |= vmcs_readl(POSTED_INTR_DESC_ADDR);
+
+	// Move to the correct location to set our bit.
+	bit_vec = pir + vector/32;
+	test_and_set_bit(vector%32, bit_vec);
+
+	// Set outstanding notification bit
+	bit_vec = pir + 8;
+	test_and_set_bit(0, bit_vec);
+}
+
+*/
 
 /**
  * vmx_launch - the main loop for a VMX Dune process
@@ -1704,6 +1744,9 @@ int vmx_launch(struct vmctl *v) {
 	int errors = 0;
 	int advance;
 	int interrupting = 0;
+	uintptr_t pir_kva, vapic_kva;
+	uint64_t pir_physical, vapic_physical;
+	struct proc * current_proc = current;
 
 	/* TODO: dirty hack til we have VMM contexts */
 	vcpu = current->vmm.guest_pcores[0];
@@ -1730,12 +1773,39 @@ int vmx_launch(struct vmctl *v) {
 		printd("REG_RSP_RIP_CR3\n");
 		vmcs_writel(GUEST_RSP, v->regs.tf_rsp);
 		vmcs_writel(GUEST_CR3, v->cr3);
-		vmcs_writel(POSTED_INTR_DESC_ADDR, v->pir);
-		vmcs_writel(POSTED_INTR_DESC_ADDR_HIGH, v->pir>>32);
-		vmcs_writel(VIRTUAL_APIC_PAGE_ADDR, v->vapic);
-		vmcs_writel(VIRTUAL_APIC_PAGE_ADDR_HIGH, v->vapic>>32);
+
+		pir_kva = uva2kva(current_proc, (void *)v->pir);
+		pir_physical = (uint64_t)PADDR(pir_kva);
+
+		vmcs_writel(POSTED_INTR_DESC_ADDR, pir_physical);
+		vmcs_writel(POSTED_INTR_DESC_ADDR_HIGH, pir_physical>>32);
+		printk("POSTED_INTR_DESC_ADDR_HIGH %ld", vmcs_readl(POSTED_INTR_DESC_ADDR_HIGH));
+		if (pir_physical & 0xfff) {
+			printk("Low order 12 bits of pir address is not 0, value: %p\n", pir_physical);
+		}
+
+		vapic_kva = uva2kva(current_proc, (void *)v->vapic);
+		vapic_physical = (uint64_t)PADDR(vapic_kva);
+
+		vmcs_writel(VIRTUAL_APIC_PAGE_ADDR, vapic_physical);
+		vmcs_writel(VIRTUAL_APIC_PAGE_ADDR_HIGH, vapic_physical>>32);
+		if (vapic_physical & 0xfff) {
+			printk("Low order 12 bits of vapic address is not 0, value: %p\n", vapic_physical);
+		}
+
 		vmcs_writel(APIC_ACCESS_ADDR, 0xfee00000);
 		vmcs_writel(APIC_ACCESS_ADDR_HIGH, 0);
+
+		// Clear the EOI exit bitmap(Gan)
+		vmcs_writel(EOI_EXIT_BITMAP0, 0);
+		vmcs_writel(EOI_EXIT_BITMAP0_HIGH, 0);
+		vmcs_writel(EOI_EXIT_BITMAP1, 0);
+		vmcs_writel(EOI_EXIT_BITMAP1_HIGH, 0);
+		vmcs_writel(EOI_EXIT_BITMAP2, 0);
+		vmcs_writel(EOI_EXIT_BITMAP2_HIGH, 0);
+		vmcs_writel(EOI_EXIT_BITMAP3, 0);
+		vmcs_writel(EOI_EXIT_BITMAP3_HIGH, 0);
+
 		printk("v->apic %p v->pir %p\n", (void *)v->vapic, (void *)v->pir);
 		// fallthrough
 	case REG_RIP:
@@ -1752,7 +1822,12 @@ int vmx_launch(struct vmctl *v) {
 		if (v->interrupt) {
 			printk("Set VM_ENTRY_INFTR_INFO_FIELD to 0x%x\n", v->interrupt);
 			//vmcs_writel(VM_ENTRY_INTR_INFO_FIELD, v->interrupt);
-			vmx_set_rvi(v->interrupt);
+			//vapic_status_dump_kernel((void *)v->vapic);
+			
+			//Not using this because we still need a VMExit.
+			//vmx_set_rvi(v->interrupt);
+
+			//vapic_status_dump_kernel((void *)v->vapic);
 			v->interrupt = 0;
 			interrupting = 1;
 		}
@@ -1779,13 +1854,21 @@ int vmx_launch(struct vmctl *v) {
 		disable_irq();
 		//dumpmsrs();
 		ret = vmx_run_vcpu(vcpu);
+		
 		//dumpmsrs();
 		enable_irq();
 		v->intrinfo1 = vmcs_readl(GUEST_INTERRUPTIBILITY_INFO);
-		v->intrinfo2 = vmcs_readl(VM_ENTRY_INTR_INFO_FIELD);
+		v->intrinfo2 = vmcs_readl(VM_EXIT_INTR_INFO);
 		vmx_put_cpu(vcpu);
+
 		if (interrupting) {
-			printk("POST INTERRUPT: ");
+			printk("POST INTERRUPT: \n");
+			unsigned long cr8val;
+			asm volatile("mov %%cr8,%0" : "=r" (cr8val));
+			printk("CR8 Value: 0x%08x", cr8val);
+			
+			printk("%s: Status is %04x\n", __func__,
+					vmcs_read16(GUEST_INTR_STATUS));
 			vmx_dump_cpu(vcpu);
 		}
 
@@ -1823,9 +1906,9 @@ int vmx_launch(struct vmctl *v) {
 				vcpu->shutdown = SHUTDOWN_NMI_EXCEPTION;
 		} else if (ret == EXIT_REASON_EXTERNAL_INTERRUPT) {
 			printk("External interrupt\n");
-			//vmx_dump_cpu(vcpu);
+			vmx_dump_cpu(vcpu);
 			printk("GUEST_INTERRUPTIBILITY_INFO: 0x%08x,",  v->intrinfo1);
-			printk("VM_ENTRY_INTR_INFO_FIELD 0x%08x,", v->intrinfo2);
+			printk("VM_EXIT_INFO_FIELD 0x%08x,", v->intrinfo2);
 			printk("rflags 0x%x\n", vcpu->regs.tf_rflags);
 			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
 		} else if (ret == EXIT_REASON_MSR_READ) {
@@ -2096,4 +2179,22 @@ int intel_vmm_pcpu_init(void) {
 	setup_vmxarea();
 	vmx_enable();
 	return 0;
+}
+
+
+void vapic_status_dump_kernel(void *vapic)
+{
+	uint32_t *p = (uint32_t *)vapic;
+	int i;
+	printk("-- BEGIN KERNEL APIC STATUS DUMP --\n");
+	for (i = 0x100/sizeof(*p); i < 0x180/sizeof(*p); i+=4) {
+		printk("VISR : 0x%x: 0x%08x\n", i, p[i]);
+	}
+	for (i = 0x200/sizeof(*p); i < 0x280/sizeof(*p); i+=4) {
+		printk("VIRR : 0x%x: 0x%08x\n", i, p[i]);
+	}
+	i = 0x0B0/sizeof(*p);
+	printk("EOI FIELD : 0x%x, 0x%08x\n", i, p[i]);
+
+	printk("-- END KERNEL APIC STATUS DUMP --\n");
 }

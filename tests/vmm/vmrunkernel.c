@@ -24,6 +24,9 @@
 #include <vmm/virtio_config.h>
 
 int msrio(struct vmctl *vcpu, uint32_t opcode);
+
+struct vmctl vmctl;
+
 /* Kind of sad what a total clusterf the pc world is. By 1999, you could just scan the hardware 
  * and work it out. But 2005, that was no longer possible. How sad. 
  * so we have to fake acpi to make it all work. !@#$!@#$#.
@@ -152,6 +155,19 @@ int resumeprompt = 0;
 //		vring_new_virtqueue(0, 512, 8192, 0, inpages, NULL, NULL, "test");
 uint64_t virtio_mmio_base = 0x100000000;
 
+void vapic_status_dump(FILE *f, void *vapic);
+static void set_posted_interrupt(int vector);
+
+#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 1)
+#error "Get a gcc newer than 4.4.0"
+#else
+#define BITOP_ADDR(x) "+m" (*(volatile long *) (x))
+#endif
+
+#define LOCK_PREFIX "lock "
+#define ADDR				BITOP_ADDR(addr)
+static inline int test_and_set_bit(int nr, volatile unsigned long *addr);
+
 void *consout(void *arg)
 {
 	char *line, *consline, *outline;
@@ -172,6 +188,7 @@ void *consout(void *arg)
 	}
 	
 	for(num = 0;;num++) {
+		//int debug = 1;
 		/* host: use any buffers we should have been sent. */
 		head = wait_for_vq_desc(v, iov, &outlen, &inlen);
 		if (debug)
@@ -182,6 +199,9 @@ void *consout(void *arg)
 		for(i = 0; i < outlen; i++) {
 			num++;
 			int j;
+			if (debug) {
+				fprintf(stderr, "CCC: IOV length is %d\n", iov[i].length);
+			}
 			for (j = 0; j < iov[i].length; j++)
 				printf("%c", ((char *)iov[i].v)[j]);
 		}
@@ -242,7 +262,8 @@ void *consin(void *arg)
 			if (fgets(consline, 4096-256, stdin) == NULL) {
 				exit(0);
 			} 
-			if (debug) fprintf(stderr, "GOT A LINE:%s:\n", consline);
+			if (debug) fprintf(stderr, "CONSIN: GOT A LINE:%s:\n", consline);
+			if (debug) fprintf(stderr, "CONSIN: OUTLEN:%d:\n", outlen);
 			if (strlen(consline) < 3 && consline[0] == 'q' ) {
 				quit = 1;
 				break;
@@ -256,6 +277,9 @@ void *consin(void *arg)
 		add_used(v, head, outlen+inlen);
 		consdata = 1;
 		if (debug) fprintf(stderr, "DONE call add_used\n");
+
+		// Send spurious for testing (Gan)
+		set_posted_interrupt(0xE5);
 	}
 	fprintf(stderr, "All done\n");
 	return NULL;
@@ -302,6 +326,62 @@ static void gencsum(uint8_t *target, void *data, int len)
 	fprintf(stderr, "Cmoputed is %02x\n", *target);
 }
 
+static inline int test_and_set_bit(int nr, volatile unsigned long *addr)
+{
+	int oldbit;
+
+	asm volatile(LOCK_PREFIX "bts %2,%1\n\t"
+		     "sbb %0,%0" : "=r" (oldbit), ADDR : "Ir" (nr) : "memory");
+
+	return oldbit;
+}
+
+static void pir_dump()
+{
+	unsigned long *pir_ptr = (unsigned long *)vmctl.pir;
+	int i;
+	fprintf(stderr, "-------Begin PIR dump-------\n");
+	for (i = 0; i < 16; i++){
+		fprintf(stderr, "Byte %d: 0x%016x\n", i, pir_ptr[i]);
+	}
+	fprintf(stderr, "-------End PIR dump-------\n");
+}
+
+static void set_posted_interrupt(int vector)
+{
+	unsigned long *bit_vec;
+	int bit_offset;
+	int i, j;
+	unsigned long *pir = (unsigned long *)vmctl.pir;
+	// Move to the correct location to set our bit.
+	bit_vec = pir + vector/(sizeof(unsigned long)*8);
+	bit_offset = vector%(sizeof(unsigned long)*8);
+	fprintf(stderr, "%s: Pre set PIR dump", __func__);
+	pir_dump();
+	fprintf(stderr, "%s: Setting pir bit offset %d at 0x%p", __func__,
+			bit_offset, bit_vec);
+	test_and_set_bit(bit_offset, bit_vec);
+
+	// Set outstanding notification bit
+	bit_vec = pir + 4;
+	fprintf(stderr, "%s: Setting pir bit offset 0 at 0x%p", __func__,
+			bit_vec);
+	test_and_set_bit(0, bit_vec);
+
+	//bit_vec = pir + 7;
+	//fprintf(stderr, "%s: Setting pir bit offset 31 at 0x%p", __func__,
+	//		bit_vec);
+	//test_and_set_bit(31, bit_vec);
+
+	//for (i = 2; i < 3; i++){
+	//	for (j = 0; j < 1; j++){
+//			test_and_set_bit(j, pir+i);
+//		}
+//	}
+
+	pir_dump();
+}
+
 int main(int argc, char **argv)
 {
 	uint64_t *p64;
@@ -313,7 +393,7 @@ int main(int argc, char **argv)
 	uint64_t virtiobase = 0x100000000ULL;
 	// lowmem is a bump allocated pointer to 2M at the "physbase" of memory 
 	void *lowmem = (void *) 0x1000000;
-	struct vmctl vmctl;
+	//struct vmctl vmctl;
 	int amt;
 	int vmmflags = 0; // Disabled probably forever. VMM_VMCALL_PRINTF;
 	uint64_t entry = 0x1200000, kerneladdress = 0x1200000;
@@ -325,6 +405,7 @@ int main(int argc, char **argv)
 	int i;
 	uint8_t csum;
 	void *coreboot_tables = (void *) 0x1165000;
+	void *a_page;
 fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 
 	// mmap is not working for us at present.
@@ -338,6 +419,23 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 	// avoid at all costs, requires too much instruction emulation.
 	//low4k[0x40e] = 0;
 	//low4k[0x40f] = 0xe0;
+
+	//Place mmap(Gan)
+	a_page = mmap((void *)0xfee00000, PGSIZE, PROT_READ | PROT_WRITE,
+		              MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	fprintf(stderr, "a_page mmap pointer %p", a_page);
+
+	if (a_page == (void *) -1) {
+		perror("Could not mmap APIC");
+		exit(1);
+	}
+	if (((uint64_t)a_page & 0xfff) != 0) {
+		perror("APIC page mapping is not page aligned");
+		exit(1);
+	}
+
+	memset(a_page, 0, 4096);
+	((uint32_t *)a_page)[0x30/4] = 0x01060015;
 
 	if (fd < 0) {
 		perror("#cons/sysctl");
@@ -481,12 +579,16 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 
 	a = (void *)(((unsigned long)a + 0xfff) & ~0xfff);
 	vmctl.pir = (uint64_t) a;
+	memset(a, 0, 4096);
 	a += 4096;
-	vmctl.vapic = (uint64_t) a;
+	//vmctl.vapic = (uint64_t) a;
+	vmctl.vapic = (uint64_t) a_page;	
+	memset(a, 0, 4096);
+	//((uint32_t *)a)[0x30/4] = 0x01060015;
 	p64 = a;
 	// set up apic values? do we need to?
 	// qemu does this.
-	((uint8_t *)a)[4] = 1;
+	//((uint8_t *)a)[4] = 1;
 	a += 4096;
 
 	if (ros_syscall(SYS_setup_vmm, nr_gpcs, vmmflags, 0, 0, 0, 0) != nr_gpcs) {
@@ -556,8 +658,13 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 	}
 	fprintf(stderr, "threads started\n");
 	fprintf(stderr, "Writing command :%s:\n", cmd);
+	
+	vapic_status_dump(stderr, (void *)vmctl.vapic);
 
 	ret = write(fd, &vmctl, sizeof(vmctl));
+
+	vapic_status_dump(stderr, (void *)vmctl.vapic);
+
 	if (ret != sizeof(vmctl)) {
 		perror(cmd);
 	}
@@ -596,6 +703,8 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 				if (debug) fprintf(stderr, "DO SOME VIRTIO\n");
 				// Lucky for us the various virtio ops are well-defined.
 				virtio_mmio(&vmctl, gpa, regx, regp, store);
+				if (debug) fprintf(stderr, "store is %d:\n", store);
+				if (debug) fprintf(stderr, "REGP IS %16x:\n", *regp);
 			} else if ((gpa & 0xfee00000) == 0xfee00000) {
 				// until we fix our include mess, just put the proto here.
 				int apic(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store);
@@ -635,6 +744,7 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 			case EXIT_REASON_EXTERNAL_INTERRUPT:
 				//debug = 1;
 				fprintf(stderr, "XINT 0x%x 0x%x\n", vmctl.intrinfo1, vmctl.intrinfo2);
+				pir_dump();
 				vmctl.command = RESUME;
 				break;
 			case EXIT_REASON_IO_INSTRUCTION:
@@ -669,6 +779,7 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 				while (!consdata)
 					;
 				//debug = 1;
+				vapic_status_dump(stderr, (void *)vmctl.vapic);
 				if (debug)fprintf(stderr, "Resume with consdata ...\n");
 				vmctl.regs.tf_rip += 3;
 				ret = write(fd, &vmctl, sizeof(vmctl));
@@ -708,14 +819,10 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 		if (consdata) {
 			if (debug) fprintf(stderr, "inject an interrupt\n");
 			fprintf(stderr, "XINT 0x%x 0x%x\n", vmctl.intrinfo1, vmctl.intrinfo2);
-			if (1 || (vmctl.intrinfo1 == 0) && (vmctl.regs.tf_rflags & 0x200)) {
-				vmctl.interrupt = 0x80000000 | virtioirq;
-				virtio_mmio_set_vring_irq();
-				consdata = 0;
-				//debug = 1;
-			} else { 
-				fprintf(stderr, "Can't inject interrupt: IF is clear\n");
-			}
+			vmctl.interrupt = 0x80000000 | virtioirq;
+			virtio_mmio_set_vring_irq();
+			consdata = 0;
+			//debug = 1;
 			vmctl.command = RESUME;
 		}
 		if (debug) fprintf(stderr, "NOW DO A RESUME\n");

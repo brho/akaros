@@ -646,6 +646,7 @@ void sysenter_callwrapper(struct syscall *sysc, unsigned long count,
 void send_ipi(uint32_t os_coreid, uint8_t vector)
 {
 	int hw_coreid = get_hw_coreid(os_coreid);
+	printk("Sending IPI with core: %d, interrupt: %d", os_coreid, vector);
 	if (hw_coreid == -1) {
 		panic("Unmapped OS coreid (OS %d)!\n", os_coreid);
 		return;
