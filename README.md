@@ -84,7 +84,7 @@ Lucent Public License.  The University of California, Berkeley, has been
 authorised by Alcatel-Lucent to release all Plan 9 software previously governed
 by the Lucent Public License, Version 1.02 under the GNU General Public
 License, Version 2.  Akaros derives its Plan 9 code from this UCB release.  For
-more information, see [LICENSE-PLAN9](LICENSE-PLAN9) or
+more information, see [LICENSE-plan9](LICENSE-plan9) or
 [here](http://akaros.cs.berkeley.edu/files/Plan9License).
 
 Our user code is likewise from a mix of sources.  All code written for Akaros,
