@@ -27,12 +27,11 @@
 #include "libioP.h"
 
 static void
-perror_internal (FILE *fp, const char *s, int errnum)
+perror_internal (FILE *fp, const char *s, int errnum, char *ros_errstr)
 {
   char buf[1024];
   const char *colon, *comma;
   const char *errstring;
-  char *ros_errstr = errstr();
 
   if (s == NULL || *s == '\0')
     s = colon = "";
@@ -58,9 +57,10 @@ void
 perror (const char *s)
 {
   int errnum = errno;
+  char errstr_save[MAX_ERRSTR_LEN];
   FILE *fp;
   int fd = -1;
-
+  strncpy(errstr_save, errstr(), MAX_ERRSTR_LEN);
 
   /* The standard says that 'perror' must not change the orientation
      of the stream.  What is supposed to happen when the stream isn't
@@ -75,14 +75,14 @@ perror (const char *s)
 	__close (fd);
 
       /* Use standard error as is.  */
-      perror_internal (stderr, s, errnum);
+      perror_internal (stderr, s, errnum, errstr_save);
     }
   else
     {
       /* We don't have to do any special hacks regarding the file
 	 position.  Since the stderr stream wasn't used so far we just
 	 write to the descriptor.  */
-      perror_internal (fp, s, errnum);
+      perror_internal (fp, s, errnum, errstr_save);
 
       if (_IO_ferror_unlocked (fp))
 	stderr->_flags |= _IO_ERR_SEEN;
