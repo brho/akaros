@@ -1197,6 +1197,10 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
 	/* Consider pushing some error checking higher in the VFS */
 	if (!count)
 		return 0;
+	if (!(file->f_flags & O_READ)) {
+		set_errno(EBADF);
+		return 0;
+	}
 	if (orig_off >= file->f_dentry->d_inode->i_size)
 		return 0; /* EOF */
 	/* Make sure we don't go past the end of the file */
@@ -1257,6 +1261,10 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
 	/* Consider pushing some error checking higher in the VFS */
 	if (!count)
 		return 0;
+	if (!(file->f_flags & O_WRITE)) {
+		set_errno(EBADF);
+		return 0;
+	}
 	if (file->f_flags & O_APPEND) {
 		spin_lock(&file->f_dentry->d_inode->i_lock);
 		orig_off = file->f_dentry->d_inode->i_size;
@@ -1318,6 +1326,10 @@ ssize_t generic_dir_read(struct file *file, char *u_buf, size_t count,
 	}
 	if (!count)
 		return 0;
+	if (!(file->f_flags & O_READ)) {
+		set_errno(EBADF);
+		return 0;
+	}
 	/* start readdir from where it left off: */
 	dirent->d_off = *offset;
 	for (   ;
