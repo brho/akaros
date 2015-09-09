@@ -43,34 +43,21 @@ struct chan *fdtochan(struct fd_table *fdt, int fd, int mode, int chkmnt,
 		set_errno(EBADF);
 		error("Bad FD %d\n", fd);
 	}
-
 	if (chkmnt && (c->flag & CMSG)) {
 		if (iref)
 			cclose(c);
+		set_errno(EBADF);
 		error(Ebadusefd);
 	}
-
-	if (mode < 0 || c->mode == ORDWR) {
+	if (mode < 0)
 		return c;
-	}
-
-	if ((mode & OTRUNC) && !(c->mode & O_WRITE)) {
+	if ((mode & c->mode) != mode) {
 		if (iref)
 			cclose(c);
-		error(Ebadusefd);
+		set_errno(EBADF);
+		error("FD access mode failure: chan mode 0x%x, wanted 0x%x",
+		      c->mode, mode);
 	}
-
-	/* TODO: this is probably wrong.  if you get this from a dev, in the dev's
-	 * open, you are probably saving mode directly, without passing it through
-	 * openmode. */
-	if ((mode & ~OTRUNC) != c->mode) {
-		warn("Trunc mode issue: mode %o, mode minus trunc %o, chan mode %o\n",
-			 mode, mode & ~OTRUNC, c->mode);
-		if (iref)
-			cclose(c);
-		error(Ebadusefd);
-	}
-
 	return c;
 }
 

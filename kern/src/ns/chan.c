@@ -1171,6 +1171,12 @@ Open:
 					 * to change that. */
 					c->flag |= omode & CEXTERNAL_FLAGS;
 					c = devtab[c->type].open(c, omode & ~OCEXEC);
+					/* if you get this from a dev, in the dev's open, you are
+					 * probably saving mode directly, without passing it through
+					 * openmode. */
+					if (c->mode & OTRUNC)
+						error("Device '%c' %s open failed to clear OTRUNC",
+						      devtab[c->type].dc, devtab[c->type].name);
 					break;
 			}
 			break;
