@@ -1163,18 +1163,18 @@ Open:
 						c->umh = m;
 					else
 						putmhead(m);
-
-					if (omode == OEXEC)
+					if (omode == O_EXEC)
 						c->flag &= ~CCACHE;
 					/* here is where convert omode/vfs flags to c->flags.
 					 * careful, O_CLOEXEC and O_REMCLO are in there.  might need
 					 * to change that. */
 					c->flag |= omode & CEXTERNAL_FLAGS;
-					c = devtab[c->type].open(c, omode & ~OCEXEC);
+					c = devtab[c->type].open(c,
+								 omode & ~O_CLOEXEC);
 					/* if you get this from a dev, in the dev's open, you are
 					 * probably saving mode directly, without passing it through
 					 * openmode. */
-					if (c->mode & OTRUNC)
+					if (c->mode & O_TRUNC)
 						error("Device '%c' %s open failed to clear OTRUNC",
 						      devtab[c->type].dc, devtab[c->type].name);
 					break;
@@ -1213,9 +1213,9 @@ Open:
 			 */
 			e.ARRAY_SIZEs++;
 			if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, nomount, NULL) == 0) {
-				if (omode & OEXCL)
+				if (omode & O_EXCL)
 					error(Eexist);
-				omode |= OTRUNC;
+				omode |= O_TRUNC;
 				goto Open;
 			}
 
@@ -1282,14 +1282,15 @@ Open:
 				kref_get(&cnew->name->ref, 1);
 
 				devtab[cnew->type].create(cnew, e.elems[e.ARRAY_SIZEs - 1],
-										  omode & ~(OEXCL | OCEXEC), perm);
+										  omode & ~(O_EXCL | O_CLOEXEC),
+							  perm);
 				poperror();
 				if (omode & O_APPEND)
-					cnew->flag |= CAPPEND;
-				if (omode & OCEXEC)
-					cnew->flag |= CCEXEC;
-				if (omode & ORCLOSE)
-					cnew->flag |= CRCLOSE;
+					cnew->flag |= O_APPEND;
+				if (omode & O_CLOEXEC)
+					cnew->flag |= O_CLOEXEC;
+				if (omode & O_REMCLO)
+					cnew->flag |= O_REMCLO;
 				if (m)
 					putmhead(m);
 				cclose(c);
@@ -1302,7 +1303,7 @@ Open:
 			cclose(cnew);
 			if (m)
 				putmhead(m);
-			if (omode & OEXCL)
+			if (omode & O_EXCL)
 				nexterror();	/* safe since we're in a waserror() */
 			poperror();	/* matching the if(!waserror) */
 
@@ -1315,7 +1316,7 @@ Open:
 				error(tmperrbuf);	/* report the error we had originally */
 			}
 			strncpy(current_errstr(), tmperrbuf, MAX_ERRSTR_LEN);
-			omode |= OTRUNC;
+			omode |= O_TRUNC;
 			goto Open;
 
 		default:

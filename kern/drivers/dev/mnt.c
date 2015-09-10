@@ -302,7 +302,7 @@ struct chan *mntauth(struct chan *c, char *spec)
 	c->mchan = m->c;
 	chan_incref(m->c);
 	c->mqid = c->qid;
-	c->mode = ORDWR;
+	c->mode = O_RDWR;
 
 	poperror();	/* r */
 	mntfree(r);

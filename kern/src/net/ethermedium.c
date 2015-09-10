@@ -187,8 +187,8 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	fd = kdial(addr, NULL, dir, &cfd);
 	if (fd < 0)
 		error("dial 0x800 failed: %s", get_cur_errbuf());
-	mchan4 = commonfdtochan(fd, ORDWR, 0, 1);
-	cchan4 = commonfdtochan(cfd, ORDWR, 0, 1);
+	mchan4 = commonfdtochan(fd, O_RDWR, 0, 1);
+	cchan4 = commonfdtochan(cfd, O_RDWR, 0, 1);
 	sysclose(fd);
 	sysclose(cfd);
 
@@ -201,7 +201,7 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	 *  get mac address and speed
 	 */
 	snprintf(addr, Maxpath, "%s/stats", dir);
-	fd = sysopen(addr, OREAD);
+	fd = sysopen(addr, O_READ);
 	if (fd < 0)
 		error("can't open ether stats: %s", get_cur_errbuf());
 
@@ -240,7 +240,7 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	fd = kdial(addr, NULL, NULL, NULL);
 	if (fd < 0)
 		error("dial 0x806 failed: %s", get_cur_errbuf());
-	achan = commonfdtochan(fd, ORDWR, 0, 1);
+	achan = commonfdtochan(fd, O_RDWR, 0, 1);
 	sysclose(fd);
 
 	/*
@@ -253,8 +253,8 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	fd = kdial(addr, NULL, dir, &cfd);
 	if (fd < 0)
 		error("dial 0x86DD failed: %s", get_cur_errbuf());
-	mchan6 = commonfdtochan(fd, ORDWR, 0, 1);
-	cchan6 = commonfdtochan(cfd, ORDWR, 0, 1);
+	mchan6 = commonfdtochan(fd, O_RDWR, 0, 1);
+	cchan6 = commonfdtochan(cfd, O_RDWR, 0, 1);
 	sysclose(fd);
 	sysclose(cfd);
 

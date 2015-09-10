@@ -314,11 +314,12 @@ enum {
 	/* chan/file flags, getable via fcntl/getfl and setably via open and
 	 * sometimes fcntl/setfl.  those that can't be set cause an error() in
 	 * fd_setfl. */
-	CCEXEC = 		O_CLOEXEC,	/* (prob should be on the FD, 9ns has it here) */
-	CRCLOSE = 		O_REMCLO,	/* remove on close (also, maybe should be on FD) */
-	CAPPEND = 		O_APPEND,	/* append on write */
-	CNONBLOCK = 	O_NONBLOCK,	/* don't block, can't be set via setfl */
-	CEXTERNAL_FLAGS = (CCEXEC | CRCLOSE | CAPPEND | CNONBLOCK),
+	CEXTERNAL_FLAGS = (
+	    O_CLOEXEC      | /* (prob should be on the FD, 9ns has it here) */
+	    O_REMCLO       | /* remove on close (also, maybe should be on FD) */
+	    O_APPEND       | /* append on write */
+	    O_NONBLOCK     | /* don't block, can't be set via setfl */
+	    0),
 };
 
 #define NS_IPCK_SHIFT  2

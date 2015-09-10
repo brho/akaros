@@ -488,7 +488,7 @@ static struct chan *procopen(struct chan *c, int omode)
 		case Qsegment:
 		case Qprofile:
 		case Qfd:
-			if (omode != OREAD)
+			if (omode != O_READ)
 				error(Eperm);
 			break;
 
@@ -515,7 +515,7 @@ static struct chan *procopen(struct chan *c, int omode)
 			break;
 
 		case Qns:
-			if (omode != OREAD)
+			if (omode != O_READ)
 				error(Eperm);
 			c->aux = kzmalloc(sizeof(struct mntwalk), KMALLOC_WAIT);
 			break;

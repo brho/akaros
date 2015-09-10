@@ -168,7 +168,7 @@ int syscreate(char *path, int mode, uint32_t perm)
 		return -1;
 	}
 
-	openmode(mode & ~OEXCL);	/* error check only; OEXCL okay here */
+	openmode(mode & ~O_EXCL);	/* error check only; OEXCL okay here */
 	c = namec(path, Acreate, mode, perm);
 	if (waserror()) {
 		cclose(c);
@@ -271,7 +271,7 @@ int sysfauth(int fd, char *aname)
 	}
 
 	validname(aname, 0);
-	c = fdtochan(&current->open_files, fd, ORDWR, 0, 1);
+	c = fdtochan(&current->open_files, fd, O_RDWR, 0, 1);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -313,7 +313,7 @@ int sysfversion(int fd, unsigned int msize, char *vers, unsigned int arglen)
 	if (arglen == 0 || memchr(vers, 0, arglen) == 0)
 		error(Ebadarg);
 
-	c = fdtochan(&current->open_files, fd, ORDWR, 0, 1);
+	c = fdtochan(&current->open_files, fd, O_RDWR, 0, 1);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -361,8 +361,8 @@ int syspipe(int fd[2])
 		error(Egreg);
 	if (walk(&c[1], &names[1], 1, 1, NULL) < 0)
 		error(Egreg);
-	c[0] = d->open(c[0], ORDWR);
-	c[1] = d->open(c[1], ORDWR);
+	c[0] = d->open(c[0], O_RDWR);
+	c[1] = d->open(c[1], O_RDWR);
 	fd[0] = newfd(c[0], 0);
 	if (fd[0] < 0)
 		error(Enofd);
@@ -467,9 +467,9 @@ int sysmount(int fd, int afd, char *old, int flags, char *spec)
 		poperror();
 		return -1;
 	}
-	bc.c = fdtochan(&current->open_files, fd, ORDWR, 0, 1);
+	bc.c = fdtochan(&current->open_files, fd, O_RDWR, 0, 1);
 	if (afd >= 0)
-		ac.c = fdtochan(&current->open_files, afd, ORDWR, 0, 1);
+		ac.c = fdtochan(&current->open_files, afd, O_RDWR, 0, 1);
 	mntparam.chan = bc.c;
 	mntparam.authchan = ac.c;
 	mntparam.spec = spec;
@@ -512,7 +512,7 @@ int sysunmount(char *src_path, char *onto_path)
 		 * opening it is the only way to get at the real
 		 * Chan underneath.
 		 */
-		cmounted.c = namec(src_path, Aopen, OREAD, 0);
+		cmounted.c = namec(src_path, Aopen, O_READ, 0);
 	}
 
 	cunmount(cmount.c, cmounted.c);
@@ -580,7 +580,8 @@ long unionread(struct chan *c, void *va, long n)
 			} else {
 				if (c->umc == NULL) {
 					c->umc = cclone(mount->to);
-					c->umc = devtab[c->umc->type].open(c->umc, OREAD);
+					c->umc = devtab[c->umc->type].open(c->umc,
+									   O_READ);
 				}
 
 				nr = devtab[c->umc->type].read(c->umc, va, n, c->umc->offset);
@@ -632,7 +633,7 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 		return -1;
 	}
 
-	c = fdtochan(&current->open_files, fd, OREAD, 1, 1);
+	c = fdtochan(&current->open_files, fd, O_READ, 1, 1);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -979,7 +980,7 @@ static long rwrite(int fd, void *va, long n, int64_t * offp)
 		poperror();
 		return -1;
 	}
-	c = fdtochan(&current->open_files, fd, OWRITE, 1, 1);
+	c = fdtochan(&current->open_files, fd, O_WRITE, 1, 1);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -993,7 +994,7 @@ static long rwrite(int fd, void *va, long n, int64_t * offp)
 	if (offp == NULL) {
 		/* append changes the offset to the end, and even if we fail later, this
 		 * change will persist */
-		if (c->flag & CAPPEND) {
+		if (c->flag & O_APPEND) {
 			dir = chandirstat(c);
 			if (!dir)
 				error("internal error: stat error in append write");

@@ -319,7 +319,7 @@ static struct chan *nixopen(struct chan *c, int omode)
 	switch (TYPE(c->qid)) {
 	case Qtopdir:
 	case Qnixdir:
-		if (omode & ORCLOSE)
+		if (omode & O_REMCLO)
 			error(Eperm);
 		if (omode & O_WRITE)
 			error(Eisdir);

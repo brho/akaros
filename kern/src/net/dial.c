@@ -104,7 +104,7 @@ static int csdial(DS * ds)
 	 *  open connection server
 	 */
 	snprintf(buf, Maxstring, "%s/cs", ds->netdir);
-	fd = sysopen(buf, ORDWR);
+	fd = sysopen(buf, O_RDWR);
 	if (fd < 0) {
 		/* no connection server, don't translate */
 		snprintf(clone, Maxpath, "%s/%s/clone", ds->netdir, ds->proto);
@@ -167,7 +167,7 @@ static int call(char *clone, char *dest, DS * ds)
 	data = kmalloc(Maxpath, KMALLOC_WAIT);
 	err = kmalloc(ERRMAX, KMALLOC_WAIT);
 
-	cfd = sysopen(clone, ORDWR);
+	cfd = sysopen(clone, O_RDWR);
 	if (cfd < 0) {
 		kerrstr(err, ERRMAX);
 		set_errstr("%s (%s)", err, clone);
@@ -208,7 +208,7 @@ static int call(char *clone, char *dest, DS * ds)
 	}
 
 	/* open data connection */
-	fd = sysopen(data, ORDWR);
+	fd = sysopen(data, O_RDWR);
 	if (fd < 0) {
 		err[0] = 0;
 		kerrstr(err, ERRMAX);
@@ -281,7 +281,7 @@ int kannounce(char *addr, char *dir)
 	/*
 	 * get a control channel
 	 */
-	ctl = sysopen(netdir, ORDWR);
+	ctl = sysopen(netdir, O_RDWR);
 	if (ctl < 0)
 		return -1;
 	cp = strrchr(netdir, '/');
@@ -328,7 +328,7 @@ int klisten(char *dir, char *newdir)
 	 *  open listen, wait for a call
 	 */
 	snprintf(buf, sizeof buf, "%s/listen", dir);
-	ctl = sysopen(buf, ORDWR);
+	ctl = sysopen(buf, O_RDWR);
 	if (ctl < 0)
 		return -1;
 
@@ -415,7 +415,7 @@ static int nettrans(char *addr, char *naddr, int na, char *file, int nf)
 	 *  ask the connection server
 	 */
 	snprintf(buf, sizeof(buf), "%s/cs", netdir);
-	fd = sysopen(buf, ORDWR);
+	fd = sysopen(buf, O_RDWR);
 	if (fd < 0)
 		return identtrans(netdir, addr, naddr, na, file, nf);
 	if (syswrite(fd, addr, strlen(addr)) < 0) {

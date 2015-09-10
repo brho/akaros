@@ -363,9 +363,9 @@ static int should_wake(void *arg)
 }
 
 static int m2p[] = {
-	[OREAD] 4,
-	[OWRITE] 2,
-	[ORDWR] 6
+	[O_READ] 4,
+	[O_WRITE] 2,
+	[O_RDWR] 6
 };
 
 static struct chan *ipopen(struct chan *c, int omode)
@@ -384,9 +384,9 @@ static struct chan *ipopen(struct chan *c, int omode)
 		default:
 			break;
 		case Qndb:
-			if (omode & (OWRITE | OTRUNC) && !iseve())
+			if (omode & (O_WRITE | O_TRUNC) && !iseve())
 				error(Eperm);
-			if ((omode & (OWRITE | OTRUNC)) == (OWRITE | OTRUNC))
+			if ((omode & (O_WRITE | O_TRUNC)) == (O_WRITE | O_TRUNC))
 				f->ndb[0] = 0;
 			break;
 		case Qlog:
@@ -433,7 +433,7 @@ static struct chan *ipopen(struct chan *c, int omode)
 				break;
 			}
 			/* we only honor nonblock on a clone */
-			if (c->flag & CNONBLOCK)
+			if (c->flag & O_NONBLOCK)
 				Fsconvnonblock(cv, TRUE);
 			mkqid(&c->qid, QID(p->x, cv->x, Qctl), 0, QTFILE);
 			break;
@@ -517,7 +517,7 @@ static struct chan *ipopen(struct chan *c, int omode)
 					kstrdup(&cv->owner, ATTACHER(c));
 					/* O_NONBLOCK/CNONBLOCK when opening listen means the *new*
 					 * conv is already non-blocking, like accept4() in Linux */
-					if (c->flag & CNONBLOCK)
+					if (c->flag & O_NONBLOCK)
 						Fsconvnonblock(nc, TRUE);
 				}
 				qunlock(&cv->qlock);

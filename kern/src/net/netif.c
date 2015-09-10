@@ -430,7 +430,7 @@ int netifwstat(struct ether *nif, struct chan *c, uint8_t * db, int n)
 		error(Enonexist);
 	}
 
-	if (netown(f, current->user, OWRITE) < 0)
+	if (netown(f, current->user, O_WRITE) < 0)
 		error(Eperm);
 
 	dir = kzmalloc(sizeof(struct dir) + n, 0);

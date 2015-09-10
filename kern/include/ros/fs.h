@@ -63,16 +63,6 @@ struct kstat {
 #define O_CLOEXEC		02000000	/* Set close_on_exec. */
 #define O_REMCLO		04000000	/* Remove on close (unsupported). */
 
-/* Plan9 names for these flags */
-#define OREAD			O_RDONLY
-#define OWRITE			O_WRONLY
-#define ORDWR			O_RDWR
-#define OEXEC			O_EXEC
-#define OTRUNC			O_TRUNC
-#define OCEXEC			O_CLOEXEC
-#define OEXCL   		O_EXCL
-#define ORCLOSE			O_REMCLO
-
 #define F_DUPFD		0	/* Duplicate file descriptor */
 #define F_GETFD		1	/* Get file descriptor flags */
 #define F_SETFD		2	/* Set file descriptor flags */

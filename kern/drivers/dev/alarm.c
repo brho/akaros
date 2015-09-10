@@ -237,7 +237,7 @@ static struct chan *alarmopen(struct chan *c, int omode)
 	switch (TYPE(c->qid)) {
 		case Qtopdir:
 		case Qalarmdir:
-			if (omode & ORCLOSE)
+			if (omode & O_REMCLO)
 				error(Eperm);
 			if (omode & O_WRITE)
 				error(Eisdir);
