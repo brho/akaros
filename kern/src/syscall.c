@@ -1371,9 +1371,15 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	struct systrace_record *t = pcpui->cur_kthread->trace;
 	int fd = -1;
 	struct file *file;
+	char *t_path;
 
 	printd("File %s Open attempt oflag %x mode %x\n", path, oflag, mode);
-	char *t_path = copy_in_path(p, path, path_l);
+	if ((oflag & O_PATH) && (oflag & O_ACCMODE)) {
+		set_errno(EINVAL);
+		set_errstr("Cannot open O_PATH with any I/O perms (O%o)", oflag);
+		return -1;
+	}
+	t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
 		return -1;
 	if (t) {

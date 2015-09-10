@@ -57,6 +57,7 @@ struct kstat {
 #define O_FSYNC			O_SYNC
 #define O_ASYNC			00020000
 #define O_DIRECT		00040000	/* Direct disk access. */
+#define O_PATH			00100000	/* Path only, no I/O */
 #define O_DIRECTORY		00200000	/* Must be a directory. */
 #define O_NOFOLLOW		00400000	/* Do not follow links. */
 #define O_NOATIME		01000000	/* Do not set atime. */

@@ -1418,6 +1418,10 @@ int fd_setfl(int fd, int flags)
 		set_errno(EINVAL);
 		error("can't toggle O_CLOEXEC with setfl");
 	}
+	if (cexternal_flags_differ(flags, c->flag, O_PATH)) {
+		set_errno(EINVAL);
+		error("can't toggle O_PATH with setfl");
+	}
 	if (cexternal_flags_differ(flags, c->flag, O_NONBLOCK)) {
 		/* If we want to let them toggle NONBLOCK, it'd require a device op */
 		set_errno(EINVAL);

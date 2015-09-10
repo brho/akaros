@@ -319,6 +319,7 @@ enum {
 	    O_REMCLO       | /* remove on close (also, maybe should be on FD) */
 	    O_APPEND       | /* append on write */
 	    O_NONBLOCK     | /* don't block, can't be set via setfl */
+	    O_PATH         | /* path open, just the name, no I/O */
 	    0),
 };
 
