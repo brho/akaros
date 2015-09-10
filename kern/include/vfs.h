@@ -41,6 +41,13 @@ struct poll_table_struct {int x;};
 
 #include <ros/fs.h>
 
+/* Create flags are those used only during creation, and not saved for later
+ * lookup or use.  Everything other than them is viewable via getfl */
+#define O_CREAT_FLAGS (O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC)
+/* These flags are those you can attempt to set via setfl for the VFS. */
+#define O_FCNTL_SET_FLAGS (O_APPEND | O_ASYNC | O_DIRECT | O_NOATIME |         \
+                           O_NONBLOCK)
+
 struct super_block;
 struct super_operations;
 struct dentry;

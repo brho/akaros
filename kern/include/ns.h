@@ -311,8 +311,9 @@ enum {
 	CCACHE = 		0x0008,	/* client cache */
 	CINTERNAL_FLAGS = (COPEN | CMSG | CFREE | CCACHE),
 
-	/* chan/file flags, setably via open and sometimes fcntl/setfl.  these are
-	 * the internal names used in some parts of 9ns */
+	/* chan/file flags, getable via fcntl/getfl and setably via open and
+	 * sometimes fcntl/setfl.  those that can't be set cause an error() in
+	 * fd_setfl. */
 	CCEXEC = 		O_CLOEXEC,	/* (prob should be on the FD, 9ns has it here) */
 	CRCLOSE = 		O_REMCLO,	/* remove on close (also, maybe should be on FD) */
 	CAPPEND = 		O_APPEND,	/* append on write */

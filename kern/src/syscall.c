@@ -1582,8 +1582,8 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, unsigned long arg1,
 			break;
 		case (F_SETFL):
 			/* only allowed to set certain flags. */
-			arg1 &= O_FCNTL_FLAGS;
-			file->f_flags = (file->f_flags & ~O_FCNTL_FLAGS) | arg1;
+			arg1 &= O_FCNTL_SET_FLAGS;
+			file->f_flags = (file->f_flags & ~O_FCNTL_SET_FLAGS) | arg1;
 			break;
 		case (F_SYNC):
 			/* TODO (if we keep the VFS) */

@@ -62,8 +62,6 @@ struct kstat {
 #define O_NOATIME		01000000	/* Do not set atime. */
 #define O_CLOEXEC		02000000	/* Set close_on_exec. */
 #define O_REMCLO		04000000	/* Remove on close (unsupported). */
-#define O_CREAT_FLAGS (O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC)
-#define O_FCNTL_FLAGS (O_APPEND | O_ASYNC | O_DIRECT | O_NOATIME | O_NONBLOCK)
 
 /* Plan9 names for these flags */
 #define OREAD			O_RDONLY
