@@ -462,6 +462,22 @@ static struct chan *ipopen(struct chan *c, int omode)
 			break;
 		case Qlisten:
 			cv = f->p[PROTO(c->qid)]->conv[CONV(c->qid)];
+			/* No permissions or Announce checks required.  We'll see if that's
+			 * a good idea or not. (the perm check would do nothing, as is,
+			 * since an O_PATH perm is 0).
+			 *
+			 * But we probably want to incref to keep the conversation around
+			 * until this FD/chan is closed.  #I is a little weird in that
+			 * objects never really go away (high water mark for convs, you can
+			 * always find them in the ns).  I think it is possible to
+			 * namec/ipgen a chan, then have that conv close, then have that
+			 * chan be opened.  You can probably do this with a data file. */
+			if (omode & O_PATH) {
+				qlock(&cv->qlock);
+				cv->inuse++;
+				qunlock(&cv->qlock);
+				break;
+			}
 			if ((perm & (cv->perm >> 6)) != perm) {
 				if (strcmp(ATTACHER(c), cv->owner) != 0)
 					error(Eperm);
