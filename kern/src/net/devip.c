@@ -362,12 +362,6 @@ static int should_wake(void *arg)
 	return cv->incall != NULL;
 }
 
-static int m2p[] = {
-	[O_READ] 4,
-	[O_WRITE] 2,
-	[O_RDWR] 6
-};
-
 static struct chan *ipopen(struct chan *c, int omode)
 {
 	ERRSTACK(2);
@@ -376,7 +370,8 @@ static struct chan *ipopen(struct chan *c, int omode)
 	int perm;
 	struct Fs *f;
 
-	perm = m2p[omode & 3];
+	/* perm is a lone rwx, not the rwx------ from the conversion */
+	perm = omode_to_rwx(omode) >> 6;
 
 	f = ipfs[c->dev];
 
