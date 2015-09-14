@@ -559,9 +559,10 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 			} else {
 				printf("EPT violation: can't handle %p\n", gpa);
 				printf("RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
+				printf("Returning 0xffffffff\n");
 				showstatus(stdout, &vmctl);
-				quit = 1;
-				break;
+				// Just fill the whole register for now.
+				*regp = (uint64_t) -1;
 			}
 			vmctl.regs.tf_rip += advance;
 			if (debug) printf("Advance rip by %d bytes to %p\n", advance, vmctl.regs.tf_rip);
