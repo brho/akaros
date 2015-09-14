@@ -651,6 +651,8 @@ native-gcc-stage3-configure: native-gcc-stage3-prep
 		--enable-c99 \
 		--enable-long-long \
 		--enable-shared \
+		--disable-canonical-prefixes \
+		--disable-canonical-system-headers \
 		$(GCC_BUILD_FLAGS);
 
 cross-gcc-stage3-configure:
@@ -681,6 +683,8 @@ cross-gcc-stage3-configure:
 		--enable-c99 \
 		--enable-long-long \
 		--enable-shared \
+		--disable-canonical-prefixes \
+		--disable-canonical-system-headers \
 		$(GCC_BUILD_FLAGS);
 
 .$(BINARY_PREFIX)gcc-stage3-configure:
