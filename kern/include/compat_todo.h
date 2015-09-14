@@ -1,6 +1,10 @@
 #ifndef ROS_KERN_COMPAT_TODO_H
 #define ROS_KERN_COMPAT_TODO_H
 
+#ifndef ROS_KERN_LINUX_COMPAT_H
+#error "Do not include compat_todo.h directly"
+#endif
+
 /* These should be moved eventually */
 
 /* Plan 9 could use this as a helper */
