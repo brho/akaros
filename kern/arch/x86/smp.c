@@ -5,6 +5,7 @@
  */
 
 #include <arch/arch.h>
+#include <arch/topology.h>
 #include <bitmask.h>
 #include <smp.h>
 
@@ -16,10 +17,6 @@
 #include <pmap.h>
 #include <env.h>
 #include <trap.h>
-
-/* Lookup table for core_id and per_cpu_inf, indexed by real __core_id() */
-int hw_coreid_lookup[MAX_NUM_CORES] = {[0 ... (MAX_NUM_CORES - 1)] -1};
-int os_coreid_lookup[MAX_NUM_CORES] = {[0 ... (MAX_NUM_CORES - 1)] -1};
 
 /*************************** IPI Wrapper Stuff ********************************/
 // checklists to protect the global interrupt_handlers for 0xf0, f1, f2, f3, f4

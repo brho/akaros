@@ -86,7 +86,7 @@ static struct Xsdt *xsdt;		/* XSDT table */
 static struct Atable *tfirst;	/* loaded DSDT/SSDT/... tables */
 static struct Atable *tlast;	/* pointer to last table */
 struct Madt *apics;				/* APIC info */
-static struct Srat *srat;		/* System resource affinity, used by physalloc */
+struct Srat *srat;				/* System resource affinity, used by physalloc */
 static struct Slit *slit;		/* System locality information table used by the scheduler */
 static struct Msct *msct;		/* Maximum system characteristics table */
 static struct Reg *reg;			/* region used for I/O */

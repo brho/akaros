@@ -117,7 +117,7 @@
 #include <ros/trapframe.h>
 #include <arch/pci.h>
 #include <arch/pic.h>
-#include <arch/coreid.h>
+#include <arch/topology.h>
 #include <arch/io.h>
 
 struct irq_handler {

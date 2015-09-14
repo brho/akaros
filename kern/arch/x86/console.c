@@ -9,7 +9,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <sys/queue.h>
-#include <arch/coreid.h>
+#include <arch/topology.h>
 
 #include <ros/memlayout.h>
 

@@ -388,5 +388,6 @@ extern uintptr_t acpimblocksize(uintptr_t, int *);
 int acpiinit(void);
 struct Atable *new_acpi_table(uint8_t *p);
 extern struct Madt *apics;
+extern struct Srat *srat;
 
 #endif /* ROS_KERN_ACPI_H */

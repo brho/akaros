@@ -382,12 +382,7 @@ long_mode:
 	mov		%ax, %gs
 	lldt	%ax
 	# paging is on, and our code is still running at 0x00100000.
-	# do some miscellaneous OS setup.  the coreid stuff is so we can call
-	# core_id() before smp_boot. 
-	movabs 	$(os_coreid_lookup), %rax
-	movl	$0x0, (%rax)
-	movabs 	$(hw_coreid_lookup), %rax
-	movl	$0x0, (%rax)
+	# do some miscellaneous OS setup.
 	# set up gs to point to our pcpu info (both GS base and KERN GS base)
 	movabs	$(per_cpu_info), %rdx
 	movq	%rdx, %rax

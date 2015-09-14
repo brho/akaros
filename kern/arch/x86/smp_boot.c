@@ -26,7 +26,6 @@
 #include "vmm/vmm.h"
 
 extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
-int num_cores = 1;
 int x86_num_cores_booted = 1;
 uintptr_t smp_stack_top;
 barrier_t generic_barrier;
@@ -78,17 +77,7 @@ static void setup_rdtscp(int coreid)
 /* TODO: consider merging __arch_pcpu with parts of this (sync with RISCV) */
 void smp_final_core_init(void)
 {
-	/* It is possible that the non-0 cores will wake up before the broadcast
-	 * ipi.  this can be due to spurious IRQs or some such.  anyone other than
-	 * core 0 that comes in here will wait til core 0 has set everything up.
-	 * those other cores might have come up before core 0 remapped the coreids,
-	 * so we can only look at the HW coreid, which is only 0 for core 0. */
-	static bool wait = TRUE;
-	if (hw_core_id() == 0)
-		wait = FALSE;
-	while (wait)
-		cpu_relax();
-	/* at this point, it is safe to get the OS coreid */
+	/* Set the coreid in pcpui for fast access to it through TLS. */
 	int coreid = get_os_coreid(hw_core_id());
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	pcpui->coreid = coreid;
@@ -97,13 +86,10 @@ void smp_final_core_init(void)
 	/* don't need this for the kernel anymore, but userspace can still use it */
 	setup_rdtscp(coreid);
 	/* After this point, all cores have set up their segmentation and whatnot to
-	 * be able to do a proper core_id().  As a note to posterity, using the
-	 * LAPIC coreid (like get_hw_coreid()) needs the LAPIC set up, which happens
-	 * by the end of vm_init() */
+	 * be able to do a proper core_id(). */
 	waiton_barrier(&generic_barrier);
-	if (hw_core_id() == 0) {
+	if (coreid == 0)
 		core_id_ready = TRUE;
-	}
 	/* being paranoid with this, it's all a bit ugly */
 	waiton_barrier(&generic_barrier);
 	setup_default_mtrrs(&generic_barrier);
@@ -134,35 +120,11 @@ static void __spin_bootlock_raw(void)
 	              "jne 1b;" : : "m"(*bootlock) : "eax", "cc", "memory");
 }
 
-/* hw_coreid_lookup will get packed, but keep it's hw values.  
- * os_coreid_lookup will remain sparse, but it's values will be consecutive.
- * for both arrays, -1 means an empty slot.  hw_step tracks the next valid entry
- * in hw_coreid_lookup, jumping over gaps of -1's. */
-static void smp_remap_coreids(void)
-{
-	for (int i = 0, hw_step = 0; i < num_cores; i++, hw_step++) {
-		if (hw_coreid_lookup[i] == -1) {
-			while (hw_coreid_lookup[hw_step] == -1) {
-				hw_step++;
-				if (hw_step == MAX_NUM_CORES)
-					panic("Mismatch in num_cores and hw_step");
-			}
-			hw_coreid_lookup[i] = hw_coreid_lookup[hw_step];
-			hw_coreid_lookup[hw_step] = -1;
-			os_coreid_lookup[hw_step] = i;
-		}
-	}
-}
-
 void smp_boot(void)
 {
 	struct per_cpu_info *pcpui0 = &per_cpu_info[0];
-	/* set core0's mappings */
-	assert(lapic_get_id() == 0);
-	os_coreid_lookup[0] = 0;
-	hw_coreid_lookup[0] = 0;
-
 	page_t *smp_stack;
+
 	// NEED TO GRAB A LOWMEM FREE PAGE FOR AP BOOTUP CODE
 	// page1 (2nd page) is reserved, hardcoded in pmap.c
 	memset(KADDR(trampoline_pg), 0, PGSIZE);
@@ -216,7 +178,6 @@ void smp_boot(void)
 	assert(!(num_cores % 2));
 	printk("Using only %d Idlecores (SMT Disabled)\n", num_cores >> 1);
 #endif /* CONFIG_DISABLE_SMT */
-	smp_remap_coreids();
 
 	/* cleans up the trampoline page, and any other low boot mem mappings */
 	x86_cleanup_bootmem();
@@ -262,10 +223,6 @@ uintptr_t smp_main(void)
 		cprintf("I am an Application Processor\n");
 	cprintf("Num_Cores: %d\n\n", num_cores);
 	*/
-	/* set up initial mappings.  core0 will adjust it later */
-	unsigned long my_hw_id = lapic_get_id();
-	os_coreid_lookup[my_hw_id] = my_hw_id;
-	hw_coreid_lookup[my_hw_id] = my_hw_id;
 
 	// Get a per-core kernel stack
 	uintptr_t my_stack_top = get_kstack();

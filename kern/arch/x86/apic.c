@@ -13,7 +13,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <bitmask.h>
-#include <arch/coreid.h>
+#include <arch/topology.h>
 
 bool lapic_check_spurious(int trap_nr)
 {

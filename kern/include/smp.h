@@ -84,9 +84,7 @@ struct per_cpu_info {
 #define current_ctx per_cpu_info[core_id()].cur_ctx
 
 typedef struct per_cpu_info  per_cpu_info_t;
-
 extern per_cpu_info_t per_cpu_info[MAX_NUM_CORES];
-extern int num_cores;
 
 /* SMP bootup functions */
 void smp_boot(void);
