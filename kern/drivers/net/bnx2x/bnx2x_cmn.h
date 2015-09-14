@@ -17,7 +17,7 @@
 #ifndef BNX2X_CMN_H
 #define BNX2X_CMN_H
 
-#include "akaros_compat.h"
+#include <linux_compat.h>
 
 #include "bnx2x.h"
 #include "bnx2x_sriov.h"

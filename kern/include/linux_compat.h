@@ -1,9 +1,9 @@
 /* Copyright (c) 2015 Google Inc.
  *
- * Dumping ground for converting between Akaros and other OSs. */
+ * Dumping ground for converting between Akaros and Linux. */
 
-#ifndef ROS_KERN_AKAROS_COMPAT_H
-#define ROS_KERN_AKAROS_COMPAT_H
+#ifndef ROS_KERN_LINUX_COMPAT_H
+#define ROS_KERN_LINUX_COMPAT_H
 
 /* Common headers that most driver files will need */
 
@@ -516,12 +516,12 @@ typedef unsigned int netdev_features_t;
 #define netif_msg_hw(p)			((p)->msg_enable & NETIF_MSG_HW)
 #define netif_msg_wol(p)		((p)->msg_enable & NETIF_MSG_WOL)
 
-enum netdev_state_t {                       
-	__LINK_STATE_START,                                       
-	__LINK_STATE_PRESENT,                                     
-	__LINK_STATE_NOCARRIER,                          
-	__LINK_STATE_LINKWATCH_PENDING,                  
-	__LINK_STATE_DORMANT,  
+enum netdev_state_t {
+	__LINK_STATE_START,
+	__LINK_STATE_PRESENT,
+	__LINK_STATE_NOCARRIER,
+	__LINK_STATE_LINKWATCH_PENDING,
+	__LINK_STATE_DORMANT,
 };
 
 enum netdev_tx {
@@ -569,21 +569,21 @@ static inline int pci_read_config_byte(struct pci_device *dev, uint32_t off,
 	*val = pcidev_read8(dev, off);
 	return 0;
 }
-                                       
+
 static inline int pci_read_config_word(struct pci_device *dev, uint32_t off,
                                        uint16_t *val)
 {
 	*val = pcidev_read16(dev, off);
 	return 0;
 }
-                                       
+
 static inline int pci_read_config_dword(struct pci_device *dev, uint32_t off,
                                         uint32_t *val)
 {
 	*val = pcidev_read32(dev, off);
 	return 0;
 }
-                                       
+
 static inline int pci_write_config_byte(struct pci_device *dev, uint32_t off,
                                         uint8_t val)
 {
@@ -762,4 +762,4 @@ static inline bool ether_addr_equal(const uint8_t *addr1, const uint8_t *addr2)
 #endif
 }
 
-#endif /* ROS_KERN_AKAROS_COMPAT_H */
+#endif /* ROS_KERN_LINUX_COMPAT_H */

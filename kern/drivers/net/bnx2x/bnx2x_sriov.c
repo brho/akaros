@@ -17,7 +17,7 @@
  *	       Ariel Elior <ariel.elior@qlogic.com>
  *
  */
-#include "akaros_compat.h"
+#include <linux_compat.h>
 
 #include "bnx2x.h"
 #include "bnx2x_init.h"

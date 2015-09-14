@@ -28,7 +28,7 @@
 #define BCM_DCBNL
 #endif
 
-#include "akaros_compat.h"
+#include <linux_compat.h>
 
 #include "bnx2x_hsi.h"
 #include "cnic_if.h"
