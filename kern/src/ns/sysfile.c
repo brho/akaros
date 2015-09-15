@@ -358,9 +358,9 @@ int syspipe(int fd[2])
 	}
 	c[0] = namec("#pipe", Atodir, 0, 0);
 	c[1] = cclone(c[0]);
-	if (walk(&c[0], &names[0], 1, 1, NULL) < 0)
+	if (walk(&c[0], &names[0], 1, FALSE, NULL) < 0)
 		error(Egreg);
-	if (walk(&c[1], &names[1], 1, 1, NULL) < 0)
+	if (walk(&c[1], &names[1], 1, FALSE, NULL) < 0)
 		error(Egreg);
 	c[0] = d->open(c[0], O_RDWR);
 	c[1] = d->open(c[1], O_RDWR);

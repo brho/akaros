@@ -656,7 +656,7 @@ struct chan *undomount(struct chan *c, struct cname *name)
  * *nerror is the number of names to display in an error message.
  */
 static char Edoesnotexist[] = "does not exist";
-int walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror)
+int walk(struct chan **cp, char **names, int nnames, bool can_mount, int *nerror)
 {
 	int dev, dotdot, i, n, nhave, ntry, type;
 	struct chan *c, *nc, *lastmountpoint = NULL;
@@ -707,7 +707,7 @@ int walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror)
 			}
 		}
 
-		if (!dotdot && !nomount)
+		if (!dotdot && can_mount)
 			domount(&c, &mh);
 
 		type = c->type;
@@ -715,7 +715,7 @@ int walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror)
 
 		if ((wq = devtab[type].walk(c, NULL, names + nhave, ntry)) == NULL) {
 			/* try a union mount, if any */
-			if (mh && !nomount) {
+			if (mh && can_mount) {
 				/*
 				 * mh->mount == c, so start at mh->mount->next
 				 */
@@ -752,7 +752,7 @@ int walk(struct chan **cp, char **names, int nnames, int nomount, int *nerror)
 			n = 1;
 		} else {
 			nc = NULL;
-			if (!nomount)
+			if (can_mount)
 				for (i = 0; i < wq->nqid && i < ntry - 1; i++)
 					if (findmount(&nc, &nmh, type, dev, wq->qid[i]))
 						break;
@@ -969,6 +969,7 @@ struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 	char tmperrbuf[ERRMAX];
 	int saved_errno;
 	char *name, *devname, *devspec;
+	bool can_mount = TRUE;
 	// Rune r;
 
 	static_assert(!(CINTERNAL_FLAGS & CEXTERNAL_FLAGS));
@@ -982,7 +983,6 @@ struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 	 * a device tree, or the current dot) as well as the name to
 	 * evaluate starting there.
 	 */
-	nomount = 0;
 	switch (name[0]) {
 		case '/':
 			c = current->slash;
@@ -992,7 +992,7 @@ struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 			break;
 
 		case '#':
-			nomount = 1;
+			can_mount = FALSE;
 			devname = get_cur_genbuf();
 			devname[0] = '\0';
 			n = 0;
@@ -1080,7 +1080,7 @@ struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 		e.ARRAY_SIZEs--;
 	}
 
-	if (walk(&c, e.elems, e.ARRAY_SIZEs, nomount, &npath) < 0) {
+	if (walk(&c, e.elems, e.ARRAY_SIZEs, can_mount, &npath) < 0) {
 		if (npath < 0 || npath > e.ARRAY_SIZEs) {
 			printd("namec %s walk error npath=%d\n", aname, npath);
 			error("walk failed");
@@ -1122,13 +1122,13 @@ NameError:
 
 	switch (amode) {
 		case Aaccess:
-			if (!nomount)
+			if (can_mount)
 				domount(&c, NULL);
 			break;
 
 		case Abind:
 			m = NULL;
-			if (!nomount)
+			if (can_mount)
 				domount(&c, &m);
 			if (c->umh != NULL)
 				putmhead(c->umh);
@@ -1142,7 +1142,7 @@ Open:
 			cname = c->name;
 			kref_get(&cname->ref, 1);
 			m = NULL;
-			if (!nomount)
+			if (can_mount)
 				domount(&c, &m);
 
 			/* our own copy to open or remove */
@@ -1219,7 +1219,7 @@ Open:
 			 * If omode&OEXCL is set, just give up.
 			 */
 			e.ARRAY_SIZEs++;
-			if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, nomount, NULL) == 0) {
+			if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, can_mount, NULL) == 0) {
 				if (omode & O_EXCL)
 					error(Eexist);
 				omode |= O_TRUNC;
@@ -1270,7 +1270,7 @@ Open:
 			cnew = NULL;	/* is this assignment necessary? */
 			/* discard error */
 			if (!waserror()) {	/* try create */
-				if (!nomount && findmount(&cnew, &m, c->type, c->dev, c->qid))
+				if (can_mount && findmount(&cnew, &m, c->type, c->dev, c->qid))
 					cnew = createdir(cnew, m);
 				else {
 					cnew = c;
@@ -1318,7 +1318,7 @@ Open:
 			strncpy(tmperrbuf, current_errstr(), MAX_ERRSTR_LEN);
 			saved_errno = get_errno();
 			/* note: we depend that walk does not error */
-			if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, nomount, NULL) < 0) {
+			if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, can_mount, NULL) < 0) {
 				set_errno(saved_errno);
 				error(tmperrbuf);	/* report the error we had originally */
 			}
