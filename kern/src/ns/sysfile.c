@@ -336,7 +336,7 @@ int syspipe(int fd[2])
 	static char *names[] = { "data", "data1" };
 
 	d = &devtab[devno('|', 0)];
-	c[0] = namec("#|", Atodir, 0, 0);
+	c[0] = 0;
 	c[1] = 0;
 	fd[0] = -1;
 	fd[1] = -1;
@@ -356,6 +356,7 @@ int syspipe(int fd[2])
 		poperror();
 		return -1;
 	}
+	c[0] = namec("#|", Atodir, 0, 0);
 	c[1] = cclone(c[0]);
 	if (walk(&c[0], &names[0], 1, 1, NULL) < 0)
 		error(Egreg);
