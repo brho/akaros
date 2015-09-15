@@ -160,11 +160,15 @@ void idt_init(void)
 	pic_mask_all();
 
 	int ncleft = MAX_NUM_CORES;
+	int num_cores_mpacpi;
 
 	ncleft = mpsinit(ncleft);
 	ncleft = mpacpi(ncleft);
-	num_cores = MAX_NUM_CORES - ncleft;
-	printk("MP and ACPI found %d cores\n", num_cores);
+	num_cores_mpacpi = MAX_NUM_CORES - ncleft;
+	printk("MP and ACPI found %d cores\n", num_cores_mpacpi);
+	if (num_cores != num_cores_mpacpi)
+		warn("Topology (%d) and MP/ACPI (%d) differ on num_cores!", num_cores,
+		     num_cores_mpacpi);
 
 	apiconline();
 	ioapiconline();
