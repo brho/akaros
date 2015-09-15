@@ -64,6 +64,9 @@ struct kstat {
 #define O_CLOEXEC		02000000	/* Set close_on_exec. */
 #define O_REMCLO		04000000	/* Remove on close (unsupported). */
 
+/* Keep this value in sync with glibc (io/fcntl.h) */
+#define AT_FDCWD	-100
+
 #define F_DUPFD		0	/* Duplicate file descriptor */
 #define F_GETFD		1	/* Get file descriptor flags */
 #define F_SETFD		2	/* Set file descriptor flags */

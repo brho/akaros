@@ -1362,15 +1362,15 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
 
 }
 
-/* Checks args/reads in the path, opens the file, and inserts it into the
- * process's open file list. */
-static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
-                         int oflag, int mode)
+/* Checks args/reads in the path, opens the file (relative to fromfd if the path
+ * is not absolute), and inserts it into the process's open file list. */
+static intreg_t sys_openat(struct proc *p, int fromfd, const char *path,
+                           size_t path_l, int oflag, int mode)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct systrace_record *t = pcpui->cur_kthread->trace;
 	int fd = -1;
-	struct file *file;
+	struct file *file = 0;
 	char *t_path;
 
 	printd("File %s Open attempt oflag %x mode %x\n", path, oflag, mode);
@@ -1386,19 +1386,25 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 		t->datalen = MIN(sizeof(t->data), path_l);
 		memmove(t->data, t_path, path_l);
 	}
-	sysc_save_str("open %s", t_path);
+	sysc_save_str("open %s at fd %d", t_path, fromfd);
 	mode &= ~p->fs_env.umask;
-	file = do_file_open(t_path, oflag, mode);
-	/* VFS */
+	/* Only check the VFS for legacy opens.  It doesn't support openat.  Actual
+	 * openats won't check here, and file == 0. */
+	if ((t_path[0] == '/') || (fromfd == AT_FDCWD))
+		file = do_file_open(t_path, oflag, mode);
+	else
+		set_errno(ENOENT);	/* was not in the VFS. */
 	if (file) {
+		/* VFS lookup succeeded */
 		/* stores the ref to file */
 		fd = insert_file(&p->open_files, file, 0, FALSE, oflag & O_CLOEXEC);
 		kref_put(&file->f_kref);	/* drop our ref */
 		if (fd < 0)
 			warn("File insertion failed");
 	} else if (get_errno() == ENOENT) {
+		/* VFS failed due to ENOENT.  Other errors don't fall back to 9ns */
 		unset_errno();	/* Go can't handle extra errnos */
-		fd = sysopen(t_path, oflag);
+		fd = sysopenat(fromfd, t_path, oflag);
 		/* successful lookup with CREATE and EXCL is an error */
 		if (fd != -1) {
 			if ((oflag & O_CREATE) && (oflag & O_EXCL)) {
@@ -1417,6 +1423,12 @@ static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
 	free_path(p, t_path);
 	printd("File %s Open, fd=%d\n", path, fd);
 	return fd;
+}
+
+static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
+                         int oflag, int mode)
+{
+	return sys_openat(p, AT_FDCWD, path, path_l, oflag, mode);
 }
 
 static intreg_t sys_close(struct proc *p, int fd)

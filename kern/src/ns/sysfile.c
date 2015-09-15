@@ -523,30 +523,38 @@ int sysunmount(char *src_path, char *onto_path)
 	return 0;
 }
 
-int sysopen(char *path, int vfs_flags)
+int sysopenat(int fromfd, char *path, int vfs_flags)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int fd;
-	struct chan *c;
+	struct chan *c = 0, *from = 0;
 
 	if (waserror()) {
+		cclose(c);
 		poperror();
 		return -1;
 	}
-
 	openmode(vfs_flags);	/* error check only */
-	c = namec(path, Aopen, vfs_flags, 0);
-	if (waserror()) {
-		cclose(c);
-		nexterror();
+	if ((path[0] == '/') || (fromfd == AT_FDCWD)) {
+		c = namec(path, Aopen, vfs_flags, 0);
+	} else {
+		/* We don't cclose from.  namec_from will convert it to the new chan
+		 * during the walk process (c).  It'll probably close from internally,
+		 * and give us something new for c.  On error, namec_from will cclose
+		 * from. */
+		from = fdtochan(&current->open_files, fromfd, -1, FALSE, TRUE);
+		c = namec_from(from, path, Aopen, vfs_flags, 0);
 	}
 	fd = newfd(c, vfs_flags);
 	if (fd < 0)
 		error(Enofd);
 	poperror();
-
-	poperror();
 	return fd;
+}
+
+int sysopen(char *path, int vfs_flags)
+{
+	return sysopenat(AT_FDCWD, path, vfs_flags);
 }
 
 long unionread(struct chan *c, void *va, long n)
