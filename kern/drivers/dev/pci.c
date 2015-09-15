@@ -22,6 +22,13 @@
 #include <ip.h>
 #include <arch/io.h>
 
+struct dev pcidevtab;
+
+static char *devname(void)
+{
+	return pcidevtab.name;
+}
+
 enum {
 	Qtopdir = 0,
 
@@ -37,8 +44,6 @@ static struct dirtab topdir[] = {
 	{".", {Qtopdir, 0, QTDIR}, 0, 0555},
 	{"pci", {Qpcidir, 0, QTDIR}, 0, 0555},
 };
-
-extern struct dev pcidevtab;
 
 static int pcidirgen(struct chan *c, int t, int tbdf, struct dir *dp)
 {
@@ -110,7 +115,7 @@ pcigen(struct chan *c, char *, struct dirtab *, int unused_int, int s,
 
 static struct chan *pciattach(char *spec)
 {
-	return devattach(pcidevtab.dc, spec);
+	return devattach(devname(), spec);
 }
 
 struct walkqid *pciwalk(struct chan *c, struct chan *nc, char **name, int nname)

@@ -76,6 +76,13 @@
 #include <kdebug.h>
 #include <bitmap.h>
 
+struct dev nixdevtab;
+
+static char *devname(void)
+{
+	return nixdevtab.name;
+}
+
 /* qid path types */
 enum {
 	Qtopdir = 1,
@@ -191,7 +198,7 @@ static int nixgen(struct chan *c, char *entry_name,
 	/* Whether we're in one dir or at the top, .. still takes us to the top. */
 	if (s == DEVDOTDOT) {
 		mkqid(&q, Qtopdir, 0, QTDIR);
-		devdir(c, c->qid, "#V", 0, eve, 0555, dp);
+		devdir(c, c->qid, devname(), 0, eve, 0555, dp);
 		return 1;
 	}
 	switch (TYPE(c->qid)) {
@@ -291,7 +298,7 @@ static struct chan *nixattach(char *spec)
 {
 	if (!nixok)
 		error("No NIXs available");
-	struct chan *c = devattach('t', spec);
+	struct chan *c = devattach(devname(), spec);
 	mkqid(&c->qid, Qtopdir, 0, QTDIR);
 	return c;
 }

@@ -669,7 +669,7 @@ void cursordisable(void);
 int cursoron(int);
 void cursoroff(int);
 void cwrite(struct chan *, uint8_t * unused_uint8_p_t, int unused_int, int64_t);
-struct chan *devattach(int unused_int, char *unused_char_p_t);
+struct chan *devattach(const char *name, char *spec);
 struct block *devbread(struct chan *, long, uint32_t);
 long devbwrite(struct chan *, struct block *, uint32_t);
 struct chan *devclone(struct chan *);
@@ -679,7 +679,7 @@ void devdir(struct chan *, struct qid, char *, int64_t, char *, long,
 long devdirread(struct chan *, char *, long, struct dirtab *, int, Devgen *);
 Devgen devgen;
 void devinit(void);
-int devno(int unused_int, int);
+int devno(const char *name, int user);
 void devpower(int);
 struct dev *devbyname(char *unused_char_p_t);
 struct chan *devopen(struct chan *, int unused_int,

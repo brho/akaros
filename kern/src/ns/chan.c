@@ -968,7 +968,7 @@ struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 	struct mhead *m;
 	char tmperrbuf[ERRMAX];
 	int saved_errno;
-	char *name;
+	char *name, *devname, *devspec;
 	// Rune r;
 
 	static_assert(!(CINTERNAL_FLAGS & CEXTERNAL_FLAGS));
@@ -993,21 +993,29 @@ struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 
 		case '#':
 			nomount = 1;
-			get_cur_genbuf()[0] = '\0';
+			devname = get_cur_genbuf();
+			devname[0] = '\0';
 			n = 0;
+			name++; /* drop the # */
 			while ((*name != '\0') && (*name != '/')) {
 				if (n >= GENBUF_SZ - 1)
 					error(Efilename);
-				get_cur_genbuf()[n++] = *name++;
+				devname[n++] = *name++;
 			}
-			get_cur_genbuf()[n] = '\0';
-#if 0
-			n = chartorune(&r, get_cur_genbuf() + 1) + 1;
-			if (r == 'M')
+			devname[n] = '\0';
+			/* for a name #foo.spec, devname = foo\0, devspec = spec\0.
+			 * genbuf contains foo\0spec\0.  for no spec, devspec = \0 */
+			devspec = strchr(devname, '.');
+			if (devspec) {
+				*devspec = '\0';
+				devspec++;
+			} else {
+				devspec = &devname[n];
+			}
+			if (!strcmp(devname, "mnt"))
 				error(Enoattach);
-#endif
-			if (get_cur_genbuf()[1] == 'M')
-				error(Enoattach);
+			/* TODO: deal with this "nodevs" business. */
+			#if 0
 			/*
 			 *  the nodevs exceptions are
 			 *  |  it only gives access to pipes you create
@@ -1022,13 +1030,12 @@ struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 				 || (get_cur_genbuf()[1] == 's'	// || r == 's'
 					 && get_cur_genbuf()[n] != '\0')))
 				error(Enoattach);
-			t = devno( /*r */ get_cur_genbuf()[1], 1);
+			#endif
+			t = devno(devname, 1);
 			if (t == -1)
-				error(Ebadsharp);
-			/* genbuf + 2: skips the # and X, just the spec left */
-			c = devtab[t].attach(get_cur_genbuf() + 2);
+				error("Unknown #device %s (spec %s)", devname, devspec);
+			c = devtab[t].attach(devspec);
 			break;
-
 		default:
 			c = current->dot;
 			if (!c)

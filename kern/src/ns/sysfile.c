@@ -335,7 +335,7 @@ int syspipe(int fd[2])
 	struct chan *c[2];
 	static char *names[] = { "data", "data1" };
 
-	d = &devtab[devno('|', 0)];
+	d = &devtab[devno("pipe", 0)];
 	c[0] = 0;
 	c[1] = 0;
 	fd[0] = -1;
@@ -356,7 +356,7 @@ int syspipe(int fd[2])
 		poperror();
 		return -1;
 	}
-	c[0] = namec("#|", Atodir, 0, 0);
+	c[0] = namec("#pipe", Atodir, 0, 0);
 	c[1] = cclone(c[0]);
 	if (walk(&c[0], &names[0], 1, 1, NULL) < 0)
 		error(Egreg);
@@ -475,7 +475,7 @@ int sysmount(int fd, int afd, char *old, int flags, char *spec)
 	mntparam.authchan = ac.c;
 	mntparam.spec = spec;
 	mntparam.flags = flags;
-	c0.c = devtab[devno('M', 0)].attach((char *)&mntparam);
+	c0.c = devtab[devno("mnt", 0)].attach((char *)&mntparam);
 
 	r = bindmount(c0.c, old, flags, spec);
 	poperror();
@@ -1318,11 +1318,11 @@ int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 		 * switch_to() also loads the cr3. */
 		new_proc->pgrp = newpgrp();
 		old_current = switch_to(new_proc);
-		new_proc->slash = namec("#r", Atodir, 0, 0);
+		new_proc->slash = namec("#root", Atodir, 0, 0);
 		if (!new_proc->slash)
 			panic("no root device");
 		switch_back(new_proc, old_current);
-		/* Want the name to be "/" instead of "#r" */
+		/* Want the name to be "/" instead of "#root" */
 		cnameclose(new_proc->slash->name);
 		new_proc->slash->name = newcname("/");
 		new_proc->dot = cclone(new_proc->slash);

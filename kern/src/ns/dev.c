@@ -23,16 +23,16 @@ void mkqid(struct qid *q, int64_t path, uint32_t vers, int type)
 	q->path = path;
 }
 
-int devno(int c, int user)
+int devno(const char *name, int user)
 {
 	int i;
 
 	for (i = 0; &devtab[i] < __devtabend; i++) {
-		if (devtab[i].dc == c)
+		if (!strcmp(devtab[i].name, name))
 			return i;
 	}
 	if (user == 0)
-		panic("devno %c 0x%u", c, c);
+		panic("Lookup of dev :%s: failed", name);
 
 	return -1;
 }
@@ -94,7 +94,7 @@ void devshutdown(void)
 {
 }
 
-struct chan *devattach(int tc, char *spec)
+struct chan *devattach(const char *name, char *spec)
 {
 	struct chan *c;
 	char *buf;
@@ -102,13 +102,13 @@ struct chan *devattach(int tc, char *spec)
 
 	c = newchan();
 	mkqid(&c->qid, 0, 0, QTDIR);
-	c->type = devno(tc, 0);
+	c->type = devno(name, 0);
 	if (spec == NULL)
 		spec = "";
-	/* 2 for #c, 1 for \0 */
-	buflen = 2 + strlen(spec) + 1;
+	/* 1 for #, 1 for ., 1 for \0 */
+	buflen = strlen(name) + strlen(spec) + 3;
 	buf = kzmalloc(buflen, KMALLOC_WAIT);
-	snprintf(buf, buflen, "#%c%s", tc, spec);
+	snprintf(buf, sizeof(buf), "#%s.%s", name, spec);
 	c->name = newcname(buf);
 	kfree(buf);
 	return c;

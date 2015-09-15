@@ -31,6 +31,13 @@
 #include <smp.h>
 #include <arch/vmm/vmm.h>
 
+struct dev procdevtab;
+
+static char *devname(void)
+{
+	return procdevtab.name;
+}
+
 enum {
 	Qdir,
 	Qtrace,
@@ -203,7 +210,7 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 	uint32_t path, perm, len;
 	if (s == DEVDOTDOT) {
 		mkqid(&qid, Qdir, 0, QTDIR);
-		devdir(c, qid, "#p", 0, eve, 0555, dp);
+		devdir(c, qid, devname(), 0, eve, 0555, dp);
 		return 1;
 	}
 
@@ -361,7 +368,7 @@ static void procinit(void)
 
 static struct chan *procattach(char *spec)
 {
-	return devattach('p', spec);
+	return devattach(devname(), spec);
 }
 
 static struct walkqid *procwalk(struct chan *c, struct chan *nc, char **name,

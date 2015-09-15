@@ -14,6 +14,13 @@
 #include <ip.h>
 #include <smallidpool.h>
 
+struct dev mntdevtab;
+
+static char *devname(void)
+{
+	return mntdevtab.name;
+}
+
 /*
  * References are managed as follows:
  * The channel to the server - a network connection or pipe - has one
@@ -383,7 +390,7 @@ struct chan *mntchan(void)
 {
 	struct chan *c;
 
-	c = devattach('M', 0);
+	c = devattach(devname(), 0);
 	spin_lock(&mntalloc.l);
 	c->dev = mntalloc.id++;
 	spin_unlock(&mntalloc.l);

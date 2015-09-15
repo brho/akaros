@@ -13,6 +13,13 @@
 #include <smp.h>
 #include <ip.h>
 
+struct dev ipdevtab;
+
+static char *devname(void)
+{
+	return ipdevtab.name;
+}
+
 enum {
 	Qtopdir = 1,				/* top level directory */
 	Qtopbase,
@@ -79,7 +86,7 @@ static int topdirgen(struct chan *c, struct dir *dp)
 {
 	struct qid q;
 	mkqid(&q, QID(0, 0, Qtopdir), 0, QTDIR);
-	snprintf(get_cur_genbuf(), GENBUF_SZ, "#I%lu", c->dev);
+	snprintf(get_cur_genbuf(), GENBUF_SZ, "#%s%lu", devname(), c->dev);
 	return founddevdir(c, q, get_cur_genbuf(), 0, network, 0555, dp);
 }
 
@@ -327,7 +334,7 @@ static struct chan *ipattach(char *spec)
 		error("bad specification");
 
 	ipgetfs(dev);
-	c = devattach('I', spec);
+	c = devattach(devname(), spec);
 	mkqid(&c->qid, QID(0, 0, Qtopdir), 0, QTDIR);
 	c->dev = dev;
 
@@ -467,7 +474,7 @@ static struct chan *ipopen(struct chan *c, int omode)
 			 * since an O_PATH perm is 0).
 			 *
 			 * But we probably want to incref to keep the conversation around
-			 * until this FD/chan is closed.  #I is a little weird in that
+			 * until this FD/chan is closed.  #ip is a little weird in that
 			 * objects never really go away (high water mark for convs, you can
 			 * always find them in the ns).  I think it is possible to
 			 * namec/ipgen a chan, then have that conv close, then have that
@@ -1335,7 +1342,7 @@ int iptapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 		case Qdata:
 			if (tap->filter & ~DEVIP_LEGAL_DATA_TAPS) {
 				set_errno(ENOSYS);
-				set_errstr("Unsupported #I data tap, must be %p",
+				set_errstr("Unsupported #%s data tap, must be %p", devname(),
 				           DEVIP_LEGAL_DATA_TAPS);
 				return -1;
 			}
@@ -1359,7 +1366,8 @@ int iptapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 					break;
 				default:
 					set_errno(ENOSYS);
-					set_errstr("Unsupported #I data tap command");
+					set_errstr("Unsupported #%s data tap command %p",
+					           devname(), cmd);
 					ret = -1;
 			}
 			spin_unlock(&conv->tap_lock);
@@ -1367,7 +1375,7 @@ int iptapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 		case Qlisten:
 			if (tap->filter & ~DEVIP_LEGAL_LISTEN_TAPS) {
 				set_errno(ENOSYS);
-				set_errstr("Unsupported #I listen tap, must be %p",
+				set_errstr("Unsupported #%s listen tap, must be %p", devname(),
 				           DEVIP_LEGAL_LISTEN_TAPS);
 				return -1;
 			}
@@ -1383,14 +1391,16 @@ int iptapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 					break;
 				default:
 					set_errno(ENOSYS);
-					set_errstr("Unsupported #I data tap command");
+					set_errstr("Unsupported #%s listen tap command %p",
+					           devname(), cmd);
 					ret = -1;
 			}
 			spin_unlock(&conv->tap_lock);
 			return ret;
 		default:
 			set_errno(ENOSYS);
-			set_errstr("Can't tap #I file type %d", TYPE(chan->qid));
+			set_errstr("Can't tap #%s file type %d", devname(),
+			           TYPE(chan->qid));
 			return -1;
 	}
 }

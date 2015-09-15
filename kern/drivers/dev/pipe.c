@@ -13,6 +13,13 @@
 #include <smp.h>
 #include <ip.h>
 
+struct dev pipedevtab;
+
+static char *devname(void)
+{
+	return pipedevtab.name;
+}
+
 typedef struct Pipe Pipe;
 struct Pipe {
 	qlock_t qlock;
@@ -75,7 +82,7 @@ static struct chan *pipeattach(char *spec)
 	Pipe *p;
 	struct chan *c;
 
-	c = devattach('|', spec);
+	c = devattach(devname(), spec);
 	p = kzmalloc(sizeof(Pipe), 0);
 	if (p == 0)
 		error(Enomem);
@@ -120,7 +127,7 @@ pipegen(struct chan *c, char *unused,
 	Pipe *p;
 
 	if (i == DEVDOTDOT) {
-		devdir(c, c->qid, "#|", 0, eve, 0555, dp);
+		devdir(c, c->qid, devname(), 0, eve, 0555, dp);
 		return 1;
 	}
 	i++;	/* skip . */

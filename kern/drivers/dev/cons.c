@@ -13,6 +13,13 @@
 #include <smp.h>
 #include <ip.h>
 
+struct dev consdevtab;
+
+static char *devname(void)
+{
+	return consdevtab.name;
+}
+
 extern char *eve;
 /* much stuff not ready yet. */
 
@@ -569,7 +576,7 @@ static void consinit(void)
 
 static struct chan *consattach(char *spec)
 {
-	return devattach('c', spec);
+	return devattach(devname(), spec);
 }
 
 static struct walkqid *conswalk(struct chan *c, struct chan *nc, char **name,

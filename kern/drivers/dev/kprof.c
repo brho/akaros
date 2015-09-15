@@ -38,6 +38,13 @@
 #include <ip.h>
 #include <oprofile.h>
 
+struct dev kprofdevtab;
+
+static char *devname(void)
+{
+	return kprofdevtab.name;
+}
+
 #define LRES	3		/* log of PC resolution */
 #define CELLSIZE	8	/* sizeof of count cell */
 
@@ -108,7 +115,7 @@ kprofattach(char *spec)
 	if ( !(oprof_alarms && kprof.buf && kprof.systrace) )
 		error(Enomem);
 
-	return devattach('K', spec);
+	return devattach(devname(), spec);
 }
 
 static void

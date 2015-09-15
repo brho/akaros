@@ -28,6 +28,13 @@
 #include <console.h>
 #include <ktest.h>
 
+struct dev regressdevtab;
+
+static char *devname(void)
+{
+	return regressdevtab.name;
+}
+
 struct regress
 {
 	spinlock_t lock;
@@ -58,7 +65,7 @@ regressattach(char *spec)
 	if (! regress.monitor) {
 		printk("monitor allocate failed. No monitor output\n");
 	}
-	return devattach('Z', spec);
+	return devattach(devname(), spec);
 }
 
 static void

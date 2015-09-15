@@ -14,6 +14,13 @@
 #include <ip.h>
 #include <umem.h>
 
+struct dev rootdevtab;
+
+static char *devname(void)
+{
+	return rootdevtab.name;
+}
+
 /* make it a power of 2 and nobody gets hurt */
 #define MAXFILE 1024
 int rootmaxq = MAXFILE;
@@ -56,7 +63,7 @@ int inumber = 13;
 /* Inferno seems to want to: perm |= DMDIR.  It gets checked in other places.
  * NxM didn't want this, IIRC.
  *
- * Also note that "" (/, #r, whatever) has no vers/next/sibling.
+ * Also note that "" (/, #root, whatever) has no vers/next/sibling.
  *
  * If you want to add new entries, add it to the roottab such that the linked
  * list of indexes is a cycle (change the last current one), then add an entry
@@ -147,7 +154,7 @@ static int newentry(int parent)
 	int n = findempty();
 	int sib;
 	if (n < 0)
-		error("#r. No more");
+		error("#root. No more");
 	printd("new entry is %d\n", n);
 	/* add the new one to the head of the linked list.  vers is 'next' */
 	roottab[n].qid.vers = rootdata[parent].child;
@@ -197,7 +204,7 @@ static struct chan *rootattach(char *spec)
 	struct chan *c;
 	if (*spec)
 		error(Ebadspec);
-	c = devattach('r', spec);
+	c = devattach(devname(), spec);
 	mkqid(&c->qid, roottab[0].qid.path, roottab[0].qid.vers, QTDIR);
 	return c;
 }
@@ -218,7 +225,7 @@ rootgen(struct chan *c, char *name,
 		// XXX we need to set the vers too.  equiv to mkqid(&c->qid, ...)
 		c->qid.path = p;
 		c->qid.type = QTDIR;
-		name = "#r";
+		name = devname();
 		if (p != 0) {
 			/* TODO: what is this doing?  do we want to walk the entire table,
 			 * or are we just walking the siblings of our parent? */
@@ -373,7 +380,7 @@ static long rootread(struct chan *c, void *buf, long n, int64_t offset)
 		n = len - offset;
 	data = rootdata[p].ptr;
 	/* we can't really claim it has to be a user address. Lots of
-	 * kernel things read directly, e.g. /dev/reboot, #V, etc.
+	 * kernel things read directly, e.g. /dev/reboot, #nix, etc.
 	 * Address validation should be done in the syscall layer.
 	 */
 	memcpy(buf, data + offset, n);

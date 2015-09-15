@@ -28,6 +28,13 @@
 #include <arch/pci.h>
 #endif
 
+struct dev acpidevtab;
+
+static char *devname(void)
+{
+	return acpidevtab.name;
+}
+
 /*
  * ACPI 4.0 Support.
  * Still WIP.
@@ -1233,7 +1240,7 @@ acpigen(struct chan *c, char *unused_char_p_t, struct dirtab *tab, int ntab,
 
 	if (i == DEVDOTDOT) {
 		mkqid(&qid, Qdir, 0, QTDIR);
-		devdir(c, qid, ".", 0, eve, 0555, dp);
+		devdir(c, qid, devname(), 0, eve, 0555, dp);
 		return 1;
 	}
 	i++;	/* skip first element for . itself */
@@ -1519,7 +1526,7 @@ static struct chan *acpiattach(char *spec)
 		error("acpi: failed to enable\n");
 //  if(fadt.sciint != 0)
 //      intrenable(fadt.sciint, acpiintr, 0, BUSUNKNOWN, "acpi");
-	return devattach('a', spec);
+	return devattach(devname(), spec);
 }
 
 static struct walkqid *acpiwalk(struct chan *c, struct chan *nc, char **name,

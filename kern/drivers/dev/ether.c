@@ -13,6 +13,13 @@
 #include <smp.h>
 #include <ip.h>
 
+struct dev etherdevtab;
+
+static char *devname(void)
+{
+	return etherdevtab.name;
+}
+
 enum {
 	Type8021Q = 0x8100,			/* value of type field for 802.1[pQ] tags */
 };
@@ -55,14 +62,14 @@ struct chan *etherattach(char *spec)
 		if (ether->maxmtu < ETHERMAXTU + 4)
 			error("interface cannot support 802.1 tags");
 		vlan = vlanalloc(ether, vlanid);
-		chan = devattach('l', spec);
+		chan = devattach(devname(), spec);
 		chan->dev = ctlrno + (vlanid << 8);
 		chan->aux = vlan;
 		poperror();
 		runlock(&ether->rwlock);
 		return chan;
 	}
-	chan = devattach('l', spec);
+	chan = devattach(devname(), spec);
 	chan->dev = ctlrno;
 	chan->aux = ether;
 	if (ether->attach)

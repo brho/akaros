@@ -2,22 +2,23 @@
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
- * devalarm/#A: a device for registering per-process alarms.
+ * #alarm: a device for registering per-process alarms.
  *
  * Allows a process to set up alarms, where the kernel will send an event to a
  * posted ev_q at a certain TSC time.
  *
- * Every process has their own alarm sets and view of #A; gen and friends look
- * at current's alarmset when it is time to gen or open a file.
+ * Every process has their own alarm sets and view of #alarm; gen and friends
+ * look at current's alarmset when it is time to gen or open a file.
  *
- * To use, first open #A/clone, and that gives you an alarm directory aN, where
- * N is ID of the alarm.  ctl takes two commands: "evq POINTER" (to tell the
- * kernel the pointer of your ev_q) and "cancel", to stop an alarm.  timer takes
- * just the value (in absolute tsc time) to fire the alarm.
+ * To use, first open #alarm/clone, and that gives you an alarm directory aN,
+ * where N is ID of the alarm.  ctl takes two commands: "evq POINTER" (to tell
+ * the kernel the pointer of your ev_q) and "cancel", to stop an alarm.  timer
+ * takes just the value (in absolute tsc time) to fire the alarm.
  *
- * While each process has a separate view of #A, it is possible to post a chan
- * to Qctl or Qtimer to #s.  If another proc has your Qtimer, it can set it in
- * the past, thereby triggering an immediate event.  More clever than useful.
+ * While each process has a separate view of #alarm, it is possible to post a
+ * chan to Qctl or Qtimer to #srv.  If another proc has your Qtimer, it can set
+ * it in the past, thereby triggering an immediate event.  More clever than
+ * useful.
  *
  * Notes on refcnting (the trickier parts here):
  * - the proc_alarms have counted references to their proc
@@ -52,6 +53,13 @@
 #include <event.h>
 #include <umem.h>
 #include <devalarm.h>
+
+struct dev alarmdevtab;
+
+static char *devname(void)
+{
+	return alarmdevtab.name;
+}
 
 /* qid path types */
 #define Qtopdir					1
@@ -116,7 +124,7 @@ static int alarmgen(struct chan *c, char *entry_name,
 	/* Whether we're in one dir or at the top, .. still takes us to the top. */
 	if (s == DEVDOTDOT) {
 		mkqid(&q, Qtopdir, 0, QTDIR);
-		devdir(c, q, "#A", 0, eve, 0555, dp);
+		devdir(c, q, devname(), 0, eve, 0555, dp);
 		return 1;
 	}
 	switch (TYPE(c->qid)) {
@@ -148,8 +156,8 @@ static int alarmgen(struct chan *c, char *entry_name,
 			 * parameters to devwalk), so that we can have some invariants
 			 * between gen runs.
 			 *
-			 * Til then, we're stuck with arrays like in #I (though we can use
-			 * Linux style fdsets) or lousy O(n^2) linked lists (like #s).
+			 * Til then, we're stuck with arrays like in #ip (though we can use
+			 * Linux style fdsets) or lousy O(n^2) linked lists (like #srv).
 			 *
 			 * Note that we won't always start a gen loop with s == 0
 			 * (devdirread, for instance) */
@@ -212,7 +220,7 @@ static void alarminit(void)
 
 static struct chan *alarmattach(char *spec)
 {
-	struct chan *c = devattach('A', spec);
+	struct chan *c = devattach(devname(), spec);
 	mkqid(&c->qid, Qtopdir, 0, QTDIR);
 	return c;
 }

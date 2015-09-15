@@ -22,6 +22,13 @@
 #include <ip.h>
 #include <time.h>
 
+struct dev archdevtab;
+
+static char *devname(void)
+{
+	return archdevtab.name;
+}
+
 typedef struct IOMap IOMap;
 struct IOMap {
 	IOMap *next;
@@ -314,7 +321,7 @@ static void checkport(int start, int end)
 
 static struct chan *archattach(char *spec)
 {
-	return devattach('P', spec);
+	return devattach(devname(), spec);
 }
 
 struct walkqid *archwalk(struct chan *c, struct chan *nc, char **name,

@@ -36,6 +36,13 @@
 #include <ip.h>
 #include <sys/queue.h>
 
+struct dev srvdevtab;
+
+static char *devname(void)
+{
+	return srvdevtab.name;
+}
+
 #define Qtopdir			1
 #define Qsrvfile		2
 
@@ -93,7 +100,7 @@ static int srvgen(struct chan *c, char *name, struct dirtab *tab,
 	if (s == DEVDOTDOT) {
 		/* changing whatever c->aux was to be topdir */
 		mkqid(&q, Qtopdir, 0, QTDIR);
-		devdir(c, q, "#s", 0, eve, 0555, dp);
+		devdir(c, q, devname(), 0, eve, 0555, dp);
 		return 1;
 	}
 	spin_lock(&srvlock);
@@ -138,7 +145,7 @@ static struct chan *srvattach(char *spec)
 {
 	/* the inferno attach was pretty complicated, but
 	 * we're not sure that complexity is needed. */
-	struct chan *c = devattach('s', spec);
+	struct chan *c = devattach(devname(), spec);
 	mkqid(&c->qid, Qtopdir, 0, QTDIR);
 	/* c->aux is an uncounted ref */
 	c->aux = top_dir;
