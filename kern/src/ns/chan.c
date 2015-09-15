@@ -995,8 +995,8 @@ struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 			nomount = 1;
 			get_cur_genbuf()[0] = '\0';
 			n = 0;
-			while (*name != '\0' && (*name != '/' || n < 2)) {
-				if (n >= sizeof(get_cur_genbuf()) - 1)
+			while ((*name != '\0') && (*name != '/')) {
+				if (n >= GENBUF_SZ - 1)
 					error(Efilename);
 				get_cur_genbuf()[n++] = *name++;
 			}
