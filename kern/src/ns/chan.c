@@ -957,93 +957,23 @@ void *memrchr(void *va, int c, long n)
  *
  * Acreatechan will never open. It will do all the tests and return a chan
  * for the directory where an open will succeed.
- */
-struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
+ *
+ * The classic namec() is broken into a front end to get the starting point and
+ * a __namec_from, which does the guts of the lookup.  */
+static struct chan *__namec_from(struct chan *c, char *aname, int amode,
+                                 int omode, uint32_t perm, bool can_mount)
 {
 	ERRSTACK(2);
-	int n, prefix, len, t, nomount, npath;
-	struct chan *c, *cnew;
+	int len, npath;
+	struct chan *cnew;
 	struct cname *cname;
 	Elemlist e;
 	struct mhead *m;
 	char tmperrbuf[ERRMAX];
 	int saved_errno;
-	char *name, *devname, *devspec;
-	bool can_mount = TRUE;
 	// Rune r;
 
 	static_assert(!(CINTERNAL_FLAGS & CEXTERNAL_FLAGS));
-
-	name = aname;
-	if (name[0] == '\0')
-		error("empty file name");
-	validname(name, 1);
-	/*
-	 * Find the starting off point (the current slash, the root of
-	 * a device tree, or the current dot) as well as the name to
-	 * evaluate starting there.
-	 */
-	switch (name[0]) {
-		case '/':
-			c = current->slash;
-			if (!c)
-				panic("no slash!");
-			chan_incref(c);
-			break;
-
-		case '#':
-			can_mount = FALSE;
-			devname = get_cur_genbuf();
-			devname[0] = '\0';
-			n = 0;
-			name++; /* drop the # */
-			while ((*name != '\0') && (*name != '/')) {
-				if (n >= GENBUF_SZ - 1)
-					error(Efilename);
-				devname[n++] = *name++;
-			}
-			devname[n] = '\0';
-			/* for a name #foo.spec, devname = foo\0, devspec = spec\0.
-			 * genbuf contains foo\0spec\0.  for no spec, devspec = \0 */
-			devspec = strchr(devname, '.');
-			if (devspec) {
-				*devspec = '\0';
-				devspec++;
-			} else {
-				devspec = &devname[n];
-			}
-			if (!strcmp(devname, "mnt"))
-				error(Enoattach);
-			/* TODO: deal with this "nodevs" business. */
-			#if 0
-			/*
-			 *  the nodevs exceptions are
-			 *  |  it only gives access to pipes you create
-			 *  e  this process's environment
-			 *  s  private file2chan creation space
-			 *  D private secure sockets name space
-			 *  a private TLS name space
-			 */
-			if (current->pgrp->nodevs &&
-				//          (utfrune("|esDa", r) == NULL
-				((strchr("|esDa", get_cur_genbuf()[1]) == NULL)
-				 || (get_cur_genbuf()[1] == 's'	// || r == 's'
-					 && get_cur_genbuf()[n] != '\0')))
-				error(Enoattach);
-			#endif
-			t = devno(devname, 1);
-			if (t == -1)
-				error("Unknown #device %s (spec %s)", devname, devspec);
-			c = devtab[t].attach(devspec);
-			break;
-		default:
-			c = current->dot;
-			if (!c)
-				panic("no dot!");
-			chan_incref(c);
-			break;
-	}
-	prefix = name - aname;
 
 	e.name = NULL;
 	e.elems = NULL;
@@ -1061,7 +991,7 @@ struct chan *namec(char *aname, int amode, int omode, uint32_t perm)
 	/*
 	 * Build a list of elements in the path.
 	 */
-	parsename(name, &e);
+	parsename(aname, &e);
 
 	/*
 	 * On create, ....
@@ -1096,7 +1026,7 @@ NameError:
 		 * the underlying failure.  implement this if you want the old stuff. */
 #if 0
 		strncpy(tmperrbuf, current->errstr, sizeof(tmperrbuf));
-		len = prefix + e.off[npath];
+		len = prefix + e.off[npath]; // prefix was name - aname, the start pt
 		if (len < ERRMAX / 3 || (name = memrchr(aname, '/', len)) == NULL
 			|| name == aname)
 			snprintf(get_cur_genbuf(), sizeof current->genbuf, "%.*s", len,
@@ -1342,6 +1272,97 @@ Open:
 	kfree(e.off);
 
 	return c;
+}
+
+struct chan *namec(char *name, int amode, int omode, uint32_t perm)
+{
+	bool can_mount = TRUE;
+	struct chan *c;
+	char *devname, *devspec;
+	int n, devtype;
+
+	if (name[0] == '\0')
+		error("empty file name");
+	validname(name, 1);
+	/*
+	 * Find the starting off point (the current slash, the root of
+	 * a device tree, or the current dot) as well as the name to
+	 * evaluate starting there.
+	 */
+	switch (name[0]) {
+		case '/':
+			c = current->slash;
+			if (!c)
+				panic("no slash!");
+			chan_incref(c);
+			break;
+
+		case '#':
+			can_mount = FALSE;
+			devname = get_cur_genbuf();
+			devname[0] = '\0';
+			n = 0;
+			name++; /* drop the # */
+			while ((*name != '\0') && (*name != '/')) {
+				if (n >= GENBUF_SZ - 1)
+					error(Efilename);
+				devname[n++] = *name++;
+			}
+			devname[n] = '\0';
+			/* for a name #foo.spec, devname = foo\0, devspec = spec\0.
+			 * genbuf contains foo\0spec\0.  for no spec, devspec = \0 */
+			devspec = strchr(devname, '.');
+			if (devspec) {
+				*devspec = '\0';
+				devspec++;
+			} else {
+				devspec = &devname[n];
+			}
+			if (!strcmp(devname, "mnt"))
+				error(Enoattach);
+			/* TODO: deal with this "nodevs" business. */
+			#if 0
+			/*
+			 *  the nodevs exceptions are
+			 *  |  it only gives access to pipes you create
+			 *  e  this process's environment
+			 *  s  private file2chan creation space
+			 *  D private secure sockets name space
+			 *  a private TLS name space
+			 */
+			if (current->pgrp->nodevs &&
+				//          (utfrune("|esDa", r) == NULL
+				((strchr("|esDa", get_cur_genbuf()[1]) == NULL)
+				 || (get_cur_genbuf()[1] == 's'	// || r == 's'
+					 && get_cur_genbuf()[n] != '\0')))
+				error(Enoattach);
+			#endif
+			devtype = devno(devname, 1);
+			if (devtype == -1)
+				error("Unknown #device %s (spec %s)", devname, devspec);
+			c = devtab[devtype].attach(devspec);
+			break;
+		default:
+			/* this case also covers \0 */
+			c = current->dot;
+			if (!c)
+				panic("no dot!");
+			chan_incref(c);
+			break;
+	}
+	return __namec_from(c, name, amode, omode, perm, can_mount);
+}
+
+struct chan *namec_from(struct chan *c, char *name, int amode, int omode,
+                        uint32_t perm)
+{
+	if (name[0] == '\0') {
+		/* Our responsibility to cclose 'c' on our error */
+		cclose(c);
+		error("empty file name");
+	}
+	validname(name, 1);
+	return __namec_from(c, name, amode, omode, perm, TRUE);
 }
 
 /*
