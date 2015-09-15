@@ -49,7 +49,7 @@
 /* FS Syscalls */
 #define SYS_read				100
 #define SYS_write				101
-#define SYS_open				102
+#define SYS_openat				102
 #define SYS_close				103
 #define SYS_fstat				104
 #define SYS_stat				105

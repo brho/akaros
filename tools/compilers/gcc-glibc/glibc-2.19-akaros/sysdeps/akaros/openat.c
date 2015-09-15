@@ -68,15 +68,7 @@ __openat (fd, file, oflag)
       va_end (arg);
     }
 
-
-	/* TODO: actually implement openat as the primary kernel interface.  for
-	 * now, only allow absolute or relative-to-CWD paths. */
-	if (fd != AT_FDCWD && file[0] != '/') {
-		werrstr("openat not implemented");
-		__set_errno (ENOSYS);
-		return -1;
-	}
-	return ros_syscall(SYS_open, file, strlen(file), oflag, mode, 0, 0);
+	return ros_syscall(SYS_openat, fd, file, strlen(file), oflag, mode, 0);
 }
 libc_hidden_def (__openat)
 weak_alias (__openat, openat)

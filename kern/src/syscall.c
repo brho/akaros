@@ -1425,12 +1425,6 @@ static intreg_t sys_openat(struct proc *p, int fromfd, const char *path,
 	return fd;
 }
 
-static intreg_t sys_open(struct proc *p, const char *path, size_t path_l,
-                         int oflag, int mode)
-{
-	return sys_openat(p, AT_FDCWD, path, path_l, oflag, mode);
-}
-
 static intreg_t sys_close(struct proc *p, int fd)
 {
 	struct file *file = get_file_from_fd(&p->open_files, fd);
@@ -2416,7 +2410,7 @@ const struct sys_table_entry syscall_table[] = {
 
 	[SYS_read] = {(syscall_t)sys_read, "read"},
 	[SYS_write] = {(syscall_t)sys_write, "write"},
-	[SYS_open] = {(syscall_t)sys_open, "open"},
+	[SYS_openat] = {(syscall_t)sys_openat, "openat"},
 	[SYS_close] = {(syscall_t)sys_close, "close"},
 	[SYS_fstat] = {(syscall_t)sys_fstat, "fstat"},
 	[SYS_stat] = {(syscall_t)sys_stat, "stat"},
