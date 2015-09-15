@@ -525,7 +525,7 @@ static struct chan *mntopencreate(int type, struct chan *c, char *name,
 	}
 	r->request.type = type;
 	r->request.fid = c->fid;
-	r->request.mode = omode & O_ACCMODE;	/* not using openmode, want O_EXEC */
+	r->request.mode = omode_to_9p_accmode(omode);
 	if (omode & O_TRUNC)
 		r->request.mode |= MNT_9P_OPEN_OTRUNC;
 	if (omode & O_REMCLO)

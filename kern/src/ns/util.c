@@ -48,3 +48,21 @@ int omode_to_rwx(int open_flags)
 	                          [O_EXEC] = 0100 };
 	return rwx_opts[open_flags & O_ACCMODE];
 }
+
+/* Converts open mode flags related to permissions, e.g. O_RDWR, to 9p.  It's a
+ * bit ugly, since 9p (according to http://man.cat-v.org/plan_9/5/open) seems to
+ * require that O_EXEC is mutually exclusive with the others.  If someone on
+ * Akaros wants EXEC, we'll just substitute READ. */
+int omode_to_9p_accmode(int open_flags)
+{
+	static int acc_opts[] = { [O_RDWR | O_EXEC] = 2,
+	                          [O_WRITE | O_EXEC] = 2,
+	                          [O_READ | O_EXEC] = 0,
+	                          [O_EXEC] = 0,
+	                          [O_RDWR] = 2,
+	                          [O_WRITE] = 1,
+	                          [O_READ] = 0,
+	                          [0] = 0 /* we can't express no permissions */
+	                          };
+	return acc_opts[open_flags & O_ACCMODE];
+}
