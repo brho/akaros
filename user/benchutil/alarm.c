@@ -3,23 +3,23 @@
  * See LICENSE for details.
  *
  * Userspace alarms.  There are lower level helpers to build your own alarms
- * from the #A device and an alarm service, based off a slimmed down version of
- * the kernel alarms.  Under the hood, the user alarm uses the #A service for
- * the root of the alarm chain.
+ * from the #alarm device and an alarm service, based off a slimmed down version
+ * of the kernel alarms.  Under the hood, the user alarm uses the #alarm service
+ * for the root of the alarm chain.
  *
  * There's only one timer chain, unlike in the kernel, for the entire process.
  * If you want one-off timers unrelated to the chain (and sent to other vcores),
- * use #A directly.
+ * use #alarm directly.
  *
  * Your handlers will run from vcore context.
  *
  * Code differences from the kernel (for future porting):
  * - init_alarm_service, run once out of init_awaiter (or wherever).
  * - set_alarm() and friends are __tc_set_alarm(), passing global_tchain.
- * - reset_tchain_interrupt() uses #A
+ * - reset_tchain_interrupt() uses #alarm
  * - removed anything related to semaphores or kthreads
  * - spinlocks -> spin_pdr_locks
- * - ev_q wrappers for converting #A events to __triggers
+ * - ev_q wrappers for converting #alarm events to __triggers
  * - printks, and other minor stuff. */
 
 #include <sys/queue.h>
@@ -55,7 +55,7 @@ int devalarm_get_fds(int *ctlfd_r, int *timerfd_r, int *alarmid_r)
 		return -1;
 	buf[ret] = 0;
 	alarmid = atoi(buf);
-	snprintf(path, sizeof(path), "#A/a%s/timer", buf);
+	snprintf(path, sizeof(path), "#alarm/a%s/timer", buf);
 	timerfd = open(path, O_RDWR | O_CLOEXEC);
 	if (timerfd < 0)
 		return -1;

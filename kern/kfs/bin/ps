@@ -1,5 +1,5 @@
 #!/bin/ash
-for i in `echo '#p/*/status'`
+for i in `echo '#proc/*/status'`
 do
 cat $i
 echo

@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
 		printf("max amt to read is %d\n", sizeof(data));
 	if (amt > sizeof(data))
 		amt = sizeof(data);
-	fd = open("#c/random", 0);
+	fd = open("#cons/random", 0);
 	if (fd < 0){
 		perror("random");
 		exit(1);

@@ -12,10 +12,10 @@ tower3MAC=00032d196d46
 tower4MAC=00032d196db0
 tower5MAC=00032d196daa
 
-MAC=`cat '#l/ether0/addr'`
+MAC=`cat '#ether/ether0/addr'`
 
-#bind -a '#I' /net
-#bind -a '#l0' /net
+#bind -a '#ip' /net
+#bind -a '#ether.0' /net
 #cat /net/ipifc/clone
 ## bind the ether0 to it
 #echo 'bind ether /net/ether0' > /net/ipifc/0/ctl
@@ -131,18 +131,18 @@ fi
 #/boot/echo -n sys > '#c/hostowner'
 #/boot/paqfs -p -S $beetroot -m /boot -q /boot/$beetroot
 #cd /boot/$cputype/bin
-bind -b '#c' /dev
+bind -b '#cons' /dev
 #bind '#d' /fd
 #bind -c '#e' /env
-bind -b '#p' /proc
-#bind -b -c '#s' /srv
-bind -b '#s' /srv
+bind -b '#proc' /proc
+#bind -b -c '#srv' /srv
+bind -b '#srv' /srv
 
 #
 # Configure the networks.
 #
-bind -a '#I' /net
-bind -a \#l$NIC /net
+bind -a '#ip' /net
+bind -a \#ether.$NIC /net
 
 # note: dhcp is possible, just not done yet.
 #get an instance of a network stack
@@ -161,19 +161,19 @@ echo "bind loopback /dev/null " > /net/ipifc/$i/ctl
 echo "add 127.0.0.1 255.0.0.0 127.0.0.0 " > /net/ipifc/$i/ctl
 
 cs&
-if [ ! -e "#s/cs" ]
+if [ ! -e "#srv/cs" ]
 then
-	echo "cs hasn't created #s/cs yet, sleeping until it does..."
-	until [ -e "#s/cs" ]
+	echo "cs hasn't created #srv/cs yet, sleeping until it does..."
+	until [ -e "#srv/cs" ]
 	do
 		usleep 1000
 	done
 fi
-mount -a \#s/cs /net
+mount -a \#srv/cs /net
 
 # this is noisy, so it is off by default.
 #echo debug > /net/cs
 
-bind -a \#K /prof/
+bind -a \#kprof /prof/
 
 echo "ifconfig complete"

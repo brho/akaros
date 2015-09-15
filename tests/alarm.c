@@ -2,7 +2,7 @@
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
- * alarm: basic functionality test for the #A device */
+ * alarm: basic functionality test for the #alarm device */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -36,9 +36,9 @@ int main(int argc, char **argv)
 
 	printf("Starting alarm test\n");
 	/* standard 9ns stuff: clone and read it to get our path, ending up with the
-	 * ctlfd and timerfd for #A/aN/{ctl,timer}.  if you plan to fork, you can
-	 * open CLOEXEC. */
-	ctlfd = open("#A/clone", O_RDWR | O_CLOEXEC);
+	 * ctlfd and timerfd for #alarm/aN/{ctl,timer}.  if you plan to fork, you
+	 * can open CLOEXEC. */
+	ctlfd = open("#alarm/clone", O_RDWR | O_CLOEXEC);
 	if (ctlfd < 0) {
 		perror("Can't clone an alarm");
 		exit(-1);
@@ -52,7 +52,7 @@ int main(int argc, char **argv)
 		exit(-1);
 	}
 	buf[ret] = 0;
-	snprintf(path, sizeof(path), "#A/a%s/timer", buf);
+	snprintf(path, sizeof(path), "#alarm/a%s/timer", buf);
 	/* Don't open CLOEXEC if you want to post it to srv later */
 	timerfd = open(path, O_RDWR);
 	if (timerfd < 0) {
@@ -102,11 +102,11 @@ int main(int argc, char **argv)
 	}
 	uthread_sleep(2);
 	close(ctlfd);
-	/* get crazy: post the timerfd to #s, then sleep (or even try to exit), and
+	/* get crazy: post the timerfd to #srv, then sleep (or even try to exit), and
 	 * then echo into it remotely!  A few limitations:
 	 * - if the process is DYING, you won't be able to send an event to it.
 	 * - the process won't leave DYING til the srv file is removed. */
-	srvfd = open("#s/alarmtest", O_WRONLY | O_CREAT | O_EXCL, 0666);
+	srvfd = open("#srv/alarmtest", O_WRONLY | O_CREAT | O_EXCL, 0666);
 	if (srvfd < 0) {
 		perror("Failed to open srv file");
 		exit(-1);
@@ -117,11 +117,11 @@ int main(int argc, char **argv)
 		perror("Failed to post timerfd");
 		exit(-1);
 	}
-	printf("Sleeping for 10 sec, try to echo 111 > '#s/alarmtest' now!\n");
+	printf("Sleeping for 10 sec, try to echo 111 > '#srv/alarmtest' now!\n");
 	uthread_sleep(10);
-	ret = unlink("#s/alarmtest");
+	ret = unlink("#srv/alarmtest");
 	if (ret < 0) {
-		perror("Failed to remove timerfd from #s, proc will never be freed");
+		perror("Failed to remove timerfd from #srv, proc will never be freed");
 		exit(-1);
 	}
 	printf("Done\n");

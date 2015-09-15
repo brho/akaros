@@ -182,7 +182,7 @@ static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data, int vcoreid)
 	char path[32];
 	struct event_queue *ev_q;
 
-	ctlfd = open("#A/clone", O_RDWR | O_CLOEXEC);
+	ctlfd = open("#alarm/clone", O_RDWR | O_CLOEXEC);
 	if (ctlfd < 0) {
 		perror("Pvcalarm: Can't clone an alarm");
 		return;
@@ -197,7 +197,7 @@ static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data, int vcoreid)
 	}
 	buf[ret] = 0;
 	alarmid = atoi(buf);
-	snprintf(path, sizeof(path), "#A/a%s/timer", buf);
+	snprintf(path, sizeof(path), "#alarm/a%s/timer", buf);
 	timerfd = open(path, O_RDWR | O_CLOEXEC);
 	if (timerfd < 0) {
 		perror("Pvcalarm: Can't open timer");
@@ -226,7 +226,7 @@ static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data, int vcoreid)
 }
 
 /* TODO: implement a way to completely remove each per-vcore alarm and
- * deregister it from the #A device */
+ * deregister it from the #alarm device */
 
 /* A preamble function to run anytime we are about to do anything on behalf of
  * the pvcalarms while in vcore context.  This preamble is necessary to ensure

@@ -209,12 +209,12 @@ void *talk_thread(void *arg)
 int main(int argc, char **argv)
 {
 	int nr_gpcs = 1;
-	int fd = open("#c/sysctl", O_RDWR), ret;
+	int fd = open("#cons/sysctl", O_RDWR), ret;
 	void * x;
 	static char cmd[512];
 	debug = argc > 1;
 	if (fd < 0) {
-		perror("#c/sysctl");
+		perror("#cons/sysctl");
 		exit(1);
 	}
 

@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
 		perror("Unable to dial!");
 		exit(-1);
 	}
-	ret = snprintf(buf, buf_len, "#s/%s", srvname);
+	ret = snprintf(buf, buf_len, "#srv/%s", srvname);
 	if (snprintf_overflow(ret, buf, buf_len)) {
 		printf("srvname too long\n");
 		exit(-1);

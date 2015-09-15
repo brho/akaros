@@ -50,7 +50,7 @@ int main(int argc, char **argv)
 	int vmmflags = VMM_VMCALL_PRINTF;
 	uint64_t entry = 0x101000c, kerneladdress = 0x1010000;
 	int nr_gpcs = 1;
-	int fd = open("#c/sysctl", O_RDWR), ret;
+	int fd = open("#cons/sysctl", O_RDWR), ret;
 	void * x;
 	int kfd = -1;
 	static char cmd[512];
@@ -64,7 +64,7 @@ int main(int argc, char **argv)
 	memset(_kernel, 0, sizeof(_kernel));
 
 	if (fd < 0) {
-		perror("#c/sysctl");
+		perror("#cons/sysctl");
 		exit(1);
 	}
 	argc--,argv++;

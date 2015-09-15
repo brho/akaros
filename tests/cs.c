@@ -236,7 +236,7 @@ procsetname(char *fmt, ...)
 	va_end(arg);
 	if (cmdname == NULL)
 		return;
-	snprintf(buf, sizeof buf, "#p/%d/args", getpid());
+	snprintf(buf, sizeof buf, "#proc/%d/args", getpid());
 	if((fd = open(buf, OWRITE)) >= 0){
 		write(fd, cmdname, strlen(cmdname)+1);
 		close(fd);
@@ -288,7 +288,7 @@ main(int argc, char *argv[])
 	/* Make us an SCP with a 2LS */
 	parlib_wants_to_be_mcp = FALSE;
 
-	snprintf(servefile, sizeof(servefile), "#s/cs%s", ext);
+	snprintf(servefile, sizeof(servefile), "#srv/cs%s", ext);
 	snprintf(netndb, sizeof(netndb), "%s/ndb", mntpt);
 	syscall(SYS_nunmount, (unsigned long)servefile, strlen(servefile),
 	        (unsigned long)mntpt, strlen(mntpt));
@@ -349,9 +349,9 @@ mountinit(char *service, char *mntpt)
 	snprintf(buf, sizeof(buf), "%d", p[1]);
 	if(write(f, buf, strlen(buf)) != strlen(buf))
 		error(1, 0, "Write %s: %r", service);
-	/* using #s: we create a pipe and drop it into #s. 
+	/* using #s: we create a pipe and drop it into #srv.
 	 * we no longer mount. That's up to you.
-	 * #s will route requests to us.
+	 * #srv will route requests to us.
 	 */
 	close(p[1]);
 

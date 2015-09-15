@@ -51,13 +51,13 @@ int main(int argc, char **argv)
 	int i, amt;
 	int nr_gpcs = 1;
 	uint64_t entry;
-	int fd = open("#c/sysctl", O_RDWR), ret;
+	int fd = open("#cons/sysctl", O_RDWR), ret;
 	int kfd = -1;
 	bool smallkernel = false;
 	void * x;
 	static char cmd[512];
 	if (fd < 0) {
-		perror("#c/sysctl");
+		perror("#cons/sysctl");
 		exit(1);
 	}
 	argc--,argv++;

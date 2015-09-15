@@ -57,11 +57,11 @@ int nr_threads = 2;
 int main(int argc, char **argv)
 {
 	int nr_gpcs = 1;
-	int fd = open("#c/sysctl", O_RDWR), ret;
+	int fd = open("#cons/sysctl", O_RDWR), ret;
 	void * x;
 	static char cmd[512];
 	if (fd < 0) {
-		perror("#c/sysctl");
+		perror("#cons/sysctl");
 		exit(1);
 	}
 	if (ros_syscall(SYS_setup_vmm, nr_gpcs, 0, 0, 0, 0, 0) != nr_gpcs) {
