@@ -1201,11 +1201,13 @@ struct mnt *mntchk(struct chan *c)
  */
 void mntdirfix(uint8_t * dirbuf, struct chan *c)
 {
-	unsigned int r;
-
-	r = devtab[c->type].dc;
+	/* TODO: We used to use the device's char (dc), instead of the type.  not
+	 * sure about the effects one way or the other.  This might be the type[2]
+	 * and dev[4] in a D (struct dir, see 9p's stat
+	 * (http://man.cat-v.org/plan_9/5/stat).  In which case, those should be for
+	 * the kernel's use.  Hopefully our kernel. */
 	dirbuf += BIT16SZ;	/* skip count */
-	PBIT16(dirbuf, r);
+	PBIT16(dirbuf, c->type);
 	dirbuf += BIT16SZ;
 	PBIT32(dirbuf, c->dev);
 }
@@ -1219,7 +1221,6 @@ int rpcattn(void *v)
 }
 
 struct dev mntdevtab __devtab = {
-	'M',
 	"mnt",
 
 	devreset,

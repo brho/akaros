@@ -1307,7 +1307,6 @@ static long procwrite(struct chan *c, void *va, long n, int64_t off)
 }
 
 struct dev procdevtab __devtab = {
-	'p',
 	"proc",
 
 	devreset,

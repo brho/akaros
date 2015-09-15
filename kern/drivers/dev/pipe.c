@@ -452,7 +452,6 @@ static int pipewstat(struct chan *c, uint8_t * dp, int n)
 }
 
 struct dev pipedevtab __devtab = {
-	'|',
 	"pipe",
 
 	devreset,

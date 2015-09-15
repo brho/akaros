@@ -178,7 +178,6 @@ regresswrite(struct chan *c, void *a, long n, int64_t unused)
 }
 
 struct dev regressdevtab __devtab = {
-	'Z',
 	"regress",
 
 	devreset,

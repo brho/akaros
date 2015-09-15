@@ -443,7 +443,6 @@ static int rootwstat(struct chan *c, uint8_t *m_buf, int m_buf_sz)
 }
 
 struct dev rootdevtab __devtab = {
-	'r',
 	"root",
 	devreset,
 	rootinit,

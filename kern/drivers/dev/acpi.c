@@ -1689,7 +1689,6 @@ static long acpiwrite(struct chan *c, void *a, long n, int64_t off)
 }
 
 struct dev acpidevtab __devtab = {
-	'a',
 	"acpi",
 
 	devreset,

@@ -73,7 +73,7 @@ int add_fd_tap(struct proc *p, struct fd_tap_req *tap_req)
 	}
 	if (!devtab[chan->type].tapfd) {
 		set_errno(ENOSYS);
-		set_errstr("Device %c does not handle taps", devtab[chan->type].dc);
+		set_errstr("Device %s does not handle taps", devtab[chan->type].name);
 		goto out_with_lock;
 	}
 	/* need to keep chan alive for our call to the device.  someone else

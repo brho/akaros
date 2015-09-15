@@ -1182,8 +1182,8 @@ Open:
 					 * probably saving mode directly, without passing it through
 					 * openmode. */
 					if (c->mode & O_TRUNC)
-						error("Device '%c' %s open failed to clear OTRUNC",
-						      devtab[c->type].dc, devtab[c->type].name);
+						error("Device %s open failed to clear O_TRUNC",
+						      devtab[c->type].name);
 					break;
 			}
 			break;

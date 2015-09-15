@@ -412,7 +412,6 @@ static long alarmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 }
 
 struct dev alarmdevtab __devtab = {
-	'A',
 	"alarm",
 
 	devreset,

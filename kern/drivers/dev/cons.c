@@ -840,8 +840,7 @@ static long consread(struct chan *c, void *buf, long n, int64_t offset)
 				error(Enomem);
 			l = 0;
 			for (i = 0; &devtab[i] < __devtabend; i++)
-				l += snprintf(p + l, READSTR - l, "#%c %s\n", devtab[i].dc,
-							  devtab[i].name);
+				l += snprintf(p + l, READSTR - l, "#%s\n", devtab[i].name);
 			if (waserror()) {
 				kfree(p);
 				nexterror();
@@ -1061,7 +1060,6 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 }
 
 struct dev consdevtab __devtab = {
-	'c',
 	"cons",
 
 	devreset,

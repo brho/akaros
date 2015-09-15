@@ -45,7 +45,7 @@ devdir(struct chan *c, struct qid qid, char *n,
 	if (c->flag & CMSG)
 		qid.type |= QTMOUNT;
 	db->qid = qid;
-	db->type = devtab[c->type].dc;
+	db->type = c->type;	/* used to use the dev's dc here */
 	db->dev = c->dev;
 	db->mode = perm;
 	db->mode |= qid.type << 24;
@@ -119,7 +119,7 @@ struct chan *devclone(struct chan *c)
 	struct chan *nc;
 
 	if (c->flag & COPEN)
-		panic("clone of open file type %c\n", devtab[c->type].dc);
+		panic("clone of open file type %s\n", devtab[c->type].name);
 
 	nc = newchan();
 
@@ -270,7 +270,7 @@ devstat(struct chan *c, uint8_t * db, int n,
 						error(Ebadarg);
 					return n;
 				}
-				printd("DEVSTAT fails:%c %llu\n", devtab[c->type].dc,
+				printd("DEVSTAT fails:%s %llu\n", devtab[c->type].name,
 					   c->qid.path);
 				set_errno(ENOENT);
 				error(Enonexist);

@@ -416,7 +416,6 @@ struct cname {
 };
 
 struct dev {
-	int dc;
 	char *name;
 
 	void (*reset) (void);

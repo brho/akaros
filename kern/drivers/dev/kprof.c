@@ -611,7 +611,6 @@ void trace_printk(const char *fmt, ...)
 }
 
 struct dev kprofdevtab __devtab = {
-	'K',
 	"kprof",
 
 	devreset,

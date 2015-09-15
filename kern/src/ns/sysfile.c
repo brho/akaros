@@ -808,7 +808,9 @@ int64_t sysseek(int fd, int64_t off, int whence)
 		nexterror();
 	}
 
-	if (devtab[c->type].dc == '|')
+	/* TODO: WTF is this?  Is pipe magically the only device that isn't
+	 * seekable? */
+	if (!strcmp(devtab[c->type].name, "pipe"))
 		error(Eisstream);
 
 	switch (whence) {

@@ -331,7 +331,6 @@ static long srvwrite(struct chan *c, void *va, long count, int64_t offset)
 }
 
 struct dev srvdevtab __devtab = {
-	's',
 	"srv",
 
 	devreset,

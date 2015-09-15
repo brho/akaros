@@ -48,16 +48,13 @@ void devtabshutdown()
 		devtab[i].shutdown();
 }
 
-struct dev *devtabget(int dc, int user)
+struct dev *devtabget(const char *name, int user)
 {
-	int i;
+	int i = devno(name, user);
+	if (i > 0)
+		return &devtab[i];
 
-	for (i = 0; &devtab[i] < __devtabend; i++) {
-		if (devtab[i].dc == dc)
-			return &devtab[i];
-	}
-
-	printk("devtabget FAILED %c\n", dc);
+	printk("devtabget FAILED %s\n", name);
 	set_errno(ENOENT);
 	error(Enonexist);
 }
@@ -79,8 +76,8 @@ long devtabread(struct chan *c, void *buf, long n, int64_t off)
 	for (i = 0; &devtab[i] < __devtabend; i++) {
 		dev = &devtab[i];
 		printd("p %p e %p e-p %d\n", p, e, e - p);
-		printd("do %d %c %s\n", i, dev->dc, dev->name);
-		p += snprintf(p, e - p, "#%c %s\n", dev->dc, dev->name);
+		printd("do %d %s\n", i, dev->name);
+		p += snprintf(p, e - p, "#%s\n", dev->name);
 	}
 
 	if (waserror()) {

@@ -253,7 +253,6 @@ static long pciwrite(struct chan *c, void *va, long n, int64_t offset)
 }
 
 struct dev pcidevtab = {
-	'$',
 	"pci",
 
 	devreset,

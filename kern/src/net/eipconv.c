@@ -132,7 +132,7 @@ void printchan(void (*putch) (int, void **), void **putdat, struct chan *c)
 	printfmt(putch, putdat, "off %p ", c->offset);
 	printfmt(putch, putdat, "type %p ", c->type);
 	if (c->type != -1)
-		printfmt(putch, putdat, "(#%c) ", devtab[c->type].dc);
+		printfmt(putch, putdat, "(#%s) ", devtab[c->type].name);
 	printfmt(putch, putdat, "dev %p ", c->dev);
 	printfmt(putch, putdat, "mode %p ", c->mode);
 	printfmt(putch, putdat, "flag %p ", c->flag);

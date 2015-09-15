@@ -488,7 +488,6 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 }
 
 struct dev archdevtab __devtab = {
-	'P',
 	"arch",
 
 	devreset,

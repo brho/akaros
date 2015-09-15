@@ -1406,7 +1406,6 @@ int iptapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 }
 
 struct dev ipdevtab __devtab = {
-	.dc = 'I',
 	.name = "ip",
 
 	.reset = ipreset,

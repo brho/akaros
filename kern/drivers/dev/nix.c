@@ -525,7 +525,6 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 }
 
 struct dev nixdevtab __devtab = {
-	't',
 	"nix",
 
 	devreset,

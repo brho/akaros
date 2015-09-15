@@ -810,7 +810,6 @@ uint32_t ethercrc(uint8_t * p, int len)
 }
 
 struct dev etherdevtab __devtab = {
-	'l',
 	"ether",
 
 	etherreset,
