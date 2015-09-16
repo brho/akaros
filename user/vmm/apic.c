@@ -21,7 +21,7 @@
 #include <stdint.h>
 #include <err.h>
 #include <sys/mman.h>
-#include <ros/vmm.h>
+#include <vmm/vmm.h>
 #include <vmm/virtio.h>
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_ids.h>
@@ -33,13 +33,6 @@ int debug_apic = 1;
 #define DPRINTF(fmt, ...) \
 	if (debug_apic) { fprintf(stderr, "apic: " fmt , ## __VA_ARGS__); }
 
-
-struct apicinfo {
-	int state; // not used yet. */
-	int id;
-	uint64_t apicbase;
-	uint64_t ioapicbase;
-};
 
 static struct apicinfo apicinfo;
 

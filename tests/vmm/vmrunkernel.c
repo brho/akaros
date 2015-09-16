@@ -14,7 +14,7 @@
 #include <sys/mman.h>
 #include <vmm/coreboot_tables.h>
 #include <vmm/vmm.h>
-#include <acpi/acpi.h>
+#include <vmm/acpi/acpi.h>
 #include <ros/arch/mmu.h>
 #include <ros/vmx.h>
 #include <parlib/uthread.h>
@@ -24,7 +24,6 @@
 #include <vmm/virtio_config.h>
 
 int msrio(struct vmctl *vcpu, uint32_t opcode);
-#if 0
 /* Kind of sad what a total clusterf the pc world is. By 1999, you could just scan the hardware 
  * and work it out. But 2005, that was no longer possible. How sad. 
  * so we have to fake acpi to make it all work. !@#$!@#$#.
@@ -84,7 +83,42 @@ struct acpi_madt_local_apic Apic0 = {.header = {.type = ACPI_MADT_TYPE_LOCAL_API
 				     .processor_id = 0, .id = 0};
 struct acpi_madt_io_apic Apic1 = {.header = {.type = ACPI_MADT_TYPE_IO_APIC, .length = sizeof(struct acpi_madt_io_apic)},
 				  .id = 1, .address = 0xfec00000, .global_irq_base = 0};
-#endif
+struct acpi_madt_interrupt_override isor[] = {
+	/* I have no idea if it should be source irq 2, global 0, or global 2, source 0. Shit. */
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 2, .global_irq = 0, .inti_flags = 0},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 1, .global_irq = 1, .inti_flags = 0},
+	//{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 //.bus = 0, .source_irq = 2, .global_irq = 2, .inti_flags = 0},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 3, .global_irq = 3, .inti_flags = 0},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 4, .global_irq = 4, .inti_flags = 0},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 5, .global_irq = 5, .inti_flags = 0},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 6, .global_irq = 6, .inti_flags = 0},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 7, .global_irq = 7, .inti_flags = 0},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 8, .global_irq = 8, .inti_flags = 0},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 9, .global_irq = 9, .inti_flags = 0},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 10, .global_irq = 10, .inti_flags = 0},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 11, .global_irq = 11, .inti_flags = 0},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 12, .global_irq = 12, .inti_flags = 0},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 13, .global_irq = 13, .inti_flags = 0},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 14, .global_irq = 14, .inti_flags = 0},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 15, .global_irq = 15, .inti_flags = 0},
+};
+
 
 /* this test will run the "kernel" in the negative address space. We hope. */
 void *low1m;
@@ -263,12 +297,10 @@ static void gencsum(uint8_t *target, void *data, int len)
 int main(int argc, char **argv)
 {
 	void *a = (void *)0xe0000;
-#if 0
 	struct acpi_table_rsdp *r;
 	struct acpi_table_fadt *f;
 	struct acpi_table_madt *m;
 	struct acpi_table_xsdt *x;
-#endif
 	uint64_t virtiobase = 0x100000000ULL;
 	// lowmem is a bump allocated pointer to 2M at the "physbase" of memory 
 	void *lowmem = (void *) 0x1000000;
@@ -364,7 +396,6 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 		exit(1);
 	}
 	memset(low1m, 0xff, MiB-4096);
-#if 0
 	r = a;
 	fprintf(stderr, "install rsdp to %p\n", r);
 	*r = rsdp;
@@ -416,6 +447,8 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 	a += sizeof(Apic0);
 	memmove(a, &Apic1, sizeof(Apic1));
 	a += sizeof(Apic1);
+	memmove(a, &isor, sizeof(isor));
+	a += sizeof(isor);
 	m->header.length = a - (void *)m;
 	gencsum(&m->header.checksum, m, m->header.length);
 	if (acpi_tb_checksum((uint8_t *) m, m->header.length) != 0) {
@@ -431,7 +464,6 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 	}
 
 	hexdump(stdout, r, a-(void *)r);
-#endif
 
 	if (ros_syscall(SYS_setup_vmm, nr_gpcs, vmmflags, 0, 0, 0, 0) != nr_gpcs) {
 		perror("Guest pcore setup failed");
@@ -539,16 +571,14 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 				if (debug) printf("DO SOME VIRTIO\n");
 				// Lucky for us the various virtio ops are well-defined.
 				virtio_mmio(&vmctl, gpa, regx, regp, store);
-#if 0
 			} else if ((gpa & 0xfee00000) == 0xfee00000) {
 				// until we fix our include mess, just put the proto here.
 				int apic(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store);
 				apic(&vmctl, gpa, regx, regp, store);
 			} else if ((gpa & 0xfec00000) == 0xfec00000) {
 				// until we fix our include mess, just put the proto here.
-				int ioapic(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store);
-				ioapic(&vmctl, gpa, regx, regp, store);
-#endif
+				int do_ioapic(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store);
+				do_ioapic(&vmctl, gpa, regx, regp, store);
 			} else if (gpa < 4096) {
 				uint64_t val = 0;
 				memmove(&val, &low4k[gpa], size);
