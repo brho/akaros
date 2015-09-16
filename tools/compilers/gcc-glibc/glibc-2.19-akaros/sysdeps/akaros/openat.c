@@ -46,20 +46,6 @@ __openat (fd, file, oflag)
       return -1;
     }
 
-  if (fd != AT_FDCWD && file[0] != '/')
-    {
-      /* Check FD is associated with a directory.  */
-      struct stat64 st;
-      if (__fxstat64 (_STAT_VER, fd, &st) != 0)
-	return -1;
-
-      if (!S_ISDIR (st.st_mode))
-	{
-	  __set_errno (ENOTDIR);
-	  return -1;
-	}
-    }
-
   if (oflag & O_CREAT)
     {
       va_list arg;
