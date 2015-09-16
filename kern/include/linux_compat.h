@@ -766,4 +766,6 @@ static inline bool ether_addr_equal(const uint8_t *addr1, const uint8_t *addr2)
 #endif
 }
 
+#include <linux/compat_todo.h>
+
 #endif /* ROS_KERN_LINUX_COMPAT_H */
