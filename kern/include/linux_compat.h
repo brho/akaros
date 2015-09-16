@@ -23,7 +23,7 @@
 #include <taskqueue.h>
 #include <zlib.h>
 #include <list.h>
-
+#include <linux/errno.h>
 /* temporary dumping ground */
 #include "compat_todo.h"
 
@@ -75,10 +75,13 @@ typedef int gfp_t;
 #define dma_unmap_addr_set(PTR, ADDR_NAME, VAL)  do { } while (0)
 #define dma_unmap_len(PTR, LEN_NAME)             (0)
 #define dma_unmap_len_set(PTR, LEN_NAME, VAL)    do { } while (0)
-#define DMA_NONE				0
-#define DMA_TO_DEVICE			1
-#define DMA_FROM_DEVICE			2
-#define DMA_BIDIRECTIONAL		3
+
+enum dma_data_direction {
+	DMA_BIDIRECTIONAL = 0,
+	DMA_TO_DEVICE = 1,
+	DMA_FROM_DEVICE = 2,
+	DMA_NONE = 3,
+};
 
 static inline void *__dma_alloc_coherent(size_t size, dma_addr_t *dma_handle,
                                          gfp_t flags)
@@ -142,6 +145,7 @@ static inline int __dma_mapping_error(dma_addr_t dma_addr)
 #define dma_unmap_page(...)
 #define dma_set_mask_and_coherent(...) (0)
 #define dma_sync_single_for_cpu(...)
+#define dma_sync_single_for_device(...)
 
 /* Wrappers to avoid struct device.  Might want that one of these days */
 #define dma_alloc_coherent(dev, size, dma_handlep, flag)                       \
@@ -637,6 +641,7 @@ static int pcie_capability_read_word(struct pci_device *dev, int pos,
                                      uint16_t *val)
 {
 	uint32_t pcie_cap;
+	*val = 0;
 	if (pos & 1)
 		return -EINVAL;
 	if (pci_find_cap(dev, PCI_CAP_ID_EXP, &pcie_cap))
@@ -647,7 +652,7 @@ static int pcie_capability_read_word(struct pci_device *dev, int pos,
 
 #define ioremap_nocache(paddr, sz) \
         (void*)vmap_pmem_nocache((uintptr_t)paddr, sz)
-#define ioremap(paddr, sz) (void*)vmap_pmem(paddr, sz)
+#define ioremap(paddr, sz) (void*)vmap_pmem((uintptr_t)paddr, sz)
 #define pci_ioremap_bar(dev, bir) (void*)pci_map_membar(dev, bir)
 #define pci_set_master(x) pci_set_bus_master(x)
 
@@ -679,7 +684,6 @@ static int pcie_capability_read_word(struct pci_device *dev, int pos,
 #define netdev_tx_sent_queue(...)
 #define skb_tx_timestamp(...)
 
-#define EPROBE_DEFER 1
 #define NET_SKB_PAD 0 		/* padding for SKBs.  Ignoring it for now */
 #define MAX_SKB_FRAGS 16	/* we'll probably delete code using this */
 #define VLAN_VID_MASK 0x0fff /* VLAN Identifier */
