@@ -46,7 +46,11 @@
 +__raw_write64(
  ...)
 
-
+@@
+@@
+-iowrite32(
++write32(
+ ...)
 
 @@
 @@
@@ -100,4 +104,16 @@
 @@
 -mmiowb(
 +bus_wmb(
+ ...)
+
+@@
+@@
+-dma_wmb(
++bus_wmb(
+ ...)
+
+@@
+@@
+-dma_rmb(
++bus_rmb(
  ...)

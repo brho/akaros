@@ -7,6 +7,13 @@ typedef qlock_t;
 @@
 expression E;
 @@
+-mutex_init(
++qlock_init(
+ E)
+
+@@
+expression E;
+@@
 -mutex_lock(
 +qlock(
  E)
@@ -50,3 +57,9 @@ expression VARP;
 @@
 -atomic_add(AMT, VARP)
 +atomic_add(VARP, AMT)
+
+@@
+expression E;
+@@
+-atomic_dec_and_test(E)
++atomic_sub_and_test(E, 1)

@@ -33,8 +33,8 @@ expression FL;
 -kcalloc(CNT, SZ, FL)
 +kzmalloc((CNT) * (SZ), FL)
 
-# These are dangerous in Akaros.  If someone is using a page* for multiple
-# pages, it's probably okay, but we should look closely.
+// These are dangerous in Akaros.  If someone is using a page* for multiple
+// pages, it's probably okay, but we should look closely.
 @@
 expression ADDR;
 expression ORDER;
@@ -68,9 +68,21 @@ expression PG;
 +page_decref(PG)
 
 @@
+struct page *page;
+@@
+-page->_count
++page->pg_kref.refcount
+
+@@
 expression KVA;
 @@
 -virt_to_head_page(KVA)
++kva2page(KVA)
+
+@@
+expression KVA;
+@@
+-virt_to_page(KVA)
 +kva2page(KVA)
 
 @@

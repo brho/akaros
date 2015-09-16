@@ -125,10 +125,37 @@ expression E;
 +spin_unlock_irqsave(E)
 
 @@
+expression lock, flags;
+@@
+-spin_lock_irqsave(lock, flags)
++spin_lock_irqsave(lock)
+...
+-spin_unlock_irqrestore(lock, flags)
++spin_unlock_irqsave(lock)
+
+@@
 expression E;
 @@
 -ilog2(E)
 +LOG2_UP(E)
+
+@@
+expression E;
+@@
+-roundup_pow_of_two(E)
++ROUNDUPPWR2(E)
+
+@@
+expression E;
+@@
+-rounddown_pow_of_two(E)
++ROUNDDOWNPWR2(E)
+
+@@
+expression E;
+@@
+-is_power_of_2(E)
++IS_PWR2(E)
 
 @@
 expression DST;

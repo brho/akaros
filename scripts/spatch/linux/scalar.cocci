@@ -13,6 +13,12 @@ typedef uint16_t;
 +uint16_t
 
 @@
+typedef __u16;
+@@
+-__u16
++uint16_t
+
+@@
 typedef u32;
 typedef uint32_t;
 @@
@@ -24,6 +30,12 @@ typedef u64;
 typedef uint64_t;
 @@
 -u64
++uint64_t
+
+@@
+typedef cycle_t;
+@@
+-cycle_t
 +uint64_t
 
 @@
@@ -59,6 +71,18 @@ typedef uint;
 @@
 -uint
 +unsigned int
+
+@@
+typedef __sum16;
+@@
+-__sum16
++uint16_t
+
+@@
+typedef __wsum;
+@@
+-__wsum
++uint32_t
 
 @@
 @@
@@ -118,3 +142,33 @@ struct ether *p;
 @@
 -p->dev_addr
 +p->ea
+
+@@
+struct ether *p;
+expression E;
+@@
+-p->dev_port = E;
+
+@@
+struct ether *p;
+expression E;
+@@
+-p->addr_len = E;
+
+@@
+struct ether *p;
+expression E;
+@@
+-p->netdev_ops = E;
+
+@@
+struct ether *p;
+expression E;
+@@
+-p->watchdog_timeo = E;
+
+@@
+struct ether *p;
+expression E;
+@@
+-p->ethtool_ops = E;
