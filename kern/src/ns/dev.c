@@ -118,11 +118,23 @@ struct chan *devclone(struct chan *c)
 {
 	struct chan *nc;
 
-	if (c->flag & COPEN)
-		panic("clone of open file type %s\n", devtab[c->type].name);
+	/* In plan 9, you couldn't clone an open chan.  We're allowing it, possibly
+	 * foolishly.  The new chan is a non-open, "kernel internal" chan.  Note
+	 * that c->flag isn't set, for instance.  c->mode is, which might be a
+	 * problem.  The newchan should eventually have a device's open called on
+	 * it, at which point it upgrades from a kernel internal chan to one that
+	 * can refer to an object in the device (e.g. grab a refcnt on a
+	 * conversation in #ip).
+	 *
+	 * Either we allow devclones of open chans, or O_PATH walks do not open a
+	 * file.  It's nice to allow the device to do something for O_PATH, but
+	 * perhaps that is not critical.  However, if we can't clone an opened chan,
+	 * then we can *only* openat from an FD that is O_PATH, which is not the
+	 * spec (and not as useful). */
+	if ((c->flag & COPEN) && !(c->flag & O_PATH))
+		panic("clone of non-O_PATH open file type %s\n", devtab[c->type].name);
 
 	nc = newchan();
-
 	nc->type = c->type;
 	nc->dev = c->dev;
 	nc->mode = c->mode;
