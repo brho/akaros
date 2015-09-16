@@ -52,9 +52,9 @@ int mlx4_en_create_cq(struct mlx4_en_priv *priv,
 	struct mlx4_en_cq *cq;
 	int err;
 
-	cq = kzalloc_node(sizeof(*cq), GFP_KERNEL, node);
+	cq = kzalloc_node(sizeof(*cq), KMALLOC_WAIT, node);
 	if (!cq) {
-		cq = kzalloc(sizeof(*cq), GFP_KERNEL);
+		cq = kzmalloc(sizeof(*cq), KMALLOC_WAIT);
 		if (!cq) {
 			en_err(priv, "Failed to allocate CQ structure\n");
 			return -ENOMEM;

@@ -62,14 +62,14 @@ void mlx4_cq_tasklet_cb(unsigned long data)
 	struct mlx4_eq_tasklet *ctx = (struct mlx4_eq_tasklet *)data;
 	struct mlx4_cq *mcq, *temp;
 
-	spin_lock_irqsave(&ctx->lock, flags);
+	spin_lock_irqsave(&ctx->lock);
 	list_splice_tail_init(&ctx->list, &ctx->process_list);
-	spin_unlock_irqrestore(&ctx->lock, flags);
+	spin_unlock_irqsave(&ctx->lock);
 
 	list_for_each_entry_safe(mcq, temp, &ctx->process_list, tasklet_ctx.list) {
 		list_del_init(&mcq->tasklet_ctx.list);
 		mcq->tasklet_ctx.comp(mcq);
-		if (atomic_dec_and_test(&mcq->refcount))
+		if (atomic_sub_and_test(&mcq->refcount, 1))
 			complete(&mcq->free);
 		if (time_after(jiffies, end))
 			break;
@@ -84,7 +84,7 @@ static void mlx4_add_cq_to_tasklet(struct mlx4_cq *cq)
 	unsigned long flags;
 	struct mlx4_eq_tasklet *tasklet_ctx = cq->tasklet_ctx.priv;
 
-	spin_lock_irqsave(&tasklet_ctx->lock, flags);
+	spin_lock_irqsave(&tasklet_ctx->lock);
 	/* When migrating CQs between EQs will be implemented, please note
 	 * that you need to sync this point. It is possible that
 	 * while migrating a CQ, completions on the old EQs could
@@ -94,10 +94,10 @@ static void mlx4_add_cq_to_tasklet(struct mlx4_cq *cq)
 		atomic_inc(&cq->refcount);
 		list_add_tail(&cq->tasklet_ctx.list, &tasklet_ctx->list);
 	}
-	spin_unlock_irqrestore(&tasklet_ctx->lock, flags);
+	spin_unlock_irqsave(&tasklet_ctx->lock);
 }
 
-void mlx4_cq_completion(struct mlx4_dev *dev, u32 cqn)
+void mlx4_cq_completion(struct mlx4_dev *dev, uint32_t cqn)
 {
 	struct mlx4_cq *cq;
 
@@ -113,7 +113,7 @@ void mlx4_cq_completion(struct mlx4_dev *dev, u32 cqn)
 	cq->comp(cq);
 }
 
-void mlx4_cq_event(struct mlx4_dev *dev, u32 cqn, int event_type)
+void mlx4_cq_event(struct mlx4_dev *dev, uint32_t cqn, int event_type)
 {
 	struct mlx4_cq_table *cq_table = &mlx4_priv(dev)->cq_table;
 	struct mlx4_cq *cq;
@@ -133,7 +133,7 @@ void mlx4_cq_event(struct mlx4_dev *dev, u32 cqn, int event_type)
 
 	cq->event(cq, event_type);
 
-	if (atomic_dec_and_test(&cq->refcount))
+	if (atomic_sub_and_test(&cq->refcount, 1))
 		complete(&cq->free);
 }
 
@@ -146,7 +146,7 @@ static int mlx4_SW2HW_CQ(struct mlx4_dev *dev, struct mlx4_cmd_mailbox *mailbox,
 }
 
 static int mlx4_MODIFY_CQ(struct mlx4_dev *dev, struct mlx4_cmd_mailbox *mailbox,
-			 int cq_num, u32 opmod)
+			 int cq_num, uint32_t opmod)
 {
 	return mlx4_cmd(dev, mailbox->dma, cq_num, opmod, MLX4_CMD_MODIFY_CQ,
 			MLX4_CMD_TIME_CLASS_A, MLX4_CMD_WRAPPED);
@@ -161,7 +161,7 @@ static int mlx4_HW2SW_CQ(struct mlx4_dev *dev, struct mlx4_cmd_mailbox *mailbox,
 }
 
 int mlx4_cq_modify(struct mlx4_dev *dev, struct mlx4_cq *cq,
-		   u16 count, u16 period)
+		   uint16_t count, uint16_t period)
 {
 	struct mlx4_cmd_mailbox *mailbox;
 	struct mlx4_cq_context *cq_context;
@@ -187,7 +187,7 @@ int mlx4_cq_resize(struct mlx4_dev *dev, struct mlx4_cq *cq,
 {
 	struct mlx4_cmd_mailbox *mailbox;
 	struct mlx4_cq_context *cq_context;
-	u64 mtt_addr;
+	uint64_t mtt_addr;
 	int err;
 
 	mailbox = mlx4_alloc_cmd_mailbox(dev);
@@ -195,7 +195,7 @@ int mlx4_cq_resize(struct mlx4_dev *dev, struct mlx4_cq *cq,
 		return PTR_ERR(mailbox);
 
 	cq_context = mailbox->buf;
-	cq_context->logsize_usrpage = cpu_to_be32(ilog2(entries) << 24);
+	cq_context->logsize_usrpage = cpu_to_be32(LOG2_UP(entries) << 24);
 	cq_context->log_page_size   = mtt->page_shift - 12;
 	mtt_addr = mlx4_mtt_addr(dev, mtt);
 	cq_context->mtt_base_addr_h = mtt_addr >> 32;
@@ -218,11 +218,11 @@ int __mlx4_cq_alloc_icm(struct mlx4_dev *dev, int *cqn)
 	if (*cqn == -1)
 		return -ENOMEM;
 
-	err = mlx4_table_get(dev, &cq_table->table, *cqn, GFP_KERNEL);
+	err = mlx4_table_get(dev, &cq_table->table, *cqn, KMALLOC_WAIT);
 	if (err)
 		goto err_out;
 
-	err = mlx4_table_get(dev, &cq_table->cmpt_table, *cqn, GFP_KERNEL);
+	err = mlx4_table_get(dev, &cq_table->cmpt_table, *cqn, KMALLOC_WAIT);
 	if (err)
 		goto err_put;
 	return 0;
@@ -237,7 +237,7 @@ err_out:
 
 static int mlx4_cq_alloc_icm(struct mlx4_dev *dev, int *cqn)
 {
-	u64 out_param;
+	uint64_t out_param;
 	int err;
 
 	if (mlx4_is_mfunc(dev)) {
@@ -266,7 +266,7 @@ void __mlx4_cq_free_icm(struct mlx4_dev *dev, int cqn)
 
 static void mlx4_cq_free_icm(struct mlx4_dev *dev, int cqn)
 {
-	u64 in_param = 0;
+	uint64_t in_param = 0;
 	int err;
 
 	if (mlx4_is_mfunc(dev)) {
@@ -281,7 +281,7 @@ static void mlx4_cq_free_icm(struct mlx4_dev *dev, int cqn)
 }
 
 int mlx4_cq_alloc(struct mlx4_dev *dev, int nent,
-		  struct mlx4_mtt *mtt, struct mlx4_uar *uar, u64 db_rec,
+		  struct mlx4_mtt *mtt, struct mlx4_uar *uar, uint64_t db_rec,
 		  struct mlx4_cq *cq, unsigned vector, int collapsed,
 		  int timestamp_en)
 {
@@ -289,7 +289,7 @@ int mlx4_cq_alloc(struct mlx4_dev *dev, int nent,
 	struct mlx4_cq_table *cq_table = &priv->cq_table;
 	struct mlx4_cmd_mailbox *mailbox;
 	struct mlx4_cq_context *cq_context;
-	u64 mtt_addr;
+	uint64_t mtt_addr;
 	int err;
 
 	if (vector > dev->caps.num_comp_vectors + dev->caps.comp_pool)
@@ -301,9 +301,9 @@ int mlx4_cq_alloc(struct mlx4_dev *dev, int nent,
 	if (err)
 		return err;
 
-	spin_lock_irq(&cq_table->lock);
+	spin_lock_irqsave(&cq_table->lock);
 	err = radix_tree_insert(&cq_table->tree, cq->cqn, cq);
-	spin_unlock_irq(&cq_table->lock);
+	spin_unlock_irqsave(&cq_table->lock);
 	if (err)
 		goto err_icm;
 
@@ -318,7 +318,7 @@ int mlx4_cq_alloc(struct mlx4_dev *dev, int nent,
 	if (timestamp_en)
 		cq_context->flags  |= cpu_to_be32(1 << 19);
 
-	cq_context->logsize_usrpage = cpu_to_be32((ilog2(nent) << 24) | uar->index);
+	cq_context->logsize_usrpage = cpu_to_be32((LOG2_UP(nent) << 24) | uar->index);
 	cq_context->comp_eqn	    = priv->eq_table.eq[vector].eqn;
 	cq_context->log_page_size   = mtt->page_shift - MLX4_ICM_PAGE_SHIFT;
 
@@ -347,9 +347,9 @@ int mlx4_cq_alloc(struct mlx4_dev *dev, int nent,
 	return 0;
 
 err_radix:
-	spin_lock_irq(&cq_table->lock);
+	spin_lock_irqsave(&cq_table->lock);
 	radix_tree_delete(&cq_table->tree, cq->cqn);
-	spin_unlock_irq(&cq_table->lock);
+	spin_unlock_irqsave(&cq_table->lock);
 
 err_icm:
 	mlx4_cq_free_icm(dev, cq->cqn);
@@ -370,11 +370,11 @@ void mlx4_cq_free(struct mlx4_dev *dev, struct mlx4_cq *cq)
 
 	synchronize_irq(priv->eq_table.eq[cq->vector].irq);
 
-	spin_lock_irq(&cq_table->lock);
+	spin_lock_irqsave(&cq_table->lock);
 	radix_tree_delete(&cq_table->tree, cq->cqn);
-	spin_unlock_irq(&cq_table->lock);
+	spin_unlock_irqsave(&cq_table->lock);
 
-	if (atomic_dec_and_test(&cq->refcount))
+	if (atomic_sub_and_test(&cq->refcount, 1))
 		complete(&cq->free);
 	wait_for_completion(&cq->free);
 
@@ -387,8 +387,8 @@ int mlx4_init_cq_table(struct mlx4_dev *dev)
 	struct mlx4_cq_table *cq_table = &mlx4_priv(dev)->cq_table;
 	int err;
 
-	spin_lock_init(&cq_table->lock);
-	INIT_RADIX_TREE(&cq_table->tree, GFP_ATOMIC);
+	spinlock_init_irqsave(&cq_table->lock);
+	INIT_RADIX_TREE(&cq_table->tree, 0);
 	if (mlx4_is_slave(dev))
 		return 0;
 

@@ -42,21 +42,21 @@ void mlx4_en_fill_qp_context(struct mlx4_en_priv *priv, int size, int stride,
 			     int user_prio, struct mlx4_qp_context *context)
 {
 	struct mlx4_en_dev *mdev = priv->mdev;
-	struct net_device *dev = priv->dev;
+	struct ether *dev = priv->dev;
 
 	memset(context, 0, sizeof *context);
 	context->flags = cpu_to_be32(7 << 16 | rss << MLX4_RSS_QPC_FLAG_OFFSET);
 	context->pd = cpu_to_be32(mdev->priv_pdn);
 	context->mtu_msgmax = 0xff;
 	if (!is_tx && !rss)
-		context->rq_size_stride = ilog2(size) << 3 | (ilog2(stride) - 4);
+		context->rq_size_stride = LOG2_UP(size) << 3 | (LOG2_UP(stride) - 4);
 	if (is_tx) {
-		context->sq_size_stride = ilog2(size) << 3 | (ilog2(stride) - 4);
+		context->sq_size_stride = LOG2_UP(size) << 3 | (LOG2_UP(stride) - 4);
 		if (mdev->dev->caps.flags2 & MLX4_DEV_CAP_FLAG2_PORT_REMAP)
 			context->params2 |= MLX4_QP_BIT_FPP;
 
 	} else {
-		context->sq_size_stride = ilog2(TXBB_SIZE) - 4;
+		context->sq_size_stride = LOG2_UP(TXBB_SIZE) - 4;
 	}
 	context->usr_page = cpu_to_be32(mdev->priv_uar.index);
 	context->local_qpn = cpu_to_be32(qpn);
@@ -70,7 +70,7 @@ void mlx4_en_fill_qp_context(struct mlx4_en_priv *priv, int size, int stride,
 	context->cqn_send = cpu_to_be32(cqn);
 	context->cqn_recv = cpu_to_be32(cqn);
 	context->db_rec_addr = cpu_to_be64(priv->res.db.dma << 2);
-	if (!(dev->features & NETIF_F_HW_VLAN_CTAG_RX))
+	if (!(dev->feat & NETIF_F_HW_VLAN_CTAG_RX))
 		context->param3 |= cpu_to_be32(1 << 30);
 
 	if (!is_tx && !rss &&
@@ -89,12 +89,12 @@ int mlx4_en_map_buffer(struct mlx4_buf *buf)
 	if (BITS_PER_LONG == 64 || buf->nbufs == 1)
 		return 0;
 
-	pages = kmalloc(sizeof *pages * buf->nbufs, GFP_KERNEL);
+	pages = kmalloc(sizeof *pages * buf->nbufs, KMALLOC_WAIT);
 	if (!pages)
 		return -ENOMEM;
 
 	for (i = 0; i < buf->nbufs; ++i)
-		pages[i] = virt_to_page(buf->page_list[i].buf);
+		pages[i] = kva2page(buf->page_list[i].buf);
 
 	buf->direct.buf = vmap(pages, buf->nbufs, VM_MAP, PAGE_KERNEL);
 	kfree(pages);

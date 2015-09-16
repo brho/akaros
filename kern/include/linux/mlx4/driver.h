@@ -58,7 +58,8 @@ struct mlx4_interface {
 	void			(*remove)(struct mlx4_dev *dev, void *context);
 	void			(*event) (struct mlx4_dev *dev, void *context,
 					  enum mlx4_dev_event event, unsigned long param);
-	void *			(*get_dev)(struct mlx4_dev *dev, void *context, u8 port);
+	void *			(*get_dev)(struct mlx4_dev *dev, void *context,
+						 uint8_t port);
 	struct list_head	list;
 	enum mlx4_protocol	protocol;
 	int			flags;
@@ -75,20 +76,20 @@ static inline int mlx4_is_bonded(struct mlx4_dev *dev)
 }
 
 struct mlx4_port_map {
-	u8	port1;
-	u8	port2;
+	uint8_t	port1;
+	uint8_t	port2;
 };
 
 int mlx4_port_map_set(struct mlx4_dev *dev, struct mlx4_port_map *v2p);
 
 void *mlx4_get_protocol_dev(struct mlx4_dev *dev, enum mlx4_protocol proto, int port);
 
-static inline u64 mlx4_mac_to_u64(u8 *addr)
+static inline uint64_t mlx4_mac_to_u64(uint8_t *addr)
 {
-	u64 mac = 0;
+	uint64_t mac = 0;
 	int i;
 
-	for (i = 0; i < ETH_ALEN; i++) {
+	for (i = 0; i < Eaddrlen; i++) {
 		mac <<= 8;
 		mac |= addr[i];
 	}

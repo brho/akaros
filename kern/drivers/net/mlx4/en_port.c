@@ -48,7 +48,7 @@ int mlx4_SET_VLAN_FLTR(struct mlx4_dev *dev, struct mlx4_en_priv *priv)
 	int i;
 	int j;
 	int index = 0;
-	u32 entry;
+	uint32_t entry;
 	int err = 0;
 
 	mailbox = mlx4_alloc_cmd_mailbox(dev);
@@ -69,7 +69,7 @@ int mlx4_SET_VLAN_FLTR(struct mlx4_dev *dev, struct mlx4_en_priv *priv)
 	return err;
 }
 
-int mlx4_en_QUERY_PORT(struct mlx4_en_dev *mdev, u8 port)
+int mlx4_en_QUERY_PORT(struct mlx4_en_dev *mdev, uint8_t port)
 {
 	struct mlx4_en_query_port_context *qport_context;
 	struct mlx4_en_priv *priv = netdev_priv(mdev->pndev[port]);
@@ -147,14 +147,15 @@ static unsigned long en_stats_adder(__be64 *start, __be64 *next, int num)
 	return ret;
 }
 
-int mlx4_en_DUMP_ETH_STATS(struct mlx4_en_dev *mdev, u8 port, u8 reset)
+int mlx4_en_DUMP_ETH_STATS(struct mlx4_en_dev *mdev, uint8_t port,
+			   uint8_t reset)
 {
 	struct mlx4_en_stat_out_mbox *mlx4_en_stats;
 	struct mlx4_en_stat_out_flow_control_mbox *flowstats;
 	struct mlx4_en_priv *priv = netdev_priv(mdev->pndev[port]);
 	struct net_device_stats *stats = &priv->stats;
 	struct mlx4_cmd_mailbox *mailbox;
-	u64 in_mod = reset << 8 | port;
+	uint64_t in_mod = reset << 8 | port;
 	int err;
 	int i;
 
@@ -169,7 +170,7 @@ int mlx4_en_DUMP_ETH_STATS(struct mlx4_en_dev *mdev, u8 port, u8 reset)
 
 	mlx4_en_stats = mailbox->buf;
 
-	spin_lock_bh(&priv->stats_lock);
+	spin_lock(&priv->stats_lock);
 
 	stats->rx_packets = 0;
 	stats->rx_bytes = 0;
@@ -294,7 +295,7 @@ int mlx4_en_DUMP_ETH_STATS(struct mlx4_en_dev *mdev, u8 port, u8 reset)
 	priv->pkstats.tx_prio[8][0] = be64_to_cpu(mlx4_en_stats->TTOT_novlan);
 	priv->pkstats.tx_prio[8][1] = be64_to_cpu(mlx4_en_stats->TOCT_novlan);
 
-	spin_unlock_bh(&priv->stats_lock);
+	spin_unlock(&priv->stats_lock);
 
 	/* 0xffs indicates invalid value */
 	memset(mailbox->buf, 0xff, sizeof(*flowstats) * MLX4_NUM_PRIORITIES);
@@ -312,7 +313,7 @@ int mlx4_en_DUMP_ETH_STATS(struct mlx4_en_dev *mdev, u8 port, u8 reset)
 
 	flowstats = mailbox->buf;
 
-	spin_lock_bh(&priv->stats_lock);
+	spin_lock(&priv->stats_lock);
 
 	for (i = 0; i < MLX4_NUM_PRIORITIES; i++)	{
 		priv->rx_priority_flowstats[i].rx_pause =
@@ -343,7 +344,7 @@ int mlx4_en_DUMP_ETH_STATS(struct mlx4_en_dev *mdev, u8 port, u8 reset)
 	priv->tx_flowstats.tx_pause_transition =
 		be64_to_cpu(flowstats[0].tx_pause_transition);
 
-	spin_unlock_bh(&priv->stats_lock);
+	spin_unlock(&priv->stats_lock);
 
 out:
 	mlx4_free_cmd_mailbox(mdev->dev, mailbox);

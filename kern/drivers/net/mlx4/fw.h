@@ -39,28 +39,28 @@
 #include "icm.h"
 
 struct mlx4_mod_stat_cfg {
-	u8 log_pg_sz;
-	u8 log_pg_sz_m;
+	uint8_t log_pg_sz;
+	uint8_t log_pg_sz_m;
 };
 
 struct mlx4_port_cap {
-	u8  supported_port_types;
-	u8  suggested_type;
-	u8  default_sense;
-	u8  log_max_macs;
-	u8  log_max_vlans;
+	uint8_t  supported_port_types;
+	uint8_t  suggested_type;
+	uint8_t  default_sense;
+	uint8_t  log_max_macs;
+	uint8_t  log_max_vlans;
 	int ib_mtu;
 	int max_port_width;
 	int max_vl;
 	int max_gids;
 	int max_pkeys;
-	u64 def_mac;
-	u16 eth_mtu;
+	uint64_t def_mac;
+	uint16_t eth_mtu;
 	int trans_type;
 	int vendor_oui;
-	u16 wavelength;
-	u64 trans_code;
-	u8 dmfs_optimized_state;
+	uint16_t wavelength;
+	uint64_t trans_code;
+	uint8_t dmfs_optimized_state;
 };
 
 struct mlx4_dev_cap {
@@ -86,12 +86,12 @@ struct mlx4_dev_cap {
 	int max_rdma_global;
 	int local_ca_ack_delay;
 	int num_ports;
-	u32 max_msg_sz;
-	u16 stat_rate_support;
+	uint32_t max_msg_sz;
+	uint16_t stat_rate_support;
 	int fs_log_max_ucast_qp_range_size;
 	int fs_max_num_qp_per_entry;
-	u64 flags;
-	u64 flags2;
+	uint64_t flags;
+	uint64_t flags2;
 	int reserved_uars;
 	int uar_size;
 	int min_page_sz;
@@ -119,22 +119,22 @@ struct mlx4_dev_cap {
 	int cmpt_entry_sz;
 	int mtt_entry_sz;
 	int resize_srq;
-	u32 bmme_flags;
-	u32 reserved_lkey;
-	u64 max_icm_sz;
+	uint32_t bmme_flags;
+	uint32_t reserved_lkey;
+	uint64_t max_icm_sz;
 	int max_gso_sz;
 	int max_rss_tbl_sz;
-	u32 max_counters;
-	u32 dmfs_high_rate_qpn_base;
-	u32 dmfs_high_rate_qpn_range;
+	uint32_t max_counters;
+	uint32_t dmfs_high_rate_qpn_base;
+	uint32_t dmfs_high_rate_qpn_range;
 	struct mlx4_rate_limit_caps rl_caps;
 	struct mlx4_port_cap port_cap[MLX4_MAX_PORTS + 1];
 };
 
 struct mlx4_func_cap {
-	u8	num_ports;
-	u8	flags;
-	u32	pf_context_behaviour;
+	uint8_t	num_ports;
+	uint8_t	flags;
+	uint32_t	pf_context_behaviour;
 	int	qp_quota;
 	int	cq_quota;
 	int	srq_quota;
@@ -143,17 +143,17 @@ struct mlx4_func_cap {
 	int	max_eq;
 	int	reserved_eq;
 	int	mcg_quota;
-	u32	qp0_qkey;
-	u32	qp0_tunnel_qpn;
-	u32	qp0_proxy_qpn;
-	u32	qp1_tunnel_qpn;
-	u32	qp1_proxy_qpn;
-	u32	reserved_lkey;
-	u8	physical_port;
-	u8	port_flags;
-	u8	flags1;
-	u64	phys_port_id;
-	u32	extra_flags;
+	uint32_t	qp0_qkey;
+	uint32_t	qp0_tunnel_qpn;
+	uint32_t	qp0_proxy_qpn;
+	uint32_t	qp1_tunnel_qpn;
+	uint32_t	qp1_proxy_qpn;
+	uint32_t	reserved_lkey;
+	uint8_t	physical_port;
+	uint8_t	port_flags;
+	uint8_t	flags1;
+	uint64_t	phys_port_id;
+	uint32_t	extra_flags;
 };
 
 struct mlx4_func {
@@ -168,69 +168,69 @@ struct mlx4_func {
 
 struct mlx4_adapter {
 	char board_id[MLX4_BOARD_ID_LEN];
-	u8   inta_pin;
+	uint8_t   inta_pin;
 };
 
 struct mlx4_init_hca_param {
-	u64 qpc_base;
-	u64 rdmarc_base;
-	u64 auxc_base;
-	u64 altc_base;
-	u64 srqc_base;
-	u64 cqc_base;
-	u64 eqc_base;
-	u64 mc_base;
-	u64 dmpt_base;
-	u64 cmpt_base;
-	u64 mtt_base;
-	u64 global_caps;
-	u16 log_mc_entry_sz;
-	u16 log_mc_hash_sz;
-	u16 hca_core_clock; /* Internal Clock Frequency (in MHz) */
-	u8  log_num_qps;
-	u8  log_num_srqs;
-	u8  log_num_cqs;
-	u8  log_num_eqs;
-	u16 num_sys_eqs;
-	u8  log_rd_per_qp;
-	u8  log_mc_table_sz;
-	u8  log_mpt_sz;
-	u8  log_uar_sz;
-	u8  mw_enabled;  /* Enable memory windows */
-	u8  uar_page_sz; /* log pg sz in 4k chunks */
-	u8  steering_mode; /* for QUERY_HCA */
-	u8  dmfs_high_steer_mode; /* for QUERY_HCA */
-	u64 dev_cap_enabled;
-	u16 cqe_size; /* For use only when CQE stride feature enabled */
-	u16 eqe_size; /* For use only when EQE stride feature enabled */
-	u8 rss_ip_frags;
+	uint64_t qpc_base;
+	uint64_t rdmarc_base;
+	uint64_t auxc_base;
+	uint64_t altc_base;
+	uint64_t srqc_base;
+	uint64_t cqc_base;
+	uint64_t eqc_base;
+	uint64_t mc_base;
+	uint64_t dmpt_base;
+	uint64_t cmpt_base;
+	uint64_t mtt_base;
+	uint64_t global_caps;
+	uint16_t log_mc_entry_sz;
+	uint16_t log_mc_hash_sz;
+	uint16_t hca_core_clock; /* Internal Clock Frequency (in MHz) */
+	uint8_t  log_num_qps;
+	uint8_t  log_num_srqs;
+	uint8_t  log_num_cqs;
+	uint8_t  log_num_eqs;
+	uint16_t num_sys_eqs;
+	uint8_t  log_rd_per_qp;
+	uint8_t  log_mc_table_sz;
+	uint8_t  log_mpt_sz;
+	uint8_t  log_uar_sz;
+	uint8_t  mw_enabled;  /* Enable memory windows */
+	uint8_t  uar_page_sz; /* log pg sz in 4k chunks */
+	uint8_t  steering_mode; /* for QUERY_HCA */
+	uint8_t  dmfs_high_steer_mode; /* for QUERY_HCA */
+	uint64_t dev_cap_enabled;
+	uint16_t cqe_size; /* For use only when CQE stride feature enabled */
+	uint16_t eqe_size; /* For use only when EQE stride feature enabled */
+	uint8_t rss_ip_frags;
 };
 
 struct mlx4_init_ib_param {
 	int port_width;
 	int vl_cap;
 	int mtu_cap;
-	u16 gid_cap;
-	u16 pkey_cap;
+	uint16_t gid_cap;
+	uint16_t pkey_cap;
 	int set_guid0;
-	u64 guid0;
+	uint64_t guid0;
 	int set_node_guid;
-	u64 node_guid;
+	uint64_t node_guid;
 	int set_si_guid;
-	u64 si_guid;
+	uint64_t si_guid;
 };
 
 struct mlx4_set_ib_param {
 	int set_si_guid;
 	int reset_qkey_viol;
-	u64 si_guid;
-	u32 cap_mask;
+	uint64_t si_guid;
+	uint32_t cap_mask;
 };
 
 void mlx4_dev_cap_dump(struct mlx4_dev *dev, struct mlx4_dev_cap *dev_cap);
 int mlx4_QUERY_DEV_CAP(struct mlx4_dev *dev, struct mlx4_dev_cap *dev_cap);
 int mlx4_QUERY_PORT(struct mlx4_dev *dev, int port, struct mlx4_port_cap *port_cap);
-int mlx4_QUERY_FUNC_CAP(struct mlx4_dev *dev, u8 gen_or_port,
+int mlx4_QUERY_FUNC_CAP(struct mlx4_dev *dev, uint8_t gen_or_port,
 			struct mlx4_func_cap *func_cap);
 int mlx4_QUERY_FUNC_CAP_wrapper(struct mlx4_dev *dev, int slave,
 				struct mlx4_vhcr *vhcr,
@@ -246,8 +246,10 @@ int mlx4_QUERY_ADAPTER(struct mlx4_dev *dev, struct mlx4_adapter *adapter);
 int mlx4_INIT_HCA(struct mlx4_dev *dev, struct mlx4_init_hca_param *param);
 int mlx4_QUERY_HCA(struct mlx4_dev *dev, struct mlx4_init_hca_param *param);
 int mlx4_CLOSE_HCA(struct mlx4_dev *dev, int panic);
-int mlx4_map_cmd(struct mlx4_dev *dev, u16 op, struct mlx4_icm *icm, u64 virt);
-int mlx4_SET_ICM_SIZE(struct mlx4_dev *dev, u64 icm_size, u64 *aux_pages);
+int mlx4_map_cmd(struct mlx4_dev *dev, uint16_t op, struct mlx4_icm *icm,
+		 uint64_t virt);
+int mlx4_SET_ICM_SIZE(struct mlx4_dev *dev, uint64_t icm_size,
+		      uint64_t *aux_pages);
 int mlx4_MAP_ICM_AUX(struct mlx4_dev *dev, struct mlx4_icm *icm);
 int mlx4_UNMAP_ICM_AUX(struct mlx4_dev *dev);
 int mlx4_NOP(struct mlx4_dev *dev);

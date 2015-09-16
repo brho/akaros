@@ -126,33 +126,33 @@ enum {
 struct mlx4_rss_context {
 	__be32			base_qpn;
 	__be32			default_qpn;
-	u16			reserved;
-	u8			hash_fn;
-	u8			flags;
+	uint16_t			reserved;
+	uint8_t			hash_fn;
+	uint8_t			flags;
 	__be32			rss_key[MLX4_EN_RSS_KEY_SIZE / sizeof(__be32)];
 	__be32			base_qpn_udp;
 };
 
 struct mlx4_qp_path {
-	u8			fl;
-	u8			vlan_control;
-	u8			disable_pkey_check;
-	u8			pkey_index;
-	u8			counter_index;
-	u8			grh_mylmc;
+	uint8_t			fl;
+	uint8_t			vlan_control;
+	uint8_t			disable_pkey_check;
+	uint8_t			pkey_index;
+	uint8_t			counter_index;
+	uint8_t			grh_mylmc;
 	__be16			rlid;
-	u8			ackto;
-	u8			mgid_index;
-	u8			static_rate;
-	u8			hop_limit;
+	uint8_t			ackto;
+	uint8_t			mgid_index;
+	uint8_t			static_rate;
+	uint8_t			hop_limit;
 	__be32			tclass_flowlabel;
-	u8			rgid[16];
-	u8			sched_queue;
-	u8			vlan_index;
-	u8			feup;
-	u8			fvl_rx;
-	u8			reserved4[2];
-	u8			dmac[ETH_ALEN];
+	uint8_t			rgid[16];
+	uint8_t			sched_queue;
+	uint8_t			vlan_index;
+	uint8_t			feup;
+	uint8_t			fvl_rx;
+	uint8_t			reserved4[2];
+	uint8_t			dmac[Eaddrlen];
 };
 
 enum { /* fl */
@@ -181,20 +181,20 @@ enum { /* fvl_rx */
 struct mlx4_qp_context {
 	__be32			flags;
 	__be32			pd;
-	u8			mtu_msgmax;
-	u8			rq_size_stride;
-	u8			sq_size_stride;
-	u8			rlkey;
+	uint8_t			mtu_msgmax;
+	uint8_t			rq_size_stride;
+	uint8_t			sq_size_stride;
+	uint8_t			rlkey;
 	__be32			usr_page;
 	__be32			local_qpn;
 	__be32			remote_qpn;
 	struct			mlx4_qp_path pri_path;
 	struct			mlx4_qp_path alt_path;
 	__be32			params1;
-	u32			reserved1;
+	uint32_t			reserved1;
 	__be32			next_send_psn;
 	__be32			cqn_send;
-	u32			reserved2[2];
+	uint32_t			reserved2[2];
 	__be32			last_acked_psn;
 	__be32			ssn;
 	__be32			params2;
@@ -207,26 +207,26 @@ struct mlx4_qp_context {
 	__be32			msn;
 	__be16			rq_wqe_counter;
 	__be16			sq_wqe_counter;
-	u32			reserved3;
+	uint32_t			reserved3;
 	__be16			rate_limit_params;
-	u8			reserved4;
-	u8			qos_vport;
+	uint8_t			reserved4;
+	uint8_t			qos_vport;
 	__be32			param3;
 	__be32			nummmcpeers_basemkey;
-	u8			log_page_size;
-	u8			reserved5[2];
-	u8			mtt_base_addr_h;
+	uint8_t			log_page_size;
+	uint8_t			reserved5[2];
+	uint8_t			mtt_base_addr_h;
 	__be32			mtt_base_addr_l;
-	u32			reserved6[10];
+	uint32_t			reserved6[10];
 };
 
 struct mlx4_update_qp_context {
 	__be64			qp_mask;
 	__be64			primary_addr_path_mask;
 	__be64			secondary_addr_path_mask;
-	u64			reserved1;
+	uint64_t			reserved1;
 	struct mlx4_qp_context	qp_context;
-	u64			reserved2[58];
+	uint64_t			reserved2[58];
 };
 
 enum {
@@ -282,8 +282,8 @@ struct mlx4_wqe_ctrl_seg {
 	union {
 		struct {
 			__be16			vlan_tag;
-			u8			ins_vlan;
-			u8			fence_size;
+			uint8_t			ins_vlan;
+			uint8_t			fence_size;
 		};
 		__be32			bf_qpn;
 	};
@@ -314,12 +314,12 @@ enum {
 };
 
 struct mlx4_wqe_mlx_seg {
-	u8			owner;
-	u8			reserved1[2];
-	u8			opcode;
+	uint8_t			owner;
+	uint8_t			reserved1[2];
+	uint8_t			opcode;
 	__be16			sched_prio;
-	u8			reserved2;
-	u8			size;
+	uint8_t			reserved2;
+	uint8_t			size;
 	/*
 	 * [17]    VL15
 	 * [16]    SLR
@@ -331,7 +331,7 @@ struct mlx4_wqe_mlx_seg {
 	 */
 	__be32			flags;
 	__be16			rlid;
-	u16			reserved3;
+	uint16_t			reserved3;
 };
 
 struct mlx4_wqe_datagram_seg {
@@ -339,7 +339,7 @@ struct mlx4_wqe_datagram_seg {
 	__be32			dqpn;
 	__be32			qkey;
 	__be16			vlan;
-	u8			mac[ETH_ALEN];
+	uint8_t			mac[Eaddrlen];
 };
 
 struct mlx4_wqe_lso_seg {
@@ -377,12 +377,12 @@ struct mlx4_wqe_fmr_seg {
 	__be64			reg_len;
 	__be32			offset;
 	__be32			page_size;
-	u32			reserved[2];
+	uint32_t			reserved[2];
 };
 
 struct mlx4_wqe_fmr_ext_seg {
-	u8			flags;
-	u8			reserved;
+	uint8_t			flags;
+	uint8_t			reserved;
 	__be16			app_mask;
 	__be16			wire_app_tag;
 	__be16			mem_app_tag;
@@ -391,16 +391,16 @@ struct mlx4_wqe_fmr_ext_seg {
 };
 
 struct mlx4_wqe_local_inval_seg {
-	u64			reserved1;
+	uint64_t			reserved1;
 	__be32			mem_key;
-	u32			reserved2;
-	u64			reserved3[2];
+	uint32_t			reserved2;
+	uint64_t			reserved3[2];
 };
 
 struct mlx4_wqe_raddr_seg {
 	__be64			raddr;
 	__be32			rkey;
-	u32			reserved;
+	uint32_t			reserved;
 };
 
 struct mlx4_wqe_atomic_seg {
@@ -443,14 +443,14 @@ enum mlx4_update_qp_params_flags {
 };
 
 struct mlx4_update_qp_params {
-	u8	smac_index;
-	u8	qos_vport;
-	u32	flags;
-	u16	rate_unit;
-	u16	rate_val;
+	uint8_t	smac_index;
+	uint8_t	qos_vport;
+	uint32_t	flags;
+	uint16_t	rate_unit;
+	uint16_t	rate_val;
 };
 
-int mlx4_update_qp(struct mlx4_dev *dev, u32 qpn,
+int mlx4_update_qp(struct mlx4_dev *dev, uint32_t qpn,
 		   enum mlx4_update_qp_attr attr,
 		   struct mlx4_update_qp_params *params);
 int mlx4_qp_modify(struct mlx4_dev *dev, struct mlx4_mtt *mtt,
@@ -465,7 +465,8 @@ int mlx4_qp_to_ready(struct mlx4_dev *dev, struct mlx4_mtt *mtt,
 		     struct mlx4_qp_context *context,
 		     struct mlx4_qp *qp, enum mlx4_qp_state *qp_state);
 
-static inline struct mlx4_qp *__mlx4_qp_lookup(struct mlx4_dev *dev, u32 qpn)
+static inline struct mlx4_qp *__mlx4_qp_lookup(struct mlx4_dev *dev,
+					       uint32_t qpn)
 {
 	return radix_tree_lookup(&dev->qp_table_tree, qpn & (dev->caps.num_qps - 1));
 }

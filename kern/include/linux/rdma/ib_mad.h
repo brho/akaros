@@ -138,10 +138,10 @@ enum {
 };
 
 struct ib_mad_hdr {
-	u8	base_version;
-	u8	mgmt_class;
-	u8	class_version;
-	u8	method;
+	uint8_t	base_version;
+	uint8_t	mgmt_class;
+	uint8_t	class_version;
+	uint8_t	method;
 	__be16	status;
 	__be16	class_specific;
 	__be64	tid;
@@ -151,15 +151,15 @@ struct ib_mad_hdr {
 };
 
 struct ib_rmpp_hdr {
-	u8	rmpp_version;
-	u8	rmpp_type;
-	u8	rmpp_rtime_flags;
-	u8	rmpp_status;
+	uint8_t	rmpp_version;
+	uint8_t	rmpp_type;
+	uint8_t	rmpp_rtime_flags;
+	uint8_t	rmpp_status;
 	__be32	seg_num;
 	__be32	paylen_newwin;
 };
 
-typedef u64 __bitwise ib_sa_comp_mask;
+typedef uint64_t __bitwise ib_sa_comp_mask;
 
 #define IB_SA_COMP_MASK(n) ((__force ib_sa_comp_mask) cpu_to_be64(1ull << (n)))
 
@@ -178,43 +178,43 @@ struct ib_sa_hdr {
 
 struct ib_mad {
 	struct ib_mad_hdr	mad_hdr;
-	u8			data[IB_MGMT_MAD_DATA];
+	uint8_t			data[IB_MGMT_MAD_DATA];
 };
 
 struct ib_rmpp_mad {
 	struct ib_mad_hdr	mad_hdr;
 	struct ib_rmpp_hdr	rmpp_hdr;
-	u8			data[IB_MGMT_RMPP_DATA];
+	uint8_t			data[IB_MGMT_RMPP_DATA];
 };
 
 struct ib_sa_mad {
 	struct ib_mad_hdr	mad_hdr;
 	struct ib_rmpp_hdr	rmpp_hdr;
 	struct ib_sa_hdr	sa_hdr;
-	u8			data[IB_MGMT_SA_DATA];
+	uint8_t			data[IB_MGMT_SA_DATA];
 } __attribute__ ((packed));
 
 struct ib_vendor_mad {
 	struct ib_mad_hdr	mad_hdr;
 	struct ib_rmpp_hdr	rmpp_hdr;
-	u8			reserved;
-	u8			oui[3];
-	u8			data[IB_MGMT_VENDOR_DATA];
+	uint8_t			reserved;
+	uint8_t			oui[3];
+	uint8_t			data[IB_MGMT_VENDOR_DATA];
 };
 
 struct ib_class_port_info {
-	u8			base_version;
-	u8			class_version;
+	uint8_t			base_version;
+	uint8_t			class_version;
 	__be16			capability_mask;
-	u8			reserved[3];
-	u8			resp_time_value;
-	u8			redirect_gid[16];
+	uint8_t			reserved[3];
+	uint8_t			resp_time_value;
+	uint8_t			redirect_gid[16];
 	__be32			redirect_tcslfl;
 	__be16			redirect_lid;
 	__be16			redirect_pkey;
 	__be32			redirect_qp;
 	__be32			redirect_qkey;
-	u8			trap_gid[16];
+	uint8_t			trap_gid[16];
 	__be32			trap_tcslfl;
 	__be16			trap_lid;
 	__be16			trap_pkey;
@@ -269,7 +269,7 @@ int ib_response_mad(struct ib_mad *mad);
  * ib_get_rmpp_resptime - Returns the RMPP response time.
  * @rmpp_hdr: An RMPP header.
  */
-static inline u8 ib_get_rmpp_resptime(struct ib_rmpp_hdr *rmpp_hdr)
+static inline uint8_t ib_get_rmpp_resptime(struct ib_rmpp_hdr *rmpp_hdr)
 {
 	return rmpp_hdr->rmpp_rtime_flags >> 3;
 }
@@ -278,7 +278,7 @@ static inline u8 ib_get_rmpp_resptime(struct ib_rmpp_hdr *rmpp_hdr)
  * ib_get_rmpp_flags - Returns the RMPP flags.
  * @rmpp_hdr: An RMPP header.
  */
-static inline u8 ib_get_rmpp_flags(struct ib_rmpp_hdr *rmpp_hdr)
+static inline uint8_t ib_get_rmpp_flags(struct ib_rmpp_hdr *rmpp_hdr)
 {
 	return rmpp_hdr->rmpp_rtime_flags & 0x7;
 }
@@ -288,7 +288,8 @@ static inline u8 ib_get_rmpp_flags(struct ib_rmpp_hdr *rmpp_hdr)
  * @rmpp_hdr: An RMPP header.
  * @rtime: The response time to set.
  */
-static inline void ib_set_rmpp_resptime(struct ib_rmpp_hdr *rmpp_hdr, u8 rtime)
+static inline void ib_set_rmpp_resptime(struct ib_rmpp_hdr *rmpp_hdr,
+					uint8_t rtime)
 {
 	rmpp_hdr->rmpp_rtime_flags = ib_get_rmpp_flags(rmpp_hdr) | (rtime << 3);
 }
@@ -298,7 +299,8 @@ static inline void ib_set_rmpp_resptime(struct ib_rmpp_hdr *rmpp_hdr, u8 rtime)
  * @rmpp_hdr: An RMPP header.
  * @flags: The flags to set.
  */
-static inline void ib_set_rmpp_flags(struct ib_rmpp_hdr *rmpp_hdr, u8 flags)
+static inline void ib_set_rmpp_flags(struct ib_rmpp_hdr *rmpp_hdr,
+				     uint8_t flags)
 {
 	rmpp_hdr->rmpp_rtime_flags = (rmpp_hdr->rmpp_rtime_flags & 0xF8) |
 				     (flags & 0x7);
@@ -371,10 +373,10 @@ struct ib_mad_agent {
 	ib_mad_send_handler	send_handler;
 	ib_mad_snoop_handler	snoop_handler;
 	void			*context;
-	u32			hi_tid;
-	u32			flags;
-	u8			port_num;
-	u8			rmpp_version;
+	uint32_t			hi_tid;
+	uint32_t			flags;
+	uint8_t			port_num;
+	uint8_t			rmpp_version;
 };
 
 /**
@@ -387,7 +389,7 @@ struct ib_mad_agent {
 struct ib_mad_send_wc {
 	struct ib_mad_send_buf	*send_buf;
 	enum ib_wc_status	status;
-	u32			vendor_err;
+	uint32_t			vendor_err;
 };
 
 /**
@@ -435,9 +437,9 @@ struct ib_mad_recv_wc {
  *
  */
 struct ib_mad_reg_req {
-	u8	mgmt_class;
-	u8	mgmt_class_version;
-	u8	oui[3];
+	uint8_t	mgmt_class;
+	uint8_t	mgmt_class_version;
+	uint8_t	oui[3];
 	DECLARE_BITMAP(method_mask, IB_MGMT_MAX_METHODS);
 };
 
@@ -461,14 +463,14 @@ struct ib_mad_reg_req {
  * @registration_flags: Registration flags to set for this agent
  */
 struct ib_mad_agent *ib_register_mad_agent(struct ib_device *device,
-					   u8 port_num,
+					   uint8_t port_num,
 					   enum ib_qp_type qp_type,
 					   struct ib_mad_reg_req *mad_reg_req,
-					   u8 rmpp_version,
+					   uint8_t rmpp_version,
 					   ib_mad_send_handler send_handler,
 					   ib_mad_recv_handler recv_handler,
 					   void *context,
-					   u32 registration_flags);
+					   uint32_t registration_flags);
 
 enum ib_mad_snoop_flags {
 	/*IB_MAD_SNOOP_POSTED_SENDS	   = 1,*/
@@ -492,7 +494,7 @@ enum ib_mad_snoop_flags {
  * @context: User specified context associated with the registration.
  */
 struct ib_mad_agent *ib_register_mad_snoop(struct ib_device *device,
-					   u8 port_num,
+					   uint8_t port_num,
 					   enum ib_qp_type qp_type,
 					   int mad_snoop_flags,
 					   ib_mad_snoop_handler snoop_handler,
@@ -561,7 +563,7 @@ void ib_cancel_mad(struct ib_mad_agent *mad_agent,
  * value.
  */
 int ib_modify_mad(struct ib_mad_agent *mad_agent,
-		  struct ib_mad_send_buf *send_buf, u32 timeout_ms);
+		  struct ib_mad_send_buf *send_buf, uint32_t timeout_ms);
 
 /**
  * ib_redirect_mad_qp - Registers a QP for MAD services.
@@ -580,7 +582,7 @@ int ib_modify_mad(struct ib_mad_agent *mad_agent,
  * MADs on the specified QP by calling ib_mad_post_send.
  */
 struct ib_mad_agent *ib_redirect_mad_qp(struct ib_qp *qp,
-					u8 rmpp_version,
+					uint8_t rmpp_version,
 					ib_mad_send_handler send_handler,
 					ib_mad_recv_handler recv_handler,
 					void *context);
@@ -630,7 +632,8 @@ int ib_process_mad_wc(struct ib_mad_agent *mad_agent,
  * If @rmpp_active is set, the RMPP header will be initialized for sending.
  */
 struct ib_mad_send_buf *ib_create_send_mad(struct ib_mad_agent *mad_agent,
-					   u32 remote_qpn, u16 pkey_index,
+					   uint32_t remote_qpn,
+					   uint16_t pkey_index,
 					   int rmpp_active,
 					   int hdr_len, int data_len,
 					   gfp_t gfp_mask);
@@ -642,7 +645,7 @@ struct ib_mad_send_buf *ib_create_send_mad(struct ib_mad_agent *mad_agent,
  *
  * This routine returns whether the management class supports RMPP.
  */
-int ib_is_mad_class_rmpp(u8 mgmt_class);
+int ib_is_mad_class_rmpp(uint8_t mgmt_class);
 
 /**
  * ib_get_mad_data_offset - returns the data offset for a given
@@ -652,7 +655,7 @@ int ib_is_mad_class_rmpp(u8 mgmt_class);
  * This routine returns the data offset in the MAD for the management
  * class requested.
  */
-int ib_get_mad_data_offset(u8 mgmt_class);
+int ib_get_mad_data_offset(uint8_t mgmt_class);
 
 /**
  * ib_get_rmpp_segment - returns the data buffer for a given RMPP segment.

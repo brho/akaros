@@ -98,7 +98,7 @@ void en_print(const char *level, const struct mlx4_en_priv *priv,
 	va_end(args);
 }
 
-void mlx4_en_update_loopback_state(struct net_device *dev,
+void mlx4_en_update_loopback_state(struct ether *dev,
 				   netdev_features_t features)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
@@ -133,7 +133,7 @@ static int mlx4_en_get_profile(struct mlx4_en_dev *mdev)
 	params->udp_rss = udp_rss;
 	params->num_tx_rings_p_up = mlx4_low_memory_profile() ?
 		MLX4_EN_MIN_TX_RING_P_UP :
-		min_t(int, num_online_cpus(), MLX4_EN_MAX_TX_RING_P_UP);
+		MIN_T(int, num_online_cpus(), MLX4_EN_MAX_TX_RING_P_UP);
 
 	if (params->udp_rss && !(mdev->dev->caps.flags
 					& MLX4_DEV_CAP_FLAG_UDP_RSS)) {
@@ -156,7 +156,7 @@ static int mlx4_en_get_profile(struct mlx4_en_dev *mdev)
 	return 0;
 }
 
-static void *mlx4_en_get_netdev(struct mlx4_dev *dev, void *ctx, u8 port)
+static void *mlx4_en_get_netdev(struct mlx4_dev *dev, void *ctx, uint8_t port)
 {
 	struct mlx4_en_dev *endev = ctx;
 
@@ -202,9 +202,9 @@ static void mlx4_en_remove(struct mlx4_dev *dev, void *endev_ptr)
 	struct mlx4_en_dev *mdev = endev_ptr;
 	int i;
 
-	mutex_lock(&mdev->state_lock);
+	qlock(&mdev->state_lock);
 	mdev->device_up = false;
-	mutex_unlock(&mdev->state_lock);
+	qunlock(&mdev->state_lock);
 
 	mlx4_foreach_port(i, dev, MLX4_PORT_TYPE_ETH)
 		if (mdev->pndev[i])
@@ -231,7 +231,7 @@ static void *mlx4_en_add(struct mlx4_dev *dev)
 
 	printk_once(KERN_INFO "%s", mlx4_en_version);
 
-	mdev = kzalloc(sizeof(*mdev), GFP_KERNEL);
+	mdev = kzmalloc(sizeof(*mdev), KMALLOC_WAIT);
 	if (!mdev)
 		goto err_free_res;
 
@@ -245,7 +245,7 @@ static void *mlx4_en_add(struct mlx4_dev *dev)
 				PAGE_SIZE);
 	if (!mdev->uar_map)
 		goto err_uar;
-	spin_lock_init(&mdev->uar_lock);
+	spinlock_init_irqsave(&mdev->uar_lock);
 
 	mdev->dev = dev;
 	mdev->dma_device = &dev->persist->pdev->dev;
@@ -294,7 +294,7 @@ static void *mlx4_en_add(struct mlx4_dev *dev)
 
 	/* At this stage all non-port specific tasks are complete:
 	 * mark the card state as up */
-	mutex_init(&mdev->state_lock);
+	qlock_init(&mdev->state_lock);
 	mdev->device_up = true;
 
 	/* Setup ports */

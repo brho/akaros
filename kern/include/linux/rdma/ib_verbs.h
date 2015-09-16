@@ -57,7 +57,7 @@
 extern struct workqueue_struct *ib_wq;
 
 union ib_gid {
-	u8	raw[16];
+	uint8_t	raw[16];
 	struct {
 		__be64	subnet_prefix;
 		__be64	interface_id;
@@ -167,13 +167,13 @@ struct ib_odp_caps {
 };
 
 struct ib_device_attr {
-	u64			fw_ver;
+	uint64_t			fw_ver;
 	__be64			sys_image_guid;
-	u64			max_mr_size;
-	u64			page_size_cap;
-	u32			vendor_id;
-	u32			vendor_part_id;
-	u32			hw_ver;
+	uint64_t			max_mr_size;
+	uint64_t			page_size_cap;
+	uint32_t			vendor_id;
+	uint32_t			vendor_part_id;
+	uint32_t			hw_ver;
 	int			max_qp;
 	int			max_qp_wr;
 	int			device_cap_flags;
@@ -205,8 +205,8 @@ struct ib_device_attr {
 	int			max_srq_wr;
 	int			max_srq_sge;
 	unsigned int		max_fast_reg_page_list_len;
-	u16			max_pkeys;
-	u8			local_ca_ack_delay;
+	uint16_t			max_pkeys;
+	uint8_t			local_ca_ack_delay;
 	int			sig_prot_cap;
 	int			sig_guard_cap;
 	struct ib_odp_caps	odp_caps;
@@ -300,45 +300,45 @@ struct ib_protocol_stats {
 };
 
 struct iw_protocol_stats {
-	u64	ipInReceives;
-	u64	ipInHdrErrors;
-	u64	ipInTooBigErrors;
-	u64	ipInNoRoutes;
-	u64	ipInAddrErrors;
-	u64	ipInUnknownProtos;
-	u64	ipInTruncatedPkts;
-	u64	ipInDiscards;
-	u64	ipInDelivers;
-	u64	ipOutForwDatagrams;
-	u64	ipOutRequests;
-	u64	ipOutDiscards;
-	u64	ipOutNoRoutes;
-	u64	ipReasmTimeout;
-	u64	ipReasmReqds;
-	u64	ipReasmOKs;
-	u64	ipReasmFails;
-	u64	ipFragOKs;
-	u64	ipFragFails;
-	u64	ipFragCreates;
-	u64	ipInMcastPkts;
-	u64	ipOutMcastPkts;
-	u64	ipInBcastPkts;
-	u64	ipOutBcastPkts;
+	uint64_t	ipInReceives;
+	uint64_t	ipInHdrErrors;
+	uint64_t	ipInTooBigErrors;
+	uint64_t	ipInNoRoutes;
+	uint64_t	ipInAddrErrors;
+	uint64_t	ipInUnknownProtos;
+	uint64_t	ipInTruncatedPkts;
+	uint64_t	ipInDiscards;
+	uint64_t	ipInDelivers;
+	uint64_t	ipOutForwDatagrams;
+	uint64_t	ipOutRequests;
+	uint64_t	ipOutDiscards;
+	uint64_t	ipOutNoRoutes;
+	uint64_t	ipReasmTimeout;
+	uint64_t	ipReasmReqds;
+	uint64_t	ipReasmOKs;
+	uint64_t	ipReasmFails;
+	uint64_t	ipFragOKs;
+	uint64_t	ipFragFails;
+	uint64_t	ipFragCreates;
+	uint64_t	ipInMcastPkts;
+	uint64_t	ipOutMcastPkts;
+	uint64_t	ipInBcastPkts;
+	uint64_t	ipOutBcastPkts;
 
-	u64	tcpRtoAlgorithm;
-	u64	tcpRtoMin;
-	u64	tcpRtoMax;
-	u64	tcpMaxConn;
-	u64	tcpActiveOpens;
-	u64	tcpPassiveOpens;
-	u64	tcpAttemptFails;
-	u64	tcpEstabResets;
-	u64	tcpCurrEstab;
-	u64	tcpInSegs;
-	u64	tcpOutSegs;
-	u64	tcpRetransSegs;
-	u64	tcpInErrs;
-	u64	tcpOutRsts;
+	uint64_t	tcpRtoAlgorithm;
+	uint64_t	tcpRtoMin;
+	uint64_t	tcpRtoMax;
+	uint64_t	tcpMaxConn;
+	uint64_t	tcpActiveOpens;
+	uint64_t	tcpPassiveOpens;
+	uint64_t	tcpAttemptFails;
+	uint64_t	tcpEstabResets;
+	uint64_t	tcpCurrEstab;
+	uint64_t	tcpInSegs;
+	uint64_t	tcpOutSegs;
+	uint64_t	tcpRetransSegs;
+	uint64_t	tcpInErrs;
+	uint64_t	tcpOutRsts;
 };
 
 union rdma_protocol_stats {
@@ -351,21 +351,21 @@ struct ib_port_attr {
 	enum ib_mtu		max_mtu;
 	enum ib_mtu		active_mtu;
 	int			gid_tbl_len;
-	u32			port_cap_flags;
-	u32			max_msg_sz;
-	u32			bad_pkey_cntr;
-	u32			qkey_viol_cntr;
-	u16			pkey_tbl_len;
-	u16			lid;
-	u16			sm_lid;
-	u8			lmc;
-	u8			max_vl_num;
-	u8			sm_sl;
-	u8			subnet_timeout;
-	u8			init_type_reply;
-	u8			active_width;
-	u8			active_speed;
-	u8                      phys_state;
+	uint32_t			port_cap_flags;
+	uint32_t			max_msg_sz;
+	uint32_t			bad_pkey_cntr;
+	uint32_t			qkey_viol_cntr;
+	uint16_t			pkey_tbl_len;
+	uint16_t			lid;
+	uint16_t			sm_lid;
+	uint8_t			lmc;
+	uint8_t			max_vl_num;
+	uint8_t			sm_sl;
+	uint8_t			subnet_timeout;
+	uint8_t			init_type_reply;
+	uint8_t			active_width;
+	uint8_t			active_speed;
+	uint8_t                      phys_state;
 };
 
 enum ib_device_modify_flags {
@@ -374,7 +374,7 @@ enum ib_device_modify_flags {
 };
 
 struct ib_device_modify {
-	u64	sys_image_guid;
+	uint64_t	sys_image_guid;
 	char	node_desc[64];
 };
 
@@ -385,9 +385,9 @@ enum ib_port_modify_flags {
 };
 
 struct ib_port_modify {
-	u32	set_port_cap_mask;
-	u32	clr_port_cap_mask;
-	u8	init_type;
+	uint32_t	set_port_cap_mask;
+	uint32_t	clr_port_cap_mask;
+	uint8_t	init_type;
 };
 
 enum ib_event_type {
@@ -418,7 +418,7 @@ struct ib_event {
 		struct ib_cq	*cq;
 		struct ib_qp	*qp;
 		struct ib_srq	*srq;
-		u8		port_num;
+		uint8_t		port_num;
 	} element;
 	enum ib_event_type	event;
 };
@@ -438,17 +438,17 @@ struct ib_event_handler {
 
 struct ib_global_route {
 	union ib_gid	dgid;
-	u32		flow_label;
-	u8		sgid_index;
-	u8		hop_limit;
-	u8		traffic_class;
+	uint32_t		flow_label;
+	uint8_t		sgid_index;
+	uint8_t		hop_limit;
+	uint8_t		traffic_class;
 };
 
 struct ib_grh {
 	__be32		version_tclass_flow;
 	__be16		paylen;
-	u8		next_hdr;
-	u8		hop_limit;
+	uint8_t		next_hdr;
+	uint8_t		hop_limit;
 	union ib_gid	sgid;
 	union ib_gid	dgid;
 };
@@ -512,7 +512,7 @@ enum ib_mr_create_flags {
  */
 struct ib_mr_init_attr {
 	int	    max_reg_descriptors;
-	u32	    flags;
+	uint32_t	    flags;
 };
 
 /**
@@ -550,14 +550,14 @@ enum ib_t10_dif_bg_type {
  */
 struct ib_t10_dif_domain {
 	enum ib_t10_dif_bg_type bg_type;
-	u16			pi_interval;
-	u16			bg;
-	u16			app_tag;
-	u32			ref_tag;
+	uint16_t			pi_interval;
+	uint16_t			bg;
+	uint16_t			app_tag;
+	uint32_t			ref_tag;
 	bool			ref_remap;
 	bool			app_escape;
 	bool			ref_escape;
-	u16			apptag_check_mask;
+	uint16_t			apptag_check_mask;
 };
 
 /**
@@ -580,7 +580,7 @@ struct ib_sig_domain {
  * @wire: wire domain layout desciptor.
  */
 struct ib_sig_attrs {
-	u8			check_mask;
+	uint8_t			check_mask;
 	struct ib_sig_domain	mem;
 	struct ib_sig_domain	wire;
 };
@@ -596,10 +596,10 @@ enum ib_sig_err_type {
  */
 struct ib_sig_err {
 	enum ib_sig_err_type	err_type;
-	u32			expected;
-	u32			actual;
-	u64			sig_err_offset;
-	u32			key;
+	uint32_t			expected;
+	uint32_t			actual;
+	uint64_t			sig_err_offset;
+	uint32_t			key;
 };
 
 enum ib_mr_status_check {
@@ -615,7 +615,7 @@ enum ib_mr_status_check {
  *     failure.
  */
 struct ib_mr_status {
-	u32		    fail_status;
+	uint32_t		    fail_status;
 	struct ib_sig_err   sig_err;
 };
 
@@ -628,14 +628,14 @@ __attribute_const__ enum ib_rate mult_to_ib_rate(int mult);
 
 struct ib_ah_attr {
 	struct ib_global_route	grh;
-	u16			dlid;
-	u8			sl;
-	u8			src_path_bits;
-	u8			static_rate;
-	u8			ah_flags;
-	u8			port_num;
-	u8			dmac[ETH_ALEN];
-	u16			vlan_id;
+	uint16_t			dlid;
+	uint8_t			sl;
+	uint8_t			src_path_bits;
+	uint8_t			static_rate;
+	uint8_t			ah_flags;
+	uint8_t			port_num;
+	uint8_t			dmac[Eaddrlen];
+	uint16_t			vlan_id;
 };
 
 enum ib_wc_status {
@@ -693,25 +693,25 @@ enum ib_wc_flags {
 };
 
 struct ib_wc {
-	u64			wr_id;
+	uint64_t			wr_id;
 	enum ib_wc_status	status;
 	enum ib_wc_opcode	opcode;
-	u32			vendor_err;
-	u32			byte_len;
+	uint32_t			vendor_err;
+	uint32_t			byte_len;
 	struct ib_qp	       *qp;
 	union {
 		__be32		imm_data;
-		u32		invalidate_rkey;
+		uint32_t		invalidate_rkey;
 	} ex;
-	u32			src_qp;
+	uint32_t			src_qp;
 	int			wc_flags;
-	u16			pkey_index;
-	u16			slid;
-	u8			sl;
-	u8			dlid_path_bits;
-	u8			port_num;	/* valid only for DR SMPs on switches */
-	u8			smac[ETH_ALEN];
-	u16			vlan_id;
+	uint16_t			pkey_index;
+	uint16_t			slid;
+	uint8_t			sl;
+	uint8_t			dlid_path_bits;
+	uint8_t			port_num;	/* valid only for DR SMPs on switches */
+	uint8_t			smac[Eaddrlen];
+	uint16_t			vlan_id;
 };
 
 enum ib_cq_notify_flags {
@@ -732,9 +732,9 @@ enum ib_srq_attr_mask {
 };
 
 struct ib_srq_attr {
-	u32	max_wr;
-	u32	max_sge;
-	u32	srq_limit;
+	uint32_t	max_wr;
+	uint32_t	max_sge;
+	uint32_t	srq_limit;
 };
 
 struct ib_srq_init_attr {
@@ -752,11 +752,11 @@ struct ib_srq_init_attr {
 };
 
 struct ib_qp_cap {
-	u32	max_send_wr;
-	u32	max_recv_wr;
-	u32	max_send_sge;
-	u32	max_recv_sge;
-	u32	max_inline_data;
+	uint32_t	max_send_wr;
+	uint32_t	max_recv_wr;
+	uint32_t	max_send_sge;
+	uint32_t	max_recv_sge;
+	uint32_t	max_inline_data;
 };
 
 enum ib_sig_type {
@@ -826,13 +826,13 @@ struct ib_qp_init_attr {
 	enum ib_sig_type	sq_sig_type;
 	enum ib_qp_type		qp_type;
 	enum ib_qp_create_flags	create_flags;
-	u8			port_num; /* special QP types only */
+	uint8_t			port_num; /* special QP types only */
 };
 
 struct ib_qp_open_attr {
 	void                  (*event_handler)(struct ib_event *, void *);
 	void		       *qp_context;
-	u32			qp_num;
+	uint32_t			qp_num;
 	enum ib_qp_type		qp_type;
 };
 
@@ -925,31 +925,31 @@ struct ib_qp_attr {
 	enum ib_qp_state	cur_qp_state;
 	enum ib_mtu		path_mtu;
 	enum ib_mig_state	path_mig_state;
-	u32			qkey;
-	u32			rq_psn;
-	u32			sq_psn;
-	u32			dest_qp_num;
+	uint32_t			qkey;
+	uint32_t			rq_psn;
+	uint32_t			sq_psn;
+	uint32_t			dest_qp_num;
 	int			qp_access_flags;
 	struct ib_qp_cap	cap;
 	struct ib_ah_attr	ah_attr;
 	struct ib_ah_attr	alt_ah_attr;
-	u16			pkey_index;
-	u16			alt_pkey_index;
-	u8			en_sqd_async_notify;
-	u8			sq_draining;
-	u8			max_rd_atomic;
-	u8			max_dest_rd_atomic;
-	u8			min_rnr_timer;
-	u8			port_num;
-	u8			timeout;
-	u8			retry_cnt;
-	u8			rnr_retry;
-	u8			alt_port_num;
-	u8			alt_timeout;
-	u8			smac[ETH_ALEN];
-	u8			alt_smac[ETH_ALEN];
-	u16			vlan_id;
-	u16			alt_vlan_id;
+	uint16_t			pkey_index;
+	uint16_t			alt_pkey_index;
+	uint8_t			en_sqd_async_notify;
+	uint8_t			sq_draining;
+	uint8_t			max_rd_atomic;
+	uint8_t			max_dest_rd_atomic;
+	uint8_t			min_rnr_timer;
+	uint8_t			port_num;
+	uint8_t			timeout;
+	uint8_t			retry_cnt;
+	uint8_t			rnr_retry;
+	uint8_t			alt_port_num;
+	uint8_t			alt_timeout;
+	uint8_t			smac[Eaddrlen];
+	uint8_t			alt_smac[Eaddrlen];
+	uint16_t			vlan_id;
+	uint16_t			alt_vlan_id;
 };
 
 enum ib_wr_opcode {
@@ -997,14 +997,14 @@ enum ib_send_flags {
 };
 
 struct ib_sge {
-	u64	addr;
-	u32	length;
-	u32	lkey;
+	uint64_t	addr;
+	uint32_t	length;
+	uint32_t	lkey;
 };
 
 struct ib_fast_reg_page_list {
 	struct ib_device       *device;
-	u64		       *page_list;
+	uint64_t		       *page_list;
 	unsigned int		max_page_list_len;
 };
 
@@ -1020,58 +1020,58 @@ struct ib_fast_reg_page_list {
  */
 struct ib_mw_bind_info {
 	struct ib_mr   *mr;
-	u64		addr;
-	u64		length;
+	uint64_t		addr;
+	uint64_t		length;
 	int		mw_access_flags;
 };
 
 struct ib_send_wr {
 	struct ib_send_wr      *next;
-	u64			wr_id;
+	uint64_t			wr_id;
 	struct ib_sge	       *sg_list;
 	int			num_sge;
 	enum ib_wr_opcode	opcode;
 	int			send_flags;
 	union {
 		__be32		imm_data;
-		u32		invalidate_rkey;
+		uint32_t		invalidate_rkey;
 	} ex;
 	union {
 		struct {
-			u64	remote_addr;
-			u32	rkey;
+			uint64_t	remote_addr;
+			uint32_t	rkey;
 		} rdma;
 		struct {
-			u64	remote_addr;
-			u64	compare_add;
-			u64	swap;
-			u64	compare_add_mask;
-			u64	swap_mask;
-			u32	rkey;
+			uint64_t	remote_addr;
+			uint64_t	compare_add;
+			uint64_t	swap;
+			uint64_t	compare_add_mask;
+			uint64_t	swap_mask;
+			uint32_t	rkey;
 		} atomic;
 		struct {
 			struct ib_ah *ah;
 			void   *header;
 			int     hlen;
 			int     mss;
-			u32	remote_qpn;
-			u32	remote_qkey;
-			u16	pkey_index; /* valid for GSI only */
-			u8	port_num;   /* valid for DR SMPs on switch only */
+			uint32_t	remote_qpn;
+			uint32_t	remote_qkey;
+			uint16_t	pkey_index; /* valid for GSI only */
+			uint8_t	port_num;   /* valid for DR SMPs on switch only */
 		} ud;
 		struct {
-			u64				iova_start;
+			uint64_t				iova_start;
 			struct ib_fast_reg_page_list   *page_list;
 			unsigned int			page_shift;
 			unsigned int			page_list_len;
-			u32				length;
+			uint32_t				length;
 			int				access_flags;
-			u32				rkey;
+			uint32_t				rkey;
 		} fast_reg;
 		struct {
 			struct ib_mw            *mw;
 			/* The new rkey for the memory window. */
-			u32                      rkey;
+			uint32_t                      rkey;
 			struct ib_mw_bind_info   bind_info;
 		} bind_mw;
 		struct {
@@ -1081,12 +1081,12 @@ struct ib_send_wr {
 			struct ib_sge	       *prot;
 		} sig_handover;
 	} wr;
-	u32			xrc_remote_srq_num;	/* XRC TGT QPs only */
+	uint32_t			xrc_remote_srq_num;	/* XRC TGT QPs only */
 };
 
 struct ib_recv_wr {
 	struct ib_recv_wr      *next;
-	u64			wr_id;
+	uint64_t			wr_id;
 	struct ib_sge	       *sg_list;
 	int			num_sge;
 };
@@ -1102,17 +1102,17 @@ enum ib_access_flags {
 };
 
 struct ib_phys_buf {
-	u64      addr;
-	u64      size;
+	uint64_t      addr;
+	uint64_t      size;
 };
 
 struct ib_mr_attr {
 	struct ib_pd	*pd;
-	u64		device_virt_addr;
-	u64		size;
+	uint64_t		device_virt_addr;
+	uint64_t		size;
 	int		mr_access_flags;
-	u32		lkey;
-	u32		rkey;
+	uint32_t		lkey;
+	uint32_t		rkey;
 };
 
 enum ib_mr_rereg_flags {
@@ -1129,7 +1129,7 @@ enum ib_mr_rereg_flags {
  * @bind_info:  More parameters of the bind operation.
  */
 struct ib_mw_bind {
-	u64                    wr_id;
+	uint64_t                    wr_id;
 	int                    send_flags;
 	struct ib_mw_bind_info bind_info;
 };
@@ -1137,7 +1137,7 @@ struct ib_mw_bind {
 struct ib_fmr_attr {
 	int	max_pages;
 	int	max_maps;
-	u8	page_shift;
+	uint8_t	page_shift;
 };
 
 struct ib_umem;
@@ -1175,7 +1175,7 @@ struct ib_ucontext {
 };
 
 struct ib_uobject {
-	u64			user_handle;	/* handle given to us by userspace */
+	uint64_t			user_handle;	/* handle given to us by userspace */
 	struct ib_ucontext     *context;	/* associated user context */
 	void		       *object;		/* containing object */
 	struct list_head	list;		/* link to context's list */
@@ -1203,7 +1203,7 @@ struct ib_xrcd {
 	atomic_t		usecnt; /* count all exposed resources */
 	struct inode	       *inode;
 
-	struct mutex		tgt_qp_mutex;
+	qlock_t		tgt_qp_mutex;
 	struct list_head	tgt_qp_list;
 };
 
@@ -1238,7 +1238,7 @@ struct ib_srq {
 		struct {
 			struct ib_xrcd *xrcd;
 			struct ib_cq   *cq;
-			u32		srq_num;
+			uint32_t		srq_num;
 		} xrc;
 	} ext;
 };
@@ -1258,7 +1258,7 @@ struct ib_qp {
 	struct ib_uobject      *uobject;
 	void                  (*event_handler)(struct ib_event *, void *);
 	void		       *qp_context;
-	u32			qp_num;
+	uint32_t			qp_num;
 	enum ib_qp_type		qp_type;
 };
 
@@ -1266,8 +1266,8 @@ struct ib_mr {
 	struct ib_device  *device;
 	struct ib_pd	  *pd;
 	struct ib_uobject *uobject;
-	u32		   lkey;
-	u32		   rkey;
+	uint32_t		   lkey;
+	uint32_t		   rkey;
 	atomic_t	   usecnt; /* count number of MWs */
 };
 
@@ -1275,7 +1275,7 @@ struct ib_mw {
 	struct ib_device	*device;
 	struct ib_pd		*pd;
 	struct ib_uobject	*uobject;
-	u32			rkey;
+	uint32_t			rkey;
 	enum ib_mw_type         type;
 };
 
@@ -1283,8 +1283,8 @@ struct ib_fmr {
 	struct ib_device	*device;
 	struct ib_pd		*pd;
 	struct list_head	list;
-	u32			lkey;
-	u32			rkey;
+	uint32_t			lkey;
+	uint32_t			rkey;
 };
 
 /* Supported steering options */
@@ -1329,15 +1329,15 @@ enum ib_flow_domain {
 };
 
 struct ib_flow_eth_filter {
-	u8	dst_mac[6];
-	u8	src_mac[6];
+	uint8_t	dst_mac[6];
+	uint8_t	src_mac[6];
 	__be16	ether_type;
 	__be16	vlan_tag;
 };
 
 struct ib_flow_spec_eth {
 	enum ib_flow_spec_type	  type;
-	u16			  size;
+	uint16_t			  size;
 	struct ib_flow_eth_filter val;
 	struct ib_flow_eth_filter mask;
 };
@@ -1349,7 +1349,7 @@ struct ib_flow_ib_filter {
 
 struct ib_flow_spec_ib {
 	enum ib_flow_spec_type	 type;
-	u16			 size;
+	uint16_t			 size;
 	struct ib_flow_ib_filter val;
 	struct ib_flow_ib_filter mask;
 };
@@ -1361,7 +1361,7 @@ struct ib_flow_ipv4_filter {
 
 struct ib_flow_spec_ipv4 {
 	enum ib_flow_spec_type	   type;
-	u16			   size;
+	uint16_t			   size;
 	struct ib_flow_ipv4_filter val;
 	struct ib_flow_ipv4_filter mask;
 };
@@ -1373,7 +1373,7 @@ struct ib_flow_tcp_udp_filter {
 
 struct ib_flow_spec_tcp_udp {
 	enum ib_flow_spec_type	      type;
-	u16			      size;
+	uint16_t			      size;
 	struct ib_flow_tcp_udp_filter val;
 	struct ib_flow_tcp_udp_filter mask;
 };
@@ -1381,7 +1381,7 @@ struct ib_flow_spec_tcp_udp {
 union ib_flow_spec {
 	struct {
 		enum ib_flow_spec_type	type;
-		u16			size;
+		uint16_t			size;
 	};
 	struct ib_flow_spec_eth		eth;
 	struct ib_flow_spec_ib		ib;
@@ -1391,11 +1391,11 @@ union ib_flow_spec {
 
 struct ib_flow_attr {
 	enum ib_flow_attr_type type;
-	u16	     size;
-	u16	     priority;
-	u32	     flags;
-	u8	     num_of_specs;
-	u8	     port;
+	uint16_t	     size;
+	uint16_t	     priority;
+	uint32_t	     flags;
+	uint8_t	     num_of_specs;
+	uint8_t	     port;
 	/* Following are the optional layers according to user request
 	 * struct ib_flow_spec_xxx
 	 * struct ib_flow_spec_yyy
@@ -1430,24 +1430,24 @@ struct ib_cache {
 	struct ib_event_handler event_handler;
 	struct ib_pkey_cache  **pkey_cache;
 	struct ib_gid_cache   **gid_cache;
-	u8                     *lmc_cache;
+	uint8_t                     *lmc_cache;
 };
 
 struct ib_dma_mapping_ops {
 	int		(*mapping_error)(struct ib_device *dev,
-					 u64 dma_addr);
-	u64		(*map_single)(struct ib_device *dev,
+					 uint64_t dma_addr);
+	uint64_t		(*map_single)(struct ib_device *dev,
 				      void *ptr, size_t size,
 				      enum dma_data_direction direction);
 	void		(*unmap_single)(struct ib_device *dev,
-					u64 addr, size_t size,
+					uint64_t addr, size_t size,
 					enum dma_data_direction direction);
-	u64		(*map_page)(struct ib_device *dev,
+	uint64_t		(*map_page)(struct ib_device *dev,
 				    struct page *page, unsigned long offset,
 				    size_t size,
 				    enum dma_data_direction direction);
 	void		(*unmap_page)(struct ib_device *dev,
-				      u64 addr, size_t size,
+				      uint64_t addr, size_t size,
 				      enum dma_data_direction direction);
 	int		(*map_sg)(struct ib_device *dev,
 				  struct scatterlist *sg, int nents,
@@ -1456,20 +1456,20 @@ struct ib_dma_mapping_ops {
 				    struct scatterlist *sg, int nents,
 				    enum dma_data_direction direction);
 	void		(*sync_single_for_cpu)(struct ib_device *dev,
-					       u64 dma_handle,
+					       uint64_t dma_handle,
 					       size_t size,
 					       enum dma_data_direction dir);
 	void		(*sync_single_for_device)(struct ib_device *dev,
-						  u64 dma_handle,
+						  uint64_t dma_handle,
 						  size_t size,
 						  enum dma_data_direction dir);
 	void		*(*alloc_coherent)(struct ib_device *dev,
 					   size_t size,
-					   u64 *dma_handle,
+					   uint64_t *dma_handle,
 					   gfp_t flag);
 	void		(*free_coherent)(struct ib_device *dev,
 					 size_t size, void *cpu_addr,
-					 u64 dma_handle);
+					 uint64_t dma_handle);
 };
 
 struct iw_cm_verbs;
@@ -1499,20 +1499,23 @@ struct ib_device {
 	int		           (*query_device)(struct ib_device *device,
 						   struct ib_device_attr *device_attr);
 	int		           (*query_port)(struct ib_device *device,
-						 u8 port_num,
+						 uint8_t port_num,
 						 struct ib_port_attr *port_attr);
 	enum rdma_link_layer	   (*get_link_layer)(struct ib_device *device,
-						     u8 port_num);
+						     uint8_t port_num);
 	int		           (*query_gid)(struct ib_device *device,
-						u8 port_num, int index,
+						uint8_t port_num, int index,
 						union ib_gid *gid);
 	int		           (*query_pkey)(struct ib_device *device,
-						 u8 port_num, u16 index, u16 *pkey);
+						 uint8_t port_num,
+						 uint16_t index,
+						 uint16_t *pkey);
 	int		           (*modify_device)(struct ib_device *device,
 						    int device_modify_mask,
 						    struct ib_device_modify *device_modify);
 	int		           (*modify_port)(struct ib_device *device,
-						  u8 port_num, int port_modify_mask,
+						  uint8_t port_num,
+						  int port_modify_mask,
 						  struct ib_port_modify *port_modify);
 	struct ib_ucontext *       (*alloc_ucontext)(struct ib_device *device,
 						     struct ib_udata *udata);
@@ -1565,8 +1568,9 @@ struct ib_device {
 						int comp_vector,
 						struct ib_ucontext *context,
 						struct ib_udata *udata);
-	int                        (*modify_cq)(struct ib_cq *cq, u16 cq_count,
-						u16 cq_period);
+	int                        (*modify_cq)(struct ib_cq *cq,
+						uint16_t cq_count,
+						uint16_t cq_period);
 	int                        (*destroy_cq)(struct ib_cq *cq);
 	int                        (*resize_cq)(struct ib_cq *cq, int cqe,
 						struct ib_udata *udata);
@@ -1583,16 +1587,18 @@ struct ib_device {
 						  struct ib_phys_buf *phys_buf_array,
 						  int num_phys_buf,
 						  int mr_access_flags,
-						  u64 *iova_start);
+						  uint64_t *iova_start);
 	struct ib_mr *             (*reg_user_mr)(struct ib_pd *pd,
-						  u64 start, u64 length,
-						  u64 virt_addr,
+						  uint64_t start,
+						  uint64_t length,
+						  uint64_t virt_addr,
 						  int mr_access_flags,
 						  struct ib_udata *udata);
 	int			   (*rereg_user_mr)(struct ib_mr *mr,
 						    int flags,
-						    u64 start, u64 length,
-						    u64 virt_addr,
+						    uint64_t start,
+						    uint64_t length,
+						    uint64_t virt_addr,
 						    int mr_access_flags,
 						    struct ib_pd *pd,
 						    struct ib_udata *udata);
@@ -1613,7 +1619,7 @@ struct ib_device {
 						    struct ib_phys_buf *phys_buf_array,
 						    int num_phys_buf,
 						    int mr_access_flags,
-						    u64 *iova_start);
+						    uint64_t *iova_start);
 	struct ib_mw *             (*alloc_mw)(struct ib_pd *pd,
 					       enum ib_mw_type type);
 	int                        (*bind_mw)(struct ib_qp *qp,
@@ -1624,19 +1630,20 @@ struct ib_device {
 						int mr_access_flags,
 						struct ib_fmr_attr *fmr_attr);
 	int		           (*map_phys_fmr)(struct ib_fmr *fmr,
-						   u64 *page_list, int list_len,
-						   u64 iova);
+						   uint64_t *page_list,
+						   int list_len,
+						   uint64_t iova);
 	int		           (*unmap_fmr)(struct list_head *fmr_list);
 	int		           (*dealloc_fmr)(struct ib_fmr *fmr);
 	int                        (*attach_mcast)(struct ib_qp *qp,
 						   union ib_gid *gid,
-						   u16 lid);
+						   uint16_t lid);
 	int                        (*detach_mcast)(struct ib_qp *qp,
 						   union ib_gid *gid,
-						   u16 lid);
+						   uint16_t lid);
 	int                        (*process_mad)(struct ib_device *device,
 						  int process_mad_flags,
-						  u8 port_num,
+						  uint8_t port_num,
 						  struct ib_wc *in_wc,
 						  struct ib_grh *in_grh,
 						  struct ib_mad *in_mad,
@@ -1650,8 +1657,9 @@ struct ib_device {
 						  *flow_attr,
 						  int domain);
 	int			   (*destroy_flow)(struct ib_flow *flow_id);
-	int			   (*check_mr_status)(struct ib_mr *mr, u32 check_mask,
-						      struct ib_mr_status *mr_status);
+	int			   (*check_mr_status)(struct ib_mr *mr,
+							 uint32_t check_mask,
+							 struct ib_mr_status *mr_status);
 
 	struct ib_dma_mapping_ops   *dma_ops;
 
@@ -1667,14 +1675,14 @@ struct ib_device {
 	}                            reg_state;
 
 	int			     uverbs_abi_ver;
-	u64			     uverbs_cmd_mask;
-	u64			     uverbs_ex_cmd_mask;
+	uint64_t			     uverbs_cmd_mask;
+	uint64_t			     uverbs_ex_cmd_mask;
 
 	char			     node_desc[64];
 	__be64			     node_guid;
-	u32			     local_dma_lkey;
-	u8                           node_type;
-	u8                           phys_port_cnt;
+	uint32_t			     local_dma_lkey;
+	uint8_t                           node_type;
+	uint8_t                           phys_port_cnt;
 };
 
 struct ib_client {
@@ -1690,7 +1698,7 @@ void ib_dealloc_device(struct ib_device *device);
 
 int ib_register_device(struct ib_device *device,
 		       int (*port_callback)(struct ib_device *,
-					    u8, struct kobject *));
+					    uint8_t, struct kobject *));
 void ib_unregister_device(struct ib_device *device);
 
 int ib_register_client   (struct ib_client *client);
@@ -1702,12 +1710,12 @@ void  ib_set_client_data(struct ib_device *device, struct ib_client *client,
 
 static inline int ib_copy_from_udata(void *dest, struct ib_udata *udata, size_t len)
 {
-	return copy_from_user(dest, udata->inbuf, len) ? -EFAULT : 0;
+	return memcpy_from_user(current, dest, udata->inbuf, len) ? -EFAULT : 0;
 }
 
 static inline int ib_copy_to_udata(struct ib_udata *udata, void *src, size_t len)
 {
-	return copy_to_user(udata->outbuf, src, len) ? -EFAULT : 0;
+	return memcpy_to_user(current, udata->outbuf, src, len) ? -EFAULT : 0;
 }
 
 /**
@@ -1738,30 +1746,30 @@ int ib_query_device(struct ib_device *device,
 		    struct ib_device_attr *device_attr);
 
 int ib_query_port(struct ib_device *device,
-		  u8 port_num, struct ib_port_attr *port_attr);
+		  uint8_t port_num, struct ib_port_attr *port_attr);
 
 enum rdma_link_layer rdma_port_get_link_layer(struct ib_device *device,
-					       u8 port_num);
+					       uint8_t port_num);
 
 int ib_query_gid(struct ib_device *device,
-		 u8 port_num, int index, union ib_gid *gid);
+		 uint8_t port_num, int index, union ib_gid *gid);
 
 int ib_query_pkey(struct ib_device *device,
-		  u8 port_num, u16 index, u16 *pkey);
+		  uint8_t port_num, uint16_t index, uint16_t *pkey);
 
 int ib_modify_device(struct ib_device *device,
 		     int device_modify_mask,
 		     struct ib_device_modify *device_modify);
 
 int ib_modify_port(struct ib_device *device,
-		   u8 port_num, int port_modify_mask,
+		   uint8_t port_num, int port_modify_mask,
 		   struct ib_port_modify *port_modify);
 
 int ib_find_gid(struct ib_device *device, union ib_gid *gid,
-		u8 *port_num, u16 *index);
+		uint8_t *port_num, uint16_t *index);
 
 int ib_find_pkey(struct ib_device *device,
-		 u8 port_num, u16 pkey, u16 *index);
+		 uint8_t port_num, uint16_t pkey, uint16_t *index);
 
 /**
  * ib_alloc_pd - Allocates an unused protection domain.
@@ -1799,7 +1807,8 @@ struct ib_ah *ib_create_ah(struct ib_pd *pd, struct ib_ah_attr *ah_attr);
  * @ah_attr: Returned attributes that can be used when creating an address
  *   handle for replying to the message.
  */
-int ib_init_ah_from_wc(struct ib_device *device, u8 port_num, struct ib_wc *wc,
+int ib_init_ah_from_wc(struct ib_device *device, uint8_t port_num,
+		       struct ib_wc *wc,
 		       struct ib_grh *grh, struct ib_ah_attr *ah_attr);
 
 /**
@@ -1815,7 +1824,7 @@ int ib_init_ah_from_wc(struct ib_device *device, u8 port_num, struct ib_wc *wc,
  * in all UD QP post sends.
  */
 struct ib_ah *ib_create_ah_from_wc(struct ib_pd *pd, struct ib_wc *wc,
-				   struct ib_grh *grh, u8 port_num);
+				   struct ib_grh *grh, uint8_t port_num);
 
 /**
  * ib_modify_ah - Modifies the address vector associated with an address
@@ -2038,7 +2047,7 @@ int ib_resize_cq(struct ib_cq *cq, int cqe);
  * @cq_period: max period of time in usec before triggering an event
  *
  */
-int ib_modify_cq(struct ib_cq *cq, u16 cq_count, u16 cq_period);
+int ib_modify_cq(struct ib_cq *cq, uint16_t cq_count, uint16_t cq_period);
 
 /**
  * ib_destroy_cq - Destroys the specified CQ.
@@ -2140,7 +2149,8 @@ struct ib_mr *ib_get_dma_mr(struct ib_pd *pd, int mr_access_flags);
  * @dev: The device for which the dma_addr was created
  * @dma_addr: The DMA address to check
  */
-static inline int ib_dma_mapping_error(struct ib_device *dev, u64 dma_addr)
+static inline int ib_dma_mapping_error(struct ib_device *dev,
+				       uint64_t dma_addr)
 {
 	if (dev->dma_ops)
 		return dev->dma_ops->mapping_error(dev, dma_addr);
@@ -2154,7 +2164,7 @@ static inline int ib_dma_mapping_error(struct ib_device *dev, u64 dma_addr)
  * @size: The size of the region in bytes
  * @direction: The direction of the DMA
  */
-static inline u64 ib_dma_map_single(struct ib_device *dev,
+static inline uint64_t ib_dma_map_single(struct ib_device *dev,
 				    void *cpu_addr, size_t size,
 				    enum dma_data_direction direction)
 {
@@ -2171,7 +2181,7 @@ static inline u64 ib_dma_map_single(struct ib_device *dev,
  * @direction: The direction of the DMA
  */
 static inline void ib_dma_unmap_single(struct ib_device *dev,
-				       u64 addr, size_t size,
+				       uint64_t addr, size_t size,
 				       enum dma_data_direction direction)
 {
 	if (dev->dma_ops)
@@ -2180,7 +2190,7 @@ static inline void ib_dma_unmap_single(struct ib_device *dev,
 		dma_unmap_single(dev->dma_device, addr, size, direction);
 }
 
-static inline u64 ib_dma_map_single_attrs(struct ib_device *dev,
+static inline uint64_t ib_dma_map_single_attrs(struct ib_device *dev,
 					  void *cpu_addr, size_t size,
 					  enum dma_data_direction direction,
 					  struct dma_attrs *attrs)
@@ -2190,7 +2200,7 @@ static inline u64 ib_dma_map_single_attrs(struct ib_device *dev,
 }
 
 static inline void ib_dma_unmap_single_attrs(struct ib_device *dev,
-					     u64 addr, size_t size,
+					     uint64_t addr, size_t size,
 					     enum dma_data_direction direction,
 					     struct dma_attrs *attrs)
 {
@@ -2206,7 +2216,7 @@ static inline void ib_dma_unmap_single_attrs(struct ib_device *dev,
  * @size: The size of the region in bytes
  * @direction: The direction of the DMA
  */
-static inline u64 ib_dma_map_page(struct ib_device *dev,
+static inline uint64_t ib_dma_map_page(struct ib_device *dev,
 				  struct page *page,
 				  unsigned long offset,
 				  size_t size,
@@ -2225,7 +2235,7 @@ static inline u64 ib_dma_map_page(struct ib_device *dev,
  * @direction: The direction of the DMA
  */
 static inline void ib_dma_unmap_page(struct ib_device *dev,
-				     u64 addr, size_t size,
+				     uint64_t addr, size_t size,
 				     enum dma_data_direction direction)
 {
 	if (dev->dma_ops)
@@ -2290,7 +2300,7 @@ static inline void ib_dma_unmap_sg_attrs(struct ib_device *dev,
  * Note: this function is obsolete. To do: change all occurrences of
  * ib_sg_dma_address() into sg_dma_address().
  */
-static inline u64 ib_sg_dma_address(struct ib_device *dev,
+static inline uint64_t ib_sg_dma_address(struct ib_device *dev,
 				    struct scatterlist *sg)
 {
 	return sg_dma_address(sg);
@@ -2318,7 +2328,7 @@ static inline unsigned int ib_sg_dma_len(struct ib_device *dev,
  * @dir: The direction of the DMA
  */
 static inline void ib_dma_sync_single_for_cpu(struct ib_device *dev,
-					      u64 addr,
+					      uint64_t addr,
 					      size_t size,
 					      enum dma_data_direction dir)
 {
@@ -2336,7 +2346,7 @@ static inline void ib_dma_sync_single_for_cpu(struct ib_device *dev,
  * @dir: The direction of the DMA
  */
 static inline void ib_dma_sync_single_for_device(struct ib_device *dev,
-						 u64 addr,
+						 uint64_t addr,
 						 size_t size,
 						 enum dma_data_direction dir)
 {
@@ -2355,7 +2365,7 @@ static inline void ib_dma_sync_single_for_device(struct ib_device *dev,
  */
 static inline void *ib_dma_alloc_coherent(struct ib_device *dev,
 					   size_t size,
-					   u64 *dma_handle,
+					   uint64_t *dma_handle,
 					   gfp_t flag)
 {
 	if (dev->dma_ops)
@@ -2379,7 +2389,7 @@ static inline void *ib_dma_alloc_coherent(struct ib_device *dev,
  */
 static inline void ib_dma_free_coherent(struct ib_device *dev,
 					size_t size, void *cpu_addr,
-					u64 dma_handle)
+					uint64_t dma_handle)
 {
 	if (dev->dma_ops)
 		dev->dma_ops->free_coherent(dev, size, cpu_addr, dma_handle);
@@ -2401,7 +2411,7 @@ struct ib_mr *ib_reg_phys_mr(struct ib_pd *pd,
 			     struct ib_phys_buf *phys_buf_array,
 			     int num_phys_buf,
 			     int mr_access_flags,
-			     u64 *iova_start);
+			     uint64_t *iova_start);
 
 /**
  * ib_rereg_phys_mr - Modifies the attributes of an existing memory region.
@@ -2431,7 +2441,7 @@ int ib_rereg_phys_mr(struct ib_mr *mr,
 		     struct ib_phys_buf *phys_buf_array,
 		     int num_phys_buf,
 		     int mr_access_flags,
-		     u64 *iova_start);
+		     uint64_t *iova_start);
 
 /**
  * ib_query_mr - Retrieves information about a specific memory region.
@@ -2510,7 +2520,7 @@ void ib_free_fast_reg_page_list(struct ib_fast_reg_page_list *page_list);
  * @mr - struct ib_mr pointer to be updated.
  * @newkey - new key to be used.
  */
-static inline void ib_update_fast_reg_key(struct ib_mr *mr, u8 newkey)
+static inline void ib_update_fast_reg_key(struct ib_mr *mr, uint8_t newkey)
 {
 	mr->lkey = (mr->lkey & 0xffffff00) | newkey;
 	mr->rkey = (mr->rkey & 0xffffff00) | newkey;
@@ -2521,9 +2531,9 @@ static inline void ib_update_fast_reg_key(struct ib_mr *mr, u8 newkey)
  * for calculating a new rkey for type 2 memory windows.
  * @rkey - the rkey to increment.
  */
-static inline u32 ib_inc_rkey(u32 rkey)
+static inline uint32_t ib_inc_rkey(uint32_t rkey)
 {
-	const u32 mask = 0x000000ff;
+	const uint32_t mask = 0x000000ff;
 	return ((rkey + 1) & mask) | (rkey & ~mask);
 }
 
@@ -2584,8 +2594,8 @@ struct ib_fmr *ib_alloc_fmr(struct ib_pd *pd,
  * @iova: The I/O virtual address to use with the mapped region.
  */
 static inline int ib_map_phys_fmr(struct ib_fmr *fmr,
-				  u64 *page_list, int list_len,
-				  u64 iova)
+				  uint64_t *page_list, int list_len,
+				  uint64_t iova)
 {
 	return fmr->device->map_phys_fmr(fmr, page_list, list_len, iova);
 }
@@ -2614,7 +2624,7 @@ int ib_dealloc_fmr(struct ib_fmr *fmr);
  * the fabric appropriately.  The port associated with the specified
  * QP must also be a member of the multicast group.
  */
-int ib_attach_mcast(struct ib_qp *qp, union ib_gid *gid, u16 lid);
+int ib_attach_mcast(struct ib_qp *qp, union ib_gid *gid, uint16_t lid);
 
 /**
  * ib_detach_mcast - Detaches the specified QP from a multicast group.
@@ -2622,7 +2632,7 @@ int ib_attach_mcast(struct ib_qp *qp, union ib_gid *gid, u16 lid);
  * @gid: Multicast group GID.
  * @lid: Multicast group LID in host byte order.
  */
-int ib_detach_mcast(struct ib_qp *qp, union ib_gid *gid, u16 lid);
+int ib_detach_mcast(struct ib_qp *qp, union ib_gid *gid, uint16_t lid);
 
 /**
  * ib_alloc_xrcd - Allocates an XRC domain.
@@ -2665,7 +2675,7 @@ static inline int ib_check_mr_access(int flags)
  *     failed checks will be indicated in the status bitmask
  *     and the relevant info shall be in the error item.
  */
-int ib_check_mr_status(struct ib_mr *mr, u32 check_mask,
+int ib_check_mr_status(struct ib_mr *mr, uint32_t check_mask,
 		       struct ib_mr_status *mr_status);
 
 #endif /* IB_VERBS_H */

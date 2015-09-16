@@ -48,26 +48,26 @@ struct mlx4_cqe {
 		struct {
 			__be16	rlid;
 			__be16  status;
-			u8      ipv6_ext_mask;
-			u8      badfcs_enc;
+			uint8_t      ipv6_ext_mask;
+			uint8_t      badfcs_enc;
 		};
-		u8  smac[ETH_ALEN];
+		uint8_t  smac[Eaddrlen];
 	};
 	__be32			byte_cnt;
 	__be16			wqe_index;
 	__be16			checksum;
-	u8			reserved[3];
-	u8			owner_sr_opcode;
+	uint8_t			reserved[3];
+	uint8_t			owner_sr_opcode;
 };
 
 struct mlx4_err_cqe {
 	__be32			my_qpn;
-	u32			reserved1[5];
+	uint32_t			reserved1[5];
 	__be16			wqe_index;
-	u8			vendor_err_syndrome;
-	u8			syndrome;
-	u8			reserved2[3];
-	u8			owner_sr_opcode;
+	uint8_t			vendor_err_syndrome;
+	uint8_t			syndrome;
+	uint8_t			reserved2[3];
+	uint8_t			owner_sr_opcode;
 };
 
 struct mlx4_ts_cqe {
@@ -76,14 +76,14 @@ struct mlx4_ts_cqe {
 	__be32			g_mlpath_rqpn;
 	__be32			timestamp_hi;
 	__be16			status;
-	u8			ipv6_ext_mask;
-	u8			badfcs_enc;
+	uint8_t			ipv6_ext_mask;
+	uint8_t			badfcs_enc;
 	__be32			byte_cnt;
 	__be16			wqe_index;
 	__be16			checksum;
-	u8			reserved;
+	uint8_t			reserved;
 	__be16			timestamp_lo;
-	u8			owner_sr_opcode;
+	uint8_t			owner_sr_opcode;
 } __packed;
 
 enum {
@@ -135,13 +135,13 @@ enum {
 	MLX4_CQE_BAD_FCS                 = 1 << 4,
 };
 
-static inline void mlx4_cq_arm(struct mlx4_cq *cq, u32 cmd,
+static inline void mlx4_cq_arm(struct mlx4_cq *cq, uint32_t cmd,
 			       void __iomem *uar_page,
 			       spinlock_t *doorbell_lock)
 {
 	__be32 doorbell[2];
-	u32 sn;
-	u32 ci;
+	uint32_t sn;
+	uint32_t ci;
 
 	sn = cq->arm_sn & 3;
 	ci = cq->cons_index & 0xffffff;
@@ -171,7 +171,7 @@ enum {
 };
 
 int mlx4_cq_modify(struct mlx4_dev *dev, struct mlx4_cq *cq,
-		   u16 count, u16 period);
+		   uint16_t count, uint16_t period);
 int mlx4_cq_resize(struct mlx4_dev *dev, struct mlx4_cq *cq,
 		   int entries, struct mlx4_mtt *mtt);
 

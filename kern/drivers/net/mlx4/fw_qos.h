@@ -48,9 +48,9 @@
 #define MLX4_VPP_DEFAULT_VPORT (0)
 
 struct mlx4_vport_qos_param {
-	u32 bw_share;
-	u32 max_avg_bw;
-	u8 enable;
+	uint32_t bw_share;
+	uint32_t max_avg_bw;
+	uint8_t enable;
 };
 
 /**
@@ -63,7 +63,8 @@ struct mlx4_vport_qos_param {
  *
  * Returns 0 on success or a negative mlx4_core errno code.
  **/
-int mlx4_SET_PORT_PRIO2TC(struct mlx4_dev *dev, u8 port, u8 *prio2tc);
+int mlx4_SET_PORT_PRIO2TC(struct mlx4_dev *dev, uint8_t port,
+			  uint8_t *prio2tc);
 
 /**
  * mlx4_SET_PORT_SCHEDULER - This routine configures the arbitration between
@@ -81,8 +82,9 @@ int mlx4_SET_PORT_PRIO2TC(struct mlx4_dev *dev, u8 port, u8 *prio2tc);
  *
  * Returns 0 on success or a negative mlx4_core errno code.
  **/
-int mlx4_SET_PORT_SCHEDULER(struct mlx4_dev *dev, u8 port, u8 *tc_tx_bw,
-			    u8 *pg, u16 *ratelimit);
+int mlx4_SET_PORT_SCHEDULER(struct mlx4_dev *dev, uint8_t port,
+			    uint8_t *tc_tx_bw,
+			    uint8_t *pg, uint16_t *ratelimit);
 /**
  * mlx4_ALLOCATE_VPP_get - Query port VPP availible resources and allocation.
  * Before distribution of VPPs to priorities, only availible_vpp is returned.
@@ -95,8 +97,8 @@ int mlx4_SET_PORT_SCHEDULER(struct mlx4_dev *dev, u8 port, u8 *tc_tx_bw,
  *
  * Returns 0 on success or a negative mlx4_core errno code.
  **/
-int mlx4_ALLOCATE_VPP_get(struct mlx4_dev *dev, u8 port,
-			  u16 *availible_vpp, u8 *vpp_p_up);
+int mlx4_ALLOCATE_VPP_get(struct mlx4_dev *dev, uint8_t port,
+			  uint16_t *availible_vpp, uint8_t *vpp_p_up);
 /**
  * mlx4_ALLOCATE_VPP_set - Distribution of VPPs among differnt priorities.
  * The total number of VPPs assigned to all for a port must not exceed
@@ -110,7 +112,8 @@ int mlx4_ALLOCATE_VPP_get(struct mlx4_dev *dev, u8 port,
  *
  * Returns 0 on success or a negative mlx4_core errno code.
  **/
-int mlx4_ALLOCATE_VPP_set(struct mlx4_dev *dev, u8 port, u8 *vpp_p_up);
+int mlx4_ALLOCATE_VPP_set(struct mlx4_dev *dev, uint8_t port,
+			  uint8_t *vpp_p_up);
 
 /**
  * mlx4_SET_VPORT_QOS_get - Query QoS proporties of a Vport.
@@ -124,7 +127,7 @@ int mlx4_ALLOCATE_VPP_set(struct mlx4_dev *dev, u8 port, u8 *vpp_p_up);
  *
  * Returns 0 on success or a negative mlx4_core errno code.
  **/
-int mlx4_SET_VPORT_QOS_get(struct mlx4_dev *dev, u8 port, u8 vport,
+int mlx4_SET_VPORT_QOS_get(struct mlx4_dev *dev, uint8_t port, uint8_t vport,
 			   struct mlx4_vport_qos_param *out_param);
 
 /**
@@ -139,7 +142,7 @@ int mlx4_SET_VPORT_QOS_get(struct mlx4_dev *dev, u8 port, u8 vport,
  *
  * Returns 0 on success or a negative mlx4_core errno code.
  **/
-int mlx4_SET_VPORT_QOS_set(struct mlx4_dev *dev, u8 port, u8 vport,
+int mlx4_SET_VPORT_QOS_set(struct mlx4_dev *dev, uint8_t port, uint8_t vport,
 			   struct mlx4_vport_qos_param *in_param);
 
 #endif /* MLX4_FW_QOS_H */

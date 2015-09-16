@@ -41,7 +41,7 @@
 int mlx4_SENSE_PORT(struct mlx4_dev *dev, int port,
 		    enum mlx4_port_type *type)
 {
-	u64 out_param;
+	uint64_t out_param;
 	int err = 0;
 
 	err = mlx4_cmd_imm(dev, 0, &out_param, port, 0,
@@ -97,7 +97,7 @@ static void mlx4_sense_port(struct work_struct *work)
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	enum mlx4_port_type stype[MLX4_MAX_PORTS];
 
-	mutex_lock(&priv->port_mutex);
+	qlock(&priv->port_mutex);
 	mlx4_do_sense_ports(dev, stype, &dev->caps.port_type[1]);
 
 	if (mlx4_check_port_params(dev, stype))
@@ -107,7 +107,7 @@ static void mlx4_sense_port(struct work_struct *work)
 		mlx4_err(dev, "Failed to change port_types\n");
 
 sense_again:
-	mutex_unlock(&priv->port_mutex);
+	qunlock(&priv->port_mutex);
 	queue_delayed_work(mlx4_wq , &sense->sense_poll,
 			   round_jiffies_relative(MLX4_SENSE_RANGE));
 }

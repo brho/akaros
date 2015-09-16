@@ -66,27 +66,27 @@ static const char *res_name[] = {
 	[MLX4_RES_MCG]		= "MCG",
 };
 
-u64 mlx4_make_profile(struct mlx4_dev *dev,
+uint64_t mlx4_make_profile(struct mlx4_dev *dev,
 		      struct mlx4_profile *request,
 		      struct mlx4_dev_cap *dev_cap,
 		      struct mlx4_init_hca_param *init_hca)
 {
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	struct mlx4_resource {
-		u64 size;
-		u64 start;
+		uint64_t size;
+		uint64_t start;
 		int type;
-		u32 num;
+		uint32_t num;
 		int log_num;
 	};
 
-	u64 total_size = 0;
+	uint64_t total_size = 0;
 	struct mlx4_resource *profile;
 	struct mlx4_resource tmp;
 	struct sysinfo si;
 	int i, j;
 
-	profile = kcalloc(MLX4_RES_NUM, sizeof(*profile), GFP_KERNEL);
+	profile = kzmalloc((MLX4_RES_NUM) * (sizeof(*profile)), KMALLOC_WAIT);
 	if (!profile)
 		return -ENOMEM;
 
@@ -104,9 +104,7 @@ u64 mlx4_make_profile(struct mlx4_dev *dev,
 	 */
 	si_meminfo(&si);
 	request->num_mtt =
-		roundup_pow_of_two(max_t(unsigned, request->num_mtt,
-					 min(1UL << (31 - log_mtts_per_seg),
-					     si.totalram >> (log_mtts_per_seg - 1))));
+		ROUNDUPPWR2(MAX_T(unsigned, request->num_mtt, MIN(1UL << (31 - log_mtts_per_seg), si.totalram >> (log_mtts_per_seg - 1))));
 
 	profile[MLX4_RES_QP].size     = dev_cap->qpc_entry_sz;
 	profile[MLX4_RES_RDMARC].size = dev_cap->rdmarc_entry_sz;
@@ -127,7 +125,8 @@ u64 mlx4_make_profile(struct mlx4_dev *dev,
 	profile[MLX4_RES_SRQ].num     = request->num_srq;
 	profile[MLX4_RES_CQ].num      = request->num_cq;
 	profile[MLX4_RES_EQ].num = mlx4_is_mfunc(dev) ? dev->phys_caps.num_phys_eqs :
-					min_t(unsigned, dev_cap->max_eqs, MAX_MSIX);
+					MIN_T(unsigned, dev_cap->max_eqs,
+					      MAX_MSIX);
 	profile[MLX4_RES_DMPT].num    = request->num_mpt;
 	profile[MLX4_RES_CMPT].num    = MLX4_NUM_CMPTS;
 	profile[MLX4_RES_MTT].num     = request->num_mtt * (1 << log_mtts_per_seg);
@@ -135,10 +134,11 @@ u64 mlx4_make_profile(struct mlx4_dev *dev,
 
 	for (i = 0; i < MLX4_RES_NUM; ++i) {
 		profile[i].type     = i;
-		profile[i].num      = roundup_pow_of_two(profile[i].num);
-		profile[i].log_num  = ilog2(profile[i].num);
+		profile[i].num      = ROUNDUPPWR2(profile[i].num);
+		profile[i].log_num  = LOG2_UP(profile[i].num);
 		profile[i].size    *= profile[i].num;
-		profile[i].size     = max(profile[i].size, (u64) PAGE_SIZE);
+		profile[i].size     = MAX(profile[i].size,
+					  (uint64_t)PAGE_SIZE);
 	}
 
 	/*
@@ -194,7 +194,7 @@ u64 mlx4_make_profile(struct mlx4_dev *dev,
 			     ++priv->qp_table.rdmarc_shift)
 				; /* nothing */
 			dev->caps.max_qp_dest_rdma = 1 << priv->qp_table.rdmarc_shift;
-			priv->qp_table.rdmarc_base   = (u32) profile[i].start;
+			priv->qp_table.rdmarc_base   = (uint32_t) profile[i].start;
 			init_hca->rdmarc_base	     = profile[i].start;
 			init_hca->log_rd_per_qp	     = priv->qp_table.rdmarc_shift;
 			break;
@@ -220,12 +220,9 @@ u64 mlx4_make_profile(struct mlx4_dev *dev,
 				init_hca->eqc_base    = profile[i].start;
 				init_hca->num_sys_eqs = dev_cap->num_sys_eqs;
 			} else {
-				dev->caps.num_eqs     = roundup_pow_of_two(
-								min_t(unsigned,
-								      dev_cap->max_eqs,
-								      MAX_MSIX));
+				dev->caps.num_eqs     = ROUNDUPPWR2(MIN_T(unsigned, dev_cap->max_eqs, MAX_MSIX));
 				init_hca->eqc_base    = profile[i].start;
-				init_hca->log_num_eqs = ilog2(dev->caps.num_eqs);
+				init_hca->log_num_eqs = LOG2_UP(dev->caps.num_eqs);
 			}
 			break;
 		case MLX4_RES_DMPT:
@@ -245,7 +242,7 @@ u64 mlx4_make_profile(struct mlx4_dev *dev,
 		case MLX4_RES_MCG:
 			init_hca->mc_base	  = profile[i].start;
 			init_hca->log_mc_entry_sz =
-					ilog2(mlx4_get_mgm_entry_size(dev));
+					LOG2_UP(mlx4_get_mgm_entry_size(dev));
 			init_hca->log_mc_table_sz = profile[i].log_num;
 			if (dev->caps.steering_mode ==
 			    MLX4_STEERING_MODE_DEVICE_MANAGED) {

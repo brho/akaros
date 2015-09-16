@@ -240,9 +240,9 @@ enum mlx4_rx_csum_mode {
 };
 
 struct mlx4_config_dev_params {
-	u16	vxlan_udp_dport;
-	u8	rx_csum_flags_port_1;
-	u8	rx_csum_flags_port_2;
+	uint16_t	vxlan_udp_dport;
+	uint8_t	rx_csum_flags_port_1;
+	uint8_t	rx_csum_flags_port_2;
 };
 
 enum mlx4_en_congestion_control_algorithm {
@@ -262,13 +262,15 @@ struct mlx4_cmd_mailbox {
 	dma_addr_t		dma;
 };
 
-int __mlx4_cmd(struct mlx4_dev *dev, u64 in_param, u64 *out_param,
-	       int out_is_imm, u32 in_modifier, u8 op_modifier,
-	       u16 op, unsigned long timeout, int native);
+int __mlx4_cmd(struct mlx4_dev *dev, uint64_t in_param, uint64_t *out_param,
+	       int out_is_imm, uint32_t in_modifier, uint8_t op_modifier,
+	       uint16_t op, unsigned long timeout, int native);
 
 /* Invoke a command with no output parameter */
-static inline int mlx4_cmd(struct mlx4_dev *dev, u64 in_param, u32 in_modifier,
-			   u8 op_modifier, u16 op, unsigned long timeout,
+static inline int mlx4_cmd(struct mlx4_dev *dev, uint64_t in_param,
+			   uint32_t in_modifier,
+			   uint8_t op_modifier, uint16_t op,
+			   unsigned long timeout,
 			   int native)
 {
 	return __mlx4_cmd(dev, in_param, NULL, 0, in_modifier,
@@ -276,8 +278,10 @@ static inline int mlx4_cmd(struct mlx4_dev *dev, u64 in_param, u32 in_modifier,
 }
 
 /* Invoke a command with an output mailbox */
-static inline int mlx4_cmd_box(struct mlx4_dev *dev, u64 in_param, u64 out_param,
-			       u32 in_modifier, u8 op_modifier, u16 op,
+static inline int mlx4_cmd_box(struct mlx4_dev *dev, uint64_t in_param,
+			       uint64_t out_param,
+			       uint32_t in_modifier, uint8_t op_modifier,
+			       uint16_t op,
 			       unsigned long timeout, int native)
 {
 	return __mlx4_cmd(dev, in_param, &out_param, 0, in_modifier,
@@ -289,8 +293,10 @@ static inline int mlx4_cmd_box(struct mlx4_dev *dev, u64 in_param, u64 out_param
  * output into the caller's out_param pointer after the command
  * executes).
  */
-static inline int mlx4_cmd_imm(struct mlx4_dev *dev, u64 in_param, u64 *out_param,
-			       u32 in_modifier, u8 op_modifier, u16 op,
+static inline int mlx4_cmd_imm(struct mlx4_dev *dev, uint64_t in_param,
+			       uint64_t *out_param,
+			       uint32_t in_modifier, uint8_t op_modifier,
+			       uint16_t op,
 			       unsigned long timeout, int native)
 {
 	return __mlx4_cmd(dev, in_param, out_param, 1, in_modifier,
@@ -300,9 +306,10 @@ static inline int mlx4_cmd_imm(struct mlx4_dev *dev, u64 in_param, u64 *out_para
 struct mlx4_cmd_mailbox *mlx4_alloc_cmd_mailbox(struct mlx4_dev *dev);
 void mlx4_free_cmd_mailbox(struct mlx4_dev *dev, struct mlx4_cmd_mailbox *mailbox);
 
-u32 mlx4_comm_get_version(void);
-int mlx4_set_vf_mac(struct mlx4_dev *dev, int port, int vf, u64 mac);
-int mlx4_set_vf_vlan(struct mlx4_dev *dev, int port, int vf, u16 vlan, u8 qos);
+uint32_t mlx4_comm_get_version(void);
+int mlx4_set_vf_mac(struct mlx4_dev *dev, int port, int vf, uint64_t mac);
+int mlx4_set_vf_vlan(struct mlx4_dev *dev, int port, int vf, uint16_t vlan,
+		     uint8_t qos);
 int mlx4_set_vf_rate(struct mlx4_dev *dev, int port, int vf, int min_tx_rate,
 		     int max_tx_rate);
 int mlx4_set_vf_spoofchk(struct mlx4_dev *dev, int port, int vf, bool setting);
@@ -318,9 +325,9 @@ void mlx4_report_internal_err_comm_event(struct mlx4_dev *dev);
  * if VST, will return vlan & qos (if not NULL)
  */
 bool mlx4_get_slave_default_vlan(struct mlx4_dev *dev, int port, int slave,
-				 u16 *vlan, u8 *qos);
+				 uint16_t *vlan, uint8_t *qos);
 
-#define MLX4_COMM_GET_IF_REV(cmd_chan_ver) (u8)((cmd_chan_ver) >> 8)
+#define MLX4_COMM_GET_IF_REV(cmd_chan_ver) (uint8_t)((cmd_chan_ver) >> 8)
 #define COMM_CHAN_EVENT_INTERNAL_ERR (1 << 17)
 
 #endif /* MLX4_CMD_H */

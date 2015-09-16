@@ -40,7 +40,7 @@
 #include "mlx4.h"
 #include "icm.h"
 
-void mlx4_srq_event(struct mlx4_dev *dev, u32 srqn, int event_type)
+void mlx4_srq_event(struct mlx4_dev *dev, uint32_t srqn, int event_type)
 {
 	struct mlx4_srq_table *srq_table = &mlx4_priv(dev)->srq_table;
 	struct mlx4_srq *srq;
@@ -60,7 +60,7 @@ void mlx4_srq_event(struct mlx4_dev *dev, u32 srqn, int event_type)
 
 	srq->event(srq, event_type);
 
-	if (atomic_dec_and_test(&srq->refcount))
+	if (atomic_sub_and_test(&srq->refcount, 1))
 		complete(&srq->free);
 }
 
@@ -103,11 +103,11 @@ int __mlx4_srq_alloc_icm(struct mlx4_dev *dev, int *srqn)
 	if (*srqn == -1)
 		return -ENOMEM;
 
-	err = mlx4_table_get(dev, &srq_table->table, *srqn, GFP_KERNEL);
+	err = mlx4_table_get(dev, &srq_table->table, *srqn, KMALLOC_WAIT);
 	if (err)
 		goto err_out;
 
-	err = mlx4_table_get(dev, &srq_table->cmpt_table, *srqn, GFP_KERNEL);
+	err = mlx4_table_get(dev, &srq_table->cmpt_table, *srqn, KMALLOC_WAIT);
 	if (err)
 		goto err_put;
 	return 0;
@@ -122,7 +122,7 @@ err_out:
 
 static int mlx4_srq_alloc_icm(struct mlx4_dev *dev, int *srqn)
 {
-	u64 out_param;
+	uint64_t out_param;
 	int err;
 
 	if (mlx4_is_mfunc(dev)) {
@@ -149,7 +149,7 @@ void __mlx4_srq_free_icm(struct mlx4_dev *dev, int srqn)
 
 static void mlx4_srq_free_icm(struct mlx4_dev *dev, int srqn)
 {
-	u64 in_param = 0;
+	uint64_t in_param = 0;
 
 	if (mlx4_is_mfunc(dev)) {
 		set_param_l(&in_param, srqn);
@@ -162,22 +162,24 @@ static void mlx4_srq_free_icm(struct mlx4_dev *dev, int srqn)
 	__mlx4_srq_free_icm(dev, srqn);
 }
 
-int mlx4_srq_alloc(struct mlx4_dev *dev, u32 pdn, u32 cqn, u16 xrcd,
-		   struct mlx4_mtt *mtt, u64 db_rec, struct mlx4_srq *srq)
+int mlx4_srq_alloc(struct mlx4_dev *dev, uint32_t pdn, uint32_t cqn,
+		   uint16_t xrcd,
+		   struct mlx4_mtt *mtt, uint64_t db_rec,
+		   struct mlx4_srq *srq)
 {
 	struct mlx4_srq_table *srq_table = &mlx4_priv(dev)->srq_table;
 	struct mlx4_cmd_mailbox *mailbox;
 	struct mlx4_srq_context *srq_context;
-	u64 mtt_addr;
+	uint64_t mtt_addr;
 	int err;
 
 	err = mlx4_srq_alloc_icm(dev, &srq->srqn);
 	if (err)
 		return err;
 
-	spin_lock_irq(&srq_table->lock);
+	spin_lock_irqsave(&srq_table->lock);
 	err = radix_tree_insert(&srq_table->tree, srq->srqn, srq);
-	spin_unlock_irq(&srq_table->lock);
+	spin_unlock_irqsave(&srq_table->lock);
 	if (err)
 		goto err_icm;
 
@@ -188,7 +190,7 @@ int mlx4_srq_alloc(struct mlx4_dev *dev, u32 pdn, u32 cqn, u16 xrcd,
 	}
 
 	srq_context = mailbox->buf;
-	srq_context->state_logsize_srqn = cpu_to_be32((ilog2(srq->max) << 24) |
+	srq_context->state_logsize_srqn = cpu_to_be32((LOG2_UP(srq->max) << 24) |
 						      srq->srqn);
 	srq_context->logstride          = srq->wqe_shift - 4;
 	srq_context->xrcd		= cpu_to_be16(xrcd);
@@ -212,9 +214,9 @@ int mlx4_srq_alloc(struct mlx4_dev *dev, u32 pdn, u32 cqn, u16 xrcd,
 	return 0;
 
 err_radix:
-	spin_lock_irq(&srq_table->lock);
+	spin_lock_irqsave(&srq_table->lock);
 	radix_tree_delete(&srq_table->tree, srq->srqn);
-	spin_unlock_irq(&srq_table->lock);
+	spin_unlock_irqsave(&srq_table->lock);
 
 err_icm:
 	mlx4_srq_free_icm(dev, srq->srqn);
@@ -231,11 +233,11 @@ void mlx4_srq_free(struct mlx4_dev *dev, struct mlx4_srq *srq)
 	if (err)
 		mlx4_warn(dev, "HW2SW_SRQ failed (%d) for SRQN %06x\n", err, srq->srqn);
 
-	spin_lock_irq(&srq_table->lock);
+	spin_lock_irqsave(&srq_table->lock);
 	radix_tree_delete(&srq_table->tree, srq->srqn);
-	spin_unlock_irq(&srq_table->lock);
+	spin_unlock_irqsave(&srq_table->lock);
 
-	if (atomic_dec_and_test(&srq->refcount))
+	if (atomic_sub_and_test(&srq->refcount, 1))
 		complete(&srq->free);
 	wait_for_completion(&srq->free);
 
@@ -277,8 +279,8 @@ int mlx4_init_srq_table(struct mlx4_dev *dev)
 	struct mlx4_srq_table *srq_table = &mlx4_priv(dev)->srq_table;
 	int err;
 
-	spin_lock_init(&srq_table->lock);
-	INIT_RADIX_TREE(&srq_table->tree, GFP_ATOMIC);
+	spinlock_init_irqsave(&srq_table->lock);
+	INIT_RADIX_TREE(&srq_table->tree, 0);
 	if (mlx4_is_slave(dev))
 		return 0;
 
@@ -297,16 +299,16 @@ void mlx4_cleanup_srq_table(struct mlx4_dev *dev)
 	mlx4_bitmap_cleanup(&mlx4_priv(dev)->srq_table.bitmap);
 }
 
-struct mlx4_srq *mlx4_srq_lookup(struct mlx4_dev *dev, u32 srqn)
+struct mlx4_srq *mlx4_srq_lookup(struct mlx4_dev *dev, uint32_t srqn)
 {
 	struct mlx4_srq_table *srq_table = &mlx4_priv(dev)->srq_table;
 	struct mlx4_srq *srq;
 	unsigned long flags;
 
-	spin_lock_irqsave(&srq_table->lock, flags);
+	spin_lock_irqsave(&srq_table->lock);
 	srq = radix_tree_lookup(&srq_table->tree,
 				srqn & (dev->caps.num_srqs - 1));
-	spin_unlock_irqrestore(&srq_table->lock, flags);
+	spin_unlock_irqsave(&srq_table->lock);
 
 	return srq;
 }

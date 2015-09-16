@@ -44,7 +44,7 @@ enum {
 	MLX4_NUM_RESERVED_UARS = 8
 };
 
-int mlx4_pd_alloc(struct mlx4_dev *dev, u32 *pdn)
+int mlx4_pd_alloc(struct mlx4_dev *dev, uint32_t *pdn)
 {
 	struct mlx4_priv *priv = mlx4_priv(dev);
 
@@ -56,13 +56,13 @@ int mlx4_pd_alloc(struct mlx4_dev *dev, u32 *pdn)
 }
 EXPORT_SYMBOL_GPL(mlx4_pd_alloc);
 
-void mlx4_pd_free(struct mlx4_dev *dev, u32 pdn)
+void mlx4_pd_free(struct mlx4_dev *dev, uint32_t pdn)
 {
 	mlx4_bitmap_free(&mlx4_priv(dev)->pd_bitmap, pdn, MLX4_USE_RR);
 }
 EXPORT_SYMBOL_GPL(mlx4_pd_free);
 
-int __mlx4_xrcd_alloc(struct mlx4_dev *dev, u32 *xrcdn)
+int __mlx4_xrcd_alloc(struct mlx4_dev *dev, uint32_t *xrcdn)
 {
 	struct mlx4_priv *priv = mlx4_priv(dev);
 
@@ -73,9 +73,9 @@ int __mlx4_xrcd_alloc(struct mlx4_dev *dev, u32 *xrcdn)
 	return 0;
 }
 
-int mlx4_xrcd_alloc(struct mlx4_dev *dev, u32 *xrcdn)
+int mlx4_xrcd_alloc(struct mlx4_dev *dev, uint32_t *xrcdn)
 {
-	u64 out_param;
+	uint64_t out_param;
 	int err;
 
 	if (mlx4_is_mfunc(dev)) {
@@ -93,14 +93,14 @@ int mlx4_xrcd_alloc(struct mlx4_dev *dev, u32 *xrcdn)
 }
 EXPORT_SYMBOL_GPL(mlx4_xrcd_alloc);
 
-void __mlx4_xrcd_free(struct mlx4_dev *dev, u32 xrcdn)
+void __mlx4_xrcd_free(struct mlx4_dev *dev, uint32_t xrcdn)
 {
 	mlx4_bitmap_free(&mlx4_priv(dev)->xrcd_bitmap, xrcdn, MLX4_USE_RR);
 }
 
-void mlx4_xrcd_free(struct mlx4_dev *dev, u32 xrcdn)
+void mlx4_xrcd_free(struct mlx4_dev *dev, uint32_t xrcdn)
 {
-	u64 in_param = 0;
+	uint64_t in_param = 0;
 	int err;
 
 	if (mlx4_is_mfunc(dev)) {
@@ -179,7 +179,7 @@ int mlx4_bf_alloc(struct mlx4_dev *dev, struct mlx4_bf *bf, int node)
 	if (!priv->bf_mapping)
 		return -ENOMEM;
 
-	mutex_lock(&priv->bf_mutex);
+	qlock(&priv->bf_mutex);
 	if (!list_empty(&priv->bf_list))
 		uar = list_entry(priv->bf_list.next, struct mlx4_uar, bf_list);
 	else {
@@ -187,9 +187,9 @@ int mlx4_bf_alloc(struct mlx4_dev *dev, struct mlx4_bf *bf, int node)
 			err = -ENOMEM;
 			goto out;
 		}
-		uar = kmalloc_node(sizeof(*uar), GFP_KERNEL, node);
+		uar = kmalloc_node(sizeof(*uar), KMALLOC_WAIT, node);
 		if (!uar) {
-			uar = kmalloc(sizeof(*uar), GFP_KERNEL);
+			uar = kmalloc(sizeof(*uar), KMALLOC_WAIT);
 			if (!uar) {
 				err = -ENOMEM;
 				goto out;
@@ -236,7 +236,7 @@ free_kmalloc:
 	kfree(uar);
 
 out:
-	mutex_unlock(&priv->bf_mutex);
+	qunlock(&priv->bf_mutex);
 	return err;
 }
 EXPORT_SYMBOL_GPL(mlx4_bf_alloc);
@@ -249,7 +249,7 @@ void mlx4_bf_free(struct mlx4_dev *dev, struct mlx4_bf *bf)
 	if (!bf->uar || !bf->uar->bf_map)
 		return;
 
-	mutex_lock(&priv->bf_mutex);
+	qlock(&priv->bf_mutex);
 	idx = (bf->reg - bf->uar->bf_map) / dev->caps.bf_reg_size;
 	bf->uar->free_bf_bmap &= ~(1 << idx);
 	if (!bf->uar->free_bf_bmap) {
@@ -263,7 +263,7 @@ void mlx4_bf_free(struct mlx4_dev *dev, struct mlx4_bf *bf)
 	} else if (list_empty(&bf->uar->bf_list))
 		list_add(&bf->uar->bf_list, &priv->bf_list);
 
-	mutex_unlock(&priv->bf_mutex);
+	qunlock(&priv->bf_mutex);
 }
 EXPORT_SYMBOL_GPL(mlx4_bf_free);
 

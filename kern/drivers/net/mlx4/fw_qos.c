@@ -49,7 +49,7 @@ enum {
 };
 
 struct mlx4_set_port_prio2tc_context {
-	u8 prio2tc[4];
+	uint8_t prio2tc[4];
 };
 
 struct mlx4_port_scheduler_tc_cfg_be {
@@ -82,12 +82,13 @@ struct mlx4_set_vport_context {
 	struct mlx4_prio_qos_param qos_p_up[MLX4_NUM_UP];
 };
 
-int mlx4_SET_PORT_PRIO2TC(struct mlx4_dev *dev, u8 port, u8 *prio2tc)
+int mlx4_SET_PORT_PRIO2TC(struct mlx4_dev *dev, uint8_t port,
+			  uint8_t *prio2tc)
 {
 	struct mlx4_cmd_mailbox *mailbox;
 	struct mlx4_set_port_prio2tc_context *context;
 	int err;
-	u32 in_mod;
+	uint32_t in_mod;
 	int i;
 
 	mailbox = mlx4_alloc_cmd_mailbox(dev);
@@ -108,13 +109,14 @@ int mlx4_SET_PORT_PRIO2TC(struct mlx4_dev *dev, u8 port, u8 *prio2tc)
 }
 EXPORT_SYMBOL(mlx4_SET_PORT_PRIO2TC);
 
-int mlx4_SET_PORT_SCHEDULER(struct mlx4_dev *dev, u8 port, u8 *tc_tx_bw,
-			    u8 *pg, u16 *ratelimit)
+int mlx4_SET_PORT_SCHEDULER(struct mlx4_dev *dev, uint8_t port,
+			    uint8_t *tc_tx_bw,
+			    uint8_t *pg, uint16_t *ratelimit)
 {
 	struct mlx4_cmd_mailbox *mailbox;
 	struct mlx4_set_port_scheduler_context *context;
 	int err;
-	u32 in_mod;
+	uint32_t in_mod;
 	int i;
 
 	mailbox = mlx4_alloc_cmd_mailbox(dev);
@@ -125,26 +127,26 @@ int mlx4_SET_PORT_SCHEDULER(struct mlx4_dev *dev, u8 port, u8 *tc_tx_bw,
 
 	for (i = 0; i < MLX4_NUM_TC; i++) {
 		struct mlx4_port_scheduler_tc_cfg_be *tc = &context->tc[i];
-		u16 r;
+		uint16_t r;
 
 		if (ratelimit && ratelimit[i]) {
 			if (ratelimit[i] <= MLX4_MAX_100M_UNITS_VAL) {
 				r = ratelimit[i];
 				tc->max_bw_units =
-					htons(MLX4_RATELIMIT_100M_UNITS);
+					cpu_to_be16(MLX4_RATELIMIT_100M_UNITS);
 			} else {
 				r = ratelimit[i] / 10;
 				tc->max_bw_units =
-					htons(MLX4_RATELIMIT_1G_UNITS);
+					cpu_to_be16(MLX4_RATELIMIT_1G_UNITS);
 			}
-			tc->max_bw_value = htons(r);
+			tc->max_bw_value = cpu_to_be16(r);
 		} else {
-			tc->max_bw_value = htons(MLX4_RATELIMIT_DEFAULT);
-			tc->max_bw_units = htons(MLX4_RATELIMIT_1G_UNITS);
+			tc->max_bw_value = cpu_to_be16(MLX4_RATELIMIT_DEFAULT);
+			tc->max_bw_units = cpu_to_be16(MLX4_RATELIMIT_1G_UNITS);
 		}
 
-		tc->pg = htons(pg[i]);
-		tc->bw_precentage = htons(tc_tx_bw[i]);
+		tc->pg = cpu_to_be16(pg[i]);
+		tc->bw_precentage = cpu_to_be16(tc_tx_bw[i]);
 	}
 
 	in_mod = MLX4_SET_PORT_SCHEDULER << 8 | port;
@@ -156,8 +158,8 @@ int mlx4_SET_PORT_SCHEDULER(struct mlx4_dev *dev, u8 port, u8 *tc_tx_bw,
 }
 EXPORT_SYMBOL(mlx4_SET_PORT_SCHEDULER);
 
-int mlx4_ALLOCATE_VPP_get(struct mlx4_dev *dev, u8 port,
-			  u16 *availible_vpp, u8 *vpp_p_up)
+int mlx4_ALLOCATE_VPP_get(struct mlx4_dev *dev, uint8_t port,
+			  uint16_t *availible_vpp, uint8_t *vpp_p_up)
 {
 	int i;
 	int err;
@@ -179,10 +181,10 @@ int mlx4_ALLOCATE_VPP_get(struct mlx4_dev *dev, u8 port,
 		goto out;
 
 	/* Total number of supported VPPs */
-	*availible_vpp = (u16)be32_to_cpu(out_param->availible_vpp);
+	*availible_vpp = (uint16_t)be32_to_cpu(out_param->availible_vpp);
 
 	for (i = 0; i < MLX4_NUM_UP; i++)
-		vpp_p_up[i] = (u8)be32_to_cpu(out_param->vpp_p_up[i]);
+		vpp_p_up[i] = (uint8_t)be32_to_cpu(out_param->vpp_p_up[i]);
 
 out:
 	mlx4_free_cmd_mailbox(dev, mailbox);
@@ -191,7 +193,8 @@ out:
 }
 EXPORT_SYMBOL(mlx4_ALLOCATE_VPP_get);
 
-int mlx4_ALLOCATE_VPP_set(struct mlx4_dev *dev, u8 port, u8 *vpp_p_up)
+int mlx4_ALLOCATE_VPP_set(struct mlx4_dev *dev, uint8_t port,
+			  uint8_t *vpp_p_up)
 {
 	int i;
 	int err;
@@ -218,7 +221,7 @@ int mlx4_ALLOCATE_VPP_set(struct mlx4_dev *dev, u8 port, u8 *vpp_p_up)
 }
 EXPORT_SYMBOL(mlx4_ALLOCATE_VPP_set);
 
-int mlx4_SET_VPORT_QOS_get(struct mlx4_dev *dev, u8 port, u8 vport,
+int mlx4_SET_VPORT_QOS_get(struct mlx4_dev *dev, uint8_t port, uint8_t vport,
 			   struct mlx4_vport_qos_param *out_param)
 {
 	int i;
@@ -255,7 +258,7 @@ out:
 }
 EXPORT_SYMBOL(mlx4_SET_VPORT_QOS_get);
 
-int mlx4_SET_VPORT_QOS_set(struct mlx4_dev *dev, u8 port, u8 vport,
+int mlx4_SET_VPORT_QOS_set(struct mlx4_dev *dev, uint8_t port, uint8_t vport,
 			   struct mlx4_vport_qos_param *in_param)
 {
 	int i;

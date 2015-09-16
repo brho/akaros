@@ -38,12 +38,12 @@ struct mlx4_en_port_stats {
 };
 
 struct mlx4_en_perf_stats {
-	u32 tx_poll;
-	u64 tx_pktsz_avg;
-	u32 inflight_avg;
-	u16 tx_coal_avg;
-	u16 rx_coal_avg;
-	u32 napi_quota;
+	uint32_t tx_poll;
+	uint64_t tx_pktsz_avg;
+	uint32_t inflight_avg;
+	uint16_t tx_coal_avg;
+	uint16_t rx_coal_avg;
+	uint32_t napi_quota;
 #define NUM_PERF_COUNTERS		6
 };
 
@@ -52,18 +52,18 @@ struct mlx4_en_perf_stats {
 #define MLX4_NUM_PRIORITIES	8
 
 struct mlx4_en_flow_stats_rx {
-	u64 rx_pause;
-	u64 rx_pause_duration;
-	u64 rx_pause_transition;
+	uint64_t rx_pause;
+	uint64_t rx_pause_duration;
+	uint64_t rx_pause_transition;
 #define NUM_FLOW_STATS_RX	3
 #define NUM_FLOW_PRIORITY_STATS_RX	(NUM_FLOW_STATS_RX * \
 					 MLX4_NUM_PRIORITIES)
 };
 
 struct mlx4_en_flow_stats_tx {
-	u64 tx_pause;
-	u64 tx_pause_duration;
-	u64 tx_pause_transition;
+	uint64_t tx_pause;
+	uint64_t tx_pause_duration;
+	uint64_t tx_pause_transition;
 #define NUM_FLOW_STATS_TX	3
 #define NUM_FLOW_PRIORITY_STATS_TX	(NUM_FLOW_STATS_TX * \
 					 MLX4_NUM_PRIORITIES)

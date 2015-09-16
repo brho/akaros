@@ -43,13 +43,13 @@
 #define IB_SMP_MAX_PATH_HOPS			64
 
 struct ib_smp {
-	u8	base_version;
-	u8	mgmt_class;
-	u8	class_version;
-	u8	method;
+	uint8_t	base_version;
+	uint8_t	mgmt_class;
+	uint8_t	class_version;
+	uint8_t	method;
 	__be16	status;
-	u8	hop_ptr;
-	u8	hop_cnt;
+	uint8_t	hop_ptr;
+	uint8_t	hop_cnt;
 	__be64	tid;
 	__be16	attr_id;
 	__be16	resv;
@@ -57,10 +57,10 @@ struct ib_smp {
 	__be64	mkey;
 	__be16	dr_slid;
 	__be16	dr_dlid;
-	u8	reserved[28];
-	u8	data[IB_SMP_DATA_SIZE];
-	u8	initial_path[IB_SMP_MAX_PATH_HOPS];
-	u8	return_path[IB_SMP_MAX_PATH_HOPS];
+	uint8_t	reserved[28];
+	uint8_t	data[IB_SMP_DATA_SIZE];
+	uint8_t	initial_path[IB_SMP_MAX_PATH_HOPS];
+	uint8_t	return_path[IB_SMP_MAX_PATH_HOPS];
 } __attribute__ ((packed));
 
 #define IB_SMP_DIRECTION			cpu_to_be16(0x8000)
@@ -91,35 +91,35 @@ struct ib_port_info {
 	__be32 cap_mask;
 	__be16 diag_code;
 	__be16 mkey_lease_period;
-	u8 local_port_num;
-	u8 link_width_enabled;
-	u8 link_width_supported;
-	u8 link_width_active;
-	u8 linkspeed_portstate;			/* 4 bits, 4 bits */
-	u8 portphysstate_linkdown;		/* 4 bits, 4 bits */
-	u8 mkeyprot_resv_lmc;			/* 2 bits, 3, 3 */
-	u8 linkspeedactive_enabled;		/* 4 bits, 4 bits */
-	u8 neighbormtu_mastersmsl;		/* 4 bits, 4 bits */
-	u8 vlcap_inittype;			/* 4 bits, 4 bits */
-	u8 vl_high_limit;
-	u8 vl_arb_high_cap;
-	u8 vl_arb_low_cap;
-	u8 inittypereply_mtucap;		/* 4 bits, 4 bits */
-	u8 vlstallcnt_hoqlife;			/* 3 bits, 5 bits */
-	u8 operationalvl_pei_peo_fpi_fpo;	/* 4 bits, 1, 1, 1, 1 */
+	uint8_t local_port_num;
+	uint8_t link_width_enabled;
+	uint8_t link_width_supported;
+	uint8_t link_width_active;
+	uint8_t linkspeed_portstate;			/* 4 bits, 4 bits */
+	uint8_t portphysstate_linkdown;		/* 4 bits, 4 bits */
+	uint8_t mkeyprot_resv_lmc;			/* 2 bits, 3, 3 */
+	uint8_t linkspeedactive_enabled;		/* 4 bits, 4 bits */
+	uint8_t neighbormtu_mastersmsl;		/* 4 bits, 4 bits */
+	uint8_t vlcap_inittype;			/* 4 bits, 4 bits */
+	uint8_t vl_high_limit;
+	uint8_t vl_arb_high_cap;
+	uint8_t vl_arb_low_cap;
+	uint8_t inittypereply_mtucap;		/* 4 bits, 4 bits */
+	uint8_t vlstallcnt_hoqlife;			/* 3 bits, 5 bits */
+	uint8_t operationalvl_pei_peo_fpi_fpo;	/* 4 bits, 1, 1, 1, 1 */
 	__be16 mkey_violations;
 	__be16 pkey_violations;
 	__be16 qkey_violations;
-	u8 guid_cap;
-	u8 clientrereg_resv_subnetto;		/* 1 bit, 2 bits, 5 */
-	u8 resv_resptimevalue;			/* 3 bits, 5 bits */
-	u8 localphyerrors_overrunerrors;	/* 4 bits, 4 bits */
+	uint8_t guid_cap;
+	uint8_t clientrereg_resv_subnetto;		/* 1 bit, 2 bits, 5 */
+	uint8_t resv_resptimevalue;			/* 3 bits, 5 bits */
+	uint8_t localphyerrors_overrunerrors;	/* 4 bits, 4 bits */
 	__be16 max_credit_hint;
-	u8 resv;
-	u8 link_roundtrip_latency[3];
+	uint8_t resv;
+	uint8_t link_roundtrip_latency[3];
 };
 
-static inline u8
+static inline uint8_t
 ib_get_smp_direction(struct ib_smp *smp)
 {
 	return ((smp->status & IB_SMP_DIRECTION) == IB_SMP_DIRECTION);

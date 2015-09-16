@@ -87,18 +87,18 @@ enum {
 };
 
 struct mlx4_en_query_port_context {
-	u8 link_up;
+	uint8_t link_up;
 #define MLX4_EN_LINK_UP_MASK	0x80
 #define MLX4_EN_ANC_MASK	0x40
-	u8 autoneg;
+	uint8_t autoneg;
 #define MLX4_EN_AUTONEG_MASK	0x80
 	__be16 mtu;
-	u8 reserved2;
-	u8 link_speed;
+	uint8_t reserved2;
+	uint8_t link_speed;
 #define MLX4_EN_SPEED_MASK	0x6f
-	u16 reserved3[5];
+	uint16_t reserved3[5];
 	__be64 mac;
-	u8 transceiver;
+	uint8_t transceiver;
 };
 
 

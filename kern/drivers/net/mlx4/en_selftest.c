@@ -57,7 +57,8 @@ static int mlx4_en_test_loopback_xmit(struct mlx4_en_priv *priv)
 
 
 	/* build the pkt before xmit */
-	skb = netdev_alloc_skb(priv->dev, MLX4_LOOPBACK_TEST_PAYLOAD + ETH_HLEN + NET_IP_ALIGN);
+	skb = netdev_alloc_skb(priv->dev,
+			       MLX4_LOOPBACK_TEST_PAYLOAD + ETHERHDRSIZE + NET_IP_ALIGN);
 	if (!skb)
 		return -ENOMEM;
 
@@ -65,9 +66,9 @@ static int mlx4_en_test_loopback_xmit(struct mlx4_en_priv *priv)
 
 	ethh = (struct ethhdr *)skb_put(skb, sizeof(struct ethhdr));
 	packet	= (unsigned char *)skb_put(skb, packet_size);
-	memcpy(ethh->h_dest, priv->dev->dev_addr, ETH_ALEN);
+	memcpy(ethh->h_dest, priv->dev->ea, Eaddrlen);
 	eth_zero_addr(ethh->h_source);
-	ethh->h_proto = htons(ETH_P_ARP);
+	ethh->h_proto = cpu_to_be16(ETH_P_ARP);
 	skb_set_mac_header(skb, 0);
 	for (i = 0; i < packet_size; ++i)	/* fill our packet */
 		packet[i] = (unsigned char)(i & 0xff);
@@ -79,16 +80,16 @@ static int mlx4_en_test_loopback_xmit(struct mlx4_en_priv *priv)
 
 static int mlx4_en_test_loopback(struct mlx4_en_priv *priv)
 {
-	u32 loopback_ok = 0;
+	uint32_t loopback_ok = 0;
 	int i;
 	bool gro_enabled;
 
         priv->loopback_ok = 0;
 	priv->validate_loopback = 1;
-	gro_enabled = priv->dev->features & NETIF_F_GRO;
+	gro_enabled = priv->dev->feat & NETIF_F_GRO;
 
-	mlx4_en_update_loopback_state(priv->dev, priv->dev->features);
-	priv->dev->features &= ~NETIF_F_GRO;
+	mlx4_en_update_loopback_state(priv->dev, priv->dev->feat);
+	priv->dev->feat &= ~NETIF_F_GRO;
 
 	/* xmit */
 	if (mlx4_en_test_loopback_xmit(priv)) {
@@ -98,7 +99,7 @@ static int mlx4_en_test_loopback(struct mlx4_en_priv *priv)
 
 	/* polling for result */
 	for (i = 0; i < MLX4_EN_LOOPBACK_RETRIES; ++i) {
-		msleep(MLX4_EN_LOOPBACK_TIMEOUT);
+		kthread_usleep(1000 * MLX4_EN_LOOPBACK_TIMEOUT);
 		if (priv->loopback_ok) {
 			loopback_ok = 1;
 			break;
@@ -112,9 +113,9 @@ mlx4_en_test_loopback_exit:
 	priv->validate_loopback = 0;
 
 	if (gro_enabled)
-		priv->dev->features |= NETIF_F_GRO;
+		priv->dev->feat |= NETIF_F_GRO;
 
-	mlx4_en_update_loopback_state(priv->dev, priv->dev->features);
+	mlx4_en_update_loopback_state(priv->dev, priv->dev->feat);
 	return !loopback_ok;
 }
 
@@ -148,13 +149,14 @@ static int mlx4_en_test_speed(struct mlx4_en_priv *priv)
 }
 
 
-void mlx4_en_ex_selftest(struct net_device *dev, u32 *flags, u64 *buf)
+void mlx4_en_ex_selftest(struct ether *dev, uint32_t *flags,
+			 uint64_t *buf)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	struct mlx4_en_dev *mdev = priv->mdev;
 	int i, carrier_ok;
 
-	memset(buf, 0, sizeof(u64) * MLX4_EN_NUM_SELF_TEST);
+	memset(buf, 0, sizeof(uint64_t) * MLX4_EN_NUM_SELF_TEST);
 
 	if (*flags & ETH_TEST_FL_OFFLINE) {
 		/* disable the interface */
@@ -164,7 +166,7 @@ void mlx4_en_ex_selftest(struct net_device *dev, u32 *flags, u64 *buf)
 		/* Wait until all tx queues are empty.
 		 * there should not be any additional incoming traffic
 		 * since we turned the carrier off */
-		msleep(200);
+		kthread_usleep(1000 * 200);
 
 		if (priv->mdev->dev->caps.flags &
 					MLX4_DEV_CAP_FLAG_UC_LOOPBACK) {

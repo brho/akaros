@@ -80,8 +80,8 @@ struct mlx4_congestion_control_mb_prio_802_1_qau_statistics {
 	__be32 reserved3[4];
 };
 
-static int mlx4_en_dcbnl_ieee_getets(struct net_device *dev,
-				   struct ieee_ets *ets)
+static int mlx4_en_dcbnl_ieee_getets(struct ether *dev,
+				     struct ieee_ets *ets)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	struct ieee_ets *my_ets = &priv->ets;
@@ -136,7 +136,7 @@ static int mlx4_en_ets_validate(struct mlx4_en_priv *priv, struct ieee_ets *ets)
 }
 
 static int mlx4_en_config_port_scheduler(struct mlx4_en_priv *priv,
-		struct ieee_ets *ets, u16 *ratelimit)
+		struct ieee_ets *ets, uint16_t *ratelimit)
 {
 	struct mlx4_en_dev *mdev = priv->mdev;
 	int num_strict = 0;
@@ -166,7 +166,7 @@ static int mlx4_en_config_port_scheduler(struct mlx4_en_priv *priv,
 }
 
 static int
-mlx4_en_dcbnl_ieee_setets(struct net_device *dev, struct ieee_ets *ets)
+mlx4_en_dcbnl_ieee_setets(struct ether *dev, struct ieee_ets *ets)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	struct mlx4_en_dev *mdev = priv->mdev;
@@ -189,8 +189,8 @@ mlx4_en_dcbnl_ieee_setets(struct net_device *dev, struct ieee_ets *ets)
 	return 0;
 }
 
-static int mlx4_en_dcbnl_ieee_getpfc(struct net_device *dev,
-		struct ieee_pfc *pfc)
+static int mlx4_en_dcbnl_ieee_getpfc(struct ether *dev,
+				     struct ieee_pfc *pfc)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 
@@ -200,8 +200,8 @@ static int mlx4_en_dcbnl_ieee_getpfc(struct net_device *dev,
 	return 0;
 }
 
-static int mlx4_en_dcbnl_ieee_setpfc(struct net_device *dev,
-		struct ieee_pfc *pfc)
+static int mlx4_en_dcbnl_ieee_setpfc(struct ether *dev,
+				     struct ieee_pfc *pfc)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	struct mlx4_en_port_profile *prof = priv->prof;
@@ -235,12 +235,12 @@ static int mlx4_en_dcbnl_ieee_setpfc(struct net_device *dev,
 	return err;
 }
 
-static u8 mlx4_en_dcbnl_getdcbx(struct net_device *dev)
+static uint8_t mlx4_en_dcbnl_getdcbx(struct ether *dev)
 {
 	return DCB_CAP_DCBX_HOST | DCB_CAP_DCBX_VER_IEEE;
 }
 
-static u8 mlx4_en_dcbnl_setdcbx(struct net_device *dev, u8 mode)
+static uint8_t mlx4_en_dcbnl_setdcbx(struct ether *dev, uint8_t mode)
 {
 	if ((mode & DCB_CAP_DCBX_LLD_MANAGED) ||
 	    (mode & DCB_CAP_DCBX_VER_CEE) ||
@@ -252,8 +252,8 @@ static u8 mlx4_en_dcbnl_setdcbx(struct net_device *dev, u8 mode)
 }
 
 #define MLX4_RATELIMIT_UNITS_IN_KB 100000 /* rate-limit HW unit in Kbps */
-static int mlx4_en_dcbnl_ieee_getmaxrate(struct net_device *dev,
-				   struct ieee_maxrate *maxrate)
+static int mlx4_en_dcbnl_ieee_getmaxrate(struct ether *dev,
+					 struct ieee_maxrate *maxrate)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	int i;
@@ -265,11 +265,11 @@ static int mlx4_en_dcbnl_ieee_getmaxrate(struct net_device *dev,
 	return 0;
 }
 
-static int mlx4_en_dcbnl_ieee_setmaxrate(struct net_device *dev,
-		struct ieee_maxrate *maxrate)
+static int mlx4_en_dcbnl_ieee_setmaxrate(struct ether *dev,
+					 struct ieee_maxrate *maxrate)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
-	u16 tmp[IEEE_8021QAZ_MAX_TCS];
+	uint16_t tmp[IEEE_8021QAZ_MAX_TCS];
 	int i, err;
 
 	for (i = 0; i < IEEE_8021QAZ_MAX_TCS; i++) {
@@ -293,14 +293,14 @@ static int mlx4_en_dcbnl_ieee_setmaxrate(struct net_device *dev,
 #define RPG_ENABLE_BIT	31
 #define CN_TAG_BIT	30
 
-static int mlx4_en_dcbnl_ieee_getqcn(struct net_device *dev,
+static int mlx4_en_dcbnl_ieee_getqcn(struct ether *dev,
 				     struct ieee_qcn *qcn)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	struct mlx4_congestion_control_mb_prio_802_1_qau_params *hw_qcn;
 	struct mlx4_cmd_mailbox *mailbox_out = NULL;
-	u64 mailbox_in_dma = 0;
-	u32 inmod = 0;
+	uint64_t mailbox_in_dma = 0;
+	uint32_t inmod = 0;
 	int i, err;
 
 	if (!(priv->mdev->dev->caps.flags2 & MLX4_DEV_CAP_FLAG2_QCN))
@@ -356,14 +356,14 @@ static int mlx4_en_dcbnl_ieee_getqcn(struct net_device *dev,
 	return 0;
 }
 
-static int mlx4_en_dcbnl_ieee_setqcn(struct net_device *dev,
+static int mlx4_en_dcbnl_ieee_setqcn(struct ether *dev,
 				     struct ieee_qcn *qcn)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	struct mlx4_congestion_control_mb_prio_802_1_qau_params *hw_qcn;
 	struct mlx4_cmd_mailbox *mailbox_in = NULL;
-	u64 mailbox_in_dma = 0;
-	u32 inmod = 0;
+	uint64_t mailbox_in_dma = 0;
+	uint32_t inmod = 0;
 	int i, err;
 #define MODIFY_ENABLE_HIGH_MASK 0xc0000000
 #define MODIFY_ENABLE_LOW_MASK 0xffc00000
@@ -419,14 +419,14 @@ static int mlx4_en_dcbnl_ieee_setqcn(struct net_device *dev,
 	return 0;
 }
 
-static int mlx4_en_dcbnl_ieee_getqcnstats(struct net_device *dev,
+static int mlx4_en_dcbnl_ieee_getqcnstats(struct ether *dev,
 					  struct ieee_qcn_stats *qcn_stats)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	struct mlx4_congestion_control_mb_prio_802_1_qau_statistics *hw_qcn_stats;
 	struct mlx4_cmd_mailbox *mailbox_out = NULL;
-	u64 mailbox_in_dma = 0;
-	u32 inmod = 0;
+	uint64_t mailbox_in_dma = 0;
+	uint32_t inmod = 0;
 	int i, err;
 
 	if (!(priv->mdev->dev->caps.flags2 & MLX4_DEV_CAP_FLAG2_QCN))

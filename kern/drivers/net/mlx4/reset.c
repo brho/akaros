@@ -42,13 +42,13 @@
 int mlx4_reset(struct mlx4_dev *dev)
 {
 	void __iomem *reset;
-	u32 *hca_header = NULL;
+	uint32_t *hca_header = NULL;
 	int pcie_cap;
-	u16 devctl;
-	u16 linkctl;
-	u16 vendor;
+	uint16_t devctl;
+	uint16_t linkctl;
+	uint16_t vendor;
 	unsigned long end;
-	u32 sem;
+	uint32_t sem;
 	int i;
 	int err = 0;
 
@@ -69,7 +69,7 @@ int mlx4_reset(struct mlx4_dev *dev)
 	 */
 
 	/* Do we need to save off the full 4K PCI Express header?? */
-	hca_header = kmalloc(256, GFP_KERNEL);
+	hca_header = kmalloc(256, KMALLOC_WAIT);
 	if (!hca_header) {
 		err = -ENOMEM;
 		mlx4_err(dev, "Couldn't allocate memory to save HCA PCI header, aborting\n");
@@ -101,11 +101,11 @@ int mlx4_reset(struct mlx4_dev *dev)
 	/* grab HW semaphore to lock out flash updates */
 	end = jiffies + MLX4_SEM_TIMEOUT_JIFFIES;
 	do {
-		sem = readl(reset + MLX4_SEM_OFFSET);
+		sem = read32(reset + MLX4_SEM_OFFSET);
 		if (!sem)
 			break;
 
-		msleep(1);
+		kthread_usleep(1000 * 1);
 	} while (time_before(jiffies, end));
 
 	if (sem) {
@@ -116,11 +116,11 @@ int mlx4_reset(struct mlx4_dev *dev)
 	}
 
 	/* actually hit reset */
-	writel(MLX4_RESET_VALUE, reset + MLX4_RESET_OFFSET);
+	write32(MLX4_RESET_VALUE, reset + MLX4_RESET_OFFSET);
 	iounmap(reset);
 
 	/* Docs say to wait one second before accessing device */
-	msleep(1000);
+	kthread_usleep(1000 * 1000);
 
 	end = jiffies + MLX4_RESET_TIMEOUT_JIFFIES;
 	do {
@@ -128,7 +128,7 @@ int mlx4_reset(struct mlx4_dev *dev)
 					  &vendor) && vendor != 0xffff)
 			break;
 
-		msleep(1);
+		kthread_usleep(1000 * 1);
 	} while (time_before(jiffies, end));
 
 	if (vendor == 0xffff) {

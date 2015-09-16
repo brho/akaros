@@ -150,7 +150,7 @@ static bool use_prio;
 module_param_named(use_prio, use_prio, bool, 0444);
 MODULE_PARM_DESC(use_prio, "Enable steering by VLAN priority on ETH ports (deprecated)");
 
-int log_mtts_per_seg = ilog2(MLX4_MTT_ENTRY_PER_SEG);
+int log_mtts_per_seg = LOG2_UP(MLX4_MTT_ENTRY_PER_SEG);
 module_param_named(log_mtts_per_seg, log_mtts_per_seg, int, 0444);
 MODULE_PARM_DESC(log_mtts_per_seg, "Log2 number of MTT entries per segment (1-7)");
 
@@ -163,7 +163,7 @@ MODULE_PARM_DESC(port_type_array, "Array of port types: HW_DEFAULT (0) is defaul
 struct mlx4_port_config {
 	struct list_head list;
 	enum mlx4_port_type port_type[MLX4_MAX_PORTS + 1];
-	struct pci_dev *pdev;
+	struct pci_device *pdev;
 };
 
 static atomic_t pf_loading = ATOMIC_INIT(0);
@@ -387,7 +387,8 @@ static int mlx4_dev_cap(struct mlx4_dev *dev, struct mlx4_dev_cap *dev_cap)
 	dev->caps.reserved_mrws	     = dev_cap->reserved_mrws;
 
 	/* The first 128 UARs are used for EQ doorbells */
-	dev->caps.reserved_uars	     = max_t(int, 128, dev_cap->reserved_uars);
+	dev->caps.reserved_uars	     = MAX_T(int, 128,
+						    dev_cap->reserved_uars);
 	dev->caps.reserved_pds	     = dev_cap->reserved_pds;
 	dev->caps.reserved_xrcds     = (dev->caps.flags & MLX4_DEV_CAP_FLAG_XRC) ?
 					dev_cap->reserved_xrcds : 0;
@@ -479,7 +480,7 @@ static int mlx4_dev_cap(struct mlx4_dev *dev, struct mlx4_dev_cap *dev_cap)
 		}
 	}
 
-	dev->caps.max_counters = 1 << ilog2(dev_cap->max_counters);
+	dev->caps.max_counters = 1 << LOG2_UP(dev_cap->max_counters);
 
 	dev->caps.reserved_qps_cnt[MLX4_QP_REGION_FW] = dev_cap->reserved_qps;
 	dev->caps.reserved_qps_cnt[MLX4_QP_REGION_ETH_ADDR] =
@@ -568,7 +569,7 @@ static int mlx4_get_pcie_dev_link_caps(struct mlx4_dev *dev,
 				       enum pci_bus_speed *speed,
 				       enum pcie_link_width *width)
 {
-	u32 lnkcap1, lnkcap2;
+	uint32_t lnkcap1, lnkcap2;
 	int err1, err2;
 
 #define  PCIE_MLW_CAP_SHIFT 4	/* start of MLW mask in link capabilities */
@@ -663,9 +664,9 @@ static int mlx4_how_many_lives_vf(struct mlx4_dev *dev)
 	return ret;
 }
 
-int mlx4_get_parav_qkey(struct mlx4_dev *dev, u32 qpn, u32 *qkey)
+int mlx4_get_parav_qkey(struct mlx4_dev *dev, uint32_t qpn, uint32_t *qkey)
 {
-	u32 qk = MLX4_RESERVED_QKEY_BASE;
+	uint32_t qk = MLX4_RESERVED_QKEY_BASE;
 
 	if (qpn >= dev->phys_caps.base_tunnel_sqpn + 8 * MLX4_MFUNC_MAX ||
 	    qpn < dev->phys_caps.base_proxy_sqpn)
@@ -747,11 +748,11 @@ static void slave_adjust_steering_mode(struct mlx4_dev *dev,
 static int mlx4_slave_cap(struct mlx4_dev *dev)
 {
 	int			   err;
-	u32			   page_size;
+	uint32_t			   page_size;
 	struct mlx4_dev_cap	   dev_cap;
 	struct mlx4_func_cap	   func_cap;
 	struct mlx4_init_hca_param hca_param;
-	u8			   i;
+	uint8_t			   i;
 
 	memset(&hca_param, 0, sizeof(hca_param));
 	err = mlx4_QUERY_HCA(dev, &hca_param);
@@ -840,11 +841,16 @@ static int mlx4_slave_cap(struct mlx4_dev *dev)
 		return -ENODEV;
 	}
 
-	dev->caps.qp0_qkey = kcalloc(dev->caps.num_ports, sizeof(u32), GFP_KERNEL);
-	dev->caps.qp0_tunnel = kcalloc(dev->caps.num_ports, sizeof (u32), GFP_KERNEL);
-	dev->caps.qp0_proxy = kcalloc(dev->caps.num_ports, sizeof (u32), GFP_KERNEL);
-	dev->caps.qp1_tunnel = kcalloc(dev->caps.num_ports, sizeof (u32), GFP_KERNEL);
-	dev->caps.qp1_proxy = kcalloc(dev->caps.num_ports, sizeof (u32), GFP_KERNEL);
+	dev->caps.qp0_qkey = kzmalloc((dev->caps.num_ports) * (sizeof(uint32_t)),
+				      KMALLOC_WAIT);
+	dev->caps.qp0_tunnel = kzmalloc((dev->caps.num_ports) * (sizeof(uint32_t)),
+					KMALLOC_WAIT);
+	dev->caps.qp0_proxy = kzmalloc((dev->caps.num_ports) * (sizeof(uint32_t)),
+				       KMALLOC_WAIT);
+	dev->caps.qp1_tunnel = kzmalloc((dev->caps.num_ports) * (sizeof(uint32_t)),
+					KMALLOC_WAIT);
+	dev->caps.qp1_proxy = kzmalloc((dev->caps.num_ports) * (sizeof(uint32_t)),
+				       KMALLOC_WAIT);
 
 	if (!dev->caps.qp0_tunnel || !dev->caps.qp0_proxy ||
 	    !dev->caps.qp1_tunnel || !dev->caps.qp1_proxy ||
@@ -1038,7 +1044,7 @@ static ssize_t set_port_type(struct device *dev,
 	int i;
 	int err = 0;
 
-	mutex_lock(&set_port_type_mutex);
+	qlock(&set_port_type_mutex);
 
 	if (!strcmp(buf, "ib\n"))
 		info->tmp_type = MLX4_PORT_TYPE_IB;
@@ -1053,7 +1059,7 @@ static ssize_t set_port_type(struct device *dev,
 	}
 
 	mlx4_stop_sense(mdev);
-	mutex_lock(&priv->port_mutex);
+	qlock(&priv->port_mutex);
 	/* Possible type is always the one that was delivered */
 	mdev->caps.possible_type[info->port] = info->tmp_type;
 
@@ -1094,9 +1100,9 @@ static ssize_t set_port_type(struct device *dev,
 
 out:
 	mlx4_start_sense(mdev);
-	mutex_unlock(&priv->port_mutex);
+	qunlock(&priv->port_mutex);
 err_out:
-	mutex_unlock(&set_port_type_mutex);
+	qunlock(&set_port_type_mutex);
 
 	return err ? err : count;
 }
@@ -1176,7 +1182,7 @@ static ssize_t set_port_ib_mtu(struct device *dev,
 	mdev->caps.port_ib_mtu[info->port] = ibta_mtu;
 
 	mlx4_stop_sense(mdev);
-	mutex_lock(&priv->port_mutex);
+	qlock(&priv->port_mutex);
 	mlx4_unregister_device(mdev);
 	for (port = 1; port <= mdev->caps.num_ports; port++) {
 		mlx4_CLOSE_PORT(mdev, port);
@@ -1189,7 +1195,7 @@ static ssize_t set_port_ib_mtu(struct device *dev,
 	}
 	err = mlx4_register_device(mdev);
 err_set_port:
-	mutex_unlock(&priv->port_mutex);
+	qunlock(&priv->port_mutex);
 	mlx4_start_sense(mdev);
 	return err ? err : count;
 }
@@ -1199,14 +1205,14 @@ int mlx4_bond(struct mlx4_dev *dev)
 	int ret = 0;
 	struct mlx4_priv *priv = mlx4_priv(dev);
 
-	mutex_lock(&priv->bond_mutex);
+	qlock(&priv->bond_mutex);
 
 	if (!mlx4_is_bonded(dev))
 		ret = mlx4_do_bond(dev, true);
 	else
 		ret = 0;
 
-	mutex_unlock(&priv->bond_mutex);
+	qunlock(&priv->bond_mutex);
 	if (ret)
 		mlx4_err(dev, "Failed to bond device: %d\n", ret);
 	else
@@ -1220,12 +1226,12 @@ int mlx4_unbond(struct mlx4_dev *dev)
 	int ret = 0;
 	struct mlx4_priv *priv = mlx4_priv(dev);
 
-	mutex_lock(&priv->bond_mutex);
+	qlock(&priv->bond_mutex);
 
 	if (mlx4_is_bonded(dev))
 		ret = mlx4_do_bond(dev, false);
 
-	mutex_unlock(&priv->bond_mutex);
+	qunlock(&priv->bond_mutex);
 	if (ret)
 		mlx4_err(dev, "Failed to unbond device: %d\n", ret);
 	else
@@ -1237,15 +1243,15 @@ EXPORT_SYMBOL_GPL(mlx4_unbond);
 
 int mlx4_port_map_set(struct mlx4_dev *dev, struct mlx4_port_map *v2p)
 {
-	u8 port1 = v2p->port1;
-	u8 port2 = v2p->port2;
+	uint8_t port1 = v2p->port1;
+	uint8_t port2 = v2p->port2;
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	int err;
 
 	if (!(dev->caps.flags2 & MLX4_DEV_CAP_FLAG2_PORT_REMAP))
 		return -ENOTSUPP;
 
-	mutex_lock(&priv->bond_mutex);
+	qlock(&priv->bond_mutex);
 
 	/* zero means keep current mapping for this port */
 	if (port1 == 0)
@@ -1274,7 +1280,7 @@ int mlx4_port_map_set(struct mlx4_dev *dev, struct mlx4_port_map *v2p)
 		}
 	}
 
-	mutex_unlock(&priv->bond_mutex);
+	qunlock(&priv->bond_mutex);
 	return err;
 }
 EXPORT_SYMBOL_GPL(mlx4_port_map_set);
@@ -1313,7 +1319,7 @@ err_free:
 	return err;
 }
 
-static int mlx4_init_cmpt_table(struct mlx4_dev *dev, u64 cmpt_base,
+static int mlx4_init_cmpt_table(struct mlx4_dev *dev, uint64_t cmpt_base,
 				int cmpt_entry_sz)
 {
 	struct mlx4_priv *priv = mlx4_priv(dev);
@@ -1322,8 +1328,8 @@ static int mlx4_init_cmpt_table(struct mlx4_dev *dev, u64 cmpt_base,
 
 	err = mlx4_init_icm_table(dev, &priv->qp_table.cmpt_table,
 				  cmpt_base +
-				  ((u64) (MLX4_CMPT_TYPE_QP *
-					  cmpt_entry_sz) << MLX4_CMPT_SHIFT),
+				  ((uint64_t) (MLX4_CMPT_TYPE_QP *
+					       cmpt_entry_sz) << MLX4_CMPT_SHIFT),
 				  cmpt_entry_sz, dev->caps.num_qps,
 				  dev->caps.reserved_qps_cnt[MLX4_QP_REGION_FW],
 				  0, 0);
@@ -1332,8 +1338,8 @@ static int mlx4_init_cmpt_table(struct mlx4_dev *dev, u64 cmpt_base,
 
 	err = mlx4_init_icm_table(dev, &priv->srq_table.cmpt_table,
 				  cmpt_base +
-				  ((u64) (MLX4_CMPT_TYPE_SRQ *
-					  cmpt_entry_sz) << MLX4_CMPT_SHIFT),
+				  ((uint64_t) (MLX4_CMPT_TYPE_SRQ *
+					       cmpt_entry_sz) << MLX4_CMPT_SHIFT),
 				  cmpt_entry_sz, dev->caps.num_srqs,
 				  dev->caps.reserved_srqs, 0, 0);
 	if (err)
@@ -1341,8 +1347,8 @@ static int mlx4_init_cmpt_table(struct mlx4_dev *dev, u64 cmpt_base,
 
 	err = mlx4_init_icm_table(dev, &priv->cq_table.cmpt_table,
 				  cmpt_base +
-				  ((u64) (MLX4_CMPT_TYPE_CQ *
-					  cmpt_entry_sz) << MLX4_CMPT_SHIFT),
+				  ((uint64_t) (MLX4_CMPT_TYPE_CQ *
+					       cmpt_entry_sz) << MLX4_CMPT_SHIFT),
 				  cmpt_entry_sz, dev->caps.num_cqs,
 				  dev->caps.reserved_cqs, 0, 0);
 	if (err)
@@ -1351,8 +1357,8 @@ static int mlx4_init_cmpt_table(struct mlx4_dev *dev, u64 cmpt_base,
 	num_eqs = dev->phys_caps.num_phys_eqs;
 	err = mlx4_init_icm_table(dev, &priv->eq_table.cmpt_table,
 				  cmpt_base +
-				  ((u64) (MLX4_CMPT_TYPE_EQ *
-					  cmpt_entry_sz) << MLX4_CMPT_SHIFT),
+				  ((uint64_t) (MLX4_CMPT_TYPE_EQ *
+					       cmpt_entry_sz) << MLX4_CMPT_SHIFT),
 				  cmpt_entry_sz, num_eqs, num_eqs, 0, 0);
 	if (err)
 		goto err_cq;
@@ -1373,10 +1379,11 @@ err:
 }
 
 static int mlx4_init_icm(struct mlx4_dev *dev, struct mlx4_dev_cap *dev_cap,
-			 struct mlx4_init_hca_param *init_hca, u64 icm_size)
+			 struct mlx4_init_hca_param *init_hca,
+			 uint64_t icm_size)
 {
 	struct mlx4_priv *priv = mlx4_priv(dev);
-	u64 aux_pages;
+	uint64_t aux_pages;
 	int num_eqs;
 	int err;
 
@@ -1603,11 +1610,11 @@ static void mlx4_slave_exit(struct mlx4_dev *dev)
 {
 	struct mlx4_priv *priv = mlx4_priv(dev);
 
-	mutex_lock(&priv->cmd.slave_cmd_mutex);
+	qlock(&priv->cmd.slave_cmd_mutex);
 	if (mlx4_comm_cmd(dev, MLX4_COMM_CMD_RESET, 0, MLX4_COMM_CMD_NA_OP,
 			  MLX4_COMM_TIME))
 		mlx4_warn(dev, "Failed to close slave function\n");
-	mutex_unlock(&priv->cmd.slave_cmd_mutex);
+	qunlock(&priv->cmd.slave_cmd_mutex);
 }
 
 static int map_bf_area(struct mlx4_dev *dev)
@@ -1637,22 +1644,22 @@ static void unmap_bf_area(struct mlx4_dev *dev)
 		io_mapping_free(mlx4_priv(dev)->bf_mapping);
 }
 
-cycle_t mlx4_read_clock(struct mlx4_dev *dev)
+uint64_t mlx4_read_clock(struct mlx4_dev *dev)
 {
-	u32 clockhi, clocklo, clockhi1;
-	cycle_t cycles;
+	uint32_t clockhi, clocklo, clockhi1;
+	uint64_t cycles;
 	int i;
 	struct mlx4_priv *priv = mlx4_priv(dev);
 
 	for (i = 0; i < 10; i++) {
-		clockhi = swab32(readl(priv->clock_mapping));
-		clocklo = swab32(readl(priv->clock_mapping + 4));
-		clockhi1 = swab32(readl(priv->clock_mapping));
+		clockhi = swab32(read32(priv->clock_mapping));
+		clocklo = swab32(read32(priv->clock_mapping + 4));
+		clockhi1 = swab32(read32(priv->clock_mapping));
 		if (clockhi == clockhi1)
 			break;
 	}
 
-	cycles = (u64) clockhi << 32 | (u64) clocklo;
+	cycles = (uint64_t) clockhi << 32 | (uint64_t) clocklo;
 
 	return cycles;
 }
@@ -1706,17 +1713,17 @@ static int mlx4_comm_check_offline(struct mlx4_dev *dev)
 {
 #define COMM_CHAN_OFFLINE_OFFSET 0x09
 
-	u32 comm_flags;
-	u32 offline_bit;
+	uint32_t comm_flags;
+	uint32_t offline_bit;
 	unsigned long end;
 	struct mlx4_priv *priv = mlx4_priv(dev);
 
 	end = msecs_to_jiffies(MLX4_COMM_OFFLINE_TIME_OUT) + jiffies;
 	while (time_before(jiffies, end)) {
-		comm_flags = swab32(readl((__iomem char *)priv->mfunc.comm +
-					  MLX4_COMM_CHAN_FLAGS));
+		comm_flags = swab32(read32((__iomem char *)priv->mfunc.comm +
+					   MLX4_COMM_CHAN_FLAGS));
 		offline_bit = (comm_flags &
-			       (u32)(1 << COMM_CHAN_OFFLINE_OFFSET));
+			       (uint32_t)(1 << COMM_CHAN_OFFLINE_OFFSET));
 		if (!offline_bit)
 			return 0;
 		/* There are cases as part of AER/Reset flow that PF needs
@@ -1724,7 +1731,7 @@ static int mlx4_comm_check_offline(struct mlx4_dev *dev)
 		 * to allow other tasks to make use of that CPU during this
 		 * time interval.
 		 */
-		msleep(100);
+		kthread_usleep(1000 * 100);
 	}
 	mlx4_err(dev, "Communication channel is offline.\n");
 	return -EIO;
@@ -1735,12 +1742,12 @@ static void mlx4_reset_vf_support(struct mlx4_dev *dev)
 #define COMM_CHAN_RST_OFFSET 0x1e
 
 	struct mlx4_priv *priv = mlx4_priv(dev);
-	u32 comm_rst;
-	u32 comm_caps;
+	uint32_t comm_rst;
+	uint32_t comm_caps;
 
-	comm_caps = swab32(readl((__iomem char *)priv->mfunc.comm +
-				 MLX4_COMM_CHAN_CAPS));
-	comm_rst = (comm_caps & (u32)(1 << COMM_CHAN_RST_OFFSET));
+	comm_caps = swab32(read32((__iomem char *)priv->mfunc.comm +
+				  MLX4_COMM_CHAN_CAPS));
+	comm_rst = (comm_caps & (uint32_t)(1 << COMM_CHAN_RST_OFFSET));
 
 	if (comm_rst)
 		dev->caps.vf_caps |= MLX4_VF_CAP_FLAG_RESET;
@@ -1749,17 +1756,17 @@ static void mlx4_reset_vf_support(struct mlx4_dev *dev)
 static int mlx4_init_slave(struct mlx4_dev *dev)
 {
 	struct mlx4_priv *priv = mlx4_priv(dev);
-	u64 dma = (u64) priv->mfunc.vhcr_dma;
+	uint64_t dma = (uint64_t) priv->mfunc.vhcr_dma;
 	int ret_from_reset = 0;
-	u32 slave_read;
-	u32 cmd_channel_ver;
+	uint32_t slave_read;
+	uint32_t cmd_channel_ver;
 
 	if (atomic_read(&pf_loading)) {
 		mlx4_warn(dev, "PF is not ready - Deferring probe\n");
 		return -EPROBE_DEFER;
 	}
 
-	mutex_lock(&priv->cmd.slave_cmd_mutex);
+	qlock(&priv->cmd.slave_cmd_mutex);
 	priv->cmd.max_cmds = 1;
 	if (mlx4_comm_check_offline(dev)) {
 		mlx4_err(dev, "PF is not responsive, skipping initialization\n");
@@ -1775,7 +1782,7 @@ static int mlx4_init_slave(struct mlx4_dev *dev)
 	if (ret_from_reset) {
 		if (MLX4_DELAY_RESET_SLAVE == ret_from_reset) {
 			mlx4_warn(dev, "slave is currently in the middle of FLR - Deferring probe\n");
-			mutex_unlock(&priv->cmd.slave_cmd_mutex);
+			qunlock(&priv->cmd.slave_cmd_mutex);
 			return -EPROBE_DEFER;
 		} else
 			goto err;
@@ -1783,7 +1790,7 @@ static int mlx4_init_slave(struct mlx4_dev *dev)
 
 	/* check the driver version - the slave I/F revision
 	 * must match the master's */
-	slave_read = swab32(readl(&priv->mfunc.comm->slave_read));
+	slave_read = swab32(read32(&priv->mfunc.comm->slave_read));
 	cmd_channel_ver = mlx4_comm_get_version();
 
 	if (MLX4_COMM_GET_IF_REV(cmd_channel_ver) !=
@@ -1806,13 +1813,13 @@ static int mlx4_init_slave(struct mlx4_dev *dev)
 			  MLX4_COMM_CMD_NA_OP, MLX4_COMM_TIME))
 		goto err;
 
-	mutex_unlock(&priv->cmd.slave_cmd_mutex);
+	qunlock(&priv->cmd.slave_cmd_mutex);
 	return 0;
 
 err:
 	mlx4_comm_cmd(dev, MLX4_COMM_CMD_RESET, 0, MLX4_COMM_CMD_NA_OP, 0);
 err_offline:
-	mutex_unlock(&priv->cmd.slave_cmd_mutex);
+	qunlock(&priv->cmd.slave_cmd_mutex);
 	return -EIO;
 }
 
@@ -2002,7 +2009,7 @@ static int mlx4_init_hca(struct mlx4_dev *dev)
 	struct mlx4_dev_cap	   dev_cap;
 	struct mlx4_profile	   profile;
 	struct mlx4_init_hca_param init_hca;
-	u64 icm_size;
+	uint64_t icm_size;
 	struct mlx4_config_dev_params params;
 	int err;
 
@@ -2044,9 +2051,9 @@ static int mlx4_init_hca(struct mlx4_dev *dev)
 			return err;
 		}
 
-		dev->caps.max_fmr_maps = (1 << (32 - ilog2(dev->caps.num_mpts))) - 1;
+		dev->caps.max_fmr_maps = (1 << (32 - LOG2_UP(dev->caps.num_mpts))) - 1;
 
-		init_hca.log_uar_sz = ilog2(dev->caps.num_uars);
+		init_hca.log_uar_sz = LOG2_UP(dev->caps.num_uars);
 		init_hca.uar_page_sz = PAGE_SHIFT - 12;
 		init_hca.mw_enabled = 0;
 		if (dev->caps.flags & MLX4_DEV_CAP_FLAG_MEM_WINDOW ||
@@ -2207,7 +2214,7 @@ static void mlx4_cleanup_counters_table(struct mlx4_dev *dev)
 	mlx4_bitmap_cleanup(&mlx4_priv(dev)->counters_bitmap);
 }
 
-int __mlx4_counter_alloc(struct mlx4_dev *dev, u32 *idx)
+int __mlx4_counter_alloc(struct mlx4_dev *dev, uint32_t *idx)
 {
 	struct mlx4_priv *priv = mlx4_priv(dev);
 
@@ -2221,9 +2228,9 @@ int __mlx4_counter_alloc(struct mlx4_dev *dev, u32 *idx)
 	return 0;
 }
 
-int mlx4_counter_alloc(struct mlx4_dev *dev, u32 *idx)
+int mlx4_counter_alloc(struct mlx4_dev *dev, uint32_t *idx)
 {
-	u64 out_param;
+	uint64_t out_param;
 	int err;
 
 	if (mlx4_is_mfunc(dev)) {
@@ -2239,15 +2246,15 @@ int mlx4_counter_alloc(struct mlx4_dev *dev, u32 *idx)
 }
 EXPORT_SYMBOL_GPL(mlx4_counter_alloc);
 
-void __mlx4_counter_free(struct mlx4_dev *dev, u32 idx)
+void __mlx4_counter_free(struct mlx4_dev *dev, uint32_t idx)
 {
 	mlx4_bitmap_free(&mlx4_priv(dev)->counters_bitmap, idx, MLX4_USE_RR);
 	return;
 }
 
-void mlx4_counter_free(struct mlx4_dev *dev, u32 idx)
+void mlx4_counter_free(struct mlx4_dev *dev, uint32_t idx)
 {
-	u64 in_param = 0;
+	uint64_t in_param = 0;
 
 	if (mlx4_is_mfunc(dev)) {
 		set_param_l(&in_param, idx);
@@ -2490,10 +2497,10 @@ static void mlx4_enable_msi_x(struct mlx4_dev *dev)
 	if (msi_x) {
 		int nreq = dev->caps.num_ports * num_online_cpus() + MSIX_LEGACY_SZ;
 
-		nreq = min_t(int, dev->caps.num_eqs - dev->caps.reserved_eqs,
-			     nreq);
+		nreq = MIN_T(int, dev->caps.num_eqs - dev->caps.reserved_eqs,
+		             nreq);
 
-		entries = kcalloc(nreq, sizeof *entries, GFP_KERNEL);
+		entries = kzmalloc((nreq) * (sizeof *entries), KMALLOC_WAIT);
 		if (!entries)
 			goto no_msi;
 
@@ -2602,7 +2609,8 @@ static int mlx4_init_steering(struct mlx4_dev *dev)
 	int num_entries = dev->caps.num_ports;
 	int i, j;
 
-	priv->steer = kzalloc(sizeof(struct mlx4_steer) * num_entries, GFP_KERNEL);
+	priv->steer = kzmalloc(sizeof(struct mlx4_steer) * num_entries,
+			       KMALLOC_WAIT);
 	if (!priv->steer)
 		return -ENOMEM;
 
@@ -2647,7 +2655,7 @@ static void mlx4_clear_steering(struct mlx4_dev *dev)
 	kfree(priv->steer);
 }
 
-static int extended_func_num(struct pci_dev *pdev)
+static int extended_func_num(struct pci_device *pdev)
 {
 	return PCI_SLOT(pdev->devfn) * 8 + PCI_FUNC(pdev->devfn);
 }
@@ -2658,7 +2666,7 @@ static int extended_func_num(struct pci_dev *pdev)
 static int mlx4_get_ownership(struct mlx4_dev *dev)
 {
 	void __iomem *owner;
-	u32 ret;
+	uint32_t ret;
 
 	if (pci_channel_offline(dev->persist->pdev))
 		return -EIO;
@@ -2671,7 +2679,7 @@ static int mlx4_get_ownership(struct mlx4_dev *dev)
 		return -ENOMEM;
 	}
 
-	ret = readl(owner);
+	ret = read32(owner);
 	iounmap(owner);
 	return (int) !!ret;
 }
@@ -2690,23 +2698,25 @@ static void mlx4_free_ownership(struct mlx4_dev *dev)
 		mlx4_err(dev, "Failed to obtain ownership bit\n");
 		return;
 	}
-	writel(0, owner);
-	msleep(1000);
+	write32(0, owner);
+	kthread_usleep(1000 * 1000);
 	iounmap(owner);
 }
 
 #define SRIOV_VALID_STATE(flags) (!!((flags) & MLX4_FLAG_SRIOV)	==\
 				  !!((flags) & MLX4_FLAG_MASTER))
 
-static u64 mlx4_enable_sriov(struct mlx4_dev *dev, struct pci_dev *pdev,
-			     u8 total_vfs, int existing_vfs, int reset_flow)
+static uint64_t mlx4_enable_sriov(struct mlx4_dev *dev,
+				  struct pci_device *pdev,
+				  uint8_t total_vfs, int existing_vfs,
+				  int reset_flow)
 {
-	u64 dev_flags = dev->flags;
+	uint64_t dev_flags = dev->flags;
 	int err = 0;
 
 	if (reset_flow) {
-		dev->dev_vfs = kcalloc(total_vfs, sizeof(*dev->dev_vfs),
-				       GFP_KERNEL);
+		dev->dev_vfs = kzmalloc((total_vfs) * (sizeof(*dev->dev_vfs)),
+					KMALLOC_WAIT);
 		if (!dev->dev_vfs)
 			goto free_mem;
 		return dev_flags;
@@ -2721,7 +2731,8 @@ static u64 mlx4_enable_sriov(struct mlx4_dev *dev, struct pci_dev *pdev,
 		}
 	}
 
-	dev->dev_vfs = kzalloc(total_vfs * sizeof(*dev->dev_vfs), GFP_KERNEL);
+	dev->dev_vfs = kzmalloc(total_vfs * sizeof(*dev->dev_vfs),
+				KMALLOC_WAIT);
 	if (NULL == dev->dev_vfs) {
 		mlx4_err(dev, "Failed to allocate memory for VFs\n");
 		goto disable_sriov;
@@ -2770,7 +2781,7 @@ static int mlx4_check_dev_cap(struct mlx4_dev *dev, struct mlx4_dev_cap *dev_cap
 	return 0;
 }
 
-static int mlx4_load_one(struct pci_dev *pdev, int pci_dev_data,
+static int mlx4_load_one(struct pci_device *pdev, int pci_dev_data,
 			 int total_vfs, int *nvfs, struct mlx4_priv *priv,
 			 int reset_flow)
 {
@@ -2785,16 +2796,16 @@ static int mlx4_load_one(struct pci_dev *pdev, int pci_dev_data,
 	dev = &priv->dev;
 
 	INIT_LIST_HEAD(&priv->ctx_list);
-	spin_lock_init(&priv->ctx_lock);
+	spinlock_init_irqsave(&priv->ctx_lock);
 
-	mutex_init(&priv->port_mutex);
-	mutex_init(&priv->bond_mutex);
+	qlock_init(&priv->port_mutex);
+	qlock_init(&priv->bond_mutex);
 
 	INIT_LIST_HEAD(&priv->pgdir_list);
-	mutex_init(&priv->pgdir_mutex);
+	qlock_init(&priv->pgdir_mutex);
 
 	INIT_LIST_HEAD(&priv->bf_list);
-	mutex_init(&priv->bf_mutex);
+	qlock_init(&priv->bf_mutex);
 
 	dev->rev_id = pdev->revision;
 	dev->numa_node = dev_to_node(&pdev->dev);
@@ -2878,7 +2889,7 @@ slave_start:
 	if (mlx4_is_master(dev)) {
 		/* when we hit the goto slave_start below, dev_cap already initialized */
 		if (!dev_cap) {
-			dev_cap = kzalloc(sizeof(*dev_cap), GFP_KERNEL);
+			dev_cap = kzmalloc(sizeof(*dev_cap), KMALLOC_WAIT);
 
 			if (!dev_cap) {
 				err = -ENOMEM;
@@ -2895,7 +2906,7 @@ slave_start:
 				goto err_fw;
 
 			if (!(dev_cap->flags2 & MLX4_DEV_CAP_FLAG2_SYS_EQS)) {
-				u64 dev_flags = mlx4_enable_sriov(dev, pdev,
+				uint64_t dev_flags = mlx4_enable_sriov(dev, pdev,
 								  total_vfs,
 								  existing_vfs,
 								  reset_flow);
@@ -2954,7 +2965,7 @@ slave_start:
 	}
 
 	if (mlx4_is_master(dev) && (dev_cap->flags2 & MLX4_DEV_CAP_FLAG2_SYS_EQS)) {
-		u64 dev_flags = mlx4_enable_sriov(dev, pdev, total_vfs,
+		uint64_t dev_flags = mlx4_enable_sriov(dev, pdev, total_vfs,
 						  existing_vfs, reset_flow);
 
 		if ((dev->flags ^ dev_flags) & (MLX4_FLAG_MASTER | MLX4_FLAG_SLAVE)) {
@@ -3037,7 +3048,7 @@ slave_start:
 		goto err_master_mfunc;
 
 	priv->msix_ctl.pool_bm = 0;
-	mutex_init(&priv->msix_ctl.pool_lock);
+	qlock_init(&priv->msix_ctl.pool_lock);
 
 	mlx4_enable_msi_x(dev);
 	if ((mlx4_is_mfunc(dev)) &&
@@ -3177,7 +3188,7 @@ err_sriov:
 	return err;
 }
 
-static int __mlx4_init_one(struct pci_dev *pdev, int pci_dev_data,
+static int __mlx4_init_one(struct pci_device *pdev, int pci_dev_data,
 			   struct mlx4_priv *priv)
 {
 	int err;
@@ -3328,7 +3339,8 @@ err_disable_pdev:
 	return err;
 }
 
-static int mlx4_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
+static int mlx4_init_one(struct pci_device *pdev,
+			 const struct pci_device_id *id)
 {
 	struct mlx4_priv *priv;
 	struct mlx4_dev *dev;
@@ -3336,12 +3348,12 @@ static int mlx4_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	printk_once(KERN_INFO "%s", mlx4_version);
 
-	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+	priv = kzmalloc(sizeof(*priv), KMALLOC_WAIT);
 	if (!priv)
 		return -ENOMEM;
 
 	dev       = &priv->dev;
-	dev->persist = kzalloc(sizeof(*dev->persist), GFP_KERNEL);
+	dev->persist = kzmalloc(sizeof(*dev->persist), KMALLOC_WAIT);
 	if (!dev->persist) {
 		kfree(priv);
 		return -ENOMEM;
@@ -3350,8 +3362,8 @@ static int mlx4_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	dev->persist->dev = dev;
 	pci_set_drvdata(pdev, dev->persist);
 	priv->pci_dev_data = id->driver_data;
-	mutex_init(&dev->persist->device_state_mutex);
-	mutex_init(&dev->persist->interface_state_mutex);
+	qlock_init(&dev->persist->device_state_mutex);
+	qlock_init(&dev->persist->interface_state_mutex);
 
 	ret =  __mlx4_init_one(pdev, id->driver_data, priv);
 	if (ret) {
@@ -3375,7 +3387,7 @@ static void mlx4_clean_dev(struct mlx4_dev *dev)
 	priv->dev.flags = flags;
 }
 
-static void mlx4_unload_one(struct pci_dev *pdev)
+static void mlx4_unload_one(struct pci_device *pdev)
 {
 	struct mlx4_dev_persistent *persist = pci_get_drvdata(pdev);
 	struct mlx4_dev  *dev  = persist->dev;
@@ -3454,16 +3466,16 @@ static void mlx4_unload_one(struct pci_dev *pdev)
 	priv->removed = 1;
 }
 
-static void mlx4_remove_one(struct pci_dev *pdev)
+static void mlx4_remove_one(struct pci_device *pdev)
 {
 	struct mlx4_dev_persistent *persist = pci_get_drvdata(pdev);
 	struct mlx4_dev  *dev  = persist->dev;
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	int active_vfs = 0;
 
-	mutex_lock(&persist->interface_state_mutex);
+	qlock(&persist->interface_state_mutex);
 	persist->interface_state |= MLX4_INTERFACE_STATE_DELETION;
-	mutex_unlock(&persist->interface_state_mutex);
+	qunlock(&persist->interface_state_mutex);
 
 	/* Disabling SR-IOV is not allowed while there are active vf's */
 	if (mlx4_is_master(dev) && dev->flags & MLX4_FLAG_SRIOV) {
@@ -3503,17 +3515,17 @@ static int restore_current_port_types(struct mlx4_dev *dev,
 
 	mlx4_stop_sense(dev);
 
-	mutex_lock(&priv->port_mutex);
+	qlock(&priv->port_mutex);
 	for (i = 0; i < dev->caps.num_ports; i++)
 		dev->caps.possible_type[i + 1] = poss_types[i];
 	err = mlx4_change_port_types(dev, types);
 	mlx4_start_sense(dev);
-	mutex_unlock(&priv->port_mutex);
+	qunlock(&priv->port_mutex);
 
 	return err;
 }
 
-int mlx4_restart_one(struct pci_dev *pdev)
+int mlx4_restart_one(struct pci_device *pdev)
 {
 	struct mlx4_dev_persistent *persist = pci_get_drvdata(pdev);
 	struct mlx4_dev	 *dev  = persist->dev;
@@ -3590,7 +3602,7 @@ static const struct pci_device_id mlx4_pci_table[] = {
 
 MODULE_DEVICE_TABLE(pci, mlx4_pci_table);
 
-static pci_ers_result_t mlx4_pci_err_detected(struct pci_dev *pdev,
+static pci_ers_result_t mlx4_pci_err_detected(struct pci_device *pdev,
 					      pci_channel_state_t state)
 {
 	struct mlx4_dev_persistent *persist = pci_get_drvdata(pdev);
@@ -3598,11 +3610,11 @@ static pci_ers_result_t mlx4_pci_err_detected(struct pci_dev *pdev,
 	mlx4_err(persist->dev, "mlx4_pci_err_detected was called\n");
 	mlx4_enter_error_state(persist);
 
-	mutex_lock(&persist->interface_state_mutex);
+	qlock(&persist->interface_state_mutex);
 	if (persist->interface_state & MLX4_INTERFACE_STATE_UP)
 		mlx4_unload_one(pdev);
 
-	mutex_unlock(&persist->interface_state_mutex);
+	qunlock(&persist->interface_state_mutex);
 	if (state == pci_channel_io_perm_failure)
 		return PCI_ERS_RESULT_DISCONNECT;
 
@@ -3610,7 +3622,7 @@ static pci_ers_result_t mlx4_pci_err_detected(struct pci_dev *pdev,
 	return PCI_ERS_RESULT_NEED_RESET;
 }
 
-static pci_ers_result_t mlx4_pci_slot_reset(struct pci_dev *pdev)
+static pci_ers_result_t mlx4_pci_slot_reset(struct pci_device *pdev)
 {
 	struct mlx4_dev_persistent *persist = pci_get_drvdata(pdev);
 	struct mlx4_dev	 *dev  = persist->dev;
@@ -3633,7 +3645,7 @@ static pci_ers_result_t mlx4_pci_slot_reset(struct pci_dev *pdev)
 	total_vfs = dev->persist->num_vfs;
 	memcpy(nvfs, dev->persist->nvfs, sizeof(dev->persist->nvfs));
 
-	mutex_lock(&persist->interface_state_mutex);
+	qlock(&persist->interface_state_mutex);
 	if (!(persist->interface_state & MLX4_INTERFACE_STATE_UP)) {
 		ret = mlx4_load_one(pdev, priv->pci_dev_data, total_vfs, nvfs,
 				    priv, 1);
@@ -3650,20 +3662,20 @@ static pci_ers_result_t mlx4_pci_slot_reset(struct pci_dev *pdev)
 			mlx4_err(dev, "could not restore original port types (%d)\n", ret);
 	}
 end:
-	mutex_unlock(&persist->interface_state_mutex);
+	qunlock(&persist->interface_state_mutex);
 
 	return ret ? PCI_ERS_RESULT_DISCONNECT : PCI_ERS_RESULT_RECOVERED;
 }
 
-static void mlx4_shutdown(struct pci_dev *pdev)
+static void mlx4_shutdown(struct pci_device *pdev)
 {
 	struct mlx4_dev_persistent *persist = pci_get_drvdata(pdev);
 
 	mlx4_info(persist->dev, "mlx4_shutdown was called\n");
-	mutex_lock(&persist->interface_state_mutex);
+	qlock(&persist->interface_state_mutex);
 	if (persist->interface_state & MLX4_INTERFACE_STATE_UP)
 		mlx4_unload_one(pdev);
-	mutex_unlock(&persist->interface_state_mutex);
+	qunlock(&persist->interface_state_mutex);
 }
 
 static const struct pci_error_handlers mlx4_err_handler = {

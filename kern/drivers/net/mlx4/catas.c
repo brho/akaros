@@ -49,7 +49,7 @@ MODULE_PARM_DESC(internal_err_reset,
 
 static int read_vendor_id(struct mlx4_dev *dev)
 {
-	u16 vendor_id = 0;
+	uint16_t vendor_id = 0;
 	int ret;
 
 	ret = pci_read_config_word(dev->persist->pdev, 0, &vendor_id);
@@ -94,17 +94,17 @@ static int mlx4_reset_slave(struct mlx4_dev *dev)
 #define COM_CHAN_RST_REQ_OFFSET 0x10
 #define COM_CHAN_RST_ACK_OFFSET 0x08
 
-	u32 comm_flags;
-	u32 rst_req;
-	u32 rst_ack;
+	uint32_t comm_flags;
+	uint32_t rst_req;
+	uint32_t rst_ack;
 	unsigned long end;
 	struct mlx4_priv *priv = mlx4_priv(dev);
 
 	if (pci_channel_offline(dev->persist->pdev))
 		return 0;
 
-	comm_flags = swab32(readl((__iomem char *)priv->mfunc.comm +
-				  MLX4_COMM_CHAN_FLAGS));
+	comm_flags = swab32(read32((__iomem char *)priv->mfunc.comm +
+				   MLX4_COMM_CHAN_FLAGS));
 	if (comm_flags == 0xffffffff) {
 		mlx4_err(dev, "VF reset is not needed\n");
 		return 0;
@@ -115,9 +115,9 @@ static int mlx4_reset_slave(struct mlx4_dev *dev)
 		return -EOPNOTSUPP;
 	}
 
-	rst_req = (comm_flags & (u32)(1 << COM_CHAN_RST_REQ_OFFSET)) >>
+	rst_req = (comm_flags & (uint32_t)(1 << COM_CHAN_RST_REQ_OFFSET)) >>
 		COM_CHAN_RST_REQ_OFFSET;
-	rst_ack = (comm_flags & (u32)(1 << COM_CHAN_RST_ACK_OFFSET)) >>
+	rst_ack = (comm_flags & (uint32_t)(1 << COM_CHAN_RST_ACK_OFFSET)) >>
 		COM_CHAN_RST_ACK_OFFSET;
 	if (rst_req != rst_ack) {
 		mlx4_err(dev, "Communication channel isn't sync, fail to send reset\n");
@@ -127,25 +127,25 @@ static int mlx4_reset_slave(struct mlx4_dev *dev)
 	rst_req ^= 1;
 	mlx4_warn(dev, "VF is sending reset request to Firmware\n");
 	comm_flags = rst_req << COM_CHAN_RST_REQ_OFFSET;
-	__raw_writel((__force u32)cpu_to_be32(comm_flags),
+	__raw_write32((__force uint32_t)cpu_to_be32(comm_flags),
 		     (__iomem char *)priv->mfunc.comm + MLX4_COMM_CHAN_FLAGS);
 	/* Make sure that our comm channel write doesn't
 	 * get mixed in with writes from another CPU.
 	 */
-	mmiowb();
+	bus_wmb();
 
 	end = msecs_to_jiffies(MLX4_COMM_TIME) + jiffies;
 	while (time_before(jiffies, end)) {
-		comm_flags = swab32(readl((__iomem char *)priv->mfunc.comm +
-					  MLX4_COMM_CHAN_FLAGS));
-		rst_ack = (comm_flags & (u32)(1 << COM_CHAN_RST_ACK_OFFSET)) >>
+		comm_flags = swab32(read32((__iomem char *)priv->mfunc.comm +
+					   MLX4_COMM_CHAN_FLAGS));
+		rst_ack = (comm_flags & (uint32_t)(1 << COM_CHAN_RST_ACK_OFFSET)) >>
 			COM_CHAN_RST_ACK_OFFSET;
 
 		/* Reading rst_req again since the communication channel can
 		 * be reset at any time by the PF and all its bits will be
 		 * set to zero.
 		 */
-		rst_req = (comm_flags & (u32)(1 << COM_CHAN_RST_REQ_OFFSET)) >>
+		rst_req = (comm_flags & (uint32_t)(1 << COM_CHAN_RST_REQ_OFFSET)) >>
 			COM_CHAN_RST_REQ_OFFSET;
 
 		if (rst_ack == rst_req) {
@@ -158,10 +158,10 @@ static int mlx4_reset_slave(struct mlx4_dev *dev)
 	return -ETIMEDOUT;
 }
 
-static int mlx4_comm_internal_err(u32 slave_read)
+static int mlx4_comm_internal_err(uint32_t slave_read)
 {
-	return (u32)COMM_CHAN_EVENT_INTERNAL_ERR ==
-		(slave_read & (u32)COMM_CHAN_EVENT_INTERNAL_ERR) ? 1 : 0;
+	return (uint32_t)COMM_CHAN_EVENT_INTERNAL_ERR ==
+		(slave_read & (uint32_t)COMM_CHAN_EVENT_INTERNAL_ERR) ? 1 : 0;
 }
 
 void mlx4_enter_error_state(struct mlx4_dev_persistent *persist)
@@ -172,7 +172,7 @@ void mlx4_enter_error_state(struct mlx4_dev_persistent *persist)
 	if (!mlx4_internal_err_reset)
 		return;
 
-	mutex_lock(&persist->device_state_mutex);
+	qlock(&persist->device_state_mutex);
 	if (persist->state & MLX4_DEVICE_STATE_INTERNAL_ERROR)
 		goto out;
 
@@ -182,11 +182,11 @@ void mlx4_enter_error_state(struct mlx4_dev_persistent *persist)
 		err = mlx4_reset_slave(dev);
 	else
 		err = mlx4_reset_master(dev);
-	BUG_ON(err != 0);
+	assert(!(err != 0));
 
 	dev->persist->state |= MLX4_DEVICE_STATE_INTERNAL_ERROR;
 	mlx4_err(dev, "device was reset successfully\n");
-	mutex_unlock(&persist->device_state_mutex);
+	qunlock(&persist->device_state_mutex);
 
 	/* At that step HW was already reset, now notify clients */
 	mlx4_dispatch_event(dev, MLX4_DEV_EVENT_CATASTROPHIC_ERROR, 0);
@@ -194,7 +194,7 @@ void mlx4_enter_error_state(struct mlx4_dev_persistent *persist)
 	return;
 
 out:
-	mutex_unlock(&persist->device_state_mutex);
+	qunlock(&persist->device_state_mutex);
 }
 
 static void mlx4_handle_error_state(struct mlx4_dev_persistent *persist)
@@ -202,14 +202,14 @@ static void mlx4_handle_error_state(struct mlx4_dev_persistent *persist)
 	int err = 0;
 
 	mlx4_enter_error_state(persist);
-	mutex_lock(&persist->interface_state_mutex);
+	qlock(&persist->interface_state_mutex);
 	if (persist->interface_state & MLX4_INTERFACE_STATE_UP &&
 	    !(persist->interface_state & MLX4_INTERFACE_STATE_DELETION)) {
 		err = mlx4_restart_one(persist->pdev);
 		mlx4_info(persist->dev, "mlx4_restart_one was ended, ret=%d\n",
 			  err);
 	}
-	mutex_unlock(&persist->interface_state_mutex);
+	qunlock(&persist->interface_state_mutex);
 }
 
 static void dump_err_buf(struct mlx4_dev *dev)
@@ -221,22 +221,22 @@ static void dump_err_buf(struct mlx4_dev *dev)
 	mlx4_err(dev, "Internal error detected:\n");
 	for (i = 0; i < priv->fw.catas_size; ++i)
 		mlx4_err(dev, "  buf[%02x]: %08x\n",
-			 i, swab32(readl(priv->catas_err.map + i)));
+			 i, swab32(read32(priv->catas_err.map + i)));
 }
 
 static void poll_catas(unsigned long dev_ptr)
 {
 	struct mlx4_dev *dev = (struct mlx4_dev *) dev_ptr;
 	struct mlx4_priv *priv = mlx4_priv(dev);
-	u32 slave_read;
+	uint32_t slave_read;
 
 	if (mlx4_is_slave(dev)) {
-		slave_read = swab32(readl(&priv->mfunc.comm->slave_read));
+		slave_read = swab32(read32(&priv->mfunc.comm->slave_read));
 		if (mlx4_comm_internal_err(slave_read)) {
 			mlx4_warn(dev, "Internal error detected on the communication channel\n");
 			goto internal_err;
 		}
-	} else if (readl(priv->catas_err.map)) {
+	} else if (read32(priv->catas_err.map)) {
 		dump_err_buf(dev);
 		goto internal_err;
 	}
