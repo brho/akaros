@@ -3853,6 +3853,7 @@ module_exit(mlx4_cleanup);
 #include <ns.h>
 
 extern int mlx4_en_init(void);
+extern int mlx4_en_open(struct ether *dev);
 
 static const struct pci_device_id *search_pci_table(struct pci_device *needle)
 {
@@ -3870,7 +3871,7 @@ static const struct pci_device_id *search_pci_table(struct pci_device *needle)
 
 static void ether_attach(struct ether *edev)
 {
-	panic("Not implemented");
+	mlx4_en_open(edev);
 }
 
 static void ether_transmit(struct ether *edev)

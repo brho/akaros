@@ -1961,7 +1961,7 @@ static void mlx4_en_clear_stats(struct ether *dev)
 	}
 }
 
-static int mlx4_en_open(struct ether *dev)
+int mlx4_en_open(struct ether *dev)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	struct mlx4_en_dev *mdev = priv->mdev;
