@@ -858,7 +858,7 @@ static int pcie_capability_read_dword(struct pci_device *dev, int pos,
 
 static inline const char *pci_name(const struct pci_device *pdev)
 {
-	return "pci"; // TODO
+	return pdev->name;
 }
 
 #define dev_name(dev) ("ether0" /* XXX */)

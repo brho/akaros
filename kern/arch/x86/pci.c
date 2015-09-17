@@ -204,6 +204,9 @@ void pci_init(void)
 				pcidev->bus = i;
 				pcidev->dev = j;
 				pcidev->func = k;
+				snprintf(pcidev->name, sizeof(pcidev->name),
+					 "%02x:%02x.%x", pcidev->bus,
+					 pcidev->dev, pcidev->func);
 				pcidev->dev_id = dev_id;
 				pcidev->ven_id = ven_id;
 				/* Get the Class/subclass */
