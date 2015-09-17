@@ -2379,6 +2379,7 @@ static int mlx4_setup_hca(struct mlx4_dev *dev)
 		if (dev->flags & MLX4_FLAG_MSI_X) {
 			mlx4_warn(dev, "NOP command failed to generate MSI-X interrupt IRQ %d)\n",
 				  priv->eq_table.eq[dev->caps.num_comp_vectors].irq);
+			panic("MSI-X required");
 			mlx4_warn(dev, "Trying again without MSI-X\n");
 		} else {
 			mlx4_err(dev, "NOP command failed to generate interrupt (IRQ %d), aborting\n",
@@ -2545,6 +2546,17 @@ no_msi:
 
 	for (i = 0; i < 2; ++i)
 		priv->eq_table.eq[i].irq = dev->persist->pdev->irq;
+#else
+	if (!msi_x)
+		panic("!msi_x");
+
+	if (pci_msix_init(dev->persist->pdev) == -1)
+		panic("pci_msix_init -1");
+
+	dev->caps.comp_pool = 0;
+	dev->caps.num_comp_vectors = 1;
+
+	dev->flags |= MLX4_FLAG_MSI_X;
 #endif
 }
 
@@ -3233,6 +3245,7 @@ static int __mlx4_init_one(struct pci_device *pdev, int pci_dev_data,
 	unsigned int i;
 
 	pr_info(DRV_NAME ": Initializing %s\n", pci_name(pdev));
+	pcidev_print_info(pdev, 1 /* verbose */);
 
 	err = pci_enable_device(pdev);
 	if (err) {
@@ -3820,4 +3833,77 @@ static void __exit mlx4_cleanup(void)
 
 module_init(mlx4_init);
 module_exit(mlx4_cleanup);
+#else
+/* Network driver stub for mlx4 */
+
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
+#include <arch/pci.h>
+#include <ip.h>
+#include <ns.h>
+
+static const struct pci_device_id *search_pci_table(struct pci_device *needle)
+{
+	const struct pci_device_id *i;
+
+	for (i = mlx4_pci_table; i->vendor; i++) {
+		if (needle->ven_id == i->vendor && needle->dev_id == i->device)
+			break;
+	}
+	if (i->vendor)
+		return i;
+
+	return NULL;
+}
+
+/* Called by devether's probe routines.  Return -1 if the edev does not match
+ * any of your ctlrs. */
+static int mlx4_pnp(struct ether *edev)
+{
+	static bool probed = false; // TODO support multiple devices
+
+	const struct pci_device_id *pci_id;
+	struct pci_device *pdev;
+
+	if (probed)
+		return -1;
+	probed = true;
+
+	STAILQ_FOREACH(pdev, &pci_devices, all_dev) {
+		/* This checks that pcidev is a Network Controller for Ethernet */
+		if (pdev->class != 0x02 || pdev->subclass != 0x00)
+			continue;
+
+		pci_id = search_pci_table(pdev);
+		if (!pci_id)
+			continue;
+
+		printk("mlx4 driver found 0x%04x:%04x at %02x:%02x.%x\n",
+		       pdev->ven_id, pdev->dev_id, pdev->bus, pdev->dev,
+		       pdev->func);
+		break;
+	}
+	if (!pci_id)
+		return -1;
+
+	mlx4_init();
+	mlx4_init_one(pdev, pci_id);
+
+	return 0;
+}
+
+linker_func_3(ethermlx4_link)
+{
+	addethercard("mlx4", mlx4_pnp);
+}
 #endif

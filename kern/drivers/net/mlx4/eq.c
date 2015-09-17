@@ -830,6 +830,16 @@ static void mlx4_msi_x_interrupt(struct hw_trapframe *hw_tf, void *eq_ptr)
 }
 #endif
 
+static void mlx4_msi_x_interrupt_akaros(struct hw_trapframe *hw_tf, void *data)
+{
+	struct mlx4_eq  *eq = data;
+	struct mlx4_dev *dev = eq ? eq->dev : 0;
+
+	if (!eq || !dev)
+		panic("!eq || !dev");
+	mlx4_eq_int(dev, eq);
+}
+
 int mlx4_MAP_EQ_wrapper(struct mlx4_dev *dev, int slave,
 			struct mlx4_vhcr *vhcr,
 			struct mlx4_cmd_mailbox *inbox,
@@ -1251,6 +1261,11 @@ int mlx4_init_eq_table(struct mlx4_dev *dev)
 					   mlx4_msi_x_interrupt,
 					   priv->eq_table.eq + i,
 					   pci_to_tbdf(PCIDEV));
+#else
+			err = register_irq(priv->eq_table.eq[i].irq,
+					   mlx4_msi_x_interrupt_akaros,
+					   priv->eq_table.eq + i,
+					   pci_to_tbdf(dev->persist->pdev));
 #endif
 			if (err)
 				goto err_out_async;
