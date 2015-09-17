@@ -3854,6 +3854,7 @@ module_exit(mlx4_cleanup);
 
 extern int mlx4_en_init(void);
 extern int mlx4_en_open(struct ether *dev);
+extern netdev_tx_t mlx4_send_packet(struct block *block, struct ether *dev);
 
 static const struct pci_device_id *search_pci_table(struct pci_device *needle)
 {
@@ -3876,7 +3877,10 @@ static void ether_attach(struct ether *edev)
 
 static void ether_transmit(struct ether *edev)
 {
-	panic("Not implemented");
+	struct block *block;
+
+	while ((block = qget(edev->oq)))
+		mlx4_send_packet(block, edev);
 }
 
 static long ether_ifstat(struct ether *edev, void *a, long n, uint32_t offset)
