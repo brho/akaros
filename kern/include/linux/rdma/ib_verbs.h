@@ -39,20 +39,7 @@
 #if !defined(IB_VERBS_H)
 #define IB_VERBS_H
 
-#include <linux/types.h>
-#include <linux/device.h>
-#include <linux/mm.h>
-#include <linux/dma-mapping.h>
-#include <linux/kref.h>
-#include <linux/list.h>
-#include <linux/rwsem.h>
-#include <linux/scatterlist.h>
-#include <linux/workqueue.h>
-#include <uapi/linux/if_ether.h>
-
-#include <linux/atomic.h>
-#include <linux/mmu_notifier.h>
-#include <asm/uaccess.h>
+#include <arch/types.h>
 
 extern struct workqueue_struct *ib_wq;
 
@@ -1181,7 +1168,6 @@ struct ib_uobject {
 	struct list_head	list;		/* link to context's list */
 	int			id;		/* index into kernel idr */
 	struct kref		ref;
-	struct rw_semaphore	mutex;		/* protects .live */
 	int			live;
 };
 
@@ -1344,7 +1330,7 @@ struct ib_flow_spec_eth {
 
 struct ib_flow_ib_filter {
 	__be16 dlid;
-	__u8   sl;
+	uint8_t   sl;
 };
 
 struct ib_flow_spec_ib {
@@ -2188,24 +2174,6 @@ static inline void ib_dma_unmap_single(struct ib_device *dev,
 		dev->dma_ops->unmap_single(dev, addr, size, direction);
 	else
 		dma_unmap_single(dev->dma_device, addr, size, direction);
-}
-
-static inline uint64_t ib_dma_map_single_attrs(struct ib_device *dev,
-					  void *cpu_addr, size_t size,
-					  enum dma_data_direction direction,
-					  struct dma_attrs *attrs)
-{
-	return dma_map_single_attrs(dev->dma_device, cpu_addr, size,
-				    direction, attrs);
-}
-
-static inline void ib_dma_unmap_single_attrs(struct ib_device *dev,
-					     uint64_t addr, size_t size,
-					     enum dma_data_direction direction,
-					     struct dma_attrs *attrs)
-{
-	return dma_unmap_single_attrs(dev->dma_device, addr, size,
-				      direction, attrs);
 }
 
 /**
