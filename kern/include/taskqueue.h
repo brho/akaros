@@ -56,6 +56,11 @@ struct delayed_work {
 	/* TODO: support for the actual alarm / timer */
 };
 
+static inline struct delayed_work *to_delayed_work(struct work_struct *work)
+{
+	return container_of(work, struct delayed_work, work);
+}
+
 #define INIT_DELAYED_WORK(dwp, funcp) (dwp)->work.func = (funcp)
 #define INIT_WORK(wp, funcp) (wp)->func = (funcp)
 void flush_workqueue(struct workqueue_struct *wq);
