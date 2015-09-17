@@ -3868,6 +3868,44 @@ static const struct pci_device_id *search_pci_table(struct pci_device *needle)
 	return NULL;
 }
 
+static void ether_attach(struct ether *edev)
+{
+	panic("Not implemented");
+}
+
+static void ether_transmit(struct ether *edev)
+{
+	panic("Not implemented");
+}
+
+static long ether_ifstat(struct ether *edev, void *a, long n, uint32_t offset)
+{
+	printk("edev %p a %p n %d offset %u\n", edev, a, n, offset);
+	return 0;
+}
+
+static long ether_ctl(struct ether *edev, void *buf, long n)
+{
+	panic("Not implemented");
+}
+
+static void ether_shutdown(struct ether *edev)
+{
+	panic("Not implemented");
+}
+
+static void ether_promiscuous(void *arg, int on)
+{
+	struct ether *edev = arg;
+	panic("Not implemented");
+}
+
+static void ether_multicast(void *arg, uint8_t *addr, int add)
+{
+	struct ether *edev = arg;
+	panic("Not implemented");
+}
+
 /* Called by devether's probe routines.  Return -1 if the edev does not match
  * any of your ctlrs. */
 static int mlx4_pnp(struct ether *edev)
@@ -3905,6 +3943,22 @@ static int mlx4_pnp(struct ether *edev)
 	persist = pci_get_drvdata(pdev);
 	persist->edev = edev;
 	mlx4_en_init();
+
+	// edev->ctlr is already initialized to struct mlx4_en_priv.
+	pdev = persist->pdev;
+	edev->irq = pdev->irqline;
+	edev->tbdf = MKBUS(BusPCI, pdev->bus, pdev->dev, pdev->func);
+	edev->mbps = 10000; // FIXME
+
+	edev->attach = ether_attach;
+	edev->transmit = ether_transmit;
+	edev->ifstat = ether_ifstat;
+	edev->ctl = ether_ctl;
+	edev->shutdown = ether_shutdown;
+
+	edev->arg = edev;
+	edev->promiscuous = ether_promiscuous;
+	edev->multicast = ether_multicast;
 
 	return 0;
 }
