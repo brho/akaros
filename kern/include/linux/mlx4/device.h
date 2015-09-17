@@ -33,16 +33,7 @@
 #ifndef MLX4_DEVICE_H
 #define MLX4_DEVICE_H
 
-#include <linux/if_ether.h>
-#include <linux/pci.h>
-#include <linux/completion.h>
-#include <linux/radix-tree.h>
-#include <linux/cpu_rmap.h>
-#include <linux/crash_dump.h>
-
-#include <linux/atomic.h>
-
-#include <linux/timecounter.h>
+#include <linux_compat.h>
 
 #define MAX_MSIX_P_PORT		17
 #define MAX_MSIX		64

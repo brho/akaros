@@ -33,9 +33,7 @@
 #ifndef MLX4_CQ_H
 #define MLX4_CQ_H
 
-#include <linux/types.h>
-#include <uapi/linux/if_ether.h>
-
+#include <linux_compat.h>
 #include <linux/mlx4/device.h>
 #include <linux/mlx4/doorbell.h>
 

@@ -33,9 +33,6 @@
 #ifndef MLX4_QP_H
 #define MLX4_QP_H
 
-#include <linux/types.h>
-#include <linux/if_ether.h>
-
 #include <linux/mlx4/device.h>
 
 #define MLX4_INVALID_LKEY	0x100
