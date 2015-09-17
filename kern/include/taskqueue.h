@@ -34,7 +34,7 @@ struct task {
 #define taskqueue_start_threads(a, b, c, d, e) (1)
 
 int taskqueue_enqueue(struct taskqueue *queue, struct task *task);
-/* We're already fast, no need for another ufnction! (sic) */
+/* We're already fast, no need for another function! */
 #define taskqueue_enqueue_fast taskqueue_enqueue
 #define TASK_INIT(str, dummy, func, arg)                                       \
 	(str)->ta_func = func;                                                     \
