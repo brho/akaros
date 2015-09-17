@@ -2834,9 +2834,9 @@ void mlx4_en_set_stats_bitmap(struct mlx4_dev *dev,
 }
 
 int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
+			struct ether *dev,
 			struct mlx4_en_port_profile *prof)
 {
-	struct ether *dev;
 	struct mlx4_en_priv *priv;
 	int i;
 	int err;
@@ -2852,6 +2852,8 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 	netif_set_real_num_rx_queues(dev, prof->rx_ring_num);
 
 	SET_NETDEV_DEV(dev, &mdev->dev->persist->pdev->dev);
+#else
+	dev->ctlr = kzmalloc(sizeof(struct mlx4_en_priv), KMALLOC_WAIT);
 #endif
 
 	/*

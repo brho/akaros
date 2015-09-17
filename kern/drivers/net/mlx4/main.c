@@ -3852,6 +3852,8 @@ module_exit(mlx4_cleanup);
 #include <ip.h>
 #include <ns.h>
 
+extern int mlx4_en_init(void);
+
 static const struct pci_device_id *search_pci_table(struct pci_device *needle)
 {
 	const struct pci_device_id *i;
@@ -3872,6 +3874,7 @@ static int mlx4_pnp(struct ether *edev)
 {
 	static bool probed = false; // TODO support multiple devices
 
+	struct mlx4_dev_persistent *persist;
 	const struct pci_device_id *pci_id;
 	struct pci_device *pdev;
 
@@ -3898,6 +3901,10 @@ static int mlx4_pnp(struct ether *edev)
 
 	mlx4_init();
 	mlx4_init_one(pdev, pci_id);
+
+	persist = pci_get_drvdata(pdev);
+	persist->edev = edev;
+	mlx4_en_init();
 
 	return 0;
 }

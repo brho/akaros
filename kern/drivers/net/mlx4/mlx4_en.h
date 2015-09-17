@@ -732,6 +732,7 @@ void mlx4_en_update_loopback_state(struct ether *dev,
 
 void mlx4_en_destroy_netdev(struct ether *dev);
 int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
+			struct ether *dev,
 			struct mlx4_en_port_profile *prof);
 
 int mlx4_en_start_port(struct ether *dev);

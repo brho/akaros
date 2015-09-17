@@ -802,6 +802,7 @@ struct mlx4_dev_persistent {
 	uint8_t		state;
 	qlock_t	interface_state_mutex; /* protect SW state */
 	uint8_t	interface_state;
+	struct ether *edev;
 };
 
 struct mlx4_dev {

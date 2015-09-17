@@ -92,6 +92,17 @@ void en_print(const char *level, const struct mlx4_en_priv *priv,
 		       level, DRV_NAME, dev_name(&priv->mdev->pdev->dev),
 		       priv->port, &vaf);
 	va_end(args);
+#else
+	va_list args;
+
+	va_start(args, format);
+	if (priv->registered)
+		printk("%s%s: %s: ", level, DRV_NAME, priv->dev->name);
+	else
+		printk("%s%s: %s: Port %d: ", level, DRV_NAME,
+		       dev_name(&priv->mdev->pdev->dev), priv->port);
+	vcprintf(format, args);
+	va_end(args);
 #endif
 }
 
@@ -318,6 +329,16 @@ static void *mlx4_en_add(struct mlx4_dev *dev)
 		mdev->nb.notifier_call = NULL;
 		mlx4_err(mdev, "Failed to create notifier\n");
 	}
+#else
+	/* FIXME initialize all ports */
+	mlx4_foreach_port(i, dev, MLX4_PORT_TYPE_ETH) {
+		if (i == 1) {
+			mlx4_en_init_netdev(mdev, i, dev->persist->edev,
+					    &mdev->profile.prof[i]);
+		} else {
+			mdev->pndev[i] = NULL;
+		}
+	}
 #endif
 
 	return mdev;
@@ -366,7 +387,7 @@ static void mlx4_en_verify_params(void)
 	}
 }
 
-static int __init mlx4_en_init(void)
+int mlx4_en_init(void)
 {
 	mlx4_en_verify_params();
 
