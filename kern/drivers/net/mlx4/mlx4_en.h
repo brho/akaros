@@ -786,7 +786,6 @@ void mlx4_en_deactivate_rx_ring(struct mlx4_en_priv *priv,
 int mlx4_en_process_rx_cq(struct ether *dev,
 			  struct mlx4_en_cq *cq,
 			  int budget);
-int mlx4_en_poll_rx_cq(struct napi_struct *napi, int budget);
 void mlx4_en_fill_qp_context(struct mlx4_en_priv *priv, int size, int stride,
 		int is_tx, int rss, int qpn, int cqn, int user_prio,
 		struct mlx4_qp_context *context);

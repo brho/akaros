@@ -582,6 +582,46 @@ fail:
 }
 #endif
 
+static void dump_packet(struct mlx4_en_priv *priv,
+			struct mlx4_en_rx_desc *rx_desc,
+			struct mlx4_en_rx_alloc *frags,
+			unsigned int length)
+{
+	void *va;
+
+	va = page_address(frags[0].page) + frags[0].page_offset;
+
+	if (length <= SMALL_PACKET_SIZE) {
+		hexdump(va, length);
+	} else {
+		printk("priv %p num_frags %d\n", priv, priv->num_frags);
+		hexdump(va, SMALL_PACKET_SIZE);
+	}
+}
+
+static void recv_packet(struct mlx4_en_priv *priv,
+			struct mlx4_en_rx_desc *rx_desc,
+			struct mlx4_en_rx_alloc *frags,
+			unsigned int length)
+{
+	struct block *block;
+	void *va;
+
+	assert(priv->num_frags == 1);
+
+	block = iallocb(length);
+	if (!block) {
+		en_dbg(RX_ERR, priv, "Failed allocating block\n");
+		priv->stats.rx_dropped++;
+		return;
+	}
+
+	va = page_address(frags[0].page) + frags[0].page_offset;
+	memcpy(block->wp, va, length);
+	block->wp += length;
+
+	etheriq(priv->dev, block, 1 /* fromwire */);
+}
 
 #if 0 // AKAROS_PORT
 static struct sk_buff *mlx4_en_rx_skb(struct mlx4_en_priv *priv,
@@ -891,6 +931,12 @@ int mlx4_en_process_rx_cq(struct ether *dev, struct mlx4_en_cq *cq,
 			ring->csum_none++;
 		}
 
+		printd("length %d ring %p bytes %d packets %d ip_summed %d\n",
+		       length, ring, ring->bytes, ring->packets, ip_summed);
+		//dump_packet(priv, rx_desc, frags, length);
+		recv_packet(priv, rx_desc, frags, length);
+		goto next;
+
 #if 0 // AKAROS_PORT
 		/* This packet is eligible for GRO if it is:
 		 * - DIX Ethernet (type interpretation)
@@ -1030,6 +1076,7 @@ out:
 	return polled;
 }
 
+static void mlx4_en_poll_rx_cq(uint32_t srcid, long a0, long a1, long a2);
 
 void mlx4_en_rx_irq(struct mlx4_cq *mcq)
 {
@@ -1040,22 +1087,23 @@ void mlx4_en_rx_irq(struct mlx4_cq *mcq)
 #if 0 // AKAROS_PORT
 		napi_schedule_irqoff(&cq->napi);
 #else
-		{ /* TODO */ }
+		send_kernel_message(core_id(), mlx4_en_poll_rx_cq, (long)cq,
+				    0, 0, KMSG_ROUTINE);
 #endif
 	else
 		mlx4_en_arm_cq(priv, cq);
 }
 
 /* Rx CQ polling - called by NAPI */
-int mlx4_en_poll_rx_cq(struct napi_struct *napi, int budget)
+static void mlx4_en_poll_rx_cq(uint32_t srcid, long a0, long a1, long a2)
 {
-	struct mlx4_en_cq *cq = container_of(napi, struct mlx4_en_cq, napi);
+	struct mlx4_en_cq *cq = (struct mlx4_en_cq *)a0;
 	struct ether *dev = cq->dev;
 	struct mlx4_en_priv *priv = netdev_priv(dev);
-	int done;
+	int done, budget = INT32_MAX;
 
 	if (!mlx4_en_cq_lock_napi(cq))
-		return budget;
+		return;
 
 	done = mlx4_en_process_rx_cq(dev, cq, budget);
 
@@ -1073,7 +1121,7 @@ int mlx4_en_poll_rx_cq(struct napi_struct *napi, int budget)
 		aff = irq_desc_get_irq_data(cq->irq_desc)->affinity;
 
 		if (likely(cpumask_test_cpu(cpu_curr, aff)))
-			return budget;
+			return;
 
 		/* Current cpu is not according to smp_irq_affinity -
 		 * probably affinity changed. need to stop this NAPI
@@ -1085,7 +1133,6 @@ int mlx4_en_poll_rx_cq(struct napi_struct *napi, int budget)
 	napi_complete_done(napi, done);
 #endif
 	mlx4_en_arm_cq(priv, cq);
-	return done;
 }
 
 static const int frag_sizes[] = {
