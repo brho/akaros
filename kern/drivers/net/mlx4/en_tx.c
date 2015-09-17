@@ -31,18 +31,8 @@
  *
  */
 
-#include <asm/page.h>
 #include <linux/mlx4/cq.h>
-#include <linux/slab.h>
 #include <linux/mlx4/qp.h>
-#include <linux/skbuff.h>
-#include <linux/if_vlan.h>
-#include <linux/prefetch.h>
-#include <linux/vmalloc.h>
-#include <linux/tcp.h>
-#include <linux/ip.h>
-#include <linux/moduleparam.h>
-
 #include "mlx4_en.h"
 
 int mlx4_en_create_tx_ring(struct mlx4_en_priv *priv,
@@ -126,8 +116,12 @@ int mlx4_en_create_tx_ring(struct mlx4_en_priv *priv,
 	}
 	ring->qp.event = mlx4_en_sqp_event;
 
+#if 0 // AKAROS_PORT
 	err = mlx4_bf_alloc(mdev->dev, &ring->bf, node);
 	if (err) {
+#else
+	if (true) {
+#endif
 		en_dbg(DRV, priv, "working without blueflame (%d)\n", err);
 		ring->bf.uar = &mdev->priv_uar;
 		ring->bf.uar->map = mdev->uar_map;
@@ -161,7 +155,9 @@ err_bounce:
 	kfree(ring->bounce_buf);
 	ring->bounce_buf = NULL;
 err_info:
+#if 0 // AKAROS_PORT
 	kvfree(ring->tx_info);
+#endif
 	ring->tx_info = NULL;
 err_ring:
 	kfree(ring);
@@ -172,6 +168,8 @@ err_ring:
 void mlx4_en_destroy_tx_ring(struct mlx4_en_priv *priv,
 			     struct mlx4_en_tx_ring **pring)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_en_dev *mdev = priv->mdev;
 	struct mlx4_en_tx_ring *ring = *pring;
 	en_dbg(DRV, priv, "Destroying tx ring, qpn: %d\n", ring->qpn);
@@ -188,6 +186,7 @@ void mlx4_en_destroy_tx_ring(struct mlx4_en_priv *priv,
 	ring->tx_info = NULL;
 	kfree(ring);
 	*pring = NULL;
+#endif
 }
 
 int mlx4_en_activate_tx_ring(struct mlx4_en_priv *priv,
@@ -215,9 +214,11 @@ int mlx4_en_activate_tx_ring(struct mlx4_en_priv *priv,
 
 	err = mlx4_qp_to_ready(mdev->dev, &ring->wqres.mtt, &ring->context,
 			       &ring->qp, &ring->qp_state);
+#if 0 // AKAROS_PORT
 	if (!cpumask_empty(&ring->affinity_mask))
 		netif_set_xps_queue(priv->dev, &ring->affinity_mask,
 				    ring->queue_index);
+#endif
 
 	return err;
 }
@@ -273,10 +274,11 @@ static uint32_t mlx4_en_free_tx_desc(struct mlx4_en_priv *priv,
 	struct mlx4_en_tx_desc *tx_desc = ring->buf + index * TXBB_SIZE;
 	struct mlx4_wqe_data_seg *data = (void *) tx_desc + tx_info->data_offset;
 	void *end = ring->buf + ring->buf_size;
-	struct sk_buff *skb = tx_info->skb;
+	struct block *block = tx_info->block;
 	int nr_maps = tx_info->nr_maps;
 	int i;
 
+#if 0 // AKAROS_PORT
 	/* We do not touch skb here, so prefetch skb->users location
 	 * to speedup consume_skb()
 	 */
@@ -288,6 +290,7 @@ static uint32_t mlx4_en_free_tx_desc(struct mlx4_en_priv *priv,
 		mlx4_en_fill_hwtstamps(priv->mdev, &hwts, timestamp);
 		skb_tstamp_tx(skb, &hwts);
 	}
+#endif
 
 	/* Optimize the common case when there are no wraparounds */
 	if (likely((void *) tx_desc + tx_info->nr_txbb * TXBB_SIZE <= end)) {
@@ -338,13 +341,15 @@ static uint32_t mlx4_en_free_tx_desc(struct mlx4_en_priv *priv,
 			}
 		}
 	}
-	dev_consume_skb_any(skb);
+	freeb(block);
 	return tx_info->nr_txbb;
 }
 
 
 int mlx4_en_free_tx_buf(struct ether *dev, struct mlx4_en_tx_ring *ring)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	int cnt = 0;
 
@@ -373,6 +378,7 @@ int mlx4_en_free_tx_buf(struct ether *dev, struct mlx4_en_tx_ring *ring)
 		en_dbg(DRV, priv, "Freed %d uncompleted tx descriptors\n", cnt);
 
 	return cnt;
+#endif
 }
 
 static bool mlx4_en_process_tx_cq(struct ether *dev,
@@ -402,7 +408,9 @@ static bool mlx4_en_process_tx_cq(struct ether *dev,
 	if (!priv->port_up)
 		return true;
 
+#if 0 // AKAROS_PORT
 	netdev_txq_bql_complete_prefetchw(ring->tx_queue);
+#endif
 
 	index = cons_index & size_mask;
 	cqe = mlx4_en_get_cqe(buf, index, priv->cqe_size) + factor;
@@ -471,6 +479,7 @@ static bool mlx4_en_process_tx_cq(struct ether *dev,
 	ACCESS_ONCE(ring->last_nr_txbb) = last_nr_txbb;
 	ACCESS_ONCE(ring->cons) = ring_cons + txbbs_skipped;
 
+#if 0 // AKAROS_PORT
 	netdev_tx_completed_queue(ring->tx_queue, packets, bytes);
 
 	/*
@@ -481,6 +490,7 @@ static bool mlx4_en_process_tx_cq(struct ether *dev,
 		netif_tx_wake_queue(ring->tx_queue);
 		ring->wake_queue++;
 	}
+#endif
 	return done < budget;
 }
 
@@ -490,7 +500,11 @@ void mlx4_en_tx_irq(struct mlx4_cq *mcq)
 	struct mlx4_en_priv *priv = netdev_priv(cq->dev);
 
 	if (likely(priv->port_up))
+#if 0 // AKAROS_PORT
 		napi_schedule_irqoff(&cq->napi);
+#else
+		{ /* TODO */ }
+#endif
 	else
 		mlx4_en_arm_cq(priv, cq);
 }
@@ -541,6 +555,7 @@ static struct mlx4_en_tx_desc *mlx4_en_bounce_to_desc(struct mlx4_en_priv *priv,
 	return ring->buf + index * TXBB_SIZE;
 }
 
+#if 0 // AKAROS_PORT
 /* Decide if skb can be inlined in tx descriptor to avoid dma mapping
  *
  * It seems strange we do not simply use skb_copy_bits().
@@ -673,11 +688,14 @@ static void build_inline_wqe(struct mlx4_en_tx_desc *tx_desc,
 		inl->byte_count = cpu_to_be32(1 << 31 | (skb->len - spc));
 	}
 }
+#endif
 
 uint16_t mlx4_en_select_queue(struct ether *dev, struct sk_buff *skb,
 			      void *accel_priv,
 			      select_queue_fallback_t fallback)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	uint16_t rings_p_up = priv->num_tx_rings_p_up;
 	uint8_t up = 0;
@@ -689,14 +707,18 @@ uint16_t mlx4_en_select_queue(struct ether *dev, struct sk_buff *skb,
 		up = skb_vlan_tag_get(skb) >> VLAN_PRIO_SHIFT;
 
 	return fallback(dev, skb) % rings_p_up + up * rings_p_up;
+#endif
 }
 
+#if 0 // AKAROS_PORT
 static void mlx4_bf_copy(void __iomem *dst, const void *src,
 			 unsigned int bytecnt)
 {
 	__iowrite64_copy(dst, src, bytecnt / 8);
 }
+#endif
 
+#if 0 // AKAROS_PORT
 netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct ether *dev)
 {
 	struct skb_shared_info *shinfo = skb_shinfo(skb);
@@ -971,7 +993,7 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct ether *dev)
 			 * endianness.
 			 */
 #if defined(__LITTLE_ENDIAN)
-			write32(
+			iowrite32(
 #else
 			iowrite32be(
 #endif
@@ -1015,4 +1037,5 @@ tx_drop:
 	priv->stats.tx_dropped++;
 	return NETDEV_TX_OK;
 }
+#endif
 

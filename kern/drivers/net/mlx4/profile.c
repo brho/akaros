@@ -32,8 +32,6 @@
  * SOFTWARE.
  */
 
-#include <linux/slab.h>
-
 #include "mlx4.h"
 #include "fw.h"
 
@@ -83,7 +81,9 @@ uint64_t mlx4_make_profile(struct mlx4_dev *dev,
 	uint64_t total_size = 0;
 	struct mlx4_resource *profile;
 	struct mlx4_resource tmp;
+#if 0 // AKAROS_PORT
 	struct sysinfo si;
+#endif
 	int i, j;
 
 	profile = kzmalloc((MLX4_RES_NUM) * (sizeof(*profile)), KMALLOC_WAIT);
@@ -102,9 +102,14 @@ uint64_t mlx4_make_profile(struct mlx4_dev *dev,
 	 * That limits us to 8TB of memory registration per HCA with
 	 * 4KB pages, which is probably OK for the next few months.
 	 */
+#if 0 // AKAROS_PORT
 	si_meminfo(&si);
 	request->num_mtt =
 		ROUNDUPPWR2(MAX_T(unsigned, request->num_mtt, MIN(1UL << (31 - log_mtts_per_seg), si.totalram >> (log_mtts_per_seg - 1))));
+#else
+	request->num_mtt =
+		ROUNDUPPWR2(MAX_T(unsigned, request->num_mtt, 1UL << (31 - log_mtts_per_seg)));
+#endif
 
 	profile[MLX4_RES_QP].size     = dev_cap->qpc_entry_sz;
 	profile[MLX4_RES_RDMARC].size = dev_cap->rdmarc_entry_sz;

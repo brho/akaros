@@ -31,12 +31,8 @@
  * SOFTWARE.
  */
 
-#include <linux/string.h>
-#include <linux/etherdevice.h>
-
+#include <linux_compat.h>
 #include <linux/mlx4/cmd.h>
-#include <linux/export.h>
-
 #include "mlx4.h"
 
 static const uint8_t zero_gid[16];	/* automatically initialized to 0 */

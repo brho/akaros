@@ -33,12 +33,9 @@
  * SOFTWARE.
  */
 
-#include <linux/gfp.h>
-#include <linux/export.h>
-
+#include <linux_compat.h>
 #include <linux/mlx4/cmd.h>
 #include <linux/mlx4/qp.h>
-
 #include "mlx4.h"
 #include "icm.h"
 
@@ -249,6 +246,8 @@ int mlx4_qp_reserve_range(struct mlx4_dev *dev, int cnt, int align,
 	flags &= dev->caps.alloc_res_qp_mask;
 
 	if (mlx4_is_mfunc(dev)) {
+		panic("Disabled");
+#if 0 // AKAROS_PORT
 		set_param_l(&in_param,
 			    (((uint32_t)flags) << 24) | (uint32_t)cnt);
 		set_param_h(&in_param, align);
@@ -261,6 +260,7 @@ int mlx4_qp_reserve_range(struct mlx4_dev *dev, int cnt, int align,
 
 		*base = get_param_l(&out_param);
 		return 0;
+#endif
 	}
 	return __mlx4_qp_reserve_range(dev, cnt, align, base, flags);
 }

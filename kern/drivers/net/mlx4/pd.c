@@ -32,11 +32,6 @@
  */
 
 #include <linux/errno.h>
-#include <linux/export.h>
-#include <linux/io-mapping.h>
-
-#include <asm/page.h>
-
 #include "mlx4.h"
 #include "icm.h"
 
@@ -156,7 +151,11 @@ int mlx4_uar_alloc(struct mlx4_dev *dev, struct mlx4_uar *uar)
 				       dev->caps.uar_page_size);
 	else
 		offset = uar->index;
+#if 0 // AKAROS_PORT
 	uar->pfn = (pci_resource_start(dev->persist->pdev, 2) >> PAGE_SHIFT)
+#else
+	uar->pfn = ((uintptr_t)pci_resource_start(dev->persist->pdev, 2) >> PAGE_SHIFT)
+#endif
 		    + offset;
 	uar->map = NULL;
 	return 0;
@@ -171,6 +170,8 @@ EXPORT_SYMBOL_GPL(mlx4_uar_free);
 
 int mlx4_bf_alloc(struct mlx4_dev *dev, struct mlx4_bf *bf, int node)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	struct mlx4_uar *uar;
 	int err = 0;
@@ -238,11 +239,14 @@ free_kmalloc:
 out:
 	qunlock(&priv->bf_mutex);
 	return err;
+#endif
 }
 EXPORT_SYMBOL_GPL(mlx4_bf_alloc);
 
 void mlx4_bf_free(struct mlx4_dev *dev, struct mlx4_bf *bf)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	int idx;
 
@@ -264,6 +268,7 @@ void mlx4_bf_free(struct mlx4_dev *dev, struct mlx4_bf *bf)
 		list_add(&bf->uar->bf_list, &priv->bf_list);
 
 	qunlock(&priv->bf_mutex);
+#endif
 }
 EXPORT_SYMBOL_GPL(mlx4_bf_free);
 

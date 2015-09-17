@@ -37,15 +37,6 @@
 #ifndef MLX4_H
 #define MLX4_H
 
-#include <linux/mutex.h>
-#include <linux/radix-tree.h>
-#include <linux/rbtree.h>
-#include <linux/timer.h>
-#include <linux/semaphore.h>
-#include <linux/workqueue.h>
-#include <linux/interrupt.h>
-#include <linux/spinlock.h>
-
 #include <linux/mlx4/device.h>
 #include <linux/mlx4/driver.h>
 #include <linux/mlx4/doorbell.h>

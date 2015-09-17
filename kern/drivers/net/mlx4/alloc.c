@@ -31,14 +31,7 @@
  * SOFTWARE.
  */
 
-#include <linux/errno.h>
-#include <linux/slab.h>
-#include <linux/mm.h>
-#include <linux/export.h>
-#include <linux/bitmap.h>
-#include <linux/dma-mapping.h>
-#include <linux/vmalloc.h>
-
+#include <linux_compat.h>
 #include "mlx4.h"
 
 uint32_t mlx4_bitmap_alloc(struct mlx4_bitmap *bitmap)
@@ -598,7 +591,13 @@ int mlx4_buf_alloc(struct mlx4_dev *dev, int size, int max_direct,
 {
 	dma_addr_t t;
 
+#if 0 // AKAROS_PORT
 	if (size <= max_direct) {
+#else
+	if (size > max_direct)
+		printd("size %p max_direct %p\n", size, max_direct);
+	if (1) {
+#endif
 		buf->nbufs        = 1;
 		buf->npages       = 1;
 		buf->page_shift   = get_order(size) + PAGE_SHIFT;
@@ -616,6 +615,8 @@ int mlx4_buf_alloc(struct mlx4_dev *dev, int size, int max_direct,
 
 		memset(buf->direct.buf, 0, size);
 	} else {
+		panic("Disabled");
+#if 0 // AKAROS_PORT
 		int i;
 
 		buf->direct.buf  = NULL;
@@ -652,6 +653,7 @@ int mlx4_buf_alloc(struct mlx4_dev *dev, int size, int max_direct,
 			if (!buf->direct.buf)
 				goto err_free;
 		}
+#endif
 	}
 
 	return 0;
@@ -672,6 +674,8 @@ void mlx4_buf_free(struct mlx4_dev *dev, int size, struct mlx4_buf *buf)
 				  buf->direct.buf,
 				  buf->direct.map);
 	else {
+		panic("Disabled");
+#if 0 // AKAROS_PORT
 		if (BITS_PER_LONG == 64)
 			vunmap(buf->direct.buf);
 
@@ -682,6 +686,7 @@ void mlx4_buf_free(struct mlx4_dev *dev, int size, struct mlx4_buf *buf)
 						  buf->page_list[i].buf,
 						  buf->page_list[i].map);
 		kfree(buf->page_list);
+#endif
 	}
 }
 EXPORT_SYMBOL_GPL(mlx4_buf_free);
@@ -751,7 +756,11 @@ int mlx4_db_alloc(struct mlx4_dev *dev, struct mlx4_db *db, int order, gfp_t gfp
 		if (!mlx4_alloc_db_from_pgdir(pgdir, db, order))
 			goto out;
 
+#if 0 // AKAROS_PORT
 	pgdir = mlx4_alloc_db_pgdir(&dev->persist->pdev->dev, gfp);
+#else
+	pgdir = mlx4_alloc_db_pgdir(0, gfp);
+#endif
 	if (!pgdir) {
 		ret = -ENOMEM;
 		goto out;

@@ -32,10 +32,10 @@
  */
 
 #include <linux/mlx4/device.h>
-#include <linux/clocksource.h>
 
 #include "mlx4_en.h"
 
+#if 0 // AKAROS_PORT
 /* mlx4_en_read_clock - read raw cycle counter (to be used by time counter)
  */
 static uint64_t mlx4_en_read_clock(const struct cyclecounter *tc)
@@ -46,9 +46,12 @@ static uint64_t mlx4_en_read_clock(const struct cyclecounter *tc)
 
 	return mlx4_read_clock(dev) & tc->mask;
 }
+#endif
 
 uint64_t mlx4_en_get_cqe_ts(struct mlx4_cqe *cqe)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	uint64_t hi, lo;
 	struct mlx4_ts_cqe *ts_cqe = (struct mlx4_ts_cqe *)cqe;
 
@@ -56,12 +59,15 @@ uint64_t mlx4_en_get_cqe_ts(struct mlx4_cqe *cqe)
 	hi = ((uint64_t)be32_to_cpu(ts_cqe->timestamp_hi) + !lo) << 16;
 
 	return hi | lo;
+#endif
 }
 
 void mlx4_en_fill_hwtstamps(struct mlx4_en_dev *mdev,
 			    struct skb_shared_hwtstamps *hwts,
 			    uint64_t timestamp)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	unsigned long flags;
 	uint64_t nsec;
 
@@ -71,6 +77,7 @@ void mlx4_en_fill_hwtstamps(struct mlx4_en_dev *mdev,
 
 	memset(hwts, 0, sizeof(struct skb_shared_hwtstamps));
 	hwts->hwtstamp = ns_to_ktime(nsec);
+#endif
 }
 
 /**
@@ -81,15 +88,20 @@ void mlx4_en_fill_hwtstamps(struct mlx4_en_dev *mdev,
  **/
 void mlx4_en_remove_timestamp(struct mlx4_en_dev *mdev)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	if (mdev->ptp_clock) {
 		ptp_clock_unregister(mdev->ptp_clock);
 		mdev->ptp_clock = NULL;
 		mlx4_info(mdev, "removed PHC\n");
 	}
+#endif
 }
 
 void mlx4_en_ptp_overflow_check(struct mlx4_en_dev *mdev)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	bool timeout = time_is_before_jiffies(mdev->last_overflow_check +
 					      mdev->overflow_period);
 	unsigned long flags;
@@ -100,8 +112,10 @@ void mlx4_en_ptp_overflow_check(struct mlx4_en_dev *mdev)
 		write_unlock_irqrestore(&mdev->clock_lock, flags);
 		mdev->last_overflow_check = jiffies;
 	}
+#endif
 }
 
+#if 0 // AKAROS_PORT
 /**
  * mlx4_en_phc_adjfreq - adjust the frequency of the hardware clock
  * @ptp: ptp clock structure
@@ -235,9 +249,12 @@ static const struct ptp_clock_info mlx4_en_ptp_clock_info = {
 	.settime64	= mlx4_en_phc_settime,
 	.enable		= mlx4_en_phc_enable,
 };
+#endif
 
 void mlx4_en_init_timestamp(struct mlx4_en_dev *mdev)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_dev *dev = mdev->dev;
 	unsigned long flags;
 	uint64_t ns, zero = 0;
@@ -282,4 +299,5 @@ void mlx4_en_init_timestamp(struct mlx4_en_dev *mdev)
 		mlx4_info(mdev, "registered PHC clock\n");
 	}
 
+#endif
 }

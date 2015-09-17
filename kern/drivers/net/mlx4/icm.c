@@ -31,11 +31,7 @@
  * SOFTWARE.
  */
 
-#include <linux/errno.h>
-#include <linux/mm.h>
-#include <linux/scatterlist.h>
-#include <linux/slab.h>
-
+#include <linux_compat.h>
 #include <linux/mlx4/cmd.h>
 
 #include "mlx4.h"
@@ -174,7 +170,11 @@ struct mlx4_icm *mlx4_alloc_icm(struct mlx4_dev *dev, int npages,
 			--cur_order;
 
 		if (coherent)
+#if 0 // AKAROS_PORT
 			ret = mlx4_alloc_icm_coherent(&dev->persist->pdev->dev,
+#else
+			ret = mlx4_alloc_icm_coherent(0,
+#endif
 						      &chunk->mem[chunk->npages],
 						      cur_order, gfp_mask);
 		else

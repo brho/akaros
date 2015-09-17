@@ -31,12 +31,6 @@
  *
  */
 
-#include <linux/kernel.h>
-#include <linux/ethtool.h>
-#include <linux/netdevice.h>
-#include <linux/delay.h>
-#include <linux/mlx4/driver.h>
-
 #include "mlx4_en.h"
 
 
@@ -48,6 +42,8 @@ static int mlx4_en_test_registers(struct mlx4_en_priv *priv)
 
 static int mlx4_en_test_loopback_xmit(struct mlx4_en_priv *priv)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct sk_buff *skb;
 	struct ethhdr *ethh;
 	unsigned char *packet;
@@ -76,6 +72,7 @@ static int mlx4_en_test_loopback_xmit(struct mlx4_en_priv *priv)
 	/* xmit the pkt */
 	err = mlx4_en_xmit(skb, priv->dev);
 	return err;
+#endif
 }
 
 static int mlx4_en_test_loopback(struct mlx4_en_priv *priv)
@@ -152,6 +149,8 @@ static int mlx4_en_test_speed(struct mlx4_en_priv *priv)
 void mlx4_en_ex_selftest(struct ether *dev, uint32_t *flags,
 			 uint64_t *buf)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	struct mlx4_en_dev *mdev = priv->mdev;
 	int i, carrier_ok;
@@ -187,4 +186,5 @@ void mlx4_en_ex_selftest(struct ether *dev, uint32_t *flags,
 		if (buf[i])
 			*flags |= ETH_TEST_FL_FAILED;
 	}
+#endif
 }

@@ -34,9 +34,7 @@
  * SOFTWARE.
  */
 
-#include <linux/hardirq.h>
-#include <linux/export.h>
-
+#include <linux_compat.h>
 #include <linux/mlx4/cmd.h>
 #include <linux/mlx4/cq.h>
 
@@ -53,12 +51,18 @@
 #define MLX4_EQ_STATE_FIRED		(10 <<  8)
 
 #define TASKLET_MAX_TIME 2
+#if 0 // AKAROS_PORT
 #define TASKLET_MAX_TIME_JIFFIES msecs_to_jiffies(TASKLET_MAX_TIME)
+#endif
 
 void mlx4_cq_tasklet_cb(unsigned long data)
 {
 	unsigned long flags;
+#if 0 // AKAROS_PORT
 	unsigned long end = jiffies + TASKLET_MAX_TIME_JIFFIES;
+#else
+	unsigned long end = TASKLET_MAX_TIME;
+#endif
 	struct mlx4_eq_tasklet *ctx = (struct mlx4_eq_tasklet *)data;
 	struct mlx4_cq *mcq, *temp;
 
@@ -71,7 +75,11 @@ void mlx4_cq_tasklet_cb(unsigned long data)
 		mcq->tasklet_ctx.comp(mcq);
 		if (atomic_sub_and_test(&mcq->refcount, 1))
 			complete(&mcq->free);
+#if 0 // AKAROS_PORT
 		if (time_after(jiffies, end))
+#else
+		if ((end--) == 0)
+#endif
 			break;
 	}
 
@@ -343,7 +351,11 @@ int mlx4_cq_alloc(struct mlx4_dev *dev, int nent,
 	INIT_LIST_HEAD(&cq->tasklet_ctx.list);
 
 
+#if 0 // AKAROS_PORT
 	cq->irq = priv->eq_table.eq[cq->vector].irq;
+#else
+	cq->irq = -1; /* FIXME */
+#endif
 	return 0;
 
 err_radix:
@@ -360,6 +372,8 @@ EXPORT_SYMBOL_GPL(mlx4_cq_alloc);
 
 void mlx4_cq_free(struct mlx4_dev *dev, struct mlx4_cq *cq)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	struct mlx4_cq_table *cq_table = &priv->cq_table;
 	int err;
@@ -379,6 +393,7 @@ void mlx4_cq_free(struct mlx4_dev *dev, struct mlx4_cq *cq)
 	wait_for_completion(&cq->free);
 
 	mlx4_cq_free_icm(dev, cq->cqn);
+#endif
 }
 EXPORT_SYMBOL_GPL(mlx4_cq_free);
 

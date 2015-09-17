@@ -31,10 +31,8 @@
  *
  */
 
-#include <linux/slab.h>
-#include <linux/vmalloc.h>
+#include <linux_compat.h>
 #include <linux/mlx4/qp.h>
-
 #include "mlx4_en.h"
 
 void mlx4_en_fill_qp_context(struct mlx4_en_priv *priv, int size, int stride,
@@ -89,6 +87,8 @@ int mlx4_en_map_buffer(struct mlx4_buf *buf)
 	if (BITS_PER_LONG == 64 || buf->nbufs == 1)
 		return 0;
 
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	pages = kmalloc(sizeof *pages * buf->nbufs, KMALLOC_WAIT);
 	if (!pages)
 		return -ENOMEM;
@@ -102,6 +102,7 @@ int mlx4_en_map_buffer(struct mlx4_buf *buf)
 		return -ENOMEM;
 
 	return 0;
+#endif
 }
 
 void mlx4_en_unmap_buffer(struct mlx4_buf *buf)
@@ -109,7 +110,10 @@ void mlx4_en_unmap_buffer(struct mlx4_buf *buf)
 	if (BITS_PER_LONG == 64 || buf->nbufs == 1)
 		return;
 
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	vunmap(buf->direct.buf);
+#endif
 }
 
 void mlx4_en_sqp_event(struct mlx4_qp *qp, enum mlx4_event event)

@@ -32,12 +32,7 @@
  * SOFTWARE.
  */
 
-#include <linux/errno.h>
-#include <linux/export.h>
-#include <linux/slab.h>
-#include <linux/kernel.h>
-#include <linux/vmalloc.h>
-
+#include <linux_compat.h>
 #include <linux/mlx4/cmd.h>
 
 #include "mlx4.h"
@@ -117,11 +112,13 @@ static int mlx4_buddy_init(struct mlx4_buddy *buddy, int max_order)
 		s = BITS_TO_LONGS(1 << (buddy->max_order - i));
 		buddy->bits[i] = kzmalloc((s) * (sizeof(long)),
 					  KMALLOC_WAIT | __GFP_NOWARN);
+#if 0 // AKAROS_PORT
 		if (!buddy->bits[i]) {
 			buddy->bits[i] = vzalloc(s * sizeof(long));
 			if (!buddy->bits[i])
 				goto err_out_free;
 		}
+#endif
 	}
 
 	set_bit(0, buddy->bits[buddy->max_order]);
@@ -129,9 +126,11 @@ static int mlx4_buddy_init(struct mlx4_buddy *buddy, int max_order)
 
 	return 0;
 
+#if 0 // AKAROS_PORT
 err_out_free:
 	for (i = 0; i <= buddy->max_order; ++i)
 		kvfree(buddy->bits[i]);
+#endif
 
 err_out:
 	kfree(buddy->bits);
@@ -142,6 +141,8 @@ err_out:
 
 static void mlx4_buddy_cleanup(struct mlx4_buddy *buddy)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	int i;
 
 	for (i = 0; i <= buddy->max_order; ++i)
@@ -149,6 +150,7 @@ static void mlx4_buddy_cleanup(struct mlx4_buddy *buddy)
 
 	kfree(buddy->bits);
 	kfree(buddy->num_free);
+#endif
 }
 
 uint32_t __mlx4_alloc_mtt_range(struct mlx4_dev *dev, int order)
@@ -298,6 +300,8 @@ static int mlx4_HW2SW_MPT(struct mlx4_dev *dev, struct mlx4_cmd_mailbox *mailbox
 int mlx4_mr_hw_get_mpt(struct mlx4_dev *dev, struct mlx4_mr *mmr,
 		       struct mlx4_mpt_entry ***mpt_entry)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	int err;
 	int key = key_to_hw_index(mmr->key) & (dev->caps.num_mpts - 1);
 	struct mlx4_cmd_mailbox *mailbox = NULL;
@@ -343,6 +347,7 @@ int mlx4_mr_hw_get_mpt(struct mlx4_dev *dev, struct mlx4_mr *mmr,
 free_mailbox:
 	mlx4_free_cmd_mailbox(dev, mailbox);
 	return err;
+#endif
 }
 EXPORT_SYMBOL_GPL(mlx4_mr_hw_get_mpt);
 

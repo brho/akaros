@@ -122,7 +122,11 @@ int mlx4_en_activate_cq(struct mlx4_en_priv *priv, struct mlx4_en_cq *cq,
 					cq->ring);
 				/* Set IRQ for specific name (per ring) */
 				if (mlx4_assign_eq(mdev->dev, name, rmap,
+#if 0 // AKAROS_PORT
 						   &cq->vector)) {
+#else
+						   (int*)&cq->vector)) {
+#endif
 					cq->vector = (cq->ring + 1 + priv->port)
 					    % mdev->dev->caps.num_comp_vectors;
 					mlx4_warn(mdev, "Failed assigning an EQ to %s, falling back to legacy EQ's\n",
@@ -164,6 +168,7 @@ int mlx4_en_activate_cq(struct mlx4_en_priv *priv, struct mlx4_en_cq *cq,
 	cq->mcq.comp  = cq->is_tx ? mlx4_en_tx_irq : mlx4_en_rx_irq;
 	cq->mcq.event = mlx4_en_cq_event;
 
+#if 0 // AKAROS_PORT
 	if (cq->is_tx) {
 		netif_napi_add(cq->dev, &cq->napi, mlx4_en_poll_tx_cq,
 			       NAPI_POLL_WEIGHT);
@@ -180,6 +185,7 @@ int mlx4_en_activate_cq(struct mlx4_en_priv *priv, struct mlx4_en_cq *cq,
 	}
 
 	napi_enable(&cq->napi);
+#endif
 
 	return 0;
 }
@@ -203,6 +209,8 @@ void mlx4_en_destroy_cq(struct mlx4_en_priv *priv, struct mlx4_en_cq **pcq)
 
 void mlx4_en_deactivate_cq(struct mlx4_en_priv *priv, struct mlx4_en_cq *cq)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	napi_disable(&cq->napi);
 	if (!cq->is_tx) {
 		napi_hash_del(&cq->napi);
@@ -212,6 +220,7 @@ void mlx4_en_deactivate_cq(struct mlx4_en_priv *priv, struct mlx4_en_cq *cq)
 	netif_napi_del(&cq->napi);
 
 	mlx4_cq_free(priv->mdev->dev, &cq->mcq);
+#endif
 }
 
 /* Set rx cq moderation parameters */

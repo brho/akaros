@@ -32,11 +32,8 @@
  * SOFTWARE.
  */
 
-#include <linux/etherdevice.h>
+#include <linux_compat.h>
 #include <linux/mlx4/cmd.h>
-#include <linux/module.h>
-#include <linux/cache.h>
-
 #include "fw.h"
 #include "icm.h"
 
@@ -1280,11 +1277,13 @@ int mlx4_QUERY_PORT_wrapper(struct mlx4_dev *dev, int slave,
 		/* set port type to currently operating port type */
 		port_type |= (dev->caps.port_type[vhcr->in_modifier] & 0x3);
 
+#if 0 // AKAROS_PORT
 		admin_link_state = priv->mfunc.master.vf_oper[slave].vport[vhcr->in_modifier].state.link_state;
 		if (IFLA_VF_LINK_STATE_ENABLE == admin_link_state)
 			port_type |= MLX4_PORT_LINK_UP_MASK;
 		else if (IFLA_VF_LINK_STATE_DISABLE == admin_link_state)
 			port_type &= ~MLX4_PORT_LINK_UP_MASK;
+#endif
 
 		MLX4_PUT(outbox->buf, port_type,
 			 QUERY_PORT_SUPPORTED_TYPE_OFFSET);
@@ -2445,6 +2444,8 @@ enum {
 
 void mlx4_opreq_action(struct work_struct *work)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_priv *priv = container_of(work, struct mlx4_priv,
 					      opreq_task);
 	struct mlx4_dev *dev = &priv->dev;
@@ -2539,6 +2540,7 @@ void mlx4_opreq_action(struct work_struct *work)
 
 out:
 	mlx4_free_cmd_mailbox(dev, mailbox);
+#endif
 }
 
 static int mlx4_check_smp_firewall_active(struct mlx4_dev *dev,

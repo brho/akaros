@@ -31,16 +31,7 @@
  *
  */
 
-#include <linux/etherdevice.h>
-#include <linux/tcp.h>
-#include <linux/if_vlan.h>
-#include <linux/delay.h>
-#include <linux/slab.h>
-#include <linux/hash.h>
-#include <net/ip.h>
-#include <net/busy_poll.h>
-#include <net/vxlan.h>
-
+#include <linux_compat.h>
 #include <linux/mlx4/driver.h>
 #include <linux/mlx4/device.h>
 #include <linux/mlx4/cmd.h>
@@ -51,6 +42,8 @@
 
 int mlx4_en_setup_tc(struct ether *dev, uint8_t up)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	int i;
 	unsigned int offset = 0;
@@ -67,6 +60,7 @@ int mlx4_en_setup_tc(struct ether *dev, uint8_t up)
 	}
 
 	return 0;
+#endif
 }
 
 #ifdef CONFIG_NET_RX_BUSY_POLL
@@ -583,8 +577,14 @@ static int mlx4_en_get_qp(struct mlx4_en_priv *priv)
 	int *qpn = &priv->base_qpn;
 	uint64_t mac = mlx4_mac_to_u64(priv->dev->ea);
 
+#if 0 // AKAROS_PORT
 	en_dbg(DRV, priv, "Registering MAC: %pM for adding\n",
 	       priv->dev->ea);
+#else
+	en_dbg(DRV, priv, "Registering MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",
+	       priv->dev->ea[0], priv->dev->ea[1], priv->dev->ea[2],
+	       priv->dev->ea[3], priv->dev->ea[4], priv->dev->ea[5]);
+#endif
 	index = mlx4_register_mac(dev, priv->port, mac);
 	if (index < 0) {
 		err = index;
@@ -610,10 +610,12 @@ static int mlx4_en_get_qp(struct mlx4_en_priv *priv)
 	if (err)
 		goto steer_err;
 
+#if 0 // AKAROS_PORT
 	err = mlx4_en_tunnel_steer_add(priv, priv->dev->ea, *qpn,
 				       &priv->tunnel_reg_id);
 	if (err)
 		goto tunnel_err;
+#endif
 
 	entry = kmalloc(sizeof(*entry), KMALLOC_WAIT);
 	if (!entry) {
@@ -624,16 +626,24 @@ static int mlx4_en_get_qp(struct mlx4_en_priv *priv)
 	memcpy(priv->current_mac, entry->mac, sizeof(priv->current_mac));
 	entry->reg_id = reg_id;
 
+#if 0 // AKAROS_PORT
 	hlist_add_head_rcu(&entry->hlist,
 			   &priv->mac_hash[entry->mac[MLX4_EN_MAC_HASH_IDX]]);
+#else
+	hlist_add_head(&entry->hlist,
+		       &priv->mac_hash[entry->mac[MLX4_EN_MAC_HASH_IDX]]);
+	/* FIXME why is rcu significant? */
+#endif
 
 	return 0;
 
 alloc_err:
 	if (priv->tunnel_reg_id)
 		mlx4_flow_detach(priv->mdev->dev, priv->tunnel_reg_id);
+#if 0 // AKAROS_PORT
 tunnel_err:
 	mlx4_en_uc_steer_release(priv, priv->dev->ea, *qpn, reg_id);
+#endif
 
 steer_err:
 	mlx4_qp_release_range(dev, *qpn, 1);
@@ -645,6 +655,8 @@ qp_err:
 
 static void mlx4_en_put_qp(struct mlx4_en_priv *priv)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_en_dev *mdev = priv->mdev;
 	struct mlx4_dev *dev = mdev->dev;
 	int qpn = priv->base_qpn;
@@ -686,8 +698,10 @@ static void mlx4_en_put_qp(struct mlx4_en_priv *priv)
 		mlx4_qp_release_range(dev, qpn, 1);
 		priv->flags &= ~MLX4_EN_FLAG_FORCE_PROMISC;
 	}
+#endif
 }
 
+#if 0 // AKAROS_PORT
 static int mlx4_en_replace_mac(struct mlx4_en_priv *priv, int qpn,
 			       unsigned char *new_mac, unsigned char *prev_mac)
 {
@@ -778,6 +792,7 @@ static int mlx4_en_set_mac(struct ether *dev, void *addr)
 
 	return err;
 }
+#endif
 
 static void mlx4_en_clear_list(struct ether *dev)
 {
@@ -790,6 +805,7 @@ static void mlx4_en_clear_list(struct ether *dev)
 	}
 }
 
+#if 0 // AKAROS_PORT
 static void mlx4_en_cache_mclist(struct ether *dev)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
@@ -1225,6 +1241,7 @@ static void mlx4_en_do_uc_filter(struct mlx4_en_priv *priv,
 			priv->port);
 	}
 }
+#endif
 
 static void mlx4_en_do_set_rx_mode(struct work_struct *work)
 {
@@ -1253,6 +1270,7 @@ static void mlx4_en_do_set_rx_mode(struct work_struct *work)
 		}
 	}
 
+#if 0 // AKAROS_PORT
 	if (dev->priv_flags & IFF_UNICAST_FLT)
 		mlx4_en_do_uc_filter(priv, dev, mdev);
 
@@ -1268,6 +1286,7 @@ static void mlx4_en_do_set_rx_mode(struct work_struct *work)
 		mlx4_en_clear_promisc_mode(priv, mdev);
 
 	mlx4_en_do_multicast(priv, dev, mdev);
+#endif
 out:
 	qunlock(&mdev->state_lock);
 }
@@ -1288,6 +1307,8 @@ static void mlx4_en_netpoll(struct ether *dev)
 
 static void mlx4_en_tx_timeout(struct ether *dev)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	struct mlx4_en_dev *mdev = priv->mdev;
 	int i;
@@ -1306,6 +1327,7 @@ static void mlx4_en_tx_timeout(struct ether *dev)
 	priv->port_stats.tx_timeout++;
 	en_dbg(DRV, priv, "Scheduling watchdog\n");
 	queue_work(mdev->workqueue, &priv->watchdog_task);
+#endif
 }
 
 
@@ -1367,6 +1389,8 @@ static void mlx4_en_set_default_moderation(struct mlx4_en_priv *priv)
 
 static void mlx4_en_auto_moderation(struct mlx4_en_priv *priv)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	unsigned long period = (unsigned long) (jiffies - priv->last_moder_jiffies);
 	struct mlx4_en_cq *cq;
 	unsigned long packets;
@@ -1426,10 +1450,13 @@ static void mlx4_en_auto_moderation(struct mlx4_en_priv *priv)
 	}
 
 	priv->last_moder_jiffies = jiffies;
+#endif
 }
 
 static void mlx4_en_do_get_stats(struct work_struct *work)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct delayed_work *delay = to_delayed_work(work);
 	struct mlx4_en_priv *priv = container_of(delay, struct mlx4_en_priv,
 						 stats_task);
@@ -1453,6 +1480,7 @@ static void mlx4_en_do_get_stats(struct work_struct *work)
 		mdev->mac_removed[MLX4_MAX_PORTS + 1 - priv->port] = 0;
 	}
 	qunlock(&mdev->state_lock);
+#endif
 }
 
 /* mlx4_en_service_task - Run service task for tasks that needed to be done
@@ -1467,8 +1495,10 @@ static void mlx4_en_service_task(struct work_struct *work)
 
 	qlock(&mdev->state_lock);
 	if (mdev->device_up) {
+#if 0 // AKAROS_PORT
 		if (mdev->dev->caps.flags2 & MLX4_DEV_CAP_FLAG2_TS)
 			mlx4_en_ptp_overflow_check(mdev);
+#endif
 
 		mlx4_en_recover_from_oom(priv);
 		queue_delayed_work(mdev->workqueue, &priv->service_task,
@@ -1515,7 +1545,10 @@ static int mlx4_en_init_affinity_hint(struct mlx4_en_priv *priv, int ring_idx)
 
 static void mlx4_en_free_affinity_hint(struct mlx4_en_priv *priv, int ring_idx)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	free_cpumask_var(priv->rx_ring[ring_idx]->affinity_mask);
+#endif
 }
 
 int mlx4_en_start_port(struct ether *dev)
@@ -1538,9 +1571,11 @@ int mlx4_en_start_port(struct ether *dev)
 
 	INIT_LIST_HEAD(&priv->mc_list);
 	INIT_LIST_HEAD(&priv->curr_list);
+#if 0 // AKAROS_PORT
 	INIT_LIST_HEAD(&priv->ethtool_list);
 	memset(&priv->ethtool_rules[0], 0,
 	       sizeof(struct ethtool_flow_id) * MAX_NUM_OF_FS_RULES);
+#endif
 
 	/* Calculate Rx buf size */
 	dev->maxmtu = MIN(dev->maxmtu, priv->max_mtu);
@@ -1637,7 +1672,11 @@ int mlx4_en_start_port(struct ether *dev)
 			mlx4_en_deactivate_cq(priv, cq);
 			goto tx_err;
 		}
+#if 0 // AKAROS_PORT
 		tx_ring->tx_queue = netdev_get_tx_queue(dev, i);
+#else
+		tx_ring->tx_queue = 0; // TODO
+#endif
 
 		/* Arm CQ for TX completions */
 		mlx4_en_arm_cq(priv, cq);
@@ -1667,6 +1706,7 @@ int mlx4_en_start_port(struct ether *dev)
 		goto tx_err;
 	}
 
+#if 0 // AKAROS_PORT
 	if (mdev->dev->caps.tunnel_offload_mode == MLX4_TUNNEL_OFFLOAD_MODE_VXLAN) {
 		err = mlx4_SET_PORT_VXLAN(mdev->dev, priv->port, VXLAN_STEER_BY_OUTER_MAC, 1);
 		if (err) {
@@ -1675,6 +1715,7 @@ int mlx4_en_start_port(struct ether *dev)
 			goto tx_err;
 		}
 	}
+#endif
 
 	/* Init port */
 	en_dbg(HW, priv, "Initializing port\n");
@@ -1703,8 +1744,10 @@ int mlx4_en_start_port(struct ether *dev)
 		vxlan_get_rx_port(dev);
 #endif
 	priv->port_up = true;
+#if 0 // AKAROS_PORT
 	netif_tx_start_all_queues(dev);
 	netif_device_attach(dev);
+#endif
 
 	return 0;
 
@@ -1732,10 +1775,14 @@ cq_err:
 
 void mlx4_en_stop_port(struct ether *dev, int detach)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	struct mlx4_en_dev *mdev = priv->mdev;
 	struct mlx4_en_mc_list *mclist, *tmp;
+#if 0 // AKAROS_PORT
 	struct ethtool_flow_id *flow, *tmp_flow;
+#endif
 	int i;
 	uint8_t mc_list[16] = {0};
 
@@ -1807,6 +1854,7 @@ void mlx4_en_stop_port(struct ether *dev, int detach)
 	/* Flush multicast filter */
 	mlx4_SET_MCAST_FLTR(mdev->dev, priv->port, 0, 1, MLX4_MCAST_CONFIG);
 
+#if 0 // AKAROS_PORT
 	/* Remove flow steering rules for the port*/
 	if (mdev->dev->caps.steering_mode ==
 	    MLX4_STEERING_MODE_DEVICE_MANAGED) {
@@ -1817,6 +1865,7 @@ void mlx4_en_stop_port(struct ether *dev, int detach)
 			list_del(&flow->list);
 		}
 	}
+#endif
 
 	mlx4_en_destroy_drop_qp(priv);
 
@@ -1855,6 +1904,7 @@ void mlx4_en_stop_port(struct ether *dev, int detach)
 
 		mlx4_en_free_affinity_hint(priv, i);
 	}
+#endif
 }
 
 static void mlx4_en_restart(struct work_struct *work)
@@ -1881,8 +1931,10 @@ static void mlx4_en_clear_stats(struct ether *dev)
 	struct mlx4_en_dev *mdev = priv->mdev;
 	int i;
 
+#if 0 // AKAROS_PORT
 	if (mlx4_en_DUMP_ETH_STATS(mdev, priv->port, 1))
 		en_dbg(HW, priv, "Failed dumping statistics\n");
+#endif
 
 	memset(&priv->stats, 0, sizeof(priv->stats));
 	memset(&priv->pstats, 0, sizeof(priv->pstats));
@@ -2046,6 +2098,8 @@ err:
 
 void mlx4_en_destroy_netdev(struct ether *dev)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	struct mlx4_en_dev *mdev = priv->mdev;
 
@@ -2075,8 +2129,10 @@ void mlx4_en_destroy_netdev(struct ether *dev)
 	kfree(priv->tx_cq);
 
 	free_netdev(dev);
+#endif
 }
 
+#if 0 // AKAROS_PORT
 static int mlx4_en_change_mtu(struct ether *dev, int new_mtu)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
@@ -2513,6 +2569,7 @@ static const struct net_device_ops mlx4_netdev_ops_master = {
 #endif
 	.ndo_set_tx_maxrate	= mlx4_en_set_tx_maxrate,
 };
+#endif
 
 struct mlx4_en_bond {
 	struct work_struct work;
@@ -2523,6 +2580,8 @@ struct mlx4_en_bond {
 
 static void mlx4_en_bond_work(struct work_struct *work)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_en_bond *bond = container_of(work,
 						     struct mlx4_en_bond,
 						     work);
@@ -2550,11 +2609,14 @@ static void mlx4_en_bond_work(struct work_struct *work)
 	}
 	dev_put(bond->priv->dev);
 	kfree(bond);
+#endif
 }
 
 static int mlx4_en_queue_bond_work(struct mlx4_en_priv *priv, int is_bonded,
 				   uint8_t v2p_p1, uint8_t v2p_p2)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_en_bond *bond = NULL;
 
 	bond = kzmalloc(sizeof(*bond), 0);
@@ -2569,11 +2631,14 @@ static int mlx4_en_queue_bond_work(struct mlx4_en_priv *priv, int is_bonded,
 	dev_hold(priv->dev);
 	queue_work(priv->mdev->workqueue, &bond->work);
 	return 0;
+#endif
 }
 
 int mlx4_en_netdev_event(struct notifier_block *this,
 			 unsigned long event, void *ptr)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct ether *ndev = netdev_notifier_info_to_dev(ptr);
 	uint8_t port = 0;
 	struct mlx4_en_dev *mdev;
@@ -2684,6 +2749,7 @@ int mlx4_en_netdev_event(struct notifier_block *this,
 
 	mlx4_en_queue_bond_work(priv, do_bond,
 				v2p_port1, v2p_port2);
+#endif
 
 	return NOTIFY_DONE;
 }
@@ -2729,6 +2795,8 @@ void mlx4_en_set_stats_bitmap(struct mlx4_dev *dev,
 			      uint8_t rx_ppp, uint8_t rx_pause,
 			      uint8_t tx_ppp, uint8_t tx_pause)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	int last_i = 0;
 
 	qlock_init(&stats_bitmap->mutex);
@@ -2762,6 +2830,7 @@ void mlx4_en_set_stats_bitmap(struct mlx4_dev *dev,
 
 	if (!mlx4_is_slave(dev))
 		bitmap_set(stats_bitmap->bitmap, last_i, NUM_PKT_STATS);
+#endif
 }
 
 int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
@@ -2773,6 +2842,7 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 	int err;
 	uint64_t mac_u64;
 
+#if 0 // AKAROS_PORT
 	dev = alloc_etherdev_mqs(sizeof(struct mlx4_en_priv),
 				 MAX_TX_RINGS, MAX_RX_RINGS);
 	if (dev == NULL)
@@ -2782,6 +2852,7 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 	netif_set_real_num_rx_queues(dev, prof->rx_ring_num);
 
 	SET_NETDEV_DEV(dev, &mdev->dev->persist->pdev->dev);
+#endif
 
 	/*
 	 * Initialize driver private data
@@ -2806,7 +2877,9 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 
 	priv->dev = dev;
 	priv->mdev = mdev;
+#if 0 // AKAROS_PORT
 	priv->ddev = &mdev->pdev->dev;
+#endif
 	priv->prof = prof;
 	priv->port = port;
 	priv->port_up = false;
@@ -2895,6 +2968,7 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 	}
 	priv->allocated = 1;
 
+#if 0 // AKAROS_PORT
 	/*
 	 * Initialize netdev entry points
 	 */
@@ -2904,6 +2978,7 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 			{}
 	netif_set_real_num_tx_queues(dev, priv->tx_ring_num);
 	netif_set_real_num_rx_queues(dev, priv->rx_ring_num);
+#endif
 
 	/*
 	 * Set driver features
@@ -2930,8 +3005,10 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 	    mdev->dev->caps.dmfs_high_steer_mode != MLX4_STEERING_DMFS_A0_STATIC)
 		dev->hw_features |= NETIF_F_NTUPLE;
 
+#if 0 // AKAROS_PORT
 	if (mdev->dev->caps.steering_mode != MLX4_STEERING_MODE_A0)
 		dev->priv_flags |= IFF_UNICAST_FLT;
+#endif
 
 	/* Setting a default hash function value */
 	if (mdev->dev->caps.flags2 & MLX4_DEV_CAP_FLAG2_RSS_TOP) {
@@ -2983,12 +3060,15 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 		en_err(priv, "Failed Initializing port\n");
 		goto out;
 	}
+#if 0 // AKAROS_PORT
 	queue_delayed_work(mdev->workqueue, &priv->stats_task, STATS_DELAY);
+#endif
 
 	if (mdev->dev->caps.flags2 & MLX4_DEV_CAP_FLAG2_TS)
 		queue_delayed_work(mdev->workqueue, &priv->service_task,
 				   SERVICE_TASK_DELAY);
 
+#if 0 // AKAROS_PORT
 	mlx4_en_set_stats_bitmap(mdev->dev, &priv->stats_bitmap,
 				 mdev->profile.prof[priv->port].rx_ppp,
 				 mdev->profile.prof[priv->port].rx_pause,
@@ -3000,6 +3080,7 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 		en_err(priv, "Netdev registration failed for port %d\n", port);
 		goto out;
 	}
+#endif
 
 	priv->registered = 1;
 
@@ -3055,9 +3136,11 @@ int mlx4_en_reset_config(struct ether *dev,
 		/* RX time-stamping is OFF, update the RX vlan offload
 		 * to the latest wanted state
 		 */
+#if 0 // AKAROS_PORT
 		if (dev->wanted_features & NETIF_F_HW_VLAN_CTAG_RX)
 			dev->feat |= NETIF_F_HW_VLAN_CTAG_RX;
 		else
+#endif
 			dev->feat &= ~NETIF_F_HW_VLAN_CTAG_RX;
 	}
 
@@ -3091,6 +3174,8 @@ int mlx4_en_reset_config(struct ether *dev,
 
 out:
 	qunlock(&mdev->state_lock);
+#if 0 // AKAROS_PORT
 	netdev_features_change(dev);
+#endif
 	return err;
 }

@@ -33,16 +33,9 @@
  * SOFTWARE.
  */
 
-#include <linux/sched.h>
-#include <linux/pci.h>
-#include <linux/errno.h>
-#include <linux/kernel.h>
-#include <linux/io.h>
-#include <linux/slab.h>
+#include <linux_compat.h>
 #include <linux/mlx4/cmd.h>
 #include <linux/mlx4/qp.h>
-#include <linux/if_ether.h>
-#include <linux/etherdevice.h>
 
 #include "mlx4.h"
 #include "fw.h"
@@ -241,6 +234,8 @@ static void *res_tracker_lookup(struct rb_root *root, uint64_t res_id)
 
 static int res_tracker_insert(struct rb_root *root, struct res_common *res)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct rb_node **new = &(root->rb_node), *parent = NULL;
 
 	/* Figure out where to put new node */
@@ -262,6 +257,7 @@ static int res_tracker_insert(struct rb_root *root, struct res_common *res)
 	rb_insert_color(&res->node, root);
 
 	return 0;
+#endif
 }
 
 enum qp_transition {
@@ -701,6 +697,8 @@ static int update_vport_qp_param(struct mlx4_dev *dev,
 				 struct mlx4_cmd_mailbox *inbox,
 				 uint8_t slave, uint32_t qpn)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_qp_context	*qpc = inbox->buf + 8;
 	struct mlx4_vport_oper_state *vp_oper;
 	struct mlx4_priv *priv;
@@ -770,6 +768,7 @@ static int update_vport_qp_param(struct mlx4_dev *dev,
 	}
 out:
 	return err;
+#endif
 }
 
 static int mpt_mask(struct mlx4_dev *dev)
@@ -1041,6 +1040,8 @@ static int add_res_range(struct mlx4_dev *dev, int slave, uint64_t base,
 			 int count,
 			 enum mlx4_resource type, int extra)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	int i;
 	int err;
 	struct mlx4_priv *priv = mlx4_priv(dev);
@@ -1092,6 +1093,7 @@ undo:
 	kfree(res_arr);
 
 	return err;
+#endif
 }
 
 static int remove_qp_ok(struct res_qp *res)
@@ -1227,6 +1229,8 @@ static int rem_res_range(struct mlx4_dev *dev, int slave, uint64_t base,
 			 int count,
 			 enum mlx4_resource type, int extra)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	uint64_t i;
 	int err;
 	struct mlx4_priv *priv = mlx4_priv(dev);
@@ -1261,6 +1265,7 @@ out:
 	spin_unlock_irqsave(mlx4_tlock(dev));
 
 	return err;
+#endif
 }
 
 static int qp_res_start_move_to(struct mlx4_dev *dev, int slave, int qpn,
@@ -3951,6 +3956,8 @@ ex_put:
 static int validate_eth_header_mac(int slave, struct _rule_hw *eth_header,
 				   struct list_head *rlist)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mac_res *res, *tmp;
 	__be64 be_mac;
 
@@ -3967,6 +3974,7 @@ static int validate_eth_header_mac(int slave, struct _rule_hw *eth_header,
 		return -EINVAL;
 	}
 	return 0;
+#endif
 }
 
 /*
@@ -4252,6 +4260,7 @@ static void detach_qp(struct mlx4_dev *dev, int slave, struct res_qp *rqp)
 	}
 }
 
+#if 0 // AKAROS_PORT
 static int _move_all_busy(struct mlx4_dev *dev, int slave,
 			  enum mlx4_resource type, int print)
 {
@@ -4391,7 +4400,7 @@ static void rem_slave_srqs(struct mlx4_dev *dev, int slave)
 	struct res_srq *tmp;
 	int state;
 	uint64_t in_param;
-	LIST_HEAD(tlist);
+	LINUX_LIST_HEAD(tlist);
 	int srqn;
 	int err;
 
@@ -4457,7 +4466,7 @@ static void rem_slave_cqs(struct mlx4_dev *dev, int slave)
 	struct res_cq *tmp;
 	int state;
 	uint64_t in_param;
-	LIST_HEAD(tlist);
+	LINUX_LIST_HEAD(tlist);
 	int cqn;
 	int err;
 
@@ -4520,7 +4529,7 @@ static void rem_slave_mrs(struct mlx4_dev *dev, int slave)
 	struct res_mpt *tmp;
 	int state;
 	uint64_t in_param;
-	LIST_HEAD(tlist);
+	LINUX_LIST_HEAD(tlist);
 	int mptn;
 	int err;
 
@@ -4588,7 +4597,7 @@ static void rem_slave_mtts(struct mlx4_dev *dev, int slave)
 	struct res_mtt *mtt;
 	struct res_mtt *tmp;
 	int state;
-	LIST_HEAD(tlist);
+	LINUX_LIST_HEAD(tlist);
 	int base;
 	int err;
 
@@ -4691,7 +4700,7 @@ static void rem_slave_eqs(struct mlx4_dev *dev, int slave)
 	struct res_eq *tmp;
 	int err;
 	int state;
-	LIST_HEAD(tlist);
+	LINUX_LIST_HEAD(tlist);
 	int eqn;
 
 	err = move_all_busy(dev, slave, RES_EQ);
@@ -4798,9 +4807,12 @@ static void rem_slave_xrcdns(struct mlx4_dev *dev, int slave)
 	}
 	spin_unlock_irqsave(mlx4_tlock(dev));
 }
+#endif
 
 void mlx4_delete_all_resources_for_slave(struct mlx4_dev *dev, int slave)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	mlx4_reset_roce_gids(dev, slave);
 	qlock(&priv->mfunc.master.res_tracker.slave_list[slave].mutex);
@@ -4816,6 +4828,7 @@ void mlx4_delete_all_resources_for_slave(struct mlx4_dev *dev, int slave)
 	rem_slave_counters(dev, slave);
 	rem_slave_xrcdns(dev, slave);
 	qunlock(&priv->mfunc.master.res_tracker.slave_list[slave].mutex);
+#endif
 }
 
 void mlx4_vf_immed_vlan_work_handler(struct work_struct *_work)

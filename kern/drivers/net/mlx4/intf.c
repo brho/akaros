@@ -31,8 +31,6 @@
  * SOFTWARE.
  */
 
-#include <linux/slab.h>
-#include <linux/export.h>
 #include <linux/errno.h>
 
 #include "mlx4.h"
@@ -44,8 +42,8 @@ struct mlx4_device_context {
 	void		       *context;
 };
 
-static LIST_HEAD(intf_list);
-static LIST_HEAD(dev_list);
+static LINUX_LIST_HEAD(intf_list);
+static LINUX_LIST_HEAD(dev_list);
 static DEFINE_MUTEX(intf_mutex);
 
 static void mlx4_add_device(struct mlx4_interface *intf, struct mlx4_priv *priv)
@@ -123,7 +121,7 @@ int mlx4_do_bond(struct mlx4_dev *dev, bool enable)
 	struct mlx4_device_context *dev_ctx = NULL, *temp_dev_ctx;
 	unsigned long flags;
 	int ret;
-	LIST_HEAD(bond_list);
+	LINUX_LIST_HEAD(bond_list);
 
 	if (!(dev->caps.flags2 & MLX4_DEV_CAP_FLAG2_PORT_REMAP))
 		return -ENOTSUPP;

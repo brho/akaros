@@ -33,16 +33,7 @@
  * SOFTWARE.
  */
 
-#include <linux/module.h>
-#include <linux/init.h>
-#include <linux/errno.h>
-#include <linux/pci.h>
-#include <linux/dma-mapping.h>
-#include <linux/slab.h>
-#include <linux/io-mapping.h>
-#include <linux/delay.h>
-#include <linux/kmod.h>
-
+#include <linux_compat.h>
 #include <linux/mlx4/device.h>
 #include <linux/mlx4/doorbell.h>
 
@@ -150,7 +141,7 @@ static bool use_prio;
 module_param_named(use_prio, use_prio, bool, 0444);
 MODULE_PARM_DESC(use_prio, "Enable steering by VLAN priority on ETH ports (deprecated)");
 
-int log_mtts_per_seg = LOG2_UP(MLX4_MTT_ENTRY_PER_SEG);
+int log_mtts_per_seg = ilog2(MLX4_MTT_ENTRY_PER_SEG);
 module_param_named(log_mtts_per_seg, log_mtts_per_seg, int, 0444);
 MODULE_PARM_DESC(log_mtts_per_seg, "Log2 number of MTT entries per segment (1-7)");
 
@@ -397,7 +388,7 @@ static int mlx4_dev_cap(struct mlx4_dev *dev, struct mlx4_dev_cap *dev_cap)
 	dev->caps.mtt_entry_sz       = dev_cap->mtt_entry_sz;
 
 	dev->caps.max_msg_sz         = dev_cap->max_msg_sz;
-	dev->caps.page_size_cap	     = ~(u32) (dev_cap->min_page_sz - 1);
+	dev->caps.page_size_cap	     = ~(uint32_t) (dev_cap->min_page_sz - 1);
 	dev->caps.flags		     = dev_cap->flags;
 	dev->caps.flags2	     = dev_cap->flags2;
 	dev->caps.bmme_flags	     = dev_cap->bmme_flags;
@@ -962,10 +953,12 @@ static void mlx4_request_modules(struct mlx4_dev *dev)
 			has_eth_port = true;
 	}
 
+#if 0 // AKAROS_PORT
 	if (has_eth_port)
 		request_module_nowait(EN_DRV_NAME);
 	if (has_ib_port || (dev->caps.flags & MLX4_DEV_CAP_FLAG_IBOE))
 		request_module_nowait(IB_DRV_NAME);
+#endif
 }
 
 /*
@@ -1159,6 +1152,8 @@ static ssize_t set_port_ib_mtu(struct device *dev,
 			     struct device_attribute *attr,
 			     const char *buf, size_t count)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_port_info *info = container_of(attr, struct mlx4_port_info,
 						   port_mtu_attr);
 	struct mlx4_dev *mdev = info->dev;
@@ -1198,6 +1193,7 @@ err_set_port:
 	qunlock(&priv->port_mutex);
 	mlx4_start_sense(mdev);
 	return err ? err : count;
+#endif
 }
 
 int mlx4_bond(struct mlx4_dev *dev)
@@ -1619,6 +1615,8 @@ static void mlx4_slave_exit(struct mlx4_dev *dev)
 
 static int map_bf_area(struct mlx4_dev *dev)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	resource_size_t bf_start;
 	resource_size_t bf_len;
@@ -1636,12 +1634,16 @@ static int map_bf_area(struct mlx4_dev *dev)
 		err = -ENOMEM;
 
 	return err;
+#endif
 }
 
 static void unmap_bf_area(struct mlx4_dev *dev)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	if (mlx4_priv(dev)->bf_mapping)
 		io_mapping_free(mlx4_priv(dev)->bf_mapping);
+#endif
 }
 
 uint64_t mlx4_read_clock(struct mlx4_dev *dev)
@@ -1711,6 +1713,8 @@ static void mlx4_close_fw(struct mlx4_dev *dev)
 
 static int mlx4_comm_check_offline(struct mlx4_dev *dev)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 #define COMM_CHAN_OFFLINE_OFFSET 0x09
 
 	uint32_t comm_flags;
@@ -1735,6 +1739,7 @@ static int mlx4_comm_check_offline(struct mlx4_dev *dev)
 	}
 	mlx4_err(dev, "Communication channel is offline.\n");
 	return -EIO;
+#endif
 }
 
 static void mlx4_reset_vf_support(struct mlx4_dev *dev)
@@ -2146,8 +2151,10 @@ static int mlx4_init_hca(struct mlx4_dev *dev)
 		}
 	}
 
+#if 0 // AKAROS_PORT
 	if (map_bf_area(dev))
 		mlx4_dbg(dev, "Failed to map blue flame area\n");
+#endif
 
 	/*Only the master set the ports, all the rest got it from it.*/
 	if (!mlx4_is_slave(dev))
@@ -2490,6 +2497,7 @@ err_uar_table_free:
 
 static void mlx4_enable_msi_x(struct mlx4_dev *dev)
 {
+#if 0 // AKAROS_PORT
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	struct msix_entry *entries;
 	int i;
@@ -2537,6 +2545,7 @@ no_msi:
 
 	for (i = 0; i < 2; ++i)
 		priv->eq_table.eq[i].irq = dev->persist->pdev->irq;
+#endif
 }
 
 static int mlx4_init_port_info(struct mlx4_dev *dev, int port)
@@ -2554,6 +2563,7 @@ static int mlx4_init_port_info(struct mlx4_dev *dev, int port)
 	}
 
 	sprintf(info->dev_name, "mlx4_port%d", port);
+#if 0 // AKAROS_PORT
 	info->port_attr.attr.name = info->dev_name;
 	if (mlx4_is_mfunc(dev))
 		info->port_attr.attr.mode = S_IRUGO;
@@ -2569,8 +2579,10 @@ static int mlx4_init_port_info(struct mlx4_dev *dev, int port)
 		mlx4_err(dev, "Failed to create file for port %d\n", port);
 		info->port = -1;
 	}
+#endif
 
 	sprintf(info->dev_mtu_name, "mlx4_port%d_mtu", port);
+#if 0 // AKAROS_PORT
 	info->port_mtu_attr.attr.name = info->dev_mtu_name;
 	if (mlx4_is_mfunc(dev))
 		info->port_mtu_attr.attr.mode = S_IRUGO;
@@ -2589,18 +2601,22 @@ static int mlx4_init_port_info(struct mlx4_dev *dev, int port)
 				   &info->port_attr);
 		info->port = -1;
 	}
+#endif
 
 	return err;
 }
 
 static void mlx4_cleanup_port_info(struct mlx4_port_info *info)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	if (info->port < 0)
 		return;
 
 	device_remove_file(&info->dev->persist->pdev->dev, &info->port_attr);
 	device_remove_file(&info->dev->persist->pdev->dev,
 			   &info->port_mtu_attr);
+#endif
 }
 
 static int mlx4_init_steering(struct mlx4_dev *dev)
@@ -2655,10 +2671,12 @@ static void mlx4_clear_steering(struct mlx4_dev *dev)
 	kfree(priv->steer);
 }
 
+#if 0 // AKAROS_PORT
 static int extended_func_num(struct pci_device *pdev)
 {
 	return PCI_SLOT(pdev->devfn) * 8 + PCI_FUNC(pdev->devfn);
 }
+#endif
 
 #define MLX4_OWNER_BASE	0x8069c
 #define MLX4_OWNER_SIZE	4
@@ -2711,6 +2729,8 @@ static uint64_t mlx4_enable_sriov(struct mlx4_dev *dev,
 				  uint8_t total_vfs, int existing_vfs,
 				  int reset_flow)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	uint64_t dev_flags = dev->flags;
 	int err = 0;
 
@@ -2761,6 +2781,7 @@ free_mem:
 	dev->persist->num_vfs = 0;
 	kfree(dev->dev_vfs);
 	return dev_flags & ~MLX4_FLAG_MASTER;
+#endif
 }
 
 enum {
@@ -2807,7 +2828,9 @@ static int mlx4_load_one(struct pci_device *pdev, int pci_dev_data,
 	INIT_LIST_HEAD(&priv->bf_list);
 	qlock_init(&priv->bf_mutex);
 
+#if 0 // AKAROS_PORT
 	dev->rev_id = pdev->revision;
+#endif
 	dev->numa_node = dev_to_node(&pdev->dev);
 
 	/* Detect if this device is a virtual function */
@@ -2842,6 +2865,7 @@ static int mlx4_load_one(struct pci_device *pdev, int pci_dev_data,
 			goto err_sriov;
 		}
 
+#if 0 // AKAROS_PORT
 		if (total_vfs) {
 			dev->flags = MLX4_FLAG_MASTER;
 			existing_vfs = pci_num_vf(pdev);
@@ -2849,6 +2873,7 @@ static int mlx4_load_one(struct pci_device *pdev, int pci_dev_data,
 				dev->flags |= MLX4_FLAG_SRIOV;
 			dev->persist->num_vfs = total_vfs;
 		}
+#endif
 	}
 
 	/* on load remove any previous indication of internal error,
@@ -2948,6 +2973,7 @@ slave_start:
 			 * Running in slave mode */
 			mlx4_cmd_cleanup(dev, MLX4_CMD_CLEANUP_ALL);
 			/* We're not a PF */
+#if 0 // AKAROS_PORT
 			if (dev->flags & MLX4_FLAG_SRIOV) {
 				if (!existing_vfs)
 					pci_disable_sriov(pdev);
@@ -2955,6 +2981,7 @@ slave_start:
 					atomic_dec(&pf_loading);
 				dev->flags &= ~MLX4_FLAG_SRIOV;
 			}
+#endif
 			if (!mlx4_is_slave(dev))
 				mlx4_free_ownership(dev);
 			dev->flags |= MLX4_FLAG_SLAVE;
@@ -3065,6 +3092,7 @@ slave_start:
 	}
 
 	err = mlx4_setup_hca(dev);
+#if 0 // AKAROS_PORT
 	if (err == -EBUSY && (dev->flags & MLX4_FLAG_MSI_X) &&
 	    !mlx4_is_mfunc(dev)) {
 		dev->flags &= ~MLX4_FLAG_MSI_X;
@@ -3073,6 +3101,7 @@ slave_start:
 		pci_disable_msix(pdev);
 		err = mlx4_setup_hca(dev);
 	}
+#endif
 
 	if (err)
 		goto err_steer;
@@ -3137,8 +3166,10 @@ err_steer:
 		mlx4_clear_steering(dev);
 
 err_disable_msix:
+#if 0 // AKAROS_PORT
 	if (dev->flags & MLX4_FLAG_MSI_X)
 		pci_disable_msix(pdev);
+#endif
 
 err_free_eq:
 	mlx4_free_eq_table(dev);
@@ -3171,10 +3202,12 @@ err_cmd:
 	mlx4_cmd_cleanup(dev, MLX4_CMD_CLEANUP_ALL);
 
 err_sriov:
+#if 0 // AKAROS_PORT
 	if (dev->flags & MLX4_FLAG_SRIOV && !existing_vfs) {
 		pci_disable_sriov(pdev);
 		dev->flags &= ~MLX4_FLAG_SRIOV;
 	}
+#endif
 
 	if (mlx4_is_master(dev) && dev->persist->num_vfs && !reset_flow)
 		atomic_dec(&pf_loading);
@@ -3250,13 +3283,25 @@ static int __mlx4_init_one(struct pci_device *pdev, int pci_dev_data,
 
 	/* Check for BARs. */
 	if (!(pci_dev_data & MLX4_PCI_DEV_IS_VF) &&
+#if 0 // AKAROS_PORT
 	    !(pci_resource_flags(pdev, 0) & IORESOURCE_MEM)) {
+#else
+	    !pci_get_membar(pdev, 0)) {
+#endif
 		dev_err(&pdev->dev, "Missing DCS, aborting (driver_data: 0x%x, pci_resource_flags(pdev, 0):0x%lx)\n",
+#if 0 // AKAROS_PORT
 			pci_dev_data, pci_resource_flags(pdev, 0));
+#else
+			pci_dev_data, pci_get_membar(pdev, 0));
+#endif
 		err = -ENODEV;
 		goto err_disable_pdev;
 	}
+#if 0 // AKAROS_PORT
 	if (!(pci_resource_flags(pdev, 2) & IORESOURCE_MEM)) {
+#else
+	if (!pci_get_membar(pdev, 2)) {
+#endif
 		dev_err(&pdev->dev, "Missing UAR, aborting\n");
 		err = -ENODEV;
 		goto err_disable_pdev;
@@ -3291,6 +3336,7 @@ static int __mlx4_init_one(struct pci_device *pdev, int pci_dev_data,
 
 	/* Allow large DMA segments, up to the firmware limit of 1 GB */
 	dma_set_max_seg_size(&pdev->dev, 1024 * 1024 * 1024);
+#if 0 // AKAROS_PORT
 	/* Detect if this device is a virtual function */
 	if (pci_dev_data & MLX4_PCI_DEV_IS_VF) {
 		/* When acting as pf, we normally skip vfs unless explicitly
@@ -3316,6 +3362,7 @@ static int __mlx4_init_one(struct pci_device *pdev, int pci_dev_data,
 			}
 		}
 	}
+#endif
 
 	err = mlx4_catas_init(&priv->dev);
 	if (err)
@@ -3331,7 +3378,9 @@ err_catas:
 	mlx4_catas_end(&priv->dev);
 
 err_release_regions:
+#if 0 // AKAROS_PORT
 	pci_release_regions(pdev);
+#endif
 
 err_disable_pdev:
 	pci_disable_device(pdev);
@@ -3448,8 +3497,10 @@ static void mlx4_unload_one(struct pci_device *pdev)
 		mlx4_multi_func_cleanup(dev);
 	mlx4_cmd_cleanup(dev, MLX4_CMD_CLEANUP_ALL);
 
+#if 0 // AKAROS_PORT
 	if (dev->flags & MLX4_FLAG_MSI_X)
 		pci_disable_msix(pdev);
+#endif
 
 	if (!mlx4_is_slave(dev))
 		mlx4_free_ownership(dev);
@@ -3494,12 +3545,14 @@ static void mlx4_remove_one(struct pci_device *pdev)
 	else
 		mlx4_info(dev, "%s: interface is down\n", __func__);
 	mlx4_catas_end(dev);
+#if 0 // AKAROS_PORT
 	if (dev->flags & MLX4_FLAG_SRIOV && !active_vfs) {
 		mlx4_warn(dev, "Disabling SR-IOV\n");
 		pci_disable_sriov(pdev);
 	}
 
 	pci_release_regions(pdev);
+#endif
 	pci_disable_device(pdev);
 	kfree(dev->persist);
 	kfree(priv);
@@ -3624,6 +3677,8 @@ static pci_ers_result_t mlx4_pci_err_detected(struct pci_device *pdev,
 
 static pci_ers_result_t mlx4_pci_slot_reset(struct pci_device *pdev)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_dev_persistent *persist = pci_get_drvdata(pdev);
 	struct mlx4_dev	 *dev  = persist->dev;
 	struct mlx4_priv *priv = mlx4_priv(dev);
@@ -3665,6 +3720,7 @@ end:
 	qunlock(&persist->interface_state_mutex);
 
 	return ret ? PCI_ERS_RESULT_DISCONNECT : PCI_ERS_RESULT_RECOVERED;
+#endif
 }
 
 static void mlx4_shutdown(struct pci_device *pdev)
@@ -3678,6 +3734,7 @@ static void mlx4_shutdown(struct pci_device *pdev)
 	qunlock(&persist->interface_state_mutex);
 }
 
+#if 0 // AKAROS_PORT
 static const struct pci_error_handlers mlx4_err_handler = {
 	.error_detected = mlx4_pci_err_detected,
 	.slot_reset     = mlx4_pci_slot_reset,
@@ -3691,6 +3748,7 @@ static struct pci_driver mlx4_driver = {
 	.remove		= mlx4_remove_one,
 	.err_handler    = &mlx4_err_handler,
 };
+#endif
 
 static int __init mlx4_verify_params(void)
 {
@@ -3739,17 +3797,21 @@ static int __init mlx4_init(void)
 	if (mlx4_verify_params())
 		return -EINVAL;
 
-
 	mlx4_wq = create_singlethread_workqueue("mlx4");
 	if (!mlx4_wq)
 		return -ENOMEM;
 
+#if 0 // AKAROS_PORT
 	ret = pci_register_driver(&mlx4_driver);
 	if (ret < 0)
 		destroy_workqueue(mlx4_wq);
 	return ret < 0 ? ret : 0;
+#else
+	return 0;
+#endif
 }
 
+#if 0 // AKAROS_PORT
 static void __exit mlx4_cleanup(void)
 {
 	pci_unregister_driver(&mlx4_driver);
@@ -3758,3 +3820,4 @@ static void __exit mlx4_cleanup(void)
 
 module_init(mlx4_init);
 module_exit(mlx4_cleanup);
+#endif

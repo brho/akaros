@@ -30,11 +30,7 @@
  * SOFTWARE.
  */
 
-#include <linux/errno.h>
-#include <linux/if_ether.h>
-#include <linux/if_vlan.h>
-#include <linux/export.h>
-
+#include <linux_compat.h>
 #include <linux/mlx4/cmd.h>
 
 #include "mlx4.h"

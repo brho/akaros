@@ -32,20 +32,10 @@
  * SOFTWARE.
  */
 
-#include <linux/sched.h>
-#include <linux/slab.h>
-#include <linux/export.h>
-#include <linux/pci.h>
-#include <linux/errno.h>
-
+#include <linux_compat.h>
 #include <linux/mlx4/cmd.h>
 #include <linux/mlx4/device.h>
-#include <linux/semaphore.h>
-#include <rdma/ib_smi.h>
-#include <linux/delay.h>
-
-#include <asm/io.h>
-
+#include <linux/rdma/ib_smi.h>
 #include "mlx4.h"
 #include "fw.h"
 #include "fw_qos.h"
@@ -290,6 +280,8 @@ static int mlx4_comm_cmd_poll(struct mlx4_dev *dev, uint8_t cmd,
 			      uint16_t param,
 			      unsigned long timeout)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	unsigned long end;
 	int err = 0;
@@ -335,12 +327,15 @@ static int mlx4_comm_cmd_poll(struct mlx4_dev *dev, uint8_t cmd,
 out:
 	up(&priv->cmd.poll_sem);
 	return err;
+#endif
 }
 
 static int mlx4_comm_cmd_wait(struct mlx4_dev *dev, uint8_t vhcr_cmd,
 			      uint16_t param, uint16_t op,
 			      unsigned long timeout)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_cmd *cmd = &mlx4_priv(dev)->cmd;
 	struct mlx4_cmd_context *context;
 	unsigned long end;
@@ -405,6 +400,7 @@ out:
 
 	up(&cmd->event_sem);
 	return err;
+#endif
 }
 
 int mlx4_comm_cmd(struct mlx4_dev *dev, uint8_t cmd, uint16_t param,
@@ -459,9 +455,15 @@ static int mlx4_cmd_post(struct mlx4_dev *dev, uint64_t in_param,
 		goto out;
 	}
 
+#if 0 // AKAROS_PORT
 	end = jiffies;
 	if (event)
 		end += msecs_to_jiffies(GO_BIT_TIMEOUT_MSECS);
+#else
+	end = 0;
+	if (event)
+		end += GO_BIT_TIMEOUT_MSECS;
+#endif
 
 	while (cmd_pending(dev)) {
 		if (pci_channel_offline(dev->persist->pdev)) {
@@ -472,7 +474,11 @@ static int mlx4_cmd_post(struct mlx4_dev *dev, uint64_t in_param,
 			goto out;
 		}
 
+#if 0 // AKAROS_PORT
 		if (time_after_eq(jiffies, end)) {
+#else
+		if ((end--) == 0) {
+#endif
 			mlx4_err(dev, "%s:cmd_pending failed\n", __func__);
 			goto out;
 		}
@@ -628,8 +634,13 @@ static int mlx4_cmd_poll(struct mlx4_dev *dev, uint64_t in_param,
 	if (err)
 		goto out_reset;
 
+#if 0 // AKAROS_PORT
 	end = msecs_to_jiffies(timeout) + jiffies;
 	while (cmd_pending(dev) && time_before(jiffies, end)) {
+#else
+	end = timeout;
+	while (cmd_pending(dev) && end--) {
+#endif
 		if (pci_channel_offline(dev->persist->pdev)) {
 			/*
 			 * Device is going through error recovery
@@ -730,8 +741,12 @@ static int mlx4_cmd_wait(struct mlx4_dev *dev, uint64_t in_param,
 	if (err)
 		goto out_reset;
 
+#if 0 // AKAROS_PORT
 	if (!wait_for_completion_timeout(&context->done,
 					 msecs_to_jiffies(timeout))) {
+#else
+	if (!wait_for_completion_timeout(&context->done, timeout)) {
+#endif
 		mlx4_warn(dev, "command 0x%x timed out (go bit not cleared)\n",
 			  op);
 		if (op == MLX4_CMD_NOP) {
@@ -1840,6 +1855,8 @@ out:
 static int mlx4_master_immediate_activate_vlan_qos(struct mlx4_priv *priv,
 					    int slave, int port)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_vport_oper_state *vp_oper;
 	struct mlx4_vport_state *vp_admin;
 	struct mlx4_vf_immed_vlan_work *work;
@@ -1928,6 +1945,7 @@ static int mlx4_master_immediate_activate_vlan_qos(struct mlx4_priv *priv,
 	queue_work(priv->mfunc.master.comm_wq, &work->work);
 
 	return 0;
+#endif
 }
 
 static void mlx4_set_default_port_qos(struct mlx4_dev *dev, int port)
@@ -2270,6 +2288,8 @@ void mlx4_master_comm_channel(struct work_struct *work)
 
 static int sync_toggles(struct mlx4_dev *dev)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	uint32_t wr_toggle;
 	uint32_t rd_toggle;
@@ -2311,6 +2331,7 @@ static int sync_toggles(struct mlx4_dev *dev)
 	priv->cmd.comm_toggle = 0;
 
 	return 0;
+#endif
 }
 
 int mlx4_multi_func_init(struct mlx4_dev *dev)
@@ -3113,6 +3134,7 @@ int mlx4_get_vf_config(struct mlx4_dev *dev, int port, int vf, struct ifla_vf_in
 		return -EINVAL;
 
 	s_info = &priv->mfunc.master.vf_admin[slave].vport[port];
+#if 0 // AKAROS_PORT
 	ivf->vf = vf;
 
 	/* need to convert it to a func */
@@ -3134,6 +3156,7 @@ int mlx4_get_vf_config(struct mlx4_dev *dev, int port, int vf, struct ifla_vf_in
 	ivf->min_tx_rate	= 0;
 	ivf->spoofchk		= s_info->spoofchk;
 	ivf->linkstate		= s_info->link_state;
+#endif
 
 	return 0;
 }
@@ -3141,6 +3164,8 @@ EXPORT_SYMBOL_GPL(mlx4_get_vf_config);
 
 int mlx4_set_vf_link_state(struct mlx4_dev *dev, int port, int vf, int link_state)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	struct mlx4_vport_state *s_info;
 	int slave;
@@ -3184,6 +3209,7 @@ int mlx4_set_vf_link_state(struct mlx4_dev *dev, int port, int vf, int link_stat
 			 "updating vf %d port %d no link state HW enforcment\n",
 			 vf, port);
 	return 0;
+#endif
 }
 EXPORT_SYMBOL_GPL(mlx4_set_vf_link_state);
 

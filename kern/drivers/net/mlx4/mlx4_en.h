@@ -34,19 +34,6 @@
 #ifndef _MLX4_EN_H_
 #define _MLX4_EN_H_
 
-#include <linux/bitops.h>
-#include <linux/compiler.h>
-#include <linux/list.h>
-#include <linux/mutex.h>
-#include <linux/netdevice.h>
-#include <linux/if_vlan.h>
-#include <linux/net_tstamp.h>
-#ifdef CONFIG_MLX4_EN_DCB
-#include <linux/dcbnl.h>
-#endif
-#include <linux/cpu_rmap.h>
-#include <linux/ptp_clock_kernel.h>
-
 #include <linux/mlx4/device.h>
 #include <linux/mlx4/qp.h>
 #include <linux/mlx4/cq.h>
@@ -214,7 +201,7 @@ enum cq_type {
 
 
 struct mlx4_en_tx_info {
-	struct sk_buff *skb;
+	struct block *block;
 	dma_addr_t	map0_dma;
 	uint32_t		map0_byte_count;
 	uint32_t		nr_txbb;
@@ -402,6 +389,7 @@ struct mlx4_en_dev {
 	uint32_t                     priv_pdn;
 	spinlock_t              uar_lock;
 	uint8_t			mac_removed[MLX4_MAX_PORTS + 1];
+#if 0 // AKAROS_PORT
 	rwlock_t		clock_lock;
 	uint32_t			nominal_c_mult;
 	struct cyclecounter	cycles;
@@ -411,6 +399,7 @@ struct mlx4_en_dev {
 	struct ptp_clock	*ptp_clock;
 	struct ptp_clock_info	ptp_clock_info;
 	struct notifier_block	nb;
+#endif
 };
 
 
@@ -463,11 +452,13 @@ struct mlx4_en_frag_info {
 
 #endif
 
+#if 0 // AKAROS_PORT
 struct ethtool_flow_id {
 	struct list_head list;
 	struct ethtool_rx_flow_spec flow_spec;
 	uint64_t id;
 };
+#endif
 
 enum {
 	MLX4_EN_FLAG_PROMISC		= (1 << 0),
@@ -500,9 +491,11 @@ struct mlx4_en_priv {
 	struct net_device_stats ret_stats;
 	struct mlx4_en_port_state port_state;
 	spinlock_t stats_lock;
+#if 0 // AKAROS_PORT
 	struct ethtool_flow_id ethtool_rules[MAX_NUM_OF_FS_RULES];
 	/* To allow rules removal while port is going down */
 	struct list_head ethtool_list;
+#endif
 
 	unsigned long last_moder_packets[MAX_RX_RINGS];
 	unsigned long last_moder_tx_packets;
@@ -578,7 +571,9 @@ struct mlx4_en_priv {
 	struct mlx4_en_stat_out_mbox hw_stats;
 	int vids[128];
 	bool wol;
+#if 0 // AKAROS_PORT
 	struct device *ddev;
+#endif
 	int base_tx_qpn;
 	struct hlist_head mac_hash[MLX4_EN_MAC_HASH_SIZE];
 	struct hwtstamp_config hwtstamp_config;
@@ -611,7 +606,9 @@ struct mlx4_mac_entry {
 	struct hlist_node hlist;
 	unsigned char mac[Eaddrlen + 2];
 	uint64_t reg_id;
+#if 0 // AKAROS_PORT
 	struct rcu_head rcu;
+#endif
 };
 
 static inline struct mlx4_cqe *mlx4_en_get_cqe(void *buf, int idx, int cqe_sz)
@@ -830,7 +827,7 @@ void mlx4_en_ex_selftest(struct ether *dev, uint32_t *flags,
 void mlx4_en_ptp_overflow_check(struct mlx4_en_dev *mdev);
 
 #define DEV_FEATURE_CHANGED(dev, new_features, feature) \
-	((dev->features & feature) ^ (new_features & feature))
+	((dev->feat & feature) ^ (new_features & feature))
 
 int mlx4_en_reset_config(struct ether *dev,
 			 struct hwtstamp_config ts_config,
@@ -852,10 +849,11 @@ void mlx4_en_fill_hwtstamps(struct mlx4_en_dev *mdev,
 void mlx4_en_init_timestamp(struct mlx4_en_dev *mdev);
 void mlx4_en_remove_timestamp(struct mlx4_en_dev *mdev);
 
+#if 0 // AKAROS_PORT
 /* Globals
  */
 extern const struct ethtool_ops mlx4_en_ethtool_ops;
-
+#endif
 
 
 /*
@@ -866,11 +864,18 @@ __printf(3, 4)
 void en_print(const char *level, const struct mlx4_en_priv *priv,
 	      const char *format, ...);
 
+#if 0 // AKAROS_PORT
 #define en_dbg(mlevel, priv, format, ...)				\
 do {									\
 	if (NETIF_MSG_##mlevel & (priv)->msg_enable)			\
 		en_print(KERN_DEBUG, priv, format, ##__VA_ARGS__);	\
 } while (0)
+#else
+#define en_dbg(mlevel, priv, format, ...)				\
+do {									\
+		en_print(KERN_DEBUG, priv, format, ##__VA_ARGS__);	\
+} while (0)
+#endif
 #define en_warn(priv, format, ...)					\
 	en_print(KERN_WARNING, priv, format, ##__VA_ARGS__)
 #define en_err(priv, format, ...)					\

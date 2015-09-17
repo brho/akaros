@@ -32,17 +32,16 @@
  */
 
 
-#include <linux/if_vlan.h>
-
 #include <linux/mlx4/device.h>
 #include <linux/mlx4/cmd.h>
-
 #include "en_port.h"
 #include "mlx4_en.h"
 
 
 int mlx4_SET_VLAN_FLTR(struct mlx4_dev *dev, struct mlx4_en_priv *priv)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_cmd_mailbox *mailbox;
 	struct mlx4_set_vlan_fltr_mbox *filter;
 	int i;
@@ -67,6 +66,7 @@ int mlx4_SET_VLAN_FLTR(struct mlx4_dev *dev, struct mlx4_en_priv *priv)
 		       MLX4_CMD_TIME_CLASS_B, MLX4_CMD_WRAPPED);
 	mlx4_free_cmd_mailbox(dev, mailbox);
 	return err;
+#endif
 }
 
 int mlx4_en_QUERY_PORT(struct mlx4_en_dev *mdev, uint8_t port)
@@ -150,6 +150,8 @@ static unsigned long en_stats_adder(__be64 *start, __be64 *next, int num)
 int mlx4_en_DUMP_ETH_STATS(struct mlx4_en_dev *mdev, uint8_t port,
 			   uint8_t reset)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_en_stat_out_mbox *mlx4_en_stats;
 	struct mlx4_en_stat_out_flow_control_mbox *flowstats;
 	struct mlx4_en_priv *priv = netdev_priv(mdev->pndev[port]);
@@ -349,5 +351,6 @@ int mlx4_en_DUMP_ETH_STATS(struct mlx4_en_dev *mdev, uint8_t port,
 out:
 	mlx4_free_cmd_mailbox(mdev->dev, mailbox);
 	return err;
+#endif
 }
 

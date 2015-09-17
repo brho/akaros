@@ -31,12 +31,7 @@
  * SOFTWARE.
  */
 
-#include <linux/errno.h>
-#include <linux/pci.h>
-#include <linux/delay.h>
-#include <linux/slab.h>
-#include <linux/jiffies.h>
-
+#include <linux_compat.h>
 #include "mlx4.h"
 
 int mlx4_reset(struct mlx4_dev *dev)
@@ -99,14 +94,22 @@ int mlx4_reset(struct mlx4_dev *dev)
 	}
 
 	/* grab HW semaphore to lock out flash updates */
+#if 0 // AKAROS_PORT
 	end = jiffies + MLX4_SEM_TIMEOUT_JIFFIES;
+#else
+	end = MLX4_SEM_TIMEOUT_JIFFIES;
+#endif
 	do {
 		sem = read32(reset + MLX4_SEM_OFFSET);
 		if (!sem)
 			break;
 
 		kthread_usleep(1000 * 1);
+#if 0 // AKAROS_PORT
 	} while (time_before(jiffies, end));
+#else
+	} while (--end);
+#endif
 
 	if (sem) {
 		mlx4_err(dev, "Failed to obtain HW semaphore, aborting\n");
@@ -122,14 +125,22 @@ int mlx4_reset(struct mlx4_dev *dev)
 	/* Docs say to wait one second before accessing device */
 	kthread_usleep(1000 * 1000);
 
+#if 0 // AKAROS_PORT
 	end = jiffies + MLX4_RESET_TIMEOUT_JIFFIES;
+#else
+	end = MLX4_RESET_TIMEOUT_JIFFIES;
+#endif
 	do {
 		if (!pci_read_config_word(dev->persist->pdev, PCI_VENDOR_ID,
 					  &vendor) && vendor != 0xffff)
 			break;
 
 		kthread_usleep(1000 * 1);
+#if 0 // AKAROS_PORT
 	} while (time_before(jiffies, end));
+#else
+	} while (--end);
+#endif
 
 	if (vendor == 0xffff) {
 		err = -ENODEV;
@@ -137,6 +148,7 @@ int mlx4_reset(struct mlx4_dev *dev)
 		goto out;
 	}
 
+#if 0 // AKAROS_PORT
 	/* Now restore the PCI headers */
 	if (pcie_cap) {
 		devctl = hca_header[(pcie_cap + PCI_EXP_DEVCTL) / 4];
@@ -156,6 +168,7 @@ int mlx4_reset(struct mlx4_dev *dev)
 			goto out;
 		}
 	}
+#endif
 
 	for (i = 0; i < 16; ++i) {
 		if (i * 4 == PCI_COMMAND)

@@ -32,7 +32,7 @@
  * SOFTWARE.
  */
 
-#include <linux/export.h>
+#include <linux_compat.h>
 #include "fw_qos.h"
 #include "fw.h"
 

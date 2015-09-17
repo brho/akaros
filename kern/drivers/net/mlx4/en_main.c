@@ -31,12 +31,7 @@
  *
  */
 
-#include <linux/cpumask.h>
-#include <linux/module.h>
-#include <linux/delay.h>
-#include <linux/netdevice.h>
-#include <linux/slab.h>
-
+#include <linux_compat.h>
 #include <linux/mlx4/driver.h>
 #include <linux/mlx4/device.h>
 #include <linux/mlx4/cmd.h>
@@ -81,6 +76,7 @@ MLX4_EN_PARM_INT(inline_thold, MAX_INLINE,
 void en_print(const char *level, const struct mlx4_en_priv *priv,
 	      const char *format, ...)
 {
+#if 0 // AKAROS_PORT
 	va_list args;
 	struct va_format vaf;
 
@@ -96,6 +92,7 @@ void en_print(const char *level, const struct mlx4_en_priv *priv,
 		       level, DRV_NAME, dev_name(&priv->mdev->pdev->dev),
 		       priv->port, &vaf);
 	va_end(args);
+#endif
 }
 
 void mlx4_en_update_loopback_state(struct ether *dev,
@@ -199,6 +196,8 @@ static void mlx4_en_event(struct mlx4_dev *dev, void *endev_ptr,
 
 static void mlx4_en_remove(struct mlx4_dev *dev, void *endev_ptr)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_en_dev *mdev = endev_ptr;
 	int i;
 
@@ -222,6 +221,7 @@ static void mlx4_en_remove(struct mlx4_dev *dev, void *endev_ptr)
 	if (mdev->nb.notifier_call)
 		unregister_netdevice_notifier(&mdev->nb);
 	kfree(mdev);
+#endif
 }
 
 static void *mlx4_en_add(struct mlx4_dev *dev)
@@ -248,7 +248,11 @@ static void *mlx4_en_add(struct mlx4_dev *dev)
 	spinlock_init_irqsave(&mdev->uar_lock);
 
 	mdev->dev = dev;
+#if 0 // AKAROS_PORT
 	mdev->dma_device = &dev->persist->pdev->dev;
+#else
+	mdev->dma_device = 0;
+#endif
 	mdev->pdev = dev->persist->pdev;
 	mdev->device_up = false;
 
@@ -278,9 +282,11 @@ static void *mlx4_en_add(struct mlx4_dev *dev)
 	mlx4_foreach_port(i, dev, MLX4_PORT_TYPE_ETH)
 		mdev->port_cnt++;
 
+#if 0 // AKAROS_PORT
 	/* Initialize time stamp mechanism */
 	if (mdev->dev->caps.flags2 & MLX4_DEV_CAP_FLAG2_TS)
 		mlx4_en_init_timestamp(mdev);
+#endif
 
 	/* Set default number of RX rings*/
 	mlx4_en_set_num_rx_rings(mdev);
@@ -299,6 +305,7 @@ static void *mlx4_en_add(struct mlx4_dev *dev)
 
 	/* Setup ports */
 
+#if 0 // AKAROS_PORT
 	/* Create a netdev for each port */
 	mlx4_foreach_port(i, dev, MLX4_PORT_TYPE_ETH) {
 		mlx4_info(mdev, "Activating port:%d\n", i);
@@ -311,6 +318,7 @@ static void *mlx4_en_add(struct mlx4_dev *dev)
 		mdev->nb.notifier_call = NULL;
 		mlx4_err(mdev, "Failed to create notifier\n");
 	}
+#endif
 
 	return mdev;
 
@@ -365,6 +373,7 @@ static int __init mlx4_en_init(void)
 	return mlx4_register_interface(&mlx4_en_interface);
 }
 
+#if 0 // AKAROS_PORT
 static void __exit mlx4_en_cleanup(void)
 {
 	mlx4_unregister_interface(&mlx4_en_interface);
@@ -372,4 +381,4 @@ static void __exit mlx4_en_cleanup(void)
 
 module_init(mlx4_en_init);
 module_exit(mlx4_en_cleanup);
-
+#endif

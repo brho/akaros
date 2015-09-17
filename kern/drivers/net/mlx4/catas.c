@@ -31,9 +31,7 @@
  * SOFTWARE.
  */
 
-#include <linux/workqueue.h>
-#include <linux/module.h>
-
+#include <linux_compat.h>
 #include "mlx4.h"
 
 enum {
@@ -91,6 +89,8 @@ static int mlx4_reset_master(struct mlx4_dev *dev)
 
 static int mlx4_reset_slave(struct mlx4_dev *dev)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 #define COM_CHAN_RST_REQ_OFFSET 0x10
 #define COM_CHAN_RST_ACK_OFFSET 0x08
 
@@ -156,6 +156,7 @@ static int mlx4_reset_slave(struct mlx4_dev *dev)
 	}
 	mlx4_err(dev, "Fail to send reset over the communication channel\n");
 	return -ETIMEDOUT;
+#endif
 }
 
 static int mlx4_comm_internal_err(uint32_t slave_read)
@@ -246,8 +247,12 @@ static void poll_catas(unsigned long dev_ptr)
 		goto internal_err;
 	}
 
+#if 0 // AKAROS_PORT
 	mod_timer(&priv->catas_err.timer,
 		  round_jiffies(jiffies + MLX4_CATAS_POLL_INTERVAL));
+#else
+	mod_timer(&priv->catas_err.timer, MLX4_CATAS_POLL_INTERVAL);
+#endif
 	return;
 
 internal_err:
@@ -267,7 +272,11 @@ static void catas_reset(struct work_struct *work)
 void mlx4_start_catas_poll(struct mlx4_dev *dev)
 {
 	struct mlx4_priv *priv = mlx4_priv(dev);
+#if 0 // AKAROS_PORT
 	phys_addr_t addr;
+#else
+	void *addr;
+#endif
 
 	INIT_LIST_HEAD(&priv->catas_err.list);
 	init_timer(&priv->catas_err.timer);
@@ -288,8 +297,12 @@ void mlx4_start_catas_poll(struct mlx4_dev *dev)
 
 	priv->catas_err.timer.data     = (unsigned long) dev;
 	priv->catas_err.timer.function = poll_catas;
+#if 0 // AKAROS_PORT
 	priv->catas_err.timer.expires  =
 		round_jiffies(jiffies + MLX4_CATAS_POLL_INTERVAL);
+#else
+	priv->catas_err.timer.delay    = MLX4_CATAS_POLL_INTERVAL;
+#endif
 	add_timer(&priv->catas_err.timer);
 }
 

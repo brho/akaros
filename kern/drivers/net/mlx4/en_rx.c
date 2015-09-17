@@ -31,21 +31,9 @@
  *
  */
 
-#include <net/busy_poll.h>
+#include <linux_compat.h>
 #include <linux/mlx4/cq.h>
-#include <linux/slab.h>
 #include <linux/mlx4/qp.h>
-#include <linux/skbuff.h>
-#include <linux/rculist.h>
-#include <linux/if_ether.h>
-#include <linux/if_vlan.h>
-#include <linux/vmalloc.h>
-#include <linux/irq.h>
-
-#if IS_ENABLED(CONFIG_IPV6)
-#include <net/ip6_checksum.h>
-#endif
-
 #include "mlx4_en.h"
 
 static int mlx4_alloc_pages(struct mlx4_en_priv *priv,
@@ -82,8 +70,8 @@ static int mlx4_alloc_pages(struct mlx4_en_priv *priv,
 	/* Not doing get_page() for each frag is a big win
 	 * on asymetric workloads. Note we can not use atomic_set().
 	 */
-	atomic_add(page_alloc->page_size / frag_info->frag_stride - 1,
-		   &page->pg_kref.refcount);
+	atomic_add(&page->pg_kref.refcount,
+		   page_alloc->page_size / frag_info->frag_stride - 1);
 	return 0;
 }
 
@@ -187,6 +175,8 @@ out:
 static void mlx4_en_destroy_allocator(struct mlx4_en_priv *priv,
 				      struct mlx4_en_rx_ring *ring)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_en_rx_alloc *page_alloc;
 	int i;
 
@@ -206,6 +196,7 @@ static void mlx4_en_destroy_allocator(struct mlx4_en_priv *priv,
 		}
 		page_alloc->page = NULL;
 	}
+#endif
 }
 
 static void mlx4_en_init_rx_desc(struct mlx4_en_priv *priv,
@@ -414,7 +405,10 @@ int mlx4_en_create_rx_ring(struct mlx4_en_priv *priv,
 err_hwq:
 	mlx4_free_hwq_res(mdev->dev, &ring->wqres, ring->buf_size);
 err_info:
+	panic("Not implemented");
+#if 0 // AKAROS_PORT
 	vfree(ring->rx_info);
+#endif
 	ring->rx_info = NULL;
 err_ring:
 	kfree(ring);
@@ -504,7 +498,10 @@ void mlx4_en_recover_from_oom(struct mlx4_en_priv *priv)
 
 	for (ring = 0; ring < priv->rx_ring_num; ring++) {
 		if (mlx4_en_is_ring_empty(priv->rx_ring[ring]))
+			panic("Not implemented");
+#if 0 // AKAROS_PORT
 			napi_reschedule(&priv->rx_cq[ring]->napi);
+#endif
 	}
 }
 
@@ -512,6 +509,8 @@ void mlx4_en_destroy_rx_ring(struct mlx4_en_priv *priv,
 			     struct mlx4_en_rx_ring **pring,
 			     uint32_t size, uint16_t stride)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_en_dev *mdev = priv->mdev;
 	struct mlx4_en_rx_ring *ring = *pring;
 
@@ -523,6 +522,7 @@ void mlx4_en_destroy_rx_ring(struct mlx4_en_priv *priv,
 	*pring = NULL;
 #ifdef CONFIG_RFS_ACCEL
 	mlx4_en_cleanup_filters(priv);
+#endif
 #endif
 }
 
@@ -536,6 +536,7 @@ void mlx4_en_deactivate_rx_ring(struct mlx4_en_priv *priv,
 }
 
 
+#if 0 // AKAROS_PORT
 static int mlx4_en_complete_rx_desc(struct mlx4_en_priv *priv,
 				    struct mlx4_en_rx_desc *rx_desc,
 				    struct mlx4_en_rx_alloc *frags,
@@ -579,8 +580,10 @@ fail:
 	}
 	return 0;
 }
+#endif
 
 
+#if 0 // AKAROS_PORT
 static struct sk_buff *mlx4_en_rx_skb(struct mlx4_en_priv *priv,
 				      struct mlx4_en_rx_desc *rx_desc,
 				      struct mlx4_en_rx_alloc *frags,
@@ -653,6 +656,7 @@ static void validate_loopback(struct mlx4_en_priv *priv, struct sk_buff *skb)
 out_loopback:
 	dev_kfree_skb_any(skb);
 }
+#endif
 
 static void mlx4_en_refill_rx_buffers(struct mlx4_en_priv *priv,
 				     struct mlx4_en_rx_ring *ring)
@@ -668,6 +672,7 @@ static void mlx4_en_refill_rx_buffers(struct mlx4_en_priv *priv,
 	}
 }
 
+#if 0 // AKAROS_PORT
 /* When hardware doesn't strip the vlan, we need to calculate the checksum
  * over it and add it to the hardware's checksum calculation
  */
@@ -750,6 +755,7 @@ static int check_csum(struct mlx4_cqe *cqe, struct sk_buff *skb, void *va,
 #endif
 	return 0;
 }
+#endif
 
 int mlx4_en_process_rx_cq(struct ether *dev, struct mlx4_en_cq *cq,
 			  int budget)
@@ -807,6 +813,7 @@ int mlx4_en_process_rx_cq(struct ether *dev, struct mlx4_en_cq *cq,
 			goto next;
 		}
 
+#if 0 // AKAROS_PORT
 		/* Check if we need to drop the packet if SRIOV is not enabled
 		 * and not performing the selftest or flb disabled
 		 */
@@ -841,6 +848,7 @@ int mlx4_en_process_rx_cq(struct ether *dev, struct mlx4_en_cq *cq,
 				rcu_read_unlock();
 			}
 		}
+#endif
 
 		/*
 		 * Packet is OK - process it.
@@ -849,8 +857,12 @@ int mlx4_en_process_rx_cq(struct ether *dev, struct mlx4_en_cq *cq,
 		length -= ring->fcs_del;
 		ring->bytes += length;
 		ring->packets++;
+#if 0 // AKAROS_PORT
 		l2_tunnel = (dev->hw_enc_features & NETIF_F_RXCSUM) &&
 			(cqe->vlan_my_qpn & cpu_to_be32(MLX4_CQE_L2_TUNNEL));
+#else
+		l2_tunnel = 0;
+#endif
 
 		if (likely(dev->feat & NETIF_F_RXCSUM)) {
 			if (cqe->status & cpu_to_be16(MLX4_CQE_STATUS_TCP |
@@ -879,6 +891,7 @@ int mlx4_en_process_rx_cq(struct ether *dev, struct mlx4_en_cq *cq,
 			ring->csum_none++;
 		}
 
+#if 0 // AKAROS_PORT
 		/* This packet is eligible for GRO if it is:
 		 * - DIX Ethernet (type interpretation)
 		 * - TCP/IP (v4)
@@ -994,6 +1007,7 @@ int mlx4_en_process_rx_cq(struct ether *dev, struct mlx4_en_cq *cq,
 			napi_gro_receive(&cq->napi, skb);
 		else
 			netif_receive_skb(skb);
+#endif
 
 next:
 		for (nr = 0; nr < priv->num_frags; nr++)
@@ -1023,7 +1037,11 @@ void mlx4_en_rx_irq(struct mlx4_cq *mcq)
 	struct mlx4_en_priv *priv = netdev_priv(cq->dev);
 
 	if (likely(priv->port_up))
+#if 0 // AKAROS_PORT
 		napi_schedule_irqoff(&cq->napi);
+#else
+		{ /* TODO */ }
+#endif
 	else
 		mlx4_en_arm_cq(priv, cq);
 }
@@ -1043,6 +1061,7 @@ int mlx4_en_poll_rx_cq(struct napi_struct *napi, int budget)
 
 	mlx4_en_cq_unlock_napi(cq);
 
+#if 0 // AKAROS_PORT
 	/* If we used up all the quota - we're probably not done yet... */
 	if (done == budget) {
 		int cpu_curr;
@@ -1064,6 +1083,7 @@ int mlx4_en_poll_rx_cq(struct napi_struct *napi, int budget)
 	}
 	/* Done for now */
 	napi_complete_done(napi, done);
+#endif
 	mlx4_en_arm_cq(priv, cq);
 	return done;
 }
@@ -1163,7 +1183,7 @@ int mlx4_en_create_drop_qp(struct mlx4_en_priv *priv)
 	int err;
 	uint32_t qpn;
 
-	err = mlx4_qp_reserve_range(priv->mdev->dev, 1, 1, &qpn,
+	err = mlx4_qp_reserve_range(priv->mdev->dev, 1, 1, (int *)&qpn,
 				    MLX4_RESERVE_A0_QP);
 	if (err) {
 		en_err(priv, "Failed reserving drop qpn\n");

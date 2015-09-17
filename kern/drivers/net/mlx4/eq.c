@@ -31,15 +31,8 @@
  * SOFTWARE.
  */
 
-#include <linux/interrupt.h>
-#include <linux/slab.h>
-#include <linux/export.h>
-#include <linux/mm.h>
-#include <linux/dma-mapping.h>
-
+#include <linux_compat.h>
 #include <linux/mlx4/cmd.h>
-#include <linux/cpu_rmap.h>
-
 #include "mlx4.h"
 #include "fw.h"
 
@@ -579,6 +572,8 @@ static int mlx4_eq_int(struct mlx4_dev *dev, struct mlx4_eq *eq)
 							continue;
 						mlx4_dbg(dev, "%s: Sending MLX4_PORT_CHANGE_SUBTYPE_DOWN to slave: %d, port:%d\n",
 							 __func__, i, port);
+						panic("Disabled");
+#if 0 // AKAROS_PORT
 						s_info = &priv->mfunc.master.vf_oper[slave].vport[port].state;
 						if (IFLA_VF_LINK_STATE_AUTO == s_info->link_state) {
 							eqe->event.port_change.port =
@@ -587,6 +582,7 @@ static int mlx4_eq_int(struct mlx4_dev *dev, struct mlx4_eq *eq)
 								| (mlx4_phys_to_slave_port(dev, i, port) << 28));
 							mlx4_slave_event(dev, i, eqe);
 						}
+#endif
 					} else {  /* IB port */
 						set_and_calc_slave_port_state(dev, i, port,
 									      MLX4_PORT_STATE_DEV_EVENT_PORT_DOWN,
@@ -614,6 +610,8 @@ static int mlx4_eq_int(struct mlx4_dev *dev, struct mlx4_eq *eq)
 							continue;
 						if (i == mlx4_master_func_num(dev))
 							continue;
+						panic("Disabled");
+#if 0 // AKAROS_PORT
 						s_info = &priv->mfunc.master.vf_oper[slave].vport[port].state;
 						if (IFLA_VF_LINK_STATE_AUTO == s_info->link_state) {
 							eqe->event.port_change.port =
@@ -622,6 +620,7 @@ static int mlx4_eq_int(struct mlx4_dev *dev, struct mlx4_eq *eq)
 								| (mlx4_phys_to_slave_port(dev, i, port) << 28));
 							mlx4_slave_event(dev, i, eqe);
 						}
+#endif
 					}
 				else /* IB port */
 					/* port-up event will be sent to a slave when the
@@ -803,6 +802,7 @@ static int mlx4_eq_int(struct mlx4_dev *dev, struct mlx4_eq *eq)
 	return eqes_found;
 }
 
+#if 0 // AKAROS_PORT
 static void mlx4_interrupt(struct hw_trapframe *hw_tf, void *dev_ptr)
 {
 	struct mlx4_dev *dev = dev_ptr;
@@ -828,6 +828,7 @@ static void mlx4_msi_x_interrupt(struct hw_trapframe *hw_tf, void *eq_ptr)
 	/* MSI-X vectors always belong to us */
 	return;
 }
+#endif
 
 int mlx4_MAP_EQ_wrapper(struct mlx4_dev *dev, int slave,
 			struct mlx4_vhcr *vhcr,
@@ -1074,6 +1075,8 @@ static void mlx4_free_eq(struct mlx4_dev *dev,
 
 static void mlx4_free_irqs(struct mlx4_dev *dev)
 {
+	panic("Not implemented");
+#if 0 // AKAROS_PORT
 	struct mlx4_eq_table *eq_table = &mlx4_priv(dev)->eq_table;
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	int	i, vec;
@@ -1102,6 +1105,7 @@ static void mlx4_free_irqs(struct mlx4_dev *dev)
 
 
 	kfree(eq_table->irq_names);
+#endif
 }
 
 static int mlx4_map_clr_int(struct mlx4_dev *dev)
@@ -1242,16 +1246,20 @@ int mlx4_init_eq_table(struct mlx4_dev *dev)
 
 			eq_name = priv->eq_table.irq_names +
 				  i * MLX4_IRQNAME_SIZE;
+#if 0 // AKAROS_PORT
 			err = register_irq(priv->eq_table.eq[i].irq,
 					   mlx4_msi_x_interrupt,
 					   priv->eq_table.eq + i,
 					   pci_to_tbdf(PCIDEV));
+#endif
 			if (err)
 				goto err_out_async;
 
 			priv->eq_table.eq[i].have_irq = 1;
 		}
 	} else {
+		panic("Disabled");
+#if 0 // AKAROS_PORT
 		snprintf(priv->eq_table.irq_names,
 			 MLX4_IRQNAME_SIZE,
 			 DRV_NAME "@pci:%s",
@@ -1262,6 +1270,7 @@ int mlx4_init_eq_table(struct mlx4_dev *dev)
 			goto err_out_async;
 
 		priv->eq_table.have_irq = 1;
+#endif
 	}
 
 	err = mlx4_MAP_EQ(dev, get_async_ev_mask(dev), 0,
@@ -1369,6 +1378,8 @@ EXPORT_SYMBOL(mlx4_test_interrupts);
 int mlx4_assign_eq(struct mlx4_dev *dev, char *name, struct cpu_rmap *rmap,
 		   int *vector)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	int vec = 0, err = 0, i;
@@ -1413,19 +1424,25 @@ int mlx4_assign_eq(struct mlx4_dev *dev, char *name, struct cpu_rmap *rmap,
 		err = (i == dev->caps.comp_pool) ? -ENOSPC : err;
 	}
 	return err;
+#endif
 }
 EXPORT_SYMBOL(mlx4_assign_eq);
 
 int mlx4_eq_get_irq(struct mlx4_dev *dev, int vec)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_priv *priv = mlx4_priv(dev);
 
 	return priv->eq_table.eq[vec].irq;
+#endif
 }
 EXPORT_SYMBOL(mlx4_eq_get_irq);
 
 void mlx4_release_eq(struct mlx4_dev *dev, int vec)
 {
+	panic("Disabled");
+#if 0 // AKAROS_PORT
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	/*bm index*/
 	int i = vec - dev->caps.num_comp_vectors - 1;
@@ -1441,7 +1458,7 @@ void mlx4_release_eq(struct mlx4_dev *dev, int vec)
 		}
 		qunlock(&priv->msix_ctl.pool_lock);
 	}
-
+#endif
 }
 EXPORT_SYMBOL(mlx4_release_eq);
 
