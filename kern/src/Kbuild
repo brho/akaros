@@ -43,6 +43,7 @@ obj-y						+= radix.o
 obj-y						+= readline.o
 obj-y						+= rendez.o
 obj-y						+= rwlock.o
+obj-y						+= scatterlist.o
 obj-y						+= schedule.o
 obj-y						+= slab.o
 obj-y						+= smallidpool.o
