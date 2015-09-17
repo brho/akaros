@@ -8,6 +8,7 @@ obj-y						+= colored_caches.o
 obj-y						+= console.o
 obj-y						+= ctype.o
 obj-y						+= devfs.o
+obj-y						+= dmapool.o
 obj-y						+= elf.o
 obj-y						+= env.o
 obj-y						+= err.o
