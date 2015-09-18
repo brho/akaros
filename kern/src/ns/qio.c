@@ -13,10 +13,13 @@
 #include <smp.h>
 #include <ip.h>
 
-#define PANIC_EXTRA(b)                                                          \
-{                                                                              \
-	if ((b)->extra_len)                                                        \
-		panic("%s doesn't handle extra_data", __FUNCTION__);               \
+#define PANIC_EXTRA(b)							\
+{									\
+	if ((b)->extra_len) {						\
+		printblock(b);						\
+		backtrace();						\
+		panic("%s doesn't handle extra_data", __FUNCTION__);	\
+	}								\
 }
 
 static uint32_t padblockcnt;
