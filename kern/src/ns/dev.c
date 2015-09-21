@@ -361,7 +361,7 @@ void devpermcheck(char *fileuid, uint32_t perm, int omode)
 	 * seem to handle O_EXEC being mixed readable or writable. */
 	rwx = omode_to_rwx(omode);
 	if ((rwx & perm) != rwx)
-		error("%s: devpermcheck(%s,0x%x,0x%x) failed", Eperm, fileuid, perm,
+		error("%s: devpermcheck(%s, 0%o, 0%o) failed", Eperm, fileuid, perm,
 			  omode);
 }
 
