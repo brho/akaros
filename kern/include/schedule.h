@@ -85,7 +85,7 @@ void avail_res_changed(int res_type, long change);
  *
  * The gets return the coreid on success, -1 or -error on failure. */
 int get_any_idle_core(void);
-int get_this_idle_core(int coreid);
+int get_specific_idle_core(int coreid);
 void put_idle_core(int coreid);
 
 /************** Proc's view of the world **************/

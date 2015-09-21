@@ -480,7 +480,7 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 				if (core < 0)
 					error("No free idle cores!");
 			} else {
-				if (get_this_idle_core(core) < 0)
+				if (get_specific_idle_core(core) < 0)
 					error("Failed to reserve core %d\n", core);
 			}
 			set_bit(core, nix->cpus);

@@ -607,7 +607,7 @@ static bool __spc_is_idle(struct sched_pcore *spc)
 	return FALSE;
 }
 
-int get_this_idle_core(int coreid)
+int get_specific_idle_core(int coreid)
 {
 	struct sched_pcore *spc = pcoreid2spc(coreid);
 	int ret = -1;
