@@ -1139,6 +1139,9 @@ int emsr_fakewrite(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t,
 		   uint32_t);
 int emsr_ok(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t, uint32_t);
 
+int emsr_fake_apicbase(struct vmx_vcpu *vcpu, struct emmsr *msr,
+		   uint32_t opcode, uint32_t qual);
+
 struct emmsr emmsrs[] = {
 	{MSR_IA32_MISC_ENABLE, "MSR_IA32_MISC_ENABLE", emsr_miscenable},
 	{MSR_IA32_SYSENTER_CS, "MSR_IA32_SYSENTER_CS", emsr_ok},
@@ -1176,7 +1179,7 @@ struct emmsr emmsrs[] = {
 	{MSR_ARCH_PERFMON_EVENTSEL1, "MSR_ARCH_PERFMON_EVENTSEL0", emsr_ok},
 	{MSR_IA32_PERF_CAPABILITIES, "MSR_IA32_PERF_CAPABILITIES", emsr_ok},
 	// unsafe.
-	{MSR_IA32_APICBASE, "MSR_IA32_APICBASE", emsr_fakewrite},
+	{MSR_IA32_APICBASE, "MSR_IA32_APICBASE", emsr_fake_apicbase},
 
 	// mostly harmless.
 	{MSR_TSC_AUX, "MSR_TSC_AUX", emsr_fakewrite},
@@ -1314,6 +1317,38 @@ int emsr_fakewrite(struct vmx_vcpu *vcpu, struct emmsr *msr,
 	}
 	return 0;
 }
+
+/* pretend to write it, but don't write it. */
+int emsr_fake_apicbase(struct vmx_vcpu *vcpu, struct emmsr *msr,
+		   uint32_t opcode, uint32_t qual) {
+	uint32_t eax, edx;
+	if (!msr->written) {
+		//rdmsr(msr->reg, eax, edx);
+		/* TODO: tightly coupled to the addr in vmrunkernel.  We want this func
+		 * to return the val that vmrunkernel put into the VMCS. */
+		eax = 0xfee00900;
+		edx = 0;
+	} else {
+		edx = msr->edx;
+		eax = msr->eax;
+	}
+	/* we just let them read the misc msr for now. */
+	if (opcode == EXIT_REASON_MSR_READ) {
+		vcpu->regs.tf_rax = set_low32(vcpu->regs.tf_rax, eax);
+		vcpu->regs.tf_rdx = set_low32(vcpu->regs.tf_rdx, edx);
+		return 0;
+	} else {
+		/* if they are writing what is already written, that's ok. */
+		if (((uint32_t) vcpu->regs.tf_rax == eax)
+		    && ((uint32_t) vcpu->regs.tf_rdx == edx))
+			return 0;
+		msr->edx = vcpu->regs.tf_rdx;
+		msr->eax = vcpu->regs.tf_rax;
+		msr->written = true;
+	}
+	return 0;
+}
+
 
 static int
 msrio(struct vmx_vcpu *vcpu, uint32_t opcode, uint32_t qual) {
