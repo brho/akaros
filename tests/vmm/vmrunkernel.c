@@ -581,10 +581,10 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 	vmctl.pir = (uint64_t) a;
 	memset(a, 0, 4096);
 	a += 4096;
-	//vmctl.vapic = (uint64_t) a;
-	vmctl.vapic = (uint64_t) a_page;	
+	vmctl.vapic = (uint64_t) a;
+	//vmctl.vapic = (uint64_t) a_page;	
 	memset(a, 0, 4096);
-	//((uint32_t *)a)[0x30/4] = 0x01060015;
+	((uint32_t *)a)[0x30/4] = 0x01060014;
 	p64 = a;
 	// set up apic values? do we need to?
 	// qemu does this.

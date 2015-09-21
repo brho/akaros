@@ -1779,8 +1779,8 @@ int vmx_launch(struct vmctl *v) {
 	int errors = 0;
 	int advance;
 	int interrupting = 0;
-	uintptr_t pir_kva, vapic_kva;
-	uint64_t pir_physical, vapic_physical;
+	uintptr_t pir_kva, vapic_kva, apic_kva;
+	uint64_t pir_physical, vapic_physical, apic_physical;
 	struct proc * current_proc = current;
 
 	/* TODO: dirty hack til we have VMM contexts */
@@ -1828,18 +1828,23 @@ int vmx_launch(struct vmctl *v) {
 			printk("Low order 12 bits of vapic address is not 0, value: %p\n", vapic_physical);
 		}
 
-		vmcs_writel(APIC_ACCESS_ADDR, 0xfee00000);
-		vmcs_writel(APIC_ACCESS_ADDR_HIGH, 0);
+		printk("VAPIC PHYSICAL ADDRESS: %p\n", vapic_physical);
+
+		apic_kva = uva2kva(current_proc, (void *)0xfee00000);
+		apic_physical = (uint64_t)PADDR(apic_kva);
+
+		vmcs_writel(APIC_ACCESS_ADDR, apic_physical);
+		vmcs_writel(APIC_ACCESS_ADDR_HIGH, apic_physical>>32);
 
 		// Clear the EOI exit bitmap(Gan)
-		vmcs_writel(EOI_EXIT_BITMAP0, 0);
-		vmcs_writel(EOI_EXIT_BITMAP0_HIGH, 0);
-		vmcs_writel(EOI_EXIT_BITMAP1, 0);
-		vmcs_writel(EOI_EXIT_BITMAP1_HIGH, 0);
-		vmcs_writel(EOI_EXIT_BITMAP2, 0);
-		vmcs_writel(EOI_EXIT_BITMAP2_HIGH, 0);
-		vmcs_writel(EOI_EXIT_BITMAP3, 0);
-		vmcs_writel(EOI_EXIT_BITMAP3_HIGH, 0);
+		vmcs_writel(EOI_EXIT_BITMAP0, 0xFFFFFFFF);
+		vmcs_writel(EOI_EXIT_BITMAP0_HIGH, 0xFFFFFFFF);
+		vmcs_writel(EOI_EXIT_BITMAP1, 0xFFFFFFFF);
+		vmcs_writel(EOI_EXIT_BITMAP1_HIGH, 0xFFFFFFFF);
+		vmcs_writel(EOI_EXIT_BITMAP2, 0xFFFFFFFF);
+		vmcs_writel(EOI_EXIT_BITMAP2_HIGH, 0xFFFFFFFF);
+		vmcs_writel(EOI_EXIT_BITMAP3, 0xFFFFFFFF);
+		vmcs_writel(EOI_EXIT_BITMAP3_HIGH, 0xFFFFFFFF);
 
 		printk("v->apic %p v->pir %p\n", (void *)v->vapic, (void *)v->pir);
 		// fallthrough
