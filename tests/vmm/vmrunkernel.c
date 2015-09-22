@@ -117,6 +117,9 @@ struct acpi_madt_interrupt_override isor[] = {
 	 .bus = 0, .source_irq = 14, .global_irq = 14, .inti_flags = 0},
 	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
 	 .bus = 0, .source_irq = 15, .global_irq = 15, .inti_flags = 0},
+	// VMMCP routes irq 32 to gsi 17
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 32, .global_irq = 17, .inti_flags = 5},
 };
 
 
@@ -127,7 +130,7 @@ unsigned long long stack[1024];
 volatile int shared = 0;
 volatile int quit = 0;
 int mcp = 1;
-int virtioirq = 0x18;
+int virtioirq = 17;
 
 /* total hack. If the vm runs away we want to get control again. */
 unsigned int maxresume = (unsigned int) -1;
@@ -201,7 +204,7 @@ void *consout(void *arg)
 }
 
 // FIXME. 
-int consdata = 0;
+volatile int consdata = 0;
 
 void *consin(void *arg)
 {
@@ -264,7 +267,7 @@ dev: VIRTIO_ID_CONSOLE,
 device_features: 0, /* Can't do it: linux console device does not support it. VIRTIO_F_VERSION_1*/
 numvqs: 2,
 vqs: {
-		{name: "consin", maxqnum: 64, f: &consin, arg: (void *)0},
+		{name: "consin", maxqnum: 64, f: consin, arg: (void *)0},
 		{name: "consout", maxqnum: 64, f: consout, arg: (void *)0},
 	}
 };
@@ -631,8 +634,8 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 				break;
 			case EXIT_REASON_INTERRUPT_WINDOW:
 				if (consdata) {
-					debug = 1;
 					if (debug) fprintf(stderr, "inject an interrupt\n");
+					virtio_mmio_set_vring_irq();
 					vmctl.interrupt = 0x80000000 | virtioirq;
 					vmctl.command = RESUME;
 					consdata = 0;
@@ -649,8 +652,19 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 				break;
 			case EXIT_REASON_HLT:
 				fflush(stdout);
-				fprintf(stderr, "\n================== Guest halted. RIP. =======================\n");
-				quit = 1;
+				if (debug)fprintf(stderr, "\n================== Guest halted. =======================\n");
+				if (debug)fprintf(stderr, "Wait for cons data\n");
+				while (!consdata)
+					;
+				//debug = 1;
+				if (debug)fprintf(stderr, "Resume with consdata ...\n");
+				vmctl.regs.tf_rip += 1;
+				ret = write(fd, &vmctl, sizeof(vmctl));
+				if (ret != sizeof(vmctl)) {
+					perror(cmd);
+				}
+				//fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
+				//showstatus(stderr, &vmctl);
 				break;
 			default:
 				fprintf(stderr, "Don't know how to handle exit %d\n", vmctl.ret_code);
@@ -666,12 +680,15 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 		if (consdata) {
 			if (debug) fprintf(stderr, "inject an interrupt\n");
 			fprintf(stderr, "XINT 0x%x 0x%x\n", vmctl.intrinfo1, vmctl.intrinfo2);
-			if ((vmctl.intrinfo1 == 0) && (vmctl.regs.tf_rflags & 0x200))
+			if ((vmctl.intrinfo1 == 0) && (vmctl.regs.tf_rflags & 0x200)) {
 				vmctl.interrupt = 0x80000000 | virtioirq;
-			else 
+				virtio_mmio_set_vring_irq();
+				consdata = 0;
+				//debug = 1;
+			} else { 
 				fprintf(stderr, "Can't inject interrupt: IF is clear\n");
+			}
 			vmctl.command = RESUME;
-			consdata = 0;
 		}
 		if (debug) fprintf(stderr, "NOW DO A RESUME\n");
 		ret = write(fd, &vmctl, sizeof(vmctl));

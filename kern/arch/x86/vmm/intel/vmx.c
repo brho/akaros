@@ -1687,6 +1687,7 @@ int vmx_launch(struct vmctl *v) {
 	struct vmx_vcpu *vcpu;
 	int errors = 0;
 	int advance;
+	int interrupting = 0;
 
 	/* TODO: dirty hack til we have VMM contexts */
 	vcpu = current->vmm.guest_pcores[0];
@@ -1721,16 +1722,16 @@ int vmx_launch(struct vmctl *v) {
 	case RESUME:
 		/* If v->interrupt is non-zero, set it in the vmcs and
 		 * zero it in the vmctl. Else set RIP.
+		 * We used to check IF and such here but we'll let the VMM do it. If the VMM screws up
+		 * we can always fix it. Note to people who know about security: could this be an issue?
+		 * I don't see how: it will mainly just break your guest vm AFAICT.
 		 */
 		if (v->interrupt) {
-			if ((v->regs.tf_rflags & 0x200) && (v->intrinfo1 == 0)) {
-				printk("Set VM_ENTRY_INFTR_INFO_FIELD to 0x%x\n", v->interrupt);
-				vmcs_writel(VM_ENTRY_INTR_INFO_FIELD, v->interrupt);
-				v->interrupt = 0;
-			} else {
-				printk("Can't set interrupt yet\n");
-			}
+			printk("Set VM_ENTRY_INFTR_INFO_FIELD to 0x%x\n", v->interrupt);
+			vmcs_writel(VM_ENTRY_INTR_INFO_FIELD, v->interrupt);
 			//vmx_set_rvi(v->interrupt);
+			v->interrupt = 0;
+			interrupting = 1;
 		}
 		printd("RESUME\n");
 		break;
@@ -1739,6 +1740,10 @@ int vmx_launch(struct vmctl *v) {
 	}
 	vcpu->shutdown = 0;
 	vmx_put_cpu(vcpu);
+	if (interrupting) {
+		printk("BEFORE INTERRUPT: ");
+		vmx_dump_cpu(vcpu);
+	}
 	vcpu->ret_code = -1;
 
 	while (1) {
@@ -1753,7 +1758,13 @@ int vmx_launch(struct vmctl *v) {
 		ret = vmx_run_vcpu(vcpu);
 		//dumpmsrs();
 		enable_irq();
+		v->intrinfo1 = vmcs_readl(GUEST_INTERRUPTIBILITY_INFO);
+		v->intrinfo2 = vmcs_readl(VM_ENTRY_INTR_INFO_FIELD);
 		vmx_put_cpu(vcpu);
+		if (interrupting) {
+			printk("POST INTERRUPT: ");
+			vmx_dump_cpu(vcpu);
+		}
 
 		if (ret == EXIT_REASON_VMCALL) {
 			if (current->vmm.flags & VMM_VMCALL_PRINTF) {
@@ -1790,15 +1801,9 @@ int vmx_launch(struct vmctl *v) {
 		} else if (ret == EXIT_REASON_EXTERNAL_INTERRUPT) {
 			printk("External interrupt\n");
 			//vmx_dump_cpu(vcpu);
-			vmx_get_cpu(vcpu);
-			v->intrinfo1 = vmcs_readl(GUEST_INTERRUPTIBILITY_INFO);
-			v->intrinfo2 = vmcs_readl(VM_ENTRY_INTR_INFO_FIELD);
-			//vmcs_write32(GUEST_INTERRUPTIBILITY_INFO, 0);
-			//vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);
 			printk("GUEST_INTERRUPTIBILITY_INFO: 0x%08x,",  v->intrinfo1);
 			printk("VM_ENTRY_INTR_INFO_FIELD 0x%08x,", v->intrinfo2);
-			printk("rflags 0x%x\n", vmcs_readl(GUEST_RFLAGS));
-			vmx_put_cpu(vcpu);
+			printk("rflags 0x%x\n", vcpu->regs.tf_rflags);
 			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
 		} else if (ret == EXIT_REASON_MSR_READ) {
 			printd("msr read\n");
@@ -1824,6 +1829,7 @@ int vmx_launch(struct vmctl *v) {
 			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
 		}
 
+		interrupting = 0;
 		/* TODO: we can't just return and relaunch the VMCS, in case we blocked.
 		 * similar to how proc_restartcore/smp_idle only restart the pcpui
 		 * cur_ctx, we need to do the same, via the VMCS resume business. */

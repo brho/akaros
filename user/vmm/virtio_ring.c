@@ -1110,6 +1110,7 @@ void add_used(struct virtqueue *_vq, unsigned int head, int len)
 	/* Make sure buffer is written before we update index. */
 	wmb();
 	vq->vring.used->idx++;
+	if (vringdebug) fprintf(stderr, "USED IDX is now %d\n", vq->vring.used->idx);
 	//vq->pending_used++;
 }
 

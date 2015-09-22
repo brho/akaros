@@ -181,5 +181,6 @@ struct virtio_threadarg {
 void dumpvirtio_mmio(FILE *f, uint64_t gpa);
 void register_virtio_mmio(struct vqdev *v, uint64_t virtio_base);
 int virtio_mmio(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store);
+void virtio_mmio_set_vring_irq(void);
 
 #endif

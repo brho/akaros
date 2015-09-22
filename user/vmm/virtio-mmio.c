@@ -57,6 +57,7 @@ typedef struct {
 	int state; // not used yet. */
 	uint64_t bar;
 	uint32_t status;
+	uint32_t isr;
 	int qsel; // queue we are on.
 	int pagesize;
 	int page_shift;
@@ -181,7 +182,9 @@ static uint32_t virtio_mmio_read(uint64_t gpa)
     case VIRTIO_MMIO_QUEUE_PFN:
 	    return mmio.vqdev->vqs[mmio.qsel].pfn;
     case VIRTIO_MMIO_INTERRUPT_STATUS:
-	    return mmio.vqdev->vqs[mmio.qsel].isr;
+		// pretty sure this is per-mmio, not per-q. 
+		return mmio.isr;
+	    //return mmio.vqdev->vqs[mmio.qsel].isr;
     case VIRTIO_MMIO_STATUS:
 	    return mmio.vqdev->vqs[mmio.qsel].status;
     case VIRTIO_MMIO_DEVICE_FEATURES_SEL:
@@ -314,7 +317,8 @@ static void virtio_mmio_write(uint64_t gpa, uint32_t value)
 	    }
         break;
     case VIRTIO_MMIO_INTERRUPT_ACK:
-        //vdev->isr &= ~value;
+	mmio.isr &= ~value;
+	// I think we're suppose to do stuff here but the hell with it for now.
         //virtio_update_irq(vdev);
         break;
     case VIRTIO_MMIO_STATUS:
@@ -400,6 +404,11 @@ static void virtio_mmio_write(uint64_t gpa, uint32_t value)
         DPRINTF("bad register offset 0x%x\n", offset);
     }
 
+}
+
+void virtio_mmio_set_vring_irq(void)
+{
+	mmio.isr |= VIRTIO_MMIO_INT_VRING;
 }
 
 int virtio_mmio(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store)
