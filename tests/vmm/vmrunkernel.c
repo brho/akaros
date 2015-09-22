@@ -280,6 +280,7 @@ void *consin(void *arg)
 
 		// Send spurious for testing (Gan)
 		set_posted_interrupt(0xE5);
+		virtio_mmio_set_vring_irq();
 	}
 	fprintf(stderr, "All done\n");
 	return NULL;
@@ -341,7 +342,7 @@ static void pir_dump()
 	unsigned long *pir_ptr = (unsigned long *)vmctl.pir;
 	int i;
 	fprintf(stderr, "-------Begin PIR dump-------\n");
-	for (i = 0; i < 16; i++){
+	for (i = 0; i < 8; i++){
 		fprintf(stderr, "Byte %d: 0x%016x\n", i, pir_ptr[i]);
 	}
 	fprintf(stderr, "-------End PIR dump-------\n");
@@ -358,26 +359,16 @@ static void set_posted_interrupt(int vector)
 	bit_offset = vector%(sizeof(unsigned long)*8);
 	fprintf(stderr, "%s: Pre set PIR dump", __func__);
 	pir_dump();
+	vapic_status_dump(stderr, (void *)vmctl.vapic);
 	fprintf(stderr, "%s: Setting pir bit offset %d at 0x%p", __func__,
 			bit_offset, bit_vec);
 	test_and_set_bit(bit_offset, bit_vec);
 
 	// Set outstanding notification bit
-	bit_vec = pir + 4;
+	/*bit_vec = pir + 4;
 	fprintf(stderr, "%s: Setting pir bit offset 0 at 0x%p", __func__,
 			bit_vec);
-	test_and_set_bit(0, bit_vec);
-
-	//bit_vec = pir + 7;
-	//fprintf(stderr, "%s: Setting pir bit offset 31 at 0x%p", __func__,
-	//		bit_vec);
-	//test_and_set_bit(31, bit_vec);
-
-	//for (i = 2; i < 3; i++){
-	//	for (j = 0; j < 1; j++){
-//			test_and_set_bit(j, pir+i);
-//		}
-//	}
+	test_and_set_bit(0, bit_vec);*/
 
 	pir_dump();
 }
@@ -707,8 +698,8 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 				if (debug) fprintf(stderr, "REGP IS %16x:\n", *regp);
 			} else if ((gpa & 0xfee00000) == 0xfee00000) {
 				// until we fix our include mess, just put the proto here.
-				int apic(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store);
-				apic(&vmctl, gpa, regx, regp, store);
+				//int apic(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store);
+				//apic(&vmctl, gpa, regx, regp, store);
 			} else if ((gpa & 0xfec00000) == 0xfec00000) {
 				// until we fix our include mess, just put the proto here.
 				int do_ioapic(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store);
@@ -804,6 +795,31 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 				}
 				//fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
 				//showstatus(stderr, &vmctl);
+				break;
+			case EXIT_REASON_APIC_ACCESS:				
+				if (1 || debug)fprintf(stderr, "APIC READ EXIT\n");
+				
+				uint64_t gpa, *regp, val;
+				uint8_t regx;
+				int store, size;
+				int advance;
+				if (decode(&vmctl, &gpa, &regx, &regp, &store, &size, &advance)) {
+					fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
+					showstatus(stderr, &vmctl);
+					quit = 1;
+					break;
+				}
+
+				int apic(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store);
+				apic(&vmctl, gpa, regx, regp, store);
+				vmctl.regs.tf_rip += advance;
+				if (debug) fprintf(stderr, "Advance rip by %d bytes to %p\n", advance, vmctl.regs.tf_rip);
+				vmctl.shutdown = 0;
+				vmctl.gpa = 0;
+				vmctl.command = REG_ALL;
+				break;
+			case EXIT_REASON_APIC_WRITE:
+				if (1 || debug)fprintf(stderr, "APIC WRITE EXIT\n");
 				break;
 			default:
 				fprintf(stderr, "Don't know how to handle exit %d\n", vmctl.ret_code);

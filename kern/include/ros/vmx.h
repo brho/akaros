@@ -326,6 +326,7 @@ enum vmcs_field {
 #define EXIT_REASON_EPT_MISCONFIG       49
 #define EXIT_REASON_WBINVD              54
 #define EXIT_REASON_XSETBV              55
+#define EXIT_REASON_APIC_WRITE		56
 #define EXIT_REASON_INVPCID             58
 
 #define VMX_EXIT_REASONS \

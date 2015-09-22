@@ -1814,7 +1814,7 @@ int vmx_launch(struct vmctl *v) {
 
 		vmcs_writel(POSTED_INTR_DESC_ADDR, pir_physical);
 		vmcs_writel(POSTED_INTR_DESC_ADDR_HIGH, pir_physical>>32);
-		printk("POSTED_INTR_DESC_ADDR_HIGH %ld", vmcs_readl(POSTED_INTR_DESC_ADDR_HIGH));
+		printk("POSTED_INTR_DESC_ADDR_HIGH %ld\n", vmcs_readl(POSTED_INTR_DESC_ADDR_HIGH));
 		if (pir_physical & 0xfff) {
 			printk("Low order 12 bits of pir address is not 0, value: %p\n", pir_physical);
 		}
@@ -1837,14 +1837,14 @@ int vmx_launch(struct vmctl *v) {
 		vmcs_writel(APIC_ACCESS_ADDR_HIGH, apic_physical>>32);
 
 		// Clear the EOI exit bitmap(Gan)
-		vmcs_writel(EOI_EXIT_BITMAP0, 0xFFFFFFFF);
-		vmcs_writel(EOI_EXIT_BITMAP0_HIGH, 0xFFFFFFFF);
-		vmcs_writel(EOI_EXIT_BITMAP1, 0xFFFFFFFF);
-		vmcs_writel(EOI_EXIT_BITMAP1_HIGH, 0xFFFFFFFF);
-		vmcs_writel(EOI_EXIT_BITMAP2, 0xFFFFFFFF);
-		vmcs_writel(EOI_EXIT_BITMAP2_HIGH, 0xFFFFFFFF);
-		vmcs_writel(EOI_EXIT_BITMAP3, 0xFFFFFFFF);
-		vmcs_writel(EOI_EXIT_BITMAP3_HIGH, 0xFFFFFFFF);
+		vmcs_writel(EOI_EXIT_BITMAP0, 0);
+		vmcs_writel(EOI_EXIT_BITMAP0_HIGH, 0);
+		vmcs_writel(EOI_EXIT_BITMAP1, 0);
+		vmcs_writel(EOI_EXIT_BITMAP1_HIGH, 0);
+		vmcs_writel(EOI_EXIT_BITMAP2, 0);
+		vmcs_writel(EOI_EXIT_BITMAP2_HIGH, 0);
+		vmcs_writel(EOI_EXIT_BITMAP3, 0);
+		vmcs_writel(EOI_EXIT_BITMAP3_HIGH, 0);
 
 		printk("v->apic %p v->pir %p\n", (void *)v->vapic, (void *)v->pir);
 		// fallthrough
@@ -1965,6 +1965,12 @@ int vmx_launch(struct vmctl *v) {
 			advance = 2;
 		} else if (ret == EXIT_REASON_IO_INSTRUCTION) {
 			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
+		} else if (ret == EXIT_REASON_APIC_WRITE) {
+			printk("BEGIN APIC WRITE EXIT DUMP\n");
+			vmx_dump_cpu(vcpu);
+			printk("END APIC WRITE EXIT DUMP\n");
+		//} else if (ret == EXIT_REASON_APIC_ACCESS) {
+			//vmx_dump_cpu(vcpu);
 		} else {
 			printk("unhandled exit: reason 0x%x, exit qualification 0x%x\n",
 			       ret, vmcs_read32(EXIT_QUALIFICATION));

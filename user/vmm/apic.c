@@ -168,6 +168,10 @@ int apic(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store)
 	uint32_t offset = gpa & 0xfffff;
 	/* basic sanity tests. */
 	// TODO: Should be minus the base but FIXME
+
+	//fprintf(stderr, "WE SHOULD NEVER BE HERE: user/vmm/apic.c");
+	//exit(1);
+
 	offset = gpa & 0xfffff;
 	if (offset & 0xf) {
 		DPRINTF("bad register offset; low nibl is non-zero\n");
