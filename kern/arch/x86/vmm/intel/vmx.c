@@ -162,6 +162,10 @@
 
 #define currentcpu (&per_cpu_info[core_id()])
 
+/* debug stuff == remove later. It's not even multivm safe. */
+uint64_t idtr;
+
+// END debug
 static unsigned long *msr_bitmap;
 #define VMX_IO_BITMAP_ORDER		4	/* 64 KB */
 #define VMX_IO_BITMAP_SZ		(1 << (VMX_IO_BITMAP_ORDER + PGSHIFT))
@@ -1545,13 +1549,17 @@ static int vmx_run_vcpu(struct vmx_vcpu *vcpu)
 		, "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"
 	);
 
+	if (vmcs_readl(GUEST_IDTR_BASE) != idtr){
+		printk("idt changed; old 0x%lx new 0x%lx\n", vmcs_read64(GUEST_IDTR_BASE), idtr);
+		idtr = vmcs_read64(GUEST_IDTR_BASE);
+	}
 	vcpu->regs.tf_rip = vmcs_readl(GUEST_RIP);
 	vcpu->regs.tf_rsp = vmcs_readl(GUEST_RSP);
 	printd("RETURN. ip %016lx sp %016lx cr2 %016lx\n",
 	       vcpu->regs.tf_rip, vcpu->regs.tf_rsp, vcpu->cr2);
 	/* FIXME: do we need to set up other flags? */
-	vcpu->regs.tf_rflags = (vmcs_readl(GUEST_RFLAGS) & 0xFF) |
-		X86_EFLAGS_IF | 0x2;
+	// NO IDEA!
+	vcpu->regs.tf_rflags = vmcs_readl(GUEST_RFLAGS); //& 0xFF) | X86_EFLAGS_IF | 0x2;
 
 	vcpu->regs.tf_cs = GD_UT;
 	vcpu->regs.tf_ss = GD_UD;
@@ -1641,6 +1649,35 @@ static int vmx_handle_nmi_exception(struct vmx_vcpu *vcpu) {
 	return -EIO;
 }
 
+static void vmx_hwapic_isr_update(struct vmctl *v, int isr)
+{
+	uint16_t status;
+	uint8_t old;
+
+	status = vmcs_read16(GUEST_INTR_STATUS);
+	old = status >> 8;
+	if (isr != old) {
+		status &= 0xff;
+		status |= isr << 8;
+		vmcs_write16(GUEST_INTR_STATUS, status);
+	}
+}
+
+static void vmx_set_rvi(int vector)
+{
+	uint16_t status;
+	uint8_t old;
+
+	status = vmcs_read16(GUEST_INTR_STATUS);
+	old = (uint8_t)status & 0xff;
+	if ((uint8_t)vector != old) {
+		status &= ~0xff;
+		status |= (uint8_t)vector;
+		printk("%s: SET 0x%x\n", __func__, status);
+		vmcs_write16(GUEST_INTR_STATUS, status);
+	}
+}
+
 /**
  * vmx_launch - the main loop for a VMX Dune process
  * @conf: the launch configuration
@@ -1686,9 +1723,14 @@ int vmx_launch(struct vmctl *v) {
 		 * zero it in the vmctl. Else set RIP.
 		 */
 		if (v->interrupt) {
-			printk("Set GUEST_INTERRUPTIBILITY_INFO to 0x%x\n", v->interrupt);
-			vmcs_writel(VM_ENTRY_INTR_INFO_FIELD, v->interrupt);
-			v->interrupt = 0;
+			if ((v->regs.tf_rflags & 0x200) && (v->intrinfo1 == 0)) {
+				printk("Set VM_ENTRY_INFTR_INFO_FIELD to 0x%x\n", v->interrupt);
+				vmcs_writel(VM_ENTRY_INTR_INFO_FIELD, v->interrupt);
+				v->interrupt = 0;
+			} else {
+				printk("Can't set interrupt yet\n");
+			}
+			//vmx_set_rvi(v->interrupt);
 		}
 		printd("RESUME\n");
 		break;
@@ -1747,15 +1789,16 @@ int vmx_launch(struct vmctl *v) {
 				vcpu->shutdown = SHUTDOWN_NMI_EXCEPTION;
 		} else if (ret == EXIT_REASON_EXTERNAL_INTERRUPT) {
 			printk("External interrupt\n");
-			vmx_dump_cpu(vcpu);
+			//vmx_dump_cpu(vcpu);
 			vmx_get_cpu(vcpu);
 			v->intrinfo1 = vmcs_readl(GUEST_INTERRUPTIBILITY_INFO);
 			v->intrinfo2 = vmcs_readl(VM_ENTRY_INTR_INFO_FIELD);
-			vmcs_write32(GUEST_INTERRUPTIBILITY_INFO, 0);
-			vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);
+			//vmcs_write32(GUEST_INTERRUPTIBILITY_INFO, 0);
+			//vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);
+			printk("GUEST_INTERRUPTIBILITY_INFO: 0x%08x,",  v->intrinfo1);
+			printk("VM_ENTRY_INTR_INFO_FIELD 0x%08x,", v->intrinfo2);
+			printk("rflags 0x%x\n", vmcs_readl(GUEST_RFLAGS));
 			vmx_put_cpu(vcpu);
-			printk("GUEST_INTERRUPTIBILITY_INFO: 0x%08x\n",  v->intrinfo1);
-			printk("VM_ENTRY_INTR_INFO_FIELD 0x%08x\n", v->intrinfo2);
 			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
 		} else if (ret == EXIT_REASON_MSR_READ) {
 			printd("msr read\n");

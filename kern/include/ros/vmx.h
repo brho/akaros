@@ -122,6 +122,8 @@ enum vmcs_field {
 	GUEST_GS_SELECTOR               = 0x0000080a,
 	GUEST_LDTR_SELECTOR             = 0x0000080c,
 	GUEST_TR_SELECTOR               = 0x0000080e,
+	GUEST_INTR_STATUS               = 0x00000810,
+	GUEST_PML_INDEX			= 0x00000812,
 	HOST_ES_SELECTOR                = 0x00000c00,
 	HOST_CS_SELECTOR                = 0x00000c02,
 	HOST_SS_SELECTOR                = 0x00000c04,

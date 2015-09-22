@@ -127,6 +127,7 @@ unsigned long long stack[1024];
 volatile int shared = 0;
 volatile int quit = 0;
 int mcp = 1;
+int virtioirq = 0x18;
 
 /* total hack. If the vm runs away we want to get control again. */
 unsigned int maxresume = (unsigned int) -1;
@@ -163,17 +164,17 @@ void *consout(void *arg)
 	int i;
 	int num;
 	if (debug) {
-		printf("----------------------- TT a %p\n", a);
-		printf("talk thread ttargs %x v %x\n", a, v);
+		fprintf(stderr, "----------------------- TT a %p\n", a);
+		fprintf(stderr, "talk thread ttargs %x v %x\n", a, v);
 	}
 	
 	for(num = 0;;num++) {
 		/* host: use any buffers we should have been sent. */
 		head = wait_for_vq_desc(v, iov, &outlen, &inlen);
 		if (debug)
-			printf("CCC: vq desc head %d, gaveit %d gotitback %d\n", head, gaveit, gotitback);
+			fprintf(stderr, "CCC: vq desc head %d, gaveit %d gotitback %d\n", head, gaveit, gotitback);
 		for(i = 0; debug && i < outlen + inlen; i++)
-			printf("CCC: v[%d/%d] v %p len %d\n", i, outlen + inlen, iov[i].v, iov[i].length);
+			fprintf(stderr, "CCC: v[%d/%d] v %p len %d\n", i, outlen + inlen, iov[i].v, iov[i].length);
 		/* host: if we got an output buffer, just output it. */
 		for(i = 0; i < outlen; i++) {
 			num++;
@@ -183,21 +184,24 @@ void *consout(void *arg)
 		}
 		
 		if (debug)
-			printf("CCC: outlen is %d; inlen is %d\n", outlen, inlen);
+			fprintf(stderr, "CCC: outlen is %d; inlen is %d\n", outlen, inlen);
 		/* host: fill in the writeable buffers. */
 		/* why we're getting these I don't know. */
 		for (i = outlen; i < outlen + inlen; i++) {
 			if (debug) fprintf(stderr, "CCC: send back empty writeable");
 			iov[i].length = 0;
 		}
-		if (debug) printf("CCC: call add_used\n");
+		if (debug) fprintf(stderr, "CCC: call add_used\n");
 		/* host: now ack that we used them all. */
 		add_used(v, head, outlen+inlen);
-		if (debug) printf("CCC: DONE call add_used\n");
+		if (debug) fprintf(stderr, "CCC: DONE call add_used\n");
 	}
 	fprintf(stderr, "All done\n");
 	return NULL;
 }
+
+// FIXME. 
+int consdata = 0;
 
 void *consin(void *arg)
 {
@@ -216,18 +220,18 @@ void *consin(void *arg)
 	int i;
 	int num;
 	
-	if (debug) printf("Spin on console being read, print num queues, halt\n");
+	if (debug) fprintf(stderr, "Spin on console being read, print num queues, halt\n");
 
 	for(num = 0;! quit;num++) {
 		int debug = 1;
 		/* host: use any buffers we should have been sent. */
 		head = wait_for_vq_desc(v, iov, &outlen, &inlen);
 		if (debug)
-			printf("vq desc head %d, gaveit %d gotitback %d\n", head, gaveit, gotitback);
+			fprintf(stderr, "vq desc head %d, gaveit %d gotitback %d\n", head, gaveit, gotitback);
 		for(i = 0; debug && i < outlen + inlen; i++)
-			printf("v[%d/%d] v %p len %d\n", i, outlen + inlen, iov[i].v, iov[i].length);
+			fprintf(stderr, "v[%d/%d] v %p len %d\n", i, outlen + inlen, iov[i].v, iov[i].length);
 		if (debug)
-			printf("outlen is %d; inlen is %d\n", outlen, inlen);
+			fprintf(stderr, "outlen is %d; inlen is %d\n", outlen, inlen);
 		/* host: fill in the writeable buffers. */
 		for (i = outlen; i < outlen + inlen; i++) {
 			/* host: read a line. */
@@ -235,7 +239,7 @@ void *consin(void *arg)
 			if (fgets(consline, 4096-256, stdin) == NULL) {
 				exit(0);
 			} 
-			if (debug) printf("GOT A LINE:%s:\n", consline);
+			if (debug) fprintf(stderr, "GOT A LINE:%s:\n", consline);
 			if (strlen(consline) < 3 && consline[0] == 'q' ) {
 				quit = 1;
 				break;
@@ -244,10 +248,11 @@ void *consin(void *arg)
 			memmove(iov[i].v, consline, strlen(consline)+ 1);
 			iov[i].length = strlen(consline) + 1;
 		}
-		if (debug) printf("call add_used\n");
+		if (debug) fprintf(stderr, "call add_used\n");
 		/* host: now ack that we used them all. */
 		add_used(v, head, outlen+inlen);
-		if (debug) printf("DONE call add_used\n");
+		consdata = 1;
+		if (debug) fprintf(stderr, "DONE call add_used\n");
 	}
 	fprintf(stderr, "All done\n");
 	return NULL;
@@ -272,13 +277,13 @@ static uint8_t acpi_tb_checksum(uint8_t *buffer, uint32_t length)
 {
 	uint8_t sum = 0;
 	uint8_t *end = buffer + length;
-	printf("tbchecksum %p for %d", buffer, length);
+	fprintf(stderr, "tbchecksum %p for %d", buffer, length);
 	while (buffer < end) {
 		if (end - buffer < 2)
-			printf("%02x\n", sum);
+			fprintf(stderr, "%02x\n", sum);
 		sum = (uint8_t)(sum + *(buffer++));
 	}
-	printf(" is %02x\n", sum);
+	fprintf(stderr, " is %02x\n", sum);
 	return (sum);
 }
 
@@ -287,11 +292,11 @@ static void gencsum(uint8_t *target, void *data, int len)
 	uint8_t csum;
 	// blast target to zero so it does not get counted (it might be in the struct we checksum) 
 	// And, yes, it is, goodness.
-	printf("gencsum %p target %p source %d bytes\n", target, data, len);
+	fprintf(stderr, "gencsum %p target %p source %d bytes\n", target, data, len);
 	*target = 0;
 	csum  = acpi_tb_checksum((uint8_t *)data, len);
 	*target = ~csum + 1;
-	printf("Cmoputed is %02x\n", *target);
+	fprintf(stderr, "Cmoputed is %02x\n", *target);
 }
 
 int main(int argc, char **argv)
@@ -316,11 +321,11 @@ int main(int argc, char **argv)
 	int i;
 	uint8_t csum;
 	void *coreboot_tables = (void *) 0x1165000;
-printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
+fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 
 	// mmap is not working for us at present.
 	if ((uint64_t)_kernel > GKERNBASE) {
-		printf("kernel array @%p is above , GKERNBASE@%p sucks\n", _kernel, GKERNBASE);
+		fprintf(stderr, "kernel array @%p is above , GKERNBASE@%p sucks\n", _kernel, GKERNBASE);
 		exit(1);
 	}
 	memset(_kernel, 0, sizeof(_kernel));
@@ -351,8 +356,12 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 			argc--,argv++;
 			maxresume = strtoull(argv[0], 0, 0);
 			break;
+		case 'i':
+			argc--,argv++;
+			virtioirq = strtoull(argv[0], 0, 0);
+			break;
 		default:
-			printf("BMAFR\n");
+			fprintf(stderr, "BMAFR\n");
 			break;
 		}
 		argc--,argv++;
@@ -403,7 +412,7 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 	memmove(&r->xsdt_physical_address, &a, sizeof(a));
 	gencsum(&r->checksum, r, ACPI_RSDP_CHECKSUM_LENGTH);
 	if ((csum = acpi_tb_checksum((uint8_t *) r, ACPI_RSDP_CHECKSUM_LENGTH)) != 0) {
-		printf("RSDP has bad checksum; summed to %x\n", csum);
+		fprintf(stderr, "RSDP has bad checksum; summed to %x\n", csum);
 		exit(1);
 	}
 
@@ -411,7 +420,7 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 	gencsum(&r->extended_checksum, r, ACPI_RSDP_XCHECKSUM_LENGTH);
 	if ((rsdp.revision >= 2) &&
 	    (acpi_tb_checksum((uint8_t *) r, ACPI_RSDP_XCHECKSUM_LENGTH) != 0)) {
-		printf("RSDP has bad checksum v2\n");
+		fprintf(stderr, "RSDP has bad checksum v2\n");
 		exit(1);
 	}
 
@@ -434,7 +443,7 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 	f->header.length = a - (void *)f;
 	gencsum(&f->header.checksum, f, f->header.length);
 	if (acpi_tb_checksum((uint8_t *)f, f->header.length) != 0) {
-		printf("ffadt has bad checksum v2\n");
+		fprintf(stderr, "ffadt has bad checksum v2\n");
 		exit(1);
 	}
 
@@ -452,14 +461,14 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 	m->header.length = a - (void *)m;
 	gencsum(&m->header.checksum, m, m->header.length);
 	if (acpi_tb_checksum((uint8_t *) m, m->header.length) != 0) {
-		printf("madt has bad checksum v2\n");
+		fprintf(stderr, "madt has bad checksum v2\n");
 		exit(1);
 	}
 	fprintf(stderr, "allchecksums ok\n");
 
 	gencsum(&x->header.checksum, x, x->header.length);
 	if ((csum = acpi_tb_checksum((uint8_t *) x, x->header.length)) != 0) {
-		printf("XSDT has bad checksum; summed to %x\n", csum);
+		fprintf(stderr, "XSDT has bad checksum; summed to %x\n", csum);
 		exit(1);
 	}
 
@@ -483,8 +492,8 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 		vcore_request(nr_threads - 1);		/* ghetto incremental interface */
 		for (int i = 0; i < nr_threads; i++) {
 			xp = __procinfo.vcoremap;
-			printf("%p\n", __procinfo.vcoremap);
-			printf("Vcore %d mapped to pcore %d\n", i,
+			fprintf(stderr, "%p\n", __procinfo.vcoremap);
+			fprintf(stderr, "Vcore %d mapped to pcore %d\n", i,
 			    	__procinfo.vcoremap[i].pcoreid);
 		}
 	}
@@ -495,7 +504,7 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 		exit(1);
 	}
 	ret = posix_memalign((void **)&p512, 4096, 3*4096);
-	printf("memalign is %p\n", p512);
+	fprintf(stderr, "memalign is %p\n", p512);
 	if (ret) {
 		perror("ptp alloc");
 		exit(1);
@@ -519,8 +528,9 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 	uint8_t *kernel = (void *)GKERNBASE;
 	//write_coreboot_table(coreboot_tables, ((void *)VIRTIOBASE) /*kernel*/, KERNSIZE + 1048576);
 	hexdump(stdout, coreboot_tables, 512);
-	printf("kernbase for pml4 is 0x%llx and entry is %llx\n", kernbase, entry);
-	printf("p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
+	fprintf(stderr, "kernbase for pml4 is 0x%llx and entry is %llx\n", kernbase, entry);
+	fprintf(stderr, "p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
+	vmctl.interrupt = 0;
 	vmctl.command = REG_RSP_RIP_CR3;
 	vmctl.cr3 = (uint64_t) p512;
 	vmctl.regs.tf_rip = entry;
@@ -529,8 +539,8 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 		/* set up virtio bits, which depend on threads being enabled. */
 		register_virtio_mmio(&vqdev, virtio_mmio_base);
 	}
-	printf("threads started\n");
-	printf("Writing command :%s:\n", cmd);
+	fprintf(stderr, "threads started\n");
+	fprintf(stderr, "Writing command :%s:\n", cmd);
 
 	ret = write(fd, &vmctl, sizeof(vmctl));
 	if (ret != sizeof(vmctl)) {
@@ -546,11 +556,11 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 			resumeprompt = 1;
 		}
 		if (debug) {
-			printf("RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
-			showstatus(stdout, &vmctl);
+			fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
+			showstatus(stderr, &vmctl);
 		}
 		if (resumeprompt) {
-			printf("RESUME?\n");
+			fprintf(stderr, "RESUME?\n");
 			c = getchar();
 			if (c == 'q')
 				break;
@@ -561,14 +571,14 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 			int store, size;
 			int advance;
 			if (decode(&vmctl, &gpa, &regx, &regp, &store, &size, &advance)) {
-				printf("RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
-				showstatus(stdout, &vmctl);
+				fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
+				showstatus(stderr, &vmctl);
 				quit = 1;
 				break;
 			}
-			if (debug) printf("%p %p %p %p %p %p\n", gpa, regx, regp, store, size, advance);
+			if (debug) fprintf(stderr, "%p %p %p %p %p %p\n", gpa, regx, regp, store, size, advance);
 			if ((gpa & ~0xfffULL) == virtiobase) {
-				if (debug) printf("DO SOME VIRTIO\n");
+				if (debug) fprintf(stderr, "DO SOME VIRTIO\n");
 				// Lucky for us the various virtio ops are well-defined.
 				virtio_mmio(&vmctl, gpa, regx, regp, store);
 			} else if ((gpa & 0xfee00000) == 0xfee00000) {
@@ -583,19 +593,19 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 				uint64_t val = 0;
 				memmove(&val, &low4k[gpa], size);
 				hexdump(stdout, &low4k[gpa], size);
-				printf("Low 1m, code %p read @ %p, size %d, val %p\n", vmctl.regs.tf_rip, gpa, size, val);
+				fprintf(stderr, "Low 1m, code %p read @ %p, size %d, val %p\n", vmctl.regs.tf_rip, gpa, size, val);
 				memmove(regp, &low4k[gpa], size);
 				hexdump(stdout, regp, size);
 			} else {
-				printf("EPT violation: can't handle %p\n", gpa);
-				printf("RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
-				printf("Returning 0xffffffff\n");
-				showstatus(stdout, &vmctl);
+				fprintf(stderr, "EPT violation: can't handle %p\n", gpa);
+				fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
+				fprintf(stderr, "Returning 0xffffffff\n");
+				showstatus(stderr, &vmctl);
 				// Just fill the whole register for now.
 				*regp = (uint64_t) -1;
 			}
 			vmctl.regs.tf_rip += advance;
-			if (debug) printf("Advance rip by %d bytes to %p\n", advance, vmctl.regs.tf_rip);
+			if (debug) fprintf(stderr, "Advance rip by %d bytes to %p\n", advance, vmctl.regs.tf_rip);
 			vmctl.shutdown = 0;
 			vmctl.gpa = 0;
 			vmctl.command = REG_ALL;
@@ -610,29 +620,23 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 			case EXIT_REASON_EXTERNAL_INTERRUPT:
 				//debug = 1;
 				fprintf(stderr, "XINT 0x%x 0x%x\n", vmctl.intrinfo1, vmctl.intrinfo2);
-				vmctl.interrupt = 0x80000302; // b0d;
-				// That sent an NMI and we got it.
-
-				vmctl.interrupt = 0x80000320; // b0d;
-				// This fails on entry
-				
-				vmctl.interrupt = 0x80000306; // b0d;
-				// This succeedd in sending a UD.
-
-				vmctl.interrupt = 0x8000030f; // b0d;
-				
 				vmctl.command = RESUME;
 				break;
 			case EXIT_REASON_IO_INSTRUCTION:
-				printf("IO @ %p\n", vmctl.regs.tf_rip);
+				fprintf(stderr, "IO @ %p\n", vmctl.regs.tf_rip);
 				io(&vmctl);
 				vmctl.shutdown = 0;
 				vmctl.gpa = 0;
 				vmctl.command = REG_ALL;
 				break;
 			case EXIT_REASON_INTERRUPT_WINDOW:
-				vmctl.interrupt = 0x80000220;
-				vmctl.command = RESUME;
+				if (consdata) {
+					debug = 1;
+					if (debug) fprintf(stderr, "inject an interrupt\n");
+					vmctl.interrupt = 0x80000000 | virtioirq;
+					vmctl.command = RESUME;
+					consdata = 0;
+				}
 				break;
 			case EXIT_REASON_MSR_WRITE:
 			case EXIT_REASON_MSR_READ:
@@ -644,7 +648,8 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 				}
 				break;
 			case EXIT_REASON_HLT:
-				printf("\n================== Guest halted. RIP. =======================\n");
+				fflush(stdout);
+				fprintf(stderr, "\n================== Guest halted. RIP. =======================\n");
 				quit = 1;
 				break;
 			default:
@@ -655,10 +660,20 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 				break;
 			}
 		}
-		if (debug) printf("at bottom of switch, quit is %d\n", quit);
+		if (debug) fprintf(stderr, "at bottom of switch, quit is %d\n", quit);
 		if (quit)
 			break;
-		if (debug) printf("NOW DO A RESUME\n");
+		if (consdata) {
+			if (debug) fprintf(stderr, "inject an interrupt\n");
+			fprintf(stderr, "XINT 0x%x 0x%x\n", vmctl.intrinfo1, vmctl.intrinfo2);
+			if ((vmctl.intrinfo1 == 0) && (vmctl.regs.tf_rflags & 0x200))
+				vmctl.interrupt = 0x80000000 | virtioirq;
+			else 
+				fprintf(stderr, "Can't inject interrupt: IF is clear\n");
+			vmctl.command = RESUME;
+			consdata = 0;
+		}
+		if (debug) fprintf(stderr, "NOW DO A RESUME\n");
 		ret = write(fd, &vmctl, sizeof(vmctl));
 		if (ret != sizeof(vmctl)) {
 			perror(cmd);
@@ -670,9 +685,10 @@ printf("%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 		int ret;
 		if (pthread_join(my_threads[i], &my_retvals[i]))
 			perror("pth_join failed");
-		printf("%d %d\n", i, ret);
+		fprintf(stderr, "%d %d\n", i, ret);
 	}
  */
 
-	return 0;
+	fflush(stdout);
+	exit(0);
 }
