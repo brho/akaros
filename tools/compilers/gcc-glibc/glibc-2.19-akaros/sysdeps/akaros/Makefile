@@ -54,3 +54,9 @@ endif
 sysdep_headers += sys/user_fd.h
 # Epoll: uses User FDs, implemented in iplib
 sysdep_headers += sys/epoll.h bits/epoll.h
+
+# Eventfd, implemented in glibc
+ifeq ($(subdir),stdlib)
+sysdep_routines += eventfd
+endif
+sysdep_headers += sys/eventfd.h bits/eventfd.h

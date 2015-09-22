@@ -48,5 +48,9 @@ libc {
 
     _sock_get_listen_fd;
     _sock_lookup_listen_fd;
+
+    eventfd;
+    eventfd_read;
+    eventfd_write;
   }
 }
