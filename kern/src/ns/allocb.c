@@ -105,6 +105,44 @@ int block_add_extd(struct block *b, unsigned int nr_bufs, int mem_flags)
 	return 0;
 }
 
+/* Go backwards from the end of the list, remember the last unused slot, and
+ * stop when a used slot is encountered. */
+static struct extra_bdata *next_unused_slot(struct block *b)
+{
+	struct extra_bdata *ebd = NULL;
+
+	for (int i = b->nr_extra_bufs - 1; i >= 0; i--) {
+		if (b->extra_data[i].base)
+			break;
+		ebd = &b->extra_data[i];
+	}
+	return ebd;
+}
+
+/* Append a zero-filled extra data buffer of length @len to block @b.
+ * Reuse an unused extra data slot if there's any.
+ * Return 0 on success or -1 on error. */
+int block_append_extra(struct block *b, int len, int mem_flags)
+{
+	unsigned int nr_bufs = b->nr_extra_bufs + 1;
+	struct extra_bdata *ebd;
+
+	ebd = next_unused_slot(b);
+	if (!ebd) {
+		if (block_add_extd(b, nr_bufs, mem_flags) != 0)
+			return -1;
+		ebd = next_unused_slot(b);
+		assert(ebd);
+	}
+	ebd->base = (uintptr_t)kzmalloc(len, mem_flags);
+	if (!ebd->base)
+		return -1;
+	ebd->off = 0;
+	ebd->len = len;
+	b->extra_len += ebd->len;
+	return 0;
+}
+
 /*
  *  interrupt time allocation
  */
