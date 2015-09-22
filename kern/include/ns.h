@@ -715,6 +715,7 @@ uint64_t fastticks(uint64_t *);
 uint64_t fastticks2ns(uint64_t);
 int findmount(struct chan **, struct mhead **, int unused_int, int, struct qid);
 void free(void *);
+void free_block_extra(struct block *);
 void freeb(struct block *);
 void freeblist(struct block *);
 void freeskey(struct signerkey *);

@@ -131,13 +131,9 @@ struct block *iallocb(int size)
 	return b;
 }
 
-void freeb(struct block *b)
+void free_block_extra(struct block *b)
 {
-	void *dead = (void *)Bdead;
 	struct extra_bdata *ebd;
-
-	if (b == NULL)
-		return;
 
 	/* assuming our release method is kfree, which will change when we support
 	 * user buffers */
@@ -146,8 +142,20 @@ void freeb(struct block *b)
 		if (ebd->base)
 			kfree((void*)ebd->base);
 	}
+	b->extra_len = 0;
+	b->nr_extra_bufs = 0;
 	kfree(b->extra_data);	/* harmless if it is 0 */
 	b->extra_data = 0;		/* in case the block is reused by a free override */
+}
+
+void freeb(struct block *b)
+{
+	void *dead = (void *)Bdead;
+
+	if (b == NULL)
+		return;
+
+	free_block_extra(b);
 	/*
 	 * drivers which perform non cache coherent DMA manage their own buffer
 	 * pool of uncached buffers and provide their own free routine.
