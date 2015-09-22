@@ -36,10 +36,10 @@ out of the box.
 2. Need Help?
 ---------------------
 First off, if you get stuck, email someone.  You can join our mailing list by
-sending an email to <akaros-request@lists.eecs.berkeley.edu>.  Once you've
-joined, send your messages to <akaros@lists.eecs.berkeley.edu>.  Or just email
-me (<brho@cs>), though the mailing list is a more scalable method in the long
-run.
+sending an email to
+[akaros+subscribe@googlegroups.com](mailto:akaros%2Bsubscribe@googlegroups.com)
+or visit the [group](http://groups.google.com/group/akaros).  Once you've
+joined, send your messages to <mailto:akaros@googlegroups.com>.
 
 Alternatively, you can poke your head in #akaros on `irc.freenode.net`.  I'm
 usually idling in there (alone), and if I'm at my computer, I'll respond.
