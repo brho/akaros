@@ -528,31 +528,72 @@ struct block *copyblock(struct block *bp, int count)
 	return nbp;
 }
 
+/* Adjust block @bp so that its size is exactly @len.
+ * If the size is increased, fill in the new contents with zeros.
+ * If the size is decreased, discard some of the old contents at the tail. */
 struct block *adjustblock(struct block *bp, int len)
 {
-	int n;
-	struct block *nbp;
+	struct extra_bdata *ebd;
+	int i;
 
 	if (len < 0) {
 		freeb(bp);
 		return NULL;
 	}
 
-	PANIC_EXTRA(bp);
-	if (bp->rp + len > bp->lim) {
-		nbp = copyblock(bp, len);
-		freeblist(bp);
-		QDEBUG checkb(nbp, "adjustblock 1");
+	if (len == BLEN(bp))
+		return bp;
 
-		return nbp;
+	/* Shrink within block main body. */
+	if (len <= BHLEN(bp)) {
+		free_block_extra(bp);
+		bp->wp = bp->rp + len;
+		QDEBUG checkb(bp, "adjustblock 1");
+		return bp;
 	}
 
-	n = BLEN(bp);
-	if (len > n)
-		memset(bp->wp, 0, len - n);
-	bp->wp = bp->rp + len;
-	QDEBUG checkb(bp, "adjustblock 2");
+	/* Need to grow. */
+	if (len > BLEN(bp)) {
+		/* Grow within block main body. */
+		if (bp->extra_len == 0 && bp->rp + len <= bp->lim) {
+			memset(bp->wp, 0, len - BLEN(bp));
+			bp->wp = bp->rp + len;
+			QDEBUG checkb(bp, "adjustblock 2");
+			return bp;
+		}
+		/* Grow with extra data buffers. */
+		block_append_extra(bp, len - BLEN(bp), KMALLOC_WAIT);
+		QDEBUG checkb(bp, "adjustblock 3");
+		return bp;
+	}
 
+	/* Shrink extra data buffers.
+	 * len is how much of ebd we need to keep.
+	 * extra_len is re-accumulated. */
+	assert(bp->extra_len > 0);
+	len -= BHLEN(bp);
+	bp->extra_len = 0;
+	for (i = 0; i < bp->nr_extra_bufs; i++) {
+		ebd = &bp->extra_data[i];
+		if (len <= ebd->len)
+			break;
+		len -= ebd->len;
+		bp->extra_len += ebd->len;
+	}
+	/* If len becomes zero, extra_data[i] should be freed. */
+	if (len > 0) {
+		ebd = &bp->extra_data[i];
+		ebd->len = len;
+		bp->extra_len += ebd->len;
+		i++;
+	}
+	for (; i < bp->nr_extra_bufs; i++) {
+		ebd = &bp->extra_data[i];
+		if (ebd->base)
+			kfree((void*)ebd->base);
+		ebd->base = ebd->off = ebd->len = 0;
+	}
+	QDEBUG checkb(bp, "adjustblock 4");
 	return bp;
 }
 
