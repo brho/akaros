@@ -1108,7 +1108,7 @@ NameError:
 		goto NameError;
 	}
 
-	if (amode == Aopen && (omode & 3) == OEXEC && (c->qid.type & QTDIR)) {
+	if ((amode == Aopen) && (omode & O_EXEC) && (c->qid.type & QTDIR)) {
 		npath = e.ARRAY_SIZEs;
 		error("cannot exec directory");
 	}
