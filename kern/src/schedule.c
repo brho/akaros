@@ -5,6 +5,7 @@
  * Scheduling and dispatching. */
 
 #include <schedule.h>
+#include <corerequest.h>
 #include <process.h>
 #include <monitor.h>
 #include <stdio.h>
