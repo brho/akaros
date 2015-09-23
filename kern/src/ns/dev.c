@@ -98,6 +98,7 @@ struct chan *devattach(int tc, char *spec)
 {
 	struct chan *c;
 	char *buf;
+	size_t buflen;
 
 	c = newchan();
 	mkqid(&c->qid, 0, 0, QTDIR);
@@ -105,8 +106,9 @@ struct chan *devattach(int tc, char *spec)
 	if (spec == NULL)
 		spec = "";
 	/* 2 for #c, 1 for \0 */
-	buf = kzmalloc(2 + strlen(spec) + 1, KMALLOC_WAIT);
-	snprintf(buf, sizeof(buf), "#%c%s", tc, spec);
+	buflen = 2 + strlen(spec) + 1;
+	buf = kzmalloc(buflen, KMALLOC_WAIT);
+	snprintf(buf, buflen, "#%c%s", tc, spec);
 	c->name = newcname(buf);
 	kfree(buf);
 	return c;
