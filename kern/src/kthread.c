@@ -230,8 +230,8 @@ void check_poison(char *msg)
 {
 #ifdef CONFIG_KTHREAD_POISON
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	assert(pcpui->cur_kthread && pcpui->cur_kthread->stacktop);
-	if (*kstack_bottom_addr(pcpui->cur_kthread->stacktop) != 0xdeadbeef) {
+	if (pcpui->cur_kthread && pcpui->cur_kthread->stacktop &&
+	    (*kstack_bottom_addr(pcpui->cur_kthread->stacktop) != 0xdeadbeef)) {
 		printk("\nBad kthread canary, msg: %s\n", msg);
 		panic("");
 	}
