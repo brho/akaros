@@ -624,6 +624,19 @@ uint32_t max_vcores(struct proc *p)
 #endif /* CONFIG_DISABLE_SMT */
 }
 
+/* Find the best core to give to p. First check p's list of cores
+ * provisioned to it, but not yet allocated. If no cores are found, try and
+ * pull from the idle list.  If no cores found on either list, return NULL.
+ * */
+struct sched_pcore *find_best_core(struct proc *p)
+{
+	struct sched_pcore *spc_i = NULL;
+	spc_i = TAILQ_FIRST(&p->ksched_data.prov_not_alloc_me);
+	if (!spc_i)
+		spc_i = TAILQ_FIRST(&idlecores);
+	return spc_i;
+}
+
 /* This deals with a request for more cores.  The amt of new cores needed is
  * passed in.  The ksched lock is held, but we are free to unlock if we want
  * (and we must, if calling out of the ksched to anything high-level).
@@ -645,14 +658,18 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 	/* get all available cores from their prov_not_alloc list.  the list might
 	 * change when we unlock (new cores added to it, or the entire list emptied,
 	 * but no core allocations will happen (we hold the poke)). */
-	while (!TAILQ_EMPTY(&p->ksched_data.prov_not_alloc_me)) {
-		if (nr_to_grant == amt_needed)
+	while (nr_to_grant != amt_needed) {
+		/* Find the next best core to allocate to p. It may be a core
+		 * provisioned to p, and it might not be. */
+		spc_i = find_best_core(p);
+		/* If no core is returned, we know that there are no more cores to give
+		 * out, so we exit the loop. */
+		if (spc_i == NULL)
 			break;
-		/* picking the next victim (first on the not_alloc list) */
-		spc_i = TAILQ_FIRST(&p->ksched_data.prov_not_alloc_me);
-		/* someone else has this proc's pcore, so we need to try to preempt.
-		 * after this block, the core will be tracked dealloc'd and on the idle
-		 * list (regardless of whether we had to preempt or not) */
+		/* If the pcore chosen currently has a proc allocated to it, we know
+		 * it must be provisioned to p, but not allocated to it. We need to try
+		 * to preempt. After this block, the core will be track_dealloc'd and
+		 * on the idle list (regardless of whether we had to preempt or not) */
 		if (spc_i->alloc_proc) {
 			proc_to_preempt = spc_i->alloc_proc;
 			/* would break both preemption and maybe the later decref */
@@ -715,14 +732,6 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 		 * still idle, despite (potentially) unlocking during the preempt
 		 * attempt above).  It is guaranteed to be track_dealloc'd()
 		 * (regardless of how we got here). */
-		corelist[nr_to_grant] = spc2pcoreid(spc_i);
-		nr_to_grant++;
-		__prov_track_alloc(p, spc2pcoreid(spc_i));
-	}
-	/* Try to get cores from the idle list that aren't prov to me (FCFS) */
-	TAILQ_FOREACH_SAFE(spc_i, &idlecores, alloc_next, temp) {
-		if (nr_to_grant == amt_needed)
-			break;
 		corelist[nr_to_grant] = spc2pcoreid(spc_i);
 		nr_to_grant++;
 		__prov_track_alloc(p, spc2pcoreid(spc_i));
