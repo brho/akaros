@@ -329,18 +329,23 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 				/* Don't want to hear bridged packets */
 				if (f->bridge && !fromwire && !fromme)
 					continue;
-				if (!f->headersonly) {
-					if (fromwire && fx == 0)
-						fx = f;
-					else if ((xbp = iallocb(len))) {
-						memmove(xbp->wp, pkt, len);
-						xbp->wp += len;
-						if (qpass(f->in, xbp) < 0)
-							ether->soverflows++;
-					} else
-						ether->soverflows++;
-				} else
+				if (f->headersonly) {
 					etherrtrace(f, pkt, len);
+					continue;
+				}
+				if (fromwire && fx == 0) {
+					fx = f;
+					continue;
+				}
+				xbp = iallocb(len);
+				if (xbp == 0) {
+					ether->soverflows++;
+					continue;
+				}
+				memmove(xbp->wp, pkt, len);
+				xbp->wp += len;
+				if (qpass(f->in, xbp) < 0)
+					ether->soverflows++;
 			}
 	}
 
@@ -380,31 +385,31 @@ static int etheroq(struct ether *ether, struct block *bp)
 	pkt = (struct etherpkt *)bp->rp;
 	len = BLEN(bp);
 	loopback = eaddrcmp(pkt->d, ether->ea) == 0;
-	if (loopback || eaddrcmp(pkt->d, ether->bcast) == 0
-		|| ether->prom) {
+	if (loopback || eaddrcmp(pkt->d, ether->bcast) == 0 || ether->prom) {
 		disable_irqsave(&irq_state);
 		etheriq(ether, bp, 0);
 		enable_irqsave(&irq_state);
+		if (loopback) {
+			freeb(bp);
+			return len;
+		}
 	}
 
-	if (!loopback) {
-		if (ether->vlanid) {
-			/* add tag */
-			bp = padblock(bp, 2 + 2);
-			memmove(bp->rp, bp->rp + 4, 2 * Eaddrlen);
-			hnputs(bp->rp + 2 * Eaddrlen, Type8021Q);
-			hnputs(bp->rp + 2 * Eaddrlen + 2, ether->vlanid & 0xFFF);	/* prio:3 0:1 vid:12 */
-			ether = ether->ctlr;
-		}
+	if (ether->vlanid) {
+		/* add tag */
+		bp = padblock(bp, 2 + 2);
+		memmove(bp->rp, bp->rp + 4, 2 * Eaddrlen);
+		hnputs(bp->rp + 2 * Eaddrlen, Type8021Q);
+		hnputs(bp->rp + 2 * Eaddrlen + 2, ether->vlanid & 0xFFF);	/* prio:3 0:1 vid:12 */
+		ether = ether->ctlr;
+	}
 
-		if ((ether->feat & NETF_PADMIN) == 0 && BLEN(bp) < ether->minmtu)
-			bp = adjustblock(bp, ether->minmtu);
+	if ((ether->feat & NETF_PADMIN) == 0 && BLEN(bp) < ether->minmtu)
+		bp = adjustblock(bp, ether->minmtu);
 
-		qbwrite(ether->oq, bp);
-		if (ether->transmit != NULL)
-			ether->transmit(ether);
-	} else
-		freeb(bp);
+	qbwrite(ether->oq, bp);
+	if (ether->transmit != NULL)
+		ether->transmit(ether);
 
 	return len;
 }
