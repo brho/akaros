@@ -209,10 +209,11 @@ int decode(struct vmctl *v, uint64_t *gpa, uint8_t *destreg, uint64_t **regp, in
 
 	*advance = insize(kva);
 
-	uint16_t ins = *(uint16_t *)(kva + 8*(kva[0] == 0x44));
+	uint16_t ins = *(uint16_t *)(kva + (kva[0] == 0x44));
 	DPRINTF("ins is %04x\n", ins);
 		
 	*destreg = (ins>>11) & 7;
+	*destreg += 8*(kva[0] == 0x44);
 	// Our primitive approach wins big here.
 	// We don't have to decode the register or the offset used
 	// in the computation; that was done by the CPU and is the gpa.
@@ -241,6 +242,30 @@ int decode(struct vmctl *v, uint64_t *gpa, uint8_t *destreg, uint64_t **regp, in
 		break;
 	case 7:
 		*regp = &v->regs.tf_rdi;
+		break;
+	case 8:
+		*regp = &v->regs.tf_r8;
+		break;
+	case 9:
+		*regp = &v->regs.tf_r9;
+		break;
+	case 10:
+		*regp = &v->regs.tf_r10;
+		break;
+	case 11:
+		*regp = &v->regs.tf_r11;
+		break;
+	case 12:
+		*regp = &v->regs.tf_r12;
+		break;
+	case 13:
+		*regp = &v->regs.tf_r13;
+		break;
+	case 14:
+		*regp = &v->regs.tf_r14;
+		break;
+	case 15:
+		*regp = &v->regs.tf_r15;
 		break;
 	}
 	return 0;

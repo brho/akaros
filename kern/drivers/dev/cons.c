@@ -1044,7 +1044,7 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 			if ((offset >> 12) ==1) {
 				ret = vm_post_interrupt(&vmctl);
 				n = ret;
-				printk("vm_interrupt_notify returns %d\n", ret);
+				//printk("vm_interrupt_notify returns %d\n", ret);
 			}
 			else {
 				ret = vm_run(&vmctl);

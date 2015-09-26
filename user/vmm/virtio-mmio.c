@@ -183,6 +183,9 @@ static uint32_t virtio_mmio_read(uint64_t gpa)
 	    return mmio.vqdev->vqs[mmio.qsel].pfn;
     case VIRTIO_MMIO_INTERRUPT_STATUS:
 		// pretty sure this is per-mmio, not per-q. 
+	//fprintf(stderr, "MMIO ISR 0x%08x\n", mmio.isr);
+	//fprintf(stderr, "GPA IS 0x%016x\n", gpa);
+	//fprintf(stderr, "mmio.bar IS 0x%016x\n", mmio.bar);
 		return mmio.isr;
 	    //return mmio.vqdev->vqs[mmio.qsel].isr;
     case VIRTIO_MMIO_STATUS:

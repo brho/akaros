@@ -168,6 +168,7 @@
 
 /* debug stuff == remove later. It's not even multivm safe. */
 uint64_t idtr;
+int debug =0;
 
 // END debug
 static unsigned long *msr_bitmap;
@@ -1772,6 +1773,7 @@ static void vmx_set_posted_interrupt(int vector)
 int vmx_interrupt_notify(struct vmctl *v) {
 	int vm_core = v->core;
 	send_ipi(vm_core, I_VMMCP_POSTED);
+	if(debug) printk("Posting Interrupt\n");
 	return 0;
 }
 
@@ -1868,7 +1870,7 @@ int vmx_launch(struct vmctl *v) {
 		 * I don't see how: it will mainly just break your guest vm AFAICT.
 		 */
 		if (v->interrupt) {
-			printk("Set VM_ENTRY_INFTR_INFO_FIELD to 0x%x\n", v->interrupt);
+			if(debug) printk("Set VM_ENTRY_INFTR_INFO_FIELD to 0x%x\n", v->interrupt);
 			//vmcs_writel(VM_ENTRY_INTR_INFO_FIELD, v->interrupt);
 			//vapic_status_dump_kernel((void *)v->vapic);
 			
@@ -1887,8 +1889,8 @@ int vmx_launch(struct vmctl *v) {
 	vcpu->shutdown = 0;
 	vmx_put_cpu(vcpu);
 	if (interrupting) {
-		printk("BEFORE INTERRUPT: ");
-		vmx_dump_cpu(vcpu);
+		if(debug) printk("BEFORE INTERRUPT: ");
+		if(debug) vmx_dump_cpu(vcpu);
 	}
 	vcpu->ret_code = -1;
 
@@ -1910,14 +1912,14 @@ int vmx_launch(struct vmctl *v) {
 		vmx_put_cpu(vcpu);
 
 		if (interrupting) {
-			printk("POST INTERRUPT: \n");
+			if(debug) printk("POST INTERRUPT: \n");
 			unsigned long cr8val;
 			asm volatile("mov %%cr8,%0" : "=r" (cr8val));
-			printk("CR8 Value: 0x%08x", cr8val);
+			if(debug) printk("CR8 Value: 0x%08x", cr8val);
 			
-			printk("%s: Status is %04x\n", __func__,
+			if(debug) printk("%s: Status is %04x\n", __func__,
 					vmcs_read16(GUEST_INTR_STATUS));
-			vmx_dump_cpu(vcpu);
+			if(debug) vmx_dump_cpu(vcpu);
 		}
 
 		if (ret == EXIT_REASON_VMCALL) {

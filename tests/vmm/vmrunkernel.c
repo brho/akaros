@@ -153,7 +153,7 @@ int resumeprompt = 0;
 /* unlike Linux, this shared struct is for both host and guest. */
 //	struct virtqueue *constoguest = 
 //		vring_new_virtqueue(0, 512, 8192, 0, inpages, NULL, NULL, "test");
-uint64_t virtio_mmio_base = 0x100000000;
+uint64_t virtio_mmio_base = 0x100000000ULL;
 
 void vapic_status_dump(FILE *f, void *vapic);
 static void set_posted_interrupt(int vector);
@@ -248,7 +248,7 @@ void *consin(void *arg)
 	if (debug) fprintf(stderr, "Spin on console being read, print num queues, halt\n");
 
 	for(num = 0;! quit;num++) {
-		int debug = 1;
+		//int debug = 1;
 		/* host: use any buffers we should have been sent. */
 		head = wait_for_vq_desc(v, iov, &outlen, &inlen);
 		if (debug)
@@ -361,10 +361,10 @@ static void set_posted_interrupt(int vector)
 	// Move to the correct location to set our bit.
 	bit_vec = pir + vector/(sizeof(unsigned long)*8);
 	bit_offset = vector%(sizeof(unsigned long)*8);
-	fprintf(stderr, "%s: Pre set PIR dump", __func__);
-	pir_dump();
-	vapic_status_dump(stderr, (void *)vmctl.vapic);
-	fprintf(stderr, "%s: Setting pir bit offset %d at 0x%p", __func__,
+	if(debug) fprintf(stderr, "%s: Pre set PIR dump\n", __func__);
+	if(debug) pir_dump();
+	if(debug) vapic_status_dump(stderr, (void *)vmctl.vapic);
+	if(debug) fprintf(stderr, "%s: Setting pir bit offset %d at 0x%p\n", __func__,
 			bit_offset, bit_vec);
 	test_and_set_bit(bit_offset, bit_vec);
 
@@ -374,7 +374,7 @@ static void set_posted_interrupt(int vector)
 			bit_vec);
 	test_and_set_bit(0, bit_vec);*/
 
-	pir_dump();
+	if(debug) pir_dump();
 }
 
 int main(int argc, char **argv)
@@ -656,11 +656,11 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 	fprintf(stderr, "threads started\n");
 	fprintf(stderr, "Writing command :%s:\n", cmd);
 	
-	vapic_status_dump(stderr, (void *)vmctl.vapic);
+	if(debug) vapic_status_dump(stderr, (void *)vmctl.vapic);
 
 	ret = pwrite(fd, &vmctl, sizeof(vmctl), 0);
 
-	vapic_status_dump(stderr, (void *)vmctl.vapic);
+	if(debug) vapic_status_dump(stderr, (void *)vmctl.vapic);
 
 	if (ret != sizeof(vmctl)) {
 		perror(cmd);
@@ -735,12 +735,12 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 			case  EXIT_REASON_VMCALL:
 				byte = vmctl.regs.tf_rdi;
 				printf("%c", byte);
-				if (byte == '\n') printf("%c", 'V');
+				if (byte == '\n') printf("%c", '%');
 				vmctl.regs.tf_rip += 3;
 				break;
 			case EXIT_REASON_EXTERNAL_INTERRUPT:
 				//debug = 1;
-				fprintf(stderr, "XINT 0x%x 0x%x\n", vmctl.intrinfo1, vmctl.intrinfo2);
+				if (debug) fprintf(stderr, "XINT 0x%x 0x%x\n", vmctl.intrinfo1, vmctl.intrinfo2);
 				pir_dump();
 				vmctl.command = RESUME;
 				break;
@@ -776,7 +776,7 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 				while (!consdata)
 					;
 				//debug = 1;
-				vapic_status_dump(stderr, (void *)vmctl.vapic);
+				if(debug) vapic_status_dump(stderr, (void *)vmctl.vapic);
 				if (debug)fprintf(stderr, "Resume with consdata ...\n");
 				vmctl.regs.tf_rip += 3;
 				ret = pwrite(fd, &vmctl, sizeof(vmctl), 0);
@@ -840,7 +840,7 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 			break;
 		if (consdata) {
 			if (debug) fprintf(stderr, "inject an interrupt\n");
-			fprintf(stderr, "XINT 0x%x 0x%x\n", vmctl.intrinfo1, vmctl.intrinfo2);
+			if (debug) fprintf(stderr, "XINT 0x%x 0x%x\n", vmctl.intrinfo1, vmctl.intrinfo2);
 			vmctl.interrupt = 0x80000000 | virtioirq;
 			virtio_mmio_set_vring_irq();
 			consdata = 0;
