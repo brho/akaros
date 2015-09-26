@@ -1769,6 +1769,12 @@ static void vmx_set_posted_interrupt(int vector)
 
 */
 
+int vmx_interrupt_notify(struct vmctl *v) {
+	int vm_core = v->core;
+	send_ipi(vm_core, 0xE5);
+	return 0;
+}
+
 /**
  * vmx_launch - the main loop for a VMX Dune process
  * @conf: the launch configuration
@@ -1790,6 +1796,8 @@ int vmx_launch(struct vmctl *v) {
 		return -ENOMEM;
 	}
 
+	v->core = core_id();
+	printk("Core Id: %d\n", v->core);
 	/* We need to prep the host's autoload region for our current core.  Right
 	 * now, the only autoloaded MSR that varies at runtime (in this case per
 	 * core is the KERN_GS_BASE). */

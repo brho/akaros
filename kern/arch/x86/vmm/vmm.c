@@ -68,6 +68,17 @@ void vmm_pcpu_init(void)
 	printk("vmm_pcpu_init failed\n");
 }
 
+int vm_post_interrupt(struct vmctl *v)
+{
+	int vmx_interrupt_notify(struct vmctl *v);
+	if (current->vmm.amd) {
+		return -1;
+	} else {
+		return vmx_interrupt_notify(v);
+	}
+	return -1;
+}
+
 int vm_run(struct vmctl *v)
 {
 	int vmx_launch(struct vmctl *v);

@@ -242,6 +242,8 @@ void *consin(void *arg)
 	uint32_t vv;
 	int i;
 	int num;
+
+	int fd = open("#cons/vmctl", O_RDWR), ret;
 	
 	if (debug) fprintf(stderr, "Spin on console being read, print num queues, halt\n");
 
@@ -281,6 +283,8 @@ void *consin(void *arg)
 		// Send spurious for testing (Gan)
 		set_posted_interrupt(0xE5);
 		virtio_mmio_set_vring_irq();
+
+		pwrite(fd, &vmctl, sizeof(vmctl), 1<<12);
 	}
 	fprintf(stderr, "All done\n");
 	return NULL;
@@ -426,7 +430,9 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 	}
 
 	memset(a_page, 0, 4096);
-	((uint32_t *)a_page)[0x30/4] = 0x01060015;
+	//((uint32_t *)a_page)[0x30/4] = 0x01060015;
+	((uint32_t *)a_page)[0x30/4] = 0xDEADBEEF;
+
 
 	if (fd < 0) {
 		perror("#cons/sysctl");
@@ -652,7 +658,7 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 	
 	vapic_status_dump(stderr, (void *)vmctl.vapic);
 
-	ret = write(fd, &vmctl, sizeof(vmctl));
+	ret = pwrite(fd, &vmctl, sizeof(vmctl), 0);
 
 	vapic_status_dump(stderr, (void *)vmctl.vapic);
 
@@ -773,7 +779,7 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 				vapic_status_dump(stderr, (void *)vmctl.vapic);
 				if (debug)fprintf(stderr, "Resume with consdata ...\n");
 				vmctl.regs.tf_rip += 3;
-				ret = write(fd, &vmctl, sizeof(vmctl));
+				ret = pwrite(fd, &vmctl, sizeof(vmctl), 0);
 				if (ret != sizeof(vmctl)) {
 					perror(cmd);
 				}
@@ -789,7 +795,7 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 				//debug = 1;
 				if (debug)fprintf(stderr, "Resume with consdata ...\n");
 				vmctl.regs.tf_rip += 1;
-				ret = write(fd, &vmctl, sizeof(vmctl));
+				ret = pwrite(fd, &vmctl, sizeof(vmctl), 0);
 				if (ret != sizeof(vmctl)) {
 					perror(cmd);
 				}
@@ -842,7 +848,7 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 			vmctl.command = RESUME;
 		}
 		if (debug) fprintf(stderr, "NOW DO A RESUME\n");
-		ret = write(fd, &vmctl, sizeof(vmctl));
+		ret = pwrite(fd, &vmctl, sizeof(vmctl), 0);
 		if (ret != sizeof(vmctl)) {
 			perror(cmd);
 		}
