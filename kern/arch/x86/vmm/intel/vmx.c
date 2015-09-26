@@ -1771,7 +1771,7 @@ static void vmx_set_posted_interrupt(int vector)
 
 int vmx_interrupt_notify(struct vmctl *v) {
 	int vm_core = v->core;
-	send_ipi(vm_core, 0xE5);
+	send_ipi(vm_core, I_VMMCP_POSTED);
 	return 0;
 }
 
@@ -1797,7 +1797,7 @@ int vmx_launch(struct vmctl *v) {
 	}
 
 	v->core = core_id();
-	printk("Core Id: %d\n", v->core);
+	printd("Core Id: %d\n", v->core);
 	/* We need to prep the host's autoload region for our current core.  Right
 	 * now, the only autoloaded MSR that varies at runtime (in this case per
 	 * core is the KERN_GS_BASE). */
