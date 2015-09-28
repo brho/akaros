@@ -47,7 +47,7 @@ int devalarm_get_fds(int *ctlfd_r, int *timerfd_r, int *alarmid_r)
 	char buf[20];
 	char path[32];
 
-	ctlfd = open("#A/clone", O_RDWR | O_CLOEXEC);
+	ctlfd = open("#alarm/clone", O_RDWR | O_CLOEXEC);
 	if (ctlfd < 0)
 		return -1;
 	ret = read(ctlfd, buf, sizeof(buf) - 1);
