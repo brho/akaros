@@ -1299,7 +1299,7 @@ static unsigned long sys_populate_va(struct proc *p, uintptr_t va,
 	return populate_va(p, ROUNDDOWN(va, PGSIZE), nr_pgs);
 }
 
-static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
+static intreg_t sys_read(struct proc *p, int fd, void *buf, size_t len)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct systrace_record *t = pcpui->cur_kthread->trace;
@@ -1332,7 +1332,7 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, int len)
 	return ret;
 }
 
-static intreg_t sys_write(struct proc *p, int fd, const void *buf, int len)
+static intreg_t sys_write(struct proc *p, int fd, const void *buf, size_t len)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct systrace_record *t = pcpui->cur_kthread->trace;
