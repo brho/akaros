@@ -24,6 +24,9 @@ struct core_request_data {
 	struct sched_pcore_tailq  prov_not_alloc_me;  /* maybe alloc to others */
 };
 
+/* Initialize any data assocaited with doing core allocation. */
+void corealloc_init(void);
+
 /* Initialize any data associated with provisiong cores to a process. */
 void coreprov_proc_init(struct proc *p);
 

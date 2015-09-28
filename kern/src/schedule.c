@@ -15,7 +15,6 @@
 #include <manager.h>
 #include <alarm.h>
 #include <sys/queue.h>
-#include <kmalloc.h>
 #include <arsc_server.h>
 
 /* Process Lists.  'unrunnable' is a holding list for SCPs that are running or
@@ -29,11 +28,9 @@ struct proc_list all_mcps_2 = TAILQ_HEAD_INITIALIZER(all_mcps_2);
 struct proc_list *primary_mcps = &all_mcps_1;
 struct proc_list *secondary_mcps = &all_mcps_2;
 
-/* The pcores in the system.  (array gets alloced in init()).  */
-struct sched_pcore *all_pcores;
-
-/* TAILQ of all unallocated, idle (CG) cores */
-struct sched_pcore_tailq idlecores = TAILQ_HEAD_INITIALIZER(idlecores);
+/* TAILQ of all unallocated, idle (CG) cores.
+ * Pulled from corealloc.c at the moment */
+extern struct sched_pcore_tailq idlecores;
 
 /* Helper, defined below */
 static void __core_request(struct proc *p, uint32_t amt_needed);
@@ -116,22 +113,10 @@ static void __ksched_tick(struct alarm_waiter *waiter)
 void schedule_init(void)
 {
 	spin_lock(&sched_lock);
-	all_pcores = kmalloc(sizeof(struct sched_pcore) * num_cores, 0);
-	memset(all_pcores, 0, sizeof(struct sched_pcore) * num_cores);
 	assert(!core_id());		/* want the alarm on core0 for now */
 	init_awaiter(&ksched_waiter, __ksched_tick);
 	set_ksched_alarm();
-	/* init the idlecore list.  if they turned off hyperthreading, give them the
-	 * odds from 1..max-1.  otherwise, give them everything by 0 (default mgmt
-	 * core).  TODO: (CG/LL) better LL/CG mgmt */
-#ifndef CONFIG_DISABLE_SMT
-	for (int i = 1; i < num_cores; i++)
-		TAILQ_INSERT_TAIL(&idlecores, pcoreid2spc(i), alloc_next);
-#else
-	assert(!(num_cores % 2));
-	for (int i = 1; i < num_cores; i += 2)
-		TAILQ_INSERT_TAIL(&idlecores, pcoreid2spc(i), alloc_next);
-#endif /* CONFIG_DISABLE_SMT */
+	corealloc_init();
 	spin_unlock(&sched_lock);
 
 #ifdef CONFIG_ARSC_SERVER
