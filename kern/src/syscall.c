@@ -1326,7 +1326,7 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, size_t len)
 
 	if ((ret > 0) && t) {
 		t->datalen = MIN(sizeof(t->data), ret);
-		memmove(t->data, buf, t->datalen);
+		memcpy(t->data, buf, t->datalen);
 	}
 
 	return ret;
@@ -1355,8 +1355,8 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, size_t len)
 	}
 
 	if (t) {
-		t->datalen = MIN(sizeof(t->data), ret);
-		memmove(t->data, buf, t->datalen);
+		t->datalen = MIN(sizeof(t->data), len);
+		memcpy(t->data, buf, t->datalen);
 	}
 	return ret;
 
@@ -1384,7 +1384,7 @@ static intreg_t sys_openat(struct proc *p, int fromfd, const char *path,
 		return -1;
 	if (t) {
 		t->datalen = MIN(sizeof(t->data), path_l);
-		memmove(t->data, t_path, path_l);
+		memcpy(t->data, t_path, t->datalen);
 	}
 	sysc_save_str("open %s at fd %d", t_path, fromfd);
 	mode &= ~p->fs_env.umask;
