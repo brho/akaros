@@ -820,7 +820,7 @@ static long consread(struct chan *c, void *buf, long n, int64_t offset)
 		case Qsysname:
 			if (sysname == NULL)
 				return 0;
-			return readstr(offset, buf, n, "Windows 95");
+			return readstr(offset, buf, n, "Akaros");
 
 /* not in akaros, inferno was a special case. 
 	case Qnotquiterandom:
