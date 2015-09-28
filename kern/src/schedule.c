@@ -41,8 +41,6 @@ static void add_to_list(struct proc *p, struct proc_list *list);
 static void remove_from_list(struct proc *p, struct proc_list *list);
 static void switch_lists(struct proc *p, struct proc_list *old,
                          struct proc_list *new);
-static uint32_t spc2pcoreid(struct sched_pcore *spc);
-static struct sched_pcore *pcoreid2spc(uint32_t pcoreid);
 static bool is_ll_core(uint32_t pcoreid);
 static void __prov_track_alloc(struct proc *p, uint32_t pcoreid);
 static void __prov_track_dealloc(struct proc *p, uint32_t pcoreid);
@@ -143,16 +141,6 @@ void schedule_init(void)
 	send_kernel_message(arsc_coreid, arsc_server, 0, 0, 0, KMSG_ROUTINE);
 	printk("Using core %d for the ARSC server\n", arsc_coreid);
 #endif /* CONFIG_ARSC_SERVER */
-}
-
-static uint32_t spc2pcoreid(struct sched_pcore *spc)
-{
-	return spc - all_pcores;
-}
-
-static struct sched_pcore *pcoreid2spc(uint32_t pcoreid)
-{
-	return &all_pcores[pcoreid];
 }
 
 /* Round-robins on whatever list it's on */

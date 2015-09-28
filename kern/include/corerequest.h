@@ -23,3 +23,17 @@ struct core_request_data {
 	struct sched_pcore_tailq  prov_alloc_me;      /* prov cores alloced us */
 	struct sched_pcore_tailq  prov_not_alloc_me;  /* maybe alloc to others */
 };
+
+static inline uint32_t spc2pcoreid(struct sched_pcore *spc)
+{
+	extern struct sched_pcore *all_pcores;
+
+	return spc - all_pcores;
+}
+
+static inline struct sched_pcore *pcoreid2spc(uint32_t pcoreid)
+{
+	extern struct sched_pcore *all_pcores;
+
+	return &all_pcores[pcoreid];
+}
