@@ -98,6 +98,10 @@ void smp_percpu_init(void)
 	kthread = __kthread_zalloc();
 	kthread->stacktop = get_stack_top();	/* assumes we're on the 1st page */
 	pcpui->cur_kthread = kthread;
+	/* Treat the startup threads as ktasks.  This will last until smp_idle when
+	 * they clear it, either in anticipation of being a user-backing kthread or
+	 * to handle an RKM. */
+	kthread->is_ktask = TRUE;
 	per_cpu_info[coreid].spare = 0;
 	/* Init relevant lists */
 	spinlock_init_irqsave(&per_cpu_info[coreid].immed_amsg_lock);
