@@ -116,7 +116,6 @@ static void __ksched_tick(struct alarm_waiter *waiter)
 void schedule_init(void)
 {
 	spin_lock(&sched_lock);
-	/* init provisioning stuff */
 	all_pcores = kmalloc(sizeof(struct sched_pcore) * num_cores, 0);
 	memset(all_pcores, 0, sizeof(struct sched_pcore) * num_cores);
 	assert(!core_id());		/* want the alarm on core0 for now */
@@ -190,8 +189,7 @@ void __sched_proc_register(struct proc *p)
 	/* one ref for the proc's existence, cradle-to-grave */
 	proc_incref(p, 1);	/* need at least this OR the 'one for existing' */
 	spin_lock(&sched_lock);
-	TAILQ_INIT(&p->ksched_data.crd.prov_alloc_me);
-	TAILQ_INIT(&p->ksched_data.crd.prov_not_alloc_me);
+	coreprov_proc_init(p);
 	add_to_list(p, &unrunnable_scps);
 	spin_unlock(&sched_lock);
 }

@@ -8,6 +8,13 @@
 #include <env.h>
 #include <schedule.h>
 
+/* Initialize any data associated with provisiong cores to a process. */
+void coreprov_proc_init(struct proc *p)
+{
+	TAILQ_INIT(&p->ksched_data.crd.prov_alloc_me);
+	TAILQ_INIT(&p->ksched_data.crd.prov_not_alloc_me);
+}
+
 /* Provision a core to proc p. This code assumes that the scheduler that uses
  * it holds a lock for the duration of the call. */
 void __provision_core(struct proc *p, struct sched_pcore *spc)

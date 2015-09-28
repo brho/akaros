@@ -24,6 +24,9 @@ struct core_request_data {
 	struct sched_pcore_tailq  prov_not_alloc_me;  /* maybe alloc to others */
 };
 
+/* Initialize any data associated with provisiong cores to a process. */
+void coreprov_proc_init(struct proc *p);
+
 /* Provision a core to proc p. This code assumes that the scheduler that uses
  * it holds a lock for the duration of the call. */
 void __provision_core(struct proc *p, struct sched_pcore *spc);
