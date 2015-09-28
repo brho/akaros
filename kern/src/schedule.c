@@ -819,11 +819,11 @@ static void __prov_track_dealloc_bulk(struct proc *p, uint32_t *pc_arr,
 		__prov_track_dealloc(p, pc_arr[i]);
 }
 
-/* P will get pcore if it needs more cores next time we look at it */
+/* Provision a core to a process. This function wraps the primary logic
+ * implemented in __provision_core, with a lock, error checking, etc. */
 int provision_core(struct proc *p, uint32_t pcoreid)
 {
 	struct sched_pcore *spc;
-	struct sched_pcore_tailq *prov_list;
 	/* Make sure we aren't asking for something that doesn't exist (bounds check
 	 * on the pcore array) */
 	if (!(pcoreid < num_cores)) {
@@ -840,30 +840,7 @@ int provision_core(struct proc *p, uint32_t pcoreid)
 	 * If we need a finer grained sched lock, this is one place where we could
 	 * have a different lock */
 	spin_lock(&sched_lock);
-	/* If the core is already prov to someone else, take it away.  (last write
-	 * wins, some other layer or new func can handle permissions). */
-	if (spc->prov_proc) {
-		/* the list the spc is on depends on whether it is alloced to the
-		 * prov_proc or not */
-		prov_list = (spc->alloc_proc == spc->prov_proc ?
-		             &spc->prov_proc->ksched_data.crd.prov_alloc_me :
-		             &spc->prov_proc->ksched_data.crd.prov_not_alloc_me);
-		TAILQ_REMOVE(prov_list, spc, prov_next);
-	}
-	/* Now prov it to p.  Again, the list it goes on depends on whether it is
-	 * alloced to p or not.  Callers can also send in 0 to de-provision. */
-	if (p) {
-		if (spc->alloc_proc == p) {
-			TAILQ_INSERT_TAIL(&p->ksched_data.crd.prov_alloc_me, spc,
-			                  prov_next);
-		} else {
-			/* this is be the victim list, which can be sorted so that we pick
-			 * the right victim (sort by alloc_proc reverse priority, etc). */
-			TAILQ_INSERT_TAIL(&p->ksched_data.crd.prov_not_alloc_me, spc,
-			                  prov_next);
-		}
-	}
-	spc->prov_proc = p;
+	__provision_core(p, spc);
 	spin_unlock(&sched_lock);
 	return 0;
 }
