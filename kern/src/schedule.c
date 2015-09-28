@@ -879,35 +879,6 @@ void print_all_resources(void)
 	spin_unlock(&pid_hash_lock);
 }
 
-void print_prov_map(void)
-{
-	struct sched_pcore *spc_i;
-	/* Doing this unlocked, which is dangerous, but won't deadlock */
-	printk("Which cores are provisioned to which procs:\n------------------\n");
-	for (int i = 0; i < num_cores; i++) {
-		spc_i = pcoreid2spc(i);
-		printk("Core %02d, prov: %d(%p) alloc: %d(%p)\n", i,
-		       spc_i->prov_proc ? spc_i->prov_proc->pid : 0, spc_i->prov_proc,
-		       spc_i->alloc_proc ? spc_i->alloc_proc->pid : 0,
-		       spc_i->alloc_proc);
-	}
-}
-
-void print_proc_prov(struct proc *p)
-{
-	struct sched_pcore *spc_i;
-	if (!p)
-		return;
-	printk("Prov cores alloced to proc %d (%p)\n----------\n", p->pid, p);
-	TAILQ_FOREACH(spc_i, &p->ksched_data.crd.prov_alloc_me, prov_next)
-		printk("Pcore %d\n", spc2pcoreid(spc_i));
-	printk("Prov cores not alloced to proc %d (%p)\n----------\n", p->pid, p);
-	TAILQ_FOREACH(spc_i, &p->ksched_data.crd.prov_not_alloc_me, prov_next)
-		printk("Pcore %d (alloced to %d (%p))\n", spc2pcoreid(spc_i),
-		       spc_i->alloc_proc ? spc_i->alloc_proc->pid : 0,
-		       spc_i->alloc_proc);
-}
-
 void next_core(uint32_t pcoreid)
 {
 	struct sched_pcore *spc_i;

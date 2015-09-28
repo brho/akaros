@@ -32,6 +32,12 @@ void __provision_core(struct proc *p, struct sched_pcore *spc);
  * that uses * it holds a lock for the duration of the call. */
 void __unprovision_all_cores(struct proc *p);
 
+/* Print a list of the cores currently provisioned to p. */
+void print_proc_coreprov(struct proc *p);
+
+/* Print the processes attached to each provisioned core. */
+void print_coreprov_map(void);
+
 static inline uint32_t spc2pcoreid(struct sched_pcore *spc)
 {
 	extern struct sched_pcore *all_pcores;

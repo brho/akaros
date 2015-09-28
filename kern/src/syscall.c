@@ -1092,7 +1092,7 @@ static int sys_provision(struct proc *p, int target_pid,
 			return prov_resource(0, res_type, res_val);
 		/* debugging interface */
 		if (target_pid == -1)
-			print_prov_map();
+			print_coreprov_map();
 		set_errno(ESRCH);
 		return -1;
 	}
