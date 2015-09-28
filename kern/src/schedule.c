@@ -202,8 +202,8 @@ void __sched_proc_register(struct proc *p)
 	/* one ref for the proc's existence, cradle-to-grave */
 	proc_incref(p, 1);	/* need at least this OR the 'one for existing' */
 	spin_lock(&sched_lock);
-	TAILQ_INIT(&p->ksched_data.prov_alloc_me);
-	TAILQ_INIT(&p->ksched_data.prov_not_alloc_me);
+	TAILQ_INIT(&p->ksched_data.crd.prov_alloc_me);
+	TAILQ_INIT(&p->ksched_data.crd.prov_not_alloc_me);
 	add_to_list(p, &unrunnable_scps);
 	spin_unlock(&sched_lock);
 }
@@ -258,8 +258,8 @@ void __sched_proc_destroy(struct proc *p, uint32_t *pc_arr, uint32_t nr_cores)
 	/* Unprovision any cores.  Note this is different than track_dealloc.
 	 * The latter does bookkeeping when an allocation changes.  This is a
 	 * bulk *provisioning* change. */
-	unprov_pcore_list(&p->ksched_data.prov_alloc_me);
-	unprov_pcore_list(&p->ksched_data.prov_not_alloc_me);
+	unprov_pcore_list(&p->ksched_data.crd.prov_alloc_me);
+	unprov_pcore_list(&p->ksched_data.crd.prov_not_alloc_me);
 	/* Remove from whatever list we are on (if any - might not be on one if it
 	 * was in the middle of __run_mcp_sched) */
 	remove_from_any_list(p);
@@ -632,7 +632,7 @@ uint32_t max_vcores(struct proc *p)
 struct sched_pcore *find_best_core(struct proc *p)
 {
 	struct sched_pcore *spc_i = NULL;
-	spc_i = TAILQ_FIRST(&p->ksched_data.prov_not_alloc_me);
+	spc_i = TAILQ_FIRST(&p->ksched_data.crd.prov_not_alloc_me);
 	if (!spc_i)
 		spc_i = TAILQ_FIRST(&idlecores);
 	return spc_i;
@@ -794,8 +794,8 @@ static void __prov_track_alloc(struct proc *p, uint32_t pcoreid)
 	spc->alloc_proc = p;
 	/* if the pcore is prov to them and now allocated, move lists */
 	if (spc->prov_proc == p) {
-		TAILQ_REMOVE(&p->ksched_data.prov_not_alloc_me, spc, prov_next);
-		TAILQ_INSERT_TAIL(&p->ksched_data.prov_alloc_me, spc, prov_next);
+		TAILQ_REMOVE(&p->ksched_data.crd.prov_not_alloc_me, spc, prov_next);
+		TAILQ_INSERT_TAIL(&p->ksched_data.crd.prov_alloc_me, spc, prov_next);
 	}
 	/* Actually allocate the core, removing it from the idle core list. */
 	TAILQ_REMOVE(&idlecores, spc, alloc_next);
@@ -811,12 +811,13 @@ static void __prov_track_dealloc(struct proc *p, uint32_t pcoreid)
 	spc->alloc_proc = 0;
 	/* if the pcore is prov to them and now deallocated, move lists */
 	if (spc->prov_proc == p) {
-		TAILQ_REMOVE(&p->ksched_data.prov_alloc_me, spc, prov_next);
+		TAILQ_REMOVE(&p->ksched_data.crd.prov_alloc_me, spc, prov_next);
 		/* this is the victim list, which can be sorted so that we pick the
 		 * right victim (sort by alloc_proc reverse priority, etc).  In this
 		 * case, the core isn't alloc'd by anyone, so it should be the first
 		 * victim. */
-		TAILQ_INSERT_HEAD(&p->ksched_data.prov_not_alloc_me, spc, prov_next);
+		TAILQ_INSERT_HEAD(&p->ksched_data.crd.prov_not_alloc_me, spc,
+		                  prov_next);
 	}
 	/* Actually dealloc the core, putting it back on the idle core list. */
 	TAILQ_INSERT_TAIL(&idlecores, spc, alloc_next);
@@ -857,19 +858,20 @@ int provision_core(struct proc *p, uint32_t pcoreid)
 		/* the list the spc is on depends on whether it is alloced to the
 		 * prov_proc or not */
 		prov_list = (spc->alloc_proc == spc->prov_proc ?
-		             &spc->prov_proc->ksched_data.prov_alloc_me :
-		             &spc->prov_proc->ksched_data.prov_not_alloc_me);
+		             &spc->prov_proc->ksched_data.crd.prov_alloc_me :
+		             &spc->prov_proc->ksched_data.crd.prov_not_alloc_me);
 		TAILQ_REMOVE(prov_list, spc, prov_next);
 	}
 	/* Now prov it to p.  Again, the list it goes on depends on whether it is
 	 * alloced to p or not.  Callers can also send in 0 to de-provision. */
 	if (p) {
 		if (spc->alloc_proc == p) {
-			TAILQ_INSERT_TAIL(&p->ksched_data.prov_alloc_me, spc, prov_next);
+			TAILQ_INSERT_TAIL(&p->ksched_data.crd.prov_alloc_me, spc,
+			                  prov_next);
 		} else {
 			/* this is be the victim list, which can be sorted so that we pick
 			 * the right victim (sort by alloc_proc reverse priority, etc). */
-			TAILQ_INSERT_TAIL(&p->ksched_data.prov_not_alloc_me, spc,
+			TAILQ_INSERT_TAIL(&p->ksched_data.crd.prov_not_alloc_me, spc,
 			                  prov_next);
 		}
 	}
@@ -947,10 +949,10 @@ void print_proc_prov(struct proc *p)
 	if (!p)
 		return;
 	printk("Prov cores alloced to proc %d (%p)\n----------\n", p->pid, p);
-	TAILQ_FOREACH(spc_i, &p->ksched_data.prov_alloc_me, prov_next)
+	TAILQ_FOREACH(spc_i, &p->ksched_data.crd.prov_alloc_me, prov_next)
 		printk("Pcore %d\n", spc2pcoreid(spc_i));
 	printk("Prov cores not alloced to proc %d (%p)\n----------\n", p->pid, p);
-	TAILQ_FOREACH(spc_i, &p->ksched_data.prov_not_alloc_me, prov_next)
+	TAILQ_FOREACH(spc_i, &p->ksched_data.crd.prov_not_alloc_me, prov_next)
 		printk("Pcore %d (alloced to %d (%p))\n", spc2pcoreid(spc_i),
 		       spc_i->alloc_proc ? spc_i->alloc_proc->pid : 0,
 		       spc_i->alloc_proc);
