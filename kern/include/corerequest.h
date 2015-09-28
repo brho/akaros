@@ -28,6 +28,10 @@ struct core_request_data {
  * it holds a lock for the duration of the call. */
 void __provision_core(struct proc *p, struct sched_pcore *spc);
 
+/* Unprovision all cores from proc p. This code assumes that the scheduler
+ * that uses * it holds a lock for the duration of the call. */
+void __unprovision_all_cores(struct proc *p);
+
 static inline uint32_t spc2pcoreid(struct sched_pcore *spc)
 {
 	extern struct sched_pcore *all_pcores;

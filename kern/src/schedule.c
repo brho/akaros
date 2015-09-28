@@ -221,20 +221,6 @@ void __sched_proc_change_to_m(struct proc *p)
 	//poke_ksched(p, RES_CORES);
 }
 
-/* Helper for the destroy CB : unprovisions any pcores for the given list */
-static void unprov_pcore_list(struct sched_pcore_tailq *list_head)
-{
-	struct sched_pcore *spc_i;
-	/* We can leave them connected within the tailq, since the scps don't have a
-	 * default list (if they aren't on a proc's list, then we don't care about
-	 * them), and since the INSERTs don't care what list you were on before
-	 * (chummy with the implementation).  Pretty sure this is right.  If there's
-	 * suspected list corruption, be safer here. */
-	TAILQ_FOREACH(spc_i, list_head, prov_next)
-		spc_i->prov_proc = 0;
-	TAILQ_INIT(list_head);
-}
-
 /* Sched callback called when the proc dies.  pc_arr holds the cores the proc
  * had, if any, and nr_cores tells us how many are in the array.
  *
@@ -246,8 +232,7 @@ void __sched_proc_destroy(struct proc *p, uint32_t *pc_arr, uint32_t nr_cores)
 	/* Unprovision any cores.  Note this is different than track_dealloc.
 	 * The latter does bookkeeping when an allocation changes.  This is a
 	 * bulk *provisioning* change. */
-	unprov_pcore_list(&p->ksched_data.crd.prov_alloc_me);
-	unprov_pcore_list(&p->ksched_data.crd.prov_not_alloc_me);
+	__unprovision_all_cores(p);
 	/* Remove from whatever list we are on (if any - might not be on one if it
 	 * was in the middle of __run_mcp_sched) */
 	remove_from_any_list(p);

@@ -39,3 +39,24 @@ void __provision_core(struct proc *p, struct sched_pcore *spc)
 	spc->prov_proc = p;
 }
 
+/* Unprovisions any pcores for the given list */
+static void __unprov_pcore_list(struct sched_pcore_tailq *list_head)
+{
+	struct sched_pcore *spc_i;
+	/* We can leave them connected within the tailq, since the scps don't have a
+	 * default list (if they aren't on a proc's list, then we don't care about
+	 * them), and since the INSERTs don't care what list you were on before
+	 * (chummy with the implementation).  Pretty sure this is right.  If there's
+	 * suspected list corruption, be safer here. */
+	TAILQ_FOREACH(spc_i, list_head, prov_next)
+		spc_i->prov_proc = 0;
+	TAILQ_INIT(list_head);
+}
+
+/* Unprovision all cores from proc p. This code assumes that the scheduler
+ * that uses * it holds a lock for the duration of the call. */
+void __unprovision_all_cores(struct proc *p)
+{
+	__unprov_pcore_list(&p->ksched_data.crd.prov_alloc_me);
+	__unprov_pcore_list(&p->ksched_data.crd.prov_not_alloc_me);
+}
