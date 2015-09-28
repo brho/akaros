@@ -316,9 +316,12 @@ static struct proc *get_controllable_proc(struct proc *p, pid_t pid)
 
 /* Helper, copies a pathname from the process into the kernel.  Returns a string
  * on success, which you must free with free_path.  Returns 0 on failure and
- * sets errno. */
+ * sets errno.  On success, if you are tracing syscalls, it will store the
+ * t_path in the trace data, clobbering whatever previously there. */
 static char *copy_in_path(struct proc *p, const char *path, size_t path_l)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct systrace_record *t = pcpui->cur_kthread->trace;
 	char *t_path;
 	/* PATH_MAX includes the \0 */
 	if (path_l > PATH_MAX) {
@@ -328,6 +331,10 @@ static char *copy_in_path(struct proc *p, const char *path, size_t path_l)
 	t_path = user_strdup_errno(p, path, path_l);
 	if (!t_path)
 		return 0;
+	if (t) {
+		t->datalen = MIN(sizeof(t->data), path_l);
+		memcpy(t->data, t_path, t->datalen);
+	}
 	return t_path;
 }
 
@@ -1367,8 +1374,6 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, size_t len)
 static intreg_t sys_openat(struct proc *p, int fromfd, const char *path,
                            size_t path_l, int oflag, int mode)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	struct systrace_record *t = pcpui->cur_kthread->trace;
 	int fd = -1;
 	struct file *file = 0;
 	char *t_path;
@@ -1382,10 +1387,6 @@ static intreg_t sys_openat(struct proc *p, int fromfd, const char *path,
 	t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
 		return -1;
-	if (t) {
-		t->datalen = MIN(sizeof(t->data), path_l);
-		memcpy(t->data, t_path, t->datalen);
-	}
 	sysc_save_str("open %s at fd %d", t_path, fromfd);
 	mode &= ~p->fs_env.umask;
 	/* Only check the VFS for legacy opens.  It doesn't support openat.  Actual
