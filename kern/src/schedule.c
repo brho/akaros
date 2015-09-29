@@ -513,45 +513,16 @@ void avail_res_changed(int res_type, long change)
 
 int get_any_idle_core(void)
 {
-	struct sched_pcore *spc;
-	int ret = -1;
 	spin_lock(&sched_lock);
-	while ((spc = TAILQ_FIRST(&idlecores))) {
-		/* Don't take cores that are provisioned to a process */
-		if (spc->prov_proc)
-			continue;
-		assert(!spc->alloc_proc);
-		TAILQ_REMOVE(&idlecores, spc, alloc_next);
-		ret = spc2pcoreid(spc);
-		break;
-	}
+	int ret = __get_any_idle_core();
 	spin_unlock(&sched_lock);
 	return ret;
 }
 
-/* TODO: if we end up using this a lot, track CG-idleness as a property of the
- * SPC instead of doing a linear search. */
-static bool __spc_is_idle(struct sched_pcore *spc)
-{
-	struct sched_pcore *i;
-	TAILQ_FOREACH(i, &idlecores, alloc_next) {
-		if (spc == i)
-			return TRUE;
-	}
-	return FALSE;
-}
-
 int get_specific_idle_core(int coreid)
 {
-	struct sched_pcore *spc = pcoreid2spc(coreid);
-	int ret = -1;
-	assert((0 <= coreid) && (coreid < num_cores));
 	spin_lock(&sched_lock);
-	if (__spc_is_idle(pcoreid2spc(coreid)) && !spc->prov_proc) {
-		assert(!spc->alloc_proc);
-		TAILQ_REMOVE(&idlecores, spc, alloc_next);
-		ret = coreid;
-	}
+	int ret = __get_specific_idle_core(coreid);
 	spin_unlock(&sched_lock);
 	return ret;
 }
@@ -559,10 +530,8 @@ int get_specific_idle_core(int coreid)
 /* similar to __sched_put_idle_core, but without the prov tracking */
 void put_idle_core(int coreid)
 {
-	struct sched_pcore *spc = pcoreid2spc(coreid);
-	assert((0 <= coreid) && (coreid < num_cores));
 	spin_lock(&sched_lock);
-	TAILQ_INSERT_TAIL(&idlecores, spc, alloc_next);
+	__put_idle_core(coreid);
 	spin_unlock(&sched_lock);
 }
 
