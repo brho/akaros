@@ -242,6 +242,7 @@ void *consin(void *arg)
 	uint32_t vv;
 	int i;
 	int num;
+	//char c[1];
 
 	int fd = open("#cons/vmctl", O_RDWR), ret;
 	
@@ -261,7 +262,7 @@ void *consin(void *arg)
 		for (i = outlen; i < outlen + inlen; i++) {
 			/* host: read a line. */
 			memset(consline, 0, 128);
-			if (fgets(consline, 4096-256, stdin) == NULL) {
+			if (read(0, consline, 1) < 0) {
 				exit(0);
 			} 
 			if (debug) fprintf(stderr, "CONSIN: GOT A LINE:%s:\n", consline);
