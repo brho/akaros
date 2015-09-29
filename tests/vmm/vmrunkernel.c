@@ -205,7 +205,7 @@ void *consout(void *arg)
 			for (j = 0; j < iov[i].length; j++)
 				printf("%c", ((char *)iov[i].v)[j]);
 		}
-		
+		fflush(stdout);
 		if (debug)
 			fprintf(stderr, "CCC: outlen is %d; inlen is %d\n", outlen, inlen);
 		/* host: fill in the writeable buffers. */
@@ -742,7 +742,7 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 			case EXIT_REASON_EXTERNAL_INTERRUPT:
 				//debug = 1;
 				if (debug) fprintf(stderr, "XINT 0x%x 0x%x\n", vmctl.intrinfo1, vmctl.intrinfo2);
-				pir_dump();
+				if (debug) pir_dump();
 				vmctl.command = RESUME;
 				break;
 			case EXIT_REASON_IO_INSTRUCTION:

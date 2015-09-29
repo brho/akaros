@@ -39,6 +39,7 @@ struct vmm {
 		void *svm;
 		struct vmx_vcpu **guest_pcores;
 	};
+	unsigned long vmexits[65];	/* TODO: use a #define from a header */
 };
 
 void vmm_init(void);

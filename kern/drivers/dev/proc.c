@@ -30,6 +30,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <arch/vmm/vmm.h>
+#include <ros/vmx.h>
 
 struct dev procdevtab;
 
@@ -56,6 +57,7 @@ enum {
 	Qregs,
 	Qsegment,
 	Qstatus,
+	Qvmstatus,
 	Qtext,
 	Qwait,
 	Qprofile,
@@ -114,6 +116,7 @@ struct dirtab procdir[] = {
 	//  {"regs",        {Qregs},    sizeof(Ureg),       0000},
 	{"segment", {Qsegment}, 0, 0444},
 	{"status", {Qstatus}, STATSIZE, 0444},
+	{"vmstatus", {Qvmstatus}, 0, 0444},
 	{"text", {Qtext}, 0, 0000},
 	{"wait", {Qwait}, 0, 0400},
 	{"profile", {Qprofile}, 0, 0400},
@@ -527,6 +530,7 @@ static struct chan *procopen(struct chan *c, int omode)
 			c->aux = kzmalloc(sizeof(struct mntwalk), KMALLOC_WAIT);
 			break;
 		case Qstatus:
+		case Qvmstatus:
 		case Qctl:
 			break;
 		case Qnotepg:
@@ -1136,6 +1140,24 @@ regread:
 				return readstr(off, va, n, buf);
 			}
 
+		case Qvmstatus:
+			{
+				char buf[50*65 + 2];
+				int i, offset;
+				offset=0;
+				offset += snprintf(buf+offset, sizeof(buf)-offset, "{\n");
+				for (i = 0; i < 65; i++) {
+					if (p->vmm.vmexits[i] != 0) {
+						offset += snprintf(buf+offset, sizeof(buf)-offset,
+						                   "\"%s\":\"%lld\",\n",
+						                   VMX_EXIT_REASON_NAMES[i],
+						                   p->vmm.vmexits[i]);
+					}
+				}
+				offset += snprintf(buf+offset, sizeof(buf)-offset, "}\n");
+				kref_put(&p->p_kref);
+				return readstr(off, va, n, buf);
+			}
 		case Qns:
 			//qlock(&p->debug);
 			if (waserror()) {
