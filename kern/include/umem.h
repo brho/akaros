@@ -40,20 +40,23 @@ void *kmalloc_errno(int len);
 bool uva_is_kva(struct proc *p, void *uva, void *kva);
 uintptr_t uva2kva(struct proc *p, void *uva);
 
-/* UWLIM is defined as virtual address below which a process can write */
-static inline bool is_user_rwaddr(void *addr, size_t len)
+/* Helper for is_user_r{w,}addr. */
+static inline bool __is_user_addr(void *addr, size_t len, uintptr_t lim)
 {
-	if (((uintptr_t)addr < UWLIM) && ((uintptr_t)addr + len <= UWLIM))
+	if (((uintptr_t)addr < lim) && ((uintptr_t)addr + len <= lim))
 		return TRUE;
 	else
 		return FALSE;
 }
 
+/* UWLIM is defined as virtual address below which a process can write */
+static inline bool is_user_rwaddr(void *addr, size_t len)
+{
+	return __is_user_addr(addr, len, UWLIM);
+}
+
 /* ULIM is defined as virtual address below which a process can read */
 static inline bool is_user_raddr(void *addr, size_t len)
 {
-	if (((uintptr_t)addr < ULIM) && ((uintptr_t)addr + len <= ULIM))
-		return TRUE;
-	else
-		return FALSE;
+	return __is_user_addr(addr, len, ULIM);
 }
