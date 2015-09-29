@@ -513,9 +513,9 @@ enum {
 	Qmsec,
 	Qnull,
 	Qrandom,
-	Qnotquiterandom,
 	Qsysname,
 	Qtime,
+	Qurandom,
 	Quser,
 	Qjit,
 };
@@ -535,10 +535,10 @@ static struct dirtab consdir[] = {
 	{"msec", {Qmsec}, NUMSIZE, 0444},
 	{"null", {Qnull}, 0, 0666},
 	{"random", {Qrandom}, 0, 0444},
-	{"notquiterandom", {Qnotquiterandom}, 0, 0444},
 	{"sysname", {Qsysname}, 0, 0664},
 	{"time", {Qtime}, 0, 0664},
 	{"user", {Quser}, 0, 0644},
+	{"urandom", {Qurandom}, 0, 0444},
 	{"jit", {Qjit}, 0, 0666},
 };
 
@@ -822,13 +822,8 @@ static long consread(struct chan *c, void *buf, long n, int64_t offset)
 				return 0;
 			return readstr(offset, buf, n, "Akaros");
 
-/* not in akaros, inferno was a special case. 
-	case Qnotquiterandom:
-		genrandom(buf, n);
-		return n;
-*/
-
 		case Qrandom:
+		case Qurandom:
 			return randomread(buf, n);
 #if 0
 		case Qmemory:
