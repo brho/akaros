@@ -1187,7 +1187,7 @@ usage:
 		return 1;
 	}
 	if (!strcmp(argv[1], "idles")) {
-		print_idlecoremap();
+		print_idle_core_map();
 	} else if (!strcmp(argv[1], "diag")) {
 		sched_diag();
 	} else if (!strcmp(argv[1], "resources")) {

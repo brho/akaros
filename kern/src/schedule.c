@@ -734,16 +734,6 @@ void sched_diag(void)
 	return;
 }
 
-void print_idlecoremap(void)
-{
-	struct sched_pcore *spc_i;
-	/* not locking, so we can look at this without deadlocking. */
-	printk("Idle cores (unlocked!):\n");
-	TAILQ_FOREACH(spc_i, &idlecores, alloc_next)
-		printk("Core %d, prov to %d (%p)\n", spc2pcoreid(spc_i),
-		       spc_i->prov_proc ? spc_i->prov_proc->pid : 0, spc_i->prov_proc);
-}
-
 void print_resources(struct proc *p)
 {
 	printk("--------------------\n");

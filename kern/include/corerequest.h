@@ -72,6 +72,10 @@ void __provision_core(struct proc *p, struct sched_pcore *spc);
  * that uses * it holds a lock for the duration of the call. */
 void __unprovision_all_cores(struct proc *p);
 
+/* Print the map of idle cores that are still allocatable through our core
+ * allocation algorithm. */
+void print_idle_core_map(void);
+
 /* Print a list of the cores currently provisioned to p. */
 void print_proc_coreprov(struct proc *p);
 

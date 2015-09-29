@@ -208,3 +208,15 @@ void __sort_idle_cores(void)
 			TAILQ_INSERT_TAIL(&idlecores, spc_i, alloc_next);
 	}
 }
+
+/* Print the map of idle cores that are still allocatable through our core
+ * allocation algorithm. */
+void print_idle_core_map(void)
+{
+	struct sched_pcore *spc_i;
+	/* not locking, so we can look at this without deadlocking. */
+	printk("Idle cores (unlocked!):\n");
+	TAILQ_FOREACH(spc_i, &idlecores, alloc_next)
+		printk("Core %d, prov to %d (%p)\n", spc2pcoreid(spc_i),
+		       spc_i->prov_proc ? spc_i->prov_proc->pid : 0, spc_i->prov_proc);
+}

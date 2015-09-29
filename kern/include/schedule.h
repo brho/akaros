@@ -88,7 +88,6 @@ int provision_core(struct proc *p, uint32_t pcoreid);
 
 /************** Debugging **************/
 void sched_diag(void);
-void print_idlecoremap(void);
 void print_resources(struct proc *p);
 void print_all_resources(void);
 void next_core_to_alloc(uint32_t pcoreid);
