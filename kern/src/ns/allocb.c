@@ -79,8 +79,9 @@ struct block *allocb(int size)
  * extra_data array.  When growing, it'll copy over the old entries.  All new
  * entries will be zeroed.  mem_flags determines if we'll block on kmallocs.
  *
+ * Return 0 on success or -1 on error.
  * Caller is responsible for concurrent access to the block's metadata. */
-void block_add_extd(struct block *b, unsigned int nr_bufs, int mem_flags)
+int block_add_extd(struct block *b, unsigned int nr_bufs, int mem_flags)
 {
 	unsigned int old_nr_bufs = b->nr_extra_bufs;
 	size_t old_amt = sizeof(struct extra_bdata) * old_nr_bufs;
@@ -88,19 +89,20 @@ void block_add_extd(struct block *b, unsigned int nr_bufs, int mem_flags)
 	void *new_bdata;
 
 	if (old_nr_bufs >= nr_bufs)
-		return;
+		return 0;
 	if (b->extra_data) {
 		new_bdata = krealloc(b->extra_data, new_amt, mem_flags);
 		if (!new_bdata)
-			return;
+			return -1;
 		memset(new_bdata + old_amt, 0, new_amt - old_amt);
 	} else {
 		new_bdata = kzmalloc(new_amt, mem_flags);
 		if (!new_bdata)
-			return;
+			return - 1;
 	}
 	b->extra_data = new_bdata;
 	b->nr_extra_bufs = nr_bufs;
+	return 0;
 }
 
 /*

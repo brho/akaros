@@ -625,7 +625,7 @@ void addprog(struct proc *);
 void addrootfile(char *unused_char_p_t, uint8_t * unused_uint8_p_t, uint32_t);
 struct block *adjustblock(struct block *, int);
 struct block *allocb(int);
-void block_add_extd(struct block *b, unsigned int nr_bufs, int mem_flags);
+int block_add_extd(struct block *b, unsigned int nr_bufs, int mem_flags);
 int anyhigher(void);
 int anyready(void);
 void _assert(char *unused_char_p_t);
