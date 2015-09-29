@@ -57,6 +57,13 @@ int __get_any_idle_core(void);
 int __get_specific_idle_core(int coreid);
 void __put_idle_core(int coreid);
 
+/* One off functions to make 'pcoreid' the next core chosen by the core
+ * allocation algorithm (so long as no provisioned cores are still idle), and
+ * to sort the idle core list for debugging. This code assumes that the
+ * scheduler that uses it holds a lock for the duration of the call. */
+void __next_core_to_alloc(uint32_t pcoreid);
+void __sort_idle_cores(void);
+
 /* Provision a core to proc p. This code assumes that the scheduler that uses
  * it holds a lock for the duration of the call. */
 void __provision_core(struct proc *p, struct sched_pcore *spc);

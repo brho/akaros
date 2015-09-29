@@ -160,3 +160,51 @@ void __put_idle_core(int coreid)
 	assert((coreid >= 0) && (coreid < num_cores));
 	TAILQ_INSERT_TAIL(&idlecores, spc, alloc_next);
 }
+
+/* One off function to make 'pcoreid' the next core chosen by the core
+ * allocation algorithm (so long as no provisioned cores are still idle).
+ * This code assumes that the scheduler that uses it holds a lock for the
+ * duration of the call. */
+void __next_core_to_alloc(uint32_t pcoreid)
+{
+	struct sched_pcore *spc_i;
+	bool match = FALSE;
+
+	TAILQ_FOREACH(spc_i, &idlecores, alloc_next) {
+		if (spc2pcoreid(spc_i) == pcoreid) {
+			match = TRUE;
+			break;
+		}
+	}
+	if (match) {
+		TAILQ_REMOVE(&idlecores, spc_i, alloc_next);
+		TAILQ_INSERT_HEAD(&idlecores, spc_i, alloc_next);
+		printk("Pcore %d will be given out next (from the idles)\n", pcoreid);
+	}
+}
+
+/* One off function to sort the idle core list for debugging in the kernel
+ * monitor. This code assumes that the scheduler that uses it holds a lock
+ * for the duration of the call. */
+void __sort_idle_cores(void)
+{
+	struct sched_pcore *spc_i, *spc_j, *temp;
+	struct sched_pcore_tailq sorter = TAILQ_HEAD_INITIALIZER(sorter);
+	bool added;
+
+	TAILQ_CONCAT(&sorter, &idlecores, alloc_next);
+	TAILQ_FOREACH_SAFE(spc_i, &sorter, alloc_next, temp) {
+		TAILQ_REMOVE(&sorter, spc_i, alloc_next);
+		added = FALSE;
+		/* don't need foreach_safe since we break after we muck with the list */
+		TAILQ_FOREACH(spc_j, &idlecores, alloc_next) {
+			if (spc_i < spc_j) {
+				TAILQ_INSERT_BEFORE(spc_j, spc_i, alloc_next);
+				added = TRUE;
+				break;
+			}
+		}
+		if (!added)
+			TAILQ_INSERT_TAIL(&idlecores, spc_i, alloc_next);
+	}
+}

@@ -91,5 +91,5 @@ void sched_diag(void);
 void print_idlecoremap(void);
 void print_resources(struct proc *p);
 void print_all_resources(void);
-void next_core(uint32_t pcoreid);
-void sort_idles(void);
+void next_core_to_alloc(uint32_t pcoreid);
+void sort_idle_cores(void);

@@ -579,8 +579,8 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 		 * it must be provisioned to p, but not allocated to it. We need to try
 		 * to preempt. After this block, the core will be track_dealloc'd and
 		 * on the idle list (regardless of whether we had to preempt or not) */
-		if (spc_i->alloc_proc) {
-			proc_to_preempt = spc_i->alloc_proc;
+		if (get_alloc_proc(spc_i)) {
+			proc_to_preempt = get_alloc_proc(spc_i);
 			/* would break both preemption and maybe the later decref */
 			assert(proc_to_preempt != p);
 			/* need to keep a valid, external ref when we unlock */
@@ -596,7 +596,7 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 				 * idle CBs).  the core is not on the idle core list.  (if we
 				 * ever have proc alloc lists, it'll still be on the old proc's
 				 * list). */
-				assert(spc_i->alloc_proc);
+				assert(get_alloc_proc(spc_i));
 				/* regardless of whether or not it is still prov to p, we need
 				 * to note its dealloc.  we are doing some excessive checking of
 				 * p == prov_proc, but using this helper is a lot clearer. */
@@ -604,12 +604,12 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 			} else {
 				/* the preempt failed, which should only happen if the pcore was
 				 * unmapped (could be dying, could be yielding, but NOT
-				 * preempted).  whoever unmapped it also triggered (or will
-				 * soon trigger) a track_core_dealloc and put it on the idle
-				 * list.  Our signal for this is spc_i->alloc_proc being 0. We
-				 * need to spin and let whoever is trying to free the core grab
-				 * the ksched lock.  We could use an 'ignore_next_idle' flag
-				 * per sched_pcore, but it's not critical anymore.
+				 * preempted).  whoever unmapped it also triggered (or will soon
+				 * trigger) a track_core_dealloc and put it on the idle list.
+				 * Our signal for this is get_alloc_proc() being 0. We need to
+				 * spin and let whoever is trying to free the core grab the
+				 * ksched lock.  We could use an 'ignore_next_idle' flag per
+				 * sched_pcore, but it's not critical anymore.
 				 *
 				 * Note, we're relying on us being the only preemptor - if the
 				 * core was unmapped by *another* preemptor, there would be no
@@ -618,7 +618,7 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 				 * allocator, the pcore could have been put on the idle list and
 				 * then quickly removed/allocated. */
 				cmb();
-				while (spc_i->alloc_proc) {
+				while (get_alloc_proc(spc_i)) {
 					/* this loop should be very rare */
 					spin_unlock(&sched_lock);
 					udelay(1);
@@ -629,7 +629,7 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 			proc_decref(proc_to_preempt);
 			/* might not be prov to p anymore (rare race).  spc_i is idle - we
 			 * might get it later, or maybe we'll give it to its rightful proc*/
-			if (spc_i->prov_proc != p)
+			if (get_prov_proc(spc_i) != p)
 				continue;
 		}
 		/* At this point, the pcore is idle, regardless of how we got here
@@ -766,45 +766,16 @@ void print_all_resources(void)
 	spin_unlock(&pid_hash_lock);
 }
 
-void next_core(uint32_t pcoreid)
+void next_core_to_alloc(uint32_t pcoreid)
 {
-	struct sched_pcore *spc_i;
-	bool match = FALSE;
 	spin_lock(&sched_lock);
-	TAILQ_FOREACH(spc_i, &idlecores, alloc_next) {
-		if (spc2pcoreid(spc_i) == pcoreid) {
-			match = TRUE;
-			break;
-		}
-	}
-	if (match) {
-		TAILQ_REMOVE(&idlecores, spc_i, alloc_next);
-		TAILQ_INSERT_HEAD(&idlecores, spc_i, alloc_next);
-		printk("Pcore %d will be given out next (from the idles)\n", pcoreid);
-	}
+	__next_core_to_alloc(pcoreid);
 	spin_unlock(&sched_lock);
 }
 
-void sort_idles(void)
+void sort_idle_cores(void)
 {
-	struct sched_pcore *spc_i, *spc_j, *temp;
-	struct sched_pcore_tailq sorter = TAILQ_HEAD_INITIALIZER(sorter);
-	bool added;
 	spin_lock(&sched_lock);
-	TAILQ_CONCAT(&sorter, &idlecores, alloc_next);
-	TAILQ_FOREACH_SAFE(spc_i, &sorter, alloc_next, temp) {
-		TAILQ_REMOVE(&sorter, spc_i, alloc_next);
-		added = FALSE;
-		/* don't need foreach_safe since we break after we muck with the list */
-		TAILQ_FOREACH(spc_j, &idlecores, alloc_next) {
-			if (spc_i < spc_j) {
-				TAILQ_INSERT_BEFORE(spc_j, spc_i, alloc_next);
-				added = TRUE;
-				break;
-			}
-		}
-		if (!added)
-			TAILQ_INSERT_TAIL(&idlecores, spc_i, alloc_next);
-	}
+	__sort_idle_cores();
 	spin_unlock(&sched_lock);
 }
