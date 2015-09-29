@@ -279,16 +279,20 @@ static int efd_tapfd(struct chan *c, struct fd_tap *tap, int cmd)
 	struct eventfd *efd = c->aux;
 	int ret;
 
-	/* We don't actually support HANGUP, but epoll implies it */
+	/* HANGUP, ERROR, and PRIORITY will never fire, but people can ask for them.
+	 * We don't actually support HANGUP, but epoll implies it.  Linux's eventfd
+	 * cand have ERROR, so apps can ask for it.  Likewise, priority is
+	 * meaningless for us, but sometimes people ask for it. */
 	#define EFD_LEGAL_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_WRITABLE |        \
-	                        FDTAP_FILT_HANGUP)
+	                        FDTAP_FILT_HANGUP | FDTAP_FILT_PRIORITY |          \
+	                        FDTAP_FILT_ERROR)
 
 	switch (c->qid.path) {
 		case Qefd:
 			if (tap->filter & ~EFD_LEGAL_TAPS) {
 				set_errno(ENOSYS);
-				set_errstr("Unsupported #%s tap, must be %p", devname(),
-				           EFD_LEGAL_TAPS);
+				set_errstr("Unsupported #%s tap, must be %p, got %p", devname(),
+				           EFD_LEGAL_TAPS, tap->filter);
 				return -1;
 			}
 			spin_lock(&efd->tap_lock);
