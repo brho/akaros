@@ -546,19 +546,6 @@ uint32_t max_vcores(struct proc *p)
 #endif /* CONFIG_DISABLE_SMT */
 }
 
-/* Find the best core to give to p. First check p's list of cores
- * provisioned to it, but not yet allocated. If no cores are found, try and
- * pull from the idle list.  If no cores found on either list, return NULL.
- * */
-struct sched_pcore *find_best_core(struct proc *p)
-{
-	struct sched_pcore *spc_i = NULL;
-	spc_i = TAILQ_FIRST(&p->ksched_data.crd.prov_not_alloc_me);
-	if (!spc_i)
-		spc_i = TAILQ_FIRST(&idlecores);
-	return spc_i;
-}
-
 /* This deals with a request for more cores.  The amt of new cores needed is
  * passed in.  The ksched lock is held, but we are free to unlock if we want
  * (and we must, if calling out of the ksched to anything high-level).
@@ -583,7 +570,7 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 	while (nr_to_grant != amt_needed) {
 		/* Find the next best core to allocate to p. It may be a core
 		 * provisioned to p, and it might not be. */
-		spc_i = find_best_core(p);
+		spc_i = __find_best_core_to_alloc(p);
 		/* If no core is returned, we know that there are no more cores to give
 		 * out, so we exit the loop. */
 		if (spc_i == NULL)

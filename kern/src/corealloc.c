@@ -35,6 +35,19 @@ void corealloc_init(void)
 #endif /* CONFIG_DISABLE_SMT */
 }
 
+/* Find the best core to allocate to a process as dictated by the core
+ * allocation algorithm. This code assumes that the scheduler that uses it
+ * holds a lock for the duration of the call. */
+struct sched_pcore *__find_best_core_to_alloc(struct proc *p)
+{
+	struct sched_pcore *spc_i = NULL;
+
+	spc_i = TAILQ_FIRST(&p->ksched_data.crd.prov_not_alloc_me);
+	if (!spc_i)
+		spc_i = TAILQ_FIRST(&idlecores);
+	return spc_i;
+}
+
 /* Track the pcore properly when it is allocated to p. This code assumes that
  * the scheduler that uses it holds a lock for the duration of the call. */
 void __track_core_alloc(struct proc *p, uint32_t pcoreid)

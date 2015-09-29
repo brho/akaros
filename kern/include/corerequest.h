@@ -30,6 +30,11 @@ void corealloc_init(void);
 /* Initialize any data associated with provisiong cores to a process. */
 void coreprov_proc_init(struct proc *p);
 
+/* Find the best core to allocate to a process as dictated by the core
+ * allocation algorithm. This code assumes that the scheduler that uses it
+ * holds a lock for the duration of the call. */
+struct sched_pcore *__find_best_core_to_alloc(struct proc *p);
+
 /* Track the pcore properly when it is allocated to p. This code assumes that
  * the scheduler that uses it holds a lock for the duration of the call. */
 void __track_core_alloc(struct proc *p, uint32_t pcoreid);
