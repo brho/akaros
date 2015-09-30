@@ -61,6 +61,6 @@
 #define COMPILER_DEPENDENT_INT64    long
 #define COMPILER_DEPENDENT_UINT64   unsigned long
 
-#include <acpi/platform/acgcc.h>
+#include "acgcc.h"
 
 #endif				/* __ACAKAROS_H__ */

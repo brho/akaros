@@ -170,10 +170,10 @@
  *****************************************************************************/
 
 #if defined(__akaros__)
-#include <acpi/platform/acakaros.h>
+#include "platform/acakaros.h"
 
 #if defined(_LINUX) || defined(__linux__)
-#include <acpi/platform/aclinux.h>
+#include "platform/aclinux.h"
 
 #elif defined(_APPLE) || defined(__APPLE__)
 #include "acmacosx.h"

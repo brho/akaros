@@ -317,7 +317,7 @@ int main(int argc, char **argv)
 	int vmmflags = 0; // Disabled probably forever. VMM_VMCALL_PRINTF;
 	uint64_t entry = 0x1200000, kerneladdress = 0x1200000;
 	int nr_gpcs = 1;
-	int fd = open("#c/vmctl", O_RDWR), ret;
+	int fd = open("#cons/vmctl", O_RDWR), ret;
 	void * xp;
 	int kfd = -1;
 	static char cmd[512];
@@ -401,6 +401,7 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 	close(kfd);
 
 	// The low 1m so we can fill in bullshit like ACPI. */
+	// And, sorry, due to the STUPID format of the RSDP for now we need the low 1M.
 	low1m = mmap((int*)4096, MiB-4096, PROT_READ | PROT_WRITE,
 	                 MAP_ANONYMOUS, -1, 0);
 	if (low1m != (void *)4096) {
@@ -476,6 +477,12 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 	}
 
 	hexdump(stdout, r, a-(void *)r);
+
+	a = (void *)(((unsigned long)a + 0xfff) & ~0xfff);
+	vmctl.pir = (uint64_t) a;
+	a += 4096;
+	vmctl.vapic = (uint64_t) a;
+	a += 4096;
 
 	if (ros_syscall(SYS_setup_vmm, nr_gpcs, vmmflags, 0, 0, 0, 0) != nr_gpcs) {
 		perror("Guest pcore setup failed");

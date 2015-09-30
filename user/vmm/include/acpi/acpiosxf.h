@@ -46,8 +46,8 @@
 #ifndef __ACPIOSXF_H__
 #define __ACPIOSXF_H__
 
-#include <acpi/platform/acenv.h>
-#include <acpi/actypes.h>
+#include "platform/acenv.h"
+#include "actypes.h"
 
 /* Types for acpi_os_execute */
 

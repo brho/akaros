@@ -517,6 +517,7 @@ static const struct vmxec cbec = {
 		     CPU_BASED_USE_MSR_BITMAPS |
 		     CPU_BASED_MONITOR_EXITING |
 		     CPU_BASED_USE_IO_BITMAPS |
+		     CPU_BASED_TPR_SHADOW |
 		     CPU_BASED_ACTIVATE_SECONDARY_CONTROLS),
 
 	.set_to_0 = (CPU_BASED_VIRTUAL_INTR_PENDING |
@@ -525,7 +526,6 @@ static const struct vmxec cbec = {
 		     CPU_BASED_RDTSC_EXITING |
 		     CPU_BASED_CR3_LOAD_EXITING |
 		     CPU_BASED_CR3_STORE_EXITING |
-		     CPU_BASED_TPR_SHADOW |
 		     CPU_BASED_MOV_DR_EXITING |
 		     CPU_BASED_VIRTUAL_NMI_PENDING |
 		     CPU_BASED_MONITOR_TRAP |
@@ -1714,6 +1714,11 @@ int vmx_launch(struct vmctl *v) {
 		printd("REG_RSP_RIP_CR3\n");
 		vmcs_writel(GUEST_RSP, v->regs.tf_rsp);
 		vmcs_writel(GUEST_CR3, v->cr3);
+		vmcs_writel(POSTED_INTR_DESC_ADDR, v->pir);
+		vmcs_writel(POSTED_INTR_DESC_ADDR_HIGH, v->pir>>32);
+		vmcs_writel(VIRTUAL_APIC_PAGE_ADDR, v->vapic);
+		vmcs_writel(VIRTUAL_APIC_PAGE_ADDR_HIGH, v->vapic>>32);
+		printk("v->apic %p v->pir %p\n", (void *)v->vapic, (void *)v->pir);
 		// fallthrough
 	case REG_RIP:
 		printd("REG_RIP %p\n", v->regs.tf_rip);
