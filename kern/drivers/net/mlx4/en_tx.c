@@ -730,6 +730,8 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct ether *dev)
 	int real_size;
 	uint32_t index;
 	__be32 op_own;
+	int i_frag;
+	int nr_frags = 0;
 	bool bounce = false;
 	dma_addr_t dma = 0;
 	uint32_t byte_count = 0;
@@ -739,7 +741,15 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct ether *dev)
 
 	ring = priv->tx_ring[0]; /* TODO multi-queue support */
 
-	real_size = CTRL_SIZE + DS_SIZE;
+	for (i_frag = 0; i_frag < block->nr_extra_bufs; i_frag++) {
+		const struct extra_bdata *ebd;
+
+		ebd = &block->extra_data[i_frag];
+		if (ebd->base && ebd->len > 0)
+			nr_frags++;
+	}
+
+	real_size = CTRL_SIZE + (nr_frags + 1) * DS_SIZE;
 	if (unlikely(!real_size))
 		goto tx_drop;
 
@@ -773,11 +783,33 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct ether *dev)
 	tx_info->data_offset = (void *)data - (void *)tx_desc;
 	tx_info->inl = 0;
 	tx_info->linear = 1;
-	tx_info->nr_maps = 1;
+	tx_info->nr_maps = nr_frags + 1;
+	data += tx_info->nr_maps - 1;
 
-	byte_count = BLEN(block);
+	/* Map fragments if any */
+	for (i_frag = block->nr_extra_bufs - 1; i_frag >= 0; i_frag--) {
+		const struct extra_bdata *ebd;
 
-	dma = dma_map_single(0, block->rp, BLEN(block), DMA_TO_DEVICE);
+		ebd = &block->extra_data[i_frag];
+		if (!ebd->base || ebd->len <= 0)
+			continue;
+
+		byte_count = ebd->len;
+		dma = dma_map_single(0, (void *)(ebd->base + ebd->off),
+				     byte_count, DMA_TO_DEVICE);
+		if (unlikely(dma_mapping_error(0, dma)))
+			goto tx_drop_unmap;
+
+		data->addr = cpu_to_be64(dma);
+		data->lkey = ring->mr_key;
+		bus_wmb();
+		data->byte_count = cpu_to_be32(byte_count);
+		--data;
+	}
+
+	byte_count = BHLEN(block);
+
+	dma = dma_map_single(0, block->rp, byte_count, DMA_TO_DEVICE);
 	if (unlikely(dma_mapping_error(0, dma)))
 		goto tx_drop_unmap;
 
