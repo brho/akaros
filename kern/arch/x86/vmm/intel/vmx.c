@@ -476,8 +476,8 @@ check_vmxec_controls(struct vmxec const *v, bool have_true_msr,
 			   v->set_to_1, v->set_to_0, reserved_1);
 		printk(" reserved_0 0x%x", reserved_0);
 		printk(" changeable_bits 0x%x\n", changeable_bits);
-		printk(" TOO BAD MAX ... we're going ahead .... no error .... \n");
-		//return false;
+		//printk(" TOO BAD MAX ... we're going ahead .... no error .... \n");
+		return false;
 	}
 
 	*result = v->set_to_1 | reserved_1;
@@ -517,7 +517,6 @@ static const struct vmxec cbec = {
 		     CPU_BASED_USE_MSR_BITMAPS |
 		     CPU_BASED_MONITOR_EXITING |
 		     CPU_BASED_USE_IO_BITMAPS |
-		     CPU_BASED_TPR_SHADOW |
 		     CPU_BASED_ACTIVATE_SECONDARY_CONTROLS),
 
 	.set_to_0 = (CPU_BASED_VIRTUAL_INTR_PENDING |
@@ -530,6 +529,9 @@ static const struct vmxec cbec = {
 		     CPU_BASED_VIRTUAL_NMI_PENDING |
 		     CPU_BASED_MONITOR_TRAP |
 		     CPU_BASED_PAUSE_EXITING |
+
+		     CPU_BASED_TPR_SHADOW |
+
 		     CPU_BASED_UNCOND_IO_EXITING),
 };
 
@@ -539,15 +541,18 @@ static const struct vmxec cb2ec = {
 	.truemsr = MSR_IA32_VMX_PROCBASED_CTLS2,
 
 	.set_to_1 = (SECONDARY_EXEC_ENABLE_EPT |
+			SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
+		     //SECONDARY_EXEC_APIC_REGISTER_VIRT |
+		     //SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
 		     SECONDARY_EXEC_WBINVD_EXITING),
 
-	.set_to_0 = (SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
+	.set_to_0 = (
+		     SECONDARY_EXEC_APIC_REGISTER_VIRT |
+		     SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
 		     SECONDARY_EXEC_DESCRIPTOR_EXITING |
 		     SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE |
 		     SECONDARY_EXEC_ENABLE_VPID |
 		     SECONDARY_EXEC_UNRESTRICTED_GUEST |
-		     SECONDARY_EXEC_APIC_REGISTER_VIRT |
-		     SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
 		     SECONDARY_EXEC_PAUSE_LOOP_EXITING |
 		     SECONDARY_EXEC_RDRAND_EXITING |
 		     SECONDARY_EXEC_ENABLE_INVPCID |
@@ -1718,6 +1723,8 @@ int vmx_launch(struct vmctl *v) {
 		vmcs_writel(POSTED_INTR_DESC_ADDR_HIGH, v->pir>>32);
 		vmcs_writel(VIRTUAL_APIC_PAGE_ADDR, v->vapic);
 		vmcs_writel(VIRTUAL_APIC_PAGE_ADDR_HIGH, v->vapic>>32);
+		vmcs_writel(APIC_ACCESS_ADDR, 0xfee00000);
+		vmcs_writel(APIC_ACCESS_ADDR_HIGH, 0);
 		printk("v->apic %p v->pir %p\n", (void *)v->vapic, (void *)v->pir);
 		// fallthrough
 	case REG_RIP:

@@ -304,6 +304,7 @@ static void gencsum(uint8_t *target, void *data, int len)
 
 int main(int argc, char **argv)
 {
+	uint64_t *p64;
 	void *a = (void *)0xe0000;
 	struct acpi_table_rsdp *r;
 	struct acpi_table_fadt *f;
@@ -482,6 +483,10 @@ fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
 	vmctl.pir = (uint64_t) a;
 	a += 4096;
 	vmctl.vapic = (uint64_t) a;
+	p64 = a;
+	// set up apic values? do we need to?
+	// qemu does this.
+	((uint8_t *)a)[4] = 1;
 	a += 4096;
 
 	if (ros_syscall(SYS_setup_vmm, nr_gpcs, vmmflags, 0, 0, 0, 0) != nr_gpcs) {
