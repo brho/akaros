@@ -15,11 +15,6 @@ struct timespec {
 	long    tv_nsec;  /* Nanoseconds */
 };
 
-struct itimerspec {
-	struct timespec  it_interval;  /* Timer period */
-	struct timespec  it_value;     /* Timer expiration */
-};
-
 struct timeval {
 	time_t tv_sec;	/* seconds */
 	time_t tv_usec;	/* microseconds */
