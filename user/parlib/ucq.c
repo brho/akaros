@@ -13,6 +13,7 @@
 #include <sys/mman.h>
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <parlib/rassert.h> /* for the static_assert() */
 #include <parlib/vcore.h>
 

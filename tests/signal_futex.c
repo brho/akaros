@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <parlib/parlib.h>
 #include <pthread.h>
 #include <futex.h>

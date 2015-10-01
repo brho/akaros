@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 /* Gets a new EFD instance, returning the FD on success. */
 int eventfd(int initval, int flags)

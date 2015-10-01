@@ -6,6 +6,7 @@
 #include <ros/bcq.h>
 #include <parlib/arch/arch.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <parlib/vcore.h>
 #include <parlib/mcs.h>
 #include <parlib/timing.h>
