@@ -58,6 +58,7 @@ struct pgrp *newpgrp(void)
 	p->pgrpid = NEXT_ID(pgrpid);
 	p->progmode = 0644;
 	qlock_init(&p->debug);
+	rwinit(&p->ns);
 	qlock_init(&p->nsh);
 	return p;
 }
