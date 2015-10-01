@@ -47,6 +47,8 @@
 #include <sys/user_fd.h>
 #include <stdio.h>
 #include <errno.h>
+#include <unistd.h>
+#include <malloc.h>
 
 /* Sanity check, so we can ID our own FDs */
 #define EPOLL_UFD_MAGIC 		0xe9011

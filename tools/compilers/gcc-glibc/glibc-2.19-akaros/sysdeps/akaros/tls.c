@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <sys/tls.h>
 #include <parlib/vcore.h>
 #include <ldsodefs.h>

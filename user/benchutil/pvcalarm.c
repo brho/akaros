@@ -15,6 +15,7 @@
 #include <parlib/arch/bitmask.h>
 #include <sys/queue.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <benchutil/pvcalarm.h>
 
 /* Different states for enabling/disabling the per-vcore alarms. */

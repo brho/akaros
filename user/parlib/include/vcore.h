@@ -15,9 +15,9 @@ __BEGIN_DECLS
  * that properly under our vcore model (we shouldn't though).  We really need to
  * rethink what sys_yield 'should' do when in multicore mode, or else come up 
  * with a different syscall entirely. */
-#include <stdlib.h>
-#include <unistd.h>
 #undef exit
+extern void _exit (int status);
+extern void exit (int __status) __THROW __attribute__ ((__noreturn__));
 #define exit(status) _exit(status)
 /*****************************************************************************/
 
