@@ -36,6 +36,12 @@
 #
 #	- There are a few other TODOs sprinkled throughout the makefile.
 
+# Allow people to override our setting of the --no-print-directory option in
+# their Makelocal. This is useful, for example, to allow emacs to find the
+# correct file when errors are encountered using its builtin 'M-x compile'
+# command.
+NO_PRINT_DIRECTORY ?= --no-print-directory
+
 # Save the ability to export the parent's original environment for future use
 export_parent_env := $(shell export | sed 's/$$/;/')
 
@@ -47,14 +53,14 @@ clear_current_env := for c in $$(env | cut -d '=' -f 1); do unset $$c; done;
 define make_as_parent
 	$(clear_current_env)\
 	$(export_parent_env)\
-	$(MAKE) --no-print-directory $(1)
+	$(MAKE) $(NO_PRINT_DIRECTORY) $(1)
 endef
 
 # Do not:
 # o  use make's built-in rules and variables
 #    (this increases performance and avoids hard-to-debug behaviour);
 # o  print "Entering directory ...";
-MAKEFLAGS += -rR --no-print-directory
+MAKEFLAGS += -rR $(NO_PRINT_DIRECTORY)
 
 # That's our default target when none is given on the command line
 # This can be overriden with a Makelocal
@@ -569,7 +575,7 @@ PHONY += install-libs $(user-dirs)
 install-libs: $(user-dirs) symlinks cc-exists
 
 $(user-dirs):
-	@cd user/$@ && $(MAKE) DEPLIBS="$^" && $(MAKE) install
+	@$(MAKE) -C user/$@ DEPLIBS="$^" && $(MAKE) -C user/$@ install
 
 
 PHONY += userclean $(clean-user-dirs)
@@ -577,7 +583,7 @@ clean-user-dirs := $(addprefix _clean_user_,$(user-dirs))
 userclean: $(clean-user-dirs) testclean utestclean
 
 $(clean-user-dirs):
-	@cd user/$(patsubst _clean_user_%,%,$@) && $(MAKE) clean
+	@$(MAKE) -C user/$(patsubst _clean_user_%,%,$@) clean
 
 tests/: tests
 tests: install-libs
@@ -585,13 +591,13 @@ tests: install-libs
 
 PHONY += utest
 utest: $(user-dirs)
-	@cd user/$@ && $(MAKE) 
+	@$(MAKE) -C user/$@
 
 testclean:
 	@$(MAKE) -f tests/Makefile clean
 
 utestclean:
-	@cd user/utest && $(MAKE) clean
+	@$(MAKE) -C user/utest clean
 
 # KFS related stuff
 PHONY += fill-kfs unfill-kfs
@@ -604,7 +610,7 @@ $(OBJDIR)/.dont-force-fill-kfs:
 	@echo "Cross Compiler 'so' files removed from KFS"
 	@$(MAKE) -f tests/Makefile uninstall
 	@echo "Apps from /test removed from KFS"
-	@cd user/utest && $(MAKE) uninstall
+	@$(MAKE) -C user/utest uninstall
 	@echo "User space tests removed from KFS"
 	@touch $(OBJDIR)/.dont-force-fill-kfs
 
@@ -614,7 +620,7 @@ fill-kfs: $(OBJDIR)/.dont-force-fill-kfs install-libs tests
 	@echo "Cross Compiler 'so' files installed to KFS"
 	@$(MAKE) -f tests/Makefile install
 	@echo "Apps from /test installed to KFS"
-	@cd user/utest && $(MAKE) install
+	@$(MAKE) -C user/utest install
 	@echo "User space tests installed to KFS"
 
 # Use doxygen to make documentation for ROS (Untested since 2010 or so)
