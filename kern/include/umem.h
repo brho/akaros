@@ -40,10 +40,27 @@ void *kmalloc_errno(int len);
 bool uva_is_kva(struct proc *p, void *uva, void *kva);
 uintptr_t uva2kva(struct proc *p, void *uva);
 
-/* Helper for is_user_r{w,}addr. */
+/* Helper for is_user_r{w,}addr.
+ *
+ * These checks are for addresses that the kernel accesses on behalf of the
+ * user, which are mapped into the user's address space.  One interpretation is
+ * whether or not the user is allowed to refer to this memory, hence the
+ * MMAP_LOWEST_VA check.  But note that the user is allowed to attempt virtual
+ * memory accesses outside of this range.  VMM code may interpose on low memory
+ * PFs to emulate certain instructions.  However, the kernel should never be
+ * given such a pointer.
+ *
+ * Without the MMAP_LOWEST_VA check, the kernel would still PF on a bad user
+ * pointer (say the user gave us 0x10; we have nothing mapped at addr 0).
+ * However, it would be more difficult to detect if the PF was the kernel acting
+ * on behalf of the user or if the kernel itself had a null pointer deref.  By
+ * checking early, the kernel will catch low addresses and error out before page
+ * faulting. */
 static inline bool __is_user_addr(void *addr, size_t len, uintptr_t lim)
 {
-	if (((uintptr_t)addr < lim) && ((uintptr_t)addr + len <= lim))
+	if ((MMAP_LOWEST_VA <= (uintptr_t)addr) &&
+	    ((uintptr_t)addr < lim) &&
+	    ((uintptr_t)addr + len <= lim))
 		return TRUE;
 	else
 		return FALSE;
