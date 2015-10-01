@@ -84,4 +84,5 @@ int glibc_close_helper(int fd)
 		return -1;
 	ufds[fd - USER_FD_BASE] = 0;
 	ufd->close(ufd);
+	return 0;
 }
