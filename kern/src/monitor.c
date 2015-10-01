@@ -69,6 +69,7 @@ static command_t commands[] = {
 	{ "kpfret", "Attempt to idle after a kernel fault", mon_kpfret},
 	{ "ks", "Kernel scheduler hacks", mon_ks},
 	{ "gfp", "Get free pages", mon_gfp },
+	{ "coreinfo", "Print diagnostics for a core", mon_coreinfo},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -1222,5 +1223,33 @@ int mon_gfp(int argc, char **argv, struct hw_trapframe *hw_tf)
 		}
 	}
 	spin_unlock_irqsave(&colored_page_free_list_lock);
+	return 0;
+}
+
+/* Prints info about a core.  Optional first arg == coreid. */
+int mon_coreinfo(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+	struct per_cpu_info *pcpui;
+	struct kthread *kth;
+	int coreid = core_id();
+
+	if (argc >= 2)
+		coreid = strtol(argv[1], 0, 0);
+	pcpui = &per_cpu_info[coreid];
+	printk("Core %d:\n\tcur_proc %d\n\towning proc %d, owning vc %d\n",
+	       coreid, pcpui->cur_proc ? pcpui->cur_proc->pid : 0,
+	       pcpui->owning_proc ? pcpui->owning_proc->pid : 0,
+	       pcpui->owning_vcoreid != 0xdeadbeef ? pcpui->owning_vcoreid : 0);
+	kth = pcpui->cur_kthread;
+	if (kth) {
+		/* kth->proc is only used when the kthread is sleeping.  when it's
+		 * running, we care about cur_proc.  if we're here, proc should be 0
+		 * unless the kth is concurrently sleeping (we called this remotely) */
+		printk("\tkthread %p (%s), sysc %p (%d)\n", kth, kth->name,
+		       kth->sysc, kth->sysc ? kth->sysc->num : -1);
+	} else {
+		/* Can happen during early boot */
+		printk("\tNo kthread!\n");
+	}
 	return 0;
 }
