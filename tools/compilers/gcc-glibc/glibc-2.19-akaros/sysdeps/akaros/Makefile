@@ -60,3 +60,13 @@ ifeq ($(subdir),stdlib)
 sysdep_routines += eventfd
 endif
 sysdep_headers += sys/eventfd.h bits/eventfd.h
+
+# time.h, override for struct timespec.  This overrides time/time.h from glibc,
+# installed as usr/inc/time.h.
+#
+# It's pretty nasty though.  We need to have the sysdep twice in the Akaros
+# directory, both copies of the same file.  First, we need regular time.h
+# listed here to eventually get installed as usr/include/time.h.  This file is
+# sysdeps/akaros/time.h.  We also need the same file at
+# sysdeps/akaros/time/time.h, which will be used during compilation.
+sysdep_headers += time.h
