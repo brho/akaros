@@ -101,19 +101,25 @@ static void set_num_cores(void)
 	}
 }
 
-/* Figure out the maximum number of numa domains we actually have and set it in
- * our cpu_topology_info struct. */
-static void set_num_numa(void)
+/* Figure out the maximum number of numa domains we actually have.
+ * This code should always return >= 0 domains. */
+static int get_num_numa(void)
 {
-	num_numa = -1;
+	int numa = -1;
 	struct Srat *temp = srat;
 	while (temp) {
 		if (temp->type == SRlapic)
-			if (temp->lapic.dom > num_numa)
-				num_numa++;
+			if (temp->lapic.dom > numa)
+				numa++;
 		temp = temp->next;
 	}
-	num_numa++;
+	return numa + 1;
+}
+
+/* Set num_numa in our topology struct */
+static void set_num_numa(void)
+{
+	num_numa = get_num_numa();
 }
 
 /* Figure out what the max apic_id we will ever have is and set it in our
@@ -315,7 +321,10 @@ void topology_init(void)
 			cpu_bits = cpu_bits - core_bits;
 		}
 	}
-	if (cpu_bits)
+	/* BIOSes are not strictly required to put NUMA information
+	 * into the ACPI table. If there is no information the safest
+	 * thing to do is assume it's a non-NUMA system, i.e. flat. */
+	if (cpu_bits && get_num_numa())
 		build_topology(core_bits, cpu_bits);
 	else
 		build_flat_topology();
