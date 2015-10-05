@@ -76,10 +76,6 @@ int get_any_idle_core(void);
 int get_specific_idle_core(int coreid);
 void put_idle_core(int coreid);
 
-/************** Proc's view of the world **************/
-/* How many vcores p will think it can have */
-uint32_t max_vcores(struct proc *p);
-
 /************** Provisioning / Allocating *************/
 /* This section is specific to a provisioning ksched.  Careful calling any of
  * this from generic kernel code, since it might not be present in all kernel

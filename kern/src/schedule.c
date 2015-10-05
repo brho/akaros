@@ -38,7 +38,6 @@ static void add_to_list(struct proc *p, struct proc_list *list);
 static void remove_from_list(struct proc *p, struct proc_list *list);
 static void switch_lists(struct proc *p, struct proc_list *old,
                          struct proc_list *new);
-static bool is_ll_core(uint32_t pcoreid);
 static void __run_mcp_ksched(void *arg);	/* don't call directly */
 static uint32_t get_cores_needed(struct proc *p);
 
@@ -535,17 +534,6 @@ void put_idle_core(int coreid)
 	spin_unlock(&sched_lock);
 }
 
-/* Normally it'll be the max number of CG cores ever */
-uint32_t max_vcores(struct proc *p)
-{
-/* TODO: (CG/LL) */
-#ifdef CONFIG_DISABLE_SMT
-	return num_cores >> 1;
-#else
-	return num_cores - 1;	/* reserving core 0 */
-#endif /* CONFIG_DISABLE_SMT */
-}
-
 /* This deals with a request for more cores.  The amt of new cores needed is
  * passed in.  The ksched lock is held, but we are free to unlock if we want
  * (and we must, if calling out of the ksched to anything high-level).
@@ -678,17 +666,6 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 		}
 	}
 	/* note the ksched lock is still held */
-}
-
-/* TODO: need more thorough CG/LL management.  For now, core0 is the only LL
- * core.  This won't play well with the ghetto shit in schedule_init() if you do
- * anything like 'DEDICATED_MONITOR' or the ARSC server.  All that needs an
- * overhaul. */
-static bool is_ll_core(uint32_t pcoreid)
-{
-	if (pcoreid == 0)
-		return TRUE;
-	return FALSE;
 }
 
 /* Provision a core to a process. This function wraps the primary logic

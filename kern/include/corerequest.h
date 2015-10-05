@@ -7,6 +7,9 @@
 
 #pragma once
 
+#include <stdbool.h>
+#include <arch/topology.h>
+
 /* The core request algorithm maintains an internal array of these: the
  * global pcore map. Note the prov_proc and alloc_proc are weak (internal)
  * references, and should only be used as a ref source while the ksched has a
@@ -104,4 +107,26 @@ static inline struct proc *get_alloc_proc(struct sched_pcore *c)
 static inline struct proc *get_prov_proc(struct sched_pcore *c)
 {
 	return c->prov_proc;
+}
+
+/* TODO: need more thorough CG/LL management.  For now, core0 is the only LL
+ * core.  This won't play well with the ghetto shit in schedule_init() if you do
+ * anything like 'DEDICATED_MONITOR' or the ARSC server.  All that needs an
+ * overhaul. */
+static inline bool is_ll_core(uint32_t pcoreid)
+{
+	if (pcoreid == 0)
+		return TRUE;
+	return FALSE;
+}
+
+/* Normally it'll be the max number of CG cores ever */
+static inline uint32_t max_vcores(struct proc *p)
+{
+/* TODO: (CG/LL) */
+#ifdef CONFIG_DISABLE_SMT
+	return num_cores >> 1;
+#else
+	return num_cores - 1;	/* reserving core 0 */
+#endif /* CONFIG_DISABLE_SMT */
 }
