@@ -79,6 +79,22 @@ config EXT2_BDEV
 
 endmenu
 
+choice COREALLOC_POLICY
+	prompt "Core Allocation Policy"
+	help
+		Select a policy for allocating cores to a process upon request.  All
+		strategies first allocate cores from the set of provisioned cores for a
+		process, but differ in how they select cores beyond this.
+
+config COREALLOC_FCFS
+	bool "Simple FCFS"
+	help
+		Allocate cores to processes on a first-come-first-served basis. All
+		cores are treated equally, and no topology information is used to try
+		and optimize which cores are given to which processes upon request.
+
+endchoice
+
 menu "Memory Management"
 
 config PAGE_COLORING
