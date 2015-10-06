@@ -169,7 +169,7 @@ void __sched_proc_register(struct proc *p)
 	/* one ref for the proc's existence, cradle-to-grave */
 	proc_incref(p, 1);	/* need at least this OR the 'one for existing' */
 	spin_lock(&sched_lock);
-	coreprov_proc_init(p);
+	corealloc_proc_init(p);
 	add_to_list(p, &unrunnable_scps);
 	spin_unlock(&sched_lock);
 }

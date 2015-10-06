@@ -39,6 +39,13 @@ void corealloc_init(void)
 #endif /* CONFIG_DISABLE_SMT */
 }
 
+/* Initialize any data associated with allocating cores to a process. */
+void corealloc_proc_init(struct proc *p)
+{
+	TAILQ_INIT(&p->ksched_data.crd.prov_alloc_me);
+	TAILQ_INIT(&p->ksched_data.crd.prov_not_alloc_me);
+}
+
 /* Find the best core to allocate to a process as dictated by the core
  * allocation algorithm. This code assumes that the scheduler that uses it
  * holds a lock for the duration of the call. */

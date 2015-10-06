@@ -16,8 +16,8 @@
 /* Initialize any data assocaited with doing core allocation. */
 void corealloc_init(void);
 
-/* Initialize any data associated with provisiong cores to a process. */
-void coreprov_proc_init(struct proc *p);
+/* Initialize any data associated with allocating cores to a process. */
+void corealloc_proc_init(struct proc *p);
 
 /* Find the best core to allocate to a process as dictated by the core
  * allocation algorithm. This code assumes that the scheduler that uses it
