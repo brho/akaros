@@ -93,6 +93,14 @@ config COREALLOC_FCFS
 		cores are treated equally, and no topology information is used to try
 		and optimize which cores are given to which processes upon request.
 
+config COREALLOC_PACKED
+	bool "Packed Topology"
+	help
+		Allocate cores to a process based on a topology-aware algorithm that
+		tries to pack allocated cores as close together as possible.  It first
+		tries to pair new cores with their hyper-threaded pair, then keep them
+		on the same socket, then the same numa domain.
+
 endchoice
 
 menu "Kernel Debugging"

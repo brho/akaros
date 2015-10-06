@@ -11,6 +11,8 @@
 #include <arch/topology.h>
 #if defined(CONFIG_COREALLOC_FCFS)
   #include <corealloc_fcfs.h>
+#elif defined(CONFIG_COREALLOC_PACKED)
+  #include <corealloc_packed.h>
 #endif
 
 /* Initialize any data assocaited with doing core allocation. */

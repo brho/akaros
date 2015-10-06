@@ -64,6 +64,7 @@ obj-y						+= multiboot.o
 obj-y						+= net/
 obj-y						+= ns/
 obj-y						+= profiler.o
+obj-$(CONFIG_COREALLOC_PACKED) += corealloc_packed.o
 obj-y						+= page_alloc.o
 obj-y						+= pagemap.o
 obj-y						+= percpu.o
