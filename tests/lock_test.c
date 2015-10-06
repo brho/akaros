@@ -445,7 +445,7 @@ __thread int __vcore_context = 0;
  */
 
 const char *argp_program_version = "lock_test v0.1475263";
-const char *argp_program_bug_address = "<akaros@lists.eecs.berkeley.edu>";
+const char *argp_program_bug_address = "<akaros+subscribe@googlegroups.com>";
 
 static char doc[] = "lock_test -- spinlock benchmarking";
 static char args_doc[] = "-w NUM -l NUM -t LOCK";

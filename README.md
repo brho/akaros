@@ -49,7 +49,10 @@ Mailing Lists
 =============
 
 #### Want to join the developers mailing list?
-Send an email to <akaros-request@lists.eecs.berkeley.edu>.
+Send an email to [akaros+subscribe@googlegroups.com](mailto:akaros%2Bsubscribe@googlegroups.com).
+
+Or visit our [google group](https://groups.google.com/forum/#!forum/akaros)
+and click "Join Group"
 
 #### Want to report a bug?
 Create a new issue [here](https://github.com/brho/akaros/issues).

@@ -6,7 +6,7 @@
 #include <parlib/vcore.h>
 
 const char *argp_program_version = "prov v0.1475263";
-const char *argp_program_bug_address = "<akaros@lists.eecs.berkeley.edu>";
+const char *argp_program_bug_address = "<akaros+subscribe@googlegroups.com>";
 
 static char doc[] = "prov -- control for provisioning resources";
 static char args_doc[] = "-p PID\n-c PROGRAM [ARGS]\nPROGRAM [ARGS]\n"
