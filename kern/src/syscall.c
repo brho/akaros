@@ -702,6 +702,7 @@ static ssize_t sys_fork(env_t* e)
 	disable_irqsave(&state);	/* protect cur_ctx */
 	/* Can't really fork if we don't have a current_ctx to fork */
 	if (!current_ctx) {
+		enable_irqsave(&state);
 		proc_destroy(env);
 		proc_decref(env);
 		set_errno(EINVAL);
@@ -711,8 +712,8 @@ static ssize_t sys_fork(env_t* e)
 	enable_irqsave(&state);
 
 	env->cache_colors_map = cache_colors_map_alloc();
-	for(int i=0; i < llc_cache->num_colors; i++)
-		if(GET_BITMASK_BIT(e->cache_colors_map,i))
+	for (int i = 0; i < llc_cache->num_colors; i++)
+		if (GET_BITMASK_BIT(e->cache_colors_map,i))
 			cache_color_alloc(llc_cache, env->cache_colors_map);
 
 	/* Make the new process have the same VMRs as the older.  This will copy the
