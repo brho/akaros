@@ -101,19 +101,33 @@ static void set_num_cores(void)
 	}
 }
 
+/* Determine if srat has a unique numa domain compared to to all of the srat
+ * records in list_head that are of type SRlapic. */
+static bool is_unique_numa(struct Srat *srat, struct Srat *list_head)
+{
+	while (list_head) {
+		if (list_head->type == SRlapic) {
+			if (srat->lapic.dom == list_head->lapic.dom)
+				return FALSE;
+		}
+		list_head = list_head->next;
+	}
+	return TRUE;
+}
+
 /* Figure out the maximum number of numa domains we actually have.
  * This code should always return >= 0 domains. */
 static int get_num_numa(void)
 {
-	int numa = -1;
+	int numa = 0;
 	struct Srat *temp = srat;
 	while (temp) {
 		if (temp->type == SRlapic)
-			if (temp->lapic.dom > numa)
+			if (is_unique_numa(temp, temp->next))
 				numa++;
 		temp = temp->next;
 	}
-	return numa + 1;
+	return numa;
 }
 
 /* Set num_numa in our topology struct */
