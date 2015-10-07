@@ -212,7 +212,7 @@ void sysfatal(char *fmt, ...)
 	va_start(arg, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, arg);
 	va_end(arg);
-	error(buf);
+	error(EFAIL, buf);
 }
 
 int pprint(char *fmt, ...)
@@ -607,7 +607,7 @@ static struct chan *consopen(struct chan *c, int omode)
 	switch ((uint32_t) c->qid.path) {
 		case Qconsctl:
 			if (!iseve())
-				error(Eperm);
+				error(EPERM, NULL);
 			qlock(&(&kbd)->qlock);
 			kbd.ctl++;
 			qunlock(&(&kbd)->qlock);
@@ -629,9 +629,9 @@ static struct chan *consopen(struct chan *c, int omode)
 				qunlock(&(&kbd)->qlock);
 				c->flag &= ~COPEN;
 				if (kscanq)
-					error(Einuse);
+					error(EBUSY, NULL);
 				else
-					error(Ebadarg);
+					error(EINVAL, NULL);
 			}
 			kscanq = qopen(256, 0, NULL, NULL);
 			qunlock(&(&kbd)->qlock);
@@ -642,12 +642,12 @@ static struct chan *consopen(struct chan *c, int omode)
 				wlock(&(&kprintq)->rwlock);
 				if (kprintq.q != NULL) {
 					wunlock(&(&kprintq)->rwlock);
-					error(Einuse);
+					error(EBUSY, NULL);
 				}
 				kprintq.q = qopen(32 * 1024, Qcoalesce, NULL, NULL);
 				if (kprintq.q == NULL) {
 					wunlock(&(&kprintq)->rwlock);
-					error(Enomem);
+					error(ENOMEM, NULL);
 				}
 				qdropoverflow(kprintq.q, 1);
 				wunlock(&(&kprintq)->rwlock);
@@ -832,7 +832,7 @@ static long consread(struct chan *c, void *buf, long n, int64_t offset)
 		case Qdrivers:
 			p = kzmalloc(READSTR, 0);
 			if (p == NULL)
-				error(Enomem);
+				error(ENOMEM, NULL);
 			l = 0;
 			for (i = 0; &devtab[i] < __devtabend; i++)
 				l += snprintf(p + l, READSTR - l, "#%s\n", devtab[i].name);
@@ -874,7 +874,7 @@ static long consread(struct chan *c, void *buf, long n, int64_t offset)
 #endif
 		default:
 			printd("consread %llu\n", c->qid.path);
-			error(Egreg);
+			error(EINVAL, NULL);
 	}
 	return -1;	/* never reached */
 }
@@ -952,15 +952,15 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 
 		case Qhostowner:
 			if (!iseve())
-				error(Eperm);
+				error(EPERM, NULL);
 			if (offset != 0 || n >= sizeof(buf))
-				error(Ebadarg);
+				error(EINVAL, NULL);
 			memmove(buf, a, n);
 			buf[n] = '\0';
 			if (n > 0 && buf[n - 1] == '\n')
 				buf[--n] = 0;
 			if (n <= 0)
-				error(Ebadarg);
+				error(EINVAL, NULL);
 			renameuser(eve, buf);
 			renameproguser(eve, buf);
 			kstrdup(&eve, buf);
@@ -969,11 +969,11 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 
 		case Quser:
 			if (!iseve())
-				error(Eperm);
+				error(EPERM, NULL);
 			if (offset != 0)
-				error(Ebadarg);
+				error(EINVAL, NULL);
 			if (n <= 0 || n >= sizeof(buf))
-				error(Ebadarg);
+				error(EINVAL, NULL);
 			strncpy(buf, a, n);
 			buf[n] = 0;
 			if (buf[n - 1] == '\n')
@@ -988,7 +988,7 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 			buf[n] = '\0';
 			x = atoi(buf);
 			if (x < 0 || x > 9)
-				error(Ebadarg);
+				error(EINVAL, NULL);
 			cflag = x;
 			return n;
 
@@ -997,9 +997,9 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 
 		case Qsysname:
 			if (offset != 0)
-				error(Ebadarg);
+				error(EINVAL, NULL);
 			if (n <= 0 || n >= sizeof(buf))
-				error(Ebadarg);
+				error(EINVAL, NULL);
 			strncpy(buf, a, n);
 			buf[n] = 0;
 			if (buf[n - 1] == '\n')
@@ -1008,7 +1008,7 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 			break;
 #endif
 		case Qsysctl:
-			//if (!iseve()) error(Eperm);
+			//if (!iseve()) error(EPERM, NULL);
 			cb = parsecmd(a, n);
 			if (cb->nf > 1) 
 			printd("cons sysctl cmd %s\n", cb->f[0]);
@@ -1049,7 +1049,7 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 			break;
 		default:
 			printd("conswrite: %llu\n", c->qid.path);
-			error(Egreg);
+			error(EINVAL, NULL);
 	}
 	return n;
 }

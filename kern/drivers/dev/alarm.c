@@ -246,9 +246,9 @@ static struct chan *alarmopen(struct chan *c, int omode)
 		case Qtopdir:
 		case Qalarmdir:
 			if (omode & O_REMCLO)
-				error(Eperm);
+				error(EPERM, NULL);
 			if (omode & O_WRITE)
-				error(Eisdir);
+				error(EISDIR, NULL);
 			break;
 		case Qclone:
 			a = kzmalloc(sizeof(struct proc_alarm), KMALLOC_WAIT);
@@ -287,7 +287,7 @@ static struct chan *alarmopen(struct chan *c, int omode)
 			}
 			spin_unlock(&p->alarmset.lock);
 			if (!a_i)
-				error("Unable to open alarm, concurrent closing");
+				error(EFAIL, "Unable to open alarm, concurrent closing");
 			break;
 	}
 	c->mode = openmode(omode);
@@ -299,17 +299,17 @@ static struct chan *alarmopen(struct chan *c, int omode)
 
 static void alarmcreate(struct chan *c, char *name, int omode, uint32_t perm)
 {
-	error(Eperm);
+	error(EPERM, NULL);
 }
 
 static void alarmremove(struct chan *c)
 {
-	error(Eperm);
+	error(EPERM, NULL);
 }
 
 static int alarmwstat(struct chan *c, uint8_t * dp, int n)
 {
-	error("No alarmwstat");
+	error(EFAIL, "No alarmwstat");
 	return 0;
 }
 
@@ -363,7 +363,7 @@ static long alarmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 	switch (TYPE(c->qid)) {
 		case Qtopdir:
 		case Qalarmdir:
-			error(Eperm);
+			error(EPERM, NULL);
 		case Qctl:
 			p_alarm = QID2A(c->qid);
 			cb = parsecmd(ubuf, n);
@@ -372,21 +372,21 @@ static long alarmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 				nexterror();
 			}
 			if (cb->nf < 1)
-				error("short control request");
+				error(EFAIL, "short control request");
 			if (!strcmp(cb->f[0], "evq")) {
 				if (cb->nf < 2)
-					error("evq needs a pointer");
+					error(EFAIL, "evq needs a pointer");
 				/* i think it's safe to do a stroul on a parsecmd.  it's kernel
 				 * memory, and space or 0 terminated */
 				hexval = strtoul(cb->f[1], 0, 16);
 				/* This is just to help userspace - event code can handle it */
 				if (!is_user_rwaddr((void *)hexval, sizeof(struct event_queue)))
-					error("Non-user ev_q pointer");
+					error(EFAIL, "Non-user ev_q pointer");
 				p_alarm->ev_q = (struct event_queue *)hexval;
 			} else if (!strcmp(cb->f[0], "cancel")) {
 				unset_alarm(p_alarm->proc->alarmset.tchain, &p_alarm->a_waiter);
 			} else {
-				error("%s: not implemented", cb->f[0]);
+				error(EFAIL, "%s: not implemented", cb->f[0]);
 			}
 			kfree(cb);
 			poperror();
@@ -396,7 +396,8 @@ static long alarmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 			 * user strings) */
 			if (n > sizeof(num64)) {
 				set_errno(EINVAL);
-				error("attempted to write %d chars, max %d", n, sizeof(num64));
+				error(EFAIL, "attempted to write %d chars, max %d", n,
+					  sizeof(num64));
 			}
 			memcpy(num64, ubuf, n);
 			num64[n] = 0;	/* enforce trailing 0 */

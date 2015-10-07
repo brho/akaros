@@ -190,7 +190,7 @@ static struct chan *srvopen(struct chan *c, int omode)
 	openmode(omode);	/* used as an error checker in plan9, does little now */
 	if (c->qid.type & QTDIR) {
 		if (omode & O_WRITE)
-			error(Eisdir);
+			error(EISDIR, NULL);
 		c->mode = openmode(omode);
 		c->flag |= COPEN;
 		c->offset = 0;
@@ -198,7 +198,7 @@ static struct chan *srvopen(struct chan *c, int omode)
 	}
 	srv = c->aux;
 	if (!grab_ref(srv))
-		error("Unable to open srv file, concurrent removal");
+		error(EFAIL, "Unable to open srv file, concurrent removal");
 	if (waserror()) {
 		kref_put(&srv->ref);
 		nexterror();
@@ -208,16 +208,16 @@ static struct chan *srvopen(struct chan *c, int omode)
 #if 0
 	if (omode & ORCLOSE) {
 		if (strcmp(srv->user, up->env->user) != 0)
-			error(Eperm);
+			error(EPERM, NULL);
 		else
 			srv->flags |= SORCLOSE;
 	}
 #endif
 	if ((srv->perm & DMEXCL) && atomic_read(&srv->opens))
-		error(Einuse);
+		error(EBUSY, NULL);
 	/* srv->chan is write-once, so we don't need to sync. */
 	if (!srv->chan)
-		error("srv file has no chan yet");
+		error(EFAIL, "srv file has no chan yet");
 	/* this is more than just the ref - 1, since there will be refs in flight
 	 * as gens work their way through the list */
 	atomic_inc(&srv->opens);
@@ -251,7 +251,7 @@ static void srvcreate(struct chan *c, char *name, int omode, uint32_t perm)
 
 static int srvwstat(struct chan *c, uint8_t * dp, int n)
 {
-	error("srvwstat not supported yet");
+	error(ENOSYS, NULL);
 	return -1;
 }
 
@@ -297,16 +297,16 @@ static long srvwrite(struct chan *c, void *va, long count, int64_t offset)
 	int fd;
 
 	if (c->qid.type & QTDIR)
-		error(Eperm);
+		error(EPERM, NULL);
 	srv = c->aux;
 	if (!grab_ref(srv))
-		error("Unable to write srv file, concurrent removal");
+		error(EFAIL, "Unable to write srv file, concurrent removal");
 	if (waserror()) {
 		kref_put(&srv->ref);
 		nexterror();
 	}
 	if (srv->chan)
-		error("srv file already has a stored chan!");
+		error(EFAIL, "srv file already has a stored chan!");
 	if (waserror()) {
 		kfree(kbuf);
 		nexterror();
@@ -321,7 +321,7 @@ static long srvwrite(struct chan *c, void *va, long count, int64_t offset)
 	/* fdtochan already increffed for us */
 	if (!__sync_bool_compare_and_swap(&srv->chan, 0, new_chan)) {
 		cclose(new_chan);
-		error("srv file already has a stored chan!");
+		error(EFAIL, "srv file already has a stored chan!");
 	}
 	poperror();
 	kfree(kbuf);

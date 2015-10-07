@@ -513,7 +513,7 @@ rtl8169ifstat(struct ether* edev, void* a, long n, uint32_t offset)
 		udelay(1000*1);
 	}
 	if(csr32r(ctlr, Dtccr) & Cmd)
-		error(Eio);
+		error(EIO, NULL);
 	dtcc = ctlr->dtcc;
 
 	edev->oerrs = dtcc->txer;
@@ -529,7 +529,7 @@ rtl8169ifstat(struct ether* edev, void* a, long n, uint32_t offset)
 	}
 
 	if((alloc = kzmalloc(READSTR, 0)) == NULL)
-		error(Enomem);
+		error(ENOMEM, NULL);
 	e = alloc+READSTR;
 
 	p = seprintf(alloc, e, "TxOk: %llu\n", dtcc->txok);

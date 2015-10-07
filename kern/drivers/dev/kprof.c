@@ -113,7 +113,7 @@ kprofattach(char *spec)
 {
 	// Did we initialise completely?
 	if ( !(oprof_alarms && kprof.buf && kprof.systrace) )
-		error(Enomem);
+		error(ENOMEM, NULL);
 
 	return devattach(devname(), spec);
 }
@@ -191,7 +191,7 @@ static void kprofinit(void)
 	oprof_alarms = kzmalloc(sizeof(struct alarm_waiter) * num_cores,
 	                        KMALLOC_WAIT);
 	if (!oprof_alarms)
-		error(Enomem);
+		error(ENOMEM, NULL);
 
 	for (int i = 0; i < num_cores; i++)
 		init_awaiter_irq(&oprof_alarms[i], oprof_alarm_handler);
@@ -239,7 +239,7 @@ kprofopen(struct chan *c, int omode)
 {
 	if(c->qid.type & QTDIR){
 		if(openmode(omode) != O_READ)
-			error(Eperm);
+			error(EPERM, NULL);
 	}
 	c->mode = openmode(omode);
 	c->flag |= COPEN;
@@ -417,7 +417,7 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 			else
 				n = 0;
 		} else
-			error("no systrace queue");
+			error(EFAIL, "no systrace queue");
 		break;
 	case Kprintxqid:
 		n = readstr(offset, va, n, printx_on ? "on" : "off");
@@ -457,7 +457,7 @@ static void manage_oprof_timer(int coreid, struct cmdbuf *cb)
 		 * is fine. */
 		unset_alarm(tchain, waiter);
 	} else {
-		error("optimer needs on|off");
+		error(EFAIL, "optimer needs on|off");
 	}
 }
 
@@ -478,7 +478,7 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 	switch((int)(c->qid.path)){
 	case Kprofctlqid:
 		if (cb->nf < 1)
-			error(ctlstring);
+			error(EFAIL, ctlstring);
 
 		/* Kprof: a "which kaddr are we at when the timer goes off".  not used
 		 * much anymore */
@@ -498,7 +498,7 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 		/* oprof: samples and traces using oprofile */
 		} else if (!strcmp(cb->f[0], "optimer")) {
 			if (cb->nf < 3)
-				error("optimer [<0|1|..|n|all> <on|off>] [period USEC]");
+				error(EFAIL, "optimer [<0|1|..|n|all> <on|off>] [period USEC]");
 			if (!strcmp(cb->f[1], "period")) {
 				oprof_timer_period = strtoul(cb->f[2], 0, 10);
 			} else if (!strcmp(cb->f[1], "all")) {
@@ -507,7 +507,7 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 			} else {
 				int pcoreid = strtoul(cb->f[1], 0, 10);
 				if (pcoreid >= num_cores)
-					error("no such coreid %d", pcoreid);
+					error(EFAIL, "no such coreid %d", pcoreid);
 				manage_oprof_timer(pcoreid, cb);
 			}
 		} else if (!strcmp(cb->f[0], "opstart")) {
@@ -515,7 +515,7 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 		} else if (!strcmp(cb->f[0], "opstop")) {
 			oprofile_control_trace(0);
 		} else {
-			error(ctlstring);
+			error(EFAIL, ctlstring);
 		}
 		break;
 
@@ -534,12 +534,12 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 		else if (!strncmp(a, "toggle", 6))	/* why not. */
 			set_printx(2);
 		else
-			error("invalid option to Kprintx %s\n", a);
+			error(EFAIL, "invalid option to Kprintx %s\n", a);
 		break;
 	case Kmpstatqid:
 	case Kmpstatrawqid:
 		if (cb->nf < 1)
-			error("mpstat bad option (reset|ipi|on|off)");
+			error(EFAIL, "mpstat bad option (reset|ipi|on|off)");
 		if (!strcmp(cb->f[0], "reset")) {
 			for (int i = 0; i < num_cores; i++)
 				reset_cpu_state_ticks(i);
@@ -549,19 +549,19 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 			/* TODO: disable the ticks */ ;
 		} else if (!strcmp(cb->f[0], "ipi")) {
 			if (cb->nf < 2)
-				error("need another arg: ipi [on|off]");
+				error(EFAIL, "need another arg: ipi [on|off]");
 			if (!strcmp(cb->f[1], "on"))
 				kprof.mpstat_ipi = TRUE;
 			else if (!strcmp(cb->f[1], "off"))
 				kprof.mpstat_ipi = FALSE;
 			else
-				error("ipi [on|off]");
+				error(EFAIL, "ipi [on|off]");
 		} else {
-			error("mpstat bad option (reset|ipi|on|off)");
+			error(EFAIL, "mpstat bad option (reset|ipi|on|off)");
 		}
 		break;
 	default:
-		error(Ebadusefd);
+		error(EBADFD, NULL);
 	}
 	kfree(cb);
 	poperror();

@@ -60,8 +60,6 @@ static Netlogflag flags[] = {
 	{NULL, 0,},
 };
 
-char Ebadnetctl[] = "too few arguments for netlog control message";
-
 enum {
 	CMset,
 	CMclear,
@@ -185,7 +183,7 @@ void netlogctl(struct Fs *f, char *s, int n)
 	}
 
 	if (cb->nf < 2)
-		error(Ebadnetctl);
+		error(EINVAL, NULL);
 
 	ct = lookupcmd(cb, routecmd, ARRAY_SIZE(routecmd));
 

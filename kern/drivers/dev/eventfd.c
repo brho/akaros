@@ -163,7 +163,7 @@ static unsigned long efd_read_efd(struct eventfd *efd, struct chan *c)
 		if (!old_count) {
 			if (c->flag & O_NONBLOCK) {
 				set_errno(EAGAIN);
-				error("Would block on #%s read", devname());
+				error(EFAIL, "Would block on #%s read", devname());
 			}
 			rendez_sleep(&efd->rv_readers, has_counts, efd);
 		} else {
@@ -221,7 +221,7 @@ static void efd_write_efd(struct eventfd *efd, unsigned long add_to,
 		if (new_count > EFD_MAX_VAL) {
 			if (c->flag & O_NONBLOCK) {
 				set_errno(EAGAIN);
-				error("Would block on #%s write", devname());
+				error(EFAIL, "Would block on #%s write", devname());
 			}
 			rendez_sleep(&efd->rv_writers, has_room, efd);
 		} else {
@@ -244,20 +244,19 @@ static long efd_write(struct chan *c, void *ubuf, long n, int64_t offset)
 		case Qctl:
 			/* If we want to allow runtime changing of settings, we can do it
 			 * here. */
-			error("No #%s ctl commands supported", devname());
+			error(EFAIL, "No #%s ctl commands supported", devname());
 			break;
 		case Qefd:
 			/* We want to give strtoul a null-terminated buf (can't handle
 			 * arbitrary user strings).  Ignoring the chan offset too. */
-			if (n > sizeof(num64)) {
-				set_errno(EINVAL);
-				error("attempted to write %d chars, max %d", n, sizeof(num64));
-			}
+			if (n > sizeof(num64))
+				error(EAGAIN, "attempted to write %d chars, max %d", n,
+					  sizeof(num64));
 			memcpy(num64, ubuf, n);
 			num64[n] = 0;	/* enforce trailing 0 */
 			write_val = strtoul(num64, 0, 0);
 			if (write_val == (unsigned long)(-1))
-				error("Eventfd write must not be -1");
+				error(EFAIL, "Eventfd write must not be -1");
 			efd_write_efd(efd, write_val, c);
 			break;
 		default:

@@ -206,7 +206,7 @@ static char *ipifcunbind(struct Ipifc *ifc)
 	while (ifc->lifc) {
 		err = ipifcremlifc(ifc, ifc->lifc);
 		if (err)
-			error(err);
+			error(EFAIL, err);
 	}
 
 	ifc->m = NULL;
@@ -684,7 +684,7 @@ static char *ipifcconnect(struct conv *c, char **argv, int argc)
 	while (ifc->lifc) {
 		err = ipifcremlifc(ifc, ifc->lifc);
 		if (err)
-			error(err);
+			error(EFAIL, err);
 	}
 	wunlock(&ifc->rwlock);
 	poperror();

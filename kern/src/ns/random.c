@@ -86,7 +86,7 @@ uint32_t randomread(void *buf, uint32_t n)
 		/* read the random byte directly into the (user) buffer */
 		amt = apipe_read(&rb.ap, buf, 1);
 		if (amt < 0)
-			error("randomread apipe");
+			error(EFAIL, "randomread apipe");
 		if (amt != 1)
 			warn("Odd amount read from random apipe");
 		buf++;

@@ -44,15 +44,15 @@ struct chan *etherattach(char *spec)
 		/* somebody interpret this for me. */
 		if (((ctlrno == 0) && (p == spec)) ||
 			(ctlrno >= MaxEther) || ((*p) && (*p != '.')))
-			error(Ebadarg);
+			error(EINVAL, NULL);
 		if (*p == '.') {	/* vlan */
 			vlanid = strtoul(p + 1, &p, 0);
 			if (vlanid <= 0 || vlanid > 0xFFF || *p)
-				error(Ebadarg);
+				error(EINVAL, NULL);
 		}
 	}
 	if ((ether = etherxx[ctlrno]) == 0)
-		error(Enodev);
+		error(ENODEV, NULL);
 	rlock(&ether->rwlock);
 	if (waserror()) {
 		runlock(&ether->rwlock);
@@ -60,7 +60,7 @@ struct chan *etherattach(char *spec)
 	}
 	if (vlanid) {
 		if (ether->maxmtu < ETHERMAXTU + 4)
-			error("interface cannot support 802.1 tags");
+			error(EFAIL, "interface cannot support 802.1 tags");
 		vlan = vlanalloc(ether, vlanid);
 		chan = devattach(devname(), spec);
 		chan->dev = ctlrno + (vlanid << 8);
@@ -443,7 +443,7 @@ static long etherwrite(struct chan *chan, void *buf, long n, int64_t unused)
 		cb = parsecmd(buf, n);
 		if (cb->nf < 1) {
 			kfree(cb);
-			error("short control request");
+			error(EFAIL, "short control request");
 		}
 		if (strcmp(cb->f[0], "nonblocking") == 0) {
 			if (cb->nf <= 1)
@@ -460,11 +460,11 @@ static long etherwrite(struct chan *chan, void *buf, long n, int64_t unused)
 			l = ether->ctl(ether, buf, n);
 			goto out;
 		}
-		error(Ebadctl);
+		error(EINVAL, NULL);
 	}
 
 	if (n > ether->maxmtu + ETHERHDRSIZE)
-		error(Etoobig);
+		error(E2BIG, NULL);
 	bp = allocb(n);
 	if (waserror()) {
 		freeb(bp);
@@ -507,7 +507,7 @@ static long etherbwrite(struct chan *chan, struct block *bp, uint32_t unused)
 	}
 	if (n > ether->maxmtu + ETHERHDRSIZE && (bp->flag & Btso) == 0) {
 		freeb(bp);
-		error(Etoobig);
+		error(E2BIG, NULL);
 	}
 	n = etheroq(ether, bp);
 	poperror();
@@ -548,7 +548,7 @@ static long vlanctl(struct ether *ether, void *buf, long n)
 		return 0;
 	}
 	kfree(cb);
-	error(Ebadctl);
+	error(EINVAL, NULL);
 	return -1;	/* not reached */
 }
 
@@ -576,13 +576,13 @@ static struct ether *vlanalloc(struct ether *ether, int id)
 			fid = i;
 	}
 	if (fid < 0)
-		error(Enoifc);
+		error(ENOENT, NULL);
 	snprintf(name, sizeof(name), "ether%d.%d", ether->ctlrno, id);
 	vlan = ether->vlans[fid];
 	if (vlan == NULL) {
 		vlan = kzmalloc(sizeof(struct ether), 1);
 		if (vlan == NULL)
-			error(Enovmem);
+			error(ENOMEM, NULL);
 		rwinit(&vlan->rwlock);
 		qlock_init(&vlan->vlq);
 		netifinit(vlan, name, Ntypes, ether->limit);

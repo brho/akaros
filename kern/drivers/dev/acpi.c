@@ -347,7 +347,7 @@ static long regio(struct Reg *r, void *p, uint32_t len, uintptr_t off, int iswr)
 			if (r->p == NULL)
 				r->p = KADDR_NOCHECK(r->base);
 			if (r->p == NULL)
-				error("regio: vmap/KADDR failed");
+				error(EFAIL, "regio: vmap/KADDR failed");
 			rp = (uintptr_t) r->p + off;
 			rio = memio;
 			break;
@@ -367,7 +367,7 @@ static long regio(struct Reg *r, void *p, uint32_t len, uintptr_t off, int iswr)
 		case Ripmi:
 		case Rfixedhw:
 			printd("regio: reg %s not supported\n", acpiregstr(r->spc));
-			error("region not supported");
+			error(EFAIL, "region not supported");
 	}
 	if (iswr)
 		regcpy(&rio, rp, &memio, (uintptr_t) p, len, r->accsz);
@@ -1495,7 +1495,7 @@ static struct chan *acpiattach(char *spec)
 	 * This code must use 64 registers to be acpi ready in nix.
 	 */
 	if (acpiinit() < 0) {
-		error("no acpi");
+		error(EFAIL, "no acpi");
 	}
 
 	/*
@@ -1523,7 +1523,7 @@ static struct chan *acpiattach(char *spec)
 		if (getpm1ctl() & Pm1SciEn)
 			break;
 	if (i == 10)
-		error("acpi: failed to enable\n");
+		error(EFAIL, "acpi: failed to enable\n");
 //  if(fadt.sciint != 0)
 //      intrenable(fadt.sciint, acpiintr, 0, BUSUNKNOWN, "acpi");
 	return devattach(devname(), spec);
@@ -1563,7 +1563,7 @@ static long acpiread(struct chan *c, void *a, long n, int64_t off)
 		ttext = kzmalloc(tlen, 0);
 	}
 	if (ttext == NULL) {
-		error("acpiread: no memory");
+		error(EFAIL, "acpiread: no memory");
 	}
 	q = c->qid.path;
 	switch (q) {
@@ -1605,10 +1605,10 @@ static long acpiread(struct chan *c, void *a, long n, int64_t off)
 			return readstr(off, a, n, ttext);
 		case Qio:
 			if (reg == NULL)
-				error("region not configured");
+				error(EFAIL, "region not configured");
 			return regio(reg, a, n, off, 0);
 	}
-	error(Eperm);
+	error(EPERM, NULL);
 	return -1;
 }
 
@@ -1622,11 +1622,11 @@ static long acpiwrite(struct chan *c, void *a, long n, int64_t off)
 
 	if (c->qid.path == Qio) {
 		if (reg == NULL)
-			error("region not configured");
+			error(EFAIL, "region not configured");
 		return regio(reg, a, n, off, 1);
 	}
 	if (c->qid.path != Qctl)
-		error(Eperm);
+		error(EPERM, NULL);
 
 	cb = parsecmd(a, n);
 	if (waserror()) {
@@ -1647,7 +1647,7 @@ static long acpiwrite(struct chan *c, void *a, long n, int64_t off)
 			if (r->spc < 0) {
 				kfree(r);
 				reg = NULL;
-				error("bad region type");
+				error(EFAIL, "bad region type");
 			}
 			if (r->spc == Rpcicfg || r->spc == Rpcibar) {
 				rno = r->base >> Rpciregshift & Rpciregmask;
@@ -1667,7 +1667,7 @@ static long acpiwrite(struct chan *c, void *a, long n, int64_t off)
 			if (r->accsz < 1 || r->accsz > 4) {
 				kfree(r);
 				reg = NULL;
-				error("bad region access size");
+				error(EFAIL, "bad region access size");
 			}
 			reg = r;
 			printd("region %s %s %p %p sz%d",
@@ -1676,7 +1676,7 @@ static long acpiwrite(struct chan *c, void *a, long n, int64_t off)
 		case CMgpe:
 			i = strtoul(cb->f[1], NULL, 0);
 			if (i >= ngpes)
-				error("gpe out of range");
+				error(EFAIL, "gpe out of range");
 			kstrdup(&gpes[i].obj, cb->f[2]);
 			setgpeen(i, 1);
 			break;

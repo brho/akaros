@@ -45,8 +45,6 @@ struct arp {
 	struct block *dropf, *dropl;
 };
 
-char *Ebadarp = "bad arp";
-
 #define haship(s) ((s)[IPaddrlen-1]%NHASH)
 
 int ReTransTimer = RETRANS_TIMER;
@@ -424,7 +422,7 @@ int arpwrite(struct Fs *fs, char *s, int len)
 	arp = fs->arp;
 
 	if (len == 0)
-		error(Ebadarp);
+		error(EINVAL, NULL);
 	if (len >= sizeof(buf))
 		len = sizeof(buf) - 1;
 	strncpy(buf, s, len);
@@ -456,7 +454,7 @@ int arpwrite(struct Fs *fs, char *s, int len)
 	} else if (strcmp(f[0], "add") == 0) {
 		switch (n) {
 			default:
-				error(Ebadarg);
+				error(EINVAL, NULL);
 			case 3:
 				parseip(ip, f[1]);
 				if (isv4(ip))
@@ -464,26 +462,26 @@ int arpwrite(struct Fs *fs, char *s, int len)
 				else
 					r = v6lookup(fs, ip, NULL);
 				if (r == NULL)
-					error("Destination unreachable");
+					error(EFAIL, "Destination unreachable");
 				m = r->rt.ifc->m;
 				n = parsemac(mac, f[2], m->maclen);
 				break;
 			case 4:
 				m = ipfindmedium(f[1]);
 				if (m == NULL)
-					error(Ebadarp);
+					error(EINVAL, NULL);
 				parseip(ip, f[2]);
 				n = parsemac(mac, f[3], m->maclen);
 				break;
 		}
 
 		if (m->ares == NULL)
-			error(Ebadarp);
+			error(EINVAL, NULL);
 
 		m->ares(fs, V6, ip, mac, n, 0);
 	} else if (strcmp(f[0], "del") == 0) {
 		if (n != 2)
-			error(Ebadarg);
+			error(EINVAL, NULL);
 
 		parseip(ip, f[1]);
 		qlock(&arp->qlock);
@@ -518,7 +516,7 @@ int arpwrite(struct Fs *fs, char *s, int len)
 		}
 		qunlock(&arp->qlock);
 	} else
-		error(Ebadarp);
+		error(EINVAL, NULL);
 
 	return len;
 }

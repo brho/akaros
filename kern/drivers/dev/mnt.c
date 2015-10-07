@@ -97,9 +97,6 @@ void mountrpc(struct mnt *, struct mntrpc *);
 int rpcattn(void *);
 struct chan *mntchan(void);
 
-char Esbadstat[] = "invalid directory entry received from server";
-char Enoversion[] = "version not established for mount channel";
-
 void (*mntstats) (int unused_int, struct chan *, uint64_t, uint32_t);
 
 static void mntinit(void)
@@ -145,9 +142,9 @@ long mntversion(struct chan *c, char *version, int msize, int returnlen)
 
 	/* validity */
 	if (msize < 0)
-		error("bad iounit in version call");
+		error(EFAIL, "bad iounit in version call");
 	if (strncmp(v, VERSION9P, strlen(VERSION9P)) != 0)
-		error("bad 9P version specification");
+		error(EFAIL, "bad 9P version specification");
 
 	m = c->mux;
 
@@ -160,11 +157,11 @@ long mntversion(struct chan *c, char *version, int msize, int returnlen)
 		if (strncmp(buf, v, k) != 0) {
 			snprintf(buf, sizeof buf, "incompatible 9P versions %s %s",
 					 m->version, v);
-			error(buf);
+			error(EFAIL, buf);
 		}
 		if (returnlen > 0) {
 			if (returnlen < k)
-				error(Eshort);
+				error(ENAMETOOLONG, NULL);
 			memmove(version, buf, k);
 		}
 		return k;
@@ -183,7 +180,7 @@ long mntversion(struct chan *c, char *version, int msize, int returnlen)
 	}
 	k = convS2M(&f, msg, 8192 + IOHDRSZ);
 	if (k == 0)
-		error("bad fversion conversion on send");
+		error(EFAIL, "bad fversion conversion on send");
 
 	spin_lock(&c->lock);
 	oo = c->offset;
@@ -196,13 +193,13 @@ long mntversion(struct chan *c, char *version, int msize, int returnlen)
 		spin_lock(&c->lock);
 		c->offset -= k - l;
 		spin_unlock(&c->lock);
-		error("short write in fversion");
+		error(EFAIL, "short write in fversion");
 	}
 
 	/* message sent; receive and decode reply */
 	k = devtab[c->type].read(c, msg, 8192 + IOHDRSZ, c->offset);
 	if (k <= 0)
-		error("EOF receiving fversion reply");
+		error(EFAIL, "EOF receiving fversion reply");
 
 	spin_lock(&c->lock);
 	c->offset += k;
@@ -210,18 +207,18 @@ long mntversion(struct chan *c, char *version, int msize, int returnlen)
 
 	l = convM2S(msg, k, &f);
 	if (l != k)
-		error("bad fversion conversion on reply");
+		error(EFAIL, "bad fversion conversion on reply");
 	if (f.type != Rversion) {
 		if (f.type == Rerror)
-			error(f.ename);
-		error("unexpected reply type in fversion");
+			error(EFAIL, f.ename);
+		error(EFAIL, "unexpected reply type in fversion");
 	}
 	if (f.msize > msize)
-		error("server tries to increase msize in fversion");
+		error(EFAIL, "server tries to increase msize in fversion");
 	if (f.msize < 256 || f.msize > 1024 * 1024)
-		error("nonsense value of msize in fversion");
+		error(EFAIL, "nonsense value of msize in fversion");
 	if (strncmp(f.version, v, strlen(f.version)) != 0)
-		error("bad 9P version returned from server");
+		error(EFAIL, "bad 9P version returned from server");
 
 	/* now build Mnt associated with this connection */
 	spin_lock(&mntalloc.l);
@@ -261,7 +258,7 @@ long mntversion(struct chan *c, char *version, int msize, int returnlen)
 	k = strlen(f.version);
 	if (returnlen > 0) {
 		if (returnlen < k)
-			error(Eshort);
+			error(ENAMETOOLONG, NULL);
 		memmove(version, f.version, k);
 	}
 
@@ -280,7 +277,7 @@ struct chan *mntauth(struct chan *c, char *spec)
 		mntversion(c, VERSION9P, MAXRPC, 0);
 		m = c->mux;
 		if (m == NULL)
-			error(Enoversion);
+			error(EINVAL, NULL);
 	}
 
 	c = mntchan();
@@ -342,7 +339,7 @@ static struct chan *mntattach(char *muxattach)
 		mntversion(c, NULL, 0, 0);
 		m = c->mux;
 		if (m == NULL)
-			error(Enoversion);
+			error(EINVAL, NULL);
 	}
 
 	c = mntchan();
@@ -413,7 +410,7 @@ static struct walkqid *mntwalk(struct chan *c, struct chan *nc, char **name,
 	if (nc != NULL)
 		printd("mntwalk: nc != NULL\n");
 	if (nname > MAXWELEM)
-		error("devmnt: too many name elements");
+		error(EFAIL, "devmnt: too many name elements");
 	alloc = 0;
 	wq = kzmalloc(sizeof(struct walkqid) + nname * sizeof(struct qid),
 				  KMALLOC_WAIT);
@@ -451,7 +448,7 @@ static struct walkqid *mntwalk(struct chan *c, struct chan *nc, char **name,
 	mountrpc(m, r);
 
 	if (r->reply.nwqid > nname)
-		error("too many QIDs returned by walk");
+		error(EFAIL, "too many QIDs returned by walk");
 	if (r->reply.nwqid < nname) {
 		if (alloc)
 			cclose(nc);
@@ -491,7 +488,7 @@ static int mntstat(struct chan *c, uint8_t * dp, int n)
 	struct mntrpc *r;
 
 	if (n < BIT16SZ)
-		error(Eshortstat);
+		error(EINVAL, NULL);
 	m = mntchk(c);
 	r = mntralloc(c, m->msize);
 	if (waserror()) {
@@ -794,13 +791,14 @@ void mountrpc(struct mnt *m, struct mntrpc *r)
 				isxdigit(e[1]) &&
 				isxdigit(e[2]) &&
 				isxdigit(e[3])) {
+
 				int errno = strtoul(e, NULL, 16);
-				set_errno(errno);
-				error(&r->reply.ename[5]);
+
+				error(errno, &r->reply.ename[5]);
 			} else
-				error(r->reply.ename);
+				error(EFAIL, r->reply.ename);
 		case Rflush:
-			error(Eintr);
+			error(EINTR, NULL);
 		default:
 			if (t == r->request.type + 1)
 				break;
@@ -814,7 +812,7 @@ void mountrpc(struct mnt *m, struct mntrpc *r)
 				("mnt: proc %s %lu: mismatch from %s %s rep 0x%p tag %d fid %d T%d R%d rp %d\n",
 				 "current->text", "current->pid", sn, cn, r, r->request.tag,
 				 r->request.fid, r->request.type, r->reply.type, r->reply.tag);
-			error(Emountrpc);
+			error(EPROTO, NULL);
 	}
 }
 
@@ -854,7 +852,7 @@ void mountio(struct mnt *m, struct mntrpc *r)
 	if (n < 0)
 		panic("bad message type in mountio");
 	if (devtab[m->c->type].write(m->c, r->rpc, n, 0) != n)
-		error(Emountrpc);
+		error(EIO, NULL);
 /*	r->stime = fastticks(NULL); */
 	r->reqlen = n;
 
@@ -875,7 +873,7 @@ void mountio(struct mnt *m, struct mntrpc *r)
 	spin_unlock(&m->lock);
 	while (r->done == 0) {
 		if (mntrpcread(m, r) < 0)
-			error(Emountrpc);
+			error(EIO, NULL);
 		mountmux(m, r);
 	}
 	mntgate(m);

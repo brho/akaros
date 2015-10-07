@@ -373,7 +373,7 @@ int cmount(struct chan *new, struct chan *old, int flag, char *spec)
 	struct mount *nm, *f, *um, **h;
 
 	if (QTDIR & (old->qid.type ^ new->qid.type))
-		error(Emount);
+		error(EINVAL, NULL);
 
 	if (old->umh)
 		printd("cmount old extra umh\n");
@@ -381,7 +381,7 @@ int cmount(struct chan *new, struct chan *old, int flag, char *spec)
 	order = flag & MORDER;
 
 	if ((old->qid.type & QTDIR) == 0 && order != MREPL)
-		error(Emount);
+		error(EINVAL, NULL);
 
 	mh = new->umh;
 
@@ -403,7 +403,7 @@ int cmount(struct chan *new, struct chan *old, int flag, char *spec)
 	 */
 	if ((flag & MCREATE) && mh && mh->mount
 		&& (mh->mount->next || !(mh->mount->mflag & MCREATE)))
-		error(Emount);
+		error(EEXIST, NULL);
 
 	pg = current->pgrp;
 	wlock(&pg->ns);
@@ -506,7 +506,7 @@ void cunmount(struct chan *mnt, struct chan *mounted)
 
 	if (m == 0) {
 		wunlock(&pg->ns);
-		error(Eunmount);
+		error(ENOENT, NULL);
 	}
 
 	wlock(&m->lock);
@@ -545,7 +545,7 @@ void cunmount(struct chan *mnt, struct chan *mounted)
 	}
 	wunlock(&m->lock);
 	wunlock(&pg->ns);
-	error(Eunion);
+	error(ENOENT, NULL);
 }
 
 struct chan *cclone(struct chan *c)
@@ -555,7 +555,7 @@ struct chan *cclone(struct chan *c)
 
 	wq = devtab[c->type].walk(c, NULL, NULL, 0);
 	if (wq == NULL)
-		error("clone failed");
+		error(EFAIL, "clone failed");
 	nc = wq->clone;
 	kfree(wq);
 	nc->name = c->name;
@@ -838,7 +838,7 @@ struct chan *createdir(struct chan *c, struct mhead *m)
 			return nc;
 		}
 	}
-	error(Enocreate);
+	error(EPERM, NULL);
 	poperror();
 	return 0;
 }
@@ -1006,21 +1006,21 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 
 		/* don't try to walk the last path element just yet. */
 		if (e.ARRAY_SIZEs == 0)
-			error(Eexist);
+			error(EEXIST, NULL);
 		e.ARRAY_SIZEs--;
 	}
 
 	if (walk(&c, e.elems, e.ARRAY_SIZEs, can_mount, &npath) < 0) {
 		if (npath < 0 || npath > e.ARRAY_SIZEs) {
 			printd("namec %s walk error npath=%d\n", aname, npath);
-			error("walk failed");
+			error(EFAIL, "walk failed");
 		}
 NameError:
 		if (current_errstr()[0]) {
 			/* errstr is set, we'll just stick with it and error out */
 			longjmp(&get_cur_errbuf()->jmpbuf, 1);
 		} else {
-			error("Name to chan lookup failed");
+			error(EFAIL, "Name to chan lookup failed");
 		}
 		/* brho: skipping the namec custom error string business, since it hides
 		 * the underlying failure.  implement this if you want the old stuff. */
@@ -1047,7 +1047,7 @@ NameError:
 
 	if ((amode == Aopen) && (omode & O_EXEC) && (c->qid.type & QTDIR)) {
 		npath = e.ARRAY_SIZEs;
-		error("cannot exec directory");
+		error(EFAIL, "cannot exec directory");
 	}
 
 	switch (amode) {
@@ -1112,7 +1112,7 @@ Open:
 					 * probably saving mode directly, without passing it through
 					 * openmode. */
 					if (c->mode & O_TRUNC)
-						error("Device %s open failed to clear O_TRUNC",
+						error(EFAIL, "Device %s open failed to clear O_TRUNC",
 						      devtab[c->type].name);
 					break;
 			}
@@ -1124,7 +1124,7 @@ Open:
 			 * so one may mount on / or . and see the effect.
 			 */
 			if (!(c->qid.type & QTDIR))
-				error(Enotdir);
+				error(ENOTDIR, NULL);
 			break;
 
 		case Amount:
@@ -1151,7 +1151,7 @@ Open:
 			e.ARRAY_SIZEs++;
 			if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, can_mount, NULL) == 0) {
 				if (omode & O_EXCL)
-					error(Eexist);
+					error(EEXIST, NULL);
 				omode |= O_TRUNC;
 				goto Open;
 			}
@@ -1250,7 +1250,8 @@ Open:
 			/* note: we depend that walk does not error */
 			if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, can_mount, NULL) < 0) {
 				set_errno(saved_errno);
-				error(tmperrbuf);	/* report the error we had originally */
+				/* Report the error we had originally */
+				error(EFAIL, tmperrbuf);
 			}
 			strncpy(current_errstr(), tmperrbuf, MAX_ERRSTR_LEN);
 			omode |= O_TRUNC;
@@ -1282,7 +1283,7 @@ struct chan *namec(char *name, int amode, int omode, uint32_t perm)
 	int n, devtype;
 
 	if (name[0] == '\0')
-		error("empty file name");
+		error(EFAIL, "empty file name");
 	validname(name, 1);
 	/*
 	 * Find the starting off point (the current slash, the root of
@@ -1305,7 +1306,7 @@ struct chan *namec(char *name, int amode, int omode, uint32_t perm)
 			name++; /* drop the # */
 			while ((*name != '\0') && (*name != '/')) {
 				if (n >= GENBUF_SZ - 1)
-					error(Efilename);
+					error(ENAMETOOLONG, NULL);
 				devname[n++] = *name++;
 			}
 			devname[n] = '\0';
@@ -1319,7 +1320,7 @@ struct chan *namec(char *name, int amode, int omode, uint32_t perm)
 				devspec = &devname[n];
 			}
 			if (!strcmp(devname, "mnt"))
-				error(Enoattach);
+				error(EINVAL, NULL);
 			/* TODO: deal with this "nodevs" business. */
 			#if 0
 			/*
@@ -1335,11 +1336,11 @@ struct chan *namec(char *name, int amode, int omode, uint32_t perm)
 				((strchr("|esDa", get_cur_genbuf()[1]) == NULL)
 				 || (get_cur_genbuf()[1] == 's'	// || r == 's'
 					 && get_cur_genbuf()[n] != '\0')))
-				error(Enoattach);
+				error(EINVAL, NULL);
 			#endif
 			devtype = devno(devname, 1);
 			if (devtype == -1)
-				error("Unknown #device %s (spec %s)", devname, devspec);
+				error(EFAIL, "Unknown #device %s (spec %s)", devname, devspec);
 			c = devtab[devtype].attach(devspec);
 			break;
 		default:
@@ -1359,7 +1360,7 @@ struct chan *namec_from(struct chan *c, char *name, int amode, int omode,
 	if (name[0] == '\0') {
 		/* Our responsibility to cclose 'c' on our error */
 		cclose(c);
-		error("empty file name");
+		error(EFAIL, "empty file name");
 	}
 	validname(name, 1);
 	return __namec_from(c, name, amode, omode, perm, TRUE);
@@ -1404,7 +1405,7 @@ void validname(char *aname, int slashok)
 	ename = memchr(name, 0, (1 << 16));
 
 	if (ename == NULL || ename - name >= (1 << 16))
-		error("name too long");
+		error(EFAIL, "name too long");
 
 	while (*name) {
 		/* all characters above '~' are ok */
@@ -1414,11 +1415,11 @@ void validname(char *aname, int slashok)
 			name += chartorune(&r, name);
 #endif
 		if (c >= 0x7f) {
-			error("Akaros doesn't do UTF-8");
+			error(EFAIL, "Akaros doesn't do UTF-8");
 		} else {
 			if (isfrog[c])
 				if (!slashok || c != '/') {
-					error("%s: %s (%p), at char %c", Ebadchar, aname, aname, c);
+					error(EFAIL, "%s: %s (%p), at char %c", Ebadchar, aname, aname, c);
 				}
 			name++;
 		}
@@ -1429,7 +1430,7 @@ void isdir(struct chan *c)
 {
 	if (c->qid.type & QTDIR)
 		return;
-	error(Enotdir);
+	error(ENOTDIR, NULL);
 }
 
 /*

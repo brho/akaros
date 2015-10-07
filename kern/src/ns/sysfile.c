@@ -40,22 +40,19 @@ struct chan *fdtochan(struct fd_table *fdt, int fd, int mode, int chkmnt,
 	if (!c) {
 		/* We lost the info about why there was a problem (we used to track file
 		 * group closed too, can add that in later). */
-		set_errno(EBADF);
-		error("Bad FD %d\n", fd);
+		error(EBADF, NULL);
 	}
 	if (chkmnt && (c->flag & CMSG)) {
 		if (iref)
 			cclose(c);
-		set_errno(EBADF);
-		error(Ebadusefd);
+		error(EBADF, NULL);
 	}
 	if (mode < 0)
 		return c;
 	if ((mode & c->mode) != mode) {
 		if (iref)
 			cclose(c);
-		set_errno(EBADF);
-		error("FD access mode failure: chan mode 0x%x, wanted 0x%x",
+		error(EBADF, "FD access mode failure: chan mode 0x%x, wanted 0x%x",
 		      c->mode, mode);
 	}
 	return c;
@@ -78,7 +75,7 @@ long kchanio(void *vc, void *buf, int n, int mode)
 	else if (mode == O_WRITE)
 		r = devtab[c->type].write(c, buf, n, c->offset);
 	else
-		error("kchanio: use only O_READ xor O_WRITE");
+		error(EFAIL, "kchanio: use only O_READ xor O_WRITE");
 
 	spin_lock(&c->lock);
 	c->offset += r;
@@ -100,10 +97,10 @@ int openmode(uint32_t omode)
 	 * Note that we no longer convert OEXEC/O_EXEC to O_READ, and instead return
 	 * just the O_ACCMODE bits. */
 	if (o >= (OTRUNC | OCEXEC | ORCLOSE | OEXEC))
-		error(Ebadarg);
+		error(EINVAL, NULL);
 	o &= ~(OTRUNC | OCEXEC | ORCLOSE);
 	if (o > OEXEC)
-		error(Ebadarg);
+		error(EINVAL, NULL);
 	if (o == OEXEC)
 		return OREAD;
 	return o;
@@ -176,7 +173,7 @@ int syscreate(char *path, int mode, uint32_t perm)
 	}
 	fd = newfd(c, mode);	/* 9ns mode is the O_FLAGS and perm is glibc mode */
 	if (fd < 0)
-		error(Enofd);
+		error(fd, NULL);
 	poperror();
 
 	poperror();
@@ -196,12 +193,12 @@ int sysdup(int old)
 	c = fdtochan(&current->open_files, old, -1, 0, 1);
 	if (c->qid.type & QTAUTH) {
 		cclose(c);
-		error(Eperm);
+		error(EPERM, NULL);
 	}
 	fd = newfd(c, 0);
 	if (fd < 0) {
 		cclose(c);
-		error(Enofd);
+		error(fd, NULL);
 	}
 	poperror();
 	return fd;
@@ -223,14 +220,14 @@ int sys_dup_to(struct proc *from_proc, unsigned int from_fd,
 	c = fdtochan(&from_proc->open_files, from_fd, -1, 0, 1);
 	if (c->qid.type & QTAUTH) {
 		cclose(c);
-		error(Eperm);
+		error(EPERM, NULL);
 	}
 	ret = insert_obj_fdt(&to_proc->open_files, c, to_fd, 0, TRUE, FALSE);
 	/* drop the ref from fdtochan.  if insert succeeded, there is one other ref
 	 * stored in the FDT */
 	cclose(c);
 	if (ret < 0)
-		error("Can't insert FD %d into FDG", to_fd);
+		error(EFAIL, "Can't insert FD %d into FDG", to_fd);
 	poperror();
 	return 0;
 }
@@ -251,7 +248,7 @@ char *sysfd2path(int fd)
 		s = kzmalloc(c->name->len + 1, 0);
 		if (s == NULL) {
 			cclose(c);
-			error(Enomem);
+			error(ENOMEM, NULL);
 		}
 		memmove(s, c->name->s, c->name->len + 1);
 	}
@@ -290,7 +287,7 @@ int sysfauth(int fd, char *aname)
 
 	fd = newfd(ac, 0);
 	if (fd < 0)
-		error(Enofd);
+		error(fd, NULL);
 	poperror();	/* ac */
 
 	poperror();
@@ -311,7 +308,7 @@ int sysfversion(int fd, unsigned int msize, char *vers, unsigned int arglen)
 
 	/* check there's a NUL in the version string */
 	if (arglen == 0 || memchr(vers, 0, arglen) == 0)
-		error(Ebadarg);
+		error(EINVAL, NULL);
 
 	c = fdtochan(&current->open_files, fd, O_RDWR, 0, 1);
 	if (waserror()) {
@@ -359,17 +356,17 @@ int syspipe(int fd[2])
 	c[0] = namec("#pipe", Atodir, 0, 0);
 	c[1] = cclone(c[0]);
 	if (walk(&c[0], &names[0], 1, FALSE, NULL) < 0)
-		error(Egreg);
+		error(EINVAL, NULL);
 	if (walk(&c[1], &names[1], 1, FALSE, NULL) < 0)
-		error(Egreg);
+		error(EINVAL, NULL);
 	c[0] = d->open(c[0], O_RDWR);
 	c[1] = d->open(c[1], O_RDWR);
 	fd[0] = newfd(c[0], 0);
 	if (fd[0] < 0)
-		error(Enofd);
+		error(fd[0], NULL);
 	fd[1] = newfd(c[1], 0);
 	if (fd[1] < 0)
-		error(Enofd);
+		error(fd[1], NULL);
 	poperror();
 	return 0;
 }
@@ -405,7 +402,7 @@ long bindmount(struct chan *c, char *old, int flag, char *spec)
 	struct chan *c1;
 
 	if (flag > MMASK || (flag & MORDER) == (MBEFORE | MAFTER))
-		error(Ebadarg);
+		error(EINVAL, NULL);
 
 	c1 = namec(old, Amount, 0, 0);
 	if (waserror()) {
@@ -547,7 +544,7 @@ int sysopenat(int fromfd, char *path, int vfs_flags)
 	}
 	fd = newfd(c, vfs_flags);
 	if (fd < 0)
-		error(Enofd);
+		error(fd, NULL);
 	poperror();
 	return fd;
 }
@@ -649,7 +646,7 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 	}
 
 	if (n < 0)
-		error(Etoosmall);
+		error(EINVAL, NULL);
 
 	dir = c->qid.type & QTDIR;
 
@@ -693,7 +690,7 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 		} else
 			off = *offp;
 		if (off < 0)
-			error(Enegoff);
+			error(EINVAL, NULL);
 		if (off == 0) {
 			if (offp == NULL) {
 				spin_lock(&c->lock);
@@ -750,7 +747,7 @@ void read_exactly_n(struct chan *c, void *vp, long n)
 		nn = devtab[c->type].read(c, p, n, c->offset);
 		printd("readn: Got %d@%lld\n", nn, c->offset);
 		if (nn == 0)
-			error("%s: wanted %d, got %d", Eshort, want, total);
+			error(EFAIL, "%s: wanted %d, got %d", Eshort, want, total);
 		spin_lock(&c->lock);
 		c->offset += nn;
 		spin_unlock(&c->lock);
@@ -819,16 +816,16 @@ int64_t sysseek(int fd, int64_t off, int whence)
 	/* TODO: WTF is this?  Is pipe magically the only device that isn't
 	 * seekable? */
 	if (!strcmp(devtab[c->type].name, "pipe"))
-		error(Eisstream);
+		error(EINVAL, NULL);
 
 	switch (whence) {
 		case 0:
 			if (c->qid.type & QTDIR) {
 				if (off != 0)
-					error(Eisdir);
+					error(EISDIR, NULL);
 				unionrewind(c);
 			} else if (off < 0)
-				error(Enegoff);
+				error(EINVAL, NULL);
 			spin_lock(&c->lock);	/* lock for int64_t assignment */
 			c->offset = off;
 			spin_unlock(&c->lock);
@@ -836,12 +833,12 @@ int64_t sysseek(int fd, int64_t off, int whence)
 
 		case 1:
 			if (c->qid.type & QTDIR)
-				error(Eisdir);
+				error(EISDIR, NULL);
 			spin_lock(&c->lock);	/* lock for read/write update */
 			off += c->offset;
 			if (off < 0) {
 				spin_unlock(&c->lock);
-				error(Enegoff);
+				error(EINVAL, NULL);
 			}
 			c->offset = off;
 			spin_unlock(&c->lock);
@@ -849,21 +846,21 @@ int64_t sysseek(int fd, int64_t off, int whence)
 
 		case 2:
 			if (c->qid.type & QTDIR)
-				error(Eisdir);
+				error(EISDIR, NULL);
 			dir = chandirstat(c);
 			if (dir == NULL)
-				error("internal error: stat error in seek");
+				error(EFAIL, "internal error: stat error in seek");
 			off += dir->length;
 			kfree(dir);
 			if (off < 0)
-				error(Enegoff);
+				error(EINVAL, NULL);
 			spin_lock(&c->lock);	/* lock for read/write update */
 			c->offset = off;
 			spin_unlock(&c->lock);
 			break;
 
 		default:
-			error(Ebadarg);
+			error(EINVAL, NULL);
 			break;
 	}
 	poperror();
@@ -880,7 +877,7 @@ void validstat(uint8_t * s, int n, int slashok)
 	char buf[64];
 
 	if (statcheck(s, n) < 0)
-		error(Ebadstat);
+		error(EINVAL, NULL);
 	/* verify that name entry is acceptable */
 	s += STATFIXLEN - 4 * BIT16SZ;	/* location of first string */
 	/*
@@ -997,10 +994,10 @@ static long rwrite(int fd, void *va, long n, int64_t * offp)
 		nexterror();
 	}
 	if (c->qid.type & QTDIR)
-		error(Eisdir);
+		error(EISDIR, NULL);
 
 	if (n < 0)
-		error(Etoosmall);
+		error(EINVAL, NULL);
 
 	if (offp == NULL) {
 		/* append changes the offset to the end, and even if we fail later, this
@@ -1008,7 +1005,7 @@ static long rwrite(int fd, void *va, long n, int64_t * offp)
 		if (c->flag & O_APPEND) {
 			dir = chandirstat(c);
 			if (!dir)
-				error("internal error: stat error in append write");
+				error(EFAIL, "internal error: stat error in append write");
 			spin_lock(&c->lock);	/* legacy lock for int64 assignment */
 			c->offset = dir->length;
 			spin_unlock(&c->lock);
@@ -1030,7 +1027,7 @@ static long rwrite(int fd, void *va, long n, int64_t * offp)
 		nexterror();
 	}
 	if (off < 0)
-		error(Enegoff);
+		error(EINVAL, NULL);
 	m = devtab[c->type].write(c, va, n, off);
 	poperror();
 
@@ -1216,11 +1213,11 @@ static long dirpackage(uint8_t * buf, long ts, struct kdirent **d)
 	}
 
 	if (i != ts)
-		error("bad directory format");
+		error(EFAIL, "bad directory format");
 
 	*d = kzmalloc(n * sizeof(**d) + ss, 0);
 	if (*d == NULL)
-		error(Enomem);
+		error(ENOMEM, NULL);
 
 	/*
 	 * then convert all buffers
@@ -1232,7 +1229,7 @@ static long dirpackage(uint8_t * buf, long ts, struct kdirent **d)
 		if (nn >= n || /*convM2D */ convM2kdirent(&buf[i], m, *d + nn, s) != m) {
 			kfree(*d);
 			*d = NULL;
-			error("bad directory entry");
+			error(EFAIL, "bad directory entry");
 		}
 		nn++;
 		s += m;
@@ -1254,7 +1251,7 @@ long sysdirread(int fd, struct kdirent **d)
 	}
 	buf = kzmalloc(DIRREADLIM, 0);
 	if (buf == NULL)
-		error(Enomem);
+		error(ENOMEM, NULL);
 	if (waserror()) {
 		kfree(buf);
 		nexterror();
@@ -1426,13 +1423,10 @@ int fd_setfl(int fd, int flags)
 	c = fdtochan(&current->open_files, fd, -1, 0, 1);
 	if (cexternal_flags_differ(flags, c->flag, O_CLOEXEC)) {
 		/* TODO: The whole CCEXEC / O_CLOEXEC on 9ns needs work */
-		set_errno(EINVAL);
-		error("can't toggle O_CLOEXEC with setfl");
+		error(EINVAL, "can't toggle O_CLOEXEC with setfl");
 	}
-	if (cexternal_flags_differ(flags, c->flag, O_PATH)) {
-		set_errno(EINVAL);
-		error("can't toggle O_PATH with setfl");
-	}
+	if (cexternal_flags_differ(flags, c->flag, O_PATH))
+		error(EINVAL, "can't toggle O_PATH with setfl");
 	c->flag = (c->flag & ~CEXTERNAL_FLAGS) | (flags & CEXTERNAL_FLAGS);
 	cclose(c);
 	poperror();

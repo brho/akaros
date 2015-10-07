@@ -3,7 +3,8 @@
 
 /* If you edit this file, be careful of tabs vs spaces.  This is processed by
  * scripts/make_errlist.c, which you need to run if you want glibc strerrno() to
- * know about your changes. */
+ * know about your changes.
+ * Keep this header with definitions ordered ascending. */
 
 // See below for the rest of the new error codes for ROS
 #define	ESUCCESS	0	/* Success */

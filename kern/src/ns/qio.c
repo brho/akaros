@@ -1269,11 +1269,11 @@ static bool qwait(struct queue *q)
 		if (q->state & Qclosed) {
 			if (++q->eof > 3) {
 				spin_unlock_irqsave(&q->lock);
-				error("multiple reads on a closed queue");
+				error(EFAIL, "multiple reads on a closed queue");
 			}
 			if (*q->err && strcmp(q->err, Ehungup) != 0) {
 				spin_unlock_irqsave(&q->lock);
-				error(q->err);
+				error(EFAIL, q->err);
 			}
 			return FALSE;
 		}
@@ -1283,7 +1283,7 @@ static bool qwait(struct queue *q)
 		if (q->state & Qnonblock) {
 			spin_unlock_irqsave(&q->lock);
 			set_errno(EAGAIN);
-			error("queue empty");
+			error(EFAIL, "queue empty");
 		}
 		spin_unlock_irqsave(&q->lock);
 		/* may throw an error() */
@@ -1641,7 +1641,7 @@ long qbwrite(struct queue *q, struct block *b)
 	/* give up if the queue is closed */
 	if (q->state & Qclosed) {
 		spin_unlock_irqsave(&q->lock);
-		error(q->err);
+		error(EFAIL, q->err);
 	}
 
 	/* if nonblocking, don't queue over the limit */
@@ -1659,7 +1659,7 @@ long qbwrite(struct queue *q, struct block *b)
 			spin_unlock_irqsave(&q->lock);
 			freeb(b);
 			set_errno(EAGAIN);
-			error("queue full");
+			error(EFAIL, "queue full");
 		}
 	}
 

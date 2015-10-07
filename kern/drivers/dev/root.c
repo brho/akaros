@@ -154,7 +154,7 @@ static int newentry(int parent)
 	int n = findempty();
 	int sib;
 	if (n < 0)
-		error("#root. No more");
+		error(EFAIL, "#root. No more");
 	printd("new entry is %d\n", n);
 	/* add the new one to the head of the linked list.  vers is 'next' */
 	roottab[n].qid.vers = rootdata[parent].child;
@@ -203,7 +203,7 @@ static struct chan *rootattach(char *spec)
 {
 	struct chan *c;
 	if (*spec)
-		error(Ebadspec);
+		error(EINVAL, NULL);
 	c = devattach(devname(), spec);
 	mkqid(&c->qid, roottab[0].qid.path, roottab[0].qid.vers, QTDIR);
 	return c;
@@ -398,19 +398,20 @@ static long rootwrite(struct chan *c, void *a, long n, int64_t off)
 	struct dirtab *r = &roottab[c->qid.path];
 
 	if (off < 0)
-		error("rootwrite: offset < 0!");
+		error(EFAIL, "rootwrite: offset < 0!");
 
 	if (off + n > rd->size){
 		void *p;
 		p = krealloc(rd->ptr, off + n, KMALLOC_WAIT);
 		if (! p)
-			error("rootwrite: could not grow the file to %d bytes", off + n);
+			error(EFAIL, "rootwrite: could not grow the file to %d bytes",
+				  off + n);
 		rd->ptr = p;
 		rd->size = off + n;
 	}
 	assert(current);
 	if (memcpy_from_user_errno(current, rd->ptr + off, a, n) < 0)
-		error("%s: bad user addr %p", __FUNCTION__, a);
+		error(EFAIL, "%s: bad user addr %p", __FUNCTION__, a);
 
 	return n;
 }
@@ -430,7 +431,7 @@ static int rootwstat(struct chan *c, uint8_t *m_buf, int m_buf_sz)
 	m_sz = convM2D(m_buf, m_buf_sz, &dir[0], (char*)&dir[1]);
 	if (!m_sz) {
 		kfree(dir);
-		error(Eshortstat);
+		error(ENODATA, NULL);
 	}
 	/* TODO: handle more things than just the mode */
 	if (!emptystr(dir->name))

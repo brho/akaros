@@ -158,7 +158,7 @@ static long pciread(struct chan *c, void *va, long n, int64_t offset)
 			tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
 			p = pcimatchtbdf(tbdf);
 			if (p == NULL)
-				error(Egreg);
+				error(EINVAL, NULL);
 			ebuf = buf + sizeof buf - 1;	/* -1 for newline */
 			w = seprintf(buf, ebuf, "%.2x.%.2x.%.2x %.4x/%.4x %3d",
 						 p->ccrb, p->ccru, p->ccrp, p->vid, p->did, p->intl);
@@ -175,7 +175,7 @@ static long pciread(struct chan *c, void *va, long n, int64_t offset)
 			tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
 			p = pcimatchtbdf(tbdf);
 			if (p == NULL)
-				error(Egreg);
+				error(EINVAL, NULL);
 			if (n + offset > 256)
 				n = 256 - offset;
 			if (n < 0)
@@ -199,7 +199,7 @@ static long pciread(struct chan *c, void *va, long n, int64_t offset)
 			}
 			return i;
 		default:
-			error(Egreg);
+			error(EINVAL, NULL);
 	}
 	return n;
 }
@@ -223,7 +223,7 @@ static long pciwrite(struct chan *c, void *va, long n, int64_t offset)
 			tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
 			p = pcimatchtbdf(tbdf);
 			if (p == NULL)
-				error(Egreg);
+				error(EINVAL, NULL);
 			if (offset > 256)
 				return 0;
 			if (n + offset > 256)
@@ -247,7 +247,7 @@ static long pciwrite(struct chan *c, void *va, long n, int64_t offset)
 			}
 			return i;
 		default:
-			error(Egreg);
+			error(EINVAL, NULL);
 	}
 	return n;
 }

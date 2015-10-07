@@ -331,7 +331,7 @@ static struct chan *ipattach(char *spec)
 
 	dev = atoi(spec);
 	if (dev >= Nfs)
-		error("bad specification");
+		error(EFAIL, "bad specification");
 
 	ipgetfs(dev);
 	c = devattach(devname(), spec);
@@ -387,7 +387,7 @@ static struct chan *ipopen(struct chan *c, int omode)
 			break;
 		case Qndb:
 			if (omode & (O_WRITE | O_TRUNC) && !iseve())
-				error(Eperm);
+				error(EPERM, NULL);
 			if ((omode & (O_WRITE | O_TRUNC)) == (O_WRITE | O_TRUNC))
 				f->ndb[0] = 0;
 			break;
@@ -409,15 +409,15 @@ static struct chan *ipopen(struct chan *c, int omode)
 		case Qbootp:
 		case Qipselftab:
 			if (omode & O_WRITE)
-				error(Eperm);
+				error(EPERM, NULL);
 			break;
 		case Qsnoop:
 			if (omode & O_WRITE)
-				error(Eperm);
+				error(EPERM, NULL);
 			p = f->p[PROTO(c->qid)];
 			cv = p->conv[CONV(c->qid)];
 			if (strcmp(ATTACHER(c), cv->owner) != 0 && !iseve())
-				error(Eperm);
+				error(EPERM, NULL);
 			atomic_inc(&cv->snoopers);
 			break;
 		case Qclone:
@@ -431,7 +431,7 @@ static struct chan *ipopen(struct chan *c, int omode)
 			qunlock(&p->qlock);
 			poperror();
 			if (cv == NULL) {
-				error(Enodev);
+				error(ENODEV, NULL);
 				break;
 			}
 			/* we only honor nonblock on a clone */
@@ -453,9 +453,9 @@ static struct chan *ipopen(struct chan *c, int omode)
 			}
 			if ((perm & (cv->perm >> 6)) != perm) {
 				if (strcmp(ATTACHER(c), cv->owner) != 0)
-					error(Eperm);
+					error(EPERM, NULL);
 				if ((perm & cv->perm) != perm)
-					error(Eperm);
+					error(EPERM, NULL);
 
 			}
 			cv->inuse++;
@@ -487,14 +487,14 @@ static struct chan *ipopen(struct chan *c, int omode)
 			}
 			if ((perm & (cv->perm >> 6)) != perm) {
 				if (strcmp(ATTACHER(c), cv->owner) != 0)
-					error(Eperm);
+					error(EPERM, NULL);
 				if ((perm & cv->perm) != perm)
-					error(Eperm);
+					error(EPERM, NULL);
 
 			}
 
 			if (cv->state != Announced)
-				error("not announced");
+				error(EFAIL, "not announced");
 
 			if (waserror()) {
 				closeconv(cv);
@@ -508,7 +508,7 @@ static struct chan *ipopen(struct chan *c, int omode)
 			while (nc == NULL) {
 				/* give up if we got a hangup */
 				if (qisclosed(cv->rq))
-					error("listen hungup");
+					error(EFAIL, "listen hungup");
 
 				qlock(&cv->listenq);
 				if (waserror()) {
@@ -518,10 +518,8 @@ static struct chan *ipopen(struct chan *c, int omode)
 				/* we can peek at incall without grabbing the cv qlock.  if
 				 * anything is there, it'll remain there until we dequeue it.
 				 * no one else can, since we hold the listenq lock */
-				if (cv->nonblock && !cv->incall) {
-					set_errno(EAGAIN);
-					error("listen queue empty");
-				}
+				if (cv->nonblock && !cv->incall)
+					error(EAGAIN, "listen queue empty");
 				/* wait for a connect */
 				rendez_sleep(&cv->listenr, should_wake, cv);
 
@@ -564,7 +562,7 @@ static int ipwstat(struct chan *c, uint8_t * dp, int n)
 	f = ipfs[c->dev];
 	switch (TYPE(c->qid)) {
 		default:
-			error(Eperm);
+			error(EPERM, NULL);
 			break;
 		case Qctl:
 		case Qdata:
@@ -578,11 +576,11 @@ static int ipwstat(struct chan *c, uint8_t * dp, int n)
 	}
 	n = convM2D(dp, n, d, (char *)&d[1]);
 	if (n == 0)
-		error(Eshortstat);
+		error(ENODATA, NULL);
 	p = f->p[PROTO(c->qid)];
 	cv = p->conv[CONV(c->qid)];
 	if (!iseve() && strcmp(ATTACHER(c), cv->owner) != 0)
-		error(Eperm);
+		error(EPERM, NULL);
 	if (!emptystr(d->uid))
 		kstrdup(&cv->owner, d->uid);
 	if (d->mode != ~0UL)
@@ -722,7 +720,7 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 	p = a;
 	switch (TYPE(ch->qid)) {
 		default:
-			error(Eperm);
+			error(EPERM, NULL);
 		case Qtopdir:
 		case Qprotodir:
 		case Qconvdir:
@@ -795,7 +793,7 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 		case Qstats:
 			x = f->p[PROTO(ch->qid)];
 			if (x->stats == NULL)
-				error("stats not implemented");
+				error(EFAIL, "stats not implemented");
 			buf = kzmalloc(Statelen, 0);
 			(*x->stats) (x, buf, Statelen);
 			rv = readstr(offset, p, n, buf);
@@ -954,7 +952,7 @@ static char *setladdrport(struct conv *c, char *str, int announcing)
 	/* one process can get all connections */
 	if (announcing && strcmp(p, "*") == 0) {
 		if (!iseve())
-			error(Eperm);
+			error(EPERM, NULL);
 		return setluniqueport(c, 0);
 	}
 
@@ -1034,14 +1032,14 @@ static void connectctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 	char *p;
 
 	if (c->state != 0)
-		error(Econinuse);
+		error(EBUSY, NULL);
 	c->state = Connecting;
 	c->cerr[0] = '\0';
 	if (x->connect == NULL)
-		error("connect not supported");
+		error(EFAIL, "connect not supported");
 	p = x->connect(c, cb->f, cb->nf);
 	if (p != NULL)
-		error(p);
+		error(EFAIL, p);
 
 	qunlock(&c->qlock);
 	if (waserror()) {
@@ -1053,7 +1051,7 @@ static void connectctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 	poperror();
 
 	if (c->cerr[0] != '\0')
-		error(c->cerr);
+		error(EFAIL, c->cerr);
 }
 
 /*
@@ -1085,14 +1083,14 @@ static void announcectlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 	char *p;
 
 	if (c->state != 0)
-		error(Econinuse);
+		error(EBUSY, NULL);
 	c->state = Announcing;
 	c->cerr[0] = '\0';
 	if (x->announce == NULL)
-		error("announce not supported");
+		error(EFAIL, "announce not supported");
 	p = x->announce(c, cb->f, cb->nf);
 	if (p != NULL)
-		error(p);
+		error(EFAIL, p);
 
 	qunlock(&c->qlock);
 	if (waserror()) {
@@ -1104,7 +1102,7 @@ static void announcectlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 	poperror();
 
 	if (c->cerr[0] != '\0')
-		error(c->cerr);
+		error(EFAIL, c->cerr);
 }
 
 /*
@@ -1136,7 +1134,7 @@ static void bindctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 	else
 		p = x->bind(c, cb->f, cb->nf);
 	if (p != NULL)
-		error(p);
+		error(EFAIL, p);
 }
 
 static void nonblockctlmsg(struct conv *c, struct cmdbuf *cb)
@@ -1151,8 +1149,7 @@ static void nonblockctlmsg(struct conv *c, struct cmdbuf *cb)
 		goto err;
 	return;
 err:
-	set_errno(EINVAL);
-	error("nonblock [on|off]");
+	error(EINVAL, "nonblock [on|off]");
 }
 
 static void tosctlmsg(struct conv *c, struct cmdbuf *cb)
@@ -1187,7 +1184,7 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 
 	switch (TYPE(ch->qid)) {
 		default:
-			error(Eperm);
+			error(EPERM, NULL);
 		case Qdata:
 			x = f->p[PROTO(ch->qid)];
 			c = x->conv[CONV(ch->qid)];
@@ -1214,7 +1211,7 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 				nexterror();
 			}
 			if (cb->nf < 1)
-				error("short control request");
+				error(EFAIL, "short control request");
 			if (strcmp(cb->f[0], "connect") == 0)
 				connectctlmsg(x, c, cb);
 			else if (strcmp(cb->f[0], "announce") == 0)
@@ -1231,32 +1228,32 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 				c->ignoreadvice = 1;
 			else if (strcmp(cb->f[0], "addmulti") == 0) {
 				if (cb->nf < 2)
-					error("addmulti needs interface address");
+					error(EFAIL, "addmulti needs interface address");
 				if (cb->nf == 2) {
 					if (!ipismulticast(c->raddr))
-						error("addmulti for a non multicast address");
+						error(EFAIL, "addmulti for a non multicast address");
 					parseip(ia, cb->f[1]);
 					ipifcaddmulti(c, c->raddr, ia);
 				} else {
 					parseip(ma, cb->f[2]);
 					if (!ipismulticast(ma))
-						error("addmulti for a non multicast address");
+						error(EFAIL, "addmulti for a non multicast address");
 					parseip(ia, cb->f[1]);
 					ipifcaddmulti(c, ma, ia);
 				}
 			} else if (strcmp(cb->f[0], "remmulti") == 0) {
 				if (cb->nf < 2)
-					error("remmulti needs interface address");
+					error(EFAIL, "remmulti needs interface address");
 				if (!ipismulticast(c->raddr))
-					error("remmulti for a non multicast address");
+					error(EFAIL, "remmulti for a non multicast address");
 				parseip(ia, cb->f[1]);
 				ipifcremmulti(c, c->raddr, ia);
 			} else if (x->ctl != NULL) {
 				p = x->ctl(c, cb->f, cb->nf);
 				if (p != NULL)
-					error(p);
+					error(EFAIL, p);
 			} else
-				error("unknown control request");
+				error(EFAIL, "unknown control request");
 			qunlock(&c->qlock);
 			kfree(cb);
 			poperror();
@@ -1480,7 +1477,7 @@ retry:
 		if (c == NULL) {
 			c = kzmalloc(sizeof(struct conv), 0);
 			if (c == NULL)
-				error(Enomem);
+				error(ENOMEM, NULL);
 			qlock_init(&c->qlock);
 			qlock_init(&c->listenq);
 			rendez_init(&c->cr);
@@ -1495,7 +1492,7 @@ retry:
 				c->ptcl = kzmalloc(p->ptclsize, 0);
 				if (c->ptcl == NULL) {
 					kfree(c);
-					error(Enomem);
+					error(ENOMEM, NULL);
 				}
 			}
 			*pp = c;
@@ -1633,9 +1630,9 @@ struct conv *Fsnewcall(struct conv *c, uint8_t * raddr, uint16_t rport,
 static long ndbwrite(struct Fs *f, char *a, uint32_t off, int n)
 {
 	if (off > strlen(f->ndb))
-		error(Eio);
+		error(EIO, NULL);
 	if (off + n >= sizeof(f->ndb) - 1)
-		error(Eio);
+		error(EIO, NULL);
 	memmove(f->ndb + off, a, n);
 	f->ndb[off + n] = 0;
 	f->ndbvers++;

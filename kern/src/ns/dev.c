@@ -185,7 +185,7 @@ struct walkqid *devwalk(struct chan *c,
 	for (j = 0; j < nname; j++) {
 		if (!(nc->qid.type & QTDIR)) {
 			if (j == 0)
-				error(Enotdir);
+				error(ENOTDIR, NULL);
 			goto Done;
 		}
 		n = name[j];
@@ -218,7 +218,7 @@ Accept:
 Notfound:
 					set_errno(ENOENT);
 					if (j == 0)
-						error(Enonexist);
+						error(ENODEV, NULL);
 					set_errstr(Enonexist);
 					goto Done;
 				case 0:
@@ -279,13 +279,13 @@ devstat(struct chan *c, uint8_t * db, int n,
 					devdir(c, c->qid, elem, 0, eve, DMDIR | 0555, &dir);
 					n = convD2M(&dir, db, n);
 					if (n == 0)
-						error(Ebadarg);
+						error(EINVAL, NULL);
 					return n;
 				}
 				printd("DEVSTAT fails:%s %llu\n", devtab[c->type].name,
 					   c->qid.path);
 				set_errno(ENOENT);
-				error(Enonexist);
+				error(ENODEV, NULL);
 			case 0:
 				printd("DEVSTAT got 0\n");
 				break;
@@ -297,7 +297,7 @@ devstat(struct chan *c, uint8_t * db, int n,
 						dir.mode |= DMMOUNT;
 					n = convD2M(&dir, db, n);
 					if (n == 0)
-						error(Ebadarg);
+						error(EINVAL, NULL);
 					return n;
 				}
 				break;
@@ -330,7 +330,7 @@ devdirread(struct chan *c, char *d, long n,
 				dsz = convD2M(&dir[0], (uint8_t *) d, n - m);
 				if (dsz <= BIT16SZ) {	/* <= not < because this isn't stat; read is stuck */
 					if (m == 0)
-						error(Eshort);
+						error(ENODATA, NULL);
 					return m;
 				}
 				m += dsz;
@@ -343,7 +343,7 @@ devdirread(struct chan *c, char *d, long n,
 }
 
 /*
- * error(Eperm) if open permission not granted for up->env->user.
+ * error(EPERM, NULL) if open permission not granted for up->env->user.
  */
 void devpermcheck(char *fileuid, uint32_t perm, int omode)
 {
@@ -361,7 +361,7 @@ void devpermcheck(char *fileuid, uint32_t perm, int omode)
 	 * seem to handle O_EXEC being mixed readable or writable. */
 	rwx = omode_to_rwx(omode);
 	if ((rwx & perm) != rwx)
-		error("%s: devpermcheck(%s, 0%o, 0%o) failed", Eperm, fileuid, perm,
+		error(EFAIL, "%s: devpermcheck(%s, 0%o, 0%o) failed", Eperm, fileuid, perm,
 			  omode);
 }
 
@@ -389,7 +389,7 @@ struct chan *devopen(struct chan *c, int omode, struct dirtab *tab, int ntab,
 Return:
 	c->offset = 0;
 	if ((c->qid.type & QTDIR) && (omode & O_WRITE))
-		error("Tried opening dir with non-read-only mode %o", omode);
+		error(EFAIL, "Tried opening dir with non-read-only mode %o", omode);
 	c->mode = openmode(omode);
 	c->flag |= COPEN;
 	return c;
@@ -398,7 +398,7 @@ Return:
 void
 devcreate(struct chan *c, char *unused_char_p_t, int unused_int, uint32_t u)
 {
-	error(Eperm);
+	error(EPERM, NULL);
 }
 
 struct block *devbread(struct chan *c, long n, uint32_t offset)
@@ -408,7 +408,7 @@ struct block *devbread(struct chan *c, long n, uint32_t offset)
 
 	bp = allocb(n);
 	if (bp == 0)
-		error(Enomem);
+		error(ENOMEM, NULL);
 	if (waserror()) {
 		freeb(bp);
 		nexterror();
@@ -436,24 +436,24 @@ long devbwrite(struct chan *c, struct block *bp, uint32_t offset)
 
 void devremove(struct chan *c)
 {
-	error(Eperm);
+	error(EPERM, NULL);
 }
 
 int devwstat(struct chan *c, uint8_t * unused_uint8_p_t, int i)
 {
-	error(Eperm);
+	error(EPERM, NULL);
 	return 0;
 }
 
 void devpower(int i)
 {
-	error(Eperm);
+	error(EPERM, NULL);
 }
 
 #if 0
 int devconfig(int unused_int, char *c, DevConf *)
 {
-	error(Eperm);
+	error(EPERM, NULL);
 	return 0;
 }
 #endif
@@ -472,7 +472,7 @@ void validwstatname(char *name)
 {
 	validname(name, 0);
 	if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
-		error(Efilename);
+		error(EINVAL, NULL);
 }
 
 struct dev *devbyname(char *name)

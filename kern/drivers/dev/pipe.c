@@ -85,14 +85,14 @@ static struct chan *pipeattach(char *spec)
 	c = devattach(devname(), spec);
 	p = kzmalloc(sizeof(Pipe), 0);
 	if (p == 0)
-		error(Enomem);
+		error(ENOMEM, NULL);
 	if (waserror()) {
 		freepipe(p);
 		nexterror();
 	}
 	p->pipedir = kzmalloc(sizeof(pipedir), 0);
 	if (p->pipedir == 0)
-		error(Enomem);
+		error(ENOMEM, NULL);
 	memmove(p->pipedir, pipedir, sizeof(pipedir));
 	kstrdup(&p->user, current->user);
 	kref_init(&p->ref, pipe_release, 1);
@@ -100,10 +100,10 @@ static struct chan *pipeattach(char *spec)
 
 	p->q[0] = qopen(pipealloc.pipeqsize, Qcoalesce, 0, 0);
 	if (p->q[0] == 0)
-		error(Enomem);
+		error(ENOMEM, NULL);
 	p->q[1] = qopen(pipealloc.pipeqsize, Qcoalesce, 0, 0);
 	if (p->q[1] == 0)
-		error(Enomem);
+		error(ENOMEM, NULL);
 	poperror();
 
 	spin_lock(&(&pipealloc)->lock);
@@ -206,7 +206,7 @@ static int pipestat(struct chan *c, uint8_t * db, int n)
 	}
 	n = convD2M(&dir, db, n);
 	if (n < BIT16SZ)
-		error(Eshortstat);
+		error(ENODATA, NULL);
 	return n;
 }
 
@@ -220,7 +220,7 @@ static struct chan *pipeopen(struct chan *c, int omode)
 
 	if (c->qid.type & QTDIR) {
 		if (omode & O_WRITE)
-			error("Can only open directories O_READ, mode is %o oct", omode);
+			error(EFAIL, "Can only open directories O_READ, mode is %o oct", omode);
 		c->mode = openmode(omode);
 		c->flag |= COPEN;
 		c->offset = 0;
@@ -422,10 +422,10 @@ static int pipewstat(struct chan *c, uint8_t * dp, int n)
 	int d1;
 
 	if (c->qid.type & QTDIR)
-		error(Eperm);
+		error(EPERM, NULL);
 	p = c->aux;
 	if (strcmp(current->user, p->user) != 0)
-		error(Eperm);
+		error(EPERM, NULL);
 	d = kzmalloc(sizeof(*d) + n, 0);
 	if (waserror()) {
 		kfree(d);
@@ -433,14 +433,14 @@ static int pipewstat(struct chan *c, uint8_t * dp, int n)
 	}
 	n = convM2D(dp, n, d, (char *)&d[1]);
 	if (n == 0)
-		error(Eshortstat);
+		error(ENODATA, NULL);
 	d1 = NETTYPE(c->qid.path) == Qdata1;
 	if (!emptystr(d->name)) {
 		validwstatname(d->name);
 		if (strlen(d->name) >= KNAMELEN)
-			error(Efilename);
+			error(ENAMETOOLONG, NULL);
 		if (strcmp(p->pipedir[1 + !d1].name, d->name) == 0)
-			error(Eexist);
+			error(EEXIST, NULL);
 		strncpy(p->pipedir[1 + d1].name, d->name,
 				MIN(KNAMELEN, sizeof(p->pipedir[1 + d1].name, d->name)));
 	}

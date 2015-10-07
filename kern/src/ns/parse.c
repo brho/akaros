@@ -91,7 +91,7 @@ void cmderror(struct cmdbuf *cb, char *s)
 		p = seprintf(p, e, "%s", cb->f[i]);
 	}
 	strncpy(p, "\"", sizeof(p));
-	error(get_cur_genbuf());
+	error(EFAIL, get_cur_genbuf());
 }
 
 void debugcmd(struct cmdbuf *cb)
@@ -111,7 +111,7 @@ struct cmdtab *lookupcmd(struct cmdbuf *cb, struct cmdtab *ctab, int nctab)
 	struct cmdtab *ct;
 
 	if (cb->nf == 0)
-		error("empty control message");
+		error(EFAIL, "empty control message");
 
 	for (ct = ctab, i = 0; i < nctab; i++, ct++) {
 		if (strcmp(ct->cmd, "*") != 0)	/* wildcard always matches */

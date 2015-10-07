@@ -153,7 +153,7 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	Etherrock *er;
 
 	if (argc < 2)
-		error(Ebadarg);
+		error(EINVAL, NULL);
 
 	addr = kmalloc(Maxpath, KMALLOC_WAIT);	//char addr[2*KNAMELEN];
 	dir = kmalloc(Maxpath, KMALLOC_WAIT);	//char addr[2*KNAMELEN];
@@ -186,7 +186,7 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	snprintf(addr, Maxpath, "%s!0x800", argv[2]);
 	fd = kdial(addr, NULL, dir, &cfd);
 	if (fd < 0)
-		error("dial 0x800 failed: %s", get_cur_errbuf());
+		error(EFAIL, "dial 0x800 failed: %s", get_cur_errbuf());
 	mchan4 = commonfdtochan(fd, O_RDWR, 0, 1);
 	cchan4 = commonfdtochan(cfd, O_RDWR, 0, 1);
 	sysclose(fd);
@@ -203,18 +203,18 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	snprintf(addr, Maxpath, "%s/stats", dir);
 	fd = sysopen(addr, O_READ);
 	if (fd < 0)
-		error("can't open ether stats: %s", get_cur_errbuf());
+		error(EFAIL, "can't open ether stats: %s", get_cur_errbuf());
 
 	buf = kzmalloc(512, 0);
 	n = sysread(fd, buf, 511);
 	sysclose(fd);
 	if (n <= 0)
-		error(Eio);
+		error(EIO, NULL);
 	buf[n] = 0;
 
 	ptr = strstr(buf, "addr: ");
 	if (!ptr)
-		error(Eio);
+		error(EIO, NULL);
 	ptr += 6;
 	parsemac(ifc->mac, ptr, 6);
 
@@ -239,7 +239,7 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	snprintf(addr, Maxpath, "%s!0x806", argv[2]);
 	fd = kdial(addr, NULL, NULL, NULL);
 	if (fd < 0)
-		error("dial 0x806 failed: %s", get_cur_errbuf());
+		error(EFAIL, "dial 0x806 failed: %s", get_cur_errbuf());
 	achan = commonfdtochan(fd, O_RDWR, 0, 1);
 	sysclose(fd);
 
@@ -252,7 +252,7 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	snprintf(addr, Maxpath, "%s!0x86DD", argv[2]);
 	fd = kdial(addr, NULL, dir, &cfd);
 	if (fd < 0)
-		error("dial 0x86DD failed: %s", get_cur_errbuf());
+		error(EFAIL, "dial 0x86DD failed: %s", get_cur_errbuf());
 	mchan6 = commonfdtochan(fd, O_RDWR, 0, 1);
 	cchan6 = commonfdtochan(cfd, O_RDWR, 0, 1);
 	sysclose(fd);

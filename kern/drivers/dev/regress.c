@@ -95,7 +95,7 @@ regressopen(struct chan *c, int omode)
 {
 	if(c->qid.type & QTDIR){
 		if(openmode(omode) != O_READ)
-			error(Eperm);
+			error(EPERM, NULL);
 	}
 	c->mode = openmode(omode);
 	c->flag |= COPEN;
@@ -134,7 +134,7 @@ regressread(struct chan *c, void *va, long n, int64_t off)
 			else
 				n = 0;
 		} else
-			error("no monitor queue");
+			error(EFAIL, "no monitor queue");
 		break;
 	default:
 		n = 0;
@@ -161,7 +161,7 @@ regresswrite(struct chan *c, void *a, long n, int64_t unused)
 		if(strncmp(a, "ktest", 5) == 0){
 			run_registered_ktest_suites();
 		} else {
-			error("regresswrite: only commands are %s", ctlcommands);
+			error(EFAIL, "regresswrite: only commands are %s", ctlcommands);
 		}
 		break;
 
@@ -170,7 +170,7 @@ regresswrite(struct chan *c, void *a, long n, int64_t unused)
 			n = -1;
 		break;
 	default:
-		error(Ebadusefd);
+		error(EBADFD, NULL);
 	}
 	kfree(cb);
 	poperror();

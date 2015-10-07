@@ -297,7 +297,7 @@ static void nixinit(void)
 static struct chan *nixattach(char *spec)
 {
 	if (!nixok)
-		error("No NIXs available");
+		error(EFAIL, "No NIXs available");
 	struct chan *c = devattach(devname(), spec);
 	mkqid(&c->qid, Qtopdir, 0, QTDIR);
 	return c;
@@ -327,16 +327,16 @@ static struct chan *nixopen(struct chan *c, int omode)
 	case Qtopdir:
 	case Qnixdir:
 		if (omode & O_REMCLO)
-			error(Eperm);
+			error(EPERM, NULL);
 		if (omode & O_WRITE)
-			error(Eisdir);
+			error(EISDIR, NULL);
 		break;
 	case Qclone:
 		spin_lock_irqsave(&nixlock);
 		if (nnix >= 1) {
 			spin_unlock_irqsave(&nixlock);
 			set_errno(EBUSY);
-			error("Already have 1 nix, we don't support more");
+			error(EFAIL, "Already have 1 nix, we don't support more");
 		}
 		nixs = krealloc(nixs, sizeof(nixs[0]) * (nnix + 1), 0);
 		v = &nixs[nnix];
@@ -371,17 +371,17 @@ static struct chan *nixopen(struct chan *c, int omode)
 
 static void nixcreate(struct chan *c, char *name, int omode, uint32_t perm)
 {
-	error(Eperm);
+	error(EPERM, NULL);
 }
 
 static void nixremove(struct chan *c)
 {
-	error(Eperm);
+	error(EPERM, NULL);
 }
 
 static int nixwstat(struct chan *c, uint8_t * dp, int n)
 {
-	error("No nixwstat");
+	error(EFAIL, "No nixwstat");
 	return 0;
 }
 
@@ -447,7 +447,7 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 	case Qtopdir:
 	case Qnixdir:
 	case Qstat:
-		error(Eperm);
+		error(EPERM, NULL);
 	case Qctl:
 		nix = c->aux;
 		cb = parsecmd(ubuf, n);
@@ -457,38 +457,38 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 			nexterror();
 		}
 		if (cb->nf < 1)
-			error("short control request");
+			error(EFAIL, "short control request");
 		if (!strcmp(cb->f[0], "run")) {
 			int core;
 			uintptr_t ip;
 			if (cb->nf != 3)
-				error("usage: run core entry");
+				error(EFAIL, "usage: run core entry");
 			core = strtoul(cb->f[1], 0, 0);
 			ip = strtoul(cb->f[2], 0, 0);
 			if (!test_bit(core, nix->cpus))
-				error("Bad core %d", core);
+				error(EFAIL, "Bad core %d", core);
 			send_kernel_message(core, nixwrapper, (long)ip, 0, 0, KMSG_ROUTINE);
 		} else if (!strcmp(cb->f[0], "test")) {
 			int core;
 			if (cb->nf != 2)
-				error("usage: test core");
+				error(EFAIL, "usage: test core");
 			core = strtoul(cb->f[1], 0, 0);
 			if (!test_bit(core, nix->cpus))
-				error("Bad core %d", core);
+				error(EFAIL, "Bad core %d", core);
 			send_kernel_message(core, nixwrapper, (long)nixtest, 0, 0,
 			                    KMSG_ROUTINE);
 		} else if (!strcmp(cb->f[0], "reserve")) {
 			int core;
 			if (cb->nf != 2)
-				error("Usage: reserve core (-1 for any)");
+				error(EFAIL, "Usage: reserve core (-1 for any)");
 			core = strtol(cb->f[1], 0, 0);
 			if (core == -1) {
 				core = get_any_idle_core();
 				if (core < 0)
-					error("No free idle cores!");
+					error(EFAIL, "No free idle cores!");
 			} else {
 				if (get_specific_idle_core(core) < 0)
-					error("Failed to reserve core %d\n", core);
+					error(EFAIL, "Failed to reserve core %d\n", core);
 			}
 			set_bit(core, nix->cpus);
 		} else if (!strcmp(cb->f[0], "check")) {
@@ -499,23 +499,23 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 				printk("Core %d is available to nix%d\n", i, nix->id);
 			}
 		} else if (!strcmp(cb->f[0], "stop")) {
-			error("can't stop a nix yet");
+			error(EFAIL, "can't stop a nix yet");
 		} else {
-			error("%s: not implemented", cb->f[0]);
+			error(EFAIL, "%s: not implemented", cb->f[0]);
 		}
 		kfree(cb);
 		poperror();
 		break;
 	case Qimage:
 		if (off < 0)
-			error("offset < 0!");
+			error(EFAIL, "offset < 0!");
 
 		if (off + n > v->imagesize) {
 			n = v->imagesize - off;
 		}
 
 		if (memcpy_from_user_errno(current, v->image + off, ubuf, n) < 0)
-			error("%s: bad user addr %p", __FUNCTION__, ubuf);
+			error(EFAIL, "%s: bad user addr %p", __FUNCTION__, ubuf);
 		break;
 
 	default:

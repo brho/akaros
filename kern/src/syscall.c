@@ -2601,7 +2601,7 @@ int systrace_reg(bool all, struct proc *p)
 int systrace_trace_pid(struct proc *p)
 {
 	if (systrace_reg(false, p))
-		error("no more processes");
+		error(EFAIL, "no more processes");
 	systrace_start(true);
 	return 0;
 }

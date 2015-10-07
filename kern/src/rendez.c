@@ -40,8 +40,7 @@ void rendez_sleep(struct rendez *rv, int (*cond)(void*), void *arg)
 		if (should_abort(&cle)) {
 			cv_unlock_irqsave(&rv->cv, &irq_state);
 			dereg_abortable_cv(&cle);
-			set_errno(EINTR);
-			error("syscall aborted");
+			error(EINTR, "syscall aborted");
 		}
 		cv_wait(&rv->cv);
 		cpu_relax();
@@ -97,8 +96,7 @@ void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
 			cv_unlock_irqsave(&rv->cv, &irq_state);
 			unset_alarm(pcpui_tchain, &awaiter);
 			dereg_abortable_cv(&cle);
-			set_errno(EINTR);
-			error("syscall aborted");
+			error(EINTR, "syscall aborted");
 		}
 		cv_wait(&rv->cv);
 		cpu_relax();

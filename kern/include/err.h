@@ -11,8 +11,9 @@
 #define waserror() (errpush(errstack, ARRAY_SIZE(errstack), &curindex,         \
                             &prev_errbuf) ||                                   \
                     setjmp(&(get_cur_errbuf()->jmpbuf)))
-#define error(x,...) do {set_errstr(x, ##__VA_ARGS__);                         \
-	                     longjmp(&get_cur_errbuf()->jmpbuf, 1);} while(0)
+#define error(e, x,...) do {set_errstr(x, ##__VA_ARGS__);				\
+							set_errno(e);								\
+							longjmp(&get_cur_errbuf()->jmpbuf, 1);} while(0)
 #define nexterror() do {errpop(errstack, ARRAY_SIZE(errstack), &curindex,      \
                             prev_errbuf);                                      \
                      longjmp(&(get_cur_errbuf())->jmpbuf, 1);} while (0)

@@ -60,7 +60,7 @@ static long bnx2x_ifstat(struct ether *edev, void *a, long n, uint32_t offset)
 	p = kzmalloc(READSTR, 0);
 	if (p == NULL) {
 		qunlock(&ctlr->slock);
-		error(Enomem);
+		error(ENOMEM, NULL);
 	}
 	l = 0;
 	for (i = 0; i < Nstatistics; i++) {
@@ -101,14 +101,14 @@ static long bnx2x_ctl(struct ether *edev, void *buf, long n)
 	struct cmdtab *ct;
 
 	if ((ctlr = edev->ctlr) == NULL)
-		error(Enonexist);
+		error(ENODEV, NULL);
 	cb = parsecmd(buf, n);
 	if (waserror()) {
 		kfree(cb);
 		nexterror();
 	}
 	if (cb->nf < 1)
-		error("short control request");
+		error(EFAIL, "short control request");
 
 	/* TODO: handle ctl command somehow.  igbe did the following: */
 	//ct = lookupcmd(cb, igbectlmsg, ARRAY_SIZE(igbectlmsg));
@@ -418,7 +418,7 @@ static void bnx2x_pci(void)
 
 		ctlr = kzmalloc(sizeof(struct bnx2x), 0);
 		if (ctlr == NULL)
-			error(Enomem);
+			error(ENOMEM, NULL);
 
 		spinlock_init_irqsave(&ctlr->imlock);
 		spinlock_init_irqsave(&ctlr->tlock);
