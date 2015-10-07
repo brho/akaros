@@ -11,13 +11,9 @@
                     int curindex = 0;
 #define waserror() setjmp(&(errpush(errstack, ARRAY_SIZE(errstack), &curindex, \
 									&prev_errbuf)->jmpbuf))
-#define error(e, x, ...)						\
-	do {										\
-		if (x != NULL)													\
-			set_errstr(x, ##__VA_ARGS__);								\
-		else															\
-			set_errstr(errno_to_string(e));								\
-		set_errno(e);													\
+#define error(e, x, ...)												\
+	do {																\
+		set_error(e, x, ##__VA_ARGS__);									\
 		longjmp(&get_cur_errbuf()->jmpbuf, 1);							\
 	} while(0)
 #define nexterror() longjmp(&(errpop(errstack, ARRAY_SIZE(errstack), &curindex, \

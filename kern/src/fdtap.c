@@ -62,19 +62,17 @@ int add_fd_tap(struct proc *p, struct fd_tap_req *tap_req)
 		goto out_with_lock;
 	}
 	if (!fdt->fd[fd].fd_chan) {
-		set_errno(EINVAL);
-		set_errstr("Can't tap a VFS file");
+		set_error(EINVAL, "Can't tap a VFS file");
 		goto out_with_lock;
 	}
 	chan = fdt->fd[fd].fd_chan;
 	if (fdt->fd[fd].fd_tap) {
-		set_errno(EBUSY);
-		set_errstr("FD %d already has a tap", fd);
+		set_error(EBUSY, "FD %d already has a tap", fd);
 		goto out_with_lock;
 	}
 	if (!devtab[chan->type].tapfd) {
-		set_errno(ENOSYS);
-		set_errstr("Device %s does not handle taps", devtab[chan->type].name);
+		set_error(ENOSYS, "Device %s does not handle taps",
+				  devtab[chan->type].name);
 		goto out_with_lock;
 	}
 	/* need to keep chan alive for our call to the device.  someone else
@@ -135,8 +133,7 @@ int remove_fd_tap(struct proc *p, int fd)
 		kref_put(&tap->kref);
 		return 0;
 	} else {
-		set_errno(EBADF);
-		set_errstr("FD %d was not tapped", fd);
+		set_error(EBADF, "FD %d was not tapped", fd);
 		return -1;
 	}
 }

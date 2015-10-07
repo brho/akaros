@@ -218,8 +218,7 @@ Accept:
 Notfound:
 					if (j == 0)
 						error(ENODEV, NULL);
-					set_errno(ENOENT);
-					set_errstr(errno_to_string(ENOENT));
+					set_error(ENOENT, NULL);
 					goto Done;
 				case 0:
 					printd("DEVWALK continue, i was %d\n", i);

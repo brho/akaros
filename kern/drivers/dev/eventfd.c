@@ -286,9 +286,8 @@ static int efd_tapfd(struct chan *c, struct fd_tap *tap, int cmd)
 	switch (c->qid.path) {
 		case Qefd:
 			if (tap->filter & ~EFD_LEGAL_TAPS) {
-				set_errno(ENOSYS);
-				set_errstr("Unsupported #%s tap, must be %p, got %p", devname(),
-				           EFD_LEGAL_TAPS, tap->filter);
+				set_error(ENOSYS, "Unsupported #%s tap, must be %p", devname(),
+						  EFD_LEGAL_TAPS);
 				return -1;
 			}
 			spin_lock(&efd->tap_lock);
@@ -302,17 +301,15 @@ static int efd_tapfd(struct chan *c, struct fd_tap *tap, int cmd)
 					ret = 0;
 					break;
 				default:
-					set_errno(ENOSYS);
-					set_errstr("Unsupported #%s tap command %p",
-					           devname(), cmd);
+					set_error(ENOSYS, "Unsupported #%s tap command %p",
+							  devname(), cmd);
 					ret = -1;
 			}
 			spin_unlock(&efd->tap_lock);
 			return ret;
 		default:
-			set_errno(ENOSYS);
-			set_errstr("Can't tap #%s file type %d", devname(),
-			           c->qid.path);
+			set_error(ENOSYS, "Can't tap #%s file type %d", devname(),
+			          c->qid.path);
 			return -1;
 	}
 }

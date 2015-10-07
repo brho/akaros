@@ -244,21 +244,26 @@ void unset_errno(void)
 	pcpui->cur_kthread->sysc->errstr[0] = '\0';
 }
 
-void set_errstr(const char *fmt, ...)
+void vset_errstr(const char *fmt, va_list ap)
 {
-	va_list ap;
-	int rc;
-
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
 	if (!pcpui->cur_kthread || !pcpui->cur_kthread->sysc)
 		return;
 
-	va_start(ap, fmt);
-	rc = vsnprintf(pcpui->cur_kthread->sysc->errstr, MAX_ERRSTR_LEN, fmt, ap);
-	va_end(ap);
+	vsnprintf(pcpui->cur_kthread->sysc->errstr, MAX_ERRSTR_LEN, fmt, ap);
 
 	/* TODO: likely not needed */
 	pcpui->cur_kthread->sysc->errstr[MAX_ERRSTR_LEN - 1] = '\0';
+}
+
+void set_errstr(const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	vset_errstr(fmt, ap);
+	va_end(ap);
 }
 
 char *current_errstr(void)
@@ -267,6 +272,17 @@ char *current_errstr(void)
 	if (!pcpui->cur_kthread || !pcpui->cur_kthread->sysc)
 		return "no errstr";
 	return pcpui->cur_kthread->sysc->errstr;
+}
+
+void set_error(int error, const char *fmt, ...)
+{
+	va_list ap;
+
+	set_errno(error);
+
+	va_start(ap, fmt);
+	vset_errstr(fmt != NULL ? fmt: errno_to_string(error), ap);
+	va_end(ap);
 }
 
 struct errbuf *get_cur_errbuf(void)
@@ -548,8 +564,8 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 
 	/* Check the size of the argenv array, error out if too large. */
 	if ((argenv_l < sizeof(struct argenv)) || (argenv_l > ARG_MAX)) {
-		set_errno(EINVAL);
-		set_errstr("The argenv array has an invalid size: %lu\n", argenv_l);
+		set_error(EINVAL, "The argenv array has an invalid size: %lu\n",
+				  argenv_l);
 		return -1;
 	}
 	/* Copy the argenv array into a kernel buffer. Delay processing of the
@@ -799,8 +815,8 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 
 	/* Check the size of the argenv array, error out if too large. */
 	if ((argenv_l < sizeof(struct argenv)) || (argenv_l > ARG_MAX)) {
-		set_errno(EINVAL);
-		set_errstr("The argenv array has an invalid size: %lu\n", argenv_l);
+		set_error(EINVAL, "The argenv array has an invalid size: %lu\n",
+				  argenv_l);
 		return -1;
 	}
 	/* Copy the argenv array into a kernel buffer. */
@@ -813,8 +829,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	 * done along side this as well. */
 	if (unpack_argenv(kargenv, argenv_l, &argc, &argv, &envc, &envp)) {
 		user_memdup_free(p, kargenv);
-		set_errno(EINVAL);
-		set_errstr("Failed to unpack the args");
+		set_error(EINVAL, "Failed to unpack the args");
 		return -1;
 	}
 
@@ -1371,8 +1386,7 @@ static intreg_t sys_openat(struct proc *p, int fromfd, const char *path,
 
 	printd("File %s Open attempt oflag %x mode %x\n", path, oflag, mode);
 	if ((oflag & O_PATH) && (oflag & O_ACCMODE)) {
-		set_errno(EINVAL);
-		set_errstr("Cannot open O_PATH with any I/O perms (O%o)", oflag);
+		set_error(EINVAL, "Cannot open O_PATH with any I/O perms (O%o)", oflag);
 		return -1;
 	}
 	t_path = copy_in_path(p, path, path_l);
@@ -1803,8 +1817,7 @@ intreg_t sys_getcwd(struct proc *p, char *u_cwd, size_t cwd_l)
 	if (!k_cwd)
 		return -1;		/* errno set by do_getcwd */
 	if (strlen(k_cwd) + 1 > cwd_l) {
-		set_errno(ERANGE);
-		set_errstr("getcwd buf too small, needed %d", strlen(k_cwd) + 1);
+		set_error(ERANGE, "getcwd buf too small, needed %d", strlen(k_cwd) + 1);
 		retval = -1;
 		goto out;
 	}
@@ -2062,8 +2075,7 @@ intreg_t sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
 	}
 	ch = fdtochan(&current->open_files, fd, -1, FALSE, TRUE);
 	if (snprintf(u_buf, len, "%s", channame(ch)) >= len) {
-		set_errno(ERANGE);
-		set_errstr("fd2path buf too small, needed %d", ret);
+		set_error(ERANGE, "fd2path buf too small, needed %d", ret);
 		ret = -1;
 	}
 	cclose(ch);
@@ -2084,8 +2096,7 @@ static int vfs_wstat(struct file *file, uint8_t *stat_m, size_t stat_sz,
 	dir = kzmalloc(sizeof(struct dir) + stat_sz, KMALLOC_WAIT);
 	m_sz = convM2D(stat_m, stat_sz, &dir[0], (char*)&dir[1]);
 	if (m_sz != stat_sz) {
-		set_errstr(errno_to_string(EINVAL));
-		set_errno(EINVAL);
+		set_error(EINVAL, NULL);
 		kfree(dir);
 		return -1;
 	}
@@ -2334,8 +2345,7 @@ static int handle_tap_req(struct proc *p, struct fd_tap_req *req)
 		case (FDTAP_CMD_REM):
 			return remove_fd_tap(p, req->fd);
 		default:
-			set_errno(ENOSYS);
-			set_errstr("FD Tap Command %d not supported", req->cmd);
+			set_error(ENOSYS, "FD Tap Command %d not supported", req->cmd);
 			return -1;
 	}
 }
