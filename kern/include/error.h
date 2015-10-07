@@ -11,16 +11,7 @@ typedef int error_t;
 #define PTR_ERR(ptr)  ((uintptr_t)(ptr))
 #define IS_ERR(ptr)   ((uintptr_t)-(uintptr_t)(ptr) < 512)
 
-/* The special format for printk %e takes an integer
- * error code and prints a string describing the error.
- * The integer may be positive or negative,
- * so that -ENOMEM and ENOMEM are equivalent.
- */
-
-static const char *const error_string[] =
-{
-	#include <errstrings.h>
-};
-#define NUMERRORS (sizeof(error_string)/sizeof(error_string[0]))
+extern const char *const errno_strings[];
+extern const int MAX_ERRNO;
 
 #endif	// !ROS_INC_ERROR_H */

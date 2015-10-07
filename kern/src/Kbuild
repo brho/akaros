@@ -1,3 +1,12 @@
+
+$(src)/error.c: $(AKAROS_ROOT)/include/ros/errno.h
+	@echo "// This file was automatically generated not edit" > $(@)
+	@echo ""                               >> $(@)
+	@echo "const char *errno_strings[] = {" >> $(@)
+	@cat $(^) | $(AKAROS_ROOT)/scripts/parse_errno.sh >> $(@)
+	@echo "};"                             >> $(@)
+	@echo "const int MAX_ERRNO = sizeof(errno_strings)/sizeof(errno_strings[0]);" >> $(@)
+
 obj-y						+= alarm.o
 obj-y						+= apipe.o
 obj-y						+= arsc.o
@@ -13,6 +22,7 @@ obj-y						+= dmapool.o
 obj-y						+= elf.o
 obj-y						+= env.o
 obj-y						+= err.o
+obj-y						+= error.o
 obj-$(CONFIG_ETH_AUDIO)		+= eth_audio.o
 obj-y						+= event.o
 obj-y						+= ext2fs.o

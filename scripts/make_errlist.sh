@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ERRLIST="tools/compilers/gcc-glibc/glibc-2.14.1-ros/sysdeps/ros/errlist.c"
+ERRLIST="tools/compilers/gcc-glibc/glibc-2.19-akaros/sysdeps/akaros/errlist.c"
 ERRNO_FILE="kern/include/ros/errno.h"
 
 echo "// This was automatically generated with make_errlist.sh, do not edit" > $ERRLIST
@@ -16,7 +16,7 @@ echo "{"                                  >> $ERRLIST
 # items on the line.  The last item on the line is */, which we never print.
 # The second to last is printed without a trailing space.
 
-grep "^#define\sE" $ERRNO_FILE | sed 's/\t\+/\t/g' | cut -f 3- | grep -v "^E" | awk '{printf "\t[ %s ] = \"", $1; for (i=3; i<NF-1; i++) printf "%s ", $i; printf "%s", $(NF-1); printf "\",\n"}' >> $ERRLIST
+cat $ERRNO_FILE | ./scripts/parse_errno.sh >> $ERRLIST
 
 echo "};"                                 >> $ERRLIST
 echo ""                                   >> $ERRLIST
