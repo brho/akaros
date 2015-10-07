@@ -462,7 +462,7 @@ int arpwrite(struct Fs *fs, char *s, int len)
 				else
 					r = v6lookup(fs, ip, NULL);
 				if (r == NULL)
-					error(EFAIL, "Destination unreachable");
+					error(EHOSTUNREACH, "Destination unreachable");
 				m = r->rt.ifc->m;
 				n = parsemac(mac, f[2], m->maclen);
 				break;

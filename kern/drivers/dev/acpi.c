@@ -1494,9 +1494,8 @@ static struct chan *acpiattach(char *spec)
 	 * This was written for the stock kernel.
 	 * This code must use 64 registers to be acpi ready in nix.
 	 */
-	if (acpiinit() < 0) {
-		error(EFAIL, "no acpi");
-	}
+	if (acpiinit() < 0)
+		error(ENOSYS, "no acpi");
 
 	/*
 	 * should use fadt->xpm* and fadt->xgpe* registers for 64 bits.
@@ -1562,9 +1561,8 @@ static long acpiread(struct chan *c, void *a, long n, int64_t off)
 		tlen = 32768;
 		ttext = kzmalloc(tlen, 0);
 	}
-	if (ttext == NULL) {
-		error(EFAIL, "acpiread: no memory");
-	}
+	if (ttext == NULL)
+		error(ENOMEM, "acpiread: no memory");
 	q = c->qid.path;
 	switch (q) {
 		case Qdir:
@@ -1676,7 +1674,7 @@ static long acpiwrite(struct chan *c, void *a, long n, int64_t off)
 		case CMgpe:
 			i = strtoul(cb->f[1], NULL, 0);
 			if (i >= ngpes)
-				error(EFAIL, "gpe out of range");
+				error(ERANGE, "gpe out of range");
 			kstrdup(&gpes[i].obj, cb->f[2]);
 			setgpeen(i, 1);
 			break;

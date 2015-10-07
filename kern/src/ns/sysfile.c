@@ -75,7 +75,7 @@ long kchanio(void *vc, void *buf, int n, int mode)
 	else if (mode == O_WRITE)
 		r = devtab[c->type].write(c, buf, n, c->offset);
 	else
-		error(EFAIL, "kchanio: use only O_READ xor O_WRITE");
+		error(ENOSYS, "kchanio: use only O_READ xor O_WRITE");
 
 	spin_lock(&c->lock);
 	c->offset += r;

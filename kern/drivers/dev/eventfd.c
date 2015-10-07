@@ -161,10 +161,8 @@ static unsigned long efd_read_efd(struct eventfd *efd, struct chan *c)
 	while (1) {
 		old_count = atomic_read(&efd->counter);
 		if (!old_count) {
-			if (c->flag & O_NONBLOCK) {
-				set_errno(EAGAIN);
-				error(EFAIL, "Would block on #%s read", devname());
-			}
+			if (c->flag & O_NONBLOCK)
+				error(EAGAIN, "Would block on #%s read", devname());
 			rendez_sleep(&efd->rv_readers, has_counts, efd);
 		} else {
 			if (efd->flags & EFD_SEMAPHORE) {
@@ -219,10 +217,8 @@ static void efd_write_efd(struct eventfd *efd, unsigned long add_to,
 		old_count = atomic_read(&efd->counter);
 		new_count = old_count + add_to;
 		if (new_count > EFD_MAX_VAL) {
-			if (c->flag & O_NONBLOCK) {
-				set_errno(EAGAIN);
-				error(EFAIL, "Would block on #%s write", devname());
-			}
+			if (c->flag & O_NONBLOCK)
+				error(EAGAIN, "Would block on #%s write", devname());
 			rendez_sleep(&efd->rv_writers, has_room, efd);
 		} else {
 			if (atomic_cas(&efd->counter, old_count, new_count))

@@ -1282,8 +1282,7 @@ static bool qwait(struct queue *q)
 		q->state |= Qstarve;
 		if (q->state & Qnonblock) {
 			spin_unlock_irqsave(&q->lock);
-			set_errno(EAGAIN);
-			error(EFAIL, "queue empty");
+			error(EAGAIN, "queue empty");
 		}
 		spin_unlock_irqsave(&q->lock);
 		/* may throw an error() */
@@ -1658,8 +1657,7 @@ long qbwrite(struct queue *q, struct block *b)
 		if (q->state & Qnonblock) {
 			spin_unlock_irqsave(&q->lock);
 			freeb(b);
-			set_errno(EAGAIN);
-			error(EFAIL, "queue full");
+			error(EAGAIN, "queue full");
 		}
 	}
 

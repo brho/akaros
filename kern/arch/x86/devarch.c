@@ -444,13 +444,13 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 		case Qgdb:
 			p = a;
 			if (n != 1)
-				error(EFAIL, "Gdb: Write one byte, '1' or '0'");
+				error(EINVAL, "Gdb: Write one byte, '1' or '0'");
 			if (*p == '1')
 				gdbactive = 1;
 			else if (*p == '0')
 				gdbactive = 0;
 			else
-				error(EFAIL, "Gdb: must be 1 or 0");
+				error(EINVAL, "Gdb: must be 1 or 0");
 			return 1;
 
 		case Qiob:
@@ -517,7 +517,8 @@ static long cputyperead(struct chan *unused, void *a, long n, int64_t off)
 {
 	char buf[512], *s, *e;
 	int i, k;
-	error(EFAIL, "unimplemented");
+
+	error(ENOSYS, NULL);
 #if 0
 	e = buf + sizeof buf;
 	s = seprintf(buf, e, "%s %d\n", "AMD64", 0);
@@ -535,21 +536,21 @@ static long cputyperead(struct chan *unused, void *a, long n, int64_t off)
 static long rmemrw(int isr, void *a, long n, int64_t off)
 {
 	if (off < 0)
-		error(EFAIL, "offset must be >= 0");
+		error(EINVAL, "offset must be >= 0");
 	if (n < 0)
-		error(EFAIL, "count must be >= 0");
+		error(EINVAL, "count must be >= 0");
 	if (isr) {
 		if (off >= MB)
-			error(EFAIL, "offset must be < 1MB");
+			error(EINVAL, "offset must be < 1MB");
 		if (off + n >= MB)
 			n = MB - off;
 		memmove(a, KADDR((uint32_t) off), n);
 	} else {
 		/* realmode buf page ok, allow vga framebuf's access */
 		if (off >= MB)
-			error(EFAIL, "offset must be < 1MB");
+			error(EINVAL, "offset must be < 1MB");
 		if (off + n > MB && (off < 0xA0000 || off + n > 0xB0000 + 0x10000))
-			error(EFAIL, "bad offset/count in write");
+			error(EINVAL, "bad offset/count in write");
 		memmove(KADDR((uint32_t) off), a, n);
 	}
 	return n;

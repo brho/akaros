@@ -186,7 +186,7 @@ int waiton_syscall(syscall_desc_t* desc)
 {
 	int retval = 0;
 	if (desc == NULL || desc->channel == NULL){
-		errno = EFAIL;
+		errno = EFAULT;
 		return -1;
 	}
 	// Make sure we were given a desc with a non-NULL frontring.  This could
@@ -194,7 +194,7 @@ int waiton_syscall(syscall_desc_t* desc)
 	syscall_front_ring_t *fr =  &desc->channel->sysfr;
 	
 	if (!fr){
-		errno = EFAIL;
+		errno = EFAULT;
 		return -1;
 	}
 	printf("waiting %d\n", vcore_id());
