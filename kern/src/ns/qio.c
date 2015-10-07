@@ -1022,8 +1022,7 @@ static int __blist_clone_to(struct block *blist, struct block *newb, int len,
 		nr_bufs += 1 + b->nr_extra_bufs;	/* 1 for the main body */
 	}
 	/* we might be holding a spinlock here, so we won't wait for kmalloc */
-	block_add_extd(newb, nr_bufs, 0);
-	if (newb->nr_extra_bufs < nr_bufs) {
+	if (block_add_extd(newb, nr_bufs, 0) != 0) {
 		/* caller will need to alloc these, then re-call us */
 		return nr_bufs;
 	}
