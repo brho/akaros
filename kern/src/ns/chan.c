@@ -687,7 +687,7 @@ int walk(struct chan **cp, char **names, int nnames, bool can_mount, int *nerror
 				*nerror = nhave;
 			cnameclose(cname);
 			cclose(c);
-			set_errstr(Enotdir);
+			set_error(ENOTDIR, NULL);
 			if (mh != NULL)
 				putmhead(mh);
 			return -1;
@@ -767,7 +767,7 @@ int walk(struct chan **cp, char **names, int nnames, bool can_mount, int *nerror
 					} else {
 						if (nerror)
 							*nerror = nhave + wq->nqid;
-						set_errstr(Enotdir);
+						set_errstr(errno_to_string(ENOTDIR));
 					}
 					kfree(wq);
 					if (mh != NULL)
@@ -1405,7 +1405,7 @@ void validname(char *aname, int slashok)
 	ename = memchr(name, 0, (1 << 16));
 
 	if (ename == NULL || ename - name >= (1 << 16))
-		error(EFAIL, "name too long");
+		error(EINVAL, "Name too long");
 
 	while (*name) {
 		/* all characters above '~' are ok */
@@ -1419,7 +1419,7 @@ void validname(char *aname, int slashok)
 		} else {
 			if (isfrog[c])
 				if (!slashok || c != '/') {
-					error(EFAIL, "%s: %s (%p), at char %c", Ebadchar, aname, aname, c);
+					error(EINVAL, "%s (%p), at char %c", aname, aname, c);
 				}
 			name++;
 		}

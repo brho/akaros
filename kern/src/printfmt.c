@@ -139,7 +139,7 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 			if (err >= MAX_ERRNO)
 				printfmt(putch, putdat, "error %d(%s)", err, get_cur_errbuf());
 			else
-				printfmt(putch, putdat, "%s (%s)", errno_strings[err], get_cur_errbuf());
+				printfmt(putch, putdat, "%s (%s)", errno_to_string(err), get_cur_errbuf());
 			break;
 
 		case 'E': // ENET MAC

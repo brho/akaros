@@ -2082,7 +2082,7 @@ reset:
 			}
 			if (seg.flags & RST) {
 				if (seg.flags & ACK)
-					localclose(s, Econrefused);
+					localclose(s, errno_to_string(ECONNREFUSED));
 				goto raise;
 			}
 
@@ -2187,7 +2187,7 @@ reset:
 						 s->raddr, s->rport, s->laddr, s->lport, tcb->rcv.nxt,
 						 seg.seq);
 			}
-			localclose(s, Econrefused);
+			localclose(s, errno_to_string(ECONNREFUSED));
 			goto raise;
 		}
 
@@ -2716,7 +2716,7 @@ void tcpkeepalive(void *v)
 	qlock(&s->qlock);
 	if (tcb->state != Closed) {
 		if (--(tcb->kacounter) <= 0) {
-			localclose(s, Etimedout);
+			localclose(s, errno_to_string(ETIMEDOUT));
 		} else {
 			tcpsendka(s);
 			tcpgo(s->p->priv, &tcb->katimer);
@@ -2809,7 +2809,7 @@ void tcptimeout(void *arg)
 				maxback = MAXBACKMS;
 			tcb->backedoff += tcb->timer.start * MSPTICK;
 			if (tcb->backedoff >= maxback) {
-				localclose(s, Etimedout);
+				localclose(s, errno_to_string(ETIMEDOUT));
 				break;
 			}
 			netlog(s->p->f, Logtcprxmt, "timeout rexmit 0x%lx %llu/%llu\n",

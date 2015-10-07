@@ -575,9 +575,9 @@ long unionread(struct chan *c, void *va, long n)
 		/* Error causes component of union to be skipped */
 		if (mount->to) {
 			/* normally we want to discard the error, but for our ghetto kdirent
-			 * hack, we need to repeat unionread if we saw a Eshort */
+			 * hack, we need to repeat unionread if we saw a ENODATA */
 			if (waserror()) {
-				if (!strcmp(current_errstr(), Eshort)) {
+				if (!strcmp(current_errstr(), errno_to_string(ENODATA))) {
 					runlock(&m->lock);
 					qunlock(&c->umqlock);
 					nexterror();
@@ -733,9 +733,9 @@ out:
 }
 
 /* Reads exactly n bytes from chan c, starting at its offset.  Can block, but if
- * we get 0 back too soon (EOF or error), then we'll error out with Eshort.
+ * we get 0 back too soon (EOF or error), then we'll error out with ENODATA.
  * That might need a little work - if there was a previous error, then we
- * clobbered it and only know Eshort but not why we completed early. */
+ * clobbered it and only know ENODATA but not why we completed early. */
 void read_exactly_n(struct chan *c, void *vp, long n)
 {
 	char *p;
@@ -747,7 +747,7 @@ void read_exactly_n(struct chan *c, void *vp, long n)
 		nn = devtab[c->type].read(c, p, n, c->offset);
 		printd("readn: Got %d@%lld\n", nn, c->offset);
 		if (nn == 0)
-			error(EFAIL, "%s: wanted %d, got %d", Eshort, want, total);
+			error(ENODATA, "wanted %d, got %d", want, total);
 		spin_lock(&c->lock);
 		c->offset += nn;
 		spin_unlock(&c->lock);

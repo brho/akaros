@@ -1271,7 +1271,7 @@ static bool qwait(struct queue *q)
 				spin_unlock_irqsave(&q->lock);
 				error(EFAIL, "multiple reads on a closed queue");
 			}
-			if (*q->err && strcmp(q->err, Ehungup) != 0) {
+			if (*q->err && strcmp(q->err, errno_to_string(ECONNABORTED)) != 0) {
 				spin_unlock_irqsave(&q->lock);
 				error(EFAIL, q->err);
 			}
@@ -1865,7 +1865,7 @@ void qclose(struct queue *q)
 	spin_lock_irqsave(&q->lock);
 	q->state |= Qclosed;
 	q->state &= ~(Qflow | Qstarve | Qdropoverflow | Qnonblock);
-	strncpy(q->err, Ehungup, sizeof(q->err));
+	strncpy(q->err, errno_to_string(ECONNABORTED), sizeof(q->err));
 	bfirst = q->bfirst;
 	q->bfirst = 0;
 	q->len = 0;
@@ -1891,7 +1891,7 @@ void qhangup(struct queue *q, char *msg)
 	spin_lock_irqsave(&q->lock);
 	q->state |= Qclosed;
 	if (msg == 0 || *msg == 0)
-		strncpy(q->err, Ehungup, sizeof(q->err));
+		strncpy(q->err, errno_to_string(ECONNABORTED), sizeof(q->err));
 	else
 		strncpy(q->err, msg, ERRMAX - 1);
 	spin_unlock_irqsave(&q->lock);

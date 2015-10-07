@@ -216,10 +216,10 @@ Accept:
 					printd("DEVWALK -1, i was %d, want path %p\n", i,
 						   c->qid.path);
 Notfound:
-					set_errno(ENOENT);
 					if (j == 0)
 						error(ENODEV, NULL);
-					set_errstr(Enonexist);
+					set_errno(ENOENT);
+					set_errstr(errno_to_string(ENOENT));
 					goto Done;
 				case 0:
 					printd("DEVWALK continue, i was %d\n", i);
@@ -361,8 +361,7 @@ void devpermcheck(char *fileuid, uint32_t perm, int omode)
 	 * seem to handle O_EXEC being mixed readable or writable. */
 	rwx = omode_to_rwx(omode);
 	if ((rwx & perm) != rwx)
-		error(EFAIL, "%s: devpermcheck(%s, 0%o, 0%o) failed", Eperm, fileuid, perm,
-			  omode);
+		error(EPERM, "devpermcheck(%s, 0%o, 0%o) failed", fileuid, perm, omode);
 }
 
 struct chan *devopen(struct chan *c, int omode, struct dirtab *tab, int ntab,

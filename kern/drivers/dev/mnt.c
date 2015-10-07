@@ -828,8 +828,7 @@ void mountio(struct mnt *m, struct mntrpc *r)
 		 * the old request to a flsh (mntflushalloc) and try again.  We'll
 		 * always try to flush, and you can't get out until the flush either
 		 * succeeds or errors out with a non-abort/Eintr error. */
-		if (strcmp(current_errstr(), "syscall aborted") &&
-		    strcmp(current_errstr(), Eintr)) {
+		if (get_errno() != EINTR) {
 			/* all other errors (not abort or Eintr) */
 			mntflushfree(m, r);
 			nexterror();

@@ -111,7 +111,7 @@ static char *ipifcbind(struct conv *c, char **argv, int argc)
 	struct medium *m;
 
 	if (argc < 2)
-		return Ebadarg;
+		return errno_to_string(EINVAL);
 
 	ifc = (struct Ipifc *)c->ptcl;
 
@@ -347,12 +347,12 @@ char *ipifcsetmtu(struct Ipifc *ifc, char **argv, int argc)
 	int mtu;
 
 	if (argc < 2)
-		return Ebadarg;
+		return errno_to_string(EINVAL);
 	if (ifc->m == NULL)
-		return Ebadarg;
+		return errno_to_string(EINVAL);
 	mtu = strtoul(argv[1], 0, 0);
 	if (mtu < ifc->m->mintu || mtu > ifc->m->maxtu)
-		return Ebadarg;
+		return errno_to_string(EINVAL);
 	ifc->maxtu = mtu;
 	return NULL;
 }
@@ -408,8 +408,7 @@ char *ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
 			maskip(rem, mask, net);
 			break;
 		default:
-			return Ebadarg;
-			break;
+			return errno_to_string(EINVAL);
 	}
 	if (isv4(ip))
 		tentative = 0;
@@ -588,7 +587,7 @@ char *ipifcrem(struct Ipifc *ifc, char **argv, int argc)
 	char *rv;
 
 	if (argc < 3)
-		return Ebadarg;
+		return errno_to_string(EINVAL);
 
 	parseip(ip, argv[1]);
 	parseipmask(mask, argv[2]);
@@ -706,7 +705,7 @@ char *ipifcsetpar6(struct Ipifc *ifc, char **argv, int argc)
 	i = 1;
 
 	if (argsleft % 2 != 0)
-		return Ebadarg;
+		return errno_to_string(EINVAL);
 
 	while (argsleft > 1) {
 		if (strcmp(argv[i], "recvra") == 0)
@@ -732,7 +731,7 @@ char *ipifcsetpar6(struct Ipifc *ifc, char **argv, int argc)
 		else if (strcmp(argv[i], "routerlt") == 0)
 			ifc->rp.routerlt = atoi(argv[i + 1]);
 		else
-			return Ebadarg;
+			return errno_to_string(EINVAL);
 
 		argsleft -= 2;
 		i += 2;
@@ -742,7 +741,7 @@ char *ipifcsetpar6(struct Ipifc *ifc, char **argv, int argc)
 	if (ifc->rp.maxraint < ifc->rp.minraint) {
 		ifc->rp.maxraint = vmax;
 		ifc->rp.minraint = vmin;
-		return Ebadarg;
+		return errno_to_string(EINVAL);
 	}
 
 	return NULL;
@@ -1642,13 +1641,13 @@ char *ipifcaddpref6(struct Ipifc *ifc, char **argv, int argc)
 		case 2:
 			break;
 		default:
-			return Ebadarg;
+			return errno_to_string(EINVAL);
 	}
 
 	if ((parseip(prefix, argv[1]) != 6) ||
 		(validlt < preflt) || (plen < 0) || (plen > 64) || (islinklocal(prefix))
 		)
-		return Ebadarg;
+		return errno_to_string(EINVAL);
 
 	lifc = kzmalloc(sizeof(struct Iplifc), 0);
 	lifc->onlink = (onlink != 0);
@@ -1660,7 +1659,7 @@ char *ipifcaddpref6(struct Ipifc *ifc, char **argv, int argc)
 	if (ifc->m->pref2addr != NULL)
 		ifc->m->pref2addr(prefix, ifc->mac);
 	else
-		return Ebadarg;
+		return errno_to_string(EINVAL);
 
 	snprintf(addr, sizeof(addr), "%I", prefix);
 	snprintf(preflen, sizeof(preflen), "/%d", plen);
