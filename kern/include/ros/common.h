@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <stdbool.h>
+#include <ros/compiler.h>
 
 typedef uintptr_t physaddr_t;
 typedef long intreg_t;
