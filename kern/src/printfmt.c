@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <kthread.h>
+#include <syscall.h>
 #include <ns.h>
 
 /* Print a number (base <= 16) in reverse order,

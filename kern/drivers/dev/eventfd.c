@@ -18,6 +18,7 @@
 #include <error.h>
 #include <sys/queue.h>
 #include <fdtap.h>
+#include <syscall.h>
 
 struct dev efd_devtab;
 

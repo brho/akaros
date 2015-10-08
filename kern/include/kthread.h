@@ -15,6 +15,10 @@
 #include <atomic.h>
 #include <setjmp.h>
 
+struct errbuf {
+	struct jmpbuf jmpbuf;
+};
+
 struct proc;
 struct kthread;
 struct semaphore;
@@ -31,7 +35,7 @@ struct kthread {
 	uintptr_t					stacktop;
 	struct proc					*proc;
 	struct syscall				*sysc;
-	void						*errbuf;	/* TODO: avoiding include loops */
+	struct errbuf				*errbuf;
 	TAILQ_ENTRY(kthread)		link;
 	/* ID, other shit, etc */
 	bool						is_ktask;	/* default is FALSE */

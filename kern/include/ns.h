@@ -8,6 +8,8 @@
 #include <rwlock.h>
 #include <linker_func.h>
 #include <fdtap.h>
+#include <ros/fs.h>
+#include <vfs.h>
 
 /*
  * functions (possibly) linked in, complete, from libc.

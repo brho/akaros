@@ -282,7 +282,7 @@ char *current_errstr(void)
 struct errbuf *get_cur_errbuf(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	return (struct errbuf*)pcpui->cur_kthread->errbuf;
+	return pcpui->cur_kthread->errbuf;
 }
 
 void set_cur_errbuf(struct errbuf *ebuf)

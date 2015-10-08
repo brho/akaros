@@ -4,11 +4,7 @@
 #define ROS_KERN_ERR_H
 
 #include <setjmp.h>
-#include <syscall.h>
-
-struct errbuf {
-	struct jmpbuf jmpbuf;
-};
+#include <kthread.h>
 
 #define ERRSTACK(x) struct errbuf *prev_errbuf; struct errbuf errstack[(x)];   \
                     int curindex = 0;
