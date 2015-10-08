@@ -11,7 +11,6 @@
 #define SYSTRACE_LOUD				0x02
 #define SYSTRACE_ALLPROC			0x04
 
-#define MAX_NUM_TRACED				10
 #define MAX_SYSTRACES				1024
 
 #define SYSCALL_STRLEN				128

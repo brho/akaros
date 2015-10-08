@@ -39,25 +39,15 @@ int systrace_flags = 0;
 struct systrace_record *systrace_buffer = 0;
 uint32_t systrace_bufidx = 0;
 size_t systrace_bufsize = 0;
-struct proc *systrace_procs[MAX_NUM_TRACED] = {0};
 spinlock_t systrace_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 // for now, only want this visible here.
 void kprof_write_sysrecord(char *pretty_buf, size_t len);
 
-/* Not enforcing the packing of systrace_procs yet, but don't rely on that */
-static bool proc_is_traced(struct proc *p)
-{
-	for (int i = 0; i < MAX_NUM_TRACED; i++)
-		if (systrace_procs[i] == p)
-			return true;
-	return false;
-}
-
 static bool __trace_this_proc(struct proc *p)
 {
 	return (systrace_flags & SYSTRACE_ON) &&
-	       ((systrace_flags & SYSTRACE_ALLPROC) || (proc_is_traced(p)));
+		((systrace_flags & SYSTRACE_ALLPROC) || is_traced_proc(p));
 }
 
 static size_t systrace_fill_pretty_buf(struct systrace_record *trace)
@@ -2524,7 +2514,7 @@ void run_local_syscall(struct syscall *sysc)
 	if ((current_errstr()[0] != 0) && (!sysc->err))
 		sysc->err = EUNSPECIFIED;
 	finish_sysc(sysc, pcpui->cur_proc);
-	pcpui->cur_kthread->sysc = 0;	/* no longer working on sysc */
+	pcpui->cur_kthread->sysc = NULL;	/* No longer working on sysc */
 }
 
 /* A process can trap and call this function, which will set up the core to
@@ -2595,24 +2585,17 @@ void systrace_start(bool silent)
 
 int systrace_reg(bool all, struct proc *p)
 {
-	int retval = 0;
 	spin_lock_irqsave(&systrace_lock);
 	if (all) {
 		printk("Tracing syscalls for all processes\n");
 		systrace_flags |= SYSTRACE_ALLPROC;
-		retval = 0;
 	} else {
-		for (int i = 0; i < MAX_NUM_TRACED; i++) {
-			if (!systrace_procs[i]) {
-				printk("Tracing syscalls for process %d\n", p->pid);
-				systrace_procs[i] = p;
-				retval = 0;
-				break;
-			}
-		}
+		set_traced_proc(p, TRUE);
+
+		printk("Tracing syscalls for process %d\n", p->pid);
 	}
 	spin_unlock_irqsave(&systrace_lock);
-	return retval;
+	return 0;
 }
 
 int systrace_trace_pid(struct proc *p)
@@ -2627,8 +2610,6 @@ void systrace_stop(void)
 {
 	spin_lock_irqsave(&systrace_lock);
 	systrace_flags = 0;
-	for (int i = 0; i < MAX_NUM_TRACED; i++)
-		systrace_procs[i] = 0;
 	spin_unlock_irqsave(&systrace_lock);
 }
 
@@ -2641,12 +2622,9 @@ int systrace_dereg(bool all, struct proc *p)
 		printk("No longer tracing syscalls for all processes.\n");
 		systrace_flags &= ~SYSTRACE_ALLPROC;
 	} else {
-		for (int i = 0; i < MAX_NUM_TRACED; i++) {
-			if (systrace_procs[i] == p) {
-				systrace_procs[i] = 0;
-				printk("No longer tracing syscalls for process %d\n", p->pid);
-			}
-		}
+		set_traced_proc(p, FALSE);
+
+		printk("No longer tracing syscalls for process %d\n", p->pid);
 	}
 	spin_unlock_irqsave(&systrace_lock);
 	return 0;

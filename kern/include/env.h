@@ -111,7 +111,8 @@ struct proc {
 typedef struct proc env_t;
 
 /* Process Flags */
-#define PROC_TRANSITION_TO_M			0x0001
+#define PROC_TRANSITION_TO_M	(1 << 0)
+#define PROC_TRACED				(1 << 1)
 
 extern atomic_t num_envs;		// Number of envs
 
@@ -121,5 +122,18 @@ void	env_pagetable_free(env_t* e);
 
 typedef int (*mem_walk_callback_t)(env_t* e, pte_t pte, void* va, void* arg);
 int		env_user_mem_walk(env_t* e, void* start, size_t len, mem_walk_callback_t callback, void* arg);
+
+static inline void set_traced_proc(struct proc *p, bool traced)
+{
+	if (traced)
+		p->env_flags |= PROC_TRACED;
+	else
+		p->env_flags &= ~PROC_TRACED;
+}
+
+static inline bool is_traced_proc(const struct proc *p)
+{
+	return (p->env_flags & PROC_TRACED) != 0;
+}
 
 #endif // !ROS_KERN_ENV_H
