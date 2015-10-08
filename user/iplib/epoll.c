@@ -158,15 +158,19 @@ static struct event_queue *ep_get_alarm_evq(void)
  * some sort of user deferred destruction. (TODO). */
 static void ep_put_ceq_evq(struct event_queue *ceq_evq)
 {
+#if 0 /* TODO: EVQ/INDIR Cleanup */
 	ceq_cleanup(&ceq_evq->ev_mbox->ceq);
 	evq_remove_wakeup_ctlr(ceq_evq);
 	put_eventq_raw(ceq_evq);
+#endif
 }
 
 static void ep_put_alarm_evq(struct event_queue *alarm_evq)
 {
+#if 0 /* TODO: EVQ/INDIR Cleanup */
 	evq_remove_wakeup_ctlr(alarm_evq);
 	put_eventq(alarm_evq);
+#endif
 }
 
 static void epoll_close(struct user_fd *ufd)
