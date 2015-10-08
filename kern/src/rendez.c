@@ -67,7 +67,8 @@ void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
 	struct cv_lookup_elm cle;
 	struct timer_chain *pcpui_tchain = &per_cpu_info[core_id()].tchain;
 
-	assert(usec > 0);
+	if (!usec)
+		return;
 	/* Doing this cond check early, but then unlocking again.  Mostly just to
 	 * avoid weird issues with the CV lock and the alarm tchain lock. */
 	cv_lock_irqsave(&rv->cv, &irq_state);
