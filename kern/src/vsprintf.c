@@ -26,8 +26,6 @@
 #include <ns.h>
 #include <ctype.h>
 
-#define unlikely(x) (x)
-
 /**
  * skip_spaces - Removes leading whitespace from @str.
  * @str: The string to be stripped.

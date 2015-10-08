@@ -7,6 +7,7 @@
 
 /* Common headers that most driver files will need */
 
+#include <ros/common.h>
 #include <assert.h>
 #include <error.h>
 #include <ip.h>
@@ -52,8 +53,6 @@
 	_ret;                                                                      \
 })
 
-#define unlikely(x) (x)
-#define likely(x) (x)
 #define UINT_MAX UINT64_MAX
 #define L1_CACHE_SHIFT (LOG2_UP(ARCH_CL_SIZE))
 #define __stringify(x...) STRINGIFY(x)

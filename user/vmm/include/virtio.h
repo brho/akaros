@@ -4,6 +4,7 @@
 #include <ros/arch/membar.h>
 #include <ros/arch/mmu.h>
 #include <ros/virtio_ring.h>
+#include <ros/common.h>
 
 #include <stddef.h>
 #include <stdbool.h>
@@ -16,7 +17,6 @@ struct scatterlist {
 	int length;
 };
 
-#define unlikely(x) (x)
 #define virtio_rmb(x) rmb()
 #define virtio_wmb(x) wmb()
 #define virtio_mb(x) mb()
