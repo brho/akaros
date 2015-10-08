@@ -74,7 +74,10 @@ static void default_term_handler(int signr, siginfo_t *info, void *ctx)
 static void default_core_handler(int signr, siginfo_t *info, void *ctx)
 {
 	fprintf(stderr, "Segmentation Fault (sorry, no core dump yet)\n");
-	print_user_context((struct user_context*)ctx);
+	if (ctx)
+		print_user_context((struct user_context*)ctx);
+	else
+		fprintf(stderr, "No ctx for %s\n", __FUNCTION__);
 	if (info) {
 		/* ghetto, we don't have access to the PF err, since we only have a few
 		 * fields available in siginfo (e.g. there's no si_trapno). */
