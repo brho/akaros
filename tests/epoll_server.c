@@ -46,7 +46,6 @@ int main()
 	char adir[40], ldir[40];
 	int n;
 	char buf[256];
-	char debugbuf[256];
 	/* We'll use this to see if we actually did epoll_waits instead of blocking
 	 * calls.  It's not 100%, but with a human on the other end, it should be
 	 * fine. */
@@ -216,10 +215,11 @@ int main()
 	}
 	/* echo until EOF */
 	has_epolled = FALSE;
+	printf("Server read: ");
 	while (1) {
 		while ((n = read(dfd, buf, sizeof(buf))) > 0) {
-			snprintf(debugbuf, n, "%s", buf);
-			printf("Server read: %s", debugbuf);
+			for (int i = 0; i < n; i++)
+				printf("%c", buf[i]);
 			fflush(stdout);
 			/* Should epoll on this direction too. */
 			if (write(dfd, buf, n) < 0) {

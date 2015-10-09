@@ -48,7 +48,6 @@ int main()
 	char adir[40], ldir[40];
 	int n;
 	char buf[256];
-	char debugbuf[256];
 
 #ifdef PLAN9NET
 	printf("Using Plan 9's networking stack\n");
@@ -132,9 +131,10 @@ int main()
 #endif
 
 	/* echo until EOF */
+	printf("Server read: ");
 	while ((n = read(dfd, buf, sizeof(buf))) > 0) {
-		snprintf(debugbuf, n, "%s", buf);
-		printf("Server read: %s", debugbuf);
+		for (int i = 0; i < n; i++)
+			printf("%c", buf[i]);
 		fflush(stdout);
 		write(dfd, buf, n);
 	}
