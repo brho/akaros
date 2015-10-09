@@ -689,6 +689,7 @@ static void ipclose(struct chan *c)
 		case Qdata:
 		case Qctl:
 		case Qerr:
+		case Qlisten:
 			if (c->flag & COPEN)
 				closeconv(f->p[PROTO(c->qid)]->conv[CONV(c->qid)]);
 			break;
