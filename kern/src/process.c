@@ -263,7 +263,7 @@ void proc_set_progname(struct proc *p, char *name)
 }
 
 /* Be sure you init'd the vcore lists before calling this. */
-static void proc_init_procinfo(struct proc* p)
+void proc_init_procinfo(struct proc* p)
 {
 	p->procinfo->pid = p->pid;
 	p->procinfo->ppid = p->ppid;
@@ -285,7 +285,7 @@ static void proc_init_procinfo(struct proc* p)
 	}
 }
 
-static void proc_init_procdata(struct proc *p)
+void proc_init_procdata(struct proc *p)
 {
 	memset(p->procdata, 0, sizeof(struct procdata));
 	/* processes can't go into vc context on vc 0 til they unset this.  This is

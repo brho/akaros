@@ -703,8 +703,6 @@ static ssize_t sys_fork(env_t* e)
 	assert(env != NULL);
 	proc_set_progname(env, e->progname);
 
-	env->heap_top = e->heap_top;
-	env->ppid = e->pid;
 	disable_irqsave(&state);	/* protect cur_ctx */
 	/* Can't really fork if we don't have a current_ctx to fork */
 	if (!current_ctx) {
@@ -738,12 +736,14 @@ static ssize_t sys_fork(env_t* e)
 	finish_current_sysc(0);
 	switch_back(env, temp);
 
+	/* Copy some state from the original proc into the new proc. */
+	env->heap_top = e->heap_top;
+	env->env_flags = e->env_flags;
+
 	/* In general, a forked process should be a fresh process, and we copy over
 	 * whatever stuff is needed between procinfo/procdata. */
-	#ifdef CONFIG_X86
-	/* new guy needs to know about ldt (everything else in procdata is fresh */
-	env->procdata->ldt = e->procdata->ldt;
-	#endif
+	*env->procdata = *e->procdata;
+	env->procinfo->heap_bottom = e->procinfo->heap_bottom;
 
 	/* FYI: once we call ready, the proc is open for concurrent usage */
 	__proc_ready(env);
@@ -846,10 +846,8 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	/* This is the point of no return for the process. */
 	/* progname is argv0, which accounts for symlinks */
 	proc_set_progname(p, argc ? argv[0] : NULL);
-	#ifdef CONFIG_X86
-	/* clear this, so the new program knows to get an LDT */
-	p->procdata->ldt = 0;
-	#endif
+	proc_init_procdata(p);
+	p->procinfo->heap_bottom = 0;
 	/* When we destroy our memory regions, accessing cur_sysc would PF */
 	pcpui->cur_kthread->sysc = 0;
 	unmap_and_destroy_vmrs(p);

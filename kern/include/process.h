@@ -61,6 +61,8 @@ extern spinlock_t pid_hash_lock;
 /* Initialization */
 void proc_init(void);
 void proc_set_progname(struct proc *p, char *name);
+void proc_init_procinfo(struct proc* p);
+void proc_init_procdata(struct proc* p);
 
 /* Process management: */
 struct proc *pid_nth(unsigned int n);
