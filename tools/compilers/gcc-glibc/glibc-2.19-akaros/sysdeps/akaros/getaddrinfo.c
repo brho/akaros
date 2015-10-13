@@ -217,11 +217,13 @@ libc_hidden_def(getaddrinfo)
 
 void freeaddrinfo(struct addrinfo *ai)
 {
-	struct addrinfo *next = ai->ai_next;
+	struct addrinfo *next;
+	if (!ai)
+		return;
 	free(ai->ai_addr);
 	free(ai->ai_canonname);
+	next = ai->ai_next;
 	free(ai);
-	if (next)
-		freeaddrinfo(next);
+	freeaddrinfo(next);
 }
 libc_hidden_def(freeaddrinfo)
