@@ -10,6 +10,16 @@
 #   Barret Rhoden <brho@cs.berkeley.edu>
 #
 # - Added a tab_length parameter, set it to 4
+# - Set tree = 0, since we do not have a Linux kernel tree
+# - No KERN_ checks for printk
+# - ENOSYS can be used in more places
+# - Block comments do not need to end on a trailing line
+# - Can use spaces for aligning (more than tab_length spaces) and thus also at
+# the beginning of a line
+# - Can indent cases once more than its switch
+# - Casting pointers can be (struct foo*) or (struct foo *)
+# - Don't prod about updating MAINTAINERS
+# - Allow C99 comments
 
 use strict;
 use POSIX;
@@ -25,7 +35,7 @@ my $V = '0.32';
 use Getopt::Long qw(:config no_auto_abbrev);
 
 my $quiet = 0;
-my $tree = 1;
+my $tree = 0;
 my $chk_signoff = 1;
 my $chk_patch = 1;
 my $tst_only;
@@ -2406,16 +2416,16 @@ sub process {
 			}
 		}
 
-# Check for added, moved or deleted files
-		if (!$reported_maintainer_file && !$in_commit_log &&
-		    ($line =~ /^(?:new|deleted) file mode\s*\d+\s*$/ ||
-		     $line =~ /^rename (?:from|to) [\w\/\.\-]+\s*$/ ||
-		     ($line =~ /\{\s*([\w\/\.\-]*)\s*\=\>\s*([\w\/\.\-]*)\s*\}/ &&
-		      (defined($1) || defined($2))))) {
-			$reported_maintainer_file = 1;
-			WARN("FILE_PATH_CHANGES",
-			     "added, moved or deleted file(s), does MAINTAINERS need updating?\n" . $herecurr);
-		}
+## Check for added, moved or deleted files
+#		if (!$reported_maintainer_file && !$in_commit_log &&
+#		    ($line =~ /^(?:new|deleted) file mode\s*\d+\s*$/ ||
+#		     $line =~ /^rename (?:from|to) [\w\/\.\-]+\s*$/ ||
+#		     ($line =~ /\{\s*([\w\/\.\-]*)\s*\=\>\s*([\w\/\.\-]*)\s*\}/ &&
+#		      (defined($1) || defined($2))))) {
+#			$reported_maintainer_file = 1;
+#			WARN("FILE_PATH_CHANGES",
+#			     "added, moved or deleted file(s), does MAINTAINERS need updating?\n" . $herecurr);
+#		}
 
 # Check for wrappage within a valid hunk of the file
 		if ($realcnt != 0 && $line !~ m{^(?:\+|-| |\\ No newline|$)}) {
@@ -2704,18 +2714,18 @@ sub process {
 # check we are in a valid source file C or perl if not then ignore this hunk
 		next if ($realfile !~ /\.(h|c|pl|dtsi|dts)$/);
 
-# at the beginning of a line any tabs must come first and anything
-# more than tab_length must use tabs.
-		if ($rawline =~ /^\+\s* \t\s*\S/ ||
-		    $rawline =~ /^\+\s*    \s*/) {
-			my $herevet = "$here\n" . cat_vet($rawline) . "\n";
-			$rpt_cleaners = 1;
-			if (ERROR("CODE_INDENT",
-				  "code indent should use tabs where possible\n" . $herevet) &&
-			    $fix) {
-				$fixed[$fixlinenr] =~ s/^\+([ \t]+)/"\+" . tabify($1)/e;
-			}
-		}
+## at the beginning of a line any tabs must come first and anything
+## more than tab_length must use tabs.
+#		if ($rawline =~ /^\+\s* \t\s*\S/ ||
+#		    $rawline =~ /^\+\s*    \s*/) {
+#			my $herevet = "$here\n" . cat_vet($rawline) . "\n";
+#			$rpt_cleaners = 1;
+#			if (ERROR("CODE_INDENT",
+#				  "code indent should use tabs where possible\n" . $herevet) &&
+#			    $fix) {
+#				$fixed[$fixlinenr] =~ s/^\+([ \t]+)/"\+" . tabify($1)/e;
+#			}
+#		}
 
 # check for space before tabs.
 		if ($rawline =~ /^\+/ && $rawline =~ / \t/) {
@@ -2803,14 +2813,14 @@ sub process {
 			     "Block comments use * on subsequent lines\n" . $hereprev);
 		}
 
-# Block comments use */ on trailing lines
-		if ($rawline !~ m@^\+[ \t]*\*/[ \t]*$@ &&	#trailing */
-		    $rawline !~ m@^\+.*/\*.*\*/[ \t]*$@ &&	#inline /*...*/
-		    $rawline !~ m@^\+.*\*{2,}/[ \t]*$@ &&	#trailing **/
-		    $rawline =~ m@^\+[ \t]*.+\*\/[ \t]*$@) {	#non blank */
-			WARN("BLOCK_COMMENT_STYLE",
-			     "Block comments use a trailing */ on a separate line\n" . $herecurr);
-		}
+## Block comments use */ on trailing lines
+#		if ($rawline !~ m@^\+[ \t]*\*/[ \t]*$@ &&	#trailing */
+#		    $rawline !~ m@^\+.*/\*.*\*/[ \t]*$@ &&	#inline /*...*/
+#		    $rawline !~ m@^\+.*\*{2,}/[ \t]*$@ &&	#trailing **/
+#		    $rawline =~ m@^\+[ \t]*.+\*\/[ \t]*$@) {	#non blank */
+#			WARN("BLOCK_COMMENT_STYLE",
+#			     "Block comments use a trailing */ on a separate line\n" . $herecurr);
+#		}
 
 # check for missing blank lines after struct/union declarations
 # with exceptions for various attributes and macros
@@ -2885,19 +2895,19 @@ sub process {
 			}
 		}
 
-# check for spaces at the beginning of a line.
-# Exceptions:
-#  1) within comments
-#  2) indented preprocessor commands
-#  3) hanging labels
-		if ($rawline =~ /^\+ / && $line !~ /^\+ *(?:$;|#|$Ident:)/)  {
-			my $herevet = "$here\n" . cat_vet($rawline) . "\n";
-			if (WARN("LEADING_SPACE",
-				 "please, no spaces at the start of a line\n" . $herevet) &&
-			    $fix) {
-				$fixed[$fixlinenr] =~ s/^\+([ \t]+)/"\+" . tabify($1)/e;
-			}
-		}
+## check for spaces at the beginning of a line.
+## Exceptions:
+##  1) within comments
+##  2) indented preprocessor commands
+##  3) hanging labels
+#		if ($rawline =~ /^\+ / && $line !~ /^\+ *(?:$;|#|$Ident:)/)  {
+#			my $herevet = "$here\n" . cat_vet($rawline) . "\n";
+#			if (WARN("LEADING_SPACE",
+#				 "please, no spaces at the start of a line\n" . $herevet) &&
+#			    $fix) {
+#				$fixed[$fixlinenr] =~ s/^\+([ \t]+)/"\+" . tabify($1)/e;
+#			}
+#		}
 
 # check we are in a valid C source file if not then ignore this hunk
 		next if ($realfile !~ /\.(h|c)$/);
@@ -3036,28 +3046,28 @@ sub process {
 # Checks which may be anchored in the context.
 #
 
-# Check for switch () and associated case and default
-# statements should be at the same indent.
-		if ($line=~/\bswitch\s*\(.*\)/) {
-			my $err = '';
-			my $sep = '';
-			my @ctx = ctx_block_outer($linenr, $realcnt);
-			shift(@ctx);
-			for my $ctx (@ctx) {
-				my ($clen, $cindent) = line_stats($ctx);
-				if ($ctx =~ /^\+\s*(case\s+|default:)/ &&
-							$indent != $cindent) {
-					$err .= "$sep$ctx\n";
-					$sep = '';
-				} else {
-					$sep = "[...]\n";
-				}
-			}
-			if ($err ne '') {
-				ERROR("SWITCH_CASE_INDENT_LEVEL",
-				      "switch and case should be at the same indent\n$hereline$err");
-			}
-		}
+## Check for switch () and associated case and default
+## statements should be at the same indent.
+#		if ($line=~/\bswitch\s*\(.*\)/) {
+#			my $err = '';
+#			my $sep = '';
+#			my @ctx = ctx_block_outer($linenr, $realcnt);
+#			shift(@ctx);
+#			for my $ctx (@ctx) {
+#				my ($clen, $cindent) = line_stats($ctx);
+#				if ($ctx =~ /^\+\s*(case\s+|default:)/ &&
+#							$indent != $cindent) {
+#					$err .= "$sep$ctx\n";
+#					$sep = '';
+#				} else {
+#					$sep = "[...]\n";
+#				}
+#			}
+#			if ($err ne '') {
+#				ERROR("SWITCH_CASE_INDENT_LEVEL",
+#				      "switch and case should be at the same indent\n$hereline$err");
+#			}
+#		}
 
 # if/while/etc brace do not go on next line, unless defining a do while loop,
 # or if that brace on the next line is for something else
@@ -3278,18 +3288,18 @@ sub process {
 			}
 		}
 
-# no C99 // comments
-		if ($line =~ m{//}) {
-			if (ERROR("C99_COMMENTS",
-				  "do not use C99 // comments\n" . $herecurr) &&
-			    $fix) {
-				my $line = $fixed[$fixlinenr];
-				if ($line =~ /\/\/(.*)$/) {
-					my $comment = trim($1);
-					$fixed[$fixlinenr] =~ s@\/\/(.*)$@/\* $comment \*/@;
-				}
-			}
-		}
+## no C99 // comments
+#		if ($line =~ m{//}) {
+#			if (ERROR("C99_COMMENTS",
+#				  "do not use C99 // comments\n" . $herecurr) &&
+#			    $fix) {
+#				my $line = $fixed[$fixlinenr];
+#				if ($line =~ /\/\/(.*)$/) {
+#					my $comment = trim($1);
+#					$fixed[$fixlinenr] =~ s@\/\/(.*)$@/\* $comment \*/@;
+#				}
+#			}
+#		}
 		# Remove C99 comments.
 		$line =~ s@//.*@@;
 		$opline =~ s@//.*@@;
@@ -3446,8 +3456,9 @@ sub process {
 			#print "AA<$1>\n";
 			my ($ident, $from, $to) = ($1, $2, $2);
 
-			# Should start with a space.
-			$to =~ s/^(\S)/ $1/;
+#			# Should start with a space.
+#			# Controls "(foo*)" should be "(foo *)"
+#			$to =~ s/^(\S)/ $1/;
 			# Should not end with a space.
 			$to =~ s/\s+$//;
 			# '*'s should not have spaces between.
@@ -3516,65 +3527,65 @@ sub process {
 			     "Prefer printk_ratelimited or pr_<level>_ratelimited to printk_ratelimit\n" . $herecurr);
 		}
 
-# printk should use KERN_* levels.  Note that follow on printk's on the
-# same line do not need a level, so we use the current block context
-# to try and find and validate the current printk.  In summary the current
-# printk includes all preceding printk's which have no newline on the end.
-# we assume the first bad printk is the one to report.
-		if ($line =~ /\bprintk\((?!KERN_)\s*"/) {
-			my $ok = 0;
-			for (my $ln = $linenr - 1; $ln >= $first_line; $ln--) {
-				#print "CHECK<$lines[$ln - 1]\n";
-				# we have a preceding printk if it ends
-				# with "\n" ignore it, else it is to blame
-				if ($lines[$ln - 1] =~ m{\bprintk\(}) {
-					if ($rawlines[$ln - 1] !~ m{\\n"}) {
-						$ok = 1;
-					}
-					last;
-				}
-			}
-			if ($ok == 0) {
-				WARN("PRINTK_WITHOUT_KERN_LEVEL",
-				     "printk() should include KERN_ facility level\n" . $herecurr);
-			}
-		}
+## printk should use KERN_* levels.  Note that follow on printk's on the
+## same line do not need a level, so we use the current block context
+## to try and find and validate the current printk.  In summary the current
+## printk includes all preceding printk's which have no newline on the end.
+## we assume the first bad printk is the one to report.
+#		if ($line =~ /\bprintk\((?!KERN_)\s*"/) {
+#			my $ok = 0;
+#			for (my $ln = $linenr - 1; $ln >= $first_line; $ln--) {
+#				#print "CHECK<$lines[$ln - 1]\n";
+#				# we have a preceding printk if it ends
+#				# with "\n" ignore it, else it is to blame
+#				if ($lines[$ln - 1] =~ m{\bprintk\(}) {
+#					if ($rawlines[$ln - 1] !~ m{\\n"}) {
+#						$ok = 1;
+#					}
+#					last;
+#				}
+#			}
+#			if ($ok == 0) {
+#				WARN("PRINTK_WITHOUT_KERN_LEVEL",
+#				     "printk() should include KERN_ facility level\n" . $herecurr);
+#			}
+#		}
+#
+#		if ($line =~ /\bprintk\s*\(\s*KERN_([A-Z]+)/) {
+#			my $orig = $1;
+#			my $level = lc($orig);
+#			$level = "warn" if ($level eq "warning");
+#			my $level2 = $level;
+#			$level2 = "dbg" if ($level eq "debug");
+#			WARN("PREFER_PR_LEVEL",
+#			     "Prefer [subsystem eg: netdev]_$level2([subsystem]dev, ... then dev_$level2(dev, ... then pr_$level(...  to printk(KERN_$orig ...\n" . $herecurr);
+#		}
+#
+#		if ($line =~ /\bpr_warning\s*\(/) {
+#			if (WARN("PREFER_PR_LEVEL",
+#				 "Prefer pr_warn(... to pr_warning(...\n" . $herecurr) &&
+#			    $fix) {
+#				$fixed[$fixlinenr] =~
+#				    s/\bpr_warning\b/pr_warn/;
+#			}
+#		}
+#
+#		if ($line =~ /\bdev_printk\s*\(\s*KERN_([A-Z]+)/) {
+#			my $orig = $1;
+#			my $level = lc($orig);
+#			$level = "warn" if ($level eq "warning");
+#			$level = "dbg" if ($level eq "debug");
+#			WARN("PREFER_DEV_LEVEL",
+#			     "Prefer dev_$level(... to dev_printk(KERN_$orig, ...\n" . $herecurr);
+#		}
 
-		if ($line =~ /\bprintk\s*\(\s*KERN_([A-Z]+)/) {
-			my $orig = $1;
-			my $level = lc($orig);
-			$level = "warn" if ($level eq "warning");
-			my $level2 = $level;
-			$level2 = "dbg" if ($level eq "debug");
-			WARN("PREFER_PR_LEVEL",
-			     "Prefer [subsystem eg: netdev]_$level2([subsystem]dev, ... then dev_$level2(dev, ... then pr_$level(...  to printk(KERN_$orig ...\n" . $herecurr);
-		}
-
-		if ($line =~ /\bpr_warning\s*\(/) {
-			if (WARN("PREFER_PR_LEVEL",
-				 "Prefer pr_warn(... to pr_warning(...\n" . $herecurr) &&
-			    $fix) {
-				$fixed[$fixlinenr] =~
-				    s/\bpr_warning\b/pr_warn/;
-			}
-		}
-
-		if ($line =~ /\bdev_printk\s*\(\s*KERN_([A-Z]+)/) {
-			my $orig = $1;
-			my $level = lc($orig);
-			$level = "warn" if ($level eq "warning");
-			$level = "dbg" if ($level eq "debug");
-			WARN("PREFER_DEV_LEVEL",
-			     "Prefer dev_$level(... to dev_printk(KERN_$orig, ...\n" . $herecurr);
-		}
-
-# ENOSYS means "bad syscall nr" and nothing else.  This will have a small
-# number of false positives, but assembly files are not checked, so at
-# least the arch entry code will not trigger this warning.
-		if ($line =~ /\bENOSYS\b/) {
-			WARN("ENOSYS",
-			     "ENOSYS means 'invalid syscall nr' and nothing else\n" . $herecurr);
-		}
+## ENOSYS means "bad syscall nr" and nothing else.  This will have a small
+## number of false positives, but assembly files are not checked, so at
+## least the arch entry code will not trigger this warning.
+#		if ($line =~ /\bENOSYS\b/) {
+#			WARN("ENOSYS",
+#			     "ENOSYS means 'invalid syscall nr' and nothing else\n" . $herecurr);
+#		}
 
 # function brace can't be on same line, except for #defines of do while,
 # or if closed on same line
