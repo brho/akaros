@@ -4,6 +4,12 @@
 # (c) 2007,2008, Andy Whitcroft <apw@uk.ibm.com> (new conditions, test suite)
 # (c) 2008-2010 Andy Whitcroft <apw@canonical.com>
 # Licensed under the terms of the GNU GPL License version 2
+#
+# Modifications for Akaros:
+#   Copyright (c) 2015 Google Inc
+#   Barret Rhoden <brho@cs.berkeley.edu>
+#
+# - Added a tab_length parameter, set it to 4
 
 use strict;
 use POSIX;
@@ -52,6 +58,7 @@ my $spelling_file = "$D/spelling.txt";
 my $codespell = 0;
 my $codespellfile = "/usr/share/codespell/dictionary.txt";
 my $color = 1;
+my $tab_length = 4;
 
 sub help {
 	my ($exitcode) = @_;
@@ -912,7 +919,7 @@ sub expand_tabs {
 		if ($c eq "\t") {
 			$res .= ' ';
 			$n++;
-			for (; ($n % 8) != 0; $n++) {
+			for (; ($n % $tab_length) != 0; $n++) {
 				$res .= ' ';
 			}
 			next;
@@ -1895,7 +1902,7 @@ sub string_find_replace {
 sub tabify {
 	my ($leading) = @_;
 
-	my $source_indent = 8;
+	my $source_indent = $tab_length;
 	my $max_spaces_before_tab = $source_indent - 1;
 	my $spaces_to_tab = " " x $source_indent;
 
@@ -2698,9 +2705,9 @@ sub process {
 		next if ($realfile !~ /\.(h|c|pl|dtsi|dts)$/);
 
 # at the beginning of a line any tabs must come first and anything
-# more than 8 must use tabs.
+# more than tab_length must use tabs.
 		if ($rawline =~ /^\+\s* \t\s*\S/ ||
-		    $rawline =~ /^\+\s*        \s*/) {
+		    $rawline =~ /^\+\s*    \s*/) {
 			my $herevet = "$here\n" . cat_vet($rawline) . "\n";
 			$rpt_cleaners = 1;
 			if (ERROR("CODE_INDENT",
@@ -2717,7 +2724,7 @@ sub process {
 				"please, no space before tabs\n" . $herevet) &&
 			    $fix) {
 				while ($fixed[$fixlinenr] =~
-					   s/(^\+.*) {8,8}\t/$1\t\t/) {}
+					   s/(^\+.*) {$tab_length,$tab_length}\t/$1\t\t/) {}
 				while ($fixed[$fixlinenr] =~
 					   s/(^\+.*) +\t/$1\t/) {}
 			}
@@ -2742,8 +2749,8 @@ sub process {
 				my $newindent = $2;
 
 				my $goodtabindent = $oldindent .
-					"\t" x ($pos / 8) .
-					" "  x ($pos % 8);
+					"\t" x ($pos / $tab_length) .
+					" "  x ($pos % $tab_length);
 				my $goodspaceindent = $oldindent . " "  x $pos;
 
 				if ($newindent ne $goodtabindent &&
@@ -3190,9 +3197,9 @@ sub process {
 			#print "line<$line> prevline<$prevline> indent<$indent> sindent<$sindent> check<$check> continuation<$continuation> s<$s> cond_lines<$cond_lines> stat_real<$stat_real> stat<$stat>\n";
 
 			if ($check && $s ne '' &&
-			    (($sindent % 8) != 0 ||
+			    (($sindent % $tab_length) != 0 ||
 			     ($sindent < $indent) ||
-			     ($sindent > $indent + 8))) {
+			     ($sindent > $indent + $tab_length))) {
 				WARN("SUSPECT_CODE_INDENT",
 				     "suspect code indent for conditional statements ($indent, $sindent)\n" . $herecurr . "$stat_real\n");
 			}
