@@ -20,14 +20,15 @@ __BEGIN_DECLS
 /* 
  * Macros for assertions. 
  */
-#define UT_ASSERT(test)                                                          \
-	UT_ASSERT_M("", test)
+#define UT_ASSERT(test, ...)                                                     \
+	UT_ASSERT_M(#test, test, __VA_ARGS__)
 
-#define UT_ASSERT_M(message, test)                                               \
+#define UT_ASSERT_M(message, test, ...)                                               \
 	do {                                                                         \
 		if (!(test)) {                                                           \
 			char fmt[] = "Assertion failure in %s() at %s:%d: %s";               \
 			sprintf(utest_msg, fmt, __FUNCTION__, __FILE__, __LINE__, message);  \
+			__VA_ARGS__;                                                         \
 			return false;                                                        \
 		}                                                                        \
 	} while (0)
