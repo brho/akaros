@@ -20,16 +20,11 @@ TEST_SUITE("FILE POSIX");
 bool test_openat(void)
 {
 	int dfd = open("/dir1", O_RDONLY);
-	if (dfd < 0) {
-		perror("open dir1");
-		return FALSE;
-	}
+	UT_ASSERT(dfd >= 0);
+
 	int ffd = openat(dfd, "f1.txt", O_RDWR);
-	if (ffd < 0) {
-		perror("open f1.txt");
-		close(dfd);
-		return FALSE;
-	}
+	UT_ASSERT(ffd >= 0, close(dfd));
+
 	close(ffd);
 	close(dfd);
 	return TRUE;
