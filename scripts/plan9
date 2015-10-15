@@ -4,7 +4,7 @@ sed -i 's/KERN_WAIT/KMALLOC_WAIT/g' $1
 sed -i 's/nelem/ARRAY_SIZE/g' $1
 
 # stuff I'm not smart enough to do with spatch
-sed -i '/strcpy.*(\(.*\),\(.*\));/s//strncpy(\1, \2, sizeof(\1));/' $1
+sed -i '/strcpy.*(\(.*\),\(.*\));/s//strlcpy(\1, \2, sizeof(\1));/' $1
 sed -i '/snprint(/s//snprintf(/' $1
 sed -i '/seprint(/s//seprintf(/' $1
 sed -i 's/[ \t][ \t]*QLock;/	qlock_t qlock;/' $1
