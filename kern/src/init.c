@@ -29,6 +29,7 @@
 #include <radix.h>
 #include <mm.h>
 #include <frontend.h>
+#include <ex_table.h>
 
 #include <arch/init.h>
 #include <bitmask.h>
@@ -64,6 +65,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	cons_init();
 	print_cpuinfo();
 
+	exception_table_init();
 	cache_init();					// Determine systems's cache properties
 	pmem_init(multiboot_kaddr);
 	kmem_cache_init();              // Sets up slab allocator

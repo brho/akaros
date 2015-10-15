@@ -16,6 +16,7 @@
 #include <syscall.h>
 #include <kdebug.h>
 #include <kmalloc.h>
+#include <ex_table.h>
 #include <arch/mptables.h>
 
 taskstate_t ts;
@@ -28,6 +29,20 @@ pseudodesc_t idt_pd;
  * given IRQ.  Modification requires holding the lock (TODO: RCU) */
 struct irq_handler *irq_handlers[NUM_IRQS];
 spinlock_t irq_handler_wlock = SPINLOCK_INITIALIZER_IRQSAVE;
+
+static bool try_handle_exception_fixup(struct hw_trapframe *hw_tf)
+{
+	if (in_kernel(hw_tf)) {
+		uintptr_t fixup_ip = get_fixup_ip(hw_tf->tf_rip);
+
+		if (fixup_ip != 0) {
+			hw_tf->tf_rip = fixup_ip;
+			return true;
+		}
+	}
+
+	return false;
+}
 
 const char *x86_trapname(int trapno)
 {
@@ -229,6 +244,9 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 	enable_irq();
 
 	if (!pcpui->cur_proc) {
+		if (try_handle_exception_fixup(hw_tf))
+			return TRUE;
+
 		/* still catch KPFs */
 		assert((hw_tf->tf_cs & 3) == 0);
 		print_trapframe(hw_tf);
@@ -248,6 +266,9 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 	if (in_kernel(hw_tf))
 		pcpui->__lock_checking_enabled++;
 	if (err) {
+		if (try_handle_exception_fixup(hw_tf))
+			return TRUE;
+
 		if (in_kernel(hw_tf)) {
 			print_trapframe(hw_tf);
 			backtrace_kframe(hw_tf);
@@ -285,6 +306,8 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 	struct per_cpu_info *pcpui;
 	bool handled = TRUE;
 	unsigned long aux = 0;
+	uintptr_t fixup_ip;
+
 	// Handle processor exceptions.
 	switch(hw_tf->tf_trapno) {
 		case T_NMI:
@@ -342,7 +365,9 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			handled = __handle_page_fault(hw_tf, &aux);
 			break;
 		case T_FPERR:
-			handle_fperr(hw_tf);
+			handled = try_handle_exception_fixup(hw_tf);
+			if (!handled)
+				handle_fperr(hw_tf);
 			break;
 		case T_SYSCALL:
 			enable_irq();
@@ -362,6 +387,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 				handled = FALSE;
 			}
 	}
+
 	if (!handled)
 		reflect_unhandled_trap(hw_tf->tf_trapno, hw_tf->tf_err, aux);
 }
