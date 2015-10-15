@@ -13,6 +13,7 @@ STRING	strcat(STRING dst, const STRING src);
 */
 char *strncpy(char *dst, const char *src, size_t size);
 size_t	strlcpy(char *dst, const char *src, size_t size);
+size_t	strlcat(char *dst, const char *src, size_t size);
 int	strcmp(const char *s1, const char *s2);
 int	strncmp(const char *s1, const char *s2, size_t size);
 int cistrcmp(char *s1, char *s2);

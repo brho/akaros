@@ -63,15 +63,39 @@ strncpy(char *dst, const char *src, size_t size) {
 size_t
 strlcpy(char *dst, const char *src, size_t size)
 {
-	char *dst_in;
-
-	dst_in = dst;
 	if (size > 0) {
 		while (--size > 0 && *src != '\0')
 			*dst++ = *src++;
 		*dst = '\0';
 	}
-	return dst - dst_in;
+
+	return strlen(src);
+}
+
+size_t
+strlcat(char *dst, const char *src, size_t size)
+{
+	size_t rem;	/* Buffer space remaining after null in dst. */
+
+	/* We must find the terminating NUL byte in dst, but abort the
+	 * search if we go past 'size' bytes.  At the end of this loop,
+	 * 'dst' will point to either the NUL byte in the original
+	 * destination or to one byte beyond the end of the buffer.
+	 *
+	 * 'rem' will be the amount of 'size' remaining beyond the NUL byte;
+	 * potentially zero. This implies that 'size - rem' is equal to the
+	 * distance from the beginning of the destination buffer to 'dst'.
+	 *
+	 * The return value of strlcat is the sum of the length of the
+	 * original destination buffer (size - rem) plus the size of the
+	 * src string (the return value of strlcpy). */
+	rem = size;
+	while ((rem > 0) && (*dst != '\0')) {
+		rem--;
+		dst++;
+	}
+
+	return (size - rem) + strlcpy(dst, src, rem);
 }
 
 int
