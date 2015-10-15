@@ -217,7 +217,7 @@ Accept:
 						   c->qid.path);
 Notfound:
 					if (j == 0)
-						error(ENODEV, NULL);
+						error(ENOENT, NULL);
 					set_error(ENOENT, NULL);
 					goto Done;
 				case 0:
@@ -283,8 +283,7 @@ devstat(struct chan *c, uint8_t * db, int n,
 				}
 				printd("DEVSTAT fails:%s %llu\n", devtab[c->type].name,
 					   c->qid.path);
-				set_errno(ENOENT);
-				error(ENODEV, NULL);
+				error(ENOENT, NULL);
 			case 0:
 				printd("DEVSTAT got 0\n");
 				break;

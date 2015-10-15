@@ -55,8 +55,7 @@ struct dev *devtabget(const char *name, int user)
 		return &devtab[i];
 
 	printk("devtabget FAILED %s\n", name);
-	set_errno(ENOENT);
-	error(ENODEV, NULL);
+	error(ENOENT, NULL);
 }
 
 long devtabread(struct chan *c, void *buf, long n, int64_t off)
