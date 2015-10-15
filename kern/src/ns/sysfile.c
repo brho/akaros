@@ -173,7 +173,7 @@ int syscreate(char *path, int mode, uint32_t perm)
 	}
 	fd = newfd(c, mode);	/* 9ns mode is the O_FLAGS and perm is glibc mode */
 	if (fd < 0)
-		error(fd, NULL);
+		error(-fd, NULL);
 	poperror();
 
 	poperror();
@@ -198,7 +198,7 @@ int sysdup(int old)
 	fd = newfd(c, 0);
 	if (fd < 0) {
 		cclose(c);
-		error(fd, NULL);
+		error(-fd, NULL);
 	}
 	poperror();
 	return fd;
@@ -287,7 +287,7 @@ int sysfauth(int fd, char *aname)
 
 	fd = newfd(ac, 0);
 	if (fd < 0)
-		error(fd, NULL);
+		error(-fd, NULL);
 	poperror();	/* ac */
 
 	poperror();
@@ -363,10 +363,10 @@ int syspipe(int fd[2])
 	c[1] = d->open(c[1], O_RDWR);
 	fd[0] = newfd(c[0], 0);
 	if (fd[0] < 0)
-		error(fd[0], NULL);
+		error(-fd[0], NULL);
 	fd[1] = newfd(c[1], 0);
 	if (fd[1] < 0)
-		error(fd[1], NULL);
+		error(-fd[1], NULL);
 	poperror();
 	return 0;
 }
@@ -544,7 +544,7 @@ int sysopenat(int fromfd, char *path, int vfs_flags)
 	}
 	fd = newfd(c, vfs_flags);
 	if (fd < 0)
-		error(fd, NULL);
+		error(-fd, NULL);
 	poperror();
 	return fd;
 }
