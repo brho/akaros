@@ -1146,6 +1146,9 @@ struct emmsr emmsrs[] = {
 	// mostly harmless.
 	{MSR_TSC_AUX, "MSR_TSC_AUX", emsr_fakewrite},
 	{MSR_RAPL_POWER_UNIT, "MSR_RAPL_POWER_UNIT", emsr_readzero},
+
+	// TBD
+	{MSR_IA32_TSC_DEADLINE, "MSR_IA32_TSC_DEADLINE", emsr_fakewrite},
 };
 
 static uint64_t set_low32(uint64_t hi, uint32_t lo)

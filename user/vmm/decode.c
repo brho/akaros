@@ -44,7 +44,11 @@ int debug_decode = 0;
 static char *modrmreg[] = {"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi"};
 
 // Since we at most have to decode less than half of each instruction, I'm trying to be dumb here.
-// Fortunately, for me, what's not hard.
+// Fortunately, for me, that's not hard.
+// I'm trying to avoid the whole Big Fun of full instruction decode, and in most of these
+// cases we only have to know register, address, operation size, and instruction length.
+// The ugly messiness of the SIB and all that are not yet needed. Maybe they
+// never will be.
 
 // Target size -- 1, 2, 4, or 8 bytes. We have yet to see 64 bytes. 
 // TODO: if we ever see it, test the prefix. Since this only supports the low 1M,
@@ -61,6 +65,10 @@ static int target(void *insn, int *store)
 		// flip the sense of s.
 		s = s == 4 ? 2 : 4;
 		return s;
+	}
+	if (*byte == 0x44) {
+		byte++;
+		word++;
 	}
 	switch(*byte) {
 	case 0x3a:
@@ -117,6 +125,12 @@ static int insize(void *rip)
 {
 	uint8_t *kva = rip;
 	int advance = 3;
+	int extra = 0;
+	if (kva[0] == 0x44) {
+		extra = 1;
+		kva++;
+	}
+
 	/* the dreaded mod/rm byte. */
 	int mod = kva[1]>>6;
 	int rm = kva[1] & 7;
@@ -127,7 +141,7 @@ static int insize(void *rip)
 	case 0x0f: 
 		break;
 	case 0x81:
-		advance = 6;
+		advance = 6 + extra;
 		break;
 	case 0x3a:
 	case 0x8a:
@@ -136,16 +150,16 @@ static int insize(void *rip)
 	case 0x8b:
 		switch (mod) {
 		case 0: 
-			advance = 2 + (rm == 4);
+			advance = 2 + (rm == 4) + extra;
 			break;
 		case 1:
-			advance = 3 + (rm == 4);
+			advance = 3 + (rm == 4) + extra;
 			break;
 		case 2: 
-			advance = 6 + (rm == 4);
+			advance = 6 + (rm == 4) + extra;
 			break;
 		case 3:
-			advance = 2;
+			advance = 2 + extra;
 			break;
 		}
 		break;
@@ -193,11 +207,11 @@ int decode(struct vmctl *v, uint64_t *gpa, uint8_t *destreg, uint64_t **regp, in
 	if (*size < 0)
 		return -1;
 
-	uint16_t ins = *(uint16_t *)kva;
-	DPRINTF("ins is %04x\n", ins);
-	
 	*advance = insize(kva);
 
+	uint16_t ins = *(uint16_t *)(kva + 8*(kva[0] == 0x44));
+	DPRINTF("ins is %04x\n", ins);
+		
 	*destreg = (ins>>11) & 7;
 	// Our primitive approach wins big here.
 	// We don't have to decode the register or the offset used
