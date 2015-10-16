@@ -38,8 +38,7 @@ void block_init(void)
 	kref_init(&ram_bd->b_kref, fake_release, 1);
 	pm_init(&ram_bd->b_pm, &block_pm_op, ram_bd);
 	ram_bd->b_data = _binary_mnt_ext2fs_img_start;
-	strncpy(ram_bd->b_name, "RAMDISK", BDEV_INLINE_NAME);
-	ram_bd->b_name[BDEV_INLINE_NAME - 1] = '\0';
+	strlcpy(ram_bd->b_name, "RAMDISK", BDEV_INLINE_NAME);
 	/* Connect it to the file system */
 	struct file *ram_bf = make_device("/dev/ramdisk", S_IRUSR | S_IWUSR,
 	                                  __S_IFBLK, &block_f_op);

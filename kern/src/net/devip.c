@@ -1573,10 +1573,9 @@ retry:
 int Fsconnected(struct conv *c, char *msg)
 {
 	if (msg != NULL && *msg != '\0')
-		strncpy(c->cerr, msg, sizeof(c->cerr));
+		strlcpy(c->cerr, msg, sizeof(c->cerr));
 
 	switch (c->state) {
-
 		case Announcing:
 			c->state = Announced;
 			break;

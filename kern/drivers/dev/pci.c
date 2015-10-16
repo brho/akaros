@@ -35,6 +35,8 @@ enum {
 	Qpcidir,
 	Qpcictl,
 	Qpciraw,
+
+	PCI_CONFIG_SZ = 256,
 };
 
 #define TYPE(q)		((uint32_t)(q).path & 0x0F)
@@ -144,7 +146,7 @@ static void pciclose(struct chan *)
 
 static long pciread(struct chan *c, void *va, long n, int64_t offset)
 {
-	char buf[256], *ebuf, *w, *a;
+	char buf[PCI_CONFIG_SZ], *ebuf, *w, *a;
 	int i, tbdf, r;
 	uint32_t x;
 	Pcidev *p;
@@ -206,17 +208,14 @@ static long pciread(struct chan *c, void *va, long n, int64_t offset)
 
 static long pciwrite(struct chan *c, void *va, long n, int64_t offset)
 {
-	char buf[256];
 	uint8_t *a;
 	int i, r, tbdf;
 	uint32_t x;
 	Pcidev *p;
 
-	if (n >= sizeof(buf))
-		n = sizeof(buf) - 1;
+	if (n > PCI_CONFIG_SZ)
+		n = PCI_CONFIG_SZ;
 	a = va;
-	strncpy(buf, (char *unused_char_p_t)a, n);
-	buf[n] = 0;
 
 	switch (TYPE(c->qid)) {
 		case Qpciraw:
@@ -224,10 +223,10 @@ static long pciwrite(struct chan *c, void *va, long n, int64_t offset)
 			p = pcimatchtbdf(tbdf);
 			if (p == NULL)
 				error(EINVAL, NULL);
-			if (offset > 256)
+			if (offset > PCI_CONFIG_SZ)
 				return 0;
-			if (n + offset > 256)
-				n = 256 - offset;
+			if (n + offset > PCI_CONFIG_SZ)
+				n = PCI_CONFIG_SZ - offset;
 			r = offset;
 			if (!(r & 3) && n == 4) {
 				x = GBIT32(a);

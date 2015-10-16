@@ -1570,7 +1570,7 @@ static long acpiread(struct chan *c, void *a, long n, int64_t off)
 		case Qtbl:
 			s = ttext;
 			e = ttext + tlen;
-			strncpy(s, "no tables\n", sizeof(s));
+			strlcpy(s, "no tables\n", tlen);
 			for (t = tfirst; t != NULL; t = t->next) {
 				ns = seprinttable(s, e, t);
 				while (ns == e - 1) {

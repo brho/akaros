@@ -216,13 +216,13 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 
 	if (c->qid.path == Qdir) {
 		if (s == 0) {
-			strncpy(get_cur_genbuf(), "trace", GENBUF_SZ);
+			strlcpy(get_cur_genbuf(), "trace", GENBUF_SZ);
 			mkqid(&qid, Qtrace, -1, QTFILE);
 			devdir(c, qid, get_cur_genbuf(), 0, eve, 0444, dp);
 			return 1;
 		}
 		if (s == 1) {
-			strncpy(get_cur_genbuf(), "tracepids", GENBUF_SZ);
+			strlcpy(get_cur_genbuf(), "tracepids", GENBUF_SZ);
 			mkqid(&qid, Qtracepids, -1, QTFILE);
 			devdir(c, qid, get_cur_genbuf(), 0, eve, 0444, dp);
 			return 1;
@@ -264,13 +264,13 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 		return 1;
 	}
 	if (c->qid.path == Qtrace) {
-		strncpy(get_cur_genbuf(), "trace", GENBUF_SZ);
+		strlcpy(get_cur_genbuf(), "trace", GENBUF_SZ);
 		mkqid(&qid, Qtrace, -1, QTFILE);
 		devdir(c, qid, get_cur_genbuf(), 0, eve, 0444, dp);
 		return 1;
 	}
 	if (c->qid.path == Qtracepids) {
-		strncpy(get_cur_genbuf(), "tracepids", GENBUF_SZ);
+		strlcpy(get_cur_genbuf(), "tracepids", GENBUF_SZ);
 		mkqid(&qid, Qtracepids, -1, QTFILE);
 		devdir(c, qid, get_cur_genbuf(), 0, eve, 0444, dp);
 		return 1;

@@ -36,8 +36,7 @@ char *get_fn_name(uintptr_t pc)
 	buf = kmalloc(name_len, 0);
 	if (!buf)
 		return 0;
-	strncpy(buf, found->name, name_len);
-	buf[name_len] = 0;
+	strlcpy(buf, found->name, name_len);
 	return buf;
 }
 

@@ -179,7 +179,7 @@ long mntversion(struct chan *c, char *version, int msize, int returnlen)
 		qunlock(&c->umqlock);
 		poperror();
 
-		strncpy(buf, m->version, sizeof buf);
+		strlcpy(buf, m->version, sizeof(buf));
 		k = strlen(buf);
 		if (strncmp(buf, v, k) != 0) {
 			snprintf(buf, sizeof buf, "incompatible 9P versions %s %s",

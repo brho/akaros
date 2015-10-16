@@ -631,14 +631,12 @@ static void dentry_set_name(struct dentry *dentry, char *name)
 	size_t name_len = strnlen(name, MAX_FILENAME_SZ);	/* not including \0! */
 	char *l_name = 0;
 	if (name_len < DNAME_INLINE_LEN) {
-		strncpy(dentry->d_iname, name, name_len);
-		dentry->d_iname[name_len] = '\0';
+		strlcpy(dentry->d_iname, name, name_len + 1);
 		qstr_builder(dentry, 0);
 	} else {
 		l_name = kmalloc(name_len + 1, 0);
 		assert(l_name);
-		strncpy(l_name, name, name_len);
-		l_name[name_len] = '\0';
+		strlcpy(l_name, name, name_len + 1);
 		qstr_builder(dentry, l_name);
 	}
 }
@@ -2740,7 +2738,7 @@ char *do_getcwd(struct fs_struct *fs_env, char **kfree_this, size_t cwd_l)
 			return 0;
 		}
 		path_start -= link_len;
-		strncpy(path_start, dentry->d_name.name, link_len);
+		memmove(path_start, dentry->d_name.name, link_len);
 		path_start--;
 		*path_start = '/';
 		dentry = dentry->d_parent;	

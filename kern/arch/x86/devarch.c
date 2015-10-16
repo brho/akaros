@@ -107,7 +107,7 @@ struct dirtab *addarchfile(char *name, int perm, Rdwrfn * rdfn, Rdwrfn * wrfn)
 	}
 
 	for (i = 0; i < narchdir; i++)
-		if (strcmp(archdir[i].name, name) == 0) {
+		if (strncmp(archdir[i].name, name, KNAMELEN) == 0) {
 			spin_unlock(&archwlock);
 			return NULL;
 		}
@@ -193,8 +193,7 @@ int ioreserve(int unused_int, int size, int align, char *tag)
 	map->start = port;
 	map->end = port + size;
 	map->reserved = 1;
-	strncpy(map->tag, tag, sizeof(map->tag));
-	map->tag[sizeof(map->tag) - 1] = 0;
+	strlcpy(map->tag, tag, sizeof(map->tag));
 	*l = map;
 
 	archdir[0].qid.vers++;
@@ -264,8 +263,7 @@ int ioalloc(int port, int size, int align, char *tag)
 	map->next = *l;
 	map->start = port;
 	map->end = port + size;
-	strncpy(map->tag, tag, sizeof(map->tag));
-	map->tag[sizeof(map->tag) - 1] = 0;
+	strlcpy(map->tag, tag, sizeof(map->tag));
 	*l = map;
 
 	archdir[0].qid.vers++;

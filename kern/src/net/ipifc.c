@@ -162,10 +162,9 @@ static char *ipifcbind(struct conv *c, char **argv, int argc)
 
 	/* set the bound device name */
 	if (argc > 2)
-		strncpy(ifc->dev, argv[2], sizeof(ifc->dev));
+		strlcpy(ifc->dev, argv[2], sizeof(ifc->dev));
 	else
-		snprintf(ifc->dev, sizeof ifc->dev, "%s%d", m->name, c->x);
-	ifc->dev[sizeof(ifc->dev) - 1] = 0;
+		snprintf(ifc->dev, sizeof(ifc->dev), "%s%d", m->name, c->x);
 
 	/* set up parameters */
 	ifc->m = m;

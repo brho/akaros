@@ -1011,7 +1011,7 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 		kfree(e.name);
 		kfree(e.elems);
 		kfree(e.off);
-//dumpmount();
+		//dumpmount();
 		nexterror();
 	}
 
@@ -1027,7 +1027,7 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 		/* perm must have DMDIR if last element is / or /. */
 		if (e.mustbedir && !(perm & DMDIR)) {
 			npath = e.ARRAY_SIZEs;
-			strncpy(tmperrbuf, "create without DMDIR", sizeof(tmperrbuf));
+			strlcpy(tmperrbuf, "create without DMDIR", sizeof(tmperrbuf));
 			goto NameError;
 		}
 
@@ -1052,7 +1052,7 @@ NameError:
 		/* brho: skipping the namec custom error string business, since it hides
 		 * the underlying failure.  implement this if you want the old stuff. */
 #if 0
-		strncpy(tmperrbuf, current->errstr, sizeof(tmperrbuf));
+		strlcpy(tmperrbuf, current->errstr, sizeof(tmperrbuf));
 		len = prefix + e.off[npath]; // prefix was name - aname, the start pt
 		if (len < ERRMAX / 3 || (name = memrchr(aname, '/', len)) == NULL
 			|| name == aname)
@@ -1068,7 +1068,7 @@ NameError:
 
 	if (e.mustbedir && !(c->qid.type & QTDIR)) {
 		npath = e.ARRAY_SIZEs;
-		strncpy(tmperrbuf, "not a directory", sizeof(tmperrbuf));
+		strlcpy(tmperrbuf, "not a directory", sizeof(tmperrbuf));
 		goto NameError;
 	}
 
@@ -1272,7 +1272,7 @@ Open:
 			poperror();	/* matching the if(!waserror) */
 
 			/* save error, so walk doesn't clobber our existing errstr */
-			strncpy(tmperrbuf, current_errstr(), MAX_ERRSTR_LEN);
+			strlcpy(tmperrbuf, current_errstr(), sizeof(tmperrbuf));
 			saved_errno = get_errno();
 			/* note: we depend that walk does not error */
 			if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, can_mount, NULL) < 0) {
@@ -1280,7 +1280,7 @@ Open:
 				/* Report the error we had originally */
 				error(EFAIL, tmperrbuf);
 			}
-			strncpy(current_errstr(), tmperrbuf, MAX_ERRSTR_LEN);
+			strlcpy(current_errstr(), tmperrbuf, MAX_ERRSTR_LEN);
 			omode |= O_TRUNC;
 			goto Open;
 
@@ -1291,9 +1291,9 @@ Open:
 	poperror();
 
 	if (e.ARRAY_SIZEs > 0)
-		strncpy(get_cur_genbuf(), e.elems[e.ARRAY_SIZEs - 1], GENBUF_SZ);
+		strlcpy(get_cur_genbuf(), e.elems[e.ARRAY_SIZEs - 1], GENBUF_SZ);
 	else
-		strncpy(get_cur_genbuf(), ".", GENBUF_SZ);
+		strlcpy(get_cur_genbuf(), ".", GENBUF_SZ);
 
 	kfree(e.name);
 	kfree(e.elems);

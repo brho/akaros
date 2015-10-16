@@ -53,8 +53,7 @@ static int parseaddr(uint8_t * unused_uint8_p_t, char *unused_char_p_t, int);
 void netifinit(struct ether *nif, char *name, int nfile, uint32_t limit)
 {
 	qlock_init(&nif->qlock);
-	strncpy(nif->name, name, KNAMELEN - 1);
-	nif->name[KNAMELEN - 1] = 0;
+	strlcpy(nif->name, name, KNAMELEN);
 	nif->nfile = nfile;
 	nif->f = kzmalloc(nfile * sizeof(struct netfile *), 0);
 	if (nif->f)
@@ -91,7 +90,7 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp,
 			case 0:
 				q.path = N2ndqid;
 				q.type = QTDIR;
-				strncpy(get_cur_genbuf(), nif->name, GENBUF_SZ);
+				strlcpy(get_cur_genbuf(), nif->name, GENBUF_SZ);
 				devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
 				break;
 			default:
@@ -188,7 +187,7 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp,
 		case DEVDOTDOT:
 			q.type = QTDIR;
 			q.path = N2ndqid;
-			strncpy(get_cur_genbuf(), nif->name, GENBUF_SZ);
+			strlcpy(get_cur_genbuf(), nif->name, GENBUF_SZ);
 			devdir(c, q, get_cur_genbuf(), 0, eve, DMDIR | 0555, dp);
 			break;
 		case 0:
@@ -465,7 +464,7 @@ int netifwstat(struct ether *nif, struct chan *c, uint8_t * db, int n)
 		error(ENODATA, NULL);
 	}
 	if (!emptystr(dir[0].uid))
-		strncpy(f->owner, dir[0].uid, KNAMELEN);
+		strlcpy(f->owner, dir[0].uid, KNAMELEN);
 	if (dir[0].mode != ~0UL)
 		f->mode = dir[0].mode;
 	kfree(dir);
@@ -558,7 +557,7 @@ static int netown(struct netfile *p, char *o, int omode)
 			return -1;
 		}
 	}
-	strncpy(p->owner, o, KNAMELEN);
+	strlcpy(p->owner, o, KNAMELEN);
 	p->mode = 0660;
 	spin_unlock(&netlock);
 	return 0;

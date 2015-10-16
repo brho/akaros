@@ -304,8 +304,13 @@ int mon_bin_run(int argc, char **argv, struct hw_trapframe *hw_tf)
 	}
 	struct file *program;
 	int retval = 0;
-	char buf[6 + MAX_FILENAME_SZ] = "/bin/";	/* /bin/ + max + \0 */
-	strncpy(buf + 5, argv[1], MAX_FILENAME_SZ);
+	char buf[5 + MAX_FILENAME_SZ + 1] = "/bin/";	/* /bin/ + max + \0 */
+
+	strlcpy(buf, "/bin/", sizeof(buf));
+	if (strlcat(buf, argv[1], sizeof(buf)) > sizeof(buf)) {
+		printk("Filename '%s' too long!\n", argv[1]);
+		return 1;
+	}
 	program = do_file_open(buf, O_READ, 0);
 	if (!program) {
 		printk("No such program!\n");

@@ -118,7 +118,7 @@ static int srvgen(struct chan *c, char *name, struct dirtab *tab,
 	c->aux = next;	/* uncounted ref */
 	mkqid(&q, Qsrvfile, 0, QTFILE);
 	/* once we release the lock, next could disappear, including next->name */
-	strncpy(get_cur_genbuf(), next->name, GENBUF_SZ);
+	strlcpy(get_cur_genbuf(), next->name, GENBUF_SZ);
 	devdir(c, q, get_cur_genbuf(), 1 /* length */ , next->user, next->perm, dp);
 	spin_unlock(&srvlock);
 	return 1;
@@ -312,8 +312,7 @@ static long srvwrite(struct chan *c, void *va, long count, int64_t offset)
 		nexterror();
 	}
 	kbuf = kmalloc(count + 1, KMALLOC_WAIT);
-	strncpy(kbuf, va, count);
-	kbuf[count] = 0;
+	strlcpy(kbuf, va, count + 1);
 	fd = strtoul(kbuf, 0, 10);
 	/* the magic of srv: srv stores the chan corresponding to the fd.  -1 for
 	 * mode, so we just get the chan with no checks (RDWR would work too). */

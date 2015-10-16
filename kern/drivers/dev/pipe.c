@@ -442,7 +442,7 @@ static long pipebwrite(struct chan *c, struct block *bp, uint32_t junk)
 	return n;
 }
 
-static int pipewstat(struct chan *c, uint8_t * dp, int n)
+static int pipewstat(struct chan *c, uint8_t *dp, int n)
 {
 	ERRSTACK(2);
 	struct dir *d;
@@ -467,10 +467,9 @@ static int pipewstat(struct chan *c, uint8_t * dp, int n)
 		validwstatname(d->name);
 		if (strlen(d->name) >= KNAMELEN)
 			error(ENAMETOOLONG, NULL);
-		if (strcmp(p->pipedir[1 + !d1].name, d->name) == 0)
+		if (strncmp(p->pipedir[1 + !d1].name, d->name, KNAMELEN) == 0)
 			error(EEXIST, NULL);
-		strncpy(p->pipedir[1 + d1].name, d->name,
-				MIN(KNAMELEN, sizeof(p->pipedir[1 + d1].name, d->name)));
+		strncpy(p->pipedir[1 + d1].name, d->name, KNAMELEN);
 	}
 	if (d->mode != ~0UL)
 		p->pipedir[d1 + 1].perm = d->mode & 0777;

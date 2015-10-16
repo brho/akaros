@@ -64,7 +64,7 @@ struct DS {
 /* only used here for now. */
 static void kerrstr(void *err, int len)
 {
-	strncpy(err, current_errstr(), len);
+	strlcpy(err, current_errstr(), len);
 }
 
 /*
@@ -95,7 +95,7 @@ int kdial(char *dest, char *local, char *dir, int *cfdp)
 		goto out;
 
 	err[0] = 0;
-	strncpy(err, current_errstr(), ERRMAX);
+	strlcpy(err, current_errstr(), ERRMAX);
 	if (strstr(err, "refused") != 0) {
 		goto out;
 	}
@@ -155,7 +155,7 @@ static int csdial(DS * ds)
 	 *  we get one that works.
 	 */
 	*besterr = 0;
-	strncpy(err, errno_to_string(ECONNRESET), ERRMAX);
+	strlcpy(err, errno_to_string(ECONNRESET), ERRMAX);
 	sysseek(fd, 0, 0);
 	while ((n = sysread(fd, buf, Maxstring - 1)) > 0) {
 		buf[n] = 0;
@@ -264,8 +264,7 @@ static void _dial_string_parse(char *str, DS * ds)
 {
 	char *p, *p2;
 
-	strncpy(ds->buf, str, Maxstring);
-	ds->buf[Maxstring - 1] = 0;
+	strlcpy(ds->buf, str, Maxstring);
 
 	p = strchr(ds->buf, '!');
 	if (p == 0) {
@@ -290,7 +289,7 @@ static void _dial_string_parse(char *str, DS * ds)
 /*
  *  announce a network service.
  */
-int kannounce(char *addr, char *dir)
+int kannounce(char *addr, char *dir, size_t dirlen)
 {
 	int ctl, n, m;
 	char buf[NETPATHLEN];
@@ -338,17 +337,17 @@ int kannounce(char *addr, char *dir)
 	 *  return directory etc.
 	 */
 	if (dir)
-		strncpy(dir, buf, sizeof(dir));
+		strlcpy(dir, buf, dirlen);
 	return ctl;
 }
 
 /*
  *  listen for an incoming call
  */
-int klisten(char *dir, char *newdir)
+int klisten(char *dir, char *newdir, size_t newdirlen)
 {
 	int ctl, n, m;
-	char buf[NETPATHLEN];
+	char buf[NETPATHLEN + 1];
 	char *cp;
 
 	/*
@@ -362,7 +361,7 @@ int klisten(char *dir, char *newdir)
 	/*
 	 *  find out which line we have
 	 */
-	strncpy(buf, dir, sizeof(buf));
+	strlcpy(buf, dir, sizeof(buf));
 	cp = strrchr(buf, '/');
 	*++cp = 0;
 	n = cp - buf;
@@ -377,7 +376,7 @@ int klisten(char *dir, char *newdir)
 	 *  return directory etc.
 	 */
 	if (newdir)
-		strncpy(newdir, buf, sizeof(newdir));
+		strlcpy(newdir, buf, newdirlen);
 	return ctl;
 
 }
@@ -392,15 +391,13 @@ identtrans(char *netdir, char *addr, char *naddr, int na, char *file, int nf)
 	char *p;
 
 	/* parse the protocol */
-	strncpy(proto, addr, sizeof(proto));
-	proto[sizeof(proto) - 1] = 0;
+	strlcpy(proto, addr, sizeof(proto));
 	p = strchr(proto, '!');
 	if (p)
 		*p++ = 0;
 
 	snprintf(file, nf, "%s/%s/clone", netdir, proto);
-	strncpy(naddr, p, na);
-	naddr[na - 1] = 0;
+	strlcpy(naddr, p, na);
 
 	return 1;
 }
@@ -425,7 +422,7 @@ static int nettrans(char *addr, char *naddr, int na, char *file, int nf)
 		return -1;
 	}
 	if (*addr != '/') {
-		strncpy(netdir, "/net", sizeof(netdir));
+		strlcpy(netdir, "/net", sizeof(netdir));
 	} else {
 		for (p2 = p; *p2 != '/'; p2--) ;
 		i = p2 - addr;
@@ -433,8 +430,7 @@ static int nettrans(char *addr, char *naddr, int na, char *file, int nf)
 			set_errstr("bad dial string: %s", addr);
 			return -1;
 		}
-		strncpy(netdir, addr, i);
-		netdir[i] = 0;
+		strlcpy(netdir, addr, i + 1);
 		addr = p2 + 1;
 	}
 
@@ -463,9 +459,7 @@ static int nettrans(char *addr, char *naddr, int na, char *file, int nf)
 	if (p == 0)
 		return -1;
 	*p++ = 0;
-	strncpy(naddr, p, na);
-	naddr[na - 1] = 0;
-	strncpy(file, buf, nf);
-	file[nf - 1] = 0;
+	strlcpy(naddr, p, na);
+	strlcpy(file, buf, nf);
 	return 0;
 }

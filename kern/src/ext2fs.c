@@ -1013,10 +1013,12 @@ static unsigned int ext2_dirent_len(struct ext2_dirent *e2dir)
 		return 0;
 }
 
-/* Helper for writing the contents of a dentry to a disk dirent */
+/* Helper for writing the contents of a dentry to a disk dirent. Zeroes the
+ * contents of the dirent so that we don't write random data to disk. */
 static void ext2_write_dirent(struct ext2_dirent *e2dir, struct dentry *dentry,
                               unsigned int rec_len)
 {
+	memset(e2dir, 0, sizeof(*e2dir));
 	e2dir->dir_inode = cpu_to_le32(dentry->d_inode->i_ino);
 	e2dir->dir_reclen = cpu_to_le16(rec_len);
 	e2dir->dir_namelen = dentry->d_name.len;
@@ -1044,7 +1046,8 @@ static void ext2_write_dirent(struct ext2_dirent *e2dir, struct dentry *dentry,
 			e2dir->dir_filetype = EXT2_FT_UNKNOWN;
 	}
 	assert(dentry->d_name.len <= 255);
-	strncpy((char*)e2dir->dir_name, dentry->d_name.name, dentry->d_name.len);
+	strlcpy((char*)e2dir->dir_name, dentry->d_name.name,
+	        sizeof(e2dir->dir_name));
 }
 
 /* Helper for ext2_create().  This tries to squeeze a dirent in the slack space
@@ -1187,8 +1190,7 @@ I_AM_HERE;
 	struct inode *inode = dentry->d_inode;
 	SET_FTYPE(inode->i_mode, __S_IFLNK);
 	inode->i_fop = &ext2_f_op_sym;
-	strncpy(string, symname, len);
-	string[len] = '\0';		/* symname should be \0d anyway, but just in case */
+	strlcpy(string, symname, len + 1);
 	#endif
 	return 0;
 }
@@ -1344,9 +1346,8 @@ int ext2_readdir(struct file *dir, struct dirent *dirent)
 		panic("Something is jacked with the dirent going beyond the dir/file");
 	/* note, dir_namelen doesn't include the \0 */
 	dirent->d_reclen = e2dir->dir_namelen;
-	strncpy(dirent->d_name, (char*)e2dir->dir_name, e2dir->dir_namelen);
 	assert(e2dir->dir_namelen <= MAX_FILENAME_SZ);
-	dirent->d_name[e2dir->dir_namelen] = '\0';
+	strlcpy(dirent->d_name, (char*)e2dir->dir_name, e2dir->dir_namelen + 1);
 	ext2_put_metablock(dir->f_dentry->d_sb, blk_buf);
 	
 	/* At the end of the directory, sort of.  ext2 often preallocates blocks, so

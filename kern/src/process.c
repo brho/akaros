@@ -257,9 +257,8 @@ void proc_set_progname(struct proc *p, char *name)
 		name = DEFAULT_PROGNAME;
 
 	/* might have an issue if a dentry name isn't null terminated, and we'd get
-	 * extra junk up to progname_sz. */
-	strncpy(p->progname, name, PROC_PROGNAME_SZ);
-	p->progname[PROC_PROGNAME_SZ - 1] = '\0';
+	 * extra junk up to progname_sz. Or crash. */
+	strlcpy(p->progname, name, PROC_PROGNAME_SZ);
 }
 
 /* Be sure you init'd the vcore lists before calling this. */

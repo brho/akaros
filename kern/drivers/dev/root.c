@@ -285,7 +285,7 @@ rootgen(struct chan *c, char *name,
 		tab = &roottab[rootdata[path].child];
 		/* we're starting at a directory. It might be '.' */
 		for (iter = 0, i = rootdata[path].child; /* break */; iter++) {
-			if(strcmp(tab->name, name) == 0){
+			if (strncmp(tab->name, name, KNAMELEN) == 0) {
 				printd("Rootgen returns 1 for %s\n", name);
 				devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
 				printd("return 1 with [%d, %d, %d]\n", dp->qid.path,

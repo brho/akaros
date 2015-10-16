@@ -392,8 +392,7 @@ int kfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	kfs_init_inode(dir, dentry);
 	SET_FTYPE(inode->i_mode, __S_IFLNK);
 	inode->i_fop = &kfs_f_op_sym;
-	strncpy(string, symname, len);
-	string[len] = '\0';		/* symname should be \0d anyway, but just in case */
+	strlcpy(string, symname, len + 1);
 	k_i_info->filestart = string;	/* reusing this void* to hold the char* */
 	return 0;
 }
@@ -584,9 +583,14 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
 			dirent->d_ino = subent->d_inode->i_ino;
 			dirent->d_off = count;
 			dirent->d_reclen = subent->d_name.len;
-			/* d_name.name is null terminated, the byte after d_name.len */
-			assert(subent->d_name.len <= MAX_FILENAME_SZ);
-			strncpy(dirent->d_name, subent->d_name.name, subent->d_name.len +1);
+			/* d_name.name is null terminated, the byte after d_name.len.
+			 * Regardless, exercise caution as we copy into d_name, should
+			 * the size of the quickstring buffer and the size of d_name
+			 * fall out of sync with one another. */
+			assert(subent->d_name.len < sizeof(dirent->d_name));
+			strncpy(dirent->d_name, subent->d_name.name,
+			        sizeof(dirent->d_name) - 1);
+			dirent->d_name[sizeof(dirent->d_name) - 1] = '\0';
 			found = TRUE;
 		}
 	}
@@ -596,13 +600,13 @@ int kfs_readdir(struct file *dir, struct dirent *dirent)
 		dirent->d_ino = dir_d->d_inode->i_ino;
 		dirent->d_off = 1;
 		dirent->d_reclen = 1;
-		strncpy(dirent->d_name, ".", 2);	/* the extra is for the null term */
+		strlcpy(dirent->d_name, ".", sizeof(dirent->d_name));
 		found = TRUE;
 	} else if (desired_file == 1) {
 		dirent->d_ino = dir_d->d_parent->d_inode->i_ino;
 		dirent->d_off = 2;
 		dirent->d_reclen = 2;
-		strncpy(dirent->d_name, "..", 3);	/* the extra is for the null term */
+		strlcpy(dirent->d_name, "..", sizeof(dirent->d_name));
 		found = TRUE;
 	}
 	/* need to check the sub-dirs as well as the sub-"files".  The main
@@ -813,7 +817,7 @@ static int __add_kfs_entry(struct dentry *parent, char *path,
 		 * anything like that. */
 		dirname_sz = first_slash - path;
 		assert(dirname_sz <= MAX_FILENAME_SZ);
-		strncpy(dir, path, dirname_sz);
+		memmove(dir, path, dirname_sz);
 		dir[dirname_sz] = '\0';
 		printd("Finding DIR %s in dentry %s (start: %p, size %d)\n", dir,
 		       parent->d_name.name, c_bhdr->c_filestart, c_bhdr->c_filesize);

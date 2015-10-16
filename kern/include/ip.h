@@ -540,7 +540,7 @@ struct arpent {
 
 extern void arpinit(struct Fs *);
 extern int arpread(struct arp *, char *unused_char_p_t, uint32_t, int);
-extern int arpwrite(struct Fs *, char *unused_char_p_t, int);
+extern int arpwrite(struct Fs *, char *unused_char_p_t, long);
 extern struct arpent *arpget(struct arp *, struct block *bp, int version,
 							 struct Ipifc *ifc, uint8_t * ip, uint8_t * h);
 extern void arprelease(struct arp *, struct arpent *a);

@@ -1890,7 +1890,7 @@ void qclose(struct queue *q)
 	spin_lock_irqsave(&q->lock);
 	q->state |= Qclosed;
 	q->state &= ~(Qflow | Qstarve | Qdropoverflow | Qnonblock);
-	strncpy(q->err, errno_to_string(ECONNABORTED), sizeof(q->err));
+	strlcpy(q->err, errno_to_string(ECONNABORTED), sizeof(q->err));
 	bfirst = q->bfirst;
 	q->bfirst = 0;
 	q->len = 0;
@@ -1916,9 +1916,9 @@ void qhangup(struct queue *q, char *msg)
 	spin_lock_irqsave(&q->lock);
 	q->state |= Qclosed;
 	if (msg == 0 || *msg == 0)
-		strncpy(q->err, errno_to_string(ECONNABORTED), sizeof(q->err));
+		strlcpy(q->err, errno_to_string(ECONNABORTED), sizeof(q->err));
 	else
-		strncpy(q->err, msg, ERRMAX - 1);
+		strlcpy(q->err, msg, ERRMAX);
 	spin_unlock_irqsave(&q->lock);
 
 	/* wake up readers/writers */

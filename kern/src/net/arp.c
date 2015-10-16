@@ -435,7 +435,7 @@ arpenter(struct Fs *fs, int version, uint8_t * ip, uint8_t * mac, int n,
 	qunlock(&arp->qlock);
 }
 
-int arpwrite(struct Fs *fs, char *s, int len)
+int arpwrite(struct Fs *fs, char *s, long len)
 {
 	int n;
 	struct route *r;
@@ -448,14 +448,13 @@ int arpwrite(struct Fs *fs, char *s, int len)
 
 	arp = fs->arp;
 
-	if (len == 0)
+	if (len <= 0)
 		error(EINVAL, NULL);
-	if (len >= sizeof(buf))
-		len = sizeof(buf) - 1;
-	strncpy(buf, s, len);
-	buf[len] = 0;
-	if (len > 0 && buf[len - 1] == '\n')
-		buf[len - 1] = 0;
+	if (len > sizeof(buf))
+		len = sizeof(buf);
+	strlcpy(buf, s, sizeof(buf));
+	if (len > 0 && buf[len - 2] == '\n')
+		buf[len - 2] = 0;
 
 	n = getfields(buf, f, 4, 1, " ");
 	if (strcmp(f[0], "flush") == 0) {
@@ -473,7 +472,7 @@ int arpwrite(struct Fs *fs, char *s, int len)
 			}
 		}
 		memset(arp->hash, 0, sizeof(arp->hash));
-// clear all pkts on these lists (rxmt, dropf/l)
+		// clear all pkts on these lists (rxmt, dropf/l)
 		arp->rxmt = NULL;
 		arp->dropf = NULL;
 		arp->dropl = NULL;

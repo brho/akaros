@@ -117,7 +117,7 @@ void cmderror(struct cmdbuf *cb, char *s)
 			p = seprintf(p, e, " ");
 		p = seprintf(p, e, "%s", cb->f[i]);
 	}
-	strncpy(p, "\"", sizeof(p));
+	seprintf(p, e, "\"");
 	error(EFAIL, get_cur_genbuf());
 }
 
