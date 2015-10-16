@@ -238,3 +238,13 @@ config TEST_u16pool
     depends on PB_KTESTS
     bool "u16 pool"
     default n
+
+config TEST_uaccess
+    depends on PB_KTESTS
+    bool "Tests user memory access fault trapping"
+    default y
+
+config TEST_sort
+    depends on PB_KTESTS
+    bool "Tests sort library functions"
+    default y

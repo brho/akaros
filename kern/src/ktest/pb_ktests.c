@@ -6,6 +6,7 @@
 
 #include <arch/mmu.h>
 #include <arch/arch.h>
+#include <arch/uaccess.h>
 #include <bitmask.h>
 #include <smp.h>
 
@@ -24,6 +25,7 @@
 #include <syscall.h>
 #include <time.h>
 #include <kfs.h>
+#include <mm.h>
 #include <multiboot.h>
 #include <pmap.h>
 #include <page_alloc.h>
@@ -38,6 +40,7 @@
 #include <umem.h>
 #include <ucq.h>
 #include <setjmp.h>
+#include <sort.h>
 
 #include <apipe.h>
 #include <rwlock.h>
@@ -2085,6 +2088,124 @@ bool test_u16pool(void)
 	return FALSE;
 }
 
+bool test_uaccess(void)
+{
+	char buf[128] = { 0 };
+	char buf2[128] = { 0 };
+	struct proc *tmp = switch_to(NULL);
+
+	KT_ASSERT_M("Copy to user (u8) to not mapped UDATA address should fail",
+				copy_to_user((void *) UDATA, buf, 1) == -EFAULT);
+	KT_ASSERT_M("Copy to user (u16) to not mapped UDATA address should fail",
+				copy_to_user((void *) UDATA, buf, 2) == -EFAULT);
+	KT_ASSERT_M("Copy to user (u32) to not mapped UDATA address should fail",
+				copy_to_user((void *) UDATA, buf, 4) == -EFAULT);
+	KT_ASSERT_M("Copy to user (u64) to not mapped UDATA address should fail",
+				copy_to_user((void *) UDATA, buf, 8) == -EFAULT);
+	KT_ASSERT_M("Copy to user (mem) to not mapped UDATA address should fail",
+				copy_to_user((void *) UDATA, buf, sizeof(buf)) == -EFAULT);
+
+	KT_ASSERT_M("Copy from user (u8) to not mapped UDATA address should fail",
+				copy_from_user(buf, (const void *) UDATA, 1) == -EFAULT);
+	KT_ASSERT_M("Copy from user (u16) to not mapped UDATA address should fail",
+				copy_from_user(buf, (const void *) UDATA, 2) == -EFAULT);
+	KT_ASSERT_M("Copy from user (u32) to not mapped UDATA address should fail",
+				copy_from_user(buf, (const void *) UDATA, 4) == -EFAULT);
+	KT_ASSERT_M("Copy from user (u64) to not mapped UDATA address should fail",
+				copy_from_user(buf, (const void *) UDATA, 8) == -EFAULT);
+	KT_ASSERT_M("Copy from user (mem) to not mapped UDATA address should fail",
+				copy_from_user(buf, (const void *) UDATA, sizeof(buf)) ==
+				-EFAULT);
+
+	KT_ASSERT_M("Copy from user with kernel side source pointer should fail",
+				copy_from_user(buf, buf2, sizeof(buf)) == -EFAULT);
+	KT_ASSERT_M("Copy to user with kernel side source pointer should fail",
+				copy_to_user(buf, buf2, sizeof(buf)) == -EFAULT);
+
+	switch_back(NULL, tmp);
+
+	if (tmp != NULL) {
+		static const size_t mmap_size = 4096;
+		void *addr = mmap(tmp, 0, mmap_size, PROT_READ | PROT_WRITE,
+		                  MAP_PRIVATE, -1, 0);
+
+		KT_ASSERT_M("Mmap failed", addr != MAP_FAILED);
+
+		KT_ASSERT_M(
+			"Copy to user (u8) to mapped address should not fail",
+			copy_to_user(addr, buf, 1) == 0);
+		KT_ASSERT_M(
+			"Copy to user (u16) to mapped address should not fail",
+			copy_to_user(addr, buf, 2) == 0);
+		KT_ASSERT_M(
+			"Copy to user (u32) to mapped address should not fail",
+			copy_to_user(addr, buf, 4) == 0);
+		KT_ASSERT_M(
+			"Copy to user (u64) to mapped address should not fail",
+			copy_to_user(addr, buf, 8) == 0);
+		KT_ASSERT_M(
+			"Copy to user (mem) to mapped address should not fail",
+			copy_to_user(addr, buf, sizeof(buf)) == 0);
+
+		KT_ASSERT_M(
+			"Copy from user (u8) to mapped address should not fail",
+			copy_from_user(buf, addr, 1) == 0);
+		KT_ASSERT_M(
+			"Copy from user (u16) to mapped address should not fail",
+			copy_from_user(buf, addr, 2) == 0);
+		KT_ASSERT_M(
+			"Copy from user (u32) to mapped address should not fail",
+			copy_from_user(buf, addr, 4) == 0);
+		KT_ASSERT_M(
+			"Copy from user (u64) to mapped address should not fail",
+			copy_from_user(buf, addr, 8) == 0);
+		KT_ASSERT_M(
+			"Copy from user (mem) to mapped address should not fail",
+			copy_from_user(buf, addr, sizeof(buf)) == 0);
+
+		munmap(tmp, (uintptr_t) addr, mmap_size);
+	}
+
+	return TRUE;
+}
+
+bool test_sort(void)
+{
+	int cmp_longs_asc(const void *p1, const void *p2)
+	{
+		const long v1 = *(const long *) p1;
+		const long v2 = *(const long *) p2;
+
+		return v1 < v2 ? -1 : (v1 > v2 ? 1 : 0);
+	}
+
+	int cmp_longs_desc(const void *p1, const void *p2)
+	{
+		const long v1 = *(const long *) p1;
+		const long v2 = *(const long *) p2;
+
+		return v1 < v2 ? 1 : (v1 > v2 ? -1 : 0);
+	}
+
+	size_t i;
+	long long_set_1[] = {
+		-9, 11, 0, 23, 123, -99, 3, 11, 23, -999, 872, 17, 21
+	};
+	long long_set_2[] = {
+		31, 77, -1, 2, 0, 64, 11, 19, 69, 111, -89, 17, 21, 44, 77
+	};
+
+	sort(long_set_1, ARRAY_SIZE(long_set_1), sizeof(long), cmp_longs_asc);
+	for (i = 1; i < ARRAY_SIZE(long_set_1); i++)
+		KT_ASSERT(long_set_1[i - 1] <= long_set_1[i]);
+
+	sort(long_set_2, ARRAY_SIZE(long_set_2), sizeof(long), cmp_longs_desc);
+	for (i = 1; i < ARRAY_SIZE(long_set_2); i++)
+		KT_ASSERT(long_set_2[i - 1] >= long_set_2[i]);
+
+	return TRUE;
+}
+
 static struct ktest ktests[] = {
 #ifdef CONFIG_X86
 	KTEST_REG(ipi_sending,        CONFIG_TEST_ipi_sending),
@@ -2124,6 +2245,8 @@ static struct ktest ktests[] = {
 	KTEST_REG(alarm,              CONFIG_TEST_alarm),
 	KTEST_REG(kmalloc_incref,     CONFIG_TEST_kmalloc_incref),
 	KTEST_REG(u16pool,            CONFIG_TEST_u16pool),
+	KTEST_REG(uaccess,            CONFIG_TEST_uaccess),
+	KTEST_REG(sort,               CONFIG_TEST_sort),
 };
 static int num_ktests = sizeof(ktests) / sizeof(struct ktest);
 linker_func_1(register_pb_ktests)
