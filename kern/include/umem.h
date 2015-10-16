@@ -14,9 +14,9 @@
 /* Is this a valid user pointer for read/write?  It doesn't care if the address
  * is paged out or even an unmapped region: simply if it is in part of the
  * address space that could be RW user.  Will also check for len bytes. */
-static inline bool is_user_rwaddr(void *addr, size_t len);
+static inline bool is_user_rwaddr(const void *addr, size_t len);
 /* Same deal, but read-only */
-static inline bool is_user_raddr(void *addr, size_t len);
+static inline bool is_user_raddr(const void *addr, size_t len);
 
 /* Copy from proc p into the kernel's dest from src */
 int memcpy_from_user(struct proc *p, void *dest, const void *va,
@@ -59,24 +59,26 @@ uintptr_t uva2kva(struct proc *p, void *uva);
  * on behalf of the user or if the kernel itself had a null pointer deref.  By
  * checking early, the kernel will catch low addresses and error out before page
  * faulting. */
-static inline bool __is_user_addr(void *addr, size_t len, uintptr_t lim)
+static inline bool __is_user_addr(const void *addr, size_t len, uintptr_t lim)
 {
-	if ((MMAP_LOWEST_VA <= (uintptr_t)addr) &&
-	    ((uintptr_t)addr < lim) &&
-	    ((uintptr_t)addr + len <= lim))
-		return TRUE;
-	else
+	if (unlikely((uintptr_t) addr < MMAP_LOWEST_VA))
 		return FALSE;
+	if (unlikely((uintptr_t) addr >= lim))
+		return FALSE;
+	if (unlikely(lim - (uintptr_t) addr < len))
+		return FALSE;
+
+	return TRUE;
 }
 
 /* UWLIM is defined as virtual address below which a process can write */
-static inline bool is_user_rwaddr(void *addr, size_t len)
+static inline bool is_user_rwaddr(const void *addr, size_t len)
 {
 	return __is_user_addr(addr, len, UWLIM);
 }
 
 /* ULIM is defined as virtual address below which a process can read */
-static inline bool is_user_raddr(void *addr, size_t len)
+static inline bool is_user_raddr(const void *addr, size_t len)
 {
 	return __is_user_addr(addr, len, ULIM);
 }
