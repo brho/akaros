@@ -5,6 +5,9 @@
  *
  * Functions for working with userspace's address space. */
 
+#ifndef ROS_KERN_UMEM_H
+#define ROS_KERN_UMEM_H
+
 #include <ros/common.h>
 #include <process.h>
 
@@ -77,3 +80,5 @@ static inline bool is_user_raddr(void *addr, size_t len)
 {
 	return __is_user_addr(addr, len, ULIM);
 }
+
+#endif /* ROS_KERN_UMEM_H */
