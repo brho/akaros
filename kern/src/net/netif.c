@@ -389,12 +389,12 @@ long netifwrite(struct ether *nif, struct chan *c, void *a, long n)
 	memmove(buf, a, n);
 	buf[n] = 0;
 
+	qlock(&nif->qlock);
 	if (waserror()) {
 		qunlock(&nif->qlock);
 		nexterror();
 	}
 
-	qlock(&nif->qlock);
 	f = nif->f[NETID(c->qid.path)];
 	if ((p = matchtoken(buf, "connect")) != 0) {
 		type = strtol(p, 0, 0);	/* allows any base, though usually hex */

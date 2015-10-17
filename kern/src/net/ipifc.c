@@ -205,11 +205,11 @@ static char *ipifcunbind(struct Ipifc *ifc)
 	ERRSTACK(1);
 	char *err;
 
+	wlock(&ifc->rwlock);
 	if (waserror()) {
 		wunlock(&ifc->rwlock);
 		nexterror();
 	}
-	wlock(&ifc->rwlock);
 
 	/* dissociate routes */
 	if (ifc->m != NULL && ifc->m->unbindonclose == 0)
@@ -701,11 +701,11 @@ static char *ipifcconnect(struct conv *c, char **argv, int argc)
 	if (ifc->m == NULL)
 		return "ipifc not yet bound to device";
 
+	wlock(&ifc->rwlock);
 	if (waserror()) {
 		wunlock(&ifc->rwlock);
 		nexterror();
 	}
-	wlock(&ifc->rwlock);
 	while (ifc->lifc) {
 		err = ipifcremlifc(ifc, ifc->lifc);
 		if (err)
@@ -1482,11 +1482,11 @@ void ipifcaddmulti(struct conv *c, uint8_t * ma, uint8_t * ia)
 		if ((*p)->inuse == 0)
 			continue;
 		ifc = (struct Ipifc *)(*p)->ptcl;
+		wlock(&ifc->rwlock);
 		if (waserror()) {
 			wunlock(&ifc->rwlock);
 			nexterror();
 		}
-		wlock(&ifc->rwlock);
 		for (lifc = ifc->lifc; lifc; lifc = lifc->next)
 			if (ipcmp(ia, lifc->local) == 0)
 				addselfcache(f, ifc, lifc, ma, Rmulti);
@@ -1525,11 +1525,11 @@ void ipifcremmulti(struct conv *c, uint8_t * ma, uint8_t * ia)
 			continue;
 
 		ifc = (struct Ipifc *)(*p)->ptcl;
+		wlock(&ifc->rwlock);
 		if (waserror()) {
 			wunlock(&ifc->rwlock);
 			nexterror();
 		}
-		wlock(&ifc->rwlock);
 		for (lifc = ifc->lifc; lifc; lifc = lifc->next)
 			if (ipcmp(ia, lifc->local) == 0)
 				remselfcache(f, ifc, lifc, ma);

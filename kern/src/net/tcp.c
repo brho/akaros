@@ -564,11 +564,11 @@ void tcpkick(void *x)
 
 	tcb = (Tcpctl *) s->ptcl;
 
+	qlock(&s->qlock);
 	if (waserror()) {
 		qunlock(&s->qlock);
 		nexterror();
 	}
-	qlock(&s->qlock);
 
 	switch (tcb->state) {
 		case Syn_sent:
@@ -613,11 +613,11 @@ void tcpacktimer(void *v)
 	s = v;
 	tcb = (Tcpctl *) s->ptcl;
 
+	qlock(&s->qlock);
 	if (waserror()) {
 		qunlock(&s->qlock);
 		nexterror();
 	}
-	qlock(&s->qlock);
 	if (tcb->state != Closed) {
 		tcb->flags |= FORCE;
 		tcprcvwin(s);
@@ -2736,11 +2736,11 @@ void tcpkeepalive(void *v)
 
 	s = v;
 	tcb = (Tcpctl *) s->ptcl;
+	qlock(&s->qlock);
 	if (waserror()) {
 		qunlock(&s->qlock);
 		nexterror();
 	}
-	qlock(&s->qlock);
 	if (tcb->state != Closed) {
 		if (--(tcb->kacounter) <= 0) {
 			localclose(s, errno_to_string(ETIMEDOUT));
@@ -2822,11 +2822,11 @@ void tcptimeout(void *arg)
 	tpriv = s->p->priv;
 	tcb = (Tcpctl *) s->ptcl;
 
+	qlock(&s->qlock);
 	if (waserror()) {
 		qunlock(&s->qlock);
 		nexterror();
 	}
-	qlock(&s->qlock);
 	switch (tcb->state) {
 		default:
 			tcb->backoff++;

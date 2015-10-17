@@ -405,11 +405,11 @@ arpenter(struct Fs *fs, int version, uint8_t * ip, uint8_t * mac, int n,
 			while (bp) {
 				next = bp->list;
 				if (ifc != NULL) {
+					rlock(&ifc->rwlock);
 					if (waserror()) {
 						runlock(&ifc->rwlock);
 						nexterror();
 					}
-					rlock(&ifc->rwlock);
 					if (ifc->m != NULL)
 						ifc->m->bwrite(ifc, bp, version, ip);
 					else
