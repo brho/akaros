@@ -5,15 +5,6 @@
 #include <benchutil/alarm.h>
 #include <errno.h>
 
-struct sem_queue_element {
-	TAILQ_ENTRY(sem_queue_element) next;
-	struct sem *sem;
-	pthread_t pthread;
-	uint64_t us_timeout;
-	struct alarm_waiter awaiter;
-	bool timedout;
-};
-
 int sem_init (sem_t *__sem, int __pshared, unsigned int __value)
 {
 	if(__pshared == TRUE) {

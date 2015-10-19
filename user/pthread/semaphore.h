@@ -22,16 +22,27 @@
 #include <sys/queue.h>
 #include <pthread.h>
 #include <parlib/mcs.h>
+#include <benchutil/alarm.h>
 
 __BEGIN_DECLS
 
 /* Value returned if `sem_open' failed.  */
 #define SEM_FAILED      ((sem_t *) 0)
 
+struct sem_queue_element {
+	TAILQ_ENTRY(sem_queue_element) next;
+	struct sem *sem;
+	pthread_t pthread;
+	uint64_t us_timeout;
+	struct alarm_waiter awaiter;
+	bool timedout;
+};
+TAILQ_HEAD(sem_qe_queue, sem_queue_element);
+
 typedef struct sem
 {
 	unsigned int count;
-	struct pthread_queue queue;
+	struct sem_qe_queue queue;
 	struct spin_pdr_lock lock;
 } sem_t;
 
