@@ -10,6 +10,7 @@
 #define PARLIB_EVENT_H
 
 #include <ros/event.h>
+#include <ros/syscall.h>
 #include <parlib/common.h>
 
 __BEGIN_DECLS
