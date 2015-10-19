@@ -54,7 +54,7 @@ void reflect_unhandled_trap(unsigned int trap_nr, unsigned int err,
 		goto error_out;
 	}
 	if (vcpd->notif_disabled) {
-		printk("Unhandled user trap in vcore context\n");
+		printk("Unhandled user trap in vcore context from VC %d\n", vcoreid);
 		goto error_out;
 	}
 	printx_unhandled_trap(p, pcpui->cur_ctx, trap_nr, err, aux);
