@@ -3,11 +3,14 @@
 #include <ros/common.h>
 #include <ros/trapframe.h>
 #include <arch/kdebug.h>
+#include <profiler.h>
 
 struct symtab_entry {
 	char *name;
 	uintptr_t addr;
 };
+
+#define TRACEME() oprofile_add_backtrace(read_pc(), read_bp())
 
 void backtrace(void);
 void backtrace_frame(uintptr_t pc, uintptr_t fp);
@@ -40,9 +43,6 @@ extern bool printx_on;
 void set_printx(int mode);
 #define printx(args...) if (printx_on) printk(args)
 #define trace_printx(args...) if (printx_on) trace_printk(args)
-
-#include <oprofile.h>
-#define TRACEME() oprofile_add_backtrace(read_pc(), read_bp())
 
 void debug_addr_proc(struct proc *p, unsigned long addr);
 void debug_addr_pid(int pid, unsigned long addr);

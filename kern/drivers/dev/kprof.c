@@ -36,7 +36,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <ip.h>
-#include <oprofile.h>
+#include <profiler.h>
 
 struct dev kprofdevtab;
 
@@ -101,10 +101,8 @@ static void oprof_alarm_handler(struct alarm_waiter *waiter,
 {
 	int coreid = core_id();
 	struct timer_chain *tchain = &per_cpu_info[coreid].tchain;
-	if (in_kernel(hw_tf))
-		oprofile_add_backtrace(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf));
-	else
-		oprofile_add_userpc(get_hwtf_pc(hw_tf));
+
+	profiler_add_hw_sample(hw_tf);
 	reset_alarm_rel(tchain, waiter, oprof_timer_period);
 }
 
@@ -186,8 +184,7 @@ static void kprofinit(void)
 		kprof.buf_sz = n;
 
 	/* no, i'm not sure how we should do this yet. */
-	int alloc_cpu_buffers(void);
-	alloc_cpu_buffers();
+	profiler_init();
 	oprof_alarms = kzmalloc(sizeof(struct alarm_waiter) * num_cores,
 	                        KMALLOC_WAIT);
 	if (!oprof_alarms)
@@ -212,8 +209,7 @@ static void kprofshutdown(void)
 	kfree(oprof_alarms); oprof_alarms = NULL;
 	kfree(kprof.buf); kprof.buf = NULL;
 	qfree(kprof.systrace); kprof.systrace = NULL;
-	void free_cpu_buffers(void);
-	free_cpu_buffers();
+	profiler_cleanup();
 }
 
 static struct walkqid*
@@ -225,7 +221,7 @@ kprofwalk(struct chan *c, struct chan *nc, char **name, int nname)
 static int
 kprofstat(struct chan *c, uint8_t *db, int n)
 {
-	kproftab[Kprofoprofileqid].length = oproflen();
+	kproftab[Kprofoprofileqid].length = profiler_size();
 	if (kprof.systrace)
 		kproftab[Kptraceqid].length = qlen(kprof.systrace);
 	else
@@ -407,7 +403,7 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 		n = ret;
 		break;
 	case Kprofoprofileqid:
-		n = oprofread(va,n);
+		n = profiler_read(va, n);
 		break;
 	case Kptraceqid:
 		if (kprof.systrace) {
@@ -511,9 +507,9 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 				manage_oprof_timer(pcoreid, cb);
 			}
 		} else if (!strcmp(cb->f[0], "opstart")) {
-			oprofile_control_trace(1);
+			profiler_control_trace(1);
 		} else if (!strcmp(cb->f[0], "opstop")) {
-			oprofile_control_trace(0);
+			profiler_control_trace(0);
 		} else {
 			error(EFAIL, ctlstring);
 		}
@@ -524,7 +520,7 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 		 */
 	case Kprofoprofileqid:
 		pc = strtoul(a, 0, 0);
-		oprofile_add_trace(pc);
+		profiler_add_trace(pc);
 		break;
 	case Kprintxqid:
 		if (!strncmp(a, "on", 2))
