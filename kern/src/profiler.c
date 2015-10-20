@@ -2,6 +2,7 @@
 #include <ros/common.h>
 #include <smp.h>
 #include <trap.h>
+#include <kthread.h>
 #include <kmalloc.h>
 #include <atomic.h>
 #include <sys/types.h>
@@ -22,16 +23,14 @@ struct op_entry {
 struct profiler_cpu_context {
 	spinlock_t lock;
 	int tracing;
-	unsigned long sample_received;
-	unsigned long sample_lost_overflow;
-	unsigned long backtrace_aborted;
-	unsigned long sample_invalid_eip;
 	struct block *block;
 };
 
 static int profiler_queue_limit = 1024;
 static size_t profiler_cpu_buffer_size = 65536;
 static size_t profiler_backtrace_depth = 16;
+static struct semaphore mtx = SEMAPHORE_INITIALIZER(mtx, 1);
+static int profiler_users = 0;
 static struct profiler_cpu_context *profiler_percpu_ctx;
 static struct queue *profiler_queue;
 
@@ -50,14 +49,14 @@ static inline size_t profiler_cpu_buffer_add_data(struct op_entry *entry,
 												  const uintptr_t *values,
 												  size_t count)
 {
-	size_t i, n = entry->size;
+	size_t i;
 
-	if (unlikely(count > n))
-		n = count;
-	for (i = 0; i < n; i++)
+	if (unlikely(count > entry->size))
+		count = entry->size;
+	for (i = 0; i < count; i++)
 		entry->data[i] = (uint64_t) values[i];
-	entry->size -= n;
-	entry->data += n;
+	entry->size -= count;
+	entry->data += count;
 
 	return entry->size;
 }
@@ -65,53 +64,63 @@ static inline size_t profiler_cpu_buffer_add_data(struct op_entry *entry,
 static void free_cpu_buffers(void)
 {
 	kfree(profiler_percpu_ctx);
+	profiler_percpu_ctx = NULL;
+
+	qclose(profiler_queue);
+	profiler_queue = NULL;
 }
 
 static int alloc_cpu_buffers(void)
 {
-	if (!profiler_queue) {
-		profiler_queue = qopen(profiler_queue_limit, 0, NULL, NULL);
-		if (!profiler_queue)
-			goto fail;
-	}
+	int i;
 
-	/* we *really* don't want to block. Losing data is better. */
+	profiler_queue = qopen(profiler_queue_limit, 0, NULL, NULL);
+	if (!profiler_queue)
+		return -ENOMEM;
+
 	qdropoverflow(profiler_queue, 1);
-	if (!profiler_percpu_ctx) {
-		int i;
+	qnonblock(profiler_queue, 1);
 
-		profiler_percpu_ctx =
-			kzmalloc(sizeof(*profiler_percpu_ctx) * num_cores, KMALLOC_WAIT);
-		if (!profiler_percpu_ctx)
-			goto fail;
+	profiler_percpu_ctx =
+		kzmalloc(sizeof(*profiler_percpu_ctx) * num_cores, KMALLOC_WAIT);
+	if (!profiler_percpu_ctx)
+		goto fail;
 
-		for (i = 0; i < num_cores; i++) {
-			struct profiler_cpu_context *b = &profiler_percpu_ctx[i];
+	for (i = 0; i < num_cores; i++) {
+		struct profiler_cpu_context *b = &profiler_percpu_ctx[i];
 
-			b->tracing = 0;
-			b->sample_received = 0;
-			b->sample_lost_overflow = 0;
-			b->backtrace_aborted = 0;
-			b->sample_invalid_eip = 0;
-			spinlock_init_irqsave(&b->lock);
-		}
+		b->tracing = 0;
+		spinlock_init_irqsave(&b->lock);
 	}
 
 	return 0;
 
 fail:
-	free_cpu_buffers();
+	qclose(profiler_queue);
+	profiler_queue = NULL;
 	return -ENOMEM;
 }
 
 int profiler_init(void)
 {
-	return alloc_cpu_buffers();
+	int error = 0;
+
+	sem_down(&mtx);
+	if (!profiler_queue)
+		error = alloc_cpu_buffers();
+	profiler_users++;
+	sem_up(&mtx);
+
+	return error;
 }
 
 void profiler_cleanup(void)
 {
-	free_cpu_buffers();
+	sem_down(&mtx);
+	profiler_users--;
+	if (profiler_users == 0)
+		free_cpu_buffers();
+	sem_up(&mtx);
 }
 
 static struct block *profiler_cpu_buffer_write_reserve(
@@ -121,7 +130,7 @@ static struct block *profiler_cpu_buffer_write_reserve(
     size_t totalsize = sizeof(struct op_sample) +
 		size * sizeof(entry->sample->data[0]);
 
-	if (unlikely((!b) || (b->lim - b->wp) < size)) {
+	if (unlikely((!b) || (b->lim - b->wp) < totalsize)) {
 		if (b)
 			qibwrite(profiler_queue, b);
 		/* For now. Later, we will grab a block off the
@@ -197,19 +206,17 @@ static void profiler_cpubuf_flushone(int core, int newbuf)
 void profiler_control_trace(int onoff)
 {
 	int core;
-	struct profiler_cpu_context *cpu_buf;
 
 	for (core = 0; core < num_cores; core++) {
-		cpu_buf = profiler_get_cpu_ctx(core);
-		cpu_buf->tracing = onoff;
+		struct profiler_cpu_context *cpu_buf = profiler_get_cpu_ctx(core);
 
+		cpu_buf->tracing = onoff;
 		if (onoff) {
 			printk("Enable tracing on %d\n", core);
-			continue;
+		} else {
+			printk("Disable tracing on %d\n", core);
+			profiler_cpubuf_flushone(core, 0);
 		}
-
-		/* halting. Force out all buffers. */
-		profiler_cpubuf_flushone(core, 0);
 	}
 }
 
@@ -245,9 +252,6 @@ void profiler_add_backtrace(uintptr_t pc, uintptr_t fp)
 		uintptr_t bt_pcs[profiler_backtrace_depth];
 		size_t n = backtrace_list(pc, fp, bt_pcs, profiler_backtrace_depth);
 
-		/* write_reserve always assumes passed-in-size + 2.
-		 * backtrace_depth should always be > 0.
-		 */
 		b = profiler_cpu_buffer_write_reserve(cpu_buf, &entry, n);
 		if (likely(b)) {
 			entry.sample->hdr = profiler_create_header(cpu, n);
@@ -290,7 +294,5 @@ int profiler_size(void)
 
 int profiler_read(void *va, int n)
 {
-	struct profiler_cpu_context *cpu_buf = profiler_get_cpu_ctx(core_id());
-
-	return cpu_buf->tracing ? qread(profiler_queue, va, n) : 0;
+	return qread(profiler_queue, va, n);
 }
