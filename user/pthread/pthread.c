@@ -308,13 +308,8 @@ static void pth_thread_runnable(struct uthread *uthread)
 static void pth_thread_paused(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
-	/* Remove from the active list.  Note that I don't particularly care about
-	 * the active list.  We keep it around because it causes bugs and keeps us
-	 * honest.  After all, some 2LS may want an active list */
-	mcs_pdr_lock(&queue_lock);
-	threads_active--;
-	TAILQ_REMOVE(&active_queue, pthread, tq_next);
-	mcs_pdr_unlock(&queue_lock);
+
+	__pthread_generic_yield(pthread);
 	/* communicate to pth_thread_runnable */
 	pthread->state = PTH_BLK_PAUSED;
 	/* At this point, you could do something clever, like put it at the front of
@@ -368,13 +363,10 @@ static void pth_thread_blockon_sysc(struct uthread *uthread, void *syscall)
 	struct syscall *sysc = (struct syscall*)syscall;
 	int old_flags;
 	uint32_t vcoreid = vcore_id();
-	/* rip from the active queue */
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+
+	__pthread_generic_yield(pthread);
 	pthread->state = PTH_BLK_SYSC;
-	mcs_pdr_lock(&queue_lock);
-	threads_active--;
-	TAILQ_REMOVE(&active_queue, pthread, tq_next);
-	mcs_pdr_unlock(&queue_lock);
 	/* Set things up so we can wake this thread up later */
 	sysc->u_data = uthread;
 	/* Register our vcore's syscall ev_q to hear about this syscall. */
@@ -441,11 +433,9 @@ static void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
                                   unsigned int err, unsigned long aux)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+
+	__pthread_generic_yield(pthread);
 	pthread->state = PTH_BLK_SYSC;
-	mcs_pdr_lock(&queue_lock);
-	threads_active--;
-	TAILQ_REMOVE(&active_queue, pthread, tq_next);
-	mcs_pdr_unlock(&queue_lock);
 
 	/* TODO: RISCV/x86 issue! (0 is divby0, 14 is PF, etc) */
 #if defined(__i386__) || defined(__x86_64__) 
