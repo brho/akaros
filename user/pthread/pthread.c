@@ -221,6 +221,8 @@ static void __attribute__((noreturn)) pth_sched_entry(void)
 		new_thread = TAILQ_FIRST(&ready_queue);
 		if (new_thread) {
 			TAILQ_REMOVE(&ready_queue, new_thread, tq_next);
+			assert(new_thread->state == PTH_RUNNABLE);
+			new_thread->state = PTH_RUNNING;
 			TAILQ_INSERT_TAIL(&active_queue, new_thread, tq_next);
 			threads_active++;
 			threads_ready--;
@@ -243,7 +245,6 @@ static void __attribute__((noreturn)) pth_sched_entry(void)
 		if (!parlib_wants_to_be_mcp)
 			sys_yield(FALSE);
 	} while (1);
-	assert(new_thread->state == PTH_RUNNABLE);
 	/* Prep the pthread to run any pending posix signal handlers registered
      * via pthread_kill once it is restored. */
 	__pthread_prep_for_pending_posix_signals(new_thread);
