@@ -381,6 +381,8 @@ static void pth_thread_blockon_sysc(struct uthread *uthread, void *syscall)
 static void pth_thread_has_blocked(struct uthread *uthread, int flags)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
+
+	__pthread_generic_yield(pthread);
 	/* could imagine doing something with the flags.  For now, we just treat all
 	 * externally blocked reasons as 'MUTEX'.  Whatever we do here, we are
 	 * mostly communicating to our future selves in pth_thread_runnable(), which
