@@ -177,9 +177,9 @@ Rock *_sock_newrock(int fd)
 	r->stype = 0;
 	r->sopts = 0;
 	r->protocol = 0;
-	memset(&r->addr, 0, sizeof(r->addr));
+	memset(&r->addr, 0, sizeof(r->addr_stor));
 	r->reserved = 0;
-	memset(&r->raddr, 0, sizeof(r->raddr));
+	memset(&r->raddr, 0, sizeof(r->raddr_stor));
 	r->ctl[0] = '\0';
 	r->other = -1;
 	r->is_listener = FALSE;
@@ -225,8 +225,8 @@ _sock_data(int cfd, char *net, int domain, int type, int protocol, Rock ** rp)
 	}
 	if (rp)
 		*rp = r;
-	memset(&r->raddr, 0, sizeof(r->raddr));
-	memset(&r->addr, 0, sizeof(r->addr));
+	memset(&r->raddr, 0, sizeof(r->raddr_stor));
+	memset(&r->addr, 0, sizeof(r->addr_stor));
 	r->domain = domain;
 	r->stype = _sock_strip_opts(type);
 	r->sopts = _sock_get_opts(type);

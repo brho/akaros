@@ -42,7 +42,7 @@ int __connect(int fd, __CONST_SOCKADDR_ARG addr, socklen_t alen)
 		errno = ENOTSOCK;
 		return -1;
 	}
-	if (alen > sizeof(r->raddr)) {
+	if (alen > sizeof(r->raddr_stor)) {
 		errno = ENAMETOOLONG;
 		return -1;
 	}

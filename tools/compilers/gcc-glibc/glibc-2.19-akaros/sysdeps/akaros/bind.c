@@ -40,7 +40,7 @@ int __bind(int fd, __CONST_SOCKADDR_ARG addr, socklen_t alen)
 		errno = ENOTSOCK;
 		return -1;
 	}
-	if (alen > sizeof(r->addr)) {
+	if (alen > sizeof(r->addr_stor)) {
 		errno = ENAMETOOLONG;
 		return -1;
 	}

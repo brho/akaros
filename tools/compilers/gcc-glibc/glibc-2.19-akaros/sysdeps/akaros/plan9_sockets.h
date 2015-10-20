@@ -46,9 +46,15 @@ struct Rock {
 	int stype;					/* socket type, from socket()'s type field */
 	int sopts;					/* socket options, from socket()'s type field */
 	int protocol;				/* ... */
-	struct sockaddr addr;		/* address from bind */
 	int reserved;				/* use a priveledged port # (< 1024) */
-	struct sockaddr raddr;		/* peer address */
+	union {
+		struct sockaddr addr;	/* address from bind */
+		struct sockaddr_storage addr_stor;
+	};
+	union {
+		struct sockaddr raddr;	/* peer address */
+		struct sockaddr_storage raddr_stor;
+	};
 	char ctl[Ctlsize];			/* name of control file (if any) */
 	int other;					/* fd of the remote end for Unix domain */
 	bool is_listener;			/* has called listen() and will accept() */
