@@ -17,6 +17,7 @@ struct scatterlist {
 	int length;
 };
 
+#define unlikely(x) (x)
 #define virtio_rmb(x) rmb()
 #define virtio_wmb(x) wmb()
 #define virtio_mb(x) mb()
