@@ -7,96 +7,90 @@
  * in the LICENSE file.
  */
 
-// get_fn_name is slowing down the kprocread
-// 	have an array of translated fns
-// 	or a "next" iterator, since we're walking in order
-//
-// irqsave locks
-//
-// kprof struct should be a ptr, have them per core
-// 		we'll probably need to track the length still, so userspace knows how
-// 		big it is
-//
-// 		will also want more files in the kprof dir for each cpu or something
-//
-// maybe don't use slot 0 and 1 as total and 'not kernel' ticks
-//
-// fix the failed assert XXX
-
 #include <vfs.h>
-#include <kfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>
+#include <atomic.h>
+#include <kthread.h>
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
 #include <error.h>
-#include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <circular_buffer.h>
+#include <umem.h>
 #include <profiler.h>
+#include <kprof.h>
 
-struct dev kprofdevtab;
+#define KTRACE_BUFFER_SIZE (128 * 1024)
+#define TRACE_PRINTK_BUFFER_SIZE (8 * 1024)
 
-static char *devname(void)
-{
-	return kprofdevtab.name;
-}
-
-#define LRES	3		/* log of PC resolution */
-#define CELLSIZE	8	/* sizeof of count cell */
-
-struct kprof
-{
-	uintptr_t	minpc;
-	uintptr_t	maxpc;
-	int	nbuf;
-	int	time;
-	uint64_t	*buf;	/* keep in sync with cellsize */
-	size_t		buf_sz;
-	spinlock_t lock;
-	struct queue *systrace;
-	bool		mpstat_ipi;
-};
-struct kprof kprof;
-
-/* output format. Nice fixed size. That makes it seekable.
- * small subtle bit here. You have to convert offset FROM FORMATSIZE units
- * to CELLSIZE units in a few places.
- */
-char *outformat = "%016llx %29.29s %016llx\n";
-#define FORMATSIZE 64
-enum{
+enum {
 	Kprofdirqid = 0,
 	Kprofdataqid,
 	Kprofctlqid,
-	Kprofoprofileqid,
 	Kptraceqid,
 	Kprintxqid,
 	Kmpstatqid,
 	Kmpstatrawqid,
 };
 
-struct dirtab kproftab[]={
-	{".",		{Kprofdirqid, 0, QTDIR},0,	DMDIR|0550},
-	{"kpdata",	{Kprofdataqid},		0,	0600},
-	{"kpctl",	{Kprofctlqid},		0,	0600},
-	{"kpoprofile",	{Kprofoprofileqid},	0,	0600},
-	{"kptrace",	{Kptraceqid},		0,	0600},
-	{"kprintx",	{Kprintxqid},		0,	0600},
-	{"mpstat",	{Kmpstatqid},		0,	0600},
-	{"mpstat-raw",	{Kmpstatrawqid},		0,	0600},
+struct trace_printk_buffer {
+	int in_use;
+	char buffer[TRACE_PRINTK_BUFFER_SIZE];
 };
 
-static size_t mpstatraw_len(void);
-static size_t mpstat_len(void);
+struct kprof {
+	struct semaphore lock;
+	struct alarm_waiter *alarms;
+	bool mpstat_ipi;
+	bool profiling;
+	char *pdata;
+	size_t psize;
+};
 
-static struct alarm_waiter *oprof_alarms;
-static unsigned int oprof_timer_period = 1000;
+struct dev kprofdevtab;
+struct dirtab kproftab[] = {
+	{".",			{Kprofdirqid,		0, QTDIR}, 0,	DMDIR|0550},
+	{"kpdata",		{Kprofdataqid},		0,	0600},
+	{"kpctl",		{Kprofctlqid},		0,	0600},
+	{"kptrace",		{Kptraceqid},		0,	0600},
+	{"kprintx",		{Kprintxqid},		0,	0600},
+	{"mpstat",		{Kmpstatqid},		0,	0600},
+	{"mpstat-raw",	{Kmpstatrawqid},	0,	0600},
+};
 
-static void oprof_alarm_handler(struct alarm_waiter *waiter,
+extern int booting;
+static struct kprof kprof;
+static bool ktrace_init_done = FALSE;
+static spinlock_t ktrace_lock = SPINLOCK_INITIALIZER_IRQSAVE;
+static struct circular_buffer ktrace_data;
+static char ktrace_buffer[KTRACE_BUFFER_SIZE];
+static int oprof_timer_period = 1000;
+
+static size_t mpstat_len(void)
+{
+	size_t each_row = 7 + NR_CPU_STATES * 26;
+
+	return each_row * (num_cores + 1) + 1;
+}
+
+static size_t mpstatraw_len(void)
+{
+	size_t header_row = 27 + NR_CPU_STATES * 7 + 1;
+	size_t cpu_row = 7 + NR_CPU_STATES * 17;
+
+	return header_row + cpu_row * num_cores + 1;
+}
+
+static char *devname(void)
+{
+	return kprofdevtab.name;
+}
+
+static void kprof_alarm_handler(struct alarm_waiter *waiter,
                                 struct hw_trapframe *hw_tf)
 {
 	int coreid = core_id();
@@ -106,135 +100,194 @@ static void oprof_alarm_handler(struct alarm_waiter *waiter,
 	reset_alarm_rel(tchain, waiter, oprof_timer_period);
 }
 
-static struct chan*
-kprofattach(char *spec)
+static struct chan *kprof_attach(char *spec)
 {
-	// Did we initialise completely?
-	if ( !(oprof_alarms && kprof.buf && kprof.systrace) )
+	if (!kprof.alarms)
 		error(ENOMEM, NULL);
 
 	return devattach(devname(), spec);
 }
 
-static void
-kproftimer(uintptr_t pc)
+static void kprof_enable_timer(int coreid, int on_off)
 {
-	if(kprof.time == 0)
-		return;
+	struct timer_chain *tchain = &per_cpu_info[coreid].tchain;
+	struct alarm_waiter *waiter = &kprof.alarms[coreid];
 
-	/*
-	 * if the pc corresponds to the idle loop, don't consider it.
-
-	if(m->inidle)
-		return;
-	 */
-	/*
-	 *  if the pc is coming out of spllo or splx,
-	 *  use the pc saved when we went splhi.
-
-	if(pc>=PTR2UINT(spllo) && pc<=PTR2UINT(spldone))
-		pc = m->splpc;
-	 */
-
-//	ilock(&kprof);
-	/* this is weird. What we do is assume that all the time since the last
-	 * measurement went into this PC. It's the best
-	 * we can do I suppose. And we are sampling at 1 ms. for now.
-	 * better ideas welcome.
-	 */
-	kprof.buf[0] += 1; //Total count of ticks.
-	if(kprof.minpc<=pc && pc<kprof.maxpc){
-		pc -= kprof.minpc;
-		pc >>= LRES;
-		kprof.buf[pc] += 1;
-	}else
-		kprof.buf[1] += 1; // Why?
-//	iunlock(&kprof);
-}
-
-static void setup_timers(void)
-{
-	void kprof_alarm(struct alarm_waiter *waiter, struct hw_trapframe *hw_tf)
-	{
-		struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
-		kproftimer(get_hwtf_pc(hw_tf));
-		set_awaiter_rel(waiter, 1000);
-		set_alarm(tchain, waiter);
+	if (on_off) {
+		/* Per CPU waiters already inited.  Will set/reset each time (1 ms
+		 * default). */
+		reset_alarm_rel(tchain, waiter, oprof_timer_period);
+	} else {
+		/* Since the alarm handler runs and gets reset within IRQ context, then
+		 * we should never fail to cancel the alarm if it was already running
+		 * (tchain locks synchronize us).  But it might not be set at all, which
+		 * is fine. */
+		unset_alarm(tchain, waiter);
 	}
-	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
-	struct alarm_waiter *waiter = kmalloc(sizeof(struct alarm_waiter), 0);
-	init_awaiter_irq(waiter, kprof_alarm);
-	set_awaiter_rel(waiter, 1000);
-	set_alarm(tchain, waiter);
 }
 
-static void kprofinit(void)
+static void kprof_profdata_clear(void)
 {
-	uint32_t n;
+	kfree(kprof.pdata);
+	kprof.pdata = NULL;
+	kprof.psize = 0;
+}
 
-	static_assert(CELLSIZE == sizeof kprof.buf[0]); // kprof size
+static void kprof_start_profiler(void)
+{
+	ERRSTACK(2);
 
-	/* allocate when first used */
-	kprof.minpc = KERN_LOAD_ADDR;
-	kprof.maxpc = (uintptr_t) &etext;
-	kprof.nbuf = (kprof.maxpc-kprof.minpc) >> LRES;
-	n = kprof.nbuf*CELLSIZE;
-	kprof.buf = kzmalloc(n, KMALLOC_WAIT);
-	if (kprof.buf)
-		kprof.buf_sz = n;
+	sem_down(&kprof.lock);
+	if (waserror()) {
+		sem_up(&kprof.lock);
+		nexterror();
+	}
+	if (!kprof.profiling) {
+		profiler_init();
+		if (waserror()) {
+			profiler_cleanup();
+			nexterror();
+		}
 
-	/* no, i'm not sure how we should do this yet. */
-	profiler_init();
-	oprof_alarms = kzmalloc(sizeof(struct alarm_waiter) * num_cores,
-	                        KMALLOC_WAIT);
-	if (!oprof_alarms)
+		profiler_control_trace(1);
+
+		for (int i = 0; i < num_cores; i++)
+			kprof_enable_timer(i, 1);
+
+		kprof.profiling = TRUE;
+
+		kprof_profdata_clear();
+	}
+	poperror();
+	poperror();
+	sem_up(&kprof.lock);
+}
+
+static void kprof_fetch_profiler_data(void)
+{
+	size_t psize = profiler_size();
+
+	kprof.pdata = kmalloc(psize, KMALLOC_WAIT);
+	if (!kprof.pdata)
 		error(ENOMEM, NULL);
+	kprof.psize = 0;
+	while (kprof.psize < psize) {
+		size_t csize = profiler_read(kprof.pdata + kprof.psize,
+									 psize - kprof.psize);
 
-	for (int i = 0; i < num_cores; i++)
-		init_awaiter_irq(&oprof_alarms[i], oprof_alarm_handler);
-
-	kprof.systrace = qopen(2 << 20, 0, 0, 0);
-	if (!kprof.systrace) {
-		printk("systrace allocate failed. No system call tracing\n");
+		if (csize == 0)
+			break;
+		kprof.psize += csize;
 	}
-	kprof.mpstat_ipi = TRUE;
+}
 
-	kproftab[Kprofdataqid].length = kprof.nbuf * FORMATSIZE;
+static void kprof_stop_profiler(void)
+{
+	ERRSTACK(1);
+
+	sem_down(&kprof.lock);
+	if (waserror()) {
+		sem_up(&kprof.lock);
+		nexterror();
+	}
+	if (kprof.profiling) {
+		for (int i = 0; i < num_cores; i++)
+			kprof_enable_timer(i, 0);
+		profiler_control_trace(0);
+		kprof_fetch_profiler_data();
+		profiler_cleanup();
+
+		kprof.profiling = FALSE;
+	}
+	poperror();
+	sem_up(&kprof.lock);
+}
+
+static void kprof_init(void)
+{
+	int i;
+	ERRSTACK(1);
+
+	sem_init(&kprof.lock, 1);
+	kprof.profiling = FALSE;
+	kprof.pdata = NULL;
+	kprof.psize = 0;
+
+	kprof.alarms = kzmalloc(sizeof(struct alarm_waiter) * num_cores,
+							KMALLOC_WAIT);
+	if (!kprof.alarms)
+		error(ENOMEM, NULL);
+	if (waserror()) {
+		kfree(kprof.alarms);
+		kprof.alarms = NULL;
+		nexterror();
+	}
+	for (i = 0; i < num_cores; i++)
+		init_awaiter_irq(&kprof.alarms[i], kprof_alarm_handler);
+
+	for (i = 0; i < ARRAY_SIZE(kproftab); i++)
+		kproftab[i].length = 0;
+
+	kprof.mpstat_ipi = TRUE;
 	kproftab[Kmpstatqid].length = mpstat_len();
 	kproftab[Kmpstatrawqid].length = mpstatraw_len();
+
+	poperror();
 }
 
-static void kprofshutdown(void)
+static void kprof_shutdown(void)
 {
-	kfree(oprof_alarms); oprof_alarms = NULL;
-	kfree(kprof.buf); kprof.buf = NULL;
-	qfree(kprof.systrace); kprof.systrace = NULL;
-	profiler_cleanup();
+	kprof_stop_profiler();
+	kprof_profdata_clear();
+
+	kfree(kprof.alarms);
+	kprof.alarms = NULL;
 }
 
-static struct walkqid*
-kprofwalk(struct chan *c, struct chan *nc, char **name, int nname)
+static void kprofclear(void)
+{
+	sem_down(&kprof.lock);
+	kprof_profdata_clear();
+	sem_up(&kprof.lock);
+}
+
+static struct walkqid *kprof_walk(struct chan *c, struct chan *nc, char **name,
+								 int nname)
 {
 	return devwalk(c, nc, name, nname, kproftab, ARRAY_SIZE(kproftab), devgen);
 }
 
-static int
-kprofstat(struct chan *c, uint8_t *db, int n)
+static size_t kprof_profdata_size(void)
 {
-	kproftab[Kprofoprofileqid].length = profiler_size();
-	if (kprof.systrace)
-		kproftab[Kptraceqid].length = qlen(kprof.systrace);
-	else
-		kproftab[Kptraceqid].length = 0;
+	return kprof.pdata != NULL ? kprof.psize : profiler_size();
+}
+
+static long kprof_profdata_read(void *dest, long size, int64_t off)
+{
+	sem_down(&kprof.lock);
+	if (kprof.pdata && off < kprof.psize) {
+		size = MIN(kprof.psize - off, size);
+		memcpy(dest, kprof.pdata + off, size);
+	} else {
+		size = 0;
+	}
+	sem_up(&kprof.lock);
+
+	return size;
+}
+
+static int kprof_stat(struct chan *c, uint8_t *db, int n)
+{
+	kproftab[Kprofdataqid].length = kprof_profdata_size();
+	kproftab[Kptraceqid].length = kprof_tracedata_size();
 
 	return devstat(c, db, n, kproftab, ARRAY_SIZE(kproftab), devgen);
 }
 
-static struct chan*
-kprofopen(struct chan *c, int omode)
+static struct chan *kprof_open(struct chan *c, int omode)
 {
-	if(c->qid.type & QTDIR){
-		if(openmode(omode) != O_READ)
+	if (c->qid.type & QTDIR) {
+		if (openmode(omode) != O_READ)
 			error(EPERM, NULL);
 	}
 	c->mode = openmode(omode);
@@ -243,15 +296,8 @@ kprofopen(struct chan *c, int omode)
 	return c;
 }
 
-static void
-kprofclose(struct chan*unused)
+static void kprof_close(struct chan *c)
 {
-}
-
-static size_t mpstat_len(void)
-{
-	size_t each_row = 7 + NR_CPU_STATES * 26;
-	return each_row * (num_cores + 1) + 1;
 }
 
 static long mpstat_read(void *va, long n, int64_t off)
@@ -292,13 +338,6 @@ static long mpstat_read(void *va, long n, int64_t off)
 	return n;
 }
 
-static size_t mpstatraw_len(void)
-{
-	size_t header_row = 27 + NR_CPU_STATES * 7 + 1;
-	size_t cpu_row = 7 + NR_CPU_STATES * 17;
-	return header_row + cpu_row * num_cores + 1;
-}
-
 static long mpstatraw_read(void *va, long n, int64_t off)
 {
 	size_t bufsz = mpstatraw_len();
@@ -330,90 +369,21 @@ static long mpstatraw_read(void *va, long n, int64_t off)
 	return n;
 }
 
-static long
-kprofread(struct chan *c, void *va, long n, int64_t off)
+static long kprof_read(struct chan *c, void *va, long n, int64_t off)
 {
 	uint64_t w, *bp;
 	char *a, *ea;
 	uintptr_t offset = off;
 	uint64_t pc;
-	int snp_ret, ret = 0;
 
-	switch((int)c->qid.path){
+	switch ((int) c->qid.path) {
 	case Kprofdirqid:
 		return devdirread(c, va, n, kproftab, ARRAY_SIZE(kproftab), devgen);
-
 	case Kprofdataqid:
-
-		if (n < FORMATSIZE){
-			n = 0;
-			break;
-		}
-		a = va;
-		ea = a + n;
-
-		/* we check offset later before deref bp.  offset / FORMATSIZE is how
-		 * many entries we're skipping/offsetting. */
-		bp = kprof.buf + offset/FORMATSIZE;
-		pc = kprof.minpc + ((offset/FORMATSIZE)<<LRES);
-		while((a < ea) && (n >= FORMATSIZE)){
-			/* what a pain. We need to manage the
-			 * fact that the *prints all make room for
-			 * \0
-			 */
-			char print[FORMATSIZE+1];
-			char *name;
-			int amt_read;
-
-			if (pc >= kprof.maxpc)
-				break;
-			/* pc is also our exit for bp.  should be in lockstep */
-			// XXX this assert fails, fix it!
-			//assert(bp < kprof.buf + kprof.nbuf);
-			/* do not attempt to filter these results based on w < threshold.
-			 * earlier, we computed bp/pc based on assuming a full-sized file,
-			 * and skipping entries will result in read() calls thinking they
-			 * received earlier entries when they really received later ones.
-			 * imagine a case where there are 1000 skipped items, and read()
-			 * asks for chunks of 32.  it'll get chunks of the next 32 valid
-			 * items, over and over (1000/32 times). */
-			w = *bp++;
-
-			if (pc == kprof.minpc)
-				name = "Total";
-			else if (pc == kprof.minpc + 8)
-				name = "User";
-			else
-				name = get_fn_name(pc);
-
-			snp_ret = snprintf(print, sizeof(print), outformat, pc, name, w);
-			assert(snp_ret == FORMATSIZE);
-			if ((pc != kprof.minpc) && (pc != kprof.minpc + 8))
-				kfree(name);
-
-			amt_read = readmem(offset % FORMATSIZE, a, n, print, FORMATSIZE);
-			offset = 0;	/* future loops have no offset */
-
-			a += amt_read;
-			n -= amt_read;
-			ret += amt_read;
-
-			pc += (1 << LRES);
-		}
-		n = ret;
-		break;
-	case Kprofoprofileqid:
-		n = profiler_read(va, n);
+		n = kprof_profdata_read(va, n, off);
 		break;
 	case Kptraceqid:
-		if (kprof.systrace) {
-			printd("Kptraceqid: kprof.systrace %p len %p\n", kprof.systrace, qlen(kprof.systrace));
-			if (qlen(kprof.systrace) > 0)
-				n = qread(kprof.systrace, va, n);
-			else
-				n = 0;
-		} else
-			error(EFAIL, "no systrace queue");
+		n = kprof_tracedata_read(va, n, off);
 		break;
 	case Kprintxqid:
 		n = readstr(offset, va, n, printx_on ? "on" : "off");
@@ -431,111 +401,101 @@ kprofread(struct chan *c, void *va, long n, int64_t off)
 	return n;
 }
 
-static void kprof_clear(struct kprof *kp)
+static void kprof_manage_timer(int coreid, struct cmdbuf *cb)
 {
-	spin_lock(&kp->lock);
-	memset(kp->buf, 0, kp->buf_sz);
-	spin_unlock(&kp->lock);
-}
-
-static void manage_oprof_timer(int coreid, struct cmdbuf *cb)
-{
-	struct timer_chain *tchain = &per_cpu_info[coreid].tchain;
-	struct alarm_waiter *waiter = &oprof_alarms[coreid];
 	if (!strcmp(cb->f[2], "on")) {
-		/* pcpu waiters already inited.  will set/reset each time (1 ms
-		 * default). */
-		reset_alarm_rel(tchain, waiter, oprof_timer_period);
+		kprof_enable_timer(coreid, 1);
 	} else if (!strcmp(cb->f[2], "off")) {
-		/* since the alarm handler runs and gets reset within IRQ context, then
-		 * we should never fail to cancel the alarm if it was already running
-		 * (tchain locks synchronize us).  but it might not be set at all, which
-		 * is fine. */
-		unset_alarm(tchain, waiter);
+		kprof_enable_timer(coreid, 0);
 	} else {
-		error(EFAIL, "optimer needs on|off");
+		error(EFAIL, "timer needs on|off");
 	}
 }
 
-static long
-kprofwrite(struct chan *c, void *a, long n, int64_t unused)
+static void kprof_usage_fail(void)
+{
+	static const char *ctlstring = "clear|start|stop|timer";
+	const char * const *cmds = profiler_configure_cmds();
+	char msgbuf[128];
+
+	strlcpy(msgbuf, ctlstring, sizeof(msgbuf));
+	for (int i = 0; cmds[i]; i++) {
+		strlcat(msgbuf, "|", sizeof(msgbuf));
+		strlcat(msgbuf, cmds[i], sizeof(msgbuf));
+	}
+
+	error(EFAIL, msgbuf);
+}
+
+static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 {
 	ERRSTACK(1);
-	uintptr_t pc;
-	struct cmdbuf *cb;
-	char *ctlstring = "startclr|start|stop|clear|opstart|opstop|optimer";
-	cb = parsecmd(a, n);
+	struct cmdbuf *cb = parsecmd(a, n);
 
 	if (waserror()) {
 		kfree(cb);
 		nexterror();
 	}
-
-	switch((int)(c->qid.path)){
+	switch ((int) c->qid.path) {
 	case Kprofctlqid:
 		if (cb->nf < 1)
-			error(EFAIL, ctlstring);
-
-		/* Kprof: a "which kaddr are we at when the timer goes off".  not used
-		 * much anymore */
-		if (!strcmp(cb->f[0], "startclr")) {
-			kprof_clear(&kprof);
-			kprof.time = 1;
-		} else if (!strcmp(cb->f[0], "start")) {
-			kprof.time = 1;
-			/* this sets up the timer on the *calling* core! */
-			setup_timers();
-		} else if (!strcmp(cb->f[0], "stop")) {
-			/* TODO: stop the timers! */
-			kprof.time = 0;
-		} else if (!strcmp(cb->f[0], "clear")) {
-			kprof_clear(&kprof);
-
-		/* oprof: samples and traces using oprofile */
-		} else if (!strcmp(cb->f[0], "optimer")) {
+			kprof_usage_fail();
+		if (profiler_configure(cb))
+			break;
+		if (!strcmp(cb->f[0], "clear")) {
+			kprofclear();
+		} else if (!strcmp(cb->f[0], "timer")) {
 			if (cb->nf < 3)
-				error(EFAIL, "optimer [<0|1|..|n|all> <on|off>] [period USEC]");
+				error(EFAIL, "timer {{all, N} {on, off}, period USEC}");
 			if (!strcmp(cb->f[1], "period")) {
 				oprof_timer_period = strtoul(cb->f[2], 0, 10);
 			} else if (!strcmp(cb->f[1], "all")) {
 				for (int i = 0; i < num_cores; i++)
-					manage_oprof_timer(i, cb);
+					kprof_manage_timer(i, cb);
 			} else {
 				int pcoreid = strtoul(cb->f[1], 0, 10);
+
 				if (pcoreid >= num_cores)
-					error(EFAIL, "no such coreid %d", pcoreid);
-				manage_oprof_timer(pcoreid, cb);
+					error(EFAIL, "No such coreid %d", pcoreid);
+				kprof_manage_timer(pcoreid, cb);
 			}
-		} else if (!strcmp(cb->f[0], "opstart")) {
-			profiler_control_trace(1);
-		} else if (!strcmp(cb->f[0], "opstop")) {
-			profiler_control_trace(0);
+		} else if (!strcmp(cb->f[0], "start")) {
+			kprof_start_profiler();
+		} else if (!strcmp(cb->f[0], "stop")) {
+			kprof_stop_profiler();
 		} else {
-			error(EFAIL, ctlstring);
+			kprof_usage_fail();
 		}
 		break;
+	case Kprofdataqid:
+		profiler_add_trace((uintptr_t) strtoul(a, 0, 0));
+		break;
+	case Kptraceqid:
+		if (a && (n > 0)) {
+			char *uptr = user_strdup_errno(current, a, n);
 
-		/* The format is a long as text. We strtoul, and jam it into the
-		 * trace buffer.
-		 */
-	case Kprofoprofileqid:
-		pc = strtoul(a, 0, 0);
-		profiler_add_trace(pc);
+			if (uptr) {
+				trace_printk(false, "%s", uptr);
+				user_memdup_free(current, uptr);
+			} else {
+				n = -1;
+			}
+		}
 		break;
 	case Kprintxqid:
 		if (!strncmp(a, "on", 2))
 			set_printx(1);
 		else if (!strncmp(a, "off", 3))
 			set_printx(0);
-		else if (!strncmp(a, "toggle", 6))	/* why not. */
+		else if (!strncmp(a, "toggle", 6))
 			set_printx(2);
 		else
-			error(EFAIL, "invalid option to Kprintx %s\n", a);
+			error(EFAIL, "Invalid option to Kprintx %s\n", a);
 		break;
 	case Kmpstatqid:
 	case Kmpstatrawqid:
 		if (cb->nf < 1)
-			error(EFAIL, "mpstat bad option (reset|ipi|on|off)");
+			error(EFAIL, "Bad mpstat option (reset|ipi|on|off)");
 		if (!strcmp(cb->f[0], "reset")) {
 			for (int i = 0; i < num_cores; i++)
 				reset_cpu_state_ticks(i);
@@ -545,7 +505,7 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 			/* TODO: disable the ticks */ ;
 		} else if (!strcmp(cb->f[0], "ipi")) {
 			if (cb->nf < 2)
-				error(EFAIL, "need another arg: ipi [on|off]");
+				error(EFAIL, "Need another arg: ipi [on|off]");
 			if (!strcmp(cb->f[1], "on"))
 				kprof.mpstat_ipi = TRUE;
 			else if (!strcmp(cb->f[1], "off"))
@@ -553,7 +513,7 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 			else
 				error(EFAIL, "ipi [on|off]");
 		} else {
-			error(EFAIL, "mpstat bad option (reset|ipi|on|off)");
+			error(EFAIL, "Bad mpstat option (reset|ipi|on|off)");
 		}
 		break;
 	default:
@@ -564,63 +524,155 @@ kprofwrite(struct chan *c, void *a, long n, int64_t unused)
 	return n;
 }
 
-void kprof_write_sysrecord(char *pretty_buf, size_t len)
+size_t kprof_tracedata_size(void)
 {
-	int wrote;
-	if (kprof.systrace) {
-		/* TODO: need qio work so we can simply add the buf as extra data */
-		wrote = qiwrite(kprof.systrace, pretty_buf, len);
-		/* based on the current queue settings, we only drop when we're running
-		 * out of memory.  odds are, we won't make it this far. */
-		if (wrote != len)
-			printk("DROPPED %s", pretty_buf);
-	}
+	return circular_buffer_size(&ktrace_data);
 }
 
-void trace_printk(const char *fmt, ...)
+size_t kprof_tracedata_read(void *data, size_t size, size_t offset)
 {
-	va_list ap;
-	struct timespec ts_now;
-	size_t bufsz = 160;	/* 2x terminal width */
-	size_t len = 0;
-	char *buf = kmalloc(bufsz, 0);
+	spin_lock_irqsave(&ktrace_lock);
+	if (likely(ktrace_init_done))
+		size = circular_buffer_read(&ktrace_data, data, size, offset);
+	else
+		size = 0;
+	spin_unlock_irqsave(&ktrace_lock);
 
-	if (!buf)
-		return;
-	tsc2timespec(read_tsc(), &ts_now);
-	len += snprintf(buf + len, bufsz - len, "[%7d.%09d] /* ", ts_now.tv_sec,
-	                ts_now.tv_nsec);
-	va_start(ap, fmt);
-	len += vsnprintf(buf + len, bufsz - len, fmt, ap);
-	va_start(ap, fmt);
-	va_end(ap);
-	len += snprintf(buf + len, bufsz - len, " */\n");
-	va_start(ap, fmt);
-	/* snprintf null terminates the buffer, and does not count that as part of
-	 * the len.  if we maxed out the buffer, let's make sure it has a \n */
-	if (len == bufsz - 1) {
-		assert(buf[bufsz - 1] == '\0');
-		buf[bufsz - 2] = '\n';
+	return size;
+}
+
+void kprof_tracedata_write(const char *pretty_buf, size_t len)
+{
+	spin_lock_irqsave(&ktrace_lock);
+	if (unlikely(!ktrace_init_done)) {
+		circular_buffer_init(&ktrace_data, sizeof(ktrace_buffer),
+							 ktrace_buffer);
+		ktrace_init_done = TRUE;
 	}
-	kprof_write_sysrecord(buf, len);
-	kfree(buf);
+	circular_buffer_write(&ktrace_data, pretty_buf, len);
+	spin_unlock_irqsave(&ktrace_lock);
+}
+
+static struct trace_printk_buffer *kprof_get_printk_buffer(void)
+{
+	static struct trace_printk_buffer boot_tpb;
+	static struct trace_printk_buffer *cpu_tpbs;
+
+	if (unlikely(booting))
+		return &boot_tpb;
+	if (unlikely(!cpu_tpbs)) {
+		/* Poor man per-CPU data structure. I really do no like littering global
+		 * data structures with module specific data.
+		 */
+		spin_lock_irqsave(&ktrace_lock);
+		if (!cpu_tpbs)
+			cpu_tpbs = kzmalloc(num_cores * sizeof(struct trace_printk_buffer),
+								0);
+		spin_unlock_irqsave(&ktrace_lock);
+	}
+
+	return cpu_tpbs + core_id();
+}
+
+void trace_vprintk(bool btrace, const char *fmt, va_list args)
+{
+	struct print_buf {
+		char *ptr;
+		char *top;
+	};
+
+	void emit_print_buf_str(struct print_buf *pb, const char *str, ssize_t size)
+	{
+		if (size < 0) {
+			for (; *str && (pb->ptr < pb->top); str++)
+				*(pb->ptr++) = *str;
+		} else {
+			for (; (size > 0) && (pb->ptr < pb->top); str++, size--)
+				*(pb->ptr++) = *str;
+		}
+	}
+
+	void bt_print(void *opaque, const char *str)
+	{
+		struct print_buf *pb = (struct print_buf *) opaque;
+
+		emit_print_buf_str(pb, "\t", 1);
+		emit_print_buf_str(pb, str, -1);
+	}
+
+	static const size_t bufsz = TRACE_PRINTK_BUFFER_SIZE;
+	static const size_t usr_bufsz = (3 * bufsz) / 8;
+	static const size_t kp_bufsz = bufsz - usr_bufsz;
+	struct trace_printk_buffer *tpb = kprof_get_printk_buffer();
+	struct timespec ts_now = { 0, 0 };
+	struct print_buf pb;
+	char *usrbuf = tpb->buffer, *kpbuf = tpb->buffer + usr_bufsz;
+	const char *utop, *uptr;
+	char hdr[64];
+
+	if (tpb->in_use)
+		return;
+	tpb->in_use++;
+	if (likely(!booting))
+		tsc2timespec(read_tsc(), &ts_now);
+	snprintf(hdr, sizeof(hdr), "[%lu.%09lu]:cpu%d: ", ts_now.tv_sec,
+			 ts_now.tv_nsec, core_id());
+
+	pb.ptr = usrbuf + vsnprintf(usrbuf, usr_bufsz, fmt, args);
+	pb.top = usrbuf + usr_bufsz;
+
+	if (pb.ptr[-1] != '\n')
+		emit_print_buf_str(&pb, "\n", 1);
+	if (btrace) {
+		emit_print_buf_str(&pb, "\tBacktrace:\n", -1);
+		gen_backtrace(bt_print, &pb);
+	}
+	/* snprintf null terminates the buffer, and does not count that as part of
+	 * the len.  If we maxed out the buffer, let's make sure it has a \n.
+	 */
+	if (pb.ptr == pb.top)
+		pb.ptr[-1] = '\n';
+	utop = pb.ptr;
+
+	pb.ptr = kpbuf;
+	pb.top = kpbuf + kp_bufsz;
+	for (uptr = usrbuf; uptr < utop;) {
+		const char *nlptr = memchr(uptr, '\n', utop - uptr);
+
+		if (nlptr == NULL)
+			nlptr = utop;
+		emit_print_buf_str(&pb, hdr, -1);
+		emit_print_buf_str(&pb, uptr, (nlptr - uptr) + 1);
+		uptr = nlptr + 1;
+	}
+	kprof_tracedata_write(kpbuf, pb.ptr - kpbuf);
+	tpb->in_use--;
+}
+
+void trace_printk(bool btrace, const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	trace_vprintk(btrace, fmt, args);
+	va_end(args);
 }
 
 struct dev kprofdevtab __devtab = {
 	.name = "kprof",
 
 	.reset = devreset,
-	.init = kprofinit,
-	.shutdown = kprofshutdown,
-	.attach = kprofattach,
-	.walk = kprofwalk,
-	.stat = kprofstat,
-	.open = kprofopen,
+	.init = kprof_init,
+	.shutdown = kprof_shutdown,
+	.attach = kprof_attach,
+	.walk = kprof_walk,
+	.stat = kprof_stat,
+	.open = kprof_open,
 	.create = devcreate,
-	.close = kprofclose,
-	.read = kprofread,
+	.close = kprof_close,
+	.read = kprof_read,
 	.bread = devbread,
-	.write = kprofwrite,
+	.write = kprof_write,
 	.bwrite = devbwrite,
 	.remove = devremove,
 	.wstat = devwstat,

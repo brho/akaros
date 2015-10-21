@@ -1,18 +1,30 @@
+/* Copyright (c) 2015 Google Inc
+ * Davide Libenzi <dlibenzi@google.com>
+ * See LICENSE for details.
+ */
 
-#ifndef ROS_KERN_INC_PROFILER_H
-#define ROS_KERN_INC_PROFILER_H
+#pragma once
 
-#include <sys/types.h>
-#include <trap.h>
+#include <stdio.h>
+#include <ros/profiler_records.h>
 
-int profiler_init(void);
+struct hw_trapframe;
+struct proc;
+struct file;
+struct cmdbuf;
+
+int profiler_configure(struct cmdbuf *cb);
+const char * const *profiler_configure_cmds(void);
+void profiler_init(void);
+void profiler_setup(void);
 void profiler_cleanup(void);
-void profiler_add_backtrace(uintptr_t pc, uintptr_t fp);
-void profiler_add_userpc(uintptr_t pc);
-void profiler_add_trace(uintptr_t eip);
+void profiler_add_kernel_backtrace(uintptr_t pc, uintptr_t fp);
+void profiler_add_user_backtrace(uintptr_t pc, uintptr_t fp);
+void profiler_add_trace(uintptr_t pc);
 void profiler_control_trace(int onoff);
 void profiler_add_hw_sample(struct hw_trapframe *hw_tf);
-int profiler_read(void *va, int);
 int profiler_size(void);
-
-#endif /* ROS_KERN_INC_PROFILER_H */
+int profiler_read(void *va, int n);
+void profiler_notify_mmap(struct proc *p, uintptr_t addr, size_t size, int prot,
+						  int flags, struct file *f, size_t offset);
+void profiler_notify_new_process(struct proc *p);

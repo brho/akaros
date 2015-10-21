@@ -10,7 +10,7 @@ struct symtab_entry {
 	uintptr_t addr;
 };
 
-#define TRACEME() oprofile_add_backtrace(read_pc(), read_bp())
+#define TRACEME() trace_printk(TRUE, "%s(%d)", __FILE__, __LINE__)
 
 void backtrace(void);
 void gen_backtrace_frame(uintptr_t eip, uintptr_t ebp,
@@ -19,6 +19,8 @@ void gen_backtrace(void (*pfunc)(void *, const char *), void *opaque);
 void backtrace_frame(uintptr_t pc, uintptr_t fp);
 size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
                       size_t nr_slots);
+size_t user_backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
+						   size_t nr_slots);
 void backtrace_kframe(struct hw_trapframe *hw_tf);
 /* for includes */ struct proc;
 void backtrace_user_ctx(struct proc *p, struct user_context *ctx);
@@ -44,8 +46,16 @@ int printdump(char *buf, int buflen, uint8_t *data);
 
 extern bool printx_on;
 void set_printx(int mode);
-#define printx(args...) if (printx_on) printk(args)
-#define trace_printx(args...) if (printx_on) trace_printk(args)
+#define printx(args...)							\
+	do {											\
+		if (printx_on)								\
+			printk(args);							\
+	} while (0)
+#define trace_printx(args...)						\
+	do {											\
+		if (printx_on)								\
+			trace_printk(TRUE, args);				\
+	} while (0)
 
 void debug_addr_proc(struct proc *p, unsigned long addr);
 void debug_addr_pid(int pid, unsigned long addr);

@@ -5,6 +5,7 @@
 #include <pmap.h>
 #include <process.h>
 #include <kmalloc.h>
+#include <arch/uaccess.h>
 
 #include <ros/memlayout.h>
 
@@ -362,6 +363,27 @@ size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
 		pc = *(uintptr_t*)(fp + sizeof(uintptr_t));
 		fp = *(uintptr_t*)fp;
 	}
+	return nr_pcs;
+}
+
+size_t user_backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
+						   size_t nr_slots)
+{
+	int error;
+	size_t nr_pcs = 0;
+	uintptr_t frame[2];
+
+	for (;;) {
+		error = copy_from_user(frame, (const void *) fp, 2 * sizeof(uintptr_t));
+		if (unlikely(error) || unlikely(nr_pcs >= nr_slots))
+			break;
+
+		/* For now straight memory access, waiting for copy_from_user(). */
+		pcs[nr_pcs++] = pc;
+		pc = frame[1];
+		fp = frame[0];
+	}
+
 	return nr_pcs;
 }
 

@@ -24,6 +24,7 @@
 #include <kmalloc.h>
 #include <vfs.h>
 #include <smp.h>
+#include <profiler.h>
 
 struct kmem_cache *vmr_kcache;
 
@@ -692,6 +693,9 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		}
 	}
 	spin_unlock(&p->vmr_lock);
+
+	profiler_notify_mmap(p, addr, len, prot, flags, file, offset);
+
 	return (void*)addr;
 }
 

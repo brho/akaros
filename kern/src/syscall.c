@@ -21,6 +21,7 @@
 #include <trap.h>
 #include <syscall.h>
 #include <kmalloc.h>
+#include <profiler.h>
 #include <stdio.h>
 #include <frontend.h>
 #include <colored_caches.h>
@@ -31,6 +32,7 @@
 #include <smp.h>
 #include <arsc_server.h>
 #include <event.h>
+#include <kprof.h>
 #include <termios.h>
 #include <manager.h>
 
@@ -40,9 +42,6 @@ struct systrace_record *systrace_buffer = 0;
 uint32_t systrace_bufidx = 0;
 size_t systrace_bufsize = 0;
 spinlock_t systrace_lock = SPINLOCK_INITIALIZER_IRQSAVE;
-
-// for now, only want this visible here.
-void kprof_write_sysrecord(char *pretty_buf, size_t len);
 
 static bool __trace_this_proc(struct proc *p)
 {
@@ -139,7 +138,7 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 		trace->retval = retval;
 		kthread->trace = 0;
 		pretty_len = systrace_fill_pretty_buf(trace);
-		kprof_write_sysrecord(trace->pretty_buf, pretty_len);
+		kprof_tracedata_write(trace->pretty_buf, pretty_len);
 		if (systrace_flags & SYSTRACE_LOUD)
 			printk("EXIT %s", trace->pretty_buf);
 		kfree(trace);
@@ -572,6 +571,7 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	user_memdup_free(p, kargenv);
 	__proc_ready(new_p);
 	pid = new_p->pid;
+	profiler_notify_new_process(new_p);
 	proc_decref(new_p);	/* give up the reference created in proc_create() */
 	return pid;
 error_load_elf:
@@ -728,6 +728,7 @@ static ssize_t sys_fork(env_t* e)
 
 	printd("[PID %d] fork PID %d\n", e->pid, env->pid);
 	ret = env->pid;
+	profiler_notify_new_process(env);
 	proc_decref(env);	/* give up the reference created in proc_alloc() */
 	return ret;
 }
@@ -743,7 +744,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
                     char *argenv, size_t argenv_l)
 {
 	int ret = -1;
-	char *t_path;
+	char *t_path = NULL;
 	struct file *program;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	int8_t state = 0;
@@ -760,10 +761,6 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 		set_errno(EINVAL);
 		return -1;
 	}
-	t_path = copy_in_path(p, path, path_l);
-	if (!t_path)
-		return -1;
-	proc_replace_binary_path(p, t_path);
 
 	disable_irqsave(&state);	/* protect cur_ctx */
 	/* Can't exec if we don't have a current_ctx to restart (if we fail).  This
@@ -805,10 +802,14 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 		set_error(EINVAL, "Failed to unpack the args");
 		return -1;
 	}
-
+	t_path = copy_in_path(p, path, path_l);
+	if (!t_path) {
+		user_memdup_free(p, kargenv);
+		return -1;
+	}
 	/* This could block: */
 	/* TODO: 9ns support */
-	program = do_file_open(p->binary_path, O_READ, 0);
+	program = do_file_open(t_path, O_READ, 0);
 	if (!program)
 		goto early_error;
 	if (!is_valid_elf(program)) {
@@ -817,6 +818,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	}
 	/* This is the point of no return for the process. */
 	/* progname is argv0, which accounts for symlinks */
+	proc_replace_binary_path(p, t_path);
 	proc_set_progname(p, argc ? argv[0] : NULL);
 	proc_init_procdata(p);
 	p->procinfo->heap_bottom = 0;
@@ -847,6 +849,7 @@ mid_error:
 	 * error value (errno is already set). */
 	kref_put(&program->f_kref);
 early_error:
+	free_path(p, t_path);
 	finish_current_sysc(-1);
 	systrace_finish_trace(pcpui->cur_kthread, -1);
 success:

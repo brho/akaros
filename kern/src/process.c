@@ -330,6 +330,8 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 		kmem_cache_free(proc_cache, p);
 		return -ENOFREEPID;
 	}
+	if (parent && parent->binary_path)
+		kstrdup(&p->binary_path, parent->binary_path);
 	/* Set the basic status variables. */
 	spinlock_init(&p->proc_lock);
 	p->exitcode = 1337;	/* so we can see processes killed by the kernel */

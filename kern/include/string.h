@@ -24,7 +24,7 @@ void *memset(void* p, int what, size_t sz);
 int   memcmp(const void* s1, const void* s2, size_t sz);
 void *memcpy(void* dst, const void* src, size_t sz);
 void *memmove(void *dst, const void* src, size_t sz);
-void *memchr(void* mem, int chr, int len);
+void *memchr(const void *mem, int chr, int len);
 
 void *memfind(const void *s, int c, size_t len);
 

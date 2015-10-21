@@ -54,7 +54,7 @@ void printipmask(void (*putch)(int, void**), void **putdat, uint8_t *ip);
 void printipv4(void (*putch)(int, void**), void **putdat, uint8_t *ip);
 
 /* #K */
-void trace_printk(const char *fmt, ...);
+void trace_printk(bool btrace, const char *fmt, ...);
 
 /* vsprintf.c (linux) */
 int vsscanf(const char *buf, const char *fmt, va_list args);

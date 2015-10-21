@@ -4,12 +4,16 @@ Akaros Profiling
 
 Contents
 ---------------------------
-"Oprofile"
+"Kprof"
 
-"Oprofile"
+"Kprof"
 ---------------------------
 Akaros has a very basic sampling profiler, similar to oprofile.  The kernel
-generates traces, which you copy off the machine and process on Linux.
+generates traces, which you copy off the machine and process on Linux using
+Linux perf.
+First build the Akaros kernel:
+
+/ $ make && make xcc-headers-install && make apps-install
 
 To get started, make sure #K is mounted.  The basic ifconfig script will do
 this, as will:
@@ -19,25 +23,34 @@ this, as will:
 You control the profiler with the kpctl file.  The general style is to start
 the events that trigger a sample, such as a timer tick, then you start and stop
 the profiling.  The distinction between the two steps is that one actually
-fires the events (e.g. the timer IRQ), and the other enables *collection* of profiling info when those events occur.
+fires the events (e.g. the timer IRQ), and the other enables *collection*
+of profiling info when those events occur.
 
-The optimer command takes the core id (or "all"), followed by "on" or "off".
+The timer command takes the core id (or "all"), followed by "on" or "off".
 As with all good devices, if you echo garbage, in, you should get the usage as
 an errstr.  That'll be kept up to date more than documentation.
+The profiler accepts a few configuration options.
+There is a queue size limit of 64MB by default, and it is used as circular
+buffer, so old data will be dropped.
+To change its value:
 
-/ $ echo garbage > /prof/kpctl
-echo failed: Unspecified, startclr|start|stop|clear|opstart|opstop|optimer
+/ $ echo prof_qlimit SIZE_KB > /prof/kpctl
 
-/ $ echo optimer garbage > /prof/kpctl
-echo failed: Unspecified, optimer [<0|1|..|n|all> <on|off>] [period USEC]
+This should be run before starting the profiler.
+There is a limit of the maximum call strace dept, by default 16.
+To change it:
 
-Let's set up the timer on core 0:
+/ $ echo prof_btdepth DEPTH > /prof/kpctl
 
-/ $ echo optimer 0 on > /prof/kpctl
+This should be run before starting the profiler as well.
+It is possible to configure the timer period, which defaults to 1000us, though
+it is not suggested to move too far from the default:
 
-And then start oprofile system-wide.
+/ $ echo timer period 1000 > /prof/kpctl
 
-/ $ echo opstart > /prof/kpctl
+And then start the Akaros profiler system-wide.
+
+/ $ echo start > /prof/kpctl
 Enable tracing on 0
 Enable tracing on 1
 Enable tracing on 2
@@ -50,48 +63,44 @@ Enable tracing on 7
 Run whatever command you want, then stop the profiler.
 
 / $ foo
-/ $ echo opstop > /prof/kpctl
-Core 0 has data
-After qibwrite in oprofile_cpubuf_flushone, opq len 303080
+/ $ echo stop > /prof/kpctl
 
-Might as well turn off the timers:
-/ $ echo optimer all off > /prof/kpctl
+The trace will be then available in the /prof/kpdata file.
+The data will be available until the next start of the profiler.
+Then copy this on your dev box.
+The easiest way is via 9p:
 
-Now we need to extract the trace.  The easiest way is via 9p.
-/ $ cat /prof/kpoprofile > trace
-/ $ cp trace /mnt/
+/ $ cp /prof/kpdata /mnt/
 
-Once the trace has been read from kpoprofile, it cannot be read again.  The
-read drains the kernel's trace buffer.
+Or by using the simple netcat (snc) utility.
+On your dev box:
 
-The trace that the kernel generates is in an Akaros-specific format.  There is
-a go program at tools/profile/op2.go that translates from the Akaros format to
-pprof format.  You could run this on Akaros, since we support Go programs, but
-since we don't have a port of pprof, it's easier to do it all in Linux.
+/ $ nc -l PORT > kpdata.data
 
-So now we're in linux, and say our 9p ufs server is rooted at mnt/netroot/.  Run op2:
+On Akaros:
 
-(linux) $ op2 < mnt/netroot/trace > trace-pp
+/ $ scn -s DEVBOX_IP -p PORT -i /prof/kpdata
 
-To get a sense for what the trace holds, you might want to start with looking at the raw addresses to distinguish between the kernel and the user.
+In order to process the Akaros kprof file, you need to convert it to the
+Linux perf one.
+You can do that, on your dev box, with:
 
-(linux) $ pprof --addresses trace-pp
-PPROF> top
-	(shows some addresses)
+/ $ ./tools/profile/kprof2perf/kprof2perf-linux -k `pwd`/obj/kern/akaros-kernel-64b -i kpdata.data -o perf.data
 
-Say the majority of the addresses are user addresses:
+You then need to build the Akaros specific Linux perf binary.
+First you need to install (if you have not already) libelf-dev:
 
-(linux) $ pprof obj/tests/foo trace-pp
-PPROF> top
-	(shows some functions)
+\ $ sudo apt-get install libelf-dev
 
-Or you can visualize things:
-(linux) $ pprof --evince obj/tests/foo trace-pp
+Then pull the Linux kernel source code which is closer to the kernel
+version you are running in your dev box, and patch it:
 
-The visualization is not of much user for user programs, since the kernel does
-not record backtraces for userspace by default.  It's a little dangerous at the
-moment.  In the future, we may have an op option to control whether or not the
-kernel attempts a backtrace.
+/ $ cd linux
+/ $ patch -p 1 < $AKAROS/tools/profile/kprof2perf/perf_patches/perf_patch.diff
+/ $ cd tools/perf
+/ $ make
 
-For more info on pprof, check out:
-http://gperftools.googlecode.com/svn/trunk/doc/cpuprofile.html
+Then you should be able to run Linux perf data analysis command on it:
+Example:
+
+$ /PATH_TO/perf --root-dir $AKAROS/kern/kfs/ report -g -i perf.data

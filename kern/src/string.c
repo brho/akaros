@@ -141,13 +141,13 @@ strrchr(const char *s, char c)
 	return lastc;
 }
 
-void *
-memchr(void* mem, int chr, int len)
+void *memchr(const void *mem, int chr, int len)
 {
-	char* s = (char*)mem;
-	for(int i = 0; i < len; i++)
-		if(s[i] == (char)chr)
-			return s+i;
+	char *s = (char*) mem;
+
+	for (int i = 0; i < len; i++)
+		if (s[i] == (char) chr)
+			return s + i;
 	return NULL;
 }
 

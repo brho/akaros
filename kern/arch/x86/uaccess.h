@@ -75,7 +75,8 @@ struct extable_ip_fixup {
 				 ".previous\n"											\
 				 _ASM_EXTABLE(1b, 3b)									\
 				 : "=r"(err)											\
-				 : "D" (dst), "S" (src), "c" (count), "i" (errret), "0" (err))
+				 : "D" (dst), "S" (src), "c" (count), "i" (errret), "0" (err) \
+				 : "memory")
 
 static inline int __put_user(void *dst, const void *src, unsigned int count)
 {
