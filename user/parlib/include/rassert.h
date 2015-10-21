@@ -10,6 +10,7 @@
 __BEGIN_DECLS
 
 #undef assert
+#undef static_assert
 
 void _warn(const char*, int, const char*, ...);
 void _panic(const char*, int, const char*, ...) __attribute__((noreturn));
