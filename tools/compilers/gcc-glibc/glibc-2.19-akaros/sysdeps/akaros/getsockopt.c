@@ -25,8 +25,8 @@ static int sol_socket_gso(Rock *r, int optname, void *optval, socklen_t *optlen)
 	return 0;
 }
 
-int getsockopt(int sockfd, int level, int optname, void *optval,
-               socklen_t *optlen)
+int __getsockopt(int sockfd, int level, int optname, void *optval,
+                 socklen_t *optlen)
 {
 	Rock *r = _sock_findrock(sockfd, 0);
 	if (!r) {
@@ -42,3 +42,4 @@ int getsockopt(int sockfd, int level, int optname, void *optval,
 			return -1;
 	};
 }
+weak_alias(__getsockopt, getsockopt)
