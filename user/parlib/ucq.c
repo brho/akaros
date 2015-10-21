@@ -11,10 +11,9 @@
 #include <parlib/ucq.h>
 #include <parlib/spinlock.h>
 #include <sys/mman.h>
-#include <assert.h>
+#include <parlib/assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <parlib/assert.h> /* for the static_assert() */
 #include <parlib/vcore.h>
 #include <parlib/ros_debug.h> /* for printd() */
 

@@ -19,7 +19,7 @@
  */
 
 #include <stddef.h>
-#include <assert.h>
+#include <parlib/assert.h>
 #include <parlib/spinlock.h>
 #include <parlib/dtls.h>
 #include <parlib/slab.h>

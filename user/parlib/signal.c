@@ -30,7 +30,7 @@
 #include <parlib/parlib.h>
 #include <parlib/event.h>
 #include <errno.h>
-#include <assert.h>
+#include <parlib/assert.h>
 #include <ros/procinfo.h>
 #include <ros/syscall.h>
 #include <sys/mman.h>

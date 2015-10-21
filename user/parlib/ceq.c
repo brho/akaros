@@ -25,7 +25,6 @@
 #include <parlib/spinlock.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <assert.h>
 
 void ceq_init(struct ceq *ceq, uint8_t op, size_t nr_events, size_t ring_sz)
 {

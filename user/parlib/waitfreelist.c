@@ -4,7 +4,7 @@
  * See LICENSE for details.
  */
 
-#include <assert.h>
+#include <parlib/assert.h>
 #include <stdlib.h>
 #include <parlib/arch/atomic.h>
 #include <parlib/waitfreelist.h>

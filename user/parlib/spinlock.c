@@ -21,7 +21,7 @@
 
 #include <stdlib.h>
 #include <errno.h>
-#include <assert.h>
+#include <parlib/assert.h>
 
 #include <parlib/spinlock.h>
 #include <parlib/vcore.h>

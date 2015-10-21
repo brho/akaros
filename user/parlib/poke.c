@@ -20,7 +20,7 @@
 
 #include <parlib/poke.h>
 #include <parlib/arch/atomic.h>
-#include <assert.h>
+#include <parlib/assert.h>
 
 /* This is the 'post (work) and poke' style of sync.  We make sure the poke
  * tracker's function runs.  Once this returns, the func either has run or is

@@ -6,7 +6,7 @@
 #include <parlib/arch/arch.h>
 #include <ros/syscall.h>
 #include <ros/procdata.h>
-#include <assert.h>
+#include <parlib/assert.h>
 #include <sys/tls.h>
 
 __BEGIN_DECLS

@@ -14,7 +14,7 @@
 
 #include <parlib/slab.h>
 #include <stdio.h>
-#include <assert.h>
+#include <parlib/assert.h>
 #include <sys/mman.h>
 #include <sys/param.h>
 

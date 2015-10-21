@@ -14,7 +14,7 @@
 #include <parlib/vcore.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
+#include <parlib/assert.h>
 #include <errno.h>
 #include <parlib/parlib.h>
 #include <parlib/event.h>

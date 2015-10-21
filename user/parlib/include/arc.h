@@ -5,7 +5,7 @@
 #include <parlib/parlib.h>
 #include <error.h>
 #include <parlib/pool.h>
-#include <assert.h>
+#include <parlib/assert.h>
 #include <sys/queue.h>
 #include <ros/syscall.h>
 #include <ros/ring_syscall.h>
