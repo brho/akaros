@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include <parlib/rassert.h>
+#include <parlib/assert.h>
 
 #define ARRAYSIZE (1024*1024)
 

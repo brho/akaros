@@ -10,7 +10,7 @@
 #include <parlib/vcore.h>
 #include <parlib/mcs.h>
 #include <parlib/timing.h>
-#include <parlib/rassert.h>
+#include <parlib/assert.h>
 #include <parlib/event.h>
 #include <parlib/uthread.h>
 

@@ -21,7 +21,7 @@
 #include <parlib/ceq.h>
 #include <parlib/arch/atomic.h>
 #include <parlib/vcore.h>
-#include <parlib/rassert.h>
+#include <parlib/assert.h>
 #include <parlib/spinlock.h>
 #include <stdlib.h>
 #include <stdio.h>

@@ -1,9 +1,15 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef PARLIB_RASSERT_H
-#define PARLIB_RASSERT_H
+#ifndef PARLIB_ASSERT_H
+#define PARLIB_ASSERT_H
 
-#include <assert.h>
+#ifdef BUILDING_PARLIB
+# include_next "assert.h"
+#else
+# include <assert.h>
+#endif
+/* For __BEGIN_DECLS.  Most every header gets it already from features.h. */
+#include <sys/cdefs.h>
 
 __BEGIN_DECLS
 
@@ -29,4 +35,4 @@ void _assert_failed(const char *file, int line, const char *msg)
 
 __END_DECLS
 
-#endif /* PARLIB_RASSERT_H */
+#endif /* PARLIB_ASSERT_H */

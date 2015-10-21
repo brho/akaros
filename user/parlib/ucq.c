@@ -14,7 +14,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <parlib/rassert.h> /* for the static_assert() */
+#include <parlib/assert.h> /* for the static_assert() */
 #include <parlib/vcore.h>
 #include <parlib/ros_debug.h> /* for printd() */
 

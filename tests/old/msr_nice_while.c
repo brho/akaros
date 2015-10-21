@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <parlib/vcore.h>
 #include <pthread.h>
-#include <parlib/rassert.h>
+#include <parlib/assert.h>
 #include <parlib/event.h>
 #include <parlib/uthread.h>
 

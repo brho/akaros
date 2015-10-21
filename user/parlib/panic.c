@@ -1,7 +1,7 @@
 #include <parlib/arch/arch.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <parlib/rassert.h>
+#include <parlib/assert.h>
 #include <stdlib.h>
 #include <parlib/ros_debug.h>
 

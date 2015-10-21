@@ -3,7 +3,7 @@
 #include <parlib/parlib.h>
 #include <parlib/event.h>
 #include <parlib/vcore.h>
-#include <parlib/rassert.h>
+#include <parlib/assert.h>
 #include <ros/bcq.h>
 #include <parlib/uthread.h>
 

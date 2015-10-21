@@ -1,6 +1,6 @@
 #include <parlib/arch/arch.h>
 #include <parlib/parlib.h>
-#include <parlib/rassert.h>
+#include <parlib/assert.h>
 #include <stdlib.h>
 #include <parlib/vcore.h>
 #include <ros/mman.h>
