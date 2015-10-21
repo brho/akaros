@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <parlib/rassert.h> /* for the static_assert() */
 #include <parlib/vcore.h>
+#include <parlib/ros_debug.h> /* for printd() */
 
 /* Initializes a ucq.  You pass in addresses of mmaped pages for the main page
  * (prod_idx) and the spare page.  I recommend mmaping a big chunk and breaking

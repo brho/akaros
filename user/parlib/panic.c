@@ -1,6 +1,9 @@
 #include <parlib/arch/arch.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <parlib/rassert.h>
+#include <stdlib.h>
+#include <parlib/ros_debug.h>
 
 char *argv0;
 
@@ -28,3 +31,10 @@ _panic(const char *file, int line, const char *fmt,...)
 		breakpoint();
 }
 
+void _assert_failed(const char *file, int line, const char *msg)
+{
+	ros_debug("[user] %s:%d, vcore %d, Assertion failed: %s\n",
+	          file, line, vcore_id(), msg);
+	breakpoint();
+	abort();
+}

@@ -4,8 +4,6 @@
 #define PARLIB_RASSERT_H
 
 #include <assert.h>
-#include <parlib/vcore.h>
-#include <parlib/ros_debug.h>
 
 __BEGIN_DECLS
 
@@ -14,18 +12,16 @@ __BEGIN_DECLS
 
 void _warn(const char*, int, const char*, ...);
 void _panic(const char*, int, const char*, ...) __attribute__((noreturn));
+void _assert_failed(const char *file, int line, const char *msg)
+     __attribute__((noreturn));
 
 #define warn(...) _warn(__FILE__, __LINE__, __VA_ARGS__)
 #define panic(...) _panic(__FILE__, __LINE__, __VA_ARGS__)
 
 #define assert(x)	                                                           \
 	do {                                                                       \
-		if (!(x)) {                                                            \
-			ros_debug("[user] %s:%d, vcore %d, Assertion failed: %s\n",        \
-			          __FILE__, __LINE__, vcore_id(), #x);                     \
-			breakpoint();                                                      \
-			abort();                                                           \
-		}                                                                      \
+		if (!(x))                                                              \
+			_assert_failed(__FILE__, __LINE__, #x);                            \
 	} while (0)
 
 // static_assert(x) will generate a compile-time error if 'x' is false.
