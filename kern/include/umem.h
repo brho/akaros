@@ -64,6 +64,8 @@ void user_memdup_free(struct proc *p, void *va);
 /* Same as memdup, but just does strings.  still needs memdup_freed */
 char *user_strdup(struct proc *p, const char *u_string, size_t strlen);
 char *user_strdup_errno(struct proc *p, const char *u_string, size_t strlen);
+char *copy_in_path(struct proc *p, const char *path, size_t path_l);
+void free_path(struct proc *p, char *t_path);
 void *kmalloc_errno(int len);
 bool uva_is_kva(struct proc *p, void *uva, void *kva);
 uintptr_t uva2kva(struct proc *p, void *uva);

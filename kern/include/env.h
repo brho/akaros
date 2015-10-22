@@ -34,7 +34,16 @@ struct proc {
 	spinlock_t proc_lock;
 	struct user_context scp_ctx; 	/* context for an SCP.  TODO: move to vc0 */
 	char user[64]; /* user name */
+
+	/* This is effectively a (potentially short) version of argv[0].
+	 */
 	char progname[PROC_PROGNAME_SZ];
+
+	/* This is the full path of the binary which the current proc structure
+	 * is tracking.
+	 */
+	char *binary_path;
+
 	pid_t pid;
 	/* Tempting to add a struct proc *parent, but we'd need to protect the use
 	 * of that reference from concurrent parent-death (letting init inherit

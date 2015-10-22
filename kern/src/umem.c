@@ -208,3 +208,34 @@ uintptr_t uva2kva(struct proc *p, void *uva)
 		return 0;
 	return (uintptr_t)page2kva(u_page) + offset;
 }
+
+/* Helper, copies a pathname from the process into the kernel.  Returns a string
+ * on success, which you must free with free_path.  Returns 0 on failure and
+ * sets errno.  On success, if you are tracing syscalls, it will store the
+ * t_path in the trace data, clobbering whatever previously there. */
+char *copy_in_path(struct proc *p, const char *path, size_t path_l)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct systrace_record *t = pcpui->cur_kthread->trace;
+	char *t_path;
+
+	/* PATH_MAX includes the \0 */
+	if (path_l > PATH_MAX) {
+		set_errno(ENAMETOOLONG);
+		return 0;
+	}
+	t_path = user_strdup_errno(p, path, path_l);
+	if (!t_path)
+		return 0;
+	if (t) {
+		t->datalen = MIN(sizeof(t->data), path_l);
+		memcpy(t->data, t_path, t->datalen);
+	}
+	return t_path;
+}
+
+/* Helper, frees a path that was allocated with copy_in_path. */
+void free_path(struct proc *p, char *t_path)
+{
+	user_memdup_free(p, t_path);
+}

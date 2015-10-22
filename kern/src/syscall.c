@@ -320,30 +320,6 @@ static struct proc *get_controllable_proc(struct proc *p, pid_t pid)
 	return target;
 }
 
-/* Helper, copies a pathname from the process into the kernel.  Returns a string
- * on success, which you must free with free_path.  Returns 0 on failure and
- * sets errno.  On success, if you are tracing syscalls, it will store the
- * t_path in the trace data, clobbering whatever previously there. */
-static char *copy_in_path(struct proc *p, const char *path, size_t path_l)
-{
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	struct systrace_record *t = pcpui->cur_kthread->trace;
-	char *t_path;
-	/* PATH_MAX includes the \0 */
-	if (unlikely(path_l > PATH_MAX)) {
-		set_errno(ENAMETOOLONG);
-		return 0;
-	}
-	t_path = user_strdup_errno(p, path, path_l);
-	if (unlikely(!t_path))
-		return 0;
-	if (unlikely(t)) {
-		t->datalen = MIN(sizeof(t->data), path_l);
-		memcpy(t->data, t_path, t->datalen);
-	}
-	return t_path;
-}
-
 static int unpack_argenv(struct argenv *argenv, size_t argenv_l,
                          int *argc_p, char ***argv_p,
                          int *envc_p, char ***envp_p)
@@ -380,12 +356,6 @@ static int unpack_argenv(struct argenv *argenv, size_t argenv_l,
 	*envc_p = envc;
 	*envp_p = envp;
 	return 0;
-}
-
-/* Helper, frees a path that was allocated with copy_in_path. */
-static void free_path(struct proc *p, char *t_path)
-{
-	user_memdup_free(p, t_path);
 }
 
 /************** Utility Syscalls **************/
@@ -558,28 +528,27 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 		return -1;
 	/* TODO: 9ns support */
 	program = do_file_open(t_path, O_READ, 0);
-	free_path(p, t_path);
 	if (!program)
-		return -1;			/* presumably, errno is already set */
+		goto error_user_memdup;
 
 	/* Check the size of the argenv array, error out if too large. */
 	if ((argenv_l < sizeof(struct argenv)) || (argenv_l > ARG_MAX)) {
 		set_error(EINVAL, "The argenv array has an invalid size: %lu\n",
 				  argenv_l);
-		return -1;
+		goto error_user_memdup;
 	}
 	/* Copy the argenv array into a kernel buffer. Delay processing of the
 	 * array to load_elf(). */
 	kargenv = user_memdup_errno(p, argenv, argenv_l);
 	if (!kargenv) {
 		set_errstr("Failed to copy in the args");
-		return -1;
+		goto error_user_memdup;
 	}
 	/* Unpack the argenv array into more usable variables. Integrity checking
 	 * done along side this as well. */
 	if (unpack_argenv(kargenv, argenv_l, &argc, &argv, &envc, &envp)) {
 		set_errstr("Failed to unpack the args");
-		goto early_error;
+		goto error_unpack;
 	}
 
 	/* TODO: need to split the proc creation, since you must load after setting
@@ -587,34 +556,37 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	//new_p = proc_create(program, 0, 0);
 	if (proc_alloc(&new_p, current, flags)) {
 		set_errstr("Failed to alloc new proc");
-		goto mid_error;
+		goto error_proc_alloc;
 	}
 	/* close the CLOEXEC ones, even though this isn't really an exec */
 	close_fdt(&new_p->open_files, TRUE);
 	/* Load the elf. */
 	if (load_elf(new_p, program, argc, argv, envc, envp)) {
 		set_errstr("Failed to load elf");
-		goto late_error;
+		goto error_load_elf;
 	}
 	/* progname is argv0, which accounts for symlinks */
-	proc_set_progname(p, argc ? argv[0] : NULL);
+	proc_set_progname(new_p, argc ? argv[0] : NULL);
+	proc_replace_binary_path(new_p, t_path);
 	kref_put(&program->f_kref);
 	user_memdup_free(p, kargenv);
 	__proc_ready(new_p);
 	pid = new_p->pid;
 	proc_decref(new_p);	/* give up the reference created in proc_create() */
 	return pid;
-late_error:
+error_load_elf:
 	set_errno(EINVAL);
 	/* proc_destroy will decref once, which is for the ref created in
 	 * proc_create().  We don't decref again (the usual "+1 for existing"),
 	 * since the scheduler, which usually handles that, hasn't heard about the
 	 * process (via __proc_ready()). */
 	proc_destroy(new_p);
-mid_error:
+error_proc_alloc:
 	kref_put(&program->f_kref);
-early_error:
+error_unpack:
 	user_memdup_free(p, kargenv);
+error_user_memdup:
+	free_path(p, t_path);
 	return -1;
 }
 
@@ -791,6 +763,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
 		return -1;
+	proc_replace_binary_path(p, t_path);
 
 	disable_irqsave(&state);	/* protect cur_ctx */
 	/* Can't exec if we don't have a current_ctx to restart (if we fail).  This
@@ -835,8 +808,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 
 	/* This could block: */
 	/* TODO: 9ns support */
-	program = do_file_open(t_path, O_READ, 0);
-	free_path(p, t_path);
+	program = do_file_open(p->binary_path, O_READ, 0);
 	if (!program)
 		goto early_error;
 	if (!is_valid_elf(program)) {

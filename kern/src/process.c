@@ -10,6 +10,7 @@
 #include <smp.h>
 #include <pmap.h>
 #include <trap.h>
+#include <umem.h>
 #include <schedule.h>
 #include <manager.h>
 #include <stdio.h>
@@ -261,6 +262,13 @@ void proc_set_progname(struct proc *p, char *name)
 	strlcpy(p->progname, name, PROC_PROGNAME_SZ);
 }
 
+void proc_replace_binary_path(struct proc *p, char *path)
+{
+	if (p->binary_path)
+		free_path(p, p->binary_path);
+	p->binary_path = path;
+}
+
 /* Be sure you init'd the vcore lists before calling this. */
 void proc_init_procinfo(struct proc* p)
 {
@@ -305,7 +313,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 	if (!(p = kmem_cache_alloc(proc_cache, 0)))
 		return -ENOMEM;
 	/* zero everything by default, other specific items are set below */
-	memset(p, 0, sizeof(struct proc));
+	memset(p, 0, sizeof(*p));
 
 	/* only one ref, which we pass back.  the old 'existence' ref is managed by
 	 * the ksched */
@@ -459,6 +467,7 @@ static void __proc_free(struct kref *kref)
 
 	__vmm_struct_cleanup(p);
 	p->progname[0] = 0;
+	free_path(p, p->binary_path);
 	cclose(p->dot);
 	cclose(p->slash);
 	p->dot = p->slash = 0; /* catch bugs */
