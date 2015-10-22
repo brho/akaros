@@ -403,3 +403,38 @@ int load_elf(struct proc* p, struct file* f,
 	return 0;
 }
 
+ssize_t get_startup_argc(struct proc *p)
+{
+	const char *sptr = (const char *) p->args_base;
+	ssize_t argc = 0;
+
+	/* TODO,DL: Use copy_from_user() when available.
+	 */
+	if (memcpy_from_user(p, &argc, sptr, sizeof(size_t)))
+		return -1;
+
+	return argc;
+}
+
+char *get_startup_argv(struct proc *p, size_t idx, char *argp,
+					   size_t max_size)
+{
+	size_t stack_space = (const char *) USTACKTOP - (const char *) p->args_base;
+	const char *sptr = (const char *) p->args_base + sizeof(size_t) +
+		idx * sizeof(char *);
+	const char *argv = NULL;
+
+	/* TODO,DL: Use copy_from_user() when available.
+	 */
+	if (memcpy_from_user(p, &argv, sptr, sizeof(char *)))
+		return NULL;
+
+	/* TODO,DL: Use strncpy_from_user() when available.
+	 */
+	max_size = MIN(max_size, stack_space);
+	if (memcpy_from_user(p, argp, argv, max_size))
+		return NULL;
+	argp[max_size - 1] = 0;
+
+	return argp;
+}
