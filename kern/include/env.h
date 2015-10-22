@@ -62,7 +62,13 @@ struct proc {
 
 	/* Keeps track of this process's current memory allocation 
      * (i.e. its heap pointer) */
-	void* heap_top;
+	void *heap_top;
+
+	/* The args_base pointer is a user pointer which points to the base of
+	 * the executable boot block (where args, environment, aux vectors, ...)
+	 * are stored.
+	 */
+	void *args_base;
 
 	// Address space
 	pgdir_t env_pgdir;			// Kernel virtual address of page dir

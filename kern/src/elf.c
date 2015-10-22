@@ -398,6 +398,7 @@ int load_elf(struct proc* p, struct file* f,
 	 * loaded. */
 	p->heap_top = (void*)ei.highest_addr;
 	p->procinfo->heap_bottom = p->heap_top;
+	p->args_base = (void *) stack_top;
 
 	return 0;
 }
