@@ -43,13 +43,18 @@ int __socket(int domain, int type, int protocol)
 				case SOCK_DGRAM:
 					net = "udp";
 					cfd = open("/net/udp/clone", open_flags);
-					/* All BSD UDP sockets are in 'headers' mode, where each packet has
-					 * the remote addr:port, local addr:port and other info. */
+					/* All BSD UDP sockets are in 'headers' mode, where each
+					 * packet has the remote addr:port, local addr:port and
+					 * other info. */
 					if (!(cfd < 0)) {
 						n = snprintf(msg, sizeof(msg), "headers");
 						n = write(cfd, msg, n);
 						if (n < 0) {
 							perror("UDP socket headers failed");
+							return -1;
+						}
+						if (lseek(cfd, 0, SEEK_SET) != 0) {
+							perror("UDP socket seek failed");
 							return -1;
 						}
 					}
