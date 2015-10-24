@@ -5,6 +5,7 @@
  * Default implementations and global values for the VFS. */
 
 #include <vfs.h> // keep this first
+#include <ros/errno.h>
 #include <sys/queue.h>
 #include <assert.h>
 #include <stdio.h>
@@ -140,6 +141,39 @@ void qstr_builder(struct dentry *dentry, char *l_name)
 char *file_name(struct file *file)
 {
 	return file->f_dentry->d_name.name;
+}
+
+static int prepend(char **pbuf, size_t *pbuflen, const char *str, size_t len)
+{
+	if (*pbuflen < len)
+		return -ENAMETOOLONG;
+	*pbuflen -= len;
+	*pbuf -= len;
+	memcpy(*pbuf, str, len);
+
+	return 0;
+}
+
+char *dentry_path(struct dentry *dentry, char *path, size_t max_size)
+{
+	size_t csize = max_size;
+	char *path_start = path + max_size, *base;
+
+	if (prepend(&path_start, &csize, "\0", 1) < 0 || csize < 1)
+		return NULL;
+	/* Handle the case that the passed dentry is the root. */
+	base = path_start - 1;
+	*base = '/';
+	while (!DENTRY_IS_ROOT(dentry)) {
+		if (prepend(&path_start, &csize, dentry->d_name.name,
+					dentry->d_name.len) < 0 ||
+			prepend(&path_start, &csize, "/", 1) < 0)
+			return NULL;
+		base = path_start;
+		dentry = dentry->d_parent;
+	}
+
+	return base;
 }
 
 /* Some issues with this, coupled closely to fs_lookup.

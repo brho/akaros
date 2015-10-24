@@ -255,6 +255,10 @@ struct dentry {
 	void						*d_fs_info;
 };
 
+/* Checks is a struct dentry pointer if the root.
+ */
+#define DENTRY_IS_ROOT(d) ((d) == (d)->d_parent)
+
 /* not sure yet if we want to call delete when refcnt == 0 (move it to LRU) or
  * when its time to remove it from the dcache. */
 struct dentry_operations {
@@ -430,9 +434,15 @@ extern struct kmem_cache *file_kcache;
 void vfs_init(void);
 void qstr_builder(struct dentry *dentry, char *l_name);
 char *file_name(struct file *file);
+char *dentry_path(struct dentry *dentry, char *path, size_t max_size);
 int path_lookup(char *path, int flags, struct nameidata *nd);
 void path_release(struct nameidata *nd);
 int mount_fs(struct fs_type *fs, char *dev_name, char *path, int flags);
+
+static inline char *file_abs_path(struct file *f, char *path, size_t max_size)
+{
+	return dentry_path(f->f_dentry, path, max_size);
+}
 
 /* Superblock functions */
 struct super_block *get_sb(void);
