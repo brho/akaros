@@ -55,6 +55,7 @@ static command_t commands[] = {
 	{ "pip", "Shorthand for procinfo pid", mon_pip},
 	{ "kill", "Kills a process", mon_kill},
 	{ "exit", "Leave the monitor", mon_exit},
+	{ "e", "Leave the monitor", mon_exit},
 	{ "kfunc", "Run a kernel function directly (!!!)", mon_kfunc},
 	{ "notify", "Notify a process.  Vcoreid will skip their prefs", mon_notify},
 	{ "measure", "Run a specific measurement", mon_measure},
