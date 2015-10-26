@@ -659,11 +659,13 @@ PHONY += apps-install
 apps-install:
 	@$(call make_as_parent, -C tools/apps/busybox)
 	@$(call make_as_parent, -C tools/profile/kprof2perf install)
+	@$(call make_as_parent, -C tools/apps/snc install)
 
 PHONY += apps-clean
 apps-clean:
 	@$(call make_as_parent, -C tools/apps/busybox clean)
 	@$(call make_as_parent, -C tools/profile/kprof2perf clean)
+	@$(call make_as_parent, -C tools/apps/snc clean)
 
 # Cross Compiler
 # =========================================================================
