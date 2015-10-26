@@ -1355,7 +1355,8 @@ int iptapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 	int ret;
 
 	#define DEVIP_LEGAL_DATA_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_WRITABLE | \
-	                               FDTAP_FILT_HANGUP)
+	                               FDTAP_FILT_HANGUP | FDTAP_FILT_PRIORITY |   \
+	                               FDTAP_FILT_ERROR)
 	#define DEVIP_LEGAL_LISTEN_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_HANGUP)
 
 	/* That's a lot of pointers to get to the conv! */
@@ -1367,8 +1368,8 @@ int iptapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 		case Qdata:
 			if (tap->filter & ~DEVIP_LEGAL_DATA_TAPS) {
 				set_errno(ENOSYS);
-				set_errstr("Unsupported #%s data tap, must be %p", devname(),
-				           DEVIP_LEGAL_DATA_TAPS);
+				set_errstr("Unsupported #%s data tap %p, must be %p", devname(),
+				           tap->filter, DEVIP_LEGAL_DATA_TAPS);
 				return -1;
 			}
 			spin_lock(&conv->tap_lock);
@@ -1400,8 +1401,8 @@ int iptapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 		case Qlisten:
 			if (tap->filter & ~DEVIP_LEGAL_LISTEN_TAPS) {
 				set_errno(ENOSYS);
-				set_errstr("Unsupported #%s listen tap, must be %p", devname(),
-				           DEVIP_LEGAL_LISTEN_TAPS);
+				set_errstr("Unsupported #%s listen tap %p, must be %p",
+				           devname(), tap->filter, DEVIP_LEGAL_LISTEN_TAPS);
 				return -1;
 			}
 			spin_lock(&conv->tap_lock);
