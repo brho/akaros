@@ -13,7 +13,6 @@ void monitor(struct hw_trapframe *hw_tf);
 int mon_help(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_kerninfo(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_backtrace(int argc, char **argv, struct hw_trapframe *hw_tf);
-int mon_bt(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_ps(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_reboot(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_showmapping(int argc, char **argv, struct hw_trapframe *hw_tf);
