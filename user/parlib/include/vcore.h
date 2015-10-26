@@ -6,6 +6,7 @@
 #include <sys/param.h>
 #include <string.h>
 #include <parlib/timing.h>
+#include <parlib/common.h>
 
 __BEGIN_DECLS
 

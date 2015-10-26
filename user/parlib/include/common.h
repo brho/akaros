@@ -8,6 +8,7 @@
 #define PARLIB_COMMON_H
 
 #include <ros/common.h>
+#include <parlib/assert.h>
 
 #define IS_PWR2(x) ((x) && !((x) & (x - 1)))
 

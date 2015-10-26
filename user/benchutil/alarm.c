@@ -26,7 +26,7 @@
 #include <sys/time.h>
 #include <benchutil/alarm.h>
 #include <stdio.h>
-#include <assert.h>
+#include <parlib/assert.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>

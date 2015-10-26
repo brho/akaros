@@ -3,7 +3,7 @@
 #include <sys/queue.h>
 #include <pthread.h>
 #include <parlib/parlib.h>
-#include <assert.h>
+#include <parlib/assert.h>
 #include <stdio.h>
 #include <errno.h>
 #include <parlib/slab.h>
