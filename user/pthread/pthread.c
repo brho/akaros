@@ -280,7 +280,7 @@ static void pth_thread_runnable(struct uthread *uthread)
 			/* can do whatever for each of these cases */
 			break;
 		default:
-			printf("Odd state %d for pthread %08p\n", pthread->state, pthread);
+			panic("Odd state %d for pthread %08p\n", pthread->state, pthread);
 	}
 	pthread->state = PTH_RUNNABLE;
 	/* Insert the newly created thread into the ready queue of threads.
