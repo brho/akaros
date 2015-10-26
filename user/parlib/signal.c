@@ -36,6 +36,7 @@
 #include <sys/mman.h>
 #include <parlib/vcore.h> /* for print_user_context() */
 #include <parlib/waitfreelist.h>
+#include <parlib/stdio.h>
 
 /* This is list of sigactions associated with each posix signal. */
 static struct sigaction sigactions[_NSIG];
@@ -73,30 +74,30 @@ static void default_term_handler(int signr, siginfo_t *info, void *ctx)
 
 static void default_core_handler(int signr, siginfo_t *info, void *ctx)
 {
-	fprintf(stderr, "Segmentation Fault (sorry, no core dump yet)\n");
+	printf("Segmentation Fault (sorry, no core dump yet)\n");
 	if (ctx)
 		print_user_context((struct user_context*)ctx);
 	else
-		fprintf(stderr, "No ctx for %s\n", __FUNCTION__);
+		printf("No ctx for %s\n", __func__);
 	if (info) {
 		/* ghetto, we don't have access to the PF err, since we only have a few
 		 * fields available in siginfo (e.g. there's no si_trapno). */
-		fprintf(stderr, "Fault type %d at addr %p\n", info->si_errno,
+		printf("Fault type %d at addr %p\n", info->si_errno,
 		        info->si_addr);
 	} else {
-		fprintf(stderr, "No fault info\n");
+		printf("No fault info\n");
 	}
 	default_term_handler((1 << 7) + signr, info, ctx);
 }
 
 static void default_stop_handler(int signr, siginfo_t *info, void *ctx)
 {
-	fprintf(stderr, "Stop signal received!  No support to stop yet though!\n");
+	printf("Stop signal received!  No support to stop yet though!\n");
 }
 
 static void default_cont_handler(int signr, siginfo_t *info, void *ctx)
 {
-	fprintf(stderr, "Cont signal received!  No support to cont yet though!\n");
+	printf("Cont signal received!  No support to cont yet though!\n");
 }
 
 typedef void (*__sigacthandler_t)(int, siginfo_t *, void *);
