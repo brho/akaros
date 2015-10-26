@@ -58,6 +58,20 @@ int ros_debug(const char *fmt, ...)
 	return cnt;
 }
 
+int akaros_printf(const char *format, ...)
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, format);
+	if (in_vcore_context())
+		ret = ros_vdebug(format, ap);
+	else
+		ret = vprintf(format, ap);
+	va_end(ap);
+	return ret;
+}
+
 /* Poor man's Ftrace, won't work well with concurrency. */
 static const char *blacklist[] = {
 	"whatever",

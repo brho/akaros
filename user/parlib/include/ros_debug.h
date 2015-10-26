@@ -4,23 +4,8 @@
 #include <parlib/common.h>
 #include <parlib/parlib.h>
 #include <parlib/vcore.h>
-#include <stdio.h>
-#include <stdarg.h>
 
 __BEGIN_DECLS
-
-void ros_debugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...);
-void ros_vdebugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_list);
-
-int	ros_debug(const char *fmt, ...);
-int	ros_vdebug(const char *fmt, va_list);
-
-//#define PRINTD_DEBUG
-#ifdef PRINTD_DEBUG
-#define printd(args...) printf(args)
-#else
-#define printd(args...) {}
-#endif
 
 #define I_AM_HERE printf("Vcore %d is in %s() at %s:%d\n", vcore_id(), \
                          __FUNCTION__, __FILE__, __LINE__);
