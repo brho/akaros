@@ -962,13 +962,13 @@ int mon_fs(int argc, char **argv, struct hw_trapframe *hw_tf)
 			printk("DENTRY     FLAGS      REFCNT NAME\n");
 			printk("--------------------------------\n");
 			/* Hash helper */
-			void print_dcache_entry(void *item)
+			void print_dcache_entry(void *item, void *opaque)
 			{
 				struct dentry *d_i = (struct dentry*)item;
 				printk("%p %p %02d     %s\n", d_i, d_i->d_flags,
 				       kref_refcnt(&d_i->d_kref), d_i->d_name.name);
 			}
-			hash_for_each(sb->s_dcache, print_dcache_entry);
+			hash_for_each(sb->s_dcache, print_dcache_entry, NULL);
 		}
 		if (argc < 3)
 			return 0;

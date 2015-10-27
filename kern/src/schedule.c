@@ -917,12 +917,12 @@ void print_resources(struct proc *p)
 void print_all_resources(void)
 {
 	/* Hash helper */
-	void __print_resources(void *item)
+	void __print_resources(void *item, void *opaque)
 	{
 		print_resources((struct proc*)item);
 	}
 	spin_lock(&pid_hash_lock);
-	hash_for_each(pid_hash, __print_resources);
+	hash_for_each(pid_hash, __print_resources, NULL);
 	spin_unlock(&pid_hash_lock);
 }
 

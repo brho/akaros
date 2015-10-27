@@ -2224,7 +2224,7 @@ void __tlbshootdown(uint32_t srcid, long a0, long a1, long a2)
 
 void print_allpids(void)
 {
-	void print_proc_state(void *item)
+	void print_proc_state(void *item, void *opaque)
 	{
 		struct proc *p = (struct proc*)item;
 		assert(p);
@@ -2241,7 +2241,7 @@ void print_allpids(void)
 	       PROC_PROGNAME_SZ - 5, "");
 	printk("------------------------------%s\n", dashes);
 	spin_lock(&pid_hash_lock);
-	hash_for_each(pid_hash, print_proc_state);
+	hash_for_each(pid_hash, print_proc_state, NULL);
 	spin_unlock(&pid_hash_lock);
 }
 
@@ -2326,7 +2326,7 @@ void print_proc_info(pid_t pid)
 void check_my_owner(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	void shazbot(void *item)
+	void shazbot(void *item, void *opaque)
 	{
 		struct proc *p = (struct proc*)item;
 		struct vcore *vc_i;
@@ -2353,7 +2353,7 @@ void check_my_owner(void)
 	extern int booting;
 	if (!booting && !pcpui->owning_proc) {
 		spin_lock(&pid_hash_lock);
-		hash_for_each(pid_hash, shazbot);
+		hash_for_each(pid_hash, shazbot, NULL);
 		spin_unlock(&pid_hash_lock);
 	}
 }

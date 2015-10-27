@@ -416,13 +416,14 @@ hashtable_iterator_search(hashtable_itr_t *itr,
 }
 
 /* Runs func on each member of the hash table */
-void hash_for_each(struct hashtable *hash, void func(void*))
+void hash_for_each(struct hashtable *hash, void func(void *, void *),
+				   void *opaque)
 {
 	if (hashtable_count(hash)) {
 		struct hashtable_itr *iter = hashtable_iterator(hash);
 		do {
 			void *item = hashtable_iterator_value(iter);
-			func(item);
+			func(item, opaque);
 		} while (hashtable_iterator_advance(iter));
 		kfree(iter);
 	}
@@ -430,13 +431,14 @@ void hash_for_each(struct hashtable *hash, void func(void*))
 
 /* Runs func on each member of the hash table, removing the item after
  * processing it.  Make sure func frees the item, o/w you'll leak. */
-void hash_for_each_remove(struct hashtable *hash, void func(void*))
+void hash_for_each_remove(struct hashtable *hash, void func(void *, void *),
+						  void *opaque)
 {
 	if (hashtable_count(hash)) {
 		struct hashtable_itr *iter = hashtable_iterator(hash);
 		do {
 			void *item = hashtable_iterator_value(iter);
-			func(item);
+			func(item, opaque);
 		} while (hashtable_iterator_remove(iter));
 		kfree(iter);
 	}

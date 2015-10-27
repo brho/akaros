@@ -286,9 +286,11 @@ ssize_t fnname (hashtable_itr_t *i, hashtable_t *h, keytype *k) \
 }
 
 /* Runs func on each member of the hash table */
-void hash_for_each(struct hashtable *hash, void func(void*));
+void hash_for_each(struct hashtable *hash, void func(void *, void *),
+				   void *opaque);
 /* Same, but removes the item too */
-void hash_for_each_remove(struct hashtable *hash, void func(void*));
+void hash_for_each_remove(struct hashtable *hash, void func(void *, void *),
+						  void *opaque);
 
 /*
  * Copyright (c) 2002, 2004, Christopher Clark
