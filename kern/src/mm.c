@@ -359,6 +359,18 @@ void print_vmrs(struct proc *p)
 		       vmr->vm_file, vmr->vm_foff);
 }
 
+void enumerate_vmrs(struct proc *p,
+					void (*func)(struct vm_region *vmr, void *opaque),
+					void *opaque)
+{
+	struct vm_region *vmr;
+
+	spin_lock(&p->vmr_lock);
+	TAILQ_FOREACH(vmr, &p->vm_regions, vm_link)
+		func(vmr, opaque);
+	spin_unlock(&p->vmr_lock);
+}
+
 /* Error values aren't quite comprehensive - check man mmap() once we do better
  * with the FS.
  *

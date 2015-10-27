@@ -50,6 +50,9 @@ void isolate_vmrs(struct proc *p, uintptr_t va, size_t len);
 void unmap_and_destroy_vmrs(struct proc *p);
 int duplicate_vmrs(struct proc *p, struct proc *new_p);
 void print_vmrs(struct proc *p);
+void enumerate_vmrs(struct proc *p,
+					void (*func)(struct vm_region *vmr, void *opaque),
+					void *opaque);
 
 /* mmap() related functions.  These manipulate VMRs and change the hardware page
  * tables.  Any requests below the LOWEST_VA will silently be upped.  This may
