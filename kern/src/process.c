@@ -2245,6 +2245,48 @@ void print_allpids(void)
 	spin_unlock(&pid_hash_lock);
 }
 
+void proc_get_set(struct process_set *pset)
+{
+	void enum_proc(void *item, void *opaque)
+	{
+		struct proc *p = (struct proc*) item;
+		struct process_set *pset = (struct process_set *) opaque;
+
+		if (pset->num_processes < pset->size) {
+			proc_incref(p, 1);
+
+			pset->procs[pset->num_processes] = p;
+			pset->num_processes++;
+		}
+	}
+
+	static const size_t num_extra_alloc = 16;
+
+	pset->procs = NULL;
+	do {
+		if (pset->procs)
+			proc_free_set(pset);
+		pset->size = atomic_read(&num_envs) + num_extra_alloc;
+		pset->num_processes = 0;
+		pset->procs = (struct proc **)
+			kzmalloc(pset->size * sizeof(struct proc *), KMALLOC_WAIT);
+		if (!pset->procs)
+			error(-ENOMEM, NULL);
+
+		spin_lock(&pid_hash_lock);
+		hash_for_each(pid_hash, enum_proc, pset);
+		spin_unlock(&pid_hash_lock);
+
+	} while (pset->num_processes == pset->size);
+}
+
+void proc_free_set(struct process_set *pset)
+{
+	for (size_t i = 0; i < pset->num_processes; i++)
+		proc_decref(pset->procs[i]);
+	kfree(pset->procs);
+}
+
 void print_proc_info(pid_t pid)
 {
 	int j = 0;

@@ -53,6 +53,12 @@
 
 #include <env.h>
 
+struct process_set {
+	size_t num_processes;
+	size_t size;
+	struct proc **procs;
+};
+
 /* Can use a htable iterator to iterate through all active procs */
 extern struct hashtable *pid_hash;
 extern spinlock_t pid_hash_lock;
@@ -91,6 +97,8 @@ bool __proc_is_mcp(struct proc *p);
 bool proc_is_vcctx_ready(struct proc *p);
 int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
                          bool enable_my_notif);
+void proc_get_set(struct process_set *pset);
+void proc_free_set(struct process_set *pset);
 
 /* Vcoremap info: */
 uint32_t proc_get_vcoreid(struct proc *p);
