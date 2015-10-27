@@ -1309,27 +1309,31 @@ int pthread_kill(pthread_t thread, int signo)
 
 int pthread_sigmask(int how, const sigset_t *set, sigset_t *oset)
 {
-	sigset_t *sigmask;
-	if (how != SIG_BLOCK && how != SIG_SETMASK && how != SIG_UNBLOCK) {
+	sigset_t *sigmask = &((struct pthread_tcb*)current_uthread)->sigmask;
+
+	if (set && (how != SIG_BLOCK) &&
+	          (how != SIG_SETMASK) &&
+	          (how != SIG_UNBLOCK)) {
 		errno = EINVAL;
 		return -1;
 	}
-	sigmask = &((struct pthread_tcb*)current_uthread)->sigmask;
 
 	if (oset)
 		*oset = *sigmask;
-	switch (how) {
-		case SIG_BLOCK:
-			*sigmask = *sigmask | *set;
-			break;
-		case SIG_SETMASK:
-			*sigmask = *set;
-			break;
-		case SIG_UNBLOCK:
-			*sigmask = *sigmask & ~(*set);
-			break;
+	if (set) {
+		switch (how) {
+			case SIG_BLOCK:
+				*sigmask = *sigmask | *set;
+				break;
+			case SIG_SETMASK:
+				*sigmask = *set;
+				break;
+			case SIG_UNBLOCK:
+				*sigmask = *sigmask & ~(*set);
+				break;
+		}
 	}
-	// Ensures any signals we just unmasked get processed if they are pending
+	/* Ensures any pending signals we unmasked get processed  */
 	pthread_yield();
 	return 0;
 }
