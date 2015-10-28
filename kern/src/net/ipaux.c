@@ -279,8 +279,8 @@ uint16_t ptclcsum_one(struct block *bp, int offset, int len)
 			hisum += ptclbsum(addr, x);
 		else
 			losum += ptclbsum(addr, x);
+		odd = (odd + x) & 1;
 		len -= x;
-
 	}
 	losum += hisum >> 8;
 	losum += (hisum & 0xff) << 8;
