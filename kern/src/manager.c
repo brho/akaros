@@ -42,7 +42,7 @@ void manager(void)
 	#define MANAGER_FUNC(dev) PASTE(manager_,dev)
 
 	#if !defined(DEVELOPER_NAME) && \
-	    (defined(CONFIG_KERNEL_POSTBOOT_TESTING) || \
+	    (defined(CONFIG_KERNEL_TESTING) || \
 	     defined(CONFIG_USERSPACE_TESTING))
 		#define DEVELOPER_NAME jenkins
 	#endif
