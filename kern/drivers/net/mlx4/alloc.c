@@ -179,7 +179,7 @@ int mlx4_bitmap_init(struct mlx4_bitmap *bitmap, uint32_t num, uint32_t mask,
 	bitmap->reserved_top = reserved_top;
 	bitmap->avail = num - reserved_top - reserved_bot;
 	bitmap->effective_len = bitmap->avail;
-	spinlock_init_irqsave(&bitmap->lock);
+	spinlock_init(&bitmap->lock);
 	bitmap->table = kzmalloc(BITS_TO_LONGS(bitmap->max) * sizeof(long),
 				 KMALLOC_WAIT);
 	if (!bitmap->table)
@@ -227,7 +227,7 @@ struct mlx4_zone_allocator *mlx4_zone_allocator_create(enum mlx4_zone_alloc_flag
 
 	INIT_LIST_HEAD(&zones->entries);
 	INIT_LIST_HEAD(&zones->prios);
-	spinlock_init_irqsave(&zones->lock);
+	spinlock_init(&zones->lock);
 	zones->last_uid = 0;
 	zones->mask = 0;
 	zones->flags = flags;

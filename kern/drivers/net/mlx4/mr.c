@@ -99,7 +99,7 @@ static int mlx4_buddy_init(struct mlx4_buddy *buddy, int max_order)
 	int i, s;
 
 	buddy->max_order = max_order;
-	spinlock_init_irqsave(&buddy->lock);
+	spinlock_init(&buddy->lock);
 
 	buddy->bits = kzmalloc((buddy->max_order + 1) * (sizeof(long *)),
 			       KMALLOC_WAIT);

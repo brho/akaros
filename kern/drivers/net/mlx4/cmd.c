@@ -2483,7 +2483,7 @@ int mlx4_cmd_init(struct mlx4_dev *dev)
 
 	if (!priv->cmd.initialized) {
 		qlock_init(&priv->cmd.slave_cmd_mutex);
-		sema_init(&priv->cmd.poll_sem, 1);
+		sem_init(&priv->cmd.poll_sem, 1);
 		priv->cmd.use_events = 0;
 		priv->cmd.toggle     = 1;
 		priv->cmd.initialized = 1;
@@ -2624,8 +2624,8 @@ int mlx4_cmd_use_events(struct mlx4_dev *dev)
 	priv->cmd.context[priv->cmd.max_cmds - 1].next = -1;
 	priv->cmd.free_head = 0;
 
-	sema_init(&priv->cmd.event_sem, priv->cmd.max_cmds);
-	spinlock_init_irqsave(&priv->cmd.context_lock);
+	sem_init(&priv->cmd.event_sem, priv->cmd.max_cmds);
+	spinlock_init(&priv->cmd.context_lock);
 
 	for (priv->cmd.token_mask = 1;
 	     priv->cmd.token_mask < priv->cmd.max_cmds;
