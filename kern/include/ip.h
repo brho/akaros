@@ -672,6 +672,10 @@ static inline void ptclcsum_finalize(struct block *bp, unsigned int feat)
 
 	if (flag && (flag & feat) != flag) {
 		csum_store = bp->rp + bp->checksum_start + bp->checksum_offset;
+		/* NOTE pseudo-header partial checksum (if any) is already placed at
+		 * csum_store (e.g. tcpcksum), and the ptclcsum() below will include
+		 * that partial checksum as part of the calculation.
+		 */
 		hnputs((uint16_t *)csum_store,
 		       ptclcsum(bp, bp->checksum_start,
 				BLEN(bp) - bp->checksum_start));
