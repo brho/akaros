@@ -2990,9 +2990,13 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 		dev->hw_features |= NETIF_F_TSO | NETIF_F_TSO6;
 
 	dev->hw_features |= NETIF_F_RXCSUM | NETIF_F_RXHASH;
+#if 0 // AKAROS_PORT
 	dev->feat = dev->hw_features | NETIF_F_HIGHDMA |
 			NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX |
 			NETIF_F_HW_VLAN_CTAG_FILTER;
+#else
+	dev->feat = NETIF_F_SG;
+#endif
 	dev->hw_features |= NETIF_F_LOOPBACK |
 			NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX;
 
