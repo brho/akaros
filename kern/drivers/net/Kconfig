@@ -22,3 +22,10 @@ config MLX4_EN
 config MLX4_CORE
 	tristate
 	default n
+
+config MLX4_DEFAULT_MGM_LOG_ENTRY_SIZE
+	int "Default log mgm size (num of qp per mcg)"
+	depends on MLX4_CORE
+	default 10
+	help
+		To activate device managed flow steering when available, set to -1.
