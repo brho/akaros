@@ -5,4 +5,4 @@ menuconfig KERNEL_TESTING
         Run unit tests for the kernel
 
 source "kern/src/ktest/Kconfig.postboot"
-
+source "kern/src/ktest/Kconfig.net"

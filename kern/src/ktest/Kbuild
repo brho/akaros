@@ -1,2 +1,3 @@
 obj-y							+= ktest.o
 obj-$(CONFIG_PB_KTESTS)			+= pb_ktests.o
+obj-$(CONFIG_NET_KTESTS)		+= net_ktests.o
