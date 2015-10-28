@@ -307,7 +307,7 @@ netifread(struct ether *nif, struct chan *c, void *a, long n,
 			if (nif->feat & NETF_UDPCK)
 				j += snprintf(p + j, READSTR - j, "udpck ");
 			if (nif->feat & NETF_TCPCK)
-				j += snprintf(p + j, READSTR - j, "tcppck ");
+				j += snprintf(p + j, READSTR - j, "tcpck ");
 			if (nif->feat & NETF_PADMIN)
 				j += snprintf(p + j, READSTR - j, "padmin ");
 			if (nif->feat & NETF_SG)
