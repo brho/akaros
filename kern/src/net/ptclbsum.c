@@ -212,6 +212,8 @@ uint16_t ptclbsum(uint8_t * addr, int len)
 	uint64_t sum = in_cksumdata(addr, len);
 	union q_util q_util;
 	union l_util l_util;
+	if ((uintptr_t)addr & 1)
+		sum <<= 8;
 	REDUCE16;
 	return cpu_to_be16(sum);
 }
