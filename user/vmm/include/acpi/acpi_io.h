@@ -1,5 +1,4 @@
-#ifndef _ACPI_IO_H_
-#define _ACPI_IO_H_
+#pragma once
 
 #include <linux/io.h>
 
@@ -20,5 +19,3 @@ void __iomem *acpi_os_get_iomem(acpi_physical_address phys, unsigned int size);
 
 int acpi_os_map_generic_address(struct acpi_generic_address *addr);
 void acpi_os_unmap_generic_address(struct acpi_generic_address *addr);
-
-#endif

@@ -19,8 +19,7 @@
  * See COPYING.LESSER for details on the GNU Lesser General Public License.
  * See COPYING for details on the GNU General Public License. */
 
-#ifndef PARLIB_SPINLOCK_H
-#define PARLIB_SPINLOCK_H
+#pragma once
 
 #include <parlib/arch/arch.h>
 #include <parlib/arch/atomic.h>
@@ -78,5 +77,3 @@ void spin_pdr_unlock(struct spin_pdr_lock *pdr_lock);
 bool spin_pdr_locked(struct spin_pdr_lock *pdr_lock);
 
 __END_DECLS
-
-#endif /* PARLIB_SPINLOCK_H */

@@ -1,5 +1,4 @@
-#ifndef _ASM_GENERIC_IOCTL_H
-#define _ASM_GENERIC_IOCTL_H
+#pragma once
 
 /* ioctl command encoding: 32 bits total, command in lower 16 bits,
  * size of the parameter structure in the lower 14 bits of the
@@ -92,5 +91,3 @@
 #define IOC_INOUT	((_IOC_WRITE|_IOC_READ) << _IOC_DIRSHIFT)
 #define IOCSIZE_MASK	(_IOC_SIZEMASK << _IOC_SIZESHIFT)
 #define IOCSIZE_SHIFT	(_IOC_SIZESHIFT)
-
-#endif /* _ASM_GENERIC_IOCTL_H */

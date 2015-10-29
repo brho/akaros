@@ -7,8 +7,7 @@
  * and not to be called by the main kernel.  Other functions are part of the
  * kernel-arch interface. */
 
-#ifndef ROS_KERN_ARCH_TRAP64_H
-#define ROS_KERN_ARCH_TRAP64_H
+#pragma once
 
 #ifndef ROS_KERN_ARCH_TRAP_H
 #error "Do not include arch/trap64.h directly."
@@ -108,5 +107,3 @@ static inline void x86_set_stacktop_tss(struct taskstate *tss, uintptr_t top)
 {
 	tss->ts_rsp0 = top;
 }
-
-#endif /* ROS_KERN_ARCH_TRAP64_H */

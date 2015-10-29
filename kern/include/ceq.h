@@ -7,12 +7,9 @@
  *
  * Kernel side (producer) */
 
-#ifndef ROS_KERN_CEQ_H
-#define ROS_KERN_CEQ_H
+#pragma once
 
 #include <ros/ceq.h>
 #include <process.h>
 
 void send_ceq_msg(struct ceq *ceq, struct proc *p, struct event_msg *msg);
-
-#endif /* ROS_KERN_CEQ_H */

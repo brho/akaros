@@ -1,5 +1,4 @@
-#ifndef ROS_INC_ARCH_MMU64_H
-#define ROS_INC_ARCH_MMU64_H
+#pragma once
 
 #ifndef ROS_INC_ARCH_MMU_H
 #error "Do not include include ros/arch/mmu64.h directly"
@@ -526,5 +525,3 @@ typedef struct Pseudodesc {
 
 /* TLS 'syscall', coupled to trapentry64.S.  Needed a non-canon 'addr' */
 #define FASTCALL_SETFSBASE 0xf0f0000000000001
-
-#endif /* ROS_INC_ARCH_MMU64_H */

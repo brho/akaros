@@ -5,8 +5,7 @@
  * Struct for the BCQ.  Needs to be in its own file so glibc doesn't try to
  * include any of the atomics needed for the actual BCQ operations.  */
 
-#ifndef ROS_INC_BCQ_STRUCT_H
-#define ROS_INC_BCQ_STRUCT_H
+#pragma once
 
 #include <ros/common.h>
 
@@ -29,5 +28,3 @@ struct __name##_bcq {                                                          \
 	struct bcq_header hdr;                                                     \
 	struct __name##_bcq_wrap wraps[__num_elems];                               \
 };                                                                             
-                                                                               
-#endif /* !ROS_INC_BCQ_STRUCT_H */

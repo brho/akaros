@@ -7,8 +7,7 @@
  * @author John Levon <levon@movementarian.org>
  */
 
-#ifndef OPROF_H
-#define OPROF_H
+#pragma once
 
 int oprofile_setup(void);
 void oprofile_shutdown(void);
@@ -32,5 +31,3 @@ int op_nmi_timer_init(void);
 
 int oprofile_set_ulong(unsigned long *addr, unsigned long val);
 int oprofile_set_timeout(unsigned long time);
-
-#endif /* OPROF_H */

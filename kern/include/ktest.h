@@ -1,5 +1,4 @@
-#ifndef ROS_INC_KTEST_H
-#define ROS_INC_KTEST_H
+#pragma once
 
 /*
  * Header file with infrastructure needed for kernel unit tests:
@@ -62,5 +61,3 @@ extern char ktest_msg[1024];
 void register_ktest_suite(struct ktest_suite *suite);
 void run_ktest_suite(struct ktest_suite *suite);
 void run_registered_ktest_suites();
-
-#endif // ROS_INC_KTEST_H

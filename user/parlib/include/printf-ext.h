@@ -9,8 +9,7 @@
  * 		register_printf_specifier('i', printf_ipaddr, printf_ipaddr_info);
  */
 
-#ifndef PARLIB_PRINTF_EXT_H
-#define PARLIB_PRINTF_EXT_H
+#pragma once
 
 #include <parlib/common.h>
 #include <printf.h>
@@ -42,5 +41,3 @@ int printf_errstr_info(const struct printf_info* info, size_t n, int *argtypes,
                        int *size);
 
 __END_DECLS
-
-#endif /* PARLIB_PRINTF_EXT_H */

@@ -1,5 +1,4 @@
-#ifndef _ROS_ERRNO_H
-#define _ROS_ERRNO_H
+#pragma once
 
 /* If you edit this file, be careful of tabs vs spaces.  This is processed by
  * scripts/make_errlist.c, which you need to run if you want glibc strerrno() to
@@ -155,5 +154,3 @@
 #define	ENOFREEPID		135	/* No free pid */
 #define	EUNSPECIFIED	136	/* Unspecified */
 #define	EMORON			137	/* Moron */
-
-#endif

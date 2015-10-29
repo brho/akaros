@@ -7,8 +7,7 @@
  * @author Kevin Klues <klueska@cs.berkeley.edu>
  */
  
-#ifndef ROS_KERN_COLORED_PAGE_ALLOC_H
-#define ROS_KERN_COLORED_PAGE_ALLOC_H
+#pragma once
 
 #include <colored_caches.h>
 #include <arch/colored_page_alloc.h>
@@ -67,5 +66,3 @@ error_t _cache##_page_alloc(page_t** page, size_t color)                      \
 		   _cache##_cache_colored_pg_link                                   \
 		);                                                                    \
 	}
-
-#endif // ROS_KERN_COLORED_PAGE_ALLOC_H

@@ -1,5 +1,4 @@
-#ifndef COREBOOT_TABLES_H
-#define COREBOOT_TABLES_H
+#pragma once
 
 #include <stdint.h>
 #include <parlib/common.h>
@@ -402,4 +401,3 @@ void lb_table_add_macs_from_vpd(struct lb_header *header);
 void lb_table_add_serialno_from_vpd(struct lb_header *header);
 
 struct lb_record *lb_new_record(struct lb_header *header);
-#endif

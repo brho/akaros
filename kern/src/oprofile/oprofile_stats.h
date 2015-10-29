@@ -7,8 +7,7 @@
  * @author John Levon
  */
 
-#ifndef OPROFILE_STATS_H
-#define OPROFILE_STATS_H
+#pragma once
 
 #include <linux/atomic.h>
 
@@ -30,5 +29,3 @@ struct dentry;
 
 /* create the stats/ dir */
 void oprofile_create_stats_files(struct super_block *sb, struct dentry *root);
-
-#endif /* OPROFILE_STATS_H */

@@ -1,7 +1,6 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef ROS_KERN_KCLOCK_H
-#define ROS_KERN_KCLOCK_H
+#pragma once
 #ifndef ROS_KERNEL
 # error "This is a ROS kernel header; user programs should not #include it"
 #endif
@@ -29,5 +28,3 @@
 unsigned mc146818_read(unsigned reg);
 void mc146818_write(unsigned reg, unsigned datum);
 void kclock_init(void);
-
-#endif	// !ROS_KERN_KCLOCK_H

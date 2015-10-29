@@ -1,5 +1,4 @@
-#ifndef ROS_INC_RISCV_H
-#define ROS_INC_RISCV_H
+#pragma once
 
 #include <arch/pcr.h>
 
@@ -51,5 +50,3 @@ clear_ipi()
 {
 	mtpcr(PCR_CLR_IPI, 0);
 }
-
-#endif

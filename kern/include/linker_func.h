@@ -27,8 +27,7 @@
  *
  * For now, all levels are run sequentially, and with interrupts enabled. */
 
-#ifndef ROS_KERN_LINKER_FUNC_H
-#define ROS_KERN_LINKER_FUNC_H
+#pragma once
 
 #define __linkerfunc1  __attribute__((__section__(".linkerfunc1")))
 #define __linkerfunc2  __attribute__((__section__(".linkerfunc2")))
@@ -65,5 +64,3 @@ extern linker_func_t __linkerfunc3start[];
 extern linker_func_t __linkerfunc3end[];
 extern linker_func_t __linkerfunc4start[];
 extern linker_func_t __linkerfunc4end[];
-
-#endif /* ROS_KERN_LINKER_FUNC_H */

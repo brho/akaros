@@ -1,5 +1,4 @@
-#ifndef ROS_INC_ARCH_TRAPFRAME_H
-#define ROS_INC_ARCH_TRAPFRAME_H
+#pragma once
 
 #ifndef ROS_INC_TRAPFRAME_H
 #error "Do not include include ros/arch/trapframe.h directly"
@@ -36,5 +35,3 @@ typedef struct ancillary_state
 	uint64_t fpr[32];
 	uint32_t fsr;
 } ancillary_state_t;
-
-#endif /* ROS_INC_ARCH_TRAPFRAME_H */

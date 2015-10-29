@@ -1,7 +1,6 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef ROS_INC_ASSERT_H
-#define ROS_INC_ASSERT_H
+#pragma once
 
 void ( _warn)(const char *, int, const char *, ...);
 void ( _panic)(const char *, int, const char *, ...)
@@ -25,5 +24,3 @@ void ( _panic)(const char *, int, const char *, ...)
 #else
 #define dassert(x) ((void) (x))  // 'Use' value, stop compile warnings
 #endif /* DEVELOPMENT_ASSERTIONS */
-
-#endif /* !ROS_INC_ASSERT_H */

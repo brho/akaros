@@ -1,5 +1,4 @@
-#ifndef PARLIB_ARCH_BITMASK_H
-#define PARLIB_ARCH_BITMASK_H
+#pragma once
 
 #include <string.h>
 #include <sys/types.h>
@@ -92,5 +91,3 @@ static inline bool BITMASK_IS_FULL(uint8_t* map, size_t size)
 }
 
 __END_DECLS
-
-#endif /* PARLIB_ARCH_BITMASK_H */

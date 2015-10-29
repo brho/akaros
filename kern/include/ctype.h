@@ -1,5 +1,4 @@
-#ifndef _LINUX_CTYPE_H
-#define _LINUX_CTYPE_H
+#pragma once
 
 /*
  * NOTE! This ctype does not handle EOF like the standard C
@@ -66,5 +65,3 @@ static inline int isodigit(const char c)
 {
 	return c >= '0' && c <= '7';
 }
-
-#endif

@@ -6,8 +6,7 @@
  * implemented as a stack.
  */
 
-#ifndef ROS_KERN_SMALLIDPOOL_H
-#define ROS_KERN_SMALLIDPOOL_H
+#pragma once
 
 #define MAX_U16_POOL_SZ (1 << 16)
 
@@ -36,5 +35,3 @@ struct u16_pool {
 struct u16_pool *create_u16_pool(unsigned int size);
 int get_u16(struct u16_pool *id);
 void put_u16(struct u16_pool *id, int v);
-
-#endif /* ROS_KERN_SMALLIDPOOL_H */

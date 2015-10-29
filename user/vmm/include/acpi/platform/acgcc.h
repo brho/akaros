@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACGCC_H__
-#define __ACGCC_H__
+#pragma once
 
 #define ACPI_INLINE             __inline__
 
@@ -74,5 +73,3 @@
 #ifdef strchr
 #undef strchr
 #endif
-
-#endif				/* __ACGCC_H__ */

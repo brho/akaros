@@ -31,8 +31,7 @@
  *
  */
 
-#ifndef _MLX4_EN_H_
-#define _MLX4_EN_H_
+#pragma once
 
 #include <linux/mlx4/device.h>
 #include <linux/mlx4/qp.h>
@@ -891,5 +890,3 @@ do {									\
 #define mlx4_warn(mdev, format, ...)					\
 	pr_warn(DRV_NAME " %s: " format,				\
 		dev_name(&(mdev)->pdev->dev), ##__VA_ARGS__)
-
-#endif

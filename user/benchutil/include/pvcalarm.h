@@ -2,8 +2,7 @@
  * Kevin Klues <klueska@cs.berkeley.edu>
  * See LICENSE for details. */
 
-#ifndef BENCHUTIL_PVCALARM_H
-#define BENCHUTIL_PVCALARM_H
+#pragma once
 
 #include <stdint.h>
  
@@ -30,5 +29,3 @@ int enable_pvcalarms(int policy, uint64_t interval, void (*callback) (void));
 int disable_pvcalarms();
 
 __END_DECLS
-
-#endif /* BENCHUTIL_PVCALARM_H */

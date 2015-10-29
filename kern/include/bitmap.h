@@ -1,5 +1,4 @@
-#ifndef __LINUX_BITMAP_H
-#define __LINUX_BITMAP_H
+#pragma once
 
 #include <bitops.h>
 
@@ -298,5 +297,3 @@ static inline int bitmap_parse(const char *buf, unsigned int buflen,
 {
 	return __bitmap_parse(buf, buflen, 0, maskp, nmaskbits);
 }
-
-#endif /* __LINUX_BITMAP_H */

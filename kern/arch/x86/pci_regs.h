@@ -19,8 +19,7 @@
  *	The HyperTransport I/O Link Specification
  */
 
-#ifndef LINUX_PCI_REGS_H
-#define LINUX_PCI_REGS_H
+#pragma once
 
 /*
  * Under PCI, each device has 256 bytes of configuration address space,
@@ -899,5 +898,3 @@
 #define PCI_TPH_CAP_ST_MASK	0x07FF0000	/* st table mask */
 #define PCI_TPH_CAP_ST_SHIFT	16	/* st table shift */
 #define PCI_TPH_BASE_SIZEOF	12	/* size with no st table */
-
-#endif /* LINUX_PCI_REGS_H */

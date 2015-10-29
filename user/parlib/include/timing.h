@@ -1,5 +1,4 @@
-#ifndef PARLIB_TIMING_H
-#define PARLIB_TIMING_H
+#pragma once
 
 #include <stdint.h>
 #include <parlib/tsc-compat.h>
@@ -22,5 +21,3 @@ uint64_t usec2tsc(uint64_t usec);
 uint64_t nsec2tsc(uint64_t nsec);
 
 __END_DECLS
-
-#endif /* PARLIB_TIMING_H */

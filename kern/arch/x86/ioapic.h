@@ -7,8 +7,7 @@
  * in the LICENSE file.
  */
 
-#ifndef ROS_KERN_IOAPIC_H
-#define ROS_KERN_IOAPIC_H
+#pragma once
 
 #include <atomic.h>
 #include <arch/apic.h>
@@ -62,5 +61,3 @@ void ioapicinit(int id, int ibase, uintptr_t pa);
 void ioapicrdtr(struct apic*, int unused_int, int*, int*);
 void ioapicrdtw(struct apic*, int unused_int, int, int);
 char *ioapicdump(char *start, char *end);
-
-#endif /* ROS_KERN_IOAPIC_H */

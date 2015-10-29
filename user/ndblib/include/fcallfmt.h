@@ -1,5 +1,4 @@
-#ifndef NDBLIB_FCALLFMT_H
-#define NDBLIB_FCALLFMT_H
+#pragma once
 
 #include <parlib/printf-ext.h>
 #include <fcall.h>
@@ -18,5 +17,3 @@ int printf_dir_info(const struct printf_info* info, size_t n, int *argtypes,
 int read9pmsg(int, void *, unsigned int);
 
 __END_DECLS
-
-#endif /* NDBLIB_FCALLFMT_H */

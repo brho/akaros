@@ -1,4 +1,5 @@
-#ifndef ROS_INC_TRAPFRAME_H
+#pragma once
+
 #define ROS_INC_TRAPFRAME_H
 
 #include <ros/arch/trapframe.h>
@@ -15,5 +16,3 @@ struct user_context {
 		struct sw_trapframe		sw_tf;
 	} tf;
 };
-
-#endif /* ROS_INC_TRAPFRAME_H */

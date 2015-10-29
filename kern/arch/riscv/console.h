@@ -1,7 +1,6 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef _CONSOLE_H_
-#define _CONSOLE_H_
+#pragma once
 #ifndef ROS_KERNEL
 # error "This is a ROS kernel header; user programs should not #include it"
 #endif
@@ -15,5 +14,3 @@
 void cons_init(void);
 /* Returns any available character, or 0 for none (legacy helper) */
 int cons_get_any_char(void);
-
-#endif /* _CONSOLE_H_ */

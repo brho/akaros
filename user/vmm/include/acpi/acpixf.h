@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACXFACE_H__
-#define __ACXFACE_H__
+#pragma once
 
 /* Current ACPICA subsystem version in YYYYMMDD format */
 
@@ -910,5 +909,3 @@ ACPI_EXTERNAL_RETURN_STATUS(acpi_status
 					       acpi_object_handler handler,
 					       void **data,
 					       void (*callback)(void *)))
-
-#endif				/* __ACXFACE_H__ */

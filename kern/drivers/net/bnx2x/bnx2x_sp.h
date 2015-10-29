@@ -16,8 +16,7 @@
  * Written by: Vladislav Zolotarov
  *
  */
-#ifndef BNX2X_SP_VERBS
-#define BNX2X_SP_VERBS
+#pragma once
 
 struct bnx2x;
 struct eth_context;
@@ -1501,5 +1500,3 @@ int bnx2x_config_rss(struct bnx2x *bp,
  */
 void bnx2x_get_rss_ind_table(struct bnx2x_rss_config_obj *rss_obj,
 			     uint8_t *ind_table);
-
-#endif /* BNX2X_SP_VERBS */

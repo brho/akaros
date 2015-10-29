@@ -32,8 +32,7 @@
  * SOFTWARE.
  */
 
-#ifndef MLX4_FW_QOS_H
-#define MLX4_FW_QOS_H
+#pragma once
 
 #include <linux/mlx4/cmd.h>
 #include <linux/mlx4/device.h>
@@ -144,5 +143,3 @@ int mlx4_SET_VPORT_QOS_get(struct mlx4_dev *dev, uint8_t port, uint8_t vport,
  **/
 int mlx4_SET_VPORT_QOS_set(struct mlx4_dev *dev, uint8_t port, uint8_t vport,
 			   struct mlx4_vport_qos_param *in_param);
-
-#endif /* MLX4_FW_QOS_H */

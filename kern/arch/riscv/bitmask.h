@@ -1,5 +1,4 @@
-#ifndef ROS_ARCH_BITMASK_H
-#define ROS_ARCH_BITMASK_H
+#pragma once
 
 #include <string.h>
 #include <sys/types.h>
@@ -99,5 +98,3 @@ static inline bool BITMASK_IS_FULL(volatile uint8_t *map, size_t size)
 	} \
 	printk("\n"); \
 }
-
-#endif /* ROS_ARCH_BITMASK_H */

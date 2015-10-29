@@ -6,8 +6,7 @@
  * reason, usually during blocking IO operations.  Check out
  * Documentation/kthreads.txt for more info than you care about. */
 
-#ifndef ROS_KERN_KTHREAD_H
-#define ROS_KERN_KTHREAD_H
+#pragma once
 
 #include <ros/common.h>
 #include <trap.h>
@@ -151,5 +150,3 @@ typedef struct semaphore qlock_t;
 #define qunlock(x) sem_up(x)
 #define canqlock(x) sem_trydown(x)
 #define QLOCK_INITIALIZER(name) SEMAPHORE_INITIALIZER(name, 1)
-
-#endif /* ROS_KERN_KTHREAD_H */

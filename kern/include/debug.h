@@ -30,8 +30,7 @@
  *  
  *
  */
-#ifndef __LWIP_DEBUG_H__
-#define __LWIP_DEBUG_H__
+#pragma once
 
 #define LWIP_PLATFORM_ASSERT(x)  assert(x)
 
@@ -93,6 +92,3 @@
 #else  /* LWIP_DEBUG */
 #define LWIP_DEBUGF(debug, message) 
 #endif /* LWIP_DEBUG */
-
-#endif /* __LWIP_DEBUG_H__ */
-

@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACBUFFER_H__
-#define __ACBUFFER_H__
+#pragma once
 
 /*
  * Contains buffer structures for these predefined names:
@@ -239,5 +238,3 @@ struct acpi_pld_info {
 
 #define ACPI_PLD_GET_HORIZ_OFFSET(dword)        ACPI_GET_BITS (dword, 16, ACPI_16BIT_MASK)
 #define ACPI_PLD_SET_HORIZ_OFFSET(dword,value)  ACPI_SET_BITS (dword, 16, ACPI_16BIT_MASK, value)	/* Offset 128+16=144, Len 16 */
-
-#endif				/* ACBUFFER_H */

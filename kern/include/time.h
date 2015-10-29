@@ -1,5 +1,4 @@
-#ifndef ROS_KERN_TIME_H
-#define ROS_KERN_TIME_H
+#pragma once
 
 #include <ros/common.h>
 #include <ros/time.h>
@@ -86,4 +85,3 @@ typedef struct Timer{
 })
 
 #endif
-#endif /* ROS_KERN_TIME_H */

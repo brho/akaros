@@ -1,5 +1,4 @@
-#ifndef ROS_INC_SYSCALL_H
-#define ROS_INC_SYSCALL_H
+#pragma once
 
 #include <ros/bits/syscall.h>
 #include <ros/arch/syscall.h>
@@ -55,5 +54,3 @@ struct argenv {
 /* Temp hack, til the rest of glibc/userspace uses sys/syscall.h */
 #include <sys/syscall.h>
 #endif /* ifndef ROS_KERNEL */
-
-#endif /* ROS_INC_SYSCALL_H */

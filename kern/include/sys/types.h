@@ -1,8 +1,7 @@
 /* This exists so we can conveniently call for sys/types.h in headers shared by
  * both the kernel and userspace.  This is the kernel's version. */
 
-#ifndef _ROS_SYS_TYPES_H
-#define _ROS_SYS_TYPES_H
+#pragma once
 
 #include <ros/common.h>
 #include <arch/types.h>
@@ -33,5 +32,3 @@ typedef uint16_t __be16;
 #define TiB	1099511627776ull
 #define PiB	1125899906842624ull
 #define EiB	1152921504606846976ull
-
-#endif /* _ROS_SYS_TYPES_H */

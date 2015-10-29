@@ -1,5 +1,4 @@
-#ifndef ROS_KERN_CPIO_H
-#define ROS_KERN_CPIO_H
+#pragma once
 
 #define CPIO_NEW_ASCII	070701
 #define CPIO_CRC_ASCII	070702
@@ -63,5 +62,3 @@ static inline long cpio_strntol(char *buf, char *src, size_t n)
 	buf[n] = '\0';
 	return strtol(buf, 0, 16);
 }
-
-#endif	/* ROS_KERN_CPIO_H */

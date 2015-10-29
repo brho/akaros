@@ -1,11 +1,7 @@
-#ifndef __ACPI_REBOOT_H
-#define __ACPI_REBOOT_H
+#pragma once
 
 #ifdef CONFIG_ACPI
 extern void acpi_reboot(void);
 #else
 static inline void acpi_reboot(void) { }
 #endif
-
-#endif
-

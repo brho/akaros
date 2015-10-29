@@ -7,8 +7,7 @@
  * This is a cheap FS that is based off of a CPIO archive appended to the end of
  * the kernel binary image. */
 
-#ifndef ROS_KERN_KFS_H
-#define ROS_KERN_KFS_H
+#pragma once
 
 #include <ros/common.h>
 #include <vfs.h>
@@ -83,5 +82,3 @@ ssize_t kfs_writev(struct file *file, const struct iovec *vector,
 ssize_t kfs_sendpage(struct file *file, struct page *page, int offset,
                      size_t size, off64_t pos, int more);
 int kfs_check_flags(int flags);
-
-#endif /* !ROS_KERN_KFS_H */

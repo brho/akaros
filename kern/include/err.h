@@ -1,7 +1,6 @@
 /* Plan9 style error popping.  For details, read Documentation/plan9.txt */
 
-#ifndef ROS_KERN_ERR_H
-#define ROS_KERN_ERR_H
+#pragma once
 
 #include <setjmp.h>
 #include <kthread.h>
@@ -25,5 +24,3 @@ struct errbuf *errpush(struct errbuf *errstack, int stacksize, int *curindex,
 						struct errbuf **prev_errbuf);
 struct errbuf *errpop(struct errbuf *errstack, int stacksize, int *curindex,
 					  struct errbuf *prev_errbuf);
-
-#endif /* ROS_KERN_ERR_H */

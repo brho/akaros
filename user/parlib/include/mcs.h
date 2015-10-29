@@ -1,5 +1,4 @@
-#ifndef PARLIB_MCS_H
-#define PARLIB_MCS_H
+#pragma once
 
 #include <parlib/vcore.h>
 #include <parlib/arch/arch.h>
@@ -112,5 +111,3 @@ void mcs_pdr_lock(struct mcs_pdr_lock *lock);
 void mcs_pdr_unlock(struct mcs_pdr_lock *lock);
 
 __END_DECLS
-
-#endif /* PARLIB_MCS_H */

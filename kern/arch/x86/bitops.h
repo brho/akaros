@@ -1,5 +1,4 @@
-#ifndef _X86_BITOPS_H
-#define _X86_BITOPS_H
+#pragma once
 
 /*
  * Copyright 1992, Linus Torvalds.
@@ -465,5 +464,3 @@ static __always_inline int fls64(uint64_t x)
 	    : "rm" (x));
 	return bitpos + 1;
 }
-
-#endif /* _ASM_X86_BITOPS_H */

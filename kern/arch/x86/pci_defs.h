@@ -1,5 +1,4 @@
-#ifndef ROS_ARCH_PCI_DEFS_H
-#define ROS_ARCH_PCI_DEFS_H
+#pragma once
 
 /* Pulled from: http://www.pcidatabase.com/pci_c_header.php.  Modified to make
  * it compile.  There are typos and whatnot.  If you notice some entry is wrong
@@ -8160,5 +8159,3 @@ char *	PciDevSelFlags [] =
 
 // Use this value for loop control during searching:
 #define	PCI_DEVSELFLAGS_LEN	(sizeof(PciDevSelFlags)/sizeof(char *))
-
-#endif /* ROS_ARCH_PCI_DEFS_H */

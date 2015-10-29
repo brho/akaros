@@ -34,8 +34,7 @@
  * SOFTWARE.
  */
 
-#if !defined(IB_SMI_H)
-#define IB_SMI_H
+#pragma once
 
 #include <linux/rdma/ib_mad.h>
 
@@ -124,5 +123,3 @@ ib_get_smp_direction(struct ib_smp *smp)
 {
 	return ((smp->status & IB_SMP_DIRECTION) == IB_SMP_DIRECTION);
 }
-
-#endif /* IB_SMI_H */

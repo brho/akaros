@@ -5,8 +5,7 @@
  * Kevin Klues <klueska@cs.berkeley.edu>    
  */
  
-#ifndef ROS_KERN_COLORED_CACHES_H
-#define ROS_KERN_COLORED_CACHES_H
+#pragma once
 
 #include <ros/common.h>
 #include <error.h>
@@ -74,6 +73,3 @@ inline size_t get_cache_bytes_per_way(cache_t *c);
 inline size_t get_cache_lines_per_way(cache_t *c);
 inline size_t get_cache_pages_per_way(cache_t *c);
 inline size_t get_cache_num_page_colors(cache_t *c);
-
-#endif // ROS_KERN_COLORED_CACHES_H
-

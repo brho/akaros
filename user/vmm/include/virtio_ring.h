@@ -1,5 +1,4 @@
-#ifndef _UAPI_LINUX_VIRTIO_RING_H
-#define _UAPI_LINUX_VIRTIO_RING_H
+#pragma once
 /* An interface for efficient virtio implementation, currently for use by KVM
  * and lguest, but hopefully others soon.  Do NOT change this since it will
  * break existing servers and clients.
@@ -167,5 +166,3 @@ static inline int vring_need_event(__u16 event_idx, __u16 new_idx, __u16 old)
 	 * event indexes in virtio start at 0. */
 	return (__u16)(new_idx - event_idx - 1) < (__u16)(new_idx - old);
 }
-
-#endif /* _UAPI_LINUX_VIRTIO_RING_H */

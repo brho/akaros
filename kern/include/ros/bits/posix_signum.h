@@ -1,5 +1,4 @@
-#ifndef ROS_INC_BITS_POSIX_SIGNUM_H
-#define ROS_INC_BITS_POSIX_SIGNUM_H
+#pragma once
 
 #ifdef ROS_KERNEL
 
@@ -49,5 +48,3 @@
 #define	WUNTRACED	2
 
 #endif /* ROS_KERNEL */
-
-#endif /* ROS_INC_BITS_POSIX_SIGNUM_H */

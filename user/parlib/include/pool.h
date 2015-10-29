@@ -1,8 +1,7 @@
 /* See COPYRIGHT for copyright information. */
 /* Kevin Klues <klueska@cs.berkeley.edu>	*/
 
-#ifndef PARLIB_POOL_H
-#define PARLIB_POOL_H
+#pragma once
 
 #include <string.h>
 
@@ -75,5 +74,3 @@ typedef struct struct_##p {                                                     
 #define POOL_MAX_SIZE(p) ((p)->size)
 
 __END_DECLS
-
-#endif /* PARLIB_POOL_H */

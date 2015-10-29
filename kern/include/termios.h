@@ -11,8 +11,7 @@
  * tell this is compatibility crap that I didn't write because it uses octal.
  * Bastages. */
 
-#ifndef ROS_KERN_TERMIOS_H
-#define ROS_KERN_TERMIOS_H
+#pragma once
 
 typedef unsigned char   cc_t;
 typedef unsigned int    speed_t;
@@ -188,5 +187,3 @@ struct termios
 #define	TCSANOW		0
 #define	TCSADRAIN	1
 #define	TCSAFLUSH	2
-
-#endif /* ROS_KERN_TERMIOS_H */

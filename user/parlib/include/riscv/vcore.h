@@ -1,5 +1,4 @@
-#ifndef PARLIB_ARCH_VCORE_H
-#define PARLIB_ARCH_VCORE_H
+#pragma once
 
 #include <parlib/common.h>
 #include <ros/trapframe.h>
@@ -139,5 +138,3 @@ static unsigned long __arch_refl_get_aux(struct user_context *ctx)
 }
 
 __END_DECLS
-
-#endif /* PARLIB_ARCH_VCORE_H */

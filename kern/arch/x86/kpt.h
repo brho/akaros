@@ -4,8 +4,7 @@
  *
  * 64 bit KPT helpers */
 
-#ifndef ROS_ARCH_KPT_H
-#define ROS_ARCH_KPT_H
+#pragma once
 
 #include <arch/ros/mmu64.h>
 
@@ -91,5 +90,3 @@ static inline void kpte_replace_perm(kpte_t *kpte, int perm)
 {
 	*kpte = (*kpte & ~PTE_PERM) | perm;
 }
-
-#endif /* ROS_ARCH_KPT_H */

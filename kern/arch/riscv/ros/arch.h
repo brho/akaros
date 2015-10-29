@@ -1,5 +1,4 @@
-#ifndef _ROS_ARCH_ARCH_H
-#define _ROS_ARCH_ARCH_H
+#pragma once
 
 #define MAX_NUM_CORES				16 // it's safe to change this as needed
 
@@ -18,5 +17,3 @@ static __inline void write_fsr(unsigned int fsr)
 }
 
 #endif /* !__ASSEMBLER__ */
-
-#endif

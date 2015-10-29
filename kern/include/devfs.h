@@ -6,8 +6,7 @@
  * needed/discovered devices in KFS in its /dev/ folder.  In the future, we
  * might want to do something like nodes like other Unixes. */
 
-#ifndef ROS_KERN_DEVFS_H
-#define ROS_KERN_DEVFS_H
+#pragma once
 
 #include <vfs.h>
 #include <kfs.h>
@@ -23,5 +22,3 @@ int dev_c_llseek(struct file *file, off64_t offset, off64_t *ret, int whence);
 
 /* Exporting these for convenience (process creation) */
 extern struct file *dev_stdin, *dev_stdout, *dev_stderr;
-
-#endif /* !ROS_KERN_DEVFS_H */

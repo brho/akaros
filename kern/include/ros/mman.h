@@ -8,8 +8,7 @@
  * issues with userspace.
  */
 
-#ifndef ROS_INCLUDE_MMAN_H
-#define ROS_INCLUDE_MMAN_H
+#pragma once
 
 /* Memory protection states (what you're allowed to do */
 #define PROT_READ		0x1
@@ -42,5 +41,3 @@
 /* Other mmap flags, which we probably won't support
 #define MAP_32BIT
 */
-
-#endif /* !ROS_INCLUDE_MMAN_H */

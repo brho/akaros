@@ -1,7 +1,6 @@
 // Arch specific struct definitions for setjmp/longjmp.
 
-#ifndef ROS_ARCH_SETJMP_H
-#define ROS_ARCH_SETJMP_H
+#pragma once
 
 #include <common.h>
 
@@ -30,5 +29,3 @@ static inline __ros_clobber_callee_regs(void)
 	asm volatile ("" : : : "ebx", "esi", "edi");
 }
 #endif
-
-#endif /* !ROS_ARCH_SETJMP_H */

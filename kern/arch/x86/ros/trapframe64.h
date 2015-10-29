@@ -1,5 +1,4 @@
-#ifndef ROS_INC_ARCH_TRAPFRAME64_H
-#define ROS_INC_ARCH_TRAPFRAME64_H
+#pragma once
 
 #ifndef ROS_INC_ARCH_TRAPFRAME_H
 #error "Do not include include ros/arch/trapframe64.h directly"
@@ -55,5 +54,3 @@ struct sw_trapframe {
 	uint16_t tf_fpucw;
 	uint16_t tf_padding0;
 };
-
-#endif /* ROS_INC_ARCH_TRAPFRAME64_H */

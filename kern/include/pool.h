@@ -1,8 +1,7 @@
 /* See COPYRIGHT for copyright information. */
 /* Kevin Klues <klueska@cs.berkeley.edu>	*/
 
-#ifndef ROS_INC_POOL_H
-#define ROS_INC_POOL_H
+#pragma once
 
 #include <string.h>
 
@@ -72,5 +71,3 @@ typedef struct struct_##p {                                                     
 #define POOL_EMPTY(p) ((p)->free == 0)
 #define POOL_SIZE(p) ((p)->free)
 #define POOL_MAX_SIZE(p) ((p)->size)
-
-#endif //ROS_INC_POOL_H

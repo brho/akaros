@@ -18,8 +18,7 @@
  * See COPYING for details on the GNU General Public License.
  */
 
-#ifndef PARLIB_DTLS_H
-#define PARLIB_DTLS_H
+#pragma once
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -51,5 +50,3 @@ void *get_dtls(dtls_key_t key);
 void destroy_dtls();
 
 __END_DECLS
-
-#endif /* PARLIB_DTLS_H */

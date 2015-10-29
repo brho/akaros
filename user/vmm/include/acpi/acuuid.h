@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACUUID_H__
-#define __ACUUID_H__
+#pragma once
 
 /*
  * Note1: UUIDs and GUIDs are defined to be identical in ACPI.
@@ -85,5 +84,3 @@
 #define UUID_BATTERY_THERMAL_LIMIT      "4c2067e3-887d-475c-9720-4af1d3ed602e"
 #define UUID_THERMAL_EXTENSIONS         "14d399cd-7a27-4b18-8fb4-7cb7b9f4e500"
 #define UUID_DEVICE_PROPERTIES          "daffd814-6eba-4d8c-8a91-bc9bbf4aa301"
-
-#endif				/* __AUUID_H__ */

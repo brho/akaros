@@ -1,5 +1,4 @@
-#ifndef ROS_INC_TYPES_H
-#define ROS_INC_TYPES_H
+#pragma once
 
 #include <stddef.h>
 
@@ -34,5 +33,3 @@ typedef int32_t uid_t;
 typedef int32_t gid_t;
 
 typedef unsigned long uintptr_t;
-
-#endif /* !ROS_INC_TYPES_H */

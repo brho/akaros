@@ -1,5 +1,4 @@
-#ifndef ROS_INC_X86_H
-#define ROS_INC_X86_H
+#pragma once
 
 #include <ros/common.h>
 #include <arch/mmu.h>
@@ -429,5 +428,3 @@ static inline void __cpu_relax(void)
 #define UNUSED_ARG(x) (void)x
 #endif /* This prevents compiler warnings for UNUSED_ARG */ 
 #endif /* !__ASSEMBLER__ */
-
-#endif /* !ROS_INC_X86_H */

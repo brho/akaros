@@ -6,8 +6,7 @@
  * Interface for asking for resources from the kernel.
  */
 
-#ifndef ROS_INCLUDE_RESOURCE_H
-#define ROS_INCLUDE_RESOURCE_H
+#pragma once
 
 #include <ros/common.h>
 
@@ -26,5 +25,3 @@ struct resource_req {
 	unsigned long				amt_wanted_min;
 	int							flags;
 };
-
-#endif // !ROS_INCLUDE_RESOURCE_H

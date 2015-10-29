@@ -1,5 +1,4 @@
-#ifndef ROS_INC_LIMITS_H
-#define ROS_INC_LIMITS_H
+#pragma once
 
 /* Keep this 255 to stay in sync with glibc (expects d_name[256]) */
 #define MAX_FILENAME_SZ 255
@@ -14,5 +13,3 @@
 /* This partitions the FD space.  Negative values are errors (bit 31).  Bits
  * 0-19 are for kernel FDs.  Bits 20-30 are for userspace shims. */
 #define NR_FILE_DESC_MAX (1 << 19)
-
-#endif /* ROS_INC_LIMITS_H */

@@ -1,8 +1,7 @@
 /* Copyright (c) 2009 The Regents of the University of California
  * See LICENSE for details.  */
 
-#ifndef ROS_PROCDATA_H
-#define ROS_PROCDATA_H
+#pragma once
 
 #include <ros/memlayout.h>
 #include <ros/ring_syscall.h>
@@ -36,5 +35,3 @@ typedef struct procdata {
 
 /* TODO: I dislike having this not be a pointer (for kernel programming) */
 #define __procdata (*(procdata_t*)UDATA)
-
-#endif /* ROS_PROCDATA_H */

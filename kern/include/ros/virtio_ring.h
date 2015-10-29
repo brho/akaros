@@ -1,5 +1,4 @@
-#ifndef ROS_VIRTIO_RING_H
-#define ROS_VIRTIO_RING_H
+#pragma once
 
 /* An interface for efficient virtio implementation, currently for use by KVM
  * and lguest, but hopefully others soon.  Do NOT change this since it will
@@ -159,5 +158,3 @@ static inline int vring_need_event(uint16_t event_idx, uint16_t new_idx, uint16_
 	 * event indexes in virtio start at 0. */
 	return (uint16_t)(new_idx - event_idx - 1) < (uint16_t)(new_idx - old);
 }
-
-#endif /* ROS_VIRTIO_RING_H */

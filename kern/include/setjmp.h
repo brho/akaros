@@ -1,7 +1,6 @@
 // Kernel implementations for setjmp/longjmp.
 
-#ifndef ROS_SETJMP_H
-#define ROS_SETJMP_H
+#pragma once
 
 #include <arch/setjmp.h>
 
@@ -17,5 +16,3 @@ void longjmp(struct jmpbuf *env, int val) __attribute__((noreturn));
                     err;})
 
 #pragma GCC diagnostic pop
-
-#endif /* !ROS_SETJMP_H */

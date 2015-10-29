@@ -1,5 +1,4 @@
-#ifndef PARLIB_UTHREAD_H
-#define PARLIB_UTHREAD_H
+#pragma once
 
 #include <parlib/vcore.h>
 #include <ros/syscall.h>
@@ -119,5 +118,3 @@ static inline void init_uthread_ctx(struct uthread *uth, void (*entry)(void),
 })
 
 __END_DECLS
-
-#endif /* PARLIB_UTHREAD_H */

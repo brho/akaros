@@ -33,8 +33,7 @@
  * the structs we don't need yet, leaving the bits and some macros behind.
  */
 
-#ifndef ROS_KERN_BITS_NETINET_H
-#define ROS_KERN_BITS_NETINET_H
+#pragma once
 
 #include <ros/common.h>
 #include <endian.h>
@@ -422,5 +421,3 @@
  */
 #define	IP_MAX_GROUP_SRC_FILTER		512	/* sources per group */
 #define	IP_MAX_SOCK_SRC_FILTER		128	/* sources per socket/group */
-
-#endif /* ROS_KERN_BITS_NETINET_H */

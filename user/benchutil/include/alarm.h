@@ -29,8 +29,7 @@
  * Don't forget to manage your memory at some (safe) point:
  * 	free(waiter); */
 
-#ifndef BENCHUTIL_ALARM_H
-#define BENCHUTIL_ALARM_H
+#pragma once
 
 #include <parlib/common.h>
 #include <sys/queue.h>
@@ -94,5 +93,3 @@ void alarm_abort_sysc(struct alarm_waiter *awaiter);
 void print_chain(struct timer_chain *tchain);
 
 __END_DECLS
-
-#endif /* BENCHUTIL_ALARM_H */

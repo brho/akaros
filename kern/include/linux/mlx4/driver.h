@@ -30,8 +30,7 @@
  * SOFTWARE.
  */
 
-#ifndef MLX4_DRIVER_H
-#define MLX4_DRIVER_H
+#pragma once
 
 #include <linux/mlx4/device.h>
 
@@ -95,5 +94,3 @@ static inline uint64_t mlx4_mac_to_u64(uint8_t *addr)
 	}
 	return mac;
 }
-
-#endif /* MLX4_DRIVER_H */

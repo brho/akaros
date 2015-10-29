@@ -7,12 +7,9 @@
  * This file is released under the GPLv2.
  */
 
-#ifndef ACPI_HED_H
-#define ACPI_HED_H
+#pragma once
 
 #include <linux/notifier.h>
 
 int register_acpi_hed_notifier(struct notifier_block *nb);
 void unregister_acpi_hed_notifier(struct notifier_block *nb);
-
-#endif

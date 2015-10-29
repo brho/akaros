@@ -1,5 +1,4 @@
-#ifndef ROS_STAB_H
-#define ROS_STAB_H
+#pragma once
 #include <ros/common.h>
 
 // <inc/stab.h>
@@ -47,5 +46,3 @@ typedef struct stab {
 	uint16_t n_desc;        // description field
 	uintptr_t n_value;	// value of symbol
 } stab_t;
-
-#endif /* !ROS_STAB_H */

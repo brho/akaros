@@ -1,5 +1,4 @@
-#ifndef PARLIB_VCORE_H
-#define PARLIB_VCORE_H
+#pragma once
 
 #include <parlib/arch/vcore.h>
 #include <parlib/arch/atomic.h>
@@ -304,5 +303,3 @@ static inline uint64_t vcore_account_uptime_nsec(uint32_t vcoreid)
 })
 
 __END_DECLS
-
-#endif /* PARLIB_VCORE_H */

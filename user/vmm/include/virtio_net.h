@@ -1,5 +1,4 @@
-#ifndef _LINUX_VIRTIO_NET_H
-#define _LINUX_VIRTIO_NET_H
+#pragma once
 /* This header is BSD licensed so anyone can use the definitions to implement
  * compatible drivers/servers.
  *
@@ -225,5 +224,3 @@ struct virtio_net_ctrl_mq {
  #define VIRTIO_NET_CTRL_MQ_VQ_PAIRS_SET        0
  #define VIRTIO_NET_CTRL_MQ_VQ_PAIRS_MIN        1
  #define VIRTIO_NET_CTRL_MQ_VQ_PAIRS_MAX        0x8000
-
-#endif /* _LINUX_VIRTIO_NET_H */

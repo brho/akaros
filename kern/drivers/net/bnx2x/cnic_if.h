@@ -10,8 +10,7 @@
  */
 
 
-#ifndef CNIC_IF_H
-#define CNIC_IF_H
+#pragma once
 
 #include "bnx2x_mfw_req.h"
 
@@ -368,5 +367,3 @@ struct cnic_ulp_ops {
 int cnic_register_driver(int ulp_type, struct cnic_ulp_ops *ulp_ops);
 
 int cnic_unregister_driver(int ulp_type);
-
-#endif

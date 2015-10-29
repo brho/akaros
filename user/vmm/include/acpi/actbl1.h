@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACTBL1_H__
-#define __ACTBL1_H__
+#pragma once
 
 /*******************************************************************************
  *
@@ -1196,5 +1195,3 @@ struct acpi_srat_gicc_affinity {
 /* Reset to default packing */
 
 #pragma pack()
-
-#endif				/* __ACTBL1_H__ */

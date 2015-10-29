@@ -7,8 +7,7 @@
  * @author John Levon <levon@movementarian.org>
  */
 
-#ifndef EVENT_BUFFER_H
-#define EVENT_BUFFER_H
+#pragma once
 
 int alloc_event_buffer(void);
 
@@ -26,5 +25,3 @@ void wake_up_buffer_waiter(void);
 
 #define INVALID_COOKIE ~0UL
 #define NO_COOKIE 0UL
-
-#endif /* EVENT_BUFFER_H */

@@ -8,8 +8,7 @@
  *
  * Note all of ext2's disk structures are little-endian. */
 
-#ifndef ROS_KERN_EXT2FS_H
-#define ROS_KERN_EXT2FS_H
+#pragma once
 
 #include <ros/common.h>
 #include <vfs.h>
@@ -262,4 +261,3 @@ struct ext2_sb_info {
 struct ext2_i_info {
 	uint32_t					i_block[15];		/* list of blocks reserved*/
 };
-#endif /* ROS_KERN_EXT2FS_H */

@@ -17,8 +17,7 @@
  * array.  You could make it == nr_events, for reasonable behavior at the
  * expense of memory. */
 
-#ifndef PARLIB_CEQ_H
-#define PARLIB_CEQ_H
+#pragma once
 
 #include <ros/ceq.h>
 #include <ros/event.h>
@@ -38,5 +37,3 @@ bool ceq_is_empty(struct ceq *ceq);
 void ceq_cleanup(struct ceq *ceq);
 
 __END_DECLS
-
-#endif /* PARLIB_CEQ_H */

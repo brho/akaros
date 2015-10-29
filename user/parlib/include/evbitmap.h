@@ -5,8 +5,7 @@
  * Event bitmaps.  These are a type of event mailbox where the message type is
  * translated to a bit, which is set in the bitmap. */
 
-#ifndef PARLIB_EVBITMAP_H
-#define PARLIB_EVBITMAP_H
+#pragma once
 
 #include <ros/evbitmap.h>
 
@@ -19,5 +18,3 @@ void evbitmap_init(struct evbitmap *evbm);
 bool get_evbitmap_msg(struct evbitmap *evbm, struct event_msg *ev_msg);
 
 __END_DECLS
-
-#endif /* PARLIB_EVBITMAP_H */

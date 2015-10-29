@@ -1,5 +1,4 @@
-#ifndef ROS_KERN_ARCH_TIME_H
-#define ROS_KERN_ARCH_TIME_H
+#pragma once
 
 #define TSC_HZ 1000000000 // really, this is the core clock frequency
 
@@ -14,5 +13,3 @@ extern system_timing_t system_timing;
 
 void timer_init(void);
 void set_timer(uint32_t usec);
-
-#endif /* ROS_KERN_ARCH_TIME_H */

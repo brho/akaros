@@ -5,8 +5,7 @@
  * All things processes!  As we move away from the old envs to processes,
  * we'll move things into here that are designed for multicore processes. */
 
-#ifndef ROS_KERN_PROCESS_H
-#define ROS_KERN_PROCESS_H
+#pragma once
 
 #include <ros/common.h>
 #include <ros/event.h>
@@ -157,5 +156,3 @@ void __abandon_core(void);
 /* Degubbing */
 void print_allpids(void);
 void print_proc_info(pid_t pid);
-
-#endif /* !ROS_KERN_PROCESS_H */

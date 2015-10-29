@@ -36,8 +36,7 @@
  * SOFTWARE.
  */
 
-#if !defined(IB_VERBS_H)
-#define IB_VERBS_H
+#pragma once
 
 #include <arch/types.h>
 
@@ -2645,5 +2644,3 @@ static inline int ib_check_mr_access(int flags)
  */
 int ib_check_mr_status(struct ib_mr *mr, uint32_t check_mask,
 		       struct ib_mr_status *mr_status);
-
-#endif /* IB_VERBS_H */

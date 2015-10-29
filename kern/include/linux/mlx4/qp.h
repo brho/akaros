@@ -30,8 +30,7 @@
  * SOFTWARE.
  */
 
-#ifndef MLX4_QP_H
-#define MLX4_QP_H
+#pragma once
 
 #include <linux/mlx4/device.h>
 
@@ -469,5 +468,3 @@ static inline struct mlx4_qp *__mlx4_qp_lookup(struct mlx4_dev *dev,
 }
 
 void mlx4_qp_remove(struct mlx4_dev *dev, struct mlx4_qp *qp);
-
-#endif /* MLX4_QP_H */

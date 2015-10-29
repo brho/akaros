@@ -4,13 +4,10 @@
  *
  * Common helpers for Akaros user programs. */
 
-#ifndef PARLIB_COMMON_H
-#define PARLIB_COMMON_H
+#pragma once
 
 #include <ros/common.h>
 #include <parlib/assert.h>
 #include <parlib/stdio.h>
 
 #define IS_PWR2(x) ((x) && !((x) & (x - 1)))
-
-#endif /* PARLIB_COMMON_H */

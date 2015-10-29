@@ -16,8 +16,7 @@
  * chronological order.  Ultimately, the sample needs to produce a uint64_t
  * (e.g. TSC tick). */
 
-#ifndef BENCHUTIL_MEASURE_H
-#define BENCHUTIL_MEASURE_H
+#pragma once
 
 __BEGIN_DECLS
 
@@ -45,5 +44,3 @@ void print_throughput(void **data, unsigned int nr_steps, uint64_t interval,
                                         uint64_t *sample));
 
 __END_DECLS
-
-#endif /* BENCHUTIL_MEASURE_H */

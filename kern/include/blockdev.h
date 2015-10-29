@@ -4,8 +4,7 @@
  *
  * Block device interfaces and structures */
 
-#ifndef ROS_KERN_BLOCKDEV_H
-#define ROS_KERN_BLOCKDEV_H
+#pragma once
 
 #include <ros/common.h>
 #include <kref.h>
@@ -97,5 +96,3 @@ void free_bhs(struct page *page);
 int bdev_submit_request(struct block_device *bdev, struct block_request *breq);
 void generic_breq_done(struct block_request *breq);
 void sleep_on_breq(struct block_request *breq);
-
-#endif /* ROS_KERN_BLOCKDEV_H */

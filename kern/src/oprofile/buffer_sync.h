@@ -7,8 +7,7 @@
  * @author John Levon <levon@movementarian.org>
  */
 
-#ifndef OPROFILE_BUFFER_SYNC_H
-#define OPROFILE_BUFFER_SYNC_H
+#pragma once
 
 /* add the necessary profiling hooks */
 int sync_start(void);
@@ -18,5 +17,3 @@ void sync_stop(void);
 
 /* sync the given CPU's buffer */
 void sync_buffer(int cpu);
-
-#endif /* OPROFILE_BUFFER_SYNC_H */

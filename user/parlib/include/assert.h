@@ -1,7 +1,6 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef PARLIB_ASSERT_H
-#define PARLIB_ASSERT_H
+#pragma once
 
 #ifdef BUILDING_PARLIB
 # include_next "assert.h"
@@ -36,5 +35,3 @@ void _assert_failed(const char *file, int line, const char *msg)
 #define parlib_static_assert(x)	switch (x) case 0: case (x):
 
 __END_DECLS
-
-#endif /* PARLIB_ASSERT_H */

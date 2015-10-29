@@ -10,8 +10,7 @@
  * Lawyers can sort out the copyrights and whatnot with these interfaces and
  * structures. */
 
-#ifndef ROS_KERN_VFS_H
-#define ROS_KERN_VFS_H
+#pragma once
 
 #include <ros/common.h>
 #include <ros/limits.h>
@@ -515,5 +514,3 @@ void print_kstat(struct kstat *kstat);
 int ls_dash_r(char *path);
 extern struct inode_operations dummy_i_op;
 extern struct dentry_operations dummy_d_op;
-
-#endif /* ROS_KERN_VFS_H */

@@ -4,8 +4,7 @@
  * See LICENSE for details.
  */
 
-#ifndef ROS_ARCH_SMP_H
-#define ROS_ARCH_SMP_H
+#pragma once
 
 #include <atomic.h>
 
@@ -18,5 +17,3 @@ struct HandlerWrapper {
 };
 
 typedef struct HandlerWrapper handler_wrapper_t;
-
-#endif /* !ROS_ARCH_SMP_H */

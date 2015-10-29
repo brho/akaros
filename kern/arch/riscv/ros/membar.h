@@ -1,5 +1,4 @@
-#ifndef ROS_INC_ARCH_MEMBAR_H
-#define ROS_INC_ARCH_MEMBAR_H
+#pragma once
 
 /* Full CPU memory barrier */
 #define mb() __sync_synchronize()
@@ -24,5 +23,3 @@
 #warning "Implement bus memory barriers"
 #define bus_wmb() mb()
 #define bus_rmb() mb()
-
-#endif /* ROS_INC_ARCH_MEMBAR_H */

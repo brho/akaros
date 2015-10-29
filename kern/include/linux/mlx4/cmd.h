@@ -30,8 +30,7 @@
  * SOFTWARE.
  */
 
-#ifndef MLX4_CMD_H
-#define MLX4_CMD_H
+#pragma once
 
 #include <linux_compat.h>
 
@@ -328,5 +327,3 @@ bool mlx4_get_slave_default_vlan(struct mlx4_dev *dev, int port, int slave,
 
 #define MLX4_COMM_GET_IF_REV(cmd_chan_ver) (uint8_t)((cmd_chan_ver) >> 8)
 #define COMM_CHAN_EVENT_INTERNAL_ERR (1 << 17)
-
-#endif /* MLX4_CMD_H */

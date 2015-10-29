@@ -27,8 +27,7 @@
  * SOFTWARE. */
 
 
-#ifndef ROS_KERN_IP_H
-#define ROS_KERN_IP_H
+#pragma once
 #include <ns.h>
 
 enum {
@@ -1098,5 +1097,3 @@ extern int archether(int unused_int, struct ether *);
 
 #define NEXT_RING(x, len) (((x) + 1) % (len))
 #define PREV_RING(x, len) (((x) == 0) ? (len) - 1: (x) - 1)
-
-#endif /* ROS_KERN_IP_H */

@@ -26,8 +26,7 @@
  * address.  This also might fuck with alignment.
  */
 
-#ifndef ROS_KERN_SLAB_H
-#define ROS_KERN_SLAB_H
+#pragma once
 
 #include <ros/common.h>
 #include <arch/mmu.h>
@@ -101,4 +100,3 @@ void kmem_cache_reap(struct kmem_cache *cp);
 /* Debug */
 void print_kmem_cache(struct kmem_cache *kc);
 void print_kmem_slab(struct kmem_slab *slab);
-#endif // !ROS_KERN_SLAB_H

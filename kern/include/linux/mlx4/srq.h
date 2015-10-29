@@ -30,8 +30,7 @@
  * SOFTWARE.
  */
 
-#ifndef MLX4_SRQ_H
-#define MLX4_SRQ_H
+#pragma once
 
 struct mlx4_wqe_srq_next_seg {
 	uint16_t			reserved1;
@@ -40,5 +39,3 @@ struct mlx4_wqe_srq_next_seg {
 };
 
 struct mlx4_srq *mlx4_srq_lookup(struct mlx4_dev *dev, uint32_t srqn);
-
-#endif /* MLX4_SRQ_H */

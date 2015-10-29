@@ -4,8 +4,7 @@
  *
  * Arch-independent VMM kernel headers */
 
-#ifndef ROS_INC_VMM_H
-#define ROS_INC_VMM_H
+#pragma once
 
 #include <ros/arch/vmm.h>
 
@@ -41,5 +40,3 @@ struct vmctl {
 	uint64_t vapic;
 	struct hw_trapframe regs;
 };
-
-#endif /* ROS_INC_VMM_H */

@@ -2,8 +2,7 @@
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details. */
 
-#ifndef ROS_INC_FDTAP_H
-#define ROS_INC_FDTAP_H
+#pragma once
 
 #include <ros/event.h>
 
@@ -43,5 +42,3 @@ struct fd_tap_req {
 	struct event_queue			*ev_q;
 	void						*data;
 };
-
-#endif /* ROS_INC_FDTAP_H */

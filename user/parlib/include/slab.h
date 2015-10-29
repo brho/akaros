@@ -27,8 +27,7 @@
  *
  * Ported directly from the kernel's slab allocator. */
 
-#ifndef PARLIB_SLAB_H
-#define PARLIB_SLAB_H
+#pragma once
 
 #include <parlib/common.h>
 #include <ros/arch/mmu.h>
@@ -107,5 +106,3 @@ void print_kmem_cache(struct kmem_cache *kc);
 void print_kmem_slab(struct kmem_slab *slab);
 
 __END_DECLS
-
-#endif /* PARLIB_SLAB_H */

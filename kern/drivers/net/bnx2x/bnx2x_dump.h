@@ -13,8 +13,7 @@
  * consent.
  */
 
-#ifndef BNX2X_DUMP_H
-#define BNX2X_DUMP_H
+#pragma once
 
 /* WaitP Definitions */
 #define DRV_DUMP_XSTORM_WAITP_ADDRESS    0x2b8a80
@@ -2213,4 +2212,3 @@ static const unsigned int dump_num_registers[NUM_CHIPS][NUM_PRESETS] = {
 	{45302, 17999, 34802, 44249, 18771, 35571, 45356, 31823, 48626, 45332,
 	 25679, 42482, 43903}
 };
-#endif

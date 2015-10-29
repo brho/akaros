@@ -4,8 +4,7 @@
  *
  * Endian #def and byte_swapping functions */
 
-#ifndef ROS_KERN_ARCH_ENDIAN_H
-#define ROS_KERN_ARCH_ENDIAN_H
+#pragma once
 
 #include <ros/common.h>
 #include <arch/types.h>
@@ -27,5 +26,3 @@ static inline uint64_t byte_swap64(uint64_t x)
 	return (uint64_t)(((uint64_t)byte_swap32(x & 0xffffffff) << 32) |
 	                  (byte_swap32(x >> 32)));
 }
-
-#endif /* ROS_KERN_ARCH_ENDIAN_H */

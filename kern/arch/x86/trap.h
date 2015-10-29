@@ -1,4 +1,5 @@
-#ifndef ROS_KERN_ARCH_TRAP_H
+#pragma once
+
 #define ROS_KERN_ARCH_TRAP_H
 
 #include <ros/arch/msr-index.h>
@@ -200,5 +201,3 @@ extern segdesc_t *gdt;
 #include <arch/trap64.h>
 
 #endif /* !__ASSEMBLER__ */
-
-#endif /* !ROS_INC_ARCH_TRAP_H */

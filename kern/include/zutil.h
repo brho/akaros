@@ -10,8 +10,7 @@
 
 /* @(#) $Id: zutil.h,v 1.1 2000/01/01 03:32:23 davem Exp $ */
 
-#ifndef _Z_UTIL_H
-#define _Z_UTIL_H
+#pragma once
 
 #include <zlib.h>
 #include <string.h>
@@ -101,5 +100,3 @@ static inline uLong zlib_adler32(uLong adler,
     }
     return (s2 << 16) | s1;
 }
-
-#endif /* _Z_UTIL_H */

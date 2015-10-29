@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACTBL_H__
-#define __ACTBL_H__
+#pragma once
 
 /*******************************************************************************
  *
@@ -411,5 +410,3 @@ struct acpi_table_desc {
 #define ACPI_FADT_V3_SIZE       (u32) (ACPI_FADT_OFFSET (sleep_control))
 #define ACPI_FADT_V5_SIZE       (u32) (ACPI_FADT_OFFSET (hypervisor_id))
 #define ACPI_FADT_V6_SIZE       (u32) (sizeof (struct acpi_table_fadt))
-
-#endif				/* __ACTBL_H__ */

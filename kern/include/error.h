@@ -1,7 +1,6 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef ROS_INC_ERROR_H
-#define ROS_INC_ERROR_H
+#pragma once
 
 #include <ros/errno.h>
 
@@ -24,5 +23,3 @@ static inline char *errno_to_string(int error)
 	return error >= 0 && error < MAX_ERRNO && errno_strings[error] != NULL ?
 		(char *) errno_strings[error]: (char *) "Unknown error";
 }
- 		 
-#endif	// !ROS_INC_ERROR_H */

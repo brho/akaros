@@ -1,5 +1,4 @@
-#ifndef ROS_INC_ARCH_SYSCALL64_H
-#define ROS_INC_ARCH_SYSCALL64_H
+#pragma once
 
 #ifndef ROS_INC_ARCH_SYSCALL_H
 #error "Do not include include ros/arch/syscall64.h directly"
@@ -58,5 +57,3 @@ static inline void __fastcall_setfsbase(uintptr_t fsbase)
 }
 
 #endif
-
-#endif /* ROS_INC_ARCH_SYSCALL64_H */

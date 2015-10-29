@@ -16,8 +16,7 @@
  * Written by: Shmulik Ravid
  *	       Ariel Elior <ariel.elior@qlogic.com>
  */
-#ifndef BNX2X_SRIOV_H
-#define BNX2X_SRIOV_H
+#pragma once
 
 #include "bnx2x_vfpf.h"
 #include "bnx2x.h"
@@ -606,4 +605,3 @@ static inline void bnx2x_vf_bulletin_finalize(struct pf_vf_bulletin_content *bul
 					      bool support_long) {}
 
 #endif /* CONFIG_BNX2X_SRIOV */
-#endif /* bnx2x_sriov.h */

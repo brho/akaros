@@ -6,8 +6,7 @@
  * consumer.
  */
 
-#ifndef ROS_INC_BCQ_H
-#define ROS_INC_BCQ_H
+#pragma once
 
 #include <ros/common.h>
 #include <ros/bcq_struct.h>
@@ -196,5 +195,3 @@ struct bcq_header {
 
 #define bcq_nr_full(_bcq)                                                      \
 	((_bcq)->hdr.prod_idx - (_bcq)->hdr.cons_pub_idx)
-
-#endif /* ROS_INC_BCQ_H */

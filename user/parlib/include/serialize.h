@@ -2,8 +2,7 @@
  * Kevin Klues <klueska@google.com>
  * See LICENSE for details. */
 
-#ifndef PARLIB_SERIALIZE_H
-#define PARLIB_SERIALIZE_H
+#pragma once
 
 #include <stddef.h>
 
@@ -14,5 +13,3 @@ struct serialized_data {
 extern struct serialized_data* serialize_argv_envp(char* const* argv,
                                                    char* const* envp);
 extern void free_serialized_data(struct serialized_data* sd);
-
-#endif // PARLIB_SERIALIZE_H

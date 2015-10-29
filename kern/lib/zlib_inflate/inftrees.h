@@ -1,5 +1,4 @@
-#ifndef INFTREES_H
-#define INFTREES_H
+#pragma once
 
 /* inftrees.h -- header to use inftrees.c
  * Copyright (C) 1995-2005 Mark Adler
@@ -56,4 +55,3 @@ typedef enum {
 extern int zlib_inflate_table (codetype type, unsigned short *lens,
                              unsigned codes, code **table,
                              unsigned *bits, unsigned short *work);
-#endif

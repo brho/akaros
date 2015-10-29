@@ -1,8 +1,7 @@
 /* Contains macros and constants for the kernel VM mapping, page tables,
  * definitions for the RISC-V MMU, etc. */
 
-#ifndef ROS_INC_ARCH_MMU_H
-#define ROS_INC_ARCH_MMU_H
+#pragma once
 
 /* **************************************** */
 /* Kernel Virtual Memory Mapping  (not really an MMU thing) */
@@ -165,5 +164,3 @@ typedef unsigned long pgdir_t;
 /* Arbitrary boundary between the break and the start of
  * memory returned by calls to mmap with addr = 0 */
 #define BRK_END 0x40000000
-
-#endif /* ROS_INC_ARCH_MMU_H */

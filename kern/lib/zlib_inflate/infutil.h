@@ -8,8 +8,7 @@
    subject to change. Applications should only use zlib.h.
  */
 
-#ifndef _INFUTIL_H
-#define _INFUTIL_H
+#pragma once
 
 #include <zlib.h>
 
@@ -21,5 +20,3 @@ struct inflate_workspace {
 };
 
 #define WS(z) ((struct inflate_workspace *)(z->workspace))
-
-#endif

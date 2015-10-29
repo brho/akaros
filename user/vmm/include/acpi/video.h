@@ -1,5 +1,4 @@
-#ifndef __ACPI_VIDEO_H
-#define __ACPI_VIDEO_H
+#pragma once
 
 #include <linux/errno.h> /* for ENODEV */
 
@@ -46,6 +45,4 @@ static inline enum acpi_backlight_type acpi_video_get_backlight_type(void)
 static void acpi_video_set_dmi_backlight_type(enum acpi_backlight_type type)
 {
 }
-#endif
-
 #endif

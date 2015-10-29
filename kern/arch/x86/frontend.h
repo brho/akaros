@@ -3,8 +3,7 @@
  * See LICENSE for details.
  */
 
-#ifndef ROS_ARCH_FRONTEND_H
-#define ROS_ARCH_FRONTEND_H
+#pragma once
 
 #define APPSERVER_MAX_PAYLOAD_SIZE 1024
 
@@ -30,5 +29,3 @@ typedef struct
 	appserver_packet_header_t header;
 	uint8_t payload[APPSERVER_MAX_PAYLOAD_SIZE];
 } appserver_packet_t;
-
-#endif

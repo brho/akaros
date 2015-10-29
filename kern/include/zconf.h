@@ -5,8 +5,7 @@
 
 /* @(#) $Id$ */
 
-#ifndef _ZCONF_H
-#define _ZCONF_H
+#pragma once
 
 /* The memory requirements for deflate are (in bytes):
             (1 << (windowBits+2)) +  (1 << (memLevel+9))
@@ -53,5 +52,3 @@ typedef unsigned char  Byte;  /* 8 bits */
 typedef unsigned int   uInt;  /* 16 bits or more */
 typedef unsigned long  uLong; /* 32 bits or more */
 typedef void     *voidp;
-
-#endif /* _ZCONF_H */

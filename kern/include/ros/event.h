@@ -4,8 +4,7 @@
  *
  * Kernel interface for event/notification delivery and preemption. */
 
-#ifndef ROS_INC_EVENT_H
-#define ROS_INC_EVENT_H
+#pragma once
 
 #include <ros/common.h>
 #include <ros/atomic.h>
@@ -126,5 +125,3 @@ struct preempt_data {
 	struct event_mbox			ev_mbox_public;		/* can be read remotely */
 	struct event_mbox			ev_mbox_private;	/* for this vcore only */
 };
-
-#endif /* ROS_INC_EVENT_H */

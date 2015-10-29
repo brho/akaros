@@ -4,8 +4,7 @@
  *
  * Print routines for Akaros user programs. */
 
-#ifndef PARLIB_STDIO_H
-#define PARLIB_STDIO_H
+#pragma once
 
 #ifdef BUILDING_PARLIB
 # include_next "stdio.h"
@@ -36,5 +35,3 @@ int akaros_printf(const char *format, ...);
 #define printf(args...) akaros_printf(args)
 
 __END_DECLS
-
-#endif /* PARLIB_STDIO_H */

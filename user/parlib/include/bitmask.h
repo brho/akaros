@@ -1,5 +1,4 @@
-#ifndef PARLIB_BITMASK_H
-#define PARLIB_BITMASK_H
+#pragma once
 
 #include <parlib/arch/bitmask.h>
 
@@ -57,5 +56,3 @@ static inline void CLR_BITMASK_RANGE(uint8_t* m, size_t beg, size_t end)
 }                                                                              
                                                                                
 __END_DECLS
-
-#endif /* PARLIB_BITMASK_H */

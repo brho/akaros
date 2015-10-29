@@ -34,8 +34,7 @@
  * SOFTWARE.
  */
 
-#ifndef MLX4_H
-#define MLX4_H
+#pragma once
 
 #include <linux/mlx4/device.h>
 #include <linux/mlx4/driver.h>
@@ -1437,5 +1436,3 @@ uint32_t mlx4_zone_free_entries_unique(struct mlx4_zone_allocator *zones,
 /* Returns a pointer to mlx4_bitmap that was attached to <zones> with <uid> */
 struct mlx4_bitmap *mlx4_zone_get_bitmap(struct mlx4_zone_allocator *zones,
 					 uint32_t uid);
-
-#endif /* MLX4_H */

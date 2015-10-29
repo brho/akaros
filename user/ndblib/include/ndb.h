@@ -6,8 +6,7 @@
  * modified, propagated, or distributed except according to the terms contained
  * in the LICENSE file.
  */
-#ifndef NDBLIB_NDB_H
-#define NDBLIB_NDB_H
+#pragma once
 
 #include <fcall.h>
 
@@ -179,5 +178,3 @@ void _ndbcacheflush(struct ndb *db);
 void setnetmtpt(char *net, int n, char *x);
 
 __END_DECLS
-
-#endif /* NDBLIB_NDB_H */

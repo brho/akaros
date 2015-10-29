@@ -1,5 +1,4 @@
-#ifndef ROS_FRONTEND_H
-#define ROS_FRONTEND_H
+#pragma once
 
 #include <ros/common.h>
 
@@ -68,5 +67,3 @@ void file_decref(struct file* f);
 #define APPSERVER_SYSCALL_pread       173
 #define APPSERVER_SYSCALL_pwrite      174
 #define APPSERVER_SYSCALL_getcwd      229
-
-#endif /* !ROS_FRONTEND_H */

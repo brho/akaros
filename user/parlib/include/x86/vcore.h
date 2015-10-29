@@ -1,4 +1,5 @@
-#ifndef PARLIB_ARCH_VCORE_H
+#pragma once
+
 #define PARLIB_ARCH_VCORE_H
 
 #ifdef __x86_64__
@@ -10,5 +11,3 @@
 __BEGIN_DECLS
 
 __END_DECLS
-
-#endif /* PARLIB_ARCH_VCORE_H */

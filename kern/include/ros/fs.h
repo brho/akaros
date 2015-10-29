@@ -1,5 +1,4 @@
-#ifndef _ROS_INC_STAT_H
-#define _ROS_INC_STAT_H
+#pragma once
 
 #include <sys/types.h>
 #include <ros/limits.h>
@@ -131,5 +130,3 @@ struct kstat {
 #define S_ISLNK(mode)	__S_ISTYPE((mode), __S_IFLNK)
 
 #endif /* ROS_KERNEL */
-
-#endif /* _ROS_INC_STAT_H */

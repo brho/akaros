@@ -2,8 +2,7 @@
  * apei.h - ACPI Platform Error Interface
  */
 
-#ifndef ACPI_APEI_H
-#define ACPI_APEI_H
+#pragma once
 
 #include <linux/acpi.h>
 #include <linux/cper.h>
@@ -46,5 +45,4 @@ int arch_apei_enable_cmcff(struct acpi_hest_header *hest_hdr, void *data);
 void arch_apei_report_mem_error(int sev, struct cper_sec_mem_err *mem_err);
 void arch_apei_flush_tlb_one(unsigned long addr);
 
-#endif
 #endif

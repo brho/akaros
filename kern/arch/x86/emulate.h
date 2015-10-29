@@ -8,8 +8,7 @@
  * From: xen-unstable 10676:af9809f51f81a3c43f276f00c81a52ef558afda4
  */
 
-#ifndef __X86_EMULATE_H__
-#define __X86_EMULATE_H__
+#pragma once
 
 struct x86_emulate_ctxt;
 
@@ -179,5 +178,3 @@ int x86_emulate_memop(struct x86_emulate_ctxt *ctxt,
  */
 void *decode_register(uint8_t modrm_reg, unsigned long *regs,
 					  int highbyte_regs);
-
-#endif /* __X86_EMULATE_H__ */

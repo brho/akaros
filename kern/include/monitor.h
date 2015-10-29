@@ -1,5 +1,4 @@
-#ifndef ROS_KERN_MONITOR_H
-#define ROS_KERN_MONITOR_H
+#pragma once
 #ifndef ROS_KERNEL
 # error "This is a ROS kernel header; user programs should not #include it"
 #endif
@@ -41,5 +40,3 @@ int mon_kpfret(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_ks(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_gfp(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_coreinfo(int argc, char **argv, struct hw_trapframe *hw_tf);
-
-#endif	// !ROS_KERN_MONITOR_H

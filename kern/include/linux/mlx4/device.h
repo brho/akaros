@@ -30,8 +30,7 @@
  * SOFTWARE.
  */
 
-#ifndef MLX4_DEVICE_H
-#define MLX4_DEVICE_H
+#pragma once
 
 #include <linux_compat.h>
 
@@ -1507,5 +1506,3 @@ struct mlx4_ptys_reg {
 int mlx4_ACCESS_PTYS_REG(struct mlx4_dev *dev,
 			 enum mlx4_access_reg_method method,
 			 struct mlx4_ptys_reg *ptys_reg);
-
-#endif /* MLX4_DEVICE_H */

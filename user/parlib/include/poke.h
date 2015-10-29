@@ -18,8 +18,7 @@
  *
  * Adapted from the kernel's implementation. */
 
-#ifndef PARLIB_POKE_H
-#define PARLIB_POKE_H
+#pragma once
 
 #include <ros/atomic.h>
 
@@ -43,5 +42,3 @@ static inline void poke_init(struct poke_tracker *tracker, void (*func)(void*))
 #define POKE_INITIALIZER(f) {.func = f}
 
 __END_DECLS
-
-#endif /* PARLIB_POKE_H */

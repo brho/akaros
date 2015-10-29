@@ -1,7 +1,6 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef ROS_KERN_ENV_H
-#define ROS_KERN_ENV_H
+#pragma once
 /* Note that the old include/ros/env.h is merged into this file */
 
 #include <ros/memlayout.h>
@@ -135,5 +134,3 @@ static inline bool is_traced_proc(const struct proc *p)
 {
 	return (p->env_flags & PROC_TRACED) != 0;
 }
-
-#endif // !ROS_KERN_ENV_H

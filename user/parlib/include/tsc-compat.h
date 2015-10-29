@@ -8,8 +8,7 @@
  * changes, this will need to change as well.  You'll know when this doesn't
  * compile (say, if timing_overhead moves).  */
 
-#ifndef PARLIB_TSC_COMPAT_H
-#define PARLIB_TSC_COMPAT_H
+#pragma once
 
 #if defined(__i386__) || defined(__x86_64__)
 #else
@@ -172,5 +171,3 @@ static inline uint64_t nsec2tsc(uint64_t nsec)
 #endif /* ! _ros_ */
 
 __END_DECLS
-
-#endif /* PARLIB_TSC_COMPAT_H */

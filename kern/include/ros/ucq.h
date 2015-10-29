@@ -15,8 +15,7 @@
  * The kernel's implementation is in kern/src/ucq.c, and the user's is in
  * user/parlib/ucq.c. */
 
-#ifndef ROS_INC_UCQ_H
-#define ROS_INC_UCQ_H
+#pragma once
 
 #include <ros/common.h>
 #include <ros/atomic.h>
@@ -86,5 +85,3 @@ static inline struct msg_container *slot2msg(uintptr_t slot)
 {
 	return &((struct ucq_page*)PTE_ADDR(slot))->msgs[PGOFF(slot)];
 }
-
-#endif /* ROS_INC_UCQ_H */

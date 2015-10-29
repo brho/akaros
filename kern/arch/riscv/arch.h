@@ -1,5 +1,4 @@
-#ifndef ROS_INC_ARCH_H
-#define ROS_INC_ARCH_H
+#pragma once
 
 #include <ros/arch/arch.h>
 #include <arch/mmu.h>
@@ -166,5 +165,3 @@ static inline void prefetch(void *addr)
 static inline void prefetchw(void *addr)
 {
 }
-
-#endif /* !ROS_INC_ARCH_H */

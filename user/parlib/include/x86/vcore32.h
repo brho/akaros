@@ -1,5 +1,4 @@
-#ifndef PARLIB_ARCH_VCORE32_H
-#define PARLIB_ARCH_VCORE32_H
+#pragma once
 
 #ifndef PARLIB_ARCH_VCORE_H
 #error "Do not include include vcore32.h directly"
@@ -397,5 +396,3 @@ static unsigned long __arch_refl_get_aux(struct user_context *ctx)
 }
 
 __END_DECLS
-
-#endif /* PARLIB_ARCH_VCORE32_H */

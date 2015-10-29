@@ -4,8 +4,7 @@
  *
  * Alarm device includes (needed for the linkage to struct proc) */
 
-#ifndef ROS_KERN_DEVALARM_H
-#define ROS_KERN_DEVALARM_H
+#pragma once
 
 #include <sys/queue.h>
 #include <kref.h>
@@ -31,5 +30,3 @@ struct proc_alarm_set {
 };
 
 void devalarm_init(struct proc *p);
-
-#endif /* ROS_KERN_DEVALARM_H */

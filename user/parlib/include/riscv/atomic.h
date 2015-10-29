@@ -1,5 +1,4 @@
-#ifndef PARLIB_ARCH_ATOMIC_H
-#define PARLIB_ARCH_ATOMIC_H
+#pragma once
 
 #include <parlib/common.h>
 #include <ros/atomic.h>
@@ -117,5 +116,3 @@ static inline void atomic_or_int(volatile int *number, int mask)
 }
 
 __END_DECLS
-
-#endif /* PARLIB_ARCH_ATOMIC_H */

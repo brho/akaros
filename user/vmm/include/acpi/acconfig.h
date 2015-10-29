@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef _ACCONFIG_H
-#define _ACCONFIG_H
+#pragma once
 
 /******************************************************************************
  *
@@ -246,5 +245,3 @@
 
 #define ACPI_DEBUGGER_COMMAND_PROMPT    '-'
 #define ACPI_DEBUGGER_EXECUTE_PROMPT    '%'
-
-#endif				/* _ACCONFIG_H */

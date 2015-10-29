@@ -23,8 +23,7 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
-#ifndef __ACPI_DRIVERS_H__
-#define __ACPI_DRIVERS_H__
+#pragma once
 
 #define ACPI_MAX_STRING			80
 
@@ -123,5 +122,3 @@ static inline int is_dock_device(struct acpi_device *adev)
 	return 0;
 }
 #endif /* CONFIG_ACPI_DOCK */
-
-#endif /*__ACPI_DRIVERS_H__*/

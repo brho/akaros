@@ -16,8 +16,7 @@
    Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
    02111-1307 USA.  */
 
-#ifndef PTHREAD_SEMAPHORE_H
-#define PTHREAD_SEMAPHORE_H
+#pragma once
 
 #include <sys/queue.h>
 #include <pthread.h>
@@ -58,5 +57,3 @@ extern int sem_post (sem_t *__sem);
 extern int sem_getvalue (sem_t *__restrict __sem, int *__restrict __sval);
 
 __END_DECLS
-
-#endif /* PTHREAD_SEMAPHORE_H */

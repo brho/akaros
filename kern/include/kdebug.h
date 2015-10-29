@@ -1,5 +1,4 @@
-#ifndef ROS_KERN_KDEBUG_H
-#define ROS_KERN_KDEBUG_H
+#pragma once
 
 #include <ros/common.h>
 #include <ros/trapframe.h>
@@ -47,5 +46,3 @@ void set_printx(int mode);
 
 void debug_addr_proc(struct proc *p, unsigned long addr);
 void debug_addr_pid(int pid, unsigned long addr);
-
-#endif /* ROS_KERN_KDEBUG_H */

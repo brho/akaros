@@ -1,5 +1,4 @@
-#ifndef __ASM_GENERIC_IOCTLS_H
-#define __ASM_GENERIC_IOCTLS_H
+#pragma once
 
 #include <ros/glibc-asm/ioctl.h>
 
@@ -106,5 +105,3 @@
 #define TIOCPKT_DOSTOP		32
 
 #define TIOCSER_TEMT	0x01	/* Transmitter physically empty */
-
-#endif /* __ASM_GENERIC_IOCTLS_H */

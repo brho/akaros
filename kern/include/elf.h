@@ -1,5 +1,4 @@
-#ifndef ROS_INC_ELF_H
-#define ROS_INC_ELF_H
+#pragma once
 
 #include <process.h>
 #include <ros/common.h>
@@ -151,5 +150,3 @@ struct file;
 bool is_valid_elf(struct file *f);
 int load_elf(struct proc* p, struct file* f,
              int argc, char *argv[], int envc, char *envp[]);
-
-#endif /* !ROS_INC_ELF_H */

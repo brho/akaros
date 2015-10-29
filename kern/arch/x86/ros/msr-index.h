@@ -1,5 +1,4 @@
-#ifndef _ROS_INC_ARCH_MSR_INDEX_H
-#define _ROS_INC_ARCH_MSR_INDEX_H
+#pragma once
 
 /* CPU model specific register (MSR) numbers */
 
@@ -542,5 +541,3 @@
 #define MSR_VM_CR                       0xc0010114
 #define MSR_VM_IGNNE                    0xc0010115
 #define MSR_VM_HSAVE_PA                 0xc0010117
-
-#endif /* _ROS_INC_ARCH_MSR_INDEX_H */

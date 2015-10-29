@@ -1,5 +1,4 @@
-#ifndef ROS_KBDREG_H
-#define ROS_KBDREG_H
+#pragma once
 
 // Special keycodes
 #define KEY_HOME	0xE0
@@ -79,5 +78,3 @@
 #define	KBR_BREAK	0xF0	/* break code prefix - sent on key release */
 #define	KBR_RSTDONE	0xAA	/* reset complete */
 #define	KBR_ECHO	0xEE	/* echo response */
-
-#endif /* !ROS_KBDREG_H */

@@ -4,8 +4,7 @@
  *
  * x86-specific Kernel debugging headers and static inlines */
 
-#ifndef ROS_KERN_ARCH_KDEBUG_H
-#define ROS_KERN_ARCH_KDEBUG_H
+#pragma once
 
 #include <ros/common.h>
 #include <arch/x86.h>
@@ -39,5 +38,3 @@ static inline uintptr_t get_caller_pc(void)
 	 * retaddr (just *(ebp + 1) is not) */
 	return *(ebp + 1) - 1;
 }
-
-#endif /* ROS_KERN_ARCH_KDEBUG_H */

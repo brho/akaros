@@ -2,7 +2,8 @@
  *
  * Dumping ground for converting between Akaros and Linux. */
 
-#ifndef ROS_KERN_LINUX_COMPAT_H
+#pragma once
+
 #define ROS_KERN_LINUX_COMPAT_H
 
 /* Common headers that most driver files will need */
@@ -766,5 +767,3 @@ static inline bool ether_addr_equal(const uint8_t *addr1, const uint8_t *addr2)
 }
 
 #include <linux/compat_todo.h>
-
-#endif /* ROS_KERN_LINUX_COMPAT_H */

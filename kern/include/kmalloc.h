@@ -5,8 +5,7 @@
  * Kevin Klues <klueska@cs.berkeley.edu>    
  */
 
-#ifndef ROS_KERN_KMALLOC_H
-#define ROS_KERN_KMALLOC_H
+#pragma once
 
 #include <ros/common.h>
 #include <kref.h>
@@ -58,6 +57,3 @@ struct kmalloc_tag {
 	uint32_t canary;
 	int flags;
 };
-
-#endif //ROS_KERN_KMALLOC_H
-

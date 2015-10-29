@@ -1,5 +1,4 @@
-#ifndef __ASM_GENERIC_SOCKET_H
-#define __ASM_GENERIC_SOCKET_H
+#pragma once
 
 #include <ros/glibc-asm/sockios.h>
 
@@ -64,4 +63,3 @@
 #define SO_DOMAIN		39
 
 #define SO_RXQ_OVFL             40
-#endif /* __ASM_GENERIC_SOCKET_H */

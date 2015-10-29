@@ -5,8 +5,7 @@
  * Kevin Klues <klueska@cs.berkeley.edu>    
  * Barret Rhoden <brho@cs.berkeley.edu> */
  
-#ifndef PAGE_ALLOC_H
-#define PAGE_ALLOC_H
+#pragma once
 
 #include <atomic.h>
 #include <sys/queue.h>
@@ -82,6 +81,3 @@ int page_is_free(size_t ppn);
 void lock_page(struct page *page);
 void unlock_page(struct page *page);
 void print_pageinfo(struct page *page);
-
-#endif //PAGE_ALLOC_H
-

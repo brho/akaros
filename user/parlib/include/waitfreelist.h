@@ -7,8 +7,7 @@
  * 
  */
 
-#ifndef PARLIB_WAITFREELIST_H
-#define PARLIB_WAITFREELIST_H
+#pragma once
 
 #include <string.h>
 
@@ -42,5 +41,3 @@ size_t wfl_remove_all(struct wfl *list, void *data);
     if (elm)
 
 __END_DECLS
-
-#endif /* PARLIB_WAITFREELIST_H */

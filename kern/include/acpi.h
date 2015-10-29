@@ -7,8 +7,7 @@
  * in the LICENSE file.
  */
 
-#ifndef ROS_KERN_ACPI_H
-#define ROS_KERN_ACPI_H
+#pragma once
 
 enum {
 
@@ -391,5 +390,3 @@ int acpiinit(void);
 struct Atable *new_acpi_table(uint8_t *p);
 extern struct Madt *apics;
 extern struct Srat *srat;
-
-#endif /* ROS_KERN_ACPI_H */

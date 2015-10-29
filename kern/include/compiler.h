@@ -1,5 +1,4 @@
-#ifndef ROS_KERN_COMPILER_H
-#define ROS_KERN_COMPILER_H
+#pragma once
 
 #ifdef __GNUC__
 
@@ -12,5 +11,3 @@
 #define unlikely(x) (x)
 
 #endif /* #ifdef __GNUC__ */
-
-#endif /* ROS_KERN_COMPILER_H */

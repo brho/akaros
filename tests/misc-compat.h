@@ -1,5 +1,4 @@
-#ifndef MISC_COMPAT_H
-#define MISC_COMPAT_H
+#pragma once
 
 #ifdef __ros__
 
@@ -67,4 +66,3 @@ static void uth_enable_notifs(void)
 #endif /* __x86_64__ */
 
 #endif /* __ros__ */
-#endif /* MISC_COMPAT_H */

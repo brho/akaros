@@ -24,8 +24,7 @@
  * Tim Deegan and Andrew Warfield November 2004.
  */
 
-#ifndef ROS_INC_RING_BUFFER_H
-#define ROS_INC_RING_BUFFER_H
+#pragma once
 #include <string.h>
 #include <ros/arch/membar.h>
 
@@ -313,8 +312,6 @@ typedef struct __name##_back_ring __name##_back_ring_t
     xen_mb();                                                           \
     (_work_to_do) = RING_HAS_UNCONSUMED_RESPONSES(_r);                  \
 } while (0)
-
-#endif /* ROS_INC_RING_BUFFER_H */
 
 /*
  * Local variables:

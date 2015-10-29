@@ -5,8 +5,7 @@
  * Unbounded concurrent queues, user side.  Check k/i/r/ucq.h or the
  * Documentation for more info. */
 
-#ifndef PARLIB_UCQ_H
-#define PARLIB_UCQ_H
+#pragma once
 
 #include <ros/ucq.h>
 
@@ -19,5 +18,3 @@ bool get_ucq_msg(struct ucq *ucq, struct event_msg *msg);
 bool ucq_is_empty(struct ucq *ucq);
 
 __END_DECLS
-
-#endif /* PARLIB_UCQ_H */

@@ -4,8 +4,7 @@
  *
  * Macros to convert to and from endian-data */
 
-#ifndef ROS_KERN_ENDIAN_H
-#define ROS_KERN_ENDIAN_H
+#pragma once
 
 #include <ros/common.h>
 #include <arch/endian.h>
@@ -69,5 +68,3 @@
 #define PP_NTOHL(x) (x)
 
 #endif /* endian */
-
-#endif /* ROS_KERN_ENDIAN_H */

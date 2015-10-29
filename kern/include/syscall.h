@@ -1,5 +1,4 @@
-#ifndef ROS_KERN_SYSCALL_H
-#define ROS_KERN_SYSCALL_H
+#pragma once
 #ifndef ROS_KERNEL
 # error "This is ROS kernel header; user programs should not #include it"
 #endif
@@ -79,5 +78,3 @@ void systrace_clear_buffer(void);
 /* Utility */
 bool syscall_uses_fd(struct syscall *sysc, int fd);
 void print_sysc(struct proc *p, struct syscall *sysc);
-
-#endif /* !ROS_KERN_SYSCALL_H */

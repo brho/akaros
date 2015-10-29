@@ -16,8 +16,7 @@
  * Written by: Dmitry Kravkov
  *
  */
-#ifndef BNX2X_DCB_H
-#define BNX2X_DCB_H
+#pragma once
 
 #include "bnx2x_hsi.h"
 
@@ -202,5 +201,3 @@ int bnx2x_dcbnl_update_applist(struct bnx2x *bp, bool delall);
 
 int bnx2x_dcbx_stop_hw_tx(struct bnx2x *bp);
 int bnx2x_dcbx_resume_hw_tx(struct bnx2x *bp);
-
-#endif /* BNX2X_DCB_H */

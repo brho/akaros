@@ -1,5 +1,4 @@
-#ifndef ROS_KERN_KSTACK_H
-#define ROS_KERN_KSTACK_H
+#pragma once
 
 #ifdef CONFIG_LARGE_KSTACKS
 #define KSTKSHIFT	(PGSHIFT + 1)		/* KSTKSIZE == 2 * PGSIZE */
@@ -8,5 +7,3 @@
 #endif
 
 #define KSTKSIZE	(1 << KSTKSHIFT)	/* size of a static kernel stack */
-
-#endif /* ROS_KERN_KSTACK_H */

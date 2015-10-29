@@ -1,5 +1,4 @@
-#ifndef ROS_INC_ARCH_MEMBAR_H
-#define ROS_INC_ARCH_MEMBAR_H
+#pragma once
 
 /* Full CPU memory barrier */
 #define mb() ({ asm volatile("mfence" ::: "memory"); })
@@ -23,5 +22,3 @@
 /* Bus memory barriers */
 #define bus_wmb() cmb()
 #define bus_rmb() asm volatile("lock; addl $0,0(%%rsp)" : : : "memory")
-
-#endif /* ROS_INC_ARCH_MEMBAR_H */

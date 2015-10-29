@@ -10,8 +10,7 @@
  * management, and other things related to virtual->physical mappings.
  */
 
-#ifndef ROS_KERN_PMAP_H
-#define ROS_KERN_PMAP_H
+#pragma once
 
 #include <ros/memlayout.h>
 #include <sys/queue.h>
@@ -166,5 +165,3 @@ static inline unsigned long nr_pages(size_t nr_bytes)
  * the generic arch/pmap.h.  It's likely that many of these ops will be inlined
  * for speed in pmap_ops. */
 #include <arch/pmap_ops.h>
-
-#endif /* !ROS_KERN_PMAP_H */

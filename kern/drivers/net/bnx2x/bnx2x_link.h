@@ -14,8 +14,7 @@
  *
  */
 
-#ifndef BNX2X_LINK_H
-#define BNX2X_LINK_H
+#pragma once
 
 
 
@@ -545,5 +544,3 @@ void bnx2x_init_mod_abs_int(struct bnx2x *bp, struct link_vars *vars,
 			    uint8_t port);
 
 void bnx2x_period_func(struct link_params *params, struct link_vars *vars);
-
-#endif /* BNX2X_LINK_H */

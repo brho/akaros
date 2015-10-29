@@ -4,8 +4,7 @@
  * Barret Rhoden <brho@cs.berkeley.edu>
  * Original by Paul Pearce <pearce@eecs.berkeley.edu> */
 
-#ifndef ROS_ARCH_PCI_H
-#define ROS_ARCH_PCI_H
+#pragma once
 
 #include <ros/common.h>
 #include <sys/queue.h>
@@ -293,5 +292,3 @@ static inline void *pci_get_drvdata(struct pci_device *pcidev)
 {
 	return pcidev->dev_data;
 }
-
-#endif /* ROS_ARCH_PCI_H */

@@ -10,8 +10,7 @@
  * @author John Levon <levon@movementarian.org>
  */
 
-#ifndef OPROFILE_H
-#define OPROFILE_H
+#pragma once
 
 /* Each escaped entry is prefixed by ESCAPE_CODE
  * then one of the following codes, then the
@@ -163,5 +162,3 @@ static inline int __init oprofile_perf_init(struct oprofile_operations *ops)
 }
 static inline void oprofile_perf_exit(void) { }
 #endif
-
-#endif /* OPROFILE_H */

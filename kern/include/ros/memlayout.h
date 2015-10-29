@@ -1,5 +1,4 @@
-#ifndef ROS_INC_MEMLAYOUT_H
-#define ROS_INC_MEMLAYOUT_H
+#pragma once
 
 #ifndef __ASSEMBLER__
 #include <ros/common.h>
@@ -31,5 +30,3 @@
 #define USTACKTOP		UMAPTOP
 /* Stack size of thread0, allocated by the kernel */
 #define USTACK_NUM_PAGES	256
-
-#endif /* !ROS_INC_MEMLAYOUT_H */

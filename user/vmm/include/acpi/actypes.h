@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACTYPES_H__
-#define __ACTYPES_H__
+#pragma once
 
 /* acpisrc:struct_defs -- for acpisrc conversion */
 
@@ -1279,5 +1278,3 @@ struct acpi_memory_list {
 /* Definitions of getopt */
 
 #define ACPI_OPT_END                    -1
-
-#endif				/* __ACTYPES_H__ */

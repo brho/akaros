@@ -5,8 +5,7 @@
  * FD taps.  Allows the user to receive events when certain things happen to an
  * FD's underlying disk/device file. */
 
-#ifndef ROS_KERN_FDTAP_H
-#define ROS_KERN_FDTAP_H
+#pragma once
 
 #include <ros/fdtap.h>
 #include <sys/queue.h>
@@ -34,5 +33,3 @@ struct fd_tap {
 int add_fd_tap(struct proc *p, struct fd_tap_req *tap_req);
 int remove_fd_tap(struct proc *p, int fd);
 int fire_tap(struct fd_tap *tap, int filter);
-
-#endif /* ROS_KERN_FDTAP_H */

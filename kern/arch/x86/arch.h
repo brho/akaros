@@ -1,5 +1,4 @@
-#ifndef ROS_INC_ARCH_H
-#define ROS_INC_ARCH_H
+#pragma once
 
 #include <ros/arch/arch.h>
 #include <ros/common.h>
@@ -188,5 +187,3 @@ static inline uint64_t max_guest_pa(void)
 {
 	return (1ULL<<40) - 1;
 }
-
-#endif /* !ROS_INC_ARCH_H */

@@ -32,8 +32,7 @@
  * SOFTWARE.
  */
 
-#ifndef MLX4_DOORBELL_H
-#define MLX4_DOORBELL_H
+#pragma once
 
 #include <arch/types.h>
 
@@ -81,5 +80,3 @@ static inline void mlx4_write64(__be32 val[2], void __iomem *dest,
 }
 
 #endif
-
-#endif /* MLX4_DOORBELL_H */

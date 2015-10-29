@@ -8,8 +8,7 @@
  */
 /* a hash file */
 
-#ifndef NDBLIB_NDBHF_H
-#define NDBLIB_NDBHF_H
+#pragma once
 
 __BEGIN_DECLS
 
@@ -43,5 +42,3 @@ struct ndbtuple* _ndbcacheadd(struct ndb *db, struct ndbs *s, char *attr, char *
 			      struct ndbtuple *t);
 
 __END_DECLS
-
-#endif /* NDBLIB_NDBHF_H */

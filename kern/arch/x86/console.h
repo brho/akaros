@@ -4,8 +4,7 @@
  *
  * x86 Console (keyboard/serial/monitor) interfaces */
 
-#ifndef ROS_KERN_ARCH_CONSOLE_H
-#define ROS_KERN_ARCH_CONSOLE_H
+#pragma once
 
 #include <ros/common.h>
 #include <sys/queue.h>
@@ -38,5 +37,3 @@ void cons_putc(int c);
 /* TODO: remove us (and serial IO) */
 void serial_send_byte(uint8_t b);
 int serial_read_byte();
-
-#endif /* ROS_KERN_ARCH_CONSOLE_H */

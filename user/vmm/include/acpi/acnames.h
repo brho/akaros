@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACNAMES_H__
-#define __ACNAMES_H__
+#pragma once
 
 /* Method names - these methods can appear anywhere in the namespace */
 
@@ -87,5 +86,3 @@
 #define ACPI_PREFIX_LOWER       (u32) 0x69706361	/* "acpi" */
 
 #define ACPI_NS_ROOT_PATH       "\\"
-
-#endif				/* __ACNAMES_H__  */

@@ -7,8 +7,7 @@
  * the Free Software Foundation.
  */
 
-#ifndef BNX2X_MFW_REQ_H
-#define BNX2X_MFW_REQ_H
+#pragma once
 
 #define PORT_0			0
 #define PORT_1			1
@@ -165,4 +164,3 @@ union drv_info_to_mcp {
 	struct fcoe_stats_info	fcoe_stat;
 	struct iscsi_stats_info	iscsi_stat;
 };
-#endif /* BNX2X_MFW_REQ_H */

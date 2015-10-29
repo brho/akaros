@@ -4,8 +4,7 @@
  *
  * 64 bit EPT helpers */
 
-#ifndef ROS_ARCH_VMM_EPT_H
-#define ROS_ARCH_VMM_EPT_H
+#pragma once
 
 #include <arch/vmm/intel/vmx.h>	/* for sync/flush helpers */
 #include <smp.h>				/* for current */
@@ -174,5 +173,3 @@ static inline void ept_inval_global(void)
 {
 	ept_sync_global();
 }
-
-#endif /* ROS_ARCH_VMM_EPT_H */

@@ -8,8 +8,7 @@
  * @author Robert Richter <robert.richter@amd.com>
  */
 
-#ifndef OPROFILE_CPU_BUFFER_H
-#define OPROFILE_CPU_BUFFER_H
+#pragma once
 #include <vfs.h>
 #include <kfs.h>
 #include <slab.h>
@@ -72,5 +71,3 @@ struct oprofile_cpu_buffer {
 #define IS_KERNEL		(1UL << 1)
 #define TRACE_BEGIN		(1UL << 2)
 #define USER_CTX_SWITCH		(1UL << 3)
-
-#endif /* OPROFILE_CPU_BUFFER_H */

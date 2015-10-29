@@ -5,8 +5,7 @@
  * Memory management for processes: syscall related functions, virtual memory
  * regions, etc. */
 
-#ifndef ROS_KERN_MM_H
-#define ROS_KERN_MM_H
+#pragma once
 
 #include <ros/common.h>
 #include <ros/mman.h>
@@ -82,5 +81,3 @@ int unmap_vmap_segment(uintptr_t vaddr, unsigned long num_pages);
 uintptr_t vmap_pmem(uintptr_t paddr, size_t nr_bytes);
 uintptr_t vmap_pmem_nocache(uintptr_t paddr, size_t nr_bytes);
 int vunmap_vmem(uintptr_t vaddr, size_t nr_bytes);
-
-#endif /* !ROS_KERN_MM_H */

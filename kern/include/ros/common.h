@@ -1,5 +1,4 @@
-#ifndef ROS_COMMON_H
-#define ROS_COMMON_H
+#pragma once
 
 #ifndef __ASSEMBLER__
 
@@ -194,5 +193,3 @@ static inline bool mult_will_overflow_u64(uint64_t a, uint64_t b)
 }
 
 #endif /* __ASSEMBLER__ */
-
-#endif /* ROS_COMMON_H */

@@ -6,8 +6,7 @@
  * Scheduling and dispatching.
  */
 
-#ifndef ROS_KERN_SCHEDULE_H
-#define ROS_KERN_SCHEDULE_H
+#pragma once
 
 #include <ros/common.h>
 #include <sys/queue.h>
@@ -106,5 +105,3 @@ void print_all_resources(void);
 void print_prov_map(void);
 void next_core(uint32_t pcoreid);
 void sort_idles(void);
-
-#endif /* ROS_KERN_SCHEDULE_H */

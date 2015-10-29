@@ -13,8 +13,7 @@
  * GNU General Public License for more details.
  */
 
-#ifndef ACPI_LPAT_H
-#define ACPI_LPAT_H
+#pragma once
 
 struct acpi_lpat {
 	int temp;
@@ -61,5 +60,4 @@ static void acpi_lpat_free_conversion_table(struct acpi_lpat_conversion_table
 {
 }
 
-#endif
 #endif

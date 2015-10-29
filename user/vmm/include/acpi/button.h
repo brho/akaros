@@ -1,5 +1,4 @@
-#ifndef ACPI_BUTTON_H
-#define ACPI_BUTTON_H
+#pragma once
 
 #include <linux/notifier.h>
 
@@ -21,5 +20,3 @@ static inline int acpi_lid_open(void)
 	return 1;
 }
 #endif /* defined(CONFIG_ACPI_BUTTON) || defined(CONFIG_ACPI_BUTTON_MODULE) */
-
-#endif /* ACPI_BUTTON_H */

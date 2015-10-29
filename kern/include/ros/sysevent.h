@@ -5,8 +5,7 @@
  * Kevin Klues <klueska@cs.berkeley.edu>    
  */
 
-#ifndef ROS_SYSEVENT_H
-#define ROS_SYSEVENT_H
+#pragma once
 
 #include <ros/ring_buffer.h>
 #include <ros/arch/mmu.h>
@@ -34,6 +33,3 @@ typedef struct sysevent_rsp {
 // Generic Sysevent Ring Buffer
 #define SYSEVENTRINGSIZE    PGSIZE
 DEFINE_RING_TYPES(sysevent, sysevent_t, sysevent_rsp_t);
-
-#endif //ROS_SYSEVENT_H
-

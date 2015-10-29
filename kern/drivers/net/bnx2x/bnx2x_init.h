@@ -12,8 +12,7 @@
  * Modified by: Vladislav Zolotarov
  */
 
-#ifndef BNX2X_INIT_H
-#define BNX2X_INIT_H
+#pragma once
 
 /* Init operation types and structures */
 enum {
@@ -784,7 +783,3 @@ static inline void bnx2x_enable_blocks_parity(struct bnx2x *bp)
 	/* Enable MCP parity attentions */
 	bnx2x_set_mcp_parity(bp, true);
 }
-
-
-#endif /* BNX2X_INIT_H */
-

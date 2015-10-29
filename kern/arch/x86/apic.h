@@ -4,8 +4,7 @@
  * See LICENSE for details.
  */
 
-#ifndef ROS_KERN_APIC_H
-#define ROS_KERN_APIC_H
+#pragma once
 
 /* 
  * Functions and definitions for dealing with the APIC and PIC, specific to
@@ -316,5 +315,3 @@ extern struct apic xioapic[Napic];
 char *apicdump(char *, char *);
 void apictimerenab(void);
 void apicinit(int apicno, uintptr_t pa, int isbp);
-
-#endif /* ROS_KERN_APIC_H */

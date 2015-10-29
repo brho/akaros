@@ -1,5 +1,4 @@
-#ifndef VIRTIO_VIRTIO_H
-#define VIRTIO_VIRTIO_H
+#pragma once
 
 #include <ros/arch/membar.h>
 #include <ros/arch/mmu.h>
@@ -134,5 +133,3 @@ static inline void write32(volatile void *addr, uint32_t value)
 {
 	*(volatile uint32_t *)addr = value;
 }
-
-#endif /* VIRTIO_VIRTIO_H */

@@ -37,8 +37,7 @@
  * used.  So your handler should check for a flag or something.  Timestamps
  * might help make sense of the data in these cases too. */
 
-#ifndef ROS_INC_TRACE_H
-#define ROS_INC_TRACE_H
+#pragma once
 
 #include <ros/common.h>
 #include <assert.h>
@@ -117,5 +116,3 @@ static inline void *get_trace_slot_overwrite_racy(struct trace_ring *tr)
 {
 	return __get_tr_slot_overwrite(tr, tr->tr_next++);
 }
-
-#endif /* ROS_INC_TRACE_H */

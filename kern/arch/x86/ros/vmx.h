@@ -21,8 +21,7 @@
  *    Yaniv Kamay <yaniv@qumranet.com>
  *
  */
-#ifndef ROS_INC_VMX_H
-#define ROS_INC_VMX_H
+#pragma once
 
 #define CPU_BASED_VIRTUAL_INTR_PENDING  0x00000004
 #define CPU_BASED_USE_TSC_OFFSETING     0x00000008
@@ -725,5 +724,3 @@ static char * const VMX_EXIT_REASON_NAMES[] = {
 	"VMX_TIMER_EXPIRED", "INVVPID", "WBINVD", "XSETBV", "APIC_WRITE", "RDRAND",
 	"INVPCID", "VMFUNC", "60", "RDSEED", "62", "XSAVES", "XRSTORS"
 };
-
-#endif /* ROS_INC_VMX_H */

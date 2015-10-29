@@ -1,5 +1,4 @@
-#ifndef _VMM_INCLUDE_VIRTIO_CONFIG_H
-#define _VMM_INCLUDE_VIRTIO_CONFIG_H
+#pragma once
 /* This header, excluding the #ifdef __KERNEL__ part, is BSD licensed so
  * anyone can use the definitions to implement compatible drivers/servers.
  *
@@ -59,5 +58,3 @@
 
 /* v1.0 compliant. */
 #define VIRTIO_F_VERSION_1		32
-
-#endif /* _VMM_INCLUDE_VIRTIO_CONFIG_H */

@@ -11,8 +11,7 @@
  *
  * The static inlines are defined farther down in the file (as always). */
 
-#ifndef ROS_KERN_ATOMIC_H
-#define ROS_KERN_ATOMIC_H
+#pragma once
 
 #include <ros/common.h>
 #include <ros/atomic.h>
@@ -345,5 +344,3 @@ static inline bool read_seqretry(seqlock_t *lock, seq_ctr_t ctr)
 {
 	return seqctr_retry(lock->r_ctr, ctr);
 }
-
-#endif /* ROS_KERN_ATOMIC_H */

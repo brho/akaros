@@ -27,8 +27,7 @@
  * SOFTWARE. */
 
 
-#ifndef ROS_KERN_NS_H
-#define ROS_KERN_NS_H
+#pragma once
 
 #include <err.h>
 #include <rendez.h>
@@ -1047,5 +1046,3 @@ extern unsigned int qiomaxatomic;
 
 /* special sections */
 #define __devtab  __attribute__((__section__(".devtab")))
-
-#endif /* ROS_KERN_NS_H */

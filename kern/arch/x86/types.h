@@ -1,5 +1,4 @@
-#ifndef ROS_INC_TYPES_H
-#define ROS_INC_TYPES_H
+#pragma once
 
 #include <stddef.h>
 #ifndef LITTLE_ENDIAN
@@ -33,5 +32,3 @@ typedef uint64_t uintptr_t;
 #define PAGE_SHIFT 12
 #define PAGE_SIZE (1<<PAGE_SHIFT)
 #define PAGE_MASK 0xFFFFFFFFfffff000
-
-#endif /* !ROS_INC_TYPES_H */

@@ -15,8 +15,7 @@
  * Maintained by: Ariel Elior <ariel.elior@qlogic.com>
  * Written by: Ariel Elior <ariel.elior@qlogic.com>
  */
-#ifndef VF_PF_IF_H
-#define VF_PF_IF_H
+#pragma once
 
 #ifdef CONFIG_BNX2X_SRIOV
 
@@ -459,4 +458,3 @@ enum channel_tlvs {
 };
 
 #endif /* CONFIG_BNX2X_SRIOV */
-#endif /* VF_PF_IF_H */

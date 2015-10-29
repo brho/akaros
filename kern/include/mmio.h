@@ -13,8 +13,7 @@
  * for the addr parameter.
  */
 
-#ifndef ROS_KERN_MMIO_H
-#define ROS_KERN_MMIO_H
+#pragma once
 
 #include <sys/types.h>
 #include <endian.h>
@@ -112,5 +111,3 @@ static inline void write64(uint64_t value, volatile void __iomem *addr)
 {
 	__raw_write64(cpu_to_le64(value), addr);
 }
-
-#endif /* ROS_KERN_MMIO_H */

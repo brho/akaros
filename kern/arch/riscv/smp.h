@@ -1,5 +1,4 @@
-#ifndef ROS_ARCH_SMP_H
-#define ROS_ARCH_SMP_H
+#pragma once
 
 #include <ros/common.h>
 #include <arch/arch.h>
@@ -12,5 +11,3 @@ typedef struct
 	wait_list_t wait_list;
 	spinlock_t lock;
 } handler_wrapper_t;
-
-#endif /* !ROS_ARCH_SMP_H */

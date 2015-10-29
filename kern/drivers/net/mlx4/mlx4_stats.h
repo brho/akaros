@@ -1,5 +1,4 @@
-#ifndef _MLX4_STATS_
-#define _MLX4_STATS_
+#pragma once
 
 #ifdef MLX4_EN_PERF_STAT
 #define NUM_PERF_STATS			NUM_PERF_COUNTERS
@@ -103,5 +102,3 @@ enum {
 
 #define MLX4_FIND_NETDEV_STAT(n) (offsetof(struct net_device_stats, n) / \
 				  sizeof(((struct net_device_stats *)0)->n))
-
-#endif

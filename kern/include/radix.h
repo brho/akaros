@@ -16,8 +16,7 @@
  * lookups based on those tags.  Or you will be able to, once it is
  * implemented. */
 
-#ifndef ROS_KERN_RADIX_H
-#define ROS_KERN_RADIX_H
+#pragma once
 
 #define LOG_RNODE_SLOTS 6
 #define NR_RNODE_SLOTS (1 << LOG_RNODE_SLOTS)
@@ -67,5 +66,3 @@ int radix_tag_gang_lookup(struct radix_tree *tree, void **results,
 
 /* Debugging */
 void print_radix_tree(struct radix_tree *tree);
-
-#endif /* !ROS_KERN_RADIX_H */

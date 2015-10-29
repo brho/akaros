@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACRESTYP_H__
-#define __ACRESTYP_H__
+#pragma once
 
 /*
  * Definitions for Resource Attributes
@@ -617,5 +616,3 @@ struct acpi_pci_routing_table {
 	u32 source_index;
 	char source[4];		/* pad to 64 bits so sizeof() works in all cases */
 };
-
-#endif				/* __ACRESTYP_H__ */

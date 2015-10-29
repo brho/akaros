@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACAKAROSEX_H__
-#define __ACAKAROSEX_H__
+#pragma once
 
 #ifdef __KERNEL__
 
@@ -112,5 +111,3 @@ void early_acpi_os_unmap_memory(void __iomem * virt, acpi_size size);
 #enif
 
 #endif				/* __KERNEL__ */
-
-#endif				/* __ACAKAROSEX_H__ */

@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACOUTPUT_H__
-#define __ACOUTPUT_H__
+#pragma once
 
 /*
  * Debug levels and component IDs. These are used to control the
@@ -455,5 +454,3 @@
 #define return_UINT32(s)                return(s)
 
 #endif				/* ACPI_DEBUG_OUTPUT */
-
-#endif				/* __ACOUTPUT_H__ */

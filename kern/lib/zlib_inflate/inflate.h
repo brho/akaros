@@ -1,5 +1,4 @@
-#ifndef INFLATE_H
-#define INFLATE_H
+#pragma once
 
 /* inflate.h -- internal inflate state definition
  * Copyright (C) 1995-2004 Mark Adler
@@ -108,4 +107,3 @@ struct inflate_state {
     unsigned short work[288];   /* work area for code table building */
     code codes[ENOUGH];         /* space for code tables */
 };
-#endif

@@ -49,8 +49,7 @@
  * many elements at once (like sys_pipe).  But we can hold off til we see how
  * people use this.  For now, this is built for one copy at a time. */
 
-#ifndef ROS_KERN_APIPE_H
-#define ROS_KERN_APIPE_H
+#pragma once
 
 #include <ros/common.h>
 #include <kthread.h>
@@ -82,5 +81,3 @@ void apipe_open_reader(struct atomic_pipe *ap);
 void apipe_open_writer(struct atomic_pipe *ap);
 void apipe_close_reader(struct atomic_pipe *ap);
 void apipe_close_writer(struct atomic_pipe *ap);
-
-#endif /* ROS_KERN_APIPE_H */

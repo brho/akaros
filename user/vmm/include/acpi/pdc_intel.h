@@ -1,8 +1,7 @@
 
 /* _PDC bit definition for Intel processors */
 
-#ifndef __PDC_INTEL_H__
-#define __PDC_INTEL_H__
+#pragma once
 
 #define ACPI_PDC_P_FFH			(0x0001)
 #define ACPI_PDC_C_C1_HALT		(0x0002)
@@ -31,5 +30,3 @@
 					 ACPI_PDC_C_C1_HALT | \
 					 ACPI_PDC_C_C1_FFH  | \
 					 ACPI_PDC_C_C2C3_FFH)
-
-#endif				/* __PDC_INTEL_H__ */

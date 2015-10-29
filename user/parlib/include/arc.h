@@ -1,6 +1,5 @@
 // Header for Asynch Remote Call, currently only support remote syscalls.
-#ifndef PARLIB_ARC_H
-#define PARLIB_ARC_H
+#pragma once
 
 #include <parlib/parlib.h>
 #include <error.h>
@@ -94,5 +93,3 @@ int get_all_desc(async_desc_t** a_desc, syscall_desc_t** s_desc);
 syscall_desc_t* arc_call(long int num, ...);
 
 __END_DECLS
-
-#endif /* PARLIB_ARC_H */

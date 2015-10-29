@@ -4,8 +4,7 @@
  *
  * Console (Keyboard/serial/whatever) related functions. */
 
-#ifndef ROS_KERN_CONSOLE_H
-#define ROS_KERN_CONSOLE_H
+#pragma once
 
 #include <atomic.h>
 #include <kthread.h>
@@ -38,5 +37,3 @@ void __run_mon(uint32_t srcid, long a0, long a1, long a2);
 
 /* function to run one command. */
 int onecmd(int argc, char *argv[], struct hw_trapframe *hw_tf);
-
-#endif /* ROS_KERN_CONSOLE_H */

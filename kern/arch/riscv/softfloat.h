@@ -1,5 +1,4 @@
-#ifndef _SOFTFLOAT_H
-#define _SOFTFLOAT_H
+#pragma once
 
 #ifdef __cplusplus
   extern "C" {
@@ -353,6 +352,4 @@ enum {
 
 #ifdef __cplusplus
  }
-#endif
-
 #endif

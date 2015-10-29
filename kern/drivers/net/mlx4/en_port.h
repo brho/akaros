@@ -31,8 +31,7 @@
  *
  */
 
-#ifndef _MLX4_EN_PORT_H_
-#define _MLX4_EN_PORT_H_
+#pragma once
 
 
 #define SET_PORT_GEN_ALL_VALID	0x7
@@ -582,6 +581,3 @@ struct mlx4_en_stat_out_mbox {
 	/* Total dropped Xmited packets */
 	__be32 TDROP;
 };
-
-
-#endif

@@ -1,9 +1,10 @@
-#ifndef ROS_INC_ARCH_SYSCALL_H
-#define ROS_INC_ARCH_SYSCALL_H
+#pragma once
 
 #define T_SYSCALL	48
 
 #ifndef ROS_KERNEL
+
+#define ROS_INC_ARCH_SYSCALL_H
 
 #include <ros/arch/syscall64.h>
 
@@ -17,5 +18,3 @@ static inline long __ros_arch_syscall(long _a0, long _a1)
 }
 
 #endif /* ifndef ROS_KERNEL */
-
-#endif /* ROS_INC_ARCH_SYSCALL_H */

@@ -1,5 +1,4 @@
-#ifndef _RISCV_PCR_H
-#define _RISCV_PCR_H
+#pragma once
 
 #define SR_ET    0x00000001
 #define SR_EF    0x00000002
@@ -85,8 +84,6 @@
 #define clearpcr(reg,val) ({ long __tmp; \
           asm volatile ("clearpcr %0,cr%2,%1" : "=r"(__tmp) : "i"(val), "i"(reg)); \
           __tmp; })
-
-#endif
 
 #endif
 

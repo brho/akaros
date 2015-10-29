@@ -35,8 +35,7 @@
  *   change all 9ns rendez functions
  */
 
-#ifndef ROS_KERN_RENDEZ_H
-#define ROS_KERN_RENDEZ_H
+#pragma once
 
 #include <ros/common.h>
 #include <kthread.h>
@@ -50,5 +49,3 @@ void rendez_sleep(struct rendez *rv, int (*cond)(void*), void *arg);
 void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
                           uint64_t usec);
 bool rendez_wakeup(struct rendez *rv);
-
-#endif /* ROS_KERN_RENDEZ_H */

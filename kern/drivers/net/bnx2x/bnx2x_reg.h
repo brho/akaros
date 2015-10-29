@@ -18,8 +18,7 @@
  * WR - Write Clear (write 1 to clear the bit)
  *
  */
-#ifndef BNX2X_REG_H
-#define BNX2X_REG_H
+#pragma once
 
 #define ATC_ATC_INT_STS_REG_ADDRESS_ERROR			 (0x1<<0)
 #define ATC_ATC_INT_STS_REG_ATC_GPA_MULTIPLE_HITS		 (0x1<<2)
@@ -7662,6 +7661,3 @@ static inline uint8_t calc_crc8(uint32_t data, uint8_t crc)
 
 	return crc_res;
 }
-
-
-#endif /* BNX2X_REG_H */

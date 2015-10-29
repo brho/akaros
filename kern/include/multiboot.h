@@ -1,5 +1,4 @@
-#ifndef ROS_INC_MULTIBOOT_H
-#define ROS_INC_MULTIBOOT_H
+#pragma once
 
 #include <ros/common.h>
 
@@ -233,5 +232,3 @@ void mboot_foreach_mmap(struct multiboot_info *mbi, mboot_foreach_t func,
                         void *data);
 bool mboot_region_collides(struct multiboot_info *mbi, uintptr_t base,
                            uintptr_t end);
-
-#endif /* !ROS_INC_MULTIBOOT_H */

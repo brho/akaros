@@ -1,5 +1,4 @@
-#ifndef _ROS_SYS_UIO_H
-#define _ROS_SYS_UIO_H
+#pragma once
 
 #include <sys/types.h>
 
@@ -32,7 +31,3 @@ struct uio {
 	enum	uio_rw uio_rw;		/* operation */
 	struct	proc *uio_proc;		/* owner */
 };
-
-
-
-#endif

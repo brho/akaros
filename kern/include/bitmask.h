@@ -1,5 +1,4 @@
-#ifndef ROS_KERN_BITMASK_H
-#define ROS_KERN_BITMASK_H
+#pragma once
 
 #include <arch/bitmask.h>
 
@@ -53,5 +52,3 @@ static inline void CLR_BITMASK_RANGE(uint8_t* m, size_t beg, size_t end)
 			(work_fn)(i);                                                      \
 	}                                                                          \
 }                                                                              
-
-#endif /* ROS_KERN_BITMASK_H */

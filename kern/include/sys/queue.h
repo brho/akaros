@@ -30,8 +30,7 @@
  * $FreeBSD$
  */
 
-#ifndef ROS_KERN_SYS_QUEUE_H
-#define ROS_KERN_SYS_QUEUE_H
+#pragma once
 
 #include <ros/common.h>    /* for __offsetof */
 
@@ -629,5 +628,3 @@ struct {								\
 	else								\
 		(head2)->tqh_last = &(head2)->tqh_first;		\
 } while (0)
-
-#endif /* ROS_KERN_SYS_QUEUE_H */

@@ -4,8 +4,7 @@
  * See LICENSE for details.
  */
 
-#ifndef ROS_INC_SMP_H
-#define ROS_INC_SMP_H
+#pragma once
 
 /* SMP related functions */
 
@@ -161,5 +160,3 @@ void pcpui_tr_foreach(int coreid, int type);
 void pcpui_tr_foreach_all(int type);
 void pcpui_tr_reset_all(void);
 void pcpui_tr_reset_and_clear_all(void);
-
-#endif /* ROS_INC_SMP_H */

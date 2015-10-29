@@ -32,8 +32,7 @@
  * SOFTWARE.
  */
 
-#ifndef MLX4_FW_H
-#define MLX4_FW_H
+#pragma once
 
 #include "mlx4.h"
 #include "icm.h"
@@ -255,5 +254,3 @@ int mlx4_UNMAP_ICM_AUX(struct mlx4_dev *dev);
 int mlx4_NOP(struct mlx4_dev *dev);
 int mlx4_MOD_STAT_CFG(struct mlx4_dev *dev, struct mlx4_mod_stat_cfg *cfg);
 void mlx4_opreq_action(struct work_struct *work);
-
-#endif /* MLX4_FW_H */

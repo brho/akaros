@@ -1,5 +1,4 @@
-#ifndef PARLIB_ARCH_H
-#define PARLIB_ARCH_H
+#pragma once
 
 #include <parlib/common.h>
 #include <ros/trapframe.h>
@@ -93,5 +92,3 @@ static inline void restore_fp_state(struct ancillary_state* silly)
 }
 
 __END_DECLS
-
-#endif /* PARLIB_ARCH_H */

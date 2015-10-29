@@ -11,8 +11,7 @@
  * Based on code from Michael Chan's bnx2 driver
  */
 
-#ifndef BNX2X_H
-#define BNX2X_H
+#pragma once
 
 /* compilation time flags */
 
@@ -2625,5 +2624,3 @@ void bnx2x_update_mng_version(struct bnx2x *bp);
 
 #define BNX2X_MAX_PHC_DRIFT 31000000
 #define BNX2X_PTP_TX_TIMEOUT
-
-#endif /* bnx2x.h */

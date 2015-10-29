@@ -2,8 +2,7 @@
  * Kevin Klues <klueska@cs.berkeley.edu>
  * See LICENSE for details. */
 
-#ifndef AKAROS_ARCH_TOPOLOGY_H
-#define AKAROS_ARCH_TOPOLOGY_H
+#pragma once
 
 #include <ros/common.h>
 #include <arch/apic.h>
@@ -79,5 +78,3 @@ static inline int core_id_early(void)
 		return 0;
 	return core_id();
 }
-
-#endif /* AKAROS_ARCH_TOPOLOGY_H */

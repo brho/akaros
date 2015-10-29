@@ -7,8 +7,7 @@
  * with the VFS, block devices also use it (hence the separate header and c
  * file). */
 
-#ifndef ROS_KERN_PAGEMAP_H
-#define ROS_KERN_PAGEMAP_H
+#pragma once
 
 #include <radix.h>
 #include <atomic.h>
@@ -68,5 +67,3 @@ void pm_remove_vmr(struct page_map *pm, struct vm_region *vmr);
 int pm_remove_contig(struct page_map *pm, unsigned long index,
                      unsigned long nr_pgs);
 void print_page_map_info(struct page_map *pm);
-
-#endif /* ROS_KERN_PAGEMAP_H */

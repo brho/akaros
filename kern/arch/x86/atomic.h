@@ -4,8 +4,7 @@
  *
  * x86 atomics and locking functions. */
 
-#ifndef ROS_KERN_ARCH_ATOMIC_H
-#define ROS_KERN_ARCH_ATOMIC_H
+#pragma once
 
 #include <ros/common.h>
 #include <ros/arch/membar.h>
@@ -167,5 +166,3 @@ static inline void __spinlock_init(spinlock_t *lock)
 {
 	lock->rlock = 0;
 }
-
-#endif /* ROS_KERN_ARCH_ATOMIC_H */

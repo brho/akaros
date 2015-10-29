@@ -1,5 +1,4 @@
-#ifndef ROS_KERN_BITOPS_H
-#define ROS_KERN_BITOPS_H
+#pragma once
 
 #define BIT(nr)			(1UL << (nr))
 #define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
@@ -130,4 +129,3 @@ static inline void CLR_BITMASK_RANGE(uint8_t* m, size_t beg, size_t end)
 	}                                                                          \
 }                                                                              
 #endif
-#endif /* ROS_KERN_BITOPS_H */

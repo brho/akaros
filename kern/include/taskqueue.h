@@ -17,8 +17,7 @@
  * aren't entirely clear.
  */
 
-#ifndef ROS_KERN_TASKQUEUE_H
-#define ROS_KERN_TASKQUEUE_H
+#pragma once
 
 typedef void (*task_fn_t)(void *context, int pending);
 struct taskqueue {};
@@ -77,5 +76,3 @@ bool queue_delayed_work(struct workqueue_struct *wq, struct delayed_work *dwork,
 bool schedule_delayed_work(struct delayed_work *dwork, unsigned long delay);
 bool cancel_delayed_work(struct delayed_work *dwork);
 bool cancel_delayed_work_sync(struct delayed_work *dwork);
-
-#endif /* ROS_KERN_TASKQUEUE_H */

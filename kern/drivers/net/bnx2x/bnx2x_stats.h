@@ -14,8 +14,7 @@
  * Statistics and Link management by Yitchak Gertner
  *
  */
-#ifndef BNX2X_STATS_H
-#define BNX2X_STATS_H
+#pragma once
 
 #include <linux_compat.h>
 
@@ -552,4 +551,3 @@ void bnx2x_save_statistics(struct bnx2x *bp);
 
 void bnx2x_afex_collect_stats(struct bnx2x *bp, void *void_afex_stats,
 			      uint32_t stats_type);
-#endif /* BNX2X_STATS_H */

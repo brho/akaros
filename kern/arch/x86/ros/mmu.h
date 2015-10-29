@@ -1,7 +1,8 @@
 /* Contains macros and constants for the kernel VM mapping, page tables,
  * segmentation, control registers, etc. */
 
-#ifndef ROS_INC_ARCH_MMU_H
+#pragma once
+
 #define ROS_INC_ARCH_MMU_H
 
 #include <ros/arch/mmu64.h>
@@ -68,5 +69,3 @@
 #define FEC_PR		0x1	// Page fault caused by protection violation
 #define FEC_WR		0x2	// Page fault caused by a write
 #define FEC_U		0x4	// Page fault occured while in user mode
-
-#endif /* ROS_INC_ARCH_MMU_H */

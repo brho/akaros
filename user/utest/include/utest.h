@@ -1,5 +1,4 @@
-#ifndef UTEST_UTEST_H
-#define UTEST_UTEST_H
+#pragma once
 
 /*
  * Header file with infrastructure needed for userspace unit tests:
@@ -105,5 +104,3 @@ static int run_utests(char *suite_name, struct utest tests[], int num_tests) {
 }
 
 __END_DECLS
-
-#endif /* UTEST_UTEST_H */

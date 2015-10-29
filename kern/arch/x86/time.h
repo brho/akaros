@@ -4,8 +4,7 @@
  *
  * See LICENSE for details. */
 
-#ifndef ROS_KERN_ARCH_TIME_H
-#define ROS_KERN_ARCH_TIME_H
+#pragma once
 
 // PIT (Programmable Interval Timer)
 #define	TIMER_REG_CNTR0	0	/* timer counter 0 port */
@@ -52,5 +51,3 @@ void udelay_pit(uint64_t usec);
 // TODO: right now timer defaults to TSC
 uint64_t gettimer(void);
 uint64_t getfreq(void);
-
-#endif /* ROS_KERN_ARCH_TIME_H */

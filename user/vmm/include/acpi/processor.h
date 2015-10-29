@@ -1,5 +1,4 @@
-#ifndef __ACPI_PROCESSOR_H
-#define __ACPI_PROCESSOR_H
+#pragma once
 
 #include <linux/kernel.h>
 #include <linux/cpu.h>
@@ -360,6 +359,4 @@ static inline void acpi_thermal_cpufreq_exit(void)
 {
 	return;
 }
-#endif
-
 #endif

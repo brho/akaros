@@ -1,5 +1,4 @@
-#ifndef ROS_INC_STRING_H
-#define ROS_INC_STRING_H
+#pragma once
 
 #include <ros/common.h>
 
@@ -42,5 +41,3 @@ void bcopy(const void *src, void *dst, size_t len);
 #ifdef CONFIG_RISCV
 #warning Implement bcopy
 #endif
-
-#endif /* ROS_INC_STRING_H */

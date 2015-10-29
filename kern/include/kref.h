@@ -10,8 +10,7 @@
  *
  * See our Documentation/kref.txt for more info. */
 
-#ifndef ROS_KERN_KREF_H
-#define ROS_KERN_KREF_H
+#pragma once
 
 #include <atomic.h>
 #include <assert.h>
@@ -80,5 +79,3 @@ static void fake_release(struct kref *kref)
 {
 	panic("Cleaning up this object is not supported!\n");
 }
-
-#endif /* ROS_KERN_KREF_H */

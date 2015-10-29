@@ -10,8 +10,7 @@
  * One consequence of this: "if some reader holds a rwlock, then any other
  * thread (including itself) can get an rlock". */
 
-#ifndef ROS_KERN_RWLOCK_H
-#define ROS_KERN_RWLOCK_H
+#pragma once
 
 #include <ros/common.h>
 #include <kthread.h>
@@ -32,5 +31,3 @@ bool canrlock(struct rwlock *rw_lock);
 void runlock(struct rwlock *rw_lock);
 void wlock(struct rwlock *rw_lock);
 void wunlock(struct rwlock *rw_lock);
-
-#endif /* ROS_KERN_RWLOCK_H */

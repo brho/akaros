@@ -1,8 +1,7 @@
 /*
  * Defines x86 CPU feature bits
  */
-#ifndef _ASM_X86_CPUFEATURE_H
-#define _ASM_X86_CPUFEATURE_H
+#pragma once
 
 #define NCAPINTS	10	/* N 32-bit words worth of info */
 
@@ -361,4 +360,3 @@ static inline bool __static_cpu_has(uint16_t bit)
 		__static_cpu_has(bit) :				\
 		boot_cpu_has(bit)				\
 )
-#endif /* _ASM_X86_CPUFEATURE_H */

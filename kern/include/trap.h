@@ -1,6 +1,7 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef ROS_KERN_TRAP_H
+#pragma once
+
 #define ROS_KERN_TRAP_H
 
 #include <ros/trapframe.h>
@@ -192,5 +193,3 @@ void print_kmsgs(uint32_t coreid);
 
 /* Debugging */
 void print_kctx_depths(const char *str);
- 
-#endif /* ROS_KERN_TRAP_H */

@@ -36,8 +36,7 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _LINUX_VIRTIO_PCI_H
-#define _LINUX_VIRTIO_PCI_H
+#pragma once
 
 #include <linux/types.h>
 
@@ -189,5 +188,3 @@ struct virtio_pci_common_cfg {
 #define VIRTIO_PCI_COMMON_Q_USEDHI	52
 
 #endif /* VIRTIO_PCI_NO_MODERN */
-
-#endif

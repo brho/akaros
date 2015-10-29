@@ -1,5 +1,4 @@
-#ifndef _VMM_H_
-#define	_VMM_H_
+#pragma once
 
 #include <ros/vmm.h>
 
@@ -57,5 +56,3 @@ struct vmx_vcpu *vmx_create_vcpu(struct proc *p);
 void vmx_destroy_vcpu(struct vmx_vcpu *vcpu);
 uint64_t construct_eptp(physaddr_t root_hpa);
 void ept_flush(uint64_t eptp);
-
-#endif	/* _VMM_H_ */

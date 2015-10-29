@@ -6,8 +6,7 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation.
  */
-#ifndef BNX2X_HSI_H
-#define BNX2X_HSI_H
+#pragma once
 
 #include "bnx2x_fw_defs.h"
 #include "bnx2x_mfw_req.h"
@@ -5886,5 +5885,3 @@ struct xstorm_queue_zone_data {
 struct xstorm_vf_zone_data {
 	struct regpair reserved;
 };
-
-#endif /* BNX2X_HSI_H */

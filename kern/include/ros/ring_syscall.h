@@ -1,5 +1,4 @@
-#ifndef _ROS_RING_SYSCALL_H
-#define _ROS_RING_SYSCALL_H
+#pragma once
 
 #include <ros/common.h>
 #include <ros/ring_buffer.h>
@@ -31,5 +30,3 @@ typedef struct syscall_req {
 // Generic Syscall Ring Buffer
 #define SYSCALLRINGSIZE    PGSIZE
 DEFINE_RING_TYPES(syscall, syscall_req_t, syscall_rsp_t);
-
-#endif

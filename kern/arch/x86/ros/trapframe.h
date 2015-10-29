@@ -1,4 +1,5 @@
-#ifndef ROS_INC_ARCH_TRAPFRAME_H
+#pragma once
+
 #define ROS_INC_ARCH_TRAPFRAME_H
 
 #ifndef ROS_INC_TRAPFRAME_H
@@ -110,5 +111,3 @@ typedef struct ancillary_state {
 	__128bits		reserv4;
 	__128bits		reserv5;
 } __attribute__((aligned(16))) ancillary_state_t;
-
-#endif /* ROS_INC_ARCH_TRAPFRAME_H */

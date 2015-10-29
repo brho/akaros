@@ -1,5 +1,4 @@
-#ifndef _LINUX_ERRNO_H
-#define _LINUX_ERRNO_H
+#pragma once
 
 #include <ros/errno.h>
 
@@ -30,5 +29,3 @@
 #define EBADTYPE	527	/* Type not supported by server */
 #define EJUKEBOX	528	/* Request initiated, but will not complete before timeout */
 #define EIOCBQUEUED	529	/* iocb queued, will get completion event */
-
-#endif

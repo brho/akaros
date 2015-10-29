@@ -4,8 +4,7 @@
  *
  * PIC: 8259 interrupt controller */
 
-#ifndef ROS_KERN_ARCH_PIC_H
-#define ROS_KERN_ARCH_PIC_H
+#pragma once
 
 #include <ros/common.h>
 
@@ -41,5 +40,3 @@ uint16_t pic_get_irr(void);
 uint16_t pic_get_isr(void);
 bool pic_check_spurious(int trap_nr);
 void pic_send_eoi(int trap_nr);
-
-#endif /* ROS_KERN_ARCH_PIC_H */

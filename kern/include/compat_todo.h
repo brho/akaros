@@ -1,5 +1,4 @@
-#ifndef ROS_KERN_COMPAT_TODO_H
-#define ROS_KERN_COMPAT_TODO_H
+#pragma once
 
 #ifndef ROS_KERN_LINUX_COMPAT_H
 #error "Do not include compat_todo.h directly"
@@ -48,5 +47,3 @@ typedef int select_queue_fallback_t;
 enum pkt_hash_types {
 	Two,
 };
-
-#endif /* ROS_KERN_COMPAT_TODO_H */

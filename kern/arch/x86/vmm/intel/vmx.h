@@ -1,5 +1,4 @@
-#ifndef VMX_H
-#define VMX_H
+#pragma once
 
 /*
  * vmx.h: VMX Architecture related definitions
@@ -291,5 +290,3 @@ struct vmxec {
 	uint32_t try_set_1;
 	uint32_t try_set_0;
 };
-
-#endif

@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACENVEX_H__
-#define __ACENVEX_H__
+#pragma once
 
 /*! [Begin] no source code translation */
 
@@ -63,5 +62,3 @@
 #endif
 
 /*! [End] no source code translation !*/
-
-#endif				/* __ACENVEX_H__ */

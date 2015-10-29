@@ -1,5 +1,4 @@
-#ifndef ROS_INC_STDIO_H
-#define ROS_INC_STDIO_H
+#pragma once
 
 #include <ros/common.h>
 #include <stdarg.h>
@@ -60,5 +59,3 @@ void trace_printk(const char *fmt, ...);
 /* vsprintf.c (linux) */
 int vsscanf(const char *buf, const char *fmt, va_list args);
 int sscanf(const char *buf, const char *fmt, ...);
-
-#endif /* !ROS_INC_STDIO_H */

@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACENV_H__
-#define __ACENV_H__
+#pragma once
 
 /*
  * Environment configuration. The purpose of this file is to interface ACPICA
@@ -439,5 +438,3 @@ typedef char *va_list;
 #define ACPI_FILE_ERR          NULL
 #endif				/* ACPI_APPLICATION */
 #endif				/* ACPI_FILE */
-
-#endif				/* __ACENV_H__ */

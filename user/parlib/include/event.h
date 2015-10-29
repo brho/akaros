@@ -6,8 +6,7 @@
  * Userspace utility functions for receiving events and notifications (IPIs).
  * Some are higher level than others; just use what you need. */ 
 
-#ifndef PARLIB_EVENT_H
-#define PARLIB_EVENT_H
+#pragma once
 
 #include <ros/event.h>
 #include <ros/syscall.h>
@@ -86,5 +85,3 @@ bool uth_check_evqs(struct event_msg *ev_msg, struct event_queue **which_evq,
                     size_t nr_evqs, ...);
 
 __END_DECLS
-
-#endif /* PARLIB_EVENT_H */

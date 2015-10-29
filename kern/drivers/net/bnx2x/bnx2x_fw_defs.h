@@ -7,8 +7,7 @@
  * the Free Software Foundation.
  */
 
-#ifndef BNX2X_FW_DEFS_H
-#define BNX2X_FW_DEFS_H
+#pragma once
 
 #define CSTORM_ASSERT_LIST_INDEX_OFFSET	(IRO[152].base)
 #define CSTORM_ASSERT_LIST_OFFSET(assertListEntry) \
@@ -392,5 +391,3 @@
 /* used for defining the amount of FCoE tasks supported for PF */
 #define MAX_FCOE_FUNCS_PER_ENGINE 2
 #define MAX_NUM_FCOE_TASKS_PER_ENGINE 4096
-
-#endif /* BNX2X_FW_DEFS_H */

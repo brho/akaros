@@ -7,8 +7,7 @@
  * This file consists of various bits of Linux code used in porting drivers to
  * Akaros. */
 
-#ifndef _LINUX_COMPAT_TODO_H
-#define _LINUX_COMPAT_TODO_H
+#pragma once
 
 #include <arch/types.h>
 #include <ros/common.h>
@@ -1042,5 +1041,3 @@ static inline bool netif_carrier_ok(struct ether *dev)
 #define NOTIFY_DONE 0
 #define SIOCGHWTSTAMP 1
 #define SIOCSHWTSTAMP 2
-
-#endif

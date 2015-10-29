@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACAKAROS_H__
-#define __ACAKAROS_H__
+#pragma once
 
 #include <stdarg.h>
 #include <string.h>
@@ -62,5 +61,3 @@
 #define COMPILER_DEPENDENT_UINT64   unsigned long
 
 #include "acgcc.h"
-
-#endif				/* __ACAKAROS_H__ */

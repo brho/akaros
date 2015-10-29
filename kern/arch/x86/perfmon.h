@@ -1,5 +1,4 @@
-#ifndef ROS_INC_PERFMON_H
-#define ROS_INC_PERFMON_H
+#pragma once
 #include <ros/common.h>
 #include <arch/x86.h>
 
@@ -20,5 +19,3 @@ static inline uint64_t read_pmc(uint32_t index)
 }
 
 void perfmon_init();
-
-#endif /* ROS_INC_PERFMON_H */

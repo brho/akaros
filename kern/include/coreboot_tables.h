@@ -27,8 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _COREBOOT_TABLES_H
-#define _COREBOOT_TABLES_H
+#pragma once
 
 #include <arch/types.h>
 
@@ -373,4 +372,3 @@ static inline const char *cb_mb_part_string(const struct cb_mainboard *cbm)
 		+ (sizeof((_rec)->map[0]) * (_idx)))
 
 int get_coreboot_info(struct sysinfo_t *info);
-#endif

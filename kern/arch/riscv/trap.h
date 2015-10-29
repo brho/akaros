@@ -1,5 +1,4 @@
-#ifndef ROS_ARCH_TRAP_H
-#define ROS_ARCH_TRAP_H
+#pragma once
 
 #ifdef __riscv64
 # define SIZEOF_HW_TRAPFRAME (36*8)
@@ -72,7 +71,5 @@ set_frame_pointer(uintptr_t fp)
 
 void handle_trap(struct hw_trapframe *hw_tf);
 int emulate_fpu(struct hw_trapframe *hw_tf);
-
-#endif
 
 #endif

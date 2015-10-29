@@ -31,8 +31,7 @@
  * SOFTWARE.
  */
 
-#ifndef MLX4_ICM_H
-#define MLX4_ICM_H
+#pragma once
 
 #define MLX4_ICM_CHUNK_LEN						\
 	((256 - sizeof (struct list_head) - 2 * sizeof (int)) /		\
@@ -125,5 +124,3 @@ static inline unsigned long mlx4_icm_size(struct mlx4_icm_iter *iter)
 
 int mlx4_MAP_ICM_AUX(struct mlx4_dev *dev, struct mlx4_icm *icm);
 int mlx4_UNMAP_ICM_AUX(struct mlx4_dev *dev);
-
-#endif /* MLX4_ICM_H */

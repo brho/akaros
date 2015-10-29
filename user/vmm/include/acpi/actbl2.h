@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACTBL2_H__
-#define __ACTBL2_H__
+#pragma once
 
 /*******************************************************************************
  *
@@ -1388,5 +1387,3 @@ struct acpi_table_wdrt {
 /* Reset to default packing */
 
 #pragma pack()
-
-#endif				/* __ACTBL2_H__ */

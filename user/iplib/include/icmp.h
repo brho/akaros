@@ -8,8 +8,7 @@
  */
 /* ICMP for IP v4 and v6 */
 
-#ifndef IPLIB_ICMP_H
-#define IPLIB_ICMP_H
+#pragma once
 
 __BEGIN_DECLS
 
@@ -87,5 +86,3 @@ struct icmphdr {
 // #define ICMPHDRSZ offsetof(Icmphdr, data[0])
 
 __END_DECLS
-
-#endif /* IPLIB_ICMP_H */

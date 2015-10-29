@@ -1,5 +1,4 @@
-#ifndef ROS_INCLUDE_BITS_SYSCALL_H
-#define ROS_INCLUDE_BITS_SYSCALL_H
+#pragma once
 
 /* system call numbers.  need to #def them for use in assembly.  Removing
  * useless ones is okay, but if we change a number, we'll need to rebuild
@@ -112,5 +111,3 @@
 #define WSTAT_UID				0x020
 #define WSTAT_GID				0x040
 #define WSTAT_MUID				0x080
-
-#endif /* !ROS_INCLUDE_SYSCALL_H */

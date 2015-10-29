@@ -4,8 +4,7 @@
 // and is intended to be linked into all user-mode applications
 // (NOT the kernel or boot loader).
 
-#ifndef PARLIB_PARLIB_H
-#define PARLIB_PARLIB_H
+#pragma once
 
 #ifndef __ASSEMBLER__
 
@@ -84,5 +83,3 @@ extern bool parlib_wants_to_be_mcp;	/* instructs the 2LS to be an MCP */
 __END_DECLS
 
 #endif	// !ASSEMBLER
-
-#endif /* PARLIB_PARLIB_H */

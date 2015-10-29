@@ -43,8 +43,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACPIOSXF_H__
-#define __ACPIOSXF_H__
+#pragma once
 
 #include "platform/acenv.h"
 #include "actypes.h"
@@ -429,5 +428,3 @@ long acpi_os_get_file_offset(ACPI_FILE file);
 #ifndef ACPI_USE_ALTERNATE_PROTOTYPE_acpi_os_set_file_offset
 acpi_status acpi_os_set_file_offset(ACPI_FILE file, long offset, u8 from);
 #endif
-
-#endif				/* __ACPIOSXF_H__ */

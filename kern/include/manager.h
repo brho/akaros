@@ -3,8 +3,7 @@
  * See LICENSE for details.
  */
 
-#ifndef ROS_KERN_MANAGER_H
-#define ROS_KERN_MANAGER_H
+#pragma once
 
 /*
  * The manager is the "asymmetric control unit", that runs on core 0 for now
@@ -20,5 +19,3 @@ static inline bool management_core(void)
 	// currently returns true for only core 0
 	return !core_id();
 }
-
-#endif /* ROS_KERN_MANAGER_H */

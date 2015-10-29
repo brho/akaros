@@ -7,8 +7,7 @@
  * @author Kevin Klues <klueska@cs.berkeley.edu>
  */
  
-#ifndef ROS_KERN_ARCH_COLORED_PAGE_ALLOC_H
-#define ROS_KERN_ARCH_COLORED_PAGE_ALLOC_H
+#pragma once
 
 /********** Page Coloring Related Macros ************/
 // Define these to make sure that each level of the cache
@@ -47,5 +46,3 @@
 	INSERT_CACHE_COLORING_PAGE_ONTO_FREE_LIST(page, l1)       \
 	INSERT_CACHE_COLORING_PAGE_ONTO_FREE_LIST(page, l2)       \
 	INSERT_CACHE_COLORING_PAGE_ONTO_FREE_LIST(page, l3)
-
-#endif // CACHE_COLORING_PAGE_ALLOC_H

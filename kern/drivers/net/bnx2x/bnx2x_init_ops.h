@@ -12,8 +12,7 @@
  * Written by: Vladislav Zolotarov
  */
 
-#ifndef BNX2X_INIT_OPS_H
-#define BNX2X_INIT_OPS_H
+#pragma once
 
 
 #ifndef BP_ILT
@@ -937,4 +936,3 @@ static void bnx2x_src_init_t2(struct bnx2x *bp, struct src_ent *t2,
 		    U64_HI((uint64_t)t2_mapping +
 			   (src_cid_count-1) * sizeof(struct src_ent)));
 }
-#endif /* BNX2X_INIT_OPS_H */

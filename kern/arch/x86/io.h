@@ -7,8 +7,7 @@
  * in the LICENSE file.
  */
 
-#ifndef ROS_KERN_ARCH_IO_H
-#define ROS_KERN_ARCH_IO_H
+#pragma once
 
 enum {
 	BusCBUS = 0,				/* Corollary CBUS */
@@ -237,5 +236,3 @@ struct Pcidev {
 #define PCIWADDR(va)	(PADDR(va)+PCIWINDOW)
 #define ISAWINDOW	0
 #define ISAWADDR(va)	(PADDR(va)+ISAWINDOW)
-
-#endif /* ROS_KERN_ARCH_IO_H */

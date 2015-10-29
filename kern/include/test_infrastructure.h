@@ -1,5 +1,4 @@
-#ifndef ROS_INC_TEST_INFRASTRUCTURE_H
-#define ROS_INC_TEST_INFRASTRUCTURE_H
+#pragma once
 
 /*
  * Header file with infrastructure needed for kernel unit tests:
@@ -55,5 +54,3 @@ struct pb_kernel_test {
 
 extern struct pb_kernel_test pb_kernel_tests[];
 extern int num_pb_kernel_tests;
-
-#endif // ROS_INC_TEST_INFRASTRUCTURE_H

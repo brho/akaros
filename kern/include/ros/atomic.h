@@ -4,8 +4,7 @@
  *
  * Locking and atomics that are part of the kernel interface. */
 
-#ifndef ROS_INC_ATOMIC_H
-#define ROS_INC_ATOMIC_H
+#pragma once
 
 #include <ros/common.h>
 #include <ros/arch/membar.h>
@@ -40,5 +39,3 @@ static inline bool seqctr_retry(seq_ctr_t old_ctr, seq_ctr_t new_ctr)
 	rmb();	/* don't allow protected reads to reorder after the check */
 	return (seq_is_locked(old_ctr)) || (old_ctr != new_ctr);	
 }
-
-#endif /* ROS_INC_ATOMIC_H */

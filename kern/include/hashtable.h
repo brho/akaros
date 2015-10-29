@@ -9,8 +9,7 @@
  *   externing the hentry cache.
  *   - hash for each */
 
-#ifndef __ROS_KERN_HASHTABLE_H__
-#define __ROS_KERN_HASHTABLE_H__
+#pragma once
 
 #include <ros/common.h>
 
@@ -290,8 +289,6 @@ ssize_t fnname (hashtable_itr_t *i, hashtable_t *h, keytype *k) \
 void hash_for_each(struct hashtable *hash, void func(void*));
 /* Same, but removes the item too */
 void hash_for_each_remove(struct hashtable *hash, void func(void*));
-
-#endif /* __ROS_KERN_HASHTABLE_H__ */
 
 /*
  * Copyright (c) 2002, 2004, Christopher Clark

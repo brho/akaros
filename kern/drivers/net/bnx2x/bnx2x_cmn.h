@@ -14,8 +14,7 @@
  * Statistics and Link management by Yitchak Gertner
  *
  */
-#ifndef BNX2X_CMN_H
-#define BNX2X_CMN_H
+#pragma once
 
 #include <linux_compat.h>
 
@@ -1347,5 +1346,3 @@ void bnx2x_squeeze_objects(struct bnx2x *bp);
 
 void bnx2x_schedule_sp_rtnl(struct bnx2x*, enum sp_rtnl_flag,
 			    uint32_t verbose);
-
-#endif /* BNX2X_CMN_H */

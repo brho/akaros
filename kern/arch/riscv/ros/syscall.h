@@ -1,5 +1,4 @@
-#ifndef _ROS_ARCH_SYSCALL_H
-#define _ROS_ARCH_SYSCALL_H
+#pragma once
 
 #ifndef ROS_KERNEL
 
@@ -15,5 +14,3 @@ __ros_arch_syscall(long _a0, long _a1)
 }
 
 #endif /* ifndef ROS_KERNEL */
-
-#endif

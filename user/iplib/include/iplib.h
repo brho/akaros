@@ -6,8 +6,7 @@
  * modified, propagated, or distributed except according to the terms contained
  * in the LICENSE file.
  */
-#ifndef IPLIB_IPLIB_H
-#define IPLIB_IPLIB_H
+#pragma once
 
 #include <parlib/common.h>
 
@@ -232,5 +231,3 @@ int accept9(int ctl, char *dir);
 int reject9(int ctl, char *dir, char *cause);
 
 __END_DECLS
-
-#endif /* IPLIB_IPLIB_H */

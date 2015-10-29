@@ -9,8 +9,7 @@
  * time is a pain, and for now we'll do the walks serially.  Because of that, a
  * given pte_t may have a KPTE and/or an EPTE.  Ideally, it'd be *and*. */
 
-#ifndef ROS_ARCH_PMAPS_OPS_H
-#define ROS_ARCH_PMAPS_OPS_H
+#pragma once
 
 #include <arch/vmm/ept.h>
 #include <arch/kpt.h>
@@ -140,5 +139,3 @@ static inline void pte_replace_perm(pte_t pte, int perm)
 	kpte_replace_perm(pte, perm);
 	epte_replace_perm(kpte_to_epte(pte), perm);
 }
-
-#endif /* ROS_ARCH_PMAPS_OPS_H */

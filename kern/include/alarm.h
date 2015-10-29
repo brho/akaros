@@ -64,8 +64,7 @@
  * return and pop up the stack after setting the alarm.
  * */
 
-#ifndef ROS_KERN_ALARM_H
-#define ROS_KERN_ALARM_H
+#pragma once
 
 #include <ros/common.h>
 #include <sys/queue.h>
@@ -141,5 +140,3 @@ void set_pcpu_alarm_interrupt(struct timer_chain *tchain);
 #define ALARM_POISON_TIME 12345				/* could use some work */
 void print_chain(struct timer_chain *tchain);
 void print_pcpu_chains(void);
-
-#endif /* ROS_KERN_ALARM_H */

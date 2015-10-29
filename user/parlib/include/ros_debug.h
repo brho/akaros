@@ -1,5 +1,4 @@
-#ifndef PARLIB_ROS_DEBUG_H
-#define PARLIB_ROS_DEBUG_H
+#pragma once
 
 #include <parlib/common.h>
 #include <parlib/parlib.h>
@@ -20,5 +19,3 @@ void __print_func_exit(const char *func, const char *file);
 void hexdump(FILE *f, void *v, int length);
 
 __END_DECLS
-
-#endif /* PARLIB_ROS_DEBUG_H */

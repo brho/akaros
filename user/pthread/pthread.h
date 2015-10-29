@@ -1,5 +1,4 @@
-#ifndef PTHREAD_PTHREAD_H
-#define PTHREAD_PTHREAD_H
+#pragma once
 
 #include <sys/queue.h>
 #include <signal.h>
@@ -282,5 +281,3 @@ extern int pthread_cond_timedwait (pthread_cond_t *__restrict __cond,
      __nonnull ((1, 2, 3));
 
 __END_DECLS
-
-#endif /* PTHREAD_PTHREAD_H */

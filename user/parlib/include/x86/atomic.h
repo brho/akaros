@@ -1,5 +1,4 @@
-#ifndef PARLIB_ARCH_ATOMIC_H
-#define PARLIB_ARCH_ATOMIC_H
+#pragma once
 
 #include <parlib/common.h>
 #include <ros/atomic.h>
@@ -98,5 +97,3 @@ static inline void atomic_orb(volatile uint8_t *number, uint8_t mask)
 }
 
 __END_DECLS
-
-#endif /* PARLIB_ARCH_ATOMIC_H */

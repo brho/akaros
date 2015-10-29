@@ -41,8 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
-#ifndef __ACTBL3_H__
-#define __ACTBL3_H__
+#pragma once
 
 /*******************************************************************************
  *
@@ -788,5 +787,3 @@ struct acpi_table_xenv {
 /* Reset to default packing */
 
 #pragma pack()
-
-#endif				/* __ACTBL3_H__ */

@@ -1,7 +1,6 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifndef ROS_PROCINFO_H
-#define ROS_PROCINFO_H
+#pragma once
 
 #include <ros/memlayout.h>
 #include <ros/common.h>
@@ -101,5 +100,3 @@ static inline uint32_t __get_vcoreid(void)
 }
 
 #endif /* ifndef ROS_KERNEL */
-
-#endif // !ROS_PROCDATA_H

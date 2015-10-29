@@ -2,8 +2,7 @@
  *
  * From commit bc208e0ee0f46744aac95c29366144271a6962bb */
 
-#ifndef _LINUX_LIST_H
-#define _LINUX_LIST_H
+#pragma once
 
 /*
  * Architectures might want to move the poison pointer offset
@@ -769,5 +768,3 @@ static inline void hlist_move_list(struct hlist_head *old,
 	for (pos = hlist_entry_safe((head)->first, typeof(*pos), member);\
 	     pos && ({ n = pos->member.next; 1; });			\
 	     pos = hlist_entry_safe(n, typeof(*pos), member))
-
-#endif

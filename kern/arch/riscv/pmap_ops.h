@@ -4,8 +4,7 @@
  *
  * Arch-specific operations for page tables and PTEs */
 
-#ifndef ROS_ARCH_PMAPS_OPS_H
-#define ROS_ARCH_PMAPS_OPS_H
+#pragma once
 
 static inline bool pte_walk_okay(pte_t pte)
 {
@@ -115,5 +114,3 @@ static inline void pte_replace_perm(pte_t pte, int perm)
 {
 	*(kpte_t*)pte = (*(kpte_t*)pte & ~PTE_PERM) | perm;
 }
-
-#endif /* ROS_ARCH_PMAPS_OPS_H */

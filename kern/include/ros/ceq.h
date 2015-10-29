@@ -32,8 +32,7 @@
  * the ring.  That's the purposed of 'idx_posted' - whether or not we think our
  * index is posted in the ring. */
 
-#ifndef ROS_INC_CEQ_H
-#define ROS_INC_CEQ_H
+#pragma once
 
 #include <ros/atomic.h>
 #include <ros/ring_buffer.h>
@@ -77,5 +76,3 @@ struct ceq {
 	atomic_t					cons_pvt_idx;	/* next cons slot to get */
 	uint32_t					u_lock[2];		/* user space lock */
 };
-
-#endif /* ROS_INC_CEQ_H */
