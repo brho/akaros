@@ -2118,6 +2118,13 @@ bool test_uaccess(void)
 				copy_from_user(buf, (const void *) UDATA, sizeof(buf)) ==
 				-EFAULT);
 
+	KT_ASSERT_M(
+		"String copy to user to not mapped UDATA address should fail",
+		strcpy_to_user(NULL, (char *) UDATA, "Akaros") == -EFAULT);
+	KT_ASSERT_M(
+		"String copy from user to not mapped UDATA address should fail",
+		strcpy_from_user(NULL, buf, (const char *) UDATA) == -EFAULT);
+
 	KT_ASSERT_M("Copy from user with kernel side source pointer should fail",
 				copy_from_user(buf, buf2, sizeof(buf)) == -EFAULT);
 	KT_ASSERT_M("Copy to user with kernel side source pointer should fail",
@@ -2163,6 +2170,15 @@ bool test_uaccess(void)
 		KT_ASSERT_M(
 			"Copy from user (mem) to mapped address should not fail",
 			copy_from_user(buf, addr, sizeof(buf)) == 0);
+
+		KT_ASSERT_M(
+			"String copy to user to mapped address should not fail",
+			strcpy_to_user(current, addr, "Akaros") == 0);
+		KT_ASSERT_M(
+			"String copy from user to mapped address should not fail",
+			strcpy_from_user(current, buf, addr) == 0);
+		KT_ASSERT_M("The copied string content should be matching",
+					memcmp(buf, "Akaros", 7) == 0);
 
 		munmap(tmp, (uintptr_t) addr, mmap_size);
 	}

@@ -17,13 +17,39 @@ static inline bool is_user_rwaddr(const void *addr, size_t len);
 /* Same deal, but read-only */
 static inline bool is_user_raddr(const void *addr, size_t len);
 
-/* Copy from proc p into the kernel's dest from src */
-int memcpy_from_user(struct proc *p, void *dest, const void *va,
-                     size_t len);
+int strcpy_from_user(struct proc *p, char *dst, const char *src);
+int strcpy_to_user(struct proc *p, char *dst, const char *src);
 
-/* Copy to proc p into va from the kernel's src */
-int memcpy_to_user(struct proc *p, void *a, const void *src,
-                   size_t len);
+/**
+ * @brief Copies data from a user buffer to a kernel buffer.
+ *
+ * @param p    the process associated with the user program
+ *             from which the buffer is being copied
+ * @param dest the destination address of the kernel buffer
+ * @param va   the address of the userspace buffer from which we are copying
+ * @param len  the length of the userspace buffer
+ *
+ * @return ESUCCESS on success
+ * @return -EFAULT  the page assocaited with 'va' is not present, the user
+ *                  lacks the proper permissions, or there was an invalid 'va'
+ */
+int memcpy_from_user(struct proc *p, void *dest, const void *va, size_t len);
+
+/**
+ * @brief Copies data to a user buffer from a kernel buffer.
+ *
+ * @param p    the process associated with the user program
+ *             to which the buffer is being copied
+ * @param dest the destination address of the user buffer
+ * @param src  the address of the kernel buffer from which we are copying
+ * @param len  the length of the user buffer
+ *
+ * @return ESUCCESS on success
+ * @return -EFAULT  the page assocaited with 'va' is not present, the user
+ *                  lacks the proper permissions, or there was an invalid 'va'
+ */
+int memcpy_to_user(struct proc *p, void *dest, const void *src, size_t len);
+
 /* Same as above, but sets errno */
 int memcpy_from_user_errno(struct proc *p, void *dst, const void *src, int len);
 int memcpy_to_user_errno(struct proc *p, void *dst, const void *src, int len);
@@ -70,6 +96,16 @@ static inline bool __is_user_addr(const void *addr, size_t len, uintptr_t lim)
 	return TRUE;
 }
 
+static inline size_t __valid_user_bytes_from(const void *addr, uintptr_t lim)
+{
+	if (unlikely((uintptr_t) addr < MMAP_LOWEST_VA))
+		return 0;
+	if (unlikely((uintptr_t) addr >= lim))
+		return 0;
+
+	return (size_t) (lim - (uintptr_t) addr);
+}
+
 /* UWLIM is defined as virtual address below which a process can write */
 static inline bool is_user_rwaddr(const void *addr, size_t len)
 {
@@ -80,4 +116,14 @@ static inline bool is_user_rwaddr(const void *addr, size_t len)
 static inline bool is_user_raddr(const void *addr, size_t len)
 {
 	return __is_user_addr(addr, len, ULIM);
+}
+
+static inline size_t valid_user_rwbytes_from(const void *addr)
+{
+	return __valid_user_bytes_from(addr, UWLIM);
+}
+
+static inline size_t valid_user_rbytes_from(const void *addr)
+{
+	return __valid_user_bytes_from(addr, ULIM);
 }

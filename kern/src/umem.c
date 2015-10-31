@@ -7,6 +7,7 @@
  * to involve some form of pinning (TODO), and that global static needs to go. */
 
 #include <ros/common.h>
+#include <arch/uaccess.h>
 #include <umem.h>
 #include <process.h>
 #include <error.h>
@@ -15,135 +16,102 @@
 #include <pmap.h>
 #include <smp.h>
 
-/**
- * @brief Copies data from a user buffer to a kernel buffer.
- * 
- * @param p    the process associated with the user program
- *             from which the buffer is being copied
- * @param dest the destination address of the kernel buffer
- * @param va   the address of the userspace buffer from which we are copying
- * @param len  the length of the userspace buffer
- *
- * @return ESUCCESS on success
- * @return -EFAULT  the page assocaited with 'va' is not present, the user 
- *                  lacks the proper permissions, or there was an invalid 'va'
- */
-int memcpy_from_user(struct proc *p, void *dest, const void *va,
-                     size_t len)
+static int string_copy_from_user(char *dst, const char *src)
 {
-	const void *start, *end;
-	size_t num_pages, i;
-	pte_t pte;
-	uintptr_t perm = PTE_USER_RO;
-	size_t bytes_copied = 0;
+	int error;
+	const char *top = src + valid_user_rbytes_from(src);
 
-	static_assert(ULIM % PGSIZE == 0 && ULIM != 0); // prevent wrap-around
-
-	start = (void*)ROUNDDOWN((uintptr_t)va, PGSIZE);
-	end = (void*)ROUNDUP((uintptr_t)va + len, PGSIZE);
-
-	if (start >= (void*)ULIM || end > (void*)ULIM)
-		return -EFAULT;
-
-	num_pages = LA2PPN(end - start);
-	for (i = 0; i < num_pages; i++) {
-		pte = pgdir_walk(p->env_pgdir, start + i * PGSIZE, 0);
-		if (!pte_walk_okay(pte))
+	for (;; dst++, src++) {
+		if (unlikely(src >= top))
 			return -EFAULT;
-		if (pte_is_present(pte) && !pte_has_perm_ur(pte))
-			return -EFAULT;
-		if (!pte_is_present(pte))
-			if (handle_page_fault(p, (uintptr_t)start + i * PGSIZE, PROT_READ))
-				return -EFAULT;
-
-		void *kpage = KADDR(pte_get_paddr(pte));
-		const void *src_start = i > 0 ? kpage : kpage + (va - start);
-		void *dst_start = dest + bytes_copied;
-		size_t copy_len = PGSIZE;
-		if (i == 0)
-			copy_len -= va - start;
-		if (i == num_pages-1)
-			copy_len -= end - (va + len);
-
-		memcpy(dst_start, src_start, copy_len);
-		bytes_copied += copy_len;
+		error = __get_user(dst, src, 1);
+		if (unlikely(error))
+			return error;
+		if (unlikely(!*dst))
+			break;
 	}
-	assert(bytes_copied == len);
+
 	return 0;
+}
+
+static int string_copy_to_user(char *dst, const char *src)
+{
+	int error;
+	char *top = dst + valid_user_rwbytes_from(dst);
+
+	for (;; dst++, src++) {
+		if (unlikely(dst >= top))
+			return -EFAULT;
+		error = __put_user(dst, src, 1);
+		if (unlikely(error))
+			return error;
+		if (unlikely(!*src))
+			break;
+	}
+
+	return 0;
+}
+
+int strcpy_from_user(struct proc *p, char *dst, const char *src)
+{
+	struct proc *prev = switch_to(p);
+	int error = string_copy_from_user(dst, src);
+
+	switch_back(p, prev);
+
+	return error;
+}
+
+int strcpy_to_user(struct proc *p, char *dst, const char *src)
+{
+	struct proc *prev = switch_to(p);
+	int error = string_copy_to_user(dst, src);
+
+	switch_back(p, prev);
+
+	return error;
+}
+
+int memcpy_from_user(struct proc *p, void *dest, const void *va, size_t len)
+{
+	struct proc *prev = switch_to(p);
+	int error = copy_from_user(dest, va, len);
+
+	switch_back(p, prev);
+
+	return error;
+}
+
+int memcpy_to_user(struct proc *p, void *dest, const void *src, size_t len)
+{
+	struct proc *prev = switch_to(p);
+	int error = copy_to_user(dest, src, len);
+
+	switch_back(p, prev);
+
+	return error;
 }
 
 /* Same as above, but sets errno */
 int memcpy_from_user_errno(struct proc *p, void *dst, const void *src, int len)
 {
-	if (memcpy_from_user(p, dst, src, len)) {
-		set_errno(EINVAL);
-		return -1;
-	}
-	return 0;
-}
+	int error = memcpy_from_user(p, dst, src, len);
 
-/**
- * @brief Copies data to a user buffer from a kernel buffer.
- * 
- * @param p    the process associated with the user program
- *             to which the buffer is being copied
- * @param dest the destination address of the user buffer
- * @param va   the address of the kernel buffer from which we are copying
- * @param len  the length of the user buffer
- *
- * @return ESUCCESS on success
- * @return -EFAULT  the page assocaited with 'va' is not present, the user 
- *                  lacks the proper permissions, or there was an invalid 'va'
- */
-int memcpy_to_user(struct proc *p, void *va, const void *src, size_t len)
-{
-	const void *start, *end;
-	size_t num_pages, i;
-	pte_t pte;
-	uintptr_t perm = PTE_USER_RW;
-	size_t bytes_copied = 0;
+	if (unlikely(error < 0))
+		set_errno(-error);
 
-	static_assert(ULIM % PGSIZE == 0 && ULIM != 0); // prevent wrap-around
-
-	start = (void*)ROUNDDOWN((uintptr_t)va, PGSIZE);
-	end = (void*)ROUNDUP((uintptr_t)va + len, PGSIZE);
-
-	if (start >= (void*)ULIM || end > (void*)ULIM)
-		return -EFAULT;
-
-	num_pages = LA2PPN(end - start);
-	for (i = 0; i < num_pages; i++) {
-		pte = pgdir_walk(p->env_pgdir, start + i * PGSIZE, 0);
-		if (!pte_walk_okay(pte))
-			return -EFAULT;
-		if (pte_is_present(pte) && !pte_has_perm_urw(pte))
-			return -EFAULT;
-		if (!pte_is_present(pte))
-			if (handle_page_fault(p, (uintptr_t)start + i * PGSIZE, PROT_WRITE))
-				return -EFAULT;
-		void *kpage = KADDR(pte_get_paddr(pte));
-		void *dst_start = i > 0 ? kpage : kpage + (va - start);
-		const void *src_start = src + bytes_copied;
-		size_t copy_len = PGSIZE;
-		if (i == 0)
-			copy_len -= va - start;
-		if (i == num_pages - 1)
-			copy_len -= end - (va + len);
-		memcpy(dst_start, src_start, copy_len);
-		bytes_copied += copy_len;
-	}
-	assert(bytes_copied == len);
-	return 0;
+	return error;
 }
 
 /* Same as above, but sets errno */
 int memcpy_to_user_errno(struct proc *p, void *dst, const void *src, int len)
 {
-	if (memcpy_to_user(p, dst, src, len)) {
-		set_errno(EFAULT);
-		return -1;
-	}
-	return 0;
+	int error = memcpy_to_user(p, dst, src, len);
+
+	if (unlikely(error < 0))
+		set_errno(-error);
+
+	return error;
 }
 
 /* Creates a buffer (kmalloc) and safely copies into it from va.  Can return an

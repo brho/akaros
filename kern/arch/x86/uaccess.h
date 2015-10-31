@@ -77,6 +77,34 @@ struct extable_ip_fixup {
 				 : "=r"(err)											\
 				 : "D" (dst), "S" (src), "c" (count), "i" (errret), "0" (err))
 
+static inline int __put_user(void *dst, const void *src, unsigned int count)
+{
+	int err = 0;
+
+	switch (count) {
+	case 1:
+		__put_user_asm(*(const uint8_t *) src, (uint8_t *) dst, err, "b",
+					   "b", "iq", -EFAULT);
+		break;
+	case 2:
+		__put_user_asm(*(const uint16_t *) src, (uint16_t *) dst, err, "w",
+					   "w", "ir", -EFAULT);
+		break;
+	case 4:
+		__put_user_asm(*(const uint32_t *) src, (uint32_t *) dst, err, "l",
+					   "k", "ir", -EFAULT);
+		break;
+	case 8:
+		__put_user_asm(*(const uint64_t *) src, (uint64_t *) dst, err, "q",
+					   "", "er", -EFAULT);
+		break;
+	default:
+		__user_memcpy(dst, src, count, err, -EFAULT);
+	}
+
+	return err;
+}
+
 static inline int copy_to_user(void *dst, const void *src, unsigned int count)
 {
 	int err = 0;
@@ -86,26 +114,35 @@ static inline int copy_to_user(void *dst, const void *src, unsigned int count)
 	} else if (!__builtin_constant_p(count)) {
 		__user_memcpy(dst, src, count, err, -EFAULT);
 	} else {
-		switch (count) {
-		case 1:
-			__put_user_asm(*(const uint8_t *) src, (uint8_t *) dst, err, "b",
-						   "b", "iq", -EFAULT);
-			break;
-		case 2:
-			__put_user_asm(*(const uint16_t *) src, (uint16_t *) dst, err, "w",
-						   "w", "ir", -EFAULT);
-			break;
-		case 4:
-			__put_user_asm(*(const uint32_t *) src, (uint32_t *) dst, err, "l",
-						   "k", "ir", -EFAULT);
-			break;
-		case 8:
-			__put_user_asm(*(const uint64_t *) src, (uint64_t *) dst, err, "q",
-						   "", "er", -EFAULT);
-			break;
-		default:
-			__user_memcpy(dst, src, count, err, -EFAULT);
-		}
+		err = __put_user(dst, src, count);
+	}
+
+	return err;
+}
+
+static inline int __get_user(void *dst, const void *src, unsigned int count)
+{
+	int err = 0;
+
+	switch (count) {
+	case 1:
+		__get_user_asm(*(uint8_t *) dst, (const uint8_t *) src, err, "b",
+					   "b", "=q", -EFAULT);
+		break;
+	case 2:
+		__get_user_asm(*(uint16_t *) dst, (const uint16_t *) src, err, "w",
+					   "w", "=r", -EFAULT);
+		break;
+	case 4:
+		__get_user_asm(*(uint32_t *) dst, (const uint32_t *) src, err, "l",
+					   "k", "=r", -EFAULT);
+		break;
+	case 8:
+		__get_user_asm(*(uint64_t *) dst, (const uint64_t *) src, err, "q",
+					   "", "=r", -EFAULT);
+		break;
+	default:
+		__user_memcpy(dst, src, count, err, -EFAULT);
 	}
 
 	return err;
@@ -121,26 +158,7 @@ static inline int copy_from_user(void *dst, const void *src,
 	} else if (!__builtin_constant_p(count)) {
 		__user_memcpy(dst, src, count, err, -EFAULT);
 	} else {
-		switch (count) {
-		case 1:
-			__get_user_asm(*(uint8_t *) dst, (const uint8_t *) src, err, "b",
-						   "b", "=q", -EFAULT);
-			break;
-		case 2:
-			__get_user_asm(*(uint16_t *) dst, (const uint16_t *) src, err, "w",
-						   "w", "=r", -EFAULT);
-			break;
-		case 4:
-			__get_user_asm(*(uint32_t *) dst, (const uint32_t *) src, err, "l",
-						   "k", "=r", -EFAULT);
-			break;
-		case 8:
-			__get_user_asm(*(uint64_t *) dst, (const uint64_t *) src, err, "q",
-						   "", "=r", -EFAULT);
-			break;
-		default:
-			__user_memcpy(dst, src, count, err, -EFAULT);
-		}
+		err = __get_user(dst, src, count);
 	}
 
 	return err;
