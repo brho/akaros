@@ -106,12 +106,12 @@ struct timer_chain {
 	struct awaiters_tailq		waiters;
 	uint64_t					earliest_time;
 	uint64_t					latest_time;
-	void (*set_interrupt) (uint64_t time, struct timer_chain *);
+	void (*set_interrupt)(struct timer_chain *);
 };
 
 /* Called once per timer chain, currently in per_cpu_init() */
 void init_timer_chain(struct timer_chain *tchain,
-                      void (*set_interrupt) (uint64_t, struct timer_chain *));
+                      void (*set_interrupt)(struct timer_chain *));
 /* For fresh alarm waiters.  func == 0 for kthreads */
 void init_awaiter(struct alarm_waiter *waiter,
                   void (*func) (struct alarm_waiter *));
@@ -134,8 +134,8 @@ bool reset_alarm_rel(struct timer_chain *tchain, struct alarm_waiter *waiter,
 int sleep_on_awaiter(struct alarm_waiter *waiter);
 /* Interrupt handlers need to call this.  Don't call it directly. */
 void __trigger_tchain(struct timer_chain *tchain, struct hw_trapframe *hw_tf);
-/* How to set a specific alarm: the per-cpu timer interrupt */
-void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain);
+/* Sets the timer chain interrupt according to the next timer in the chain. */
+void set_pcpu_alarm_interrupt(struct timer_chain *tchain);
 
 /* Debugging */
 #define ALARM_POISON_TIME 12345				/* could use some work */

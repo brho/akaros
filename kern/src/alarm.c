@@ -38,7 +38,7 @@ static void reset_tchain_times(struct timer_chain *tchain)
 
 /* One time set up of a tchain, currently called in per_cpu_init() */
 void init_timer_chain(struct timer_chain *tchain,
-                      void (*set_interrupt) (uint64_t, struct timer_chain *))
+                      void (*set_interrupt)(struct timer_chain *))
 {
 	spinlock_init_irqsave(&tchain->lock);
 	TAILQ_INIT(&tchain->waiters);
@@ -113,13 +113,13 @@ static void reset_tchain_interrupt(struct timer_chain *tchain)
 	if (TAILQ_EMPTY(&tchain->waiters)) {
 		/* Turn it off */
 		printd("Turning alarm off\n");
-		tchain->set_interrupt(0, tchain);
+		tchain->set_interrupt(tchain);
 	} else {
 		/* Make sure it is on and set to the earliest time */
 		assert(tchain->earliest_time != ALARM_POISON_TIME);
 		/* TODO: check for times in the past or very close to now */
 		printd("Turning alarm on for %llu\n", tchain->earliest_time);
-		tchain->set_interrupt(tchain->earliest_time, tchain);
+		tchain->set_interrupt(tchain);
 	}
 }
 
@@ -364,11 +364,13 @@ int sleep_on_awaiter(struct alarm_waiter *waiter)
 	return 0;
 }
 
-/* Sets the Alarm interrupt, per-core style.  Also is an example of what any
- * similar function needs to do (this is the func ptr in the tchain). 
- * Note the tchain is our per-core one, and we don't need tchain passed to us to
- * figure that out.  It's kept around in case other tchain-usage wants it -
- * might not be necessary in the future.
+/* Sets the timer interrupt for the timer chain passed as parameter.
+ * The next interrupt will be scheduled at the nearest timer available in the
+ * chain.
+ * This function can be called either for the local CPU, or for a remote CPU.
+ * If called for the local CPU, it proceeds in setting up the local timer,
+ * otherwise it will trigger an IPI, and will let the remote CPU IRQ handler
+ * to setup the timer according to the active information on its timer chain.
  *
  * Needs to set the interrupt to trigger tchain at the given time, or disarm it
  * if time is 0.   Any function like this needs to do a few things:
@@ -381,9 +383,9 @@ int sleep_on_awaiter(struct alarm_waiter *waiter)
  * Called with the tchain lock held, and IRQs disabled.  However, we could be
  * calling this cross-core, and we cannot disable those IRQs (hence the
  * locking). */
-void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain)
+void set_pcpu_alarm_interrupt(struct timer_chain *tchain)
 {
-	uint64_t rel_usec, now;
+	uint64_t time, rel_usec, now;
 	int pcoreid = core_id();
 	struct per_cpu_info *rem_pcpui, *pcpui = &per_cpu_info[pcoreid];
 	struct timer_chain *pcpui_tchain = &pcpui->tchain;
@@ -400,6 +402,7 @@ void set_pcpu_alarm_interrupt(uint64_t time, struct timer_chain *tchain)
 		send_ipi(rem_pcpui - &per_cpu_info[0], IdtLAPIC_TIMER);
 		return;
 	}
+	time = TAILQ_EMPTY(&tchain->waiters) ? 0 : tchain->earliest_time;
 	if (time) {
 		/* Arm the alarm.  For times in the past, we just need to make sure it
 		 * goes off. */
