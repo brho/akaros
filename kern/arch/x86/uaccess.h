@@ -40,38 +40,38 @@ struct extable_ip_fixup {
 	" .quad (" #to ") - .\n"									\
 	" .popsection\n"
 
-#define __put_user_asm(x, addr, err, itype, rtype, ltype, errret)       \
+#define __put_user_asm(x, addr, err, itype, rtype, ltype, errret)		\
 	asm volatile(ASM_STAC "\n"											\
-				 "1:        mov"itype" %"rtype"1,%2\n"					\
-	             "2: " ASM_CLAC "\n"									\
+				 "1:		mov"itype" %"rtype"1,%2\n"					\
+				 "2: " ASM_CLAC "\n"									\
 				 ".section .fixup,\"ax\"\n"								\
-				 "3:        mov %3,%0\n"								\
-				 "  jmp 2b\n"											\
+				 "3:		mov %3,%0\n"								\
+				 "	jmp 2b\n"											\
 				 ".previous\n"											\
 				 _ASM_EXTABLE(1b, 3b)									\
 				 : "=r"(err)											\
 				 : ltype(x), "m" (__m(addr)), "i" (errret), "0" (err))
 
 #define __get_user_asm(x, addr, err, itype, rtype, ltype, errret)	\
-	asm volatile(ASM_STAC "\n"                                      \
-				 "1:        mov"itype" %2,%"rtype"1\n"              \
-				 "2: " ASM_CLAC "\n"                                \
+	asm volatile(ASM_STAC "\n"										\
+				 "1:		mov"itype" %2,%"rtype"1\n"				\
+				 "2: " ASM_CLAC "\n"								\
 				 ".section .fixup,\"ax\"\n"							\
-				 "3:        mov %3,%0\n"                            \
-				 "  xor"itype" %"rtype"1,%"rtype"1\n"               \
-				 "  jmp 2b\n"                                       \
-				 ".previous\n"                                      \
-				 _ASM_EXTABLE(1b, 3b)                               \
-				 : "=r" (err), ltype(x)                             \
+				 "3:		mov %3,%0\n"							\
+				 "	xor"itype" %"rtype"1,%"rtype"1\n"				\
+				 "	jmp 2b\n"										\
+				 ".previous\n"										\
+				 _ASM_EXTABLE(1b, 3b)								\
+				 : "=r" (err), ltype(x)								\
 				 : "m" (__m(addr)), "i" (errret), "0" (err))
 
 #define __user_memcpy(dst, src, count, err, errret)						\
 	asm volatile(ASM_STAC "\n"											\
-				 "1:        rep movsb\n"								\
-	             "2: " ASM_CLAC "\n"									\
+				 "1:		rep movsb\n"								\
+				 "2: " ASM_CLAC "\n"									\
 				 ".section .fixup,\"ax\"\n"								\
-				 "3:        mov %4,%0\n"								\
-				 "  jmp 2b\n"											\
+				 "3:		mov %4,%0\n"								\
+				 "	jmp 2b\n"											\
 				 ".previous\n"											\
 				 _ASM_EXTABLE(1b, 3b)									\
 				 : "=r"(err)											\
