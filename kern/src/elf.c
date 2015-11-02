@@ -135,7 +135,7 @@ static uintptr_t populate_stack(struct proc *p, int argc, char *argv[],
 /* We need the writable flag for ld.  Even though the elf header says it wants
  * RX (and not W) for its main program header, it will page fault (eip 56f0,
  * 46f0 after being relocated to 0x1000, va 0x20f4). */
-static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
+static int load_one_elf(struct proc *p, struct file *f, uintptr_t pg_num,
                         elf_info_t *ei, bool writable)
 {
 	int ret = -1;
@@ -254,7 +254,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 
 			uintptr_t memstart = ROUNDDOWN(p_va, PGSIZE);
 			uintptr_t memsz = ROUNDUP(p_va + p_memsz, PGSIZE) - memstart;
-			memstart += pgoffset * PGSIZE;
+			memstart += pg_num * PGSIZE;
 
 			if (memstart + memsz > ei->highest_addr)
 				ei->highest_addr = memstart + memsz;
@@ -342,7 +342,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pgoffset,
 		}
 		ei->phdr = (long)phdr_addr + e_phoff;
 	}
-	ei->entry = elf_field(elfhdr, e_entry) + pgoffset*PGSIZE;
+	ei->entry = elf_field(elfhdr, e_entry) + pg_num * PGSIZE;
 	ei->phnum = e_phnum;
 	ei->elf64 = elf64;
 	ret = 0;
