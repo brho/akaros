@@ -10,11 +10,14 @@
 #endif
 /* For __BEGIN_DECLS.  Most every header gets it already from features.h. */
 #include <sys/cdefs.h>
+/* So we can undefine warn */
+#include <err.h>
 
 __BEGIN_DECLS
 
 #undef assert
 #undef static_assert
+#undef warn
 
 void _warn(const char*, int, const char*, ...);
 void _panic(const char*, int, const char*, ...) __attribute__((noreturn));
