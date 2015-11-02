@@ -69,6 +69,24 @@ diff -ur binutils-2.24/gas/configure.tgt binutils-2.24-ros/gas/configure.tgt
    i386-*-kaos*)				fmt=elf ;;
    i386-*-bsd*)				fmt=aout em=386bsd ;;
    i386-*-nacl*)				fmt=elf em=nacl
+diff -ur binutils-2.24/gold/binary.cc binutils-2.24-ros/gold/binary.cc
+--- binutils-2.24/gold/binary.cc	2015-11-02 15:17:29.049801929 -0500
++++ binutils-2.24-ros/gold/binary.cc	2015-11-02 15:17:38.246051136 -0500
+@@ -24,13 +24,13 @@
+ 
+ #include <cerrno>
+ #include <cstring>
+-#include "safe-ctype.h"
+ 
+ #include "elfcpp.h"
+ #include "stringpool.h"
+ #include "fileread.h"
+ #include "output.h"
+ #include "binary.h"
++#include "safe-ctype.h"
+ 
+ // Support for reading binary files as input.  These become blobs in
+ // the final output.  These files are treated as though they have a
 diff -ur binutils-2.24/ld/configure.tgt binutils-2.24-ros/ld/configure.tgt
 --- binutils-2.24/ld/configure.tgt	2013-11-26 06:37:33.000000000 -0500
 +++ binutils-2.24-ros/ld/configure.tgt	2015-03-13 19:04:52.888987865 -0400
