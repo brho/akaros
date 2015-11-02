@@ -208,7 +208,6 @@ static inline uint64_t vcore_account_uptime_nsec(uint32_t vcoreid)
 #else
 
 #include <features.h>
-#if __GNUC_PREREQ(4,4)
 
 /* These macro acrobatics trick the compiler into not caching the (linear)
  * address of TLS variables across loads/stores of the TLS descriptor, in lieu
@@ -223,18 +222,6 @@ static inline uint64_t vcore_account_uptime_nsec(uint32_t vcoreid)
 	} safe_access_tls_var_internal();                                          \
 }
 
-#else
-
-#define begin_safe_access_tls_vars()                                           \
-	printf("ERROR: For PIC use gcc 4.4 or above for tls support!\n");          \
-	printf("ERROR: As a quick fix, recompile your app with -static...\n");     \
-	exit(2);
-
-#define end_safe_access_tls_vars()                                             \
-	printf("Will never be called because we abort above!");                    \
-	exit(2);
-
-#endif //__GNUC_PREREQ
 #endif // __PIC__
 
 /* Switches into the TLS 'tls_desc'.  Capable of being called from either
