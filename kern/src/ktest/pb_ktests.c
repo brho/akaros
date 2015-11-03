@@ -38,6 +38,7 @@
 #include <kthread.h>
 #include <schedule.h>
 #include <umem.h>
+#include <init.h>
 #include <ucq.h>
 #include <setjmp.h>
 #include <sort.h>
@@ -2206,6 +2207,75 @@ bool test_sort(void)
 	return TRUE;
 }
 
+bool test_cmdline_parse(void)
+{
+	static const char *fake_cmdline =
+		"kernel -root=/foo -simple -num=123 -quoted='abc \\'' -dup=311 "
+		"-dup='akaros' -empty='' -inner=-outer -outer=-inner=xyz";
+	const char *opt;
+	char param[128];
+
+	/* Note that the get_boot_option() API should be passed NULL the first time
+	 * it is called, in normal cases, and should be passed the value returned by
+	 * previous call to get_boot_option(), in case multiple options with same
+	 * name have to be fetched.
+	 */
+	opt = get_boot_option(fake_cmdline, "-root", param, sizeof(param));
+	KT_ASSERT_M("Unable to parse -root option", opt);
+	KT_ASSERT_M("Invalid -root option value", strcmp(param, "/foo") == 0);
+
+	opt = get_boot_option(fake_cmdline, "-root", NULL, 0);
+	KT_ASSERT_M("Unable to parse -root option when param not provided", opt);
+
+	opt = get_boot_option(fake_cmdline, "-simple", param, sizeof(param));
+	KT_ASSERT_M("Unable to parse -simple option", opt);
+	KT_ASSERT_M("Invalid -simple option value", strcmp(param, "") == 0);
+
+	opt = get_boot_option(fake_cmdline, "-num", param, sizeof(param));
+	KT_ASSERT_M("Unable to parse -num option", opt);
+	KT_ASSERT_M("Invalid -num option value", strcmp(param, "123") == 0);
+
+	opt = get_boot_option(fake_cmdline, "-quoted", param, sizeof(param));
+	KT_ASSERT_M("Unable to parse -quoted option", opt);
+	KT_ASSERT_M("Invalid -quoted option value", strcmp(param, "abc '") == 0);
+
+	opt = get_boot_option(fake_cmdline, "-dup", param, sizeof(param));
+	KT_ASSERT_M("Unable to parse -dup option", opt);
+	KT_ASSERT_M("Invalid -dup option first value", strcmp(param, "311") == 0);
+
+	opt = get_boot_option(opt, "-dup", param, sizeof(param));
+	KT_ASSERT_M("Unable to parse -dup option", opt);
+	KT_ASSERT_M("Invalid -dup option second value",
+				strcmp(param, "akaros") == 0);
+
+	opt = get_boot_option(fake_cmdline, "-inner", param, sizeof(param));
+	KT_ASSERT_M("Unable to parse -inner option", opt);
+	KT_ASSERT_M("Invalid -inner option value", strcmp(param, "-outer") == 0);
+
+	opt = get_boot_option(opt, "-inner", param, sizeof(param));
+	KT_ASSERT_M("Should not be parsing -inner as value", !opt);
+
+	opt = get_boot_option(fake_cmdline, "-outer", param, sizeof(param));
+	KT_ASSERT_M("Unable to parse -outer option", opt);
+	KT_ASSERT_M("Invalid -outer option value",
+				strcmp(param, "-inner=xyz") == 0);
+
+	opt = get_boot_option(fake_cmdline, "-missing", param, sizeof(param));
+	KT_ASSERT_M("Should not be parsing -missing option", !opt);
+
+	opt = get_boot_option(fake_cmdline, "-inne", NULL, 0);
+	KT_ASSERT_M("Should not be parsing -inne option", !opt);
+
+	opt = get_boot_option(fake_cmdline, "-outera", NULL, 0);
+	KT_ASSERT_M("Should not be parsing -outera option", !opt);
+
+	opt = get_boot_option(fake_cmdline, "-empty", param, sizeof(param));
+	KT_ASSERT_M("Unable to parse -empty option", opt);
+	KT_ASSERT_M("Invalid -empty option value", strcmp(param, "") == 0);
+
+	return TRUE;
+}
+
 static struct ktest ktests[] = {
 #ifdef CONFIG_X86
 	KTEST_REG(ipi_sending,        CONFIG_TEST_ipi_sending),
@@ -2247,6 +2317,7 @@ static struct ktest ktests[] = {
 	KTEST_REG(u16pool,            CONFIG_TEST_u16pool),
 	KTEST_REG(uaccess,            CONFIG_TEST_uaccess),
 	KTEST_REG(sort,               CONFIG_TEST_sort),
+	KTEST_REG(cmdline_parse,      CONFIG_TEST_cmdline_parse),
 };
 static int num_ktests = sizeof(ktests) / sizeof(struct ktest);
 linker_func_1(register_pb_ktests)

@@ -248,3 +248,8 @@ config TEST_sort
     depends on PB_KTESTS
     bool "Tests sort library functions"
     default y
+
+config TEST_cmdline_parse
+    depends on PB_KTESTS
+    bool "Tests command line parsing functions"
+    default y
