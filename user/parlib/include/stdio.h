@@ -33,7 +33,7 @@ int	ros_vdebug(const char *fmt, va_list);
  * otherwise. */
 int akaros_printf(const char *format, ...);
 #undef printf
-#define printf akaros_printf
+#define printf(args...) akaros_printf(args)
 
 __END_DECLS
 
