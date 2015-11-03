@@ -147,7 +147,7 @@ uint8_t _kernel[KERNSIZE];
 unsigned long long *p512, *p1, *p2m;
 
 void **my_retvals;
-int nr_threads = 3;
+int nr_threads = 4;
 int debug = 0;
 int resumeprompt = 0;
 /* unlike Linux, this shared struct is for both host and guest. */
@@ -167,6 +167,17 @@ static void set_posted_interrupt(int vector);
 #define LOCK_PREFIX "lock "
 #define ADDR				BITOP_ADDR(addr)
 static inline int test_and_set_bit(int nr, volatile unsigned long *addr);
+
+void *timer_thread(void *arg)
+{
+	int fd = open("#cons/vmctl", O_RDWR), ret;
+
+	while (1) {
+		set_posted_interrupt(0xef);
+		pwrite(fd, &vmctl, sizeof(vmctl), 1<<12);
+		uthread_usleep(1);
+	}
+}
 
 void *consout(void *arg)
 {
@@ -243,6 +254,8 @@ void *consin(void *arg)
 	int i;
 	int num;
 	//char c[1];
+	int timer_started = 0;
+	pthread_t timerthread_struct;
 
 	int fd = open("#cons/vmctl", O_RDWR), ret;
 	
@@ -286,6 +299,15 @@ void *consin(void *arg)
 		virtio_mmio_set_vring_irq();
 
 		pwrite(fd, &vmctl, sizeof(vmctl), 1<<12);
+		if (!timer_started && mcp) {
+			/* Start up timer thread */
+			if (pthread_create(&timerthread_struct, NULL, timer_thread, NULL)) {
+				fprintf(stderr, "pth_create failed for timer thread.");
+				perror("pth_create");
+			} else {
+				timer_started = 1;
+			}
+		}
 	}
 	fprintf(stderr, "All done\n");
 	return NULL;
