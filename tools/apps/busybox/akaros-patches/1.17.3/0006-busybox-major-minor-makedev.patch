@@ -1,0 +1,47 @@
+diff -ur busybox-1.17.3-akaros-base/include/libbb.h busybox-1.17.3-akaros/include/libbb.h
+--- busybox-1.17.3-akaros-base/include/libbb.h	2015-11-03 16:05:17.610100657 -0500
++++ busybox-1.17.3-akaros/include/libbb.h	2015-11-03 16:10:35.950717057 -0500
+@@ -1265,8 +1265,20 @@
+ #ifdef __GLIBC__
+ /* At least glibc has horrendously large inline for this, so wrap it */
+ unsigned long long bb_makedev(unsigned int major, unsigned int minor) FAST_FUNC;
++unsigned int bb_major(unsigned long long dev) FAST_FUNC;
++unsigned int bb_minor(unsigned long long dev) FAST_FUNC;
++#ifdef makedev
+ #undef makedev
++#endif
+ #define makedev(a,b) bb_makedev(a,b)
++#ifdef major
++#undef major
++#endif
++#define major(a) bb_major(a)
++#ifdef minor
++#undef minor
++#endif
++#define minor(a) bb_minor(a)
+ #endif
+ 
+ 
+diff -ur busybox-1.17.3-akaros-base/libbb/makedev.c busybox-1.17.3-akaros/libbb/makedev.c
+--- busybox-1.17.3-akaros-base/libbb/makedev.c	2015-11-03 16:05:17.522098264 -0500
++++ busybox-1.17.3-akaros/libbb/makedev.c	2015-11-03 16:12:53.898427762 -0500
+@@ -19,6 +19,18 @@
+ unsigned long long FAST_FUNC bb_makedev(unsigned int major, unsigned int minor);
+ unsigned long long FAST_FUNC bb_makedev(unsigned int major, unsigned int minor)
+ {
+-	return makedev(major, minor);
++	return ((major << 16) | minor);
++}
++
++unsigned int FAST_FUNC bb_major(unsigned long long dev);
++unsigned int FAST_FUNC bb_major(unsigned long long dev)
++{
++	return ((dev >> 16) & 0xFFFF);
++}
++
++unsigned int FAST_FUNC bb_minor(unsigned long long dev);
++unsigned int FAST_FUNC bb_minor(unsigned long long dev)
++{
++	return (dev & 0xFFFF);
+ }
+ #endif
