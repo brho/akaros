@@ -30,7 +30,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <arch/vmm/vmm.h>
-#include <ros/vmx.h>
+#include <ros/vmm.h>
 
 struct dev procdevtab;
 

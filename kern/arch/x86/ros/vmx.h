@@ -403,7 +403,7 @@ enum vmcs_field {
 #define INTR_TYPE_EXT_INTR              (0 << 8) /* external interrupt */
 #define INTR_TYPE_NMI_INTR		(2 << 8) /* NMI */
 #define INTR_TYPE_HARD_EXCEPTION	(3 << 8) /* processor exception */
-#define INTR_TYPE_EXCEPTION             (3 << 8)       /* processor exception */  
+#define INTR_TYPE_EXCEPTION             (3 << 8)       /* processor exception */
 #define INTR_TYPE_SOFT_INTR             (4 << 8) /* software interrupt */
 #define INTR_TYPE_SOFT_EXCEPTION	(6 << 8) /* software exception */
 
@@ -717,7 +717,7 @@ static char * const VMX_EXIT_REASON_NAMES[] = {
 	"INTERRUPT_WINDOW", "NMI_WINDOW", "TASK_SWITCH", "CPUID", "GETSEC", "HLT", "INVD",
 	"INVLPG", "RDPMC", "RDTSC", "RSM", "VMCALL", "VMCLEAR", "VMLAUNCH", "VMPTRLD",
 	"VMPTRST", "VMREAD", "VMRESUME", "VMWRITE", "VMOFF", "VMON", "CR_ACCESS",
-	"DR_ACCESS", "IO_INSTRUCTION", "MSR_READ", "MSR_WRITE", "INVALID_STATE", 
+	"DR_ACCESS", "IO_INSTRUCTION", "MSR_READ", "MSR_WRITE", "INVALID_STATE",
 	"ENTRY_MSR_LOADING", "35", "MWAIT_INSTRUCTION", "MONITOR_TRAP_FLAG", "38",
 	"MONITOR_INSTRUCTION", "PAUSE_INSTRUCTION", "MCE_DURING_VMENTRY", "42",
 	"TPR_BELOW_THRESHOLD", "APIC_ACCESS", "VIRTUALIZED_EOI", "GDTR_IDTR_ACCESS",

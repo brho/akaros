@@ -24,7 +24,9 @@
  *    Yaniv Kamay <yaniv@qumranet.com>
  *
  */
-#include <ros/vmx.h>
+
+#include <ros/arch/vmx.h>
+
 int vmx_init(void);
 void vmx_exit(void);
 int intel_vmm_init(void);

@@ -16,7 +16,7 @@
 #include <vmm/vmm.h>
 #include <vmm/acpi/acpi.h>
 #include <ros/arch/mmu.h>
-#include <ros/vmx.h>
+#include <ros/vmm.h>
 #include <parlib/uthread.h>
 #include <vmm/virtio.h>
 #include <vmm/virtio_mmio.h>

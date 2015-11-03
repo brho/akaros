@@ -2,10 +2,12 @@
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
- * 64 bit KPT helpers */
+ * Arch-independent VMM kernel headers */
 
 #ifndef ROS_INC_VMM_H
 #define ROS_INC_VMM_H
+
+#include <ros/arch/vmm.h>
 
 #define	VMM_VMCALL_PRINTF	0x1	/* Enable VMCALL output console hack */
 

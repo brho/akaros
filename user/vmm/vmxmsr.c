@@ -22,7 +22,6 @@
 #include <err.h>
 #include <sys/mman.h>
 #include <ros/vmm.h>
-#include <ros/vmx.h>
 #include <ros/arch/msr-index.h>
 #include <vmm/virtio.h>
 #include <vmm/virtio_mmio.h>
