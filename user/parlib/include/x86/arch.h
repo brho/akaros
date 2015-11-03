@@ -3,8 +3,6 @@
 
 #include <ros/trapframe.h>
 #include <ros/arch/mmu.h>
-#include <parlib/common.h>
-#include <string.h>
 
 __BEGIN_DECLS
 
