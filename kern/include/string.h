@@ -5,7 +5,7 @@
 
 int	strlen(const char *s);
 int	strnlen(const char *s, size_t size);
-char *strstr(char *s1, char *s2);
+char *strstr(const char *s1, const char *s2);
 
 /* zra : These aren't being used, and they are dangerous, so I'm rm'ing them
 STRING	strcpy(STRING dst, const STRING src);

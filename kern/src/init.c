@@ -46,10 +46,76 @@
 #include <acpi.h>
 #include <coreboot_tables.h>
 
+#define MAX_BOOT_CMDLINE_SIZE 4096
+
+#define ASSIGN_PTRVAL(prm, top, val)			\
+	do {										\
+		if (prm && (prm < top)) {				\
+			*prm = val;							\
+			prm++;								\
+		}										\
+	} while (0)
+
 int booting = 1;
 struct sysinfo_t sysinfo;
+static char boot_cmdline[MAX_BOOT_CMDLINE_SIZE];
+
 static void run_linker_funcs(void);
 static int run_init_script(void);
+
+const char *get_boot_option(const char *base, const char *option, char *param,
+							size_t max_param)
+{
+	size_t optlen = strlen(option);
+	char *ptop = param + max_param - 1;
+	const char *opt, *arg;
+
+	if (!base)
+		base = boot_cmdline;
+	for (;;) {
+		opt = strstr(base, option);
+		if (!opt)
+			return NULL;
+		if (((opt == base) || (opt[-1] == ' ')) &&
+			((opt[optlen] == 0) || (opt[optlen] == '=') ||
+			 (opt[optlen] == ' ')))
+			break;
+		base = opt + optlen;
+	}
+	arg = opt + optlen;
+	if (*arg == '=') {
+		arg++;
+		if (*arg == '\'') {
+			arg++;
+			for (; *arg; arg++) {
+				if (*arg == '\\')
+					arg++;
+				else if (*arg == '\'')
+					break;
+				ASSIGN_PTRVAL(param, ptop, *arg);
+			}
+		} else {
+			for (; *arg && (*arg != ' '); arg++)
+				ASSIGN_PTRVAL(param, ptop, *arg);
+		}
+	}
+	ASSIGN_PTRVAL(param, ptop, 0);
+
+	return arg;
+}
+
+static void extract_multiboot_cmdline(struct multiboot_info *mbi)
+{
+	if (mbi && (mbi->flags & MULTIBOOT_INFO_CMDLINE) && mbi->cmdline) {
+		const char *cmdln = (const char *) KADDR(mbi->cmdline);
+
+		/* We need to copy the command line in a permanent buffer, since the
+		 * multiboot memory where it is currently residing will be part of the
+		 * free boot memory later on in the boot process.
+		 */
+		strlcpy(boot_cmdline, cmdln, sizeof(boot_cmdline));
+	}
+}
 
 void kernel_init(multiboot_info_t *mboot_info)
 {
@@ -62,8 +128,12 @@ void kernel_init(multiboot_info_t *mboot_info)
 	 * memory, we may clobber it. */
 	multiboot_kaddr = (struct multiboot_info*)((physaddr_t)mboot_info
                                                + KERNBASE);
+	extract_multiboot_cmdline(multiboot_kaddr);
+
 	cons_init();
 	print_cpuinfo();
+
+	printk("Boot Command Line: '%s'\n", boot_cmdline);
 
 	exception_table_init();
 	cache_init();					// Determine systems's cache properties
