@@ -41,7 +41,8 @@ void vmm_init(void)
 		printd("intel_vmm_init worked\n");
 
 		//Register I_VMMCP_POSTED IRQ
-		register_irq(I_VMMCP_POSTED, vmmcp_posted_handler, NULL, MKBUS(BusLAPIC, 0, 0, 0));
+		//register_irq(I_VMMCP_POSTED, vmmcp_posted_handler, NULL,
+		//		MKBUS(BusLAPIC, 0, 0, 0));
 		x86_supports_vmx = TRUE;
 		return;
 	}

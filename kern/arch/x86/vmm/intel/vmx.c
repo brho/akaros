@@ -1912,6 +1912,8 @@ int vmx_launch(struct vmctl *v) {
 		//dumpmsrs();
 		enable_irq();
 
+		// Update the core the vm is running on in case it has changed.
+		v->core = core_id();
 		current_proc->vmm.vmexits[ret] += 1;
 
 		v->intrinfo1 = vmcs_readl(GUEST_INTERRUPTIBILITY_INFO);
@@ -1951,6 +1953,7 @@ int vmx_launch(struct vmctl *v) {
 			vmx_dump_cpu(vcpu);
 			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
 		} else if (ret == EXIT_REASON_CPUID) {
+			printk("CPUID EXIT RIP: %p\n", vcpu->regs.tf_rip);
 			vmx_handle_cpuid(vcpu);
 			vmx_get_cpu(vcpu);
 			vmcs_writel(GUEST_RIP, vcpu->regs.tf_rip + 2);

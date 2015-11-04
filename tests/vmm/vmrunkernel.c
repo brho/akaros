@@ -424,7 +424,10 @@ int main(int argc, char **argv)
 	uint8_t csum;
 	void *coreboot_tables = (void *) 0x1165000;
 	void *a_page;
-fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT, PML1_PTE_REACH);
+
+
+	fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT,
+			PML1_PTE_REACH);
 
 	// mmap is not working for us at present.
 	if ((uint64_t)_kernel > GKERNBASE) {
