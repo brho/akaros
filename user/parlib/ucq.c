@@ -32,7 +32,7 @@ void ucq_init_raw(struct ucq *ucq, uintptr_t pg1, uintptr_t pg2)
 	ucq->prod_overflow = FALSE;
 	atomic_set(&ucq->nr_extra_pgs, 0);
 	atomic_set(&ucq->spare_pg, pg2);
-	static_assert(sizeof(struct spin_pdr_lock) <= sizeof(ucq->u_lock));
+	parlib_static_assert(sizeof(struct spin_pdr_lock) <= sizeof(ucq->u_lock));
 	spin_pdr_init((struct spin_pdr_lock*)(&ucq->u_lock));
 	ucq->ucq_ready = TRUE;
 }

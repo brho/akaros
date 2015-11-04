@@ -16,7 +16,6 @@
 __BEGIN_DECLS
 
 #undef assert
-#undef static_assert
 #undef warn
 
 void _warn(const char*, int, const char*, ...);
@@ -33,8 +32,8 @@ void _assert_failed(const char *file, int line, const char *msg)
 			_assert_failed(__FILE__, __LINE__, #x);                            \
 	} while (0)
 
-// static_assert(x) will generate a compile-time error if 'x' is false.
-#define static_assert(x)	switch (x) case 0: case (x):
+// parlib_static_assert(x) will generate a compile-time error if 'x' is false.
+#define parlib_static_assert(x)	switch (x) case 0: case (x):
 
 __END_DECLS
 

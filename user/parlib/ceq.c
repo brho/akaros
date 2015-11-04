@@ -44,7 +44,7 @@ void ceq_init(struct ceq *ceq, uint8_t op, size_t nr_events, size_t ring_sz)
 	atomic_init(&ceq->prod_idx, 0);
 	atomic_init(&ceq->cons_pub_idx, 0);
 	atomic_init(&ceq->cons_pvt_idx, 0);
-	static_assert(sizeof(struct spin_pdr_lock) <= sizeof(ceq->u_lock));
+	parlib_static_assert(sizeof(struct spin_pdr_lock) <= sizeof(ceq->u_lock));
 	spin_pdr_init((struct spin_pdr_lock*)&ceq->u_lock);
 }
 
