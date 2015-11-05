@@ -13,6 +13,9 @@ struct symtab_entry {
 #define TRACEME() oprofile_add_backtrace(read_pc(), read_bp())
 
 void backtrace(void);
+void gen_backtrace_frame(uintptr_t eip, uintptr_t ebp,
+						 void (*pfunc)(void *, const char *), void *opaque);
+void gen_backtrace(void (*pfunc)(void *, const char *), void *opaque);
 void backtrace_frame(uintptr_t pc, uintptr_t fp);
 size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
                       size_t nr_slots);

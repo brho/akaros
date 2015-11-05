@@ -8,6 +8,19 @@
 
 #include <ros/memlayout.h>
 
+/* The return address is right above ebp on the stack.  We subtract an
+ * additional 1 to make sure the eip we get is actually in the function
+ * that called us.  I had a couple cases early on where call was the last
+ * instruction in a function, and simply reading the retaddr would point
+ * into another function (the next one in the object).
+ */
+#define GET_FRAME_START(ebp, eip)							\
+	do {													\
+		ebp = read_bp();									\
+		eip = *(uintptr_t *) (ebp + sizeof(uintptr_t)) - 1; \
+		ebp = *(uintptr_t *) ebp;							\
+	} while (0)
+
 // Beginning of stabs table
 extern const stab_t __STAB_BEGIN__[];
 
@@ -27,6 +40,36 @@ typedef struct UserStabData {
 	const char *stabstr_end;
 } user_stab_data_t;
 
+static void printk_func(void *opaque, const char *str)
+{
+	printk("%s", str);
+}
+
+void gen_backtrace_frame(uintptr_t eip, uintptr_t ebp,
+						 void (*pfunc)(void *, const char *), void *opaque)
+{
+#define MAX_BT_DEPTH 20
+	char *func_name;
+	char bt_line[128];
+	uintptr_t pcs[MAX_BT_DEPTH];
+	size_t nr_pcs = backtrace_list(eip, ebp, pcs, MAX_BT_DEPTH);
+
+	for (size_t i = 0; i < nr_pcs; i++) {
+		func_name = get_fn_name(pcs[i]);
+		snprintf(bt_line, sizeof(bt_line), "#%02d [<%p>] in %s\n", i + 1,
+				 pcs[i], func_name);
+		pfunc(opaque, bt_line);
+		kfree(func_name);
+	}
+}
+
+void gen_backtrace(void (*pfunc)(void *, const char *), void *opaque)
+{
+	uintptr_t ebp, eip;
+
+	GET_FRAME_START(ebp, eip);
+	gen_backtrace_frame(eip, ebp, pfunc, opaque);
+}
 
 /* We used to check for a null terminating byte for the entire strings section
  * (due to JOS, I think), but that's not what the spec says: only that all
@@ -323,33 +366,14 @@ size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
 }
 
 void backtrace_frame(uintptr_t eip, uintptr_t ebp)
-{ 
-	char *func_name;
-	#define MAX_BT_DEPTH 20
-	uintptr_t pcs[MAX_BT_DEPTH];
-	size_t nr_pcs = backtrace_list(eip, ebp, pcs, MAX_BT_DEPTH);
-
-	for (int i = 0; i < nr_pcs; i++) {
-		func_name = get_fn_name(pcs[i]);
-		printk("#%02d [<%p>] in %s\n", i + 1,  pcs[i], func_name);
-		kfree(func_name);
-	}
+{
+	gen_backtrace_frame(eip, ebp, &printk_func, NULL);
 }
 
 void backtrace(void)
 {
-	uintptr_t ebp, eip;
-	ebp = read_bp();
-	/* retaddr is right above ebp on the stack.  we subtract an additional 1 to
-	 * make sure the eip we get is actually in the function that called us.
-	 * i had a couple cases early on where call was the last instruction in a
-	 * function, and simply reading the retaddr would point into another
-	 * function (the next one in the object) */
-	eip = *(uintptr_t*)(ebp + sizeof(uintptr_t)) - 1;
-	/* jump back a frame (out of backtrace) */
-	ebp = *(uintptr_t*)ebp;
 	printk("Stack Backtrace on Core %d:\n", core_id());
-	backtrace_frame(eip, ebp);
+	gen_backtrace(&printk_func, NULL);
 }
 
 /* Assumes 32-bit header */
