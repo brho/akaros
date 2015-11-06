@@ -34,6 +34,7 @@
 #include <kmalloc.h>
 #include <hashtable.h>
 #include <radix.h>
+#include <circular_buffer.h>
 #include <monitor.h>
 #include <kthread.h>
 #include <schedule.h>
@@ -877,6 +878,83 @@ bool test_hashtable(void)
 	hashtable_destroy(h);
 
 	return true;
+}
+
+bool test_circular_buffer(void)
+{
+	static const size_t cbsize = 4096;
+	struct circular_buffer cb;
+	char *bigbuf;
+	size_t csize, off, cnum, mxsize;
+	char buf[256];
+
+	KT_ASSERT_M("Failed to build the circular buffer",
+				circular_buffer_init(&cb, cbsize, NULL));
+
+	for (size_t i = 0; i < 8 * cbsize; i++) {
+		size_t len = snprintf(buf, sizeof(buf), "%lu\n", i);
+
+		KT_ASSERT_M("Circular buffer write failed",
+					circular_buffer_write(&cb, buf, len) == len);
+	}
+	cnum = off = 0;
+	while ((csize = circular_buffer_read(&cb, buf, sizeof(buf), off)) != 0) {
+		char *top = buf + csize;
+		char *ptr = buf;
+		char *pnl;
+
+		while ((pnl = memchr(ptr, '\n', top - ptr)) != NULL) {
+			size_t num;
+
+			*pnl = 0;
+			num = strtoul(ptr, NULL, 10);
+			KT_ASSERT_M("Numbers should be ascending", num >= cnum);
+			cnum = num;
+			ptr = pnl + 1;
+		}
+
+		off += ptr - buf;
+	}
+
+	for (size_t i = 0; i < (cbsize / sizeof(buf) + 1); i++) {
+		memset(buf, (int) i, sizeof(buf));
+
+		KT_ASSERT_M("Circular buffer write failed",
+					circular_buffer_write(&cb, buf,
+										  sizeof(buf)) == sizeof(buf));
+	}
+	cnum = off = 0;
+	while ((csize = circular_buffer_read(&cb, buf, sizeof(buf), off)) != 0) {
+		size_t num = buf[0];
+
+		KT_ASSERT_M("Invalid record read size", csize == sizeof(buf));
+
+		if (off != 0)
+			KT_ASSERT_M("Invalid record sequence number",
+						num == ((cnum + 1) % 256));
+		cnum = num;
+		off += csize;
+	}
+
+	bigbuf = kzmalloc(cbsize, KMALLOC_WAIT);
+	KT_ASSERT(bigbuf != NULL);
+
+	mxsize = circular_buffer_max_write_size(&cb);
+	KT_ASSERT_M("Circular buffer max write failed",
+				circular_buffer_write(&cb, bigbuf, mxsize) == mxsize);
+
+	memset(bigbuf, 17, cbsize);
+	csize = circular_buffer_read(&cb, bigbuf, mxsize, 0);
+	KT_ASSERT_M("Invalid max record read size", csize == mxsize);
+
+	for (size_t i = 0; i < csize; i++)
+		KT_ASSERT_M("Invalid max record value", bigbuf[i] == 0);
+
+	kfree(bigbuf);
+
+	circular_buffer_destroy(&cb);
+
+	return TRUE;
 }
 
 /* Ghetto test, only tests one prod or consumer at a time */
@@ -2313,6 +2391,7 @@ static struct ktest ktests[] = {
 	KTEST_REG(slab,               CONFIG_TEST_slab),
 	KTEST_REG(kmalloc,            CONFIG_TEST_kmalloc),
 	KTEST_REG(hashtable,          CONFIG_TEST_hashtable),
+	KTEST_REG(circular_buffer,    CONFIG_TEST_circular_buffer),
 	KTEST_REG(bcq,                CONFIG_TEST_bcq),
 	KTEST_REG(ucq,                CONFIG_TEST_ucq),
 	KTEST_REG(vm_regions,         CONFIG_TEST_vm_regions),

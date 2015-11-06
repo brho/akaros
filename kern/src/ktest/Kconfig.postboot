@@ -117,6 +117,13 @@ config TEST_hashtable
     help
         Run the hashtable test
 
+config TEST_circular_buffer
+    depends on PB_KTESTS
+    bool "Circular buffer test"
+    default y
+    help
+        Run the circular buffer test
+
 config TEST_bcq
     depends on PB_KTESTS
     bool "BCQ test"
