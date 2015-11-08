@@ -12,26 +12,28 @@
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>
+#include <kthread.h>
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
 #include <error.h>
 #include <cpio.h>
 #include <pmap.h>
+#include <umem.h>
 #include <smp.h>
 #include <ip.h>
 #include <time.h>
+#include <atomic.h>
+#include <core_set.h>
+#include <completion.h>
+#include <address_range.h>
+#include <arch/uaccess.h>
+#include <arch/devarch.h>
 
-struct dev archdevtab;
+#define REAL_MEM_SIZE (1024 * 1024)
 
-static char *devname(void)
-{
-	return archdevtab.name;
-}
-
-typedef struct IOMap IOMap;
-struct IOMap {
-	IOMap *next;
+struct io_map {
+	struct io_map *next;
 	int reserved;
 	char tag[13];
 	uint32_t start;
@@ -40,10 +42,9 @@ struct IOMap {
 
 static struct {
 	spinlock_t lock;
-	IOMap *map;
-	IOMap *free;
-	IOMap maps[32];				// some initial free maps
-
+	struct io_map *map;
+	struct io_map *free;
+	struct io_map maps[32];				// some initial free maps
 	qlock_t ql;					// lock for reading map
 } iomap;
 
@@ -54,18 +55,28 @@ enum {
 	Qiow,
 	Qiol,
 	Qgdb,
-	Qmapram,
 	Qrealmem,
-	Qbase,
+	Qmsr,
 
-	Qmax = 16,
+	Qmax,
 };
 
-typedef long Rdwrfn(struct chan *, void *, long, int64_t);
+enum {
+	Linelen = 31,
+};
 
-static Rdwrfn *readfn[Qmax];
-static Rdwrfn *writefn[Qmax];
+struct smp_read_values {
+	uint64_t *values;
+	uint32_t addr;
+	atomic_t err;
+};
+struct smp_write_values {
+	uint32_t addr;
+	uint64_t value;
+	atomic_t err;
+};
 
+struct dev archdevtab;
 static struct dirtab archdir[Qmax] = {
 	{".", {Qdir, 0, QTDIR}, 0, 0555},
 	{"ioalloc", {Qioalloc, 0}, 0, 0444},
@@ -73,133 +84,65 @@ static struct dirtab archdir[Qmax] = {
 	{"iow", {Qiow, 0}, 0, 0666},
 	{"iol", {Qiol, 0}, 0, 0666},
 	{"gdb", {Qgdb, 0}, 0, 0660},
-	{"mapram", {Qmapram, 0}, 0, 0444},
-	{"realmodemem", {Qrealmem, 0}, 0, 0664},
+	{"realmem", {Qrealmem, 0}, 0, 0444},
+	{"msr", {Qmsr, 0}, 0, 0666},
 };
 
-spinlock_t archwlock;			/* the lock is only for changing archdir */
-int narchdir = Qbase;
 int gdbactive = 0;
 
-/* If we use these, put this in a header */
-int ioalloc(int port, int size, int align, char *tag);
-
-/*
- * Add a file to the #P listing.  Once added, you can't delete it.
- * You can't add a file with the same name as one already there,
- * and you get a pointer to the Dirtab entry so you can do things
- * like change the Qid version.  Changing the Qid path is disallowed.
- */
-struct dirtab *addarchfile(char *name, int perm, Rdwrfn * rdfn, Rdwrfn * wrfn)
+static void cpu_read_msr(void *opaque)
 {
-	int i;
-	struct dirtab d;
-	struct dirtab *dp;
+	int err, cpu = core_id();
+	struct smp_read_values *srv = (struct smp_read_values *) opaque;
 
-	memset(&d, 0, sizeof d);
-	strncpy(d.name, name, sizeof(d.name));
-	d.perm = perm;
-
-	spin_lock(&archwlock);
-	if (narchdir >= Qmax) {
-		spin_unlock(&archwlock);
-		return NULL;
-	}
-
-	for (i = 0; i < narchdir; i++)
-		if (strncmp(archdir[i].name, name, KNAMELEN) == 0) {
-			spin_unlock(&archwlock);
-			return NULL;
-		}
-
-	d.qid.path = narchdir;
-	archdir[narchdir] = d;
-	readfn[narchdir] = rdfn;
-	writefn[narchdir] = wrfn;
-	dp = &archdir[narchdir++];
-	spin_unlock(&archwlock);
-
-	return dp;
+	err = safe_read_msr(srv->addr, &srv->values[cpu]);
+	if (unlikely(err))
+		atomic_cas(&srv->err, 0, err);
 }
 
-void ioinit(void)
+uint64_t *coreset_read_msr(const struct core_set *cset, uint32_t addr,
+						   size_t *nvalues)
 {
-	int i;
-	char *excluded = "";
+	int err;
+	struct smp_read_values srv;
 
-	panic("Akaros doesn't do IO port allocation yet.  Don't init.");
-	for (i = 0; i < ARRAY_SIZE(iomap.maps) - 1; i++)
-		iomap.maps[i].next = &iomap.maps[i + 1];
-	iomap.maps[i].next = NULL;
-	iomap.free = iomap.maps;
-	char *s;
-
-	s = excluded;
-	while (s && *s != '\0' && *s != '\n') {
-		char *ends;
-		int io_s, io_e;
-
-		io_s = (int)strtol(s, &ends, 0);
-		if (ends == NULL || ends == s || *ends != '-') {
-			printd("ioinit: cannot parse option string\n");
-			break;
-		}
-		s = ++ends;
-
-		io_e = (int)strtol(s, &ends, 0);
-		if (ends && *ends == ',')
-			*ends++ = '\0';
-		s = ends;
-
-		ioalloc(io_s, io_e - io_s + 1, 0, "pre-allocated");
+	srv.addr = addr;
+	atomic_init(&srv.err, 0);
+	srv.values = kzmalloc(num_cores * sizeof(*srv.values), 0);
+	if (unlikely(!srv.values))
+		return ERR_PTR(-ENOMEM);
+	smp_do_in_cores(cset, cpu_read_msr, &srv);
+	err = (int) atomic_read(&srv.err);
+	if (unlikely(err)) {
+		kfree(srv.values);
+		return ERR_PTR(err);
 	}
+	*nvalues = num_cores;
+
+	return srv.values;
 }
 
-// Reserve a range to be ioalloced later.
-// This is in particular useful for exchangable cards, such
-// as pcmcia and cardbus cards.
-int ioreserve(int unused_int, int size, int align, char *tag)
+static void cpu_write_msr(void *opaque)
 {
-	IOMap *map, **l;
-	int i, port;
+	int err;
+	struct smp_write_values *swv = (struct smp_write_values *) opaque;
 
-	spin_lock(&(&iomap)->lock);
-	// find a free port above 0x400 and below 0x1000
-	port = 0x400;
-	for (l = &iomap.map; *l; l = &(*l)->next) {
-		map = *l;
-		if (map->start < 0x400)
-			continue;
-		i = map->start - port;
-		if (i > size)
-			break;
-		if (align > 0)
-			port = ((port + align - 1) / align) * align;
-		else
-			port = map->end;
-	}
-	if (*l == NULL) {
-		spin_unlock(&(&iomap)->lock);
-		return -1;
-	}
-	map = iomap.free;
-	if (map == NULL) {
-		printd("ioalloc: out of maps");
-		spin_unlock(&(&iomap)->lock);
-		return port;
-	}
-	iomap.free = map->next;
-	map->next = *l;
-	map->start = port;
-	map->end = port + size;
-	map->reserved = 1;
-	strlcpy(map->tag, tag, sizeof(map->tag));
-	*l = map;
+	err = safe_write_msr(swv->addr, swv->value);
+	if (unlikely(err))
+		atomic_cas(&swv->err, 0, err);
+}
 
-	archdir[0].qid.vers++;
+int coreset_write_msr(const struct core_set *cset, uint32_t addr,
+					   uint64_t value)
+{
+	struct smp_write_values swv;
 
-	spin_unlock(&(&iomap)->lock);
-	return map->start;
+	swv.addr = addr;
+	swv.value = value;
+	atomic_init(&swv.err, 0);
+	smp_do_in_cores(cset, cpu_write_msr, &swv);
+
+	return (int) atomic_read(&swv.err);
 }
 
 //
@@ -208,7 +151,7 @@ int ioreserve(int unused_int, int size, int align, char *tag)
 //
 int ioalloc(int port, int size, int align, char *tag)
 {
-	IOMap *map, **l;
+	struct io_map *map, **l;
 	int i;
 
 	spin_lock(&(&iomap)->lock);
@@ -274,7 +217,7 @@ int ioalloc(int port, int size, int align, char *tag)
 
 void iofree(int port)
 {
-	IOMap *map, **l;
+	struct io_map *map, **l;
 
 	spin_lock(&(&iomap)->lock);
 	for (l = &iomap.map; *l; l = &(*l)->next) {
@@ -294,7 +237,7 @@ void iofree(int port)
 
 int iounused(int start, int end)
 {
-	IOMap *map;
+	struct io_map *map;
 
 	for (map = iomap.map; map; map = map->next) {
 		if (((start >= map->start) && (start < map->end))
@@ -302,6 +245,86 @@ int iounused(int start, int end)
 			return 0;
 	}
 	return 1;
+}
+
+void ioinit(void)
+{
+	int i;
+	char *excluded = "";
+
+	panic("Akaros doesn't do IO port allocation yet.  Don't init.");
+	for (i = 0; i < ARRAY_SIZE(iomap.maps) - 1; i++)
+		iomap.maps[i].next = &iomap.maps[i + 1];
+	iomap.maps[i].next = NULL;
+	iomap.free = iomap.maps;
+	char *s;
+
+	s = excluded;
+	while (s && *s != '\0' && *s != '\n') {
+		char *ends;
+		int io_s, io_e;
+
+		io_s = (int)strtol(s, &ends, 0);
+		if (ends == NULL || ends == s || *ends != '-') {
+			printd("ioinit: cannot parse option string\n");
+			break;
+		}
+		s = ++ends;
+
+		io_e = (int)strtol(s, &ends, 0);
+		if (ends && *ends == ',')
+			*ends++ = '\0';
+		s = ends;
+
+		ioalloc(io_s, io_e - io_s + 1, 0, "pre-allocated");
+	}
+}
+
+// Reserve a range to be ioalloced later.
+// This is in particular useful for exchangable cards, such
+// as pcmcia and cardbus cards.
+int ioreserve(int unused_int, int size, int align, char *tag)
+{
+	struct io_map *map, **l;
+	int i, port;
+
+	spin_lock(&(&iomap)->lock);
+	// find a free port above 0x400 and below 0x1000
+	port = 0x400;
+	for (l = &iomap.map; *l; l = &(*l)->next) {
+		map = *l;
+		if (map->start < 0x400)
+			continue;
+		i = map->start - port;
+		if (i > size)
+			break;
+		if (align > 0)
+			port = ((port + align - 1) / align) * align;
+		else
+			port = map->end;
+	}
+	if (*l == NULL) {
+		spin_unlock(&(&iomap)->lock);
+		return -1;
+	}
+	map = iomap.free;
+	if (map == NULL) {
+		printd("ioalloc: out of maps");
+		spin_unlock(&(&iomap)->lock);
+		return port;
+	}
+	iomap.free = map->next;
+	map->next = *l;
+	map->start = port;
+	map->end = port + size;
+	map->reserved = 1;
+	strlcpy(map->tag, tag, sizeof(map->tag));
+	*l = map;
+
+	archdir[0].qid.vers++;
+
+	spin_unlock(&(&iomap)->lock);
+	return map->start;
 }
 
 static void checkport(int start, int end)
@@ -319,47 +342,45 @@ static void checkport(int start, int end)
 
 static struct chan *archattach(char *spec)
 {
-	return devattach(devname(), spec);
+	return devattach(archdevtab.name, spec);
 }
 
 struct walkqid *archwalk(struct chan *c, struct chan *nc, char **name,
 						 int nname)
 {
-	return devwalk(c, nc, name, nname, archdir, narchdir, devgen);
+	return devwalk(c, nc, name, nname, archdir, Qmax, devgen);
 }
 
 static int archstat(struct chan *c, uint8_t * dp, int n)
 {
-	return devstat(c, dp, n, archdir, narchdir, devgen);
+	archdir[Qrealmem].length = REAL_MEM_SIZE;
+
+	return devstat(c, dp, n, archdir, Qmax, devgen);
 }
 
 static struct chan *archopen(struct chan *c, int omode)
 {
-	return devopen(c, omode, archdir, narchdir, devgen);
+	return devopen(c, omode, archdir, Qmax, devgen);
 }
 
 static void archclose(struct chan *unused)
 {
 }
 
-enum {
-	Linelen = 31,
-};
-
 static long archread(struct chan *c, void *a, long n, int64_t offset)
 {
 	char *buf, *p;
 	int port;
+	size_t nvalues;
+	uint64_t *values;
 	uint16_t *sp;
 	uint32_t *lp;
-	IOMap *map;
-	Rdwrfn *fn;
+	struct io_map *map;
+	struct core_set cset;
 
 	switch ((uint32_t) c->qid.path) {
-
 		case Qdir:
-			return devdirread(c, a, n, archdir, narchdir, devgen);
-
+			return devdirread(c, a, n, archdir, Qmax, devgen);
 		case Qgdb:
 			p = gdbactive ? "1" : "0";
 			return readstr(offset, a, n, p);
@@ -369,7 +390,6 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			for (p = a; port < offset + n; port++)
 				*p++ = inb(port);
 			return n;
-
 		case Qiow:
 			if (n & 1)
 				error(EINVAL, NULL);
@@ -378,7 +398,6 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			for (port = offset; port < offset + n; port += 2)
 				*sp++ = inw(port);
 			return n;
-
 		case Qiol:
 			if (n & 3)
 				error(EINVAL, NULL);
@@ -387,20 +406,35 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			for (port = offset; port < offset + n; port += 4)
 				*lp++ = inl(port);
 			return n;
-
 		case Qioalloc:
 			break;
-
 		case Qrealmem:
-			printk("readmem %p %p %p %p %p\n",offset, a, n, KADDR(0), 1048576);
-			return readmem(offset, a, n, KADDR(0), 1048576);
-			break;
-
+			return readmem(offset, a, n, KADDR(0), REAL_MEM_SIZE);
+		case Qmsr:
+			if (!address_range_find(msr_rd_wlist, ARRAY_SIZE(msr_rd_wlist),
+									(uintptr_t) offset))
+				error(EPERM, NULL);
+			core_set_init(&cset);
+			core_set_fill_available(&cset);
+			values = coreset_read_msr(&cset, (uint32_t) offset, &nvalues);
+			if (likely(!IS_ERR(values))) {
+				if (n >= nvalues * sizeof(uint64_t)) {
+					if (memcpy_to_user_errno(current, a, values,
+											 nvalues * sizeof(uint64_t)))
+						n = -1;
+					else
+						n = nvalues * sizeof(uint64_t);
+				} else {
+					kfree(values);
+					error(ERANGE, NULL);
+				}
+				kfree(values);
+			} else {
+				error(-PTR_ERR(values), NULL);
+			}
+			return n;
 		default:
-			if (c->qid.path < narchdir && (fn = readfn[c->qid.path]))
-				return fn(c, a, n, offset);
-			error(EPERM, NULL);
-			break;
+			error(EINVAL, NULL);
 	}
 
 	if ((buf = kzmalloc(n, 0)) == NULL)
@@ -422,9 +456,6 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			}
 			spin_unlock(&(&iomap)->lock);
 			break;
-		case Qmapram:
-			error(ENOSYS, NULL);
-			break;
 	}
 
 	n = p - buf;
@@ -437,13 +468,13 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 {
 	char *p;
-	int port;
+	int port, err;
+	uint64_t value;
 	uint16_t *sp;
 	uint32_t *lp;
-	Rdwrfn *fn;
+	struct core_set cset;
 
 	switch ((uint32_t) c->qid.path) {
-
 		case Qgdb:
 			p = a;
 			if (n != 1)
@@ -455,14 +486,12 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 			else
 				error(EINVAL, "Gdb: must be 1 or 0");
 			return 1;
-
 		case Qiob:
 			p = a;
 			checkport(offset, offset + n);
 			for (port = offset; port < offset + n; port++)
 				outb(port, *p++);
 			return n;
-
 		case Qiow:
 			if (n & 1)
 				error(EINVAL, NULL);
@@ -471,7 +500,6 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 			for (port = offset; port < offset + n; port += 2)
 				outw(port, *sp++);
 			return n;
-
 		case Qiol:
 			if (n & 3)
 				error(EINVAL, NULL);
@@ -480,12 +508,22 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 			for (port = offset; port < offset + n; port += 4)
 				outl(port, *lp++);
 			return n;
-
+		case Qmsr:
+			if (!address_range_find(msr_wr_wlist, ARRAY_SIZE(msr_wr_wlist),
+									(uintptr_t) offset))
+				error(EPERM, NULL);
+			core_set_init(&cset);
+			core_set_fill_available(&cset);
+			if (n != sizeof(uint64_t))
+				error(EINVAL, NULL);
+			if (memcpy_from_user_errno(current, &value, a, sizeof(value)))
+				return -1;
+			err = coreset_write_msr(&cset, (uint32_t) offset, value);
+			if (unlikely(err))
+				error(-err, NULL);
+			return sizeof(uint64_t);
 		default:
-			if (c->qid.path < narchdir && (fn = writefn[c->qid.path]))
-				return fn(c, a, n, offset);
-			error(EPERM, NULL);
-			break;
+			error(EINVAL, NULL);
 	}
 	return 0;
 }
@@ -509,72 +547,6 @@ struct dev archdevtab __devtab = {
 	.remove = devremove,
 	.wstat = devwstat,
 };
-
-/*
- */
-void nop(void)
-{
-}
-
-static long cputyperead(struct chan *unused, void *a, long n, int64_t off)
-{
-	char buf[512], *s, *e;
-	int i, k;
-
-	error(ENOSYS, NULL);
-#if 0
-	e = buf + sizeof buf;
-	s = seprintf(buf, e, "%s %d\n", "AMD64", 0);
-	k = m->ncpuinfoe - m->ncpuinfos;
-	if (k > 4)
-		k = 4;
-	for (i = 0; i < k; i++)
-		s = seprintf(s, e, "%#8.8ux %#8.8ux %#8.8ux %#8.8ux\n",
-					 m->cpuinfo[i][0], m->cpuinfo[i][1],
-					 m->cpuinfo[i][2], m->cpuinfo[i][3]);
-	return readstr(off, a, n, buf);
-#endif
-}
-
-static long rmemrw(int isr, void *a, long n, int64_t off)
-{
-	if (off < 0)
-		error(EINVAL, "offset must be >= 0");
-	if (n < 0)
-		error(EINVAL, "count must be >= 0");
-	if (isr) {
-		if (off >= MB)
-			error(EINVAL, "offset must be < 1MB");
-		if (off + n >= MB)
-			n = MB - off;
-		memmove(a, KADDR((uint32_t) off), n);
-	} else {
-		/* realmode buf page ok, allow vga framebuf's access */
-		if (off >= MB)
-			error(EINVAL, "offset must be < 1MB");
-		if (off + n > MB && (off < 0xA0000 || off + n > 0xB0000 + 0x10000))
-			error(EINVAL, "bad offset/count in write");
-		memmove(KADDR((uint32_t) off), a, n);
-	}
-	return n;
-}
-
-static long rmemread(struct chan *unused, void *a, long n, int64_t off)
-{
-	return rmemrw(1, a, n, off);
-}
-
-static long rmemwrite(struct chan *unused, void *a, long n, int64_t off)
-{
-	return rmemrw(0, a, n, off);
-}
-
-void archinit(void)
-{
-	spinlock_init(&archwlock);
-	addarchfile("cputype", 0444, cputyperead, NULL);
-	addarchfile("realmodemem", 0660, rmemread, rmemwrite);
-}
 
 void archreset(void)
 {
