@@ -7,6 +7,7 @@
  * in the LICENSE file.
  */
 
+#include <arch/time.h>
 #include <vfs.h>
 #include <slab.h>
 #include <kmalloc.h>
@@ -19,6 +20,7 @@
 #include <error.h>
 #include <pmap.h>
 #include <smp.h>
+#include <time.h>
 #include <circular_buffer.h>
 #include <umem.h>
 #include <profiler.h>
@@ -43,7 +45,7 @@ struct trace_printk_buffer {
 };
 
 struct kprof {
-	struct semaphore lock;
+	qlock_t lock;
 	struct alarm_waiter *alarms;
 	bool mpstat_ipi;
 	bool profiling;
@@ -62,13 +64,12 @@ struct dirtab kproftab[] = {
 	{"mpstat-raw",	{Kmpstatrawqid},	0,	0600},
 };
 
-extern int booting;
 static struct kprof kprof;
 static bool ktrace_init_done = FALSE;
 static spinlock_t ktrace_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 static struct circular_buffer ktrace_data;
 static char ktrace_buffer[KTRACE_BUFFER_SIZE];
-static int oprof_timer_period = 1000;
+static int kprof_timer_period = 1000;
 
 static size_t mpstat_len(void)
 {
@@ -97,7 +98,7 @@ static void kprof_alarm_handler(struct alarm_waiter *waiter,
 	struct timer_chain *tchain = &per_cpu_info[coreid].tchain;
 
 	profiler_add_hw_sample(hw_tf);
-	reset_alarm_rel(tchain, waiter, oprof_timer_period);
+	reset_alarm_rel(tchain, waiter, kprof_timer_period);
 }
 
 static struct chan *kprof_attach(char *spec)
@@ -116,7 +117,7 @@ static void kprof_enable_timer(int coreid, int on_off)
 	if (on_off) {
 		/* Per CPU waiters already inited.  Will set/reset each time (1 ms
 		 * default). */
-		reset_alarm_rel(tchain, waiter, oprof_timer_period);
+		reset_alarm_rel(tchain, waiter, kprof_timer_period);
 	} else {
 		/* Since the alarm handler runs and gets reset within IRQ context, then
 		 * we should never fail to cancel the alarm if it was already running
@@ -137,13 +138,13 @@ static void kprof_start_profiler(void)
 {
 	ERRSTACK(2);
 
-	sem_down(&kprof.lock);
+	qlock(&kprof.lock);
 	if (waserror()) {
-		sem_up(&kprof.lock);
+		qunlock(&kprof.lock);
 		nexterror();
 	}
 	if (!kprof.profiling) {
-		profiler_init();
+		profiler_setup();
 		if (waserror()) {
 			profiler_cleanup();
 			nexterror();
@@ -160,7 +161,7 @@ static void kprof_start_profiler(void)
 	}
 	poperror();
 	poperror();
-	sem_up(&kprof.lock);
+	qunlock(&kprof.lock);
 }
 
 static void kprof_fetch_profiler_data(void)
@@ -185,9 +186,9 @@ static void kprof_stop_profiler(void)
 {
 	ERRSTACK(1);
 
-	sem_down(&kprof.lock);
+	qlock(&kprof.lock);
 	if (waserror()) {
-		sem_up(&kprof.lock);
+		qunlock(&kprof.lock);
 		nexterror();
 	}
 	if (kprof.profiling) {
@@ -200,7 +201,7 @@ static void kprof_stop_profiler(void)
 		kprof.profiling = FALSE;
 	}
 	poperror();
-	sem_up(&kprof.lock);
+	qunlock(&kprof.lock);
 }
 
 static void kprof_init(void)
@@ -208,7 +209,9 @@ static void kprof_init(void)
 	int i;
 	ERRSTACK(1);
 
-	sem_init(&kprof.lock, 1);
+	profiler_init();
+
+	qlock_init(&kprof.lock);
 	kprof.profiling = FALSE;
 	kprof.pdata = NULL;
 	kprof.psize = 0;
@@ -246,9 +249,9 @@ static void kprof_shutdown(void)
 
 static void kprofclear(void)
 {
-	sem_down(&kprof.lock);
+	qlock(&kprof.lock);
 	kprof_profdata_clear();
-	sem_up(&kprof.lock);
+	qunlock(&kprof.lock);
 }
 
 static struct walkqid *kprof_walk(struct chan *c, struct chan *nc, char **name,
@@ -264,14 +267,14 @@ static size_t kprof_profdata_size(void)
 
 static long kprof_profdata_read(void *dest, long size, int64_t off)
 {
-	sem_down(&kprof.lock);
+	qlock(&kprof.lock);
 	if (kprof.pdata && off < kprof.psize) {
 		size = MIN(kprof.psize - off, size);
 		memcpy(dest, kprof.pdata + off, size);
 	} else {
 		size = 0;
 	}
-	sem_up(&kprof.lock);
+	qunlock(&kprof.lock);
 
 	return size;
 }
@@ -448,7 +451,7 @@ static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 			if (cb->nf < 3)
 				error(EFAIL, "timer {{all, N} {on, off}, period USEC}");
 			if (!strcmp(cb->f[1], "period")) {
-				oprof_timer_period = strtoul(cb->f[2], 0, 10);
+				kprof_timer_period = strtoul(cb->f[2], 0, 10);
 			} else if (!strcmp(cb->f[1], "all")) {
 				for (int i = 0; i < num_cores; i++)
 					kprof_manage_timer(i, cb);
@@ -558,7 +561,7 @@ static struct trace_printk_buffer *kprof_get_printk_buffer(void)
 	static struct trace_printk_buffer boot_tpb;
 	static struct trace_printk_buffer *cpu_tpbs;
 
-	if (unlikely(booting))
+	if (unlikely(!num_cores))
 		return &boot_tpb;
 	if (unlikely(!cpu_tpbs)) {
 		/* Poor man per-CPU data structure. I really do no like littering global
@@ -613,7 +616,7 @@ void trace_vprintk(bool btrace, const char *fmt, va_list args)
 	if (tpb->in_use)
 		return;
 	tpb->in_use++;
-	if (likely(!booting))
+	if (likely(system_timing.tsc_freq))
 		tsc2timespec(read_tsc(), &ts_now);
 	snprintf(hdr, sizeof(hdr), "[%lu.%09lu]:cpu%d: ", ts_now.tv_sec,
 			 ts_now.tv_nsec, core_id());

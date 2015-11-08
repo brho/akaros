@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <smp.h>
+#include <kprof.h>
 
 spinlock_t output_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
@@ -47,6 +48,11 @@ int vcprintf(const char *fmt, va_list ap)
 	int *cntp = &cnt;
 	volatile int i;
 	int8_t irq_state = 0;
+	va_list args;
+
+	va_copy(args, ap);
+	trace_vprintk(false, fmt, args);
+	va_end(args);
 
 	/* this ktrap depth stuff is in case the kernel faults in a printfmt call.
 	 * we disable the locking if we're in a fault handler so that we don't
