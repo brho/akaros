@@ -52,5 +52,9 @@ libc {
     eventfd;
     eventfd_read;
     eventfd_write;
+
+    # Weak symbols in parlib-compat.c
+    akaros_printf;
+    _assert_failed;
   }
 }

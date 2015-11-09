@@ -10,6 +10,11 @@ CFLAGS-flockfile.c = $(libio-mtsafe)
 CFLAGS-ftrylockfile.c = $(libio-mtsafe)
 CFLAGS-funlockfile.c = $(libio-mtsafe)
 
+# Weak alias functions for linking without parlib
+ifeq ($(subdir),stdlib)
+sysdep_routines += parlib-compat
+endif
+
 # Any sysdep .c file you want needs to be added here, if it's not somewhere
 # else already.  Many posix-ish .c files already are taken care of.  We also
 # need to be careful to only include some of them for specific subdirs.
