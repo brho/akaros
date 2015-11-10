@@ -18,6 +18,11 @@ struct sigdata {
 	struct ancillary_state as;
 	struct siginfo info;
 };
+struct sigstate {
+	sigset_t mask;
+	sigset_t pending;
+	struct sigdata *data;
+};
 
 /* A set of functions related to handling posix signals on akaros. The
  * implementation of these functions is 2LS specific. */

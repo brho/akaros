@@ -90,36 +90,36 @@ static void __pthread_prep_sighandler(struct pthread_tcb *pthread,
 	if (pthread->uthread.flags & UTHREAD_SAVED) {
 		ctx = &pthread->uthread.u_ctx;
 		stack = get_user_ctx_stack(ctx) - sizeof(struct sigdata);
-		pthread->sigdata = (struct sigdata*)stack;
+		pthread->sigstate.data = (struct sigdata*)stack;
 		if (pthread->uthread.flags & UTHREAD_FPSAVED) {
-			pthread->sigdata->as = pthread->uthread.as;
+			pthread->sigstate.data->as = pthread->uthread.as;
 			pthread->uthread.flags &= ~UTHREAD_FPSAVED;
 		}
 	} else {
 		assert(current_uthread == &pthread->uthread);
 		ctx = &vcpd_of(vcore_id())->uthread_ctx;
 		stack = get_user_ctx_stack(ctx) - sizeof(struct sigdata);
-		pthread->sigdata = (struct sigdata*)stack;
-		save_fp_state(&pthread->sigdata->as);
+		pthread->sigstate.data = (struct sigdata*)stack;
+		save_fp_state(&pthread->sigstate.data->as);
 	}
 	if (info != NULL)
-		pthread->sigdata->info = *info;
+		pthread->sigstate.data->info = *info;
 
-	init_user_ctx(&pthread->sigdata->u_ctx, (uintptr_t)entry, stack);
-	swap_user_contexts(ctx, &pthread->sigdata->u_ctx);
+	init_user_ctx(&pthread->sigstate.data->u_ctx, (uintptr_t)entry, stack);
+	swap_user_contexts(ctx, &pthread->sigstate.data->u_ctx);
 }
 
 /* Restore the context saved as the result of running a signal handler on a
  * pthread. This context will execute the next time the pthread is run. */
 static void __pthread_restore_after_sighandler(struct pthread_tcb *pthread)
 {
-	pthread->uthread.u_ctx = pthread->sigdata->u_ctx;
+	pthread->uthread.u_ctx = pthread->sigstate.data->u_ctx;
 	pthread->uthread.flags |= UTHREAD_SAVED;
 	if (pthread->uthread.u_ctx.type == ROS_HW_CTX) {
-		pthread->uthread.as = pthread->sigdata->as;
+		pthread->uthread.as = pthread->sigstate.data->as;
 		pthread->uthread.flags |= UTHREAD_FPSAVED;
 	}
-	pthread->sigdata = NULL;
+	pthread->sigstate.data = NULL;
 }
 
 /* Callback when yielding a pthread after upon completion of a sighandler.  We
@@ -132,16 +132,16 @@ static void __exit_sighandler_cb(struct uthread *uthread, void *junk)
 	__pth_yield_cb(uthread, 0);
 }
 
-/* Run a specific sighandler from the top of the sigdata stack. The 'info'
+/* Run a specific sighandler from the top of the sigstate stack. The 'info'
  * struct is prepopulated before the call is triggered as the result of a
  * reflected fault. */
 static void __run_sighandler()
 {
 	struct pthread_tcb *me = pthread_self();
-	__sigdelset(&me->sigpending, me->sigdata->info.si_signo);
-	trigger_posix_signal(me->sigdata->info.si_signo,
-	                     &me->sigdata->info,
-	                     &me->sigdata->u_ctx);
+	__sigdelset(&me->sigstate.pending, me->sigstate.data->info.si_signo);
+	trigger_posix_signal(me->sigstate.data->info.si_signo,
+	                     &me->sigstate.data->info,
+	                     &me->sigstate.data->u_ctx);
 	uthread_yield(FALSE, __exit_sighandler_cb, 0);
 }
 
@@ -151,11 +151,11 @@ static void __run_sighandler()
 static void __run_pending_sighandlers()
 {
 	struct pthread_tcb *me = pthread_self();
-	sigset_t andset = me->sigpending & (~me->sigmask);
+	sigset_t andset = me->sigstate.pending & (~me->sigstate.mask);
 	for (int i = 1; i < _NSIG; i++) {
 		if (__sigismember(&andset, i)) {
-			__sigdelset(&me->sigpending, i);
-			trigger_posix_signal(i, NULL, &me->sigdata->u_ctx);
+			__sigdelset(&me->sigstate.pending, i);
+			trigger_posix_signal(i, NULL, &me->sigstate.data->u_ctx);
 		}
 	}
 	uthread_yield(FALSE, __exit_sighandler_cb, 0);
@@ -168,8 +168,8 @@ static void __run_pending_sighandlers()
 static void __pthread_signal_and_restart(struct pthread_tcb *pthread,
                                           int signo, int code, void *addr)
 {
-	if (!__sigismember(&pthread->sigmask, signo)) {
-		if (pthread->sigdata) {
+	if (!__sigismember(&pthread->sigstate.mask, signo)) {
+		if (pthread->sigstate.data) {
 			printf("Pthread sighandler faulted, signal: %d\n", signo);
 			/* uthread.c already copied out the faulting ctx into the uth */
 			print_user_context(&pthread->uthread.u_ctx);
@@ -190,8 +190,8 @@ static void __pthread_signal_and_restart(struct pthread_tcb *pthread,
  * handler is complete, the original context will be restored and restarted. */
 static void __pthread_prep_for_pending_posix_signals(pthread_t pthread)
 {
-	if (!pthread->sigdata && pthread->sigpending) {
-		sigset_t andset = pthread->sigpending & (~pthread->sigmask);
+	if (!pthread->sigstate.data && pthread->sigstate.pending) {
+		sigset_t andset = pthread->sigstate.pending & (~pthread->sigstate.mask);
 		if (!__sigisemptyset(&andset)) {
 			__pthread_prep_sighandler(pthread, __run_pending_sighandlers, NULL);
 		}
@@ -600,8 +600,8 @@ void __attribute__((constructor)) pthread_lib_init(void)
 	t->state = PTH_RUNNING;
 	t->joiner = 0;
 	/* implies that sigmasks are longs, which they are. */
-	t->sigmask = 0;
-	__sigemptyset(&t->sigpending);
+	t->sigstate.mask = 0;
+	__sigemptyset(&t->sigstate.pending);
 	assert(t->id == 0);
 	t->sched_policy = SCHED_FIFO;
 	t->sched_priority = 0;
@@ -712,9 +712,9 @@ int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	pthread->id = get_next_pid();
 	pthread->detached = FALSE;				/* default */
 	pthread->joiner = 0;
-	pthread->sigmask = ((pthread_t)current_uthread)->sigmask;
-	__sigemptyset(&pthread->sigpending);
-	pthread->sigdata = NULL;
+	pthread->sigstate.mask = ((pthread_t)current_uthread)->sigstate.mask;
+	__sigemptyset(&pthread->sigstate.pending);
+	pthread->sigstate.data = NULL;
 	/* Might override these later, based on attr && EXPLICIT_SCHED */
 	pthread->sched_policy = parent->sched_policy;
 	pthread->sched_priority = parent->sched_priority;
@@ -1307,12 +1307,12 @@ int pthread_kill(pthread_t thread, int signo)
 {
 	// Slightly racy with clearing of mask when triggering the signal, but
 	// that's OK, as signals are inherently racy since they don't queue up.
-	return sigaddset(&thread->sigpending, signo);
+	return sigaddset(&thread->sigstate.pending, signo);
 }
 
 int pthread_sigmask(int how, const sigset_t *set, sigset_t *oset)
 {
-	sigset_t *sigmask = &((struct pthread_tcb*)current_uthread)->sigmask;
+	sigset_t *sigmask = &((struct pthread_tcb*)current_uthread)->sigstate.mask;
 
 	if (set && (how != SIG_BLOCK) &&
 	          (how != SIG_SETMASK) &&

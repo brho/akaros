@@ -7,6 +7,7 @@
 #include <parlib/mcs.h>
 #include <parlib/dtls.h>
 #include <parlib/spinlock.h>
+#include <parlib/signal.h>
 /* GNU / POSIX scheduling crap */
 #include <sched.h>
 
@@ -50,9 +51,7 @@ struct pthread_tcb {
 	void *(*start_routine)(void*);
 	void *arg;
 	void *retval;
-	sigset_t sigmask;
-	sigset_t sigpending;
-	struct sigdata *sigdata;
+	struct sigstate sigstate;
 	int sched_policy;
 	int sched_priority;		/* careful, GNU #defines this to __sched_priority */
 	struct pthread_cleanup_stack cr_stack;
