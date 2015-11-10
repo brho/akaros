@@ -8,8 +8,6 @@
  */
 
 #include <vfs.h>
-#include <kfs.h>
-#include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>
 #include <kthread.h>
@@ -17,7 +15,6 @@
 #include <stdio.h>
 #include <assert.h>
 #include <error.h>
-#include <cpio.h>
 #include <pmap.h>
 #include <umem.h>
 #include <smp.h>
@@ -27,6 +24,7 @@
 #include <core_set.h>
 #include <completion.h>
 #include <address_range.h>
+#include <arch/ros/msr-index.h>
 #include <arch/uaccess.h>
 #include <arch/devarch.h>
 
@@ -87,7 +85,23 @@ static struct dirtab archdir[Qmax] = {
 	{"realmem", {Qrealmem, 0}, 0, 0444},
 	{"msr", {Qmsr, 0}, 0, 0666},
 };
+/* White list entries needs to be ordered by start address, and never overlap.
+ */
+#define MAX_COUNTERS 16
+#define MAX_FIX_COUNTERS 4
 
+static const struct address_range msr_rd_wlist[] = {
+	ADDRESS_RANGE(0x00000000, 0xffffffff),
+};
+static const struct address_range msr_wr_wlist[] = {
+	ADDRESS_RANGE(MSR_IA32_PERFCTR0, MSR_IA32_PERFCTR0 + MAX_COUNTERS - 1),
+	ADDRESS_RANGE(MSR_ARCH_PERFMON_EVENTSEL0,
+				  MSR_ARCH_PERFMON_EVENTSEL0 + MAX_COUNTERS - 1),
+	ADDRESS_RANGE(MSR_IA32_PERF_CTL, MSR_IA32_PERF_CTL),
+	ADDRESS_RANGE(MSR_CORE_PERF_FIXED_CTR0,
+				  MSR_CORE_PERF_FIXED_CTR0 + MAX_FIX_COUNTERS - 1),
+	ADDRESS_RANGE(MSR_CORE_PERF_FIXED_CTR_CTRL, MSR_CORE_PERF_GLOBAL_OVF_CTRL),
+};
 int gdbactive = 0;
 
 static void cpu_read_msr(void *opaque)
