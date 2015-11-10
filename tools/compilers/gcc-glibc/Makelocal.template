@@ -1,7 +1,3 @@
-# Number of make jobs to spawn.  
-MAKE_JOBS := $(shell expr `cat /proc/cpuinfo | grep processor | wc -l` - 1)
-
 RISCV_INSTDIR         := $(HOME)/install/riscv-ucb-akaros-gcc/
 X86_64_INSTDIR        := $(HOME)/install/x86_64-ucb-akaros-gcc/
 X86_64_NATIVE_INSTDIR := $(HOME)/install/x86_64-ucb-akaros-gcc-native/
-
