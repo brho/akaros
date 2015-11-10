@@ -84,16 +84,13 @@ static void __pthread_prep_sighandler(struct pthread_tcb *pthread,
                                       void (*entry)(void),
                                       struct siginfo *info)
 {
+	uintptr_t stack;
 	struct user_context *ctx;
 
-	pthread->sigdata = alloc_sigdata();
-	if (info != NULL)
-		pthread->sigdata->info = *info;
-	init_user_ctx(&pthread->sigdata->u_ctx,
-	              (uintptr_t)entry,
-	              (uintptr_t)pthread->sigdata->stack);
 	if (pthread->uthread.flags & UTHREAD_SAVED) {
 		ctx = &pthread->uthread.u_ctx;
+		stack = get_user_ctx_stack(ctx) - sizeof(struct sigdata);
+		pthread->sigdata = (struct sigdata*)stack;
 		if (pthread->uthread.flags & UTHREAD_FPSAVED) {
 			pthread->sigdata->as = pthread->uthread.as;
 			pthread->uthread.flags &= ~UTHREAD_FPSAVED;
@@ -101,8 +98,14 @@ static void __pthread_prep_sighandler(struct pthread_tcb *pthread,
 	} else {
 		assert(current_uthread == &pthread->uthread);
 		ctx = &vcpd_of(vcore_id())->uthread_ctx;
+		stack = get_user_ctx_stack(ctx) - sizeof(struct sigdata);
+		pthread->sigdata = (struct sigdata*)stack;
 		save_fp_state(&pthread->sigdata->as);
 	}
+	if (info != NULL)
+		pthread->sigdata->info = *info;
+
+	init_user_ctx(&pthread->sigdata->u_ctx, (uintptr_t)entry, stack);
 	swap_user_contexts(ctx, &pthread->sigdata->u_ctx);
 }
 
@@ -116,7 +119,6 @@ static void __pthread_restore_after_sighandler(struct pthread_tcb *pthread)
 		pthread->uthread.as = pthread->sigdata->as;
 		pthread->uthread.flags |= UTHREAD_FPSAVED;
 	}
-	free_sigdata(pthread->sigdata);
 	pthread->sigdata = NULL;
 }
 

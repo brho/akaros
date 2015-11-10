@@ -71,39 +71,6 @@ struct signal_ops default_signal_ops = {
 	.sigwaitinfo = __sigwaitinfo
 };
 
-/* This is a wait-free-list used to hold the data necessary to execute signal
- * handlers inside a 2LS. We are able to store them in a wfl because all
- * sigdata structs are created equal, and reuse is encouraged as uthreads
- * ask for them on demand. */
-static struct wfl sigdata_list;
-#define SIGNAL_STACK_SIZE (2*PGSIZE + sizeof(struct sigdata))
-
-/* This function allocates a sigdata struct for use when running signal
- * handlers inside a 2LS. The sigdata struct returned is pre-initialized with
- * the 'stack' field pointing to a valid stack.  Space is allocated for both
- * the sigdata struct and the stack in a single mmap call.  The sigdata struct
- * just sits at the bottom of the stack, and its 'stack' field points just
- * above it.  */
-struct sigdata *alloc_sigdata()
-{
-	struct sigdata *data = wfl_remove(&sigdata_list);
-	if (data == NULL) {
-		void *stack = mmap(0, SIGNAL_STACK_SIZE,
-		                   PROT_READ|PROT_WRITE|PROT_EXEC,
-		                   MAP_POPULATE|MAP_ANONYMOUS, -1, 0);
-		assert(stack != MAP_FAILED);
-		data = stack + SIGNAL_STACK_SIZE - sizeof(struct sigdata);
-		data->stack = data;
-	}
-	return data;
-}
-
-/* This function frees a previously allocated sigdata struct. */
-void free_sigdata(struct sigdata *sigdata)
-{
-	wfl_insert(&sigdata_list, sigdata);
-}
-
 /* This is the catch all akaros event->posix signal handler.  All posix signals
  * are received in a single akaros event type.  They are then dispatched from
  * this function to their proper posix signal handler */
@@ -131,7 +98,6 @@ void init_posix_signals(void)
 	posix_sig_ev_q->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_SPAM_INDIR |
 	                           EVENT_WAKEUP;
 	register_kevent_q(posix_sig_ev_q, EV_POSIX_SIGNAL);
-	wfl_init(&sigdata_list);
 }
 
 /* This is managed by vcore / 2LS code */
