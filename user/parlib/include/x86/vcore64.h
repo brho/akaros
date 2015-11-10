@@ -353,6 +353,14 @@ static inline void init_user_ctx(struct user_context *ctx, uintptr_t entry_pt,
 	sw_tf->tf_fpucw = 0x037f;		/* x86 default FP CW */
 }
 
+static inline uintptr_t get_user_ctx_stack(struct user_context *ctx)
+{
+	if (ctx->type == ROS_HW_CTX)
+		return ctx->tf.hw_tf.tf_rsp;
+	else
+		return ctx->tf.sw_tf.tf_rsp;
+}
+
 // this is how we get our thread id on entry.
 #define __vcore_id_on_entry \
 ({ \
