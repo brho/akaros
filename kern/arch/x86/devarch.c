@@ -491,23 +491,23 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 }
 
 struct dev archdevtab __devtab = {
-	"arch",
+	.name = "arch",
 
-	devreset,
-	devinit,
-	devshutdown,
-	archattach,
-	archwalk,
-	archstat,
-	archopen,
-	devcreate,
-	archclose,
-	archread,
-	devbread,
-	archwrite,
-	devbwrite,
-	devremove,
-	devwstat,
+	.reset = devreset,
+	.init = devinit,
+	.shutdown = devshutdown,
+	.attach = archattach,
+	.walk = archwalk,
+	.stat = archstat,
+	.open = archopen,
+	.create = devcreate,
+	.close = archclose,
+	.read = archread,
+	.bread = devbread,
+	.write = archwrite,
+	.bwrite = devbwrite,
+	.remove = devremove,
+	.wstat = devwstat,
 };
 
 /*

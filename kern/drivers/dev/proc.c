@@ -1329,25 +1329,25 @@ static long procwrite(struct chan *c, void *va, long n, int64_t off)
 }
 
 struct dev procdevtab __devtab = {
-	"proc",
+	.name = "proc",
 
-	devreset,
-	procinit,
-	devshutdown,
-	procattach,
-	procwalk,
-	procstat,
-	procopen,
-	devcreate,
-	procclose,
-	procread,
-	devbread,
-	procwrite,
-	devbwrite,
-	devremove,
-	procwstat,
-	devpower,
-	devchaninfo,
+	.reset = devreset,
+	.init = procinit,
+	.shutdown = devshutdown,
+	.attach = procattach,
+	.walk = procwalk,
+	.stat = procstat,
+	.open = procopen,
+	.create = devcreate,
+	.close = procclose,
+	.read = procread,
+	.bread = devbread,
+	.write = procwrite,
+	.bwrite = devbwrite,
+	.remove = devremove,
+	.wstat = procwstat,
+	.power = devpower,
+	.chaninfo = devchaninfo,
 };
 
 #if 0

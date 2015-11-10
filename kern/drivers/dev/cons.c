@@ -1114,25 +1114,25 @@ static long conswrite(struct chan *c, void *va, long n, int64_t offset)
 }
 
 struct dev consdevtab __devtab = {
-	"cons",
+	.name = "cons",
 
-	devreset,
-	consinit,
-	devshutdown,
-	consattach,
-	conswalk,
-	consstat,
-	consopen,
-	devcreate,
-	consclose,
-	consread,
-	devbread,
-	conswrite,
-	devbwrite,
-	devremove,
-	devwstat,
-	devpower,
-	devchaninfo,
+	.reset = devreset,
+	.init = consinit,
+	.shutdown = devshutdown,
+	.attach = consattach,
+	.walk = conswalk,
+	.stat = consstat,
+	.open = consopen,
+	.create = devcreate,
+	.close = consclose,
+	.read = consread,
+	.bread = devbread,
+	.write = conswrite,
+	.bwrite = devbwrite,
+	.remove = devremove,
+	.wstat = devwstat,
+	.power = devpower,
+	.chaninfo = devchaninfo,
 };
 
 static uint32_t randn;
