@@ -18,6 +18,7 @@
 #include <sys/mman.h>
 #include <parlib/event.h>
 #include <parlib/ucq.h>
+#include <parlib/signal.h>
 
 struct pthread_queue ready_queue = TAILQ_HEAD_INITIALIZER(ready_queue);
 struct pthread_queue active_queue = TAILQ_HEAD_INITIALIZER(active_queue);

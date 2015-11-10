@@ -23,6 +23,8 @@ libc {
 	_sys_siglist;
 	sys_siglist;
 	sys_sigabbrev;
+    signal_ops;
+    trigger_posix_signal;
 
     init_empty_dir;
     convM2S;

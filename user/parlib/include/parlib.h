@@ -59,24 +59,6 @@ int         sys_tap_fds(struct fd_tap_req *tap_reqs, size_t nr_reqs);
 
 void		syscall_async(struct syscall *sysc, unsigned long num, ...);
 
-/* Posix signal related stuff */
-struct sigdata {
-	struct user_context u_ctx;
-	struct ancillary_state as;
-	struct siginfo info;
-	void *stack;
-};
-/* This is the set of global function pointers that a 2LS using signals needs
- * to implement.  Subject to grow over time. */
-struct signal_ops {
-	int (*sigprocmask)(int, __const sigset_t *__restrict, sigset_t *__restrict);
-};
-extern struct signal_ops *signal_ops;
-void init_posix_signals(void);
-struct sigdata *alloc_sigdata();
-void free_sigdata(struct sigdata *sigdata);
-void trigger_posix_signal(int sig_nr, struct siginfo *info, void *aux);
-
 /* Control variables */
 extern bool parlib_wants_to_be_mcp;	/* instructs the 2LS to be an MCP */
 
