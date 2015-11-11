@@ -51,7 +51,6 @@ struct pthread_tcb {
 	void *(*start_routine)(void*);
 	void *arg;
 	void *retval;
-	struct sigstate sigstate;
 	int sched_policy;
 	int sched_priority;		/* careful, GNU #defines this to __sched_priority */
 	struct pthread_cleanup_stack cr_stack;

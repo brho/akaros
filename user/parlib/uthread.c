@@ -45,6 +45,10 @@ static void uthread_init_thread0(struct uthread *uthread)
 	current_uthread = uthread;
 	/* Thread is currently running (it is 'us') */
 	uthread->state = UT_RUNNING;
+	/* Reset the signal state */
+	uthread->sigstate.mask = 0;
+	__sigemptyset(&uthread->sigstate.pending);
+	uthread->sigstate.data = NULL;
 	/* utf/as doesn't represent the state of the uthread (we are running) */
 	uthread->flags &= ~(UTHREAD_SAVED | UTHREAD_FPSAVED);
 	/* need to track thread0 for TLS deallocation */
@@ -275,6 +279,10 @@ void uthread_init(struct uthread *new_thread, struct uth_thread_attr *attr)
 	int ret;
 	assert(new_thread);
 	new_thread->state = UT_NOT_RUNNING;
+	/* Set the signal state. */
+	new_thread->sigstate.mask = current_uthread->sigstate.mask;
+	__sigemptyset(&new_thread->sigstate.pending);
+	new_thread->sigstate.data = NULL;
 	/* They should have zero'd the uthread.  Let's check critical things: */
 	assert(!new_thread->flags && !new_thread->sysc);
 	/* the utf holds the GP context of the uthread (set by the 2LS earlier).

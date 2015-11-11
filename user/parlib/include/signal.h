@@ -12,6 +12,8 @@
 
 #include <ros/procinfo.h>
 
+struct uthread;
+
 /* Data we need to carry around as part of handling posix signals on akaros. */
 struct sigdata {
 	struct user_context u_ctx;
@@ -49,3 +51,7 @@ extern struct signal_ops *signal_ops;
 /* External API for initializing and generating posix signals inside a 2LS. */
 void init_posix_signals(void);
 void trigger_posix_signal(int sig_nr, struct siginfo *info, void *aux);
+void uthread_prep_pending_signals(struct uthread *uthread);
+void uthread_prep_signal_from_fault(struct uthread *uthread,
+                                    int signo, int code, void *addr);
+int uthread_signal(struct uthread *uthread, int signo);

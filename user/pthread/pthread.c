@@ -1,6 +1,3 @@
-// Needed for sigmask functions...
-#define _GNU_SOURCE
-
 #include <ros/trapframe.h>
 #include "pthread.h"
 #include <parlib/vcore.h>
@@ -59,144 +56,11 @@ struct schedule_ops pthread_sched_ops = {
 	.thread_has_blocked = pth_thread_has_blocked,
 	.thread_refl_fault = pth_thread_refl_fault,
 };
-struct signal_ops pthread_signal_ops = {
-	.sigprocmask = pthread_sigmask,
-};
 
 /* Static helpers */
 static void __pthread_free_stack(struct pthread_tcb *pt);
 static int __pthread_allocate_stack(struct pthread_tcb *pt);
 static void __pth_yield_cb(struct uthread *uthread, void *junk);
-
-/* Swap the contents of two user contexts (not just their pointers). */
-static void swap_user_contexts(struct user_context *c1, struct user_context *c2)
-{
-	struct user_context temp_ctx;
-	temp_ctx = *c1;
-	*c1 = *c2;
-	*c2 = temp_ctx;
-}
-
-/* Prep a pthread to run a signal handler.  The original context of the pthread
- * is saved, and a new context with a new stack is set up to run the signal
- * handler the next time the pthread is run. */
-static void __pthread_prep_sighandler(struct pthread_tcb *pthread,
-                                      void (*entry)(void),
-                                      struct siginfo *info)
-{
-	uintptr_t stack;
-	struct user_context *ctx;
-
-	if (pthread->uthread.flags & UTHREAD_SAVED) {
-		ctx = &pthread->uthread.u_ctx;
-		stack = get_user_ctx_stack(ctx) - sizeof(struct sigdata);
-		pthread->sigstate.data = (struct sigdata*)stack;
-		if (pthread->uthread.flags & UTHREAD_FPSAVED) {
-			pthread->sigstate.data->as = pthread->uthread.as;
-			pthread->uthread.flags &= ~UTHREAD_FPSAVED;
-		}
-	} else {
-		assert(current_uthread == &pthread->uthread);
-		ctx = &vcpd_of(vcore_id())->uthread_ctx;
-		stack = get_user_ctx_stack(ctx) - sizeof(struct sigdata);
-		pthread->sigstate.data = (struct sigdata*)stack;
-		save_fp_state(&pthread->sigstate.data->as);
-	}
-	if (info != NULL)
-		pthread->sigstate.data->info = *info;
-
-	init_user_ctx(&pthread->sigstate.data->u_ctx, (uintptr_t)entry, stack);
-	swap_user_contexts(ctx, &pthread->sigstate.data->u_ctx);
-}
-
-/* Restore the context saved as the result of running a signal handler on a
- * pthread. This context will execute the next time the pthread is run. */
-static void __pthread_restore_after_sighandler(struct pthread_tcb *pthread)
-{
-	pthread->uthread.u_ctx = pthread->sigstate.data->u_ctx;
-	pthread->uthread.flags |= UTHREAD_SAVED;
-	if (pthread->uthread.u_ctx.type == ROS_HW_CTX) {
-		pthread->uthread.as = pthread->sigstate.data->as;
-		pthread->uthread.flags |= UTHREAD_FPSAVED;
-	}
-	pthread->sigstate.data = NULL;
-}
-
-/* Callback when yielding a pthread after upon completion of a sighandler.  We
- * didn't save the current context on yeild, but that's ok because here we
- * restore the original saved context of the pthread and then treat this like a
- * normal voluntary yield. */
-static void __exit_sighandler_cb(struct uthread *uthread, void *junk)
-{
-	__pthread_restore_after_sighandler((struct pthread_tcb*)uthread);
-	__pth_yield_cb(uthread, 0);
-}
-
-/* Run a specific sighandler from the top of the sigstate stack. The 'info'
- * struct is prepopulated before the call is triggered as the result of a
- * reflected fault. */
-static void __run_sighandler()
-{
-	struct pthread_tcb *me = pthread_self();
-	__sigdelset(&me->sigstate.pending, me->sigstate.data->info.si_signo);
-	trigger_posix_signal(me->sigstate.data->info.si_signo,
-	                     &me->sigstate.data->info,
-	                     &me->sigstate.data->u_ctx);
-	uthread_yield(FALSE, __exit_sighandler_cb, 0);
-}
-
-/* Run through all pending sighandlers and trigger them with a NULL info field.
- * These handlers are triggered as the result of a pthread_kill(), and thus
- * don't require individual 'info' structs. */
-static void __run_pending_sighandlers()
-{
-	struct pthread_tcb *me = pthread_self();
-	sigset_t andset = me->sigstate.pending & (~me->sigstate.mask);
-	for (int i = 1; i < _NSIG; i++) {
-		if (__sigismember(&andset, i)) {
-			__sigdelset(&me->sigstate.pending, i);
-			trigger_posix_signal(i, NULL, &me->sigstate.data->u_ctx);
-		}
-	}
-	uthread_yield(FALSE, __exit_sighandler_cb, 0);
-}
-
-/* If the given signal is unmasked, prep the pthread to run it's signal
- * handler, but don't run it yet. In either case, make the pthread runnable
- * again. Once the signal handler is complete, the original context will be
- * restored and restarted. */
-static void __pthread_signal_and_restart(struct pthread_tcb *pthread,
-                                          int signo, int code, void *addr)
-{
-	if (!__sigismember(&pthread->sigstate.mask, signo)) {
-		if (pthread->sigstate.data) {
-			printf("Pthread sighandler faulted, signal: %d\n", signo);
-			/* uthread.c already copied out the faulting ctx into the uth */
-			print_user_context(&pthread->uthread.u_ctx);
-			exit(-1);
-		}
-		struct siginfo info = {0};
-		info.si_signo = signo;
-		info.si_code = code;
-		info.si_addr = addr;
-		__pthread_prep_sighandler(pthread, __run_sighandler, &info);
-	}
-	pth_thread_runnable(&pthread->uthread);
-}
-
-/* If there are any pending signals, prep the pthread to run it's signal
- * handler. The next time the pthread is run, it will pop into it's signal
- * handler context instead of its original saved context. Once the signal
- * handler is complete, the original context will be restored and restarted. */
-static void __pthread_prep_for_pending_posix_signals(pthread_t pthread)
-{
-	if (!pthread->sigstate.data && pthread->sigstate.pending) {
-		sigset_t andset = pthread->sigstate.pending & (~pthread->sigstate.mask);
-		if (!__sigisemptyset(&andset)) {
-			__pthread_prep_sighandler(pthread, __run_pending_sighandlers, NULL);
-		}
-	}
-}
 
 /* Called from vcore entry.  Options usually include restarting whoever was
  * running there before or running a new thread.  Events are handled out of
@@ -207,7 +71,7 @@ static void __attribute__((noreturn)) pth_sched_entry(void)
 	if (current_uthread) {
 		/* Prep the pthread to run any pending posix signal handlers registered
          * via pthread_kill once it is restored. */
-		__pthread_prep_for_pending_posix_signals((pthread_t)current_uthread);
+		uthread_prep_pending_signals(current_uthread);
 		/* Run the thread itself */
 		run_current_uthread();
 		assert(0);
@@ -250,7 +114,7 @@ static void __attribute__((noreturn)) pth_sched_entry(void)
 	} while (1);
 	/* Prep the pthread to run any pending posix signal handlers registered
      * via pthread_kill once it is restored. */
-	__pthread_prep_for_pending_posix_signals(new_thread);
+	uthread_prep_pending_signals((struct uthread*)new_thread);
 	/* Run the thread itself */
 	run_uthread((struct uthread*)new_thread);
 	assert(0);
@@ -397,18 +261,23 @@ static void pth_thread_has_blocked(struct uthread *uthread, int flags)
 		printf("For great justice!\n");
 }
 
+static void __signal_and_restart(struct uthread *uthread,
+                                 int signo, int code, void *addr)
+{
+	uthread_prep_signal_from_fault(uthread, signo, code, addr);
+	pth_thread_runnable(uthread);
+}
+
 static void handle_div_by_zero(struct uthread *uthread, unsigned int err,
                                unsigned long aux)
 {
-	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
-	__pthread_signal_and_restart(pthread, SIGFPE, FPE_INTDIV, (void*)aux);
+	__signal_and_restart(uthread, SIGFPE, FPE_INTDIV, (void*)aux);
 }
 
 static void handle_gp_fault(struct uthread *uthread, unsigned int err,
                             unsigned long aux)
 {
-	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
-	__pthread_signal_and_restart(pthread, SIGSEGV, SEGV_ACCERR, (void*)aux);
+	__signal_and_restart(uthread, SIGSEGV, SEGV_ACCERR, (void*)aux);
 }
 
 static void handle_page_fault(struct uthread *uthread, unsigned int err,
@@ -416,7 +285,7 @@ static void handle_page_fault(struct uthread *uthread, unsigned int err,
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 	if (!(err & PF_VMR_BACKED)) {
-		__pthread_signal_and_restart(pthread, SIGSEGV, SEGV_MAPERR, (void*)aux);
+		__signal_and_restart(uthread, SIGSEGV, SEGV_MAPERR, (void*)aux);
 	} else {
 		/* stitching for the event handler.  sysc -> uth, uth -> sysc */
 		uthread->local_sysc.u_data = uthread;
@@ -600,8 +469,6 @@ void __attribute__((constructor)) pthread_lib_init(void)
 	t->state = PTH_RUNNING;
 	t->joiner = 0;
 	/* implies that sigmasks are longs, which they are. */
-	t->sigstate.mask = 0;
-	__sigemptyset(&t->sigstate.pending);
 	assert(t->id == 0);
 	t->sched_policy = SCHED_FIFO;
 	t->sched_priority = 0;
@@ -664,8 +531,7 @@ void __attribute__((constructor)) pthread_lib_init(void)
 		sysc_mgmt[i].ev_q->ev_mbox = sysc_mbox;
 	}
 #endif
-	/* Publish our signal_ops.  Sched ops is set by 2ls_init */
-	signal_ops = &pthread_signal_ops;
+	/* Sched ops is set by 2ls_init */
 	uthread_2ls_init((struct uthread*)t, &pthread_sched_ops);
 	atomic_init(&threads_total, 1);			/* one for thread0 */
 }
@@ -712,9 +578,6 @@ int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	pthread->id = get_next_pid();
 	pthread->detached = FALSE;				/* default */
 	pthread->joiner = 0;
-	pthread->sigstate.mask = ((pthread_t)current_uthread)->sigstate.mask;
-	__sigemptyset(&pthread->sigstate.pending);
-	pthread->sigstate.data = NULL;
 	/* Might override these later, based on attr && EXPLICIT_SCHED */
 	pthread->sched_policy = parent->sched_policy;
 	pthread->sched_priority = parent->sched_priority;
@@ -1305,40 +1168,17 @@ int pthread_detach(pthread_t thread)
 
 int pthread_kill(pthread_t thread, int signo)
 {
-	// Slightly racy with clearing of mask when triggering the signal, but
-	// that's OK, as signals are inherently racy since they don't queue up.
-	return sigaddset(&thread->sigstate.pending, signo);
+	return uthread_signal(&thread->uthread, signo);
 }
 
 int pthread_sigmask(int how, const sigset_t *set, sigset_t *oset)
 {
-	sigset_t *sigmask = &((struct pthread_tcb*)current_uthread)->sigstate.mask;
+	int ret = sigprocmask(how, set, oset);
 
-	if (set && (how != SIG_BLOCK) &&
-	          (how != SIG_SETMASK) &&
-	          (how != SIG_UNBLOCK)) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	if (oset)
-		*oset = *sigmask;
-	if (set) {
-		switch (how) {
-			case SIG_BLOCK:
-				*sigmask = *sigmask | *set;
-				break;
-			case SIG_SETMASK:
-				*sigmask = *set;
-				break;
-			case SIG_UNBLOCK:
-				*sigmask = *sigmask & ~(*set);
-				break;
-		}
-	}
-	/* Ensures any pending signals we unmasked get processed  */
-	pthread_yield();
-	return 0;
+	/* Ensures any pending signals we just unmasked get processed. */
+	if (set && ret == 0)
+		pthread_yield();
+	return ret;
 }
 
 int pthread_sigqueue(pthread_t *thread, int sig, const union sigval value)

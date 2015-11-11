@@ -1,6 +1,7 @@
 #pragma once
 
 #include <parlib/vcore.h>
+#include <parlib/signal.h>
 #include <ros/syscall.h>
 
 __BEGIN_DECLS
@@ -28,6 +29,7 @@ struct uthread {
 	void *tls_desc;
 	int flags;
 	int state;
+	struct sigstate sigstate;
 	int notif_disabled_depth;
 	struct syscall *sysc;	/* syscall we're blocking on, if any */
 	struct syscall local_sysc;	/* for when we don't want to use the stack */
