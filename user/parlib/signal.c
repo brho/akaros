@@ -56,6 +56,7 @@ static int __sigtimedwait(__const sigset_t *__restrict __set,
 static int __sigwait(__const sigset_t *__restrict __set, int *__restrict __sig);
 static int __sigwaitinfo(__const sigset_t *__restrict __set,
                          siginfo_t *__restrict __info);
+static int __sigself(int signo);
 
 /* The default definition of signal_ops (similar to sched_ops in uthread.c) */
 struct signal_ops default_signal_ops = {
@@ -69,7 +70,8 @@ struct signal_ops default_signal_ops = {
 	.sigsuspend = __sigsuspend,
 	.sigtimedwait = __sigtimedwait,
 	.sigwait = __sigwait,
-	.sigwaitinfo = __sigwaitinfo
+	.sigwaitinfo = __sigwaitinfo,
+	.sigself = __sigself
 };
 
 /* This is the catch all akaros event->posix signal handler.  All posix signals
@@ -339,3 +341,14 @@ static int __sigwaitinfo(__const sigset_t *__restrict __set,
 	return 0;
 }
 
+static int __sigself(int signo)
+{
+	int ret = uthread_signal(current_uthread, signo);
+
+	void cb(struct uthread *uthread, void *arg)
+	{
+		uthread_paused(uthread);
+	}
+	if (ret == 0)
+		uthread_yield(TRUE, cb, 0);
+}

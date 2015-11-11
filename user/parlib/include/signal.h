@@ -29,6 +29,7 @@ struct sigstate {
 /* A set of functions related to handling posix signals on akaros. The
  * implementation of these functions is 2LS specific. */
 struct signal_ops {
+	/* Standard ops */
 	int (*sigaltstack)(__const struct sigaltstack *__restrict,
                        struct sigaltstack *__restrict);
 	int (*siginterrupt)(int, int);
@@ -42,6 +43,9 @@ struct signal_ops {
 	                    __const struct timespec *__restrict);
 	int (*sigwait)(__const sigset_t *__restrict, int *__restrict);
 	int (*sigwaitinfo)(__const sigset_t *__restrict, siginfo_t *__restrict);
+
+	/* Extended ops */
+	int (*sigself)(int signo);
 };
 
 /* Glibc defines the symbol for signal_ops so that the function pointers
