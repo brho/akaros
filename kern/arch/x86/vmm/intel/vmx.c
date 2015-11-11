@@ -1818,6 +1818,7 @@ int vmx_launch(struct vmctl *v) {
 		printd("REG_RSP_RIP_CR3\n");
 		vmcs_writel(GUEST_RSP, v->regs.tf_rsp);
 		vmcs_writel(GUEST_CR3, v->cr3);
+		vcpu->regs = v->regs;
 
 		pir_kva = uva2kva(current_proc, (void *)v->pir);
 		pir_physical = (uint64_t)PADDR(pir_kva);
