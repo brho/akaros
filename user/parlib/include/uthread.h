@@ -81,6 +81,7 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
 void uthread_sleep(unsigned int seconds);
 void uthread_usleep(unsigned int usecs);
 void uthread_has_blocked(struct uthread *uthread, int flags);
+void uthread_paused(struct uthread *uthread);
 
 /* Utility functions */
 bool __check_preempt_pending(uint32_t vcoreid);	/* careful: check the code */
