@@ -29,6 +29,7 @@ struct schedule_ops thread0_2ls_ops = {
 	.thread_blockon_sysc = thread0_thread_blockon_sysc,
 	.thread_refl_fault = thread0_thread_refl_fault,
 	.thread_runnable = thread0_thread_runnable,
+	.thread_paused = thread0_thread_runnable,
 	.thread_has_blocked = thread0_thread_has_blocked,
 };
 
@@ -64,11 +65,13 @@ static void thread0_sched_entry(void)
 {
 	/* TODO: support signal handling whenever we run a uthread */
 	if (current_uthread) {
+		uthread_prep_pending_signals(current_uthread);
 		run_current_uthread();
 		assert(0);
 	}
 	while (1) {
 		if (!thread0_info.is_blocked) {
+			uthread_prep_pending_signals(thread0_uth);
 			run_uthread(thread0_uth);
 			assert(0);
 		}
