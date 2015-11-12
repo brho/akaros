@@ -43,6 +43,7 @@ function gen_request()
 		kill -s TERM $TOP_PID
 	else
 		echo "The changes in this request can be viewed online at:"
+		echo ""
 		echo "    https://github.com/brho/akaros/compare/${base_sha1}...${head_sha1}"
 		echo ""
 		echo "${request}"
