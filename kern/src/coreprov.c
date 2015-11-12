@@ -10,9 +10,11 @@
 
 /* Provision a core to proc p. This code assumes that the scheduler that uses
  * it holds a lock for the duration of the call. */
-void __provision_core(struct proc *p, struct sched_pcore *spc)
+void __provision_core(struct proc *p, uint32_t pcoreid)
 {
+	struct sched_pcore *spc = pcoreid2spc(pcoreid);
 	struct sched_pcore_tailq *prov_list;
+
 	/* If the core is already prov to someone else, take it away.  (last write
 	 * wins, some other layer or new func can handle permissions). */
 	if (spc->prov_proc) {

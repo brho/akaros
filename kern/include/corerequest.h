@@ -20,9 +20,10 @@ void corealloc_init(void);
 void corealloc_proc_init(struct proc *p);
 
 /* Find the best core to allocate to a process as dictated by the core
- * allocation algorithm. This code assumes that the scheduler that uses it
- * holds a lock for the duration of the call. */
-struct sched_pcore *__find_best_core_to_alloc(struct proc *p);
+ * allocation algorithm. If no core is found, return -1. This code assumes
+ * that the scheduler that uses it holds a lock for the duration of the call.
+ * */
+uint32_t __find_best_core_to_alloc(struct proc *p);
 
 /* Track the pcore properly when it is allocated to p. This code assumes that
  * the scheduler that uses it holds a lock for the duration of the call. */
@@ -55,7 +56,7 @@ void __sort_idle_cores(void);
 
 /* Provision a core to proc p. This code assumes that the scheduler that uses
  * it holds a lock for the duration of the call. */
-void __provision_core(struct proc *p, struct sched_pcore *spc);
+void __provision_core(struct proc *p, uint32_t pcoreid);
 
 /* Unprovision all cores from proc p. This code assumes that the scheduler
  * that uses * it holds a lock for the duration of the call. */
@@ -70,6 +71,20 @@ void print_proc_coreprov(struct proc *p);
 
 /* Print the processes attached to each provisioned core. */
 void print_coreprov_map(void);
+
+static inline struct proc *get_alloc_proc(uint32_t pcoreid)
+{
+	extern struct sched_pcore *all_pcores;
+
+	return all_pcores[pcoreid].alloc_proc;
+}
+
+static inline struct proc *get_prov_proc(uint32_t pcoreid)
+{
+	extern struct sched_pcore *all_pcores;
+
+	return all_pcores[pcoreid].prov_proc;
+}
 
 /* TODO: need more thorough CG/LL management.  For now, core0 is the only LL
  * core.  This won't play well with the ghetto shit in schedule_init() if you do

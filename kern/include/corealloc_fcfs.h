@@ -25,7 +25,6 @@ struct core_request_data {
 };
 
 static inline uint32_t spc2pcoreid(struct sched_pcore *spc)
-
 {
 	extern struct sched_pcore *all_pcores;
 
@@ -39,12 +38,3 @@ static inline struct sched_pcore *pcoreid2spc(uint32_t pcoreid)
 	return &all_pcores[pcoreid];
 }
 
-static inline struct proc *get_alloc_proc(struct sched_pcore *c)
-{
-	return c->alloc_proc;
-}
-
-static inline struct proc *get_prov_proc(struct sched_pcore *c)
-{
-	return c->prov_proc;
-}

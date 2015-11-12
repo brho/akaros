@@ -28,10 +28,6 @@ struct proc_list all_mcps_2 = TAILQ_HEAD_INITIALIZER(all_mcps_2);
 struct proc_list *primary_mcps = &all_mcps_1;
 struct proc_list *secondary_mcps = &all_mcps_2;
 
-/* TAILQ of all unallocated, idle (CG) cores.
- * Pulled from corealloc.c at the moment */
-extern struct sched_pcore_tailq idlecores;
-
 /* Helper, defined below */
 static void __core_request(struct proc *p, uint32_t amt_needed);
 static void add_to_list(struct proc *p, struct proc_list *list);
@@ -62,12 +58,10 @@ struct poke_tracker ksched_poker = POKE_INITIALIZER(__run_mcp_ksched);
  * of a proc on those lists.  proc lifetime within the ksched but outside this
  * lock is protected by the proc kref. */
 //spinlock_t proclist_lock = SPINLOCK_INITIALIZER; /* subsumed by bksl */
-/* - protects the provisioning assignment, membership of sched_pcores in
- * provision lists, and the integrity of all prov lists (the lists of each
- * proc).  does NOT protect spc->alloc_proc. */
+/* - protects the provisioning assignment, and the integrity of all prov
+ * lists (the lists of each proc). */
 //spinlock_t prov_lock = SPINLOCK_INITIALIZER;
-/* - protects allocation structures: spc->alloc_proc, the integrity and
- * membership of the idelcores tailq. */
+/* - protects allocation structures */
 //spinlock_t alloc_lock = SPINLOCK_INITIALIZER;
 spinlock_t sched_lock = SPINLOCK_INITIALIZER;
 
@@ -273,7 +267,6 @@ void __sched_scp_wakeup(struct proc *p)
  * a scheduling decision (or at least plan to). */
 void __sched_put_idle_core(struct proc *p, uint32_t coreid)
 {
-	struct sched_pcore *spc = pcoreid2spc(coreid);
 	spin_lock(&sched_lock);
 	__track_core_dealloc(p, coreid);
 	spin_unlock(&sched_lock);
@@ -547,7 +540,7 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 {
 	uint32_t nr_to_grant = 0;
 	uint32_t corelist[num_cores];
-	struct sched_pcore *spc_i, *temp;
+	uint32_t pcoreid;
 	struct proc *proc_to_preempt;
 	bool success;
 	/* we come in holding the ksched lock, and we hold it here to protect
@@ -558,24 +551,24 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 	while (nr_to_grant != amt_needed) {
 		/* Find the next best core to allocate to p. It may be a core
 		 * provisioned to p, and it might not be. */
-		spc_i = __find_best_core_to_alloc(p);
+		pcoreid = __find_best_core_to_alloc(p);
 		/* If no core is returned, we know that there are no more cores to give
 		 * out, so we exit the loop. */
-		if (spc_i == NULL)
+		if (pcoreid == -1)
 			break;
 		/* If the pcore chosen currently has a proc allocated to it, we know
 		 * it must be provisioned to p, but not allocated to it. We need to try
 		 * to preempt. After this block, the core will be track_dealloc'd and
 		 * on the idle list (regardless of whether we had to preempt or not) */
-		if (get_alloc_proc(spc_i)) {
-			proc_to_preempt = get_alloc_proc(spc_i);
+		if (get_alloc_proc(pcoreid)) {
+			proc_to_preempt = get_alloc_proc(pcoreid);
 			/* would break both preemption and maybe the later decref */
 			assert(proc_to_preempt != p);
 			/* need to keep a valid, external ref when we unlock */
 			proc_incref(proc_to_preempt, 1);
 			spin_unlock(&sched_lock);
 			/* sending no warning time for now - just an immediate preempt. */
-			success = proc_preempt_core(proc_to_preempt, spc2pcoreid(spc_i), 0);
+			success = proc_preempt_core(proc_to_preempt, pcoreid, 0);
 			/* reaquire locks to protect provisioning and idle lists */
 			spin_lock(&sched_lock);
 			if (success) {
@@ -584,11 +577,11 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 				 * idle CBs).  the core is not on the idle core list.  (if we
 				 * ever have proc alloc lists, it'll still be on the old proc's
 				 * list). */
-				assert(get_alloc_proc(spc_i));
+				assert(get_alloc_proc(pcoreid));
 				/* regardless of whether or not it is still prov to p, we need
 				 * to note its dealloc.  we are doing some excessive checking of
 				 * p == prov_proc, but using this helper is a lot clearer. */
-				__track_core_dealloc(proc_to_preempt, spc2pcoreid(spc_i));
+				__track_core_dealloc(proc_to_preempt, pcoreid);
 			} else {
 				/* the preempt failed, which should only happen if the pcore was
 				 * unmapped (could be dying, could be yielding, but NOT
@@ -606,7 +599,7 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 				 * allocator, the pcore could have been put on the idle list and
 				 * then quickly removed/allocated. */
 				cmb();
-				while (get_alloc_proc(spc_i)) {
+				while (get_alloc_proc(pcoreid)) {
 					/* this loop should be very rare */
 					spin_unlock(&sched_lock);
 					udelay(1);
@@ -615,9 +608,9 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 			}
 			/* no longer need to keep p_to_pre alive */
 			proc_decref(proc_to_preempt);
-			/* might not be prov to p anymore (rare race).  spc_i is idle - we
+			/* might not be prov to p anymore (rare race). pcoreid is idle - we
 			 * might get it later, or maybe we'll give it to its rightful proc*/
-			if (get_prov_proc(spc_i) != p)
+			if (get_prov_proc(pcoreid) != p)
 				continue;
 		}
 		/* At this point, the pcore is idle, regardless of how we got here
@@ -625,13 +618,13 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
 		 * place).  We also know the core is still provisioned to us.  Lets add
 		 * it to the corelist for p (so we can give it to p in bulk later), and
 		 * track its allocation with p (so our internal data structures stay in
-		 * sync). We rely on the fact that we are the only allocator (spc_i is
+		 * sync). We rely on the fact that we are the only allocator (pcoreid is
 		 * still idle, despite (potentially) unlocking during the preempt
 		 * attempt above).  It is guaranteed to be track_dealloc'd()
 		 * (regardless of how we got here). */
-		corelist[nr_to_grant] = spc2pcoreid(spc_i);
+		corelist[nr_to_grant] = pcoreid;
 		nr_to_grant++;
-		__track_core_alloc(p, spc2pcoreid(spc_i));
+		__track_core_alloc(p, pcoreid);
 	}
 	/* Now, actually give them out */
 	if (nr_to_grant) {
@@ -672,7 +665,6 @@ static void __core_request(struct proc *p, uint32_t amt_needed)
  * implemented in __provision_core, with a lock, error checking, etc. */
 int provision_core(struct proc *p, uint32_t pcoreid)
 {
-	struct sched_pcore *spc;
 	/* Make sure we aren't asking for something that doesn't exist (bounds check
 	 * on the pcore array) */
 	if (!(pcoreid < num_cores)) {
@@ -684,12 +676,11 @@ int provision_core(struct proc *p, uint32_t pcoreid)
 		set_errno(EBUSY);
 		return -1;
 	}
-	spc = pcoreid2spc(pcoreid);
-	/* Note the sched lock protects the spc tailqs for all procs in this code.
+	/* Note the sched lock protects the tailqs for all procs in this code.
 	 * If we need a finer grained sched lock, this is one place where we could
 	 * have a different lock */
 	spin_lock(&sched_lock);
-	__provision_core(p, spc);
+	__provision_core(p, pcoreid);
 	spin_unlock(&sched_lock);
 	return 0;
 }
