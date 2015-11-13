@@ -77,7 +77,7 @@ bool check_vcoreid(const char *str, uint32_t vcoreid);
 /* Static inlines */
 static inline uint32_t max_vcores(void)
 {
-	return MIN(__procinfo.max_vcores, MAX_VCORES);
+	return MAX(1, MIN(__procinfo.max_vcores, MAX_VCORES));
 }
 
 static inline uint32_t num_vcores(void)
