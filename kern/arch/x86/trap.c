@@ -3,6 +3,7 @@
 #include <arch/arch.h>
 #include <arch/console.h>
 #include <arch/apic.h>
+#include <arch/perfmon.h>
 #include <ros/common.h>
 #include <smp.h>
 #include <assert.h>
@@ -192,6 +193,8 @@ void idt_init(void)
 	register_irq(IdtLAPIC_TIMER, timer_interrupt, NULL,
 	             MKBUS(BusLAPIC, 0, 0, 0));
 	register_irq(IdtLAPIC_ERROR, handle_lapic_error, NULL,
+	             MKBUS(BusLAPIC, 0, 0, 0));
+	register_irq(IdtLAPIC_PCINT, perfmon_interrupt, NULL,
 	             MKBUS(BusLAPIC, 0, 0, 0));
 	register_irq(I_KERNEL_MSG, handle_kmsg_ipi, NULL, MKBUS(BusIPI, 0, 0, 0));
 }
