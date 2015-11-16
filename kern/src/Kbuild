@@ -52,6 +52,7 @@ obj-y						+= ns/
 obj-y						+= profiler.o
 obj-y						+= page_alloc.o
 obj-y						+= pagemap.o
+obj-y						+= percpu.o
 obj-y						+= pmap.o
 obj-y						+= printf.o
 obj-y						+= printfmt.o

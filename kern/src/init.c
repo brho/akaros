@@ -30,6 +30,7 @@
 #include <mm.h>
 #include <frontend.h>
 #include <ex_table.h>
+#include <percpu.h>
 
 #include <arch/init.h>
 #include <bitmask.h>
@@ -146,6 +147,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	colored_page_alloc_init();      // Allocates colors for agnostic processes
 	acpiinit();
 	topology_init();
+	percpu_init();
 	kthread_init();					/* might need to tweak when this happens */
 	vmr_init();
 	file_init();
