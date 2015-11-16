@@ -573,7 +573,7 @@ endif #ifeq ($(mixed-targets),1)
 # List all userspace directories here, and state any dependencies between them,
 # such as how pthread depends on parlib.
 
-user-dirs = parlib pthread benchutil iplib ndblib vmm
+user-dirs = parlib pthread benchutil iplib ndblib vmm perfmon
 benchutil: parlib
 pthread: parlib benchutil
 iplib: parlib
@@ -586,6 +586,7 @@ install-libs: $(user-dirs) symlinks cc-exists
 $(user-dirs):
 	@$(MAKE) -C user/$@ DEPLIBS="$^" && $(MAKE) -C user/$@ install
 
+user: $(user-dirs)
 
 PHONY += userclean $(clean-user-dirs)
 clean-user-dirs := $(addprefix _clean_user_,$(user-dirs))
@@ -656,7 +657,7 @@ realclean: userclean mrproper doxyclean objclean
 # =========================================================================
 
 PHONY += apps-install
-apps-install:
+apps-install: install-libs
 	@$(call make_as_parent, -C tools/apps/busybox)
 	@$(call make_as_parent, -C tools/profile/kprof2perf install)
 	@$(call make_as_parent, -C tools/apps/snc install)
