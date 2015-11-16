@@ -18,6 +18,14 @@
 #include <trace.h>
 #include <kdebug.h>
 #include <kmalloc.h>
+#include <core_set.h>
+#include <completion.h>
+
+struct all_cpu_work {
+	struct completion comp;
+	void (*func)(void *);
+	void *opaque;
+};
 
 struct per_cpu_info per_cpu_info[MAX_NUM_CORES];
 
@@ -238,4 +246,35 @@ void pcpui_tr_reset_and_clear_all(void)
 {
 	for (int i = 0; i < num_cores; i++)
 		trace_ring_reset_and_clear(&per_cpu_info[i].traces);
+}
+
+static void smp_do_core_work(uint32_t srcid, long a0, long a1, long a2)
+{
+	struct all_cpu_work *acw = (struct all_cpu_work *) a0;
+
+	acw->func(acw->opaque);
+	completion_complete(&acw->comp, 1);
+}
+
+void smp_do_in_cores(const struct core_set *cset, void (*func)(void *),
+					 void *opaque)
+{
+	int cpu = core_id();
+	struct all_cpu_work acw;
+
+	memset(&acw, 0, sizeof(acw));
+	completion_init(&acw.comp, core_set_remote_count(cset));
+	acw.func = func;
+	acw.opaque = opaque;
+
+	for (int i = 0; i < num_cores; i++) {
+		if (core_set_getcpu(cset, i)) {
+			if (i == cpu)
+				func(opaque);
+			else
+				send_kernel_message(i, smp_do_core_work, (long) &acw, 0, 0,
+									KMSG_ROUTINE);
+		}
+	}
+	completion_wait(&acw.comp);
 }

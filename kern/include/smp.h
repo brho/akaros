@@ -17,6 +17,7 @@
 #include <syscall.h>
 #include <alarm.h>
 #include <trace.h>
+#include <core_set.h>
 
 #define CPU_STATE_IRQ			0
 #define CPU_STATE_KERNEL		1
@@ -153,6 +154,9 @@ struct pcpu_trace_event {
 # define pcpui_trace_locks(pcpui, lock)
 
 #endif /* CONFIG_TRACE_LOCKS */
+
+void smp_do_in_cores(const struct core_set *cset, void (*func)(void *),
+					 void *opaque);
 
 /* Run the handlers for all events in a pcpui ring.  Can run on all cores, or
  * just one core.  'type' selects which event type is handled (0 for all). */
