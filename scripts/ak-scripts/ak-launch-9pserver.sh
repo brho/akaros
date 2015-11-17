@@ -60,12 +60,7 @@ function main() {
 	mkdir -p ${akaros_9p_root}
 
 	# Kill any old instances of the ufs server on ${ufs_port}
-	local ufs_pid=$(ps aux | grep "ufs" | grep "\-addr=:${ufs_port}" \
-	                       | head -1 | awk '{print $2}' )
-	if [ "${ufs_pid}" != "" ]; then
-		echo "Killing old 9p server instance on port=${ufs_port} (pid ${ufs_pid})"
-		echo "${ufs_pid}" | xargs kill
-	fi
+	ak kill-9pserver --ufs-port="${ufs_port}"
 
 	# Start a new ufs instance on ${ufs_port}
 	nohup ${gopath}/bin/ufs -akaros=true -addr=:${ufs_port} \
