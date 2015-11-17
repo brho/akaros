@@ -299,15 +299,15 @@ void *consin(void *arg)
 		virtio_mmio_set_vring_irq();
 
 		pwrite(fd, &vmctl, sizeof(vmctl), 1<<12);
-		if (!timer_started && mcp) {
-			/* Start up timer thread */
+		/*if (!timer_started && mcp) {
+			// Start up timer thread
 			if (pthread_create(&timerthread_struct, NULL, timer_thread, NULL)) {
 				fprintf(stderr, "pth_create failed for timer thread.");
 				perror("pth_create");
 			} else {
 				timer_started = 1;
 			}
-		}
+		}*/
 	}
 	fprintf(stderr, "All done\n");
 	return NULL;

@@ -1950,7 +1950,7 @@ int vmx_launch(struct vmctl *v) {
 			vmx_dump_cpu(vcpu);
 			vcpu->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
 		} else if (ret == EXIT_REASON_CPUID) {
-			printk("CPUID EXIT RIP: %p\n", vcpu->regs.tf_rip);
+			printd("CPUID EXIT RIP: %p\n", vcpu->regs.tf_rip);
 			vmx_handle_cpuid(vcpu);
 			vmx_get_cpu(vcpu);
 			vmcs_writel(GUEST_RIP, vcpu->regs.tf_rip + 2);
