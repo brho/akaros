@@ -32,6 +32,7 @@ static inline void reboot(void)
               __attribute__((always_inline)) __attribute__((noreturn));
 static inline void prefetch(void *addr);
 static inline void prefetchw(void *addr);
+static inline void swap_gs(void);
 
 /* in trap.c */
 void send_ipi(uint32_t os_coreid, uint8_t vector);
@@ -186,4 +187,9 @@ static inline void prefetchw(void *addr)
 static inline uint64_t max_guest_pa(void)
 {
 	return (1ULL<<40) - 1;
+}
+
+static inline void swap_gs(void)
+{
+	asm volatile ("swapgs");
 }
