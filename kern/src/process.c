@@ -1089,9 +1089,9 @@ void __proc_save_fpu_s(struct proc *p)
  * In the future, we'll probably use vc0's space for scp_ctx and the silly
  * state.  If we ever do that, we'll need to stop using scp_ctx (soon to be in
  * VCPD) as a location for pcpui->cur_ctx to point (dangerous) */
-void __proc_save_context_s(struct proc *p, struct user_context *ctx)
+void __proc_save_context_s(struct proc *p)
 {
-	p->scp_ctx = *ctx;
+	p->scp_ctx = *current_ctx;
 	__seq_start_write(&p->procinfo->coremap_seqctr);
 	__unmap_vcore(p, 0);
 	__seq_end_write(&p->procinfo->coremap_seqctr);
@@ -1154,13 +1154,13 @@ void proc_yield(struct proc *p, bool being_nice)
 				/* if we're here, we want to sleep.  a concurrent event that
 				 * hasn't already written notif_pending will have seen WAITING,
 				 * and will be spinning while we do this. */
-				__proc_save_context_s(p, current_ctx);
+				__proc_save_context_s(p);
 				spin_unlock(&p->proc_lock);
 			} else {
 				/* yielding to allow other processes to run.  we're briefly
 				 * WAITING, til we are woken up */
 				__proc_set_state(p, PROC_WAITING);
-				__proc_save_context_s(p, current_ctx);
+				__proc_save_context_s(p);
 				spin_unlock(&p->proc_lock);
 				/* immediately wake up the proc (makes it runnable) */
 				proc_wakeup(p);

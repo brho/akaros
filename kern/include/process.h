@@ -89,7 +89,7 @@ void proc_signal_parent(struct proc *child);
 int __proc_disown_child(struct proc *parent, struct proc *child);
 int proc_change_to_m(struct proc *p);
 void __proc_save_fpu_s(struct proc *p);
-void __proc_save_context_s(struct proc *p, struct user_context *ctx);
+void __proc_save_context_s(struct proc *p);
 void proc_yield(struct proc *p, bool being_nice);
 void proc_notify(struct proc *p, uint32_t vcoreid);
 void proc_wakeup(struct proc *p);

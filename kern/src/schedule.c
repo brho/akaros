@@ -315,7 +315,7 @@ static bool __schedule_scp(void)
 			/* Saving FP state aggressively.  Odds are, the SCP was hit by an
 			 * IRQ and has a HW ctx, in which case we must save. */
 			__proc_save_fpu_s(pcpui->owning_proc);
-			__proc_save_context_s(pcpui->owning_proc, pcpui->cur_ctx);
+			__proc_save_context_s(pcpui->owning_proc);
 			vcore_account_offline(pcpui->owning_proc, 0);
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			__unmap_vcore(p, 0);

@@ -888,7 +888,7 @@ static int __hpf_load_page(struct proc *p, struct page_map *pm,
 			/* it's possible for HPF to loop a few times; we can only save the
 			 * first time, o/w we could clobber. */
 			if (first) {
-				__proc_save_context_s(p, pcpui->cur_ctx);
+				__proc_save_context_s(p);
 				__proc_save_fpu_s(p);
 				/* We clear the owner, since userspace doesn't run here
 				 * anymore, but we won't abandon since the fault handler
