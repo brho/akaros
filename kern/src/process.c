@@ -949,7 +949,7 @@ int proc_change_to_m(struct proc *p)
 			struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
 			assert(current_ctx);
 			/* Copy uthread0's context to VC 0's uthread slot */
-			vcpd->uthread_ctx = *current_ctx;
+			copy_current_ctx_to(&vcpd->uthread_ctx);
 			clear_owning_proc(core_id());	/* so we don't restart */
 			save_vc_fp_state(vcpd);
 			/* Userspace needs to not fuck with notif_disabled before
@@ -1006,7 +1006,7 @@ uint32_t __proc_change_to_s(struct proc *p, uint32_t *pc_arr)
 	assert(p->state == PROC_RUNNING_M); // TODO: (ACR) async core req
 	/* save the context, to be restarted in _S mode */
 	assert(current_ctx);
-	p->scp_ctx = *current_ctx;
+	copy_current_ctx_to(&p->scp_ctx);
 	clear_owning_proc(core_id());	/* so we don't restart */
 	save_vc_fp_state(vcpd);
 	/* sending death, since it's not our job to save contexts or anything in
@@ -1091,7 +1091,7 @@ void __proc_save_fpu_s(struct proc *p)
  * VCPD) as a location for pcpui->cur_ctx to point (dangerous) */
 void __proc_save_context_s(struct proc *p)
 {
-	p->scp_ctx = *current_ctx;
+	copy_current_ctx_to(&p->scp_ctx);
 	__seq_start_write(&p->procinfo->coremap_seqctr);
 	__unmap_vcore(p, 0);
 	__seq_end_write(&p->procinfo->coremap_seqctr);
@@ -2005,7 +2005,7 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 	} else {
 		/* need to set up the calling vcore's ctx so that it'll get restarted by
 		 * __startcore, to make the caller look like it was preempted. */
-		caller_vcpd->vcore_ctx = *current_ctx;
+		copy_current_ctx_to(&caller_vcpd->vcore_ctx);
 		save_vc_fp_state(caller_vcpd);
 	}
 	/* Mark our core as preempted (for userspace recovery).  Userspace checks
@@ -2136,7 +2136,7 @@ void __notify(uint32_t srcid, long a0, long a1, long a2)
 	vcpd->notif_disabled = TRUE;
 	/* save the old ctx in the uthread slot, build and pop a new one.  Note that
 	 * silly state isn't our business for a notification. */
-	vcpd->uthread_ctx = *pcpui->cur_ctx;
+	copy_current_ctx_to(&vcpd->uthread_ctx);
 	memset(pcpui->cur_ctx, 0, sizeof(struct user_context));
 	proc_init_ctx(pcpui->cur_ctx, vcoreid, vcpd->vcore_entry,
 	              vcpd->vcore_stack, vcpd->vcore_tls_desc);
@@ -2167,9 +2167,9 @@ void __preempt(uint32_t srcid, long a0, long a1, long a2)
 	 * cur_ctx in the uthread slot, and it'll appear to the vcore when it comes
 	 * back up the uthread just took a notification. */
 	if (vcpd->notif_disabled)
-		vcpd->vcore_ctx = *pcpui->cur_ctx;
+		copy_current_ctx_to(&vcpd->vcore_ctx);
 	else
-		vcpd->uthread_ctx = *pcpui->cur_ctx;
+		copy_current_ctx_to(&vcpd->uthread_ctx);
 	/* Userspace in a preemption handler on another core might be copying FP
 	 * state from memory (VCPD) at the moment, and if so we don't want to
 	 * clobber it.  In this rare case, our current core's FPU state should be

@@ -103,6 +103,14 @@ uintptr_t get_user_ctx_fp(struct user_context *ctx)
 	}
 }
 
+/* Helper, copies the current context to to_ctx. */
+void copy_current_ctx_to(struct user_context *to_ctx)
+{
+	struct user_context *cur_ctx = current_ctx;
+
+	*to_ctx = *cur_ctx;
+}
+
 struct kmem_cache *kernel_msg_cache;
 
 void kernel_msg_init(void)

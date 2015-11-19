@@ -736,7 +736,7 @@ static ssize_t sys_fork(env_t* e)
 		set_errno(EINVAL);
 		return -1;
 	}
-	env->scp_ctx = *current_ctx;
+	copy_current_ctx_to(&env->scp_ctx);
 	enable_irqsave(&state);
 
 	env->cache_colors_map = cache_colors_map_alloc();
@@ -824,7 +824,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	}
 	/* Preemptively copy out the cur_ctx, in case we fail later (easier on
 	 * cur_ctx if we do this now) */
-	p->scp_ctx = *pcpui->cur_ctx;
+	copy_current_ctx_to(&p->scp_ctx);
 	/* Clear the current_ctx.  We won't be returning the 'normal' way.  Even if
 	 * we want to return with an error, we need to go back differently in case
 	 * we succeed.  This needs to be done before we could possibly block, but
