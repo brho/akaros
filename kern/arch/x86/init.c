@@ -91,6 +91,10 @@ void arch_init()
 	perfmon_init();
 	cons_irq_init();
 	intel_lpc_init();
+#ifdef CONFIG_ENABLE_LEGACY_USB
+	printk("Legacy USB support enabled, expect SMM interference!\n");
+#else
 	usb_disable_legacy();
+#endif
 	check_timing_stability();
 }
