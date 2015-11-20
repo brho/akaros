@@ -108,6 +108,9 @@ void copy_current_ctx_to(struct user_context *to_ctx)
 {
 	struct user_context *cur_ctx = current_ctx;
 
+	/* Be sure to finalize into cur_ctx, not the to_ctx.  o/w the arch could get
+	 * confused by other calls to finalize. */
+	arch_finalize_ctx(cur_ctx);
 	*to_ctx = *cur_ctx;
 }
 

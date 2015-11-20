@@ -1251,6 +1251,8 @@ void proc_yield(struct proc *p, bool being_nice)
 		__proc_set_state(p, PROC_WAITING);
 	}
 	spin_unlock(&p->proc_lock);
+	/* We discard the current context, but we still need to restore the core */
+	arch_finalize_ctx(pcpui->cur_ctx);
 	/* Hand the now-idle core to the ksched */
 	__sched_put_idle_core(p, pcoreid);
 	goto out_yield_core;
@@ -2001,7 +2003,11 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 		 * and we don't care about either the uthread_ctx or the vcore_ctx. */
 		caller_vcpd->notif_disabled = FALSE;
 		/* Don't need to save the FPU.  There should be no uthread or other
-		 * reason to return to the FPU state. */
+		 * reason to return to the FPU state.  But we do need to finalize the
+		 * context, even though we are throwing it away.  We need to return the
+		 * pcore to a state where it can run any context and not be bound to
+		 * the old context. */
+		arch_finalize_ctx(pcpui->cur_ctx);
 	} else {
 		/* need to set up the calling vcore's ctx so that it'll get restarted by
 		 * __startcore, to make the caller look like it was preempted. */
@@ -2211,7 +2217,8 @@ void __death(uint32_t srcid, long a0, long a1, long a2)
 		vcore_account_offline(p, vcoreid);	/* in case anyone is counting */
 		/* We won't restart the process later.  current gets cleared later when
 		 * we notice there is no owning_proc and we have nothing to do
-		 * (smp_idle, restartcore, etc) */
+		 * (smp_idle, restartcore, etc). */
+		arch_finalize_ctx(pcpui->cur_ctx);
 		clear_owning_proc(coreid);
 	}
 }

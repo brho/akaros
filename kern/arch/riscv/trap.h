@@ -72,4 +72,13 @@ set_frame_pointer(uintptr_t fp)
 void handle_trap(struct hw_trapframe *hw_tf);
 int emulate_fpu(struct hw_trapframe *hw_tf);
 
+static inline bool arch_ctx_is_partial(struct user_context *ctx)
+{
+	return FALSE;
+}
+
+static inline void arch_finalize_ctx(struct user_context *ctx)
+{
+}
+
 #endif

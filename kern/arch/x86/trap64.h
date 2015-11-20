@@ -107,3 +107,36 @@ static inline void x86_set_stacktop_tss(struct taskstate *tss, uintptr_t top)
 {
 	tss->ts_rsp0 = top;
 }
+
+static inline bool x86_hwtf_is_partial(struct hw_trapframe *tf)
+{
+	return FALSE;
+}
+
+static inline bool x86_swtf_is_partial(struct sw_trapframe *tf)
+{
+	return FALSE;
+}
+
+static inline bool arch_ctx_is_partial(struct user_context *ctx)
+{
+	switch (ctx->type) {
+	case (ROS_HW_CTX):
+		return x86_hwtf_is_partial(&ctx->tf.hw_tf);
+	case (ROS_SW_CTX):
+		return x86_swtf_is_partial(&ctx->tf.sw_tf);
+	}
+	return FALSE;
+}
+
+/* Makes sure that the user context is fully saved into ctx and not split across
+ * the struct and HW, meaning it is not a "partial context". */
+static inline void arch_finalize_ctx(struct user_context *ctx)
+{
+	switch (ctx->type) {
+	case (ROS_HW_CTX):
+		break;
+	case (ROS_SW_CTX):
+		break;
+	}
+}

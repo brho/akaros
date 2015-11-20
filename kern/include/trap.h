@@ -40,6 +40,34 @@ void __arch_reflect_trap_hwtf(struct hw_trapframe *hw_tf, unsigned int trap_nr,
 uintptr_t get_user_ctx_pc(struct user_context *ctx);
 uintptr_t get_user_ctx_fp(struct user_context *ctx);
 
+/* Partial contexts are those where the full context is split between the parts
+ * in the struct and the parts still loaded in hardware.
+ *
+ * Finalizing a context ensures that the full context is saved in the struct and
+ * nothing remains in hardware.  Finalize does two things: makes sure the
+ * context can be run again on another core and makes sure the core can run
+ * another context.
+ *
+ * arch_finalize_ctx() must be idempotent and have no effect on a full context.
+ * It is up to the architecture to keep track of whether or not a context is
+ * full or partial and handle finalize calls on a context that might not be
+ * partial.  They can do so in the ctx itself, in their own arch-dependent
+ * manner.
+ *
+ * The kernel's guarantee to the arches is that:
+ * - finalize will be called after proc_pop_ctx (i.e. after it runs) at least
+ * once, before that context is used again on another core or before another
+ * context is used on this core.
+ * - the arches can store the partial status and anything else it wants in the
+ * *ctx without fear of it being tampered with.
+ * - user-provided contexts will be passed to proc_secure_ctx, and those
+ * contexts are full/finalized already.  Anything else is a user bug.  The
+ * arches enforce this.
+ * - an arch will never be asked to pop a partial context that was not already
+ * loaded onto the current core.
+ * - contexts will be finalized before handing them back to the user. */
+extern inline void arch_finalize_ctx(struct user_context *ctx);
+extern inline bool arch_ctx_is_partial(struct user_context *ctx);
 void copy_current_ctx_to(struct user_context *to_ctx);
 
 /* Kernel messages.  This is an in-order 'active message' style messaging
