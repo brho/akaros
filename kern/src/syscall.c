@@ -375,6 +375,58 @@ static int sys_block(struct proc *p, unsigned int usec)
 	return 0;
 }
 
+/* Pause execution for a number of nanoseconds.
+ * The current implementation rounds up to the nearest microsecond. If the
+ * syscall is aborted, we return the remaining time the call would have ran
+ * in the 'rem' parameter.  */
+static int sys_nanosleep(struct proc *p,
+                         const struct timespec *req,
+                         struct timespec *rem)
+{
+	ERRSTACK(1);
+	uint64_t usec;
+	struct timespec kreq, krem = {0, 0};
+	uint64_t tsc = read_tsc();
+
+	/* Check the input arguments. */
+	if (memcpy_from_user(p, &kreq, req, sizeof(struct timespec))) {
+		set_errno(EFAULT);
+		return -1;
+	}
+	if (rem && memcpy_to_user(p, rem, &krem, sizeof(struct timespec))) {
+		set_errno(EFAULT);
+		return -1;
+	}
+	if (kreq.tv_sec < 0) {
+		set_errno(EINVAL);
+		return -1;
+	}
+	if ((kreq.tv_nsec < 0) || (kreq.tv_nsec > 999999999)) {
+		set_errno(EINVAL);
+		return -1;
+	}
+
+	/* Convert timespec to usec. Ignore overflow on the tv_sec field. */
+	usec = kreq.tv_sec * 1000000;
+	usec += DIV_ROUND_UP(kreq.tv_nsec, 1000);
+
+	/* Attempt to sleep. If we get aborted, copy the remaining time into
+	 * 'rem' and return. We assume the tsc is sufficient to tell how much
+	 * time is remaining (i.e. it only overflows on the order of hundreds of
+	 * years, which should be sufficiently long enough to ensure we don't
+	 * overflow). */
+	if (waserror()) {
+		tsc2timespec(read_tsc() - tsc, &krem);
+		if (rem && memcpy_to_user(p, rem, &krem, sizeof(struct timespec)))
+			set_errno(EFAULT);
+		poperror();
+		return -1;
+	}
+	kthread_usleep(usec);
+	poperror();
+	return 0;
+}
+
 // Writes 'val' to 'num_writes' entries of the well-known array in the kernel
 // address space.  It's just #defined to be some random 4MB chunk (which ought
 // to be boot_alloced or something).  Meant to grab exclusive access to cache
@@ -2382,6 +2434,7 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_abort_sysc] = {(syscall_t)sys_abort_sysc, "abort_sysc"},
 	[SYS_abort_sysc_fd] = {(syscall_t)sys_abort_sysc_fd, "abort_sysc_fd"},
 	[SYS_populate_va] = {(syscall_t)sys_populate_va, "populate_va"},
+	[SYS_nanosleep] = {(syscall_t)sys_nanosleep, "nanosleep"},
 
 	[SYS_read] = {(syscall_t)sys_read, "read"},
 	[SYS_write] = {(syscall_t)sys_write, "write"},
