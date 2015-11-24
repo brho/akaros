@@ -39,6 +39,7 @@ obj-y						+= init.o
 obj-y						+= kdebug.o
 obj-y						+= kfs.o
 obj-y						+= kmalloc.o
+obj-y						+= kreallocarray.o
 obj-y						+= ktest/
 obj-y						+= kthread.o
 obj-y						+= manager.o

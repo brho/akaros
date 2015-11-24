@@ -21,6 +21,7 @@ void* kzmalloc(size_t size, int flags);
 void *kmalloc_align(size_t size, int flags, size_t align);
 void *kzmalloc_align(size_t size, int flags, size_t align);
 void *krealloc(void *buf, size_t size, int flags);
+void *kreallocarray(void *buf, size_t nmemb, size_t size, int flags);
 int kmalloc_refcnt(void *buf);
 void kmalloc_incref(void *buf);
 void kfree(void *buf);
