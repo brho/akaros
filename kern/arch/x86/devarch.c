@@ -20,12 +20,10 @@
 #include <smp.h>
 #include <ip.h>
 #include <time.h>
-#include <atomic.h>
 #include <core_set.h>
-#include <completion.h>
 #include <address_range.h>
 #include <arch/ros/msr-index.h>
-#include <arch/uaccess.h>
+#include <arch/msr.h>
 #include <arch/devarch.h>
 
 #define REAL_MEM_SIZE (1024 * 1024)
@@ -63,17 +61,6 @@ enum {
 	Linelen = 31,
 };
 
-struct smp_read_values {
-	uint64_t *values;
-	uint32_t addr;
-	atomic_t err;
-};
-struct smp_write_values {
-	uint32_t addr;
-	uint64_t value;
-	atomic_t err;
-};
-
 struct dev archdevtab;
 static struct dirtab archdir[Qmax] = {
 	{".", {Qdir, 0, QTDIR}, 0, 0555},
@@ -103,61 +90,6 @@ static const struct address_range msr_wr_wlist[] = {
 	ADDRESS_RANGE(MSR_CORE_PERF_FIXED_CTR_CTRL, MSR_CORE_PERF_GLOBAL_OVF_CTRL),
 };
 int gdbactive = 0;
-
-static void cpu_read_msr(void *opaque)
-{
-	int err, cpu = core_id();
-	struct smp_read_values *srv = (struct smp_read_values *) opaque;
-
-	err = safe_read_msr(srv->addr, &srv->values[cpu]);
-	if (unlikely(err))
-		atomic_cas(&srv->err, 0, err);
-}
-
-uint64_t *coreset_read_msr(const struct core_set *cset, uint32_t addr,
-						   size_t *nvalues)
-{
-	int err;
-	struct smp_read_values srv;
-
-	srv.addr = addr;
-	atomic_init(&srv.err, 0);
-	srv.values = kzmalloc(num_cores * sizeof(*srv.values), 0);
-	if (unlikely(!srv.values))
-		return ERR_PTR(-ENOMEM);
-	smp_do_in_cores(cset, cpu_read_msr, &srv);
-	err = (int) atomic_read(&srv.err);
-	if (unlikely(err)) {
-		kfree(srv.values);
-		return ERR_PTR(err);
-	}
-	*nvalues = num_cores;
-
-	return srv.values;
-}
-
-static void cpu_write_msr(void *opaque)
-{
-	int err;
-	struct smp_write_values *swv = (struct smp_write_values *) opaque;
-
-	err = safe_write_msr(swv->addr, swv->value);
-	if (unlikely(err))
-		atomic_cas(&swv->err, 0, err);
-}
-
-int coreset_write_msr(const struct core_set *cset, uint32_t addr,
-					   uint64_t value)
-{
-	struct smp_write_values swv;
-
-	swv.addr = addr;
-	swv.value = value;
-	atomic_init(&swv.err, 0);
-	smp_do_in_cores(cset, cpu_write_msr, &swv);
-
-	return (int) atomic_read(&swv.err);
-}
 
 //
 //  alloc some io port space and remember who it was
@@ -430,7 +362,7 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 				error(EPERM, NULL);
 			core_set_init(&cset);
 			core_set_fill_available(&cset);
-			values = coreset_read_msr(&cset, (uint32_t) offset, &nvalues);
+			values = msr_cores_read(&cset, (uint32_t) offset, &nvalues);
 			if (likely(!IS_ERR(values))) {
 				if (n >= nvalues * sizeof(uint64_t)) {
 					if (memcpy_to_user_errno(current, a, values,
@@ -532,7 +464,7 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 				error(EINVAL, NULL);
 			if (memcpy_from_user_errno(current, &value, a, sizeof(value)))
 				return -1;
-			err = coreset_write_msr(&cset, (uint32_t) offset, value);
+			err = msr_cores_write(&cset, (uint32_t) offset, value);
 			if (unlikely(err))
 				error(-err, NULL);
 			return sizeof(uint64_t);

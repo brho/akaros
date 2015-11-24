@@ -5,11 +5,9 @@
 
 #pragma once
 
-#include <sys/types.h>
-#include <stdio.h>
-#include <core_set.h>
-
-uint64_t *coreset_read_msr(const struct core_set *cset, uint32_t addr,
-						   size_t *nvalues);
-int coreset_write_msr(const struct core_set *cset, uint32_t addr,
-					  uint64_t value);
+int ioalloc(int port, int size, int align, char *tag);
+void iofree(int port);
+int iounused(int start, int end);
+void ioinit(void);
+int ioreserve(int unused_int, int size, int align, char *tag);
+void archreset(void);
