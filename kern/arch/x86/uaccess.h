@@ -40,6 +40,33 @@ struct extable_ip_fixup {
 	" .quad (" #to ") - .\n"									\
 	" .popsection\n"
 
+#define __read_msr_asm(eax, edx, addr, err, errret)						\
+	asm volatile(ASM_STAC "\n"											\
+				 "1:		rdmsr\n"									\
+				 "			mfence\n"									\
+				 "2: " ASM_CLAC "\n"									\
+				 ".section .fixup,\"ax\"\n"								\
+				 "3:		mov %4,%0\n"								\
+				 "	jmp 2b\n"											\
+				 ".previous\n"											\
+				 _ASM_EXTABLE(1b, 3b)									\
+				 : "=r" (err), "=d" (edx), "=a" (eax)					\
+				 : "c" (addr), "i" (errret), "0" (err))
+
+#define __write_msr_asm(val, addr, err, errret)							\
+	asm volatile(ASM_STAC "\n"											\
+				 "1:		wrmsr\n"									\
+				 "2: " ASM_CLAC "\n"									\
+				 ".section .fixup,\"ax\"\n"								\
+				 "3:		mov %4,%0\n"								\
+				 "	jmp 2b\n"											\
+				 ".previous\n"											\
+				 _ASM_EXTABLE(1b, 3b)									\
+				 : "=r" (err)											\
+				 : "d" ((uint32_t) (val >> 32)),						\
+				   "a" ((uint32_t) (val & 0xffffffff)), "c" (addr),		\
+				   "i" (errret), "0" (err))
+
 #define __put_user_asm(x, addr, err, itype, rtype, ltype, errret)		\
 	asm volatile(ASM_STAC "\n"											\
 				 "1:		mov"itype" %"rtype"1,%2\n"					\
@@ -161,6 +188,27 @@ static inline int copy_from_user(void *dst, const void *src,
 	} else {
 		err = __get_user(dst, src, count);
 	}
+
+	return err;
+}
+
+static inline int safe_read_msr(uint32_t addr, uint64_t *value)
+{
+	int err = 0;
+	uint32_t edx, eax;
+
+	__read_msr_asm(eax, edx, addr, err, -EFAULT);
+	if (likely(err == 0))
+		*value = ((uint64_t) edx << 32) | eax;
+
+	return err;
+}
+
+static inline int safe_write_msr(uint32_t addr, uint64_t value)
+{
+	int err = 0;
+
+	__write_msr_asm(value, addr, err, -EFAULT);
 
 	return err;
 }
