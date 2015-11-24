@@ -1000,3 +1000,10 @@ extern unsigned int qiomaxatomic;
 
 /* special sections */
 #define __devtab  __attribute__((__section__(".devtab")))
+
+#define DEVVARS_ENTRY(name, fmt)                                               \
+struct dirtab __attribute__((__section__("devvars"))) __devvars_##name =       \
+              {#name "!" fmt,                                                  \
+               {(uint64_t)&(name), 0, QTFILE},                                 \
+               sizeof((name)),                                                 \
+               0444}

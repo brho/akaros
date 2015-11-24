@@ -4,3 +4,9 @@ config REGRESS
         help
                 The regression test device allows you to push commands to monitor()
 		for testing. Defaults to 'y' for now.
+
+config DEVVARS
+	bool "#vars kernel variable exporter"
+	default y
+	help
+		The #vars device exports read access to select kernel variables.
