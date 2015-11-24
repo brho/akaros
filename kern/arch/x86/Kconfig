@@ -48,7 +48,7 @@ config LOUSY_LAPIC_TIMER
 
 config NOMTRRS
 	bool "Disable MTRRs"
-	default n
+	default y
 	help
 		Old debug option from when we were having issues with MTRRs.  If your
 		machine won't boot, try turning this on.
