@@ -48,11 +48,19 @@ export_parent_env := $(shell export | sed 's/$$/;/')
 # Save the ability to clear the current environment for future use
 clear_current_env := for c in $$(env | cut -d '=' -f 1); do unset $$c; done;
 
+define export_user_variables
+	CROSS_COMPILE="$(CROSS_COMPILE)"\
+	CROSS_INCLUDE="$(XCC_TARGET_INCLUDE)"\
+	ROS_CFLAGS="$(CFLAGS_USER)"\
+	ROS_LDFLAGS="$(LDFLAGS_USER)"
+endef
+
 # Define a set of commands to reset the environment to the parent's environment
 # and then run a local make target
 define make_as_parent
 	$(clear_current_env)\
 	$(export_parent_env)\
+	$(call export_user_variables)\
 	$(MAKE) $(NO_PRINT_DIRECTORY) $(1)
 endef
 
@@ -650,10 +658,12 @@ realclean: userclean mrproper doxyclean objclean
 PHONY += apps-install
 apps-install:
 	@$(call make_as_parent, -C tools/apps/busybox)
+	@$(call make_as_parent, -C tools/profile/kprof2perf install)
 
 PHONY += apps-clean
 apps-clean:
 	@$(call make_as_parent, -C tools/apps/busybox clean)
+	@$(call make_as_parent, -C tools/profile/kprof2perf clean)
 
 # Cross Compiler
 # =========================================================================
