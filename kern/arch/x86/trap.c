@@ -381,8 +381,11 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			break;
 		default:
 			if (hw_tf->tf_cs == GD_KT) {
-				print_trapframe(hw_tf);
-				panic("Damn Damn!  Unhandled trap in the kernel!");
+				handled = try_handle_exception_fixup(hw_tf);
+				if (!handled) {
+					print_trapframe(hw_tf);
+					panic("Damn Damn!  Unhandled trap in the kernel!");
+				}
 			} else {
 				handled = FALSE;
 			}
