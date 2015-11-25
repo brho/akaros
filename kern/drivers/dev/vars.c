@@ -439,3 +439,49 @@ struct dev vars_devtab __devtab = {
 	.chaninfo = devchaninfo,
 	.tapfd = 0,
 };
+
+/* The utest needs these variables exported */
+#ifdef CONFIG_DEVVARS_TEST
+
+static char *s = "string";
+static char c = 'x';
+static uint8_t  u8  = 8;
+static uint16_t u16 = 16;
+static uint32_t u32 = 32;
+static uint64_t u64 = 64;
+static uint8_t  d8  = -8;
+static uint16_t d16 = -16;
+static uint32_t d32 = -32;
+static uint64_t d64 = -64;
+static uint8_t  x8  = 0x8;
+static uint16_t x16 = 0x16;
+static uint32_t x32 = 0x32;
+static uint64_t x64 = 0x64;
+static uint8_t  o8  = 01;
+static uint16_t o16 = 016;
+static uint32_t o32 = 032;
+static uint64_t o64 = 064;
+
+/* For testing creation.  There is no ENTRY for this. */
+char *devvars_foobar = "foobar";
+
+DEVVARS_ENTRY(s, "s");
+DEVVARS_ENTRY(c, "c");
+DEVVARS_ENTRY(u8,  "ub");
+DEVVARS_ENTRY(u16, "uh");
+DEVVARS_ENTRY(u32, "uw");
+DEVVARS_ENTRY(u64, "ug");
+DEVVARS_ENTRY(d8,  "db");
+DEVVARS_ENTRY(d16, "dh");
+DEVVARS_ENTRY(d32, "dw");
+DEVVARS_ENTRY(d64, "dg");
+DEVVARS_ENTRY(x8,  "xb");
+DEVVARS_ENTRY(x16, "xh");
+DEVVARS_ENTRY(x32, "xw");
+DEVVARS_ENTRY(x64, "xg");
+DEVVARS_ENTRY(o8,  "ob");
+DEVVARS_ENTRY(o16, "oh");
+DEVVARS_ENTRY(o32, "ow");
+DEVVARS_ENTRY(o64, "og");
+
+#endif /* CONFIG_DEVVARS_TEST */

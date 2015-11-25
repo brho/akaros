@@ -10,3 +10,12 @@ config DEVVARS
 	default y
 	help
 		The #vars device exports read access to select kernel variables.
+
+config DEVVARS_TEST
+	bool "#vars test files"
+	depends on DEVVARS
+	default n
+	help
+		Have #vars include a collection of test files that devvars utest uses.
+		Say 'y' if you plan to use the utest, at the expense of having a
+		cluttered #vars.
