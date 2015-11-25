@@ -93,12 +93,11 @@ int mon_ps(int argc, char** argv, struct hw_trapframe *hw_tf)
 
 int mon_kerninfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-	extern char _start[], etext[], edata[], end[];
+	extern char _start[], etext[], end[];
 
 	cprintf("Special kernel symbols:\n");
 	cprintf("  _start %016x (virt)  %016x (phys)\n", _start, (uintptr_t)(_start - KERNBASE));
 	cprintf("  etext  %016x (virt)  %016x (phys)\n", etext, (uintptr_t)(etext - KERNBASE));
-	cprintf("  edata  %016x (virt)  %016x (phys)\n", edata, (uintptr_t)(edata - KERNBASE));
 	cprintf("  end    %016x (virt)  %016x (phys)\n", end, (uintptr_t)(end - KERNBASE));
 	cprintf("Kernel executable memory footprint: %dKB\n",
 		(uint32_t)(end-_start+1023)/1024);

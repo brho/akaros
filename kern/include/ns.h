@@ -70,9 +70,6 @@ static inline uint32_t getcallerpc(void *v)
 	return 0;
 }
 
-extern char etext[];
-extern char edata[];
-extern char end[];
 extern int getfields(char *unused_char_p_t, char **unused_char_pp_t,
 					 int unused_int, int, char *);
 extern int tokenize(char *unused_char_p_t, char **unused_char_pp_t, int);
