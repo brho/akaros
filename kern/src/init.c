@@ -119,9 +119,9 @@ static void extract_multiboot_cmdline(struct multiboot_info *mbi)
 
 void kernel_init(multiboot_info_t *mboot_info)
 {
-	extern char edata[], end[];
+	extern char __start_bss[], __stop_bss[];
 
-	memset(edata, 0, end - edata);
+	memset(__start_bss, 0, __stop_bss - __start_bss);
 	/* mboot_info is a physical address.  while some arches currently have the
 	 * lower memory mapped, everyone should have it mapped at kernbase by now.
 	 * also, it might be in 'free' memory, so once we start dynamically using

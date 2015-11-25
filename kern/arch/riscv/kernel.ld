@@ -53,8 +53,10 @@ SECTIONS
 	PROVIDE(edata = .);
 
 	.bss : {
+		PROVIDE(__start_bss = .);
 		*(.bss)
 		*(.sbss)
+		PROVIDE(__stop_bss = .);
 	}
 
 	PROVIDE(end = .);
