@@ -32,6 +32,19 @@ __BEGIN_DECLS
 		}                                                                        \
 	} while (0)
 
+
+/* If 'test' fails, Sets an assert message, which can be a format string, and
+ * returns false. */
+#define UT_ASSERT_FMT(message, test, ...)                                      \
+	do {                                                                       \
+		if (!(test)) {                                                         \
+			char fmt[] = "Assertion failure in %s() at %s:%d: " #message;      \
+			sprintf(utest_msg, fmt, __func__, __FILE__, __LINE__,              \
+			        ##__VA_ARGS__);                                            \
+			return false;                                                      \
+		}                                                                      \
+	} while (0)
+
 /*
  * Structs and macros for registering test cases.
  */
