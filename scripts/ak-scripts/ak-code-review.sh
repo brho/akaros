@@ -32,9 +32,8 @@ function gen_request()
 {
 	# Set some local variables
 	local base_sha1=$(git rev-parse ${base})
-	local head_sha1=$(git rev-parse ${head})
+	local head_sha1=${remote}:${head}
 	base_sha1=${base_sha1:0:7}
-	head_sha1=${head_sha1:0:7}
 
 	# Get the text from a git request-pull
     request=$(git request-pull ${patch} ${base} ${remote} ${head});
