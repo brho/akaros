@@ -316,13 +316,14 @@ static void archclose(struct chan *unused)
 static long archread(struct chan *c, void *a, long n, int64_t offset)
 {
 	char *buf, *p;
-	int port;
-	size_t nvalues;
+	int err, port;
 	uint64_t *values;
 	uint16_t *sp;
 	uint32_t *lp;
 	struct io_map *map;
 	struct core_set cset;
+	struct msr_address msra;
+	struct msr_value msrv;
 
 	switch ((uint32_t) c->qid.path) {
 		case Qdir:
@@ -362,22 +363,28 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 				error(EPERM, NULL);
 			core_set_init(&cset);
 			core_set_fill_available(&cset);
-			values = msr_cores_read(&cset, (uint32_t) offset, &nvalues);
-			if (likely(!IS_ERR(values))) {
-				if (n >= nvalues * sizeof(uint64_t)) {
-					if (memcpy_to_user_errno(current, a, values,
-											 nvalues * sizeof(uint64_t)))
-						n = -1;
-					else
-						n = nvalues * sizeof(uint64_t);
+			msr_init_address(&msra);
+			msr_set_address(&msra, (uint32_t) offset);
+			msr_init_value(&msrv);
+			values = kzmalloc(num_cores * sizeof(uint64_t), KMALLOC_WAIT);
+			if (!values)
+				error(ENOMEM, NULL);
+			msr_set_values(&msrv, values, num_cores);
+
+			err = msr_cores_read(&cset, &msra, &msrv);
+
+			n = -1;
+			if (likely(!err)) {
+				if (n >= num_cores * sizeof(uint64_t)) {
+					if (!memcpy_to_user_errno(current, a, values,
+											  num_cores * sizeof(uint64_t)))
+						n = num_cores * sizeof(uint64_t);
 				} else {
 					kfree(values);
 					error(ERANGE, NULL);
 				}
-				kfree(values);
-			} else {
-				error(-PTR_ERR(values), NULL);
 			}
+			kfree(values);
 			return n;
 		default:
 			error(EINVAL, NULL);
@@ -419,6 +426,8 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 	uint16_t *sp;
 	uint32_t *lp;
 	struct core_set cset;
+	struct msr_address msra;
+	struct msr_value msrv;
 
 	switch ((uint32_t) c->qid.path) {
 		case Qgdb:
@@ -458,13 +467,19 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 			if (!address_range_find(msr_wr_wlist, ARRAY_SIZE(msr_wr_wlist),
 									(uintptr_t) offset))
 				error(EPERM, NULL);
-			core_set_init(&cset);
-			core_set_fill_available(&cset);
 			if (n != sizeof(uint64_t))
 				error(EINVAL, NULL);
 			if (memcpy_from_user_errno(current, &value, a, sizeof(value)))
 				return -1;
-			err = msr_cores_write(&cset, (uint32_t) offset, value);
+
+			core_set_init(&cset);
+			core_set_fill_available(&cset);
+			msr_init_address(&msra);
+			msr_set_address(&msra, (uint32_t) offset);
+			msr_init_value(&msrv);
+			msr_set_value(&msrv, value);
+
+			err = msr_cores_write(&cset, &msra, &msrv);
 			if (unlikely(err))
 				error(-err, NULL);
 			return sizeof(uint64_t);
