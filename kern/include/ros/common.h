@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <stdbool.h>
+#include <string.h>
 
 typedef uintptr_t physaddr_t;
 typedef long intreg_t;
@@ -37,6 +38,8 @@ typedef unsigned long uintreg_t;
 #define is_defined__(comma, value) is_defined___(comma 1, 0)
 #define is_defined___(_, v, ...) v
 
+#define COUNT_OF(x) (sizeof((x))/sizeof((x)[0]))
+
 // Efficient min and max operations
 #ifdef ROS_KERNEL /* Glibc or other user libs have their own */
 #define MIN(_a, _b)						\
@@ -63,9 +66,11 @@ typedef unsigned long uintreg_t;
 /* Will return false for 0.  Debatable, based on what you want. */
 #define IS_PWR2(x) ((x) && !((x) & (x - 1)))
 
-#define ARRAY_SIZE(x) (sizeof((x))/sizeof((x)[0]))
+#define ARRAY_SIZE(x) COUNT_OF(x)
 
 #endif
+
+#define ZERO_DATA(s) memset(&(s), 0, sizeof(s))
 
 /* Rounding operations (efficient when n is a power of 2)
  * Round down to the nearest multiple of n.
