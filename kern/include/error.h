@@ -8,9 +8,9 @@ typedef int error_t;
 extern const char *const errno_strings[];
 extern const int MAX_ERRNO;
 
-#define ERR_PTR(err)  ((void *)((uintptr_t)(err)))
-#define PTR_ERR(ptr)  ((uintptr_t)(ptr))
-#define IS_ERR(ptr)   ((uintptr_t)-(uintptr_t)(ptr) <= MAX_ERRNO)
+#define ERR_PTR(err)  ((void *)((intptr_t)(err)))
+#define PTR_ERR(ptr)  ((intptr_t)(ptr))
+#define IS_ERR(ptr)   (-(intptr_t)(ptr) <= MAX_ERRNO)
 
 /* Plan9 wants to return non-const char* all over the place, so even if a const
  * char* would have made much more sense, unless we want to refactor a huge

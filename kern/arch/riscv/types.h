@@ -33,3 +33,4 @@ typedef int32_t uid_t;
 typedef int32_t gid_t;
 
 typedef unsigned long uintptr_t;
+typedef signed long intptr_t;
