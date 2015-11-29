@@ -7,6 +7,7 @@
  * in the LICENSE file.
  */
 
+#include <ros/memops.h>
 #include <vfs.h>
 #include <kmalloc.h>
 #include <kref.h>
@@ -14,19 +15,29 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
-#include <error.h>
+#include <err.h>
 #include <pmap.h>
 #include <umem.h>
 #include <smp.h>
 #include <ip.h>
 #include <time.h>
+#include <bitops.h>
 #include <core_set.h>
 #include <address_range.h>
+#include <arch/ros/perfmon.h>
+#include <arch/topology.h>
+#include <arch/perfmon.h>
 #include <arch/ros/msr-index.h>
 #include <arch/msr.h>
 #include <arch/devarch.h>
 
 #define REAL_MEM_SIZE (1024 * 1024)
+
+struct perf_context {
+	struct perfmon_session *ps;
+	size_t resp_size;
+	uint8_t *resp;
+};
 
 struct io_map {
 	struct io_map *next;
@@ -53,6 +64,7 @@ enum {
 	Qgdb,
 	Qrealmem,
 	Qmsr,
+	Qperf,
 
 	Qmax,
 };
@@ -71,22 +83,24 @@ static struct dirtab archdir[Qmax] = {
 	{"gdb", {Qgdb, 0}, 0, 0660},
 	{"realmem", {Qrealmem, 0}, 0, 0444},
 	{"msr", {Qmsr, 0}, 0, 0666},
+	{"perf", {Qperf, 0}, 0, 0666},
 };
 /* White list entries needs to be ordered by start address, and never overlap.
  */
-#define MAX_COUNTERS 16
-#define MAX_FIX_COUNTERS 4
+#define MSR_MAX_VAR_COUNTERS 16
+#define MSR_MAX_FIX_COUNTERS 4
 
 static const struct address_range msr_rd_wlist[] = {
 	ADDRESS_RANGE(0x00000000, 0xffffffff),
 };
 static const struct address_range msr_wr_wlist[] = {
-	ADDRESS_RANGE(MSR_IA32_PERFCTR0, MSR_IA32_PERFCTR0 + MAX_COUNTERS - 1),
+	ADDRESS_RANGE(MSR_IA32_PERFCTR0,
+				  MSR_IA32_PERFCTR0 + MSR_MAX_VAR_COUNTERS - 1),
 	ADDRESS_RANGE(MSR_ARCH_PERFMON_EVENTSEL0,
-				  MSR_ARCH_PERFMON_EVENTSEL0 + MAX_COUNTERS - 1),
+				  MSR_ARCH_PERFMON_EVENTSEL0 + MSR_MAX_VAR_COUNTERS - 1),
 	ADDRESS_RANGE(MSR_IA32_PERF_CTL, MSR_IA32_PERF_CTL),
 	ADDRESS_RANGE(MSR_CORE_PERF_FIXED_CTR0,
-				  MSR_CORE_PERF_FIXED_CTR0 + MAX_FIX_COUNTERS - 1),
+				  MSR_CORE_PERF_FIXED_CTR0 + MSR_MAX_FIX_COUNTERS - 1),
 	ADDRESS_RANGE(MSR_CORE_PERF_FIXED_CTR_CTRL, MSR_CORE_PERF_GLOBAL_OVF_CTRL),
 };
 int gdbactive = 0;
@@ -304,13 +318,181 @@ static int archstat(struct chan *c, uint8_t * dp, int n)
 	return devstat(c, dp, n, archdir, Qmax, devgen);
 }
 
-static struct chan *archopen(struct chan *c, int omode)
+static struct perf_context *arch_create_perf_context(void)
 {
-	return devopen(c, omode, archdir, Qmax, devgen);
+	ERRSTACK(1);
+	struct perf_context *pc = kzmalloc(sizeof(struct perf_context),
+									   KMALLOC_WAIT);
+
+	if (waserror()) {
+		kfree(pc);
+		nexterror();
+	}
+	pc->ps = perfmon_create_session();
+	poperror();
+
+	return pc;
 }
 
-static void archclose(struct chan *unused)
+static void arch_free_perf_context(struct perf_context *pc)
 {
+	if (likely(pc)) {
+		perfmon_close_session(pc->ps);
+		kfree(pc->resp);
+		kfree(pc);
+	}
+}
+
+static const uint8_t *arch_read_core_set(struct core_set *cset,
+										 const uint8_t *kptr,
+										 const uint8_t *ktop)
+{
+	int i, nb;
+	uint32_t n;
+
+	error_assert(EBADMSG, (kptr + sizeof(uint32_t)) <= ktop);
+	kptr = get_le_u32(kptr, &n);
+	error_assert(EBADMSG, (kptr + n) <= ktop);
+	core_set_init(cset);
+	nb = MIN((int) n * 8, num_cores);
+	for (i = 0; i < nb; i++) {
+		if (test_bit(i, (const unsigned long *) kptr))
+			core_set_setcpu(cset, i);
+	}
+
+	return kptr + n;
+}
+
+static long arch_perf_write(struct perf_context *pc, const void *udata,
+							long usize)
+{
+	ERRSTACK(1);
+	void *kdata;
+	const uint8_t *kptr, *ktop;
+
+	kfree(pc->resp);
+	pc->resp = NULL;
+	pc->resp_size = 0;
+
+	kdata = user_memdup_errno(current, udata, usize);
+	if (unlikely(!kdata))
+		return -1;
+	if (waserror()) {
+		kfree(kdata);
+		nexterror();
+	}
+	kptr = kdata;
+	ktop = kptr + usize;
+	error_assert(EBADMSG, (kptr + 1) <= ktop);
+	switch (*kptr++) {
+		case PERFMON_CMD_COUNTER_OPEN: {
+			int ped;
+			struct perfmon_event pev;
+			struct core_set cset;
+
+			error_assert(EBADMSG, (kptr + 3 * sizeof(uint64_t)) <= ktop);
+			perfmon_init_event(&pev);
+			kptr = get_le_u64(kptr, &pev.event);
+			kptr = get_le_u64(kptr, &pev.flags);
+			kptr = get_le_u64(kptr, &pev.trigger_count);
+			kptr = arch_read_core_set(&cset, kptr, ktop);
+
+			ped = perfmon_open_event(&cset, pc->ps, &pev);
+
+			pc->resp_size = sizeof(uint32_t);
+			pc->resp = kmalloc(pc->resp_size, KMALLOC_WAIT);
+			put_le_u32(pc->resp, (uint32_t) ped);
+			break;
+		}
+		case PERFMON_CMD_COUNTER_STATUS: {
+			int i;
+			uint32_t ped;
+			uint8_t *rptr;
+			uint64_t *mvalues;
+			struct perfmon_status *pef;
+
+			error_assert(EBADMSG, (kptr + sizeof(uint32_t)) <= ktop);
+			kptr = get_le_u32(kptr, &ped);
+
+			pef = perfmon_get_event_status(pc->ps, (int) ped);
+
+			mvalues = kzmalloc(num_cores * sizeof(mvalues), KMALLOC_WAIT);
+			for (i = 0; i < num_cores; i++)
+				mvalues[i] = pef->cores_values[i];
+
+			pc->resp_size = 3 * sizeof(uint64_t) + sizeof(uint32_t) +
+				num_cores * sizeof(uint64_t);
+			pc->resp = kmalloc(pc->resp_size, KMALLOC_WAIT);
+
+			rptr = put_le_u64(pc->resp, pef->ev.event);
+			rptr = put_le_u64(rptr, pef->ev.flags);
+			rptr = put_le_u64(rptr, pef->ev.trigger_count);
+			rptr = put_le_u32(rptr, num_cores);
+			for (i = 0; i < num_cores; i++)
+				rptr = put_le_u64(rptr, mvalues[i]);
+			kfree(mvalues);
+			perfmon_free_event_status(pef);
+			break;
+		}
+		case PERFMON_CMD_COUNTER_CLOSE: {
+			uint32_t ped;
+
+			error_assert(EBADMSG, (kptr + sizeof(uint32_t)) <= ktop);
+			kptr = get_le_u32(kptr, &ped);
+
+			perfmon_close_event(pc->ps, (int) ped);
+			break;
+		}
+		case PERFMON_CMD_CPU_CAPS: {
+			uint8_t *rptr;
+			struct perfmon_cpu_caps pcc;
+
+			kptr++;
+			perfmon_get_cpu_caps(&pcc);
+
+			pc->resp_size = 6 * sizeof(uint32_t);
+			pc->resp = kmalloc(pc->resp_size, KMALLOC_WAIT);
+
+			rptr = put_le_u32(pc->resp, pcc.perfmon_version);
+			rptr = put_le_u32(rptr, pcc.proc_arch_events);
+			rptr = put_le_u32(rptr, pcc.bits_x_counter);
+			rptr = put_le_u32(rptr, pcc.counters_x_proc);
+			rptr = put_le_u32(rptr, pcc.bits_x_fix_counter);
+			rptr = put_le_u32(rptr, pcc.fix_counters_x_proc);
+			break;
+		}
+		default:
+			error(EINVAL, "Invalid perfmon command: 0x%x", kptr[-1]);
+	}
+	poperror();
+	kfree(kdata);
+
+	return (long) (kptr - (const uint8_t *) kdata);
+}
+
+static struct chan *archopen(struct chan *c, int omode)
+{
+	c = devopen(c, omode, archdir, Qmax, devgen);
+	switch ((uint32_t) c->qid.path) {
+		case Qperf:
+			assert(!c->aux);
+			c->aux = arch_create_perf_context();
+			break;
+	}
+
+	return c;
+}
+
+static void archclose(struct chan *c)
+{
+	switch ((uint32_t) c->qid.path) {
+		case Qperf:
+			if (c->aux) {
+				arch_free_perf_context((struct perf_context *) c->aux);
+				c->aux = NULL;
+			}
+			break;
+	}
 }
 
 static long archread(struct chan *c, void *a, long n, int64_t offset)
@@ -363,9 +545,7 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 				error(EPERM, NULL);
 			core_set_init(&cset);
 			core_set_fill_available(&cset);
-			msr_init_address(&msra);
 			msr_set_address(&msra, (uint32_t) offset);
-			msr_init_value(&msrv);
 			values = kzmalloc(num_cores * sizeof(uint64_t), KMALLOC_WAIT);
 			if (!values)
 				error(ENOMEM, NULL);
@@ -373,19 +553,36 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 
 			err = msr_cores_read(&cset, &msra, &msrv);
 
-			n = -1;
 			if (likely(!err)) {
 				if (n >= num_cores * sizeof(uint64_t)) {
 					if (!memcpy_to_user_errno(current, a, values,
 											  num_cores * sizeof(uint64_t)))
 						n = num_cores * sizeof(uint64_t);
+					else
+						n = -1;
 				} else {
 					kfree(values);
 					error(ERANGE, NULL);
 				}
+			} else {
+				n = -1;
 			}
 			kfree(values);
 			return n;
+		case Qperf: {
+			struct perf_context *pc = (struct perf_context *) c->aux;
+
+			assert(pc);
+			if (pc->resp && ((size_t) offset < pc->resp_size)) {
+				n = MIN(n, (long) pc->resp_size - (long) offset);
+				if (memcpy_to_user_errno(current, a, pc->resp + offset, n))
+					n = -1;
+			} else {
+				n = 0;
+			}
+
+			return n;
+		}
 		default:
 			error(EINVAL, NULL);
 	}
@@ -474,15 +671,20 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 
 			core_set_init(&cset);
 			core_set_fill_available(&cset);
-			msr_init_address(&msra);
 			msr_set_address(&msra, (uint32_t) offset);
-			msr_init_value(&msrv);
 			msr_set_value(&msrv, value);
 
 			err = msr_cores_write(&cset, &msra, &msrv);
 			if (unlikely(err))
 				error(-err, NULL);
 			return sizeof(uint64_t);
+		case Qperf: {
+			struct perf_context *pc = (struct perf_context *) c->aux;
+
+			assert(pc);
+
+			return arch_perf_write(pc, a, n);
+		}
 		default:
 			error(EINVAL, NULL);
 	}
