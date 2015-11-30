@@ -34,3 +34,12 @@ void *kreallocarray(void *optr, size_t nmemb, size_t size, int flags)
 	}
 	return krealloc(optr, size * nmemb, flags);
 }
+
+void *kmalloc_array(size_t nmemb, size_t size, int flags)
+{
+	if (((nmemb >= MUL_NO_OVERFLOW) || (size >= MUL_NO_OVERFLOW)) &&
+	    (nmemb > 0) && ((SIZE_MAX / nmemb) < size)) {
+		return NULL;
+	}
+	return kmalloc(size * nmemb, flags);
+}

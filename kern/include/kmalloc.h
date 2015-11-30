@@ -16,8 +16,9 @@
 #define KMALLOC_LARGEST KMALLOC_SMALLEST << NUM_KMALLOC_CACHES
 
 void kmalloc_init(void);
-void* kmalloc(size_t size, int flags);
-void* kzmalloc(size_t size, int flags);
+void *kmalloc(size_t size, int flags);
+void *kmalloc_array(size_t nmemb, size_t size, int flags);
+void *kzmalloc(size_t size, int flags);
 void *kmalloc_align(size_t size, int flags, size_t align);
 void *kzmalloc_align(size_t size, int flags, size_t align);
 void *krealloc(void *buf, size_t size, int flags);
