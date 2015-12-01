@@ -416,10 +416,6 @@ void profiler_control_trace(int onoff)
 		 * we let profiler_is_tracing() to perform it at the next timer tick.
 		 */
 		cpu_buf->tracing = onoff ? 1 : -1;
-		if (onoff)
-			printk("Enable tracing on %d\n", core);
-		else
-			printk("Disable tracing on %d\n", core);
 	}
 }
 
