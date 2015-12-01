@@ -25,10 +25,8 @@ the events that trigger a sample, such as a timer tick, then you start and stop
 the profiling.  The distinction between the two steps is that one actually
 fires the events (e.g. the timer IRQ), and the other enables *collection*
 of profiling info when those events occur.
-
-The timer command takes the core id (or "all"), followed by "on" or "off".
-As with all good devices, if you echo garbage, in, you should get the usage as
-an errstr.  That'll be kept up to date more than documentation.
+Aside from timer based sampling, the Akaros `perf` tool allows to sample by
+catching performance counter overflows.
 The profiler accepts a few configuration options.
 There is a queue size limit of 64MB by default, and it is used as circular
 buffer, so old data will be dropped.
@@ -37,37 +35,135 @@ To change its value:
 / $ echo prof_qlimit SIZE_KB > /prof/kpctl
 
 This should be run before starting the profiler.
-There is a limit of the maximum call strace dept, by default 16.
-To change it:
 
-/ $ echo prof_btdepth DEPTH > /prof/kpctl
-
-This should be run before starting the profiler as well.
 It is possible to configure the timer period, which defaults to 1000us, though
 it is not suggested to move too far from the default:
 
 / $ echo timer period 1000 > /prof/kpctl
 
+
+                    Timer Base Profiling
+
+The timer command takes the core id (or "all"), followed by "on" or "off".
+As with all good devices, if you echo garbage, in, you should get the usage as
+an errstr.  That'll be kept up to date more than documentation.
+
+For profiling, besides the counters overflow sampling handled by the `perf`
+utility, you need to enable timers:
+
+/ $ echo timer all on > /prof/kpctl
+
 And then start the Akaros profiler system-wide.
 
 / $ echo start > /prof/kpctl
-Enable tracing on 0
-Enable tracing on 1
-Enable tracing on 2
-Enable tracing on 3
-Enable tracing on 4
-Enable tracing on 5
-Enable tracing on 6
-Enable tracing on 7
 
-Run whatever command you want, then stop the profiler.
+Run whatever command you want the sampling to be based on, then stop timers
+and profiler:
 
-/ $ foo
+/ $ my_test_program ...
+/ $ echo timer all off > /prof/kpctl
 / $ echo stop > /prof/kpctl
 
 The trace will be then available in the /prof/kpdata file.
 The data will be available until the next start of the profiler.
-Then copy this on your dev box.
+
+
+                    Akaros Perf Tool
+
+The Akaros `perf` is a tool which allows to both programming and reading
+the CPU performance counters, and enabling counter overflow interrupt based
+tracing.
+Its help screen reads like:
+
+Use: perf {list,cpucaps,record} [-mkecxh] -- CMD [ARGS ...]
+        list            Lists all the available events and their meaning.
+        cpucaps         Shows the system CPU capabilities in term of performance counters.
+        record           Setups the configured counters, runs CMD, and shows the values of the counters.
+Options:
+        -m PATH          Sets the path of the PERF file ('#arch/perf').
+        -k PATH          Sets the path of the KPROF control file ('/prof/kpctl').
+        -e EVENT_SPEC    Adds an event to be tracked.
+        -c CPUS_STR      Selects the CPU set on which the counters should be active.
+        -x EVENT_RX      Sets the event name regular expression for list.
+        -h               Displays this help screen.
+
+To list the counters available for sampling, you can run the following command
+(note, it might be a very long output):
+
+/ $ perf list
+
+Or, if you have some hint of what you are looking for (example, "FLUSH"), you
+can run:
+
+/ $ perf list -x FLUSH
+
+The -x parameter accepts regular expression syntax.
+To get information about how many counters, and their bit size, are available in
+the system, you can run:
+
+/ $ perf cpucaps
+
+Which produces an output like:
+
+PERF.version             = 2
+PERF.proc_arch_events    = 7
+PERF.bits_x_counter      = 48
+PERF.counters_x_proc     = 4
+PERF.bits_x_fix_counter  = 48
+PERF.fix_counters_x_proc = 3
+
+You need to specify the list of CPUs where the counters will be active, and the
+CMD passed as `perf` parameter will be run onto.
+The format of the CPUS_STR is as follow:
+
+  [[!]{all,I[.J]+,N-M}][:...]
+
+Where:
+  all    = Enable all CPUs
+  llall  = Enable all low latency CPUs
+  I.J.K  = Enable CPUs I, J, and K
+  N-M    = Enable CPUs from N to M, included
+
+Examples:
+  0.2.4:8-19
+  all:!2.4.8
+
+Setting up an event, either for simple reading, or for sampling, requires
+providing the event coordinates (of which, the output emitted by the commands
+above, will help).
+The event coordinates come as event ID and event mask couple.
+They can either be specified by numeric values (example, 0xbd:0x20), or by
+their name (TLB_FLUSH:STLB_ANY).
+The format of the -e event specification is as follow:
+
+  {EVENT_ID:MASK,EVENT_NAME:MASK_NAME}[,os[={0,1}]][,usr[={0,1}]]
+    [,int[={0,1}]][,invcmsk[={0,1}]][,cmask=MASK][,icount=COUNT]
+
+With the following meaning:
+
+  os     = Should the counter tick when in ring 0 (default 1)
+  usr    = Should the counter tick when in ring 1,2,3 (default 1)
+  int    = Should counter overflow interrupt based sampling be enabled (default 0)
+  icount = After how many increments in the counter value, the sampling
+           interrupt should trigger (default 0 - not allowed if int==1)
+
+After the double hyphen (--), follow the command, and its arguments, to be
+executed while the sampling is happening.
+In most cases this could simply be a `sleep` (embedded perf command).
+Example:
+
+/ $ perf record -e TLB_FLUSH:STLB_ANY,int=1,icount=20 -- sleep 10
+
+When the command run by `perf` exits, the configured counter values are shown.
+If used as counter overflow interrupt sampling, the tracing data will be in
+the usual /prof/kpdata file.
+
+
+
+                    Analyzing Profiler Data
+
+The profiler tracing data generated in the /prof/kpdata file, needs to be copied
+on your dev box.
 The easiest way is via 9p:
 
 / $ cp /prof/kpdata /mnt/

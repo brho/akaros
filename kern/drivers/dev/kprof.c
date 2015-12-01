@@ -146,20 +146,15 @@ static void kprof_start_profiler(void)
 	if (!kprof.profiling) {
 		profiler_setup();
 		if (waserror()) {
+			kprof.profiling = FALSE;
 			profiler_cleanup();
 			nexterror();
 		}
-
 		profiler_control_trace(1);
-
-		for (int i = 0; i < num_cores; i++)
-			kprof_enable_timer(i, 1);
-
 		kprof.profiling = TRUE;
-
 		kprof_profdata_clear();
+		poperror();
 	}
-	poperror();
 	poperror();
 	qunlock(&kprof.lock);
 }
@@ -192,8 +187,6 @@ static void kprof_stop_profiler(void)
 		nexterror();
 	}
 	if (kprof.profiling) {
-		for (int i = 0; i < num_cores; i++)
-			kprof_enable_timer(i, 0);
 		profiler_control_trace(0);
 		kprof_fetch_profiler_data();
 		profiler_cleanup();
