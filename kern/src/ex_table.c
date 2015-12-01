@@ -10,12 +10,13 @@
  * ruled by the overall Linux copyright.
  */
 
-#include <ex_table.h>
 #include <arch/uaccess.h>
+#include <compiler.h>
 #include <sort.h>
+#include <ex_table.h>
 
-extern struct extable_ip_fixup __start___ex_table;
-extern struct extable_ip_fixup __stop___ex_table;
+extern struct extable_ip_fixup __attribute__((weak)) __start___ex_table[];
+extern struct extable_ip_fixup __attribute__((weak)) __stop___ex_table[];
 
 static int fixup_cmp(const void *f1, const void *f2)
 {
@@ -25,48 +26,48 @@ static int fixup_cmp(const void *f1, const void *f2)
 
 void exception_table_init(void)
 {
-	struct extable_ip_fixup *first = &__start___ex_table;
-	struct extable_ip_fixup *last = &__stop___ex_table;
-	uint64_t offset = 0;
+	if (__start___ex_table) {
+		struct extable_ip_fixup *first = __start___ex_table;
+		struct extable_ip_fixup *last = __stop___ex_table;
+		uint64_t offset = 0;
 
-	for (struct extable_ip_fixup *fx = first; fx < last; fx++) {
-		fx->insn += offset;
-		offset += sizeof(fx->insn);
-		fx->fixup += offset;
-		offset += sizeof(fx->fixup);
+		for (struct extable_ip_fixup *fx = first; fx < last; fx++) {
+			fx->insn += offset;
+			offset += sizeof(fx->insn);
+			fx->fixup += offset;
+			offset += sizeof(fx->fixup);
+		}
+
+		sort(first, last - first, sizeof(*first), fixup_cmp);
+
+		offset = 0;
+		for (struct extable_ip_fixup *fx = first; fx < last; fx++) {
+			fx->insn -= offset;
+			offset += sizeof(fx->insn);
+			fx->fixup -= offset;
+			offset += sizeof(fx->fixup);
+		}
 	}
-
-	sort(first, last - first, sizeof(*first), fixup_cmp);
-
-	offset = 0;
-	for (struct extable_ip_fixup *fx = first; fx < last; fx++) {
-		fx->insn -= offset;
-		offset += sizeof(fx->insn);
-		fx->fixup -= offset;
-		offset += sizeof(fx->fixup);
-	}
-
-	/* Avoid undefined __start___ex_table and __stop___ex_table errors when
-	 * no code is using the exception table facility.
-	 */
-	_ASM_EXTABLE_INIT();
 }
 
 uintptr_t get_fixup_ip(uintptr_t xip)
 {
-	const struct extable_ip_fixup *first = &__start___ex_table;
-	const struct extable_ip_fixup *last = &__stop___ex_table;
+	const struct extable_ip_fixup *first = __start___ex_table;
 
-	while (first <= last) {
-		const struct extable_ip_fixup *x = first + ((last - first) >> 1);
-		uintptr_t insn = ex_insn_addr(x);
+	if (likely(first)) {
+		const struct extable_ip_fixup *last = __stop___ex_table;
 
-		if (insn < xip)
-			first = x + 1;
-		else if (insn > xip)
-			last = x - 1;
-		else
-			return (uintptr_t) ex_fixup_addr(x);
+		while (first <= last) {
+			const struct extable_ip_fixup *x = first + ((last - first) >> 1);
+			uintptr_t insn = ex_insn_addr(x);
+
+			if (insn < xip)
+				first = x + 1;
+			else if (insn > xip)
+				last = x - 1;
+			else
+				return (uintptr_t) ex_fixup_addr(x);
+		}
 	}
 
 	return 0;

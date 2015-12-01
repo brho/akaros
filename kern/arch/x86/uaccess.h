@@ -26,13 +26,6 @@ struct extable_ip_fixup {
 	uint64_t fixup;
 };
 
-#define _ASM_EXTABLE_INIT()										\
-	asm volatile(												\
-	" .pushsection \"__ex_table\",\"a\"\n"						\
-	" .balign 16\n"												\
-	" .popsection\n"											\
-	: :)
-
 #define _ASM_EXTABLE(from, to)									\
 	" .pushsection \"__ex_table\",\"a\"\n"						\
 	" .balign 16\n"												\
