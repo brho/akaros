@@ -108,14 +108,25 @@ static inline void x86_set_stacktop_tss(struct taskstate *tss, uintptr_t top)
 	tss->ts_rsp0 = top;
 }
 
+/* Keep tf_padding0 in sync with trapentry64.S */
 static inline bool x86_hwtf_is_partial(struct hw_trapframe *tf)
 {
-	return FALSE;
+	return tf->tf_padding0 == 1;
 }
 
 static inline bool x86_swtf_is_partial(struct sw_trapframe *tf)
 {
-	return FALSE;
+	return tf->tf_padding0 == 1;
+}
+
+static inline void x86_hwtf_clear_partial(struct hw_trapframe *tf)
+{
+	tf->tf_padding0 = 0;
+}
+
+static inline void x86_swtf_clear_partial(struct sw_trapframe *tf)
+{
+	tf->tf_padding0 = 0;
 }
 
 static inline bool arch_ctx_is_partial(struct user_context *ctx)
@@ -129,14 +140,39 @@ static inline bool arch_ctx_is_partial(struct user_context *ctx)
 	return FALSE;
 }
 
+/* Partial contexts for HW and SW TFs have the user's gs in MSR_KERNEL_GS_BASE.
+ * The kernel's gs is loaded into gs.  We need to put the kernel's gs into
+ * KERNEL_GS_BASE so the core is ready to run another full context, save the
+ * user's {GS,FS}_BASE into their TF so it can run on another core, and keep GS
+ * loaded with the current GS (the kernel's). */
+static inline void x86_finalize_hwtf(struct hw_trapframe *tf)
+{
+	tf->tf_gsbase = read_msr(MSR_KERNEL_GS_BASE);
+	write_msr(MSR_KERNEL_GS_BASE, read_msr(MSR_GS_BASE));
+	tf->tf_fsbase = read_msr(MSR_FS_BASE);
+	x86_hwtf_clear_partial(tf);
+}
+
+static inline void x86_finalize_swtf(struct sw_trapframe *tf)
+{
+	tf->tf_gsbase = read_msr(MSR_KERNEL_GS_BASE);
+	write_msr(MSR_KERNEL_GS_BASE, read_msr(MSR_GS_BASE));
+	tf->tf_fsbase = read_msr(MSR_FS_BASE);
+	x86_swtf_clear_partial(tf);
+}
+
 /* Makes sure that the user context is fully saved into ctx and not split across
  * the struct and HW, meaning it is not a "partial context". */
 static inline void arch_finalize_ctx(struct user_context *ctx)
 {
+	if (!arch_ctx_is_partial(ctx))
+		return;
 	switch (ctx->type) {
 	case (ROS_HW_CTX):
+		x86_finalize_hwtf(&ctx->tf.hw_tf);
 		break;
 	case (ROS_SW_CTX):
+		x86_finalize_swtf(&ctx->tf.sw_tf);
 		break;
 	}
 }

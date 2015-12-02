@@ -33,7 +33,9 @@ void print_trapframe(struct hw_trapframe *hw_tf)
 	 * nuts when we print/panic */
 	pcpui->__lock_checking_enabled--;
 	spin_lock_irqsave(&ptf_lock);
-	printk("HW TRAP frame at %p on core %d\n", hw_tf, core_id());
+	printk("HW TRAP frame %sat %p on core %d\n",
+	       x86_hwtf_is_partial(hw_tf) ? "(partial) " : "",
+	       hw_tf, core_id());
 	printk("  rax  0x%016lx\n",           hw_tf->tf_rax);
 	printk("  rbx  0x%016lx\n",           hw_tf->tf_rbx);
 	printk("  rcx  0x%016lx\n",           hw_tf->tf_rcx);
@@ -79,7 +81,9 @@ void print_swtrapframe(struct sw_trapframe *sw_tf)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	pcpui->__lock_checking_enabled--;
 	spin_lock_irqsave(&ptf_lock);
-	printk("SW TRAP frame at %p on core %d\n", sw_tf, core_id());
+	printk("SW TRAP frame %sat %p on core %d\n",
+	       x86_swtf_is_partial(sw_tf) ? "(partial) " : "",
+	       sw_tf, core_id());
 	printk("  rbx  0x%016lx\n",           sw_tf->tf_rbx);
 	printk("  rbp  0x%016lx\n",           sw_tf->tf_rbp);
 	printk("  r12  0x%016lx\n",           sw_tf->tf_r12);

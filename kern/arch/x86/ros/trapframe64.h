@@ -23,20 +23,20 @@ struct hw_trapframe {
 	uint64_t tf_r14;
 	uint64_t tf_r15;
 	uint32_t tf_trapno;
-	uint32_t tf_padding5;
+	uint32_t tf_padding5;		/* used in trap reflection */
 	/* below here defined by x86 hardware (error code optional) */
 	uint32_t tf_err;
-	uint32_t tf_padding4;
+	uint32_t tf_padding4;		/* used in trap reflection */
 	uint64_t tf_rip;
 	uint16_t tf_cs;
-	uint16_t tf_padding3;
+	uint16_t tf_padding3;		/* used in trap reflection */
 	uint32_t tf_padding2;
 	uint64_t tf_rflags;
 	/* unlike 32 bit, SS:RSP is always pushed, even when not changing rings */
 	uint64_t tf_rsp;
 	uint16_t tf_ss;
 	uint16_t tf_padding1;
-	uint32_t tf_padding0;
+	uint32_t tf_padding0;		/* used for partial contexts */
 };
 
 struct sw_trapframe {
@@ -52,5 +52,5 @@ struct sw_trapframe {
 	uint64_t tf_rsp;
 	uint32_t tf_mxcsr;
 	uint16_t tf_fpucw;
-	uint16_t tf_padding0;
+	uint16_t tf_padding0;		/* used for partial contexts */
 };
