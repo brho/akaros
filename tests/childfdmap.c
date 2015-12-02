@@ -59,7 +59,8 @@ int main(int argc, char *argv[])
 	child_argv[1] = "1"; /* dummy arg, signal so we know they're the child */
 	child_argv[2] = 0;
 
-	kid = sys_proc_create(filename, strlen(filename), child_argv, NULL, 0);
+	kid = sys_proc_create(filename, strlen(filename),
+						  (const char * const *) child_argv, NULL, 0);
 	if (kid < 0) {
 		perror("create failed");
 		exit(1);

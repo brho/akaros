@@ -8,7 +8,9 @@
 
 int main(int argc, char **argv, char **envp)
 {
-	struct serialized_data *sd = serialize_argv_envp(argv, envp);
+	struct serialized_data *sd =
+		serialize_argv_envp((const char * const *) argv,
+							(const char * const *) envp);
 	size_t *kargc = (size_t*)sd->buf;
 	size_t *kenvc = (size_t*)(sd->buf + sizeof(size_t));
 	char **kargv = (char**)(sd->buf + 2*sizeof(size_t));

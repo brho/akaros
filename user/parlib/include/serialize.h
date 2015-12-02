@@ -10,6 +10,6 @@ struct serialized_data {
 	size_t len;
 	char buf[];
 };
-extern struct serialized_data* serialize_argv_envp(char* const* argv,
-                                                   char* const* envp);
-extern void free_serialized_data(struct serialized_data* sd);
+extern struct serialized_data *serialize_argv_envp(const char * const *argv,
+                                                   const char * const *envp);
+extern void free_serialized_data(struct serialized_data *sd);
