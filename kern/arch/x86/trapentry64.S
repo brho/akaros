@@ -350,7 +350,6 @@ trap_tbl_end:
 .text
 _alltraps:
 	cld
-	swapgs			# harmless if we were already in the kernel
 	pushq %r15
 	pushq %r14
 	pushq %r13
@@ -367,32 +366,14 @@ _alltraps:
 	pushq %rbx
 	pushq %rax
 	cmpw $GD_KT, 0x90(%rsp)	# 0x90 - diff btw tf_cs and tf_rax
-	je trap_kernel_tf
-	# this is a user TF, so we need to save their fs/gsbase and load gs base for
-	# the kernel.
-	movl $MSR_FS_BASE, %ecx
-	rdmsr
-	shl $32, %rdx
-	orq %rax, %rdx
-	pushq %rdx
-	# because we swapped gs earlier, the user GS is now in KERN_GS_BASE
-	movl $MSR_KERN_GS_BASE, %ecx
-	rdmsr
-	shl $32, %rdx
-	orq %rax, %rdx
-	pushq %rdx
-	# make sure the kernel's gs base is loaded into the KERN slot at all times
-	movl $MSR_GS_BASE, %ecx
-	rdmsr
-	movl $MSR_KERN_GS_BASE, %ecx
-	wrmsr
-	jmp trap_all_tf
-trap_kernel_tf:
-	# we don't muck with fs/gsbase, push placeholders
-	movq $0xdeadbeef, %rax
-	pushq %rax
-	pushq %rax
+	je trap_all_tf
+	# this is a user TF.  we need to swapgs to get the kernel's gs and mark the
+	# context as partial
+	swapgs					# user's GS is now in MSR_KERNEL_GS_BASE
+	movl $0x1, 0xac(%rsp)	# 0xac - diff btw tf_padding0 and tf_rax
 trap_all_tf:
+	pushq $0				# fsbase space
+	pushq $0				# gsbase space
 	movq $0, %rbp			# so we can backtrace to this point
 	movq %rsp, %rdi
 	call trap
@@ -419,7 +400,6 @@ trap_all_tf:
 # might merge this with _alltraps
 _allirqs:
 	cld
-	swapgs			# harmless if we were already in the kernel
 	pushq %r15
 	pushq %r14
 	pushq %r13
@@ -436,32 +416,14 @@ _allirqs:
 	pushq %rbx
 	pushq %rax
 	cmpw $GD_KT, 0x90(%rsp)	# 0x90 - diff btw tf_cs and tf_rax
-	je irq_kernel_tf
-	# this is a user TF, so we need to save their fs/gsbase and load gs base for
-	# the kernel.
-	movl $MSR_FS_BASE, %ecx
-	rdmsr
-	shl $32, %rdx
-	orq %rax, %rdx
-	pushq %rdx
-	# because we swapped gs earlier, the user GS is now in KERN_GS_BASE
-	movl $MSR_KERN_GS_BASE, %ecx
-	rdmsr
-	shl $32, %rdx
-	orq %rax, %rdx
-	pushq %rdx
-	# make sure the kernel's gs base is loaded into the KERN slot at all times
-	movl $MSR_GS_BASE, %ecx
-	rdmsr
-	movl $MSR_KERN_GS_BASE, %ecx
-	wrmsr
-	jmp irq_all_tf
-irq_kernel_tf:
-	# we don't muck with fs/gsbase, push placeholders
-	movq $0xdeadbeef, %rax
-	pushq %rax
-	pushq %rax
+	je irq_all_tf
+	# this is a user TF.  we need to swapgs to get the kernel's gs and mark the
+	# context as partial
+	swapgs					# user's GS is now in MSR_KERNEL_GS_BASE
+	movl $0x1, 0xac(%rsp)	# 0xac - diff btw tf_padding0 and tf_rax
 irq_all_tf:
+	pushq $0				# fsbase space
+	pushq $0				# gsbase space
 	movq $0, %rbp			# so we can backtrace to this point
 	movq %rsp, %rdi
 	call handle_irq
@@ -515,11 +477,12 @@ fastcall_pop:
 normal_syscall:
 #endif
 	# cld is handled by the SFMASK
-	swapgs
+	swapgs					# user's GS is now in MSR_KERNEL_GS_BASE
 	movq %gs:0, %rsp
 	# Saving the FPU callee-saved state for now.  Might be able to have the
 	# preempt handler deal with it.
-	pushq $0			# space for mxcsr and fpucw
+	pushq $0				# space for mxcsr, fpucw, and padding0
+	movw $0x1, 0x6(%rsp)	# tf_padding0 = 1, partial context
 	fnstcw 0x4(%rsp)
 	stmxcsr (%rsp)
 	pushq %rdx			# rsp, saved by userspace
@@ -530,23 +493,8 @@ normal_syscall:
 	pushq %r12
 	pushq %rbp
 	pushq %rbx
-	# save fs and gs base
-	movl $MSR_FS_BASE, %ecx
-	rdmsr
-	shl $32, %rdx
-	orq %rax, %rdx
-	pushq %rdx
-	# because we swapped gs earlier, the user GS is now in KERN_GS_BASE
-	movl $MSR_KERN_GS_BASE, %ecx
-	rdmsr
-	shl $32, %rdx
-	orq %rax, %rdx
-	pushq %rdx
-	# make sure the kernel's gs base is loaded into the KERN slot at all times
-	movl $MSR_GS_BASE, %ecx
-	rdmsr
-	movl $MSR_KERN_GS_BASE, %ecx
-	wrmsr
+	pushq $0			# fsbase space
+	pushq $0			# gsbase space
 	movq $0, %rbp			# so we can backtrace to this point
 	movq %rsp, %rdx
 	# arg0, rdi: struct sysc*.  arg1, rsi: count.  arg2, rdx: sw_tf
