@@ -126,13 +126,13 @@ void mlx4_cq_event(struct mlx4_dev *dev, uint32_t cqn, int event_type)
 	struct mlx4_cq_table *cq_table = &mlx4_priv(dev)->cq_table;
 	struct mlx4_cq *cq;
 
-	spin_lock(&cq_table->lock);
+	spin_lock_irqsave(&cq_table->lock);
 
 	cq = radix_tree_lookup(&cq_table->tree, cqn & (dev->caps.num_cqs - 1));
 	if (cq)
 		atomic_inc(&cq->refcount);
 
-	spin_unlock(&cq_table->lock);
+	spin_unlock_irqsave(&cq_table->lock);
 
 	if (!cq) {
 		mlx4_warn(dev, "Async event for bogus CQ %08x\n", cqn);
