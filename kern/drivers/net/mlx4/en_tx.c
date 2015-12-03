@@ -830,6 +830,12 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct ether *dev)
 
 	/* Prepare ctrl segement apart opcode+ownership */
 	tx_desc->ctrl.srcrb_flags = priv->ctrl_flags;
+	if (likely(block->flag & BCKSUM_FLAGS)) {
+		if (block->flag & Bipck)
+			tx_desc->ctrl.srcrb_flags |= cpu_to_be32(MLX4_WQE_CTRL_IP_CSUM);
+		if (block->flag & (Budpck | Btcpck))
+			tx_desc->ctrl.srcrb_flags |= cpu_to_be32(MLX4_WQE_CTRL_TCP_UDP_CSUM);
+	}
 
 	if (priv->flags & MLX4_EN_FLAG_ENABLE_HW_LOOPBACK) {
 		struct ethhdr *ethh;
