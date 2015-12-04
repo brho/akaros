@@ -240,9 +240,6 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	int err;
 
-	/* safe to reenable after rcr2 */
-	enable_irq();
-
 	if (!pcpui->cur_proc) {
 		if (try_handle_exception_fixup(hw_tf))
 			return TRUE;
@@ -262,6 +259,8 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 	 * Also consider turning on IRQs globally while we call HPF. */
 	if (in_kernel(hw_tf))
 		pcpui->__lock_checking_enabled--;
+	/* safe to reenable after rcr2 and after disabling lock checking */
+	enable_irq();
 	err = handle_page_fault(pcpui->cur_proc, fault_va, prot);
 	if (in_kernel(hw_tf))
 		pcpui->__lock_checking_enabled++;
