@@ -413,6 +413,7 @@ void __mcs_pdr_lock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 			 * so they can hand us the lock. */
 			if (vcore_is_preempted(pred_vcoreid) ||
 			    seq != __procinfo.coremap_seqctr) {
+				/* Note that we don't normally ensure our *pred* runs. */
 				if (lock->lockholder_vcoreid == MCSPDR_NO_LOCKHOLDER ||
 				    lock->lockholder_vcoreid == vcore_id())
 					ensure_vcore_runs(pred_vcoreid);
@@ -451,7 +452,13 @@ void __mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 		while (qnode->next == 0) {
 			/* We need to get our next to run, but we don't know who they are.
 			 * If we make sure a tail is running, that will percolate up to make
-			 * sure our qnode->next is running */
+			 * sure our qnode->next is running.
+			 *
+			 * But first, we need to tell everyone that there is no specific
+			 * lockholder.  lockholder_vcoreid is a short-circuit on the "walk
+			 * the chain" PDR.  Normally, that's okay.  But now we need to make
+			 * sure everyone is walking the chain from a_tail up to our pred. */
+			lock->lockholder_vcoreid = MCSPDR_NO_LOCKHOLDER;
 			ensure_vcore_runs(a_tail_vcoreid);
 			cpu_relax();
 		}
