@@ -366,16 +366,18 @@ void sem_down(struct semaphore *sem)
 #endif /* CONFIG_KTHREAD_POISON */
 	/* Kthreads that are ktasks are not related to any process, and do not need
 	 * to work in a process's address space.  They can operate in any address
-	 * space that has the kernel mapped (like boot_pgdir, or any pgdir).
+	 * space that has the kernel mapped (like boot_pgdir, or any pgdir).  Some
+	 * ktasks may switch_to, at which point they do care about the address
+	 * space and must maintain a reference.
 	 *
-	 * Other kthreads need to stay in the process context (if there is one), but
-	 * we want the core (which could be a vcore) to stay in the context too.  In
-	 * the future, we could check owning_proc. If it isn't set, we could leave
-	 * the process context and transfer the refcnt to kthread->proc. */
-	if (!is_ktask(kthread)) {
+	 * Normal kthreads need to stay in the process context, but we want the core
+	 * (which could be a vcore) to stay in the context too. */
+	if (kthread->flags & KTH_SAVE_ADDR_SPACE) {
 		kthread->proc = current;
-		if (kthread->proc)	/* still could be none, like during init */
-			proc_incref(kthread->proc, 1);
+		assert(kthread->proc);
+		/* In the future, we could check owning_proc. If it isn't set, we could
+		 * clear current and transfer the refcnt to kthread->proc. */
+		proc_incref(kthread->proc, 1);
 	} else {
 		kthread->proc = 0;
 	} 
