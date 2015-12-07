@@ -335,17 +335,16 @@ void sem_down(struct semaphore *sem)
 		new_kthread = pcpui->spare;
 		new_stacktop = new_kthread->stacktop;
 		pcpui->spare = 0;
-		/* Based on how we set KTH_IS_KTASK (in PRKM), we'll usually have a
-		 * spare with KTH_IS_KTASK set, even though the default setting is off.
-		 * The reason is that the launching of blocked kthreads also uses PRKM,
-		 * and that KMSG (__launch_kthread) doesn't return.  Thus the soon-to-be
-		 * spare kthread, that is launching another, has flags & KTH_IS_KTASK
-		 * set. */
-		new_kthread->flags = 0;
+		/* The old flags could have KTH_IS_KTASK set.  The reason is that the
+		 * launching of blocked kthreads also uses PRKM, and that KMSG
+		 * (__launch_kthread) doesn't return.  Thus the soon-to-be spare
+		 * kthread, that is launching another, has flags & KTH_IS_KTASK set. */
+		new_kthread->flags = KTH_DEFAULT_FLAGS;
 		new_kthread->proc = 0;
 		new_kthread->name = 0;
 	} else {
 		new_kthread = __kthread_zalloc();
+		new_kthread->flags = KTH_DEFAULT_FLAGS;
 		new_stacktop = get_kstack();
 		new_kthread->stacktop = new_stacktop;
 #ifdef CONFIG_KTHREAD_POISON

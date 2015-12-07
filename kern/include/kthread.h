@@ -27,6 +27,8 @@ TAILQ_HEAD(semaphore_tailq, semaphore);
 #define GENBUF_SZ 128	/* plan9 uses this as a scratch space, per syscall */
 
 #define KTH_IS_KTASK			(1 << 0)
+#define KTH_KTASK_FLAGS			(KTH_IS_KTASK)
+#define KTH_DEFAULT_FLAGS (0)
 
 /* This captures the essence of a kernel context that we want to suspend.  When
  * a kthread is running, we make sure its stacktop is the default kernel stack,

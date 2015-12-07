@@ -61,8 +61,9 @@ static void try_run_proc(void)
 static void __attribute__((noinline, noreturn)) __smp_idle(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
 	clear_rkmsg(pcpui);
-	pcpui->cur_kthread->flags &= ~KTH_IS_KTASK;
+	pcpui->cur_kthread->flags = KTH_DEFAULT_FLAGS;
 	enable_irq();	/* one-shot change to get any IRQs before we halt later */
 	while (1) {
 		disable_irq();
@@ -109,7 +110,7 @@ void smp_percpu_init(void)
 	/* Treat the startup threads as ktasks.  This will last until smp_idle when
 	 * they clear it, either in anticipation of being a user-backing kthread or
 	 * to handle an RKM. */
-	kthread->flags |= KTH_IS_KTASK;
+	kthread->flags = KTH_KTASK_FLAGS;
 	per_cpu_info[coreid].spare = 0;
 	/* Init relevant lists */
 	spinlock_init_irqsave(&per_cpu_info[coreid].immed_amsg_lock);
