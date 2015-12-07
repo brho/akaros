@@ -790,7 +790,7 @@ static int __abort_all_sysc(struct proc *p,
 	struct cv_lookup_elm *cle;
 	int8_t irq_state = 0;
 	struct cv_lookup_tailq abortall_list;
-	struct proc *old_proc = switch_to(p);
+	uintptr_t old_proc = switch_to(p);
 	int ret = 0;
 	/* Concerns: we need to not remove them from their original list, since
 	 * concurrent wake ups will cause a dereg, which will remove from the list.

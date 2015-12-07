@@ -712,7 +712,7 @@ static int sys_change_vcore(struct proc *p, uint32_t vcoreid,
 
 static ssize_t sys_fork(env_t* e)
 {
-	struct proc *temp;
+	uintptr_t temp;
 	int8_t state = 0;
 	int ret;
 
@@ -2724,7 +2724,7 @@ bool syscall_uses_fd(struct syscall *sysc, int fd)
 
 void print_sysc(struct proc *p, struct syscall *sysc)
 {
-	struct proc *old_p = switch_to(p);
+	uintptr_t old_p = switch_to(p);
 	printk("SYS_%d, flags %p, a0 %p, a1 %p, a2 %p, a3 %p, a4 %p, a5 %p\n",
 	       sysc->num, atomic_read(&sysc->flags),
 	       sysc->arg0, sysc->arg1, sysc->arg2, sysc->arg3, sysc->arg4,

@@ -1335,7 +1335,7 @@ void print_chaninfo(struct chan *c)
 int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 {
 	
-	struct proc *old_current;
+	uintptr_t old_current;
 	struct kref *new_dot_ref;
 	ERRSTACK(1);
 	if (waserror()) {

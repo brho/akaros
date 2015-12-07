@@ -1058,7 +1058,8 @@ bool test_ucq(void)
 	void send_msgs(struct alarm_waiter *waiter)
 	{
 		struct timer_chain *tchain;
-		struct proc *old_proc, *p = waiter->data;
+		struct proc *p = waiter->data;
+		uintptr_t old_proc;
 		struct ucq *ucq = (struct ucq*)USTACKTOP;
 		struct event_msg msg;
 

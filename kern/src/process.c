@@ -1791,14 +1791,14 @@ void clear_owning_proc(uint32_t coreid)
 
 /* Switches to the address space/context of new_p, doing nothing if we are
  * already in new_p.  This won't add extra refcnts or anything, and needs to be
- * paired with switch_back() at the end of whatever function you are in.  Don't
- * migrate cores in the middle of a pair.  Specifically, the uncounted refs are
- * one for the old_proc, which is passed back to the caller, and new_p is
- * getting placed in cur_proc. */
-struct proc *switch_to(struct proc *new_p)
+ * paired with switch_back() at the end of whatever function you are in.
+ * Specifically, the uncounted refs are one for the old_proc, which is passed
+ * back to the caller, and new_p is getting placed in cur_proc. */
+uintptr_t switch_to(struct proc *new_p)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct proc *old_proc;
+
 	old_proc = pcpui->cur_proc;					/* uncounted ref */
 	/* If we aren't the proc already, then switch to it */
 	if (old_proc != new_p) {
@@ -1808,14 +1808,16 @@ struct proc *switch_to(struct proc *new_p)
 		else
 			lcr3(boot_cr3);
 	}
-	return old_proc;
+	return (uintptr_t)old_proc;
 }
 
-/* This switches back to old_proc from new_p.  Pair it with switch_to(), and
- * pass in its return value for old_proc. */
-void switch_back(struct proc *new_p, struct proc *old_proc)
+/* This switches back from new_p to the original process.  Pair it with
+ * switch_to(), and pass in its return value for old_ret. */
+void switch_back(struct proc *new_p, uintptr_t old_ret)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct proc *old_proc = (struct proc*)old_ret;
+
 	if (old_proc != new_p) {
 		pcpui->cur_proc = old_proc;
 		if (old_proc)

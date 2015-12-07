@@ -134,7 +134,7 @@ error_addr:
 void print_ucq(struct proc *p, struct ucq *ucq)
 {
 	struct ucq_page *ucq_pg;
-	struct proc *old_proc = switch_to(p);
+	uintptr_t old_proc = switch_to(p);
 
 	printk("UCQ %p\n", ucq);
 	printk("prod_idx: %p, cons_idx: %p\n", atomic_read(&ucq->prod_idx),

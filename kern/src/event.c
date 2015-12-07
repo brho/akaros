@@ -362,8 +362,9 @@ static void send_indir(struct proc *p, struct event_queue *ev_q,
 void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
                 uint32_t vcoreid)
 {
-	struct proc *old_proc;
+	uintptr_t old_proc;
 	struct event_mbox *ev_mbox = 0;
+
 	assert(!in_irq_ctx(&per_cpu_info[core_id()]));
 	assert(p);
 	if (p->state == PROC_DYING)
@@ -482,7 +483,8 @@ void post_vcore_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid,
 {
 	/* Need to set p as current to post the event */
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	struct proc *old_proc = switch_to(p);
+	uintptr_t old_proc = switch_to(p);
+
 	/* *ev_mbox is the user address of the vcpd mbox */
 	post_vc_msg(p, vcoreid, get_vcpd_mbox(vcoreid, ev_flags), msg, ev_flags);
 	switch_back(p, old_proc);

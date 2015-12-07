@@ -2328,9 +2328,10 @@ void file_release(struct kref *kref)
 ssize_t kread_file(struct file *file, void *buf, size_t sz)
 {
 	/* TODO: (KFOP) (VFS kernel read/writes need to have no proc current) */
-	struct proc *old_proc = switch_to(0);
+	uintptr_t old_proc = switch_to(0);
 	off64_t dummy = 0;
 	ssize_t cpy_amt = file->f_op->read(file, buf, sz, &dummy);
+
 	switch_back(0, old_proc);
 	return cpy_amt;
 }

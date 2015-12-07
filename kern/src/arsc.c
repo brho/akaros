@@ -83,7 +83,7 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 	size_t count = 0;
 	syscall_back_ring_t* sysbr = &p->syscallbackring;
 	struct per_cpu_info* pcpui = &per_cpu_info[core_id()];
-	struct proc *old_proc;
+	uintptr_t old_proc;
 	// looking at a process not initialized to perform arsc. 
 	if (sysbr == NULL) 
 		return count;

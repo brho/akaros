@@ -21,7 +21,7 @@ bool is_valid_elf(struct file *f)
 {
 	elf64_t h;
 	off64_t o = 0;
-	struct proc *c = switch_to(0);
+	uintptr_t c = switch_to(0);
 
 	if (f->f_op->read(f, (char*)&h, sizeof(elf64_t), &o) != sizeof(elf64_t)) {
 		goto fail;
@@ -148,7 +148,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pg_num,
 	
 	/* When reading on behalf of the kernel, we need to make sure no proc is
 	 * "current".  This is a bit ghetto (TODO: KFOP) */
-	struct proc *old_proc = switch_to(0);
+	uintptr_t old_proc = switch_to(0);
 
 	/* Read in ELF header. */
 	elf64_t elfhdr_storage;

@@ -54,7 +54,7 @@ static int string_copy_to_user(char *dst, const char *src)
 
 int strcpy_from_user(struct proc *p, char *dst, const char *src)
 {
-	struct proc *prev = switch_to(p);
+	uintptr_t prev = switch_to(p);
 	int error = string_copy_from_user(dst, src);
 
 	switch_back(p, prev);
@@ -64,7 +64,7 @@ int strcpy_from_user(struct proc *p, char *dst, const char *src)
 
 int strcpy_to_user(struct proc *p, char *dst, const char *src)
 {
-	struct proc *prev = switch_to(p);
+	uintptr_t prev = switch_to(p);
 	int error = string_copy_to_user(dst, src);
 
 	switch_back(p, prev);
@@ -74,7 +74,7 @@ int strcpy_to_user(struct proc *p, char *dst, const char *src)
 
 int memcpy_from_user(struct proc *p, void *dest, const void *va, size_t len)
 {
-	struct proc *prev = switch_to(p);
+	uintptr_t prev = switch_to(p);
 	int error = copy_from_user(dest, va, len);
 
 	switch_back(p, prev);
@@ -84,7 +84,7 @@ int memcpy_from_user(struct proc *p, void *dest, const void *va, size_t len)
 
 int memcpy_to_user(struct proc *p, void *dest, const void *src, size_t len)
 {
-	struct proc *prev = switch_to(p);
+	uintptr_t prev = switch_to(p);
 	int error = copy_to_user(dest, src, len);
 
 	switch_back(p, prev);
