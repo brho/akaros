@@ -290,13 +290,9 @@ static bool __schedule_scp(void)
 	struct proc *p;
 	uint32_t pcoreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[pcoreid];
-	int8_t state = 0;
 	/* if there are any runnables, run them here and put any currently running
 	 * SCP on the tail of the runnable queue. */
 	if ((p = TAILQ_FIRST(&runnable_scps))) {
-		/* protect owning proc, cur_ctx, etc.  note this nests with the
-		 * calls in proc_yield_s */
-		disable_irqsave(&state);
 		/* someone is currently running, dequeue them */
 		if (pcpui->owning_proc) {
 			spin_lock(&pcpui->owning_proc->proc_lock);
@@ -306,7 +302,6 @@ static bool __schedule_scp(void)
 				send_kernel_message(core_id(), __just_sched, 0, 0, 0,
 				                    KMSG_ROUTINE);
 				spin_unlock(&pcpui->owning_proc->proc_lock);
-				enable_irqsave(&state);
 				return FALSE;
 			}
 			printd("Descheduled %d in favor of %d\n", pcpui->owning_proc->pid,
@@ -335,7 +330,6 @@ static bool __schedule_scp(void)
 		switch_lists(p, &runnable_scps, &unrunnable_scps);
 		printd("PID of the SCP i'm running: %d\n", p->pid);
 		proc_run_s(p);	/* gives it core we're running on */
-		enable_irqsave(&state);
 		return TRUE;
 	}
 	return FALSE;

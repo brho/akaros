@@ -713,7 +713,6 @@ static int sys_change_vcore(struct proc *p, uint32_t vcoreid,
 static ssize_t sys_fork(env_t* e)
 {
 	uintptr_t temp;
-	int8_t state = 0;
 	int ret;
 
 	// TODO: right now we only support fork for single-core processes
@@ -727,17 +726,14 @@ static ssize_t sys_fork(env_t* e)
 	assert(env != NULL);
 	proc_set_progname(env, e->progname);
 
-	disable_irqsave(&state);	/* protect cur_ctx */
 	/* Can't really fork if we don't have a current_ctx to fork */
 	if (!current_ctx) {
-		enable_irqsave(&state);
 		proc_destroy(env);
 		proc_decref(env);
 		set_errno(EINVAL);
 		return -1;
 	}
 	copy_current_ctx_to(&env->scp_ctx);
-	enable_irqsave(&state);
 
 	env->cache_colors_map = cache_colors_map_alloc();
 	for (int i = 0; i < llc_cache->num_colors; i++)
@@ -799,7 +795,6 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	char *t_path = NULL;
 	struct file *program;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	int8_t state = 0;
 	int argc, envc;
 	char **argv, **envp;
 	struct argenv *kargenv;
@@ -814,11 +809,9 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 		return -1;
 	}
 
-	disable_irqsave(&state);	/* protect cur_ctx */
 	/* Can't exec if we don't have a current_ctx to restart (if we fail).  This
 	 * isn't 100% true, but I'm okay with it. */
 	if (!pcpui->cur_ctx) {
-		enable_irqsave(&state);
 		set_errno(EINVAL);
 		return -1;
 	}
@@ -833,7 +826,6 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	 * Note that we will 'hard block' if we block at all.  We can't return to
 	 * userspace and then asynchronously finish the exec later. */
 	clear_owning_proc(core_id());
-	enable_irqsave(&state);
 
 	/* Check the size of the argenv array, error out if too large. */
 	if ((argenv_l < sizeof(struct argenv)) || (argenv_l > ARG_MAX)) {
