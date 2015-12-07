@@ -886,3 +886,30 @@ bool should_abort(struct cv_lookup_elm *cle)
 		return TRUE;
 	return FALSE;
 }
+
+/* Sometimes the kernel needs to switch out of process context and into a
+ * 'process-less' kernel thread.  This is basically a ktask.  We use this mostly
+ * when performing file ops as the kernel.  It's nasty, and all uses of this
+ * probably should be removed.  (TODO: KFOP). */
+uintptr_t switch_to_ktask(void)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct kthread *kth = pcpui->cur_kthread;
+
+	if (is_ktask(kth))
+		return 0;
+	/* We leave the SAVE_ADDR_SPACE flag on.  Now we're basically a ktask that
+	 * cares about its addr space, since we need to return to it (not that we're
+	 * leaving). */
+	kth->flags |= KTH_IS_KTASK;
+	return 1;
+}
+
+void switch_back_from_ktask(uintptr_t old_ret)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct kthread *kth = pcpui->cur_kthread;
+
+	if (old_ret)
+		kth->flags &= ~KTH_IS_KTASK;
+}

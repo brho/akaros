@@ -153,6 +153,9 @@ void __reg_abortable_cv(struct cv_lookup_elm *cle, struct cond_var *cv);
 void dereg_abortable_cv(struct cv_lookup_elm *cle);
 bool should_abort(struct cv_lookup_elm *cle);
 
+uintptr_t switch_to_ktask(void);
+void switch_back_from_ktask(uintptr_t old_ret);
+
 /* qlocks are plan9's binary sempahore, which are wrappers around our sems.
  * Not sure if they'll need irqsave or normal sems. */
 typedef struct semaphore qlock_t;

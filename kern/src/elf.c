@@ -21,7 +21,7 @@ bool is_valid_elf(struct file *f)
 {
 	elf64_t h;
 	off64_t o = 0;
-	uintptr_t c = switch_to(0);
+	uintptr_t c = switch_to_ktask();
 
 	if (f->f_op->read(f, (char*)&h, sizeof(elf64_t), &o) != sizeof(elf64_t)) {
 		goto fail;
@@ -30,10 +30,10 @@ bool is_valid_elf(struct file *f)
 		goto fail;
 	}
 success:
-	switch_back(0, c);
+	switch_back_from_ktask(c);
 	return TRUE;
 fail:
-	switch_back(0, c);
+	switch_back_from_ktask(c);
 	return FALSE;
 }
 
@@ -146,9 +146,9 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pg_num,
 	void* phdrs = 0;
 	int mm_perms, mm_flags = MAP_FIXED;
 	
-	/* When reading on behalf of the kernel, we need to make sure no proc is
-	 * "current".  This is a bit ghetto (TODO: KFOP) */
-	uintptr_t old_proc = switch_to(0);
+	/* When reading on behalf of the kernel, we need to switch to a ktask so
+	 * the VFS (and maybe other places) know. (TODO: KFOP) */
+	uintptr_t old_ret = switch_to_ktask();
 
 	/* Read in ELF header. */
 	elf64_t elfhdr_storage;
@@ -350,7 +350,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pg_num,
 fail:
 	if (phdrs)
 		kfree(phdrs);
-	switch_back(0, old_proc);
+	switch_back_from_ktask(old_ret);
 	return ret;
 }
 
