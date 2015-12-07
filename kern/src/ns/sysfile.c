@@ -1335,7 +1335,6 @@ void print_chaninfo(struct chan *c)
 int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 {
 	
-	uintptr_t old_current;
 	struct kref *new_dot_ref;
 	ERRSTACK(1);
 	if (waserror()) {
@@ -1345,17 +1344,11 @@ int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 	}
 	if (!parent) {
 		/* We are probably spawned by the kernel directly, and have no parent to
-		 * inherit from.
-		 *
-		 * TODO: One problem is namec wants a current set for things like
-		 * genbuf.  So we'll use new_proc for this bootstrapping.  Note
-		 * switch_to() also loads the cr3. */
+		 * inherit from. */
 		new_proc->pgrp = newpgrp();
-		old_current = switch_to(new_proc);
 		new_proc->slash = namec("#root", Atodir, 0, 0);
 		if (!new_proc->slash)
 			panic("no root device");
-		switch_back(new_proc, old_current);
 		/* Want the name to be "/" instead of "#root" */
 		cnameclose(new_proc->slash->name);
 		new_proc->slash->name = newcname("/");
