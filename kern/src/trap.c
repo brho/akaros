@@ -238,7 +238,7 @@ void process_routine_kmsg(void)
 		 * it's not running on behalf of a process, and we're actually spawning
 		 * a kernel task.  While we do have a syscall that does work in an RKM
 		 * (change_to), it's not really the rest of the syscall context. */
-		pcpui->cur_kthread->is_ktask = TRUE;
+		pcpui->cur_kthread->flags |= KTH_IS_KTASK;
 		pcpui_trace_kmsg(pcpui, (uintptr_t)msg_cp.pc);
 		msg_cp.pc(msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
 		/* And if we make it back, be sure to unset this.  If we never return,
@@ -247,8 +247,8 @@ void process_routine_kmsg(void)
 		 * an example of an RKM that does this, check out the
 		 * monitor->mon_bin_run.  Finally, if the kthread gets swapped out of
 		 * pcpui, such as in __launch_kthread(), the next time the kthread is
-		 * reused, is_ktask will be reset. */
-		pcpui->cur_kthread->is_ktask = FALSE;
+		 * reused, KTH_IS_KTASK will be reset. */
+		pcpui->cur_kthread->flags &= ~KTH_IS_KTASK;
 		/* If we aren't still in early RKM, it is because the KMSG blocked
 		 * (thus leaving early RKM, finishing in default context) and then
 		 * returned.  This is a 'detached' RKM.  Must idle in this scenario,

@@ -207,7 +207,7 @@ static void __ktask_wrapper(uint32_t srcid, long a0, long a1, long a2)
 	void *arg = (void*)a1;
 	char *name = (char*)a2;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	assert(pcpui->cur_kthread->is_ktask);
+	assert(is_ktask(pcpui->cur_kthread));
 	pcpui->cur_kthread->name = name;
 	/* There are some rendezs out there that aren't wrapped.  Though no one can
 	 * abort them.  Yet. */
@@ -335,12 +335,13 @@ void sem_down(struct semaphore *sem)
 		new_kthread = pcpui->spare;
 		new_stacktop = new_kthread->stacktop;
 		pcpui->spare = 0;
-		/* Based on how we set is_ktask (in PRKM), we'll usually have a spare
-		 * with is_ktask set, even though the default setting is off.  The
-		 * reason is that the launching of blocked kthreads also uses PRKM, and
-		 * that KMSG (__launch_kthread) doesn't return.  Thus the soon-to-be
-		 * spare kthread, that is launching another, has is_ktask set. */
-		new_kthread->is_ktask = FALSE;
+		/* Based on how we set KTH_IS_KTASK (in PRKM), we'll usually have a
+		 * spare with KTH_IS_KTASK set, even though the default setting is off.
+		 * The reason is that the launching of blocked kthreads also uses PRKM,
+		 * and that KMSG (__launch_kthread) doesn't return.  Thus the soon-to-be
+		 * spare kthread, that is launching another, has flags & KTH_IS_KTASK
+		 * set. */
+		new_kthread->flags = 0;
 		new_kthread->proc = 0;
 		new_kthread->name = 0;
 	} else {
@@ -372,7 +373,7 @@ void sem_down(struct semaphore *sem)
 	 * we want the core (which could be a vcore) to stay in the context too.  In
 	 * the future, we could check owning_proc. If it isn't set, we could leave
 	 * the process context and transfer the refcnt to kthread->proc. */
-	if (!kthread->is_ktask) {
+	if (!is_ktask(kthread)) {
 		kthread->proc = current;
 		if (kthread->proc)	/* still could be none, like during init */
 			proc_incref(kthread->proc, 1);
@@ -840,7 +841,7 @@ void __reg_abortable_cv(struct cv_lookup_elm *cle, struct cond_var *cv)
 	cle->cv = cv;
 	cle->kthread = pcpui->cur_kthread;
 	/* Could be a ktask.  Can build in support for aborting these later */
-	if (cle->kthread->is_ktask) {
+	if (is_ktask(cle->kthread)) {
 		cle->sysc = 0;
 		return;
 	}
@@ -860,7 +861,7 @@ void __reg_abortable_cv(struct cv_lookup_elm *cle, struct cond_var *cv)
  * CV lock.  So if we hold the CV lock, we can deadlock (circular dependency).*/
 void dereg_abortable_cv(struct cv_lookup_elm *cle)
 {
-	if (cle->kthread->is_ktask)
+	if (is_ktask(cle->kthread))
 		return;
 	assert(cle->proc);
 	spin_lock_irqsave(&cle->proc->abort_list_lock);
@@ -876,7 +877,7 @@ void dereg_abortable_cv(struct cv_lookup_elm *cle)
  * this with things for ktasks in the future. */
 bool should_abort(struct cv_lookup_elm *cle)
 {
-	if (cle->kthread->is_ktask)
+	if (is_ktask(cle->kthread))
 		return FALSE;
 	if (cle->proc && (cle->proc->state == PROC_DYING))
 		return TRUE;

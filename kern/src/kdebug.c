@@ -110,7 +110,7 @@ static void __print_hdr(void)
 		printk("IRQ       :");
 	} else {
 		assert(pcpui->cur_kthread);
-		if (pcpui->cur_kthread->is_ktask) {
+		if (is_ktask(pcpui->cur_kthread)) {
 			printk("%10s:", pcpui->cur_kthread->name);
 		} else {
 			printk("PID %3d   :", pcpui->cur_proc ? pcpui->cur_proc->pid : 0);
