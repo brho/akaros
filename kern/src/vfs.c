@@ -1250,16 +1250,12 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
 		error = pm_load_page(file->f_mapping, i, &page);
 		assert(!error);	/* TODO: handle ENOMEM and friends */
 		copy_amt = MIN(PGSIZE - page_off, buf_end - buf);
-		/* TODO: (UMEM) think about this.  if it's a user buffer, we're relying
-		 * on current to detect whose it is (which should work for async calls).
-		 * Also, need to propagate errors properly...  Probably should do a
-		 * user_mem_check, then free, and also to make a distinction between
-		 * when the kernel wants a read/write (TODO: KFOP) */
-		if (current) {
+		/* TODO: (KFOP) Probably shouldn't do this.  Either memcpy directly, or
+		 * split out the is_user_r(w)addr from copy_{to,from}_user() */
+		if (!is_ktask(per_cpu_info[core_id()].cur_kthread))
 			memcpy_to_user(current, buf, page2kva(page) + page_off, copy_amt);
-		} else {
+		else
 			memcpy(buf, page2kva(page) + page_off, copy_amt);
-		}
 		buf += copy_amt;
 		page_off = 0;
 		pm_put_page(page);	/* it's still in the cache, we just don't need it */
@@ -1323,14 +1319,11 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
 		error = pm_load_page(file->f_mapping, i, &page);
 		assert(!error);	/* TODO: handle ENOMEM and friends */
 		copy_amt = MIN(PGSIZE - page_off, buf_end - buf);
-		/* TODO: (UMEM) (KFOP) think about this.  if it's a user buffer, we're
-		 * relying on current to detect whose it is (which should work for async
-		 * calls). */
-		if (current) {
+		/* TODO: (UMEM) (KFOP) think about this. */
+		if (!is_ktask(per_cpu_info[core_id()].cur_kthread))
 			memcpy_from_user(current, page2kva(page) + page_off, buf, copy_amt);
-		} else {
+		else
 			memcpy(page2kva(page) + page_off, buf, copy_amt);
-		}
 		buf += copy_amt;
 		page_off = 0;
 		atomic_or(&page->pg_flags, PG_DIRTY);
@@ -1377,11 +1370,10 @@ ssize_t generic_dir_read(struct file *file, char *u_buf, size_t count,
 		}
 		/* Slight info exposure: could be extra crap after the name in the
 		 * dirent (like the name of a deleted file) */
-		if (current) {
+		if (!is_ktask(per_cpu_info[core_id()].cur_kthread))
 			memcpy_to_user(current, u_buf, dirent, sizeof(struct dirent));
-		} else {
+		else
 			memcpy(u_buf, dirent, sizeof(struct dirent));
-		}
 		amt_copied += sizeof(struct dirent);
 		/* 0 signals end of directory */
 		if (retval == 0)
