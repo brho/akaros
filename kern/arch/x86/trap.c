@@ -262,6 +262,7 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 	/* safe to reenable after rcr2 and after disabling lock checking */
 	enable_irq();
 	err = handle_page_fault(pcpui->cur_proc, fault_va, prot);
+	disable_irq();
 	if (in_kernel(hw_tf))
 		pcpui->__lock_checking_enabled++;
 	if (err) {
@@ -330,6 +331,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 		case T_BRKPT:
 			enable_irq();
 			monitor(hw_tf);
+			disable_irq();
 			break;
 		case T_ILLOP:
 		{
@@ -357,6 +359,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			}
 			enable_irq();
 			monitor(hw_tf);
+			disable_irq();
 			pcpui->__lock_checking_enabled++;		/* for print debugging */
 			break;
 		}
@@ -377,6 +380,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			prep_syscalls(current,
 			              (struct syscall*)x86_get_systrap_arg0(hw_tf),
 						  (unsigned int)x86_get_systrap_arg1(hw_tf));
+			disable_irq();
 			break;
 		default:
 			if (hw_tf->tf_cs == GD_KT) {
@@ -638,9 +642,10 @@ void sysenter_callwrapper(struct syscall *sysc, unsigned long count,
 	 * mandatory (we had immediate KMSGs that would muck with cur_ctx).  Now it
 	 * should only help for sanity/debugging. */
 	enable_irq();
-	/* Set up and run the async calls */
+	/* Set up and run the async calls.  This may block, and we could migrate to
+	 * another core.  If you use pcpui again, you need to reread it. */
 	prep_syscalls(current, sysc, count);
-	/* If you use pcpui again, reread it, since you might have migrated */
+	disable_irq();
 	proc_restartcore();
 }
 
