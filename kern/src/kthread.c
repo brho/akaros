@@ -872,7 +872,6 @@ void __reg_abortable_cv(struct cv_lookup_elm *cle, struct cond_var *cv)
 		return;
 	}
 	cle->sysc = cle->kthread->sysc;
-	assert(cle->sysc);
 	cle->proc = pcpui->cur_proc;
 	atomic_init(&cle->abort_in_progress, 0);
 	spin_lock_irqsave(&cle->proc->abort_list_lock);
