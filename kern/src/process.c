@@ -767,16 +767,8 @@ void __proc_startcore(struct proc *p, struct user_context *ctx)
 void proc_restartcore(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
 	assert(!pcpui->cur_kthread->sysc);
-	/* TODO: can probably remove this enable_irq.  it was an optimization for
-	 * RKMs */
-	/* Try and get any interrupts before we pop back to userspace.  If we didn't
-	 * do this, we'd just get them in userspace, but this might save us some
-	 * effort/overhead. */
-	enable_irq();
-	/* Need ints disabled when we return from PRKM (race on missing
-	 * messages/IPIs) */
-	disable_irq();
 	process_routine_kmsg();
 	/* If there is no owning process, just idle, since we don't know what to do.
 	 * This could be because the process had been restarted a long time ago and

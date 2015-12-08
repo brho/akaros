@@ -130,8 +130,8 @@ static inline void cpu_relax(void)
 	__cpu_relax();
 }
 
-/* This doesn't atomically enable interrupts and then halt, like we want, so
- * x86 needs to use a custom helper in the irq handler in trap.c. */
+/* This atomically enables interrupts and halts.  sti does not take effect until
+ * after the *next* instruction */
 static inline void cpu_halt(void)
 {
 	asm volatile("sti; hlt" : : : "memory");

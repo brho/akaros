@@ -430,24 +430,6 @@ static void set_current_ctx_sw(struct per_cpu_info *pcpui,
 	pcpui->cur_ctx = &pcpui->actual_ctx;
 }
 
-/* If the interrupt interrupted a halt, we advance past it.  Made to work with
- * x86's custom cpu_halt() in arch/arch.h.  Note this nearly never gets called.
- * I needed to insert exactly one 'nop' in cpu_halt() (that isn't there now) to
- * get the interrupt to trip on the hlt, o/w the hlt will execute before the
- * interrupt arrives (even with a pending interrupt that should hit right after
- * an interrupt_enable (sti)).  This was on the i7. */
-static void abort_halt(struct hw_trapframe *hw_tf)
-{
-	/* Don't care about user TFs.  Incidentally, dereferencing user EIPs is
-	 * reading userspace memory, which can be dangerous.  It can page fault,
-	 * like immediately after a fork (which doesn't populate the pages). */
-	if (!in_kernel(hw_tf))
-		return;
-	/* the halt instruction in is 0xf4, and it's size is 1 byte */
-	if (*(uint8_t*)x86_get_ip_hw(hw_tf) == 0xf4)
-		x86_advance_ip(hw_tf, 1);
-}
-
 void trap(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
@@ -502,8 +484,6 @@ void handle_irq(struct hw_trapframe *hw_tf)
 	if (!in_irq_ctx(pcpui))
 		__set_cpu_state(pcpui, CPU_STATE_IRQ);
 	inc_irq_depth(pcpui);
-	/* Coupled with cpu_halt() and smp_idle() */
-	abort_halt(hw_tf);
 	//if (core_id())
 	if (hw_tf->tf_trapno != IdtLAPIC_TIMER)	/* timer irq */
 	if (hw_tf->tf_trapno != I_KERNEL_MSG)
