@@ -31,7 +31,8 @@ void *debug_canary;
 
 /* Flags to pass to kmalloc */
 /* Not implemented yet. Block until it is available. */
-#define KMALLOC_WAIT			4
+#define KMALLOC_WAIT			(1 << 2)
+#define KMALLOC_ERROR			(1 << 3)
 
 /* Kmalloc tag flags looks like this:
  *

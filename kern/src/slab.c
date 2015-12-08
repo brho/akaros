@@ -15,13 +15,14 @@
 #include <stdio.h>
 #include <assert.h>
 #include <pmap.h>
+#include <kmalloc.h>
 
 struct kmem_cache_list kmem_caches;
 spinlock_t kmem_caches_lock;
 
 /* Backend/internal functions, defined later.  Grab the lock before calling
  * these. */
-static void kmem_cache_grow(struct kmem_cache *cp);
+static bool kmem_cache_grow(struct kmem_cache *cp);
 
 /* Cache of the kmem_cache objects, needed for bootstrapping */
 struct kmem_cache kmem_cache_cache;
@@ -161,9 +162,15 @@ void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
 	struct kmem_slab *a_slab = TAILQ_FIRST(&cp->partial_slab_list);
 	// 	if none, go to empty list and get an empty and make it partial
 	if (!a_slab) {
-		if (TAILQ_EMPTY(&cp->empty_slab_list))
-			// TODO: think about non-sleeping flags
-			kmem_cache_grow(cp);
+		// TODO: think about non-sleeping flags
+		if (TAILQ_EMPTY(&cp->empty_slab_list) &&
+			!kmem_cache_grow(cp)) {
+			spin_unlock_irqsave(&cp->cache_lock);
+			if (flags & KMALLOC_ERROR)
+				error(ENOMEM, NULL);
+			else
+				panic("[German Accent]: OOM for a small slab growth!!!");
+		}
 		// move to partial list
 		a_slab = TAILQ_FIRST(&cp->empty_slab_list);
 		TAILQ_REMOVE(&cp->empty_slab_list, a_slab, link);
@@ -242,15 +249,16 @@ void kmem_cache_free(struct kmem_cache *cp, void *buf)
  * Grab the cache lock before calling this.
  *
  * TODO: think about page colouring issues with kernel memory allocation. */
-static void kmem_cache_grow(struct kmem_cache *cp)
+static bool kmem_cache_grow(struct kmem_cache *cp)
 {
 	struct kmem_slab *a_slab;
 	struct kmem_bufctl *a_bufctl;
 	if (cp->obj_size <= SLAB_LARGE_CUTOFF) {
 		// Just get a single page for small slabs
 		page_t *a_page;
+
 		if (kpage_alloc(&a_page))
-			panic("[German Accent]: OOM for a small slab growth!!!");
+			return FALSE;
 		// the slab struct is stored at the end of the page
 		a_slab = (struct kmem_slab*)(page2kva(a_page) + PGSIZE -
 		                             sizeof(struct kmem_slab));
@@ -274,6 +282,8 @@ static void kmem_cache_grow(struct kmem_cache *cp)
 		*((uintptr_t**)(buf + cp->obj_size)) = NULL;
 	} else {
 		a_slab = kmem_cache_alloc(kmem_slab_cache, 0);
+		if (!a_slab)
+			return FALSE;
 		// TODO: hash table for back reference (BUF)
 		a_slab->obj_size = ROUNDUP(cp->obj_size + sizeof(uintptr_t), cp->align);
 		/* Figure out how much memory we want.  We need at least min_pgs.  We'll
@@ -282,8 +292,11 @@ static void kmem_cache_grow(struct kmem_cache *cp)
 		                         PGSIZE;
 		size_t order_pg_alloc = LOG2_UP(min_pgs);
 		void *buf = get_cont_pages(order_pg_alloc, 0);
-		if (!buf)
-			panic("[German Accent]: OOM for a large slab growth!!!");
+
+		if (!buf) {
+			kmem_cache_free(kmem_slab_cache, a_slab);
+			return FALSE;
+		}
 		a_slab->num_busy_obj = 0;
 		/* The number of objects is based on the rounded up amt requested. */
 		a_slab->num_total_obj = ((1 << order_pg_alloc) * PGSIZE) /
@@ -305,6 +318,8 @@ static void kmem_cache_grow(struct kmem_cache *cp)
 	}
 	// add a_slab to the empty_list
 	TAILQ_INSERT_HEAD(&cp->empty_slab_list, a_slab, link);
+
+	return TRUE;
 }
 
 /* This deallocs every slab from the empty list.  TODO: think a bit more about

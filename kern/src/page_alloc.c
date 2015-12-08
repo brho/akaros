@@ -5,10 +5,12 @@
  * Kevin Klues <klueska@cs.berkeley.edu>    
  * Barret Rhoden <brho@cs.berkeley.edu> */
 
+#include <ros/errno.h>
 #include <sys/queue.h>
 #include <bitmask.h>
 #include <page_alloc.h>
 #include <pmap.h>
+#include <err.h>
 #include <string.h>
 #include <kmalloc.h>
 #include <blockdev.h>
@@ -206,6 +208,8 @@ void *get_cont_pages(size_t order, int flags)
 	//If we couldn't find them, return NULL
 	if( first == -1 ) {
 		spin_unlock_irqsave(&colored_page_free_list_lock);
+		if (flags & KMALLOC_ERROR)
+			error(ENOMEM, NULL);
 		return NULL;
 	}
 
@@ -262,7 +266,9 @@ void *get_cont_phys_pages_at(size_t order, physaddr_t at, int flags)
 	for (unsigned long i = first_pg_nr; i < first_pg_nr + nr_pgs; i++) {
 		if (!page_is_free(i)) {
 			spin_unlock_irqsave(&colored_page_free_list_lock);
-			return 0;
+			if (flags & KMALLOC_ERROR)
+				error(ENOMEM, NULL);
+			return NULL;
 		}
 	}
 	for (unsigned long i = first_pg_nr; i < first_pg_nr + nr_pgs; i++)
