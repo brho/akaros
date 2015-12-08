@@ -934,7 +934,7 @@ static int __hpf_load_page(struct proc *p, struct page_map *pm,
  * shootdown is on its way.  Userspace should have waited for the mprotect to
  * return before trying to write (or whatever), so we don't care and will fault
  * them. */
-int handle_page_fault(struct proc *p, uintptr_t va, int prot)
+static int __hpf(struct proc *p, uintptr_t va, int prot, bool file_ok)
 {
 	struct vm_region *vmr;
 	struct page *a_page;
@@ -964,6 +964,8 @@ refault:
 			goto out;
 		}
 	} else {
+		if (!file_ok)
+			return -EACCES;
 		/* If this fails, either something got screwed up with the VMR, or the
 		 * permissions changed after mmap/mprotect.  Either way, I want to know
 		 * (though it's not critical). */
@@ -1033,6 +1035,16 @@ out_put_pg:
 out:
 	spin_unlock(&p->vmr_lock);
 	return ret;
+}
+
+int handle_page_fault(struct proc *p, uintptr_t va, int prot)
+{
+	return __hpf(p, va, prot, TRUE);
+}
+
+int handle_page_fault_nofile(struct proc *p, uintptr_t va, int prot)
+{
+	return __hpf(p, va, prot, FALSE);
 }
 
 /* Attempts to populate the pages, as if there was a page faults.  Bails on

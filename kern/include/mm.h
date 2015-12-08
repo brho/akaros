@@ -66,6 +66,7 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 int mprotect(struct proc *p, uintptr_t addr, size_t len, int prot);
 int munmap(struct proc *p, uintptr_t addr, size_t len);
 int handle_page_fault(struct proc *p, uintptr_t va, int prot);
+int handle_page_fault_nofile(struct proc *p, uintptr_t va, int prot);
 unsigned long populate_va(struct proc *p, uintptr_t va, unsigned long nr_pgs);
 
 /* These assume the mm_lock is held already */
