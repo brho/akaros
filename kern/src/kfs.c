@@ -116,6 +116,12 @@ int kfs_readpage(struct page_map *pm, struct page *page)
 	struct kfs_i_info *k_i_info = (struct kfs_i_info*)
 	                              pm->pm_host->i_fs_info;
 	uintptr_t begin = (size_t)k_i_info->filestart + pg_idx_byte;
+
+	/* Pretend that we blocked while filing this page.  This catches a lot of
+	 * bugs.  It does slightly slow down the kernel, but it's only when filling
+	 * the page cache, and considering we are using a RAMFS, you shouldn't
+	 * measure things that actually rely on KFS's performance. */
+	kthread_usleep(1000);
 	/* If we're beyond the initial start point, we just need a zero page.  This
 	 * is for a hole or for extending a file (even though it won't be saved).
 	 * Otherwise, we want the data from KFS, being careful to not copy from
