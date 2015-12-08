@@ -233,19 +233,35 @@ static void handle_fperr(struct hw_trapframe *hw_tf)
 	proc_destroy(current);
 }
 
-static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
+static bool __handler_user_page_fault(struct hw_trapframe *hw_tf,
+                                      uintptr_t fault_va, int prot)
 {
-	uintptr_t fault_va = rcr2();
-	int prot = hw_tf->tf_err & PF_ERROR_WRITE ? PROT_WRITE : PROT_READ;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	int err;
 
+	assert(pcpui->owning_proc == pcpui->cur_proc);
+	enable_irq();
+	err = handle_page_fault(pcpui->owning_proc, fault_va, prot);
+	disable_irq();
+	if (err) {
+		if (err == -EAGAIN)
+			hw_tf->tf_err |= PF_VMR_BACKED;
+		return FALSE;
+	}
+	return TRUE;
+}
+
+static bool __handler_kernel_page_fault(struct hw_trapframe *hw_tf,
+                                        uintptr_t fault_va, int prot)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	int err;
+
+	/* In general, if there's no cur_proc, a KPF is a bug. */
 	if (!pcpui->cur_proc) {
+		/* This only runs from test_uaccess(), where it is expected to fail. */
 		if (try_handle_exception_fixup(hw_tf))
 			return TRUE;
-
-		/* still catch KPFs */
-		assert((hw_tf->tf_cs & 3) == 0);
 		print_trapframe(hw_tf);
 		backtrace_kframe(hw_tf);
 		panic("Proc-less Page Fault in the Kernel at %p!", fault_va);
@@ -254,40 +270,26 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 	 * holding locks in the kernel and could deadlock when we HPF.  For now, I'm
 	 * just disabling the lock checker, since it'll flip out when it sees there
 	 * is a kernel trap.  Will need to think about this a bit, esp when we
-	 * properly handle bad addrs and whatnot.
+	 * properly handle bad addrs and whatnot. */
+	pcpui->__lock_checking_enabled--;
+	/* It is a bug for the kernel to access user memory while holding locks that
+	 * are used by handle_page_fault.  At a minimum, this includes p->vmr_lock
+	 * and memory allocation locks.
 	 *
-	 * Also consider turning on IRQs globally while we call HPF. */
-	if (in_kernel(hw_tf))
-		pcpui->__lock_checking_enabled--;
-	/* safe to reenable after rcr2 and after disabling lock checking */
-	enable_irq();
-	err = handle_page_fault(pcpui->cur_proc, fault_va, prot);
-	disable_irq();
-	if (in_kernel(hw_tf))
-		pcpui->__lock_checking_enabled++;
+	 * In an effort to reduce the number of locks (both now and in the future),
+	 * the kernel will not attempt to handle faults on file-back VMRs.  We
+	 * probably can turn that on in the future, but I'd rather keep things safe
+	 * for now.
+	 *
+	 * Note that we do not enable IRQs here, unlike in the user case.  Again,
+	 * this is to limit the locks we could be grabbing. */
+	err = handle_page_fault_nofile(pcpui->cur_proc, fault_va, prot);
+	pcpui->__lock_checking_enabled++;
 	if (err) {
 		if (try_handle_exception_fixup(hw_tf))
 			return TRUE;
-
-		if (in_kernel(hw_tf)) {
-			print_trapframe(hw_tf);
-			backtrace_kframe(hw_tf);
-			panic("Proc-ful Page Fault in the Kernel at %p!", fault_va);
-			/* if we want to do something like kill a process or other code, be
-			 * aware we are in a sort of irq-like context, meaning the main
-			 * kernel code we 'interrupted' could be holding locks - even
-			 * irqsave locks. */
-		}
-
-		if (err == -EAGAIN)
-			hw_tf->tf_err |= PF_VMR_BACKED;
-		*aux = fault_va;
-		return FALSE;
-		/* useful debugging */
-		printk("[%08x] user %s fault va %p ip %p on core %d with err %d\n",
-		       current->pid, prot & PROT_READ ? "READ" : "WRITE", fault_va,
-		       hw_tf->tf_rip, core_id(), err);
 		print_trapframe(hw_tf);
+		backtrace_kframe(hw_tf);
 		/* Turn this on to help debug bad function pointers */
 		printd("rsp %p\n\t 0(rsp): %p\n\t 8(rsp): %p\n\t 16(rsp): %p\n"
 		       "\t24(rsp): %p\n", hw_tf->tf_rsp,
@@ -295,8 +297,25 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 		       *(uintptr_t*)(hw_tf->tf_rsp +  8),
 		       *(uintptr_t*)(hw_tf->tf_rsp + 16),
 		       *(uintptr_t*)(hw_tf->tf_rsp + 24));
+		panic("Proc-ful Page Fault in the Kernel at %p!", fault_va);
+		/* if we want to do something like kill a process or other code, be
+		 * aware we are in a sort of irq-like context, meaning the main
+		 * kernel code we 'interrupted' could be holding locks - even
+		 * irqsave locks. */
 	}
 	return TRUE;
+}
+
+static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
+{
+	uintptr_t fault_va = rcr2();
+	int prot = hw_tf->tf_err & PF_ERROR_WRITE ? PROT_WRITE : PROT_READ;
+
+	*aux = fault_va;
+	if (in_kernel(hw_tf))
+		return __handler_kernel_page_fault(hw_tf, fault_va, prot);
+	else
+		return __handler_user_page_fault(hw_tf, fault_va, prot);
 }
 
 /* Certain traps want IRQs enabled, such as the syscall.  Others can't handle
