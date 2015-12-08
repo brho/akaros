@@ -12,6 +12,7 @@
 #include <smp.h>
 #include <schedule.h>
 #include <kstack.h>
+#include <arch/uaccess.h>
 
 uintptr_t get_kstack(void)
 {
@@ -729,7 +730,8 @@ void cv_broadcast_irqsave(struct cond_var *cv, int8_t *irq_state)
 	enable_irqsave(irq_state);
 }
 
-/* Helper, aborts and releases a CLE.  dereg_ spinwaits on abort_in_progress. */
+/* Helper, aborts and releases a CLE.  dereg_ spinwaits on abort_in_progress.
+ * This can throw a PF */
 static void __abort_and_release_cle(struct cv_lookup_elm *cle)
 {
 	int8_t irq_state = 0;
@@ -760,8 +762,10 @@ static void __abort_and_release_cle(struct cv_lookup_elm *cle)
  *   all the memory for CLE is safe */
 bool abort_sysc(struct proc *p, struct syscall *sysc)
 {
+	ERRSTACK(1);
 	struct cv_lookup_elm *cle;
 	int8_t irq_state = 0;
+
 	spin_lock_irqsave(&p->abort_list_lock);
 	TAILQ_FOREACH(cle, &p->abortable_sleepers, link) {
 		if (cle->sysc == sysc) {
@@ -774,7 +778,9 @@ bool abort_sysc(struct proc *p, struct syscall *sysc)
 	spin_unlock_irqsave(&p->abort_list_lock);
 	if (!cle)
 		return FALSE;
-	__abort_and_release_cle(cle);
+	if (!waserror())	/* discard error */
+		__abort_and_release_cle(cle);
+	poperror();
 	return TRUE;
 }
 
@@ -787,11 +793,13 @@ static int __abort_all_sysc(struct proc *p,
                             bool (*should_abort)(struct cv_lookup_elm*, void*),
                             void *arg)
 {
+	ERRSTACK(1);
 	struct cv_lookup_elm *cle;
 	int8_t irq_state = 0;
 	struct cv_lookup_tailq abortall_list;
 	uintptr_t old_proc = switch_to(p);
 	int ret = 0;
+
 	/* Concerns: we need to not remove them from their original list, since
 	 * concurrent wake ups will cause a dereg, which will remove from the list.
 	 * We also can't touch freed memory, so we need a refcnt to keep cles
@@ -806,8 +814,11 @@ static int __abort_all_sysc(struct proc *p,
 		ret++;
 	}
 	spin_unlock_irqsave(&p->abort_list_lock);
-	TAILQ_FOREACH(cle, &abortall_list, abortall_link)
-		__abort_and_release_cle(cle);
+	if (!waserror()) { /* discard error */
+		TAILQ_FOREACH(cle, &abortall_list, abortall_link)
+			__abort_and_release_cle(cle);
+	}
+	poperror();
 	switch_back(p, old_proc);
 	return ret;
 }
@@ -822,9 +833,23 @@ void abort_all_sysc(struct proc *p)
 	__abort_all_sysc(p, always_abort, 0);
 }
 
+/* cle->sysc could be a bad pointer.  we can either use copy_from_user (btw,
+ * we're already in their addr space) or we can use a waserror in
+ * __abort_all_sysc().  Both options are fine.  I went with it here for a couple
+ * reasons.  It is only this abort function pointer that accesses sysc, though
+ * that could change.  Our syscall aborting isn't plugged into a broader error()
+ * handler yet, which means we'd want to poperror instead of nexterror in
+ * __abort_all_sysc, and that would required int ret getting a volatile flag. */
 static bool sysc_uses_fd(struct cv_lookup_elm *cle, void *fd)
 {
-	return syscall_uses_fd(cle->sysc, (int)(long)fd);
+	struct syscall local_sysc;
+	int err;
+
+	err = copy_from_user(&local_sysc, cle->sysc, sizeof(struct syscall));
+	/* Trigger an abort on error */
+	if (err)
+		return TRUE;
+	return syscall_uses_fd(&local_sysc, (int)(long)fd);
 }
 
 int abort_all_sysc_fd(struct proc *p, int fd)
@@ -878,12 +903,22 @@ void dereg_abortable_cv(struct cv_lookup_elm *cle)
  * this with things for ktasks in the future. */
 bool should_abort(struct cv_lookup_elm *cle)
 {
+	struct syscall local_sysc;
+	int err;
+
 	if (is_ktask(cle->kthread))
 		return FALSE;
 	if (cle->proc && (cle->proc->state == PROC_DYING))
 		return TRUE;
-	if (cle->sysc && (atomic_read(&cle->sysc->flags) & SC_ABORT))
-		return TRUE;
+	if (cle->sysc) {
+		assert(cle->proc && (cle->proc == current));
+		err = copy_from_user(&local_sysc, cle->sysc,
+		                     offsetof(struct syscall, flags) +
+		                     sizeof(cle->sysc->flags));
+		/* just go ahead and abort if there was an error */
+		if (err || (atomic_read(&local_sysc.flags) & SC_ABORT))
+			return TRUE;
+	}
 	return FALSE;
 }
 
