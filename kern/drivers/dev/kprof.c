@@ -40,7 +40,7 @@ enum {
 };
 
 struct trace_printk_buffer {
-	int in_use;
+	atomic_t in_use;
 	char buffer[TRACE_PRINTK_BUFFER_SIZE];
 };
 
@@ -560,21 +560,24 @@ static struct trace_printk_buffer *kprof_get_printk_buffer(void)
 {
 	static struct trace_printk_buffer boot_tpb;
 	static struct trace_printk_buffer *cpu_tpbs;
+	static atomic_t alloc_done;
 
 	if (unlikely(!num_cores))
 		return &boot_tpb;
 	if (unlikely(!cpu_tpbs)) {
 		/* Poor man per-CPU data structure. I really do no like littering global
 		 * data structures with module specific data.
+		 * We cannot take the ktrace_lock to protect the kzmalloc() call, as
+		 * that might trigger printk()s, and we would reenter here.
+		 * Let only one core into the kzmalloc() path, and let the others get
+		 * the boot_tpb until finished.
 		 */
-		spin_lock_irqsave(&ktrace_lock);
-		if (!cpu_tpbs)
-			cpu_tpbs = kzmalloc(num_cores * sizeof(struct trace_printk_buffer),
-								0);
-		spin_unlock_irqsave(&ktrace_lock);
+		if (!atomic_cas(&alloc_done, 0, 1))
+			return &boot_tpb;
+		cpu_tpbs = kzmalloc(num_cores * sizeof(struct trace_printk_buffer), 0);
 	}
 
-	return cpu_tpbs + core_id();
+	return cpu_tpbs + core_id_early();
 }
 
 void trace_vprintk(bool btrace, const char *fmt, va_list args)
@@ -613,13 +616,12 @@ void trace_vprintk(bool btrace, const char *fmt, va_list args)
 	const char *utop, *uptr;
 	char hdr[64];
 
-	if (tpb->in_use)
+	if (!atomic_cas(&tpb->in_use, 0, 1))
 		return;
-	tpb->in_use++;
 	if (likely(system_timing.tsc_freq))
 		tsc2timespec(read_tsc(), &ts_now);
 	snprintf(hdr, sizeof(hdr), "[%lu.%09lu]:cpu%d: ", ts_now.tv_sec,
-			 ts_now.tv_nsec, core_id());
+			 ts_now.tv_nsec, core_id_early());
 
 	pb.ptr = usrbuf + vsnprintf(usrbuf, usr_bufsz, fmt, args);
 	pb.top = usrbuf + usr_bufsz;
@@ -649,7 +651,7 @@ void trace_vprintk(bool btrace, const char *fmt, va_list args)
 		uptr = nlptr + 1;
 	}
 	kprof_tracedata_write(kpbuf, pb.ptr - kpbuf);
-	tpb->in_use--;
+	atomic_set(&tpb->in_use, 0);
 }
 
 void trace_printk(bool btrace, const char *fmt, ...)
