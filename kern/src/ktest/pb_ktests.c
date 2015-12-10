@@ -2171,96 +2171,99 @@ bool test_uaccess(void)
 {
 	char buf[128] = { 0 };
 	char buf2[128] = { 0 };
-	struct proc *tmp = switch_to(NULL);
+	struct proc *tmp;
+	int err;
+	static const size_t mmap_size = 4096;
+	void *addr;
 
-	KT_ASSERT_M("Copy to user (u8) to not mapped UDATA address should fail",
-				copy_to_user((void *) UDATA, buf, 1) == -EFAULT);
-	KT_ASSERT_M("Copy to user (u16) to not mapped UDATA address should fail",
-				copy_to_user((void *) UDATA, buf, 2) == -EFAULT);
-	KT_ASSERT_M("Copy to user (u32) to not mapped UDATA address should fail",
-				copy_to_user((void *) UDATA, buf, 4) == -EFAULT);
-	KT_ASSERT_M("Copy to user (u64) to not mapped UDATA address should fail",
-				copy_to_user((void *) UDATA, buf, 8) == -EFAULT);
-	KT_ASSERT_M("Copy to user (mem) to not mapped UDATA address should fail",
-				copy_to_user((void *) UDATA, buf, sizeof(buf)) == -EFAULT);
+	err = proc_alloc(&tmp, 0, 0);
+	KT_ASSERT_M("Failed to alloc a temp proc", err == 0);
+	/* Tell everyone we're ready in case some ops don't work on PROC_CREATED */
+	__proc_set_state(tmp, PROC_RUNNABLE_S);
 
-	KT_ASSERT_M("Copy from user (u8) to not mapped UDATA address should fail",
-				copy_from_user(buf, (const void *) UDATA, 1) == -EFAULT);
-	KT_ASSERT_M("Copy from user (u16) to not mapped UDATA address should fail",
-				copy_from_user(buf, (const void *) UDATA, 2) == -EFAULT);
-	KT_ASSERT_M("Copy from user (u32) to not mapped UDATA address should fail",
-				copy_from_user(buf, (const void *) UDATA, 4) == -EFAULT);
-	KT_ASSERT_M("Copy from user (u64) to not mapped UDATA address should fail",
-				copy_from_user(buf, (const void *) UDATA, 8) == -EFAULT);
-	KT_ASSERT_M("Copy from user (mem) to not mapped UDATA address should fail",
-				copy_from_user(buf, (const void *) UDATA, sizeof(buf)) ==
-				-EFAULT);
+	addr = mmap(tmp, 0, mmap_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, -1, 0);
+
+	KT_ASSERT_M("Mmap failed", addr != MAP_FAILED);
 
 	KT_ASSERT_M(
-		"String copy to user to not mapped UDATA address should fail",
-		strcpy_to_user(NULL, (char *) UDATA, "Akaros") == -EFAULT);
+		"Copy to user (u8) to mapped address should not fail",
+		copy_to_user(addr, buf, 1) == 0);
 	KT_ASSERT_M(
-		"String copy from user to not mapped UDATA address should fail",
-		strcpy_from_user(NULL, buf, (const char *) UDATA) == -EFAULT);
+		"Copy to user (u16) to mapped address should not fail",
+		copy_to_user(addr, buf, 2) == 0);
+	KT_ASSERT_M(
+		"Copy to user (u32) to mapped address should not fail",
+		copy_to_user(addr, buf, 4) == 0);
+	KT_ASSERT_M(
+		"Copy to user (u64) to mapped address should not fail",
+		copy_to_user(addr, buf, 8) == 0);
+	KT_ASSERT_M(
+		"Copy to user (mem) to mapped address should not fail",
+		copy_to_user(addr, buf, sizeof(buf)) == 0);
+
+	KT_ASSERT_M(
+		"Copy from user (u8) to mapped address should not fail",
+		copy_from_user(buf, addr, 1) == 0);
+	KT_ASSERT_M(
+		"Copy from user (u16) to mapped address should not fail",
+		copy_from_user(buf, addr, 2) == 0);
+	KT_ASSERT_M(
+		"Copy from user (u32) to mapped address should not fail",
+		copy_from_user(buf, addr, 4) == 0);
+	KT_ASSERT_M(
+		"Copy from user (u64) to mapped address should not fail",
+		copy_from_user(buf, addr, 8) == 0);
+	KT_ASSERT_M(
+		"Copy from user (mem) to mapped address should not fail",
+		copy_from_user(buf, addr, sizeof(buf)) == 0);
+
+	KT_ASSERT_M(
+		"String copy to user to mapped address should not fail",
+		strcpy_to_user(current, addr, "Akaros") == 0);
+	KT_ASSERT_M(
+		"String copy from user to mapped address should not fail",
+		strcpy_from_user(current, buf, addr) == 0);
+	KT_ASSERT_M("The copied string content should be matching",
+				memcmp(buf, "Akaros", 7) == 0);
+
+	munmap(tmp, (uintptr_t) addr, mmap_size);
+
+
+	KT_ASSERT_M("Copy to user (u8) to not mapped address should fail",
+				copy_to_user(addr, buf, 1) == -EFAULT);
+	KT_ASSERT_M("Copy to user (u16) to not mapped address should fail",
+				copy_to_user(addr, buf, 2) == -EFAULT);
+	KT_ASSERT_M("Copy to user (u32) to not mapped address should fail",
+				copy_to_user(addr, buf, 4) == -EFAULT);
+	KT_ASSERT_M("Copy to user (u64) to not mapped address should fail",
+				copy_to_user(addr, buf, 8) == -EFAULT);
+	KT_ASSERT_M("Copy to user (mem) to not mapped address should fail",
+				copy_to_user(addr, buf, sizeof(buf)) == -EFAULT);
+
+	KT_ASSERT_M("Copy from user (u8) to not mapped address should fail",
+				copy_from_user(buf, addr, 1) == -EFAULT);
+	KT_ASSERT_M("Copy from user (u16) to not mapped address should fail",
+				copy_from_user(buf, addr, 2) == -EFAULT);
+	KT_ASSERT_M("Copy from user (u32) to not mapped address should fail",
+				copy_from_user(buf, addr, 4) == -EFAULT);
+	KT_ASSERT_M("Copy from user (u64) to not mapped address should fail",
+				copy_from_user(buf, addr, 8) == -EFAULT);
+	KT_ASSERT_M("Copy from user (mem) to not mapped address should fail",
+				copy_from_user(buf, addr, sizeof(buf)) == -EFAULT);
+
+	KT_ASSERT_M(
+		"String copy to user to not mapped address should fail",
+		strcpy_to_user(NULL, addr, "Akaros") == -EFAULT);
+	KT_ASSERT_M(
+		"String copy from user to not mapped address should fail",
+		strcpy_from_user(NULL, buf, addr) == -EFAULT);
 
 	KT_ASSERT_M("Copy from user with kernel side source pointer should fail",
 				copy_from_user(buf, buf2, sizeof(buf)) == -EFAULT);
 	KT_ASSERT_M("Copy to user with kernel side source pointer should fail",
 				copy_to_user(buf, buf2, sizeof(buf)) == -EFAULT);
 
-	switch_back(NULL, tmp);
-
-	if (tmp != NULL) {
-		static const size_t mmap_size = 4096;
-		void *addr = mmap(tmp, 0, mmap_size, PROT_READ | PROT_WRITE,
-		                  MAP_PRIVATE, -1, 0);
-
-		KT_ASSERT_M("Mmap failed", addr != MAP_FAILED);
-
-		KT_ASSERT_M(
-			"Copy to user (u8) to mapped address should not fail",
-			copy_to_user(addr, buf, 1) == 0);
-		KT_ASSERT_M(
-			"Copy to user (u16) to mapped address should not fail",
-			copy_to_user(addr, buf, 2) == 0);
-		KT_ASSERT_M(
-			"Copy to user (u32) to mapped address should not fail",
-			copy_to_user(addr, buf, 4) == 0);
-		KT_ASSERT_M(
-			"Copy to user (u64) to mapped address should not fail",
-			copy_to_user(addr, buf, 8) == 0);
-		KT_ASSERT_M(
-			"Copy to user (mem) to mapped address should not fail",
-			copy_to_user(addr, buf, sizeof(buf)) == 0);
-
-		KT_ASSERT_M(
-			"Copy from user (u8) to mapped address should not fail",
-			copy_from_user(buf, addr, 1) == 0);
-		KT_ASSERT_M(
-			"Copy from user (u16) to mapped address should not fail",
-			copy_from_user(buf, addr, 2) == 0);
-		KT_ASSERT_M(
-			"Copy from user (u32) to mapped address should not fail",
-			copy_from_user(buf, addr, 4) == 0);
-		KT_ASSERT_M(
-			"Copy from user (u64) to mapped address should not fail",
-			copy_from_user(buf, addr, 8) == 0);
-		KT_ASSERT_M(
-			"Copy from user (mem) to mapped address should not fail",
-			copy_from_user(buf, addr, sizeof(buf)) == 0);
-
-		KT_ASSERT_M(
-			"String copy to user to mapped address should not fail",
-			strcpy_to_user(current, addr, "Akaros") == 0);
-		KT_ASSERT_M(
-			"String copy from user to mapped address should not fail",
-			strcpy_from_user(current, buf, addr) == 0);
-		KT_ASSERT_M("The copied string content should be matching",
-					memcmp(buf, "Akaros", 7) == 0);
-
-		munmap(tmp, (uintptr_t) addr, mmap_size);
-	}
-
+	proc_decref(tmp);
 	return TRUE;
 }
 
