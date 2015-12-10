@@ -153,7 +153,6 @@ extern taskstate_t ts;
 int bus_irq_setup(struct irq_handler *irq_h);	/* ioapic.c */
 extern const char *x86_trapname(int trapno);
 extern void sysenter_handler(void);
-void backtrace_kframe(struct hw_trapframe *hw_tf);
 
 /* Defined and set up in in arch/init.c, used for XMM initialization */
 extern struct ancillary_state x86_default_fpu;

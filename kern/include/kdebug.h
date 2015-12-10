@@ -45,9 +45,6 @@ void print_backtrace_list(uintptr_t *pcs, size_t nr_pcs,
 /* Backtraces the calling kernel context, using pfunc for printing */
 void gen_backtrace(void (*pfunc)(void *, const char *), void *opaque);
 
-/* Temporary func */
-#define backtrace_kframe backtrace_hwtf
-
 /* Arch dependent, listed here for ease-of-use */
 static inline uintptr_t get_caller_pc(void);
 

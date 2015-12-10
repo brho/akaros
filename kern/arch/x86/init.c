@@ -42,7 +42,7 @@ static void irq_console(struct hw_trapframe *hw_tf, void *data)
 				return;
 			}
 			print_trapframe(hw_tf);
-			backtrace_kframe(hw_tf);
+			backtrace_hwtf(hw_tf);
 			return;
 	}
 	/* Do our work in an RKM, instead of interrupt context.  Note the RKM will

@@ -263,7 +263,7 @@ static bool __handler_kernel_page_fault(struct hw_trapframe *hw_tf,
 		if (try_handle_exception_fixup(hw_tf))
 			return TRUE;
 		print_trapframe(hw_tf);
-		backtrace_kframe(hw_tf);
+		backtrace_hwtf(hw_tf);
 		panic("Proc-less Page Fault in the Kernel at %p!", fault_va);
 	}
 	/* TODO - handle kernel page faults.  This is dangerous, since we might be
@@ -289,7 +289,7 @@ static bool __handler_kernel_page_fault(struct hw_trapframe *hw_tf,
 		if (try_handle_exception_fixup(hw_tf))
 			return TRUE;
 		print_trapframe(hw_tf);
-		backtrace_kframe(hw_tf);
+		backtrace_hwtf(hw_tf);
 		/* Turn this on to help debug bad function pointers */
 		printd("rsp %p\n\t 0(rsp): %p\n\t 8(rsp): %p\n\t 16(rsp): %p\n"
 		       "\t24(rsp): %p\n", hw_tf->tf_rsp,
@@ -338,7 +338,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			extern bool mon_verbose_trace;
 			if (mon_verbose_trace) {
 				print_trapframe(hw_tf);
-				backtrace_kframe(hw_tf);
+				backtrace_hwtf(hw_tf);
 			}
 			char *fn_name = get_fn_name(x86_get_ip_hw(hw_tf));
 			printk("Core %d is at %p (%s)\n", core_id(), x86_get_ip_hw(hw_tf),
