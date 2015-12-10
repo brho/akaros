@@ -94,6 +94,7 @@ struct extable_ip_fixup {
 
 #define __user_memcpy(dst, src, count, err, errret)						\
 	asm volatile(ASM_STAC "\n"											\
+				 "  		cld\n"										\
 				 "1:		rep movsb\n"								\
 				 "2: " ASM_CLAC "\n"									\
 				 ".section .fixup,\"ax\"\n"								\
@@ -101,8 +102,8 @@ struct extable_ip_fixup {
 				 "	jmp 2b\n"											\
 				 ".previous\n"											\
 				 _ASM_EXTABLE(1b, 3b)									\
-				 : "=r"(err)											\
-				 : "D" (dst), "S" (src), "c" (count), "i" (errret), "0" (err) \
+				 : "=r"(err), "+D" (dst), "+S" (src), "+c" (count)		\
+				 : "i" (errret), "0" (err)								\
 				 : "memory")
 
 static inline int __put_user(void *dst, const void *src, unsigned int count)
