@@ -4,6 +4,7 @@
 #include <ros/trapframe.h>
 #include <arch/kdebug.h>
 #include <profiler.h>
+/* for includes */ struct proc;
 
 struct symtab_entry {
 	char *name;
@@ -12,18 +13,40 @@ struct symtab_entry {
 
 #define TRACEME() trace_printk(TRUE, "%s(%d)", __FILE__, __LINE__)
 
+/* An alternative here is to have backtrace_list kmalloc an array.  The downside
+ * is that we're calling into the allocator in potentially-delicate situations,
+ * such as the NMI handler. */
+#define MAX_BT_DEPTH 20
+
+/*** Printk Backtraces, usually used for debugging or from the monitor */
+/* Backtraces the calling kernel context */
 void backtrace(void);
-void gen_backtrace_frame(uintptr_t eip, uintptr_t ebp,
-						 void (*pfunc)(void *, const char *), void *opaque);
-void gen_backtrace(void (*pfunc)(void *, const char *), void *opaque);
+/* Backtraces a PC/FP, with no protections */
 void backtrace_frame(uintptr_t pc, uintptr_t fp);
+/* Backtraces a user PC/FP */
+void backtrace_user_frame(uintptr_t pc, uintptr_t fp);
+/* Backtraces a hardware TF.  Can handle user or kernel TFs */
+void backtrace_hwtf(struct hw_trapframe *hw_tf);
+/* Backtraces a user context */
+void backtrace_user_ctx(struct proc *p, struct user_context *ctx);
+
+/*** Programmatic Backtraces */
+/* Backtraces a PC/FP, stores results in *pcs, with no protections */
 size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
                       size_t nr_slots);
-size_t user_backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
+/* Backtraces a user PC/FP, stores results in *pcs */
+size_t backtrace_user_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
 						   size_t nr_slots);
-void backtrace_kframe(struct hw_trapframe *hw_tf);
-/* for includes */ struct proc;
-void backtrace_user_ctx(struct proc *p, struct user_context *ctx);
+/* Prints out a backtrace list, using pfunc(opaque, "line") for the printk.
+ * This does a symbol lookup on the kernel binary, so it is less useful for a
+ * user backtrace. */
+void print_backtrace_list(uintptr_t *pcs, size_t nr_pcs,
+						  void (*pfunc)(void *, const char *), void *opaque);
+/* Backtraces the calling kernel context, using pfunc for printing */
+void gen_backtrace(void (*pfunc)(void *, const char *), void *opaque);
+
+/* Temporary func */
+#define backtrace_kframe backtrace_hwtf
 
 /* Arch dependent, listed here for ease-of-use */
 static inline uintptr_t get_caller_pc(void);

@@ -7,6 +7,8 @@
 
 #include <ros/memlayout.h>
 
+/* Here's the old backtrace, remove it once gen_backtrace is done: */
+#if 0
 void backtrace(void)
 {
 	void **fp;
@@ -20,10 +22,11 @@ void backtrace(void)
 		fp = (void**)sp;
 	}
 }
+#endif
 
-void backtrace_frame(uintptr_t pc, uintptr_t fp)
+void gen_backtrace(void (*pfunc)(void *, const char *), void *opaque)
 {
-	printk("\n\tTODO: backtrace frame on riscv\n\n");
+	printk("\n\tTODO: %s on riscv\n\n", __func__);
 }
 
 /* can either implement these, or use the x86 ones globally and limit the
@@ -31,6 +34,13 @@ void backtrace_frame(uintptr_t pc, uintptr_t fp)
 size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
                       size_t nr_slots)
 {
-	printk("\n\tTODO: backtrace list on riscv\n\n");
+	printk("\n\tTODO: %s on riscv\n\n", __func__);
+	return 0;
+}
+
+size_t backtrace_user_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
+						   size_t nr_slots)
+{
+	printk("\n\tTODO: %s on riscv\n\n", __func__);
 	return 0;
 }

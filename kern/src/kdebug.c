@@ -201,31 +201,80 @@ void debug_addr_pid(int pid, unsigned long addr)
 	proc_decref(p);
 }
 
-void backtrace_kframe(struct hw_trapframe *hw_tf)
+void print_backtrace_list(uintptr_t *pcs, size_t nr_pcs,
+						  void (*pfunc)(void *, const char *), void *opaque)
+{
+	char *func_name;
+	char bt_line[128];
+
+	for (size_t i = 0; i < nr_pcs; i++) {
+		func_name = get_fn_name(pcs[i]);
+		snprintf(bt_line, sizeof(bt_line), "#%02d [<%p>] in %s\n", i + 1,
+				 pcs[i], func_name);
+		pfunc(opaque, bt_line);
+		kfree(func_name);
+	}
+}
+
+static void printk_func(void *opaque, const char *str)
+{
+	printk("%s", str);
+}
+
+void backtrace(void)
+{
+	printk("Stack Backtrace on Core %d:\n", core_id());
+	gen_backtrace(&printk_func, NULL);
+}
+
+void backtrace_frame(uintptr_t eip, uintptr_t ebp)
+{
+	uintptr_t pcs[MAX_BT_DEPTH];
+	size_t nr_pcs = backtrace_list(eip, ebp, pcs, MAX_BT_DEPTH);
+
+	printk("\nBacktrace of kernel context on Core %d:\n", core_id());
+	print_backtrace_list(pcs, nr_pcs, &printk_func, NULL);
+}
+
+/* TODO: change debug_addr_proc() to allow print redirection like
+ * print_backtrace_list(). */
+void backtrace_user_frame(uintptr_t eip, uintptr_t ebp)
+{
+	uintptr_t pcs[MAX_BT_DEPTH];
+	size_t nr_pcs = backtrace_user_list(eip, ebp, pcs, MAX_BT_DEPTH);
+
+	printk("\nBacktrace of user context on Core %d:\n", core_id());
+	printk("\tOffsets only matter for shared libraries\n");
+	/* This formatting is consumed by scripts/bt-akaros.sh. */
+	for (int i = 0; i < nr_pcs; i++) {
+		printk("#%02d ", i + 1);
+		/* TODO: user backtraces all assume we're working on 'current' */
+		debug_addr_proc(current, pcs[i]);
+	}
+}
+
+void backtrace_hwtf(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
 	pcpui->__lock_checking_enabled--;
-	printk("\nBacktrace of kernel context on Core %d:\n", core_id());
-	backtrace_frame(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf));
+	if (in_kernel(hw_tf))
+		backtrace_frame(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf));
+	else
+		backtrace_user_frame(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf));
 	pcpui->__lock_checking_enabled++;
 }
 
 void backtrace_user_ctx(struct proc *p, struct user_context *ctx)
 {
-	#define MAX_BT_DEPTH 20
-	uintptr_t pcs[MAX_BT_DEPTH];
-	size_t nr_pcs;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
 	if (!ctx) {
 		printk("Null user context!\n");
 		return;
 	}
-	nr_pcs = backtrace_list(get_user_ctx_pc(ctx), get_user_ctx_fp(ctx), pcs,
-	                        MAX_BT_DEPTH);
-	printk("User context backtrace:\n");
-	printk("\tOffsets only matter for shared libraries\n");
-	for (int i = 0; i < nr_pcs; i++) {
-		printk("#%02d ", i + 1);
-		debug_addr_proc(p, pcs[i]);
-	}
+	assert(pcpui->cur_proc);
+	pcpui->__lock_checking_enabled--;
+	backtrace_user_frame(get_user_ctx_pc(ctx), get_user_ctx_fp(ctx));
+	pcpui->__lock_checking_enabled++;
 }

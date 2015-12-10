@@ -463,7 +463,7 @@ void profiler_add_user_backtrace(uintptr_t pc, uintptr_t fp)
 
 			trace[0] = pc;
 			if (likely(fp))
-				n = user_backtrace_list(pc, fp, trace + 1,
+				n = backtrace_user_list(pc, fp, trace + 1,
 										PROFILER_BT_DEPTH - 1) + 1;
 
 			profiler_push_user_trace64(cpu_buf, p, trace, n);
