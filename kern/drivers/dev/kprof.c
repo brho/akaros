@@ -7,6 +7,7 @@
  * in the LICENSE file.
  */
 
+#include <ros/profiler_records.h>
 #include <arch/time.h>
 #include <vfs.h>
 #include <slab.h>
@@ -97,7 +98,8 @@ static void kprof_alarm_handler(struct alarm_waiter *waiter,
 	int coreid = core_id();
 	struct timer_chain *tchain = &per_cpu_info[coreid].tchain;
 
-	profiler_add_hw_sample(hw_tf);
+	profiler_add_hw_sample(hw_tf, PROF_MKINFO(PROF_DOM_TIMER,
+											  kprof_timer_period));
 	reset_alarm_rel(tchain, waiter, kprof_timer_period);
 }
 
@@ -195,6 +197,12 @@ static void kprof_stop_profiler(void)
 	}
 	poperror();
 	qunlock(&kprof.lock);
+}
+
+static void kprof_flush_profiler(void)
+{
+	if (kprof.profiling)
+		profiler_trace_data_flush();
 }
 
 static void kprof_init(void)
@@ -410,7 +418,7 @@ static void kprof_manage_timer(int coreid, struct cmdbuf *cb)
 
 static void kprof_usage_fail(void)
 {
-	static const char *ctlstring = "clear|start|stop|timer";
+	static const char *ctlstring = "clear|start|stop|flush|timer";
 	const char * const *cmds = profiler_configure_cmds();
 	char msgbuf[128];
 
@@ -457,6 +465,8 @@ static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 			}
 		} else if (!strcmp(cb->f[0], "start")) {
 			kprof_start_profiler();
+		} else if (!strcmp(cb->f[0], "flush")) {
+			kprof_flush_profiler();
 		} else if (!strcmp(cb->f[0], "stop")) {
 			kprof_stop_profiler();
 		} else {
@@ -464,7 +474,7 @@ static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 		}
 		break;
 	case Kprofdataqid:
-		profiler_add_trace((uintptr_t) strtoul(a, 0, 0));
+		profiler_add_trace((uintptr_t) strtoul(a, 0, 0), 0);
 		break;
 	case Kptraceqid:
 		if (a && (n > 0)) {

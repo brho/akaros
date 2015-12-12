@@ -5,6 +5,7 @@
 
 #include <sys/types.h>
 #include <arch/ros/msr-index.h>
+#include <arch/ros/membar.h>
 #include <arch/x86.h>
 #include <arch/msr.h>
 #include <arch/uaccess.h>
@@ -55,13 +56,13 @@ static void perfmon_read_cpu_caps(struct perfmon_cpu_caps *pcc)
 
 	cpuid(0x0a, 0, &a, &b, &c, &d);
 
-	ZERO_DATA(*pcc);
-	pcc->perfmon_version = a & 0xff;
 	pcc->proc_arch_events = a >> 24;
 	pcc->bits_x_counter = (a >> 16) & 0xff;
 	pcc->counters_x_proc = (a >> 8) & 0xff;
 	pcc->bits_x_fix_counter = (d >> 5) & 0xff;
 	pcc->fix_counters_x_proc = d & 0x1f;
+	wmb_f();
+	pcc->perfmon_version = a & 0xff;
 }
 
 static void perfmon_enable_event(int event, bool enable)
@@ -96,11 +97,11 @@ static uint64_t perfmon_get_fixevent_mask(const struct perfmon_event *pev,
 {
 	uint64_t m = 0;
 
-	if (pev->u.b.inten)
+	if (PMEV_GET_EN(pev->event))
 		m |= 1 << 3;
-	if (pev->u.b.os)
+	if (PMEV_GET_OS(pev->event))
 		m |= (1 << 0);
-	if (pev->u.b.usr)
+	if (PMEV_GET_USR(pev->event))
 		m |= (1 << 1);
 
 	m <<= eventno * FIXCNTR_NBITS;
@@ -119,14 +120,14 @@ static void perfmon_do_cores_alloc(void *opaque)
 	if (perfmon_is_fixed_event(&pa->ev)) {
 		uint64_t fxctrl_value = read_msr(MSR_CORE_PERF_FIXED_CTR_CTRL), tmp;
 
-		i = pa->ev.u.b.event;
+		i = PMEV_GET_EVENT(pa->ev.event);
 		if (i >= (int) cpu_caps.fix_counters_x_proc) {
 			i = -EINVAL;
 		} else if (fxctrl_value & (FIXCNTR_MASK << i)) {
 			i = -EBUSY;
 		} else {
 			cctx->fixed_counters[i] = pa->ev;
-			cctx->fixed_counters[i].u.b.en = 1;
+			PMEV_SET_EN(cctx->fixed_counters[i].event, 1);
 
 			tmp = perfmon_get_fixevent_mask(&pa->ev, i, fxctrl_value);
 
@@ -138,7 +139,7 @@ static void perfmon_do_cores_alloc(void *opaque)
 		}
 	} else {
 		for (i = 0; i < (int) cpu_caps.counters_x_proc; i++) {
-			if (cctx->counters[i].u.v == 0) {
+			if (cctx->counters[i].event == 0) {
 				if (!perfmon_event_available(i))
 					warn_once("Counter %d is free but not available", i);
 				else
@@ -147,13 +148,13 @@ static void perfmon_do_cores_alloc(void *opaque)
 		}
 		if (i < (int) cpu_caps.counters_x_proc) {
 			cctx->counters[i] = pa->ev;
-			cctx->counters[i].u.b.en = 1;
+			PMEV_SET_EN(cctx->counters[i].event, 1);
 
 			perfmon_enable_event(i, TRUE);
 
 			write_msr(MSR_IA32_PERFCTR0 + i, -(int64_t) pa->ev.trigger_count);
 			write_msr(MSR_ARCH_PERFMON_EVENTSEL0 + i,
-					  cctx->counters[i].u.v);
+					  cctx->counters[i].event);
 		} else {
 			i = -ENOSPC;
 		}
@@ -285,6 +286,11 @@ static struct perfmon_status *perfmon_alloc_status(void)
 	return pef;
 }
 
+static void perfmon_arm_irq(void)
+{
+	write_mmreg32(LAPIC_LVT_PERFMON, IdtLAPIC_PCINT);
+}
+
 void perfmon_init(void)
 {
 	int i;
@@ -293,6 +299,11 @@ void perfmon_init(void)
 	lcr4(rcr4() | CR4_PCE);
 
 	/* This will be called from every core, no need to execute more than once.
+	 * All the call to perfmon_init() will be done when the core boots, so
+	 * they will be no perfmon users calling it, while perfmon_read_cpu_caps()
+	 * is executing.
+	 * All the cores will be writing the same values, so even from that POV,
+	 * no serialization is required.
 	 */
 	if (cpu_caps.perfmon_version == 0)
 		perfmon_read_cpu_caps(&cpu_caps);
@@ -308,7 +319,18 @@ void perfmon_init(void)
 	for (i = 0; i < (int) cpu_caps.fix_counters_x_proc; i++)
 		write_msr(MSR_CORE_PERF_FIXED_CTR0 + i, 0);
 
-	write_mmreg32(LAPIC_LVT_PERFMON, IdtLAPIC_PCINT);
+	perfmon_arm_irq();
+}
+
+static uint64_t perfmon_make_sample_event(const struct perfmon_event *pev)
+{
+	uint64_t ei = ((uint64_t) PMEV_GET_MASK(pev->event) << 8) |
+		PMEV_GET_EVENT(pev->event);
+
+	if (perfmon_is_fixed_event(pev))
+		ei |= 1 << 16;
+
+	return PROF_MKINFO(PROF_DOM_PMU, ei);
 }
 
 void perfmon_interrupt(struct hw_trapframe *hw_tf, void *data)
@@ -317,28 +339,32 @@ void perfmon_interrupt(struct hw_trapframe *hw_tf, void *data)
 	struct perfmon_cpu_context *cctx = PERCPU_VARPTR(counters_env);
 	uint64_t gctrl, status;
 
-	profiler_add_hw_sample(hw_tf);
-
 	spin_lock_irqsave(&cctx->lock);
 	/* We need to save the global control status, because we need to disable
 	 * counters in order to be able to reset their values.
 	 * We will restore the global control status on exit.
 	 */
+	status = read_msr(MSR_CORE_PERF_GLOBAL_STATUS);
 	gctrl = read_msr(MSR_CORE_PERF_GLOBAL_CTRL);
 	write_msr(MSR_CORE_PERF_GLOBAL_CTRL, 0);
-	status = read_msr(MSR_CORE_PERF_GLOBAL_STATUS);
 	for (i = 0; i < (int) cpu_caps.counters_x_proc; i++) {
 		if (status & ((uint64_t) 1 << i)) {
-			if (cctx->counters[i].u.v)
+			if (cctx->counters[i].event) {
+				profiler_add_hw_sample(
+					hw_tf, perfmon_make_sample_event(cctx->counters + i));
 				write_msr(MSR_IA32_PERFCTR0 + i,
 						  -(int64_t) cctx->counters[i].trigger_count);
+			}
 		}
 	}
 	for (i = 0; i < (int) cpu_caps.fix_counters_x_proc; i++) {
 		if (status & ((uint64_t) 1 << (32 + i))) {
-			if (cctx->fixed_counters[i].u.v)
+			if (cctx->fixed_counters[i].event) {
+				profiler_add_hw_sample(
+					hw_tf, perfmon_make_sample_event(cctx->fixed_counters + i));
 				write_msr(MSR_CORE_PERF_FIXED_CTR0 + i,
 						  -(int64_t) cctx->fixed_counters[i].trigger_count);
+			}
 		}
 	}
 	write_msr(MSR_CORE_PERF_GLOBAL_OVF_CTRL, status);
@@ -346,8 +372,10 @@ void perfmon_interrupt(struct hw_trapframe *hw_tf, void *data)
 	spin_unlock_irqsave(&cctx->lock);
 
 	/* We need to re-arm the IRQ as the PFM IRQ gets masked on trigger.
+	 * Note that KVM and real HW seems to be doing two different things WRT
+	 * re-arming the IRQ. KVM re-arms does not mask the IRQ, while real HW does.
 	 */
-	write_mmreg32(LAPIC_LVT_PERFMON, IdtLAPIC_PCINT);
+	perfmon_arm_irq();
 }
 
 void perfmon_get_cpu_caps(struct perfmon_cpu_caps *pcc)
