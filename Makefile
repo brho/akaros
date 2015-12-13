@@ -610,10 +610,20 @@ utestclean:
 	@$(MAKE) -C user/utest clean
 
 # KFS related stuff
-PHONY += fill-kfs unfill-kfs
+PHONY += fill-kfs unfill-kfs create-build-file
 xcc-gcc-libs = $(XCC_TARGET_ROOT)/../lib/
 xcc-so-files = $(addprefix $(XCC_TARGET_LIB), *.so*) \
                $(addprefix $(xcc-gcc-libs), *.so*)
+
+KERNEL_ELF_PATH=$(abspath $(KERNEL_OBJ))-64b
+create-build-file:
+ifneq ($(INVARIANT_BUILD),1)
+		@echo "KernelPath: $(KERNEL_ELF_PATH)" > kern/kfs/etc/build.info
+		@echo "KernelSize: $(shell stat -c %s $(KERNEL_ELF_PATH))" >> \
+			kern/kfs/etc/build.info
+		@echo "Date: `date`" >> kern/kfs/etc/build.info
+		@echo "Host: `hostname`" >> kern/kfs/etc/build.info
+endif
 
 $(OBJDIR)/.dont-force-fill-kfs:
 	$(Q)rm -rf $(addprefix $(FIRST_KFS_PATH)/lib/, $(notdir $(xcc-so-files)))
@@ -624,7 +634,7 @@ $(OBJDIR)/.dont-force-fill-kfs:
 	@echo "User space tests removed from KFS"
 	@touch $(OBJDIR)/.dont-force-fill-kfs
 
-fill-kfs: $(OBJDIR)/.dont-force-fill-kfs install-libs tests
+fill-kfs: $(OBJDIR)/.dont-force-fill-kfs install-libs tests create-build-file
 	@mkdir -p $(FIRST_KFS_PATH)/lib
 	$(Q)cp -uP $(xcc-so-files) $(FIRST_KFS_PATH)/lib
 	@echo "Cross Compiler 'so' files installed to KFS"
