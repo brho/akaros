@@ -163,12 +163,12 @@ static void kprof_start_profiler(void)
 
 static void kprof_fetch_profiler_data(void)
 {
-	size_t psize = profiler_size();
+	size_t psize = kprof.psize + profiler_size();
+	char *ndata = krealloc(kprof.pdata, psize, KMALLOC_WAIT);
 
-	kprof.pdata = kmalloc(psize, KMALLOC_WAIT);
-	if (!kprof.pdata)
+	if (!ndata)
 		error(ENOMEM, NULL);
-	kprof.psize = 0;
+	kprof.pdata = ndata;
 	while (kprof.psize < psize) {
 		size_t csize = profiler_read(kprof.pdata + kprof.psize,
 									 psize - kprof.psize);
@@ -201,8 +201,19 @@ static void kprof_stop_profiler(void)
 
 static void kprof_flush_profiler(void)
 {
-	if (kprof.profiling)
+	ERRSTACK(1);
+
+	qlock(&kprof.lock);
+	if (waserror()) {
+		qunlock(&kprof.lock);
+		nexterror();
+	}
+	if (kprof.profiling) {
 		profiler_trace_data_flush();
+		kprof_fetch_profiler_data();
+	}
+	poperror();
+	qunlock(&kprof.lock);
 }
 
 static void kprof_init(void)
