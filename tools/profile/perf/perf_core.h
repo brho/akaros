@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include "akaros.h"
+#include "perfconv.h"
 
 #define MAX_CPU_EVENTS 256
 
@@ -54,6 +55,7 @@ void perf_finalize(void);
 void perf_parse_event(const char *str, struct perf_eventsel *sel);
 struct perf_context *perf_create_context(const struct perf_context_config *cfg);
 void perf_free_context(struct perf_context *pctx);
+void perf_flush_context_traces(struct perf_context *pctx);
 void perf_context_event_submit(struct perf_context *pctx,
 							   const struct core_set *cores,
 							   const struct perf_eventsel *sel);
@@ -61,6 +63,10 @@ void perf_context_show_values(struct perf_context *pctx, FILE *file);
 void perf_show_events(const char *rx, FILE *file);
 void perf_get_event_string(const struct perf_eventsel *sel, char *sbuf,
 						   size_t size);
+void perf_make_eventsel_from_event_mask(struct perf_eventsel *sel,
+										uint32_t event, uint32_t mask);
+void perf_convert_trace_data(struct perfconv_context *cctx, const char *input,
+							 const char *output);
 
 static inline const struct perf_arch_info *perf_context_get_arch_info(
 	const struct perf_context *pctx)

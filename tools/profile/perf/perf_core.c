@@ -21,6 +21,7 @@
 #include <perfmon/err.h>
 #include <perfmon/pfmlib.h>
 #include "xlib.h"
+#include "perfconv.h"
 #include "akaros.h"
 #include "perf_core.h"
 
@@ -207,10 +208,10 @@ void perf_parse_event(const char *str, struct perf_eventsel *sel)
 	ZERO_DATA(*sel);
 	sel->eidx = -1;
 	sel->ev.flags = 0;
-	sel->ev.u.v = 0;
-	sel->ev.u.b.os = 1;
-	sel->ev.u.b.usr = 1;
-	sel->ev.u.b.en = 1;
+	sel->ev.event = 0;
+	PMEV_SET_OS(sel->ev.event, 1);
+	PMEV_SET_USR(sel->ev.event, 1);
+	PMEV_SET_EN(sel->ev.event, 1);
 	if (isdigit(*tok)) {
 		ev = strchr(tok, ':');
 		if (ev == NULL) {
@@ -219,8 +220,8 @@ void perf_parse_event(const char *str, struct perf_eventsel *sel)
 			exit(1);
 		}
 		*ev++ = 0;
-		sel->ev.u.b.event = (uint8_t) strtoul(tok, NULL, 0);
-		sel->ev.u.b.mask = (uint8_t) strtoul(ev, NULL, 0);
+		PMEV_SET_EVENT(sel->ev.event, (uint8_t) strtoul(tok, NULL, 0));
+		PMEV_SET_MASK(sel->ev.event, (uint8_t) strtoul(ev, NULL, 0));
 	} else {
 		uint32_t event, mask;
 
@@ -229,28 +230,30 @@ void perf_parse_event(const char *str, struct perf_eventsel *sel)
 			fprintf(stderr, "Unable to find event: %s\n", tok);
 			exit(1);
 		}
-		sel->ev.u.b.event = (uint8_t) event;
-		sel->ev.u.b.mask = (uint8_t) mask;
+		PMEV_SET_EVENT(sel->ev.event, (uint8_t) event);
+		PMEV_SET_MASK(sel->ev.event, (uint8_t) mask);
 	}
 	while ((tok = strtok_r(NULL, ",", &sptr)) != NULL) {
 		ev = strchr(tok, '=');
 		if (ev)
 			*ev++ = 0;
 		if (!strcmp(tok, "os")) {
-			sel->ev.u.b.os = (ev == NULL || atoi(ev) != 0) ? 1 : 0;
+			PMEV_SET_OS(sel->ev.event, (ev == NULL || atoi(ev) != 0) ? 1 : 0);
 		} else if (!strcmp(tok, "usr")) {
-			sel->ev.u.b.usr = (ev == NULL || atoi(ev) != 0) ? 1 : 0;
+			PMEV_SET_USR(sel->ev.event, (ev == NULL || atoi(ev) != 0) ? 1 : 0);
 		} else if (!strcmp(tok, "int")) {
-			sel->ev.u.b.inten = (ev == NULL || atoi(ev) != 0) ? 1 : 0;
+			PMEV_SET_INTEN(sel->ev.event,
+						   (ev == NULL || atoi(ev) != 0) ? 1 : 0);
 		} else if (!strcmp(tok, "invcmsk")) {
-			sel->ev.u.b.invcmsk = (ev == NULL || atoi(ev) != 0) ? 1 : 0;
+			PMEV_SET_INVCMSK(sel->ev.event,
+							 (ev == NULL || atoi(ev) != 0) ? 1 : 0);
 		} else if (!strcmp(tok, "cmask")) {
 			if (ev == NULL) {
 				fprintf(stderr, "Invalid event spec string: '%s'\n"
 						"\tShould be: %s\n", str, event_spec);
 				exit(1);
 			}
-			sel->ev.u.b.cmask = (uint32_t) strtoul(ev, NULL, 0);
+			PMEV_SET_CMASK(sel->ev.event, (uint32_t) strtoul(ev, NULL, 0));
 		} else if (!strcmp(tok, "icount")) {
 			if (ev == NULL) {
 				fprintf(stderr, "Invalid event spec string: '%s'\n"
@@ -260,7 +263,7 @@ void perf_parse_event(const char *str, struct perf_eventsel *sel)
 			sel->ev.trigger_count = (uint64_t) strtoul(ev, NULL, 0);
 		}
 	}
-	if (sel->ev.u.b.inten && !sel->ev.trigger_count) {
+	if (PMEV_GET_INTEN(sel->ev.event) && !sel->ev.trigger_count) {
 		fprintf(stderr,
 				"Counter trigger count for interrupt is too small: %lu\n",
 				sel->ev.trigger_count);
@@ -298,7 +301,7 @@ static int perf_open_event(int perf_fd, const struct core_set *cores,
 	int i, j;
 
 	*wptr++ = PERFMON_CMD_COUNTER_OPEN;
-	wptr = put_le_u64(wptr, sel->ev.u.v);
+	wptr = put_le_u64(wptr, sel->ev.event);
 	wptr = put_le_u64(wptr, sel->ev.flags);
 	wptr = put_le_u64(wptr, sel->ev.trigger_count);
 
@@ -345,7 +348,7 @@ static uint64_t *perf_get_event_values(int perf_fd, int ped,
 		exit(1);
 	}
 
-	rptr = get_le_u64(rptr, &sel->ev.u.v);
+	rptr = get_le_u64(rptr, &sel->ev.event);
 	rptr = get_le_u64(rptr, &sel->ev.flags);
 	rptr = get_le_u64(rptr, &sel->ev.trigger_count);
 	rptr = get_le_u32(rptr, &n);
@@ -389,6 +392,13 @@ static void perf_disable_sampling(int kpctl_fd)
 	xwrite(kpctl_fd, disable_str, strlen(disable_str));
 }
 
+static void perf_flush_sampling(int kpctl_fd)
+{
+	static const char * const flush_str = "flush";
+
+	xwrite(kpctl_fd, flush_str, strlen(flush_str));
+}
+
 struct perf_context *perf_create_context(const struct perf_context_config *cfg)
 {
 	struct perf_context *pctx = xzmalloc(sizeof(struct perf_context));
@@ -409,6 +419,11 @@ void perf_free_context(struct perf_context *pctx)
 	close(pctx->kpctl_fd);
 	close(pctx->perf_fd);
 	free(pctx);
+}
+
+void perf_flush_context_traces(struct perf_context *pctx)
+{
+	perf_flush_sampling(pctx->kpctl_fd);
 }
 
 void perf_context_event_submit(struct perf_context *pctx,
@@ -604,15 +619,85 @@ void perf_get_event_string(const struct perf_eventsel *sel, char *sbuf,
     einfo.size = sizeof(einfo);
 	if ((sel->eidx >= 0) &&
 		(pfm_get_event_info(sel->eidx, PFM_OS_NONE, &einfo) == PFM_SUCCESS)) {
-		const char *mask_name = perf_get_event_mask_name(&einfo,
-														 sel->ev.u.b.mask);
+		const char *mask_name =
+			perf_get_event_mask_name(&einfo, PMEV_GET_MASK(sel->ev.event));
 
 		if (mask_name)
 			snprintf(sbuf, size, "%s:%s", einfo.name, mask_name);
 		else
 			snprintf(sbuf, size, "%s", einfo.name);
 	} else {
-		snprintf(sbuf, size, "0x%02x:0x%02x", sel->ev.u.b.event,
-				 sel->ev.u.b.mask);
+		snprintf(sbuf, size, "0x%02x:0x%02x",
+				 (int) PMEV_GET_EVENT(sel->ev.event),
+				 (int) PMEV_GET_MASK(sel->ev.event));
 	}
+}
+
+void perf_make_eventsel_from_event_mask(struct perf_eventsel *sel,
+										uint32_t event, uint32_t mask)
+{
+	ZERO_DATA(*sel);
+	PMEV_SET_EVENT(sel->ev.event, (uint8_t) event);
+	PMEV_SET_MASK(sel->ev.event, (uint8_t) mask);
+	sel->eidx = perf_find_event_by_id(event, mask);
+}
+
+static bool perf_get_kernel_elf_path(char *path, size_t psize, size_t *ksize)
+{
+	bool got_path = FALSE, got_size = FALSE;
+	FILE *bfile;
+	char *ptr;
+	char lnbuf[1024];
+
+	bfile = fopen("/etc/build.info", "r");
+	if (bfile) {
+		while (fgets(lnbuf, sizeof(lnbuf) - 1, bfile)) {
+			for (ptr = lnbuf + strlen(lnbuf); (ptr > lnbuf) &&
+					 strchr(" \t\r\n", ptr[-1]); ptr--)
+				ptr[-1] = '\0';
+			if (!strncmp(lnbuf, "KernelPath:", 11)) {
+				for (ptr = lnbuf + 11; *ptr && strchr(" \t", *ptr); ptr++)
+					;
+				if (*ptr) {
+					strncpy(path, ptr, psize);
+					path[psize - 1] = '\0';
+					got_path = TRUE;
+				}
+			} else if (!strncmp(lnbuf, "KernelSize:", 11)) {
+				for (ptr = lnbuf + 11; *ptr && strchr(" \t", *ptr); ptr++)
+					;
+				if (*ptr && isxdigit(*ptr)) {
+					*ksize = (size_t) strtoul(ptr, NULL, 0);
+					got_size = TRUE;
+				}
+			}
+		}
+		fclose(bfile);
+	}
+
+	return got_path && got_size;
+}
+
+void perf_convert_trace_data(struct perfconv_context *cctx, const char *input,
+							 const char *output)
+{
+	FILE *infile, *outfile;
+	size_t ksize;
+	char kpath[1024];
+
+	infile = xfopen(input, "rb");
+	if (xfsize(infile) > 0) {
+		outfile = xfopen(output, "wb");
+
+		if (perf_get_kernel_elf_path(kpath, sizeof(kpath), &ksize))
+			perfconv_add_kernel_mmap(kpath, ksize, cctx);
+		else
+			fprintf(stderr, "Unable to fetch kernel build information!\n"
+					"Kernel traces will be missing symbol information.\n");
+
+		perfconv_process_input(cctx, infile, outfile);
+
+		fclose(outfile);
+	}
+	fclose(infile);
 }

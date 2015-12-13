@@ -17,6 +17,7 @@
 #include <parlib/parlib.h>
 #include "xlib.h"
 #include "akaros.h"
+#include "perfconv.h"
 #include "perf_core.h"
 
 static struct perf_context_config perf_cfg = {
@@ -27,7 +28,7 @@ static struct perf_context_config perf_cfg = {
 static void usage(const char *prg)
 {
 	fprintf(stderr,
-			"Use: %s {list,cpucaps,record} [-mkecxh] -- CMD [ARGS ...]\n"
+			"Use: %s {list,cpucaps,record} [-mkecxoKh] -- CMD [ARGS ...]\n"
 			"\tlist            Lists all the available events and their meaning.\n"
 			"\tcpucaps         Shows the system CPU capabilities in term of "
 			"performance counters.\n"
@@ -50,6 +51,8 @@ static void usage(const char *prg)
 			"\t                 Examples: all:!3.4.7  0-15:!3.5.7\n"
 			"\t-x EVENT_RX      Sets the event name regular expression for "
 			"list.\n"
+			"\t-o PATH          Sets the perf output file path ('perf.data').\n"
+			"\t-K PATH          Sets the kprof data file path ('#kprof/kpdata').\n"
 			"\t-h               Displays this help screen.\n", prg,
 			perf_cfg.perf_file, perf_cfg.kpctl_file);
 	exit(1);
@@ -104,11 +107,14 @@ int main(int argc, const char * const *argv)
 {
 	int i, icmd = -1, num_events = 0;
 	const char *cmd = argv[1], *show_rx = NULL;
+	const char *kpdata_file = "#kprof/kpdata", *outfile = "perf.data";
+	struct perfconv_context *cctx;
 	struct perf_context *pctx;
 	struct core_set cores;
 	const char *events[MAX_CPU_EVENTS];
 
 	ros_get_all_cores_set(&cores);
+	cctx = perfconv_create_context();
 
 	for (i = 2; i < argc; i++) {
 		if (!strcmp(argv[i], "-m")) {
@@ -131,6 +137,12 @@ int main(int argc, const char * const *argv)
 		} else if (!strcmp(argv[i], "-c")) {
 			if (++i < argc)
 				ros_parse_cores(argv[i], &cores);
+		} else if (!strcmp(argv[i], "-o")) {
+			if (++i < argc)
+				outfile = argv[i];
+		} else if (!strcmp(argv[i], "-K")) {
+			if (++i < argc)
+				kpdata_file = argv[i];
 		} else if (!strcmp(argv[i], "--")) {
 			icmd = i + 1;
 			break;
@@ -165,10 +177,21 @@ int main(int argc, const char * const *argv)
 			run_process_and_wait(argc - icmd, argv + icmd, &cores);
 
 		perf_context_show_values(pctx, stdout);
+
+		/* Flush the profiler per-CPU trace data into the main queue, so that
+		 * it will be available for read.
+		 */
+		perf_flush_context_traces(pctx);
+
+		/* Generate the Linux perf file format with the traces which have been
+		 * created during this operation.
+		 */
+		perf_convert_trace_data(cctx, kpdata_file, outfile);
 	} else {
 		usage(argv[0]);
 	}
 	perf_free_context(pctx);
+	perfconv_free_context(cctx);
 	perf_finalize();
 
 	return 0;

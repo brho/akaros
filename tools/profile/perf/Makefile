@@ -10,7 +10,7 @@ AKAROS_ROOT ?= $(BUILDDIR)/../../..
 MAKE_JOBS ?= 4
 KFS_ROOT ?= $(AKAROS_ROOT)/kern/kfs
 
-SOURCES = perf.c xlib.c perf_core.c akaros.c
+SOURCES = perf.c perfconv.c xlib.c perf_core.c akaros.c
 
 XCC = $(CROSS_COMPILE)gcc
 
