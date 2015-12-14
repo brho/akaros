@@ -329,55 +329,6 @@ static inline uintptr_t get_user_ctx_stack(struct user_context *ctx)
 	temp; \
 })
 
-/* For debugging. */
-#include <stdio.h>
-static void print_hw_tf(struct hw_trapframe *tf)
-{
-	printf("[user] HW TRAP frame %08p\n", tf);
-	printf("  edi  0x%08x\n", tf->tf_regs.reg_edi);
-	printf("  esi  0x%08x\n", tf->tf_regs.reg_esi);
-	printf("  ebp  0x%08x\n", tf->tf_regs.reg_ebp);
-	printf("  oesp 0x%08x\n", tf->tf_regs.reg_oesp);
-	printf("  ebx  0x%08x\n", tf->tf_regs.reg_ebx);
-	printf("  edx  0x%08x\n", tf->tf_regs.reg_edx);
-	printf("  ecx  0x%08x\n", tf->tf_regs.reg_ecx);
-	printf("  eax  0x%08x\n", tf->tf_regs.reg_eax);
-	printf("  gs   0x----%04x\n", tf->tf_gs);
-	printf("  fs   0x----%04x\n", tf->tf_fs);
-	printf("  es   0x----%04x\n", tf->tf_es);
-	printf("  ds   0x----%04x\n", tf->tf_ds);
-	printf("  trap 0x%08x\n", tf->tf_trapno);
-	printf("  err  0x%08x\n", tf->tf_err);
-	printf("  eip  0x%08x\n", tf->tf_eip);
-	printf("  cs   0x----%04x\n", tf->tf_cs);
-	printf("  flag 0x%08x\n", tf->tf_eflags);
-	printf("  esp  0x%08x\n", tf->tf_esp);
-	printf("  ss   0x----%04x\n", tf->tf_ss);
-}
-
-static void print_sw_tf(struct sw_trapframe *sw_tf)
-{
-	printf("[user] SW TRAP frame %08p\n", sw_tf);
-	printf("  ebp  0x%08x\n", sw_tf->tf_ebp);
-	printf("  ebx  0x%08x\n", sw_tf->tf_ebx);
-	printf("  esi  0x%08x\n", sw_tf->tf_esi);
-	printf("  edi  0x%08x\n", sw_tf->tf_edi);
-	printf("  esp  0x%08x\n", sw_tf->tf_esp);
-	printf("  eip  0x%08x\n", sw_tf->tf_eip);
-	printf(" mxcsr 0x%08x\n", sw_tf->tf_mxcsr);
-	printf(" fpucw 0x----%04x\n", sw_tf->tf_fpucw);
-}
-
-static void print_user_context(struct user_context *ctx)
-{
-	if (ctx->type == ROS_HW_CTX)
-		print_hw_tf(&ctx->tf.hw_tf);
-	else if (ctx->type == ROS_SW_CTX)
-		print_sw_tf(&ctx->tf.sw_tf);
-	else
-		printf("Unknown context type %d\n", ctx->type);
-}
-
 static bool has_refl_fault(struct user_context *ctx)
 {
 	return ctx->tf.hw_tf.tf_padding3 == ROS_ARCH_REFL_ID;
