@@ -33,7 +33,7 @@ _panic(const char *file, int line, const char *fmt,...)
 
 void _assert_failed(const char *file, int line, const char *msg)
 {
-	ros_debug("[user] %s:%d, vcore %d, Assertion failed: %s\n",
-	          file, line, vcore_id(), msg);
+	printf("[user] %s:%d, vcore %d, Assertion failed: %s\n", file, line,
+	       vcore_id(), msg);
 	abort();
 }

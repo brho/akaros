@@ -19,7 +19,6 @@ void ros_debugfmt(void (*putch)(int, void**), void **putdat, const char *fmt,
                   ...);
 void ros_vdebugfmt(void (*putch)(int, void**), void **putdat, const char *fmt,
                    va_list);
-int	ros_debug(const char *fmt, ...);
 int	ros_vdebug(const char *fmt, va_list);
 
 #ifdef PRINTD_DEBUG

@@ -533,7 +533,7 @@ bool check_vcoreid(const char *str, uint32_t vcoreid)
 {
 	uint32_t kvcoreid = get_vcoreid();
 	if (vcoreid != kvcoreid) {
-		ros_debug("%s: VC %d thought it was VC %d\n", str, kvcoreid, vcoreid);
+		printf("%s: VC %d thought it was VC %d\n", str, kvcoreid, vcoreid);
 		return FALSE;
 	}
 	return TRUE;

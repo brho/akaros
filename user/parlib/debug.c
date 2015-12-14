@@ -46,18 +46,6 @@ int ros_vdebug(const char *fmt, va_list ap)
 	return b.cnt;
 }
 
-int ros_debug(const char *fmt, ...)
-{
-	va_list ap;
-	int cnt;
-
-	va_start(ap, fmt);
-	cnt = ros_vdebug(fmt, ap);
-	va_end(ap);
-
-	return cnt;
-}
-
 int akaros_printf(const char *format, ...)
 {
 	va_list ap;
