@@ -6,13 +6,18 @@
 #include <libc-symbols.h>
 #include <parlib/stdio.h>
 #include <parlib/assert.h>
+#include <stdbool.h>
 
-/* Here we define functions that are really defined in parlib, but we need
- * them in libc in order to link it. We weak alias them here so that the
- * parlib definitions will override them later. Unfortunately, this trick
- * only works so long as we leave parlib as a static library. If we ever
- * decide to make parlib a .so, then we will have to revisit this and use
- * function pointers at runtime or something similar. */
+/* Here we define functions and variables that are really defined in parlib, but
+ * we need them in libc in order to link it. We weak alias them here so that the
+ * parlib definitions will override them later.
+ *
+ * Unfortunately, this trick only works so long as we leave parlib as a static
+ * library. If we ever decide to make parlib a .so, then we will have to revisit
+ * this and use function pointers at runtime or something similar. */
+
+__thread bool __weak_vcore_context = FALSE;
+weak_alias(__weak_vcore_context, __vcore_context);
 
 int __akaros_printf(const char *format, ...)
 {
@@ -20,6 +25,13 @@ int __akaros_printf(const char *format, ...)
 	return -1;
 }
 weak_alias(__akaros_printf, akaros_printf)
+
+int __akaros_vprintf(const char *fmt, va_list ap)
+{
+	assert(0);
+	return -1;
+}
+weak_alias(__akaros_vprintf, akaros_vprintf)
 
 void __print_user_context(struct user_context *ctx)
 {
