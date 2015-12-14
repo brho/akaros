@@ -15,11 +15,9 @@
 
 __BEGIN_DECLS
 
-void ros_debugfmt(void (*putch)(int, void**), void **putdat, const char *fmt,
-                  ...);
-void ros_vdebugfmt(void (*putch)(int, void**), void **putdat, const char *fmt,
-                   va_list);
-int	ros_vdebug(const char *fmt, va_list);
+void akaros_vprintfmt(void (*putch)(int, void**), void **putdat,
+                      const char *fmt, va_list);
+int akaros_vprintf(const char *fmt, va_list);
 
 #ifdef PRINTD_DEBUG
 #define printd(args...) printf(args)

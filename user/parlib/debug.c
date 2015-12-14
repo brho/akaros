@@ -33,14 +33,14 @@ static void putch(int ch, debugbuf_t **b)
 	(*b)->cnt++;
 }
 
-int ros_vdebug(const char *fmt, va_list ap)
+int akaros_vprintf(const char *fmt, va_list ap)
 {
 	debugbuf_t b;
 	debugbuf_t *bp = &b;
 
 	b.idx = 0;
 	b.cnt = 0;
-	ros_vdebugfmt((void*)putch, (void*)&bp, fmt, ap);
+	akaros_vprintfmt((void*)putch, (void*)&bp, fmt, ap);
 	sys_cputs(b.buf, b.idx);
 
 	return b.cnt;
@@ -53,7 +53,7 @@ int akaros_printf(const char *format, ...)
 
 	va_start(ap, format);
 	if (in_vcore_context())
-		ret = ros_vdebug(format, ap);
+		ret = akaros_vprintf(format, ap);
 	else
 		ret = vprintf(format, ap);
 	va_end(ap);

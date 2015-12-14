@@ -24,8 +24,8 @@ static void printnum(void (*putch)(int, void**), void **putdat,
 }
 
 // Main function to format and print a string.
-void ros_debugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...);
-void ros_vdebugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_list ap)
+void akaros_vprintfmt(void (*putch)(int, void**), void **putdat,
+                      const char *fmt, va_list ap)
 {
 	register const char *p;
 	const char *last_fmt;
@@ -194,13 +194,3 @@ void ros_vdebugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, v
 		}
 	}
 }
-
-void ros_debugfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...)
-{
-	va_list ap;
-
-	va_start(ap, fmt);
-	ros_vdebugfmt(putch, putdat, fmt, ap);
-	va_end(ap);
-}
-
