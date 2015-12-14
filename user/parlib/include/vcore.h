@@ -27,12 +27,10 @@ extern void exit (int __status) __THROW __attribute__ ((__noreturn__));
 #define TRANSITION_STACK_PAGES 2
 #define TRANSITION_STACK_SIZE (TRANSITION_STACK_PAGES*PGSIZE)
 
-/* Defined by glibc; Must be implemented by a user level threading library */
+/* Defined in vcore.c */
 extern void vcore_entry();
-/* Defined in glibc's start.c */
 extern __thread bool __vcore_context;
 extern __thread int __vcoreid;
-/* Defined in vcore.c */
 extern __thread struct syscall __vcore_one_sysc;	/* see sys_change_vcore */
 
 /* Vcore API functions */
