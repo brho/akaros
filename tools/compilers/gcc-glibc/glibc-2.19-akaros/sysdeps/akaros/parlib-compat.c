@@ -21,6 +21,12 @@ int __akaros_printf(const char *format, ...)
 }
 weak_alias(__akaros_printf, akaros_printf)
 
+void __print_user_context(struct user_context *ctx)
+{
+	assert(0);
+}
+weak_alias(__print_user_context, print_user_context)
+
 void ___assert_failed(const char *file, int line, const char *msg)
 {
 	assert(0);

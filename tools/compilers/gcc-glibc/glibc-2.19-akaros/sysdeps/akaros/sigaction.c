@@ -5,12 +5,16 @@
  * See LICENSE for details.
  */
 
-#include <stdio.h>
 #include <errno.h>
 #include <ros/procinfo.h>
 #include <ros/syscall.h>
 #include <parlib/signal.h>
 #include <parlib/vcore.h>
+/* This is nasty.  We can't use the regular printf here.  If we do, we'll get
+ * the dreaded "multiple libcs" error during a glibc rebuild.  But we can use an
+ * akaros_printf.  If there are parts of glibc that don't link against parlib,
+ * we'll get the weak symbol.  (rtld perhaps). */
+#include <parlib/stdio.h>
 
 /* We define the signal_ops struct in glibc so that it is accessible without
  * being linked to parlib. Parlib-based 2LSs will override it with their
@@ -36,30 +40,30 @@ static void default_term_handler(int signr, siginfo_t *info, void *ctx)
 
 static void default_core_handler(int signr, siginfo_t *info, void *ctx)
 {
-	printf("Segmentation Fault (sorry, no core dump yet)\n");
+	akaros_printf("Segmentation Fault (sorry, no core dump yet)\n");
 	if (ctx)
 		print_user_context((struct user_context*)ctx);
 	else
-		printf("No ctx for %s\n", __func__);
+		akaros_printf("No ctx for %s\n", __func__);
 	if (info) {
 		/* ghetto, we don't have access to the PF err, since we only have a few
 		 * fields available in siginfo (e.g. there's no si_trapno). */
-		printf("Fault type %d at addr %p\n", info->si_errno,
-		        info->si_addr);
+		akaros_printf("Fault type %d at addr %p\n", info->si_errno,
+		              info->si_addr);
 	} else {
-		printf("No fault info\n");
+		akaros_printf("No fault info\n");
 	}
 	default_term_handler((1 << 7) + signr, info, ctx);
 }
 
 static void default_stop_handler(int signr, siginfo_t *info, void *ctx)
 {
-	printf("Stop signal received!  No support to stop yet though!\n");
+	akaros_printf("Stop signal received!  No support to stop yet though!\n");
 }
 
 static void default_cont_handler(int signr, siginfo_t *info, void *ctx)
 {
-	printf("Cont signal received!  No support to cont yet though!\n");
+	akaros_printf("Cont signal received!  No support to cont yet though!\n");
 }
 
 typedef void (*__sigacthandler_t)(int, siginfo_t *, void *);
