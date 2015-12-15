@@ -644,38 +644,31 @@ void perf_make_eventsel_from_event_mask(struct perf_eventsel *sel,
 
 static bool perf_get_kernel_elf_path(char *path, size_t psize, size_t *ksize)
 {
-	bool got_path = FALSE, got_size = FALSE;
-	FILE *bfile;
-	char *ptr;
-	char lnbuf[1024];
+	int fd;
+	ssize_t rsize = -1;
 
-	bfile = fopen("/etc/build.info", "r");
-	if (bfile) {
-		while (fgets(lnbuf, sizeof(lnbuf) - 1, bfile)) {
-			for (ptr = lnbuf + strlen(lnbuf); (ptr > lnbuf) &&
-					 strchr(" \t\r\n", ptr[-1]); ptr--)
-				ptr[-1] = '\0';
-			if (!strncmp(lnbuf, "KernelPath:", 11)) {
-				for (ptr = lnbuf + 11; *ptr && strchr(" \t", *ptr); ptr++)
-					;
-				if (*ptr) {
-					strncpy(path, ptr, psize);
-					path[psize - 1] = '\0';
-					got_path = TRUE;
-				}
-			} else if (!strncmp(lnbuf, "KernelSize:", 11)) {
-				for (ptr = lnbuf + 11; *ptr && strchr(" \t", *ptr); ptr++)
-					;
-				if (*ptr && isxdigit(*ptr)) {
-					*ksize = (size_t) strtoul(ptr, NULL, 0);
-					got_size = TRUE;
-				}
-			}
-		}
-		fclose(bfile);
+	fd = open("#version/kernel_path", O_RDONLY);
+	if (fd >= 0) {
+		rsize = read(fd, path, psize);
+		while ((rsize > 0) && (path[rsize - 1] == '\n'))
+			rsize--;
+		close(fd);
+
+		/* We do not export the real kernel size from the #versions device,
+		 * because of cyclic dependency issues. The only reason the size is
+		 * needed, is because we generate an MMAP record, which Linux perf
+		 * uses to find which ELF should be used to resolve addresses to
+		 * symbols. Above the Akaros kernel, hardly other ELF will be loaded,
+		 * so the worst it can happen if something above the kernel ELF
+		 * proper address gets a hit, is that Linux perf will ask the kernel
+		 * ELF to resolve an address, and that will fail.
+		 * So here we use a large enough size to cover kernel size expansions
+		 * for the next 10 years.
+		 */
+		*ksize = 128 * 1024 * 1024;
 	}
 
-	return got_path && got_size;
+	return rsize > 0;
 }
 
 void perf_convert_trace_data(struct perfconv_context *cctx, const char *input,
