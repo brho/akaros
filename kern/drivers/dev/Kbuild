@@ -12,6 +12,7 @@ obj-y						+= proc.o
 obj-$(CONFIG_REGRESS)				+= regress.o
 obj-y						+= root.o
 obj-y						+= srv.o
+obj-y						+= version.o
 obj-$(CONFIG_DEVVARS)		+= vars.o
 
 obj-$(CONFIG_NIX)				+= nix.o
