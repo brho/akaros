@@ -2168,24 +2168,8 @@ bool test_u16pool(void)
 	return FALSE;
 }
 
-bool test_uaccess(void)
+static bool uaccess_mapped(void *addr, char *buf, char *buf2)
 {
-	char buf[128] = { 0 };
-	char buf2[128] = { 0 };
-	struct proc *tmp;
-	int err;
-	static const size_t mmap_size = 4096;
-	void *addr;
-
-	err = proc_alloc(&tmp, 0, 0);
-	KT_ASSERT_M("Failed to alloc a temp proc", err == 0);
-	/* Tell everyone we're ready in case some ops don't work on PROC_CREATED */
-	__proc_set_state(tmp, PROC_RUNNABLE_S);
-
-	addr = mmap(tmp, 0, mmap_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, -1, 0);
-
-	KT_ASSERT_M("Mmap failed", addr != MAP_FAILED);
-
 	KT_ASSERT_M(
 		"Copy to user (u8) to mapped address should not fail",
 		copy_to_user(addr, buf, 1) == 0);
@@ -2227,9 +2211,11 @@ bool test_uaccess(void)
 	KT_ASSERT_M("The copied string content should be matching",
 				memcmp(buf, "Akaros", 7) == 0);
 
-	munmap(tmp, (uintptr_t) addr, mmap_size);
+	return TRUE;
+}
 
-
+static bool uaccess_unmapped(void *addr, char *buf, char *buf2)
+{
 	KT_ASSERT_M("Copy to user (u8) to not mapped address should fail",
 				copy_to_user(addr, buf, 1) == -EFAULT);
 	KT_ASSERT_M("Copy to user (u16) to not mapped address should fail",
@@ -2264,8 +2250,37 @@ bool test_uaccess(void)
 	KT_ASSERT_M("Copy to user with kernel side source pointer should fail",
 				copy_to_user(buf, buf2, sizeof(buf)) == -EFAULT);
 
-	proc_decref(tmp);
 	return TRUE;
+}
+
+bool test_uaccess(void)
+{
+	char buf[128] = { 0 };
+	char buf2[128] = { 0 };
+	struct proc *tmp;
+	uintptr_t switch_tmp;
+	int err;
+	static const size_t mmap_size = 4096;
+	void *addr;
+	bool passed = FALSE;
+
+	err = proc_alloc(&tmp, 0, 0);
+	KT_ASSERT_M("Failed to alloc a temp proc", err == 0);
+	/* Tell everyone we're ready in case some ops don't work on PROC_CREATED */
+	__proc_set_state(tmp, PROC_RUNNABLE_S);
+	switch_tmp = switch_to(tmp);
+	addr = mmap(tmp, 0, mmap_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, -1, 0);
+	if (addr == MAP_FAILED)
+		goto out;
+	passed = uaccess_mapped(addr, buf, buf2);
+	munmap(tmp, (uintptr_t) addr, mmap_size);
+	if (!passed)
+		goto out;
+	passed = uaccess_unmapped(addr, buf, buf2);
+out:
+	switch_back(tmp, switch_tmp);
+	proc_decref(tmp);
+	return passed;
 }
 
 bool test_sort(void)
