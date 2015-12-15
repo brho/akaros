@@ -19,6 +19,8 @@ ros-project.tmproj
 kern/boot
 kern/include/arch
 kern/src/arch
+kern/src/build_info.c
+kern/src/error.c
 user/parlib/include/arch
 Documentation/doxygen/rosdoc
 sim/

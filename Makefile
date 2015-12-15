@@ -40,6 +40,16 @@
 # their Makelocal. This is useful, for example, to allow emacs to find the
 # correct file when errors are encountered using its builtin 'M-x compile'
 # command.
+VERSION = 0
+PATCHLEVEL = 1
+SUBLEVEL = 0
+EXTRAVERSION =
+VERNAME = Nanwan
+
+KERNELVERSION = $(VERSION)$(if $(PATCHLEVEL),.$(PATCHLEVEL)$(if $(SUBLEVEL),.$(SUBLEVEL)))$(EXTRAVERSION)
+
+export KERNELVERSION VERNAME
+
 NO_PRINT_DIRECTORY ?= --no-print-directory
 
 # Save the ability to export the parent's original environment for future use
@@ -82,6 +92,10 @@ export AKAROS_ROOT
 # Setup dumping ground for object files and any temporary files we need to
 # generate for non-kbuild targets
 OBJDIR ?= obj
+
+# Don't need to export these, since the Makelocal is included.
+KERNEL_OBJ := $(OBJDIR)/kern/akaros-kernel
+CMP_KERNEL_OBJ := $(KERNEL_OBJ).gz
 
 # Symlinks
 # =========================================================================
@@ -389,9 +403,8 @@ export CFLAGS_USER CXXFLAGS_USER CFLAGS_USER_LIBS
 # kernel build output.  Right now, it's only passed down to tests/
 dummy-1 := $(shell mkdir -p $(OBJDIR)/kern/)
 
-# Don't need to export these, since the Makelocal is included.
-KERNEL_OBJ := $(OBJDIR)/kern/akaros-kernel
-CMP_KERNEL_OBJ := $(KERNEL_OBJ).gz
+# Machinery to create the kernel build info source
+export BUILD_INFO_FILE
 
 # Since we're doing this outside of the dot-config part, some targets, such as
 # clean, won't read in our .config/auto.conf, and won't know about the
@@ -610,20 +623,10 @@ utestclean:
 	@$(MAKE) -C user/utest clean
 
 # KFS related stuff
-PHONY += fill-kfs unfill-kfs create-build-file
+PHONY += fill-kfs unfill-kfs
 xcc-gcc-libs = $(XCC_TARGET_ROOT)/../lib/
 xcc-so-files = $(addprefix $(XCC_TARGET_LIB), *.so*) \
                $(addprefix $(xcc-gcc-libs), *.so*)
-
-KERNEL_ELF_PATH=$(abspath $(KERNEL_OBJ))-64b
-create-build-file:
-ifneq ($(INVARIANT_BUILD),1)
-		@echo "KernelPath: $(KERNEL_ELF_PATH)" > kern/kfs/etc/build.info
-		@echo "KernelSize: $(shell stat -c %s $(KERNEL_ELF_PATH))" >> \
-			kern/kfs/etc/build.info
-		@echo "Date: `date`" >> kern/kfs/etc/build.info
-		@echo "Host: `hostname`" >> kern/kfs/etc/build.info
-endif
 
 $(OBJDIR)/.dont-force-fill-kfs:
 	$(Q)rm -rf $(addprefix $(FIRST_KFS_PATH)/lib/, $(notdir $(xcc-so-files)))
@@ -634,7 +637,7 @@ $(OBJDIR)/.dont-force-fill-kfs:
 	@echo "User space tests removed from KFS"
 	@touch $(OBJDIR)/.dont-force-fill-kfs
 
-fill-kfs: $(OBJDIR)/.dont-force-fill-kfs install-libs tests create-build-file
+fill-kfs: $(OBJDIR)/.dont-force-fill-kfs install-libs tests
 	@mkdir -p $(FIRST_KFS_PATH)/lib
 	$(Q)cp -uP $(xcc-so-files) $(FIRST_KFS_PATH)/lib
 	@echo "Cross Compiler 'so' files installed to KFS"

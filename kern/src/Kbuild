@@ -7,12 +7,35 @@ $(src)/error.c: $(AKAROS_ROOT)/include/ros/errno.h
 	@echo "};"                             >> $(@)
 	@echo "const int MAX_ERRNO = sizeof(errno_strings)/sizeof(errno_strings[0]);" >> $(@)
 
+$(src)/build_info.c:
+ifeq ($(BUILD_INFO_FILE),)
+		@echo "/* Automatically generated. DO NOT EDIT! */" > $(@)
+		@echo "" >> $(@)
+		@echo "const char build_info_kernel_path[] = { \"$(KERNEL_ELF_PATH)\" };"\
+			>> $(@)
+		@echo "const char build_info_date[] = { \"`date`\" };"\
+			>> $(@)
+		@echo "const char build_info_host[] = { \"`hostname`\" };"\
+			>> $(@)
+		@echo "const char build_info_commitid[] = { \"`git rev-parse HEAD`\" };"\
+			>> $(@)
+		@echo "const char build_info_version[] = { \"$(KERNELVERSION)\" };"\
+			>> $(@)
+		@echo "const char build_info_version_name[] = { \"$(VERNAME)\" };"\
+			>> $(@)
+else
+		@cp $(BUILD_INFO_FILE) $(@)
+endif
+
+clean-files += build_info.c error.c
+
 obj-y						+= alarm.o
 obj-y						+= apipe.o
 obj-y						+= arsc.o
 obj-y						+= atomic.o
 obj-y						+= bitmap.o
 obj-y						+= blockdev.o
+obj-y						+= build_info.o
 obj-y						+= ceq.o
 obj-y						+= colored_caches.o
 obj-y						+= completion.o
