@@ -116,16 +116,20 @@ void chandevreset(void)
 {
 	int i;
 
-	for (i = 0; &devtab[i] < __devtabend; i++)
-		devtab[i].reset();
+	for (i = 0; &devtab[i] < __devtabend; i++) {
+		if (devtab[i].reset)
+			devtab[i].reset();
+	}
 }
 
 void chandevinit(void)
 {
 	int i;
 
-	for (i = 0; &devtab[i] < __devtabend; i++)
-		devtab[i].init();
+	for (i = 0; &devtab[i] < __devtabend; i++) {
+		if (devtab[i].init)
+			devtab[i].init();
+	}
 }
 
 void chandevshutdown(void)
@@ -134,8 +138,10 @@ void chandevshutdown(void)
 
 	/* shutdown in reverse order */
 	for (i = 0; &devtab[i] < __devtabend; i++) ;
-	for (i--; i >= 0; i--)
-		devtab[i].shutdown();
+	for (i--; i >= 0; i--) {
+		if (devtab[i].shutdown)
+			devtab[i].shutdown();
+	}
 }
 
 static void chan_release(struct kref *kref)

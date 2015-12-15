@@ -20,8 +20,10 @@ void devtabreset()
 {
 	int i;
 
-	for (i = 0; &devtab[i] < __devtabend; i++)
-		devtab[i].reset();
+	for (i = 0; &devtab[i] < __devtabend; i++) {
+		if (devtab[i].reset)
+			devtab[i].reset();
+	}
 }
 
 void devtabinit()
@@ -32,7 +34,8 @@ void devtabinit()
 		/* if we have errors, check the align of struct dev and objdump */
 		printd("i %d, '%s', dev %p, init %p\n", i, devtab[i].name,
 				&devtab[i], devtab[i].init);
-		devtab[i].init();
+		if (devtab[i].init)
+			devtab[i].init();
 	}
 }
 
@@ -44,8 +47,10 @@ void devtabshutdown()
 	 * Shutdown in reverse order.
 	 */
 	for (i = 0; &devtab[i] < __devtabend; i++) ;
-	for (i--; i >= 0; i--)
-		devtab[i].shutdown();
+	for (i--; i >= 0; i--) {
+		if (devtab[i].shutdown)
+			devtab[i].shutdown();
+	}
 }
 
 struct dev *devtabget(const char *name, int user)
