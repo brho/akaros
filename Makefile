@@ -417,8 +417,9 @@ kfs-paths := kern/kfs
 endif
 
 FIRST_KFS_PATH = $(firstword $(kfs-paths))
+ABS_KFS_PATH = $(abspath $(FIRST_KFS_PATH))
 
-export OBJDIR FIRST_KFS_PATH
+export OBJDIR FIRST_KFS_PATH ABS_KFS_PATH
 
 # Avoiding implicit rules
 $(srctree)/Makelocal: ;
@@ -669,16 +670,27 @@ realclean: userclean mrproper doxyclean objclean
 # Bundled apps
 # =========================================================================
 
-PHONY += apps-install
-apps-install: install-libs
+app-dirs = tools/apps/snc
+tagged-app-dirs := $(subst /,__,$(app-dirs))
+app-dirs-install := $(addprefix _install_,$(tagged-app-dirs))
+app-dirs-clean := $(addprefix _clean_,$(tagged-app-dirs))
+
+PHONY += $(app-dirs-install) $(app-dirs-clean)
+
+$(app-dirs-install):
+	@$(MAKE) -C $(patsubst _install_%,%,$(subst __,/,$@)) install
+
+$(app-dirs-clean):
+	@$(MAKE) -C $(patsubst _clean_%,%,$(subst __,/,$@)) clean
+
+PHONY +=  apps-install
+apps-install: $(app-dirs-install)
 	@$(call make_as_parent, -C tools/apps/busybox)
-	@$(call make_as_parent, -C tools/apps/snc install)
 	@$(call make_as_parent, -C tools/profile/perf install)
 
 PHONY += apps-clean
-apps-clean:
+apps-clean: $(app-dirs-clean)
 	@$(call make_as_parent, -C tools/apps/busybox clean)
-	@$(call make_as_parent, -C tools/apps/snc clean)
 	@$(call make_as_parent, -C tools/profile/perf clean)
 
 # Cross Compiler

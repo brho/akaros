@@ -1,0 +1,60 @@
+# Makefrag for some user apps
+# They must set APPNAME, then include this fragment
+# e.g.  APPNAME = perf
+
+ARCH ?= none	# catch bugs
+SRCDIR ?=
+INCDIR = $(shell if [ -d "$(SRCDIR)include" ]; then echo "$(SRCDIR)include";\
+	else echo -n ""; fi)
+
+OBJDIR ?= $(SRCDIR)obj
+# DEPLIBS passed in from the top-level Makefile
+DEPLIBS := $(DEPLIBS)
+DEPLIBAS = $(patsubst %, $(XCC_TARGET_LIB)/lib%.a, $(DEPLIBS))
+
+ifneq ($(INCDIR),)
+	INCS = -I$(INCDIR)
+endif
+
+FINALAPP = $(OBJDIR)/$(APPNAME)
+FINALAPP-INSTALL = $(ABS_KFS_PATH)/bin/$(APPNAME)
+
+uc = $(shell echo $(1) | tr a-z A-Z)
+
+APPUCNAME := $(call uc, $(APPNAME))
+HEADERS := $(shell find $(INCDIR) -name "*.h")
+CFILES  := $(wildcard $(SRCDIR)*.c)
+CFILES  += $(wildcard $(SRCDIR)$(ARCH)/*.c)
+SFILES  := $(wildcard $(SRCDIR)$(ARCH)/*.S)
+OBJS    := $(patsubst %.c, $(OBJDIR)/%.o, $(CFILES)) \
+           $(patsubst %.S, $(OBJDIR)/%.o, $(SFILES))
+
+all: $(FINALAPP)
+	@:
+
+$(OBJDIR)/$(ARCH)/%.o: $(SRCDIR)$(ARCH)/%.S $(HEADERS) $(DEPLIBAS)
+	@echo + as [$(APPUCNAME)] $<
+	@mkdir -p $(@D)
+	$(Q)$(CC) $(CFLAGS_USER) $(INCS) -o $@ -c $<
+
+$(OBJDIR)/%.o: $(SRCDIR)%.c $(HEADERS) $(DEPLIBAS)
+	@echo + cc [$(APPUCNAME)] $<
+	@mkdir -p $(@D)
+	$(Q)$(CC) $(CFLAGS_USER) $(INCS) -o $@ -c $<
+
+$(FINALAPP): $(OBJS)
+	@echo + ld [$(APPUCNAME)] $@
+	@mkdir -p $(@D)
+	$(Q)$(CC) -o $@ $(OBJS) $(DEPLIBAS)
+
+$(FINALAPP-INSTALL): $(FINALAPP)
+	@echo + in [$(APPUCNAME)] $< $@
+	@cp $< $@
+
+install: $(FINALAPP-INSTALL)
+	@echo > /dev/null
+
+clean:
+	@echo + clean [$(APPUCNAME)]
+	$(Q)rm -rf $(FINALAPP)
+	$(Q)rm -rf $(OBJDIR)
