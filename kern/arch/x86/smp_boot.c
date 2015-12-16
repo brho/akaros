@@ -261,8 +261,6 @@ uintptr_t smp_main(void)
 
 	apiconline();
 
-	// set a default logical id for now
-	lapic_set_logid(lapic_get_id());
 
 	return my_stack_top; // will be loaded in smp_entry.S
 }

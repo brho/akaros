@@ -82,9 +82,7 @@ static inline void lapic_send_eoi(int unused);
 static inline uint32_t lapic_get_version(void);
 static inline uint32_t lapic_get_error(void);
 static inline uint32_t lapic_get_id(void);
-static inline void lapic_set_id(uint8_t id);	// Careful, may not actually work
 static inline uint8_t lapic_get_logid(void);
-static inline void lapic_set_logid(uint8_t id);
 static inline void lapic_disable_timer(void);
 static inline void lapic_disable(void);
 static inline void lapic_enable(void);
@@ -125,19 +123,9 @@ static inline uint32_t lapic_get_id(void)
 	return read_mmreg32(LAPIC_ID) >> 24;
 }
 
-static inline void lapic_set_id(uint8_t id)
-{
-	write_mmreg32(LAPIC_ID, id << 24);
-}
-
 static inline uint8_t lapic_get_logid(void)
 {
 	return read_mmreg32(LAPIC_LOGICAL_ID) >> 24;
-}
-
-static inline void lapic_set_logid(uint8_t id)
-{
-	write_mmreg32(LAPIC_LOGICAL_ID, id << 24);
 }
 
 static inline void lapic_disable_timer(void)
