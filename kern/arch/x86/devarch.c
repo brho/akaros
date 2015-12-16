@@ -475,6 +475,8 @@ static struct chan *archopen(struct chan *c, int omode)
 	c = devopen(c, omode, archdir, Qmax, devgen);
 	switch ((uint32_t) c->qid.path) {
 		case Qperf:
+			if (!perfmon_supported())
+				error(ENODEV, "perf is not supported");
 			assert(!c->aux);
 			c->aux = arch_create_perf_context();
 			break;

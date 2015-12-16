@@ -61,7 +61,6 @@ static void perfmon_read_cpu_caps(struct perfmon_cpu_caps *pcc)
 	pcc->counters_x_proc = (a >> 8) & 0xff;
 	pcc->bits_x_fix_counter = (d >> 5) & 0xff;
 	pcc->fix_counters_x_proc = d & 0x1f;
-	wmb_f();
 	pcc->perfmon_version = a & 0xff;
 }
 
@@ -291,22 +290,24 @@ static void perfmon_arm_irq(void)
 	write_mmreg32(LAPIC_LVT_PERFMON, IdtLAPIC_PCINT);
 }
 
-void perfmon_init(void)
+bool perfmon_supported(void)
+{
+	return cpu_caps.perfmon_version >= 2;
+}
+
+void perfmon_global_init(void)
+{
+	perfmon_read_cpu_caps(&cpu_caps);
+}
+
+void perfmon_pcpu_init(void)
 {
 	int i;
 
+	if (!perfmon_supported())
+		return;
 	/* Enable user level access to the performance counters */
 	lcr4(rcr4() | CR4_PCE);
-
-	/* This will be called from every core, no need to execute more than once.
-	 * All the call to perfmon_init() will be done when the core boots, so
-	 * they will be no perfmon users calling it, while perfmon_read_cpu_caps()
-	 * is executing.
-	 * All the cores will be writing the same values, so even from that POV,
-	 * no serialization is required.
-	 */
-	if (cpu_caps.perfmon_version == 0)
-		perfmon_read_cpu_caps(&cpu_caps);
 
 	/* Reset all the counters and selectors to zero.
 	 */

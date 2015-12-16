@@ -80,6 +80,7 @@ void arch_init()
 	save_fp_state(&x86_default_fpu); /* used in arch/trap.h for fpu init */
 	pci_init();
 	vmm_init();
+	perfmon_global_init();
 	// this returns when all other cores are done and ready to receive IPIs
 	#ifdef CONFIG_SINGLE_CORE
 		smp_percpu_init();
@@ -88,7 +89,6 @@ void arch_init()
 	#endif
 	proc_init();
 
-	perfmon_init();
 	cons_irq_init();
 	intel_lpc_init();
 #ifdef CONFIG_ENABLE_LEGACY_USB

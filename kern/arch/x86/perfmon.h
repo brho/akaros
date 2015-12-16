@@ -49,7 +49,9 @@ struct perfmon_status {
 	uint64_t cores_values[0];
 };
 
-void perfmon_init(void);
+bool perfmon_supported(void);
+void perfmon_global_init(void);
+void perfmon_pcpu_init(void);
 void perfmon_interrupt(struct hw_trapframe *hw_tf, void *data);
 void perfmon_get_cpu_caps(struct perfmon_cpu_caps *pcc);
 int perfmon_open_event(const struct core_set *cset, struct perfmon_session *ps,

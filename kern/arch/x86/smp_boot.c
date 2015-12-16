@@ -302,7 +302,7 @@ void __arch_pcpu_init(uint32_t coreid)
 	assert(read_msr(MSR_KERN_GS_BASE) == (uint64_t)pcpui);
 	/* Don't try setting up til after setting GS */
 	x86_sysenter_init(x86_get_stacktop_tss(pcpui->tss));
-	/* need to init perfctr before potentiall using it in timer handler */
-	perfmon_init();
+	/* need to init perfctr before potentially using it in timer handler */
+	perfmon_pcpu_init();
 	vmm_pcpu_init();
 }
