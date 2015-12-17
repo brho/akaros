@@ -287,7 +287,7 @@ static struct perfmon_status *perfmon_alloc_status(void)
 
 static void perfmon_arm_irq(void)
 {
-	write_mmreg32(LAPIC_LVT_PERFMON, IdtLAPIC_PCINT);
+	apicrput(MSR_LAPIC_LVT_PERFMON, IdtLAPIC_PCINT);
 }
 
 bool perfmon_supported(void)

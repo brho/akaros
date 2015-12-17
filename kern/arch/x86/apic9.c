@@ -14,72 +14,30 @@
 #include <arch/io.h>
 #include <trap.h>
 
-enum {							/* Local APIC registers */
-	Id = 0x0020,				/* Identification */
-	Ver = 0x0030,	/* Version */
-	Tp = 0x0080,	/* Task Priority */
-	Ap = 0x0090,	/* Arbitration Priority */
-	Pp = 0x00a0,	/* Processor Priority */
-	Eoi = 0x00b0,	/* EOI */
-	Ld = 0x00d0,	/* Logical Destination */
-	Df = 0x00e0,	/* Destination Format */
-	Siv = 0x00f0,	/* Spurious Interrupt Vector */
-	Is = 0x0100,	/* Interrupt Status (8) */
-	Tm = 0x0180,	/* Trigger Mode (8) */
-	Ir = 0x0200,	/* Interrupt Request (8) */
-	Es = 0x0280,	/* Error Status */
-	Iclo = 0x0300,	/* Interrupt Command */
-	Ichi = 0x0310,	/* Interrupt Command [63:32] */
-	Lvt0 = 0x0320,	/* Local Vector Table 0 */
-	Lvt5 = 0x0330,	/* Local Vector Table 5 */
-	Lvt4 = 0x0340,	/* Local Vector Table 4 */
-	Lvt1 = 0x0350,	/* Local Vector Table 1 */
-	Lvt2 = 0x0360,	/* Local Vector Table 2 */
-	Lvt3 = 0x0370,	/* Local Vector Table 3 */
-	Tic = 0x0380,	/* Timer Initial Count */
-	Tcc = 0x0390,	/* Timer Current Count */
-	Tdc = 0x03e0,	/* Timer Divide Configuration */
-
-	Tlvt = Lvt0,	/* Timer */
-	Lint0 = Lvt1,	/* Local Interrupt 0 */
-	Lint1 = Lvt2,	/* Local Interrupt 1 */
-	Elvt = Lvt3,	/* Error */
-	Pclvt = Lvt4,	/* Performance Counter */
-	Tslvt = Lvt5,	/* Thermal Sensor */
-};
-
 static char *apicregnames[] = {
-	[Id] "Identification",
-	[Ver] "Version",
-	[Tp] "Task Priority",
-	[Ap] "Arbitration Priority",
-	[Pp] "Processor Priority",
-	[Eoi] "EOI",
-	[Ld] "Logical Destination",
-	[Df] "Destination Format",
-	[Siv] "Spurious Interrupt Vector",
-	[Is] "Interrupt Status (8)",
-	[Tm] "Trigger Mode (8)",
-	[Ir] "Interrupt Request (8)",
-	[Es] "Error Status",
-	[Iclo] "Interrupt Command",
-	[Ichi] "Interrupt Command [63:32]",
-	[Lvt0] "Local Vector Table 0",
-	[Lvt5] "Local Vector Table 5",
-	[Lvt4] "Local Vector Table 4",
-	[Lvt1] "Local Vector Table 1",
-	[Lvt2] "Local Vector Table 2",
-	[Lvt3] "Local Vector Table 3",
-	[Tic] "Timer Initial Count",
-	[Tcc] "Timer Current Count",
-	[Tdc] "Timer Divide Configuration",
+	[MSR_LAPIC_ID] "Identification",
+	[MSR_LAPIC_VERSION] "Version",
+	[MSR_LAPIC_TPR] "Task Priority",
+//	[Ap] "Arbitration Priority",
+	[MSR_LAPIC_PPR] "Processor Priority",
+	[MSR_LAPIC_EOI] "EOI",
+	[MSR_LAPIC_LDR] "Logical Destination",
+	[MSR_LAPIC_SPURIOUS] "Spurious Interrupt Vector",
+	[MSR_LAPIC_ISR_START] "Interrupt Status (8)",
+	[MSR_LAPIC_TMR_START] "Trigger Mode (8)",
+	[MSR_LAPIC_IRR_START] "Interrupt Request (8)",
+	[MSR_LAPIC_ESR] "Error Status",
+	[MSR_LAPIC_ICR] "Interrupt Command",
+	[MSR_LAPIC_INITIAL_COUNT] "Timer Initial Count",
+	[MSR_LAPIC_CURRENT_COUNT] "Timer Current Count",
+	[MSR_LAPIC_DIVIDE_CONFIG_REG] "Timer Divide Configuration",
 
-	[Tlvt] "Timer",
-	[Lint0] "Local Interrupt 0",
-	[Lint1] "Local Interrupt 1",
-	[Elvt] "Error",
-	[Pclvt] "Performance Counter",
-	[Tslvt] "Thermal Sensor",
+	[MSR_LAPIC_LVT_TIMER] "Timer",
+	[MSR_LAPIC_LVT_LINT0] "Local Interrupt 0",
+	[MSR_LAPIC_LVT_LINT1] "Local Interrupt 1",
+	[MSR_LAPIC_LVT_ERROR_REG] "Error",
+	[MSR_LAPIC_LVT_PERFMON] "Performance Counter",
+	[MSR_LAPIC_LVT_THERMAL] "Thermal Sensor",
 };
 
 enum {							/* Siv */
@@ -113,31 +71,89 @@ enum {							/* Tdc */
 
 static uintptr_t apicbase;
 static int apmachno = 1;
+static uint32_t apicr310;
 
 struct apic xlapic[Napic];
 
-static uint32_t apicrget(int r)
+static void __apic_ir_dump(uint64_t r);
+
+static void __apic_ir_dump(uint64_t r)
+{
+	int i;
+	uint32_t val;
+
+	if (r != MSR_LAPIC_ISR_START && r != MSR_LAPIC_IRR_START &&
+	    r != MSR_LAPIC_TMR_START)
+		panic("Invalid register dump offset!");
+
+	for (i = 7; i >= 0; i--) {
+		val = apicrget(r+i);
+		if (val) {
+			printk("Register at range (%d,%d]: 0x%08x\n", ((i+1)*32),
+			       i*32, val);
+		}
+	}
+}
+void apic_isr_dump(void)
+{
+	printk("ISR DUMP\n");
+	__apic_ir_dump(MSR_LAPIC_ISR_START);
+}
+void apic_irr_dump(void)
+{
+	printk("IRR DUMP\n");
+	__apic_ir_dump(MSR_LAPIC_IRR_START);
+}
+
+uint32_t apicrget(uint64_t r)
 {
 	uint32_t val;
-	if (!apicbase)
-		panic("apicrget: no apic");
-	val = read_mmreg32(apicbase + r);
+
+	if (r >= MSR_LAPIC_END)
+		panic("%s: OUT OF BOUNDS: register 0x%x\n", __func__, r);
+	if (r != MSR_LAPIC_SPURIOUS && r != MSR_LAPIC_DIVIDE_CONFIG_REG)
+		printd("%s: Reading from register 0x%llx\n",
+		       __func__, r);
+
+	val = read_msr(r);
 	printd("apicrget: %s returns %p\n", apicregnames[r], val);
+	if (r == MSR_LAPIC_ID) {
+		printd("APIC ID: 0x%lx\n", val);
+		printd("APIC LOGICAL ID: 0x%lx\n",
+		       apicrget(MSR_LAPIC_LDR));
+	}
 	return val;
 }
 
-static void apicrput(int r, uint32_t data)
+void apicrput(uint64_t r, uint32_t data)
 {
-	if (!apicbase)
-		panic("apicrput: no apic");
+	uint64_t temp_data = 0;
+
+	if (r >= MSR_LAPIC_END)
+		panic("%s: OUT OF BOUNDS: register 0x%x\n", __func__, r);
+	if (r != MSR_LAPIC_INITIAL_COUNT && r != MSR_LAPIC_LVT_TIMER &&
+	    r != MSR_LAPIC_DIVIDE_CONFIG_REG && r != MSR_LAPIC_EOI)
+		printd("%s: Writing to register 0x%llx, value 0x%lx\n",
+		       __func__, r, data);
+	if (r == MSR_LAPIC_ID)
+		panic("ILLEGAL WRITE TO ID");
 	printd("apicrput: %s = %p\n", apicregnames[r], data);
-	write_mmreg32(apicbase + r, data);
+
+	temp_data |= data;
+
+	write_msr(r, temp_data);
+}
+
+void apicsendipi(uint64_t data)
+{
+	printd("SENDING IPI: 0x%016lx\n", data);
+	write_msr(MSR_LAPIC_ICR, data);
 }
 
 void apicinit(int apicno, uintptr_t pa, int isbp)
 {
 	struct apic *apic;
-
+	uint64_t msr_val;
 	/*
 	 * Mark the APIC useable if it has a good ID
 	 * and the registers can be mapped.
@@ -156,30 +172,35 @@ void apicinit(int apicno, uintptr_t pa, int isbp)
 		return;
 	}
 	assert(pa == LAPIC_PBASE);
-	apicbase = LAPIC_BASE;	/* was the plan to just clobber the global? */
 	apic->useable = 1;
 
 	/* plan 9 used to set up a mapping btw apic and pcpui like so:
 		pcpui->apicno = apicno; // acpino is the hw_coreid
 		apic->machno = apmachno++; // machno is the os_coreid
 	 * akaros does its own remapping of hw <-> os coreid during smp_boot */
+
+	//X2APIC INIT
+	msr_val = read_msr(IA32_APIC_BASE);
+	write_msr(IA32_APIC_BASE, msr_val | (3<<10));
 }
 
 static char *apicdump0(char *start, char *end, struct apic *apic, int i)
 {
 	if (!apic->useable || apic->addr != 0)
 		return start;
-	start =
-		seprintf(start, end, "apic%d: oscore %d lint0 %#8.8p lint1 %#8.8p\n", i,
-				 get_os_coreid(i), apic->lvt[0], apic->lvt[1]);
-	start =
-		seprintf(start, end, " tslvt %#8.8p pclvt %#8.8p elvt %#8.8p\n",
-				 apicrget(Tslvt), apicrget(Pclvt), apicrget(Elvt));
-	start =
-		seprintf(start, end,
-				 " tlvt %#8.8p lint0 %#8.8p lint1 %#8.8p siv %#8.8p\n",
-				 apicrget(Tlvt), apicrget(Lint0), apicrget(Lint1),
-				 apicrget(Siv));
+	start = seprintf(start, end,
+	                 "apic%d: oscore %d lint0 %#8.8p lint1 %#8.8p\n", i,
+		         get_os_coreid(i), apic->lvt[0], apic->lvt[1]);
+	start =	seprintf(start, end, " tslvt %#8.8p pclvt %#8.8p elvt %#8.8p\n",
+	                 apicrget(MSR_LAPIC_LVT_THERMAL),
+	                 apicrget(MSR_LAPIC_LVT_PERFMON),
+	                 apicrget(MSR_LAPIC_LVT_ERROR_REG));
+	start =	seprintf(start, end,
+	                 " tlvt %#8.8p lint0 %#8.8p lint1 %#8.8p siv %#8.8p\n",
+	                 apicrget(MSR_LAPIC_LVT_TIMER),
+	                 apicrget(MSR_LAPIC_LVT_LINT0),
+	                 apicrget(MSR_LAPIC_LVT_LINT1),
+	                 apicrget(MSR_LAPIC_SPURIOUS));
 	return start;
 }
 
@@ -202,8 +223,8 @@ char *apicdump(char *start, char *end)
 void handle_lapic_error(struct hw_trapframe *hw_tf, void *data)
 {
 	uint32_t err;
-	apicrput(Es, 0);
-	err = apicrget(Es);
+	apicrput(MSR_LAPIC_ESR, 0);
+	err = apicrget(MSR_LAPIC_ESR);
 	/* i get a shitload of these on my nehalem, many with err == 0 */
 	printd("LAPIC error vector, got 0x%08x\n", err);
 }
@@ -214,12 +235,14 @@ int apiconline(void)
 	uint64_t tsc;
 	uint32_t dfr, ver;
 	int apicno, nlvt;
+	uint64_t msr_val;
 
-	if (!apicbase) {
-		printk("No apicbase on HW core %d!!\n", hw_core_id());
-		return 0;
-	}
-	if ((apicno = ((apicrget(Id) >> 24) & 0xff)) >= Napic) {
+	//X2APIC INIT
+	msr_val = read_msr(IA32_APIC_BASE);
+	write_msr(IA32_APIC_BASE, msr_val | (3<<10));
+
+	apicno = lapic_get_id();
+	if (apicno >= Napic) {
 		printk("Bad apicno %d on HW core %d!!\n", apicno, hw_core_id());
 		return 0;
 	}
@@ -231,7 +254,7 @@ int apiconline(void)
 	}
 	/* Things that can only be done when on the processor owning the APIC,
 	 * apicinit above runs on the bootstrap processor. */
-	ver = apicrget(Ver);
+	ver = apicrget(MSR_LAPIC_VERSION);
 	nlvt = ((ver >> 16) & 0xff) + 1;
 	if (nlvt > ARRAY_SIZE(apic->lvt)) {
 		printk("apiconline%d: nlvt %d > max (%d)\n",
@@ -246,22 +269,22 @@ int apiconline(void)
 	//if (memcmp(m->cpuinfo, "AuthenticAMD", 12) == 0)
 	//	dfr = 0xf0000000;
 	//else
-		dfr = 0xffffffff;
-	apicrput(Df, dfr);
-	apicrput(Ld, 0x00000000);
+	//	dfr = 0xffffffff;
+	//apicrput(Df, dfr);
+	//apicrput(MSR_LAPIC_LDR, 0x00000000);
 
 	/* Disable interrupts until ready by setting the Task Priority register to
 	 * 0xff. */
-	apicrput(Tp, 0xff);
+	apicrput(MSR_LAPIC_TPR, 0xff);
 
 	/* Software-enable the APIC in the Spurious Interrupt Vector register and
 	 * set the vector number. The vector number must have bits 3-0 0x0f unless
 	 * the Extended Spurious Vector Enable bit is set in the HyperTransport
 	 * Transaction Control register. */
-	apicrput(Siv, Swen | IdtLAPIC_SPURIOUS);
+	apicrput(MSR_LAPIC_SPURIOUS, Swen | IdtLAPIC_SPURIOUS);
 
 	/* Acknowledge any outstanding interrupts. */
-	apicrput(Eoi, 0);
+	apicrput(MSR_LAPIC_EOI, 0);
 
 	/* Mask interrupts on Performance Counter overflow and Thermal Sensor if
 	 * implemented, and on Lintr0 (Legacy INTR), Lintr1 (Legacy NMI), and the
@@ -269,22 +292,22 @@ int apiconline(void)
 	 * Error interrupt. */
 	switch (apic->nlvt) {
 		case 6:
-			apicrput(Tslvt, Im);
+			apicrput(MSR_LAPIC_LVT_THERMAL, Im);
 			/* fall-through */
 		case 5:
-			apicrput(Pclvt, Im);
+			apicrput(MSR_LAPIC_LVT_PERFMON, Im);
 			/* fall-through */
 		default:
 			break;
 	}
 	/* lvt[0] and [1] were set to 0 in the BSS */
-	apicrput(Lint1, apic->lvt[1] | Im | IdtLAPIC_LINT1);
-	apicrput(Lint0, apic->lvt[0] | Im | IdtLAPIC_LINT0);
-	apicrput(Tlvt, Im);
+	apicrput(MSR_LAPIC_LVT_LINT1, apic->lvt[1] | Im | IdtLAPIC_LINT1);
+	apicrput(MSR_LAPIC_LVT_LINT0, apic->lvt[0] | Im | IdtLAPIC_LINT0);
+	apicrput(MSR_LAPIC_LVT_TIMER, Im);
 
-	apicrput(Es, 0);
-	apicrget(Es);
-	apicrput(Elvt, IdtLAPIC_ERROR | Im);
+	apicrput(MSR_LAPIC_ESR, 0);
+	apicrget(MSR_LAPIC_ESR);
+	apicrput(MSR_LAPIC_LVT_ERROR_REG, IdtLAPIC_ERROR | Im);
 
 	/* Not sure we need this from plan 9, Akaros never did:
 	 *
@@ -299,6 +322,6 @@ int apiconline(void)
  	/* this is to enable the APIC interrupts.  we did a SW lapic_enable()
 	 * earlier.  if we ever have issues where the lapic seems offline, check
 	 * here. */
-	apicrput(Tp, 0);
+	apicrput(MSR_LAPIC_TPR, 0);
 	return 1;
 }

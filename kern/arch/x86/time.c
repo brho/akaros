@@ -31,10 +31,10 @@ void timer_init(void){
 	__lapic_set_timer(0xffffffff, IdtLAPIC_TIMER, FALSE,
 	                  LAPIC_TIMER_DIVISOR_BITS);
 	// Mask the LAPIC Timer, so we never receive this interrupt (minor race)
-	mask_lapic_lvt(LAPIC_LVT_TIMER);
-	timercount[0] = read_mmreg32(LAPIC_TIMER_CURRENT);
+	mask_lapic_lvt(MSR_LAPIC_LVT_TIMER);
+	timercount[0] = apicrget(MSR_LAPIC_CURRENT_COUNT);
 	udelay_pit(1000000);
-	timercount[1] = read_mmreg32(LAPIC_TIMER_CURRENT);
+	timercount[1] = apicrget(MSR_LAPIC_CURRENT_COUNT);
 	system_timing.bus_freq = (timercount[0] - timercount[1])
 	                         * LAPIC_TIMER_DIVISOR_VAL;
 	/* The time base for the timer is derived from the processor's bus clock,
@@ -49,7 +49,7 @@ void pit_set_timer(uint32_t divisor, uint32_t mode)
 	if (divisor & 0xffff0000)
 		warn("Divisor too large!");
 	mode = TIMER_SEL0|TIMER_16BIT|mode;
-	outb(TIMER_MODE, mode); 
+	outb(TIMER_MODE, mode);
 	outb(TIMER_CNTR0, divisor & 0xff);
 	outb(TIMER_CNTR0, (divisor >> 8) );
 	system_timing.pit_mode = mode;
@@ -64,7 +64,7 @@ static int getpit()
 
     /* Select counter 0 and latch counter value. */
     outb(TIMER_MODE, TIMER_SEL0 | TIMER_LATCH);
-    
+
     low = inb(TIMER_CNTR0);
     high = inb(TIMER_CNTR0);
 
@@ -119,14 +119,14 @@ void udelay_pit(uint64_t usec)
 	else
 		// round up the ticks left
 		ticks_left = ((uint64_t)usec * (long long)PIT_FREQ+ 999999)
-			     / 1000000; 
+			     / 1000000;
 	while (ticks_left > 0) {
 		tick = getpit();
 		delta = prev_tick - tick;
 		prev_tick = tick;
 		if (delta < 0) {
 			// counter looped around during the delta time period
-			delta += system_timing.pit_divisor; // maximum count 
+			delta += system_timing.pit_divisor; // maximum count
 			if (delta < 0)
 				delta = 0;
 		}
@@ -136,7 +136,7 @@ void udelay_pit(uint64_t usec)
 
 uint64_t gettimer(void)
 {
-	return read_tsc();	
+	return read_tsc();
 }
 
 uint64_t getfreq(void)

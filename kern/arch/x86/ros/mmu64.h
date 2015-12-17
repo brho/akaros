@@ -31,14 +31,14 @@ typedef struct x86_pgdir {
  *                     |                              |                     |
  * KERN_LOAD_ADDR -->  +------------------------------+ 0xffffffffc0000000 -+
  *                     |                              |
- *                     |          Local APIC          | RW/--  APIC_SIZE (1MB)
- *                     |                              |
- *    LAPIC_BASE  -->  +------------------------------+ 0xffffffffbff00000
- *                     |                              |
  *                     |            IOAPIC            | RW/--  APIC_SIZE (1MB)
  *                     |                              |
- *  IOAPIC_BASE,  -->  +------------------------------+ 0xffffffffbfe00000
- *  KERN_DYN_TOP       |   Kernel Dynamic Mappings    |
+ *   IOAPIC_BASE  -->  +------------------------------+ 0xffffffffbff00000
+ *                     |                              |
+ *                     |                              | RW/--  APIC_SIZE (1MB)
+ *                     |                              |
+ *   KERN_DYN_TOP -->  +------------------------------+ 0xffffffffbfe00000
+ *                     |   Kernel Dynamic Mappings    |
  *                     |              .               |
  *                     :              .               :
  *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ RW/--
@@ -152,8 +152,7 @@ typedef struct x86_pgdir {
 #define KERN_LOAD_ADDR  0xffffffffc0000000
 /* Static kernel mappings */
 #define APIC_SIZE 		0x100000
-#define LAPIC_BASE		(KERN_LOAD_ADDR - APIC_SIZE)
-#define IOAPIC_BASE		(LAPIC_BASE - APIC_SIZE)
+#define IOAPIC_BASE		(KERN_LOAD_ADDR - APIC_SIZE)
 /* All arches must define this, which is the lower limit of their static
  * mappings, and where the dynamic mappings will start. */
 #define KERN_DYN_TOP	IOAPIC_BASE

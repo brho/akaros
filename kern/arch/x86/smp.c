@@ -144,7 +144,6 @@ static int smp_call_function(uint8_t type, uint32_t dest, isr_t handler,
 			panic("Invalid type for cross-core function call!");
 	}
 	// wait long enough to receive our own broadcast (PROBABLY WORKS) TODO
-	lapic_wait_to_send();
 	disable_irqsave(&state);
 	return 0;
 }

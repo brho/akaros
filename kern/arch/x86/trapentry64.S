@@ -68,7 +68,16 @@
 	.type name, @function;				\
 	.align 2;							\
 	name:;								\
-	movl $0, (LAPIC_BASE + 0x0b0);      \
+	pushq %rax;			\
+	pushq %rcx;			\
+	pushq %rdx;			\
+	movq $0, %rax;			\
+	movq $0, %rdx;			\
+	movq $(MSR_LAPIC_EOI), %rcx; 	\
+	wrmsr;				\
+	popq %rdx;			\
+	popq %rcx;			\
+	popq %rax;			\
 	iretq;								\
 	.data;								\
 	.quad name;							\
