@@ -79,9 +79,6 @@
 // offset in page
 #define PGOFF(la)	(((uintptr_t) (la)) & (PGSIZE-1))
 
-// construct PTE from PPN and flags
-#define PTE(ppn, flags) ((ppn) << PTE_PPN_SHIFT | (flags))
-
 // construct PTD from physical address
 #define PTD(pa) (((uintptr_t)(pa) >> PGSHIFT << PTE_PPN_SHIFT) | PTE_T)
 

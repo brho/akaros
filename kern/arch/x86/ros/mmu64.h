@@ -251,9 +251,6 @@ typedef struct x86_pgdir {
 #define PGOFF(la)		((uintptr_t)(la) & (PGSIZE - 1))
 #define NPTENTRIES		512
 
-/* construct PTE from PPN and flags */
-#define PTE(ppn, flags) ((ppn) << PGSHIFT | PGOFF(flags))
-
 /* This is used in places (procinfo) meaning "size of smallest jumbo page" */
 #define PTSIZE PML2_PTE_REACH
 

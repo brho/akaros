@@ -4,6 +4,8 @@
  *
  * Arch-specific operations for page tables and PTEs */
 
+#warning "These are the x86 ops.  Adopt them for RISC-V"
+
 #pragma once
 
 static inline bool pte_walk_okay(pte_t pte)
@@ -70,7 +72,7 @@ static inline unsigned long pte_print(pte_t pte)
 
 static inline void pte_write(pte_t pte, physaddr_t pa, int settings)
 {
-	*(kpte_t*)pte = PTE(pa2ppn(pa), settings);
+	*(kpte_t*)pte = build_pte(pa, settings);
 }
 
 static inline void pte_clear_present(pte_t pte)

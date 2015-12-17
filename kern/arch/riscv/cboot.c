@@ -27,7 +27,7 @@ void pagetable_init(uint32_t memsize_mb, pte_t* l1pt, pte_t* l1pt_boot,
 	uint64_t memsize = mem_size(memsize_mb);
 	for(uint64_t pa = 0; pa < memsize+L1PGSIZE-1; pa += L1PGSIZE)
 	{
-		pte_t pte = PTE(LA2PPN(pa), PTE_KERN_RW | PTE_E);
+		pte_t pte = build_pte(pa, PTE_KERN_RW | PTE_E);
 
 		l1pt_boot[L1X(pa)] = pte; // identity mapping
 		l1pt_boot[L1X(KERNBASE+pa)] = pte; // KERNBASE mapping
@@ -48,7 +48,7 @@ void pagetable_init(uint32_t memsize_mb, pte_t* l1pt, pte_t* l1pt_boot,
 	l1pt_boot[L1X(KERN_LOAD_ADDR)] = PTD(l2pt);
 
 	for (uintptr_t pa = 0; pa < (uintptr_t)(-KERN_LOAD_ADDR); pa += L2PGSIZE)
-		l2pt[L2X(KERN_LOAD_ADDR+pa)] = PTE(LA2PPN(pa), PTE_KERN_RW | PTE_E);
+		l2pt[L2X(KERN_LOAD_ADDR+pa)] = build_pte(pa, PTE_KERN_RW | PTE_E);
 #else
 	(void) l2pt; // don't need this for rv32
 #endif

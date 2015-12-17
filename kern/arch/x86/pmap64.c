@@ -590,8 +590,8 @@ int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd)
 	memset(ept, 0, PGSIZE);
 
 	/* VPT and UVPT map the proc's page table, with different permissions. */
-	kpt[PML4(VPT)]  = PTE(LA2PPN(PADDR(kpt)), PTE_KERN_RW);
-	kpt[PML4(UVPT)] = PTE(LA2PPN(PADDR(kpt)), PTE_USER_RO);
+	kpt[PML4(VPT)]  = build_kpte(PADDR(kpt), PTE_KERN_RW);
+	kpt[PML4(UVPT)] = build_kpte(PADDR(kpt), PTE_USER_RO);
 
 	new_pd->kpte = kpt;
 	new_pd->eptp = construct_eptp(PADDR(ept));

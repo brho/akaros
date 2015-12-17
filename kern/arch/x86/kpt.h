@@ -58,7 +58,7 @@ static inline void kpte_write(kpte_t *kpte, physaddr_t pa, int settings)
 {
 	assert(!PGOFF(pa));
 	/* The arch-bits like PTE_D, PTE_PS, etc are all in the native KPT format */
-	*kpte = pa | settings;
+	*kpte = build_kpte(pa, settings);
 }
 
 static inline void kpte_clear_present(kpte_t *kpte)
