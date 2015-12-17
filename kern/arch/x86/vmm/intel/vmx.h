@@ -26,6 +26,11 @@
 
 #include <ros/arch/vmx.h>
 
+#define INTEL_MSR_WRITE_OFFSET			2048
+
+#define INTEL_X2APIC_MSR_START			0x100
+#define INTEL_X2APIC_MSR_LENGTH			(0x40/8)
+
 int vmx_init(void);
 void vmx_exit(void);
 int intel_vmm_init(void);

@@ -545,16 +545,16 @@ static const struct vmxec cb2ec = {
 	.truemsr = MSR_IA32_VMX_PROCBASED_CTLS2,
 
 	.must_be_1 = (SECONDARY_EXEC_ENABLE_EPT |
-		     SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
 		     SECONDARY_EXEC_APIC_REGISTER_VIRT |
 		     SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
+		     SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE |
 		     SECONDARY_EXEC_WBINVD_EXITING),
 
 	.must_be_0 = (
 		     //SECONDARY_EXEC_APIC_REGISTER_VIRT |
 		     //SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
 		     SECONDARY_EXEC_DESCRIPTOR_EXITING |
-		     SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE |
+		     SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
 		     SECONDARY_EXEC_ENABLE_VPID |
 		     SECONDARY_EXEC_UNRESTRICTED_GUEST |
 		     SECONDARY_EXEC_PAUSE_LOOP_EXITING |
@@ -1311,6 +1311,15 @@ int intel_vmm_init(void) {
 	/* FIXME: do we need APIC virtualization (flexpriority?) */
 
 	memset(msr_bitmap, 0xff, PAGE_SIZE);
+
+	/* The following MSRs are virtualized to the vapic page so there is no
+	 * write or read from the actual MSR. */
+	memset((void *)msr_bitmap + INTEL_X2APIC_MSR_START, 0,
+	       INTEL_X2APIC_MSR_LENGTH);
+	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_LAPIC_EOI);
+	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_LAPIC_TPR);
+	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_LAPIC_SELF_IPI);
+
 	memset(io_bitmap, 0xff, VMX_IO_BITMAP_SZ);
 
 	/* These are the only MSRs that are not autoloaded and not intercepted */

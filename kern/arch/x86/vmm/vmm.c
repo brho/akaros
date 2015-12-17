@@ -284,6 +284,20 @@ struct emmsr emmsrs[] = {
 
 	// TBD
 	{MSR_IA32_TSC_DEADLINE, "MSR_IA32_TSC_DEADLINE", emsr_fakewrite},
+
+	// APIC Fakewrites. We should eventually transition this onto the vapic
+	// This will require userspace msr handling.
+	{MSR_LAPIC_INITIAL_COUNT, "MSR_LAPIC_INITIAL_COUNT", emsr_fakewrite},
+	{MSR_LAPIC_LVT_TIMER, "MSR_LAPIC_LVT_TIMER", emsr_fakewrite},
+	{MSR_LAPIC_LVT_PERFMON, "MSR_LAPIC_LVT_PERFMON", emsr_fakewrite},
+	{MSR_LAPIC_TPR, "MSR_LAPIC_TPR", emsr_fakewrite},
+	{MSR_LAPIC_SPURIOUS, "MSR_LAPIC_SPURIOUS", emsr_fakewrite},
+	{MSR_LAPIC_LVT_LINT0, "MSR_LAPIC_LVT_LINT0", emsr_fakewrite},
+	{MSR_LAPIC_LVT_LINT1, "MSR_LAPIC_LVT_LINT1", emsr_fakewrite},
+	{MSR_LAPIC_ESR, "MSR_LAPIC_ESR", emsr_fakewrite},
+	{MSR_LAPIC_LVT_ERROR_REG, "MSR_LAPIC_LVT_ERROR_REG", emsr_fakewrite},
+	{MSR_LAPIC_DIVIDE_CONFIG_REG, "MSR_LAPIC_DIVIDE_CONFIG_REG",
+	 emsr_fakewrite},
 };
 
 /* this may be the only register that needs special handling.
