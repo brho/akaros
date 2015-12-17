@@ -4,6 +4,8 @@
  */
 
 #include <libc-symbols.h>
+#include <ros/common.h>
+#include <ros/trapframe.h>
 #include <parlib/stdio.h>
 #include <parlib/assert.h>
 #include <stdbool.h>
