@@ -74,11 +74,6 @@
 // index into L4 PT
 #define L4X(la)		((((uintptr_t) (la)) >> L4PGSHIFT) & (NPTENTRIES-1))
 
-// construct linear address from indexes and offset
-#define PGADDR(l1, l2, l3, l4, o) ((uintptr_t) ((l1) << L1PGSHIFT | (l2) << L2PGSHIFT | (l3) << L3PGSHIFT | (l4) << L4PGSHIFT | (o)))
-#else
-// construct linear address from indexes and offset
-#define PGADDR(l1, l2, o) ((uintptr_t) ((l1) << L1PGSHIFT | (l2) << L2PGSHIFT | (o)))
 #endif
 
 // offset in page

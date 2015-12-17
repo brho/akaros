@@ -249,26 +249,13 @@ typedef struct x86_pgdir {
 #define LA2PPN(la)		((uintptr_t)(la) >> PGSHIFT)
 #define PTE2PPN(pte)	LA2PPN(pte)
 #define PGOFF(la)		((uintptr_t)(la) & (PGSIZE - 1))
+#define NPTENTRIES		512
 
 /* construct PTE from PPN and flags */
 #define PTE(ppn, flags) ((ppn) << PGSHIFT | PGOFF(flags))
 
-/* construct linear address from indexes and offset */
-#define PGADDR(p4, p3, p2, p1, o) ((void*)(((p4) << PML4_SHIFT) |              \
-                                           ((p3) << PML3_SHIFT) |              \
-                                           ((p2) << PML2_SHIFT) |              \
-                                           ((p1) << PML1_SHIFT) |(o)))
-
 /* This is used in places (procinfo) meaning "size of smallest jumbo page" */
 #define PTSIZE PML2_PTE_REACH
-
-
-/* TODO: not sure if we'll need these - limited to 64bit code */
-/* this only gives us the L1 PML */
-#define PTX(la)		((((uintptr_t) (la)) >> 12) & 0x1ff)
-#define JPGOFF(la)	(((uintptr_t) (la)) & 0x001FFFFF)
-#define NPTENTRIES		512
-#define JPGSIZE PTSIZE
 
 /* Page table/directory entry flags. */
 
