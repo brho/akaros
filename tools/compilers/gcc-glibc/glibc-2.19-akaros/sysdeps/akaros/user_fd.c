@@ -27,6 +27,8 @@ static size_t nr_ufds = 0;
 int ufd_get_fd(struct user_fd *ufd)
 {
 	struct user_fd **new_ufds;
+	int fd;
+
 	if (!ufds) {
 		nr_ufds = 1 << (sizeof(int) * 8 - LOG2_UP(NR_FILE_DESC_MAX) - 1);
 		/* Two things: instead of worrying about growing and reallocing (which
@@ -45,8 +47,11 @@ int ufd_get_fd(struct user_fd *ufd)
 	 * start in different areas, or maintain a 'last used' hint FD. */
 	for (int i = 0; i < nr_ufds; i++) {
 		if (!ufds[i]) {
-			if (atomic_cas_ptr((void**)&ufds[i], 0, ufd))
-				return i + USER_FD_BASE;
+			if (atomic_cas_ptr((void**)&ufds[i], 0, ufd)) {
+				fd = i + USER_FD_BASE;
+				ufds[i]->fd = fd;
+				return fd;
+			}
 		}
 	}
 	__set_errno(ENFILE);
