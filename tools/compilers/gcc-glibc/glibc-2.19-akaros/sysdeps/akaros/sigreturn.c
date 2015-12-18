@@ -21,6 +21,6 @@
 
 int __sigreturn(struct sigcontext *context)
 {
-	signal_ops->sigreturn(context);
+	return signal_ops->sigreturn(context);
 }
 weak_alias(__sigreturn, sigreturn)
