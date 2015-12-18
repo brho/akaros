@@ -19,12 +19,6 @@
  * 	exec and flags in struct user_fd.
  * 	- EPOLL_CTL_MOD is just a DEL then an ADD.  There might be races associated
  * 	with that.
- * 	- If you close a tracked FD without removing it from the epoll set, the
- * 	kernel will turn off the FD tap.  You may still have an epoll event that was
- * 	concurrently sent.  Likewise, that FD may be used again by your program, and
- * 	if you add *that* one to another epoll set before removing it from the
- * 	current one, weird things may happen (like having two epoll ctlrs turning on
- * 	and off taps).
  * 	- epoll_pwait is probably racy.
  * 	- You can't dup an epoll fd (same as other user FDs).
  * 	- If you add a BSD socket FD to an epoll set before calling listen(), you'll
@@ -41,6 +35,7 @@
 #include <parlib/uthread.h>
 #include <parlib/timing.h>
 #include <sys/user_fd.h>
+#include <sys/close_cb.h>
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
@@ -236,8 +231,24 @@ static int init_ep_ctlr(struct epoll_ctlr *ep, int size)
 	return 0;
 }
 
+static void epoll_fd_closed(int fd)
+{
+	struct epoll_ctlr *ep;
+
+	/* Lockless peek, avoid locking for every close() */
+	if (TAILQ_EMPTY(&all_ctlrs))
+		return;
+	uth_mutex_lock(ctlrs_mtx);
+	TAILQ_FOREACH(ep, &all_ctlrs, link)
+		epoll_ctl(ep->ufd.fd, EPOLL_CTL_DEL, fd, 0);
+	uth_mutex_unlock(ctlrs_mtx);
+}
+
 static void epoll_init(void)
 {
+	static struct close_cb epoll_close_cb = {.func = epoll_fd_closed};
+
+	register_close_cb(&epoll_close_cb);
 	ctlrs_mtx = uth_mutex_alloc();
 }
 
