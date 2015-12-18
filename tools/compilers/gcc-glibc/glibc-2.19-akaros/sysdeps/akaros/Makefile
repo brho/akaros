@@ -55,8 +55,10 @@ endif
 # User FDs
 ifeq ($(subdir),stdlib)
 sysdep_routines += user_fd
+sysdep_routines += close_cb
 endif
 sysdep_headers += sys/user_fd.h
+sysdep_headers += sys/close_cb.h
 # Epoll: uses User FDs, implemented in iplib
 sysdep_headers += sys/epoll.h bits/epoll.h
 

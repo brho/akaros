@@ -22,11 +22,19 @@
 #include <stddef.h>
 #include <ros/syscall.h>
 #include <sys/user_fd.h>
+#include <sys/close_cb.h>
 
-/* Write NBYTES of BUF to FD.  Return the number written, or -1.  */
-int
-__close (int fd)
+int __close(int fd)
 {
+	struct close_cb *cb = close_callbacks;
+
+	/* Another thread could be publishing a new callback to the front of the
+	 * list concurrently.  We'll miss that callback.  They to handle this,
+	 * usually by making sure their CB is registered before using FDs. */
+	while (cb) {
+		cb->func(fd);
+		cb = cb->next;
+	}
 	if (fd >= USER_FD_BASE)
 		return glibc_close_helper(fd);
 	else
