@@ -45,17 +45,23 @@
 #include <errno.h>
 #include <unistd.h>
 #include <malloc.h>
+#include <sys/queue.h>
 
 /* Sanity check, so we can ID our own FDs */
 #define EPOLL_UFD_MAGIC 		0xe9011
 
 struct epoll_ctlr {
+	TAILQ_ENTRY(epoll_ctlr)		link;
 	struct event_queue			*ceq_evq;
 	struct ceq					*ceq;	/* convenience pointer */
 	unsigned int				size;
 	uth_mutex_t					mtx;
 	struct user_fd				ufd;
 };
+
+TAILQ_HEAD(epoll_ctlrs, epoll_ctlr);
+static struct epoll_ctlrs all_ctlrs = TAILQ_HEAD_INITIALIZER(all_ctlrs);
+static uth_mutex_t ctlrs_mtx;
 
 /* There's some bookkeeping we need to maintain on every FD.  Right now, the FD
  * is the index into the CEQ event array, so we can just hook this into the user
@@ -209,6 +215,9 @@ static void epoll_close(struct user_fd *ufd)
 	} while (nr_done < nr_tap_req);
 	free(tap_reqs);
 	ep_put_ceq_evq(ep->ceq_evq);
+	uth_mutex_lock(ctlrs_mtx);
+	TAILQ_REMOVE(&all_ctlrs, ep, link);
+	uth_mutex_unlock(ctlrs_mtx);
 	uth_mutex_free(ep->mtx);
 	free(ep);
 }
@@ -227,11 +236,17 @@ static int init_ep_ctlr(struct epoll_ctlr *ep, int size)
 	return 0;
 }
 
+static void epoll_init(void)
+{
+	ctlrs_mtx = uth_mutex_alloc();
+}
+
 int epoll_create(int size)
 {
 	int fd;
 	struct epoll_ctlr *ep;
 
+	run_once(epoll_init());
 	/* good thing the arg is a signed int... */
 	if (size < 0) {
 		errno = EINVAL;
@@ -246,6 +261,9 @@ int epoll_create(int size)
 	fd = ufd_get_fd(&ep->ufd);
 	if (fd < 0)
 		free(ep);
+	uth_mutex_lock(ctlrs_mtx);
+	TAILQ_INSERT_TAIL(&all_ctlrs, ep, link);
+	uth_mutex_unlock(ctlrs_mtx);
 	return fd;
 }
 
