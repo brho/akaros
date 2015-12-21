@@ -7,7 +7,14 @@ $(src)/error.c: $(AKAROS_ROOT)/include/ros/errno.h
 	@echo "};"                             >> $(@)
 	@echo "const int MAX_ERRNO = sizeof(errno_strings)/sizeof(errno_strings[0]);" >> $(@)
 
-$(src)/build_info.c:
+$(src)/build_info.cid:
+	@echo `git rev-parse HEAD` > $(src)/build_info.cid.tmp
+	@if [ ! -f $(src)/build_info.cid ] || \
+		[ `cmp -s $(src)/build_info.cid $(src)/build_info.cid.tmp` -ne 0 ]; then \
+			cp $(src)/build_info.cid.tmp $(src)/build_info.cid; fi;
+	@rm -f $(src)/build_info.cid.tmp
+
+$(src)/build_info.c: $(src)/build_info.cid
 ifeq ($(BUILD_INFO_FILE),)
 		@echo "/* Automatically generated. DO NOT EDIT! */" > $(@)
 		@echo "" >> $(@)
@@ -17,17 +24,17 @@ ifeq ($(BUILD_INFO_FILE),)
 			>> $(@)
 		@echo "const char build_info_host[] = { \"`hostname`\" };"\
 			>> $(@)
-		@echo "const char build_info_commitid[] = { \"`git rev-parse HEAD`\" };"\
+		@echo "const char build_info_commitid[] = { \"`cat $(src)/build_info.cid`\" };"\
 			>> $(@)
 		@echo "const char build_info_version[] = { \"$(KERNELVERSION)\" };"\
 			>> $(@)
 		@echo "const char build_info_version_name[] = { \"$(VERNAME)\" };"\
 			>> $(@)
 else
-		@cp $(BUILD_INFO_FILE) $(@)
+		cp $(BUILD_INFO_FILE) $(@)
 endif
 
-clean-files += build_info.c error.c
+clean-files += build_info.c build_info.cid error.c
 
 obj-y						+= alarm.o
 obj-y						+= apipe.o
