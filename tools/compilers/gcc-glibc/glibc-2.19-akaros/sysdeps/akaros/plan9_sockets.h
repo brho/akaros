@@ -63,6 +63,7 @@ struct Rock {
 
 extern Rock *_sock_findrock(int, struct stat *);
 extern Rock *_sock_newrock(int);
+extern void _sock_fd_closed(int fd);
 extern void _sock_srvname(char *, char *);
 extern int _sock_srv(char *, int);
 extern int _sock_data(int, char *, int, int, int, Rock **);
