@@ -57,6 +57,8 @@ struct Pipe {
 	int qref[2];
 	struct dirtab *pipedir;
 	char *user;
+	struct fdtap_slist data_taps[2];
+	spinlock_t tap_lock;
 };
 
 static struct {
@@ -142,6 +144,11 @@ static struct chan *pipeattach(char *spec)
 	c->qid.type = QTDIR;
 	c->aux = p;
 	c->dev = 0;
+
+	/* taps. */
+	SLIST_INIT(&p->data_taps[0]);	/* already = 0; set to be futureproof */
+	SLIST_INIT(&p->data_taps[1]);
+	spinlock_init(&p->tap_lock);
 	return c;
 }
 
@@ -479,6 +486,75 @@ static int pipewstat(struct chan *c, uint8_t *dp, int n)
 	return n;
 }
 
+static void pipe_wake_cb(struct queue *q, void *data, int filter)
+{
+	/* If you allocate structs like this on odd byte boundaries, you
+	 * deserve what you get.  */
+	uintptr_t kludge = (uintptr_t) data;
+	int which = kludge & 1;
+	Pipe *p = (Pipe*)(kludge & ~1ULL);
+	struct fd_tap *tap_i;
+
+	spin_lock(&p->tap_lock);
+	SLIST_FOREACH(tap_i, &p->data_taps[which], link)
+		fire_tap(tap_i, filter);
+	spin_unlock(&p->tap_lock);
+}
+
+static int pipetapfd(struct chan *chan, struct fd_tap *tap, int cmd)
+{
+	int ret;
+	Pipe *p;
+	int which = 1;
+	uint64_t kludge;
+
+	p = chan->aux;
+	kludge = (uint64_t)p;
+#define DEVPIPE_LEGAL_DATA_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_WRITABLE | \
+                                 FDTAP_FILT_HANGUP | FDTAP_FILT_ERROR)
+
+	switch (NETTYPE(chan->qid.path)) {
+	case Qdata0:
+		which = 0;
+		/* fall through */
+	case Qdata1:
+		kludge |= which;
+
+		if (tap->filter & ~DEVPIPE_LEGAL_DATA_TAPS) {
+			set_errno(ENOSYS);
+			set_errstr("Unsupported #%s data tap %p, must be %p", devname(),
+			           tap->filter, DEVPIPE_LEGAL_DATA_TAPS);
+			return -1;
+		}
+		spin_lock(&p->tap_lock);
+		switch (cmd) {
+		case (FDTAP_CMD_ADD):
+			if (SLIST_EMPTY(&p->data_taps[which]))
+				qio_set_wake_cb(p->q[which], pipe_wake_cb, (void *)kludge);
+			SLIST_INSERT_HEAD(&p->data_taps[which], tap, link);
+			ret = 0;
+			break;
+		case (FDTAP_CMD_REM):
+			SLIST_REMOVE(&p->data_taps[which], tap, fd_tap, link);
+			if (SLIST_EMPTY(&p->data_taps[which]))
+				qio_set_wake_cb(p->q[which], 0, (void *)kludge);
+			ret = 0;
+			break;
+		default:
+			set_errno(ENOSYS);
+			set_errstr("Unsupported #%s data tap command %p", devname(), cmd);
+			ret = -1;
+		}
+		spin_unlock(&p->tap_lock);
+		return ret;
+	default:
+		set_errno(ENOSYS);
+		set_errstr("Can't tap #%s file type %d", devname(),
+		           NETTYPE(chan->qid.path));
+		return -1;
+	}
+}
+
 struct dev pipedevtab __devtab = {
 	.name = "pipe",
 
@@ -499,4 +575,5 @@ struct dev pipedevtab __devtab = {
 	.wstat = pipewstat,
 	.power = devpower,
 	.chaninfo = devchaninfo,
+	.tapfd = pipetapfd,
 };
