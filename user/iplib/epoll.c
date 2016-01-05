@@ -26,9 +26,6 @@
  * 	current one, weird things may happen (like having two epoll ctlrs turning on
  * 	and off taps).
  * 	- epoll_pwait is probably racy.
- * 	- Using spin locks instead of mutexes during syscalls that could block.  The
- * 	process won't deadlock, but it will busy wait on something like an RPC,
- * 	depending on the device being tapped.
  * 	- You can't dup an epoll fd (same as other user FDs).
  * 	- If you add a BSD socket FD to an epoll set before calling listen(), you'll
  * 	only epoll on the data (which is inactive) instead of on the accept().
@@ -42,7 +39,6 @@
 #include <parlib/event.h>
 #include <parlib/ceq.h>
 #include <parlib/uthread.h>
-#include <parlib/spinlock.h>
 #include <parlib/timing.h>
 #include <sys/user_fd.h>
 #include <stdio.h>
@@ -57,7 +53,7 @@ struct epoll_ctlr {
 	struct event_queue			*ceq_evq;
 	struct ceq					*ceq;	/* convenience pointer */
 	unsigned int				size;
-	struct spin_pdr_lock		lock;
+	uth_mutex_t					mtx;
 	struct user_fd				ufd;
 };
 
@@ -213,6 +209,8 @@ static void epoll_close(struct user_fd *ufd)
 	} while (nr_done < nr_tap_req);
 	free(tap_reqs);
 	ep_put_ceq_evq(ep->ceq_evq);
+	uth_mutex_free(ep->mtx);
+	free(ep);
 }
 
 static int init_ep_ctlr(struct epoll_ctlr *ep, int size)
@@ -222,7 +220,7 @@ static int init_ep_ctlr(struct epoll_ctlr *ep, int size)
 	if (size == 1)
 		size = 128;
 	ep->size = ceq_size;
-	spin_pdr_init(&ep->lock);
+	ep->mtx = uth_mutex_alloc();
 	ep->ufd.magic = EPOLL_UFD_MAGIC;
 	ep->ufd.close = epoll_close;
 	ep->ceq_evq = ep_get_ceq_evq(ceq_size);
@@ -233,6 +231,7 @@ int epoll_create(int size)
 {
 	int fd;
 	struct epoll_ctlr *ep;
+
 	/* good thing the arg is a signed int... */
 	if (size < 0) {
 		errno = EINVAL;
@@ -380,8 +379,7 @@ int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 		werrstr("Epoll can't track User FDs");
 		return -1;
 	}
-	/* TODO: don't use a spinlock, use a mutex.  sys_tap_fds can block. */
-	spin_pdr_lock(&ep->lock);
+	uth_mutex_lock(ep->mtx);
 	switch (op) {
 		case (EPOLL_CTL_MOD):
 			/* In lieu of a proper MOD, just remove and readd.  The errors might
@@ -403,7 +401,7 @@ int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 			errno = EINVAL;
 			ret = -1;
 	}
-	spin_pdr_unlock(&ep->lock);
+	uth_mutex_unlock(ep->mtx);
 	return ret;
 }
 
@@ -444,14 +442,14 @@ static int __epoll_wait(struct epoll_ctlr *ep, struct epoll_event *events,
 	/* Locking to protect get_ep_event_from_msg, specifically that the ep_fd
 	 * stored at ceq_ev->user_data does not get concurrently removed and
 	 * freed. */
-	spin_pdr_lock(&ep->lock);
+	uth_mutex_lock(ep->mtx);
 	for (int i = 0; i < maxevents; i++) {
 		if (uth_check_evqs(&msg, &which_evq, 1, ep->ceq_evq)) {
 			if (get_ep_event_from_msg(ep, &msg, &events[i]))
 				nr_ret++;
 		}
 	}
-	spin_pdr_unlock(&ep->lock);
+	uth_mutex_unlock(ep->mtx);
 	if (nr_ret)
 		return nr_ret;
 	if (timeout == 0)
@@ -480,10 +478,10 @@ static int __epoll_wait(struct epoll_ctlr *ep, struct epoll_event *events,
 	} else {
 		uth_blockon_evqs(&msg, &which_evq, 1, ep->ceq_evq);
 	}
-	spin_pdr_lock(&ep->lock);
+	uth_mutex_lock(ep->mtx);
 	if (get_ep_event_from_msg(ep, &msg, &events[0]))
 		nr_ret++;
-	spin_pdr_unlock(&ep->lock);
+	uth_mutex_unlock(ep->mtx);
 	/* We might not have gotten one yet.  And regardless, there might be more
 	 * available.  Let's try again, with timeout == 0 to ensure no blocking.  We
 	 * use nr_ret (0 or 1 now) to adjust maxevents and events accordingly. */
