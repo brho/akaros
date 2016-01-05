@@ -22,6 +22,10 @@ static void thread0_thread_refl_fault(struct uthread *uthread,
                                       unsigned long aux);
 static void thread0_thread_runnable(struct uthread *uth);
 static void thread0_thread_has_blocked(struct uthread *uth, int flags);
+static uth_mutex_t thread0_mtx_alloc(void);
+static void thread0_mtx_free(uth_mutex_t m);
+static void thread0_mtx_lock(uth_mutex_t m);
+static void thread0_mtx_unlock(uth_mutex_t m);
 
 /* externed into uthread.c */
 struct schedule_ops thread0_2ls_ops = {
@@ -31,6 +35,10 @@ struct schedule_ops thread0_2ls_ops = {
 	.thread_runnable = thread0_thread_runnable,
 	.thread_paused = thread0_thread_runnable,
 	.thread_has_blocked = thread0_thread_has_blocked,
+	.mutex_alloc = thread0_mtx_alloc,
+	.mutex_free = thread0_mtx_free,
+	.mutex_lock = thread0_mtx_lock,
+	.mutex_unlock = thread0_mtx_unlock,
 };
 
 /* externed into uthread.c */
@@ -107,4 +115,23 @@ static void thread0_thread_runnable(struct uthread *uth)
 static void thread0_thread_has_blocked(struct uthread *uth, int flags)
 {
 	thread0_info.is_blocked = TRUE;
+}
+
+/* We only have one thread, so we don't need mutexes */
+static uth_mutex_t thread0_mtx_alloc(void)
+{
+	/* Returning something non-zero, in case someone compares it to 0 */
+	return (uth_mutex_t)0x1234;
+}
+
+static void thread0_mtx_free(uth_mutex_t m)
+{
+}
+
+static void thread0_mtx_lock(uth_mutex_t m)
+{
+}
+
+static void thread0_mtx_unlock(uth_mutex_t m)
+{
 }
