@@ -39,9 +39,11 @@ struct uthread {
 	char err_str[MAX_ERRSTR_LEN];
 };
 extern __thread struct uthread *current_uthread;
+typedef void* uth_mutex_t;
 
 /* 2L-Scheduler operations.  Examples in pthread.c. */
 struct schedule_ops {
+	/**** These functions must be defined ****/
 	/* Functions supporting thread ops */
 	void (*sched_entry)(void);
 	void (*thread_runnable)(struct uthread *);
@@ -50,6 +52,12 @@ struct schedule_ops {
 	void (*thread_has_blocked)(struct uthread *, int);
 	void (*thread_refl_fault)(struct uthread *, unsigned int, unsigned int,
 							  unsigned long);
+	/**** Defining these functions is optional. ****/
+	/* 2LSs can leave the mutex funcs empty for a default implementation */
+	uth_mutex_t (*mutex_alloc)(void);
+	void (*mutex_free)(uth_mutex_t);
+	void (*mutex_lock)(uth_mutex_t);
+	void (*mutex_unlock)(uth_mutex_t);
 	/* Functions event handling wants */
 	void (*preempt_pending)(void);
 };
@@ -118,5 +126,12 @@ static inline void init_uthread_ctx(struct uthread *uth, void (*entry)(void),
 	end_access_tls_vars();                                                     \
 	val;                                                                       \
 })
+
+/* Generic Uthread Mutexes.  2LSs implement their own methods, but we need a
+ * 2LS-independent interface and default implementation. */
+uth_mutex_t uth_mutex_alloc(void);
+void uth_mutex_free(uth_mutex_t m);
+void uth_mutex_lock(uth_mutex_t m);
+void uth_mutex_unlock(uth_mutex_t m);
 
 __END_DECLS
