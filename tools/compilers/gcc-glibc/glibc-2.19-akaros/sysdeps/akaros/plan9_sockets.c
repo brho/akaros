@@ -293,12 +293,6 @@ int _sock_get_opts(int type)
 	return type & (SOCK_NONBLOCK | SOCK_CLOEXEC);
 }
 
-/* Temp dummy, for compilation */
-int _sock_get_listen_fd(int sock_fd)
-{
-	return -1;
-}
-
 /* Opens the FD for "listen", and attaches it to the Rock.  When the dfd (and
  * thus the Rock) closes, we'll close the listen file too.  Returns the FD on
  * success, -1 on error. */

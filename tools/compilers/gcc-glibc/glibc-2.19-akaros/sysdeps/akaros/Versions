@@ -50,7 +50,6 @@ libc {
 
     register_close_cb;
 
-    _sock_get_listen_fd;
     _sock_lookup_listen_fd;
 
     eventfd;
