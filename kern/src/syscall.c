@@ -2518,7 +2518,6 @@ void run_local_syscall(struct syscall *sysc)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
-	assert(irq_is_enabled());	/* in case we proc destroy */
 	/* In lieu of pinning, we just check the sysc and will PF on the user addr
 	 * later (if the addr was unmapped).  Which is the plan for all UMEM. */
 	if (!is_user_rwaddr(sysc, sizeof(struct syscall))) {

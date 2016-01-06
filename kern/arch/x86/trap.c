@@ -232,7 +232,6 @@ static void handle_fperr(struct hw_trapframe *hw_tf)
 	if (fpsw & ~fpcw & FP_EXCP_PE)
 		printk("\tInexact result (precision)\n");
 	printk("Killing the process.\n");
-	enable_irq();
 	proc_destroy(current);
 }
 

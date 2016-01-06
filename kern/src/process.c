@@ -807,10 +807,7 @@ void proc_destroy(struct proc *p)
 	uint32_t nr_cores_revoked = 0;
 	struct kthread *sleeper;
 	struct proc *child_i, *temp;
-	/* Can't spin on the proc lock with irq disabled.  This is a problem for all
-	 * places where we grab the lock, but it is particularly bad for destroy,
-	 * since we tend to call this from trap and irq handlers */
-	assert(irq_is_enabled());
+
 	spin_lock(&p->proc_lock);
 	/* storage for pc_arr is alloced at decl, which is after grabbing the lock*/
 	uint32_t pc_arr[p->procinfo->num_vcores];

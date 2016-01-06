@@ -73,7 +73,6 @@ void reflect_unhandled_trap(unsigned int trap_nr, unsigned int err,
 	return;
 error_out:
 	print_unhandled_trap(p, pcpui->cur_ctx, trap_nr, err, aux);
-	enable_irq();
 	proc_destroy(p);
 }
 

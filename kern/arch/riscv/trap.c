@@ -182,7 +182,6 @@ unhandled_trap(struct hw_trapframe *state, const char* name)
 		spin_unlock(&screwup_lock);
 
 		assert(current);
-		enable_irq();
 		proc_destroy(current);
 	}
 }
