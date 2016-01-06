@@ -189,6 +189,12 @@ Rock *_sock_newrock(int fd)
 
 void _sock_fd_closed(int fd)
 {
+	Rock *r = _sock_findrock(fd, 0);
+
+	if (!r)
+		return;
+	if (r->is_listener)
+		close(r->listen_fd);
 }
 
 /* For a ctlfd and a few other settings, it opens and returns the corresponding
@@ -287,22 +293,23 @@ int _sock_get_opts(int type)
 	return type & (SOCK_NONBLOCK | SOCK_CLOEXEC);
 }
 
-/* Used by user/iplib (e.g. epoll).  Opens and returns the FD for the
- * conversation's listen fd, which the caller needs to close.  Returns -1 if the
- * FD is not a listener. */
+/* Temp dummy, for compilation */
 int _sock_get_listen_fd(int sock_fd)
+{
+	return -1;
+}
+
+/* Opens the FD for "listen", and attaches it to the Rock.  When the dfd (and
+ * thus the Rock) closes, we'll close the listen file too.  Returns the FD on
+ * success, -1 on error. */
+int _rock_open_listen_fd(Rock *r)
 {
 	char listen_file[Ctlsize + 3];
 	char *x, *last_ctl;
-	Rock *r = _sock_findrock(sock_fd, 0);
 	int ret;
 
-	if (!r)
-		return -1;
 	if (!r->is_listener)
 		return -1;
-	/* We want an FD for the "listen" file.  This is for epoll.  We
-	 * could optimize and only do this on demand, but whatever. */
 	strncpy(listen_file, r->ctl, sizeof(listen_file));
 	/* We want the conversation directory.  We can find the last "ctl"
 	 * in the CTL name (they could have mounted at /ctlfoo/net/) */
@@ -324,9 +331,8 @@ int _sock_get_listen_fd(int sock_fd)
 	return ret;
 }
 
-/* Used by user/iplib (e.g. epoll).  Looks up a previously opened FD for the
- * listen file for this conversation.  Returns -1 if the FD is not a listener
- * with an already-opened listen FD. */
+/* Used by user/iplib (e.g. epoll).  Looks up the FD listen file for this
+ * conversation.  Returns -1 if the FD is not a listener. */
 int _sock_lookup_listen_fd(int sock_fd)
 {
 	Rock *r = _sock_findrock(sock_fd, 0);

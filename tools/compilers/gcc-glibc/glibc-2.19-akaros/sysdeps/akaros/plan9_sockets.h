@@ -72,6 +72,8 @@ extern void _sock_ingetaddr(Rock *, struct sockaddr_in *, socklen_t *,
 							const char *);
 extern int _sock_strip_opts(int type);
 extern int _sock_get_opts(int type);
+extern int _rock_open_listen_fd(Rock *r);
+extern int _sock_lookup_listen_fd(int sock_fd);
 
 extern void _syserrno(void);
 
