@@ -85,28 +85,35 @@ devdir(struct chan *c, struct qid qid, char *n,
 }
 
 /*
- * the zeroth element of the table MUST be the directory itself for ..
- * Any entry with qid vers of -1 will return 0, indicating that the value is
- * valid but there is nothing there continue walk.
- * TODO(gvdl): Update akaros devgen man page.
-*/
+ * The zeroth element of the table MUST be the directory itself, or '.' (dot),
+ * for processing '..' (dot-dot). Specifically, if i==DEVDOTDOT, we call devdir
+ * on the *directory* (that is, dot), as opposed to children of the directory.
+ * The rest of the system assumes that the first entry in the table refers to
+ * the directory, and by convention this is named '.' (dot). This is confusing.
+ *
+ * Any entry with qid verion of -1 will return 0, indicating that the value is
+ * valid but there is nothing there, so continue walking.
+ *
+ * TODO(cross): Document devgen and clean this mess up. Devgen should probably
+ * be removed and replaced with a smarter data structure.
+ */
 int
-devgen(struct chan *c, char *unused_char_p_t, struct dirtab *tab, int ntab,
-	   int i, struct dir *dp)
+devgen(struct chan *c, char *unused_name, struct dirtab *tab, int ntab,
+       int i, struct dir *dp)
 {
-	if (tab == 0)
+	if (tab == NULL)
 		return -1;
 	if (i != DEVDOTDOT) {
-		/* skip over the first element, that for . itself */
+		/* Skip over the first element, that for the directory itself. */
 		i++;
-		if (i >= ntab)
+		if (i < 0 || ntab <= i)
 			return -1;
 		tab += i;
 	}
-	int ret = (tab->qid.vers == -1)? 0 : 1;
-	if (ret)
-		devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
-	return ret;
+	if (tab->qid.vers == -1)
+		return 0;
+	devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
+	return 1;
 }
 
 void devreset(void)
