@@ -500,7 +500,7 @@ icmphostunr(struct Fs *f, struct Ipifc *ifc,
 	p = (struct ip6hdr *)bp->rp;
 
 	if (isv6mcast(p->src))
-		goto clean;
+		goto freebl;
 
 	nbp = newIPICMP(sz);
 	np = (struct IPICMP *)nbp->rp;
@@ -510,11 +510,9 @@ icmphostunr(struct Fs *f, struct Ipifc *ifc,
 		netlog(f, Logicmp, "send icmphostunr -> s%I d%I\n", p->src, p->dst);
 	} else {
 		netlog(f, Logicmp, "icmphostunr fail -> s%I d%I\n", p->src, p->dst);
+		runlock(&ifc->rwlock);
 		freeblist(nbp);
-		if (free)
-			goto clean;
-		else
-			return;
+		goto freebl;
 	}
 
 	memmove(np->dst, p->src, IPaddrlen);
@@ -529,14 +527,12 @@ icmphostunr(struct Fs *f, struct Ipifc *ifc,
 
 	if (free)
 		ipiput6(f, ifc, nbp);
-	else {
+	else
 		ipoput6(f, nbp, 0, MAXTTL, DFLTTOS, NULL);
-		return;
-	}
-
-clean:
 	runlock(&ifc->rwlock);
-	freeblist(bp);
+freebl:
+	if (free)
+		freeblist(bp);
 }
 
 extern void icmpttlexceeded6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
