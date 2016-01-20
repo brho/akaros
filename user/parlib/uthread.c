@@ -640,12 +640,17 @@ void run_uthread(struct uthread *uthread)
 	assert(!current_uthread);
 	assert(uthread->state == UT_NOT_RUNNING);
 	assert(uthread->flags & UTHREAD_SAVED);
-	/* For HW CTX, FPSAVED must match UTH SAVE (and both be on here).  For SW,
-	 * FP should never be saved. */
-	if (uthread->u_ctx.type == ROS_HW_CTX)
+	/* For HW/VM CTX, FPSAVED must match UTH SAVE (and both be on here).  For
+	 * SW, FP should never be saved. */
+	switch (uthread->u_ctx.type) {
+	case ROS_HW_CTX:
+	case ROS_VM_CTX:
 		assert(uthread->flags & UTHREAD_FPSAVED);
-	else
+		break;
+	case ROS_SW_CTX:
 		assert(!(uthread->flags & UTHREAD_FPSAVED));
+		break;
+	}
 	if (has_refl_fault(&uthread->u_ctx)) {
 		clear_refl_fault(&uthread->u_ctx);
 		handle_refl_fault(uthread, &uthread->u_ctx);
@@ -712,9 +717,12 @@ static void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread,
 {
 	assert(uthread);
 	if (uthread->flags & UTHREAD_SAVED) {
-		/* I don't know of scenarios where HW ctxs FP state differs from GP */
-		if (uthread->u_ctx.type == ROS_HW_CTX)
+		/* I don't know of scenarios where HW/VM ctxs FP state differs from GP*/
+		switch (uthread->u_ctx.type) {
+		case ROS_HW_CTX:
+		case ROS_VM_CTX:
 			assert(uthread->flags & UTHREAD_FPSAVED);
+		}
 		assert(vcore_local);
 		return;
 	}

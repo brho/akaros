@@ -195,15 +195,29 @@ static inline void pop_sw_tf(struct sw_trapframe *sw_tf, uint32_t vcoreid)
  * a notification message while notifs were disabled. */
 static inline void pop_user_ctx(struct user_context *ctx, uint32_t vcoreid)
 {
-	if (ctx->type == ROS_HW_CTX)
+	switch (ctx->type) {
+	case ROS_HW_CTX:
 		pop_hw_tf(&ctx->tf.hw_tf, vcoreid);
-	else
+		break;
+	case ROS_SW_CTX:
 		pop_sw_tf(&ctx->tf.sw_tf, vcoreid);
+		break;
+	case ROS_VM_CTX:
+		ros_syscall(SYS_pop_ctx, ctx, 0, 0, 0, 0, 0);
+		break;
+	}
+	assert(0);
 }
 
 /* Like the regular pop_user_ctx, but this one doesn't check or clear
  * notif_pending.  The only case where we use this is when an IRQ/notif
- * interrupts a uthread that is in the process of disabling notifs. */
+ * interrupts a uthread that is in the process of disabling notifs.
+ *
+ * If we need to support VM_CTXs here, we'll need to tell the kernel whether or
+ * not we want to enable_notifs (flag to SYS_pop_ctx).  The only use case for
+ * this is when disabling notifs.  Currently, a VM can't do this or do things
+ * like uthread_yield.  It doesn't have access to the vcore's or uthread's TLS
+ * to bootstrap any of that stuff. */
 static inline void pop_user_ctx_raw(struct user_context *ctx, uint32_t vcoreid)
 {
 	struct hw_trapframe *tf = &ctx->tf.hw_tf;
@@ -355,10 +369,16 @@ static inline void init_user_ctx(struct user_context *ctx, uintptr_t entry_pt,
 
 static inline uintptr_t get_user_ctx_stack(struct user_context *ctx)
 {
-	if (ctx->type == ROS_HW_CTX)
+	switch (ctx->type) {
+	case ROS_HW_CTX:
 		return ctx->tf.hw_tf.tf_rsp;
-	else
+	case ROS_SW_CTX:
 		return ctx->tf.sw_tf.tf_rsp;
+	case ROS_VM_CTX:
+		return ctx->tf.vm_tf.tf_rsp;
+	default:
+		assert(0);
+	}
 }
 
 // this is how we get our thread id on entry.
@@ -370,12 +390,30 @@ static inline uintptr_t get_user_ctx_stack(struct user_context *ctx)
 
 static bool has_refl_fault(struct user_context *ctx)
 {
-	return ctx->tf.hw_tf.tf_padding3 == ROS_ARCH_REFL_ID;
+	switch (ctx->type) {
+	case ROS_HW_CTX:
+		return ctx->tf.hw_tf.tf_padding3 == ROS_ARCH_REFL_ID;
+	case ROS_SW_CTX:
+		return FALSE;
+	case ROS_VM_CTX:
+		return ctx->tf.vm_tf.tf_flags & VMCTX_FL_HAS_FAULT ? TRUE : FALSE;
+	}
 }
 
 static void clear_refl_fault(struct user_context *ctx)
 {
-	ctx->tf.hw_tf.tf_padding3 = 0;
+	switch (ctx->type) {
+	case ROS_HW_CTX:
+		ctx->tf.hw_tf.tf_padding3 = 0;
+		break;
+	case ROS_SW_CTX:
+		/* Should never attempt this on an SW ctx */
+		assert(0);
+		break;
+	case ROS_VM_CTX:
+		ctx->tf.vm_tf.tf_flags &= ~VMCTX_FL_HAS_FAULT;
+		break;
+	}
 }
 
 static unsigned int __arch_refl_get_nr(struct user_context *ctx)
