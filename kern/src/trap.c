@@ -79,26 +79,28 @@ error_out:
 uintptr_t get_user_ctx_pc(struct user_context *ctx)
 {
 	switch (ctx->type) {
-		case ROS_HW_CTX:
-			return get_hwtf_pc(&ctx->tf.hw_tf);
-		case ROS_SW_CTX:
-			return get_swtf_pc(&ctx->tf.sw_tf);
-		default:
-			warn("Bad context type %d for ctx %p\n", ctx->type, ctx);
-			return 0;
+	case ROS_HW_CTX:
+		return get_hwtf_pc(&ctx->tf.hw_tf);
+	case ROS_SW_CTX:
+		return get_swtf_pc(&ctx->tf.sw_tf);
+	case ROS_VM_CTX:
+		return get_vmtf_pc(&ctx->tf.vm_tf);
+	default:
+		panic("Bad context type %d for ctx %p\n", ctx->type, ctx);
 	}
 }
 
 uintptr_t get_user_ctx_fp(struct user_context *ctx)
 {
 	switch (ctx->type) {
-		case ROS_HW_CTX:
-			return get_hwtf_fp(&ctx->tf.hw_tf);
-		case ROS_SW_CTX:
-			return get_swtf_fp(&ctx->tf.sw_tf);
-		default:
-			warn("Bad context type %d for ctx %p\n", ctx->type, ctx);
-			return 0;
+	case ROS_HW_CTX:
+		return get_hwtf_fp(&ctx->tf.hw_tf);
+	case ROS_SW_CTX:
+		return get_swtf_fp(&ctx->tf.sw_tf);
+	case ROS_VM_CTX:
+		return get_vmtf_fp(&ctx->tf.vm_tf);
+	default:
+		panic("Bad context type %d for ctx %p\n", ctx->type, ctx);
 	}
 }
 
@@ -333,10 +335,17 @@ void print_kctx_depths(const char *str)
 
 void print_user_ctx(struct user_context *ctx)
 {
-	if (ctx->type == ROS_SW_CTX)
-		print_swtrapframe(&ctx->tf.sw_tf);
-	else if (ctx->type == ROS_HW_CTX)
+	switch (ctx->type) {
+	case ROS_HW_CTX:
 		print_trapframe(&ctx->tf.hw_tf);
-	else
+		break;
+	case ROS_SW_CTX:
+		print_swtrapframe(&ctx->tf.sw_tf);
+		break;
+	case ROS_VM_CTX:
+		print_vmtrapframe(&ctx->tf.vm_tf);
+		break;
+	default:
 		printk("Bad TF %p type %d!\n", ctx, ctx->type);
+	}
 }

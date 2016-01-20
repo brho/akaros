@@ -102,6 +102,48 @@ void print_swtrapframe(struct sw_trapframe *sw_tf)
 	pcpui->__lock_checking_enabled++;
 }
 
+void print_vmtrapframe(struct vm_trapframe *vm_tf)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	pcpui->__lock_checking_enabled--;
+	spin_lock_irqsave(&ptf_lock);
+	printk("VM Trapframe %sat %p on core %d\n",
+	       x86_vmtf_is_partial(vm_tf) ? "(partial) " : "",
+	       vm_tf, core_id());
+	printk("  rax  0x%016lx\n",           vm_tf->tf_rax);
+	printk("  rbx  0x%016lx\n",           vm_tf->tf_rbx);
+	printk("  rcx  0x%016lx\n",           vm_tf->tf_rcx);
+	printk("  rdx  0x%016lx\n",           vm_tf->tf_rdx);
+	printk("  rbp  0x%016lx\n",           vm_tf->tf_rbp);
+	printk("  rsi  0x%016lx\n",           vm_tf->tf_rsi);
+	printk("  rdi  0x%016lx\n",           vm_tf->tf_rdi);
+	printk("  r8   0x%016lx\n",           vm_tf->tf_r8);
+	printk("  r9   0x%016lx\n",           vm_tf->tf_r9);
+	printk("  r10  0x%016lx\n",           vm_tf->tf_r10);
+	printk("  r11  0x%016lx\n",           vm_tf->tf_r11);
+	printk("  r12  0x%016lx\n",           vm_tf->tf_r12);
+	printk("  r13  0x%016lx\n",           vm_tf->tf_r13);
+	printk("  r14  0x%016lx\n",           vm_tf->tf_r14);
+	printk("  r15  0x%016lx\n",           vm_tf->tf_r15);
+	printk("  rip  0x%016lx\n",           vm_tf->tf_rip);
+	printk("  rflg 0x%016lx\n",           vm_tf->tf_rflags);
+	printk("  rsp  0x%016lx\n",           vm_tf->tf_rsp);
+	printk("  cr2  0x%016lx\n",           vm_tf->tf_cr2);
+	printk("  cr3  0x%016lx\n",           vm_tf->tf_cr3);
+	printk("Gpcore 0x%08x\n",             vm_tf->tf_guest_pcoreid);
+	printk("Flags  0x%08x\n",             vm_tf->tf_flags);
+	printk("Inject 0x%08x\n",             vm_tf->tf_trap_inject);
+	printk("ExitRs 0x%08x\n",             vm_tf->tf_exit_reason);
+	printk("ExitQl 0x%08x\n",             vm_tf->tf_exit_qual);
+	printk("Intr1  0x%016lx\n",           vm_tf->tf_intrinfo1);
+	printk("Intr2  0x%016lx\n",           vm_tf->tf_intrinfo2);
+	printk("GVA    0x%016lx\n",           vm_tf->tf_guest_va);
+	printk("GPA    0x%016lx\n",           vm_tf->tf_guest_pa);
+	spin_unlock_irqsave(&ptf_lock);
+	pcpui->__lock_checking_enabled++;
+}
+
 void __arch_reflect_trap_hwtf(struct hw_trapframe *hw_tf, unsigned int trap_nr,
                               unsigned int err, unsigned long aux)
 {

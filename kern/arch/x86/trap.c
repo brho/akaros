@@ -451,6 +451,17 @@ static void set_current_ctx_sw(struct per_cpu_info *pcpui,
 	pcpui->cur_ctx = &pcpui->actual_ctx;
 }
 
+/* TODO: (VMCTX) need to call this after we enter the kernel from a vm ctx. */
+static void set_current_ctx_vm(struct per_cpu_info *pcpui,
+                               struct vm_trapframe *vm_tf)
+{
+	assert(!irq_is_enabled());
+	assert(!pcpui->cur_ctx);
+	pcpui->actual_ctx.type = ROS_VM_CTX;
+	pcpui->actual_ctx.tf.vm_tf = *vm_tf;
+	pcpui->cur_ctx = &pcpui->actual_ctx;
+}
+
 void trap(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];

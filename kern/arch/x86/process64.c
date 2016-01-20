@@ -8,74 +8,96 @@
 #include <assert.h>
 #include <stdio.h>
 
+static void __attribute__((noreturn)) proc_pop_hwtf(struct hw_trapframe *tf)
+{
+	/* for both HW and SW, note we pass an offset into the TF, beyond the fs and
+	 * gs bases */
+	if (x86_hwtf_is_partial(tf)) {
+		swap_gs();
+	} else {
+		write_msr(MSR_GS_BASE, (uint64_t)tf->tf_gsbase);
+		write_msr(MSR_FS_BASE, (uint64_t)tf->tf_fsbase);
+	}
+	asm volatile ("movq %0, %%rsp;          "
+	              "popq %%rax;              "
+	              "popq %%rbx;              "
+	              "popq %%rcx;              "
+	              "popq %%rdx;              "
+	              "popq %%rbp;              "
+	              "popq %%rsi;              "
+	              "popq %%rdi;              "
+	              "popq %%r8;               "
+	              "popq %%r9;               "
+	              "popq %%r10;              "
+	              "popq %%r11;              "
+	              "popq %%r12;              "
+	              "popq %%r13;              "
+	              "popq %%r14;              "
+	              "popq %%r15;              "
+	              "addq $0x10, %%rsp;       "
+	              "iretq                    "
+	              : : "g" (&tf->tf_rax) : "memory");
+	panic("iretq failed");
+}
+
+static void __attribute__((noreturn)) proc_pop_swtf(struct sw_trapframe *tf)
+{
+	if (x86_swtf_is_partial(tf)) {
+		swap_gs();
+	} else {
+		write_msr(MSR_GS_BASE, (uint64_t)tf->tf_gsbase);
+		write_msr(MSR_FS_BASE, (uint64_t)tf->tf_fsbase);
+	}
+	/* We need to 0 out any registers that aren't part of the sw_tf and that we
+	 * won't use/clobber on the out-path.  While these aren't part of the sw_tf,
+	 * we also don't want to leak any kernel register content. */
+	asm volatile ("movq %0, %%rsp;          "
+	              "movq $0, %%rax;          "
+	              "movq $0, %%rdx;          "
+	              "movq $0, %%rsi;          "
+	              "movq $0, %%rdi;          "
+	              "movq $0, %%r8;           "
+	              "movq $0, %%r9;           "
+	              "movq $0, %%r10;          "
+	              "popq %%rbx;              "
+	              "popq %%rbp;              "
+	              "popq %%r12;              "
+	              "popq %%r13;              "
+	              "popq %%r14;              "
+	              "popq %%r15;              "
+	              "movq %1, %%r11;          "
+	              "popq %%rcx;              "
+	              "popq %%rsp;              "
+	              "rex.w sysret             "
+	              : : "g"(&tf->tf_rbx), "i"(FL_IF) : "memory");
+	panic("sysret failed");
+}
+
+static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
+{
+	/* This function probably will be able to fail internally.  If that happens,
+	 * we'll just build a dummy SW TF and pop that instead. */
+	/* TODO: (VMCTX) */
+	panic("Not implemented");
+}
+
 void proc_pop_ctx(struct user_context *ctx)
 {
 	disable_irq();
-	/* for both HW and SW, note we pass an offset into the TF, beyond the fs and
-	 * gs bases */
-	if (ctx->type == ROS_HW_CTX) {
-		struct hw_trapframe *tf = &ctx->tf.hw_tf;
-
-		if (x86_hwtf_is_partial(tf)) {
-			swap_gs();
-		} else {
-			write_msr(MSR_GS_BASE, (uint64_t)tf->tf_gsbase);
-			write_msr(MSR_FS_BASE, (uint64_t)tf->tf_fsbase);
-		}
-		asm volatile ("movq %0, %%rsp;          "
-		              "popq %%rax;              "
-		              "popq %%rbx;              "
-		              "popq %%rcx;              "
-		              "popq %%rdx;              "
-		              "popq %%rbp;              "
-		              "popq %%rsi;              "
-		              "popq %%rdi;              "
-		              "popq %%r8;               "
-		              "popq %%r9;               "
-		              "popq %%r10;              "
-		              "popq %%r11;              "
-		              "popq %%r12;              "
-		              "popq %%r13;              "
-		              "popq %%r14;              "
-		              "popq %%r15;              "
-		              "addq $0x10, %%rsp;       "
-		              "iretq                    "
-		              : : "g" (&tf->tf_rax) : "memory");
-		panic("iretq failed");
-	} else {
-		struct sw_trapframe *tf = &ctx->tf.sw_tf;
-
-		if (x86_swtf_is_partial(tf)) {
-			swap_gs();
-		} else {
-			write_msr(MSR_GS_BASE, (uint64_t)tf->tf_gsbase);
-			write_msr(MSR_FS_BASE, (uint64_t)tf->tf_fsbase);
-		}
-		/* We need to 0 out any registers that aren't part of the sw_tf and that
-		 * we won't use/clobber on the out-path.  While these aren't part of the
-		 * sw_tf, we also don't want to leak any kernel register content. */
-		asm volatile ("movq %0, %%rsp;          "
-		              "movq $0, %%rax;          "
-					  "movq $0, %%rdx;          "
-					  "movq $0, %%rsi;          "
-					  "movq $0, %%rdi;          "
-					  "movq $0, %%r8;           "
-					  "movq $0, %%r9;           "
-					  "movq $0, %%r10;          "
-		              "popq %%rbx;              "
-		              "popq %%rbp;              "
-		              "popq %%r12;              "
-		              "popq %%r13;              "
-		              "popq %%r14;              "
-		              "popq %%r15;              "
-					  "movq %1, %%r11;          "
-		              "popq %%rcx;              "
-		              "popq %%rsp;              "
-		              "rex.w sysret             "
-		              : : "g"(&tf->tf_rbx), "i"(FL_IF) : "memory");
-		panic("sysret failed");
+	switch (ctx->type) {
+	case ROS_HW_CTX:
+		proc_pop_hwtf(&ctx->tf.hw_tf);
+		break;
+	case ROS_SW_CTX:
+		proc_pop_swtf(&ctx->tf.sw_tf);
+		break;
+	case ROS_VM_CTX:
+		proc_pop_vmtf(&ctx->tf.vm_tf);
+		break;
+	default:
+		/* We should have caught this when securing the ctx */
+		panic("Unknown context type %d!", ctx->type);
 	}
-	panic("Unknown context type!\n");
 }
 
 /* Helper: if *addr isn't a canonical user address, poison it.  Use this when
@@ -114,29 +136,53 @@ void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
 	proc_secure_ctx(ctx);
 }
 
+static void proc_secure_hwtf(struct hw_trapframe *tf)
+{
+	enforce_user_canon(&tf->tf_gsbase);
+	enforce_user_canon(&tf->tf_fsbase);
+	/* GD_UD is the user data segment selector in the GDT, and
+	 * GD_UT is the user text segment selector (see inc/memlayout.h).
+	 * The low 2 bits of each segment register contains the
+	 * Requestor Privilege Level (RPL); 3 means user mode. */
+	tf->tf_ss = GD_UD | 3;
+	tf->tf_cs = GD_UT | 3;
+	tf->tf_rflags |= FL_IF;
+	x86_hwtf_clear_partial(tf);
+}
+
+static void proc_secure_swtf(struct sw_trapframe *tf)
+{
+	enforce_user_canon(&tf->tf_gsbase);
+	enforce_user_canon(&tf->tf_fsbase);
+	enforce_user_canon(&tf->tf_rip);
+	x86_swtf_clear_partial(tf);
+}
+
+static void proc_secure_vmtf(struct vm_trapframe *tf)
+{
+	/* The user can say whatever it wants for the bulk of the TF, but the only
+	 * thing it can't fake is whether or not it is a partial context, which
+	 * other parts of the kernel rely on. */
+	x86_vmtf_clear_partial(tf);
+}
+
 void proc_secure_ctx(struct user_context *ctx)
 {
-	if (ctx->type == ROS_SW_CTX) {
-		struct sw_trapframe *tf = &ctx->tf.sw_tf;
-		enforce_user_canon(&tf->tf_gsbase);
-		enforce_user_canon(&tf->tf_fsbase);
-		enforce_user_canon(&tf->tf_rip);
-		x86_swtf_clear_partial(tf);
-	} else {
-		/* If we aren't SW, we're assuming (and forcing) a HW ctx.  If this is
-		 * somehow fucked up, userspace should die rather quickly. */
-		struct hw_trapframe *tf = &ctx->tf.hw_tf;
+	switch (ctx->type) {
+	case ROS_HW_CTX:
+		proc_secure_hwtf(&ctx->tf.hw_tf);
+		break;
+	case ROS_SW_CTX:
+		proc_secure_swtf(&ctx->tf.sw_tf);
+		break;
+	case ROS_VM_CTX:
+		proc_secure_vmtf(&ctx->tf.vm_tf);
+		break;
+	default:
+		/* If we aren't another ctx type, we're assuming (and forcing) a HW ctx.
+		 * If this is somehow fucked up, userspace should die rather quickly. */
 		ctx->type = ROS_HW_CTX;
-		enforce_user_canon(&tf->tf_gsbase);
-		enforce_user_canon(&tf->tf_fsbase);
-		/* GD_UD is the user data segment selector in the GDT, and
-		 * GD_UT is the user text segment selector (see inc/memlayout.h).
-		 * The low 2 bits of each segment register contains the
-		 * Requestor Privilege Level (RPL); 3 means user mode. */
-		tf->tf_ss = GD_UD | 3;
-		tf->tf_cs = GD_UT | 3;
-		tf->tf_rflags |= FL_IF;
-		x86_hwtf_clear_partial(tf);
+		proc_secure_hwtf(&ctx->tf.hw_tf);
 	}
 }
 

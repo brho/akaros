@@ -13,8 +13,6 @@
 #error "Do not include arch/trap64.h directly."
 #endif
 
-void print_swtrapframe(struct sw_trapframe *sw_tf);
-
 static inline bool in_kernel(struct hw_trapframe *hw_tf)
 {
 	return (hw_tf->tf_cs & ~3) == GD_KT;
@@ -38,6 +36,16 @@ static inline uintptr_t get_swtf_pc(struct sw_trapframe *sw_tf)
 static inline uintptr_t get_swtf_fp(struct sw_trapframe *sw_tf)
 {
 	return sw_tf->tf_rbp;
+}
+
+static inline uintptr_t get_vmtf_pc(struct vm_trapframe *vm_tf)
+{
+	return vm_tf->tf_rip;
+}
+
+static inline uintptr_t get_vmtf_fp(struct vm_trapframe *vm_tf)
+{
+	return vm_tf->tf_rbp;
 }
 
 static inline uintptr_t x86_get_ip_hw(struct hw_trapframe *hw_tf)
@@ -119,6 +127,11 @@ static inline bool x86_swtf_is_partial(struct sw_trapframe *tf)
 	return tf->tf_padding0 == 1;
 }
 
+static inline bool x86_vmtf_is_partial(struct vm_trapframe *tf)
+{
+	return tf->tf_flags & VMCTX_FL_PARTIAL ? TRUE : FALSE;
+}
+
 static inline void x86_hwtf_clear_partial(struct hw_trapframe *tf)
 {
 	tf->tf_padding0 = 0;
@@ -129,13 +142,20 @@ static inline void x86_swtf_clear_partial(struct sw_trapframe *tf)
 	tf->tf_padding0 = 0;
 }
 
+static inline void x86_vmtf_clear_partial(struct vm_trapframe *tf)
+{
+	tf->tf_flags &= ~VMCTX_FL_PARTIAL;
+}
+
 static inline bool arch_ctx_is_partial(struct user_context *ctx)
 {
 	switch (ctx->type) {
-	case (ROS_HW_CTX):
+	case ROS_HW_CTX:
 		return x86_hwtf_is_partial(&ctx->tf.hw_tf);
-	case (ROS_SW_CTX):
+	case ROS_SW_CTX:
 		return x86_swtf_is_partial(&ctx->tf.sw_tf);
+	case ROS_VM_CTX:
+		return x86_vmtf_is_partial(&ctx->tf.vm_tf);
 	}
 	return FALSE;
 }
@@ -161,6 +181,13 @@ static inline void x86_finalize_swtf(struct sw_trapframe *tf)
 	x86_swtf_clear_partial(tf);
 }
 
+static inline void x86_finalize_vmtf(struct vm_trapframe *tf)
+{
+	x86_vmtf_clear_partial(tf);
+	/* TODO: (VMCTX) */
+	panic("Not implemented");
+}
+
 /* Makes sure that the user context is fully saved into ctx and not split across
  * the struct and HW, meaning it is not a "partial context". */
 static inline void arch_finalize_ctx(struct user_context *ctx)
@@ -168,11 +195,14 @@ static inline void arch_finalize_ctx(struct user_context *ctx)
 	if (!arch_ctx_is_partial(ctx))
 		return;
 	switch (ctx->type) {
-	case (ROS_HW_CTX):
+	case ROS_HW_CTX:
 		x86_finalize_hwtf(&ctx->tf.hw_tf);
 		break;
-	case (ROS_SW_CTX):
+	case ROS_SW_CTX:
 		x86_finalize_swtf(&ctx->tf.sw_tf);
+		break;
+	case ROS_VM_CTX:
+		x86_finalize_vmtf(&ctx->tf.vm_tf);
 		break;
 	}
 }

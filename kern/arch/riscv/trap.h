@@ -56,6 +56,18 @@ static inline uintptr_t get_swtf_fp(struct sw_trapframe *sw_tf)
 	//return sw_tf->tf_rbp;
 }
 
+static inline uintptr_t get_vmtf_pc(struct vm_trapframe *vm_tf)
+{
+	#warning "fix me"
+	return 0;
+}
+
+static inline uintptr_t get_vmtf_fp(struct vm_trapframe *vm_tf)
+{
+	#warning "fix me"
+	return 0;
+}
+
 static inline void __attribute__((always_inline))
 set_stack_pointer(uintptr_t sp)
 {
