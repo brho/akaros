@@ -1271,6 +1271,54 @@ static int sys_change_to_m(struct proc *p)
 	return retval;
 }
 
+/* Assists the user/2LS by atomically running *ctx and leaving vcore context.
+ * Normally, the user can do this themselves, but x86 VM contexts need kernel
+ * support.  The caller ought to be in vcore context, and if a notif is pending,
+ * then the calling vcore will restart in a fresh VC ctx (as if it was notified
+ * or did a sys_vc_entry).
+ *
+ * Note that this will set the TLS too, which is part of the context.  Parlib's
+ * pop_user_ctx currently does *not* do this, since the TLS is managed
+ * separately.  If you want to use this syscall for testing, you'll need to 0
+ * out fsbase and conditionally write_msr in proc_pop_ctx(). */
+static int sys_pop_ctx(struct proc *p, struct user_context *ctx)
+{
+	int pcoreid = core_id();
+	struct per_cpu_info *pcpui = &per_cpu_info[pcoreid];
+	int vcoreid = pcpui->owning_vcoreid;
+	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
+
+	/* With change_to, there's a bunch of concerns about changing the vcore map,
+	 * since the kernel may have already locked and sent preempts, deaths, etc.
+	 *
+	 * In this case, we don't care as much.  Other than notif_pending and
+	 * notif_disabled, it's more like we're just changing a few registers in
+	 * cur_ctx.  We can safely order-after any kernel messages or other changes,
+	 * as if the user had done all of the changes we'll make and then did a
+	 * no-op syscall.
+	 *
+	 * Since we are mucking with current_ctx, it is important that we don't
+	 * block before or during this syscall. */
+	arch_finalize_ctx(pcpui->cur_ctx);
+	if (copy_from_user(pcpui->cur_ctx, ctx, sizeof(struct user_context))) {
+		/* The 2LS isn't really in a position to handle errors.  At the very
+		 * least, we can print something and give them a fresh vc ctx. */
+		printk("[kernel] unable to copy user_ctx, 2LS bug\n");
+		memset(pcpui->cur_ctx, 0, sizeof(struct user_context));
+		proc_init_ctx(pcpui->cur_ctx, vcoreid, vcpd->vcore_entry,
+		              vcpd->vcore_stack, vcpd->vcore_tls_desc);
+		return -1;
+	}
+	proc_secure_ctx(pcpui->cur_ctx);
+	/* The caller leaves vcore context no matter what.  We'll put them back in
+	 * if they missed a message. */
+	vcpd->notif_disabled = FALSE;
+	wrmb();	/* order disabled write before pending read */
+	if (vcpd->notif_pending)
+		send_kernel_message(pcoreid, __notify, (long)p, 0, 0, KMSG_ROUTINE);
+	return 0;
+}
+
 /* Initializes a process to run virtual machine contexts, returning the number
  * initialized, optionally setting errno */
 static int sys_setup_vmm(struct proc *p, unsigned int nr_guest_pcores,
@@ -2427,6 +2475,7 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_abort_sysc_fd] = {(syscall_t)sys_abort_sysc_fd, "abort_sysc_fd"},
 	[SYS_populate_va] = {(syscall_t)sys_populate_va, "populate_va"},
 	[SYS_nanosleep] = {(syscall_t)sys_nanosleep, "nanosleep"},
+	[SYS_pop_ctx] = {(syscall_t)sys_pop_ctx, "pop_ctx"},
 
 	[SYS_read] = {(syscall_t)sys_read, "read"},
 	[SYS_write] = {(syscall_t)sys_write, "write"},
