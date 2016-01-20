@@ -17,6 +17,8 @@ static inline bool is_user_rwaddr(const void *addr, size_t len);
 /* Same deal, but read-only */
 static inline bool is_user_raddr(const void *addr, size_t len);
 
+#include <arch/uaccess.h>
+
 int strcpy_from_user(struct proc *p, char *dst, const char *src);
 int strcpy_to_user(struct proc *p, char *dst, const char *src);
 
