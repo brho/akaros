@@ -23,10 +23,10 @@
 #include <kdebug.h>
 #include <kmalloc.h>
 
+static spinlock_t ptf_lock = SPINLOCK_INITIALIZER_IRQSAVE;
+
 void print_trapframe(struct hw_trapframe *hw_tf)
 {
-	static spinlock_t ptf_lock = SPINLOCK_INITIALIZER_IRQSAVE;
-
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* This is only called in debug scenarios, and often when the kernel trapped
 	 * and needs to tell us about it.  Disable the lock checker so it doesn't go
@@ -79,8 +79,8 @@ void print_trapframe(struct hw_trapframe *hw_tf)
 
 void print_swtrapframe(struct sw_trapframe *sw_tf)
 {
-	static spinlock_t ptf_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
 	pcpui->__lock_checking_enabled--;
 	spin_lock_irqsave(&ptf_lock);
 	printk("SW TRAP frame %sat %p on core %d\n",
