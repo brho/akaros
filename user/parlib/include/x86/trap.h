@@ -11,6 +11,10 @@
 
 __BEGIN_DECLS
 
+#define HW_TRAP_DIV_ZERO		0
+#define HW_TRAP_GP_FAULT		13
+#define HW_TRAP_PAGE_FAULT		14
+
 static bool has_refl_fault(struct user_context *ctx)
 {
 	switch (ctx->type) {

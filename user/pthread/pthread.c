@@ -16,6 +16,7 @@
 #include <parlib/event.h>
 #include <parlib/ucq.h>
 #include <parlib/signal.h>
+#include <parlib/arch/trap.h>
 
 struct pthread_queue ready_queue = TAILQ_HEAD_INITIALIZER(ready_queue);
 struct pthread_queue active_queue = TAILQ_HEAD_INITIALIZER(active_queue);
@@ -312,30 +313,25 @@ static void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
 	__pthread_generic_yield(pthread);
 	pthread->state = PTH_BLK_SYSC;
 
-	/* TODO: RISCV/x86 issue! (0 is divby0, 14 is PF, etc) */
-#if defined(__i386__) || defined(__x86_64__) 
-	switch(trap_nr) {
-		case 0:
-			handle_div_by_zero(uthread, err, aux);
-			break;
-		case 13:
-			handle_gp_fault(uthread, err, aux);
-			break;
-		case 14:
-			handle_page_fault(uthread, err, aux);
-			break;
-		default:
-			printf("Pthread has unhandled fault: %d, err: %d, aux: %p\n",
-			       trap_nr, err, aux);
-			/* Note that uthread.c already copied out our ctx into the uth
-			 * struct */
-			print_user_context(&uthread->u_ctx);
-			printf("Turn on printx to spew unhandled, malignant trap info\n");
-			exit(-1);
+	switch (trap_nr) {
+	case HW_TRAP_DIV_ZERO:
+		handle_div_by_zero(uthread, err, aux);
+		break;
+	case HW_TRAP_GP_FAULT:
+		handle_gp_fault(uthread, err, aux);
+		break;
+	case HW_TRAP_PAGE_FAULT:
+		handle_page_fault(uthread, err, aux);
+		break;
+	default:
+		printf("Pthread has unhandled fault: %d, err: %d, aux: %p\n",
+		       trap_nr, err, aux);
+		/* Note that uthread.c already copied out our ctx into the uth
+		 * struct */
+		print_user_context(&uthread->u_ctx);
+		printf("Turn on printx to spew unhandled, malignant trap info\n");
+		exit(-1);
 	}
-#else
-	#error "Handling hardware faults is currently only supported on x86"
-#endif
 }
 
 /* Akaros pthread extensions / hacks */

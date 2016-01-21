@@ -11,6 +11,12 @@
 
 __BEGIN_DECLS
 
+#error fix these numbers
+
+#define HW_TRAP_DIV_ZERO		0
+#define HW_TRAP_GP_FAULT		1
+#define HW_TRAP_PAGE_FAULT		2
+
 #error implement these
 static bool has_refl_fault(struct user_context *ctx)
 {
