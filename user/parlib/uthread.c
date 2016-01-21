@@ -576,9 +576,7 @@ static void set_uthread_tls(struct uthread *uthread, uint32_t vcoreid)
 /* Attempts to handle a fault for uth, etc */
 static void handle_refl_fault(struct uthread *uth, struct user_context *ctx)
 {
-	sched_ops->thread_refl_fault(uth, __arch_refl_get_nr(ctx),
-	                             __arch_refl_get_err(ctx),
-	                             __arch_refl_get_aux(ctx));
+	sched_ops->thread_refl_fault(uth, ctx);
 }
 
 /* Run the thread that was current_uthread, from a previous run.  Should be

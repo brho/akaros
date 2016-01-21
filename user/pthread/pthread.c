@@ -42,8 +42,8 @@ static void pth_thread_runnable(struct uthread *uthread);
 static void pth_thread_paused(struct uthread *uthread);
 static void pth_thread_blockon_sysc(struct uthread *uthread, void *sysc);
 static void pth_thread_has_blocked(struct uthread *uthread, int flags);
-static void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
-                                  unsigned int err, unsigned long aux);
+static void pth_thread_refl_fault(struct uthread *uth,
+                                  struct user_context *ctx);
 
 /* Event Handlers */
 static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
@@ -305,8 +305,9 @@ static void handle_page_fault(struct uthread *uthread, unsigned int err,
 	}
 }
 
-static void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
-                                  unsigned int err, unsigned long aux)
+static void pth_thread_refl_hw_fault(struct uthread *uthread,
+                                     unsigned int trap_nr,
+                                     unsigned int err, unsigned long aux)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 
@@ -331,6 +332,23 @@ static void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
 		print_user_context(&uthread->u_ctx);
 		printf("Turn on printx to spew unhandled, malignant trap info\n");
 		exit(-1);
+	}
+}
+
+static void pth_thread_refl_fault(struct uthread *uth,
+                                  struct user_context *ctx)
+{
+	switch (ctx->type) {
+	case ROS_HW_CTX:
+		pth_thread_refl_hw_fault(uth, __arch_refl_get_nr(ctx),
+		                         __arch_refl_get_err(ctx),
+		                         __arch_refl_get_aux(ctx));
+		break;
+	case ROS_VM_CTX:
+		/* TODO: (VMCTX) the pthread 2LS might not bother with this */
+		break;
+	default:
+		assert(0);
 	}
 }
 

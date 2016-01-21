@@ -50,8 +50,7 @@ struct schedule_ops {
 	void (*thread_paused)(struct uthread *);
 	void (*thread_blockon_sysc)(struct uthread *, void *);
 	void (*thread_has_blocked)(struct uthread *, int);
-	void (*thread_refl_fault)(struct uthread *, unsigned int, unsigned int,
-							  unsigned long);
+	void (*thread_refl_fault)(struct uthread *, struct user_context *);
 	/**** Defining these functions is optional. ****/
 	/* 2LSs can leave the mutex funcs empty for a default implementation */
 	uth_mutex_t (*mutex_alloc)(void);

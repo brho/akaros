@@ -13,13 +13,13 @@
 #include <parlib/vcore.h>
 #include <parlib/uthread.h>
 #include <parlib/event.h>
+#include <parlib/arch/trap.h>
 #include <stdlib.h>
 
 static void thread0_sched_entry(void);
 static void thread0_thread_blockon_sysc(struct uthread *uthread, void *sysc);
-static void thread0_thread_refl_fault(struct uthread *uthread,
-                                      unsigned int trap_nr, unsigned int err,
-                                      unsigned long aux);
+static void thread0_thread_refl_fault(struct uthread *uth,
+                                      struct user_context *ctx);
 static void thread0_thread_runnable(struct uthread *uth);
 static void thread0_thread_has_blocked(struct uthread *uth, int flags);
 static uth_mutex_t thread0_mtx_alloc(void);
@@ -96,15 +96,21 @@ static void thread0_thread_blockon_sysc(struct uthread *uthread, void *arg)
 		thread0_thread_runnable(uthread);
 }
 
-static void thread0_thread_refl_fault(struct uthread *uthread,
-                                      unsigned int trap_nr, unsigned int err,
-                                      unsigned long aux)
+static void thread0_thread_refl_fault(struct uthread *uth,
+                                      struct user_context *ctx)
 {
-	printf("SCP has unhandled fault: %d, err: %d, aux: %p\n", trap_nr, err,
-	       aux);
-	print_user_context(&uthread->u_ctx);
-	printf("Turn on printx to spew unhandled, malignant trap info\n");
-	exit(-1);
+	switch (ctx->type) {
+	case ROS_HW_CTX:
+		printf("SCP has unhandled fault: %d, err: %d, aux: %p\n",
+		       __arch_refl_get_nr(ctx), __arch_refl_get_err(ctx),
+		       __arch_refl_get_aux(ctx));
+		print_user_context(ctx);
+		printf("Turn on printx to spew unhandled, malignant trap info\n");
+		exit(-1);
+		break;
+	default:
+		assert(0);
+	}
 }
 
 static void thread0_thread_runnable(struct uthread *uth)
