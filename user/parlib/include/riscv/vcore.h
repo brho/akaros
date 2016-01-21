@@ -117,29 +117,4 @@ static inline uintptr_t get_user_ctx_stack(struct user_context *ctx)
 	temp; \
 })
 
-#error implement these
-static bool has_refl_fault(struct user_context *ctx)
-{
-	return 0;
-}
-
-static void clear_refl_fault(struct user_context *ctx)
-{
-}
-
-static unsigned int __arch_refl_get_nr(struct user_context *ctx)
-{
-	return 0;
-}
-
-static unsigned int __arch_refl_get_err(struct user_context *ctx)
-{
-	return 0;
-}
-
-static unsigned long __arch_refl_get_aux(struct user_context *ctx)
-{
-	return 0;
-}
-
 __END_DECLS

@@ -10,6 +10,7 @@
 #include <parlib/event.h>
 #include <stdlib.h>
 #include <parlib/assert.h>
+#include <parlib/arch/trap.h>
 
 /* SCPs have a default 2LS that only manages thread 0.  Any other 2LS, such as
  * pthreads, should override sched_ops in its init code. */
