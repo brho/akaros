@@ -34,6 +34,7 @@ void set_stack_top(uintptr_t stacktop);
 uintptr_t get_stack_top(void);
 
 void send_nmi(uint32_t os_coreid);
+int reflect_current_context(void);
 void reflect_unhandled_trap(unsigned int trap_nr, unsigned int err,
                             unsigned long aux);
 void __arch_reflect_trap_hwtf(struct hw_trapframe *hw_tf, unsigned int trap_nr,
