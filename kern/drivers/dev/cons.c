@@ -1086,7 +1086,7 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 
 		case Qbintime:
 			if (!iseve())
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			return writebintime(a, n);
 
 #if 0
@@ -1122,14 +1122,14 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 			}
 			break;
 		case Qsysctl:
-			//if (!iseve()) error(EPERM, NULL);
+			//if (!iseve()) error(EPERM, ERROR_FIXME);
 			cb = parsecmd(a, n);
 			if (cb->nf > 1)
 			printd("cons sysctl cmd %s\n", cb->f[0]);
 
 		case Qreboot:
 			if (!iseve())
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			cb = parsecmd(a, n);
 
 			if (waserror()) {
@@ -1204,9 +1204,9 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 				break;
 			}
 			if (!iseve())
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			if (buf[0] < '0' || '9' < buf[0])
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			fd = strtoul(buf, 0, 0);
 			swc = fdtochan(fd, -1, 1, 1);
 			setswapchan(swc);
@@ -1215,9 +1215,9 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 
 		case Qsysname:
 			if (offset != 0)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			if (n <= 0 || n >= sizeof buf)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			strncpy(buf, a, n);
 			buf[n] = 0;
 			if (buf[n - 1] == '\n')
@@ -1438,7 +1438,7 @@ static int writebintime(char *buf, int n)
 	switch (*buf) {
 		case 'n':
 			if (n < sizeof(int64_t))
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			le2int64_t(&delta, p);
 #if 0
 			todset(delta, 0, 0);
@@ -1446,7 +1446,7 @@ static int writebintime(char *buf, int n)
 			break;
 		case 'd':
 			if (n < sizeof(int64_t) + sizeof(long))
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			p = le2int64_t(&delta, p);
 			le2long(&period, p);
 #if 0
@@ -1455,10 +1455,10 @@ static int writebintime(char *buf, int n)
 			break;
 		case 'f':
 			if (n < sizeof(uint64_t))
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			le2int64_t(&fasthz, p);
 			if (fasthz <= 0)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 #if 0
 			todsetfreq(fasthz);
 #endif

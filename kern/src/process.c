@@ -2290,7 +2290,7 @@ void proc_get_set(struct process_set *pset)
 		pset->procs = (struct proc **)
 			kzmalloc(pset->size * sizeof(struct proc *), KMALLOC_WAIT);
 		if (!pset->procs)
-			error(-ENOMEM, NULL);
+			error(-ENOMEM, ERROR_FIXME);
 
 		spin_lock(&pid_hash_lock);
 		hash_for_each(pid_hash, enum_proc, pset);

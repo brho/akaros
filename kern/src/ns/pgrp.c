@@ -137,7 +137,7 @@ void pgrpcpy(struct pgrp *to, struct pgrp *from)
 			}
 			mh = newmhead(f->from);
 			if (!mh)
-				error(ENOMEM, NULL);
+				error(ENOMEM, ERROR_FIXME);
 			*l = mh;
 			l = &mh->hash;
 			link = &mh->mount;

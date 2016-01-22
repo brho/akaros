@@ -406,7 +406,7 @@ int cmount(struct chan *new, struct chan *old, int flag, char *spec)
 	struct mount *nm, *f, *um, **h;
 
 	if (QTDIR & (old->qid.type ^ new->qid.type))
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 
 	if (old->umh)
 		printd("cmount old extra umh\n");
@@ -414,7 +414,7 @@ int cmount(struct chan *new, struct chan *old, int flag, char *spec)
 	order = flag & MORDER;
 
 	if ((old->qid.type & QTDIR) == 0 && order != MREPL)
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 
 	mh = new->umh;
 
@@ -436,7 +436,7 @@ int cmount(struct chan *new, struct chan *old, int flag, char *spec)
 	 */
 	if ((flag & MCREATE) && mh && mh->mount
 		&& (mh->mount->next || !(mh->mount->mflag & MCREATE)))
-		error(EEXIST, NULL);
+		error(EEXIST, ERROR_FIXME);
 
 	pg = current->pgrp;
 	wlock(&pg->ns);
@@ -539,7 +539,7 @@ void cunmount(struct chan *mnt, struct chan *mounted)
 
 	if (m == 0) {
 		wunlock(&pg->ns);
-		error(ENOENT, NULL);
+		error(ENOENT, ERROR_FIXME);
 	}
 
 	wlock(&m->lock);
@@ -578,7 +578,7 @@ void cunmount(struct chan *mnt, struct chan *mounted)
 	}
 	wunlock(&m->lock);
 	wunlock(&pg->ns);
-	error(ENOENT, NULL);
+	error(ENOENT, ERROR_FIXME);
 }
 
 struct chan *cclone(struct chan *c)
@@ -720,7 +720,7 @@ int walk(struct chan **cp, char **names, int nnames, bool can_mount, int *nerror
 				*nerror = nhave;
 			cnameclose(cname);
 			cclose(c);
-			set_error(ENOTDIR, NULL);
+			set_error(ENOTDIR, ERROR_FIXME);
 			if (mh != NULL)
 				putmhead(mh);
 			return -1;
@@ -871,7 +871,7 @@ struct chan *createdir(struct chan *c, struct mhead *m)
 			return nc;
 		}
 	}
-	error(EPERM, NULL);
+	error(EPERM, ERROR_FIXME);
 	poperror();
 	return 0;
 }
@@ -1039,7 +1039,7 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 
 		/* don't try to walk the last path element just yet. */
 		if (e.ARRAY_SIZEs == 0)
-			error(EEXIST, NULL);
+			error(EEXIST, ERROR_FIXME);
 		e.ARRAY_SIZEs--;
 	}
 
@@ -1157,7 +1157,7 @@ Open:
 			 * so one may mount on / or . and see the effect.
 			 */
 			if (!(c->qid.type & QTDIR))
-				error(ENOTDIR, NULL);
+				error(ENOTDIR, ERROR_FIXME);
 			break;
 
 		case Amount:
@@ -1184,7 +1184,7 @@ Open:
 			e.ARRAY_SIZEs++;
 			if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, can_mount, NULL) == 0) {
 				if (omode & O_EXCL)
-					error(EEXIST, NULL);
+					error(EEXIST, ERROR_FIXME);
 				omode |= O_TRUNC;
 				goto Open;
 			}
@@ -1339,7 +1339,7 @@ struct chan *namec(char *name, int amode, int omode, uint32_t perm)
 			name++; /* drop the # */
 			while ((*name != '\0') && (*name != '/')) {
 				if (n >= GENBUF_SZ - 1)
-					error(ENAMETOOLONG, NULL);
+					error(ENAMETOOLONG, ERROR_FIXME);
 				devname[n++] = *name++;
 			}
 			devname[n] = '\0';
@@ -1353,7 +1353,7 @@ struct chan *namec(char *name, int amode, int omode, uint32_t perm)
 				devspec = &devname[n];
 			}
 			if (!strcmp(devname, "mnt"))
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			/* TODO: deal with this "nodevs" business. */
 			#if 0
 			/*
@@ -1369,7 +1369,7 @@ struct chan *namec(char *name, int amode, int omode, uint32_t perm)
 				((strchr("|esDa", get_cur_genbuf()[1]) == NULL)
 				 || (get_cur_genbuf()[1] == 's'	// || r == 's'
 					 && get_cur_genbuf()[n] != '\0')))
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			#endif
 			devtype = devno(devname, 1);
 			if (devtype == -1)
@@ -1463,7 +1463,7 @@ void isdir(struct chan *c)
 {
 	if (c->qid.type & QTDIR)
 		return;
-	error(ENOTDIR, NULL);
+	error(ENOTDIR, ERROR_FIXME);
 }
 
 /*

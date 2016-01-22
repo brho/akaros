@@ -1362,7 +1362,7 @@ static void i82563attach(struct ether *edev)
 		kzmalloc(ctlr->nrd * sizeof(Rd) + ctlr->ntd * sizeof(Td) + 255, 0);
 	if (ctlr->alloc == NULL) {
 		qunlock(&ctlr->alock);
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	}
 	ctlr->rdba = (Rd *) ROUNDUP((uintptr_t) ctlr->alloc, 256);
 	ctlr->tdba = (Td *) (ctlr->rdba + ctlr->nrd);
@@ -1693,7 +1693,7 @@ static long i82563ctl(struct ether *edev, void *buf, long n)
 	struct cmdtab *ct;
 
 	if ((ctlr = edev->ctlr) == NULL)
-		error(ENODEV, NULL);
+		error(ENODEV, ERROR_FIXME);
 
 	cb = parsecmd(buf, n);
 	if (waserror()) {
@@ -1706,14 +1706,14 @@ static long i82563ctl(struct ether *edev, void *buf, long n)
 		case CMrdtr:
 			v = strtoul(cb->f[1], &p, 0);
 			if (*p || v > 0xffff)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			ctlr->rdtr = v;
 			csr32w(ctlr, Rdtr, v);
 			break;
 		case CMradv:
 			v = strtoul(cb->f[1], &p, 0);
 			if (*p || v > 0xffff)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			ctlr->radv = v;
 			csr32w(ctlr, Radv, v);
 			break;

@@ -639,7 +639,7 @@ igbeifstat(struct ether* edev, void* a, long n, uint32_t offset)
 	p = kzmalloc(READSTR, 0);
 	if(p == NULL) {
 		qunlock(&ctlr->slock);
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	}
 	l = 0;
 	for(i = 0; i < Nstatistics; i++){
@@ -730,7 +730,7 @@ igbectl(struct ether* edev, void* buf, long n)
 	struct cmdtab *ct;
 
 	if((ctlr = edev->ctlr) == NULL)
-		error(ENODEV, NULL);
+		error(ENODEV, ERROR_FIXME);
 
 	cb = parsecmd(buf, n);
 	if(waserror()){
@@ -743,7 +743,7 @@ igbectl(struct ether* edev, void* buf, long n)
 	case CMrdtr:
 		v = strtol(cb->f[1], &p, 0);
 		if(v < 0 || p == cb->f[1] || v > 0xFFFF)
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 		ctlr->rdtr = v;
 		csr32w(ctlr, Rdtr, Fpd|v);
 		break;
@@ -1245,7 +1245,7 @@ igbeattach(struct ether* edev)
 	ctlr->alloc = kzmalloc(ctlr->nrd * sizeof(Rd) + ctlr->ntd * sizeof(Td) + 127, 0);
 	if(ctlr->alloc == NULL) {
 		printd("igbe: can't allocate ctlr->alloc\n");
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	}
 	ctlr->rdba = (Rd*)ROUNDUP((uintptr_t)ctlr->alloc, 128);
 	ctlr->tdba = (Td*)(ctlr->rdba+ctlr->nrd);
@@ -1254,7 +1254,7 @@ igbeattach(struct ether* edev)
 	ctlr->tb = kzmalloc(ctlr->ntd * sizeof(struct block *), 0);
 	if (ctlr->rb == NULL || ctlr->tb == NULL) {
 		printd("igbe: can't allocate ctlr->rb or ctlr->tb\n");
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	}
 
 	/* the ktasks should free these names, if they ever exit */
@@ -1997,7 +1997,7 @@ igbepci(void)
 		ctlr = kzmalloc(sizeof(struct ctlr), 0);
 		if(ctlr == NULL) {
 			vunmap_vmem((uintptr_t)mem, pcidev->bar[0].mmio_sz);
-			error(ENOMEM, NULL);
+			error(ENOMEM, ERROR_FIXME);
 		}
 		spinlock_init_irqsave(&ctlr->imlock);
 		spinlock_init_irqsave(&ctlr->tlock);

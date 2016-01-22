@@ -1617,7 +1617,7 @@ static long acpiread(struct chan *c, void *a, long n, int64_t off)
 				error(EFAIL, "region not configured");
 			return regio(reg, a, n, off, 0);
 	}
-	error(EPERM, NULL);
+	error(EPERM, ERROR_FIXME);
 	return -1;
 }
 
@@ -1635,7 +1635,7 @@ static long acpiwrite(struct chan *c, void *a, long n, int64_t off)
 		return regio(reg, a, n, off, 1);
 	}
 	if (c->qid.path != Qctl)
-		error(EPERM, NULL);
+		error(EPERM, ERROR_FIXME);
 
 	cb = parsecmd(a, n);
 	if (waserror()) {

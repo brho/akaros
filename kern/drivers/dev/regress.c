@@ -95,7 +95,7 @@ regressopen(struct chan *c, int omode)
 {
 	if(c->qid.type & QTDIR){
 		if(openmode(omode) != O_READ)
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 	}
 	c->mode = openmode(omode);
 	c->flag |= COPEN;
@@ -170,7 +170,7 @@ regresswrite(struct chan *c, void *a, long n, int64_t unused)
 			n = -1;
 		break;
 	default:
-		error(EBADFD, NULL);
+		error(EBADFD, ERROR_FIXME);
 	}
 	kfree(cb);
 	poperror();

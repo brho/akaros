@@ -60,7 +60,7 @@ struct dev *devtabget(const char *name, int user)
 		return &devtab[i];
 
 	printk("devtabget FAILED %s\n", name);
-	error(ENOENT, NULL);
+	error(ENOENT, ERROR_FIXME);
 }
 
 long devtabread(struct chan *c, void *buf, long n, int64_t off)
@@ -73,7 +73,7 @@ long devtabread(struct chan *c, void *buf, long n, int64_t off)
 
 	alloc = kzmalloc(READSTR, KMALLOC_WAIT);
 	if (alloc == NULL)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 
 	p = alloc;
 	e = p + READSTR;

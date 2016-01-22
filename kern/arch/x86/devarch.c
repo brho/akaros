@@ -297,7 +297,7 @@ static void checkport(int start, int end)
 
 	if (iounused(start, end))
 		return;
-	error(EPERM, NULL);
+	error(EPERM, ERROR_FIXME);
 }
 
 static struct chan *archattach(char *spec)
@@ -523,7 +523,7 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			return n;
 		case Qiow:
 			if (n & 1)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			checkport(offset, offset + n);
 			sp = a;
 			for (port = offset; port < offset + n; port += 2)
@@ -531,7 +531,7 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			return n;
 		case Qiol:
 			if (n & 3)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			checkport(offset, offset + n);
 			lp = a;
 			for (port = offset; port < offset + n; port += 4)
@@ -544,13 +544,13 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 		case Qmsr:
 			if (!address_range_find(msr_rd_wlist, ARRAY_SIZE(msr_rd_wlist),
 									(uintptr_t) offset))
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			core_set_init(&cset);
 			core_set_fill_available(&cset);
 			msr_set_address(&msra, (uint32_t) offset);
 			values = kzmalloc(num_cores * sizeof(uint64_t), KMALLOC_WAIT);
 			if (!values)
-				error(ENOMEM, NULL);
+				error(ENOMEM, ERROR_FIXME);
 			msr_set_values(&msrv, values, num_cores);
 
 			err = msr_cores_read(&cset, &msra, &msrv);
@@ -564,7 +564,7 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 						n = -1;
 				} else {
 					kfree(values);
-					error(ERANGE, NULL);
+					error(ERANGE, ERROR_FIXME);
 				}
 			} else {
 				n = -1;
@@ -586,11 +586,11 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			return n;
 		}
 		default:
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 	}
 
 	if ((buf = kzmalloc(n, 0)) == NULL)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	p = buf;
 	n = n / Linelen;
 	offset = offset / Linelen;
@@ -648,7 +648,7 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 			return n;
 		case Qiow:
 			if (n & 1)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			checkport(offset, offset + n);
 			sp = a;
 			for (port = offset; port < offset + n; port += 2)
@@ -656,7 +656,7 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 			return n;
 		case Qiol:
 			if (n & 3)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			checkport(offset, offset + n);
 			lp = a;
 			for (port = offset; port < offset + n; port += 4)
@@ -665,9 +665,9 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 		case Qmsr:
 			if (!address_range_find(msr_wr_wlist, ARRAY_SIZE(msr_wr_wlist),
 									(uintptr_t) offset))
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			if (n != sizeof(uint64_t))
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			if (memcpy_from_user_errno(current, &value, a, sizeof(value)))
 				return -1;
 
@@ -678,7 +678,7 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 
 			err = msr_cores_write(&cset, &msra, &msrv);
 			if (unlikely(err))
-				error(-err, NULL);
+				error(-err, ERROR_FIXME);
 			return sizeof(uint64_t);
 		case Qperf: {
 			struct perf_context *pc = (struct perf_context *) c->aux;
@@ -688,7 +688,7 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 			return arch_perf_write(pc, a, n);
 		}
 		default:
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 	}
 	return 0;
 }

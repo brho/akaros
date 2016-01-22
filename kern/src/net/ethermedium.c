@@ -180,7 +180,7 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	Etherrock *er;
 
 	if (argc < 2)
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 
 	addr = kmalloc(Maxpath, KMALLOC_WAIT);	//char addr[2*KNAMELEN];
 	dir = kmalloc(Maxpath, KMALLOC_WAIT);	//char addr[2*KNAMELEN];
@@ -236,12 +236,12 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	n = sysread(fd, buf, 511);
 	sysclose(fd);
 	if (n <= 0)
-		error(EIO, NULL);
+		error(EIO, ERROR_FIXME);
 	buf[n] = 0;
 
 	ptr = strstr(buf, "addr: ");
 	if (!ptr)
-		error(EIO, NULL);
+		error(EIO, ERROR_FIXME);
 	ptr += 6;
 	parsemac(ifc->mac, ptr, 6);
 

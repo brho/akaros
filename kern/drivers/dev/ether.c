@@ -71,15 +71,15 @@ struct chan *etherattach(char *spec)
 		/* somebody interpret this for me. */
 		if (((ctlrno == 0) && (p == spec)) ||
 			(ctlrno >= MaxEther) || ((*p) && (*p != '.')))
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 		if (*p == '.') {	/* vlan */
 			vlanid = strtoul(p + 1, &p, 0);
 			if (vlanid <= 0 || vlanid > 0xFFF || *p)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 		}
 	}
 	if ((ether = etherxx[ctlrno]) == 0)
-		error(ENODEV, NULL);
+		error(ENODEV, ERROR_FIXME);
 	rlock(&ether->rwlock);
 	if (waserror()) {
 		runlock(&ether->rwlock);
@@ -487,11 +487,11 @@ static long etherwrite(struct chan *chan, void *buf, long n, int64_t unused)
 			l = ether->ctl(ether, buf, n);
 			goto out;
 		}
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 	}
 
 	if (n > ether->maxmtu + ETHERHDRSIZE)
-		error(E2BIG, NULL);
+		error(E2BIG, ERROR_FIXME);
 	bp = allocb(n);
 	if (waserror()) {
 		freeb(bp);
@@ -534,7 +534,7 @@ static long etherbwrite(struct chan *chan, struct block *bp, uint32_t unused)
 	}
 	if (n > ether->maxmtu + ETHERHDRSIZE && (bp->flag & Btso) == 0) {
 		freeb(bp);
-		error(E2BIG, NULL);
+		error(E2BIG, ERROR_FIXME);
 	}
 	n = etheroq(ether, bp);
 	poperror();
@@ -575,7 +575,7 @@ static long vlanctl(struct ether *ether, void *buf, long n)
 		return 0;
 	}
 	kfree(cb);
-	error(EINVAL, NULL);
+	error(EINVAL, ERROR_FIXME);
 	return -1;	/* not reached */
 }
 
@@ -603,13 +603,13 @@ static struct ether *vlanalloc(struct ether *ether, int id)
 			fid = i;
 	}
 	if (fid < 0)
-		error(ENOENT, NULL);
+		error(ENOENT, ERROR_FIXME);
 	snprintf(name, sizeof(name), "ether%d.%d", ether->ctlrno, id);
 	vlan = ether->vlans[fid];
 	if (vlan == NULL) {
 		vlan = kzmalloc(sizeof(struct ether), 1);
 		if (vlan == NULL)
-			error(ENOMEM, NULL);
+			error(ENOMEM, ERROR_FIXME);
 		rwinit(&vlan->rwlock);
 		qlock_init(&vlan->vlq);
 		netifinit(vlan, name, Ntypes, ether->limit);

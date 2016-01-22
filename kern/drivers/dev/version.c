@@ -78,7 +78,7 @@ static struct chan *ver_open(struct chan *c, int omode)
 {
 	if (c->qid.type & QTDIR) {
 		if (openmode(omode) != O_READ)
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 	}
 	c->mode = openmode(omode);
 	c->flag |= COPEN;
@@ -121,7 +121,7 @@ static long ver_read(struct chan *c, void *va, long n, int64_t off)
 			return ver_emit_nlstr(va, build_info_version_name, n, (long) off);
 		break;
 	default:
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 	}
 
 	return 0;
@@ -129,7 +129,7 @@ static long ver_read(struct chan *c, void *va, long n, int64_t off)
 
 static long ver_write(struct chan *c, void *a, long n, int64_t unused)
 {
-	error(ENOTSUP, NULL);
+	error(ENOTSUP, ERROR_FIXME);
 	return -1;
 }
 

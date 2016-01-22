@@ -167,7 +167,7 @@ void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
 			!kmem_cache_grow(cp)) {
 			spin_unlock_irqsave(&cp->cache_lock);
 			if (flags & KMALLOC_ERROR)
-				error(ENOMEM, NULL);
+				error(ENOMEM, ERROR_FIXME);
 			else
 				panic("[German Accent]: OOM for a small slab growth!!!");
 		}

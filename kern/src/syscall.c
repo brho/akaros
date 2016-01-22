@@ -2113,7 +2113,7 @@ static int vfs_wstat(struct file *file, uint8_t *stat_m, size_t stat_sz,
 	dir = kzmalloc(sizeof(struct dir) + stat_sz, KMALLOC_WAIT);
 	m_sz = convM2D(stat_m, stat_sz, &dir[0], (char*)&dir[1]);
 	if (m_sz != stat_sz) {
-		set_error(EINVAL, NULL);
+		set_error(EINVAL, ERROR_FIXME);
 		kfree(dir);
 		return -1;
 	}

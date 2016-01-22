@@ -114,14 +114,14 @@ static struct chan *pipeattach(char *spec)
 	c = devattach(devname(), spec);
 	p = kzmalloc(sizeof(Pipe), 0);
 	if (p == 0)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	if (waserror()) {
 		freepipe(p);
 		nexterror();
 	}
 	p->pipedir = kzmalloc(sizeof(pipedir), 0);
 	if (p->pipedir == 0)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	memmove(p->pipedir, pipedir, sizeof(pipedir));
 	kstrdup(&p->user, current->user);
 	kref_init(&p->ref, pipe_release, 1);
@@ -129,10 +129,10 @@ static struct chan *pipeattach(char *spec)
 
 	p->q[0] = qopen(pipealloc.pipeqsize, Qcoalesce, 0, 0);
 	if (p->q[0] == 0)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	p->q[1] = qopen(pipealloc.pipeqsize, Qcoalesce, 0, 0);
 	if (p->q[1] == 0)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	poperror();
 
 	spin_lock(&(&pipealloc)->lock);
@@ -240,7 +240,7 @@ static int pipestat(struct chan *c, uint8_t * db, int n)
 	}
 	n = convD2M(&dir, db, n);
 	if (n < BIT16SZ)
-		error(ENODATA, NULL);
+		error(ENODATA, ERROR_FIXME);
 	return n;
 }
 
@@ -458,10 +458,10 @@ static int pipewstat(struct chan *c, uint8_t *dp, int n)
 	int d1;
 
 	if (c->qid.type & QTDIR)
-		error(EPERM, NULL);
+		error(EPERM, ERROR_FIXME);
 	p = c->aux;
 	if (strcmp(current->user, p->user) != 0)
-		error(EPERM, NULL);
+		error(EPERM, ERROR_FIXME);
 	d = kzmalloc(sizeof(*d) + n, 0);
 	if (waserror()) {
 		kfree(d);
@@ -469,14 +469,14 @@ static int pipewstat(struct chan *c, uint8_t *dp, int n)
 	}
 	n = convM2D(dp, n, d, (char *)&d[1]);
 	if (n == 0)
-		error(ENODATA, NULL);
+		error(ENODATA, ERROR_FIXME);
 	d1 = NETTYPE(c->qid.path) == Qdata1;
 	if (!emptystr(d->name)) {
 		validwstatname(d->name);
 		if (strlen(d->name) >= KNAMELEN)
-			error(ENAMETOOLONG, NULL);
+			error(ENAMETOOLONG, ERROR_FIXME);
 		if (strncmp(p->pipedir[1 + !d1].name, d->name, KNAMELEN) == 0)
-			error(EEXIST, NULL);
+			error(EEXIST, ERROR_FIXME);
 		strncpy(p->pipedir[1 + d1].name, d->name, KNAMELEN);
 	}
 	if (d->mode != ~0UL)

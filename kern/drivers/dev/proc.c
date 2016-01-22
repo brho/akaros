@@ -401,7 +401,7 @@ static void nonone(struct proc *p)
 		return;
 	if (iseve())
 		return;
-	error(EPERM, NULL);
+	error(EPERM, ERROR_FIXME);
 #endif
 }
 
@@ -417,10 +417,10 @@ static struct chan *procopen(struct chan *c, int omode)
 		return devopen(c, omode, 0, 0, procgen);
 
 	if (QID(c->qid) == Qtrace) {
-		error(ENOSYS, NULL);
+		error(ENOSYS, ERROR_FIXME);
 #if 0
 		if (omode != OREAD)
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 		lock(&tlock);
 		if (waserror()) {
 			unlock(&tlock);
@@ -433,12 +433,12 @@ static struct chan *procopen(struct chan *c, int omode)
 			tevents = (Traceevent *) kzmalloc(sizeof(Traceevent) * Nevents,
 											  KMALLOC_WAIT);
 			if (tevents == NULL)
-				error(ENOMEM, NULL);
+				error(ENOMEM, ERROR_FIXME);
 			tpids = kzmalloc(Ntracedpids * 20, KMALLOC_WAIT);
 			if (tpids == NULL) {
 				kfree(tpids);
 				tpids = NULL;
-				error(ENOMEM, NULL);
+				error(ENOMEM, ERROR_FIXME);
 			}
 			tpidsc = tpids;
 			tpidse = tpids + Ntracedpids * 20;
@@ -456,10 +456,10 @@ static struct chan *procopen(struct chan *c, int omode)
 #endif
 	}
 	if (QID(c->qid) == Qtracepids) {
-		error(ENOSYS, NULL);
+		error(ENOSYS, ERROR_FIXME);
 #if 0
 		if (omode != OREAD)
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 		c->mode = openmode(omode);
 		c->flag |= COPEN;
 		c->offset = 0;
@@ -467,7 +467,7 @@ static struct chan *procopen(struct chan *c, int omode)
 #endif
 	}
 	if ((p = pid2proc(SLOT(c->qid))) == NULL)
-		error(ESRCH, NULL);
+		error(ESRCH, ERROR_FIXME);
 	//qlock(&p->debug);
 	if (waserror()) {
 		//qunlock(&p->debug);
@@ -476,16 +476,16 @@ static struct chan *procopen(struct chan *c, int omode)
 	}
 	pid = PID(c->qid);
 	if (p->pid != pid)
-		error(ESRCH, NULL);
+		error(ESRCH, ERROR_FIXME);
 
 	omode = openmode(omode);
 
 	switch (QID(c->qid)) {
 		case Qtext:
-			error(ENOSYS, NULL);
+			error(ENOSYS, ERROR_FIXME);
 /*
 			if (omode != OREAD)
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			tc = proctext(c, p);
 			tc->offset = 0;
 			poperror();
@@ -499,17 +499,17 @@ static struct chan *procopen(struct chan *c, int omode)
 		case Qprofile:
 		case Qfd:
 			if (omode != O_READ)
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			break;
 
 		case Qnote:
 //          if (p->privatemem)
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 			break;
 
 		case Qmem:
 //          if (p->privatemem)
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 			//nonone(p);
 			break;
 
@@ -526,7 +526,7 @@ static struct chan *procopen(struct chan *c, int omode)
 
 		case Qns:
 			if (omode != O_READ)
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			c->aux = kzmalloc(sizeof(struct mntwalk), KMALLOC_WAIT);
 			break;
 		case Qstatus:
@@ -534,14 +534,14 @@ static struct chan *procopen(struct chan *c, int omode)
 		case Qctl:
 			break;
 		case Qnotepg:
-			error(ENOSYS, NULL);
+			error(ENOSYS, ERROR_FIXME);
 #if 0
 			nonone(p);
 			pg = p->pgrp;
 			if (pg == NULL)
-				error(ESRCH, NULL);
+				error(ESRCH, ERROR_FIXME);
 			if (omode != OWRITE || pg->pgrpid == 1)
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			c->pgrpid.path = pg->pgrpid + 1;
 			c->pgrpid.vers = p->noteid;
 #endif
@@ -552,7 +552,7 @@ static struct chan *procopen(struct chan *c, int omode)
 			//qunlock(&p->debug);
 			kref_put(&p->p_kref);
 			printk("procopen %#llux\n", c->qid.path);
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 	}
 
 	/* Affix pid to qid */
@@ -563,7 +563,7 @@ static struct chan *procopen(struct chan *c, int omode)
 	/* TODO: think about what we really want here.  In akaros, we wouldn't have
 	 * our pid changed like that. */
 	if (p->pid != pid)
-		error(ESRCH, NULL);
+		error(ESRCH, ERROR_FIXME);
 
 	tc = devopen(c, omode, 0, 0, procgen);
 	poperror();
@@ -575,19 +575,19 @@ static struct chan *procopen(struct chan *c, int omode)
 static int procwstat(struct chan *c, uint8_t * db, int n)
 {
 	ERRSTACK(2);
-	error(ENOSYS, NULL);
+	error(ENOSYS, ERROR_FIXME);
 #if 0
 	struct proc *p;
 	struct dir *d;
 
 	if (c->qid.type & QTDIR)
-		error(EPERM, NULL);
+		error(EPERM, ERROR_FIXME);
 
 	if (QID(c->qid) == Qtrace)
 		return devwstat(c, db, n);
 
 	if ((p = pid2proc(SLOT(c->qid))) == NULL)
-		error(ESRCH, NULL);
+		error(ESRCH, ERROR_FIXME);
 	nonone(p);
 	d = NULL;
 	qlock(&p->debug);
@@ -599,18 +599,18 @@ static int procwstat(struct chan *c, uint8_t * db, int n)
 	}
 
 	if (p->pid != PID(c->qid))
-		error(ESRCH, NULL);
+		error(ESRCH, ERROR_FIXME);
 
 	if (strcmp(current->user, p->user) != 0 && strcmp(current->user, eve) != 0)
-		error(EPERM, NULL);
+		error(EPERM, ERROR_FIXME);
 
 	d = kzmalloc(sizeof(struct dir) + n, KMALLOC_WAIT);
 	n = convM2D(db, n, &d[0], (char *)&d[1]);
 	if (n == 0)
-		error(ENOENT, NULL);
+		error(ENOENT, ERROR_FIXME);
 	if (!emptystr(d->uid) && strcmp(d->uid, p->user) != 0) {
 		if (strcmp(current->user, eve) != 0)
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 		else
 			kstrdup(&p->user, d->uid);
 	}
@@ -853,10 +853,10 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 			return readstr(off, va, n, tpids);
 #endif
 	if ((p = pid2proc(SLOT(c->qid))) == NULL)
-		error(ESRCH, NULL);
+		error(ESRCH, ERROR_FIXME);
 	if (p->pid != PID(c->qid)) {
 		kref_put(&p->p_kref);
-		error(ESRCH, NULL);
+		error(ESRCH, ERROR_FIXME);
 	}
 	switch (QID(c->qid)) {
 		default:
@@ -902,7 +902,7 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 
 			if (!iseve()) {
 				kref_put(&p->p_kref);
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			}
 
 			/* validate kernel addresses */
@@ -925,7 +925,7 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 				}
 			}
 			kref_put(&p->p_kref);
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 
 		case Qprofile:
 			s = p->seg[TSEG];
@@ -951,9 +951,9 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 				nexterror();
 			}
 			if (p->pid != PID(c->qid))
-				error(ESRCH, NULL);
+				error(ESRCH, ERROR_FIXME);
 			if (n < 1)	/* must accept at least the '\0' */
-				error(ENAMETOOLONG, NULL);
+				error(ENAMETOOLONG, ERROR_FIXME);
 			if (p->nnote == 0)
 				n = 0;
 			else {
@@ -991,7 +991,7 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 regread:
 			if (rptr == 0) {
 				kref_put(&p->p_kref);
-				error(ENODATA, NULL);
+				error(ENODATA, ERROR_FIXME);
 			}
 			if (offset >= rsize) {
 				kref_put(&p->p_kref);
@@ -1092,7 +1092,7 @@ regread:
 		case Qwait:
 			if (!canqlock(&p->qwaitr)) {
 				kref_put(&p->p_kref);
-				error(EBUSY, NULL);
+				error(EBUSY, ERROR_FIXME);
 			}
 
 			if (waserror()) {
@@ -1104,14 +1104,14 @@ regread:
 			lock(&p->exl);
 			if (up == p && p->nchild == 0 && p->waitq == 0) {
 				unlock(&p->exl);
-				error(ECHILD, NULL);
+				error(ECHILD, ERROR_FIXME);
 			}
 			pid = p->pid;
 			while (p->waitq == 0) {
 				unlock(&p->exl);
 				rendez_sleep(&p->waitr, haswaitq, p);
 				if (p->pid != pid)
-					error(ESRCH, NULL);
+					error(ESRCH, ERROR_FIXME);
 				lock(&p->exl);
 			}
 			wq = p->waitq;
@@ -1166,7 +1166,7 @@ regread:
 				nexterror();
 			}
 			if (p->pgrp == NULL || p->pid != PID(c->qid))
-				error(ESRCH, NULL);
+				error(ESRCH, ERROR_FIXME);
 			mw = c->aux;
 			if (mw->cddone) {
 				poperror();
@@ -1210,7 +1210,7 @@ regread:
 #endif
 	}
 
-	error(EINVAL, NULL);
+	error(EINVAL, ERROR_FIXME);
 	return 0;	/* not reached */
 }
 
@@ -1259,17 +1259,17 @@ static long procwrite(struct chan *c, void *va, long n, int64_t off)
 	uintptr_t offset;
 
 	if (c->qid.type & QTDIR)
-		error(EISDIR, NULL);
+		error(EISDIR, ERROR_FIXME);
 
 	if ((p = pid2proc(SLOT(c->qid))) == NULL)
-		error(ESRCH, NULL);
+		error(ESRCH, ERROR_FIXME);
 
 	if (waserror()) {
 		kref_put(&p->p_kref);
 		nexterror();
 	}
 	if (p->pid != PID(c->qid))
-		error(ESRCH, NULL);
+		error(ESRCH, ERROR_FIXME);
 
 	offset = off;
 
@@ -1277,13 +1277,13 @@ static long procwrite(struct chan *c, void *va, long n, int64_t off)
 #if 0
 		case Qargs:
 			if (n == 0)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			if (n >= sizeof buf - strlen(p->text) - 1)
-				error(E2BIG, NULL);
+				error(E2BIG, ERROR_FIXME);
 			l = snprintf(buf, sizeof buf, "%s [%s]", p->text, (char *)va);
 			args = kzmalloc(l + 1, KMALLOC_WAIT);
 			if (args == NULL)
-				error(ENOMEM, NULL);
+				error(ENOMEM, ERROR_FIXME);
 			memmove(args, buf, l);
 			args[l] = 0;
 			kfree(p->args);
@@ -1294,7 +1294,7 @@ static long procwrite(struct chan *c, void *va, long n, int64_t off)
 
 		case Qmem:
 			if (p->state != Stopped)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 
 			n = procctlmemio(p, offset, n, va, 0);
 			break;
@@ -1305,7 +1305,7 @@ static long procwrite(struct chan *c, void *va, long n, int64_t off)
 			else if (offset + n > sizeof(Ureg))
 				n = sizeof(Ureg) - offset;
 			if (p->dbgreg == 0)
-				error(ENODATA, NULL);
+				error(ENODATA, ERROR_FIXME);
 			setregisters(p->dbgreg, (char *)(p->dbgreg) + offset, va, n);
 			break;
 
@@ -1360,15 +1360,15 @@ static struct chan *proctext(struct chan *c, struct proc *p)
 
 	s = p->seg[TSEG];
 	if (s == 0)
-		error(ENOENT, NULL);
+		error(ENOENT, ERROR_FIXME);
 	if (p->state == Dead)
-		error(ESRCH, NULL);
+		error(ESRCH, ERROR_FIXME);
 
 	lock(s);
 	i = s->image;
 	if (i == 0) {
 		unlock(s);
-		error(ESRCH, NULL);
+		error(ESRCH, ERROR_FIXME);
 	}
 	unlock(s);
 
@@ -1380,19 +1380,19 @@ static struct chan *proctext(struct chan *c, struct proc *p)
 
 	tc = i->c;
 	if (tc == 0)
-		error(ESRCH, NULL);
+		error(ESRCH, ERROR_FIXME);
 
 	/* TODO: what do you want here?  you can't get a kref and have the new val
 	 * be 1.  Here is the old code: if (kref_get(&tc->ref, 1) == 1 || ... ) */
 	if (kref_refcnt(&tc->ref, 1) == 1 || (tc->flag & COPEN) == 0
 		|| tc->mode != OREAD) {
 		cclose(tc);
-		error(ESRCH, NULL);
+		error(ESRCH, ERROR_FIXME);
 	}
 
 	if (p->pid != PID(c->qid)) {
 		cclose(tc);
-		error(ESRCH, NULL);
+		error(ESRCH, ERROR_FIXME);
 	}
 
 	poperror();
@@ -1409,7 +1409,7 @@ void procstopwait(struct proc *p, int ctl)
 	int pid;
 
 	if (p->pdbg)
-		error(EBUSY, NULL);
+		error(EBUSY, ERROR_FIXME);
 	if (procstopped(p) || p->state == Broken)
 		return;
 
@@ -1428,7 +1428,7 @@ void procstopwait(struct proc *p, int ctl)
 	poperror();
 	qlock(&p->debug);
 	if (p->pid != pid)
-		error(ESRCH, NULL);
+		error(ESRCH, ERROR_FIXME);
 }
 
 #endif
@@ -1541,7 +1541,7 @@ procctlmemio(struct proc *p, uintptr_t offset, int n, void *va, int read)
 	for (;;) {
 		s = seg(p, offset, 1);
 		if (s == 0)
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 
 		if (offset + n >= s->top)
 			n = s->top - offset;

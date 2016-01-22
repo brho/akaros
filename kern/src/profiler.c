@@ -269,7 +269,7 @@ static void alloc_cpu_buffers(void)
 
 	profiler_queue = qopen(profiler_queue_limit, 0, NULL, NULL);
 	if (!profiler_queue)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	if (waserror()) {
 		free_cpu_buffers();
 		nexterror();

@@ -106,7 +106,7 @@ static void kprof_alarm_handler(struct alarm_waiter *waiter,
 static struct chan *kprof_attach(char *spec)
 {
 	if (!kprof.alarms)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 
 	return devattach(devname(), spec);
 }
@@ -167,7 +167,7 @@ static void kprof_fetch_profiler_data(void)
 	char *ndata = krealloc(kprof.pdata, psize, KMALLOC_WAIT);
 
 	if (!ndata)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	kprof.pdata = ndata;
 	while (kprof.psize < psize) {
 		size_t csize = profiler_read(kprof.pdata + kprof.psize,
@@ -231,7 +231,7 @@ static void kprof_init(void)
 	kprof.alarms = kzmalloc(sizeof(struct alarm_waiter) * num_cores,
 							KMALLOC_WAIT);
 	if (!kprof.alarms)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	if (waserror()) {
 		kfree(kprof.alarms);
 		kprof.alarms = NULL;
@@ -303,7 +303,7 @@ static struct chan *kprof_open(struct chan *c, int omode)
 {
 	if (c->qid.type & QTDIR) {
 		if (openmode(omode) != O_READ)
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 	}
 	c->mode = openmode(omode);
 	c->flag |= COPEN;
@@ -534,7 +534,7 @@ static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 		}
 		break;
 	default:
-		error(EBADFD, NULL);
+		error(EBADFD, ERROR_FIXME);
 	}
 	kfree(cb);
 	poperror();

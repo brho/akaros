@@ -219,7 +219,7 @@ struct walkqid *devwalk(struct chan *c,
 	for (j = 0; j < nname; j++) {
 		if (!(nc->qid.type & QTDIR)) {
 			if (j == 0)
-				error(ENOTDIR, NULL);
+				error(ENOTDIR, ERROR_FIXME);
 			goto Done;
 		}
 		n = name[j];
@@ -251,8 +251,8 @@ Accept:
 						   c->qid.path);
 Notfound:
 					if (j == 0)
-						error(ENOENT, NULL);
-					set_error(ENOENT, NULL);
+						error(ENOENT, ERROR_FIXME);
+					set_error(ENOENT, ERROR_FIXME);
 					goto Done;
 				case 0:
 					printd("DEVWALK continue, i was %d\n", i);
@@ -312,12 +312,12 @@ devstat(struct chan *c, uint8_t * db, int n,
 					devdir(c, c->qid, elem, 0, eve, DMDIR | 0555, &dir);
 					n = convD2M(&dir, db, n);
 					if (n == 0)
-						error(EINVAL, NULL);
+						error(EINVAL, ERROR_FIXME);
 					return n;
 				}
 				printd("DEVSTAT fails:%s %llu\n", devtab[c->type].name,
 					   c->qid.path);
-				error(ENOENT, NULL);
+				error(ENOENT, ERROR_FIXME);
 			case 0:
 				printd("DEVSTAT got 0\n");
 				break;
@@ -329,7 +329,7 @@ devstat(struct chan *c, uint8_t * db, int n,
 						dir.mode |= DMMOUNT;
 					n = convD2M(&dir, db, n);
 					if (n == 0)
-						error(EINVAL, NULL);
+						error(EINVAL, ERROR_FIXME);
 					return n;
 				}
 				break;
@@ -362,7 +362,7 @@ devdirread(struct chan *c, char *d, long n,
 				dsz = convD2M(&dir[0], (uint8_t *) d, n - m);
 				if (dsz <= BIT16SZ) {	/* <= not < because this isn't stat; read is stuck */
 					if (m == 0)
-						error(ENODATA, NULL);
+						error(ENODATA, ERROR_FIXME);
 					return m;
 				}
 				m += dsz;
@@ -375,7 +375,7 @@ devdirread(struct chan *c, char *d, long n,
 }
 
 /*
- * error(EPERM, NULL) if open permission not granted for up->env->user.
+ * error(EPERM, ERROR_FIXME) if open permission not granted for up->env->user.
  */
 void devpermcheck(char *fileuid, uint32_t perm, int omode)
 {
@@ -429,7 +429,7 @@ Return:
 void
 devcreate(struct chan *c, char *unused_char_p_t, int unused_int, uint32_t u)
 {
-	error(EPERM, NULL);
+	error(EPERM, ERROR_FIXME);
 }
 
 struct block *devbread(struct chan *c, long n, uint32_t offset)
@@ -439,7 +439,7 @@ struct block *devbread(struct chan *c, long n, uint32_t offset)
 
 	bp = allocb(n);
 	if (bp == 0)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	if (waserror()) {
 		freeb(bp);
 		nexterror();
@@ -467,24 +467,24 @@ long devbwrite(struct chan *c, struct block *bp, uint32_t offset)
 
 void devremove(struct chan *c)
 {
-	error(EPERM, NULL);
+	error(EPERM, ERROR_FIXME);
 }
 
 int devwstat(struct chan *c, uint8_t * unused_uint8_p_t, int i)
 {
-	error(EPERM, NULL);
+	error(EPERM, ERROR_FIXME);
 	return 0;
 }
 
 void devpower(int i)
 {
-	error(EPERM, NULL);
+	error(EPERM, ERROR_FIXME);
 }
 
 #if 0
 int devconfig(int unused_int, char *c, DevConf *)
 {
-	error(EPERM, NULL);
+	error(EPERM, ERROR_FIXME);
 	return 0;
 }
 #endif
@@ -503,7 +503,7 @@ void validwstatname(char *name)
 {
 	validname(name, 0);
 	if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 }
 
 struct dev *devbyname(char *name)

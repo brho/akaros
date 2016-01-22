@@ -414,7 +414,7 @@ static struct chan *ipopen(struct chan *c, int omode)
 			break;
 		case Qndb:
 			if (omode & (O_WRITE | O_TRUNC) && !iseve())
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			if ((omode & (O_WRITE | O_TRUNC)) == (O_WRITE | O_TRUNC))
 				f->ndb[0] = 0;
 			break;
@@ -436,15 +436,15 @@ static struct chan *ipopen(struct chan *c, int omode)
 		case Qbootp:
 		case Qipselftab:
 			if (omode & O_WRITE)
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			break;
 		case Qsnoop:
 			if (omode & O_WRITE)
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			p = f->p[PROTO(c->qid)];
 			cv = p->conv[CONV(c->qid)];
 			if (strcmp(ATTACHER(c), cv->owner) != 0 && !iseve())
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			atomic_inc(&cv->snoopers);
 			break;
 		case Qclone:
@@ -458,7 +458,7 @@ static struct chan *ipopen(struct chan *c, int omode)
 			qunlock(&p->qlock);
 			poperror();
 			if (cv == NULL) {
-				error(ENODEV, NULL);
+				error(ENODEV, ERROR_FIXME);
 				break;
 			}
 			/* we only honor nonblock on a clone */
@@ -480,9 +480,9 @@ static struct chan *ipopen(struct chan *c, int omode)
 			}
 			if ((perm & (cv->perm >> 6)) != perm) {
 				if (strcmp(ATTACHER(c), cv->owner) != 0)
-					error(EPERM, NULL);
+					error(EPERM, ERROR_FIXME);
 				if ((perm & cv->perm) != perm)
-					error(EPERM, NULL);
+					error(EPERM, ERROR_FIXME);
 
 			}
 			cv->inuse++;
@@ -514,9 +514,9 @@ static struct chan *ipopen(struct chan *c, int omode)
 			}
 			if ((perm & (cv->perm >> 6)) != perm) {
 				if (strcmp(ATTACHER(c), cv->owner) != 0)
-					error(EPERM, NULL);
+					error(EPERM, ERROR_FIXME);
 				if ((perm & cv->perm) != perm)
-					error(EPERM, NULL);
+					error(EPERM, ERROR_FIXME);
 
 			}
 
@@ -589,7 +589,7 @@ static int ipwstat(struct chan *c, uint8_t * dp, int n)
 	f = ipfs[c->dev];
 	switch (TYPE(c->qid)) {
 		default:
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 			break;
 		case Qctl:
 		case Qdata:
@@ -603,11 +603,11 @@ static int ipwstat(struct chan *c, uint8_t * dp, int n)
 	}
 	n = convM2D(dp, n, d, (char *)&d[1]);
 	if (n == 0)
-		error(ENODATA, NULL);
+		error(ENODATA, ERROR_FIXME);
 	p = f->p[PROTO(c->qid)];
 	cv = p->conv[CONV(c->qid)];
 	if (!iseve() && strcmp(ATTACHER(c), cv->owner) != 0)
-		error(EPERM, NULL);
+		error(EPERM, ERROR_FIXME);
 	if (!emptystr(d->uid))
 		kstrdup(&cv->owner, d->uid);
 	if (d->mode != ~0UL)
@@ -748,7 +748,7 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 	p = a;
 	switch (TYPE(ch->qid)) {
 		default:
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 		case Qtopdir:
 		case Qprotodir:
 		case Qconvdir:
@@ -980,7 +980,7 @@ static char *setladdrport(struct conv *c, char *str, int announcing)
 	/* one process can get all connections */
 	if (announcing && strcmp(p, "*") == 0) {
 		if (!iseve())
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 		return setluniqueport(c, 0);
 	}
 
@@ -1060,7 +1060,7 @@ static void connectctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 	char *p;
 
 	if (c->state != 0)
-		error(EBUSY, NULL);
+		error(EBUSY, ERROR_FIXME);
 	c->state = Connecting;
 	c->cerr[0] = '\0';
 	if (x->connect == NULL)
@@ -1111,7 +1111,7 @@ static void announcectlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 	char *p;
 
 	if (c->state != 0)
-		error(EBUSY, NULL);
+		error(EBUSY, ERROR_FIXME);
 	c->state = Announcing;
 	c->cerr[0] = '\0';
 	if (x->announce == NULL)
@@ -1212,7 +1212,7 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 
 	switch (TYPE(ch->qid)) {
 		default:
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 		case Qdata:
 			x = f->p[PROTO(ch->qid)];
 			c = x->conv[CONV(ch->qid)];
@@ -1506,7 +1506,7 @@ retry:
 		if (c == NULL) {
 			c = kzmalloc(sizeof(struct conv), 0);
 			if (c == NULL)
-				error(ENOMEM, NULL);
+				error(ENOMEM, ERROR_FIXME);
 			qlock_init(&c->qlock);
 			qlock_init(&c->listenq);
 			rendez_init(&c->cr);
@@ -1521,7 +1521,7 @@ retry:
 				c->ptcl = kzmalloc(p->ptclsize, 0);
 				if (c->ptcl == NULL) {
 					kfree(c);
-					error(ENOMEM, NULL);
+					error(ENOMEM, ERROR_FIXME);
 				}
 			}
 			*pp = c;
@@ -1658,9 +1658,9 @@ struct conv *Fsnewcall(struct conv *c, uint8_t * raddr, uint16_t rport,
 static long ndbwrite(struct Fs *f, char *a, uint32_t off, int n)
 {
 	if (off > strlen(f->ndb))
-		error(EIO, NULL);
+		error(EIO, ERROR_FIXME);
 	if (off + n >= sizeof(f->ndb) - 1)
-		error(EIO, NULL);
+		error(EIO, ERROR_FIXME);
 	memmove(f->ndb + off, a, n);
 	f->ndb[off + n] = 0;
 	f->ndbvers++;

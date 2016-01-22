@@ -327,9 +327,9 @@ static struct chan *nixopen(struct chan *c, int omode)
 	case Qtopdir:
 	case Qnixdir:
 		if (omode & O_REMCLO)
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 		if (omode & O_WRITE)
-			error(EISDIR, NULL);
+			error(EISDIR, ERROR_FIXME);
 		break;
 	case Qclone:
 		spin_lock_irqsave(&nixlock);
@@ -371,12 +371,12 @@ static struct chan *nixopen(struct chan *c, int omode)
 
 static void nixcreate(struct chan *c, char *name, int omode, uint32_t perm)
 {
-	error(EPERM, NULL);
+	error(EPERM, ERROR_FIXME);
 }
 
 static void nixremove(struct chan *c)
 {
-	error(EPERM, NULL);
+	error(EPERM, ERROR_FIXME);
 }
 
 static int nixwstat(struct chan *c, uint8_t * dp, int n)
@@ -447,7 +447,7 @@ static long nixwrite(struct chan *c, void *ubuf, long n, int64_t off)
 	case Qtopdir:
 	case Qnixdir:
 	case Qstat:
-		error(EPERM, NULL);
+		error(EPERM, ERROR_FIXME);
 	case Qctl:
 		nix = c->aux;
 		cb = parsecmd(ubuf, n);

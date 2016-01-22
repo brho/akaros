@@ -190,7 +190,7 @@ static struct chan *srvopen(struct chan *c, int omode)
 	openmode(omode);	/* used as an error checker in plan9, does little now */
 	if (c->qid.type & QTDIR) {
 		if (omode & O_WRITE)
-			error(EISDIR, NULL);
+			error(EISDIR, ERROR_FIXME);
 		c->mode = openmode(omode);
 		c->flag |= COPEN;
 		c->offset = 0;
@@ -208,13 +208,13 @@ static struct chan *srvopen(struct chan *c, int omode)
 #if 0
 	if (omode & ORCLOSE) {
 		if (strcmp(srv->user, up->env->user) != 0)
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 		else
 			srv->flags |= SORCLOSE;
 	}
 #endif
 	if ((srv->perm & DMEXCL) && atomic_read(&srv->opens))
-		error(EBUSY, NULL);
+		error(EBUSY, ERROR_FIXME);
 	/* srv->chan is write-once, so we don't need to sync. */
 	if (!srv->chan)
 		error(EFAIL, "srv file has no chan yet");
@@ -251,7 +251,7 @@ static void srvcreate(struct chan *c, char *name, int omode, uint32_t perm)
 
 static int srvwstat(struct chan *c, uint8_t * dp, int n)
 {
-	error(ENOSYS, NULL);
+	error(ENOSYS, ERROR_FIXME);
 	return -1;
 }
 
@@ -297,7 +297,7 @@ static long srvwrite(struct chan *c, void *va, long count, int64_t offset)
 	int fd;
 
 	if (c->qid.type & QTDIR)
-		error(EPERM, NULL);
+		error(EPERM, ERROR_FIXME);
 	srv = c->aux;
 	if (!grab_ref(srv))
 		error(EFAIL, "Unable to write srv file, concurrent removal");

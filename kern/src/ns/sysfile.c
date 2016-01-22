@@ -67,12 +67,12 @@ struct chan *fdtochan(struct fd_table *fdt, int fd, int mode, int chkmnt,
 	if (!c) {
 		/* We lost the info about why there was a problem (we used to track file
 		 * group closed too, can add that in later). */
-		error(EBADF, NULL);
+		error(EBADF, ERROR_FIXME);
 	}
 	if (chkmnt && (c->flag & CMSG)) {
 		if (iref)
 			cclose(c);
-		error(EBADF, NULL);
+		error(EBADF, ERROR_FIXME);
 	}
 	if (mode < 0)
 		return c;
@@ -124,10 +124,10 @@ int openmode(uint32_t omode)
 	 * Note that we no longer convert OEXEC/O_EXEC to O_READ, and instead return
 	 * just the O_ACCMODE bits. */
 	if (o >= (OTRUNC | OCEXEC | ORCLOSE | OEXEC))
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 	o &= ~(OTRUNC | OCEXEC | ORCLOSE);
 	if (o > OEXEC)
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 	if (o == OEXEC)
 		return OREAD;
 	return o;
@@ -200,7 +200,7 @@ int syscreate(char *path, int mode, uint32_t perm)
 	}
 	fd = newfd(c, mode);	/* 9ns mode is the O_FLAGS and perm is glibc mode */
 	if (fd < 0)
-		error(-fd, NULL);
+		error(-fd, ERROR_FIXME);
 	poperror();
 
 	poperror();
@@ -220,12 +220,12 @@ int sysdup(int old)
 	c = fdtochan(&current->open_files, old, -1, 0, 1);
 	if (c->qid.type & QTAUTH) {
 		cclose(c);
-		error(EPERM, NULL);
+		error(EPERM, ERROR_FIXME);
 	}
 	fd = newfd(c, 0);
 	if (fd < 0) {
 		cclose(c);
-		error(-fd, NULL);
+		error(-fd, ERROR_FIXME);
 	}
 	poperror();
 	return fd;
@@ -247,7 +247,7 @@ int sys_dup_to(struct proc *from_proc, unsigned int from_fd,
 	c = fdtochan(&from_proc->open_files, from_fd, -1, 0, 1);
 	if (c->qid.type & QTAUTH) {
 		cclose(c);
-		error(EPERM, NULL);
+		error(EPERM, ERROR_FIXME);
 	}
 	ret = insert_obj_fdt(&to_proc->open_files, c, to_fd, 0, TRUE, FALSE);
 	/* drop the ref from fdtochan.  if insert succeeded, there is one other ref
@@ -275,7 +275,7 @@ char *sysfd2path(int fd)
 		s = kzmalloc(c->name->len + 1, 0);
 		if (s == NULL) {
 			cclose(c);
-			error(ENOMEM, NULL);
+			error(ENOMEM, ERROR_FIXME);
 		}
 		memmove(s, c->name->s, c->name->len + 1);
 	}
@@ -314,7 +314,7 @@ int sysfauth(int fd, char *aname)
 
 	fd = newfd(ac, 0);
 	if (fd < 0)
-		error(-fd, NULL);
+		error(-fd, ERROR_FIXME);
 	poperror();	/* ac */
 
 	poperror();
@@ -335,7 +335,7 @@ int sysfversion(int fd, unsigned int msize, char *vers, unsigned int arglen)
 
 	/* check there's a NUL in the version string */
 	if (arglen == 0 || memchr(vers, 0, arglen) == 0)
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 
 	c = fdtochan(&current->open_files, fd, O_RDWR, 0, 1);
 	if (waserror()) {
@@ -383,17 +383,17 @@ int syspipe(int fd[2])
 	c[0] = namec("#pipe", Atodir, 0, 0);
 	c[1] = cclone(c[0]);
 	if (walk(&c[0], &names[0], 1, FALSE, NULL) < 0)
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 	if (walk(&c[1], &names[1], 1, FALSE, NULL) < 0)
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 	c[0] = d->open(c[0], O_RDWR);
 	c[1] = d->open(c[1], O_RDWR);
 	fd[0] = newfd(c[0], 0);
 	if (fd[0] < 0)
-		error(-fd[0], NULL);
+		error(-fd[0], ERROR_FIXME);
 	fd[1] = newfd(c[1], 0);
 	if (fd[1] < 0)
-		error(-fd[1], NULL);
+		error(-fd[1], ERROR_FIXME);
 	poperror();
 	return 0;
 }
@@ -429,7 +429,7 @@ long bindmount(struct chan *c, char *old, int flag, char *spec)
 	struct chan *c1;
 
 	if (flag > MMASK || (flag & MORDER) == (MBEFORE | MAFTER))
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 
 	c1 = namec(old, Amount, 0, 0);
 	if (waserror()) {
@@ -571,7 +571,7 @@ int sysopenat(int fromfd, char *path, int vfs_flags)
 	}
 	fd = newfd(c, vfs_flags);
 	if (fd < 0)
-		error(-fd, NULL);
+		error(-fd, ERROR_FIXME);
 	poperror();
 	return fd;
 }
@@ -673,7 +673,7 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 	}
 
 	if (n < 0)
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 
 	dir = c->qid.type & QTDIR;
 
@@ -717,7 +717,7 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 		} else
 			off = *offp;
 		if (off < 0)
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 		if (off == 0) {
 			if (offp == NULL) {
 				spin_lock(&c->lock);
@@ -843,16 +843,16 @@ int64_t sysseek(int fd, int64_t off, int whence)
 	/* TODO: WTF is this?  Is pipe magically the only device that isn't
 	 * seekable? */
 	if (!strcmp(devtab[c->type].name, "pipe"))
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 
 	switch (whence) {
 		case 0:
 			if (c->qid.type & QTDIR) {
 				if (off != 0)
-					error(EISDIR, NULL);
+					error(EISDIR, ERROR_FIXME);
 				unionrewind(c);
 			} else if (off < 0)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			spin_lock(&c->lock);	/* lock for int64_t assignment */
 			c->offset = off;
 			spin_unlock(&c->lock);
@@ -860,12 +860,12 @@ int64_t sysseek(int fd, int64_t off, int whence)
 
 		case 1:
 			if (c->qid.type & QTDIR)
-				error(EISDIR, NULL);
+				error(EISDIR, ERROR_FIXME);
 			spin_lock(&c->lock);	/* lock for read/write update */
 			off += c->offset;
 			if (off < 0) {
 				spin_unlock(&c->lock);
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			}
 			c->offset = off;
 			spin_unlock(&c->lock);
@@ -873,21 +873,21 @@ int64_t sysseek(int fd, int64_t off, int whence)
 
 		case 2:
 			if (c->qid.type & QTDIR)
-				error(EISDIR, NULL);
+				error(EISDIR, ERROR_FIXME);
 			dir = chandirstat(c);
 			if (dir == NULL)
 				error(EFAIL, "internal error: stat error in seek");
 			off += dir->length;
 			kfree(dir);
 			if (off < 0)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			spin_lock(&c->lock);	/* lock for read/write update */
 			c->offset = off;
 			spin_unlock(&c->lock);
 			break;
 
 		default:
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 			break;
 	}
 	poperror();
@@ -904,7 +904,7 @@ void validstat(uint8_t * s, int n, int slashok)
 	char buf[64];
 
 	if (statcheck(s, n) < 0)
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 	/* verify that name entry is acceptable */
 	s += STATFIXLEN - 4 * BIT16SZ;	/* location of first string */
 	/*
@@ -1021,10 +1021,10 @@ static long rwrite(int fd, void *va, long n, int64_t * offp)
 		nexterror();
 	}
 	if (c->qid.type & QTDIR)
-		error(EISDIR, NULL);
+		error(EISDIR, ERROR_FIXME);
 
 	if (n < 0)
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 
 	if (offp == NULL) {
 		/* append changes the offset to the end, and even if we fail later, this
@@ -1054,7 +1054,7 @@ static long rwrite(int fd, void *va, long n, int64_t * offp)
 		nexterror();
 	}
 	if (off < 0)
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 	m = devtab[c->type].write(c, va, n, off);
 	poperror();
 
@@ -1244,7 +1244,7 @@ static long dirpackage(uint8_t * buf, long ts, struct kdirent **d)
 
 	*d = kzmalloc(n * sizeof(**d) + ss, 0);
 	if (*d == NULL)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 
 	/*
 	 * then convert all buffers
@@ -1278,7 +1278,7 @@ long sysdirread(int fd, struct kdirent **d)
 	}
 	buf = kzmalloc(DIRREADLIM, 0);
 	if (buf == NULL)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	if (waserror()) {
 		kfree(buf);
 		nexterror();

@@ -398,7 +398,7 @@ static int perfmon_install_session_alloc(struct perfmon_session *ps,
 		i = -ENFILE;
 	spin_unlock(&ps->lock);
 	if (unlikely(i < 0))
-		error(-i, NULL);
+		error(-i, ERROR_FIXME);
 
 	return i;
 }
@@ -444,7 +444,7 @@ static void perfmon_alloc_get(struct perfmon_session *ps, int ped, bool reset,
 	struct perfmon_alloc *pa;
 
 	if (unlikely((ped < 0) || (ped >= ARRAY_SIZE(ps->allocs))))
-		error(EBADFD, NULL);
+		error(EBADFD, ERROR_FIXME);
 	spin_lock(&ps->lock);
 	pa = ps->allocs[ped];
 	if (likely(pa)) {
@@ -455,7 +455,7 @@ static void perfmon_alloc_get(struct perfmon_session *ps, int ped, bool reset,
 	}
 	spin_unlock(&ps->lock);
 	if (unlikely(!pa))
-		error(ENOENT, NULL);
+		error(ENOENT, ERROR_FIXME);
 	*ppa = pa;
 }
 
