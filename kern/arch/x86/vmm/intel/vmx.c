@@ -608,14 +608,14 @@ static const struct vmxec vmexit = {
 
 	.must_be_1 = (VM_EXIT_SAVE_DEBUG_CONTROLS |	/* can't set to 0 */
 				 VM_EXIT_ACK_INTR_ON_EXIT |
-				 VM_EXIT_SAVE_IA32_EFER | 
-				VM_EXIT_LOAD_IA32_EFER | 
+				 VM_EXIT_SAVE_IA32_EFER |
+				VM_EXIT_LOAD_IA32_EFER |
 				VM_EXIT_HOST_ADDR_SPACE_SIZE),	/* 64 bit */
 
 	.must_be_0 = (VM_EXIT_LOAD_IA32_PERF_GLOBAL_CTRL |
 				// VM_EXIT_ACK_INTR_ON_EXIT |
 				 VM_EXIT_SAVE_IA32_PAT |
-				 VM_EXIT_LOAD_IA32_PAT | 
+				 VM_EXIT_LOAD_IA32_PAT |
 				VM_EXIT_SAVE_VMX_PREEMPTION_TIMER),
 };
 
@@ -1858,7 +1858,7 @@ int vmx_launch(struct vmctl *v) {
 		vmcs_writel(EOI_EXIT_BITMAP3_HIGH, 0);
 
 		printk("v->apic %p v->pir %p\n", (void *)v->vapic, (void *)v->pir);
-		
+
 		// Initialize vmexits counter
 		for (int i = 0; i < 65; i++)
 			current_proc->vmm.vmexits[i] = 0;
@@ -1870,25 +1870,21 @@ int vmx_launch(struct vmctl *v) {
 	case RESUME:
 		/* If v->interrupt is non-zero, set it in the vmcs and
 		 * zero it in the vmctl. Else set RIP.
-		 * We used to check IF and such here but we'll let the VMM do it. If the VMM screws up
-		 * we can always fix it. Note to people who know about security: could this be an issue?
+		 * We used to check RFLAGS.IF and such here but we'll let the VMM
+		 * do it. If the VMM screws up we can always fix it. Note to people
+		 * who know about security: could this be an issue?
 		 * I don't see how: it will mainly just break your guest vm AFAICT.
 		 */
 		if (v->interrupt) {
 			if(debug) printk("Set VM_ENTRY_INFTR_INFO_FIELD to 0x%x\n", v->interrupt);
-			//vmcs_writel(VM_ENTRY_INTR_INFO_FIELD, v->interrupt);
-			//vapic_status_dump_kernel((void *)v->vapic);
-			
-			//Not using this because we still need a VMExit.
-			//vmx_set_rvi(v->interrupt);
+			vmcs_writel(VM_ENTRY_INTR_INFO_FIELD, v->interrupt);
 
-			//vapic_status_dump_kernel((void *)v->vapic);
 			v->interrupt = 0;
 			interrupting = 1;
 		}
 		printd("RESUME\n");
 		break;
-	default: 
+	default:
 		error(EINVAL, "Bad command in vmx_launch");
 	}
 	vcpu->shutdown = 0;
@@ -1909,7 +1905,7 @@ int vmx_launch(struct vmctl *v) {
 		disable_irq();
 		//dumpmsrs();
 		ret = vmx_run_vcpu(vcpu);
-		
+
 		//dumpmsrs();
 		enable_irq();
 
@@ -1926,7 +1922,7 @@ int vmx_launch(struct vmctl *v) {
 			unsigned long cr8val;
 			asm volatile("mov %%cr8,%0" : "=r" (cr8val));
 			if(debug) printk("CR8 Value: 0x%08x", cr8val);
-			
+
 			if(debug) printk("%s: Status is %04x\n", __func__,
 					vmcs_read16(GUEST_INTR_STATUS));
 			if(debug) vmx_dump_cpu(vcpu);
