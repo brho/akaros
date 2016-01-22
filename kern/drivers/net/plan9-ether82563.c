@@ -34,15 +34,19 @@
  * on the assumption that allowing jumbo packets makes the controller
  * much slower (as is true of the 82579), never allow jumbos.
  */
-#include "u.h"
-#include "../port/lib.h"
-#include "mem.h"
-#include "dat.h"
-#include "fns.h"
-#include "io.h"
-#include "../port/error.h"
-#include "../port/netif.h"
-#include "etherif.h"
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
+#include <ip.h>
 
 #define now() TK2MS(MACHP(0)->ticks)
 
@@ -366,12 +370,12 @@ typedef struct Rd Rd;
 typedef struct Td Td;
 
 struct Rd {				/* Receive Descriptor */
-	u32int	addr[2];
-	u16int	length;
-	u16int	checksum;
-	u8int	status;
-	u8int	errors;
-	u16int	special;
+	uint32_t	addr[2];
+	uint16_t	length;
+	uint16_t	checksum;
+	uint8_t	status;
+	uint8_t	errors;
+	uint16_t	special;
 };
 
 enum {					/* Rd status */
@@ -395,9 +399,9 @@ enum {					/* Rd errors */
 };
 
 struct Td {				/* Transmit Descriptor */
-	u32int	addr[2];		/* Data */
-	u32int	control;
-	u32int	status;
+	uint32_t	addr[2];		/* Data */
+	uint32_t	control;
+	uint32_t	status;
 };
 
 enum {					/* Tdesc control */
@@ -427,10 +431,10 @@ enum {					/* Tdesc status */
 };
 
 typedef struct {
-	u16int	*reg;
-	u32int	*reg32;
-	u16int	base;
-	u16int	lim;
+	uint16_t	*reg;
+	uint32_t	*reg32;
+	uint16_t	base;
+	uint16_t	lim;
 } Flash;
 
 enum {
@@ -532,20 +536,20 @@ static char *tname[] = {
 struct Ctlr {
 	int	port;
 	Pcidev	*pcidev;
-	Ctlr	*next;
-	Ether	*edev;
+	struct ctlr	*next;
+	struct ether	*edev;
 	int	active;
 	int	type;
-	ushort	eeprom[0x40];
+	uint16_t	eeprom[0x40];
 
-	QLock	alock;			/* attach */
+	qlock_t	alock;			/* attach */
 	int	attached;
 
 	int	*nic;
-	Lock	imlock;
+	spinlock_t	imlock;
 	int	im;			/* interrupt mask */
 
-	Rendez	lrendez;
+	struct rendez	lrendez;
 	int	lim;
 	int	phynum;
 	int	didk1fix;
@@ -554,52 +558,52 @@ struct Ctlr {
 	Watermark wmrd;
 	Watermark wmtd;
 
-	QLock	slock;
-	uint	statistics[Nstatistics];
-	uint	lsleep;
-	uint	lintr;
-	uint	rsleep;
-	uint	rintr;
-	uint	txdw;
-	uint	tintr;
-	uint	ixsm;
-	uint	ipcs;
-	uint	tcpcs;
-	uint	speeds[4];
+	qlock_t	slock;
+	unsigned int	statistics[Nstatistics];
+	unsigned int	lsleep;
+	unsigned int	lintr;
+	unsigned int	rsleep;
+	unsigned int	rintr;
+	unsigned int	txdw;
+	unsigned int	tintr;
+	unsigned int	ixsm;
+	unsigned int	ipcs;
+	unsigned int	tcpcs;
+	unsigned int	speeds[4];
 
-	uchar	ra[Eaddrlen];		/* receive address */
-	ulong	mta[128];		/* multicast table array */
+	uint8_t	ra[Eaddrlen];		/* receive address */
+	uint32_t	mta[128];		/* multicast table array */
 
-	Rendez	rrendez;
+	struct rendez	rrendez;
 	int	rim;
 	int	rdfree;			/* rx descriptors awaiting packets */
 	Rd	*rdba;			/* receive descriptor base address */
-	Block	**rb;			/* receive buffers */
+	struct block	**rb;			/* receive buffers */
 	int	rdh;			/* receive descriptor head */
 	int	rdt;			/* receive descriptor tail */
 
-	Rendez	trendez;
-	QLock	tlock;
+	struct rendez	trendez;
+	qlock_t	tlock;
 	Td	*tdba;			/* transmit descriptor base address */
-	Block	**tb;			/* transmit buffers */
+	struct block	**tb;			/* transmit buffers */
 	int	tdh;			/* transmit descriptor head */
 	int	tdt;			/* transmit descriptor tail */
 
 	int	fcrtl;
 	int	fcrth;
 
-	uint	pbs;			/* packet buffer size */
-	uint	pba;			/* packet buffer allocation */
+	unsigned int	pbs;			/* packet buffer size */
+	unsigned int	pba;			/* packet buffer allocation */
 };
 
 #define csr32r(c, r)	(*((c)->nic+((r)/4)))
 #define csr32w(c, r, v)	(*((c)->nic+((r)/4)) = (v))
 
-static Ctlr* i82563ctlrhead;
-static Ctlr* i82563ctlrtail;
+static struct ctlr* i82563ctlrhead;
+static struct ctlr* i82563ctlrtail;
 
-static Lock i82563rblock;		/* free receive Blocks */
-static Block* i82563rbpool;
+static spinlock_t i82563rblock;		/* free receive Blocks */
+static struct block* i82563rbpool;
 static int nrbfull;	/* # of rcv Blocks with data awaiting processing */
 
 static int speedtab[] = {
@@ -616,7 +620,7 @@ static char* statistics[] = {
 	"Excessive Collisions",
 	"Multiple Collision",
 	"Late Collisions",
-	nil,
+	NULL,
 	"Collision",
 	"Transmit Underrun",
 	"Defer",
@@ -624,7 +628,7 @@ static char* statistics[] = {
 	"Sequence Error",
 	"Carrier Extension Error",
 	"Receive Error Length",
-	nil,
+	NULL,
 	"XON Received",
 	"XON Transmitted",
 	"XOFF Received",
@@ -640,13 +644,13 @@ static char* statistics[] = {
 	"Broadcast Packets Received",
 	"Multicast Packets Received",
 	"Good Packets Transmitted",
-	nil,
+	NULL,
 	"Good Octets Received",
-	nil,
+	NULL,
 	"Good Octets Transmitted",
-	nil,
-	nil,
-	nil,
+	NULL,
+	NULL,
+	NULL,
 	"Receive No Buffers",
 	"Receive Undersize",
 	"Receive Fragment",
@@ -656,9 +660,9 @@ static char* statistics[] = {
 	"Management Packets Drop",
 	"Management Packets Tx",
 	"Total Octets Received",
-	nil,
+	NULL,
 	"Total Octets Transmitted",
-	nil,
+	NULL,
 	"Total Packets Received",
 	"Total Packets Transmitted",
 	"Packets Transmitted (64 Bytes)",
@@ -682,28 +686,28 @@ static char* statistics[] = {
 	"Interrupt Rx Overrun",
 };
 
-static int i82563reset(Ctlr *);
+static int i82563reset(struct ctlr *);
 
 static long
-i82563ifstat(Ether* edev, void* a, long n, ulong offset)
+i82563ifstat(struct ether* edev, void* a, long n, uint32_t offset)
 {
-	Ctlr *ctlr;
+	struct ctlr *ctlr;
 	char *s, *p, *e, *stat;
 	int i, r;
-	uvlong tuvl, ruvl;
+	uint64_t tuvl, ruvl;
 
 	ctlr = edev->ctlr;
-	qlock(&ctlr->slock);
-	p = s = malloc(READSTR);
-	if(p == nil) {
-		qunlock(&ctlr->slock);
+	qlock(&(&ctlr->slock)->qlock);
+	p = s = kzmalloc(READSTR, 0);
+	if(p == NULL) {
+		qunlock(&(&ctlr->slock)->qlock);
 		error(Enomem);
 	}
 	e = p + READSTR;
 
 	for(i = 0; i < Nstatistics; i++){
 		r = csr32r(ctlr, Statistics + i*4);
-		if((stat = statistics[i]) == nil)
+		if((stat = statistics[i]) == NULL)
 			continue;
 		switch(i){
 		case Gorcl:
@@ -711,15 +715,15 @@ i82563ifstat(Ether* edev, void* a, long n, ulong offset)
 		case Torl:
 		case Totl:
 			ruvl = r;
-			ruvl += (uvlong)csr32r(ctlr, Statistics+(i+1)*4) << 32;
+			ruvl += (uint64_t)csr32r(ctlr, Statistics+(i+1)*4) << 32;
 			tuvl = ruvl;
 			tuvl += ctlr->statistics[i];
-			tuvl += (uvlong)ctlr->statistics[i+1] << 32;
+			tuvl += (uint64_t)ctlr->statistics[i+1] << 32;
 			if(tuvl == 0)
 				continue;
 			ctlr->statistics[i] = tuvl;
 			ctlr->statistics[i+1] = tuvl >> 32;
-			p = seprint(p, e, "%s: %llud %llud\n", stat, tuvl, ruvl);
+			p = seprintf(p, e, "%s: %llud %llud\n", stat, tuvl, ruvl);
 			i++;
 			break;
 
@@ -727,51 +731,50 @@ i82563ifstat(Ether* edev, void* a, long n, ulong offset)
 			ctlr->statistics[i] += r;
 			if(ctlr->statistics[i] == 0)
 				continue;
-			p = seprint(p, e, "%s: %ud %ud\n", stat,
+			p = seprintf(p, e, "%s: %ud %ud\n", stat,
 				ctlr->statistics[i], r);
 			break;
 		}
 	}
 
-	p = seprint(p, e, "lintr: %ud %ud\n", ctlr->lintr, ctlr->lsleep);
-	p = seprint(p, e, "rintr: %ud %ud\n", ctlr->rintr, ctlr->rsleep);
-	p = seprint(p, e, "tintr: %ud %ud\n", ctlr->tintr, ctlr->txdw);
-	p = seprint(p, e, "ixcs: %ud %ud %ud\n", ctlr->ixsm, ctlr->ipcs, ctlr->tcpcs);
-	p = seprint(p, e, "ctrl: %.8ux\n", csr32r(ctlr, Ctrl));
-	p = seprint(p, e, "ctrlext: %.8ux\n", csr32r(ctlr, Ctrlext));
-	p = seprint(p, e, "status: %.8ux\n", csr32r(ctlr, Status));
-	p = seprint(p, e, "txcw: %.8ux\n", csr32r(ctlr, Txcw));
-	p = seprint(p, e, "txdctl: %.8ux\n", csr32r(ctlr, Txdctl));
-	p = seprint(p, e, "pbs: %dKB\n", ctlr->pbs);
-	p = seprint(p, e, "pba: %#.8ux\n", ctlr->pba);
+	p = seprintf(p, e, "lintr: %ud %ud\n", ctlr->lintr, ctlr->lsleep);
+	p = seprintf(p, e, "rintr: %ud %ud\n", ctlr->rintr, ctlr->rsleep);
+	p = seprintf(p, e, "tintr: %ud %ud\n", ctlr->tintr, ctlr->txdw);
+	p = seprintf(p, e, "ixcs: %ud %ud %ud\n", ctlr->ixsm, ctlr->ipcs, ctlr->tcpcs);
+	p = seprintf(p, e, "ctrl: %.8ux\n", csr32r(ctlr, Ctrl));
+	p = seprintf(p, e, "ctrlext: %.8ux\n", csr32r(ctlr, Ctrlext));
+	p = seprintf(p, e, "status: %.8ux\n", csr32r(ctlr, Status));
+	p = seprintf(p, e, "txcw: %.8ux\n", csr32r(ctlr, Txcw));
+	p = seprintf(p, e, "txdctl: %.8ux\n", csr32r(ctlr, Txdctl));
+	p = seprintf(p, e, "pbs: %dKB\n", ctlr->pbs);
+	p = seprintf(p, e, "pba: %#.8ux\n", ctlr->pba);
 
-	p = seprint(p, e, "speeds: 10:%ud 100:%ud 1000:%ud ?:%ud\n",
+	p = seprintf(p, e, "speeds: 10:%ud 100:%ud 1000:%ud ?:%ud\n",
 		ctlr->speeds[0], ctlr->speeds[1], ctlr->speeds[2], ctlr->speeds[3]);
-	p = seprint(p, e, "type: %s\n", tname[ctlr->type]);
-	p = seprint(p, e, "nrbfull (rcv blocks outstanding): %d\n", nrbfull);
+	p = seprintf(p, e, "type: %s\n", tname[ctlr->type]);
+	p = seprintf(p, e, "nrbfull (rcv blocks outstanding): %d\n", nrbfull);
 
-//	p = seprint(p, e, "eeprom:");
+//	p = seprintf(p, e, "eeprom:");
 //	for(i = 0; i < 0x40; i++){
 //		if(i && ((i & 7) == 0))
-//			p = seprint(p, e, "\n       ");
-//		p = seprint(p, e, " %4.4ux", ctlr->eeprom[i]);
+//			p = seprintf(p, e, "\n       ");
+//		p = seprintf(p, e, " %4.4ux", ctlr->eeprom[i]);
 //	}
-//	p = seprint(p, e, "\n");
+//	p = seprintf(p, e, "\n");
 
 	p = seprintmark(p, e, &ctlr->wmrb);
 	p = seprintmark(p, e, &ctlr->wmrd);
 	p = seprintmark(p, e, &ctlr->wmtd);
 
-	USED(p);
 	n = readstr(offset, a, n, s);
-	free(s);
-	qunlock(&ctlr->slock);
+	kfree(s);
+	qunlock(&(&ctlr->slock)->qlock);
 
 	return n;
 }
 
 static long
-i82563ctl(Ether*, void*, long)
+i82563ctl(struct ether*, void*, long)
 {
 	error(Enonexist);
 	return 0;
@@ -781,8 +784,8 @@ static void
 i82563promiscuous(void* arg, int on)
 {
 	int rctl;
-	Ctlr *ctlr;
-	Ether *edev;
+	struct ctlr *ctlr;
+	struct ether *edev;
 
 	edev = arg;
 	ctlr = edev->ctlr;
@@ -800,7 +803,7 @@ i82563promiscuous(void* arg, int on)
  * This must be right for multicast (thus ipv6) to work reliably.
  */
 static int
-mcasttblsize(Ctlr *ctlr)
+mcasttblsize(struct ctlr *ctlr)
 {
 	switch (ctlr->type) {
 	case i210:
@@ -821,11 +824,11 @@ mcasttblsize(Ctlr *ctlr)
 }
 
 static void
-i82563multicast(void* arg, uchar* addr, int on)
+i82563multicast(void* arg, uint8_t* addr, int on)
 {
 	int bit, x;
-	Ctlr *ctlr;
-	Ether *edev;
+	struct ctlr *ctlr;
+	struct ether *edev;
 
 	edev = arg;
 	ctlr = edev->ctlr;
@@ -846,48 +849,48 @@ i82563multicast(void* arg, uchar* addr, int on)
 	csr32w(ctlr, Mta+x*4, ctlr->mta[x]);
 }
 
-static Block*
+static struct block*
 i82563rballoc(void)
 {
-	Block *bp;
+	struct block *bp;
 
-	ilock(&i82563rblock);
-	if((bp = i82563rbpool) != nil){
+	spin_lock_irqsave(&(&i82563rblock)->lock);
+	if((bp = i82563rbpool) != NULL){
 		i82563rbpool = bp->next;
-		bp->next = nil;
+		bp->next = NULL;
 		_xinc(&bp->ref);	/* prevent bp from being freed */
 	}
-	iunlock(&i82563rblock);
+	spin_unlock_irqsave(&(&i82563rblock)->lock);
 
 	return bp;
 }
 
 static void
-i82563rbfree(Block* b)
+i82563rbfree(struct block* b)
 {
-	b->rp = b->wp = (uchar*)PGROUND((uintptr)b->base);
+	b->rp = b->wp = ( uint8_t *unused_uint8_p_t)PGROUND((uintptr_t_t)b->base);
  	b->flag &= ~(Bipck | Budpck | Btcpck | Bpktck);
-	ilock(&i82563rblock);
+	spin_lock_irqsave(&(&i82563rblock)->lock);
 	b->next = i82563rbpool;
 	i82563rbpool = b;
 	nrbfull--;
-	iunlock(&i82563rblock);
+	spin_unlock_irqsave(&(&i82563rblock)->lock);
 }
 
 static void
-i82563im(Ctlr* ctlr, int im)
+i82563im(struct ctlr* ctlr, int im)
 {
-	ilock(&ctlr->imlock);
+	spin_lock_irqsave(&(&ctlr->imlock)->lock);
 	ctlr->im |= im;
 	csr32w(ctlr, Ims, ctlr->im);
-	iunlock(&ctlr->imlock);
+	spin_unlock_irqsave(&(&ctlr->imlock)->lock);
 }
 
 static void
-i82563txinit(Ctlr* ctlr)
+i82563txinit(struct ctlr* ctlr)
 {
 	int i, r, tctl;
-	Block *bp;
+	struct block *bp;
 
 	tctl = 0x0F<<Ctshift | Psp;
 	switch (ctlr->type) {
@@ -904,8 +907,8 @@ i82563txinit(Ctlr* ctlr)
 	csr32w(ctlr, Tctl, tctl);
 	csr32w(ctlr, Tipg, 6<<20 | 8<<10 | 8);		/* yb sez: 0x702008 */
 	for(i = 0; i < Ntd; i++)
-		if((bp = ctlr->tb[i]) != nil) {
-			ctlr->tb[i] = nil;
+		if((bp = ctlr->tb[i]) != NULL) {
+			ctlr->tb[i] = NULL;
 			freeb(bp);
 		}
 	memset(ctlr->tdba, 0, Ntd * sizeof(Td));
@@ -929,16 +932,16 @@ i82563txinit(Ctlr* ctlr)
 }
 
 static int
-i82563cleanup(Ctlr *ctlr)
+i82563cleanup(struct ctlr *ctlr)
 {
-	Block *bp;
+	struct block *bp;
 	int tdh, n;
 
 	tdh = ctlr->tdh;
 	while(ctlr->tdba[n = NEXT(tdh, Ntd)].status & Tdd){
 		tdh = n;
-		if((bp = ctlr->tb[tdh]) != nil){
-			ctlr->tb[tdh] = nil;
+		if((bp = ctlr->tb[tdh]) != NULL){
+			ctlr->tb[tdh] = NULL;
 			freeb(bp);
 		}else
 			iprint("82563 tx underrun!\n");
@@ -948,15 +951,15 @@ i82563cleanup(Ctlr *ctlr)
 }
 
 static void
-i82563transmit(Ether* edev)
+i82563transmit(struct ether* edev)
 {
 	Td *td;
-	Block *bp;
-	Ctlr *ctlr;
+	struct block *bp;
+	struct ctlr *ctlr;
 	int tdh, tdt;
 
 	ctlr = edev->ctlr;
-	qlock(&ctlr->tlock);
+	qlock(&(&ctlr->tlock)->qlock);
 
 	/*
 	 * Free any completed packets
@@ -965,7 +968,7 @@ i82563transmit(Ether* edev)
 
 	/* if link down on 218, don't try since we need k1fix to run first */
 	if (!edev->link && ctlr->type == i218 && !ctlr->didk1fix) {
-		qunlock(&ctlr->tlock);
+		qunlock(&(&ctlr->tlock)->qlock);
 		return;
 	}
 
@@ -979,7 +982,7 @@ i82563transmit(Ether* edev)
 			i82563im(ctlr, Txdw);
 			break;
 		}
-		if((bp = qget(edev->oq)) == nil)
+		if((bp = qget(edev->oq)) == NULL)
 			break;
 		td = &ctlr->tdba[tdt];
 		td->addr[0] = PCIWADDR(bp->rp);
@@ -995,25 +998,25 @@ i82563transmit(Ether* edev)
 		csr32w(ctlr, Tdt, tdt);
 	}
 	/* else may not be any new ones, but could be some still in flight */
-	qunlock(&ctlr->tlock);
+	qunlock(&(&ctlr->tlock)->qlock);
 }
 
 static void
-i82563replenish(Ctlr* ctlr)
+i82563replenish(struct ctlr* ctlr)
 {
 	Rd *rd;
 	int rdt;
-	Block *bp;
+	struct block *bp;
 
 	rdt = ctlr->rdt;
 	while(NEXT(rdt, Nrd) != ctlr->rdh){
 		rd = &ctlr->rdba[rdt];
-		if(ctlr->rb[rdt] != nil){
-			print("#l%d: 82563: rx overrun\n", ctlr->edev->ctlrno);
+		if(ctlr->rb[rdt] != NULL){
+			printd("#l%d: 82563: rx overrun\n", ctlr->edev->ctlrno);
 			break;
 		}
 		bp = i82563rballoc();
-		if(bp == nil)
+		if(bp == NULL)
 			/*
 			 * this almost never gets better.  likely there's a bug
 			 * elsewhere in the kernel that is failing to free a
@@ -1034,9 +1037,9 @@ i82563replenish(Ctlr* ctlr)
 }
 
 static void
-i82563rxinit(Ctlr* ctlr)
+i82563rxinit(struct ctlr* ctlr)
 {
-	Block *bp;
+	struct block *bp;
 	int i, r, rctl, type;
 
 	rctl = Dpf|Bsize2048|Bam|RdtmsHALF;
@@ -1075,8 +1078,8 @@ i82563rxinit(Ctlr* ctlr)
 	csr32w(ctlr, Radv, 0);
 
 	for(i = 0; i < Nrd; i++)
-		if((bp = ctlr->rb[i]) != nil){
-			ctlr->rb[i] = nil;
+		if((bp = ctlr->rb[i]) != NULL){
+			ctlr->rb[i] = NULL;
 			freeb(bp);
 		}
 	i82563replenish(ctlr);
@@ -1100,7 +1103,7 @@ i82563rxinit(Ctlr* ctlr)
 static int
 i82563rim(void* ctlr)
 {
-	return ((Ctlr*)ctlr)->rim != 0;
+	return ((struct ctlr*)ctlr)->rim != 0;
 }
 
 /*
@@ -1112,7 +1115,7 @@ i82563rim(void* ctlr)
  * Must be called with rd->errors == 0.
  */
 static void
-ckcksums(Ctlr *ctlr, Rd *rd, Block *bp)
+ckcksums(struct ctlr *ctlr, Rd *rd, struct block *bp)
 {
 if (0) {
 	if(rd->status & Ixsm)
@@ -1141,10 +1144,10 @@ static void
 i82563rproc(void* arg)
 {
 	Rd *rd;
-	Block *bp;
-	Ctlr *ctlr;
+	struct block *bp;
+	struct ctlr *ctlr;
 	int rdh, rim, passed;
-	Ether *edev;
+	struct ether *edev;
 
 	edev = arg;
 	ctlr = edev->ctlr;
@@ -1159,7 +1162,7 @@ i82563rproc(void* arg)
 		i82563replenish(ctlr);
 		i82563im(ctlr, Rxt0|Rxo|Rxdmt0|Rxseq|Ack);
 		ctlr->rsleep++;
-		sleep(&ctlr->rrendez, i82563rim, ctlr);
+		rendez_sleep(&ctlr->rrendez, i82563rim, ctlr);
 
 		rdh = ctlr->rdh;
 		passed = 0;
@@ -1179,19 +1182,19 @@ i82563rproc(void* arg)
 				bp->lim = bp->wp;	/* lie like a dog. */
 				if(0)
 					ckcksums(ctlr, rd, bp);
-				ilock(&i82563rblock);
+				spin_lock_irqsave(&(&i82563rblock)->lock);
 				nrbfull++;
-				iunlock(&i82563rblock);
+				spin_unlock_irqsave(&(&i82563rblock)->lock);
 				notemark(&ctlr->wmrb, nrbfull);
 				etheriq(edev, bp, 1);	/* pass pkt upstream */
 				passed++;
 			} else {
 				if (rd->status & Reop && rd->errors)
-					print("%s: input packet error %#ux\n",
+					printd("%s: input packet error %#ux\n",
 						tname[ctlr->type], rd->errors);
 				freeb(bp);
 			}
-			ctlr->rb[rdh] = nil;
+			ctlr->rb[rdh] = NULL;
 
 			/* rd needs to be replenished to accept another pkt */
 			rd->status = 0;
@@ -1212,11 +1215,11 @@ i82563rproc(void* arg)
 static int
 i82563lim(void* ctlr)
 {
-	return ((Ctlr*)ctlr)->lim != 0;
+	return ((struct ctlr*)ctlr)->lim != 0;
 }
 
 static int
-phynum(Ctlr *ctlr)
+phynum(struct ctlr *ctlr)
 {
 	if (ctlr->phynum < 0)
 		switch (ctlr->type) {
@@ -1234,10 +1237,10 @@ phynum(Ctlr *ctlr)
 	return ctlr->phynum;
 }
 
-static uint
-phyread(Ctlr *ctlr, int reg)
+static unsigned int
+phyread(struct ctlr *ctlr, int reg)
 {
-	uint phy, i;
+	unsigned int phy, i;
 
 	if (reg >= 32)
 		iprint("phyread: reg %d >= 32\n", reg);
@@ -1254,10 +1257,10 @@ phyread(Ctlr *ctlr, int reg)
 	return phy & 0xffff;
 }
 
-static uint
-phywrite(Ctlr *ctlr, int reg, ushort val)
+static unsigned int
+phywrite(struct ctlr *ctlr, int reg, uint16_t val)
 {
-	uint phy, i;
+	unsigned int phy, i;
 
 	if (reg >= 32)
 		iprint("phyread: reg %d >= 32\n", reg);
@@ -1275,8 +1278,8 @@ phywrite(Ctlr *ctlr, int reg, ushort val)
 	return 0;
 }
 
-static ulong
-kmrnread(Ctlr *ctlr, ulong reg_addr)
+static uint32_t
+kmrnread(struct ctlr *ctlr, uint32_t reg_addr)
 {
 	csr32w(ctlr, Kumctrlsta, ((reg_addr << Kumctrlstaoffshift) &
 		Kumctrlstaoff) | Kumctrlstaren);  /* write register address */
@@ -1285,7 +1288,7 @@ kmrnread(Ctlr *ctlr, ulong reg_addr)
 }
 
 static void
-kmrnwrite(Ctlr *ctlr, ulong reg_addr, ushort data)
+kmrnwrite(struct ctlr *ctlr, uint32_t reg_addr, uint16_t data)
 {
 	csr32w(ctlr, Kumctrlsta, ((reg_addr << Kumctrlstaoffshift) &
 		Kumctrlstaoff) | data);
@@ -1316,12 +1319,12 @@ kmrnwrite(Ctlr *ctlr, ulong reg_addr, ushort data)
  * link speeds to avoid Tx hangs.
  */
 static void
-k1fix(Ctlr *ctlr)
+k1fix(struct ctlr *ctlr)
 {
 	int txtmout;			/* units of 10µs */
-	ulong fextnvm6, status;
-	ushort reg;
-	Ether *edev;
+	uint32_t fextnvm6, status;
+	uint16_t reg;
+	struct ether *edev;
 
 	edev = ctlr->edev;
 	fextnvm6 = csr32r(ctlr, Fextnvm6);
@@ -1373,9 +1376,9 @@ k1fix(Ctlr *ctlr)
 static void
 i82563lproc(void *v)
 {
-	uint phy, sp, a, phy79, prevlink;
-	Ctlr *ctlr;
-	Ether *edev;
+	unsigned int phy, sp, a, phy79, prevlink;
+	struct ctlr *ctlr;
+	struct ether *edev;
 
 	edev = v;
 	ctlr = edev->ctlr;
@@ -1438,20 +1441,20 @@ next:
 		ctlr->lim = 0;
 		i82563im(ctlr, Lsc);
 		ctlr->lsleep++;
-		sleep(&ctlr->lrendez, i82563lim, ctlr);
+		rendez_sleep(&ctlr->lrendez, i82563lim, ctlr);
 	}
 }
 
 static void
 i82563tproc(void *v)
 {
-	Ether *edev;
-	Ctlr *ctlr;
+	struct ether *edev;
+	struct ctlr *ctlr;
 
 	edev = v;
 	ctlr = edev->ctlr;
 	for(;;){
-		sleep(&ctlr->trendez, return0, 0);
+		rendez_sleep(&ctlr->trendez, return0, 0);
 		i82563transmit(edev);
 	}
 }
@@ -1460,13 +1463,13 @@ i82563tproc(void *v)
  * controller is buggered; shock it back to life.
  */
 static void
-restart(Ctlr *ctlr)
+restart(struct ctlr *ctlr)
 {
 if (0) {
-	static Lock rstlock;
+	static spinlock_t rstlock;
 
-	qlock(&ctlr->tlock);
-	ilock(&rstlock);
+	qlock(&(&ctlr->tlock)->qlock);
+	spin_lock_irqsave(&(&rstlock)->lock);
 	iprint("#l%d: resetting...", ctlr->edev->ctlrno);
 	i82563reset(ctlr);
 	/* [rt]xinit reset the ring indices */
@@ -1474,70 +1477,71 @@ if (0) {
 	i82563rxinit(ctlr);
 	coherence();
 	csr32w(ctlr, Rctl, csr32r(ctlr, Rctl) | Ren);
-	iunlock(&rstlock);
-	qunlock(&ctlr->tlock);
+	spin_unlock_irqsave(&(&rstlock)->lock);
+	qunlock(&(&ctlr->tlock)->qlock);
 	iprint("reset\n");
 }
 }
 
 static void
-freerbs(Ctlr *)
+freerbs(struct ctlr *)
 {
 	int i;
-	Block *bp;
+	struct block *bp;
 
 	for(i = Nrb; i > 0; i--){
 		bp = i82563rballoc();
-		bp->free = nil;
+		bp->free = NULL;
 		freeb(bp);
 	}
 }
 
 static void
-freemem(Ctlr *ctlr)
+freemem(struct ctlr *ctlr)
 {
 	freerbs(ctlr);
-	free(ctlr->tb);
-	ctlr->tb = nil;
-	free(ctlr->rb);
-	ctlr->rb = nil;
-	free(ctlr->tdba);
-	ctlr->tdba = nil;
-	free(ctlr->rdba);
-	ctlr->rdba = nil;
+	kfree(ctlr->tb);
+	ctlr->tb = NULL;
+	kfree(ctlr->rb);
+	ctlr->rb = NULL;
+	kfree(ctlr->tdba);
+	ctlr->tdba = NULL;
+	kfree(ctlr->rdba);
+	ctlr->rdba = NULL;
 }
 
 static void
-i82563attach(Ether* edev)
+i82563attach(struct ether* edev)
 {
+	ERRSTACK(2);
 	int i;
-	Block *bp;
-	Ctlr *ctlr;
+	struct block *bp;
+	struct ctlr *ctlr;
 	char name[KNAMELEN];
 
 	ctlr = edev->ctlr;
-	qlock(&ctlr->alock);
+	qlock(&(&ctlr->alock)->qlock);
 
 	if(ctlr->attached){
-		qunlock(&ctlr->alock);
+		qunlock(&(&ctlr->alock)->qlock);
 		return;
 	}
 
 	if(waserror()){
 		freemem(ctlr);
-		qunlock(&ctlr->alock);
+		qunlock(&(&ctlr->alock)->qlock);
 		nexterror();
 	}
 
 	ctlr->rdba = mallocalign(Nrd * sizeof(Rd), 128, 0, 0);
 	ctlr->tdba = mallocalign(Ntd * sizeof(Td), 128, 0, 0);
-	if(ctlr->rdba == nil || ctlr->tdba == nil ||
-	   (ctlr->rb = malloc(Nrd*sizeof(Block*))) == nil ||
-	   (ctlr->tb = malloc(Ntd*sizeof(Block*))) == nil)
+	if(ctlr->rdba == NULL || ctlr->tdba == NULL ||
+	   (ctlr->rb = kzmalloc(Nrd * sizeof(struct block *), 0)) == NULL ||
+	   (ctlr->tb = kzmalloc(Ntd * sizeof(struct block *), 0)) == NULL)
 		error(Enomem);
 
 	for(i = 0; i < Nrb; i++){
-		if((bp = allocb(ETHERMAXTU + Slop + BY2PG)) == nil)
+		if((bp = allocb(ETHERMAXTU + Slop + BY2PG)) == NULL)
 			error(Enomem);
 		bp->free = i82563rbfree;
 		freeb(bp);
@@ -1550,31 +1554,31 @@ i82563attach(Ether* edev)
 	initmark(&ctlr->wmrd, Nrd-1, "rcv descrs processed at once");
 	initmark(&ctlr->wmtd, Ntd-1, "xmit descr queue len");
 
-	snprint(name, sizeof name, "#l%dl", edev->ctlrno);
+	snprintf(name, sizeof name, "#l%dl", edev->ctlrno);
 	kproc(name, i82563lproc, edev);
 
-	snprint(name, sizeof name, "#l%dr", edev->ctlrno);
+	snprintf(name, sizeof name, "#l%dr", edev->ctlrno);
 	kproc(name, i82563rproc, edev);
 
-	snprint(name, sizeof name, "#l%dt", edev->ctlrno);
+	snprintf(name, sizeof name, "#l%dt", edev->ctlrno);
 	kproc(name, i82563tproc, edev);
 
 	i82563txinit(ctlr);
 
-	qunlock(&ctlr->alock);
+	qunlock(&(&ctlr->alock)->qlock);
 	poperror();
 }
 
 static void
 i82563interrupt(Ureg*, void* arg)
 {
-	Ctlr *ctlr;
-	Ether *edev;
+	struct ctlr *ctlr;
+	struct ether *edev;
 	int icr, im, i, loops;
 
 	edev = arg;
 	ctlr = edev->ctlr;
-	ilock(&ctlr->imlock);
+	spin_lock_irqsave(&(&ctlr->imlock)->lock);
 	csr32w(ctlr, Imc, ~0);
 	im = ctlr->im;
 	loops = 0;
@@ -1585,24 +1589,24 @@ i82563interrupt(Ureg*, void* arg)
 		if(icr & Lsc){
 			im &= ~Lsc;
 			ctlr->lim = icr & Lsc;
-			wakeup(&ctlr->lrendez);
+			rendez_wakeup(&ctlr->lrendez);
 			ctlr->lintr++;
 		}
 		if(icr & (Rxt0|Rxo|Rxdmt0|Rxseq|Ack)){
 			ctlr->rim = icr & (Rxt0|Rxo|Rxdmt0|Rxseq|Ack);
 			im &= ~(Rxt0|Rxo|Rxdmt0|Rxseq|Ack);
-			wakeup(&ctlr->rrendez);
+			rendez_wakeup(&ctlr->rrendez);
 			ctlr->rintr++;
 		}
 		if(icr & Txdw){
 			im &= ~Txdw;
 			ctlr->tintr++;
-			wakeup(&ctlr->trendez);
+			rendez_wakeup(&ctlr->trendez);
 		}
 	}
 	ctlr->im = im;
 	csr32w(ctlr, Ims, im);
-	iunlock(&ctlr->imlock);
+	spin_unlock_irqsave(&(&ctlr->imlock)->lock);
 	if (loops)
 		; //intrisforme();
 }
@@ -1611,15 +1615,15 @@ i82563interrupt(Ureg*, void* arg)
 static void
 i82575interrupt(Ureg*, void *)
 {
-	Ctlr *ctlr;
+	struct ctlr *ctlr;
 
-	for (ctlr = i82563ctlrhead; ctlr != nil && ctlr->edev != nil;
+	for (ctlr = i82563ctlrhead; ctlr != NULL && ctlr->edev != NULL;
 	     ctlr = ctlr->next)
-		i82563interrupt(nil, ctlr->edev);
+		i82563interrupt(NULL, ctlr->edev);
 }
 
 static int
-i82563detach0(Ctlr* ctlr)
+i82563detach0(struct ctlr* ctlr)
 {
 	int r, timeo;
 
@@ -1652,7 +1656,7 @@ i82563detach0(Ctlr* ctlr)
 		break;
 	case i218:
 		// after pxe or 9fat boot, pba is always 0xe0012 on i218 => 32K
-		ctlr->pbs = (ctlr->pba >> 16) + (ushort)ctlr->pba;
+		ctlr->pbs = (ctlr->pba >> 16) + (uint16_t)ctlr->pba;
 		csr32w(ctlr, Pbs, ctlr->pbs);
 		break;
 	}
@@ -1696,27 +1700,27 @@ i82563detach0(Ctlr* ctlr)
 }
 
 static int
-i82563detach(Ctlr* ctlr)
+i82563detach(struct ctlr* ctlr)
 {
 	int r;
-	static Lock detlck;
+	static spinlock_t detlck;
 
-	ilock(&detlck);
+	spin_lock_irqsave(&(&detlck)->lock);
 	r = i82563detach0(ctlr);
-	iunlock(&detlck);
+	spin_unlock_irqsave(&(&detlck)->lock);
 	return r;
 }
 
 static void
-i82563shutdown(Ether* ether)
+i82563shutdown(struct ether* ether)
 {
 	i82563detach(ether->ctlr);
 }
 
-static ushort
-eeread(Ctlr *ctlr, int adr)
+static uint16_t
+eeread(struct ctlr *ctlr, int adr)
 {
-	ulong n;
+	uint32_t n;
 
 	csr32w(ctlr, Eerd, EEstart | adr << 2);
 	for (n = 1000000; (csr32r(ctlr, Eerd) & EEdone) == 0 && n-- > 0; )
@@ -1728,9 +1732,9 @@ eeread(Ctlr *ctlr, int adr)
 
 /* load eeprom into ctlr */
 static int
-eeload(Ctlr *ctlr)
+eeload(struct ctlr *ctlr)
 {
-	ushort sum;
+	uint16_t sum;
 	int data, adr;
 
 	sum = 0;
@@ -1743,9 +1747,9 @@ eeload(Ctlr *ctlr)
 }
 
 static int
-fcycle(Ctlr *, Flash *f)
+fcycle(struct ctlr *, Flash *f)
 {
-	ushort s, i;
+	uint16_t s, i;
 
 	s = f->reg[Fsts];
 	if((s&Fvalid) == 0)
@@ -1761,10 +1765,10 @@ fcycle(Ctlr *, Flash *f)
 }
 
 static int
-fread(Ctlr *ctlr, Flash *f, int ladr)
+fread(struct ctlr *ctlr, Flash *f, int ladr)
 {
-	ushort s;
-	ulong n;
+	uint16_t s;
+	uint32_t n;
 
 	delay(1);
 	if(fcycle(ctlr, f) == -1)
@@ -1789,15 +1793,15 @@ fread(Ctlr *ctlr, Flash *f, int ladr)
 
 /* load flash into ctlr */
 static int
-fload(Ctlr *ctlr)
+fload(struct ctlr *ctlr)
 {
-	ulong data, io, r, adr;
-	ushort sum;
+	uint32_t data, io, r, adr;
+	uint16_t sum;
 	Flash f;
 
 	io = ctlr->pcidev->mem[1].bar & ~0x0f;
 	f.reg = vmap(io, ctlr->pcidev->mem[1].size);
-	if(f.reg == nil)
+	if(f.reg == NULL)
 		return -1;
 	f.reg32 = (void*)f.reg;
 	f.base = f.reg32[Bfpr] & FMASK(0, 13);
@@ -1819,7 +1823,7 @@ fload(Ctlr *ctlr)
 }
 
 static int
-i82563reset(Ctlr *ctlr)
+i82563reset(struct ctlr *ctlr)
 {
 	int i, r, type;
 
@@ -1845,7 +1849,7 @@ i82563reset(Ctlr *ctlr)
 		break;
 	}
 	if (r != 0 && r != 0xBABA){
-		print("%s: bad EEPROM checksum - %#.4ux\n",
+		printd("%s: bad EEPROM checksum - %#.4ux\n",
 			tname[type], r);
 		//return -1;
 	}
@@ -1902,12 +1906,12 @@ static void
 i82563pci(void)
 {
 	int type;
-	ulong io;
+	uint32_t io;
 	void *mem;
 	Pcidev *p;
-	Ctlr *ctlr;
+	struct ctlr *ctlr;
 
-	p = nil;
+	p = NULL;
 	while(p = pcimatch(p, 0x8086, 0)){
 		switch(p->did){
 		default:
@@ -1984,12 +1988,12 @@ i82563pci(void)
 
 		io = p->mem[0].bar & ~0x0F;
 		mem = vmap(io, p->mem[0].size);
-		if(mem == nil){
-			print("%s: can't map %.8lux\n", tname[type], io);
+		if(mem == NULL){
+			printd("%s: can't map %.8lux\n", tname[type], io);
 			continue;
 		}
-		ctlr = malloc(sizeof(Ctlr));
-		if(ctlr == nil) {
+		ctlr = kzmalloc(sizeof(struct ctlr), 0);
+		if(ctlr == NULL) {
 			vunmap(mem, p->mem[0].size);
 			error(Enomem);
 		}
@@ -2001,12 +2005,12 @@ i82563pci(void)
 
 		if(i82563reset(ctlr)){
 			vunmap(mem, p->mem[0].size);
-			free(ctlr);
+			kfree(ctlr);
 			continue;
 		}
 		pcisetbme(p);
 
-		if(i82563ctlrhead != nil)
+		if(i82563ctlrhead != NULL)
 			i82563ctlrtail->next = ctlr;
 		else
 			i82563ctlrhead = ctlr;
@@ -2015,9 +2019,9 @@ i82563pci(void)
 }
 
 static int
-pnp(Ether* edev, int type)
+pnp(struct ether* edev, int type)
 {
-	Ctlr *ctlr;
+	struct ctlr *ctlr;
 	static int done;
 
 	if(!done) {
@@ -2029,7 +2033,7 @@ pnp(Ether* edev, int type)
 	 * Any adapter matches if no edev->port is supplied,
 	 * otherwise the ports must match.
 	 */
-	for(ctlr = i82563ctlrhead; ctlr != nil; ctlr = ctlr->next){
+	for(ctlr = i82563ctlrhead; ctlr != NULL; ctlr = ctlr->next){
 		if(ctlr->active)
 			continue;
 		if(type != Iany && ctlr->type != type)
@@ -2039,7 +2043,7 @@ pnp(Ether* edev, int type)
 			break;
 		}
 	}
-	if(ctlr == nil)
+	if(ctlr == NULL)
 		return -1;
 
 	edev->ctlr = ctlr;
@@ -2070,67 +2074,67 @@ pnp(Ether* edev, int type)
 }
 
 static int
-anypnp(Ether *e)
+anypnp(struct ether *e)
 {
 	return pnp(e, Iany);
 }
 
 static int
-i82563pnp(Ether *e)
+i82563pnp(struct ether *e)
 {
 	return pnp(e, i82563);
 }
 
 static int
-i82566pnp(Ether *e)
+i82566pnp(struct ether *e)
 {
 	return pnp(e, i82566);
 }
 
 static int
-i82571pnp(Ether *e)
+i82571pnp(struct ether *e)
 {
 	return pnp(e, i82571);
 }
 
 static int
-i82572pnp(Ether *e)
+i82572pnp(struct ether *e)
 {
 	return pnp(e, i82572);
 }
 
 static int
-i82573pnp(Ether *e)
+i82573pnp(struct ether *e)
 {
 	return pnp(e, i82573);
 }
 
 static int
-i82575pnp(Ether *e)
+i82575pnp(struct ether *e)
 {
 	return pnp(e, i82575);
 }
 
 static int
-i82579pnp(Ether *e)
+i82579pnp(struct ether *e)
 {
 	return pnp(e, i82579);
 }
 
 static int
-i210pnp(Ether *e)
+i210pnp(struct ether *e)
 {
 	return pnp(e, i210);
 }
 
 static int
-i217pnp(Ether *e)
+i217pnp(struct ether *e)
 {
 	return pnp(e, i217);
 }
 
 static int
-i218pnp(Ether *e)
+i218pnp(struct ether *e)
 {
 	return pnp(e, i218);
 }
