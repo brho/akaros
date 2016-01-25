@@ -129,6 +129,8 @@ int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores, int flags)
 		}
 	}
 	vmm->nr_guest_pcores = i;
+	for (int i = 0; i < VMM_VMEXIT_NR_TYPES; i++)
+		vmm->vmexits[i] = 0;
 	qunlock(&vmm->qlock);
 	return i;
 }

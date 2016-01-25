@@ -1858,10 +1858,6 @@ int vmx_launch(struct vmctl *v) {
 		vmcs_writel(EOI_EXIT_BITMAP3_HIGH, 0);
 
 		printk("v->apic %p v->pir %p\n", (void *)v->vapic, (void *)v->pir);
-
-		// Initialize vmexits counter
-		for (int i = 0; i < 65; i++)
-			current_proc->vmm.vmexits[i] = 0;
 		// fallthrough
 	case REG_RIP:
 		printd("REG_RIP %p\n", v->regs.tf_rip);

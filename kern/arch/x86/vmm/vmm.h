@@ -14,6 +14,8 @@ static inline int cpu_has_svm(const char **msg)
 	return 0;
 }
 
+#define VMM_VMEXIT_NR_TYPES		65
+
 struct vmm {
 	qlock_t qlock;
 	// always false.
@@ -38,7 +40,7 @@ struct vmm {
 		void *svm;
 		struct vmx_vcpu **guest_pcores;
 	};
-	unsigned long vmexits[65];	/* TODO: use a #define from a header */
+	unsigned long vmexits[VMM_VMEXIT_NR_TYPES];
 };
 
 void vmm_init(void);
