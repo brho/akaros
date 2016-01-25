@@ -46,6 +46,7 @@ struct kthread {
 	char						*name;
 	char						generic_buf[GENBUF_SZ];
 	struct systrace_record		*trace;
+	struct systrace_record		*strace;
 };
 
 /* Semaphore for kthreads to sleep on.  0 or less means you need to sleep */

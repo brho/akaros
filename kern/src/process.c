@@ -211,7 +211,7 @@ struct proc *pid_nth(unsigned int n)
 		 * so continue
 		 */
 
-		if (kref_get_not_zero(&p->p_kref, 1)){
+		if (kref_get_not_zero(&p->p_kref, 1)) {
 			/* this one counts */
 			if (! n){
 				printd("pid_nth: at end, p %p\n", p);
@@ -220,7 +220,7 @@ struct proc *pid_nth(unsigned int n)
 			kref_put(&p->p_kref);
 			n--;
 		}
-		if (!hashtable_iterator_advance(iter)){
+		if (!hashtable_iterator_advance(iter)) {
 			p = NULL;
 			break;
 		}
@@ -468,6 +468,10 @@ static void __proc_free(struct kref *kref)
 	assert(kref_refcnt(&p->p_kref) == 0);
 	assert(TAILQ_EMPTY(&p->alarmset.list));
 
+	if (p->strace) {
+		kref_put(&p->strace->procs);
+		kref_put(&p->strace->users);
+	}
 	__vmm_struct_cleanup(p);
 	p->progname[0] = 0;
 	free_path(p, p->binary_path);

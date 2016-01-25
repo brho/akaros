@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is part of the UCB release of Plan 9. It is subject to the license
  * terms in the LICENSE file found in the top-level directory of this
  * distribution and at http://akaros.cs.berkeley.edu/files/Plan9License. No
@@ -57,6 +57,7 @@ enum {
 	Qregs,
 	Qsegment,
 	Qstatus,
+	Qstrace,
 	Qvmstatus,
 	Qtext,
 	Qwait,
@@ -80,13 +81,16 @@ enum {
 	CMstartstop,
 	CMstartsyscall,
 	CMstop,
+	CMtrace,
 	CMwaitstop,
 	CMwired,
-	CMtrace,
 	CMcore,
 	CMvminit,
 	CMvmstart,
 	CMvmkill,
+	CMstraceme,
+	CMstraceall,
+	CMstraceoff,
 };
 
 enum {
@@ -116,6 +120,7 @@ struct dirtab procdir[] = {
 	//  {"regs",        {Qregs},    sizeof(Ureg),       0000},
 	{"segment", {Qsegment}, 0, 0444},
 	{"status", {Qstatus}, STATSIZE, 0444},
+	{"strace", {Qstrace}, 0, 0666},
 	{"vmstatus", {Qvmstatus}, 0, 0444},
 	{"text", {Qtext}, 0, 0000},
 	{"wait", {Qwait}, 0, 0400},
@@ -140,15 +145,18 @@ struct cmdtab proccmd[] = {
 	{CMstartstop, "startstop", 1},
 	{CMstartsyscall, "startsyscall", 1},
 	{CMstop, "stop", 1},
+	{CMtrace, "trace", 0},
 	{CMwaitstop, "waitstop", 1},
 	{CMwired, "wired", 2},
-	{CMtrace, "trace", 0},
 	{CMcore, "core", 2},
 	{CMcore, "core", 2},
 	{CMcore, "core", 2},
 	{CMvminit, "vminit", 0},
 	{CMvmstart, "vmstart", 0},
 	{CMvmkill, "vmkill", 0},
+	{CMstraceme, "straceme", 0},
+	{CMstraceall, "straceall", 0},
+	{CMstraceoff, "straceoff", 0},
 };
 
 /*
@@ -533,6 +541,16 @@ static struct chan *procopen(struct chan *c, int omode)
 		case Qvmstatus:
 		case Qctl:
 			break;
+
+		case Qstrace:
+			if (!p->strace)
+				error(ENOENT, "Process does not have tracing enabled");
+			/* the ref we are upping is the one we put in __proc_free, which is
+			 * the one we got from CMstrace{on,me}.  We have a ref on p, so we
+			 * know we won't free until we decref the proc. */
+			kref_get(&p->strace->users, 1);
+			c->aux = p->strace;
+			break;
 		case Qnotepg:
 			error(ENOSYS, ERROR_FIXME);
 #if 0
@@ -548,9 +566,6 @@ static struct chan *procopen(struct chan *c, int omode)
 			break;
 
 		default:
-			poperror();
-			//qunlock(&p->debug);
-			kref_put(&p->p_kref);
 			printk("procopen %#llux\n", c->qid.path);
 			error(EINVAL, ERROR_FIXME);
 	}
@@ -730,8 +745,19 @@ static void procclose(struct chan *c)
 		 */
 		spin_unlock(&tlock);
 	}
+	if (QID(c->qid) == Qsyscall) {
+		if (c->aux)
+			qclose(c->aux);
+		c->aux = NULL;
+	}
 	if (QID(c->qid) == Qns && c->aux != 0)
 		kfree(c->aux);
+	if (QID(c->qid) == Qstrace && c->aux != 0) {
+		struct strace *s = c->aux;
+
+		kref_put(&s->users);
+		c->aux = NULL;
+	}
 }
 
 void int2flag(int flag, char *s)
@@ -811,6 +837,7 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 	int tesz;
 	uint8_t *rptr;
 	struct mntwalk *mw;
+	struct strace *s;
 
 	if (c->qid.type & QTDIR) {
 		int nn;
@@ -853,10 +880,11 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 			return readstr(off, va, n, tpids);
 #endif
 	if ((p = pid2proc(SLOT(c->qid))) == NULL)
-		error(ESRCH, ERROR_FIXME);
+		error(ESRCH, "%d: no such process", SLOT(c->qid));
 	if (p->pid != PID(c->qid)) {
 		kref_put(&p->p_kref);
-		error(ESRCH, ERROR_FIXME);
+		error(ESRCH, "weird: p->pid is %d, PID(c->qid) is %d: mismatch",
+		      p->pid, PID(c->qid));
 	}
 	switch (QID(c->qid)) {
 		default:
@@ -1129,15 +1157,34 @@ regread:
 			kfree(wq);
 			return n;
 #endif
+		case Qstrace:
+			s = c->aux;
+			/* We need to decref, so that p can get freed while we are blocked
+			 * on the qread.  in proc_free, the strace is released that will
+			 * qhangup that will wake us up. */
+			kref_put(&p->p_kref);
+			n = qread(s->q, va, n);
+			return n;
+
 		case Qstatus:{
-				/* the extra 2 is paranoia */
-				char buf[8 + 1 + PROC_PROGNAME_SZ + 1 + 10 + 1 + 6 + 2];
-				snprintf(buf, sizeof(buf),
+				/* the old code grew the stack and was hideous.
+				 * status is not a high frequency operation; just malloc. */
+				char *buf = kmalloc(4096, KMALLOC_WAIT);
+				char *s = buf, *e = buf + 4096;
+				int i;
+
+				s = seprintf(s, e,
 				         "%8d %-*s %-10s %6d", p->pid, PROC_PROGNAME_SZ,
 				         p->progname, procstate2str(p->state),
 				         p->ppid);
+				if (p->strace)
+					s = seprintf(s, e, " %d trace users %d traced procs",
+					             kref_refcnt(&p->strace->users),
+					             kref_refcnt(&p->strace->procs));
 				kref_put(&p->p_kref);
-				return readstr(off, va, n, buf);
+				i = readstr(off, va, n, buf);
+				kfree(buf);
+				return i;
 			}
 
 		case Qvmstatus:
@@ -1210,7 +1257,8 @@ regread:
 #endif
 	}
 
-	error(EINVAL, ERROR_FIXME);
+
+	error(EINVAL, "QID %d did not match any QIDs for #proc", QID(c->qid));
 	return 0;	/* not reached */
 }
 
@@ -1317,15 +1365,21 @@ static long procwrite(struct chan *c, void *va, long n, int64_t off)
 			procctlreq(p, va, n);
 			break;
 
+		/* this lets your write a marker into the data stream,
+		 * which is a very powerful tool. */
+		case Qstrace:
+			assert(c->aux);
+			/* it is possible that the q hungup and is closed.  that would be
+			 * the case if all of the procs closed and decref'd.  if the q is
+			 * closed, qwrite() will throw an error. */
+			n = qwrite(((struct strace*)c->aux)->q, va, n);
+			break;
 		default:
-			poperror();
-			kref_put(&p->p_kref);
 			error(EFAIL, "unknown qid %#llux in procwrite\n", c->qid.path);
 	}
 	poperror();
 	kref_put(&p->p_kref);
 	return n;
-
 }
 
 struct dev procdevtab __devtab = {
@@ -1462,6 +1516,21 @@ void procctlclosefiles(struct proc *p, int all, int fd)
 		procctlcloseone(p, fd);
 }
 
+static void strace_shutdown(struct kref *a)
+{
+	struct strace *strace = container_of(a, struct strace, procs);
+
+	qhangup(strace->q, "No more traces");
+}
+
+static void strace_release(struct kref *a)
+{
+	struct strace *strace = container_of(a, struct strace, users);
+
+	qfree(strace->q);
+	kfree(strace);
+}
+
 static void procctlreq(struct proc *p, char *va, int n)
 {
 	ERRSTACK(1);
@@ -1471,6 +1540,7 @@ static void procctlreq(struct proc *p, char *va, int n)
 	struct cmdtab *ct;
 	int64_t time;
 	char *e;
+	struct strace *strace;
 
 	cb = parsecmd(va, n);
 	if (waserror()) {
@@ -1481,40 +1551,81 @@ static void procctlreq(struct proc *p, char *va, int n)
 	ct = lookupcmd(cb, proccmd, ARRAY_SIZE(proccmd));
 
 	switch (ct->index) {
-		case CMvmstart:
-		case CMvmkill:
-		default:
-			error(EFAIL, "nope\n");
-			break;
-		case CMtrace:
-			systrace_trace_pid(p);
-			break;
-		case CMclose:
-			procctlclosefiles(p, 0, atoi(cb->f[1]));
-			break;
-		case CMclosefiles:
-			procctlclosefiles(p, 1, 0);
-			break;
-#if 0
-			we may want this.Let us pause a proc.case CMhang:p->hang = 1;
-			break;
-#endif
-		case CMkill:
-			p = pid2proc(strtol(cb->f[1], 0, 0));
-			if (!p)
-				error(EFAIL, "No such proc\n");
+	case CMstraceall:
+	case CMstraceme:
+		/* common allocation.  if we inherited, we might have one already */
+		if (!p->strace) {
+			strace = kmalloc(sizeof(*p->strace), KMALLOC_WAIT);
+			strace->q = qopen(65536, Qdropoverflow|Qcoalesce, NULL, NULL);
+			/* both of these refs are put when the proc is freed.  procs is for
+			 * every process that has this p->strace.  users is procs + every
+			 * user (e.g. from open()).
+			 *
+			 * it is possible to kref_put the procs kref in proc_destroy, which
+			 * would make strace's job easier (no need to do an async wait on
+			 * the child), and we wouldn't need to decref p in
+			 * procread(Qstrace).  But the downside is that proc_destroy races
+			 * with us here with the kref initialization. */
+			kref_init(&strace->procs, strace_shutdown, 1);
+			kref_init(&strace->users, strace_release, 1);
+			if (!atomic_cas_ptr((void**)&p->strace, 0, strace)) {
+				/* someone else won the race and installed strace. */
+				qfree(strace->q);
+				kfree(strace);
+				error(EAGAIN, "Concurrent strace init, try again");
+			}
+		}
+		break;
+	}
 
-			enable_irqsave(&irq_state);
-			proc_destroy(p);
-			disable_irqsave(&irq_state);
-			proc_decref(p);
-			/* this is a little ghetto. it's not fully free yet, but we are also
-			 * slowing it down by messing with it, esp with the busy waiting on a
-			 * hyperthreaded core. */
-			spin_on(p->env_cr3);
-			break;
-		case CMvminit:
-			break;
+	/* actually do the command. */
+	switch (ct->index) {
+	case CMvmstart:
+	case CMvmkill:
+	default:
+		error(EFAIL, "Command not implemented");
+		break;
+	case CMtrace:
+		systrace_trace_pid(p);
+		break;
+	case CMclose:
+		procctlclosefiles(p, 0, atoi(cb->f[1]));
+		break;
+	case CMclosefiles:
+		procctlclosefiles(p, 1, 0);
+		break;
+#if 0
+		we may want this.Let us pause a proc.case CMhang:p->hang = 1;
+		break;
+#endif
+	case CMkill:
+		p = pid2proc(strtol(cb->f[1], 0, 0));
+		if (!p)
+			error(EFAIL, "No such proc\n");
+
+		enable_irqsave(&irq_state);
+		proc_destroy(p);
+		disable_irqsave(&irq_state);
+		proc_decref(p);
+		/* this is a little ghetto. it's not fully free yet, but we are also
+		 * slowing it down by messing with it, esp with the busy waiting on a
+		 * hyperthreaded core. */
+		spin_on(p->env_cr3);
+		break;
+	case CMvminit:
+		break;
+	case CMstraceme:
+		p->strace_on = TRUE;
+		p->strace_inherit = FALSE;
+		break;
+	case CMstraceall:
+		p->strace_on = TRUE;
+		p->strace_inherit = TRUE;
+		break;
+	case CMstraceoff:
+		p->strace_on = FALSE;
+		p->strace_inherit = FALSE;
+		break;
 	}
 	poperror();
 	kfree(cb);

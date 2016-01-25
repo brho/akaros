@@ -79,7 +79,8 @@ struct chan *fdtochan(struct fd_table *fdt, int fd, int mode, int chkmnt,
 	if ((mode & c->mode) != mode) {
 		if (iref)
 			cclose(c);
-		error(EBADF, "FD access mode failure: chan mode 0x%x, wanted 0x%x",
+		error(EBADF,
+		      "FD access mode failure: chan mode 0x%x, wanted 0x%x (opened with 0 instead of O_READ?)",
 		      c->mode, mode);
 	}
 	return c;

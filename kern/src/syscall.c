@@ -54,13 +54,17 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace)
 	size_t len = 0;
 	struct timespec ts_start;
 	struct timespec ts_end;
+	char what = 'X';
 	tsc2timespec(trace->start_timestamp, &ts_start);
 	tsc2timespec(trace->end_timestamp, &ts_end);
+	if (trace->end_timestamp == 0)
+		what = 'E';
 
 	len = snprintf(trace->pretty_buf, SYSTR_PRETTY_BUF_SZ - len,
-	           "[%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%llx, 0x%llx, "
+	           "%c [%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%llx, 0x%llx, "
 	           "0x%llx, 0x%llx, 0x%llx, 0x%llx) ret: 0x%llx proc: %d core: %d "
 	           "vcore: %d data: ",
+	           what,
 	           ts_start.tv_sec,
 	           ts_start.tv_nsec,
 	           ts_end.tv_sec,
@@ -77,17 +81,83 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace)
 	           trace->pid,
 	           trace->coreid,
 	           trace->vcoreid);
-	/* if we have extra data, print it out on the next line, lined up nicely.
-	 * this is only useful for looking at the dump in certain terminals.  if we
-	 * have a tool that processes the info, we shouldn't do this. */
-	if (trace->datalen)
-		len += snprintf(trace->pretty_buf + len, SYSTR_PRETTY_BUF_SZ - len,
-		                "\n%67s", "");
+
 	len += printdump(trace->pretty_buf + len,
-	                 MIN(trace->datalen, SYSTR_PRETTY_BUF_SZ - len - 1),
+			 trace->datalen,
+	                 SYSTR_PRETTY_BUF_SZ - len - 1,
 	                 trace->data);
 	len += snprintf(trace->pretty_buf + len, SYSTR_PRETTY_BUF_SZ - len, "\n");
 	return len;
+}
+
+static struct systrace_record *sctrace(struct systrace_record *trace,
+                                       struct proc *p, struct syscall *sysc)
+{
+	int n;
+	uintreg_t cp = 0;
+	int datalen = 0;
+
+	assert(p->strace);
+
+	if (!trace) {
+		// TODO: could we allocb and then write that block?
+		// Still, if we're tracing, we take a hit, and this is so
+		// much more efficient than strace it's not clear we care.
+		trace = kmalloc(SYSTR_BUF_SZ, 0);
+
+		if (!trace)
+			return NULL;
+
+		int coreid, vcoreid;
+		struct proc *p = current;
+
+		coreid = core_id();
+		vcoreid = proc_get_vcoreid(p);
+
+		// TODO: functionalize this, if we decide this
+		// approach is OK.
+		trace->start_timestamp = read_tsc();
+		trace->end_timestamp = 0;
+		trace->syscallno = sysc->num;
+		trace->arg0 = sysc->arg0;
+		trace->arg1 = sysc->arg1;
+		trace->arg2 = sysc->arg2;
+		trace->arg3 = sysc->arg3;
+		trace->arg4 = sysc->arg4;
+		trace->arg5 = sysc->arg5;
+		trace->pid = p->pid;
+		trace->coreid = coreid;
+		trace->vcoreid = vcoreid;
+		trace->pretty_buf = (char*)trace + sizeof(struct systrace_record);
+		trace->datalen = 0;
+		trace->data[0] = 0;
+		switch (sysc->num) {
+		case SYS_write:
+			cp = sysc->arg1;
+			datalen = sysc->arg2;
+			break;
+		case SYS_openat:
+			cp = sysc->arg1;
+			datalen = sysc->arg2;
+			break;
+		}
+	} else {
+		trace->end_timestamp = read_tsc();
+		trace->retval = sysc->retval;
+		switch (sysc->num) {
+		case SYS_read:
+			cp = sysc->arg1;
+			datalen = sysc->retval < 0 ? 0 : sysc->retval;
+			break;
+		}
+
+	}
+
+	trace->datalen = MIN(sizeof(trace->data), datalen);
+	memmove(trace->data, (void *)cp, trace->datalen);
+	n = systrace_fill_pretty_buf(trace);
+	qwrite(p->strace->q, trace->pretty_buf, n);
+	return trace;
 }
 
 static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
@@ -96,6 +166,10 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 	int coreid, vcoreid;
 	struct proc *p = current;
 
+	if (p->strace_on)
+		kthread->strace = sctrace(NULL, p, sysc);
+
+	/* TODO: merge these two types of tracing, or just remove this old one */
 	if (!__trace_this_proc(p))
 		return;
 	assert(!kthread->trace);	/* catch memory leaks */
@@ -133,6 +207,7 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 {
 	struct systrace_record *trace = kthread->trace;
 	size_t pretty_len;
+
 	if (trace) {
 		trace->end_timestamp = read_tsc();
 		trace->retval = retval;
@@ -142,6 +217,12 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 		if (systrace_flags & SYSTRACE_LOUD)
 			printk("EXIT %s", trace->pretty_buf);
 		kfree(trace);
+	}
+	/* TODO: merge with or remove the old tracer */
+	if (kthread->strace) {
+		sctrace(kthread->strace, current, kthread->sysc);
+		kfree(kthread->strace);
+		kthread->strace = 0;
 	}
 }
 
@@ -560,6 +641,19 @@ static pid_t sys_getpid(struct proc *p)
 	return p->pid;
 }
 
+/* Helper for proc_create and fork */
+static void inherit_strace(struct proc *parent, struct proc *child)
+{
+	if (parent->strace && parent->strace_inherit) {
+		/* Refcnt on both, put in the child's ->strace. */
+		kref_get(&parent->strace->users, 1);
+		kref_get(&parent->strace->procs, 1);
+		child->strace = parent->strace;
+		child->strace_on = TRUE;
+		child->strace_inherit = TRUE;
+	}
+}
+
 /* Creates a process from the file 'path'.  The process is not runnable by
  * default, so it needs it's status to be changed so that the next call to
  * schedule() will try to run it. */
@@ -609,6 +703,7 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 		set_errstr("Failed to alloc new proc");
 		goto error_proc_alloc;
 	}
+	inherit_strace(p, new_p);
 	/* close the CLOEXEC ones, even though this isn't really an exec */
 	close_fdt(&new_p->open_files, TRUE);
 	/* Load the elf. */
@@ -759,6 +854,8 @@ static ssize_t sys_fork(env_t* e)
 	/* Copy some state from the original proc into the new proc. */
 	env->heap_top = e->heap_top;
 	env->env_flags = e->env_flags;
+
+	inherit_strace(e, env);
 
 	/* In general, a forked process should be a fresh process, and we copy over
 	 * whatever stuff is needed between procinfo/procdata. */
@@ -1821,7 +1918,7 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 
 	if (symname){
 		copy_amt = strnlen(symname, buf_l - 1) + 1;
-		if (! memcpy_to_user_errno(p, u_buf, symname, copy_amt))
+		if (!memcpy_to_user_errno(p, u_buf, symname, copy_amt))
 			ret = copy_amt - 1;
 	}
 	if (path_d)
@@ -2322,7 +2419,7 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 	}
 
 	mlen = convD2M(&dir, mbuf, sizeof(mbuf));
-	if (! mlen) {
+	if (!mlen) {
 		printk("convD2M failed\n");
 		set_errno(EINVAL);
 		goto done;
@@ -2515,6 +2612,7 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_tap_fds] = {(syscall_t)sys_tap_fds, "tap_fds"},
 };
 const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
+
 /* Executes the given syscall.
  *
  * Note tf is passed in, which points to the tf of the context on the kernel
@@ -2566,6 +2664,7 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 void run_local_syscall(struct syscall *sysc)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct proc *p = pcpui->cur_proc;
 
 	/* In lieu of pinning, we just check the sysc and will PF on the user addr
 	 * later (if the addr was unmapped).  Which is the plan for all UMEM. */
