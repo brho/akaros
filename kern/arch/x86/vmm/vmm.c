@@ -18,6 +18,7 @@
 #include "intel/vmx.h"
 #include "vmm.h"
 #include <trap.h>
+#include <umem.h>
 
 /* TODO: have better cpuid info storage and checks */
 bool x86_supports_vmx = FALSE;
@@ -93,10 +94,13 @@ int vm_run(struct vmctl *v)
 
 /* Initializes a process to run virtual machine contexts, returning the number
  * initialized, optionally setting errno */
-int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores, int flags)
+int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores,
+                    struct vmm_gpcore_init *u_gpcis, int flags)
 {
 	struct vmm *vmm = &p->vmm;
 	unsigned int i;
+	struct vmm_gpcore_init gpci;
+
 	if (flags & ~VMM_ALL_FLAGS) {
 		set_errstr("%s: flags is 0x%lx, VMM_ALL_FLAGS is 0x%lx\n", __func__,
 		           flags, VMM_ALL_FLAGS);
@@ -104,7 +108,6 @@ int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores, int flags)
 		return 0;
 	}
 	vmm->flags = flags;
-
 	if (!x86_supports_vmx) {
 		set_errno(ENODEV);
 		return 0;
@@ -121,7 +124,12 @@ int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores, int flags)
 	vmm->amd = 0;
 	vmm->guest_pcores = kzmalloc(sizeof(void*) * nr_guest_pcores, KMALLOC_WAIT);
 	for (i = 0; i < nr_guest_pcores; i++) {
-		vmm->guest_pcores[i] = vmx_create_vcpu(p);
+		if (copy_from_user(&gpci, &u_gpcis[i],
+		                   sizeof(struct vmm_gpcore_init))) {
+			set_error(EINVAL, "Bad pointer %p for gps", u_gpcis);
+			break;
+		}
+		vmm->guest_pcores[i] = vmx_create_vcpu(p, &gpci);
 		/* If we failed, we'll clean it up when the process dies */
 		if (!vmm->guest_pcores[i]) {
 			set_errno(ENOMEM);

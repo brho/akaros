@@ -1322,9 +1322,9 @@ static int sys_pop_ctx(struct proc *p, struct user_context *ctx)
 /* Initializes a process to run virtual machine contexts, returning the number
  * initialized, optionally setting errno */
 static int sys_setup_vmm(struct proc *p, unsigned int nr_guest_pcores,
-                         int flags)
+                         struct vmm_gpcore_init *gpcis, int flags)
 {
-	return vmm_struct_init(p, nr_guest_pcores, flags);
+	return vmm_struct_init(p, nr_guest_pcores, gpcis, flags);
 }
 
 /* Pokes the ksched for the given resource for target_pid.  If the target pid

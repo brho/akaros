@@ -35,8 +35,5 @@ struct vmctl {
 	uint32_t interrupt;
 	uint32_t intrinfo1;
 	uint32_t intrinfo2;
-	// These two page-sized entities must be page-aligned
-	uint64_t pir;
-	uint64_t vapic;
 	struct hw_trapframe regs;
 };

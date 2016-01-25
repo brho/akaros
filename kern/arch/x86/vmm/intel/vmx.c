@@ -960,16 +960,46 @@ construct_eptp(physaddr_t root_hpa)
 	return eptp;
 }
 
+/* Helper: some fields of the VMCS need a physical page address, e.g. the VAPIC
+ * page.  We have the user address.  This converts the user to phys addr and
+ * sets that up in the VMCS.  Returns 0 on success, -1 o/w. */
+static int vmcs_set_pgaddr(struct proc *p, void *u_addr, unsigned long field)
+{
+	uintptr_t kva;
+	physaddr_t paddr;
+
+	/* Enforce page alignment */
+	kva = uva2kva(p, ROUNDDOWN(u_addr, PGSIZE));
+	if (!kva) {
+		set_error(EINVAL, "Unmapped pgaddr %p for VMCS", u_addr);
+		return -1;
+	}
+	paddr = PADDR(kva);
+	/* TODO: need to pin the page.  A munmap would actually be okay (though
+	 * probably we should kill the process), but we need to keep the page from
+	 * being reused.  A refcnt would do the trick, which we decref when we
+	 * destroy the guest core/vcpu. */
+	assert(!PGOFF(paddr));
+	vmcs_writel(field, paddr);
+	/* Pages are inserted twice.  Once, with the full paddr.  The next field is
+	 * the upper 32 bits of the paddr. */
+	vmcs_writel(field + 1, paddr >> 32);
+	return 0;
+}
+
 /**
- * vmx_setup_initial_guest_state - configures the initial state of guest registers
+ * vmx_setup_initial_guest_state - configures the initial state of guest
+ * registers and the VMCS.  Returns 0 on success, -1 o/w.
  */
-static void
-vmx_setup_initial_guest_state(void)
+static int vmx_setup_initial_guest_state(struct proc *p,
+                                         struct vmm_gpcore_init *gpci)
 {
 	unsigned long tmpl;
 	unsigned long cr4 = X86_CR4_PAE | X86_CR4_VMXE | X86_CR4_OSXMMEXCPT |
 		X86_CR4_PGE | X86_CR4_OSFXSR;
 	uint32_t protected_mode = X86_CR0_PG | X86_CR0_PE;
+	int ret = 0;
+
 #if 0
 	do
 		we need it if (boot_cpu_has(X86_FEATURE_PCID))
@@ -1060,7 +1090,25 @@ vmx_setup_initial_guest_state(void)
 
 	/* Initialize posted interrupt notification vector */
 	vmcs_write16(POSTED_NOTIFICATION_VEC, I_VMMCP_POSTED);
-	}
+
+	/* Clear the EOI exit bitmap */
+	vmcs_writel(EOI_EXIT_BITMAP0, 0);
+	vmcs_writel(EOI_EXIT_BITMAP0_HIGH, 0);
+	vmcs_writel(EOI_EXIT_BITMAP1, 0);
+	vmcs_writel(EOI_EXIT_BITMAP1_HIGH, 0);
+	vmcs_writel(EOI_EXIT_BITMAP2, 0);
+	vmcs_writel(EOI_EXIT_BITMAP2_HIGH, 0);
+	vmcs_writel(EOI_EXIT_BITMAP3, 0);
+	vmcs_writel(EOI_EXIT_BITMAP3_HIGH, 0);
+
+	/* Initialize parts based on the users info.  If one of them fails, we'll do
+	 * the others but then error out. */
+	ret |= vmcs_set_pgaddr(p, gpci->pir_addr, POSTED_INTR_DESC_ADDR);
+	ret |= vmcs_set_pgaddr(p, gpci->vapic_addr, VIRTUAL_APIC_PAGE_ADDR);
+	ret |= vmcs_set_pgaddr(p, gpci->apic_addr, APIC_ACCESS_ADDR);
+
+	return ret;
+}
 
 static void __vmx_disable_intercept_for_msr(unsigned long *msr_bitmap,
 					    uint32_t msr) {
@@ -1463,8 +1511,11 @@ static void vmx_setup_vmcs(struct vmx_vcpu *vcpu) {
  *
  * Returns: A new VCPU structure
  */
-struct vmx_vcpu *vmx_create_vcpu(struct proc *p) {
+struct vmx_vcpu *vmx_create_vcpu(struct proc *p, struct vmm_gpcore_init *gpci)
+{
 	struct vmx_vcpu *vcpu = kmalloc(sizeof(struct vmx_vcpu), KMALLOC_WAIT);
+	int ret;
+
 	if (!vcpu) {
 		return NULL;
 	}
@@ -1481,10 +1532,11 @@ struct vmx_vcpu *vmx_create_vcpu(struct proc *p) {
 
 	vmx_get_cpu(vcpu);
 	vmx_setup_vmcs(vcpu);
-	vmx_setup_initial_guest_state();
+	ret = vmx_setup_initial_guest_state(p, gpci);
 	vmx_put_cpu(vcpu);
 
-	return vcpu;
+	if (!ret)
+		return vcpu;
 
 fail_vmcs:
 	kfree(vcpu);
@@ -1819,45 +1871,6 @@ int vmx_launch(struct vmctl *v) {
 		vmcs_writel(GUEST_RSP, v->regs.tf_rsp);
 		vmcs_writel(GUEST_CR3, v->cr3);
 		vcpu->regs = v->regs;
-
-		pir_kva = uva2kva(current_proc, (void *)v->pir);
-		pir_physical = (uint64_t)PADDR(pir_kva);
-
-		vmcs_writel(POSTED_INTR_DESC_ADDR, pir_physical);
-		vmcs_writel(POSTED_INTR_DESC_ADDR_HIGH, pir_physical>>32);
-		printk("POSTED_INTR_DESC_ADDR_HIGH %ld\n", vmcs_readl(POSTED_INTR_DESC_ADDR_HIGH));
-		if (pir_physical & 0xfff) {
-			printk("Low order 12 bits of pir address is not 0, value: %p\n", pir_physical);
-		}
-
-		vapic_kva = uva2kva(current_proc, (void *)v->vapic);
-		vapic_physical = (uint64_t)PADDR(vapic_kva);
-
-		vmcs_writel(VIRTUAL_APIC_PAGE_ADDR, vapic_physical);
-		vmcs_writel(VIRTUAL_APIC_PAGE_ADDR_HIGH, vapic_physical>>32);
-		if (vapic_physical & 0xfff) {
-			printk("Low order 12 bits of vapic address is not 0, value: %p\n", vapic_physical);
-		}
-
-		printk("VAPIC PHYSICAL ADDRESS: %p\n", vapic_physical);
-
-		apic_kva = uva2kva(current_proc, (void *)0xfee00000);
-		apic_physical = (uint64_t)PADDR(apic_kva);
-
-		vmcs_writel(APIC_ACCESS_ADDR, apic_physical);
-		vmcs_writel(APIC_ACCESS_ADDR_HIGH, apic_physical>>32);
-
-		// Clear the EOI exit bitmap(Gan)
-		vmcs_writel(EOI_EXIT_BITMAP0, 0);
-		vmcs_writel(EOI_EXIT_BITMAP0_HIGH, 0);
-		vmcs_writel(EOI_EXIT_BITMAP1, 0);
-		vmcs_writel(EOI_EXIT_BITMAP1_HIGH, 0);
-		vmcs_writel(EOI_EXIT_BITMAP2, 0);
-		vmcs_writel(EOI_EXIT_BITMAP2_HIGH, 0);
-		vmcs_writel(EOI_EXIT_BITMAP3, 0);
-		vmcs_writel(EOI_EXIT_BITMAP3_HIGH, 0);
-
-		printk("v->apic %p v->pir %p\n", (void *)v->vapic, (void *)v->pir);
 		// fallthrough
 	case REG_RIP:
 		printd("REG_RIP %p\n", v->regs.tf_rip);

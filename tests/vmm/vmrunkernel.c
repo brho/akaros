@@ -26,6 +26,7 @@
 int msrio(struct vmctl *vcpu, uint32_t opcode);
 
 struct vmctl vmctl;
+struct vmm_gpcore_init gpci;
 
 /* Kind of sad what a total clusterf the pc world is. By 1999, you could just scan the hardware 
  * and work it out. But 2005, that was no longer possible. How sad. 
@@ -366,7 +367,7 @@ static inline int test_and_set_bit(int nr, volatile unsigned long *addr)
 
 static void pir_dump()
 {
-	unsigned long *pir_ptr = (unsigned long *)vmctl.pir;
+	unsigned long *pir_ptr = (unsigned long *)gpci.pir_addr;
 	int i;
 	fprintf(stderr, "-------Begin PIR dump-------\n");
 	for (i = 0; i < 8; i++){
@@ -380,13 +381,14 @@ static void set_posted_interrupt(int vector)
 	unsigned long *bit_vec;
 	int bit_offset;
 	int i, j;
-	unsigned long *pir = (unsigned long *)vmctl.pir;
+	unsigned long *pir = (unsigned long *)gpci.pir_addr;
 	// Move to the correct location to set our bit.
 	bit_vec = pir + vector/(sizeof(unsigned long)*8);
 	bit_offset = vector%(sizeof(unsigned long)*8);
 	if(debug) fprintf(stderr, "%s: Pre set PIR dump\n", __func__);
 	if(debug) pir_dump();
-	if(debug) vapic_status_dump(stderr, (void *)vmctl.vapic);
+	if (debug)
+		vapic_status_dump(stderr, gpci.vapic_addr);
 	if(debug) fprintf(stderr, "%s: Setting pir bit offset %d at 0x%p\n", __func__,
 			bit_offset, bit_vec);
 	test_and_set_bit(bit_offset, bit_vec);
@@ -601,10 +603,10 @@ int main(int argc, char **argv)
 	hexdump(stdout, r, a-(void *)r);
 
 	a = (void *)(((unsigned long)a + 0xfff) & ~0xfff);
-	vmctl.pir = (uint64_t) a;
+	gpci.pir_addr = a;
 	memset(a, 0, 4096);
 	a += 4096;
-	vmctl.vapic = (uint64_t) a;
+	gpci.vapic_addr = a;
 	//vmctl.vapic = (uint64_t) a_page;	
 	memset(a, 0, 4096);
 	((uint32_t *)a)[0x30/4] = 0x01060014;
@@ -613,8 +615,10 @@ int main(int argc, char **argv)
 	// qemu does this.
 	//((uint8_t *)a)[4] = 1;
 	a += 4096;
+	gpci.apic_addr = (void*)0xfee00000;
 
-	if (ros_syscall(SYS_setup_vmm, nr_gpcs, vmmflags, 0, 0, 0, 0) != nr_gpcs) {
+	if (ros_syscall(SYS_setup_vmm, nr_gpcs, &gpci, vmmflags, 0, 0, 0) !=
+	    nr_gpcs) {
 		perror("Guest pcore setup failed");
 		exit(1);
 	}
@@ -682,11 +686,13 @@ int main(int argc, char **argv)
 	fprintf(stderr, "threads started\n");
 	fprintf(stderr, "Writing command :%s:\n", cmd);
 	
-	if(debug) vapic_status_dump(stderr, (void *)vmctl.vapic);
+	if (debug)
+		vapic_status_dump(stderr, (void *)gpci.vapic_addr);
 
 	ret = pwrite(fd, &vmctl, sizeof(vmctl), 0);
 
-	if(debug) vapic_status_dump(stderr, (void *)vmctl.vapic);
+	if (debug)
+		vapic_status_dump(stderr, (void *)gpci.vapic_addr);
 
 	if (ret != sizeof(vmctl)) {
 		perror(cmd);
@@ -802,7 +808,8 @@ int main(int argc, char **argv)
 				while (!consdata)
 					;
 				//debug = 1;
-				if(debug) vapic_status_dump(stderr, (void *)vmctl.vapic);
+				if (debug)
+					vapic_status_dump(stderr, gpci.vapic_addr);
 				if (debug)fprintf(stderr, "Resume with consdata ...\n");
 				vmctl.regs.tf_rip += 3;
 				ret = pwrite(fd, &vmctl, sizeof(vmctl), 0);

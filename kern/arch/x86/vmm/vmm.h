@@ -46,7 +46,8 @@ struct vmm {
 void vmm_init(void);
 void vmm_pcpu_init(void);
 
-int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores, int flags);
+int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores,
+                    struct vmm_gpcore_init *gpcis, int flags);
 void __vmm_struct_cleanup(struct proc *p);
 
 int vm_post_interrupt(struct vmctl *v);
@@ -54,7 +55,7 @@ int vm_run(struct vmctl *);
 int intel_vmx_start(int id);
 int intel_vmx_setup(int nvmcs);
 
-struct vmx_vcpu *vmx_create_vcpu(struct proc *p);
+struct vmx_vcpu *vmx_create_vcpu(struct proc *p, struct vmm_gpcore_init *gpci);
 void vmx_destroy_vcpu(struct vmx_vcpu *vcpu);
 uint64_t construct_eptp(physaddr_t root_hpa);
 void ept_flush(uint64_t eptp);
