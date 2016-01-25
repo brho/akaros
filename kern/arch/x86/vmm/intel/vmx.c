@@ -969,7 +969,7 @@ static int vmcs_set_pgaddr(struct proc *p, void *u_addr, unsigned long field)
 	physaddr_t paddr;
 
 	/* Enforce page alignment */
-	kva = uva2kva(p, ROUNDDOWN(u_addr, PGSIZE));
+	kva = uva2kva(p, ROUNDDOWN(u_addr, PGSIZE), PGSIZE, PROT_WRITE);
 	if (!kva) {
 		set_error(EINVAL, "Unmapped pgaddr %p for VMCS", u_addr);
 		return -1;

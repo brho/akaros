@@ -70,7 +70,7 @@ char *copy_in_path(struct proc *p, const char *path, size_t path_l);
 void free_path(struct proc *p, char *t_path);
 void *kmalloc_errno(int len);
 bool uva_is_kva(struct proc *p, void *uva, void *kva);
-uintptr_t uva2kva(struct proc *p, void *uva);
+uintptr_t uva2kva(struct proc *p, void *uva, size_t len, int prot);
 
 /* Helper for is_user_r{w,}addr.
  *
