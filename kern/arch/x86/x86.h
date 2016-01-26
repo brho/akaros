@@ -296,6 +296,11 @@ static inline unsigned long rcr0(void)
 	return val;
 }
 
+static inline void lcr2(unsigned long val)
+{
+	asm volatile("mov %0,%%cr2" : : "r" (val));
+}
+
 static inline unsigned long rcr2(void)
 {
 	unsigned long val;
