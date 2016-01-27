@@ -1171,25 +1171,26 @@ static void dumpmsrs(void) {
 struct emmsr {
 	uint32_t reg;
 	char *name;
-	int (*f) (struct vmx_vcpu * vcpu, struct emmsr *, uint32_t, uint32_t);
+	bool (*f)(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
+	          uint64_t *rax, uint32_t opcode);
 	bool written;
 	uint32_t edx, eax;
 };
 
-int emsr_miscenable(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t,
-		    uint32_t);
-int emsr_mustmatch(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t,
-		   uint32_t);
-int emsr_readonly(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t,
-		  uint32_t);
-int emsr_readzero(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t,
-		  uint32_t);
-int emsr_fakewrite(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t,
-		   uint32_t);
-int emsr_ok(struct vmx_vcpu *vcpu, struct emmsr *, uint32_t, uint32_t);
-
-int emsr_fake_apicbase(struct vmx_vcpu *vcpu, struct emmsr *msr,
-		   uint32_t opcode, uint32_t qual);
+bool emsr_miscenable(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
+                     uint64_t *rax, uint32_t opcode);
+bool emsr_mustmatch(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
+                    uint64_t *rax, uint32_t opcode);
+bool emsr_readonly(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
+                   uint64_t *rax, uint32_t opcode);
+bool emsr_readzero(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
+                   uint64_t *rax, uint32_t opcode);
+bool emsr_fakewrite(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
+                    uint64_t *rax, uint32_t opcode);
+bool emsr_ok(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
+             uint64_t *rax, uint32_t opcode);
+bool emsr_fake_apicbase(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
+                        uint64_t *rax, uint32_t opcode);
 
 struct emmsr emmsrs[] = {
 	{MSR_IA32_MISC_ENABLE, "MSR_IA32_MISC_ENABLE", emsr_miscenable},
@@ -1256,93 +1257,86 @@ static uint64_t set_low8(uint64_t hi, uint8_t lo)
 /* this may be the only register that needs special handling.
  * If there others then we might want to extend teh emmsr struct.
  */
-int emsr_miscenable(struct vmx_vcpu *vcpu, struct emmsr *msr,
-		    uint32_t opcode, uint32_t qual) {
+bool emsr_miscenable(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
+                     uint64_t *rax, uint32_t opcode)
+{
 	uint32_t eax, edx;
+
 	rdmsr(msr->reg, eax, edx);
 	/* we just let them read the misc msr for now. */
 	if (opcode == EXIT_REASON_MSR_READ) {
-		vcpu->regs.tf_rax = set_low32(vcpu->regs.tf_rax, eax);
-		vcpu->regs.tf_rax |= MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
-		vcpu->regs.tf_rdx = set_low32(vcpu->regs.tf_rdx, edx);
-		return 0;
+		*rax = set_low32(*rax, eax);
+		*rax |= MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
+		*rdx = set_low32(*rdx, edx);
+		return TRUE;
 	} else {
 		/* if they are writing what is already written, that's ok. */
-		if (((uint32_t) vcpu->regs.tf_rax == eax)
-		    && ((uint32_t) vcpu->regs.tf_rdx == edx))
-			return 0;
+		if (((uint32_t) *rax == eax) && ((uint32_t) *rdx == edx))
+			return TRUE;
 	}
 	printk
 		("%s: Wanted to write 0x%x:0x%x, but could not; value was 0x%x:0x%x\n",
-		 msr->name, (uint32_t) vcpu->regs.tf_rdx,
-		 (uint32_t) vcpu->regs.tf_rax, edx, eax);
-	return SHUTDOWN_UNHANDLED_EXIT_REASON;
+		 msr->name, (uint32_t) *rdx, (uint32_t) *rax, edx, eax);
+	return FALSE;
 }
 
-int emsr_mustmatch(struct vmx_vcpu *vcpu, struct emmsr *msr,
-		   uint32_t opcode, uint32_t qual) {
+/* TODO: this looks like a copy-paste for the read side.  What's the purpose of
+ * mustmatch?  No one even uses it. */
+bool emsr_mustmatch(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
+                    uint64_t *rax, uint32_t opcode)
+{
 	uint32_t eax, edx;
+
 	rdmsr(msr->reg, eax, edx);
 	/* we just let them read the misc msr for now. */
 	if (opcode == EXIT_REASON_MSR_READ) {
-		vcpu->regs.tf_rax = set_low32(vcpu->regs.tf_rax, eax);
-		vcpu->regs.tf_rdx = set_low32(vcpu->regs.tf_rdx, edx);
-		return 0;
+		*rax = set_low32(*rax, eax);
+		*rdx = set_low32(*rdx, edx);
+		return TRUE;
 	} else {
 		/* if they are writing what is already written, that's ok. */
-		if (((uint32_t) vcpu->regs.tf_rax == eax)
-		    && ((uint32_t) vcpu->regs.tf_rdx == edx))
-			return 0;
+		if (((uint32_t) *rax == eax) && ((uint32_t) *rdx == edx))
+			return TRUE;
 	}
 	printk
 		("%s: Wanted to write 0x%x:0x%x, but could not; value was 0x%x:0x%x\n",
-		 msr->name, (uint32_t) vcpu->regs.tf_rdx,
-		 (uint32_t) vcpu->regs.tf_rax, edx, eax);
-	return SHUTDOWN_UNHANDLED_EXIT_REASON;
+		 msr->name, (uint32_t) *rdx, (uint32_t) *rax, edx, eax);
+	return FALSE;
 }
 
-int emsr_ok(struct vmx_vcpu *vcpu, struct emmsr *msr, uint32_t opcode,
-	    uint32_t qual) {
-	if (opcode == EXIT_REASON_MSR_READ) {
-		rdmsr(msr->reg, vcpu->regs.tf_rdx, vcpu->regs.tf_rax);
-	} else {
-		uint64_t val =
-			(uint64_t) vcpu->regs.tf_rdx << 32 | vcpu->regs.tf_rax;
-		write_msr(msr->reg, val);
-	}
-	return 0;
-}
-
-int emsr_readonly(struct vmx_vcpu *vcpu, struct emmsr *msr, uint32_t opcode,
-		  uint32_t qual) {
+bool emsr_readonly(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
+                   uint64_t *rax, uint32_t opcode)
+{
 	uint32_t eax, edx;
-	rdmsr((uint32_t) vcpu->regs.tf_rcx, eax, edx);
-	/* we just let them read the misc msr for now. */
+
+	rdmsr((uint32_t) *rcx, eax, edx);
 	if (opcode == EXIT_REASON_MSR_READ) {
-		vcpu->regs.tf_rax = set_low32(vcpu->regs.tf_rax, eax);
-		vcpu->regs.tf_rdx = set_low32(vcpu->regs.tf_rdx, edx);
-		return 0;
+		*rax = set_low32(*rax, eax);
+		*rdx = set_low32(*rdx, edx);
+		return TRUE;
 	}
 
 	printk("%s: Tried to write a readonly register\n", msr->name);
-	return SHUTDOWN_UNHANDLED_EXIT_REASON;
+	return FALSE;
 }
 
-int emsr_readzero(struct vmx_vcpu *vcpu, struct emmsr *msr, uint32_t opcode,
-		  uint32_t qual) {
+bool emsr_readzero(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
+                   uint64_t *rax, uint32_t opcode)
+{
 	if (opcode == EXIT_REASON_MSR_READ) {
-		vcpu->regs.tf_rax = 0;
-		vcpu->regs.tf_rdx = 0;
-		return 0;
+		*rax = 0;
+		*rdx = 0;
+		return TRUE;
 	}
 
 	printk("%s: Tried to write a readonly register\n", msr->name);
-	return SHUTDOWN_UNHANDLED_EXIT_REASON;
+	return FALSE;
 }
 
 /* pretend to write it, but don't write it. */
-int emsr_fakewrite(struct vmx_vcpu *vcpu, struct emmsr *msr,
-		   uint32_t opcode, uint32_t qual) {
+bool emsr_fakewrite(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
+                    uint64_t *rax, uint32_t opcode)
+{
 	uint32_t eax, edx;
 	if (!msr->written) {
 		rdmsr(msr->reg, eax, edx);
@@ -1352,25 +1346,38 @@ int emsr_fakewrite(struct vmx_vcpu *vcpu, struct emmsr *msr,
 	}
 	/* we just let them read the misc msr for now. */
 	if (opcode == EXIT_REASON_MSR_READ) {
-		vcpu->regs.tf_rax = set_low32(vcpu->regs.tf_rax, eax);
-		vcpu->regs.tf_rdx = set_low32(vcpu->regs.tf_rdx, edx);
-		return 0;
+		*rax = set_low32(*rax, eax);
+		*rdx = set_low32(*rdx, edx);
+		return TRUE;
 	} else {
 		/* if they are writing what is already written, that's ok. */
-		if (((uint32_t) vcpu->regs.tf_rax == eax)
-		    && ((uint32_t) vcpu->regs.tf_rdx == edx))
-			return 0;
-		msr->edx = vcpu->regs.tf_rdx;
-		msr->eax = vcpu->regs.tf_rax;
-		msr->written = true;
+		if (((uint32_t) *rax == eax) && ((uint32_t) *rdx == edx))
+			return TRUE;
+		msr->edx = *rdx;
+		msr->eax = *rax;
+		msr->written = TRUE;
 	}
-	return 0;
+	return TRUE;
+}
+
+bool emsr_ok(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
+             uint64_t *rax, uint32_t opcode)
+{
+	if (opcode == EXIT_REASON_MSR_READ) {
+		rdmsr(msr->reg, *rdx, *rax);
+	} else {
+		uint64_t val = (uint64_t) *rdx << 32 | *rax;
+		write_msr(msr->reg, val);
+	}
+	return TRUE;
 }
 
 /* pretend to write it, but don't write it. */
-int emsr_fake_apicbase(struct vmx_vcpu *vcpu, struct emmsr *msr,
-		   uint32_t opcode, uint32_t qual) {
+bool emsr_fake_apicbase(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
+                        uint64_t *rax, uint32_t opcode)
+{
 	uint32_t eax, edx;
+
 	if (!msr->written) {
 		//rdmsr(msr->reg, eax, edx);
 		/* TODO: tightly coupled to the addr in vmrunkernel.  We want this func
@@ -1383,19 +1390,18 @@ int emsr_fake_apicbase(struct vmx_vcpu *vcpu, struct emmsr *msr,
 	}
 	/* we just let them read the misc msr for now. */
 	if (opcode == EXIT_REASON_MSR_READ) {
-		vcpu->regs.tf_rax = set_low32(vcpu->regs.tf_rax, eax);
-		vcpu->regs.tf_rdx = set_low32(vcpu->regs.tf_rdx, edx);
-		return 0;
+		*rax = set_low32(*rax, eax);
+		*rdx = set_low32(*rdx, edx);
+		return TRUE;
 	} else {
 		/* if they are writing what is already written, that's ok. */
-		if (((uint32_t) vcpu->regs.tf_rax == eax)
-		    && ((uint32_t) vcpu->regs.tf_rdx == edx))
+		if (((uint32_t) *rax == eax) && ((uint32_t) *rdx == edx))
 			return 0;
-		msr->edx = vcpu->regs.tf_rdx;
-		msr->eax = vcpu->regs.tf_rax;
-		msr->written = true;
+		msr->edx = *rdx;
+		msr->eax = *rax;
+		msr->written = TRUE;
 	}
-	return 0;
+	return TRUE;
 }
 
 
@@ -1405,7 +1411,11 @@ msrio(struct vmx_vcpu *vcpu, uint32_t opcode, uint32_t qual) {
 	for (i = 0; i < ARRAY_SIZE(emmsrs); i++) {
 		if (emmsrs[i].reg != vcpu->regs.tf_rcx)
 			continue;
-		return emmsrs[i].f(vcpu, &emmsrs[i], opcode, qual);
+		if (emmsrs[i].f(&emmsrs[i], &vcpu->regs.tf_rcx, &vcpu->regs.tf_rdx,
+		                &vcpu->regs.tf_rax, opcode))
+			return 0;
+		else
+			return SHUTDOWN_UNHANDLED_EXIT_REASON;
 	}
 	printk("msrio for 0x%lx failed\n", vcpu->regs.tf_rcx);
 	return SHUTDOWN_UNHANDLED_EXIT_REASON;
