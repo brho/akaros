@@ -636,6 +636,7 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	addr = vmr->vm_base;
 	vmr->vm_prot = prot;
 	vmr->vm_flags = flags;
+	vmr->vm_foff = offset;
 	if (file) {
 		if (!check_file_perms(vmr, file, prot)) {
 			assert(!vmr->vm_file);
@@ -669,7 +670,6 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		pm_add_vmr(file2pm(file), vmr);
 	}
 	vmr->vm_file = file;
-	vmr->vm_foff = offset;
 	vmr = merge_me(vmr);		/* attempts to merge with neighbors */
 
 	if (flags & MAP_POPULATE && prot != PROT_NONE) {
