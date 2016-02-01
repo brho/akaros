@@ -1232,21 +1232,6 @@ struct emmsr emmsrs[] = {
 	{MSR_IA32_TSC_DEADLINE, "MSR_IA32_TSC_DEADLINE", emsr_fakewrite},
 };
 
-static uint64_t set_low32(uint64_t hi, uint32_t lo)
-{
-	return (hi & 0xffffffff00000000ULL) | lo;
-}
-
-static uint64_t set_low16(uint64_t hi, uint16_t lo)
-{
-	return (hi & 0xffffffffffff0000ULL) | lo;
-}
-
-static uint64_t set_low8(uint64_t hi, uint8_t lo)
-{
-	return (hi & 0xffffffffffffff00ULL) | lo;
-}
-
 /* this may be the only register that needs special handling.
  * If there others then we might want to extend teh emmsr struct.
  */
@@ -1258,9 +1243,9 @@ bool emsr_miscenable(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 	rdmsr(msr->reg, eax, edx);
 	/* we just let them read the misc msr for now. */
 	if (opcode == EXIT_REASON_MSR_READ) {
-		*rax = set_low32(*rax, eax);
+		*rax = eax;
 		*rax |= MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
-		*rdx = set_low32(*rdx, edx);
+		*rdx = edx;
 		return TRUE;
 	} else {
 		/* if they are writing what is already written, that's ok. */
@@ -1283,8 +1268,8 @@ bool emsr_mustmatch(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 	rdmsr(msr->reg, eax, edx);
 	/* we just let them read the misc msr for now. */
 	if (opcode == EXIT_REASON_MSR_READ) {
-		*rax = set_low32(*rax, eax);
-		*rdx = set_low32(*rdx, edx);
+		*rax = eax;
+		*rdx = edx;
 		return TRUE;
 	} else {
 		/* if they are writing what is already written, that's ok. */
@@ -1304,8 +1289,8 @@ bool emsr_readonly(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 
 	rdmsr((uint32_t) *rcx, eax, edx);
 	if (opcode == EXIT_REASON_MSR_READ) {
-		*rax = set_low32(*rax, eax);
-		*rdx = set_low32(*rdx, edx);
+		*rax = eax;
+		*rdx = edx;
 		return TRUE;
 	}
 
@@ -1339,8 +1324,8 @@ bool emsr_fakewrite(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 	}
 	/* we just let them read the misc msr for now. */
 	if (opcode == EXIT_REASON_MSR_READ) {
-		*rax = set_low32(*rax, eax);
-		*rdx = set_low32(*rdx, edx);
+		*rax = eax;
+		*rdx = edx;
 		return TRUE;
 	} else {
 		/* if they are writing what is already written, that's ok. */
@@ -1383,8 +1368,8 @@ bool emsr_fake_apicbase(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 	}
 	/* we just let them read the misc msr for now. */
 	if (opcode == EXIT_REASON_MSR_READ) {
-		*rax = set_low32(*rax, eax);
-		*rdx = set_low32(*rdx, edx);
+		*rax = eax;
+		*rdx = edx;
 		return TRUE;
 	} else {
 		/* if they are writing what is already written, that's ok. */
