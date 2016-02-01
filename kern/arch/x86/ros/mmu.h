@@ -64,6 +64,8 @@
 #define FL_VIF		0x00080000	// Virtual Interrupt Flag
 #define FL_VIP		0x00100000	// Virtual Interrupt Pending
 #define FL_ID		0x00200000	// ID flag
+#define FL_RSVD_1	0x00000002	// These 1s must be 1, rflags |= this
+#define FL_RSVD_0	0x003f7fd7	// These 0s must be 0, rflags &= this
 
 // Page fault error codes
 #define FEC_PR		0x1	// Page fault caused by protection violation

@@ -163,6 +163,8 @@ static void proc_secure_vmtf(struct vm_trapframe *tf)
 	/* The user can say whatever it wants for the bulk of the TF, but the only
 	 * thing it can't fake is whether or not it is a partial context, which
 	 * other parts of the kernel rely on. */
+	tf->tf_rflags |= FL_RSVD_1;
+	tf->tf_rflags &= FL_RSVD_0;
 	x86_vmtf_clear_partial(tf);
 }
 
