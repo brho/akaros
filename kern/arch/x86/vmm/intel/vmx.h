@@ -308,3 +308,6 @@ struct vmxec {
 	uint32_t try_set_1;
 	uint32_t try_set_0;
 };
+
+void vmx_load_guest_pcore(struct vmx_vcpu *gpc);
+void vmx_unload_guest_pcore(struct vmx_vcpu *gpc);

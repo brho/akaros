@@ -17,6 +17,7 @@ static inline int cpu_has_svm(const char **msg)
 #define VMM_VMEXIT_NR_TYPES		65
 
 struct vmm {
+	spinlock_t lock;	/* protects guest_pcore assignment */
 	qlock_t qlock;
 	// always false.
 	int amd;
@@ -59,3 +60,7 @@ struct vmx_vcpu *vmx_create_vcpu(struct proc *p, struct vmm_gpcore_init *gpci);
 void vmx_destroy_vcpu(struct vmx_vcpu *vcpu);
 uint64_t construct_eptp(physaddr_t root_hpa);
 void ept_flush(uint64_t eptp);
+
+struct vmx_vcpu *lookup_guest_pcore(struct proc *p, int guest_pcoreid);
+struct vmx_vcpu *load_guest_pcore(struct proc *p, int guest_pcoreid);
+void unload_guest_pcore(struct proc *p, int guest_pcoreid);

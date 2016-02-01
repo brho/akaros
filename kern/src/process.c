@@ -410,6 +410,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 	TAILQ_INIT(&p->abortable_sleepers);
 	spinlock_init_irqsave(&p->abort_list_lock);
 	memset(&p->vmm, 0, sizeof(struct vmm));
+	spinlock_init(&p->vmm.lock);
 	qlock_init(&p->vmm.qlock);
 	printd("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
 	*pp = p;

@@ -41,6 +41,7 @@ struct per_cpu_info {
 	pseudodesc_t host_gdt;
 	int vmx_enabled;
 	void *local_vcpu;
+	int guest_pcoreid;
 #endif
 	spinlock_t lock;
 	/* Process management */

@@ -2273,3 +2273,14 @@ void vapic_status_dump_kernel(void *vapic)
 
 	printk("-- END KERNEL APIC STATUS DUMP --\n");
 }
+
+void vmx_load_guest_pcore(struct vmx_vcpu *gpc)
+{
+	vmcs_load(gpc->vmcs);
+	__vmx_setup_cpu();
+}
+
+void vmx_unload_guest_pcore(struct vmx_vcpu *gpc)
+{
+	vmcs_clear(gpc->vmcs);
+}

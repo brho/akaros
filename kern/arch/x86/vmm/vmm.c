@@ -60,6 +60,9 @@ static void vmmcp_posted_handler(struct hw_trapframe *hw_tf, void *data)
 
 void vmm_pcpu_init(void)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	pcpui->guest_pcoreid = -1;
 	if (!x86_supports_vmx)
 		return;
 	if (! intel_vmm_pcpu_init()) {
@@ -158,4 +161,52 @@ void __vmm_struct_cleanup(struct proc *p)
 	kfree(vmm->guest_pcores);
 	ept_flush(p->env_pgdir.eptp);
 	vmm->vmmcp = FALSE;
+}
+
+struct vmx_vcpu *lookup_guest_pcore(struct proc *p, int guest_pcoreid)
+{
+	/* nr_guest_pcores is written once at setup and never changed */
+	if (guest_pcoreid >= p->vmm.nr_guest_pcores)
+		return 0;
+	return p->vmm.guest_pcores[guest_pcoreid];
+}
+
+struct vmx_vcpu *load_guest_pcore(struct proc *p, int guest_pcoreid)
+{
+	struct vmx_vcpu *gpc;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	gpc = lookup_guest_pcore(p, guest_pcoreid);
+	if (!gpc)
+		return 0;
+	assert(pcpui->guest_pcoreid == -1);
+	spin_lock(&p->vmm.lock);
+	if (gpc->cpu != -1) {
+		spin_unlock(&p->vmm.lock);
+		return 0;
+	}
+	gpc->cpu = core_id();
+	spin_unlock(&p->vmm.lock);
+	/* We've got dibs on the gpc; we don't need to hold the lock any longer. */
+	pcpui->guest_pcoreid = guest_pcoreid;
+	ept_sync_context(vcpu_get_eptp(gpc));
+	vmx_load_guest_pcore(gpc);
+	return gpc;
+}
+
+void unload_guest_pcore(struct proc *p, int guest_pcoreid)
+{
+	struct vmx_vcpu *gpc;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	gpc = lookup_guest_pcore(p, guest_pcoreid);
+	assert(gpc);
+	spin_lock(&p->vmm.lock);
+	assert(gpc->cpu != -1);
+	ept_sync_context(vcpu_get_eptp(gpc));
+	vmx_unload_guest_pcore(gpc);
+	gpc->cpu = -1;
+	/* As soon as we unlock, this gpc can be started on another core */
+	spin_unlock(&p->vmm.lock);
+	pcpui->guest_pcoreid = -1;
 }
