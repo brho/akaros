@@ -1242,7 +1242,7 @@ bool emsr_miscenable(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 
 	rdmsr(msr->reg, eax, edx);
 	/* we just let them read the misc msr for now. */
-	if (opcode == EXIT_REASON_MSR_READ) {
+	if (opcode == VMM_MSR_EMU_READ) {
 		*rax = eax;
 		*rax |= MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
 		*rdx = edx;
@@ -1267,7 +1267,7 @@ bool emsr_mustmatch(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 
 	rdmsr(msr->reg, eax, edx);
 	/* we just let them read the misc msr for now. */
-	if (opcode == EXIT_REASON_MSR_READ) {
+	if (opcode == VMM_MSR_EMU_READ) {
 		*rax = eax;
 		*rdx = edx;
 		return TRUE;
@@ -1288,7 +1288,7 @@ bool emsr_readonly(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 	uint32_t eax, edx;
 
 	rdmsr((uint32_t) *rcx, eax, edx);
-	if (opcode == EXIT_REASON_MSR_READ) {
+	if (opcode == VMM_MSR_EMU_READ) {
 		*rax = eax;
 		*rdx = edx;
 		return TRUE;
@@ -1301,7 +1301,7 @@ bool emsr_readonly(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 bool emsr_readzero(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
                    uint64_t *rax, uint32_t opcode)
 {
-	if (opcode == EXIT_REASON_MSR_READ) {
+	if (opcode == VMM_MSR_EMU_READ) {
 		*rax = 0;
 		*rdx = 0;
 		return TRUE;
@@ -1323,7 +1323,7 @@ bool emsr_fakewrite(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 		eax = msr->eax;
 	}
 	/* we just let them read the misc msr for now. */
-	if (opcode == EXIT_REASON_MSR_READ) {
+	if (opcode == VMM_MSR_EMU_READ) {
 		*rax = eax;
 		*rdx = edx;
 		return TRUE;
@@ -1341,7 +1341,7 @@ bool emsr_fakewrite(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 bool emsr_ok(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
              uint64_t *rax, uint32_t opcode)
 {
-	if (opcode == EXIT_REASON_MSR_READ) {
+	if (opcode == VMM_MSR_EMU_READ) {
 		rdmsr(msr->reg, *rdx, *rax);
 	} else {
 		uint64_t val = (uint64_t) *rdx << 32 | *rax;
@@ -1367,7 +1367,7 @@ bool emsr_fake_apicbase(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 		eax = msr->eax;
 	}
 	/* we just let them read the misc msr for now. */
-	if (opcode == EXIT_REASON_MSR_READ) {
+	if (opcode == VMM_MSR_EMU_READ) {
 		*rax = eax;
 		*rdx = edx;
 		return TRUE;
@@ -1396,6 +1396,8 @@ static int
 msrio(struct vmx_vcpu *vcpu, uint32_t opcode, uint32_t qual) {
 	int i;
 
+	opcode = (opcode == EXIT_REASON_MSR_READ ? VMM_MSR_EMU_READ :
+	                                           VMM_MSR_EMU_WRITE);
 	if (!vmm_emulate_msr(&vcpu->regs.tf_rcx, &vcpu->regs.tf_rdx,
 	                     &vcpu->regs.tf_rax, opcode))
 		return SHUTDOWN_UNHANDLED_EXIT_REASON;
