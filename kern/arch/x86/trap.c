@@ -342,8 +342,9 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 				print_trapframe(hw_tf);
 				backtrace_hwtf(hw_tf);
 			}
-			char *fn_name = get_fn_name(x86_get_ip_hw(hw_tf));
-			printk("Core %d is at %p (%s)\n", core_id(), x86_get_ip_hw(hw_tf),
+			char *fn_name = get_fn_name(get_hwtf_pc(hw_tf));
+
+			printk("Core %d is at %p (%s)\n", core_id(), get_hwtf_pc(hw_tf),
 			       fn_name);
 			kfree(fn_name);
 			print_kmsgs(core_id());
@@ -357,7 +358,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 		case T_ILLOP:
 		{
 			/* TODO: this can PF if there is a concurrent unmap/PM removal. */
-			uintptr_t ip = x86_get_ip_hw(hw_tf);
+			uintptr_t ip = get_hwtf_pc(hw_tf);
 			pcpui = &per_cpu_info[core_id()];
 			pcpui->__lock_checking_enabled--;		/* for print debugging */
 			/* We will muck with the actual TF.  If we're dealing with

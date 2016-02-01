@@ -48,11 +48,6 @@ static inline uintptr_t get_vmtf_fp(struct vm_trapframe *vm_tf)
 	return vm_tf->tf_rbp;
 }
 
-static inline uintptr_t x86_get_ip_hw(struct hw_trapframe *hw_tf)
-{
-	return hw_tf->tf_rip;
-}
-
 static inline void x86_advance_ip(struct hw_trapframe *hw_tf, size_t bytes)
 {
 	hw_tf->tf_rip += bytes;
