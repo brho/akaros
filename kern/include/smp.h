@@ -38,7 +38,6 @@ struct per_cpu_info {
 	uintptr_t stacktop;			/* must be first */
 	int coreid;					/* must be second */
 	struct vmcs *vmxarea;
-	pseudodesc_t host_gdt;
 	int vmx_enabled;
 	void *local_vcpu;
 	int guest_pcoreid;

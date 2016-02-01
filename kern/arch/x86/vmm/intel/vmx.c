@@ -771,81 +771,24 @@ vmx_setup_constant_host_state(void)
 
 	vmcs_write16(HOST_FS_SELECTOR, 0);	/* 22.2.4 */
 	vmcs_write16(HOST_GS_SELECTOR, 0);	/* 22.2.4 */
-
-	/* TODO: This (at least gs) is per cpu */
-	rdmsrl(MSR_FS_BASE, tmpl);
-	vmcs_writel(HOST_FS_BASE, tmpl);	/* 22.2.4 */
-	rdmsrl(MSR_GS_BASE, tmpl);
-	vmcs_writel(HOST_GS_BASE, tmpl);	/* 22.2.4 */
+	vmcs_write(HOST_FS_BASE, 0);
 }
 
-static inline uint16_t
-vmx_read_ldt(void)
+/* Set up the per-core VMCS fields.  This is the host state that varies from
+ * core to core, which the hardware will switch for us on VM enters/exits. */
+static void __vmx_setup_pcpu(struct vmx_vcpu *gpc)
 {
-	uint16_t ldt;
-asm("sldt %0":"=g"(ldt));
-	return ldt;
-}
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
-static unsigned long
-segment_base(uint16_t selector)
-{
-	pseudodesc_t *gdt = &currentcpu->host_gdt;
-	struct desc_struct *d;
-	unsigned long table_base;
-	unsigned long v;
-
-	if (!(selector & ~3)) {
-		return 0;
-	}
-
-	table_base = gdt->pd_base;
-
-	if (selector & 4) {	/* from ldt */
-		uint16_t ldt_selector = vmx_read_ldt();
-
-		if (!(ldt_selector & ~3)) {
-			return 0;
-		}
-
-		table_base = segment_base(ldt_selector);
-	}
-	d = (struct desc_struct *)(table_base + (selector & ~7));
-	v = get_desc_base(d);
-	if (d->s == 0 && (d->type == 2 || d->type == 9 || d->type == 11))
-		v |= ((unsigned long)((struct ldttss_desc64 *)d)->base3) << 32;
-	return v;
-}
-
-static inline unsigned long
-vmx_read_tr_base(void)
-{
-	uint16_t tr;
-asm("str %0":"=g"(tr));
-	return segment_base(tr);
-}
-
-static void
-__vmx_setup_cpu(void)
-{
-	pseudodesc_t *gdt = &currentcpu->host_gdt;
-	unsigned long sysenter_esp;
-	unsigned long tmpl;
-
-	/*
-	 * Linux uses per-cpu TSS and GDT, so set these when switching
-	 * processors.
-	 */
-	vmcs_writel(HOST_TR_BASE, vmx_read_tr_base());	/* 22.2.4 */
-	vmcs_writel(HOST_GDTR_BASE, gdt->pd_base);	/* 22.2.4 */
-
-	rdmsrl(MSR_IA32_SYSENTER_ESP, sysenter_esp);
-	vmcs_writel(HOST_IA32_SYSENTER_ESP, sysenter_esp);	/* 22.2.3 */
-
-	rdmsrl(MSR_FS_BASE, tmpl);
-	vmcs_writel(HOST_FS_BASE, tmpl);	/* 22.2.4 */
-	rdmsrl(MSR_GS_BASE, tmpl);
-	vmcs_writel(HOST_GS_BASE, tmpl);	/* 22.2.4 */
+	vmcs_write(HOST_TR_BASE, (uintptr_t)pcpui->tss);
+	vmcs_writel(HOST_GDTR_BASE, (uintptr_t)pcpui->gdt);
+	vmcs_write(HOST_RSP, pcpui->stacktop);
+	vmcs_write(HOST_GS_BASE, (uintptr_t)pcpui);
+	/* TODO: this is MSR_KERNEL_GS_BASE, the 0'th autoload.  This array API is a
+	 * little dangerous. */
+	gpc->msr_autoload.host[0].value = (uintptr_t)pcpui;
+	/* TODO: we might need to also set HOST_IA32_PERF_GLOBAL_CTRL.  Need to
+	 * think about how perf will work with VMs */
 }
 
 /**
@@ -875,7 +818,7 @@ vmx_get_cpu(struct vmx_vcpu *vcpu)
 
 			vcpu->launched = 0;
 			vmcs_load(vcpu->vmcs);
-			__vmx_setup_cpu();
+			__vmx_setup_pcpu(vcpu);
 			vcpu->cpu = cur_cpu;
 		} else {
 			vmcs_load(vcpu->vmcs);
@@ -1854,8 +1797,6 @@ static void vmx_enable(void) {
 		goto failed;
 
 	currentcpu->vmx_enabled = 1;
-	// TODO: do we need this?
-	store_gdt(&currentcpu->host_gdt);
 
 	printk("VMX enabled on CPU %d\n", core_id());
 	return;
@@ -2033,7 +1974,7 @@ void vapic_status_dump_kernel(void *vapic)
 void vmx_load_guest_pcore(struct vmx_vcpu *gpc)
 {
 	vmcs_load(gpc->vmcs);
-	__vmx_setup_cpu();
+	__vmx_setup_pcpu(gpc);
 }
 
 void vmx_unload_guest_pcore(struct vmx_vcpu *gpc)
