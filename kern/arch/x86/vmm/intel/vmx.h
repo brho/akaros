@@ -264,6 +264,24 @@ static inline uint64_t vcpu_get_eptp(struct vmx_vcpu *vcpu)
 	return vcpu->proc->env_pgdir.eptp;
 }
 
+static inline unsigned long vmcs_read(unsigned long field)
+{
+	unsigned long value;
+
+	asm volatile (ASM_VMX_VMREAD_RDX_RAX : "=a"(value) : "d"(field) : "cc");
+	return value;
+}
+
+/* Returns true if the op succeeded.  It can fail if the field is unsupported */
+static inline bool vmcs_write(unsigned long field, unsigned long value)
+{
+	uint8_t error;
+
+	asm volatile (ASM_VMX_VMWRITE_RAX_RDX "; setna %0"
+	              : "=q"(error) : "a"(value), "d"(field) : "cc");
+	return error ? FALSE : TRUE;
+}
+
 /*
  * VMX Execution Controls (vmxec)
  * Some bits can be set, others can not (i.e. they are reserved).

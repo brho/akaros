@@ -277,10 +277,7 @@ vmcs_get_current(void)
 __always_inline unsigned long
 vmcs_readl(unsigned long field)
 {
-	unsigned long value;
-
-	asm volatile (ASM_VMX_VMREAD_RDX_RAX:"=a"(value):"d"(field):"cc");
-	return value;
+	return vmcs_read(field);
 }
 
 __always_inline uint16_t
@@ -311,11 +308,7 @@ vmwrite_error(unsigned long field, unsigned long value)
 void
 vmcs_writel(unsigned long field, unsigned long value)
 {
-	uint8_t error;
-
-	asm volatile (ASM_VMX_VMWRITE_RAX_RDX "; setna %0":"=q"(error):"a"(value),
-				  "d"(field):"cc");
-	if (error)
+	if (!vmcs_write(field, value))
 		vmwrite_error(field, value);
 }
 
