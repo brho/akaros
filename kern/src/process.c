@@ -752,8 +752,6 @@ void __proc_startcore(struct proc *p, struct user_context *ctx)
 	 * to block later and lose track of our address space. */
 	assert(!is_ktask(pcpui->cur_kthread));
 	__set_proc_current(p);
-	/* Clear the current_ctx, since it is no longer used */
-	current_ctx = 0;	/* TODO: might not need this... */
 	__set_cpu_state(pcpui, CPU_STATE_USER);
 	proc_pop_ctx(ctx);
 }

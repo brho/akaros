@@ -436,7 +436,6 @@ static void set_current_ctx_hw(struct per_cpu_info *pcpui,
                                struct hw_trapframe *hw_tf)
 {
 	assert(!irq_is_enabled());
-	assert(!pcpui->cur_ctx);
 	pcpui->actual_ctx.type = ROS_HW_CTX;
 	pcpui->actual_ctx.tf.hw_tf = *hw_tf;
 	pcpui->cur_ctx = &pcpui->actual_ctx;
@@ -446,18 +445,15 @@ static void set_current_ctx_sw(struct per_cpu_info *pcpui,
                                struct sw_trapframe *sw_tf)
 {
 	assert(!irq_is_enabled());
-	assert(!pcpui->cur_ctx);
 	pcpui->actual_ctx.type = ROS_SW_CTX;
 	pcpui->actual_ctx.tf.sw_tf = *sw_tf;
 	pcpui->cur_ctx = &pcpui->actual_ctx;
 }
 
-/* TODO: (VMCTX) need to call this after we enter the kernel from a vm ctx. */
 static void set_current_ctx_vm(struct per_cpu_info *pcpui,
                                struct vm_trapframe *vm_tf)
 {
 	assert(!irq_is_enabled());
-	assert(!pcpui->cur_ctx);
 	pcpui->actual_ctx.type = ROS_VM_CTX;
 	pcpui->actual_ctx.tf.vm_tf = *vm_tf;
 	pcpui->cur_ctx = &pcpui->actual_ctx;
