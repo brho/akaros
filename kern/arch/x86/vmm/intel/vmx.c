@@ -1397,21 +1397,24 @@ bool emsr_fake_apicbase(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 	return TRUE;
 }
 
+bool vmm_emulate_msr(uint64_t *rcx, uint64_t *rdx, uint64_t *rax, int op)
+{
+	for (int i = 0; i < ARRAY_SIZE(emmsrs); i++) {
+		if (emmsrs[i].reg != *rcx)
+			continue;
+		return emmsrs[i].f(&emmsrs[i], rcx, rdx, rax, op);
+	}
+	return FALSE;
+}
 
 static int
 msrio(struct vmx_vcpu *vcpu, uint32_t opcode, uint32_t qual) {
 	int i;
-	for (i = 0; i < ARRAY_SIZE(emmsrs); i++) {
-		if (emmsrs[i].reg != vcpu->regs.tf_rcx)
-			continue;
-		if (emmsrs[i].f(&emmsrs[i], &vcpu->regs.tf_rcx, &vcpu->regs.tf_rdx,
-		                &vcpu->regs.tf_rax, opcode))
-			return 0;
-		else
-			return SHUTDOWN_UNHANDLED_EXIT_REASON;
-	}
-	printk("msrio for 0x%lx failed\n", vcpu->regs.tf_rcx);
-	return SHUTDOWN_UNHANDLED_EXIT_REASON;
+
+	if (!vmm_emulate_msr(&vcpu->regs.tf_rcx, &vcpu->regs.tf_rdx,
+	                     &vcpu->regs.tf_rax, opcode))
+		return SHUTDOWN_UNHANDLED_EXIT_REASON;
+	return 0;
 }
 
 /* Notes on autoloading.  We can't autoload FS_BASE or GS_BASE, according to the

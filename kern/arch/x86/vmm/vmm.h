@@ -64,3 +64,5 @@ void ept_flush(uint64_t eptp);
 struct vmx_vcpu *lookup_guest_pcore(struct proc *p, int guest_pcoreid);
 struct vmx_vcpu *load_guest_pcore(struct proc *p, int guest_pcoreid);
 void unload_guest_pcore(struct proc *p, int guest_pcoreid);
+
+bool vmm_emulate_msr(uint64_t *rcx, uint64_t *rdx, uint64_t *rax, int op);
