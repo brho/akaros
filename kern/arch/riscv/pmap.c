@@ -98,6 +98,12 @@ page_check(void)
 {
 }
 
+uintptr_t gva2gpa(struct proc *p, uintptr_t cr3, uintptr_t gva)
+{
+	panic("Unimplemented");
+	return 0;
+}
+
 int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd)
 {
 	pte_t *kpt = kpage_alloc_addr();
