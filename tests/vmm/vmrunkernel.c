@@ -28,6 +28,161 @@ int msrio(struct vmctl *vcpu, uint32_t opcode);
 struct vmctl vmctl;
 struct vmm_gpcore_init gpci;
 
+/* Whoever holds the ball runs.  run_vm never actually grabs it - it is grabbed
+ * on its behalf. */
+uth_mutex_t the_ball;
+pthread_t vm_thread;
+void (*old_thread_refl)(struct uthread *uth, struct user_context *ctx);
+
+/* callback, runs in vcore context.  this sets up our initial context.  once we
+ * become runnable again, we'll run the first bits of the vm ctx.  after that,
+ * our context will be stopped and started and will just run whatever the guest
+ * VM wants.  we'll never come back to this code or to run_vm(). */
+static void __build_vm_ctx_cb(struct uthread *uth, void *arg)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uth;
+	struct vmctl *vmctl = (struct vmctl*)arg;
+	struct vm_trapframe *vm_tf;
+
+	__pthread_generic_yield(pthread);
+	pthread->state = PTH_BLK_YIELDING;
+
+	memset(&uth->u_ctx, 0, sizeof(struct user_context));
+	uth->u_ctx.type = ROS_VM_CTX;
+	vm_tf = &uth->u_ctx.tf.vm_tf;
+
+	vm_tf->tf_guest_pcoreid = 0;	/* assuming only 1 guest core */
+	vm_tf->tf_cr3 = vmctl->cr3;
+	vm_tf->tf_rip = vmctl->regs.tf_rip;
+	vm_tf->tf_rsp = vmctl->regs.tf_rsp;
+
+	/* other HW/GP regs are 0, which should be fine.  the FP state is still
+	 * whatever we were running before, though this is pretty much unnecessary.
+	 * we mostly don't want crazy crap in the uth->as, and a non-current_uthread
+	 * VM ctx is supposed to have something in their FP state (like HW ctxs). */
+	save_fp_state(&uth->as);
+	uth->flags |= UTHREAD_FPSAVED | UTHREAD_SAVED;
+
+	uthread_runnable(uth);
+}
+
+static void *run_vm(void *arg)
+{
+	struct vmctl *vmctl = (struct vmctl*)arg;
+
+	assert(vmctl->command == REG_RSP_RIP_CR3);
+	/* We need to hack our context, so that next time we run, we're a VM ctx */
+	uthread_yield(FALSE, __build_vm_ctx_cb, arg);
+}
+
+static void vmm_thread_refl_fault(struct uthread *uth,
+                                  struct user_context *ctx)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uth;
+
+	/* Hack to call the original pth 2LS op */
+	if (!ctx->type == ROS_VM_CTX) {
+		old_thread_refl(uth, ctx);
+		return;
+	}
+	__pthread_generic_yield(pthread);
+	/* normally we'd handle the vmexit here.  to work within the existing
+	 * framework, we just wake the controller thread.  It'll look at our ctx
+	 * then make us runnable again */
+	pthread->state = PTH_BLK_MUTEX;
+	uth_mutex_unlock(the_ball);		/* wake the run_vmthread */
+}
+
+static void copy_vmtf_to_vmctl(struct vm_trapframe *vm_tf, struct vmctl *vmctl)
+{
+	vmctl->cr3 = vm_tf->tf_cr3;
+	vmctl->gva = vm_tf->tf_guest_va;
+	vmctl->gpa = vm_tf->tf_guest_pa;
+	vmctl->exit_qual = vm_tf->tf_exit_qual;
+	if (vm_tf->tf_exit_reason == EXIT_REASON_EPT_VIOLATION)
+		vmctl->shutdown = SHUTDOWN_EPT_VIOLATION;
+	else
+		vmctl->shutdown = SHUTDOWN_UNHANDLED_EXIT_REASON;
+	vmctl->ret_code = vm_tf->tf_exit_reason;
+	vmctl->interrupt = vm_tf->tf_trap_inject;
+	vmctl->intrinfo1 = vm_tf->tf_intrinfo1;
+	vmctl->intrinfo2 = vm_tf->tf_intrinfo2;
+	/* Most of the HW TF.  Should be good enough for now */
+	vmctl->regs.tf_rax = vm_tf->tf_rax;
+	vmctl->regs.tf_rbx = vm_tf->tf_rbx;
+	vmctl->regs.tf_rcx = vm_tf->tf_rcx;
+	vmctl->regs.tf_rdx = vm_tf->tf_rdx;
+	vmctl->regs.tf_rbp = vm_tf->tf_rbp;
+	vmctl->regs.tf_rsi = vm_tf->tf_rsi;
+	vmctl->regs.tf_rdi = vm_tf->tf_rdi;
+	vmctl->regs.tf_r8  = vm_tf->tf_r8;
+	vmctl->regs.tf_r9  = vm_tf->tf_r9;
+	vmctl->regs.tf_r10 = vm_tf->tf_r10;
+	vmctl->regs.tf_r11 = vm_tf->tf_r11;
+	vmctl->regs.tf_r12 = vm_tf->tf_r12;
+	vmctl->regs.tf_r13 = vm_tf->tf_r13;
+	vmctl->regs.tf_r14 = vm_tf->tf_r14;
+	vmctl->regs.tf_r15 = vm_tf->tf_r15;
+	vmctl->regs.tf_rip = vm_tf->tf_rip;
+	vmctl->regs.tf_rflags = vm_tf->tf_rflags;
+	vmctl->regs.tf_rsp = vm_tf->tf_rsp;
+}
+
+static void copy_vmctl_to_vmtf(struct vmctl *vmctl, struct vm_trapframe *vm_tf)
+{
+	vm_tf->tf_rax = vmctl->regs.tf_rax;
+	vm_tf->tf_rbx = vmctl->regs.tf_rbx;
+	vm_tf->tf_rcx = vmctl->regs.tf_rcx;
+	vm_tf->tf_rdx = vmctl->regs.tf_rdx;
+	vm_tf->tf_rbp = vmctl->regs.tf_rbp;
+	vm_tf->tf_rsi = vmctl->regs.tf_rsi;
+	vm_tf->tf_rdi = vmctl->regs.tf_rdi;
+	vm_tf->tf_r8  = vmctl->regs.tf_r8;
+	vm_tf->tf_r9  = vmctl->regs.tf_r9;
+	vm_tf->tf_r10 = vmctl->regs.tf_r10;
+	vm_tf->tf_r11 = vmctl->regs.tf_r11;
+	vm_tf->tf_r12 = vmctl->regs.tf_r12;
+	vm_tf->tf_r13 = vmctl->regs.tf_r13;
+	vm_tf->tf_r14 = vmctl->regs.tf_r14;
+	vm_tf->tf_r15 = vmctl->regs.tf_r15;
+	vm_tf->tf_rip = vmctl->regs.tf_rip;
+	vm_tf->tf_rflags = vmctl->regs.tf_rflags;
+	vm_tf->tf_rsp = vmctl->regs.tf_rsp;
+	vm_tf->tf_cr3 = vmctl->cr3;
+	vm_tf->tf_trap_inject = vmctl->interrupt;
+	/* Don't care about the rest of the fields.  The kernel only writes them */
+}
+
+/* this will start the vm thread, and return when the thread has blocked,
+ * with the right info in vmctl. */
+static void run_vmthread(struct vmctl *vmctl)
+{
+	struct vm_trapframe *vm_tf;
+
+	if (!vm_thread) {
+		/* first time through, we make the vm thread.  the_ball was already
+		 * grabbed right after it was alloc'd. */
+		if (pthread_create(&vm_thread, NULL, run_vm, vmctl)) {
+			perror("pth_create");
+			exit(-1);
+		}
+		/* hack in our own handlers for some 2LS ops */
+		old_thread_refl = sched_ops->thread_refl_fault;
+		sched_ops->thread_refl_fault = vmm_thread_refl_fault;
+	} else {
+		copy_vmctl_to_vmtf(vmctl, &vm_thread->uthread.u_ctx.tf.vm_tf);
+		uth_mutex_lock(the_ball);	/* grab it for the vm_thread */
+		uthread_runnable((struct uthread*)vm_thread);
+	}
+	uth_mutex_lock(the_ball);
+	/* We woke due to a vm exit.  Need to unlock for the next time we're run */
+	uth_mutex_unlock(the_ball);
+	/* the vm stopped.  we can do whatever we want before rerunning it.  since
+	 * we're controlling the uth, we need to handle its vmexits.  we'll fill in
+	 * the vmctl, since that's the current framework. */
+	copy_vmtf_to_vmctl(&vm_thread->uthread.u_ctx.tf.vm_tf, vmctl);
+}
+
 /* Kind of sad what a total clusterf the pc world is. By 1999, you could just scan the hardware 
  * and work it out. But 2005, that was no longer possible. How sad. 
  * so we have to fake acpi to make it all work. !@#$!@#$#.
@@ -292,7 +447,8 @@ void *consin(void *arg)
 		if (debug) fprintf(stderr, "call add_used\n");
 		/* host: now ack that we used them all. */
 		add_used(v, head, outlen+inlen);
-		consdata = 1;
+		/* turn off consdata - the IRQ injection isn't right */
+		//consdata = 1;
 		if (debug) fprintf(stderr, "DONE call add_used\n");
 
 		// Send spurious for testing (Gan)
@@ -427,6 +583,8 @@ int main(int argc, char **argv)
 	void *coreboot_tables = (void *) 0x1165000;
 	void *a_page;
 
+	the_ball = uth_mutex_alloc();
+	uth_mutex_lock(the_ball);
 
 	fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT,
 			PML1_PTE_REACH);
@@ -689,14 +847,11 @@ int main(int argc, char **argv)
 	if (debug)
 		vapic_status_dump(stderr, (void *)gpci.vapic_addr);
 
-	ret = pwrite(fd, &vmctl, sizeof(vmctl), 0);
+	run_vmthread(&vmctl);
 
 	if (debug)
 		vapic_status_dump(stderr, (void *)gpci.vapic_addr);
 
-	if (ret != sizeof(vmctl)) {
-		perror(cmd);
-	}
 	while (1) {
 		void showstatus(FILE *f, struct vmctl *v);
 		int c;
@@ -812,10 +967,7 @@ int main(int argc, char **argv)
 					vapic_status_dump(stderr, gpci.vapic_addr);
 				if (debug)fprintf(stderr, "Resume with consdata ...\n");
 				vmctl.regs.tf_rip += 3;
-				ret = pwrite(fd, &vmctl, sizeof(vmctl), 0);
-				if (ret != sizeof(vmctl)) {
-					perror(cmd);
-				}
+				run_vmthread(&vmctl);
 				//fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
 				//showstatus(stderr, &vmctl);
 				break;
@@ -828,10 +980,7 @@ int main(int argc, char **argv)
 				//debug = 1;
 				if (debug)fprintf(stderr, "Resume with consdata ...\n");
 				vmctl.regs.tf_rip += 1;
-				ret = pwrite(fd, &vmctl, sizeof(vmctl), 0);
-				if (ret != sizeof(vmctl)) {
-					perror(cmd);
-				}
+				run_vmthread(&vmctl);
 				//fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
 				//showstatus(stderr, &vmctl);
 				break;
@@ -881,10 +1030,7 @@ int main(int argc, char **argv)
 			vmctl.command = RESUME;
 		}
 		if (debug) fprintf(stderr, "NOW DO A RESUME\n");
-		ret = pwrite(fd, &vmctl, sizeof(vmctl), 0);
-		if (ret != sizeof(vmctl)) {
-			perror(cmd);
-		}
+		run_vmthread(&vmctl);
 	}
 
 	/* later. 

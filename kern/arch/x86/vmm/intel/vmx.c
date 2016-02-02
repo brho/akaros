@@ -753,8 +753,8 @@ vmx_setup_constant_host_state(void)
 	native_store_idt(&dt);
 	vmcs_writel(HOST_IDTR_BASE, dt.pd_base);	/* 22.2.4 */
 
-	asm("mov $.Lkvm_vmx_return, %0":"=r"(tmpl));
-	vmcs_writel(HOST_RIP, tmpl);	/* 22.2.5 */
+	extern void vmexit_handler(void);
+	vmcs_writel(HOST_RIP, (unsigned long)vmexit_handler);
 
 	rdmsr(MSR_IA32_SYSENTER_CS, low32, high32);
 	vmcs_write32(HOST_IA32_SYSENTER_CS, low32);
@@ -1524,8 +1524,11 @@ static void vmx_set_posted_interrupt(int vector)
 
 */
 
-int vmx_interrupt_notify(struct vmctl *v) {
-	int vm_core = v->core;
+int vmx_interrupt_notify(struct vmctl *v)
+{
+	/* Assume we want to IPI guest pcore 0 (which vmctl controlled). */
+	int vm_core = current->vmm.guest_pcores[0]->cpu;
+
 	send_ipi(vm_core, I_VMMCP_POSTED);
 	if(debug) printk("Posting Interrupt\n");
 	return 0;
