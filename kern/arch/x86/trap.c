@@ -494,22 +494,11 @@ static bool vector_is_irq(int apic_vec)
 	return (IdtPIC <= apic_vec) && (apic_vec <= IdtMAX);
 }
 
-/* Note IRQs are disabled unless explicitly turned on.
- *
- * In general, we should only get trapno's >= PIC1_OFFSET (32).  Anything else
- * should be a trap.  Even if we don't use the PIC, that should be the standard.
- * It is possible to get a spurious LAPIC IRQ with vector 15 (or similar), but
- * the spurious check should catch that.
- *
- * Note that from hardware's perspective (PIC, etc), IRQs start from 0, but they
- * are all mapped up at PIC1_OFFSET for the cpu / irq_handler. */
-void handle_irq(struct hw_trapframe *hw_tf)
+static void irq_dispatch(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct irq_handler *irq_h;
-	/* Copy out the TF for now */
-	if (!in_kernel(hw_tf))
-		set_current_ctx_hw(pcpui, hw_tf);
+
 	if (!in_irq_ctx(pcpui))
 		__set_cpu_state(pcpui, CPU_STATE_IRQ);
 	inc_irq_depth(pcpui);
@@ -552,6 +541,25 @@ out_no_eoi:
 	dec_irq_depth(pcpui);
 	if (!in_irq_ctx(pcpui))
 		__set_cpu_state(pcpui, CPU_STATE_KERNEL);
+}
+
+/* Note IRQs are disabled unless explicitly turned on.
+ *
+ * In general, we should only get trapno's >= PIC1_OFFSET (32).  Anything else
+ * should be a trap.  Even if we don't use the PIC, that should be the standard.
+ * It is possible to get a spurious LAPIC IRQ with vector 15 (or similar), but
+ * the spurious check should catch that.
+ *
+ * Note that from hardware's perspective (PIC, etc), IRQs start from 0, but they
+ * are all mapped up at PIC1_OFFSET for the cpu / irq_handler. */
+void handle_irq(struct hw_trapframe *hw_tf)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	/* Copy out the TF for now */
+	if (!in_kernel(hw_tf))
+		set_current_ctx_hw(pcpui, hw_tf);
+	irq_dispatch(hw_tf);
 	/* Return to the current process, which should be runnable.  If we're the
 	 * kernel, we should just return naturally.  Note that current and tf need
 	 * to still be okay (might not be after blocking) */
