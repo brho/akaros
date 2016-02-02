@@ -726,7 +726,7 @@ vmx_free_vmcs(struct vmcs *vmcs)
  * Set up the vmcs's constant host-state fields, i.e., host-state fields that
  * will not change in the lifetime of the guest.
  * Note that host-state that does change is set elsewhere. E.g., host-state
- * that is set differently for each CPU is set in vmx_vcpu_load(), not here.
+ * that is set differently for each CPU is set in __vmx_setup_pcpu(), not here.
  */
 static void
 vmx_setup_constant_host_state(void)
@@ -771,7 +771,7 @@ vmx_setup_constant_host_state(void)
 
 /* Set up the per-core VMCS fields.  This is the host state that varies from
  * core to core, which the hardware will switch for us on VM enters/exits. */
-static void __vmx_setup_pcpu(struct vmx_vcpu *gpc)
+static void __vmx_setup_pcpu(struct guest_pcore *gpc)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
@@ -974,17 +974,18 @@ static void __vmx_disable_intercept_for_io(unsigned long *io_bitmap,
 	__clear_bit(port, io_bitmap);
 }
 
-static void vcpu_print_autoloads(struct vmx_vcpu *vcpu) {
+static void gpc_print_autoloads(struct guest_pcore *gpc)
+{
 	struct vmx_msr_entry *e;
 	int sz = sizeof(autoloaded_msrs) / sizeof(*autoloaded_msrs);
 	printk("Host Autoloads:\n-------------------\n");
 	for (int i = 0; i < sz; i++) {
-		e = &vcpu->msr_autoload.host[i];
+		e = &gpc->msr_autoload.host[i];
 		printk("\tMSR 0x%08x: %p\n", e->index, e->value);
 	}
 	printk("Guest Autoloads:\n-------------------\n");
 	for (int i = 0; i < sz; i++) {
-		e = &vcpu->msr_autoload.guest[i];
+		e = &gpc->msr_autoload.guest[i];
 		printk("\tMSR 0x%08x %p\n", e->index, e->value);
 	}
 }
@@ -1016,7 +1017,8 @@ static void dumpmsrs(void) {
  *
  * Other MSRs, such as MSR_IA32_PEBS_ENABLE only work on certain architectures
  * only work on certain architectures. */
-static void setup_msr(struct vmx_vcpu *vcpu) {
+static void setup_msr(struct guest_pcore *gpc)
+{
 	struct vmx_msr_entry *e;
 	int sz = sizeof(autoloaded_msrs) / sizeof(*autoloaded_msrs);
 	int i;
@@ -1024,7 +1026,7 @@ static void setup_msr(struct vmx_vcpu *vcpu) {
 	static_assert((sizeof(autoloaded_msrs) / sizeof(*autoloaded_msrs)) <=
 		      NR_AUTOLOAD_MSRS);
 
-	vcpu->msr_autoload.nr = sz;
+	gpc->msr_autoload.nr = sz;
 
 	/* Since PADDR(msr_bitmap) is non-zero, and the bitmap is all 0xff, we now
 	 * intercept all MSRs */
@@ -1034,25 +1036,25 @@ static void setup_msr(struct vmx_vcpu *vcpu) {
 	vmcs_write64(IO_BITMAP_B, PADDR((uintptr_t)io_bitmap +
 	                                (VMX_IO_BITMAP_SZ / 2)));
 
-	vmcs_write32(VM_EXIT_MSR_STORE_COUNT, vcpu->msr_autoload.nr);
-	vmcs_write32(VM_EXIT_MSR_LOAD_COUNT, vcpu->msr_autoload.nr);
-	vmcs_write32(VM_ENTRY_MSR_LOAD_COUNT, vcpu->msr_autoload.nr);
+	vmcs_write32(VM_EXIT_MSR_STORE_COUNT, gpc->msr_autoload.nr);
+	vmcs_write32(VM_EXIT_MSR_LOAD_COUNT, gpc->msr_autoload.nr);
+	vmcs_write32(VM_ENTRY_MSR_LOAD_COUNT, gpc->msr_autoload.nr);
 
-	vmcs_write64(VM_EXIT_MSR_LOAD_ADDR, PADDR(vcpu->msr_autoload.host));
-	vmcs_write64(VM_EXIT_MSR_STORE_ADDR, PADDR(vcpu->msr_autoload.guest));
-	vmcs_write64(VM_ENTRY_MSR_LOAD_ADDR, PADDR(vcpu->msr_autoload.guest));
+	vmcs_write64(VM_EXIT_MSR_LOAD_ADDR, PADDR(gpc->msr_autoload.host));
+	vmcs_write64(VM_EXIT_MSR_STORE_ADDR, PADDR(gpc->msr_autoload.guest));
+	vmcs_write64(VM_ENTRY_MSR_LOAD_ADDR, PADDR(gpc->msr_autoload.guest));
 
 	for (i = 0; i < sz; i++) {
 		uint64_t val;
 
-		e = &vcpu->msr_autoload.host[i];
+		e = &gpc->msr_autoload.host[i];
 		e->index = autoloaded_msrs[i];
 		__vmx_disable_intercept_for_msr(msr_bitmap, e->index);
 		rdmsrl(e->index, val);
 		e->value = val;
 		printk("host index %p val %p\n", e->index, e->value);
 
-		e = &vcpu->msr_autoload.guest[i];
+		e = &gpc->msr_autoload.guest[i];
 		e->index = autoloaded_msrs[i];
 		e->value = 0xDEADBEEF;
 		printk("guest index %p val %p\n", e->index, e->value);
@@ -1062,7 +1064,8 @@ static void setup_msr(struct vmx_vcpu *vcpu) {
 /**
  *  vmx_setup_vmcs - configures the vmcs with starting parameters
  */
-static void vmx_setup_vmcs(struct vmx_vcpu *vcpu) {
+static void vmx_setup_vmcs(struct guest_pcore *gpc)
+{
 	vmcs_write16(VIRTUAL_PROCESSOR_ID, 0);
 	vmcs_write64(VMCS_LINK_POINTER, -1ull);	/* 22.3.1.5 */
 
@@ -1078,13 +1081,13 @@ static void vmx_setup_vmcs(struct vmx_vcpu *vcpu) {
 			     vmcs_config.cpu_based_2nd_exec_ctrl);
 	}
 
-	vmcs_write64(EPT_POINTER, vcpu_get_eptp(vcpu));
+	vmcs_write64(EPT_POINTER, gpc_get_eptp(gpc));
 
 	vmcs_write32(PAGE_FAULT_ERROR_CODE_MASK, 0);
 	vmcs_write32(PAGE_FAULT_ERROR_CODE_MATCH, 0);
 	vmcs_write32(CR3_TARGET_COUNT, 0);	/* 22.2.1 */
 
-	setup_msr(vcpu);
+	setup_msr(gpc);
 
 	vmcs_config.vmentry_ctrl |= VM_ENTRY_IA32E_MODE;
 
@@ -1094,56 +1097,57 @@ static void vmx_setup_vmcs(struct vmx_vcpu *vcpu) {
 	vmcs_writel(CR0_GUEST_HOST_MASK, 0);	// ~0ul);
 	vmcs_writel(CR4_GUEST_HOST_MASK, 0);	// ~0ul);
 
-	//kvm_write_tsc(&vmx->vcpu, 0);
+	//kvm_write_tsc(&vmx->gpc, 0);
 	vmcs_writel(TSC_OFFSET, 0);
 
 	vmx_setup_constant_host_state();
 }
 
 /**
- * vmx_create_vcpu - allocates and initializes a new virtual cpu
+ * create_guest_pcore - allocates and initializes a guest physical core
  *
  * Returns: A new VCPU structure
  */
-struct vmx_vcpu *vmx_create_vcpu(struct proc *p, struct vmm_gpcore_init *gpci)
+struct guest_pcore *create_guest_pcore(struct proc *p,
+                                       struct vmm_gpcore_init *gpci)
 {
-	struct vmx_vcpu *vcpu = kmalloc(sizeof(struct vmx_vcpu), KMALLOC_WAIT);
+	struct guest_pcore *gpc = kmalloc(sizeof(struct guest_pcore), KMALLOC_WAIT);
 	int ret;
 
-	if (!vcpu) {
+	if (!gpc)
 		return NULL;
-	}
 
-	memset(vcpu, 0, sizeof(*vcpu));
+	memset(gpc, 0, sizeof(*gpc));
 
-	vcpu->proc = p;	/* uncounted (weak) reference */
-	vcpu->vmcs = vmx_alloc_vmcs();
-	printd("%d: vcpu->vmcs is %p\n", core_id(), vcpu->vmcs);
-	if (!vcpu->vmcs)
+	gpc->proc = p;	/* uncounted (weak) reference */
+	gpc->vmcs = vmx_alloc_vmcs();
+	printd("%d: gpc->vmcs is %p\n", core_id(), gpc->vmcs);
+	if (!gpc->vmcs)
 		goto fail_vmcs;
 
-	vcpu->cpu = -1;
+	gpc->cpu = -1;
 
-	vmx_load_guest_pcore(vcpu);
-	vmx_setup_vmcs(vcpu);
+	vmx_load_guest_pcore(gpc);
+	vmx_setup_vmcs(gpc);
 	ret = vmx_setup_initial_guest_state(p, gpci);
-	vmx_unload_guest_pcore(vcpu);
+	vmx_unload_guest_pcore(gpc);
 
 	if (!ret)
-		return vcpu;
+		return gpc;
 
 fail_vmcs:
-	kfree(vcpu);
+	kfree(gpc);
 	return NULL;
 }
 
 /**
- * vmx_destroy_vcpu - destroys and frees an existing virtual cpu
- * @vcpu: the VCPU to destroy
+ * destroy_guest_pcore - destroys and frees an existing guest physical core
+ * @gpc: the GPC to destroy
  */
-void vmx_destroy_vcpu(struct vmx_vcpu *vcpu) {
-	vmx_free_vmcs(vcpu->vmcs);
-	kfree(vcpu);
+void destroy_guest_pcore(struct guest_pcore *gpc)
+{
+	vmx_free_vmcs(gpc->vmcs);
+	kfree(gpc);
 }
 
 static void vmx_step_instruction(void) {
@@ -1196,7 +1200,7 @@ static int __vmx_enable(struct vmcs *vmxon_buf) {
 	lcr4(rcr4() | X86_CR4_VMXE);
 
 	__vmxon(phys_addr);
-	vpid_sync_vcpu_global();	/* good idea, even if we aren't using vpids */
+	vpid_sync_gpc_global();	/* good idea, even if we aren't using vpids */
 	ept_sync_global();
 
 	return 0;
@@ -1373,13 +1377,13 @@ void vapic_status_dump_kernel(void *vapic)
 	printk("-- END KERNEL APIC STATUS DUMP --\n");
 }
 
-void vmx_load_guest_pcore(struct vmx_vcpu *gpc)
+void vmx_load_guest_pcore(struct guest_pcore *gpc)
 {
 	vmcs_load(gpc->vmcs);
 	__vmx_setup_pcpu(gpc);
 }
 
-void vmx_unload_guest_pcore(struct vmx_vcpu *gpc)
+void vmx_unload_guest_pcore(struct guest_pcore *gpc)
 {
 	vmcs_clear(gpc->vmcs);
 }

@@ -121,7 +121,7 @@ int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores,
 			set_error(EINVAL, "Bad pointer %p for gps", u_gpcis);
 			break;
 		}
-		vmm->guest_pcores[i] = vmx_create_vcpu(p, &gpci);
+		vmm->guest_pcores[i] = create_guest_pcore(p, &gpci);
 		/* If we failed, we'll clean it up when the process dies */
 		if (!vmm->guest_pcores[i]) {
 			set_errno(ENOMEM);
@@ -145,14 +145,14 @@ void __vmm_struct_cleanup(struct proc *p)
 		return;
 	for (int i = 0; i < vmm->nr_guest_pcores; i++) {
 		if (vmm->guest_pcores[i])
-			vmx_destroy_vcpu(vmm->guest_pcores[i]);
+			destroy_guest_pcore(vmm->guest_pcores[i]);
 	}
 	kfree(vmm->guest_pcores);
 	ept_flush(p->env_pgdir.eptp);
 	vmm->vmmcp = FALSE;
 }
 
-struct vmx_vcpu *lookup_guest_pcore(struct proc *p, int guest_pcoreid)
+struct guest_pcore *lookup_guest_pcore(struct proc *p, int guest_pcoreid)
 {
 	/* nr_guest_pcores is written once at setup and never changed */
 	if (guest_pcoreid >= p->vmm.nr_guest_pcores)
@@ -160,9 +160,9 @@ struct vmx_vcpu *lookup_guest_pcore(struct proc *p, int guest_pcoreid)
 	return p->vmm.guest_pcores[guest_pcoreid];
 }
 
-struct vmx_vcpu *load_guest_pcore(struct proc *p, int guest_pcoreid)
+struct guest_pcore *load_guest_pcore(struct proc *p, int guest_pcoreid)
 {
-	struct vmx_vcpu *gpc;
+	struct guest_pcore *gpc;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
 	gpc = lookup_guest_pcore(p, guest_pcoreid);
@@ -178,21 +178,21 @@ struct vmx_vcpu *load_guest_pcore(struct proc *p, int guest_pcoreid)
 	spin_unlock(&p->vmm.lock);
 	/* We've got dibs on the gpc; we don't need to hold the lock any longer. */
 	pcpui->guest_pcoreid = guest_pcoreid;
-	ept_sync_context(vcpu_get_eptp(gpc));
+	ept_sync_context(gpc_get_eptp(gpc));
 	vmx_load_guest_pcore(gpc);
 	return gpc;
 }
 
 void unload_guest_pcore(struct proc *p, int guest_pcoreid)
 {
-	struct vmx_vcpu *gpc;
+	struct guest_pcore *gpc;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
 	gpc = lookup_guest_pcore(p, guest_pcoreid);
 	assert(gpc);
 	spin_lock(&p->vmm.lock);
 	assert(gpc->cpu != -1);
-	ept_sync_context(vcpu_get_eptp(gpc));
+	ept_sync_context(gpc_get_eptp(gpc));
 	vmx_unload_guest_pcore(gpc);
 	gpc->cpu = -1;
 	/* As soon as we unlock, this gpc can be started on another core */

@@ -61,10 +61,10 @@ static inline void ept_sync_individual_addr(uint64_t eptp, gpa_t gpa);
 static inline void __vmxon(uint64_t addr);
 static inline void __vmxoff(void);
 static inline void __invvpid(int ext, uint16_t vpid, gva_t gva);
-static inline void vpid_sync_vcpu_single(uint16_t vpid);
-static inline void vpid_sync_vcpu_global(void);
+static inline void vpid_sync_gpc_single(uint16_t vpid);
+static inline void vpid_sync_gpc_global(void);
 static inline void vpid_sync_context(uint16_t vpid);
-static inline uint64_t vcpu_get_eptp(struct vmx_vcpu *vcpu);
+static inline uint64_t gpc_get_eptp(struct guest_pcore *gpc);
 
 /* no way to get around some of this stuff. */
 /* we will do the bare minimum required. */
@@ -235,7 +235,7 @@ static inline void __invvpid(int ext, uint16_t vpid, gva_t gva)
 		  : : "a"(&operand), "c"(ext) : "cc", "memory");
 }
 
-static inline void vpid_sync_vcpu_single(uint16_t vpid)
+static inline void vpid_sync_gpc_single(uint16_t vpid)
 {
 	if (vpid == 0) {
 		return;
@@ -245,7 +245,7 @@ static inline void vpid_sync_vcpu_single(uint16_t vpid)
 		__invvpid(VMX_VPID_EXTENT_SINGLE_CONTEXT, vpid, 0);
 }
 
-static inline void vpid_sync_vcpu_global(void)
+static inline void vpid_sync_gpc_global(void)
 {
 	if (cpu_has_vmx_invvpid_global())
 		__invvpid(VMX_VPID_EXTENT_ALL_CONTEXT, 0, 0);
@@ -254,14 +254,14 @@ static inline void vpid_sync_vcpu_global(void)
 static inline void vpid_sync_context(uint16_t vpid)
 {
 	if (cpu_has_vmx_invvpid_single())
-		vpid_sync_vcpu_single(vpid);
+		vpid_sync_gpc_single(vpid);
 	else
-		vpid_sync_vcpu_global();
+		vpid_sync_gpc_global();
 }
 
-static inline uint64_t vcpu_get_eptp(struct vmx_vcpu *vcpu)
+static inline uint64_t gpc_get_eptp(struct guest_pcore *gpc)
 {
-	return vcpu->proc->env_pgdir.eptp;
+	return gpc->proc->env_pgdir.eptp;
 }
 
 static inline unsigned long vmcs_read(unsigned long field)
@@ -309,5 +309,5 @@ struct vmxec {
 	uint32_t try_set_0;
 };
 
-void vmx_load_guest_pcore(struct vmx_vcpu *gpc);
-void vmx_unload_guest_pcore(struct vmx_vcpu *gpc);
+void vmx_load_guest_pcore(struct guest_pcore *gpc);
+void vmx_unload_guest_pcore(struct guest_pcore *gpc);

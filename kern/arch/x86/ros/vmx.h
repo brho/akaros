@@ -690,18 +690,6 @@ struct ldttss_desc64 {
 	uint32_t zero1;
 } __attribute__((packed));
 
-struct vmx_vcpu {
-	int cpu;
-	struct proc *proc;
-	struct msr_autoload {
-		unsigned nr;
-		struct vmx_msr_entry guest[NR_AUTOLOAD_MSRS];
-		struct vmx_msr_entry host[NR_AUTOLOAD_MSRS];
-	} msr_autoload;
-	struct vmcs *vmcs;
-};
-
-
 static char * const VMX_EXIT_REASON_NAMES[] = {
 	VMX_EXIT_REASONS
 };

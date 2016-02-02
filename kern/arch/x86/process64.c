@@ -94,7 +94,7 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct proc *p = pcpui->cur_proc;
-	struct vmx_vcpu *gpc;
+	struct guest_pcore *gpc;
 
 	if (x86_vmtf_is_partial(tf)) {
 		gpc = lookup_guest_pcore(p, tf->tf_guest_pcoreid);
