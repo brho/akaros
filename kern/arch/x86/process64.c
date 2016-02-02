@@ -73,12 +73,113 @@ static void __attribute__((noreturn)) proc_pop_swtf(struct sw_trapframe *tf)
 	panic("sysret failed");
 }
 
+/* If popping a VM TF fails for some reason, we need to reflect it back to the
+ * user.  It is possible that the reflection fails.  We still need to run
+ * something, and it's a lousy time to try something else.  So We'll give them a
+ * TF that will probably fault right away and kill them. */
+static void __attribute__((noreturn)) handle_bad_vm_tf(struct vm_trapframe *tf)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	tf->tf_exit_reason |= VMX_EXIT_REASONS_FAILED_VMENTRY;
+	tf->tf_flags |= VMCTX_FL_HAS_FAULT;
+	if (reflect_current_context()) {
+		printk("[kernel] Unable to reflect after a bad VM enter\n");
+		proc_init_ctx(pcpui->cur_ctx, 0, 0xcafebabe, 0, 0);
+	}
+	proc_pop_ctx(pcpui->cur_ctx);
+}
+
 static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 {
-	/* This function probably will be able to fail internally.  If that happens,
-	 * we'll just build a dummy SW TF and pop that instead. */
-	/* TODO: (VMCTX) */
-	panic("Not implemented");
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct proc *p = pcpui->cur_proc;
+	struct vmx_vcpu *gpc;
+
+	if (x86_vmtf_is_partial(tf)) {
+		gpc = lookup_guest_pcore(p, tf->tf_guest_pcoreid);
+		assert(gpc);
+		assert(pcpui->guest_pcoreid == tf->tf_guest_pcoreid);
+	} else {
+		gpc = load_guest_pcore(p, tf->tf_guest_pcoreid);
+		if (!gpc) {
+			tf->tf_exit_reason = EXIT_REASON_GUEST_IN_USE;
+			handle_bad_vm_tf(tf);
+		}
+	}
+	vmcs_write(GUEST_RSP, tf->tf_rsp);
+	vmcs_write(GUEST_CR3, tf->tf_cr3);
+	vmcs_write(GUEST_RIP, tf->tf_rip);
+	vmcs_write(GUEST_RFLAGS, tf->tf_rflags);
+	/* cr2 is not part of the VMCS state; we need to save/restore it manually */
+	lcr2(tf->tf_cr2);
+	vmcs_write(VM_ENTRY_INTR_INFO_FIELD, tf->tf_trap_inject);
+	/* vmlaunch/resume can fail, so we need to be able to return from this.
+	 * Thus we can't clobber rsp via the popq style of setting the registers.
+	 * Likewise, we don't want to lose rbp via the clobber list.
+	 *
+	 * Partial contexts have already been launched, so we resume them. */
+	asm volatile ("testl $"STRINGIFY(VMCTX_FL_PARTIAL)", %c[flags](%0);"
+	              "pushq %%rbp;              "	/* save in case we fail */
+	              "movq %c[rbx](%0), %%rbx;  "
+	              "movq %c[rcx](%0), %%rcx;  "
+	              "movq %c[rdx](%0), %%rdx;  "
+	              "movq %c[rbp](%0), %%rbp;  "
+	              "movq %c[rsi](%0), %%rsi;  "
+	              "movq %c[rdi](%0), %%rdi;  "
+	              "movq %c[r8](%0),  %%r8;   "
+	              "movq %c[r9](%0),  %%r9;   "
+	              "movq %c[r10](%0), %%r10;  "
+	              "movq %c[r11](%0), %%r11;  "
+	              "movq %c[r12](%0), %%r12;  "
+	              "movq %c[r13](%0), %%r13;  "
+	              "movq %c[r14](%0), %%r14;  "
+	              "movq %c[r15](%0), %%r15;  "
+	              "movq %c[rax](%0), %%rax;  "	/* clobber our *tf last */
+	              "jnz 1f;                   "	/* jump if partial */
+	              ASM_VMX_VMLAUNCH";         "	/* non-partial gets launched */
+	              "jmp 2f;                   "
+	              "1: "ASM_VMX_VMRESUME";    "	/* partials get resumed */
+	              "2: popq %%rbp;            "	/* vmlaunch failed */
+	              :
+	              : "a" (tf),
+	                [rax]"i"(offsetof(struct vm_trapframe, tf_rax)),
+	                [rbx]"i"(offsetof(struct vm_trapframe, tf_rbx)),
+	                [rcx]"i"(offsetof(struct vm_trapframe, tf_rcx)),
+	                [rdx]"i"(offsetof(struct vm_trapframe, tf_rdx)),
+	                [rbp]"i"(offsetof(struct vm_trapframe, tf_rbp)),
+	                [rsi]"i"(offsetof(struct vm_trapframe, tf_rsi)),
+	                [rdi]"i"(offsetof(struct vm_trapframe, tf_rdi)),
+	                 [r8]"i"(offsetof(struct vm_trapframe, tf_r8)),
+	                 [r9]"i"(offsetof(struct vm_trapframe, tf_r9)),
+	                [r10]"i"(offsetof(struct vm_trapframe, tf_r10)),
+	                [r11]"i"(offsetof(struct vm_trapframe, tf_r11)),
+	                [r12]"i"(offsetof(struct vm_trapframe, tf_r12)),
+	                [r13]"i"(offsetof(struct vm_trapframe, tf_r13)),
+	                [r14]"i"(offsetof(struct vm_trapframe, tf_r14)),
+	                [r15]"i"(offsetof(struct vm_trapframe, tf_r15)),
+	                [flags]"i"(offsetof(struct vm_trapframe, tf_flags))
+	              : "cc", "memory", "rbx", "rcx", "rdx", "rsi", "rdi",
+	                "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+	/* vmlaunch/resume failed.  It could be for a few reasons, including things
+	 * like launching instead of resuming, not having a VMCS loaded, failing a
+	 * host-state area check, etc.  Those are kernel problems.
+	 *
+	 * The user also might be able to trigger some of these failures.  For
+	 * instance, rflags could be bad, or the trap_injection could be
+	 * misformatted.  We might catch that in secure_tf, or we could reflect
+	 * those to the user.  Detecting btw the kernel and user mistakes might be
+	 * a pain.
+	 *
+	 * For now, the plan is to just reflect everything back to the user and
+	 * whitelist errors that are known to be kernel bugs.
+	 *
+	 * Also we should always have a non-shadow VMCS, so ZF should be 1 and we
+	 * can read the error register. */
+	assert(read_flags() & FL_ZF);
+	tf->tf_exit_reason = EXIT_REASON_VMENTER_FAILED;
+	tf->tf_exit_qual = vmcs_read(VM_INSTRUCTION_ERROR);
+	handle_bad_vm_tf(tf);
 }
 
 void proc_pop_ctx(struct user_context *ctx)

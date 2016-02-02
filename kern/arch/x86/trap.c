@@ -676,3 +676,191 @@ void send_ipi(uint32_t os_coreid, uint8_t vector)
 	}
 	__send_ipi(hw_coreid, vector);
 }
+
+/****************** VM exit handling ******************/
+
+static bool handle_vmexit_cpuid(struct vm_trapframe *tf)
+{
+	uint32_t eax, ebx, ecx, edx;
+
+	cpuid(tf->tf_rax, tf->tf_rcx, &eax, &ebx, &ecx, &edx);
+	tf->tf_rax = eax;
+	tf->tf_rbx = ebx;
+	tf->tf_rcx = ecx;
+	tf->tf_rdx = edx;
+	tf->tf_rip += 2;
+	return TRUE;
+}
+
+static bool handle_vmexit_ept_fault(struct vm_trapframe *tf)
+{
+	int prot = 0;
+	int ret;
+
+	prot |= tf->tf_exit_qual & VMX_EPT_FAULT_READ ? PROT_READ : 0;
+	prot |= tf->tf_exit_qual & VMX_EPT_FAULT_WRITE ? PROT_WRITE : 0;
+	prot |= tf->tf_exit_qual & VMX_EPT_FAULT_INS ? PROT_EXEC : 0;
+	ret = handle_page_fault(current, tf->tf_guest_pa, prot);
+	if (ret) {
+		/* TODO: maybe put ret in the TF somewhere */
+		return FALSE;
+	}
+	return TRUE;
+}
+
+static bool handle_vmexit_nmi(struct vm_trapframe *tf)
+{
+	/* Sanity checks, make sure we really got an NMI.  Feel free to remove. */
+	assert((tf->tf_intrinfo2 & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI_INTR);
+	assert((tf->tf_intrinfo2 & INTR_INFO_VECTOR_MASK) == T_NMI);
+	/* our NMI handler from trap.c won't run.  but we don't need the lock
+	 * disabling stuff. */
+	extern bool mon_verbose_trace;
+
+	if (mon_verbose_trace) {
+		print_vmtrapframe(tf);
+		/* TODO: a backtrace of the guest would be nice here. */
+	}
+	printk("Core %d is at %p\n", core_id(), get_vmtf_pc(tf));
+	return TRUE;
+}
+
+bool handle_vmexit_msr(struct vm_trapframe *tf)
+{
+	bool ret;
+
+	ret = vmm_emulate_msr(&tf->tf_rcx, &tf->tf_rdx, &tf->tf_rax,
+	                      (tf->tf_exit_reason == EXIT_REASON_MSR_READ
+						   ? VMM_MSR_EMU_READ : VMM_MSR_EMU_WRITE));
+	if (ret)
+		tf->tf_rip += 2;
+	return ret;
+}
+
+bool handle_vmexit_extirq(struct vm_trapframe *tf)
+{
+	struct hw_trapframe hw_tf;
+
+	/* For now, we just handle external IRQs.  I think guest traps should go to
+	 * the guest, based on our vmctls */
+	assert((tf->tf_intrinfo2 & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_EXT_INTR);
+	/* TODO: Our IRQ handlers all expect TFs.  Let's fake one.  A bunch of
+	 * handlers (e.g. backtrace/perf) will probably be unhappy about a user TF
+	 * that is really a VM, so this all needs work. */
+	hw_tf.tf_gsbase = 0;
+	hw_tf.tf_fsbase = 0;
+	hw_tf.tf_rax = tf->tf_rax;
+	hw_tf.tf_rbx = tf->tf_rbx;
+	hw_tf.tf_rcx = tf->tf_rcx;
+	hw_tf.tf_rdx = tf->tf_rdx;
+	hw_tf.tf_rbp = tf->tf_rbp;
+	hw_tf.tf_rsi = tf->tf_rsi;
+	hw_tf.tf_rdi = tf->tf_rdi;
+	hw_tf.tf_r8 = tf->tf_r8;
+	hw_tf.tf_r9 = tf->tf_r9;
+	hw_tf.tf_r10 = tf->tf_r10;
+	hw_tf.tf_r11 = tf->tf_r11;
+	hw_tf.tf_r12 = tf->tf_r12;
+	hw_tf.tf_r13 = tf->tf_r13;
+	hw_tf.tf_r14 = tf->tf_r14;
+	hw_tf.tf_r15 = tf->tf_r15;
+	hw_tf.tf_trapno = tf->tf_intrinfo2 & INTR_INFO_VECTOR_MASK;
+	hw_tf.tf_err = 0;
+	hw_tf.tf_rip = tf->tf_rip;
+	hw_tf.tf_cs = GD_UT;	/* faking a user TF, even though it's a VM */
+	hw_tf.tf_rflags = tf->tf_rflags;
+	hw_tf.tf_rsp = tf->tf_rsp;
+	hw_tf.tf_ss = GD_UD;
+
+	irq_dispatch(&hw_tf);
+	/* Consider returning whether or not there was a handler registered */
+	return TRUE;
+}
+
+static void vmexit_dispatch(struct vm_trapframe *tf)
+{
+	bool handled = FALSE;
+
+	/* Do not block in any of these functions.
+	 *
+	 * If we block, we'll probably need to finalize the context.  If we do, then
+	 * there's a chance the guest pcore can start somewhere else, and then we
+	 * can't get the GPC loaded again.  Plus, they could be running a GPC with
+	 * an unresolved vmexit.  It's just mess.
+	 *
+	 * If we want to enable IRQs, we can do so on a case-by-case basis.  Don't
+	 * do it for external IRQs - the irq_dispatch code will handle it. */
+	switch (tf->tf_exit_reason) {
+	case EXIT_REASON_VMCALL:
+		if (current->vmm.flags & VMM_VMCALL_PRINTF) {
+			printk("%c", tf->tf_rdi);
+			tf->tf_rip += 3;
+			handled = TRUE;
+		}
+		break;
+	case EXIT_REASON_CPUID:
+		handled = handle_vmexit_cpuid(tf);
+		break;
+	case EXIT_REASON_EPT_VIOLATION:
+		handled = handle_vmexit_ept_fault(tf);
+		break;
+	case EXIT_REASON_EXCEPTION_NMI:
+		handled = handle_vmexit_nmi(tf);
+		break;
+	case EXIT_REASON_MSR_READ:
+	case EXIT_REASON_MSR_WRITE:
+		handled = handle_vmexit_msr(tf);
+		break;
+	case EXIT_REASON_EXTERNAL_INTERRUPT:
+		handled = handle_vmexit_extirq(tf);
+		break;
+	default:
+		printd("Unhandled vmexit: reason 0x%x, exit qualification 0x%x\n",
+		       tf->tf_exit_reason, tf->tf_exit_qual);
+	}
+	if (!handled) {
+		tf->tf_flags |= VMCTX_FL_HAS_FAULT;
+		if (reflect_current_context()) {
+			/* VM contexts shouldn't be in vcore context, so this should be
+			 * pretty rare (unlike SCPs or VC ctx page faults). */
+			printk("[kernel] Unable to reflect VM Exit\n");
+			print_vmtrapframe(tf);
+			proc_destroy(current);
+		}
+	}
+}
+
+void handle_vmexit(struct vm_trapframe *tf)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	tf->tf_rip = vmcs_read(GUEST_RIP);
+	tf->tf_rflags = vmcs_read(GUEST_RFLAGS);
+	tf->tf_rsp = vmcs_read(GUEST_RSP);
+	tf->tf_cr2 = rcr2();
+	tf->tf_cr3 = vmcs_read(GUEST_CR3);
+	tf->tf_guest_pcoreid = pcpui->guest_pcoreid;
+	tf->tf_flags |= VMCTX_FL_PARTIAL;
+	tf->tf_exit_reason = vmcs_read(VM_EXIT_REASON);
+	tf->tf_exit_qual = vmcs_read(EXIT_QUALIFICATION);
+	tf->tf_intrinfo1 = vmcs_read(GUEST_INTERRUPTIBILITY_INFO);
+	tf->tf_intrinfo2 = vmcs_read(VM_EXIT_INTR_INFO);
+	tf->tf_guest_va = vmcs_read(GUEST_LINEAR_ADDRESS);
+	tf->tf_guest_pa = vmcs_read(GUEST_PHYSICAL_ADDRESS);
+
+	set_current_ctx_vm(pcpui, tf);
+	tf = &pcpui->cur_ctx->tf.vm_tf;
+	vmexit_dispatch(tf);
+	/* We're either restarting a partial VM ctx (vmcs was launched, loaded on
+	 * the core, etc) or a SW vc ctx for the reflected trap.  Or the proc is
+	 * dying and we'll handle a __death KMSG shortly. */
+	proc_restartcore();
+}
+
+void x86_finalize_vmtf(struct vm_trapframe *tf)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	x86_vmtf_clear_partial(tf);
+	unload_guest_pcore(pcpui->cur_proc, pcpui->guest_pcoreid);
+}

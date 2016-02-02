@@ -344,9 +344,6 @@ static void pth_thread_refl_fault(struct uthread *uth,
 		                         __arch_refl_get_err(ctx),
 		                         __arch_refl_get_aux(ctx));
 		break;
-	case ROS_VM_CTX:
-		/* TODO: (VMCTX) the pthread 2LS might not bother with this */
-		break;
 	default:
 		assert(0);
 	}

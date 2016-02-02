@@ -176,12 +176,7 @@ static inline void x86_finalize_swtf(struct sw_trapframe *tf)
 	x86_swtf_clear_partial(tf);
 }
 
-static inline void x86_finalize_vmtf(struct vm_trapframe *tf)
-{
-	x86_vmtf_clear_partial(tf);
-	/* TODO: (VMCTX) */
-	panic("Not implemented");
-}
+void x86_finalize_vmtf(struct vm_trapframe *tf);
 
 /* Makes sure that the user context is fully saved into ctx and not split across
  * the struct and HW, meaning it is not a "partial context". */

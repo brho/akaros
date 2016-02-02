@@ -502,3 +502,42 @@ normal_syscall:
 	# return via pop_tf, never this path
 sysenter_spin:
 	jmp sysenter_spin
+
+.globl vmexit_handler;
+.type vmexit_handler, @function;
+vmexit_handler:
+	# rflags has all flags = 0, so cli and cld already.
+	# HOST_GS_BASE and RSP is set by the hardware
+	# Set default values.  Most of these will be set in C later.
+	pushq $0			# guest_pa
+	pushq $0			# guest_va
+	pushq $0			# intrinfo2 and 1
+	pushq $0			# exit_qual + exit_reason
+	pushq $0			# pad + trap_inject
+	pushq $0			# flags + guest_pcorid
+	pushq $0			# cr3
+	pushq $0			# cr2
+	pushq $0			# rsp
+	pushq $0			# rflags
+	pushq $0			# rip
+	# Save register state
+	pushq %r15
+	pushq %r14
+	pushq %r13
+	pushq %r12
+	pushq %r11
+	pushq %r10
+	pushq %r9
+	pushq %r8
+	pushq %rdi
+	pushq %rsi
+	pushq %rbp
+	pushq %rdx
+	pushq %rcx
+	pushq %rbx
+	pushq %rax
+	movq $0, %rbp			# so we can backtrace to this point
+	movq %rsp, %rdi
+	call handle_vmexit
+vmexit_spin:
+	jmp vmexit_spin
