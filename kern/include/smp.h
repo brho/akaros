@@ -39,7 +39,6 @@ struct per_cpu_info {
 	int coreid;					/* must be second */
 	struct vmcs *vmxarea;
 	int vmx_enabled;
-	void *local_vcpu;
 	int guest_pcoreid;
 #endif
 	spinlock_t lock;

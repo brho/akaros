@@ -84,17 +84,6 @@ int vm_post_interrupt(struct vmctl *v)
 	return -1;
 }
 
-int vm_run(struct vmctl *v)
-{
-	int vmx_launch(struct vmctl *v);
-	if (current->vmm.amd) {
-		return -1;
-	} else {
-		return vmx_launch(v);
-	}
-	return -1;
-}
-
 /* Initializes a process to run virtual machine contexts, returning the number
  * initialized, optionally setting errno */
 int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores,

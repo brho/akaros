@@ -91,7 +91,6 @@ static int writetime(char *, int);
 static int writebintime(char *, int);
 
 enum {
-	CMV,
 	CMbroken,
 	CMconsole,
 	CMhalt,
@@ -102,7 +101,6 @@ enum {
 
 
 struct cmdtab rebootmsg[] = {
-	{CMV, "V", 4},
 	{CMbroken, "broken", 0},
 	{CMconsole, "console", 1},
 	{CMhalt, "halt", 1},
@@ -1113,12 +1111,8 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 				ret = vm_post_interrupt(&vmctl);
 				n = ret;
 				//printk("vm_interrupt_notify returns %d\n", ret);
-			}
-			else {
-				ret = vm_run(&vmctl);
-				printd("vm_run returns %d\n", ret);
-				n = ret;
-				memmove(a, &vmctl, sizeof(vmctl));
+			} else {
+				error(EINVAL, "Bad vmctl command");
 			}
 			break;
 		case Qsysctl:
@@ -1147,26 +1141,6 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 				case CMnobroken:
 					keepbroken = 0;
 					break;
-				case CMV:
-					/* it's ok to throw away this struct each time;
-					 * this is stateless and going away soon anyway.
-					 * we only kept it here until we can rewrite all the
-					 * tests
-					 */
-					rip =  strtoul(cb->f[1], NULL, 0);
-					rsp =  strtoul(cb->f[2], NULL, 0);
-					cr3 =  strtoul(cb->f[3], NULL, 0);
-					if (cr3) {
-						vmctl.command = REG_RSP_RIP_CR3;
-						vmctl.cr3 = cr3;
-						vmctl.regs.tf_rip = rip;
-						vmctl.regs.tf_rsp = rsp;
-					} else {
-						vmctl.command = RESUME;
-					}
-					ret = vm_run(&vmctl);
-					printd("vm_run returns %d\n", ret);
-					n = ret;
 				case CMreboot:
 					reboot();
 					break;

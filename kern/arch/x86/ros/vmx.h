@@ -691,26 +691,13 @@ struct ldttss_desc64 {
 } __attribute__((packed));
 
 struct vmx_vcpu {
-
 	int cpu;
-	int launched;
-	struct hw_trapframe regs;
-	uint8_t  fail;
-	uint64_t exit_reason;
-	uint64_t host_rsp;
-
-	uint64_t cr2;
-
-	int shutdown;
-	int ret_code;
 	struct proc *proc;
-
 	struct msr_autoload {
 		unsigned nr;
 		struct vmx_msr_entry guest[NR_AUTOLOAD_MSRS];
 		struct vmx_msr_entry host[NR_AUTOLOAD_MSRS];
 	} msr_autoload;
-
 	struct vmcs *vmcs;
 };
 

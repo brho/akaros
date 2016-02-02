@@ -52,7 +52,6 @@ int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores,
 void __vmm_struct_cleanup(struct proc *p);
 
 int vm_post_interrupt(struct vmctl *v);
-int vm_run(struct vmctl *);
 int intel_vmx_start(int id);
 int intel_vmx_setup(int nvmcs);
 
