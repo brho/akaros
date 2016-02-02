@@ -37,7 +37,6 @@ struct per_cpu_info {
 #ifdef CONFIG_X86
 	uintptr_t stacktop;			/* must be first */
 	int coreid;					/* must be second */
-	struct vmcs *vmxarea;
 	int vmx_enabled;
 	int guest_pcoreid;
 #endif

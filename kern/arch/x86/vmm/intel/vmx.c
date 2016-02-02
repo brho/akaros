@@ -1203,29 +1203,6 @@ static int __vmx_enable(struct vmcs *vmxon_buf) {
 }
 
 /**
- * vmx_enable - enables VMX mode on the current CPU
- * @unused: not used (required for on_each_cpu())
- *
- * Sets up necessary state for enable (e.g. a scratchpad for VMXON.)
- */
-static void vmx_enable(void) {
-	struct vmcs *vmxon_buf = currentcpu->vmxarea;
-	int ret;
-
-	ret = __vmx_enable(vmxon_buf);
-	if (ret)
-		goto failed;
-
-	currentcpu->vmx_enabled = 1;
-
-	printk("VMX enabled on CPU %d\n", core_id());
-	return;
-
-failed:
-	printk("Failed to enable VMX on core %d, err = %d\n", core_id(), ret);
-}
-
-/**
  * vmx_disable - disables VMX mode on the current CPU
  */
 static void vmx_disable(void *unused) {
@@ -1256,17 +1233,6 @@ static bool probe_cpu_vmx(void) {
 		printk("Machine supports VT-x\n");
 		return TRUE;
 	}
-}
-
-static void setup_vmxarea(void) {
-	struct vmcs *vmxon_buf;
-	printd("Set up vmxarea for cpu %d\n", core_id());
-	vmxon_buf = __vmx_alloc_vmcs(core_id());
-	if (!vmxon_buf) {
-		printk("setup_vmxarea failed on node %d\n", core_id());
-		return;
-	}
-	currentcpu->vmxarea = vmxon_buf;
 }
 
 static int ept_init(void) {
@@ -1367,10 +1333,26 @@ int intel_vmm_init(void) {
 	return 0;
 }
 
-int intel_vmm_pcpu_init(void) {
-	setup_vmxarea();
-	vmx_enable();
+int intel_vmm_pcpu_init(void)
+{
+	struct vmcs *vmxon_buf;
+	int ret;
+
+	vmxon_buf = __vmx_alloc_vmcs(core_id());
+	if (!vmxon_buf) {
+		printk("setup_vmxarea failed on node %d\n", core_id());
+		return -1;
+	}
+
+	ret = __vmx_enable(vmxon_buf);
+	if (ret)
+		goto failed;
+	currentcpu->vmx_enabled = 1;
+	printk("VMX enabled on CPU %d\n", core_id());
 	return 0;
+failed:
+	printk("Failed to enable VMX on core %d, err = %d\n", core_id(), ret);
+	return ret;
 }
 
 
