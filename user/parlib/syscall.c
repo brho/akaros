@@ -57,8 +57,8 @@ void sys_yield(bool being_nice)
 	ros_syscall(SYS_yield, being_nice, 0, 0, 0, 0, 0);
 }
 
-int sys_proc_create(const char *path, size_t path_l, const char * const *argv,
-					const char * const *envp, int flags)
+int sys_proc_create(const char *path, size_t path_l, char *const argv[],
+                    char *const envp[], int flags)
 {
 	struct serialized_data *sd = serialize_argv_envp(argv, envp);
 	if (!sd) {

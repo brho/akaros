@@ -8,8 +8,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-struct serialized_data *serialize_argv_envp(const char * const *argv,
-                                            const char * const *envp)
+struct serialized_data *serialize_argv_envp(char *const argv[],
+                                            char *const envp[])
 {
 	size_t bufsize = 0;
 	size_t argc = 0, envc = 0;

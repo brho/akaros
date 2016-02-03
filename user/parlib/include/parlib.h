@@ -34,9 +34,8 @@ size_t      sys_getpcoreid(void);
 int         sys_getpid(void);
 int         sys_proc_destroy(int pid, int exitcode);
 void        sys_yield(bool being_nice);
-int         sys_proc_create(const char *path, size_t path_l,
-                            const char * const *argv, const char * const *envp,
-                            int flags);
+int         sys_proc_create(const char *path, size_t path_l, char *const argv[],
+                            char *const envp[], int flags);
 int         sys_proc_run(int pid);
 ssize_t     sys_shared_page_alloc(void **addr, pid_t p2, 
                                   int p1_flags, int p2_flags);
