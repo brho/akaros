@@ -1,0 +1,4 @@
+obj-y						+= fortuna.o
+obj-y						+= rijndael.o
+obj-y						+= sha2.o
+

@@ -39,10 +39,8 @@ Decrypt:	   498 cycles =    51.4 mbits/sec
 Mean:		   500 cycles =    51.2 mbits/sec
 
 */
-#include <u.h>
-#include <libc.h>
 
-#include "rijndael.h"
+#include <random/rijndael.h>
 
 #include "rijndael.tbl"
 

@@ -36,9 +36,7 @@
  * contrib/pgcrypto/sha2.c
  */
 
-#include "u.h"
-#include <libc.h>
-#include "sha2.h"
+#include <random/sha2.h>
 
 /*** SHA-256/512 Various Length Definitions ***********************/
 enum {
@@ -172,7 +170,7 @@ static const uint64_t sha512_initial_hash_value[8] = {
 /*** SHA-256: *********************************************************/
 void SHA256_Init(SHA256Ctx *context)
 {
-	if (context == nil)
+	if (context == NULL)
 		return;
 	memmove(context->state, sha256_initial_hash_value, SHA256DigestLength);
 	memset(context->buffer, 0, SHA256BlockLength);
@@ -340,7 +338,7 @@ static void SHA256_Last(SHA256Ctx *context)
 void SHA256_Final(uint8_t digest[], SHA256Ctx *context)
 {
 	/* If no digest buffer is passed, we don't bother doing this: */
-	if (digest != nil) {
+	if (digest != NULL) {
 		SHA256_Last(context);
 
 		memmove(digest, context->state, SHA256DigestLength);
@@ -353,7 +351,7 @@ void SHA256_Final(uint8_t digest[], SHA256Ctx *context)
 /*** SHA-512: *********************************************************/
 void SHA512_Init(SHA512Ctx *context)
 {
-	if (context == nil)
+	if (context == NULL)
 		return;
 	memmove(context->state, sha512_initial_hash_value, SHA512DigestLength);
 	memset(context->buffer, 0, SHA512_block_length);
@@ -525,7 +523,7 @@ static void SHA512_Last(SHA512Ctx *context)
 void SHA512_Final(uint8_t digest[], SHA512Ctx *context)
 {
 	/* If no digest buffer is passed, we don't bother doing this: */
-	if (digest != nil) {
+	if (digest != NULL) {
 		SHA512_Last(context);
 
 		/* Save the hash data for output: */
@@ -539,7 +537,7 @@ void SHA512_Final(uint8_t digest[], SHA512Ctx *context)
 /*** SHA-384: *********************************************************/
 void SHA384_Init(SHA384Ctx *context)
 {
-	if (context == nil)
+	if (context == NULL)
 		return;
 	memmove(context->state, sha384_initial_hash_value, SHA512DigestLength);
 	memset(context->buffer, 0, SHA384BlockLength);
@@ -554,7 +552,7 @@ void SHA384_Update(SHA384Ctx *context, const uint8_t *data, size_t len)
 void SHA384_Final(uint8_t digest[], SHA384Ctx *context)
 {
 	/* If no digest buffer is passed, we don't bother doing this: */
-	if (digest != nil) {
+	if (digest != NULL) {
 		SHA512_Last((SHA512Ctx *)context);
 
 		/* Save the hash data for output: */
@@ -568,7 +566,7 @@ void SHA384_Final(uint8_t digest[], SHA384Ctx *context)
 /*** SHA-224: *********************************************************/
 void SHA224_Init(SHA224Ctx *context)
 {
-	if (context == nil)
+	if (context == NULL)
 		return;
 	memmove(context->state, sha224_initial_hash_value, SHA256DigestLength);
 	memset(context->buffer, 0, SHA256BlockLength);
@@ -583,7 +581,7 @@ void SHA224_Update(SHA224Ctx *context, const uint8_t *data, size_t len)
 void SHA224_Final(uint8_t digest[], SHA224Ctx *context)
 {
 	/* If no digest buffer is passed, we don't bother doing this: */
-	if (digest != nil) {
+	if (digest != NULL) {
 		SHA256_Last(context);
 
 		memmove(digest, context->state, SHA224DigestLength);

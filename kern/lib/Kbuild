@@ -4,3 +4,4 @@ obj-y						+= slice.o
 obj-y						+= sort.o
 obj-y						+= zlib_deflate/
 obj-y						+= zlib_inflate/
+obj-y						+= random/

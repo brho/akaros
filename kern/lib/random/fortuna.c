@@ -29,14 +29,13 @@
  * contrib/pgcrypto/fortuna.c
  */
 
-#include <u.h>
-#include <rijndael.h>
-#include <sha2.h>
+#include <arch/arch.h>
+#include <time.h>
 
-#include "../port/lib.h"
-#include "mem.h"
-#include "dat.h"
-#include "fns.h"
+#include <random/fortuna.h>
+#include <random/rijndael.h>
+#include <random/sha2.h>
+
 
 /*
  * Why Fortuna-like: There does not seem to be any definitive reference
@@ -210,7 +209,7 @@ static int enough_time_passed(FState *st)
 	int32_t now;
 	int32_t last = st->lastReseedTime;
 
-	now = seconds();
+	now = tsc2sec(read_tsc());
 
 	/* check how much time has passed */
 	ok = 0;
