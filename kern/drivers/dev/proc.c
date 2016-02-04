@@ -828,11 +828,11 @@ static int eventsavailable(void *)
 #endif
 static long procread(struct chan *c, void *va, long n, int64_t off)
 {
-	ERRSTACK(5);
+	ERRSTACK(1);
 	struct proc *p;
 	long l, r;
 	int i, j, navail, pid, rsize;
-	char flag[10], *sps, *srv, statbuf[512];
+	char flag[10], *sps, *srv;
 	uintptr_t offset, u;
 	int tesz;
 	uint8_t *rptr;
@@ -848,37 +848,6 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 	}
 
 	offset = off;
-#if 0
-	if (QID(c->qid) == Qtrace) {
-		if (!eventsavailable(NULL))
-			return 0;
-
-		rptr = va;
-		tesz = BIT32SZ + BIT32SZ + BIT64SZ + BIT32SZ;
-		navail = tproduced - tconsumed;
-		if (navail > n / tesz)
-			navail = n / tesz;
-		while (navail > 0) {
-			PBIT32(rptr, tevents[tconsumed & Emask].pid);
-			rptr += BIT32SZ;
-			PBIT32(rptr, tevents[tconsumed & Emask].etype);
-			rptr += BIT32SZ;
-			PBIT64(rptr, tevents[tconsumed & Emask].time);
-			rptr += BIT64SZ;
-			PBIT32(rptr, tevents[tconsumed & Emask].core);
-			rptr += BIT32SZ;
-			tconsumed++;
-			navail--;
-		}
-		return rptr - (uint8_t *) va;
-	}
-
-	if (QID(c->qid) == Qtracepids)
-		if (tpids == NULL)
-			return 0;
-		else
-			return readstr(off, va, n, tpids);
-#endif
 	/* Some shit in proc doesn't need to grab the reference.  For strace, we
 	 * already have the chan open, and all we want to do is read the queue,
 	 * which exists because of our kref on it. */
@@ -900,273 +869,6 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 		default:
 			kref_put(&p->p_kref);
 			break;
-#if 0
-#warning check refcnting in here
-		case Qargs:
-			qlock(&p->debug);
-			j = procargs(p, current->genbuf, sizeof current->genbuf);
-			qunlock(&p->debug);
-			kref_put(&p->p_kref);
-			if (offset >= j)
-				return 0;
-			if (offset + n > j)
-				n = j - offset;
-			memmove(va, &current->genbuf[offset], n);
-			return n;
-
-		case Qsyscall:
-			if (p->syscalltrace == NULL)
-				return 0;
-			return readstr(offset, va, n, p->syscalltrace);
-
-		case Qcore:
-			i = 0;
-			ac = p->ac;
-			wired = p->wired;
-			if (ac != NULL)
-				i = ac->machno;
-			else if (wired != NULL)
-				i = wired->machno;
-			snprint(statbuf, sizeof statbuf, "%d\n", i);
-			return readstr(offset, va, n, statbuf);
-
-		case Qmem:
-			if (offset < KZERO
-				|| (offset >= USTKTOP - USTKSIZE && offset < USTKTOP)) {
-				r = procctlmemio(p, offset, n, va, 1);
-				kref_put(&p->p_kref);
-				return r;
-			}
-
-			if (!iseve()) {
-				kref_put(&p->p_kref);
-				error(EPERM, ERROR_FIXME);
-			}
-
-			/* validate kernel addresses */
-			if (offset < PTR2UINT(end)) {
-				if (offset + n > PTR2UINT(end))
-					n = PTR2UINT(end) - offset;
-				memmove(va, UINT2PTR(offset), n);
-				kref_put(&p->p_kref);
-				return n;
-			}
-			for (i = 0; i < nelem(conf.mem); i++) {
-				cm = &conf.mem[i];
-				/* klimit-1 because klimit might be zero! */
-				if (cm->kbase <= offset && offset <= cm->klimit - 1) {
-					if (offset + n >= cm->klimit - 1)
-						n = cm->klimit - offset;
-					memmove(va, UINT2PTR(offset), n);
-					kref_put(&p->p_kref);
-					return n;
-				}
-			}
-			kref_put(&p->p_kref);
-			error(EINVAL, ERROR_FIXME);
-
-		case Qprofile:
-			s = p->seg[TSEG];
-			if (s == 0 || s->profile == 0)
-				error(EFAIL, "profile is off");
-			i = (s->top - s->base) >> LRESPROF;
-			i *= sizeof(*s->profile);
-			if (offset >= i) {
-				kref_put(&p->p_kref);
-				return 0;
-			}
-			if (offset + n > i)
-				n = i - offset;
-			memmove(va, ((char *)s->profile) + offset, n);
-			kref_put(&p->p_kref);
-			return n;
-
-		case Qnote:
-			qlock(&p->debug);
-			if (waserror()) {
-				qunlock(&p->debug);
-				kref_put(&p->p_kref);
-				nexterror();
-			}
-			if (p->pid != PID(c->qid))
-				error(ESRCH, ERROR_FIXME);
-			if (n < 1)	/* must accept at least the '\0' */
-				error(ENAMETOOLONG, ERROR_FIXME);
-			if (p->nnote == 0)
-				n = 0;
-			else {
-				i = strlen(p->note[0].msg) + 1;
-				if (i > n)
-					i = n;
-				rptr = va;
-				memmove(rptr, p->note[0].msg, i);
-				rptr[i - 1] = '\0';
-				p->nnote--;
-				memmove(p->note, p->note + 1, p->nnote * sizeof(Note));
-				n = i;
-			}
-			if (p->nnote == 0)
-				p->notepending = 0;
-			poperror();
-			qunlock(&p->debug);
-			kref_put(&p->p_kref);
-			return n;
-
-		case Qproc:
-			if (offset >= sizeof(struct proc)) {
-				kref_put(&p->p_kref);
-				return 0;
-			}
-			if (offset + n > sizeof(struct proc))
-				n = sizeof(struct proc) - offset;
-			memmove(va, ((char *)p) + offset, n);
-			kref_put(&p->p_kref);
-			return n;
-
-		case Qregs:
-			rptr = (uint8_t *) p->dbgreg;
-			rsize = sizeof(Ureg);
-regread:
-			if (rptr == 0) {
-				kref_put(&p->p_kref);
-				error(ENODATA, ERROR_FIXME);
-			}
-			if (offset >= rsize) {
-				kref_put(&p->p_kref);
-				return 0;
-			}
-			if (offset + n > rsize)
-				n = rsize - offset;
-			memmove(va, rptr + offset, n);
-			kref_put(&p->p_kref);
-			return n;
-
-		case Qkregs:
-			memset(&kur, 0, sizeof(Ureg));
-			setkernur(&kur, p);
-			rptr = (uint8_t *) & kur;
-			rsize = sizeof(Ureg);
-			goto regread;
-
-		case Qfpregs:
-			r = fpudevprocio(p, va, n, offset, 0);
-			kref_put(&p->p_kref);
-			return r;
-
-		case Qstatus:
-			if (offset >= STATSIZE) {
-				kref_put(&p->p_kref);
-				return 0;
-			}
-			if (offset + n > STATSIZE)
-				n = STATSIZE - offset;
-
-			sps = p->psstate;
-			if (sps == 0)
-				sps = statename[p->state];
-			memset(statbuf, ' ', sizeof statbuf);
-			j = 2 * KNAMELEN + 12;
-			snprint(statbuf, j + 1, "%-*.*s%-*.*s%-12.11s",
-					KNAMELEN, KNAMELEN - 1, p->text,
-					KNAMELEN, KNAMELEN - 1, p->user, sps);
-
-			for (i = 0; i < 6; i++) {
-				l = p->time[i];
-				if (i == TReal)
-					l = sys->ticks - l;
-				l = TK2MS(l);
-				readnum(0, statbuf + j + NUMSIZE * i, NUMSIZE, l, NUMSIZE);
-			}
-			/* ignore stack, which is mostly non-existent */
-			u = 0;
-			for (i = 1; i < NSEG; i++) {
-				s = p->seg[i];
-				if (s)
-					u += s->top - s->base;
-			}
-			readnum(0, statbuf + j + NUMSIZE * 6, NUMSIZE, u >> 10u, NUMSIZE);	/* wrong size */
-			readnum(0, statbuf + j + NUMSIZE * 7, NUMSIZE, p->basepri, NUMSIZE);
-			readnum(0, statbuf + j + NUMSIZE * 8, NUMSIZE, p->priority,
-					NUMSIZE);
-
-			/*
-			 * NIX: added # of traps, syscalls, and iccs
-			 */
-			readnum(0, statbuf + j + NUMSIZE * 9, NUMSIZE, p->ntrap, NUMSIZE);
-			readnum(0, statbuf + j + NUMSIZE * 10, NUMSIZE, p->nintr, NUMSIZE);
-			readnum(0, statbuf + j + NUMSIZE * 11, NUMSIZE, p->nsyscall,
-					NUMSIZE);
-			readnum(0, statbuf + j + NUMSIZE * 12, NUMSIZE, p->nicc, NUMSIZE);
-			readnum(0, statbuf + j + NUMSIZE * 13, NUMSIZE, p->nactrap,
-					NUMSIZE);
-			readnum(0, statbuf + j + NUMSIZE * 14, NUMSIZE, p->nacsyscall,
-					NUMSIZE);
-			memmove(va, statbuf + offset, n);
-			kref_put(&p->p_kref);
-			return n;
-
-		case Qsegment:
-			j = 0;
-			for (i = 0; i < NSEG; i++) {
-				sg = p->seg[i];
-				if (sg == 0)
-					continue;
-				j += sprint(statbuf + j, "%-6s %c%c %p %p %4d\n",
-							sname[sg->type & SG_TYPE],
-							sg->type & SG_RONLY ? 'R' : ' ',
-							sg->profile ? 'P' : ' ',
-							sg->base, sg->top, sg->ref);
-			}
-			kref_put(&p->p_kref);
-			if (offset >= j)
-				return 0;
-			if (offset + n > j)
-				n = j - offset;
-			if (n == 0 && offset == 0)
-				exhausted("segments");
-			memmove(va, &statbuf[offset], n);
-			return n;
-
-		case Qwait:
-			if (!canqlock(&p->qwaitr)) {
-				kref_put(&p->p_kref);
-				error(EBUSY, ERROR_FIXME);
-			}
-
-			if (waserror()) {
-				qunlock(&p->qwaitr);
-				kref_put(&p->p_kref);
-				nexterror();
-			}
-
-			lock(&p->exl);
-			if (up == p && p->nchild == 0 && p->waitq == 0) {
-				unlock(&p->exl);
-				error(ECHILD, ERROR_FIXME);
-			}
-			pid = p->pid;
-			while (p->waitq == 0) {
-				unlock(&p->exl);
-				rendez_sleep(&p->waitr, haswaitq, p);
-				if (p->pid != pid)
-					error(ESRCH, ERROR_FIXME);
-				lock(&p->exl);
-			}
-			wq = p->waitq;
-			p->waitq = wq->next;
-			p->nwait--;
-			unlock(&p->exl);
-
-			poperror();
-			qunlock(&p->qwaitr);
-			kref_put(&p->p_kref);
-			n = snprint(va, n, "%d %lu %lud %lud %q",
-						wq->w.pid,
-						wq->w.time[TUser], wq->w.time[TSys], wq->w.time[TReal],
-						wq->w.msg);
-			kfree(wq);
-			return n;
-#endif
 		case Qstatus:{
 				/* the old code grew the stack and was hideous.
 				 * status is not a high frequency operation; just malloc. */
@@ -1190,21 +892,24 @@ regread:
 
 		case Qvmstatus:
 			{
-				char buf[50*65 + 2];
+				size_t buflen = 50 * 65 + 2;
+				char *buf = kmalloc(buflen, KMALLOC_WAIT);
 				int i, offset;
-				offset=0;
-				offset += snprintf(buf+offset, sizeof(buf)-offset, "{\n");
+				offset = 0;
+				offset += snprintf(buf + offset, buflen - offset, "{\n");
 				for (i = 0; i < 65; i++) {
 					if (p->vmm.vmexits[i] != 0) {
-						offset += snprintf(buf+offset, sizeof(buf)-offset,
+						offset += snprintf(buf + offset, buflen - offset,
 						                   "\"%s\":\"%lld\",\n",
 						                   VMX_EXIT_REASON_NAMES[i],
 						                   p->vmm.vmexits[i]);
 					}
 				}
-				offset += snprintf(buf+offset, sizeof(buf)-offset, "}\n");
+				offset += snprintf(buf + offset, buflen - offset, "}\n");
 				kref_put(&p->p_kref);
-				return readstr(off, va, n, buf);
+				n = readstr(off, va, n, buf);
+				kfree(buf);
+				return n;
 			}
 		case Qns:
 			//qlock(&p->debug);
@@ -1246,19 +951,7 @@ regread:
 			//qunlock(&p->debug);
 			kref_put(&p->p_kref);
 			return i;
-#if 0
-		case Qnoteid:
-			r = readnum(offset, va, n, p->noteid, NUMSIZE);
-			kref_put(&p->p_kref);
-			return r;
-		case Qfd:
-			r = procfds(p, va, n, offset);
-			kref_put(&p->p_kref);
-			return r;
-#endif
 	}
-
-
 	error(EINVAL, "QID %d did not match any QIDs for #proc", QID(c->qid));
 	return 0;	/* not reached */
 }
