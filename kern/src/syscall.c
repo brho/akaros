@@ -90,8 +90,11 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace)
 	return len;
 }
 
+/* On enter, we have !trace, a sysc, and retval is meaningless.  On exit, we had
+ * trace, retval and !sysc */
 static struct systrace_record *sctrace(struct systrace_record *trace,
-                                       struct proc *p, struct syscall *sysc)
+                                       struct proc *p, struct syscall *sysc,
+                                       long retval)
 {
 	int n;
 	uintreg_t cp = 0;
@@ -143,14 +146,13 @@ static struct systrace_record *sctrace(struct systrace_record *trace,
 		}
 	} else {
 		trace->end_timestamp = read_tsc();
-		trace->retval = sysc->retval;
-		switch (sysc->num) {
+		trace->retval = retval;
+		switch (trace->syscallno) {
 		case SYS_read:
-			cp = sysc->arg1;
-			datalen = sysc->retval < 0 ? 0 : sysc->retval;
+			cp = trace->arg1;
+			datalen = retval < 0 ? 0 : retval;
 			break;
 		}
-
 	}
 
 	trace->datalen = MIN(sizeof(trace->data), datalen);
@@ -167,7 +169,9 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 	struct proc *p = current;
 
 	if (p->strace_on)
-		kthread->strace = sctrace(NULL, p, sysc);
+		kthread->strace = sctrace(NULL, p, sysc, 0);
+	else
+		kthread->strace = 0;
 
 	/* TODO: merge these two types of tracing, or just remove this old one */
 	if (!__trace_this_proc(p))
@@ -220,7 +224,7 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 	}
 	/* TODO: merge with or remove the old tracer */
 	if (kthread->strace) {
-		sctrace(kthread->strace, current, kthread->sysc);
+		sctrace(kthread->strace, current, 0, retval);
 		kfree(kthread->strace);
 		kthread->strace = 0;
 	}
