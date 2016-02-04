@@ -847,8 +847,6 @@ int qwrite(struct queue *, void *, int);
 typedef void (*qio_wake_cb_t)(struct queue *q, void *data, int filter);
 void qio_set_wake_cb(struct queue *q, qio_wake_cb_t func, void *data);
 
-void randominit(void);
-uint32_t randomread(void *, uint32_t);
 void *realloc(void *, uint32_t);
 int readmem(unsigned long offset, char *buf, unsigned long n,
 			void *mem, size_t mem_len);

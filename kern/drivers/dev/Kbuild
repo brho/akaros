@@ -9,6 +9,7 @@ obj-y						+= mnt.o
 #obj-y						+= pci.o
 obj-y						+= pipe.o
 obj-y						+= proc.o
+obj-y						+= random.o
 obj-$(CONFIG_REGRESS)				+= regress.o
 obj-y						+= root.o
 obj-y						+= srv.o

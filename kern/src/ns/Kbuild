@@ -13,7 +13,6 @@ obj-y						+= getfields.o
 obj-y						+= parse.o
 obj-y						+= pgrp.o
 obj-y						+= qio.o
-obj-y						+= random.o
 obj-y						+= sysfile.o
 obj-y						+= tokenize.o
 obj-y						+= util.o

@@ -84,7 +84,6 @@ static struct {
 char *sysname;
 int64_t fasthz;
 
-static void seedrand(void);
 static int readtime(uint32_t, char *, int);
 static int readbintime(char *, int);
 static int writetime(char *, int);
@@ -599,14 +598,12 @@ enum {
 	Qpgrpid,
 	Qpid,
 	Qppid,
-	Qrandom,
 	Qreboot,
 	Qswap,
 	Qsysctl,
 	Qsysname,
 	Qsysstat,
 	Qtime,
-	Qurandom,
 	Quser,
 	Qvmctl,
 	Qzero,
@@ -635,14 +632,12 @@ static struct dirtab consdir[] = {
 	{"pgrpid", {Qpgrpid}, NUMSIZE, 0444},
 	{"pid", {Qpid}, NUMSIZE, 0444},
 	{"ppid", {Qppid}, NUMSIZE, 0444},
-	{"random", {Qrandom}, 0, 0444},
 	{"reboot", {Qreboot}, 0, 0660},
 	{"swap", {Qswap}, 0, 0664},
 	{"sysctl", {Qsysctl}, 0, 0666},
 	{"sysname", {Qsysname}, 0, 0664},
 	{"sysstat", {Qsysstat}, 0, 0666},
 	{"time", {Qtime}, NUMSIZE + 3 * VLNUMSIZE, 0664},
-	{"urandom", {Qurandom}, 0, 0444},
 	{"user", {Quser}, 0, 0666},
 	{"vmctl", {Qvmctl}, 0, 0666},
 	{"zero", {Qzero}, 0, 0444},
@@ -680,7 +675,6 @@ static void consinit(void)
 #if 0
 	todinit();
 #endif
-	randominit();
 	/*
 	 * at 115200 baud, the 1024 char buffer takes 56 ms to process,
 	 * processing it every 22 ms should be fine
@@ -964,10 +958,6 @@ static long consread(struct chan *c, void *buf, long n, int64_t off)
 				return 0;
 			return consreadstr((uint32_t) offset, buf, n, sysname);
 
-		case Qrandom:
-		case Qurandom:
-			return randomread(buf, n);
-
 		case Qdrivers:
 			b = kzmalloc(READSTR, 0);
 			if (b == NULL)
@@ -1231,31 +1221,6 @@ struct dev consdevtab __devtab = {
 static char *devname(void)
 {
 	return consdevtab.name;
-}
-
-static uint32_t randn;
-
-static void seedrand(void)
-{
-	ERRSTACK(2);
-	if (!waserror()) {
-		randomread((void *)&randn, sizeof(randn));
-		poperror();
-	}
-}
-
-int nrand(int n)
-{
-	if (randn == 0)
-		seedrand();
-	randn = randn * 1103515245 + 12345 + read_tsc();
-	return (randn >> 16) % n;
-}
-
-int rand(void)
-{
-	nrand(1);
-	return randn;
 }
 
 static uint64_t uvorder = 0x0001020304050607ULL;
