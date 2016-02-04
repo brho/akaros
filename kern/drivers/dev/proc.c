@@ -879,6 +879,16 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 		else
 			return readstr(off, va, n, tpids);
 #endif
+	/* Some shit in proc doesn't need to grab the reference.  For strace, we
+	 * already have the chan open, and all we want to do is read the queue,
+	 * which exists because of our kref on it. */
+	switch (QID(c->qid)) {
+		case Qstrace:
+			s = c->aux;
+			n = qread(s->q, va, n);
+			return n;
+	}
+
 	if ((p = pid2proc(SLOT(c->qid))) == NULL)
 		error(ESRCH, "%d: no such process", SLOT(c->qid));
 	if (p->pid != PID(c->qid)) {
@@ -1157,15 +1167,6 @@ regread:
 			kfree(wq);
 			return n;
 #endif
-		case Qstrace:
-			s = c->aux;
-			/* We need to decref, so that p can get freed while we are blocked
-			 * on the qread.  in proc_free, the strace is released that will
-			 * qhangup that will wake us up. */
-			kref_put(&p->p_kref);
-			n = qread(s->q, va, n);
-			return n;
-
 		case Qstatus:{
 				/* the old code grew the stack and was hideous.
 				 * status is not a high frequency operation; just malloc. */
@@ -1519,8 +1520,15 @@ void procctlclosefiles(struct proc *p, int all, int fd)
 static void strace_shutdown(struct kref *a)
 {
 	struct strace *strace = container_of(a, struct strace, procs);
+	static const char base_msg[] = "Traced ~%lu syscs, Dropped %lu";
+	size_t msg_len = NUMSIZE64 * 2 + sizeof(base_msg);
+	char *msg = kmalloc(msg_len, 0);
 
-	qhangup(strace->q, "No more traces");
+	if (msg)
+		snprintf(msg, msg_len, base_msg, strace->appx_nr_sysc,
+		         atomic_read(&strace->nr_drops));
+	qhangup(strace->q, msg);
+	kfree(msg);
 }
 
 static void strace_release(struct kref *a)
@@ -1555,7 +1563,7 @@ static void procctlreq(struct proc *p, char *va, int n)
 	case CMstraceme:
 		/* common allocation.  if we inherited, we might have one already */
 		if (!p->strace) {
-			strace = kmalloc(sizeof(*p->strace), KMALLOC_WAIT);
+			strace = kzmalloc(sizeof(*p->strace), KMALLOC_WAIT);
 			strace->q = qopen(65536, Qdropoverflow|Qcoalesce, NULL, NULL);
 			/* both of these refs are put when the proc is freed.  procs is for
 			 * every process that has this p->strace.  users is procs + every

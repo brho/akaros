@@ -83,11 +83,10 @@ void main(int argc, char **argv, char **envp)
 	sys_proc_run(pid);
 
 	while ((amt = read(fd, buf, sizeof(buf))) > 0) {
-		if (write(1, buf, amt) < amt) {
+		if (write(fileno(stderr), buf, amt) < amt) {
 			fprintf(stderr, "Write to stdout: %r\n");
 			exit(1);
 		}
 	}
-	if ((amt < 0) && (errno != ESRCH))
-		fprintf(stderr, "Read fd %d for %s: %r\n", fd, p);
+	fprintf(stderr, "strace of PID %d: %r\n", pid);
 }

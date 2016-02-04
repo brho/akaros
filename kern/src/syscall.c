@@ -103,13 +103,23 @@ static struct systrace_record *sctrace(struct systrace_record *trace,
 	assert(p->strace);
 
 	if (!trace) {
+		/* We're using qiwrite, which has no flow control.  We'll do it
+		 * manually. */
+		if (qfull(p->strace->q)) {
+			atomic_inc(&p->strace->nr_drops);
+			return NULL;
+		}
 		// TODO: could we allocb and then write that block?
 		// Still, if we're tracing, we take a hit, and this is so
 		// much more efficient than strace it's not clear we care.
 		trace = kmalloc(SYSTR_BUF_SZ, 0);
 
-		if (!trace)
+		if (!trace) {
+			atomic_inc(&p->strace->nr_drops);
 			return NULL;
+		}
+		/* Avoiding the atomic op.  We sacrifice accuracy for less overhead. */
+		p->strace->appx_nr_sysc++;
 
 		int coreid, vcoreid;
 		struct proc *p = current;
@@ -158,7 +168,7 @@ static struct systrace_record *sctrace(struct systrace_record *trace,
 	trace->datalen = MIN(sizeof(trace->data), datalen);
 	memmove(trace->data, (void *)cp, trace->datalen);
 	n = systrace_fill_pretty_buf(trace);
-	qwrite(p->strace->q, trace->pretty_buf, n);
+	qiwrite(p->strace->q, trace->pretty_buf, n);
 	return trace;
 }
 

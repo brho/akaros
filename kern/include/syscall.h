@@ -43,9 +43,10 @@ struct systrace_record {
 };
 
 struct strace {
-	bool opened;
 	bool tracing;
 	bool inherit;
+	atomic_t nr_drops;
+	unsigned long appx_nr_sysc;
 	struct kref procs; /* when procs goes to zero, q is hung up. */
 	struct kref users; /* when users goes to zero, q and struct are freed. */
 	struct queue *q;
