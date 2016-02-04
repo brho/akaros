@@ -207,25 +207,3 @@ struct dev randomdevtab __devtab = {
 	.power = devpower,
 	.chaninfo = devchaninfo,
 };
-
-/* This is something used by the TCP stack.
- * I have no idea of why these numbers were chosen. */
-static uint32_t randn;
-
-static void seedrand(void)
-{
-	ERRSTACK(2);
-	if (!waserror()) {
-		_randomread((void *)&randn, sizeof(randn));
-		poperror();
-	}
-}
-
-int nrand(int n)
-{
-	if (randn == 0)
-		seedrand();
-	randn = randn * 1103515245 + 12345 + read_tsc();
-	return (randn >> 16) % n;
-}
-

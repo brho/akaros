@@ -792,7 +792,6 @@ char *nextelem(char *unused_char_p_t, char *);
 
 struct cname *newcname(char *unused_char_p_t);
 void notkilled(void);
-int nrand(int);
 uint32_t random_read(void *xp, uint32_t n);
 uint32_t urandom_read(void *xp, uint32_t n);
 uint64_t ns2fastticks(uint64_t);

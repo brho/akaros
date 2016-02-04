@@ -916,7 +916,7 @@ static void setlport(struct conv *c)
 				*pp = 600;
 		} else
 			while (*pp < 5000)
-				*pp = nrand(1 << 15);
+				urandom_read(pp, sizeof(*pp));
 
 		found = 0;
 		for (x = 0; x < p->nc; x++) {

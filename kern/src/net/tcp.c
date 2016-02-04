@@ -1235,7 +1235,7 @@ int ntohtcp4(Tcp * tcph, struct block **bpp)
  */
 void tcpsndsyn(struct conv *s, Tcpctl * tcb)
 {
-	tcb->iss = (nrand(1 << 16) << 16) | nrand(1 << 16);
+	urandom_read(&tcb->iss, sizeof(tcb->iss));
 	tcb->rttseq = tcb->iss;
 	tcb->snd.wl2 = tcb->iss;
 	tcb->snd.una = tcb->iss;
@@ -1508,7 +1508,7 @@ limbo(struct conv *s, uint8_t * source, uint8_t * dest, Tcp * seg, int version)
 		lp->mss = seg->mss;
 		lp->rcvscale = seg->ws;
 		lp->irs = seg->seq;
-		lp->iss = (nrand(1 << 16) << 16) | nrand(1 << 16);
+		urandom_read(&lp->iss, sizeof(lp->iss));
 	}
 
 	if (sndsynack(s->p, lp) < 0) {
@@ -2680,7 +2680,7 @@ void tcpsendka(struct conv *s)
 	seg.mss = 0;
 	seg.ws = 0;
 	if (tcpporthogdefense)
-		seg.seq = tcb->snd.una - (1 << 30) - nrand(1 << 20);
+		urandom_read(&seg.seq, sizeof(seg.seq));
 	else
 		seg.seq = tcb->snd.una - 1;
 	seg.ack = tcb->rcv.nxt;
