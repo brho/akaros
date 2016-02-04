@@ -47,7 +47,7 @@ void random_add(void *xp)
 /*
  *  consume random bytes
  */
-static uint32_t _randomread(void *xp, uint32_t n)
+uint32_t random_read(void *xp, uint32_t n)
 {
 	ERRSTACK(1);
 
@@ -69,17 +69,18 @@ static uint32_t _randomread(void *xp, uint32_t n)
 /**
  * Fast random generator
  **/
-uint32_t urandomread(void *xp, uint32_t n)
+uint32_t urandom_read(void *xp, uint32_t n)
 {
-	ERRSTACK(1);
 	uint64_t seed[16];
 	uint8_t *e, *p;
 	uint32_t x = 0;
 	uint64_t s0;
 	uint64_t s1;
 
+	if (n <= sizeof(seed))
+		return random_read(xp, n);
 	// The initial seed is from a good random pool.
-	_randomread(seed, sizeof(seed));
+	random_read(seed, sizeof(seed));
 	p = xp;
 	for (e = p + n; p < e;) {
 		s0 = seed[x];
@@ -157,9 +158,9 @@ static long randomread(struct chan *c, void *va, long n, int64_t ignored)
 			return devdirread(c, va, n, randomdir,
 					  ARRAY_SIZE(randomdir), devgen);
 		case Qrandom:
-			return _randomread(va, n);
+			return random_read(va, n);
 		case Qurandom:
-			return urandomread(va, n);
+			return urandom_read(va, n);
 		default:
 			panic("randomread: qid %d is impossible", c->qid.path);
 	}
