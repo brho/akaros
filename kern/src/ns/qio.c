@@ -2032,7 +2032,7 @@ void qflush(struct queue *q)
 
 int qfull(struct queue *q)
 {
-	return q->state & Qflow;
+	return q->len >= q->limit;
 }
 
 int qstate(struct queue *q)
