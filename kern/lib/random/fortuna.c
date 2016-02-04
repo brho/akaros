@@ -29,7 +29,6 @@
  * contrib/pgcrypto/fortuna.c
  */
 
-
 #include <u.h>
 #include <rijndael.h>
 #include <sha2.h>
@@ -38,9 +37,6 @@
 #include "mem.h"
 #include "dat.h"
 #include "fns.h"
-
-
-
 
 /*
  * Why Fortuna-like: There does not seem to be any definitive reference
@@ -70,7 +66,6 @@
  * results, but continuing with old state.
  */
 
-
 /*
  * Algorithm parameters
  */
@@ -89,54 +84,49 @@
  * In our case the minimal cycle time would be bit longer
  * than the system-randomness feeding frequency.
  */
-enum{
-	numPools	= 23,
+enum {
+	numPools = 23,
 
 	/* in microseconds */
-	reseedInterval = 100000,	/* 0.1 sec */
+	reseedInterval = 100000, /* 0.1 sec */
 
 	/* for one big request, reseed after this many bytes */
-	reseedBytes	= (1024*1024),
+	reseedBytes = (1024 * 1024),
 
 	/*
 	* Skip reseed if pool 0 has less than this many
 	* bytes added since last reseed.
 	*/
-	pool0Fill		= (256/8),
+	pool0Fill = (256 / 8),
 
-/*
-* Algorithm constants
-*/
+	/*
+	* Algorithm constants
+	*/
 
 	/* Both cipher key size and hash result size */
-	block			= 32,
+	block = 32,
 
 	/* cipher block size */
-	ciphBlock		= 16
+	ciphBlock = 16
 };
-
-
-
 
 /* for internal wrappers */
 typedef SHA256Ctx mdCtx;
 typedef rijndaelCtx ciphCtx;
 
-struct FState
-{
-	uint8_t		counter[ciphBlock];
-	uint8_t		result[ciphBlock];
-	uint8_t		key[block];
-	mdCtx		pool[numPools];
-	ciphCtx		ciph;
-	unsigned	reseedCount;
-	int32_t 	lastReseedTime;
-	unsigned	pool0Bytes;
-	unsigned	rndPos;
-	int			tricksDone;
+struct FState {
+	uint8_t counter[ciphBlock];
+	uint8_t result[ciphBlock];
+	uint8_t key[block];
+	mdCtx pool[numPools];
+	ciphCtx ciph;
+	unsigned reseedCount;
+	int32_t lastReseedTime;
+	unsigned pool0Bytes;
+	unsigned rndPos;
+	int tricksDone;
 };
 typedef struct FState FState;
-
 
 /*
  * Use our own wrappers here.
@@ -146,34 +136,26 @@ typedef struct FState FState;
  * - No memory allocations.
  */
 
-static void
-ciph_init(ciphCtx * ctx, const uint8_t *key, int klen)
+static void ciph_init(ciphCtx *ctx, const uint8_t *key, int klen)
 {
-	rijndael_set_key(ctx, (const uint32_t *) key, klen, 1);
+	rijndael_set_key(ctx, (const uint32_t *)key, klen, 1);
 }
 
-static void
-ciph_encrypt(ciphCtx * ctx, const uint8_t *in, uint8_t *out)
+static void ciph_encrypt(ciphCtx *ctx, const uint8_t *in, uint8_t *out)
 {
-	rijndael_encrypt(ctx, (const uint32_t *) in, (uint32_t *) out);
+	rijndael_encrypt(ctx, (const uint32_t *)in, (uint32_t *)out);
 }
 
-static void
-md_init(mdCtx * ctx)
-{
-	SHA256_Init(ctx);
-}
+static void md_init(mdCtx *ctx) { SHA256_Init(ctx); }
 
-static void
-md_update(mdCtx * ctx, const uint8_t *data, int len)
+static void md_update(mdCtx *ctx, const uint8_t *data, int len)
 {
 	SHA256_Update(ctx, data, len);
 }
 
-static void
-md_result(mdCtx * ctx, uint8_t *dst)
+static void md_result(mdCtx *ctx, uint8_t *dst)
 {
-	SHA256Ctx	tmp;
+	SHA256Ctx tmp;
 
 	memmove(&tmp, ctx, sizeof(*ctx));
 	SHA256_Final(dst, &tmp);
@@ -183,10 +165,9 @@ md_result(mdCtx * ctx, uint8_t *dst)
 /*
  * initialize state
  */
-static void
-init_state(FState *st)
+static void init_state(FState *st)
 {
-	int			i;
+	int i;
 
 	memset(st, 0, sizeof(*st));
 	for (i = 0; i < numPools; i++)
@@ -197,10 +178,9 @@ init_state(FState *st)
  * Endianess does not matter.
  * It just needs to change without repeating.
  */
-static void
-inc_counter(FState *st)
+static void inc_counter(FState *st)
 {
-	uint32_t	   *val = (uint32_t *) st->counter;
+	uint32_t *val = (uint32_t *)st->counter;
 
 	if (++val[0])
 		return;
@@ -214,50 +194,45 @@ inc_counter(FState *st)
 /*
  * This is called 'cipher in counter mode'.
  */
-static void
-encrypt_counter(FState *st, uint8_t *dst)
+static void encrypt_counter(FState *st, uint8_t *dst)
 {
 	ciph_encrypt(&st->ciph, st->counter, dst);
 	inc_counter(st);
 }
 
-
 /*
  * The time between reseed must be at least reseedInterval
  * microseconds.
  */
-static int
-enough_time_passed(FState *st)
+static int enough_time_passed(FState *st)
 {
-	        int                     ok;
-        int32_t now;
-        int32_t last = st->lastReseedTime;
+	int ok;
+	int32_t now;
+	int32_t last = st->lastReseedTime;
 
-        now = seconds();
+	now = seconds();
 
-        /* check how much time has passed */
-        ok = 0;
-        if (now - last >= reseedInterval)
-                ok = 1;
+	/* check how much time has passed */
+	ok = 0;
+	if (now - last >= reseedInterval)
+		ok = 1;
 
-        /* reseed will happen, update lastReseedTime */
-        if (ok)
-                st->lastReseedTime=now;
+	/* reseed will happen, update lastReseedTime */
+	if (ok)
+		st->lastReseedTime = now;
 
-        return ok;
-
+	return ok;
 }
 
 /*
  * generate new key from all the pools
  */
-static void
-reseed(FState *st)
+static void reseed(FState *st)
 {
-	unsigned	k;
-	unsigned	n;
-	mdCtx		key_md;
-	uint8_t		buf[block];
+	unsigned k;
+	unsigned n;
+	mdCtx key_md;
+	uint8_t buf[block];
 
 	/* set pool as empty */
 	st->pool0Bytes = 0;
@@ -271,8 +246,7 @@ reseed(FState *st)
 	 * The goal: use k-th pool only 1/(2^k) of the time.
 	 */
 	md_init(&key_md);
-	for (k = 0; k < numPools; k++)
-	{
+	for (k = 0; k < numPools; k++) {
 		md_result(&st->pool[k], buf);
 		md_update(&key_md, buf, block);
 
@@ -297,10 +271,9 @@ reseed(FState *st)
 /*
  * Pick a random pool.	This uses key bytes as random source.
  */
-static unsigned
-get_rand_pool(FState *st)
+static unsigned get_rand_pool(FState *st)
 {
-	unsigned	rnd;
+	unsigned rnd;
 
 	/*
 	 * This slightly prefers lower pools - thats OK.
@@ -317,12 +290,11 @@ get_rand_pool(FState *st)
 /*
  * update pools
  */
-static void
-add_entropy(FState *st, const uint8_t *data, unsigned len)
+static void add_entropy(FState *st, const uint8_t *data, unsigned len)
 {
-	unsigned	pos;
-	uint8_t		hash[block];
-	mdCtx		md;
+	unsigned pos;
+	uint8_t hash[block];
+	mdCtx md;
 
 	/* hash given data */
 	md_init(&md);
@@ -348,8 +320,7 @@ add_entropy(FState *st, const uint8_t *data, unsigned len)
 /*
  * Just take 2 next blocks as new key
  */
-static void
-rekey(FState *st)
+static void rekey(FState *st)
 {
 	encrypt_counter(st, st->key);
 	encrypt_counter(st, st->key + ciphBlock);
@@ -362,18 +333,16 @@ rekey(FState *st)
  * This can also be viewed as spreading the startup
  * entropy over all of the components.
  */
-static void
-startup_tricks(FState *st)
+static void startup_tricks(FState *st)
 {
-	int			i;
-	uint8_t		buf[block];
+	int i;
+	uint8_t buf[block];
 
 	/* Use next block as counter. */
 	encrypt_counter(st, st->counter);
 
 	/* Now shuffle pools, excluding #0 */
-	for (i = 1; i < numPools; i++)
-	{
+	for (i = 1; i < numPools; i++) {
 		encrypt_counter(st, buf);
 		encrypt_counter(st, buf + ciphBlock);
 		md_update(&st->pool[i], buf, block);
@@ -387,11 +356,10 @@ startup_tricks(FState *st)
 	st->tricksDone = 1;
 }
 
-static void
-extract_data(FState *st, unsigned count, uint8_t *dst)
+static void extract_data(FState *st, unsigned count, uint8_t *dst)
 {
-	unsigned	n;
-	unsigned	block_nr = 0;
+	unsigned n;
+	unsigned block_nr = 0;
 
 	/* Should we reseed? */
 	if (st->pool0Bytes >= pool0Fill || st->reseedCount == 0)
@@ -402,8 +370,7 @@ extract_data(FState *st, unsigned count, uint8_t *dst)
 	if (!st->tricksDone)
 		startup_tricks(st);
 
-	while (count > 0)
-	{
+	while (count > 0) {
 		/* produce bytes */
 		encrypt_counter(st, st->result);
 
@@ -418,8 +385,7 @@ extract_data(FState *st, unsigned count, uint8_t *dst)
 
 		/* must not give out too many bytes with one key */
 		block_nr++;
-		if (block_nr > (reseedBytes / ciphBlock))
-		{
+		if (block_nr > (reseedBytes / ciphBlock)) {
 			rekey(st);
 			block_nr = 0;
 		}
@@ -429,9 +395,10 @@ extract_data(FState *st, unsigned count, uint8_t *dst)
 }
 
 static FState mainState;
-static int	initDone = 0;
+static int initDone;
 
-static void init(){
+static void init()
+{
 	init_state(&mainState);
 	initDone = 1;
 }
@@ -440,27 +407,21 @@ static void init(){
  * public interface
  */
 
-
-
-void
-fortuna_add_entropy(const uint8_t *data, unsigned len)
+void fortuna_add_entropy(const uint8_t *data, unsigned len)
 {
 	if (!initDone)
-	{
 		init();
-	}
+
 	if (!data || !len)
 		return;
 	add_entropy(&mainState, data, len);
 }
 
-void
-fortuna_get_bytes(unsigned len, uint8_t *dst)
+void fortuna_get_bytes(unsigned len, uint8_t *dst)
 {
 	if (!initDone)
-	{
 		init();
-	}
+
 	if (!dst || !len)
 		return;
 	extract_data(&mainState, len, dst);
