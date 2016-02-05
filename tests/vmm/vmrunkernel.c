@@ -775,7 +775,7 @@ int main(int argc, char **argv)
 	a += 4096;
 	gpci.apic_addr = (void*)0xfee00000;
 
-	if (ros_syscall(SYS_setup_vmm, nr_gpcs, &gpci, vmmflags, 0, 0, 0) !=
+	if (ros_syscall(SYS_vmm_setup, nr_gpcs, &gpci, vmmflags, 0, 0, 0) !=
 	    nr_gpcs) {
 		perror("Guest pcore setup failed");
 		exit(1);

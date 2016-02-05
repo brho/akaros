@@ -42,7 +42,7 @@
 #define SYS_abort_sysc				31
 #define SYS_populate_va				32
 #define SYS_abort_sysc_fd			33
-#define SYS_setup_vmm				34
+#define SYS_vmm_setup				34
 #define SYS_vc_entry				35
 #define SYS_nanosleep				36
 #define SYS_pop_ctx					37

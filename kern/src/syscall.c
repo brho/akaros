@@ -1432,7 +1432,7 @@ static int sys_pop_ctx(struct proc *p, struct user_context *ctx)
 
 /* Initializes a process to run virtual machine contexts, returning the number
  * initialized, optionally setting errno */
-static int sys_setup_vmm(struct proc *p, unsigned int nr_guest_pcores,
+static int sys_vmm_setup(struct proc *p, unsigned int nr_guest_pcores,
                          struct vmm_gpcore_init *gpcis, int flags)
 {
 	return vmm_struct_init(p, nr_guest_pcores, gpcis, flags);
@@ -2580,7 +2580,7 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_init_arsc] = {(syscall_t)sys_init_arsc, "init_arsc"},
 #endif
 	[SYS_change_to_m] = {(syscall_t)sys_change_to_m, "change_to_m"},
-	[SYS_setup_vmm] = {(syscall_t)sys_setup_vmm, "setup_vmm"},
+	[SYS_vmm_setup] = {(syscall_t)sys_vmm_setup, "vmm_setup"},
 	[SYS_poke_ksched] = {(syscall_t)sys_poke_ksched, "poke_ksched"},
 	[SYS_abort_sysc] = {(syscall_t)sys_abort_sysc, "abort_sysc"},
 	[SYS_abort_sysc_fd] = {(syscall_t)sys_abort_sysc_fd, "abort_sysc_fd"},
