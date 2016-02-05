@@ -23,8 +23,6 @@
 /* TODO: have better cpuid info storage and checks */
 bool x86_supports_vmx = FALSE;
 
-static void vmmcp_posted_handler(struct hw_trapframe *hw_tf, void *data);
-
 /* Figure out what kind of CPU we are on, and if it supports any reasonable
  * virtualization. For now, if we're not some sort of newer intel, don't
  * bother. This does all cores. Again, note, we make these decisions at runtime,
@@ -39,11 +37,6 @@ void vmm_init(void)
 	 */
 	ret = intel_vmm_init();
 	if (! ret) {
-		printd("intel_vmm_init worked\n");
-
-		//Register I_VMMCP_POSTED IRQ
-		//register_irq(I_VMMCP_POSTED, vmmcp_posted_handler, NULL,
-		//		MKBUS(BusLAPIC, 0, 0, 0));
 		x86_supports_vmx = TRUE;
 		return;
 	}
@@ -51,11 +44,6 @@ void vmm_init(void)
 	/* TODO: AMD. Will we ever care? It's not clear. */
 	printk("vmm_init failed, ret %d\n", ret);
 	return;
-}
-
-static void vmmcp_posted_handler(struct hw_trapframe *hw_tf, void *data)
-{
-	printk("%s\n", __func__);
 }
 
 void vmm_pcpu_init(void)

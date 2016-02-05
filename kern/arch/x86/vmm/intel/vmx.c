@@ -929,7 +929,7 @@ static int vmx_setup_initial_guest_state(struct proc *p,
 	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);	/* 22.2.1 */
 
 	/* Initialize posted interrupt notification vector */
-	vmcs_write16(POSTED_NOTIFICATION_VEC, I_VMMCP_POSTED);
+	vmcs_write16(POSTED_NOTIFICATION_VEC, I_POKE_CORE);
 
 	/* Clear the EOI exit bitmap */
 	vmcs_writel(EOI_EXIT_BITMAP0, 0);
@@ -1160,7 +1160,7 @@ int vmx_interrupt_notify(struct vmctl *v)
 	/* Assume we want to IPI guest pcore 0 (which vmctl controlled). */
 	int vm_core = current->vmm.guest_pcores[0]->cpu;
 
-	send_ipi(vm_core, I_VMMCP_POSTED);
+	send_ipi(vm_core, I_POKE_CORE);
 	return 0;
 }
 
