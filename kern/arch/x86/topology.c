@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <kmalloc.h>
 #include <string.h>
+#include <ns.h>
 #include <acpi.h>
 #include <arch/arch.h>
 #include <arch/apic.h>
@@ -78,13 +79,16 @@ static void set_socket_ids(void)
  * apid_id. */
 static int find_numa_domain(int apic_id)
 {
-	struct Srat *temp = srat;
-	while (temp) {
-		if (temp->type == SRlapic) {
+	if (srat == NULL)
+		return -1;
+
+	for (int i = 0; i < srat->nchildren; i++) {
+		struct Srat *temp = srat->children[i]->tbl;
+
+		if (temp != NULL && temp->type == SRlapic) {
 			if (temp->lapic.apic == apic_id)
 				return temp->lapic.dom;
 		}
-		temp = temp->next;
 	}
 	return -1;
 }
@@ -93,24 +97,28 @@ static int find_numa_domain(int apic_id)
  * cpu_topology_info struct. */
 static void set_num_cores(void)
 {
-	struct Apicst *temp = apics->st;
-	while (temp) {
-		if (temp->type == ASlapic)
+	if (apics == NULL)
+		return;
+
+	for (int i = 0; i < apics->nchildren; i++) {
+		struct Apicst *temp = apics->children[i]->tbl;
+
+		if (temp != NULL && temp->type == ASlapic)
 			num_cores++;
-		temp = temp->next;
 	}
 }
 
 /* Determine if srat has a unique numa domain compared to to all of the srat
  * records in list_head that are of type SRlapic. */
-static bool is_unique_numa(struct Srat *srat, struct Srat *list_head)
+static bool is_unique_numa(struct Srat *srat, struct Atable **tail,
+                           size_t begin, size_t end)
 {
-	while (list_head) {
-		if (list_head->type == SRlapic) {
-			if (srat->lapic.dom == list_head->lapic.dom)
+	for (int i = begin; i < end; i++) {
+		struct Srat *st = tail[i]->tbl;
+
+		if (st->type == SRlapic)
+			if (srat->lapic.dom == st->lapic.dom)
 				return FALSE;
-		}
-		list_head = list_head->next;
 	}
 	return TRUE;
 }
@@ -120,13 +128,18 @@ static bool is_unique_numa(struct Srat *srat, struct Srat *list_head)
 static int get_num_numa(void)
 {
 	int numa = 0;
-	struct Srat *temp = srat;
-	while (temp) {
-		if (temp->type == SRlapic)
-			if (is_unique_numa(temp, temp->next))
+
+	if (srat == NULL)
+		return 0;
+
+	for (int i = 0; i < srat->nchildren; i++) {
+		struct Srat *temp = srat->children[i]->tbl;
+
+		if (temp != NULL && temp->type == SRlapic)
+			if (is_unique_numa(temp, srat->children, i, srat->nchildren))
 				numa++;
-		temp = temp->next;
 	}
+
 	return numa;
 }
 
@@ -140,13 +153,13 @@ static void set_num_numa(void)
  * cpu_topology_info struct. */
 static void set_max_apic_id(void)
 {
-	struct Apicst *temp = apics->st;
-	while (temp) {
+	for (int i = 0; i < apics->nchildren; i++) {
+		struct Apicst *temp = apics->children[i]->tbl;
+
 		if (temp->type == ASlapic) {
 			if (temp->lapic.id > max_apic_id)
 				max_apic_id = temp->lapic.id;
 		}
-		temp = temp->next;
 	}
 }
 
@@ -166,11 +179,11 @@ static void init_os_coreid_lookup(void)
 	 * necessary because there is no ordering to the linked list we are
 	 * pulling these ids from. After this, loop back through and set the
 	 * mapping appropriately. */
-	struct Apicst *temp = apics->st;
-	while (temp) {
+	for (int i = 0; i < apics->nchildren; i++) {
+		struct Apicst *temp = apics->children[i]->tbl;
+
 		if (temp->type == ASlapic)
 			os_coreid_lookup[temp->lapic.id] = 0;
-		temp = temp->next;
 	}
 	int os_coreid = 0;
 	for (int i = 0; i <= max_apic_id; i++)
