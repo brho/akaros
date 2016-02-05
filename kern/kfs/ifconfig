@@ -64,6 +64,7 @@ fi
 #/boot/paqfs -p -S $beetroot -m /boot -q /boot/$beetroot
 #cd /boot/$cputype/bin
 bind -b '#cons' /dev
+bind -b '#random' /dev
 #bind '#d' /fd
 #bind -c '#e' /env
 bind -b '#proc' /proc
