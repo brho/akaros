@@ -1155,15 +1155,6 @@ static void vmx_step_instruction(void) {
 		    vmcs_read32(VM_EXIT_INSTRUCTION_LEN));
 }
 
-int vmx_interrupt_notify(struct vmctl *v)
-{
-	/* Assume we want to IPI guest pcore 0 (which vmctl controlled). */
-	int vm_core = current->vmm.guest_pcores[0]->cpu;
-
-	send_ipi(vm_core, I_POKE_CORE);
-	return 0;
-}
-
 /**
  * __vmx_enable - low-level enable of VMX mode on the current CPU
  * @vmxon_buf: an opaque buffer for use as the VMXON region

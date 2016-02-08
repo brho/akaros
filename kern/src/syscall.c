@@ -1438,6 +1438,11 @@ static int sys_vmm_setup(struct proc *p, unsigned int nr_guest_pcores,
 	return vmm_struct_init(p, nr_guest_pcores, gpcis, flags);
 }
 
+static int sys_vmm_poke_guest(struct proc *p, int guest_pcoreid)
+{
+	return vmm_poke_guest(p, guest_pcoreid);
+}
+
 /* Pokes the ksched for the given resource for target_pid.  If the target pid
  * == 0, we just poke for the calling process.  The common case is poking for
  * self, so we avoid the lookup. 
@@ -2581,6 +2586,7 @@ const struct sys_table_entry syscall_table[] = {
 #endif
 	[SYS_change_to_m] = {(syscall_t)sys_change_to_m, "change_to_m"},
 	[SYS_vmm_setup] = {(syscall_t)sys_vmm_setup, "vmm_setup"},
+	[SYS_vmm_poke_guest] = {(syscall_t)sys_vmm_poke_guest, "vmm_poke_guest"},
 	[SYS_poke_ksched] = {(syscall_t)sys_poke_ksched, "poke_ksched"},
 	[SYS_abort_sysc] = {(syscall_t)sys_abort_sysc, "abort_sysc"},
 	[SYS_abort_sysc_fd] = {(syscall_t)sys_abort_sysc_fd, "abort_sysc_fd"},

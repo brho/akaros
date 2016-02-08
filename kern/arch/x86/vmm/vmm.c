@@ -61,17 +61,6 @@ void vmm_pcpu_init(void)
 	printk("vmm_pcpu_init failed\n");
 }
 
-int vm_post_interrupt(struct vmctl *v)
-{
-	int vmx_interrupt_notify(struct vmctl *v);
-	if (current->vmm.amd) {
-		return -1;
-	} else {
-		return vmx_interrupt_notify(v);
-	}
-	return -1;
-}
-
 /* Initializes a process to run virtual machine contexts, returning the number
  * initialized, optionally setting errno */
 int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores,
@@ -138,6 +127,31 @@ void __vmm_struct_cleanup(struct proc *p)
 	kfree(vmm->guest_pcores);
 	ept_flush(p->env_pgdir.eptp);
 	vmm->vmmcp = FALSE;
+}
+
+int vmm_poke_guest(struct proc *p, int guest_pcoreid)
+{
+	struct guest_pcore *gpc;
+	int pcoreid;
+
+	gpc = lookup_guest_pcore(p, guest_pcoreid);
+	if (!gpc) {
+		set_error(ENOENT, "Bad guest_pcoreid %d", guest_pcoreid);
+		return -1;
+	}
+	/* We're doing an unlocked peek; it could change immediately.  This is a
+	 * best effort service. */
+	pcoreid = ACCESS_ONCE(gpc->cpu);
+	if (pcoreid == -1) {
+		/* So we know that we'll miss the poke for the posted IRQ.  We could
+		 * return an error.  However, error handling for this case isn't
+		 * particularly helpful (yet).  The absence of the error does not mean
+		 * the IRQ was posted.  We'll still return 0, meaning "the user didn't
+		 * mess up; we tried." */
+		return 0;
+	}
+	send_ipi(pcoreid, I_POKE_CORE);
+	return 0;
 }
 
 struct guest_pcore *lookup_guest_pcore(struct proc *p, int guest_pcoreid)

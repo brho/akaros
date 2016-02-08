@@ -326,11 +326,9 @@ static inline int test_and_set_bit(int nr, volatile unsigned long *addr);
 
 void *timer_thread(void *arg)
 {
-	int fd = open("#cons/vmctl", O_RDWR), ret;
-
 	while (1) {
 		set_posted_interrupt(0xef);
-		pwrite(fd, &vmctl, sizeof(vmctl), 1<<12);
+		ros_syscall(SYS_vmm_poke_guest, 0, 0, 0, 0, 0, 0);
 		uthread_usleep(1);
 	}
 }
@@ -413,8 +411,6 @@ void *consin(void *arg)
 	int timer_started = 0;
 	pthread_t timerthread_struct;
 
-	int fd = open("#cons/vmctl", O_RDWR), ret;
-	
 	if (debug) fprintf(stderr, "Spin on console being read, print num queues, halt\n");
 
 	for(num = 0;! quit;num++) {
@@ -455,7 +451,7 @@ void *consin(void *arg)
 		set_posted_interrupt(0xE5);
 		virtio_mmio_set_vring_irq();
 
-		pwrite(fd, &vmctl, sizeof(vmctl), 1<<12);
+		ros_syscall(SYS_vmm_poke_guest, 0, 0, 0, 0, 0, 0);
 		/*if (!timer_started && mcp) {
 			// Start up timer thread
 			if (pthread_create(&timerthread_struct, NULL, timer_thread, NULL)) {
@@ -574,7 +570,7 @@ int main(int argc, char **argv)
 	int vmmflags = 0; // Disabled probably forever. VMM_VMCALL_PRINTF;
 	uint64_t entry = 0x1200000, kerneladdress = 0x1200000;
 	int nr_gpcs = 1;
-	int fd = open("#cons/vmctl", O_RDWR), ret;
+	int ret;
 	void * xp;
 	int kfd = -1;
 	static char cmd[512];
@@ -620,10 +616,6 @@ int main(int argc, char **argv)
 	((uint32_t *)a_page)[0x30/4] = 0xDEADBEEF;
 
 
-	if (fd < 0) {
-		perror("#cons/sysctl");
-		exit(1);
-	}
 	argc--,argv++;
 	// switches ...
 	// Sorry, I don't much like the gnu opt parsing code.

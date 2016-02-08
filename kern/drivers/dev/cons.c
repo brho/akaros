@@ -605,7 +605,6 @@ enum {
 	Qsysstat,
 	Qtime,
 	Quser,
-	Qvmctl,
 	Qzero,
 };
 
@@ -639,7 +638,6 @@ static struct dirtab consdir[] = {
 	{"sysstat", {Qsysstat}, 0, 0666},
 	{"time", {Qtime}, NUMSIZE + 3 * VLNUMSIZE, 0664},
 	{"user", {Quser}, 0, 0666},
-	{"vmctl", {Qvmctl}, 0, 0666},
 	{"zero", {Qzero}, 0, 0444},
 };
 
@@ -1095,16 +1093,6 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 			error(EPERM, "Cannot write to config QID");
 			break;
 
-		case Qvmctl:
-			memmove(&vmctl, a, sizeof(vmctl));
-			if ((offset >> 12) ==1) {
-				ret = vm_post_interrupt(&vmctl);
-				n = ret;
-				//printk("vm_interrupt_notify returns %d\n", ret);
-			} else {
-				error(EINVAL, "Bad vmctl command");
-			}
-			break;
 		case Qsysctl:
 			//if (!iseve()) error(EPERM, ERROR_FIXME);
 			cb = parsecmd(a, n);
