@@ -367,13 +367,13 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			 * the same).  See set_current_ctx() for more info. */
 			if (!in_kernel(hw_tf))
 				hw_tf = &pcpui->cur_ctx->tf.hw_tf;
-			printd("bad opcode, eip: %p, next 3 bytes: %x %x %x\n", ip, 
-			       *(uint8_t*)(ip + 0), 
-			       *(uint8_t*)(ip + 1), 
-			       *(uint8_t*)(ip + 2)); 
+			printd("bad opcode, eip: %p, next 3 bytes: %x %x %x\n", ip,
+			       *(uint8_t*)(ip + 0),
+			       *(uint8_t*)(ip + 1),
+			       *(uint8_t*)(ip + 2));
 			/* rdtscp: 0f 01 f9 */
-			if (*(uint8_t*)(ip + 0) == 0x0f, 
-			    *(uint8_t*)(ip + 1) == 0x01, 
+			if (*(uint8_t*)(ip + 0) == 0x0f,
+			    *(uint8_t*)(ip + 1) == 0x01,
 			    *(uint8_t*)(ip + 2) == 0xf9) {
 				x86_fake_rdtscp(hw_tf);
 				pcpui->__lock_checking_enabled++;	/* for print debugging */

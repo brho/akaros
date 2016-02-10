@@ -1,4 +1,4 @@
-#include <stdio.h> 
+#include <stdio.h>
 #include <pthread.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -18,10 +18,15 @@
 #include <ros/arch/mmu.h>
 #include <ros/vmm.h>
 #include <parlib/uthread.h>
+#include <vmm/linux_bootparam.h>
 #include <vmm/virtio.h>
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
+
+
+
+void showstatus(FILE *f, struct vmctl *v);
 
 int msrio(struct vmctl *vcpu, uint32_t opcode);
 
@@ -33,65 +38,6 @@ struct vmm_gpcore_init gpci;
 uth_mutex_t the_ball;
 pthread_t vm_thread;
 void (*old_thread_refl)(struct uthread *uth, struct user_context *ctx);
-
-/* callback, runs in vcore context.  this sets up our initial context.  once we
- * become runnable again, we'll run the first bits of the vm ctx.  after that,
- * our context will be stopped and started and will just run whatever the guest
- * VM wants.  we'll never come back to this code or to run_vm(). */
-static void __build_vm_ctx_cb(struct uthread *uth, void *arg)
-{
-	struct pthread_tcb *pthread = (struct pthread_tcb*)uth;
-	struct vmctl *vmctl = (struct vmctl*)arg;
-	struct vm_trapframe *vm_tf;
-
-	__pthread_generic_yield(pthread);
-	pthread->state = PTH_BLK_YIELDING;
-
-	memset(&uth->u_ctx, 0, sizeof(struct user_context));
-	uth->u_ctx.type = ROS_VM_CTX;
-	vm_tf = &uth->u_ctx.tf.vm_tf;
-
-	vm_tf->tf_guest_pcoreid = 0;	/* assuming only 1 guest core */
-	vm_tf->tf_cr3 = vmctl->cr3;
-	vm_tf->tf_rip = vmctl->regs.tf_rip;
-	vm_tf->tf_rsp = vmctl->regs.tf_rsp;
-
-	/* other HW/GP regs are 0, which should be fine.  the FP state is still
-	 * whatever we were running before, though this is pretty much unnecessary.
-	 * we mostly don't want crazy crap in the uth->as, and a non-current_uthread
-	 * VM ctx is supposed to have something in their FP state (like HW ctxs). */
-	save_fp_state(&uth->as);
-	uth->flags |= UTHREAD_FPSAVED | UTHREAD_SAVED;
-
-	uthread_runnable(uth);
-}
-
-static void *run_vm(void *arg)
-{
-	struct vmctl *vmctl = (struct vmctl*)arg;
-
-	assert(vmctl->command == REG_RSP_RIP_CR3);
-	/* We need to hack our context, so that next time we run, we're a VM ctx */
-	uthread_yield(FALSE, __build_vm_ctx_cb, arg);
-}
-
-static void vmm_thread_refl_fault(struct uthread *uth,
-                                  struct user_context *ctx)
-{
-	struct pthread_tcb *pthread = (struct pthread_tcb*)uth;
-
-	/* Hack to call the original pth 2LS op */
-	if (!ctx->type == ROS_VM_CTX) {
-		old_thread_refl(uth, ctx);
-		return;
-	}
-	__pthread_generic_yield(pthread);
-	/* normally we'd handle the vmexit here.  to work within the existing
-	 * framework, we just wake the controller thread.  It'll look at our ctx
-	 * then make us runnable again */
-	pthread->state = PTH_BLK_MUTEX;
-	uth_mutex_unlock(the_ball);		/* wake the run_vmthread */
-}
 
 static void copy_vmtf_to_vmctl(struct vm_trapframe *vm_tf, struct vmctl *vmctl)
 {
@@ -153,6 +99,66 @@ static void copy_vmctl_to_vmtf(struct vmctl *vmctl, struct vm_trapframe *vm_tf)
 	/* Don't care about the rest of the fields.  The kernel only writes them */
 }
 
+/* callback, runs in vcore context.  this sets up our initial context.  once we
+ * become runnable again, we'll run the first bits of the vm ctx.  after that,
+ * our context will be stopped and started and will just run whatever the guest
+ * VM wants.  we'll never come back to this code or to run_vm(). */
+static void __build_vm_ctx_cb(struct uthread *uth, void *arg)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uth;
+	struct vmctl *vmctl = (struct vmctl*)arg;
+	struct vm_trapframe *vm_tf;
+
+	__pthread_generic_yield(pthread);
+	pthread->state = PTH_BLK_YIELDING;
+
+	memset(&uth->u_ctx, 0, sizeof(struct user_context));
+	uth->u_ctx.type = ROS_VM_CTX;
+	vm_tf = &uth->u_ctx.tf.vm_tf;
+
+	vm_tf->tf_guest_pcoreid = 0;	/* assuming only 1 guest core */
+
+	copy_vmctl_to_vmtf(vmctl, vm_tf);
+
+	/* other HW/GP regs are 0, which should be fine.  the FP state is still
+	 * whatever we were running before, though this is pretty much unnecessary.
+	 * we mostly don't want crazy crap in the uth->as, and a non-current_uthread
+	 * VM ctx is supposed to have something in their FP state (like HW ctxs). */
+	save_fp_state(&uth->as);
+	uth->flags |= UTHREAD_FPSAVED | UTHREAD_SAVED;
+
+	uthread_runnable(uth);
+}
+
+static void *run_vm(void *arg)
+{
+	struct vmctl *vmctl = (struct vmctl*)arg;
+
+	assert(vmctl->command == REG_RSP_RIP_CR3);
+	/* We need to hack our context, so that next time we run, we're a VM ctx */
+	uthread_yield(FALSE, __build_vm_ctx_cb, arg);
+}
+
+static void vmm_thread_refl_fault(struct uthread *uth,
+                                  struct user_context *ctx)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uth;
+
+	/* Hack to call the original pth 2LS op */
+	if (!ctx->type == ROS_VM_CTX) {
+		old_thread_refl(uth, ctx);
+		return;
+	}
+	__pthread_generic_yield(pthread);
+	/* normally we'd handle the vmexit here.  to work within the existing
+	 * framework, we just wake the controller thread.  It'll look at our ctx
+	 * then make us runnable again */
+	pthread->state = PTH_BLK_MUTEX;
+	uth_mutex_unlock(the_ball);		/* wake the run_vmthread */
+}
+
+
+
 /* this will start the vm thread, and return when the thread has blocked,
  * with the right info in vmctl. */
 static void run_vmthread(struct vmctl *vmctl)
@@ -183,12 +189,15 @@ static void run_vmthread(struct vmctl *vmctl)
 	copy_vmtf_to_vmctl(&vm_thread->uthread.u_ctx.tf.vm_tf, vmctl);
 }
 
-/* Kind of sad what a total clusterf the pc world is. By 1999, you could just scan the hardware 
- * and work it out. But 2005, that was no longer possible. How sad. 
- * so we have to fake acpi to make it all work. !@#$!@#$#.
+/* By 1999, you could just scan the hardware
+ * and work it out. But 2005, that was no longer possible. How sad.
+ * so we have to fake acpi to make it all work.
  * This will be copied to memory at 0xe0000, so the kernel can find it.
  */
-/* assume they're all 256 bytes long just to make it easy. Just have pointers that point to aligned things. */
+
+/* assume they're all 256 bytes long just to make it easy.
+ * Just have pointers that point to aligned things.
+ */
 
 struct acpi_table_rsdp rsdp = {
 	.signature = "RSD PTR ",
@@ -234,7 +243,7 @@ struct acpi_table_madt madt = {
 		.asl_compiler_id = "RON ",
 		.asl_compiler_revision = 0,
 	},
-	
+
 	.address = 0xfee00000ULL,
 };
 
@@ -307,7 +316,7 @@ int nr_threads = 4;
 int debug = 0;
 int resumeprompt = 0;
 /* unlike Linux, this shared struct is for both host and guest. */
-//	struct virtqueue *constoguest = 
+//	struct virtqueue *constoguest =
 //		vring_new_virtqueue(0, 512, 8192, 0, inpages, NULL, NULL, "test");
 uint64_t virtio_mmio_base = 0x100000000ULL;
 
@@ -347,11 +356,12 @@ void *consout(void *arg)
 	uint32_t vv;
 	int i;
 	int num;
+
 	if (debug) {
 		fprintf(stderr, "----------------------- TT a %p\n", a);
 		fprintf(stderr, "talk thread ttargs %x v %x\n", a, v);
 	}
-	
+
 	for(num = 0;;num++) {
 		//int debug = 1;
 		/* host: use any buffers we should have been sent. */
@@ -388,7 +398,7 @@ void *consout(void *arg)
 	return NULL;
 }
 
-// FIXME. 
+// FIXME.
 volatile int consdata = 0;
 
 void *consin(void *arg)
@@ -429,7 +439,7 @@ void *consin(void *arg)
 			memset(consline, 0, 128);
 			if (read(0, consline, 1) < 0) {
 				exit(0);
-			} 
+			}
 			if (debug) fprintf(stderr, "CONSIN: GOT A LINE:%s:\n", consline);
 			if (debug) fprintf(stderr, "CONSIN: OUTLEN:%d:\n", outlen);
 			if (strlen(consline) < 3 && consline[0] == 'q' ) {
@@ -498,8 +508,8 @@ static uint8_t acpi_tb_checksum(uint8_t *buffer, uint32_t length)
 static void gencsum(uint8_t *target, void *data, int len)
 {
 	uint8_t csum;
-	// blast target to zero so it does not get counted (it might be in the struct we checksum) 
-	// And, yes, it is, goodness.
+	// blast target to zero so it does not get counted
+	// (it might be in the struct we checksum) And, yes, it is, goodness.
 	fprintf(stderr, "gencsum %p target %p source %d bytes\n", target, data, len);
 	*target = 0;
 	csum  = acpi_tb_checksum((uint8_t *)data, len);
@@ -537,6 +547,8 @@ static void set_posted_interrupt(int vector)
 
 int main(int argc, char **argv)
 {
+	struct boot_params *bp;
+	char *cmdline;
 	uint64_t *p64;
 	void *a = (void *)0xe0000;
 	struct acpi_table_rsdp *r;
@@ -544,7 +556,7 @@ int main(int argc, char **argv)
 	struct acpi_table_madt *m;
 	struct acpi_table_xsdt *x;
 	uint64_t virtiobase = 0x100000000ULL;
-	// lowmem is a bump allocated pointer to 2M at the "physbase" of memory 
+	// lowmem is a bump allocated pointer to 2M at the "physbase" of memory
 	void *lowmem = (void *) 0x1000000;
 	//struct vmctl vmctl;
 	int amt;
@@ -566,6 +578,7 @@ int main(int argc, char **argv)
 	fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT,
 			PML1_PTE_REACH);
 
+
 	// mmap is not working for us at present.
 	if ((uint64_t)_kernel > GKERNBASE) {
 		fprintf(stderr, "kernel array @%p is above , GKERNBASE@%p sucks\n", _kernel, GKERNBASE);
@@ -581,7 +594,7 @@ int main(int argc, char **argv)
 	//Place mmap(Gan)
 	a_page = mmap((void *)0xfee00000, PGSIZE, PROT_READ | PROT_WRITE,
 		              MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
-	fprintf(stderr, "a_page mmap pointer %p", a_page);
+	fprintf(stderr, "a_page mmap pointer %p\n", a_page);
 
 	if (a_page == (void *) -1) {
 		perror("Could not mmap APIC");
@@ -738,7 +751,7 @@ int main(int argc, char **argv)
 	memset(a, 0, 4096);
 	a += 4096;
 	gpci.vapic_addr = a;
-	//vmctl.vapic = (uint64_t) a_page;	
+	//vmctl.vapic = (uint64_t) a_page;
 	memset(a, 0, 4096);
 	((uint32_t *)a)[0x30/4] = 0x01060014;
 	p64 = a;
@@ -747,6 +760,51 @@ int main(int argc, char **argv)
 	//((uint8_t *)a)[4] = 1;
 	a += 4096;
 	gpci.apic_addr = (void*)0xfee00000;
+
+	/* Allocate memory for, and zero the bootparams
+	 * page before writing to it, or Linux thinks
+	 * we're talking crazy.
+	 */
+	a += 4096;
+	bp = a;
+	memset(bp, 0, 4096);
+
+	/* Set the kernel command line parameters */
+	a += 4096;
+	cmdline = a;
+	a += 4096;
+	bp->hdr.cmd_line_ptr = (uintptr_t) cmdline;
+	sprintf(cmdline, "earlyprintk=vmcall,keep"
+		             " console=hvc0"
+		             " virtio_mmio.device=1M@0x100000000:32"
+		             " nosmp"
+		             " maxcpus=1"
+		             " acpi.debug_layer=0x2"
+		             " acpi.debug_level=0xffffffff"
+		             " apic=debug"
+		             " noexec=off"
+		             " nohlt"
+		             " init=/bin/sh"
+		             " lapic=notscdeadline"
+		             " lapictimerfreq=1000"
+		             " pit=none");
+
+
+	/* Put the e820 memory region information in the boot_params */
+	bp->e820_entries = 3;
+	int e820i = 0;
+
+	bp->e820_map[e820i].addr = 0;
+	bp->e820_map[e820i].size = 16 * 1048576;
+	bp->e820_map[e820i++].type = E820_RESERVED;
+
+	bp->e820_map[e820i].addr = 16 * 1048576;
+	bp->e820_map[e820i].size = 128 * 1048576;
+	bp->e820_map[e820i++].type = E820_RAM;
+
+	bp->e820_map[e820i].addr = 0xf0000000;
+	bp->e820_map[e820i].size = 0x10000000;
+	bp->e820_map[e820i++].type = E820_RESERVED;
 
 	if (ros_syscall(SYS_vmm_setup, nr_gpcs, &gpci, vmmflags, 0, 0, 0) !=
 	    nr_gpcs) {
@@ -810,13 +868,14 @@ int main(int argc, char **argv)
 	vmctl.cr3 = (uint64_t) p512;
 	vmctl.regs.tf_rip = entry;
 	vmctl.regs.tf_rsp = (uint64_t) &stack[1024];
+	vmctl.regs.tf_rsi = (uint64_t) bp;
 	if (mcp) {
 		/* set up virtio bits, which depend on threads being enabled. */
 		register_virtio_mmio(&vqdev, virtio_mmio_base);
 	}
 	fprintf(stderr, "threads started\n");
 	fprintf(stderr, "Writing command :%s:\n", cmd);
-	
+
 	if (debug)
 		vapic_status_dump(stderr, (void *)gpci.vapic_addr);
 
@@ -826,7 +885,7 @@ int main(int argc, char **argv)
 		vapic_status_dump(stderr, (void *)gpci.vapic_addr);
 
 	while (1) {
-		void showstatus(FILE *f, struct vmctl *v);
+
 		int c;
 		uint8_t byte;
 		vmctl.command = REG_RIP;
@@ -923,10 +982,25 @@ int main(int argc, char **argv)
 			case EXIT_REASON_MSR_WRITE:
 			case EXIT_REASON_MSR_READ:
 				fprintf(stderr, "Do an msr\n");
-				quit = msrio(&vmctl, vmctl.ret_code);
-				if (quit) {
+				if (msrio(&vmctl, vmctl.ret_code)) {
+					// uh-oh, msrio failed
+					// well, hand back a GP fault which is what Intel does
 					fprintf(stderr, "MSR FAILED: RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
 					showstatus(stderr, &vmctl);
+
+					// Use event injection through vmctl to send
+					// a general protection fault
+					// vmctl.interrupt gets written to the VM-Entry
+					// Interruption-Information Field by vmx
+					vmctl.interrupt = (1 << 31) // "Valid" bit
+					                | (0 << 12) // Reserved by Intel
+					                | (1 << 11) // Deliver-error-code bit (set if event pushes error code to stack)
+					                | (3 << 8)  // Event type (3 is "hardware exception")
+					                | 13;       // Interrupt/exception vector (13 is "general protection fault")
+					run_vmthread(&vmctl);
+				} else {
+					vmctl.regs.tf_rip += 2;
+					run_vmthread(&vmctl);
 				}
 				break;
 			case EXIT_REASON_MWAIT_INSTRUCTION:
@@ -957,9 +1031,9 @@ int main(int argc, char **argv)
 				//fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
 				//showstatus(stderr, &vmctl);
 				break;
-			case EXIT_REASON_APIC_ACCESS:				
+			case EXIT_REASON_APIC_ACCESS:
 				if (1 || debug)fprintf(stderr, "APIC READ EXIT\n");
-				
+
 				uint64_t gpa, *regp, val;
 				uint8_t regx;
 				int store, size;
@@ -1006,7 +1080,7 @@ int main(int argc, char **argv)
 		run_vmthread(&vmctl);
 	}
 
-	/* later. 
+	/* later.
 	for (int i = 0; i < nr_threads-1; i++) {
 		int ret;
 		if (pthread_join(my_threads[i], &my_retvals[i]))
