@@ -372,8 +372,6 @@ EXPORT_SYMBOL_GPL(mlx4_cq_alloc);
 
 void mlx4_cq_free(struct mlx4_dev *dev, struct mlx4_cq *cq)
 {
-	panic("Disabled");
-#if 0 // AKAROS_PORT
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	struct mlx4_cq_table *cq_table = &priv->cq_table;
 	int err;
@@ -393,7 +391,6 @@ void mlx4_cq_free(struct mlx4_dev *dev, struct mlx4_cq *cq)
 	wait_for_completion(&cq->free);
 
 	mlx4_cq_free_icm(dev, cq->cqn);
-#endif
 }
 EXPORT_SYMBOL_GPL(mlx4_cq_free);
 
