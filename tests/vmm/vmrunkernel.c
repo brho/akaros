@@ -519,7 +519,7 @@ static inline int test_and_set_bit(int nr, volatile unsigned long *addr)
 
 static void pir_dump()
 {
-	unsigned long *pir_ptr = (unsigned long *)gpci.pir_addr;
+	unsigned long *pir_ptr = gpci.posted_irq_desc;
 	int i;
 	fprintf(stderr, "-------Begin PIR dump-------\n");
 	for (i = 0; i < 8; i++){
@@ -530,28 +530,9 @@ static void pir_dump()
 
 static void set_posted_interrupt(int vector)
 {
-	unsigned long *bit_vec;
-	int bit_offset;
-	int i, j;
-	unsigned long *pir = (unsigned long *)gpci.pir_addr;
-	// Move to the correct location to set our bit.
-	bit_vec = pir + vector/(sizeof(unsigned long)*8);
-	bit_offset = vector%(sizeof(unsigned long)*8);
-	if(debug) fprintf(stderr, "%s: Pre set PIR dump\n", __func__);
-	if(debug) pir_dump();
-	if (debug)
-		vapic_status_dump(stderr, gpci.vapic_addr);
-	if(debug) fprintf(stderr, "%s: Setting pir bit offset %d at 0x%p\n", __func__,
-			bit_offset, bit_vec);
-	test_and_set_bit(bit_offset, bit_vec);
-
-	// Set outstanding notification bit
-	/*bit_vec = pir + 4;
-	fprintf(stderr, "%s: Setting pir bit offset 0 at 0x%p", __func__,
-			bit_vec);
-	test_and_set_bit(0, bit_vec);*/
-
-	if(debug) pir_dump();
+	test_and_set_bit(vector, gpci.posted_irq_desc);
+	/* LOCKed instruction provides the mb() */
+	test_and_set_bit(VMX_POSTED_OUTSTANDING_NOTIF, gpci.posted_irq_desc);
 }
 
 int main(int argc, char **argv)
@@ -753,7 +734,7 @@ int main(int argc, char **argv)
 	hexdump(stdout, r, a-(void *)r);
 
 	a = (void *)(((unsigned long)a + 0xfff) & ~0xfff);
-	gpci.pir_addr = a;
+	gpci.posted_irq_desc = a;
 	memset(a, 0, 4096);
 	a += 4096;
 	gpci.vapic_addr = a;

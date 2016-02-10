@@ -114,6 +114,12 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 	/* cr2 is not part of the VMCS state; we need to save/restore it manually */
 	lcr2(tf->tf_cr2);
 	vmcs_write(VM_ENTRY_INTR_INFO_FIELD, tf->tf_trap_inject);
+	/* Someone may have tried poking the guest and posting an IRQ, but the IPI
+	 * missed (concurrent vmexit).  In these cases, the 'outstanding
+	 * notification' bit should still be set, and we can resend the IPI.  This
+	 * will arrive after we vmenter, since IRQs are currently disabled. */
+	if (test_bit(VMX_POSTED_OUTSTANDING_NOTIF, gpc->posted_irq_desc))
+		send_self_ipi(I_POKE_CORE);
 	/* vmlaunch/resume can fail, so we need to be able to return from this.
 	 * Thus we can't clobber rsp via the popq style of setting the registers.
 	 * Likewise, we don't want to lose rbp via the clobber list.

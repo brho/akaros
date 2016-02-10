@@ -943,7 +943,7 @@ static int vmx_setup_initial_guest_state(struct proc *p,
 
 	/* Initialize parts based on the users info.  If one of them fails, we'll do
 	 * the others but then error out. */
-	ret |= vmcs_set_pgaddr(p, gpci->pir_addr, POSTED_INTR_DESC_ADDR);
+	ret |= vmcs_set_pgaddr(p, gpci->posted_irq_desc, POSTED_INTR_DESC_ADDR);
 	ret |= vmcs_set_pgaddr(p, gpci->vapic_addr, VIRTUAL_APIC_PAGE_ADDR);
 	ret |= vmcs_set_pgaddr(p, gpci->apic_addr, APIC_ACCESS_ADDR);
 
@@ -1131,6 +1131,8 @@ struct guest_pcore *create_guest_pcore(struct proc *p,
 	vmx_setup_vmcs(gpc);
 	ret = vmx_setup_initial_guest_state(p, gpci);
 	vmx_unload_guest_pcore(gpc);
+
+	gpc->posted_irq_desc = gpci->posted_irq_desc;
 
 	if (!ret)
 		return gpc;

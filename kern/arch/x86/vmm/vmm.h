@@ -19,6 +19,7 @@ static inline int cpu_has_svm(const char **msg)
 struct guest_pcore {
 	int cpu;
 	struct proc *proc;
+	unsigned long *posted_irq_desc;
 	struct msr_autoload {
 		unsigned nr;
 		struct vmx_msr_entry guest[NR_AUTOLOAD_MSRS];

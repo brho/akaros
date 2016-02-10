@@ -411,6 +411,8 @@ enum vmcs_field {
 #define INTR_TYPE_SOFT_INTR             (4 << 8) /* software interrupt */
 #define INTR_TYPE_SOFT_EXCEPTION	(6 << 8) /* software exception */
 
+#define VMX_POSTED_OUTSTANDING_NOTIF		256
+
 /* GUEST_INTERRUPTIBILITY_INFO flags. */
 #define GUEST_INTR_STATE_STI		0x00000001
 #define GUEST_INTR_STATE_MOV_SS		0x00000002
