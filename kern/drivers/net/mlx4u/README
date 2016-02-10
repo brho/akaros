@@ -1,0 +1,41 @@
+This directory contains logic for priviledged verbs aka user mode control
+path to support libibverbs. It is based off linux-4.1.15 snapshot of
+drivers/infiniband/hw/mlx4/. Changes on top of baseline are described
+here.
+
+Some common reasons for changes to baseline source:
+
+HF1:	Linux source code that #includes standard linux header files eg
+	linux/list.h, linux/idr.h had to be modified since these headers
+	are absent in akaros.
+
+HF2:	Headers copied from Linux eg rdma/ib_verbs.h were placed in akaros
+	in linux/rdma/ib_verbs.h.
+
+HF3:	Some changes were done to pull in lesser header files from Linux.
+
+Per file listing of changes:
+
+user.h, cq.c, doorbell.c, mr.c, srq.c, qp.c, mlx4_ib.h, main.c:	HF1
+main.c: HF2
+mlx4_ib.h: HF3 (ib_sa.h)
+
+qp.c:	Avoid compiling/linking big chunk of code, while providing
+	panic-stub mandatory function vectors (checked by
+	ib_device_check_mandatory()).
+
+main.c:	Stubs to reduce including other mlx4/ source files.
+	Akaros version of mlx4_ib_mmap()
+	Akaros does not have dev->dev->persist->pdev->device
+	Akaros does not have dev->persist->pdev->bus->name
+	Sysfs elimination
+	Reduced uverbs_cmd_mask and mlx4 function vector for minimal support
+	No register_netdevice_notifier() and register_inetaddr_notifier()
+	No netdev/inet events ... generally no netdev hook up
+	Panic-stub eth_link_query_port() because dependencies on netdev
+
+Makefile: Compilation of this directory depends on CONFIG_MLX4_INFINIBAND,
+	which must be selected in build config. Use -Wno-pointer-sign (for
+	main.c mlx4_ib_add() mlx4_counter_alloc() call) and -include local
+	compatibility header file (sometimes overriding akaros compatibility
+	definitions).
