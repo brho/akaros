@@ -291,7 +291,7 @@ void print_kmsgs(uint32_t coreid)
 		STAILQ_FOREACH(kmsg_i, list, link) {
 			fn_name = get_fn_name((long)kmsg_i->pc);
 			printk("%s KMSG on %d from %d to run %p(%s)\n", type,
-			       kmsg_i->dstid, kmsg_i->srcid, kmsg_i->pc, fn_name); 
+			       kmsg_i->dstid, kmsg_i->srcid, kmsg_i->pc, fn_name);
 			kfree(fn_name);
 		}
 	}
@@ -333,7 +333,7 @@ void kmsg_queue_stat(void)
 			printk("\targ1: %p\n", kmsg->arg1);
 			printk("\targ2: %p\n", kmsg->arg2);
 		}
-			
+
 	}
 }
 
@@ -341,7 +341,7 @@ void print_kctx_depths(const char *str)
 {
 	uint32_t coreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
-	
+
 	if (!str)
 		str = "(none)";
 	printk("%s: Core %d, irq depth %d, ktrap depth %d, irqon %d\n", str, coreid,

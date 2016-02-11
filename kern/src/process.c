@@ -572,7 +572,7 @@ static bool scp_is_vcctx_ready(struct preempt_data *vcpd)
 }
 
 /* Dispatches a _S process to run on the current core.  This should never be
- * called to "restart" a core.   
+ * called to "restart" a core.
  *
  * This will always return, regardless of whether or not the calling core is
  * being given to a process. (it used to pop the tf directly, before we had
@@ -1133,7 +1133,7 @@ void proc_yield(struct proc *p, bool being_nice)
 				 * WAITING.  one (or both) of us will see and make sure the proc
 				 * wakes up.  */
 				__proc_set_state(p, PROC_WAITING);
-				wrmb(); /* don't let the state write pass the notif read */ 
+				wrmb(); /* don't let the state write pass the notif read */
 				if (vcpd->notif_pending) {
 					__proc_set_state(p, PROC_RUNNING_S);
 					/* they can't handle events, just need to prevent a yield.
@@ -1575,7 +1575,7 @@ static void __proc_give_cores_running(struct proc *p, uint32_t *pc_arr,
 	for (int i = 0; i < num; i++) {
 		assert(__proc_give_a_pcore(p, pc_arr[i], &p->inactive_vcs, &vc_i));
 		send_kernel_message(pc_arr[i], __startcore, (long)p,
-		                    (long)vcore2vcoreid(p, vc_i), 
+		                    (long)vcore2vcoreid(p, vc_i),
 		                    (long)vc_i->nr_preempts_sent, KMSG_ROUTINE);
 	}
 	__seq_end_write(&p->procinfo->coremap_seqctr);
