@@ -1337,18 +1337,14 @@ sndrst(struct Proto *tcp, uint8_t * source, uint8_t * dest,
  *  send a reset to the remote side and close the conversation
  *  called with s qlocked
  */
-char *tcphangup(struct conv *s)
+static void tcphangup(struct conv *s)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	Tcp seg;
 	Tcpctl *tcb;
 	struct block *hbp;
 
 	tcb = (Tcpctl *) s->ptcl;
-	if (waserror()) {
-		poperror();
-		return commonerror();
-	}
 	if (ipcmp(s->raddr, IPnoaddr)) {
 		/* discard error style, poperror regardless */
 		if (!waserror()) {
@@ -1378,8 +1374,6 @@ char *tcphangup(struct conv *s)
 		poperror();
 	}
 	localclose(s, NULL);
-	poperror();
-	return NULL;
 }
 
 /*
@@ -2756,14 +2750,14 @@ void tcpkeepalive(void *v)
 /*
  *  start keepalive timer
  */
-char *tcpstartka(struct conv *s, char **f, int n)
+static void tcpstartka(struct conv *s, char **f, int n)
 {
 	Tcpctl *tcb;
 	int x;
 
 	tcb = (Tcpctl *) s->ptcl;
 	if (tcb->state != Established)
-		return "connection must be in Establised state";
+		error(ENOTCONN, "connection must be in Establised state");
 	if (n > 1) {
 		x = atoi(f[1]);
 		if (x >= MSPTICK)
@@ -2771,21 +2765,17 @@ char *tcpstartka(struct conv *s, char **f, int n)
 	}
 	tcpsetkacounter(tcb);
 	tcpgo(s->p->priv, &tcb->katimer);
-
-	return NULL;
 }
 
 /*
  *  turn checksums on/off
  */
-char *tcpsetchecksum(struct conv *s, char **f, int unused)
+static void tcpsetchecksum(struct conv *s, char **f, int unused)
 {
 	Tcpctl *tcb;
 
 	tcb = (Tcpctl *) s->ptcl;
 	tcb->nochecksum = !atoi(f[1]);
-
-	return NULL;
 }
 
 void tcprxmit(struct conv *s)
@@ -3086,29 +3076,39 @@ void tcpadvise(struct Proto *tcp, struct block *bp, char *msg)
 	freeblist(bp);
 }
 
-static char *tcpporthogdefensectl(char *val)
+static void tcpporthogdefensectl(char *val)
 {
 	if (strcmp(val, "on") == 0)
 		tcpporthogdefense = 1;
 	else if (strcmp(val, "off") == 0)
 		tcpporthogdefense = 0;
 	else
-		return "unknown value for tcpporthogdefense";
-	return NULL;
+		error(EINVAL, "unknown value for tcpporthogdefense");
 }
 
 /* called with c qlocked */
 char *tcpctl(struct conv *c, char **f, int n)
 {
+	ERRSTACK(1);
+
+	if (waserror()) {
+		poperror();
+		return current_errstr();
+	}
+
 	if (n == 1 && strcmp(f[0], "hangup") == 0)
-		return tcphangup(c);
-	if (n >= 1 && strcmp(f[0], "keepalive") == 0)
-		return tcpstartka(c, f, n);
-	if (n >= 1 && strcmp(f[0], "checksum") == 0)
-		return tcpsetchecksum(c, f, n);
-	if (n >= 1 && strcmp(f[0], "tcpporthogdefense") == 0)
-		return tcpporthogdefensectl(f[1]);
-	return "unknown control request";
+		tcphangup(c);
+	else if (n >= 1 && strcmp(f[0], "keepalive") == 0)
+		tcpstartka(c, f, n);
+	else if (n >= 1 && strcmp(f[0], "checksum") == 0)
+		tcpsetchecksum(c, f, n);
+	else if (n >= 1 && strcmp(f[0], "tcpporthogdefense") == 0)
+		tcpporthogdefensectl(f[1]);
+	else
+		error(EINVAL, "unknown command to %s", __func__);
+
+	poperror();
+	return NULL;
 }
 
 int tcpstats(struct Proto *tcp, char *buf, int len)
