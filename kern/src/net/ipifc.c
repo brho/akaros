@@ -807,8 +807,6 @@ static char *ipifcctl(struct conv *c, char **argv, int argc)
 	ifc = (struct Ipifc *)c->ptcl;
 	if (strcmp(argv[0], "add") == 0)
 		return ipifcadd(ifc, argv, argc, 0, NULL);
-	else if (strcmp(argv[0], "bootp") == 0)
-		return bootp(ifc);
 	else if (strcmp(argv[0], "try") == 0)
 		return ipifcadd(ifc, argv, argc, 1, NULL);
 	else if (strcmp(argv[0], "remove") == 0)

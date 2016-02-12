@@ -683,12 +683,6 @@ static inline void ptclcsum_finalize(struct block *bp, unsigned int feat)
 }
 
 /*
- * bootp.c
- */
-char *(*bootp) (struct Ipifc * unused_ipifc);
-int (*bootpread) (char *unused_char_p_t, uint32_t, int);
-
-/*
  *  iprouter.c
  */
 void useriprouter(struct Fs *, struct Ipifc *unused_ipifc, struct block *);

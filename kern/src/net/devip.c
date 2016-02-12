@@ -51,7 +51,6 @@ enum {
 	Qtopdir = 1,				/* top level directory */
 	Qtopbase,
 	Qarp = Qtopbase,
-	Qbootp,
 	Qndb,
 	Qiproute,
 	Qiprouter,
@@ -193,11 +192,6 @@ static int ip1gen(struct chan *c, int i, struct dir *dp)
 		case Qarp:
 			p = "arp";
 			break;
-		case Qbootp:
-			if (bootp == NULL)
-				return 0;
-			p = "bootp";
-			break;
 		case Qndb:
 			p = "ndb";
 			len = strlen(f->ndb);
@@ -246,7 +240,6 @@ ipgen(struct chan *c, char *unused_char_p_t, struct dirtab *d, int unused_int,
 			s -= f->np;
 			return ip1gen(c, s + Qtopbase, dp);
 		case Qarp:
-		case Qbootp:
 		case Qndb:
 		case Qlog:
 		case Qiproute:
@@ -433,7 +426,6 @@ static struct chan *ipopen(struct chan *c, int omode)
 		case Qremote:
 		case Qlocal:
 		case Qstats:
-		case Qbootp:
 		case Qipselftab:
 			if (omode & O_WRITE)
 				error(EPERM, ERROR_FIXME);
@@ -755,8 +747,6 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 			return devdirread(ch, a, n, 0, 0, ipgen);
 		case Qarp:
 			return arpread(f->arp, a, offset, n);
-		case Qbootp:
-			return bootpread(a, offset, n);
 		case Qndb:
 			return readstr(offset, a, n, f->ndb);
 		case Qiproute:
