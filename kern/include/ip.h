@@ -633,11 +633,7 @@ extern void ipifcremroute(struct Fs *, int unused_int, uint8_t * u8pt,
 						  uint8_t * u8pt2);
 extern void ipifcremmulti(struct conv *c, uint8_t * ma, uint8_t * ia);
 extern void ipifcaddmulti(struct conv *c, uint8_t * ma, uint8_t * ia);
-extern char *ipifcrem(struct Ipifc *ifc, char **argv, int argc);
-extern char *ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
-					  struct Iplifc *lifcp);
 extern long ipselftabread(struct Fs *, char *a, uint32_t offset, int n);
-extern char *ipifcaddpref6(struct Ipifc *ifc, char **argv, int argc);
 extern void ipsendra6(struct Fs *f, int on);
 
 /*

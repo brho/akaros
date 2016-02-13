@@ -94,11 +94,12 @@ static void addselfcache(struct Fs *f, struct Ipifc *ifc, struct Iplifc *lifc,
 						 uint8_t * a, int type);
 static void remselfcache(struct Fs *f,
 						 struct Ipifc *ifc, struct Iplifc *lifc, uint8_t * a);
-static char *ipifcjoinmulti(struct Ipifc *ifc, char **argv, int argc);
-static char *ipifcleavemulti(struct Ipifc *ifc, char **argv, int argc);
+static void ipifcjoinmulti(struct Ipifc *ifc, char **argv, int argc);
+static void ipifcleavemulti(struct Ipifc *ifc, char **argv, int argc);
 static void ipifcregisterproxy(struct Fs *, struct Ipifc *,
 							   uint8_t * unused_uint8_p_t);
-static char *ipifcremlifc(struct Ipifc *, struct Iplifc *);
+static void ipifcremlifc(struct Ipifc *, struct Iplifc *);
+static void ipifcaddpref6(struct Ipifc *ifc, char **argv, int argc);
 
 /*
  *  link in a new medium
@@ -200,7 +201,7 @@ static char *ipifcbind(struct conv *c, char **argv, int argc)
  *  detach a device from an interface, close the interface
  *  called with ifc->conv closed
  */
-static char *ipifcunbind(struct Ipifc *ifc)
+static void ipifcunbind(struct Ipifc *ifc)
 {
 	ERRSTACK(1);
 	char *err;
@@ -229,16 +230,12 @@ static char *ipifcunbind(struct Ipifc *ifc)
 	qclose(ifc->conv->sq);
 
 	/* disassociate logical interfaces */
-	while (ifc->lifc) {
-		err = ipifcremlifc(ifc, ifc->lifc);
-		if (err)
-			error(EFAIL, err);
-	}
+	while (ifc->lifc)
+		ipifcremlifc(ifc, ifc->lifc);
 
 	ifc->m = NULL;
 	wunlock(&ifc->rwlock);
 	poperror();
-	return NULL;
 }
 
 char sfixedformat[] =
@@ -368,26 +365,26 @@ static void ipifcclose(struct conv *c)
 /*
  *  change an interface's mtu
  */
-char *ipifcsetmtu(struct Ipifc *ifc, char **argv, int argc)
+static void ipifcsetmtu(struct Ipifc *ifc, char **argv, int argc)
 {
 	int mtu;
 
 	if (argc < 2)
-		return errno_to_string(EINVAL);
+		error(EINVAL, "Too few args (%d) to %s", argc, __func__);
 	if (ifc->m == NULL)
-		return errno_to_string(EINVAL);
+		error(EFAIL, "No medium on IFC");
 	mtu = strtoul(argv[1], 0, 0);
 	if (mtu < ifc->m->mintu || mtu > ifc->m->maxtu)
-		return errno_to_string(EINVAL);
+		error(EFAIL, "Bad MTU size %d (%d, %d)", mtu, ifc->m->mintu,
+		      ifc->m->maxtu);
 	ifc->maxtu = mtu;
-	return NULL;
 }
 
 /*
  *  add an address to an interface.
  */
-char *ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
-			   struct Iplifc *lifcp)
+static void ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
+                     struct Iplifc *lifcp)
 {
 	uint8_t ip[IPaddrlen], mask[IPaddrlen], rem[IPaddrlen];
 	uint8_t bcast[IPaddrlen], net[IPaddrlen];
@@ -397,7 +394,7 @@ char *ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
 	int sendnbrdisc = 0;
 
 	if (ifc->m == NULL)
-		return "ipifc not yet bound to device";
+		error(EFAIL, "ipifc not yet bound to device");
 
 	f = ifc->conv->p->f;
 
@@ -434,7 +431,7 @@ char *ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
 			maskip(rem, mask, net);
 			break;
 		default:
-			return errno_to_string(EINVAL);
+			error(EINVAL, "Bad arg num to %s", __func__);
 	}
 	if (isv4(ip))
 		tentative = 0;
@@ -554,14 +551,13 @@ out:
 	wunlock(&ifc->rwlock);
 	if (tentative && sendnbrdisc)
 		icmpns(f, 0, SRC_UNSPEC, ip, TARG_MULTI, ifc->mac);
-	return NULL;
 }
 
 /*
  *  remove a logical interface from an ifc
  *  always called with ifc wlock'd
  */
-static char *ipifcremlifc(struct Ipifc *ifc, struct Iplifc *lifc)
+static void ipifcremlifc(struct Ipifc *ifc, struct Iplifc *lifc)
 {
 	struct Iplifc **l;
 	struct Fs *f;
@@ -575,7 +571,7 @@ static char *ipifcremlifc(struct Ipifc *ifc, struct Iplifc *lifc)
 	 */
 	for (l = &ifc->lifc; *l != NULL && *l != lifc; l = &(*l)->next) ;
 	if (*l == NULL)
-		return "address not on this interface";
+		error(EFAIL, "address not on this interface");
 	*l = lifc->next;
 
 	/* disassociate any addresses */
@@ -596,24 +592,22 @@ static char *ipifcremlifc(struct Ipifc *ifc, struct Iplifc *lifc)
 	}
 
 	kfree(lifc);
-	return NULL;
-
 }
 
 /*
  *  remove an address from an interface.
  *  called with c locked
  */
-char *ipifcrem(struct Ipifc *ifc, char **argv, int argc)
+static void ipifcrem(struct Ipifc *ifc, char **argv, int argc)
 {
+	ERRSTACK(1);
 	uint8_t ip[IPaddrlen];
 	uint8_t mask[IPaddrlen];
 	uint8_t rem[IPaddrlen];
 	struct Iplifc *lifc;
-	char *rv;
 
 	if (argc < 3)
-		return errno_to_string(EINVAL);
+		error(EINVAL, "Too few args (%d) to %s", argc, __func__);
 
 	parseip(ip, argv[1]);
 	parseipmask(mask, argv[2]);
@@ -623,6 +617,10 @@ char *ipifcrem(struct Ipifc *ifc, char **argv, int argc)
 		parseip(rem, argv[3]);
 
 	wlock(&ifc->rwlock);
+	if (waserror()) {
+		wunlock(&ifc->rwlock);
+		nexterror();
+	}
 
 	/*
 	 *  find address on this interface and remove from chain.
@@ -636,9 +634,9 @@ char *ipifcrem(struct Ipifc *ifc, char **argv, int argc)
 			break;
 	}
 
-	rv = ipifcremlifc(ifc, lifc);
+	ipifcremlifc(ifc, lifc);
+	poperror();
 	wunlock(&ifc->rwlock);
-	return rv;
 }
 
 /*
@@ -706,24 +704,24 @@ static char *ipifcconnect(struct conv *c, char **argv, int argc)
 		wunlock(&ifc->rwlock);
 		nexterror();
 	}
-	while (ifc->lifc) {
-		err = ipifcremlifc(ifc, ifc->lifc);
-		if (err)
-			error(EFAIL, err);
-	}
+	while (ifc->lifc)
+		ipifcremlifc(ifc, ifc->lifc);
 	wunlock(&ifc->rwlock);
 	poperror();
 
-	err = ipifcadd(ifc, argv, argc, 0, NULL);
-	if (err)
-		return err;
+	if (waserror()) {
+		poperror();
+		return current_errstr();
+	}
+	ipifcadd(ifc, argv, argc, 0, NULL);
+	poperror();
 
 	Fsconnected(c, NULL);
 
 	return NULL;
 }
 
-char *ipifcsetpar6(struct Ipifc *ifc, char **argv, int argc)
+static void ipifcsetpar6(struct Ipifc *ifc, char **argv, int argc)
 {
 	int i, argsleft, vmax = ifc->rp.maxraint, vmin = ifc->rp.minraint;
 
@@ -731,7 +729,7 @@ char *ipifcsetpar6(struct Ipifc *ifc, char **argv, int argc)
 	i = 1;
 
 	if (argsleft % 2 != 0)
-		return errno_to_string(EINVAL);
+		error(EINVAL, "Non-even number of args (%d) to %s", argc, __func__);
 
 	while (argsleft > 1) {
 		if (strcmp(argv[i], "recvra") == 0)
@@ -757,7 +755,7 @@ char *ipifcsetpar6(struct Ipifc *ifc, char **argv, int argc)
 		else if (strcmp(argv[i], "routerlt") == 0)
 			ifc->rp.routerlt = atoi(argv[i + 1]);
 		else
-			return errno_to_string(EINVAL);
+			error(EINVAL, "unknown command to %s", __func__);
 
 		argsleft -= 2;
 		i += 2;
@@ -767,13 +765,11 @@ char *ipifcsetpar6(struct Ipifc *ifc, char **argv, int argc)
 	if (ifc->rp.maxraint < ifc->rp.minraint) {
 		ifc->rp.maxraint = vmax;
 		ifc->rp.minraint = vmin;
-		return errno_to_string(EINVAL);
+		error(EINVAL, "inconsistent ifc->rp 'raint'");
 	}
-
-	return NULL;
 }
 
-char *ipifcsendra6(struct Ipifc *ifc, char **argv, int argc)
+static void ipifcsendra6(struct Ipifc *ifc, char **argv, int argc)
 {
 	int i;
 
@@ -781,10 +777,9 @@ char *ipifcsendra6(struct Ipifc *ifc, char **argv, int argc)
 	if (argc > 1)
 		i = atoi(argv[1]);
 	ifc->sendra6 = (i != 0);
-	return NULL;
 }
 
-char *ipifcrecvra6(struct Ipifc *ifc, char **argv, int argc)
+static void ipifcrecvra6(struct Ipifc *ifc, char **argv, int argc)
 {
 	int i;
 
@@ -792,7 +787,15 @@ char *ipifcrecvra6(struct Ipifc *ifc, char **argv, int argc)
 	if (argc > 1)
 		i = atoi(argv[1]);
 	ifc->recvra6 = (i != 0);
-	return NULL;
+}
+
+static void ipifc_iprouting(struct Fs *f, char **argv, int argc)
+{
+	int i = 1;
+
+	if (argc > 1)
+		i = atoi(argv[1]);
+	iprouting(f, i);
 }
 
 /*
@@ -803,40 +806,45 @@ static char *ipifcctl(struct conv *c, char **argv, int argc)
 {
 	struct Ipifc *ifc;
 	int i;
+	ERRSTACK(1);
+
+	if (waserror()) {
+		poperror();
+		return current_errstr();
+	}
 
 	ifc = (struct Ipifc *)c->ptcl;
 	if (strcmp(argv[0], "add") == 0)
-		return ipifcadd(ifc, argv, argc, 0, NULL);
+		ipifcadd(ifc, argv, argc, 0, NULL);
 	else if (strcmp(argv[0], "try") == 0)
-		return ipifcadd(ifc, argv, argc, 1, NULL);
+		ipifcadd(ifc, argv, argc, 1, NULL);
 	else if (strcmp(argv[0], "remove") == 0)
-		return ipifcrem(ifc, argv, argc);
+		ipifcrem(ifc, argv, argc);
 	else if (strcmp(argv[0], "unbind") == 0)
-		return ipifcunbind(ifc);
+		ipifcunbind(ifc);
 	else if (strcmp(argv[0], "joinmulti") == 0)
-		return ipifcjoinmulti(ifc, argv, argc);
+		ipifcjoinmulti(ifc, argv, argc);
 	else if (strcmp(argv[0], "leavemulti") == 0)
-		return ipifcleavemulti(ifc, argv, argc);
+		ipifcleavemulti(ifc, argv, argc);
 	else if (strcmp(argv[0], "mtu") == 0)
-		return ipifcsetmtu(ifc, argv, argc);
-	else if (strcmp(argv[0], "reassemble") == 0) {
+		ipifcsetmtu(ifc, argv, argc);
+	else if (strcmp(argv[0], "reassemble") == 0)
 		ifc->reassemble = 1;
-		return NULL;
-	} else if (strcmp(argv[0], "iprouting") == 0) {
-		i = 1;
-		if (argc > 1)
-			i = atoi(argv[1]);
-		iprouting(c->p->f, i);
-		return NULL;
-	} else if (strcmp(argv[0], "addpref6") == 0)
-		return ipifcaddpref6(ifc, argv, argc);
+	else if (strcmp(argv[0], "iprouting") == 0)
+		ipifc_iprouting(c->p->f, argv, argc);
+	else if (strcmp(argv[0], "addpref6") == 0)
+		ipifcaddpref6(ifc, argv, argc);
 	else if (strcmp(argv[0], "setpar6") == 0)
-		return ipifcsetpar6(ifc, argv, argc);
+		ipifcsetpar6(ifc, argv, argc);
 	else if (strcmp(argv[0], "sendra6") == 0)
-		return ipifcsendra6(ifc, argv, argc);
+		ipifcsendra6(ifc, argv, argc);
 	else if (strcmp(argv[0], "recvra6") == 0)
-		return ipifcrecvra6(ifc, argv, argc);
-	return "unsupported ctl";
+		ipifcrecvra6(ifc, argv, argc);
+	else
+		error(EINVAL, "unknown command to %s", __func__);
+
+	poperror();
+	return NULL;
 }
 
 int ipifcstats(struct Proto *ipifc, char *buf, int len)
@@ -1541,14 +1549,14 @@ void ipifcremmulti(struct conv *c, uint8_t * ma, uint8_t * ia)
 /*
  *  make lifc's join and leave multicast groups
  */
-static char *ipifcjoinmulti(struct Ipifc *ifc, char **argv, int argc)
+static void ipifcjoinmulti(struct Ipifc *ifc, char **argv, int argc)
 {
-	return NULL;
+	warn_once("Not implemented, should it be?");
 }
 
-static char *ipifcleavemulti(struct Ipifc *ifc, char **argv, int argc)
+static void ipifcleavemulti(struct Ipifc *ifc, char **argv, int argc)
 {
-	return NULL;
+	warn_once("Not implemented, should it be?");
 }
 
 static void ipifcregisterproxy(struct Fs *f, struct Ipifc *ifc, uint8_t * ip)
@@ -1634,7 +1642,7 @@ enum {
 	Ngates = 3,
 };
 
-char *ipifcaddpref6(struct Ipifc *ifc, char **argv, int argc)
+static void ipifcaddpref6(struct Ipifc *ifc, char **argv, int argc)
 {
 	uint8_t onlink = 1;
 	uint8_t autoflag = 1;
@@ -1665,13 +1673,13 @@ char *ipifcaddpref6(struct Ipifc *ifc, char **argv, int argc)
 		case 2:
 			break;
 		default:
-			return errno_to_string(EINVAL);
+			error(EINVAL, "Bad arg num to %s", __func__);
 	}
 
 	if ((parseip(prefix, argv[1]) != 6) ||
 		(validlt < preflt) || (plen < 0) || (plen > 64) || (islinklocal(prefix))
 		)
-		return errno_to_string(EINVAL);
+		error(EFAIL, "IP parsing failed");
 
 	lifc = kzmalloc(sizeof(struct Iplifc), 0);
 	lifc->onlink = (onlink != 0);
@@ -1683,7 +1691,7 @@ char *ipifcaddpref6(struct Ipifc *ifc, char **argv, int argc)
 	if (ifc->m->pref2addr != NULL)
 		ifc->m->pref2addr(prefix, ifc->mac);
 	else
-		return errno_to_string(EINVAL);
+		error(EFAIL, "Null IFC pref");
 
 	snprintf(addr, sizeof(addr), "%I", prefix);
 	snprintf(preflen, sizeof(preflen), "/%d", plen);
@@ -1691,5 +1699,5 @@ char *ipifcaddpref6(struct Ipifc *ifc, char **argv, int argc)
 	params[1] = addr;
 	params[2] = preflen;
 
-	return ipifcadd(ifc, params, 3, 0, lifc);
+	ipifcadd(ifc, params, 3, 0, lifc);
 }
