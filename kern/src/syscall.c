@@ -355,6 +355,7 @@ void set_errstr(const char *fmt, ...)
 {
 	va_list ap;
 
+	assert(fmt);
 	va_start(ap, fmt);
 	vset_errstr(fmt, ap);
 	va_end(ap);
@@ -374,8 +375,9 @@ void set_error(int error, const char *fmt, ...)
 
 	set_errno(error);
 
+	assert(fmt);
 	va_start(ap, fmt);
-	vset_errstr(fmt != NULL ? fmt: errno_to_string(error), ap);
+	vset_errstr(fmt, ap);
 	va_end(ap);
 }
 
