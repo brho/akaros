@@ -1298,7 +1298,7 @@ static bool qwait(struct queue *q)
 				spin_unlock_irqsave(&q->lock);
 				error(EFAIL, "multiple reads on a closed queue");
 			}
-			if (*q->err && strcmp(q->err, errno_to_string(ECONNABORTED)) != 0) {
+			if (q->err[0]) {
 				spin_unlock_irqsave(&q->lock);
 				error(EFAIL, q->err);
 			}
@@ -1667,7 +1667,10 @@ long qbwrite(struct queue *q, struct block *b)
 	/* give up if the queue is closed */
 	if (q->state & Qclosed) {
 		spin_unlock_irqsave(&q->lock);
-		error(EFAIL, q->err);
+		if (q->err[0])
+			error(EFAIL, q->err);
+		else
+			error(EFAIL, "connection closed");
 	}
 
 	/* if nonblocking, don't queue over the limit */
@@ -1890,7 +1893,7 @@ void qclose(struct queue *q)
 	spin_lock_irqsave(&q->lock);
 	q->state |= Qclosed;
 	q->state &= ~(Qflow | Qstarve | Qdropoverflow | Qnonblock);
-	strlcpy(q->err, errno_to_string(ECONNABORTED), sizeof(q->err));
+	q->err[0] = 0;
 	bfirst = q->bfirst;
 	q->bfirst = 0;
 	q->len = 0;
@@ -1906,17 +1909,19 @@ void qclose(struct queue *q)
 	qwake_cb(q, FDTAP_FILT_HANGUP);
 }
 
-/*
- *  Mark a queue as closed.  Wakeup any readers.  Don't remove queued
- *  blocks.
- */
+/* Mark a queue as closed.  Wakeup any readers.  Don't remove queued blocks.
+ *
+ * msg will be the errstr received by any waiters (qread, qbread, etc).  If
+ * there is no message, which is what also happens during a natural qclose(),
+ * those waiters will simply return 0.  qwriters will always error() on a
+ * closed/hungup queue. */
 void qhangup(struct queue *q, char *msg)
 {
 	/* mark it */
 	spin_lock_irqsave(&q->lock);
 	q->state |= Qclosed;
 	if (msg == 0 || *msg == 0)
-		strlcpy(q->err, errno_to_string(ECONNABORTED), sizeof(q->err));
+		q->err[0] = 0;
 	else
 		strlcpy(q->err, msg, ERRMAX);
 	spin_unlock_irqsave(&q->lock);
