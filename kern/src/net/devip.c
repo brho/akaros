@@ -1108,23 +1108,15 @@ static void announcectlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 /*
  *  called by protocol bind routine to set addresses
  */
-char *Fsstdbind(struct conv *c, char *argv[], int argc)
+void Fsstdbind(struct conv *c, char *argv[], int argc)
 {
-	ERRSTACK(1);
-
 	switch (argc) {
 		default:
-			return "bad args to bind";
+			error(EINVAL, "bad args to bind");
 		case 2:
-			if (waserror()) {
-				poperror();
-				return current_errstr();
-			}
 			setladdrport(c, argv[1], 0);
-			poperror();
 			break;
 	}
-	return 0;
 }
 
 void Fsconvnonblock(struct conv *cv, bool onoff)
@@ -1136,14 +1128,10 @@ void Fsconvnonblock(struct conv *cv, bool onoff)
 
 static void bindctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 {
-	char *p;
-
 	if (x->bind == NULL)
-		p = Fsstdbind(c, cb->f, cb->nf);
+		Fsstdbind(c, cb->f, cb->nf);
 	else
-		p = x->bind(c, cb->f, cb->nf);
-	if (p != NULL)
-		error(EFAIL, p);
+		x->bind(c, cb->f, cb->nf);
 }
 
 static void nonblockctlmsg(struct conv *c, struct cmdbuf *cb)

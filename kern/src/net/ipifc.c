@@ -132,26 +132,26 @@ struct medium *ipfindmedium(char *name)
  *  attach a device (or pkt driver) to the interface.
  *  called with c locked
  */
-static char *ipifcbind(struct conv *c, char **argv, int argc)
+static void ipifcbind(struct conv *c, char **argv, int argc)
 {
 	ERRSTACK(1);
 	struct Ipifc *ifc;
 	struct medium *m;
 
 	if (argc < 2)
-		return errno_to_string(EINVAL);
+		error(EINVAL, "Too few args (%d) to %s", argc, __func__);
 
 	ifc = (struct Ipifc *)c->ptcl;
 
 	/* bind the device to the interface */
 	m = ipfindmedium(argv[1]);
 	if (m == NULL)
-		return "unknown interface type";
+		error(EFAIL, "unknown interface type");
 
 	wlock(&ifc->rwlock);
 	if (ifc->m != NULL) {
 		wunlock(&ifc->rwlock);
-		return "interface already bound";
+		error(EFAIL, "interfacr already bound");
 	}
 	if (waserror()) {
 		wunlock(&ifc->rwlock);
@@ -193,8 +193,6 @@ static char *ipifcbind(struct conv *c, char **argv, int argc)
 
 	wunlock(&ifc->rwlock);
 	poperror();
-
-	return NULL;
 }
 
 /*

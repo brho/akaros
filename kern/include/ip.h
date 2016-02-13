@@ -291,7 +291,7 @@ struct Proto {
 
 	void (*connect)(struct conv *, char **, int);
 	void (*announce)(struct conv *, char **, int);
-	char *(*bind) (struct conv *, char **unused_char_pp_t, int);
+	void (*bind)(struct conv *, char **, int);
 	int (*state) (struct conv *, char *unused_char_p_t, int);
 	void (*create) (struct conv *);
 	void (*close) (struct conv *);
@@ -390,7 +390,7 @@ struct Proto *Fsrcvpcol(struct Fs *, uint8_t unused_uint8_t);
 struct Proto *Fsrcvpcolx(struct Fs *, uint8_t unused_uint8_t);
 void Fsstdconnect(struct conv *, char **, int);
 void Fsstdannounce(struct conv *, char **, int);
-char *Fsstdbind(struct conv *, char **unused_char_pp_t, int);
+void Fsstdbind(struct conv *, char **, int);
 void Fsconvnonblock(struct conv *, bool);
 uint32_t scalednconv(void);
 
