@@ -688,7 +688,6 @@ struct chan *undomount(struct chan *c, struct cname *name)
  * Either walks all the way or not at all.  No partial results in *cp.
  * *nerror is the number of names to display in an error message.
  */
-static char Edoesnotexist[] = "does not exist";
 int walk(struct chan **cp, char **names, int nnames, bool can_mount, int *nerror)
 {
 	int dev, dotdot, i, n, nhave, ntry, type;
@@ -796,11 +795,11 @@ int walk(struct chan **cp, char **names, int nnames, bool can_mount, int *nerror
 					if (wq->nqid == 0 || (wq->qid[wq->nqid - 1].type & QTDIR)) {
 						if (nerror)
 							*nerror = nhave + wq->nqid + 1;
-						set_errstr(Edoesnotexist);
+						set_error(ENOENT, "walk failed");
 					} else {
 						if (nerror)
 							*nerror = nhave + wq->nqid;
-						set_errstr(errno_to_string(ENOTDIR));
+						set_error(ENOTDIR, "walk failed");
 					}
 					kfree(wq);
 					if (mh != NULL)

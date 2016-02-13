@@ -605,7 +605,7 @@ long unionread(struct chan *c, void *va, long n)
 			/* normally we want to discard the error, but for our ghetto kdirent
 			 * hack, we need to repeat unionread if we saw a ENODATA */
 			if (waserror()) {
-				if (!strcmp(current_errstr(), errno_to_string(ENODATA))) {
+				if (get_errno() == ENODATA) {
 					runlock(&m->lock);
 					qunlock(&c->umqlock);
 					nexterror();

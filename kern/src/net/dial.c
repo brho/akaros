@@ -155,7 +155,7 @@ static int csdial(DS * ds)
 	 *  we get one that works.
 	 */
 	*besterr = 0;
-	strlcpy(err, errno_to_string(ECONNRESET), ERRMAX);
+	strlcpy(err, "csdial() connection reset", ERRMAX);
 	sysseek(fd, 0, 0);
 	while ((n = sysread(fd, buf, Maxstring - 1)) > 0) {
 		buf[n] = 0;

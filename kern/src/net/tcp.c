@@ -2091,7 +2091,7 @@ reset:
 			}
 			if (seg.flags & RST) {
 				if (seg.flags & ACK)
-					localclose(s, errno_to_string(ECONNREFUSED));
+					localclose(s, "connection refused");
 				goto raise;
 			}
 
@@ -2196,7 +2196,7 @@ reset:
 						 s->raddr, s->rport, s->laddr, s->lport, tcb->rcv.nxt,
 						 seg.seq);
 			}
-			localclose(s, errno_to_string(ECONNREFUSED));
+			localclose(s, "connection refused");
 			goto raise;
 		}
 
@@ -2725,7 +2725,7 @@ void tcpkeepalive(void *v)
 	}
 	if (tcb->state != Closed) {
 		if (--(tcb->kacounter) <= 0) {
-			localclose(s, errno_to_string(ETIMEDOUT));
+			localclose(s, "connection timed out");
 		} else {
 			tcpsendka(s);
 			tcpgo(s->p->priv, &tcb->katimer);
@@ -2814,7 +2814,7 @@ void tcptimeout(void *arg)
 				maxback = MAXBACKMS;
 			tcb->backedoff += tcb->timer.start * MSPTICK;
 			if (tcb->backedoff >= maxback) {
-				localclose(s, errno_to_string(ETIMEDOUT));
+				localclose(s, "connection timed out");
 				break;
 			}
 			netlog(s->p->f, Logtcprxmt, "timeout rexmit 0x%lx %llu/%llu\n",
