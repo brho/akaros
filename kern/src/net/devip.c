@@ -1058,25 +1058,17 @@ static void connectctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 /*
  *  called by protocol announce routine to set addresses
  */
-char *Fsstdannounce(struct conv *c, char *argv[], int argc)
+void Fsstdannounce(struct conv *c, char *argv[], int argc)
 {
-	ERRSTACK(1);
-
 	memset(c->raddr, 0, sizeof(c->raddr));
 	c->rport = 0;
 	switch (argc) {
 		default:
-			return "bad args to announce";
+			error(EINVAL, "bad args to announce");
 		case 2:
-			if (waserror()) {
-				poperror();
-				return current_errstr();
-			}
 			setladdrport(c, argv[1], 1);
-			poperror();
 			break;
 	}
-	return 0;
 }
 
 /*
@@ -1098,9 +1090,7 @@ static void announcectlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 	c->cerr[0] = '\0';
 	if (x->announce == NULL)
 		error(EFAIL, "announce not supported");
-	p = x->announce(c, cb->f, cb->nf);
-	if (p != NULL)
-		error(EFAIL, p);
+	x->announce(c, cb->f, cb->nf);
 
 	qunlock(&c->qlock);
 	if (waserror()) {

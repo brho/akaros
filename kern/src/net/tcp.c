@@ -494,17 +494,11 @@ static int tcpinuse(struct conv *c)
 	return s->state != Closed;
 }
 
-static char *tcpannounce(struct conv *c, char **argv, int argc)
+static void tcpannounce(struct conv *c, char **argv, int argc)
 {
-	char *e;
-
-	e = Fsstdannounce(c, argv, argc);
-	if (e != NULL)
-		return e;
+	Fsstdannounce(c, argv, argc);
 	tcpstart(c, TCP_LISTEN);
 	Fsconnected(c, NULL);
-
-	return NULL;
 }
 
 /*

@@ -941,7 +941,7 @@ int icmpstats6(struct Proto *icmp6, char *buf, int len)
 
 // need to import from icmp.c
 extern int icmpstate(struct conv *c, char *state, int n);
-extern char *icmpannounce(struct conv *c, char **argv, int argc);
+extern void icmpannounce(struct conv *c, char **argv, int argc);
 extern void icmpconnect(struct conv *c, char **argv, int argc);
 extern void icmpclose(struct conv *c);
 

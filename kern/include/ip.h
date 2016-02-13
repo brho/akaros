@@ -290,7 +290,7 @@ struct Proto {
 	int ipproto;				/* ip protocol type */
 
 	void (*connect)(struct conv *, char **, int);
-	char *(*announce) (struct conv *, char **unused_char_pp_t, int);
+	void (*announce)(struct conv *, char **, int);
 	char *(*bind) (struct conv *, char **unused_char_pp_t, int);
 	int (*state) (struct conv *, char *unused_char_p_t, int);
 	void (*create) (struct conv *);
@@ -389,7 +389,7 @@ struct conv *Fsprotoclone(struct Proto *, char *unused_char_p_t);
 struct Proto *Fsrcvpcol(struct Fs *, uint8_t unused_uint8_t);
 struct Proto *Fsrcvpcolx(struct Fs *, uint8_t unused_uint8_t);
 void Fsstdconnect(struct conv *, char **, int);
-char *Fsstdannounce(struct conv *, char **unused_char_pp_t, int);
+void Fsstdannounce(struct conv *, char **, int);
 char *Fsstdbind(struct conv *, char **unused_char_pp_t, int);
 void Fsconvnonblock(struct conv *, bool);
 uint32_t scalednconv(void);

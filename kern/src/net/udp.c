@@ -164,19 +164,14 @@ static int udpstate(struct conv *c, char *state, int n)
 					c->rq ? qlen(c->rq) : 0, c->wq ? qlen(c->wq) : 0);
 }
 
-static char *udpannounce(struct conv *c, char **argv, int argc)
+static void udpannounce(struct conv *c, char **argv, int argc)
 {
-	char *e;
 	Udppriv *upriv;
 
 	upriv = c->p->priv;
-	e = Fsstdannounce(c, argv, argc);
-	if (e != NULL)
-		return e;
+	Fsstdannounce(c, argv, argc);
 	Fsconnected(c, NULL);
 	iphtadd(&upriv->ht, c);
-
-	return NULL;
 }
 
 static void udpcreate(struct conv *c)
