@@ -154,16 +154,10 @@ static void icmpcreate(struct conv *c)
 	c->wq = qbypass(icmpkick, c);
 }
 
-extern char *icmpconnect(struct conv *c, char **argv, int argc)
+void icmpconnect(struct conv *c, char **argv, int argc)
 {
-	char *e;
-
-	e = Fsstdconnect(c, argv, argc);
-	if (e != NULL)
-		return e;
-	Fsconnected(c, e);
-
-	return NULL;
+	Fsstdconnect(c, argv, argc);
+	Fsconnected(c, 0);
 }
 
 extern int icmpstate(struct conv *c, char *state, int n)

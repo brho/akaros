@@ -688,7 +688,7 @@ void ipifcremroute(struct Fs *f, int vers, uint8_t * addr, uint8_t * mask)
  *  addresses.  This is a macro that means, remove all the old interfaces
  *  and add a new one.
  */
-static char *ipifcconnect(struct conv *c, char **argv, int argc)
+static void ipifcconnect(struct conv *c, char **argv, int argc)
 {
 	ERRSTACK(1);
 	char *err;
@@ -697,7 +697,7 @@ static char *ipifcconnect(struct conv *c, char **argv, int argc)
 	ifc = (struct Ipifc *)c->ptcl;
 
 	if (ifc->m == NULL)
-		return "ipifc not yet bound to device";
+		error(EFAIL, "ipifc not yet bound to device");
 
 	wlock(&ifc->rwlock);
 	if (waserror()) {
@@ -709,16 +709,9 @@ static char *ipifcconnect(struct conv *c, char **argv, int argc)
 	wunlock(&ifc->rwlock);
 	poperror();
 
-	if (waserror()) {
-		poperror();
-		return current_errstr();
-	}
 	ipifcadd(ifc, argv, argc, 0, NULL);
-	poperror();
 
 	Fsconnected(c, NULL);
-
-	return NULL;
 }
 
 static void ipifcsetpar6(struct Ipifc *ifc, char **argv, int argc)

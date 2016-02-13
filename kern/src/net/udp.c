@@ -146,19 +146,15 @@ struct Udpcb {
 	uint8_t headers;
 };
 
-static char *udpconnect(struct conv *c, char **argv, int argc)
+static void udpconnect(struct conv *c, char **argv, int argc)
 {
-	char *e;
 	Udppriv *upriv;
 
 	upriv = c->p->priv;
-	e = Fsstdconnect(c, argv, argc);
-	Fsconnected(c, e);
-	if (e != NULL)
-		return e;
+	Fsstdconnect(c, argv, argc);
+	Fsconnected(c, 0);
 
 	iphtadd(&upriv->ht, c);
-	return NULL;
 }
 
 static int udpstate(struct conv *c, char *state, int n)

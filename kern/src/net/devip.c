@@ -848,7 +848,7 @@ static void setladdr(struct conv *c)
 /*
  *  set a local port making sure the quad of raddr,rport,laddr,lport is unique
  */
-static char *setluniqueport(struct conv *c, int lport)
+static void setluniqueport(struct conv *c, int lport)
 {
 	struct Proto *p;
 	struct conv *xp;
@@ -869,12 +869,11 @@ static char *setluniqueport(struct conv *c, int lport)
 			&& ipcmp(xp->raddr, c->raddr) == 0
 			&& ipcmp(xp->laddr, c->laddr) == 0) {
 			qunlock(&p->qlock);
-			return "address in use";
+			error(EFAIL, "address in use");
 		}
 	}
 	c->lport = lport;
 	qunlock(&p->qlock);
-	return NULL;
 }
 
 /*
@@ -928,14 +927,11 @@ static void setlport(struct conv *c)
  *  set a local address and port from a string of the form
  *	[address!]port[!r]
  */
-static char *setladdrport(struct conv *c, char *str, int announcing)
+static void setladdrport(struct conv *c, char *str, int announcing)
 {
 	char *p;
-	char *rv;
 	uint16_t lport;
 	uint8_t addr[IPaddrlen];
-
-	rv = NULL;
 
 	/*
 	 *  ignore restricted part if it exists.  it's
@@ -963,7 +959,7 @@ static char *setladdrport(struct conv *c, char *str, int announcing)
 			if (ipforme(c->p->f, addr))
 				ipmove(c->laddr, addr);
 			else
-				return "not a local IP address";
+				error(EFAIL, "not a local IP address");
 		}
 	}
 
@@ -971,24 +967,23 @@ static char *setladdrport(struct conv *c, char *str, int announcing)
 	if (announcing && strcmp(p, "*") == 0) {
 		if (!iseve())
 			error(EPERM, ERROR_FIXME);
-		return setluniqueport(c, 0);
+		setluniqueport(c, 0);
 	}
 
 	lport = atoi(p);
 	if (lport <= 0)
 		setlport(c);
 	else
-		rv = setluniqueport(c, lport);
-	return rv;
+		setluniqueport(c, lport);
 }
 
-static char *setraddrport(struct conv *c, char *str)
+static void setraddrport(struct conv *c, char *str)
 {
 	char *p;
 
 	p = strchr(str, '!');
 	if (p == NULL)
-		return "malformed address";
+		error(EFAIL, "malformed address");
 	*p++ = 0;
 	parseip(c->raddr, str);
 	c->rport = atoi(p);
@@ -997,33 +992,25 @@ static char *setraddrport(struct conv *c, char *str)
 		if (strstr(p, "!r") != NULL)
 			c->restricted = 1;
 	}
-	return NULL;
 }
 
 /*
  *  called by protocol connect routine to set addresses
  */
-char *Fsstdconnect(struct conv *c, char *argv[], int argc)
+void Fsstdconnect(struct conv *c, char *argv[], int argc)
 {
-	char *p;
-
 	switch (argc) {
 		default:
-			return "bad args to connect";
+			error(EINVAL, "bad args to %s", __func__);
 		case 2:
-			p = setraddrport(c, argv[1]);
-			if (p != NULL)
-				return p;
+			setraddrport(c, argv[1]);
 			setladdr(c);
 			setlport(c);
 			break;
 		case 3:
-			p = setraddrport(c, argv[1]);
-			if (p != NULL)
-				return p;
-			p = setladdrport(c, argv[2], 0);
-			if (p != NULL)
-				return p;
+			setraddrport(c, argv[1]);
+			setladdrport(c, argv[2], 0);
+			break;
 	}
 
 	if ((memcmp(c->raddr, v4prefix, IPv4off) == 0 &&
@@ -1032,8 +1019,6 @@ char *Fsstdconnect(struct conv *c, char *argv[], int argc)
 		c->ipversion = V4;
 	else
 		c->ipversion = V6;
-
-	return NULL;
 }
 
 /*
@@ -1055,9 +1040,7 @@ static void connectctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 	c->cerr[0] = '\0';
 	if (x->connect == NULL)
 		error(EFAIL, "connect not supported");
-	p = x->connect(c, cb->f, cb->nf);
-	if (p != NULL)
-		error(EFAIL, p);
+	x->connect(c, cb->f, cb->nf);
 
 	qunlock(&c->qlock);
 	if (waserror()) {
@@ -1077,14 +1060,23 @@ static void connectctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
  */
 char *Fsstdannounce(struct conv *c, char *argv[], int argc)
 {
+	ERRSTACK(1);
+
 	memset(c->raddr, 0, sizeof(c->raddr));
 	c->rport = 0;
 	switch (argc) {
 		default:
 			return "bad args to announce";
 		case 2:
-			return setladdrport(c, argv[1], 1);
+			if (waserror()) {
+				poperror();
+				return current_errstr();
+			}
+			setladdrport(c, argv[1], 1);
+			poperror();
+			break;
 	}
+	return 0;
 }
 
 /*
@@ -1128,12 +1120,21 @@ static void announcectlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
  */
 char *Fsstdbind(struct conv *c, char *argv[], int argc)
 {
+	ERRSTACK(1);
+
 	switch (argc) {
 		default:
 			return "bad args to bind";
 		case 2:
-			return setladdrport(c, argv[1], 0);
+			if (waserror()) {
+				poperror();
+				return current_errstr();
+			}
+			setladdrport(c, argv[1], 0);
+			poperror();
+			break;
 	}
+	return 0;
 }
 
 void Fsconvnonblock(struct conv *cv, bool onoff)

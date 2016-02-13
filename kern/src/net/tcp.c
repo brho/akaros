@@ -463,16 +463,10 @@ void tcpsetstate(struct conv *s, uint8_t newstate)
 		Fsconnected(s, NULL);
 }
 
-static char *tcpconnect(struct conv *c, char **argv, int argc)
+static void tcpconnect(struct conv *c, char **argv, int argc)
 {
-	char *e;
-
-	e = Fsstdconnect(c, argv, argc);
-	if (e != NULL)
-		return e;
+	Fsstdconnect(c, argv, argc);
 	tcpstart(c, TCP_CONNECT);
-
-	return NULL;
 }
 
 static int tcpstate(struct conv *c, char *state, int n)
