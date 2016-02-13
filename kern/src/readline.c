@@ -20,7 +20,7 @@ int readline(char *buf, size_t buf_l, const char *prompt, ...)
 	while (1) {
 		c = getchar();
 		if (c < 0) {
-			printk("read error: %e\n", c);	/* %e! */
+			printk("read error: %d\n", c);
 			retval = i;
 			break;
 		} else if (c == '\b' || c == 0x7f) {

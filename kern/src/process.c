@@ -431,14 +431,13 @@ void __proc_ready(struct proc *p)
 	spin_unlock(&pid_hash_lock);
 }
 
-/* Creates a process from the specified file, argvs, and envps.  Tempted to get
- * rid of proc_alloc's style, but it is so quaint... */
+/* Creates a process from the specified file, argvs, and envps. */
 struct proc *proc_create(struct file *prog, char **argv, char **envp)
 {
 	struct proc *p;
 	error_t r;
 	if ((r = proc_alloc(&p, current, 0 /* flags */)) < 0)
-		panic("proc_create: %e", r);	/* one of 3 quaint usages of %e */
+		panic("proc_create: %d", r);
 	int argc = 0, envc = 0;
 	if(argv) while(argv[argc]) argc++;
 	if(envp) while(envp[envc]) envc++;

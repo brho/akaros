@@ -131,17 +131,6 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 			putch(va_arg(ap, int), putdat);
 			break;
 
-		// error message
-		case 'e':
-			err = va_arg(ap, int);
-			if (err < 0)
-				err = -err;
-			if (err >= MAX_ERRNO)
-				printfmt(putch, putdat, "error %d(%s)", err, get_cur_errbuf());
-			else
-				printfmt(putch, putdat, "%s (%s)", errno_to_string(err), get_cur_errbuf());
-			break;
-
 		case 'E': // ENET MAC
 			if ((mac = va_arg(ap, uint8_t *)) == NULL){
 				char *s = "00:00:00:00:00:00";
