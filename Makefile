@@ -360,7 +360,7 @@ CFLAGS_KERNEL += -O2 -pipe -MD
 CFLAGS_KERNEL += -std=gnu99 -fgnu89-inline
 CFLAGS_KERNEL += -fno-strict-aliasing -fno-omit-frame-pointer
 CFLAGS_KERNEL += -fno-stack-protector
-CFLAGS_KERNEL += -Wall -Wno-format -Wno-unused
+CFLAGS_KERNEL += -Wall -Wno-format -Wno-unused -Werror
 CFLAGS_KERNEL += -DROS_KERNEL 
 CFLAGS_KERNEL += -include include/generated/autoconf.h -include include/common.h
 CFLAGS_KERNEL += -fplan9-extensions
