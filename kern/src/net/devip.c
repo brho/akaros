@@ -1267,9 +1267,7 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 				parseip(ia, cb->f[1]);
 				ipifcremmulti(c, c->raddr, ia);
 			} else if (x->ctl != NULL) {
-				p = x->ctl(c, cb->f, cb->nf);
-				if (p != NULL)
-					error(EFAIL, p);
+				x->ctl(c, cb->f, cb->nf);
 			} else
 				error(EFAIL, "unknown control request");
 			qunlock(&c->qlock);

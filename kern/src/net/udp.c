@@ -582,21 +582,16 @@ void udpiput(struct Proto *udp, struct Ipifc *ifc, struct block *bp)
 
 }
 
-char *udpctl(struct conv *c, char **f, int n)
+static void udpctl(struct conv *c, char **f, int n)
 {
-	Udpcb *ucb;
+	Udpcb *ucb = (Udpcb*)c->ptcl;
 
-	ucb = (Udpcb *) c->ptcl;
-	if (n == 1) {
-		if (strcmp(f[0], "oldheaders") == 0) {
-			ucb->headers = 6;
-			return NULL;
-		} else if (strcmp(f[0], "headers") == 0) {
-			ucb->headers = 7;
-			return NULL;
-		}
-	}
-	return "unknown control request";
+	if ((n == 1) && strcmp(f[0], "oldheaders") == 0)
+		ucb->headers = 6;
+	else if ((n == 1) && strcmp(f[0], "headers") == 0)
+		ucb->headers = 7;
+	else
+		error(EINVAL, "unknown command to %s", __func__);
 }
 
 void udpadvise(struct Proto *udp, struct block *bp, char *msg)

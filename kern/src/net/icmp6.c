@@ -343,19 +343,14 @@ static void icmpkick6(void *x, struct block *bp)
 	ipoput6(c->p->f, bp, 0, c->ttl, c->tos, NULL);
 }
 
-char *icmpctl6(struct conv *c, char **argv, int argc)
+static void icmpctl6(struct conv *c, char **argv, int argc)
 {
-	Icmpcb6 *icb;
+	Icmpcb6 *icb = (Icmpcb6*)c->ptcl;
 
-	icb = (Icmpcb6 *) c->ptcl;
-
-	if (argc == 1) {
-		if (strcmp(argv[0], "headers") == 0) {
-			icb->headers = 6;
-			return NULL;
-		}
-	}
-	return "unknown control request";
+	if ((argc == 1) && strcmp(argv[0], "headers") == 0)
+		icb->headers = 6;
+	else
+		error(EINVAL, "unknown command to %s", __func__);
 }
 
 static void goticmpkt6(struct Proto *icmp, struct block *bp, int muxkey)

@@ -296,7 +296,7 @@ struct Proto {
 	void (*create) (struct conv *);
 	void (*close) (struct conv *);
 	void (*rcv) (struct Proto *, struct Ipifc *, struct block *);
-	char *(*ctl) (struct conv *, char **unused_char_pp_t, int);
+	void (*ctl)(struct conv *, char **, int);
 	void (*advise) (struct Proto *, struct block *, char *unused_char_p_t);
 	int (*stats) (struct Proto *, char *unused_char_p_t, int);
 	int (*local) (struct conv *, char *unused_char_p_t, int);

@@ -802,16 +802,10 @@ static void ipifc_iprouting(struct Fs *f, char **argv, int argc)
  *  non-standard control messages.
  *  called with c locked.
  */
-static char *ipifcctl(struct conv *c, char **argv, int argc)
+static void ipifcctl(struct conv *c, char **argv, int argc)
 {
 	struct Ipifc *ifc;
 	int i;
-	ERRSTACK(1);
-
-	if (waserror()) {
-		poperror();
-		return current_errstr();
-	}
 
 	ifc = (struct Ipifc *)c->ptcl;
 	if (strcmp(argv[0], "add") == 0)
@@ -842,9 +836,6 @@ static char *ipifcctl(struct conv *c, char **argv, int argc)
 		ipifcrecvra6(ifc, argv, argc);
 	else
 		error(EINVAL, "unknown command to %s", __func__);
-
-	poperror();
-	return NULL;
 }
 
 int ipifcstats(struct Proto *ipifc, char *buf, int len)

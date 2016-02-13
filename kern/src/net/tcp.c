@@ -3087,15 +3087,8 @@ static void tcpporthogdefensectl(char *val)
 }
 
 /* called with c qlocked */
-char *tcpctl(struct conv *c, char **f, int n)
+static void tcpctl(struct conv *c, char **f, int n)
 {
-	ERRSTACK(1);
-
-	if (waserror()) {
-		poperror();
-		return current_errstr();
-	}
-
 	if (n == 1 && strcmp(f[0], "hangup") == 0)
 		tcphangup(c);
 	else if (n >= 1 && strcmp(f[0], "keepalive") == 0)
@@ -3106,9 +3099,6 @@ char *tcpctl(struct conv *c, char **f, int n)
 		tcpporthogdefensectl(f[1]);
 	else
 		error(EINVAL, "unknown command to %s", __func__);
-
-	poperror();
-	return NULL;
 }
 
 int tcpstats(struct Proto *tcp, char *buf, int len)
