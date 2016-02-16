@@ -472,9 +472,8 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	mkdir -p $(SYSROOT)/usr/include/ros/arch
 	cp -r $(AKAROSDIR)/kern/arch/$(AKAROS_ARCH_DIR)/ros/* \
 	    $(SYSROOT)/usr/include/ros/arch/
-	mkdir -p $(SYSROOT)/usr/include/parlib
 	cp -r $(AKAROSDIR)/user/parlib/include/* \
-	    $(SYSROOT)/usr/include/parlib/
+	    $(SYSROOT)/usr/include/
 	cp -r $(AKAROSDIR)/user/pthread/*.h \
 	    $(SYSROOT)/usr/include/
 

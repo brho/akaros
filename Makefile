@@ -122,7 +122,7 @@ endif
 
 PHONY += symlinks clean_symlinks
 clean_symlinks: objclean
-	@rm -f kern/include/arch kern/boot user/parlib/include/arch
+	@rm -f kern/include/arch kern/boot user/parlib/include/parlib/arch
 
 arch-link := $(notdir $(shell readlink kern/include/arch))
 valid-arches := $(notdir $(wildcard kern/arch/*))
@@ -140,7 +140,7 @@ symlinks: clean_symlinks
 	@echo Making symlinks...
 	$(Q)ln -fs ../arch/$(ARCH) kern/include/arch
 	$(Q)ln -fs arch/$(ARCH)/boot kern/boot
-	$(Q)ln -fs $(ARCH) user/parlib/include/arch
+	$(Q)ln -fs $(ARCH) user/parlib/include/parlib/arch
 	$(Q)$(MAKE) -f $(srctree)/Makefile clean
 
     else

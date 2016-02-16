@@ -17,7 +17,7 @@
 #include <fcntl.h>
 #include <iplib/iplib.h>
 #include <ndblib/ndb.h>
-#include "ndbhf.h"
+#include <ndblib/ndbhf.h>
 
 static struct ndb*	doopen(char*);
 static void	hffree(struct ndb*);
