@@ -4,12 +4,8 @@
  */
 
 #pragma once
-#ifdef BUILDING_PARLIB
-#include_next "signal.h"
-#else
-#include <signal.h>
-#endif
 
+#include <signal.h>
 #include <ros/procinfo.h>
 
 struct uthread;

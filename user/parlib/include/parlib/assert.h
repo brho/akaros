@@ -2,11 +2,7 @@
 
 #pragma once
 
-#ifdef BUILDING_PARLIB
-# include_next "assert.h"
-#else
-# include <assert.h>
-#endif
+#include <assert.h>
 /* For __BEGIN_DECLS.  Most every header gets it already from features.h. */
 #include <sys/cdefs.h>
 /* So we can undefine warn */

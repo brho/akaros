@@ -6,11 +6,7 @@
 
 #pragma once
 
-#ifdef BUILDING_PARLIB
-# include_next "stdio.h"
-#else
-# include <stdio.h>
-#endif
+#include <stdio.h>
 #include <stdarg.h>
 
 __BEGIN_DECLS
