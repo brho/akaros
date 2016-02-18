@@ -63,6 +63,7 @@ void ensure_vcore_runs(uint32_t vcoreid);
 void cpu_relax_vc(uint32_t vcoreid);
 uint32_t get_vcoreid(void);
 bool check_vcoreid(const char *str, uint32_t vcoreid);
+void __attribute__((noreturn)) vcore_yield_or_restart(void);
 void print_hw_tf(struct hw_trapframe *tf);
 void print_sw_tf(struct sw_trapframe *sw_tf);
 void print_user_context(struct user_context *ctx);

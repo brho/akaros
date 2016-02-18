@@ -507,3 +507,14 @@ bool check_vcoreid(const char *str, uint32_t vcoreid)
 	}
 	return TRUE;
 }
+
+/* Helper.  Yields the vcore, or restarts it from scratch. */
+void __attribute__((noreturn)) vcore_yield_or_restart(void)
+{
+	struct preempt_data *vcpd = vcpd_of(vcore_id());
+
+	vcore_yield(FALSE);
+	/* If vcore_yield returns, we have an event.  Just restart vcore context. */
+	set_stack_pointer((void*)vcpd->vcore_stack);
+	vcore_entry();
+}
