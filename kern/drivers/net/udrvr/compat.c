@@ -77,9 +77,19 @@ int get_user_page(struct proc *p, unsigned long uvastart, int write, int force,
 		goto err1;
 
 	if (!pte_is_present(pte)) {
+		struct page *pp;
+		unsigned long prot = PTE_P | PTE_U | PTE_A | PTE_W | PTE_D;
+#if 0
 		printk("[akaros]: get_user_page() uva=0x%llx pte absent\n",
 		    uvastart);
-		goto err1;
+#endif
+		/*
+		 * TODO: ok to allocate with pte_lock? "prot" needs to be
+		 * based on VMR writability, refer to pgprot_noncached().
+		 */
+		if (upage_alloc(p, &pp, 0))
+			goto err1;
+		pte_write(pte, page2pa(pp), prot);
 	}
 
 	if (write && (!pte_has_perm_urw(pte))) {
@@ -100,6 +110,7 @@ int sg_alloc_table(struct sg_table *ptr, unsigned int npages, gfp_t mask)
 {
 	ptr->sgl = kmalloc((sizeof(struct scatterlist) * npages), mask);
 	ptr->nents = ptr->orig_nents = npages;
+	sg_init_table(ptr->sgl, npages);
 	return 0;
 }
 
