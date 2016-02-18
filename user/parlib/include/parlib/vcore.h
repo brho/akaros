@@ -25,7 +25,7 @@ extern void exit (int __status) __THROW __attribute__ ((__noreturn__));
 #define TRANSITION_STACK_SIZE (TRANSITION_STACK_PAGES*PGSIZE)
 
 /* Defined in vcore.c */
-extern void vcore_entry();
+void __attribute__((noreturn)) vcore_entry(void);
 extern __thread bool __vcore_context;
 extern __thread int __vcoreid;
 extern __thread struct syscall __vcore_one_sysc;	/* see sys_change_vcore */

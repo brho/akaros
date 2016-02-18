@@ -98,8 +98,8 @@ void uth_enable_notifs(void);
 
 /* Helpers, which sched_entry() can call */
 void highjack_current_uthread(struct uthread *uthread);
-void run_current_uthread(void);
-void run_uthread(struct uthread *uthread);
+void __attribute__((noreturn)) run_current_uthread(void);
+void __attribute__((noreturn)) run_uthread(struct uthread *uthread);
 
 /* Asking for trouble with this API, when we just want stacktop (or whatever
  * the SP will be). */

@@ -583,7 +583,7 @@ static void handle_refl_fault(struct uthread *uth, struct user_context *ctx)
  * called only when the uthread already was running, and we were interrupted by
  * the kernel (event, etc).  Do not call this to run a fresh uthread, even if
  * you've set it to be current. */
-void run_current_uthread(void)
+void __attribute__((noreturn)) run_current_uthread(void)
 {
 	struct uthread *uth;
 	uint32_t vcoreid = vcore_id();
@@ -632,7 +632,7 @@ void run_current_uthread(void)
  * necessary (we only must do it once for an entire time in VC ctx, and in
  * loops), and might have been optimizing a rare event at a cost in both
  * instructions and complexity. */
-void run_uthread(struct uthread *uthread)
+void __attribute__((noreturn)) run_uthread(struct uthread *uthread)
 {
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
