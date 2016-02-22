@@ -14,92 +14,87 @@ __BEGIN_DECLS
 #define BYTES_FOR_BITMASK(size) \
 	(((size) - 1) / 8 + 1)
 
-#define BYTES_FOR_BITMASK_WITH_CHECK(size) \
-	((size) ? ((size) - (1)) / (8) + (1) : (0))
-
-static bool GET_BITMASK_BIT(uint8_t* name, size_t bit) 
+static inline bool GET_BITMASK_BIT(uint8_t *name, size_t bit)
 {
-	return (((name)[(bit)/8] & (1 << ((bit) % 8))) ? 1 : 0);
+	return name[bit / 8] & (1 << (bit % 8)) ? TRUE : FALSE;
 }
 
-#define SET_BITMASK_BIT(name, bit) \
-	((name)[(bit)/8] |= (1 << ((bit) % 8)));
-/*
-static void SET_BITMASK_BIT(uint8_t* name, size_t bit)
+static inline void SET_BITMASK_BIT(uint8_t *name, size_t bit)
 {
-	((name)[(bit)/8] |= (1 << ((bit) % 8)));
-}
-*/
-
-#define CLR_BITMASK_BIT(name, bit) \
-	((name)[(bit)/8] &= ~(1 << ((bit) % 8)));
-/*
-static void CLR_BITMASK_BIT(uint8_t* name, size_t bit) 
-{
-	((name)[(bit)/8] &= ~(1 << ((bit) % 8)));
-}
-*/
-
-static void SET_BITMASK_BIT_ATOMIC(uint8_t* name, size_t bit) 
-{
-	(atomic_orb(&(name)[(bit)/8], (1 << ((bit) % 8))));
+	name[bit / 8] |= 1 << (bit % 8);
 }
 
-#define CLR_BITMASK_BIT_ATOMIC(name, bit) \
-	(atomic_andb(&(name)[(bit)/8], ~(1 << ((bit) % 8))))
-
-#define CLR_BITMASK(name, size) \
-({ \
-	memset((void*)((uintptr_t)(name)), 0, BYTES_FOR_BITMASK((size))); \
-})
-
-#define FILL_BITMASK(name, size) \
-({ \
-	memset((void*)((uintptr_t)(name)), 255, BYTES_FOR_BITMASK((size))); \
-	(name)[BYTES_FOR_BITMASK((size))-1] >>= (((size) % 8) ? (8 - ((size) % 8)) : 0 ); \
-}) 
-
-#define COPY_BITMASK(newmask, oldmask, size) \
-({ \
-	memcpy((void*)((uintptr_t)(newmask)), \
-           (void*)((uintptr_t)(oldmask)), \
-           BYTES_FOR_BITMASK((size))); \
-})
-
-// this checks the entire last byte, so keep it 0 in the other macros
-#define BITMASK_IS_CLEAR(name, size) ({ \
-	uint32_t __n = BYTES_FOR_BITMASK((size)); \
-	bool clear = 1; \
-	while (__n-- > 0) { \
-		if ((name)[__n]) { \
-			clear = 0; \
-			break;\
-		}\
-	} \
-	clear; })
-
-static inline bool BITMASK_IS_FULL(uint8_t* map, size_t size)
+static inline void CLR_BITMASK_BIT(uint8_t *name, size_t bit)
 {
-	int _size = size;
-	for (int i = 0; i < BYTES_FOR_BITMASK(size); i++) {
-		for (int j = 0; j < MIN(8,_size); j++)
-			if(!((map[i] >> j) &1))
+	name[bit / 8] &= ~(1 << (bit % 8));
+}
+
+static inline void SET_BITMASK_BIT_ATOMIC(uint8_t *name, size_t bit)
+{
+	atomic_orb(&name[bit / 8], 1 << (bit % 8));
+}
+
+static inline void CLR_BITMASK_BIT_ATOMIC(uint8_t *name, size_t bit)
+{
+	atomic_andb(&name[bit / 8], ~(1 << (bit % 8)));
+}
+
+static inline void CLR_BITMASK(uint8_t *name, size_t size)
+{
+	memset(name, 0, BYTES_FOR_BITMASK(size));
+}
+
+static inline void FILL_BITMASK(uint8_t *name, size_t size)
+{
+	memset(name, 255, BYTES_FOR_BITMASK(size));
+	name[BYTES_FOR_BITMASK(size) - 1] >>= ((size % 8) ? (8 - (size % 8)) : 0);
+}
+
+static inline void COPY_BITMASK(uint8_t *newmask, uint8_t *oldmask, size_t size)
+{
+	memcpy(newmask, oldmask, BYTES_FOR_BITMASK(size));
+}
+
+/* this checks the entire last byte, so keep it 0 in the other functions */
+static bool BITMASK_IS_CLEAR(uint8_t *name, size_t size)
+{
+	uint32_t __n = BYTES_FOR_BITMASK(size);
+	bool clear = TRUE;
+
+	while (__n-- > 0) {
+		if (name[__n]) {
+			clear = FALSE;
+			break;
+		}
+	}
+	return clear;
+}
+
+static inline bool BITMASK_IS_FULL(uint8_t *map, size_t size)
+{
+	size_t nr_bytes = BYTES_FOR_BITMASK(size);
+
+	for (int i = 0; i < nr_bytes; i++) {
+		for (int j = 0; j < MIN(8, size); j++) {
+			if (!((map[i] >> j) & 1))
 				return FALSE;
-			_size--;
+			size--;
+		}
 	}
 	return TRUE;
 }
 
-#define PRINT_BITMASK(name, size) { \
-	int i;	\
-	int _size = size; \
-	for (i = 0; i < BYTES_FOR_BITMASK(size); i++) { \
-		int j;	\
-		for (j = 0; j < MIN(8,_size); j++) \
-			printf("%x", ((name)[i] >> j) & 1);	\
-			_size--; \
-	} \
-	printf("\n"); \
+static inline void PRINT_BITMASK(uint8_t *name, size_t size)
+{
+	size_t nr_bytes = BYTES_FOR_BITMASK(size);
+
+	for (int i = 0; i < nr_bytes; i++) {
+		for (int j = 0; j < MIN(8, size); j++) {
+			printf("%x", (name[i] >> j) & 1);
+			size--;
+		}
+	}
+	printf("\n");
 }
 
 __END_DECLS
