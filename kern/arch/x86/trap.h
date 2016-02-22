@@ -4,6 +4,7 @@
 
 #include <ros/arch/msr-index.h>
 #include <ros/errno.h>
+#include <arch/fixup.h>
 
 #define NUM_IRQS					256
 
@@ -121,6 +122,7 @@
 #include <arch/pic.h>
 #include <arch/topology.h>
 #include <arch/io.h>
+#include <stdio.h>
 
 struct irq_handler {
 	struct irq_handler *next;
@@ -160,23 +162,49 @@ extern uint64_t x86_default_xcr0;
 
 static inline void save_fp_state(struct ancillary_state *silly)
 {
-	asm volatile("fxsave %0" : : "m"(*silly));
+	uint32_t eax, edx;
+
+	edx = x86_default_xcr0 >> 32;
+	eax = x86_default_xcr0;
+	asm volatile("xsaveopt64 %0" : : "m"(*silly), "a"(eax), "d"(edx));
 }
 
-/* TODO: this can trigger a GP fault if MXCSR reserved bits are set.  Callers
- * will need to handle intercepting the kernel fault. */
+static inline void init_fp_state(void);
 static inline void restore_fp_state(struct ancillary_state *silly)
 {
-	asm volatile("fxrstor %0" : : "m"(*silly));
+	int err = 0;
+	uint32_t eax, edx;
+
+	edx = x86_default_xcr0 >> 32;
+	eax = x86_default_xcr0;
+	asm volatile(ASM_STAC               ";"
+		         "1: xrstor64 %1         ;"
+	             "2: " ASM_CLAC "        ;"
+	             ".section .fixup, \"ax\";"
+	             "3: mov %4, %0          ;"
+	             "   jmp 2b              ;"
+	             ".previous              ;"
+	             _ASM_EXTABLE(1b, 3b)
+	             : "=r" (err)
+	             : "m"(*silly), "a"(eax), "d"(edx),
+	               "i" (-EINVAL), "0" (err));
+
+	if (err) {
+		printk("Error restoring fp state!");
+		printk("Likely a bad ancillary_state argument.\n");
+		printk("Re-initializing fp state to default due to error.\n");
+		init_fp_state();
+	}
 }
 
-/* A regular fninit will only initialize the x87 header part of the FPU, not the
- * st(n) (MMX) registers, the XMM registers, or the MXCSR state.  So to init,
- * we'll just keep around a copy of the default FPU state, which we grabbed
- * during boot, and can copy that over.
+/* A regular fninit only initializes the control, status, tag, ip,
+ * and data pointer registers. Since it leaves the data registers,
+ * MXCSR, etc. unchanged, we use init_fp_state to restore a default
+ * state that we save at boot time.
  *
- * Alternatively, we can fninit, ldmxcsr with the default value, and 0 out all
- * of the registers manually. */
+ * If you're looking for a workout, you could also fninit, ldmxcsr with
+ * a default value, and 0 all the registers by hand.
+ */
 static inline void init_fp_state(void)
 {
 	restore_fp_state(&x86_default_fpu);
