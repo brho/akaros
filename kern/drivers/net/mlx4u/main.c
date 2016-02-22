@@ -411,11 +411,13 @@ static int eth_link_query_port(struct ib_device *ibdev, u8 port,
 	if (is_bonded)
 		rtnl_lock(); /* required to get upper dev */
 	spin_lock_bh(&iboe->lock);
+#if 0	/* AKAROS */
 	ndev = iboe->netdevs[port - 1];
 	if (ndev && is_bonded)
 		ndev = netdev_master_upper_dev_get(ndev);
 	if (!ndev)
 		goto out_unlock;
+#endif	/* AKAROS */
 
 	tmp = iboe_get_mtu(ndev->mtu);
 	props->active_mtu = tmp ? min(props->max_mtu, tmp) : IB_MTU_256;
