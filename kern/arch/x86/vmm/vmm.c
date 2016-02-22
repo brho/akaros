@@ -185,6 +185,8 @@ struct guest_pcore *load_guest_pcore(struct proc *p, int guest_pcoreid)
 	pcpui->guest_pcoreid = guest_pcoreid;
 	ept_sync_context(gpc_get_eptp(gpc));
 	vmx_load_guest_pcore(gpc);
+	/* Load guest's xcr0 */
+	lxcr0(gpc->xcr0);
 	return gpc;
 }
 
@@ -200,6 +202,11 @@ void unload_guest_pcore(struct proc *p, int guest_pcoreid)
 	ept_sync_context(gpc_get_eptp(gpc));
 	vmx_unload_guest_pcore(gpc);
 	gpc->cpu = -1;
+
+	/* Save guest's xcr0 and restore Akaros's default. */
+	gpc->xcr0 = rxcr0();
+	lxcr0(x86_default_xcr0);
+
 	/* As soon as we unlock, this gpc can be started on another core */
 	spin_unlock(&p->vmm.lock);
 	pcpui->guest_pcoreid = -1;
