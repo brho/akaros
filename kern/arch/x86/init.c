@@ -81,13 +81,84 @@ static void cons_irq_init(void)
 	}
 }
 
-void arch_init()
+/* Init x86 processor extended state */
+// TODO/XXX: Eventually consolidate all of our "cpu has" stuff.
+#define CPUID_XSAVE_SUPPORT         (1 << 26)
+#define CPUID_XSAVEOPT_SUPPORT      (1 << 0)
+void ancillary_state_init(void)
 {
-	/* need to reinit before saving, in case boot agents used the FPU or it is
-	 * o/w dirty.  had this happen on c89, which had a full FP stack after
-	 * booting. */
+	uint32_t eax, ebx, ecx, edx;
+	uint64_t proc_supported_features; /* proc supported user state components */
+
+	/* Note: The cpuid function comes from arch/x86.h
+	 * arg1 is eax input, arg2 is ecx input, then
+	 * pointers to eax, ebx, ecx, edx output values.
+	 */
+
+	// First check general XSAVE support. Die if not supported.
+	cpuid(0x01, 0x00, 0, 0, &ecx, 0);
+	if (!(CPUID_XSAVE_SUPPORT & ecx))
+		panic("No XSAVE support! Refusing to boot.\n");
+
+
+	// Next check XSAVEOPT support. Die if not supported.
+	cpuid(0x0d, 0x01, &eax, 0, 0, 0);
+	if (!(CPUID_XSAVEOPT_SUPPORT & eax))
+		panic("No XSAVEOPT support! Refusing to boot.\n");
+
+
+	// Next determine the user state components supported
+	// by the processor and set x86_default_xcr0.
+	cpuid(0x0d, 0x00, &eax, 0, 0, &edx);
+	proc_supported_features = ((uint64_t)edx << 32) | eax;
+
+	// Intersection of processor-supported and Akaros-supported
+	// features is the Akaros-wide default at runtime.
+	x86_default_xcr0 = X86_MAX_XCR0 & proc_supported_features;
+
+	/*
+	 *	Make sure CR4.OSXSAVE is set and set the local xcr0 to the default.
+	 *	We will do both of these things again during per-cpu init,
+	 *	but we are about to use XSAVE to build our default extended state
+	 *	record, so we need them enabled.
+	 *	You must set CR4_OSXSAVE before setting xcr0, or a #UD fault occurs.
+	 */
+	lcr4(rcr4() | CR4_OSXSAVE);
+	lxcr0(x86_default_xcr0);
+
+	/*
+	 *	Build a default set of extended state values that we can later use to
+	 *	initialize extended state on other cores, or restore on this core.
+	 *	We need to use FNINIT to reset the FPU before saving, in case boot
+	 *	agents used the FPU or it is dirty for some reason. An old comment that
+	 *	used to be here said "had this happen on c89, which had a full FP stack
+	 *	after booting." Note that FNINIT does not clear the data registers,
+	 *	but it tags them all as empty (0b11).
+	 */
+
 	asm volatile ("fninit");
-	save_fp_state(&x86_default_fpu); /* used in arch/trap.h for fpu init */
+
+	// Zero the default extended state memory region before saving.
+	memset(&x86_default_fpu, 0x00, sizeof(struct ancillary_state));
+
+	/*
+	 *	Save only the x87 FPU state so that the extended state registers
+	 *	remain zeroed in the default.
+	 *	We use XSAVE64 instead of XSAVEOPT64 (save_fp_state uses XSAVEOPT64),
+	 *	because XSAVEOPT64 may decide to skip saving a state component
+	 *	if that state component is in its initial configuration, and
+	 *	we just used FNINIT to put the x87 in its initial configuration.
+	 *	We can be confident that the x87 bit (bit 0) is set in xcr0, because
+	 *	Intel requires it to be set at all times.
+	 */
+	edx = 0x0;
+	eax = 0x1;
+	asm volatile("xsave64 %0" : : "m"(x86_default_fpu), "a"(eax), "d"(edx));
+}
+
+void arch_init(void)
+{
+	ancillary_state_init();
 	pci_init();
 	vmm_init();
 	perfmon_global_init();

@@ -276,17 +276,22 @@ void __arch_pcpu_init(uint32_t coreid)
 {
 	uintptr_t *my_stack_bot;
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
+	uint32_t eax, edx;
 
 	/* Flushes any potentially old mappings from smp_boot() (note the page table
 	 * removal) */
 	tlbflush();
-	/* Ensure the FPU units are initialized */
-	asm volatile ("fninit");
 
 	/* Enable SSE instructions.  We might have to do more, like masking certain
 	 * flags or exceptions in the MXCSR, or at least handle the SIMD exceptions.
 	 * We don't do it for FP yet either, so YMMV. */
-	lcr4(rcr4() | CR4_OSFXSR | CR4_OSXMME);
+	lcr4(rcr4() | CR4_OSFXSR | CR4_OSXMME | CR4_OSXSAVE);
+
+	// Set xcr0 to the Akaros-wide default
+	lxcr0(x86_default_xcr0);
+
+	// Initialize fpu and extended state by restoring our default XSAVE area.
+	init_fp_state();
 
 	/* core 0 sets up via the global gdt symbol */
 	if (!coreid) {
