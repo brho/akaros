@@ -19,33 +19,48 @@
 
 /*
  * Our version knocked off from kern/src/mm.c version + uncaching logic from
- * vmap_pmem_nocache().
+ * vmap_pmem_nocache(). This routine is expected to be invoked as part of mmap()
+ * handler.
  */
 int map_upage_at_addr(struct proc *p, physaddr_t paddr, uintptr_t addr, int pteprot, int dolock)
 {
-	pte_t	pte;
-	int	rv = -1;
+	pte_t		pte;
+	int		rv = -1;
+	struct page	*pp;
+
+	/* __vmr_free_pgs() assumes mapped pte is backed by "struct page" */
+	if (paddr > max_paddr) {
+		printk("[akaros]: map_upage_at_addr(): paddr=0x%llx "
+		    "max_paddr=0x%llx\n", paddr, max_paddr);
+		return -1;
+	}
+
+	/* Ensure kernel has not put such special pages into free pool */
+	if (page_is_free(paddr >> PAGE_SHIFT)) {
+		printk("[akaros]: map_upage_at_addr(): FreePA=0x%llx\n",
+		    paddr);
+		return -1;
+	}
+
+	pp = pa2page(paddr);
+
+	/* __vmr_free_pgs() refcnt's pagemap pages differently */
+	if (atomic_read(&pp->pg_flags) & PG_PAGEMAP) {
+		printk("[akaros]: map_upage_at_addr(): mapPA=0x%llx\n",
+		    paddr);
+		return -1;
+	}
 
 	spin_lock(&p->pte_lock);
 
-	pte = pgdir_walk(p->env_pgdir, (void*)addr, TRUE);
-
-	if (!pte_walk_okay(pte))
-		goto err1;
-	pte_write(pte, paddr, pteprot);
-	// tlbflush(); tlb_flush_global();
-	rv = 0;
-err1:
-	spin_unlock(&p->pte_lock);
-
 	/*
-	 * TODO: @mm tear down, unmap_and_destroy_vmrs():__vmr_free_pgs()
-	 * decrefs page, which is a problem. 1st level workaround is to set
-	 * PG_LOCKED/PG_PAGEMAP to avoid that. Not proud of myself.
+	 * Free any existing page backing uva, drop in this page, and
+	 * acquire refcnt on page on behalf of user. Note though that we
+	 * do not expect an existing page, since we are invoked in mmap
+	 * path (page_insert() does not handle PG_PAGEMAP refcnt's).
 	 */
-	if ((rv == 0) && (dolock == 1))
-		atomic_set(&pa2page(paddr)->pg_flags, PG_LOCKED | PG_PAGEMAP);
-
+	rv = page_insert(p->env_pgdir, pp, (void *)addr, pteprot);
+	spin_unlock(&p->pte_lock);
 	return rv;
 }
 
@@ -54,20 +69,19 @@ void set_page_dirty_lock(struct page *pagep)
 	atomic_or(&pagep->pg_flags, PG_DIRTY);
 }
 
-/*
- * get_user_pages() does not grab a page ref count. Thus, put_page()
- * can not release page ref count.
- */
 void put_page(struct page *pagep)
 {
-	/* page_decref(pagep) / __put_page(pagep) */
+	if (atomic_read(&pagep->pg_flags) & PG_PAGEMAP)
+		printk("[akaros]: put_page() on pagemap page!!!\n");
+	page_decref(pagep);
 }
 
 int get_user_page(struct proc *p, unsigned long uvastart, int write, int force,
     struct page **plist)
 {
-	pte_t	pte;
-	int	ret = -1;
+	pte_t		pte;
+	int		ret = -1;
+	struct page	*pp;
 
 	spin_lock(&p->pte_lock);
 
@@ -77,7 +91,6 @@ int get_user_page(struct proc *p, unsigned long uvastart, int write, int force,
 		goto err1;
 
 	if (!pte_is_present(pte)) {
-		struct page *pp;
 		unsigned long prot = PTE_P | PTE_U | PTE_A | PTE_W | PTE_D;
 #if 0
 		printk("[akaros]: get_user_page() uva=0x%llx pte absent\n",
@@ -90,6 +103,15 @@ int get_user_page(struct proc *p, unsigned long uvastart, int write, int force,
 		if (upage_alloc(p, &pp, 0))
 			goto err1;
 		pte_write(pte, page2pa(pp), prot);
+	} else {
+		pp = pa2page(pte_get_paddr(pte));
+
+		/* __vmr_free_pgs() refcnt's pagemap pages differently */
+		if (atomic_read(&pp->pg_flags) & PG_PAGEMAP) {
+			printk("[akaros]: get_user_page(): uva=0x%llx\n",
+			    uvastart);
+			goto err1;
+		}
 	}
 
 	if (write && (!pte_has_perm_urw(pte))) {
@@ -99,7 +121,8 @@ int get_user_page(struct proc *p, unsigned long uvastart, int write, int force,
 		goto err1;
 	}
 
-	plist[0] = pa2page(pte_get_paddr(pte));
+	page_incref(pp);
+	plist[0] = pp;
 	ret = 1;
 err1:
 	spin_unlock(&p->pte_lock);
@@ -190,6 +213,75 @@ static const struct file_operations ib_api_ver = {
 	.release= kfs_release,
 };
 
+static ssize_t mlx4_mgm_read(struct file *filp, char __user *buf,
+    size_t count, loff_t *pos)
+{
+#if CONFIG_MLX4_DEFAULT_MGM_LOG_ENTRY_SIZE == -1
+	char		src[4] = { '-', '1', 0, 0 };
+#else
+	char		src[4] = { '1', '0', 0, 0 };
+#endif
+
+	return sysfs_read(buf, count, pos, src);
+}
+
+static const struct file_operations mlx4_mgm = {
+	.read	= mlx4_mgm_read,
+	.open	= kfs_open,
+	.release= kfs_release,
+};
+
+#if 0
+static void stradd(char *dest, int val, int num)
+{
+	int	tval = val, i = 0, fac = 1;
+
+	while (tval) {
+		tval /= 10;
+		fac *= 10;
+		i++;
+	}
+	fac /= 10;
+	tval = val;
+	while (tval && num) {
+		int dig = tval / fac;
+		*dest++ = dig + '0';
+		tval -= (dig * fac);
+		fac /= 10;
+		num--;
+	}
+}
+
+static ssize_t cpu_read(struct file *filp, char __user *buf,
+    size_t count, loff_t *pos)
+{
+	char cpu_info_str[128];
+	long freq = system_timing.tsc_freq, idx;
+
+	strncpy(cpu_info_str, "cpu MHz\t\t: ", 16);
+	idx = strlen(cpu_info_str);
+
+	stradd(cpu_info_str + idx, freq / 1000000, 4);
+	idx += 4;
+
+	strncpy(cpu_info_str + idx, ".", 1);
+	idx++;
+
+	stradd(cpu_info_str + idx, freq % 1000000, 3);
+	idx += 3;
+
+	cpu_info_str[idx] = 0;
+
+	return sysfs_read(buf, count, pos, cpu_info_str);
+}
+
+static const struct file_operations cpuinfo = {
+	.read	= cpu_read,
+	.open	= kfs_open,
+	.release= kfs_release,
+};
+#endif
+
 void sysfs_init(void)
 {
 	do_mkdir("/dev/infiniband", S_IRWXU | S_IRWXG | S_IRWXO);
@@ -201,6 +293,21 @@ void sysfs_init(void)
 	make_device("/sys/class/infiniband_verbs/abi_version",
 		    S_IWUSR | S_IWGRP | S_IWOTH | S_IRUSR | S_IRGRP | S_IROTH,
 		    __S_IFCHR, (struct file_operations *)&ib_api_ver);
+
+	do_mkdir("/sys/module", S_IRWXU | S_IRWXG | S_IRWXO);
+	do_mkdir("/sys/module/mlx4_core", S_IRWXU | S_IRWXG | S_IRWXO);
+	do_mkdir("/sys/module/mlx4_core/parameters", S_IRWXU | S_IRWXG |
+	    S_IRWXO);
+	make_device("/sys/module/mlx4_core/parameters/log_num_mgm_entry_size",
+		    S_IWUSR | S_IWGRP | S_IWOTH | S_IRUSR | S_IRGRP | S_IROTH,
+		    __S_IFCHR, (struct file_operations *)&mlx4_mgm);
+
+#if 0
+	/* Do this thru init scripts */
+	do_mkdir("/proc", S_IRWXU | S_IRWXG | S_IRWXO);
+	make_device("/proc/cpuinfo", S_IWUSR | S_IWGRP | S_IWOTH | S_IRUSR |
+	    S_IRGRP | S_IROTH, __S_IFCHR, (struct file_operations *)&cpuinfo);
+#endif
 }
 
 static ssize_t dver_read(struct file *filp, char __user *buf,
