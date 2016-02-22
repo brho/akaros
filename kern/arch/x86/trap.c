@@ -777,6 +777,37 @@ bool handle_vmexit_extirq(struct vm_trapframe *tf)
 	return TRUE;
 }
 
+static bool handle_vmexit_xsetbv(struct vm_trapframe *tf)
+{
+	// The VM's requested-feature bitmap is represented by edx:eax
+	uint64_t vm_rfbm = (tf->tf_rdx << 32) | tf->tf_rax;
+
+	// If the VM tries to set xcr0 to a superset
+	// of Akaros's default value, kill the VM.
+
+	// Bit in vm_rfbm and x86_default_xcr0:        Ok. Requested and allowed.
+	// Bit in vm_rfbm but not x86_default_xcr0:    Bad! Requested, not allowed.
+	// Bit not in vm_rfbm but in x86_default_xcr0: Ok. Not requested.
+
+	// vm_rfbm & (~x86_default_xcr0) is nonzero if any bits
+	// are set in vm_rfbm but not x86_default_xcr0
+
+	if (vm_rfbm & (~x86_default_xcr0))
+		return FALSE;
+
+
+	// If attempting to use vm_rfbm for xsetbv
+	// causes a fault, we reflect to the VMM.
+	if (safe_lxcr0(vm_rfbm))
+		return FALSE;
+
+
+	// If no fault, advance the instruction pointer
+	// and return TRUE to make the VM resume.
+	tf->tf_rip += 3; // XSETBV is a 3-byte instruction
+	return TRUE;
+}
+
 static void vmexit_dispatch(struct vm_trapframe *tf)
 {
 	bool handled = FALSE;
@@ -813,6 +844,9 @@ static void vmexit_dispatch(struct vm_trapframe *tf)
 		break;
 	case EXIT_REASON_EXTERNAL_INTERRUPT:
 		handled = handle_vmexit_extirq(tf);
+		break;
+	case EXIT_REASON_XSETBV:
+		handled = handle_vmexit_xsetbv(tf);
 		break;
 	default:
 		printd("Unhandled vmexit: reason 0x%x, exit qualification 0x%x\n",
