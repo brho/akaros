@@ -209,7 +209,7 @@ void print_kmsgs(uint32_t coreid);
 /* TRUE if we are allowed to spin, given that the 'lock' was declared as not
  * grabbable from IRQ context.  Meaning, we can't grab the lock from any nested
  * context.  (And for most locks, we can never grab them from a kernel trap
- * handler). 
+ * handler).
  *
  * Example is a lock that is not declared as irqsave, but we later grab it from
  * irq context.  This could deadlock the system, even if it doesn't do it this
