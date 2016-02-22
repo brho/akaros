@@ -579,6 +579,28 @@ static void handle_refl_fault(struct uthread *uth, struct user_context *ctx)
 	sched_ops->thread_refl_fault(uth, ctx);
 }
 
+/* 2LS helper: stops the current uthread, saves its state, and returns a pointer
+ * to it.  Unlike __uthread_pause, which is called by non-specific 2LS code,
+ * this function is called by a specific 2LS to stop it's current uthread. */
+struct uthread *stop_current_uthread(void)
+{
+	struct uthread *uth;
+	struct preempt_data *vcpd = vcpd_of(vcore_id());
+
+	uth = current_uthread;
+	current_uthread = 0;
+	if (!(uth->flags & UTHREAD_SAVED)) {
+		uth->u_ctx = vcpd->uthread_ctx;
+		uth->flags |= UTHREAD_SAVED;
+	}
+	if ((uth->u_ctx.type != ROS_SW_CTX) && !(uth->flags & UTHREAD_FPSAVED)) {
+		save_fp_state(&uth->as);
+		uth->flags |= UTHREAD_FPSAVED;
+	}
+	uth->state = UT_NOT_RUNNING;
+	return uth;
+}
+
 /* Run the thread that was current_uthread, from a previous run.  Should be
  * called only when the uthread already was running, and we were interrupted by
  * the kernel (event, etc).  Do not call this to run a fresh uthread, even if
@@ -600,12 +622,7 @@ void __attribute__((noreturn)) run_current_uthread(void)
 		/* we preemptively copy out and make non-running, so that there is a
 		 * consistent state for the handler.  it can then block the uth or
 		 * whatever. */
-		uth = current_uthread;
-		current_uthread = 0;
-		uth->u_ctx = vcpd->uthread_ctx;
-		save_fp_state(&uth->as);
-		uth->state = UT_NOT_RUNNING;
-		uth->flags |= UTHREAD_SAVED | UTHREAD_FPSAVED;
+		uth = stop_current_uthread();
 		handle_refl_fault(uth, &vcpd->uthread_ctx);
 		/* we abort no matter what.  up to the 2LS to reschedule the thread */
 		set_stack_pointer((void*)vcpd->vcore_stack);

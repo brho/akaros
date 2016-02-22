@@ -98,6 +98,7 @@ void uth_enable_notifs(void);
 
 /* Helpers, which sched_entry() can call */
 void highjack_current_uthread(struct uthread *uthread);
+struct uthread *stop_current_uthread(void);
 void __attribute__((noreturn)) run_current_uthread(void);
 void __attribute__((noreturn)) run_uthread(struct uthread *uthread);
 
