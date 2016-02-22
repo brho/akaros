@@ -26,6 +26,7 @@ struct guest_pcore {
 		struct vmx_msr_entry host[NR_AUTOLOAD_MSRS];
 	} msr_autoload;
 	struct vmcs *vmcs;
+	uint64_t xcr0;
 };
 
 struct vmm {

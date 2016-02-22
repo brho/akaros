@@ -1,5 +1,5 @@
 /* Copyright 2015 Google Inc.
- * 
+ *
  * See LICENSE for details.
  */
 
@@ -20,13 +20,16 @@
 #include <trap.h>
 #include <umem.h>
 
+#include <arch/x86.h>
+
+
 /* TODO: have better cpuid info storage and checks */
 bool x86_supports_vmx = FALSE;
 
 /* Figure out what kind of CPU we are on, and if it supports any reasonable
  * virtualization. For now, if we're not some sort of newer intel, don't
  * bother. This does all cores. Again, note, we make these decisions at runtime,
- * to avoid getting into the problems that compile-time decisions can cause. 
+ * to avoid getting into the problems that compile-time decisions can cause.
  * At this point, of course, it's still all intel.
  */
 void vmm_init(void)

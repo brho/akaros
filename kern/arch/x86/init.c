@@ -2,6 +2,7 @@
 
 #include <smp.h>
 
+#include <arch/x86.h>
 #include <arch/pci.h>
 #include <arch/console.h>
 #include <arch/perfmon.h>
@@ -9,7 +10,16 @@
 #include <console.h>
 #include <monitor.h>
 #include <arch/usb.h>
+#include <assert.h>
 
+/*
+ *	x86_default_xcr0 is the Akaros-wide
+ *	default value for the xcr0 register.
+ *
+ *	It is set on every processor during
+ *	per-cpu init.
+ */
+uint64_t x86_default_xcr0;
 struct ancillary_state x86_default_fpu;
 uint32_t kerndate;
 
