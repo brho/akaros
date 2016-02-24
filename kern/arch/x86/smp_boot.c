@@ -305,4 +305,5 @@ void __arch_pcpu_init(uint32_t coreid)
 	/* need to init perfctr before potentially using it in timer handler */
 	perfmon_pcpu_init();
 	vmm_pcpu_init();
+	lcr4(rcr4() & ~CR4_TSD);
 }
