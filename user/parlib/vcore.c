@@ -14,6 +14,7 @@
 #include <parlib/ucq.h>
 #include <ros/arch/membar.h>
 #include <parlib/printf-ext.h>
+#include <parlib/poke.h>
 
 __thread int __vcoreid = 0;
 __thread bool __vcore_context = FALSE;
@@ -223,105 +224,62 @@ void vcore_change_to_m(void)
 	assert(!in_vcore_context());
 }
 
-/* Returns -1 with errno set on error, or 0 on success.  This does not return
- * the number of cores actually granted (though some parts of the kernel do
- * internally).
- *
- * This tries to get "more vcores", based on the number we currently have.
- * We'll probably need smarter 2LSs in the future that just directly set
- * amt_wanted.  What happens is we can have a bunch of 2LS vcore contexts
- * trying to get "another vcore", which currently means more than num_vcores().
- * If you have someone ask for two more, and then someone else ask for one more,
- * how many you ultimately ask for depends on if the kernel heard you and
- * adjusted num_vcores in between the two calls.  Or maybe your amt_wanted
- * already was num_vcores + 5, so neither call is telling the kernel anything
- * new.  It comes down to "one more than I have" vs "one more than I've already
- * asked for".
- *
- * So for now, this will keep the older behavior (one more than I have).  It
- * will try to accumulate any concurrent requests, and adjust amt_wanted up.
- * Interleaving, repetitive calls (everyone asking for one more) may get
- * ignored.
- *
- * Note the doesn't block or anything (despite the min number requested is
- * 1), since the kernel won't block the call.
- *
- * There are a few concurrency concerns.  We have _max_vcores_ever_wanted,
- * initialization of new vcore stacks/TLSs, making sure we don't ask for too
- * many (minor point), and most importantly not asking the kernel for too much
- * or otherwise miscommunicating our desires to the kernel.  Remember, the
- * kernel wants just one answer from the process about what it wants, and it is
- * up to the process to figure that out.
- *
- * So we basically have one thread do the submitting/prepping/bookkeeping, and
- * other threads come in just update the number wanted and make sure someone
- * is sorting things out.  This will perform a bit better too, since only one
- * vcore makes syscalls (which hammer the proc_lock).  This essentially has
- * cores submit work, and one core does the work (like Eric's old delta
- * functions).
- *
- * There's a slight semantic change: this will return 0 (success) for the
- * non-submitters, and 0 if we submitted.  -1 only if the submitter had some
- * non-kernel failure.
- *
- * Also, beware that this (like the old version) doesn't protect with races on
- * num_vcores().  num_vcores() is how many you have now or very soon (accounting
- * for messages in flight that will take your cores), not how many you told the
- * kernel you want. */
-int vcore_request_more(long nr_new_vcores)
+static void __vc_req_poke(void *nr_vc_wanted)
 {
-	long nr_to_prep_now, nr_vcores_wanted;
-	static atomic_t nr_new_vcores_wanted;
-	static atomic_t vc_req_being_handled;
+	long nr_vcores_wanted = *(long*)nr_vc_wanted;
 
-	/* Early sanity checks */
-	if ((nr_new_vcores < 0) || (nr_new_vcores + num_vcores() > max_vcores()))
-		return -1;	/* consider ERRNO */
-	/* Post our desires (ROS atomic_add() conflicts with glibc) */
-	atomic_fetch_and_add(&nr_new_vcores_wanted, nr_new_vcores);
-try_handle_it:
-	cmb();	/* inc before swap.  the atomic is a CPU mb() */
-	if (atomic_swap(&vc_req_being_handled, 1)) {
-		/* We got a 1 back, so someone else is already working on it */
-		return 0;
-	}
-	/* So now we're the ones supposed to handle things.  This does things in the
-	 * "increment based on the number we have", vs "increment on the number we
-	 * said we want".
-	 *
-	 * Figure out how many we have, though this is racy.  Yields/preempts/grants
-	 * will change this over time, and we may end up asking for less than we
-	 * had. */
-	nr_vcores_wanted = num_vcores();
-	/* Pull all of the vcores wanted into our local variable, where we'll deal
-	 * with prepping/requesting that many vcores.  Keep doing this til we think
-	 * no more are wanted. */
-	while ((nr_to_prep_now = atomic_swap(&nr_new_vcores_wanted, 0))) {
-		nr_vcores_wanted += nr_to_prep_now;
-		/* Don't bother prepping or asking for more than we can ever get */
-		nr_vcores_wanted = MIN(nr_vcores_wanted, max_vcores());
-		if (prep_new_vcores(nr_vcores_wanted)) {
-			atomic_set(&vc_req_being_handled, 0);
-			return -1;
-		}
-	}
-	cmb();	/* force a reread of num_vcores() */
-	/* Update amt_wanted if we now want *more* than what the kernel already
-	 * knows.  See notes in the func doc. */
+	if (prep_new_vcores(nr_vcores_wanted))
+		panic("Unable to prep up to %d vcores!", nr_vcores_wanted);
 	if (nr_vcores_wanted > __procdata.res_req[RES_CORES].amt_wanted)
 		__procdata.res_req[RES_CORES].amt_wanted = nr_vcores_wanted;
-	/* If num_vcores isn't what we want, we can poke the ksched.  Due to some
-	 * races with yield, our desires may be old.  Not a big deal; any vcores
-	 * that pop up will just end up yielding (or get preempt messages.)  */
 	if (nr_vcores_wanted > num_vcores())
 		sys_poke_ksched(0, RES_CORES);	/* 0 -> poke for ourselves */
-	/* Unlock, (which lets someone else work), and check to see if more work
-	 * needs to be done.  If so, we'll make sure it gets handled. */
-	atomic_set(&vc_req_being_handled, 0);	/* unlock, to allow others to try */
-	wrmb();
-	/* check for any that might have come in while we were out */
-	if (atomic_read(&nr_new_vcores_wanted))
-		goto try_handle_it;
+}
+static struct poke_tracker vc_req_poke = POKE_INITIALIZER(__vc_req_poke);
+
+/* Requests the kernel that we have a total of nr_vcores_wanted.
+ *
+ * This is callable by multiple threads/vcores concurrently.  Exactly one of
+ * them will actually run __vc_req_poke.  The others will just return.
+ *
+ * This means that two threads could ask for differing amounts, and only one of
+ * them will succeed.  This is no different than a racy write to a shared
+ * variable.  The poke provides a single-threaded environment, so that we don't
+ * worry about racing on VCPDs or hitting the kernel with excessive SYS_pokes.
+ *
+ * Since we're using the post-and-poke style, we can do a 'last write wins'
+ * policy for the value used in the poke (and subsequent pokes). */
+void vcore_request_total(long nr_vcores_wanted)
+{
+	static long nr_vc_wanted;
+
+	if (nr_vcores_wanted == __procdata.res_req[RES_CORES].amt_wanted)
+		return;
+
+	/* We race to "post our work" here.  Whoever handles the poke will get the
+	 * latest value written here. */
+	nr_vc_wanted = nr_vcores_wanted;
+	poke(&vc_req_poke, &nr_vc_wanted);
+}
+
+/* This tries to get "more vcores", based on the number we currently have.
+ *
+ * What happens is we can have a bunch of threads trying to get "another vcore",
+ * which currently means more than num_vcores().  If you have someone ask for
+ * two more, and then someone else ask for one more, how many you ultimately ask
+ * for depends on if the kernel heard you and adjusted num_vcores in between the
+ * two calls.  Or maybe your amt_wanted already was num_vcores + 5, so neither
+ * call is telling the kernel anything new.  It comes down to "one more than I
+ * have" vs "one more than I've already asked for".
+ *
+ * So for now, this will keep the older behavior (one more than I have).  This
+ * is all quite racy, so we can just guess and request a total number of vcores.
+ *
+ * Returns 0 always, probably panics on error.  This does not return the number
+ * of cores actually granted (though some parts of the kernel do internally). */
+int vcore_request_more(long nr_new_vcores)
+{
+	vcore_request_total(nr_new_vcores + num_vcores());
 	return 0;
 }
 

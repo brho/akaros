@@ -54,6 +54,7 @@ static inline uint64_t vcore_account_total_nsec(uint32_t vcoreid);
 void vcore_lib_init(void);
 void vcore_change_to_m(void);
 int vcore_request_more(long nr_new_vcores);
+void vcore_request_total(long nr_vcores_wanted);
 void vcore_yield(bool preempt_pending);
 void vcore_reenter(void (*entry_func)(void));
 void enable_notifs(uint32_t vcoreid);
