@@ -53,19 +53,19 @@ int main(int argc, char** argv)
 				printf("Should not see me!!!!!!!!!!!!!!!!!!\n");
 				while(1);
 			case TEST_ONE_CORE:
-				retval = vcore_request(1);
+				retval = vcore_request_more(1);
 				printf("One core test's core0's retval: %d\n", retval);
 				printf("Check to see it's on a worker core.\n");
 				while(1);
 			case TEST_ASK_FOR_TOO_MANY_CORES:
-				retval = vcore_request(12);
+				retval = vcore_request_more(12);
 				printf("Asked for too many, retval: %d\n", retval);
 				return 0;
 			case TEST_INCREMENTAL_CHANGES:
-				retval = vcore_request(4);
+				retval = vcore_request_more(4);
 				break;
 			default:
-				retval = vcore_request(5);
+				retval = vcore_request_more(5);
 		}
 		if (retval)
 			panic("failed to allocate cores!");
@@ -78,7 +78,7 @@ int main(int argc, char** argv)
 		case TEST_YIELD_OUT_OF_ORDER:
 			udelay(10000000);
 			printf("Core 2 should have yielded, asking for another\n");
-			retval = vcore_request(5);
+			retval = vcore_request_more(5);
 			break;
 		case TEST_YIELD_0_OUT_OF_ORDER:
 			udelay(5000000);
@@ -109,12 +109,12 @@ void vcore_entry(void)
 				// Testing asking for less than we already have
 				udelay(1000000);
 				printf("Asking for too few:\n");
-				retval = vcore_request(2);
+				retval = vcore_request_more(2);
 				printf("Should be -EINVAL(7): %d\n", retval);
 				// Testing getting more while running
 				printf("Asking for more while running:\n");
 				udelay(1000000);
-				retval = vcore_request(5);
+				retval = vcore_request_more(5);
 				printf("core2's retval: %d\n", retval);
 				break;
 			case TEST_YIELD_OUT_OF_ORDER:
@@ -124,7 +124,7 @@ void vcore_entry(void)
 			case TEST_YIELD_0_OUT_OF_ORDER:
 				udelay(7500000);
 				printf("Core 0 should have yielded, asking for another\n");
-				retval = vcore_request(5);
+				retval = vcore_request_more(5);
 		}
 	}
 	global_tests(vcoreid);
@@ -144,7 +144,7 @@ static void global_tests(uint32_t vcoreid)
 			if (vcoreid == 2) {
 				printf("Core %d trying to request 0/ switch to _S\n", vcoreid);
 				udelay(3000000);
-				retval = vcore_request(0);
+				retval = vcore_request_more(0);
 				// will only see this if we are scheduled()
 				printf("Core %d back up! (retval:%d)\n", vcoreid, retval);
 				printf("And exiting\n");
@@ -153,7 +153,7 @@ static void global_tests(uint32_t vcoreid)
 			while(1);
 		case TEST_CRAZY_YIELDS:
 			udelay(300000*vcoreid);
-			vcore_request(5);
+			vcore_request_more(5);
 			sys_yield(0);
 			printf("should  never see me, unless you slip into *_S\n");
 			break;

@@ -241,7 +241,7 @@ void vcore_change_to_m(void)
  * num_vcores().  num_vcores() is how many you have now or very soon (accounting
  * for messages in flight that will take your cores), not how many you told the
  * kernel you want. */
-int vcore_request(long nr_new_vcores)
+int vcore_request_more(long nr_new_vcores)
 {
 	long nr_to_prep_now, nr_vcores_wanted;
 

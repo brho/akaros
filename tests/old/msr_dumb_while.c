@@ -14,7 +14,7 @@ int main(int argc, char** argv)
 	/* Get EV_ALARM on vcore 1, with IPI. */
 	enable_kevent(EV_ALARM, 1, EVENT_IPI | EVENT_VCORE_PRIVATE);
 
-	vcore_request(max_vcores());
+	vcore_request_more(max_vcores());
 
 	/* should never make it here */
 	return -1;

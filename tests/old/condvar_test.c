@@ -124,7 +124,7 @@ int main(void)
 	 * 2LSs VC management and got up to 2 VC.  Assuming no preemption. */
 	pthread_can_vcore_request(FALSE);	/* 2LS won't manage vcores */
 	while (num_vcores() < 2)
-		vcore_request(1);
+		vcore_request_more(1);
 	for (long i = 0; i < 1000; i++) {
 		for (int j = 0; j < 10; j++) {	/* some extra chances at each point */
 			state = FALSE;

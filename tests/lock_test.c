@@ -743,7 +743,7 @@ static void os_prep_work(pthread_t *worker_threads, int nr_threads)
 		clear_kevent_q(EV_VCORE_PREEMPT);
 		clear_kevent_q(EV_CHECK_MSGS);
 	}
-	if (vcore_request(nr_threads - 1)) {
+	if (vcore_request_more(nr_threads - 1)) {
 		printf("Failed to request %d more vcores, currently have %d\n",
 		       nr_threads - 1, num_vcores());
 		exit(-1);

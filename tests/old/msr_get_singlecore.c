@@ -49,13 +49,13 @@ int main(int argc, char** argv)
 /* end: stuff userspace needs to do before switching to multi-mode */
 
 	/* get into multi mode */
-	retval = vcore_request(1);
+	retval = vcore_request_more(1);
 	if (retval)
 		printf("Fucked!\n");
 
 	printf("Proc %d requesting another vcore\n", getpid());
 	begin = read_tsc();
-	retval = vcore_request(1);
+	retval = vcore_request_more(1);
 	if (retval)
 		printf("Fucked!\n");
 	while (!core1_up)
@@ -69,7 +69,7 @@ int main(int argc, char** argv)
 	udelay(2000000);
 	printf("Proc %d requesting the vcore again\n", getpid());
 	begin = read_tsc();
-	retval = vcore_request(1);
+	retval = vcore_request_more(1);
 	if (retval)
 		printf("Fucked!\n");
 	while (!core1_up)

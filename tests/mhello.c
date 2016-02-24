@@ -88,7 +88,7 @@ int main(int argc, char** argv)
 		       vcoreid, &temp, temp);
 		printf("Multi-Goodbye, world, from PID: %d!\n", sys_getpid());
 		printf("Requesting %d vcores\n", max_vcores() - 1);
-		retval = vcore_request(max_vcores() - 1); /* since we already have 1 */
+		retval = vcore_request_more(max_vcores() - 1); /* since we already have 1 */
 		//retval = vcore_request(5);
 		printf("This is vcore0, right after vcore_request, retval=%d\n", retval);
 		/* vcore_context test */
@@ -174,7 +174,7 @@ void ghetto_vcore_entry(void)
 	udelay(10000000);
 	#endif
 
-	vcore_request(1);
+	vcore_request_more(1);
 	udelay(vcoreid * 10000000);
 	//exit(0);
 	while(1);

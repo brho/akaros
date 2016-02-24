@@ -63,7 +63,7 @@ int main(int argc, char** argv)
 	enable_notifs(0);
 /* end: stuff userspace needs to do before switching to multi-mode */
 
-	retval = vcore_request(1);
+	retval = vcore_request_more(1);
 	if (retval < 0)
 		printf("No cores granted, Rut Ro Raggy!\n");
 	/* now we're back in thread 0 on vcore 0 */

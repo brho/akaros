@@ -161,7 +161,7 @@ static void pth_thread_runnable(struct uthread *uthread)
 	/* Smarter schedulers should look at the num_vcores() and how much work is
 	 * going on to make a decision about how many vcores to request. */
 	if (can_adjust_vcores)
-		vcore_request(threads_ready);
+		vcore_request_more(threads_ready);
 }
 
 /* For some reason not under its control, the uthread stopped running (compared
@@ -936,7 +936,7 @@ static void wake_slist(struct pthread_list *to_wake)
 	threads_ready += nr_woken;
 	mcs_pdr_unlock(&queue_lock);
 	if (can_adjust_vcores)
-		vcore_request(threads_ready);
+		vcore_request_more(threads_ready);
 }
 
 int pthread_cond_broadcast(pthread_cond_t *c)
