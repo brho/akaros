@@ -16,22 +16,14 @@
 #include <compiler.h>
 #include <stdint.h>
 #include <umem.h>
+#include <arch/fixup.h>
 
-#define ASM_STAC
-#define ASM_CLAC
 #define __m(x) *(x)
 
 struct extable_ip_fixup {
 	uint64_t insn;
 	uint64_t fixup;
 };
-
-#define _ASM_EXTABLE(from, to)									\
-	" .pushsection \"__ex_table\",\"a\"\n"						\
-	" .balign 16\n"												\
-	" .quad (" #from ") - .\n"									\
-	" .quad (" #to ") - .\n"									\
-	" .popsection\n"
 
 #define __read_msr_asm(eax, edx, addr, err, errret)						\
 	asm volatile(ASM_STAC "\n"											\
