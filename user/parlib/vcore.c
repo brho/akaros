@@ -18,11 +18,6 @@
 __thread int __vcoreid = 0;
 __thread bool __vcore_context = FALSE;
 
-/* starting with 1 since we alloc vcore0's stacks and TLS in vcore_lib_init(). */
-static size_t _max_vcores_ever_wanted = 1;
-atomic_t nr_new_vcores_wanted;
-atomic_t vc_req_being_handled;
-
 __thread struct syscall __vcore_one_sysc = {.flags = (atomic_t)SC_DONE, 0};
 
 /* Per vcore entery function used when reentering at the top of a vcore's stack */
@@ -106,6 +101,39 @@ static int allocate_vcore_stack(int id)
 	return 0;
 }
 
+/* Helper, initializes a new vcore.  Do not call directly. */
+static int __prep_new_vcore(int vcoreid)
+{
+	if (allocate_vcore_stack(vcoreid))
+		goto error_vc_stack;
+	if (allocate_transition_tls(vcoreid))
+		goto error_tls;
+	return 0;
+
+error_tls:
+	free_vcore_stack(vcoreid);
+error_vc_stack:
+	return -1;
+}
+
+/* Initializes vcores before they are used, up to nr_total_vcores.
+ *
+ * Vcores need certain things, such as a stack and TLS.  These are determined by
+ * userspace.  Every vcore needs these set up before we drop into vcore context
+ * on that vcore.  This means we need to prep before asking the kernel for those
+ * vcores. */
+static int prep_new_vcores(int nr_total_vcores)
+{
+	static int _max_vcores_ever_wanted = 0;
+
+	for (int i = _max_vcores_ever_wanted; i < nr_total_vcores; i++) {
+		if (__prep_new_vcore(i))
+			return -1;
+		_max_vcores_ever_wanted++;
+	}
+	return 0;
+}
+
 /* Run libc specific early setup code. */
 static void vcore_libc_init(void)
 {
@@ -128,7 +156,7 @@ void __attribute__((constructor)) vcore_lib_init(void)
 	/* Need to alloc vcore0's transition stuff here (technically, just the TLS)
 	 * so that schedulers can use vcore0's transition TLS before it comes up in
 	 * vcore_entry() */
-	if (allocate_vcore_stack(0) || allocate_transition_tls(0))
+	if (prep_new_vcores(1))
 		goto vcore_lib_init_fail;
 
 	/* Initialize our VCPD event queues' ucqs, two pages per ucq, 4 per vcore */
@@ -154,7 +182,6 @@ void __attribute__((constructor)) vcore_lib_init(void)
 		/* Set the lowest level entry point for each vcore. */
 		vcpd_of(i)->vcore_entry = (uintptr_t)__kernel_vcore_entry;
 	}
-	atomic_init(&vc_req_being_handled, 0);
 	assert(!in_vcore_context());
 	vcore_libc_init();
 	return;
@@ -244,6 +271,8 @@ void vcore_change_to_m(void)
 int vcore_request_more(long nr_new_vcores)
 {
 	long nr_to_prep_now, nr_vcores_wanted;
+	static atomic_t nr_new_vcores_wanted;
+	static atomic_t vc_req_being_handled;
 
 	/* Early sanity checks */
 	if ((nr_new_vcores < 0) || (nr_new_vcores + num_vcores() > max_vcores()))
@@ -271,13 +300,9 @@ try_handle_it:
 		nr_vcores_wanted += nr_to_prep_now;
 		/* Don't bother prepping or asking for more than we can ever get */
 		nr_vcores_wanted = MIN(nr_vcores_wanted, max_vcores());
-		/* Make sure all we might ask for are prepped */
-		for (long i = _max_vcores_ever_wanted; i < nr_vcores_wanted; i++) {
-			if (allocate_vcore_stack(i) || allocate_transition_tls(i)) {
-				atomic_set(&vc_req_being_handled, 0);	/* unlock and bail out*/
-				return -1;
-			}
-			_max_vcores_ever_wanted++;	/* done in the loop to handle failures*/
+		if (prep_new_vcores(nr_vcores_wanted)) {
+			atomic_set(&vc_req_being_handled, 0);
+			return -1;
 		}
 	}
 	cmb();	/* force a reread of num_vcores() */
