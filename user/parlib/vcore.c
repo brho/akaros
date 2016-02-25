@@ -274,13 +274,10 @@ void vcore_request_total(long nr_vcores_wanted)
  *
  * So for now, this will keep the older behavior (one more than I have).  This
  * is all quite racy, so we can just guess and request a total number of vcores.
- *
- * Returns 0 always, probably panics on error.  This does not return the number
- * of cores actually granted (though some parts of the kernel do internally). */
-int vcore_request_more(long nr_new_vcores)
+ */
+void vcore_request_more(long nr_new_vcores)
 {
 	vcore_request_total(nr_new_vcores + num_vcores());
-	return 0;
 }
 
 /* This can return, if you failed to yield due to a concurrent event.  Note

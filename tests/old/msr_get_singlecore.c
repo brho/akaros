@@ -26,7 +26,6 @@ volatile bool core1_up = FALSE;
 int main(int argc, char** argv)
 {
 	uint32_t vcoreid = vcore_id();
-	int retval = 0;
 
 	mcs_barrier_init(&b, max_vcores());
 
@@ -53,9 +52,7 @@ int main(int argc, char** argv)
 
 	printf("Proc %d requesting another vcore\n", getpid());
 	begin = read_tsc();
-	retval = vcore_request_more(1);
-	if (retval)
-		printf("Fucked!\n");
+	vcore_request_more(1);
 	while (!core1_up)
 		cpu_relax;
 	end = read_tsc();
@@ -67,9 +64,7 @@ int main(int argc, char** argv)
 	udelay(2000000);
 	printf("Proc %d requesting the vcore again\n", getpid());
 	begin = read_tsc();
-	retval = vcore_request_more(1);
-	if (retval)
-		printf("Fucked!\n");
+	vcore_request_more(1);
 	while (!core1_up)
 		cpu_relax();
 	end = read_tsc();
