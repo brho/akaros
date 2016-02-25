@@ -56,7 +56,7 @@ int main(int argc, char** argv)
 /* end: stuff userspace needs to do before switching to multi-mode */
 
 	begin = read_tsc();
-	retval = vcore_request_more(max_vcores());
+	retval = vcore_request_total(max_vcores());
 	if (retval)
 		printf("Fucked!\n");
 	mcs_barrier_wait(&b, vcoreid);
@@ -68,9 +68,7 @@ int main(int argc, char** argv)
 	       udiff(begin, end), ndiff(begin, end), max_vcores());
 	udelay(5000000);
 	begin = read_tsc();
-	retval = vcore_request_more(max_vcores() - 1);
-	if (retval)
-		printf("Fucked!\n");
+	vcore_request_total(max_vcores());
 	mcs_barrier_wait(&b, vcoreid);
 	end = read_tsc();
 	printf("Took %llu usec (%llu nsec) to receive %d cores (warm).\n",

@@ -85,7 +85,7 @@ int main(int argc, char** argv)
 		pthread_can_vcore_request(FALSE);	/* 2LS won't manage vcores */
 		pthread_need_tls(FALSE);
 		pthread_mcp_init();					/* gives us one vcore */
-		vcore_request_more(nr_vcores - 1);		/* ghetto incremental interface */
+		vcore_request_total(nr_vcores);
 		for (int i = 0; i < nr_vcores; i++) {
 			printf_safe("Vcore %d mapped to pcore %d\n", i,
 			            __procinfo.vcoremap[i].pcoreid);

@@ -21,7 +21,7 @@ struct schedule_ops ghetto_sched_ops = {
 
 int main(int argc, char** argv)
 {
-	int num_started, retval;
+	int num_started;
 	unsigned int ev_type;
 
 	/* register our syscall handler (2LS does this) */
@@ -63,9 +63,7 @@ int main(int argc, char** argv)
 	enable_notifs(0);
 /* end: stuff userspace needs to do before switching to multi-mode */
 
-	retval = vcore_request_more(1);
-	if (retval < 0)
-		printf("No cores granted, Rut Ro Raggy!\n");
+	vcore_request_total(1);
 	/* now we're back in thread 0 on vcore 0 */
 	ev_q->ev_flags = EVENT_IPI;
 	ev_q->ev_vcore = 0;

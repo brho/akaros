@@ -48,7 +48,7 @@ int main(int argc, char** argv)
 	 * just mhello showing its warts due to trying to work outside uthread.c */
 	ros_syscall_blockon = __ros_syscall_spinon;
 
-	vcore_request_more(nr_vcores - 1); /* since we already have 1 */
+	vcore_request_total(nr_vcores);
 
 	while (1)
 		sys_halt_core(0);

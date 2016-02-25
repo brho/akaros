@@ -38,7 +38,6 @@ static void __ros_syscall_spinon(struct syscall *sysc)
 int main(int argc, char** argv)
 {
 	uint32_t vcoreid;
-	int retval;
 
 	/* vcore_context test */
 	assert(!in_vcore_context());
@@ -88,9 +87,8 @@ int main(int argc, char** argv)
 		       vcoreid, &temp, temp);
 		printf("Multi-Goodbye, world, from PID: %d!\n", sys_getpid());
 		printf("Requesting %d vcores\n", max_vcores() - 1);
-		retval = vcore_request_more(max_vcores() - 1); /* since we already have 1 */
-		//retval = vcore_request(5);
-		printf("This is vcore0, right after vcore_request, retval=%d\n", retval);
+		vcore_request_total(max_vcores());
+		printf("This is vcore0, right after vcore_request\n");
 		/* vcore_context test */
 		assert(!in_vcore_context());
 	}

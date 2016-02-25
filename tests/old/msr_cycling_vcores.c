@@ -20,7 +20,7 @@ int main(int argc, char** argv)
 	printf("Good chance this doesn't work anymore!\n");
 	mcs_barrier_init(&b, max_vcores());
 
-	vcore_request_more(max_vcores());
+	vcore_request_total(max_vcores());
 	printf("We're screwed!\n");
 
 	/* should never make it here */
@@ -44,7 +44,7 @@ void vcore_entry(void)
 			udelay(15000000);
 			printf("Proc %d requesting its cores again\n", getpid());
 			begin = read_tsc();
-			vcore_request_more(max_vcores() - 1); /* since we already have 1 */
+			vcore_request_total(max_vcores());
 			mcs_barrier_wait(&b, vcoreid);
 			end = read_tsc();
 			printf("Took %llu usec (%llu nsec) to get my yielded cores back.\n",
