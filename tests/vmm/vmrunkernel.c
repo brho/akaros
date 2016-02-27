@@ -550,6 +550,21 @@ static void set_posted_interrupt(int vector)
 int main(int argc, char **argv)
 {
 	struct boot_params *bp;
+	char *cmdline_default = "earlyprintk=vmcall,keep"
+		                    " console=hvc0"
+		                    " virtio_mmio.device=1M@0x100000000:32"
+		                    " nosmp"
+		                    " maxcpus=1"
+		                    " acpi.debug_layer=0x2"
+		                    " acpi.debug_level=0xffffffff"
+		                    " apic=debug"
+		                    " noexec=off"
+		                    " nohlt"
+		                    " init=/bin/launcher"
+		                    " lapic=notscdeadline"
+		                    " lapictimerfreq=1000"
+		                    " pit=none";
+	char *cmdline_extra = "\0";
 	char *cmdline;
 	uint64_t *p64;
 	void *a = (void *)0xe0000;
@@ -612,7 +627,7 @@ int main(int argc, char **argv)
 	//((uint32_t *)a_page)[0x30/4] = 0xDEADBEEF;
 
 
-	argc--,argv++;
+	argc--, argv++;
 	// switches ...
 	// Sorry, I don't much like the gnu opt parsing code.
 	while (1) {
@@ -626,18 +641,21 @@ int main(int argc, char **argv)
 			vmmflags |= VMM_VMCALL_PRINTF;
 			break;
 		case 'm':
-			argc--,argv++;
+			argc--, argv++;
 			maxresume = strtoull(argv[0], 0, 0);
 			break;
 		case 'i':
-			argc--,argv++;
+			argc--, argv++;
 			virtioirq = strtoull(argv[0], 0, 0);
 			break;
+		case 'c':
+			argc--, argv++;
+			cmdline_extra = argv[0];
 		default:
 			fprintf(stderr, "BMAFR\n");
 			break;
 		}
-		argc--,argv++;
+		argc--, argv++;
 	}
 	if (argc < 1) {
 		fprintf(stderr, "Usage: %s vmimage [-n (no vmcall printf)] [coreboot_tables [loadaddress [entrypoint]]]\n", argv[0]);
@@ -778,20 +796,7 @@ int main(int argc, char **argv)
 	cmdline = a;
 	a += 4096;
 	bp->hdr.cmd_line_ptr = (uintptr_t) cmdline;
-	sprintf(cmdline, "earlyprintk=vmcall,keep"
-		             " console=hvc0"
-		             " virtio_mmio.device=1M@0x100000000:32"
-		             " nosmp"
-		             " maxcpus=1"
-		             " acpi.debug_layer=0x2"
-		             " acpi.debug_level=0xffffffff"
-		             " apic=debug"
-		             " noexec=off"
-		             " nohlt"
-		             " init=/bin/sh"
-		             " lapic=notscdeadline"
-		             " lapictimerfreq=1000"
-		             " pit=none");
+	sprintf(cmdline, "%s %s", cmdline_default, cmdline_extra);
 
 
 	/* Put the e820 memory region information in the boot_params */
