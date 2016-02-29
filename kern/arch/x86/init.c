@@ -143,7 +143,8 @@ void ancillary_state_init(void)
 
 	/*
 	 *	Save only the x87 FPU state so that the extended state registers
-	 *	remain zeroed in the default.
+	 *	remain zeroed in the default. There is a caveat to this that involves
+	 *  the MXCSR register, this is handled below.
 	 *	We use XSAVE64 instead of XSAVEOPT64 (save_fp_state uses XSAVEOPT64),
 	 *	because XSAVEOPT64 may decide to skip saving a state component
 	 *	if that state component is in its initial configuration, and
@@ -154,6 +155,23 @@ void ancillary_state_init(void)
 	edx = 0x0;
 	eax = 0x1;
 	asm volatile("xsave64 %0" : : "m"(x86_default_fpu), "a"(eax), "d"(edx));
+
+	/* We must set the MXCSR field in the default state struct to its
+	 * power-on value of 0x1f80. This masks all SIMD floating
+	 * point exceptions and clears all SIMD floating-point exception
+	 * flags, sets rounding control to round-nearest, disables
+	 * flush-to-zero mode, and disables denormals-are-zero mode.
+	 *
+	 * We don't actually have to set the MXCSR itself here,
+	 * because it will be set from the default state struct when
+	 * we perform per-cpu init.
+	 *
+	 * Right now, we set the MXCSR through fp_head_64d. Since
+	 * the mxcsr is at the same offset in all fp header formats
+	 * implemented for Akaros, this will function correctly for
+	 * all supported operating modes.
+	 */
+	 x86_default_fpu.fp_head_64d.mxcsr = 0x1f80;
 }
 
 void arch_init(void)
