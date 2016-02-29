@@ -7,6 +7,7 @@
 #include <ros/resource.h>
 #include <ros/atomic.h>
 #include <ros/arch/arch.h>
+#include <ros/cpu_feat.h>
 #include <string.h>
 
 /* Process creation flags */
@@ -65,7 +66,7 @@ typedef struct procinfo {
 
 /* We align this so that the kernel can easily allocate it in the BSS */
 struct proc_global_info {
-
+	unsigned long cpu_feats[__NR_CPU_FEAT_BITS];
 } __attribute__((aligned(PGSIZE)));
 #define PROCGINFO_NUM_PAGES  (sizeof(struct proc_global_info) / PGSIZE)
 
