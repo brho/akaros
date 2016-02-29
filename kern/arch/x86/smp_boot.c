@@ -22,6 +22,7 @@
 #include <env.h>
 #include <trap.h>
 #include <kmalloc.h>
+#include <arch/fsgsbase.h>
 
 #include "vmm/vmm.h"
 
@@ -81,7 +82,7 @@ void smp_final_core_init(void)
 	int coreid = get_os_coreid(hw_core_id());
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	pcpui->coreid = coreid;
-	write_msr(MSR_GS_BASE, (uint64_t)pcpui);
+	write_msr(MSR_GS_BASE, (uintptr_t)pcpui);	/* our cr4 isn't set yet */
 	write_msr(MSR_KERN_GS_BASE, (uint64_t)pcpui);
 	/* don't need this for the kernel anymore, but userspace can still use it */
 	setup_rdtscp(coreid);
@@ -301,7 +302,7 @@ void __arch_pcpu_init(uint32_t coreid)
 		pcpui->gdt = (segdesc_t*)(*my_stack_bot +
 		                          sizeof(taskstate_t) + sizeof(pseudodesc_t));
 	}
-	assert(read_msr(MSR_GS_BASE) == (uint64_t)pcpui);
+	assert(read_gsbase() == (uintptr_t)pcpui);
 	assert(read_msr(MSR_KERN_GS_BASE) == (uint64_t)pcpui);
 	/* Don't try setting up til after setting GS */
 	x86_sysenter_init(x86_get_stacktop_tss(pcpui->tss));

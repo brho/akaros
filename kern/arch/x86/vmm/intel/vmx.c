@@ -877,7 +877,7 @@ static int vmx_setup_initial_guest_state(struct proc *p,
 	vmcs_writel(GUEST_ES_BASE, 0);
 	vmcs_writel(GUEST_GS_BASE, 0);
 	vmcs_writel(GUEST_SS_BASE, 0);
-	rdmsrl(MSR_FS_BASE, tmpl);
+	tmpl = read_fsbase();
 	vmcs_writel(GUEST_FS_BASE, tmpl);
 
 	/* guest segment access rights */

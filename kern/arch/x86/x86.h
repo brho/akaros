@@ -138,6 +138,7 @@
 #define X86_CR8_TPR	0x0000000F /* task priority register */
 
 #ifndef __ASSEMBLER__
+
 static inline uint8_t inb(int port) __attribute__((always_inline));
 static inline void insb(int port, void *addr, int cnt)
               __attribute__((always_inline));

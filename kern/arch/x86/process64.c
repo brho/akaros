@@ -3,6 +3,7 @@
 #include <process.h>
 #include <pmap.h>
 #include <smp.h>
+#include <arch/fsgsbase.h>
 
 #include <string.h>
 #include <assert.h>
@@ -15,8 +16,8 @@ static void __attribute__((noreturn)) proc_pop_hwtf(struct hw_trapframe *tf)
 	if (x86_hwtf_is_partial(tf)) {
 		swap_gs();
 	} else {
-		write_msr(MSR_GS_BASE, (uint64_t)tf->tf_gsbase);
-		write_msr(MSR_FS_BASE, (uint64_t)tf->tf_fsbase);
+		write_gsbase(tf->tf_gsbase);
+		write_fsbase(tf->tf_fsbase);
 	}
 	asm volatile ("movq %0, %%rsp;          "
 	              "popq %%rax;              "
@@ -45,8 +46,8 @@ static void __attribute__((noreturn)) proc_pop_swtf(struct sw_trapframe *tf)
 	if (x86_swtf_is_partial(tf)) {
 		swap_gs();
 	} else {
-		write_msr(MSR_GS_BASE, (uint64_t)tf->tf_gsbase);
-		write_msr(MSR_FS_BASE, (uint64_t)tf->tf_fsbase);
+		write_gsbase(tf->tf_gsbase);
+		write_fsbase(tf->tf_fsbase);
 	}
 	/* We need to 0 out any registers that aren't part of the sw_tf and that we
 	 * won't use/clobber on the out-path.  While these aren't part of the sw_tf,

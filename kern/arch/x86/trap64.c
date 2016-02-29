@@ -55,7 +55,7 @@ void print_trapframe(struct hw_trapframe *hw_tf)
 	                                      x86_trapname(hw_tf->tf_trapno));
 	/* FYI: these aren't physically adjacent to trap and err */
 	if (hw_tf->tf_cs == GD_KT)
-		printk("  gsbs 0x%016lx\n",       read_msr(MSR_GS_BASE));
+		printk("  gsbs 0x%016lx\n",       read_gsbase());
 	else
 		printk("  gsbs 0x%016lx\n",       hw_tf->tf_gsbase);
 	printk("  fsbs 0x%016lx\n",           hw_tf->tf_fsbase);

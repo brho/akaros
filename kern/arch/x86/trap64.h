@@ -13,6 +13,8 @@
 #error "Do not include arch/trap64.h directly."
 #endif
 
+#include <arch/fsgsbase.h>
+
 static inline bool in_kernel(struct hw_trapframe *hw_tf)
 {
 	return (hw_tf->tf_cs & ~3) == GD_KT;
@@ -163,16 +165,16 @@ static inline bool arch_ctx_is_partial(struct user_context *ctx)
 static inline void x86_finalize_hwtf(struct hw_trapframe *tf)
 {
 	tf->tf_gsbase = read_msr(MSR_KERNEL_GS_BASE);
-	write_msr(MSR_KERNEL_GS_BASE, read_msr(MSR_GS_BASE));
-	tf->tf_fsbase = read_msr(MSR_FS_BASE);
+	write_msr(MSR_KERNEL_GS_BASE, read_gsbase());
+	tf->tf_fsbase = read_fsbase();
 	x86_hwtf_clear_partial(tf);
 }
 
 static inline void x86_finalize_swtf(struct sw_trapframe *tf)
 {
 	tf->tf_gsbase = read_msr(MSR_KERNEL_GS_BASE);
-	write_msr(MSR_KERNEL_GS_BASE, read_msr(MSR_GS_BASE));
-	tf->tf_fsbase = read_msr(MSR_FS_BASE);
+	write_msr(MSR_KERNEL_GS_BASE, read_gsbase());
+	tf->tf_fsbase = read_fsbase();
 	x86_swtf_clear_partial(tf);
 }
 
