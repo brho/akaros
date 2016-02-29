@@ -40,6 +40,7 @@
 #define CR4_OSXMME	0x00000400	// OS support for unmasked SIMD FP exceptions
 #define CR4_VMXE	0x00002000	// VMX enable
 #define CR4_SMXE	0x00004000	// SMX enable
+#define CR4_FSGSBASE	0x00010000	// RD/WR FS/GS Base enabled
 #define CR4_OSXSAVE	0x00040000	// XSAVE and processor extended states-enabled
 
 // Eflags register

@@ -22,6 +22,7 @@
 #include <env.h>
 #include <trap.h>
 #include <kmalloc.h>
+#include <cpu_feat.h>
 #include <arch/fsgsbase.h>
 
 #include "vmm/vmm.h"
@@ -281,6 +282,8 @@ void __arch_pcpu_init(uint32_t coreid)
 	 * removal) */
 	tlbflush();
 
+	if (cpu_has_feat(CPU_FEAT_X86_FSGSBASE))
+		lcr4(rcr4() | CR4_FSGSBASE);
 	/* Enable SSE instructions.  We might have to do more, like masking certain
 	 * flags or exceptions in the MXCSR, or at least handle the SIMD exceptions.
 	 * We don't do it for FP yet either, so YMMV. */

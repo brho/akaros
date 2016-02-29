@@ -412,8 +412,11 @@ static inline void *__get_tls_desc(void)
 
 static inline void __set_tls_desc(void *tls_desc)
 {
-	/* TODO: check for and use WRFSBASE */
-	__fastcall_setfsbase((uintptr_t)tls_desc);
+	if (!cpu_has_feat(CPU_FEAT_X86_FSGSBASE)) {
+		__fastcall_setfsbase((uintptr_t)tls_desc);
+		return;
+	}
+	asm volatile ("wrfsbase %0" : : "r"(tls_desc));
 }
 
 static inline const char* tls_init_tp(void* thrdescr)
