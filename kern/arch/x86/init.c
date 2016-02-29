@@ -11,6 +11,7 @@
 #include <monitor.h>
 #include <arch/usb.h>
 #include <assert.h>
+#include <cpu_feat.h>
 
 /*
  *	x86_default_xcr0 is the Akaros-wide
@@ -82,30 +83,14 @@ static void cons_irq_init(void)
 }
 
 /* Init x86 processor extended state */
-// TODO/XXX: Eventually consolidate all of our "cpu has" stuff.
-#define CPUID_XSAVE_SUPPORT         (1 << 26)
-#define CPUID_XSAVEOPT_SUPPORT      (1 << 0)
 void ancillary_state_init(void)
 {
 	uint32_t eax, ebx, ecx, edx;
 	uint64_t proc_supported_features; /* proc supported user state components */
 
-	/* Note: The cpuid function comes from arch/x86.h
-	 * arg1 is eax input, arg2 is ecx input, then
-	 * pointers to eax, ebx, ecx, edx output values.
-	 */
-
-	// First check general XSAVE support. Die if not supported.
-	cpuid(0x01, 0x00, 0, 0, &ecx, 0);
-	if (!(CPUID_XSAVE_SUPPORT & ecx))
-		panic("No XSAVE support! Refusing to boot.\n");
-
-
-	// Next check XSAVEOPT support. Die if not supported.
-	cpuid(0x0d, 0x01, &eax, 0, 0, 0);
-	if (!(CPUID_XSAVEOPT_SUPPORT & eax))
+	/* TODO: switch between XSAVEOPT and pre-XSAVE FP ops */
+	if (!cpu_has_feat(CPU_FEAT_X86_XSAVEOPT))
 		panic("No XSAVEOPT support! Refusing to boot.\n");
-
 
 	// Next determine the user state components supported
 	// by the processor and set x86_default_xcr0.

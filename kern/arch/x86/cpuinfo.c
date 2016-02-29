@@ -13,6 +13,7 @@
 #include <pmap.h>
 #include <kdebug.h>
 #include <string.h>
+#include <cpu_feat.h>
 
 /* Check Intel's SDM 2a for Table 3-17 for the cpuid leaves */
 void print_cpuinfo(void)
@@ -165,6 +166,18 @@ void print_cpuinfo(void)
 		printk("Always running APIC detected\n");
 	else
 		printk("Always running APIC *not* detected\n");
+
+	/* TODO: Eventually consolidate all of our "cpuid" stuff. */
+	#define CPUID_XSAVE_SUPPORT         (1 << 26)
+	#define CPUID_XSAVEOPT_SUPPORT      (1 << 0)
+
+	cpuid(0x0d, 0x01, &eax, 0, 0, 0);
+	if (CPUID_XSAVEOPT_SUPPORT & eax) {
+		cpuid(0x01, 0x00, 0, 0, &ecx, 0);
+		/* XSAVEOPT should imply XSAVE */
+		assert(CPUID_XSAVE_SUPPORT & ecx);
+		cpu_set_feat(CPU_FEAT_X86_XSAVEOPT);
+	}
 }
 
 #define BIT_SPACING "        "
