@@ -85,22 +85,27 @@ typedef struct x86_pgdir {
  *    UVPT      ---->  +------------------------------+ 0x00007f8000000000 -+
  *                     | Unmapped (expandable region) |                     |
  *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|                     |
+ *                     |       Global R/O Info        | R-/R-  PML2_PTE_REACH
+ *                     |       (proc_glb_info)        |                     |
+ *    UGINFO    ---->  +------------------------------+ 0x00007f7fffe00000 -+
+ *                     | Unmapped (expandable region) |                     |
+ *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|                     |
  *                     |     Per-Process R/O Info     | R-/R-  PML2_PTE_REACH
  *                     |         (procinfo)           |                     |
- * UWLIM, UINFO ---->  +------------------------------+ 0x00007f7fffe00000 -+
+ * UWLIM, UINFO ---->  +------------------------------+ 0x00007f7fffc00000 -+
  *                     | Unmapped (expandable region) |                     |
  *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|                     |
  *                     |     Per-Process R/W Data     | RW/RW  PML2_PTE_REACH
  *                     |         (procdata)           |                     |
- *    UDATA     ---->  +------------------------------+ 0x00007f7fffc00000 -+
+ *    UDATA     ---->  +------------------------------+ 0x00007f7fffa00000 -+
  *                     |                              |
  *                     |    Global Shared R/W Data    | RW/RW  PGSIZE
  *                     |                              |
- * UMAPTOP, UGDATA ->  +------------------------------+ 0x00007f7fffbff000
+ * UMAPTOP, UGDATA ->  +------------------------------+ 0x00007f7fff9ff000
  *    USTACKTOP        |                              |
  *                     |      Normal User Stack       | RW/RW 256 * PGSIZE
  *                     |                              |
- *                     +------------------------------+ 0x00007f7fffaff000
+ *                     +------------------------------+ 0x00007f7fff8ff000
  *                     |                              |
  *                     |        Empty Memory          |
  *                     |                              |

@@ -58,6 +58,7 @@
 	} while (0)
 
 int booting = 1;
+struct proc_global_info __proc_global_info;
 struct sysinfo_t sysinfo;
 static char boot_cmdline[MAX_BOOT_CMDLINE_SIZE];
 

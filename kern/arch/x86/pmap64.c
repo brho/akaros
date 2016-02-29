@@ -434,12 +434,13 @@ static void check_syms_va(void)
 	check_sym_va(KERNBASE,       0xffff800000000000);
 	check_sym_va(ULIM,           0x0000800000000000);
 	check_sym_va(UVPT,           0x00007f8000000000);
-	check_sym_va(UINFO,          0x00007f7fffe00000);
-	check_sym_va(UWLIM,          0x00007f7fffe00000);
-	check_sym_va(UDATA,          0x00007f7fffc00000);
-	check_sym_va(UGDATA,         0x00007f7fffbff000);
-	check_sym_va(UMAPTOP,        0x00007f7fffbff000);
-	check_sym_va(USTACKTOP,      0x00007f7fffbff000);
+	check_sym_va(UGINFO,         0x00007f7fffe00000);
+	check_sym_va(UINFO,          0x00007f7fffc00000);
+	check_sym_va(UWLIM,          0x00007f7fffc00000);
+	check_sym_va(UDATA,          0x00007f7fffa00000);
+	check_sym_va(UGDATA,         0x00007f7fff9ff000);
+	check_sym_va(UMAPTOP,        0x00007f7fff9ff000);
+	check_sym_va(USTACKTOP,      0x00007f7fff9ff000);
 	check_sym_va(BRK_END,        0x0000400000000000);
 }
 

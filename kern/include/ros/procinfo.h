@@ -61,12 +61,23 @@ typedef struct procinfo {
 	struct pcore		pcoremap[MAX_NUM_CORES];
 	seq_ctr_t			coremap_seqctr;
 } procinfo_t;
-#define PROCINFO_NUM_PAGES  ((sizeof(procinfo_t)-1)/PGSIZE + 1)	
+#define PROCINFO_NUM_PAGES  ((sizeof(procinfo_t)-1)/PGSIZE + 1)
 
+/* We align this so that the kernel can easily allocate it in the BSS */
+struct proc_global_info {
 
-// this is how user programs access the procinfo page
-#ifndef ROS_KERNEL
-# define __procinfo (*(procinfo_t*)UINFO)
+} __attribute__((aligned(PGSIZE)));
+#define PROCGINFO_NUM_PAGES  (sizeof(struct proc_global_info) / PGSIZE)
+
+#ifdef ROS_KERNEL
+
+/* defined in init.c */
+extern struct proc_global_info __proc_global_info;
+
+#else /* Userland */
+
+#define __procinfo (*(procinfo_t*)UINFO)
+#define __proc_global_info (*(struct proc_global_info*)UGINFO)
 
 #include <ros/common.h>
 #include <ros/atomic.h>

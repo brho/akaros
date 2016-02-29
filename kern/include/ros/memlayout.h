@@ -16,8 +16,10 @@
 #define EXTPHYSMEM	0x100000
 #endif
 
+/* Read-only, global shared info structures */
+#define UGINFO			(UVPT - PTSIZE)
 /* Read-only, per-process shared info structures */
-#define UINFO			(UVPT - PTSIZE)
+#define UINFO			(UGINFO - PTSIZE)
 /* Top of user-writable VM */
 #define UWLIM			UINFO
 /* Read-write, per-process shared info structures */
