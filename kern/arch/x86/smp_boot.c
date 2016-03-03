@@ -284,13 +284,23 @@ void __arch_pcpu_init(uint32_t coreid)
 
 	if (cpu_has_feat(CPU_FEAT_X86_FSGSBASE))
 		lcr4(rcr4() | CR4_FSGSBASE);
-	/* Enable SSE instructions.  We might have to do more, like masking certain
-	 * flags or exceptions in the MXCSR, or at least handle the SIMD exceptions.
-	 * We don't do it for FP yet either, so YMMV. */
-	lcr4(rcr4() | CR4_OSFXSR | CR4_OSXMME | CR4_OSXSAVE);
 
-	// Set xcr0 to the Akaros-wide default
-	lxcr0(x86_default_xcr0);
+	/*
+	 * Enable SSE instructions.
+	 * CR4.OSFXSR enables SSE and ensures that MXCSR/XMM gets saved with FXSAVE
+	 * CR4.OSXSAVE enables XSAVE instructions. Only set if XSAVEOPT supported.
+	 * CR4.OSXMME indicates OS support for software exception handlers for
+	 * SIMD floating-point exceptions (turn it on to get #XM exceptions
+	 * in the event of a SIMD error instead of #UD exceptions).
+	 */
+	lcr4(rcr4() | CR4_OSFXSR | CR4_OSXMME);
+
+	if (cpu_has_feat(CPU_FEAT_X86_XSAVEOPT)) {
+		// You MUST set CR4.OSXSAVE before loading xcr0
+		lcr4(rcr4() | CR4_OSXSAVE);
+		// Set xcr0 to the Akaros-wide default
+		lxcr0(x86_default_xcr0);
+	}
 
 	// Initialize fpu and extended state by restoring our default XSAVE area.
 	init_fp_state();

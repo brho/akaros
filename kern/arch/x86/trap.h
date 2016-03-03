@@ -121,6 +121,7 @@
 #include <arch/pci.h>
 #include <arch/pic.h>
 #include <arch/topology.h>
+#include <cpu_feat.h>
 #include <arch/io.h>
 #include <stdio.h>
 
@@ -164,9 +165,17 @@ static inline void save_fp_state(struct ancillary_state *silly)
 {
 	uint32_t eax, edx;
 
-	edx = x86_default_xcr0 >> 32;
-	eax = x86_default_xcr0;
-	asm volatile("xsaveopt64 %0" : : "m"(*silly), "a"(eax), "d"(edx));
+	if (cpu_has_feat(CPU_FEAT_X86_XSAVEOPT)) {
+		edx = x86_default_xcr0 >> 32;
+		eax = x86_default_xcr0;
+		asm volatile("xsaveopt64 %0" : : "m"(*silly), "a"(eax), "d"(edx));
+	} else if (cpu_has_feat(CPU_FEAT_X86_XSAVE)) {
+		edx = x86_default_xcr0 >> 32;
+		eax = x86_default_xcr0;
+		asm volatile("xsave64 %0" : : "m"(*silly), "a"(eax), "d"(edx));
+	} else {
+		asm volatile("fxsave64 %0" : : "m"(*silly));
+	}
 }
 
 static inline void init_fp_state(void);
@@ -175,19 +184,34 @@ static inline void restore_fp_state(struct ancillary_state *silly)
 	int err = 0;
 	uint32_t eax, edx;
 
-	edx = x86_default_xcr0 >> 32;
-	eax = x86_default_xcr0;
-	asm volatile(ASM_STAC               ";"
-		         "1: xrstor64 %1         ;"
-	             "2: " ASM_CLAC "        ;"
-	             ".section .fixup, \"ax\";"
-	             "3: mov %4, %0          ;"
-	             "   jmp 2b              ;"
-	             ".previous              ;"
-	             _ASM_EXTABLE(1b, 3b)
-	             : "=r" (err)
-	             : "m"(*silly), "a"(eax), "d"(edx),
-	               "i" (-EINVAL), "0" (err));
+	if (cpu_has_feat(CPU_FEAT_X86_XSAVE)) {
+		edx = x86_default_xcr0 >> 32;
+		eax = x86_default_xcr0;
+		asm volatile(ASM_STAC               ";"
+		             "1: xrstor64 %1         ;"
+		             "2: " ASM_CLAC "        ;"
+		             ".section .fixup, \"ax\";"
+		             "3: mov %4, %0          ;"
+		             "   jmp 2b              ;"
+		             ".previous              ;"
+		             _ASM_EXTABLE(1b, 3b)
+		             : "=r" (err)
+		             : "m"(*silly), "a"(eax), "d"(edx),
+		               "i" (-EINVAL), "0" (err));
+	} else {
+		asm volatile(ASM_STAC               ";"
+		             "1: fxrstor64 %1         ;"
+		             "2: " ASM_CLAC "        ;"
+		             ".section .fixup, \"ax\";"
+		             "3: mov %2, %0          ;"
+		             "   jmp 2b              ;"
+		             ".previous              ;"
+		             _ASM_EXTABLE(1b, 3b)
+		             : "=r" (err)
+		             : "m"(*silly),
+		               "i" (-EINVAL), "0" (err));
+	}
+
 
 	if (err) {
 		printk("Error restoring fp state!");

@@ -1,7 +1,7 @@
 /* See COPYRIGHT for copyright information. */
 
+#include <ros/common.h>
 #include <smp.h>
-
 #include <arch/x86.h>
 #include <arch/pci.h>
 #include <arch/console.h>
@@ -88,75 +88,118 @@ void ancillary_state_init(void)
 	uint32_t eax, ebx, ecx, edx;
 	uint64_t proc_supported_features; /* proc supported user state components */
 
-	/* TODO: switch between XSAVEOPT and pre-XSAVE FP ops */
-	if (!cpu_has_feat(CPU_FEAT_X86_XSAVEOPT))
-		panic("No XSAVEOPT support! Refusing to boot.\n");
+	// If you don't at least have FXSAVE and FXRSTOR
+	// (includes OSFXSR), you don't boot.
+	if (!cpu_has_feat(CPU_FEAT_X86_FXSR))
+		panic("No FXSAVE/FXRSTOR (FXSR) support! Refusing to boot.");
 
-	// Next determine the user state components supported
-	// by the processor and set x86_default_xcr0.
-	cpuid(0x0d, 0x00, &eax, 0, 0, &edx);
-	proc_supported_features = ((uint64_t)edx << 32) | eax;
+	if (cpu_has_feat(CPU_FEAT_X86_XSAVEOPT)) {
+		// Next determine the user state components supported
+		// by the processor and set x86_default_xcr0.
+		cpuid(0x0d, 0x00, &eax, 0, 0, &edx);
+		proc_supported_features = ((uint64_t)edx << 32) | eax;
 
-	// Intersection of processor-supported and Akaros-supported
-	// features is the Akaros-wide default at runtime.
-	x86_default_xcr0 = X86_MAX_XCR0 & proc_supported_features;
+		// Intersection of processor-supported and Akaros-supported
+		// features is the Akaros-wide default at runtime.
+		x86_default_xcr0 = X86_MAX_XCR0 & proc_supported_features;
 
-	/*
-	 *	Make sure CR4.OSXSAVE is set and set the local xcr0 to the default.
-	 *	We will do both of these things again during per-cpu init,
-	 *	but we are about to use XSAVE to build our default extended state
-	 *	record, so we need them enabled.
-	 *	You must set CR4_OSXSAVE before setting xcr0, or a #UD fault occurs.
-	 */
-	lcr4(rcr4() | CR4_OSXSAVE);
-	lxcr0(x86_default_xcr0);
+		/*
+		 * Make sure CR4.OSXSAVE is set and set the local xcr0 to the default.
+		 * We will do both of these things again during per-cpu init,
+		 * but we are about to use XSAVE to build our default extended state
+		 * record, so we need them enabled.
+		 * You must set CR4_OSXSAVE before setting xcr0, or a #UD fault occurs.
+		 */
+		lcr4(rcr4() | CR4_OSXSAVE);
+		lxcr0(x86_default_xcr0);
 
-	/*
-	 *	Build a default set of extended state values that we can later use to
-	 *	initialize extended state on other cores, or restore on this core.
-	 *	We need to use FNINIT to reset the FPU before saving, in case boot
-	 *	agents used the FPU or it is dirty for some reason. An old comment that
-	 *	used to be here said "had this happen on c89, which had a full FP stack
-	 *	after booting." Note that FNINIT does not clear the data registers,
-	 *	but it tags them all as empty (0b11).
-	 */
+		/*
+		 * Build a default set of extended state values that we can later use
+		 * to initialize extended state on other cores, or restore on this
+		 * core. We need to use FNINIT to reset the FPU before saving, in case
+		 * boot agents used the FPU or it is dirty for some reason. An old
+		 * comment that used to be here said "had this happen on c89, which had
+		 * a full FP stack after booting." Note that FNINIT does not clear the
+		 * data registers, but it tags them all as empty (0b11).
+		 */
 
-	asm volatile ("fninit");
+		// Zero the default extended state memory region before saving.
+		// It may be possible for memset to clobber SSE registers.
+		memset(&x86_default_fpu, 0x00, sizeof(struct ancillary_state));
+		asm volatile ("fninit");
 
-	// Zero the default extended state memory region before saving.
-	memset(&x86_default_fpu, 0x00, sizeof(struct ancillary_state));
+		/*
+		 * Save only the x87 FPU state so that the extended state registers
+		 * remain zeroed in the default. There is a caveat to this that
+		 * involves the MXCSR register, this is handled below.
+		 * We use XSAVE64 instead of XSAVEOPT64 (save_fp_state uses
+		 * XSAVEOPT64), because XSAVEOPT64 may decide to skip saving a state
+		 * component if that state component is in its initial configuration,
+		 * and we just used FNINIT to put the x87 in its initial configuration.
+		 * We can be confident that the x87 bit (bit 0) is set in xcr0, because
+		 * Intel requires it to be set at all times.
+		 */
+		edx = 0x0;
+		eax = 0x1;
+		asm volatile("xsave64 %0" : : "m"(x86_default_fpu), "a"(eax), "d"(edx));
 
-	/*
-	 *	Save only the x87 FPU state so that the extended state registers
-	 *	remain zeroed in the default. There is a caveat to this that involves
-	 *  the MXCSR register, this is handled below.
-	 *	We use XSAVE64 instead of XSAVEOPT64 (save_fp_state uses XSAVEOPT64),
-	 *	because XSAVEOPT64 may decide to skip saving a state component
-	 *	if that state component is in its initial configuration, and
-	 *	we just used FNINIT to put the x87 in its initial configuration.
-	 *	We can be confident that the x87 bit (bit 0) is set in xcr0, because
-	 *	Intel requires it to be set at all times.
-	 */
-	edx = 0x0;
-	eax = 0x1;
-	asm volatile("xsave64 %0" : : "m"(x86_default_fpu), "a"(eax), "d"(edx));
+		/* We must set the MXCSR field in the default state struct to its
+		 * power-on value of 0x1f80. This masks all SIMD floating
+		 * point exceptions and clears all SIMD floating-point exception
+		 * flags, sets rounding control to round-nearest, disables
+		 * flush-to-zero mode, and disables denormals-are-zero mode.
+		 *
+		 * We don't actually have to set the MXCSR itself here,
+		 * because it will be set from the default state struct when
+		 * we perform per-cpu init.
+		 *
+		 * Right now, we set the MXCSR through fp_head_64d. Since
+		 * the mxcsr is at the same offset in all fp header formats
+		 * implemented for Akaros, this will function correctly for
+		 * all supported operating modes.
+		 */
+		 x86_default_fpu.fp_head_64d.mxcsr = 0x1f80;
+	} else {
+		// Since no program should try to use XSAVE features
+		// on this processor, we set x86_default_xcr0 to 0x0
+		x86_default_xcr0 = 0x0;
 
-	/* We must set the MXCSR field in the default state struct to its
-	 * power-on value of 0x1f80. This masks all SIMD floating
-	 * point exceptions and clears all SIMD floating-point exception
-	 * flags, sets rounding control to round-nearest, disables
-	 * flush-to-zero mode, and disables denormals-are-zero mode.
-	 *
-	 * We don't actually have to set the MXCSR itself here,
-	 * because it will be set from the default state struct when
-	 * we perform per-cpu init.
-	 *
-	 * Right now, we set the MXCSR through fp_head_64d. Since
-	 * the mxcsr is at the same offset in all fp header formats
-	 * implemented for Akaros, this will function correctly for
-	 * all supported operating modes.
-	 */
-	 x86_default_fpu.fp_head_64d.mxcsr = 0x1f80;
+		/*
+		 * Build a default set of extended state values that we can later use to
+		 * initialize extended state on other cores, or restore on this core.
+		 * We need to use FNINIT to reset the FPU before saving, in case boot
+		 * agents used the FPU or it is dirty for some reason. An old comment
+		 * that used to be here said "had this happen on c89, which had a full
+		 * FP stack after booting." Note that FNINIT does not clear the data
+		 * registers, but it tags them all as empty (0b11).
+		 */
+
+		// Zero the default extended state memory region before saving.
+		// It may be possible for memset to clobber SSE registers.
+		memset(&x86_default_fpu, 0x00, sizeof(struct ancillary_state));
+		asm volatile ("fninit");
+
+		// Save the x87 FPU state
+		asm volatile("fxsave64 %0" : : "m"(x86_default_fpu));
+
+		/*
+		 * Because FXSAVE may have also saved junk from the XMM registers,
+		 * depending on how the hardware was implemented and the setting
+		 * of CR4.OSFXSR, we manually zero the region of the ancillary_state
+		 * containing those registers after saving FPU state. There are 16
+		 * XMM registers, each 128 bits, for a total size of 256 bytes.
+		 */
+		memset(&(x86_default_fpu.xmm0), 0x00, 256);
+
+		/*
+		 * Finally, because Only the Paranoid Survive, we set the MXCSR
+		 * for our default state. It should have been saved by FXSAVE,
+		 * but who knows if the default value is still there at this
+		 * point in the boot process.
+		 */
+		x86_default_fpu.fp_head_64d.mxcsr = 0x1f80;
+	}
+
 }
 
 void arch_init(void)
