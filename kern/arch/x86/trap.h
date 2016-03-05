@@ -165,6 +165,36 @@ static inline void save_fp_state(struct ancillary_state *silly)
 {
 	uint32_t eax, edx;
 
+	/* PLEASE NOTE:
+	 * AMD CPUs ignore the FOP/FIP/FDP fields when there is
+	 * no pending exception. When you are on AMD, we zero these fields in the
+	 * ancillary_state argument before saving. This way, if you are on AMD and
+	 * re-using an ancillary_state memory region, an old save's information
+	 * won't leak into your new data. The side-effect of this is that you can't
+	 * trust these fields to report accurate information on AMD unless an
+	 * exception was pending. Granted, AMD says that only exception handlers
+	 * should care about FOP/FIP/FDP, so that's probably okay.
+	 *
+	 * You should also note that on newer Intel 64 processors, while the value
+	 * of the FOP is always saved and restored, it contains the opcode of the
+	 * most recent x87 FPU instruction that triggered an unmasked exception,
+	 * rather than simply the most recent opcode. Some older Xeons and P4s had
+	 * the fopcode compatibility mode feature, which you could use to make the
+	 * FOP update on every x87 non-control instruction, but that has been
+	 * eliminated in newer hardware.
+	 *
+	 */
+	if (cpu_has_feat(CPU_FEAT_X86_VENDOR_AMD)) {
+		silly->fp_head_64d.fop      = 0x0;
+		silly->fp_head_64d.fpu_ip   = 0x0;
+		silly->fp_head_64d.cs       = 0x0;
+		silly->fp_head_64d.padding1 = 0x0; // padding1 is FIP or rsvd, proc dep.
+		silly->fp_head_64d.fpu_dp   = 0x0;
+		silly->fp_head_64d.ds       = 0x0;
+		silly->fp_head_64d.padding2 = 0x0; // padding2 is FDP or rsvd, proc dep.
+	}
+
+
 	if (cpu_has_feat(CPU_FEAT_X86_XSAVEOPT)) {
 		edx = x86_default_xcr0 >> 32;
 		eax = x86_default_xcr0;
@@ -183,6 +213,30 @@ static inline void restore_fp_state(struct ancillary_state *silly)
 {
 	int err = 0;
 	uint32_t eax, edx;
+
+	/*
+	 * Since AMD CPUs ignore the FOP/FIP/FDP fields when there is
+	 * no pending exception, we clear those fields before restoring
+	 * when we are both on AMD and there is no pending exception in
+	 * the ancillary_state argument to restore_fp_state.
+	 * If there is a pending exception in the ancillary_state,
+	 * these fields will be written to the FPU upon executing
+	 * a restore instruction, and there is nothing to worry about.
+	 *
+	 * See CVE-2006-1056 and CVE-2013-2076 on cve.mitre.org.
+	 *
+	 * We check for a pending exception by checking FSW.ES (bit 7)
+	 *
+	 * FNINIT clears FIP and FDP and, even though it is technically a
+	 * control instruction, it clears FOP because it is initializing the FPU.
+	 *
+	 * NOTE: This might not be the most efficient way to do things, and
+	 *       could be an optimization target for context switch performance
+	 *       on AMD processors in the future.
+	 */
+	if (!(silly->fp_head_64d.fsw & 0x80)
+		&& cpu_has_feat(CPU_FEAT_X86_VENDOR_AMD))
+		asm volatile ("fninit;");
 
 	if (cpu_has_feat(CPU_FEAT_X86_XSAVE)) {
 		edx = x86_default_xcr0 >> 32;
