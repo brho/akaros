@@ -126,6 +126,9 @@ void ancillary_state_init(void)
 		// Zero the default extended state memory region before saving.
 		// It may be possible for memset to clobber SSE registers.
 		memset(&x86_default_fpu, 0x00, sizeof(struct ancillary_state));
+
+		// FNINIT clears FIP and FDP and, even though it is technically a
+		// control instruction, it clears FOP while initializing the FPU.
 		asm volatile ("fninit");
 
 		/*
@@ -177,6 +180,9 @@ void ancillary_state_init(void)
 		// Zero the default extended state memory region before saving.
 		// It may be possible for memset to clobber SSE registers.
 		memset(&x86_default_fpu, 0x00, sizeof(struct ancillary_state));
+
+		// FNINIT clears FIP and FDP and, even though it is technically a
+		// control instruction, it clears FOP while initializing the FPU.
 		asm volatile ("fninit");
 
 		// Save the x87 FPU state
