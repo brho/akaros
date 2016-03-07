@@ -21,9 +21,6 @@ extern void exit (int __status) __THROW __attribute__ ((__noreturn__));
 #define exit(status) _exit(status)
 /*****************************************************************************/
 
-#define LOG2_MAX_VCORES 6
-#define MAX_VCORES (1 << LOG2_MAX_VCORES)
-
 #define TRANSITION_STACK_PAGES 2
 #define TRANSITION_STACK_SIZE (TRANSITION_STACK_PAGES*PGSIZE)
 
@@ -78,7 +75,7 @@ void print_user_context(struct user_context *ctx);
 /* Static inlines */
 static inline uint32_t max_vcores(void)
 {
-	return MAX(1, MIN(__procinfo.max_vcores, MAX_VCORES));
+	return MAX(1, __procinfo.max_vcores);
 }
 
 static inline uint32_t num_vcores(void)
