@@ -14,8 +14,6 @@
 #include <parlib/event.h>
 #include <parlib/uthread.h>
 
-mcs_barrier_t b;
-
 __thread int temp;
 void *core0_tls = 0;
 
@@ -41,9 +39,6 @@ int main(int argc, char** argv)
 {
 	uint32_t vcoreid;
 	int retval;
-
-	/* Initialize our barrier. */
-	mcs_barrier_init(&b, max_vcores());
 
 	/* vcore_context test */
 	assert(!in_vcore_context());
@@ -125,7 +120,6 @@ int main(int argc, char** argv)
 	}
 
 	printf("Vcore %d Done!\n", vcoreid);
-	//mcs_barrier_wait(&b,vcore_id());
 
 	printf("All Cores Done!\n", vcoreid);
 	while(1); // manually kill from the monitor
@@ -181,7 +175,6 @@ void ghetto_vcore_entry(void)
 	#endif
 
 	vcore_request(1);
-	//mcs_barrier_wait(&b,vcore_id());
 	udelay(vcoreid * 10000000);
 	//exit(0);
 	while(1);
