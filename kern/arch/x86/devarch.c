@@ -90,10 +90,10 @@ static struct dirtab archdir[Qmax] = {
 #define MSR_MAX_VAR_COUNTERS 16
 #define MSR_MAX_FIX_COUNTERS 4
 
-static const struct address_range msr_rd_wlist[] = {
+static struct address_range msr_rd_wlist[] = {
 	ADDRESS_RANGE(0x00000000, 0xffffffff),
 };
-static const struct address_range msr_wr_wlist[] = {
+static struct address_range msr_wr_wlist[] = {
 	ADDRESS_RANGE(MSR_IA32_PERFCTR0,
 				  MSR_IA32_PERFCTR0 + MSR_MAX_VAR_COUNTERS - 1),
 	ADDRESS_RANGE(MSR_ARCH_PERFMON_EVENTSEL0,
@@ -693,11 +693,21 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 	return 0;
 }
 
+static void archinit(void)
+{
+	int ret;
+
+	ret = address_range_init(msr_rd_wlist, ARRAY_SIZE(msr_rd_wlist));
+	assert(!ret);
+	ret = address_range_init(msr_wr_wlist, ARRAY_SIZE(msr_wr_wlist));
+	assert(!ret);
+}
+
 struct dev archdevtab __devtab = {
 	.name = "arch",
 
 	.reset = devreset,
-	.init = devinit,
+	.init = archinit,
 	.shutdown = devshutdown,
 	.attach = archattach,
 	.walk = archwalk,
