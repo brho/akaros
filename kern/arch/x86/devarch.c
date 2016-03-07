@@ -544,7 +544,7 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 		case Qmsr:
 			if (!address_range_find(msr_rd_wlist, ARRAY_SIZE(msr_rd_wlist),
 									(uintptr_t) offset))
-				error(EPERM, ERROR_FIXME);
+				error(EPERM, "MSR 0x%x not in read whitelist", offset);
 			core_set_init(&cset);
 			core_set_fill_available(&cset);
 			msr_set_address(&msra, (uint32_t) offset);
@@ -564,10 +564,16 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 						n = -1;
 				} else {
 					kfree(values);
-					error(ERANGE, ERROR_FIXME);
+					error(ERANGE, "Not enough space for MSR read");
 				}
 			} else {
-				n = -1;
+				switch (-err) {
+				case (EFAULT):
+					error(-err, "read_msr() faulted on MSR 0x%x", offset);
+				case (ERANGE):
+					error(-err, "Not enough space for MSR read");
+				};
+				error(-err, "MSR read failed");
 			}
 			kfree(values);
 			return n;
@@ -665,9 +671,9 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 		case Qmsr:
 			if (!address_range_find(msr_wr_wlist, ARRAY_SIZE(msr_wr_wlist),
 									(uintptr_t) offset))
-				error(EPERM, ERROR_FIXME);
+				error(EPERM, "MSR 0x%x not in write whitelist", offset);
 			if (n != sizeof(uint64_t))
-				error(EINVAL, ERROR_FIXME);
+				error(EINVAL, "Tried to write more than a u64 (%p)", n);
 			if (memcpy_from_user_errno(current, &value, a, sizeof(value)))
 				return -1;
 
@@ -677,8 +683,15 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 			msr_set_value(&msrv, value);
 
 			err = msr_cores_write(&cset, &msra, &msrv);
-			if (unlikely(err))
-				error(-err, ERROR_FIXME);
+			if (unlikely(err)) {
+				switch (-err) {
+				case (EFAULT):
+					error(-err, "write_msr() faulted on MSR 0x%x", offset);
+				case (ERANGE):
+					error(-err, "Not enough space for MSR write");
+				};
+				error(-err, "MSR write failed");
+			}
 			return sizeof(uint64_t);
 		case Qperf: {
 			struct perf_context *pc = (struct perf_context *) c->aux;
