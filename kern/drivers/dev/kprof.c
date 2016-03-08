@@ -71,6 +71,7 @@ static spinlock_t ktrace_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 static struct circular_buffer ktrace_data;
 static char ktrace_buffer[KTRACE_BUFFER_SIZE];
 static int kprof_timer_period = 1000;
+static char kprof_control_usage[128];
 
 static size_t mpstat_len(void)
 {
@@ -246,6 +247,11 @@ static void kprof_init(void)
 	kprof.mpstat_ipi = TRUE;
 	kproftab[Kmpstatqid].length = mpstat_len();
 	kproftab[Kmpstatrawqid].length = mpstatraw_len();
+
+	strlcpy(kprof_control_usage, "clear|start|stop|flush|timer",
+	        sizeof(kprof_control_usage));
+	profiler_append_configure_usage(kprof_control_usage,
+	                                sizeof(kprof_control_usage));
 
 	poperror();
 }
@@ -427,21 +433,6 @@ static void kprof_manage_timer(int coreid, struct cmdbuf *cb)
 	}
 }
 
-static void kprof_usage_fail(void)
-{
-	static const char *ctlstring = "clear|start|stop|flush|timer";
-	const char * const *cmds = profiler_configure_cmds();
-	char msgbuf[128];
-
-	strlcpy(msgbuf, ctlstring, sizeof(msgbuf));
-	for (int i = 0; cmds[i]; i++) {
-		strlcat(msgbuf, "|", sizeof(msgbuf));
-		strlcat(msgbuf, cmds[i], sizeof(msgbuf));
-	}
-
-	error(EFAIL, msgbuf);
-}
-
 static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 {
 	ERRSTACK(1);
@@ -454,7 +445,7 @@ static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 	switch ((int) c->qid.path) {
 	case Kprofctlqid:
 		if (cb->nf < 1)
-			kprof_usage_fail();
+			error(EFAIL, kprof_control_usage);
 		if (profiler_configure(cb))
 			break;
 		if (!strcmp(cb->f[0], "clear")) {
@@ -481,7 +472,7 @@ static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 		} else if (!strcmp(cb->f[0], "stop")) {
 			kprof_stop_profiler();
 		} else {
-			kprof_usage_fail();
+			error(EFAIL, kprof_control_usage);
 		}
 		break;
 	case Kprofdataqid:

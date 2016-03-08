@@ -14,7 +14,7 @@ struct file;
 struct cmdbuf;
 
 int profiler_configure(struct cmdbuf *cb);
-const char * const *profiler_configure_cmds(void);
+void profiler_append_configure_usage(char *msgbuf, size_t buflen);
 void profiler_init(void);
 void profiler_setup(void);
 void profiler_cleanup(void);

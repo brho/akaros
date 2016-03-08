@@ -309,26 +309,30 @@ int profiler_configure(struct cmdbuf *cb)
 			error(EFAIL, "Profiler already running");
 		profiler_queue_limit = (int) profiler_get_checked_value(
 			cb->f[1], 1024, 1024 * 1024, max_pmem / 32);
-	} else if (!strcmp(cb->f[0], "prof_cpubufsz")) {
+		return 1;
+	}
+	if (!strcmp(cb->f[0], "prof_cpubufsz")) {
 		if (cb->nf < 2)
 			error(EFAIL, "prof_cpubufsz KB");
 		profiler_cpu_buffer_size = (size_t) profiler_get_checked_value(
 			cb->f[1], 1024, 16 * 1024, 1024 * 1024);
-	} else {
-		return 0;
+		return 1;
 	}
 
-	return 1;
+	return 0;
 }
 
-const char* const *profiler_configure_cmds(void)
+void profiler_append_configure_usage(char *msgbuf, size_t buflen)
 {
-	static const char * const cmds[] = {
-		"prof_qlimit", "prof_cpubufsz",
-		NULL
+	const char * const cmds[] = {
+		"prof_qlimit",
+		"prof_cpubufsz",
 	};
 
-	return cmds;
+	for (int i = 0; i < COUNT_OF(cmds); i++) {
+		strlcat(msgbuf, "|", buflen);
+		strlcat(msgbuf, cmds[i], buflen);
+	}
 }
 
 static void profiler_release(struct kref *kref)
