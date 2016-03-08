@@ -618,6 +618,36 @@ static ssize_t compat(struct ib_uverbs_file *file, size_t count,
 }
 
 /*
+ * Request structure is:
+ * ib_uverbs_cmd_hdr :: (almost) ib_uverbs_ex_cmd_hdr_compat.
+ * Response structure is:
+ * 8B comp_mask :: ib_uverbs_query_device_resp :: 8B timestamp_mask ::
+ * 8B hca_core_clock
+ */
+static ssize_t compat_query(struct ib_uverbs_file *file, size_t count,
+    const char __user *buf)
+{
+	unsigned long			tmpbuf[17], tval = 0;
+	struct ib_uverbs_cmd_hdr	*p = (struct ib_uverbs_cmd_hdr *)tmpbuf;
+	char __user			*dst = (char __user *)buf;
+	int				insz, outsz;
+
+	if (copy_from_user(tmpbuf, buf, count))
+		return -EFAULT;
+	insz = p->in_words * 4;
+	outsz = p->out_words * 4;
+
+	/* Zero out expected comp_mask field in response */
+	copy_to_user((void *)tmpbuf[3], &tval, 8);
+	/* Kernel writes out after expected comp_mask field */
+	tmpbuf[3] += 8;
+	/* Move "response" upwards to "buf" */
+	copy_to_user(dst, &tmpbuf[3], sizeof(struct ib_uverbs_query_device));
+
+	return ib_uverbs_query_device(file, buf, insz, outsz);
+}
+
+/*
  * Compat hack for applications/libraries we care about. Retrofit Linux 3.12
  * style APIs.
  */
@@ -635,6 +665,8 @@ ssize_t check_old_abi(struct file *filp, const char __user *buf, size_t count)
 		return compat_ex(file, count, buf);
 	} else if (tmp == IB_USER_VERBS_CMD_MODIFY_QP) {
 		return compat(file, count, buf);
+	} else if (tmp == 56) {
+		return compat_query(file, count, buf);
 	} else if (tmp == IB_USER_VERBS_CMD_QUERY_QP) {
 		panic("query_qp API difference not handled\n");
 	}
