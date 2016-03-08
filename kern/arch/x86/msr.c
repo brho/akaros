@@ -50,7 +50,7 @@ static void msr_smp_read(void *opaque)
 }
 
 int msr_cores_read(const struct core_set *cset, const struct msr_address *msra,
-				   struct msr_value *msrv)
+                   struct msr_value *msrv)
 {
 	int err;
 	struct smp_read_values srv;
@@ -99,7 +99,7 @@ static void msr_smp_write(void *opaque)
 }
 
 int msr_cores_write(const struct core_set *cset, const struct msr_address *msra,
-					const struct msr_value *msrv)
+                    const struct msr_value *msrv)
 {
 	struct smp_write_values swv;
 

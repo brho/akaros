@@ -80,10 +80,10 @@ static void perfmon_enable_fix_event(int event, bool enable)
 
 	if (enable)
 		write_msr(MSR_CORE_PERF_GLOBAL_CTRL,
-				  gctrl | ((uint64_t) 1 << (32 + event)));
+		          gctrl | ((uint64_t) 1 << (32 + event)));
 	else
 		write_msr(MSR_CORE_PERF_GLOBAL_CTRL,
-				  gctrl & ~((uint64_t) 1 << (32 + event)));
+		          gctrl & ~((uint64_t) 1 << (32 + event)));
 }
 
 static bool perfmon_event_available(uint32_t event)
@@ -92,7 +92,7 @@ static bool perfmon_event_available(uint32_t event)
 }
 
 static uint64_t perfmon_get_fixevent_mask(const struct perfmon_event *pev,
-										  int eventno, uint64_t base)
+                                          int eventno, uint64_t base)
 {
 	uint64_t m = 0;
 
@@ -133,7 +133,7 @@ static void perfmon_do_cores_alloc(void *opaque)
 			perfmon_enable_fix_event(i, TRUE);
 
 			write_msr(MSR_CORE_PERF_FIXED_CTR0 + i,
-					  -(int64_t) pa->ev.trigger_count);
+			          -(int64_t) pa->ev.trigger_count);
 			write_msr(MSR_CORE_PERF_FIXED_CTR_CTRL, tmp);
 		}
 	} else {
@@ -153,7 +153,7 @@ static void perfmon_do_cores_alloc(void *opaque)
 
 			write_msr(MSR_IA32_PERFCTR0 + i, -(int64_t) pa->ev.trigger_count);
 			write_msr(MSR_ARCH_PERFMON_EVENTSEL0 + i,
-					  cctx->counters[i].event);
+			          cctx->counters[i].event);
 		} else {
 			i = -ENOSPC;
 		}
@@ -184,7 +184,7 @@ static void perfmon_do_cores_free(void *opaque)
 			perfmon_enable_fix_event((int) ccno, FALSE);
 
 			write_msr(MSR_CORE_PERF_FIXED_CTR_CTRL,
-					  fxctrl_value & ~(FIXCNTR_MASK << ccbitsh));
+			          fxctrl_value & ~(FIXCNTR_MASK << ccbitsh));
 			write_msr(MSR_CORE_PERF_FIXED_CTR0 + ccno, 0);
 		}
 	} else {
@@ -214,15 +214,15 @@ static void perfmon_do_cores_status(void *opaque)
 	spin_lock_irqsave(&cctx->lock);
 	if (perfmon_is_fixed_event(&env->pa->ev))
 		env->pef->cores_values[coreno] =
-			read_msr(MSR_CORE_PERF_FIXED_CTR0 + ccno);
+		    read_msr(MSR_CORE_PERF_FIXED_CTR0 + ccno);
 	else
 		env->pef->cores_values[coreno] =
-			read_msr(MSR_IA32_PERFCTR0 + ccno);
+		    read_msr(MSR_IA32_PERFCTR0 + ccno);
 	spin_unlock_irqsave(&cctx->lock);
 }
 
 static void perfmon_setup_alloc_core_set(const struct perfmon_alloc *pa,
-										 struct core_set *cset)
+                                         struct core_set *cset)
 {
 	int i;
 
@@ -265,8 +265,8 @@ static struct perfmon_alloc *perfmon_create_alloc(const struct perfmon_event *pe
 {
 	int i;
 	struct perfmon_alloc *pa = kzmalloc(sizeof(struct perfmon_alloc) +
-										num_cores * sizeof(counter_t),
-										KMALLOC_WAIT);
+	                                        num_cores * sizeof(counter_t),
+	                                    KMALLOC_WAIT);
 
 	kref_init(&pa->ref, perfmon_release_alloc, 1);
 	pa->ev = *pev;
@@ -279,8 +279,8 @@ static struct perfmon_alloc *perfmon_create_alloc(const struct perfmon_event *pe
 static struct perfmon_status *perfmon_alloc_status(void)
 {
 	struct perfmon_status *pef = kzmalloc(sizeof(struct perfmon_status) +
-										  num_cores * sizeof(uint64_t),
-										  KMALLOC_WAIT);
+	                                          num_cores * sizeof(uint64_t),
+	                                      KMALLOC_WAIT);
 
 	return pef;
 }
@@ -352,9 +352,9 @@ void perfmon_interrupt(struct hw_trapframe *hw_tf, void *data)
 		if (status & ((uint64_t) 1 << i)) {
 			if (cctx->counters[i].event) {
 				profiler_add_hw_sample(
-					hw_tf, perfmon_make_sample_event(cctx->counters + i));
+				    hw_tf, perfmon_make_sample_event(cctx->counters + i));
 				write_msr(MSR_IA32_PERFCTR0 + i,
-						  -(int64_t) cctx->counters[i].trigger_count);
+				          -(int64_t) cctx->counters[i].trigger_count);
 			}
 		}
 	}
@@ -362,9 +362,9 @@ void perfmon_interrupt(struct hw_trapframe *hw_tf, void *data)
 		if (status & ((uint64_t) 1 << (32 + i))) {
 			if (cctx->fixed_counters[i].event) {
 				profiler_add_hw_sample(
-					hw_tf, perfmon_make_sample_event(cctx->fixed_counters + i));
+				    hw_tf, perfmon_make_sample_event(cctx->fixed_counters + i));
 				write_msr(MSR_CORE_PERF_FIXED_CTR0 + i,
-						  -(int64_t) cctx->fixed_counters[i].trigger_count);
+				          -(int64_t) cctx->fixed_counters[i].trigger_count);
 			}
 		}
 	}
@@ -385,7 +385,7 @@ void perfmon_get_cpu_caps(struct perfmon_cpu_caps *pcc)
 }
 
 static int perfmon_install_session_alloc(struct perfmon_session *ps,
-										 struct perfmon_alloc *pa)
+                                         struct perfmon_alloc *pa)
 {
 	int i;
 
@@ -404,7 +404,7 @@ static int perfmon_install_session_alloc(struct perfmon_session *ps,
 }
 
 int perfmon_open_event(const struct core_set *cset, struct perfmon_session *ps,
-					   const struct perfmon_event *pev)
+                       const struct perfmon_event *pev)
 {
 	ERRSTACK(1);
 	int i;
@@ -439,7 +439,7 @@ int perfmon_open_event(const struct core_set *cset, struct perfmon_session *ps,
 }
 
 static void perfmon_alloc_get(struct perfmon_session *ps, int ped, bool reset,
-							  struct perfmon_alloc **ppa)
+                              struct perfmon_alloc **ppa)
 {
 	struct perfmon_alloc *pa;
 
@@ -468,7 +468,7 @@ void perfmon_close_event(struct perfmon_session *ps, int ped)
 }
 
 struct perfmon_status *perfmon_get_event_status(struct perfmon_session *ps,
-												int ped)
+                                                int ped)
 {
 	struct core_set cset;
 	struct perfmon_status_env env;
@@ -491,11 +491,10 @@ void perfmon_free_event_status(struct perfmon_status *pef)
 
 static void perfmon_release_session(struct kref *kref)
 {
-	struct perfmon_session *ps = container_of(kref, struct perfmon_session,
-											  ref);
-	int i;
+	struct perfmon_session *ps =
+	    container_of(kref, struct perfmon_session, ref);
 
-	for (i = 0; i < ARRAY_SIZE(ps->allocs); i++) {
+	for (int i = 0; i < ARRAY_SIZE(ps->allocs); i++) {
 		struct perfmon_alloc *pa = ps->allocs[i];
 
 		if (pa)
@@ -507,7 +506,7 @@ static void perfmon_release_session(struct kref *kref)
 struct perfmon_session *perfmon_create_session(void)
 {
 	struct perfmon_session *ps = kzmalloc(sizeof(struct perfmon_session),
-										  KMALLOC_WAIT);
+	                                      KMALLOC_WAIT);
 
 	kref_init(&ps->ref, perfmon_release_session, 1);
 	spinlock_init(&ps->lock);

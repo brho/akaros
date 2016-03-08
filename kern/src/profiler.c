@@ -32,7 +32,7 @@
 
 struct profiler_cpu_context {
 	struct block *block;
-    int cpu;
+	int cpu;
 	int tracing;
 	size_t dropped_data_size;
 };
@@ -62,7 +62,7 @@ static inline char *vb_encode_uint64(char *data, uint64_t n)
 }
 
 static struct block *profiler_buffer_write(struct profiler_cpu_context *cpu_buf,
-										   struct block *b)
+                                           struct block *b)
 {
 	if (b) {
 		qibwrite(profiler_queue, b);
@@ -86,7 +86,7 @@ static char *profiler_cpu_buffer_write_reserve(
 
 	if (unlikely((!b) || (b->lim - b->wp) < size)) {
 		cpu_buf->block = b = profiler_buffer_write(cpu_buf, b);
-        if (unlikely(!b))
+		if (unlikely(!b))
 			return NULL;
 	}
 	*pb = b;
@@ -106,8 +106,8 @@ static inline size_t profiler_max_envelope_size(void)
 }
 
 static void profiler_push_kernel_trace64(struct profiler_cpu_context *cpu_buf,
-										 const uintptr_t *trace, size_t count,
-										 uint64_t info)
+                                         const uintptr_t *trace, size_t count,
+                                         uint64_t info)
 {
 	size_t i, size = sizeof(struct proftype_kern_trace64) +
 		count * sizeof(uint64_t);
@@ -137,8 +137,8 @@ static void profiler_push_kernel_trace64(struct profiler_cpu_context *cpu_buf,
 }
 
 static void profiler_push_user_trace64(struct profiler_cpu_context *cpu_buf,
-									   struct proc *p, const uintptr_t *trace,
-									   size_t count, uint64_t info)
+                                       struct proc *p, const uintptr_t *trace,
+                                       size_t count, uint64_t info)
 {
 	size_t i, size = sizeof(struct proftype_user_trace64) +
 		count * sizeof(uint64_t);
@@ -169,7 +169,7 @@ static void profiler_push_user_trace64(struct profiler_cpu_context *cpu_buf,
 }
 
 static void profiler_push_pid_mmap(struct proc *p, uintptr_t addr, size_t msize,
-								   size_t offset, const char *path)
+                                   size_t offset, const char *path)
 {
 	size_t i, plen = strlen(path) + 1,
 		size = sizeof(struct proftype_pid_mmap64) + plen;
@@ -231,8 +231,8 @@ static void profiler_emit_current_system_status(void)
 		struct proc *p = (struct proc *) opaque;
 
 		profiler_notify_mmap(p, vmr->vm_base, vmr->vm_end - vmr->vm_base,
-							 vmr->vm_prot, vmr->vm_flags, vmr->vm_file,
-							 vmr->vm_foff);
+		                     vmr->vm_prot, vmr->vm_flags, vmr->vm_file,
+		                     vmr->vm_foff);
 	}
 
 	ERRSTACK(1);
@@ -279,7 +279,7 @@ static void alloc_cpu_buffers(void)
 	qnonblock(profiler_queue, TRUE);
 
 	profiler_percpu_ctx =
-		kzmalloc(sizeof(*profiler_percpu_ctx) * num_cores, KMALLOC_WAIT);
+	    kzmalloc(sizeof(*profiler_percpu_ctx) * num_cores, KMALLOC_WAIT);
 
 	for (i = 0; i < num_cores; i++) {
 		struct profiler_cpu_context *b = &profiler_percpu_ctx[i];
@@ -289,7 +289,7 @@ static void alloc_cpu_buffers(void)
 }
 
 static long profiler_get_checked_value(const char *value, long k, long minval,
-									   long maxval)
+                                       long maxval)
 {
 	long lvalue = strtol(value, NULL, 0) * k;
 
@@ -417,7 +417,7 @@ void profiler_control_trace(int onoff)
 	core_set_init(&cset);
 	core_set_fill_available(&cset);
 	smp_do_in_cores(&cset, profiler_core_trace_enable,
-					(void *) (uintptr_t) onoff);
+	                (void *) (uintptr_t) onoff);
 }
 
 static void profiler_core_flush(void *opaque)
@@ -458,7 +458,7 @@ void profiler_add_kernel_backtrace(uintptr_t pc, uintptr_t fp, uint64_t info)
 			trace[0] = pc;
 			if (likely(fp))
 				n = backtrace_list(pc, fp, trace + 1,
-								   PROFILER_BT_DEPTH - 1) + 1;
+				                   PROFILER_BT_DEPTH - 1) + 1;
 
 			profiler_push_kernel_trace64(cpu_buf, trace, n, info);
 		}
@@ -479,7 +479,7 @@ void profiler_add_user_backtrace(uintptr_t pc, uintptr_t fp, uint64_t info)
 			trace[0] = pc;
 			if (likely(fp))
 				n = backtrace_user_list(pc, fp, trace + 1,
-										PROFILER_BT_DEPTH - 1) + 1;
+				                        PROFILER_BT_DEPTH - 1) + 1;
 
 			profiler_push_user_trace64(cpu_buf, p, trace, n, info);
 		}
@@ -491,10 +491,10 @@ void profiler_add_hw_sample(struct hw_trapframe *hw_tf, uint64_t info)
 {
 	if (in_kernel(hw_tf))
 		profiler_add_kernel_backtrace(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf),
-									  info);
+		                              info);
 	else
 		profiler_add_user_backtrace(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf),
-									info);
+		                            info);
 }
 
 int profiler_size(void)
@@ -508,7 +508,7 @@ int profiler_read(void *va, int n)
 }
 
 void profiler_notify_mmap(struct proc *p, uintptr_t addr, size_t size, int prot,
-						  int flags, struct file *f, size_t offset)
+                          int flags, struct file *f, size_t offset)
 {
 	if (kref_get_not_zero(&profiler_kref, 1)) {
 		if (f && (prot & PROT_EXEC) && profiler_percpu_ctx) {

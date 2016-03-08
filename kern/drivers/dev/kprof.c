@@ -171,7 +171,7 @@ static void kprof_fetch_profiler_data(void)
 	kprof.pdata = ndata;
 	while (kprof.psize < psize) {
 		size_t csize = profiler_read(kprof.pdata + kprof.psize,
-									 psize - kprof.psize);
+		                             psize - kprof.psize);
 
 		if (csize == 0)
 			break;
@@ -229,7 +229,7 @@ static void kprof_init(void)
 	kprof.psize = 0;
 
 	kprof.alarms = kzmalloc(sizeof(struct alarm_waiter) * num_cores,
-							KMALLOC_WAIT);
+	                        KMALLOC_WAIT);
 	if (!kprof.alarms)
 		error(ENOMEM, ERROR_FIXME);
 	if (waserror()) {
@@ -267,7 +267,7 @@ static void kprofclear(void)
 }
 
 static struct walkqid *kprof_walk(struct chan *c, struct chan *nc, char **name,
-								 int nname)
+                                  int nname)
 {
 	return devwalk(c, nc, name, nname, kproftab, ARRAY_SIZE(kproftab), devgen);
 }
@@ -563,7 +563,7 @@ void kprof_tracedata_write(const char *pretty_buf, size_t len)
 	spin_lock_irqsave(&ktrace_lock);
 	if (unlikely(!ktrace_init_done)) {
 		circular_buffer_init(&ktrace_data, sizeof(ktrace_buffer),
-							 ktrace_buffer);
+		                     ktrace_buffer);
 		ktrace_init_done = TRUE;
 	}
 	circular_buffer_write(&ktrace_data, pretty_buf, len);
@@ -635,7 +635,7 @@ void trace_vprintk(bool btrace, const char *fmt, va_list args)
 	if (likely(system_timing.tsc_freq))
 		tsc2timespec(read_tsc(), &ts_now);
 	snprintf(hdr, sizeof(hdr), "[%lu.%09lu]:cpu%d: ", ts_now.tv_sec,
-			 ts_now.tv_nsec, core_id_early());
+	         ts_now.tv_nsec, core_id_early());
 
 	pb.ptr = usrbuf + vsnprintf(usrbuf, usr_bufsz, fmt, args);
 	pb.top = usrbuf + usr_bufsz;

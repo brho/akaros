@@ -13,8 +13,8 @@
 #include <linux_compat.h>
 
 #include <arch/uaccess.h>	/* copy_from_user(), copy_to_user() */
-#define access_ok(type, addr, size)     1
 
+#define access_ok(type, addr, size)     1
 
 /*
  * Device file /dev/XXXX has a dentry and inode that is associated
@@ -82,9 +82,9 @@ static unsigned long pgprot_noncached(int vmprot)
 #define is_vm_hugetlb_page(vma)	0
 
 extern int map_upage_at_addr(struct proc *p, physaddr_t paddr, uintptr_t addr,
-    int pteprot, int dolock);
+                             int pteprot, int dolock);
 extern int get_user_page(struct proc *p, unsigned long uvastart, int write,
-     int force, struct page **plist);
+                         int force, struct page **plist);
 extern void put_page(struct page *pagep);
 extern void set_page_dirty_lock(struct page *pagep);
 
@@ -239,7 +239,7 @@ struct ib_ud_header {
 
 extern void sysfs_init(void);
 extern void sysfs_create(int devnum, const struct file_operations *verb_fops,
-    void *ptr);
+                         void *ptr);
 
 extern ssize_t check_old_abi(struct file *filp, const char __user *buf,
-    size_t count);
+                             size_t count);
