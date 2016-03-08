@@ -109,12 +109,12 @@ static void profiler_push_kernel_trace64(struct profiler_cpu_context *cpu_buf,
                                          const uintptr_t *trace, size_t count,
                                          uint64_t info)
 {
-	size_t i, size = sizeof(struct proftype_kern_trace64) +
+	size_t size = sizeof(struct proftype_kern_trace64) +
 		count * sizeof(uint64_t);
 	struct block *b;
-	char *resptr = profiler_cpu_buffer_write_reserve(
-		cpu_buf, size + profiler_max_envelope_size(), &b);
-	char *ptr = resptr;
+	void *resptr = profiler_cpu_buffer_write_reserve(
+	    cpu_buf, size + profiler_max_envelope_size(), &b);
+	void *ptr = resptr;
 
 	if (likely(ptr)) {
 		struct proftype_kern_trace64 *record;
@@ -129,7 +129,7 @@ static void profiler_push_kernel_trace64(struct profiler_cpu_context *cpu_buf,
 		record->tstamp = nsec();
 		record->cpu = cpu_buf->cpu;
 		record->num_traces = count;
-		for (i = 0; i < count; i++)
+		for (size_t i = 0; i < count; i++)
 			record->trace[i] = (uint64_t) trace[i];
 
 		profiler_cpu_buffer_write_commit(cpu_buf, b, ptr - resptr);
@@ -140,12 +140,12 @@ static void profiler_push_user_trace64(struct profiler_cpu_context *cpu_buf,
                                        struct proc *p, const uintptr_t *trace,
                                        size_t count, uint64_t info)
 {
-	size_t i, size = sizeof(struct proftype_user_trace64) +
+	size_t size = sizeof(struct proftype_user_trace64) +
 		count * sizeof(uint64_t);
 	struct block *b;
-	char *resptr = profiler_cpu_buffer_write_reserve(
-		cpu_buf, size + profiler_max_envelope_size(), &b);
-	char *ptr = resptr;
+	void *resptr = profiler_cpu_buffer_write_reserve(
+	    cpu_buf, size + profiler_max_envelope_size(), &b);
+	void *ptr = resptr;
 
 	if (likely(ptr)) {
 		struct proftype_user_trace64 *record;
@@ -161,7 +161,7 @@ static void profiler_push_user_trace64(struct profiler_cpu_context *cpu_buf,
 		record->pid = p->pid;
 		record->cpu = cpu_buf->cpu;
 		record->num_traces = count;
-		for (i = 0; i < count; i++)
+		for (size_t i = 0; i < count; i++)
 			record->trace[i] = (uint64_t) trace[i];
 
 		profiler_cpu_buffer_write_commit(cpu_buf, b, ptr - resptr);
@@ -171,12 +171,12 @@ static void profiler_push_user_trace64(struct profiler_cpu_context *cpu_buf,
 static void profiler_push_pid_mmap(struct proc *p, uintptr_t addr, size_t msize,
                                    size_t offset, const char *path)
 {
-	size_t i, plen = strlen(path) + 1,
-		size = sizeof(struct proftype_pid_mmap64) + plen;
-	char *resptr = kmalloc(size + profiler_max_envelope_size(), 0);
+	size_t plen = strlen(path) + 1;
+	size_t size = sizeof(struct proftype_pid_mmap64) + plen;
+	void *resptr = kmalloc(size + profiler_max_envelope_size(), 0);
 
 	if (likely(resptr)) {
-		char *ptr = resptr;
+		void *ptr = resptr;
 		struct proftype_pid_mmap64 *record;
 
 		ptr = vb_encode_uint64(ptr, PROFTYPE_PID_MMAP64);
@@ -200,12 +200,12 @@ static void profiler_push_pid_mmap(struct proc *p, uintptr_t addr, size_t msize,
 
 static void profiler_push_new_process(struct proc *p)
 {
-	size_t i, plen = strlen(p->binary_path) + 1,
-		size = sizeof(struct proftype_new_process) + plen;
-	char *resptr = kmalloc(size + profiler_max_envelope_size(), 0);
+	size_t plen = strlen(p->binary_path) + 1;
+	size_t size = sizeof(struct proftype_new_process) + plen;
+	void *resptr = kmalloc(size + profiler_max_envelope_size(), 0);
 
 	if (likely(resptr)) {
-		char *ptr = resptr;
+		void *ptr = resptr;
 		struct proftype_new_process *record;
 
 		ptr = vb_encode_uint64(ptr, PROFTYPE_NEW_PROCESS);
@@ -265,7 +265,6 @@ static void free_cpu_buffers(void)
 static void alloc_cpu_buffers(void)
 {
 	ERRSTACK(1);
-	int i;
 
 	profiler_queue = qopen(profiler_queue_limit, 0, NULL, NULL);
 	if (!profiler_queue)
@@ -281,7 +280,7 @@ static void alloc_cpu_buffers(void)
 	profiler_percpu_ctx =
 	    kzmalloc(sizeof(*profiler_percpu_ctx) * num_cores, KMALLOC_WAIT);
 
-	for (i = 0; i < num_cores; i++) {
+	for (int i = 0; i < num_cores; i++) {
 		struct profiler_cpu_context *b = &profiler_percpu_ctx[i];
 
 		b->cpu = i;
