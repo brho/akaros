@@ -329,7 +329,7 @@ void profiler_append_configure_usage(char *msgbuf, size_t buflen)
 		"prof_cpubufsz",
 	};
 
-	for (int i = 0; i < COUNT_OF(cmds); i++) {
+	for (int i = 0; i < ARRAY_SIZE(cmds); i++) {
 		strlcat(msgbuf, "|", buflen);
 		strlcat(msgbuf, cmds[i], buflen);
 	}
