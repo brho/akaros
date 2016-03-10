@@ -227,10 +227,13 @@ static int mlx4_ib_query_device(struct ib_device *ibdev,
 		props->device_cap_flags |= IB_DEVICE_MANAGED_FLOW_STEERING;
 	}
 
+#if 0	/* AKAROS */
 	props->vendor_id	   = be32_to_cpup((__be32 *) (out_mad->data + 36)) &
 		0xffffff;
-#if 0	/* AKAROS */
 	props->vendor_part_id	   = dev->dev->persist->pdev->device;
+#else
+	props->vendor_id	   = PCI_VENDOR_ID_MELLANOX;
+	props->vendor_part_id	   = 0x1003;	// MT27500 Family ConnectX-3
 #endif	/* AKAROS */
 	props->hw_ver		   = be32_to_cpup((__be32 *) (out_mad->data + 32));
 	memcpy(&props->sys_image_guid, out_mad->data +	4, 8);
