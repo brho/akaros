@@ -1016,10 +1016,8 @@ int main(int argc, char **argv)
 					                | (1 << 11) // Deliver-error-code bit (set if event pushes error code to stack)
 					                | (3 << 8)  // Event type (3 is "hardware exception")
 					                | 13;       // Interrupt/exception vector (13 is "general protection fault")
-					run_vmthread(&vmctl);
 				} else {
 					vmctl.regs.tf_rip += 2;
-					run_vmthread(&vmctl);
 				}
 				break;
 			case EXIT_REASON_MWAIT_INSTRUCTION:
@@ -1033,7 +1031,6 @@ int main(int argc, char **argv)
 					vapic_status_dump(stderr, gpci.vapic_addr);
 				if (debug)fprintf(stderr, "Resume with consdata ...\n");
 				vmctl.regs.tf_rip += 3;
-				run_vmthread(&vmctl);
 				//fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
 				//showstatus(stderr, &vmctl);
 				break;
@@ -1046,7 +1043,6 @@ int main(int argc, char **argv)
 				//debug = 1;
 				if (debug)fprintf(stderr, "Resume with consdata ...\n");
 				vmctl.regs.tf_rip += 1;
-				run_vmthread(&vmctl);
 				//fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
 				//showstatus(stderr, &vmctl);
 				break;
