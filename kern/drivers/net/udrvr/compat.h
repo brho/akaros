@@ -61,23 +61,8 @@ typedef atomic_t			atomic64_t;
 #define	spin_unlock_bh(E)		spin_unlock(E)
 #define	DEFINE_SPINLOCK(x)		spinlock_t x = SPINLOCK_INITIALIZER
 
-/*
- * Linux pgprot_noncached() adds _PAGE_PCD ie bit 4, which is akaros __PTE_PCD.
- * Akaros PTE_NOCACHE also sets bit 3 ie _PAGE_PWT (which is overkill?).
- * Linux pgprot_writecombine() defaults to pgprot_noncached() when PAT is
- * not enabled, otherwise just sets bit 3 ie _PAGE_PWT.
- */
-static unsigned long pgprot_noncached(int vmprot)
-{
-	unsigned long	prot = PTE_P | PTE_U | PTE_A | PTE_NOCACHE;
-
-	if (vmprot & PROT_WRITE)
-		prot |= PTE_W | PTE_D;
-	return prot;
-}
-
-/* TODO: Factor in PAT usage */
-#define	pgprot_writecombine(vmprot)	pgprot_noncached(vmprot)
+extern unsigned long pgprot_noncached(int vmprot);
+extern unsigned long pgprot_writecombine(int vmprot);
 
 #define is_vm_hugetlb_page(vma)	0
 

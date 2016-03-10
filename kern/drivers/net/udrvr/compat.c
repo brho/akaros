@@ -17,6 +17,25 @@
 #include <linux/rdma/ib_user_verbs.h>
 #include "uverbs.h"
 
+static unsigned long pgprot_val(int vmprot)
+{
+	unsigned long	prot = PTE_P | PTE_U | PTE_A;
+
+	if (vmprot & PROT_WRITE)
+		prot |= PTE_W | PTE_D;
+	return prot;
+}
+
+unsigned long pgprot_noncached(int vmprot)
+{
+	return pgprot_val(vmprot) | PTE_NOCACHE;
+}
+
+unsigned long pgprot_writecombine(int vmprot)
+{
+	return pgprot_val(vmprot) | PTE_WRITECOMB;
+}
+
 /*
  * Our version knocked off from kern/src/mm.c version + uncaching logic from
  * vmap_pmem_nocache(). This routine is expected to be invoked as part of mmap()
