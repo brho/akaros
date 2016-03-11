@@ -93,6 +93,9 @@ static inline uint32_t __get_vcoreid_from_procinfo(void)
 	 * there is a 'memory barrier' between the IPI write and the seqctr write.
 	 * I think this is true. */
 	uint32_t kpcoreid, kvcoreid;
+	extern long __ros_syscall_noerrno(unsigned int _num, long _a0, long _a1,
+	                                  long _a2, long _a3, long _a4, long _a5);
+
 	seq_ctr_t old_seq;
 	do {
 		cmb();
