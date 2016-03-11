@@ -98,7 +98,9 @@
 #define PTE_SR   0x200 // Supervisor Write permission
 #define PTE_PERM (PTE_SR | PTE_SW | PTE_SX | PTE_UR | PTE_UW | PTE_UX)
 #define PTE_PPN_SHIFT 13
+#warning "Review RISCV PTE_modes, like NOCACHE/WRITECOMB"
 #define PTE_NOCACHE	0 // PTE bits to turn off caching, if possible
+#define PTE_WRITECOMB	0 // PTE bits to turn on write-combining, if possible
 
 // commly used access modes
 

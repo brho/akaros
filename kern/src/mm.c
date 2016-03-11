@@ -1222,6 +1222,11 @@ uintptr_t vmap_pmem_nocache(uintptr_t paddr, size_t nr_bytes)
 	return vmap_pmem_flags(paddr, nr_bytes, PTE_NOCACHE);
 }
 
+uintptr_t vmap_pmem_writecomb(uintptr_t paddr, size_t nr_bytes)
+{
+	return vmap_pmem_flags(paddr, nr_bytes, PTE_WRITECOMB);
+}
+
 int vunmap_vmem(uintptr_t vaddr, size_t nr_bytes)
 {
 	unsigned long nr_pages = ROUNDUP(nr_bytes, PGSIZE) >> PGSHIFT;
