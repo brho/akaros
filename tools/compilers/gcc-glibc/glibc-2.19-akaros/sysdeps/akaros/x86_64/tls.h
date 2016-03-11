@@ -32,6 +32,7 @@
 #include <ros/procinfo.h>
 #include <ros/procdata.h>
 #include <ros/arch/mmu.h>
+#include <parlib/cpu_feat.h>
 
 /* Replacement type for __m128 since this file is included by ld.so,
    which is compiled with -mno-sse.  It must not change the alignment
