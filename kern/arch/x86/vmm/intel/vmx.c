@@ -163,6 +163,7 @@
 #include <trap.h>
 
 #include <smp.h>
+#include <ros/procinfo.h>
 
 #define currentcpu (&per_cpu_info[core_id()])
 
@@ -1131,7 +1132,7 @@ struct guest_pcore *create_guest_pcore(struct proc *p,
 	vmx_setup_vmcs(gpc);
 	ret = vmx_setup_initial_guest_state(p, gpci);
 	vmx_unload_guest_pcore(gpc);
-	gpc->xcr0 = x86_default_xcr0;
+	gpc->xcr0 = __proc_global_info.x86_default_xcr0;
 
 	gpc->posted_irq_desc = gpci->posted_irq_desc;
 

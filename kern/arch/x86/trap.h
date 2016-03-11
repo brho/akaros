@@ -159,10 +159,10 @@ extern void sysenter_handler(void);
 
 /* Defined and set up in in arch/init.c, used for XMM initialization */
 extern struct ancillary_state x86_default_fpu;
-extern uint64_t x86_default_xcr0;
 
 static inline void save_fp_state(struct ancillary_state *silly)
 {
+	uint64_t x86_default_xcr0 = __proc_global_info.x86_default_xcr0;
 	uint32_t eax, edx;
 
 	/* PLEASE NOTE:
@@ -211,6 +211,7 @@ static inline void save_fp_state(struct ancillary_state *silly)
 static inline void init_fp_state(void);
 static inline void restore_fp_state(struct ancillary_state *silly)
 {
+	uint64_t x86_default_xcr0 = __proc_global_info.x86_default_xcr0;
 	int err = 0;
 	uint32_t eax, edx;
 

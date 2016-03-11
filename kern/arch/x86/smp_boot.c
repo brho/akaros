@@ -24,6 +24,7 @@
 #include <kmalloc.h>
 #include <cpu_feat.h>
 #include <arch/fsgsbase.h>
+#include <ros/procinfo.h>
 
 #include "vmm/vmm.h"
 
@@ -299,7 +300,7 @@ void __arch_pcpu_init(uint32_t coreid)
 		// You MUST set CR4.OSXSAVE before loading xcr0
 		lcr4(rcr4() | CR4_OSXSAVE);
 		// Set xcr0 to the Akaros-wide default
-		lxcr0(x86_default_xcr0);
+		lxcr0(__proc_global_info.x86_default_xcr0);
 	}
 
 	// Initialize fpu and extended state by restoring our default XSAVE area.

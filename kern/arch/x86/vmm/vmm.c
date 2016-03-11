@@ -21,6 +21,7 @@
 #include <umem.h>
 
 #include <arch/x86.h>
+#include <ros/procinfo.h>
 
 
 /* TODO: have better cpuid info storage and checks */
@@ -205,7 +206,7 @@ void unload_guest_pcore(struct proc *p, int guest_pcoreid)
 
 	/* Save guest's xcr0 and restore Akaros's default. */
 	gpc->xcr0 = rxcr0();
-	lxcr0(x86_default_xcr0);
+	lxcr0(__proc_global_info.x86_default_xcr0);
 
 	/* As soon as we unlock, this gpc can be started on another core */
 	spin_unlock(&p->vmm.lock);

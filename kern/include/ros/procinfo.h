@@ -67,6 +67,7 @@ typedef struct procinfo {
 /* We align this so that the kernel can easily allocate it in the BSS */
 struct proc_global_info {
 	unsigned long cpu_feats[__NR_CPU_FEAT_BITS];
+	uint64_t x86_default_xcr0;
 } __attribute__((aligned(PGSIZE)));
 #define PROCGINFO_NUM_PAGES  (sizeof(struct proc_global_info) / PGSIZE)
 

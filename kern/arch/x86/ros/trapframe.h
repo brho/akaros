@@ -81,7 +81,7 @@ typedef struct {
  *  This may be a superset of available state components on a given
  *  processor. We CPUID at boot and determine the intersection
  *  of Akaros-supported and processor-supported features, and we
- *  save this value to x86_default_xcr0 in arch/x86/init.c.
+ *  save this value to __proc_global_info.x86_default_xcr0 in arch/x86/init.c.
  *  We guarantee that the set of feature components specified by
  *  X86_MAX_XCR0 will fit in the ancillary_state struct.
  *  If you add to the mask, make sure you also extend ancillary_state!

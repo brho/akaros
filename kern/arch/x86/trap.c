@@ -19,6 +19,7 @@
 #include <kmalloc.h>
 #include <ex_table.h>
 #include <arch/mptables.h>
+#include <ros/procinfo.h>
 
 taskstate_t ts;
 
@@ -792,7 +793,7 @@ static bool handle_vmexit_xsetbv(struct vm_trapframe *tf)
 	// vm_rfbm & (~x86_default_xcr0) is nonzero if any bits
 	// are set in vm_rfbm but not x86_default_xcr0
 
-	if (vm_rfbm & (~x86_default_xcr0))
+	if (vm_rfbm & (~__proc_global_info.x86_default_xcr0))
 		return FALSE;
 
 

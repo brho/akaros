@@ -11,16 +11,10 @@
 #include <monitor.h>
 #include <arch/usb.h>
 #include <assert.h>
+#include <ros/procinfo.h>
 #include <cpu_feat.h>
 
-/*
- *	x86_default_xcr0 is the Akaros-wide
- *	default value for the xcr0 register.
- *
- *	It is set on every processor during
- *	per-cpu init.
- */
-uint64_t x86_default_xcr0;
+
 struct ancillary_state x86_default_fpu;
 uint32_t kerndate;
 
@@ -95,13 +89,14 @@ void ancillary_state_init(void)
 
 	if (cpu_has_feat(CPU_FEAT_X86_XSAVE)) {
 		// Next determine the user state components supported
-		// by the processor and set x86_default_xcr0.
+		// by the processor and set x86_default_xcr0 in proc_global_info.
 		cpuid(0x0d, 0x00, &eax, 0, 0, &edx);
 		proc_supported_features = ((uint64_t)edx << 32) | eax;
 
 		// Intersection of processor-supported and Akaros-supported
 		// features is the Akaros-wide default at runtime.
-		x86_default_xcr0 = X86_MAX_XCR0 & proc_supported_features;
+		__proc_global_info.x86_default_xcr0 = X86_MAX_XCR0 &
+		                                      proc_supported_features;
 
 		/*
 		 * Make sure CR4.OSXSAVE is set and set the local xcr0 to the default.
@@ -111,7 +106,7 @@ void ancillary_state_init(void)
 		 * You must set CR4_OSXSAVE before setting xcr0, or a #UD fault occurs.
 		 */
 		lcr4(rcr4() | CR4_OSXSAVE);
-		lxcr0(x86_default_xcr0);
+		lxcr0(__proc_global_info.x86_default_xcr0);
 
 		/*
 		 * Build a default set of extended state values that we can later use
@@ -165,7 +160,7 @@ void ancillary_state_init(void)
 	} else {
 		// Since no program should try to use XSAVE features
 		// on this processor, we set x86_default_xcr0 to 0x0
-		x86_default_xcr0 = 0x0;
+		__proc_global_info.x86_default_xcr0 = 0x0;
 
 		/*
 		 * Build a default set of extended state values that we can later use to
