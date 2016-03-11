@@ -82,6 +82,8 @@ void print_cpuinfo(void)
 		panic("MSRs not supported!");
 	if (!(edx & 0x00001000))
 		panic("MTRRs not supported!");
+	if (!(edx & (1 << 16)))
+		panic("PAT not supported!");
 	if (!(edx & 0x00002000))
 		panic("Global Pages not supported!");
 	if (!(edx & 0x00000200))
