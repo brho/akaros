@@ -469,7 +469,7 @@ void vm_init(void)
 	/* For the LAPIC and IOAPIC, we use PAT (but not *the* PAT flag) to make
 	 * these type UC */
 	map_segment(boot_pgdir, IOAPIC_BASE, APIC_SIZE, IOAPIC_PBASE,
-	            PTE_PCD | PTE_PWT | PTE_KERN_RW | PTE_G, max_jumbo_shift);
+	            PTE_NOCACHE | PTE_KERN_RW | PTE_G, max_jumbo_shift);
 	/* VPT mapping: recursive PTE inserted at the VPT spot */
 	boot_kpt[PML4(VPT)] = PADDR(boot_kpt) | PTE_W | PTE_P;
 	/* same for UVPT, accessible by userspace (RO). */

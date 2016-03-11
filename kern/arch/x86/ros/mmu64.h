@@ -268,15 +268,15 @@ typedef struct x86_pgdir {
 #define PTE_P			0x001	/* Present */
 #define PTE_W			0x002	/* Writeable */
 #define PTE_U			0x004	/* User */
-#define PTE_PWT			0x008	/* Write-Through */
-#define PTE_PCD			0x010	/* Cache-Disable */
+#define __PTE_PWT		0x008	/* Write-Through */
+#define __PTE_PCD		0x010	/* Cache-Disable */
 #define PTE_A			0x020	/* Accessed */
 #define PTE_D			0x040	/* Dirty */
 #define PTE_PS			0x080	/* Page Size */
-#define PTE_PAT			0x080	/* Page attribute table */
+#define __PTE_PAT		0x080	/* Page attribute table */
 #define PTE_G			0x100	/* Global Page */
-#define PTE_JPAT		0x800	/* Jumbo PAT */
-#define PTE_NOCACHE		(PTE_PWT | PTE_PCD)
+#define __PTE_JPAT		0x800	/* Jumbo PAT */
+#define PTE_NOCACHE		(__PTE_PWT | __PTE_PCD)
 
 /* Permissions fields and common access modes.  These should be read as 'just
  * kernel or user too' and 'RO or RW'.  USER_RO means read-only for everyone. */
