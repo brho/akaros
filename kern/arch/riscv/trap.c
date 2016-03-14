@@ -112,12 +112,21 @@ format_trapframe(struct hw_trapframe *hw_tf, char* buf, int bufsz)
 	return len;
 }
 
-void
-print_trapframe(struct hw_trapframe *hw_tf)
+void print_trapframe(struct hw_trapframe *hw_tf)
 {
 	char buf[1024];
 	int len = format_trapframe(hw_tf, buf, sizeof(buf));
 	cputbuf(buf,len);
+}
+
+void print_swtrapframe(struct sw_trapframe *sw_tf)
+{
+	#warning "fix me"
+}
+
+void print_vmtrapframe(struct vm_trapframe *vm_tf)
+{
+	#warning "fix me"
 }
 
 static void exit_halt_loop(struct hw_trapframe *hw_tf)
@@ -182,7 +191,6 @@ unhandled_trap(struct hw_trapframe *state, const char* name)
 		spin_unlock(&screwup_lock);
 
 		assert(current);
-		enable_irq();
 		proc_destroy(current);
 	}
 }

@@ -7,6 +7,7 @@
 #include <ros/resource.h>
 #include <ros/atomic.h>
 #include <ros/arch/arch.h>
+#include <ros/cpu_feat.h>
 #include <string.h>
 
 /* Process creation flags */
@@ -61,12 +62,23 @@ typedef struct procinfo {
 	struct pcore		pcoremap[MAX_NUM_CORES];
 	seq_ctr_t			coremap_seqctr;
 } procinfo_t;
-#define PROCINFO_NUM_PAGES  ((sizeof(procinfo_t)-1)/PGSIZE + 1)	
+#define PROCINFO_NUM_PAGES  ((sizeof(procinfo_t)-1)/PGSIZE + 1)
 
+/* We align this so that the kernel can easily allocate it in the BSS */
+struct proc_global_info {
+	unsigned long cpu_feats[__NR_CPU_FEAT_BITS];
+} __attribute__((aligned(PGSIZE)));
+#define PROCGINFO_NUM_PAGES  (sizeof(struct proc_global_info) / PGSIZE)
 
-// this is how user programs access the procinfo page
-#ifndef ROS_KERNEL
-# define __procinfo (*(procinfo_t*)UINFO)
+#ifdef ROS_KERNEL
+
+/* defined in init.c */
+extern struct proc_global_info __proc_global_info;
+
+#else /* Userland */
+
+#define __procinfo (*(procinfo_t*)UINFO)
+#define __proc_global_info (*(struct proc_global_info*)UGINFO)
 
 #include <ros/common.h>
 #include <ros/atomic.h>
@@ -81,6 +93,9 @@ static inline uint32_t __get_vcoreid_from_procinfo(void)
 	 * there is a 'memory barrier' between the IPI write and the seqctr write.
 	 * I think this is true. */
 	uint32_t kpcoreid, kvcoreid;
+	extern long __ros_syscall_noerrno(unsigned int _num, long _a0, long _a1,
+	                                  long _a2, long _a3, long _a4, long _a5);
+
 	seq_ctr_t old_seq;
 	do {
 		cmb();

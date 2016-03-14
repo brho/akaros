@@ -289,14 +289,14 @@ struct Proto {
 	int x;						/* protocol index */
 	int ipproto;				/* ip protocol type */
 
-	char *(*connect) (struct conv *, char **unused_char_pp_t, int);
-	char *(*announce) (struct conv *, char **unused_char_pp_t, int);
-	char *(*bind) (struct conv *, char **unused_char_pp_t, int);
+	void (*connect)(struct conv *, char **, int);
+	void (*announce)(struct conv *, char **, int);
+	void (*bind)(struct conv *, char **, int);
 	int (*state) (struct conv *, char *unused_char_p_t, int);
 	void (*create) (struct conv *);
 	void (*close) (struct conv *);
 	void (*rcv) (struct Proto *, struct Ipifc *, struct block *);
-	char *(*ctl) (struct conv *, char **unused_char_pp_t, int);
+	void (*ctl)(struct conv *, char **, int);
 	void (*advise) (struct Proto *, struct block *, char *unused_char_p_t);
 	int (*stats) (struct Proto *, char *unused_char_p_t, int);
 	int (*local) (struct conv *, char *unused_char_p_t, int);
@@ -388,9 +388,9 @@ int Fsbuiltinproto(struct Fs *, uint8_t unused_uint8_t);
 struct conv *Fsprotoclone(struct Proto *, char *unused_char_p_t);
 struct Proto *Fsrcvpcol(struct Fs *, uint8_t unused_uint8_t);
 struct Proto *Fsrcvpcolx(struct Fs *, uint8_t unused_uint8_t);
-char *Fsstdconnect(struct conv *, char **unused_char_pp_t, int);
-char *Fsstdannounce(struct conv *, char **unused_char_pp_t, int);
-char *Fsstdbind(struct conv *, char **unused_char_pp_t, int);
+void Fsstdconnect(struct conv *, char **, int);
+void Fsstdannounce(struct conv *, char **, int);
+void Fsstdbind(struct conv *, char **, int);
 void Fsconvnonblock(struct conv *, bool);
 uint32_t scalednconv(void);
 
@@ -633,11 +633,7 @@ extern void ipifcremroute(struct Fs *, int unused_int, uint8_t * u8pt,
 						  uint8_t * u8pt2);
 extern void ipifcremmulti(struct conv *c, uint8_t * ma, uint8_t * ia);
 extern void ipifcaddmulti(struct conv *c, uint8_t * ma, uint8_t * ia);
-extern char *ipifcrem(struct Ipifc *ifc, char **argv, int argc);
-extern char *ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
-					  struct Iplifc *lifcp);
 extern long ipselftabread(struct Fs *, char *a, uint32_t offset, int n);
-extern char *ipifcaddpref6(struct Ipifc *ifc, char **argv, int argc);
 extern void ipsendra6(struct Fs *f, int on);
 
 /*
@@ -681,12 +677,6 @@ static inline void ptclcsum_finalize(struct block *bp, unsigned int feat)
 		bp->flag &= ~BCKSUM_FLAGS;
 	}
 }
-
-/*
- * bootp.c
- */
-char *(*bootp) (struct Ipifc * unused_ipifc);
-int (*bootpread) (char *unused_char_p_t, uint32_t, int);
 
 /*
  *  iprouter.c

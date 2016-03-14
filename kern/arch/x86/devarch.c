@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is part of the UCB release of Plan 9. It is subject to the license
  * terms in the LICENSE file found in the top-level directory of this
  * distribution and at http://akaros.cs.berkeley.edu/files/Plan9License. No
@@ -90,10 +90,10 @@ static struct dirtab archdir[Qmax] = {
 #define MSR_MAX_VAR_COUNTERS 16
 #define MSR_MAX_FIX_COUNTERS 4
 
-static const struct address_range msr_rd_wlist[] = {
+static struct address_range msr_rd_wlist[] = {
 	ADDRESS_RANGE(0x00000000, 0xffffffff),
 };
-static const struct address_range msr_wr_wlist[] = {
+static struct address_range msr_wr_wlist[] = {
 	ADDRESS_RANGE(MSR_IA32_PERFCTR0,
 				  MSR_IA32_PERFCTR0 + MSR_MAX_VAR_COUNTERS - 1),
 	ADDRESS_RANGE(MSR_ARCH_PERFMON_EVENTSEL0,
@@ -200,8 +200,8 @@ int iounused(int start, int end)
 	struct io_map *map;
 
 	for (map = iomap.map; map; map = map->next) {
-		if (((start >= map->start) && (start < map->end))
-			|| ((start <= map->start) && (end > map->start)))
+		if (((start >= map->start) && (start < map->end)) ||
+		    ((start <= map->start) && (end > map->start)))
 			return 0;
 	}
 	return 1;
@@ -297,7 +297,7 @@ static void checkport(int start, int end)
 
 	if (iounused(start, end))
 		return;
-	error(EPERM, NULL);
+	error(EPERM, ERROR_FIXME);
 }
 
 static struct chan *archattach(char *spec)
@@ -322,7 +322,7 @@ static struct perf_context *arch_create_perf_context(void)
 {
 	ERRSTACK(1);
 	struct perf_context *pc = kzmalloc(sizeof(struct perf_context),
-									   KMALLOC_WAIT);
+	                                   KMALLOC_WAIT);
 
 	if (waserror()) {
 		kfree(pc);
@@ -344,8 +344,8 @@ static void arch_free_perf_context(struct perf_context *pc)
 }
 
 static const uint8_t *arch_read_core_set(struct core_set *cset,
-										 const uint8_t *kptr,
-										 const uint8_t *ktop)
+                                         const uint8_t *kptr,
+                                         const uint8_t *ktop)
 {
 	int i, nb;
 	uint32_t n;
@@ -364,7 +364,7 @@ static const uint8_t *arch_read_core_set(struct core_set *cset,
 }
 
 static long arch_perf_write(struct perf_context *pc, const void *udata,
-							long usize)
+                            long usize)
 {
 	ERRSTACK(1);
 	void *kdata;
@@ -523,7 +523,7 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			return n;
 		case Qiow:
 			if (n & 1)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			checkport(offset, offset + n);
 			sp = a;
 			for (port = offset; port < offset + n; port += 2)
@@ -531,7 +531,7 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			return n;
 		case Qiol:
 			if (n & 3)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			checkport(offset, offset + n);
 			lp = a;
 			for (port = offset; port < offset + n; port += 4)
@@ -543,14 +543,14 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			return readmem(offset, a, n, KADDR(0), REAL_MEM_SIZE);
 		case Qmsr:
 			if (!address_range_find(msr_rd_wlist, ARRAY_SIZE(msr_rd_wlist),
-									(uintptr_t) offset))
-				error(EPERM, NULL);
+			                        (uintptr_t) offset))
+				error(EPERM, "MSR 0x%x not in read whitelist", offset);
 			core_set_init(&cset);
 			core_set_fill_available(&cset);
 			msr_set_address(&msra, (uint32_t) offset);
 			values = kzmalloc(num_cores * sizeof(uint64_t), KMALLOC_WAIT);
 			if (!values)
-				error(ENOMEM, NULL);
+				error(ENOMEM, ERROR_FIXME);
 			msr_set_values(&msrv, values, num_cores);
 
 			err = msr_cores_read(&cset, &msra, &msrv);
@@ -558,16 +558,22 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			if (likely(!err)) {
 				if (n >= num_cores * sizeof(uint64_t)) {
 					if (!memcpy_to_user_errno(current, a, values,
-											  num_cores * sizeof(uint64_t)))
+					                          num_cores * sizeof(uint64_t)))
 						n = num_cores * sizeof(uint64_t);
 					else
 						n = -1;
 				} else {
 					kfree(values);
-					error(ERANGE, NULL);
+					error(ERANGE, "Not enough space for MSR read");
 				}
 			} else {
-				n = -1;
+				switch (-err) {
+				case (EFAULT):
+					error(-err, "read_msr() faulted on MSR 0x%x", offset);
+				case (ERANGE):
+					error(-err, "Not enough space for MSR read");
+				};
+				error(-err, "MSR read failed");
 			}
 			kfree(values);
 			return n;
@@ -586,11 +592,11 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			return n;
 		}
 		default:
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 	}
 
 	if ((buf = kzmalloc(n, 0)) == NULL)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	p = buf;
 	n = n / Linelen;
 	offset = offset / Linelen;
@@ -602,7 +608,7 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 				if (offset-- > 0)
 					continue;
 				snprintf(p, n * Linelen, "%#8p %#8p %-12.12s\n", map->start,
-						 map->end - 1, map->tag);
+				         map->end - 1, map->tag);
 				p += Linelen;
 				n--;
 			}
@@ -648,7 +654,7 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 			return n;
 		case Qiow:
 			if (n & 1)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			checkport(offset, offset + n);
 			sp = a;
 			for (port = offset; port < offset + n; port += 2)
@@ -656,7 +662,7 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 			return n;
 		case Qiol:
 			if (n & 3)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			checkport(offset, offset + n);
 			lp = a;
 			for (port = offset; port < offset + n; port += 4)
@@ -664,10 +670,10 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 			return n;
 		case Qmsr:
 			if (!address_range_find(msr_wr_wlist, ARRAY_SIZE(msr_wr_wlist),
-									(uintptr_t) offset))
-				error(EPERM, NULL);
+			                        (uintptr_t) offset))
+				error(EPERM, "MSR 0x%x not in write whitelist", offset);
 			if (n != sizeof(uint64_t))
-				error(EINVAL, NULL);
+				error(EINVAL, "Tried to write more than a u64 (%p)", n);
 			if (memcpy_from_user_errno(current, &value, a, sizeof(value)))
 				return -1;
 
@@ -677,8 +683,15 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 			msr_set_value(&msrv, value);
 
 			err = msr_cores_write(&cset, &msra, &msrv);
-			if (unlikely(err))
-				error(-err, NULL);
+			if (unlikely(err)) {
+				switch (-err) {
+				case (EFAULT):
+					error(-err, "write_msr() faulted on MSR 0x%x", offset);
+				case (ERANGE):
+					error(-err, "Not enough space for MSR write");
+				};
+				error(-err, "MSR write failed");
+			}
 			return sizeof(uint64_t);
 		case Qperf: {
 			struct perf_context *pc = (struct perf_context *) c->aux;
@@ -688,16 +701,26 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 			return arch_perf_write(pc, a, n);
 		}
 		default:
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 	}
 	return 0;
+}
+
+static void archinit(void)
+{
+	int ret;
+
+	ret = address_range_init(msr_rd_wlist, ARRAY_SIZE(msr_rd_wlist));
+	assert(!ret);
+	ret = address_range_init(msr_wr_wlist, ARRAY_SIZE(msr_wr_wlist));
+	assert(!ret);
 }
 
 struct dev archdevtab __devtab = {
 	.name = "arch",
 
 	.reset = devreset,
-	.init = devinit,
+	.init = archinit,
 	.shutdown = devshutdown,
 	.attach = archattach,
 	.walk = archwalk,

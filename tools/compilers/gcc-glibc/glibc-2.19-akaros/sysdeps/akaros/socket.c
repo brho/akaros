@@ -15,6 +15,8 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/close_cb.h>
+#include <ros/common.h>
 
 /* bsd extensions */
 #include <sys/uio.h>
@@ -34,6 +36,9 @@ int __socket(int domain, int type, int protocol)
 	int pfd[2];
 	char *net;
 	char msg[128];
+	static struct close_cb _sock_close_cb = {.func = _sock_fd_closed};
+
+	run_once(register_close_cb(&_sock_close_cb));
 
 	switch (domain) {
 		case PF_INET:

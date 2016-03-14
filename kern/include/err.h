@@ -19,6 +19,8 @@
 									 prev_errbuf)->jmpbuf), 1)
 #define poperror() errpop(errstack, ARRAY_SIZE(errstack), &curindex,	\
 						  prev_errbuf)
+/* Give Akaros people a hint that we need a real error message. */
+#define ERROR_FIXME "This space in %s@%d needs filling in.", __FILE__, __LINE__
 
 struct errbuf *errpush(struct errbuf *errstack, int stacksize, int *curindex,
 						struct errbuf **prev_errbuf);

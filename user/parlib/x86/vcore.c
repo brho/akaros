@@ -63,12 +63,53 @@ void print_sw_tf(struct sw_trapframe *sw_tf)
 	printf(" fpucw 0x%04x\n",             sw_tf->tf_fpucw);
 }
 
+void print_vm_tf(struct vm_trapframe *vm_tf)
+{
+	printf("[user] VM Trapframe 0x%016x\n", vm_tf);
+	printf("  rax  0x%016lx\n",           vm_tf->tf_rax);
+	printf("  rbx  0x%016lx\n",           vm_tf->tf_rbx);
+	printf("  rcx  0x%016lx\n",           vm_tf->tf_rcx);
+	printf("  rdx  0x%016lx\n",           vm_tf->tf_rdx);
+	printf("  rbp  0x%016lx\n",           vm_tf->tf_rbp);
+	printf("  rsi  0x%016lx\n",           vm_tf->tf_rsi);
+	printf("  rdi  0x%016lx\n",           vm_tf->tf_rdi);
+	printf("  r8   0x%016lx\n",           vm_tf->tf_r8);
+	printf("  r9   0x%016lx\n",           vm_tf->tf_r9);
+	printf("  r10  0x%016lx\n",           vm_tf->tf_r10);
+	printf("  r11  0x%016lx\n",           vm_tf->tf_r11);
+	printf("  r12  0x%016lx\n",           vm_tf->tf_r12);
+	printf("  r13  0x%016lx\n",           vm_tf->tf_r13);
+	printf("  r14  0x%016lx\n",           vm_tf->tf_r14);
+	printf("  r15  0x%016lx\n",           vm_tf->tf_r15);
+	printf("  rip  0x%016lx\n",           vm_tf->tf_rip);
+	printf("  rflg 0x%016lx\n",           vm_tf->tf_rflags);
+	printf("  rsp  0x%016lx\n",           vm_tf->tf_rsp);
+	printf("  cr2  0x%016lx\n",           vm_tf->tf_cr2);
+	printf("  cr3  0x%016lx\n",           vm_tf->tf_cr3);
+	printf("Gpcore 0x%08x\n",             vm_tf->tf_guest_pcoreid);
+	printf("Flags  0x%08x\n",             vm_tf->tf_flags);
+	printf("Inject 0x%08x\n",             vm_tf->tf_trap_inject);
+	printf("ExitRs 0x%08x\n",             vm_tf->tf_exit_reason);
+	printf("ExitQl 0x%08x\n",             vm_tf->tf_exit_qual);
+	printf("Intr1  0x%016lx\n",           vm_tf->tf_intrinfo1);
+	printf("Intr2  0x%016lx\n",           vm_tf->tf_intrinfo2);
+	printf("GVA    0x%016lx\n",           vm_tf->tf_guest_va);
+	printf("GPA    0x%016lx\n",           vm_tf->tf_guest_pa);
+}
+
 void print_user_context(struct user_context *ctx)
 {
-	if (ctx->type == ROS_HW_CTX)
+	switch (ctx->type) {
+	case ROS_HW_CTX:
 		print_hw_tf(&ctx->tf.hw_tf);
-	else if (ctx->type == ROS_SW_CTX)
+		break;
+	case ROS_SW_CTX:
 		print_sw_tf(&ctx->tf.sw_tf);
-	else
+		break;
+	case ROS_VM_CTX:
+		print_vm_tf(&ctx->tf.vm_tf);
+		break;
+	default:
 		printf("Unknown context type %d\n", ctx->type);
+	}
 }

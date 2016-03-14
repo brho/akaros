@@ -32,6 +32,7 @@
 #include <ros/procinfo.h>
 #include <ros/procdata.h>
 #include <ros/arch/mmu.h>
+#include <parlib/cpu_feat.h>
 
 /* Replacement type for __m128 since this file is included by ld.so,
    which is compiled with -mno-sse.  It must not change the alignment
@@ -412,8 +413,11 @@ static inline void *__get_tls_desc(void)
 
 static inline void __set_tls_desc(void *tls_desc)
 {
-	/* TODO: check for and use WRFSBASE */
-	__fastcall_setfsbase((uintptr_t)tls_desc);
+	if (!cpu_has_feat(CPU_FEAT_X86_FSGSBASE)) {
+		__fastcall_setfsbase((uintptr_t)tls_desc);
+		return;
+	}
+	asm volatile ("wrfsbase %0" : : "r"(tls_desc));
 }
 
 static inline const char* tls_init_tp(void* thrdescr)

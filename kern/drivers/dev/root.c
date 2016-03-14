@@ -230,7 +230,7 @@ static struct chan *rootattach(char *spec)
 {
 	struct chan *c;
 	if (*spec)
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 	c = devattach(devname(), spec);
 	mkqid(&c->qid, roottab[0].qid.path, roottab[0].qid.vers, QTDIR);
 	return c;
@@ -458,7 +458,7 @@ static int rootwstat(struct chan *c, uint8_t *m_buf, int m_buf_sz)
 	m_sz = convM2D(m_buf, m_buf_sz, &dir[0], (char*)&dir[1]);
 	if (!m_sz) {
 		kfree(dir);
-		error(ENODATA, NULL);
+		error(ENODATA, ERROR_FIXME);
 	}
 	/* TODO: handle more things than just the mode */
 	if (!emptystr(dir->name))

@@ -17,6 +17,8 @@ static inline bool is_user_rwaddr(const void *addr, size_t len);
 /* Same deal, but read-only */
 static inline bool is_user_raddr(const void *addr, size_t len);
 
+#include <arch/uaccess.h>
+
 int strcpy_from_user(struct proc *p, char *dst, const char *src);
 int strcpy_to_user(struct proc *p, char *dst, const char *src);
 
@@ -68,7 +70,9 @@ char *copy_in_path(struct proc *p, const char *path, size_t path_l);
 void free_path(struct proc *p, char *t_path);
 void *kmalloc_errno(int len);
 bool uva_is_kva(struct proc *p, void *uva, void *kva);
-uintptr_t uva2kva(struct proc *p, void *uva);
+uintptr_t uva2kva(struct proc *p, void *uva, size_t len, int prot);
+/* In arch/pmap{64}.c */
+uintptr_t gva2gpa(struct proc *p, uintptr_t cr3, uintptr_t gva);
 
 /* Helper for is_user_r{w,}addr.
  *

@@ -84,14 +84,12 @@ static struct {
 char *sysname;
 int64_t fasthz;
 
-static void seedrand(void);
 static int readtime(uint32_t, char *, int);
 static int readbintime(char *, int);
 static int writetime(char *, int);
 static int writebintime(char *, int);
 
 enum {
-	CMV,
 	CMbroken,
 	CMconsole,
 	CMhalt,
@@ -102,7 +100,6 @@ enum {
 
 
 struct cmdtab rebootmsg[] = {
-	{CMV, "V", 4},
 	{CMbroken, "broken", 0},
 	{CMconsole, "console", 1},
 	{CMhalt, "halt", 1},
@@ -601,16 +598,13 @@ enum {
 	Qpgrpid,
 	Qpid,
 	Qppid,
-	Qrandom,
 	Qreboot,
 	Qswap,
 	Qsysctl,
 	Qsysname,
 	Qsysstat,
 	Qtime,
-	Qurandom,
 	Quser,
-	Qvmctl,
 	Qzero,
 };
 
@@ -637,16 +631,13 @@ static struct dirtab consdir[] = {
 	{"pgrpid", {Qpgrpid}, NUMSIZE, 0444},
 	{"pid", {Qpid}, NUMSIZE, 0444},
 	{"ppid", {Qppid}, NUMSIZE, 0444},
-	{"random", {Qrandom}, 0, 0444},
 	{"reboot", {Qreboot}, 0, 0660},
 	{"swap", {Qswap}, 0, 0664},
 	{"sysctl", {Qsysctl}, 0, 0666},
 	{"sysname", {Qsysname}, 0, 0664},
 	{"sysstat", {Qsysstat}, 0, 0666},
 	{"time", {Qtime}, NUMSIZE + 3 * VLNUMSIZE, 0664},
-	{"urandom", {Qurandom}, 0, 0444},
 	{"user", {Quser}, 0, 0666},
-	{"vmctl", {Qvmctl}, 0, 0666},
 	{"zero", {Qzero}, 0, 0444},
 };
 
@@ -682,7 +673,6 @@ static void consinit(void)
 #if 0
 	todinit();
 #endif
-	randominit();
 	/*
 	 * at 115200 baud, the 1024 char buffer takes 56 ms to process,
 	 * processing it every 22 ms should be fine
@@ -966,10 +956,6 @@ static long consread(struct chan *c, void *buf, long n, int64_t off)
 				return 0;
 			return consreadstr((uint32_t) offset, buf, n, sysname);
 
-		case Qrandom:
-		case Qurandom:
-			return randomread(buf, n);
-
 		case Qdrivers:
 			b = kzmalloc(READSTR, 0);
 			if (b == NULL)
@@ -1086,7 +1072,7 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 
 		case Qbintime:
 			if (!iseve())
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			return writebintime(a, n);
 
 #if 0
@@ -1107,29 +1093,15 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 			error(EPERM, "Cannot write to config QID");
 			break;
 
-		case Qvmctl:
-			memmove(&vmctl, a, sizeof(vmctl));
-			if ((offset >> 12) ==1) {
-				ret = vm_post_interrupt(&vmctl);
-				n = ret;
-				//printk("vm_interrupt_notify returns %d\n", ret);
-			}
-			else {
-				ret = vm_run(&vmctl);
-				printd("vm_run returns %d\n", ret);
-				n = ret;
-				memmove(a, &vmctl, sizeof(vmctl));
-			}
-			break;
 		case Qsysctl:
-			//if (!iseve()) error(EPERM, NULL);
+			//if (!iseve()) error(EPERM, ERROR_FIXME);
 			cb = parsecmd(a, n);
 			if (cb->nf > 1)
 			printd("cons sysctl cmd %s\n", cb->f[0]);
 
 		case Qreboot:
 			if (!iseve())
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			cb = parsecmd(a, n);
 
 			if (waserror()) {
@@ -1147,26 +1119,6 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 				case CMnobroken:
 					keepbroken = 0;
 					break;
-				case CMV:
-					/* it's ok to throw away this struct each time;
-					 * this is stateless and going away soon anyway.
-					 * we only kept it here until we can rewrite all the
-					 * tests
-					 */
-					rip =  strtoul(cb->f[1], NULL, 0);
-					rsp =  strtoul(cb->f[2], NULL, 0);
-					cr3 =  strtoul(cb->f[3], NULL, 0);
-					if (cr3) {
-						vmctl.command = REG_RSP_RIP_CR3;
-						vmctl.cr3 = cr3;
-						vmctl.regs.tf_rip = rip;
-						vmctl.regs.tf_rsp = rsp;
-					} else {
-						vmctl.command = RESUME;
-					}
-					ret = vm_run(&vmctl);
-					printd("vm_run returns %d\n", ret);
-					n = ret;
 				case CMreboot:
 					reboot();
 					break;
@@ -1204,9 +1156,9 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 				break;
 			}
 			if (!iseve())
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			if (buf[0] < '0' || '9' < buf[0])
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			fd = strtoul(buf, 0, 0);
 			swc = fdtochan(fd, -1, 1, 1);
 			setswapchan(swc);
@@ -1215,9 +1167,9 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 
 		case Qsysname:
 			if (offset != 0)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			if (n <= 0 || n >= sizeof buf)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			strncpy(buf, a, n);
 			buf[n] = 0;
 			if (buf[n - 1] == '\n')
@@ -1257,31 +1209,6 @@ struct dev consdevtab __devtab = {
 static char *devname(void)
 {
 	return consdevtab.name;
-}
-
-static uint32_t randn;
-
-static void seedrand(void)
-{
-	ERRSTACK(2);
-	if (!waserror()) {
-		randomread((void *)&randn, sizeof(randn));
-		poperror();
-	}
-}
-
-int nrand(int n)
-{
-	if (randn == 0)
-		seedrand();
-	randn = randn * 1103515245 + 12345 + read_tsc();
-	return (randn >> 16) % n;
-}
-
-int rand(void)
-{
-	nrand(1);
-	return randn;
 }
 
 static uint64_t uvorder = 0x0001020304050607ULL;
@@ -1438,7 +1365,7 @@ static int writebintime(char *buf, int n)
 	switch (*buf) {
 		case 'n':
 			if (n < sizeof(int64_t))
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			le2int64_t(&delta, p);
 #if 0
 			todset(delta, 0, 0);
@@ -1446,7 +1373,7 @@ static int writebintime(char *buf, int n)
 			break;
 		case 'd':
 			if (n < sizeof(int64_t) + sizeof(long))
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			p = le2int64_t(&delta, p);
 			le2long(&period, p);
 #if 0
@@ -1455,10 +1382,10 @@ static int writebintime(char *buf, int n)
 			break;
 		case 'f':
 			if (n < sizeof(uint64_t))
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			le2int64_t(&fasthz, p);
 			if (fasthz <= 0)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 #if 0
 			todsetfreq(fasthz);
 #endif

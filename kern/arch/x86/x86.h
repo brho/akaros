@@ -2,6 +2,8 @@
 
 #include <ros/common.h>
 #include <arch/mmu.h>
+#include <ros/errno.h>
+#include <arch/fixup.h>
 
 /* Model Specific Registers */
 // TODO: figure out which are intel specific, and name them accordingly
@@ -136,6 +138,7 @@
 #define X86_CR8_TPR	0x0000000F /* task priority register */
 
 #ifndef __ASSEMBLER__
+
 static inline uint8_t inb(int port) __attribute__((always_inline));
 static inline void insb(int port, void *addr, int cnt)
               __attribute__((always_inline));
@@ -164,6 +167,11 @@ static inline void lcr3(unsigned long val) __attribute__((always_inline));
 static inline unsigned long rcr3(void) __attribute__((always_inline));
 static inline void lcr4(unsigned long val) __attribute__((always_inline));
 static inline unsigned long rcr4(void) __attribute__((always_inline));
+
+static inline void lxcr0(uint64_t xcr0) __attribute__((always_inline));
+static inline int safe_lxcr0(uint64_t xcr0) __attribute__((always_inline));
+static inline uint64_t rxcr0(void) __attribute__((always_inline));
+
 static inline unsigned long read_flags(void) __attribute__((always_inline));
 static inline void write_eflags(unsigned long eflags)
               __attribute__((always_inline));
@@ -296,6 +304,11 @@ static inline unsigned long rcr0(void)
 	return val;
 }
 
+static inline void lcr2(unsigned long val)
+{
+	asm volatile("mov %0,%%cr2" : : "r" (val));
+}
+
 static inline unsigned long rcr2(void)
 {
 	unsigned long val;
@@ -325,6 +338,49 @@ static inline unsigned long rcr4(void)
 	unsigned long cr4;
 	asm volatile("mov %%cr4,%0" : "=r" (cr4));
 	return cr4;
+}
+
+static inline void lxcr0(uint64_t xcr0)
+{
+	uint32_t eax, edx;
+
+	edx = xcr0 >> 32;
+	eax = xcr0;
+	asm volatile("xsetbv"
+	             : /* No outputs */
+	             : "a"(eax), "c" (0), "d"(edx));
+}
+
+static inline int safe_lxcr0(uint64_t xcr0)
+{
+	int err = 0;
+	uint32_t eax, edx;
+
+	edx = xcr0 >> 32;
+	eax = xcr0;
+	asm volatile(ASM_STAC               ";"
+		         "1: xsetbv              ;"
+	             "2: " ASM_CLAC "        ;"
+	             ".section .fixup, \"ax\";"
+	             "3: mov %4, %0          ;"
+	             "   jmp 2b              ;"
+	             ".previous              ;"
+	             _ASM_EXTABLE(1b, 3b)
+	             : "=r" (err)
+	             : "a"(eax), "c" (0), "d"(edx),
+	               "i" (-EINVAL), "0" (err));
+
+	return err;
+}
+
+static inline uint64_t rxcr0(void)
+{
+	uint32_t eax, edx;
+
+	asm volatile("xgetbv"
+	             : "=a"(eax), "=d"(edx)
+	             : "c" (0));
+	return ((uint64_t)edx << 32) | eax;
 }
 
 static inline unsigned long read_flags(void)
@@ -365,7 +421,7 @@ static inline void cpuid(uint32_t info1, uint32_t info2, uint32_t *eaxp,
 {
 	uint32_t eax, ebx, ecx, edx;
 	/* Can select with both eax (info1) and ecx (info2) */
-	asm volatile("cpuid" 
+	asm volatile("cpuid"
 		: "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
 		: "a" (info1), "c" (info2));
 	if (eaxp)
@@ -396,7 +452,7 @@ static inline uint64_t read_msr(uint32_t reg)
 static inline void write_msr(uint32_t reg, uint64_t val)
 {
 	asm volatile("wrmsr" : : "d"((uint32_t)(val >> 32)),
-	                         "a"((uint32_t)(val & 0xFFFFFFFF)), 
+	                         "a"((uint32_t)(val & 0xFFFFFFFF)),
 	                         "c"(reg));
 }
 
@@ -426,5 +482,5 @@ static inline void __cpu_relax(void)
 
 #ifndef UNUSED_ARG
 #define UNUSED_ARG(x) (void)x
-#endif /* This prevents compiler warnings for UNUSED_ARG */ 
+#endif /* This prevents compiler warnings for UNUSED_ARG */
 #endif /* !__ASSEMBLER__ */

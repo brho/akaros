@@ -449,7 +449,7 @@ int arpwrite(struct Fs *fs, char *s, long len)
 	arp = fs->arp;
 
 	if (len <= 0)
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 	if (len > sizeof(buf))
 		len = sizeof(buf);
 	strlcpy(buf, s, sizeof(buf));
@@ -480,7 +480,7 @@ int arpwrite(struct Fs *fs, char *s, long len)
 	} else if (strcmp(f[0], "add") == 0) {
 		switch (n) {
 			default:
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			case 3:
 				parseip(ip, f[1]);
 				if (isv4(ip))
@@ -495,19 +495,19 @@ int arpwrite(struct Fs *fs, char *s, long len)
 			case 4:
 				m = ipfindmedium(f[1]);
 				if (m == NULL)
-					error(EINVAL, NULL);
+					error(EINVAL, ERROR_FIXME);
 				parseip(ip, f[2]);
 				n = parsemac(mac, f[3], m->maclen);
 				break;
 		}
 
 		if (m->ares == NULL)
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 
 		m->ares(fs, V6, ip, mac, n, 0);
 	} else if (strcmp(f[0], "del") == 0) {
 		if (n != 2)
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 
 		parseip(ip, f[1]);
 		qlock(&arp->qlock);
@@ -542,7 +542,7 @@ int arpwrite(struct Fs *fs, char *s, long len)
 		}
 		qunlock(&arp->qlock);
 	} else
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 
 	return len;
 }

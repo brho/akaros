@@ -54,13 +54,17 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace)
 	size_t len = 0;
 	struct timespec ts_start;
 	struct timespec ts_end;
+	char what = 'X';
 	tsc2timespec(trace->start_timestamp, &ts_start);
 	tsc2timespec(trace->end_timestamp, &ts_end);
+	if (trace->end_timestamp == 0)
+		what = 'E';
 
 	len = snprintf(trace->pretty_buf, SYSTR_PRETTY_BUF_SZ - len,
-	           "[%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%llx, 0x%llx, "
+	           "%c [%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%llx, 0x%llx, "
 	           "0x%llx, 0x%llx, 0x%llx, 0x%llx) ret: 0x%llx proc: %d core: %d "
 	           "vcore: %d data: ",
+	           what,
 	           ts_start.tv_sec,
 	           ts_start.tv_nsec,
 	           ts_end.tv_sec,
@@ -77,17 +81,95 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace)
 	           trace->pid,
 	           trace->coreid,
 	           trace->vcoreid);
-	/* if we have extra data, print it out on the next line, lined up nicely.
-	 * this is only useful for looking at the dump in certain terminals.  if we
-	 * have a tool that processes the info, we shouldn't do this. */
-	if (trace->datalen)
-		len += snprintf(trace->pretty_buf + len, SYSTR_PRETTY_BUF_SZ - len,
-		                "\n%67s", "");
+
 	len += printdump(trace->pretty_buf + len,
-	                 MIN(trace->datalen, SYSTR_PRETTY_BUF_SZ - len - 1),
+			 trace->datalen,
+	                 SYSTR_PRETTY_BUF_SZ - len - 1,
 	                 trace->data);
 	len += snprintf(trace->pretty_buf + len, SYSTR_PRETTY_BUF_SZ - len, "\n");
 	return len;
+}
+
+/* On enter, we have !trace, a sysc, and retval is meaningless.  On exit, we had
+ * trace, retval and !sysc */
+static struct systrace_record *sctrace(struct systrace_record *trace,
+                                       struct proc *p, struct syscall *sysc,
+                                       long retval)
+{
+	int n;
+	uintreg_t cp = 0;
+	int datalen = 0;
+
+	assert(p->strace);
+
+	if (!trace) {
+		/* We're using qiwrite, which has no flow control.  We'll do it
+		 * manually. */
+		if (qfull(p->strace->q)) {
+			atomic_inc(&p->strace->nr_drops);
+			return NULL;
+		}
+		// TODO: could we allocb and then write that block?
+		// Still, if we're tracing, we take a hit, and this is so
+		// much more efficient than strace it's not clear we care.
+		trace = kmalloc(SYSTR_BUF_SZ, 0);
+
+		if (!trace) {
+			atomic_inc(&p->strace->nr_drops);
+			return NULL;
+		}
+		/* Avoiding the atomic op.  We sacrifice accuracy for less overhead. */
+		p->strace->appx_nr_sysc++;
+
+		int coreid, vcoreid;
+		struct proc *p = current;
+
+		coreid = core_id();
+		vcoreid = proc_get_vcoreid(p);
+
+		// TODO: functionalize this, if we decide this
+		// approach is OK.
+		trace->start_timestamp = read_tsc();
+		trace->end_timestamp = 0;
+		trace->syscallno = sysc->num;
+		trace->arg0 = sysc->arg0;
+		trace->arg1 = sysc->arg1;
+		trace->arg2 = sysc->arg2;
+		trace->arg3 = sysc->arg3;
+		trace->arg4 = sysc->arg4;
+		trace->arg5 = sysc->arg5;
+		trace->pid = p->pid;
+		trace->coreid = coreid;
+		trace->vcoreid = vcoreid;
+		trace->pretty_buf = (char*)trace + sizeof(struct systrace_record);
+		trace->datalen = 0;
+		trace->data[0] = 0;
+		switch (sysc->num) {
+		case SYS_write:
+			cp = sysc->arg1;
+			datalen = sysc->arg2;
+			break;
+		case SYS_openat:
+			cp = sysc->arg1;
+			datalen = sysc->arg2;
+			break;
+		}
+	} else {
+		trace->end_timestamp = read_tsc();
+		trace->retval = retval;
+		switch (trace->syscallno) {
+		case SYS_read:
+			cp = trace->arg1;
+			datalen = retval < 0 ? 0 : retval;
+			break;
+		}
+	}
+
+	trace->datalen = MIN(sizeof(trace->data), datalen);
+	memmove(trace->data, (void *)cp, trace->datalen);
+	n = systrace_fill_pretty_buf(trace);
+	qiwrite(p->strace->q, trace->pretty_buf, n);
+	return trace;
 }
 
 static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
@@ -96,6 +178,12 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 	int coreid, vcoreid;
 	struct proc *p = current;
 
+	if (p->strace_on)
+		kthread->strace = sctrace(NULL, p, sysc, 0);
+	else
+		kthread->strace = 0;
+
+	/* TODO: merge these two types of tracing, or just remove this old one */
 	if (!__trace_this_proc(p))
 		return;
 	assert(!kthread->trace);	/* catch memory leaks */
@@ -133,6 +221,7 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 {
 	struct systrace_record *trace = kthread->trace;
 	size_t pretty_len;
+
 	if (trace) {
 		trace->end_timestamp = read_tsc();
 		trace->retval = retval;
@@ -142,6 +231,12 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 		if (systrace_flags & SYSTRACE_LOUD)
 			printk("EXIT %s", trace->pretty_buf);
 		kfree(trace);
+	}
+	/* TODO: merge with or remove the old tracer */
+	if (kthread->strace) {
+		sctrace(kthread->strace, current, 0, retval);
+		kfree(kthread->strace);
+		kthread->strace = 0;
 	}
 }
 
@@ -260,6 +355,7 @@ void set_errstr(const char *fmt, ...)
 {
 	va_list ap;
 
+	assert(fmt);
 	va_start(ap, fmt);
 	vset_errstr(fmt, ap);
 	va_end(ap);
@@ -279,8 +375,9 @@ void set_error(int error, const char *fmt, ...)
 
 	set_errno(error);
 
+	assert(fmt);
 	va_start(ap, fmt);
-	vset_errstr(fmt != NULL ? fmt: errno_to_string(error), ap);
+	vset_errstr(fmt, ap);
 	va_end(ap);
 }
 
@@ -560,6 +657,19 @@ static pid_t sys_getpid(struct proc *p)
 	return p->pid;
 }
 
+/* Helper for proc_create and fork */
+static void inherit_strace(struct proc *parent, struct proc *child)
+{
+	if (parent->strace && parent->strace_inherit) {
+		/* Refcnt on both, put in the child's ->strace. */
+		kref_get(&parent->strace->users, 1);
+		kref_get(&parent->strace->procs, 1);
+		child->strace = parent->strace;
+		child->strace_on = TRUE;
+		child->strace_inherit = TRUE;
+	}
+}
+
 /* Creates a process from the file 'path'.  The process is not runnable by
  * default, so it needs it's status to be changed so that the next call to
  * schedule() will try to run it. */
@@ -609,6 +719,7 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 		set_errstr("Failed to alloc new proc");
 		goto error_proc_alloc;
 	}
+	inherit_strace(p, new_p);
 	/* close the CLOEXEC ones, even though this isn't really an exec */
 	close_fdt(&new_p->open_files, TRUE);
 	/* Load the elf. */
@@ -759,6 +870,8 @@ static ssize_t sys_fork(env_t* e)
 	/* Copy some state from the original proc into the new proc. */
 	env->heap_top = e->heap_top;
 	env->env_flags = e->env_flags;
+
+	inherit_strace(e, env);
 
 	/* In general, a forked process should be a fresh process, and we copy over
 	 * whatever stuff is needed between procinfo/procdata. */
@@ -1271,12 +1384,65 @@ static int sys_change_to_m(struct proc *p)
 	return retval;
 }
 
+/* Assists the user/2LS by atomically running *ctx and leaving vcore context.
+ * Normally, the user can do this themselves, but x86 VM contexts need kernel
+ * support.  The caller ought to be in vcore context, and if a notif is pending,
+ * then the calling vcore will restart in a fresh VC ctx (as if it was notified
+ * or did a sys_vc_entry).
+ *
+ * Note that this will set the TLS too, which is part of the context.  Parlib's
+ * pop_user_ctx currently does *not* do this, since the TLS is managed
+ * separately.  If you want to use this syscall for testing, you'll need to 0
+ * out fsbase and conditionally write_msr in proc_pop_ctx(). */
+static int sys_pop_ctx(struct proc *p, struct user_context *ctx)
+{
+	int pcoreid = core_id();
+	struct per_cpu_info *pcpui = &per_cpu_info[pcoreid];
+	int vcoreid = pcpui->owning_vcoreid;
+	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
+
+	/* With change_to, there's a bunch of concerns about changing the vcore map,
+	 * since the kernel may have already locked and sent preempts, deaths, etc.
+	 *
+	 * In this case, we don't care as much.  Other than notif_pending and
+	 * notif_disabled, it's more like we're just changing a few registers in
+	 * cur_ctx.  We can safely order-after any kernel messages or other changes,
+	 * as if the user had done all of the changes we'll make and then did a
+	 * no-op syscall.
+	 *
+	 * Since we are mucking with current_ctx, it is important that we don't
+	 * block before or during this syscall. */
+	arch_finalize_ctx(pcpui->cur_ctx);
+	if (copy_from_user(pcpui->cur_ctx, ctx, sizeof(struct user_context))) {
+		/* The 2LS isn't really in a position to handle errors.  At the very
+		 * least, we can print something and give them a fresh vc ctx. */
+		printk("[kernel] unable to copy user_ctx, 2LS bug\n");
+		memset(pcpui->cur_ctx, 0, sizeof(struct user_context));
+		proc_init_ctx(pcpui->cur_ctx, vcoreid, vcpd->vcore_entry,
+		              vcpd->vcore_stack, vcpd->vcore_tls_desc);
+		return -1;
+	}
+	proc_secure_ctx(pcpui->cur_ctx);
+	/* The caller leaves vcore context no matter what.  We'll put them back in
+	 * if they missed a message. */
+	vcpd->notif_disabled = FALSE;
+	wrmb();	/* order disabled write before pending read */
+	if (vcpd->notif_pending)
+		send_kernel_message(pcoreid, __notify, (long)p, 0, 0, KMSG_ROUTINE);
+	return 0;
+}
+
 /* Initializes a process to run virtual machine contexts, returning the number
  * initialized, optionally setting errno */
-static int sys_setup_vmm(struct proc *p, unsigned int nr_guest_pcores,
-                         int flags)
+static int sys_vmm_setup(struct proc *p, unsigned int nr_guest_pcores,
+                         struct vmm_gpcore_init *gpcis, int flags)
 {
-	return vmm_struct_init(p, nr_guest_pcores, flags);
+	return vmm_struct_init(p, nr_guest_pcores, gpcis, flags);
+}
+
+static int sys_vmm_poke_guest(struct proc *p, int guest_pcoreid)
+{
+	return vmm_poke_guest(p, guest_pcoreid);
 }
 
 /* Pokes the ksched for the given resource for target_pid.  If the target pid
@@ -1773,7 +1939,7 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 
 	if (symname){
 		copy_amt = strnlen(symname, buf_l - 1) + 1;
-		if (! memcpy_to_user_errno(p, u_buf, symname, copy_amt))
+		if (!memcpy_to_user_errno(p, u_buf, symname, copy_amt))
 			ret = copy_amt - 1;
 	}
 	if (path_d)
@@ -2113,7 +2279,7 @@ static int vfs_wstat(struct file *file, uint8_t *stat_m, size_t stat_sz,
 	dir = kzmalloc(sizeof(struct dir) + stat_sz, KMALLOC_WAIT);
 	m_sz = convM2D(stat_m, stat_sz, &dir[0], (char*)&dir[1]);
 	if (m_sz != stat_sz) {
-		set_error(EINVAL, NULL);
+		set_error(EINVAL, ERROR_FIXME);
 		kfree(dir);
 		return -1;
 	}
@@ -2274,7 +2440,7 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 	}
 
 	mlen = convD2M(&dir, mbuf, sizeof(mbuf));
-	if (! mlen) {
+	if (!mlen) {
 		printk("convD2M failed\n");
 		set_errno(EINVAL);
 		goto done;
@@ -2421,12 +2587,14 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_init_arsc] = {(syscall_t)sys_init_arsc, "init_arsc"},
 #endif
 	[SYS_change_to_m] = {(syscall_t)sys_change_to_m, "change_to_m"},
-	[SYS_setup_vmm] = {(syscall_t)sys_setup_vmm, "setup_vmm"},
+	[SYS_vmm_setup] = {(syscall_t)sys_vmm_setup, "vmm_setup"},
+	[SYS_vmm_poke_guest] = {(syscall_t)sys_vmm_poke_guest, "vmm_poke_guest"},
 	[SYS_poke_ksched] = {(syscall_t)sys_poke_ksched, "poke_ksched"},
 	[SYS_abort_sysc] = {(syscall_t)sys_abort_sysc, "abort_sysc"},
 	[SYS_abort_sysc_fd] = {(syscall_t)sys_abort_sysc_fd, "abort_sysc_fd"},
 	[SYS_populate_va] = {(syscall_t)sys_populate_va, "populate_va"},
 	[SYS_nanosleep] = {(syscall_t)sys_nanosleep, "nanosleep"},
+	[SYS_pop_ctx] = {(syscall_t)sys_pop_ctx, "pop_ctx"},
 
 	[SYS_read] = {(syscall_t)sys_read, "read"},
 	[SYS_write] = {(syscall_t)sys_write, "write"},
@@ -2466,6 +2634,7 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_tap_fds] = {(syscall_t)sys_tap_fds, "tap_fds"},
 };
 const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
+
 /* Executes the given syscall.
  *
  * Note tf is passed in, which points to the tf of the context on the kernel
@@ -2517,8 +2686,8 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 void run_local_syscall(struct syscall *sysc)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct proc *p = pcpui->cur_proc;
 
-	assert(irq_is_enabled());	/* in case we proc destroy */
 	/* In lieu of pinning, we just check the sysc and will PF on the user addr
 	 * later (if the addr was unmapped).  Which is the plan for all UMEM. */
 	if (!is_user_rwaddr(sysc, sizeof(struct syscall))) {

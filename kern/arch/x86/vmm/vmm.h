@@ -14,7 +14,23 @@ static inline int cpu_has_svm(const char **msg)
 	return 0;
 }
 
+#define VMM_VMEXIT_NR_TYPES		65
+
+struct guest_pcore {
+	int cpu;
+	struct proc *proc;
+	unsigned long *posted_irq_desc;
+	struct msr_autoload {
+		unsigned nr;
+		struct vmx_msr_entry guest[NR_AUTOLOAD_MSRS];
+		struct vmx_msr_entry host[NR_AUTOLOAD_MSRS];
+	} msr_autoload;
+	struct vmcs *vmcs;
+	uint64_t xcr0;
+};
+
 struct vmm {
+	spinlock_t lock;	/* protects guest_pcore assignment */
 	qlock_t qlock;
 	// always false.
 	int amd;
@@ -36,23 +52,32 @@ struct vmm {
 	// installed would GPF on a K7.
 	union {
 		void *svm;
-		struct vmx_vcpu **guest_pcores;
+		struct guest_pcore **guest_pcores;
 	};
-	unsigned long vmexits[65];	/* TODO: use a #define from a header */
+	unsigned long vmexits[VMM_VMEXIT_NR_TYPES];
 };
 
 void vmm_init(void);
 void vmm_pcpu_init(void);
 
-int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores, int flags);
+int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores,
+                    struct vmm_gpcore_init *gpcis, int flags);
 void __vmm_struct_cleanup(struct proc *p);
+int vmm_poke_guest(struct proc *p, int guest_pcoreid);
 
-int vm_post_interrupt(struct vmctl *v);
-int vm_run(struct vmctl *);
 int intel_vmx_start(int id);
 int intel_vmx_setup(int nvmcs);
 
-struct vmx_vcpu *vmx_create_vcpu(struct proc *p);
-void vmx_destroy_vcpu(struct vmx_vcpu *vcpu);
+struct guest_pcore *create_guest_pcore(struct proc *p,
+                                       struct vmm_gpcore_init *gpci);
+void destroy_guest_pcore(struct guest_pcore *vcpu);
 uint64_t construct_eptp(physaddr_t root_hpa);
 void ept_flush(uint64_t eptp);
+
+struct guest_pcore *lookup_guest_pcore(struct proc *p, int guest_pcoreid);
+struct guest_pcore *load_guest_pcore(struct proc *p, int guest_pcoreid);
+void unload_guest_pcore(struct proc *p, int guest_pcoreid);
+
+#define VMM_MSR_EMU_READ		1
+#define VMM_MSR_EMU_WRITE		2
+bool vmm_emulate_msr(uint64_t *rcx, uint64_t *rdx, uint64_t *rax, int op);

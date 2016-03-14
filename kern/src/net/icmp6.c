@@ -26,18 +26,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE. */
 
-#include <vfs.h>
-#include <kfs.h>
-#include <slab.h>
 #include <kmalloc.h>
-#include <kref.h>
 #include <string.h>
 #include <stdio.h>
-#include <assert.h>
+#include <syscall.h>
 #include <error.h>
-#include <cpio.h>
-#include <pmap.h>
-#include <smp.h>
 #include <ip.h>
 
 struct ICMPpkt {
@@ -52,10 +45,6 @@ struct ICMPpkt {
  * We have been naming the struct
  * members and just using the extra level of deref
  * e.g. i->x becomes i->i6->x.
- * I'm going to use insert the structs into
- * this because it's just a lot easier, and
- * maybe someday gcc will grow up and me more
- * like Plan 9 C.
  */
 struct IPICMP {
 /*
@@ -343,19 +332,14 @@ static void icmpkick6(void *x, struct block *bp)
 	ipoput6(c->p->f, bp, 0, c->ttl, c->tos, NULL);
 }
 
-char *icmpctl6(struct conv *c, char **argv, int argc)
+static void icmpctl6(struct conv *c, char **argv, int argc)
 {
-	Icmpcb6 *icb;
+	Icmpcb6 *icb = (Icmpcb6*)c->ptcl;
 
-	icb = (Icmpcb6 *) c->ptcl;
-
-	if (argc == 1) {
-		if (strcmp(argv[0], "headers") == 0) {
-			icb->headers = 6;
-			return NULL;
-		}
-	}
-	return "unknown control request";
+	if ((argc == 1) && strcmp(argv[0], "headers") == 0)
+		icb->headers = 6;
+	else
+		error(EINVAL, "unknown command to icmpctl6");
 }
 
 static void goticmpkt6(struct Proto *icmp, struct block *bp, int muxkey)
@@ -401,14 +385,15 @@ static struct block *mkechoreply6(struct block *bp)
 
 /*
  * sends out an ICMPv6 neighbor solicitation
- * 	suni == SRC_UNSPEC or SRC_UNI, 
+ * 	suni == SRC_UNSPEC or SRC_UNI,
  *	tuni == TARG_MULTI => multicast for address resolution,
  * 	and tuni == TARG_UNI => neighbor reachability.
  */
 
-extern void
-icmpns(struct Fs *f, uint8_t * src, int suni, uint8_t * targ, int tuni,
-	   uint8_t * mac)
+void icmpns(struct Fs *f,
+            uint8_t *src, int suni,
+            uint8_t *targ, int tuni,
+            uint8_t *mac)
 {
 	struct block *nbp;
 	struct Ndpkt *np;
@@ -452,9 +437,8 @@ icmpns(struct Fs *f, uint8_t * src, int suni, uint8_t * targ, int tuni,
 /*
  * sends out an ICMPv6 neighbor advertisement. pktflags == RSO flags.
  */
-extern void
-icmpna(struct Fs *f, uint8_t * src, uint8_t * dst, uint8_t * targ,
-	   uint8_t * mac, uint8_t flags)
+void icmpna(struct Fs *f, uint8_t * src, uint8_t * dst, uint8_t * targ,
+            uint8_t * mac, uint8_t flags)
 {
 	struct block *nbp;
 	struct Ndpkt *np;
@@ -485,9 +469,8 @@ icmpna(struct Fs *f, uint8_t * src, uint8_t * dst, uint8_t * targ,
 	ipoput6(f, nbp, 0, MAXTTL, DFLTTOS, NULL);
 }
 
-extern void
-icmphostunr(struct Fs *f, struct Ipifc *ifc,
-			struct block *bp, int code, int free)
+void icmphostunr(struct Fs *f, struct Ipifc *ifc,
+                 struct block *bp, int code, int free)
 {
 	struct block *nbp;
 	struct IPICMP *np;
@@ -535,7 +518,7 @@ freebl:
 		freeblist(bp);
 }
 
-extern void icmpttlexceeded6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
+void icmpttlexceeded6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 {
 	struct block *nbp;
 	struct IPICMP *np;
@@ -555,10 +538,10 @@ extern void icmpttlexceeded6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 
 	if (ipv6anylocal(ifc, np->src)) {
 		netlog(f, Logicmp, "send icmpttlexceeded6 -> s%I d%I\n", p->src,
-			   p->dst);
+		       p->dst);
 	} else {
 		netlog(f, Logicmp, "icmpttlexceeded6 fail -> s%I d%I\n", p->src,
-			   p->dst);
+		       p->dst);
 		return;
 	}
 
@@ -566,7 +549,7 @@ extern void icmpttlexceeded6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 	np->type = TimeExceedV6;
 	np->code = 0;
 	memmove(nbp->rp + sizeof(struct IPICMP), bp->rp,
-			sz - sizeof(struct IPICMP));
+	        sz - sizeof(struct IPICMP));
 	set_cksum(nbp);
 	np->ttl = HOP_LIMIT;
 	np->vcf[0] = 0x06 << 4;
@@ -574,7 +557,7 @@ extern void icmpttlexceeded6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 	ipoput6(f, nbp, 0, MAXTTL, DFLTTOS, NULL);
 }
 
-extern void icmppkttoobig6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
+void icmppkttoobig6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 {
 	struct block *nbp;
 	struct IPICMP *np;
@@ -592,12 +575,11 @@ extern void icmppkttoobig6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 	nbp = newIPICMP(sz);
 	np = (struct IPICMP *)nbp->rp;
 
-	if (ipv6anylocal(ifc, np->src)) {
-		netlog(f, Logicmp, "send icmppkttoobig6 -> s%I d%I\n", p->src, p->dst);
-	} else {
+	if (!ipv6anylocal(ifc, np->src)) {
 		netlog(f, Logicmp, "icmppkttoobig6 fail -> s%I d%I\n", p->src, p->dst);
 		return;
 	}
+	netlog(f, Logicmp, "send icmppkttoobig6 -> s%I d%I\n", p->src, p->dst);
 
 	memmove(np->dst, p->src, IPaddrlen);
 	np->type = PacketTooBigV6;
@@ -615,9 +597,8 @@ extern void icmppkttoobig6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 /*
  * RFC 2461, pages 39-40, pages 57-58.
  */
-static int
-valid(struct Proto *icmp, struct Ipifc *ifc,
-	  struct block *bp, Icmppriv6 * ipriv)
+static int valid(struct Proto *icmp, struct Ipifc *ifc,
+                 struct block *bp, Icmppriv6 * ipriv)
 {
 	int sz, osz, unsp, n, ttl, iplen;
 	int pktsz = BLEN(bp);
@@ -851,7 +832,7 @@ static void icmpiput6(struct Proto *icmp, struct Ipifc *ipifc, struct block *bp)
 
 		case RouterAdvert:
 		case RouterSolicit:
-			/* using lsrc as a temp, munge hdr for goticmp6 
+			/* using lsrc as a temp, munge hdr for goticmp6
 			   memmove(lsrc, p->src, IPaddrlen);
 			   memmove(p->src, p->dst, IPaddrlen);
 			   memmove(p->dst, lsrc, IPaddrlen); */
@@ -895,10 +876,10 @@ static void icmpiput6(struct Proto *icmp, struct Ipifc *ipifc, struct block *bp)
 		case NbrAdvert:
 			np = (struct Ndpkt *)p;
 
-			/* if the target address matches one of the local interface 
-			 * address and the local interface address has tentative bit set, 
-			 * then insert into ARP table. this is so the duplication address 
-			 * detection part of ipconfig can discover duplication through 
+			/* if the target address matches one of the local interface
+			 * address and the local interface address has tentative bit set,
+			 * then insert into ARP table. this is so the duplication address
+			 * detection part of ipconfig can discover duplication through
 			 * the arp table
 			 */
 			lifc = iplocalonifc(ipifc, np->target);
@@ -937,17 +918,16 @@ int icmpstats6(struct Proto *icmp6, char *buf, int len)
 		if (icmpnames6[i])
 			p = seprintf(p, e, "%s: %u %u\n", icmpnames6[i], priv->in[i],
 						 priv->out[i]);
-/*		else
+		else
 			p = seprintf(p, e, "%d: %u %u\n", i, priv->in[i], priv->out[i]);
-*/
 	}
 	return p - buf;
 }
 
 // need to import from icmp.c
 extern int icmpstate(struct conv *c, char *state, int n);
-extern char *icmpannounce(struct conv *c, char **argv, int argc);
-extern char *icmpconnect(struct conv *c, char **argv, int argc);
+extern void icmpannounce(struct conv *c, char **argv, int argc);
+extern void icmpconnect(struct conv *c, char **argv, int argc);
 extern void icmpclose(struct conv *c);
 
 void icmp6newconv(struct Proto *icmp6, struct conv *conv)

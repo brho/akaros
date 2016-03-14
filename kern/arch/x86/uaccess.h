@@ -16,9 +16,8 @@
 #include <compiler.h>
 #include <stdint.h>
 #include <umem.h>
+#include <arch/fixup.h>
 
-#define ASM_STAC
-#define ASM_CLAC
 #define __m(x) *(x)
 
 struct extable_ip_fixup {
@@ -26,25 +25,18 @@ struct extable_ip_fixup {
 	uint64_t fixup;
 };
 
-#define _ASM_EXTABLE(from, to)									\
-	" .pushsection \"__ex_table\",\"a\"\n"						\
-	" .balign 16\n"												\
-	" .quad (" #from ") - .\n"									\
-	" .quad (" #to ") - .\n"									\
-	" .popsection\n"
-
 #define __read_msr_asm(eax, edx, addr, err, errret)						\
 	asm volatile(ASM_STAC "\n"											\
-				 "1:		rdmsr\n"									\
-				 "			mfence\n"									\
-				 "2: " ASM_CLAC "\n"									\
-				 ".section .fixup,\"ax\"\n"								\
-				 "3:		mov %4,%0\n"								\
-				 "	jmp 2b\n"											\
-				 ".previous\n"											\
-				 _ASM_EXTABLE(1b, 3b)									\
-				 : "=r" (err), "=d" (edx), "=a" (eax)					\
-				 : "c" (addr), "i" (errret), "0" (err))
+	             "1:		rdmsr\n"									\
+	             "			mfence\n"									\
+	             "2: " ASM_CLAC "\n"									\
+	             ".section .fixup,\"ax\"\n"								\
+	             "3:		mov %4,%0\n"								\
+	             "	jmp 2b\n"											\
+	             ".previous\n"											\
+	             _ASM_EXTABLE(1b, 3b)									\
+	             : "=r" (err), "=d" (edx), "=a" (eax)					\
+	             : "c" (addr), "i" (errret), "0" (err))
 
 #define __write_msr_asm(val, addr, err, errret)							\
 	asm volatile(ASM_STAC "\n"											\
@@ -106,19 +98,19 @@ static inline int __put_user(void *dst, const void *src, unsigned int count)
 	switch (count) {
 	case 1:
 		__put_user_asm(*(const uint8_t *) src, (uint8_t *) dst, err, "b",
-					   "b", "iq", -EFAULT);
+		               "b", "iq", -EFAULT);
 		break;
 	case 2:
 		__put_user_asm(*(const uint16_t *) src, (uint16_t *) dst, err, "w",
-					   "w", "ir", -EFAULT);
+		               "w", "ir", -EFAULT);
 		break;
 	case 4:
 		__put_user_asm(*(const uint32_t *) src, (uint32_t *) dst, err, "l",
-					   "k", "ir", -EFAULT);
+		               "k", "ir", -EFAULT);
 		break;
 	case 8:
 		__put_user_asm(*(const uint64_t *) src, (uint64_t *) dst, err, "q",
-					   "", "er", -EFAULT);
+		               "", "er", -EFAULT);
 		break;
 	default:
 		__user_memcpy(dst, src, count, err, -EFAULT);
@@ -149,19 +141,19 @@ static inline int __get_user(void *dst, const void *src, unsigned int count)
 	switch (count) {
 	case 1:
 		__get_user_asm(*(uint8_t *) dst, (const uint8_t *) src, err, "b",
-					   "b", "=q", -EFAULT);
+		               "b", "=q", -EFAULT);
 		break;
 	case 2:
 		__get_user_asm(*(uint16_t *) dst, (const uint16_t *) src, err, "w",
-					   "w", "=r", -EFAULT);
+		               "w", "=r", -EFAULT);
 		break;
 	case 4:
 		__get_user_asm(*(uint32_t *) dst, (const uint32_t *) src, err, "l",
-					   "k", "=r", -EFAULT);
+		               "k", "=r", -EFAULT);
 		break;
 	case 8:
 		__get_user_asm(*(uint64_t *) dst, (const uint64_t *) src, err, "q",
-					   "", "=r", -EFAULT);
+		               "", "=r", -EFAULT);
 		break;
 	default:
 		__user_memcpy(dst, src, count, err, -EFAULT);
@@ -171,7 +163,7 @@ static inline int __get_user(void *dst, const void *src, unsigned int count)
 }
 
 static inline int copy_from_user(void *dst, const void *src,
-								 unsigned int count)
+                                 unsigned int count)
 {
 	int err = 0;
 

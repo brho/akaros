@@ -22,14 +22,13 @@
 #include <arch/ioapic.h>
 #include <arch/topology.h>
 
-extern struct Madt *apics;
-
 int mpacpi(int ncleft)
 {
 	char *already;
 	int np, bp;
 	struct apic *apic;
 	struct Apicst *st;
+	struct Madt *mt;
 
 	/* If we don't have an mpisabusno yet, it's because the MP tables failed to
 	 * parse.  So we'll just take the last one available.  I think we're
@@ -41,12 +40,16 @@ int mpacpi(int ncleft)
 
 	if (apics == NULL)
 		return ncleft;
+	mt = apics->tbl;
+	if (mt == NULL)
+		return ncleft;
 
 	printd("APIC lapic paddr %#.8llux, flags %#.8ux\n",
-		   apics->lapicpa, apics->pcat);
+		   mt->lapicpa, mt->pcat);
 	np = 0;
 	printd("apics->st %p\n", apics->st);
-	for (st = apics->st; st != NULL; st = st->next) {
+	for (int i = 0; i < apics->nchildren; i++) {
+		st = apics->children[i]->tbl;
 		already = "";
 		switch (st->type) {
 			case ASlapic:
@@ -60,7 +63,7 @@ int mpacpi(int ncleft)
 					already = "(mp)";
 				} else if (ncleft != 0) {
 					ncleft--;
-					apicinit(st->lapic.id, apics->lapicpa, bp);
+					apicinit(st->lapic.id, mt->lapicpa, bp);
 				} else
 					already = "(off)";
 

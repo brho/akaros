@@ -16,6 +16,7 @@
 #include <parlib/event.h>
 #include <parlib/ucq.h>
 #include <parlib/signal.h>
+#include <parlib/arch/trap.h>
 
 struct pthread_queue ready_queue = TAILQ_HEAD_INITIALIZER(ready_queue);
 struct pthread_queue active_queue = TAILQ_HEAD_INITIALIZER(active_queue);
@@ -41,8 +42,8 @@ static void pth_thread_runnable(struct uthread *uthread);
 static void pth_thread_paused(struct uthread *uthread);
 static void pth_thread_blockon_sysc(struct uthread *uthread, void *sysc);
 static void pth_thread_has_blocked(struct uthread *uthread, int flags);
-static void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
-                                  unsigned int err, unsigned long aux);
+static void pth_thread_refl_fault(struct uthread *uth,
+                                  struct user_context *ctx);
 
 /* Event Handlers */
 static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
@@ -304,38 +305,48 @@ static void handle_page_fault(struct uthread *uthread, unsigned int err,
 	}
 }
 
-static void pth_thread_refl_fault(struct uthread *uthread, unsigned int trap_nr,
-                                  unsigned int err, unsigned long aux)
+static void pth_thread_refl_hw_fault(struct uthread *uthread,
+                                     unsigned int trap_nr,
+                                     unsigned int err, unsigned long aux)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 
 	__pthread_generic_yield(pthread);
 	pthread->state = PTH_BLK_SYSC;
 
-	/* TODO: RISCV/x86 issue! (0 is divby0, 14 is PF, etc) */
-#if defined(__i386__) || defined(__x86_64__) 
-	switch(trap_nr) {
-		case 0:
-			handle_div_by_zero(uthread, err, aux);
-			break;
-		case 13:
-			handle_gp_fault(uthread, err, aux);
-			break;
-		case 14:
-			handle_page_fault(uthread, err, aux);
-			break;
-		default:
-			printf("Pthread has unhandled fault: %d, err: %d, aux: %p\n",
-			       trap_nr, err, aux);
-			/* Note that uthread.c already copied out our ctx into the uth
-			 * struct */
-			print_user_context(&uthread->u_ctx);
-			printf("Turn on printx to spew unhandled, malignant trap info\n");
-			exit(-1);
+	switch (trap_nr) {
+	case HW_TRAP_DIV_ZERO:
+		handle_div_by_zero(uthread, err, aux);
+		break;
+	case HW_TRAP_GP_FAULT:
+		handle_gp_fault(uthread, err, aux);
+		break;
+	case HW_TRAP_PAGE_FAULT:
+		handle_page_fault(uthread, err, aux);
+		break;
+	default:
+		printf("Pthread has unhandled fault: %d, err: %d, aux: %p\n",
+		       trap_nr, err, aux);
+		/* Note that uthread.c already copied out our ctx into the uth
+		 * struct */
+		print_user_context(&uthread->u_ctx);
+		printf("Turn on printx to spew unhandled, malignant trap info\n");
+		exit(-1);
 	}
-#else
-	#error "Handling hardware faults is currently only supported on x86"
-#endif
+}
+
+static void pth_thread_refl_fault(struct uthread *uth,
+                                  struct user_context *ctx)
+{
+	switch (ctx->type) {
+	case ROS_HW_CTX:
+		pth_thread_refl_hw_fault(uth, __arch_refl_get_nr(ctx),
+		                         __arch_refl_get_err(ctx),
+		                         __arch_refl_get_aux(ctx));
+		break;
+	default:
+		assert(0);
+	}
 }
 
 /* Akaros pthread extensions / hacks */

@@ -15,6 +15,7 @@ config BNX2X_SRIOV
 config MLX4_EN
 	tristate "Mellanox Technologies 1/10/40Gbit Ethernet support"
 	select MLX4_CORE
+	select MLX4_INFINIBAND
 	help
 		This driver supports Mellanox Technologies ConnectX Ethernet
 		devices.
@@ -29,3 +30,7 @@ config MLX4_DEFAULT_MGM_LOG_ENTRY_SIZE
 	default 10
 	help
 		To activate device managed flow steering when available, set to -1.
+
+config MLX4_INFINIBAND
+	tristate
+	default n

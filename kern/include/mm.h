@@ -84,4 +84,5 @@ int unmap_vmap_segment(uintptr_t vaddr, unsigned long num_pages);
 /* Helper wrappers, since no one will probably call the *_segment funcs */
 uintptr_t vmap_pmem(uintptr_t paddr, size_t nr_bytes);
 uintptr_t vmap_pmem_nocache(uintptr_t paddr, size_t nr_bytes);
+uintptr_t vmap_pmem_writecomb(uintptr_t paddr, size_t nr_bytes);
 int vunmap_vmem(uintptr_t vaddr, size_t nr_bytes);

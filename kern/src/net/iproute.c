@@ -839,7 +839,7 @@ long routewrite(struct Fs *f, struct chan *c, char *p, int n)
 			}
 	} else if (strcmp(cb->f[0], "remove") == 0) {
 		if (cb->nf < 3)
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 		parseip(addr, cb->f[1]);
 		parseipmask(mask, cb->f[2]);
 		if (memcmp(addr, v4prefix, IPv4off) == 0)
@@ -848,7 +848,7 @@ long routewrite(struct Fs *f, struct chan *c, char *p, int n)
 			v6delroute(f, addr, mask, 1);
 	} else if (strcmp(cb->f[0], "add") == 0) {
 		if (cb->nf < 4)
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 		parseip(addr, cb->f[1]);
 		parseipmask(mask, cb->f[2]);
 		parseip(gate, cb->f[3]);
@@ -864,7 +864,7 @@ long routewrite(struct Fs *f, struct chan *c, char *p, int n)
 			v6addroute(f, tag, addr, mask, gate, 0);
 	} else if (strcmp(cb->f[0], "tag") == 0) {
 		if (cb->nf < 2)
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 
 		a = c->aux;
 		na = newipaux(a->owner, cb->f[1]);

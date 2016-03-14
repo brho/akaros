@@ -71,6 +71,7 @@ static spinlock_t ktrace_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 static struct circular_buffer ktrace_data;
 static char ktrace_buffer[KTRACE_BUFFER_SIZE];
 static int kprof_timer_period = 1000;
+static char kprof_control_usage[128];
 
 static size_t mpstat_len(void)
 {
@@ -106,7 +107,7 @@ static void kprof_alarm_handler(struct alarm_waiter *waiter,
 static struct chan *kprof_attach(char *spec)
 {
 	if (!kprof.alarms)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 
 	return devattach(devname(), spec);
 }
@@ -167,11 +168,11 @@ static void kprof_fetch_profiler_data(void)
 	char *ndata = krealloc(kprof.pdata, psize, KMALLOC_WAIT);
 
 	if (!ndata)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	kprof.pdata = ndata;
 	while (kprof.psize < psize) {
 		size_t csize = profiler_read(kprof.pdata + kprof.psize,
-									 psize - kprof.psize);
+		                             psize - kprof.psize);
 
 		if (csize == 0)
 			break;
@@ -229,9 +230,9 @@ static void kprof_init(void)
 	kprof.psize = 0;
 
 	kprof.alarms = kzmalloc(sizeof(struct alarm_waiter) * num_cores,
-							KMALLOC_WAIT);
+	                        KMALLOC_WAIT);
 	if (!kprof.alarms)
-		error(ENOMEM, NULL);
+		error(ENOMEM, ERROR_FIXME);
 	if (waserror()) {
 		kfree(kprof.alarms);
 		kprof.alarms = NULL;
@@ -246,6 +247,11 @@ static void kprof_init(void)
 	kprof.mpstat_ipi = TRUE;
 	kproftab[Kmpstatqid].length = mpstat_len();
 	kproftab[Kmpstatrawqid].length = mpstatraw_len();
+
+	strlcpy(kprof_control_usage, "clear|start|stop|flush|timer",
+	        sizeof(kprof_control_usage));
+	profiler_append_configure_usage(kprof_control_usage,
+	                                sizeof(kprof_control_usage));
 
 	poperror();
 }
@@ -267,7 +273,7 @@ static void kprofclear(void)
 }
 
 static struct walkqid *kprof_walk(struct chan *c, struct chan *nc, char **name,
-								 int nname)
+                                  int nname)
 {
 	return devwalk(c, nc, name, nname, kproftab, ARRAY_SIZE(kproftab), devgen);
 }
@@ -303,7 +309,7 @@ static struct chan *kprof_open(struct chan *c, int omode)
 {
 	if (c->qid.type & QTDIR) {
 		if (openmode(omode) != O_READ)
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 	}
 	c->mode = openmode(omode);
 	c->flag |= COPEN;
@@ -427,21 +433,6 @@ static void kprof_manage_timer(int coreid, struct cmdbuf *cb)
 	}
 }
 
-static void kprof_usage_fail(void)
-{
-	static const char *ctlstring = "clear|start|stop|flush|timer";
-	const char * const *cmds = profiler_configure_cmds();
-	char msgbuf[128];
-
-	strlcpy(msgbuf, ctlstring, sizeof(msgbuf));
-	for (int i = 0; cmds[i]; i++) {
-		strlcat(msgbuf, "|", sizeof(msgbuf));
-		strlcat(msgbuf, cmds[i], sizeof(msgbuf));
-	}
-
-	error(EFAIL, msgbuf);
-}
-
 static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 {
 	ERRSTACK(1);
@@ -454,7 +445,7 @@ static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 	switch ((int) c->qid.path) {
 	case Kprofctlqid:
 		if (cb->nf < 1)
-			kprof_usage_fail();
+			error(EFAIL, kprof_control_usage);
 		if (profiler_configure(cb))
 			break;
 		if (!strcmp(cb->f[0], "clear")) {
@@ -481,7 +472,7 @@ static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 		} else if (!strcmp(cb->f[0], "stop")) {
 			kprof_stop_profiler();
 		} else {
-			kprof_usage_fail();
+			error(EFAIL, kprof_control_usage);
 		}
 		break;
 	case Kprofdataqid:
@@ -534,7 +525,7 @@ static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 		}
 		break;
 	default:
-		error(EBADFD, NULL);
+		error(EBADFD, ERROR_FIXME);
 	}
 	kfree(cb);
 	poperror();
@@ -563,7 +554,7 @@ void kprof_tracedata_write(const char *pretty_buf, size_t len)
 	spin_lock_irqsave(&ktrace_lock);
 	if (unlikely(!ktrace_init_done)) {
 		circular_buffer_init(&ktrace_data, sizeof(ktrace_buffer),
-							 ktrace_buffer);
+		                     ktrace_buffer);
 		ktrace_init_done = TRUE;
 	}
 	circular_buffer_write(&ktrace_data, pretty_buf, len);
@@ -635,7 +626,7 @@ void trace_vprintk(bool btrace, const char *fmt, va_list args)
 	if (likely(system_timing.tsc_freq))
 		tsc2timespec(read_tsc(), &ts_now);
 	snprintf(hdr, sizeof(hdr), "[%lu.%09lu]:cpu%d: ", ts_now.tv_sec,
-			 ts_now.tv_nsec, core_id_early());
+	         ts_now.tv_nsec, core_id_early());
 
 	pb.ptr = usrbuf + vsnprintf(usrbuf, usr_bufsz, fmt, args);
 	pb.top = usrbuf + usr_bufsz;

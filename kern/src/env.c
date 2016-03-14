@@ -61,6 +61,12 @@ int env_setup_vm(env_t *e)
 		                PGSIZE), (void*)(UDATA + i*PGSIZE), PTE_USER_RW) < 0)
 			goto env_setup_vm_error;
 	}
+	for (int i = 0; i < PROCGINFO_NUM_PAGES; i++) {
+		if (page_insert(e->env_pgdir,
+		                kva2page((void*)&__proc_global_info + i * PGSIZE),
+		                (void*)(UGINFO + i * PGSIZE), PTE_USER_RO) < 0)
+			goto env_setup_vm_error;
+	}
 	/* Finally, set up the Global Shared Data page for all processes.  Can't be
 	 * trusted, but still very useful at this stage for us.  Consider removing
 	 * when we have real processes (TODO). 

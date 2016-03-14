@@ -22,6 +22,8 @@
 #include <env.h>
 #include <trap.h>
 #include <kmalloc.h>
+#include <cpu_feat.h>
+#include <arch/fsgsbase.h>
 
 #include "vmm/vmm.h"
 
@@ -81,7 +83,7 @@ void smp_final_core_init(void)
 	int coreid = get_os_coreid(hw_core_id());
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	pcpui->coreid = coreid;
-	write_msr(MSR_GS_BASE, (uint64_t)pcpui);
+	write_msr(MSR_GS_BASE, (uintptr_t)pcpui);	/* our cr4 isn't set yet */
 	write_msr(MSR_KERN_GS_BASE, (uint64_t)pcpui);
 	/* don't need this for the kernel anymore, but userspace can still use it */
 	setup_rdtscp(coreid);
@@ -261,8 +263,6 @@ uintptr_t smp_main(void)
 
 	apiconline();
 
-	// set a default logical id for now
-	lapic_set_logid(lapic_get_id());
 
 	return my_stack_top; // will be loaded in smp_entry.S
 }
@@ -276,17 +276,34 @@ void __arch_pcpu_init(uint32_t coreid)
 {
 	uintptr_t *my_stack_bot;
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
+	uint32_t eax, edx;
 
 	/* Flushes any potentially old mappings from smp_boot() (note the page table
 	 * removal) */
 	tlbflush();
-	/* Ensure the FPU units are initialized */
-	asm volatile ("fninit");
 
-	/* Enable SSE instructions.  We might have to do more, like masking certain
-	 * flags or exceptions in the MXCSR, or at least handle the SIMD exceptions.
-	 * We don't do it for FP yet either, so YMMV. */
+	if (cpu_has_feat(CPU_FEAT_X86_FSGSBASE))
+		lcr4(rcr4() | CR4_FSGSBASE);
+
+	/*
+	 * Enable SSE instructions.
+	 * CR4.OSFXSR enables SSE and ensures that MXCSR/XMM gets saved with FXSAVE
+	 * CR4.OSXSAVE enables XSAVE instructions. Only set if XSAVEOPT supported.
+	 * CR4.OSXMME indicates OS support for software exception handlers for
+	 * SIMD floating-point exceptions (turn it on to get #XM exceptions
+	 * in the event of a SIMD error instead of #UD exceptions).
+	 */
 	lcr4(rcr4() | CR4_OSFXSR | CR4_OSXMME);
+
+	if (cpu_has_feat(CPU_FEAT_X86_XSAVEOPT)) {
+		// You MUST set CR4.OSXSAVE before loading xcr0
+		lcr4(rcr4() | CR4_OSXSAVE);
+		// Set xcr0 to the Akaros-wide default
+		lxcr0(x86_default_xcr0);
+	}
+
+	// Initialize fpu and extended state by restoring our default XSAVE area.
+	init_fp_state();
 
 	/* core 0 sets up via the global gdt symbol */
 	if (!coreid) {
@@ -298,11 +315,12 @@ void __arch_pcpu_init(uint32_t coreid)
 		pcpui->gdt = (segdesc_t*)(*my_stack_bot +
 		                          sizeof(taskstate_t) + sizeof(pseudodesc_t));
 	}
-	assert(read_msr(MSR_GS_BASE) == (uint64_t)pcpui);
+	assert(read_gsbase() == (uintptr_t)pcpui);
 	assert(read_msr(MSR_KERN_GS_BASE) == (uint64_t)pcpui);
 	/* Don't try setting up til after setting GS */
 	x86_sysenter_init(x86_get_stacktop_tss(pcpui->tss));
 	/* need to init perfctr before potentially using it in timer handler */
 	perfmon_pcpu_init();
 	vmm_pcpu_init();
+	lcr4(rcr4() & ~CR4_TSD);
 }

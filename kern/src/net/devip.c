@@ -51,7 +51,6 @@ enum {
 	Qtopdir = 1,				/* top level directory */
 	Qtopbase,
 	Qarp = Qtopbase,
-	Qbootp,
 	Qndb,
 	Qiproute,
 	Qiprouter,
@@ -193,11 +192,6 @@ static int ip1gen(struct chan *c, int i, struct dir *dp)
 		case Qarp:
 			p = "arp";
 			break;
-		case Qbootp:
-			if (bootp == NULL)
-				return 0;
-			p = "bootp";
-			break;
 		case Qndb:
 			p = "ndb";
 			len = strlen(f->ndb);
@@ -246,7 +240,6 @@ ipgen(struct chan *c, char *unused_char_p_t, struct dirtab *d, int unused_int,
 			s -= f->np;
 			return ip1gen(c, s + Qtopbase, dp);
 		case Qarp:
-		case Qbootp:
 		case Qndb:
 		case Qlog:
 		case Qiproute:
@@ -414,7 +407,7 @@ static struct chan *ipopen(struct chan *c, int omode)
 			break;
 		case Qndb:
 			if (omode & (O_WRITE | O_TRUNC) && !iseve())
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			if ((omode & (O_WRITE | O_TRUNC)) == (O_WRITE | O_TRUNC))
 				f->ndb[0] = 0;
 			break;
@@ -433,18 +426,17 @@ static struct chan *ipopen(struct chan *c, int omode)
 		case Qremote:
 		case Qlocal:
 		case Qstats:
-		case Qbootp:
 		case Qipselftab:
 			if (omode & O_WRITE)
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			break;
 		case Qsnoop:
 			if (omode & O_WRITE)
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			p = f->p[PROTO(c->qid)];
 			cv = p->conv[CONV(c->qid)];
 			if (strcmp(ATTACHER(c), cv->owner) != 0 && !iseve())
-				error(EPERM, NULL);
+				error(EPERM, ERROR_FIXME);
 			atomic_inc(&cv->snoopers);
 			break;
 		case Qclone:
@@ -458,7 +450,7 @@ static struct chan *ipopen(struct chan *c, int omode)
 			qunlock(&p->qlock);
 			poperror();
 			if (cv == NULL) {
-				error(ENODEV, NULL);
+				error(ENODEV, ERROR_FIXME);
 				break;
 			}
 			/* we only honor nonblock on a clone */
@@ -480,9 +472,9 @@ static struct chan *ipopen(struct chan *c, int omode)
 			}
 			if ((perm & (cv->perm >> 6)) != perm) {
 				if (strcmp(ATTACHER(c), cv->owner) != 0)
-					error(EPERM, NULL);
+					error(EPERM, ERROR_FIXME);
 				if ((perm & cv->perm) != perm)
-					error(EPERM, NULL);
+					error(EPERM, ERROR_FIXME);
 
 			}
 			cv->inuse++;
@@ -514,9 +506,9 @@ static struct chan *ipopen(struct chan *c, int omode)
 			}
 			if ((perm & (cv->perm >> 6)) != perm) {
 				if (strcmp(ATTACHER(c), cv->owner) != 0)
-					error(EPERM, NULL);
+					error(EPERM, ERROR_FIXME);
 				if ((perm & cv->perm) != perm)
-					error(EPERM, NULL);
+					error(EPERM, ERROR_FIXME);
 
 			}
 
@@ -589,7 +581,7 @@ static int ipwstat(struct chan *c, uint8_t * dp, int n)
 	f = ipfs[c->dev];
 	switch (TYPE(c->qid)) {
 		default:
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 			break;
 		case Qctl:
 		case Qdata:
@@ -603,11 +595,11 @@ static int ipwstat(struct chan *c, uint8_t * dp, int n)
 	}
 	n = convM2D(dp, n, d, (char *)&d[1]);
 	if (n == 0)
-		error(ENODATA, NULL);
+		error(ENODATA, ERROR_FIXME);
 	p = f->p[PROTO(c->qid)];
 	cv = p->conv[CONV(c->qid)];
 	if (!iseve() && strcmp(ATTACHER(c), cv->owner) != 0)
-		error(EPERM, NULL);
+		error(EPERM, ERROR_FIXME);
 	if (!emptystr(d->uid))
 		kstrdup(&cv->owner, d->uid);
 	if (d->mode != ~0UL)
@@ -748,15 +740,13 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 	p = a;
 	switch (TYPE(ch->qid)) {
 		default:
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 		case Qtopdir:
 		case Qprotodir:
 		case Qconvdir:
 			return devdirread(ch, a, n, 0, 0, ipgen);
 		case Qarp:
 			return arpread(f->arp, a, offset, n);
-		case Qbootp:
-			return bootpread(a, offset, n);
 		case Qndb:
 			return readstr(offset, a, n, f->ndb);
 		case Qiproute:
@@ -858,7 +848,7 @@ static void setladdr(struct conv *c)
 /*
  *  set a local port making sure the quad of raddr,rport,laddr,lport is unique
  */
-static char *setluniqueport(struct conv *c, int lport)
+static void setluniqueport(struct conv *c, int lport)
 {
 	struct Proto *p;
 	struct conv *xp;
@@ -879,12 +869,11 @@ static char *setluniqueport(struct conv *c, int lport)
 			&& ipcmp(xp->raddr, c->raddr) == 0
 			&& ipcmp(xp->laddr, c->laddr) == 0) {
 			qunlock(&p->qlock);
-			return "address in use";
+			error(EFAIL, "address in use");
 		}
 	}
 	c->lport = lport;
 	qunlock(&p->qlock);
-	return NULL;
 }
 
 /*
@@ -916,7 +905,7 @@ static void setlport(struct conv *c)
 				*pp = 600;
 		} else
 			while (*pp < 5000)
-				*pp = nrand(1 << 15);
+				urandom_read(pp, sizeof(*pp));
 
 		found = 0;
 		for (x = 0; x < p->nc; x++) {
@@ -938,14 +927,11 @@ static void setlport(struct conv *c)
  *  set a local address and port from a string of the form
  *	[address!]port[!r]
  */
-static char *setladdrport(struct conv *c, char *str, int announcing)
+static void setladdrport(struct conv *c, char *str, int announcing)
 {
 	char *p;
-	char *rv;
 	uint16_t lport;
 	uint8_t addr[IPaddrlen];
-
-	rv = NULL;
 
 	/*
 	 *  ignore restricted part if it exists.  it's
@@ -973,32 +959,31 @@ static char *setladdrport(struct conv *c, char *str, int announcing)
 			if (ipforme(c->p->f, addr))
 				ipmove(c->laddr, addr);
 			else
-				return "not a local IP address";
+				error(EFAIL, "not a local IP address");
 		}
 	}
 
 	/* one process can get all connections */
 	if (announcing && strcmp(p, "*") == 0) {
 		if (!iseve())
-			error(EPERM, NULL);
-		return setluniqueport(c, 0);
+			error(EPERM, ERROR_FIXME);
+		setluniqueport(c, 0);
 	}
 
 	lport = atoi(p);
 	if (lport <= 0)
 		setlport(c);
 	else
-		rv = setluniqueport(c, lport);
-	return rv;
+		setluniqueport(c, lport);
 }
 
-static char *setraddrport(struct conv *c, char *str)
+static void setraddrport(struct conv *c, char *str)
 {
 	char *p;
 
 	p = strchr(str, '!');
 	if (p == NULL)
-		return "malformed address";
+		error(EFAIL, "malformed address");
 	*p++ = 0;
 	parseip(c->raddr, str);
 	c->rport = atoi(p);
@@ -1007,33 +992,25 @@ static char *setraddrport(struct conv *c, char *str)
 		if (strstr(p, "!r") != NULL)
 			c->restricted = 1;
 	}
-	return NULL;
 }
 
 /*
  *  called by protocol connect routine to set addresses
  */
-char *Fsstdconnect(struct conv *c, char *argv[], int argc)
+void Fsstdconnect(struct conv *c, char *argv[], int argc)
 {
-	char *p;
-
 	switch (argc) {
 		default:
-			return "bad args to connect";
+			error(EINVAL, "bad args to %s", __func__);
 		case 2:
-			p = setraddrport(c, argv[1]);
-			if (p != NULL)
-				return p;
+			setraddrport(c, argv[1]);
 			setladdr(c);
 			setlport(c);
 			break;
 		case 3:
-			p = setraddrport(c, argv[1]);
-			if (p != NULL)
-				return p;
-			p = setladdrport(c, argv[2], 0);
-			if (p != NULL)
-				return p;
+			setraddrport(c, argv[1]);
+			setladdrport(c, argv[2], 0);
+			break;
 	}
 
 	if ((memcmp(c->raddr, v4prefix, IPv4off) == 0 &&
@@ -1042,8 +1019,6 @@ char *Fsstdconnect(struct conv *c, char *argv[], int argc)
 		c->ipversion = V4;
 	else
 		c->ipversion = V6;
-
-	return NULL;
 }
 
 /*
@@ -1060,14 +1035,12 @@ static void connectctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 	char *p;
 
 	if (c->state != 0)
-		error(EBUSY, NULL);
+		error(EBUSY, ERROR_FIXME);
 	c->state = Connecting;
 	c->cerr[0] = '\0';
 	if (x->connect == NULL)
 		error(EFAIL, "connect not supported");
-	p = x->connect(c, cb->f, cb->nf);
-	if (p != NULL)
-		error(EFAIL, p);
+	x->connect(c, cb->f, cb->nf);
 
 	qunlock(&c->qlock);
 	if (waserror()) {
@@ -1085,15 +1058,16 @@ static void connectctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 /*
  *  called by protocol announce routine to set addresses
  */
-char *Fsstdannounce(struct conv *c, char *argv[], int argc)
+void Fsstdannounce(struct conv *c, char *argv[], int argc)
 {
 	memset(c->raddr, 0, sizeof(c->raddr));
 	c->rport = 0;
 	switch (argc) {
 		default:
-			return "bad args to announce";
+			error(EINVAL, "bad args to announce");
 		case 2:
-			return setladdrport(c, argv[1], 1);
+			setladdrport(c, argv[1], 1);
+			break;
 	}
 }
 
@@ -1111,14 +1085,12 @@ static void announcectlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 	char *p;
 
 	if (c->state != 0)
-		error(EBUSY, NULL);
+		error(EBUSY, ERROR_FIXME);
 	c->state = Announcing;
 	c->cerr[0] = '\0';
 	if (x->announce == NULL)
 		error(EFAIL, "announce not supported");
-	p = x->announce(c, cb->f, cb->nf);
-	if (p != NULL)
-		error(EFAIL, p);
+	x->announce(c, cb->f, cb->nf);
 
 	qunlock(&c->qlock);
 	if (waserror()) {
@@ -1136,13 +1108,14 @@ static void announcectlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 /*
  *  called by protocol bind routine to set addresses
  */
-char *Fsstdbind(struct conv *c, char *argv[], int argc)
+void Fsstdbind(struct conv *c, char *argv[], int argc)
 {
 	switch (argc) {
 		default:
-			return "bad args to bind";
+			error(EINVAL, "bad args to bind");
 		case 2:
-			return setladdrport(c, argv[1], 0);
+			setladdrport(c, argv[1], 0);
+			break;
 	}
 }
 
@@ -1155,14 +1128,10 @@ void Fsconvnonblock(struct conv *cv, bool onoff)
 
 static void bindctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 {
-	char *p;
-
 	if (x->bind == NULL)
-		p = Fsstdbind(c, cb->f, cb->nf);
+		Fsstdbind(c, cb->f, cb->nf);
 	else
-		p = x->bind(c, cb->f, cb->nf);
-	if (p != NULL)
-		error(EFAIL, p);
+		x->bind(c, cb->f, cb->nf);
 }
 
 static void nonblockctlmsg(struct conv *c, struct cmdbuf *cb)
@@ -1212,7 +1181,7 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 
 	switch (TYPE(ch->qid)) {
 		default:
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 		case Qdata:
 			x = f->p[PROTO(ch->qid)];
 			c = x->conv[CONV(ch->qid)];
@@ -1277,9 +1246,7 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 				parseip(ia, cb->f[1]);
 				ipifcremmulti(c, c->raddr, ia);
 			} else if (x->ctl != NULL) {
-				p = x->ctl(c, cb->f, cb->nf);
-				if (p != NULL)
-					error(EFAIL, p);
+				x->ctl(c, cb->f, cb->nf);
 			} else
 				error(EFAIL, "unknown control request");
 			qunlock(&c->qlock);
@@ -1506,7 +1473,7 @@ retry:
 		if (c == NULL) {
 			c = kzmalloc(sizeof(struct conv), 0);
 			if (c == NULL)
-				error(ENOMEM, NULL);
+				error(ENOMEM, ERROR_FIXME);
 			qlock_init(&c->qlock);
 			qlock_init(&c->listenq);
 			rendez_init(&c->cr);
@@ -1521,7 +1488,7 @@ retry:
 				c->ptcl = kzmalloc(p->ptclsize, 0);
 				if (c->ptcl == NULL) {
 					kfree(c);
-					error(ENOMEM, NULL);
+					error(ENOMEM, ERROR_FIXME);
 				}
 			}
 			*pp = c;
@@ -1658,9 +1625,9 @@ struct conv *Fsnewcall(struct conv *c, uint8_t * raddr, uint16_t rport,
 static long ndbwrite(struct Fs *f, char *a, uint32_t off, int n)
 {
 	if (off > strlen(f->ndb))
-		error(EIO, NULL);
+		error(EIO, ERROR_FIXME);
 	if (off + n >= sizeof(f->ndb) - 1)
-		error(EIO, NULL);
+		error(EIO, ERROR_FIXME);
 	memmove(f->ndb + off, a, n);
 	f->ndb[off + n] = 0;
 	f->ndbvers++;

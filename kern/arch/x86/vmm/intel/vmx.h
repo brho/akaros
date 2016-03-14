@@ -26,6 +26,11 @@
 
 #include <ros/arch/vmx.h>
 
+#define INTEL_MSR_WRITE_OFFSET			2048
+
+#define INTEL_X2APIC_MSR_START			0x100
+#define INTEL_X2APIC_MSR_LENGTH			(0x40/8)
+
 int vmx_init(void);
 void vmx_exit(void);
 int intel_vmm_init(void);
@@ -61,10 +66,10 @@ static inline void ept_sync_individual_addr(uint64_t eptp, gpa_t gpa);
 static inline void __vmxon(uint64_t addr);
 static inline void __vmxoff(void);
 static inline void __invvpid(int ext, uint16_t vpid, gva_t gva);
-static inline void vpid_sync_vcpu_single(uint16_t vpid);
-static inline void vpid_sync_vcpu_global(void);
+static inline void vpid_sync_gpc_single(uint16_t vpid);
+static inline void vpid_sync_gpc_global(void);
 static inline void vpid_sync_context(uint16_t vpid);
-static inline uint64_t vcpu_get_eptp(struct vmx_vcpu *vcpu);
+static inline uint64_t gpc_get_eptp(struct guest_pcore *gpc);
 
 /* no way to get around some of this stuff. */
 /* we will do the bare minimum required. */
@@ -235,7 +240,7 @@ static inline void __invvpid(int ext, uint16_t vpid, gva_t gva)
 		  : : "a"(&operand), "c"(ext) : "cc", "memory");
 }
 
-static inline void vpid_sync_vcpu_single(uint16_t vpid)
+static inline void vpid_sync_gpc_single(uint16_t vpid)
 {
 	if (vpid == 0) {
 		return;
@@ -245,7 +250,7 @@ static inline void vpid_sync_vcpu_single(uint16_t vpid)
 		__invvpid(VMX_VPID_EXTENT_SINGLE_CONTEXT, vpid, 0);
 }
 
-static inline void vpid_sync_vcpu_global(void)
+static inline void vpid_sync_gpc_global(void)
 {
 	if (cpu_has_vmx_invvpid_global())
 		__invvpid(VMX_VPID_EXTENT_ALL_CONTEXT, 0, 0);
@@ -254,14 +259,32 @@ static inline void vpid_sync_vcpu_global(void)
 static inline void vpid_sync_context(uint16_t vpid)
 {
 	if (cpu_has_vmx_invvpid_single())
-		vpid_sync_vcpu_single(vpid);
+		vpid_sync_gpc_single(vpid);
 	else
-		vpid_sync_vcpu_global();
+		vpid_sync_gpc_global();
 }
 
-static inline uint64_t vcpu_get_eptp(struct vmx_vcpu *vcpu)
+static inline uint64_t gpc_get_eptp(struct guest_pcore *gpc)
 {
-	return vcpu->proc->env_pgdir.eptp;
+	return gpc->proc->env_pgdir.eptp;
+}
+
+static inline unsigned long vmcs_read(unsigned long field)
+{
+	unsigned long value;
+
+	asm volatile (ASM_VMX_VMREAD_RDX_RAX : "=a"(value) : "d"(field) : "cc");
+	return value;
+}
+
+/* Returns true if the op succeeded.  It can fail if the field is unsupported */
+static inline bool vmcs_write(unsigned long field, unsigned long value)
+{
+	uint8_t error;
+
+	asm volatile (ASM_VMX_VMWRITE_RAX_RDX "; setna %0"
+	              : "=q"(error) : "a"(value), "d"(field) : "cc");
+	return error ? FALSE : TRUE;
 }
 
 /*
@@ -290,3 +313,6 @@ struct vmxec {
 	uint32_t try_set_1;
 	uint32_t try_set_0;
 };
+
+void vmx_load_guest_pcore(struct guest_pcore *gpc);
+void vmx_unload_guest_pcore(struct guest_pcore *gpc);

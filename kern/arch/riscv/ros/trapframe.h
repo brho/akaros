@@ -20,6 +20,10 @@ struct sw_trapframe {
 	/* TODO */
 };
 
+struct vm_trapframe {
+	/* TODO */
+};
+
 #define GPR_RA 1
 #define GPR_SP 14
 #define GPR_A0 18

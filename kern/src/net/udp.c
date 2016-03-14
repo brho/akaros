@@ -146,19 +146,15 @@ struct Udpcb {
 	uint8_t headers;
 };
 
-static char *udpconnect(struct conv *c, char **argv, int argc)
+static void udpconnect(struct conv *c, char **argv, int argc)
 {
-	char *e;
 	Udppriv *upriv;
 
 	upriv = c->p->priv;
-	e = Fsstdconnect(c, argv, argc);
-	Fsconnected(c, e);
-	if (e != NULL)
-		return e;
+	Fsstdconnect(c, argv, argc);
+	Fsconnected(c, 0);
 
 	iphtadd(&upriv->ht, c);
-	return NULL;
 }
 
 static int udpstate(struct conv *c, char *state, int n)
@@ -168,19 +164,14 @@ static int udpstate(struct conv *c, char *state, int n)
 					c->rq ? qlen(c->rq) : 0, c->wq ? qlen(c->wq) : 0);
 }
 
-static char *udpannounce(struct conv *c, char **argv, int argc)
+static void udpannounce(struct conv *c, char **argv, int argc)
 {
-	char *e;
 	Udppriv *upriv;
 
 	upriv = c->p->priv;
-	e = Fsstdannounce(c, argv, argc);
-	if (e != NULL)
-		return e;
+	Fsstdannounce(c, argv, argc);
 	Fsconnected(c, NULL);
 	iphtadd(&upriv->ht, c);
-
-	return NULL;
 }
 
 static void udpcreate(struct conv *c)
@@ -582,21 +573,16 @@ void udpiput(struct Proto *udp, struct Ipifc *ifc, struct block *bp)
 
 }
 
-char *udpctl(struct conv *c, char **f, int n)
+static void udpctl(struct conv *c, char **f, int n)
 {
-	Udpcb *ucb;
+	Udpcb *ucb = (Udpcb*)c->ptcl;
 
-	ucb = (Udpcb *) c->ptcl;
-	if (n == 1) {
-		if (strcmp(f[0], "oldheaders") == 0) {
-			ucb->headers = 6;
-			return NULL;
-		} else if (strcmp(f[0], "headers") == 0) {
-			ucb->headers = 7;
-			return NULL;
-		}
-	}
-	return "unknown control request";
+	if ((n == 1) && strcmp(f[0], "oldheaders") == 0)
+		ucb->headers = 6;
+	else if ((n == 1) && strcmp(f[0], "headers") == 0)
+		ucb->headers = 7;
+	else
+		error(EINVAL, "unknown command to %s", __func__);
 }
 
 void udpadvise(struct Proto *udp, struct block *bp, char *msg)

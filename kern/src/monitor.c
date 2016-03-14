@@ -341,7 +341,6 @@ int mon_bin_run(int argc, char **argv, struct hw_trapframe *hw_tf)
 
 int mon_procinfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-	int8_t irq_state = 0;
 	if (argc < 2) {
 		printk("Usage: procinfo OPTION\n");
 		printk("\tall: show all active pids\n");
@@ -379,9 +378,7 @@ int mon_procinfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 			printk("No such proc\n");
 			return 1;
 		}
-		enable_irqsave(&irq_state);
 		proc_destroy(p);
-		disable_irqsave(&irq_state);
 		proc_decref(p);
 	} else {
 		printk("Bad option\n");
@@ -403,7 +400,7 @@ int mon_pip(int argc, char **argv, struct hw_trapframe *hw_tf)
 int mon_kill(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	struct proc *p;
-	int8_t irq_state = 0;
+
 	if (argc < 2) {
 		printk("Usage: kill PID\n");
 		return 1;
@@ -413,9 +410,7 @@ int mon_kill(int argc, char **argv, struct hw_trapframe *hw_tf)
 		printk("No such proc\n");
 		return 1;
 	}
-	enable_irqsave(&irq_state);
 	proc_destroy(p);
-	disable_irqsave(&irq_state);
 	proc_decref(p);
 	return 0;
 }
@@ -521,7 +516,6 @@ int mon_measure(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	uint64_t begin = 0, diff = 0;
 	uint32_t end_refcnt = 0;
-	int8_t irq_state = 0;
 
 	if (argc < 2) {
 		printk("Usage: measure OPTION\n");
@@ -549,9 +543,7 @@ int mon_measure(int argc, char **argv, struct hw_trapframe *hw_tf)
 		printk("Warning: this will be inaccurate due to the appserver.\n");
 		end_refcnt = kref_refcnt(&p->p_kref) - p->procinfo->num_vcores - 1;
 #endif /* CONFIG_APPSERVER */
-		enable_irqsave(&irq_state);
 		proc_destroy(p);
-		disable_irqsave(&irq_state);
 		proc_decref(p);
 #ifdef CONFIG_APPSERVER
 		/* Won't be that accurate, since it's not actually going through the

@@ -67,7 +67,7 @@ static inline int __get_user(void *dst, const void *src, unsigned int count)
 }
 
 static inline int copy_from_user(void *dst, const void *src,
-								 unsigned int count)
+                                 unsigned int count)
 {
 #warning "The copy_from_user() API is a stub and should be re-implemented"
 

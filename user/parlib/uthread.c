@@ -10,6 +10,7 @@
 #include <parlib/event.h>
 #include <stdlib.h>
 #include <parlib/assert.h>
+#include <parlib/arch/trap.h>
 
 /* SCPs have a default 2LS that only manages thread 0.  Any other 2LS, such as
  * pthreads, should override sched_ops in its init code. */
@@ -575,9 +576,7 @@ static void set_uthread_tls(struct uthread *uthread, uint32_t vcoreid)
 /* Attempts to handle a fault for uth, etc */
 static void handle_refl_fault(struct uthread *uth, struct user_context *ctx)
 {
-	sched_ops->thread_refl_fault(uth, __arch_refl_get_nr(ctx),
-	                             __arch_refl_get_err(ctx),
-	                             __arch_refl_get_aux(ctx));
+	sched_ops->thread_refl_fault(uth, ctx);
 }
 
 /* Run the thread that was current_uthread, from a previous run.  Should be
@@ -640,12 +639,17 @@ void run_uthread(struct uthread *uthread)
 	assert(!current_uthread);
 	assert(uthread->state == UT_NOT_RUNNING);
 	assert(uthread->flags & UTHREAD_SAVED);
-	/* For HW CTX, FPSAVED must match UTH SAVE (and both be on here).  For SW,
-	 * FP should never be saved. */
-	if (uthread->u_ctx.type == ROS_HW_CTX)
+	/* For HW/VM CTX, FPSAVED must match UTH SAVE (and both be on here).  For
+	 * SW, FP should never be saved. */
+	switch (uthread->u_ctx.type) {
+	case ROS_HW_CTX:
+	case ROS_VM_CTX:
 		assert(uthread->flags & UTHREAD_FPSAVED);
-	else
+		break;
+	case ROS_SW_CTX:
 		assert(!(uthread->flags & UTHREAD_FPSAVED));
+		break;
+	}
 	if (has_refl_fault(&uthread->u_ctx)) {
 		clear_refl_fault(&uthread->u_ctx);
 		handle_refl_fault(uthread, &uthread->u_ctx);
@@ -712,9 +716,12 @@ static void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread,
 {
 	assert(uthread);
 	if (uthread->flags & UTHREAD_SAVED) {
-		/* I don't know of scenarios where HW ctxs FP state differs from GP */
-		if (uthread->u_ctx.type == ROS_HW_CTX)
+		/* I don't know of scenarios where HW/VM ctxs FP state differs from GP*/
+		switch (uthread->u_ctx.type) {
+		case ROS_HW_CTX:
+		case ROS_VM_CTX:
 			assert(uthread->flags & UTHREAD_FPSAVED);
+		}
 		assert(vcore_local);
 		return;
 	}

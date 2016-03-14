@@ -181,7 +181,6 @@ void manager_brho(void)
 				spin_unlock(&p->proc_lock);
 				udelay(5000000);
 				printk("Killing p\n");
-				enable_irq();
 				proc_destroy(p);
 				printk("Killed p\n");
 			panic("This is okay");

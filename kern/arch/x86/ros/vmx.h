@@ -346,43 +346,48 @@ enum vmcs_field {
 #define EXIT_REASON_RDSEED              61
 #define EXIT_REASON_XSAVES              63
 #define EXIT_REASON_XRSTORS             64
+/* Non-standard exit reasons */
+#define EXIT_REASON_GUEST_IN_USE        257
+#define EXIT_REASON_VMENTER_FAILED      258
 
 #define VMX_EXIT_REASONS \
-	{ EXIT_REASON_EXCEPTION_NMI,         "EXCEPTION_NMI" }, \
-	{ EXIT_REASON_EXTERNAL_INTERRUPT,    "EXTERNAL_INTERRUPT" }, \
-	{ EXIT_REASON_TRIPLE_FAULT,          "TRIPLE_FAULT" }, \
-	{ EXIT_REASON_PENDING_INTERRUPT,     "PENDING_INTERRUPT" }, \
-	{ EXIT_REASON_NMI_WINDOW,            "NMI_WINDOW" }, \
-	{ EXIT_REASON_TASK_SWITCH,           "TASK_SWITCH" }, \
-	{ EXIT_REASON_CPUID,                 "CPUID" }, \
-	{ EXIT_REASON_HLT,                   "HLT" }, \
-	{ EXIT_REASON_INVLPG,                "INVLPG" }, \
-	{ EXIT_REASON_RDPMC,                 "RDPMC" }, \
-	{ EXIT_REASON_RDTSC,                 "RDTSC" }, \
-	{ EXIT_REASON_VMCALL,                "VMCALL" }, \
-	{ EXIT_REASON_VMCLEAR,               "VMCLEAR" }, \
-	{ EXIT_REASON_VMLAUNCH,              "VMLAUNCH" }, \
-	{ EXIT_REASON_VMPTRLD,               "VMPTRLD" }, \
-	{ EXIT_REASON_VMPTRST,               "VMPTRST" }, \
-	{ EXIT_REASON_VMREAD,                "VMREAD" }, \
-	{ EXIT_REASON_VMRESUME,              "VMRESUME" }, \
-	{ EXIT_REASON_VMWRITE,               "VMWRITE" }, \
-	{ EXIT_REASON_VMOFF,                 "VMOFF" }, \
-	{ EXIT_REASON_VMON,                  "VMON" }, \
-	{ EXIT_REASON_CR_ACCESS,             "CR_ACCESS" }, \
-	{ EXIT_REASON_DR_ACCESS,             "DR_ACCESS" }, \
-	{ EXIT_REASON_IO_INSTRUCTION,        "IO_INSTRUCTION" }, \
-	{ EXIT_REASON_MSR_READ,              "MSR_READ" }, \
-	{ EXIT_REASON_MSR_WRITE,             "MSR_WRITE" }, \
-	{ EXIT_REASON_MWAIT_INSTRUCTION,     "MWAIT_INSTRUCTION" }, \
-	{ EXIT_REASON_MONITOR_INSTRUCTION,   "MONITOR_INSTRUCTION" }, \
-	{ EXIT_REASON_PAUSE_INSTRUCTION,     "PAUSE_INSTRUCTION" }, \
-	{ EXIT_REASON_MCE_DURING_VMENTRY,    "MCE_DURING_VMENTRY" }, \
-	{ EXIT_REASON_TPR_BELOW_THRESHOLD,   "TPR_BELOW_THRESHOLD" }, \
-	{ EXIT_REASON_APIC_ACCESS,           "APIC_ACCESS" }, \
-	{ EXIT_REASON_EPT_VIOLATION,         "EPT_VIOLATION" }, \
-	{ EXIT_REASON_EPT_MISCONFIG,         "EPT_MISCONFIG" }, \
-	{ EXIT_REASON_WBINVD,                "WBINVD" }
+	[EXIT_REASON_EXCEPTION_NMI]         "EXCEPTION_NMI", \
+	[EXIT_REASON_EXTERNAL_INTERRUPT]    "EXTERNAL_INTERRUPT", \
+	[EXIT_REASON_TRIPLE_FAULT]          "TRIPLE_FAULT", \
+	[EXIT_REASON_PENDING_INTERRUPT]     "PENDING_INTERRUPT", \
+	[EXIT_REASON_NMI_WINDOW]            "NMI_WINDOW", \
+	[EXIT_REASON_TASK_SWITCH]           "TASK_SWITCH", \
+	[EXIT_REASON_CPUID]                 "CPUID", \
+	[EXIT_REASON_HLT]                   "HLT", \
+	[EXIT_REASON_INVLPG]                "INVLPG", \
+	[EXIT_REASON_RDPMC]                 "RDPMC", \
+	[EXIT_REASON_RDTSC]                 "RDTSC", \
+	[EXIT_REASON_VMCALL]                "VMCALL", \
+	[EXIT_REASON_VMCLEAR]               "VMCLEAR", \
+	[EXIT_REASON_VMLAUNCH]              "VMLAUNCH", \
+	[EXIT_REASON_VMPTRLD]               "VMPTRLD", \
+	[EXIT_REASON_VMPTRST]               "VMPTRST", \
+	[EXIT_REASON_VMREAD]                "VMREAD", \
+	[EXIT_REASON_VMRESUME]              "VMRESUME", \
+	[EXIT_REASON_VMWRITE]               "VMWRITE", \
+	[EXIT_REASON_VMOFF]                 "VMOFF", \
+	[EXIT_REASON_VMON]                  "VMON", \
+	[EXIT_REASON_CR_ACCESS]             "CR_ACCESS", \
+	[EXIT_REASON_DR_ACCESS]             "DR_ACCESS", \
+	[EXIT_REASON_IO_INSTRUCTION]        "IO_INSTRUCTION", \
+	[EXIT_REASON_MSR_READ]              "MSR_READ", \
+	[EXIT_REASON_MSR_WRITE]             "MSR_WRITE", \
+	[EXIT_REASON_MWAIT_INSTRUCTION]     "MWAIT_INSTRUCTION", \
+	[EXIT_REASON_MONITOR_INSTRUCTION]   "MONITOR_INSTRUCTION", \
+	[EXIT_REASON_PAUSE_INSTRUCTION]     "PAUSE_INSTRUCTION", \
+	[EXIT_REASON_MCE_DURING_VMENTRY]    "MCE_DURING_VMENTRY", \
+	[EXIT_REASON_TPR_BELOW_THRESHOLD]   "TPR_BELOW_THRESHOLD", \
+	[EXIT_REASON_APIC_ACCESS]           "APIC_ACCESS", \
+	[EXIT_REASON_EPT_VIOLATION]         "EPT_VIOLATION", \
+	[EXIT_REASON_EPT_MISCONFIG]         "EPT_MISCONFIG", \
+	[EXIT_REASON_WBINVD]                "WBINVD", \
+	[EXIT_REASON_GUEST_IN_USE]          "GUEST_IN_USE", \
+	[EXIT_REASON_VMENTER_FAILED]        "VMENTER_FAILED"
 
 /*
  * Interruption-information format
@@ -405,6 +410,8 @@ enum vmcs_field {
 #define INTR_TYPE_EXCEPTION             (3 << 8)       /* processor exception */
 #define INTR_TYPE_SOFT_INTR             (4 << 8) /* software interrupt */
 #define INTR_TYPE_SOFT_EXCEPTION	(6 << 8) /* software exception */
+
+#define VMX_POSTED_OUTSTANDING_NOTIF		256
 
 /* GUEST_INTERRUPTIBILITY_INFO flags. */
 #define GUEST_INTR_STATE_STI		0x00000001
@@ -685,42 +692,6 @@ struct ldttss_desc64 {
 	uint32_t zero1;
 } __attribute__((packed));
 
-struct vmx_vcpu {
-
-	int cpu;
-	int launched;
-	struct hw_trapframe regs;
-	uint8_t  fail;
-	uint64_t exit_reason;
-	uint64_t host_rsp;
-
-	uint64_t cr2;
-
-	int shutdown;
-	int ret_code;
-	struct proc *proc;
-
-	struct msr_autoload {
-		unsigned nr;
-		struct vmx_msr_entry guest[NR_AUTOLOAD_MSRS];
-		struct vmx_msr_entry host[NR_AUTOLOAD_MSRS];
-	} msr_autoload;
-
-	struct vmcs *vmcs;
-};
-
-
 static char * const VMX_EXIT_REASON_NAMES[] = {
-	"EXCEPTION_NMI", "EXTERNAL_INTERRUPT", "TRIPLE_FAULT",
-	"INIT_SIGNAL", "START_UP_IPI", "IO_SM_INTERRUPT", "OTHER_SMI",
-	"INTERRUPT_WINDOW", "NMI_WINDOW", "TASK_SWITCH", "CPUID", "GETSEC", "HLT", "INVD",
-	"INVLPG", "RDPMC", "RDTSC", "RSM", "VMCALL", "VMCLEAR", "VMLAUNCH", "VMPTRLD",
-	"VMPTRST", "VMREAD", "VMRESUME", "VMWRITE", "VMOFF", "VMON", "CR_ACCESS",
-	"DR_ACCESS", "IO_INSTRUCTION", "MSR_READ", "MSR_WRITE", "INVALID_STATE",
-	"ENTRY_MSR_LOADING", "35", "MWAIT_INSTRUCTION", "MONITOR_TRAP_FLAG", "38",
-	"MONITOR_INSTRUCTION", "PAUSE_INSTRUCTION", "MCE_DURING_VMENTRY", "42",
-	"TPR_BELOW_THRESHOLD", "APIC_ACCESS", "VIRTUALIZED_EOI", "GDTR_IDTR_ACCESS",
-	"LDTR_TR_ACCESS", "EPT_VIOLATION", "EPT_MISCONFIG", "INVEPT", "RDTSCP",
-	"VMX_TIMER_EXPIRED", "INVVPID", "WBINVD", "XSETBV", "APIC_WRITE", "RDRAND",
-	"INVPCID", "VMFUNC", "60", "RDSEED", "62", "XSAVES", "XRSTORS"
+	VMX_EXIT_REASONS
 };

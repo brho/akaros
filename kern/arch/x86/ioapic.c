@@ -216,14 +216,20 @@ static int acpi_irq2ioapic(int irq)
  *		use MSI instead). */
 static int acpi_make_rdt(int tbdf, int irq, int busno, int devno)
 {
-	struct Apicst *st;
+	struct Atable *at;
+	struct Apicst *st, *lst;
 	uint32_t lo;
 	int pol, edge_level, ioapic_nr, gsi_irq;
 
-	for (st = apics->st; st != NULL; st = st->next) {
-		if (st->type == ASintovr) {
-			if (st->intovr.irq == irq)
+	at = apics;
+	st = NULL;
+	for (int i = 0; i < at->nchildren; i++) {
+		lst = at->children[i]->tbl;
+		if (lst->type == ASintovr) {
+			if (lst->intovr.irq == irq) {
+				st = lst;
 				break;
+			}
 		}
 	}
 	if (st) {

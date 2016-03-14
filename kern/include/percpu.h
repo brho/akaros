@@ -55,7 +55,7 @@
 		typeof(var) *__cv;												\
 		if (likely(percpu_base))										\
 			__cv = (typeof(var) *) (percpu_base + cpu * PERCPU_SIZE +	\
-									PERCPU_OFFSET(var));				\
+			                            PERCPU_OFFSET(var));				\
 		else															\
 			__cv = &var;												\
 		__cv;															\

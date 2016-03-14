@@ -210,7 +210,7 @@ void netlogctl(struct Fs *f, char *s, int n)
 	}
 
 	if (cb->nf < 2)
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 
 	ct = lookupcmd(cb, routecmd, ARRAY_SIZE(routecmd));
 

@@ -13,15 +13,19 @@
 #include <parlib/vcore.h>
 #include <parlib/uthread.h>
 #include <parlib/event.h>
+#include <parlib/arch/trap.h>
 #include <stdlib.h>
 
 static void thread0_sched_entry(void);
 static void thread0_thread_blockon_sysc(struct uthread *uthread, void *sysc);
-static void thread0_thread_refl_fault(struct uthread *uthread,
-                                      unsigned int trap_nr, unsigned int err,
-                                      unsigned long aux);
+static void thread0_thread_refl_fault(struct uthread *uth,
+                                      struct user_context *ctx);
 static void thread0_thread_runnable(struct uthread *uth);
 static void thread0_thread_has_blocked(struct uthread *uth, int flags);
+static uth_mutex_t thread0_mtx_alloc(void);
+static void thread0_mtx_free(uth_mutex_t m);
+static void thread0_mtx_lock(uth_mutex_t m);
+static void thread0_mtx_unlock(uth_mutex_t m);
 
 /* externed into uthread.c */
 struct schedule_ops thread0_2ls_ops = {
@@ -31,6 +35,10 @@ struct schedule_ops thread0_2ls_ops = {
 	.thread_runnable = thread0_thread_runnable,
 	.thread_paused = thread0_thread_runnable,
 	.thread_has_blocked = thread0_thread_has_blocked,
+	.mutex_alloc = thread0_mtx_alloc,
+	.mutex_free = thread0_mtx_free,
+	.mutex_lock = thread0_mtx_lock,
+	.mutex_unlock = thread0_mtx_unlock,
 };
 
 /* externed into uthread.c */
@@ -88,15 +96,21 @@ static void thread0_thread_blockon_sysc(struct uthread *uthread, void *arg)
 		thread0_thread_runnable(uthread);
 }
 
-static void thread0_thread_refl_fault(struct uthread *uthread,
-                                      unsigned int trap_nr, unsigned int err,
-                                      unsigned long aux)
+static void thread0_thread_refl_fault(struct uthread *uth,
+                                      struct user_context *ctx)
 {
-	printf("SCP has unhandled fault: %d, err: %d, aux: %p\n", trap_nr, err,
-	       aux);
-	print_user_context(&uthread->u_ctx);
-	printf("Turn on printx to spew unhandled, malignant trap info\n");
-	exit(-1);
+	switch (ctx->type) {
+	case ROS_HW_CTX:
+		printf("SCP has unhandled fault: %d, err: %d, aux: %p\n",
+		       __arch_refl_get_nr(ctx), __arch_refl_get_err(ctx),
+		       __arch_refl_get_aux(ctx));
+		print_user_context(ctx);
+		printf("Turn on printx to spew unhandled, malignant trap info\n");
+		exit(-1);
+		break;
+	default:
+		assert(0);
+	}
 }
 
 static void thread0_thread_runnable(struct uthread *uth)
@@ -107,4 +121,23 @@ static void thread0_thread_runnable(struct uthread *uth)
 static void thread0_thread_has_blocked(struct uthread *uth, int flags)
 {
 	thread0_info.is_blocked = TRUE;
+}
+
+/* We only have one thread, so we don't need mutexes */
+static uth_mutex_t thread0_mtx_alloc(void)
+{
+	/* Returning something non-zero, in case someone compares it to 0 */
+	return (uth_mutex_t)0x1234;
+}
+
+static void thread0_mtx_free(uth_mutex_t m)
+{
+}
+
+static void thread0_mtx_lock(uth_mutex_t m)
+{
+}
+
+static void thread0_mtx_unlock(uth_mutex_t m)
+{
 }

@@ -8,7 +8,6 @@
 #include <assert.h>
 #include <stdio.h>
 
-/* TODO: handle user and kernel contexts */
 void proc_pop_ctx(struct user_context *ctx)
 {
 	struct hw_trapframe *tf = &ctx->tf.hw_tf;
@@ -46,7 +45,7 @@ void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
 	tf->gpr[GPR_A0] = vcoreid;
 }
 
-/* TODO: handle both HW and SW contexts */
+/* TODO: handle SW and VM contexts */
 void proc_secure_ctx(struct user_context *ctx)
 {
 	struct hw_trapframe *tf = &ctx->tf.hw_tf;

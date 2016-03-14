@@ -154,16 +154,10 @@ static void icmpcreate(struct conv *c)
 	c->wq = qbypass(icmpkick, c);
 }
 
-extern char *icmpconnect(struct conv *c, char **argv, int argc)
+void icmpconnect(struct conv *c, char **argv, int argc)
 {
-	char *e;
-
-	e = Fsstdconnect(c, argv, argc);
-	if (e != NULL)
-		return e;
-	Fsconnected(c, e);
-
-	return NULL;
+	Fsstdconnect(c, argv, argc);
+	Fsconnected(c, 0);
 }
 
 extern int icmpstate(struct conv *c, char *state, int n)
@@ -173,16 +167,10 @@ extern int icmpstate(struct conv *c, char *state, int n)
 					c->rq ? qlen(c->rq) : 0, c->wq ? qlen(c->wq) : 0);
 }
 
-extern char *icmpannounce(struct conv *c, char **argv, int argc)
+void icmpannounce(struct conv *c, char **argv, int argc)
 {
-	char *e;
-
-	e = Fsstdannounce(c, argv, argc);
-	if (e != NULL)
-		return e;
+	Fsstdannounce(c, argv, argc);
 	Fsconnected(c, NULL);
-
-	return NULL;
 }
 
 extern void icmpclose(struct conv *c)

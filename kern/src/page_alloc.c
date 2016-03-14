@@ -209,7 +209,7 @@ void *get_cont_pages(size_t order, int flags)
 	if( first == -1 ) {
 		spin_unlock_irqsave(&colored_page_free_list_lock);
 		if (flags & KMALLOC_ERROR)
-			error(ENOMEM, NULL);
+			error(ENOMEM, ERROR_FIXME);
 		return NULL;
 	}
 
@@ -267,7 +267,7 @@ void *get_cont_phys_pages_at(size_t order, physaddr_t at, int flags)
 		if (!page_is_free(i)) {
 			spin_unlock_irqsave(&colored_page_free_list_lock);
 			if (flags & KMALLOC_ERROR)
-				error(ENOMEM, NULL);
+				error(ENOMEM, ERROR_FIXME);
 			return NULL;
 		}
 	}

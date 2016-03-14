@@ -160,7 +160,7 @@ static long pciread(struct chan *c, void *va, long n, int64_t offset)
 			tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
 			p = pcimatchtbdf(tbdf);
 			if (p == NULL)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			ebuf = buf + sizeof buf - 1;	/* -1 for newline */
 			w = seprintf(buf, ebuf, "%.2x.%.2x.%.2x %.4x/%.4x %3d",
 						 p->ccrb, p->ccru, p->ccrp, p->vid, p->did, p->intl);
@@ -177,7 +177,7 @@ static long pciread(struct chan *c, void *va, long n, int64_t offset)
 			tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
 			p = pcimatchtbdf(tbdf);
 			if (p == NULL)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			if (n + offset > 256)
 				n = 256 - offset;
 			if (n < 0)
@@ -201,7 +201,7 @@ static long pciread(struct chan *c, void *va, long n, int64_t offset)
 			}
 			return i;
 		default:
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 	}
 	return n;
 }
@@ -222,7 +222,7 @@ static long pciwrite(struct chan *c, void *va, long n, int64_t offset)
 			tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
 			p = pcimatchtbdf(tbdf);
 			if (p == NULL)
-				error(EINVAL, NULL);
+				error(EINVAL, ERROR_FIXME);
 			if (offset > PCI_CONFIG_SZ)
 				return 0;
 			if (n + offset > PCI_CONFIG_SZ)
@@ -246,7 +246,7 @@ static long pciwrite(struct chan *c, void *va, long n, int64_t offset)
 			}
 			return i;
 		default:
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 	}
 	return n;
 }

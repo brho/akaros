@@ -188,7 +188,7 @@ long mntversion(struct chan *c, char *version, int msize, int returnlen)
 		}
 		if (returnlen > 0) {
 			if (returnlen < k)
-				error(ENAMETOOLONG, NULL);
+				error(ENAMETOOLONG, ERROR_FIXME);
 			memmove(version, buf, k);
 		}
 		return k;
@@ -285,7 +285,7 @@ long mntversion(struct chan *c, char *version, int msize, int returnlen)
 	k = strlen(f.version);
 	if (returnlen > 0) {
 		if (returnlen < k)
-			error(ENAMETOOLONG, NULL);
+			error(ENAMETOOLONG, ERROR_FIXME);
 		memmove(version, f.version, k);
 	}
 
@@ -304,7 +304,7 @@ struct chan *mntauth(struct chan *c, char *spec)
 		mntversion(c, VERSION9P, MAXRPC, 0);
 		m = c->mux;
 		if (m == NULL)
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 	}
 
 	c = mntchan();
@@ -366,7 +366,7 @@ static struct chan *mntattach(char *muxattach)
 		mntversion(c, NULL, 0, 0);
 		m = c->mux;
 		if (m == NULL)
-			error(EINVAL, NULL);
+			error(EINVAL, ERROR_FIXME);
 	}
 
 	c = mntchan();
@@ -515,7 +515,7 @@ static int mntstat(struct chan *c, uint8_t * dp, int n)
 	struct mntrpc *r;
 
 	if (n < BIT16SZ)
-		error(EINVAL, NULL);
+		error(EINVAL, ERROR_FIXME);
 	m = mntchk(c);
 	r = mntralloc(c, m->msize);
 	if (waserror()) {
@@ -825,7 +825,7 @@ void mountrpc(struct mnt *m, struct mntrpc *r)
 			} else
 				error(EFAIL, r->reply.ename);
 		case Rflush:
-			error(EINTR, NULL);
+			error(EINTR, ERROR_FIXME);
 		default:
 			if (t == r->request.type + 1)
 				break;
@@ -839,7 +839,7 @@ void mountrpc(struct mnt *m, struct mntrpc *r)
 				("mnt: proc %s %lu: mismatch from %s %s rep 0x%p tag %d fid %d T%d R%d rp %d\n",
 				 "current->text", "current->pid", sn, cn, r, r->request.tag,
 				 r->request.fid, r->request.type, r->reply.type, r->reply.tag);
-			error(EPROTO, NULL);
+			error(EPROTO, ERROR_FIXME);
 	}
 }
 
@@ -878,7 +878,7 @@ void mountio(struct mnt *m, struct mntrpc *r)
 	if (n < 0)
 		panic("bad message type in mountio");
 	if (devtab[m->c->type].write(m->c, r->rpc, n, 0) != n)
-		error(EIO, NULL);
+		error(EIO, ERROR_FIXME);
 /*	r->stime = fastticks(NULL); */
 	r->reqlen = n;
 
@@ -899,7 +899,7 @@ void mountio(struct mnt *m, struct mntrpc *r)
 	spin_unlock(&m->lock);
 	while (r->done == 0) {
 		if (mntrpcread(m, r) < 0)
-			error(EIO, NULL);
+			error(EIO, ERROR_FIXME);
 		mountmux(m, r);
 	}
 	mntgate(m);

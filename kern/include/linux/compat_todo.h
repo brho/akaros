@@ -163,55 +163,73 @@ static inline void rb_link_node(struct rb_node * node, struct rb_node * parent,
 
 /* XXX This is not a tree. */
 struct radix_tree_node {
+	struct list_head	linkage;
 	unsigned long		index;
 	void			*item;
-	struct radix_tree_node	*next;
 };
 
 struct radix_tree_root {
-	struct radix_tree_node	*rnode;
+	struct list_head	hlinks;
 };
 
-#define INIT_RADIX_TREE(root, mask) \
-do { \
-	(root)->rnode = NULL; \
-} while (0)
+static inline void INIT_RADIX_TREE(struct radix_tree_root *rp, int mask)
+{
+	INIT_LIST_HEAD(&rp->hlinks);
+}
 
 static inline int radix_tree_insert(struct radix_tree_root *root,
 				    unsigned long index, void *item)
 {
+	struct list_head *lp = root->hlinks.next;
 	struct radix_tree_node *p;
 
-	for (p = root->rnode; p; p = p->next) {
+	while (lp != &root->hlinks) {
+		p = (struct radix_tree_node *)lp;
 		if (p->index == index)
 			return -EEXIST;
+		lp = lp->next;
 	}
+
 	p = kmalloc(sizeof(*p), KMALLOC_WAIT);
 	if (!p)
 		return -ENOMEM;
 	p->index = index;
 	p->item = item;
-	p->next = root->rnode;
-	root->rnode = p;
+	list_add(&p->linkage, &root->hlinks);
 	return 0;
 }
 
 static inline void *radix_tree_lookup(struct radix_tree_root *root,
 				      unsigned long index)
 {
+	struct list_head *lp = root->hlinks.next;
 	struct radix_tree_node *p;
 
-	for (p = root->rnode; p; p = p->next) {
+	while (lp != &root->hlinks) {
+		p = (struct radix_tree_node *)lp;
 		if (p->index == index)
 			return p->item;
+		lp = lp->next;
 	}
+
 	return NULL;
 }
 
-static inline void *radix_tree_delete(struct radix_tree_root *root,
+static inline void radix_tree_delete(struct radix_tree_root *root,
 				      unsigned long index)
 {
-	panic("todo");
+	struct list_head *lp = root->hlinks.next;
+	struct radix_tree_node *p;
+
+	while (lp != &root->hlinks) {
+		p = (struct radix_tree_node *)lp;
+		if (p->index == index) {
+			list_del(lp);
+			return;
+		}
+		lp = lp->next;
+	}
+	panic("Node not found\n");
 }
 
 #define INIT_DEFERRABLE_WORK(_work, _func) \

@@ -194,15 +194,21 @@ bool uva_is_kva(struct proc *p, void *uva, void *kva)
 }
 
 /* Given a proc and a user virtual address, gives us the KVA.  Useful for
- * debugging.  Returns 0 if the page is unmapped (page lookup fails).  If you
- * give it a kva, it'll give you that same KVA, but this doesn't play nice with
- * Jumbo pages. */
-uintptr_t uva2kva(struct proc *p, void *uva)
+ * debugging.  Returns 0 if the page is unmapped (page lookup fails).  This
+ * doesn't play nice with Jumbo pages. */
+uintptr_t uva2kva(struct proc *p, void *uva, size_t len, int prot)
 {
 	struct page *u_page;
 	uintptr_t offset = PGOFF(uva);
 	if (!p)
 		return 0;
+	if (prot & PROT_WRITE) {
+		if (!is_user_rwaddr(uva, len))
+			return 0;
+	} else {
+		if (!is_user_raddr(uva, len))
+			return 0;
+	}
 	u_page = page_lookup(p->env_pgdir, uva, 0);
 	if (!u_page)
 		return 0;

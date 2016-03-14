@@ -29,6 +29,7 @@
  * you have the right type of FD. */
 struct user_fd {
 	int							magic;
+	int							fd;
 	void (*close)(struct user_fd *);
 };
 

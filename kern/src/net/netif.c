@@ -230,7 +230,7 @@ struct chan *netifopen(struct ether *nif, struct chan *c, int omode)
 	id = 0;
 	if (c->qid.type & QTDIR) {
 		if (omode & O_WRITE)
-			error(EPERM, NULL);
+			error(EPERM, ERROR_FIXME);
 	} else {
 		switch (NETTYPE(c->qid.path)) {
 			case Ndataqid:
@@ -244,14 +244,14 @@ struct chan *netifopen(struct ether *nif, struct chan *c, int omode)
 				break;
 			default:
 				if (omode & O_WRITE)
-					error(EINVAL, NULL);
+					error(EINVAL, ERROR_FIXME);
 		}
 		switch (NETTYPE(c->qid.path)) {
 			case Ndataqid:
 			case Nctlqid:
 				f = nif->f[id];
 				if (netown(f, current->user, omode & 7) < 0)
-					error(EPERM, NULL);
+					error(EPERM, ERROR_FIXME);
 				break;
 		}
 	}
@@ -336,7 +336,7 @@ netifread(struct ether *nif, struct chan *c, void *a, long n,
 		case Nifstatqid:
 			return 0;
 	}
-	error(EINVAL, NULL);
+	error(EINVAL, ERROR_FIXME);
 	return -1;	/* not reached */
 }
 
@@ -382,7 +382,7 @@ long netifwrite(struct ether *nif, struct chan *c, void *a, long n)
 	uint8_t binaddr[Nmaxaddr];
 
 	if (NETTYPE(c->qid.path) != Nctlqid)
-		error(EPERM, NULL);
+		error(EPERM, ERROR_FIXME);
 
 	if (n >= sizeof(buf))
 		n = sizeof(buf) - 1;
@@ -399,7 +399,7 @@ long netifwrite(struct ether *nif, struct chan *c, void *a, long n)
 	if ((p = matchtoken(buf, "connect")) != 0) {
 		type = strtol(p, 0, 0);	/* allows any base, though usually hex */
 		if (typeinuse(nif, type))
-			error(EBUSY, NULL);
+			error(EBUSY, ERROR_FIXME);
 		f->type = type;
 		if (f->type < 0)
 			nif->all++;
@@ -452,16 +452,16 @@ int netifwstat(struct ether *nif, struct chan *c, uint8_t * db, int n)
 
 	f = nif->f[NETID(c->qid.path)];
 	if (f == 0)
-		error(ENOENT, NULL);
+		error(ENOENT, ERROR_FIXME);
 
 	if (netown(f, current->user, O_WRITE) < 0)
-		error(EPERM, NULL);
+		error(EPERM, ERROR_FIXME);
 
 	dir = kzmalloc(sizeof(struct dir) + n, 0);
 	m = convM2D(db, n, &dir[0], (char *)&dir[1]);
 	if (m == 0) {
 		kfree(dir);
-		error(ENODATA, NULL);
+		error(ENODATA, ERROR_FIXME);
 	}
 	if (!emptystr(dir[0].uid))
 		strlcpy(f->owner, dir[0].uid, KNAMELEN);
@@ -575,7 +575,7 @@ static int openfile(struct ether *nif, int id)
 	if (id >= 0) {
 		f = nif->f[id];
 		if (f == 0)
-			error(ENODEV, NULL);
+			error(ENODEV, ERROR_FIXME);
 		qlock(&f->qlock);
 		qreopen(f->in);
 		f->inuse++;
@@ -619,7 +619,7 @@ static int openfile(struct ether *nif, int id)
 		poperror();
 		return fp - nif->f;
 	}
-	error(ENODEV, NULL);
+	error(ENODEV, ERROR_FIXME);
 	return -1;	/* not reached */
 }
 

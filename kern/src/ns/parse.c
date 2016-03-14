@@ -144,12 +144,8 @@ struct cmdtab *lookupcmd(struct cmdbuf *cb, struct cmdtab *ctab, int nctab)
 		if (strcmp(ct->cmd, "*") != 0)	/* wildcard always matches */
 			if (strcmp(ct->cmd, cb->f[0]) != 0)
 				continue;
-		if (ct->narg != 0 && ct->narg != cb->nf) {
-			// oh how I hate plan 9 error handling sometimes (DL: sometimes?!?).
-			printk("%s: for %s have %d want %d\n", errno_to_string(EINVAL),
-				   cb->f[0], cb->nf, ct->narg);
-			cmderror(cb, "bring me another fucking rock");
-		}
+		if (ct->narg != 0 && ct->narg != cb->nf)
+			cmderror(cb, "wrong number of args");
 		return ct;
 	}
 

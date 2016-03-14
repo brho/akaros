@@ -110,8 +110,9 @@ bool test_pic_reception(void)
 	pic_unmask_irq(0, 0);
 	cprintf("PIC1 Mask = 0x%04x\n", inb(PIC1_DATA));
 	cprintf("PIC2 Mask = 0x%04x\n", inb(PIC2_DATA));
-	unmask_lapic_lvt(LAPIC_LVT_LINT0);
-	cprintf("Core %d's LINT0: 0x%08x\n", core_id(), read_mmreg32(LAPIC_LVT_LINT0));
+	unmask_lapic_lvt(MSR_LAPIC_LVT_LINT0);
+	printk("Core %d's LINT0: 0x%08x\n", core_id(),
+	       apicrget(MSR_LAPIC_LVT_TIMER));
 	enable_irq();
 	while(1);
 
@@ -571,7 +572,6 @@ bool test_lapic_status_bit(void)
 	// KT_ASSERT_M("IPIs received should be 0", (0 == a));
 	for(int i = 0; i < NUM_IPI; i++) {
 		send_ipi(7, I_TESTING);
-		lapic_wait_to_send();
 	}
 	// need to wait a bit to let those IPIs get there
 	udelay(5000000);

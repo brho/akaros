@@ -43,8 +43,8 @@ void circular_buffer_clear(struct circular_buffer *cb)
 }
 
 static bool circular_buffer_is_overlap(const struct circular_buffer *cb,
-									   const char *rptr, const char *wptr,
-									   size_t size)
+                                       const char *rptr, const char *wptr,
+                                       size_t size)
 {
 	/* Check if the current write operation [wptr, wptr+size) is overwriting
 	 * the block at which rptr in pointing to.
@@ -53,7 +53,7 @@ static bool circular_buffer_is_overlap(const struct circular_buffer *cb,
 }
 
 static void circular_buffer_write_skip(struct circular_buffer *cb, char *wrptr,
-									   size_t size)
+                                       size_t size)
 {
 	/* Move the read pointer forward, so that the incoming write does not
 	 * overwrite the block the read pointer is looking at.
@@ -74,7 +74,7 @@ static void circular_buffer_write_skip(struct circular_buffer *cb, char *wrptr,
 }
 
 size_t circular_buffer_write(struct circular_buffer *cb,
-							 const char *data, size_t size)
+                             const char *data, size_t size)
 {
 	/* Data is written and evetually discarded in atomic blocks, in order to
 	 * maintain the consistency of the information stored in the buffer.
@@ -107,7 +107,7 @@ size_t circular_buffer_write(struct circular_buffer *cb,
 }
 
 size_t circular_buffer_read(struct circular_buffer *cb, char *data, size_t size,
-							size_t off)
+                            size_t off)
 {
 	size_t asize = cb->size, rsize = 0;
 	const char *rdptr = cb->rdptr;

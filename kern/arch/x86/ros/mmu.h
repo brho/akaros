@@ -40,6 +40,7 @@
 #define CR4_OSXMME	0x00000400	// OS support for unmasked SIMD FP exceptions
 #define CR4_VMXE	0x00002000	// VMX enable
 #define CR4_SMXE	0x00004000	// SMX enable
+#define CR4_FSGSBASE	0x00010000	// RD/WR FS/GS Base enabled
 #define CR4_OSXSAVE	0x00040000	// XSAVE and processor extended states-enabled
 
 // Eflags register
@@ -64,6 +65,8 @@
 #define FL_VIF		0x00080000	// Virtual Interrupt Flag
 #define FL_VIP		0x00100000	// Virtual Interrupt Pending
 #define FL_ID		0x00200000	// ID flag
+#define FL_RSVD_1	0x00000002	// These 1s must be 1, rflags |= this
+#define FL_RSVD_0	0x003f7fd7	// These 0s must be 0, rflags &= this
 
 // Page fault error codes
 #define FEC_PR		0x1	// Page fault caused by protection violation

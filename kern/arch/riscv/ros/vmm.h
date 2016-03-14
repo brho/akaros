@@ -5,3 +5,6 @@
  * RISC-V VMM kernel headers */
 
 #pragma once
+
+struct vmm_gpcore_init {
+}

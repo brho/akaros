@@ -211,7 +211,7 @@ struct proc *pid_nth(unsigned int n)
 		 * so continue
 		 */
 
-		if (kref_get_not_zero(&p->p_kref, 1)){
+		if (kref_get_not_zero(&p->p_kref, 1)) {
 			/* this one counts */
 			if (! n){
 				printd("pid_nth: at end, p %p\n", p);
@@ -220,7 +220,7 @@ struct proc *pid_nth(unsigned int n)
 			kref_put(&p->p_kref);
 			n--;
 		}
-		if (!hashtable_iterator_advance(iter)){
+		if (!hashtable_iterator_advance(iter)) {
 			p = NULL;
 			break;
 		}
@@ -410,6 +410,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 	TAILQ_INIT(&p->abortable_sleepers);
 	spinlock_init_irqsave(&p->abort_list_lock);
 	memset(&p->vmm, 0, sizeof(struct vmm));
+	spinlock_init(&p->vmm.lock);
 	qlock_init(&p->vmm.qlock);
 	printd("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
 	*pp = p;
@@ -430,14 +431,13 @@ void __proc_ready(struct proc *p)
 	spin_unlock(&pid_hash_lock);
 }
 
-/* Creates a process from the specified file, argvs, and envps.  Tempted to get
- * rid of proc_alloc's style, but it is so quaint... */
+/* Creates a process from the specified file, argvs, and envps. */
 struct proc *proc_create(struct file *prog, char **argv, char **envp)
 {
 	struct proc *p;
 	error_t r;
 	if ((r = proc_alloc(&p, current, 0 /* flags */)) < 0)
-		panic("proc_create: %e", r);	/* one of 3 quaint usages of %e */
+		panic("proc_create: %d", r);
 	int argc = 0, envc = 0;
 	if(argv) while(argv[argc]) argc++;
 	if(envp) while(envp[envc]) envc++;
@@ -467,6 +467,10 @@ static void __proc_free(struct kref *kref)
 	assert(kref_refcnt(&p->p_kref) == 0);
 	assert(TAILQ_EMPTY(&p->alarmset.list));
 
+	if (p->strace) {
+		kref_put(&p->strace->procs);
+		kref_put(&p->strace->users);
+	}
 	__vmm_struct_cleanup(p);
 	p->progname[0] = 0;
 	free_path(p, p->binary_path);
@@ -568,7 +572,7 @@ static bool scp_is_vcctx_ready(struct preempt_data *vcpd)
 }
 
 /* Dispatches a _S process to run on the current core.  This should never be
- * called to "restart" a core.   
+ * called to "restart" a core.
  *
  * This will always return, regardless of whether or not the calling core is
  * being given to a process. (it used to pop the tf directly, before we had
@@ -751,8 +755,6 @@ void __proc_startcore(struct proc *p, struct user_context *ctx)
 	 * to block later and lose track of our address space. */
 	assert(!is_ktask(pcpui->cur_kthread));
 	__set_proc_current(p);
-	/* Clear the current_ctx, since it is no longer used */
-	current_ctx = 0;	/* TODO: might not need this... */
 	__set_cpu_state(pcpui, CPU_STATE_USER);
 	proc_pop_ctx(ctx);
 }
@@ -807,10 +809,7 @@ void proc_destroy(struct proc *p)
 	uint32_t nr_cores_revoked = 0;
 	struct kthread *sleeper;
 	struct proc *child_i, *temp;
-	/* Can't spin on the proc lock with irq disabled.  This is a problem for all
-	 * places where we grab the lock, but it is particularly bad for destroy,
-	 * since we tend to call this from trap and irq handlers */
-	assert(irq_is_enabled());
+
 	spin_lock(&p->proc_lock);
 	/* storage for pc_arr is alloced at decl, which is after grabbing the lock*/
 	uint32_t pc_arr[p->procinfo->num_vcores];
@@ -1134,7 +1133,7 @@ void proc_yield(struct proc *p, bool being_nice)
 				 * WAITING.  one (or both) of us will see and make sure the proc
 				 * wakes up.  */
 				__proc_set_state(p, PROC_WAITING);
-				wrmb(); /* don't let the state write pass the notif read */ 
+				wrmb(); /* don't let the state write pass the notif read */
 				if (vcpd->notif_pending) {
 					__proc_set_state(p, PROC_RUNNING_S);
 					/* they can't handle events, just need to prevent a yield.
@@ -1576,7 +1575,7 @@ static void __proc_give_cores_running(struct proc *p, uint32_t *pc_arr,
 	for (int i = 0; i < num; i++) {
 		assert(__proc_give_a_pcore(p, pc_arr[i], &p->inactive_vcs, &vc_i));
 		send_kernel_message(pc_arr[i], __startcore, (long)p,
-		                    (long)vcore2vcoreid(p, vc_i), 
+		                    (long)vcore2vcoreid(p, vc_i),
 		                    (long)vc_i->nr_preempts_sent, KMSG_ROUTINE);
 	}
 	__seq_end_write(&p->procinfo->coremap_seqctr);
@@ -2293,7 +2292,7 @@ void proc_get_set(struct process_set *pset)
 		pset->procs = (struct proc **)
 			kzmalloc(pset->size * sizeof(struct proc *), KMALLOC_WAIT);
 		if (!pset->procs)
-			error(-ENOMEM, NULL);
+			error(-ENOMEM, ERROR_FIXME);
 
 		spin_lock(&pid_hash_lock);
 		hash_for_each(pid_hash, enum_proc, pset);

@@ -6,7 +6,7 @@
  *
  * Modified for the Akaros operating system:
  * Copyright (c) 2013-2014 The Regents of the University of California
- * Copyright (c) 2013-2015 Google Inc.
+ * Copyright (c) 2013-2016 Google Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,34 +24,10 @@
  * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE. */
+ * SOFTWARE.
+ */
 
-#include <vfs.h>
-#include <kfs.h>
-#include <slab.h>
-#include <kmalloc.h>
-#include <kref.h>
-#include <string.h>
-#include <stdio.h>
-#include <assert.h>
 #include <error.h>
-#include <cpio.h>
-#include <pmap.h>
-#include <smp.h>
-#include <ip.h>
-
-#include <vfs.h>
-#include <kfs.h>
-#include <slab.h>
-#include <kmalloc.h>
-#include <kref.h>
-#include <string.h>
-#include <stdio.h>
-#include <assert.h>
-#include <error.h>
-#include <cpio.h>
-#include <pmap.h>
-#include <smp.h>
 #include <ip.h>
 
 enum {
@@ -74,7 +50,7 @@ enum {
 struct fragment6;
 
 struct block *ip6reassemble(struct IP *, int unused_int, struct block *,
-							struct ip6hdr *);
+                            struct ip6hdr *);
 void ipfragfree6(struct IP *, struct fragment6 *);
 struct fragment6 *ipfragallo6(struct IP *);
 static struct block *procxtns(struct IP *ip, struct block *bp, int doreasm);
@@ -168,17 +144,16 @@ struct IP {
 	int iprouting;				/* true if we route like a gateway */
 };
 
-int
-ipoput6(struct Fs *f,
-		struct block *bp, int gating, int ttl, int tos, struct conv *c)
+int ipoput6(struct Fs *f, struct block *bp,
+            int gating, int ttl, int tos, struct conv *c)
 {
 	ERRSTACK(1);
 	int tentative;
 	struct Ipifc *ifc;
 	uint8_t *gate, nexthdr;
 	struct ip6hdr *eh;
-	int medialen, len, chunk, uflen, flen, seglen, lid, offset, fragoff,
-		morefrags, blklen;
+	int medialen, len, chunk, uflen, flen, seglen, lid, offset, fragoff;
+	int morefrags, blklen;
 	struct route *r, *sr;
 	struct fraghdr6 fraghdr;
 	struct block *xp, *nb;
@@ -213,7 +188,6 @@ ipoput6(struct Fs *f,
 	}
 
 	if (len >= IP_MAX) {
-//      print("len > IP_MAX, free\n");
 		ip->stats[OutDiscards]++;
 		netlog(f, Logip, "exceeded ip max size %I\n", eh->dst);
 		goto free;
@@ -221,7 +195,6 @@ ipoput6(struct Fs *f,
 
 	r = v6lookup(f, eh->dst, c);
 	if (r == NULL) {
-//      print("no route for %I, src %I free\n", eh->dst, eh->src);
 		ip->stats[OutNoRoutes]++;
 		netlog(f, Logip, "no interface %I\n", eh->dst);
 		rv = -1;
@@ -272,12 +245,11 @@ ipoput6(struct Fs *f,
 
 	if (gating)
 		if (ifc->reassemble <= 0) {
-
-			/* v6 intermediate nodes are not supposed to fragment pkts;
-			   we fragment if ifc->reassemble is turned on; an exception
-			   needed for nat.
+			/*
+			 * v6 intermediate nodes are not supposed to fragment pkts;
+			 * we fragment if ifc->reassemble is turned on; an exception
+			 * needed for nat.
 			 */
-
 			ip->stats[OutDiscards]++;
 			icmppkttoobig6(f, ifc, bp);
 			netlog(f, Logip, "%I: gated pkts not fragmented\n", eh->dst);
@@ -595,7 +567,7 @@ struct block *procopts(struct block *bp)
 }
 
 struct block *ip6reassemble(struct IP *ip, int uflen, struct block *bp,
-							struct ip6hdr *ih)
+                            struct ip6hdr *ih)
 {
 
 	int fend, offset;
@@ -769,5 +741,6 @@ struct block *ip6reassemble(struct IP *ip, int uflen, struct block *bp,
 		pktposn += BKFG(bl)->flen;
 	}
 	qunlock(&ip->fraglock6);
+
 	return NULL;
 }

@@ -5,6 +5,8 @@
 
 #include <ros/common.h>
 #include <process.h>
+#include <kref.h>
+#include <ns.h>
 
 #define SYSTRACE_ON					0x01
 #define SYSTRACE_LOUD				0x02
@@ -38,6 +40,16 @@ struct systrace_record {
 		uint8_t			datalen;
 	};
 	uint8_t			data[SYSTR_RECORD_SZ - sizeof(struct systrace_record_anon)];
+};
+
+struct strace {
+	bool tracing;
+	bool inherit;
+	atomic_t nr_drops;
+	unsigned long appx_nr_sysc;
+	struct kref procs; /* when procs goes to zero, q is hung up. */
+	struct kref users; /* when users goes to zero, q and struct are freed. */
+	struct queue *q;
 };
 
 /* Syscall table */

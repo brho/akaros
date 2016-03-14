@@ -13,6 +13,7 @@
 #include <pmap.h>
 #include <kdebug.h>
 #include <string.h>
+#include <cpu_feat.h>
 
 /* Check Intel's SDM 2a for Table 3-17 for the cpuid leaves */
 void print_cpuinfo(void)
@@ -23,12 +24,13 @@ void print_cpuinfo(void)
 	char vendor_id[13];
 	int max_std_lvl, max_extd_lvl;
 	extern char _start[];
-	bool is_intel;
 
 	if (sizeof(long) == 8)
 		printk("64 bit Kernel Booting...\n");
 	else
 		printk("32 bit Kernel Booting...\n");
+
+	// x86 Vendor Detection:
 	asm volatile ("cpuid;"
 	          "movl    %%ebx, (%2);"
 	          "movl    %%edx, 4(%2);"
@@ -40,10 +42,15 @@ void print_cpuinfo(void)
 	vendor_id[12] = '\0';
 	cprintf("Vendor ID: %s\n", vendor_id);
 	/* not a great check - old intel P5s have no vendor id */
-	is_intel = !strcmp(vendor_id, "GenuineIntel");
+	if (!strcmp(vendor_id, "GenuineIntel"))
+		cpu_set_feat(CPU_FEAT_X86_VENDOR_INTEL);
+	else if (!strcmp(vendor_id, "AuthenticAMD"))
+		cpu_set_feat(CPU_FEAT_X86_VENDOR_AMD);
+
+
 	/* intel supports a way to hide the upper leaves of cpuid, beyond 3.  the
 	 * bios might have done this, so we'll make sure it is off. */
-	if (is_intel) {
+	if (cpu_has_feat(CPU_FEAT_X86_VENDOR_INTEL)) {
 		msr_val = read_msr(IA32_MISC_ENABLE);
 		if (msr_val & (1 << 22))
 			write_msr(IA32_MISC_ENABLE, msr_val & ~(1 << 22));
@@ -75,6 +82,8 @@ void print_cpuinfo(void)
 		panic("MSRs not supported!");
 	if (!(edx & 0x00001000))
 		panic("MTRRs not supported!");
+	if (!(edx & (1 << 16)))
+		panic("PAT not supported!");
 	if (!(edx & 0x00002000))
 		panic("Global Pages not supported!");
 	if (!(edx & 0x00000200))
@@ -84,14 +93,14 @@ void print_cpuinfo(void)
 	else
 		cprintf("x2APIC Not Detected\n");
 	/* Not sure how to detect AMD HW virt yet. */
-	if ((ecx & 0x00000060) && is_intel) {
+	if ((ecx & 0x00000060) && cpu_has_feat(CPU_FEAT_X86_VENDOR_INTEL)) {
 		msr_val = read_msr(IA32_FEATURE_CONTROL);
 		printd("64 Bit Feature Control: 0x%08x\n", msr_val);
 		if ((msr_val & 0x5) == 0x5)
 			printk("Hardware virtualization supported\n");
 		else
 			printk("Hardware virtualization not supported\n");
-	} else { 
+	} else {
 		printk("Hardware virtualization not detected.  (AMD?)\n");
 	}
 	/* FP and SSE Checks */
@@ -132,15 +141,11 @@ void print_cpuinfo(void)
 	cpuid(0x07, 0x0, &eax, &ebx, &ecx, &edx);
 	if (ebx & 0x00000001) {
 		printk("FS/GS Base RD/W supported\n");
-		/* Untested, since we don't have a machine that supports this.  Email us
-		 * if this fails. */
-		printk("Attempting to enable WRFSBASE...\n");
-		lcr4(rcr4() | (1 << 16));
+		cpu_set_feat(CPU_FEAT_X86_FSGSBASE);
 	} else {
 		printk("FS/GS Base RD/W not supported\n");
 		#ifdef CONFIG_NOFASTCALL_FSBASE
-		printk("\nGIANT WARNING: Can't write FS Base from userspace, "
-		       "and no FASTCALL support!\n\n");
+		panic("Can't write FS Base from userspace, and no FASTCALL support!");
 		#endif
 	}
 	cpuid(0x80000001, 0x0, &eax, &ebx, &ecx, &edx);
@@ -165,6 +170,22 @@ void print_cpuinfo(void)
 		printk("Always running APIC detected\n");
 	else
 		printk("Always running APIC *not* detected\n");
+
+	/* TODO: Eventually consolidate all of our "cpuid" stuff. */
+	#define CPUID_FXSR_SUPPORT          (1 << 24)
+	#define CPUID_XSAVE_SUPPORT         (1 << 26)
+	#define CPUID_XSAVEOPT_SUPPORT      (1 << 0)
+
+	cpuid(0x01, 0x00, 0, 0, &ecx, &edx);
+	if (CPUID_FXSR_SUPPORT & edx)
+		cpu_set_feat(CPU_FEAT_X86_FXSR);
+	if (CPUID_XSAVE_SUPPORT & ecx)
+		cpu_set_feat(CPU_FEAT_X86_XSAVE);
+
+	cpuid(0x0d, 0x01, &eax, 0, 0, 0);
+	if (CPUID_XSAVEOPT_SUPPORT & eax)
+		cpu_set_feat(CPU_FEAT_X86_XSAVEOPT);
+
 }
 
 #define BIT_SPACING "        "
@@ -198,8 +219,8 @@ void show_mapping(pgdir_t pgdir, uintptr_t start, size_t size)
 			       pte_is_jumbo(pte),
 			       pte_is_dirty(pte),
 			       pte_is_accessed(pte),
-			       (pte_print(pte) & PTE_PCD) / PTE_PCD,
-			       (pte_print(pte) & PTE_PWT) / PTE_PWT,
+			       (pte_print(pte) & __PTE_PCD) / __PTE_PCD,
+			       (pte_print(pte) & __PTE_PWT) / __PTE_PWT,
 			       (perm & PTE_U) / PTE_U,
 			       (perm & PTE_W) / PTE_W,
 			       pte_is_present(pte),

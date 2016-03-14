@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <kmalloc.h>
 #include <page_alloc.h>
+#include <umem.h>
 
 extern char boot_pml4[], gdt64[], gdt64desc[];
 pgdir_t boot_pgdir;
@@ -426,20 +427,20 @@ static void check_syms_va(void)
 {
 	/* Make sure our symbols are up to date (see arch/ros/mmu64.h) */
 	check_sym_va(KERN_LOAD_ADDR, 0xffffffffc0000000);
-	check_sym_va(LAPIC_BASE,     0xffffffffbff00000);
-	check_sym_va(IOAPIC_BASE,    0xffffffffbfe00000);
+	check_sym_va(IOAPIC_BASE,    0xffffffffbff00000);
 	check_sym_va(VPT_TOP,        0xffffff0000000000);
 	check_sym_va(VPT,            0xfffffe8000000000);
 	check_sym_va(KERN_VMAP_TOP,  0xfffffe8000000000);
 	check_sym_va(KERNBASE,       0xffff800000000000);
 	check_sym_va(ULIM,           0x0000800000000000);
 	check_sym_va(UVPT,           0x00007f8000000000);
-	check_sym_va(UINFO,          0x00007f7fffe00000);
-	check_sym_va(UWLIM,          0x00007f7fffe00000);
-	check_sym_va(UDATA,          0x00007f7fffc00000);
-	check_sym_va(UGDATA,         0x00007f7fffbff000);
-	check_sym_va(UMAPTOP,        0x00007f7fffbff000);
-	check_sym_va(USTACKTOP,      0x00007f7fffbff000);
+	check_sym_va(UGINFO,         0x00007f7fffe00000);
+	check_sym_va(UINFO,          0x00007f7fffc00000);
+	check_sym_va(UWLIM,          0x00007f7fffc00000);
+	check_sym_va(UDATA,          0x00007f7fffa00000);
+	check_sym_va(UGDATA,         0x00007f7fff9ff000);
+	check_sym_va(UMAPTOP,        0x00007f7fff9ff000);
+	check_sym_va(USTACKTOP,      0x00007f7fff9ff000);
 	check_sym_va(BRK_END,        0x0000400000000000);
 }
 
@@ -467,10 +468,8 @@ void vm_init(void)
 	}
 	/* For the LAPIC and IOAPIC, we use PAT (but not *the* PAT flag) to make
 	 * these type UC */
-	map_segment(boot_pgdir, LAPIC_BASE, APIC_SIZE, LAPIC_PBASE,
-	            PTE_PCD | PTE_PWT | PTE_KERN_RW | PTE_G, max_jumbo_shift);
 	map_segment(boot_pgdir, IOAPIC_BASE, APIC_SIZE, IOAPIC_PBASE,
-	            PTE_PCD | PTE_PWT | PTE_KERN_RW | PTE_G, max_jumbo_shift);
+	            PTE_NOCACHE | PTE_KERN_RW | PTE_G, max_jumbo_shift);
 	/* VPT mapping: recursive PTE inserted at the VPT spot */
 	boot_kpt[PML4(VPT)] = PADDR(boot_kpt) | PTE_W | PTE_P;
 	/* same for UVPT, accessible by userspace (RO). */
@@ -547,6 +546,46 @@ error_t	pagetable_remove(pgdir_t pgdir, void *va)
 
 void page_check(void)
 {
+}
+
+/* Similar to the kernels page table walk, but walks the guest page tables for a
+ * guest_va.  Takes a proc and user virtual (guest physical) address for the
+ * PML, returning the actual PTE (copied out of userspace). */
+static kpte_t __guest_pml_walk(struct proc *p, kpte_t *u_pml, uintptr_t gva,
+                               int flags, int pml_shift)
+{
+	kpte_t pte;
+
+	if (memcpy_from_user(p, &pte, &u_pml[PMLx(gva, pml_shift)],
+	                     sizeof(kpte_t))) {
+		printk("Buggy pml %p, tried %p\n", u_pml, &u_pml[PMLx(gva, pml_shift)]);
+		return 0;
+	}
+	if (walk_is_complete(&pte, pml_shift, flags))
+		return pte;
+	if (!kpte_is_present(&pte))
+		return 0;
+	return __guest_pml_walk(p, (kpte_t*)PTE_ADDR(pte), gva, flags,
+	                        pml_shift - BITS_PER_PML);
+}
+
+uintptr_t gva2gpa(struct proc *p, uintptr_t cr3, uintptr_t gva)
+{
+	kpte_t pte;
+	int shift = PML1_SHIFT;
+
+	pte = __guest_pml_walk(p, (kpte_t*)cr3, gva, shift, PML4_SHIFT);
+	if (!pte)
+		return 0;
+	/* TODO: Jumbos mess with us.  We need to know the shift the walk did.  This
+	 * is a little nasty, but will work til we make Akaros more jumbo-aware. */
+	while (pte & PTE_PS) {
+		shift += BITS_PER_PML;
+		pte = __guest_pml_walk(p, (kpte_t*)cr3, gva, shift, PML4_SHIFT);
+		if (!pte)
+			return 0;
+	}
+	return (pte & ~((1 << shift) - 1)) | (gva & ((1 << shift) - 1));
 }
 
 /* Sets up the page directory, based on boot_copy.

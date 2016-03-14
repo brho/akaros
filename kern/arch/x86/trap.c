@@ -232,7 +232,6 @@ static void handle_fperr(struct hw_trapframe *hw_tf)
 	if (fpsw & ~fpcw & FP_EXCP_PE)
 		printk("\tInexact result (precision)\n");
 	printk("Killing the process.\n");
-	enable_irq();
 	proc_destroy(current);
 }
 
@@ -343,8 +342,9 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 				print_trapframe(hw_tf);
 				backtrace_hwtf(hw_tf);
 			}
-			char *fn_name = get_fn_name(x86_get_ip_hw(hw_tf));
-			printk("Core %d is at %p (%s)\n", core_id(), x86_get_ip_hw(hw_tf),
+			char *fn_name = get_fn_name(get_hwtf_pc(hw_tf));
+
+			printk("Core %d is at %p (%s)\n", core_id(), get_hwtf_pc(hw_tf),
 			       fn_name);
 			kfree(fn_name);
 			print_kmsgs(core_id());
@@ -358,7 +358,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 		case T_ILLOP:
 		{
 			/* TODO: this can PF if there is a concurrent unmap/PM removal. */
-			uintptr_t ip = x86_get_ip_hw(hw_tf);
+			uintptr_t ip = get_hwtf_pc(hw_tf);
 			pcpui = &per_cpu_info[core_id()];
 			pcpui->__lock_checking_enabled--;		/* for print debugging */
 			/* We will muck with the actual TF.  If we're dealing with
@@ -367,13 +367,13 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			 * the same).  See set_current_ctx() for more info. */
 			if (!in_kernel(hw_tf))
 				hw_tf = &pcpui->cur_ctx->tf.hw_tf;
-			printd("bad opcode, eip: %p, next 3 bytes: %x %x %x\n", ip, 
-			       *(uint8_t*)(ip + 0), 
-			       *(uint8_t*)(ip + 1), 
-			       *(uint8_t*)(ip + 2)); 
+			printd("bad opcode, eip: %p, next 3 bytes: %x %x %x\n", ip,
+			       *(uint8_t*)(ip + 0),
+			       *(uint8_t*)(ip + 1),
+			       *(uint8_t*)(ip + 2));
 			/* rdtscp: 0f 01 f9 */
-			if (*(uint8_t*)(ip + 0) == 0x0f, 
-			    *(uint8_t*)(ip + 1) == 0x01, 
+			if (*(uint8_t*)(ip + 0) == 0x0f,
+			    *(uint8_t*)(ip + 1) == 0x01,
 			    *(uint8_t*)(ip + 2) == 0xf9) {
 				x86_fake_rdtscp(hw_tf);
 				pcpui->__lock_checking_enabled++;	/* for print debugging */
@@ -436,7 +436,6 @@ static void set_current_ctx_hw(struct per_cpu_info *pcpui,
                                struct hw_trapframe *hw_tf)
 {
 	assert(!irq_is_enabled());
-	assert(!pcpui->cur_ctx);
 	pcpui->actual_ctx.type = ROS_HW_CTX;
 	pcpui->actual_ctx.tf.hw_tf = *hw_tf;
 	pcpui->cur_ctx = &pcpui->actual_ctx;
@@ -446,9 +445,17 @@ static void set_current_ctx_sw(struct per_cpu_info *pcpui,
                                struct sw_trapframe *sw_tf)
 {
 	assert(!irq_is_enabled());
-	assert(!pcpui->cur_ctx);
 	pcpui->actual_ctx.type = ROS_SW_CTX;
 	pcpui->actual_ctx.tf.sw_tf = *sw_tf;
+	pcpui->cur_ctx = &pcpui->actual_ctx;
+}
+
+static void set_current_ctx_vm(struct per_cpu_info *pcpui,
+                               struct vm_trapframe *vm_tf)
+{
+	assert(!irq_is_enabled());
+	pcpui->actual_ctx.type = ROS_VM_CTX;
+	pcpui->actual_ctx.tf.vm_tf = *vm_tf;
 	pcpui->cur_ctx = &pcpui->actual_ctx;
 }
 
@@ -487,22 +494,11 @@ static bool vector_is_irq(int apic_vec)
 	return (IdtPIC <= apic_vec) && (apic_vec <= IdtMAX);
 }
 
-/* Note IRQs are disabled unless explicitly turned on.
- *
- * In general, we should only get trapno's >= PIC1_OFFSET (32).  Anything else
- * should be a trap.  Even if we don't use the PIC, that should be the standard.
- * It is possible to get a spurious LAPIC IRQ with vector 15 (or similar), but
- * the spurious check should catch that.
- *
- * Note that from hardware's perspective (PIC, etc), IRQs start from 0, but they
- * are all mapped up at PIC1_OFFSET for the cpu / irq_handler. */
-void handle_irq(struct hw_trapframe *hw_tf)
+static void irq_dispatch(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct irq_handler *irq_h;
-	/* Copy out the TF for now */
-	if (!in_kernel(hw_tf))
-		set_current_ctx_hw(pcpui, hw_tf);
+
 	if (!in_irq_ctx(pcpui))
 		__set_cpu_state(pcpui, CPU_STATE_IRQ);
 	inc_irq_depth(pcpui);
@@ -545,6 +541,25 @@ out_no_eoi:
 	dec_irq_depth(pcpui);
 	if (!in_irq_ctx(pcpui))
 		__set_cpu_state(pcpui, CPU_STATE_KERNEL);
+}
+
+/* Note IRQs are disabled unless explicitly turned on.
+ *
+ * In general, we should only get trapno's >= PIC1_OFFSET (32).  Anything else
+ * should be a trap.  Even if we don't use the PIC, that should be the standard.
+ * It is possible to get a spurious LAPIC IRQ with vector 15 (or similar), but
+ * the spurious check should catch that.
+ *
+ * Note that from hardware's perspective (PIC, etc), IRQs start from 0, but they
+ * are all mapped up at PIC1_OFFSET for the cpu / irq_handler. */
+void handle_irq(struct hw_trapframe *hw_tf)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	/* Copy out the TF for now */
+	if (!in_kernel(hw_tf))
+		set_current_ctx_hw(pcpui, hw_tf);
+	irq_dispatch(hw_tf);
 	/* Return to the current process, which should be runnable.  If we're the
 	 * kernel, we should just return naturally.  Note that current and tf need
 	 * to still be okay (might not be after blocking) */
@@ -660,4 +675,226 @@ void send_ipi(uint32_t os_coreid, uint8_t vector)
 		return;
 	}
 	__send_ipi(hw_coreid, vector);
+}
+
+/****************** VM exit handling ******************/
+
+static bool handle_vmexit_cpuid(struct vm_trapframe *tf)
+{
+	uint32_t eax, ebx, ecx, edx;
+
+	cpuid(tf->tf_rax, tf->tf_rcx, &eax, &ebx, &ecx, &edx);
+	tf->tf_rax = eax;
+	tf->tf_rbx = ebx;
+	tf->tf_rcx = ecx;
+	tf->tf_rdx = edx;
+	tf->tf_rip += 2;
+	return TRUE;
+}
+
+static bool handle_vmexit_ept_fault(struct vm_trapframe *tf)
+{
+	int prot = 0;
+	int ret;
+
+	prot |= tf->tf_exit_qual & VMX_EPT_FAULT_READ ? PROT_READ : 0;
+	prot |= tf->tf_exit_qual & VMX_EPT_FAULT_WRITE ? PROT_WRITE : 0;
+	prot |= tf->tf_exit_qual & VMX_EPT_FAULT_INS ? PROT_EXEC : 0;
+	ret = handle_page_fault(current, tf->tf_guest_pa, prot);
+	if (ret) {
+		/* TODO: maybe put ret in the TF somewhere */
+		return FALSE;
+	}
+	return TRUE;
+}
+
+static bool handle_vmexit_nmi(struct vm_trapframe *tf)
+{
+	/* Sanity checks, make sure we really got an NMI.  Feel free to remove. */
+	assert((tf->tf_intrinfo2 & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI_INTR);
+	assert((tf->tf_intrinfo2 & INTR_INFO_VECTOR_MASK) == T_NMI);
+	/* our NMI handler from trap.c won't run.  but we don't need the lock
+	 * disabling stuff. */
+	extern bool mon_verbose_trace;
+
+	if (mon_verbose_trace) {
+		print_vmtrapframe(tf);
+		/* TODO: a backtrace of the guest would be nice here. */
+	}
+	printk("Core %d is at %p\n", core_id(), get_vmtf_pc(tf));
+	return TRUE;
+}
+
+bool handle_vmexit_msr(struct vm_trapframe *tf)
+{
+	bool ret;
+
+	ret = vmm_emulate_msr(&tf->tf_rcx, &tf->tf_rdx, &tf->tf_rax,
+	                      (tf->tf_exit_reason == EXIT_REASON_MSR_READ
+						   ? VMM_MSR_EMU_READ : VMM_MSR_EMU_WRITE));
+	if (ret)
+		tf->tf_rip += 2;
+	return ret;
+}
+
+bool handle_vmexit_extirq(struct vm_trapframe *tf)
+{
+	struct hw_trapframe hw_tf;
+
+	/* For now, we just handle external IRQs.  I think guest traps should go to
+	 * the guest, based on our vmctls */
+	assert((tf->tf_intrinfo2 & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_EXT_INTR);
+	/* TODO: Our IRQ handlers all expect TFs.  Let's fake one.  A bunch of
+	 * handlers (e.g. backtrace/perf) will probably be unhappy about a user TF
+	 * that is really a VM, so this all needs work. */
+	hw_tf.tf_gsbase = 0;
+	hw_tf.tf_fsbase = 0;
+	hw_tf.tf_rax = tf->tf_rax;
+	hw_tf.tf_rbx = tf->tf_rbx;
+	hw_tf.tf_rcx = tf->tf_rcx;
+	hw_tf.tf_rdx = tf->tf_rdx;
+	hw_tf.tf_rbp = tf->tf_rbp;
+	hw_tf.tf_rsi = tf->tf_rsi;
+	hw_tf.tf_rdi = tf->tf_rdi;
+	hw_tf.tf_r8 = tf->tf_r8;
+	hw_tf.tf_r9 = tf->tf_r9;
+	hw_tf.tf_r10 = tf->tf_r10;
+	hw_tf.tf_r11 = tf->tf_r11;
+	hw_tf.tf_r12 = tf->tf_r12;
+	hw_tf.tf_r13 = tf->tf_r13;
+	hw_tf.tf_r14 = tf->tf_r14;
+	hw_tf.tf_r15 = tf->tf_r15;
+	hw_tf.tf_trapno = tf->tf_intrinfo2 & INTR_INFO_VECTOR_MASK;
+	hw_tf.tf_err = 0;
+	hw_tf.tf_rip = tf->tf_rip;
+	hw_tf.tf_cs = GD_UT;	/* faking a user TF, even though it's a VM */
+	hw_tf.tf_rflags = tf->tf_rflags;
+	hw_tf.tf_rsp = tf->tf_rsp;
+	hw_tf.tf_ss = GD_UD;
+
+	irq_dispatch(&hw_tf);
+	/* Consider returning whether or not there was a handler registered */
+	return TRUE;
+}
+
+static bool handle_vmexit_xsetbv(struct vm_trapframe *tf)
+{
+	// The VM's requested-feature bitmap is represented by edx:eax
+	uint64_t vm_rfbm = (tf->tf_rdx << 32) | tf->tf_rax;
+
+	// If the VM tries to set xcr0 to a superset
+	// of Akaros's default value, kill the VM.
+
+	// Bit in vm_rfbm and x86_default_xcr0:        Ok. Requested and allowed.
+	// Bit in vm_rfbm but not x86_default_xcr0:    Bad! Requested, not allowed.
+	// Bit not in vm_rfbm but in x86_default_xcr0: Ok. Not requested.
+
+	// vm_rfbm & (~x86_default_xcr0) is nonzero if any bits
+	// are set in vm_rfbm but not x86_default_xcr0
+
+	if (vm_rfbm & (~x86_default_xcr0))
+		return FALSE;
+
+
+	// If attempting to use vm_rfbm for xsetbv
+	// causes a fault, we reflect to the VMM.
+	if (safe_lxcr0(vm_rfbm))
+		return FALSE;
+
+
+	// If no fault, advance the instruction pointer
+	// and return TRUE to make the VM resume.
+	tf->tf_rip += 3; // XSETBV is a 3-byte instruction
+	return TRUE;
+}
+
+static void vmexit_dispatch(struct vm_trapframe *tf)
+{
+	bool handled = FALSE;
+
+	/* Do not block in any of these functions.
+	 *
+	 * If we block, we'll probably need to finalize the context.  If we do, then
+	 * there's a chance the guest pcore can start somewhere else, and then we
+	 * can't get the GPC loaded again.  Plus, they could be running a GPC with
+	 * an unresolved vmexit.  It's just mess.
+	 *
+	 * If we want to enable IRQs, we can do so on a case-by-case basis.  Don't
+	 * do it for external IRQs - the irq_dispatch code will handle it. */
+	switch (tf->tf_exit_reason) {
+	case EXIT_REASON_VMCALL:
+		if (current->vmm.flags & VMM_VMCALL_PRINTF) {
+			printk("%c", tf->tf_rdi);
+			tf->tf_rip += 3;
+			handled = TRUE;
+		}
+		break;
+	case EXIT_REASON_CPUID:
+		handled = handle_vmexit_cpuid(tf);
+		break;
+	case EXIT_REASON_EPT_VIOLATION:
+		handled = handle_vmexit_ept_fault(tf);
+		break;
+	case EXIT_REASON_EXCEPTION_NMI:
+		handled = handle_vmexit_nmi(tf);
+		break;
+	case EXIT_REASON_MSR_READ:
+	case EXIT_REASON_MSR_WRITE:
+		handled = handle_vmexit_msr(tf);
+		break;
+	case EXIT_REASON_EXTERNAL_INTERRUPT:
+		handled = handle_vmexit_extirq(tf);
+		break;
+	case EXIT_REASON_XSETBV:
+		handled = handle_vmexit_xsetbv(tf);
+		break;
+	default:
+		printd("Unhandled vmexit: reason 0x%x, exit qualification 0x%x\n",
+		       tf->tf_exit_reason, tf->tf_exit_qual);
+	}
+	if (!handled) {
+		tf->tf_flags |= VMCTX_FL_HAS_FAULT;
+		if (reflect_current_context()) {
+			/* VM contexts shouldn't be in vcore context, so this should be
+			 * pretty rare (unlike SCPs or VC ctx page faults). */
+			printk("[kernel] Unable to reflect VM Exit\n");
+			print_vmtrapframe(tf);
+			proc_destroy(current);
+		}
+	}
+}
+
+void handle_vmexit(struct vm_trapframe *tf)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	tf->tf_rip = vmcs_read(GUEST_RIP);
+	tf->tf_rflags = vmcs_read(GUEST_RFLAGS);
+	tf->tf_rsp = vmcs_read(GUEST_RSP);
+	tf->tf_cr2 = rcr2();
+	tf->tf_cr3 = vmcs_read(GUEST_CR3);
+	tf->tf_guest_pcoreid = pcpui->guest_pcoreid;
+	tf->tf_flags |= VMCTX_FL_PARTIAL;
+	tf->tf_exit_reason = vmcs_read(VM_EXIT_REASON);
+	tf->tf_exit_qual = vmcs_read(EXIT_QUALIFICATION);
+	tf->tf_intrinfo1 = vmcs_read(GUEST_INTERRUPTIBILITY_INFO);
+	tf->tf_intrinfo2 = vmcs_read(VM_EXIT_INTR_INFO);
+	tf->tf_guest_va = vmcs_read(GUEST_LINEAR_ADDRESS);
+	tf->tf_guest_pa = vmcs_read(GUEST_PHYSICAL_ADDRESS);
+
+	set_current_ctx_vm(pcpui, tf);
+	tf = &pcpui->cur_ctx->tf.vm_tf;
+	vmexit_dispatch(tf);
+	/* We're either restarting a partial VM ctx (vmcs was launched, loaded on
+	 * the core, etc) or a SW vc ctx for the reflected trap.  Or the proc is
+	 * dying and we'll handle a __death KMSG shortly. */
+	proc_restartcore();
+}
+
+void x86_finalize_vmtf(struct vm_trapframe *tf)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	x86_vmtf_clear_partial(tf);
+	unload_guest_pcore(pcpui->cur_proc, pcpui->guest_pcoreid);
 }

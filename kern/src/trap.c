@@ -17,6 +17,14 @@ static void print_unhandled_trap(struct proc *p, struct user_context *ctx,
                                  unsigned int trap_nr, unsigned int err,
                                  unsigned long aux)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	uint32_t vcoreid = pcpui->owning_vcoreid;
+	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
+
+	if (!proc_is_vcctx_ready(p))
+		printk("Unhandled user trap from early SCP\n");
+	else if (vcpd->notif_disabled)
+		printk("Unhandled user trap in vcore context from VC %d\n", vcoreid);
 	print_user_ctx(ctx);
 	printk("err 0x%x (for PFs: User 4, Wr 2, Rd 1), aux %p\n", err, aux);
 	debug_addr_proc(p, get_user_ctx_pc(ctx));
@@ -38,68 +46,76 @@ static void printx_unhandled_trap(struct proc *p, struct user_context *ctx,
 		print_unhandled_trap(p, ctx, trap_nr, err, aux);
 }
 
-void reflect_unhandled_trap(unsigned int trap_nr, unsigned int err,
-                            unsigned long aux)
+/* Helper, reflects the current context back to the 2LS.  Returns 0 on success,
+ * -1 on failure. */
+int reflect_current_context(void)
 {
 	uint32_t coreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	struct proc *p = pcpui->cur_proc;
 	uint32_t vcoreid = pcpui->owning_vcoreid;
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
-	struct hw_trapframe *hw_tf = &pcpui->cur_ctx->tf.hw_tf;
+
+	if (!proc_is_vcctx_ready(p))
+		return -1;
+	if (vcpd->notif_disabled)
+		return -1;
+	/* the guts of a __notify */
+	vcpd->notif_disabled = TRUE;
+	copy_current_ctx_to(&vcpd->uthread_ctx);
+	memset(pcpui->cur_ctx, 0, sizeof(struct user_context));
+	proc_init_ctx(pcpui->cur_ctx, vcoreid, vcpd->vcore_entry,
+	              vcpd->vcore_stack, vcpd->vcore_tls_desc);
+	return 0;
+}
+
+void reflect_unhandled_trap(unsigned int trap_nr, unsigned int err,
+                            unsigned long aux)
+{
+	uint32_t coreid = core_id();
+	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
+	struct proc *p = pcpui->cur_proc;
+
 	assert(p);
 	assert(pcpui->cur_ctx && (pcpui->cur_ctx->type == ROS_HW_CTX));
-	if (!proc_is_vcctx_ready(p)) {
-		printk("Unhandled user trap from early SCP\n");
-		goto error_out;
-	}
-	if (vcpd->notif_disabled) {
-		printk("Unhandled user trap in vcore context from VC %d\n", vcoreid);
-		goto error_out;
-	}
-	printx_unhandled_trap(p, pcpui->cur_ctx, trap_nr, err, aux);
 	/* need to store trap_nr, err code, and aux into the tf so that it can get
 	 * extracted on the other end, and we need to flag the TF in some way so we
 	 * can tell it was reflected.  for example, on a PF, we need some number (14
 	 * on x86), the prot violation (write, read, etc), and the virt addr (aux).
 	 * parlib will know how to extract this info. */
-	__arch_reflect_trap_hwtf(hw_tf, trap_nr, err, aux);
-	/* the guts of a __notify */
-	vcpd->notif_disabled = TRUE;
-	vcpd->uthread_ctx = *pcpui->cur_ctx;
-	memset(pcpui->cur_ctx, 0, sizeof(struct user_context));
-	proc_init_ctx(pcpui->cur_ctx, vcoreid, vcpd->vcore_entry,
-	              vcpd->vcore_stack, vcpd->vcore_tls_desc);
-	return;
-error_out:
-	print_unhandled_trap(p, pcpui->cur_ctx, trap_nr, err, aux);
-	enable_irq();
-	proc_destroy(p);
+	__arch_reflect_trap_hwtf(&pcpui->cur_ctx->tf.hw_tf, trap_nr, err, aux);
+	printx_unhandled_trap(p, pcpui->cur_ctx, trap_nr, err, aux);
+	if (reflect_current_context()) {
+		print_unhandled_trap(p, pcpui->cur_ctx, trap_nr, err, aux);
+		proc_destroy(p);
+	}
 }
 
 uintptr_t get_user_ctx_pc(struct user_context *ctx)
 {
 	switch (ctx->type) {
-		case ROS_HW_CTX:
-			return get_hwtf_pc(&ctx->tf.hw_tf);
-		case ROS_SW_CTX:
-			return get_swtf_pc(&ctx->tf.sw_tf);
-		default:
-			warn("Bad context type %d for ctx %p\n", ctx->type, ctx);
-			return 0;
+	case ROS_HW_CTX:
+		return get_hwtf_pc(&ctx->tf.hw_tf);
+	case ROS_SW_CTX:
+		return get_swtf_pc(&ctx->tf.sw_tf);
+	case ROS_VM_CTX:
+		return get_vmtf_pc(&ctx->tf.vm_tf);
+	default:
+		panic("Bad context type %d for ctx %p\n", ctx->type, ctx);
 	}
 }
 
 uintptr_t get_user_ctx_fp(struct user_context *ctx)
 {
 	switch (ctx->type) {
-		case ROS_HW_CTX:
-			return get_hwtf_fp(&ctx->tf.hw_tf);
-		case ROS_SW_CTX:
-			return get_swtf_fp(&ctx->tf.sw_tf);
-		default:
-			warn("Bad context type %d for ctx %p\n", ctx->type, ctx);
-			return 0;
+	case ROS_HW_CTX:
+		return get_hwtf_fp(&ctx->tf.hw_tf);
+	case ROS_SW_CTX:
+		return get_swtf_fp(&ctx->tf.sw_tf);
+	case ROS_VM_CTX:
+		return get_vmtf_fp(&ctx->tf.vm_tf);
+	default:
+		panic("Bad context type %d for ctx %p\n", ctx->type, ctx);
 	}
 }
 
@@ -275,7 +291,7 @@ void print_kmsgs(uint32_t coreid)
 		STAILQ_FOREACH(kmsg_i, list, link) {
 			fn_name = get_fn_name((long)kmsg_i->pc);
 			printk("%s KMSG on %d from %d to run %p(%s)\n", type,
-			       kmsg_i->dstid, kmsg_i->srcid, kmsg_i->pc, fn_name); 
+			       kmsg_i->dstid, kmsg_i->srcid, kmsg_i->pc, fn_name);
 			kfree(fn_name);
 		}
 	}
@@ -317,7 +333,7 @@ void kmsg_queue_stat(void)
 			printk("\targ1: %p\n", kmsg->arg1);
 			printk("\targ2: %p\n", kmsg->arg2);
 		}
-			
+
 	}
 }
 
@@ -325,7 +341,7 @@ void print_kctx_depths(const char *str)
 {
 	uint32_t coreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
-	
+
 	if (!str)
 		str = "(none)";
 	printk("%s: Core %d, irq depth %d, ktrap depth %d, irqon %d\n", str, coreid,
@@ -334,10 +350,17 @@ void print_kctx_depths(const char *str)
 
 void print_user_ctx(struct user_context *ctx)
 {
-	if (ctx->type == ROS_SW_CTX)
-		print_swtrapframe(&ctx->tf.sw_tf);
-	else if (ctx->type == ROS_HW_CTX)
+	switch (ctx->type) {
+	case ROS_HW_CTX:
 		print_trapframe(&ctx->tf.hw_tf);
-	else
+		break;
+	case ROS_SW_CTX:
+		print_swtrapframe(&ctx->tf.sw_tf);
+		break;
+	case ROS_VM_CTX:
+		print_vmtrapframe(&ctx->tf.vm_tf);
+		break;
+	default:
 		printk("Bad TF %p type %d!\n", ctx, ctx->type);
+	}
 }

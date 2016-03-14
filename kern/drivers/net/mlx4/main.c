@@ -3949,6 +3949,29 @@ static int mlx4_pnp(struct ether *edev)
 	persist->edev = edev;
 	mlx4_en_init();
 
+	/*
+	 * In Linux, this is the module initialization vs device probe sequence:
+	 * Core init routine mlx4_init() first executes, then EN/IB interface
+	 * registration (mlx4_en_init(), mlx4_ib_init() invokes
+	 * mlx4_register_interface()). Then, probe flow
+	 * mlx4_pnp():mlx4_init_one():__mlx4_init_one():mlx4_load_one() does
+	 * mlx4_register_device(). This causes all registered
+	 * interface handlers (mlx4_en_add(), mlx4_ib_add()) to be invoked.
+	 *
+	 * In Akaros, the flow is different. Device probe flow first does
+	 * mlx4_register_device(). Then core init mlx4_init() followed by
+	 * interface registration. What should really happen is that
+	 * mlx4_init(), mlx4_en_init() and mlx4_ib_init() should be invoked
+	 * from ethermlx4_link() prior to device probe.
+	 */
+#ifdef CONFIG_MLX4_INFINIBAND
+	extern int mlx4_ib_init();
+	extern int ib_uverbs_init();
+
+	ib_uverbs_init();
+	mlx4_ib_init();
+#endif
+
 	// edev->ctlr is already initialized to struct mlx4_en_priv.
 	pdev = persist->pdev;
 	edev->irq = pdev->irqline;

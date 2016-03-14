@@ -463,16 +463,10 @@ void tcpsetstate(struct conv *s, uint8_t newstate)
 		Fsconnected(s, NULL);
 }
 
-static char *tcpconnect(struct conv *c, char **argv, int argc)
+static void tcpconnect(struct conv *c, char **argv, int argc)
 {
-	char *e;
-
-	e = Fsstdconnect(c, argv, argc);
-	if (e != NULL)
-		return e;
+	Fsstdconnect(c, argv, argc);
 	tcpstart(c, TCP_CONNECT);
-
-	return NULL;
 }
 
 static int tcpstate(struct conv *c, char *state, int n)
@@ -500,17 +494,11 @@ static int tcpinuse(struct conv *c)
 	return s->state != Closed;
 }
 
-static char *tcpannounce(struct conv *c, char **argv, int argc)
+static void tcpannounce(struct conv *c, char **argv, int argc)
 {
-	char *e;
-
-	e = Fsstdannounce(c, argv, argc);
-	if (e != NULL)
-		return e;
+	Fsstdannounce(c, argv, argc);
 	tcpstart(c, TCP_LISTEN);
 	Fsconnected(c, NULL);
-
-	return NULL;
 }
 
 /*
@@ -1235,7 +1223,7 @@ int ntohtcp4(Tcp * tcph, struct block **bpp)
  */
 void tcpsndsyn(struct conv *s, Tcpctl * tcb)
 {
-	tcb->iss = (nrand(1 << 16) << 16) | nrand(1 << 16);
+	urandom_read(&tcb->iss, sizeof(tcb->iss));
 	tcb->rttseq = tcb->iss;
 	tcb->snd.wl2 = tcb->iss;
 	tcb->snd.una = tcb->iss;
@@ -1337,18 +1325,14 @@ sndrst(struct Proto *tcp, uint8_t * source, uint8_t * dest,
  *  send a reset to the remote side and close the conversation
  *  called with s qlocked
  */
-char *tcphangup(struct conv *s)
+static void tcphangup(struct conv *s)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	Tcp seg;
 	Tcpctl *tcb;
 	struct block *hbp;
 
 	tcb = (Tcpctl *) s->ptcl;
-	if (waserror()) {
-		poperror();
-		return commonerror();
-	}
 	if (ipcmp(s->raddr, IPnoaddr)) {
 		/* discard error style, poperror regardless */
 		if (!waserror()) {
@@ -1378,8 +1362,6 @@ char *tcphangup(struct conv *s)
 		poperror();
 	}
 	localclose(s, NULL);
-	poperror();
-	return NULL;
 }
 
 /*
@@ -1508,7 +1490,7 @@ limbo(struct conv *s, uint8_t * source, uint8_t * dest, Tcp * seg, int version)
 		lp->mss = seg->mss;
 		lp->rcvscale = seg->ws;
 		lp->irs = seg->seq;
-		lp->iss = (nrand(1 << 16) << 16) | nrand(1 << 16);
+		urandom_read(&lp->iss, sizeof(lp->iss));
 	}
 
 	if (sndsynack(s->p, lp) < 0) {
@@ -2109,7 +2091,7 @@ reset:
 			}
 			if (seg.flags & RST) {
 				if (seg.flags & ACK)
-					localclose(s, errno_to_string(ECONNREFUSED));
+					localclose(s, "connection refused");
 				goto raise;
 			}
 
@@ -2214,7 +2196,7 @@ reset:
 						 s->raddr, s->rport, s->laddr, s->lport, tcb->rcv.nxt,
 						 seg.seq);
 			}
-			localclose(s, errno_to_string(ECONNREFUSED));
+			localclose(s, "connection refused");
 			goto raise;
 		}
 
@@ -2680,7 +2662,7 @@ void tcpsendka(struct conv *s)
 	seg.mss = 0;
 	seg.ws = 0;
 	if (tcpporthogdefense)
-		seg.seq = tcb->snd.una - (1 << 30) - nrand(1 << 20);
+		urandom_read(&seg.seq, sizeof(seg.seq));
 	else
 		seg.seq = tcb->snd.una - 1;
 	seg.ack = tcb->rcv.nxt;
@@ -2743,7 +2725,7 @@ void tcpkeepalive(void *v)
 	}
 	if (tcb->state != Closed) {
 		if (--(tcb->kacounter) <= 0) {
-			localclose(s, errno_to_string(ETIMEDOUT));
+			localclose(s, "connection timed out");
 		} else {
 			tcpsendka(s);
 			tcpgo(s->p->priv, &tcb->katimer);
@@ -2756,14 +2738,14 @@ void tcpkeepalive(void *v)
 /*
  *  start keepalive timer
  */
-char *tcpstartka(struct conv *s, char **f, int n)
+static void tcpstartka(struct conv *s, char **f, int n)
 {
 	Tcpctl *tcb;
 	int x;
 
 	tcb = (Tcpctl *) s->ptcl;
 	if (tcb->state != Established)
-		return "connection must be in Establised state";
+		error(ENOTCONN, "connection must be in Establised state");
 	if (n > 1) {
 		x = atoi(f[1]);
 		if (x >= MSPTICK)
@@ -2771,21 +2753,17 @@ char *tcpstartka(struct conv *s, char **f, int n)
 	}
 	tcpsetkacounter(tcb);
 	tcpgo(s->p->priv, &tcb->katimer);
-
-	return NULL;
 }
 
 /*
  *  turn checksums on/off
  */
-char *tcpsetchecksum(struct conv *s, char **f, int unused)
+static void tcpsetchecksum(struct conv *s, char **f, int unused)
 {
 	Tcpctl *tcb;
 
 	tcb = (Tcpctl *) s->ptcl;
 	tcb->nochecksum = !atoi(f[1]);
-
-	return NULL;
 }
 
 void tcprxmit(struct conv *s)
@@ -2836,7 +2814,7 @@ void tcptimeout(void *arg)
 				maxback = MAXBACKMS;
 			tcb->backedoff += tcb->timer.start * MSPTICK;
 			if (tcb->backedoff >= maxback) {
-				localclose(s, errno_to_string(ETIMEDOUT));
+				localclose(s, "connection timed out");
 				break;
 			}
 			netlog(s->p->f, Logtcprxmt, "timeout rexmit 0x%lx %llu/%llu\n",
@@ -3086,29 +3064,29 @@ void tcpadvise(struct Proto *tcp, struct block *bp, char *msg)
 	freeblist(bp);
 }
 
-static char *tcpporthogdefensectl(char *val)
+static void tcpporthogdefensectl(char *val)
 {
 	if (strcmp(val, "on") == 0)
 		tcpporthogdefense = 1;
 	else if (strcmp(val, "off") == 0)
 		tcpporthogdefense = 0;
 	else
-		return "unknown value for tcpporthogdefense";
-	return NULL;
+		error(EINVAL, "unknown value for tcpporthogdefense");
 }
 
 /* called with c qlocked */
-char *tcpctl(struct conv *c, char **f, int n)
+static void tcpctl(struct conv *c, char **f, int n)
 {
 	if (n == 1 && strcmp(f[0], "hangup") == 0)
-		return tcphangup(c);
-	if (n >= 1 && strcmp(f[0], "keepalive") == 0)
-		return tcpstartka(c, f, n);
-	if (n >= 1 && strcmp(f[0], "checksum") == 0)
-		return tcpsetchecksum(c, f, n);
-	if (n >= 1 && strcmp(f[0], "tcpporthogdefense") == 0)
-		return tcpporthogdefensectl(f[1]);
-	return "unknown control request";
+		tcphangup(c);
+	else if (n >= 1 && strcmp(f[0], "keepalive") == 0)
+		tcpstartka(c, f, n);
+	else if (n >= 1 && strcmp(f[0], "checksum") == 0)
+		tcpsetchecksum(c, f, n);
+	else if (n >= 1 && strcmp(f[0], "tcpporthogdefense") == 0)
+		tcpporthogdefensectl(f[1]);
+	else
+		error(EINVAL, "unknown command to %s", __func__);
 }
 
 int tcpstats(struct Proto *tcp, char *buf, int len)

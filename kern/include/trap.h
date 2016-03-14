@@ -17,6 +17,8 @@ void idt_init(void);
 int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf);
 int route_irqs(int cpu_vec, int coreid);
 void print_trapframe(struct hw_trapframe *hw_tf);
+void print_swtrapframe(struct sw_trapframe *sw_tf);
+void print_vmtrapframe(struct vm_trapframe *vm_tf);
 void print_user_ctx(struct user_context *ctx);
 /* Generic per-core timer interrupt handler.  set_percore_timer() will fire the
  * timer_interrupt(). */
@@ -32,6 +34,7 @@ void set_stack_top(uintptr_t stacktop);
 uintptr_t get_stack_top(void);
 
 void send_nmi(uint32_t os_coreid);
+int reflect_current_context(void);
 void reflect_unhandled_trap(unsigned int trap_nr, unsigned int err,
                             unsigned long aux);
 void __arch_reflect_trap_hwtf(struct hw_trapframe *hw_tf, unsigned int trap_nr,
@@ -206,7 +209,7 @@ void print_kmsgs(uint32_t coreid);
 /* TRUE if we are allowed to spin, given that the 'lock' was declared as not
  * grabbable from IRQ context.  Meaning, we can't grab the lock from any nested
  * context.  (And for most locks, we can never grab them from a kernel trap
- * handler). 
+ * handler).
  *
  * Example is a lock that is not declared as irqsave, but we later grab it from
  * irq context.  This could deadlock the system, even if it doesn't do it this

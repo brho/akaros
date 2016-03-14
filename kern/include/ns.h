@@ -792,7 +792,8 @@ char *nextelem(char *unused_char_p_t, char *);
 
 struct cname *newcname(char *unused_char_p_t);
 void notkilled(void);
-int nrand(int);
+uint32_t random_read(void *xp, uint32_t n);
+uint32_t urandom_read(void *xp, uint32_t n);
 uint64_t ns2fastticks(uint64_t);
 int okaddr(uint32_t, uint32_t, int);
 int omode_to_rwx(int);
@@ -847,8 +848,6 @@ int qwrite(struct queue *, void *, int);
 typedef void (*qio_wake_cb_t)(struct queue *q, void *data, int filter);
 void qio_set_wake_cb(struct queue *q, qio_wake_cb_t func, void *data);
 
-void randominit(void);
-uint32_t randomread(void *, uint32_t);
 void *realloc(void *, uint32_t);
 int readmem(unsigned long offset, char *buf, unsigned long n,
 			void *mem, size_t mem_len);

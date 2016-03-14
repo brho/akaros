@@ -19,16 +19,7 @@
  * 	exec and flags in struct user_fd.
  * 	- EPOLL_CTL_MOD is just a DEL then an ADD.  There might be races associated
  * 	with that.
- * 	- If you close a tracked FD without removing it from the epoll set, the
- * 	kernel will turn off the FD tap.  You may still have an epoll event that was
- * 	concurrently sent.  Likewise, that FD may be used again by your program, and
- * 	if you add *that* one to another epoll set before removing it from the
- * 	current one, weird things may happen (like having two epoll ctlrs turning on
- * 	and off taps).
  * 	- epoll_pwait is probably racy.
- * 	- Using spin locks instead of mutexes during syscalls that could block.  The
- * 	process won't deadlock, but it will busy wait on something like an RPC,
- * 	depending on the device being tapped.
  * 	- You can't dup an epoll fd (same as other user FDs).
  * 	- If you add a BSD socket FD to an epoll set before calling listen(), you'll
  * 	only epoll on the data (which is inactive) instead of on the accept().
@@ -42,24 +33,30 @@
 #include <parlib/event.h>
 #include <parlib/ceq.h>
 #include <parlib/uthread.h>
-#include <parlib/spinlock.h>
 #include <parlib/timing.h>
 #include <sys/user_fd.h>
+#include <sys/close_cb.h>
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
 #include <malloc.h>
+#include <sys/queue.h>
 
 /* Sanity check, so we can ID our own FDs */
 #define EPOLL_UFD_MAGIC 		0xe9011
 
 struct epoll_ctlr {
+	TAILQ_ENTRY(epoll_ctlr)		link;
 	struct event_queue			*ceq_evq;
 	struct ceq					*ceq;	/* convenience pointer */
 	unsigned int				size;
-	struct spin_pdr_lock		lock;
+	uth_mutex_t					mtx;
 	struct user_fd				ufd;
 };
+
+TAILQ_HEAD(epoll_ctlrs, epoll_ctlr);
+static struct epoll_ctlrs all_ctlrs = TAILQ_HEAD_INITIALIZER(all_ctlrs);
+static uth_mutex_t ctlrs_mtx;
 
 /* There's some bookkeeping we need to maintain on every FD.  Right now, the FD
  * is the index into the CEQ event array, so we can just hook this into the user
@@ -71,7 +68,6 @@ struct ep_fd_data {
 	struct epoll_event			ep_event;
 	int							fd;
 	int							filter;
-	int							sock_listen_fd;
 };
 
 /* Converts epoll events to FD taps. */
@@ -192,14 +188,6 @@ static void epoll_close(struct user_fd *ufd)
 		ep_fd_i = (struct ep_fd_data*)ceq_ev_i->user_data;
 		if (!ep_fd_i)
 			continue;
-		if (ep_fd_i->sock_listen_fd >= 0) {
-			/* This tap is using a listen_fd, opened by __epoll_ctl_add, so the
-			 * user doesn't know about this FD.  We need to remove the tap and
-			 * close the FD; the kernel will remove the tap when we close it. */
-			close(ep_fd_i->sock_listen_fd);
-			free(ep_fd_i);
-			continue;
-		}
 		tap_req_i = &tap_reqs[nr_tap_req++];
 		tap_req_i->fd = i;
 		tap_req_i->cmd = FDTAP_CMD_REM;
@@ -213,6 +201,11 @@ static void epoll_close(struct user_fd *ufd)
 	} while (nr_done < nr_tap_req);
 	free(tap_reqs);
 	ep_put_ceq_evq(ep->ceq_evq);
+	uth_mutex_lock(ctlrs_mtx);
+	TAILQ_REMOVE(&all_ctlrs, ep, link);
+	uth_mutex_unlock(ctlrs_mtx);
+	uth_mutex_free(ep->mtx);
+	free(ep);
 }
 
 static int init_ep_ctlr(struct epoll_ctlr *ep, int size)
@@ -222,17 +215,40 @@ static int init_ep_ctlr(struct epoll_ctlr *ep, int size)
 	if (size == 1)
 		size = 128;
 	ep->size = ceq_size;
-	spin_pdr_init(&ep->lock);
+	ep->mtx = uth_mutex_alloc();
 	ep->ufd.magic = EPOLL_UFD_MAGIC;
 	ep->ufd.close = epoll_close;
 	ep->ceq_evq = ep_get_ceq_evq(ceq_size);
 	return 0;
 }
 
+static void epoll_fd_closed(int fd)
+{
+	struct epoll_ctlr *ep;
+
+	/* Lockless peek, avoid locking for every close() */
+	if (TAILQ_EMPTY(&all_ctlrs))
+		return;
+	uth_mutex_lock(ctlrs_mtx);
+	TAILQ_FOREACH(ep, &all_ctlrs, link)
+		epoll_ctl(ep->ufd.fd, EPOLL_CTL_DEL, fd, 0);
+	uth_mutex_unlock(ctlrs_mtx);
+}
+
+static void epoll_init(void)
+{
+	static struct close_cb epoll_close_cb = {.func = epoll_fd_closed};
+
+	register_close_cb(&epoll_close_cb);
+	ctlrs_mtx = uth_mutex_alloc();
+}
+
 int epoll_create(int size)
 {
 	int fd;
 	struct epoll_ctlr *ep;
+
+	run_once(epoll_init());
 	/* good thing the arg is a signed int... */
 	if (size < 0) {
 		errno = EINVAL;
@@ -247,6 +263,9 @@ int epoll_create(int size)
 	fd = ufd_get_fd(&ep->ufd);
 	if (fd < 0)
 		free(ep);
+	uth_mutex_lock(ctlrs_mtx);
+	TAILQ_INSERT_TAIL(&all_ctlrs, ep, link);
+	uth_mutex_unlock(ctlrs_mtx);
 	return fd;
 }
 
@@ -274,26 +293,14 @@ static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
 	}
 	/* The sockets-to-plan9 networking shims are a bit inconvenient.  The user
 	 * asked us to epoll on an FD, but that FD is actually a Qdata FD.  We need
-	 * to actually epoll on the listen_fd.  We'll store this in the ep_fd, so
-	 * that later on we can close it.
+	 * to actually epoll on the listen_fd.
 	 *
 	 * As far as tracking the FD goes for epoll_wait() reporting, if the app
 	 * wants to track the FD they think we are using, then they already passed
-	 * that in event->data.
-	 *
-	 * But before we get too far, we need to make sure we aren't already tapping
-	 * this FD's listener (hence the lookup).
-	 *
-	 * This all assumes that this socket is only added to one epoll set at a
-	 * time.  The _sock calls are racy, and once one epoller set up a listen_fd
-	 * in the Rock, we'll think that it was us. */
+	 * that in event->data. */
 	extern int _sock_lookup_listen_fd(int sock_fd);	/* in glibc */
-	extern int _sock_get_listen_fd(int sock_fd);
-	if (_sock_lookup_listen_fd(fd) >= 0) {
-		errno = EEXIST;
-		return -1;
-	}
-	sock_listen_fd = _sock_get_listen_fd(fd);
+
+	sock_listen_fd = _sock_lookup_listen_fd(fd);
 	if (sock_listen_fd >= 0)
 		fd = sock_listen_fd;
 	ceq_ev = ep_get_ceq_ev(ep, fd);
@@ -322,7 +329,6 @@ static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
 	ep_fd->filter = filter;
 	ep_fd->ep_event = *event;
 	ep_fd->ep_event.events |= EPOLLHUP;
-	ep_fd->sock_listen_fd = sock_listen_fd;
 	ceq_ev->user_data = (uint64_t)ep_fd;
 	return 0;
 }
@@ -358,11 +364,6 @@ static int __epoll_ctl_del(struct epoll_ctlr *ep, int fd,
 	 * has already closed and the kernel removed the tap. */
 	sys_tap_fds(&tap_req, 1);
 	ceq_ev->user_data = 0;
-	assert(ep_fd->sock_listen_fd == sock_listen_fd);
-	if (ep_fd->sock_listen_fd >= 0) {
-		assert(ep_fd->sock_listen_fd == sock_listen_fd);
-		close(ep_fd->sock_listen_fd);
-	}
 	free(ep_fd);
 	return 0;
 }
@@ -380,8 +381,7 @@ int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 		werrstr("Epoll can't track User FDs");
 		return -1;
 	}
-	/* TODO: don't use a spinlock, use a mutex.  sys_tap_fds can block. */
-	spin_pdr_lock(&ep->lock);
+	uth_mutex_lock(ep->mtx);
 	switch (op) {
 		case (EPOLL_CTL_MOD):
 			/* In lieu of a proper MOD, just remove and readd.  The errors might
@@ -403,7 +403,7 @@ int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 			errno = EINVAL;
 			ret = -1;
 	}
-	spin_pdr_unlock(&ep->lock);
+	uth_mutex_unlock(ep->mtx);
 	return ret;
 }
 
@@ -444,14 +444,14 @@ static int __epoll_wait(struct epoll_ctlr *ep, struct epoll_event *events,
 	/* Locking to protect get_ep_event_from_msg, specifically that the ep_fd
 	 * stored at ceq_ev->user_data does not get concurrently removed and
 	 * freed. */
-	spin_pdr_lock(&ep->lock);
+	uth_mutex_lock(ep->mtx);
 	for (int i = 0; i < maxevents; i++) {
 		if (uth_check_evqs(&msg, &which_evq, 1, ep->ceq_evq)) {
 			if (get_ep_event_from_msg(ep, &msg, &events[i]))
 				nr_ret++;
 		}
 	}
-	spin_pdr_unlock(&ep->lock);
+	uth_mutex_unlock(ep->mtx);
 	if (nr_ret)
 		return nr_ret;
 	if (timeout == 0)
@@ -480,10 +480,10 @@ static int __epoll_wait(struct epoll_ctlr *ep, struct epoll_event *events,
 	} else {
 		uth_blockon_evqs(&msg, &which_evq, 1, ep->ceq_evq);
 	}
-	spin_pdr_lock(&ep->lock);
+	uth_mutex_lock(ep->mtx);
 	if (get_ep_event_from_msg(ep, &msg, &events[0]))
 		nr_ret++;
-	spin_pdr_unlock(&ep->lock);
+	uth_mutex_unlock(ep->mtx);
 	/* We might not have gotten one yet.  And regardless, there might be more
 	 * available.  Let's try again, with timeout == 0 to ensure no blocking.  We
 	 * use nr_ret (0 or 1 now) to adjust maxevents and events accordingly. */

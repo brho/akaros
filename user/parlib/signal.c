@@ -151,9 +151,12 @@ static void __restore_after_sighandler(struct uthread *uthread)
 {
 	uthread->u_ctx = uthread->sigstate.data->u_ctx;
 	uthread->flags |= UTHREAD_SAVED;
-	if (uthread->u_ctx.type == ROS_HW_CTX) {
+	switch (uthread->u_ctx.type) {
+	case ROS_HW_CTX:
+	case ROS_VM_CTX:
 		uthread->as = uthread->sigstate.data->as;
 		uthread->flags |= UTHREAD_FPSAVED;
+		break;
 	}
 	uthread->sigstate.data = NULL;
 }

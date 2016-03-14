@@ -120,50 +120,6 @@ void mcs_unlock_notifsafe(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 	uth_enable_notifs();
 }
 
-// MCS dissemination barrier!
-int mcs_barrier_init(mcs_barrier_t* b, size_t np)
-{
-	if(np > max_vcores())
-		return -1;
-	b->allnodes = (mcs_dissem_flags_t*)malloc(np*sizeof(mcs_dissem_flags_t));
-	memset(b->allnodes,0,np*sizeof(mcs_dissem_flags_t));
-	b->nprocs = np;
-
-	b->logp = (np & (np-1)) != 0;
-	while(np >>= 1)
-		b->logp++;
-
-	size_t i,k;
-	for(i = 0; i < b->nprocs; i++)
-	{
-		b->allnodes[i].parity = 0;
-		b->allnodes[i].sense = 1;
-
-		for(k = 0; k < b->logp; k++)
-		{
-			size_t j = (i+(1<<k)) % b->nprocs;
-			b->allnodes[i].partnerflags[0][k] = &b->allnodes[j].myflags[0][k];
-			b->allnodes[i].partnerflags[1][k] = &b->allnodes[j].myflags[1][k];
-		} 
-	}
-
-	return 0;
-}
-
-void mcs_barrier_wait(mcs_barrier_t* b, size_t pid)
-{
-	mcs_dissem_flags_t* localflags = &b->allnodes[pid];
-	size_t i;
-	for(i = 0; i < b->logp; i++)
-	{
-		*localflags->partnerflags[localflags->parity][i] = localflags->sense;
-		while(localflags->myflags[localflags->parity][i] != localflags->sense);
-	}
-	if(localflags->parity)
-		localflags->sense = 1-localflags->sense;
-	localflags->parity = 1-localflags->parity;
-}
-
 /* Preemption detection and recovering MCS locks. */
 /* Old style.  Has trouble getting out of 'preempt/change-to storms' under
  * heavy contention and with preemption. */

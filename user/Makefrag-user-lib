@@ -43,15 +43,10 @@ $(FINALLIB): $(OBJS)
 	@mkdir -p $(@D)
 	$(Q)$(AR) rc $@ $(OBJS)
 
-# Allow three different patterns for installing include files
+# Allow two different patterns for installing include files
 $(FINALLIB-INSTALL): $(FINALLIB)
 	@cp $(FINALLIB) $@
-	@if [ -L "$(INCDIR)/$(LIBNAME)" ]; then \
-		rm -rf $(XCC_TARGET_INCLUDE)/$(LIBNAME) ; \
-		mkdir $(XCC_TARGET_INCLUDE)/$(LIBNAME) ; \
-		cp -r $(INCDIR)/* $(XCC_TARGET_INCLUDE)/$(LIBNAME)/ ; \
-		rm $(XCC_TARGET_INCLUDE)/$(LIBNAME)/$(LIBNAME) ; \
-	elif [ -d "$(INCDIR)/$(LIBNAME)" ]; then \
+	@if [ -d "$(INCDIR)/$(LIBNAME)" ]; then \
 		rm -rf $(XCC_TARGET_INCLUDE)/$(LIBNAME) ; \
 		cp -r $(INCDIR)/$(LIBNAME) $(XCC_TARGET_INCLUDE)/ ; \
 	else \

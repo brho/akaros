@@ -14,7 +14,6 @@
 #include <pmap.h>
 #include <umem.h>
 #include <smp.h>
-#include <atomic.h>
 #include <core_set.h>
 #include <completion.h>
 #include <arch/uaccess.h>
@@ -23,13 +22,13 @@
 struct smp_read_values {
 	const struct msr_address *msra;
 	struct msr_value *msrv;
-	atomic_t err;
+	int err;
 };
 
 struct smp_write_values {
 	const struct msr_address *msra;
 	const struct msr_value *msrv;
-	atomic_t err;
+	int err;
 };
 
 static void msr_smp_read(void *opaque)
@@ -40,17 +39,23 @@ static void msr_smp_read(void *opaque)
 	uint64_t value;
 
 	err = msr_get_core_address(coreno, srv->msra, &addr);
-	if (likely(!err)) {
-		err = safe_read_msr(addr, &value);
-		if (likely(!err))
-			err = msr_set_core_value(coreno, value, srv->msrv);
-	}
-	if (unlikely(err))
-		atomic_cas(&srv->err, 0, err);
+	if (err)
+		goto errout;
+	err = safe_read_msr(addr, &value);
+	if (err)
+		goto errout;
+	err = msr_set_core_value(coreno, value, srv->msrv);
+	if (err)
+		goto errout;
+
+	return;
+
+errout:
+	srv->err = err;
 }
 
 int msr_cores_read(const struct core_set *cset, const struct msr_address *msra,
-				   struct msr_value *msrv)
+                   struct msr_value *msrv)
 {
 	int err;
 	struct smp_read_values srv;
@@ -58,10 +63,10 @@ int msr_cores_read(const struct core_set *cset, const struct msr_address *msra,
 	ZERO_DATA(srv);
 	srv.msra = msra;
 	srv.msrv = msrv;
-	atomic_init(&srv.err, 0);
+	srv.err = 0;
 	smp_do_in_cores(cset, msr_smp_read, &srv);
 
-	return (int) atomic_read(&srv.err);
+	return srv.err;
 }
 
 int msr_core_read(unsigned int coreno, uint32_t addr, uint64_t *value)
@@ -89,27 +94,33 @@ static void msr_smp_write(void *opaque)
 	uint64_t value;
 
 	err = msr_get_core_address(coreno, swv->msra, &addr);
-	if (likely(!err)) {
-		err = msr_get_core_value(coreno, swv->msrv, &value);
-		if (likely(!err))
-			err = safe_write_msr(addr, value);
-	}
-	if (unlikely(err))
-		atomic_cas(&swv->err, 0, err);
+	if (err)
+		goto errout;
+	err = msr_get_core_value(coreno, swv->msrv, &value);
+	if (err)
+		goto errout;
+	err = safe_write_msr(addr, value);
+	if (err)
+		goto errout;
+
+	return;
+
+errout:
+	swv->err = err;
 }
 
 int msr_cores_write(const struct core_set *cset, const struct msr_address *msra,
-					const struct msr_value *msrv)
+                    const struct msr_value *msrv)
 {
 	struct smp_write_values swv;
 
 	ZERO_DATA(swv);
 	swv.msra = msra;
 	swv.msrv = msrv;
-	atomic_init(&swv.err, 0);
+	swv.err = 0;
 	smp_do_in_cores(cset, msr_smp_write, &swv);
 
-	return (int) atomic_read(&swv.err);
+	return swv.err;
 }
 
 int msr_core_write(unsigned int coreno, uint32_t addr, uint64_t value)

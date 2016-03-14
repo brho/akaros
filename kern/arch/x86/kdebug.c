@@ -92,8 +92,8 @@ static bool stab_table_valid(const char *stabstr, const char *stabstr_end)
 //
 static void
 stab_binsearch(const stab_t *stabs,
-           const stab_t *stab_end,
-           int *region_left, int *region_right,
+               const stab_t *stab_end,
+               int *region_left, int *region_right,
 	       int type, uintptr_t addr)
 {
 	int l = *region_left, r = *region_right, any_matches = 0;

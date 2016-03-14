@@ -68,7 +68,16 @@
 	.type name, @function;				\
 	.align 2;							\
 	name:;								\
-	movl $0, (LAPIC_BASE + 0x0b0);      \
+	pushq %rax;			\
+	pushq %rcx;			\
+	pushq %rdx;			\
+	movq $0, %rax;			\
+	movq $0, %rdx;			\
+	movq $(MSR_LAPIC_EOI), %rcx; 	\
+	wrmsr;				\
+	popq %rdx;			\
+	popq %rcx;			\
+	popq %rax;			\
 	iretq;								\
 	.data;								\
 	.quad name;							\
@@ -312,7 +321,7 @@ IRQ_HANDLER(IRQ193, I_SMP_CALL1)
 IRQ_HANDLER(IRQ194, I_SMP_CALL2)
 IRQ_HANDLER(IRQ195, I_SMP_CALL3)
 IRQ_HANDLER(IRQ196, I_SMP_CALL4)
-IRQ_HANDLER(IRQ197, I_VMMCP_POSTED)
+IRQ_HANDLER(IRQ197, 229)
 IRQ_HANDLER(IRQ198, 230)
 IRQ_HANDLER(IRQ199, 231)
 IRQ_HANDLER(IRQ200, 232)
@@ -502,3 +511,42 @@ normal_syscall:
 	# return via pop_tf, never this path
 sysenter_spin:
 	jmp sysenter_spin
+
+.globl vmexit_handler;
+.type vmexit_handler, @function;
+vmexit_handler:
+	# rflags has all flags = 0, so cli and cld already.
+	# HOST_GS_BASE and RSP is set by the hardware
+	# Set default values.  Most of these will be set in C later.
+	pushq $0			# guest_pa
+	pushq $0			# guest_va
+	pushq $0			# intrinfo2 and 1
+	pushq $0			# exit_qual + exit_reason
+	pushq $0			# pad + trap_inject
+	pushq $0			# flags + guest_pcorid
+	pushq $0			# cr3
+	pushq $0			# cr2
+	pushq $0			# rsp
+	pushq $0			# rflags
+	pushq $0			# rip
+	# Save register state
+	pushq %r15
+	pushq %r14
+	pushq %r13
+	pushq %r12
+	pushq %r11
+	pushq %r10
+	pushq %r9
+	pushq %r8
+	pushq %rdi
+	pushq %rsi
+	pushq %rbp
+	pushq %rdx
+	pushq %rcx
+	pushq %rbx
+	pushq %rax
+	movq $0, %rbp			# so we can backtrace to this point
+	movq %rsp, %rdi
+	call handle_vmexit
+vmexit_spin:
+	jmp vmexit_spin

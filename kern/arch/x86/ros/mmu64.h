@@ -31,14 +31,14 @@ typedef struct x86_pgdir {
  *                     |                              |                     |
  * KERN_LOAD_ADDR -->  +------------------------------+ 0xffffffffc0000000 -+
  *                     |                              |
- *                     |          Local APIC          | RW/--  APIC_SIZE (1MB)
- *                     |                              |
- *    LAPIC_BASE  -->  +------------------------------+ 0xffffffffbff00000
- *                     |                              |
  *                     |            IOAPIC            | RW/--  APIC_SIZE (1MB)
  *                     |                              |
- *  IOAPIC_BASE,  -->  +------------------------------+ 0xffffffffbfe00000
- *  KERN_DYN_TOP       |   Kernel Dynamic Mappings    |
+ *   IOAPIC_BASE  -->  +------------------------------+ 0xffffffffbff00000
+ *                     |                              |
+ *                     |                              | RW/--  APIC_SIZE (1MB)
+ *                     |                              |
+ *   KERN_DYN_TOP -->  +------------------------------+ 0xffffffffbfe00000
+ *                     |   Kernel Dynamic Mappings    |
  *                     |              .               |
  *                     :              .               :
  *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ RW/--
@@ -85,22 +85,27 @@ typedef struct x86_pgdir {
  *    UVPT      ---->  +------------------------------+ 0x00007f8000000000 -+
  *                     | Unmapped (expandable region) |                     |
  *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|                     |
+ *                     |       Global R/O Info        | R-/R-  PML2_PTE_REACH
+ *                     |       (proc_glb_info)        |                     |
+ *    UGINFO    ---->  +------------------------------+ 0x00007f7fffe00000 -+
+ *                     | Unmapped (expandable region) |                     |
+ *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|                     |
  *                     |     Per-Process R/O Info     | R-/R-  PML2_PTE_REACH
  *                     |         (procinfo)           |                     |
- * UWLIM, UINFO ---->  +------------------------------+ 0x00007f7fffe00000 -+
+ * UWLIM, UINFO ---->  +------------------------------+ 0x00007f7fffc00000 -+
  *                     | Unmapped (expandable region) |                     |
  *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|                     |
  *                     |     Per-Process R/W Data     | RW/RW  PML2_PTE_REACH
  *                     |         (procdata)           |                     |
- *    UDATA     ---->  +------------------------------+ 0x00007f7fffc00000 -+
+ *    UDATA     ---->  +------------------------------+ 0x00007f7fffa00000 -+
  *                     |                              |
  *                     |    Global Shared R/W Data    | RW/RW  PGSIZE
  *                     |                              |
- * UMAPTOP, UGDATA ->  +------------------------------+ 0x00007f7fffbff000
+ * UMAPTOP, UGDATA ->  +------------------------------+ 0x00007f7fff9ff000
  *    USTACKTOP        |                              |
  *                     |      Normal User Stack       | RW/RW 256 * PGSIZE
  *                     |                              |
- *                     +------------------------------+ 0x00007f7fffaff000
+ *                     +------------------------------+ 0x00007f7fff8ff000
  *                     |                              |
  *                     |        Empty Memory          |
  *                     |                              |
@@ -152,8 +157,7 @@ typedef struct x86_pgdir {
 #define KERN_LOAD_ADDR  0xffffffffc0000000
 /* Static kernel mappings */
 #define APIC_SIZE 		0x100000
-#define LAPIC_BASE		(KERN_LOAD_ADDR - APIC_SIZE)
-#define IOAPIC_BASE		(LAPIC_BASE - APIC_SIZE)
+#define IOAPIC_BASE		(KERN_LOAD_ADDR - APIC_SIZE)
 /* All arches must define this, which is the lower limit of their static
  * mappings, and where the dynamic mappings will start. */
 #define KERN_DYN_TOP	IOAPIC_BASE
@@ -264,15 +268,16 @@ typedef struct x86_pgdir {
 #define PTE_P			0x001	/* Present */
 #define PTE_W			0x002	/* Writeable */
 #define PTE_U			0x004	/* User */
-#define PTE_PWT			0x008	/* Write-Through */
-#define PTE_PCD			0x010	/* Cache-Disable */
+#define __PTE_PWT		0x008	/* Write-Through */
+#define __PTE_PCD		0x010	/* Cache-Disable */
 #define PTE_A			0x020	/* Accessed */
 #define PTE_D			0x040	/* Dirty */
 #define PTE_PS			0x080	/* Page Size */
-#define PTE_PAT			0x080	/* Page attribute table */
+#define __PTE_PAT		0x080	/* Page attribute table */
 #define PTE_G			0x100	/* Global Page */
-#define PTE_JPAT		0x800	/* Jumbo PAT */
-#define PTE_NOCACHE		(PTE_PWT | PTE_PCD)
+#define __PTE_JPAT		0x800	/* Jumbo PAT */
+#define PTE_NOCACHE		(__PTE_PWT | __PTE_PCD)
+#define PTE_WRITECOMB	(__PTE_PCD)
 
 /* Permissions fields and common access modes.  These should be read as 'just
  * kernel or user too' and 'RO or RW'.  USER_RO means read-only for everyone. */

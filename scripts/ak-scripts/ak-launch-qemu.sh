@@ -20,8 +20,10 @@ function usage() {
 	echo "    ${cmd//?/ } [ --num-cores=<nc> ]"
 	echo "    ${cmd//?/ } [ --memory-size=<ms> ]"
 	echo "    ${cmd//?/ } [ --network-card=<nc> ]"
-	echo "    ${cmd//?/ } [ --host-port=<hp> ]"
-	echo "    ${cmd//?/ } [ --akaros-port=<ap> ]"
+	echo "    ${cmd//?/ } [ --host-tcp-port=<htp> ]"
+	echo "    ${cmd//?/ } [ --akaros-tcp-port=<atp> ]"
+	echo "    ${cmd//?/ } [ --host-udp-port=<hup> ]"
+	echo "    ${cmd//?/ } [ --akaros-udp-port=<aup> ]"
 	echo "    ${cmd//?/ } [ --disable-kvm ]"
 	echo ""
 	echo "Options:"
@@ -40,9 +42,13 @@ function usage() {
 	echo "                            [default: 4096]"
 	echo "    --network-card=<nc>     The network card to launch qemu qith"
 	echo "                            [default: e1000]"
-	echo "    --host-port=<hp>        The host port to forward network traffic"
+	echo "    --host-tcp-port=<htp>   The host TCP port to forward network traffic"
 	echo "                            [default: 5555]"
-	echo "    --akaros-port=<hp>      The akaros port to receive network traffic"
+	echo "    --akaros-tcp-port=<atp> The Akaros TCP port to receive network traffic"
+	echo "                            [default: 5555]"
+	echo "    --host-udp-port=<hup>   The host UDP port to forward network traffic"
+	echo "                            [default: 5555]"
+	echo "    --akaros-udp-port=<aup> The Akaros UDP port to receive network traffic"
 	echo "                            [default: 5555]"
 	echo "    --disable-kvm           Disable kvm for qemu"
 }
@@ -51,7 +57,8 @@ function main() {
 	# Set these command line arguments before invoking main
 	# Check the sanity of our environment variables
 	check_vars akaros_root qemu_cmd init_script cpu_type num_cores \
-	           memory_size network_card host_port akaros_port
+	           memory_size network_card host_tcp_port akaros_tcp_port \
+	           host_udp_port akaros_udp_port
 	check_dirs akaros_root
 	check_execs qemu_cmd
 	if [ "\"${init_script}\"" != "${init_script_default}" ]; then
@@ -67,7 +74,7 @@ function main() {
 	local akinit_script="/bin/ak-init.sh"
 	local akinit_script_path=${akaros_root}/kern/kfs/${akinit_script}
 	local qemu_network="-net nic,model=${network_card} \
-	                    -net user,hostfwd=tcp::${host_port}-:${akaros_port}"
+	                    -net user,hostfwd=tcp::${host_tcp_port}-:${akaros_tcp_port},hostfwd=udp::${host_udp_port}-:${akaros_udp_port}"
 
 	# Launch the monitor if not launched yet and set the monitor tty
 	local monitor_tty="$(ak launch-qemu-monitor --print-tty-only)"
