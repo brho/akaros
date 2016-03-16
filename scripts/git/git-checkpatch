@@ -1,0 +1,31 @@
+#!/bin/bash
+# Barret Rhoden (brho@cs.berkeley.edu)
+# Copyright 2016 Google Inc
+#
+# Runs checkpatch on a set of commits, (From, To].
+
+
+TMPDIR="${TMPDIR:-/tmp/fp-cp}"
+
+usage()
+{
+	echo "$0 <from>..<to>"
+	exit -1
+}
+
+if [ $# -ne 1 ]
+then
+	usage
+fi
+
+if [ ! -f ./scripts/checkpatch.pl ]
+then
+	echo "Run from the root of the Akaros repo"
+	exit -1
+fi
+
+mkdir -p $TMPDIR
+
+git format-patch -o $TMPDIR $1
+./scripts/checkpatch.pl $TMPDIR/*.patch
+rm $TMPDIR/*patch

@@ -1,0 +1,33 @@
+
+_git_untrack ()
+{
+	_git_branch
+}
+
+_git_track ()
+{
+	local remote=""
+	local trim_remote=""
+
+	if [[ $cur =~ ^.+?/ ]]
+	then
+		remote=${BASH_REMATCH[0]}
+	fi
+
+	# We have no remote, let's get one and append the /
+	if [ -z "$remote" ]; then
+		__gitcomp_nl "$(__git_remotes)" "" "$cur" "/"
+		return
+	fi
+	# remove the / for the ls-remote
+	trim_remote="${remote::-1}"
+	remote_branches="$(git ls-remote --heads $trim_remote | grep -o '[^/]*$')"
+	# arg3: generate completion matches, should be current string minus remote/
+	__gitcomp_nl "$remote_branches" "$remote" "${cur#$remote}"
+}
+
+_git_track_review ()
+{
+	_git_track
+}
+

@@ -1,0 +1,16 @@
+Example config for send-email with Gmail.  You can put this in
+akaros-repo/.git/config.
+
+If you use the same email account for multiple projects, you can put all of the
+settings except the 'to' in your global ~/.gitconfig file.
+
+[sendemail]
+	smtpEncryption = tls
+	smtpServer = smtp.gmail.com
+	smtpUser = YOUR_ADDRESS@gmail.com
+	smtpServerPort = 587
+	smtpPass = YOUR_PASSWORD
+	suppresscc = self
+	annotate = true
+	confirm = always
+	to = akaros@googlegroups.com

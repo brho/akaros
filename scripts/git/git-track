@@ -1,0 +1,40 @@
+#!/bin/bash
+# Barret Rhoden (brho@cs.berkeley.edu)
+# Copyright 2016 Google Inc
+#
+# Tracks a branch in a remote repo.
+#
+# If the remote is already set up, then you only need to pass it remote/branch.
+# If the remote is new, you will need to pass the URL for the repo.
+
+
+usage()
+{
+	echo "$0 <remote>/<branch> [<url>]"
+	exit -1
+}
+
+if [ $# -lt 1 ]
+then
+	usage
+fi
+
+REMOTE=`echo $1 | cut -f 1 -d '/'`
+BRANCH=`echo $1 | cut -f 2- -d '/'`
+
+git remote | grep $REMOTE > /dev/null
+if [ $? -ne 0 ]
+then
+	if [ $# -ne 2 ]
+	then
+		echo "Remote $REMOTE not tracked yet and no URL passed"
+		echo "	Try again with the repo's URL or add the remote manually"
+		usage
+	fi
+	URL=$2
+	git remote add -t $BRANCH $REMOTE $URL
+else
+	git remote set-branches --add $REMOTE $BRANCH
+fi
+
+git fetch $REMOTE

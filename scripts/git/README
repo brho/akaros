@@ -1,0 +1,20 @@
+These scripts are for working with Git with Akaros.
+
+You may want to copy the scripts to somewhere in your path, especially for the
+git-scripts.  Anything named git-foo that is in your path will be executable
+as:
+
+	$ git foo
+
+Some of the scripts expect you to run them from the root of the Akaros repo.
+Others use directories for storing patches.  You can override the location of
+those directories with an environment variable or just by editing your own copy
+of the scripts.
+
+If you'd like bash autocompletion for the git-foo commands, source the bashrc
+fragment in your setup.  You might need to relaunch a shell for them to take
+effect.
+
+The config file contains example git configs.
+
+Some of these scripts and configs are rather niche, YMMV.

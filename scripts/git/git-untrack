@@ -1,0 +1,35 @@
+#!/bin/bash
+# Barret Rhoden (brho@cs.berkeley.edu)
+# Copyright 2016 Google Inc
+#
+# Stops tracking a remote branch
+
+usage()
+{
+	echo "$0 <remote>/<branch>"
+	exit -1
+}
+
+if [ $# -ne 1 ]
+then
+	usage
+fi
+
+REMOTE=`echo $1 | cut -f 1 -d '/'`
+BRANCH=`echo $1 | cut -f 2- -d '/'`
+
+git remote | grep $REMOTE > /dev/null
+if [ $? -ne 0 ]
+then
+	echo "Remote $REMOTE not tracked at all!"
+	usage
+fi
+
+if [ "x$BRANCH" == "x" ]
+then
+	echo "No branch!"
+	usage
+fi
+
+git branch -dr $REMOTE/$BRANCH
+sed -i "/$REMOTE\/$BRANCH/d" .git/config

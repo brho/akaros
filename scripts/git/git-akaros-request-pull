@@ -1,0 +1,21 @@
+#!/bin/bash
+# Barret Rhoden (brho@cs.berkeley.edu)
+# Copyright 2016 Google Inc
+#
+# Wrapper around git request-pull that adds in a github URL to view the
+# patchset
+
+OUTPUT=`git request-pull $*`
+LINEMATCH="----------------------------------------------------------------"
+
+if [ $? -ne 0 ]
+then
+	echo "$OUTPUT"
+	exit $?
+fi
+
+FROM_SHA=`git log --format=format:%h -1 $1`
+TO_SHA=`git log --format=format:%h -1 $2/$3`
+URL="https://github.com/brho/akaros/compare/$FROM_SHA...$TO_SHA"
+
+echo "$OUTPUT" | sed "/$LINEMATCH/aView this online at:\n$URL\n\n$LINEMATCH"

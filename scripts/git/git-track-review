@@ -1,0 +1,55 @@
+#!/bin/bash
+# Barret Rhoden (brho@cs.berkeley.edu)
+# Copyright 2016 Google Inc
+#
+# Tracks a remote branch and runs checkpatch on the commits from the merge
+# point of master to the tip of the remote branch.
+
+PATCHDIR="${PATCHDIR:-../patches}"
+
+usage()
+{
+	echo "$0 <remote>/<branch> [<url>]"
+	exit -1
+}
+
+if [ $# -lt 1 ]
+then
+	usage
+fi
+
+if [ ! -f ./scripts/checkpatch.pl ]
+then
+	echo "Run from the root of the Akaros repo"
+	exit -1
+fi
+
+REMOTE=`echo $1 | cut -f 1 -d '/'`
+TO=`echo $1 | cut -f 2- -d '/'`
+
+git track $REMOTE/$TO $2
+
+if [ $? -ne 0 ]
+then
+	exit -1
+fi
+
+FROM=`git merge-base master $REMOTE/$TO`
+
+if [ $? -ne 0 ]
+then
+	echo "From failed; $FROM"
+	exit -1
+fi
+
+ls $PATCHDIR/*.patch 2>/dev/null
+
+if [ $? -eq 0 ]
+then
+	echo "$PATCHDIR has patches, remove and try again"
+	exit -1
+fi
+
+git format-patch -k -M -N -o $PATCHDIR $FROM..$REMOTE/$TO
+
+./scripts/checkpatch.pl $PATCHDIR/*

@@ -1,6 +1,6 @@
 Akaros Contribution Policies
 ===========================
-**2015-04-27** Barret Rhoden (`brho`)
+**2016-03-14** Barret Rhoden (`brho`)
 
 Interested in contributing to Akaros?  This document covers coding standards,
 version control usage, and other contribution policies.
@@ -19,6 +19,9 @@ Contents
     - Oh No, I Committed and Pushed Something I Want to Change
     - Crap, Someone Reset a Branch I was Tracking!
     - What Happens When Two People `push -f`
+    - Before You Submit Patches: checkpatch
+    - How To Submit Patches: git send-email
+    - How To Submit Patches: git request-pull
 
 
 Licensing
@@ -34,6 +37,8 @@ All new code should be licensed "GPLv2 or later".
 
 You (or your employer) may retain the copyright to your contributions, if
 applicable.  We do not require copyright assignment.
+
+Your git 'Sign-off' indicates your agreement with these rules.
 
 
 Contribution Philosophy
@@ -60,9 +65,11 @@ Attacking people is not.
 
 Contribution Steps
 ---------------------------
+Contributing to Akaros is much like contributing to the Linux kernel.
+
 The short version of adding code to Akaros:
 + Email the list early and often
-+ Push to a remote branch (not master)
++ Send-email or push to your own repo/branch and request-pull
 + Get someone (brho) to shepherd your work
 + Fix up your commits until they are merged
 
@@ -76,22 +83,32 @@ applies cleanly to `origin/master`.  Sane, means there are not a lot of "oh wait
 this patch is wrong, reverting".  The patch series should tell a story of
 getting from A to B, where each patch is easily reviewable.
 
-Push your changes to a separate branch, and email the list asking for advice or
-review.  Someone, usually me, will shepherd your work, providing feedback and
-TODOs.  Name your branch something reasonable (e.g. `inferno-b` and
-`inferno-r`).  Your username is a suitable branch name, if you don't want to
-bother with a title.  If you do not have access to the `brho:origin/` repo, then
-push it somewhere else on github and email us your git remotes info.  The only
-people with push access are those I know personally.  As the group grows, that
-will not scale and people will need to start using their own repos.  For now, a
-central repo works fine.
+If your change is minor, like a bug fix, then feel free to just fix it and
+submit the patch; you don't need to ask before fixing a bug.
 
-Thanks to git's fast and simple branching, we can work and rework on branches
-that are not master.  Reworking branches includes rewriting commits and git's
-history.  (See below for some git commands).  The general rule is that there is
-no expectation of stability in any branch other than master.  Those branches
-may be rebased without warning by people working on the branch.  You 'own'
-whatever branch you push.
+Before you submit your patch, run scripts/checkpatch.pl on it.  Checkpatch has
+both false positives and false negatives, but at least run it and fix the
+obviously incorrect changes.  Email the mailing list if you have any questions.
+See below for how to use checkpatch.
+
+To submit your patchset, you have two options: git send-email or git
+request-pull.  Send-email will take each of your patches and send it to the
+mailing list.  Request-pull requires you to push your work to a branch in your
+own repo (probably on github), and it will output a block of text.  You then
+email that output to the mailing list with a suitable subject.  See below for
+how to do a send-email or request-pull.
+
+Once your patches or request-pull has been emailed to the list, someone, usually
+me, will shepherd your work, providing feedback and TODOs.  The TODOs usually
+consist of fixing commits, such that your patchset does not introduce errors at
+intermediate patches.  This means you will need to rewrite commits and git's
+history.  It is not enough to just add an extra commit on top of broken patches
+in your patchset. (See below for some git commands and examples).
+
+After you fixed a patchset, you send-email or request pull again, and you do so
+in response to your original email.  For request-pull, this is easy: you just
+hit reply to the first message.  For send-email, you use the --in-reply-to=
+option.
 
 In general, I prefer not to merge, but it may be necessary based on the age of
 the changed branch.  If we scale out and have various submaintainers, we'll
@@ -99,19 +116,32 @@ merge those branches into the main repo.  But at this point, the `brho:origin/`
 repo is a 'leaf' (the one and only leaf).  We'll hold off on merging until we
 have many leaves.
 
-For minor changes and bug fixes, just push them or email a patch.  Use your
-better judgement.
+If you bring in code from another project:
++ First add the code, unaltered if possible, in a single commit.  That commit
+must say where you got the code from, such as a URL, project name and version,
+etc.  Do not add the .c files to Kbuild yet.  Otherwise, you'll break the build.
 
-When adding new patches to a branch, you should rebase your commits on top of
-the branch's latest commit, then do a fast-forward merge.
++ Run spatch, if applicable, in a single commit.
 
-Your commits should be of a reasonable size.  Try to isolate your commits to
++ Run clang-format, if applicable, in a single commit.  It's much easier to
+diagnose problems if spatch and reformatting was done before any other changes.
+
++ Add your own changes, such that it compiles.  This is the point where you add
+the .c files to Kbuild so that we actually build the files.
+
+
+A few final notes:
++ You must sign-off your commits.
+
++ Your commits should be of a reasonable size.  Try to isolate your commits to
 logically consistent, easily verifiable changes.  Each commit should compile,
 but you don't want to change everything in one commit.
 
-If a patch relied on spatch, provide the commands or scripts used.
++ If a patch relied on spatch, provide the commands or scripts used in the
+commit message.  If the script is likely to be useful beyond your patch, then
+put it in scripts/spatch/ so we can reuse it or learn from it.
 
-Remember that someone other than yourself has to look at each of these
++ Remember that someone other than yourself has to look at each of these
 commits.
 
 
@@ -120,10 +150,11 @@ Coding Standard
 Our coding standard is similar to the Linux kernel style (but with a tabstop of
 4), so when in doubt, do what they do.
 
-+ If you are bringing in code from a project other than Linux, run
-  `scripts/lindent.sh` on it.  Lindent isn't perfect, but it's close enough.
-  Linux code is usually fine (even with 8 space tabs), and lindent sometimes
-  does more harm than good on that code.
++ If you are bringing in code from another project other than Linux, such as
+Plan 9, run clang-format on it.  We have a format file in the root of the Akaros
+repo.  clang-format isn't perfect, but it's close enough.  Linux code is usually
+fine (even with 8 space tabs), and formatters sometimes do more harm than good
+on that code.  You can try clang-format for Linux code and see how it works.
 
 + You'll note that old code may lack the correct style, especially due to the
   large bodies of code from other systems involved.  Typically, we fix it when
@@ -186,7 +217,11 @@ Git Workflow
 ------------------------------------
 Git allows us to do a lot of cool things.  One of its primary purposes is to
 provide a means for us to review each others code.  In this section, I'll
-describe how I use git to make changes to Akaros.
+describe how I use git to make changes to Akaros and send those changes to the
+mailing list.
+
+There are a bunch of scripts and tools in scripts/git/.  I'll use some of them
+below.
 
 ### Setup
 
@@ -242,7 +277,9 @@ working directory.
 Take a look at things before you commit; see if you missed any files or added
 anything you don't want.
 
-`$ git commit`
+`$ git commit -s`
+
+The -s is to append your "Signed-off-by" line.
 
 Write a descriptive message, with a short, one-line summary first.  e.g.
 
@@ -294,13 +331,13 @@ Now you want to add some, but not all, of your changes to `monitor.c`:
 
 Select only the changes you want, then commit:
 
-`$ git commit  # write message`
+`$ git commit -s  # write message`
 
 Then make further commits:
 
 ```
-$ git add -p kern/src/monitor ; git commit
-$ git add -p kern/src/monitor ; git commit
+$ git add -p kern/src/monitor ; git commit -s
+$ git add -p kern/src/monitor ; git commit -s
 
 $ git push origin monitor-change
 ```
@@ -547,3 +584,112 @@ case, nothing).  Check out `git help push` for more info.
 
 Again, these techinques work well with small groups, but not for big branches
 like `origin/master`.
+
+
+### Before You Submit Patches: checkpatch
+
+scripts/checkpatch.pl is modified from Linux's checkpatch and takes a patchfile as input.  I wrote a wrapper script for it that operates on a branch: scripts/git/git-checkpatch.  I have it in my path, so I can call it like a git subcommand:
+
+```
+$ git checkpatch master..my_branch_head
+```
+
+That will generate the patches from master..my_branch_head and run checkpatch on each of them in series.
+If you don't have the git scripts in your path, you'll have to do something like:
+
+```
+$ ./scripts/git/git-checkpatch master..my_branch_head
+```
+
+Some developers have a checkpatch pre-commit hook.  It's a personal preference.  This [site](http://blog.vmsplice.net/2011/03/how-to-automatically-run-checkpatchpl.html) suggests the following:
+```
+	$ cat >.git/hooks/pre-commit
+	#!/bin/bash
+	exec git diff --cached | scripts/checkpatch.pl --no-signoff -q -
+	^D
+	$ chmod 755 .git/hooks/pre-commit
+```
+If checkpatch throws false-positives, then you'll have to bypass the precommit hook with a -n.
+
+For more info on checkpatch, check out http://www.tuxradar.com/content/newbies-guide-hacking-linux-kernel.  We use it just like Linux.
+
+
+### How To Submit Patches: git send-email
+
+git send-email is a simple way to send patches.  It works from the command line
+and you don't need a github account or remote repo.
+
+Akaros is no different than Linux or any of a number of projects in our use of
+send-email.  For a good overview, check out:
+https://www.freedesktop.org/wiki/Software/PulseAudio/HowToUseGitSendEmail/.
+
+Here's the basics for Akaros:
+
+Use the config stub for sendemail in scripts/git/config to send emails to the mailing list.
+
+If your patchset consists of more than one patch, use the --cover-letter option.
+This will send an introductory email, called PATCH 0/n, in which you explain
+your patch a bit.  If you have just one patch, you don't need to bother with a
+cover letter.  Make the subject and message for the cover letter reasonably
+descriptive of your overall change.
+
+If you have a remote branch tracking your patchset and are not overwhelmed with
+git commands yet, you can put the output of scripts/git/pre-se.sh in the
+cover-letter email.  This provides a convenient github link to browse the changes.
+
+If you are using send-email to send new versions of a patch, do it in-reply-to
+your original email.  See git help send-email for an example.
+
+Here's an example.  Say I have a branch called 'vmm' and want to send the patches from master to it:
+
+```
+$ git send-email --cover-letter master..vmm
+```
+That sent emails to the mailing list, thanks to the config setting for sendemail.
+For your first time, you can send-email to yourself instead:
+
+```
+$ git send-email --to=you@gmail.com --cover-letter master..vmm
+```
+
+If you want to send a single patch from the tip of the vmm branch:
+
+```
+$ git send-email -1 vmm
+```
+
+For more info, check out:
++ git help send-email
++ https://www.freedesktop.org/wiki/Software/PulseAudio/HowToUseGitSendEmail/
++ http://www.tuxradar.com/content/newbies-guide-hacking-linux-kernel  
+
+
+### How To Submit Patches: git request-pull
+
+If you have a github account or any place where you can push a branch, you can
+use request-pull to submit a patchset.  We also have a custom version of
+request-pull that adds extra info into the output:
+scripts/git/git-akaros-request-pull.
+
+The usage is simple.  Make sure your branch is up to date on your repo, then do
+a request-pull.  'FROM' is the point from which your branch diverges from the
+Akaros mainline.  Usually, it'll be 'master'.
+
+```
+$ git push REPO BRANCH
+$ git akaros-request-pull FROM REPO BRANCH
+```
+
+Here's how I would do a request-pull for my example 'vmm' branch:
+
+```
+$ git akaros-request-pull master origin vmm
+```
+
+Then copy-paste the output into an email and send it to the mailing list.
+
+If you don't have scripts/git/ in your PATH, you can either:
+
+```
+$ ./scripts/git/git-akaros-request-pull master origin vmm
+```
