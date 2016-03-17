@@ -24,7 +24,7 @@
 /* This code has been modified by UC Berkeley and Google to work in Akaros. */
 /*
  * Intel Gigabit Ethernet PCI-Express Controllers.
- *	8256[36], 8257[1-79], 21[078]
+ *	8256[367], 8257[1-79], 21[078]
  * Pretty basic, does not use many of the chip smarts.
  * The interrupt mitigation tuning for each chip variant
  * is probably different. The reset/initialisation
@@ -902,40 +902,69 @@ static void i82563promiscuous(void *arg, int on)
 }
 
 /*
- * Returns number of longs of ctlr->mta in use (a power of 2).
+ * Returns the number of bits of mac address used in multicast hash,
+ * thus the number of longs of ctlr->mta (2^(bits-5)).
  * This must be right for multicast (thus ipv6) to work reliably.
+ *
+ * The default multicast hash for mta is based on 12 bits of MAC address;
+ * the rightmost bit is a function of Rctl's Multicast Offset: 0=>36,
+ * 1=>35, 2=>34, 3=>32.  Exceptions include the 578, 579, 217, 218, 219;
+ * they use only 10 bits, ignoring the rightmost 2 of the 12.
  */
-static int mcasttblsize(struct ctlr *ctlr)
+static int mcastbits(struct ctlr *ctlr)
 {
 	switch (ctlr->type) {
-		case i210:
-			return 16;
-			/*
-			 * openbsd says all `ich8' versions (ich8, ich9, ich10, pch, pch2
-			 * and pch_lpt) have 32 longs.  the 218 seems to be an exception.
-			 */
+		/*
+		 * openbsd says all `ich8' versions (ich8, ich9, ich10, pch,
+		 * pch2 and pch_lpt) have 32 longs (use 10 bits of mac address
+		 * for hash).
+		 */
 		case i82566:
 		case i82567:
+	//	case i82578:
+		case i82579:
 		case i217:
-			return 32;
 		case i218:
-			return 64;
+	//	case i219:
+			return 10;		/* 32 longs */
+		case i82563:
+		case i82571:
+		case i82572:
+		case i82573:
+		case i82574:
+	//	case i82575:
+	//	case i82583:
+		case i210:			/* includes i211 */
+			return 12;		/* 128 longs */
 		default:
-			return 128;
-	}
+			printk("82563: unsure of multicast bits in mac addresses; enabling promiscuous multicast reception\n");
+			csr32w(ctlr, Rctl, csr32r(ctlr, Rctl) | Mpe);
+			return 10;	/* be conservative (for mta size) */
+		}
+}
+
+static int mcbitstolongs(int nmcbits)
+{
+	return 1 << (nmcbits - 5);	/* 2^5 = 32 */
 }
 
 static void i82563multicast(void *arg, uint8_t *addr, int on)
 {
-	int bit, x;
+	uint32_t nbits, tblsz, hash, word, bit;
 	struct ctlr *ctlr;
 	struct ether *edev;
 
 	edev = arg;
 	ctlr = edev->ctlr;
 
-	x = (addr[5] >> 1) & (mcasttblsize(ctlr) - 1);
-	bit = (addr[5] & 1) << 4 | addr[4] >> 4;
+	nbits = mcastbits(ctlr);
+	tblsz = mcbitstolongs(nbits);
+	/* assume multicast offset in Rctl is 0 (we clear it above) */
+	hash = addr[5] << 4 | addr[4] >> 4;	/* bits 47:36 of mac */
+	if (nbits == 10)
+		hash >>= 2;			/* discard 37:36 of mac */
+	word = (hash / 32) & (tblsz - 1);
+	bit = 1UL << (hash % 32);
 	/*
 	 * multiple ether addresses can hash to the same filter bit,
 	 * so it's never safe to clear a filter bit.
@@ -944,10 +973,10 @@ static void i82563multicast(void *arg, uint8_t *addr, int on)
 	 * then set the ones corresponding to in-use addresses.
 	 */
 	if (on)
-		ctlr->mta[x] |= 1 << bit;
-//  else
-//      ctlr->mta[x] &= ~(1<<bit);
-	csr32w(ctlr, Mta + x * 4, ctlr->mta[x]);
+		ctlr->mta[word] |= bit;
+//	else
+//		ctlr->mta[word] &= ~bit;
+	csr32w(ctlr, Mta+word*4, ctlr->mta[word]);
 }
 
 static void i82563im(struct ctlr *ctlr, int im)
@@ -1955,7 +1984,7 @@ macset:
 	csr32w(ctlr, Rah, 0x80000000 | ctlr->ra[5] << 8 | ctlr->ra[4]);
 
 	/* populate multicast table */
-	for (i = 0; i < mcasttblsize(ctlr); i++)
+	for (i = 0; i < mcbitstolongs(mcastbits(ctlr)); i++)
 		csr32w(ctlr, Mta + i * 4, ctlr->mta[i]);
 
 	/*
