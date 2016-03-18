@@ -8,7 +8,7 @@ TESTS_DIR = tests
 CFLAGS_TESTS += $(CFLAGS_USER) -g
 TESTS_CXXFLAGS += $(CXXFLAGS_USER) -g -std=gnu++11
 
-TESTS_LDLIBS := -lpthread -lvmm -lbenchutil -lm -lndblib -liplib
+TESTS_LDLIBS := -lpthread -lvmm -lbenchutil -lm -lndblib -liplib -ldl
 
 TESTS_SRCS_C := $(wildcard $(TESTS_DIR)/*.c)
 TESTS_SRCS_CPP := $(wildcard $(TESTS_DIR)/*.cc)
