@@ -26,6 +26,7 @@
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
+#include <vmm/sched.h>
 
 #define IOAPIC_CONFIG 0x100
 #define IOAPIC_NUM_PINS 24
@@ -115,7 +116,8 @@ static void ioapic_write(int ix, uint64_t offset, uint32_t value)
 
 }
 
-int do_ioapic(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store)
+int do_ioapic(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
+              uint64_t *regp, int store)
 {
 	// TODO: compute an index for the ioapic array. 
 	int ix = 0;

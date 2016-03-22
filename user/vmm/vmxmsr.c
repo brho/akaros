@@ -27,11 +27,13 @@
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
+#include <vmm/sched.h>
+#include <ros/arch/trapframe.h>
 
 struct emmsr {
 	uint32_t reg;
 	char *name;
-	int (*f) (struct vmctl * vcpu, struct emmsr *, uint32_t);
+	int (*f)(struct guest_thread *vm_thread, struct emmsr *, uint32_t);
 	bool written;
 	uint32_t edx, eax;
 };
@@ -50,12 +52,17 @@ static inline void write_msr(uint32_t reg, uint64_t val)
 	                         "c"(reg));
 }
 
-int emsr_miscenable(struct vmctl *vcpu, struct emmsr *, uint32_t);
-int emsr_mustmatch(struct vmctl *vcpu, struct emmsr *, uint32_t);
-int emsr_readonly(struct vmctl *vcpu, struct emmsr *, uint32_t);
-int emsr_readzero(struct vmctl *vcpu, struct emmsr *, uint32_t);
-int emsr_fakewrite(struct vmctl *vcpu, struct emmsr *, uint32_t);
-int emsr_ok(struct vmctl *vcpu, struct emmsr *, uint32_t);
+static int emsr_miscenable(struct guest_thread *vm_thread, struct emmsr *,
+                           uint32_t);
+static int emsr_mustmatch(struct guest_thread *vm_thread, struct emmsr *,
+                          uint32_t);
+static int emsr_readonly(struct guest_thread *vm_thread, struct emmsr *,
+                         uint32_t);
+static int emsr_readzero(struct guest_thread *vm_thread, struct emmsr *,
+                         uint32_t);
+static int emsr_fakewrite(struct guest_thread *vm_thread, struct emmsr *,
+                          uint32_t);
+static int emsr_ok(struct guest_thread *vm_thread, struct emmsr *, uint32_t);
 
 struct emmsr emmsrs[] = {
 	{MSR_IA32_MISC_ENABLE, "MSR_IA32_MISC_ENABLE", emsr_miscenable},
@@ -119,71 +126,81 @@ static uint64_t set_low8(uint64_t hi, uint8_t lo)
 /* this may be the only register that needs special handling.
  * If there others then we might want to extend teh emmsr struct.
  */
-int emsr_miscenable(struct vmctl *vcpu, struct emmsr *msr,
-		    uint32_t opcode) {
+static int emsr_miscenable(struct guest_thread *vm_thread, struct emmsr *msr,
+                           uint32_t opcode) {
 	uint32_t eax, edx;
-	rdmsr(msr->reg, eax, edx);
-	/* we just let them read the misc msr for now. */
-	if (opcode == EXIT_REASON_MSR_READ) {
-		vcpu->regs.tf_rax = set_low32(vcpu->regs.tf_rax, eax);
-		vcpu->regs.tf_rax |= MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
-		vcpu->regs.tf_rdx = set_low32(vcpu->regs.tf_rdx, edx);
-		return 0;
-	} else {
-		/* if they are writing what is already written, that's ok. */
-		if (((uint32_t) vcpu->regs.tf_rax == eax)
-		    && ((uint32_t) vcpu->regs.tf_rdx == edx))
-			return 0;
-	}
-	fprintf(stderr, 
-		"%s: Wanted to write 0x%x:0x%x, but could not; value was 0x%x:0x%x\n",
-		 msr->name, (uint32_t) vcpu->regs.tf_rdx,
-		 (uint32_t) vcpu->regs.tf_rax, edx, eax);
-	return SHUTDOWN_UNHANDLED_EXIT_REASON;
-}
+	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
 
-int emsr_mustmatch(struct vmctl *vcpu, struct emmsr *msr,
-		   uint32_t opcode) {
-	uint32_t eax, edx;
 	rdmsr(msr->reg, eax, edx);
 	/* we just let them read the misc msr for now. */
 	if (opcode == EXIT_REASON_MSR_READ) {
-		vcpu->regs.tf_rax = set_low32(vcpu->regs.tf_rax, eax);
-		vcpu->regs.tf_rdx = set_low32(vcpu->regs.tf_rdx, edx);
+		vm_tf->tf_rax = set_low32(vm_tf->tf_rax, eax);
+		vm_tf->tf_rax |= MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
+		vm_tf->tf_rdx = set_low32(vm_tf->tf_rdx, edx);
 		return 0;
 	} else {
 		/* if they are writing what is already written, that's ok. */
-		if (((uint32_t) vcpu->regs.tf_rax == eax)
-		    && ((uint32_t) vcpu->regs.tf_rdx == edx))
+		if (((uint32_t) vm_tf->tf_rax == eax)
+		    && ((uint32_t) vm_tf->tf_rdx == edx))
 			return 0;
 	}
 	fprintf(stderr,
 		"%s: Wanted to write 0x%x:0x%x, but could not; value was 0x%x:0x%x\n",
-		 msr->name, (uint32_t) vcpu->regs.tf_rdx,
-		 (uint32_t) vcpu->regs.tf_rax, edx, eax);
+		 msr->name, (uint32_t) vm_tf->tf_rdx,
+		 (uint32_t) vm_tf->tf_rax, edx, eax);
 	return SHUTDOWN_UNHANDLED_EXIT_REASON;
 }
 
-int emsr_ok(struct vmctl *vcpu, struct emmsr *msr, uint32_t opcode)
-{
+static int emsr_mustmatch(struct guest_thread *vm_thread, struct emmsr *msr,
+                          uint32_t opcode) {
+	uint32_t eax, edx;
+	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
+
+	rdmsr(msr->reg, eax, edx);
+	/* we just let them read the misc msr for now. */
 	if (opcode == EXIT_REASON_MSR_READ) {
-		rdmsr(msr->reg, vcpu->regs.tf_rdx, vcpu->regs.tf_rax);
+		vm_tf->tf_rax = set_low32(vm_tf->tf_rax, eax);
+		vm_tf->tf_rdx = set_low32(vm_tf->tf_rdx, edx);
+		return 0;
+	} else {
+		/* if they are writing what is already written, that's ok. */
+		if (((uint32_t) vm_tf->tf_rax == eax)
+		    && ((uint32_t) vm_tf->tf_rdx == edx))
+			return 0;
+	}
+	fprintf(stderr,
+		"%s: Wanted to write 0x%x:0x%x, but could not; value was 0x%x:0x%x\n",
+		 msr->name, (uint32_t) vm_tf->tf_rdx,
+		 (uint32_t) vm_tf->tf_rax, edx, eax);
+	return SHUTDOWN_UNHANDLED_EXIT_REASON;
+}
+
+static int emsr_ok(struct guest_thread *vm_thread, struct emmsr *msr,
+                   uint32_t opcode)
+{
+	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
+
+	if (opcode == EXIT_REASON_MSR_READ) {
+		rdmsr(msr->reg, vm_tf->tf_rdx, vm_tf->tf_rax);
 	} else {
 		uint64_t val =
-			(uint64_t) vcpu->regs.tf_rdx << 32 | vcpu->regs.tf_rax;
+			(uint64_t) vm_tf->tf_rdx << 32 | vm_tf->tf_rax;
 		write_msr(msr->reg, val);
 	}
 	return 0;
 }
 
-int emsr_readonly(struct vmctl *vcpu, struct emmsr *msr, uint32_t opcode)
+static int emsr_readonly(struct guest_thread *vm_thread, struct emmsr *msr,
+                         uint32_t opcode)
 {
 	uint32_t eax, edx;
-	rdmsr((uint32_t) vcpu->regs.tf_rcx, eax, edx);
+	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
+
+	rdmsr((uint32_t) vm_tf->tf_rcx, eax, edx);
 	/* we just let them read the misc msr for now. */
 	if (opcode == EXIT_REASON_MSR_READ) {
-		vcpu->regs.tf_rax = set_low32(vcpu->regs.tf_rax, eax);
-		vcpu->regs.tf_rdx = set_low32(vcpu->regs.tf_rdx, edx);
+		vm_tf->tf_rax = set_low32(vm_tf->tf_rax, eax);
+		vm_tf->tf_rdx = set_low32(vm_tf->tf_rdx, edx);
 		return 0;
 	}
 
@@ -191,11 +208,14 @@ int emsr_readonly(struct vmctl *vcpu, struct emmsr *msr, uint32_t opcode)
 	return SHUTDOWN_UNHANDLED_EXIT_REASON;
 }
 
-int emsr_readzero(struct vmctl *vcpu, struct emmsr *msr, uint32_t opcode)
+static int emsr_readzero(struct guest_thread *vm_thread, struct emmsr *msr,
+                         uint32_t opcode)
 {
+	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
+
 	if (opcode == EXIT_REASON_MSR_READ) {
-		vcpu->regs.tf_rax = 0;
-		vcpu->regs.tf_rdx = 0;
+		vm_tf->tf_rax = 0;
+		vm_tf->tf_rdx = 0;
 		return 0;
 	}
 
@@ -204,9 +224,12 @@ int emsr_readzero(struct vmctl *vcpu, struct emmsr *msr, uint32_t opcode)
 }
 
 /* pretend to write it, but don't write it. */
-int emsr_fakewrite(struct vmctl *vcpu, struct emmsr *msr, uint32_t opcode)
+static int emsr_fakewrite(struct guest_thread *vm_thread, struct emmsr *msr,
+                          uint32_t opcode)
 {
 	uint32_t eax, edx;
+	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
+
 	if (!msr->written) {
 		rdmsr(msr->reg, eax, edx);
 	} else {
@@ -215,30 +238,31 @@ int emsr_fakewrite(struct vmctl *vcpu, struct emmsr *msr, uint32_t opcode)
 	}
 	/* we just let them read the misc msr for now. */
 	if (opcode == EXIT_REASON_MSR_READ) {
-		vcpu->regs.tf_rax = set_low32(vcpu->regs.tf_rax, eax);
-		vcpu->regs.tf_rdx = set_low32(vcpu->regs.tf_rdx, edx);
+		vm_tf->tf_rax = set_low32(vm_tf->tf_rax, eax);
+		vm_tf->tf_rdx = set_low32(vm_tf->tf_rdx, edx);
 		return 0;
 	} else {
 		/* if they are writing what is already written, that's ok. */
-		if (((uint32_t) vcpu->regs.tf_rax == eax)
-		    && ((uint32_t) vcpu->regs.tf_rdx == edx))
+		if (((uint32_t) vm_tf->tf_rax == eax)
+		    && ((uint32_t) vm_tf->tf_rdx == edx))
 			return 0;
-		msr->edx = vcpu->regs.tf_rdx;
-		msr->eax = vcpu->regs.tf_rax;
+		msr->edx = vm_tf->tf_rdx;
+		msr->eax = vm_tf->tf_rax;
 		msr->written = true;
 	}
 	return 0;
 }
 
 int
-msrio(struct vmctl *vcpu, uint32_t opcode) {
+msrio(struct guest_thread *vm_thread, uint32_t opcode) {
 	int i;
+	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
 	for (i = 0; i < sizeof(emmsrs)/sizeof(emmsrs[0]); i++) {
-		if (emmsrs[i].reg != vcpu->regs.tf_rcx)
+		if (emmsrs[i].reg != vm_tf->tf_cr3)
 			continue;
-		return emmsrs[i].f(vcpu, &emmsrs[i], opcode);
+		return emmsrs[i].f(vm_thread, &emmsrs[i], opcode);
 	}
-	fprintf(stderr,"msrio for 0x%lx failed\n", vcpu->regs.tf_rcx);
+	fprintf(stderr, "msrio for 0x%lx failed\n", vm_tf->tf_cr3);
 	return SHUTDOWN_UNHANDLED_EXIT_REASON;
 }
 

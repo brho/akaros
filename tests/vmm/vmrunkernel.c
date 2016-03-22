@@ -23,12 +23,7 @@
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
-
-
-
-void showstatus(FILE *f, struct vmctl *v);
-
-int msrio(struct vmctl *vcpu, uint32_t opcode);
+#include <vmm/sched.h>
 
 struct vmctl vmctl;
 struct vmm_gpcore_init gpci;
@@ -37,6 +32,7 @@ struct vmm_gpcore_init gpci;
  * on its behalf. */
 uth_mutex_t the_ball;
 pthread_t vm_thread;
+
 void (*old_thread_refl)(struct uthread *uth, struct user_context *ctx);
 
 static void copy_vmtf_to_vmctl(struct vm_trapframe *vm_tf, struct vmctl *vmctl)
@@ -588,6 +584,7 @@ int main(int argc, char **argv)
 	uint8_t csum;
 	void *coreboot_tables = (void *) 0x1165000;
 	void *a_page;
+	struct vm_trapframe *vm_tf;
 
 	the_ball = uth_mutex_alloc();
 	uth_mutex_lock(the_ball);
@@ -903,18 +900,21 @@ int main(int argc, char **argv)
 		}
 	}
 
+	vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
+
 	while (1) {
 
 		int c;
 		uint8_t byte;
-		vmctl.command = REG_RIP;
+		//vmctl.command = REG_RIP;
 		if (maxresume-- == 0) {
 			debug = 1;
 			resumeprompt = 1;
 		}
 		if (debug) {
-			fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
-			showstatus(stderr, &vmctl);
+			fprintf(stderr, "RIP %p, exit reason 0x%x\n", vm_tf->tf_rip,
+			        vm_tf->tf_exit_reason);
+			showstatus(stderr, (struct guest_thread*)&vm_thread);
 		}
 		if (resumeprompt) {
 			fprintf(stderr, "RESUME?\n");
@@ -922,14 +922,16 @@ int main(int argc, char **argv)
 			if (c == 'q')
 				break;
 		}
-		if (vmctl.shutdown == SHUTDOWN_EPT_VIOLATION) {
+		if (vm_tf->tf_exit_reason == EXIT_REASON_EPT_VIOLATION) {
 			uint64_t gpa, *regp, val;
 			uint8_t regx;
 			int store, size;
 			int advance;
-			if (decode(&vmctl, &gpa, &regx, &regp, &store, &size, &advance)) {
-				fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
-				showstatus(stderr, &vmctl);
+			if (decode((struct guest_thread *) vm_thread, &gpa, &regx, &regp,
+			           &store, &size, &advance)) {
+				fprintf(stderr, "RIP %p, shutdown 0x%x\n", vm_tf->tf_rip,
+				        vm_tf->tf_exit_reason);
+				showstatus(stderr, (struct guest_thread*)&vm_thread);
 				quit = 1;
 				break;
 			}
@@ -937,7 +939,8 @@ int main(int argc, char **argv)
 			if ((gpa & ~0xfffULL) == virtiobase) {
 				if (debug) fprintf(stderr, "DO SOME VIRTIO\n");
 				// Lucky for us the various virtio ops are well-defined.
-				virtio_mmio(&vmctl, gpa, regx, regp, store);
+				virtio_mmio((struct guest_thread *)vm_thread, gpa, regx, regp,
+				            store);
 				if (debug) fprintf(stderr, "store is %d:\n", store);
 				if (debug) fprintf(stderr, "REGP IS %16x:\n", *regp);
 			} else if ((gpa & 0xfee00000) == 0xfee00000) {
@@ -946,78 +949,85 @@ int main(int argc, char **argv)
 				//apic(&vmctl, gpa, regx, regp, store);
 			} else if ((gpa & 0xfec00000) == 0xfec00000) {
 				// until we fix our include mess, just put the proto here.
-				int do_ioapic(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store);
-				do_ioapic(&vmctl, gpa, regx, regp, store);
+				do_ioapic((struct guest_thread *)vm_thread, gpa, regx, regp,
+				          store);
 			} else if (gpa < 4096) {
 				uint64_t val = 0;
 				memmove(&val, &low4k[gpa], size);
 				hexdump(stdout, &low4k[gpa], size);
-				fprintf(stderr, "Low 1m, code %p read @ %p, size %d, val %p\n", vmctl.regs.tf_rip, gpa, size, val);
+				fprintf(stderr, "Low 1m, code %p read @ %p, size %d, val %p\n",
+				        vm_tf->tf_rip, gpa, size, val);
 				memmove(regp, &low4k[gpa], size);
 				hexdump(stdout, regp, size);
 			} else {
 				fprintf(stderr, "EPT violation: can't handle %p\n", gpa);
-				fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
+				fprintf(stderr, "RIP %p, exit reason 0x%x\n", vm_tf->tf_rip,
+				        vm_tf->tf_exit_reason);
 				fprintf(stderr, "Returning 0xffffffff\n");
-				showstatus(stderr, &vmctl);
+				showstatus(stderr, (struct guest_thread*)&vm_thread);
 				// Just fill the whole register for now.
 				*regp = (uint64_t) -1;
 			}
-			vmctl.regs.tf_rip += advance;
-			if (debug) fprintf(stderr, "Advance rip by %d bytes to %p\n", advance, vmctl.regs.tf_rip);
-			vmctl.shutdown = 0;
-			vmctl.gpa = 0;
-			vmctl.command = REG_ALL;
-		} else if (vmctl.shutdown == SHUTDOWN_UNHANDLED_EXIT_REASON) {
-			switch(vmctl.ret_code){
+			vm_tf->tf_rip += advance;
+			if (debug)
+				fprintf(stderr, "Advance rip by %d bytes to %p\n",
+				        advance, vm_tf->tf_rip);
+			//vmctl.shutdown = 0;
+			//vmctl.gpa = 0;
+			//vmctl.command = REG_ALL;
+		} else {
+			switch (vm_tf->tf_exit_reason) {
 			case  EXIT_REASON_VMCALL:
-				byte = vmctl.regs.tf_rdi;
+				byte = vm_tf->tf_rdi;
 				printf("%c", byte);
 				if (byte == '\n') printf("%c", '%');
-				vmctl.regs.tf_rip += 3;
+				vm_tf->tf_rip += 3;
 				break;
 			case EXIT_REASON_EXTERNAL_INTERRUPT:
 				//debug = 1;
-				if (debug) fprintf(stderr, "XINT 0x%x 0x%x\n", vmctl.intrinfo1, vmctl.intrinfo2);
+				if (debug)
+					fprintf(stderr, "XINT 0x%x 0x%x\n",
+					        vm_tf->tf_intrinfo1, vm_tf->tf_intrinfo2);
 				if (debug) pir_dump();
-				vmctl.command = RESUME;
+				//vmctl.command = RESUME;
 				break;
 			case EXIT_REASON_IO_INSTRUCTION:
-				fprintf(stderr, "IO @ %p\n", vmctl.regs.tf_rip);
-				io(&vmctl);
-				vmctl.shutdown = 0;
-				vmctl.gpa = 0;
-				vmctl.command = REG_ALL;
+				fprintf(stderr, "IO @ %p\n", vm_tf->tf_rip);
+				io((struct guest_thread *)vm_thread);
+				//vmctl.shutdown = 0;
+				//vmctl.gpa = 0;
+				//vmctl.command = REG_ALL;
 				break;
 			case EXIT_REASON_INTERRUPT_WINDOW:
 				if (consdata) {
 					if (debug) fprintf(stderr, "inject an interrupt\n");
 					virtio_mmio_set_vring_irq();
-					vmctl.interrupt = 0x80000000 | virtioirq;
-					vmctl.command = RESUME;
+					vm_tf->tf_trap_inject = 0x80000000 | virtioirq;
+					//vmctl.command = RESUME;
 					consdata = 0;
 				}
 				break;
 			case EXIT_REASON_MSR_WRITE:
 			case EXIT_REASON_MSR_READ:
 				fprintf(stderr, "Do an msr\n");
-				if (msrio(&vmctl, vmctl.ret_code)) {
+				if (msrio((struct guest_thread *)vm_thread,
+				          vm_tf->tf_exit_reason)) {
 					// uh-oh, msrio failed
 					// well, hand back a GP fault which is what Intel does
-					fprintf(stderr, "MSR FAILED: RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
-					showstatus(stderr, &vmctl);
+					fprintf(stderr, "MSR FAILED: RIP %p, shutdown 0x%x\n",
+					        vm_tf->tf_rip, vm_tf->tf_exit_reason);
+					showstatus(stderr, (struct guest_thread*)&vm_thread);
 
 					// Use event injection through vmctl to send
 					// a general protection fault
 					// vmctl.interrupt gets written to the VM-Entry
 					// Interruption-Information Field by vmx
-					vmctl.interrupt = (1 << 31) // "Valid" bit
-					                | (0 << 12) // Reserved by Intel
-					                | (1 << 11) // Deliver-error-code bit (set if event pushes error code to stack)
-					                | (3 << 8)  // Event type (3 is "hardware exception")
-					                | 13;       // Interrupt/exception vector (13 is "general protection fault")
+					vm_tf->tf_trap_inject = VM_TRAP_VALID
+					                      | VM_TRAP_ERROR_CODE
+					                      | VM_TRAP_HARDWARE
+					                      | 13; // GPF
 				} else {
-					vmctl.regs.tf_rip += 2;
+					vm_tf->tf_rip += 2;
 				}
 				break;
 			case EXIT_REASON_MWAIT_INSTRUCTION:
@@ -1030,9 +1040,9 @@ int main(int argc, char **argv)
 				if (debug)
 					vapic_status_dump(stderr, gpci.vapic_addr);
 				if (debug)fprintf(stderr, "Resume with consdata ...\n");
-				vmctl.regs.tf_rip += 3;
+				vm_tf->tf_rip += 3;
 				//fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
-				//showstatus(stderr, &vmctl);
+				//showstatus(stderr, (struct guest_thread*)&vm_thread);
 				break;
 			case EXIT_REASON_HLT:
 				fflush(stdout);
@@ -1042,9 +1052,9 @@ int main(int argc, char **argv)
 					;
 				//debug = 1;
 				if (debug)fprintf(stderr, "Resume with consdata ...\n");
-				vmctl.regs.tf_rip += 1;
+				vm_tf->tf_rip += 1;
 				//fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
-				//showstatus(stderr, &vmctl);
+				//showstatus(stderr, (struct guest_thread*)&vm_thread);
 				break;
 			case EXIT_REASON_APIC_ACCESS:
 				if (1 || debug)fprintf(stderr, "APIC READ EXIT\n");
@@ -1053,28 +1063,35 @@ int main(int argc, char **argv)
 				uint8_t regx;
 				int store, size;
 				int advance;
-				if (decode(&vmctl, &gpa, &regx, &regp, &store, &size, &advance)) {
-					fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
-					showstatus(stderr, &vmctl);
+				if (decode((struct guest_thread *)vm_thread, &gpa, &regx,
+				           &regp, &store, &size, &advance)) {
+					fprintf(stderr, "RIP %p, shutdown 0x%x\n", vm_tf->tf_rip,
+					        vm_tf->tf_exit_reason);
+					showstatus(stderr, (struct guest_thread*)&vm_thread);
 					quit = 1;
 					break;
 				}
 
-				int apic(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store);
-				apic(&vmctl, gpa, regx, regp, store);
-				vmctl.regs.tf_rip += advance;
-				if (debug) fprintf(stderr, "Advance rip by %d bytes to %p\n", advance, vmctl.regs.tf_rip);
-				vmctl.shutdown = 0;
-				vmctl.gpa = 0;
-				vmctl.command = REG_ALL;
+				int apic(struct guest_thread *vm_thread, uint64_t gpa,
+				         int destreg, uint64_t *regp, int store);
+				apic((struct guest_thread *)vm_thread, gpa, regx, regp, store);
+				vm_tf->tf_rip += advance;
+				if (debug)
+					fprintf(stderr, "Advance rip by %d bytes to %p\n",
+					        advance, vm_tf->tf_rip);
+				//vmctl.shutdown = 0;
+				//vmctl.gpa = 0;
+				//vmctl.command = REG_ALL;
 				break;
 			case EXIT_REASON_APIC_WRITE:
 				if (1 || debug)fprintf(stderr, "APIC WRITE EXIT\n");
 				break;
 			default:
-				fprintf(stderr, "Don't know how to handle exit %d\n", vmctl.ret_code);
-				fprintf(stderr, "RIP %p, shutdown 0x%x\n", vmctl.regs.tf_rip, vmctl.shutdown);
-				showstatus(stderr, &vmctl);
+				fprintf(stderr, "Don't know how to handle exit %d\n",
+				        vm_tf->tf_exit_reason);
+				fprintf(stderr, "RIP %p, shutdown 0x%x\n", vm_tf->tf_rip,
+				        vm_tf->tf_exit_reason);
+				showstatus(stderr, (struct guest_thread*)&vm_thread);
 				quit = 1;
 				break;
 			}
@@ -1084,15 +1101,19 @@ int main(int argc, char **argv)
 			break;
 		if (consdata) {
 			if (debug) fprintf(stderr, "inject an interrupt\n");
-			if (debug) fprintf(stderr, "XINT 0x%x 0x%x\n", vmctl.intrinfo1, vmctl.intrinfo2);
-			vmctl.interrupt = 0x80000000 | virtioirq;
+			if (debug)
+				fprintf(stderr, "XINT 0x%x 0x%x\n", vm_tf->tf_intrinfo1,
+				        vm_tf->tf_intrinfo2);
+			vm_tf->tf_trap_inject = 0x80000000 | virtioirq;
 			virtio_mmio_set_vring_irq();
 			consdata = 0;
 			//debug = 1;
-			vmctl.command = RESUME;
+			//vmctl.command = RESUME;
 		}
 		if (debug) fprintf(stderr, "NOW DO A RESUME\n");
+		copy_vmtf_to_vmctl(vm_tf, &vmctl);
 		run_vmthread(&vmctl);
+		copy_vmctl_to_vmtf(&vmctl, vm_tf);
 	}
 
 	/* later.

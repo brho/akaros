@@ -36,6 +36,7 @@
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
+#include <ros/arch/trapframe.h>
 
 int debug_decode = 0;
 #define DPRINTF(fmt, ...) \
@@ -178,10 +179,12 @@ static int insize(void *rip)
 // int is the reg index which we can use for printing info.
 // regp points to the register in hw_trapframe from which
 // to load or store a result.
-int decode(struct vmctl *v, uint64_t *gpa, uint8_t *destreg, uint64_t **regp, int *store, int *size, int *advance)
+int decode(struct guest_thread *vm_thread, uint64_t *gpa, uint8_t *destreg,
+           uint64_t **regp, int *store, int *size, int *advance)
 {
+	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
 
-	DPRINTF("v is %p\n", v);
+	DPRINTF("v is %p\n", vm_tf);
 
 	// Duh, which way did he go George? Which way did he go? 
 	// First hit on Google gets you there!
@@ -190,7 +193,7 @@ int decode(struct vmctl *v, uint64_t *gpa, uint8_t *destreg, uint64_t **regp, in
 	// instruction decode, knowing this gpa reduces our work:
 	// we don't have to find the source address in registers,
 	// only the register holding or receiving the value.
-	*gpa = v->gpa;
+	*gpa = vm_tf->tf_guest_pa;
 	DPRINTF("gpa is %p\n", *gpa);
 
 	// To find out what to do, we have to look at
@@ -199,7 +202,7 @@ int decode(struct vmctl *v, uint64_t *gpa, uint8_t *destreg, uint64_t **regp, in
 	// we take a shortcut for now: read the low 30 bits and use
 	// that as the kernel PA, or our VA, and see what's
 	// there. Hokey. Works.
-	uint8_t *kva = (void *)(v->regs.tf_rip & 0x3fffffff);
+	uint8_t *kva = (void *)(vm_tf->tf_rip & 0x3fffffff);
 	DPRINTF("kva is %p\n", kva);
 
 	// fail fast. If we can't get the size we're done.
@@ -220,52 +223,52 @@ int decode(struct vmctl *v, uint64_t *gpa, uint8_t *destreg, uint64_t **regp, in
 	// All we need to know is which destination or source register it is.
 	switch (*destreg) {
 	case 0:
-		*regp = &v->regs.tf_rax;
+		*regp = &vm_tf->tf_rax;
 		break;
 	case 1:
-		*regp = &v->regs.tf_rcx;
+		*regp = &vm_tf->tf_rcx;
 		break;
 	case 2:
-		*regp = &v->regs.tf_rdx;
+		*regp = &vm_tf->tf_rdx;
 		break;
 	case 3:
-		*regp = &v->regs.tf_rbx;
+		*regp = &vm_tf->tf_rbx;
 		break;
 	case 4:
-		*regp = &v->regs.tf_rsp; // uh, right.
+		*regp = &vm_tf->tf_rsp; // uh, right.
 		break;
 	case 5:
-		*regp = &v->regs.tf_rbp;
+		*regp = &vm_tf->tf_rbp;
 		break;
 	case 6:
-		*regp = &v->regs.tf_rsi;
+		*regp = &vm_tf->tf_rsi;
 		break;
 	case 7:
-		*regp = &v->regs.tf_rdi;
+		*regp = &vm_tf->tf_rdi;
 		break;
 	case 8:
-		*regp = &v->regs.tf_r8;
+		*regp = &vm_tf->tf_r8;
 		break;
 	case 9:
-		*regp = &v->regs.tf_r9;
+		*regp = &vm_tf->tf_r9;
 		break;
 	case 10:
-		*regp = &v->regs.tf_r10;
+		*regp = &vm_tf->tf_r10;
 		break;
 	case 11:
-		*regp = &v->regs.tf_r11;
+		*regp = &vm_tf->tf_r11;
 		break;
 	case 12:
-		*regp = &v->regs.tf_r12;
+		*regp = &vm_tf->tf_r12;
 		break;
 	case 13:
-		*regp = &v->regs.tf_r13;
+		*regp = &vm_tf->tf_r13;
 		break;
 	case 14:
-		*regp = &v->regs.tf_r14;
+		*regp = &vm_tf->tf_r14;
 		break;
 	case 15:
-		*regp = &v->regs.tf_r15;
+		*regp = &vm_tf->tf_r15;
 		break;
 	}
 	return 0;

@@ -18,6 +18,8 @@
 #include <vmm/virtio.h>
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_ids.h>
+#include <vmm/sched.h>
+#include <ros/arch/trapframe.h>
 
 /* nowhere on my linux system. */
 #define ARRAY_SIZE(x) (sizeof((x))/sizeof((x)[0]))
@@ -120,7 +122,7 @@ static int configwrite8(uint32_t addr, uint8_t val)
  * It would have been nice had intel encoded the IO exit info as nicely as they
  * encoded, some of the other exits.
  */
-int io(struct vmctl *v)
+int io(struct guest_thread *vm_thread)
 {
 
 	/* Get a pointer to the memory at %rip. This is quite messy and part of the
@@ -132,33 +134,34 @@ int io(struct vmctl *v)
 	uint16_t *ip16;
 	uintptr_t ip;
 	uint32_t edx;
+	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
 	/* for now, we're going to be a bit crude. In kernel, p is about v, so we just blow away
 	 * the upper 34 bits and take the rest + 1M as our address
 	 * TODO: put this in vmctl somewhere?
 	 */
-	ip = v->regs.tf_rip & 0x3fffffff;
-	edx = v->regs.tf_rdx;
+	ip = vm_tf->tf_rip & 0x3fffffff;
+	edx = vm_tf->tf_rdx;
 	ip8 = (void *)ip;
 	ip16 = (void *)ip;
 	//printf("io: ip16 %p\n", *ip16, edx);
 
 	if (*ip8 == 0xef) {
-		v->regs.tf_rip += 1;
+		vm_tf->tf_rip += 1;
 		/* out at %edx */
 		if (edx == 0xcf8) {
 			//printf("Set cf8 ");
-			return configaddr(v->regs.tf_rax);
+			return configaddr(vm_tf->tf_rax);
 		}
 		if (edx == 0xcfc) {
 			//printf("Set cfc ");
-			return configwrite32(edx, v->regs.tf_rax);
+			return configwrite32(edx, vm_tf->tf_rax);
 		}
 		printf("(out rax, edx): unhandled IO address dx @%p is 0x%x\n", ip8, edx);
 		return -1;
 	}
 	// out %al, %dx
 	if (*ip8 == 0xee) {
-		v->regs.tf_rip += 1;
+		vm_tf->tf_rip += 1;
 		/* out al %edx */
 		if (edx == 0xcfb) { // special!
 			printf("Just ignore the damned cfb write\n");
@@ -172,24 +175,24 @@ int io(struct vmctl *v)
 		return -1;
 	}
 	if (*ip8 == 0xec) {
-		v->regs.tf_rip += 1;
+		vm_tf->tf_rip += 1;
 		//printf("configread8 ");
-		return configread8(edx, &v->regs.tf_rax);
+		return configread8(edx, &vm_tf->tf_rax);
 	}
 	if (*ip8 == 0xed) {
-		v->regs.tf_rip += 1;
+		vm_tf->tf_rip += 1;
 		if (edx == 0xcf8) {
 			//printf("read cf8 0x%lx\n", v->regs.tf_rax);
-			v->regs.tf_rax = cf8;
+			vm_tf->tf_rax = cf8;
 			return 0;
 		}
 		//printf("configread32 ");
-		return configread32(edx, &v->regs.tf_rax);
+		return configread32(edx, &vm_tf->tf_rax);
 	}
 	if (*ip16 == 0xed66) {
-		v->regs.tf_rip += 2;
+		vm_tf->tf_rip += 2;
 		//printf("configread16 ");
-		return configread16(edx, &v->regs.tf_rax);
+		return configread16(edx, &vm_tf->tf_rax);
 	}
 	printf("unknown IO %p %x %x\n", ip8, *ip8, *ip16);
 	return -1;

@@ -26,6 +26,7 @@
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
+#include <vmm/sched.h>
 
 
 #define APIC_CONFIG 0x100
@@ -163,7 +164,8 @@ static void apic_write(uint64_t offset, uint32_t value)
 
 }
 
-int apic(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store)
+int apic(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
+         uint64_t *regp, int store)
 {
 	uint32_t offset = gpa & 0xfffff;
 	/* basic sanity tests. */

@@ -39,6 +39,7 @@
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
+#include <vmm/sched.h>
 
 int debug_virtio_mmio = 0;
 #define DPRINTF(fmt, ...) \
@@ -414,14 +415,17 @@ void virtio_mmio_set_vring_irq(void)
 	mmio.isr |= VIRTIO_MMIO_INT_VRING;
 }
 
-int virtio_mmio(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store)
+int virtio_mmio(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
+                uint64_t *regp, int store)
 {
 	if (store) {
 		virtio_mmio_write(gpa, *regp);
-		DPRINTF("Write: mov %s to %s @%p val %p\n", regname(destreg), virtio_names[(uint8_t)gpa], gpa, *regp);
+		DPRINTF("Write: mov %s to %s @%p val %p\n", regname(destreg),
+		        virtio_names[(uint8_t)gpa], gpa, *regp);
 	} else {
 		*regp = virtio_mmio_read(gpa);
-		DPRINTF("Read: Set %s from %s @%p to %p\n", regname(destreg), virtio_names[(uint8_t)gpa], gpa, *regp);
+		DPRINTF("Read: Set %s from %s @%p to %p\n", regname(destreg),
+		        virtio_names[(uint8_t)gpa], gpa, *regp);
 	}
 
 }
