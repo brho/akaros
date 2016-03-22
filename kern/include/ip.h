@@ -66,6 +66,12 @@ enum {
 	Connected = 4,
 };
 
+enum {
+	SHUT_RD = 0,
+	SHUT_WR = 1,
+	SHUT_RDWR = 2,
+};
+
 /*
  *  one per conversation directory
  */
@@ -295,6 +301,7 @@ struct Proto {
 	int (*state) (struct conv *, char *unused_char_p_t, int);
 	void (*create) (struct conv *);
 	void (*close) (struct conv *);
+	void (*shutdown)(struct conv *, int);
 	void (*rcv) (struct Proto *, struct Ipifc *, struct block *);
 	void (*ctl)(struct conv *, char **, int);
 	void (*advise) (struct Proto *, struct block *, char *unused_char_p_t);

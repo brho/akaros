@@ -501,6 +501,27 @@ static void tcpannounce(struct conv *c, char **argv, int argc)
 	Fsconnected(c, NULL);
 }
 
+static void tcpshutdown(struct conv *c, int how)
+{
+	Tcpctl *tcb = (Tcpctl*)c->ptcl;
+
+	/* Do nothing for the read side */
+	if (how == SHUT_RD)
+		return;
+	/* Sends a FIN.  If we're in another state (like Listen), we'll run into
+	 * issues, since we'll never send the FIN.  We'll be shutdown on our end,
+	 * but we'll never tell the distant end.  Might just be an app issue. */
+	switch (tcb->state) {
+	case Syn_received:
+	case Established:
+		tcb->flgcnt++;
+		tcb->snd.nxt++;
+		tcpsetstate(c, Finwait1);
+		tcpoutput(c);
+		break;
+	}
+}
+
 /*
  *  tcpclose is always called with the q locked
  */
@@ -3178,6 +3199,7 @@ void tcpinit(struct Fs *fs)
 	tcp->state = tcpstate;
 	tcp->create = tcpcreate;
 	tcp->close = tcpclose;
+	tcp->shutdown = tcpshutdown;
 	tcp->rcv = tcpiput;
 	tcp->advise = tcpadvise;
 	tcp->stats = tcpstats;

@@ -1149,6 +1149,31 @@ err:
 	error(EINVAL, "nonblock [on|off]");
 }
 
+static void shutdownctlmsg(struct conv *cv, struct cmdbuf *cb)
+{
+	if (cb->nf < 2)
+		goto err;
+	if (!strcmp(cb->f[1], "rd")) {
+		qhangup(cv->rq, "shutdown");
+		if (cv->p->shutdown)
+			cv->p->shutdown(cv, SHUT_RD);
+	} else if (!strcmp(cb->f[1], "wr")) {
+		qhangup(cv->wq, "shutdown");
+		if (cv->p->shutdown)
+			cv->p->shutdown(cv, SHUT_WR);
+	} else if (!strcmp(cb->f[1], "rdwr")) {
+		qhangup(cv->rq, "shutdown");
+		qhangup(cv->wq, "shutdown");
+		if (cv->p->shutdown)
+			cv->p->shutdown(cv, SHUT_RDWR);
+	} else {
+		goto err;
+	}
+	return;
+err:
+	error(EINVAL, "shutdown [rx|tx|rxtx]");
+}
+
 static void tosctlmsg(struct conv *c, struct cmdbuf *cb)
 {
 	if (cb->nf < 2)
@@ -1217,6 +1242,8 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 				bindctlmsg(x, c, cb);
 			else if (strcmp(cb->f[0], "nonblock") == 0)
 				nonblockctlmsg(c, cb);
+			else if (strcmp(cb->f[0], "shutdown") == 0)
+				shutdownctlmsg(c, cb);
 			else if (strcmp(cb->f[0], "ttl") == 0)
 				ttlctlmsg(c, cb);
 			else if (strcmp(cb->f[0], "tos") == 0)
