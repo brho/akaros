@@ -295,7 +295,7 @@ void __arch_pcpu_init(uint32_t coreid)
 	 */
 	lcr4(rcr4() | CR4_OSFXSR | CR4_OSXMME);
 
-	if (cpu_has_feat(CPU_FEAT_X86_XSAVEOPT)) {
+	if (cpu_has_feat(CPU_FEAT_X86_XSAVE)) {
 		// You MUST set CR4.OSXSAVE before loading xcr0
 		lcr4(rcr4() | CR4_OSXSAVE);
 		// Set xcr0 to the Akaros-wide default

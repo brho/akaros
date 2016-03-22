@@ -93,7 +93,7 @@ void ancillary_state_init(void)
 	if (!cpu_has_feat(CPU_FEAT_X86_FXSR))
 		panic("No FXSAVE/FXRSTOR (FXSR) support! Refusing to boot.");
 
-	if (cpu_has_feat(CPU_FEAT_X86_XSAVEOPT)) {
+	if (cpu_has_feat(CPU_FEAT_X86_XSAVE)) {
 		// Next determine the user state components supported
 		// by the processor and set x86_default_xcr0.
 		cpuid(0x0d, 0x00, &eax, 0, 0, &edx);
