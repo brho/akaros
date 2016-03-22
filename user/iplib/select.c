@@ -48,6 +48,7 @@
 #include <ros/common.h>
 #include <parlib/uthread.h>
 #include <sys/close_cb.h>
+#include <sys/fork_cb.h>
 #include <sys/epoll.h>
 #include <malloc.h>
 #include <stdlib.h>
@@ -82,9 +83,30 @@ static void select_fd_closed(int fd)
 	uth_mutex_unlock(fdset_mtx);
 }
 
+static void select_forked(void)
+{
+	struct epoll_event ep_ev;
+
+	uth_mutex_lock(fdset_mtx);
+	for (int i = 0; i < FD_SETSIZE; i++) {
+		if (fd_is_set(i, &all_fds)) {
+			ep_ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLHUP |
+			               EPOLLERR;
+			ep_ev.data.fd = i;
+			/* Discard error.  The underlying tap is gone, and the epoll ctlr
+			 * might also have been emptied.  We just want to make sure there is
+			 * no epoll/tap so that a future CTL_ADD doesn't fail. */
+			epoll_ctl(epoll_fd, EPOLL_CTL_DEL, i, &ep_ev);
+			FD_CLR(i, &all_fds);
+		}
+	}
+	uth_mutex_unlock(fdset_mtx);
+}
+
 static void select_init(void)
 {
 	static struct close_cb select_close_cb = {.func = select_fd_closed};
+	static struct fork_cb select_fork_cb = {.func = select_forked};
 
 	register_close_cb(&select_close_cb);
 	epoll_fd = epoll_create(FD_SETSIZE);
@@ -94,6 +116,7 @@ static void select_init(void)
 	}
 	fdset_mtx = uth_mutex_alloc();
 	sleep_mtx = uth_mutex_alloc();
+	register_fork_cb(&select_fork_cb);
 }
 
 static int select_tv_to_ep_timeout(struct timeval *tv)

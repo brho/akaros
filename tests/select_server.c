@@ -210,6 +210,19 @@ int main(void)
 		has_selected = TRUE;
 		assert(FD_ISSET(dfd, &rfds));
 		/* you might get a HUP, but keep on reading! */
+
+		/* Crazy fork tests.  This will fork and let the child keep going with
+		 * the connection. */
+		switch (fork()) {
+		case -1:
+			perror("Fork");
+			exit(-1);
+			break;
+		case 0:
+			break;
+		default:
+			exit(0);
+		}
 	}
 	assert(has_selected);
 
