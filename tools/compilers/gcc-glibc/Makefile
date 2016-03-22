@@ -643,7 +643,7 @@ native-gcc-stage3-configure: native-gcc-stage3-prep
 		--with-isl=no \
 		--with-cloog=no \
 		--with-libelf=no \
-		--enable-threads=no \
+		--enable-threads=posix \
 		--enable-tls \
 		--disable-nls \
 		--disable-multilib \
@@ -675,7 +675,7 @@ cross-gcc-stage3-configure:
 		--with-isl=no \
 		--with-cloog=no \
 		--with-libelf=no \
-		--enable-threads=no \
+		--enable-threads=posix \
 		--disable-nls \
 		--disable-multilib \
 		--with-local-prefix=$(SYSROOT) \
