@@ -34,7 +34,7 @@ int __socket(int domain, int type, int protocol)
 	int cfd, n;
 	int open_flags = O_RDWR;
 	int pfd[2];
-	char *net;
+	const char *net;
 	char msg[128];
 	static struct close_cb _sock_close_cb = {.func = _sock_fd_closed};
 

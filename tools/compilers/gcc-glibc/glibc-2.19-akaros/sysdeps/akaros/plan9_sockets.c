@@ -199,8 +199,9 @@ void _sock_fd_closed(int fd)
 
 /* For a ctlfd and a few other settings, it opens and returns the corresponding
  * datafd.  This will close cfd for you. */
-int
-_sock_data(int cfd, char *net, int domain, int type, int protocol, Rock ** rp)
+
+int _sock_data(int cfd, const char *net, int domain, int type, int protocol,
+               Rock **rp)
 {
 	int n, fd;
 	Rock *r;

@@ -36,7 +36,7 @@ ssize_t __sendto(int fd, const void *buf, size_t n,
 		int ret;
 		uint32_t remote_addr;
 		uint16_t remote_port;
-		char *p, *newbuf;
+		uint8_t *p, *newbuf;
 		/* Might not have a to if we were called from send() */
 		if (!to.__sockaddr__) {
 			/* if they didn't connect yet, then there's no telling what raddr

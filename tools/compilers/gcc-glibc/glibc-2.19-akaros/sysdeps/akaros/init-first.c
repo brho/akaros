@@ -168,7 +168,7 @@ _dl_start (void)
  * For this reason, I couldn't put this in sysdeps/akaros/errno.c and still use
  * snprintf.  init-first is a reasonable dumping ground, and is one of the
  * sources of the multiple_libcs. */
-void werrstr(char *fmt, ...)
+void werrstr(const char *fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);

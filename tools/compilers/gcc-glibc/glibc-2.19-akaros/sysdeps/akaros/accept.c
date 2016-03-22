@@ -30,7 +30,8 @@
    new socket's descriptor, or -1 for errors.  */
 int accept(int fd, __SOCKADDR_ARG addr, socklen_t * __restrict alen)
 {
-	int n, nfd, lcfd;
+	int nfd, lcfd;
+	socklen_t n;
 	Rock *r, *nr;
 	struct sockaddr_in *ip;
 	char name[Ctlsize];
