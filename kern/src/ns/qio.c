@@ -818,10 +818,12 @@ int qconsume(struct queue *q, void *vp, int len)
 int qpass(struct queue *q, struct block *b)
 {
 	int dlen, len, dowakeup;
+	bool was_empty;
 
 	/* sync with qread */
 	dowakeup = 0;
 	spin_lock_irqsave(&q->lock);
+	was_empty = q->len == 0;
 	if (q->len >= q->limit) {
 		freeblist(b);
 		spin_unlock_irqsave(&q->lock);
@@ -861,10 +863,10 @@ int qpass(struct queue *q, struct block *b)
 	}
 	spin_unlock_irqsave(&q->lock);
 
-	if (dowakeup) {
+	if (dowakeup)
 		rendez_wakeup(&q->rr);
+	if (was_empty)
 		qwake_cb(q, FDTAP_FILT_READABLE);
-	}
 
 	return len;
 }
@@ -872,10 +874,12 @@ int qpass(struct queue *q, struct block *b)
 int qpassnolim(struct queue *q, struct block *b)
 {
 	int dlen, len, dowakeup;
+	bool was_empty;
 
 	/* sync with qread */
 	dowakeup = 0;
 	spin_lock_irqsave(&q->lock);
+	was_empty = q->len == 0;
 
 	if (q->state & Qclosed) {
 		freeblist(b);
@@ -910,10 +914,10 @@ int qpassnolim(struct queue *q, struct block *b)
 	}
 	spin_unlock_irqsave(&q->lock);
 
-	if (dowakeup) {
+	if (dowakeup)
 		rendez_wakeup(&q->rr);
+	if (was_empty)
 		qwake_cb(q, FDTAP_FILT_READABLE);
-	}
 
 	return len;
 }
@@ -949,10 +953,12 @@ int qproduce(struct queue *q, void *vp, int len)
 	struct block *b;
 	int dowakeup;
 	uint8_t *p = vp;
+	bool was_empty;
 
 	/* sync with qread */
 	dowakeup = 0;
 	spin_lock_irqsave(&q->lock);
+	was_empty = q->len == 0;
 
 	/* no waiting receivers, room in buffer? */
 	if (q->len >= q->limit) {
@@ -998,10 +1004,10 @@ int qproduce(struct queue *q, void *vp, int len)
 		q->state |= Qflow;
 	spin_unlock_irqsave(&q->lock);
 
-	if (dowakeup) {
+	if (dowakeup)
 		rendez_wakeup(&q->rr);
+	if (was_empty)
 		qwake_cb(q, FDTAP_FILT_READABLE);
-	}
 
 	return len;
 }
@@ -1641,6 +1647,7 @@ long qbwrite(struct queue *q, struct block *b)
 	ERRSTACK(1);
 	int n, dowakeup;
 	volatile bool should_free_b = TRUE;
+	bool was_empty;
 
 	n = BLEN(b);
 
@@ -1659,6 +1666,7 @@ long qbwrite(struct queue *q, struct block *b)
 	}
 
 	spin_lock_irqsave(&q->lock);
+	was_empty = q->len == 0;
 
 	/* give up if the queue is closed */
 	if (q->state & Qclosed) {
@@ -1712,10 +1720,10 @@ long qbwrite(struct queue *q, struct block *b)
 		q->kick(q->arg);
 
 	/* wakeup anyone consuming at the other end */
-	if (dowakeup) {
+	if (dowakeup)
 		rendez_wakeup(&q->rr);
+	if (was_empty)
 		qwake_cb(q, FDTAP_FILT_READABLE);
-	}
 
 	/*
 	 *  flow control, wait for queue to get below the limit
@@ -1747,12 +1755,14 @@ long qbwrite(struct queue *q, struct block *b)
 long qibwrite(struct queue *q, struct block *b)
 {
 	int n, dowakeup;
+	bool was_empty;
 
 	dowakeup = 0;
 
 	n = BLEN(b);
 
 	spin_lock_irqsave(&q->lock);
+	was_empty = q->len == 0;
 
 	QDEBUG checkb(b, "qibwrite");
 	if (q->bfirst)
@@ -1774,8 +1784,9 @@ long qibwrite(struct queue *q, struct block *b)
 		if (q->kick)
 			q->kick(q->arg);
 		rendez_wakeup(&q->rr);
-		qwake_cb(q, FDTAP_FILT_READABLE);
 	}
+	if (was_empty)
+		qwake_cb(q, FDTAP_FILT_READABLE);
 
 	return n;
 }
