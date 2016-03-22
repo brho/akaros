@@ -18,6 +18,9 @@
  * library. If we ever decide to make parlib a .so, then we will have to revisit
  * this and use function pointers at runtime or something similar. */
 
+__thread int __weak_vcoreid = 0;
+weak_alias(__weak_vcoreid, __vcoreid);
+
 __thread bool __weak_vcore_context = FALSE;
 weak_alias(__weak_vcore_context, __vcore_context);
 

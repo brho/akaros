@@ -42,6 +42,11 @@ sysdep_routines += convS2M
 endif
 sysdep_headers += fcall.h
 
+# Scheduling related routines.
+ifeq ($(subdir),stdlib)
+sysdep_routines += sched_getcpu
+endif
+
 # Syscall pack arg routines
 ifeq ($(subdir),stdlib)
 sysdep_routines += serialize

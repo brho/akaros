@@ -35,6 +35,8 @@ libc {
     convD2M;
     sizeD2M;
 
+    sched_getcpu;
+
     serialize_argv_envp;
     free_serialized_data;
 
@@ -58,6 +60,7 @@ libc {
     eventfd_write;
 
     # Weak symbols in parlib-compat.c
+    __vcoreid;
     __vcore_context;
     akaros_printf;
     akaros_vprintf;
