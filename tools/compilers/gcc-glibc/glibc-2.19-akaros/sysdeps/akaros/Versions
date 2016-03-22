@@ -20,9 +20,9 @@ libc {
     free_tls;
     reinit_tls;
 
-	_sys_siglist;
-	sys_siglist;
-	sys_sigabbrev;
+    _sys_siglist;
+    sys_siglist;
+    sys_sigabbrev;
     signal_ops;
     trigger_posix_signal;
 
@@ -43,9 +43,9 @@ libc {
     # helper functions from resolv (which we don't build)
     __h_errno_location;
 
-	# Normally not exported by glibc, but we do all of our threading in
-	# userspace and need to set this up for each of our uthreads that have TLS.
-	__ctype_init;
+    # Normally not exported by glibc, but we do all of our threading in
+    # userspace and need to set this up for each of our uthreads that have TLS.
+    __ctype_init;
 
     ufd_get_fd;
     ufd_lookup;
