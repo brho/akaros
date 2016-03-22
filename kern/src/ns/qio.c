@@ -657,11 +657,9 @@ struct block *qget(struct queue *q)
 
 	spin_unlock_irqsave(&q->lock);
 
-	if (dowakeup) {
+	if (dowakeup)
 		rendez_wakeup(&q->wr);
-		/* We only send the writable event on wakeup, which is edge triggered */
-		qwake_cb(q, FDTAP_FILT_WRITABLE);
-	}
+	qwake_cb(q, FDTAP_FILT_WRITABLE);
 
 	return b;
 }
@@ -738,10 +736,9 @@ int qdiscard(struct queue *q, int len)
 
 	spin_unlock_irqsave(&q->lock);
 
-	if (dowakeup) {
+	if (dowakeup)
 		rendez_wakeup(&q->wr);
-		qwake_cb(q, FDTAP_FILT_WRITABLE);
-	}
+	qwake_cb(q, FDTAP_FILT_WRITABLE);
 
 	return sofar;
 }
@@ -808,10 +805,9 @@ int qconsume(struct queue *q, void *vp, int len)
 
 	spin_unlock_irqsave(&q->lock);
 
-	if (dowakeup) {
+	if (dowakeup)
 		rendez_wakeup(&q->wr);
-		qwake_cb(q, FDTAP_FILT_WRITABLE);
-	}
+	qwake_cb(q, FDTAP_FILT_WRITABLE);
 
 	if (tofree != NULL)
 		freeblist(tofree);
@@ -1491,8 +1487,8 @@ static void qwakeup_iunlock(struct queue *q)
 		if (q->kick)
 			q->kick(q->arg);
 		rendez_wakeup(&q->wr);
-		qwake_cb(q, FDTAP_FILT_WRITABLE);
 	}
+	qwake_cb(q, FDTAP_FILT_WRITABLE);
 }
 
 /*
@@ -1840,11 +1836,9 @@ int qwrite(struct queue *q, void *vp, int len)
  */
 int qiwrite(struct queue *q, void *vp, int len)
 {
-	int n, sofar, dowakeup;
+	int n, sofar;
 	struct block *b;
 	uint8_t *p = vp;
-
-	dowakeup = 0;
 
 	sofar = 0;
 	do {
