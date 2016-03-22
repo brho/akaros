@@ -49,6 +49,7 @@ libc {
     ufd_lookup;
 
     register_close_cb;
+    register_fork_cb;
 
     _sock_lookup_listen_fd;
 

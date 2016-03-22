@@ -21,13 +21,25 @@
 #include <sys/types.h>
 #include <stdlib.h>
 #include <ros/syscall.h>
+#include <sys/fork_cb.h>
 
 /* Clone the calling process, creating an exact copy.
    Return -1 for errors, 0 to the new process,
    and the process ID of the new process to the old process.  */
 pid_t __fork(void)
 {
-	return ros_syscall(SYS_fork, 0, 0, 0, 0, 0, 0);
+	pid_t ret;
+	struct fork_cb *cb;
+
+	ret = ros_syscall(SYS_fork, 0, 0, 0, 0, 0, 0);
+	if (ret == 0) {
+		cb = fork_callbacks;
+		while (cb) {
+			cb->func();
+			cb = cb->next;
+		}
+	}
+	return ret;
 }
 libc_hidden_def (__fork)
 weak_alias (__fork, fork)
