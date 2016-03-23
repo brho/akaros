@@ -609,21 +609,6 @@ static int sys_cache_invalidate(void)
 
 /* sys_reboot(): called directly from dispatch table. */
 
-// Read a character from the system console.
-// Returns the character.
-/* TODO: remove me */
-static uint16_t sys_cgetc(struct proc *p)
-{
-	uint16_t c;
-
-	// The cons_get_any_char() primitive doesn't wait for a character,
-	// but the sys_cgetc() system call does.
-	while ((c = cons_get_any_char()) == 0)
-		cpu_relax();
-
-	return c;
-}
-
 /* Returns the id of the physical core this syscall is executed on. */
 static uint32_t sys_getpcoreid(void)
 {
@@ -2543,7 +2528,6 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_cache_buster] = {(syscall_t)sys_cache_buster, "buster"},
 	[SYS_cache_invalidate] = {(syscall_t)sys_cache_invalidate, "wbinv"},
 	[SYS_reboot] = {(syscall_t)reboot, "reboot!"},
-	[SYS_cgetc] = {(syscall_t)sys_cgetc, "cgetc"},
 	[SYS_getpcoreid] = {(syscall_t)sys_getpcoreid, "getpcoreid"},
 	[SYS_getvcoreid] = {(syscall_t)sys_getvcoreid, "getvcoreid"},
 	[SYS_getpid] = {(syscall_t)sys_getpid, "getpid"},

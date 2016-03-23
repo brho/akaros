@@ -19,11 +19,6 @@ size_t sys_getpcoreid(void)
 	 return ros_syscall(SYS_getpcoreid, 0, 0, 0, 0, 0, 0);
 }
 
-uint16_t sys_cgetc(void)
-{
-    return ros_syscall(SYS_cgetc, 0, 0, 0, 0, 0, 0);
-}
-
 int sys_null(void)
 {
     return ros_syscall(SYS_null, 0, 0, 0, 0, 0, 0);

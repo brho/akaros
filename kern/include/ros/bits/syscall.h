@@ -8,7 +8,7 @@
 #define SYS_cache_invalidate		 3
 #define SYS_reboot					 4
 /* was SYS_cputs					 5 */
-#define SYS_cgetc					 6
+/* was SYS_cgetc					 6 */
 #define SYS_getpcoreid				 7
 #define SYS_getvcoreid				 8
 #define SYS_getpid					 9
