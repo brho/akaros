@@ -1,5 +1,5 @@
 // Implementation of cprintf console output for user processes,
-// based on printfmt() and the sys_cputs() system call.
+// based on printfmt() and the write() system call.
 //
 // cprintf is a debugging statement, not a generic output statement.
 // It is very important that it always go to the console, especially when
@@ -8,6 +8,7 @@
 #include <parlib/common.h>
 #include <parlib/parlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <parlib/spinlock.h>
 
 // Collect up to BUF_SIZE characters into a buffer
@@ -27,7 +28,7 @@ static void putch(int ch, debugbuf_t **b)
 {
 	(*b)->buf[(*b)->idx++] = ch;
 	if ((*b)->idx == BUF_SIZE) {
-		sys_cputs((*b)->buf, (*b)->idx);
+		write(1, (*b)->buf, (*b)->idx);
 		(*b)->idx = 0;
 	}
 	(*b)->cnt++;
@@ -41,7 +42,7 @@ int akaros_vprintf(const char *fmt, va_list ap)
 	b.idx = 0;
 	b.cnt = 0;
 	akaros_vprintfmt((void*)putch, (void*)&bp, fmt, ap);
-	sys_cputs(b.buf, b.idx);
+	write(1, b.buf, b.idx);
 
 	return b.cnt;
 }
