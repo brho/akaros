@@ -18,10 +18,3 @@ int msrio(struct guest_thread *vm_thread, uint32_t opcode);
 int do_ioapic(struct guest_thread *vm_thread, uint64_t gpa,
               int destreg, uint64_t *regp, int store);
 
-
-
-/* Intel VM Trap Injection Fields */
-#define VM_TRAP_VALID               (1 << 31)
-#define VM_TRAP_ERROR_CODE          (1 << 11)
-#define VM_TRAP_HARDWARE            (3 << 8)
-/* End Intel VM Trap Injection Fields */

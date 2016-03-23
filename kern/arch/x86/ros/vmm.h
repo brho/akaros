@@ -15,3 +15,9 @@ struct vmm_gpcore_init {
 	void					*vapic_addr;
 	void					*apic_addr;
 };
+
+/* Intel VM Trap Injection Fields */
+#define VM_TRAP_VALID               (1 << 31)
+#define VM_TRAP_ERROR_CODE          (1 << 11)
+#define VM_TRAP_HARDWARE            (3 << 8)
+/* End Intel VM Trap Injection Fields */
