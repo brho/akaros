@@ -609,19 +609,6 @@ static int sys_cache_invalidate(void)
 
 /* sys_reboot(): called directly from dispatch table. */
 
-/* Print a string to the system console. */
-static ssize_t sys_cputs(struct proc *p, const char *string,
-                         size_t strlen)
-{
-	char *t_string;
-	t_string = user_strdup_errno(p, string, strlen);
-	if (!t_string)
-		return -1;
-	printk("%.*s", strlen, t_string);
-	user_memdup_free(p, t_string);
-	return (ssize_t)strlen;
-}
-
 // Read a character from the system console.
 // Returns the character.
 /* TODO: remove me */
@@ -2556,7 +2543,6 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_cache_buster] = {(syscall_t)sys_cache_buster, "buster"},
 	[SYS_cache_invalidate] = {(syscall_t)sys_cache_invalidate, "wbinv"},
 	[SYS_reboot] = {(syscall_t)reboot, "reboot!"},
-	[SYS_cputs] = {(syscall_t)sys_cputs, "cputs"},
 	[SYS_cgetc] = {(syscall_t)sys_cgetc, "cgetc"},
 	[SYS_getpcoreid] = {(syscall_t)sys_getpcoreid, "getpcoreid"},
 	[SYS_getvcoreid] = {(syscall_t)sys_getvcoreid, "getvcoreid"},

@@ -26,7 +26,6 @@ enum {
 	PG_RDWR   = 6,
 };
 
-ssize_t     sys_cputs(const uint8_t *s, size_t len);
 uint16_t    sys_cgetc(void);
 int         sys_null(void);
 size_t      sys_getpcoreid(void);
