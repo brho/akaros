@@ -29,6 +29,10 @@
 struct kmem_cache *vmr_kcache;
 
 static int __vmr_free_pgs(struct proc *p, pte_t pte, void *va, void *arg);
+static int populate_pm_va(struct proc *p, uintptr_t va, unsigned long nr_pgs,
+                          int pte_prot, struct page_map *pm, size_t offset,
+                          int flags, bool exec);
+
 /* minor helper, will ease the file->chan transition */
 static struct page_map *file2pm(struct file *file)
 {
@@ -313,8 +317,38 @@ static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
 	                         new_p);
 }
 
+static int fill_vmr(struct proc *p, struct proc *new_p, struct vm_region *vmr)
+{
+	int ret = 0;
+
+	if ((!vmr->vm_file) || (vmr->vm_flags & MAP_PRIVATE)) {
+		assert(!(vmr->vm_flags & MAP_SHARED));
+		ret = copy_pages(p, new_p, vmr->vm_base, vmr->vm_end);
+	} else {
+		/* non-private file, i.e. page cacheable.  we have to honor MAP_LOCKED,
+		 * (but we might be able to ignore MAP_POPULATE). */
+		if (vmr->vm_flags & MAP_LOCKED) {
+			/* need to keep the file alive in case we unlock/block */
+			kref_get(&vmr->vm_file->f_kref, 1);
+			/* math is a bit nasty if vm_base isn't page aligned */
+			assert(!PGOFF(vmr->vm_base));
+			ret = populate_pm_va(new_p, vmr->vm_base,
+			                     (vmr->vm_end - vmr->vm_base) >> PGSHIFT,
+			                     vmr->vm_prot, vmr->vm_file->f_mapping,
+			                     vmr->vm_foff, vmr->vm_flags,
+			                     vmr->vm_prot & PROT_EXEC);
+			kref_put(&vmr->vm_file->f_kref);
+		}
+	}
+	return ret;
+}
+
 /* This will make new_p have the same VMRs as p, and it will make sure all
  * physical pages are copied over, with the exception of MAP_SHARED files.
+ * MAP_SHARED files that are also MAP_LOCKED will be attached to the process -
+ * presumably they are in the page cache since the parent locked them.  This is
+ * all pretty nasty.
+ *
  * This is used by fork().
  *
  * Note that if you are working on a VMR that is a file, you'll want to be
@@ -338,17 +372,14 @@ int duplicate_vmrs(struct proc *p, struct proc *new_p)
 			kref_get(&vm_i->vm_file->f_kref, 1);
 			pm_add_vmr(file2pm(vm_i->vm_file), vmr);
 		}
-		if (!vmr->vm_file || vmr->vm_flags & MAP_PRIVATE) {
-			assert(!(vmr->vm_flags & MAP_SHARED));
-			/* Copy over the memory from one VMR to the other */
-			if ((ret = copy_pages(p, new_p, vmr->vm_base, vmr->vm_end))) {
-				if (vm_i->vm_file) {
-					pm_remove_vmr(file2pm(vm_i->vm_file), vmr);
-					kref_put(&vm_i->vm_file->f_kref);
-				}
-				kmem_cache_free(vmr_kcache, vm_i);
-				return ret;
+		ret = fill_vmr(p, new_p, vmr);
+		if (ret) {
+			if (vm_i->vm_file) {
+				pm_remove_vmr(file2pm(vm_i->vm_file), vmr);
+				kref_put(&vm_i->vm_file->f_kref);
 			}
+			kmem_cache_free(vmr_kcache, vm_i);
+			return ret;
 		}
 		TAILQ_INSERT_TAIL(&new_p->vm_regions, vmr, vm_link);
 	}

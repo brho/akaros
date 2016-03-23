@@ -282,7 +282,8 @@ static bool __handler_kernel_page_fault(struct hw_trapframe *hw_tf,
 	 * In an effort to reduce the number of locks (both now and in the future),
 	 * the kernel will not attempt to handle faults on file-back VMRs.  We
 	 * probably can turn that on in the future, but I'd rather keep things safe
-	 * for now.
+	 * for now.  (We'll probably need to change this when we stop
+	 * MAP_POPULATE | MAP_LOCKED entire binaries).
 	 *
 	 * Note that we do not enable IRQs here, unlike in the user case.  Again,
 	 * this is to limit the locks we could be grabbing. */
