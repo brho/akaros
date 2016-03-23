@@ -341,8 +341,14 @@ int duplicate_vmrs(struct proc *p, struct proc *new_p)
 		if (!vmr->vm_file || vmr->vm_flags & MAP_PRIVATE) {
 			assert(!(vmr->vm_flags & MAP_SHARED));
 			/* Copy over the memory from one VMR to the other */
-			if ((ret = copy_pages(p, new_p, vmr->vm_base, vmr->vm_end)))
+			if ((ret = copy_pages(p, new_p, vmr->vm_base, vmr->vm_end))) {
+				if (vm_i->vm_file) {
+					pm_remove_vmr(file2pm(vm_i->vm_file), vmr);
+					kref_put(&vm_i->vm_file->f_kref);
+				}
+				kmem_cache_free(vmr_kcache, vm_i);
 				return ret;
+			}
 		}
 		TAILQ_INSERT_TAIL(&new_p->vm_regions, vmr, vm_link);
 	}
@@ -1056,6 +1062,7 @@ unsigned long populate_va(struct proc *p, uintptr_t va, unsigned long nr_pgs)
 	unsigned long nr_filled = 0;
 	struct page *page;
 	int pte_prot;
+	int ret;
 
 	/* we can screw around with ways to limit the find_vmr calls (can do the
 	 * next in line if we didn't unlock, etc., but i don't expect us to do this
@@ -1079,15 +1086,16 @@ unsigned long populate_va(struct proc *p, uintptr_t va, unsigned long nr_pgs)
 		} else {
 			/* need to keep the file alive in case we unlock/block */
 			kref_get(&vmr->vm_file->f_kref, 1);
-			if (populate_pm_va(p, va, nr_pgs_this_vmr, pte_prot,
-			                   vmr->vm_file->f_mapping,
-			                   vmr->vm_foff - (va - vmr->vm_base),
-							   vmr->vm_flags, vmr->vm_prot & PROT_EXEC)) {
+			ret = populate_pm_va(p, va, nr_pgs_this_vmr, pte_prot,
+			                     vmr->vm_file->f_mapping,
+			                     vmr->vm_foff - (va - vmr->vm_base),
+			                     vmr->vm_flags, vmr->vm_prot & PROT_EXEC);
+			kref_put(&vmr->vm_file->f_kref);
+			if (ret) {
 				/* we might have failed if the underlying file doesn't cover the
 				 * mmap window, depending on how we'll deal with truncation. */
 				break;
 			}
-			kref_put(&vmr->vm_file->f_kref);
 		}
 		nr_filled += nr_pgs_this_vmr;
 		va += nr_pgs_this_vmr << PGSHIFT;
