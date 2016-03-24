@@ -253,16 +253,50 @@ static int emsr_fakewrite(struct guest_thread *vm_thread, struct emmsr *msr,
 	return 0;
 }
 
-int
-msrio(struct guest_thread *vm_thread, uint32_t opcode) {
+static int emsr_apic(struct guest_thread *vm_thread,
+                     struct vmm_gpcore_init *gpci, uint32_t opcode)
+{
+	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
+	int apic_offset = vm_tf->tf_rcx & 0xff;
+	uint64_t value;
+
+	if (opcode == EXIT_REASON_MSR_READ) {
+		if (vm_tf->tf_rcx != MSR_LAPIC_ICR) {
+			vm_tf->tf_rax = ((uint32_t *)(gpci->vapic_addr))[apic_offset];
+			vm_tf->tf_rdx = 0;
+		} else {
+			vm_tf->tf_rax = ((uint32_t *)(gpci->vapic_addr))[apic_offset];
+			vm_tf->tf_rdx = ((uint32_t *)(gpci->vapic_addr))[apic_offset + 1];
+		}
+	} else {
+		if (vm_tf->tf_rcx != MSR_LAPIC_ICR)
+			((uint32_t *)(gpci->vapic_addr))[apic_offset] =
+			                                       (uint32_t)(vm_tf->tf_rax);
+		else {
+			((uint32_t *)(gpci->vapic_addr))[apic_offset] =
+			                                       (uint32_t)(vm_tf->tf_rax);
+			((uint32_t *)(gpci->vapic_addr))[apic_offset + 1] =
+			                                       (uint32_t)(vm_tf->tf_rdx);
+		}
+	}
+	return 0;
+}
+
+int msrio(struct guest_thread *vm_thread, struct vmm_gpcore_init *gpci,
+          uint32_t opcode)
+{
 	int i;
 	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
+
+	if (vm_tf->tf_rcx >= MSR_LAPIC_ID && vm_tf->tf_rcx < MSR_LAPIC_END)
+		return emsr_apic(vm_thread, gpci, opcode);
+
 	for (i = 0; i < sizeof(emmsrs)/sizeof(emmsrs[0]); i++) {
-		if (emmsrs[i].reg != vm_tf->tf_cr3)
+		if (emmsrs[i].reg != vm_tf->tf_rcx)
 			continue;
 		return emmsrs[i].f(vm_thread, &emmsrs[i], opcode);
 	}
-	fprintf(stderr, "msrio for 0x%lx failed\n", vm_tf->tf_cr3);
+	fprintf(stderr, "msrio for 0x%lx failed\n", vm_tf->tf_rcx);
 	return SHUTDOWN_UNHANDLED_EXIT_REASON;
 }
 

@@ -338,14 +338,19 @@ static void set_posted_interrupt(int vector);
 #define ADDR				BITOP_ADDR(addr)
 static inline int test_and_set_bit(int nr, volatile unsigned long *addr);
 
-static int timer_started;
 pthread_t timerthread_struct;
 
 void *timer_thread(void *arg)
 {
+	uint8_t vector;
+	uint32_t initial_count;
 	while (1) {
-		set_posted_interrupt(0xef);
-		ros_syscall(SYS_vmm_poke_guest, 0, 0, 0, 0, 0, 0);
+		vector = ((uint32_t *)gpci.vapic_addr)[0x32] & 0xff;
+		initial_count = ((uint32_t *)gpci.vapic_addr)[0x38];
+		if (vector && initial_count) {
+			set_posted_interrupt(vector);
+			ros_syscall(SYS_vmm_poke_guest, 0, 0, 0, 0, 0, 0);
+		}
 		uthread_usleep(100000);
 	}
 	fprintf(stderr, "SENDING TIMER\n");
@@ -558,7 +563,7 @@ int main(int argc, char **argv)
 		                    " nohlt"
 		                    " init=/bin/launcher"
 		                    " lapic=notscdeadline"
-		                    " lapictimerfreq=1000"
+		                    " lapictimerfreq=1000000"
 		                    " pit=none";
 	char *cmdline_extra = "\0";
 	char *cmdline;
@@ -585,6 +590,7 @@ int main(int argc, char **argv)
 	void *coreboot_tables = (void *) 0x1165000;
 	void *a_page;
 	struct vm_trapframe *vm_tf;
+	uint64_t tsc_freq_khz;
 
 	the_ball = uth_mutex_alloc();
 	uth_mutex_lock(the_ball);
@@ -793,7 +799,9 @@ int main(int argc, char **argv)
 	cmdline = a;
 	a += 4096;
 	bp->hdr.cmd_line_ptr = (uintptr_t) cmdline;
-	sprintf(cmdline, "%s %s", cmdline_default, cmdline_extra);
+	tsc_freq_khz = get_tsc_freq()/1000;
+	sprintf(cmdline, "%s tscfreq=%lld %s", cmdline_default, tsc_freq_khz,
+	        cmdline_extra);
 
 
 	/* Put the e820 memory region information in the boot_params */
@@ -890,13 +898,11 @@ int main(int argc, char **argv)
 	if (debug)
 		vapic_status_dump(stderr, (void *)gpci.vapic_addr);
 
-	if (0 && !timer_started && mcp) {
+	if (mcp) {
 		/* Start up timer thread */
 		if (pthread_create(&timerthread_struct, NULL, timer_thread, NULL)) {
 			fprintf(stderr, "pth_create failed for timer thread.");
 			perror("pth_create");
-		} else {
-			timer_started = 1;
 		}
 	}
 
@@ -1010,7 +1016,7 @@ int main(int argc, char **argv)
 			case EXIT_REASON_MSR_WRITE:
 			case EXIT_REASON_MSR_READ:
 				fprintf(stderr, "Do an msr\n");
-				if (msrio((struct guest_thread *)vm_thread,
+				if (msrio((struct guest_thread *)vm_thread, &gpci,
 				          vm_tf->tf_exit_reason)) {
 					// uh-oh, msrio failed
 					// well, hand back a GP fault which is what Intel does
