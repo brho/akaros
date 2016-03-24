@@ -21,6 +21,7 @@ typedef struct debugbuf {
 	size_t  idx;	// current buffer index
 	size_t  cnt;	// total bytes printed so far
 	uint8_t buf[BUF_SIZE];
+	int     stream_fd;
 } debugbuf_t;
 
 
@@ -28,21 +29,22 @@ static void putch(int ch, debugbuf_t **b)
 {
 	(*b)->buf[(*b)->idx++] = ch;
 	if ((*b)->idx == BUF_SIZE) {
-		write(1, (*b)->buf, (*b)->idx);
+		write((*b)->stream_fd, (*b)->buf, (*b)->idx);
 		(*b)->idx = 0;
 	}
 	(*b)->cnt++;
 }
 
-int akaros_vprintf(const char *fmt, va_list ap)
+int akaros_vfprintf(FILE *stream, const char *fmt, va_list ap)
 {
 	debugbuf_t b;
 	debugbuf_t *bp = &b;
 
 	b.idx = 0;
 	b.cnt = 0;
+	b.stream_fd = fileno(stream);
 	akaros_vprintfmt((void*)putch, (void*)&bp, fmt, ap);
-	write(1, b.buf, b.idx);
+	write(b.stream_fd, b.buf, b.idx);
 
 	return b.cnt;
 }
@@ -54,7 +56,7 @@ int akaros_printf(const char *format, ...)
 
 	va_start(ap, format);
 	if (in_vcore_context())
-		ret = akaros_vprintf(format, ap);
+		ret = akaros_vprintf(stdout, format, ap);
 	else
 		ret = vprintf(format, ap);
 	va_end(ap);

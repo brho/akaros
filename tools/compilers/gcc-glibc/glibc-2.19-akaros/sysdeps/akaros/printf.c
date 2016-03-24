@@ -33,7 +33,7 @@ int __printf(const char *format, ...)
 
 	va_start(ap, format);
 	if (in_vcore_context())
-		ret = akaros_vprintf(format, ap);
+		ret = akaros_vfprintf(stdout, format, ap);
 	else
 		ret = vfprintf(stdout, format, ap);
 	va_end(ap);

@@ -31,12 +31,12 @@ int __akaros_printf(const char *format, ...)
 }
 weak_alias(__akaros_printf, akaros_printf)
 
-int __akaros_vprintf(const char *fmt, va_list ap)
+int __akaros_vfprintf(FILE *stream, const char *fmt, va_list ap)
 {
 	assert(0);
 	return -1;
 }
-weak_alias(__akaros_vprintf, akaros_vprintf)
+weak_alias(__akaros_vfprintf, akaros_vfprintf)
 
 void __print_user_context(struct user_context *ctx)
 {
