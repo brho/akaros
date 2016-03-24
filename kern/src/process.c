@@ -877,8 +877,8 @@ void proc_destroy(struct proc *p)
 	 * refcnt indirectly related to one of our files.  specifically, if we have
 	 * a parent sleeping on our pipe, that parent won't wake up to decref until
 	 * the pipe closes.  And if the parent doesnt decref, we don't free.
-	 * alternatively, we could send a SIGCHILD to the parent, but that would
-	 * require parent's to never ignore that signal (or risk never reaping).
+	 * Even if we send a SIGCHLD to the parent, that would require that the
+	 * parent to never ignores that signal (or we risk never reaping).
 	 *
 	 * Also note that any mmap'd files will still be mmapped.  You can close the
 	 * file after mmapping, with no effect. */
@@ -890,14 +890,15 @@ void proc_destroy(struct proc *p)
 }
 
 /* Can use this to signal anything that might cause a parent to wait on the
- * child, such as termination, or (in the future) signals.  Change the state or
- * whatever before calling. */
+ * child, such as termination, or signals.  Change the state or whatever before
+ * calling. */
 void proc_signal_parent(struct proc *child)
 {
 	struct kthread *sleeper;
 	struct proc *parent = pid2proc(child->ppid);
 	if (!parent)
 		return;
+	send_posix_signal(parent, SIGCHLD);
 	/* there could be multiple kthreads sleeping for various reasons.  even an
 	 * SCP could have multiple async syscalls. */
 	cv_broadcast(&parent->child_wait);
