@@ -55,10 +55,7 @@ int akaros_printf(const char *format, ...)
 	int ret;
 
 	va_start(ap, format);
-	if (in_vcore_context())
-		ret = akaros_vprintf(stdout, format, ap);
-	else
-		ret = vprintf(format, ap);
+	ret = vprintf(format, ap);
 	va_end(ap);
 	return ret;
 }
