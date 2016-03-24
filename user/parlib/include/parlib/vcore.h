@@ -30,6 +30,9 @@ extern __thread bool __vcore_context;
 extern __thread int __vcoreid;
 extern __thread struct syscall __vcore_one_sysc;	/* see sys_change_vcore */
 
+/* Arch specific entry from the kernel */
+void __attribute__((noreturn)) __kernel_vcore_entry(void);
+
 /* Vcore API functions */
 static inline uint32_t max_vcores(void);
 static inline uint32_t num_vcores(void);

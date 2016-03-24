@@ -223,16 +223,23 @@ void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
 	/* zero the entire structure for any type, prevent potential disclosure */
 	memset(ctx, 0, sizeof(struct user_context));
 	ctx->type = ROS_SW_CTX;
-	/* Stack pointers in a fresh stack frame need to be 16 byte aligned
-	 * (AMD64 ABI). If we call this function from within load_elf(), it
-	 * should already be aligned properly, but we round again here for good
-	 * measure. We used to subtract an extra 8 bytes here to allow us to
-	 * write our _start() function in C instead of assembly. This was
-	 * necessary to account for a preamble inserted the compiler which
-	 * assumed a return address was pushed on the stack. Now that we properly
-	 * pass our arguments on the stack, we will have to rewrite our _start()
-	 * function in assembly to handle things properly. */
-	sw_tf->tf_rsp = ROUNDDOWN(stack_top, 16);
+	/* Stack pointers in x86 C functions need to be such that adding or
+	 * subtracting 8 will result in 16 byte alignment (AMD64 ABI), which we call
+	 * an odd-8-byte alignment.  The reason is so that input arguments (on the
+	 * stack) are 16 byte aligned.  The extra 8 bytes is the retaddr, pushed on
+	 * the stack.  Compilers know they can subtract 8 to get 16 byte alignment
+	 * for instructions like movaps.
+	 *
+	 * However, the kernel will start contexts at 16 byte aligned stacks.  This
+	 * is because glibc's _start (in ASM) expects this.  Parlib x86's vcore
+	 * entry does the same.
+	 *
+	 * We init contexts for both an elf startup as well as vcore entry.  It is
+	 * up to the caller (including the user) to make sure the stack is aligned
+	 * properly.  elf.c doesn't know about these concerns, so if it messes up,
+	 * there's nothing we can really do, since the args are just wrong.  ld will
+	 * fail immediately though, so we'll find out quickly. */
+	sw_tf->tf_rsp = stack_top;
 	sw_tf->tf_rip = entryp;
 	sw_tf->tf_rbp = 0;	/* for potential backtraces */
 	sw_tf->tf_mxcsr = 0x00001f80;	/* x86 default mxcsr */

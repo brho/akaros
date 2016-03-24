@@ -1,6 +1,7 @@
 #include <ros/syscall.h>
-#include <parlib/arch/vcore.h>
+#include <parlib/vcore.h>
 #include <parlib/stdio.h>
+#include <stdlib.h>
 
 struct syscall vc_entry = {
 	.num = SYS_vc_entry,
@@ -112,4 +113,33 @@ void print_user_context(struct user_context *ctx)
 	default:
 		printf("Unknown context type %d\n", ctx->type);
 	}
+}
+
+/* The second-lowest level function jumped to by the kernel on every vcore
+ * entry.  We get called from __kernel_vcore_entry.
+ *
+ * We should consider making it mandatory to set the tls_desc in the kernel. We
+ * wouldn't even need to pass the vcore id to user space at all if we did this.
+ * It would already be set in the preinstalled TLS as __vcore_id. */
+void __attribute__((noreturn)) __kvc_entry_c(void)
+{
+	/* The kernel sets the TLS desc for us, based on whatever is in VCPD.
+	 *
+	 * x86 32-bit TLS is pretty jacked up, so the kernel doesn't set the TLS
+	 * desc for us.  it's a little more expensive to do it here, esp for
+	 * amd64.  Can remove this when/if we overhaul 32 bit TLS. */
+	int id = __vcore_id_on_entry;
+
+	#ifndef __x86_64__
+	set_tls_desc(vcpd_of(id)->vcore_tls_desc);
+	#endif
+	/* Every time the vcore comes up, it must set that it is in vcore context.
+	 * uthreads may share the same TLS as their vcore (when uthreads do not have
+	 * their own TLS), and if a uthread was preempted, __vcore_context == FALSE,
+	 * and that will continue to be true the next time the vcore pops up. */
+	__vcore_context = TRUE;
+	vcore_entry();
+	fprintf(stderr, "vcore_entry() should never return!\n");
+	abort();
+	__builtin_unreachable();
 }
