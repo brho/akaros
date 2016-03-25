@@ -494,7 +494,7 @@ static void echo(char *buf, int n)
 		}
 	}
 
-	qproduce(kbdq, buf, n);
+	qwrite(kbdq, buf, n);	/* was once qproduce, YMMV */
 	if (kbd.raw)
 		return;
 	kmesgputs(buf, n);

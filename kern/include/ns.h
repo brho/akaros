@@ -835,7 +835,6 @@ void qnonblock(struct queue *, bool);
 struct queue *qopen(int unused_int, int, void (*)(void *), void *);
 int qpass(struct queue *, struct block *);
 int qpassnolim(struct queue *, struct block *);
-int qproduce(struct queue *, void *, int);
 void qputback(struct queue *, struct block *);
 long qread(struct queue *, void *, int);
 struct block *qremove(struct queue *);
