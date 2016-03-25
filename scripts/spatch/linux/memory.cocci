@@ -6,17 +6,17 @@
 @@
 @@
 -GFP_KERNEL
-+KMALLOC_WAIT
++MEM_WAIT
 
 @@
 @@
 -GFP_WAIT
-+KMALLOC_WAIT
++MEM_WAIT
 
 @@
 @@
 -__GFP_WAIT
-+KMALLOC_WAIT
++MEM_WAIT
 
 @@
 expression SZ;

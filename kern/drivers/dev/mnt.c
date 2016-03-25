@@ -440,7 +440,7 @@ static struct walkqid *mntwalk(struct chan *c, struct chan *nc, char **name,
 		error(EFAIL, "devmnt: too many name elements");
 	alloc = 0;
 	wq = kzmalloc(sizeof(struct walkqid) + nname * sizeof(struct qid),
-				  KMALLOC_WAIT);
+				  MEM_WAIT);
 	if (waserror()) {
 		if (alloc && wq->clone != NULL)
 			cclose(wq->clone);
@@ -1121,7 +1121,7 @@ struct mntrpc *mntralloc(struct chan *c, uint32_t msize)
 		 * The header is split from the data buffer as
 		 * mountmux may swap the buffer with another header.
 		 */
-		new->rpc = kzmalloc(msize, KMALLOC_WAIT);
+		new->rpc = kzmalloc(msize, MEM_WAIT);
 		if (new->rpc == NULL) {
 			kfree(new);
 			spin_unlock(&mntalloc.l);
@@ -1139,7 +1139,7 @@ struct mntrpc *mntralloc(struct chan *c, uint32_t msize)
 		mntalloc.nrpcfree--;
 		if (new->rpclen < msize) {
 			kfree(new->rpc);
-			new->rpc = kzmalloc(msize, KMALLOC_WAIT);
+			new->rpc = kzmalloc(msize, MEM_WAIT);
 			if (new->rpc == NULL) {
 				kfree(new);
 				mntalloc.nrpcused--;

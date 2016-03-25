@@ -39,7 +39,7 @@ static long ver_emit_nlstr(char *dest, const char *src, long size,
 						   long offset)
 {
 	long n, slen = strlen(src);
-	char *buf = kmalloc(slen + 2, KMALLOC_WAIT);
+	char *buf = kmalloc(slen + 2, MEM_WAIT);
 
 	snprintf(buf, slen + 2, "%s\n", src);
 	n = readmem(offset, dest, size, buf, slen + 2);

@@ -190,7 +190,7 @@ static inline int radix_tree_insert(struct radix_tree_root *root,
 		lp = lp->next;
 	}
 
-	p = kmalloc(sizeof(*p), KMALLOC_WAIT);
+	p = kmalloc(sizeof(*p), MEM_WAIT);
 	if (!p)
 		return -ENOMEM;
 	p->index = index;

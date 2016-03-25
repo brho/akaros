@@ -208,7 +208,7 @@ void *get_cont_pages(size_t order, int flags)
 	//If we couldn't find them, return NULL
 	if( first == -1 ) {
 		spin_unlock_irqsave(&colored_page_free_list_lock);
-		if (flags & KMALLOC_ERROR)
+		if (flags & MEM_ERROR)
 			error(ENOMEM, ERROR_FIXME);
 		return NULL;
 	}
@@ -266,7 +266,7 @@ void *get_cont_phys_pages_at(size_t order, physaddr_t at, int flags)
 	for (unsigned long i = first_pg_nr; i < first_pg_nr + nr_pgs; i++) {
 		if (!page_is_free(i)) {
 			spin_unlock_irqsave(&colored_page_free_list_lock);
-			if (flags & KMALLOC_ERROR)
+			if (flags & MEM_ERROR)
 				error(ENOMEM, ERROR_FIXME);
 			return NULL;
 		}

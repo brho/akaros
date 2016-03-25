@@ -33,9 +33,6 @@ void *debug_canary;
 #define MEM_WAIT				(1 << 2)
 #define MEM_ERROR				(1 << 3)
 
-#define KMALLOC_WAIT			MEM_WAIT
-#define KMALLOC_ERROR			MEM_ERROR
-
 /* Kmalloc tag flags looks like this:
  *
  * +--------------28---------------+-----4------+

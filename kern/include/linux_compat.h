@@ -168,7 +168,7 @@ static inline int __dma_mapping_error(dma_addr_t dma_addr)
 
 static void *vmalloc(size_t size)
 {
-	void *vaddr = get_cont_pages(LOG2_UP(nr_pages(size)), KMALLOC_WAIT);
+	void *vaddr = get_cont_pages(LOG2_UP(nr_pages(size)), MEM_WAIT);
 	/* zalloc, to be safe */
 	if (vaddr)
 		memset(vaddr, 0, size);
@@ -727,7 +727,7 @@ static inline int request_firmware(const struct firmware **fwp,
 		kref_put(&fw_file->f_kref);
 		return -1;
 	}
-	ret_fw = kmalloc(sizeof(struct firmware), KMALLOC_WAIT);
+	ret_fw = kmalloc(sizeof(struct firmware), MEM_WAIT);
 	ret_fw->data = fw_data;
 	ret_fw->size = fw_file->f_dentry->d_inode->i_size;
 	*fwp = ret_fw;

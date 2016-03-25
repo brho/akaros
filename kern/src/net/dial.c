@@ -76,8 +76,8 @@ int kdial(char *dest, char *local, char *dir, int *cfdp)
 	int rv;
 	char *err, *alterr;
 
-	err = kmalloc(ERRMAX, KMALLOC_WAIT);
-	alterr = kmalloc(ERRMAX, KMALLOC_WAIT);
+	err = kmalloc(ERRMAX, MEM_WAIT);
+	alterr = kmalloc(ERRMAX, MEM_WAIT);
 
 	ds.local = local;
 	ds.dir = dir;
@@ -123,10 +123,10 @@ static int csdial(DS * ds)
 	int n, fd, rv = -1;
 	char *p, *buf, *clone, *err, *besterr;
 
-	buf = kmalloc(Maxstring, KMALLOC_WAIT);
-	clone = kmalloc(Maxpath, KMALLOC_WAIT);
-	err = kmalloc(ERRMAX, KMALLOC_WAIT);
-	besterr = kmalloc(ERRMAX, KMALLOC_WAIT);
+	buf = kmalloc(Maxstring, MEM_WAIT);
+	clone = kmalloc(Maxpath, MEM_WAIT);
+	err = kmalloc(ERRMAX, MEM_WAIT);
+	besterr = kmalloc(ERRMAX, MEM_WAIT);
 	/*
 	 *  open connection server
 	 */
@@ -190,9 +190,9 @@ static int call(char *clone, char *dest, DS * ds)
 	int fd, cfd, n, retval;
 	char *name, *data, *err, *p;
 
-	name = kmalloc(Maxpath, KMALLOC_WAIT);
-	data = kmalloc(Maxpath, KMALLOC_WAIT);
-	err = kmalloc(ERRMAX, KMALLOC_WAIT);
+	name = kmalloc(Maxpath, MEM_WAIT);
+	data = kmalloc(Maxpath, MEM_WAIT);
+	err = kmalloc(ERRMAX, MEM_WAIT);
 
 	cfd = sysopen(clone, O_RDWR);
 	if (cfd < 0) {

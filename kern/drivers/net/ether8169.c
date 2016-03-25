@@ -835,13 +835,13 @@ rtl8169attach(struct ether* edev)
 		/*
 		 * Handle allocation/init errors here.
 		 */
-		ctlr->td = kzmalloc_align(sizeof(D) * Ntd, KMALLOC_WAIT, 256);
-		ctlr->tb = kzmalloc(Ntd * sizeof(struct block *), KMALLOC_WAIT);
+		ctlr->td = kzmalloc_align(sizeof(D) * Ntd, MEM_WAIT, 256);
+		ctlr->tb = kzmalloc(Ntd * sizeof(struct block *), MEM_WAIT);
 		ctlr->ntd = Ntd;
-		ctlr->rd = kzmalloc_align(sizeof(D) * Nrd, KMALLOC_WAIT, 256);
-		ctlr->rb = kzmalloc(Nrd * sizeof(struct block *), KMALLOC_WAIT);
+		ctlr->rd = kzmalloc_align(sizeof(D) * Nrd, MEM_WAIT, 256);
+		ctlr->rb = kzmalloc(Nrd * sizeof(struct block *), MEM_WAIT);
 		ctlr->nrd = Nrd;
-		ctlr->dtcc = kzmalloc_align(sizeof(Dtcc), KMALLOC_WAIT, 64);
+		ctlr->dtcc = kzmalloc_align(sizeof(Dtcc), MEM_WAIT, 64);
 		rtl8169init(edev);
 		ctlr->init = 1;
 	}
@@ -1121,7 +1121,7 @@ rtl8169pci(void)
 
 		port = pcidev->bar[0].pio_base;
 
-		ctlr = kzmalloc(sizeof(struct ctlr), KMALLOC_WAIT);
+		ctlr = kzmalloc(sizeof(struct ctlr), MEM_WAIT);
 		spinlock_init_irqsave(&ctlr->ilock);
 		spinlock_init_irqsave(&ctlr->tlock);
 		spinlock_init_irqsave(&ctlr->rlock);

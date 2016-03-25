@@ -71,7 +71,7 @@ long devtabread(struct chan *c, void *buf, long n, int64_t off)
 	struct dev *dev;
 	char *alloc, *e, *p;
 
-	alloc = kzmalloc(READSTR, KMALLOC_WAIT);
+	alloc = kzmalloc(READSTR, MEM_WAIT);
 	if (alloc == NULL)
 		error(ENOMEM, ERROR_FIXME);
 

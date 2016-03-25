@@ -322,7 +322,7 @@ static struct perf_context *arch_create_perf_context(void)
 {
 	ERRSTACK(1);
 	struct perf_context *pc = kzmalloc(sizeof(struct perf_context),
-	                                   KMALLOC_WAIT);
+	                                   MEM_WAIT);
 
 	if (waserror()) {
 		kfree(pc);
@@ -400,7 +400,7 @@ static long arch_perf_write(struct perf_context *pc, const void *udata,
 			ped = perfmon_open_event(&cset, pc->ps, &pev);
 
 			pc->resp_size = sizeof(uint32_t);
-			pc->resp = kmalloc(pc->resp_size, KMALLOC_WAIT);
+			pc->resp = kmalloc(pc->resp_size, MEM_WAIT);
 			put_le_u32(pc->resp, (uint32_t) ped);
 			break;
 		}
@@ -416,13 +416,14 @@ static long arch_perf_write(struct perf_context *pc, const void *udata,
 
 			pef = perfmon_get_event_status(pc->ps, (int) ped);
 
-			mvalues = kzmalloc(num_cores * sizeof(mvalues), KMALLOC_WAIT);
+			mvalues = kzmalloc(num_cores * sizeof(mvalues),
+					   MEM_WAIT);
 			for (i = 0; i < num_cores; i++)
 				mvalues[i] = pef->cores_values[i];
 
 			pc->resp_size = 3 * sizeof(uint64_t) + sizeof(uint32_t) +
 				num_cores * sizeof(uint64_t);
-			pc->resp = kmalloc(pc->resp_size, KMALLOC_WAIT);
+			pc->resp = kmalloc(pc->resp_size, MEM_WAIT);
 
 			rptr = put_le_u64(pc->resp, pef->ev.event);
 			rptr = put_le_u64(rptr, pef->ev.flags);
@@ -451,7 +452,7 @@ static long arch_perf_write(struct perf_context *pc, const void *udata,
 			perfmon_get_cpu_caps(&pcc);
 
 			pc->resp_size = 6 * sizeof(uint32_t);
-			pc->resp = kmalloc(pc->resp_size, KMALLOC_WAIT);
+			pc->resp = kmalloc(pc->resp_size, MEM_WAIT);
 
 			rptr = put_le_u32(pc->resp, pcc.perfmon_version);
 			rptr = put_le_u32(rptr, pcc.proc_arch_events);
@@ -548,7 +549,8 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			core_set_init(&cset);
 			core_set_fill_available(&cset);
 			msr_set_address(&msra, (uint32_t) offset);
-			values = kzmalloc(num_cores * sizeof(uint64_t), KMALLOC_WAIT);
+			values = kzmalloc(num_cores * sizeof(uint64_t),
+					  MEM_WAIT);
 			if (!values)
 				error(ENOMEM, ERROR_FIXME);
 			msr_set_values(&msrv, values, num_cores);

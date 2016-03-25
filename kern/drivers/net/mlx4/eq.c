@@ -955,14 +955,14 @@ static int mlx4_create_eq(struct mlx4_dev *dev, int nent,
 	npages = PAGE_ALIGN(eq->nent * dev->caps.eqe_size) / PAGE_SIZE;
 
 	eq->page_list = kmalloc(npages * sizeof *eq->page_list,
-				KMALLOC_WAIT);
+				MEM_WAIT);
 	if (!eq->page_list)
 		goto err_out;
 
 	for (i = 0; i < npages; ++i)
 		eq->page_list[i].buf = NULL;
 
-	dma_list = kmalloc(npages * sizeof *dma_list, KMALLOC_WAIT);
+	dma_list = kmalloc(npages * sizeof *dma_list, MEM_WAIT);
 	if (!dma_list)
 		goto err_out_free;
 
@@ -975,7 +975,7 @@ static int mlx4_create_eq(struct mlx4_dev *dev, int nent,
 		eq->page_list[i].buf = dma_alloc_coherent(&dev->persist->
 							  pdev->dev,
 							  PAGE_SIZE, &t,
-							  KMALLOC_WAIT);
+							  MEM_WAIT);
 		if (!eq->page_list[i].buf)
 			goto err_out_free_pages;
 
@@ -1145,7 +1145,7 @@ int mlx4_alloc_eq_table(struct mlx4_dev *dev)
 	struct mlx4_priv *priv = mlx4_priv(dev);
 
 	priv->eq_table.eq = kzmalloc((dev->caps.num_eqs - dev->caps.reserved_eqs) * (sizeof *priv->eq_table.eq),
-				     KMALLOC_WAIT);
+				     MEM_WAIT);
 	if (!priv->eq_table.eq)
 		return -ENOMEM;
 
@@ -1164,7 +1164,7 @@ int mlx4_init_eq_table(struct mlx4_dev *dev)
 	int i;
 
 	priv->eq_table.uar_map = kzmalloc((mlx4_num_eq_uar(dev)) * (sizeof *priv->eq_table.uar_map),
-					  KMALLOC_WAIT);
+					  MEM_WAIT);
 	if (!priv->eq_table.uar_map) {
 		err = -ENOMEM;
 		goto err_out_free;
@@ -1196,7 +1196,7 @@ int mlx4_init_eq_table(struct mlx4_dev *dev)
 	priv->eq_table.irq_names =
 		kmalloc(MLX4_IRQNAME_SIZE * (dev->caps.num_comp_vectors + 1 +
 					     dev->caps.comp_pool),
-			KMALLOC_WAIT);
+			MEM_WAIT);
 	if (!priv->eq_table.irq_names) {
 		err = -ENOMEM;
 		goto err_out_bitmap;

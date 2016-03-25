@@ -2201,7 +2201,7 @@ void bnx2x_igu_clear_sb_gen(struct bnx2x *bp, uint8_t func,
 			    bool is_pf);
 
 #define BNX2X_ILT_ZALLOC(x, y, size)					\
-	x = dma_zalloc_coherent(&bp->pdev->dev, size, y, KMALLOC_WAIT)
+	x = dma_zalloc_coherent(&bp->pdev->dev, size, y, MEM_WAIT)
 
 #define BNX2X_ILT_FREE(x, y, size) \
 	do { \

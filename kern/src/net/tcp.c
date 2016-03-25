@@ -899,7 +899,7 @@ void tcpstart(struct conv *s, int mode)
 	Tcpctl *tcb;
 	struct tcppriv *tpriv;
 	/* tcpackproc needs to free this if it ever exits */
-	char *kpname = kmalloc(KNAMELEN, KMALLOC_WAIT);
+	char *kpname = kmalloc(KNAMELEN, MEM_WAIT);
 
 	tpriv = s->p->priv;
 

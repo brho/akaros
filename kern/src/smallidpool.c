@@ -20,7 +20,7 @@ struct u16_pool *create_u16_pool(unsigned int size)
 	if (size > MAX_U16_POOL_SZ)
 		return NULL;
 	/* ids and check are alloced and aligned right after the id struct */
-	id = kmalloc(sizeof(*id) + sizeof(uint16_t) * size + size, KMALLOC_WAIT);
+	id = kmalloc(sizeof(*id) + sizeof(uint16_t) * size + size, MEM_WAIT);
 	spinlock_init_irqsave(&id->lock);
 	id->size = size;
 	id->ids = (void *)&id[1];

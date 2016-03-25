@@ -148,7 +148,7 @@ static int mlx4_en_init_allocator(struct mlx4_en_priv *priv,
 		const struct mlx4_en_frag_info *frag_info = &priv->frag_info[i];
 
 		if (mlx4_alloc_pages(priv, &ring->page_alloc[i],
-				     frag_info, KMALLOC_WAIT | __GFP_COLD))
+				     frag_info, MEM_WAIT | __GFP_COLD))
 			goto out;
 
 		en_dbg(DRV, priv, "  frag %d allocator: - size:%d frags:%d\n",
@@ -273,7 +273,7 @@ static int mlx4_en_fill_rx_buffers(struct mlx4_en_priv *priv)
 
 			if (mlx4_en_prepare_rx_desc(priv, ring,
 						    ring->actual_size,
-						    KMALLOC_WAIT | __GFP_COLD)) {
+						    MEM_WAIT | __GFP_COLD)) {
 				if (ring->actual_size < MLX4_EN_MIN_RX_SIZE) {
 					en_err(priv, "Failed to allocate enough rx buffers\n");
 					return -ENOMEM;
@@ -352,9 +352,9 @@ int mlx4_en_create_rx_ring(struct mlx4_en_priv *priv,
 	int err = -ENOMEM;
 	int tmp;
 
-	ring = kzalloc_node(sizeof(*ring), KMALLOC_WAIT, node);
+	ring = kzalloc_node(sizeof(*ring), MEM_WAIT, node);
 	if (!ring) {
-		ring = kzmalloc(sizeof(*ring), KMALLOC_WAIT);
+		ring = kzmalloc(sizeof(*ring), MEM_WAIT);
 		if (!ring) {
 			en_err(priv, "Failed to allocate RX ring structure\n");
 			return -ENOMEM;
@@ -1188,11 +1188,11 @@ static int mlx4_en_config_rss_qp(struct mlx4_en_priv *priv, int qpn,
 	struct mlx4_qp_context *context;
 	int err = 0;
 
-	context = kmalloc(sizeof(*context), KMALLOC_WAIT);
+	context = kmalloc(sizeof(*context), MEM_WAIT);
 	if (!context)
 		return -ENOMEM;
 
-	err = mlx4_qp_alloc(mdev->dev, qpn, qp, KMALLOC_WAIT);
+	err = mlx4_qp_alloc(mdev->dev, qpn, qp, MEM_WAIT);
 	if (err) {
 		en_err(priv, "Failed to allocate qp #%x\n", qpn);
 		goto out;
@@ -1237,7 +1237,7 @@ int mlx4_en_create_drop_qp(struct mlx4_en_priv *priv)
 		return err;
 	}
 	err = mlx4_qp_alloc(priv->mdev->dev, qpn, &priv->drop_qp,
-			    KMALLOC_WAIT);
+			    MEM_WAIT);
 	if (err) {
 		en_err(priv, "Failed allocating drop qp\n");
 		mlx4_qp_release_range(priv->mdev->dev, qpn, 1);
@@ -1294,7 +1294,7 @@ int mlx4_en_config_rss_steer(struct mlx4_en_priv *priv)
 
 	/* Configure RSS indirection qp */
 	err = mlx4_qp_alloc(mdev->dev, priv->base_qpn, &rss_map->indir_qp,
-			    KMALLOC_WAIT);
+			    MEM_WAIT);
 	if (err) {
 		en_err(priv, "Failed to allocate RSS indirection QP\n");
 		goto rss_err;

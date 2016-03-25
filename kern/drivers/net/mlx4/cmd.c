@@ -948,7 +948,7 @@ static int mlx4_MAD_IFC_wrapper(struct mlx4_dev *dev, int slave,
 				if (port < 1 || port > dev->caps.num_ports)
 					return -EINVAL;
 				table = kzmalloc(((dev->caps.pkey_table_len[port] / 32) + 1) * (sizeof(*table) * 32),
-						 KMALLOC_WAIT);
+						 MEM_WAIT);
 
 				if (!table)
 					return -ENOMEM;
@@ -1696,7 +1696,7 @@ static int mlx4_master_process_vhcr(struct mlx4_dev *dev, int slave,
 	int err = 0;
 
 	/* Create sw representation of Virtual HCR */
-	vhcr = kzmalloc(sizeof(struct mlx4_vhcr), KMALLOC_WAIT);
+	vhcr = kzmalloc(sizeof(struct mlx4_vhcr), MEM_WAIT);
 	if (!vhcr)
 		return -ENOMEM;
 
@@ -1888,7 +1888,7 @@ static int mlx4_master_immediate_activate_vlan_qos(struct mlx4_priv *priv,
 		 vp_admin->default_vlan, vp_admin->default_qos,
 		 vp_admin->link_state);
 
-	work = kzmalloc(sizeof(*work), KMALLOC_WAIT);
+	work = kzmalloc(sizeof(*work), MEM_WAIT);
 	if (!work)
 		return -ENOMEM;
 
@@ -2360,19 +2360,19 @@ int mlx4_multi_func_init(struct mlx4_dev *dev)
 
 		priv->mfunc.master.slave_state =
 			kzmalloc(dev->num_slaves * sizeof(struct mlx4_slave_state),
-				 KMALLOC_WAIT);
+				 MEM_WAIT);
 		if (!priv->mfunc.master.slave_state)
 			goto err_comm;
 
 		priv->mfunc.master.vf_admin =
 			kzmalloc(dev->num_slaves * sizeof(struct mlx4_vf_admin_state),
-				 KMALLOC_WAIT);
+				 MEM_WAIT);
 		if (!priv->mfunc.master.vf_admin)
 			goto err_comm_admin;
 
 		priv->mfunc.master.vf_oper =
 			kzmalloc(dev->num_slaves * sizeof(struct mlx4_vf_oper_state),
-				 KMALLOC_WAIT);
+				 MEM_WAIT);
 		if (!priv->mfunc.master.vf_oper)
 			goto err_comm_oper;
 
@@ -2395,7 +2395,7 @@ int mlx4_multi_func_init(struct mlx4_dev *dev)
 
 				s_state->vlan_filter[port] =
 					kzmalloc(sizeof(struct mlx4_vlan_fltr),
-						 KMALLOC_WAIT);
+						 MEM_WAIT);
 				if (!s_state->vlan_filter[port]) {
 					if (--port)
 						kfree(s_state->vlan_filter[port]);
@@ -2504,7 +2504,7 @@ int mlx4_cmd_init(struct mlx4_dev *dev)
 		priv->mfunc.vhcr = dma_alloc_coherent(&dev->persist->pdev->dev,
 						      PAGE_SIZE,
 						      &priv->mfunc.vhcr_dma,
-						      KMALLOC_WAIT);
+						      MEM_WAIT);
 		if (!priv->mfunc.vhcr)
 			goto err;
 
@@ -2607,7 +2607,7 @@ int mlx4_cmd_use_events(struct mlx4_dev *dev)
 
 	priv->cmd.context = kmalloc(priv->cmd.max_cmds *
 				   sizeof (struct mlx4_cmd_context),
-				   KMALLOC_WAIT);
+				   MEM_WAIT);
 	if (!priv->cmd.context)
 		return -ENOMEM;
 
@@ -2661,11 +2661,11 @@ struct mlx4_cmd_mailbox *mlx4_alloc_cmd_mailbox(struct mlx4_dev *dev)
 {
 	struct mlx4_cmd_mailbox *mailbox;
 
-	mailbox = kmalloc(sizeof *mailbox, KMALLOC_WAIT);
+	mailbox = kmalloc(sizeof *mailbox, MEM_WAIT);
 	if (!mailbox)
 		return ERR_PTR(-ENOMEM);
 
-	mailbox->buf = pci_pool_alloc(mlx4_priv(dev)->cmd.pool, KMALLOC_WAIT,
+	mailbox->buf = pci_pool_alloc(mlx4_priv(dev)->cmd.pool, MEM_WAIT,
 				      &mailbox->dma);
 	if (!mailbox->buf) {
 		kfree(mailbox);

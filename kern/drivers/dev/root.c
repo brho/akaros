@@ -429,7 +429,7 @@ static long rootwrite(struct chan *c, void *a, long n, int64_t off)
 
 	if (off + n > rd->size){
 		void *p;
-		p = krealloc(rd->ptr, off + n, KMALLOC_WAIT);
+		p = krealloc(rd->ptr, off + n, MEM_WAIT);
 		if (! p)
 			error(EFAIL, "rootwrite: could not grow the file to %d bytes",
 				  off + n);
@@ -454,7 +454,7 @@ static int rootwstat(struct chan *c, uint8_t *m_buf, int m_buf_sz)
 	/* common trick in wstats.  we want the dir and any strings in the M.  the
 	 * strings are smaller than entire M (strings plus other M).  the strings
 	 * will be placed right after the dir (dir[1]) */
-	dir = kzmalloc(sizeof(struct dir) + m_buf_sz, KMALLOC_WAIT);
+	dir = kzmalloc(sizeof(struct dir) + m_buf_sz, MEM_WAIT);
 	m_sz = convM2D(m_buf, m_buf_sz, &dir[0], (char*)&dir[1]);
 	if (!m_sz) {
 		kfree(dir);

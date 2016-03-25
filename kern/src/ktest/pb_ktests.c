@@ -936,7 +936,7 @@ bool test_circular_buffer(void)
 		off += csize;
 	}
 
-	bigbuf = kzmalloc(cbsize, KMALLOC_WAIT);
+	bigbuf = kzmalloc(cbsize, MEM_WAIT);
 	KT_ASSERT(bigbuf != NULL);
 
 	mxsize = circular_buffer_max_write_size(&cb);
@@ -2091,7 +2091,7 @@ bool test_u16pool(void)
 	int numalloc;
 	KT_ASSERT(id);
 
-	t = kzmalloc(sizeof(int) * (AMT + 1), KMALLOC_WAIT);
+	t = kzmalloc(sizeof(int) * (AMT + 1), MEM_WAIT);
 	for (x = 0; x < 1024; x++) {
 		KT_ASSERT_M("Should be empty", id->tos == 0);
 		for (i = 0; i < id->size; i++) {

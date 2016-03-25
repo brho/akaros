@@ -692,7 +692,7 @@ __vmx_alloc_vmcs(int node)
 {
 	struct vmcs *vmcs;
 
-	vmcs = get_cont_pages_node(node, vmcs_config.order, KMALLOC_WAIT);
+	vmcs = get_cont_pages_node(node, vmcs_config.order, MEM_WAIT);
 	if (!vmcs)
 		return 0;
 	memset(vmcs, 0, vmcs_config.size);
@@ -1112,7 +1112,8 @@ static void vmx_setup_vmcs(struct guest_pcore *gpc)
 struct guest_pcore *create_guest_pcore(struct proc *p,
                                        struct vmm_gpcore_init *gpci)
 {
-	struct guest_pcore *gpc = kmalloc(sizeof(struct guest_pcore), KMALLOC_WAIT);
+	struct guest_pcore *gpc = kmalloc(sizeof(struct guest_pcore),
+					  MEM_WAIT);
 	int ret;
 
 	if (!gpc)
@@ -1303,7 +1304,7 @@ int intel_vmm_init(void) {
 		return -ENOMEM;
 	}
 	io_bitmap = (unsigned long *)get_cont_pages(VMX_IO_BITMAP_ORDER,
-	                                            KMALLOC_WAIT);
+	                                            MEM_WAIT);
 	if (!io_bitmap) {
 		printk("Could not allocate msr_bitmap\n");
 		kfree(msr_bitmap);

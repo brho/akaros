@@ -182,8 +182,8 @@ static void etherbind(struct Ipifc *ifc, int argc, char **argv)
 	if (argc < 2)
 		error(EINVAL, ERROR_FIXME);
 
-	addr = kmalloc(Maxpath, KMALLOC_WAIT);	//char addr[2*KNAMELEN];
-	dir = kmalloc(Maxpath, KMALLOC_WAIT);	//char addr[2*KNAMELEN];
+	addr = kmalloc(Maxpath, MEM_WAIT);	//char addr[2*KNAMELEN];
+	dir = kmalloc(Maxpath, MEM_WAIT);	//char addr[2*KNAMELEN];
 	mchan4 = cchan4 = achan = mchan6 = cchan6 = NULL;
 	buf = NULL;
 	if (waserror()) {

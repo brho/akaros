@@ -6533,11 +6533,11 @@ void bnx2x_post_irq_nic_init(struct bnx2x *bp, uint32_t load_code)
 static int bnx2x_gunzip_init(struct bnx2x *bp)
 {
 	bp->gunzip_buf = dma_alloc_coherent(&bp->pdev->dev, FW_BUF_SIZE,
-					    &bp->gunzip_mapping, KMALLOC_WAIT);
+					    &bp->gunzip_mapping, MEM_WAIT);
 	if (bp->gunzip_buf  == NULL)
 		goto gunzip_nomem1;
 
-	bp->strm = kmalloc(sizeof(*bp->strm), KMALLOC_WAIT);
+	bp->strm = kmalloc(sizeof(*bp->strm), MEM_WAIT);
 	if (bp->strm  == NULL)
 		goto gunzip_nomem2;
 
@@ -8341,7 +8341,7 @@ int bnx2x_alloc_mem(struct bnx2x *bp)
 		allocated += bp->context[i].size;
 	}
 	bp->ilt->lines = kzmalloc((ILT_MAX_LINES) * (sizeof(struct ilt_line)),
-				  KMALLOC_WAIT);
+				  MEM_WAIT);
 	if (!bp->ilt->lines)
 		goto alloc_mem_err;
 
@@ -10485,7 +10485,7 @@ static int bnx2x_prev_mark_path(struct bnx2x *bp, bool after_undi)
 	up(&bnx2x_prev_sem);
 
 	/* Create an entry for this path and add it */
-	tmp_list = kmalloc(sizeof(struct bnx2x_prev_path_list), KMALLOC_WAIT);
+	tmp_list = kmalloc(sizeof(struct bnx2x_prev_path_list), MEM_WAIT);
 	if (!tmp_list) {
 		BNX2X_ERR("Failed to allocate 'bnx2x_prev_path_list'\n");
 		return -ENOMEM;
@@ -12040,7 +12040,7 @@ static void bnx2x_read_fwinfo(struct bnx2x *bp)
 	i += PCI_VPD_LRDT_TAG_SIZE;
 
 	if (block_end > BNX2X_VPD_LEN) {
-		vpd_extended_data = kmalloc(block_end, KMALLOC_WAIT);
+		vpd_extended_data = kmalloc(block_end, MEM_WAIT);
 		if (vpd_extended_data  == NULL)
 			goto out_not_found;
 
@@ -13105,7 +13105,7 @@ static void be16_to_cpu_n(const uint8_t *_source, uint8_t *_target,
 #define BNX2X_ALLOC_AND_SET(arr, lbl, func)				\
 do {									\
 	uint32_t len = be32_to_cpu(fw_hdr->arr.len);				\
-	bp->arr = kmalloc(len, KMALLOC_WAIT);				\
+	bp->arr = kmalloc(len, MEM_WAIT);				\
 	if (!bp->arr)							\
 		goto lbl;						\
 	func(bp->firmware->data + be32_to_cpu(fw_hdr->arr.offset),	\
@@ -14462,7 +14462,7 @@ static int bnx2x_register_cnic(struct ether *dev, struct cnic_ops *ops,
 
 	bp->cnic_enabled = true;
 
-	bp->cnic_kwq = kzmalloc(PAGE_SIZE, KMALLOC_WAIT);
+	bp->cnic_kwq = kzmalloc(PAGE_SIZE, MEM_WAIT);
 	if (!bp->cnic_kwq)
 		return -ENOMEM;
 

@@ -439,10 +439,10 @@ static struct chan *procopen(struct chan *c, int omode)
 		topens++;
 		if (tevents == NULL) {
 			tevents = (Traceevent *) kzmalloc(sizeof(Traceevent) * Nevents,
-											  KMALLOC_WAIT);
+											  MEM_WAIT);
 			if (tevents == NULL)
 				error(ENOMEM, ERROR_FIXME);
-			tpids = kzmalloc(Ntracedpids * 20, KMALLOC_WAIT);
+			tpids = kzmalloc(Ntracedpids * 20, MEM_WAIT);
 			if (tpids == NULL) {
 				kfree(tpids);
 				tpids = NULL;
@@ -535,7 +535,7 @@ static struct chan *procopen(struct chan *c, int omode)
 		case Qns:
 			if (omode != O_READ)
 				error(EPERM, ERROR_FIXME);
-			c->aux = kzmalloc(sizeof(struct mntwalk), KMALLOC_WAIT);
+			c->aux = kzmalloc(sizeof(struct mntwalk), MEM_WAIT);
 			break;
 		case Qstatus:
 		case Qvmstatus:
@@ -619,7 +619,7 @@ static int procwstat(struct chan *c, uint8_t * db, int n)
 	if (strcmp(current->user, p->user) != 0 && strcmp(current->user, eve) != 0)
 		error(EPERM, ERROR_FIXME);
 
-	d = kzmalloc(sizeof(struct dir) + n, KMALLOC_WAIT);
+	d = kzmalloc(sizeof(struct dir) + n, MEM_WAIT);
 	n = convM2D(db, n, &d[0], (char *)&d[1]);
 	if (n == 0)
 		error(ENOENT, ERROR_FIXME);
@@ -788,11 +788,11 @@ static char *argcpy(char *s, char *p)
 	if (n > 128)
 		n = 128;
 	if (n <= 0) {
-		t = kzmalloc(1, KMALLOC_WAIT);
+		t = kzmalloc(1, MEM_WAIT);
 		*t = 0;
 		return t;
 	}
-	t = kzmalloc(n, KMALLOC_WAIT);
+	t = kzmalloc(n, MEM_WAIT);
 	tp = t;
 	te = t + n;
 
@@ -872,7 +872,7 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 		case Qstatus:{
 				/* the old code grew the stack and was hideous.
 				 * status is not a high frequency operation; just malloc. */
-				char *buf = kmalloc(4096, KMALLOC_WAIT);
+				char *buf = kmalloc(4096, MEM_WAIT);
 				char *s = buf, *e = buf + 4096;
 				int i;
 
@@ -893,7 +893,7 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 		case Qvmstatus:
 			{
 				size_t buflen = 50 * 65 + 2;
-				char *buf = kmalloc(buflen, KMALLOC_WAIT);
+				char *buf = kmalloc(buflen, MEM_WAIT);
 				int i, offset;
 				offset = 0;
 				offset += snprintf(buf + offset, buflen - offset, "{\n");
@@ -1023,7 +1023,7 @@ static long procwrite(struct chan *c, void *va, long n, int64_t off)
 			if (n >= sizeof buf - strlen(p->text) - 1)
 				error(E2BIG, ERROR_FIXME);
 			l = snprintf(buf, sizeof buf, "%s [%s]", p->text, (char *)va);
-			args = kzmalloc(l + 1, KMALLOC_WAIT);
+			args = kzmalloc(l + 1, MEM_WAIT);
 			if (args == NULL)
 				error(ENOMEM, ERROR_FIXME);
 			memmove(args, buf, l);
@@ -1256,7 +1256,7 @@ static void procctlreq(struct proc *p, char *va, int n)
 	case CMstraceme:
 		/* common allocation.  if we inherited, we might have one already */
 		if (!p->strace) {
-			strace = kzmalloc(sizeof(*p->strace), KMALLOC_WAIT);
+			strace = kzmalloc(sizeof(*p->strace), MEM_WAIT);
 			strace->q = qopen(65536, Qdropoverflow|Qcoalesce, NULL, NULL);
 			/* both of these refs are put when the proc is freed.  procs is for
 			 * every process that has this p->strace.  users is procs + every

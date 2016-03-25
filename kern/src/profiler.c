@@ -278,7 +278,7 @@ static void alloc_cpu_buffers(void)
 	qnonblock(profiler_queue, TRUE);
 
 	profiler_percpu_ctx =
-	    kzmalloc(sizeof(*profiler_percpu_ctx) * num_cores, KMALLOC_WAIT);
+	    kzmalloc(sizeof(*profiler_percpu_ctx) * num_cores, MEM_WAIT);
 
 	for (int i = 0; i < num_cores; i++) {
 		struct profiler_cpu_context *b = &profiler_percpu_ctx[i];

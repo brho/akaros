@@ -141,7 +141,7 @@ struct chan *devattach(const char *name, char *spec)
 		spec = "";
 	/* 1 for #, 1 for ., 1 for \0 */
 	buflen = strlen(name) + strlen(spec) + 3;
-	buf = kzmalloc(buflen, KMALLOC_WAIT);
+	buf = kzmalloc(buflen, MEM_WAIT);
 	snprintf(buf, sizeof(buf), "#%s.%s", name, spec);
 	c->name = newcname(buf);
 	kfree(buf);
@@ -198,7 +198,7 @@ struct walkqid *devwalk(struct chan *c,
 
 	alloc = 0;
 	wq = kzmalloc(sizeof(struct walkqid) + nname * sizeof(struct qid),
-				  KMALLOC_WAIT);
+				  MEM_WAIT);
 	if (waserror()) {
 		if (alloc && wq->clone != NULL)
 			cclose(wq->clone);

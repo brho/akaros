@@ -89,7 +89,7 @@ int mlx4_en_map_buffer(struct mlx4_buf *buf)
 
 	panic("Disabled");
 #if 0 // AKAROS_PORT
-	pages = kmalloc(sizeof *pages * buf->nbufs, KMALLOC_WAIT);
+	pages = kmalloc(sizeof *pages * buf->nbufs, MEM_WAIT);
 	if (!pages)
 		return -ENOMEM;
 

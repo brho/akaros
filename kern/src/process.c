@@ -2292,7 +2292,7 @@ void proc_get_set(struct process_set *pset)
 		pset->size = atomic_read(&num_envs) + num_extra_alloc;
 		pset->num_processes = 0;
 		pset->procs = (struct proc **)
-			kzmalloc(pset->size * sizeof(struct proc *), KMALLOC_WAIT);
+			kzmalloc(pset->size * sizeof(struct proc *), MEM_WAIT);
 		if (!pset->procs)
 			error(-ENOMEM, ERROR_FIXME);
 

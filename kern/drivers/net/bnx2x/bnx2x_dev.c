@@ -327,7 +327,7 @@ static void bnx2x_attach(struct ether *edev)
 	/* Alloc all your ctrl crap. */
 
 	/* the ktasks should free these names, if they ever exit */
-	name = kmalloc(KNAMELEN, KMALLOC_WAIT);
+	name = kmalloc(KNAMELEN, MEM_WAIT);
 	snprintf(name, KNAMELEN, "#l%d-bnx2x_rproc", edev->ctlrno);
 	ktask(name, bnx2x_rproc, edev);
 

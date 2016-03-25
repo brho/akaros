@@ -166,7 +166,7 @@ static void kprof_start_profiler(void)
 static void kprof_fetch_profiler_data(void)
 {
 	size_t psize = kprof.psize + profiler_size();
-	char *ndata = krealloc(kprof.pdata, psize, KMALLOC_WAIT);
+	char *ndata = krealloc(kprof.pdata, psize, MEM_WAIT);
 
 	if (!ndata)
 		error(ENOMEM, ERROR_FIXME);
@@ -231,7 +231,7 @@ static void kprof_init(void)
 	kprof.psize = 0;
 
 	kprof.alarms = kzmalloc(sizeof(struct alarm_waiter) * num_cores,
-	                        KMALLOC_WAIT);
+	                        MEM_WAIT);
 	if (!kprof.alarms)
 		error(ENOMEM, ERROR_FIXME);
 	if (waserror()) {
@@ -325,7 +325,7 @@ static void kprof_close(struct chan *c)
 static long mpstat_read(void *va, long n, int64_t off)
 {
 	size_t bufsz = mpstat_len();
-	char *buf = kmalloc(bufsz, KMALLOC_WAIT);
+	char *buf = kmalloc(bufsz, MEM_WAIT);
 	int len = 0;
 	struct per_cpu_info *pcpui;
 	uint64_t cpu_total;
@@ -363,7 +363,7 @@ static long mpstat_read(void *va, long n, int64_t off)
 static long mpstatraw_read(void *va, long n, int64_t off)
 {
 	size_t bufsz = mpstatraw_len();
-	char *buf = kmalloc(bufsz, KMALLOC_WAIT);
+	char *buf = kmalloc(bufsz, MEM_WAIT);
 	int len = 0;
 	struct per_cpu_info *pcpui;
 

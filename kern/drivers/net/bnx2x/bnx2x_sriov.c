@@ -591,7 +591,7 @@ int bnx2x_vf_mcast(struct bnx2x *bp, struct bnx2x_virtf *vf,
 		set_bit(RAMROD_COMP_WAIT, &mcast.ramrod_flags);
 	if (mc_num) {
 		mc = kzmalloc(mc_num * sizeof(struct bnx2x_mcast_list_elem),
-			      KMALLOC_WAIT);
+			      MEM_WAIT);
 		if (!mc) {
 			BNX2X_ERR("Cannot Configure mulicasts due to lack of memory\n");
 			return -ENOMEM;
@@ -1272,7 +1272,7 @@ int bnx2x_iov_init_one(struct bnx2x *bp, int int_mode_param,
 	}
 
 	/* allocate the vfs database */
-	bp->vfdb = kzmalloc(sizeof(*(bp->vfdb)), KMALLOC_WAIT);
+	bp->vfdb = kzmalloc(sizeof(*(bp->vfdb)), MEM_WAIT);
 	if (!bp->vfdb) {
 		BNX2X_ERR("failed to allocate vf database\n");
 		err = -ENOMEM;
@@ -1300,7 +1300,7 @@ int bnx2x_iov_init_one(struct bnx2x *bp, int int_mode_param,
 
 	/* allocate the vf array */
 	bp->vfdb->vfs = kzmalloc(sizeof(struct bnx2x_virtf) * BNX2X_NR_VIRTFN(bp),
-				 KMALLOC_WAIT);
+				 MEM_WAIT);
 	if (!bp->vfdb->vfs) {
 		BNX2X_ERR("failed to allocate vf array\n");
 		err = -ENOMEM;
@@ -1325,7 +1325,7 @@ int bnx2x_iov_init_one(struct bnx2x *bp, int int_mode_param,
 
 	/* allocate the queue arrays for all VFs */
 	bp->vfdb->vfqs = kzmalloc(BNX2X_MAX_NUM_VF_QUEUES * sizeof(struct bnx2x_vf_queue),
-				  KMALLOC_WAIT);
+				  MEM_WAIT);
 
 	if (!bp->vfdb->vfqs) {
 		BNX2X_ERR("failed to allocate vf queue array\n");

@@ -161,7 +161,7 @@ static int new_steering_entry(struct mlx4_dev *dev, uint8_t port,
 		return -EINVAL;
 
 	s_steer = &mlx4_priv(dev)->steer[port - 1];
-	new_entry = kzmalloc(sizeof *new_entry, KMALLOC_WAIT);
+	new_entry = kzmalloc(sizeof *new_entry, MEM_WAIT);
 	if (!new_entry)
 		return -ENOMEM;
 
@@ -174,7 +174,7 @@ static int new_steering_entry(struct mlx4_dev *dev, uint8_t port,
 	 */
 	pqp = get_promisc_qp(dev, port, steer, qpn);
 	if (pqp) {
-		dqp = kmalloc(sizeof *dqp, KMALLOC_WAIT);
+		dqp = kmalloc(sizeof *dqp, MEM_WAIT);
 		if (!dqp) {
 			err = -ENOMEM;
 			goto out_alloc;
@@ -273,7 +273,7 @@ static int existing_steering_entry(struct mlx4_dev *dev, uint8_t port,
 	}
 
 	/* add the qp as a duplicate on this index */
-	dqp = kmalloc(sizeof *dqp, KMALLOC_WAIT);
+	dqp = kmalloc(sizeof *dqp, MEM_WAIT);
 	if (!dqp)
 		return -ENOMEM;
 	dqp->qpn = qpn;
@@ -442,7 +442,7 @@ static int add_promisc_qp(struct mlx4_dev *dev, uint8_t port,
 		goto out_mutex;
 	}
 
-	pqp = kmalloc(sizeof *pqp, KMALLOC_WAIT);
+	pqp = kmalloc(sizeof *pqp, MEM_WAIT);
 	if (!pqp) {
 		err = -ENOMEM;
 		goto out_mutex;
@@ -479,7 +479,7 @@ static int add_promisc_qp(struct mlx4_dev *dev, uint8_t port,
 					 * Add to duplicates.
 					 */
 					dqp = kmalloc(sizeof(*dqp),
-						      KMALLOC_WAIT);
+						      MEM_WAIT);
 					if (!dqp) {
 						err = -ENOMEM;
 						goto out_mailbox;

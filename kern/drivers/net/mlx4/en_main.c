@@ -242,7 +242,7 @@ static void *mlx4_en_add(struct mlx4_dev *dev)
 
 	printk_once(KERN_INFO "%s", mlx4_en_version);
 
-	mdev = kzmalloc(sizeof(*mdev), KMALLOC_WAIT);
+	mdev = kzmalloc(sizeof(*mdev), MEM_WAIT);
 	if (!mdev)
 		goto err_free_res;
 

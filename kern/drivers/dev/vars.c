@@ -81,7 +81,7 @@ static void vars_init(void)
 	struct dirtab *dot, temp;
 
 	nr_vars = &__stop_devvars - &__start_devvars;
-	vars_dir = kmalloc_array(nr_vars, sizeof(struct dirtab), KMALLOC_WAIT);
+	vars_dir = kmalloc_array(nr_vars, sizeof(struct dirtab), MEM_WAIT);
 	if (!vars_dir)
 		error(ENOMEM, "kmalloc_array failed, nr_vars was %p", nr_vars);
 	memcpy(vars_dir, &__start_devvars, nr_vars * sizeof(struct dirtab));
@@ -225,7 +225,7 @@ static void vars_create(struct chan *c, char *name, int omode, uint32_t perm)
 	new_slot = find_free_var();
 	if (!new_slot) {
 		vars_dir = kreallocarray(vars_dir, nr_vars * 2, sizeof(struct dirtab),
-		                         KMALLOC_WAIT);
+		                         MEM_WAIT);
 		if (!vars_dir)
 			error(ENOMEM, "krealloc_array failed, nr_vars was %p", nr_vars);
 		memset(vars_dir + nr_vars, 0, nr_vars * sizeof(struct dirtab));

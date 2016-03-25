@@ -102,7 +102,7 @@ static kpte_t *__pml_walk(kpte_t *pml, uintptr_t va, int flags, int pml_shift)
 	if (!kpte_is_present(kpte)) {
 		if (!(flags & PG_WALK_CREATE))
 			return NULL;
-		new_pml_kva = get_cont_pages(1, KMALLOC_WAIT);
+		new_pml_kva = get_cont_pages(1, MEM_WAIT);
 		memset(new_pml_kva, 0, PGSIZE * 2);
 		/* Might want better error handling (we're probably out of memory) */
 		if (!new_pml_kva)
@@ -623,7 +623,7 @@ uintptr_t gva2gpa(struct proc *p, uintptr_t cr3, uintptr_t gva)
  * data segment). */
 int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd)
 {
-	kpte_t *kpt = get_cont_pages(1, KMALLOC_WAIT);
+	kpte_t *kpt = get_cont_pages(1, MEM_WAIT);
 	memcpy(kpt, boot_copy.kpte, PGSIZE);
 	epte_t *ept = kpte_to_epte(kpt);
 	memset(ept, 0, PGSIZE);

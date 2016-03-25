@@ -188,9 +188,9 @@ int mlx4_bf_alloc(struct mlx4_dev *dev, struct mlx4_bf *bf, int node)
 			err = -ENOMEM;
 			goto out;
 		}
-		uar = kmalloc_node(sizeof(*uar), KMALLOC_WAIT, node);
+		uar = kmalloc_node(sizeof(*uar), MEM_WAIT, node);
 		if (!uar) {
-			uar = kmalloc(sizeof(*uar), KMALLOC_WAIT);
+			uar = kmalloc(sizeof(*uar), MEM_WAIT);
 			if (!uar) {
 				err = -ENOMEM;
 				goto out;

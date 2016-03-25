@@ -617,7 +617,7 @@ static int mlx4_en_get_qp(struct mlx4_en_priv *priv)
 		goto tunnel_err;
 #endif
 
-	entry = kmalloc(sizeof(*entry), KMALLOC_WAIT);
+	entry = kmalloc(sizeof(*entry), MEM_WAIT);
 	if (!entry) {
 		err = -ENOMEM;
 		goto alloc_err;
@@ -861,7 +861,7 @@ static void update_mclist_flags(struct mlx4_en_priv *priv,
 		if (!found) {
 			new_mc = kmemdup(src_tmp,
 					 sizeof(struct mlx4_en_mc_list),
-					 KMALLOC_WAIT);
+					 MEM_WAIT);
 			if (!new_mc)
 				return;
 
@@ -1195,7 +1195,7 @@ static void mlx4_en_do_uc_filter(struct mlx4_en_priv *priv,
 		}
 
 		if (!found) {
-			entry = kmalloc(sizeof(*entry), KMALLOC_WAIT);
+			entry = kmalloc(sizeof(*entry), MEM_WAIT);
 			if (!entry) {
 				en_err(priv, "Failed adding MAC %pM on port:%d (out of memory)\n",
 				       ha->addr, priv->port);
@@ -1535,7 +1535,7 @@ static int mlx4_en_init_affinity_hint(struct mlx4_en_priv *priv, int ring_idx)
 	struct mlx4_en_rx_ring *ring = priv->rx_ring[ring_idx];
 	int numa_node = priv->mdev->dev->numa_node;
 
-	if (!zalloc_cpumask_var(&ring->affinity_mask, KMALLOC_WAIT))
+	if (!zalloc_cpumask_var(&ring->affinity_mask, MEM_WAIT))
 		return -ENOMEM;
 
 	cpumask_set_cpu(cpumask_local_spread(ring_idx, numa_node),
@@ -2853,7 +2853,7 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 
 	SET_NETDEV_DEV(dev, &mdev->dev->persist->pdev->dev);
 #else
-	dev->ctlr = kzmalloc(sizeof(struct mlx4_en_priv), KMALLOC_WAIT);
+	dev->ctlr = kzmalloc(sizeof(struct mlx4_en_priv), MEM_WAIT);
 #endif
 
 	/*
@@ -2895,13 +2895,13 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 	netdev_rss_key_fill(priv->rss_key, sizeof(priv->rss_key));
 
 	priv->tx_ring = kzmalloc(sizeof(struct mlx4_en_tx_ring *) * MAX_TX_RINGS,
-				 KMALLOC_WAIT);
+				 MEM_WAIT);
 	if (!priv->tx_ring) {
 		err = -ENOMEM;
 		goto out;
 	}
 	priv->tx_cq = kzmalloc(sizeof(struct mlx4_en_cq *) * MAX_TX_RINGS,
-			       KMALLOC_WAIT);
+			       MEM_WAIT);
 	if (!priv->tx_cq) {
 		err = -ENOMEM;
 		goto out;

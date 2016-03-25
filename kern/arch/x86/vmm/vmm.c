@@ -95,7 +95,8 @@ int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores,
 	vmm->vmmcp = TRUE;
 	nr_guest_pcores = MIN(nr_guest_pcores, num_cores);
 	vmm->amd = 0;
-	vmm->guest_pcores = kzmalloc(sizeof(void*) * nr_guest_pcores, KMALLOC_WAIT);
+	vmm->guest_pcores = kzmalloc(sizeof(void*) * nr_guest_pcores,
+				     MEM_WAIT);
 	for (i = 0; i < nr_guest_pcores; i++) {
 		if (copy_from_user(&gpci, &u_gpcis[i],
 		                   sizeof(struct vmm_gpcore_init))) {

@@ -50,7 +50,7 @@ static void mlx4_add_device(struct mlx4_interface *intf, struct mlx4_priv *priv)
 {
 	struct mlx4_device_context *dev_ctx;
 
-	dev_ctx = kmalloc(sizeof *dev_ctx, KMALLOC_WAIT);
+	dev_ctx = kmalloc(sizeof *dev_ctx, MEM_WAIT);
 	if (!dev_ctx)
 		return;
 

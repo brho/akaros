@@ -102,16 +102,16 @@ static int mlx4_buddy_init(struct mlx4_buddy *buddy, int max_order)
 	spinlock_init(&buddy->lock);
 
 	buddy->bits = kzmalloc((buddy->max_order + 1) * (sizeof(long *)),
-			       KMALLOC_WAIT);
+			       MEM_WAIT);
 	buddy->num_free = kzmalloc(((buddy->max_order + 1)) * (sizeof *buddy->num_free),
-				   KMALLOC_WAIT);
+				   MEM_WAIT);
 	if (!buddy->bits || !buddy->num_free)
 		goto err_out;
 
 	for (i = 0; i <= buddy->max_order; ++i) {
 		s = BITS_TO_LONGS(1 << (buddy->max_order - i));
 		buddy->bits[i] = kzmalloc((s) * (sizeof(long)),
-					  KMALLOC_WAIT | __GFP_NOWARN);
+					  MEM_WAIT | __GFP_NOWARN);
 #if 0 // AKAROS_PORT
 		if (!buddy->bits[i]) {
 			buddy->bits[i] = vzalloc(s * sizeof(long));
@@ -644,7 +644,7 @@ int mlx4_mr_enable(struct mlx4_dev *dev, struct mlx4_mr *mr)
 	struct mlx4_mpt_entry *mpt_entry;
 	int err;
 
-	err = mlx4_mpt_alloc_icm(dev, key_to_hw_index(mr->key), KMALLOC_WAIT);
+	err = mlx4_mpt_alloc_icm(dev, key_to_hw_index(mr->key), MEM_WAIT);
 	if (err)
 		return err;
 
@@ -858,7 +858,7 @@ int mlx4_mw_enable(struct mlx4_dev *dev, struct mlx4_mw *mw)
 	struct mlx4_mpt_entry *mpt_entry;
 	int err;
 
-	err = mlx4_mpt_alloc_icm(dev, key_to_hw_index(mw->key), KMALLOC_WAIT);
+	err = mlx4_mpt_alloc_icm(dev, key_to_hw_index(mw->key), MEM_WAIT);
 	if (err)
 		return err;
 

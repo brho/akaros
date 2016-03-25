@@ -515,7 +515,7 @@ static int mlx4_create_zones(struct mlx4_dev *dev,
 	if (NULL == qp_table->zones)
 		return -ENOMEM;
 
-	bitmap = kmalloc(sizeof(*bitmap), KMALLOC_WAIT);
+	bitmap = kmalloc(sizeof(*bitmap), MEM_WAIT);
 
 	if (NULL == bitmap) {
 		err = -ENOMEM;
@@ -808,13 +808,13 @@ int mlx4_init_qp_table(struct mlx4_dev *dev)
 		/* In mfunc, calculate proxy and tunnel qp offsets for the PF here,
 		 * since the PF does not call mlx4_slave_caps */
 		dev->caps.qp0_tunnel = kzmalloc((dev->caps.num_ports) * (sizeof(uint32_t)),
-						KMALLOC_WAIT);
+						MEM_WAIT);
 		dev->caps.qp0_proxy = kzmalloc((dev->caps.num_ports) * (sizeof(uint32_t)),
-					       KMALLOC_WAIT);
+					       MEM_WAIT);
 		dev->caps.qp1_tunnel = kzmalloc((dev->caps.num_ports) * (sizeof(uint32_t)),
-						KMALLOC_WAIT);
+						MEM_WAIT);
 		dev->caps.qp1_proxy = kzmalloc((dev->caps.num_ports) * (sizeof(uint32_t)),
-					       KMALLOC_WAIT);
+					       MEM_WAIT);
 
 		if (!dev->caps.qp0_tunnel || !dev->caps.qp0_proxy ||
 		    !dev->caps.qp1_tunnel || !dev->caps.qp1_proxy) {

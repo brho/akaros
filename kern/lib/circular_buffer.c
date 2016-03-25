@@ -16,7 +16,7 @@ bool circular_buffer_init(struct circular_buffer *cb, size_t size, char *mem)
 	if (mem)
 		cb->base = mem;
 	else
-		cb->base = kmalloc(size, KMALLOC_WAIT);
+		cb->base = kmalloc(size, MEM_WAIT);
 	if (cb->base) {
 		cb->rdptr = cb->wrptr = cb->base;
 		cb->size = 0;

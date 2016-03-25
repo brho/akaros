@@ -130,7 +130,7 @@ struct Atable *mkatable(struct Atable *parent,
 	void *m;
 	struct Atable *t;
 
-	m = kzmalloc(ATABLEBUFSZ + addsize, KMALLOC_WAIT);
+	m = kzmalloc(ATABLEBUFSZ + addsize, MEM_WAIT);
 	if (m == NULL)
 		panic("no memory for more aml tables");
 	t = m;
@@ -160,7 +160,7 @@ struct Atable *finatable(struct Atable *t, struct slice *slice)
 	t->nchildren = n;
 	t->children = (struct Atable **)slice_finalize(slice);
 	dirs = kreallocarray(NULL, n + NQtypes, sizeof(struct dirtab),
-	                     KMALLOC_WAIT);
+	                     MEM_WAIT);
 	assert(dirs != NULL);
 	dirs[0] = (struct dirtab){ ".",      t->qid,   0, 0555 };
 	dirs[1] = (struct dirtab){ "pretty", t->pqid,  0, 0444 };
@@ -498,7 +498,7 @@ static void *sdtmap(uintptr_t pa, size_t *n, int cksum)
 		printk("acpi: SDT: bad checksum. pa = %p, len = %lu\n", pa, *n);
 		return NULL;
 	}
-	p = kzmalloc(sizeof(struct Acpilist) + *n, KMALLOC_WAIT);
+	p = kzmalloc(sizeof(struct Acpilist) + *n, MEM_WAIT);
 	if (p == NULL)
 		panic("sdtmap: memory allocation failed for %lu bytes", *n);
 	memmove(p->raw, (void *)sdt, *n);
@@ -1543,7 +1543,7 @@ static void parsersdptr(void)
 	printd("acpi: XSDT %#p\n", xsdt);
 	parsexsdt(root);
 	atableindex = kreallocarray(NULL, lastpath, sizeof(struct Atable *),
-	                            KMALLOC_WAIT);
+	                            MEM_WAIT);
 	assert(atableindex != NULL);
 	makeindex(root);
 }

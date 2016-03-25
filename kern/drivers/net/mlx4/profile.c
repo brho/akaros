@@ -86,7 +86,7 @@ uint64_t mlx4_make_profile(struct mlx4_dev *dev,
 #endif
 	int i, j;
 
-	profile = kzmalloc((MLX4_RES_NUM) * (sizeof(*profile)), KMALLOC_WAIT);
+	profile = kzmalloc((MLX4_RES_NUM) * (sizeof(*profile)), MEM_WAIT);
 	if (!profile)
 		return -ENOMEM;
 

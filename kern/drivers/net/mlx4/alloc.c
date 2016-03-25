@@ -181,7 +181,7 @@ int mlx4_bitmap_init(struct mlx4_bitmap *bitmap, uint32_t num, uint32_t mask,
 	bitmap->effective_len = bitmap->avail;
 	spinlock_init(&bitmap->lock);
 	bitmap->table = kzmalloc(BITS_TO_LONGS(bitmap->max) * sizeof(long),
-				 KMALLOC_WAIT);
+				 MEM_WAIT);
 	if (!bitmap->table)
 		return -ENOMEM;
 
@@ -220,7 +220,7 @@ struct mlx4_zone_entry {
 struct mlx4_zone_allocator *mlx4_zone_allocator_create(enum mlx4_zone_alloc_flags flags)
 {
 	struct mlx4_zone_allocator *zones = kmalloc(sizeof(*zones),
-						    KMALLOC_WAIT);
+						    MEM_WAIT);
 
 	if (NULL == zones)
 		return NULL;
@@ -244,7 +244,7 @@ int mlx4_zone_add_one(struct mlx4_zone_allocator *zone_alloc,
 {
 	uint32_t mask = mlx4_bitmap_masked_value(bitmap, (uint32_t)-1);
 	struct mlx4_zone_entry *it;
-	struct mlx4_zone_entry *zone = kmalloc(sizeof(*zone), KMALLOC_WAIT);
+	struct mlx4_zone_entry *zone = kmalloc(sizeof(*zone), MEM_WAIT);
 
 	if (NULL == zone)
 		return -ENOMEM;
@@ -812,13 +812,13 @@ int mlx4_alloc_hwq_res(struct mlx4_dev *dev, struct mlx4_hwq_resources *wqres,
 {
 	int err;
 
-	err = mlx4_db_alloc(dev, &wqres->db, 1, KMALLOC_WAIT);
+	err = mlx4_db_alloc(dev, &wqres->db, 1, MEM_WAIT);
 	if (err)
 		return err;
 
 	*wqres->db.db = 0;
 
-	err = mlx4_buf_alloc(dev, size, max_direct, &wqres->buf, KMALLOC_WAIT);
+	err = mlx4_buf_alloc(dev, size, max_direct, &wqres->buf, MEM_WAIT);
 	if (err)
 		goto err_db;
 
@@ -827,7 +827,7 @@ int mlx4_alloc_hwq_res(struct mlx4_dev *dev, struct mlx4_hwq_resources *wqres,
 	if (err)
 		goto err_buf;
 
-	err = mlx4_buf_write_mtt(dev, &wqres->mtt, &wqres->buf, KMALLOC_WAIT);
+	err = mlx4_buf_write_mtt(dev, &wqres->mtt, &wqres->buf, MEM_WAIT);
 	if (err)
 		goto err_mtt;
 

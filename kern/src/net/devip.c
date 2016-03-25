@@ -311,7 +311,7 @@ static struct Fs *ipgetfs(int dev)
 
 	qlock(&fslock);
 	if (ipfs[dev] == NULL) {
-		f = kzmalloc(sizeof(struct Fs), KMALLOC_WAIT);
+		f = kzmalloc(sizeof(struct Fs), MEM_WAIT);
 		rwinit(&f->rwlock);
 		qlock_init(&f->iprouter.qlock);
 		ip_init(f);

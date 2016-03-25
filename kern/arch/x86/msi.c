@@ -362,7 +362,7 @@ struct msix_irq_vector *pci_msix_enable(struct pci_device *p, uint64_t vec)
 		spin_unlock_irqsave(&p->lock);
 		return 0;
 	}
-	linkage = kmalloc(sizeof(struct msix_irq_vector), KMALLOC_WAIT);
+	linkage = kmalloc(sizeof(struct msix_irq_vector), MEM_WAIT);
 	linkage->pcidev = p;
 	linkage->entry = entry;
 	linkage->addr_lo = msi_make_addr_lo(vec);

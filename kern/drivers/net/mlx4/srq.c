@@ -100,11 +100,11 @@ int __mlx4_srq_alloc_icm(struct mlx4_dev *dev, int *srqn)
 	if (*srqn == -1)
 		return -ENOMEM;
 
-	err = mlx4_table_get(dev, &srq_table->table, *srqn, KMALLOC_WAIT);
+	err = mlx4_table_get(dev, &srq_table->table, *srqn, MEM_WAIT);
 	if (err)
 		goto err_out;
 
-	err = mlx4_table_get(dev, &srq_table->cmpt_table, *srqn, KMALLOC_WAIT);
+	err = mlx4_table_get(dev, &srq_table->cmpt_table, *srqn, MEM_WAIT);
 	if (err)
 		goto err_put;
 	return 0;

@@ -833,15 +833,15 @@ static int mlx4_slave_cap(struct mlx4_dev *dev)
 	}
 
 	dev->caps.qp0_qkey = kzmalloc((dev->caps.num_ports) * (sizeof(uint32_t)),
-				      KMALLOC_WAIT);
+				      MEM_WAIT);
 	dev->caps.qp0_tunnel = kzmalloc((dev->caps.num_ports) * (sizeof(uint32_t)),
-					KMALLOC_WAIT);
+					MEM_WAIT);
 	dev->caps.qp0_proxy = kzmalloc((dev->caps.num_ports) * (sizeof(uint32_t)),
-				       KMALLOC_WAIT);
+				       MEM_WAIT);
 	dev->caps.qp1_tunnel = kzmalloc((dev->caps.num_ports) * (sizeof(uint32_t)),
-					KMALLOC_WAIT);
+					MEM_WAIT);
 	dev->caps.qp1_proxy = kzmalloc((dev->caps.num_ports) * (sizeof(uint32_t)),
-				       KMALLOC_WAIT);
+				       MEM_WAIT);
 
 	if (!dev->caps.qp0_tunnel || !dev->caps.qp0_proxy ||
 	    !dev->caps.qp1_tunnel || !dev->caps.qp1_proxy ||
@@ -2509,7 +2509,7 @@ static void mlx4_enable_msi_x(struct mlx4_dev *dev)
 		nreq = MIN_T(int, dev->caps.num_eqs - dev->caps.reserved_eqs,
 		             nreq);
 
-		entries = kzmalloc((nreq) * (sizeof *entries), KMALLOC_WAIT);
+		entries = kzmalloc((nreq) * (sizeof *entries), MEM_WAIT);
 		if (!entries)
 			goto no_msi;
 
@@ -2638,7 +2638,7 @@ static int mlx4_init_steering(struct mlx4_dev *dev)
 	int i, j;
 
 	priv->steer = kzmalloc(sizeof(struct mlx4_steer) * num_entries,
-			       KMALLOC_WAIT);
+			       MEM_WAIT);
 	if (!priv->steer)
 		return -ENOMEM;
 
@@ -2748,7 +2748,7 @@ static uint64_t mlx4_enable_sriov(struct mlx4_dev *dev,
 
 	if (reset_flow) {
 		dev->dev_vfs = kzmalloc((total_vfs) * (sizeof(*dev->dev_vfs)),
-					KMALLOC_WAIT);
+					MEM_WAIT);
 		if (!dev->dev_vfs)
 			goto free_mem;
 		return dev_flags;
@@ -2764,7 +2764,7 @@ static uint64_t mlx4_enable_sriov(struct mlx4_dev *dev,
 	}
 
 	dev->dev_vfs = kzmalloc(total_vfs * sizeof(*dev->dev_vfs),
-				KMALLOC_WAIT);
+				MEM_WAIT);
 	if (NULL == dev->dev_vfs) {
 		mlx4_err(dev, "Failed to allocate memory for VFs\n");
 		goto disable_sriov;
@@ -2926,7 +2926,7 @@ slave_start:
 	if (mlx4_is_master(dev)) {
 		/* when we hit the goto slave_start below, dev_cap already initialized */
 		if (!dev_cap) {
-			dev_cap = kzmalloc(sizeof(*dev_cap), KMALLOC_WAIT);
+			dev_cap = kzmalloc(sizeof(*dev_cap), MEM_WAIT);
 
 			if (!dev_cap) {
 				err = -ENOMEM;
@@ -3410,12 +3410,12 @@ static int mlx4_init_one(struct pci_device *pdev,
 
 	printk_once(KERN_INFO "%s", mlx4_version);
 
-	priv = kzmalloc(sizeof(*priv), KMALLOC_WAIT);
+	priv = kzmalloc(sizeof(*priv), MEM_WAIT);
 	if (!priv)
 		return -ENOMEM;
 
 	dev       = &priv->dev;
-	dev->persist = kzmalloc(sizeof(*dev->persist), KMALLOC_WAIT);
+	dev->persist = kzmalloc(sizeof(*dev->persist), MEM_WAIT);
 	if (!dev->persist) {
 		kfree(priv);
 		return -ENOMEM;

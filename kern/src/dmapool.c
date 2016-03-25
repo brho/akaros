@@ -72,7 +72,7 @@ struct dma_pool *dma_pool_create(const char *name, void *dev,
 	else if ((boundary < size) || (boundary & (boundary - 1)))
 		return NULL;
 
-	retval = kmalloc(sizeof(*retval), KMALLOC_WAIT);
+	retval = kmalloc(sizeof(*retval), MEM_WAIT);
 	if (!retval)
 		return retval;
 

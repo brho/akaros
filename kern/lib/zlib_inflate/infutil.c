@@ -15,10 +15,10 @@ int zlib_inflate_blob(void *gunzip_buf, unsigned int sz,
 	int rc;
 
 	rc = -ENOMEM;
-	strm = kmalloc(sizeof(*strm), KMALLOC_WAIT);
+	strm = kmalloc(sizeof(*strm), MEM_WAIT);
 	if (strm == NULL)
 		goto gunzip_nomem1;
-	strm->workspace = kmalloc(zlib_inflate_workspacesize(), KMALLOC_WAIT);
+	strm->workspace = kmalloc(zlib_inflate_workspacesize(), MEM_WAIT);
 	if (strm->workspace == NULL)
 		goto gunzip_nomem2;
 

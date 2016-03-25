@@ -80,7 +80,7 @@ struct pgrp *newpgrp(void)
 {
 	struct pgrp *p;
 
-	p = kzmalloc(sizeof(struct pgrp), KMALLOC_WAIT);
+	p = kzmalloc(sizeof(struct pgrp), MEM_WAIT);
 	kref_init(&p->ref, freepgrp, 1);
 	p->pgrpid = NEXT_ID(pgrpid);
 	p->progmode = 0644;

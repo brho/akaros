@@ -2005,7 +2005,7 @@ int do_pipe(struct file **pipe_files, int flags)
 	/* Actually build the pipe.  We're using one page, hanging off the
 	 * pipe_inode_info struct.  When we release the inode, we free the pipe
 	 * memory too */
-	pipe_i->i_pipe = kmalloc(sizeof(struct pipe_inode_info), KMALLOC_WAIT);
+	pipe_i->i_pipe = kmalloc(sizeof(struct pipe_inode_info), MEM_WAIT);
 	pii = pipe_i->i_pipe;
 	if (!pii) {
 		set_errno(ENOMEM);
@@ -2337,7 +2337,7 @@ void *kread_whole_file(struct file *file)
 	ssize_t cpy_amt;
 
 	size = file->f_dentry->d_inode->i_size;
-	contents = kmalloc(size, KMALLOC_WAIT);
+	contents = kmalloc(size, MEM_WAIT);
 	cpy_amt = kread_file(file, contents, size);
 	if (cpy_amt < 0) {
 		printk("Error %d reading file %s\n", get_errno(), file_name(file));
@@ -2599,7 +2599,7 @@ void close_fdt(struct fd_table *fdt, bool cloexec)
 	int idx = 0;
 
 	to_close = kzmalloc(sizeof(struct file_desc) * fdt->max_files,
-	                    KMALLOC_WAIT);
+	                    MEM_WAIT);
 	spin_lock(&fdt->lock);
 	if (fdt->closed) {
 		spin_unlock(&fdt->lock);

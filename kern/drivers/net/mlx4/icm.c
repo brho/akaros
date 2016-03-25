@@ -362,7 +362,7 @@ int mlx4_table_get_range(struct mlx4_dev *dev, struct mlx4_icm_table *table,
 	uint32_t i;
 
 	for (i = start; i <= end; i += inc) {
-		err = mlx4_table_get(dev, table, i, KMALLOC_WAIT);
+		err = mlx4_table_get(dev, table, i, MEM_WAIT);
 		if (err)
 			goto fail;
 	}
@@ -402,7 +402,7 @@ int mlx4_init_icm_table(struct mlx4_dev *dev, struct mlx4_icm_table *table,
 	num_icm = (nobj + obj_per_chunk - 1) / obj_per_chunk;
 
 	table->icm      = kzmalloc((num_icm) * (sizeof *table->icm),
-				   KMALLOC_WAIT);
+				   MEM_WAIT);
 	if (!table->icm)
 		return -ENOMEM;
 	table->virt     = virt;
@@ -421,7 +421,7 @@ int mlx4_init_icm_table(struct mlx4_dev *dev, struct mlx4_icm_table *table,
 					i * MLX4_TABLE_CHUNK_SIZE);
 
 		table->icm[i] = mlx4_alloc_icm(dev, chunk_size >> PAGE_SHIFT,
-					       (use_lowmem ? KMALLOC_WAIT : GFP_HIGHUSER) |
+					       (use_lowmem ? MEM_WAIT : GFP_HIGHUSER) |
 					       __GFP_NOWARN, use_coherent);
 		if (!table->icm[i])
 			goto err;

@@ -1340,8 +1340,8 @@ static int add_ip_rule(struct mlx4_en_priv *priv,
 	struct mlx4_spec_list *spec_l3 = NULL;
 	struct ethtool_usrip4_spec *l3_mask = &cmd->fs.m_u.usr_ip4_spec;
 
-	spec_l3 = kzmalloc(sizeof(*spec_l3), KMALLOC_WAIT);
-	spec_l2 = kzmalloc(sizeof(*spec_l2), KMALLOC_WAIT);
+	spec_l3 = kzmalloc(sizeof(*spec_l3), MEM_WAIT);
+	spec_l2 = kzmalloc(sizeof(*spec_l2), MEM_WAIT);
 	if (!spec_l2 || !spec_l3) {
 		err = -ENOMEM;
 		goto free_spec;
@@ -1379,9 +1379,9 @@ static int add_tcp_udp_rule(struct mlx4_en_priv *priv,
 	struct mlx4_spec_list *spec_l4 = NULL;
 	struct ethtool_tcpip4_spec *l4_mask = &cmd->fs.m_u.tcp_ip4_spec;
 
-	spec_l2 = kzmalloc(sizeof(*spec_l2), KMALLOC_WAIT);
-	spec_l3 = kzmalloc(sizeof(*spec_l3), KMALLOC_WAIT);
-	spec_l4 = kzmalloc(sizeof(*spec_l4), KMALLOC_WAIT);
+	spec_l2 = kzmalloc(sizeof(*spec_l2), MEM_WAIT);
+	spec_l3 = kzmalloc(sizeof(*spec_l3), MEM_WAIT);
+	spec_l4 = kzmalloc(sizeof(*spec_l4), MEM_WAIT);
 	if (!spec_l2 || !spec_l3 || !spec_l4) {
 		err = -ENOMEM;
 		goto free_spec;
@@ -1452,7 +1452,7 @@ static int mlx4_en_ethtool_to_net_trans_rule(struct ether *dev,
 
 	switch (cmd->fs.flow_type & ~(FLOW_EXT | FLOW_MAC_EXT)) {
 	case ETHER_FLOW:
-		spec_l2 = kzmalloc(sizeof(*spec_l2), KMALLOC_WAIT);
+		spec_l2 = kzmalloc(sizeof(*spec_l2), MEM_WAIT);
 		if (!spec_l2)
 			return -ENOMEM;
 

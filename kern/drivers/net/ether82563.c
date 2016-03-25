@@ -1631,7 +1631,7 @@ static void i82563attach(struct ether *edev)
 
 	ctlr->alloc = kzmalloc(Nrd * sizeof(struct rd) +
 	                           Ntd * sizeof(struct td) + 255,
-	                       KMALLOC_WAIT);
+	                       MEM_WAIT);
 	if (ctlr->alloc == NULL) {
 		qunlock(&ctlr->alock);
 		error(ENOMEM, "i82563attach: error allocating rx/tx rings");
@@ -1648,15 +1648,15 @@ static void i82563attach(struct ether *edev)
 	ctlr->edev = edev;	/* point back to Ether* */
 	ctlr->attached = 1;
 
-	lname = kzmalloc(KNAMELEN, KMALLOC_WAIT);
+	lname = kzmalloc(KNAMELEN, MEM_WAIT);
 	snprintf(lname, KNAMELEN, "#l%dl", edev->ctlrno);
 	ktask(lname, i82563lproc, edev);
 
-	rname = kzmalloc(KNAMELEN, KMALLOC_WAIT);
+	rname = kzmalloc(KNAMELEN, MEM_WAIT);
 	snprintf(rname, KNAMELEN, "#l%dr", edev->ctlrno);
 	ktask(rname, i82563rproc, edev);
 
-	tname = kzmalloc(KNAMELEN, KMALLOC_WAIT);
+	tname = kzmalloc(KNAMELEN, MEM_WAIT);
 	snprintf(tname, KNAMELEN, "#l%dt", edev->ctlrno);
 	ktask(tname, i82563tproc, edev);
 

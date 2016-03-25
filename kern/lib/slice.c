@@ -54,7 +54,8 @@ void slice_append(struct slice *s, void *p)
 		if (s->capacity == 0)
 			s->capacity = 4;
 		s->capacity *= 2;
-		ps = kreallocarray(s->ptrs, s->capacity, sizeof(void *), KMALLOC_WAIT);
+		ps = kreallocarray(s->ptrs, s->capacity, sizeof(void *),
+				   MEM_WAIT);
 		assert(ps != NULL);		/* XXX: if size*sizeof(void*) overflows. */
 		s->ptrs = ps;
 	}
@@ -71,7 +72,7 @@ void **slice_finalize(struct slice *slice)
 {
 	void **ps;
 
-	ps = kreallocarray(slice->ptrs, slice->len, sizeof(void *), KMALLOC_WAIT);
+	ps = kreallocarray(slice->ptrs, slice->len, sizeof(void *), MEM_WAIT);
 	assert(ps != NULL);
 	slice->len = 0;
 	slice->capacity = 0;

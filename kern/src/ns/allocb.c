@@ -99,7 +99,7 @@ static struct block *_allocb(int size, int mem_flags)
 
 struct block *allocb(int size)
 {
-	return _allocb(size, KMALLOC_WAIT);
+	return _allocb(size, MEM_WAIT);
 }
 
 /* Makes sure b has nr_bufs extra_data.  Will grow, but not shrink, an existing

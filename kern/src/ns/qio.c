@@ -589,7 +589,7 @@ struct block *adjustblock(struct block *bp, int len)
 			return bp;
 		}
 		/* Grow with extra data buffers. */
-		block_append_extra(bp, len - BLEN(bp), KMALLOC_WAIT);
+		block_append_extra(bp, len - BLEN(bp), MEM_WAIT);
 		QDEBUG checkb(bp, "adjustblock 3");
 		return bp;
 	}
@@ -1142,7 +1142,7 @@ struct block *blist_clone(struct block *blist, int header_len, int len,
 	do {
 		ret = __blist_clone_to(blist, newb, len, offset);
 		if (ret)
-			block_add_extd(newb, ret, KMALLOC_WAIT);
+			block_add_extd(newb, ret, MEM_WAIT);
 	} while (ret);
 	return newb;
 }
@@ -1162,7 +1162,7 @@ struct block *qclone(struct queue *q, int header_len, int len, uint32_t offset)
 		ret = __blist_clone_to(q->bfirst, newb, len, offset);
 		spin_unlock_irqsave(&q->lock);
 		if (ret)
-			block_add_extd(newb, ret, KMALLOC_WAIT);
+			block_add_extd(newb, ret, MEM_WAIT);
 	} while (ret);
 	return newb;
 }
@@ -1822,7 +1822,7 @@ int qwrite(struct queue *q, void *vp, int len)
 		b = allocb(64);
 		ext_buf = kmalloc(n, 0);
 		memcpy(ext_buf, p + sofar, n);
-		block_add_extd(b, 1, KMALLOC_WAIT); /* returns 0 on success */
+		block_add_extd(b, 1, MEM_WAIT); /* returns 0 on success */
 		b->extra_data[0].base = (uintptr_t)ext_buf;
 		b->extra_data[0].off = 0;
 		b->extra_data[0].len = n;

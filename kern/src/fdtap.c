@@ -44,7 +44,7 @@ int add_fd_tap(struct proc *p, struct fd_tap_req *tap_req)
 		set_errno(EBADF);
 		return -1;
 	}
-	tap = kzmalloc(sizeof(struct fd_tap), KMALLOC_WAIT);
+	tap = kzmalloc(sizeof(struct fd_tap), MEM_WAIT);
 	tap->proc = p;
 	tap->fd = fd;
 	tap->filter = tap_req->filter;

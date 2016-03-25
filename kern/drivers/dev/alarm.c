@@ -251,7 +251,7 @@ static struct chan *alarmopen(struct chan *c, int omode)
 				error(EISDIR, ERROR_FIXME);
 			break;
 		case Qclone:
-			a = kzmalloc(sizeof(struct proc_alarm), KMALLOC_WAIT);
+			a = kzmalloc(sizeof(struct proc_alarm), MEM_WAIT);
 			kref_init(&a->kref, alarm_release, 1);
 			init_awaiter(&a->a_waiter, proc_alarm_handler);
 			spin_lock(&p->alarmset.lock);

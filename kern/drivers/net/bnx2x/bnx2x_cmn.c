@@ -643,7 +643,7 @@ static void *bnx2x_frag_alloc(const struct bnx2x_fastpath *fp, gfp_t gfp_mask)
 {
 	if (fp->rx_frag_size) {
 		/* GFP_KERNEL allocations are used only during initialization */
-		if (unlikely(gfp_mask & KMALLOC_WAIT))
+		if (unlikely(gfp_mask & MEM_WAIT))
 			return (void *)kpage_alloc_addr();
 
 #if 0 // AKAROS_PORT
@@ -1400,7 +1400,7 @@ void bnx2x_init_rx_rings(struct bnx2x *bp)
 					&tpa_info->first_buf;
 
 				first_buf->data =
-					bnx2x_frag_alloc(fp, KMALLOC_WAIT);
+					bnx2x_frag_alloc(fp, MEM_WAIT);
 				if (!first_buf->data) {
 					BNX2X_ERR("Failed to allocate TPA skb pool for queue[%d] - disabling TPA on this queue!\n",
 						  j);
@@ -1423,7 +1423,7 @@ void bnx2x_init_rx_rings(struct bnx2x *bp)
 			     i < MAX_RX_SGE_CNT*NUM_RX_SGE_PAGES; i++) {
 
 				if (bnx2x_alloc_rx_sge(bp, fp, ring_prod,
-						       KMALLOC_WAIT) < 0) {
+						       MEM_WAIT) < 0) {
 					BNX2X_ERR("was only able to allocate %d rx sges\n",
 						  i);
 					BNX2X_ERR("disabling TPA for queue[%d]\n",
@@ -4448,7 +4448,7 @@ static int bnx2x_alloc_rx_bds(struct bnx2x_fastpath *fp,
 	 * fp->eth_q_stats.rx_skb_alloc_failed = 0
 	 */
 	for (i = 0; i < rx_ring_size; i++) {
-		if (bnx2x_alloc_rx_data(bp, fp, ring_prod, KMALLOC_WAIT) < 0) {
+		if (bnx2x_alloc_rx_data(bp, fp, ring_prod, MEM_WAIT) < 0) {
 			failure_cnt++;
 			continue;
 		}
@@ -4561,7 +4561,7 @@ static int bnx2x_alloc_fp_mem_at(struct bnx2x *bp, int index)
 			   index, cos);
 
 			txdata->tx_buf_ring = kzmalloc((NUM_TX_BD) * (sizeof(struct sw_tx_bd)),
-						       KMALLOC_WAIT);
+						       MEM_WAIT);
 			if (!txdata->tx_buf_ring)
 				goto alloc_mem_err;
 			txdata->tx_desc_ring = BNX2X_PCI_ALLOC(&txdata->tx_desc_mapping,
@@ -4576,7 +4576,7 @@ static int bnx2x_alloc_fp_mem_at(struct bnx2x *bp, int index)
 		/* fastpath rx rings: rx_buf rx_desc rx_comp */
 		bnx2x_fp(bp, index, rx_buf_ring) =
 			kzmalloc((NUM_RX_BD) * (sizeof(struct sw_rx_bd)),
-				 KMALLOC_WAIT);
+				 MEM_WAIT);
 		if (!bnx2x_fp(bp, index, rx_buf_ring))
 			goto alloc_mem_err;
 		bnx2x_fp(bp, index, rx_desc_ring) =
@@ -4595,7 +4595,7 @@ static int bnx2x_alloc_fp_mem_at(struct bnx2x *bp, int index)
 		/* SGE ring */
 		bnx2x_fp(bp, index, rx_page_ring) =
 			kzmalloc((NUM_RX_SGE) * (sizeof(struct sw_rx_page)),
-				 KMALLOC_WAIT);
+				 MEM_WAIT);
 		if (!bnx2x_fp(bp, index, rx_page_ring))
 			goto alloc_mem_err;
 		bnx2x_fp(bp, index, rx_sge_ring) =
@@ -4725,13 +4725,13 @@ int bnx2x_alloc_mem_bp(struct bnx2x *bp)
 	bp->fp_array_size = fp_array_size;
 	BNX2X_DEV_INFO("fp_array_size %d\n", bp->fp_array_size);
 
-	fp = kzmalloc((bp->fp_array_size) * (sizeof(*fp)), KMALLOC_WAIT);
+	fp = kzmalloc((bp->fp_array_size) * (sizeof(*fp)), MEM_WAIT);
 	if (!fp)
 		goto alloc_err;
 	for (i = 0; i < bp->fp_array_size; i++) {
 		fp[i].tpa_info =
 			kzmalloc((ETH_MAX_AGGREGATION_QUEUES_E1H_E2) * (sizeof(struct bnx2x_agg_info)),
-				 KMALLOC_WAIT);
+				 MEM_WAIT);
 		if (!(fp[i].tpa_info))
 			goto alloc_err;
 	}
@@ -4740,13 +4740,13 @@ int bnx2x_alloc_mem_bp(struct bnx2x *bp)
 
 	/* allocate sp objs */
 	bp->sp_objs = kzmalloc((bp->fp_array_size) * (sizeof(struct bnx2x_sp_objs)),
-			       KMALLOC_WAIT);
+			       MEM_WAIT);
 	if (!bp->sp_objs)
 		goto alloc_err;
 
 	/* allocate fp_stats */
 	bp->fp_stats = kzmalloc((bp->fp_array_size) * (sizeof(struct bnx2x_fp_stats)),
-				KMALLOC_WAIT);
+				MEM_WAIT);
 	if (!bp->fp_stats)
 		goto alloc_err;
 
@@ -4756,19 +4756,19 @@ int bnx2x_alloc_mem_bp(struct bnx2x *bp)
 	BNX2X_DEV_INFO("txq_array_size %d", txq_array_size);
 
 	bp->bnx2x_txq = kzmalloc((txq_array_size) * (sizeof(struct bnx2x_fp_txdata)),
-				 KMALLOC_WAIT);
+				 MEM_WAIT);
 	if (!bp->bnx2x_txq)
 		goto alloc_err;
 
 	// AKAROS_PORT: we probably won't use this table */
 	/* msix table */
-	tbl = kzmalloc((msix_table_size) * (sizeof(*tbl)), KMALLOC_WAIT);
+	tbl = kzmalloc((msix_table_size) * (sizeof(*tbl)), MEM_WAIT);
 	if (!tbl)
 		goto alloc_err;
 	bp->msix_table = tbl;
 
 	/* ilt */
-	ilt = kzmalloc(sizeof(*ilt), KMALLOC_WAIT);
+	ilt = kzmalloc(sizeof(*ilt), MEM_WAIT);
 	if (!ilt)
 		goto alloc_err;
 	bp->ilt = ilt;

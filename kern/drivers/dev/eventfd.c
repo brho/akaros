@@ -70,7 +70,7 @@ static struct chan *efd_attach(char *spec)
 	struct eventfd *efd;
 
 	c = devattach(devname(), spec);
-	efd = kzmalloc(sizeof(struct eventfd), KMALLOC_WAIT);
+	efd = kzmalloc(sizeof(struct eventfd), MEM_WAIT);
 	SLIST_INIT(&efd->fd_taps);
 	spinlock_init(&efd->tap_lock);
 	rendez_init(&efd->rv_readers);

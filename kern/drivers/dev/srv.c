@@ -126,7 +126,7 @@ static int srvgen(struct chan *c, char *name, struct dirtab *tab,
 
 static void __srvinit(void)
 {
-	top_dir = kzmalloc(sizeof(struct srvfile), KMALLOC_WAIT);
+	top_dir = kzmalloc(sizeof(struct srvfile), MEM_WAIT);
 	/* kstrdup, just in case we free this later */
 	kstrdup(&top_dir->name, "srv");
 	kstrdup(&top_dir->user, current ? current->user : "eve");
@@ -233,7 +233,7 @@ static struct chan *srvopen(struct chan *c, int omode)
 static void srvcreate(struct chan *c, char *name, int omode, uint32_t perm)
 {
 	struct srvfile *srv;
-	srv = kzmalloc(sizeof(struct srvfile), KMALLOC_WAIT);
+	srv = kzmalloc(sizeof(struct srvfile), MEM_WAIT);
 	kstrdup(&srv->name, name);
 	kstrdup(&srv->user, current ? current->user : "eve");
 	srv->perm = 0770;	/* TODO need some security thoughts */
@@ -311,7 +311,7 @@ static long srvwrite(struct chan *c, void *va, long count, int64_t offset)
 		kfree(kbuf);
 		nexterror();
 	}
-	kbuf = kmalloc(count + 1, KMALLOC_WAIT);
+	kbuf = kmalloc(count + 1, MEM_WAIT);
 	strlcpy(kbuf, va, count + 1);
 	fd = strtoul(kbuf, 0, 10);
 	/* the magic of srv: srv stores the chan corresponding to the fd.  -1 for

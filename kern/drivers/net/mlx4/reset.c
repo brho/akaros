@@ -64,7 +64,7 @@ int mlx4_reset(struct mlx4_dev *dev)
 	 */
 
 	/* Do we need to save off the full 4K PCI Express header?? */
-	hca_header = kmalloc(256, KMALLOC_WAIT);
+	hca_header = kmalloc(256, MEM_WAIT);
 	if (!hca_header) {
 		err = -ENOMEM;
 		mlx4_err(dev, "Couldn't allocate memory to save HCA PCI header, aborting\n");

@@ -245,7 +245,7 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 
 static void alloc_sysc_str(struct kthread *kth)
 {
-	kth->name = kmalloc(SYSCALL_STRLEN, KMALLOC_WAIT);
+	kth->name = kmalloc(SYSCALL_STRLEN, MEM_WAIT);
 	kth->name[0] = 0;
 }
 
@@ -1891,7 +1891,7 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 	path_d = lookup_dentry(t_path, 0);
 	if (!path_d){
 		int n = 2048;
-		buf = kmalloc(n*2, KMALLOC_WAIT);
+		buf = kmalloc(n*2, MEM_WAIT);
 		struct dir *d = (void *)&buf[n];
  		/* try 9ns. */
 		if (sysstat(t_path, buf, n) > 0) {
@@ -2244,7 +2244,7 @@ static int vfs_wstat(struct file *file, uint8_t *stat_m, size_t stat_sz,
 	int m_sz;
 	int retval = 0;
 
-	dir = kzmalloc(sizeof(struct dir) + stat_sz, KMALLOC_WAIT);
+	dir = kzmalloc(sizeof(struct dir) + stat_sz, MEM_WAIT);
 	m_sz = convM2D(stat_m, stat_sz, &dir[0], (char*)&dir[1]);
 	if (m_sz != stat_sz) {
 		set_error(EINVAL, ERROR_FIXME);

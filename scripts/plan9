@@ -1,6 +1,6 @@
 #!/bin/sh
 sed -i 's/nil/NULL/g' $1
-sed -i 's/KERN_WAIT/KMALLOC_WAIT/g' $1
+sed -i 's/KERN_WAIT/MEM_WAIT/g' $1
 sed -i 's/nelem/ARRAY_SIZE/g' $1
 
 # stuff I'm not smart enough to do with spatch

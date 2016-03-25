@@ -266,7 +266,7 @@ static struct perfmon_alloc *perfmon_create_alloc(const struct perfmon_event *pe
 	int i;
 	struct perfmon_alloc *pa = kzmalloc(sizeof(struct perfmon_alloc) +
 	                                        num_cores * sizeof(counter_t),
-	                                    KMALLOC_WAIT);
+	                                    MEM_WAIT);
 
 	kref_init(&pa->ref, perfmon_release_alloc, 1);
 	pa->ev = *pev;
@@ -280,7 +280,7 @@ static struct perfmon_status *perfmon_alloc_status(void)
 {
 	struct perfmon_status *pef = kzmalloc(sizeof(struct perfmon_status) +
 	                                          num_cores * sizeof(uint64_t),
-	                                      KMALLOC_WAIT);
+	                                      MEM_WAIT);
 
 	return pef;
 }
@@ -506,7 +506,7 @@ static void perfmon_release_session(struct kref *kref)
 struct perfmon_session *perfmon_create_session(void)
 {
 	struct perfmon_session *ps = kzmalloc(sizeof(struct perfmon_session),
-	                                      KMALLOC_WAIT);
+	                                      MEM_WAIT);
 
 	kref_init(&ps->ref, perfmon_release_session, 1);
 	spinlock_init(&ps->lock);

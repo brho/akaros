@@ -687,7 +687,7 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 		/* expecting only one dirent at a time, o/w we're busted */
 		assert(n >= sizeof(struct kdirent));
 		if (!c->buf) {
-			c->buf=kmalloc(DIRREADSIZE, KMALLOC_WAIT);
+			c->buf = kmalloc(DIRREADSIZE, MEM_WAIT);
 			c->bufused = 0;
 		}
 		/* Attempt to extract an M, in case there was some already */
@@ -955,7 +955,7 @@ int sysfstatakaros(int fd, struct kstat *ks)
 	
 	int n = 4096;
 	uint8_t *buf;
-	buf = kmalloc(n, KMALLOC_WAIT);
+	buf = kmalloc(n, MEM_WAIT);
 	n = sysfstat(fd, buf, n);
 	if (n > 0) {
 		convM2kstat(buf, n, ks);
@@ -994,7 +994,7 @@ int sysstatakaros(char *path, struct kstat *ks)
 	
 	int n = 4096;
 	uint8_t *buf;
-	buf = kmalloc(n, KMALLOC_WAIT);
+	buf = kmalloc(n, MEM_WAIT);
 	n = sysstat(path, buf, n);
 	if (n > 0) {
 		convM2kstat(buf, n, ks);

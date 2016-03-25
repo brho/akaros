@@ -44,9 +44,9 @@ int mlx4_en_create_tx_ring(struct mlx4_en_priv *priv,
 	int tmp;
 	int err;
 
-	ring = kzalloc_node(sizeof(*ring), KMALLOC_WAIT, node);
+	ring = kzalloc_node(sizeof(*ring), MEM_WAIT, node);
 	if (!ring) {
-		ring = kzmalloc(sizeof(*ring), KMALLOC_WAIT);
+		ring = kzmalloc(sizeof(*ring), MEM_WAIT);
 		if (!ring) {
 			en_err(priv, "Failed allocating TX ring\n");
 			return -ENOMEM;
@@ -58,7 +58,7 @@ int mlx4_en_create_tx_ring(struct mlx4_en_priv *priv,
 	ring->stride = stride;
 
 	tmp = size * sizeof(struct mlx4_en_tx_info);
-	ring->tx_info = kmalloc_node(tmp, KMALLOC_WAIT | __GFP_NOWARN, node);
+	ring->tx_info = kmalloc_node(tmp, MEM_WAIT | __GFP_NOWARN, node);
 	if (!ring->tx_info) {
 		ring->tx_info = vmalloc(tmp);
 		if (!ring->tx_info) {
@@ -70,9 +70,9 @@ int mlx4_en_create_tx_ring(struct mlx4_en_priv *priv,
 	en_dbg(DRV, priv, "Allocated tx_info ring at addr:%p size:%d\n",
 		 ring->tx_info, tmp);
 
-	ring->bounce_buf = kmalloc_node(MAX_DESC_SIZE, KMALLOC_WAIT, node);
+	ring->bounce_buf = kmalloc_node(MAX_DESC_SIZE, MEM_WAIT, node);
 	if (!ring->bounce_buf) {
-		ring->bounce_buf = kmalloc(MAX_DESC_SIZE, KMALLOC_WAIT);
+		ring->bounce_buf = kmalloc(MAX_DESC_SIZE, MEM_WAIT);
 		if (!ring->bounce_buf) {
 			err = -ENOMEM;
 			goto err_info;
@@ -109,7 +109,7 @@ int mlx4_en_create_tx_ring(struct mlx4_en_priv *priv,
 		goto err_map;
 	}
 
-	err = mlx4_qp_alloc(mdev->dev, ring->qpn, &ring->qp, KMALLOC_WAIT);
+	err = mlx4_qp_alloc(mdev->dev, ring->qpn, &ring->qp, MEM_WAIT);
 	if (err) {
 		en_err(priv, "Failed allocating qp %d\n", ring->qpn);
 		goto err_reserve;

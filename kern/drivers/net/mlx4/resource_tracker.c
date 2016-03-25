@@ -463,7 +463,7 @@ int mlx4_init_resource_tracker(struct mlx4_dev *dev)
 
 	priv->mfunc.master.res_tracker.slave_list =
 		kzmalloc(dev->num_slaves * sizeof(struct slave_list),
-			 KMALLOC_WAIT);
+			 MEM_WAIT);
 	if (!priv->mfunc.master.res_tracker.slave_list)
 		return -ENOMEM;
 
@@ -483,15 +483,15 @@ int mlx4_init_resource_tracker(struct mlx4_dev *dev)
 		struct resource_allocator *res_alloc =
 			&priv->mfunc.master.res_tracker.res_alloc[i];
 		res_alloc->quota = kmalloc((dev->persist->num_vfs + 1) *
-					   sizeof(int), KMALLOC_WAIT);
+					   sizeof(int), MEM_WAIT);
 		res_alloc->guaranteed = kmalloc((dev->persist->num_vfs + 1) *
-						sizeof(int), KMALLOC_WAIT);
+						sizeof(int), MEM_WAIT);
 		if (i == RES_MAC || i == RES_VLAN)
 			res_alloc->allocated = kzmalloc(MLX4_MAX_PORTS * (dev->persist->num_vfs + 1) * sizeof(int),
-							KMALLOC_WAIT);
+							MEM_WAIT);
 		else
 			res_alloc->allocated = kzmalloc((dev->persist->num_vfs + 1) * sizeof(int),
-							KMALLOC_WAIT);
+							MEM_WAIT);
 
 		if (!res_alloc->quota || !res_alloc->guaranteed ||
 		    !res_alloc->allocated)
@@ -859,7 +859,7 @@ static struct res_common *alloc_qp_tr(int id)
 {
 	struct res_qp *ret;
 
-	ret = kzmalloc(sizeof *ret, KMALLOC_WAIT);
+	ret = kzmalloc(sizeof *ret, MEM_WAIT);
 	if (!ret)
 		return NULL;
 
@@ -877,7 +877,7 @@ static struct res_common *alloc_mtt_tr(int id, int order)
 {
 	struct res_mtt *ret;
 
-	ret = kzmalloc(sizeof *ret, KMALLOC_WAIT);
+	ret = kzmalloc(sizeof *ret, MEM_WAIT);
 	if (!ret)
 		return NULL;
 
@@ -893,7 +893,7 @@ static struct res_common *alloc_mpt_tr(int id, int key)
 {
 	struct res_mpt *ret;
 
-	ret = kzmalloc(sizeof *ret, KMALLOC_WAIT);
+	ret = kzmalloc(sizeof *ret, MEM_WAIT);
 	if (!ret)
 		return NULL;
 
@@ -908,7 +908,7 @@ static struct res_common *alloc_eq_tr(int id)
 {
 	struct res_eq *ret;
 
-	ret = kzmalloc(sizeof *ret, KMALLOC_WAIT);
+	ret = kzmalloc(sizeof *ret, MEM_WAIT);
 	if (!ret)
 		return NULL;
 
@@ -922,7 +922,7 @@ static struct res_common *alloc_cq_tr(int id)
 {
 	struct res_cq *ret;
 
-	ret = kzmalloc(sizeof *ret, KMALLOC_WAIT);
+	ret = kzmalloc(sizeof *ret, MEM_WAIT);
 	if (!ret)
 		return NULL;
 
@@ -937,7 +937,7 @@ static struct res_common *alloc_srq_tr(int id)
 {
 	struct res_srq *ret;
 
-	ret = kzmalloc(sizeof *ret, KMALLOC_WAIT);
+	ret = kzmalloc(sizeof *ret, MEM_WAIT);
 	if (!ret)
 		return NULL;
 
@@ -952,7 +952,7 @@ static struct res_common *alloc_counter_tr(int id)
 {
 	struct res_counter *ret;
 
-	ret = kzmalloc(sizeof *ret, KMALLOC_WAIT);
+	ret = kzmalloc(sizeof *ret, MEM_WAIT);
 	if (!ret)
 		return NULL;
 
@@ -966,7 +966,7 @@ static struct res_common *alloc_xrcdn_tr(int id)
 {
 	struct res_xrcdn *ret;
 
-	ret = kzmalloc(sizeof *ret, KMALLOC_WAIT);
+	ret = kzmalloc(sizeof *ret, MEM_WAIT);
 	if (!ret)
 		return NULL;
 
@@ -980,7 +980,7 @@ static struct res_common *alloc_fs_rule_tr(uint64_t id, int qpn)
 {
 	struct res_fs_rule *ret;
 
-	ret = kzmalloc(sizeof *ret, KMALLOC_WAIT);
+	ret = kzmalloc(sizeof *ret, MEM_WAIT);
 	if (!ret)
 		return NULL;
 
@@ -1049,7 +1049,7 @@ static int add_res_range(struct mlx4_dev *dev, int slave, uint64_t base,
 	struct mlx4_resource_tracker *tracker = &priv->mfunc.master.res_tracker;
 	struct rb_root *root = &tracker->res_tree[type];
 
-	res_arr = kzmalloc(count * sizeof *res_arr, KMALLOC_WAIT);
+	res_arr = kzmalloc(count * sizeof *res_arr, MEM_WAIT);
 	if (!res_arr)
 		return -ENOMEM;
 
@@ -1599,7 +1599,7 @@ static int qp_alloc_res(struct mlx4_dev *dev, int slave, int op, int cmd,
 			return err;
 
 		if (!fw_reserved(dev, qpn)) {
-			err = __mlx4_qp_alloc_icm(dev, qpn, KMALLOC_WAIT);
+			err = __mlx4_qp_alloc_icm(dev, qpn, MEM_WAIT);
 			if (err) {
 				res_abort_move(dev, slave, RES_QP, qpn);
 				return err;
@@ -1686,7 +1686,7 @@ static int mpt_alloc_res(struct mlx4_dev *dev, int slave, int op, int cmd,
 		if (err)
 			return err;
 
-		err = __mlx4_mpt_alloc_icm(dev, mpt->key, KMALLOC_WAIT);
+		err = __mlx4_mpt_alloc_icm(dev, mpt->key, MEM_WAIT);
 		if (err) {
 			res_abort_move(dev, slave, RES_MPT, id);
 			return err;
@@ -1806,7 +1806,7 @@ static int mac_add_to_slave(struct mlx4_dev *dev, int slave, uint64_t mac,
 
 	if (mlx4_grant_resource(dev, slave, RES_MAC, 1, port))
 		return -EINVAL;
-	res = kzmalloc(sizeof *res, KMALLOC_WAIT);
+	res = kzmalloc(sizeof *res, MEM_WAIT);
 	if (!res) {
 		mlx4_release_resource(dev, slave, RES_MAC, 1, port);
 		return -ENOMEM;
@@ -1913,7 +1913,7 @@ static int vlan_add_to_slave(struct mlx4_dev *dev, int slave, uint16_t vlan,
 
 	if (mlx4_grant_resource(dev, slave, RES_VLAN, 1, port))
 		return -EINVAL;
-	res = kzmalloc(sizeof(*res), KMALLOC_WAIT);
+	res = kzmalloc(sizeof(*res), MEM_WAIT);
 	if (!res) {
 		mlx4_release_resource(dev, slave, RES_VLAN, 1, port);
 		return -ENOMEM;
@@ -3787,7 +3787,7 @@ static int add_mcg_res(struct mlx4_dev *dev, int slave, struct res_qp *rqp,
 	struct res_gid *res;
 	int err;
 
-	res = kzmalloc(sizeof *res, KMALLOC_WAIT);
+	res = kzmalloc(sizeof *res, MEM_WAIT);
 	if (!res)
 		return -ENOMEM;
 

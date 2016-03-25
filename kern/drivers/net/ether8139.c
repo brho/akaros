@@ -425,7 +425,7 @@ static void rtl8139attach(struct ether *edev)
 	if (ctlr->alloc == NULL) {
 		ctlr->rblen = 1 << ((Rblen >> RblenSHIFT) + 13);
 		ctlr->alloc = kzmalloc(ctlr->rblen + 16 + Ntd * Tdbsz + ARCH_CL_SIZE,
-							   KMALLOC_WAIT);
+							   MEM_WAIT);
 		rtl8139init(edev);
 	}
 	qunlock(&ctlr->alock);
@@ -715,7 +715,7 @@ static int rtl8139pnp(struct ether *edev)
 			if (pcidev->class != 0x02 || pcidev->subclass != 0)
 				continue;
 
-			ctlr = kzmalloc(sizeof(struct ctlr), KMALLOC_WAIT);
+			ctlr = kzmalloc(sizeof(struct ctlr), MEM_WAIT);
 			qlock_init(&ctlr->alock);
 			spinlock_init_irqsave(&ctlr->ilock);
 			spinlock_init_irqsave(&ctlr->tlock);

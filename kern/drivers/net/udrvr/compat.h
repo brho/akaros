@@ -85,9 +85,9 @@ extern void set_page_dirty_lock(struct page *pagep);
 #define	read_lock(p)
 #define	read_unlock(p)
 
-#define	GFP_KERNEL			KMALLOC_WAIT
+#define	GFP_KERNEL			MEM_WAIT
 #define	GFP_ATOMIC			0
-#define	GFP_NOIO			KMALLOC_WAIT
+#define	GFP_NOIO			MEM_WAIT
 #define	GFP_NOWAIT			0
 
 #define	__get_free_page(f)		kpage_alloc_addr()

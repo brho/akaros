@@ -1258,11 +1258,11 @@ igbeattach(struct ether* edev)
 	}
 
 	/* the ktasks should free these names, if they ever exit */
-	name = kmalloc(KNAMELEN, KMALLOC_WAIT);
+	name = kmalloc(KNAMELEN, MEM_WAIT);
 	snprintf(name, KNAMELEN, "#l%dlproc", edev->ctlrno);
 	ktask(name, igbelproc, edev);
 
-	name = kmalloc(KNAMELEN, KMALLOC_WAIT);
+	name = kmalloc(KNAMELEN, MEM_WAIT);
 	snprintf(name, KNAMELEN, "#l%drproc", edev->ctlrno);
 	ktask(name, igberproc, edev);
 
