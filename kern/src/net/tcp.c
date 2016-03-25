@@ -638,7 +638,7 @@ void tcpacktimer(void *v)
 
 static void tcpcreate(struct conv *c)
 {
-	c->rq = qopen(QMAX, Qcoalesce, tcpacktimer, c);
+	c->rq = qopen(QMAX, Qcoalesce, 0, 0);
 	c->wq = qopen(8 * QMAX, Qkick, tcpkick, c);
 }
 
