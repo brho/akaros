@@ -29,10 +29,12 @@ void kfree(void *buf);
 void kmalloc_canary_check(char *str);
 void *debug_canary;
 
-/* Flags to pass to kmalloc */
-/* Not implemented yet. Block until it is available. */
-#define KMALLOC_WAIT			(1 << 2)
-#define KMALLOC_ERROR			(1 << 3)
+#define MEM_ATOMIC				(1 << 1)
+#define MEM_WAIT				(1 << 2)
+#define MEM_ERROR				(1 << 3)
+
+#define KMALLOC_WAIT			MEM_WAIT
+#define KMALLOC_ERROR			MEM_ERROR
 
 /* Kmalloc tag flags looks like this:
  *
