@@ -108,7 +108,6 @@ static void qwake_cb(struct queue *q, int filter)
 void ixsummary(void)
 {
 	debugging ^= 1;
-	iallocsummary();
 	printd("pad %lu, concat %lu, pullup %lu, copy %lu\n",
 		   padblockcnt, concatblockcnt, pullupblockcnt, copyblockcnt);
 	printd("consume %lu, produce %lu, qcopy %lu\n",

@@ -356,7 +356,6 @@ enum {
 #define NS_SHIFT_MAX 6
 
 enum {
-	BINTR = (1 << 0),
 	BFREE = (1 << 1),
 	Bipck = (1 << NS_IPCK_SHIFT),	/* ip checksum */
 	Budpck = (1 << NS_UDPCK_SHIFT),	/* udp checksum */
@@ -749,7 +748,6 @@ void getcolor(uint32_t, uint32_t *, uint32_t *, uint32_t *);
 uint32_t getmalloctag(void *);
 uint32_t getrealloctag(void *);
 struct block *iallocb(int);
-void iallocsummary(void);
 void printblock(struct block *b);
 void ilock(spinlock_t *);
 int iprint(char *unused_char_p_t, ...);

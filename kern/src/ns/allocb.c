@@ -48,8 +48,6 @@ enum {
 	BLOCKALIGN = 32,	/* was the old BY2V in inferno, which was 8 */
 };
 
-static atomic_t ialloc_bytes = 0;
-
 /*
  *  allocate blocks (round data base address to 64 bit boundary).
  *  if mallocz gives us more than we asked for, leave room at the front
@@ -175,27 +173,7 @@ int block_append_extra(struct block *b, int len, int mem_flags)
  */
 struct block *iallocb(int size)
 {
-	struct block *b;
-
-#if 0	/* conf is some inferno global config */
-	if (atomic_read(&ialloc_bytes) > conf.ialloc) {
-		//printk("iallocb: limited %lu/%lu\n", atomic_read(&ialloc_bytes),
-		//       conf.ialloc);
-		return NULL;
-	}
-#endif
-
-	b = _allocb(size, 0);	/* no KMALLOC_WAIT */
-	if (b == NULL) {
-		//printk("iallocb: no memory %lu/%lu\n", atomic_read(&ialloc_bytes),
-		//       conf.ialloc);
-		return NULL;
-	}
-	b->flag = BINTR;
-
-	atomic_add(&ialloc_bytes, b->lim - b->base);
-
-	return b;
+	return _allocb(size, 0);
 }
 
 void free_block_extra(struct block *b)
@@ -230,10 +208,6 @@ void freeb(struct block *b)
 	if (b->free) {
 		b->free(b);
 		return;
-	}
-	if (b->flag & BINTR) {
-		/* subtracting the size of b */
-		atomic_add(&ialloc_bytes, -(b->lim - b->base));
 	}
 
 	/* poison the block in case someone is still holding onto it */
@@ -282,11 +256,6 @@ void checkb(struct block *b, char *msg)
 		}
 	}
 
-}
-
-void iallocsummary(void)
-{
-	printd("ialloc %lu/%lu\n", atomic_read(&ialloc_bytes), 0 /*conf.ialloc */ );
 }
 
 void printblock(struct block *b)
