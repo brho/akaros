@@ -1121,7 +1121,7 @@ static void i82563replenish(struct ctlr *ctlr)
 			printd("#l%d: 82563: rx overrun\n", ctlr->edev->ctlrno);
 			break;
 		}
-		bp = iallocb(ctlr->rbsz + Slop + Rbalign);
+		bp = block_alloc(ctlr->rbsz + Slop + Rbalign, MEM_ATOMIC);
 		if (bp == NULL) {
 			warn_once("OOM, trying to survive");
 			break;

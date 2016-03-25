@@ -582,7 +582,7 @@ static void sendarp(struct Ipifc *ifc, struct arpent *a)
 	n = sizeof(Etherarp);
 	if (n < a->type->mintu)
 		n = a->type->mintu;
-	bp = allocb(n);
+	bp = block_alloc(n, MEM_WAIT);
 	memset(bp->rp, 0, n);
 	e = (Etherarp *) bp->rp;
 	memmove(e->tpa, a->ip + IPv4off, sizeof(e->tpa));
@@ -657,7 +657,7 @@ static void sendgarp(struct Ipifc *ifc, uint8_t * ip)
 	n = sizeof(Etherarp);
 	if (n < ifc->m->mintu)
 		n = ifc->m->mintu;
-	bp = allocb(n);
+	bp = block_alloc(n, MEM_WAIT);
 	memset(bp->rp, 0, n);
 	e = (Etherarp *) bp->rp;
 	memmove(e->tpa, ip + IPv4off, sizeof(e->tpa));
@@ -758,7 +758,7 @@ static void recvarp(struct Ipifc *ifc)
 			n = sizeof(Etherarp);
 			if (n < ifc->mintu)
 				n = ifc->mintu;
-			rbp = allocb(n);
+			rbp = block_alloc(n, MEM_WAIT);
 			r = (Etherarp *) rbp->rp;
 			memset(r, 0, sizeof(Etherarp));
 			hnputs(r->type, ETARP);

@@ -53,7 +53,7 @@ enum {
  *  if mallocz gives us more than we asked for, leave room at the front
  *  for header.
  */
-static struct block *_allocb(int size, int mem_flags)
+struct block *block_alloc(size_t size, int mem_flags)
 {
 	struct block *b;
 	uintptr_t addr;
@@ -93,11 +93,6 @@ static struct block *_allocb(int size, int mem_flags)
 	 * b->rp is advanced by some aligned amount, based on how much extra we
 	 * received from kmalloc and the Hdrspc. */
 	return b;
-}
-
-struct block *allocb(int size)
-{
-	return _allocb(size, MEM_WAIT);
 }
 
 /* Makes sure b has nr_bufs extra_data.  Will grow, but not shrink, an existing
@@ -166,14 +161,6 @@ int block_append_extra(struct block *b, int len, int mem_flags)
 	ebd->len = len;
 	b->extra_len += ebd->len;
 	return 0;
-}
-
-/*
- *  interrupt time allocation
- */
-struct block *iallocb(int size)
-{
-	return _allocb(size, 0);
 }
 
 void free_block_extra(struct block *b)

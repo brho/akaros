@@ -437,7 +437,7 @@ struct block *devbread(struct chan *c, long n, uint32_t offset)
 	ERRSTACK(1);
 	struct block *bp;
 
-	bp = allocb(n);
+	bp = block_alloc(n, MEM_WAIT);
 	if (bp == 0)
 		error(ENOMEM, ERROR_FIXME);
 	if (waserror()) {

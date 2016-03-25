@@ -218,7 +218,7 @@ extern void icmpttlexceeded(struct Fs *f, uint8_t * ia, struct block *bp)
 	p = (Icmp *) bp->rp;
 
 	netlog(f, Logicmp, "sending icmpttlexceeded -> %V\n", p->src);
-	nbp = allocb(ICMP_IPSIZE + ICMP_HDRSIZE + ICMP_IPSIZE + 8);
+	nbp = block_alloc(ICMP_IPSIZE + ICMP_HDRSIZE + ICMP_IPSIZE + 8, MEM_WAIT);
 	nbp->wp += ICMP_IPSIZE + ICMP_HDRSIZE + ICMP_IPSIZE + 8;
 	np = (Icmp *) nbp->rp;
 	np->vihl = IP_VER4;
@@ -256,7 +256,7 @@ static void icmpunreachable(struct Fs *f, struct block *bp, int code, int seq)
 		return;
 
 	netlog(f, Logicmp, "sending icmpnoconv -> %V\n", p->src);
-	nbp = allocb(ICMP_IPSIZE + ICMP_HDRSIZE + ICMP_IPSIZE + 8);
+	nbp = block_alloc(ICMP_IPSIZE + ICMP_HDRSIZE + ICMP_IPSIZE + 8, MEM_WAIT);
 	nbp->wp += ICMP_IPSIZE + ICMP_HDRSIZE + ICMP_IPSIZE + 8;
 	np = (Icmp *) nbp->rp;
 	np->vihl = IP_VER4;

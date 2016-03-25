@@ -539,7 +539,7 @@ static void rtl8139receive(struct ether *edev)
 		p = ctlr->rbstart + capr;
 		capr = (capr + length) % ctlr->rblen;
 
-		if ((bp = iallocb(length)) != NULL) {
+		if ((bp = block_alloc(length, MEM_ATOMIC)) != NULL) {
 			if (p + length >= ctlr->rbstart + ctlr->rblen) {
 				l = ctlr->rbstart + ctlr->rblen - p;
 				memmove(bp->wp, p, l);

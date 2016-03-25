@@ -229,7 +229,8 @@ static void bnx2x_replenish(struct bnx2x *ctlr)
 	//while (NEXT_RING(rdt, ctlr->nrd) != ctlr->rdh) {
 		//if we want a new block
 		{
-			bp = iallocb(64); // TODO: use your block size, e.g. Rbsz
+			// TODO: use your block size, e.g. Rbsz
+			bp = block_alloc(64, MEM_ATOMIC);
 			if (bp == NULL) {
 				/* needs to be a safe print for interrupt level */
 				printk("#l%d bnx2x_replenish: no available buffers\n",

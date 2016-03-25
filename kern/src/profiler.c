@@ -76,7 +76,7 @@ static struct block *profiler_buffer_write(struct profiler_cpu_context *cpu_buf,
 		}
 	}
 
-	return iallocb(profiler_cpu_buffer_size);
+	return block_alloc(profiler_cpu_buffer_size, MEM_ATOMIC);
 }
 
 static char *profiler_cpu_buffer_write_reserve(

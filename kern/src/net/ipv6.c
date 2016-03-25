@@ -29,6 +29,7 @@
 
 #include <error.h>
 #include <ip.h>
+#include <kmalloc.h>
 
 enum {
 	IP4HDR = 20,				/* sizeof(Ip4hdr) */
@@ -291,7 +292,7 @@ int ipoput6(struct Fs *f, struct block *bp,
 	morefrags = 1;
 
 	for (; fragoff < flen; fragoff += seglen) {
-		nb = allocb(uflen + IP6FHDR + seglen);
+		nb = block_alloc(uflen + IP6FHDR + seglen, MEM_WAIT);
 
 		if (fragoff + seglen >= flen) {
 			seglen = flen - fragoff;

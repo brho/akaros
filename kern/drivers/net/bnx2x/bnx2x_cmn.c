@@ -1004,7 +1004,7 @@ static int bnx2x_rx_int(struct bnx2x_fastpath *fp, int budget)
 		if (1) {
 //		if ((bp->dev->maxmtu > ETH_MAX_PACKET_SIZE) &&
 //		    (len <= RX_COPY_THRESH)) {
-			block = iallocb(len);
+			block = block_alloc(len, MEM_ATOMIC);
 			if (block == NULL) {
 				DP(NETIF_MSG_RX_ERR | NETIF_MSG_RX_STATUS,
 				   "ERROR  packet dropped because of alloc failure\n");

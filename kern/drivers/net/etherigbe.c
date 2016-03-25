@@ -1054,7 +1054,7 @@ igbereplenish(struct ctlr* ctlr)
 	while(NEXT_RING(rdt, ctlr->nrd) != ctlr->rdh){
 		rd = &ctlr->rdba[rdt];
 		if(ctlr->rb[rdt] == NULL){
-			bp = iallocb(Rbsz);
+			bp = block_alloc(Rbsz, MEM_ATOMIC);
 			if(bp == NULL){
 				/* needs to be a safe print for interrupt level */
 				printk("#l%d: igbereplenish: no available buffers\n",

@@ -984,7 +984,8 @@ struct block *htontcp6(Tcp * tcph, struct block *data, Tcp6hdr * ph,
 			return NULL;
 	} else {
 		dlen = 0;
-		data = allocb(hdrlen + TCP6_PKT + 64);	/* the 64 pad is to meet mintu's */
+		/* the 64 pad is to meet mintu's */
+		data = block_alloc(hdrlen + TCP6_PKT + 64, MEM_WAIT);
 		if (data == NULL)
 			return NULL;
 		data->wp += hdrlen + TCP6_PKT;
@@ -1067,7 +1068,8 @@ struct block *htontcp4(Tcp * tcph, struct block *data, Tcp4hdr * ph,
 			return NULL;
 	} else {
 		dlen = 0;
-		data = allocb(hdrlen + TCP4_PKT + 64);	/* the 64 pad is to meet mintu's */
+		/* the 64 pad is to meet mintu's */
+		data = block_alloc(hdrlen + TCP4_PKT + 64, MEM_WAIT);
 		if (data == NULL)
 			return NULL;
 		data->wp += hdrlen + TCP4_PKT;
@@ -2692,7 +2694,7 @@ void tcpsendka(struct conv *s)
 	if (tcb->state == Finwait2) {
 		seg.flags |= FIN;
 	} else {
-		dbp = allocb(1);
+		dbp = block_alloc(1, MEM_WAIT);
 		dbp->wp++;
 	}
 

@@ -254,7 +254,7 @@ static void set_cksum(struct block *bp)
 static struct block *newIPICMP(int packetlen)
 {
 	struct block *nbp;
-	nbp = allocb(packetlen);
+	nbp = block_alloc(packetlen, MEM_WAIT);
 	nbp->wp += packetlen;
 	memset(nbp->rp, 0, packetlen);
 	return nbp;

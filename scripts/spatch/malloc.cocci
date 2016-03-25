@@ -53,3 +53,17 @@ expression E1;
 -mallocz(
 +kzmalloc(
 ...);
+
+@@
+expression E1;
+@@
+-allocb(E1
++block_alloc(E1, MEM_WAIT
+ )
+
+@@
+expression E1;
+@@
+-iallocb(E1
++block_alloc(E1, MEM_ATOMIC
+ )

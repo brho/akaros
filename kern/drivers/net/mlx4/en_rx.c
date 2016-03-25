@@ -609,7 +609,7 @@ static void recv_packet(struct mlx4_en_priv *priv,
 
 	assert(priv->num_frags == 1);
 
-	block = iallocb(length);
+	block = block_alloc(length, MEM_ATOMIC);
 	if (!block) {
 		en_dbg(RX_ERR, priv, "Failed allocating block\n");
 		priv->stats.rx_dropped++;

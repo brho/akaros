@@ -153,7 +153,7 @@ struct block *padblock(struct block *bp, int size)
 			panic("padblock %p", getcallerpc(&bp));
 		n = BLEN(bp);
 		padblockcnt++;
-		nbp = allocb(size + n);
+		nbp = block_alloc(size + n, MEM_WAIT);
 		nbp->rp += size;
 		nbp->wp = nbp->rp;
 		memmove(nbp->wp, bp->rp, n);
@@ -173,7 +173,7 @@ struct block *padblock(struct block *bp, int size)
 
 		n = BLEN(bp);
 		padblockcnt++;
-		nbp = allocb(size + n);
+		nbp = block_alloc(size + n, MEM_WAIT);
 		memmove(nbp->wp, bp->rp, n);
 		nbp->wp += n;
 		freeb(bp);
@@ -232,7 +232,7 @@ struct block *concatblock(struct block *bp)
 
 	/* probably use parts of qclone */
 	PANIC_EXTRA(bp);
-	nb = allocb(blocklen(bp));
+	nb = block_alloc(blocklen(bp), MEM_WAIT);
 	for (f = bp; f; f = f->next) {
 		len = BLEN(f);
 		memmove(nb->wp, f->rp, len);
@@ -256,7 +256,7 @@ struct block *linearizeblock(struct block *b)
 	if (!b->extra_len)
 		return b;
 
-	newb = allocb(BLEN(b));
+	newb = block_alloc(BLEN(b), MEM_WAIT);
 	len = BHLEN(b);
 	memcpy(newb->wp, b->rp, len);
 	newb->wp += len;
@@ -337,7 +337,7 @@ struct block *pullupblock(struct block *bp, int n)
 	 *  add another to the front of the list.
 	 */
 	if (bp->lim - bp->rp < n) {
-		nbp = allocb(n);
+		nbp = block_alloc(n, MEM_WAIT);
 		nbp->next = bp;
 		bp = nbp;
 	}
@@ -528,7 +528,7 @@ struct block *copyblock(struct block *bp, int count)
 	struct block *nbp;
 
 	QDEBUG checkb(bp, "copyblock 0");
-	nbp = allocb(count);
+	nbp = block_alloc(count, MEM_WAIT);
 	if (bp->flag & BCKSUM_FLAGS) {
 		nbp->flag |= (bp->flag & BCKSUM_FLAGS);
 		nbp->checksum_start = bp->checksum_start;
@@ -936,7 +936,7 @@ struct block *packblock(struct block *bp)
 		nbp = *l;
 		n = BLEN(nbp);
 		if ((n << 2) < BALLOC(nbp)) {
-			*l = allocb(n);
+			*l = block_alloc(n, MEM_WAIT);
 			memmove((*l)->wp, nbp->rp, n);
 			(*l)->wp += n;
 			(*l)->next = nbp->next;
@@ -974,7 +974,7 @@ int qproduce(struct queue *q, void *vp, int len)
 	if ((q->state & Qcoalesce) == 0 || q->bfirst == NULL
 		|| b->lim - b->wp < len) {
 		/* need a new block */
-		b = iallocb(len);
+		b = block_alloc(len, MEM_ATOMIC);
 		if (b == 0) {
 			spin_unlock_irqsave(&q->lock);
 			return 0;
@@ -1137,7 +1137,7 @@ struct block *blist_clone(struct block *blist, int header_len, int len,
                           uint32_t offset)
 {
 	int ret;
-	struct block *newb = allocb(header_len);
+	struct block *newb = block_alloc(header_len, MEM_WAIT);
 	do {
 		ret = __blist_clone_to(blist, newb, len, offset);
 		if (ret)
@@ -1152,7 +1152,7 @@ struct block *blist_clone(struct block *blist, int header_len, int len,
 struct block *qclone(struct queue *q, int header_len, int len, uint32_t offset)
 {
 	int ret;
-	struct block *newb = allocb(header_len);
+	struct block *newb = block_alloc(header_len, MEM_WAIT);
 	/* the while loop should rarely be used: it would require someone
 	 * concurrently adding to the queue. */
 	do {
@@ -1176,7 +1176,7 @@ struct block *qcopy_old(struct queue *q, int len, uint32_t offset)
 	struct block *b, *nb;
 	uint8_t *p;
 
-	nb = allocb(len);
+	nb = block_alloc(len, MEM_WAIT);
 
 	spin_lock_irqsave(&q->lock);
 
@@ -1444,7 +1444,7 @@ struct block *mem2bl(uint8_t * p, int len)
 		if (n > Maxatomic)
 			n = Maxatomic;
 
-		*l = b = allocb(n);
+		*l = b = block_alloc(n, MEM_WAIT);
 		/* TODO consider extra_data */
 		memmove(b->wp, p, n);
 		b->wp += n;
@@ -1530,7 +1530,7 @@ struct block *qbread(struct queue *q, int len)
 		PANIC_EXTRA(b);
 		if ((q->state & Qmsg) == 0) {
 			n -= len;
-			b = allocb(n);
+			b = block_alloc(n, MEM_WAIT);
 			memmove(b->wp, nb->rp + len, n);
 			b->wp += n;
 			qputback(q, b);
@@ -1818,7 +1818,7 @@ int qwrite(struct queue *q, void *vp, int len)
 		 * only available via padblock (to the left).  we also need some space
 		 * for pullupblock for some basic headers (like icmp) that get written
 		 * in directly */
-		b = allocb(64);
+		b = block_alloc(64, MEM_WAIT);
 		ext_buf = kmalloc(n, 0);
 		memcpy(ext_buf, p + sofar, n);
 		block_add_extd(b, 1, MEM_WAIT); /* returns 0 on success */
@@ -1827,7 +1827,7 @@ int qwrite(struct queue *q, void *vp, int len)
 		b->extra_data[0].len = n;
 		b->extra_len += n;
 #else
-		b = allocb(n);
+		b = block_alloc(n, MEM_WAIT);
 		memmove(b->wp, p + sofar, n);
 		b->wp += n;
 #endif
@@ -1856,7 +1856,7 @@ int qiwrite(struct queue *q, void *vp, int len)
 		if (n > Maxatomic)
 			n = Maxatomic;
 
-		b = iallocb(n);
+		b = block_alloc(n, MEM_ATOMIC);
 		if (b == NULL)
 			break;
 		/* TODO consider extra_data */

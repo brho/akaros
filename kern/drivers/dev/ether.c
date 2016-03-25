@@ -270,7 +270,7 @@ static void etherrtrace(struct netfile *f, struct etherpkt *pkt, int len)
 		n = 58;
 	else
 		n = len;
-	bp = iallocb(68);
+	bp = block_alloc(68, MEM_ATOMIC);
 	if (bp == NULL)
 		return;
 	memmove(bp->wp, pkt->d, n);
@@ -371,7 +371,7 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 					fx = f;
 					continue;
 				}
-				xbp = iallocb(len);
+				xbp = block_alloc(len, MEM_ATOMIC);
 				if (xbp == 0) {
 					ether->soverflows++;
 					continue;
@@ -492,7 +492,7 @@ static long etherwrite(struct chan *chan, void *buf, long n, int64_t unused)
 
 	if (n > ether->maxmtu + ETHERHDRSIZE)
 		error(E2BIG, ERROR_FIXME);
-	bp = allocb(n);
+	bp = block_alloc(n, MEM_WAIT);
 	if (waserror()) {
 		freeb(bp);
 		nexterror();

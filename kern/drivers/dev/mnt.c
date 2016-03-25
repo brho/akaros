@@ -984,7 +984,7 @@ int mntrpcread(struct mnt *m, struct mntrpc *r)
 			l = &(b->next);
 		} else {
 			/* split block and put unused bit back */
-			nb = allocb(i - len);
+			nb = block_alloc(i - len, MEM_WAIT);
 			memmove(nb->wp, b->rp + len, i - len);
 			b->wp = b->rp + len;
 			nb->wp += i - len;

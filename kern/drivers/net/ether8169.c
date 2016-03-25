@@ -619,7 +619,7 @@ rtl8169replenish(struct ctlr* ctlr)
 			 * Simple allocation for now.
 			 * This better be aligned on 8.
 			 */
-			bp = iallocb(Mps);
+			bp = block_alloc(Mps, MEM_ATOMIC);
 			if(bp == NULL){
 				printk("no available buffers\n");
 				break;
