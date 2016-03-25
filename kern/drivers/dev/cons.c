@@ -17,6 +17,8 @@
 #include <atomic.h>
 #include <smp.h>
 #include <error.h>
+#include <sys/queue.h>
+#include <event.h>
 
 #if 0
 void (*consdebug) (void) = NULL;
@@ -88,6 +90,7 @@ static int readtime(uint32_t, char *, int);
 static int readbintime(char *, int);
 static int writetime(char *, int);
 static int writebintime(char *, int);
+static void killkid(void);
 
 enum {
 	CMbroken,
@@ -606,6 +609,7 @@ enum {
 	Qtime,
 	Quser,
 	Qzero,
+	Qkillkid,
 };
 
 enum {
@@ -619,6 +623,8 @@ static struct dirtab consdir[] = {
 	{"config", {Qconfig}, 0, 0444},
 	{"cons", {Qcons}, 0, 0660},
 	{"consctl", {Qconsctl}, 0, 0220},
+	// FIXME -- we don't have real permissions yet so we set it to 222, not 220
+	{"killkid", {Qkillkid}, 0, 0220 | /* BOGUS */ 2},
 	{"cputime", {Qcputime}, 6 * NUMSIZE, 0444},
 	{"drivers", {Qdrivers}, 0, 0444},
 	{"hostdomain", {Qhostdomain}, DOMLEN, 0664},
@@ -1042,6 +1048,11 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 			}
 			break;
 
+		/* TODO: have it take a command about just *how* to kill the kid? */
+		case Qkillkid:
+			killkid();
+			break;
+
 		case Qconsctl:
 			if (n >= sizeof(buf))
 				n = sizeof(buf) - 1;
@@ -1125,6 +1136,7 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 				case CMpanic:
 					*(uint32_t *) 0 = 0;
 					panic("/dev/reboot");
+					break;
 			}
 			poperror();
 			kfree(cb);
@@ -1392,4 +1404,64 @@ static int writebintime(char *buf, int n)
 			break;
 	}
 	return n;
+}
+
+/*
+ * find_first_kid finds your immediate descendant. Not because we're
+ * trying to give it a check from the estate, mind you. We're here on
+ * much more unpleasant business. To make it easy to call this
+ * multiple times without lots of fussy checking, we allow it to be
+ * called with NULL pointers; hence find_first_kid(find_first_kid(x))
+ * works even if x is chaste and will return NULL.
+ */
+static struct proc *find_first_kid(struct proc *p)
+{
+	struct proc *kid;
+
+	cv_lock(&p->child_wait);
+	kid = TAILQ_FIRST(&p->children);
+	if (kid) {
+		proc_incref(kid, 1);
+		proc_decref(p);
+	}
+	cv_unlock(&p->child_wait);
+	return kid;
+}
+
+/*
+ * killkid manages population issues by killing your kids.  This is a
+ * particular temporary (we think) function for ssh. As such, we are
+ * going to make a Command Decision to never kill the top level
+ * kid. We start on grandkids, in other words.  Hey, the parent/child
+ * terminology was Ken's idea; go yell at him.  If you want, we can
+ * rename this to DrownCuteKittens.
+ *
+ * This was hard to get right so it's way more verbose than you might think we need.
+ * Sorry.
+ */
+void killkid(void)
+{
+	struct proc *check, *kid, *grandkid, *victim;
+
+	/* find first grandkid */
+	proc_incref(current, 1);
+	kid = find_first_kid(current);
+	if (!kid) {
+		proc_decref(current);
+		return;
+	}
+	grandkid = find_first_kid(kid);
+	if (!grandkid) {
+		proc_decref(kid);
+		return;
+	}
+	victim = grandkid;
+	while (1) {
+		check = find_first_kid(victim);
+		if (!check)
+			break;
+		victim = check;
+	}
+	send_posix_signal(victim, SIGINT);
+	proc_decref(victim);
 }
