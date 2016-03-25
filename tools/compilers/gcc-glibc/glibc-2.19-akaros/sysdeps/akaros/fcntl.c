@@ -37,6 +37,8 @@ int __vfcntl(int fd, int cmd, va_list vl)
 	return ret;
 }
 
+/* We used to override fcntl() with some Rock processing from within Glibc.  It
+ * might be useful to overrider fcntl() in the future. */
 int __fcntl(int fd, int cmd, ...)
 {
 	int ret;
@@ -47,3 +49,4 @@ int __fcntl(int fd, int cmd, ...)
 	return ret;
 }
 libc_hidden_def(__fcntl)
+weak_alias(__fcntl, fcntl)

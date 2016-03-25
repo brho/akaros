@@ -20,7 +20,6 @@ endif
 # need to be careful to only include some of them for specific subdirs.
 ifeq ($(subdir),socket)
 sysdep_routines += sa_len plan9_sockets
-sysdep_routines += fcntl-ext
 endif
 sysdep_headers += sys/syscall.h sys/tls.h
 
