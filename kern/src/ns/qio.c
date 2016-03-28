@@ -563,6 +563,7 @@ struct block *copyblock(struct block *bp, int count)
 struct block *adjustblock(struct block *bp, int len)
 {
 	struct extra_bdata *ebd;
+	void *buf;
 	int i;
 
 	if (len < 0) {
@@ -591,7 +592,8 @@ struct block *adjustblock(struct block *bp, int len)
 			return bp;
 		}
 		/* Grow with extra data buffers. */
-		block_append_extra(bp, len - BLEN(bp), MEM_WAIT);
+		buf = kzmalloc(len - BLEN(bp), MEM_WAIT);
+		block_append_extra(bp, (uintptr_t)buf, 0, len - BLEN(bp), MEM_WAIT);
 		QDEBUG checkb(bp, "adjustblock 3");
 		return bp;
 	}

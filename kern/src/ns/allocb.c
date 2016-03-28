@@ -139,10 +139,11 @@ static struct extra_bdata *next_unused_slot(struct block *b)
 	return ebd;
 }
 
-/* Append a zero-filled extra data buffer of length @len to block @b.
- * Reuse an unused extra data slot if there's any.
+/* Append an extra data buffer @base with offset @off of length @len to block
+ * @b.  Reuse an unused extra data slot if there's any.
  * Return 0 on success or -1 on error. */
-int block_append_extra(struct block *b, int len, int mem_flags)
+int block_append_extra(struct block *b, uintptr_t base, uint32_t off,
+                       uint32_t len, int mem_flags)
 {
 	unsigned int nr_bufs = b->nr_extra_bufs + 1;
 	struct extra_bdata *ebd;
@@ -154,10 +155,8 @@ int block_append_extra(struct block *b, int len, int mem_flags)
 		ebd = next_unused_slot(b);
 		assert(ebd);
 	}
-	ebd->base = (uintptr_t)kzmalloc(len, mem_flags);
-	if (!ebd->base)
-		return -1;
-	ebd->off = 0;
+	ebd->base = base;
+	ebd->off = off;
 	ebd->len = len;
 	b->extra_len += ebd->len;
 	return 0;
