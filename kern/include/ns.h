@@ -815,7 +815,6 @@ ssize_t qibwrite(struct queue *q, struct block *b);
 struct queue *qbypass(void (*)(void *, struct block *), void *);
 int qcanread(struct queue *);
 void qclose(struct queue *);
-int qconsume(struct queue *, void *, int);
 struct block *qcopy(struct queue *, int unused_int, uint32_t);
 struct block *qclone(struct queue *q, int header_len, int len,
                      uint32_t offset);
