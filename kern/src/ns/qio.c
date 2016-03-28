@@ -1176,7 +1176,7 @@ void qaddlist(struct queue *q, struct block *b)
 /*
  *  called with q ilocked
  */
-struct block *qremove(struct queue *q)
+static struct block *qremove(struct queue *q)
 {
 	struct block *b;
 

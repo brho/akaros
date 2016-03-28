@@ -837,7 +837,6 @@ ssize_t qpass(struct queue *, struct block *);
 ssize_t qpassnolim(struct queue *, struct block *);
 void qputback(struct queue *, struct block *);
 long qread(struct queue *, void *, int);
-struct block *qremove(struct queue *);
 void qreopen(struct queue *);
 void qsetlimit(struct queue *, int);
 int qwindow(struct queue *);
