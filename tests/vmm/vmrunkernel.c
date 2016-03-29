@@ -15,6 +15,7 @@
 #include <vmm/coreboot_tables.h>
 #include <vmm/vmm.h>
 #include <vmm/acpi/acpi.h>
+#include <vmm/acpi/vmm_simple_dsdt.h>
 #include <ros/arch/mmu.h>
 #include <ros/vmm.h>
 #include <parlib/uthread.h>
@@ -196,7 +197,7 @@ static void run_vmthread(struct vmctl *vmctl)
  */
 
 struct acpi_table_rsdp rsdp = {
-	.signature = "RSD PTR ",
+	.signature = ACPI_SIG_RSDP,
 	.oem_id = "AKAROS",
 	.revision = 2,
 	.length = 36,
@@ -204,9 +205,8 @@ struct acpi_table_rsdp rsdp = {
 
 struct acpi_table_xsdt xsdt = {
 	.header = {
-		.signature= "XSDT",
-		// This is so stupid. Incredibly stupid.
-		.revision = 0,
+		.signature = ACPI_SIG_DSDT,
+		.revision = 2,
 		.oem_id = "AKAROS",
 		.oem_table_id = "ALPHABET",
 		.oem_revision = 0,
@@ -216,9 +216,8 @@ struct acpi_table_xsdt xsdt = {
 };
 struct acpi_table_fadt fadt = {
 	.header = {
-		.signature= "FADT",
-		// This is so stupid. Incredibly stupid.
-		.revision = 0,
+		.signature = ACPI_SIG_FADT,
+		.revision = 2,
 		.oem_id = "AKAROS",
 		.oem_table_id = "ALPHABET",
 		.oem_revision = 0,
@@ -227,12 +226,13 @@ struct acpi_table_fadt fadt = {
 	},
 };
 
+
 /* This has to be dropped into memory, then the other crap just follows it.
  */
 struct acpi_table_madt madt = {
 	.header = {
-		.signature = "APIC",
-		.revision = 0,
+		.signature = ACPI_SIG_MADT,
+		.revision = 2,
 		.oem_id = "AKAROS",
 		.oem_table_id = "ALPHABET",
 		.oem_revision = 0,
@@ -704,7 +704,7 @@ int main(int argc, char **argv)
 	fprintf(stderr, "install rsdp to %p\n", r);
 	*r = rsdp;
 	a += sizeof(*r);
-	memmove(&r->xsdt_physical_address, &a, sizeof(a));
+	r->xsdt_physical_address = (uint64_t)a;
 	gencsum(&r->checksum, r, ACPI_RSDP_CHECKSUM_LENGTH);
 	if ((csum = acpi_tb_checksum((uint8_t *) r, ACPI_RSDP_CHECKSUM_LENGTH)) != 0) {
 		fprintf(stderr, "RSDP has bad checksum; summed to %x\n", csum);
@@ -733,12 +733,18 @@ int main(int argc, char **argv)
 	f = a;
 	fprintf(stderr, "install fadt to %p\n", f);
 	*f = fadt;
-	x->table_offset_entry[2] = (uint64_t) f;
+	x->table_offset_entry[0] = (uint64_t)f; // fadt MUST be first in xsdt!
 	a += sizeof(*f);
 	f->header.length = a - (void *)f;
+
+	f->Xdsdt = (uint64_t) a;
+	fprintf(stderr, "install dsdt to %p\n", a);
+	memcpy(a, &DSDT_DSDTTBL_Header, 36);
+	a += 36;
+
 	gencsum(&f->header.checksum, f, f->header.length);
 	if (acpi_tb_checksum((uint8_t *)f, f->header.length) != 0) {
-		fprintf(stderr, "ffadt has bad checksum v2\n");
+		fprintf(stderr, "fadt has bad checksum v2\n");
 		exit(1);
 	}
 
@@ -756,18 +762,22 @@ int main(int argc, char **argv)
 	memmove(a, &isor, sizeof(isor));
 	a += sizeof(isor);
 	m->header.length = a - (void *)m;
+
 	gencsum(&m->header.checksum, m, m->header.length);
 	if (acpi_tb_checksum((uint8_t *) m, m->header.length) != 0) {
 		fprintf(stderr, "madt has bad checksum v2\n");
 		exit(1);
 	}
-	fprintf(stderr, "allchecksums ok\n");
 
 	gencsum(&x->header.checksum, x, x->header.length);
 	if ((csum = acpi_tb_checksum((uint8_t *) x, x->header.length)) != 0) {
 		fprintf(stderr, "XSDT has bad checksum; summed to %x\n", csum);
 		exit(1);
 	}
+
+
+
+	fprintf(stderr, "allchecksums ok\n");
 
 	hexdump(stdout, r, a-(void *)r);
 
