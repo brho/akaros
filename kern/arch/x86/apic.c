@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <bitmask.h>
 #include <arch/topology.h>
+#include <ros/procinfo.h>
 
 bool lapic_check_spurious(int trap_nr)
 {
@@ -139,8 +140,8 @@ void lapic_set_timer(uint32_t usec, bool periodic)
 	 * then, we might not be able to match 4000 sec (based on the bus speed).
 	 * The kernel alarm code can handle spurious timer interrupts, so we just
 	 * set the timer for as close as we can get to the desired time. */
-	uint64_t ticks64 = (usec * system_timing.bus_freq) / LAPIC_TIMER_DIVISOR_VAL
-	                    / 1000000;
+	uint64_t ticks64 = (usec * __proc_global_info.bus_freq)
+	                   / LAPIC_TIMER_DIVISOR_VAL / 1000000;
 	uint32_t ticks32 = ((ticks64 >> 32) ? 0xffffffff : ticks64);
 	assert(ticks32 > 0);
 	__lapic_set_timer(ticks32, IdtLAPIC_TIMER, periodic,

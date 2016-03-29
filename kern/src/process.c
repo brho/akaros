@@ -25,6 +25,7 @@
 #include <arsc_server.h>
 #include <devfs.h>
 #include <kmalloc.h>
+#include <ros/procinfo.h>
 
 struct kmem_cache *proc_cache;
 
@@ -275,8 +276,8 @@ void proc_init_procinfo(struct proc* p)
 	p->procinfo->pid = p->pid;
 	p->procinfo->ppid = p->ppid;
 	p->procinfo->max_vcores = max_vcores(p);
-	p->procinfo->tsc_freq = system_timing.tsc_freq;
-	p->procinfo->timing_overhead = system_timing.timing_overhead;
+	p->procinfo->tsc_freq = __proc_global_info.tsc_freq;
+	p->procinfo->timing_overhead = __proc_global_info.tsc_overhead;
 	p->procinfo->heap_bottom = 0;
 	/* 0'ing the arguments.  Some higher function will need to set them */
 	memset(p->procinfo->res_grant, 0, sizeof(p->procinfo->res_grant));

@@ -12,8 +12,10 @@
 #include <trap.h>
 #include <assert.h>
 #include <stdio.h>
+#include <ros/procinfo.h>
 
-system_timing_t system_timing = {0, 0, 0xffff, 0};
+static uint16_t pit_divisor;
+static uint8_t pit_mode;
 
 // timer init calibrates both tsc timer and lapic timer using PIT
 void timer_init(void){
@@ -26,8 +28,8 @@ void timer_init(void){
 	tscval[0] = read_tsc();
 	udelay_pit(1000000);
 	tscval[1] = read_tsc();
-	system_timing.tsc_freq = tscval[1] - tscval[0];
-	cprintf("TSC Frequency: %llu\n", system_timing.tsc_freq);
+	__proc_global_info.tsc_freq = tscval[1] - tscval[0];
+	cprintf("TSC Frequency: %llu\n", __proc_global_info.tsc_freq);
 	__lapic_set_timer(0xffffffff, IdtLAPIC_TIMER, FALSE,
 	                  LAPIC_TIMER_DIVISOR_BITS);
 	// Mask the LAPIC Timer, so we never receive this interrupt (minor race)
@@ -35,13 +37,13 @@ void timer_init(void){
 	timercount[0] = apicrget(MSR_LAPIC_CURRENT_COUNT);
 	udelay_pit(1000000);
 	timercount[1] = apicrget(MSR_LAPIC_CURRENT_COUNT);
-	system_timing.bus_freq = (timercount[0] - timercount[1])
+	__proc_global_info.bus_freq = (timercount[0] - timercount[1])
 	                         * LAPIC_TIMER_DIVISOR_VAL;
 	/* The time base for the timer is derived from the processor's bus clock,
 	 * divided by the value specified in the divide configuration register.
 	 * Note we mult and div by the divisor, saving the actual freq (even though
 	 * we don't use it yet). */
-	cprintf("Bus Frequency: %llu\n", system_timing.bus_freq);
+	cprintf("Bus Frequency: %llu\n", __proc_global_info.bus_freq);
 }
 
 void pit_set_timer(uint32_t divisor, uint32_t mode)
@@ -52,8 +54,8 @@ void pit_set_timer(uint32_t divisor, uint32_t mode)
 	outb(TIMER_MODE, mode);
 	outb(TIMER_CNTR0, divisor & 0xff);
 	outb(TIMER_CNTR0, (divisor >> 8) );
-	system_timing.pit_mode = mode;
-	system_timing.pit_divisor = divisor;
+	pit_mode = mode;
+	pit_divisor = divisor;
 	// cprintf("timer mode set to %d, divisor %d\n",mode, divisor);
 }
 
@@ -75,7 +77,7 @@ static int getpit()
 void udelay(uint64_t usec)
 {
 	#if !defined(__BOCHS__)
-	if (system_timing.tsc_freq != 0)
+	if (__proc_global_info.tsc_freq != 0)
 	{
 		uint64_t start, end, now;
 
@@ -126,7 +128,7 @@ void udelay_pit(uint64_t usec)
 		prev_tick = tick;
 		if (delta < 0) {
 			// counter looped around during the delta time period
-			delta += system_timing.pit_divisor; // maximum count
+			delta += pit_divisor; // maximum count
 			if (delta < 0)
 				delta = 0;
 		}
@@ -141,7 +143,7 @@ uint64_t gettimer(void)
 
 uint64_t getfreq(void)
 {
-	return system_timing.tsc_freq;
+	return __proc_global_info.tsc_freq;
 }
 
 void set_core_timer(uint32_t usec, bool periodic)

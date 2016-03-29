@@ -4,14 +4,13 @@
 #include <arch/arch.h>
 #include <stdio.h>
 #include <assert.h>
-
-system_timing_t system_timing = {0};
+#include <ros/procinfo.h>
 
 void
 timer_init(void)
 {
-	system_timing.tsc_freq = TSC_HZ;
-	cprintf("TSC Frequency: %llu\n", system_timing.tsc_freq);
+	__proc_global_info.tsc_freq = TSC_HZ;
+	cprintf("TSC Frequency: %llu\n", __proc_global_info.tsc_freq);
 }
 
 void
@@ -43,12 +42,12 @@ set_core_timer(uint32_t usec, bool periodic)
 void
 udelay(uint64_t usec)
 {
-	if (system_timing.tsc_freq != 0)
+	if (__proc_global_info.tsc_freq != 0)
 	{
 		uint64_t start, end, now;
-        
+
 		start = read_tsc();
-		end = start + (system_timing.tsc_freq * usec) / 1000000;
+		end = start + (__proc_global_info.tsc_freq * usec) / 1000000;
 
 		do
 		{

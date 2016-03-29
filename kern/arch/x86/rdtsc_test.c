@@ -297,6 +297,7 @@
 #include <stdio.h>
 #include <kmalloc.h>
 #include <time.h>
+#include <ros/procinfo.h>
 
 #define STAT_SIZE_DEF 10000
 #define LOOP_BOUND_DEF 1000
@@ -755,7 +756,7 @@ void test_tsc_cycles(void)
 				      : : : "eax", "cc");
 	}
 	end = read_tsc_serialized();
-	end = end - start - system_timing.timing_overhead;
+	end = end - start - __proc_global_info.tsc_overhead;
 	printk("%llu (100,000) ticks passed, run twice to load the icache\n", end);
 
 	enable_irqsave(&irq_state);

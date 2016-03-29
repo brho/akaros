@@ -26,6 +26,7 @@
 #include <umem.h>
 #include <profiler.h>
 #include <kprof.h>
+#include <ros/procinfo.h>
 
 #define KTRACE_BUFFER_SIZE (128 * 1024)
 #define TRACE_PRINTK_BUFFER_SIZE (8 * 1024)
@@ -371,7 +372,7 @@ static long mpstatraw_read(void *va, long n, int64_t off)
 
 	/* header line: version, num_cores, tsc freq, state names */
 	len += snprintf(buf + len, bufsz - len, "v%03d %5d %16llu", 1, num_cores,
-	                system_timing.tsc_freq);
+	                __proc_global_info.tsc_freq);
 	for (int j = 0; j < NR_CPU_STATES; j++)
 		len += snprintf(buf + len, bufsz - len, " %6s", cpu_state_names[j]);
 	len += snprintf(buf + len, bufsz - len, "\n");
@@ -623,7 +624,7 @@ void trace_vprintk(bool btrace, const char *fmt, va_list args)
 
 	if (!atomic_cas(&tpb->in_use, 0, 1))
 		return;
-	if (likely(system_timing.tsc_freq))
+	if (likely(__proc_global_info.tsc_freq))
 		tsc2timespec(read_tsc(), &ts_now);
 	snprintf(hdr, sizeof(hdr), "[%lu.%09lu]:cpu%d: ", ts_now.tv_sec,
 	         ts_now.tv_nsec, core_id_early());

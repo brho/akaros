@@ -3,6 +3,7 @@
 #include <ros/common.h>
 #include <ros/time.h>
 #include <arch/time.h>
+#include <ros/procinfo.h>
 
 void train_timing();
 void udelay(uint64_t usec);	/* done in arch-specific files */
@@ -37,7 +38,7 @@ uint64_t stop_timing(uint64_t start_time)
 {
     uint64_t diff = read_tsc_serialized();
     diff -= start_time;
-    diff -= system_timing.timing_overhead;
+    diff -= __proc_global_info.tsc_overhead;
 	if ((int64_t) diff < 0) {
 		return 1;
 	}

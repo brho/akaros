@@ -34,16 +34,6 @@
 #define TIMER_CNTR2 (IO_TIMER1 + TIMER_REG_CNTR2)
 #define TIMER_MODE  (IO_TIMER1 + TIMER_REG_MODE)
 
-typedef struct system_timing {
-	uint64_t tsc_freq;
-	uint64_t bus_freq;
-	uint64_t timing_overhead;
-	uint16_t pit_divisor;
-	uint8_t pit_mode;
-} system_timing_t;
-
-extern system_timing_t system_timing;
-
 // PIT related
 void pit_set_timer(uint32_t freq, uint32_t mode);
 void timer_init(void);

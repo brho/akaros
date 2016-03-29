@@ -5,6 +5,7 @@
 #include <multiboot.h>
 #include <pmap.h>
 #include <smp.h>
+#include <ros/procinfo.h>
 
 /* Determines the overhead of tsc timing.  Note the start/stop calls are
  * inlined, so we're trying to determine the lowest amount of overhead
@@ -20,7 +21,7 @@ void train_timing()
 
 	/* Reset this, in case we run it again.  The use of start/stop to determine
 	 * the overhead relies on timing_overhead being 0. */
-	system_timing.timing_overhead = 0;
+	__proc_global_info.tsc_overhead = 0;
 	/* timing might use cpuid, in which case we warm it up to avoid some extra
 	 * variance */
 	time = start_timing();
@@ -37,7 +38,7 @@ void train_timing()
 		max_overhead = MAX(max_overhead, diff);
 	}
 	enable_irqsave(&irq_state);
-	system_timing.timing_overhead = min_overhead;
+	__proc_global_info.tsc_overhead = min_overhead;
 	printk("TSC overhead (Min: %llu, Max: %llu)\n", min_overhead, max_overhead);
 }
 
@@ -56,15 +57,15 @@ void timer_interrupt(struct hw_trapframe *hw_tf, void *data)
  * called something that scaled down the tsc_time by more than 1000. */
 uint64_t tsc2sec(uint64_t tsc_time)
 {
-	return tsc_time / system_timing.tsc_freq;
+	return tsc_time / __proc_global_info.tsc_freq;
 }
 
 uint64_t tsc2msec(uint64_t tsc_time)
 {
 	if (mult_will_overflow_u64(tsc_time, 1000))
 		return tsc2sec(tsc_time) * 1000;
-	else 
-		return (tsc_time * 1000) / system_timing.tsc_freq;
+	else
+		return (tsc_time * 1000) / __proc_global_info.tsc_freq;
 }
 
 uint64_t tsc2usec(uint64_t tsc_time)
@@ -72,7 +73,7 @@ uint64_t tsc2usec(uint64_t tsc_time)
 	if (mult_will_overflow_u64(tsc_time, 1000000))
 		return tsc2msec(tsc_time) * 1000;
 	else
-		return (tsc_time * 1000000) / system_timing.tsc_freq;
+		return (tsc_time * 1000000) / __proc_global_info.tsc_freq;
 }
 
 uint64_t tsc2nsec(uint64_t tsc_time)
@@ -80,42 +81,42 @@ uint64_t tsc2nsec(uint64_t tsc_time)
 	if (mult_will_overflow_u64(tsc_time, 1000000000))
 		return tsc2usec(tsc_time) * 1000;
 	else
-		return (tsc_time * 1000000000) / system_timing.tsc_freq;
+		return (tsc_time * 1000000000) / __proc_global_info.tsc_freq;
 }
 
 uint64_t sec2tsc(uint64_t sec)
 {
-	if (mult_will_overflow_u64(sec, system_timing.tsc_freq)) {
+	if (mult_will_overflow_u64(sec, __proc_global_info.tsc_freq)) {
 		/* in this case, we simply can't express the number of ticks */
 		warn("Wraparound in sec2tsc(), rounding up");
 		return (uint64_t)(-1);
 	} else {
-		return sec * system_timing.tsc_freq;
+		return sec * __proc_global_info.tsc_freq;
 	}
 }
 
 uint64_t msec2tsc(uint64_t msec)
 {
-	if (mult_will_overflow_u64(msec, system_timing.tsc_freq))
+	if (mult_will_overflow_u64(msec, __proc_global_info.tsc_freq))
 		return sec2tsc(msec / 1000);
 	else
-		return (msec * system_timing.tsc_freq) / 1000;
+		return (msec * __proc_global_info.tsc_freq) / 1000;
 }
 
 uint64_t usec2tsc(uint64_t usec)
 {
-	if (mult_will_overflow_u64(usec, system_timing.tsc_freq))
+	if (mult_will_overflow_u64(usec, __proc_global_info.tsc_freq))
 		return msec2tsc(usec / 1000);
 	else
-		return (usec * system_timing.tsc_freq) / 1000000;
+		return (usec * __proc_global_info.tsc_freq) / 1000000;
 }
 
 uint64_t nsec2tsc(uint64_t nsec)
 {
-	if (mult_will_overflow_u64(nsec, system_timing.tsc_freq))
+	if (mult_will_overflow_u64(nsec, __proc_global_info.tsc_freq))
 		return usec2tsc(nsec / 1000);
 	else
-		return (nsec * system_timing.tsc_freq) / 1000000000;
+		return (nsec * __proc_global_info.tsc_freq) / 1000000000;
 }
 
 /* TODO: figure out what epoch time TSC == 0 is and store that as boot_tsc */

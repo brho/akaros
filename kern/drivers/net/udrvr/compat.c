@@ -16,6 +16,7 @@
 #include <devfs.h>
 #include <linux/rdma/ib_user_verbs.h>
 #include "uverbs.h"
+#include <ros/procinfo.h>
 
 static unsigned long pgprot_val(int vmprot)
 {
@@ -275,7 +276,7 @@ static ssize_t cpu_read(struct file *filp, char __user *buf,
     size_t count, loff_t *pos)
 {
 	char cpu_info_str[128];
-	long freq = system_timing.tsc_freq, idx;
+	long freq = __proc_global_info.tsc_freq, idx;
 
 	strncpy(cpu_info_str, "cpu MHz\t\t: ", 16);
 	idx = strlen(cpu_info_str);
