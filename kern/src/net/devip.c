@@ -100,6 +100,12 @@ extern char *eve;
 static long ndbwrite(struct Fs *, char *unused_char_p_t, uint32_t, int);
 static void closeconv(struct conv *);
 
+static struct conv *chan2conv(struct chan *chan)
+{
+	/* That's a lot of pointers to get to the conv! */
+	return ipfs[chan->dev]->p[PROTO(chan->qid)]->conv[CONV(chan->qid)];
+}
+
 static inline int founddevdir(struct chan *c, struct qid q, char *n,
 							  int64_t length, char *user, long perm,
 							  struct dir *db)
@@ -123,7 +129,7 @@ static int ip3gen(struct chan *c, int i, struct dir *dp)
 	struct conv *cv;
 	char *p;
 
-	cv = ipfs[c->dev]->p[PROTO(c->qid)]->conv[CONV(c->qid)];
+	cv = chan2conv(c);
 	if (cv->owner == NULL)
 		kstrdup(&cv->owner, eve);
 	mkqid(&q, QID(PROTO(c->qid), CONV(c->qid), i), 0, QTFILE);
@@ -827,14 +833,10 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 static struct block *ipbread(struct chan *ch, long n, uint32_t offset)
 {
 	struct conv *c;
-	struct Proto *x;
-	struct Fs *f;
 
 	switch (TYPE(ch->qid)) {
 		case Qdata:
-			f = ipfs[ch->dev];
-			x = f->p[PROTO(ch->qid)];
-			c = x->conv[CONV(ch->qid)];
+			c = chan2conv(ch);
 			return qbread(c->rq, n);
 		default:
 			return devbread(ch, n, offset);
@@ -1290,15 +1292,11 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 static long ipbwrite(struct chan *ch, struct block *bp, uint32_t offset)
 {
 	struct conv *c;
-	struct Proto *x;
-	struct Fs *f;
 	int n;
 
 	switch (TYPE(ch->qid)) {
 		case Qdata:
-			f = ipfs[ch->dev];
-			x = f->p[PROTO(ch->qid)];
-			c = x->conv[CONV(ch->qid)];
+			c = chan2conv(ch);
 			if (bp->next)
 				bp = concatblock(bp);
 			n = BLEN(bp);
@@ -1347,20 +1345,13 @@ static void ip_wake_cb(struct queue *q, void *data, int filter)
 
 int iptapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 {
-	struct conv *conv;
-	struct Proto *x;
-	struct Fs *f;
+	struct conv *conv = chan2conv(chan);
 	int ret;
 
 	#define DEVIP_LEGAL_DATA_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_WRITABLE | \
 	                               FDTAP_FILT_HANGUP | FDTAP_FILT_PRIORITY |   \
 	                               FDTAP_FILT_ERROR)
 	#define DEVIP_LEGAL_LISTEN_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_HANGUP)
-
-	/* That's a lot of pointers to get to the conv! */
-	f = ipfs[chan->dev];
-	x = f->p[PROTO(chan->qid)];
-	conv = x->conv[CONV(chan->qid)];
 
 	switch (TYPE(chan->qid)) {
 		case Qdata:
