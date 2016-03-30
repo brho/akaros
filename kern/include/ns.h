@@ -809,7 +809,7 @@ struct block *pullupqueue(struct queue *, int);
 void putmhead(struct mhead *);
 void putstrn(char *unused_char_p_t, int);
 void qaddlist(struct queue *, struct block *);
-struct block *qbread(struct queue *, int);
+struct block *qbread(struct queue *q, size_t len);
 ssize_t qbwrite(struct queue *, struct block *);
 ssize_t qibwrite(struct queue *q, struct block *b);
 struct queue *qbypass(void (*)(void *, struct block *), void *);
@@ -820,7 +820,7 @@ struct block *qclone(struct queue *q, int header_len, int len,
                      uint32_t offset);
 struct block *blist_clone(struct block *blist, int header_len, int len,
                           uint32_t offset);
-int qdiscard(struct queue *, int);
+size_t qdiscard(struct queue *q, size_t len);
 void qflush(struct queue *);
 void qfree(struct queue *);
 int qfull(struct queue *);
@@ -835,7 +835,7 @@ struct queue *qopen(int unused_int, int, void (*)(void *), void *);
 ssize_t qpass(struct queue *, struct block *);
 ssize_t qpassnolim(struct queue *, struct block *);
 void qputback(struct queue *, struct block *);
-long qread(struct queue *, void *, int);
+size_t qread(struct queue *q, void *va, size_t len);
 void qreopen(struct queue *);
 void qsetlimit(struct queue *, int);
 int qwindow(struct queue *);

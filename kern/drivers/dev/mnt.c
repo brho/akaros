@@ -965,6 +965,9 @@ int mntrpcread(struct mnt *m, struct mntrpc *r)
 		return -1;
 	}
 
+	/* TODO: this should use a qio helper directly.  qputback should have the
+	 * qlocked, but I guess we assume we're the only one using it. */
+
 	/* hang the data off of the fcall struct */
 	l = &r->b;
 	*l = NULL;
