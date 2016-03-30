@@ -96,6 +96,7 @@ enum {
 	QIO_LIMIT = (1 << 1),			/* respect q->limit */
 	QIO_DROP_OVERFLOW = (1 << 2),	/* alternative to setting qdropoverflow */
 	QIO_JUST_ONE_BLOCK = (1 << 3),	/* when qbreading, just get one block */
+	QIO_NON_BLOCK = (1 << 4),		/* throw EAGAIN instead of blocking */
 };
 
 unsigned int qiomaxatomic = Maxatomic;
@@ -103,7 +104,7 @@ unsigned int qiomaxatomic = Maxatomic;
 static ssize_t __qbwrite(struct queue *q, struct block *b, int flags);
 static struct block *__qbread(struct queue *q, size_t len, int qio_flags,
                               int mem_flags);
-static bool qwait_and_ilock(struct queue *q);
+static bool qwait_and_ilock(struct queue *q, int qio_flags);
 static void qwakeup_iunlock(struct queue *q);
 
 /* Helper: fires a wake callback, sending 'filter' */
@@ -749,7 +750,7 @@ static int __try_qbread(struct queue *q, size_t len, int qio_flags,
 	size_t blen;
 
 	if (qio_flags & QIO_CAN_ERR_SLEEP) {
-		if (!qwait_and_ilock(q)) {
+		if (!qwait_and_ilock(q, qio_flags)) {
 			spin_unlock_irqsave(&q->lock);
 			return QBR_FAIL;
 		}
@@ -1202,7 +1203,7 @@ static int notempty(void *a)
 /* Block, waiting for the queue to be non-empty or closed.  Returns with
  * the spinlock held.  Returns TRUE when there queue is not empty, FALSE if it
  * was naturally closed.  Throws an error o/w. */
-static bool qwait_and_ilock(struct queue *q)
+static bool qwait_and_ilock(struct queue *q, int qio_flags)
 {
 	while (1) {
 		spin_lock_irqsave(&q->lock);
@@ -1222,7 +1223,7 @@ static bool qwait_and_ilock(struct queue *q)
 		/* We set Qstarve regardless of whether we are non-blocking or not.
 		 * Qstarve tracks the edge detection of the queue being empty. */
 		q->state |= Qstarve;
-		if (q->state & Qnonblock) {
+		if (qio_flags & QIO_NON_BLOCK) {
 			spin_unlock_irqsave(&q->lock);
 			error(EAGAIN, "queue empty");
 		}
@@ -1426,10 +1427,26 @@ struct block *qbread(struct queue *q, size_t len)
 	return __qbread(q, len, QIO_JUST_ONE_BLOCK | QIO_CAN_ERR_SLEEP, MEM_WAIT);
 }
 
+struct block *qbread_nonblock(struct queue *q, size_t len)
+{
+	return __qbread(q, len, QIO_JUST_ONE_BLOCK | QIO_CAN_ERR_SLEEP |
+	                QIO_NON_BLOCK, MEM_WAIT);
+}
+
 /* read up to len from a queue into vp. */
 size_t qread(struct queue *q, void *va, size_t len)
 {
 	struct block *blist = __qbread(q, len, QIO_CAN_ERR_SLEEP, MEM_WAIT);
+
+	if (!blist)
+		return 0;
+	return read_all_blocks(blist, va, len);
+}
+
+size_t qread_nonblock(struct queue *q, void *va, size_t len)
+{
+	struct block *blist = __qbread(q, len, QIO_CAN_ERR_SLEEP | QIO_NON_BLOCK,
+	                               MEM_WAIT);
 
 	if (!blist)
 		return 0;
@@ -1497,7 +1514,9 @@ static ssize_t __qbwrite(struct queue *q, struct block *b, int qio_flags)
 			freeb(b);
 			return -1;
 		}
-		if ((qio_flags & QIO_CAN_ERR_SLEEP) && (q->state & Qnonblock)) {
+		/* People shouldn't set NON_BLOCK without CAN_ERR, but we can be nice
+		 * and catch it. */
+		if ((qio_flags & QIO_CAN_ERR_SLEEP) && (qio_flags & QIO_NON_BLOCK)) {
 			spin_unlock_irqsave(&q->lock);
 			freeb(b);
 			error(EAGAIN, "queue full");
@@ -1532,7 +1551,7 @@ static ssize_t __qbwrite(struct queue *q, struct block *b, int qio_flags)
 	 *  queue infinite crud.
 	 */
 	if ((qio_flags & QIO_CAN_ERR_SLEEP) &&
-	    !(q->state & (Qdropoverflow | Qnonblock))) {
+	    !(q->state & Qdropoverflow) && !(qio_flags & QIO_NON_BLOCK)) {
 		/* This is a racy peek at the q status.  If we accidentally block, we
 		 * set Qflow, so someone should wake us.  If we accidentally don't
 		 * block, we just returned to the user and let them slip a block past
@@ -1553,6 +1572,11 @@ static ssize_t __qbwrite(struct queue *q, struct block *b, int qio_flags)
 ssize_t qbwrite(struct queue *q, struct block *b)
 {
 	return __qbwrite(q, b, QIO_CAN_ERR_SLEEP | QIO_LIMIT);
+}
+
+ssize_t qbwrite_nonblock(struct queue *q, struct block *b)
+{
+	return __qbwrite(q, b, QIO_CAN_ERR_SLEEP | QIO_LIMIT | QIO_NON_BLOCK);
 }
 
 ssize_t qibwrite(struct queue *q, struct block *b)
@@ -1630,6 +1654,12 @@ static ssize_t __qwrite(struct queue *q, void *vp, size_t len, int mem_flags,
 ssize_t qwrite(struct queue *q, void *vp, int len)
 {
 	return __qwrite(q, vp, len, MEM_WAIT, QIO_CAN_ERR_SLEEP | QIO_LIMIT);
+}
+
+ssize_t qwrite_nonblock(struct queue *q, void *vp, int len)
+{
+	return __qwrite(q, vp, len, MEM_WAIT, QIO_CAN_ERR_SLEEP | QIO_LIMIT |
+	                                      QIO_NON_BLOCK);
 }
 
 ssize_t qiwrite(struct queue *q, void *vp, int len)
