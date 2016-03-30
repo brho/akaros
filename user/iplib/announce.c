@@ -43,7 +43,7 @@ int announce9(char *addr, char *dir, int flags)
 	/*
 	 * get a control channel
 	 */
-	ctl = open(netdir, O_RDWR | (flags & O_NONBLOCK));
+	ctl = open(netdir, O_RDWR);
 	if(ctl<0){
 		fprintf(stderr,"announce opening %s: %r\n", netdir);
 		return -1;

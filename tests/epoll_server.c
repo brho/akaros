@@ -9,7 +9,7 @@
  * #define for PLAN9NET. */
 
 /* Comment this out for BSD sockets */
-#define PLAN9NET
+//#define PLAN9NET
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -58,7 +58,7 @@ int main()
 	 * writes "announce [addr]" into ctl.  This "announce" command often has a
 	 * "bind" in it too.  plan9 bind just sets the local addr/port.  TCP
 	 * announce also does this.  Returns the ctlfd. */
-	afd = announce9("tcp!*!23", adir, O_NONBLOCK);
+	afd = announce9("tcp!*!23", adir, 0);
 
 	if (afd < 0) {
 		perror("Announce failure");
@@ -119,6 +119,11 @@ int main()
 		perror("listen fd");
 		return -1;
 	}
+	/* This is a little subtle.  We're putting a tap on the listen file /
+	 * listen_fd.  When this fires, we get an event because of that listen_fd.
+	 * But we don't actually listen or do anything to that listen_fd.  It's
+	 * solely for monitoring.  We open a path, below, and we'll reattempt to do
+	 * *that* operation when someone tells us that our listen tap fires. */
 	ep_ev.data.fd = listen_fd;
 	if (epoll_ctl(epfd, EPOLL_CTL_ADD, listen_fd, &ep_ev)) {
 		perror("epoll_ctl_add listen");
@@ -132,7 +137,7 @@ int main()
 		 * out the conv number (the line) for this new conv.  listen() returns
 		 * the ctl for this new conv.
 		 *
-		 * Non-block is for the new connection.  Not the act of listening. */
+		 * Non-block is for the act of listening, and applies to lcfd. */
 		lcfd = listen9(adir, ldir, O_NONBLOCK);
 		if (lcfd >= 0)
 			break;
@@ -194,12 +199,6 @@ int main()
 	}
 	printf("Accepted and got dfd %d\n", dfd);
 	assert(has_epolled);
-	/* In lieu of accept4, we set the new socket's nonblock status manually */
-	ret = fcntl(dfd, F_SETFL, O_NONBLOCK);
-	if (ret < 0) {
-		perror("setfl dfd");
-		exit(-1);
-	}
 	if (epoll_ctl(epfd, EPOLL_CTL_DEL, srv_socket, &ep_ev)) {
 		perror("epoll_ctl_del");
 		while (1);
@@ -208,6 +207,13 @@ int main()
 
 #endif
 
+	/* In lieu of accept4, we set the new socket's nonblock status manually.
+	 * Both OSs do this.  */
+	ret = fcntl(dfd, F_SETFL, O_NONBLOCK);
+	if (ret < 0) {
+		perror("setfl dfd");
+		exit(-1);
+	}
 	ep_ev.data.fd = dfd;
 	if (epoll_ctl(epfd, EPOLL_CTL_ADD, dfd, &ep_ev)) {
 		perror("epoll_ctl_add dvd");

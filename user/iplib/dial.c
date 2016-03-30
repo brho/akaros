@@ -27,7 +27,7 @@ static int call(char *clone, char *dest, int *cfdp, char *dir, char *local,
 	char data[3*NAMELEN+10];
 	char *p;
 
-	cfd = open(clone, O_RDWR | (flags & O_NONBLOCK));
+	cfd = open(clone, O_RDWR);
 	if(cfd < 0)
 		return -1;
 
@@ -56,7 +56,7 @@ static int call(char *clone, char *dest, int *cfdp, char *dir, char *local,
 	}
 
 	/* open data connection */
-	fd = open(data, O_RDWR);
+	fd = open(data, O_RDWR | (flags & O_NONBLOCK));
 	if(fd < 0){
 		close(cfd);
 		return -1;

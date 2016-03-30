@@ -63,7 +63,7 @@ int main(void)
 	 * writes "announce [addr]" into ctl.  This "announce" command often has a
 	 * "bind" in it too.  plan9 bind just sets the local addr/port.  TCP
 	 * announce also does this.  Returns the ctlfd. */
-	afd = announce9("tcp!*!23", adir, O_NONBLOCK);
+	afd = announce9("tcp!*!23", adir, 0);
 
 	if (afd < 0) {
 		perror("Announce failure");
@@ -116,6 +116,11 @@ int main(void)
 		perror("listen fd");
 		return -1;
 	}
+	/* This is a little subtle.  We're putting a tap on the listen file /
+	 * listen_fd.  When this fires, we get an event because of that listen_fd.
+	 * But we don't actually listen or do anything to that listen_fd.  It's
+	 * solely for monitoring.  We open a path, below, and we'll reattempt to do
+	 * *that* operation when someone tells us that our listen tap fires. */
 	FD_ZERO(&rfds);
 	FD_SET(listen_fd, &rfds);
 	has_selected = FALSE;
@@ -126,7 +131,7 @@ int main(void)
 		 * out the conv number (the line) for this new conv.  listen() returns
 		 * the ctl for this new conv.
 		 *
-		 * Non-block is for the new connection.  Not the act of listening. */
+		 * Non-block is for the act of listening, and applies to lcfd. */
 		lcfd = listen9(adir, ldir, O_NONBLOCK);
 		if (lcfd >= 0)
 			break;
@@ -177,15 +182,16 @@ int main(void)
 	}
 	printf("Accepted and got dfd %d\n", dfd);
 	assert(has_selected);
-	/* In lieu of accept4, we set the new socket's nonblock status manually */
+
+#endif
+
+	/* In lieu of accept4, we set the new socket's nonblock status manually.
+	 * Both OSs do this.  */
 	ret = fcntl(dfd, F_SETFL, O_NONBLOCK);
 	if (ret < 0) {
 		perror("setfl dfd");
 		exit(-1);
 	}
-
-#endif
-
 	FD_SET(dfd, &rfds);
 	/* echo until EOF */
 	has_selected = FALSE;
