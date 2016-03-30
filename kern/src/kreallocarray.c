@@ -22,7 +22,6 @@
  * if both s1 < MUL_NO_OVERFLOW and s2 < MUL_NO_OVERFLOW
  */
 enum {
-	SIZE_MAX = ~(size_t)0,
 	MUL_NO_OVERFLOW = ((size_t)1 << (sizeof(size_t) * 4))
 };
 

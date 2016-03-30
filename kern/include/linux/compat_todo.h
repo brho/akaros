@@ -534,8 +534,6 @@ static inline void __raw_writeq(uint64_t value, volatile void *addr)
 #define min3(x, y, z) MIN((typeof(x))MIN(x, y), z)
 #define max3(x, y, z) MAX((typeof(x))MAX(x, y), z)
 
-#define SIZE_MAX        (~(size_t)0)
-
 typedef unsigned int pci_channel_state_t;
 
 enum pci_channel_state {
