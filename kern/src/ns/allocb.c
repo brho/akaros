@@ -179,13 +179,15 @@ void free_block_extra(struct block *b)
 	b->extra_data = 0;		/* in case the block is reused by a free override */
 }
 
-void freeb(struct block *b)
+/* Frees a block, returning its size (len, not alloc) */
+size_t freeb(struct block *b)
 {
 	void *dead = (void *)Bdead;
+	size_t ret;
 
 	if (b == NULL)
-		return;
-
+		return 0;
+	ret = BLEN(b);
 	free_block_extra(b);
 	/*
 	 * drivers which perform non cache coherent DMA manage their own buffer
@@ -193,17 +195,30 @@ void freeb(struct block *b)
 	 */
 	if (b->free) {
 		b->free(b);
-		return;
+		return ret;
 	}
-
 	/* poison the block in case someone is still holding onto it */
 	b->next = dead;
 	b->rp = dead;
 	b->wp = dead;
 	b->lim = dead;
 	b->base = dead;
-
 	kfree(b);
+	return ret;
+}
+
+/* Free a list of blocks, returning their total size. */
+size_t freeblist(struct block *b)
+{
+	struct block *next;
+	size_t ret = 0;
+
+	for (; b != 0; b = next) {
+		next = b->next;
+		b->next = 0;
+		ret += freeb(b);
+	}
+	return ret;
 }
 
 void checkb(struct block *b, char *msg)

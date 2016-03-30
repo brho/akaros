@@ -118,20 +118,6 @@ void ixsummary(void)
 }
 
 /*
- *  free a list of blocks
- */
-void freeblist(struct block *b)
-{
-	struct block *next;
-
-	for (; b != 0; b = next) {
-		next = b->next;
-		b->next = 0;
-		freeb(b);
-	}
-}
-
-/*
  *  pad a block to the front (or the back if size is negative)
  */
 struct block *padblock(struct block *bp, int size)
