@@ -2719,7 +2719,6 @@ void run_local_syscall(struct syscall *sysc)
  * at least one, it will run it directly. */
 void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_syscs)
 {
-	int retval;
 	/* Careful with pcpui here, we could have migrated */
 	if (!nr_syscs) {
 		printk("[kernel] No nr_sysc, probably a bug, user!\n");
