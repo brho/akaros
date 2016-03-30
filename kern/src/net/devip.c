@@ -459,9 +459,6 @@ static struct chan *ipopen(struct chan *c, int omode)
 				error(ENODEV, ERROR_FIXME);
 				break;
 			}
-			/* we only honor nonblock on a clone */
-			if (c->flag & O_NONBLOCK)
-				Fsconvnonblock(cv, TRUE);
 			mkqid(&c->qid, QID(p->x, cv->x, Qctl), 0, QTFILE);
 			break;
 		case Qdata:
@@ -543,7 +540,7 @@ static struct chan *ipopen(struct chan *c, int omode)
 				/* we can peek at incall without grabbing the cv qlock.  if
 				 * anything is there, it'll remain there until we dequeue it.
 				 * no one else can, since we hold the listenq lock */
-				if (cv->nonblock && !cv->incall)
+				if ((c->flag & O_NONBLOCK) && !cv->incall)
 					error(EAGAIN, "listen queue empty");
 				/* wait for a connect */
 				rendez_sleep(&cv->listenr, should_wake, cv);
@@ -556,10 +553,6 @@ static struct chan *ipopen(struct chan *c, int omode)
 					cv->incall = nc->next;
 					mkqid(&c->qid, QID(PROTO(c->qid), nc->x, Qctl), 0, QTFILE);
 					kstrdup(&cv->owner, ATTACHER(c));
-					/* O_NONBLOCK/CNONBLOCK when opening listen means the *new*
-					 * conv is already non-blocking, like accept4() in Linux */
-					if (c->flag & O_NONBLOCK)
-						Fsconvnonblock(nc, TRUE);
 				}
 				qunlock(&cv->qlock);
 
@@ -632,8 +625,7 @@ static char *ipchaninfo(struct chan *ch, char *ret, size_t ret_l)
 		case Qdata:
 			proto = f->p[PROTO(ch->qid)];
 			conv = proto->conv[CONV(ch->qid)];
-			snprintf(ret, ret_l, "Qdata, %s %s proto %s, conv idx %d",
-			         conv->nonblock ? "nonblock" : "block",
+			snprintf(ret, ret_l, "Qdata, %s proto %s, conv idx %d",
 			         SLIST_EMPTY(&conv->data_taps) ? "untapped" : "tapped",
 			         proto->name, conv->x);
 			break;
@@ -646,9 +638,8 @@ static char *ipchaninfo(struct chan *ch, char *ret, size_t ret_l)
 		case Qlisten:
 			proto = f->p[PROTO(ch->qid)];
 			conv = proto->conv[CONV(ch->qid)];
-			snprintf(ret, ret_l, "Qlisten, %s %s proto %s, conv idx %d",
-			         conv->nonblock ? "nonblock" : "block",
-			         SLIST_EMPTY(&conv->data_taps) ? "untapped" : "tapped",
+			snprintf(ret, ret_l, "Qlisten, %s proto %s, conv idx %d",
+			         SLIST_EMPTY(&conv->listen_taps) ? "untapped" : "tapped",
 			         proto->name, conv->x);
 			break;
 		case Qlog:
@@ -804,14 +795,15 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 			x = f->p[PROTO(ch->qid)];
 			c = x->conv[CONV(ch->qid)];
 			sofar = (*x->state) (c, buf, Statelen - 2);
-			sofar += snprintf(buf + sofar, Statelen - 2 - sofar, "nonblock %s\n",
-			                  c->nonblock ? "on" : "off");
 			rv = readstr(offset, p, n, buf);
 			kfree(buf);
 			return rv;
 		case Qdata:
 			c = f->p[PROTO(ch->qid)]->conv[CONV(ch->qid)];
-			return qread(c->rq, a, n);
+			if (ch->flag & O_NONBLOCK)
+				return qread_nonblock(c->rq, a, n);
+			else
+				return qread(c->rq, a, n);
 		case Qerr:
 			c = f->p[PROTO(ch->qid)]->conv[CONV(ch->qid)];
 			return qread(c->eq, a, n);
@@ -837,7 +829,10 @@ static struct block *ipbread(struct chan *ch, long n, uint32_t offset)
 	switch (TYPE(ch->qid)) {
 		case Qdata:
 			c = chan2conv(ch);
-			return qbread(c->rq, n);
+			if (ch->flag & O_NONBLOCK)
+				return qbread_nonblock(c->rq, n);
+			else
+				return qbread(c->rq, n);
 		default:
 			return devbread(ch, n, offset);
 	}
@@ -1125,34 +1120,12 @@ void Fsstdbind(struct conv *c, char *argv[], int argc)
 	}
 }
 
-void Fsconvnonblock(struct conv *cv, bool onoff)
-{
-	qnonblock(cv->wq, onoff);
-	qnonblock(cv->rq, onoff);
-	cv->nonblock = onoff;
-}
-
 static void bindctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 {
 	if (x->bind == NULL)
 		Fsstdbind(c, cb->f, cb->nf);
 	else
 		x->bind(c, cb->f, cb->nf);
-}
-
-static void nonblockctlmsg(struct conv *c, struct cmdbuf *cb)
-{
-	if (cb->nf < 2)
-		goto err;
-	if (!strcmp(cb->f[1], "on"))
-		Fsconvnonblock(c, TRUE);
-	else if (!strcmp(cb->f[1], "off"))
-		Fsconvnonblock(c, FALSE);
-	else
-		goto err;
-	return;
-err:
-	error(EINVAL, "nonblock [on|off]");
 }
 
 static void shutdownctlmsg(struct conv *cv, struct cmdbuf *cb)
@@ -1216,7 +1189,10 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 		case Qdata:
 			x = f->p[PROTO(ch->qid)];
 			c = x->conv[CONV(ch->qid)];
-			qwrite(c->wq, a, n);
+			if (ch->flag & O_NONBLOCK)
+				qwrite_nonblock(c->wq, a, n);
+			else
+				qwrite(c->wq, a, n);
 			break;
 		case Qarp:
 			return arpwrite(f, a, n);
@@ -1246,8 +1222,6 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 				announcectlmsg(x, c, cb);
 			else if (strcmp(cb->f[0], "bind") == 0)
 				bindctlmsg(x, c, cb);
-			else if (strcmp(cb->f[0], "nonblock") == 0)
-				nonblockctlmsg(c, cb);
 			else if (strcmp(cb->f[0], "shutdown") == 0)
 				shutdownctlmsg(c, cb);
 			else if (strcmp(cb->f[0], "ttl") == 0)
@@ -1300,7 +1274,10 @@ static long ipbwrite(struct chan *ch, struct block *bp, uint32_t offset)
 			if (bp->next)
 				bp = concatblock(bp);
 			n = BLEN(bp);
-			qbwrite(c->wq, bp);
+			if (ch->flag & O_NONBLOCK)
+				qbwrite_nonblock(c->wq, bp);
+			else
+				qbwrite(c->wq, bp);
 			return n;
 		default:
 			return devbwrite(ch, bp, offset);
@@ -1550,7 +1527,6 @@ retry:
 	c->restricted = 0;
 	c->ttl = MAXTTL;
 	c->tos = DFLTTOS;
-	c->nonblock = FALSE;
 	qreopen(c->rq);
 	qreopen(c->wq);
 	qreopen(c->eq);

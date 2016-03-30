@@ -86,7 +86,6 @@ struct conv {
 	uint32_t ttl;				/* max time to live */
 	uint32_t tos;				/* type of service */
 	int ignoreadvice;			/* don't terminate connection on icmp errors */
-	bool nonblock;				/* set to nonblocking, O_NONBLOCK style */
 
 	uint8_t ipversion;
 	uint8_t laddr[IPaddrlen];	/* local IP address */
@@ -398,7 +397,6 @@ struct Proto *Fsrcvpcolx(struct Fs *, uint8_t unused_uint8_t);
 void Fsstdconnect(struct conv *, char **, int);
 void Fsstdannounce(struct conv *, char **, int);
 void Fsstdbind(struct conv *, char **, int);
-void Fsconvnonblock(struct conv *, bool);
 uint32_t scalednconv(void);
 
 /* 
