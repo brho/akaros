@@ -345,9 +345,15 @@ static long piperead(struct chan *c, void *va, long n, int64_t ignored)
 			return devdirread(c, va, n, p->pipedir, ARRAY_SIZE(pipedir),
 							  pipegen);
 		case Qdata0:
-			return qread(p->q[0], va, n);
+			if (c->flag & O_NONBLOCK)
+				return qread_nonblock(p->q[0], va, n);
+			else
+				return qread(p->q[0], va, n);
 		case Qdata1:
-			return qread(p->q[1], va, n);
+			if (c->flag & O_NONBLOCK)
+				return qread_nonblock(p->q[1], va, n);
+			else
+				return qread(p->q[1], va, n);
 		default:
 			panic("piperead");
 	}
@@ -362,9 +368,15 @@ static struct block *pipebread(struct chan *c, long n, uint32_t offset)
 
 	switch (NETTYPE(c->qid.path)) {
 		case Qdata0:
-			return qbread(p->q[0], n);
+			if (c->flag & O_NONBLOCK)
+				return qbread_nonblock(p->q[0], n);
+			else
+				return qbread(p->q[0], n);
 		case Qdata1:
-			return qbread(p->q[1], n);
+			if (c->flag & O_NONBLOCK)
+				return qbread_nonblock(p->q[1], n);
+			else
+				return qbread(p->q[1], n);
 	}
 
 	return devbread(c, n, offset);
@@ -396,11 +408,17 @@ static long pipewrite(struct chan *c, void *va, long n, int64_t ignored)
 
 	switch (NETTYPE(c->qid.path)) {
 		case Qdata0:
-			n = qwrite(p->q[1], va, n);
+			if (c->flag & O_NONBLOCK)
+				n = qwrite_nonblock(p->q[1], va, n);
+			else
+				n = qwrite(p->q[1], va, n);
 			break;
 
 		case Qdata1:
-			n = qwrite(p->q[0], va, n);
+			if (c->flag & O_NONBLOCK)
+				n = qwrite_nonblock(p->q[0], va, n);
+			else
+				n = qwrite(p->q[0], va, n);
 			break;
 
 		default:
@@ -434,11 +452,17 @@ static long pipebwrite(struct chan *c, struct block *bp, uint32_t junk)
 	p = c->aux;
 	switch (NETTYPE(c->qid.path)) {
 		case Qdata0:
-			n = qbwrite(p->q[1], bp);
+			if (c->flag & O_NONBLOCK)
+				n = qbwrite_nonblock(p->q[1], bp);
+			else
+				n = qbwrite(p->q[1], bp);
 			break;
 
 		case Qdata1:
-			n = qbwrite(p->q[0], bp);
+			if (c->flag & O_NONBLOCK)
+				n = qbwrite_nonblock(p->q[0], bp);
+			else
+				n = qbwrite(p->q[0], bp);
 			break;
 
 		default:
