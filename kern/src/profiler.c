@@ -275,7 +275,6 @@ static void alloc_cpu_buffers(void)
 	}
 
 	qdropoverflow(profiler_queue, TRUE);
-	qnonblock(profiler_queue, TRUE);
 
 	profiler_percpu_ctx =
 	    kzmalloc(sizeof(*profiler_percpu_ctx) * num_cores, MEM_WAIT);
