@@ -1434,7 +1434,7 @@ static bool cexternal_flags_differ(int set1, int set2, int flags)
 
 int fd_setfl(int fd, int flags)
 {
-	ERRSTACK(1);
+	ERRSTACK(2);
 	struct chan *c;
 
 	if (waserror()) {
@@ -1442,6 +1442,10 @@ int fd_setfl(int fd, int flags)
 		return -1;
 	}
 	c = fdtochan(&current->open_files, fd, -1, 0, 1);
+	if (waserror()) {
+		cclose(c);
+		nexterror();
+	}
 	if (cexternal_flags_differ(flags, c->flag, O_CLOEXEC)) {
 		/* TODO: The whole CCEXEC / O_CLOEXEC on 9ns needs work */
 		error(EINVAL, "can't toggle O_CLOEXEC with setfl");
@@ -1449,6 +1453,7 @@ int fd_setfl(int fd, int flags)
 	if (cexternal_flags_differ(flags, c->flag, O_PATH))
 		error(EINVAL, "can't toggle O_PATH with setfl");
 	c->flag = (c->flag & ~CEXTERNAL_FLAGS) | (flags & CEXTERNAL_FLAGS);
+	poperror();
 	cclose(c);
 	poperror();
 	return 0;
