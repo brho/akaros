@@ -1320,7 +1320,8 @@ void print_chaninfo(struct chan *c)
 		printk("Chan type %d has no chaninfo!\n", c->type);
 		has_dev = FALSE;
 	}
-	printk("Chan pathname: %s ref %d, Dev: %s, Devinfo: %s",
+	printk("Chan flags: %p, pathname: %s, ref: %d, Dev: %s, Devinfo: %s",
+		   c->flag,
 		   c->name ? c->name->s : "no cname",
 		   kref_refcnt(&c->ref),
 		   has_dev ? devtab[c->type].name : "no dev",
@@ -1436,6 +1437,7 @@ int fd_setfl(int fd, int flags)
 {
 	ERRSTACK(2);
 	struct chan *c;
+	int ret = 0;
 
 	if (waserror()) {
 		poperror();
@@ -1452,9 +1454,14 @@ int fd_setfl(int fd, int flags)
 	}
 	if (cexternal_flags_differ(flags, c->flag, O_PATH))
 		error(EINVAL, "can't toggle O_PATH with setfl");
+	/* Devices can do various prep work, including RPCs to other servers (#mnt)
+	 * for a chan_ctl operation.  If they want to not support the new flags,
+	 * they can throw an error. */
+	if (devtab[c->type].chan_ctl)
+		ret = devtab[c->type].chan_ctl(c, flags & CEXTERNAL_FLAGS);
 	c->flag = (c->flag & ~CEXTERNAL_FLAGS) | (flags & CEXTERNAL_FLAGS);
 	poperror();
 	cclose(c);
 	poperror();
-	return 0;
+	return ret;
 }
