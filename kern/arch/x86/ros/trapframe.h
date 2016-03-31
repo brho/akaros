@@ -157,7 +157,7 @@ typedef struct ancillary_state {
 	 *	See the Intel Architecture Instruction Set Extensions Programming
 	 *	Reference page 3-3 for detailed offsets in this region.
 	*/
-	uint8_t			extended_region[2112];
+	uint8_t			extended_region[2120];
 
 	/* ancillary state  */
 } __attribute__((aligned(64))) ancillary_state_t;
