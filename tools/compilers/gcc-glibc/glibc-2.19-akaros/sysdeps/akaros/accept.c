@@ -39,6 +39,7 @@ int accept(int fd, __SOCKADDR_ARG addr, socklen_t * __restrict alen)
 	char *p;
 	const char *net = 0;
 	char listen[Ctlsize];
+	int open_flags = O_RDWR;
 
 	r = _sock_findrock(fd, 0);
 	if (r == 0) {
@@ -57,25 +58,29 @@ int accept(int fd, __SOCKADDR_ARG addr, socklen_t * __restrict alen)
 					break;
 			}
 			/* at this point, our FD is for the data file.  we need to open the
-			 * listen file.  The line is stored in r->ctl (e.g. /net/tcp/666/ctl) */
+			 * listen file.  The line is stored in r->ctl (e.g.
+			 * /net/tcp/666/ctl) */
 			strcpy(listen, r->ctl);
 			p = strrchr(listen, '/');
 			if (p == 0)
 				return -1;
 			strcpy(p + 1, "listen");
-
-			lcfd = open(listen, O_RDWR);
+			open_flags |= (r->sopts & SOCK_NONBLOCK ? O_NONBLOCK : 0);
+			lcfd = open(listen, open_flags);
 			if (lcfd < 0)
 				return -1;
-			/* at this point, we have a new conversation, and lcfd is its ctl fd.
-			 * nfd will be the FD for that conv's data file.  sock_data will trade
-			 * our lcfd for the data file fd.  even if it fails, sock_data will
-			 * close our lcfd for us.  when it succeeds, it'll open the data file
-			 * before closing lcfd, which will keep the converstation alive.
+			/* at this point, we have a new conversation, and lcfd is its ctl
+			 * fd.  nfd will be the FD for that conv's data file.  sock_data
+			 * will trade our lcfd for the data file fd.  even if it fails,
+			 * sock_data will close our lcfd for us.  when it succeeds, it'll
+			 * open the data file before closing lcfd, which will keep the
+			 * converstation alive.
 			 *
-			 * Note, we pass the listen socket's stype, but not it's sopts.  If
-			 * we implement something like accept4, that's where those sopts
-			 * (e.g. O_CLOEXEC, O_NONBLOCK) will come from. */
+			 * Note, we pass the listen socket's stype, but not it's sopts.  The
+			 * sopts (e.g. SOCK_NONBLOCK) apply to the original socket, not to
+			 * the new one.  If we want to do something like accept4(), we'll
+			 * want to pass the sopts for the *new* socket in stype.  (Both the
+			 * listen socket and the new socket have the same stype). */
 			nfd = _sock_data(lcfd, net, r->domain, r->stype, r->protocol, &nr);
 			if (nfd < 0)
 				return -1;

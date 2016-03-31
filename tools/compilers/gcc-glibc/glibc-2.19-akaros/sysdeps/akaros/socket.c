@@ -32,7 +32,6 @@ int __socket(int domain, int type, int protocol)
 {
 	Rock *r;
 	int cfd, n;
-	int open_flags = O_RDWR;
 	int pfd[2];
 	const char *net;
 	char msg[128];
@@ -42,12 +41,11 @@ int __socket(int domain, int type, int protocol)
 
 	switch (domain) {
 		case PF_INET:
-			open_flags |= (type & SOCK_NONBLOCK ? O_NONBLOCK : 0);
 			/* get a free network directory */
 			switch (_sock_strip_opts(type)) {
 				case SOCK_DGRAM:
 					net = "udp";
-					cfd = open("/net/udp/clone", open_flags);
+					cfd = open("/net/udp/clone", O_RDWR);
 					/* All BSD UDP sockets are in 'headers' mode, where each
 					 * packet has the remote addr:port, local addr:port and
 					 * other info. */
@@ -66,7 +64,7 @@ int __socket(int domain, int type, int protocol)
 					break;
 				case SOCK_STREAM:
 					net = "tcp";
-					cfd = open("/net/tcp/clone", open_flags);
+					cfd = open("/net/tcp/clone", O_RDWR);
 					break;
 				default:
 					errno = EPROTONOSUPPORT;

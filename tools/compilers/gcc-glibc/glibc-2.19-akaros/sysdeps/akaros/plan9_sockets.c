@@ -199,13 +199,13 @@ void _sock_fd_closed(int fd)
 
 /* For a ctlfd and a few other settings, it opens and returns the corresponding
  * datafd.  This will close cfd for you. */
-
 int _sock_data(int cfd, const char *net, int domain, int type, int protocol,
                Rock **rp)
 {
 	int n, fd;
 	Rock *r;
 	char name[Ctlsize];
+	int open_flags = O_RDWR;
 
 	/* get the data file name */
 	n = read(cfd, name, sizeof(name) - 1);
@@ -219,7 +219,8 @@ int _sock_data(int cfd, const char *net, int domain, int type, int protocol,
 	snprintf(name, sizeof name, "/net/%s/%d/data", net, n);
 
 	/* open data file */
-	fd = open(name, O_RDWR);
+	open_flags |= (type & SOCK_NONBLOCK ? O_NONBLOCK : 0);
+	fd = open(name, open_flags);
 	close(cfd);	/* close this no matter what */
 	if (fd < 0) {
 		errno = ENOBUFS;
