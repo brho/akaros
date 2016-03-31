@@ -632,7 +632,6 @@ enum {
 	Qcoalesce = (1 << 4),	/* coallesce packets on read */
 	Qkick = (1 << 5),	/* always call the kick routine after qwrite */
 	Qdropoverflow = (1 << 6),	/* writes that would block will be dropped */
-	Qnonblock = (1 << 7),	/* do not block, throw EAGAIN */
 };
 
 #define DEVDOTDOT -1
@@ -832,7 +831,6 @@ int qisclosed(struct queue *);
 ssize_t qiwrite(struct queue *, void *, int);
 int qlen(struct queue *);
 void qdropoverflow(struct queue *, bool);
-void qnonblock(struct queue *, bool);
 struct queue *qopen(int unused_int, int, void (*)(void *), void *);
 ssize_t qpass(struct queue *, struct block *);
 ssize_t qpassnolim(struct queue *, struct block *);

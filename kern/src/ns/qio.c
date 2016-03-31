@@ -1691,7 +1691,7 @@ void qclose(struct queue *q)
 	/* mark it */
 	spin_lock_irqsave(&q->lock);
 	q->state |= Qclosed;
-	q->state &= ~(Qflow | Qstarve | Qdropoverflow | Qnonblock);
+	q->state &= ~(Qflow | Qstarve | Qdropoverflow);
 	q->err[0] = 0;
 	bfirst = q->bfirst;
 	q->bfirst = 0;
@@ -1800,15 +1800,6 @@ void qdropoverflow(struct queue *q, bool onoff)
 		q->state |= Qdropoverflow;
 	else
 		q->state &= ~Qdropoverflow;
-}
-
-/* set whether or not the queue is nonblocking, in the EAGAIN sense. */
-void qnonblock(struct queue *q, bool onoff)
-{
-	if (onoff)
-		q->state |= Qnonblock;
-	else
-		q->state &= ~Qnonblock;
 }
 
 /*
