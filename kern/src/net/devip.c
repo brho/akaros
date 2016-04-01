@@ -625,9 +625,9 @@ static char *ipchaninfo(struct chan *ch, char *ret, size_t ret_l)
 		case Qdata:
 			proto = f->p[PROTO(ch->qid)];
 			conv = proto->conv[CONV(ch->qid)];
-			snprintf(ret, ret_l, "Qdata, %s proto %s, conv idx %d",
+			snprintf(ret, ret_l, "Qdata, %s, proto %s, conv idx %d, rq len %d, wq len %d",
 			         SLIST_EMPTY(&conv->data_taps) ? "untapped" : "tapped",
-			         proto->name, conv->x);
+			         proto->name, conv->x, qlen(conv->rq), qlen(conv->wq));
 			break;
 		case Qarp:
 			ret = "Qarp";
