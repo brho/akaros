@@ -840,12 +840,6 @@ int64_t sysseek(int fd, int64_t off, int whence)
 		cclose(c);
 		nexterror();
 	}
-
-	/* TODO: WTF is this?  Is pipe magically the only device that isn't
-	 * seekable? */
-	if (!strcmp(devtab[c->type].name, "pipe"))
-		error(EINVAL, ERROR_FIXME);
-
 	switch (whence) {
 		case 0:
 			if (c->qid.type & QTDIR) {
