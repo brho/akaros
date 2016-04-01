@@ -27,10 +27,11 @@
  * will result in spurious wakeups.
  *
  * One issue with the global FD set is that one thread may consume the epoll
- * events intended for another thread.  To get around this, only one thread is
- * the actual epoller, and the others block on a mutex.  An alternative is to
- * use a per-thread FD set, using TLS, but not every 2LS uses TLS, and
- * performance is not a concern for code using select().
+ * events intended for another thread (or even for itself at another call
+ * site!).  To get around this, only one thread is the actual epoller, and the
+ * others block on a mutex.  An alternative is to use a per-thread FD set, using
+ * TLS, but not every 2LS uses TLS, and performance is not a concern for code
+ * using select().
  *
  * Notes:
  * - pselect might be racy
@@ -47,6 +48,7 @@
 
 #include <ros/common.h>
 #include <parlib/uthread.h>
+#include <parlib/arch/arch.h>
 #include <sys/close_cb.h>
 #include <sys/fork_cb.h>
 #include <sys/epoll.h>
@@ -58,7 +60,7 @@
 static int epoll_fd;
 static fd_set all_fds;
 static uth_mutex_t fdset_mtx;
-static struct uthread *owner;
+static uintptr_t unique_caller;
 static uth_mutex_t sleep_mtx;
 
 static bool fd_is_set(unsigned int fd, fd_set *set)
@@ -132,6 +134,7 @@ int select(int nfds, fd_set *readfds, fd_set *writefds,
 	bool changed_set = FALSE;
 	struct epoll_event ep_ev;
 	struct epoll_event *ep_results;
+	uintptr_t my_call_id;
 	int ep_timeout = select_tv_to_ep_timeout(timeout);
 
 	run_once(select_init());
@@ -180,14 +183,21 @@ int select(int nfds, fd_set *readfds, fd_set *writefds,
 	/* Since there is a global epoll set, we could have multiple threads
 	 * epolling at a time and one thread could consume the events that should
 	 * wake another thread.  We don't know when the 'other' thread last polled,
-	 * so we'll need to assume its event was consumed and just return.  If a
-	 * thread selects again and no other thread has since selected, then we know
-	 * no one consumed the events.  We use an 'owner' to track which thread most
-	 * recently selected.  We use a mutex so that the extra threads sleep. */
+	 * so we'll need to assume its event was consumed and just return.
+	 *
+	 * To make matters more confusing, we could also have a single thread that
+	 * selects multiple times on separate FD sets.  So we also need to
+	 * distinguish between calls and threads.
+	 *
+	 * If the same {thread, callsite} selects again and no one else has since
+	 * selected, then we know no one consumed the events.  We'll use the stack
+	 * pointer to uniquely identify the {thread, callsite} combo that recently
+	 * selected.  We use a mutex so that the extra threads sleep. */
 	uth_mutex_lock(sleep_mtx);
-	if (owner != current_uthread) {
-		/* Could thrash, if we fight with another uth for owner */
-		owner = current_uthread;
+	my_call_id = get_stack_pointer();
+	if (my_call_id != unique_caller) {
+		/* Could thrash, if we fight with another uth for unique_caller */
+		unique_caller = my_call_id;
 		uth_mutex_unlock(sleep_mtx);
 		return nfds;
 	}
