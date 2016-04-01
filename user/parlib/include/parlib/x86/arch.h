@@ -41,6 +41,14 @@ set_stack_pointer(void *sp)
 	asm volatile("mov %0,%%"X86_REG_SP"" : : "r"(sp) : "memory", X86_REG_SP);
 }
 
+static inline unsigned long get_stack_pointer(void)
+{
+	unsigned long sp;
+
+	asm volatile("mov %%"X86_REG_SP",%0" : "=r"(sp));
+	return sp;
+}
+
 static inline void breakpoint(void)
 {
 	asm volatile("int3");

@@ -16,6 +16,14 @@ set_stack_pointer(void* sp)
 	asm volatile ("move sp, %0" : : "r"(sp) : "memory");
 }
 
+static inline unsigned long get_stack_pointer(void)
+{
+	unsigned long sp;
+
+	asm volatile("move %0, sp" : "=r"(sp));
+	return sp;
+}
+
 static __inline void
 breakpoint(void)
 {
