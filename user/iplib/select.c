@@ -39,12 +39,15 @@
  *   select use it as a timer only.  if that comes up, we can expand this.
  * - if you epoll or FD tap an FD, then try to use select on it, you'll get an
  *   error (only one tap per FD).  select() only knows about the FDs in its set.
+ * - if you select() on a readfd that is a disk file, it'll always say it is
+ *   available for I/O.
  */
 
 #include <sys/select.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include <ros/common.h>
 #include <parlib/uthread.h>
@@ -128,6 +131,21 @@ static int select_tv_to_ep_timeout(struct timeval *tv)
 	return tv->tv_sec * 1000 + DIV_ROUND_UP(tv->tv_usec, 1000);
 }
 
+/* Check with the kernel if FD is readable or not.  Some apps will call select()
+ * on something even if it is already readable.
+ *
+ * TODO: this *won't* work for disk based files.  It only works on qids that are
+ * backed with qio queues or something similar, where size == readable. */
+static bool fd_is_readable(int fd)
+{
+	struct stat stat_buf;
+	int ret;
+
+	ret = fstat(fd, &stat_buf);
+	assert(!ret);
+	return stat_buf.st_size > 0;
+}
+
 int select(int nfds, fd_set *readfds, fd_set *writefds,
            fd_set *exceptfds, struct timeval *timeout)
 {
@@ -142,6 +160,13 @@ int select(int nfds, fd_set *readfds, fd_set *writefds,
 	if (nfds < 0) {
 		errno = EINVAL;
 		return -1;
+	}
+	/* It is legal to select even if you didn't consume all of the data in an
+	 * FD.  Similar for writables, though it's harder for us to check those.
+	 * Hopefully we don't need to. */
+	for (int i = 0; i < nfds; i++) {
+		if (fd_is_set(i, readfds) && fd_is_readable(i))
+			return nfds;
 	}
 	uth_mutex_lock(fdset_mtx);
 	for (int i = 0; i < nfds; i++) {
