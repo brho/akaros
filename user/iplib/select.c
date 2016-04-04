@@ -153,6 +153,7 @@ int select(int nfds, fd_set *readfds, fd_set *writefds,
 	struct epoll_event ep_ev;
 	struct epoll_event *ep_results;
 	uintptr_t my_call_id;
+	int ret;
 	int ep_timeout = select_tv_to_ep_timeout(timeout);
 
 	run_once(select_init());
@@ -236,10 +237,12 @@ int select(int nfds, fd_set *readfds, fd_set *writefds,
 	}
 	/* Don't care which ones were set; we'll just tell the user they all were
 	 * set.  If they can't handle that, this whole plan won't work. */
-	epoll_wait(epoll_fd, ep_results, FD_SETSIZE, ep_timeout);
+	ret = epoll_wait(epoll_fd, ep_results, FD_SETSIZE, ep_timeout);
 	uth_mutex_unlock(sleep_mtx);
 	free(ep_results);
 	/* TODO: consider updating timeval.  It's not mandatory (POSIX). */
+	if (ret == 0)	/* timeout */
+		return 0;
 	return nfds;
 }
 
