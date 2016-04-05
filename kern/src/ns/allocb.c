@@ -225,6 +225,7 @@ void checkb(struct block *b, char *msg)
 {
 	void *dead = (void *)Bdead;
 	struct extra_bdata *ebd;
+	size_t extra_len = 0;
 
 	if (b == dead)
 		panic("checkb b %s 0x%lx", msg, b);
@@ -251,12 +252,19 @@ void checkb(struct block *b, char *msg)
 
 	for (int i = 0; i < b->nr_extra_bufs; i++) {
 		ebd = &b->extra_data[i];
+		if (!ebd->base && (ebd->off || ebd->len))
+			panic("checkb %s: ebd %d has no base, but has off %d and len %d",
+			      msg, i, ebd->off, ebd->len);
 		if (ebd->base) {
 			if (!kmalloc_refcnt((void*)ebd->base))
-				panic("checkb buf %d, base %p has no refcnt!\n", i, ebd->base);
+				panic("checkb %s: buf %d, base %p has no refcnt!\n", msg, i,
+				      ebd->base);
+			extra_len += ebd->len;
 		}
 	}
-
+	if (extra_len != b->extra_len)
+		panic("checkb %s: block extra_len %d differs from sum of ebd len %d",
+		      msg, b->extra_len, extra_len);
 }
 
 void printblock(struct block *b)

@@ -302,7 +302,7 @@ struct block *pullupblock(struct block *bp, int n)
 		if (len > bp->extra_len)
 			panic("pullup more than extra (%d, %d, %d)\n",
 			      n, BHLEN(bp), bp->extra_len);
-		checkb(bp, "before pullup");
+		QDEBUG checkb(bp, "before pullup");
 		for (int i = 0; (i < bp->nr_extra_bufs) && len; i++) {
 			ebd = &bp->extra_data[i];
 			if (!ebd->base || !ebd->len)
@@ -323,7 +323,7 @@ struct block *pullupblock(struct block *bp, int n)
 		/* maybe just call pullupblock recursively here */
 		if (len)
 			panic("pullup %d bytes overdrawn\n", len);
-		checkb(bp, "after pullup");
+		QDEBUG checkb(bp, "after pullup");
 		return bp;
 	}
 
