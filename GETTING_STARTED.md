@@ -246,7 +246,7 @@ Here is the command I use to run `qemu`/`kvm`.  It's evolved over the years,
 and it will vary based on your linux distribution.  Don't run it just yet:
 
 ```
-$ qemu-system-x86_64 -s -enable-kvm -cpu kvm64 -smp 8 -m 4096 -nographic -monitor /dev/pts/3 -net nic,model=e1000 -net user,hostfwd=tcp::5555-:23 -net dump,file=/tmp/vm.pcap -drive file=mnt/hdd.img,index=0,media=disk,format=raw
+$ qemu-system-x86_64 -s -enable-kvm -cpu kvm64 -smp 8 -m 4096 -nographic -monitor /dev/pts/3 -net nic,model=e1000 -net user,hostfwd=tcp::5555-:22 -net dump,file=/tmp/vm.pcap -drive file=mnt/hdd.img,index=0,media=disk,format=raw
 ```
 
 If you skipped making a virtual machine image or want to run the kernel
@@ -264,7 +264,7 @@ handle your inputs.
 spawning off a fake cpu crt/monitor.
 
 The command as written uses qemu's user networking.  It's emulated and a little
-slow.  The example I have alo forwards port `5555` on the host to port `23` on
+slow.  The example I have alo forwards port `5555` on the host to port `22` on
 the guest.  Customize it according to your needs.
 
 Another option for networking is to set up a tun/tap device.  I use this on

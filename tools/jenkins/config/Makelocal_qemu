@@ -5,7 +5,7 @@ MEMORY_SIZE ?= 1024
 KERNEL_BIN ?= obj/kern/akaros-kernel
 ENABLE_KVM ?= #-enable-kvm
 
-QEMU_NETWORK = -net nic,model=$(NETWORK_CARD) -net user,hostfwd=tcp::5555-:23
+QEMU_NETWORK = -net nic,model=$(NETWORK_CARD) -net user,hostfwd=tcp::5555-:22
 
 qemu: all qemu-run 
 
