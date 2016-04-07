@@ -155,7 +155,7 @@ static inline void restore_fp_state(struct ancillary_state *silly)
 	if (cpu_has_feat(CPU_FEAT_X86_XSAVE)) {
 		edx = x86_default_xcr0 >> 32;
 		eax = x86_default_xcr0;
-		asm volatile("xrstor64 %0" : : "m"(*silly));
+		asm volatile("xrstor64 %0" : : "m"(*silly), "a"(eax), "d"(edx));
 	} else {
 		asm volatile("fxrstor64 %0" : : "m"(*silly));
 	}
