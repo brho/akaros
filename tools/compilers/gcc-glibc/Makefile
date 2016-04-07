@@ -358,6 +358,7 @@ gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2 \
 	rm -rf gcc-$(GCC_VERSION)
 	tar -jxf gcc-$(GCC_VERSION).tar.bz2
 	$(MAKE) .gcc-akaros-patch
+	patch --no-backup-if-mismatch -p0 < gcc-$(GCC_VERSION)-r233572.patch
 	patch --no-backup-if-mismatch -p0 < gcc-$(GCC_VERSION)-riscv.patch
 	(cd gcc-$(GCC_VERSION) && \
 	 ln -s ../gmp-$(GMP_VERSION) gmp && \
