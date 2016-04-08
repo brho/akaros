@@ -63,6 +63,10 @@ libc {
     eventfd_read;
     eventfd_write;
 
+    timerfd_create;
+    timerfd_settime;
+    timerfd_gettime;
+
     # Weak symbols in parlib-compat.c
     __vcoreid;
     __vcore_context;

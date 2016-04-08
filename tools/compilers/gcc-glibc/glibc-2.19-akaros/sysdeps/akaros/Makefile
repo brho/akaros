@@ -77,6 +77,12 @@ sysdep_routines += eventfd
 endif
 sysdep_headers += sys/eventfd.h bits/eventfd.h
 
+# Timerfd, implemented in glibc
+ifeq ($(subdir),stdlib)
+sysdep_routines += timerfd
+endif
+sysdep_headers += sys/timerfd.h bits/timerfd.h
+
 # time.h, override for struct timespec.  This overrides time/time.h from glibc,
 # installed as usr/inc/time.h.
 #
