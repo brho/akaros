@@ -25,7 +25,9 @@
  *	timerfd01.c
  * HISTORY
  *	28/05/2008 Initial contribution by Davide Libenzi <davidel@xmailserver.org>
- *      28/05/2008 Integrated to LTP by Subrata Modak <subrata@linux.vnet.ibm.com>
+ *	28/05/2008 Integrated to LTP by Subrata Modak <subrata@linux.vnet.ibm.com>
+ *	2016-04-08 Deintegrated from LTP by Barret Rhoden <brho@cs.berkeley.edu>
+ *		Ported to Akaros.  Added a few more tests.
  */
 
 #define _GNU_SOURCE
@@ -42,24 +44,11 @@
 #include <fcntl.h>
 #include <time.h>
 #include <errno.h>
-#include "test.h"
-#include "linux_syscall_numbers.h"
 
-#define cleanup tst_exit
-
-char *TCID = "timerfd01";
-
-/*
- * This were good at the time of 2.6.23-rc7 ...
- *
- * #ifdef __NR_timerfd
- *
- * ... but is not now with 2.6.25
- */
-#ifdef __NR_timerfd_create
-
-/* Definitions from include/linux/timerfd.h */
-#define TFD_TIMER_ABSTIME (1 << 0)
+#include <sys/timerfd.h>
+#include <sys/select.h>
+#include <benchutil/alarm.h>
+#include <parlib/uthread.h>
 
 struct tmr_type {
 	int id;
@@ -85,38 +74,27 @@ void set_timespec(struct timespec *tmr, unsigned long long ustime)
 	tmr->tv_nsec = (long)(1000ULL * (ustime % 1000000ULL));
 }
 
-int timerfd_create(int clockid, int flags)
-{
-
-	return ltp_syscall(__NR_timerfd_create, clockid, flags);
-}
-
-int timerfd_settime(int ufc, int flags, const struct itimerspec *utmr,
-		    struct itimerspec *otmr)
-{
-
-	return ltp_syscall(__NR_timerfd_settime, ufc, flags, utmr, otmr);
-}
-
-int timerfd_gettime(int ufc, struct itimerspec *otmr)
-{
-
-	return ltp_syscall(__NR_timerfd_gettime, ufc, otmr);
-}
 
 long waittmr(int tfd, int timeo)
 {
 	u_int64_t ticks;
-	struct pollfd pfd;
+	fd_set rfds;
+	struct timeval tv, *timeout = 0;
+	int ret;
 
-	pfd.fd = tfd;
-	pfd.events = POLLIN;
-	pfd.revents = 0;
-	if (poll(&pfd, 1, timeo) < 0) {
-		perror("poll");
+	FD_ZERO(&rfds);
+	FD_SET(tfd, &rfds);
+	if (timeo != -1) {
+		tv.tv_sec = timeo / 1000;
+		tv.tv_usec = (timeo % 1000) * 1000;
+		timeout = &tv;
+	}
+	ret = select(tfd + 1, &rfds, 0, 0, timeout);
+	if (ret < 0) {
+		perror("select");
 		return -1;
 	}
-	if ((pfd.revents & POLLIN) == 0) {
+	if (ret == 0) {
 		fprintf(stdout, "no ticks happened\n");
 		return -1;
 	}
@@ -124,11 +102,8 @@ long waittmr(int tfd, int timeo)
 		perror("timerfd read");
 		return -1;
 	}
-
 	return ticks;
 }
-
-int TST_TOTAL = 3;
 
 int main(int ac, char **av)
 {
@@ -141,12 +116,6 @@ int main(int ac, char **av)
 		{CLOCK_MONOTONIC, "CLOCK MONOTONIC"},
 		{CLOCK_REALTIME, "CLOCK REALTIME"},
 	};
-
-	if ((tst_kvercmp(2, 6, 25)) < 0) {
-		tst_resm(TCONF, "This test can only run on kernels that are ");
-		tst_resm(TCONF, "2.6.25 and higher");
-		exit(0);
-	}
 
 	for (i = 0; i < sizeof(clks) / sizeof(clks[0]); i++) {
 		fprintf(stdout,
@@ -169,7 +138,7 @@ int main(int ac, char **av)
 			return 1;
 		}
 
-		fprintf(stdout, "wating timer ...\n");
+		fprintf(stdout, "waiting timer ...\n");
 		ticks = waittmr(tfd, -1);
 		ttmr = getustime(clks[i].id);
 		if (ticks <= 0)
@@ -187,7 +156,7 @@ int main(int ac, char **av)
 			return 1;
 		}
 
-		fprintf(stdout, "wating timer ...\n");
+		fprintf(stdout, "waiting timer ...\n");
 		ticks = waittmr(tfd, -1);
 		ttmr = getustime(clks[i].id);
 		if (ticks <= 0)
@@ -219,7 +188,7 @@ int main(int ac, char **av)
 		fprintf(stdout, "sleeping 1 second ...\n");
 		sleep(1);
 
-		fprintf(stdout, "wating timer ...\n");
+		fprintf(stdout, "waiting timer ...\n");
 		ticks = waittmr(tfd, -1);
 		ttmr = getustime(clks[i].id);
 		if (ticks <= 0)
@@ -238,7 +207,7 @@ int main(int ac, char **av)
 		}
 		fprintf(stdout, "timerfd = %d\n", tfd);
 
-		fprintf(stdout, "wating timer (flush the single tick) ...\n");
+		fprintf(stdout, "waiting timer (flush the single tick) ...\n");
 		ticks = waittmr(tfd, -1);
 		ttmr = getustime(clks[i].id);
 		if (ticks <= 0)
@@ -259,21 +228,69 @@ int main(int ac, char **av)
 		else
 			fprintf(stdout, "success\n");
 
+		/* try a select loop with O_NONBLOCK */
+		fd_set rfds;
+		bool has_selected = FALSE;
+		int ret;
+
+		FD_ZERO(&rfds);
+		FD_SET(tfd, &rfds);
+		set_timespec(&tmr.it_value, 1000000);
+		set_timespec(&tmr.it_interval, 0);
+		if (timerfd_settime(tfd, 0, &tmr, NULL)) {
+			perror("timerfd_settime");
+			exit(-1);
+		}
+		while (1) {
+			ret = read(tfd, &uticks, sizeof(uticks));
+			if (ret < 0) {
+				if (errno != EAGAIN) {
+					perror("select read");
+					exit(-1);
+				}
+			} else {
+				if (ret != sizeof(uticks)) {
+					fprintf(stdout, "short read! (bad)\n");
+					exit(-1);
+				}
+				if (uticks)
+					break;
+			}
+			if (select(tfd + 1, &rfds, 0, 0, 0) < 0) {
+				perror("select");
+				return -1;
+			}
+			has_selected = TRUE;
+		}
+		if (!has_selected) {
+			fprintf(stdout, "Failed to try to select!\n");
+			exit(-1);
+		}
+		fprintf(stdout, "more success\n");
 		fcntl(tfd, F_SETFL, fcntl(tfd, F_GETFL, 0) & ~O_NONBLOCK);
+
+		/* let's make sure it actually blocks too. */
+		struct alarm_waiter waiter;
+
+		init_awaiter(&waiter, alarm_abort_sysc);
+		waiter.data = current_uthread;
+		set_awaiter_rel(&waiter, 1000000);
+
+		set_timespec(&tmr.it_value, 10000000);
+		set_timespec(&tmr.it_interval, 0);
+		if (timerfd_settime(tfd, 0, &tmr, NULL)) {
+			perror("timerfd_settime");
+			exit(-1);
+		}
+		set_alarm(&waiter);
+		ret = read(tfd, &uticks, sizeof(uticks));
+		unset_alarm(&waiter);
+		if (ret > 0) {
+			fprintf(stdout, "Failed to block when we should have!\n");
+			exit(-1);
+		}
+		fprintf(stdout, "done (still success)\n");
 
 		close(tfd);
 	}
-
-	tst_exit();
 }
-
-#else
-int TST_TOTAL = 0;
-
-int main(void)
-{
-
-	tst_brkm(TCONF, NULL,
-		 "This test needs a kernel that has timerfd syscall.");
-}
-#endif
