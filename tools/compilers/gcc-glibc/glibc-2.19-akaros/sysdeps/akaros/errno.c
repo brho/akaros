@@ -66,6 +66,27 @@ char *errstr(void)
 	return ros_errstr_loc();
 }
 
+/* Using this instead of strcpy/memcpy to avoid dependencies. */
+static void simple_strcpy(char *dst, char *src, size_t size)
+{
+	for (size_t i = 0; (i < size) && *src; i++)
+		*dst++ = *src++;
+}
+
+/* Helpers to save and restore errno and errstr into temporary locations.  Make
+ * sure str is MAX_ERRSTR_LEN bytes long. */
+void save_err(int *no, char *str)
+{
+	*no = errno;
+	simple_strcpy(str, errstr(), MAX_ERRSTR_LEN);
+}
+
+void restore_err(int *no, char *str)
+{
+	errno = *no;
+	simple_strcpy(errstr(), str, MAX_ERRSTR_LEN);
+}
+
 /* Don't try to hidden_data_def the function pointers.  Won't allow us to
  * switch, or otherwise track the right location. */
 libc_hidden_def(__errno_location_tls)

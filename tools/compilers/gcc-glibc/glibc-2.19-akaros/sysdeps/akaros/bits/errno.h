@@ -12,6 +12,8 @@ int *__errno_location(void);
 char *errstr(void); 	/* can't macro, errstr is used internally in libc */
 /* this is defined in init-first.c, but declared here for easy #includes */
 void werrstr(const char *fmt, ...);
+void save_err(int *no, char *str);
+void restore_err(int *no, char *str);
 
 # ifdef libc_hidden_proto
 libc_hidden_proto(__errno_location_tls)

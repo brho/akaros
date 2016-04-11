@@ -13,6 +13,8 @@ libc {
     __ros_scp_simple_evq;
     __ros_syscall_noerrno;
     __ros_syscall_errno;
+    save_err;
+    restore_err;
 
     set_tls_desc;
     get_tls_desc;
