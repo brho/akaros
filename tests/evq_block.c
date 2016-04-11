@@ -42,9 +42,9 @@ int main(int argc, char **argv)
 		return -1;
 	if (devalarm_get_fds(&ctlfd2, &timerfd2, 0))
 		return -1;
-	if (devalarm_set_evq(ctlfd1, evq1))
+	if (devalarm_set_evq(timerfd1, evq1, 0))
 		return -1;
-	if (devalarm_set_evq(ctlfd2, evq2))
+	if (devalarm_set_evq(timerfd2, evq2, 0))
 		return -1;
 	now = read_tsc();
 	/* with this setup and the early sleep, two fires, then one.  but we'll

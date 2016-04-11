@@ -72,13 +72,17 @@ int devalarm_get_fds(int *ctlfd_r, int *timerfd_r, int *alarmid_r)
 	return 0;
 }
 
-int devalarm_set_evq(int ctlfd, struct event_queue *ev_q)
+int devalarm_set_evq(int timerfd, struct event_queue *ev_q, int alarmid)
 {
-	int ret;
-	char path[32];
-	ret = snprintf(path, sizeof(path), "evq %llx", ev_q);
-	ret = write(ctlfd, path, ret);
-	if (ret <= 0)
+	struct fd_tap_req tap_req = {0};
+
+	tap_req.fd = timerfd;
+	tap_req.cmd = FDTAP_CMD_ADD;
+	tap_req.filter = FDTAP_FILT_WRITTEN;
+	tap_req.ev_id = EV_ALARM;
+	tap_req.ev_q = ev_q;
+	tap_req.data = (void*)(long)alarmid;
+	if (sys_tap_fds(&tap_req, 1) != 1)
 		return -1;
 	return 0;
 }
@@ -92,6 +96,13 @@ int devalarm_set_time(int timerfd, uint64_t tsc_time)
 	if (ret <= 0)
 		return -1;
 	return 0;
+}
+
+int devalarm_get_id(struct event_msg *ev_msg)
+{
+	if (!ev_msg)
+		return -1;
+	return (int)(long)ev_msg->ev_arg3;
 }
 
 int devalarm_disable(int ctlfd)
@@ -162,7 +173,7 @@ static void init_alarm_service(void)
 	reset_tchain_times(&global_tchain);
 
 	if (devalarm_get_fds(&ctlfd, &timerfd, &alarmid)) {
-		perror("devalarm_get_fds");
+		perror("Useralarm: devalarm_get_fds");
 		return;
 	}
 	/* Since we're doing SPAM_PUBLIC later, we actually don't need a big ev_q.
@@ -177,7 +188,7 @@ static void init_alarm_service(void)
 	 * __trigger can handle spurious upcalls.  If it ever is not okay, then use
 	 * an INDIR (probably with SPAM_INDIR too) instead of SPAM_PUBLIC. */
 	ev_q->ev_flags = EVENT_IPI | EVENT_SPAM_PUBLIC | EVENT_WAKEUP;
-	if (devalarm_set_evq(ctlfd, ev_q)) {
+	if (devalarm_set_evq(timerfd, ev_q, alarmid)) {
 		perror("set_alarm_evq");
 		return;
 	}
@@ -324,7 +335,7 @@ static void handle_user_alarm(struct event_msg *ev_msg, unsigned int ev_type,
                               void *data)
 {
 	assert(ev_type == EV_ALARM);
-	if (ev_msg && (ev_msg->ev_arg2 == global_tchain.alarmid))
+	if (devalarm_get_id(ev_msg) == global_tchain.alarmid)
 		__trigger_tchain(&global_tchain);
 }
 

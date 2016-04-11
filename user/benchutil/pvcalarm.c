@@ -17,6 +17,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <benchutil/pvcalarm.h>
+#include <benchutil/alarm.h>
 
 /* Different states for enabling/disabling the per-vcore alarms. */
 enum {
@@ -78,11 +79,7 @@ static int init_global_pvcalarm()
  * time */
 static void run_pvcalarm(struct pvcalarm_data *pvcalarm_data, uint64_t offset)
 {
-	int ret;
-	char buf[20];
-	ret = snprintf(buf, sizeof(buf), "%llx", read_tsc() + offset);
-	ret = write(pvcalarm_data->timerfd, buf, ret);
-	if (ret <= 0) {
+	if (devalarm_set_time(pvcalarm_data->timerfd, read_tsc() + offset)) {
 		perror("Useralarm: Failed to set timer");
 		return;
 	}
@@ -100,9 +97,7 @@ static void start_pvcalarm(struct pvcalarm_data *pvcalarm_data, uint64_t offset)
 /* Stop the pvc alarm associated with pvcalarm_data */
 static void stop_pvcalarm(struct pvcalarm_data *pvcalarm_data)
 {
-	int ret;
-	ret = write(pvcalarm_data->ctlfd, "cancel", sizeof("cancel"));
-	if (ret <= 0) {
+	if (devalarm_disable(pvcalarm_data->ctlfd)) {
 		printf("Useralarm: unable to disarm alarm!\n");
 		return;
 	}
@@ -178,30 +173,11 @@ int disable_pvcalarms()
  * online and the pvcalarm service is active */
 static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data, int vcoreid)
 {
-	int ctlfd, timerfd, alarmid, ev_flags, ret;
-	char buf[20];
-	char path[32];
+	int ctlfd, timerfd, alarmid, ev_flags;
 	struct event_queue *ev_q;
 
-	ctlfd = open("#alarm/clone", O_RDWR | O_CLOEXEC);
-	if (ctlfd < 0) {
-		perror("Pvcalarm: Can't clone an alarm");
-		return;
-	}
-	ret = read(ctlfd, buf, sizeof(buf) - 1);
-	if (ret <= 0) {
-		if (!ret)
-			printf("Pvcalarm: Got early EOF from ctl\n");
-		else
-			perror("Pvcalarm: Can't read ctl");
-		return;
-	}
-	buf[ret] = 0;
-	alarmid = atoi(buf);
-	snprintf(path, sizeof(path), "#alarm/a%s/timer", buf);
-	timerfd = open(path, O_RDWR | O_CLOEXEC);
-	if (timerfd < 0) {
-		perror("Pvcalarm: Can't open timer");
+	if (devalarm_get_fds(&ctlfd, &timerfd, &alarmid)) {
+		perror("Pvcalarm: alarm setup");
 		return;
 	}
 	register_ev_handler(EV_ALARM, handle_pvcalarm, 0);
@@ -213,10 +189,8 @@ static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data, int vcoreid)
 	}
 	ev_q->ev_vcore = vcoreid;
 	ev_q->ev_flags = ev_flags;
-	ret = snprintf(path, sizeof(path), "evq %llx", ev_q);
-	ret = write(ctlfd, path, ret);
-	if (ret <= 0) {
-		perror("Pvcalarm: Failed to write ev_q");
+	if (devalarm_set_evq(timerfd, ev_q, alarmid)) {
+		perror("Pvcalarm: Failed to set evq");
 		return;
 	}
 	/* now the alarm is all set, just need to write the timer whenever we want
@@ -261,7 +235,8 @@ static void handle_pvcalarm(struct event_msg *ev_msg, unsigned int ev_type,
                             void *data)
 {
 	struct pvcalarm_data *pvcalarm_data = &global_pvcalarm.data[vcore_id()];
-	if (!ev_msg || (ev_msg->ev_arg2 != pvcalarm_data->alarmid))
+
+	if (devalarm_get_id(ev_msg) != pvcalarm_data->alarmid)
 		return;
 	if (!__vcore_preamble()) return;
 	global_pvcalarm.handler(ev_msg, ev_type, data);

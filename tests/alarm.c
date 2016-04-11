@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <parlib/event.h>
 #include <benchutil/measure.h>
+#include <benchutil/alarm.h>
 #include <parlib/uthread.h>
 #include <parlib/timing.h>
 
@@ -24,39 +25,18 @@ static void handle_alarm(struct event_msg *ev_msg, unsigned int ev_type,
                          void *data)
 {
 	assert(ev_type == EV_ALARM);
-	printf("\tAlarm fired!, id %d\n", ev_msg ? ev_msg->ev_arg2 : 55555);
+	printf("\tAlarm fired!, id %p\n", devalarm_get_id(ev_msg));
 }
 
 int main(int argc, char **argv)
 {
 	int ctlfd, timerfd, alarm_nr, ret, srvfd;
 	char buf[20];
-	char path[32];
 	struct event_queue *ev_q;
 
 	printf("Starting alarm test\n");
-	/* standard 9ns stuff: clone and read it to get our path, ending up with the
-	 * ctlfd and timerfd for #alarm/aN/{ctl,timer}.  if you plan to fork, you
-	 * can open CLOEXEC. */
-	ctlfd = open("#alarm/clone", O_RDWR | O_CLOEXEC);
-	if (ctlfd < 0) {
-		perror("Can't clone an alarm");
-		exit(-1);
-	}
-	ret = read(ctlfd, buf, sizeof(buf) - 1);
-	if (ret <= 0) {
-		if (!ret)
-			printf("Got early EOF from ctl\n");
-		else
-			perror("Can't read ctl");
-		exit(-1);
-	}
-	buf[ret] = 0;
-	snprintf(path, sizeof(path), "#alarm/a%s/timer", buf);
-	/* Don't open CLOEXEC if you want to post it to srv later */
-	timerfd = open(path, O_RDWR);
-	if (timerfd < 0) {
-		perror("Can't open timer");
+	if (devalarm_get_fds(&ctlfd, &timerfd, 0)) {
+		perror("Alarm setup");
 		exit(-1);
 	}
 	/* Since we're doing SPAM_PUBLIC later, we actually don't need a big ev_q.
@@ -72,31 +52,23 @@ int main(int argc, char **argv)
 	 * we have concurrent preempts/yields. */
 	ev_q->ev_flags = EVENT_IPI | EVENT_SPAM_PUBLIC | EVENT_WAKEUP;
 	/* Register the ev_q for our alarm */
-	ret = snprintf(path, sizeof(path), "evq %llx", ev_q);
-	ret = write(ctlfd, path, ret);
-	if (ret <= 0) {
-		perror("Failed to write ev_q");
+	if (devalarm_set_evq(timerfd, ev_q, 0xdeadbeef)) {
+		perror("Failed to set evq");
 		exit(-1);
 	}
 	/* Try to set, then cancel before it should go off */
-	ret = snprintf(buf, sizeof(buf), "%llx", read_tsc() + sec2tsc(1));
-	ret = write(timerfd, buf, ret);
-	if (ret <= 0) {
+	if (devalarm_set_time(timerfd, read_tsc() + sec2tsc(1))) {
 		perror("Failed to set timer");
 		exit(-1);
 	}
-	ret = snprintf(buf, sizeof(buf), "cancel");
-	ret = write(ctlfd, buf, ret);
-	if (ret <= 0) {
+	if (devalarm_disable(ctlfd)) {
 		perror("Failed to cancel timer");
 		exit(-1);
 	}
 	uthread_sleep(2);
 	printf("No alarm should have fired yet\n");
 	/* Try to set and receive */
-	ret = snprintf(buf, sizeof(buf), "%llx", read_tsc() + sec2tsc(1));
-	ret = write(timerfd, buf, ret);
-	if (ret <= 0) {
+	if (devalarm_set_time(timerfd, read_tsc() + sec2tsc(1))) {
 		perror("Failed to set timer");
 		exit(-1);
 	}

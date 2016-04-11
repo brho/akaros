@@ -9,8 +9,8 @@
 #include <sys/queue.h>
 #include <kref.h>
 #include <alarm.h>
-#include <event.h>
 #include <atomic.h>
+#include <fdtap.h>
 
 struct proc_alarm {
 	TAILQ_ENTRY(proc_alarm)		link;
@@ -18,7 +18,8 @@ struct proc_alarm {
 	struct kref					kref;
 	struct alarm_waiter			a_waiter;
 	struct proc					*proc;
-	struct event_queue			*ev_q;
+	spinlock_t					tap_lock;
+	struct fdtap_slist			fd_taps;
 };
 TAILQ_HEAD(proc_alarm_list, proc_alarm);
 

@@ -4,16 +4,18 @@
  *
  * #alarm: a device for registering per-process alarms.
  *
- * Allows a process to set up alarms, where the kernel will send an event to a
- * posted ev_q at a certain TSC time.
+ * Allows a process to set up alarms, which they can tap to get events at a
+ * certain TSC time.
  *
  * Every process has their own alarm sets and view of #alarm; gen and friends
  * look at current's alarmset when it is time to gen or open a file.
  *
  * To use, first open #alarm/clone, and that gives you an alarm directory aN,
- * where N is ID of the alarm.  ctl takes two commands: "evq POINTER" (to tell
- * the kernel the pointer of your ev_q) and "cancel", to stop an alarm.  timer
- * takes just the value (in absolute tsc time) to fire the alarm.
+ * where N is ID of the alarm.
+ *
+ * ctl takes one command: "cancel", to stop an alarm.  timer takes just the
+ * value (in absolute tsc time) to fire the alarm.  To find out about the timer
+ * firing, put an FD tap on the timer for FDTAP_FILT_WRITTEN.
  *
  * While each process has a separate view of #alarm, it is possible to post a
  * chan to Qctl or Qtimer to #srv.  If another proc has your Qtimer, it can set
@@ -50,7 +52,6 @@
 #include <kref.h>
 #include <atomic.h>
 #include <alarm.h>
-#include <event.h>
 #include <umem.h>
 #include <devalarm.h>
 
@@ -90,19 +91,24 @@ static void alarm_release(struct kref *kref)
 	kfree(a);
 }
 
+static void alarm_fire_taps(struct proc_alarm *a, int filter)
+{
+	struct fd_tap *tap_i;
+
+	if (SLIST_EMPTY(&a->fd_taps))
+		return;
+	/* TODO: (RCU) Locking to protect the list and the tap's existence. */
+	spin_lock(&a->tap_lock);
+	SLIST_FOREACH(tap_i, &a->fd_taps, link)
+		fire_tap(tap_i, filter);
+	spin_unlock(&a->tap_lock);
+}
+
 static void proc_alarm_handler(struct alarm_waiter *a_waiter)
 {
 	struct proc_alarm *a = container_of(a_waiter, struct proc_alarm, a_waiter);
-	struct event_queue *ev_q = ACCESS_ONCE(a->ev_q);
-	struct event_msg msg;
-	if (!ev_q || !a->proc) {
-		printk("[kernel] proc_alarm, bad ev_q %p or proc %p\n", ev_q, a->proc);
-		return;
-	}
-	memset(&msg, 0, sizeof(struct event_msg));
-	msg.ev_type = EV_ALARM;
-	msg.ev_arg2 = a->id;
-	send_event(a->proc, ev_q, &msg, 0);
+
+	alarm_fire_taps(a, FDTAP_FILT_WRITTEN);
 }
 
 void devalarm_init(struct proc *p)
@@ -253,6 +259,8 @@ static struct chan *alarmopen(struct chan *c, int omode)
 		case Qclone:
 			a = kzmalloc(sizeof(struct proc_alarm), MEM_WAIT);
 			kref_init(&a->kref, alarm_release, 1);
+			SLIST_INIT(&a->fd_taps);
+			spinlock_init(&a->tap_lock);
 			init_awaiter(&a->a_waiter, proc_alarm_handler);
 			spin_lock(&p->alarmset.lock);
 			a->id = p->alarmset.id_counter++;
@@ -373,17 +381,7 @@ static long alarmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 			}
 			if (cb->nf < 1)
 				error(EFAIL, "short control request");
-			if (!strcmp(cb->f[0], "evq")) {
-				if (cb->nf < 2)
-					error(EFAIL, "evq needs a pointer");
-				/* i think it's safe to do a stroul on a parsecmd.  it's kernel
-				 * memory, and space or 0 terminated */
-				hexval = strtoul(cb->f[1], 0, 16);
-				/* This is just to help userspace - event code can handle it */
-				if (!is_user_rwaddr((void *)hexval, sizeof(struct event_queue)))
-					error(EFAIL, "Non-user ev_q pointer");
-				p_alarm->ev_q = (struct event_queue *)hexval;
-			} else if (!strcmp(cb->f[0], "cancel")) {
+			if (!strcmp(cb->f[0], "cancel")) {
 				unset_alarm(p_alarm->proc->alarmset.tchain, &p_alarm->a_waiter);
 			} else {
 				error(EFAIL, "%s: not implemented", cb->f[0]);
@@ -414,6 +412,62 @@ static long alarmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 	return n;
 }
 
+static int alarm_tapfd(struct chan *c, struct fd_tap *tap, int cmd)
+{
+	int ret;
+	struct proc_alarm *a = QID2A(c->qid);
+
+	/* We don't actually support HANGUP, but epoll implies it. */
+	#define ALARM_LEGAL_TIMER_TAPS (FDTAP_FILT_WRITTEN | FDTAP_FILT_HANGUP)
+
+	switch (TYPE(c->qid)) {
+	case Qtimer:
+		if (tap->filter & ~ALARM_LEGAL_TIMER_TAPS) {
+			set_error(ENOSYS, "Unsupported #%s tap, must be %p", devname(),
+					  ALARM_LEGAL_TIMER_TAPS);
+			return -1;
+		}
+		spin_lock(&a->tap_lock);
+		switch (cmd) {
+		case (FDTAP_CMD_ADD):
+			SLIST_INSERT_HEAD(&a->fd_taps, tap, link);
+			ret = 0;
+			break;
+		case (FDTAP_CMD_REM):
+			SLIST_REMOVE(&a->fd_taps, tap, fd_tap, link);
+			ret = 0;
+			break;
+		default:
+			set_error(ENOSYS, "Unsupported #%s tap command %p",
+					  devname(), cmd);
+			ret = -1;
+		}
+		spin_unlock(&a->tap_lock);
+		return ret;
+	default:
+		set_error(ENOSYS, "Can't tap #%s file type %d", devname(),
+		          c->qid.path);
+		return -1;
+	}
+}
+
+static char *alarm_chaninfo(struct chan *ch, char *ret, size_t ret_l)
+{
+	struct proc_alarm *a = QID2A(ch->qid);
+
+	switch (TYPE(ch->qid)) {
+	case Qctl:
+	case Qtimer:
+		snprintf(ret, ret_l, "Id %d, %s, expires %llu", a->id,
+		         SLIST_EMPTY(&a->fd_taps) ? "untapped" : "tapped",
+		         a->a_waiter.wake_up_time);
+		break;
+	default:
+		return devchaninfo(ch, ret, ret_l);
+	}
+	return ret;
+}
+
 struct dev alarmdevtab __devtab = {
 	.name = "alarm",
 
@@ -433,5 +487,6 @@ struct dev alarmdevtab __devtab = {
 	.remove = alarmremove,
 	.wstat = alarmwstat,
 	.power = devpower,
-	.chaninfo = devchaninfo,
+	.chaninfo = alarm_chaninfo,
+	.tapfd = alarm_tapfd,
 };
