@@ -63,7 +63,6 @@ libc {
     __vcoreid;
     __vcore_context;
     akaros_printf;
-    akaros_vfprintf;
     print_user_context;
     _assert_failed;
   }

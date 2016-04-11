@@ -30,9 +30,7 @@
 #include <locale/localeinfo.h>
 #include <stdio.h>
 
-/* AKAROS: added a callout to our vprintf for vcore context */
-#include <parlib/stdio.h>
-#include <parlib/vcore.h>
+/* Modified for AKAROS, uses malloc in place of large stack allocations */
 
 /* This code is shared between the standard stdio implementation found
    in GNU C library and the libio implementation originally found in
@@ -224,10 +222,6 @@ static CHAR_T *group_number (CHAR_T *, CHAR_T *, const char *, const char *)
 int
 vfprintf (FILE *s, const CHAR_T *format, va_list ap)
 {
-	/* AKAROS */
-	if (in_vcore_context())
-		return akaros_vfprintf(s, format, ap);
-
   /* The character used as thousands separator.  */
 #ifdef COMPILE_WPRINTF
   wchar_t thousands_sep = L'\0';
@@ -251,7 +245,10 @@ vfprintf (FILE *s, const CHAR_T *format, va_list ap)
   const UCHAR_T *end_of_spec;
 
   /* Buffer intermediate results.  */
-  CHAR_T work_buffer[1000];
+  /* AKAROS malloc work_buf */
+  //CHAR_T work_buffer[1000];
+  CHAR_T *work_buffer = malloc(1000);
+
   CHAR_T *workstart = NULL;
   CHAR_T *workend;
 
@@ -2061,6 +2058,8 @@ all_done:
   _IO_funlockfile (s);
   _IO_cleanup_region_end (0);
 
+  /* AKAROS */
+  free(work_buffer);
   return done;
 }
 
@@ -2284,7 +2283,10 @@ internal_function
 buffered_vfprintf (_IO_FILE *s, const CHAR_T *format,
 		   _IO_va_list args)
 {
-  CHAR_T buf[_IO_BUFSIZ];
+	/* AKAROS: malloc the buf.  */
+  //CHAR_T buf[_IO_BUFSIZ];
+  CHAR_T *buf = malloc(_IO_BUFSIZ);
+
   struct helper_file helper;
   _IO_FILE *hp = (_IO_FILE *) &helper._f;
   int result, to_flush;
@@ -2346,6 +2348,7 @@ buffered_vfprintf (_IO_FILE *s, const CHAR_T *format,
   _IO_funlockfile (s);
   __libc_cleanup_region_end (0);
 
+  free(buf); /* AKAROS */
   return result;
 }
 
