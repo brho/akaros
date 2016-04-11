@@ -943,7 +943,6 @@ int sysfstatakaros(int fd, struct kstat *);
 char *sysfd2path(int fd);
 int sysfauth(int fd, char *aname);
 int sysfversion(int fd, unsigned int msize, char *vers, unsigned int arglen);
-int syspipe(int fd[2]);
 int sysfwstat(int fd, uint8_t * buf, int n);
 long bindmount(struct chan *c, char *old, int flag, char *spec);
 int sysbind(char *new, char *old, int flags);

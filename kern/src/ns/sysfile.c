@@ -353,52 +353,6 @@ int sysfversion(int fd, unsigned int msize, char *vers, unsigned int arglen)
 	return m;
 }
 
-int syspipe(int fd[2])
-{
-	ERRSTACK(1);
-	struct dev *d;
-	struct chan *c[2];
-	static char *names[] = { "data", "data1" };
-
-	d = &devtab[devno("pipe", 0)];
-	c[0] = 0;
-	c[1] = 0;
-	fd[0] = -1;
-	fd[1] = -1;
-	if (waserror()) {
-		/* need to remove from the fd table and make sure the chan is closed
-		 * exactly once.  if fd[i] >= 0, then the fd is valid (or it was!) and
-		 * the fd table has the only ref (newfd() currently decrefs/consumes the
-		 * reference).  cclose() doesn't care if you pass it 0 (like kfree()). */
-		if (fd[0] >= 0)
-			close_fd(&current->open_files, fd[0]);
-		else
-			cclose(c[0]);
-		if (fd[1] >= 0)
-			close_fd(&current->open_files, fd[1]);
-		else
-			cclose(c[1]);
-		poperror();
-		return -1;
-	}
-	c[0] = namec("#pipe", Atodir, 0, 0);
-	c[1] = cclone(c[0]);
-	if (walk(&c[0], &names[0], 1, FALSE, NULL) < 0)
-		error(EINVAL, ERROR_FIXME);
-	if (walk(&c[1], &names[1], 1, FALSE, NULL) < 0)
-		error(EINVAL, ERROR_FIXME);
-	c[0] = d->open(c[0], O_RDWR);
-	c[1] = d->open(c[1], O_RDWR);
-	fd[0] = newfd(c[0], 0);
-	if (fd[0] < 0)
-		error(-fd[0], ERROR_FIXME);
-	fd[1] = newfd(c[1], 0);
-	if (fd[1] < 0)
-		error(-fd[1], ERROR_FIXME);
-	poperror();
-	return 0;
-}
-
 int sysfwstat(int fd, uint8_t * buf, int n)
 {
 	ERRSTACK(2);

@@ -69,7 +69,7 @@
 #define SYS_getcwd				117
 #define SYS_mkdir				118
 #define SYS_rmdir				119
-#define SYS_pipe				120
+/* was SYS_pipe				120 */
 
 #define SYS_wstat				121
 #define SYS_fwstat				122

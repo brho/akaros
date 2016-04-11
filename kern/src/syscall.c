@@ -2011,22 +2011,6 @@ intreg_t sys_rmdir(struct proc *p, const char *path, size_t path_l)
 	return retval;
 }
 
-intreg_t sys_pipe(struct proc *p, int *u_pipefd, int flags)
-{
-	int pipefd[2] = {0};
-	int retval = syspipe(pipefd);
-
-	if (retval)
-		return -1;
-	if (memcpy_to_user_errno(p, u_pipefd, pipefd, sizeof(pipefd))) {
-		sysclose(pipefd[0]);
-		sysclose(pipefd[1]);
-		set_errno(EFAULT);
-		return -1;
-	}
-	return 0;
-}
-
 intreg_t sys_gettimeofday(struct proc *p, int *buf)
 {
 	static spinlock_t gtod_lock = SPINLOCK_INITIALIZER;
@@ -2582,7 +2566,6 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_getcwd] = {(syscall_t)sys_getcwd, "getcwd"},
 	[SYS_mkdir] = {(syscall_t)sys_mkdir, "mkdir"},
 	[SYS_rmdir] = {(syscall_t)sys_rmdir, "rmdir"},
-	[SYS_pipe] = {(syscall_t)sys_pipe, "pipe"},
 	[SYS_gettimeofday] = {(syscall_t)sys_gettimeofday, "gettime"},
 	[SYS_tcgetattr] = {(syscall_t)sys_tcgetattr, "tcgetattr"},
 	[SYS_tcsetattr] = {(syscall_t)sys_tcsetattr, "tcsetattr"},

@@ -333,7 +333,7 @@ mountinit(char *service, char *mntpt)
 	char buf[32];
 	int ret;
 
-	ret = syscall(SYS_pipe, (unsigned long)p);
+	ret = pipe(p);
 	if (ret < 0){
 		error(1, 0, "pipe: %r");
 		exit(1);
