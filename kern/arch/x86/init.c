@@ -122,14 +122,21 @@ void ancillary_state_init(void)
 		// It may be possible for memset to clobber SSE registers.
 		memset(&x86_default_fpu, 0x00, sizeof(struct ancillary_state));
 
-		// FNINIT clears FIP and FDP and, even though it is technically a
-		// control instruction, it clears FOP while initializing the FPU.
+		/*
+		 * FNINIT clears FIP and FDP and, even though it is technically a
+		 * control instruction, it clears FOP while initializing the FPU.
+		 *
+		 * This marks the STX/MMX registers as empty in the FPU tag word,
+		 * but does not actually clear the values in the registers,
+		 * so we manually clear them in the xsave area after saving.
+		 */
 		asm volatile ("fninit");
 
 		/*
 		 * Save only the x87 FPU state so that the extended state registers
-		 * remain zeroed in the default. There is a caveat to this that
-		 * involves the MXCSR register, this is handled below.
+		 * remain zeroed in the default. The MXCSR is in a separate state
+		 * component (SSE), so we manually set its value in the default state.
+		 *
 		 * We use XSAVE64 instead of XSAVEOPT64 (save_fp_state uses
 		 * XSAVEOPT64), because XSAVEOPT64 may decide to skip saving a state
 		 * component if that state component is in its initial configuration,
@@ -140,6 +147,9 @@ void ancillary_state_init(void)
 		edx = 0x0;
 		eax = 0x1;
 		asm volatile("xsave64 %0" : : "m"(x86_default_fpu), "a"(eax), "d"(edx));
+
+		// Clear junk that might have been saved from STX/MMX registers
+		memset(&(x86_default_fpu.st0_mm0), 0x00, 128);
 
 		/* We must set the MXCSR field in the default state struct to its
 		 * power-on value of 0x1f80. This masks all SIMD floating
@@ -176,21 +186,29 @@ void ancillary_state_init(void)
 		// It may be possible for memset to clobber SSE registers.
 		memset(&x86_default_fpu, 0x00, sizeof(struct ancillary_state));
 
-		// FNINIT clears FIP and FDP and, even though it is technically a
-		// control instruction, it clears FOP while initializing the FPU.
+		/*
+		 * FNINIT clears FIP and FDP and, even though it is technically a
+		 * control instruction, it clears FOP while initializing the FPU.
+		 *
+		 * This marks the STX/MMX registers as empty in the FPU tag word,
+		 * but does not actually clear the values in the registers,
+		 * so we manually clear them in the xsave area after saving.
+		 */
 		asm volatile ("fninit");
 
 		// Save the x87 FPU state
 		asm volatile("fxsave64 %0" : : "m"(x86_default_fpu));
 
 		/*
-		 * Because FXSAVE may have also saved junk from the XMM registers,
+		 * Clear junk that might have been saved from the STX/MMX registers.
+		 *
+		 * FXSAVE may have also saved junk from the XMM registers,
 		 * depending on how the hardware was implemented and the setting
-		 * of CR4.OSFXSR, we manually zero the region of the ancillary_state
-		 * containing those registers after saving FPU state. There are 16
-		 * XMM registers, each 128 bits, for a total size of 256 bytes.
+		 * of CR4.OSFXSR. So we clear that too.
+		 *
+		 * MMX: 128 bytes, XMM: 256 bytes
 		 */
-		memset(&(x86_default_fpu.xmm0), 0x00, 256);
+		memset(&(x86_default_fpu.st0_mm0), 0x00, 128 + 256);
 
 		/*
 		 * Finally, because Only the Paranoid Survive, we set the MXCSR

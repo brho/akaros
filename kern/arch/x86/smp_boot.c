@@ -289,7 +289,7 @@ void __arch_pcpu_init(uint32_t coreid)
 	/*
 	 * Enable SSE instructions.
 	 * CR4.OSFXSR enables SSE and ensures that MXCSR/XMM gets saved with FXSAVE
-	 * CR4.OSXSAVE enables XSAVE instructions. Only set if XSAVEOPT supported.
+	 * CR4.OSXSAVE enables XSAVE instructions. Only set if XSAVE supported.
 	 * CR4.OSXMME indicates OS support for software exception handlers for
 	 * SIMD floating-point exceptions (turn it on to get #XM exceptions
 	 * in the event of a SIMD error instead of #UD exceptions).
