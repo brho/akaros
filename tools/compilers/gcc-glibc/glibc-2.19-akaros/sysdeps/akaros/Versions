@@ -56,6 +56,8 @@ libc {
     register_fork_cb;
 
     _sock_lookup_listen_fd;
+    get_sibling_fd;
+    write_hex_to_fd;
 
     eventfd;
     eventfd_read;

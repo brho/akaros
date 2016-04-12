@@ -339,3 +339,35 @@ int _sock_lookup_listen_fd(int sock_fd)
 		return -1;
 	return r->listen_fd;
 }
+
+/* Given an FD, opens the FD with the name 'sibling' in the same directory.
+ * e.g., you have a data, you open a ctl.  Don't use this with cloned FDs (i.e.
+ * open clone, get a ctl back) until we fix 9p and fd2path. */
+int get_sibling_fd(int fd, const char *sibling)
+{
+	char path[MAX_PATH_LEN];
+	char *graft;
+
+	if (syscall(SYS_fd2path, fd, path, sizeof(path)) < 0)
+		return -1;
+	graft = strrchr(path, '/');
+	if (!graft)
+		return -1;
+	graft++;
+	*graft = 0;
+	snprintf(graft, sizeof(path) - strlen(path), sibling);
+	return open(path, O_RDWR);
+}
+
+/* Writes num to FD in ASCII in hex format. */
+int write_hex_to_fd(int fd, uint64_t num)
+{
+	int ret;
+	char cmd[50];
+
+	ret = snprintf(cmd, sizeof(cmd), "%llx", num);
+	ret = write(fd, cmd, ret);
+	if (ret <= 0)
+		return -1;
+	return 0;
+}

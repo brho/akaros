@@ -77,6 +77,9 @@ extern int _sock_get_opts(int type);
 extern int _rock_open_listen_fd(Rock *r);
 extern int _sock_lookup_listen_fd(int sock_fd);
 
+int get_sibling_fd(int fd, const char *sibling);
+int write_hex_to_fd(int fd, uint64_t num);
+
 extern void _syserrno(void);
 
 /* The plan9 UDP header looks like:
