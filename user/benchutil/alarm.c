@@ -38,6 +38,7 @@
 #include <parlib/uthread.h>
 #include <parlib/spinlock.h>
 #include <parlib/timing.h>
+#include <sys/plan9_helpers.h>
 
 /* Helper to get your own alarm.   If you don't care about a return value, pass
  * 0 and it'll be ignored.  The alarm is built, but has no evq or timer set. */
@@ -89,13 +90,7 @@ int devalarm_set_evq(int timerfd, struct event_queue *ev_q, int alarmid)
 
 int devalarm_set_time(int timerfd, uint64_t tsc_time)
 {
-	int ret;
-	char buf[20];
-	ret = snprintf(buf, sizeof(buf), "%llx", tsc_time);
-	ret = write(timerfd, buf, ret);
-	if (ret <= 0)
-		return -1;
-	return 0;
+	return write_hex_to_fd(timerfd, tsc_time);
 }
 
 int devalarm_get_id(struct event_msg *ev_msg)
@@ -105,12 +100,9 @@ int devalarm_get_id(struct event_msg *ev_msg)
 	return (int)(long)ev_msg->ev_arg3;
 }
 
-int devalarm_disable(int ctlfd)
+int devalarm_disable(int timerfd)
 {
-	int ret = write(ctlfd, "cancel", sizeof("cancel"));
-	if (ret <= 0)
-		return -1;
-	return 0;
+	return write_hex_to_fd(timerfd, 0);
 }
 
 /* Helpers, basically renamed kernel interfaces, with the *tchain. */
@@ -276,7 +268,7 @@ static void reset_tchain_interrupt(struct timer_chain *tchain)
 	if (TAILQ_EMPTY(&tchain->waiters)) {
 		/* Turn it off */
 		printd("Turning alarm off\n");
-		if (devalarm_disable(tchain->ctlfd)) {
+		if (devalarm_disable(tchain->timerfd)) {
 			printf("Useralarm: unable to disarm alarm!\n");
 			return;
 		}

@@ -97,7 +97,7 @@ static void start_pvcalarm(struct pvcalarm_data *pvcalarm_data, uint64_t offset)
 /* Stop the pvc alarm associated with pvcalarm_data */
 static void stop_pvcalarm(struct pvcalarm_data *pvcalarm_data)
 {
-	if (devalarm_disable(pvcalarm_data->ctlfd)) {
+	if (devalarm_disable(pvcalarm_data->timerfd)) {
 		printf("Useralarm: unable to disarm alarm!\n");
 		return;
 	}

@@ -1,4 +1,5 @@
 /* Copyright (c) 2013 The Regents of the University of California
+ * Copyright (c) 2016 Google Inc.
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
@@ -11,11 +12,14 @@
  * look at current's alarmset when it is time to gen or open a file.
  *
  * To use, first open #alarm/clone, and that gives you an alarm directory aN,
- * where N is ID of the alarm.
+ * where N is ID of the alarm.  The FD you get from clone points to 'ctl.'
  *
- * ctl takes one command: "cancel", to stop an alarm.  timer takes just the
- * value (in absolute tsc time) to fire the alarm.  To find out about the timer
- * firing, put an FD tap on the timer for FDTAP_FILT_WRITTEN.
+ * 'ctl' takes no commands.  You can read it to get the ID.  That's it.
+ *
+ * 'timer' takes the hex string value (in absolute tsc time) to fire the alarm.
+ * Writing 0 disables the alarm.  You can read 'timer' to get the next time it
+ * will fire, in TSC time.  0 means it is disabled.  To find out about the timer
+ * firing, put an FD tap on 'timer' for FDTAP_FILT_WRITTEN.
  *
  * While each process has a separate view of #alarm, it is possible to post a
  * chan to Qctl or Qtimer to #srv.  If another proc has your Qtimer, it can set
@@ -108,6 +112,7 @@ static void proc_alarm_handler(struct alarm_waiter *a_waiter)
 {
 	struct proc_alarm *a = container_of(a_waiter, struct proc_alarm, a_waiter);
 
+	a_waiter->wake_up_time = 0;
 	alarm_fire_taps(a, FDTAP_FILT_WRITTEN);
 }
 
@@ -362,33 +367,15 @@ static long alarmread(struct chan *c, void *ubuf, long n, int64_t offset)
  * proc_alarm. */
 static long alarmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 {
-	ERRSTACK(1);
 	char num64[NUMSIZE64];
-	struct cmdbuf *cb;
 	struct proc_alarm *p_alarm;
 	uint64_t hexval;
 
 	switch (TYPE(c->qid)) {
 		case Qtopdir:
 		case Qalarmdir:
-			error(EPERM, ERROR_FIXME);
 		case Qctl:
-			p_alarm = QID2A(c->qid);
-			cb = parsecmd(ubuf, n);
-			if (waserror()) {
-				kfree(cb);
-				nexterror();
-			}
-			if (cb->nf < 1)
-				error(EFAIL, "short control request");
-			if (!strcmp(cb->f[0], "cancel")) {
-				unset_alarm(p_alarm->proc->alarmset.tchain, &p_alarm->a_waiter);
-			} else {
-				error(EFAIL, "%s: not implemented", cb->f[0]);
-			}
-			kfree(cb);
-			poperror();
-			break;
+			error(EPERM, ERROR_FIXME);
 		case Qtimer:
 			/* want to give strtoul a null-terminated buf (can't handle random
 			 * user strings) */
@@ -401,10 +388,15 @@ static long alarmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 			num64[n] = 0;	/* enforce trailing 0 */
 			hexval = strtoul(num64, 0, 16);
 			p_alarm = QID2A(c->qid);
-			/* if you don't know if it was running or not, resetting will turn
-			 * it on regardless. */
-			reset_alarm_abs(p_alarm->proc->alarmset.tchain, &p_alarm->a_waiter,
-							hexval);
+			if (hexval) {
+				/* if you don't know if it was running or not, resetting will
+				 * turn it on regardless. */
+				reset_alarm_abs(p_alarm->proc->alarmset.tchain,
+				                &p_alarm->a_waiter, hexval);
+			} else {
+				unset_alarm(p_alarm->proc->alarmset.tchain, &p_alarm->a_waiter);
+				p_alarm->a_waiter.wake_up_time = 0;
+			}
 			break;
 		default:
 			panic("Bad QID %p in devalarm", c->qid.path);

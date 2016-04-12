@@ -61,7 +61,7 @@ int main(int argc, char **argv)
 		perror("Failed to set timer");
 		exit(-1);
 	}
-	if (devalarm_disable(ctlfd)) {
+	if (devalarm_disable(timerfd)) {
 		perror("Failed to cancel timer");
 		exit(-1);
 	}

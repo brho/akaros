@@ -44,7 +44,7 @@ int devalarm_get_fds(int *ctlfd_r, int *timerfd_r, int *alarmid_r);
 int devalarm_set_evq(int timerfd, struct event_queue *ev_q, int alarmid);
 int devalarm_set_time(int timerfd, uint64_t tsc_time);
 int devalarm_get_id(struct event_msg *ev_msg);
-int devalarm_disable(int ctlfd);
+int devalarm_disable(int timerfd);
 
 /* Alarm service */
 
