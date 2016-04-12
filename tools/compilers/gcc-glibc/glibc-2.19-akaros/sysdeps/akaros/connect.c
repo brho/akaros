@@ -22,7 +22,7 @@
 #include <sys/un.h>
 #include <arpa/inet.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 /* Open a connection on socket FD to peer at ADDR (which LEN bytes long).
    For connectionless socket types, just set the default address to send to

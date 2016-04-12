@@ -56,6 +56,9 @@ ifeq ($(subdir),stdlib)
 sysdep_routines += tls
 endif
 
+# Plan 9 Shims
+sysdep_headers += sys/plan9_helpers.h
+
 # User FDs
 ifeq ($(subdir),stdlib)
 sysdep_routines += user_fd

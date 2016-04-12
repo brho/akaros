@@ -23,7 +23,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 /* Create a new socket of type TYPE in domain DOMAIN, using
    protocol PROTOCOL.  If PROTOCOL is zero, one is chosen automatically.

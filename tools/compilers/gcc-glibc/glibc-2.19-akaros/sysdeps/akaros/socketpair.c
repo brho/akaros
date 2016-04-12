@@ -16,7 +16,7 @@
 #include <sys/uio.h>
 #include <sys/socket.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 /* Create two new sockets, of type TYPE in domain DOMAIN and using
    protocol PROTOCOL, which are connected to each other, and put file

@@ -17,7 +17,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 int __getservbyport_r(int port, const char *proto, struct servent *result_buf,
                       char *buf, size_t buflen, struct servent **result)

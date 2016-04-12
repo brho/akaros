@@ -21,7 +21,7 @@
 #include <netinet/in.h>
 #include <sys/un.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 /* Put the local address of FD into *ADDR and its length in *LEN.  */
 int __getsockname(int fd, __SOCKADDR_ARG addr, socklen_t * __restrict alen)

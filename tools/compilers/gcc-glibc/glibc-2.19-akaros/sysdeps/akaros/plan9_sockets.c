@@ -23,7 +23,7 @@
 #include <sys/un.h>
 #include <arpa/inet.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 void
 _sock_ingetaddr(Rock * r, struct sockaddr_in *ip, socklen_t * alen,

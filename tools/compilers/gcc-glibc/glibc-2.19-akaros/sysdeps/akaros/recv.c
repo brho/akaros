@@ -17,7 +17,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 /* Read N bytes into BUF from socket FD.
    Returns the number read or -1 for errors.  */

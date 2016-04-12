@@ -11,7 +11,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 /* Shuts down all or part of the connection open on socket FD.  Returns 0 on
  * success, -1 for errors. */

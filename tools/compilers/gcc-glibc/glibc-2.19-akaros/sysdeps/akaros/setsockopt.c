@@ -5,7 +5,7 @@
 #include <errno.h>
 #include <sys/socket.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 static int sol_socket_sso(Rock *r, int optname, void *optval, socklen_t optlen)
 {

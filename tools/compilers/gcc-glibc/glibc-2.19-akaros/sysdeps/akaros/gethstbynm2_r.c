@@ -23,7 +23,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 enum {
 	Nname = 6,

@@ -21,7 +21,7 @@
 #include <netinet/in.h>
 #include <sys/un.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 /* Await a connection on socket FD.
    When a connection arrives, open a new socket to communicate with it,

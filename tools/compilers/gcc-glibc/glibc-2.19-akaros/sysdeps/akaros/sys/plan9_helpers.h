@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is part of the UCB release of Plan 9. It is subject to the license
  * terms in the LICENSE file found in the top-level directory of this
  * distribution and at http://akaros.cs.berkeley.edu/files/Plan9License. No
@@ -6,8 +6,8 @@
  * modified, propagated, or distributed except according to the terms contained
  * in the LICENSE file.
  */
-#ifndef PLAN9_SOCKETS_H
-#define PLAN9_SOCKETS_H
+
+#pragma once
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -17,7 +17,9 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-__BEGIN_DECLS typedef struct Rock Rock;
+__BEGIN_DECLS
+
+typedef struct Rock Rock;
 
 enum {
 	Ctlsize = 128,
@@ -99,4 +101,3 @@ uint32_t plan9addr_to_naddr(uint8_t * buf);
 Rock *udp_sock_get_rock(int fd);
 
 __END_DECLS
-#endif /* PLAN9_SOCKETS_H */

@@ -18,7 +18,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 /* Send N bytes of BUF on socket FD to peer at address TO (which is
    TOLEN bytes long).  Returns the number sent, or -1 for errors.  */

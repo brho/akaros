@@ -18,7 +18,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 /* similar to gethostbyaddr, just calling the reentrant _r method, and using
  * inet_ntop instead of the non-reentrant inet_ntoa. */

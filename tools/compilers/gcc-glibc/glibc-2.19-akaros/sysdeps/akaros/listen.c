@@ -23,7 +23,7 @@
 #include <netinet/in.h>
 #include <sys/un.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 /* Prepare to accept connections on socket FD.
    N connection requests will be queued before further requests are refused.

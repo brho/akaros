@@ -41,6 +41,7 @@
 #include <unistd.h>
 #include <malloc.h>
 #include <sys/queue.h>
+#include <sys/plan9_helpers.h>
 
 /* Sanity check, so we can ID our own FDs */
 #define EPOLL_UFD_MAGIC 		0xe9011
@@ -298,8 +299,6 @@ static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
 	 * As far as tracking the FD goes for epoll_wait() reporting, if the app
 	 * wants to track the FD they think we are using, then they already passed
 	 * that in event->data. */
-	extern int _sock_lookup_listen_fd(int sock_fd);	/* in glibc */
-
 	sock_listen_fd = _sock_lookup_listen_fd(fd);
 	if (sock_listen_fd >= 0)
 		fd = sock_listen_fd;
@@ -343,7 +342,6 @@ static int __epoll_ctl_del(struct epoll_ctlr *ep, int fd,
 
 	/* They could be asking to clear an epoll for a listener.  We need to remove
 	 * the tap for the real FD we tapped */
-	extern int _sock_lookup_listen_fd(int sock_fd);	/* in glibc */
 	sock_listen_fd = _sock_lookup_listen_fd(fd);
 	if (sock_listen_fd >= 0)
 		fd = sock_listen_fd;

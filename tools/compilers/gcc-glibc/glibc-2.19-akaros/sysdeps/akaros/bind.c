@@ -23,7 +23,7 @@
 #include <netinet/in.h>
 #include <sys/un.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 /* Give the socket FD the local address ADDR (which is LEN bytes long).  */
 int __bind(int fd, __CONST_SOCKADDR_ARG addr, socklen_t alen)

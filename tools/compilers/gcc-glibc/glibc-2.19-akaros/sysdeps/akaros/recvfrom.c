@@ -18,7 +18,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 /* Read N bytes into BUF through socket FD from peer
    at address FROM (which is FROMLEN bytes long).

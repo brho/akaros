@@ -17,7 +17,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-#include "plan9_sockets.h"
+#include <sys/plan9_helpers.h>
 
 /* Send N bytes of BUF to socket FD.  Returns the number sent or -1.  */
 ssize_t __send(int fd, __const void *buf, size_t n, int flags)
