@@ -42,3 +42,15 @@ void ___assert_failed(const char *file, int line, const char *msg)
 	assert(0);
 }
 weak_alias(___assert_failed, _assert_failed)
+
+uint64_t __nsec2tsc(uint64_t nsec)
+{
+	assert(0);
+}
+weak_alias(__nsec2tsc, nsec2tsc)
+
+uint64_t __tsc2nsec(uint64_t tsc_time)
+{
+	assert(0);
+}
+weak_alias(__tsc2nsec, tsc2nsec)
