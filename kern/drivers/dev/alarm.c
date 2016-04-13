@@ -21,6 +21,15 @@
  * will fire, in TSC time.  0 means it is disabled.  To find out about the timer
  * firing, put an FD tap on 'timer' for FDTAP_FILT_WRITTEN.
  *
+ * 'period' takes the hex string value (in TSC ticks) for the period of the
+ * alarm.  If non-zero, the alarm will rearm when it fires.  You can read the
+ * period.
+ *
+ * Reading the 'count' file will return the number of times the alarm has
+ * expired since the last read or the last write to 'timer'.  If this is 0, then
+ * read() will block or EAGAIN.  You cannot write 'count'.  You can tap it for
+ * FDTAP_FILT_READABLE.
+ *
  * While each process has a separate view of #alarm, it is possible to post a
  * chan to Qctl or Qtimer to #srv.  If another proc has your Qtimer, it can set
  * it in the past, thereby triggering an immediate event.  More clever than
@@ -72,6 +81,8 @@ static char *devname(void)
 #define Qalarmdir				3
 #define Qctl					4
 #define Qtimer					5	/* Qctl + 1 */
+#define Qperiod					6
+#define Qcount					7
 
 /* This paddr/kaddr is a bit dangerous.  it'll work so long as we don't need all
  * 64 bits for a physical address (48 is the current norm on x86_64). */
@@ -99,21 +110,30 @@ static void alarm_fire_taps(struct proc_alarm *a, int filter)
 {
 	struct fd_tap *tap_i;
 
-	if (SLIST_EMPTY(&a->fd_taps))
-		return;
-	/* TODO: (RCU) Locking to protect the list and the tap's existence. */
-	spin_lock(&a->tap_lock);
 	SLIST_FOREACH(tap_i, &a->fd_taps, link)
 		fire_tap(tap_i, filter);
-	spin_unlock(&a->tap_lock);
 }
 
 static void proc_alarm_handler(struct alarm_waiter *a_waiter)
 {
 	struct proc_alarm *a = container_of(a_waiter, struct proc_alarm, a_waiter);
 
-	a_waiter->wake_up_time = 0;
-	alarm_fire_taps(a, FDTAP_FILT_WRITTEN);
+	/* We need the alarm to *not* hold the tchain lock (i.e. not in IRQ ctx),
+	 * o/w we could deadlock.  The lock ordering is alarm_lock->tchain_lock. */
+	assert(!a_waiter->holds_tchain_lock);
+	cv_lock(&a->cv);
+	a->count++;
+	if (a->should_stop || !a->period) {
+		a_waiter->wake_up_time = 0;
+		a->armed = FALSE;
+	} else {
+		a_waiter->wake_up_time += a->period;
+		set_alarm(a->proc->alarmset.tchain, a_waiter);
+	}
+	__cv_broadcast(&a->cv);
+	cv_unlock(&a->cv);
+	/* Fires taps for both Qtimer and Qcount. */
+	alarm_fire_taps(a, FDTAP_FILT_WRITTEN | FDTAP_FILT_READABLE);
 }
 
 void devalarm_init(struct proc *p)
@@ -199,6 +219,14 @@ static int alarmgen(struct chan *c, char *entry_name,
 					mkqid(&q, QID(QID2A(c->qid), Qtimer), 0, QTFILE);
 					devdir(c, q, "timer", 0, eve, 0666, dp);
 					return 1;
+				case Qperiod:
+					mkqid(&q, QID(QID2A(c->qid), Qperiod), 0, QTFILE);
+					devdir(c, q, "period", 0, eve, 0666, dp);
+					return 1;
+				case Qcount:
+					mkqid(&q, QID(QID2A(c->qid), Qcount), 0, QTFILE);
+					devdir(c, q, "count", 0, eve, 0666, dp);
+					return 1;
 			}
 			return -1;
 			/* Need to also provide a direct hit for Qclone and all other files
@@ -220,6 +248,12 @@ static int alarmgen(struct chan *c, char *entry_name,
 			return 1;
 		case Qtimer:
 			devdir(c, c->qid, "timer", 0, eve, 0666, dp);
+			return 1;
+		case Qperiod:
+			devdir(c, c->qid, "period", 0, eve, 0666, dp);
+			return 1;
+		case Qcount:
+			devdir(c, c->qid, "count", 0, eve, 0666, dp);
 			return 1;
 	}
 	return -1;
@@ -265,7 +299,7 @@ static struct chan *alarmopen(struct chan *c, int omode)
 			a = kzmalloc(sizeof(struct proc_alarm), MEM_WAIT);
 			kref_init(&a->kref, alarm_release, 1);
 			SLIST_INIT(&a->fd_taps);
-			spinlock_init(&a->tap_lock);
+			cv_init(&a->cv);
 			init_awaiter(&a->a_waiter, proc_alarm_handler);
 			spin_lock(&p->alarmset.lock);
 			a->id = p->alarmset.id_counter++;
@@ -277,6 +311,8 @@ static struct chan *alarmopen(struct chan *c, int omode)
 			break;
 		case Qctl:
 		case Qtimer:
+		case Qperiod:
+		case Qcount:
 			/* the purpose of opening is to hold a kref on the proc_alarm */
 			a = QID2A(c->qid);
 			assert(a);
@@ -336,29 +372,101 @@ static void alarmclose(struct chan *c)
 	switch (TYPE(c->qid)) {
 		case Qctl:
 		case Qtimer:
+		case Qperiod:
+		case Qcount:
 			kref_put(&QID2A(c->qid)->kref);
 			break;
 	}
 }
 
+/* Helper for Qcount to encapsulate timerfd. */
+static long read_qcount(struct chan *c, void *ubuf, size_t n)
+{
+	ERRSTACK(1);
+	struct proc_alarm *a = QID2A(c->qid);
+	struct cv_lookup_elm cle;
+	unsigned long old_count;
+
+	if (n > sizeof(old_count))
+		error(EINVAL, "timerfd buffer is too small (%llu)", n);
+	/* TODO: have easily abortable CVs that don't require this mechanism. */
+	cv_lock(&a->cv);
+	__reg_abortable_cv(&cle, &a->cv);
+	if (waserror()) {
+		cv_unlock(&a->cv);
+		dereg_abortable_cv(&cle);
+		nexterror();
+	}
+	while (!a->count) {
+		if (c->flag & O_NONBLOCK)
+			error(EAGAIN, "#alarm count was 0");
+		if (should_abort(&cle))
+			error(EINTR, "syscall aborted");
+		cv_wait(&a->cv);
+	}
+	old_count = a->count;
+	a->count = 0;
+	cv_unlock(&a->cv);
+	dereg_abortable_cv(&cle);
+	poperror();
+	if (copy_to_user(ubuf, &old_count, sizeof(old_count)))
+		error(EFAULT, "timerfd copy_to_user failed");
+	return sizeof(old_count);
+}
+
 static long alarmread(struct chan *c, void *ubuf, long n, int64_t offset)
 {
 	struct proc_alarm *p_alarm;
+
 	switch (TYPE(c->qid)) {
 		case Qtopdir:
 		case Qalarmdir:
 			return devdirread(c, ubuf, n, 0, 0, alarmgen);
 		case Qctl:
 			p_alarm = QID2A(c->qid);
+			/* simple reads from p_alarm shouldn't need a lock */
 			return readnum(offset, ubuf, n, p_alarm->id, NUMSIZE32);
 		case Qtimer:
 			p_alarm = QID2A(c->qid);
 			return readnum(offset, ubuf, n, p_alarm->a_waiter.wake_up_time,
 						   NUMSIZE64);
+		case Qperiod:
+			p_alarm = QID2A(c->qid);
+			return readnum(offset, ubuf, n, p_alarm->period, NUMSIZE64);
+		case Qcount:
+			return read_qcount(c, ubuf, n);	/* ignore offset */
 		default:
 			panic("Bad QID %p in devalarm", c->qid.path);
 	}
 	return 0;
+}
+
+/* Helper, sets the procalarm to hexval (abs TSC ticks).  0 disarms. */
+static void set_proc_alarm(struct proc_alarm *a, uint64_t hexval)
+{
+	cv_lock(&a->cv);
+	/* Due to how we have to maintain 'count', we need to strictly account for
+	 * the firings of the alarm.  Easiest thing is to disarm it, make sure it is
+	 * off, reset everything, then rearm it. */
+	while (a->armed) {
+		a->should_stop = TRUE;
+		if (unset_alarm(a->proc->alarmset.tchain, &a->a_waiter)) {
+			a->armed = FALSE;
+			break;
+		}
+		/* We didn't find it on the tchain, which means it has left the chain,
+		 * but hasn't fired yet.  We need to block til it fired and disarmed
+		 * itself */
+		cv_wait(&a->cv);
+	}
+	a->should_stop = FALSE;
+	a->count = 0;
+	if (hexval) {
+		a->armed = TRUE;
+		set_awaiter_abs(&a->a_waiter, hexval);
+		set_alarm(a->proc->alarmset.tchain, &a->a_waiter);
+	}
+	cv_unlock(&a->cv);
 }
 
 /* Note that in read and write we have an open chan, which means we have an
@@ -368,25 +476,22 @@ static long alarmread(struct chan *c, void *ubuf, long n, int64_t offset)
 static long alarmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 {
 	struct proc_alarm *p_alarm;
-	uint64_t hexval;
 
 	switch (TYPE(c->qid)) {
 		case Qtopdir:
 		case Qalarmdir:
 		case Qctl:
+		case Qcount:
 			error(EPERM, ERROR_FIXME);
 		case Qtimer:
-			hexval = strtoul_from_ubuf(ubuf, n, 16);
+			set_proc_alarm(QID2A(c->qid), strtoul_from_ubuf(ubuf, n, 16));
+			break;
+		case Qperiod:
 			p_alarm = QID2A(c->qid);
-			if (hexval) {
-				/* if you don't know if it was running or not, resetting will
-				 * turn it on regardless. */
-				reset_alarm_abs(p_alarm->proc->alarmset.tchain,
-				                &p_alarm->a_waiter, hexval);
-			} else {
-				unset_alarm(p_alarm->proc->alarmset.tchain, &p_alarm->a_waiter);
-				p_alarm->a_waiter.wake_up_time = 0;
-			}
+			/* racing with the handler which checks the val repeatedly */
+			cv_lock(&p_alarm->cv);
+			p_alarm->period = strtoul_from_ubuf(ubuf, n, 16);
+			cv_unlock(&p_alarm->cv);
 			break;
 		default:
 			panic("Bad QID %p in devalarm", c->qid.path);
@@ -394,38 +499,49 @@ static long alarmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 	return n;
 }
 
-static int alarm_tapfd(struct chan *c, struct fd_tap *tap, int cmd)
+/* We use the same tap list, regardless of Qtimer or Qcount */
+static int tap_alarm(struct proc_alarm *a, struct fd_tap *tap, int cmd,
+                     int legal_filter)
 {
 	int ret;
+
+	if (tap->filter & ~legal_filter) {
+		set_error(ENOSYS, "Unsupported #%s tap, must be %p", devname(),
+				  legal_filter);
+		return -1;
+	}
+	cv_lock(&a->cv);
+	switch (cmd) {
+	case (FDTAP_CMD_ADD):
+		SLIST_INSERT_HEAD(&a->fd_taps, tap, link);
+		ret = 0;
+		break;
+	case (FDTAP_CMD_REM):
+		SLIST_REMOVE(&a->fd_taps, tap, fd_tap, link);
+		ret = 0;
+		break;
+	default:
+		set_error(ENOSYS, "Unsupported #%s tap command %p",
+				  devname(), cmd);
+		ret = -1;
+	}
+	cv_unlock(&a->cv);
+	return ret;
+}
+
+static int alarm_tapfd(struct chan *c, struct fd_tap *tap, int cmd)
+{
 	struct proc_alarm *a = QID2A(c->qid);
 
 	/* We don't actually support HANGUP, but epoll implies it. */
 	#define ALARM_LEGAL_TIMER_TAPS (FDTAP_FILT_WRITTEN | FDTAP_FILT_HANGUP)
+	#define ALARM_LEGAL_COUNT_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_HANGUP)
 
 	switch (TYPE(c->qid)) {
 	case Qtimer:
-		if (tap->filter & ~ALARM_LEGAL_TIMER_TAPS) {
-			set_error(ENOSYS, "Unsupported #%s tap, must be %p", devname(),
-					  ALARM_LEGAL_TIMER_TAPS);
-			return -1;
-		}
-		spin_lock(&a->tap_lock);
-		switch (cmd) {
-		case (FDTAP_CMD_ADD):
-			SLIST_INSERT_HEAD(&a->fd_taps, tap, link);
-			ret = 0;
-			break;
-		case (FDTAP_CMD_REM):
-			SLIST_REMOVE(&a->fd_taps, tap, fd_tap, link);
-			ret = 0;
-			break;
-		default:
-			set_error(ENOSYS, "Unsupported #%s tap command %p",
-					  devname(), cmd);
-			ret = -1;
-		}
-		spin_unlock(&a->tap_lock);
-		return ret;
+		return tap_alarm(a, tap, cmd, ALARM_LEGAL_TIMER_TAPS);
+	case Qcount:
+		return tap_alarm(a, tap, cmd, ALARM_LEGAL_COUNT_TAPS);
 	default:
 		set_error(ENOSYS, "Can't tap #%s file type %d", devname(),
 		          c->qid.path);
@@ -435,14 +551,17 @@ static int alarm_tapfd(struct chan *c, struct fd_tap *tap, int cmd)
 
 static char *alarm_chaninfo(struct chan *ch, char *ret, size_t ret_l)
 {
-	struct proc_alarm *a = QID2A(ch->qid);
+	struct proc_alarm *a;
 
 	switch (TYPE(ch->qid)) {
 	case Qctl:
 	case Qtimer:
-		snprintf(ret, ret_l, "Id %d, %s, expires %llu", a->id,
-		         SLIST_EMPTY(&a->fd_taps) ? "untapped" : "tapped",
-		         a->a_waiter.wake_up_time);
+	case Qperiod:
+	case Qcount:
+		a = QID2A(ch->qid);
+		snprintf(ret, ret_l, "Id %d, %s, expires %llu, period %llu, count %llu",
+		         a->id, SLIST_EMPTY(&a->fd_taps) ? "untapped" : "tapped",
+		         a->a_waiter.wake_up_time, a->period, a->count);
 		break;
 	default:
 		return devchaninfo(ch, ret, ret_l);
