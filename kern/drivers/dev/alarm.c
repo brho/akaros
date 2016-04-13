@@ -367,7 +367,6 @@ static long alarmread(struct chan *c, void *ubuf, long n, int64_t offset)
  * proc_alarm. */
 static long alarmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 {
-	char num64[NUMSIZE64];
 	struct proc_alarm *p_alarm;
 	uint64_t hexval;
 
@@ -377,16 +376,7 @@ static long alarmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
 		case Qctl:
 			error(EPERM, ERROR_FIXME);
 		case Qtimer:
-			/* want to give strtoul a null-terminated buf (can't handle random
-			 * user strings) */
-			if (n > sizeof(num64)) {
-				set_errno(EINVAL);
-				error(EFAIL, "attempted to write %d chars, max %d", n,
-					  sizeof(num64));
-			}
-			memcpy(num64, ubuf, n);
-			num64[n] = 0;	/* enforce trailing 0 */
-			hexval = strtoul(num64, 0, 16);
+			hexval = strtoul_from_ubuf(ubuf, n, 16);
 			p_alarm = QID2A(c->qid);
 			if (hexval) {
 				/* if you don't know if it was running or not, resetting will

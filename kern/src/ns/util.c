@@ -2,6 +2,8 @@
 
 #include <ns.h>
 #include <string.h>
+#include <err.h>
+#include <syscall.h>
 
 /* Copies n bytes from mem + offset into buf, similar to a read() call. */
 int readmem(unsigned long offset, char *buf, unsigned long n,
@@ -34,6 +36,22 @@ int readstr(unsigned long offset, char *buf, unsigned long n, char *str)
 {
 	/* always include the \0 */
 	return readmem(offset, buf, n, str, strlen(str) + 1);
+}
+
+/* Helper: extracts a long from a user buffer (in text). */
+unsigned long strtoul_from_ubuf(void *ubuf, size_t count, int base)
+{
+	char num64[NUMSIZE64];
+
+	/* want to give strtoul a null-terminated buf (can't handle random
+	 * user strings) */
+	if (count > sizeof(num64)) {
+		set_errno(EINVAL);
+		error(EFAIL, "attempted to write %d chars, max %d", count,
+			  sizeof(num64)); }
+	memcpy(num64, ubuf, count);
+	num64[count] = 0;	/* enforce trailing 0 */
+	return strtoul(num64, 0, base);
 }
 
 /* Converts open mode flags, e.g. O_RDWR, to a rwx------ value, e.g. S_IRUSR */

@@ -852,6 +852,7 @@ int readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
 			size_t size);
 int readstr(unsigned long offset, char *buf, unsigned long n, char *str);
 int readnum_int64_t(uint32_t, char *unused_char_p_t, uint32_t, int64_t, int);
+unsigned long strtoul_from_ubuf(void *ubuf, size_t count, int base);
 void ready(struct proc *);
 void renameproguser(char *unused_char_p_t, char *);
 void renameuser(char *unused_char_p_t, char *);
