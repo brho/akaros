@@ -102,26 +102,16 @@ void udelay(uint64_t usec)
 void udelay_pit(uint64_t usec)
 {
 	int64_t delta, prev_tick, tick, ticks_left;
+
+	if (usec <= 0)
+		return;
+
 	prev_tick = getpit();
 	/*
-	 * Calculate (n * (i8254_freq / 1e6)) without using floating point
-	 * and without any avoidable overflows.
+	 * Calculate ticks as (usec * (i8254_freq / 1e6)) rounded up
+	 * without using floating point and without any avoidable overflows.
 	 */
-	if (usec <= 0)
-		ticks_left = 0;
-	// some optimization from bsd code
-	else if (usec < 256)
-		/*
-		 * Use fixed point to avoid a slow division by 1000000.
-		 * 39099 = 1193182 * 2^15 / 10^6 rounded to nearest.
-		 * 2^15 is the first power of 2 that gives exact results
-		 * for n between 0 and 256.
-		 */
-		ticks_left = ((uint64_t)usec * 39099 + (1 << 15) - 1) >> 15;
-	else
-		// round up the ticks left
-		ticks_left = ((uint64_t)usec * (long long)PIT_FREQ+ 999999)
-			     / 1000000;
+	ticks_left = ((usec * PIT_FREQ) + 999999) / 1000000;
 	while (ticks_left > 0) {
 		tick = getpit();
 		delta = prev_tick - tick;
