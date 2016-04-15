@@ -700,27 +700,12 @@ int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 			return 1;
 		}
 		if (!strcmp(argv[2], "start")) {
-			bool all = TRUE;
-			bool silent = FALSE;
-			struct proc *p = NULL;
-			if (argc >= 4) {
-				silent = (bool)strtol(argv[3], 0, 0);
-			}
-			if (argc >= 5) {
-				all = FALSE;
-				p = pid2proc(strtol(argv[4], 0, 0));
-				if (!p) {
-					printk("No such process\n");
-					return 1;
-				}
-			}
-			systrace_start(silent);
-			if (systrace_reg(all, p))
-				printk("No room to trace more processes\n");
+			systrace_loud = TRUE;
 		} else if (!strcmp(argv[2], "stop")) {
-			/* Stop. To see the output, kfunc systrace_print and systrace_clear */
-			/* or cat #K/kptrace or /prof/kptrace */
-			systrace_stop();
+			systrace_loud = FALSE;
+		} else {
+			printk("Need a start or stop.\n");
+			return 1;
 		}
 	} else if (!strcmp(argv[1], "coretf")) {
 		if (argc != 3) {

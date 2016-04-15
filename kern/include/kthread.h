@@ -45,7 +45,6 @@ struct kthread {
 	int							flags;
 	char						*name;
 	char						generic_buf[GENBUF_SZ];
-	struct systrace_record		*trace;
 	struct systrace_record		*strace;
 };
 

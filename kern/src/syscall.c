@@ -1445,7 +1445,6 @@ static unsigned long sys_populate_va(struct proc *p, uintptr_t va,
 static intreg_t sys_read(struct proc *p, int fd, void *buf, size_t len)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	struct systrace_record *t = pcpui->cur_kthread->trace;
 	ssize_t ret;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
 	sysc_save_str("read on fd %d", fd);
@@ -1466,21 +1465,15 @@ static intreg_t sys_read(struct proc *p, int fd, void *buf, size_t len)
 		/* plan9, should also handle errors (EBADF) */
 		ret = sysread(fd, buf, len);
 	}
-
-	if ((ret > 0) && t) {
-		t->datalen = MIN(sizeof(t->data), ret);
-		memcpy(t->data, buf, t->datalen);
-	}
-
 	return ret;
 }
 
 static intreg_t sys_write(struct proc *p, int fd, const void *buf, size_t len)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	struct systrace_record *t = pcpui->cur_kthread->trace;
 	ssize_t ret;
 	struct file *file = get_file_from_fd(&p->open_files, fd);
+
 	sysc_save_str("write on fd %d", fd);
 	/* VFS */
 	if (file) {
@@ -1496,13 +1489,7 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, size_t len)
 		/* plan9, should also handle errors */
 		ret = syswrite(fd, (void*)buf, len);
 	}
-
-	if (t) {
-		t->datalen = MIN(sizeof(t->data), len);
-		memcpy(t->data, buf, t->datalen);
-	}
 	return ret;
-
 }
 
 /* Checks args/reads in the path, opens the file (relative to fromfd if the path
@@ -2283,7 +2270,6 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
                     char *new_path, size_t new_path_l)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	struct systrace_record *t = pcpui->cur_kthread->trace;
 	ERRSTACK(1);
 	int mountpointlen = 0;
 	char *from_path = copy_in_path(p, old_path, old_path_l);
@@ -2294,9 +2280,6 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 	if ((!from_path) || (!to_path))
 		return -1;
 	printd("sys_rename :%s: to :%s: : ", from_path, to_path);
-	if (t) {
-		t->datalen = snprintf((char *)t->data, sizeof(t->data), "Rename :%s: to :%s:", from_path, to_path);
-	}
 
 	/* we need a fid for the wstat. */
 	/* TODO: maybe wrap the 9ns stuff better.  sysrename maybe? */
@@ -2675,27 +2658,6 @@ void __signal_syscall(struct syscall *sysc, struct proc *p)
 			send_event(p, ev_q, &local_msg, 0);
 		}
 	}
-}
-
-/* If you call this while it is running, it will change the mode */
-void systrace_start(bool silent)
-{
-	systrace_loud = TRUE;
-}
-
-int systrace_reg(bool all, struct proc *p)
-{
-	return 0;
-}
-
-int systrace_trace_pid(struct proc *p)
-{
-	return 0;
-}
-
-void systrace_stop(void)
-{
-	systrace_loud = FALSE;
 }
 
 bool syscall_uses_fd(struct syscall *sysc, int fd)

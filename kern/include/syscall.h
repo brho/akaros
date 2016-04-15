@@ -52,6 +52,8 @@ struct strace {
 	struct queue *q;
 };
 
+extern bool systrace_loud;
+
 /* Syscall table */
 typedef intreg_t (*syscall_t)(struct proc *, uintreg_t, uintreg_t, uintreg_t,
                               uintreg_t, uintreg_t, uintreg_t);
@@ -77,12 +79,6 @@ struct errbuf *get_cur_errbuf(void);
 void set_cur_errbuf(struct errbuf *ebuf);
 char *get_cur_genbuf(void);
 void __signal_syscall(struct syscall *sysc, struct proc *p);
-
-/* Tracing functions */
-void systrace_start(bool silent);
-int systrace_trace_pid(struct proc *p);
-void systrace_stop(void);
-int systrace_reg(bool all, struct proc *p);
 
 /* Utility */
 bool syscall_uses_fd(struct syscall *sysc, int fd);

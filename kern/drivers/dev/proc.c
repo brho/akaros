@@ -81,7 +81,6 @@ enum {
 	CMstartstop,
 	CMstartsyscall,
 	CMstop,
-	CMtrace,
 	CMwaitstop,
 	CMwired,
 	CMcore,
@@ -145,7 +144,6 @@ struct cmdtab proccmd[] = {
 	{CMstartstop, "startstop", 1},
 	{CMstartsyscall, "startsyscall", 1},
 	{CMstop, "stop", 1},
-	{CMtrace, "trace", 0},
 	{CMwaitstop, "waitstop", 1},
 	{CMwired, "wired", 2},
 	{CMcore, "core", 2},
@@ -1285,9 +1283,6 @@ static void procctlreq(struct proc *p, char *va, int n)
 	case CMvmkill:
 	default:
 		error(EFAIL, "Command not implemented");
-		break;
-	case CMtrace:
-		systrace_trace_pid(p);
 		break;
 	case CMclose:
 		procctlclosefiles(p, 0, atoi(cb->f[1]));
