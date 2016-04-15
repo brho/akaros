@@ -83,9 +83,6 @@ void systrace_start(bool silent);
 int systrace_trace_pid(struct proc *p);
 void systrace_stop(void);
 int systrace_reg(bool all, struct proc *p);
-int systrace_dereg(bool all, struct proc *p);
-void systrace_print(bool all, struct proc *p);
-void systrace_clear_buffer(void);
 
 /* Utility */
 bool syscall_uses_fd(struct syscall *sysc, int fd);

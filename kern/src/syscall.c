@@ -37,172 +37,118 @@
 #include <manager.h>
 #include <ros/procinfo.h>
 
-/* Tracing Globals */
-int systrace_flags = 0;
-struct systrace_record *systrace_buffer = 0;
-uint32_t systrace_bufidx = 0;
-size_t systrace_bufsize = 0;
-spinlock_t systrace_lock = SPINLOCK_INITIALIZER_IRQSAVE;
+/* Global, used by the kernel monitor for syscall debugging. */
+bool systrace_loud = FALSE;
 
-static bool __trace_this_proc(struct proc *p)
-{
-	return (systrace_flags & SYSTRACE_ON) &&
-		((systrace_flags & SYSTRACE_ALLPROC) || is_traced_proc(p));
-}
-
-static size_t systrace_fill_pretty_buf(struct systrace_record *trace)
+/* Helper, given the trace record, pretty-print the trace's contents into the
+ * trace's pretty buf.  'entry' says whether we're an entry record or not
+ * (exit).  Returns the number of bytes put into the pretty_buf. */
+static size_t systrace_fill_pretty_buf(struct systrace_record *trace,
+                                       bool entry)
 {
 	size_t len = 0;
 	struct timespec ts_start;
 	struct timespec ts_end;
-	char what = 'X';
+
 	tsc2timespec(trace->start_timestamp, &ts_start);
 	tsc2timespec(trace->end_timestamp, &ts_end);
-	if (trace->end_timestamp == 0)
-		what = 'E';
-
-	len = snprintf(trace->pretty_buf, SYSTR_PRETTY_BUF_SZ - len,
-	           "%c [%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%llx, 0x%llx, "
-	           "0x%llx, 0x%llx, 0x%llx, 0x%llx) ret: 0x%llx proc: %d core: %d "
-	           "vcore: %d data: ",
-	           what,
-	           ts_start.tv_sec,
-	           ts_start.tv_nsec,
-	           ts_end.tv_sec,
-	           ts_end.tv_nsec,
-	           trace->syscallno,
-	           syscall_table[trace->syscallno].name,
-	           trace->arg0,
-	           trace->arg1,
-	           trace->arg2,
-	           trace->arg3,
-	           trace->arg4,
-	           trace->arg5,
-	           trace->retval,
-	           trace->pid,
-	           trace->coreid,
-	           trace->vcoreid);
-
-	len += printdump(trace->pretty_buf + len,
-			 trace->datalen,
+	/* Slightly different formats between entry and exit.  Entry has retval set
+	 * to ---, and begins with E.  Exit begins with X. */
+	if (entry) {
+		len = snprintf(trace->pretty_buf, SYSTR_PRETTY_BUF_SZ - len,
+		      "E [%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%llx, 0x%llx, "
+		      "0x%llx, 0x%llx, 0x%llx, 0x%llx) ret: --- proc: %d core: %d "
+		      "vcore: %d data: ",
+		               ts_start.tv_sec,
+		               ts_start.tv_nsec,
+		               ts_end.tv_sec,
+		               ts_end.tv_nsec,
+		               trace->syscallno,
+		               syscall_table[trace->syscallno].name,
+		               trace->arg0,
+		               trace->arg1,
+		               trace->arg2,
+		               trace->arg3,
+		               trace->arg4,
+		               trace->arg5,
+		               trace->pid,
+		               trace->coreid,
+		               trace->vcoreid);
+	} else {
+		len = snprintf(trace->pretty_buf, SYSTR_PRETTY_BUF_SZ - len,
+		      "X [%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%llx, 0x%llx, "
+		      "0x%llx, 0x%llx, 0x%llx, 0x%llx) ret: 0x%llx proc: %d core: %d "
+		      "vcore: %d data: ",
+		               ts_start.tv_sec,
+		               ts_start.tv_nsec,
+		               ts_end.tv_sec,
+		               ts_end.tv_nsec,
+		               trace->syscallno,
+		               syscall_table[trace->syscallno].name,
+		               trace->arg0,
+		               trace->arg1,
+		               trace->arg2,
+		               trace->arg3,
+		               trace->arg4,
+		               trace->arg5,
+		               trace->retval,
+		               trace->pid,
+		               trace->coreid,
+		               trace->vcoreid);
+	}
+	len += printdump(trace->pretty_buf + len, trace->datalen,
 	                 SYSTR_PRETTY_BUF_SZ - len - 1,
 	                 trace->data);
 	len += snprintf(trace->pretty_buf + len, SYSTR_PRETTY_BUF_SZ - len, "\n");
 	return len;
 }
 
-/* On enter, we have !trace, a sysc, and retval is meaningless.  On exit, we had
- * trace, retval and !sysc */
-static struct systrace_record *sctrace(struct systrace_record *trace,
-                                       struct proc *p, struct syscall *sysc,
-                                       long retval)
+/* Helper: spits out our trace to the various sinks. */
+static void systrace_output(struct systrace_record *trace,
+                            struct strace *strace, bool entry)
 {
-	int n;
-	uintreg_t cp = 0;
-	int datalen = 0;
+	size_t pretty_len;
 
-	assert(p->strace);
-
-	if (!trace) {
-		/* We're using qiwrite, which has no flow control.  We'll do it
-		 * manually. */
-		if (qfull(p->strace->q)) {
-			atomic_inc(&p->strace->nr_drops);
-			return NULL;
-		}
-		// TODO: could we allocb and then write that block?
-		// Still, if we're tracing, we take a hit, and this is so
-		// much more efficient than strace it's not clear we care.
-		trace = kmalloc(SYSTR_BUF_SZ, 0);
-
-		if (!trace) {
-			atomic_inc(&p->strace->nr_drops);
-			return NULL;
-		}
-		/* Avoiding the atomic op.  We sacrifice accuracy for less overhead. */
-		p->strace->appx_nr_sysc++;
-
-		int coreid, vcoreid;
-		struct proc *p = current;
-
-		coreid = core_id();
-		vcoreid = proc_get_vcoreid(p);
-
-		// TODO: functionalize this, if we decide this
-		// approach is OK.
-		trace->start_timestamp = read_tsc();
-		trace->end_timestamp = 0;
-		trace->syscallno = sysc->num;
-		trace->arg0 = sysc->arg0;
-		trace->arg1 = sysc->arg1;
-		trace->arg2 = sysc->arg2;
-		trace->arg3 = sysc->arg3;
-		trace->arg4 = sysc->arg4;
-		trace->arg5 = sysc->arg5;
-		trace->pid = p->pid;
-		trace->coreid = coreid;
-		trace->vcoreid = vcoreid;
-		trace->pretty_buf = (char*)trace + sizeof(struct systrace_record);
-		trace->datalen = 0;
-		trace->data[0] = 0;
-		switch (sysc->num) {
-		case SYS_write:
-			cp = sysc->arg1;
-			datalen = sysc->arg2;
-			break;
-		case SYS_openat:
-			cp = sysc->arg1;
-			datalen = sysc->arg2;
-			break;
-		}
-	} else {
-		trace->end_timestamp = read_tsc();
-		trace->retval = retval;
-		switch (trace->syscallno) {
-		case SYS_read:
-			cp = trace->arg1;
-			datalen = retval < 0 ? 0 : retval;
-			break;
-		}
-	}
-
-	trace->datalen = MIN(sizeof(trace->data), datalen);
-	memmove(trace->data, (void *)cp, trace->datalen);
-	n = systrace_fill_pretty_buf(trace);
-	qiwrite(p->strace->q, trace->pretty_buf, n);
-	return trace;
+	pretty_len = systrace_fill_pretty_buf(trace, entry);
+	if (strace)
+		qiwrite(strace->q, trace->pretty_buf, pretty_len);
+	if (systrace_loud)
+		printk("%s", trace->pretty_buf);
 }
 
+/* Starts a trace for p running sysc, attaching it to kthread.  Pairs with
+ * systrace_finish_trace(). */
 static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 {
-	struct systrace_record *trace;
-	int coreid, vcoreid;
 	struct proc *p = current;
+	struct systrace_record *trace;
+	long data_arg;
+	size_t data_len = 0;
 
-	if (p->strace_on)
-		kthread->strace = sctrace(NULL, p, sysc, 0);
-	else
-		kthread->strace = 0;
-
-	/* TODO: merge these two types of tracing, or just remove this old one */
-	if (!__trace_this_proc(p))
+	kthread->strace = 0;
+	if (!p->strace_on && !systrace_loud)
 		return;
-	assert(!kthread->trace);	/* catch memory leaks */
-	coreid = core_id();
-	vcoreid = proc_get_vcoreid(p);
-	if (systrace_flags & SYSTRACE_LOUD) {
-		printk("ENTER [%16llu] Syscall %3d (%12s):(0x%llx, 0x%llx, 0x%llx, "
-		       "0x%llx, 0x%llx, 0x%llx) proc: %d core: %d vcore: %d\n",
-		       read_tsc(),
-		       sysc->num, syscall_table[sysc->num].name,
-			   sysc->arg0, sysc->arg1, sysc->arg2, sysc->arg3, sysc->arg4,
-			   sysc->arg5, p->pid, coreid, vcoreid);
+	trace = kmalloc(SYSTR_BUF_SZ, MEM_ATOMIC);
+	if (p->strace) {
+		/* We're using qiwrite below, which has no flow control.  We'll do it
+		 * manually.  TODO: consider a block_alloc and qpass, though note that
+		 * we actually write the same trace in twice (entry and exit).
+		 * Alternatively, we can add another qio method that has flow control
+		 * and non blocking. */
+		if (qfull(p->strace->q)) {
+			atomic_inc(&p->strace->nr_drops);
+			kfree(trace);
+			return;
+		}
+		if (!trace)
+			atomic_inc(&p->strace->nr_drops);
+		/* Avoiding the atomic op.  We sacrifice accuracy for less overhead. */
+		p->strace->appx_nr_sysc++;
 	}
-	trace = kmalloc(SYSTR_BUF_SZ, 0);
 	if (!trace)
 		return;
-	kthread->trace = trace;
 	trace->start_timestamp = read_tsc();
+	trace->end_timestamp = 0;
 	trace->syscallno = sysc->num;
 	trace->arg0 = sysc->arg0;
 	trace->arg1 = sysc->arg1;
@@ -210,35 +156,63 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 	trace->arg3 = sysc->arg3;
 	trace->arg4 = sysc->arg4;
 	trace->arg5 = sysc->arg5;
+	trace->retval = 0;
 	trace->pid = p->pid;
-	trace->coreid = coreid;
-	trace->vcoreid = vcoreid;
+	trace->coreid = core_id();
+	trace->vcoreid = proc_get_vcoreid(p);
 	trace->pretty_buf = (char*)trace + sizeof(struct systrace_record);
 	trace->datalen = 0;
 	trace->data[0] = 0;
+
+	switch (sysc->num) {
+	case SYS_write:
+		data_arg = sysc->arg1;
+		data_len = sysc->arg2;
+		break;
+	case SYS_openat:
+		data_arg = sysc->arg1;
+		data_len = sysc->arg2;
+		break;
+	}
+	trace->datalen = MIN(sizeof(trace->data), data_len);
+	if (trace->datalen)
+		copy_from_user(trace->data, (void*)data_arg, trace->datalen);
+
+	systrace_output(trace, p->strace, TRUE);
+	kthread->strace = trace;
 }
 
+/* Finishes the trace on kthread for p, with retval being the return from the
+ * syscall we're tracing.  Pairs with systrace_start_trace(). */
 static void systrace_finish_trace(struct kthread *kthread, long retval)
 {
-	struct systrace_record *trace = kthread->trace;
-	size_t pretty_len;
+	struct proc *p = current;
+	struct systrace_record *trace;
+	long data_arg;
+	size_t data_len = 0;
 
-	if (trace) {
-		trace->end_timestamp = read_tsc();
-		trace->retval = retval;
-		kthread->trace = 0;
-		pretty_len = systrace_fill_pretty_buf(trace);
-		kprof_tracedata_write(trace->pretty_buf, pretty_len);
-		if (systrace_flags & SYSTRACE_LOUD)
-			printk("EXIT %s", trace->pretty_buf);
-		kfree(trace);
+	if (!kthread->strace)
+		return;
+	trace = kthread->strace;
+	trace->end_timestamp = read_tsc();
+	trace->retval = retval;
+
+	/* Only try to do the trace data if we didn't do it on entry */
+	if (!trace->datalen) {
+		switch (trace->syscallno) {
+		case SYS_read:
+			data_arg = trace->arg1;
+			data_len = retval < 0 ? 0 : retval;
+			break;
+		}
+		trace->datalen = MIN(sizeof(trace->data), data_len);
+		if (trace->datalen)
+			copy_from_user(trace->data, (void*)data_arg, trace->datalen);
 	}
-	/* TODO: merge with or remove the old tracer */
-	if (kthread->strace) {
-		sctrace(kthread->strace, current, 0, retval);
-		kfree(kthread->strace);
-		kthread->strace = 0;
-	}
+
+	systrace_output(trace, p->strace, FALSE);
+	kfree(kthread->strace);
+	kthread->strace = 0;
 }
 
 #ifdef CONFIG_SYSCALL_STRING_SAVING
@@ -2703,108 +2677,25 @@ void __signal_syscall(struct syscall *sysc, struct proc *p)
 	}
 }
 
-/* Syscall tracing */
-static void __init_systrace(void)
-{
-	systrace_buffer = kmalloc(MAX_SYSTRACES*sizeof(struct systrace_record), 0);
-	if (!systrace_buffer)
-		panic("Unable to alloc a trace buffer\n");
-	systrace_bufidx = 0;
-	systrace_bufsize = MAX_SYSTRACES;
-	/* Note we never free the buffer - it's around forever.  Feel free to change
-	 * this if you want to change the size or something dynamically. */
-}
-
 /* If you call this while it is running, it will change the mode */
 void systrace_start(bool silent)
 {
-	static bool init = FALSE;
-	spin_lock_irqsave(&systrace_lock);
-	if (!init) {
-		__init_systrace();
-		init = TRUE;
-	}
-	systrace_flags = silent ? SYSTRACE_ON : SYSTRACE_ON | SYSTRACE_LOUD;
-	spin_unlock_irqsave(&systrace_lock);
+	systrace_loud = TRUE;
 }
 
 int systrace_reg(bool all, struct proc *p)
 {
-	spin_lock_irqsave(&systrace_lock);
-	if (all) {
-		printk("Tracing syscalls for all processes\n");
-		systrace_flags |= SYSTRACE_ALLPROC;
-	} else {
-		set_traced_proc(p, TRUE);
-
-		printk("Tracing syscalls for process %d\n", p->pid);
-	}
-	spin_unlock_irqsave(&systrace_lock);
 	return 0;
 }
 
 int systrace_trace_pid(struct proc *p)
 {
-	if (systrace_reg(false, p))
-		error(EFAIL, "no more processes");
-	systrace_start(true);
 	return 0;
 }
 
 void systrace_stop(void)
 {
-	spin_lock_irqsave(&systrace_lock);
-	systrace_flags = 0;
-	spin_unlock_irqsave(&systrace_lock);
-}
-
-/* If you registered a process specifically, then you need to dereg it
- * specifically.  Or just fully stop, which will do it for all. */
-int systrace_dereg(bool all, struct proc *p)
-{
-	spin_lock_irqsave(&systrace_lock);
-	if (all) {
-		printk("No longer tracing syscalls for all processes.\n");
-		systrace_flags &= ~SYSTRACE_ALLPROC;
-	} else {
-		set_traced_proc(p, FALSE);
-
-		printk("No longer tracing syscalls for process %d\n", p->pid);
-	}
-	spin_unlock_irqsave(&systrace_lock);
-	return 0;
-}
-
-/* Regardless of locking, someone could be writing into the buffer */
-void systrace_print(bool all, struct proc *p)
-{
-	spin_lock_irqsave(&systrace_lock);
-	/* if you want to be clever, you could make this start from the earliest
-	 * timestamp and loop around.  Careful of concurrent writes. */
-	for (int i = 0; i < systrace_bufsize; i++)
-		if (systrace_buffer[i].start_timestamp)
-			printk("[%16llu] Syscall %3d (%12s):(%p, %p, %p, %p, %p,"
-			       "%p) proc: %d core: %d vcore: %d\n",
-			       systrace_buffer[i].start_timestamp,
-			       systrace_buffer[i].syscallno,
-			       syscall_table[systrace_buffer[i].syscallno].name,
-			       systrace_buffer[i].arg0,
-			       systrace_buffer[i].arg1,
-			       systrace_buffer[i].arg2,
-			       systrace_buffer[i].arg3,
-			       systrace_buffer[i].arg4,
-			       systrace_buffer[i].arg5,
-			       systrace_buffer[i].pid,
-			       systrace_buffer[i].coreid,
-			       systrace_buffer[i].vcoreid);
-	spin_unlock_irqsave(&systrace_lock);
-}
-
-void systrace_clear_buffer(void)
-{
-	spin_lock_irqsave(&systrace_lock);
-	memset(systrace_buffer, 0, sizeof(struct systrace_record) * MAX_SYSTRACES);
-	spin_unlock_irqsave(&systrace_lock);
+	systrace_loud = FALSE;
 }
 
 bool syscall_uses_fd(struct syscall *sysc, int fd)
