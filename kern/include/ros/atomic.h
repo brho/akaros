@@ -17,7 +17,7 @@ typedef void* atomic_t;
  * after.  If the value has changed, the reader needs to re-read.  If the value
  * is odd, a write is in progress or it is otherwise invalid/locked. */
 
-typedef uint8_t seq_ctr_t;
+typedef uint32_t seq_ctr_t;
 #define SEQCTR_INITIALIZER 0
 
 static inline bool seq_is_locked(seq_ctr_t seq_ctr);
