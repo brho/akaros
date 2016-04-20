@@ -52,6 +52,7 @@ static inline void __pop_ros_tf(struct hw_trapframe *tf, uint32_t vcoreid,
 
 	set_stack_pointer((void*)tf->gpr[GPR_SP]);
 
+#warning "Need to worry about notif_pending and stack growth?"
 	tf = _tf;
 	vcoreid = _vcoreid;
 	struct preempt_data* vcpd = &__procdata.vcore_preempt_data[vcoreid];

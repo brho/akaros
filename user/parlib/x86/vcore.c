@@ -191,14 +191,38 @@ static void pop_sw_tf(struct sw_trapframe *sw_tf, uint32_t vcoreid)
 /* Pops a user context, reanabling notifications at the same time.  A Userspace
  * scheduler can call this when transitioning off the transition stack.
  *
- * At some point in vcore context before calling this, you need to clear
- * notif_pending (do this by calling handle_events()).  As a potential
- * optimization, consider clearing the notif_pending flag / handle_events again
- * (right before popping), right before calling this.  If notif_pending is not
- * clear, this will self_notify this core, since it should be because we missed
- * a notification message while notifs were disabled. */
+ * pop_user_ctx will fail if we have a notif_pending; you're not allowed to
+ * leave vcore context with notif_pending set.  Some code in vcore_entry
+ * needs clear notif_pending and check whatever might have caused a notif
+ * (e.g. call handle_events()).
+ *
+ * If notif_pending is not clear, this will self_notify this core, since it
+ * should be because we missed a notification message while notifs were
+ * disabled. */
 void pop_user_ctx(struct user_context *ctx, uint32_t vcoreid)
 {
+	struct preempt_data *vcpd = vcpd_of(vcoreid);
+
+	/* We check early for notif_pending, since if we deal with it during
+	 * pop_hw_tf, we grow the stack slightly.  If a thread consistently fails to
+	 * restart due to notif pending, it will eventually run off the bottom of
+	 * its stack.  By performing the check here, we shrink that window.  You'd
+	 * have to have a notif come after this check, but also *not* before this
+	 * check.  If you PF in pop_user_ctx, this all failed. */
+	if (vcpd->notif_pending) {
+		/* if pop_user_ctx fails (and resets the vcore), the ctx contents must
+		 * be in VCPD (due to !UTHREAD_SAVED).  it might already be there. */
+		if (ctx != &vcpd->uthread_ctx)
+			vcpd->uthread_ctx = *ctx;
+		/* To restart the vcore, we must have the right TLS, stack pointer, and
+		 * vc_ctx = TRUE. */
+		set_tls_desc((void*)vcpd->vcore_tls_desc);
+		begin_safe_access_tls_vars()
+		__vcore_context = TRUE;
+		end_safe_access_tls_vars()
+		set_stack_pointer((void*)vcpd->vcore_stack);
+		vcore_entry();
+	}
 	switch (ctx->type) {
 	case ROS_HW_CTX:
 		pop_hw_tf(&ctx->tf.hw_tf, vcoreid);
