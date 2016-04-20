@@ -42,6 +42,15 @@ static inline uintptr_t get_hwtf_fp(struct hw_trapframe *hw_tf)
 	//return hw_tf->tf_rbp;
 }
 
+static inline uintptr_t get_hwtf_sp(struct hw_trapframe *hw_tf)
+{
+	/* do you even have frame pointers?  this is used for backtrace, but if you
+	 * don't use FPs, we'll need to change up our parameters or something. */
+	#warning "fix me"
+	return 0;
+	//return hw_tf->tf_rsp;
+}
+
 static inline uintptr_t get_swtf_pc(struct sw_trapframe *sw_tf)
 {
 	#warning "fix me"
@@ -56,6 +65,13 @@ static inline uintptr_t get_swtf_fp(struct sw_trapframe *sw_tf)
 	//return sw_tf->tf_rbp;
 }
 
+static inline uintptr_t get_swtf_sp(struct sw_trapframe *sw_tf)
+{
+	#warning "fix me"
+	return 0;
+	//return sw_tf->tf_rsp;
+}
+
 static inline uintptr_t get_vmtf_pc(struct vm_trapframe *vm_tf)
 {
 	#warning "fix me"
@@ -63,6 +79,12 @@ static inline uintptr_t get_vmtf_pc(struct vm_trapframe *vm_tf)
 }
 
 static inline uintptr_t get_vmtf_fp(struct vm_trapframe *vm_tf)
+{
+	#warning "fix me"
+	return 0;
+}
+
+static inline uintptr_t get_vmtf_sp(struct vm_trapframe *vm_tf)
 {
 	#warning "fix me"
 	return 0;

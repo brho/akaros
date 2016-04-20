@@ -119,6 +119,20 @@ uintptr_t get_user_ctx_fp(struct user_context *ctx)
 	}
 }
 
+uintptr_t get_user_ctx_sp(struct user_context *ctx)
+{
+	switch (ctx->type) {
+	case ROS_HW_CTX:
+		return get_hwtf_sp(&ctx->tf.hw_tf);
+	case ROS_SW_CTX:
+		return get_swtf_sp(&ctx->tf.sw_tf);
+	case ROS_VM_CTX:
+		return get_vmtf_sp(&ctx->tf.vm_tf);
+	default:
+		panic("Bad context type %d for ctx %p\n", ctx->type, ctx);
+	}
+}
+
 /* Helper, copies the current context to to_ctx. */
 void copy_current_ctx_to(struct user_context *to_ctx)
 {

@@ -42,6 +42,7 @@ void __arch_reflect_trap_hwtf(struct hw_trapframe *hw_tf, unsigned int trap_nr,
 
 uintptr_t get_user_ctx_pc(struct user_context *ctx);
 uintptr_t get_user_ctx_fp(struct user_context *ctx);
+uintptr_t get_user_ctx_sp(struct user_context *ctx);
 
 /* Partial contexts are those where the full context is split between the parts
  * in the struct and the parts still loaded in hardware.
