@@ -82,9 +82,11 @@ int getifaddrs(struct ifaddrs **ifap)
 	closedir(net);
 	return 0;
 }
+libc_hidden_def(getifaddrs)
 
 void freeifaddrs(struct ifaddrs *ifa)
 {
 	for (; ifa; ifa = ifa->ifa_next)
 		free(ifa);
 }
+libc_hidden_def(freeifaddrs)
