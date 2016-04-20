@@ -1513,10 +1513,24 @@ static intreg_t sys_openat(struct proc *p, int fromfd, const char *path,
 	mode &= ~p->fs_env.umask;
 	/* Only check the VFS for legacy opens.  It doesn't support openat.  Actual
 	 * openats won't check here, and file == 0. */
+#define REMOVE_BEFORE_FLIGHT 1
+#if REMOVE_BEFORE_FLIGHT
+	/*
+	 * HACK. This is another stopgap until we move away from the
+	 * vfs. People need to see /dev. This is written in such a way
+	 * as to fail quickly, be easily removed, and still do what we
+	 * want.
+	 */
+	if ((fromfd == AT_FDCWD) && (path_l == 4) && (t_path[0] == '/')
+		&& (t_path[1] == 'd') && (t_path[2] == 'e') && (t_path[3] == 'v')) {
+		set_errno(ENOENT);
+	} else {
+#endif
 	if ((t_path[0] == '/') || (fromfd == AT_FDCWD))
 		file = do_file_open(t_path, oflag, mode);
 	else
 		set_errno(ENOENT);	/* was not in the VFS. */
+	}
 	if (file) {
 		/* VFS lookup succeeded */
 		/* stores the ref to file */
