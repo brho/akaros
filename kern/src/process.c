@@ -1273,6 +1273,15 @@ out_yield_core:				/* successfully yielded the core */
 void proc_notify(struct proc *p, uint32_t vcoreid)
 {
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
+
+	/* If you're thinking about checking notif_pending and then returning if it
+	 * is already set, note that some callers (e.g. the event system) set
+	 * notif_pending when they deliver a message, regardless of whether there is
+	 * an IPI or not.  Those callers assume that we don't care about
+	 * notif_pending, only notif_disabled.  So don't change this without
+	 * changing them (probably can't without a lot of thought - that
+	 * notif_pending is about missing messages.  It might be possible to say "no
+	 * IPI, but don't let me miss messages that were delivered." */
 	vcpd->notif_pending = TRUE;
 	wrmb();	/* must write notif_pending before reading notif_disabled */
 	if (!vcpd->notif_disabled) {
