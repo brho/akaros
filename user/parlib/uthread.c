@@ -475,6 +475,14 @@ void uthread_usleep(unsigned int usecs)
 	sys_block(usecs);	/* usec sleep */
 }
 
+void uthread_sleep_forever(void)
+{
+	uth_mutex_t mtx = uth_mutex_alloc();
+
+	uth_mutex_lock(mtx);
+	uth_mutex_lock(mtx);
+}
+
 /* Cleans up the uthread (the stuff we did in uthread_init()).  If you want to
  * destroy a currently running uthread, you'll want something like
  * pthread_exit(), which yields, and calls this from its sched_ops yield. */
