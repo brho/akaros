@@ -952,26 +952,26 @@ int main(int argc, char **argv)
 				break;
 			}
 			if (debug) fprintf(stderr, "%p %p %p %p %p %p\n", gpa, regx, regp, store, size, advance);
-			if ((gpa & ~0xfffULL) == virtiobase) {
+			if (PG_ADDR(gpa) == virtiobase) {
 				if (debug) fprintf(stderr, "DO SOME VIRTIO\n");
 				// Lucky for us the various virtio ops are well-defined.
 				virtio_mmio((struct guest_thread *)vm_thread, gpa, regx, regp,
 				            store);
 				if (debug) fprintf(stderr, "store is %d:\n", store);
 				if (debug) fprintf(stderr, "REGP IS %16x:\n", *regp);
-			} else if ((gpa & 0xfee00000) == 0xfee00000) {
+			} else if (PG_ADDR(gpa) == 0xfee00000) {
 				// until we fix our include mess, just put the proto here.
 				//int apic(struct vmctl *v, uint64_t gpa, int destreg, uint64_t *regp, int store);
 				//apic(&vmctl, gpa, regx, regp, store);
-			} else if ((gpa & 0xfec00000) == 0xfec00000) {
+			} else if (PG_ADDR(gpa) == 0xfec00000) {
 				// until we fix our include mess, just put the proto here.
 				do_ioapic((struct guest_thread *)vm_thread, gpa, regx, regp,
 				          store);
-			} else if (gpa < 4096) {
+			} else if (PG_ADDR(gpa) == 0) {
 				uint64_t val = 0;
 				memmove(&val, &low4k[gpa], size);
 				hexdump(stdout, &low4k[gpa], size);
-				fprintf(stderr, "Low 1m, code %p read @ %p, size %d, val %p\n",
+				fprintf(stderr, "Low 4k, code %p read @ %p, size %d, val %p\n",
 				        vm_tf->tf_rip, gpa, size, val);
 				memmove(regp, &low4k[gpa], size);
 				hexdump(stdout, regp, size);
