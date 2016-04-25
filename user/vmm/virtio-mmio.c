@@ -67,6 +67,7 @@ typedef struct {
 	struct vqdev *vqdev;
 } mmiostate;
 
+/* TODO: probably embed this in the struct virtual_machine */
 static mmiostate mmio;
 
 void register_virtio_mmio(struct vqdev *vqdev, uint64_t virtio_base)
@@ -75,7 +76,6 @@ void register_virtio_mmio(struct vqdev *vqdev, uint64_t virtio_base)
 	mmio.vqdev = vqdev;
 }
 
-static uint32_t virtio_mmio_read(uint64_t gpa);
 char *virtio_names[] = {
 	[VIRTIO_MMIO_MAGIC_VALUE] "VIRTIO_MMIO_MAGIC_VALUE",
 	[VIRTIO_MMIO_VERSION] "VIRTIO_MMIO_VERSION",
@@ -108,7 +108,7 @@ char *virtio_names[] = {
 /* We're going to attempt to make mmio stateless, since the real machine is in
  * the guest kernel. From what we know so far, all IO to the mmio space is 32 bits.
  */
-static uint32_t virtio_mmio_read(uint64_t gpa)
+static uint32_t virtio_mmio_read(struct virtual_machine *vm, uint64_t gpa)
 {
 
 	unsigned int offset = gpa - mmio.bar;
@@ -209,7 +209,8 @@ static uint32_t virtio_mmio_read(uint64_t gpa)
     return 0;
 }
 
-static void virtio_mmio_write(uint64_t gpa, uint32_t value)
+static void virtio_mmio_write(struct virtual_machine *vm, uint64_t gpa,
+                              uint32_t value)
 {
 	uint64_t val64;
 	uint32_t low, high;
@@ -415,15 +416,15 @@ void virtio_mmio_set_vring_irq(void)
 	mmio.isr |= VIRTIO_MMIO_INT_VRING;
 }
 
-int virtio_mmio(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
+int virtio_mmio(struct guest_thread *gth, uint64_t gpa, int destreg,
                 uint64_t *regp, int store)
 {
 	if (store) {
-		virtio_mmio_write(gpa, *regp);
+		virtio_mmio_write(gth_to_vm(gth), gpa, *regp);
 		DPRINTF("Write: mov %s to %s @%p val %p\n", regname(destreg),
 		        virtio_names[(uint8_t)gpa], gpa, *regp);
 	} else {
-		*regp = virtio_mmio_read(gpa);
+		*regp = virtio_mmio_read(gth_to_vm(gth), gpa);
 		DPRINTF("Read: Set %s from %s @%p to %p\n", regname(destreg),
 		        virtio_names[(uint8_t)gpa], gpa, *regp);
 	}
