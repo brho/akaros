@@ -14,6 +14,13 @@ struct virtual_machine {
 	struct guest_thread			**gths;
 	unsigned int				nr_gpcs;
 	struct vmm_gpcore_init		*gpcis;
+
+	/* TODO: put these in appropriate structures.  e.g., virtio things in
+	 * something related to virtio.  low4k in something related to the guest's
+	 * memory. */
+	uintptr_t					virtio_mmio_base;
+	int							virtio_irq;
+	uint8_t						*low4k;
 };
 
 char *regname(uint8_t reg);

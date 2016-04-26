@@ -26,8 +26,11 @@
 #include <vmm/virtio_config.h>
 #include <vmm/sched.h>
 
-struct vmctl vmctl;
+
+struct virtual_machine local_vm, *vm = &local_vm;
 struct vmm_gpcore_init gpci;
+
+struct vmctl vmctl;
 
 /* Whoever holds the ball runs.  run_vm never actually grabs it - it is grabbed
  * on its behalf. */
@@ -298,12 +301,9 @@ struct acpi_madt_interrupt_override isor[] = {
 
 /* this test will run the "kernel" in the negative address space. We hope. */
 void *low1m;
-uint8_t low4k[4096];
-unsigned long long stack[1024];
 volatile int shared = 0;
 volatile int quit = 0;
 int mcp = 1;
-int virtioirq = 17;
 
 /* total hack. If the vm runs away we want to get control again. */
 unsigned int maxresume = (unsigned int) -1;
@@ -323,7 +323,6 @@ int resumeprompt = 0;
 /* unlike Linux, this shared struct is for both host and guest. */
 //	struct virtqueue *constoguest =
 //		vring_new_virtqueue(0, 512, 8192, 0, inpages, NULL, NULL, "test");
-uint64_t virtio_mmio_base = 0x100000000ULL;
 
 void vapic_status_dump(FILE *f, void *vapic);
 static void set_posted_interrupt(int vector);
@@ -573,7 +572,6 @@ int main(int argc, char **argv)
 	struct acpi_table_fadt *f;
 	struct acpi_table_madt *m;
 	struct acpi_table_xsdt *x;
-	uint64_t virtiobase = 0x100000000ULL;
 	// lowmem is a bump allocated pointer to 2M at the "physbase" of memory
 	void *lowmem = (void *) 0x1000000;
 	//struct vmctl vmctl;
@@ -606,7 +604,8 @@ int main(int argc, char **argv)
 	}
 	memset(_kernel, 0, sizeof(_kernel));
 	memset(lowmem, 0xff, 2*1048576);
-	memset(low4k, 0xff, 4096);
+	vm->low4k = malloc(PGSIZE);
+	memset(vm->low4k, 0xff, PGSIZE);
 	// avoid at all costs, requires too much instruction emulation.
 	//low4k[0x40e] = 0;
 	//low4k[0x40f] = 0xe0;
@@ -629,6 +628,7 @@ int main(int argc, char **argv)
 	((uint32_t *)a_page)[0x30/4] = 0x01060015;
 	//((uint32_t *)a_page)[0x30/4] = 0xDEADBEEF;
 
+	vm->virtio_irq = 17; /* TODO: is this an option?  or a #define? */
 
 	argc--, argv++;
 	// switches ...
@@ -649,7 +649,7 @@ int main(int argc, char **argv)
 			break;
 		case 'i':
 			argc--, argv++;
-			virtioirq = strtoull(argv[0], 0, 0);
+			vm->virtio_irq = strtoull(argv[0], 0, 0);
 			break;
 		case 'c':
 			argc--, argv++;
@@ -887,15 +887,20 @@ int main(int argc, char **argv)
 	hexdump(stdout, coreboot_tables, 512);
 	fprintf(stderr, "kernbase for pml4 is 0x%llx and entry is %llx\n", kernbase, entry);
 	fprintf(stderr, "p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
+
+
+	vm->virtio_mmio_base = 0x100000000;
+
+
 	vmctl.interrupt = 0;
 	vmctl.command = REG_RSP_RIP_CR3;
 	vmctl.cr3 = (uint64_t) p512;
 	vmctl.regs.tf_rip = entry;
-	vmctl.regs.tf_rsp = (uint64_t) &stack[1024];
+	vmctl.regs.tf_rsp = 0;
 	vmctl.regs.tf_rsi = (uint64_t) bp;
 	if (mcp) {
 		/* set up virtio bits, which depend on threads being enabled. */
-		register_virtio_mmio(&vqdev, virtio_mmio_base);
+		register_virtio_mmio(&vqdev, vm->virtio_mmio_base);
 	}
 	fprintf(stderr, "threads started\n");
 	fprintf(stderr, "Writing command :%s:\n", cmd);
@@ -952,7 +957,7 @@ int main(int argc, char **argv)
 				break;
 			}
 			if (debug) fprintf(stderr, "%p %p %p %p %p %p\n", gpa, regx, regp, store, size, advance);
-			if (PG_ADDR(gpa) == virtiobase) {
+			if (PG_ADDR(gpa) == vm->virtio_mmio_base) {
 				if (debug) fprintf(stderr, "DO SOME VIRTIO\n");
 				// Lucky for us the various virtio ops are well-defined.
 				virtio_mmio((struct guest_thread *)vm_thread, gpa, regx, regp,
@@ -969,11 +974,11 @@ int main(int argc, char **argv)
 				          store);
 			} else if (PG_ADDR(gpa) == 0) {
 				uint64_t val = 0;
-				memmove(&val, &low4k[gpa], size);
-				hexdump(stdout, &low4k[gpa], size);
+				memmove(&val, &vm->low4k[gpa], size);
+				hexdump(stdout, &vm->low4k[gpa], size);
 				fprintf(stderr, "Low 4k, code %p read @ %p, size %d, val %p\n",
 				        vm_tf->tf_rip, gpa, size, val);
-				memmove(regp, &low4k[gpa], size);
+				memmove(regp, &vm->low4k[gpa], size);
 				hexdump(stdout, regp, size);
 			} else {
 				fprintf(stderr, "EPT violation: can't handle %p\n", gpa);
@@ -1018,7 +1023,7 @@ int main(int argc, char **argv)
 				if (consdata) {
 					if (debug) fprintf(stderr, "inject an interrupt\n");
 					virtio_mmio_set_vring_irq();
-					vm_tf->tf_trap_inject = 0x80000000 | virtioirq;
+					vm_tf->tf_trap_inject = 0x80000000 | vm->virtio_irq;
 					//vmctl.command = RESUME;
 					consdata = 0;
 				}
@@ -1120,7 +1125,7 @@ int main(int argc, char **argv)
 			if (debug)
 				fprintf(stderr, "XINT 0x%x 0x%x\n", vm_tf->tf_intrinfo1,
 				        vm_tf->tf_intrinfo2);
-			vm_tf->tf_trap_inject = 0x80000000 | virtioirq;
+			vm_tf->tf_trap_inject = 0x80000000 | vm->virtio_irq;
 			virtio_mmio_set_vring_irq();
 			consdata = 0;
 			//debug = 1;

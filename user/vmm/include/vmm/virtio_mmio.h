@@ -35,6 +35,7 @@
 #pragma once
 
 #include <vmm/sched.h>
+
 /*
  * Control registers
  */
