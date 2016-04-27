@@ -20,7 +20,9 @@ static void print_unhandled_trap(struct proc *p, struct user_context *ctx,
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	uint32_t vcoreid = pcpui->owning_vcoreid;
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
+	static spinlock_t print_trap_lock = SPINLOCK_INITIALIZER;
 
+	spin_lock(&print_trap_lock);
 	if (!proc_is_vcctx_ready(p))
 		printk("Unhandled user trap from early SCP\n");
 	else if (vcpd->notif_disabled)
@@ -30,6 +32,7 @@ static void print_unhandled_trap(struct proc *p, struct user_context *ctx,
 	debug_addr_proc(p, get_user_ctx_pc(ctx));
 	print_vmrs(p);
 	backtrace_user_ctx(p, ctx);
+	spin_unlock(&print_trap_lock);
 }
 
 /* Traps that are considered normal operations. */
