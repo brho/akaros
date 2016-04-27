@@ -97,7 +97,8 @@ bool __check_preempt_pending(uint32_t vcoreid);	/* careful: check the code */
 void uth_disable_notifs(void);
 void uth_enable_notifs(void);
 
-/* Helpers, which sched_entry() can call */
+/* Helpers, which the 2LS can call */
+void __block_uthread_on_async_sysc(struct uthread *uth);
 void highjack_current_uthread(struct uthread *uthread);
 struct uthread *stop_current_uthread(void);
 void __attribute__((noreturn)) run_current_uthread(void);

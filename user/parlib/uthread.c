@@ -541,6 +541,24 @@ static void __ros_uth_syscall_blockon(struct syscall *sysc)
 	uthread_yield(TRUE, sched_ops->thread_blockon_sysc, sysc);
 }
 
+/* 2LS helper.  Run this from vcore context.  It will block a uthread on it's
+ * internal syscall struct, which should be an async call.  You'd use this in
+ * e.g. thread_refl_fault when the 2LS initiates a syscall on behalf of the
+ * uthread. */
+void __block_uthread_on_async_sysc(struct uthread *uth)
+{
+	assert(in_vcore_context());
+	uth->sysc = &uth->local_sysc;
+	/* If a DONT_MIGRATE issued a syscall that blocks, we gotta spin, same as
+	 * with the usual blockon. */
+	if (uth->flags & UTHREAD_DONT_MIGRATE) {
+		__ros_vcore_ctx_syscall_blockon(uth->sysc);
+		uth->sysc = 0;
+		return;
+	}
+	sched_ops->thread_blockon_sysc(uth, uth->sysc);
+}
+
 /* Simply sets current uthread to be whatever the value of uthread is.  This
  * can be called from outside of sched_entry() to highjack the current context,
  * and make sure that the new uthread struct is used to store this context upon

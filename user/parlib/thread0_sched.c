@@ -96,20 +96,43 @@ static void thread0_thread_blockon_sysc(struct uthread *uthread, void *arg)
 		thread0_thread_runnable(uthread);
 }
 
+static void refl_error(struct uthread *uth, unsigned int trap_nr,
+                       unsigned int err, unsigned long aux)
+{
+	printf("Thread has unhandled fault: %d, err: %d, aux: %p\n",
+	       trap_nr, err, aux);
+	/* Note that uthread.c already copied out our ctx into the uth
+	 * struct */
+	print_user_context(&uth->u_ctx);
+	printf("Turn on printx to spew unhandled, malignant trap info\n");
+	exit(-1);
+}
+
+static bool handle_page_fault(struct uthread *uth, unsigned int err,
+                              unsigned long aux)
+{
+	if (!(err & PF_VMR_BACKED))
+		return FALSE;
+	syscall_async(&uth->local_sysc, SYS_populate_va, aux, 1);
+	__block_uthread_on_async_sysc(uth);
+	return TRUE;
+}
+
 static void thread0_thread_refl_fault(struct uthread *uth,
                                       struct user_context *ctx)
 {
-	switch (ctx->type) {
-	case ROS_HW_CTX:
-		printf("SCP has unhandled fault: %d, err: %d, aux: %p\n",
-		       __arch_refl_get_nr(ctx), __arch_refl_get_err(ctx),
-		       __arch_refl_get_aux(ctx));
-		print_user_context(ctx);
-		printf("Turn on printx to spew unhandled, malignant trap info\n");
-		exit(-1);
+	unsigned int trap_nr = __arch_refl_get_nr(ctx);
+	unsigned int err = __arch_refl_get_err(ctx);
+	unsigned long aux = __arch_refl_get_aux(ctx);
+
+	assert(ctx->type == ROS_HW_CTX);
+	switch (trap_nr) {
+	case HW_TRAP_PAGE_FAULT:
+		if (!handle_page_fault(uth, err, aux))
+			refl_error(uth, trap_nr, err, aux);
 		break;
 	default:
-		assert(0);
+		refl_error(uth, trap_nr, err, aux);
 	}
 }
 

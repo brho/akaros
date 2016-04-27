@@ -288,20 +288,8 @@ static void handle_page_fault(struct uthread *uthread, unsigned int err,
 	if (!(err & PF_VMR_BACKED)) {
 		__signal_and_restart(uthread, SIGSEGV, SEGV_MAPERR, (void*)aux);
 	} else {
-		/* stitching for the event handler.  sysc -> uth, uth -> sysc */
-		uthread->local_sysc.u_data = uthread;
-		uthread->sysc = &uthread->local_sysc;
-		pthread->state = PTH_BLK_SYSC;
-		/* one downside is that we'll never check the return val of the syscall.  if
-		 * we errored out, we wouldn't know til we PF'd again, and inspected the old
-		 * retval/err and other sysc fields (make sure the PF is on the same addr,
-		 * etc).  could run into this issue on truncated files too. */
 		syscall_async(&uthread->local_sysc, SYS_populate_va, aux, 1);
-		if (!register_evq(&uthread->local_sysc, sysc_mgmt[vcore_id()].ev_q)) {
-			/* Lost the race with the call being done.  The kernel won't send the
-			 * event.  Just restart him. */
-			restart_thread(&uthread->local_sysc);
-		}
+		__block_uthread_on_async_sysc(uthread);
 	}
 }
 
