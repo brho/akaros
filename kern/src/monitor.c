@@ -877,6 +877,7 @@ static void pm_flusher(void *unused)
 
 	/* could also put the delay between calls, or even within remove, during the
 	 * WB phase. */
+	printk("GIANT WARNING: the pm_flusher is running and will never stop!\n");
 	while (1) {
 		kthread_usleep(5000);
 		TAILQ_FOREACH(sb, &super_blocks, s_list) {
