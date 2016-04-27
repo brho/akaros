@@ -164,8 +164,8 @@ static void apic_write(uint64_t offset, uint32_t value)
 
 }
 
-int apic(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
-         uint64_t *regp, int store)
+int __apic_access(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
+                  uint64_t *regp, int store)
 {
 	uint32_t offset = gpa & 0xfffff;
 	/* basic sanity tests. */

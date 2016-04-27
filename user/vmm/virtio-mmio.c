@@ -311,10 +311,7 @@ static void virtio_mmio_write(struct virtual_machine *vm, uint64_t gpa,
 							  NULL, NULL, /* callbacks */
  							  mmio.vqdev->vqs[mmio.qsel].name);
 		    fprintf(stderr, "START THE THREAD. pfn is 0x%x, virtio is %p\n", mmio.pagesize, va->arg->virtio);
-		    if (pthread_create(&va->arg->thread, NULL, va->arg->f, va)) {
-			    fprintf(stderr, "pth_create failed for vq %s", va->arg->name);
-			    perror("pth_create");
-		    }
+			vmm_run_task(vm, va->arg->func, va);
         break;
     case VIRTIO_MMIO_QUEUE_NOTIFY:
 	    if (value < mmio.vqdev->numvqs) {
@@ -388,10 +385,7 @@ static void virtio_mmio_write(struct virtual_machine *vm, uint64_t gpa,
 		    va->arg = &mmio.vqdev->vqs[mmio.qsel];
 		    va->arg->virtio = (void *)(va->arg->pfn * mmio.pagesize);
 		    fprintf(stderr, "START THE THREAD. pfn is 0x%x, virtio is %p\n", mmio.pagesize, va->arg->virtio);
-		    if (pthread_create(&va->arg->thread, NULL, va->arg->f, va)) {
-			    fprintf(stderr, "pth_create failed for vq %s", va->arg->name);
-			    perror("pth_create");
-		    }
+			vmm_run_task(vm, va->arg->func, va);
 	    }
 	    break;
 

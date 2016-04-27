@@ -32,11 +32,30 @@ int msrio(struct guest_thread *vm_thread, struct vmm_gpcore_init *gpci,
           uint32_t opcode);
 int do_ioapic(struct guest_thread *vm_thread, uint64_t gpa,
               int destreg, uint64_t *regp, int store);
+bool handle_vmexit(struct guest_thread *gth);
+int __apic_access(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
+                  uint64_t *regp, int store);
 
 /* Lookup helpers */
 
 static struct virtual_machine *gth_to_vm(struct guest_thread *gth)
 {
-	/* TODO */
-	return 0;
+	return ((struct vmm_thread*)gth)->vm;
+}
+
+static struct vm_trapframe *gth_to_vmtf(struct guest_thread *gth)
+{
+	return &gth->uthread.u_ctx.tf.vm_tf;
+}
+
+static struct vmm_gpcore_init *gth_to_gpci(struct guest_thread *gth)
+{
+	struct virtual_machine *vm = gth_to_vm(gth);
+
+	return &vm->gpcis[gth->gpc_id];
+}
+
+static struct virtual_machine *get_my_vm(void)
+{
+	return ((struct vmm_thread*)current_uthread)->vm;
 }

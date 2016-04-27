@@ -144,12 +144,12 @@
 // status; and a pointer to the virtio struct.
 struct vq {
 	char *name;
-	void *(*f)(void *arg); // Start this as a thread when a matching virtio is discovered.
+	/* Start this as a thread when a matching virtio is discovered. */
+	void (*func)(void *arg);
 	void *arg;
 	int maxqnum; // how many things the q gets? or something. 
 	int qnum; 
 	int qalign;
-	pthread_t thread;
 	/* filled in by virtio probing. */
 	uint64_t pfn;
 	uint32_t isr; // not used yet but ...
