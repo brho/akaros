@@ -59,6 +59,7 @@ void		syscall_async(struct syscall *sysc, unsigned long num, ...);
 
 /* Control variables */
 extern bool parlib_wants_to_be_mcp;	/* instructs the 2LS to be an MCP */
+extern bool parlib_never_yield;		/* instructs the 2LS to not yield vcores */
 
 __END_DECLS
 

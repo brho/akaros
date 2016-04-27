@@ -289,6 +289,9 @@ void vcore_yield(bool preempt_pending)
 	unsigned long old_nr;
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
+
+	if (!preempt_pending && parlib_never_yield)
+		return;
 	__sync_fetch_and_and(&vcpd->flags, ~VC_CAN_RCV_MSG);
 	/* no wrmb() necessary, handle_events() has an mb() if it is checking */
 	/* Clears notif pending and tries to handle events.  This is an optimization
