@@ -295,8 +295,11 @@ bool emsr_miscenable(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
                      uint64_t *rax, uint32_t opcode)
 {
 	uint32_t eax, edx;
+	uint64_t val;
 
-	rdmsr(msr->reg, eax, edx);
+	if (read_msr_safe(msr->reg, &val))
+		return FALSE;
+	split_msr_val(val, &edx, &eax);
 	/* we just let them read the misc msr for now. */
 	if (opcode == VMM_MSR_EMU_READ) {
 		*rax = eax;
@@ -320,8 +323,11 @@ bool emsr_mustmatch(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
                     uint64_t *rax, uint32_t opcode)
 {
 	uint32_t eax, edx;
+	uint64_t val;
 
-	rdmsr(msr->reg, eax, edx);
+	if (read_msr_safe(msr->reg, &val))
+		return FALSE;
+	split_msr_val(val, &edx, &eax);
 	/* we just let them read the misc msr for now. */
 	if (opcode == VMM_MSR_EMU_READ) {
 		*rax = eax;
@@ -342,8 +348,11 @@ bool emsr_readonly(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
                    uint64_t *rax, uint32_t opcode)
 {
 	uint32_t eax, edx;
+	uint64_t val;
 
-	rdmsr((uint32_t) *rcx, eax, edx);
+	if (read_msr_safe(msr->reg, &val))
+		return FALSE;
+	split_msr_val(val, &edx, &eax);
 	if (opcode == VMM_MSR_EMU_READ) {
 		*rax = eax;
 		*rdx = edx;
@@ -372,9 +381,12 @@ bool emsr_fakewrite(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
                     uint64_t *rax, uint32_t opcode)
 {
 	uint32_t eax, edx;
+	uint64_t val;
 
 	if (!msr->written) {
-		rdmsr(msr->reg, eax, edx);
+		if (read_msr_safe(msr->reg, &val))
+			return FALSE;
+		split_msr_val(val, &edx, &eax);
 	} else {
 		edx = msr->edx;
 		eax = msr->eax;
@@ -399,15 +411,18 @@ bool emsr_ok(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
              uint64_t *rax, uint32_t opcode)
 {
 	uint32_t eax, edx;
+	uint64_t val;
 
 	if (opcode == VMM_MSR_EMU_READ) {
-		rdmsr(msr->reg, eax, edx);
+		if (read_msr_safe(msr->reg, &val))
+			return FALSE;
+		split_msr_val(val, &edx, &eax);
 		*rax = eax;
 		*rdx = edx;
 	} else {
-		uint64_t val = (*rdx << 32) | (*rax & 0xffffffff);
-
-		write_msr(msr->reg, val);
+		val = (*rdx << 32) | (*rax & 0xffffffff);
+		if (write_msr_safe(msr->reg, val))
+			return FALSE;
 	}
 	return TRUE;
 }
@@ -419,7 +434,6 @@ bool emsr_fake_apicbase(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 	uint32_t eax, edx;
 
 	if (!msr->written) {
-		//rdmsr(msr->reg, eax, edx);
 		/* TODO: tightly coupled to the addr in vmrunkernel.  We want this func
 		 * to return the val that vmrunkernel put into the VMCS. */
 		eax = 0xfee00900;
