@@ -451,9 +451,7 @@ static inline uint64_t read_msr(uint32_t reg)
 
 static inline void write_msr(uint32_t reg, uint64_t val)
 {
-	asm volatile("wrmsr" : : "d"((uint32_t)(val >> 32)),
-	                         "a"((uint32_t)(val & 0xFFFFFFFF)),
-	                         "c"(reg));
+	asm volatile("wrmsr" : : "d"(val >> 32), "a"(val & 0xFFFFFFFF), "c"(reg));
 }
 
 static inline void write_mmreg32(uintptr_t reg, uint32_t val)
