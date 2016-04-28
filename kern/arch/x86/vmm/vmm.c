@@ -398,10 +398,14 @@ bool emsr_fakewrite(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 bool emsr_ok(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
              uint64_t *rax, uint32_t opcode)
 {
+	uint32_t eax, edx;
+
 	if (opcode == VMM_MSR_EMU_READ) {
-		rdmsr(msr->reg, *rdx, *rax);
+		rdmsr(msr->reg, eax, edx);
+		*rax = eax;
+		*rdx = edx;
 	} else {
-		uint64_t val = (uint64_t) *rdx << 32 | *rax;
+		uint64_t val = (*rdx << 32) | (*rax & 0xffffffff);
 
 		write_msr(msr->reg, val);
 	}

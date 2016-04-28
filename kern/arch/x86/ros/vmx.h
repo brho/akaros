@@ -641,8 +641,15 @@ struct vmcs {
 
 typedef uint64_t gpa_t;
 typedef uint64_t gva_t;
+/* TODO: remove these nasty macros */
 #define rdmsrl(msr, val) (val) = read_msr((msr))
-#define rdmsr(msr, low, high) do {uint64_t m = read_msr(msr); low = m; high = m>>32;} while (0)
+#define rdmsr(msr, low, high)                                                  \
+do {                                                                           \
+	uint64_t m = read_msr(msr);                                                \
+	                                                                           \
+	low = m & 0xffffffff;                                                      \
+	high = m >> 32;                                                            \
+} while (0)
 
 struct vmx_capability {
 	uint32_t ept;
