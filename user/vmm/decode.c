@@ -273,19 +273,3 @@ int decode(struct guest_thread *vm_thread, uint64_t *gpa, uint8_t *destreg,
 	}
 	return 0;
 }
-
-#if 0
-// stupid emulator since what we need is so limited.
-int emu(struct vmctl *v, uint64_t gpa, uint8_t destreg, uint64_t *regp, int store, int size, int advance)
-{
-	uint8_t *kva = f->regs.tf_rip;
-
-	if (
-	switch(kva[0]) {
-
-				val = *(uint64_t*) (lowmem + gpa); 
-				printf("val %p ", val);
-				memcpy(regp, &val, size);
-
-}
-#endif

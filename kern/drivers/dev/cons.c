@@ -1027,7 +1027,6 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 	int x;
 	uint64_t rip, rsp, cr3, flags, vcpu;
 	int ret;
-	struct vmctl vmctl;
 
 	a = va;
 	offset = off;
