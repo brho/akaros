@@ -41,7 +41,7 @@ static void msr_smp_read(void *opaque)
 	err = msr_get_core_address(coreno, srv->msra, &addr);
 	if (err)
 		goto errout;
-	err = safe_read_msr(addr, &value);
+	err = read_msr_safe(addr, &value);
 	if (err)
 		goto errout;
 	err = msr_set_core_value(coreno, value, srv->msrv);
@@ -99,7 +99,7 @@ static void msr_smp_write(void *opaque)
 	err = msr_get_core_value(coreno, swv->msrv, &value);
 	if (err)
 		goto errout;
-	err = safe_write_msr(addr, value);
+	err = write_msr_safe(addr, value);
 	if (err)
 		goto errout;
 

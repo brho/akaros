@@ -178,7 +178,7 @@ static inline int copy_from_user(void *dst, const void *src,
 	return err;
 }
 
-static inline int safe_read_msr(uint32_t addr, uint64_t *value)
+static inline int read_msr_safe(uint32_t addr, uint64_t *value)
 {
 	int err = 0;
 	uint32_t edx, eax;
@@ -190,7 +190,7 @@ static inline int safe_read_msr(uint32_t addr, uint64_t *value)
 	return err;
 }
 
-static inline int safe_write_msr(uint32_t addr, uint64_t value)
+static inline int write_msr_safe(uint32_t addr, uint64_t value)
 {
 	int err = 0;
 
