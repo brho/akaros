@@ -1492,8 +1492,9 @@ static ssize_t __qbwrite(struct queue *q, struct block *b, int qio_flags)
 	bool was_empty;
 
 	if (q->bypass) {
+		ret = blocklen(b);
 		(*q->bypass) (q->arg, b);
-		return blocklen(b);
+		return ret;
 	}
 	spin_lock_irqsave(&q->lock);
 	was_empty = q->len == 0;
