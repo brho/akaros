@@ -37,6 +37,10 @@
 #include <manager.h>
 #include <ros/procinfo.h>
 
+static int execargs_stringer(struct proc *p, char *d, size_t slen,
+			     char *path, size_t path_l,
+			     char *argenv, size_t argenv_l);
+
 /* Global, used by the kernel monitor for syscall debugging. */
 bool systrace_loud = FALSE;
 
@@ -120,7 +124,7 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 {
 	struct proc *p = current;
 	struct systrace_record *trace;
-	long data_arg;
+	uintreg_t data_arg;
 	size_t data_len = 0;
 
 	kthread->strace = 0;
@@ -145,6 +149,11 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 	}
 	if (!trace)
 		return;
+	/* if you ever need to debug just one strace function, this is
+	 * handy way to do it: just bail out if it's not the one you
+	 * want.
+	 * if (sysc->num != SYS_exec)
+	 * return; */
 	trace->start_timestamp = read_tsc();
 	trace->end_timestamp = 0;
 	trace->syscallno = sysc->num;
@@ -171,12 +180,23 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 		data_arg = sysc->arg1;
 		data_len = sysc->arg2;
 		break;
+	case SYS_exec:
+		trace->datalen = execargs_stringer(current,
+						   (char *)trace->data,
+						   sizeof(trace->data),
+						   (char *)sysc->arg0,
+						   sysc->arg1,
+						   (char *)sysc->arg2,
+						   sysc->arg3);
+		break;
 	}
-	trace->datalen = MIN(sizeof(trace->data), data_len);
-	if (trace->datalen)
+	if (data_len) {
+		trace->datalen = MIN(sizeof(trace->data), data_len);
 		copy_from_user(trace->data, (void*)data_arg, trace->datalen);
+	}
 
 	systrace_output(trace, p->strace, TRUE);
+
 	kthread->strace = trace;
 }
 
@@ -837,6 +857,60 @@ static ssize_t sys_fork(env_t* e)
 	profiler_notify_new_process(env);
 	proc_decref(env);	/* give up the reference created in proc_alloc() */
 	return ret;
+}
+
+/* string for sys_exec arguments. Assumes that d is pointing to zero'd
+ * storage or storage that does not require null termination or
+ * provides the null. */
+static int execargs_stringer(struct proc *p, char *d, size_t slen,
+			     char *path, size_t path_l,
+			     char *argenv, size_t argenv_l)
+{
+	int argc, envc, i;
+	char **argv, **envp;
+	struct argenv *kargenv;
+	int amt;
+	char *s = d;
+	char *e = d + slen;
+
+	if (path_l > slen)
+		path_l = slen;
+	if (memcpy_from_user(p, d, path, path_l)) {
+		s = seprintf(s, e, "Invalid exec path");
+		return s - d;
+	}
+	s += path_l;
+
+	/* yes, this code is cloned from below. I wrote a helper but
+	 * Barret and I concluded after talking about it that the
+	 * helper was not really helper-ful, as it has almost 10
+	 * arguments. Please, don't suggest a cpp macro. Thank you. */
+	/* Check the size of the argenv array, error out if too large. */
+	if ((argenv_l < sizeof(struct argenv)) || (argenv_l > ARG_MAX)) {
+		s = seprintf(s, e, "The argenv array has an invalid size: %lu\n",
+				  argenv_l);
+		return s - d;
+	}
+	/* Copy the argenv array into a kernel buffer. */
+	kargenv = user_memdup_errno(p, argenv, argenv_l);
+	if (!kargenv) {
+		s = seprintf(s, e, "Failed to copy in the args and environment");
+		return s - d;
+	}
+	/* Unpack the argenv array into more usable variables. Integrity checking
+	 * done along side this as well. */
+	if (unpack_argenv(kargenv, argenv_l, &argc, &argv, &envc, &envp)) {
+		s = seprintf(s, e, "Failed to unpack the args");
+		user_memdup_free(p, kargenv);
+		return s - d;
+	}
+	s = seprintf(s, e, "[%d]{", argc);
+	for (i = 0; i < argc; i++)
+		s = seprintf(s, e, "%s, ", argv[i]);
+	s = seprintf(s, e, "}");
+
+	user_memdup_free(p, kargenv);
+	return s - d;
 }
 
 /* Load the binary "path" into the current process, and start executing it.
