@@ -486,6 +486,12 @@ int main(int argc, char **argv)
 		case 'c':
 			argc--, argv++;
 			cmdline_extra = argv[0];
+		case 'g':	/* greedy */
+			parlib_never_yield = TRUE;
+			break;
+		case 's':	/* scp */
+			parlib_wants_to_be_mcp = FALSE;
+			break;
 		default:
 			fprintf(stderr, "BMAFR\n");
 			break;
@@ -661,10 +667,6 @@ int main(int argc, char **argv)
 	bp->e820_map[e820i].size = 0x10000000;
 	bp->e820_map[e820i++].type = E820_RESERVED;
 
-
-	/* Set parlib vars to control the 2LS. */
-	parlib_wants_to_be_mcp = TRUE;	/* default */
-	parlib_never_yield = FALSE;		/* default */
 	vm->nr_gpcs = 1;
 	vm->gpcis = &gpci;
 	ret = vmm_init(vm, vmmflags);
