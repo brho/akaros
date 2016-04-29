@@ -1023,7 +1023,7 @@ void load_inode(struct dentry *dentry, unsigned long ino)
  * note we don't pass this an nd, like Linux does... */
 static struct inode *create_inode(struct dentry *dentry, int mode)
 {
-	uint64_t now = epoch_sec();
+	struct timespec now = nsec2timespec(epoch_nsec());
 	/* note it is the i_ino that uniquely identifies a file in the specific
 	 * filesystem.  there's a diff between creating an inode (even for an in-use
 	 * ino) and then filling it in, and vs creating a brand new one.
@@ -1036,12 +1036,12 @@ static struct inode *create_inode(struct dentry *dentry, int mode)
 	inode->i_nlink = 1;
 	inode->i_size = 0;
 	inode->i_blocks = 0;
-	inode->i_atime.tv_sec = now;
-	inode->i_ctime.tv_sec = now;
-	inode->i_mtime.tv_sec = now;
-	inode->i_atime.tv_nsec = 0;
-	inode->i_ctime.tv_nsec = 0;
-	inode->i_mtime.tv_nsec = 0;
+	inode->i_atime.tv_sec = now.tv_sec;
+	inode->i_ctime.tv_sec = now.tv_sec;
+	inode->i_mtime.tv_sec = now.tv_sec;
+	inode->i_atime.tv_nsec = now.tv_nsec;
+	inode->i_ctime.tv_nsec = now.tv_nsec;
+	inode->i_mtime.tv_nsec = now.tv_nsec;
 	inode->i_bdev = inode->i_sb->s_bdev;
 	/* when we have notions of users, do something here: */
 	inode->i_uid = 0;
@@ -2057,7 +2057,7 @@ int do_rename(char *old_path, char *new_path)
 	struct dentry *old_d, *new_d, *unlink_d;
 	int error;
 	int retval = 0;
-	uint64_t now;
+	struct timespec now;
 
 	nd_o->intent = LOOKUP_ACCESS; /* maybe, might need another type */
 
@@ -2186,15 +2186,15 @@ int do_rename(char *old_path, char *new_path)
 	dcache_put(old_dir_d->d_sb, old_d);
 
 	/* TODO could have a helper for this, but it's going away soon */
-	now = epoch_sec();
-	old_dir_i->i_ctime.tv_sec = now;
-	old_dir_i->i_mtime.tv_sec = now;
-	old_dir_i->i_ctime.tv_nsec = 0;
-	old_dir_i->i_mtime.tv_nsec = 0;
-	new_dir_i->i_ctime.tv_sec = now;
-	new_dir_i->i_mtime.tv_sec = now;
-	new_dir_i->i_ctime.tv_nsec = 0;
-	new_dir_i->i_mtime.tv_nsec = 0;
+	now = nsec2timespec(epoch_nsec());
+	old_dir_i->i_ctime.tv_sec = now.tv_sec;
+	old_dir_i->i_mtime.tv_sec = now.tv_sec;
+	old_dir_i->i_ctime.tv_nsec = now.tv_nsec;
+	old_dir_i->i_mtime.tv_nsec = now.tv_nsec;
+	new_dir_i->i_ctime.tv_sec = now.tv_sec;
+	new_dir_i->i_mtime.tv_sec = now.tv_sec;
+	new_dir_i->i_ctime.tv_nsec = now.tv_nsec;
+	new_dir_i->i_mtime.tv_nsec = now.tv_nsec;
 
 	/* fall-through */
 out_paths_and_refs:
@@ -2211,7 +2211,7 @@ out_old_path:
 int do_truncate(struct inode *inode, off64_t len)
 {
 	off64_t old_len;
-	uint64_t now;
+	struct timespec now;
 	if (len < 0) {
 		set_errno(EINVAL);
 		return -1;
@@ -2236,11 +2236,11 @@ int do_truncate(struct inode *inode, off64_t len)
 		pm_remove_contig(inode->i_mapping, old_len >> PGSHIFT,
 		                 (len >> PGSHIFT) - (old_len >> PGSHIFT));
 	}
-	now = epoch_sec();
-	inode->i_ctime.tv_sec = now;
-	inode->i_mtime.tv_sec = now;
-	inode->i_ctime.tv_nsec = 0;
-	inode->i_mtime.tv_nsec = 0;
+	now = nsec2timespec(epoch_nsec());
+	inode->i_ctime.tv_sec = now.tv_sec;
+	inode->i_mtime.tv_sec = now.tv_sec;
+	inode->i_ctime.tv_nsec = now.tv_nsec;
+	inode->i_mtime.tv_nsec = now.tv_nsec;
 	return 0;
 }
 

@@ -12,7 +12,7 @@
  * attainable by using the TSC (or whatever timing source).
  *
  * For more detailed TSC measurements, use test_rdtsc() in k/a/i/rdtsc_test.c */
-void train_timing() 
+static void train_timing(void)
 {
 	uint64_t min_overhead = UINT64_MAX;
 	uint64_t max_overhead = 0;
@@ -50,107 +50,88 @@ void timer_interrupt(struct hw_trapframe *hw_tf, void *data)
 	__trigger_tchain(&per_cpu_info[core_id()].tchain, hw_tf);
 }
 
-/* We can overflow/wraparound when we multiply up, but we have to divide last,
- * or else we lose precision.  If we're too big and will overflow, we'll
- * sacrifice precision for correctness, and degrade to the next lower level
- * (losing 3 digits worth).  The recursive case shouldn't overflow, since it
- * called something that scaled down the tsc_time by more than 1000. */
-uint64_t tsc2sec(uint64_t tsc_time)
+/*
+ * We use scaled integer arithmetic for converting between TSC clock cycles
+ * and nanoseconds. In each case we use a fixed shift value of 32 which
+ * gives a very high degree of accuracy.
+ *
+ * The actual scaling calculations rely on being able use the 128 bit
+ * product of two unsigned 64 bit numbers as an intermediate result
+ * in the calculation. Fortunately, on x86_64 at least, gcc's 128 bit
+ * support is sufficiently good that it generates optimal code for this
+ * calculation without the need to write any assembler.
+ */
+static inline uint64_t mult_shift_64(uint64_t a, uint64_t b, uint8_t shift)
 {
-	return tsc_time / __proc_global_info.tsc_freq;
+	return ((unsigned __int128)a * b) >> shift;
 }
 
-uint64_t tsc2msec(uint64_t tsc_time)
+static uint64_t cycles_to_nsec_mult;
+static uint64_t nsec_to_cycles_mult;
+
+#define CYCLES_TO_NSEC_SHIFT	32
+#define NSEC_TO_CYCLES_SHIFT	32
+
+static void cycles_to_nsec_init(uint64_t tsc_freq_hz)
 {
-	if (mult_will_overflow_u64(tsc_time, 1000))
-		return tsc2sec(tsc_time) * 1000;
-	else
-		return (tsc_time * 1000) / __proc_global_info.tsc_freq;
+	cycles_to_nsec_mult = (NSEC_PER_SEC << CYCLES_TO_NSEC_SHIFT) / tsc_freq_hz;
 }
 
-uint64_t tsc2usec(uint64_t tsc_time)
+static void nsec_to_cycles_init(uint64_t tsc_freq_hz)
 {
-	if (mult_will_overflow_u64(tsc_time, 1000000))
-		return tsc2msec(tsc_time) * 1000;
-	else
-		return (tsc_time * 1000000) / __proc_global_info.tsc_freq;
+	uint64_t divisor = NSEC_PER_SEC;
+
+	/*
+	 * In the unlikely event that the TSC frequency is greater
+	 * than (1 << 32) we have to lose a little precision to
+	 * avoid overflow in the calculation of the multiplier.
+	 */
+	while (tsc_freq_hz >= ((uint64_t)1 << NSEC_TO_CYCLES_SHIFT)) {
+		tsc_freq_hz >>= 1;
+		divisor >>= 1;
+	}
+	nsec_to_cycles_mult = (tsc_freq_hz << NSEC_TO_CYCLES_SHIFT) / divisor;
 }
 
 uint64_t tsc2nsec(uint64_t tsc_time)
 {
-	if (mult_will_overflow_u64(tsc_time, 1000000000))
-		return tsc2usec(tsc_time) * 1000;
-	else
-		return (tsc_time * 1000000000) / __proc_global_info.tsc_freq;
-}
-
-uint64_t sec2tsc(uint64_t sec)
-{
-	if (mult_will_overflow_u64(sec, __proc_global_info.tsc_freq)) {
-		/* in this case, we simply can't express the number of ticks */
-		warn("Wraparound in sec2tsc(), rounding up");
-		return (uint64_t)(-1);
-	} else {
-		return sec * __proc_global_info.tsc_freq;
-	}
-}
-
-uint64_t msec2tsc(uint64_t msec)
-{
-	if (mult_will_overflow_u64(msec, __proc_global_info.tsc_freq))
-		return sec2tsc(msec / 1000);
-	else
-		return (msec * __proc_global_info.tsc_freq) / 1000;
-}
-
-uint64_t usec2tsc(uint64_t usec)
-{
-	if (mult_will_overflow_u64(usec, __proc_global_info.tsc_freq))
-		return msec2tsc(usec / 1000);
-	else
-		return (usec * __proc_global_info.tsc_freq) / 1000000;
+	return mult_shift_64(tsc_time, cycles_to_nsec_mult, CYCLES_TO_NSEC_SHIFT);
 }
 
 uint64_t nsec2tsc(uint64_t nsec)
 {
-	if (mult_will_overflow_u64(nsec, __proc_global_info.tsc_freq))
-		return usec2tsc(nsec / 1000);
-	else
-		return (nsec * __proc_global_info.tsc_freq) / 1000000000;
+	return mult_shift_64(nsec, nsec_to_cycles_mult, NSEC_TO_CYCLES_SHIFT);
 }
 
-/* TODO: figure out what epoch time TSC == 0 is and store that as boot_tsc */
-static uint64_t boot_sec = 1242129600; /* nanwan's birthday */
+/*
+ * Rudimentary timekeeping implementation.
+ *
+ * Nothing here yet apart from the base walltime and TSC cycle values
+ * at system init time.
+ */
+static struct {
+	uint64_t	walltime_ns_last;
+	uint64_t	tsc_cycles_last;
+} timekeeping;
 
-uint64_t epoch_tsc(void)
-{
-	return read_tsc() + sec2tsc(boot_sec);
-}
 
-uint64_t epoch_sec(void)
-{
-	return tsc2sec(epoch_tsc());
-}
-
-uint64_t epoch_msec(void)
-{
-	return tsc2msec(epoch_tsc());
-}
-
-uint64_t epoch_usec(void)
-{
-	return tsc2usec(epoch_tsc());
-}
-
+/*
+ * Return nanoseconds since the UNIX epoch, 1st January, 1970.
+ */
 uint64_t epoch_nsec(void)
 {
-	return tsc2nsec(epoch_tsc());
+	uint64_t cycles = read_tsc() - timekeeping.tsc_cycles_last;
+
+	return timekeeping.walltime_ns_last + tsc2nsec(cycles);
 }
 
-void tsc2timespec(uint64_t tsc_time, struct timespec *ts)
+void time_init(void)
 {
-	ts->tv_sec = tsc2sec(tsc_time);
-	/* subtract off everything but the remainder */
-	tsc_time -= sec2tsc(ts->tv_sec);
-	ts->tv_nsec = tsc2nsec(tsc_time);
+	train_timing();
+
+	timekeeping.walltime_ns_last = read_persistent_clock();
+	timekeeping.tsc_cycles_last  = read_tsc();
+
+	cycles_to_nsec_init(__proc_global_info.tsc_freq);
+	nsec_to_cycles_init(__proc_global_info.tsc_freq);
 }

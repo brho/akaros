@@ -57,3 +57,8 @@ udelay(uint64_t usec)
 	}
 	else panic("udelay() was called before timer_init(), moron!");
 }
+
+uint64_t read_persistent_clock(void)
+{
+	return 1242129600 * 1000000000UL; /* nanwan's birthday */
+}

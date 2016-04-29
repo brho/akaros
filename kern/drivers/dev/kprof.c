@@ -348,7 +348,7 @@ static long mpstat_read(void *va, long n, int64_t off)
 			cpu_total += pcpui->state_ticks[j];
 		cpu_total = MAX(cpu_total, 1);	/* for the divide later */
 		for (int j = 0; j < NR_CPU_STATES; j++) {
-			tsc2timespec(pcpui->state_ticks[j], &ts);
+			ts = tsc2timespec(pcpui->state_ticks[j]);
 			len += snprintf(buf + len, bufsz - len, "%10d.%06d (%3d%%)%s",
 			                ts.tv_sec, ts.tv_nsec / 1000,
 			                MIN((pcpui->state_ticks[j] * 100) / cpu_total, 100),
@@ -625,7 +625,7 @@ void trace_vprintk(bool btrace, const char *fmt, va_list args)
 	if (!atomic_cas(&tpb->in_use, 0, 1))
 		return;
 	if (likely(__proc_global_info.tsc_freq))
-		tsc2timespec(read_tsc(), &ts_now);
+		ts_now = tsc2timespec(read_tsc());
 	snprintf(hdr, sizeof(hdr), "[%lu.%09lu]:cpu%d: ", ts_now.tv_sec,
 	         ts_now.tv_nsec, core_id_early());
 

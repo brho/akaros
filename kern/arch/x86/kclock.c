@@ -9,7 +9,6 @@
 
 #include <kclock.h>
 
-
 unsigned
 mc146818_read(unsigned reg)
 {
@@ -24,5 +23,7 @@ mc146818_write(unsigned reg, unsigned datum)
 	outb(IO_RTC+1, datum);
 }
 
-
-
+uint64_t read_persistent_clock(void)
+{
+	return 1242129600 * 1000000000UL; /* nanwan's birthday */
+}

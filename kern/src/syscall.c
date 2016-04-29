@@ -47,11 +47,9 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace,
                                        bool entry)
 {
 	size_t len = 0;
-	struct timespec ts_start;
-	struct timespec ts_end;
+	struct timespec ts_start = tsc2timespec(trace->start_timestamp);
+	struct timespec ts_end = tsc2timespec(trace->end_timestamp);
 
-	tsc2timespec(trace->start_timestamp, &ts_start);
-	tsc2timespec(trace->end_timestamp, &ts_end);
 	/* Slightly different formats between entry and exit.  Entry has retval set
 	 * to ---, and begins with E.  Exit begins with X. */
 	if (entry) {
@@ -488,7 +486,7 @@ static int sys_nanosleep(struct proc *p,
 	 * years, which should be sufficiently long enough to ensure we don't
 	 * overflow). */
 	if (waserror()) {
-		tsc2timespec(read_tsc() - tsc, &krem);
+		krem = tsc2timespec(read_tsc() - tsc);
 		if (rem && memcpy_to_user(p, rem, &krem, sizeof(struct timespec)))
 			set_errno(EFAULT);
 		poperror();
@@ -1988,26 +1986,9 @@ intreg_t sys_rmdir(struct proc *p, const char *path, size_t path_l)
 
 intreg_t sys_gettimeofday(struct proc *p, int *buf)
 {
-	static spinlock_t gtod_lock = SPINLOCK_INITIALIZER;
-	static int t0 = 0;
+	struct timeval tv = nsec2timeval(epoch_nsec());
 
-	spin_lock(&gtod_lock);
-	if(t0 == 0)
-
-#if (defined CONFIG_APPSERVER)
-	t0 = ufe(time,0,0,0,0);
-#else
-	// Nanwan's birthday, bitches!!
-	t0 = 1242129600;
-#endif
-	spin_unlock(&gtod_lock);
-
-	long long dt = read_tsc();
-	/* TODO: This probably wants its own function, using a struct timeval */
-	long kbuf[2] = {t0+dt/__proc_global_info.tsc_freq,
-	    (dt%__proc_global_info.tsc_freq)*1000000/__proc_global_info.tsc_freq};
-
-	return memcpy_to_user_errno(p,buf,kbuf,sizeof(kbuf));
+	return memcpy_to_user_errno(p, buf, &tv, sizeof(tv));
 }
 
 intreg_t sys_tcgetattr(struct proc *p, int fd, void *termios_p)

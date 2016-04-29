@@ -158,7 +158,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	timer_init();
 	vfs_init();
 	devfs_init();
-	train_timing();
+	time_init();
 	kb_buf_init(&cons_buf);
 	arch_init();
 	block_init();
