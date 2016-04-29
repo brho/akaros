@@ -2653,6 +2653,8 @@ void clone_fdt(struct fd_table *src, struct fd_table *dst)
 {
 	struct file *file;
 	struct chan *chan;
+	int ret;
+
 	spin_lock(&src->lock);
 	if (src->closed) {
 		spin_unlock(&src->lock);
@@ -2664,6 +2666,15 @@ void clone_fdt(struct fd_table *src, struct fd_table *dst)
 		spin_unlock(&dst->lock);
 		spin_unlock(&src->lock);
 		return;
+	}
+	while (src->max_files > dst->max_files) {
+		ret = grow_fd_set(dst);
+		if (ret < 0) {
+			set_error(-ret, "Failed to grow for a clone_fdt");
+			spin_unlock(&dst->lock);
+			spin_unlock(&src->lock);
+			return;
+		}
 	}
 	for (int i = 0; i < src->max_fdset; i++) {
 		if (GET_BITMASK_BIT(src->open_fds->fds_bits, i)) {
