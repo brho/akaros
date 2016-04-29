@@ -795,6 +795,7 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 			}
 		}
 		spin_unlock(&p->pte_lock);
+		vmr = merge_me(vmr);
 		next_vmr = TAILQ_NEXT(vmr, vm_link);
 		vmr = next_vmr;
 	}
