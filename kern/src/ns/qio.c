@@ -1212,11 +1212,11 @@ static bool qwait_and_ilock(struct queue *q, int qio_flags)
 		if (q->state & Qclosed) {
 			if (++q->eof > 3) {
 				spin_unlock_irqsave(&q->lock);
-				error(EFAIL, "multiple reads on a closed queue");
+				error(EPIPE, "multiple reads on a closed queue");
 			}
 			if (q->err[0]) {
 				spin_unlock_irqsave(&q->lock);
-				error(EFAIL, q->err);
+				error(EPIPE, q->err);
 			}
 			return FALSE;
 		}
@@ -1504,9 +1504,9 @@ static ssize_t __qbwrite(struct queue *q, struct block *b, int qio_flags)
 		if (!(qio_flags & QIO_CAN_ERR_SLEEP))
 			return -1;
 		if (q->err[0])
-			error(EFAIL, q->err);
+			error(EPIPE, q->err);
 		else
-			error(EFAIL, "connection closed");
+			error(EPIPE, "connection closed");
 	}
 	if ((qio_flags & QIO_LIMIT) && (q->len >= q->limit)) {
 		/* drop overflow takes priority over regular non-blocking */

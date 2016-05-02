@@ -387,22 +387,8 @@ static struct block *pipebread(struct chan *c, long n, uint32_t offset)
  */
 static long pipewrite(struct chan *c, void *va, long n, int64_t ignored)
 {
-	ERRSTACK(2);
 	Pipe *p;
 	//Prog *r;
-
-	if (waserror()) {
-		/* avoid exceptions when pipe is a mounted queue */
-		if ((c->flag & CMSG) == 0) {
-/*
-			r = up->iprog;
-			if(r != NULL && r->kill == NULL)
-				r->kill = "write on closed pipe";
-*/
-		}
-		set_errno(EPIPE);
-		nexterror();
-	}
 
 	p = c->aux;
 
@@ -425,29 +411,14 @@ static long pipewrite(struct chan *c, void *va, long n, int64_t ignored)
 			panic("pipewrite");
 	}
 
-	poperror();
 	return n;
 }
 
 static long pipebwrite(struct chan *c, struct block *bp, uint32_t junk)
 {
-	ERRSTACK(2);
 	long n;
 	Pipe *p;
 	//Prog *r;
-
-	if (waserror()) {
-		/* avoid exceptions when pipe is a mounted queue */
-/*
-		if((c->flag & CMSG) == 0) {
-			r = up->iprog;
-			if(r != NULL && r->kill == NULL)
-				r->kill = "write on closed pipe";
-		}
-*/
-		set_errno(EPIPE);
-		nexterror();
-	}
 
 	p = c->aux;
 	switch (NETTYPE(c->qid.path)) {
@@ -470,7 +441,6 @@ static long pipebwrite(struct chan *c, struct block *bp, uint32_t junk)
 			panic("pipebwrite");
 	}
 
-	poperror();
 	return n;
 }
 
