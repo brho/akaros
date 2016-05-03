@@ -26,6 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE. */
 
+#include <stdint.h>
 
 enum virtio_input_config_select {
 	VIRTIO_INPUT_CFG_UNSET      = 0x00,
@@ -38,37 +39,35 @@ enum virtio_input_config_select {
 };
 
 struct virtio_input_absinfo {
-	__u32 min;
-	__u32 max;
-	__u32 fuzz;
-	__u32 flat;
-	__u32 res;
+	uint32_t min;
+	uint32_t max;
+	uint32_t fuzz;
+	uint32_t flat;
+	uint32_t res;
 };
 
 struct virtio_input_devids {
-	__u16 bustype;
-	__u16 vendor;
-	__u16 product;
-	__u16 version;
+	uint16_t bustype;
+	uint16_t vendor;
+	uint16_t product;
+	uint16_t version;
 };
 
 struct virtio_input_config {
-	__u8    select;
-	__u8    subsel;
-	__u8    size;
-	__u8    reserved[5];
+	uint8_t    select;
+	uint8_t    subsel;
+	uint8_t    size;
+	uint8_t    reserved[5];
 	union {
 		char string[128];
-		__u8 bitmap[128];
+		uint8_t bitmap[128];
 		struct virtio_input_absinfo abs;
 		struct virtio_input_devids ids;
 	} u;
 };
 
 struct virtio_input_event {
-	__le16 type;
-	__le16 code;
-	__le32 value;
+	uint16_t type;
+	uint16_t code;
+	uint32_t value;
 };
-
-

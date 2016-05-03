@@ -26,6 +26,8 @@
 
 #pragma once
 
+ #include <stdint.h>
+
 /* Default values of the CDB and sense data size configuration fields */
 #define VIRTIO_SCSI_CDB_DEFAULT_SIZE   32
 #define VIRTIO_SCSI_SENSE_DEFAULT_SIZE 96
@@ -39,77 +41,77 @@
 
 /* SCSI command request, followed by data-out */
 struct virtio_scsi_cmd_req {
-	__u8 lun[8];		/* Logical Unit Number */
-	__virtio64 tag;		/* Command identifier */
-	__u8 task_attr;		/* Task attribute */
-	__u8 prio;		/* SAM command priority field */
-	__u8 crn;
-	__u8 cdb[VIRTIO_SCSI_CDB_SIZE];
+	uint8_t lun[8];		/* Logical Unit Number */
+	uint64_t tag;		/* Command identifier */
+	uint8_t task_attr;		/* Task attribute */
+	uint8_t prio;		/* SAM command priority field */
+	uint8_t crn;
+	uint8_t cdb[VIRTIO_SCSI_CDB_SIZE];
 } __attribute__((packed));
 
 /* SCSI command request, followed by protection information */
 struct virtio_scsi_cmd_req_pi {
-	__u8 lun[8];		/* Logical Unit Number */
-	__virtio64 tag;		/* Command identifier */
-	__u8 task_attr;		/* Task attribute */
-	__u8 prio;		/* SAM command priority field */
-	__u8 crn;
-	__virtio32 pi_bytesout;	/* DataOUT PI Number of bytes */
-	__virtio32 pi_bytesin;		/* DataIN PI Number of bytes */
-	__u8 cdb[VIRTIO_SCSI_CDB_SIZE];
+	uint8_t lun[8];		/* Logical Unit Number */
+	uint64_t tag;		/* Command identifier */
+	uint8_t task_attr;		/* Task attribute */
+	uint8_t prio;		/* SAM command priority field */
+	uint8_t crn;
+	uint32_t pi_bytesout;	/* DataOUT PI Number of bytes */
+	uint32_t pi_bytesin;		/* DataIN PI Number of bytes */
+	uint8_t cdb[VIRTIO_SCSI_CDB_SIZE];
 } __attribute__((packed));
 
 /* Response, followed by sense data and data-in */
 struct virtio_scsi_cmd_resp {
-	__virtio32 sense_len;		/* Sense data length */
-	__virtio32 resid;		/* Residual bytes in data buffer */
-	__virtio16 status_qualifier;	/* Status qualifier */
-	__u8 status;		/* Command completion status */
-	__u8 response;		/* Response values */
-	__u8 sense[VIRTIO_SCSI_SENSE_SIZE];
+	uint32_t sense_len;		/* Sense data length */
+	uint32_t resid;		/* Residual bytes in data buffer */
+	uint16_t status_qualifier;	/* Status qualifier */
+	uint8_t status;		/* Command completion status */
+	uint8_t response;		/* Response values */
+	uint8_t sense[VIRTIO_SCSI_SENSE_SIZE];
 } __attribute__((packed));
 
 /* Task Management Request */
 struct virtio_scsi_ctrl_tmf_req {
-	__virtio32 type;
-	__virtio32 subtype;
-	__u8 lun[8];
-	__virtio64 tag;
+	uint32_t type;
+	uint32_t subtype;
+	uint8_t lun[8];
+	uint64_t tag;
 } __attribute__((packed));
 
 struct virtio_scsi_ctrl_tmf_resp {
-	__u8 response;
+	uint8_t response;
 } __attribute__((packed));
 
 /* Asynchronous notification query/subscription */
 struct virtio_scsi_ctrl_an_req {
-	__virtio32 type;
-	__u8 lun[8];
-	__virtio32 event_requested;
+	uint32_t type;
+	uint8_t lun[8];
+	uint32_t event_requested;
 } __attribute__((packed));
 
 struct virtio_scsi_ctrl_an_resp {
-	__virtio32 event_actual;
-	__u8 response;
+	uint32_t event_actual;
+	uint8_t response;
 } __attribute__((packed));
 
 struct virtio_scsi_event {
-	__virtio32 event;
-	__u8 lun[8];
-	__virtio32 reason;
+	uint32_t event;
+	uint8_t lun[8];
+	uint32_t reason;
 } __attribute__((packed));
 
 struct virtio_scsi_config {
-	__u32 num_queues;
-	__u32 seg_max;
-	__u32 max_sectors;
-	__u32 cmd_per_lun;
-	__u32 event_info_size;
-	__u32 sense_size;
-	__u32 cdb_size;
-	__u16 max_channel;
-	__u16 max_target;
-	__u32 max_lun;
+	uint32_t num_queues;
+	uint32_t seg_max;
+	uint32_t max_sectors;
+	uint32_t cmd_per_lun;
+	uint32_t event_info_size;
+	uint32_t sense_size;
+	uint32_t cdb_size;
+	uint16_t max_channel;
+	uint16_t max_target;
+	uint32_t max_lun;
 } __attribute__((packed));
 
 /* Feature Bits */
@@ -164,6 +166,3 @@ struct virtio_scsi_config {
 #define VIRTIO_SCSI_S_ORDERED                  1
 #define VIRTIO_SCSI_S_HEAD                     2
 #define VIRTIO_SCSI_S_ACA                      3
-
-
-

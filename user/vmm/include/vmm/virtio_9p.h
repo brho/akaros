@@ -24,6 +24,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE. */
+#include <stdint.h>
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
 
@@ -34,9 +35,7 @@
 
 struct virtio_9p_config {
 	/* length of the tag name */
-	__u16 tag_len;
+	uint16_t tag_len;
 	/* non-NULL terminated tag name */
-	__u8 tag[0];
+	uint8_t tag[0];
 } __attribute__((packed));
-
-

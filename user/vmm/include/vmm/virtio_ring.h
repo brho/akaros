@@ -31,6 +31,7 @@
  *
  * Copyright Rusty Russell IBM Corporation 2007. */
 
+#include <stdint.h>
 
 /* This marks a buffer as continuing via the next field. */
 #define VRING_DESC_F_NEXT	1
@@ -60,32 +61,32 @@
 /* Virtio ring descriptors: 16 bytes.  These can chain together via "next". */
 struct vring_desc {
 	/* Address (guest-physical). */
-	__virtio64 addr;
+	uint64_t addr;
 	/* Length. */
-	__virtio32 len;
+	uint32_t len;
 	/* The flags as indicated above. */
-	__virtio16 flags;
+	uint16_t flags;
 	/* We chain unused descriptors via this, too */
-	__virtio16 next;
+	uint16_t next;
 };
 
 struct vring_avail {
-	__virtio16 flags;
-	__virtio16 idx;
-	__virtio16 ring[];
+	uint16_t flags;
+	uint16_t idx;
+	uint16_t ring[];
 };
 
 /* u32 is used here for ids for padding reasons. */
 struct vring_used_elem {
 	/* Index of start of used descriptor chain. */
-	__virtio32 id;
+	uint32_t id;
 	/* Total length of the descriptor chain which was used (written to) */
-	__virtio32 len;
+	uint32_t len;
 };
 
 struct vring_used {
-	__virtio16 flags;
-	__virtio16 idx;
+	uint16_t flags;
+	uint16_t idx;
 	struct vring_used_elem ring[];
 };
 
@@ -133,7 +134,7 @@ struct vring {
 /* We publish the used event index at the end of the available ring, and vice
  * versa. They are at the end for backwards compatibility. */
 #define vring_used_event(vr) ((vr)->avail->ring[(vr)->num])
-#define vring_avail_event(vr) (*(__virtio16 *)&(vr)->used->ring[(vr)->num])
+#define vring_avail_event(vr) (*(uint16_t *)&(vr)->used->ring[(vr)->num])
 
 static inline void vring_init(struct vring *vr, unsigned int num, void *p,
 			      unsigned long align)
@@ -141,29 +142,28 @@ static inline void vring_init(struct vring *vr, unsigned int num, void *p,
 	vr->num = num;
 	vr->desc = p;
 	vr->avail = p + num*sizeof(struct vring_desc);
-	vr->used = (void *)(((uintptr_t)&vr->avail->ring[num] + sizeof(__virtio16)
+	vr->used = (void *)(((uintptr_t)&vr->avail->ring[num] + sizeof(uint16_t)
 		+ align-1) & ~(align - 1));
 }
 
 static inline unsigned vring_size(unsigned int num, unsigned long align)
 {
-	return ((sizeof(struct vring_desc) * num + sizeof(__virtio16) * (3 + num)
+	return ((sizeof(struct vring_desc) * num + sizeof(uint16_t) * (3 + num)
 		 + align - 1) & ~(align - 1))
-		+ sizeof(__virtio16) * 3 + sizeof(struct vring_used_elem) * num;
+		+ sizeof(uint16_t) * 3 + sizeof(struct vring_used_elem) * num;
 }
 
 /* The following is used with USED_EVENT_IDX and AVAIL_EVENT_IDX */
 /* Assuming a given event_idx value from the other side, if
  * we have just incremented index from old to new_idx,
  * should we trigger an event? */
-static inline int vring_need_event(__u16 event_idx, __u16 new_idx, __u16 old)
+static inline int vring_need_event(uint16_t event_idx,
+                                   uint16_t new_idx, uint16_t old)
 {
 	/* Note: Xen has similar logic for notification hold-off
 	 * in include/xen/interface/io/ring.h with req_event and req_prod
 	 * corresponding to event_idx + 1 and new_idx respectively.
 	 * Note also that req_event and req_prod in Xen start at 1,
 	 * event indexes in virtio start at 0. */
-	return (__u16)(new_idx - event_idx - 1) < (__u16)(new_idx - old);
+	return (uint16_t)(new_idx - event_idx - 1) < (uint16_t)(new_idx - old);
 }
-
-
