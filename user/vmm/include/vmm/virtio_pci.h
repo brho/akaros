@@ -38,8 +38,6 @@
 
 #pragma once
 
-#include <linux/types.h>
-
 #ifndef VIRTIO_PCI_NO_LEGACY
 
 /* A 32-bit r/o bitmask of the features supported by the host */

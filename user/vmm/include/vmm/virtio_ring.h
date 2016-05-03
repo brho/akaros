@@ -30,11 +30,8 @@
  * SUCH DAMAGE.
  *
  * Copyright Rusty Russell IBM Corporation 2007. */
-#ifndef __KERNEL__
-#include <stdint.h>
-#endif
-#include <linux/types.h>
-#include <linux/virtio_types.h>
+
+#include <vmm/virtio_types.h>
 
 /* This marks a buffer as continuing via the next field. */
 #define VRING_DESC_F_NEXT	1

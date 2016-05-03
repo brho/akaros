@@ -24,9 +24,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE. */
-#include <linux/types.h>
-#include <linux/virtio_ids.h>
-#include <linux/virtio_config.h>
+#include <vmm/virtio_ids.h>
+#include <vmm/virtio_config.h>
 
 /* The feature bitmap for virtio 9P */
 

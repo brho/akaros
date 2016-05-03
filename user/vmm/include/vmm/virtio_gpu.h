@@ -37,7 +37,6 @@
 
 #pragma once
 
-#include <linux/types.h>
 
 #define VIRTIO_GPU_F_VIRGL 0
 

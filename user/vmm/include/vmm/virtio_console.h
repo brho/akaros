@@ -30,10 +30,9 @@
  * Copyright (C) Amit Shah <amit.shah@redhat.com>, 2009, 2010, 2011
  */
 #pragma once
-#include <linux/types.h>
-#include <linux/virtio_types.h>
-#include <linux/virtio_ids.h>
-#include <linux/virtio_config.h>
+#include <vmm/virtio_types.h>
+#include <vmm/virtio_ids.h>
+#include <vmm/virtio_config.h>
 
 /* Feature bits */
 #define VIRTIO_CONSOLE_F_SIZE	0	/* Does host provide console size? */

@@ -26,7 +26,6 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE. */
 
-#include <linux/types.h>
 
 enum virtio_input_config_select {
 	VIRTIO_INPUT_CFG_UNSET      = 0x00,

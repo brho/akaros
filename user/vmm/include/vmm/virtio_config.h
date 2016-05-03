@@ -28,7 +28,6 @@
 /* Virtio devices use a standardized configuration space to define their
  * features and pass configuration information, but each implementation can
  * store and access that space differently. */
-#include <linux/types.h>
 
 /* Status byte for guest to report progress, and synchronize features. */
 /* We have seen device and processed generic fields (VIRTIO_CONFIG_F_VIRTIO) */

@@ -30,7 +30,6 @@
  * Copyright (C) 2014 Red Hat, Inc.
  * Author: Michael S. Tsirkin <mst@redhat.com>
  */
-#include <linux/types.h>
 
 /*
  * __virtio{16,32,64} have the following meaning:
