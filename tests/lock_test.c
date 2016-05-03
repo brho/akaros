@@ -732,7 +732,7 @@ static void os_prep_work(pthread_t *worker_threads, int nr_threads)
 	atomic_init(&indir_idx, 0);
 	atomic_init(&preempt_cnt, 0);
 	atomic_init(&indir_cnt, 0);
-	pthread_can_vcore_request(FALSE);	/* 2LS won't manage vcores */
+	parlib_never_yield = TRUE;
 	pthread_need_tls(FALSE);
 	pthread_mcp_init();					/* gives us one vcore */
 	register_ev_handler(EV_VCORE_PREEMPT, trace_preempt, 0);
@@ -744,6 +744,7 @@ static void os_prep_work(pthread_t *worker_threads, int nr_threads)
 		clear_kevent_q(EV_CHECK_MSGS);
 	}
 	vcore_request_total(nr_threads);
+	parlib_never_vc_request = TRUE;
 	for (int i = 0; i < nr_threads; i++) {
 		printd("Vcore %d mapped to pcore %d\n", i,
 		       __procinfo.vcoremap[i].pcoreid);

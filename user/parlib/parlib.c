@@ -7,3 +7,4 @@
 /* Control variables */
 bool parlib_wants_to_be_mcp = TRUE;
 bool parlib_never_yield = FALSE;
+bool parlib_never_vc_request = FALSE;

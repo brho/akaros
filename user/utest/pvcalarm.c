@@ -14,9 +14,10 @@ bool test_pvcalarms(void) {
 		__sync_fetch_and_add(&count[vcore_id()], 1);
 	}
 
-	pthread_can_vcore_request(FALSE);
+	parlib_never_yield = TRUE;
 	pthread_mcp_init();
 	vcore_request_total(max_vcores());
+	parlib_never_vc_request = TRUE;
 	for (int i=0; i<max_vcores(); i++)
 		count[i] = 0;
 	
@@ -65,7 +66,8 @@ bool test_sigperf(void)
 	}
 
 	pthread_lib_init();
-	pthread_can_vcore_request(TRUE);
+	parlib_never_yield = FALSE;
+	parlib_never_vc_request = FALSE;
 
 	sigset_t s;
 	sigemptyset(&s);

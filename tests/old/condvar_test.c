@@ -122,9 +122,10 @@ int main(void)
 	 *
 	 * Need to make sure we are running in parallel here.  Temp turned off the
 	 * 2LSs VC management and got up to 2 VC.  Assuming no preemption. */
-	pthread_can_vcore_request(FALSE);	/* 2LS won't manage vcores */
+	parlib_never_yield = TRUE;
 	while (num_vcores() < 2)
 		vcore_request_more(1);
+	parlib_never_vc_request = TRUE;
 	for (long i = 0; i < 1000; i++) {
 		for (int j = 0; j < 10; j++) {	/* some extra chances at each point */
 			state = FALSE;
@@ -147,6 +148,7 @@ int main(void)
 			pthread_join(my_threads[0], my_retvals[0]);
 		}
 	}
-	pthread_can_vcore_request(TRUE);	/* 2LS controls VCs again */
+	parlib_never_yield = FALSE;
+	parlib_never_vc_request = FALSE;
 	printf("test_cv: single sender/receiver complete\n");
 }

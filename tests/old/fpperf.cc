@@ -72,7 +72,8 @@ int main(int argc, char **argv)
 	#if 1
 	# ifdef __ros__
 	if (argc == 4) {
-		pthread_can_vcore_request(FALSE);
+		parlib_never_yield = TRUE;
+		parlib_never_vc_request = TRUE;
 		pthread_mcp_init();
 		printf("Vcore %d mapped to pcore %d\n", 0, __procinfo.vcoremap[0].pcoreid);
 	}

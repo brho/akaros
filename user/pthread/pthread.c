@@ -24,7 +24,6 @@ struct mcs_pdr_lock queue_lock;
 int threads_ready = 0;
 int threads_active = 0;
 atomic_t threads_total;
-bool can_adjust_vcores = TRUE;
 bool need_tls = TRUE;
 
 /* Array of per-vcore structs to manage waiting on syscalls and handling
@@ -107,11 +106,8 @@ static void __attribute__((noreturn)) pth_sched_entry(void)
 		/* no new thread, try to yield */
 		printd("[P] No threads, vcore %d is yielding\n", vcore_id());
 		/* TODO: you can imagine having something smarter here, like spin for a
-		 * bit before yielding (or not at all if you want to be greedy). */
-		if (can_adjust_vcores)
-			vcore_yield(FALSE);
-		if (!parlib_wants_to_be_mcp)
-			sys_yield(FALSE);
+		 * bit before yielding. */
+		vcore_yield(FALSE);
 	} while (1);
 	/* Prep the pthread to run any pending posix signal handlers registered
      * via pthread_kill once it is restored. */
@@ -160,8 +156,7 @@ static void pth_thread_runnable(struct uthread *uthread)
 	mcs_pdr_unlock(&queue_lock);
 	/* Smarter schedulers should look at the num_vcores() and how much work is
 	 * going on to make a decision about how many vcores to request. */
-	if (can_adjust_vcores)
-		vcore_request_more(threads_ready);
+	vcore_request_more(threads_ready);
 }
 
 /* For some reason not under its control, the uthread stopped running (compared
@@ -338,14 +333,6 @@ static void pth_thread_refl_fault(struct uthread *uth,
 }
 
 /* Akaros pthread extensions / hacks */
-
-/* Tells the pthread 2LS to not change the number of vcores.  This means it will
- * neither request vcores nor yield vcores.  Only used for testing. */
-void pthread_can_vcore_request(bool can)
-{
-	/* checked when we would request or yield */
-	can_adjust_vcores = can;
-}
 
 void pthread_need_tls(bool need)
 {
@@ -541,13 +528,6 @@ void pthread_mcp_init()
 	/* Prevent this from happening more than once. */
 	init_once_racy(return);
 
-	if (!parlib_wants_to_be_mcp) {
-		/* sign to whether or not we ask for more vcores.  actually, if we're
-		 * an SCP, the current kernel will ignore our requests, but best to not
-		 * rely on that. */
-		can_adjust_vcores = FALSE;
-		return;
-	}
 	uthread_mcp_init();
 	/* From here forward we are an MCP running on vcore 0. Could consider doing
 	 * other pthread specific initialization based on knowing we are an mcp
@@ -923,8 +903,7 @@ static void wake_slist(struct pthread_list *to_wake)
 	}
 	threads_ready += nr_woken;
 	mcs_pdr_unlock(&queue_lock);
-	if (can_adjust_vcores)
-		vcore_request_more(threads_ready);
+	vcore_request_more(threads_ready);
 }
 
 int pthread_cond_broadcast(pthread_cond_t *c)

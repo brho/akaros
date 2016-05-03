@@ -68,7 +68,8 @@ int main(int argc, char** argv)
 		nr_switch_loops = strtol(argv[1], 0, 10);
 	printf("Making 2 threads of %d switches each\n", nr_switch_loops);
 
-	pthread_can_vcore_request(FALSE);	/* 2LS won't manage vcores */
+	parlib_never_yield = TRUE;
+	parlib_never_vc_request = TRUE;
 	pthread_need_tls(FALSE);
 	pthread_mcp_init();					/* gives us one vcore */
 

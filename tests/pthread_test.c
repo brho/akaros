@@ -82,10 +82,11 @@ int main(int argc, char** argv)
 #ifdef __ros__
 	if (nr_vcores) {
 		/* Only do the vcore trickery if requested */
-		pthread_can_vcore_request(FALSE);	/* 2LS won't manage vcores */
+		parlib_never_yield = TRUE;
 		pthread_need_tls(FALSE);
 		pthread_mcp_init();					/* gives us one vcore */
 		vcore_request_total(nr_vcores);
+		parlib_never_vc_request = TRUE;
 		for (int i = 0; i < nr_vcores; i++) {
 			printf_safe("Vcore %d mapped to pcore %d\n", i,
 			            __procinfo.vcoremap[i].pcoreid);

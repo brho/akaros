@@ -8,6 +8,7 @@
 #include <parlib/dtls.h>
 #include <parlib/spinlock.h>
 #include <parlib/signal.h>
+#include <parlib/parlib.h>
 /* GNU / POSIX scheduling crap */
 #include <sched.h>
 
@@ -152,7 +153,6 @@ typedef int pthread_once_t;
 typedef dtls_key_t pthread_key_t;
 
 /* Akaros pthread extensions / hacks */
-void pthread_can_vcore_request(bool can);	/* default is TRUE */
 void pthread_need_tls(bool need);			/* default is TRUE */
 void pthread_lib_init(void);
 void pthread_mcp_init(void);
