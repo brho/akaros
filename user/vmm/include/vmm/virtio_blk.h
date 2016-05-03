@@ -26,7 +26,6 @@
  * SUCH DAMAGE. */
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
-#include <vmm/virtio_types.h>
 
 /* Feature bits */
 #define VIRTIO_BLK_F_SIZE_MAX	1	/* Indicates maximum segment size */

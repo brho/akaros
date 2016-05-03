@@ -26,8 +26,6 @@
 
 #pragma once
 
-#include <vmm/virtio_types.h>
-
 /* Default values of the CDB and sense data size configuration fields */
 #define VIRTIO_SCSI_CDB_DEFAULT_SIZE   32
 #define VIRTIO_SCSI_SENSE_DEFAULT_SIZE 96

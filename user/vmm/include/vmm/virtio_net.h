@@ -26,7 +26,6 @@
  * SUCH DAMAGE. */
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
-#include <vmm/virtio_types.h>
 #include <linux/if_ether.h>
 
 /* The feature bitmap for virtio net */

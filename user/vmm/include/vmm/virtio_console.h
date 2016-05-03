@@ -30,7 +30,6 @@
  * Copyright (C) Amit Shah <amit.shah@redhat.com>, 2009, 2010, 2011
  */
 #pragma once
-#include <vmm/virtio_types.h>
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
 
