@@ -59,6 +59,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <signal.h>
+#include <ros/fs.h>
 
 static int epoll_fd;
 static fd_set all_fds;
@@ -131,19 +132,26 @@ static int select_tv_to_ep_timeout(struct timeval *tv)
 	return tv->tv_sec * 1000 + DIV_ROUND_UP(tv->tv_usec, 1000);
 }
 
-/* Check with the kernel if FD is readable or not.  Some apps will call select()
- * on something even if it is already readable.
+/* Check with the kernel if FD is readable/writable or not.  Some apps will call
+ * select() on something even if it is already actionable, and not wait until
+ * they get the EAGAIN.
  *
  * TODO: this *won't* work for disk based files.  It only works on qids that are
- * backed with qio queues or something similar, where size == readable. */
-static bool fd_is_readable(int fd)
+ * backed with qio queues or something similar, where the device has support for
+ * setting DMREADABLE/DMWRITABLE. */
+static bool fd_is_actionable(int fd, fd_set *readfds, fd_set *writefds)
 {
 	struct stat stat_buf;
 	int ret;
 
+	/* Avoid the stat call on FDs we're not tracking (which should trigger an
+	 * error, or give us the stat for FD 0). */
+	if (!(fd_is_set(fd, readfds) || fd_is_set(fd, writefds)))
+		return FALSE;
 	ret = fstat(fd, &stat_buf);
 	assert(!ret);
-	return stat_buf.st_size > 0;
+	return (fd_is_set(fd, readfds)  && S_READABLE(stat_buf.st_mode)) ||
+	       (fd_is_set(fd, writefds) && S_WRITABLE(stat_buf.st_mode));
 }
 
 int select(int nfds, fd_set *readfds, fd_set *writefds,
@@ -162,11 +170,10 @@ int select(int nfds, fd_set *readfds, fd_set *writefds,
 		errno = EINVAL;
 		return -1;
 	}
-	/* It is legal to select even if you didn't consume all of the data in an
-	 * FD.  Similar for writables, though it's harder for us to check those.
-	 * Hopefully we don't need to. */
+	/* It is legal to select on read even if you didn't consume all of the data
+	 * in an FD; similarly for writers on non-full FDs. */
 	for (int i = 0; i < nfds; i++) {
-		if (fd_is_set(i, readfds) && fd_is_readable(i))
+		if (fd_is_actionable(i, readfds, writefds))
 			return nfds;
 	}
 	uth_mutex_lock(fdset_mtx);
