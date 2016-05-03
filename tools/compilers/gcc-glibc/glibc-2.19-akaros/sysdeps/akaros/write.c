@@ -33,7 +33,7 @@ ssize_t __libc_write(int fd, const void *buf, size_t nbytes)
 {
 	int ret = ros_syscall(SYS_write, fd, buf, nbytes, 0, 0, 0);
 
-	if (unlikely((ret != 0) && (errno == EPIPE))) {
+	if (unlikely((ret < 0) && (errno == EPIPE))) {
 		sigset_t mask;
 
 		sigprocmask(0, NULL, &mask);

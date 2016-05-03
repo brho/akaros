@@ -22,7 +22,7 @@
 #include <stddef.h>
 #include <ros/syscall.h>
 
-/* Write NBYTES of BUF to FD.  Return the number written, or -1.  */
+/* Read NBYTES of FD to buf.  Return the number read, or -1.  */
 ssize_t
 __libc_read (int fd, void *buf, size_t nbytes)
 {
