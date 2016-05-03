@@ -36,8 +36,7 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _LINUX_VIRTIO_PCI_H
-#define _LINUX_VIRTIO_PCI_H
+#pragma once
 
 #include <linux/types.h>
 
@@ -196,4 +195,4 @@ struct virtio_pci_cfg_cap {
 
 #endif /* VIRTIO_PCI_NO_MODERN */
 
-#endif
+

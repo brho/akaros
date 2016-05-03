@@ -29,8 +29,7 @@
  * Copyright (C) Red Hat, Inc., 2009, 2010, 2011
  * Copyright (C) Amit Shah <amit.shah@redhat.com>, 2009, 2010, 2011
  */
-#ifndef _UAPI_LINUX_VIRTIO_CONSOLE_H
-#define _UAPI_LINUX_VIRTIO_CONSOLE_H
+#pragma once
 #include <linux/types.h>
 #include <linux/virtio_types.h>
 #include <linux/virtio_ids.h>
@@ -75,4 +74,4 @@ struct virtio_console_control {
 #define VIRTIO_CONSOLE_PORT_NAME	7
 
 
-#endif /* _UAPI_LINUX_VIRTIO_CONSOLE_H */
+

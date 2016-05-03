@@ -1,5 +1,4 @@
-#ifndef _LINUX_VIRTIO_9P_H
-#define _LINUX_VIRTIO_9P_H
+#pragma once
 /* This header is BSD licensed so anyone can use the definitions to implement
  * compatible drivers/servers.
  *
@@ -41,4 +40,4 @@ struct virtio_9p_config {
 	__u8 tag[0];
 } __attribute__((packed));
 
-#endif /* _LINUX_VIRTIO_9P_H */
+

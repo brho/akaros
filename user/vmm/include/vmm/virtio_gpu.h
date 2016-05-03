@@ -35,8 +35,7 @@
  * SUCH DAMAGE.
  */
 
-#ifndef VIRTIO_GPU_HW_H
-#define VIRTIO_GPU_HW_H
+#pragma once
 
 #include <linux/types.h>
 
@@ -313,4 +312,4 @@ enum virtio_gpu_formats {
 	VIRTIO_GPU_FORMAT_R8G8B8X8_UNORM  = 134,
 };
 
-#endif
+

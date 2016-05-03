@@ -1,5 +1,4 @@
-#ifndef _LINUX_VIRTIO_INPUT_H
-#define _LINUX_VIRTIO_INPUT_H
+#pragma once
 /* This header is BSD licensed so anyone can use the definitions to implement
  * compatible drivers/servers.
  *
@@ -73,4 +72,4 @@ struct virtio_input_event {
 	__le32 value;
 };
 
-#endif /* _LINUX_VIRTIO_INPUT_H */
+

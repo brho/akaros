@@ -1,5 +1,4 @@
-#ifndef _LINUX_VIRTIO_BLK_H
-#define _LINUX_VIRTIO_BLK_H
+#pragma once
 /* This header is BSD licensed so anyone can use the definitions to implement
  * compatible drivers/servers.
  *
@@ -146,4 +145,4 @@ struct virtio_scsi_inhdr {
 #define VIRTIO_BLK_S_OK		0
 #define VIRTIO_BLK_S_IOERR	1
 #define VIRTIO_BLK_S_UNSUPP	2
-#endif /* _LINUX_VIRTIO_BLK_H */
+

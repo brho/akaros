@@ -1,5 +1,4 @@
-#ifndef _LINUX_VIRTIO_IDS_H
-#define _LINUX_VIRTIO_IDS_H
+#pragma once
 /*
  * Virtio IDs
  *
@@ -42,4 +41,4 @@
 #define VIRTIO_ID_GPU          16 /* virtio GPU */
 #define VIRTIO_ID_INPUT        18 /* virtio input */
 
-#endif /* _LINUX_VIRTIO_IDS_H */
+

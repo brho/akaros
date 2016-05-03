@@ -1,5 +1,4 @@
-#ifndef _LINUX_VIRTIO_BALLOON_H
-#define _LINUX_VIRTIO_BALLOON_H
+#pragma once
 /* This header is BSD licensed so anyone can use the definitions to implement
  * compatible drivers/servers.
  *
@@ -81,4 +80,4 @@ struct virtio_balloon_stat {
 	__virtio64 val;
 } __attribute__((packed));
 
-#endif /* _LINUX_VIRTIO_BALLOON_H */
+
