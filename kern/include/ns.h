@@ -120,6 +120,8 @@ extern int parseether(uint8_t * unused_uint8_p_t, char *unused_char_p_t);
 #define DMAPPEND	0x40000000	/* mode bit for append only files */
 #define DMEXCL		0x20000000	/* mode bit for exclusive use files */
 #define DMMOUNT		0x10000000	/* mode bit for mounted channel */
+#define DMWRITABLE	0x08000000	/* non-standard, for select() */
+#define DMREADABLE	0x04000000	/* non-standard, for select() */
 #define DMSYMLINK	0x02000000	/* symlink -- from 9p2000.u */
 #define DMREAD		0x4	/* mode bit for read permission */
 #define DMWRITE		0x2	/* mode bit for write permission */
@@ -844,6 +846,8 @@ ssize_t qwrite(struct queue *, void *, int);
 ssize_t qwrite_nonblock(struct queue *, void *, int);
 typedef void (*qio_wake_cb_t)(struct queue *q, void *data, int filter);
 void qio_set_wake_cb(struct queue *q, qio_wake_cb_t func, void *data);
+bool qreadable(struct queue *q);
+bool qwritable(struct queue *q);
 
 void *realloc(void *, uint32_t);
 int readmem(unsigned long offset, char *buf, unsigned long n,

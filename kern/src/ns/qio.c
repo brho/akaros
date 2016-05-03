@@ -1859,3 +1859,15 @@ void qio_set_wake_cb(struct queue *q, qio_wake_cb_t func, void *data)
 	wmb();	/* if we see func, we'll also see the data for it */
 	q->wake_cb = func;
 }
+
+/* Helper for detecting whether we'll block on a read at this instant. */
+bool qreadable(struct queue *q)
+{
+	return qlen(q) > 0;
+}
+
+/* Helper for detecting whether we'll block on a write at this instant. */
+bool qwritable(struct queue *q)
+{
+	return qwindow(q) > 0;
+}

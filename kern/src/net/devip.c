@@ -128,6 +128,7 @@ static int ip3gen(struct chan *c, int i, struct dir *dp)
 	struct qid q;
 	struct conv *cv;
 	char *p;
+	int perm;
 
 	cv = chan2conv(c);
 	if (cv->owner == NULL)
@@ -141,11 +142,16 @@ static int ip3gen(struct chan *c, int i, struct dir *dp)
 			return founddevdir(c, q, "ctl", 0,
 					           cv->owner, cv->perm, dp);
 		case Qdata:
+			perm = cv->perm;
+			perm |= qreadable(cv->rq) ? DMREADABLE : 0;
+			perm |= qwritable(cv->wq) ? DMWRITABLE : 0;
 			return founddevdir(c, q, "data", qlen(cv->rq),
-							   cv->owner, cv->perm, dp);
+							   cv->owner, perm, dp);
 		case Qerr:
+			perm = cv->perm;
+			perm |= qreadable(cv->eq) ? DMREADABLE : 0;
 			return founddevdir(c, q, "err", qlen(cv->eq),
-							   cv->owner, cv->perm, dp);
+							   cv->owner, perm, dp);
 		case Qlisten:
 			return founddevdir(c, q, "listen", 0, cv->owner, cv->perm, dp);
 		case Qlocal:
@@ -157,8 +163,10 @@ static int ip3gen(struct chan *c, int i, struct dir *dp)
 		case Qsnoop:
 			if (strcmp(cv->p->name, "ipifc") != 0)
 				return -1;
+			perm = 0400;
+			perm |= qreadable(cv->sq) ? DMREADABLE : 0;
 			return founddevdir(c, q, "snoop", qlen(cv->sq),
-							   cv->owner, 0400, dp);
+							   cv->owner, perm, dp);
 		case Qstatus:
 			p = "status";
 			break;
