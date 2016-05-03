@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
 		printf("STAT RESULTS\n---------------------\n");
 		printf("dev       : %d\n", st.st_dev);
 		printf("ino       : %d\n", st.st_ino);
-		printf("mode      : %d\n", st.st_mode);
+		printf("mode      : %o(oct)\n", st.st_mode);
 		printf("nlink     : %d\n", st.st_nlink);
 		printf("uid       : %d\n", st.st_uid);
 		printf("gid       : %d\n", st.st_gid);
