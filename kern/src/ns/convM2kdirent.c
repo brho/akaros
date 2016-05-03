@@ -96,6 +96,24 @@ unsigned int convM2kdirent(uint8_t * buf, unsigned int nbuf, struct kdirent *kd,
 	return p - buf;
 }
 
+static int mode_9ns_to_posix(int mode_9ns)
+{
+	int mode_posix = 0;
+
+	if (mode_9ns & DMDIR)
+		mode_posix |= __S_IFDIR;
+	else if (mode_9ns & DMSYMLINK)
+		mode_posix |= __S_IFLNK;
+	else
+		mode_posix |= __S_IFREG;
+	if (mode_9ns & DMREADABLE)
+		mode_posix |= __S_READABLE;
+	if (mode_9ns & DMWRITABLE)
+		mode_posix |= __S_WRITABLE;
+	mode_posix |= mode_9ns & 0777;
+	return mode_posix;
+}
+
 unsigned int convM2kstat(uint8_t * buf, unsigned int nbuf, struct kstat *ks)
 {
 	uint8_t *p, *ebuf;
@@ -120,16 +138,7 @@ unsigned int convM2kstat(uint8_t * buf, unsigned int nbuf, struct kstat *ks)
 	p += BIT32SZ;
 	ks->st_ino = GBIT64(p);
 	p += BIT64SZ;
-	ks->st_mode = GBIT32(p);
-	if (ks->st_mode & DMDIR) {
-		ks->st_mode &= ~DMDIR;
-		ks->st_mode |= __S_IFDIR;
-	} else if (ks->st_mode & DMSYMLINK) {
-		ks->st_mode &= ~DMSYMLINK;
-		ks->st_mode |= __S_IFLNK;
-	} else {
-		ks->st_mode |= __S_IFREG;
-	}
+	ks->st_mode = mode_9ns_to_posix(GBIT32(p));
 	p += BIT32SZ;
 	ks->st_atim.tv_sec = GBIT32(p);
 	p += BIT32SZ;

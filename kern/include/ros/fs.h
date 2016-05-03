@@ -104,23 +104,24 @@ struct kstat {
 #define S_PMASK 00777	/* mask for all perms */
 
 /* File type is encoded in the file mode */
-#define __S_IFMT	0170000	/* These bits determine file type */
+#define __S_IFMT		000170000	/* These bits determine file type */
 /* File types */
-#define __S_IFDIR	0040000	/* Directory */
-#define __S_IFCHR	0020000	/* Character device */
-#define __S_IFBLK	0060000	/* Block device */
-#define __S_IFREG	0100000	/* Regular file */
-#define __S_IFIFO	0010000	/* FIFO */
-#define __S_IFLNK	0120000	/* Symbolic link */
-#define __S_IFSOCK	0140000	/* Socket */
+#define __S_IFDIR		000040000	/* Directory */
+#define __S_IFCHR		000020000	/* Character device */
+#define __S_IFBLK		000060000	/* Block device */
+#define __S_IFREG		000100000	/* Regular file */
+#define __S_IFIFO		000010000	/* FIFO */
+#define __S_IFLNK		000120000	/* Symbolic link */
+#define __S_IFSOCK		000140000	/* Socket */
 /* Protection bits */
-#define __S_ISUID	04000	/* Set user ID on execution */
-#define __S_ISGID	02000	/* Set group ID on execution */
-#define __S_ISVTX	01000	/* Save swapped text after use (sticky) */
-#define __S_IREAD	0400	/* Read by owner */
-#define __S_IWRITE	0200	/* Write by owner */
-#define __S_IEXEC	0100	/* Execute by owner */
-/* Test macros for file types.	*/
+#define __S_ISUID		000004000	/* Set user ID on execution */
+#define __S_ISGID		000002000	/* Set group ID on execution */
+#define __S_ISVTX		000001000	/* Save swapped text after use (sticky) */
+#define __S_IREAD		000000400	/* Read by owner */
+#define __S_IWRITE		000000200	/* Write by owner */
+#define __S_IEXEC		000000100	/* Execute by owner */
+
+/* Test macros for file types */
 #define __S_ISTYPE(mode, mask)	(((mode) & __S_IFMT) == (mask))
 #define S_ISDIR(mode)	__S_ISTYPE((mode), __S_IFDIR)
 #define S_ISCHR(mode)	__S_ISTYPE((mode), __S_IFCHR)
@@ -130,3 +131,12 @@ struct kstat {
 #define S_ISLNK(mode)	__S_ISTYPE((mode), __S_IFLNK)
 
 #endif /* ROS_KERNEL */
+
+/* Non-standard bits */
+#define __S_NONSTD		077000000	/* Magic Akaros bits */
+#define __S_READABLE	001000000	/* File is readable */
+#define __S_WRITABLE	002000000	/* File is writable */
+
+/* Test macros for non-standard bits */
+#define S_READABLE(mode)	(((mode) & __S_READABLE) != 0)
+#define S_WRITABLE(mode)	(((mode) & __S_WRITABLE) != 0)
