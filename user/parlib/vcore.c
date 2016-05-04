@@ -228,6 +228,7 @@ static void __vc_req_poke(void *nr_vc_wanted)
 {
 	long nr_vcores_wanted = *(long*)nr_vc_wanted;
 
+	nr_vcores_wanted = MIN(nr_vcores_wanted, max_vcores());
 	if (prep_new_vcores(nr_vcores_wanted))
 		panic("Unable to prep up to %d vcores!", nr_vcores_wanted);
 	if (nr_vcores_wanted > __procdata.res_req[RES_CORES].amt_wanted)
