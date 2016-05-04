@@ -10,10 +10,20 @@
  * enable notifs, make sure notif IPIs weren't pending, restore the work reg,
  * and then "ret".
  *
+ * However, we can't just put the extra stuff directly below the rsp.  We need
+ * to leave room for the redzone: area that is potentially being used.  (Even if
+ * you compile with -mno-red-zone, some asm code (glibc memcpy) will still use
+ * that area).
+ *
  * This is what the target uthread's stack will look like (growing down):
  *
  * Target RSP -> |   u_thread's old stuff   | the future %rsp, tf->tf_rsp
- *               |   new rip                | 0x08 below %rsp (one slot is 0x08)
+ *               |            .             | beginning of Red Zone
+ *               |            .             |
+ *               |   128 Bytes of Red Zone  |
+ *               |            .             |
+ *               |            .             | end of Red Zone
+ *               |   new rip                | 0x08 below Red (one slot is 0x08)
  *               |   rflags space           | 0x10 below
  *               |   rdi save space         | 0x18 below
  *               |   *sysc ptr to syscall   | 0x20 below
@@ -29,18 +39,7 @@
  * so that restarting *this* code won't clobber shit we need later.  The way we
  * do this is that we do any "stack jumping" before we enable interrupts/notifs.
  * These jumps are when we directly modify rsp, specifically in the down
- * direction (subtracts).  Adds would be okay.
- *
- * Another 64-bit concern is the red-zone.  The AMD64 ABI allows the use of
- * space below the stack pointer by regular programs.  If we allowed this, we
- * would clobber that space when we do our TF restarts, much like with OSs and
- * IRQ handlers.  Thus we have the cross compiler automatically disabling the
- * redzone (-mno-red-zone is a built-in option).
- *
- * When compared to the 32 bit code, notice we use rdi, instead of eax, for our
- * work.  This is because rdi is the arg0 of a syscall.  Using it saves us some
- * extra moves, since we need to pop the *sysc before saving any other
- * registers. */
+ * direction (subtracts).  Adds would be okay. */
 
 /* Helper for writing the info we need later to the u_tf's stack.  Also, note
  * this goes backwards, since memory reads up the stack. */
@@ -52,6 +51,7 @@ struct restart_helper {
 	uint64_t					rflags;
 	uint64_t					rip;
 };
+
 /* Static syscall, used for self-notifying.  We never wait on it, and we
  * actually might submit it multiple times in parallel on different cores!
  * While this may seem dangerous, the kernel needs to be able to handle this
@@ -74,11 +74,13 @@ struct syscall vc_entry = {
 
 static void pop_hw_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 {
+	#define X86_RED_ZONE_SZ			128
 	struct restart_helper *rst;
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
 
-	/* The stuff we need to write will be below the current stack of the utf */
-	rst = (struct restart_helper*)((void*)tf->tf_rsp -
+	/* The stuff we need to write will be below the current stack and red zone
+	 * of the utf */
+	rst = (struct restart_helper*)((void*)tf->tf_rsp - X86_RED_ZONE_SZ -
 	                               sizeof(struct restart_helper));
 	/* Fill in the info we'll need later */
 	rst->notif_disab_loc = &vcpd->notif_disabled;
@@ -106,6 +108,7 @@ static void pop_hw_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 	              "popq %%r15;           "
 	              "addq $0x28, %%rsp;    " /* move to the rsp slot in the tf */
 	              "popq %%rsp;           " /* change to the utf's %rsp */
+	              "subq %[red], %%rsp;   " /* jump over the redzone */
 	              "subq $0x10, %%rsp;    " /* move rsp to below rdi's slot */
 	              "pushq %%rdi;          " /* save rdi, will clobber soon */
 	              "subq $0x18, %%rsp;    " /* move to notif_dis_loc slot */
@@ -131,9 +134,9 @@ static void pop_hw_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 				  "1: addq $0x08, %%rsp; " /* discard &sysc (on non-sc path) */
 	              "2: popq %%rdi;        " /* restore tf's %rdi (both paths) */
 				  "popfq;                " /* restore utf's rflags */
-	              "ret;                  " /* return to the new PC */
+	              "ret %[red];           " /* return to the new PC, skip red */
 	              :
-	              : "g"(&tf->tf_rax), "i"(T_SYSCALL)
+	              : "g"(&tf->tf_rax), "i"(T_SYSCALL), [red]"i"(X86_RED_ZONE_SZ)
 	              : "memory");
 }
 
