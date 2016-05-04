@@ -35,7 +35,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define CPP_SPEC "%{posix:-D_POSIX_SOURCE} %{pthread:-D_REENTRANT}"
 
 #undef CC1_SPEC
-#define CC1_SPEC "%(cc1_cpu) %{profile:-p} -mno-red-zone "
+#define CC1_SPEC "%(cc1_cpu) %{profile:-p} "
 
 /* The svr4 ABI for the i386 says that records and unions are returned
    in memory.  In the 64bit compilation we will turn this flag off in
