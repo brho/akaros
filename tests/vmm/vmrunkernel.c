@@ -17,16 +17,24 @@
 #include <vmm/acpi/acpi.h>
 #include <vmm/acpi/vmm_simple_dsdt.h>
 #include <ros/arch/mmu.h>
+#include <ros/arch/membar.h>
 #include <ros/vmm.h>
 #include <parlib/uthread.h>
 #include <vmm/linux_bootparam.h>
+
 #include <vmm/virtio.h>
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
+#include <vmm/virtio_console.h>
+#include <vmm/virtio_lguest_console.h>
+
 #include <vmm/sched.h>
+#include <sys/eventfd.h>
+#include <sys/uio.h>
 
 struct virtual_machine local_vm, *vm = &local_vm;
+
 struct vmm_gpcore_init gpci;
 
 /* By 1999, you could just scan the hardware
@@ -194,137 +202,50 @@ void timer_thread(void *arg)
 	fprintf(stderr, "SENDING TIMER\n");
 }
 
-void consout(void *arg)
-{
-	char *line, *consline, *outline;
-	static struct scatterlist out[] = { {NULL, sizeof(outline)}, };
-	static struct scatterlist in[] = { {NULL, sizeof(line)}, };
-	static struct scatterlist iov[32];
-	struct virtio_threadarg *a = arg;
-	static unsigned int inlen, outlen, conslen;
-	struct virtqueue *v = a->arg->virtio;
-	fprintf(stderr, "talk thread ..\n");
-	uint16_t head, gaveit = 0, gotitback = 0;
-	uint32_t vv;
-	int i;
-	int num;
-
-	if (debug) {
-		fprintf(stderr, "----------------------- TT a %p\n", a);
-		fprintf(stderr, "talk thread ttargs %x v %x\n", a, v);
-	}
-
-	for(num = 0;;num++) {
-		//int debug = 1;
-		/* host: use any buffers we should have been sent. */
-		head = wait_for_vq_desc(v, iov, &outlen, &inlen);
-		if (debug)
-			fprintf(stderr, "CCC: vq desc head %d, gaveit %d gotitback %d\n", head, gaveit, gotitback);
-		for(i = 0; debug && i < outlen + inlen; i++)
-			fprintf(stderr, "CCC: v[%d/%d] v %p len %d\n", i, outlen + inlen, iov[i].v, iov[i].length);
-		/* host: if we got an output buffer, just output it. */
-		for(i = 0; i < outlen; i++) {
-			num++;
-			int j;
-			if (debug) {
-				fprintf(stderr, "CCC: IOV length is %d\n", iov[i].length);
-			}
-			for (j = 0; j < iov[i].length; j++)
-				printf("%c", ((char *)iov[i].v)[j]);
-		}
-		fflush(stdout);
-		if (debug)
-			fprintf(stderr, "CCC: outlen is %d; inlen is %d\n", outlen, inlen);
-		/* host: fill in the writeable buffers. */
-		/* why we're getting these I don't know. */
-		for (i = outlen; i < outlen + inlen; i++) {
-			if (debug) fprintf(stderr, "CCC: send back empty writeable");
-			iov[i].length = 0;
-		}
-		if (debug) fprintf(stderr, "CCC: call add_used\n");
-		/* host: now ack that we used them all. */
-		add_used(v, head, outlen+inlen);
-		if (debug) fprintf(stderr, "CCC: DONE call add_used\n");
-	}
-	fprintf(stderr, "All done\n");
-}
 
 // FIXME.
 volatile int consdata = 0;
 
-void consin(void *arg)
+static void virtio_poke_guest(void)
 {
-	struct virtio_threadarg *a = arg;
-	char *line, *outline;
-	static char consline[128];
-	static struct scatterlist iov[32];
-	static struct scatterlist out[] = { {NULL, sizeof(outline)}, };
-	static struct scatterlist in[] = { {NULL, sizeof(line)}, };
-
-	static unsigned int inlen, outlen, conslen;
-	struct virtqueue *v = a->arg->virtio;
-	fprintf(stderr, "consin thread ..\n");
-	uint16_t head, gaveit = 0, gotitback = 0;
-	uint32_t vv;
-	int i;
-	int num;
-	//char c[1];
-
-	if (debug) fprintf(stderr, "Spin on console being read, print num queues, halt\n");
-
-	for(num = 0;! quit;num++) {
-		//int debug = 1;
-		/* host: use any buffers we should have been sent. */
-		head = wait_for_vq_desc(v, iov, &outlen, &inlen);
-		if (debug)
-			fprintf(stderr, "vq desc head %d, gaveit %d gotitback %d\n", head, gaveit, gotitback);
-		for(i = 0; debug && i < outlen + inlen; i++)
-			fprintf(stderr, "v[%d/%d] v %p len %d\n", i, outlen + inlen, iov[i].v, iov[i].length);
-		if (debug)
-			fprintf(stderr, "outlen is %d; inlen is %d\n", outlen, inlen);
-		/* host: fill in the writeable buffers. */
-		for (i = outlen; i < outlen + inlen; i++) {
-			/* host: read a line. */
-			memset(consline, 0, 128);
-			if (read(0, consline, 1) < 0) {
-				exit(0);
-			}
-			if (debug) fprintf(stderr, "CONSIN: GOT A LINE:%s:\n", consline);
-			if (debug) fprintf(stderr, "CONSIN: OUTLEN:%d:\n", outlen);
-			if (strlen(consline) < 3 && consline[0] == 'q' ) {
-				fflush(stdout);
-				exit(0);
-			}
-
-			memmove(iov[i].v, consline, strlen(consline)+ 1);
-			iov[i].length = strlen(consline) + 1;
-		}
-		if (debug) fprintf(stderr, "call add_used\n");
-		/* host: now ack that we used them all. */
-		add_used(v, head, outlen+inlen);
-		/* turn off consdata - the IRQ injection isn't right */
-		//consdata = 1;
-		if (debug) fprintf(stderr, "DONE call add_used\n");
-
-		// Send spurious for testing (Gan)
-		set_posted_interrupt(0xE5);
-		virtio_mmio_set_vring_irq();
-
-		ros_syscall(SYS_vmm_poke_guest, 0, 0, 0, 0, 0, 0);
-	}
-	fprintf(stderr, "All done\n");
+	set_posted_interrupt(0xE5);
+	ros_syscall(SYS_vmm_poke_guest, 0, 0, 0, 0, 0, 0);
 }
 
-static struct vqdev vqdev= {
-name: "console",
-dev: VIRTIO_ID_CONSOLE,
-device_features: 0, /* Can't do it: linux console device does not support it. VIRTIO_F_VERSION_1*/
-numvqs: 2,
-vqs: {
-		{name: "consin",  maxqnum: 64, func: consin,  arg: (void *)0},
-		{name: "consout", maxqnum: 64, func: consout, arg: (void *)0},
-	}
+static struct virtio_mmio_dev cons_mmio_dev = {
+	.poke_guest = virtio_poke_guest
 };
+
+static struct virtio_console_config cons_cfg;
+static struct virtio_console_config cons_cfg_d;
+
+static struct virtio_vq_dev cons_vqdev = {
+	.name = "console",
+	.dev_id = VIRTIO_ID_CONSOLE,
+	.dev_feat = ((uint64_t)1 << VIRTIO_F_VERSION_1)
+					  | (1 << VIRTIO_RING_F_INDIRECT_DESC)
+	                  ,
+	.num_vqs = 2,
+	.cfg = &cons_cfg,
+	.cfg_d = &cons_cfg_d,
+	.cfg_sz = sizeof(struct virtio_console_config),
+	.transport_dev = &cons_mmio_dev,
+	.vqs = {
+			{
+				.name = "cons_receiveq",
+				.qnum_max = 64,
+				.srv_fn = cons_receiveq_fn,
+				.vqdev = &cons_vqdev
+			},
+			{
+				.name = "cons_transmitq",
+				.qnum_max = 64,
+				.srv_fn = cons_transmitq_fn,
+				.vqdev = &cons_vqdev
+			},
+		}
+};
+
 
 void lowmem() {
 	__asm__ __volatile__ (".section .lowmem, \"aw\"\n\tlow: \n\t.=0x1000\n\t.align 0x100000\n\t.previous\n");
@@ -701,9 +622,11 @@ int main(int argc, char **argv)
 	fprintf(stderr, "kernbase for pml4 is 0x%llx and entry is %llx\n", kernbase, entry);
 	fprintf(stderr, "p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
 
-
 	vm->virtio_mmio_base = 0x100000000;
 	register_virtio_mmio(&vqdev, vm->virtio_mmio_base);
+
+	cons_mmio_dev.addr = vm->virtio_mmio_base;
+	cons_mmio_dev.vqdev = &cons_vqdev;
 
 	vmm_run_task(vm, timer_thread, 0);
 
