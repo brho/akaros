@@ -22,6 +22,13 @@
  */
 
 
+#include <sys/eventfd.h>
+#include <sys/uio.h>
+#include <ros/arch/membar.h>
+#include <vmm/virtio.h>
+#include <vmm/virtio_ids.h>
+#include <vmm/virtio_config.h>
+
 /*L:200
  * Device Handling.
  *
