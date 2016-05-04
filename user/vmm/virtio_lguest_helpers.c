@@ -1,9 +1,11 @@
 /* Virtio helper functions from linux/tools/lguest/lguest.c
  *
  * Copyright (C) 1991-2016, the Linux Kernel authors
+ * Copyright (c) 2016 Google Inc.
  *
  * Author:
  *  Rusty Russell <rusty@rustcorp.com.au>
+ *  Michael Taufen <mtaufen@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -15,6 +17,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * The code from lguest.c has been modified for Akaros.
+ *
  * Original linux/tools/lguest/lguest.c:
  *   https://github.com/torvalds/linux/blob/v4.5/tools/lguest/lguest.c
  *   most recent hash on the file as of v4.5 tag:
@@ -25,10 +29,15 @@
 #include <sys/eventfd.h>
 #include <sys/uio.h>
 #include <ros/arch/membar.h>
+#include <ros/arch/mmu.h>
 #include <vmm/virtio.h>
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
 
+// The purpose is to make sure the addresses provided by the guest are not
+// outside the bounds of the guest's memory.
+// Based on _check_pointer in Linux's lguest.c, which came with
+// the following comment:
 /*L:200
  * Device Handling.
  *
@@ -37,72 +46,82 @@
  * we have a convenient routine which checks it and exits with an error message
  * if something funny is going on:
  */
-static void *_check_pointer(struct device *d,
-			    unsigned long addr, unsigned int size,
-			    unsigned int line)
+void *virtio_check_pointer(struct virtio_vq *vq, uint64_t addr,
+                           uint32_t size, char *file, uint32_t line)
 {
-	/*
-	 * Check if the requested address and size exceeds the allocated memory,
-	 * or addr + size wraps around.
-	 */
-	if ((addr + size) > guest_limit || (addr + size) < addr)
-		bad_driver(d, "%s:%i: Invalid address %#lx",
-			   __FILE__, line, addr);
-	/*
-	 * We return a pointer for the caller's convenience, now we know it's
-	 * safe to use.
-	 */
-	return from_guest_phys(addr);
+	// We check that the pointer + the size doesn't wrap around, and that the
+	// pointer + the size isn't past the top of the guest's address space.
+	// UVPT is the top of the guest's address space, and is included from
+	// ros/arch/mmu64.h via ros/arch/mmu.h.
+	if ((addr + size) < addr || (addr + size) > UVPT)
+		VIRTIO_DRI_ERRX(vq->vqdev,
+			"Driver provided an invalid address or size (addr:0x%x sz:%u).\n"
+			"  Location: %s:%d", addr, size, file, line);
+
+	return (void *)addr;
 }
 
 
+// For traversing the chain of descriptors
+// Based on next_desc Linux's lguest.c, which came with the following comment:
 /*
  * Each buffer in the virtqueues is actually a chain of descriptors.  This
  * function returns the next descriptor in the chain, or vq->vring.num if we're
  * at the end.
  */
-static unsigned next_desc(struct device *d, struct vring_desc *desc,
-			  unsigned int i, unsigned int max)
+static uint32_t next_desc(struct vring_desc *desc, uint32_t i, uint32_t max,
+		struct virtio_vq *vq) // The vq is just for the error message.
 {
-	unsigned int next;
+	uint32_t next;
 
-	/* If this descriptor says it doesn't chain, we're done. */
+	// No more in the chain, so return max to signal that we reached the end
 	if (!(desc[i].flags & VRING_DESC_F_NEXT))
 		return max;
 
-	/* Check they're not leading us off end of descriptors. */
 	next = desc[i].next;
-	/* Make sure compiler knows to grab that: we don't want it changing! */
-	wmb();
+
+	// TODO: Figure out why lguest had the memory barrier here.
+	//       DO NOT REMOVE UNLESS YOU KNOW WHY!
+	wmb_f();
 
 	if (next >= max)
-		bad_driver(d, "Desc next is %u", next);
+		VIRTIO_DRI_ERRX(vq->vqdev,
+			"The next descriptor index in the chain provided by the driver is outside the bounds of the maximum allowed size of its queue.");
 
 	return next;
 }
 
+// Adds descriptor chain to the used ring of the vq
+// Based on add_used in Linux's lguest.c, which came with the following comment:
 /*
  * After we've used one of their buffers, we tell the Guest about it.  Sometime
  * later we'll want to send them an interrupt using trigger_irq(); note that
  * wait_for_vq_desc() does that for us if it has to wait.
  */
-static void add_used(struct virtqueue *vq, unsigned int head, int len)
+void virtio_add_used_desc(struct virtio_vq *vq, uint32_t head, uint32_t len)
 {
-	struct vring_used_elem *used;
+	// virtio-v1.0-cs04 s4.2.2.1 MMIO Device Register Layout
+	if (!vq->qready)
+		VIRTIO_DEV_ERRX(vq->vqdev,
+			"The device may not process queues with QueueReady set to 0x0.\n"
+			"  See virtio-v1.0-cs04 s4.2.2.1 MMIO Device Register Layout");
 
-	/*
-	 * The virtqueue contains a ring of used buffers.  Get a pointer to the
-	 * next entry in that used ring.
-	 */
-	used = &vq->vring.used->ring[vq->vring.used->idx % vq->vring.num];
-	used->id = head;
-	used->len = len;
-	/* Make sure buffer is written before we update index. */
+	// NOTE: len is the total length of the descriptor chain (in bytes)
+	//       that was written to.
+	//       So you should pass 0 if you didn't write anything, and pass
+	//       the number of bytes you wrote otherwise.
+	vq->vring.used->ring[vq->vring.used->idx % vq->vring.num].id = head;
+	vq->vring.used->ring[vq->vring.used->idx % vq->vring.num].len = len;
+
+	// virtio-v1.0-cs04 s2.4.8.2 The Virtqueue Used Ring
+	// TODO: Take note, Barret is thinking about renaming our wmb() to wwmb()
+	// The device MUST set len prior to updating the used idx, hence wmb()
 	wmb();
 	vq->vring.used->idx++;
-	vq->pending_used++;
 }
 
+// Based on wait_for_vq_desc in Linux's'lguest.c, which came with
+// the following comment:
 /*
  * This looks in the virtqueue for the first available buffer, and converts
  * it to an iovec for convenient access.  Since descriptors consist of some
@@ -111,228 +130,210 @@ static void add_used(struct virtqueue *vq, unsigned int head, int len)
  *
  * This function waits if necessary, and returns the descriptor number found.
  */
-static unsigned wait_for_vq_desc(struct virtqueue *vq,
-				 struct iovec iov[],
-				 unsigned int *out_num, unsigned int *in_num)
+uint32_t virtio_next_avail_vq_desc(struct virtio_vq *vq, struct iovec iov[],
+                            uint32_t *olen, uint32_t *ilen)
 {
-	unsigned int i, head, max;
+// TODO: Need to make sure we don't overflow iov. Right now we're just kind of
+//       trusting that whoever provided the iov made it at least as big as
+//       qnum_max, but maybe we shouldn't be that trusting.
+	uint32_t i, head, max;
 	struct vring_desc *desc;
-	u16 last_avail = lg_last_avail(vq);
+	eventfd_t event;
 
-	/*
-	 * 2.4.7.1:
-	 *
-	 *   The driver MUST handle spurious interrupts from the device.
-	 *
-	 * That's why this is a while loop.
-	 */
+	while (vq->last_avail == vq->vring.avail->idx) {
+		// We know the ring has updated when idx advances. We check == because
+		// idx is allowed to wrap around eventually.
 
-	/* There's nothing available? */
-	while (last_avail == vq->vring.avail->idx) {
-		u64 event;
+		// NOTE: lguest kicks the guest with an irq before they wait on the
+		//       eventfd. Instead, I delegate that responsibility to the
+		//       queue service functions.
 
-		/*
-		 * Since we're about to sleep, now is a good time to tell the
-		 * Guest about what we've used up to now.
-		 */
-		trigger_irq(vq);
-
-		/* OK, now we need to know about added descriptors. */
+		// We're about to wait on the eventfd, so we need to tell the guest
+		// that we want a notification when it adds new buffers for
+		// us to process.
 		vq->vring.used->flags &= ~VRING_USED_F_NO_NOTIFY;
 
-		/*
-		 * They could have slipped one in as we were doing that: make
-		 * sure it's written, then check again.
-		 */
-		mb();
-		if (last_avail != vq->vring.avail->idx) {
+		// If the guest added an available buffer while we were unsetting
+		// the VRING_USED_F_NO_NOTIFY flag, we'll break out here and process
+		// the new buffer.
+		wrmb();
+		if (vq->last_avail != vq->vring.avail->idx) {
 			vq->vring.used->flags |= VRING_USED_F_NO_NOTIFY;
 			break;
 		}
 
-		/* Nothing new?  Wait for eventfd to tell us they refilled. */
-		if (read(vq->eventfd, &event, sizeof(event)) != sizeof(event))
-			errx(1, "Event read failed?");
+		if (eventfd_read(vq->eventfd, &event))
+			VIRTIO_DEV_ERRX(vq->vqdev,
+				"eventfd read failed while waiting for available descriptors\n");
 
-		/* We don't need to be notified again. */
+		// We don't need the guest to notify us about new buffers unless
+		// we're waiting on the eventfd, because we will detect the
+		// updated vq->vring.avail->idx.
 		vq->vring.used->flags |= VRING_USED_F_NO_NOTIFY;
 	}
 
-	/* Check it isn't doing very strange things with descriptor numbers. */
-	if ((u16)(vq->vring.avail->idx - last_avail) > vq->vring.num)
-		bad_driver_vq(vq, "Guest moved used index from %u to %u",
-			      last_avail, vq->vring.avail->idx);
+	// NOTE: lguest is a bit cryptic about why they check for this.
+	//       They just say, "Check it isn't doing very strange things with
+	//       descriptor numbers."
+	//       I added the reason I believe they do it in this comment and
+	//       the below error message.
+	// The guest can't have incremented idx more than vring.num times since
+	// we last incremented vq->last_avail, because it would have run out of
+	// places to put descriptors after incrementing exactly vring.num times
+	// (prior to our next vq->last_avail++)
+	if ((vq->vring.avail->idx - vq->last_avail) > vq->vring.num)
+		VIRTIO_DRI_ERRX(vq->vqdev,
+			"The driver advanced vq->vring.avail->idx from %u to %u, which have a difference greater than the capacity of a queue. The idx is supposed to increase by 1 for each descriptor chain added to the available ring; the driver should have run out of room and thus been forced to wait for us to catch up!",
+			vq->last_avail, vq->vring.avail);
 
+	// lguest says here:
 	/*
 	 * Make sure we read the descriptor number *after* we read the ring
 	 * update; don't let the cpu or compiler change the order.
 	 */
 	rmb();
 
+	// Mod because it's a *ring*. lguest said:
 	/*
 	 * Grab the next descriptor number they're advertising, and increment
 	 * the index we've seen.
 	 */
-	head = vq->vring.avail->ring[last_avail % vq->vring.num];
-	lg_last_avail(vq)++;
+	head = vq->vring.avail->ring[vq->last_avail % vq->vring.num];
+	vq->last_avail++;
 
-	/* If their number is silly, that's a fatal mistake. */
 	if (head >= vq->vring.num)
-		bad_driver_vq(vq, "Guest says index %u is available", head);
+		VIRTIO_DRI_ERRX(vq->vqdev,
+			"The index of the head of the descriptor chain provided by the driver is after the end of the queue.");
 
-	/* When we start there are none of either input nor output. */
-	*out_num = *in_num = 0;
+	// Don't know how many output buffers or input buffers there are yet,
+	// this depends on the descriptor chain.
+	*olen = *ilen = 0;
 
+	// Since vring.num is the size of the queue, max is the max descriptors
+	// that should be in a descriptor chain. If we find more than that, the
+	// driver is doing something wrong.
 	max = vq->vring.num;
 	desc = vq->vring.desc;
 	i = head;
 
+	// NOTE: (from lguest)
 	/*
 	 * We have to read the descriptor after we read the descriptor number,
 	 * but there's a data dependency there so the CPU shouldn't reorder
 	 * that: no rmb() required.
 	 */
+	// Mike: The descriptor number is stored in i; what lguest means is
+	//       that data must flow from avail_ring to head to i before i
+	//       is used to index into desc.
 
 	do {
-		/*
-		 * If this is an indirect entry, then this buffer contains a
-		 * descriptor table which we handle as if it's any normal
-		 * descriptor chain.
-		 */
+		// If it's an indirect descriptor, it points at a table of descriptors
+		// provided by the guest driver. The descriptors in that table are
+		// still chained, so we can ultimately handle them the same way as
+		// direct descriptors.
 		if (desc[i].flags & VRING_DESC_F_INDIRECT) {
-			/* 2.4.5.3.1:
-			 *
-			 *  The driver MUST NOT set the VIRTQ_DESC_F_INDIRECT
-			 *  flag unless the VIRTIO_F_INDIRECT_DESC feature was
-			 *  negotiated.
-			 */
-			if (!(vq->dev->features_accepted &
-			      (1<<VIRTIO_RING_F_INDIRECT_DESC)))
-				bad_driver_vq(vq, "vq indirect not negotiated");
 
-			/*
-			 * 2.4.5.3.1:
-			 *
-			 *   The driver MUST NOT set the VIRTQ_DESC_F_INDIRECT
-			 *   flag within an indirect descriptor (ie. only one
-			 *   table per descriptor).
-			 */
+			// virtio-v1.0-cs04 s2.4.5.3.1 Indirect Descriptors
+			if (!(vq->vqdev->dri_feat & (1<<VIRTIO_RING_F_INDIRECT_DESC)))
+				VIRTIO_DRI_ERRX(vq->vqdev,
+					"The driver must not set the INDIRECT flag on a descriptor if the INDIRECT_DESC feature was not negotiated.\n"
+					"  See virtio-v1.0-cs04 s2.4.5.3.1 Indirect Descriptors");
+
+			// NOTE: desc is only modified when we detect an indirect
+			//       descriptor, so our implementation works whether there is an
+			//       indirect descriptor at the very beginning OR at the very
+			//       end of the chain (virtio-v1.0-cs04 s2.4.5.3.2 compliant)
+			// virtio-v1.0-cs04 s2.4.5.3.1 Indirect Descriptors
 			if (desc != vq->vring.desc)
-				bad_driver_vq(vq, "Indirect within indirect");
+				VIRTIO_DRI_ERRX(vq->vqdev,
+					"The driver must not set the INDIRECT flag on a descriptor within an indirect descriptor.\n"
+					"  See virtio-v1.0-cs04 s2.4.5.3.1 Indirect Descriptors");
 
-			/*
-			 * Proposed update VIRTIO-134 spells this out:
-			 *
-			 *   A driver MUST NOT set both VIRTQ_DESC_F_INDIRECT
-			 *   and VIRTQ_DESC_F_NEXT in flags.
-			 */
+			// virtio-v1.0-cs04 s2.4.5.3.1 Indirect Descriptors
 			if (desc[i].flags & VRING_DESC_F_NEXT)
-				bad_driver_vq(vq, "indirect and next together");
+				VIRTIO_DRI_ERRX(vq->vqdev,
+					"The driver must not set both the INDIRECT and NEXT flags on a descriptor.\n"
+					"  See virtio-v1.0-cs04 s2.4.5.3.1 Indirect Descriptors");
 
+			// nonzero mod indicates wrong table size
 			if (desc[i].len % sizeof(struct vring_desc))
-				bad_driver_vq(vq,
-					      "Invalid size for indirect table");
-			/*
-			 * 2.4.5.3.2:
-			 *
-			 *  The device MUST ignore the write-only flag
-			 *  (flags&VIRTQ_DESC_F_WRITE) in the descriptor that
-			 *  refers to an indirect table.
-			 *
-			 * We ignore it here: :)
-			 */
+				VIRTIO_DRI_ERRX(vq->vqdev,
+					"The size of a vring descriptor does not evenly divide the length of the indirect table provided by the driver. Bad table size.");
+
+			// NOTE: virtio-v1.0-cs04 s2.4.5.3.2 Indirect Descriptors
+			//       says that the device MUST ignore the write-only flag in the
+			//       descriptor that refers to an indirect table. So we ignore.
 
 			max = desc[i].len / sizeof(struct vring_desc);
-			desc = check_pointer(vq->dev, desc[i].addr, desc[i].len);
+			desc = virtio_check_pointer(vq, desc[i].addr, desc[i].len,
+			                            __FILE__, __LINE__);
+
+			// Now that desc is pointing at the table of indirect descriptors,
+			// we set i to 0 so that we can start walking that table
 			i = 0;
 
-			/* 2.4.5.3.1:
-			 *
-			 *  A driver MUST NOT create a descriptor chain longer
-			 *  than the Queue Size of the device.
-			 */
-			if (max > vq->pci_config.queue_size)
-				bad_driver_vq(vq,
-					      "indirect has too many entries");
+			// virtio-v1.0-cs04 s2.4.5.3.1 Indirect Descriptors
+			if (max > vq->vring.num) {
+				VIRTIO_DRI_ERRX(vq->vqdev,
+					"The driver must not create a descriptor chain longer than the queue size of the device.\n"
+					"  See virtio-v1.0-cs04 s2.4.5.3.1 Indirect Descriptors");
+			}
 		}
 
-		/* Grab the first descriptor, and check it's OK. */
-		iov[*out_num + *in_num].iov_len = desc[i].len;
-		iov[*out_num + *in_num].iov_base
-			= check_pointer(vq->dev, desc[i].addr, desc[i].len);
-		/* If this is an input descriptor, increment that count. */
-		if (desc[i].flags & VRING_DESC_F_WRITE)
-			(*in_num)++;
+		// Now build the scatterlist of buffers for the device to process
+		iov[*olen + *ilen].iov_len = desc[i].len;
+		iov[*olen + *ilen].iov_base = virtio_check_pointer(vq, desc[i].addr,
+		                                                   desc[i].len,
+		                                                   __FILE__, __LINE__);
+
+		if (desc[i].flags & VRING_DESC_F_WRITE) {
+			// input descriptor, increment *ilen
+			(*ilen)++;
+		}
 		else {
-			/*
-			 * If it's an output descriptor, they're all supposed
-			 * to come before any input descriptors.
-			 */
-			if (*in_num)
-				bad_driver_vq(vq,
-					      "Descriptor has out after in");
-			(*out_num)++;
+			// virtio-v1.0-cs04 s2.4.4.2 Message Framing
+			if (*ilen) {
+				VIRTIO_DRI_ERRX(vq->vqdev,
+					"Device detected an output descriptor after an input descriptor. The driver must place any device-writeable descriptor elements after all device-readable descriptor elements.\n"
+					"  See virtio-v1.0-cs04 s2.4.4.2 Message Framing");
+			}
+
+			(*olen)++;
 		}
 
-		/* If we've got too many, that implies a descriptor loop. */
-		if (*out_num + *in_num > max)
-			bad_driver_vq(vq, "Looped descriptor");
-	} while ((i = next_desc(vq->dev, desc, i, max)) != max);
+		// virtio-v1.0-cs04 s2.4.5.2 The Virtqueue Descriptor Table
+		if (*olen + *ilen > max) {
+			VIRTIO_DRI_ERRX(vq->vqdev,
+				"The driver must ensure that there are no loops in the descriptor chain it provides! The combined length of readable and writeable buffers was greater than the number of elements in the queue.\n"
+				"  See virtio-v1.0-cs04 s2.4.5.2 The Virtqueue Descriptor Table");
+		}
+
+
+	} while ((i = next_desc(desc, i, max, vq)) != max);
 
 	return head;
+
 }
 
-/*
- * 4.1.4.3.2:
- *
- *  The driver MUST configure the other virtqueue fields before
- *  enabling the virtqueue with queue_enable.
- *
- * When they enable the virtqueue, we check that their setup is valid.
- */
-static void check_virtqueue(struct device *d, struct virtqueue *vq)
+// Based on check_virtqueue from lguest.c
+// We call this when the driver writes 0x1 to QueueReady
+void virtio_check_vring(struct virtio_vq *vq)
 {
-	/* Because lguest is 32 bit, all the descriptor high bits must be 0 */
-	if (vq->pci_config.queue_desc_hi
-	    || vq->pci_config.queue_avail_hi
-	    || vq->pci_config.queue_used_hi)
-		bad_driver_vq(vq, "invalid 64-bit queue address");
+	// First make sure that the pointers on the vring are all valid:
+	virtio_check_pointer(vq, (uint64_t)vq->vring.desc,
+	                     sizeof(*vq->vring.desc) * vq->vring.num,
+	                     __FILE__, __LINE__);
+	virtio_check_pointer(vq, (uint64_t)vq->vring.avail,
+	                     sizeof(*vq->vring.avail) * vq->vring.num,
+	                     __FILE__, __LINE__);
+	virtio_check_pointer(vq, (uint64_t)vq->vring.used,
+	                     sizeof(*vq->vring.used) * vq->vring.num,
+	                     __FILE__, __LINE__);
 
-	/*
-	 * 2.4.1:
-	 *
-	 *  The driver MUST ensure that the physical address of the first byte
-	 *  of each virtqueue part is a multiple of the specified alignment
-	 *  value in the above table.
-	 */
-	if (vq->pci_config.queue_desc_lo % 16
-	    || vq->pci_config.queue_avail_lo % 2
-	    || vq->pci_config.queue_used_lo % 4)
-		bad_driver_vq(vq, "invalid alignment in queue addresses");
 
-	/* Initialize the virtqueue and check they're all in range. */
-	vq->vring.num = vq->pci_config.queue_size;
-	vq->vring.desc = check_pointer(vq->dev,
-				       vq->pci_config.queue_desc_lo,
-				       sizeof(*vq->vring.desc) * vq->vring.num);
-	vq->vring.avail = check_pointer(vq->dev,
-					vq->pci_config.queue_avail_lo,
-					sizeof(*vq->vring.avail)
-					+ (sizeof(vq->vring.avail->ring[0])
-					   * vq->vring.num));
-	vq->vring.used = check_pointer(vq->dev,
-				       vq->pci_config.queue_used_lo,
-				       sizeof(*vq->vring.used)
-				       + (sizeof(vq->vring.used->ring[0])
-					  * vq->vring.num));
-
-	/*
-	 * 2.4.9.1:
-	 *
-	 *   The driver MUST initialize flags in the used ring to 0
-	 *   when allocating the used ring.
-	 */
+	// virtio-v1.0-cs04 s2.4.9.1 Virtqueue Notification Suppression
 	if (vq->vring.used->flags != 0)
-		bad_driver_vq(vq, "invalid initial used.flags %#x",
-			      vq->vring.used->flags);
+		VIRTIO_DRI_ERRX(vq->vqdev,
+			"The driver must initialize the flags field of the used ring to 0 when allocating the used ring.\n"
+			"  See virtio-v1.0-cs04 s2.4.9.1 Virtqueue Notification Suppression");
 }
