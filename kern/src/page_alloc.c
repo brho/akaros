@@ -196,10 +196,14 @@ void *get_cont_pages(size_t order, int flags)
 		int j;
 		for(j=i; j>=(i-(npages-1)); j--) {
 			if( !page_is_free(j) ) {
-				i = j - 1;
+				/* i will be j - 1 next time around the outer loop */
+				i = j;
 				break;
 			}
 		}
+		/* careful: if we change the allocator and allow npages = 0, then this
+		 * will trip when we set i = j.  then we'll be handing out in-use
+		 * memory. */
 		if( j == (i-(npages-1)-1)) {
 			first = j+1;
 			break;
