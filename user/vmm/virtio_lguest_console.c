@@ -25,87 +25,135 @@
  *     e523caa601f4a7c2fa1ecd040db921baf7453798
  */
 
-/* This is the routine which handles console input (ie. stdin). */
-static void console_input(struct virtqueue *vq)
+#include <stdlib.h>
+#include <err.h>
+#include <sys/eventfd.h>
+#include <sys/uio.h>
+#include <vmm/virtio.h>
+#include <vmm/virtio_mmio.h>
+
+void *cons_receiveq_fn(void *_vq) // host -> guest
 {
-	int len;
-	unsigned int head, in_num, out_num;
-	struct console_abort *abort = vq->dev->priv;
-	struct iovec iov[vq->vring.num];
+	struct virtio_vq *vq = _vq;
+	uint32_t head;
+	uint32_t olen, ilen;
+	uint32_t i, j;
+	int num_read;
+	struct iovec *iov;
 
-	/* Make sure there's a descriptor available. */
-	head = wait_for_vq_desc(vq, iov, &out_num, &in_num);
-	if (out_num)
-		bad_driver_vq(vq, "Output buffers in console in queue?");
+	if (!vq)
+		errx(1,
+			"\n  %s:%d\n"
+			"  Virtio device: (not sure which one): Error, device behavior.\n"
+			"  The device must provide a valid virtio_vq as an argument to %s."
+			, __FILE__, __LINE__, __func__);
 
-	/* Read into it.  This is where we usually wait. */
-	len = readv(STDIN_FILENO, iov, in_num);
-	if (len <= 0) {
-		/* Ran out of input? */
-		warnx("Failed to get console input, ignoring console.");
-		/*
-		 * For simplicity, dying threads kill the whole Launcher.  So
-		 * just nap here.
-		 */
-		for (;;)
-			pause();
+	// NOTE: The virtio_next_avail_vq_desc will not write more than
+	//       vq->vring.num entries to iov, and the device implementation
+	//       (virtio_mmio.c) will not allow the driver to set vq->vring.num to a
+	//       value greater than QueueNumMax (vq->qnum_max), so you are safe as
+	//       long as your iov is at least vq->qnum_max iovecs in size.
+	iov = malloc(vq->qnum_max * sizeof(struct iovec));
+
+	if (vq->qready == 0x0)
+		VIRTIO_DEV_ERRX(vq->vqdev,
+			"The service function for queue '%s' was launched before the driver set QueueReady to 0x1."
+			, vq->name);
+
+	// NOTE: This will block in 2 places:
+	//       - reading from stdin
+	//       - reading from eventfd in virtio_next_avail_vq_desc
+	while (1) {
+		head = virtio_next_avail_vq_desc(vq, iov, &olen, &ilen);
+
+		if (olen) {
+			// virtio-v1.0-cs04 s5.3.6.1 Device Operation (console section)
+			VIRTIO_DRI_ERRX(vq->vqdev,
+				"The driver placed a device-readable buffer in the console device's receiveq.\n"
+				"  See virtio-v1.0-cs04 s5.3.6.1 Device Operation");
+		}
+
+		// TODO: We may want to add some sort of console abort
+		//       (e.g. type q and enter to quit)
+		// readv from stdin as much as we can (to end of bufs or end of input)
+		num_read = readv(0, iov, ilen);
+		if (num_read < 0)
+			VIRTIO_DEV_ERRX(vq->vqdev,
+				"Encountered an error trying to read input from stdin (fd 0).");
+
+		// You pass the number of bytes written to virtio_add_used_desc
+		virtio_add_used_desc(vq, head, num_read);
+
+		// Poke the guest however the mmio transport prefers
+		// NOTE: assuming that the mmio transport was used for now
+		virtio_mmio_set_vring_irq(vq->vqdev->transport_dev);
+		if (((struct virtio_mmio_dev*)vq->vqdev->transport_dev)->poke_guest)
+			((struct virtio_mmio_dev*)vq->vqdev->transport_dev)->poke_guest();
+		else
+			VIRTIO_DEV_ERRX(vq->vqdev,
+				"The host MUST provide a way for device interrupts to be sent to the guest. The 'poke_guest' function pointer on the vq->vqdev->transport_dev (assumed to be a struct virtio_mmio_dev) was not set.");
 	}
-
-	/* Tell the Guest we used a buffer. */
-	add_used_and_trigger(vq, head, len);
-
-	/*
-	 * Three ^C within one second?  Exit.
-	 *
-	 * This is such a hack, but works surprisingly well.  Each ^C has to
-	 * be in a buffer by itself, so they can't be too fast.  But we check
-	 * that we get three within about a second, so they can't be too
-	 * slow.
-	 */
-	if (len != 1 || ((char *)iov[0].iov_base)[0] != 3) {
-		abort->count = 0;
-		return;
-	}
-
-	abort->count++;
-	if (abort->count == 1)
-		gettimeofday(&abort->start, NULL);
-	else if (abort->count == 3) {
-		struct timeval now;
-
-		gettimeofday(&now, NULL);
-		/* Kill all Launcher processes with SIGINT, like normal ^C */
-		if (now.tv_sec <= abort->start.tv_sec+1)
-			kill(0, SIGINT);
-		abort->count = 0;
-	}
+	free(iov);
+	return NULL;
 }
 
-/* This is the routine which handles console output (ie. stdout). */
-static void console_output(struct virtqueue *vq)
+void *cons_transmitq_fn(void *_vq) // guest -> host
 {
-	unsigned int head, out, in;
-	struct iovec iov[vq->vring.num];
+	struct virtio_vq *vq = _vq;
+	uint32_t head;
+	uint32_t olen, ilen;
+	uint32_t i, j;
+	struct iovec *iov;
 
-	/* We usually wait in here, for the Guest to give us something. */
-	head = wait_for_vq_desc(vq, iov, &out, &in);
-	if (in)
-		bad_driver_vq(vq, "Input buffers in console output queue?");
+	if (!vq)
+		errx(1,
+			"\n  %s:%d\n"
+			"  Virtio device: (not sure which one): Error, device behavior.\n"
+			"  The device must provide a valid virtio_vq as an argument to %s."
+			, __FILE__, __LINE__, __func__);
 
-	/* writev can return a partial write, so we loop here. */
-	while (!iov_empty(iov, out)) {
-		int len = writev(STDOUT_FILENO, iov, out);
+	// NOTE: The virtio_next_avail_vq_desc will not write more than
+	//       vq->vring.num entries to iov, and the device implementation
+	//       (virtio_mmio.c) will not allow the driver to set vq->vring.num to a
+	//       value greater than QueueNumMax (vq->qnum_max), so you are safe as
+	//       long as your iov is at least vq->qnum_max iovecs in size.
+	iov = malloc(vq->qnum_max * sizeof(struct iovec));
 
-		if (len <= 0) {
-			warn("Write to stdout gave %i (%d)", len, errno);
-			break;
+	if (vq->qready == 0x0)
+		VIRTIO_DEV_ERRX(vq->vqdev,
+			"The service function for queue '%s' was launched before the driver set QueueReady to 0x1."
+			, vq->name);
+
+	while (1) {
+		// Get the buffers:
+		head = virtio_next_avail_vq_desc(vq, iov, &olen, &ilen);
+
+		if (ilen) {
+			// virtio-v1.0-cs04 s5.3.6.1 Device Operation (console section)
+			VIRTIO_DRI_ERRX(vq->vqdev,
+				"The driver placed a device-writeable buffer in the console device's transmitq.\n"
+				"  See virtio-v1.0-cs04 s5.3.6.1 Device Operation");
 		}
-		iov_consume(vq->dev, iov, out, NULL, len);
-	}
+		// Process the buffers:
+		for (i = 0; i < olen; ++i) {
+			for (j = 0; j < iov[i].iov_len; ++j)
+				printf("%c", ((char *)iov[i].iov_base)[j]);
+		}
+		fflush(stdout);
 
-	/*
-	 * We're finished with that buffer: if we're going to sleep,
-	 * wait_for_vq_desc() will prod the Guest with an interrupt.
-	 */
-	add_used(vq, head, 0);
+		// Add all the buffers to the used ring.
+		// Pass 0 because we wrote nothing.
+		virtio_add_used_desc(vq, head, 0);
+
+		// Poke the guest however the mmio transport prefers
+		// NOTE: assuming that the mmio transport was used for now
+		virtio_mmio_set_vring_irq(vq->vqdev->transport_dev);
+		if (((struct virtio_mmio_dev*)vq->vqdev->transport_dev)->poke_guest)
+			((struct virtio_mmio_dev*)vq->vqdev->transport_dev)->poke_guest();
+		else
+			VIRTIO_DEV_ERRX(vq->vqdev,
+				"The host MUST provide a way for device interrupts to be sent to the guest. The 'poke_guest' function pointer on the vq->vqdev->transport_dev (assumed to be a struct virtio_mmio_dev) was not set.");
+	}
+	free(iov);
+	return NULL;
 }
