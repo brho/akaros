@@ -6,12 +6,12 @@
  * Akarosn is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 2 of the License.
- * 
+ *
  * Akaros is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * Lesser GNU General Public License for more details.
- * 
+ *
  * See COPYING.LESSER for details on the GNU Lesser General Public License.
  * See COPYING for details on the GNU General Public License.
  */
@@ -51,10 +51,10 @@ static char *modrmreg[] = {"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi
 // The ugly messiness of the SIB and all that are not yet needed. Maybe they
 // never will be.
 
-// Target size -- 1, 2, 4, or 8 bytes. We have yet to see 64 bytes. 
+// Target size -- 1, 2, 4, or 8 bytes. We have yet to see 64 bytes.
 // TODO: if we ever see it, test the prefix. Since this only supports the low 1M,
 // that's not likely.
-static int target(void *insn, int *store) 
+static int target(void *insn, int *store)
 {
 	*store = 0;
 	int s = -1;
@@ -79,10 +79,22 @@ static int target(void *insn, int *store)
 		break;
 	case 0x89:
 	case 0x8b:
-		s = 2;
+		// TODO: To really know, for sure, that this is 32 bit, we'd likely have
+		//       to check the segment descriptor for the guest's current code
+		//       segment in it's GDT. The D flag (bit 22) determines whether the
+		//       instruction is using 32 or 16-bit operand size. I'm just going
+		//       to assume the flag is set (meaning 32 bit operands) for now, in
+		//       order to make virtio work. But really we should check if we
+		//       want to know for sure. Note that this hack (changing the below
+		//       line) only applies to mov instructions.
+		//
+		//       And I think there's also a prefix you can use to switch the
+		//       instruction to 16-bit addressing
+		//       (address-size override prefix?)
+		s = 4;
 		break;
 	case 0x81:
-		s = 4;	
+		s = 4;
 		break;
 	case 0x0f:
 	switch(*word) {
@@ -137,9 +149,9 @@ static int insize(void *rip)
 	int rm = kva[1] & 7;
 
 	switch(kva[0]) {
-	default: 
+	default:
 		fprintf(stderr, "BUG! %s got 0x%x\n", __func__, kva[0]);
-	case 0x0f: 
+	case 0x0f:
 		break;
 	case 0x81:
 		advance = 6 + extra;
@@ -150,13 +162,13 @@ static int insize(void *rip)
 	case 0x89:
 	case 0x8b:
 		switch (mod) {
-		case 0: 
+		case 0:
 			advance = 2 + (rm == 4) + extra;
 			break;
 		case 1:
 			advance = 3 + (rm == 4) + extra;
 			break;
-		case 2: 
+		case 2:
 			advance = 6 + (rm == 4) + extra;
 			break;
 		case 3:
@@ -175,7 +187,7 @@ static int insize(void *rip)
 // address (gpa) the decode is far simpler because we only need to find the register, how many bytes
 // to move, and how big the instruction is. I thought about bringing in emulate.c from kvm from xen,
 // but it has way more stuff than we need.
-// gpa is a pointer to the gpa. 
+// gpa is a pointer to the gpa.
 // int is the reg index which we can use for printing info.
 // regp points to the register in hw_trapframe from which
 // to load or store a result.
@@ -186,7 +198,7 @@ int decode(struct guest_thread *vm_thread, uint64_t *gpa, uint8_t *destreg,
 
 	DPRINTF("v is %p\n", vm_tf);
 
-	// Duh, which way did he go George? Which way did he go? 
+	// Duh, which way did he go George? Which way did he go?
 	// First hit on Google gets you there!
 	// This is the guest physical address of the access.
 	// This is nice, because if we ever go with more complete
@@ -214,7 +226,7 @@ int decode(struct guest_thread *vm_thread, uint64_t *gpa, uint8_t *destreg,
 
 	uint16_t ins = *(uint16_t *)(kva + (kva[0] == 0x44));
 	DPRINTF("ins is %04x\n", ins);
-		
+
 	*destreg = (ins>>11) & 7;
 	*destreg += 8*(kva[0] == 0x44);
 	// Our primitive approach wins big here.
