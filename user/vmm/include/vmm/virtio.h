@@ -113,3 +113,10 @@ struct virtio_vq_dev {
 	// Flexible array of vqs on this device
 	struct virtio_vq vqs[];
 };
+
+// Do not include virtio_lguest_helpers.h directly. You should include the
+// contained functions by including virtio.h. These functions are kept apart
+// from virtio.h so that we can keep a clean separation between our code
+// and code derived from lguest.
+#include <vmm/virtio_lguest_helpers.h>
+
