@@ -176,7 +176,7 @@ static int perf_find_event_by_id(uint32_t event, uint32_t mask)
 	return -1;
 }
 
-void perf_initialize(int argc, const char * const *argv)
+void perf_initialize(int argc, char *argv[])
 {
 	pfm_err_t err = pfm_initialize();
 

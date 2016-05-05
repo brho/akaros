@@ -72,7 +72,7 @@ static void show_perf_arch_info(const struct perf_arch_info *pai, FILE *file)
 			pai->fix_counters_x_proc);
 }
 
-static void run_process_and_wait(int argc, const char * const *argv,
+static void run_process_and_wait(int argc, char *argv[],
 								 const struct core_set *cores)
 {
 	int pid, status;
@@ -103,7 +103,7 @@ static void run_process_and_wait(int argc, const char * const *argv,
 	waitpid(pid, &status, 0);
 }
 
-int main(int argc, const char * const *argv)
+int main(int argc, char *argv[])
 {
 	int i, icmd = -1, num_events = 0;
 	const char *cmd = argv[1], *show_rx = NULL;

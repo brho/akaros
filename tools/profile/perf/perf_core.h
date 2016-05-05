@@ -50,7 +50,7 @@ struct perf_context_config {
 	const char *kpctl_file;
 };
 
-void perf_initialize(int argc, const char * const *argv);
+void perf_initialize(int argc, char *argv[]);
 void perf_finalize(void);
 void perf_parse_event(const char *str, struct perf_eventsel *sel);
 struct perf_context *perf_create_context(const struct perf_context_config *cfg);
