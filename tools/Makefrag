@@ -1,0 +1,66 @@
+# Helper for writing application Makefiles
+#
+# Those apps should include this directly and be located three directories down
+# from the AKAROS_ROOT.
+#
+# Other than providing defaults for things like AKAROS_ROOT, the main thing
+# this does is set the cross compiler.  You can override some things with a
+# Makelocal.
+#
+# Exports CROSS_COMPILE, ARCH, KBUILD_VERBOSE, Q, MAKEFLAGS, BUILDDIR,
+# AKAROS_ROOT, MAKE_JOBS FIRST_KFS_PATH, KFS_ROOT
+
+# Do not:
+# o  use make's built-in rules and variables
+#    (this increases performance and avoids hard-to-debug behaviour);
+# o  print "Entering directory ...";
+MAKEFLAGS += -rR --no-print-directory
+
+# Overrides
+-include Makelocal
+BUILDDIR ?= $(shell pwd)
+AKAROS_ROOT ?= $(BUILDDIR)/../../..
+MAKE_JOBS ?= 4
+FIRST_KFS_PATH ?= $(AKAROS_ROOT)/kern/kfs
+KFS_ROOT = $(FIRST_KFS_PATH)
+
+# To put more focus on warnings, be less verbose as default
+# Use 'make V=1' to see the full commands
+# Yanked this from the top-level.  It might work with V=1 from there too.
+# Interestingly enough, V=1 gets passed to busybox, which also uses Kbuild,
+# allowing us to control it's verbosity too.
+ifeq ("$(origin V)", "command line")
+  KBUILD_VERBOSE ?= $(V)
+endif
+ifndef KBUILD_VERBOSE
+  KBUILD_VERBOSE = 0
+endif
+ifeq ($(KBUILD_VERBOSE),1)
+  Q ?=
+else
+  Q ?= @
+endif
+
+
+# CC prefix detection.  If we're called from the top-level Makefile, CC will be
+# set.
+
+# So that valid-arches aren't the default goal
+.DEFAULT_GOAL = all
+# Helper target, so users can say make x86_64 and get ARCH=x86_64
+valid-arches := riscv x86_64
+PHONY += $(valid-arches)
+$(valid-arches):
+	$(MAKE) ARCH=$@
+
+ifeq ($(CROSS_COMPILE),)
+    # ARCH will only be set if they called make (valid-arches) directly.
+    ifneq ($(ARCH),)
+        ifeq ($(filter $(valid-arches), $(ARCH)),)
+            $(error ARCH $(ARCH) invalid, must be one of: $(valid-arches))
+        endif
+    else
+        ARCH := x86_64
+    endif
+    CROSS_COMPILE := $(ARCH)-ucb-akaros-
+endif
