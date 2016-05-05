@@ -257,7 +257,7 @@ static void free_cpu_buffers(void)
 	profiler_percpu_ctx = NULL;
 
 	if (profiler_queue) {
-		qclose(profiler_queue);
+		qfree(profiler_queue);
 		profiler_queue = NULL;
 	}
 }
