@@ -28,6 +28,7 @@
 
 #include <sys/eventfd.h>
 #include <sys/uio.h>
+#include <ros/common.h>
 #include <ros/arch/membar.h>
 #include <ros/arch/mmu.h>
 #include <vmm/virtio.h>
@@ -78,11 +79,20 @@ static uint32_t next_desc(struct vring_desc *desc, uint32_t i, uint32_t max,
 	if (!(desc[i].flags & VRING_DESC_F_NEXT))
 		return max;
 
-	next = desc[i].next;
+	// TODO: Closely audit the decision to use ACCESS_ONCE() instead of wmb().
+	//       If we encounter strange problems in the future, it might be worth
+	//       changing it back to a wmb() to see what happens. For the record,
+	//       the virtio console doesn't seem to have any issues running without
+	//       the ACCESS_ONCE() or the wmb(). But they had a barrier here, so
+	//       I'm hesitant to do anything less than ACCESS_ONCE().
 
-	// TODO: Figure out why lguest had the memory barrier here.
-	//       DO NOT REMOVE UNLESS YOU KNOW WHY!
-	wmb_f();
+	// Based on the original comment from lguest:
+	// "Make sure compiler knows to grab that: we don't want it changing!",
+	// it seems that they used a memory barrier after `next = desc[i].next`
+	// to prevent the compiler from returning a `next` that differs from
+	// the `next` that is compared to max. An ACCESS_ONCE() should suffice
+	// to prevent this (see ros/common.h and http://lwn.net/Articles/508991/).
+	next = ACCESS_ONCE(desc[i].next);
 
 	if (next >= max)
 		VIRTIO_DRI_ERRX(vq->vqdev,
