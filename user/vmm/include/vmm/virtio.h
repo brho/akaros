@@ -16,9 +16,9 @@
 
 #include <stdint.h>
 #include <err.h>
-#include <pthread.h>
 #include <sys/uio.h>
 #include <vmm/virtio_ring.h>
+#include <vmm/sched.h>
 
 // This file contains the core virtio structs, functions, and macros for Akaros
 
@@ -69,10 +69,10 @@ struct virtio_vq {
 	uint16_t last_avail;
 
 	// The service function that processes buffers for this queue
-	void *(*srv_fn)(void *arg);
+	void (*srv_fn)(void *arg);
 
 	// The thread that the service function is running in
-	pthread_t srv_th;
+	struct task_thread *srv_th;
 
 	// Write eventfd to wake up the service function; it blocks on eventfd read
 	int eventfd;

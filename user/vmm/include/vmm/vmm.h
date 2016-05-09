@@ -21,6 +21,7 @@ struct virtual_machine {
 	uintptr_t					virtio_mmio_base;
 	int							virtio_irq;
 	uint8_t						*low4k;
+	struct virtio_mmio_dev		*cons_mmio_dev;
 };
 
 char *regname(uint8_t reg);

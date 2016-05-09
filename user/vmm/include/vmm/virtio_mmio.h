@@ -228,7 +228,9 @@ void virtio_mmio_set_cfg_irq(struct virtio_mmio_dev *mmio_dev);
 //   It is used to calculate the offset from the mmio device's base address,
 //   and thus the target register of the access operation.
 // - size is the width of the access operation in bytes.
-uint32_t virtio_mmio_rd(struct virtio_mmio_dev *mmio_dev,
+uint32_t virtio_mmio_rd(struct virtual_machine *unused_vm,
+                        struct virtio_mmio_dev *mmio_dev,
                         uint64_t gpa, uint8_t size);
-void     virtio_mmio_wr(struct virtio_mmio_dev *mmio_dev,
+void     virtio_mmio_wr(struct virtual_machine *vm,
+                        struct virtio_mmio_dev *mmio_dev,
                         uint64_t gpa, uint8_t size, uint32_t *value);

@@ -623,10 +623,10 @@ int main(int argc, char **argv)
 	fprintf(stderr, "p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
 
 	vm->virtio_mmio_base = 0x100000000;
-	register_virtio_mmio(&vqdev, vm->virtio_mmio_base);
 
 	cons_mmio_dev.addr = vm->virtio_mmio_base;
 	cons_mmio_dev.vqdev = &cons_vqdev;
+	vm->cons_mmio_dev = &cons_mmio_dev;
 
 	vmm_run_task(vm, timer_thread, 0);
 

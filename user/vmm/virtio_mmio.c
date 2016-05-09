@@ -37,7 +37,6 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <pthread.h>
 #include <unistd.h>
 #include <sys/eventfd.h>
 #include <vmm/virtio_config.h>
@@ -133,7 +132,8 @@ static void virtio_mmio_reset(struct virtio_mmio_dev *mmio_dev)
 	virtio_mmio_reset_cfg(mmio_dev);
 }
 
-uint32_t virtio_mmio_rd(struct virtio_mmio_dev *mmio_dev,
+uint32_t virtio_mmio_rd(struct virtual_machine *unused_vm,
+                        struct virtio_mmio_dev *mmio_dev,
                         uint64_t gpa, uint8_t size)
 {
 	uint64_t offset = gpa - mmio_dev->addr;
@@ -354,7 +354,8 @@ uint32_t virtio_mmio_rd(struct virtio_mmio_dev *mmio_dev,
 	return 0;
 }
 
-void virtio_mmio_wr(struct virtio_mmio_dev *mmio_dev, uint64_t gpa,
+void virtio_mmio_wr(struct virtual_machine *vm,
+                    struct virtio_mmio_dev *mmio_dev, uint64_t gpa,
                     uint8_t size, uint32_t *value)
 {
 	uint64_t offset = gpa - mmio_dev->addr;
@@ -565,18 +566,14 @@ void virtio_mmio_wr(struct virtio_mmio_dev *mmio_dev, uint64_t gpa,
 					mmio_dev->vqdev->vqs[mmio_dev->qsel].eventfd = eventfd(0, 0);
 					mmio_dev->vqdev->vqs[mmio_dev->qsel].qready = 0x1;
 
-					if (pthread_create(
-					               // service thread id
-					               &mmio_dev->vqdev->vqs[mmio_dev->qsel].srv_th,
-					               // no special thread attrs
-					               NULL,
-					               // service function that srv_th starts in
-					               mmio_dev->vqdev->vqs[mmio_dev->qsel].srv_fn,
-					               // arg passed to srv_fn is the vq itself
-					               &mmio_dev->vqdev->vqs[mmio_dev->qsel]))
+					mmio_dev->vqdev->vqs[mmio_dev->qsel].srv_th =
+							vmm_run_task(vm,
+									mmio_dev->vqdev->vqs[mmio_dev->qsel].srv_fn,
+									&mmio_dev->vqdev->vqs[mmio_dev->qsel]);
+					if (!mmio_dev->vqdev->vqs[mmio_dev->qsel].srv_th) {
 						VIRTIO_DEV_ERRX(mmio_dev->vqdev,
-							"pthread_create failed when trying to start service thread after driver wrote 0x1 to QueueReady.");
-
+							"vm_run_task failed when trying to start service thread after driver wrote 0x1 to QueueReady.");
+					}
 				} else if (mmio_dev->vqdev->vqs[mmio_dev->qsel].qready == 0x1
 					       && *value == 0x0) {
 					// Driver is trying to revoke QueueReady while the queue is

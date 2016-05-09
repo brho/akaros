@@ -28,20 +28,19 @@ static bool handle_ept_fault(struct guest_thread *gth)
 	 * be wrong too. */
 	if (PG_ADDR(gpa) == vm->virtio_mmio_base) {
 		/* TODO: can the guest cause us to spawn off infinite threads? */
-		virtio_mmio(gth, gpa, regx, regp, store);
 		if (size < 0) {
 			// TODO: It would be preferable for the decoder to return an
 			//       unsigned value, so that we don't have to worry
 			//       about this. I don't know if it's even possible for
 			//       the width to be negative;
-			VIRTIO_DRI_ERRX(cons_mmio_dev.vqdev,
+			VIRTIO_DRI_ERRX(vm->cons_mmio_dev->vqdev,
 			    "Driver tried to access the device with a negative access width in the instruction?");
 		}
 		//fprintf(stderr, "RIP is 0x%x\n", vm_tf->tf_rip);
 		if (store)
-			virtio_mmio_wr(&cons_mmio_dev, gpa, size, (uint32_t *)regp);
+			virtio_mmio_wr(vm, vm->cons_mmio_dev, gpa, size, (uint32_t *)regp);
 		else
-			*regp = virtio_mmio_rd(&cons_mmio_dev, gpa, size);
+			*regp = virtio_mmio_rd(vm, vm->cons_mmio_dev, gpa, size);
 
 	} else if (PG_ADDR(gpa) == 0xfec00000) {
 		do_ioapic(gth, gpa, regx, regp, store);
