@@ -864,6 +864,17 @@ void ipifcinit(struct Fs *f)
 }
 
 /*
+ * TODO: Change this to a proper release.
+ * At the moment, this is difficult since link removal
+ * requires access to more than just the kref/struct Iplink.
+ * E.g., the self and interface pointers.
+ */
+static void link_release(struct kref *kref)
+{
+	(void)kref;
+}
+
+/*
  *  add to self routing cache
  *	called with c locked
  */
@@ -904,7 +915,7 @@ addselfcache(struct Fs *f, struct Ipifc *ifc,
 	/* allocate a lifc-to-local link and link to both */
 	if (lp == NULL) {
 		lp = kzmalloc(sizeof(*lp), 0);
-		kref_init(&lp->ref, fake_release, 1);
+		kref_init(&lp->ref, link_release, 1);
 		lp->lifc = lifc;
 		lp->self = p;
 		lp->selflink = p->link;
@@ -981,7 +992,7 @@ static void ipselffree(struct Ipself *p)
  *	called with c locked
  */
 static void
-remselfcache(struct Fs *f, struct Ipifc *ifc, struct Iplifc *lifc, uint8_t * a)
+remselfcache(struct Fs *f, struct Ipifc *ifc, struct Iplifc *lifc, uint8_t *a)
 {
 	struct Ipself *p, **l;
 	struct Iplink *link, **l_self, **l_lifc;
@@ -1027,7 +1038,25 @@ remselfcache(struct Fs *f, struct Ipifc *ifc, struct Iplifc *lifc, uint8_t * a)
 	if (link == NULL)
 		panic("remselfcache");
 
-	if (kref_refcnt(&link->ref) > 1)
+	/*
+	 * TODO: The check for 'refcnt > 0' here is awkward.  It
+	 * exists so that 'remselfcache' can be called concurrently.
+	 * In the original plan 9 code, the 'goto out' branch was
+	 * taken if the decremented reference count was exactly zero.
+	 * In other threads this could become -1, which plan 9 didn't
+	 * care about since the logic would be skipped over, and since
+	 * 'iplinkfree' won't _actually_ free the link for five seconds
+	 * (see comments in that function), and since all of the actual
+	 * link manipulation happens in the thread where the reference
+	 * is exactly equal to zero.  But on Akaros, a negative kref
+	 * will panic; hence checking for a positive ref count before
+	 * decrementing.  This entire mechanism is dubious.  But Since
+	 * this function is protected by a lock this is probably OK for
+	 * the time being.
+	 *
+	 * However, it is a terrible design and we should fix it.
+	 */
+	if (kref_refcnt(&link->ref) > 0 && kref_put(&link->ref) != 0)
 		goto out;
 
 	if ((p->type & Rmulti) && ifc->m->remmulti != NULL)

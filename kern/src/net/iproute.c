@@ -50,6 +50,19 @@ struct route *v6freelist;
 rwlock_t routelock;
 uint32_t v4routegeneration, v6routegeneration;
 
+/*
+ * TODO: Change this to a proper release.
+ * At the moment this is difficult to do since deleting
+ * a route involves manipulating more data structures than
+ * a kref/struct route.  E.g., unlinking from the route tree
+ * requires access to a parent pointer, which doesn't exist
+ * in the route structure itself.
+ */
+static void route_release(struct kref *kref)
+{
+	(void)kref;
+}
+
 static void freeroute(struct route *r)
 {
 	struct route **l;
@@ -89,7 +102,7 @@ static struct route *allocroute(int type)
 	memset(r, 0, n);
 	r->rt.type = type;
 	r->rt.ifc = NULL;
-	kref_init(&r->rt.kref, fake_release, 1);
+	kref_init(&r->rt.kref, route_release, 1);
 
 	return r;
 }
