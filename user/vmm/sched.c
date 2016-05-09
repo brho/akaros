@@ -462,19 +462,20 @@ static void __task_thread_run(void)
 	uthread_yield(FALSE, __tth_exit_cb, 0);
 }
 
-int vmm_run_task(struct virtual_machine *vm, void (*func)(void *), void *arg)
+struct task_thread *vmm_run_task(struct virtual_machine *vm,
+                                 void (*func)(void *), void *arg)
 {
 	struct task_thread *tth;
 	struct uth_thread_attr tth_attr = {.want_tls = TRUE};
 
 	tth = (struct task_thread*)alloc_vmm_thread(vm, VMM_THREAD_TASK);
 	if (!tth)
-		return -1;
+		return 0;
 	tth->stacksize = VMM_THR_STACKSIZE;
 	tth->stacktop = __alloc_stack(tth->stacksize);
 	if (!tth->stacktop) {
 		free(tth);
-		return -1;
+		return 0;
 	}
 	tth->func = func;
 	tth->arg = arg;
@@ -483,7 +484,7 @@ int vmm_run_task(struct virtual_machine *vm, void (*func)(void *), void *arg)
 	uthread_init((struct uthread*)tth, &tth_attr);
 	acct_thread_unblocked((struct vmm_thread*)tth);
 	enqueue_vmm_thread((struct vmm_thread*)tth);
-	return 0;
+	return tth;
 }
 
 /* Helpers for tracking nr_unblk_* threads. */

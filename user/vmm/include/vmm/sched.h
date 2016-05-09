@@ -75,6 +75,7 @@ int vmm_init(struct virtual_machine *vm, int flags);
 /* Starts a guest thread/core. */
 void start_guest_thread(struct guest_thread *gth);
 /* Start and run a task thread. */
-int vmm_run_task(struct virtual_machine *vm, void (*func)(void *), void *arg);
+struct task_thread *vmm_run_task(struct virtual_machine *vm,
+                                 void (*func)(void *), void *arg);
 
 __END_DECLS
