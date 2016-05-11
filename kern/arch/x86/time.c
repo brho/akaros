@@ -39,6 +39,7 @@ void timer_init(void){
 	timercount[1] = apicrget(MSR_LAPIC_CURRENT_COUNT);
 	__proc_global_info.bus_freq = (timercount[0] - timercount[1])
 	                         * LAPIC_TIMER_DIVISOR_VAL;
+	assert(__proc_global_info.bus_freq);
 	/* The time base for the timer is derived from the processor's bus clock,
 	 * divided by the value specified in the divide configuration register.
 	 * Note we mult and div by the divisor, saving the actual freq (even though
