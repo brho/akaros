@@ -12,15 +12,6 @@ tower3MAC=00032d196d46
 tower4MAC=00032d196db0
 tower5MAC=00032d196daa
 
-# qemu is the default
-me=10.0.2.15
-mask=255.255.255.0
-# brho: i don't know what exactly 'remote' is supposed to be, but that is
-# the third argument processed by adding to an ipifc.  if we pass nothing,
-# it'll build 'remote' by masking me & mask.
-remote=10.0.2.0
-route=10.0.2.2
-
 if [ "$MAC" = "$qemuMAC" ]
 then
     echo "Welcome to QEMU!"
