@@ -39,7 +39,12 @@ struct uthread {
 	char err_str[MAX_ERRSTR_LEN];
 };
 extern __thread struct uthread *current_uthread;
-typedef void* uth_mutex_t;
+
+/* These structs are undefined.  We use them instead of void * so we can get
+ * compiler warnings if someone passes the wrong pointer type.  Internally, we
+ * use another struct type for mtx and cvs. */
+typedef struct __uth_mtx_opaque * uth_mutex_t;
+typedef struct __uth_cv_opaque * uth_cond_var_t;
 
 /* 2L-Scheduler operations.  Examples in pthread.c. */
 struct schedule_ops {
@@ -52,11 +57,16 @@ struct schedule_ops {
 	void (*thread_has_blocked)(struct uthread *, int);
 	void (*thread_refl_fault)(struct uthread *, struct user_context *);
 	/**** Defining these functions is optional. ****/
-	/* 2LSs can leave the mutex funcs empty for a default implementation */
+	/* 2LSs can leave the mutex/cv funcs empty for a default implementation */
 	uth_mutex_t (*mutex_alloc)(void);
 	void (*mutex_free)(uth_mutex_t);
 	void (*mutex_lock)(uth_mutex_t);
 	void (*mutex_unlock)(uth_mutex_t);
+	uth_cond_var_t (*cond_var_alloc)(void);
+	void (*cond_var_free)(uth_cond_var_t);
+	void (*cond_var_wait)(uth_cond_var_t, uth_mutex_t);
+	void (*cond_var_signal)(uth_cond_var_t);
+	void (*cond_var_broadcast)(uth_cond_var_t);
 	/* Functions event handling wants */
 	void (*preempt_pending)(void);
 };
@@ -135,5 +145,15 @@ uth_mutex_t uth_mutex_alloc(void);
 void uth_mutex_free(uth_mutex_t m);
 void uth_mutex_lock(uth_mutex_t m);
 void uth_mutex_unlock(uth_mutex_t m);
+
+/* Generic Uthread Condition Variables.  2LSs can implement their own methods.
+ * Callers to cv_wait must hold the mutex, which it will atomically wait and
+ * unlock, then relock when it returns.  Callers to signal and broadcast may
+ * hold the mutex, if they choose. */
+uth_cond_var_t uth_cond_var_alloc(void);
+void uth_cond_var_free(uth_cond_var_t cv);
+void uth_cond_var_wait(uth_cond_var_t cv, uth_mutex_t m);
+void uth_cond_var_signal(uth_cond_var_t cv);
+void uth_cond_var_broadcast(uth_cond_var_t cv);
 
 __END_DECLS
