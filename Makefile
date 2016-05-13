@@ -670,7 +670,7 @@ realclean: userclean mrproper doxyclean objclean
 # Bundled apps
 # =========================================================================
 
-app-dirs = tools/apps/snc
+app-dirs =
 tagged-app-dirs := $(subst /,__,$(app-dirs))
 app-dirs-install := $(addprefix _install_,$(tagged-app-dirs))
 app-dirs-clean := $(addprefix _clean_,$(tagged-app-dirs))
