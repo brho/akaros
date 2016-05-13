@@ -200,38 +200,27 @@ static uint64_t perfconv_get_config_type(uint64_t config)
 	return (config >> 56) & 0x7f;
 }
 
-static void add_static_mmap(const char *path, uint64_t addr, uint64_t offset,
-							uint64_t size, uint32_t pid,
-							struct perfconv_context *cctx)
+void perfconv_add_kernel_mmap(struct perfconv_context *cctx)
 {
+	char path[] = "[kernel.kallsyms]";
 	struct static_mmap64 *mm;
-	struct stat stb;
-
-	if (size == 0) {
-		if (stat(path, &stb)) {
-			fprintf(stderr, "Unable to stat mmapped file '%s': %s\n",
-					path, strerror(errno));
-			exit(1);
-		}
-		size = (uint64_t) stb.st_size;
-	}
 
 	mm = xmem_arena_zalloc(&cctx->ma, sizeof(struct static_mmap64));
-	mm->pid = pid;
-	mm->addr = addr;
-	mm->size = size;
-	mm->offset = offset;
+	mm->pid = -1;				/* Linux HOST_KERNEL_ID == -1 */
+	mm->tid = 0;				/* Default thread: swapper */
+	mm->header_misc = PERF_RECORD_MISC_KERNEL;
+	/* Linux sets addr = 0, size = 0xffffffff9fffffff, off = 0xffffffff81000000
+	 * Their mmap record is also called [kernel.kallsyms]_text (I think).  They
+	 * also have a _text symbol in kallsyms at ffffffff81000000 (equiv to our
+	 * KERN_LOAD_ADDR (which is 0xffffffffc0000000)).  Either way, this seems to
+	 * work for us; we'll see.  It's also arch-independent (for now). */
+	mm->addr = 0;
+	mm->size = 0xffffffffffffffff;
+	mm->offset = 0x0;
 	mm->path = xmem_arena_strdup(&cctx->ma, path);
 
 	mm->next = cctx->static_mmaps;
 	cctx->static_mmaps = mm;
-}
-
-void perfconv_add_kernel_mmap(const char *path, size_t ksize,
-							  struct perfconv_context *cctx)
-{
-	add_static_mmap(path, cctx->kernel_load_address, cctx->kernel_load_address,
-					(uint64_t) ksize, 0, cctx);
 }
 
 static void headers_init(struct perf_headers *hdrs)
@@ -373,9 +362,10 @@ static void emit_static_mmaps(struct perfconv_context *cctx)
 		struct perf_record_mmap *xrec = xzmalloc(size);
 
 		xrec->header.type = PERF_RECORD_MMAP;
-		xrec->header.misc = PERF_RECORD_MISC_USER;
+		xrec->header.misc = mm->header_misc;
 		xrec->header.size = size;
-		xrec->pid = xrec->tid = mm->pid;
+		xrec->pid = mm->pid;
+		xrec->tid = mm->tid;
 		xrec->addr = mm->addr;
 		xrec->len = mm->size;
 		xrec->pgoff = mm->offset;
@@ -435,9 +425,17 @@ static void emit_kernel_trace64(struct perf_record *pr,
 	struct perf_record_sample *xrec = xzmalloc(size);
 
 	xrec->header.type = PERF_RECORD_SAMPLE;
-	xrec->header.misc = PERF_RECORD_MISC_USER;
+	xrec->header.misc = PERF_RECORD_MISC_KERNEL;
 	xrec->header.size = size;
 	xrec->ip = rec->trace[0];
+	/* TODO: We could have pid/tid for kernel tasks during their lifetime.
+	 * During syscalls, we could use the pid of the process.  For the kernel
+	 * itself, -1 seems to be generic kernel stuff, and tid == 0 is 'swapper'.
+	 *
+	 * Right now, the kernel doesn't even tell us the pid, so we have no way of
+	 * knowing from userspace. */
+	xrec->pid = -1;
+	xrec->tid = 0;
 	xrec->time = rec->tstamp;
 	xrec->addr = rec->trace[0];
 	xrec->id = perfconv_get_event_id(cctx, rec->info);
@@ -506,7 +504,6 @@ struct perfconv_context *perfconv_create_context(void)
 	struct perfconv_context *cctx = xzmalloc(sizeof(struct perfconv_context));
 
 	xmem_arena_init(&cctx->ma, 0);
-	cctx->kernel_load_address = 0xffffffffc0000000;
 	cctx->alloced_events = 128;
 	cctx->events = xmem_arena_zalloc(
 		&cctx->ma, cctx->alloced_events * sizeof(*cctx->events));
@@ -517,8 +514,6 @@ struct perfconv_context *perfconv_create_context(void)
 	mem_file_init(&cctx->attrs, &cctx->ma);
 	mem_file_init(&cctx->data, &cctx->ma);
 	mem_file_init(&cctx->event_types, &cctx->ma);
-
-	emit_comm(0, "[kernel]", cctx);
 
 	return cctx;
 }

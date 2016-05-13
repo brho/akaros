@@ -45,6 +45,8 @@ struct static_mmap64 {
 	uint64_t size;
 	uint64_t offset;
 	uint32_t pid;
+	uint32_t tid;
+	uint16_t header_misc;
 	char *path;
 };
 
@@ -60,7 +62,6 @@ struct perf_event_id {
 struct perfconv_context {
 	struct mem_arena ma;
 	int debug_level;
-	uint64_t kernel_load_address;
 	struct static_mmap64 *static_mmaps;
 	uint64_t sqnr_id;
 	struct perf_event_id *events;
@@ -73,7 +74,6 @@ struct perfconv_context {
 struct perfconv_context *perfconv_create_context(void);
 void perfconv_free_context(struct perfconv_context *cctx);
 void perfconv_set_dbglevel(int level, struct perfconv_context *cctx);
-void perfconv_add_kernel_mmap(const char *path, size_t size,
-							  struct perfconv_context *cctx);
+void perfconv_add_kernel_mmap(struct perfconv_context *cctx);
 void perfconv_process_input(struct perfconv_context *cctx, FILE *input,
 							FILE *output);

@@ -642,35 +642,6 @@ void perf_make_eventsel_from_event_mask(struct perf_eventsel *sel,
 	sel->eidx = perf_find_event_by_id(event, mask);
 }
 
-static bool perf_get_kernel_elf_path(char *path, size_t psize, size_t *ksize)
-{
-	int fd;
-	ssize_t rsize = -1;
-
-	fd = open("#version/kernel_path", O_RDONLY);
-	if (fd >= 0) {
-		rsize = read(fd, path, psize);
-		while ((rsize > 0) && (path[rsize - 1] == '\n'))
-			rsize--;
-		close(fd);
-
-		/* We do not export the real kernel size from the #versions device,
-		 * because of cyclic dependency issues. The only reason the size is
-		 * needed, is because we generate an MMAP record, which Linux perf
-		 * uses to find which ELF should be used to resolve addresses to
-		 * symbols. Above the Akaros kernel, hardly other ELF will be loaded,
-		 * so the worst it can happen if something above the kernel ELF
-		 * proper address gets a hit, is that Linux perf will ask the kernel
-		 * ELF to resolve an address, and that will fail.
-		 * So here we use a large enough size to cover kernel size expansions
-		 * for the next 10 years.
-		 */
-		*ksize = 128 * 1024 * 1024;
-	}
-
-	return rsize > 0;
-}
-
 void perf_convert_trace_data(struct perfconv_context *cctx, const char *input,
 							 const char *output)
 {
@@ -682,12 +653,7 @@ void perf_convert_trace_data(struct perfconv_context *cctx, const char *input,
 	if (xfsize(infile) > 0) {
 		outfile = xfopen(output, "wb");
 
-		if (perf_get_kernel_elf_path(kpath, sizeof(kpath), &ksize))
-			perfconv_add_kernel_mmap(kpath, ksize, cctx);
-		else
-			fprintf(stderr, "Unable to fetch kernel build information!\n"
-					"Kernel traces will be missing symbol information.\n");
-
+		perfconv_add_kernel_mmap(cctx);
 		perfconv_process_input(cctx, infile, outfile);
 
 		fclose(outfile);
