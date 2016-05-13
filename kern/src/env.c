@@ -49,8 +49,8 @@ int env_setup_vm(env_t *e)
 		goto env_setup_vm_error_i;
 	if (!(e->procdata = get_cont_pages(LOG2_UP(PROCDATA_NUM_PAGES), 0)))
 		goto env_setup_vm_error_d;
-	/* Normally we'd 0 the pages here.  We handle it in proc_init_proc*.  Don't
-	 * start the process without calling those. */
+	/* Normally we would 0 the pages here.  We handle it in proc_init_proc*.
+	 * Do not start the process without calling those. */
 	for (int i = 0; i < PROCINFO_NUM_PAGES; i++) {
 		if (page_insert(e->env_pgdir, kva2page((void*)e->procinfo + i *
 		                PGSIZE), (void*)(UINFO + i*PGSIZE), PTE_USER_RO) < 0)
