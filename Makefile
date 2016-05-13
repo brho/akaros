@@ -403,9 +403,6 @@ export CFLAGS_USER CXXFLAGS_USER CFLAGS_USER_LIBS
 # kernel build output.  Right now, it's only passed down to tests/
 dummy-1 := $(shell mkdir -p $(OBJDIR)/kern/)
 
-# Machinery to create the kernel build info source
-export BUILD_INFO_FILE
-
 # Since we're doing this outside of the dot-config part, some targets, such as
 # clean, won't read in our .config/auto.conf, and won't know about the
 # KFS_PATH.  Future rules related to KFS will have issues (mkdir with no

@@ -6,20 +6,16 @@ $(src)/build_info.cid:
 	@rm -f $(src)/build_info.cid.tmp
 
 $(src)/build_info.c: $(src)/build_info.cid
-ifeq ($(BUILD_INFO_FILE),)
-		@echo "/* Automatically generated. DO NOT EDIT! */" > $(@)
-		@echo "" >> $(@)
-		@echo "const char build_info_date[] = { \"`date`\" };"\
-			>> $(@)
-		@echo "const char build_info_commitid[] = { \"`cat $(src)/build_info.cid`\" };"\
-			>> $(@)
-		@echo "const char build_info_version[] = { \"$(KERNELVERSION)\" };"\
-			>> $(@)
-		@echo "const char build_info_version_name[] = { \"$(VERNAME)\" };"\
-			>> $(@)
-else
-		cp $(BUILD_INFO_FILE) $(@)
-endif
+	@echo "/* Automatically generated. DO NOT EDIT! */" > $(@)
+	@echo "" >> $(@)
+	@echo "const char build_info_date[] = { \"`date`\" };"\
+		>> $(@)
+	@echo "const char build_info_commitid[] = { \"`cat $(src)/build_info.cid`\" };"\
+		>> $(@)
+	@echo "const char build_info_version[] = { \"$(KERNELVERSION)\" };"\
+		>> $(@)
+	@echo "const char build_info_version_name[] = { \"$(VERNAME)\" };"\
+		>> $(@)
 
 clean-files += build_info.c build_info.cid
 
