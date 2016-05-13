@@ -9,11 +9,7 @@ $(src)/build_info.c: $(src)/build_info.cid
 ifeq ($(BUILD_INFO_FILE),)
 		@echo "/* Automatically generated. DO NOT EDIT! */" > $(@)
 		@echo "" >> $(@)
-		@echo "const char build_info_kernel_path[] = { \"$(KERNEL_ELF_PATH)\" };"\
-			>> $(@)
 		@echo "const char build_info_date[] = { \"`date`\" };"\
-			>> $(@)
-		@echo "const char build_info_host[] = { \"`hostname`\" };"\
 			>> $(@)
 		@echo "const char build_info_commitid[] = { \"`cat $(src)/build_info.cid`\" };"\
 			>> $(@)

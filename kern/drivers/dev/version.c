@@ -16,9 +16,7 @@
 
 enum {
 	Kverdirqid = 0,
-	Kverkernelpath,
 	Kverdate,
-	Kverhost,
 	Kvercommitid,
 	Kverversion,
 	Kverversionname,
@@ -27,9 +25,7 @@ enum {
 struct dev verdevtab;
 static struct dirtab vertab[] = {
 	{".",				{Kverdirqid,		0, QTDIR}, 0,	DMDIR|0550},
-	{"kernel_path",		{Kverkernelpath},	0,	0444},
 	{"date",			{Kverdate},			0,	0444},
-	{"host",			{Kverhost},			0,	0444},
 	{"commitid",		{Kvercommitid},		0,	0444},
 	{"version",			{Kverversion},		0,	0444},
 	{"version_name",	{Kverversionname},	0,	0444},
@@ -96,17 +92,9 @@ static long ver_read(struct chan *c, void *va, long n, int64_t off)
 	switch ((int) c->qid.path) {
 	case Kverdirqid:
 		return devdirread(c, va, n, vertab, ARRAY_SIZE(vertab), devgen);
-	case Kverkernelpath:
-		if (build_info_kernel_path)
-			return ver_emit_nlstr(va, build_info_kernel_path, n, (long) off);
-		break;
 	case Kverdate:
 		if (build_info_date)
 			return ver_emit_nlstr(va, build_info_date, n, (long) off);
-		break;
-	case Kverhost:
-		if (build_info_host)
-			return ver_emit_nlstr(va, build_info_host, n, (long) off);
 		break;
 	case Kvercommitid:
 		if (build_info_commitid)

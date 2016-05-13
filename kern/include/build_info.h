@@ -7,9 +7,7 @@
 
 #include <compiler.h>
 
-extern const char __weak build_info_kernel_path[];
 extern const char __weak build_info_date[];
-extern const char __weak build_info_host[];
 extern const char __weak build_info_commitid[];
 extern const char __weak build_info_version[];
 extern const char __weak build_info_version_name[];

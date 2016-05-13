@@ -8,9 +8,5 @@ LDFLAGS_KERNEL += -z max-page-size=0x1000
 # Need to change the format to 32 bit, to trick multiboot/grub1 into loading
 ARCH_POST_LINK_CMD = cp $@ $@-64b; $(OBJCOPY) -I elf64-x86-64 -O elf32-i386 $@
 
-# Machinery to create the kernel build info source
-KERNEL_ELF_PATH := $(abspath $(KERNEL_OBJ))-64b
-export KERNEL_ELF_PATH
-
 # BITS is used in Kbuilds, so we can select bit-specific source files.
 export BITS
