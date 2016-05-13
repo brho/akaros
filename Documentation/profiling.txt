@@ -1,78 +1,76 @@
 Akaros Profiling
 ===========================
-2015-07-15 Barret Rhoden (brho)
 
-Contents
----------------------------
-"Kprof"
+Contents:
 
-"Kprof"
----------------------------
-Akaros has a very basic sampling profiler, similar to oprofile.  The kernel
-generates traces, which you copy off the machine and process on Linux using
-Linux perf.
-First build the Akaros kernel:
+ (*) Perf
+     - Setup
+     - Example
+     - Somewhat Outdated Notes
 
-/ $ make && make xcc-headers-install && make apps-install
-
-To get started, make sure #K is mounted.  The basic ifconfig script will do
-this, as will:
-
-/ $ bind -a \#K /prof/
-
-You control the profiler with the kpctl file.  The general style is to start
-the events that trigger a sample, such as a timer tick, then you start and stop
-the profiling.  The distinction between the two steps is that one actually
-fires the events (e.g. the timer IRQ), and the other enables *collection*
-of profiling info when those events occur.
-Aside from timer based sampling, the Akaros `perf` tool allows to sample by
-catching performance counter overflows.
-The profiler accepts a few configuration options.
-There is a queue size limit of 64MB by default, and it is used as circular
-buffer, so old data will be dropped.
-To change its value:
-
-/ $ echo prof_qlimit SIZE_KB > /prof/kpctl
-
-This should be run before starting the profiler.
-
-It is possible to configure the timer period, which defaults to 1000us, though
-it is not suggested to move too far from the default:
-
-/ $ echo timer period 1000 > /prof/kpctl
+ (*) Old Oprofile Notes
 
 
-                    Timer Base Profiling
+===========================
+PERF
+===========================
+Akaros has limited support for perf_events.  perf is a tool which utilizes CPU
+performance counters for performance monitoring and troubleshooting.
 
-The timer command takes the core id (or "all"), followed by "on" or "off".
-As with all good devices, if you echo garbage, in, you should get the usage as
-an errstr.  That'll be kept up to date more than documentation.
-
-For profiling, besides the counters overflow sampling handled by the `perf`
-utility, you need to enable timers:
-
-/ $ echo timer all on > /prof/kpctl
-
-And then start the Akaros profiler system-wide.
-
-/ $ echo start > /prof/kpctl
-
-Run whatever command you want the sampling to be based on, then stop timers
-and profiler:
-
-/ $ my_test_program ...
-/ $ echo timer all off > /prof/kpctl
-/ $ echo stop > /prof/kpctl
-
-The trace will be then available in the /prof/kpdata file.
-The data will be available until the next start of the profiler.
+Akaros has its own version of perf, similar in spirit to Linux's perf, that
+produces PERFILE2 ABI compliant perf.data files (if not, file a bug!).  The
+kernel generates traces, under the direction of perf.  You then copy the traces
+to a Linux host and process using Linux's perf.
 
 
-                    Akaros Perf Tool
+SETUP
+--------------------
+To build Akaros's perf directly:
 
-The Akaros `perf` is a tool which allows to both programming and reading
-the CPU performance counters, and enabling counter overflow interrupt based
-tracing.
+(linux)$ cd tools/profile/perf ; make ; cd -
+
+Or to build it along with all apps:
+
+(linux)$ make apps-install
+
+You will also need suitable recent Linux perf for the reporting of the data
+(something that understands PERFILE2 format).  Unpatched Linux 4.5 perf did the
+trick.  You'll also want libelf and maybe other libraries.
+
+First, install libelf according to your distro.  On ubuntu:
+(linux) $ sudo apt-get install libelf-dev
+
+Then try to just install perf using your Linux distro, and install any needed
+dependencies.  On ubuntu, you can install linux-tools-common and whatever else
+it asks for (something particular to your host kernel).
+
+If you get the following error when running perf record:
+
+	incompatible file format (rerun with -v to learn more)
+
+Then you'll need a newer version of perf.  Download Linux source, then
+
+(linux) $ cd tools/perf/
+(linux) $ make
+
+Then use your new perf binary.  This all is just installing a recent perf - it
+has little to do with Akaros at this point.  If you run into incompatibilities
+between our perf.data format and the latest Linux, file a bug.
+
+
+BASIC EXAMPLE
+--------------------
+You should be able to do the following:
+
+/ $ perf record -e 0x13c:0,int=1,icount=10000 -- /bin/hello
+
+Then scp perf.data to Linux
+
+(linux) $ perf report --kallsyms=obj/kern/ksyms.map --symfs=kern/kfs
+
+
+SOMEWHAT OUTDATED NOTES
+--------------------
 Its help screen reads like:
 
 Use: perf {list,cpucaps,record} [-mkecxh] -- CMD [ARGS ...]
@@ -158,45 +156,59 @@ When the command run by `perf` exits, the configured counter values are shown.
 If used as counter overflow interrupt sampling, the tracing data will be in
 the usual /prof/kpdata file.
 
+===========================
+OLD OPROFILE (probably broken)
+===========================
+
+To get started, make sure #K is mounted.  The basic ifconfig script will do
+this, as will:
+
+/ $ bind -a \#K /prof/
+
+You control the profiler with the kpctl file.  The general style is to start
+the events that trigger a sample, such as a timer tick, then you start and stop
+the profiling.  The distinction between the two steps is that one actually
+fires the events (e.g. the timer IRQ), and the other enables *collection*
+of profiling info when those events occur.
+
+Aside from timer based sampling, the Akaros `perf` tool allows to sample by
+catching performance counter overflows.
+
+The profiler accepts a few configuration options.  There is a queue size limit
+of 64MB by default, and it is used as circular buffer, so old data will be
+dropped.
+
+To change its value:
+
+/ $ echo prof_qlimit SIZE_KB > /prof/kpctl
+
+This should be run before starting the profiler.
+
+It is possible to configure the timer period, which defaults to 1000us, though
+it is not suggested to move too far from the default:
+
+/ $ echo timer period 1000 > /prof/kpctl
 
 
-                    Analyzing Profiler Data
+The timer command takes the core id (or "all"), followed by "on" or "off".
+As with all good devices, if you echo garbage, in, you should get the usage as
+an errstr.  That'll be kept up to date more than documentation.
 
-The profiler tracing data generated in the /prof/kpdata file, needs to be copied
-on your dev box.
-The easiest way is via 9p:
+For profiling, besides the counters overflow sampling handled by the `perf`
+utility, you need to enable timers:
 
-/ $ cp /prof/kpdata /mnt/
+/ $ echo timer all on > /prof/kpctl
 
-Or by using the simple netcat (snc) utility.
-On your dev box:
+And then start the Akaros profiler system-wide.
 
-/ $ nc -l PORT > kpdata.data
+/ $ echo start > /prof/kpctl
 
-On Akaros:
+Run whatever command you want the sampling to be based on, then stop timers
+and profiler:
 
-/ $ scn -s DEVBOX_IP -p PORT -i /prof/kpdata
+/ $ my_test_program ...
+/ $ echo stop > /prof/kpctl
+/ $ echo timer all off > /prof/kpctl
 
-In order to process the Akaros kprof file, you need to convert it to the
-Linux perf one.
-You can do that, on your dev box, with:
-
-/ $ ./tools/profile/kprof2perf/kprof2perf-linux -k `pwd`/obj/kern/akaros-kernel-64b -i kpdata.data -o perf.data
-
-You then need to build the Akaros specific Linux perf binary.
-First you need to install (if you have not already) libelf-dev:
-
-\ $ sudo apt-get install libelf-dev
-
-Then pull the Linux kernel source code which is closer to the kernel
-version you are running in your dev box, and patch it:
-
-/ $ cd linux
-/ $ patch -p 1 < $AKAROS/tools/profile/kprof2perf/perf_patches/perf_patch.diff
-/ $ cd tools/perf
-/ $ make
-
-Then you should be able to run Linux perf data analysis command on it:
-Example:
-
-$ /PATH_TO/perf --root-dir $AKAROS/kern/kfs/ report -g -i perf.data
+The trace will be then available in the /prof/kpdata file.
+The data will be available until the next start of the profiler.
