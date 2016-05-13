@@ -511,10 +511,10 @@ struct perf_record_comm {
 } __attribute__((packed));
 
 /* For type PERF_RECORD_SAMPLE
- * Configured with: PERF_SAMPLE_IP | PERF_SAMPLE_TID && PERF_SAMPLE_TIME &&
- * PERF_SAMPLE_ADDR && PERF_SAMPLE_ID && PERF_SAMPLE_CPU &&
- * PERF_SAMPLE_CALLCHAIN.
- */
+ *
+ * Configured with: PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
+ * PERF_SAMPLE_ADDR | PERF_SAMPLE_ID | PERF_SAMPLE_CPU |
+ * PERF_SAMPLE_CALLCHAIN. */
 struct perf_record_sample {
 	struct perf_event_header header;
 	uint64_t ip;

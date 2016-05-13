@@ -300,10 +300,13 @@ static void add_default_attribute(struct mem_file *amf, struct mem_file *mmf,
 	attr.config = config;
 	attr.mmap = 1;
 	attr.comm = 1;
+	/* We don't know the actual sample_period at this point, but the perf report
+	 * percentages are all relative. */
+	attr.sample_period = 1;
+	/* Closely coupled with struct perf_record_sample */
 	attr.sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
-		PERF_SAMPLE_ADDR | PERF_SAMPLE_ID | PERF_SAMPLE_CPU |
-		PERF_SAMPLE_CALLCHAIN;
-
+	                   PERF_SAMPLE_ADDR | PERF_SAMPLE_ID | PERF_SAMPLE_CPU |
+	                   PERF_SAMPLE_CALLCHAIN;
 	add_attribute(amf, mmf, &attr, &id, 1);
 }
 
