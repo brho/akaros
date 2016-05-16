@@ -1,3 +1,5 @@
+#pragma once
+
 #include <arch/types.h>
 
 /* Limits of integral types.  */

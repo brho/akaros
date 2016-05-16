@@ -3,8 +3,9 @@
  * See the COPYRIGHT files at the top of this source tree for full 
  * license information.
  */
-#ifndef _ROS_ARSC_SERVER_H
-#define __ROS_ARSC_SERVER_H
+
+#pragma once
+
 #include <ros/common.h>
 #include <ros/ring_syscall.h>
 #include <arch/types.h>
@@ -22,4 +23,3 @@ intreg_t syscall_async(struct proc* p, syscall_req_t *syscall);
 void arsc_server(uint32_t srcid, long a0, long a1, long a2);
 
 static intreg_t process_generic_syscalls(struct proc* p, size_t max);
-#endif //ARSC_SERVER

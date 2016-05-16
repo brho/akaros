@@ -3,6 +3,8 @@
  * so the code in this file is compiled twice, once per pte size.
  */
 
+#pragma once
+
 #if PTTYPE == 64
 #define pt_element_t uint64_t
 #define guest_walker guest_walker64
