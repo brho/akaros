@@ -7,8 +7,7 @@
 
 #pragma once
 
-/* Include this outside the ifndef, due to circular include concerns. */
-#include <ros/event.h>
+#include <ros/event_bits.h>
 
 struct evbitmap {
 	bool						check_bits;

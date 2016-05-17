@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include <ros/common.h>
+#include <ros/event_bits.h>
 #include <ros/atomic.h>
 #include <ros/arch/mmu.h>
 
@@ -48,9 +48,6 @@ struct ucq_page_header {
 	uintptr_t					cons_next_pg;	/* next page to consume */
 	atomic_t 					nr_cons;		/* like an inverted refcnt */
 };
-
-/* Including here since event.h needs to know about struct ucq */
-#include <ros/event.h>
 
 struct msg_container {
 	struct event_msg			ev_msg;
