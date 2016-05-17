@@ -91,8 +91,8 @@ void arpinit(struct Fs *f)
 /*
  *  create a new arp entry for an ip address.
  */
-static struct arpent *newarp6(struct arp *arp, uint8_t * ip, struct Ipifc *ifc,
-							  int addrxt)
+static struct arpent *newarp6(struct arp *arp, uint8_t *ip, struct Ipifc *ifc,
+                              int addrxt)
 {
 	unsigned int t;
 	struct block *next, *xp;
@@ -230,7 +230,7 @@ void cleanarpent(struct arp *arp, struct arpent *a)
  *  waiting for ip->mac to be resolved.
  */
 struct arpent *arpget(struct arp *arp, struct block *bp, int version,
-					  struct Ipifc *ifc, uint8_t * ip, uint8_t * mac)
+                      struct Ipifc *ifc, uint8_t *ip, uint8_t *mac)
 {
 	int hash, len;
 	struct arpent *a;
@@ -299,7 +299,7 @@ void arprelease(struct arp *arp, struct arpent *a)
  * called with arp locked
  */
 struct block *arpresolve(struct arp *arp, struct arpent *a, struct medium *type,
-						 uint8_t * mac)
+                         uint8_t *mac)
 {
 	struct block *bp;
 	struct arpent *f, **l;
@@ -330,9 +330,8 @@ struct block *arpresolve(struct arp *arp, struct arpent *a, struct medium *type,
 	return bp;
 }
 
-void
-arpenter(struct Fs *fs, int version, uint8_t * ip, uint8_t * mac, int n,
-		 int refresh)
+void arpenter(struct Fs *fs, int version, uint8_t *ip, uint8_t *mac, int n,
+              int refresh)
 {
 	ERRSTACK(1);
 	struct arp *arp;
