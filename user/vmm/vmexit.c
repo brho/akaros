@@ -24,25 +24,24 @@ static bool handle_ept_fault(struct guest_thread *gth)
 
 	if (decode(gth, &gpa, &regx, &regp, &store, &size, &advance))
 		return FALSE;
+	assert(size >= 0);
 	/* TODO use helpers for some of these addr checks.  the fee/fec ones might
 	 * be wrong too. */
-	if (PG_ADDR(gpa) == vm->virtio_mmio_base) {
+	for (int i = 0; i < VIRTIO_MMIO_MAX_NUM_DEV; i++) {
+		if (vm->virtio_mmio_devices[i] == NULL)
+			continue;
+		if (PG_ADDR(gpa) != vm->virtio_mmio_devices[i]->addr)
+			continue;
 		/* TODO: can the guest cause us to spawn off infinite threads? */
-		if (size < 0) {
-			// TODO: It would be preferable for the decoder to return an
-			//       unsigned value, so that we don't have to worry
-			//       about this. I don't know if it's even possible for
-			//       the width to be negative;
-			VIRTIO_DRI_ERRX(vm->cons_mmio_dev->vqdev,
-			    "Driver tried to access the device with a negative access width in the instruction?");
-		}
-		//fprintf(stderr, "RIP is 0x%x\n", vm_tf->tf_rip);
 		if (store)
-			virtio_mmio_wr(vm, vm->cons_mmio_dev, gpa, size, (uint32_t *)regp);
+			virtio_mmio_wr(vm, vm->virtio_mmio_devices[i], gpa, size,
+			               (uint32_t *)regp);
 		else
-			*regp = virtio_mmio_rd(vm, vm->cons_mmio_dev, gpa, size);
-
-	} else if (PG_ADDR(gpa) == 0xfec00000) {
+			*regp = virtio_mmio_rd(vm, vm->virtio_mmio_devices[i], gpa, size);
+		vm_tf->tf_rip += advance;
+		return TRUE;
+	}
+	if (PG_ADDR(gpa) == 0xfec00000) {
 		do_ioapic(gth, gpa, regx, regp, store);
 	} else if (PG_ADDR(gpa) == 0) {
 		memmove(regp, &vm->low4k[gpa], size);
@@ -52,7 +51,7 @@ static bool handle_ept_fault(struct guest_thread *gth)
 				vm_tf->tf_exit_reason);
 		fprintf(stderr, "Returning 0xffffffff\n");
 		showstatus(stderr, gth);
-		// Just fill the whole register for now.
+		/* Just fill the whole register for now. */
 		*regp = (uint64_t) -1;
 		return FALSE;
 	}

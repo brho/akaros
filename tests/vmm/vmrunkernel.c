@@ -381,8 +381,6 @@ int main(int argc, char **argv)
 	((uint32_t *)a_page)[0x30/4] = 0x01060015;
 	//((uint32_t *)a_page)[0x30/4] = 0xDEADBEEF;
 
-	vm->virtio_irq = 17; /* TODO: is this an option?  or a #define? */
-
 	argc--, argv++;
 	// switches ...
 	// Sorry, I don't much like the gnu opt parsing code.
@@ -399,10 +397,6 @@ int main(int argc, char **argv)
 		case 'm':
 			argc--, argv++;
 			maxresume = strtoull(argv[0], 0, 0);
-			break;
-		case 'i':
-			argc--, argv++;
-			vm->virtio_irq = strtoull(argv[0], 0, 0);
 			break;
 		case 'c':
 			argc--, argv++;
@@ -622,11 +616,14 @@ int main(int argc, char **argv)
 	fprintf(stderr, "kernbase for pml4 is 0x%llx and entry is %llx\n", kernbase, entry);
 	fprintf(stderr, "p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
 
-	vm->virtio_mmio_base = 0x100000000;
-
-	cons_mmio_dev.addr = vm->virtio_mmio_base;
+	/* The MMIO address of the console device is really the address of an
+	 * unbacked EPT page: accesses to this page will cause a page fault that
+	 * traps to the host, which will examine the fault, see it was for the
+	 * known MMIO address, and fulfill the MMIO read or write on the guest's
+	 * behalf accordingly. */
+	cons_mmio_dev.addr = 0x100000000;
 	cons_mmio_dev.vqdev = &cons_vqdev;
-	vm->cons_mmio_dev = &cons_mmio_dev;
+	vm->virtio_mmio_devices[VIRTIO_MMIO_CONSOLE_DEV] = &cons_mmio_dev;
 
 	vmm_run_task(vm, timer_thread, 0);
 

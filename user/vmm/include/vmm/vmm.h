@@ -9,6 +9,15 @@
 #include <ros/vmm.h>
 #include <vmm/sched.h>
 
+/* The listing of VIRTIO MMIO devices. We currently only expect to have 2,
+ * console and network. Only the console is implemented right now.*/
+enum {
+	VIRTIO_MMIO_CONSOLE_DEV,
+
+	/* This should always be the last entry. */
+	VIRTIO_MMIO_MAX_NUM_DEV = 2,
+};
+
 /* Structure to encapsulate all of the bookkeeping for a VM. */
 struct virtual_machine {
 	struct guest_thread			**gths;
@@ -18,10 +27,8 @@ struct virtual_machine {
 	/* TODO: put these in appropriate structures.  e.g., virtio things in
 	 * something related to virtio.  low4k in something related to the guest's
 	 * memory. */
-	uintptr_t					virtio_mmio_base;
-	int							virtio_irq;
 	uint8_t						*low4k;
-	struct virtio_mmio_dev		*cons_mmio_dev;
+	struct virtio_mmio_dev		*virtio_mmio_devices[VIRTIO_MMIO_MAX_NUM_DEV];
 };
 
 char *regname(uint8_t reg);
