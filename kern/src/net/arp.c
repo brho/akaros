@@ -121,7 +121,8 @@ static struct arpent *newarp6(struct arp *arp, uint8_t * ip, struct Ipifc *ifc,
 			freeblist(xp);
 			xp = next;
 		}
-	} else {	// queue icmp unreachable for rxmitproc later on, w/o arp lock
+	} else {
+		/* queue icmp unreachable for rxmitproc later, w/o arp lock */
 		if (xp) {
 			if (arp->dropl == NULL)
 				arp->dropf = xp;
@@ -345,7 +346,6 @@ arpenter(struct Fs *fs, int version, uint8_t * ip, uint8_t * mac, int n,
 	arp = fs->arp;
 
 	if (n != 6) {
-//      print("arp: len = %d\n", n);
 		return;
 	}
 
@@ -364,7 +364,6 @@ arpenter(struct Fs *fs, int version, uint8_t * ip, uint8_t * mac, int n,
 	}
 
 	if (r == NULL) {
-//      print("arp: no route for entry\n");
 		return;
 	}
 
@@ -472,7 +471,7 @@ int arpwrite(struct Fs *fs, char *s, long len)
 			}
 		}
 		memset(arp->hash, 0, sizeof(arp->hash));
-		// clear all pkts on these lists (rxmt, dropf/l)
+		/* clear all pkts on these lists (rxmt, dropf/l) */
 		arp->rxmt = NULL;
 		arp->dropf = NULL;
 		arp->dropl = NULL;
@@ -603,11 +602,11 @@ static uint64_t rxmitsols(struct arp *arp)
 	a = arp->rxmt;
 	if (a == NULL) {
 		nrxt = 0;
-		goto dodrops;	//return nrxt;
+		goto dodrops;	/* return nrxt; */
 	}
 	nrxt = a->rtime - NOW;
 	if (nrxt > 3 * ReTransTimer / 4)
-		goto dodrops;	//return nrxt;
+		goto dodrops;	/* return nrxt; */
 
 	for (; a; a = a->nextrxt) {
 		ifc = a->ifc;
@@ -693,7 +692,6 @@ static void rxmitproc(void *v)
 	uint64_t wakeupat;
 
 	arp->rxmitp = current;
-	//print("arp rxmitproc started\n");
 	if (waserror()) {
 		arp->rxmitp = 0;
 		poperror();
