@@ -51,7 +51,7 @@ static void kfs_init(void)
 	                                 __alignof__(struct kfs_i_info), 0, 0, 0);
 }
 
-/* Creates the SB (normally would read in from disc and create).  Passes it's
+/* Creates the SB (normally would read in from disc and create).  Passes its
  * ref out to whoever consumes this.  Returns 0 on failure.
  * TODO: consider pulling out more of the FS-independent stuff, if possible.
  * There are only two things, but the pain in the ass is that you'd need to read
@@ -533,7 +533,7 @@ int kfs_d_release(struct dentry *dentry)
 	return -1;
 }
 
-/* Called when the dentry loses it's inode (becomes "negative") */
+/* Called when the dentry loses its inode (becomes "negative") */
 void kfs_d_iput(struct dentry *dentry, struct inode *inode)
 { // default, call i_put to release the inode object
 }
@@ -809,7 +809,7 @@ struct file_operations kfs_f_op_sym = {
 static int __add_kfs_entry(struct dentry *parent, char *path,
                            struct cpio_bin_hdr *c_bhdr)
 {
-	char *first_slash = strchr(path, '/');	
+	char *first_slash = strchr(path, '/');
 	char dir[MAX_FILENAME_SZ + 1];	/* room for the \0 */
 	size_t dirname_sz;				/* not counting the \0 */
 	struct dentry *dentry = 0;
