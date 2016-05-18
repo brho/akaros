@@ -189,7 +189,7 @@ static struct dentry *do_lookup(struct dentry *parent, char *name)
 		warn("OOM in do_lookup(), probably wasn't expected\n");
 		return 0;
 	}
-	result = dcache_get(parent->d_sb, query); 
+	result = dcache_get(parent->d_sb, query);
 	if (result) {
 		__dentry_free(query);
 		return result;
@@ -218,7 +218,7 @@ static struct dentry *do_lookup(struct dentry *parent, char *name)
 
 	/* TODO: if the following are done by us, how do we know the i_ino?
 	 * also need to handle inodes that are already read in!  For now, we're
-	 * going to have the FS handle it in it's lookup() method: 
+	 * going to have the FS handle it in its lookup() method:
 	 * - get a new inode
 	 * - read in the inode
 	 * - put in the inode cache */
@@ -298,7 +298,7 @@ static int follow_symlink(struct nameidata *nd)
 	nd->depth++;
 	symname = nd->dentry->d_inode->i_op->readlink(nd->dentry);
 	/* We need to pin in nd->dentry (the dentry of the symlink), since we need
-	 * it's symname's storage to stay in memory throughout the upcoming
+	 * its symname's storage to stay in memory throughout the upcoming
 	 * link_path_walk().  The last_sym gets decreffed when we path_release() or
 	 * follow another symlink. */
 	if (nd->last_sym)
@@ -312,7 +312,7 @@ static int follow_symlink(struct nameidata *nd)
 		if (!current)
 			nd->dentry = default_ns.root->mnt_root;
 		else
-			nd->dentry = current->fs_env.root;	
+			nd->dentry = current->fs_env.root;
 		nd->mnt = nd->dentry->d_sb->s_mount;
 		kref_get(&nd->mnt->mnt_kref, 1);
 		kref_get(&nd->dentry->d_kref, 1);
@@ -337,7 +337,7 @@ static bool packed_trailing_slashes(char *first_slash)
 	return FALSE;
 }
 
-/* Simple helper to set nd to track it's last name to be Name.  Also be careful
+/* Simple helper to set nd to track its last name to be Name.  Also be careful
  * with the storage of name.  Don't use and nd's name past the lifetime of the
  * string used in the path_lookup()/link_path_walk/whatever.  Consider replacing
  * parts of this with a qstr builder.  Note this uses the dentry's d_op, which
@@ -492,7 +492,7 @@ next_loop:
 }
 
 /* Given path, return the inode for the final dentry.  The ND should be
- * initialized for the first call - specifically, we need the intent. 
+ * initialized for the first call - specifically, we need the intent.
  * LOOKUP_PARENT and friends go in the flags var, which is not the intent.
  *
  * If path_lookup wants a PARENT, but hits the top of the FS (root or
@@ -515,11 +515,11 @@ int path_lookup(char *path, int flags, struct nameidata *nd)
 		if (!current)
 			nd->dentry = default_ns.root->mnt_root;
 		else
-			nd->dentry = current->fs_env.root;	
+			nd->dentry = current->fs_env.root;
 	} else {						/* relative lookup */
 		assert(current);
 		/* Don't need to lock on the fs_env since we're reading one item */
-		nd->dentry = current->fs_env.pwd;	
+		nd->dentry = current->fs_env.pwd;
 	}
 	nd->mnt = nd->dentry->d_sb->s_mount;
 	/* Whenever references get put in the nd, incref them.  Whenever they are
@@ -528,7 +528,7 @@ int path_lookup(char *path, int flags, struct nameidata *nd)
 	kref_get(&nd->dentry->d_kref, 1);
 	nd->flags = flags;
 	nd->depth = 0;					/* used in symlink following */
-	retval =  link_path_walk(path, nd);	
+	retval =  link_path_walk(path, nd);
 	/* make sure our PARENT lookup worked */
 	if (!retval && (flags & LOOKUP_PARENT))
 		assert(nd->last.name);
@@ -556,7 +556,7 @@ int mount_fs(struct fs_type *fs, char *dev_name, char *path, int flags)
 	retval = path_lookup(path, LOOKUP_DIRECTORY, nd);
 	if (retval)
 		goto out;
-	/* taking the namespace of the vfsmount of path */ 
+	/* taking the namespace of the vfsmount of path */
 	if (!__mount_fs(fs, dev_name, nd->dentry, flags, nd->mnt->mnt_namespace))
 		retval = -EINVAL;
 out:
@@ -587,7 +587,7 @@ static ssize_t __dcache_eq(void *k1, void *k2)
 
 /* Helper to alloc and initialize a generic superblock.  This handles all the
  * VFS related things, like lists.  Each FS will need to handle its own things
- * in it's *_get_sb(), usually involving reading off the disc. */
+ * in its *_get_sb(), usually involving reading off the disc. */
 struct super_block *get_sb(void)
 {
 	struct super_block *sb = kmalloc(sizeof(struct super_block), 0);
@@ -610,7 +610,7 @@ struct super_block *get_sb(void)
 
 /* Final stages of initializing a super block, including creating and linking
  * the root dentry, root inode, vmnt, and sb.  The d_op and root_ino are
- * FS-specific, but otherwise it's FS-independent, tricky, and not worth having
+ * FS-specific, but otherwise its FS-independent, tricky, and not worth having
  * around multiple times.
  *
  * Not the world's best interface, so it's subject to change, esp since we're
@@ -1382,7 +1382,7 @@ ssize_t generic_dir_read(struct file *file, char *u_buf, size_t count,
 	/* Next time read is called, we pick up where we left off */
 	*offset = dirent->d_off;	/* UMEM */
 	/* important to tell them how much they got.  they often keep going til they
-	 * get 0 back (in the case of ls).  it's also how much has been read, but it
+	 * get 0 back (in the case of ls).  It's also how much has been read, but it
 	 * isn't how much the f_pos has moved (which is opaque to the VFS). */
 	return amt_copied;
 }
@@ -1430,7 +1430,7 @@ struct file *do_file_open(char *path, int flags, int mode)
 	}
 	/* So it didn't already exist, release the path from the previous lookup,
 	 * and then we try to create it. */
-	path_release(nd);	
+	path_release(nd);
 	/* get the parent, following links.  this means you get the parent of the
 	 * final link (which may not be in 'path' in the first place. */
 	nd->intent = LOOKUP_CREATE;
@@ -1440,7 +1440,7 @@ struct file *do_file_open(char *path, int flags, int mode)
 		goto out_path_only;
 	}
 	/* see if the target is there (shouldn't be), and handle accordingly */
-	file_d = do_lookup(nd->dentry, nd->last.name); 
+	file_d = do_lookup(nd->dentry, nd->last.name);
 	if (!file_d) {
 		if (!(flags & O_CREAT)) {
 			warn("Extremely unlikely race, probably a bug");
@@ -1505,7 +1505,7 @@ int do_symlink(char *path, const char *symname, int mode)
 		goto out_path_only;
 	}
 	/* see if the target is already there, handle accordingly */
-	sym_d = do_lookup(nd->dentry, nd->last.name); 
+	sym_d = do_lookup(nd->dentry, nd->last.name);
 	if (sym_d) {
 		set_errno(EEXIST);
 		goto out_sym_d;
@@ -1544,7 +1544,7 @@ int do_link(char *old_path, char *new_path)
 	}
 	parent_dir = nd->dentry->d_inode;
 	/* see if the new target is already there, handle accordingly */
-	link_d = do_lookup(nd->dentry, nd->last.name); 
+	link_d = do_lookup(nd->dentry, nd->last.name);
 	if (link_d) {
 		set_errno(EEXIST);
 		goto out_link_d;
@@ -1610,7 +1610,7 @@ int do_unlink(char *path)
 	}
 	parent_dir = nd->dentry->d_inode;
 	/* make sure the target is there */
-	dentry = do_lookup(nd->dentry, nd->last.name); 
+	dentry = do_lookup(nd->dentry, nd->last.name);
 	if (!dentry) {
 		set_errno(ENOENT);
 		goto out_path_only;
@@ -1654,7 +1654,7 @@ int do_access(char *path, int mode)
 	int retval = 0;
 	nd->intent = LOOKUP_ACCESS;
 	retval = path_lookup(path, 0, nd);
-	path_release(nd);	
+	path_release(nd);
 	return retval;
 }
 
@@ -1730,7 +1730,7 @@ int do_rmdir(char *path)
 		goto out_path_only;
 	}
 	/* make sure the target is already there, handle accordingly */
-	dentry = do_lookup(nd->dentry, nd->last.name); 
+	dentry = do_lookup(nd->dentry, nd->last.name);
 	if (!dentry) {
 		set_errno(ENOENT);
 		goto out_path_only;
@@ -2101,7 +2101,7 @@ int do_rename(char *old_path, char *new_path)
 		goto out_paths_and_src;
 	}
 	/* TODO: if we're doing a rename that moves a directory, we need to make
-	 * sure the new_path doesn't include the old_path.  it's not as simple as
+	 * sure the new_path doesn't include the old_path.  It's not as simple as
 	 * just checking, since there could be a concurrent rename that breaks the
 	 * check later.  e.g. what if new_dir's parent is being moved into a child
 	 * of old_dir?
@@ -2765,7 +2765,7 @@ char *do_getcwd(struct fs_struct *fs_env, char **kfree_this, size_t cwd_l)
 	kbuf[cwd_l - 2] = '/';
 	/* for each dentry in the path, all the way back to the root of fs_env, we
 	 * grab the dentry name, push path_start back enough, and write in the name,
-	 * using /'s to terminate.  We skip the root, since we don't want it's
+	 * using /'s to terminate.  We skip the root, since we don't want its
 	 * actual name, just "/", which is set before each loop. */
 	path_start = kbuf + cwd_l - 2;	/* the last byte written */
 	while (dentry != fs_env->root) {
@@ -2779,7 +2779,7 @@ char *do_getcwd(struct fs_struct *fs_env, char **kfree_this, size_t cwd_l)
 		memmove(path_start, dentry->d_name.name, link_len);
 		path_start--;
 		*path_start = '/';
-		dentry = dentry->d_parent;	
+		dentry = dentry->d_parent;
 	}
 	return path_start;
 }
@@ -2844,7 +2844,7 @@ static void print_dir(struct dentry *dentry, char *buf, int depth)
 				default:
 					warn("Look around you!  Unknown filetype!");
 			}
-			kref_put(&child_d->d_kref);	
+			kref_put(&child_d->d_kref);
 		}
 loop_next:
 		if (retval <= 0)
