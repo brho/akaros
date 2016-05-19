@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is part of the UCB release of Plan 9. It is subject to the license
  * terms in the LICENSE file found in the top-level directory of this
  * distribution and at http://akaros.cs.berkeley.edu/files/Plan9License. No
@@ -172,7 +172,7 @@ int pci_msi_enable(struct pci_device *p, uint64_t vec)
 		return -1;
 	}
 
-	/* read it, clear out the Mmesgmsk bits. 
+	/* read it, clear out the Mmesgmsk bits.
 	 * This means that there will be no multiple
 	 * messages enabled.
 	 */
@@ -236,7 +236,7 @@ static uintptr_t msix_get_capbar_paddr(struct pci_device *p, int offset)
 {
 	uint32_t bir, capbar_off;
 	uintptr_t membar;
-	
+
 	bir = pcidev_read32(p, offset);
 	capbar_off = bir & ~0x7;
 	bir &= 0x7;

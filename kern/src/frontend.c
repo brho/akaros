@@ -132,8 +132,8 @@ int frontend_syscall_errno(struct proc* p, int n, int a0, int a1, int a2, int a3
 	return ret;
 }
 
-int32_t frontend_syscall(pid_t pid, int32_t syscall_num, 
-                         uint32_t arg0, uint32_t arg1, 
+int32_t frontend_syscall(pid_t pid, int32_t syscall_num,
+                         uint32_t arg0, uint32_t arg1,
                          uint32_t arg2, uint32_t arg3, int32_t* errno)
 {
 #ifndef CONFIG_APPSERVER

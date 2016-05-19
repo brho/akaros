@@ -1,8 +1,8 @@
-/* Copyright (c) 2009, 2010 The Regents of the University  of California. 
- * See the COPYRIGHT files at the top of this source tree for full 
+/* Copyright (c) 2009, 2010 The Regents of the University  of California.
+ * See the COPYRIGHT files at the top of this source tree for full
  * license information.
- * 
- * Kevin Klues <klueska@cs.berkeley.edu>    
+ *
+ * Kevin Klues <klueska@cs.berkeley.edu>
  * Barret Rhoden <brho@cs.berkeley.edu> */
 
 #include <ros/errno.h>
@@ -35,7 +35,7 @@ size_t global_next_color = 0;
 
 void colored_page_alloc_init()
 {
-	global_cache_colors_map = 
+	global_cache_colors_map =
 	       kmalloc(BYTES_FOR_BITMASK(llc_cache->num_colors), 0);
 	CLR_BITMASK(global_cache_colors_map, llc_cache->num_colors);
 	for(int i = 0; i < llc_cache->num_colors/NUM_KERNEL_COLORS; i++)
@@ -68,27 +68,27 @@ static void __page_init(struct page *page)
 	}                                                                       \
 	return -ENOMEM;
 
-static ssize_t __page_alloc_from_color_range(page_t** page,  
+static ssize_t __page_alloc_from_color_range(page_t** page,
                                            uint16_t base_color,
-                                           uint16_t range) 
+                                           uint16_t range)
 {
-	__PAGE_ALLOC_FROM_RANGE_GENERIC(page, base_color, range, 
+	__PAGE_ALLOC_FROM_RANGE_GENERIC(page, base_color, range,
 	                 !BSD_LIST_EMPTY(&colored_page_free_list[i]));
 }
 
-static ssize_t __page_alloc_from_color_map_range(page_t** page, uint8_t* map, 
+static ssize_t __page_alloc_from_color_map_range(page_t** page, uint8_t* map,
                                               size_t base_color, size_t range)
-{  
-	__PAGE_ALLOC_FROM_RANGE_GENERIC(page, base_color, range, 
+{
+	__PAGE_ALLOC_FROM_RANGE_GENERIC(page, base_color, range,
 		    GET_BITMASK_BIT(map, i) &&
 			!BSD_LIST_EMPTY(&colored_page_free_list[i]))
 }
 
-static ssize_t __colored_page_alloc(uint8_t* map, page_t** page, 
+static ssize_t __colored_page_alloc(uint8_t* map, page_t** page,
                                                size_t next_color)
 {
 	ssize_t ret;
-	if((ret = __page_alloc_from_color_map_range(page, map, 
+	if((ret = __page_alloc_from_color_map_range(page, map,
 	                           next_color, llc_cache->num_colors - next_color)) < 0)
 		ret = __page_alloc_from_color_map_range(page, map, 0, next_color);
 	return ret;
@@ -126,7 +126,7 @@ static error_t __page_alloc_specific(page_t** page, size_t ppn)
 error_t upage_alloc(struct proc* p, page_t** page, int zero)
 {
 	spin_lock_irqsave(&colored_page_free_list_lock);
-	ssize_t ret = __colored_page_alloc(p->cache_colors_map, 
+	ssize_t ret = __colored_page_alloc(p->cache_colors_map,
 	                                     page, p->next_cache_color);
 	spin_unlock_irqsave(&colored_page_free_list_lock);
 
@@ -140,20 +140,20 @@ error_t upage_alloc(struct proc* p, page_t** page, int zero)
 }
 
 /* Allocates a refcounted page of memory for the kernel's use */
-error_t kpage_alloc(page_t** page) 
+error_t kpage_alloc(page_t** page)
 {
 	ssize_t ret;
 	spin_lock_irqsave(&colored_page_free_list_lock);
-	if ((ret = __page_alloc_from_color_range(page, global_next_color, 
+	if ((ret = __page_alloc_from_color_range(page, global_next_color,
 	                            llc_cache->num_colors - global_next_color)) < 0)
 		ret = __page_alloc_from_color_range(page, 0, global_next_color);
 
 	if (ret >= 0) {
-		global_next_color = ret;        
+		global_next_color = ret;
 		ret = ESUCCESS;
 	}
 	spin_unlock_irqsave(&colored_page_free_list_lock);
-	
+
 	return ret;
 }
 
@@ -186,7 +186,7 @@ void *kpage_zalloc_addr(void)
  */
 void *get_cont_pages(size_t order, int flags)
 {
-	size_t npages = 1 << order;	
+	size_t npages = 1 << order;
 
 	size_t naddrpages = max_paddr / PGSIZE;
 	// Find 'npages' free consecutive pages
@@ -283,7 +283,7 @@ void *get_cont_phys_pages_at(size_t order, physaddr_t at, int flags)
 
 void free_cont_pages(void *buf, size_t order)
 {
-	size_t npages = 1 << order;	
+	size_t npages = 1 << order;
 	spin_lock_irqsave(&colored_page_free_list_lock);
 	for (size_t i = kva2ppn(buf); i < kva2ppn(buf) + npages; i++) {
 		page_t* page = ppn2page(i);
@@ -291,7 +291,7 @@ void free_cont_pages(void *buf, size_t order)
 		assert(page_is_free(i));
 	}
 	spin_unlock_irqsave(&colored_page_free_list_lock);
-	return;	
+	return;
 }
 
 /*
@@ -300,12 +300,12 @@ void free_cont_pages(void *buf, size_t order)
  * the caller must do that if necessary.
  *
  * ppn         -- the page number to allocate
- * *page       -- is set to point to the Page struct 
+ * *page       -- is set to point to the Page struct
  *                of the newly allocated page
  *
- * RETURNS 
+ * RETURNS
  *   ESUCCESS  -- on success
- *   -ENOMEM   -- otherwise 
+ *   -ENOMEM   -- otherwise
  */
 error_t upage_alloc_specific(struct proc* p, page_t** page, size_t ppn)
 {
@@ -376,7 +376,7 @@ static void page_release(struct kref *kref)
  * code).  Sets the reference count on a page to a specific value, usually 1. */
 void page_setref(page_t *page, size_t val)
 {
-	kref_init(&page->pg_kref, page_release, val); 
+	kref_init(&page->pg_kref, page_release, val);
 }
 
 /* Attempts to get a lock on the page for IO operations.  If it is already

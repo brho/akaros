@@ -244,7 +244,7 @@ struct Ipifc {
 
 	uint8_t sendra6;			/* == 1 => send router advs on this ifc */
 	uint8_t recvra6;			/* == 1 => recv router advs on this ifc */
-	struct routerparams rp;		/* router parameters as in RFC 2461, pp.40--43. 
+	struct routerparams rp;		/* router parameters as in RFC 2461, pp.40--43.
 								   used only if node is router */
 };
 
@@ -399,7 +399,7 @@ void Fsstdannounce(struct conv *, char **, int);
 void Fsstdbind(struct conv *, char **, int);
 uint32_t scalednconv(void);
 
-/* 
+/*
  *  logging
  */
 enum {

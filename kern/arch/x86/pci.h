@@ -11,7 +11,7 @@
 #include <atomic.h>
 #include <arch/pci_regs.h>
 
-#define pci_debug(...)  printk(__VA_ARGS__)  
+#define pci_debug(...)  printk(__VA_ARGS__)
 
 #define PCI_CONFIG_ADDR     0xCF8
 #define PCI_CONFIG_DATA     0xCFC

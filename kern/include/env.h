@@ -69,7 +69,7 @@ struct proc {
 	uint8_t* cache_colors_map;
 	size_t next_cache_color;
 
-	/* Keeps track of this process's current memory allocation 
+	/* Keeps track of this process's current memory allocation
      * (i.e. its heap pointer) */
 	void *heap_top;
 
@@ -90,11 +90,11 @@ struct proc {
 	// Per process info and data pages
  	procinfo_t *procinfo;       // KVA of per-process shared info table (RO)
 	procdata_t *procdata;       // KVA of per-process shared data table (RW)
-	
+
 	// The backring pointers for processing asynchronous system calls from the user
 	// Note this is the actual backring, not a pointer to it somewhere else
 	syscall_back_ring_t syscallbackring;
-	
+
 	// The front ring pointers for pushing asynchronous system events out to the user
 	// Note this is the actual frontring, not a pointer to it somewhere else
 	sysevent_front_ring_t syseventfrontring;

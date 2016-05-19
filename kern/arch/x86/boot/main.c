@@ -9,16 +9,16 @@
  * DISK LAYOUT
  *  * This program(boot.S and main.c) is the bootloader.  It should
  *    be stored in the first sector of the disk.
- * 
+ *
  *  * The 2nd sector onward holds the kernel image.
- *	
+ *
  *  * The kernel image must be in ELF format.
  *
- * BOOT UP STEPS	
+ * BOOT UP STEPS
  *  * when the CPU boots it loads the BIOS into memory and executes it
  *
  *  * the BIOS intializes devices, sets of the interrupt routines, and
- *    reads the first sector of the boot device(e.g., hard-drive) 
+ *    reads the first sector of the boot device(e.g., hard-drive)
  *    into memory and jumps to it.
  *
  *  * Assuming this boot loader is stored in the first sector of the
@@ -74,7 +74,7 @@ readseg(uint32_t va, uint32_t count, uint32_t offset)
 
 	va &= 0x0FFFFFFF;
 	end_va = va + count;
-	
+
 	// round down to sector boundary
 	va &= ~(SECTSIZE - 1);
 
@@ -105,9 +105,9 @@ readsect(void *dst, uint32_t offset)
 	// wait for disk to be ready
 	waitdisk();
 
-	/* the ISA uses a specified block of memory, 
-	   addresses 0x1F0-0x1F7, that can use the special 
-	   instructions inb/outb, as demonstrated in the 
+	/* the ISA uses a specified block of memory,
+	   addresses 0x1F0-0x1F7, that can use the special
+	   instructions inb/outb, as demonstrated in the
 	   following code in order to access the disk
 	   Offset is 28 bytes long
 	*/

@@ -186,7 +186,7 @@ struct buffer_head *bdev_get_buffer(struct block_device *bdev,
 	if (!blk_num)
 		warn("Asking for the 0th block of a bdev...");
 	/* Make sure there's a page in the page cache.  Should always be one. */
-	error = pm_load_page(pm, blk_num / blk_per_pg, &page); 
+	error = pm_load_page(pm, blk_num / blk_per_pg, &page);
 	if (error)
 		panic("Failed to load page! (%d)", error);
 	my_buf = page2kva(page) + blk_offset;

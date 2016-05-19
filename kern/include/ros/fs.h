@@ -86,7 +86,7 @@ struct kstat {
 /* TODO: have userpsace use our stuff from bits/stats.h */
 #ifdef ROS_KERNEL
 #define stat kstat
-#define dirent kdirent 
+#define dirent kdirent
 
 /* File creation modes (access controls) */
 #define S_IRWXU 00700	/* user (file owner) has read, write and execute perms */

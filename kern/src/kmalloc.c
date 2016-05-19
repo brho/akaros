@@ -1,9 +1,9 @@
-/* Copyright (c) 2009 The Regents of the University of California. 
- * See the COPYRIGHT files at the top of this source tree for full 
+/* Copyright (c) 2009 The Regents of the University of California.
+ * See the COPYRIGHT files at the top of this source tree for full
  * license information.
- * 
+ *
  * Barret Rhoden <brho@cs.berkeley.edu>
- * Kevin Klues <klueska@cs.berkeley.edu>    
+ * Kevin Klues <klueska@cs.berkeley.edu>
  */
 #include <ros/common.h>
 #include <error.h>
@@ -39,7 +39,7 @@ void kmalloc_init(void)
 	}
 }
 
-void *kmalloc(size_t size, int flags) 
+void *kmalloc(size_t size, int flags)
 {
 	// reserve space for bookkeeping and preserve alignment
 	size_t ksize = size + sizeof(struct kmalloc_tag);
@@ -78,7 +78,7 @@ void *kmalloc(size_t size, int flags)
 	return buf + sizeof(struct kmalloc_tag);
 }
 
-void *kzmalloc(size_t size, int flags) 
+void *kzmalloc(size_t size, int flags)
 {
 	void *v = kmalloc(size, flags);
 	if (!v)

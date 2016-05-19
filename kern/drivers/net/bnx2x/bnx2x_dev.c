@@ -112,7 +112,7 @@ static long bnx2x_ctl(struct ether *edev, void *buf, long n)
 
 	/* TODO: handle ctl command somehow.  igbe did the following: */
 	//ct = lookupcmd(cb, igbectlmsg, ARRAY_SIZE(igbectlmsg));
-	
+
 	kfree(cb);
 	poperror();
 	return n;
@@ -429,7 +429,7 @@ static void bnx2x_pci(void)
 
 		ctlr->pcidev = pcidev;
 		ctlr->pci_id = pci_id;
-		
+
 		spin_lock(&bnx2x_tq_lock);
 		TAILQ_INSERT_TAIL(&bnx2x_tq, ctlr, link9ns);
 		spin_unlock(&bnx2x_tq_lock);
@@ -467,7 +467,7 @@ static int bnx2x_pnp(struct ether *edev)
 	                   ctlr->pcidev->func);
 	edev->mbps = 1000;
 	memmove(edev->ea, ctlr->link_params.mac_addr, Eaddrlen);
-	
+
 	/*
 	 * Linkage to the generic ethernet driver.
 	 */

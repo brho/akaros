@@ -632,7 +632,7 @@ static ssize_t compat(struct ib_uverbs_file *file, size_t count,
 	copy_to_user(dst, &tmpbuf[6], sizeof(struct ib_uverbs_qp_dest));
 	dst += sizeof(struct ib_uverbs_qp_dest);
 	copy_to_user(dst, &tmpbuf[11], 48);
-	
+
 
 	return ib_uverbs_modify_qp(file, buf, insz, outsz);
 }

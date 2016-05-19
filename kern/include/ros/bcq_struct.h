@@ -27,4 +27,4 @@ struct __name##_bcq_wrap {                                                     \
 struct __name##_bcq {                                                          \
 	struct bcq_header hdr;                                                     \
 	struct __name##_bcq_wrap wraps[__num_elems];                               \
-};                                                                             
+};

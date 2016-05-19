@@ -46,7 +46,7 @@
 #define IP_HDR_SZ 20
 
 
-/* modified to be consistent with linux and our user space tool chain 
+/* modified to be consistent with linux and our user space tool chain
  * we need to make our mind up about bsd/linux structs
  */
 #define	INADDR_ANY			(struct in_addr) {0x00000000}
@@ -242,8 +242,8 @@
  * Default local port range, used by IP_PORTRANGE_DEFAULT
  */
 #define IPPORT_EPHEMERALFIRST	10000
-#define IPPORT_EPHEMERALLAST	65535 
- 
+#define IPPORT_EPHEMERALLAST	65535
+
 /*
  * Dynamic port range, used by IP_PORTRANGE_HIGH.
  */
@@ -300,7 +300,7 @@
 							 (((uint32_t)(i) & 0xffff0000) == 0xc0a80000))
 
 #define	IN_LOCAL_GROUP(i)	(((uint32_t)(i) & 0xffffff00) == 0xe0000000)
- 
+
 #define	IN_ANY_LOCAL(i)		(IN_LINKLOCAL(i) || IN_LOCAL_GROUP(i))
 
 #define	INADDR_LOOPBACK			(uint32_t)0x7f000001

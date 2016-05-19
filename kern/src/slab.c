@@ -46,7 +46,7 @@ static void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	kc->ctor = ctor;
 	kc->dtor = dtor;
 	kc->nr_cur_alloc = 0;
-	
+
 	/* put in cache list based on it's size */
 	struct kmem_cache *i, *prev = NULL;
 	spin_lock_irqsave(&kmem_caches_lock);
@@ -75,10 +75,10 @@ void kmem_cache_init(void)
 	                    __alignof__(struct kmem_cache), 0, NULL, NULL);
 	/* Build the slab and bufctl caches */
 	kmem_slab_cache = kmem_cache_create("kmem_slab", sizeof(struct kmem_slab),
-	                       __alignof__(struct kmem_slab), 0, NULL, NULL); 
+	                       __alignof__(struct kmem_slab), 0, NULL, NULL);
 	kmem_bufctl_cache = kmem_cache_create("kmem_bufctl",
 	                         sizeof(struct kmem_bufctl),
-	                         __alignof__(struct kmem_bufctl), 0, NULL, NULL); 
+	                         __alignof__(struct kmem_bufctl), 0, NULL, NULL);
 }
 
 /* Cache management */
@@ -149,7 +149,7 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 	spin_lock_irqsave(&kmem_caches_lock);
 	SLIST_REMOVE(&kmem_caches, cp, kmem_cache, link);
 	spin_unlock_irqsave(&kmem_caches_lock);
-	kmem_cache_free(&kmem_cache_cache, cp); 
+	kmem_cache_free(&kmem_cache_cache, cp);
 	spin_unlock_irqsave(&cp->cache_lock);
 }
 
@@ -175,7 +175,7 @@ void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
 		a_slab = TAILQ_FIRST(&cp->empty_slab_list);
 		TAILQ_REMOVE(&cp->empty_slab_list, a_slab, link);
 		TAILQ_INSERT_HEAD(&cp->partial_slab_list, a_slab, link);
-	} 
+	}
 	// have a partial now (a_slab), get an item, return item
 	if (cp->obj_size <= SLAB_LARGE_CUTOFF) {
 		retval = a_slab->free_small_obj;
@@ -307,7 +307,7 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 			// Initialize the object, if necessary
 			if (cp->ctor)
 				cp->ctor(buf, cp->obj_size);
-			a_bufctl = kmem_cache_alloc(kmem_bufctl_cache, 0);	
+			a_bufctl = kmem_cache_alloc(kmem_bufctl_cache, 0);
 			TAILQ_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl, link);
 			a_bufctl->buf_addr = buf;
 			a_bufctl->my_slab = a_slab;
@@ -328,7 +328,7 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 void kmem_cache_reap(struct kmem_cache *cp)
 {
 	struct kmem_slab *a_slab, *next;
-	
+
 	// Destroy all empty slabs.  Refer to the notes about the while loop
 	spin_lock_irqsave(&cp->cache_lock);
 	a_slab = TAILQ_FIRST(&cp->empty_slab_list);

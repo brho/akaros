@@ -42,7 +42,7 @@ static uint32_t get_cores_needed(struct proc *p);
 /* poke-style ksched - ensures the MCP ksched only runs once at a time.  since
  * only one mcp ksched runs at a time, while this is set, the ksched knows no
  * cores are being allocated by other code (though they could be dealloc, due to
- * yield). 
+ * yield).
  *
  * The main value to this sync method is to make the 'make sure the ksched runs
  * only once at a time and that it actually runs' invariant/desire wait-free, so
@@ -325,7 +325,7 @@ static bool __schedule_scp(void)
 			 * proc_run_s would pick it up.  This way is a bit safer for
 			 * future changes, but has an extra (empty) TLB flush.  */
 			abandon_core();
-		} 
+		}
 		/* Run the new proc */
 		switch_lists(p, &runnable_scps, &unrunnable_scps);
 		printd("PID of the SCP i'm running: %d\n", p->pid);
@@ -436,7 +436,7 @@ static void __run_mcp_ksched(void *arg)
 }
 
 /* Something has changed, and for whatever reason the scheduler should
- * reevaluate things. 
+ * reevaluate things.
  *
  * Don't call this if you are processing a syscall or otherwise care about your
  * kthread variables, cur_proc/owning_proc, etc.

@@ -1,8 +1,8 @@
-/* Copyright (c) 2009 The Regents of the University  of California. 
- * See the COPYRIGHT files at the top of this source tree for full 
+/* Copyright (c) 2009 The Regents of the University  of California.
+ * See the COPYRIGHT files at the top of this source tree for full
  * license information.
- * 
- * Kevin Klues <klueska@cs.berkeley.edu>    
+ *
+ * Kevin Klues <klueska@cs.berkeley.edu>
  */
 
 #include <ros/common.h>
@@ -35,7 +35,7 @@ inline void init_cache_properties(cache_t *c, size_t sz_k, size_t wa, size_t cls
 #endif
 }
 
-inline void init_free_cache_colors_map(cache_t* c) 
+inline void init_free_cache_colors_map(cache_t* c)
 {
 	// Initialize the free colors map
 	c->free_colors_map = kmalloc(c->num_colors, 0);
@@ -88,24 +88,24 @@ inline size_t get_cache_num_offset_bits(cache_t *c) {
 	return (LOG2_UP(get_cache_line_size_bytes(c)));
 }
 inline size_t get_cache_num_index_bits(cache_t *c) {
-	return (LOG2_UP(get_cache_size_bytes(c) 
+	return (LOG2_UP(get_cache_size_bytes(c)
                    / get_cache_ways_associative(c)
                    / get_cache_line_size_bytes(c)));
 }
 inline size_t get_cache_num_tag_bits(cache_t *c) {
-	return (NUM_ADDR_BITS - get_cache_num_offset_bits(c) 
+	return (NUM_ADDR_BITS - get_cache_num_offset_bits(c)
                           - get_cache_num_index_bits(c));
 }
 inline size_t get_cache_num_page_color_bits(cache_t *c) {
-	return (get_cache_num_offset_bits(c) 
-                  + get_cache_num_index_bits(c) 
-                  - PGSHIFT); 
+	return (get_cache_num_offset_bits(c)
+                  + get_cache_num_index_bits(c)
+                  - PGSHIFT);
 }
 inline size_t get_cache_bytes_per_line(cache_t *c) {
 	return (1 << get_cache_num_offset_bits(c));
 }
 inline size_t get_cache_num_lines(cache_t *c) {
-	return (get_cache_size_bytes(c)/get_cache_bytes_per_line(c));  
+	return (get_cache_size_bytes(c)/get_cache_bytes_per_line(c));
 }
 inline size_t get_cache_num_sets(cache_t *c) {
 	return (get_cache_num_lines(c)/get_cache_ways_associative(c));
@@ -118,10 +118,10 @@ inline size_t get_cache_lines_per_page(cache_t *c) {
 }
 inline size_t get_cache_bytes_per_way(cache_t *c) {
 	return (get_cache_size_bytes(c)/get_cache_ways_associative(c));
-} 
+}
 inline size_t get_cache_lines_per_way(cache_t *c) {
 	return (get_cache_num_lines(c)/get_cache_ways_associative(c));
-} 
+}
 inline size_t get_cache_pages_per_way(cache_t *c) {
 	return (get_cache_lines_per_way(c)/get_cache_lines_per_page(c));
 }
@@ -129,7 +129,7 @@ inline size_t get_cache_num_page_colors(cache_t *c) {
 	return get_cache_pages_per_way(c);
 }
 
-static inline void set_color_range(uint16_t color, uint8_t* map, 
+static inline void set_color_range(uint16_t color, uint8_t* map,
                                    cache_t* smaller, cache_t* bigger)
 {
 	size_t base, r;
@@ -141,13 +141,13 @@ static inline void set_color_range(uint16_t color, uint8_t* map,
 	else {
 		r = smaller->num_colors / bigger->num_colors;
 		base = color/r;
-		if(BITMASK_IS_SET_IN_RANGE(smaller->free_colors_map, 
+		if(BITMASK_IS_SET_IN_RANGE(smaller->free_colors_map,
 		                           base*r, base*r+r-1))
 			SET_BITMASK_BIT(map, base);
 	}
 }
 
-static inline void clr_color_range(uint16_t color, uint8_t* map, 
+static inline void clr_color_range(uint16_t color, uint8_t* map,
                                    cache_t* smaller, cache_t* bigger)
 {
 	size_t base, r;
@@ -163,12 +163,12 @@ static inline void clr_color_range(uint16_t color, uint8_t* map,
 	}
 }
 
-static inline error_t __cache_color_alloc_specific(size_t color, cache_t* c, 
-                                                         uint8_t* colors_map) 
+static inline error_t __cache_color_alloc_specific(size_t color, cache_t* c,
+                                                         uint8_t* colors_map)
 {
 	if(!GET_BITMASK_BIT(c->free_colors_map, color))
-		return -ENOCACHE;	
-	
+		return -ENOCACHE;
+
 	if(l1)
 		clr_color_range(color, l1->free_colors_map, c, l1);
 	if(l2)
@@ -180,10 +180,10 @@ static inline error_t __cache_color_alloc_specific(size_t color, cache_t* c,
 	return ESUCCESS;
 }
 
-static inline error_t __cache_color_alloc(cache_t* c, uint8_t* colors_map) 
+static inline error_t __cache_color_alloc(cache_t* c, uint8_t* colors_map)
 {
 	if(BITMASK_IS_CLEAR(c->free_colors_map, c->num_colors))
-		return -ENOCACHE;	
+		return -ENOCACHE;
 
 	int color=0;
 	do {
@@ -191,11 +191,11 @@ static inline error_t __cache_color_alloc(cache_t* c, uint8_t* colors_map)
 			break;
 	} while(++color);
 
-	return __cache_color_alloc_specific(color, c, colors_map);	
+	return __cache_color_alloc_specific(color, c, colors_map);
 }
 
-static inline void __cache_color_free_specific(size_t color, cache_t* c, 
-                                                     uint8_t* colors_map) 
+static inline void __cache_color_free_specific(size_t color, cache_t* c,
+                                                     uint8_t* colors_map)
 {
 	if(GET_BITMASK_BIT(c->free_colors_map, color))
 		return;
@@ -216,10 +216,10 @@ static inline void __cache_color_free_specific(size_t color, cache_t* c,
 	clr_color_range(color, colors_map, c, llc_cache);
 }
 
-static inline void __cache_color_free(cache_t* c, uint8_t* colors_map) 
+static inline void __cache_color_free(cache_t* c, uint8_t* colors_map)
 {
 	if(BITMASK_IS_FULL(c->free_colors_map, c->num_colors))
-		return;	
+		return;
 
 	int color=0;
 	do {
@@ -233,7 +233,7 @@ static inline void __cache_color_free(cache_t* c, uint8_t* colors_map)
 	if(color == c->num_colors)
 		return;
 
-	__cache_color_free_specific(color, c, colors_map);	
+	__cache_color_free_specific(color, c, colors_map);
 }
 
 uint8_t* cache_colors_map_alloc() {
@@ -253,14 +253,14 @@ void cache_colors_map_free(uint8_t* colors_map) {
 #endif
 }
 
-error_t cache_color_alloc(cache_t* c, uint8_t* colors_map) 
+error_t cache_color_alloc(cache_t* c, uint8_t* colors_map)
 {
 	spin_lock_irqsave(&cache_colors_lock);
 	error_t e = __cache_color_alloc(c, colors_map);
 	spin_unlock_irqsave(&cache_colors_lock);
 	return e;
 }
-error_t cache_color_alloc_specific(size_t color, cache_t* c, uint8_t* colors_map) 
+error_t cache_color_alloc_specific(size_t color, cache_t* c, uint8_t* colors_map)
 {
 	spin_lock_irqsave(&cache_colors_lock);
 	error_t e = __cache_color_alloc_specific(color, c, colors_map);
@@ -268,13 +268,13 @@ error_t cache_color_alloc_specific(size_t color, cache_t* c, uint8_t* colors_map
 	return e;
 }
 
-void cache_color_free(cache_t* c, uint8_t* colors_map) 
+void cache_color_free(cache_t* c, uint8_t* colors_map)
 {
 	spin_lock_irqsave(&cache_colors_lock);
 	__cache_color_free(c, colors_map);
 	spin_unlock_irqsave(&cache_colors_lock);
 }
-void cache_color_free_specific(size_t color, cache_t* c, uint8_t* colors_map) 
+void cache_color_free_specific(size_t color, cache_t* c, uint8_t* colors_map)
 {
 	spin_lock_irqsave(&cache_colors_lock);
 	__cache_color_free_specific(color, c, colors_map);

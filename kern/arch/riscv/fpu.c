@@ -108,7 +108,7 @@ static int emulate_fpu_silly(struct hw_trapframe *state,
 	*/
 	else
 	  return 1;
-	
+
 	silly->fsr = sf.float_rounding_mode << 5 | sf.float_exception_flags;
 	return 0;
 }

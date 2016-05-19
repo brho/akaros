@@ -196,7 +196,7 @@ void pci_init(void)
 				dev_id = result >> 16;
 				ven_id = result & 0xffff;
 				/* Skip invalid IDs (not a device) */
-				if (ven_id == INVALID_VENDOR_ID) 
+				if (ven_id == INVALID_VENDOR_ID)
 					break;	/* skip functions too, they won't exist */
 				pcidev = kzmalloc(sizeof(struct pci_device), 0);
 				/* we don't need to lock it til we post the pcidev to the list*/

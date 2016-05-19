@@ -5,7 +5,7 @@
 #include <arch/console.h>
 
 void arch_init()
-{		
+{
 	smp_boot();
 	proc_init();
 }

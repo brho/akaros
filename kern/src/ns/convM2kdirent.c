@@ -68,7 +68,7 @@ unsigned int convM2kdirent(uint8_t * buf, unsigned int nbuf, struct kdirent *kd,
 	/* for now, uids in akaros are ints. Does not
 	 * matter; kdirents are limited in what they tell you.
 	 * get the name, ignore the rest. Maybe we can
-	 * fix this later. 
+	 * fix this later.
 	 */
 	for (i = 0; i < 4; i++) {
 		if (p + BIT16SZ > ebuf)
@@ -149,7 +149,7 @@ unsigned int convM2kstat(uint8_t * buf, unsigned int nbuf, struct kstat *ks)
 	ks->st_blksize = 512;
 	ks->st_blocks = ROUNDUP(ks->st_size, ks->st_blksize) / ks->st_blksize;
 
-	ks->st_nlink = 2;	// links make no sense any more. 
+	ks->st_nlink = 2;	// links make no sense any more.
 	ks->st_uid = ks->st_gid = 0;
 
 	return p - buf;

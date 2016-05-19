@@ -25,7 +25,7 @@ static __inline void tlbflush(void)
 }
 
 static __inline void invlpg(void *addr)
-{ 
+{
 	tlbflush();
 }
 
@@ -101,7 +101,7 @@ static __inline void disable_irqsave(int8_t* state)
 {
 	if ((*state == 0) && irq_is_enabled())
 		disable_irq();
-	else 
+	else
 		(*state)--;
 }
 

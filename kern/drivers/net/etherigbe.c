@@ -1971,7 +1971,7 @@ igbepci(void)
 		       pcidev->ven_id, pcidev->dev_id,
 		       pcidev->bus, pcidev->dev, pcidev->func);
 
-		mmio_paddr = pcidev->bar[0].mmio_base32 ? pcidev->bar[0].mmio_base32 : 
+		mmio_paddr = pcidev->bar[0].mmio_base32 ? pcidev->bar[0].mmio_base32 :
 		                                          pcidev->bar[0].mmio_base64;
 		mem = (void*)vmap_pmem_nocache(mmio_paddr, pcidev->bar[0].mmio_sz);
 		if(mem == NULL){

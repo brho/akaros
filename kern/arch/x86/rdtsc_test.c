@@ -105,10 +105,10 @@
  * min is less than 'normal', means that we could get negative numbers for some
  * measurements (the goal is to determine the overhead and subtract that from
  * our total measurement, and if we think the overhead is 32 but was actually 28
- * for a run, we could have issues). 
+ * for a run, we could have issues).
  *
  * But wait, there's more:
- * 
+ *
  * When we add code around (and inside) the measurement, things get even worse:
  * - If we put variable (a volatile btw) = j + i; in the loop, there's no real
  *   change.  I checked cases 1, 4 and 5, 1 being the intel recommended, 4 being
@@ -129,10 +129,10 @@
  * the cost of instructions regardless of whether or not the first or last
  * commands are rdtscp (I'm more concerned with the end time call, which is
  * where this hiding may be happening).  Perhaps the pipeline needs to be
- * drained (or something), and it takes a certain amount of time to do so, 
+ * drained (or something), and it takes a certain amount of time to do so,
  * regardless of a few extra instructions squeezed in.  Meaning we can't tell
  * the difference between 0 and a few cycles, and probably a few cycles are
- * 'free' / hidden by the rdtsc call. 
+ * 'free' / hidden by the rdtsc call.
  *
  * Bottom line?  Our measurements are inexact, despite the stable minimum and
  * low variance.  Everything will be +/- our max deviation, as well as
@@ -248,7 +248,7 @@
  * within their execution.  rdtsc probably takes its measurement earlier in the
  * instruction (~16-20 cycles/ticks earlier perhaps?), based on the 48->28
  * back-side step and the front-side 28->44 step.
- * 		
+ *
  * Anyway, what matters is a relatively stable method without a lot of variance
  * that has a solid floor/min that we can detect at runtime (to run tests on a
  * given machine).  Using rdtscp for the start measurement seems unreliable
@@ -460,10 +460,10 @@ static inline void filltimes(uint64_t **times, unsigned int loop_bound,
 						 :
 						 : "%eax", "%ebx", "%ecx", "%edx");
 			#endif
-			
+
 			start = ( ((uint64_t)start_high << 32) | start_low );
 			end = ( ((uint64_t)end_high << 32) | end_low );
-			
+
 			if ( (int64_t)(end - start) < 0) {
 				printk("CRITICAL ERROR IN TAKING THE TIME!!!!!!\n"
                        "loop(%d) stat(%d) start = %llu, end = %llu, "
@@ -520,9 +520,9 @@ int test_rdtsc(unsigned int loop_bound, unsigned int stat_size)
 	uint64_t tot_var = 0, max_dev_all = 0, var_of_vars = 0, var_of_mins = 0;
 	loop_bound = loop_bound ?: LOOP_BOUND_DEF;
 	stat_size = stat_size ?: STAT_SIZE_DEF;
-	
+
 	printk("Running rdtsc tests...\n");
-	
+
 	times = kmalloc(loop_bound * sizeof(uint64_t*), 0);
 	if (!times) {
 		printk("unable to allocate memory for times\n");
@@ -538,21 +538,21 @@ int test_rdtsc(unsigned int loop_bound, unsigned int stat_size)
 			return 0;
 		}
 	}
-	
+
 	variances = kmalloc(loop_bound * sizeof(uint64_t), 0);
 	if (!variances) {
 		printk("unable to allocate memory for variances\n");
 		// not bothering to free **times
 		return 0;
 	}
-	
+
 	min_values = kmalloc(loop_bound * sizeof(uint64_t), 0);
 	if (!min_values) {
 		printk("unable to allocate memory for min_values\n");
 		// not bothering to free **times or variances
 		return 0;
 	}
-	
+
 	disable_irqsave(&state);
 
 	filltimes(times, loop_bound, stat_size);
@@ -563,7 +563,7 @@ int test_rdtsc(unsigned int loop_bound, unsigned int stat_size)
 		max_dev = 0;
 		min_time = 0;
 		max_time = 0;
-	
+
 		for (i = 0; i < stat_size; i++) {
 			if ((min_time == 0) || (min_time > times[j][i]))
 				min_time = times[j][i];
@@ -578,23 +578,23 @@ int test_rdtsc(unsigned int loop_bound, unsigned int stat_size)
 			max_dev_all = max_dev;
 		variances[j] = var_calc(times[j], stat_size);
 		tot_var += variances[j];
-		
+
 		printk("loop_size:%d >>>> variance(cycles): %llu; "
                "max_deviation: %llu; min time: %llu\n", j, variances[j],
                max_dev, min_time);
 		prev_min = min_time;
 	}
-	
+
 	var_of_vars = var_calc(variances, loop_bound);
 	var_of_mins = var_calc(min_values, loop_bound);
-	
+
 	printk("total number of spurious min values = %d\n", spurious);
 	/* is this next one the mean variance, not the total? */
 	printk("total variance = %llu\n", (tot_var/loop_bound));
 	printk("absolute max deviation = %llu\n", max_dev_all);
 	printk("variance of variances = %llu\n", var_of_vars);
 	printk("variance of minimum values = %llu\n", var_of_mins);
-	
+
 	for (j = 0; j < loop_bound; j++) {
 		kfree(times[j]);
 	}
@@ -625,7 +625,7 @@ bool check_timing_stability(void)
 	/* 2mil detected an SMI about 95% of the time on my nehalem. */
 	for (int i = 0; i < 3000000; i++) {
 		start = read_tsc_serialized();
-		for (int j = 0; j < 500; j++) 
+		for (int j = 0; j < 500; j++)
 			dummy = j;
  		end = read_tsc_serialized();
 		if ((int64_t)(end - start) < 0) {

@@ -85,18 +85,18 @@ static void pat_init(void)
 }
 
 // could consider having an API to allow these to dynamically change
-// MTRRs are for physical, static ranges.  PAT are linear, more granular, and 
+// MTRRs are for physical, static ranges.  PAT are linear, more granular, and
 // more dynamic
 void setup_default_mtrrs(barrier_t* smp_barrier)
 {
 	// disable interrupts
 	int8_t state = 0;
 	disable_irqsave(&state);
-	// barrier - if we're meant to do this for all cores, we'll be 
+	// barrier - if we're meant to do this for all cores, we'll be
 	// passed a pointer to an initialized barrier
 	if (smp_barrier)
 		waiton_barrier(smp_barrier);
-	
+
 	// disable caching	cr0: set CD and clear NW
 	lcr0((rcr0() | CR0_CD) & ~CR0_NW);
 	// flush caches
@@ -104,7 +104,7 @@ void setup_default_mtrrs(barrier_t* smp_barrier)
 	// flush tlb
 	tlb_flush_global();
 	// disable MTRRs, and sets default type to WB (06)
-#ifndef CONFIG_NOMTRRS 
+#ifndef CONFIG_NOMTRRS
 	write_msr(IA32_MTRR_DEF_TYPE, 0x00000006);
 
 	// Now we can actually safely adjust the MTRRs
@@ -117,8 +117,8 @@ void setup_default_mtrrs(barrier_t* smp_barrier)
 	write_msr(IA32_MTRR_PHYSBASE1, PTE_ADDR(DEVPHYSMEM) | 0x00);
 	write_msr(IA32_MTRR_PHYSMASK1, 0x0000000ffffc0800);
 	// APIC/IOAPIC holes
-	/* Going to skip them, since we set their mode using PAT when we 
-	 * map them in 
+	/* Going to skip them, since we set their mode using PAT when we
+	 * map them in
 	 */
 	// make sure all other MTRR ranges are disabled (should be unnecessary)
 	write_msr(IA32_MTRR_PHYSMASK2, 0);
@@ -130,7 +130,7 @@ void setup_default_mtrrs(barrier_t* smp_barrier)
 
 	// keeps default type to WB (06), turns MTRRs on, and turns off fixed ranges
 	write_msr(IA32_MTRR_DEF_TYPE, 0x00000806);
-#endif	
+#endif
 	pat_init();
 	// reflush caches and TLB
 	cache_flush();

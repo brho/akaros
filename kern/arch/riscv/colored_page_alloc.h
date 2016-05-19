@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2009 The Regents of the University  of California.  
- * See the COPYRIGHT files at the top of this source tree for full 
+ * Copyright (c) 2009 The Regents of the University  of California.
+ * See the COPYRIGHT files at the top of this source tree for full
  * license information.
  */
 /**
  * @author Kevin Klues <klueska@cs.berkeley.edu>
  */
- 
+
 #pragma once
 
 /********** Page Coloring Related Macros ************/
@@ -21,12 +21,12 @@
 	DECLARE_CACHE_COLORED_PAGE_FREE_LIST(l1)                  \
 	DECLARE_CACHE_COLORED_PAGE_FREE_LIST(l2)                  \
 	DECLARE_CACHE_COLORED_PAGE_FREE_LIST(l3)
-	
+
 #define DECLARE_EXTERN_CACHE_COLORED_PAGE_FREE_LISTS()        \
 	DECLARE_EXTERN_CACHE_COLORED_PAGE_FREE_LIST(l1)           \
 	DECLARE_EXTERN_CACHE_COLORED_PAGE_FREE_LIST(l2)           \
 	DECLARE_EXTERN_CACHE_COLORED_PAGE_FREE_LIST(l3)
-	
+
 #define DECLARE_CACHE_COLORED_PAGE_ALLOC_FUNCTIONS()          \
 	DECLARE_CACHE_COLORED_PAGE_ALLOC_FUNCTION(l1)             \
 	DECLARE_CACHE_COLORED_PAGE_ALLOC_FUNCTION(l2)             \
@@ -41,7 +41,7 @@
 	REMOVE_CACHE_COLORING_PAGE_FROM_FREE_LIST(page, l1)       \
 	REMOVE_CACHE_COLORING_PAGE_FROM_FREE_LIST(page, l2)       \
 	REMOVE_CACHE_COLORING_PAGE_FROM_FREE_LIST(page, l3)
-	
+
 #define INSERT_CACHE_COLORING_PAGE_ONTO_FREE_LISTS(page)      \
 	INSERT_CACHE_COLORING_PAGE_ONTO_FREE_LIST(page, l1)       \
 	INSERT_CACHE_COLORING_PAGE_ONTO_FREE_LIST(page, l2)       \

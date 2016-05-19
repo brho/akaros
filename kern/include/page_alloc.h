@@ -1,10 +1,10 @@
-/* Copyright (c) 2009, 2010 The Regents of the University  of California. 
- * See the COPYRIGHT files at the top of this source tree for full 
+/* Copyright (c) 2009, 2010 The Regents of the University  of California.
+ * See the COPYRIGHT files at the top of this source tree for full
  * license information.
- * 
- * Kevin Klues <klueska@cs.berkeley.edu>    
+ *
+ * Kevin Klues <klueska@cs.berkeley.edu>
  * Barret Rhoden <brho@cs.berkeley.edu> */
- 
+
 #pragma once
 
 #include <atomic.h>

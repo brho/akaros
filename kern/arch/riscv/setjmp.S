@@ -10,7 +10,7 @@
 .type slim_setjmp, @function
 slim_setjmp:
 	ret
-	
+
 .size slim_setjmp,.-slim_setjmp
 
 .text
@@ -19,5 +19,5 @@ slim_setjmp:
 .type longjmp, @function
 longjmp:
 	ret
-	
+
 .size longjmp,.-longjmp

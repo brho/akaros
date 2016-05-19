@@ -932,7 +932,7 @@ struct block *packblock(struct block *bp)
 }
 
 /* Add an extra_data entry to newb at newb_idx pointing to b's body, starting at
- * body_rp, for up to len.  Returns the len consumed. 
+ * body_rp, for up to len.  Returns the len consumed.
  *
  * The base is 'b', so that we can kfree it later.  This currently ties us to
  * using kfree for the release method for all extra_data.
@@ -1255,7 +1255,7 @@ static size_t read_from_block(struct block *b, uint8_t *to, size_t amt)
 {
 	size_t copy_amt, retval = 0;
 	struct extra_bdata *ebd;
-	
+
 	copy_amt = MIN(BHLEN(b), amt);
 	memcpy(to, b->rp, copy_amt);
 	/* advance the rp, since this block not be completely consumed and future

@@ -848,7 +848,7 @@ int64_t sysseek(int fd, int64_t off, int whence)
 
 void validstat(uint8_t * s, int n, int slashok)
 {
-	
+
 	int m;
 	char buf[64];
 
@@ -900,7 +900,7 @@ int sysfstat(int fd, uint8_t *buf, int n)
 
 int sysfstatakaros(int fd, struct kstat *ks)
 {
-	
+
 	int n = 4096;
 	uint8_t *buf;
 	buf = kmalloc(n, MEM_WAIT);
@@ -939,7 +939,7 @@ int sysstat(char *path, uint8_t *buf, int n)
 
 int sysstatakaros(char *path, struct kstat *ks)
 {
-	
+
 	int n = 4096;
 	uint8_t *buf;
 	buf = kmalloc(n, MEM_WAIT);
@@ -1138,7 +1138,7 @@ struct dir *sysdirfstat(int fd)
 
 int sysdirwstat(char *name, struct dir *dir)
 {
-	
+
 	uint8_t *buf;
 	int r;
 
@@ -1152,7 +1152,7 @@ int sysdirwstat(char *name, struct dir *dir)
 
 int sysdirfwstat(int fd, struct dir *dir)
 {
-	
+
 	uint8_t *buf;
 	int r;
 
@@ -1166,7 +1166,7 @@ int sysdirfwstat(int fd, struct dir *dir)
 
 static long dirpackage(uint8_t * buf, long ts, struct kdirent **d)
 {
-	
+
 	char *s;
 	long ss, i, n, nn, m = 0;
 
@@ -1261,7 +1261,7 @@ int sysiounit(int fd)
 
 void print_chaninfo(struct chan *c)
 {
-	
+
 	char buf[64] = { 0 };
 	bool has_dev = c->type != -1;
 	if (has_dev && !devtab[c->type].chaninfo) {
@@ -1284,7 +1284,7 @@ void print_chaninfo(struct chan *c)
  * the pgrp. */
 int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 {
-	
+
 	struct kref *new_dot_ref;
 	ERRSTACK(1);
 	if (waserror()) {

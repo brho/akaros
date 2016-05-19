@@ -14,7 +14,7 @@
 #include <time.h>
 #include <sys/queue.h>
 
-/* Macros for assertions. 
+/* Macros for assertions.
  */
 #define KT_ASSERT(test)                                                          \
 	KT_ASSERT_M("", test)

@@ -1,5 +1,5 @@
 /* Copyright (C) 2002, 2004 Christopher Clark  <firstname.lastname@cl.cam.ac.uk>
- * 
+ *
  * Modified 2009 by Barret Rhoden <brho@cs.berkeley.edu>
  * Changes include:
  *   - No longer frees keys or values.  It's up to the client to do that.
@@ -49,7 +49,7 @@ size_t __generic_hash(void *k)
 	/* 0x9e370001UL used by Linux (32 bit)
 	 * (prime approx to the golden ratio to the max integer, IAW Knuth)
 	 */
-	return (size_t)k * 0x9e370001UL;	
+	return (size_t)k * 0x9e370001UL;
 }
 
 ssize_t __generic_eq(void *k1, void *k2)
@@ -130,7 +130,7 @@ hashtable_expand(hashtable_t *h)
         h->table = newtable;
     }
     /* Plan B: realloc instead */
-    else 
+    else
     {
         newtable = (hash_entry_t**)
                    krealloc(h->table, newsize*sizeof(hash_entry_t*), 0);
@@ -447,23 +447,23 @@ void hash_for_each_remove(struct hashtable *hash, void func(void *, void *),
 /*
  * Copyright (c) 2002, 2004, Christopher Clark
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 
+ *
  * * Redistributions of source code must retain the above copyright
  * notice, this list of conditions and the following disclaimer.
- * 
+ *
  * * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
+ *
  * * Neither the name of the original author; nor the names of any contributors
  * may be used to endorse or promote products derived from this software
  * without specific prior written permission.
- * 
- * 
+ *
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR

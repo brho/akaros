@@ -176,7 +176,7 @@ void *apipe_head(struct atomic_pipe *ap)
 	return ap->ap_buf + (ap->ap_rd_off & (ap->ap_ring_sz - 1)) * ap->ap_elem_sz;
 }
 
-/* 
+/*
  * Read data from the pipe until a condition is satisfied.
  * f is the function that determines the condition. f saves its
  * state in arg. When f returns non-zero, this function exits,

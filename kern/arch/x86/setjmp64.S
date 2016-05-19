@@ -22,10 +22,10 @@ slim_setjmp:
 	pop  %rsi          # Temporarily grab the return address and adjust %rsp
 	movq %rsi,(%rdi)   # Save the return address
 	movq %rsp,8(%rdi)  # The adjusted %rsp is the post-return %rsp (see longjmp)
-	movq %rbp,16(%rdi) 
+	movq %rbp,16(%rdi)
 	push %rsi          # Restore stuff to make the call/return stack happy
 	ret
-	
+
 .size slim_setjmp,.-slim_setjmp
 
 .text
@@ -37,5 +37,5 @@ longjmp:
 	movq 16(%rdi),%rbp
 	movq 8(%rdi),%rsp  # Set the post-return %rsp
 	jmp *(%rdi)        # Jump back to setjmp callsite (no ret necessary)
-	
+
 .size longjmp,.-longjmp

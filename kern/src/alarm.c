@@ -377,7 +377,7 @@ int sleep_on_awaiter(struct alarm_waiter *waiter)
  * 	- Make sure the interrupt is on and will go off when we want
  * 	- Make sure the interrupt source can find tchain
  * 	- Make sure the interrupt handler calls __trigger_tchain(tchain)
- * 	- Make sure you don't clobber an old tchain here (a bug) 
+ * 	- Make sure you don't clobber an old tchain here (a bug)
  * This implies the function knows how to find its timer source/void
  *
  * Called with the tchain lock held, and IRQs disabled.  However, we could be

@@ -63,7 +63,7 @@
  * enough so the producer knows the item is free.  If pub_idx was their item,
  * they move it forward to the next item.  If it is not, currently, they spin
  * and wait until the previous consumer finishes, and then move it forward.
- * This isn't ideal, and we can deal with this in the future.  
+ * This isn't ideal, and we can deal with this in the future.
  *
  * Enqueue will enqueue the item pointed to by elem.  Dequeue will write an
  * item into the memory pointed to by elem.
@@ -108,7 +108,7 @@ struct bcq_header {
 
 #endif
 
-/* Functions */                                                                
+/* Functions */
 #define bcq_init(_bcq, _ele_type, _num_elems)                                  \
 ({                                                                             \
 	memset((_bcq), 0, sizeof(*(_bcq)));                                        \

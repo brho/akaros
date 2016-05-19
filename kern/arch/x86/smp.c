@@ -168,7 +168,7 @@ int smp_call_function_single(uint32_t dest, isr_t handler, void *data,
 }
 
 // If you want to wait, pass the address of a pointer up above, then call
-// this to do the actual waiting.  Be somewhat careful about uninitialized 
+// this to do the actual waiting.  Be somewhat careful about uninitialized
 // or old wrapper pointers.
 int smp_call_wait(handler_wrapper_t* wrapper)
 {

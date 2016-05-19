@@ -16,11 +16,11 @@
 void frontend_proc_init(struct proc* p);
 void frontend_proc_free(struct proc* p);
 
-int32_t frontend_syscall(pid_t pid, int32_t syscall_num, 
-                         uint32_t arg0, uint32_t arg1, uint32_t arg2, 
+int32_t frontend_syscall(pid_t pid, int32_t syscall_num,
+                         uint32_t arg0, uint32_t arg1, uint32_t arg2,
                          uint32_t arg3, int32_t* errno);
 
-int frontend_syscall_errno(struct proc* p, int n, int a0, 
+int frontend_syscall_errno(struct proc* p, int n, int a0,
                            int a1, int a2, int a3);
 
 void file_init(void);

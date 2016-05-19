@@ -133,7 +133,7 @@ static inline void __spin_lock_raw(volatile uint32_t *rlock)
 			"	je 2f;                "
 			"	pause;                "
 			"	jmp 1b;               "
-			"2:                       " 
+			"2:                       "
 			"	movb $1, %1;          "
 			"	xchgb %1, %0;         "
 			"	cmpb $0, %1;          "

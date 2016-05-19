@@ -8,7 +8,7 @@
  *
  * There is a list of kmem_cache, which are the caches of objects of a given
  * size.  This list is sorted in order of size.  Each kmem_cache has three
- * lists of slabs: full, partial, and empty.  
+ * lists of slabs: full, partial, and empty.
  *
  * For large objects, the kmem_slabs point to bufctls, which have the address
  * of their large buffers.  These slabs can consist of more than one contiguous

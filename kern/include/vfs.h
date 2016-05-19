@@ -69,7 +69,7 @@ TAILQ_HEAD(file_tailq, file);
 TAILQ_HEAD(io_wb_tailq, io_writeback);
 TAILQ_HEAD(event_poll_tailq, event_poll);
 TAILQ_HEAD(vfsmount_tailq, vfsmount);
-TAILQ_HEAD(fs_type_tailq, fs_type); 
+TAILQ_HEAD(fs_type_tailq, fs_type);
 
 /* Linux's quickstring - saves recomputing the hash and length.  Note the length
  * is the non-null-terminated length, as you'd get from strlen(). (for now) */

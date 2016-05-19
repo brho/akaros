@@ -97,10 +97,10 @@ stab_binsearch(const stab_t *stabs,
 	       int type, uintptr_t addr)
 {
 	int l = *region_left, r = *region_right, any_matches = 0;
-	
+
 	while (l <= r) {
 		int true_m = (l + r) / 2, m = true_m;
-		
+
 		// search for earliest stab with right type
 		while (m >= l && stabs[m].n_type != type)
 			m--;
@@ -202,7 +202,7 @@ debuginfo_eip(uintptr_t addr, eipdebuginfo_t *info)
 	// 'eip'.  First, we find the basic source file containing 'eip'.
 	// Then, we look in that source file for the function.  Then we look
 	// for the line number.
-	
+
 	// Search the entire set of stabs for the source file (type N_SO).
 	lfile = 0;
 	rfile = (stab_end - stabs) - 1;
@@ -235,7 +235,7 @@ debuginfo_eip(uintptr_t addr, eipdebuginfo_t *info)
 	}
 	// Ignore stuff after the colon.
 	info->eip_fn_namelen = strfind(info->eip_fn_name, ':') - info->eip_fn_name;
-	
+
 	// Search within [lline, rline] for the line number stab.
 	// If found, set info->eip_line to the right line number.
 	// If not found, return -1.
@@ -247,12 +247,12 @@ debuginfo_eip(uintptr_t addr, eipdebuginfo_t *info)
 	// Your code here.
 
 	stab_binsearch(stabs, stab_end, &lline, &rline, N_SLINE, addr);
-	if (lline <= rline) 
+	if (lline <= rline)
 		// stabs[lline] points to the line number
 		info->eip_line = stabs[lline].n_value;
 	else
 		return -1;
-	
+
 	// Search backwards from the line number for the relevant filename
 	// stab.
 	// We can't just use the "lfile" stab because inlined functions
@@ -274,7 +274,7 @@ debuginfo_eip(uintptr_t addr, eipdebuginfo_t *info)
 		while (stabs[lfun++].n_type == N_PSYM)
 			info->eip_fn_narg++;
 	}
-	
+
 	return 0;
 }
 

@@ -18,7 +18,7 @@
  * 		ret = apipe_read(&ap, &to_local_struct, 1);
  * 		apipe_close_writer(&ap);
  * 		apipe_close_reader(&ap);
- * 	
+ *
  * Read and write return the number of elements copied.  If they copied any
  * amount, they will return.  They will block if the pipe is empty/full,
  * and there exist corresponding writers/readers.

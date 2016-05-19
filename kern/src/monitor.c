@@ -288,7 +288,7 @@ int mon_bin_ls(int argc, char **argv, struct hw_trapframe *hw_tf)
 	}
 	printk("Files in /bin:\n-------------------------------\n");
 	do {
-		retval = bin_dir->f_op->readdir(bin_dir, &dir);	
+		retval = bin_dir->f_op->readdir(bin_dir, &dir);
 		printk("%s\n", dir.d_name);
 	} while (retval == 1);
 	kref_put(&bin_dir->f_kref);
@@ -548,7 +548,7 @@ int mon_measure(int argc, char **argv, struct hw_trapframe *hw_tf)
 #ifdef CONFIG_APPSERVER
 		/* Won't be that accurate, since it's not actually going through the
 		 * __proc_free() path. */
-		spin_on(kref_refcnt(&p->p_kref) != end_refcnt);	
+		spin_on(kref_refcnt(&p->p_kref) != end_refcnt);
 #else
 		/* this is a little ghetto. it's not fully free yet, but we are also
 		 * slowing it down by messing with it, esp with the busy waiting on a
@@ -734,7 +734,7 @@ int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 			pcpui_type = 0;
 		printk("\nRunning PCPUI Trace Ring handlers for type %d\n", pcpui_type);
 		if (argc >= 4) {
-			pcpui_coreid = strtol(argv[3], 0, 0); 
+			pcpui_coreid = strtol(argv[3], 0, 0);
 			pcpui_tr_foreach(pcpui_coreid, pcpui_type);
 		} else {
 			pcpui_tr_foreach_all(pcpui_type);

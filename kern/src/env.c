@@ -69,7 +69,7 @@ int env_setup_vm(env_t *e)
 	}
 	/* Finally, set up the Global Shared Data page for all processes.  Can't be
 	 * trusted, but still very useful at this stage for us.  Consider removing
-	 * when we have real processes (TODO). 
+	 * when we have real processes (TODO).
 	 *
 	 * Note the page is alloced only the first time through, and its ref is
 	 * stored in shared_page. */

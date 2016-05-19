@@ -114,7 +114,7 @@ struct vcore *vcoreid2vcore(struct proc *p, uint32_t vcoreid);
  *
  * These are internal functions.  Error checking is to catch bugs, and you
  * shouldn't call these functions with parameters you are not sure about (like
- * an invalid corelist).  
+ * an invalid corelist).
  *
  * WARNING: YOU MUST HOLD THE PROC_LOCK BEFORE CALLING THESE! */
 /* Gives process p the additional num cores listed in corelist */

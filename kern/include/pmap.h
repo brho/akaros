@@ -91,7 +91,7 @@ void	page_decref(page_t *pp);
 
 void	tlb_invalidate(pgdir_t pgdir, void *ga);
 void tlb_flush_global(void);
-bool regions_collide_unsafe(uintptr_t start1, uintptr_t end1, 
+bool regions_collide_unsafe(uintptr_t start1, uintptr_t end1,
                             uintptr_t start2, uintptr_t end2);
 
 /* Arch specific implementations for these */
@@ -141,12 +141,12 @@ static inline void *ppn2kva(size_t pp)
 	return page2kva(ppn2page(pp));
 }
 
-static inline page_t* kva2page(void* addr) 
+static inline page_t* kva2page(void* addr)
 {
 	return pa2page(PADDR(addr));
 }
 
-static inline ppn_t kva2ppn(void* addr) 
+static inline ppn_t kva2ppn(void* addr)
 {
 	return page2ppn(kva2page(addr));
 }

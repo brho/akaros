@@ -364,8 +364,8 @@ int duplicate_vmrs(struct proc *p, struct proc *new_p)
 		vmr->vm_proc = new_p;
 		vmr->vm_base = vm_i->vm_base;
 		vmr->vm_end = vm_i->vm_end;
-		vmr->vm_prot = vm_i->vm_prot;	
-		vmr->vm_flags = vm_i->vm_flags;	
+		vmr->vm_prot = vm_i->vm_prot;
+		vmr->vm_flags = vm_i->vm_flags;
 		vmr->vm_file = vm_i->vm_file;
 		vmr->vm_foff = vm_i->vm_foff;
 		if (vm_i->vm_file) {

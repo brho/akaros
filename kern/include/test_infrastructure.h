@@ -9,8 +9,8 @@
 #include <stdio.h>
 #include <kmalloc.h>
 
-/* Macros for assertions. 
- * They depend on <stdbool.h> and printk() to be included in the source file. 
+/* Macros for assertions.
+ * They depend on <stdbool.h> and printk() to be included in the source file.
  */
 #define KT_ASSERT_M(message, test)                                               \
 	do {                                                                         \

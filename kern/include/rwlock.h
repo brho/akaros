@@ -5,7 +5,7 @@
  * Reader-writer queue locks (sleeping locks).
  *
  * Readers favor readers; writers favor writers.  Check out rwlock.c for more
- * info. 
+ * info.
  *
  * One consequence of this: "if some reader holds a rwlock, then any other
  * thread (including itself) can get an rlock". */

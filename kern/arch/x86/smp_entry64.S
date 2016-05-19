@@ -59,8 +59,8 @@ protcseg:
 	# Setup cr0.  PE and PG are critical for now.  The others are similar to
 	# what we want in general (-AM with 64 bit, it's useless).
 	movl	%cr0, %eax
-	orl		$(CR0_PE | CR0_PG | CR0_WP | CR0_NE | CR0_MP), %eax  
-	andl	$(~(CR0_AM | CR0_TS | CR0_EM | CR0_CD | CR0_NW)), %eax  
+	orl		$(CR0_PE | CR0_PG | CR0_WP | CR0_NE | CR0_MP), %eax
+	andl	$(~(CR0_AM | CR0_TS | CR0_EM | CR0_CD | CR0_NW)), %eax
 	movl	%eax, %cr0
 	# load the 64bit GDT and jump to long mode (symbol from entry64)
 	lgdt	gdt64desc
@@ -117,6 +117,6 @@ smp_boot_lock:							# this lock word will be only used from
 	.word	0							# its spot in the trampoline (0x1000)
 .globl			smp_semaphore
 smp_semaphore:							# poor man's polling semaphore
-	.word	0							
+	.word	0
 .globl			smp_entry_end
 smp_entry_end:

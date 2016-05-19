@@ -123,7 +123,7 @@ void *radix_delete(struct radix_tree *tree, unsigned long key)
 	slot = &r_node->items[key & (NR_RNODE_SLOTS - 1)];
 	retval = *slot;
 	if (retval) {
-		__radix_remove_slot(r_node, (struct radix_node**)slot);	
+		__radix_remove_slot(r_node, (struct radix_node**)slot);
 	} else {
 		/* it's okay to delete an empty, but i want to know about it for now */
 		warn("Tried to remove a non-existant item from a radix tree!");

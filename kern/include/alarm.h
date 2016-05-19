@@ -34,8 +34,8 @@
  * fire (sitting in an RKM queue).  It will fire at some point, but perhaps it
  * has not fired yet.  It is also possibly (though extremely unlikely) that if
  * you reset an RKM alarm that the new alarm actually happens before the old one
- * (if the new RKM was sent to another core).  
- * 
+ * (if the new RKM was sent to another core).
+ *
  * To use an IRQ alarm, init the waiter with init_awaiter_irq().
  *
  * Quick howto, using the pcpu tchains:
@@ -72,7 +72,7 @@
 
 /* These structures allow code to block or defer work for a certain amount of
  * time.  Timer chains (like off a per-core timer) are made of lists/trees of
- * these. 
+ * these.
  *
  * If you have a func pointer, that handler will run when the alarm goes off.
  * If you don't have a func pointer, you sleep on the semaphore and block your

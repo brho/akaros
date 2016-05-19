@@ -14,7 +14,7 @@
 #define BYTES_FOR_BITMASK_WITH_CHECK(size) \
 	((size) ? ((size) - (1)) / (8) + (1) : (0))
 
-static bool GET_BITMASK_BIT(uint8_t* name, size_t bit) 
+static bool GET_BITMASK_BIT(uint8_t* name, size_t bit)
 {
 	return (((name)[(bit)/8] & (1 << ((bit) % 8))) ? 1 : 0);
 }
@@ -31,13 +31,13 @@ static void SET_BITMASK_BIT(uint8_t* name, size_t bit)
 #define CLR_BITMASK_BIT(name, bit) \
 	((name)[(bit)/8] &= ~(1 << ((bit) % 8)));
 /*
-static void CLR_BITMASK_BIT(uint8_t* name, size_t bit) 
+static void CLR_BITMASK_BIT(uint8_t* name, size_t bit)
 {
 	((name)[(bit)/8] &= ~(1 << ((bit) % 8)));
 }
 */
 
-static void SET_BITMASK_BIT_ATOMIC(uint8_t* name, size_t bit) 
+static void SET_BITMASK_BIT_ATOMIC(uint8_t* name, size_t bit)
 {
 	(atomic_orb(&(name)[(bit)/8], (1 << ((bit) % 8))));
 }
@@ -54,7 +54,7 @@ static void SET_BITMASK_BIT_ATOMIC(uint8_t* name, size_t bit)
 ({ \
 	memset((void*)((uintptr_t)(name)), 255, BYTES_FOR_BITMASK((size))); \
 	(name)[BYTES_FOR_BITMASK((size))-1] >>= (((size) % 8) ? (8 - ((size) % 8)) : 0 ); \
-}) 
+})
 
 #define COPY_BITMASK(newmask, oldmask, size) \
 ({ \

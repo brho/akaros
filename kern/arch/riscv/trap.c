@@ -94,14 +94,14 @@ format_trapframe(struct hw_trapframe *hw_tf, char* buf, int bufsz)
 	  "v0", "v1", "a0", "a1", "a2", "a3", "a4", "a5",
 	  "a6", "a7", "a8", "a9", "aA", "aB", "aC", "aD"
 	};
-	
+
 	hw_tf->gpr[0] = 0;
-	
+
 	for(int i = 0; i < 32; i+=4)
 	{
 		for(int j = 0; j < 4; j++)
 			len += snprintf(buf+len, bufsz-len,
-			                "%s %016lx%c", regnames[i+j], hw_tf->gpr[i+j], 
+			                "%s %016lx%c", regnames[i+j], hw_tf->gpr[i+j],
 			                j < 3 ? ' ' : '\n');
 	}
 	len += snprintf(buf+len, bufsz-len,
@@ -316,7 +316,7 @@ handle_trap(struct hw_trapframe *hw_tf)
 	  [IRQ_HOST] = handle_host_interrupt,
 	  [IRQ_IPI] = handle_interprocessor_interrupt,
 	};
-	
+
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	if (hw_tf->cause < 0)
 	{
@@ -347,7 +347,7 @@ handle_trap(struct hw_trapframe *hw_tf)
 		#warning "if a trap wasn't handled fully, like an MCP pf, reflect it
 		reflect_unhandled_trap(hw_tf->tf_trapno, hw_tf->tf_err, aux);
 	}
-	
+
 	extern void pop_hw_tf(struct hw_trapframe *tf);	/* in asm */
 	/* Return to the current process, which should be runnable.  If we're the
 	 * kernel, we should just return naturally.  Note that current and tf need

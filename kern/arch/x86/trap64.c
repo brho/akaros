@@ -69,7 +69,7 @@ void print_trapframe(struct hw_trapframe *hw_tf)
 	pcpui->__lock_checking_enabled++;
 
 	/* Used in trapentry64.S */
-	static_assert(offsetof(struct hw_trapframe, tf_cs) - 
+	static_assert(offsetof(struct hw_trapframe, tf_cs) -
 	              offsetof(struct hw_trapframe, tf_rax) == 0x90);
 	static_assert(offsetof(struct hw_trapframe, tf_padding0) -
 	              offsetof(struct hw_trapframe, tf_rax) == 0xac);

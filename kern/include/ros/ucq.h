@@ -6,7 +6,7 @@
  * size chunks.  The pages/buffers are linked together by an info struct at the
  * beginning of the page.  Producers and consumers sync on the idxes when
  * operating in a page, and page swaps are synced via the proc* for the kernel
- * and via the ucq's u_lock for the user. 
+ * and via the ucq's u_lock for the user.
  *
  * There's a bunch of details and issues discussed in the Documentation.
  *

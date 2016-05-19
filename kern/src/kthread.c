@@ -118,7 +118,7 @@ static void __launch_kthread(uint32_t srcid, long a0, long a1, long a2)
 	struct kthread *kthread = (struct kthread*)a0;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct proc *cur_proc = pcpui->cur_proc;
-	
+
 	/* Make sure we are a routine kmsg */
 	assert(in_early_rkmsg_ctx(pcpui));
 	if (pcpui->owning_proc && pcpui->owning_proc != kthread->proc) {
@@ -381,7 +381,7 @@ void sem_down(struct semaphore *sem)
 		proc_incref(kthread->proc, 1);
 	} else {
 		kthread->proc = 0;
-	} 
+	}
 	if (setjmp(&kthread->context))
 		goto block_return_path;
 	spin_lock(&sem->lock);

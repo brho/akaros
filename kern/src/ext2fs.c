@@ -486,7 +486,7 @@ void ext2_check_sb(struct ext2_sb *e2sb, struct ext2_block_group *bg,
 	blksize = 1024 << le32_to_cpu(e2sb->s_log_block_size);
 	blks_per_group = le32_to_cpu(e2sb->s_blocks_per_group);
 	num_blk_group = num_blks / blks_per_group + (num_blks % blks_per_group ? 1 : 0);
-	
+
 	if (print) {
 		printk("EXT2 info:\n-------------------------\n");
 		printk("Total Inodes:     %8d\n", le32_to_cpu(e2sb->s_inodes_cnt));
@@ -516,7 +516,7 @@ void ext2_check_sb(struct ext2_sb *e2sb, struct ext2_block_group *bg,
 		printk("Volume name:      %s\n", e2sb->s_volume_name);
 		printk("\nBlock Group Info:\n----------------------\n");
 	}
-	
+
 	for (int i = 0; i < num_blk_group; i++) {
 		sum_blks += le16_to_cpu(bg[i].bg_free_blocks_cnt);
 		sum_inodes += le16_to_cpu(bg[i].bg_free_inodes_cnt);
@@ -530,7 +530,7 @@ void ext2_check_sb(struct ext2_sb *e2sb, struct ext2_block_group *bg,
 			printk("Used Dirs:   %8d\n", le16_to_cpu(bg[i].bg_used_dirs_cnt));
 		}
 	}
-	
+
 	/* Sanity Assertions.  A good ext2 will always pass these. */
 	inodes_per_grp = le32_to_cpu(e2sb->s_inodes_per_group);
 	blks_per_group = le32_to_cpu(e2sb->s_blocks_per_group);
@@ -1160,7 +1160,7 @@ struct dentry *ext2_lookup(struct inode *dir, struct dentry *dentry,
 	struct ext2_dirent *dir_buf, *dir_i;
 	if (!ext2_foreach_dirent(dir, lookup_each_func, (long)dentry, 0, 0))
 		return dentry;
-	printd("EXT2: Not Found, %s\n", dentry->d_name.name);	
+	printd("EXT2: Not Found, %s\n", dentry->d_name.name);
 	return 0;
 }
 
@@ -1349,7 +1349,7 @@ int ext2_readdir(struct file *dir, struct dirent *dirent)
 	assert(e2dir->dir_namelen <= MAX_FILENAME_SZ);
 	strlcpy(dirent->d_name, (char*)e2dir->dir_name, e2dir->dir_namelen + 1);
 	ext2_put_metablock(dir->f_dentry->d_sb, blk_buf);
-	
+
 	/* At the end of the directory, sort of.  ext2 often preallocates blocks, so
 	 * this will cause us to walk along til the end, which isn't quite right. */
 	if (dir->f_dentry->d_inode->i_size == dirent->d_off)

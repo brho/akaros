@@ -5,8 +5,8 @@
  * Hacked BSD taskqueues.  In lieu of actually running a kproc or something that
  * sleeps on a queue of tasks, we'll just blast out a kmsg.  We can always
  * change the implementation if we need more control.
- * 
- * 
+ *
+ *
  * Linux workqueue wrappers:
  *
  * Caveats:

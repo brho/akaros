@@ -78,12 +78,12 @@ int inumber = 13;
  * *sizep is a pointer for reasons not understood.
  * next is the sibling. For a dir, it's the first element after '.'.
  *	int	dotdot;
- *      int     child; 
+ *      int     child;
  *	void	*ptr;
  *	int	size;
  *	int	*sizep;
- * 
- * entry is empty if type is 0. We look in roottab to determine that. 
+ *
+ * entry is empty if type is 0. We look in roottab to determine that.
 */
 /* we pack the qid as follows: path is the index, vers is ., and type is type */
 
@@ -367,7 +367,7 @@ static void rootcreate(struct chan *c, char *name, int omode, uint32_t perm)
 	/* need to filter openmode so that it gets only the access-type bits */
 	omode = openmode(omode);
 	c->mode = openmode(omode);
-	printd("rootcreate: c %p, name %s, omode %o, perm %x\n", 
+	printd("rootcreate: c %p, name %s, omode %o, perm %x\n",
 	       c, name, omode, perm);
 	/* find an empty slot */
 	int path = c->qid.path;

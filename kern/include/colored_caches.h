@@ -1,10 +1,10 @@
-/* Copyright (c) 2009 The Regents of the University  of California. 
- * See the COPYRIGHT files at the top of this source tree for full 
+/* Copyright (c) 2009 The Regents of the University  of California.
+ * See the COPYRIGHT files at the top of this source tree for full
  * license information.
- * 
- * Kevin Klues <klueska@cs.berkeley.edu>    
+ *
+ * Kevin Klues <klueska@cs.berkeley.edu>
  */
- 
+
 #pragma once
 
 #include <ros/common.h>
@@ -17,7 +17,7 @@ typedef struct Cache {
 	size_t sz_k;
 	size_t clsz;
 	uint8_t* free_colors_map;
-	
+
 	//Added as optimization (derived from above);
 	size_t num_colors;
 } cache_t;
@@ -49,7 +49,7 @@ static inline size_t get_page_color(uintptr_t page, cache_t *c) {
 uint8_t* cache_colors_map_alloc();
 void cache_colors_map_free(uint8_t* colors_map);
 error_t cache_color_alloc(cache_t* c, uint8_t* colors_map);
-error_t cache_color_alloc_specific(size_t color, cache_t* c, 
+error_t cache_color_alloc_specific(size_t color, cache_t* c,
                                          uint8_t* colors_map);
 void cache_color_free(cache_t* c, uint8_t* colors_map);
 void cache_color_free_specific(size_t color, cache_t* c, uint8_t* colors_map);

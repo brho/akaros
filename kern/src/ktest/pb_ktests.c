@@ -121,11 +121,11 @@ bool test_pic_reception(void)
 
 #endif // CONFIG_X86
 
-// TODO: Add assertions. Possibly the way to go is to extract relevant info 
-//       from cache properties and make assertions on the colored pages lists 
+// TODO: Add assertions. Possibly the way to go is to extract relevant info
+//       from cache properties and make assertions on the colored pages lists
 //       based on those.
 // TODO: The test was commented out. Figure out why was it like that and fix it.
-bool test_page_coloring(void) 
+bool test_page_coloring(void)
 {
 	/*
 	//Print the different cache properties of our machine
@@ -140,7 +140,7 @@ bool test_page_coloring(void)
 	cprintf("Max Address: %llu\n", MAX_VADDR);
 	cprintf("Num Pages: %u\n", npages);
 
-	//Declare a local variable for allocating pages	
+	//Declare a local variable for allocating pages
 	page_t* page;
 
 	cprintf("Contents of the page free list:\n");
@@ -161,7 +161,7 @@ bool test_page_coloring(void)
 
 	//Put all the pages back by reinitializing
 	page_init();
-	
+
 	//Run through and allocate all pages through l2_page_alloc
 	cprintf("Allocating from L2 page colors:\n");
 	for(int i=0; i<get_cache_num_page_colors(l2); i++) {
@@ -172,7 +172,7 @@ bool test_page_coloring(void)
 
 	//Put all the pages back by reinitializing
 	page_init();
-	
+
 	//Run through and allocate all pages through l3_page_alloc
 	cprintf("Allocating from L3 page colors:\n");
 	for(int i=0; i<get_cache_num_page_colors(l3); i++) {
@@ -180,19 +180,19 @@ bool test_page_coloring(void)
 		while(colored_page_alloc(l3, &page, i) != -ENOMEM)
 			cprintf("    Page: %d\n", page2ppn(page));
 	}
-	
+
 	//Put all the pages back by reinitializing
 	page_init();
-	
+
 	//Run through and allocate all pages through page_alloc
 	cprintf("Allocating from global allocator:\n");
 	while(upage_alloc(&page) != -ENOMEM)
 		cprintf("    Page: %d\n", page2ppn(page));
-	
+
 	if(colored_page_alloc(l2, &page, 0) != -ENOMEM)
 		cprintf("Should not get here, all pages should already be gone!\n");
 	cprintf("All pages gone for sure...\n");
-	
+
 	//Now lets put a few pages back using page_free..
 	cprintf("Reinserting pages via page_free and reallocating them...\n");
 	page_free(&pages[0]);
@@ -202,8 +202,8 @@ bool test_page_coloring(void)
 	page_free(&pages[4]);
 
 	while(upage_alloc(&page) != -ENOMEM)
-		cprintf("Page: %d\n", page2ppn(page));	
-	
+		cprintf("Page: %d\n", page2ppn(page));
+
 	page_init();
 	*/
 	return true;
@@ -264,7 +264,7 @@ bool test_barrier(void)
 	return true;
 }
 
-// TODO: Maybe remove all the printing statements and instead use the 
+// TODO: Maybe remove all the printing statements and instead use the
 //       KT_ASSERT_M macro to include a message on assertions.
 bool test_interrupts_irqsave(void)
 {
@@ -385,11 +385,11 @@ bool test_bitmasks(void)
 	KT_ASSERT_M("Bit 11 should be 0", 0 == GET_BITMASK_BIT(mask, 11));
 	FILL_BITMASK(mask, masksize);
 //	PRINT_BITMASK(mask, masksize);
-	KT_ASSERT_M("Bitmask should not be clear after calling FILL_BITMASK", 
+	KT_ASSERT_M("Bitmask should not be clear after calling FILL_BITMASK",
 	            0 == BITMASK_IS_CLEAR(mask,masksize));
 	CLR_BITMASK(mask, masksize);
 //	PRINT_BITMASK(mask, masksize);
-	KT_ASSERT_M("Bitmask should be clear after calling CLR_BITMASK", 
+	KT_ASSERT_M("Bitmask should be clear after calling CLR_BITMASK",
 	            1 == BITMASK_IS_CLEAR(mask,masksize));
 	return true;
 }
@@ -655,7 +655,7 @@ bool test_circ_buffer(void)
 		FOR_CIRC_BUFFER(i, 5, j)
 			printk("Starting with current = %d, each value = %d\n", i, j);
 	}
-	
+
 	return true;
 }
 
@@ -698,7 +698,7 @@ bool test_kernel_messages(void)
 		                    KMSG_ROUTINE);
 	}
 	udelay(5000000);
-	
+
 	return true;
 }
 #endif // CONFIG_X86
@@ -745,7 +745,7 @@ bool test_slab(void)
 bool test_kmalloc(void)
 {
 	printk("Testing Kmalloc\n");
-	void *bufs[NUM_KMALLOC_CACHES + 1];	
+	void *bufs[NUM_KMALLOC_CACHES + 1];
 	size_t size;
 	for (int i = 0; i < NUM_KMALLOC_CACHES + 1; i++){
 		size = (KMALLOC_SMALLEST << i) - sizeof(struct kmalloc_tag);
@@ -780,58 +780,58 @@ bool test_hashtable(void)
 	struct test *v = &tstruct[0];
 
 	h = create_hashtable(32, __generic_hash, __generic_eq);
-	
+
 	// test inserting one item, then finding it again
-	KT_ASSERT_M("It should be possible to insert items to a hashtable", 
+	KT_ASSERT_M("It should be possible to insert items to a hashtable",
 	            hashtable_insert(h, (void*)k, v));
 	v = NULL;
-	KT_ASSERT_M("It should be possible to find inserted stuff in a hashtable", 
+	KT_ASSERT_M("It should be possible to find inserted stuff in a hashtable",
 	            (v = hashtable_search(h, (void*)k)));
 
-	KT_ASSERT_M("The extracted element should be the same we inserted", 
+	KT_ASSERT_M("The extracted element should be the same we inserted",
 	            (v == &tstruct[0]));
 
 	v = NULL;
 
-	KT_ASSERT_M("It should be possible to remove an existing element", 
+	KT_ASSERT_M("It should be possible to remove an existing element",
 	            (v = hashtable_remove(h, (void*)k)));
 
-	KT_ASSERT_M("An element should not remain in a hashtable after deletion", 
+	KT_ASSERT_M("An element should not remain in a hashtable after deletion",
 	            !(v = hashtable_search(h, (void*)k)));
 
 	/* Testing a bunch of items, insert, search, and removal */
 	for (int i = 0; i < 10; i++) {
 		k = i; // vary the key, we don't do KEY collisions
-		KT_ASSERT_M("It should be possible to insert elements to a hashtable", 
+		KT_ASSERT_M("It should be possible to insert elements to a hashtable",
 		            (hashtable_insert(h, (void*)k, &tstruct[i])));
 	}
 	// read out the 10 items
 	for (int i = 0; i < 10; i++) {
 		k = i;
-		KT_ASSERT_M("It should be possible to find inserted stuff in a hashtable", 
+		KT_ASSERT_M("It should be possible to find inserted stuff in a hashtable",
 		            (v = hashtable_search(h, (void*)k)));
-		KT_ASSERT_M("The extracted element should be the same we inserted", 
+		KT_ASSERT_M("The extracted element should be the same we inserted",
 		            (v == &tstruct[i]));
 	}
 
-	KT_ASSERT_M("The total count of number of elements should be 10", 
+	KT_ASSERT_M("The total count of number of elements should be 10",
 	            (10 == hashtable_count(h)));
 
 	// remove the 10 items
 	for (int i = 0; i < 10; i++) {
 		k = i;
-		KT_ASSERT_M("It should be possible to remove an existing element", 
+		KT_ASSERT_M("It should be possible to remove an existing element",
 		            (v = hashtable_remove(h, (void*)k)));
 
 	}
 	// make sure they are all gone
 	for (int i = 0; i < 10; i++) {
 		k = i;
-		KT_ASSERT_M("An element should not remain in a hashtable after deletion", 
+		KT_ASSERT_M("An element should not remain in a hashtable after deletion",
 		            !(v = hashtable_search(h, (void*)k)));
 	}
 
-	KT_ASSERT_M("The hashtable should be empty", 
+	KT_ASSERT_M("The hashtable should be empty",
 	            (0 == hashtable_count(h)));
 
 	hashtable_destroy(h);
@@ -843,36 +843,36 @@ bool test_hashtable(void)
 	for (int i = 0; i < 10; i++) {
 		k = i; // vary the key, we don't do KEY collisions
 
-		KT_ASSERT_M("It should be possible to insert elements to a hashtable", 
+		KT_ASSERT_M("It should be possible to insert elements to a hashtable",
 		            (hashtable_insert(h, (void*)k, &tstruct[i])));
 	}
 	// read out the 10 items
 	for (int i = 0; i < 10; i++) {
 		k = i;
-		KT_ASSERT_M("It should be possible to find inserted stuff in a hashtable", 
+		KT_ASSERT_M("It should be possible to find inserted stuff in a hashtable",
 		            (v = hashtable_search(h, (void*)k)));
-		KT_ASSERT_M("The extracted element should be the same we inserted", 
+		KT_ASSERT_M("The extracted element should be the same we inserted",
 		            (v == &tstruct[i]));
 	}
 
-	KT_ASSERT_M("The total count of number of elements should be 10", 
+	KT_ASSERT_M("The total count of number of elements should be 10",
 	            (10 == hashtable_count(h)));
 
 	// remove the 10 items
 	for (int i = 0; i < 10; i++) {
 		k = i;
-		KT_ASSERT_M("It should be possible to remove an existing element", 
+		KT_ASSERT_M("It should be possible to remove an existing element",
 		            (v = hashtable_remove(h, (void*)k)));
 	}
 	// make sure they are all gone
 	for (int i = 0; i < 10; i++) {
 		k = i;
 
-		KT_ASSERT_M("An element should not remain in a hashtable after deletion", 
+		KT_ASSERT_M("An element should not remain in a hashtable after deletion",
 		            !(v = hashtable_search(h, (void*)k)));
 	}
 
-	KT_ASSERT_M("The hashtable should be empty", 
+	KT_ASSERT_M("The hashtable should be empty",
 	            (0 == hashtable_count(h)));
 
 	hashtable_destroy(h);
@@ -967,26 +967,26 @@ bool test_bcq(void)
 		int y;
 	};
 	struct my_struct in_struct, out_struct;
-	
+
 	DEFINE_BCQ_TYPES(test, struct my_struct, 16);
 	struct test_bcq t_bcq;
 	bcq_init(&t_bcq, struct my_struct, 16);
-	
+
 	in_struct.x = 4;
 	in_struct.y = 5;
 	out_struct.x = 1;
 	out_struct.y = 2;
-	
+
 	bcq_enqueue(&t_bcq, &in_struct, 16, 5);
 	bcq_dequeue(&t_bcq, &out_struct, 16);
 	printk("out x %d. out y %d\n", out_struct.x, out_struct.y);
-	
+
 	/* Tests the BCQ a bit more, esp with overflow */
 	#define NR_ELEM_A_BCQ 8 /* NOTE: this must be a power of 2! */
 	DEFINE_BCQ_TYPES(my, int, NR_ELEM_A_BCQ);
 	struct my_bcq a_bcq;
 	bcq_init(&a_bcq, int, NR_ELEM_A_BCQ);
-	
+
 	int y = 2;
 	int output[100];
 	int retval[100];
@@ -1011,27 +1011,27 @@ bool test_bcq(void)
 		printk("enqueued: %d, had retval %d \n", y, retval[i]);
 	}
 	//print_a_bcq(&a_bcq);
-	
+
 	/* Try to dequeue more than we put in */
 	for (int i = 0; i < 15; i++) {
 		retval[i] = bcq_dequeue(&a_bcq, &output[i], NR_ELEM_A_BCQ);
 		printk("dequeued: %d with retval %d\n", output[i], retval[i]);
 	}
 	//print_a_bcq(&a_bcq);
-	
+
 	/* Put in some it should be able to take */
 	for (int i = 0; i < 3; i++) {
 		y = i;
 		retval[i] = bcq_enqueue(&a_bcq, &y, NR_ELEM_A_BCQ, 10);
 		printk("enqueued: %d, had retval %d \n", y, retval[i]);
 	}
-	
+
 	/* Take those, and then a couple extra */
 	for (int i = 0; i < 5; i++) {
 		retval[i] = bcq_dequeue(&a_bcq, &output[i], NR_ELEM_A_BCQ);
 		printk("dequeued: %d with retval %d\n", output[i], retval[i]);
 	}
-	
+
 	/* Try some one-for-one */
 	for (int i = 0; i < 5; i++) {
 		y = i;
@@ -1122,8 +1122,8 @@ bool test_ucq(void)
 	/* Just spawn the program */
 	struct file *program;
 	program = do_file_open("/bin/ucq", O_READ, 0);
-	
-	KT_ASSERT_M("We should be able to find /bin/ucq", 
+
+	KT_ASSERT_M("We should be able to find /bin/ucq",
 	            program);
 
 	struct proc *p = proc_create(program, NULL, NULL);
@@ -1137,7 +1137,7 @@ bool test_ucq(void)
 	 * around that are runnable */
 	run_scheduler();
 	smp_idle();
-	
+
 	KT_ASSERT_M("We should never return from schedule",
 	            false);
 
@@ -1157,8 +1157,8 @@ bool test_vm_regions(void)
 	TAILQ_INIT(&p->vm_regions);
 
 	struct vmr_summary {
-		uintptr_t base; 
-		uintptr_t end; 
+		uintptr_t base;
+		uintptr_t end;
 	};
 	int check_vmrs(struct proc *p, struct vmr_summary *results, int len, int n)
 	{
@@ -1194,7 +1194,7 @@ bool test_vm_regions(void)
 	results[0].end = 0x4000;
 	check_vmrs(p, results, 1, n++);
 	/* Grow it poorly */
-	KT_ASSERT_M("It should pass bad grow test", 
+	KT_ASSERT_M("It should pass bad grow test",
 	            (-1 == grow_vmr(vmrs[0], 0x3000)));
 	check_vmrs(p, results, 1, n++);
 	/* Make another right next to it */
@@ -1203,7 +1203,7 @@ bool test_vm_regions(void)
 	results[1].end = 0x5000;
 	check_vmrs(p, results, 2, n++);
 	/* try to grow through it */
-	KT_ASSERT_M("It should pass bad grow test", 
+	KT_ASSERT_M("It should pass bad grow test",
 	            (-1 == grow_vmr(vmrs[0], 0x5000)));
 	check_vmrs(p, results, 2, n++);
 	/* Merge them */
@@ -1217,7 +1217,7 @@ bool test_vm_regions(void)
 	results[1].end = 0xa000;
 	check_vmrs(p, results, 2, n++);
 	/* try to merge unmergables (just testing ranges) */
-	KT_ASSERT_M("It should pass bad merge test", 
+	KT_ASSERT_M("It should pass bad merge test",
 	            (-1 == merge_vmr(vmrs[0], vmrs[1])));
 	check_vmrs(p, results, 2, n++);
 	vmrs[2] = split_vmr(vmrs[1], 0x8000);
@@ -1235,13 +1235,13 @@ bool test_vm_regions(void)
 	results[1].base = 0x8000;
 	results[1].end = 0x9000;
 	check_vmrs(p, results, 2, n++);	/* 10 */
-	KT_ASSERT_M("We should be able to find the right vmr", 
+	KT_ASSERT_M("We should be able to find the right vmr",
 	            (vmrs[2] == find_vmr(p, 0x8500)));
-	KT_ASSERT_M("We should be able to find the right vmr", 
+	KT_ASSERT_M("We should be able to find the right vmr",
 	            (vmrs[2] == find_first_vmr(p, 0x8500)));
-	KT_ASSERT_M("We should be able to find the right vmr", 
+	KT_ASSERT_M("We should be able to find the right vmr",
 	            (vmrs[2] == find_first_vmr(p, 0x7500)));
-	KT_ASSERT_M("We shouldn't be able to find a vmr", 
+	KT_ASSERT_M("We shouldn't be able to find a vmr",
 	            !(find_first_vmr(p, 0x9500)));
 	/* grow up to another */
 	grow_vmr(vmrs[0], 0x8000);
@@ -1250,7 +1250,7 @@ bool test_vm_regions(void)
 	vmrs[0]->vm_prot = 88;
 	vmrs[2]->vm_prot = 77;
 	/* should be unmergeable due to perms */
-	KT_ASSERT_M("It should pass bad merge test", 
+	KT_ASSERT_M("It should pass bad merge test",
 	            -1 == merge_vmr(vmrs[0], vmrs[2]));
 	check_vmrs(p, results, 2, n++);
 	/* should merge now */
@@ -1296,13 +1296,13 @@ bool test_radix_tree(void)
 	struct radix_tree *tree = &real_tree;
 	void *retval;
 
-	KT_ASSERT_M("It should be possible to insert at 0", 
+	KT_ASSERT_M("It should be possible to insert at 0",
 	            !radix_insert(tree, 0, (void*)0xdeadbeef, 0));
 	radix_delete(tree, 0);
-	KT_ASSERT_M("It should be possible to re-insert at 0", 
+	KT_ASSERT_M("It should be possible to re-insert at 0",
 	            !radix_insert(tree, 0, (void*)0xdeadbeef, 0));
 
-	KT_ASSERT_M("It should be possible to insert first", 
+	KT_ASSERT_M("It should be possible to insert first",
 	            !radix_insert(tree, 3, (void*)0xdeadbeef, 0));
 	radix_insert(tree, 4, (void*)0x04040404, 0);
 	KT_ASSERT((void*)0xdeadbeef == radix_lookup(tree, 3));
@@ -1313,13 +1313,13 @@ bool test_radix_tree(void)
 			print_radix_tree(tree);
 			monitor(0);
 		}
-	KT_ASSERT_M("It should be possible to insert a two-tier", 
+	KT_ASSERT_M("It should be possible to insert a two-tier",
 	            !radix_insert(tree, 65, (void*)0xcafebabe, 0));
-	KT_ASSERT_M("It should not be possible to reinsert", 
+	KT_ASSERT_M("It should not be possible to reinsert",
 	            radix_insert(tree, 4, (void*)0x03030303, 0));
-	KT_ASSERT_M("It should be possible to insert a two-tier boundary", 
+	KT_ASSERT_M("It should be possible to insert a two-tier boundary",
 	            !radix_insert(tree, 4095, (void*)0x4095, 0));
-	KT_ASSERT_M("It should be possible to insert a three-tier", 
+	KT_ASSERT_M("It should be possible to insert a three-tier",
 	            !radix_insert(tree, 4096, (void*)0x4096, 0));
 	//print_radix_tree(tree);
 	radix_delete(tree, 65);
@@ -1337,26 +1337,26 @@ bool test_radix_tree(void)
 bool test_random_fs(void)
 {
 	int retval = do_symlink("/dir1/sym", "/bin/hello", S_IRWXU);
-	KT_ASSERT_M("symlink1 should be created successfully", 
+	KT_ASSERT_M("symlink1 should be created successfully",
 	            (!retval));
 	retval = do_symlink("/symdir", "/dir1/dir1-1", S_IRWXU);
-	KT_ASSERT_M("symlink1 should be created successfully", 
+	KT_ASSERT_M("symlink1 should be created successfully",
 	            (!retval));
 	retval = do_symlink("/dir1/test.txt", "/dir2/test2.txt", S_IRWXU);
-	KT_ASSERT_M("symlink2 should be created successfully", 
+	KT_ASSERT_M("symlink2 should be created successfully",
 	            (!retval));
 	retval = do_symlink("/dir1/dir1-1/up", "../../", S_IRWXU);
-	KT_ASSERT_M("symlink3 should be created successfully", 
+	KT_ASSERT_M("symlink3 should be created successfully",
 	            (!retval));
 	retval = do_symlink("/bin/hello-sym", "hello", S_IRWXU);
-	KT_ASSERT_M("symlink4 should be created successfully", 
+	KT_ASSERT_M("symlink4 should be created successfully",
 	            (!retval));
 
 	struct dentry *dentry;
 	struct nameidata nd_r = {0}, *nd = &nd_r;
 	retval = path_lookup("/dir1/sym", 0, nd);
-	KT_ASSERT_M("symlink lookup should work for an existing symlink", 
-	            (!retval));	
+	KT_ASSERT_M("symlink lookup should work for an existing symlink",
+	            (!retval));
 	char *symname = nd->dentry->d_inode->i_op->readlink(nd->dentry);
 	printk("Pathlookup got %s (sym)\n", nd->dentry->d_name.name);
 	if (!symname)
@@ -1367,33 +1367,33 @@ bool test_random_fs(void)
 	/* try with follow */
 	memset(nd, 0, sizeof(struct nameidata));
 	retval = path_lookup("/dir1/sym", LOOKUP_FOLLOW, nd);
-	
-	KT_ASSERT_M("symlink lookup should work for an existing symlink", 
+
+	KT_ASSERT_M("symlink lookup should work for an existing symlink",
 	            (!retval));
 	printk("Pathlookup got %s (hello)\n", nd->dentry->d_name.name);
 	path_release(nd);
-	
+
 	/* try with a directory */
 	memset(nd, 0, sizeof(struct nameidata));
 	retval = path_lookup("/symdir/f1-1.txt", 0, nd);
-	KT_ASSERT_M("symlink lookup should work for an existing symlink", 
+	KT_ASSERT_M("symlink lookup should work for an existing symlink",
 	            (!retval));
 	printk("Pathlookup got %s (f1-1.txt)\n", nd->dentry->d_name.name);
 	path_release(nd);
-	
+
 	/* try with a rel path */
 	printk("Try with a rel path\n");
 	memset(nd, 0, sizeof(struct nameidata));
 	retval = path_lookup("/symdir/up/hello.txt", 0, nd);
-	KT_ASSERT_M("symlink lookup should work for an existing symlink", 
+	KT_ASSERT_M("symlink lookup should work for an existing symlink",
 	            (!retval));
 	printk("Pathlookup got %s (hello.txt)\n", nd->dentry->d_name.name);
 	path_release(nd);
-	
+
 	printk("Try for an ELOOP\n");
 	memset(nd, 0, sizeof(struct nameidata));
 	retval = path_lookup("/symdir/up/symdir/up/symdir/up/symdir/up/hello.txt", 0, nd);
-	KT_ASSERT_M("symlink lookup should fail for a non existing symlink", 
+	KT_ASSERT_M("symlink lookup should fail for a non existing symlink",
 	            (retval));
 	path_release(nd);
 
@@ -1460,7 +1460,7 @@ bool test_kref(void)
 {
 	struct kref local_kref;
 	bool done = FALSE;
-	
+
 	kref_init(&local_kref, fake_release, 1);
 	send_kernel_message(2, __test_kref_2, (long)&local_kref, (long)&done, 0,
 	                    KMSG_ROUTINE);
@@ -1515,9 +1515,9 @@ bool test_atomics(void)
 		do {
 			old_num = atomic_read(&actual_num);
 			/* First time, try to fail */
-			if (attempt == 0) 
+			if (attempt == 0)
 				old_num++;
-			attempt++;	
+			attempt++;
 		} while (!atomic_cas(&actual_num, old_num, old_num + 10));
 		if (atomic_read(&actual_num) != init_val + 10) {
 			return false;
@@ -1684,19 +1684,19 @@ bool test_cv(void)
 bool test_memset(void)
 {
 	#define ARR_SZ 256
-	
+
 	void print_array(char *c, size_t len)
 	{
 		for (int i = 0; i < len; i++)
 			printk("%04d: %02x\n", i, *c++);
 	}
-	
+
 	bool check_array(char *c, char x, size_t len)
 	{
 		for (int i = 0; i < len; i++) {
 			#define ASSRT_SIZE 64
 			char *assrt_msg = (char*) kmalloc(ASSRT_SIZE, 0);
-			snprintf(assrt_msg, ASSRT_SIZE, 
+			snprintf(assrt_msg, ASSRT_SIZE,
 				     "Char %d is %c (%02x), should be %c (%02x)", i, *c, *c,
 				     x, x);
 			KT_ASSERT_M(assrt_msg, (*c == x));
@@ -1704,7 +1704,7 @@ bool test_memset(void)
 		}
 		return true;
 	}
-	
+
 	bool run_check(char *arr, int ch, size_t len)
 	{
 		char *c = arr;
@@ -1734,7 +1734,7 @@ void __attribute__((noinline)) __longjmp_wrapper(struct jmpbuf* jb)
 	printk("Starting: %s\n", __FUNCTION__);
 	longjmp(jb, 1);
 	// Should never get here
-	printk("Exiting: %s\n", __FUNCTION__); 
+	printk("Exiting: %s\n", __FUNCTION__);
 }
 
 // TODO: Add assertions.
@@ -1892,7 +1892,7 @@ bool test_rwlock(void)
 		/* signal to allow core 0 to finish */
 		atomic_dec(&rwlock_counter);
 	}
-		
+
 	/* send 4 messages to each non core 0 */
 	atomic_init(&rwlock_counter, (num_cores - 1) * 4);
 	for (int i = 1; i < num_cores; i++)

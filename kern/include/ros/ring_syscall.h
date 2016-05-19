@@ -11,7 +11,7 @@ typedef enum {
 	RES_free,  // The response has been digested by the user space, can be reallocated
 	REQ_alloc, // Space fo request is allocated
 	REQ_ready, // The request is populated by the caller
-	REQ_processing, // The request is being processed, 
+	REQ_processing, // The request is being processed,
 					// or a kernel thread is going to pick up the stack to process this later.
 
 	RES_ready // The response is ready to be picked up

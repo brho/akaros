@@ -1,6 +1,6 @@
 /* Copyright (c) 2009,13 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
- * See LICENSE for details. 
+ * See LICENSE for details.
  *
  * Arch independent physical memory and page table management.
  *
@@ -98,7 +98,7 @@ static void set_largest_freezone(struct multiboot_mmap_entry *entry, void *data)
  * "end" is a symbol marking the end of the kernel.  This covers anything linked
  * in with the kernel (KFS, etc).  However, 'end' is a kernel load address,
  * which differs from kernbase addrs in 64 bit.  We need to use the kernbase
- * mapping for anything dynamic (because it could go beyond 1 GB). 
+ * mapping for anything dynamic (because it could go beyond 1 GB).
  *
  * Ideally, we'll use the largest mmap zone, as reported by multiboot.  If we
  * don't have one (riscv), we'll just use the memory after the kernel.
@@ -175,25 +175,25 @@ void *boot_zalloc(size_t amt, size_t align)
 	return v;
 }
 
-/** 
+/**
  * @brief Map the physical page 'pp' into the virtual address 'va' in page
  *        directory 'pgdir'
  *
  * Map the physical page 'pp' at virtual address 'va'.
  * The permissions (the low 12 bits) of the page table
  * entry should be set to 'perm|PTE_P'.
- * 
+ *
  * Details:
  *   - If there is already a page mapped at 'va', it is page_remove()d.
- *   - If necessary, on demand, allocates a page table and inserts it into 
+ *   - If necessary, on demand, allocates a page table and inserts it into
  *     'pgdir'.
- *   - page_incref() should be called if the insertion succeeds. 
+ *   - page_incref() should be called if the insertion succeeds.
  *   - The TLB must be invalidated if a page was formerly present at 'va'.
  *     (this is handled in page_remove)
  *
  * No support for jumbos here.  We will need to be careful when trying to
  * insert regular pages into something that was already jumbo.  We will
- * also need to be careful with our overloading of the PTE_PS and 
+ * also need to be careful with our overloading of the PTE_PS and
  * PTE_PAT flags...
  *
  * @param[in] pgdir the page directory to insert the page into
@@ -201,7 +201,7 @@ void *boot_zalloc(size_t amt, size_t align)
  *                  physical page that should be inserted.
  * @param[in] va    the virtual address where the page should be
  *                  inserted.
- * @param[in] perm  the permition bits with which to set up the 
+ * @param[in] perm  the permition bits with which to set up the
  *                  virtual mapping.
  *
  * @return ESUCCESS  on success
@@ -209,7 +209,7 @@ void *boot_zalloc(size_t amt, size_t align)
  *                   into which the page should be inserted
  *
  */
-int page_insert(pgdir_t pgdir, struct page *page, void *va, int perm) 
+int page_insert(pgdir_t pgdir, struct page *page, void *va, int perm)
 {
 	pte_t pte = pgdir_walk(pgdir, va, 1);
 	if (!pte_walk_okay(pte))
@@ -228,7 +228,7 @@ int page_insert(pgdir_t pgdir, struct page *page, void *va, int perm)
 }
 
 /**
- * @brief Return the page mapped at virtual address 'va' in 
+ * @brief Return the page mapped at virtual address 'va' in
  * page directory 'pgdir'.
  *
  * If pte_store is not NULL, then we store in it the address
@@ -258,7 +258,7 @@ page_t *page_lookup(pgdir_t pgdir, void *va, pte_t *pte_store)
  * @brief Unmaps the physical page at virtual address 'va' in page directory
  * 'pgdir'.
  *
- * If there is no physical page at that address, this function silently 
+ * If there is no physical page at that address, this function silently
  * does nothing.
  *
  * Details:
@@ -268,10 +268,10 @@ page_t *page_lookup(pgdir_t pgdir, void *va, pte_t *pte_store)
  *     (if such a PTE exists)
  *   - The TLB is invalidated if an entry is removes from the pg dir/pg table.
  *
- * This may be wonky wrt Jumbo pages and decref.  
+ * This may be wonky wrt Jumbo pages and decref.
  *
  * @param pgdir the page directory from with the page sholuld be removed
- * @param va    the virtual address at which the page we are trying to 
+ * @param va    the virtual address at which the page we are trying to
  *              remove is mapped
  * TODO: consider deprecating this, or at least changing how it works with TLBs.
  * Might want to have the caller need to manage the TLB.  Also note it is used
@@ -306,7 +306,7 @@ void page_remove(pgdir_t pgdir, void *va)
  *
  * TODO: (TLB) Need to sort this for cross core lovin'
  *
- * @param pgdir the page directory assocaited with the tlb entry 
+ * @param pgdir the page directory assocaited with the tlb entry
  *              we are trying to invalidate
  * @param va    the virtual address associated with the tlb entry
  *              we are trying to invalidate
@@ -321,7 +321,7 @@ void tlb_invalidate(pgdir_t pgdir, void *va)
 /* Helper, returns true if any part of (start1, end1) is within (start2, end2).
  * Equality of endpoints (like end1 == start2) is okay.
  * Assumes no wrap-around. */
-bool regions_collide_unsafe(uintptr_t start1, uintptr_t end1, 
+bool regions_collide_unsafe(uintptr_t start1, uintptr_t end1,
                             uintptr_t start2, uintptr_t end2)
 {
 	if (start1 <= start2) {

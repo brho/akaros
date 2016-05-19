@@ -145,7 +145,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pg_num,
 	off64_t f_off = 0;
 	void* phdrs = 0;
 	int mm_perms, mm_flags = MAP_FIXED;
-	
+
 	/* When reading on behalf of the kernel, we need to switch to a ktask so
 	 * the VFS (and maybe other places) know. (TODO: KFOP) */
 	uintptr_t old_ret = switch_to_ktask();

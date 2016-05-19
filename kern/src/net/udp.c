@@ -325,7 +325,7 @@ void udpkick(void *x, struct block *bp)
 			if (bp == NULL)
 				return;
 
-			// using the v6 ip header to create pseudo header 
+			// using the v6 ip header to create pseudo header
 			// first then reset it to the normal ip header
 			uh6 = (Udp6hdr *) (bp->rp);
 			memset(uh6, 0, 8);
@@ -388,7 +388,7 @@ void udpiput(struct Proto *udp, struct Ipifc *ifc, struct block *bp)
 	version = ((uh4->vihl & 0xF0) == IP_VER6) ? V6 : V4;
 
 	/*
-	 * Put back pseudo header for checksum 
+	 * Put back pseudo header for checksum
 	 * (remember old values for icmpnoconv())
 	 */
 	switch (version) {

@@ -113,7 +113,7 @@ void manager_brho(void)
 	static bool first = TRUE;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
-	if (first) {	
+	if (first) {
 		printk("*** IRQs must be enabled for input emergency codes ***\n");
 		#ifdef CONFIG_X86
 		printk("*** Hit ctrl-g to enter the monitor. ***\n");
@@ -222,7 +222,7 @@ void manager_brho(void)
 }
 
 void manager_jenkins()
-{ 
+{
 	#ifdef CONFIG_KERNEL_TESTING
 		printk("<-- BEGIN_KERNEL_TESTS -->\n");
 		run_registered_ktest_suites();
@@ -279,7 +279,7 @@ void manager_waterman()
 
 void manager_yuzhu()
 {
-	
+
 	static uint8_t progress = 0;
 	static struct proc *p;
 

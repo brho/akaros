@@ -27,7 +27,7 @@ void devfs_init(void)
 {
 	int mode;
 	/* Make sure there is a dev directory */
-	struct dentry *dentry = lookup_dentry("/dev/", 0);	
+	struct dentry *dentry = lookup_dentry("/dev/", 0);
 	if (!dentry) {
 		assert(!do_mkdir("/dev/", S_IRWXU | S_IRWXG | S_IRWXO));
 	} else {

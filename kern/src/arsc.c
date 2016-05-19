@@ -62,11 +62,11 @@ void arsc_server(uint32_t srcid, long a0, long a1, long a2)
 	while (1) {
 		while (TAILQ_EMPTY(&arsc_proc_list))
 			cpu_relax();
-		
+
 		TAILQ_FOREACH(p, &arsc_proc_list, proc_arsc_link) {
 			/* Probably want to try to process a dying process's syscalls.  If
 			 * not, just move it to an else case */
-			process_generic_syscalls (p, MAX_ASRC_BATCH); 
+			process_generic_syscalls (p, MAX_ASRC_BATCH);
 			if (p->state == PROC_DYING) {
 				TAILQ_REMOVE(&arsc_proc_list, p, proc_arsc_link);
 				proc_decref(p);
@@ -84,8 +84,8 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 	syscall_back_ring_t* sysbr = &p->syscallbackring;
 	struct per_cpu_info* pcpui = &per_cpu_info[core_id()];
 	uintptr_t old_proc;
-	// looking at a process not initialized to perform arsc. 
-	if (sysbr == NULL) 
+	// looking at a process not initialized to perform arsc.
+	if (sysbr == NULL)
 		return count;
 	/* Bail out if there is nothing to do */
 	if (!RING_HAS_UNCONSUMED_REQUESTS(sysbr))
@@ -94,7 +94,7 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 	 * pointers, etc. */
 	old_proc = switch_to(p);
 	// max is the most we'll process.  max = 0 means do as many as possible
-	// TODO: check for initialization of the ring. 
+	// TODO: check for initialization of the ring.
 	while (RING_HAS_UNCONSUMED_REQUESTS(sysbr) && ((!max)||(count < max)) ) {
 		// ASSUME: one queue per process
 		count++;
@@ -105,10 +105,10 @@ static intreg_t process_generic_syscalls(struct proc *p, size_t max)
 		syscall_rsp_t rsp;
 		// this assumes we get our answer immediately for the syscall.
 		syscall_req_t* req = RING_GET_REQUEST(sysbr, ++sysbr->req_cons);
-		
+
 		pcpui->cur_kthread->sysc = req->sc;
 		run_local_syscall(req->sc); // TODO: blocking call will block arcs as well.
-		
+
 		// need to keep the slot in the ring buffer if it is blocked
 		(sysbr->rsp_prod_pvt)++;
 		req->status = RES_ready;

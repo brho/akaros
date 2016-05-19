@@ -713,7 +713,7 @@ rtl8169init(struct ether* edev)
 		 */
 		printk("untested\n");
 		break;
-#if 0	      
+#if 0
 		r = csr8r(ctlr, Config2) & 0x07;
 		if(r == 0x01)				/* 66MHz PCI */
 			csr32w(ctlr, 0x7C, 0x0007FFFF);	/* magic */

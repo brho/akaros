@@ -44,7 +44,7 @@ multiboot_header:
 /* Helper: creates count mappings in the PML3 for 1GB jumbo pages for the given
  * vaddr to paddr range in physical memory.  Then it puts that PML3's addr in
  * the PML4's appropriate slot.  Using a macro mostly to help with 64 bit
- * argument marshalling.  
+ * argument marshalling.
  *
  * This will clobber ax, dx, cx, di, si.
  *
@@ -95,7 +95,7 @@ map_gb_pages:
 	call	insert_pml3
 	pop		%ebx
 	ret
-	
+
 # Fills pml3 with "count" jumbo entries, mapping from vaddr -> paddr.
 # pml3s are responsible for bits 38..30 of vaddr space and 30 bit paddr entries
 #
@@ -127,7 +127,7 @@ fill_jpml3:
 	jnz		1b
 	pop		%ebx
 	ret
-	
+
 #define MAP_2MB_PAGES(pml3, vaddr, paddr, count, pml2base)                     \
 	movl	$(pml2base), %eax;                                                 \
 	push	%eax;                                                              \
@@ -169,7 +169,7 @@ map_2mb_pages:
 	call	insert_pml3
 	pop		%ebx
 	ret
-	
+
 # Fills pml3 with "count" pml2 entries, mapping from vaddr -> paddr.
 # pml3s are responsible for bits 38..30 of vaddr space and 30 bit paddr entries
 #
@@ -331,8 +331,8 @@ post_mapping:
 	# Setup cr0.  PE and PG are critical for now.  The others are similar to
 	# what we want in general (-AM with 64 bit, it's useless).
 	movl	%cr0, %eax
-	orl		$(CR0_PE | CR0_PG | CR0_WP | CR0_NE | CR0_MP), %eax  
-	andl	$(~(CR0_AM | CR0_TS | CR0_EM | CR0_CD | CR0_NW)), %eax  
+	orl		$(CR0_PE | CR0_PG | CR0_WP | CR0_NE | CR0_MP), %eax
+	andl	$(~(CR0_AM | CR0_TS | CR0_EM | CR0_CD | CR0_NW)), %eax
 	movl	%eax, %cr0
 	pop		%ebx				# restore multiboot info
 	# load the 64bit GDT and jump to long mode

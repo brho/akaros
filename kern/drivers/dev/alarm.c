@@ -169,7 +169,7 @@ static int alarmgen(struct chan *c, char *entry_name,
 			}
 			s--;	/* 1 -> 0th element, 2 -> 1st element, etc */
 			/* Gets the s-th element (0 index)
-			 * 
+			 *
 			 * I would like to take advantage of the state machine and our
 			 * previous answer to get the sth element of the list.  We can get
 			 * at our previous run of gen from dp (struct dir), and use that to

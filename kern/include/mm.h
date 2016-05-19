@@ -27,8 +27,8 @@ struct vm_region {
 	struct proc					*vm_proc;	/* owning process, for now */
 	uintptr_t					vm_base;
 	uintptr_t					vm_end;
-	int							vm_prot;	
-	int							vm_flags;	
+	int							vm_prot;
+	int							vm_flags;
 	struct file					*vm_file;
 	size_t						vm_foff;
 };

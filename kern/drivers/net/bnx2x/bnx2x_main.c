@@ -8735,7 +8735,7 @@ static void bnx2x_dump_q_state_params(struct bnx2x_queue_state_params *q_params)
 	        q_params->params.setup.gen_params.cos    );
 	pr_info("qsp setup.gen.fp_hsi  %p\n",
 	        q_params->params.setup.gen_params.fp_hsi );
-	
+
 	pr_info("qsp setup.rxq.dscr_map             %p\n",
 	        q_params->params.setup.rxq_params.dscr_map             );
 	pr_info("qsp setup.rxq.sge_map              %p\n",
@@ -8772,7 +8772,7 @@ static void bnx2x_dump_q_state_params(struct bnx2x_queue_state_params *q_params)
 	        q_params->params.setup.rxq_params.silent_removal_value );
 	pr_info("qsp setup.rxq.silent_removal_mask  %p\n",
 	        q_params->params.setup.rxq_params.silent_removal_mask  );
-	
+
 	pr_info("qsp setup.txq.dscr_map          %p\n",
 	        q_params->params.setup.txq_params.dscr_map          );
 	pr_info("qsp setup.txq.fw_sb_id          %p\n",
@@ -8787,7 +8787,7 @@ static void bnx2x_dump_q_state_params(struct bnx2x_queue_state_params *q_params)
 	        q_params->params.setup.txq_params.tss_leading_cl_id );
 	pr_info("qsp setup.txq.default_vlan      %p\n",
 	        q_params->params.setup.txq_params.default_vlan      );
-	
+
 	pr_info("qsp setup.pau.bd_th_lo  %p\n",
 	        q_params->params.setup.pause_params.bd_th_lo  );
 	pr_info("qsp setup.pau.bd_th_hi  %p\n",

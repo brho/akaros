@@ -278,7 +278,7 @@ static void finish_sysc(struct syscall *sysc, struct proc *p)
 	 * to not muck with the flags while we're signalling. */
 	atomic_or(&sysc->flags, SC_K_LOCK | SC_DONE);
 	__signal_syscall(sysc, p);
-	atomic_and(&sysc->flags, ~SC_K_LOCK); 
+	atomic_and(&sysc->flags, ~SC_K_LOCK);
 }
 
 /* Helper that "finishes" the current async syscall.  This should be used with
@@ -917,7 +917,7 @@ static int execargs_stringer(struct proc *p, char *d, size_t slen,
  * argv and envp are magically bundled in procinfo for now.  Keep in sync with
  * glibc's sysdeps/ros/execve.c.  Once past a certain point, this function won't
  * return.  It assumes (and checks) that it is current.  Don't give it an extra
- * refcnt'd *p (syscall won't do that). 
+ * refcnt'd *p (syscall won't do that).
  * Note: if someone batched syscalls with this call, they could clobber their
  * old memory (and will likely PF and die).  Don't do it... */
 static int sys_exec(struct proc *p, char *path, size_t path_l,
@@ -1466,7 +1466,7 @@ static int sys_vmm_poke_guest(struct proc *p, int guest_pcoreid)
 
 /* Pokes the ksched for the given resource for target_pid.  If the target pid
  * == 0, we just poke for the calling process.  The common case is poking for
- * self, so we avoid the lookup. 
+ * self, so we avoid the lookup.
  *
  * Not sure if you could harm someone via asking the kernel to look at them, so
  * we'll do a 'controls' check for now.  In the future, we might have something
@@ -2393,7 +2393,7 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 	printd("Newchan: %C\n", newchan);
 	printd("Newchan: mchan %C\n", newchan->mchan);
 
-	if ((newchan->dev != oldchan->dev) || 
+	if ((newchan->dev != oldchan->dev) ||
 		(newchan->type != oldchan->type)) {
 		printd("Old chan and new chan do not match\n");
 		set_errno(ENODEV);
@@ -2448,7 +2448,7 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 	};
 	printk("syswstat returns %d\n", retval);
 
-done: 
+done:
 	free_path(p, from_path);
 	free_path(p, to_path);
 	cclose(oldchan);

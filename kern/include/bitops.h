@@ -111,7 +111,7 @@ static inline void CLR_BITMASK_RANGE(uint8_t* m, size_t beg, size_t end)
 
 
 /* Runs *work on every bit in the bitmask, passing *work the value of the bit
- * that is set.  Optionally clears the bit from the bitmask. 
+ * that is set.  Optionally clears the bit from the bitmask.
  *
  * We need this to be a macro, so that the calling code doesn't need the
  * address for work_fn.  This matters for code that has nested functions that
@@ -127,5 +127,5 @@ static inline void CLR_BITMASK_RANGE(uint8_t* m, size_t beg, size_t end)
 		if (present)                                                           \
 			(work_fn)(i);                                                      \
 	}                                                                          \
-}                                                                              
+}
 #endif

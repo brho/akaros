@@ -7,7 +7,7 @@
 
 ///////////////////////////////////////////////////////////////////
 // The kernel (this code) is linked at address 0xFFFFFFFF80000000,
-// but we tell the bootloader to load it at physical address 
+// but we tell the bootloader to load it at physical address
 // 0x00000000, which is the start of extended memory.
 // (See kernel.ld)
 ///////////////////////////////////////////////////////////////////
@@ -85,7 +85,7 @@ notcore0:
   add    sp, sp, a6
   li     a7, KERN_LOAD_ADDR
   sub    sp, sp, a7
-  
+
   jal    enable_mmu
 
   // relocate stack and call into C code

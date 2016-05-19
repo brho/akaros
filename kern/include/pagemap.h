@@ -52,7 +52,7 @@ struct page_map_operations {
 	commit_write: complete a write (disk backed pages)
 	bmap: get a logical block number from a file block index
 	invalidate page: invalidate, part of truncating
-	release page: prepare to release 
+	release page: prepare to release
 	direct_io: bypass the page cache */
 };
 

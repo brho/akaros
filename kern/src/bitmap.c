@@ -343,7 +343,7 @@ again:
 #define CHUNKSZ				32
 #define nbits_to_hold_value(val)	fls(val)
 #define BASEDEC 10		/* fancier cpuset lists input in decimal */
-#if 0 
+#if 0
 later
 /**
  * bitmap_scnprintf - convert bitmap to an ASCII hex string.

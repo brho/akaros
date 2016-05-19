@@ -93,7 +93,7 @@
 #define SYS_fd2path				149
 
 /* Syscalls we plan to remove someday */
-#define SYS_cache_buster        200 
+#define SYS_cache_buster        200
 
 /* For Buster Measurement Flags */
 #define BUSTER_SHARED			0x0001

@@ -1,7 +1,7 @@
 /* Copyright (c) 2009,13 The Regents of the University of California
  * Barret Rhoden <brho@cs.berkeley.edu>
  * Kevin Klues <klueska@cs.berkeley.edu>
- * See LICENSE for details. 
+ * See LICENSE for details.
  *
  * Multiboot parsing and helper functions. */
 

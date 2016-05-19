@@ -229,7 +229,7 @@ int commit_checklist_wait(checklist_t* list, checklist_mask_t* mask)
 		cpu_relax();
 
 	// list is ours and clear, set it to the settings of our list
-	COPY_BITMASK(list->mask.bits, mask->bits, mask->size); 
+	COPY_BITMASK(list->mask.bits, mask->bits, mask->size);
 	return 0;
 }
 
@@ -246,21 +246,21 @@ int commit_checklist_nowait(checklist_t* list, checklist_mask_t* mask)
 // what if two different actors are waiting on the list, but for different reasons?
 // part of the problem is we are doing both set and check via the same path
 //
-// aside: we made this a lot more difficult than the usual barriers or even 
+// aside: we made this a lot more difficult than the usual barriers or even
 // the RCU grace-period checkers, since we have to worry about this construct
 // being used by others before we are done with it.
 //
 // how about this: if we want to wait on this later, we just don't release the
 // lock.  if we release it, then we don't care who comes in and grabs and starts
-// checking the list.  
-// 	- regardless, there are going to be issues with people looking for a free 
-// 	item.  even if they grab the lock, they may end up waiting a while and 
-// 	wantint to bail (like test for a while, give up, move on, etc).  
+// checking the list.
+// 	- regardless, there are going to be issues with people looking for a free
+// 	item.  even if they grab the lock, they may end up waiting a while and
+// 	wantint to bail (like test for a while, give up, move on, etc).
 // 	- still limited in that only the setter can check, and only one person
 // 	can spinwait / check for completion.  if someone else tries to wait (wanting
 // 	completion), they may miss it if someone else comes in and grabs the lock
 // 	to use it for a new checklist
-// 		- if we had the ability to sleep and get woken up, we could have a 
+// 		- if we had the ability to sleep and get woken up, we could have a
 // 		queue.  actually, we could do a queue anyway, but they all spin
 // 		and it's the bosses responsibility to *wake* them
 

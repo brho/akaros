@@ -1,29 +1,29 @@
 /*
- * Copyright (c) 2009 The Regents of the University  of California.  
- * See the COPYRIGHT files at the top of this source tree for full 
+ * Copyright (c) 2009 The Regents of the University  of California.
+ * See the COPYRIGHT files at the top of this source tree for full
  * license information.
  */
 /**
  * @author Kevin Klues <klueska@cs.berkeley.edu>
  */
- 
+
 #pragma once
 
 #include <colored_caches.h>
 #include <arch/colored_page_alloc.h>
 #include <stdio.h>
-	
+
 #define DECLARE_CACHE_COLORED_PAGE_LINK(_cache)                               \
 	page_list_entry_t _cache##_cache_colored_pg_link;
-	
+
 #define DECLARE_CACHE_COLORED_PAGE_FREE_LIST(_cache)                          \
 	uint8_t _cache##_num_colors = 0;                                          \
 	page_list_t *_cache##_cache_colored_page_list = NULL;
-	
+
 #define DECLARE_EXTERN_CACHE_COLORED_PAGE_FREE_LIST(_cache)                   \
     extern uint8_t _cache##_num_colors;                                       \
 	extern page_list_t *_cache##_cache_colored_page_list;
-	
+
 #define DECLARE_CACHE_COLORED_PAGE_ALLOC_FUNCTION(_cache)                     \
 error_t _cache##_page_alloc(page_t** page, size_t color)                      \
 {                                                                             \
