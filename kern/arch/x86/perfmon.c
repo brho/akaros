@@ -117,12 +117,13 @@ static void perfmon_do_cores_alloc(void *opaque)
 
 	spin_lock_irqsave(&cctx->lock);
 	if (perfmon_is_fixed_event(&pa->ev)) {
-		uint64_t fxctrl_value = read_msr(MSR_CORE_PERF_FIXED_CTR_CTRL), tmp;
+		uint64_t fxctrl_value = read_msr(MSR_CORE_PERF_FIXED_CTR_CTRL);
+		uint64_t tmp;
 
 		i = PMEV_GET_EVENT(pa->ev.event);
 		if (i >= (int) cpu_caps.fix_counters_x_proc) {
 			i = -EINVAL;
-		} else if (fxctrl_value & (FIXCNTR_MASK << i)) {
+		} else if (fxctrl_value & (FIXCNTR_MASK << (i * FIXCNTR_NBITS))) {
 			i = -EBUSY;
 		} else {
 			cctx->fixed_counters[i] = pa->ev;
