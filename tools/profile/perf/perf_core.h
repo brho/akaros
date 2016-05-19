@@ -26,9 +26,11 @@ struct perf_arch_info {
 	uint32_t fix_counters_x_proc;
 };
 
+#define MAX_FQSTR_SZ 128
 struct perf_eventsel {
 	struct perfmon_event ev;
 	int eidx;
+	char fq_str[MAX_FQSTR_SZ];
 };
 
 struct perf_event {
@@ -63,8 +65,6 @@ void perf_context_show_values(struct perf_context *pctx, FILE *file);
 void perf_show_events(const char *rx, FILE *file);
 void perf_get_event_string(const struct perf_eventsel *sel, char *sbuf,
 						   size_t size);
-void perf_make_eventsel_from_event_mask(struct perf_eventsel *sel,
-										uint32_t event, uint32_t mask);
 void perf_convert_trace_data(struct perfconv_context *cctx, const char *input,
 							 const char *output);
 

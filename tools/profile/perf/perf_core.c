@@ -1,7 +1,9 @@
-/* Copyright (c) 2015 Google Inc
+/* Copyright (c) 2015-2016 Google Inc
  * Davide Libenzi <dlibenzi@google.com>
- * See LICENSE for details.
- */
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * Stephane Eranian <eranian@gmail.com> (perf_show_event_info() from libpfm4)
+ *
+ * See LICENSE for details. */
 
 #include <ros/arch/msr-index.h>
 #include <ros/arch/perfmon.h>
@@ -31,31 +33,6 @@ struct event_coords {
 	const char *umask;
 };
 
-static const uint32_t invalid_mask = (uint32_t) -1;
-
-static void perf_parse_event_coords(const char *name, struct event_coords *ec)
-{
-	const char *cptr = strchr(name, ':');
-
-	if (cptr == NULL) {
-		ec->buffer = NULL;
-		ec->event = name;
-		ec->umask = NULL;
-	} else {
-		size_t cpos = cptr - name;
-
-		ec->buffer = xstrdup(name);
-		ec->event = ec->buffer;
-		ec->umask = ec->buffer + cpos + 1;
-		ec->buffer[cpos] = 0;
-	}
-}
-
-static void perf_free_event_coords(struct event_coords *ec)
-{
-	free(ec->buffer);
-}
-
 static const char *perf_get_event_mask_name(const pfm_event_info_t *einfo,
 											uint32_t mask)
 {
@@ -82,100 +59,6 @@ static const char *perf_get_event_mask_name(const pfm_event_info_t *einfo,
 	return NULL;
 }
 
-static int perf_resolve_event_name(const char *name, uint32_t *event,
-								   uint32_t *mask, uint32_t mask_hint)
-{
-	int idx;
-	struct event_coords ec;
-
-	perf_parse_event_coords(name, &ec);
-
-	idx = pfm_find_event(ec.event);
-	if (idx >= 0) {
-		int i;
-		pfm_err_t err;
-		pfm_event_info_t einfo;
-		pfm_event_attr_info_t ainfo;
-
-		ZERO_DATA(einfo);
-		einfo.size = sizeof(einfo);
-		err = pfm_get_event_info(idx, PFM_OS_NONE, &einfo);
-		if (err != PFM_SUCCESS) {
-			fprintf(stderr, "Unable to retrieve event (%s) info: %s\n",
-					name, pfm_strerror(err));
-			exit(1);
-		}
-
-		*event = (uint32_t) einfo.code;
-		*mask = invalid_mask;
-
-		ZERO_DATA(ainfo);
-		ainfo.size = sizeof(ainfo);
-		pfm_for_each_event_attr(i, &einfo) {
-			err = pfm_get_event_attr_info(idx, i, PFM_OS_NONE, &ainfo);
-			if (err != PFM_SUCCESS) {
-				fprintf(stderr, "Failed to get attribute info: %s\n",
-						pfm_strerror(err));
-				exit(1);
-			}
-			if (ainfo.type == PFM_ATTR_UMASK) {
-				if (mask_hint != invalid_mask) {
-					if (mask_hint == (uint32_t) ainfo.code) {
-						*mask = (uint32_t) ainfo.code;
-						break;
-					}
-				} else if (!ec.umask) {
-					*mask = (uint32_t) ainfo.code;
-					if (ainfo.is_dfl)
-						break;
-				} else if (!strcmp(ec.umask, ainfo.name)) {
-					*mask = (uint32_t) ainfo.code;
-					break;
-				}
-			}
-		}
-	}
-	perf_free_event_coords(&ec);
-
-	return idx;
-}
-
-static int perf_find_event_by_id(uint32_t event, uint32_t mask)
-{
-	int pmu;
-	pfm_pmu_info_t pinfo;
-	pfm_event_info_t info;
-
-    ZERO_DATA(pinfo);
-    pinfo.size = sizeof(pinfo);
-    ZERO_DATA(info);
-    info.size = sizeof(info);
-
-	pfm_for_all_pmus(pmu) {
-		pfm_err_t err = pfm_get_pmu_info(pmu, &pinfo);
-
-		if (err != PFM_SUCCESS || !pinfo.is_present)
-			continue;
-
-		for (int i = pinfo.first_event; i != -1; i = pfm_get_event_next(i)) {
-			uint32_t cevent, cmask;
-
-			err = pfm_get_event_info(i, PFM_OS_NONE, &info);
-			if (err != PFM_SUCCESS) {
-				fprintf(stderr, "Failed to get event info: %s\n",
-						pfm_strerror(err));
-				exit(1);
-			}
-			if (perf_resolve_event_name(info.name, &cevent, &cmask, mask) != i)
-				continue;
-			if ((cevent == event) && (cmask == mask))
-				return i;
-		}
-	}
-
-	return -1;
-}
-
 void perf_initialize(int argc, char *argv[])
 {
 	pfm_err_t err = pfm_initialize();
@@ -192,84 +75,183 @@ void perf_finalize(void)
 	pfm_terminate();
 }
 
+/* This is arch-specific and maybe model specific in the future.  For some
+ * events, pfm4 gives us a pseudo encoding.  Those codes don't map to real
+ * hardware events and are meant to be interpreted by Linux for *other* HW
+ * events, e.g. in arch/x86/events/intel/core.c.
+ *
+ * While we're here, we can also take *real* encodings and treat them like
+ * pseudo encodings.  For instance, the arch event 0x3c (unhalted_core_cycles)
+ * can also be done with fixed counter 1.  This all assumes we have version 2 or
+ * later of Intel's perfmon. */
+static void x86_handle_pseudo_encoding(struct perf_eventsel *sel)
+{
+	uint8_t lower_byte;
+
+	switch (sel->ev.event & 0xffff) {
+	case 0xc0:	/* arch inst_retired */
+		sel->ev.flags |= PERFMON_FIXED_EVENT;
+		PMEV_SET_MASK(sel->ev.event, 0);
+		PMEV_SET_EVENT(sel->ev.event, 0);
+		return;
+	case 0x3c:	/* arch unhalted_core_cycles */
+		sel->ev.flags |= PERFMON_FIXED_EVENT;
+		PMEV_SET_MASK(sel->ev.event, 0);
+		PMEV_SET_EVENT(sel->ev.event, 1);
+		return;
+	case 0x13c:	/* arch unhalted_reference_cycles */
+	case 0x300:	/* pseudo encode: unhalted_reference_cycles */
+		sel->ev.flags |= PERFMON_FIXED_EVENT;
+		PMEV_SET_MASK(sel->ev.event, 0);
+		PMEV_SET_EVENT(sel->ev.event, 2);
+		return;
+	};
+	lower_byte = sel->ev.event & 0xff;
+	if ((lower_byte == 0x00) || (lower_byte == 0xff))
+		fprintf(stderr, "Unhandled pseudo encoding %d\n", lower_byte);
+}
+
+/* Parse the string using pfm's lookup functions.  Returns TRUE on success and
+ * fills in parts of sel. */
+static bool parse_os_encoding(const char *str, struct perf_eventsel *sel)
+{
+	pfm_pmu_encode_arg_t encode;
+	int err;
+	char *ptr;
+
+	memset(&encode, 0, sizeof(encode));
+	encode.size = sizeof(encode);
+	encode.fstr = &ptr;
+	err = pfm_get_os_event_encoding(str, PFM_PLM3 | PFM_PLM0, PFM_OS_NONE,
+	                                &encode);
+	if (err)
+		return FALSE;
+	strlcpy(sel->fq_str, ptr, MAX_FQSTR_SZ);
+	free(ptr);
+	if (encode.count == 0) {
+		fprintf(stderr, "Found event %s, but it had no codes!\n", sel->fq_str);
+		return FALSE;
+	}
+	sel->ev.event = encode.codes[0];
+	sel->eidx = encode.idx;
+	x86_handle_pseudo_encoding(sel);
+	return TRUE;
+}
+
+static bool is_end_of_raw(char c)
+{
+	return (c == ':') || (c == '\0');
+}
+
+/* Helper: given a string, if the event is a raw hex code, return its numeric
+ * value.  Returns -1 if it does not match a raw code.
+ *
+ * rNN[N][N][:,\0].  Begins with r, has at least two hexdigits, up to 4, and
+ * ends with : , or \0. */
+static int extract_raw_code(const char *event)
+{
+	int i;
+	char copy[5] = {0};
+
+	if (event[0] != 'r')
+		return -1;
+	event++;
+	for (i = 0; i < 4; i++) {
+		if (isxdigit(event[i]))
+			continue;
+		if (is_end_of_raw(event[i]))
+			break;
+		return -1;
+	}
+	if (!is_end_of_raw(event[i]))
+		return -1;
+	/* 'i' tracks how many we found (i.e. every 'continue') */
+	if (i < 2)
+		return -1;
+	/* need a null-terminated raw code for strtol. */
+	for (int j = 0; j < i; j++)
+		copy[j] = event[j];
+	return strtol(copy, NULL, 16);
+}
+
+/* Parse the string for a raw encoding.  Returns TRUE on success and fills in
+ * parts of sel.  It has basic modifiers, like pfm4, for setting bits in the
+ * event code.  This is arch specific, and is all x86 (intel) for now. */
+static bool parse_raw_encoding(const char *str, struct perf_eventsel *sel)
+{
+	int code = extract_raw_code(str);
+	char *dup_str, *tok_save, *tok;
+
+	if (code == -1)
+		return FALSE;
+	sel->eidx = -1;
+	sel->ev.event = code;
+	strncpy(sel->fq_str, str, MAX_FQSTR_SZ);
+	dup_str = xstrdup(str);
+	tok = strtok_r(dup_str, ":", &tok_save);
+	assert(tok);	/* discard first token; it must exist */
+	while ((tok = strtok_r(NULL, ":", &tok_save))) {
+		switch (tok[0]) {
+		case 'u':
+			PMEV_SET_USR(sel->ev.event, 1);
+			break;
+		case 'k':
+			PMEV_SET_OS(sel->ev.event, 1);
+			break;
+		case 'e':
+			PMEV_SET_EDGE(sel->ev.event, 1);
+			break;
+		case 'p':
+			PMEV_SET_PC(sel->ev.event, 1);
+			break;
+		case 't':
+			PMEV_SET_ANYTH(sel->ev.event, 1);
+			break;
+		case 'i':
+			PMEV_SET_INVCMSK(sel->ev.event, 1);
+			break;
+		case 'c':
+			if (tok[1] != '=') {
+				fprintf(stderr, "Bad cmask tok %s, ignoring\n", tok);
+				break;
+			}
+			errno = 0;
+			PMEV_SET_CMASK(sel->ev.event, strtoul(&tok[2], NULL, 0));
+			if (errno)
+				fprintf(stderr, "Bad cmask tok %s, trying anyway\n", tok);
+			break;
+		}
+	}
+	free(dup_str);
+	/* Note that we do not call x86_handle_pseudo_encoding here.  We'll submit
+	 * exactly what the user asked us for - which also means no fixed counters
+	 * for them (unless we want a :f: token or something). */
+	return TRUE;
+}
+
+/* Given an event description string, fills out sel with the info from the
+ * string such that it can be submitted to the OS.
+ *
+ * The caller can set more bits if they like, such as whether or not to
+ * interrupt on overflow, the sample_period, etc.  None of those settings are
+ * part of the event string.
+ *
+ * Kills the program on failure. */
 void perf_parse_event(const char *str, struct perf_eventsel *sel)
 {
-	static const char *const event_spec =
-		"{EVENT_ID:MASK,EVENT_NAME:MASK_NAME}[,os[={0,1}]][,usr[={0,1}]]"
-		"[,int[={0,1}]][,invcmsk[={0,1}]][,cmask=MASK][,icount=COUNT]";
-	char *dstr = xstrdup(str), *sptr, *tok, *ev;
-
-	tok = strtok_r(dstr, ",", &sptr);
-	if (tok == NULL) {
-		fprintf(stderr, "Invalid event spec string: '%s'\n\t%s\n", str,
-				event_spec);
-		exit(1);
-	}
 	ZERO_DATA(*sel);
-	sel->eidx = -1;
-	sel->ev.flags = 0;
-	sel->ev.event = 0;
-	PMEV_SET_OS(sel->ev.event, 1);
-	PMEV_SET_USR(sel->ev.event, 1);
+	if (parse_os_encoding(str, sel))
+		goto success;
+	if (parse_raw_encoding(str, sel))
+		goto success;
+	fprintf(stderr, "Failed to parse event string %s\n", str);
+	exit(-1);
+success:
+	if (!PMEV_GET_OS(sel->ev.event) && !PMEV_GET_USR(sel->ev.event)) {
+		PMEV_SET_OS(sel->ev.event, 1);
+		PMEV_SET_USR(sel->ev.event, 1);
+	}
 	PMEV_SET_EN(sel->ev.event, 1);
-	if (isdigit(*tok)) {
-		ev = strchr(tok, ':');
-		if (ev == NULL) {
-			fprintf(stderr, "Invalid event spec string: '%s'\n"
-					"\tShould be: %s\n", str, event_spec);
-			exit(1);
-		}
-		*ev++ = 0;
-		PMEV_SET_EVENT(sel->ev.event, (uint8_t) strtoul(tok, NULL, 0));
-		PMEV_SET_MASK(sel->ev.event, (uint8_t) strtoul(ev, NULL, 0));
-	} else {
-		uint32_t event, mask;
-
-		sel->eidx = perf_resolve_event_name(tok, &event, &mask, invalid_mask);
-		if (sel->eidx < 0) {
-			fprintf(stderr, "Unable to find event: %s\n", tok);
-			exit(1);
-		}
-		PMEV_SET_EVENT(sel->ev.event, (uint8_t) event);
-		PMEV_SET_MASK(sel->ev.event, (uint8_t) mask);
-	}
-	while ((tok = strtok_r(NULL, ",", &sptr)) != NULL) {
-		ev = strchr(tok, '=');
-		if (ev)
-			*ev++ = 0;
-		if (!strcmp(tok, "os")) {
-			PMEV_SET_OS(sel->ev.event, (ev == NULL || atoi(ev) != 0) ? 1 : 0);
-		} else if (!strcmp(tok, "usr")) {
-			PMEV_SET_USR(sel->ev.event, (ev == NULL || atoi(ev) != 0) ? 1 : 0);
-		} else if (!strcmp(tok, "int")) {
-			PMEV_SET_INTEN(sel->ev.event,
-						   (ev == NULL || atoi(ev) != 0) ? 1 : 0);
-		} else if (!strcmp(tok, "invcmsk")) {
-			PMEV_SET_INVCMSK(sel->ev.event,
-							 (ev == NULL || atoi(ev) != 0) ? 1 : 0);
-		} else if (!strcmp(tok, "cmask")) {
-			if (ev == NULL) {
-				fprintf(stderr, "Invalid event spec string: '%s'\n"
-						"\tShould be: %s\n", str, event_spec);
-				exit(1);
-			}
-			PMEV_SET_CMASK(sel->ev.event, (uint32_t) strtoul(ev, NULL, 0));
-		} else if (!strcmp(tok, "icount")) {
-			if (ev == NULL) {
-				fprintf(stderr, "Invalid event spec string: '%s'\n"
-						"\tShould be: %s\n", str, event_spec);
-				exit(1);
-			}
-			sel->ev.trigger_count = (uint64_t) strtoul(ev, NULL, 0);
-		}
-	}
-	if (PMEV_GET_INTEN(sel->ev.event) && !sel->ev.trigger_count) {
-		fprintf(stderr,
-				"Counter trigger count for interrupt is too small: %lu\n",
-				sel->ev.trigger_count);
-		exit(1);
-	}
-	free(dstr);
 }
 
 static void perf_get_arch_info(int perf_fd, struct perf_arch_info *pai)
@@ -490,6 +472,7 @@ static void perf_print_attr_flags(const pfm_event_attr_info_t *info, FILE *file)
 		fputs("None ", file);
 }
 
+/* Ported from libpfm4 */
 static void perf_show_event_info(const pfm_event_info_t *info,
 								 const pfm_pmu_info_t *pinfo, FILE *file)
 {
@@ -631,15 +614,6 @@ void perf_get_event_string(const struct perf_eventsel *sel, char *sbuf,
 				 (int) PMEV_GET_EVENT(sel->ev.event),
 				 (int) PMEV_GET_MASK(sel->ev.event));
 	}
-}
-
-void perf_make_eventsel_from_event_mask(struct perf_eventsel *sel,
-										uint32_t event, uint32_t mask)
-{
-	ZERO_DATA(*sel);
-	PMEV_SET_EVENT(sel->ev.event, (uint8_t) event);
-	PMEV_SET_MASK(sel->ev.event, (uint8_t) mask);
-	sel->eidx = perf_find_event_by_id(event, mask);
 }
 
 void perf_convert_trace_data(struct perfconv_context *cctx, const char *input,
