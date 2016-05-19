@@ -63,8 +63,6 @@ void perf_context_event_submit(struct perf_context *pctx,
 							   const struct perf_eventsel *sel);
 void perf_context_show_values(struct perf_context *pctx, FILE *file);
 void perf_show_events(const char *rx, FILE *file);
-void perf_get_event_string(const struct perf_eventsel *sel, char *sbuf,
-						   size_t size);
 void perf_convert_trace_data(struct perfconv_context *cctx, const char *input,
 							 const char *output);
 

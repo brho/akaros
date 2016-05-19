@@ -305,13 +305,12 @@ static int perf_open_event(int perf_fd, const struct core_set *cores,
 	return (int) ped;
 }
 
-static uint64_t *perf_get_event_values(int perf_fd, int ped,
-									   struct perf_eventsel *sel,
-									   size_t *pnvalues)
+static uint64_t *perf_get_event_values(int perf_fd, int ped, size_t *pnvalues)
 {
 	ssize_t rsize;
 	uint32_t i, n;
 	uint64_t *values;
+	uint64_t temp;
 	size_t bufsize = 3 * sizeof(uint64_t) + sizeof(uint32_t) +
 		MAX_NUM_CORES * sizeof(uint64_t);
 	uint8_t *cmdbuf = xmalloc(bufsize);
@@ -330,9 +329,11 @@ static uint64_t *perf_get_event_values(int perf_fd, int ped,
 		exit(1);
 	}
 
-	rptr = get_le_u64(rptr, &sel->ev.event);
-	rptr = get_le_u64(rptr, &sel->ev.flags);
-	rptr = get_le_u64(rptr, &sel->ev.trigger_count);
+	/* TODO: The kernel lies to us about this, it's all 0. */
+	rptr = get_le_u64(rptr, &temp);		/* discard ev.event */
+	rptr = get_le_u64(rptr, &temp);		/* discard ev.flags */
+	rptr = get_le_u64(rptr, &temp);		/* discard ev.trigger_count */
+
 	rptr = get_le_u32(rptr, &n);
 	if (((rptr - cmdbuf) + n * sizeof(uint64_t)) > rsize) {
 		fprintf(stderr, "Invalid read size while fetching event status: %ld\n",
@@ -428,14 +429,15 @@ void perf_context_show_values(struct perf_context *pctx, FILE *file)
 {
 	for (int i = 0; i < pctx->event_count; i++) {
 		size_t nvalues;
-		struct perf_eventsel sel;
+		struct perf_eventsel *sel = &pctx->events[i].sel;
 		uint64_t *values = perf_get_event_values(pctx->perf_fd,
-												 pctx->events[i].ped, &sel,
+												 pctx->events[i].ped,
 												 &nvalues);
-		char ename[256];
 
-		perf_get_event_string(&pctx->events[i].sel, ename, sizeof(ename));
-		fprintf(file, "Event: %s\n\t", ename);
+		fprintf(file, "Event: %s, final code %p%s, trigger count %d\n\t",
+		        sel->fq_str, sel->ev.event,
+		        perfmon_is_fixed_event(&sel->ev) ? " (fixed)" : "",
+		        sel->ev.trigger_count);
 		for (size_t j = 0; j < nvalues; j++)
 			fprintf(file, "%lu ", values[j]);
 		fprintf(file, "\n");
@@ -591,29 +593,6 @@ void perf_show_events(const char *rx, FILE *file)
 	}
 	if (rx)
 		regfree(&crx);
-}
-
-void perf_get_event_string(const struct perf_eventsel *sel, char *sbuf,
-						   size_t size)
-{
-	pfm_event_info_t einfo;
-
-    ZERO_DATA(einfo);
-    einfo.size = sizeof(einfo);
-	if ((sel->eidx >= 0) &&
-		(pfm_get_event_info(sel->eidx, PFM_OS_NONE, &einfo) == PFM_SUCCESS)) {
-		const char *mask_name =
-			perf_get_event_mask_name(&einfo, PMEV_GET_MASK(sel->ev.event));
-
-		if (mask_name)
-			snprintf(sbuf, size, "%s:%s", einfo.name, mask_name);
-		else
-			snprintf(sbuf, size, "%s", einfo.name);
-	} else {
-		snprintf(sbuf, size, "0x%02x:0x%02x",
-				 (int) PMEV_GET_EVENT(sel->ev.event),
-				 (int) PMEV_GET_MASK(sel->ev.event));
-	}
 }
 
 void perf_convert_trace_data(struct perfconv_context *cctx, const char *input,
