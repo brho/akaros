@@ -64,64 +64,89 @@ static void perfmon_read_cpu_caps(struct perfmon_cpu_caps *pcc)
 	pcc->perfmon_version = a & 0xff;
 }
 
-static void perfmon_enable_event(int event)
+static void perfmon_enable_event(int idx, uint64_t event)
 {
-	uint64_t gctrl = read_msr(MSR_CORE_PERF_GLOBAL_CTRL);
+	uint64_t gctrl;
 
-	write_msr(MSR_CORE_PERF_GLOBAL_CTRL, gctrl | (1 << event));
+	/* Events need to be enabled in both MSRs */
+	write_msr(MSR_ARCH_PERFMON_EVENTSEL0 + idx, event);
+	gctrl = read_msr(MSR_CORE_PERF_GLOBAL_CTRL);
+	write_msr(MSR_CORE_PERF_GLOBAL_CTRL, gctrl | (1 << idx));
 }
 
-static void perfmon_disable_event(int event)
+static void perfmon_disable_event(int idx)
 {
-	uint64_t gctrl = read_msr(MSR_CORE_PERF_GLOBAL_CTRL);
+	uint64_t gctrl;
 
-	write_msr(MSR_CORE_PERF_GLOBAL_CTRL, gctrl & ~(1 << event));
+	/* Events can be disabled in either location.  We could just clear the
+	 * global ctrl, but we use the contents of EVENTSEL to say if the counter is
+	 * available or not. */
+	write_msr(MSR_ARCH_PERFMON_EVENTSEL0 + idx, 0);
+	gctrl = read_msr(MSR_CORE_PERF_GLOBAL_CTRL);
+	write_msr(MSR_CORE_PERF_GLOBAL_CTRL, gctrl & ~(1 << idx));
 }
 
-static void perfmon_enable_fix_event(int event)
+static bool perfmon_event_available(uint32_t idx)
 {
-	uint64_t gctrl = read_msr(MSR_CORE_PERF_GLOBAL_CTRL);
-
-	write_msr(MSR_CORE_PERF_GLOBAL_CTRL,
-	          gctrl | ((uint64_t) 1 << (32 + event)));
+	return read_msr(MSR_ARCH_PERFMON_EVENTSEL0 + idx) == 0;
 }
 
-static void perfmon_disable_fix_event(int event)
-{
-	uint64_t gctrl = read_msr(MSR_CORE_PERF_GLOBAL_CTRL);
-
-	write_msr(MSR_CORE_PERF_GLOBAL_CTRL,
-	          gctrl & ~((uint64_t) 1 << (32 + event)));
-}
-
-static bool perfmon_event_available(uint32_t event)
-{
-	return read_msr(MSR_ARCH_PERFMON_EVENTSEL0 + event) == 0;
-}
-
-static uint64_t perfmon_get_fixevent_mask(const struct perfmon_event *pev,
-                                          int eventno, uint64_t base)
+/* Helper.  Given an event, a fixed counter index, and the contents of the fixed
+ * counter ctl MSR, output the value for the fixed counter ctl that will enable
+ * the event at idx. */
+static uint64_t perfmon_apply_fixevent_mask(uint64_t event, int idx,
+                                            uint64_t base)
 {
 	uint64_t m = 0;
 
-	if (PMEV_GET_INTEN(pev->event))
-		m |= 1 << 3;
-	if (PMEV_GET_OS(pev->event))
+	if (PMEV_GET_OS(event))
 		m |= (1 << 0);
-	if (PMEV_GET_USR(pev->event))
+	if (PMEV_GET_USR(event))
 		m |= (1 << 1);
-	if (PMEV_GET_ANYTH(pev->event) && (cpu_caps.perfmon_version >= 3))
+	if (PMEV_GET_ANYTH(event) && (cpu_caps.perfmon_version >= 3))
 		m |= (1 << 2);
+	if (PMEV_GET_INTEN(event))
+		m |= (1 << 3);
 	/* Enable enforcement: we need at least one bit set so that this fixed
 	 * counter appears to be in use. */
-	if (PMEV_GET_EN(pev->event) && !PMEV_GET_OS(pev->event) &&
-	    !PMEV_GET_USR(pev->event))
+	if (PMEV_GET_EN(event) && !PMEV_GET_OS(event) && !PMEV_GET_USR(event))
 		m |= (1 << 0) | (1 << 1);
 
-	m <<= eventno * FIXCNTR_NBITS;
-	m |= base & ~(FIXCNTR_MASK << (eventno * FIXCNTR_NBITS));
+	m <<= idx * FIXCNTR_NBITS;
+	m |= base & ~(FIXCNTR_MASK << (idx * FIXCNTR_NBITS));
 
 	return m;
+}
+
+/* These helpers take the fxctrl_value to save on a rdmsr. */
+static void perfmon_enable_fix_event(int idx, uint64_t event,
+                                     uint64_t fxctrl_value)
+{
+	uint64_t gctrl, fx;
+
+	/* Enable in both locations: the bits in FIXED and the bit in GLOBAL. */
+	fx = perfmon_apply_fixevent_mask(event, idx, fxctrl_value);
+	write_msr(MSR_CORE_PERF_FIXED_CTR_CTRL, fx);
+	gctrl = read_msr(MSR_CORE_PERF_GLOBAL_CTRL);
+	write_msr(MSR_CORE_PERF_GLOBAL_CTRL, gctrl | ((uint64_t) 1 << (32 + idx)));
+}
+
+static void perfmon_disable_fix_event(int idx, uint64_t fxctrl_value)
+{
+	uint64_t gctrl;
+
+	/* Events can be disabled in either location.  We could just clear the
+	 * global ctrl, but we use the bits of fxctlr to say if the counter is
+	 * available or not. */
+	write_msr(MSR_CORE_PERF_FIXED_CTR_CTRL,
+	          fxctrl_value & ~(FIXCNTR_MASK << (idx * FIXCNTR_NBITS)));
+	gctrl = read_msr(MSR_CORE_PERF_GLOBAL_CTRL);
+	write_msr(MSR_CORE_PERF_GLOBAL_CTRL, gctrl & ~((uint64_t) 1 << (32 + idx)));
+}
+
+static bool perfmon_fix_event_available(uint32_t idx, uint64_t fxctrl_value)
+{
+	return (fxctrl_value & (FIXCNTR_MASK << (idx * FIXCNTR_NBITS))) == 0;
 }
 
 /* Helper to set a fixed perfcounter to trigger/overflow after count events.
@@ -156,12 +181,11 @@ static void perfmon_do_cores_alloc(void *opaque)
 	spin_lock_irqsave(&cctx->lock);
 	if (perfmon_is_fixed_event(&pa->ev)) {
 		uint64_t fxctrl_value = read_msr(MSR_CORE_PERF_FIXED_CTR_CTRL);
-		uint64_t tmp;
 
 		i = PMEV_GET_EVENT(pa->ev.event);
 		if (i >= (int) cpu_caps.fix_counters_x_proc) {
 			i = -EINVAL;
-		} else if (fxctrl_value & (FIXCNTR_MASK << (i * FIXCNTR_NBITS))) {
+		} else if (!perfmon_fix_event_available(i, fxctrl_value)) {
 			i = -EBUSY;
 		} else {
 			/* Keep a copy of pa->ev for later.  pa is read-only and shared. */
@@ -172,18 +196,14 @@ static void perfmon_do_cores_alloc(void *opaque)
 			else
 				write_msr(MSR_CORE_PERF_FIXED_CTR0 + i, 0);
 			write_msr(MSR_CORE_PERF_GLOBAL_OVF_CTRL, 1ULL << (32 + i));
-			/* Event needs to be enabled in both MSRs */
-			perfmon_enable_fix_event(i);
-			tmp = perfmon_get_fixevent_mask(pev, i, fxctrl_value);
-			write_msr(MSR_CORE_PERF_FIXED_CTR_CTRL, tmp);
+			perfmon_enable_fix_event(i, pev->event, fxctrl_value);
 		}
 	} else {
 		for (i = 0; i < (int) cpu_caps.counters_x_proc; i++) {
 			if (cctx->counters[i].event == 0) {
-				if (!perfmon_event_available(i))
-					warn_once("Counter %d is free but not available", i);
-				else
-					break;
+				/* kernel bug if the MSRs don't agree with our bookkeeping */
+				assert(perfmon_event_available(i));
+				break;
 			}
 		}
 		if (i < (int) cpu_caps.counters_x_proc) {
@@ -194,8 +214,7 @@ static void perfmon_do_cores_alloc(void *opaque)
 			else
 				write_msr(MSR_IA32_PERFCTR0 + i, 0);
 			write_msr(MSR_CORE_PERF_GLOBAL_OVF_CTRL, 1ULL << i);
-			perfmon_enable_event(i);
-			write_msr(MSR_ARCH_PERFMON_EVENTSEL0 + i, pev->event);
+			perfmon_enable_event(i, pev->event);
 		} else {
 			i = -ENOSPC;
 		}
@@ -214,28 +233,20 @@ static void perfmon_do_cores_free(void *opaque)
 
 	spin_lock_irqsave(&cctx->lock);
 	if (perfmon_is_fixed_event(&pa->ev)) {
-		unsigned int ccbitsh = ccno * FIXCNTR_NBITS;
 		uint64_t fxctrl_value = read_msr(MSR_CORE_PERF_FIXED_CTR_CTRL);
 
 		if ((ccno >= cpu_caps.fix_counters_x_proc) ||
-			!(fxctrl_value & (FIXCNTR_MASK << ccbitsh))) {
+		    perfmon_fix_event_available(ccno, fxctrl_value)) {
 			err = -ENOENT;
 		} else {
 			perfmon_init_event(&cctx->fixed_counters[ccno]);
-
-			perfmon_disable_fix_event((int) ccno);
-
-			write_msr(MSR_CORE_PERF_FIXED_CTR_CTRL,
-			          fxctrl_value & ~(FIXCNTR_MASK << ccbitsh));
+			perfmon_disable_fix_event((int) ccno, fxctrl_value);
 			write_msr(MSR_CORE_PERF_FIXED_CTR0 + ccno, 0);
 		}
 	} else {
 		if (ccno < (int) cpu_caps.counters_x_proc) {
 			perfmon_init_event(&cctx->counters[ccno]);
-
 			perfmon_disable_event((int) ccno);
-
-			write_msr(MSR_ARCH_PERFMON_EVENTSEL0 + ccno, 0);
 			write_msr(MSR_IA32_PERFCTR0 + ccno, 0);
 		} else {
 			err = -ENOENT;
