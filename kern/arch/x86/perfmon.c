@@ -109,6 +109,28 @@ static uint64_t perfmon_get_fixevent_mask(const struct perfmon_event *pev,
 	return m;
 }
 
+/* Helper to set a fixed perfcounter to trigger/overflow after count events.
+ * Anytime you set a perfcounter to something non-zero, you need to use this
+ * helper. */
+static void perfmon_set_fixed_trigger(unsigned int idx, uint64_t count)
+{
+	int64_t write_val = -(int64_t)count;
+
+	write_val &= (1ULL << cpu_caps.bits_x_fix_counter) - 1;
+	write_msr(MSR_CORE_PERF_FIXED_CTR0 + idx, write_val);
+}
+
+/* Helper to set a regular perfcounter to trigger/overflow after count events.
+ * Anytime you set a perfcounter to something non-zero, you ought to use this
+ * helper. */
+static void perfmon_set_unfixed_trigger(unsigned int idx, uint64_t count)
+{
+	int64_t write_val = -(int64_t)count;
+
+	write_val &= (1ULL << cpu_caps.bits_x_counter) - 1;
+	write_msr(MSR_IA32_PERFCTR0 + idx, write_val);
+}
+
 static void perfmon_do_cores_alloc(void *opaque)
 {
 	struct perfmon_alloc *pa = (struct perfmon_alloc *) opaque;
@@ -133,8 +155,7 @@ static void perfmon_do_cores_alloc(void *opaque)
 
 			perfmon_enable_fix_event(i, TRUE);
 
-			write_msr(MSR_CORE_PERF_FIXED_CTR0 + i,
-			          -(int64_t) pa->ev.trigger_count);
+			perfmon_set_fixed_trigger(i, pa->ev.trigger_count);
 			write_msr(MSR_CORE_PERF_FIXED_CTR_CTRL, tmp);
 		}
 	} else {
@@ -152,7 +173,7 @@ static void perfmon_do_cores_alloc(void *opaque)
 
 			perfmon_enable_event(i, TRUE);
 
-			write_msr(MSR_IA32_PERFCTR0 + i, -(int64_t) pa->ev.trigger_count);
+			perfmon_set_unfixed_trigger(i, pa->ev.trigger_count);
 			write_msr(MSR_ARCH_PERFMON_EVENTSEL0 + i,
 			          cctx->counters[i].event);
 		} else {
@@ -354,8 +375,7 @@ void perfmon_interrupt(struct hw_trapframe *hw_tf, void *data)
 			if (cctx->counters[i].event) {
 				profiler_add_hw_sample(
 				    hw_tf, perfmon_make_sample_event(cctx->counters + i));
-				write_msr(MSR_IA32_PERFCTR0 + i,
-				          -(int64_t) cctx->counters[i].trigger_count);
+				perfmon_set_unfixed_trigger(i, cctx->counters[i].trigger_count);
 			}
 		}
 	}
@@ -364,8 +384,8 @@ void perfmon_interrupt(struct hw_trapframe *hw_tf, void *data)
 			if (cctx->fixed_counters[i].event) {
 				profiler_add_hw_sample(
 				    hw_tf, perfmon_make_sample_event(cctx->fixed_counters + i));
-				write_msr(MSR_CORE_PERF_FIXED_CTR0 + i,
-				          -(int64_t) cctx->fixed_counters[i].trigger_count);
+				perfmon_set_fixed_trigger(i,
+				        cctx->fixed_counters[i].trigger_count);
 			}
 		}
 	}
