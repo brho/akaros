@@ -64,26 +64,34 @@ static void perfmon_read_cpu_caps(struct perfmon_cpu_caps *pcc)
 	pcc->perfmon_version = a & 0xff;
 }
 
-static void perfmon_enable_event(int event, bool enable)
+static void perfmon_enable_event(int event)
 {
 	uint64_t gctrl = read_msr(MSR_CORE_PERF_GLOBAL_CTRL);
 
-	if (enable)
-		write_msr(MSR_CORE_PERF_GLOBAL_CTRL, gctrl | (1 << event));
-	else
-		write_msr(MSR_CORE_PERF_GLOBAL_CTRL, gctrl & ~(1 << event));
+	write_msr(MSR_CORE_PERF_GLOBAL_CTRL, gctrl | (1 << event));
 }
 
-static void perfmon_enable_fix_event(int event, bool enable)
+static void perfmon_disable_event(int event)
 {
 	uint64_t gctrl = read_msr(MSR_CORE_PERF_GLOBAL_CTRL);
 
-	if (enable)
-		write_msr(MSR_CORE_PERF_GLOBAL_CTRL,
-		          gctrl | ((uint64_t) 1 << (32 + event)));
-	else
-		write_msr(MSR_CORE_PERF_GLOBAL_CTRL,
-		          gctrl & ~((uint64_t) 1 << (32 + event)));
+	write_msr(MSR_CORE_PERF_GLOBAL_CTRL, gctrl & ~(1 << event));
+}
+
+static void perfmon_enable_fix_event(int event)
+{
+	uint64_t gctrl = read_msr(MSR_CORE_PERF_GLOBAL_CTRL);
+
+	write_msr(MSR_CORE_PERF_GLOBAL_CTRL,
+	          gctrl | ((uint64_t) 1 << (32 + event)));
+}
+
+static void perfmon_disable_fix_event(int event)
+{
+	uint64_t gctrl = read_msr(MSR_CORE_PERF_GLOBAL_CTRL);
+
+	write_msr(MSR_CORE_PERF_GLOBAL_CTRL,
+	          gctrl & ~((uint64_t) 1 << (32 + event)));
 }
 
 static bool perfmon_event_available(uint32_t event)
@@ -96,12 +104,19 @@ static uint64_t perfmon_get_fixevent_mask(const struct perfmon_event *pev,
 {
 	uint64_t m = 0;
 
-	if (PMEV_GET_EN(pev->event))
+	if (PMEV_GET_INTEN(pev->event))
 		m |= 1 << 3;
 	if (PMEV_GET_OS(pev->event))
 		m |= (1 << 0);
 	if (PMEV_GET_USR(pev->event))
 		m |= (1 << 1);
+	if (PMEV_GET_ANYTH(pev->event) && (cpu_caps.perfmon_version >= 3))
+		m |= (1 << 2);
+	/* Enable enforcement: we need at least one bit set so that this fixed
+	 * counter appears to be in use. */
+	if (PMEV_GET_EN(pev->event) && !PMEV_GET_OS(pev->event) &&
+	    !PMEV_GET_USR(pev->event))
+		m |= (1 << 0) | (1 << 1);
 
 	m <<= eventno * FIXCNTR_NBITS;
 	m |= base & ~(FIXCNTR_MASK << (eventno * FIXCNTR_NBITS));
@@ -136,6 +151,7 @@ static void perfmon_do_cores_alloc(void *opaque)
 	struct perfmon_alloc *pa = (struct perfmon_alloc *) opaque;
 	struct perfmon_cpu_context *cctx = PERCPU_VARPTR(counters_env);
 	int i;
+	struct perfmon_event *pev;
 
 	spin_lock_irqsave(&cctx->lock);
 	if (perfmon_is_fixed_event(&pa->ev)) {
@@ -148,14 +164,17 @@ static void perfmon_do_cores_alloc(void *opaque)
 		} else if (fxctrl_value & (FIXCNTR_MASK << (i * FIXCNTR_NBITS))) {
 			i = -EBUSY;
 		} else {
+			/* Keep a copy of pa->ev for later.  pa is read-only and shared. */
 			cctx->fixed_counters[i] = pa->ev;
-			PMEV_SET_EN(cctx->fixed_counters[i].event, 1);
-
-			tmp = perfmon_get_fixevent_mask(&pa->ev, i, fxctrl_value);
-
-			perfmon_enable_fix_event(i, TRUE);
-
-			perfmon_set_fixed_trigger(i, pa->ev.trigger_count);
+			pev = &cctx->fixed_counters[i];
+			if (PMEV_GET_INTEN(pev->event))
+				perfmon_set_fixed_trigger(i, pev->trigger_count);
+			else
+				write_msr(MSR_CORE_PERF_FIXED_CTR0 + i, 0);
+			write_msr(MSR_CORE_PERF_GLOBAL_OVF_CTRL, 1ULL << (32 + i));
+			/* Event needs to be enabled in both MSRs */
+			perfmon_enable_fix_event(i);
+			tmp = perfmon_get_fixevent_mask(pev, i, fxctrl_value);
 			write_msr(MSR_CORE_PERF_FIXED_CTR_CTRL, tmp);
 		}
 	} else {
@@ -169,13 +188,14 @@ static void perfmon_do_cores_alloc(void *opaque)
 		}
 		if (i < (int) cpu_caps.counters_x_proc) {
 			cctx->counters[i] = pa->ev;
-			PMEV_SET_EN(cctx->counters[i].event, 1);
-
-			perfmon_enable_event(i, TRUE);
-
-			perfmon_set_unfixed_trigger(i, pa->ev.trigger_count);
-			write_msr(MSR_ARCH_PERFMON_EVENTSEL0 + i,
-			          cctx->counters[i].event);
+			pev = &cctx->counters[i];
+			if (PMEV_GET_INTEN(pev->event))
+				perfmon_set_unfixed_trigger(i, pev->trigger_count);
+			else
+				write_msr(MSR_IA32_PERFCTR0 + i, 0);
+			write_msr(MSR_CORE_PERF_GLOBAL_OVF_CTRL, 1ULL << i);
+			perfmon_enable_event(i);
+			write_msr(MSR_ARCH_PERFMON_EVENTSEL0 + i, pev->event);
 		} else {
 			i = -ENOSPC;
 		}
@@ -203,7 +223,7 @@ static void perfmon_do_cores_free(void *opaque)
 		} else {
 			perfmon_init_event(&cctx->fixed_counters[ccno]);
 
-			perfmon_enable_fix_event((int) ccno, FALSE);
+			perfmon_disable_fix_event((int) ccno);
 
 			write_msr(MSR_CORE_PERF_FIXED_CTR_CTRL,
 			          fxctrl_value & ~(FIXCNTR_MASK << ccbitsh));
@@ -213,7 +233,7 @@ static void perfmon_do_cores_free(void *opaque)
 		if (ccno < (int) cpu_caps.counters_x_proc) {
 			perfmon_init_event(&cctx->counters[ccno]);
 
-			perfmon_enable_event((int) ccno, FALSE);
+			perfmon_disable_event((int) ccno);
 
 			write_msr(MSR_ARCH_PERFMON_EVENTSEL0 + ccno, 0);
 			write_msr(MSR_IA32_PERFCTR0 + ccno, 0);
@@ -435,6 +455,10 @@ int perfmon_open_event(const struct core_set *cset, struct perfmon_session *ps,
 		perfmon_destroy_alloc(pa);
 		nexterror();
 	}
+	/* Ensure we're turning on the event.  The user could have forgotten to set
+	 * it.  Our tracking of whether or not a counter is in use depends on it
+	 * being enabled, or at least that some bit is set. */
+	PMEV_SET_EN(pa->ev.event, 1);
 	smp_do_in_cores(cset, perfmon_do_cores_alloc, pa);
 
 	for (i = 0; i < num_cores; i++) {
