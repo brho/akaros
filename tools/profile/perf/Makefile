@@ -13,7 +13,8 @@ all: perf
 PHONY += perf
 perf: $(SOURCES)
 	@echo "  CC      perf"
-	$(Q)$(XCC) -O2 -std=gnu99 -o perf $(SOURCES) $(LIBS)
+	$(Q)$(XCC) -O2 -Wall -Wno-format -Wno-unused -Werror \
+	           -std=gnu99 -o perf $(SOURCES) $(LIBS)
 
 
 PHONY += install

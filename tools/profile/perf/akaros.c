@@ -37,7 +37,9 @@ size_t ros_total_cores(void)
 void ros_parse_cores(const char *str, struct core_set *cores)
 {
 	unsigned int fcpu, ncpu;
-	char *dstr = xstrdup(str), *tok, *sptr, *sptr2;
+	char *dstr = xstrdup(str);
+	char *sptr = NULL;
+	char *tok, *sptr2;
 
 	ZERO_DATA(*cores);
 	for (tok = strtok_r(dstr, ":", &sptr); tok;

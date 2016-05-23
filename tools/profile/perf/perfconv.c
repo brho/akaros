@@ -348,7 +348,8 @@ static void emit_pid_mmap64(struct perf_record *pr,
 							struct perfconv_context *cctx)
 {
 	struct proftype_pid_mmap64 *rec = (struct proftype_pid_mmap64 *) pr->data;
-	size_t size = sizeof(struct perf_record_mmap) + strlen(rec->path) + 1;
+	size_t size = sizeof(struct perf_record_mmap) +
+	              strlen((char*)rec->path) + 1;
 	struct perf_record_mmap *xrec = xzmalloc(size);
 
 	xrec->header.type = PERF_RECORD_MMAP;
@@ -358,7 +359,7 @@ static void emit_pid_mmap64(struct perf_record *pr,
 	xrec->addr = rec->addr;
 	xrec->len = rec->size;
 	xrec->pgoff = rec->offset;
-	strcpy(xrec->filename, rec->path);
+	strcpy(xrec->filename, (char*)rec->path);
 
 	mem_file_write(&cctx->data, xrec, size, 0);
 
@@ -428,10 +429,10 @@ static void emit_new_process(struct perf_record *pr,
 							 struct perfconv_context *cctx)
 {
 	struct proftype_new_process *rec = (struct proftype_new_process *) pr->data;
-	const char *comm = strrchr(rec->path, '/');
+	const char *comm = strrchr((char*)rec->path, '/');
 
 	if (!comm)
-		comm = rec->path;
+		comm = (char*)rec->path;
 	else
 		comm++;
 	emit_comm(rec->pid, comm, cctx);
