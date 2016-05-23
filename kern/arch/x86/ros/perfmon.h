@@ -24,6 +24,7 @@
  *   U64 EVENT_DESCRIPTOR;
  *   U64 EVENT_FLAGS;
  *   U64 EVENT_TRIGGER_COUNT;
+ *   U64 EVENT_USER_DATA;
  *   U32 NUM_CPUMASK_BYTES;
  *   U8 CPUMASK_BYTES[NUM_CPUMASK_BYTES];
  * PERFMON_CMD_COUNTER_OPEN response
@@ -103,6 +104,7 @@ struct perfmon_event {
 	uint64_t event;
 	uint64_t flags;
 	uint64_t trigger_count;
+	uint64_t user_data;
 };
 
 static inline void perfmon_init_event(struct perfmon_event *pev)

@@ -378,13 +378,7 @@ void perfmon_pcpu_init(void)
 
 static uint64_t perfmon_make_sample_event(const struct perfmon_event *pev)
 {
-	uint64_t ei = ((uint64_t) PMEV_GET_MASK(pev->event) << 8) |
-		PMEV_GET_EVENT(pev->event);
-
-	if (perfmon_is_fixed_event(pev))
-		ei |= 1 << 16;
-
-	return PROF_MKINFO(PROF_DOM_PMU, ei);
+	return pev->user_data;
 }
 
 void perfmon_interrupt(struct hw_trapframe *hw_tf, void *data)

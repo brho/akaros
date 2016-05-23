@@ -165,10 +165,10 @@ int main(int argc, char *argv[])
 			usage(argv[0]);
 
 		for (i = 0; i < num_events; i++) {
-			struct perf_eventsel sel;
+			struct perf_eventsel *sel;
 
-			perf_parse_event(events[i], &sel);
-			perf_context_event_submit(pctx, &cores, &sel);
+			sel = perf_parse_event(events[i]);
+			perf_context_event_submit(pctx, &cores, sel);
 		}
 
 		if (!strcmp(argv[icmd], "sleep") && (icmd + 1) < argc)

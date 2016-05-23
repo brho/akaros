@@ -237,13 +237,16 @@ static bool parse_raw_encoding(const char *str, struct perf_eventsel *sel)
  * part of the event string.
  *
  * Kills the program on failure. */
-void perf_parse_event(const char *str, struct perf_eventsel *sel)
+struct perf_eventsel *perf_parse_event(const char *str)
 {
-	ZERO_DATA(*sel);
+	struct perf_eventsel *sel = xzmalloc(sizeof(struct perf_eventsel));
+
+	sel->ev.user_data = (uint64_t)sel;
 	if (parse_os_encoding(str, sel))
 		goto success;
 	if (parse_raw_encoding(str, sel))
 		goto success;
+	free(sel);
 	fprintf(stderr, "Failed to parse event string %s\n", str);
 	exit(-1);
 success:
@@ -252,6 +255,7 @@ success:
 		PMEV_SET_USR(sel->ev.event, 1);
 	}
 	PMEV_SET_EN(sel->ev.event, 1);
+	return sel;
 }
 
 static void perf_get_arch_info(int perf_fd, struct perf_arch_info *pai)
@@ -286,6 +290,7 @@ static int perf_open_event(int perf_fd, const struct core_set *cores,
 	wptr = put_le_u64(wptr, sel->ev.event);
 	wptr = put_le_u64(wptr, sel->ev.flags);
 	wptr = put_le_u64(wptr, sel->ev.trigger_count);
+	wptr = put_le_u64(wptr, sel->ev.user_data);
 
 	for (i = CORE_SET_SIZE - 1; (i >= 0) && !cores->core_set[i]; i--)
 		;

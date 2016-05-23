@@ -395,6 +395,7 @@ static long arch_perf_write(struct perf_context *pc, const void *udata,
 			kptr = get_le_u64(kptr, &pev.event);
 			kptr = get_le_u64(kptr, &pev.flags);
 			kptr = get_le_u64(kptr, &pev.trigger_count);
+			kptr = get_le_u64(kptr, &pev.user_data);
 			kptr = arch_read_core_set(&cset, kptr, ktop);
 
 			ped = perfmon_open_event(&cset, pc->ps, &pev);
