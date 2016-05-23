@@ -686,11 +686,13 @@ $(app-dirs-clean):
 PHONY +=  apps-install
 apps-install: $(app-dirs-install)
 	@$(call make_as_parent, -C tools/apps/busybox)
+	@$(call make_as_parent, -C tools/apps/ipconfig install)
 	@$(call make_as_parent, -C tools/profile/perf install)
 
 PHONY += apps-clean
 apps-clean: $(app-dirs-clean)
 	@$(call make_as_parent, -C tools/apps/busybox clean)
+	@$(call make_as_parent, -C tools/apps/ipconfig clean)
 	@$(call make_as_parent, -C tools/profile/perf clean)
 
 # Cross Compiler
