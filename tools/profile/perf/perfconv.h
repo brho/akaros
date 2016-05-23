@@ -60,6 +60,7 @@ struct perf_event_id {
 };
 
 struct perfconv_context {
+	struct perf_context *pctx;
 	struct mem_arena ma;
 	int debug_level;
 	struct static_mmap64 *static_mmaps;
@@ -71,7 +72,7 @@ struct perfconv_context {
 	struct mem_file fhdrs, misc, attrs, data, event_types;
 };
 
-struct perfconv_context *perfconv_create_context(void);
+struct perfconv_context *perfconv_create_context(struct perf_context *pctx);
 void perfconv_free_context(struct perfconv_context *cctx);
 void perfconv_set_dbglevel(int level, struct perfconv_context *cctx);
 void perfconv_add_kernel_mmap(struct perfconv_context *cctx);

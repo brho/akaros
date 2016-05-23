@@ -114,7 +114,6 @@ int main(int argc, char *argv[])
 	const char *events[MAX_CPU_EVENTS];
 
 	ros_get_all_cores_set(&cores);
-	cctx = perfconv_create_context();
 
 	for (i = 2; i < argc; i++) {
 		if (!strcmp(argv[i], "-m")) {
@@ -155,6 +154,7 @@ int main(int argc, char *argv[])
 
 	perf_initialize(argc, argv);
 	pctx = perf_create_context(&perf_cfg);
+	cctx = perfconv_create_context(pctx);
 
 	if (!strcmp(cmd, "list")) {
 		perf_show_events(show_rx, stdout);

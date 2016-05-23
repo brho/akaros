@@ -499,10 +499,11 @@ static void add_event_type(struct mem_file *mf, uint64_t id, const char *name)
 	mem_file_write(mf, &evt, sizeof(evt), 0);
 }
 
-struct perfconv_context *perfconv_create_context(void)
+struct perfconv_context *perfconv_create_context(struct perf_context *pctx)
 {
 	struct perfconv_context *cctx = xzmalloc(sizeof(struct perfconv_context));
 
+	cctx->pctx = pctx;
 	xmem_arena_init(&cctx->ma, 0);
 	cctx->alloced_events = 128;
 	cctx->events = xmem_arena_zalloc(
