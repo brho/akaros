@@ -64,9 +64,6 @@ struct perfconv_context {
 	struct mem_arena ma;
 	int debug_level;
 	struct static_mmap64 *static_mmaps;
-	uint64_t sqnr_id;
-	struct perf_event_id *events;
-	size_t alloced_events;
 	struct perf_header ph;
 	struct perf_headers hdrs;
 	struct mem_file fhdrs, misc, attrs, data, event_types;

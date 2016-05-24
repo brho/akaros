@@ -187,19 +187,6 @@ static struct mem_file_reloc *mem_file_add_reloc(struct mem_file *mf,
 	return rel;
 }
 
-static uint64_t perfconv_make_config_id(bool is_raw, uint64_t type,
-										uint64_t event_id)
-{
-	uint64_t config = is_raw ? (uint64_t) 1 << 63 : 0;
-
-	return config | (type << 56) | (event_id & (((uint64_t) 1 << 56) - 1));
-}
-
-static uint64_t perfconv_get_config_type(uint64_t config)
-{
-	return (config >> 56) & 0x7f;
-}
-
 void perfconv_add_kernel_mmap(struct perfconv_context *cctx)
 {
 	char path[] = "[kernel.kallsyms]";
@@ -259,9 +246,8 @@ static void perf_header_init(struct perf_header *ph)
 	ph->attr_size = sizeof(struct perf_event_attr);
 }
 
-static void add_attribute(struct mem_file *amf, struct mem_file *mmf,
-						  const struct perf_event_attr *attr,
-						  const uint64_t *ids, size_t nids)
+static void emit_attr(struct mem_file *amf, struct mem_file *mmf,
+                      const struct perf_event_attr *attr, uint64_t id)
 {
 	struct perf_file_section *psids;
 	struct perf_file_section sids;
@@ -269,88 +255,52 @@ static void add_attribute(struct mem_file *amf, struct mem_file *mmf,
 	mem_file_write(amf, attr, sizeof(*attr), 0);
 
 	sids.offset = mmf->size;
-	sids.size = nids * sizeof(uint64_t);
+	sids.size = sizeof(uint64_t);
 
-	mem_file_write(mmf, ids, nids * sizeof(uint64_t), 0);
+	mem_file_write(mmf, &id, sizeof(uint64_t), 0);
 
 	psids = mem_file_write(amf, &sids, sizeof(sids), MBWR_SOLID);
 
 	mem_file_add_reloc(amf, &psids->offset);
 }
 
-static void add_default_attribute(struct mem_file *amf, struct mem_file *mmf,
-								  uint64_t config, uint64_t id)
+/* Given raw_info, which is what the kernel sends as user_data for a particular
+ * sample, look up the 'id' for the event/sample.  The 'id' identifies the event
+ * stream that the sample is a part of.  There are many samples per event
+ * stream, all identified by 'id.'  It doesn't matter what 'id', so long as it
+ * is unique.  We happen to use the pointer to the sample's eventsel.
+ *
+ * If this is the first time we've seen 'raw_info', we'll also add an attribute
+ * to the perf ctx.  There is one attr per 'id' / event stream. */
+static uint64_t perfconv_get_event_id(struct perfconv_context *cctx,
+									  uint64_t raw_info)
 {
+	struct perf_eventsel *sel = (struct perf_eventsel*)raw_info;
 	struct perf_event_attr attr;
+	uint64_t raw_event;
 
+	assert(sel);
+	if (sel->attr_emitted)
+		return raw_info;
+	raw_event = sel->ev.event;
 	ZERO_DATA(attr);
-	attr.type = (uint32_t) perfconv_get_config_type(config);
 	attr.size = sizeof(attr);
-	attr.config = config;
 	attr.mmap = 1;
 	attr.comm = 1;
-	/* We don't know the actual sample_period at this point, but the perf report
-	 * percentages are all relative. */
-	attr.sample_period = 1;
+	attr.sample_period = sel->ev.trigger_count;
 	/* Closely coupled with struct perf_record_sample */
 	attr.sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
 	                   PERF_SAMPLE_ADDR | PERF_SAMPLE_ID | PERF_SAMPLE_CPU |
 	                   PERF_SAMPLE_CALLCHAIN;
-	add_attribute(amf, mmf, &attr, &id, 1);
-}
-
-static uint64_t perfconv_get_event_id(struct perfconv_context *cctx,
-									  uint64_t info)
-{
-	size_t i, j, n, ipos;
-	uint64_t id, config;
-	struct perf_event_id *nevents;
-
-	for (;;) {
-		ipos = (size_t) (info % cctx->alloced_events);
-		for (i = cctx->alloced_events; (i > 0) &&
-				 (cctx->events[ipos].event != 0);
-			 i--, ipos = (ipos + 1) % cctx->alloced_events) {
-			if (cctx->events[ipos].event == info)
-				return cctx->events[ipos].id;
-		}
-		if (i != 0)
-			break;
-		/* Need to resize the hash ...
-		 */
-		n = 2 * cctx->alloced_events;
-		nevents = xmem_arena_zalloc(&cctx->ma, n * sizeof(*cctx->events));
-		for (i = 0; i < cctx->alloced_events; i++) {
-			if (cctx->events[i].event == 0)
-				continue;
-			j = cctx->events[i].event % n;
-			for (; nevents[j].event; j = (j + 1) % n)
-				;
-			nevents[j].event = cctx->events[i].event;
-			nevents[j].id = cctx->events[i].id;
-		}
-		cctx->alloced_events = n;
-		cctx->events = nevents;
-	}
-
-	cctx->events[ipos].event = info;
-	cctx->events[ipos].id = id = cctx->sqnr_id;
-	cctx->sqnr_id++;
-
-	switch ((int) PROF_INFO_DOM(info)) {
-	case PROF_DOM_PMU:
-		config = perfconv_make_config_id(TRUE, PERF_TYPE_RAW,
-										 PROF_INFO_DATA(info));
-		break;
-	case PROF_DOM_TIMER:
-	default:
-		config = perfconv_make_config_id(FALSE, PERF_TYPE_HARDWARE,
-										 PERF_COUNT_HW_CPU_CYCLES);
-	}
-
-	add_default_attribute(&cctx->attrs, &cctx->misc, config, id);
-
-	return id;
+	attr.exclude_guest = 1;	/* we can't trace VMs yet */
+	attr.exclude_hv = 1;	/* we aren't tracing our hypervisor, AFAIK */
+	attr.exclude_user = !PMEV_GET_USR(raw_event);
+	attr.exclude_kernel = !PMEV_GET_OS(raw_event);
+	attr.type = sel->type;
+	attr.config = sel->config;
+	emit_attr(&cctx->attrs, &cctx->misc, &attr, raw_info);
+	sel->attr_emitted = TRUE;
+	return raw_info;
 }
 
 static void emit_static_mmaps(struct perfconv_context *cctx)
@@ -505,9 +455,6 @@ struct perfconv_context *perfconv_create_context(struct perf_context *pctx)
 
 	cctx->pctx = pctx;
 	xmem_arena_init(&cctx->ma, 0);
-	cctx->alloced_events = 128;
-	cctx->events = xmem_arena_zalloc(
-		&cctx->ma, cctx->alloced_events * sizeof(*cctx->events));
 	perf_header_init(&cctx->ph);
 	headers_init(&cctx->hdrs);
 	mem_file_init(&cctx->fhdrs, &cctx->ma);

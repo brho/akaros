@@ -255,6 +255,9 @@ success:
 		PMEV_SET_USR(sel->ev.event, 1);
 	}
 	PMEV_SET_EN(sel->ev.event, 1);
+	/* perf_event_attr fields (communicating with perfconv.c) */
+	sel->type = PERF_TYPE_RAW;
+	sel->config = PMEV_GET_MASK(sel->ev.event) | PMEV_GET_EVENT(sel->ev.event);
 	return sel;
 }
 

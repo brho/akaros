@@ -29,6 +29,9 @@ struct perf_arch_info {
 #define MAX_FQSTR_SZ 128
 struct perf_eventsel {
 	struct perfmon_event ev;
+	bool attr_emitted;
+	uint32_t type;
+	uint64_t config;
 	int eidx;
 	char fq_str[MAX_FQSTR_SZ];
 };
