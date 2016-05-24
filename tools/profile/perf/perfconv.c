@@ -1,5 +1,7 @@
-/* Copyright (c) 2015 Google Inc
+/* Copyright (c) 2015-2016 Google Inc
  * Davide Libenzi <dlibenzi@google.com>
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ *
  * See LICENSE for details.
  *
  * Converts kprof profiler files into Linux perf ones. The Linux Perf file
@@ -215,26 +217,67 @@ static void headers_init(struct perf_headers *hdrs)
 	ZERO_DATA(*hdrs);
 }
 
-static void headers_add_header(struct perf_headers *hdrs, size_t nhdr,
+static void headers_add_header(struct perf_header *ph,
+                               struct perf_headers *hdrs, size_t nhdr,
 							   struct mem_block *mb)
 {
 	always_assert(nhdr < HEADER_FEAT_BITS);
 
 	hdrs->headers[nhdr] = mb;
+	set_bitno(ph->adds_features, nhdr);
 }
 
-static void headers_write(struct perf_headers *hdrs, struct perf_header *ph,
-						  struct mem_file *mf)
+static void headers_finalize(struct perf_headers *hdrs, struct mem_file *mf)
 {
-	size_t i;
+	struct perf_file_section *header_file_secs, *file_sec;
+	struct perf_file_section *file_sec_reloc;
+	size_t nr_hdrs = 0;
+	size_t hdr_off;
+	struct mem_block *mb;
+	size_t mb_sz;
 
-	for (i = 0; i < HEADER_FEAT_BITS; i++) {
-		struct mem_block *mb = hdrs->headers[i];
+	/* For each header, we need a perf_file_section.  These header file sections
+	 * are right after the main perf header, and they point to actual header. */
+	for (int i = 0; i < HEADER_FEAT_BITS; i++)
+		if (hdrs->headers[i])
+			nr_hdrs++;
+	if (!nr_hdrs)
+		return;
+	header_file_secs = xmalloc(sizeof(struct perf_file_section) * nr_hdrs);
 
-		if (mb) {
-			mem_file_write(mf, mb->base, mb->wptr - mb->base, 0);
-			set_bitno(ph->adds_features, i);
-		}
+	hdr_off = sizeof(struct perf_file_section) * nr_hdrs;
+	file_sec = header_file_secs;
+
+	/* Spit out the perf_file_sections first and track relocations for all of
+	 * the offsets. */
+	for (int i = 0; i < HEADER_FEAT_BITS; i++) {
+		mb = hdrs->headers[i];
+		if (!mb)
+			continue;
+		mb_sz = mb->wptr - mb->base;
+		file_sec->size = mb_sz;
+		file_sec->offset = hdr_off;		/* offset rel to this memfile */
+		/* When we sync the memfile, we'll need to relocate each of the offsets
+		 * so that they are relative to the final file.   mem_file_write()
+		 * should be returning the location of where it wrote our file section
+		 * within the memfile.  that's the offset that we'll reloc later. */
+		file_sec_reloc = mem_file_write(mf, file_sec,
+		                                sizeof(struct perf_file_section), 0);
+		assert(file_sec->size == file_sec_reloc->size);
+		assert(file_sec->offset == file_sec_reloc->offset);
+		mem_file_add_reloc(mf, &file_sec_reloc->offset);
+
+		hdr_off += mb_sz;
+		file_sec++;
+	}
+	free(header_file_secs);
+
+	/* Spit out the actual headers */
+	for (int i = 0; i < HEADER_FEAT_BITS; i++) {
+		mb = hdrs->headers[i];
+		if (!mb)
+			continue;
+		mem_file_write(mf, mb->base, mb->wptr - mb->base, 0);
 	}
 }
 
@@ -246,22 +289,30 @@ static void perf_header_init(struct perf_header *ph)
 	ph->attr_size = sizeof(struct perf_event_attr);
 }
 
-static void emit_attr(struct mem_file *amf, struct mem_file *mmf,
+/* For each attr we emit, we push out the attr, then a perf_file_section for the
+ * id(s) for that attr.  This wasn't mentioned in
+ * https://lwn.net/Articles/644919/, but it's what Linux perf expects
+ * (util/header.c).  It looks like you can have multiple IDs per event attr.
+ * We'll only emit one.  The *contents* of the perf_file_section for the ids
+ * aren't in the attr perf_file_section, they are in a separate one
+ * (attr_id_mf).
+ *
+ * Note that *attr_mf*'s relocs are relative to the base of *attr_id_mf*, which
+ * we'll need to sort out later. */
+static void emit_attr(struct mem_file *attr_mf, struct mem_file *attr_id_mf,
                       const struct perf_event_attr *attr, uint64_t id)
 {
 	struct perf_file_section *psids;
 	struct perf_file_section sids;
 
-	mem_file_write(amf, attr, sizeof(*attr), 0);
+	mem_file_write(attr_mf, attr, sizeof(*attr), 0);
 
-	sids.offset = mmf->size;
+	sids.offset = attr_id_mf->size;
 	sids.size = sizeof(uint64_t);
+	mem_file_write(attr_id_mf, &id, sizeof(uint64_t), 0);
 
-	mem_file_write(mmf, &id, sizeof(uint64_t), 0);
-
-	psids = mem_file_write(amf, &sids, sizeof(sids), MBWR_SOLID);
-
-	mem_file_add_reloc(amf, &psids->offset);
+	psids = mem_file_write(attr_mf, &sids, sizeof(sids), MBWR_SOLID);
+	mem_file_add_reloc(attr_mf, &psids->offset);
 }
 
 /* Given raw_info, which is what the kernel sends as user_data for a particular
@@ -298,7 +349,7 @@ static uint64_t perfconv_get_event_id(struct perfconv_context *cctx,
 	attr.exclude_kernel = !PMEV_GET_OS(raw_event);
 	attr.type = sel->type;
 	attr.config = sel->config;
-	emit_attr(&cctx->attrs, &cctx->misc, &attr, raw_info);
+	emit_attr(&cctx->attrs, &cctx->attr_ids, &attr, raw_info);
 	sel->attr_emitted = TRUE;
 	return raw_info;
 }
@@ -438,18 +489,6 @@ static void emit_new_process(struct perf_record *pr,
 	emit_comm(rec->pid, comm, cctx);
 }
 
-static void add_event_type(struct mem_file *mf, uint64_t id, const char *name)
-{
-	struct perf_trace_event_type evt;
-
-	ZERO_DATA(evt);
-	evt.event_id = id;
-	strncpy(evt.name, name, sizeof(evt.name));
-	evt.name[sizeof(evt.name) - 1] = 0;
-
-	mem_file_write(mf, &evt, sizeof(evt), 0);
-}
-
 struct perfconv_context *perfconv_create_context(struct perf_context *pctx)
 {
 	struct perfconv_context *cctx = xzmalloc(sizeof(struct perfconv_context));
@@ -459,9 +498,10 @@ struct perfconv_context *perfconv_create_context(struct perf_context *pctx)
 	perf_header_init(&cctx->ph);
 	headers_init(&cctx->hdrs);
 	mem_file_init(&cctx->fhdrs, &cctx->ma);
-	mem_file_init(&cctx->misc, &cctx->ma);
+	mem_file_init(&cctx->attr_ids, &cctx->ma);
 	mem_file_init(&cctx->attrs, &cctx->ma);
 	mem_file_init(&cctx->data, &cctx->ma);
+	/* event_types is ignored in newer versions of perf */
 	mem_file_init(&cctx->event_types, &cctx->ma);
 
 	return cctx;
@@ -479,7 +519,8 @@ void perfconv_process_input(struct perfconv_context *cctx, FILE *input,
 							FILE *output)
 {
 	size_t processed_records = 0;
-	uint64_t offset, rel_offset;
+	uint64_t offset;
+	uint64_t attr_ids_off = sizeof(cctx->ph);
 	struct perf_record pr;
 
 	emit_static_mmaps(cctx);
@@ -512,34 +553,48 @@ void perfconv_process_input(struct perfconv_context *cctx, FILE *input,
 		free_record(&pr);
 	}
 
-	headers_write(&cctx->hdrs, &cctx->ph, &cctx->fhdrs);
-	offset = sizeof(cctx->ph) + cctx->fhdrs.size + cctx->misc.size;
 
-	if (cctx->event_types.size > 0) {
-		cctx->ph.event_types.offset = offset;
-		cctx->ph.event_types.size = cctx->event_types.size;
-		offset += cctx->event_types.size;
-	}
-	if (cctx->attrs.size > 0) {
-		cctx->ph.attrs.offset = offset;
-		cctx->ph.attrs.size = cctx->attrs.size;
-		offset += cctx->attrs.size;
-	}
-	if (cctx->data.size > 0) {
-		cctx->ph.data.offset = offset;
-		cctx->ph.data.size = cctx->data.size;
-		offset += cctx->data.size;
-	}
+
+	/* Add all of the headers before outputting ph */
+
+	headers_finalize(&cctx->hdrs, &cctx->fhdrs);
+
+	/* attrs, events, and data will come after attr_ids. */
+	offset = sizeof(cctx->ph) + cctx->attr_ids.size;
+
+	/* These are the perf_file_sections in the main perf header.  We need this
+	 * sorted out before we emit the PH. */
+	cctx->ph.event_types.offset = offset;
+	cctx->ph.event_types.size = cctx->event_types.size;
+	offset += cctx->event_types.size;
+
+	cctx->ph.attrs.offset = offset;
+	cctx->ph.attrs.size = cctx->attrs.size;
+	offset += cctx->attrs.size;
+
+	cctx->ph.data.offset = offset;
+	cctx->ph.data.size = cctx->data.size;
+	offset += cctx->data.size;
 
 	xfwrite(&cctx->ph, sizeof(cctx->ph), output);
-	mem_file_sync(&cctx->fhdrs, output, OFFSET_NORELOC);
 
-	rel_offset = (uint64_t) ftell(output);
-	mem_file_sync(&cctx->misc, output, rel_offset);
-
-	mem_file_sync(&cctx->event_types, output, rel_offset);
-	mem_file_sync(&cctx->attrs, output, rel_offset);
-	mem_file_sync(&cctx->data, output, rel_offset);
+	/* attr_ids comes right after the cctx->ph.  We need to put it before
+	 * attrs, since attrs needs to know the offset of the base of attrs_ids for
+	 * its relocs. */
+	assert(ftell(output) == attr_ids_off);
+	mem_file_sync(&cctx->attr_ids, output, OFFSET_NORELOC);
+	mem_file_sync(&cctx->event_types, output, OFFSET_NORELOC);
+	/* reloc is based off *attr_ids* base */
+	mem_file_sync(&cctx->attrs, output, attr_ids_off);
+	/* Keep data last, so we can append the feature headers.*/
+	mem_file_sync(&cctx->data, output, OFFSET_NORELOC);
+	/* The feature headers must be right after the data section.  I didn't see
+	 * anything in the ABI about this, but Linux's perf has this line:
+	 *
+	 *		ph->feat_offset  = header->data.offset + header->data.size;
+	 */
+	mem_file_sync(&cctx->fhdrs, output,
+	              cctx->ph.data.offset + cctx->ph.data.size);
 
 	dbg_print(cctx, 2, stderr, "Conversion succeeded: %lu records converted\n",
 			  processed_records);

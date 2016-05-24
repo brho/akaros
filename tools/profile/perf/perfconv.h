@@ -66,7 +66,7 @@ struct perfconv_context {
 	struct static_mmap64 *static_mmaps;
 	struct perf_header ph;
 	struct perf_headers hdrs;
-	struct mem_file fhdrs, misc, attrs, data, event_types;
+	struct mem_file fhdrs, attr_ids, attrs, data, event_types;
 };
 
 struct perfconv_context *perfconv_create_context(struct perf_context *pctx);
