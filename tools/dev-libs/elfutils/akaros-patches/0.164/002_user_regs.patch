@@ -1,0 +1,12 @@
+diff -ur elfutils-0.164-orig/backends/x86_64_initreg.c elfutils-0.164/backends/x86_64_initreg.c
+--- elfutils-0.164-orig/backends/x86_64_initreg.c	2016-05-26 10:35:41.119818980 -0400
++++ elfutils-0.164/backends/x86_64_initreg.c	2016-05-26 10:36:01.639902408 -0400
+@@ -31,7 +31,7 @@
+ #endif
+ 
+ #include <stdlib.h>
+-#ifdef __x86_64__
++#if defined(__x86_64__) && defined(__linux__)
+ # include <sys/user.h>
+ # include <sys/ptrace.h>
+ #endif

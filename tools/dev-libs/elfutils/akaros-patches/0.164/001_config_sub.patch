@@ -1,0 +1,32 @@
+--- a/config/config.sub	2016-05-03 09:58:04.771992109 -0400
++++ b/config/config.sub	2016-05-25 18:37:58.194322815 -0400
+@@ -140,6 +140,9 @@
+ ### recognize some manufacturers as not being operating systems, so we
+ ### can provide default operating systems below.
+ case $os in
++	-akaros*)
++		os=-akaros
++		;;
+ 	-sun*os*)
+ 		# Prevent following clause from handling this invalid input.
+ 		;;
+@@ -1346,6 +1333,9 @@
+ 	# First match some system type aliases
+ 	# that might get confused with valid system types.
+ 	# -solaris* is a basic system type, with this one exception.
++	-akaros*)
++		os=-akaros
++		;;
+ 	-auroraux)
+ 		os=-auroraux
+ 		;;
+@@ -1728,6 +1721,9 @@
+ case $basic_machine in
+ 	*-unknown)
+ 		case $os in
++			-akaros*)
++				vendor=ucb
++				;;
+ 			-riscix*)
+ 				vendor=acorn
+ 				;;
