@@ -244,8 +244,10 @@ static void profiler_emit_current_system_status(void)
 		nexterror();
 	}
 
-	for (size_t i = 0; i < pset.num_processes; i++)
+	for (size_t i = 0; i < pset.num_processes; i++) {
+		profiler_notify_new_process(pset.procs[i]);
 		enumerate_vmrs(pset.procs[i], enum_proc, pset.procs[i]);
+	}
 
 	poperror();
 	proc_free_set(&pset);
