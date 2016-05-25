@@ -44,6 +44,13 @@ static long ver_emit_nlstr(char *dest, const char *src, long size,
 	return n;
 }
 
+static size_t ver_get_file_size(const char *src)
+{
+	if (!src)
+		return 0;
+	return strlen(src) + 1;
+}
+
 static struct chan *ver_attach(char *spec)
 {
 	return devattach(verdevtab.name, spec);
@@ -51,7 +58,11 @@ static struct chan *ver_attach(char *spec)
 
 static void ver_init(void)
 {
-
+	/* Our devtab's length params are wrong - need to stitch them up. */
+	vertab[Kverdate].length = ver_get_file_size(build_info_date);
+	vertab[Kvercommitid].length = ver_get_file_size(build_info_commitid);
+	vertab[Kverversion].length = ver_get_file_size(build_info_version);
+	vertab[Kverversionname].length = ver_get_file_size(build_info_version_name);
 }
 
 static void ver_shutdown(void)
