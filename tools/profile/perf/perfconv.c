@@ -214,16 +214,20 @@ static void headers_init(struct perf_headers *hdrs)
 	ZERO_DATA(*hdrs);
 }
 
+/* Prepends a header (the mem_block) to the list of memblocks for the given
+ * HEADER type.  They will all be concatted together during finalization. */
 static void headers_add_header(struct perf_header *ph,
                                struct perf_headers *hdrs, size_t nhdr,
 							   struct mem_block *mb)
 {
 	always_assert(nhdr < HEADER_FEAT_BITS);
 
+	mb->next = hdrs->headers[nhdr];
 	hdrs->headers[nhdr] = mb;
 	set_bitno(ph->adds_features, nhdr);
 }
 
+/* Emits the headers contents to the mem_file */
 static void headers_finalize(struct perf_headers *hdrs, struct mem_file *mf)
 {
 	struct perf_file_section *header_file_secs, *file_sec;
@@ -252,6 +256,11 @@ static void headers_finalize(struct perf_headers *hdrs, struct mem_file *mf)
 		if (!mb)
 			continue;
 		mb_sz = mb->wptr - mb->base;
+		/* headers[i] is a chain of memblocks */
+		while (mb->next) {
+			mb = mb->next;
+			mb_sz += mb->wptr - mb->base;
+		}
 		file_sec->size = mb_sz;
 		file_sec->offset = hdr_off;		/* offset rel to this memfile */
 		/* When we sync the memfile, we'll need to relocate each of the offsets
@@ -272,10 +281,106 @@ static void headers_finalize(struct perf_headers *hdrs, struct mem_file *mf)
 	/* Spit out the actual headers */
 	for (int i = 0; i < HEADER_FEAT_BITS; i++) {
 		mb = hdrs->headers[i];
-		if (!mb)
-			continue;
-		mem_file_write(mf, mb->base, mb->wptr - mb->base, 0);
+		while (mb) {
+			mem_file_write(mf, mb->base, mb->wptr - mb->base, 0);
+			mb = mb->next;
+		}
 	}
+}
+
+/* Builds a struct perf_header_string from str and returns it in a mem_block */
+static struct mem_block *header_make_string(const char *str)
+{
+	struct perf_header_string *hdr;
+	struct mem_block *mb;
+	size_t str_sz = strlen(str) + 1;
+	size_t hdr_sz = ROUNDUP(str_sz + sizeof(struct perf_header_string),
+	                        PERF_STRING_ALIGN);
+
+	mb = mem_block_alloc(hdr_sz);
+	/* Manually writing to the block to avoid another alloc.  I guess I could do
+	 * two writes (len and string) and try to not screw it up, but that'd be a
+	 * mess. */
+	hdr = (struct perf_header_string*)mb->wptr;
+	mb->wptr += hdr_sz;
+	hdr->len = str_sz;
+	memcpy(hdr->string, str, str_sz);
+	return mb;
+}
+
+/* Opens and reads filename, returning the contents.  Free the ret. */
+static char *get_str_from_os(const char *filename)
+{
+	int fd, ret;
+	struct stat fd_stat;
+	char *buf;
+	size_t buf_sz;
+
+	fd = open(filename, O_RDONLY);
+	if (fd < 0)
+		return 0;
+	ret = fstat(fd, &fd_stat);
+	if (ret) {
+		close(fd);
+		return 0;
+	}
+	buf_sz = fd_stat.st_size + 1;
+	buf = xmalloc(buf_sz);
+	ret = read(fd, buf, buf_sz - 1);
+	if (ret <= 0) {
+		free(buf);
+		close(fd);
+		return 0;
+	}
+	close(fd);
+	/* OS strings should be null terminated, but let's be defensive */
+	buf[ret] = 0;
+	return buf;
+}
+
+static void hdr_do_osrelease(struct perf_header *ph, struct perf_headers *hdrs)
+{
+	char *str;
+
+	str = get_str_from_os("#version/version_name");
+	if (!str)
+		return;
+	headers_add_header(ph, hdrs, HEADER_OSRELEASE, header_make_string(str));
+	free(str);
+}
+
+static void hdr_do_nrcpus(struct perf_header *ph, struct perf_headers *hdrs)
+{
+	char *str;
+	uint32_t nr_cores;
+	struct mem_block *mb;
+	struct nr_cpus *hdr;
+
+	str = get_str_from_os("#vars/num_cores!dw");
+	if (!str)
+		return;
+	nr_cores = atoi(str);
+	free(str);
+
+	mb = mem_block_alloc(sizeof(struct nr_cpus));
+	hdr = (struct nr_cpus*)mb->wptr;
+	mb->wptr += sizeof(struct nr_cpus);
+
+	hdr->nr_cpus_online = nr_cores;
+	hdr->nr_cpus_available = nr_cores;
+
+	headers_add_header(ph, hdrs, HEADER_NRCPUS, mb);
+}
+
+/* Helper: adds all the headers, marking them in PH and storing them in
+ * feat_hdrs. */
+static void headers_build(struct perf_header *ph, struct perf_headers *hdrs,
+                          struct mem_file *feat_hdrs)
+{
+	hdr_do_osrelease(ph, hdrs);
+	hdr_do_nrcpus(ph, hdrs);
+
+	headers_finalize(hdrs, feat_hdrs);
 }
 
 static void perf_header_init(struct perf_header *ph)
@@ -547,11 +652,8 @@ void perfconv_process_input(struct perfconv_context *cctx, FILE *input,
 		free_record(&pr);
 	}
 
-
-
 	/* Add all of the headers before outputting ph */
-
-	headers_finalize(&cctx->hdrs, &cctx->fhdrs);
+	headers_build(&cctx->ph, &cctx->hdrs, &cctx->fhdrs);
 
 	/* attrs, events, and data will come after attr_ids. */
 	offset = sizeof(cctx->ph) + cctx->attr_ids.size;

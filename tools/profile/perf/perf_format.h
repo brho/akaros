@@ -1,4 +1,5 @@
-/* Copyright (c) 2015 Google Inc
+/* Copyright (C) 2009-2016, the Linux Perf authors
+ * Copyright (c) 2015 Google Inc
  * Davide Libenzi <dlibenzi@google.com>
  * See LICENSE for details.
  *
@@ -448,6 +449,8 @@ struct perf_file_section {
 	uint64_t size;		/* Size of the section */
 } __attribute__((packed));
 
+#define PERF_STRING_ALIGN						64
+
 struct perf_header_string {
 	uint32_t len;
 	char string[0];		/* Zero terminated */
@@ -456,6 +459,11 @@ struct perf_header_string {
 struct perf_header_string_list {
 	uint32_t nr;
 	struct perf_header_string strings[0];	/* Variable length records */
+};
+
+struct nr_cpus {
+	uint32_t					nr_cpus_online;
+	uint32_t					nr_cpus_available;
 };
 
 #define MAX_EVENT_NAME 64
