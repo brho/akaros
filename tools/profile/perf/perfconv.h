@@ -32,7 +32,6 @@ struct mem_block {
 };
 
 struct mem_file {
-	struct mem_arena *ma;
 	size_t size;
 	struct mem_block *head;
 	struct mem_block *tail;
@@ -61,7 +60,6 @@ struct perf_event_id {
 
 struct perfconv_context {
 	struct perf_context *pctx;
-	struct mem_arena ma;
 	int debug_level;
 	struct static_mmap64 *static_mmaps;
 	struct perf_header ph;

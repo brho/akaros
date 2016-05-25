@@ -91,10 +91,9 @@ static int read_record(FILE *file, struct perf_record *pr)
 	return 0;
 }
 
-static struct mem_block *mem_block_alloc(struct mem_file *mf, size_t size)
+static struct mem_block *mem_block_alloc(size_t size)
 {
-	struct mem_block *mb = xmem_arena_alloc(mf->ma,
-											sizeof(struct mem_block) + size);
+	struct mem_block *mb = xmalloc(sizeof(struct mem_block) + size);
 
 	mb->next = NULL;
 	mb->base = mb->wptr = (char *) mb + sizeof(struct mem_block);
@@ -116,10 +115,9 @@ static char *mem_block_write(struct mem_block *mb, const void *data,
 	return wrbase;
 }
 
-static void mem_file_init(struct mem_file *mf, struct mem_arena *ma)
+static void mem_file_init(struct mem_file *mf)
 {
 	ZERO_DATA(*mf);
-	mf->ma = ma;
 }
 
 static int mem_block_can_write(struct mem_block *mb, size_t size, int flags)
@@ -139,7 +137,7 @@ static void *mem_file_write(struct mem_file *mf, const void *data, size_t size,
 		struct mem_block *mb = mf->tail;
 
 		if (!mb || !mem_block_can_write(mb, size, flags)) {
-			mb = mem_block_alloc(mf, max(MEMFILE_BLOCK_SIZE, size));
+			mb = mem_block_alloc(max(MEMFILE_BLOCK_SIZE, size));
 			if (!mf->tail)
 				mf->head = mb;
 			else
@@ -179,8 +177,7 @@ static void mem_file_sync(struct mem_file *mf, FILE *file, uint64_t rel_offset)
 static struct mem_file_reloc *mem_file_add_reloc(struct mem_file *mf,
 												 uint64_t *ptr)
 {
-	struct mem_file_reloc *rel =
-		xmem_arena_zalloc(mf->ma, sizeof(struct mem_file_reloc));
+	struct mem_file_reloc *rel = xzmalloc(sizeof(struct mem_file_reloc));
 
 	rel->ptr = ptr;
 	rel->next = mf->relocs;
@@ -194,7 +191,7 @@ void perfconv_add_kernel_mmap(struct perfconv_context *cctx)
 	char path[] = "[kernel.kallsyms]";
 	struct static_mmap64 *mm;
 
-	mm = xmem_arena_zalloc(&cctx->ma, sizeof(struct static_mmap64));
+	mm = xzmalloc(sizeof(struct static_mmap64));
 	mm->pid = -1;				/* Linux HOST_KERNEL_ID == -1 */
 	mm->tid = 0;				/* Default thread: swapper */
 	mm->header_misc = PERF_RECORD_MISC_KERNEL;
@@ -206,7 +203,7 @@ void perfconv_add_kernel_mmap(struct perfconv_context *cctx)
 	mm->addr = 0;
 	mm->size = 0xffffffffffffffff;
 	mm->offset = 0x0;
-	mm->path = xmem_arena_strdup(&cctx->ma, path);
+	mm->path = xstrdup(path);
 
 	mm->next = cctx->static_mmaps;
 	cctx->static_mmaps = mm;
@@ -494,25 +491,22 @@ struct perfconv_context *perfconv_create_context(struct perf_context *pctx)
 	struct perfconv_context *cctx = xzmalloc(sizeof(struct perfconv_context));
 
 	cctx->pctx = pctx;
-	xmem_arena_init(&cctx->ma, 0);
 	perf_header_init(&cctx->ph);
 	headers_init(&cctx->hdrs);
-	mem_file_init(&cctx->fhdrs, &cctx->ma);
-	mem_file_init(&cctx->attr_ids, &cctx->ma);
-	mem_file_init(&cctx->attrs, &cctx->ma);
-	mem_file_init(&cctx->data, &cctx->ma);
+	mem_file_init(&cctx->fhdrs);
+	mem_file_init(&cctx->attr_ids);
+	mem_file_init(&cctx->attrs);
+	mem_file_init(&cctx->data);
 	/* event_types is ignored in newer versions of perf */
-	mem_file_init(&cctx->event_types, &cctx->ma);
+	mem_file_init(&cctx->event_types);
 
 	return cctx;
 }
 
 void perfconv_free_context(struct perfconv_context *cctx)
 {
-	if (cctx) {
-		xmem_arena_destroy(&cctx->ma);
+	if (cctx)
 		free(cctx);
-	}
 }
 
 void perfconv_process_input(struct perfconv_context *cctx, FILE *input,

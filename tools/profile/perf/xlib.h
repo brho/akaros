@@ -30,22 +30,6 @@
 					__FILE__, __LINE__);								\
 	} while (0)
 
-struct mem_arena_block {
-	struct mem_arena_block *next;
-};
-
-struct mem_arena {
-	size_t block_size;
-	struct mem_arena_block *blocks;
-	char *ptr;
-	char *top;
-};
-
-void xmem_arena_init(struct mem_arena *ma, size_t block_size);
-void xmem_arena_destroy(struct mem_arena *ma);
-void *xmem_arena_alloc(struct mem_arena *ma, size_t size);
-void *xmem_arena_zalloc(struct mem_arena *ma, size_t size);
-char *xmem_arena_strdup(struct mem_arena *ma, const char *str);
 int xopen(const char *path, int flags, mode_t mode);
 void xwrite(int fd, const void *data, size_t size);
 void xread(int fd, void *data, size_t size);
