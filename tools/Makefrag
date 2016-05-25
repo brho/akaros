@@ -8,7 +8,8 @@
 # Makelocal.
 #
 # Exports CROSS_COMPILE, ARCH, KBUILD_VERBOSE, Q, MAKEFLAGS, BUILDDIR,
-# AKAROS_ROOT, MAKE_JOBS FIRST_KFS_PATH, KFS_ROOT
+# AKAROS_ROOT, AKAROS_XCC_ROOT, AKAROS_PREFIX, AKAROS_SYSROOT, MAKE_JOBS,
+# FIRST_KFS_PATH, KFS_ROOT
 
 # Do not:
 # o  use make's built-in rules and variables
@@ -23,6 +24,7 @@ AKAROS_ROOT ?= $(BUILDDIR)/../../..
 MAKE_JOBS ?= 4
 FIRST_KFS_PATH ?= $(AKAROS_ROOT)/kern/kfs
 KFS_ROOT = $(FIRST_KFS_PATH)
+AKAROS_XCC_ROOT ?= $(shell grep X86_64_INSTDIR $(AKAROS_ROOT)/tools/compilers/gcc-glibc/Makelocal | cut -f 3 -d' ')
 
 # To put more focus on warnings, be less verbose as default
 # Use 'make V=1' to see the full commands
@@ -64,3 +66,7 @@ ifeq ($(CROSS_COMPILE),)
     endif
     CROSS_COMPILE := $(ARCH)-ucb-akaros-
 endif
+
+# strip the trailing - from CROSS_COMPILE
+AKAROS_PREFIX = $(shell x=$(CROSS_COMPILE); echo $${x%?})
+AKAROS_SYSROOT = $(AKAROS_XCC_ROOT)/$(AKAROS_PREFIX)/sysroot/
