@@ -9,6 +9,6 @@
 
 .globl __kernel_vcore_entry
 __kernel_vcore_entry:
-	call __kvc_entry_c
+	call __kvc_entry_c@PLT
 1:
-	jb 1
+	jmp 1b
