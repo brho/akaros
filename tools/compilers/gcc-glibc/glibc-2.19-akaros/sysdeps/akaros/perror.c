@@ -57,10 +57,11 @@ void
 perror (const char *s)
 {
   int errnum = errno;
-  char errstr_save[MAX_ERRSTR_LEN];
+  char errstr_save[MAX_ERRSTR_LEN + 1];
   FILE *fp;
   int fd = -1;
   strncpy(errstr_save, errstr(), MAX_ERRSTR_LEN);
+  errstr_save[MAX_ERRSTR_LEN] = '\0';
 
   /* The standard says that 'perror' must not change the orientation
      of the stream.  What is supposed to happen when the stream isn't
