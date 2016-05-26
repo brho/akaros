@@ -9,54 +9,27 @@
 #include <string.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <stdbool.h>
 
-#include "symbol.h"
-#include "machine.h"
-#include "vdso.h"
-#include <symbol/kallsyms.h>
-#include "debug.h"
+#include <gelf.h>
+#include <libelf.h>
+#include "xlib.h"
+#include "elf.h"
 
-#ifndef EM_AARCH64
-#define EM_AARCH64	183  /* ARM 64 bit */
-#endif
+#define pr_err(args...) fprintf(stderr, args)
+#define pr_debug2(args...) pr_err(args)
 
+#define PERF_ELF_C_READ_MMAP ELF_C_READ_MMAP
 
-#ifdef HAVE_CPLUS_DEMANGLE_SUPPORT
-extern char *cplus_demangle(const char *, int);
+enum map_type {
+	MAP__FUNCTION = 0,
+	MAP__VARIABLE,
+};
 
-static inline char *bfd_demangle(void __maybe_unused *v, const char *c, int i)
-{
-	return cplus_demangle(c, i);
-}
-#else
-#ifdef NO_DEMANGLE
-static inline char *bfd_demangle(void __maybe_unused *v,
-				 const char __maybe_unused *c,
-				 int __maybe_unused i)
+static inline char *bfd_demangle(void *v, const char *c, int i)
 {
 	return NULL;
 }
-#else
-#define PACKAGE 'perf'
-#include <bfd.h>
-#endif
-#endif
-
-#ifndef HAVE_ELF_GETPHDRNUM_SUPPORT
-static int elf_getphdrnum(Elf *elf, size_t *dst)
-{
-	GElf_Ehdr gehdr;
-	GElf_Ehdr *ehdr;
-
-	ehdr = gelf_getehdr(elf, &gehdr);
-	if (!ehdr)
-		return -1;
-
-	*dst = ehdr->e_phnum;
-
-	return 0;
-}
-#endif
 
 #ifndef NT_GNU_BUILD_ID
 #define NT_GNU_BUILD_ID 3
