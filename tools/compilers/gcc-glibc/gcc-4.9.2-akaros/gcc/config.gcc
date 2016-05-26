@@ -879,6 +879,8 @@ case ${target} in
   use_gcc_stdint=wrap
   ;;
 *-*-akaros*)
+  # brho 2016-05-26 needed for various command line options like -rdynamic
+  extra_options="$extra_options gnu-user.opt"
   # brho 2015-04-17
   # We need this for the shared libgcc_s.so
   tmake_file="t-slibgcc"
