@@ -397,6 +397,7 @@ $(BINARY_PREFIX)gcc-stage1-builddir: gcc-$(GCC_VERSION)
 		--disable-nls \
 		--disable-multilib \
 		--enable-languages=c \
+		--enable-linker-build-id \
 		$(GCC_BUILD_FLAGS);
 	echo "MAKEINFO = :" >> $(BINARY_PREFIX)gcc-stage1-builddir/Makefile;
 	touch $@
@@ -444,6 +445,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 		--disable-nls \
 		--enable-languages=c,c++,fortran \
 		--disable-multilib \
+		--enable-linker-build-id \
 		$(GCC_BUILD_FLAGS);
 	echo "MAKEINFO = :" >> $(BINARY_PREFIX)gcc-stage2-builddir/Makefile;
 	touch $@
@@ -653,6 +655,7 @@ native-gcc-stage3-configure: native-gcc-stage3-prep
 		--enable-shared \
 		--disable-canonical-prefixes \
 		--disable-canonical-system-headers \
+		--enable-linker-build-id \
 		$(GCC_BUILD_FLAGS);
 
 cross-gcc-stage3-configure:
@@ -685,6 +688,7 @@ cross-gcc-stage3-configure:
 		--enable-shared \
 		--disable-canonical-prefixes \
 		--disable-canonical-system-headers \
+		--enable-linker-build-id \
 		$(GCC_BUILD_FLAGS);
 
 .$(BINARY_PREFIX)gcc-stage3-configure:
