@@ -1,10 +1,10 @@
 include ../../Makefrag
 
-SOURCES = perf.c perfconv.c xlib.c perf_core.c akaros.c
+SOURCES = perf.c perfconv.c xlib.c perf_core.c akaros.c symbol-elf.c
 
 XCC = $(CROSS_COMPILE)gcc
 
-LIBS=-lperfmon
+LIBS=-lperfmon -lelf
 
 PHONY := all
 all: perf

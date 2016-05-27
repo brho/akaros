@@ -26,6 +26,7 @@
 #include "perfconv.h"
 #include "akaros.h"
 #include "perf_core.h"
+#include "elf.h"
 
 struct event_coords {
 	char *buffer;
@@ -68,6 +69,7 @@ void perf_initialize(int argc, char *argv[])
 				pfm_strerror(err));
 		exit(1);
 	}
+	symbol__elf_init();
 }
 
 void perf_finalize(void)
@@ -615,6 +617,7 @@ void perf_convert_trace_data(struct perfconv_context *cctx, const char *input,
 		outfile = xfopen(output, "wb");
 
 		perfconv_add_kernel_mmap(cctx);
+		perfconv_add_kernel_buildid(cctx);
 		perfconv_process_input(cctx, infile, outfile);
 
 		fclose(outfile);

@@ -71,5 +71,6 @@ struct perfconv_context *perfconv_create_context(struct perf_context *pctx);
 void perfconv_free_context(struct perfconv_context *cctx);
 void perfconv_set_dbglevel(int level, struct perfconv_context *cctx);
 void perfconv_add_kernel_mmap(struct perfconv_context *cctx);
+void perfconv_add_kernel_buildid(struct perfconv_context *cctx);
 void perfconv_process_input(struct perfconv_context *cctx, FILE *input,
 							FILE *output);

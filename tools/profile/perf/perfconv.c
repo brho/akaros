@@ -29,6 +29,7 @@
 #include "xlib.h"
 #include "perf_core.h"
 #include "perfconv.h"
+#include "elf.h"
 
 #define MAX_PERF_RECORD_SIZE (32 * 1024 * 1024)
 #define PERF_RECORD_BUFFER_SIZE 1024
@@ -372,6 +373,106 @@ static void hdr_do_nrcpus(struct perf_header *ph, struct perf_headers *hdrs)
 	headers_add_header(ph, hdrs, HEADER_NRCPUS, mb);
 }
 
+/* Returns TRUE if we already emitted a build-id for path.  If this gets too
+ * slow (which we'll know because of perf!) we can use a hash table (don't hash
+ * on the first few bytes btw - they are usually either /bin or /lib). */
+static bool lookup_buildid(struct perfconv_context *cctx, const char *path)
+{
+	struct build_id_event *b_evt;
+	struct mem_block *mb;
+	size_t b_evt_path_sz;
+
+	mb = cctx->hdrs.headers[HEADER_BUILD_ID];
+	while (mb) {
+		b_evt = (struct build_id_event*)mb->base;
+		b_evt_path_sz = b_evt->header.size -
+		                offsetof(struct build_id_event, filename);
+		/* ignoring the last byte since we forced it to be \0 earlier. */
+		if (!strncmp(b_evt->filename, path, b_evt_path_sz - 1))
+			return TRUE;
+		mb = mb->next;
+	}
+	return FALSE;
+}
+
+/* Helper: given a path, allocs and inits a build_id_event within a mem_block,
+ * returning both via parameters.  Caller needs to set header.misc and fill in
+ * the actual build_id. */
+static void build_id_alloc(const char *path, struct build_id_event **b_evt_p,
+                           struct mem_block **mb_p)
+{
+	struct build_id_event *b_evt;
+	struct mem_block *mb;
+	size_t path_sz, b_evt_sz;
+
+	path_sz = strlen(path) + 1;
+	b_evt_sz = path_sz + sizeof(struct build_id_event);
+
+	mb = mem_block_alloc(b_evt_sz);
+	b_evt = (struct build_id_event*)mb->wptr;
+	mb->wptr += b_evt_sz;
+
+	b_evt->header.type = 0;	/* if this fails, try 67 (synthetic build id) */
+	/* header.size filled in by the caller, depending on the type */
+	b_evt->header.size = b_evt_sz;
+	strlcpy(b_evt->filename, path, path_sz);
+
+	*b_evt_p = b_evt;
+	*mb_p = mb;
+}
+
+/* Add a build-id header.  Unlike many of the other headers, this one is built
+ * on the fly as we emit other records. */
+static void hdr_add_buildid(struct perfconv_context *cctx, const char *path,
+                            int pid)
+{
+	struct build_id_event *b_evt;
+	struct mem_block *mb;
+	int ret;
+
+	if (lookup_buildid(cctx, path))
+		return;
+
+	build_id_alloc(path, &b_evt, &mb);
+	b_evt->header.misc = PERF_RECORD_MISC_USER;
+	b_evt->pid = pid;
+	ret = filename__read_build_id(path, b_evt->build_id, BUILD_ID_SIZE);
+	if (ret <= 0)
+		free(mb);
+	else
+		headers_add_header(&cctx->ph, &cctx->hdrs, HEADER_BUILD_ID, mb);
+}
+
+static void convert_str_to_binary(char *b_id_str, uint8_t *b_id_raw)
+{
+	char *c = b_id_str;
+
+	for (int i = 0; i < BUILD_ID_SIZE; i++) {
+		b_id_raw[i] = nibble_to_num(*c) << 4 | nibble_to_num(*(c + 1));
+		c += 2;
+	}
+}
+
+void perfconv_add_kernel_buildid(struct perfconv_context *cctx)
+{
+	struct build_id_event *b_evt;
+	struct mem_block *mb;
+	int ret, fd;
+	char build_id[BUILD_ID_SIZE * 2 + 1] = {0};
+
+	build_id_alloc("[kernel.kallsyms]", &b_evt, &mb);
+	b_evt->header.misc = PERF_RECORD_MISC_KERNEL;
+	b_evt->pid = -1;
+	fd = xopen("#version/build_id", O_RDONLY, 0);
+	ret = read(fd, build_id, sizeof(build_id));
+	if (ret <= 0) {
+		free(mb);
+	} else {
+		convert_str_to_binary(build_id, b_evt->build_id);
+		headers_add_header(&cctx->ph, &cctx->hdrs, HEADER_BUILD_ID, mb);
+	}
+}
+
 /* Helper: adds all the headers, marking them in PH and storing them in
  * feat_hdrs. */
 static void headers_build(struct perf_header *ph, struct perf_headers *hdrs,
@@ -505,6 +606,8 @@ static void emit_pid_mmap64(struct perf_record *pr,
 	              strlen((char*)rec->path) + 1;
 	struct perf_record_mmap *xrec = xzmalloc(size);
 
+	hdr_add_buildid(cctx, (char*)rec->path, rec->pid);
+
 	xrec->header.type = PERF_RECORD_MMAP;
 	xrec->header.misc = PERF_RECORD_MISC_USER;
 	xrec->header.size = size;
@@ -582,8 +685,11 @@ static void emit_new_process(struct perf_record *pr,
 							 struct perfconv_context *cctx)
 {
 	struct proftype_new_process *rec = (struct proftype_new_process *) pr->data;
-	const char *comm = strrchr((char*)rec->path, '/');
+	const char *comm;
 
+	hdr_add_buildid(cctx, (char*)rec->path, rec->pid);
+
+	comm = strrchr((char*)rec->path, '/');
 	if (!comm)
 		comm = (char*)rec->path;
 	else

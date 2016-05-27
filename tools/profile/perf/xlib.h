@@ -44,6 +44,7 @@ void *xzmalloc(size_t size);
 char *xstrdup(const char *str);
 const char *vb_decode_uint64(const char *data, uint64_t *pval);
 int vb_fdecode_uint64(FILE *file, uint64_t *pval);
+uint8_t nibble_to_num(char c);
 
 static inline void cpuid(uint32_t ieax, uint32_t iecx, uint32_t *eaxp,
                          uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp)

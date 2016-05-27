@@ -466,6 +466,13 @@ struct nr_cpus {
 	uint32_t					nr_cpus_available;
 };
 
+struct build_id_event {
+	struct perf_event_header	header;
+	pid_t						pid;
+	uint8_t						build_id[24];	/* BUILD_ID_SIZE aligned u64 */
+	char						filename[];
+};
+
 #define MAX_EVENT_NAME 64
 
 struct perf_trace_event_type {
