@@ -15,6 +15,7 @@ SECTIONS
 	PROVIDE(etext = .);	/* Define the 'etext' symbol to this value */
 
 	INCLUDE kern/linker_tables.ld
+	INCLUDE kern/build_id.ld
 
 	.rodata : {
 		*(.rodata .rodata.* .gnu.linkonce.r.*)

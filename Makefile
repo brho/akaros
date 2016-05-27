@@ -539,6 +539,7 @@ $(ext2_bdev_obj): $(ext2-bdev)
 quiet_cmd_link-akaros = LINK    $@
       cmd_link-akaros = $(CONFIG_SHELL) scripts/link-kernel.sh $@ \
                         kern/arch/$(ARCH)/$(KERNEL_LD) $(LDFLAGS_KERNEL) \
+                        --build-id=sha1 \
                         $(akaros-deps) $(gcc-lib) $(kern_cpio_obj) \
                         $(ext2_bdev_obj); \
                         $(ARCH_POST_LINK_CMD)
