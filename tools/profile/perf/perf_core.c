@@ -34,6 +34,51 @@ struct event_coords {
 	const char *umask;
 };
 
+struct perf_generic_event {
+	char						*name;
+	uint32_t					type;
+	uint32_t					config;
+};
+
+struct perf_generic_event generic_events[] = {
+	{ .name = "cycles",
+	  .type = PERF_TYPE_HARDWARE,
+	  .config = PERF_COUNT_HW_CPU_CYCLES,
+	},
+	{ .name = "cpu-cycles",
+	  .type = PERF_TYPE_HARDWARE,
+	  .config = PERF_COUNT_HW_CPU_CYCLES,
+	},
+	{ .name = "instructions",
+	  .type = PERF_TYPE_HARDWARE,
+	  .config = PERF_COUNT_HW_INSTRUCTIONS,
+	},
+	{ .name = "cache-references",
+	  .type = PERF_TYPE_HARDWARE,
+	  .config = PERF_COUNT_HW_CACHE_REFERENCES,
+	},
+	{ .name = "cache-misses",
+	  .type = PERF_TYPE_HARDWARE,
+	  .config = PERF_COUNT_HW_CACHE_MISSES,
+	},
+	{ .name = "branches",
+	  .type = PERF_TYPE_HARDWARE,
+	  .config = PERF_COUNT_HW_BRANCH_INSTRUCTIONS,
+	},
+	{ .name = "branch-instructions",
+	  .type = PERF_TYPE_HARDWARE,
+	  .config = PERF_COUNT_HW_BRANCH_INSTRUCTIONS,
+	},
+	{ .name = "branch-misses",
+	  .type = PERF_TYPE_HARDWARE,
+	  .config = PERF_COUNT_HW_BRANCH_MISSES,
+	},
+	{ .name = "bus-cycles",
+	  .type = PERF_TYPE_HARDWARE,
+	  .config = PERF_COUNT_HW_BUS_CYCLES,
+	},
+};
+
 static const char *perf_get_event_mask_name(const pfm_event_info_t *einfo,
 											uint32_t mask)
 {
@@ -115,7 +160,7 @@ static void x86_handle_pseudo_encoding(struct perf_eventsel *sel)
 
 /* Parse the string using pfm's lookup functions.  Returns TRUE on success and
  * fills in parts of sel. */
-static bool parse_os_encoding(const char *str, struct perf_eventsel *sel)
+static bool parse_pfm_encoding(const char *str, struct perf_eventsel *sel)
 {
 	pfm_pmu_encode_arg_t encode;
 	int err;
@@ -137,6 +182,8 @@ static bool parse_os_encoding(const char *str, struct perf_eventsel *sel)
 	sel->ev.event = encode.codes[0];
 	sel->eidx = encode.idx;
 	x86_handle_pseudo_encoding(sel);
+	sel->type = PERF_TYPE_RAW;
+	sel->config = PMEV_GET_MASK(sel->ev.event) | PMEV_GET_EVENT(sel->ev.event);
 	return TRUE;
 }
 
@@ -176,23 +223,16 @@ static int extract_raw_code(const char *event)
 	return strtol(copy, NULL, 16);
 }
 
-/* Parse the string for a raw encoding.  Returns TRUE on success and fills in
- * parts of sel.  It has basic modifiers, like pfm4, for setting bits in the
- * event code.  This is arch specific, and is all x86 (intel) for now. */
-static bool parse_raw_encoding(const char *str, struct perf_eventsel *sel)
+/* Takes any modifiers, e.g. u:k:etc, and sets the respective values in sel. */
+static void parse_modifiers(const char *str, struct perf_eventsel *sel)
 {
-	int code = extract_raw_code(str);
-	char *dup_str, *tok_save, *tok;
+	char *dup_str, *tok, *tok_save = 0;
 
-	if (code == -1)
-		return FALSE;
-	sel->eidx = -1;
-	sel->ev.event = code;
-	strncpy(sel->fq_str, str, MAX_FQSTR_SZ);
 	dup_str = xstrdup(str);
-	tok = strtok_r(dup_str, ":", &tok_save);
-	assert(tok);	/* discard first token; it must exist */
-	while ((tok = strtok_r(NULL, ":", &tok_save))) {
+	for (tok = strtok_r(dup_str, ":", &tok_save);
+	     tok;
+	     tok = strtok_r(NULL, ":", &tok_save)) {
+
 		switch (tok[0]) {
 		case 'u':
 			PMEV_SET_USR(sel->ev.event, 1);
@@ -225,9 +265,124 @@ static bool parse_raw_encoding(const char *str, struct perf_eventsel *sel)
 		}
 	}
 	free(dup_str);
+}
+
+/* Parse the string for a raw encoding.  Returns TRUE on success and fills in
+ * parts of sel.  It has basic modifiers, like pfm4, for setting bits in the
+ * event code.  This is arch specific, and is all x86 (intel) for now. */
+static bool parse_raw_encoding(const char *str, struct perf_eventsel *sel)
+{
+	int code = extract_raw_code(str);
+	char *colon;
+
+	if (code == -1)
+		return FALSE;
+	sel->eidx = -1;
+	sel->ev.event = code;
+	strlcpy(sel->fq_str, str, MAX_FQSTR_SZ);
+	colon = strchr(str, ':');
+	if (colon)
+		parse_modifiers(colon + 1, sel);
 	/* Note that we do not call x86_handle_pseudo_encoding here.  We'll submit
 	 * exactly what the user asked us for - which also means no fixed counters
 	 * for them (unless we want a :f: token or something). */
+	sel->type = PERF_TYPE_RAW;
+	sel->config = PMEV_GET_MASK(sel->ev.event) | PMEV_GET_EVENT(sel->ev.event);
+	return TRUE;
+}
+
+/* Helper, returns true is str is a generic event string, and fills in sel with
+ * the type and config. */
+static bool generic_str_get_code(const char *str, struct perf_eventsel *sel)
+{
+	char *colon = strchr(str, ':');
+	/* if there was no :, we compare as far as we can.  generic_events.name is a
+	 * string literal, so strcmp() is fine. */
+	size_t len = colon ? colon - str : SIZE_MAX;
+
+	for (int i = 0; i < COUNT_OF(generic_events); i++) {
+		if (!strncmp(generic_events[i].name, str, len)) {
+			sel->type = generic_events[i].type;
+			sel->config = generic_events[i].config;
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+/* TODO: this is arch-specific and possibly machine-specific. (intel for now).
+ * Basically a lot of our perf is arch-dependent. (e.g. PMEV_*). */
+static bool arch_translate_generic(struct perf_eventsel *sel)
+{
+	switch (sel->type) {
+	case PERF_TYPE_HARDWARE:
+		/* These are the intel/x86 architectural perf events */
+		switch (sel->config) {
+		case PERF_COUNT_HW_CPU_CYCLES:
+			PMEV_SET_MASK(sel->ev.event, 0x00);
+			PMEV_SET_EVENT(sel->ev.event, 0x3c);
+			break;
+		case PERF_COUNT_HW_INSTRUCTIONS:
+			PMEV_SET_MASK(sel->ev.event, 0x00);
+			PMEV_SET_EVENT(sel->ev.event, 0xc0);
+			break;
+		case PERF_COUNT_HW_CACHE_REFERENCES:
+			PMEV_SET_MASK(sel->ev.event, 0x4f);
+			PMEV_SET_EVENT(sel->ev.event, 0x2e);
+			break;
+		case PERF_COUNT_HW_CACHE_MISSES:
+			PMEV_SET_MASK(sel->ev.event, 0x41);
+			PMEV_SET_EVENT(sel->ev.event, 0x2e);
+			break;
+		case PERF_COUNT_HW_BRANCH_INSTRUCTIONS:
+			PMEV_SET_MASK(sel->ev.event, 0x00);
+			PMEV_SET_EVENT(sel->ev.event, 0xc4);
+			break;
+		case PERF_COUNT_HW_BRANCH_MISSES:
+			PMEV_SET_MASK(sel->ev.event, 0x00);
+			PMEV_SET_EVENT(sel->ev.event, 0xc5);
+			break;
+		case PERF_COUNT_HW_BUS_CYCLES:
+			/* Unhalted reference cycles */
+			PMEV_SET_MASK(sel->ev.event, 0x01);
+			PMEV_SET_EVENT(sel->ev.event, 0x3c);
+			break;
+		default:
+			return FALSE;
+		};
+		break;
+	default:
+		return FALSE;
+	};
+	/* This will make sure we use fixed counters if available */
+	x86_handle_pseudo_encoding(sel);
+	return TRUE;
+}
+
+/* Parse the string for a built-in encoding.  These are the perf defaults such
+ * as 'cycles' or 'cache-references.' Returns TRUE on success and fills in parts
+ * of sel. */
+static bool parse_generic_encoding(const char *str, struct perf_eventsel *sel)
+{
+	bool ret = FALSE;
+	char *colon;
+
+	if (!generic_str_get_code(str, sel))
+		return FALSE;
+	switch (sel->type) {
+	case PERF_TYPE_HARDWARE:
+	case PERF_TYPE_HW_CACHE:
+		ret = arch_translate_generic(sel);
+		break;
+	};
+	if (!ret) {
+		fprintf(stderr, "Unsupported built-in event %s\n", str);
+		return FALSE;
+	}
+	strlcpy(sel->fq_str, str, MAX_FQSTR_SZ);
+	colon = strchr(str, ':');
+	if (colon)
+		parse_modifiers(colon + 1, sel);
 	return TRUE;
 }
 
@@ -244,7 +399,9 @@ struct perf_eventsel *perf_parse_event(const char *str)
 	struct perf_eventsel *sel = xzmalloc(sizeof(struct perf_eventsel));
 
 	sel->ev.user_data = (uint64_t)sel;
-	if (parse_os_encoding(str, sel))
+	if (parse_generic_encoding(str, sel))
+		goto success;
+	if (parse_pfm_encoding(str, sel))
 		goto success;
 	if (parse_raw_encoding(str, sel))
 		goto success;
@@ -257,9 +414,6 @@ success:
 		PMEV_SET_USR(sel->ev.event, 1);
 	}
 	PMEV_SET_EN(sel->ev.event, 1);
-	/* perf_event_attr fields (communicating with perfconv.c) */
-	sel->type = PERF_TYPE_RAW;
-	sel->config = PMEV_GET_MASK(sel->ev.event) | PMEV_GET_EVENT(sel->ev.event);
 	return sel;
 }
 
