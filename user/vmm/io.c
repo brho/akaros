@@ -21,9 +21,6 @@
 #include <vmm/sched.h>
 #include <ros/arch/trapframe.h>
 
-/* nowhere on my linux system. */
-#define ARRAY_SIZE(x) (sizeof((x))/sizeof((x)[0]))
-
 /* crude PCI bus. Just enough to get virtio working. I would rather not add to this. */
 struct pciconfig {
 	uint32_t registers[256];
@@ -51,7 +48,7 @@ void regp(uint32_t **reg)
 	*reg = &allones;
 	int devfn = (cf8>>8) & 0xff;
 	//printf("devfn %d\n", devfn);
-	if (devfn < ARRAY_SIZE(pcibus))
+	if (devfn < COUNT_OF(pcibus))
 		*reg = &pcibus[devfn].registers[(cf8>>2)&0x3f];
 	//printf("-->regp *reg 0x%lx\n", **reg);
 }

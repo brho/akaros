@@ -22,9 +22,6 @@
 #include <vmm/sched.h>
 #include <ros/arch/trapframe.h>
 
-/* nowhere on my linux system. */
-#define ARRAY_SIZE(x) (sizeof((x))/sizeof((x)[0]))
-
 char *vmxexit[] = {
 	VMX_EXIT_REASONS
 };
@@ -36,7 +33,7 @@ void showstatus(FILE *f, struct guest_thread *vm_thread)
 	char *when = shutdown & VMX_EXIT_REASONS_FAILED_VMENTRY ? "entry" : "exit";
 	shutdown &= ~VMX_EXIT_REASONS_FAILED_VMENTRY;
 	char *reason = "UNKNOWN";
-	if (shutdown < ARRAY_SIZE(vmxexit) && vmxexit[shutdown])
+	if (shutdown < COUNT_OF(vmxexit) && vmxexit[shutdown])
 		reason = vmxexit[shutdown];
 	fprintf(f, "Shutdown: core %d, %s due to %s(0x%x); ret code 0x%x\n",
 	        vm_tf->tf_guest_pcoreid, when, reason, shutdown,

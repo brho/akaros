@@ -23,8 +23,7 @@
 #include <ndblib/fcallfmt.h>
 #include <fcall.h>
 #include <parlib/spinlock.h>
-
-#define ARRAY_SIZE(x) (sizeof((x))/sizeof((x)[0]))
+#include <ros/common.h>
 
 enum
 {
@@ -1723,7 +1722,7 @@ genquery(Mfile *mf, char *query)
 	struct ndbtuple *t;
 	struct ndbs s;
 
-	n = getfields(query, attr, ARRAY_SIZE(attr), 1, " ");
+	n = getfields(query, attr, COUNT_OF(attr), 1, " ");
 	if(n == 0)
 		return "bad query";
 

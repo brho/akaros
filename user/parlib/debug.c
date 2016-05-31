@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <parlib/spinlock.h>
+#include <ros/common.h>
 
 int akaros_printf(const char *format, ...)
 {
@@ -22,8 +23,7 @@ static const char *blacklist[] = {
 
 static bool is_blacklisted(const char *s)
 {
-	#define ARRAY_SIZE(x) (sizeof((x))/sizeof((x)[0]))
-	for (int i = 0; i < ARRAY_SIZE(blacklist); i++) {
+	for (int i = 0; i < COUNT_OF(blacklist); i++) {
 		if (!strcmp(blacklist[i], s))
 			return TRUE;
 	}
