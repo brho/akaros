@@ -38,18 +38,18 @@ fi
 #
 # Set up the initial namespace for starting networking.
 #
-bind -b '#cons' /dev
-bind -b '#random' /dev
-#bind '#d' /fd
-#bind -c '#e' /env
-bind -b '#proc' /proc
-bind -b '#srv' /srv
+/bin/bind -b '#cons' /dev
+/bin/bind -b '#random' /dev
+#/bin/bind '#d' /fd
+#/bin/bind -c '#e' /env
+/bin/bind -b '#proc' /proc
+/bin/bind -b '#srv' /srv
 
 #
 # Configure the network mount point.
 #
-bind -a '#ip' /net
-bind -a '#ether'.$NIC /net
+/bin/bind -a '#ip' /net
+/bin/bind -a '#ether'.$NIC /net
 
 if [ -x /bin/ipconfig ]
 then
@@ -110,6 +110,6 @@ mount -a '#srv/cs' /net
 # This is noisy, so it is off by default.
 #echo debug > /net/cs
 
-bind -a '#kprof' /prof
+/bin/bind -a '#kprof' /prof
 
 echo 'ifconfig complete'
