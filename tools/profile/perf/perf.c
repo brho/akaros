@@ -103,6 +103,25 @@ static void run_process_and_wait(int argc, char *argv[],
 	waitpid(pid, &status, 0);
 }
 
+static void save_cmdline(int argc, char *argv[])
+{
+	size_t len = 0;
+	char *p;
+
+	for (int i = 0; i < argc; i++)
+		len += strlen(argv[i]) + 1;
+	cmd_line_save = xmalloc(len);
+	p = cmd_line_save;
+	for (int i = 0; i < argc; i++) {
+		strcpy(p, argv[i]);
+		p += strlen(argv[i]);
+		if (!(i == argc - 1)) {
+			*p = ' ';	/* overwrite \0 with ' ' */
+			p++;
+		}
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	int i, icmd = -1, num_events = 0;
@@ -112,6 +131,8 @@ int main(int argc, char *argv[])
 	struct perf_context *pctx;
 	struct core_set cores;
 	const char *events[MAX_CPU_EVENTS];
+
+	save_cmdline(argc, argv);
 
 	ros_get_all_cores_set(&cores);
 

@@ -38,6 +38,8 @@
 
 #define MBWR_SOLID (1 << 0)
 
+char *cmd_line_save;
+
 struct perf_record {
 	uint64_t type;
 	uint64_t size;
@@ -373,6 +375,31 @@ static void hdr_do_nrcpus(struct perf_header *ph, struct perf_headers *hdrs)
 	headers_add_header(ph, hdrs, HEADER_NRCPUS, mb);
 }
 
+/* Unfortunately, HEADER_CMDLINE doesn't just take a string.  It takes a list of
+ * null-terminated perf_header_strings (i.e. argv), with the a u32 for the
+ * number of strings.  We can just send one string for the entire cmd line. */
+static void hdr_do_cmdline(struct perf_header *ph, struct perf_headers *hdrs)
+{
+	struct perf_header_string *hdr;
+	struct mem_block *mb;
+	size_t str_sz = strlen(cmd_line_save) + 1;
+	size_t hdr_sz = sizeof(uint32_t) +
+	                ROUNDUP(str_sz + sizeof(struct perf_header_string),
+	                        PERF_STRING_ALIGN);
+
+	mb = mem_block_alloc(hdr_sz);
+	/* emit the nr strings (1) */
+	*(uint32_t*)mb->wptr = 1;
+	mb->wptr += sizeof(uint32_t);
+	/* emit the perf_header_string, as usual */
+	hdr = (struct perf_header_string*)mb->wptr;
+	mb->wptr += hdr_sz - sizeof(uint32_t);
+	hdr->len = str_sz;
+	memcpy(hdr->string, cmd_line_save, str_sz);
+
+	headers_add_header(ph, hdrs, HEADER_CMDLINE, mb);
+}
+
 /* Returns TRUE if we already emitted a build-id for path.  If this gets too
  * slow (which we'll know because of perf!) we can use a hash table (don't hash
  * on the first few bytes btw - they are usually either /bin or /lib). */
@@ -480,6 +507,7 @@ static void headers_build(struct perf_header *ph, struct perf_headers *hdrs,
 {
 	hdr_do_osrelease(ph, hdrs);
 	hdr_do_nrcpus(ph, hdrs);
+	hdr_do_cmdline(ph, hdrs);
 
 	headers_finalize(hdrs, feat_hdrs);
 }

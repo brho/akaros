@@ -67,6 +67,8 @@ struct perfconv_context {
 	struct mem_file fhdrs, attr_ids, attrs, data, event_types;
 };
 
+extern char *cmd_line_save;
+
 struct perfconv_context *perfconv_create_context(struct perf_context *pctx);
 void perfconv_free_context(struct perfconv_context *cctx);
 void perfconv_set_dbglevel(int level, struct perfconv_context *cctx);
