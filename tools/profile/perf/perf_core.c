@@ -28,12 +28,6 @@
 #include "perf_core.h"
 #include "elf.h"
 
-struct event_coords {
-	char *buffer;
-	const char *event;
-	const char *umask;
-};
-
 struct perf_generic_event {
 	char						*name;
 	uint32_t					type;
@@ -180,7 +174,6 @@ static bool parse_pfm_encoding(const char *str, struct perf_eventsel *sel)
 		return FALSE;
 	}
 	sel->ev.event = encode.codes[0];
-	sel->eidx = encode.idx;
 	x86_handle_pseudo_encoding(sel);
 	sel->type = PERF_TYPE_RAW;
 	sel->config = PMEV_GET_MASK(sel->ev.event) | PMEV_GET_EVENT(sel->ev.event);
@@ -277,7 +270,6 @@ static bool parse_raw_encoding(const char *str, struct perf_eventsel *sel)
 
 	if (code == -1)
 		return FALSE;
-	sel->eidx = -1;
 	sel->ev.event = code;
 	strlcpy(sel->fq_str, str, MAX_FQSTR_SZ);
 	colon = strchr(str, ':');

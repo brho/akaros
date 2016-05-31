@@ -32,7 +32,6 @@ struct perf_eventsel {
 	bool attr_emitted;
 	uint32_t type;
 	uint64_t config;
-	int eidx;
 	char fq_str[MAX_FQSTR_SZ];
 };
 
