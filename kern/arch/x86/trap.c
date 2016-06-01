@@ -685,7 +685,24 @@ static bool handle_vmexit_cpuid(struct vm_trapframe *tf)
 {
 	uint32_t eax, ebx, ecx, edx;
 
-	cpuid(tf->tf_rax, tf->tf_rcx, &eax, &ebx, &ecx, &edx);
+	/* 0x4000000 is taken from Linux; it is not documented but it signals the
+	 * use of KVM. */
+	if (tf->tf_rax == 0x40000000) {
+		/* Pretend to be KVM: Return the KVM signature by placing the following
+		 * constants in RAX, RBX, RCX and RDX. RAX is set to 0, while RBX to
+		 * RDX forms the string "KVMKVMKVMKVM\0\0\0". This can be placed in
+		 * 0x100 offsets from 0x40000000 to 0x40010000. */
+		eax = 0;
+		ebx = 0x4b4d564b;
+		ecx = 0x564b4d56;
+		edx = 0x0000004d;
+	} else {
+		cpuid(tf->tf_rax, tf->tf_rcx, &eax, &ebx, &ecx, &edx);
+		if (tf->tf_rax == 1) {
+			/* Set the hypervisor bit to let the guest know it is virtualized */
+			ecx |= 1 << 31;
+		}
+	}
 	tf->tf_rax = eax;
 	tf->tf_rbx = ebx;
 	tf->tf_rcx = ecx;
