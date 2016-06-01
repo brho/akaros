@@ -155,8 +155,8 @@ volatile int quit = 0;
 /* total hack. If the vm runs away we want to get control again. */
 unsigned int maxresume = (unsigned int) -1;
 
-#define MiB 0x100000u
-#define GiB (1u<<30)
+#define MiB 0x100000ull
+#define GiB (1ull << 30)
 #define GKERNBASE (16*MiB)
 #define KERNSIZE (128*MiB+GKERNBASE)
 uint8_t _kernel[KERNSIZE];
@@ -310,7 +310,6 @@ int main(int argc, char **argv)
 	struct boot_params *bp;
 	char *cmdline_default = "earlyprintk=vmcall,keep"
 		                    " console=hvc0"
-		                    " virtio_mmio.device=1M@0x100000000:32"
 		                    " nosmp"
 		                    " maxcpus=1"
 		                    " acpi.debug_layer=0x2"
@@ -345,6 +344,8 @@ int main(int argc, char **argv)
 	void *a_page;
 	struct vm_trapframe *vm_tf;
 	uint64_t tsc_freq_khz;
+	char *cmdlinep;
+	int cmdlinesz, len;
 
 	fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT,
 			PML1_PTE_REACH);
@@ -528,8 +529,6 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-
-
 	fprintf(stderr, "allchecksums ok\n");
 
 	hexdump(stdout, r, a-(void *)r);
@@ -556,16 +555,6 @@ int main(int argc, char **argv)
 	bp = a;
 	memset(bp, 0, 4096);
 
-	/* Set the kernel command line parameters */
-	a += 4096;
-	cmdline = a;
-	a += 4096;
-	bp->hdr.cmd_line_ptr = (uintptr_t) cmdline;
-	tsc_freq_khz = get_tsc_freq()/1000;
-	sprintf(cmdline, "%s tscfreq=%lld %s", cmdline_default, tsc_freq_khz,
-	        cmdline_extra);
-
-
 	/* Put the e820 memory region information in the boot_params */
 	bp->e820_entries = 3;
 	int e820i = 0;
@@ -581,6 +570,47 @@ int main(int argc, char **argv)
 	bp->e820_map[e820i].addr = 0xf0000000;
 	bp->e820_map[e820i].size = 0x10000000;
 	bp->e820_map[e820i++].type = E820_RESERVED;
+
+	/* The MMIO address of the console device is really the address of an
+	 * unbacked EPT page: accesses to this page will cause a page fault that
+	 * traps to the host, which will examine the fault, see it was for the
+	 * known MMIO address, and fulfill the MMIO read or write on the guest's
+	 * behalf accordingly. We place the virtio space at 512 GB higher than the
+	 * guest physical memory to avoid a full page table walk. */
+	uint64_t virtio_mmio_base_addr = ROUNDUP((bp->e820_map[e820i - 1].addr +
+	                                          bp->e820_map[e820i - 1].size),
+	                                         512 * GiB);
+
+	cons_mmio_dev.addr = virtio_mmio_base_addr;
+	cons_mmio_dev.vqdev = &cons_vqdev;
+	vm->virtio_mmio_devices[VIRTIO_MMIO_CONSOLE_DEV] = &cons_mmio_dev;
+
+	/* Set the kernel command line parameters */
+	a += 4096;
+	cmdline = a;
+	a += 4096;
+	bp->hdr.cmd_line_ptr = (uintptr_t) cmdline;
+
+	tsc_freq_khz = get_tsc_freq()/1000;
+	len = snprintf(cmdline, 4096, "%s tscfreq=%lld %s", cmdline_default,
+	               tsc_freq_khz, cmdline_extra);
+
+	cmdlinesz = 4096 - len;
+	cmdlinep = cmdline + len;
+
+	for (int i = 0; i < VIRTIO_MMIO_MAX_NUM_DEV; i++) {
+		if (vm->virtio_mmio_devices[i] == NULL)
+			continue;
+		/* Append all the virtio mmio base addresses. */
+		len = snprintf(cmdlinep, cmdlinesz, " virtio_mmio.device=1K@0x%llx:32",
+		               vm->virtio_mmio_devices[i]->addr);
+		if (len >= cmdlinesz) {
+			fprintf(stderr, "Too many arguments to the linux command line.");
+			exit(1);
+		}
+		cmdlinesz -= len;
+		cmdlinep += len;
+	}
 
 	vm->nr_gpcs = 1;
 	vm->gpcis = &gpci;
@@ -615,15 +645,6 @@ int main(int argc, char **argv)
 	hexdump(stdout, coreboot_tables, 512);
 	fprintf(stderr, "kernbase for pml4 is 0x%llx and entry is %llx\n", kernbase, entry);
 	fprintf(stderr, "p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
-
-	/* The MMIO address of the console device is really the address of an
-	 * unbacked EPT page: accesses to this page will cause a page fault that
-	 * traps to the host, which will examine the fault, see it was for the
-	 * known MMIO address, and fulfill the MMIO read or write on the guest's
-	 * behalf accordingly. */
-	cons_mmio_dev.addr = 0x100000000;
-	cons_mmio_dev.vqdev = &cons_vqdev;
-	vm->virtio_mmio_devices[VIRTIO_MMIO_CONSOLE_DEV] = &cons_mmio_dev;
 
 	vmm_run_task(vm, timer_thread, 0);
 
