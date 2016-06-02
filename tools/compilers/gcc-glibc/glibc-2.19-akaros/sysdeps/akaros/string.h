@@ -31,6 +31,10 @@ __BEGIN_DECLS
 #define	__need_NULL
 #include <stddef.h>
 
+#ifdef __ros__
+#include <bits/string-akaros.h>
+#endif
+
 /* Provide correct C++ prototypes, and indicate this to the caller.  This
    requires a compatible C++ standard library.  As a heuristic, we provide
    these when the compiler indicates full conformance with C++98 or later,

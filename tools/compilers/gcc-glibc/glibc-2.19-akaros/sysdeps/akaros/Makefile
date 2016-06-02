@@ -46,6 +46,16 @@ ifeq ($(subdir),stdlib)
 sysdep_routines += sched_getcpu
 endif
 
+# Imports from OpenBSD.
+ifeq ($(subdir),stdlib)
+sysdep_routines += reallocarray
+endif
+ifeq ($(subdir),string)
+sysdep_routines += strlcat
+sysdep_routines += strlcpy
+endif
+sysdep_headers += stdlib.h string.h bits/stdlib-akaros.h bits/string-akaros.h
+
 # Syscall pack arg routines
 ifeq ($(subdir),stdlib)
 sysdep_routines += serialize

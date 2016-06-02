@@ -33,6 +33,10 @@
 
 __BEGIN_DECLS
 
+#ifdef __ros__
+#include <bits/stdlib-akaros.h>
+#endif
+
 #ifndef __need_malloc_and_calloc
 #define	_STDLIB_H	1
 

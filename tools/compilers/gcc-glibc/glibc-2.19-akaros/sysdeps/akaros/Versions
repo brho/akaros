@@ -42,6 +42,11 @@ libc {
     serialize_argv_envp;
     free_serialized_data;
 
+    # Imports from other OpenBSD.
+    reallocarray;
+    strlcat;
+    strlcpy;
+
     # helper functions from resolv (which we don't build)
     __h_errno_location;
 
