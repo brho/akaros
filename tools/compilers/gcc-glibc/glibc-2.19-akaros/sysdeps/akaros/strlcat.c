@@ -16,8 +16,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/types.h>
 #include <string.h>
+#include <sys/types.h>
 
 /*
  * Appends src to string dst of size dsize (unlike strncat, dsize is the
@@ -26,8 +26,7 @@
  * Returns strlen(src) + MIN(dsize, strlen(initial dst)).
  * If retval >= dsize, truncation occurred.
  */
-size_t
-strlcat(char *dst, const char *src, size_t dsize)
+size_t __strlcat(char *dst, const char *src, size_t dsize)
 {
 	const char *odst = dst;
 	const char *osrc = src;
@@ -41,7 +40,7 @@ strlcat(char *dst, const char *src, size_t dsize)
 	n = dsize - dlen;
 
 	if (n-- == 0)
-		return(dlen + strlen(src));
+		return (dlen + strlen(src));
 	while (*src != '\0') {
 		if (n != 0) {
 			*dst++ = *src;
@@ -51,6 +50,6 @@ strlcat(char *dst, const char *src, size_t dsize)
 	}
 	*dst = '\0';
 
-	return(dlen + (src - osrc));	/* count does not include NUL */
+	return (dlen + (src - osrc)); /* count does not include NUL */
 }
-DEF_WEAK(strlcat);
+weak_alias(__strlcat, strlcat)
