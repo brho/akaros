@@ -83,9 +83,19 @@ static void __attribute__((noinline, noreturn)) __smp_idle(void)
 
 void smp_idle(void)
 {
+	/* FP must be zeroed before SP.  Ideally, we'd do both atomically.  If we
+	 * take an IRQ in between and set SP first, then a backtrace would be
+	 * confused since FP points *below* the SP that the *IRQ handler* is now
+	 * using.  Disabling IRQs gets us most of the way, but we could have an NMI
+	 * that does a BT (e.g. for debugging).  By zeroing FP first, at least we
+	 * won't BT at all (though FP is still out of sync with SP).
+	 *
+	 * Disabling IRQs here also will help with general sanity. */
+	disable_irq();
 	#ifdef CONFIG_RESET_STACKS
-	set_stack_pointer(get_stack_top());
 	set_frame_pointer(0);
+	cmb();
+	set_stack_pointer(get_stack_top());
 	#endif /* CONFIG_RESET_STACKS */
 	__smp_idle();
 	assert(0);
