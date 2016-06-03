@@ -53,23 +53,21 @@ void regp(uint32_t **reg)
 	//printf("-->regp *reg 0x%lx\n", **reg);
 }
 
-static uint32_t configaddr(uint32_t val)
+static void configaddr(uint32_t val)
 {
 	printf("%s 0x%lx\n", __func__, val);
 	cf8 = val;
-	return 0;
 }
 
-static uint32_t configread32(uint32_t edx, uint64_t *reg)
+static void configread32(uint32_t edx, uint64_t *reg)
 {
 	uint32_t *r = &cf8;
 	regp(&r);
 	*reg = *r;
 	printf("%s: 0x%lx 0x%lx, 0x%lx 0x%lx\n", __func__, cf8, edx, r, *reg);
-	return 0;
 }
 
-static uint32_t configread16(uint32_t edx, uint64_t *reg)
+static void configread16(uint32_t edx, uint64_t *reg)
 {
 	uint64_t val;
 	int which = ((edx&2)>>1) * 16;
@@ -77,10 +75,9 @@ static uint32_t configread16(uint32_t edx, uint64_t *reg)
 	val >>= which;
 	*reg = val;
 	printf("%s: 0x%lx, 0x%lx 0x%lx\n", __func__, edx, val, *reg);
-	return 0;
 }
 
-static uint32_t configread8(uint32_t edx, uint64_t *reg)
+static void configread8(uint32_t edx, uint64_t *reg)
 {
 	uint64_t val;
 	int which = (edx&3) * 8;
@@ -88,28 +85,24 @@ static uint32_t configread8(uint32_t edx, uint64_t *reg)
 	val >>= which;
 	*reg = val;
 	printf("%s: 0x%lx, 0x%lx 0x%lx\n", __func__, edx, val, *reg);
-	return 0;
 }
 
-static int configwrite32(uint32_t addr, uint32_t val)
+static void configwrite32(uint32_t addr, uint32_t val)
 {
 	uint32_t *r = &cf8;
 	regp(&r);
 	*r = val;
 	printf("%s 0x%lx 0x%lx\n", __func__, addr, val);
-	return 0;
 }
 
-static int configwrite16(uint32_t addr, uint16_t val)
+static void configwrite16(uint32_t addr, uint16_t val)
 {
 	printf("%s 0x%lx 0x%lx\n", __func__, addr, val);
-	return 0;
 }
 
-static int configwrite8(uint32_t addr, uint8_t val)
+static void configwrite8(uint32_t addr, uint8_t val)
 {
 	printf("%s 0x%lx 0x%lx\n", __func__, addr, val);
-	return 0;
 }
 
 /* this is very minimal. It needs to move to vmm/io.c but we don't
@@ -119,7 +112,7 @@ static int configwrite8(uint32_t addr, uint8_t val)
  * It would have been nice had intel encoded the IO exit info as nicely as they
  * encoded, some of the other exits.
  */
-int io(struct guest_thread *vm_thread)
+bool io(struct guest_thread *vm_thread)
 {
 
 	/* Get a pointer to the memory at %rip. This is quite messy and part of the
@@ -147,14 +140,31 @@ int io(struct guest_thread *vm_thread)
 		/* out at %edx */
 		if (edx == 0xcf8) {
 			//printf("Set cf8 ");
-			return configaddr(vm_tf->tf_rax);
+			configaddr(vm_tf->tf_rax);
+			return true;
 		}
 		if (edx == 0xcfc) {
 			//printf("Set cfc ");
-			return configwrite32(edx, vm_tf->tf_rax);
+			configwrite32(edx, vm_tf->tf_rax);
+			return true;
 		}
+		/* While it is perfectly legal to do IO operations to
+		 * nonexistant places, we print a warning here as it
+		 * might also indicate a problem.  In practice these
+		 * types of IOs happens less frequently, and whether
+		 * they are bad or not is not always easy to decide.
+		 * Simple example: for about the first 10 years Linux
+		 * used to outb 0x98 to port 0x80 while idle. We
+		 * wouldn't want to call that an error, but that kind
+		 * of thing is a bad practice we ought to know about,
+		 * because it can cause chipset errors and result in
+		 * other non-obvious failures (in one case, breaking
+		 * BIOS reflash operations).  Plus, true story, it
+		 * confused people into thinking we were running
+		 * Windows 98, not Linux.
+		 */
 		printf("(out rax, edx): unhandled IO address dx @%p is 0x%x\n", ip8, edx);
-		return -1;
+		return true;
 	}
 	// out %al, %dx
 	if (*ip8 == 0xee) {
@@ -162,36 +172,49 @@ int io(struct guest_thread *vm_thread)
 		/* out al %edx */
 		if (edx == 0xcfb) { // special!
 			printf("Just ignore the damned cfb write\n");
-			return 0;
+			return true;
 		}
 		if ((edx&~3) == 0xcfc) {
 			//printf("ignoring write to cfc ");
-			return 0;
+			return true;
 		}
+		/* Another case where we print a message but it's not an error. */
 		printf("out al, dx: unhandled IO address dx @%p is 0x%x\n", ip8, edx);
-		return -1;
+		return true;
 	}
 	if (*ip8 == 0xec) {
 		vm_tf->tf_rip += 1;
 		//printf("configread8 ");
-		return configread8(edx, &vm_tf->tf_rax);
+		configread8(edx, &vm_tf->tf_rax);
+		return true;
 	}
 	if (*ip8 == 0xed) {
 		vm_tf->tf_rip += 1;
 		if (edx == 0xcf8) {
 			//printf("read cf8 0x%lx\n", v->regs.tf_rax);
 			vm_tf->tf_rax = cf8;
-			return 0;
+			return true;
 		}
 		//printf("configread32 ");
-		return configread32(edx, &vm_tf->tf_rax);
+		configread32(edx, &vm_tf->tf_rax);
+		return true;
 	}
 	if (*ip16 == 0xed66) {
 		vm_tf->tf_rip += 2;
 		//printf("configread16 ");
-		return configread16(edx, &vm_tf->tf_rax);
+		configread16(edx, &vm_tf->tf_rax);
+		return true;
 	}
+
+	/* This is, so far, the only case in which we indicate
+	 * failure: we can't even decode the instruction. We've
+	 * implemented the common cases above, and recently this
+	 * failure has been seen only when the RIP is set to some
+	 * bizarre value and we start fetching instructions from
+	 * (e.g.) the middle of a page table. PTEs look like IO
+	 * instructions to the CPU.
+	 */
 	printf("unknown IO %p %x %x\n", ip8, *ip8, *ip16);
-	return -1;
+	return false;
 }
 

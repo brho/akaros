@@ -74,8 +74,7 @@ static bool handle_vmcall(struct guest_thread *gth)
 
 static bool handle_io(struct guest_thread *gth)
 {
-	io(gth);
-	return TRUE;
+	return io(gth);
 }
 
 static bool handle_msr(struct guest_thread *gth)
