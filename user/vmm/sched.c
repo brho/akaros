@@ -322,6 +322,16 @@ static void __ctlr_entry(void)
 	struct virtual_machine *vm = gth_to_vm(cth->buddy);
 
 	if (!handle_vmexit(cth->buddy)) {
+		struct vm_trapframe *vm_tf = gth_to_vmtf(cth->buddy);
+
+		fprintf(stderr, "vmm: handle_vmexit returned false\n");
+		fprintf(stderr, "Note: this may be a kernel module, not the kernel\n");
+		fprintf(stderr, "RIP was %p:\n", (void *)vm_tf->tf_rip);
+		/* TODO: properly walk the kernel page tables to map the tf_rip
+		 * to a physical address. For now, however, this hack is good
+		 * enough.
+		 */
+		hexdump(stderr, (void *)(vm_tf->tf_rip & 0x3fffffff), 16);
 		showstatus(stderr, cth->buddy);
 		exit(0);
 	}
