@@ -166,18 +166,22 @@ static void kprof_start_profiler(void)
 static void kprof_fetch_profiler_data(void)
 {
 	size_t psize = kprof.psize + profiler_size();
+	size_t read_amt;
 	char *ndata = krealloc(kprof.pdata, psize, MEM_WAIT);
 
 	if (!ndata)
 		error(ENOMEM, ERROR_FIXME);
 	kprof.pdata = ndata;
+	/* psize includes a snapshot of the profiler's size.  It might grow in the
+	 * meantime, but we'll only ever grab as much as we saw originally.  This is
+	 * fine.  The important thing is that we only grab contiguous records. */
 	while (kprof.psize < psize) {
-		size_t csize = profiler_read(kprof.pdata + kprof.psize,
-		                             psize - kprof.psize);
-
-		if (csize == 0)
-			break;
-		kprof.psize += csize;
+		read_amt = profiler_read(kprof.pdata + kprof.psize,
+		                         psize - kprof.psize);
+		/* We are the only reader - we must always get whatever was in the
+		 * queue. */
+		assert(read_amt);
+		kprof.psize += read_amt;
 	}
 }
 

@@ -34,7 +34,7 @@ struct profiler_cpu_context {
 	struct block *block;
 	int cpu;
 	int tracing;
-	size_t dropped_data_size;
+	size_t dropped_data_cnt;
 };
 
 static int profiler_queue_limit = 64 * 1024 * 1024;
@@ -64,18 +64,12 @@ static inline char *vb_encode_uint64(char *data, uint64_t n)
 static struct block *profiler_buffer_write(struct profiler_cpu_context *cpu_buf,
                                            struct block *b)
 {
+	/* qpass will drop b if the queue is over its limit.  we're willing to lose
+	 * traces, but we won't lose 'control' events, such as MMAP and PID. */
 	if (b) {
-		qibwrite(profiler_queue, b);
-
-		if (qlen(profiler_queue) > profiler_queue_limit) {
-			b = qget(profiler_queue);
-			if (likely(b)) {
-				cpu_buf->dropped_data_size += BLEN(b);
-				freeb(b);
-			}
-		}
+		if (qpass(profiler_queue, b) < 0)
+			cpu_buf->dropped_data_cnt++;
 	}
-
 	return block_alloc(profiler_cpu_buffer_size, MEM_ATOMIC);
 }
 
@@ -268,6 +262,14 @@ static void alloc_cpu_buffers(void)
 {
 	ERRSTACK(1);
 
+	/* It is very important that we enqueue and dequeue entire records at once.
+	 * If we leave partial records, the entire stream will be corrupt.  Our
+	 * reader does its best to make sure it has room for complete records
+	 * (checks qlen()).
+	 *
+	 * If we ever get corrupt streams, try making this a Qmsg.  Though it
+	 * doesn't help every situation - we have issues with writes greater than
+	 * Maxatomic regardless. */
 	profiler_queue = qopen(profiler_queue_limit, 0, NULL, NULL);
 	if (!profiler_queue)
 		error(ENOMEM, ERROR_FIXME);
@@ -275,8 +277,6 @@ static void alloc_cpu_buffers(void)
 		free_cpu_buffers();
 		nexterror();
 	}
-
-	qdropoverflow(profiler_queue, TRUE);
 
 	profiler_percpu_ctx =
 	    kzmalloc(sizeof(*profiler_percpu_ctx) * num_cores, MEM_WAIT);
