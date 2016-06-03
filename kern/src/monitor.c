@@ -422,11 +422,12 @@ int mon_exit(int argc, char **argv, struct hw_trapframe *hw_tf)
 
 int mon_kfunc(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-	void (*func)(void *arg, ...);
+	long ret;
+	long (*func)(void *arg, ...);
 
 	if (argc < 2) {
 		printk("Usage: kfunc FUNCTION [arg1] [arg2] [etc]\n");
-		printk("Arguments must be in hex.  Can take 6 args.\n");
+		printk("Use 0x with hex arguments.  Can take 6 args.\n");
 		return 1;
 	}
 	func = (void*)get_symbol_addr(argv[1]);
@@ -437,46 +438,47 @@ int mon_kfunc(int argc, char **argv, struct hw_trapframe *hw_tf)
 	/* Not elegant, but whatever.  maybe there's a better syntax, or we can do
 	 * it with asm magic. */
 	switch (argc) {
-		case 2: /* have to fake one arg */
-			func((void*)0);
-			break;
-		case 3: /* the real first arg */
-			func((void*)strtol(argv[2], 0, 16));
-			break;
-		case 4:
-			func((void*)strtol(argv[2], 0, 16),
-			            strtol(argv[3], 0, 16));
-			break;
-		case 5:
-			func((void*)strtol(argv[2], 0, 16),
-			            strtol(argv[3], 0, 16),
-			            strtol(argv[4], 0, 16));
-			break;
-		case 6:
-			func((void*)strtol(argv[2], 0, 16),
-			            strtol(argv[3], 0, 16),
-			            strtol(argv[4], 0, 16),
-			            strtol(argv[5], 0, 16));
-			break;
-		case 7:
-			func((void*)strtol(argv[2], 0, 16),
-			            strtol(argv[3], 0, 16),
-			            strtol(argv[4], 0, 16),
-			            strtol(argv[5], 0, 16),
-			            strtol(argv[6], 0, 16));
-			break;
-		case 8:
-			func((void*)strtol(argv[2], 0, 16),
-			            strtol(argv[3], 0, 16),
-			            strtol(argv[4], 0, 16),
-			            strtol(argv[5], 0, 16),
-			            strtol(argv[6], 0, 16),
-			            strtol(argv[7], 0, 16));
-			break;
-		default:
-			printk("Bad number of arguments.\n");
-			return -1;
+	case 2: /* have to fake one arg */
+		ret = func((void*)0);
+		break;
+	case 3: /* the real first arg */
+		ret = func((void*)strtol(argv[2], 0, 0));
+		break;
+	case 4:
+		ret = func((void*)strtol(argv[2], 0, 0),
+		                  strtol(argv[3], 0, 0));
+		break;
+	case 5:
+		ret = func((void*)strtol(argv[2], 0, 0),
+		                  strtol(argv[3], 0, 0),
+		                  strtol(argv[4], 0, 0));
+		break;
+	case 6:
+		ret = func((void*)strtol(argv[2], 0, 0),
+		                  strtol(argv[3], 0, 0),
+		                  strtol(argv[4], 0, 0),
+		                  strtol(argv[5], 0, 0));
+		break;
+	case 7:
+		ret = func((void*)strtol(argv[2], 0, 0),
+		                  strtol(argv[3], 0, 0),
+		                  strtol(argv[4], 0, 0),
+		                  strtol(argv[5], 0, 0),
+		                  strtol(argv[6], 0, 0));
+		break;
+	case 8:
+		ret = func((void*)strtol(argv[2], 0, 0),
+		                  strtol(argv[3], 0, 0),
+		                  strtol(argv[4], 0, 0),
+		                  strtol(argv[5], 0, 0),
+		                  strtol(argv[6], 0, 0),
+		                  strtol(argv[7], 0, 0));
+		break;
+	default:
+		printk("Bad number of arguments.\n");
+		return -1;
 	}
+	printk("%s (might have) returned %p\n", argv[1], ret);
 	return 0;
 }
 
