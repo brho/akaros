@@ -30,6 +30,7 @@
 
 #define VBE_MAX_SIZE(t) ((8 * sizeof(t) + 6) / 7)
 
+/* Do not rely on the contents of the PCPU ctx with IRQs enabled. */
 struct profiler_cpu_context {
 	struct block *block;
 	int cpu;
@@ -73,6 +74,10 @@ static struct block *profiler_buffer_write(struct profiler_cpu_context *cpu_buf,
 	return block_alloc(profiler_cpu_buffer_size, MEM_ATOMIC);
 }
 
+/* Helper, paired with profiler_cpu_buffer_write_commit.  Ensures there is
+ * enough room in the pcpu block for our write.  May alloc a new one.
+ *
+ * IRQs must be disabled before calling, until after write_commit. */
 static char *profiler_cpu_buffer_write_reserve(
 	struct profiler_cpu_context *cpu_buf, size_t size, struct block **pb)
 {
@@ -88,6 +93,9 @@ static char *profiler_cpu_buffer_write_reserve(
 	return (char *) b->wp;
 }
 
+/* Helper, paired with write_reserve.  Finalizes the writing into the block's
+ * main body of @size bytes.  IRQs must be disabled until after this is called.
+ */
 static inline void profiler_cpu_buffer_write_commit(
 	struct profiler_cpu_context *cpu_buf, struct block *b, size_t size)
 {
@@ -106,9 +114,12 @@ static void profiler_push_kernel_trace64(struct profiler_cpu_context *cpu_buf,
 	size_t size = sizeof(struct proftype_kern_trace64) +
 		count * sizeof(uint64_t);
 	struct block *b;
-	void *resptr = profiler_cpu_buffer_write_reserve(
+	void *resptr, *ptr;
+
+	assert(!irq_is_enabled());
+	resptr = profiler_cpu_buffer_write_reserve(
 	    cpu_buf, size + profiler_max_envelope_size(), &b);
-	void *ptr = resptr;
+	ptr = resptr;
 
 	if (likely(ptr)) {
 		struct proftype_kern_trace64 *record;
@@ -137,9 +148,12 @@ static void profiler_push_user_trace64(struct profiler_cpu_context *cpu_buf,
 	size_t size = sizeof(struct proftype_user_trace64) +
 		count * sizeof(uint64_t);
 	struct block *b;
-	void *resptr = profiler_cpu_buffer_write_reserve(
+	void *resptr, *ptr;
+
+	assert(!irq_is_enabled());
+	resptr = profiler_cpu_buffer_write_reserve(
 	    cpu_buf, size + profiler_max_envelope_size(), &b);
-	void *ptr = resptr;
+	ptr = resptr;
 
 	if (likely(ptr)) {
 		struct proftype_user_trace64 *record;
@@ -396,11 +410,15 @@ void profiler_cleanup(void)
 
 static void profiler_cpu_flush(struct profiler_cpu_context *cpu_buf)
 {
+	int8_t irq_state = 0;
+
+	disable_irqsave(&irq_state);
 	if (cpu_buf->block && profiler_queue) {
 		qibwrite(profiler_queue, cpu_buf->block);
 
 		cpu_buf->block = NULL;
 	}
+	enable_irqsave(&irq_state);
 }
 
 static void profiler_core_trace_enable(void *opaque)
