@@ -57,3 +57,22 @@ void showstatus(FILE *f, struct guest_thread *vm_thread)
 	fprintf(f, "  r14  0x%016lx\n",           vm_tf->tf_r14);
 	fprintf(f, "  r15  0x%016lx\n",           vm_tf->tf_r15);
 }
+
+/* Convert a kernel guest virtual address to physical address.
+ * Assumes that the guest VA is in the high negative address space.
+ * TODO: Takes the vm_thread argument so that we can walk the page tables
+ * instead of just coercing the pointer. Therefore, this is not in vmm.h
+ * since it may get complex. */
+uint64_t gvatogpa(struct guest_thread *vm_thread, uint64_t va)
+{
+	assert(vm_thread != NULL);
+	assert(va >= 0xffffffffc0000000ULL);
+	return va & 0x3fffffff;
+}
+
+/* Get the RIP as a physical address. */
+uint64_t rippa(struct guest_thread *vm_thread)
+{
+	assert(vm_thread != NULL);
+	return gvatogpa(vm_thread, gth_to_vmtf(vm_thread)->tf_rip);
+}
