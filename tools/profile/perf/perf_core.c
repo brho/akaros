@@ -99,7 +99,7 @@ static const char *perf_get_event_mask_name(const pfm_event_info_t *einfo,
 	return NULL;
 }
 
-void perf_initialize(int argc, char *argv[])
+void perf_initialize(void)
 {
 	pfm_err_t err = pfm_initialize();
 

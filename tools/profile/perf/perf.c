@@ -1,4 +1,5 @@
-/* Copyright (c) 2015 Google Inc
+/* Copyright (c) 2015-2016 Google Inc
+ * Barret Rhoden <brho@cs.berkeley.edu>
  * Davide Libenzi <dlibenzi@google.com>
  * See LICENSE for details.
  */
@@ -14,53 +15,127 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <errno.h>
+#include <argp.h>
 #include <parlib/parlib.h>
+#include <parlib/timing.h>
 #include "xlib.h"
 #include "akaros.h"
 #include "perfconv.h"
 #include "perf_core.h"
 
+/* Helpers */
+static void run_process_and_wait(int argc, char *argv[],
+								 const struct core_set *cores);
+
+/* For communicating with perf_create_context() */
 static struct perf_context_config perf_cfg = {
 	.perf_file = "#arch/perf",
 	.kpctl_file = "#kprof/kpctl",
+	.kpdata_file = "#kprof/kpdata",
 };
 
-static void usage(const char *prg)
+static struct perfconv_context *cctx;
+static struct perf_context *pctx;
+
+struct perf_opts {
+	const char					*output_file;
+	const char					*events;
+	char						**cmd_argv;
+	int							cmd_argc;
+	struct core_set				cores;
+	bool						got_cores;
+	bool						verbose;
+	bool						sampling;
+	bool						record_quiet;
+	unsigned long				record_period;
+};
+static struct perf_opts opts;
+
+struct perf_cmd {
+	char						*name;
+	char						*desc;
+	char						*opts;
+	int (*func)(struct perf_cmd *, int, char **);
+};
+
+static int perf_help(struct perf_cmd *cmd, int argc, char *argv[]);
+static int perf_list(struct perf_cmd *cmd, int argc, char *argv[]);
+static int perf_record(struct perf_cmd *cmd, int argc, char *argv[]);
+static int perf_pmu_caps(struct perf_cmd *cmd, int argc, char *argv[]);
+
+static struct perf_cmd perf_cmds[] = {
+	{ .name = "help",
+	  .desc = "Detailed help for commands",
+	  .opts = "COMMAND",
+	  .func = perf_help,
+	},
+	{ .name = "list",
+	  .desc = "Lists all available events",
+	  .opts = "[REGEX]",
+	  .func = perf_list,
+	},
+	{ .name = "record",
+	  .desc = "Samples events during command execution",
+	  .opts = 0,
+	  .func = perf_record,
+	},
+	{ .name = "pmu_caps",
+	  .desc = "Shows PMU capabilities",
+	  .opts = "",
+	  .func = perf_pmu_caps,
+	},
+};
+
+/**************************** perf help ****************************/
+
+static int perf_help(struct perf_cmd *cmd, int argc, char *argv[])
 {
-	fprintf(stderr,
-			"Use: %s {list,cpucaps,record} [-mkecxoKh] -- CMD [ARGS ...]\n"
-			"\tlist            Lists all the available events and their meaning.\n"
-			"\tcpucaps         Shows the system CPU capabilities in term of "
-			"performance counters.\n"
-			"\trecord           Setups the configured counters, runs CMD, and "
-			"shows the values of the counters.\n"
-			"Options:\n"
-			"\t-m PATH          Sets the path of the PERF file ('%s').\n"
-			"\t-k PATH          Sets the path of the KPROF control file "
-			"('%s').\n"
-			"\t-e EVENT_SPEC    Adds an event to be tracked.\n"
-			"\t-c CPUS_STR      Selects the CPU set on which the counters "
-			"should be active.\n"
-			"\t                 The following format is supported for the CPU "
-			"set:\n"
-			"\t                   !      = Negates the following set\n"
-			"\t                   all    = Enable all CPUs\n"
-			"\t                   llall  = Enable all low latency CPUs\n"
-			"\t                   I.J.K  = Enable CPUs I, J, and K\n"
-			"\t                   N-M    = Enable CPUs from N to M, included\n"
-			"\t                 Examples: all:!3.4.7  0-15:!3.5.7\n"
-			"\t-x EVENT_RX      Sets the event name regular expression for "
-			"list.\n"
-			"\t-o PATH          Sets the perf output file path ('perf.data').\n"
-			"\t-K PATH          Sets the kprof data file path ('#kprof/kpdata').\n"
-			"\t-h               Displays this help screen.\n", prg,
-			perf_cfg.perf_file, perf_cfg.kpctl_file);
-	exit(1);
+	char *sub_argv[2];
+
+	if (argc < 2) {
+		fprintf(stderr, "perf %s %s\n", cmd->name, cmd->opts);
+		return -1;
+	}
+	for (int i = 0; i < COUNT_OF(perf_cmds); i++) {
+		if (!strcmp(perf_cmds[i].name, argv[1])) {
+			if (perf_cmds[i].opts) {
+				fprintf(stdout, "perf %s %s\n", perf_cmds[i].name,
+				        perf_cmds[i].opts);
+				fprintf(stdout, "\t%s\n", perf_cmds[i].desc);
+			} else {
+				/* For argp subcommands, call their help directly. */
+				sub_argv[0] = xstrdup(perf_cmds[i].name);
+				sub_argv[1] = xstrdup("--help");
+				perf_cmds[i].func(&perf_cmds[i], 2, sub_argv);
+				free(sub_argv[0]);
+				free(sub_argv[1]);
+			}
+			return 0;
+		}
+	}
+	fprintf(stderr, "Unknown perf command %s\n", argv[1]);
+	return -1;
 }
 
-static void show_perf_arch_info(const struct perf_arch_info *pai, FILE *file)
+/**************************** perf list ****************************/
+
+static int perf_list(struct perf_cmd *cmd, int argc, char *argv[])
 {
-	fprintf(file,
+	char *show_regex = NULL;
+
+	if (argc > 1)
+		show_regex = argv[1];
+	perf_show_events(show_regex, stdout);
+	return 0;
+}
+
+/**************************** perf pmu_caps ************************/
+
+static int perf_pmu_caps(struct perf_cmd *cmd, int argc, char *argv[])
+{
+	const struct perf_arch_info *pai = perf_context_get_arch_info(pctx);
+
+	fprintf(stdout,
 			"PERF.version             = %u\n"
 			"PERF.proc_arch_events    = %u\n"
 			"PERF.bits_x_counter      = %u\n"
@@ -70,6 +145,193 @@ static void show_perf_arch_info(const struct perf_arch_info *pai, FILE *file)
 			pai->perfmon_version, pai->proc_arch_events, pai->bits_x_counter,
 			pai->counters_x_proc, pai->bits_x_fix_counter,
 			pai->fix_counters_x_proc);
+	return 0;
+}
+
+/**************************** Common argp ************************/
+
+/* Collection argument parsing.  These options are common to any function that
+ * will collect perf events, e.g. perf record and perf stat. */
+
+static struct argp_option collect_opts[] = {
+	{"event", 'e', "EVENT", 0, "Event string, e.g. cycles:u:k"},
+	{"cores", 'C', "CORE_LIST", 0, "List of cores, e.g. 0.2.4:8-19"},
+	{"cpu", 'C', 0, OPTION_ALIAS},
+	{"all-cpus", 'a', 0, 0, "Collect events on all cores (on by default)"},
+	{"verbose", 'v', 0, 0, 0},
+	{ 0 }
+};
+
+static const char *collect_args_doc = "COMMAND [ARGS]";
+
+static error_t parse_collect_opt(int key, char *arg, struct argp_state *state)
+{
+	struct perf_opts *p_opts = state->input;
+
+	/* argp doesn't pass input to the child parser(s) by default... */
+	state->child_inputs[0] = state->input;
+
+	switch (key) {
+	case 'a':
+		/* Our default operation is to track all cores; we don't follow
+		 * processes yet. */
+		break;
+	case 'C':
+		ros_parse_cores(arg, &p_opts->cores);
+		p_opts->got_cores = TRUE;
+		break;
+	case 'e':
+		p_opts->events = arg;
+		break;
+	case 'v':
+		p_opts->verbose = TRUE;
+		break;
+	case ARGP_KEY_ARG:
+		p_opts->cmd_argc = state->argc - state->next + 1;
+		p_opts->cmd_argv = xmalloc(sizeof(char*) * (p_opts->cmd_argc + 1));
+		p_opts->cmd_argv[0] = arg;
+		memcpy(&p_opts->cmd_argv[1], &state->argv[state->next],
+		       sizeof(char*) * (p_opts->cmd_argc - 1));
+		p_opts->cmd_argv[p_opts->cmd_argc] = NULL;
+		state->next = state->argc;
+		break;
+	case ARGP_KEY_END:
+		if (!p_opts->cmd_argc)
+			argp_usage(state);
+		/* By default, we set all cores (different than linux) */
+		if (!p_opts->got_cores)
+			ros_get_all_cores_set(&p_opts->cores);
+		break;
+	default:
+		return ARGP_ERR_UNKNOWN;
+	}
+	return 0;
+}
+
+/* Helper, parses args using the collect_opts and the child parser for a given
+ * cmd. */
+static void collect_argp(struct perf_cmd *cmd, int argc, char *argv[],
+                         struct argp_child *children, struct perf_opts *opts)
+{
+	struct argp collect_opt = {collect_opts, parse_collect_opt,
+	                           collect_args_doc, cmd->desc, children};
+	char *cmd_name;
+	const char *fmt = "perf %s";
+	size_t cmd_sz = strlen(cmd->name) + strlen(fmt) + 1;
+
+	/* Rewrite the command name from foo to perf foo for the --help output */
+	cmd_name = xmalloc(cmd_sz);
+	snprintf(cmd_name, cmd_sz, fmt, cmd->name);
+	cmd_name[cmd_sz - 1] = '\0';
+	argv[0] = cmd_name;
+	argp_parse(&collect_opt, argc, argv, ARGP_IN_ORDER, 0, opts);
+	/* It's possible that someone could still be using cmd_name */
+}
+
+/* Helper, submits the events in opts to the kernel for monitoring. */
+static void submit_events(struct perf_opts *opts)
+{
+	struct perf_eventsel *sel;
+	char *dup_evts, *tok, *tok_save = 0;
+
+	dup_evts = xstrdup(opts->events);
+	for (tok = strtok_r(dup_evts, ",", &tok_save);
+	     tok;
+		 tok = strtok_r(NULL, ",", &tok_save)) {
+
+		sel = perf_parse_event(tok);
+		PMEV_SET_INTEN(sel->ev.event, opts->sampling);
+		sel->ev.trigger_count = opts->record_period;
+		perf_context_event_submit(pctx, &opts->cores, sel);
+	}
+	free(dup_evts);
+}
+
+/**************************** perf record ************************/
+
+static struct argp_option record_opts[] = {
+	{"count", 'c', "PERIOD", 0, "Sampling period"},
+	{"output", 'o', "FILE", 0, "Output file name (default perf.data)"},
+	{"freq", 'F', "FREQUENCY", 0, "Sampling frequency (assumes cycles)"},
+	{"call-graph", 'g', 0, 0, "Backtrace recording (always on!)"},
+	{"quiet", 'q', 0, 0, "No printing to stdio"},
+	{ 0 }
+};
+
+/* In lieu of adaptively changing the period to maintain a set freq, we
+ * just assume they want cycles and that the TSC is close to that.
+ *
+ * (cycles/sec) / (samples/sec) = cycles / sample = period.
+ *
+ * TODO: this also assumes we're running the core at full speed. */
+static unsigned long freq_to_period(unsigned long freq)
+{
+	return get_tsc_freq() / freq;
+}
+
+static error_t parse_record_opt(int key, char *arg, struct argp_state *state)
+{
+	struct perf_opts *p_opts = state->input;
+
+	switch (key) {
+	case 'c':
+		if (p_opts->record_period)
+			argp_error(state, "Period set.  Only use at most one of -c -F");
+		p_opts->record_period = atol(arg);
+		break;
+	case 'F':
+		if (p_opts->record_period)
+			argp_error(state, "Period set.  Only use at most one of -c -F");
+		/* TODO: when we properly support freq, multiple events will have the
+		 * same freq but different, dynamic, periods. */
+		p_opts->record_period = freq_to_period(atol(arg));
+		break;
+	case 'g':
+		/* Our default operation is to record backtraces. */
+		break;
+	case 'o':
+		p_opts->output_file = arg;
+		break;
+	case 'q':
+		p_opts->record_quiet = TRUE;
+		break;
+	case ARGP_KEY_END:
+		if (!p_opts->events)
+			p_opts->events = "cycles";
+		if (!p_opts->output_file)
+			p_opts->output_file = "perf.data";
+		if (!p_opts->record_period)
+			p_opts->record_period = freq_to_period(1000);
+		break;
+	default:
+		return ARGP_ERR_UNKNOWN;
+	}
+	return 0;
+}
+
+static int perf_record(struct perf_cmd *cmd, int argc, char *argv[])
+{
+	struct argp argp_record = {record_opts, parse_record_opt};
+	struct argp_child children[] = { {&argp_record, 0, 0, 0}, {0} };
+
+	collect_argp(cmd, argc, argv, children, &opts);
+	opts.sampling = TRUE;
+
+	submit_events(&opts);
+	if (!strcmp(opts.cmd_argv[0], "sleep") && (opts.cmd_argc > 1))
+		sleep(atoi(opts.cmd_argv[1]));
+	else
+		run_process_and_wait(opts.cmd_argc, opts.cmd_argv,
+		                     &opts.cores);
+	if (opts.verbose)
+		perf_context_show_values(pctx, stdout);
+	/* Flush the profiler per-CPU trace data into the main queue, so that
+	 * it will be available for read. */
+	perf_flush_context_traces(pctx);
+	/* Generate the Linux perf file format with the traces which have been
+	 * created during this operation. */
+	perf_convert_trace_data(cctx, perf_cfg.kpdata_file, opts.output_file);
+	return 0;
 }
 
 static void run_process_and_wait(int argc, char *argv[],
@@ -122,98 +384,38 @@ static void save_cmdline(int argc, char *argv[])
 	}
 }
 
+static void global_usage(void)
+{
+	fprintf(stderr, "  Usage: perf COMMAND [ARGS]\n");
+	fprintf(stderr, "\n  Available commands:\n\n");
+	for (int i = 0; i < COUNT_OF(perf_cmds); i++)
+		fprintf(stderr, "  \t%s: %s\n", perf_cmds[i].name, perf_cmds[i].desc);
+	exit(-1);
+}
+
 int main(int argc, char *argv[])
 {
-	int i, icmd = -1, num_events = 0;
-	const char *cmd = argv[1], *show_rx = NULL;
-	const char *kpdata_file = "#kprof/kpdata", *outfile = "perf.data";
-	struct perfconv_context *cctx;
-	struct perf_context *pctx;
-	struct core_set cores;
-	const char *events[MAX_CPU_EVENTS];
+	int i, ret = -1;
 
 	save_cmdline(argc, argv);
 
-	ros_get_all_cores_set(&cores);
-
-	for (i = 2; i < argc; i++) {
-		if (!strcmp(argv[i], "-m")) {
-			if (++i < argc)
-				perf_cfg.perf_file = argv[i];
-		} else if (!strcmp(argv[i], "-k")) {
-			if (++i < argc)
-				perf_cfg.kpctl_file = argv[i];
-		} else if (!strcmp(argv[i], "-e")) {
-			if (++i < argc) {
-				if (num_events >= MAX_CPU_EVENTS) {
-					fprintf(stderr, "Too many events: %d\n", num_events);
-					return 1;
-				}
-				events[num_events++] = argv[i];
-			}
-		} else if (!strcmp(argv[i], "-x")) {
-			if (++i < argc)
-				show_rx = argv[i];
-		} else if (!strcmp(argv[i], "-c")) {
-			if (++i < argc)
-				ros_parse_cores(argv[i], &cores);
-		} else if (!strcmp(argv[i], "-o")) {
-			if (++i < argc)
-				outfile = argv[i];
-		} else if (!strcmp(argv[i], "-K")) {
-			if (++i < argc)
-				kpdata_file = argv[i];
-		} else if (!strcmp(argv[i], "--")) {
-			icmd = i + 1;
-			break;
-		} else {
-			usage(argv[0]);
-		}
-	}
-	if (!cmd)
-		usage(argv[0]);
-
-	perf_initialize(argc, argv);
+	/* Common inits.  Some functions don't need these, but it doesn't hurt. */
+	perf_initialize();
 	pctx = perf_create_context(&perf_cfg);
 	cctx = perfconv_create_context(pctx);
 
-	if (!strcmp(cmd, "list")) {
-		perf_show_events(show_rx, stdout);
-	} else if (!strcmp(cmd, "cpucaps")) {
-		show_perf_arch_info(perf_context_get_arch_info(pctx), stdout);
-	} else if (!strcmp(cmd, "record")) {
-		if (icmd < 0)
-			usage(argv[0]);
-
-		for (i = 0; i < num_events; i++) {
-			struct perf_eventsel *sel;
-
-			sel = perf_parse_event(events[i]);
-			perf_context_event_submit(pctx, &cores, sel);
+	if (argc < 2)
+		global_usage();
+	for (i = 0; i < COUNT_OF(perf_cmds); i++) {
+		if (!strcmp(perf_cmds[i].name, argv[1])) {
+			ret = perf_cmds[i].func(&perf_cmds[i], argc - 1, argv + 1);
+			break;
 		}
-
-		if (!strcmp(argv[icmd], "sleep") && (icmd + 1) < argc)
-			sleep(atoi(argv[icmd + 1]));
-		else
-			run_process_and_wait(argc - icmd, argv + icmd, &cores);
-
-		perf_context_show_values(pctx, stdout);
-
-		/* Flush the profiler per-CPU trace data into the main queue, so that
-		 * it will be available for read.
-		 */
-		perf_flush_context_traces(pctx);
-
-		/* Generate the Linux perf file format with the traces which have been
-		 * created during this operation.
-		 */
-		perf_convert_trace_data(cctx, kpdata_file, outfile);
-	} else {
-		usage(argv[0]);
 	}
+	if (i == COUNT_OF(perf_cmds))
+		global_usage();
 	perf_free_context(pctx);
 	perfconv_free_context(cctx);
 	perf_finalize();
-
-	return 0;
+	return ret;
 }
