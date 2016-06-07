@@ -189,6 +189,15 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 						   (char *)sysc->arg2,
 						   sysc->arg3);
 		break;
+	case SYS_proc_create:
+		trace->datalen = execargs_stringer(current,
+						   (char *)trace->data,
+						   sizeof(trace->data),
+						   (char *)sysc->arg0,
+						   sysc->arg1,
+						   (char *)sysc->arg2,
+						   sysc->arg3);
+		break;
 	}
 	if (data_len) {
 		trace->datalen = MIN(sizeof(trace->data), data_len);
@@ -655,42 +664,44 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	/* TODO: 9ns support */
 	program = do_file_open(t_path, O_READ, 0);
 	if (!program)
-		goto error_user_memdup;
-
+		goto error_with_path;
+	if (!is_valid_elf(program)) {
+		set_errno(ENOEXEC);
+		goto error_with_file;
+	}
 	/* Check the size of the argenv array, error out if too large. */
 	if ((argenv_l < sizeof(struct argenv)) || (argenv_l > ARG_MAX)) {
 		set_error(EINVAL, "The argenv array has an invalid size: %lu\n",
 				  argenv_l);
-		goto error_user_memdup;
+		goto error_with_file;
 	}
 	/* Copy the argenv array into a kernel buffer. Delay processing of the
 	 * array to load_elf(). */
 	kargenv = user_memdup_errno(p, argenv, argenv_l);
 	if (!kargenv) {
-		set_errstr("Failed to copy in the args");
-		goto error_user_memdup;
+		set_error(EINVAL, "Failed to copy in the args");
+		goto error_with_file;
 	}
 	/* Unpack the argenv array into more usable variables. Integrity checking
 	 * done along side this as well. */
 	if (unpack_argenv(kargenv, argenv_l, &argc, &argv, &envc, &envp)) {
-		set_errstr("Failed to unpack the args");
-		goto error_unpack;
+		set_error(EINVAL, "Failed to unpack the args");
+		goto error_with_kargenv;
 	}
-
 	/* TODO: need to split the proc creation, since you must load after setting
 	 * args/env, since auxp gets set up there. */
 	//new_p = proc_create(program, 0, 0);
 	if (proc_alloc(&new_p, current, flags)) {
-		set_errstr("Failed to alloc new proc");
-		goto error_proc_alloc;
+		set_error(ENOMEM, "Failed to alloc new proc");
+		goto error_with_kargenv;
 	}
 	inherit_strace(p, new_p);
 	/* close the CLOEXEC ones, even though this isn't really an exec */
 	close_fdt(&new_p->open_files, TRUE);
 	/* Load the elf. */
 	if (load_elf(new_p, program, argc, argv, envc, envp)) {
-		set_errstr("Failed to load elf");
-		goto error_load_elf;
+		set_error(EINVAL, "Failed to load elf");
+		goto error_with_proc;
 	}
 	/* progname is argv0, which accounts for symlinks */
 	proc_set_progname(new_p, argc ? argv[0] : NULL);
@@ -702,18 +713,17 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	profiler_notify_new_process(new_p);
 	proc_decref(new_p);	/* give up the reference created in proc_create() */
 	return pid;
-error_load_elf:
-	set_errno(EINVAL);
+error_with_proc:
 	/* proc_destroy will decref once, which is for the ref created in
 	 * proc_create().  We don't decref again (the usual "+1 for existing"),
 	 * since the scheduler, which usually handles that, hasn't heard about the
 	 * process (via __proc_ready()). */
 	proc_destroy(new_p);
-error_proc_alloc:
-	kref_put(&program->f_kref);
-error_unpack:
+error_with_kargenv:
 	user_memdup_free(p, kargenv);
-error_user_memdup:
+error_with_file:
+	kref_put(&program->f_kref);
+error_with_path:
 	free_path(p, t_path);
 	return -1;
 }
