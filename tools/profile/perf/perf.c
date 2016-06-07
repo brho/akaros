@@ -36,6 +36,7 @@ static struct perf_context_config perf_cfg = {
 
 static struct perfconv_context *cctx;
 static struct perf_context *pctx;
+extern char **environ;	/* POSIX envp */
 
 struct perf_opts {
 	FILE						*outfile;
@@ -318,11 +319,7 @@ static int perf_record(struct perf_cmd *cmd, int argc, char *argv[])
 	opts.sampling = TRUE;
 
 	submit_events(&opts);
-	if (!strcmp(opts.cmd_argv[0], "sleep") && (opts.cmd_argc > 1))
-		sleep(atoi(opts.cmd_argv[1]));
-	else
-		run_process_and_wait(opts.cmd_argc, opts.cmd_argv,
-		                     &opts.cores);
+	run_process_and_wait(opts.cmd_argc, opts.cmd_argv, &opts.cores);
 	if (opts.verbose)
 		perf_context_show_values(pctx, stdout);
 	/* Flush the profiler per-CPU trace data into the main queue, so that
@@ -342,9 +339,10 @@ static void run_process_and_wait(int argc, char *argv[],
 	size_t max_cores = ros_total_cores();
 	struct core_set pvcores;
 
-	pid = sys_proc_create(argv[0], strlen(argv[0]), argv, NULL, 0);
+	pid = create_child_with_stdfds(argv[0], argc, argv, environ);
 	if (pid < 0) {
-		perror(argv[0]);
+		perror("Unable to spawn child");
+		fflush(stderr);
 		exit(1);
 	}
 
@@ -357,6 +355,7 @@ static void run_process_and_wait(int argc, char *argv[],
 				fprintf(stderr,
 						"Unable to provision CPU %lu to PID %d: cmd='%s'\n",
 						i, pid, argv[0]);
+				sys_proc_destroy(pid, -1);
 				exit(1);
 			}
 		}
