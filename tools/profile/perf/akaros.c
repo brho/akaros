@@ -29,9 +29,41 @@ size_t ros_get_low_latency_core_count(void)
 	return COUNT_OF(llcores);
 }
 
-size_t ros_total_cores(void)
+static int guess_nr_cores(void)
 {
 	return max_vcores() + ros_get_low_latency_core_count();
+}
+
+static int get_vars_nr_cores(void)
+{
+	int fd, ret;
+	char buf[10];
+
+	fd = xopen("#vars/num_cores!dw", O_READ, 0);
+	if (fd < 0)
+		return -1;
+	if (read(fd, buf, sizeof(buf)) <= 0) {
+		close(fd);
+		return -1;
+	}
+	ret = atoi(buf);
+	return ret;
+}
+
+static int nr_cores;
+
+static void set_nr_cores(void)
+{
+	nr_cores = get_vars_nr_cores();
+	if (nr_cores == -1)
+		nr_cores = guess_nr_cores();
+}
+
+
+size_t ros_total_cores(void)
+{
+	run_once(set_nr_cores());
+	return nr_cores;
 }
 
 void ros_parse_cores(const char *str, struct core_set *cores)
@@ -42,62 +74,36 @@ void ros_parse_cores(const char *str, struct core_set *cores)
 	char *tok, *sptr2;
 
 	ZERO_DATA(*cores);
-	for (tok = strtok_r(dstr, ":", &sptr); tok;
-		 tok = strtok_r(NULL, ":", &sptr)) {
-		bool neg_core = FALSE;
+	for (tok = strtok_r(dstr, ",", &sptr); tok;
+		 tok = strtok_r(NULL, ",", &sptr)) {
 
-		if (*tok == '!') {
-			neg_core = TRUE;
-			tok++;
-		}
-		if (!strcmp(tok, "all")) {
-			size_t max_cores = ros_total_cores();
-
-			if (max_cores > MAX_NUM_CORES) {
-				fprintf(stderr, "The number of system CPU exceeds the "
-						"structure limits: num_cores=%u limits=%u\n", max_cores,
-						CHAR_BIT * CORE_SET_SIZE);
-				exit(1);
-			}
-			if (neg_core)
-				memset(cores->core_set, 0,
-					   DIV_ROUND_UP(max_cores, CHAR_BIT));
-			else
-				memset(cores->core_set, 0xff,
-					   DIV_ROUND_UP(max_cores, CHAR_BIT));
-		} else if (!strcmp(tok, "llall")) {
-			ros_get_low_latency_core_set(cores);
-		} else if (strchr(tok, '-')) {
+		if (strchr(tok, '-')) {
 			if (sscanf(tok, "%u-%u", &fcpu, &ncpu) != 2) {
 				fprintf(stderr, "Invalid CPU range: %s\n", tok);
 				exit(1);
 			}
-			if ((fcpu >= MAX_NUM_CORES) ||
-				(ncpu >= MAX_NUM_CORES) || (fcpu > ncpu)) {
+			if (fcpu >= ros_total_cores()) {
+				fprintf(stderr, "CPU number out of bound: %u\n", fcpu);
+				exit(1);
+			}
+			if (ncpu >= ros_total_cores()) {
+				fprintf(stderr, "CPU number out of bound: %u\n", ncpu);
+				exit(1);
+			}
+			if (fcpu > ncpu) {
+				fprintf(stderr, "CPU range is backwards: %u-%u\n", fcpu, ncpu);
+				exit(1);
+			}
+			for (; fcpu <= ncpu; fcpu++)
+				ros_set_bit(cores->core_set, fcpu);
+		} else {
+			fcpu = atoi(tok);
+			if (fcpu >= ros_total_cores()) {
 				fprintf(stderr, "CPU number out of bound: %u\n",
 						fcpu);
 				exit(1);
 			}
-			for (; fcpu <= ncpu; fcpu++) {
-				if (neg_core)
-					ros_clear_bit(cores->core_set, fcpu);
-				else
-					ros_set_bit(cores->core_set, fcpu);
-			}
-		} else {
-			for (tok = strtok_r(tok, ".", &sptr2); tok;
-				 tok = strtok_r(NULL, ".", &sptr2)) {
-				fcpu = atoi(tok);
-				if (fcpu >= MAX_NUM_CORES) {
-					fprintf(stderr, "CPU number out of bound: %u\n",
-							fcpu);
-					exit(1);
-				}
-				if (neg_core)
-					ros_clear_bit(cores->core_set, fcpu);
-				else
-					ros_set_bit(cores->core_set, fcpu);
-			}
+			ros_set_bit(cores->core_set, fcpu);
 		}
 	}
 	free(dstr);
