@@ -36,18 +36,11 @@ void main(int argc, char **argv, char **envp)
 	static char p[2 * MAX_PATH_LEN];
 	static char buf[16384];
 	struct syscall sysc;
-	char *prog_name = argv[1];
-
 
 	if (argc < 2)
 		usage();
-	if ((*argv[1] != '/') && (*argv[1] != '.')) {
-		snprintf(p, sizeof(p), "/bin/%s", argv[1]);
-		prog_name = p;
-	}
 
-	pid = sys_proc_create(prog_name, strlen(prog_name), argv + 1, envp,
-	                      PROC_DUP_FGRP);
+	pid = create_child_with_stdfds(argv[1], argc - 1, argv + 1, envp);
 	if (pid < 0) {
 		perror("proc_create");
 		exit(-1);

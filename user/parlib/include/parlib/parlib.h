@@ -28,7 +28,6 @@ enum {
 
 int         sys_null(void);
 size_t      sys_getpcoreid(void);
-/* Process Management */
 int         sys_getpid(void);
 int         sys_proc_destroy(int pid, int exitcode);
 void        sys_yield(bool being_nice);
@@ -61,6 +60,12 @@ void		syscall_async(struct syscall *sysc, unsigned long num, ...);
 extern bool parlib_wants_to_be_mcp;	/* instructs the 2LS to be an MCP */
 extern bool parlib_never_yield;		/* instructs the 2LS to not yield vcores */
 extern bool parlib_never_vc_request;/* 2LS: do not request vcores */
+
+/* Process Management */
+pid_t create_child(const char *exe, int argc, char *const argv[],
+                   char *const envp[]);
+pid_t create_child_with_stdfds(const char *exe, int argc, char *const argv[],
+                               char *const envp[]);
 
 __END_DECLS
 
