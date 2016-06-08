@@ -556,11 +556,20 @@ int main(int argc, char **argv)
 	memset(bp, 0, 4096);
 
 	/* Put the e820 memory region information in the boot_params */
-	bp->e820_entries = 3;
+	bp->e820_entries = 5;
 	int e820i = 0;
 
+	/* Give it just a tiny bit of memory -- 60k -- at low memory. */
 	bp->e820_map[e820i].addr = 0;
-	bp->e820_map[e820i].size = 16 * 1048576;
+	bp->e820_map[e820i].size = 4 * 1024;
+	bp->e820_map[e820i++].type = E820_RESERVED;
+
+	bp->e820_map[e820i].addr = 4 * 1024;
+	bp->e820_map[e820i].size = 64 * 1024 - 4 * 1024;
+	bp->e820_map[e820i++].type = E820_RAM;
+
+	bp->e820_map[e820i].addr = 64 * 1024;
+	bp->e820_map[e820i].size = 16 * 1048576 - 64 * 1024;
 	bp->e820_map[e820i++].type = E820_RESERVED;
 
 	bp->e820_map[e820i].addr = 16 * 1048576;
