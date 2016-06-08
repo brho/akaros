@@ -335,6 +335,7 @@ int main(int argc, char **argv)
 	int vmmflags = 0; // Disabled probably forever. VMM_VMCALL_PRINTF;
 	uint64_t entry = 0x1200000, kerneladdress = 0x1200000;
 	int ret;
+	uintptr_t size;
 	void * xp;
 	int kfd = -1;
 	static char cmd[512];
@@ -429,10 +430,10 @@ int main(int argc, char **argv)
 		perror(argv[0]);
 		exit(1);
 	}
-	// read in the kernel.
+	// read in the kernel, one 2M page at a time.
 	xp = (void *)kerneladdress;
 	for(;;) {
-		amt = read(kfd, xp, 1048576);
+		amt = read(kfd, xp, PML2_PTE_REACH);
 		if (amt < 0) {
 			perror("read");
 			exit(1);
@@ -442,7 +443,8 @@ int main(int argc, char **argv)
 		}
 		xp += amt;
 	}
-	fprintf(stderr, "Read in %d bytes\n", xp-kerneladdress);
+	size = ROUNDUP((uintptr_t)xp - kerneladdress, PML2_PTE_REACH);
+	fprintf(stderr, "Read in %d bytes\n", size);
 	close(kfd);
 
 	// The low 1m so we can fill in bullshit like ACPI. */
@@ -626,33 +628,38 @@ int main(int argc, char **argv)
 	ret = vmm_init(vm, vmmflags);
 	assert(!ret);
 
-
-	ret = posix_memalign((void **)&p512, 4096, 3*4096);
-	fprintf(stderr, "memalign is %p\n", p512);
+	/* Allocate 3 pages for page table pages: a page of 512 GiB
+	 * PTEs with only one entry filled to point to a page of 1 GiB
+	 * PTEs; a page of 1 GiB PTEs with only one entry filled to
+	 * point to a page of 2 MiB PTEs; and a page of 2 MiB PTEs,
+	 * only a subset of which will be filled. */
+	ret = posix_memalign((void **)&p512, PGSIZE, 3 * PGSIZE);
 	if (ret) {
 		perror("ptp alloc");
 		exit(1);
 	}
-	p1 = &p512[512];
-	p2m = &p512[1024];
-	uint64_t kernbase = 0; //0xffffffff80000000;
-	uint64_t highkernbase = 0xffffffff80000000;
-	p512[PML4(kernbase)] = (unsigned long long)p1 | 7;
-	p1[PML3(kernbase)] = /*0x87; */(unsigned long long)p2m | 7;
-	p512[PML4(highkernbase)] = (unsigned long long)p1 | 7;
-	p1[PML3(highkernbase)] = /*0x87; */(unsigned long long)p2m | 7;
-#define _2MiB (0x200000)
 
-	for (i = 0; i < 512; i++) {
-		p2m[PML2(kernbase + i * _2MiB)] = 0x87 | i * _2MiB;
+	/* Set up a 1:1 ("identity") page mapping from guest virtual
+	 * to guest physical using the (host virtual)
+	 * `kerneladdress`. This mapping is used for only a short
+	 * time, until the guest sets up its own page tables. Be aware
+	 * that the values stored in the table are physical addresses.
+	 * This is subtle and mistakes are easily disguised due to the
+	 * identity mapping, so take care when manipulating these
+	 * mappings. */
+	p1 = &p512[NPTENTRIES];
+	p2m = &p512[2 * NPTENTRIES];
+
+	p512[PML4(kerneladdress)] = (uint64_t)p1 | PTE_KERN_RW;
+	p1[PML3(kerneladdress)] = (uint64_t)p2m | PTE_KERN_RW;
+	for (uintptr_t i = 0; i < size; i += PML2_PTE_REACH) {
+		p2m[PML2(kerneladdress + i)] =
+		    (uint64_t)(kerneladdress + i) | PTE_KERN_RW | PTE_PS;
 	}
 
-	kernbase >>= (0+12);
-	kernbase <<= (0 + 12);
 	uint8_t *kernel = (void *)GKERNBASE;
 	//write_coreboot_table(coreboot_tables, ((void *)VIRTIOBASE) /*kernel*/, KERNSIZE + 1048576);
 	hexdump(stdout, coreboot_tables, 512);
-	fprintf(stderr, "kernbase for pml4 is 0x%llx and entry is %llx\n", kernbase, entry);
 	fprintf(stderr, "p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
 
 	vmm_run_task(vm, timer_thread, 0);
