@@ -25,7 +25,7 @@
  *
  * Similar to bits/time.h, this includes various tidbits based on what
  * "__need"s are #defined.  Akaros's modification is to use our kernel header
- * for the struct timespec. */
+ * for the struct timespec and two helpers for working with timespecs. */
 
 #ifndef	_TIME_H
 
@@ -427,6 +427,12 @@ extern struct tm *getdate (const char *__string);
 extern int getdate_r (const char *__restrict __string,
 		      struct tm *__restrict __resbufp);
 # endif
+
+/* Akaros timespec helpers */
+void add_timespecs(struct timespec *sum, const struct timespec *x,
+                   const struct timespec *y);
+void subtract_timespecs(struct timespec *diff, const struct timespec *minuend,
+                        const struct timespec *subtrahend);
 
 __END_DECLS
 

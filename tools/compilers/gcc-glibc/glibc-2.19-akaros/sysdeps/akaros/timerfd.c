@@ -57,33 +57,6 @@ static int set_timer(int timerfd, uint64_t abs_ticks)
 	return write_hex_to_fd(timerfd, abs_ticks);
 }
 
-/* Helper: adds normal timespecs */
-static void add_timespecs(struct timespec *sum, const struct timespec *x,
-                          const struct timespec *y)
-{
-	bool plus_one = FALSE;
-
-	sum->tv_nsec = x->tv_nsec + y->tv_nsec;
-	/* Overflow detection */
-	if (sum->tv_nsec / 1000000000) {
-		sum->tv_nsec -= 1000000000;
-		plus_one = TRUE;
-	}
-	sum->tv_sec = x->tv_sec + y->tv_sec + (plus_one ? 1 : 0);
-}
-
-/* Helper: subtracts normal timespecs */
-static void sub_timespecs(struct timespec *diff, const struct timespec *minuend,
-                          const struct timespec *subtrahend)
-{
-	unsigned long borrow_amt = 0;
-
-	if (minuend->tv_nsec < subtrahend->tv_nsec)
-		borrow_amt = 1000000000;
-	diff->tv_nsec = borrow_amt + minuend->tv_nsec - subtrahend->tv_nsec;
-	diff->tv_sec = minuend->tv_sec - subtrahend->tv_sec - (borrow_amt ? 1 : 0);
-}
-
 static uint64_t timespec2tsc(const struct timespec *ts)
 {
 	return nsec2tsc(ts->tv_sec * 1000000000ULL + ts->tv_nsec);
@@ -176,7 +149,7 @@ int timerfd_settime(int fd, int flags,
 		ret = clock_gettime(CLOCK_MONOTONIC, &now_timespec);
 		if (ret < 0)
 			goto out;
-		sub_timespecs(&rel_timespec, &new_value->it_value, &now_timespec);
+		subtract_timespecs(&rel_timespec, &new_value->it_value, &now_timespec);
 	} else {
 		rel_timespec = new_value->it_value;
 	}

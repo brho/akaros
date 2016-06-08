@@ -71,6 +71,8 @@ libc {
     timerfd_create;
     timerfd_settime;
     timerfd_gettime;
+    add_timespecs;
+    subtract_timespecs;
 
     # Weak symbols in parlib-compat.c
     __vcoreid;
