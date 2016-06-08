@@ -860,7 +860,11 @@ static int vmx_setup_initial_guest_state(struct proc *p,
 				X86_CR0_MP | X86_CR0_ET | X86_CR0_NE);
 	vmcs_writel(GUEST_CR3, rcr3());
 	vmcs_writel(GUEST_CR4, cr4);
-	vmcs_writel(CR4_READ_SHADOW, cr4);
+	/* The only bits that matter in this shadow are those that are
+	 * set in CR4_GUEST_HOST_MASK.  TODO: do we need to separate
+	 * the setting of this value from that of
+	 * CR4_GUEST_HOST_MASK? */
+	vmcs_writel(CR4_READ_SHADOW, 0);
 	vmcs_writel(GUEST_IA32_EFER, EFER_LME | EFER_LMA |
 				EFER_SCE /*| EFER_FFXSR */ );
 	vmcs_writel(GUEST_GDTR_BASE, 0);
@@ -1096,7 +1100,17 @@ static void vmx_setup_vmcs(struct guest_pcore *gpc)
 	vmcs_write32(VM_ENTRY_CONTROLS, vmcs_config.vmentry_ctrl);
 
 	vmcs_writel(CR0_GUEST_HOST_MASK, 0);	// ~0ul);
-	vmcs_writel(CR4_GUEST_HOST_MASK, 0);	// ~0ul);
+
+	/* Mask some bits in CR4 as host-owned by setting them in this
+	 * VMCS entry.  For example, for now, we mark the CR4_VMXE bit
+	 * as host owned.  Right now, when Linux boots, it wants to
+	 * set CR4_VMXE to 0 at first, which is fine -- we do not want
+	 * to think about nested virtualization yet. But if we don't
+	 * mark this bit as host owned we get a VMEXIT. Marking
+	 * CR4_VMXE as host owned means that the writes will succeed
+	 * with no vmexit if the value written matches the
+	 * corresponding bit in the shadow register. */
+	vmcs_writel(CR4_GUEST_HOST_MASK, CR4_VMXE);
 
 	//kvm_write_tsc(&vmx->gpc, 0);
 	vmcs_writel(TSC_OFFSET, 0);
