@@ -549,6 +549,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 
 	// Handle processor exceptions.
 	switch(hw_tf->tf_trapno) {
+		case T_DEBUG:
 		case T_BRKPT:
 			enable_irq();
 			monitor(hw_tf);
