@@ -35,6 +35,7 @@
 
 struct perf_context {
 	struct perfmon_session *ps;
+	qlock_t resp_lock;
 	size_t resp_size;
 	uint8_t *resp;
 };
@@ -328,12 +329,14 @@ static struct perf_context *arch_create_perf_context(void)
 		kfree(pc);
 		nexterror();
 	}
+	qlock_init(&pc->resp_lock);
 	pc->ps = perfmon_create_session();
 	poperror();
 
 	return pc;
 }
 
+/* Called after the last reference (FD / chan) to pc is closed. */
 static void arch_free_perf_context(struct perf_context *pc)
 {
 	perfmon_close_session(pc->ps);
@@ -368,17 +371,20 @@ static long arch_perf_write(struct perf_context *pc, const void *udata,
 	void *kdata;
 	const uint8_t *kptr, *ktop;
 
+	kdata = user_memdup_errno(current, udata, usize);
+	if (unlikely(!kdata))
+		return -1;
+	qlock(&pc->resp_lock);
+	if (waserror()) {
+		qunlock(&pc->resp_lock);
+		kfree(kdata);
+		nexterror();
+	}
+	/* Fresh command, reset the response buffer */
 	kfree(pc->resp);
 	pc->resp = NULL;
 	pc->resp_size = 0;
 
-	kdata = user_memdup_errno(current, udata, usize);
-	if (unlikely(!kdata))
-		return -1;
-	if (waserror()) {
-		kfree(kdata);
-		nexterror();
-	}
 	kptr = kdata;
 	ktop = kptr + usize;
 	error_assert(EBADMSG, (kptr + 1) <= ktop);
@@ -465,6 +471,7 @@ static long arch_perf_write(struct perf_context *pc, const void *udata,
 			error(EINVAL, "Invalid perfmon command: 0x%x", kptr[-1]);
 	}
 	poperror();
+	qunlock(&pc->resp_lock);
 	kfree(kdata);
 
 	return (long) (kptr - (const uint8_t *) kdata);
@@ -582,6 +589,7 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			struct perf_context *pc = (struct perf_context *) c->aux;
 
 			assert(pc);
+			qlock(&pc->resp_lock);
 			if (pc->resp && ((size_t) offset < pc->resp_size)) {
 				n = MIN(n, (long) pc->resp_size - (long) offset);
 				if (memcpy_to_user_errno(current, a, pc->resp + offset, n))
@@ -589,6 +597,7 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			} else {
 				n = 0;
 			}
+			qunlock(&pc->resp_lock);
 
 			return n;
 		}
