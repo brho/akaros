@@ -13,6 +13,7 @@
 #include <core_set.h>
 #include <kref.h>
 #include <stdint.h>
+#include <kthread.h>
 
 #define MAX_VAR_COUNTERS 32
 #define MAX_FIX_COUNTERS 16
@@ -33,14 +34,13 @@ struct perfmon_cpu_caps {
 };
 
 struct perfmon_alloc {
-	struct kref ref;
 	struct perfmon_event ev;
 	counter_t cores_counters[0];
 };
 
 struct perfmon_session {
 	struct kref ref;
-	spinlock_t lock;
+	qlock_t qlock;
 	struct perfmon_alloc *allocs[MAX_PERFMON_COUNTERS];
 };
 

@@ -1,7 +1,34 @@
 /* Copyright (c) 2015 Google Inc
  * Davide Libenzi <dlibenzi@google.com>
+ * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
- */
+ *
+ * Manages the setting and reading of hardware perf counters across all cores,
+ * including generating samples in response to counter overflow interrupts.
+ *
+ * The hardware interface is pretty straightforward - it's mostly setting and
+ * unsetting fixed and unfixed events, sometimes with interrupts and trigger
+ * counts.
+ *
+ * The 'command' to the cores is a struct perfmon_alloc.  This tells the core
+ * which event to set up (this is the perfmon_event).  The cores respond in
+ * counters[], saying which of their counters it is using for that event.  If
+ * the cores are given different alloc requests, it is possible that they might
+ * choose different counters[] for the same event.
+ *
+ * These perfmon_allocs are collected in a perfmon_session.  The session is just
+ * a bunch of allocs, which are referred to by index (the 'ped').  Currently,
+ * the session is grabbed by whoever opens the perf FD in devarch, and closed
+ * when that FD is closed.  They are 1:1 with devarch's perf_contexts.
+ *
+ * The values for the counters are extracted with perfmon_get_event_status(),
+ * which uses a struct perfmon_status to collect the results.  We pass the
+ * perfmon_alloc as part of the perfmon_status_env, since we need to tell the
+ * core which counter we're talking about.
+ *
+ * You can have multiple sessions, but if you try to install the same counter in
+ * multiple, concurrent sessions, the hardware might complain (it definitely
+ * will if it is a fixed event). */
 
 #include <sys/types.h>
 #include <arch/ros/msr-index.h>
@@ -301,17 +328,8 @@ static void perfmon_free_alloc(struct perfmon_alloc *pa)
 
 static void perfmon_destroy_alloc(struct perfmon_alloc *pa)
 {
-	if (pa) {
-		perfmon_cleanup_cores_alloc(pa);
-		perfmon_free_alloc(pa);
-	}
-}
-
-static void perfmon_release_alloc(struct kref *kref)
-{
-	struct perfmon_alloc *pa = container_of(kref, struct perfmon_alloc, ref);
-
-	perfmon_destroy_alloc(pa);
+	perfmon_cleanup_cores_alloc(pa);
+	perfmon_free_alloc(pa);
 }
 
 static struct perfmon_alloc *perfmon_create_alloc(const struct perfmon_event *pev)
@@ -321,7 +339,6 @@ static struct perfmon_alloc *perfmon_create_alloc(const struct perfmon_event *pe
 	                                        num_cores * sizeof(counter_t),
 	                                    MEM_WAIT);
 
-	kref_init(&pa->ref, perfmon_release_alloc, 1);
 	pa->ev = *pev;
 	for (i = 0; i < num_cores; i++)
 		pa->cores_counters[i] = INVALID_COUNTER;
@@ -329,7 +346,7 @@ static struct perfmon_alloc *perfmon_create_alloc(const struct perfmon_event *pe
 	return pa;
 }
 
-static struct perfmon_status *perfmon_alloc_status(void)
+static struct perfmon_status *perfmon_status_alloc(void)
 {
 	struct perfmon_status *pef = kzmalloc(sizeof(struct perfmon_status) +
 	                                          num_cores * sizeof(uint64_t),
@@ -433,20 +450,16 @@ void perfmon_get_cpu_caps(struct perfmon_cpu_caps *pcc)
 static int perfmon_install_session_alloc(struct perfmon_session *ps,
                                          struct perfmon_alloc *pa)
 {
-	int i;
-
-	spin_lock(&ps->lock);
-	for (i = 0; (i < ARRAY_SIZE(ps->allocs)) && (ps->allocs[i] != NULL); i++)
-		;
-	if (likely(i < ARRAY_SIZE(ps->allocs)))
-		ps->allocs[i] = pa;
-	else
-		i = -ENFILE;
-	spin_unlock(&ps->lock);
-	if (unlikely(i < 0))
-		error(-i, ERROR_FIXME);
-
-	return i;
+	qlock(&ps->qlock);
+	for (int i = 0; i < ARRAY_SIZE(ps->allocs); i++) {
+		if (!ps->allocs[i]) {
+			ps->allocs[i] = pa;
+			qunlock(&ps->qlock);
+			return i;
+		}
+	}
+	qunlock(&ps->qlock);
+	error(ENFILE, "Too many perf allocs in the session");
 }
 
 int perfmon_open_event(const struct core_set *cset, struct perfmon_session *ps,
@@ -488,48 +501,61 @@ int perfmon_open_event(const struct core_set *cset, struct perfmon_session *ps,
 	return i;
 }
 
-static void perfmon_alloc_get(struct perfmon_session *ps, int ped, bool reset,
-                              struct perfmon_alloc **ppa)
+/* Helper, looks up a pa, given ped.  Hold the qlock. */
+static struct perfmon_alloc *__lookup_pa(struct perfmon_session *ps, int ped)
 {
 	struct perfmon_alloc *pa;
 
 	if (unlikely((ped < 0) || (ped >= ARRAY_SIZE(ps->allocs))))
-		error(EBADFD, ERROR_FIXME);
-	spin_lock(&ps->lock);
+		error(EBADFD, "Perf event %d out of range", ped);
 	pa = ps->allocs[ped];
-	if (likely(pa)) {
-		if (reset)
-			ps->allocs[ped] = NULL;
-		else
-			kref_get(&pa->ref, 1);
-	}
-	spin_unlock(&ps->lock);
-	if (unlikely(!pa))
-		error(ENOENT, ERROR_FIXME);
-	*ppa = pa;
+	if (!pa)
+		error(ENOENT, "No perf alloc for event %d", ped);
+	return pa;
 }
 
 void perfmon_close_event(struct perfmon_session *ps, int ped)
 {
+	ERRSTACK(1);
 	struct perfmon_alloc *pa;
 
-	perfmon_alloc_get(ps, ped, TRUE, &pa);
-	kref_put(&pa->ref);
+	qlock(&ps->qlock);
+	if (waserror()) {
+		qunlock(&ps->qlock);
+		nexterror();
+	};
+	/* lookup does the error checking */
+	pa = __lookup_pa(ps, ped);
+	ps->allocs[ped] = NULL;
+	poperror();
+	qunlock(&ps->qlock);
+	perfmon_destroy_alloc(pa);
 }
 
+/* Fetches the status (i.e. PMU counters) of event ped from all applicable
+ * cores.  Returns a perfmon_status, which the caller should free. */
 struct perfmon_status *perfmon_get_event_status(struct perfmon_session *ps,
                                                 int ped)
 {
+	ERRSTACK(1);
 	struct core_set cset;
 	struct perfmon_status_env env;
 
-	perfmon_alloc_get(ps, ped, FALSE, &env.pa);
-	env.pef = perfmon_alloc_status();
-	perfmon_setup_alloc_core_set(env.pa, &cset);
+	/* qlock keeps the PA alive.  We don't want to spin, since the spinners
+	 * might prevent the smp_do_in_cores(), resulting in a deadlock. */
+	qlock(&ps->qlock);
+	if (waserror()) {
+		qunlock(&ps->qlock);
+		nexterror();
+	};
+	env.pa = __lookup_pa(ps, ped);
+	env.pef = perfmon_status_alloc();
 
+	perfmon_setup_alloc_core_set(env.pa, &cset);
 	smp_do_in_cores(&cset, perfmon_do_cores_status, &env);
 
-	kref_put(&env.pa->ref);
+	poperror();
+	qunlock(&ps->qlock);
 
 	return env.pef;
 }
@@ -548,7 +574,7 @@ static void perfmon_release_session(struct kref *kref)
 		struct perfmon_alloc *pa = ps->allocs[i];
 
 		if (pa)
-			kref_put(&pa->ref);
+			perfmon_destroy_alloc(pa);
 	}
 	kfree(ps);
 }
@@ -559,8 +585,7 @@ struct perfmon_session *perfmon_create_session(void)
 	                                      MEM_WAIT);
 
 	kref_init(&ps->ref, perfmon_release_session, 1);
-	spinlock_init(&ps->lock);
-
+	qlock_init(&ps->qlock);
 	return ps;
 }
 
@@ -571,6 +596,5 @@ void perfmon_get_session(struct perfmon_session *ps)
 
 void perfmon_close_session(struct perfmon_session *ps)
 {
-	if (likely(ps))
-		kref_put(&ps->ref);
+	kref_put(&ps->ref);
 }
