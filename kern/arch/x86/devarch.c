@@ -336,11 +336,9 @@ static struct perf_context *arch_create_perf_context(void)
 
 static void arch_free_perf_context(struct perf_context *pc)
 {
-	if (likely(pc)) {
-		perfmon_close_session(pc->ps);
-		kfree(pc->resp);
-		kfree(pc);
-	}
+	perfmon_close_session(pc->ps);
+	kfree(pc->resp);
+	kfree(pc);
 }
 
 static const uint8_t *arch_read_core_set(struct core_set *cset,

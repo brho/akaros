@@ -42,7 +42,6 @@
 #include <smp.h>
 #include <atomic.h>
 #include <core_set.h>
-#include <kref.h>
 #include <percpu.h>
 #include <kmalloc.h>
 #include <err.h>
@@ -565,36 +564,23 @@ void perfmon_free_event_status(struct perfmon_status *pef)
 	kfree(pef);
 }
 
-static void perfmon_release_session(struct kref *kref)
-{
-	struct perfmon_session *ps =
-	    container_of(kref, struct perfmon_session, ref);
-
-	for (int i = 0; i < ARRAY_SIZE(ps->allocs); i++) {
-		struct perfmon_alloc *pa = ps->allocs[i];
-
-		if (pa)
-			perfmon_destroy_alloc(pa);
-	}
-	kfree(ps);
-}
-
 struct perfmon_session *perfmon_create_session(void)
 {
 	struct perfmon_session *ps = kzmalloc(sizeof(struct perfmon_session),
 	                                      MEM_WAIT);
 
-	kref_init(&ps->ref, perfmon_release_session, 1);
 	qlock_init(&ps->qlock);
 	return ps;
 }
 
-void perfmon_get_session(struct perfmon_session *ps)
-{
-	kref_get(&ps->ref, 1);
-}
-
 void perfmon_close_session(struct perfmon_session *ps)
 {
-	kref_put(&ps->ref);
+	struct perfmon_alloc *pa;
+
+	for (int i = 0; i < ARRAY_SIZE(ps->allocs); i++) {
+		pa = ps->allocs[i];
+		if (pa)
+			perfmon_destroy_alloc(pa);
+	}
+	kfree(ps);
 }

@@ -11,7 +11,6 @@
 #include <arch/x86.h>
 #include <atomic.h>
 #include <core_set.h>
-#include <kref.h>
 #include <stdint.h>
 #include <kthread.h>
 
@@ -39,7 +38,6 @@ struct perfmon_alloc {
 };
 
 struct perfmon_session {
-	struct kref ref;
 	qlock_t qlock;
 	struct perfmon_alloc *allocs[MAX_PERFMON_COUNTERS];
 };
@@ -61,7 +59,6 @@ struct perfmon_status *perfmon_get_event_status(struct perfmon_session *ps,
 												int ped);
 void perfmon_free_event_status(struct perfmon_status *pef);
 struct perfmon_session *perfmon_create_session(void);
-void perfmon_get_session(struct perfmon_session *ps);
 void perfmon_close_session(struct perfmon_session *ps);
 
 static inline uint64_t read_pmc(uint32_t index)
