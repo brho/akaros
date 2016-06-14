@@ -579,6 +579,11 @@ void perf_context_event_submit(struct perf_context *pctx,
 	pevt->cores = *cores;
 	pevt->sel = *sel;
 	pevt->ped = perf_open_event(pctx->perf_fd, cores, sel);
+	if (pevt->ped < 0) {
+		fprintf(stderr, "Unable to submit event \"%s\": %s\n", sel->fq_str,
+		        errstr());
+		exit(1);
+	}
 }
 
 void perf_context_show_values(struct perf_context *pctx, FILE *file)

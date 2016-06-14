@@ -197,6 +197,29 @@ static void perfmon_set_unfixed_trigger(unsigned int idx, uint64_t count)
 	write_msr(MSR_IA32_PERFCTR0 + idx, write_val);
 }
 
+/* Helper: sets errno/errstr based on the error code returned from the core.  We
+ * don't have a great way to get errors back from smp_do_in_cores() commands.
+ * We use negative counter values (e.g. i = -EBUSY) to signal an error of a
+ * certain type.  This converts that to something useful for userspace. */
+static void perfmon_convert_error(int err_code, int core_id)
+{
+	switch (err_code) {
+	case EBUSY:
+		set_error(err_code, "Fixed perf counter is busy on core %d", core_id);
+		break;
+	case ENOSPC:
+		set_error(err_code, "Perf counter idx out of range on core %d",
+		          core_id);
+		break;
+	case ENOENT:
+		set_error(err_code, "Perf counter not set on core %d", core_id);
+		break;
+	default:
+		set_error(err_code, "Unknown perf counter error on core %d", core_id);
+		break;
+	};
+}
+
 static void perfmon_do_cores_alloc(void *opaque)
 {
 	struct perfmon_alloc *pa = (struct perfmon_alloc *) opaque;
@@ -210,7 +233,7 @@ static void perfmon_do_cores_alloc(void *opaque)
 
 		i = PMEV_GET_EVENT(pa->ev.event);
 		if (i >= (int) cpu_caps.fix_counters_x_proc) {
-			i = -EINVAL;
+			i = -ENOSPC;
 		} else if (!perfmon_fix_event_available(i, fxctrl_value)) {
 			i = -EBUSY;
 		} else {
@@ -484,7 +507,8 @@ int perfmon_open_event(const struct core_set *cset, struct perfmon_session *ps,
 
 			if (unlikely(ccno < 0)) {
 				perfmon_destroy_alloc(pa);
-				return (int) ccno;
+				perfmon_convert_error(-(int)ccno, i);
+				return -1;
 			}
 		}
 	}
