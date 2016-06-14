@@ -414,6 +414,9 @@ int main(int argc, char *argv[])
 	}
 	if (i == COUNT_OF(perf_cmds))
 		global_usage();
+	/* This cleanup is optional - they'll all be dealt with when the program
+	 * exits.  This means its safe for us to exit(-1) at any point in the
+	 * program. */
 	perf_free_context(pctx);
 	perfconv_free_context(cctx);
 	perf_finalize();

@@ -51,6 +51,7 @@ struct kprof {
 	struct alarm_waiter *alarms;
 	bool mpstat_ipi;
 	bool profiling;
+	bool opened;
 	char *pdata;
 	size_t psize;
 };
@@ -231,6 +232,7 @@ static void kprof_init(void)
 
 	qlock_init(&kprof.lock);
 	kprof.profiling = FALSE;
+	kprof.opened = FALSE;
 	kprof.pdata = NULL;
 	kprof.psize = 0;
 
@@ -316,6 +318,20 @@ static struct chan *kprof_open(struct chan *c, int omode)
 		if (openmode(omode) != O_READ)
 			error(EPERM, ERROR_FIXME);
 	}
+	switch ((int) c->qid.path) {
+	case Kprofctlqid:
+		/* We have one global profiler.  Only one FD may be opened at a time for
+		 * it.  If we ever have separate profilers, we can create the profiler
+		 * here, and every open would get a separate instance. */
+		qlock(&kprof.lock);
+		if (kprof.opened) {
+			qunlock(&kprof.lock);
+			error(EBUSY, "Global profiler is already open");
+		}
+		kprof.opened = TRUE;
+		qunlock(&kprof.lock);
+		break;
+	}
 	c->mode = openmode(omode);
 	c->flag |= COPEN;
 	c->offset = 0;
@@ -324,6 +340,14 @@ static struct chan *kprof_open(struct chan *c, int omode)
 
 static void kprof_close(struct chan *c)
 {
+	if (c->flag & COPEN) {
+		switch ((int) c->qid.path) {
+		case Kprofctlqid:
+			kprof_stop_profiler();
+			kprof.opened = FALSE;
+			break;
+		}
+	}
 }
 
 static long mpstat_read(void *va, long n, int64_t off)

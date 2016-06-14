@@ -552,11 +552,8 @@ struct perf_context *perf_create_context(const struct perf_context_config *cfg)
 
 void perf_free_context(struct perf_context *pctx)
 {
-	for (int i = 0; i < pctx->event_count; i++)
-		perf_close_event(pctx->perf_fd, pctx->events[i].ped);
-	perf_disable_sampling(pctx->kpctl_fd);
-	close(pctx->kpctl_fd);
-	close(pctx->perf_fd);
+	close(pctx->kpctl_fd);	/* disabled sampling */
+	close(pctx->perf_fd);	/* closes all events */
 	free(pctx);
 }
 
