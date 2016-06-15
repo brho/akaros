@@ -517,27 +517,6 @@ static void perf_close_event(int perf_fd, int ped)
 	xpwrite(perf_fd, cmdbuf, wptr - cmdbuf, 0);
 }
 
-static void perf_enable_sampling(int kpctl_fd)
-{
-	static const char * const enable_str = "start";
-
-	xwrite(kpctl_fd, enable_str, strlen(enable_str));
-}
-
-static void perf_disable_sampling(int kpctl_fd)
-{
-	static const char * const disable_str = "stop";
-
-	xwrite(kpctl_fd, disable_str, strlen(disable_str));
-}
-
-static void perf_flush_sampling(int kpctl_fd)
-{
-	static const char * const flush_str = "flush";
-
-	xwrite(kpctl_fd, flush_str, strlen(flush_str));
-}
-
 struct perf_context *perf_create_context(const struct perf_context_config *cfg)
 {
 	struct perf_context *pctx = xzmalloc(sizeof(struct perf_context));
@@ -545,7 +524,6 @@ struct perf_context *perf_create_context(const struct perf_context_config *cfg)
 	pctx->perf_fd = xopen(cfg->perf_file, O_RDWR, 0);
 	pctx->kpctl_fd = xopen(cfg->kpctl_file, O_RDWR, 0);
 	perf_get_arch_info(pctx->perf_fd, &pctx->pai);
-	perf_enable_sampling(pctx->kpctl_fd);
 
 	return pctx;
 }
@@ -555,11 +533,6 @@ void perf_free_context(struct perf_context *pctx)
 	close(pctx->kpctl_fd);	/* disabled sampling */
 	close(pctx->perf_fd);	/* closes all events */
 	free(pctx);
-}
-
-void perf_flush_context_traces(struct perf_context *pctx)
-{
-	perf_flush_sampling(pctx->kpctl_fd);
 }
 
 void perf_context_event_submit(struct perf_context *pctx,
@@ -581,6 +554,26 @@ void perf_context_event_submit(struct perf_context *pctx,
 		        errstr());
 		exit(1);
 	}
+}
+
+void perf_stop_events(struct perf_context *pctx)
+{
+	for (int i = 0; i < pctx->event_count; i++)
+		perf_close_event(pctx->perf_fd, pctx->events[i].ped);
+}
+
+void perf_start_sampling(struct perf_context *pctx)
+{
+	static const char * const enable_str = "start";
+
+	xwrite(pctx->kpctl_fd, enable_str, strlen(enable_str));
+}
+
+void perf_stop_sampling(struct perf_context *pctx)
+{
+	static const char * const disable_str = "stop";
+
+	xwrite(pctx->kpctl_fd, disable_str, strlen(disable_str));
 }
 
 void perf_context_show_values(struct perf_context *pctx, FILE *file)

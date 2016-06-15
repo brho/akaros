@@ -318,13 +318,17 @@ static int perf_record(struct perf_cmd *cmd, int argc, char *argv[])
 	collect_argp(cmd, argc, argv, children, &opts);
 	opts.sampling = TRUE;
 
+	/* Once a perf event is submitted, it'll start counting and firing the IRQ.
+	 * However, we can control whether or not the samples are collected. */
 	submit_events(&opts);
+	perf_start_sampling(pctx);
 	run_process_and_wait(opts.cmd_argc, opts.cmd_argv, &opts.cores);
+	perf_stop_sampling(pctx);
 	if (opts.verbose)
 		perf_context_show_values(pctx, stdout);
-	/* Flush the profiler per-CPU trace data into the main queue, so that
-	 * it will be available for read. */
-	perf_flush_context_traces(pctx);
+	/* The events are still counting and firing IRQs.  Let's be nice and turn
+	 * them off to minimize our impact. */
+	perf_stop_events(pctx);
 	/* Generate the Linux perf file format with the traces which have been
 	 * created during this operation. */
 	perf_convert_trace_data(cctx, perf_cfg.kpdata_file, opts.outfile);
