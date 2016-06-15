@@ -766,7 +766,6 @@ void perf_convert_trace_data(struct perfconv_context *cctx, const char *input,
 {
 	FILE *infile;
 	size_t ksize;
-	char kpath[1024];
 
 	infile = xfopen(input, "rb");
 	if (xfsize(infile) > 0) {

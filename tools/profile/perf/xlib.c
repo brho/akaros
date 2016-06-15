@@ -94,13 +94,18 @@ FILE *xfdopen(int fd, const char *mode)
 
 off_t xfsize(FILE *file)
 {
-	off_t pos = ftello(file), size;
+	struct stat stat_buf;
+	int fd = fileno(file);
 
-	xfseek(file, 0, SEEK_END);
-	size = ftello(file);
-	xfseek(file, pos, SEEK_SET);
-
-	return size;
+	if (fd < 0) {
+		perror("xfsize fileno");
+		exit(1);
+	}
+	if (fstat(fd, &stat_buf)) {
+		perror("xfsize fstat");
+		exit(1);
+	}
+	return stat_buf.st_size;
 }
 
 void xfwrite(const void *data, size_t size, FILE *file)
