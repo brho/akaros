@@ -312,6 +312,31 @@ enum perf_hw_id {
 	PERF_COUNT_HW_MAX,						/* non-ABI */
 };
 
+/* We can output a bunch of different versions of perf_event_attr.  The oldest
+ * Linux perf I've run across expects version 3 and can't handle anything
+ * larger.  Since we're not using anything from versions 1 or higher, we can sit
+ * at version 0 for now. */
+#define PERF_ATTR_VER0
+
+#ifdef PERF_ATTR_VER1
+	#define __PERF_ATTR_VER1 1
+#endif
+#ifdef PERF_ATTR_VER2
+	#define __PERF_ATTR_VER1 1
+	#define __PERF_ATTR_VER2 1
+#endif
+#ifdef PERF_ATTR_VER3
+	#define __PERF_ATTR_VER1 1
+	#define __PERF_ATTR_VER2 1
+	#define __PERF_ATTR_VER3 1
+#endif
+#ifdef PERF_ATTR_VER4
+	#define __PERF_ATTR_VER1 1
+	#define __PERF_ATTR_VER2 1
+	#define __PERF_ATTR_VER3 1
+	#define __PERF_ATTR_VER4 1
+#endif
+
 /*
  * Hardware event_id to monitor via a performance monitoring event:
  */
@@ -387,12 +412,17 @@ struct perf_event_attr {
 		uint64_t bp_addr;
 		uint64_t config1; /* extension of config */
 	};
+
+#ifdef __PERF_ATTR_VER1
 	union {
 		uint64_t bp_len;
 		uint64_t config2; /* extension of config1 */
 	};
+
+# ifdef __PERF_ATTR_VER2
 	uint64_t branch_sample_type; /* enum perf_branch_sample_type */
 
+#  ifdef __PERF_ATTR_VER3
 	/*
 	 * Defines set of user regs to dump on samples.
 	 * See asm/perf_regs.h for details.
@@ -404,6 +434,7 @@ struct perf_event_attr {
 	 */
 	uint32_t sample_stack_user;
 
+#   ifdef __PERF_ATTR_VER4
 	/* Align to u64. */
 	uint32_t __reserved_2;
 
@@ -416,6 +447,10 @@ struct perf_event_attr {
 	 * See asm/perf_regs.h for details.
 	 */
 	uint64_t sample_regs_intr;
+#   endif /* __PERF_ATTR_VER4 */
+#  endif /* __PERF_ATTR_VER3 */
+# endif /* __PERF_ATTR_VER2 */
+#endif /* __PERF_ATTR_VER1 */
 } __attribute__((packed));
 
 #define PERF_RECORD_MISC_CPUMODE_MASK		(7 << 0)
