@@ -6,9 +6,10 @@ Contents:
  (*) Perf
      - Setup
      - Example
-     - Somewhat Outdated Notes
+     - More Complicated Examples
+     - Differences From Linux
 
- (*) Old Oprofile Notes
+ (*) mpstat
 
 
 ===========================
@@ -27,7 +28,8 @@ SETUP
 --------------------
 To build Akaros's perf directly:
 
-(linux)$ cd tools/profile/perf ; make ; cd -
+(linux)$ cd tools/dev-libs/elfutils ; make install; cd -
+(linux)$ cd tools/dev-util/perf ; make install; cd -
 
 Or to build it along with all apps:
 
@@ -35,7 +37,8 @@ Or to build it along with all apps:
 
 You will also need suitable recent Linux perf for the reporting of the data
 (something that understands PERFILE2 format).  Unpatched Linux 4.5 perf did the
-trick.  You'll also want libelf and maybe other libraries.
+trick.  You'll also want libelf and maybe other libraries on your Linux
+machine.
 
 First, install libelf according to your distro.  On ubuntu:
 (linux) $ sudo apt-get install libelf-dev
@@ -44,11 +47,8 @@ Then try to just install perf using your Linux distro, and install any needed
 dependencies.  On ubuntu, you can install linux-tools-common and whatever else
 it asks for (something particular to your host kernel).
 
-If you get the following error when running perf record:
-
-	incompatible file format (rerun with -v to learn more)
-
-Then you'll need a newer version of perf.  Download Linux source, then
+Linux perf changes a lot.  Newer versions are usually nicer.  I recommend
+building one of them:  Download Linux source, then
 
 (linux) $ cd tools/perf/
 (linux) $ make
@@ -60,155 +60,200 @@ between our perf.data format and the latest Linux, file a bug.
 
 BASIC EXAMPLE
 --------------------
+Perf on Akaros supports record, stat, and a few custom options.
+
 You should be able to do the following:
 
-/ $ perf record -e 0x13c:0,int=1,icount=10000 -- /bin/hello
+/ $ perf record ls
 
 Then scp perf.data to Linux
 
-(linux) $ perf report --kallsyms=obj/kern/ksyms.map --symfs=kern/kfs
+(linux) $ scp AKAROS_MACHINE:perf.data .
+(linux) $ perf report --kallsyms=obj/kern/ksyms.map --symfs=kern/kfs/
+
+Perf will look on your host machine for the kernel symbol table and for
+binaries.  We need to tell it kallsyms and symfs to override those settings.
+
+It can be a hassle to type out the kallsyms and symfs, so we have a script that
+will automate that.  Use scripts/perf in any place that you'd normally use
+perf.  Set your $AKAROS_ROOT (default is ".") and optionally override $PERF_CMD
+("default is "perf").  For most people, this will just be:
+
+(linux) $ ./scripts/perf report
+
+The perf.data file is implied, so the above command is equivalent to:
+
+(linux) $ ./scripts/perf report -i perf.data
 
 
-SOMEWHAT OUTDATED NOTES
+MORE COMPLICATED EXAMPLES
 --------------------
-Its help screen reads like:
+First, try perf --help for usage.  Then check out
+https://perf.wiki.kernel.org/index.php/Tutorial.  We strive to be mostly
+compatible with the usage of Linux perf.
 
-Use: perf {list,cpucaps,record} [-mkecxh] -- CMD [ARGS ...]
-        list            Lists all the available events and their meaning.
-        cpucaps         Shows the system CPU capabilities in term of performance counters.
-        record           Setups the configured counters, runs CMD, and shows the values of the counters.
-Options:
-        -m PATH          Sets the path of the PERF file ('#arch/perf').
-        -k PATH          Sets the path of the KPROF control file ('/prof/kpctl').
-        -e EVENT_SPEC    Adds an event to be tracked.
-        -c CPUS_STR      Selects the CPU set on which the counters should be active.
-        -x EVENT_RX      Sets the event name regular expression for list.
-        -h               Displays this help screen.
+perf stat runs a command and reports the count of events during the run of the
+command.  perf record runs a command and outputs perf.data, which contains
+backtrace samples from when the event counters overflowed.  For those familiar
+with other perfmon systems, perf stat is like PAPI and perf record is like
+Oprofile.
 
-To list the counters available for sampling, you can run the following command
-(note, it might be a very long output):
+perf record and stat both track a set of events with the -e flag.  -e takes a
+comma-separated list of events.  Events can be expressed in one of three forms:
 
-/ $ perf list
+- Generic events (called "pre-defined" events on Linux)
+- Libpfm events
+- Raw events
 
-Or, if you have some hint of what you are looking for (example, "FLUSH"), you
-can run:
+Linux's perf only takes Generic and Raw events, so the libpfm4 is an added
+bonus.
 
-/ $ perf list -x FLUSH
+Generic events consist of strings like "cycles" or "cache-misses".  Raw events
+aresimple strings of the form "rXXX", where the X's are hex nibbles.  The hex
+codes are passed directly to the PMU.  You can actually have 2-4 Xs on Akaros.
 
-The -x parameter accepts regular expression syntax.
-To get information about how many counters, and their bit size, are available in
-the system, you can run:
+Libpfm events are strings that correspond to events specific to your machine.
+Libpfm knows about PMU events for a given machine.  It figures out what machine
+perf is running on and selects events that should be available.  Check out
+http://perfmon2.sourceforge.net/ for more info.
 
-/ $ perf cpucaps
+To see the list of events available, use `perf list [regex]`, supplying an
+optional search regex.  For example, on a Haswell:
 
-Which produces an output like:
+/ $ perf list unhalted_reference_cycles
+#-----------------------------
+IDX      : 37748738
+PMU name : ix86arch (Intel X86 architectural PMU)
+Name     : UNHALTED_REFERENCE_CYCLES
+Equiv    : None
+Flags    : None
+Desc     : count reference clock cycles while the clock signal on the specific core is running. The reference clock operates at a fixed frequency, irrespective of c
+ore frequency changes due to performance state transitions
+Code     : 0x13c
+Modif-00 : 0x00 : PMU : [k] : monitor at priv level 0 (boolean)
+Modif-01 : 0x01 : PMU : [u] : monitor at priv level 1, 2, 3 (boolean)
+Modif-02 : 0x02 : PMU : [e] : edge level (may require counter-mask >= 1) (boolean)
+Modif-03 : 0x03 : PMU : [i] : invert (boolean)
+Modif-04 : 0x04 : PMU : [c] : counter-mask in range [0-255] (integer)
+Modif-05 : 0x05 : PMU : [t] : measure any thread (boolean)
+#-----------------------------
+IDX      : 322961409
+PMU name : hsw_ep (Intel Haswell EP)
+Name     : UNHALTED_REFERENCE_CYCLES
+Equiv    : None
+Flags    : None
+Desc     : Unhalted reference cycles
+Code     : 0x300
+Modif-00 : 0x00 : PMU : [k] : monitor at priv level 0 (boolean)
+Modif-01 : 0x01 : PMU : [u] : monitor at priv level 1, 2, 3 (boolean)
+Modif-02 : 0x05 : PMU : [t] : measure any thread (boolean)
 
-PERF.version             = 2
-PERF.proc_arch_events    = 7
-PERF.bits_x_counter      = 48
-PERF.counters_x_proc     = 4
-PERF.bits_x_fix_counter  = 48
-PERF.fix_counters_x_proc = 3
+There are two different events for UNHALTED_REFERENCE_CYCLES (case
+insensitive).  libpfm will select the most appropriate one.  You can override
+this selection by specifying a PMU:
 
-You need to specify the list of CPUs where the counters will be active, and the
-CMD passed as `perf` parameter will be run onto.
-The format of the CPUS_STR is as follow:
+/ $ perf stat -e ix86arch::UNHALTED_REFERENCE_CYCLES ls
 
-  [[!]{all,I[.J]+,N-M}][:...]
+Here's how to specify multiple events:
 
-Where:
-  all    = Enable all CPUs
-  llall  = Enable all low latency CPUs
-  I.J.K  = Enable CPUs I, J, and K
-  N-M    = Enable CPUs from N to M, included
+/ $ perf record -e cycles,instructions ls
 
-Examples:
-  0.2.4:8-19
-  all:!2.4.8
+Events also take a set of modifiers.  For instance, you can specify running
+counters only in kernel mode or user mode.  Modifiers are separated by a ':'.
 
-Setting up an event, either for simple reading, or for sampling, requires
-providing the event coordinates (of which, the output emitted by the commands
-above, will help).
-The event coordinates come as event ID and event mask couple.
-They can either be specified by numeric values (example, 0xbd:0x20), or by
-their name (TLB_FLUSH:STLB_ANY).
-The format of the -e event specification is as follow:
+This will track only user cycles (default is user and kernel):
 
-  {EVENT_ID:MASK,EVENT_NAME:MASK_NAME}[,os[={0,1}]][,usr[={0,1}]]
-    [,int[={0,1}]][,invcmsk[={0,1}]][,cmask=MASK][,icount=COUNT]
+/ $ perf record -e cycles:u ls
 
-With the following meaning:
+To use a raw event, you need to know the event number.  You can either look in
+your favorite copy of the SDM, or you can ask libpfm.  Though if you ask
+libpfm, you might as well just use its string processing.  For example:
 
-  os     = Should the counter tick when in ring 0 (default 1)
-  usr    = Should the counter tick when in ring 1,2,3 (default 1)
-  int    = Should counter overflow interrupt based sampling be enabled (default 0)
-  icount = After how many increments in the counter value, the sampling
-           interrupt should trigger (default 0 - not allowed if int==1)
+/ $ perf list FLUSH
+#-----------------------------
+IDX      : 322961462
+PMU name : hsw_ep (Intel Haswell EP)
+Name     : TLB_FLUSH
+Equiv    : None
+Flags    : None
+Desc     : TLB flushes
+Code     : 0xbd
+Umask-00 : 0x01 : PMU : [DTLB_THREAD] : None : Count number of DTLB flushes of thread-specific entries
+Umask-01 : 0x20 : PMU : [STLB_ANY] : None : Count number of any STLB flushes
+Modif-00 : 0x00 : PMU : [k] : monitor at priv level 0 (boolean)
+Modif-01 : 0x01 : PMU : [u] : monitor at priv level 1, 2, 3 (boolean)
+Modif-02 : 0x02 : PMU : [e] : edge level (may require counter-mask >= 1) (boolean)
+Modif-03 : 0x03 : PMU : [i] : invert (boolean)
+Modif-04 : 0x04 : PMU : [c] : counter-mask in range [0-255] (integer)
+Modif-05 : 0x05 : PMU : [t] : measure any thread (boolean)
+Modif-06 : 0x07 : PMU : [intx] : monitor only inside transactional memory region (boolean)
+Modif-07 : 0x08 : PMU : [intxcp] : do not count occurrences inside aborted transactional memory region (boolean)
 
-After the double hyphen (--), follow the command, and its arguments, to be
-executed while the sampling is happening.
-In most cases this could simply be a `sleep` (embedded perf command).
-Example:
+The raw code is 0xbd.  So the following are equivalent (but slightly buggy!):
 
-/ $ perf record -e TLB_FLUSH:STLB_ANY,int=1,icount=20 -- sleep 10
+/ $ perf stat -e TLB_FLUSH ls
+/ $ perf stat -e rbd ls
 
-When the command run by `perf` exits, the configured counter values are shown.
-If used as counter overflow interrupt sampling, the tracing data will be in
-the usual /prof/kpdata file.
+If you actually run those, rbd will have zero hits, and TLB_FLUSH will give you
+the error "Failed to parse event string TLB_FLUSH".
+
+Some events actually rather particular to their Umasks, and TLB_FLUSH is one of
+them.  TLB_FLUSH wants a Umask.  Umasks are selectors for specific sub-types of
+events.  In the case of TLB_FLUSH, we can choose between DTLB_THREAD and
+STLB_ANY.  Umasks are not always required - they just happen to be on my
+Haswell for TLB_FLUSH.  That being said, we can ask for the event like so:
+
+/ $ perf stat -e TLB_FLUSH:STLB_ANY ls
+/ $ perf stat -e r20bd ls
+
+Note that the Umask is placed before the Code.  These 16 bits are passed
+directly to the PMU, and on Intel the format is "umask:event".
+
+perf record is based on recording samples when event counters overflow.  The
+number of events required to trigger a sample is referred to as the
+sample_period.  You can set it with -c, e.g.
+
+/ $ perf record -c 10000 ls
+
+
+DIFFERENCES FROM LINUX
+--------------------
+For the most part, Akaros perf is similar to Linux.  A few things are
+different.
+
+The biggest difference is that our perf does not follow processes around.  We
+count events for cores, not processes.  You can specify certain cores, but not
+certain processes.  Any options related to tracking specific processes are
+unsupported.
+
+The -F option (frequency) is loosely supported.  The kernel cannot adjust the
+sampling count dynamically to meet a certain frequencey.  Instead, we guess
+that -F is used with cycles, and pick a sample period that will generate
+samples at the desired frequency if the core is unhalted.  YMMV.
+
+Akaros currently supports only PMU events.  In the future, we may add events
+like context-switches.
+
 
 ===========================
-OLD OPROFILE (probably broken)
+mpstat
 ===========================
+Akaros has basic support for mpstat.  mpstat gives a high-level glance at where
+each core is spending its time.
 
-To get started, make sure #K is mounted.  The basic ifconfig script will do
-this, as will:
+For starters, bind kprof somewhere.  The basic ifconfig script binds it to
+/prof.
 
-/ $ bind -a \#K /prof/
+To see the CPU usage, cat mpstat:
 
-You control the profiler with the kpctl file.  The general style is to start
-the events that trigger a sample, such as a timer tick, then you start and stop
-the profiling.  The distinction between the two steps is that one actually
-fires the events (e.g. the timer IRQ), and the other enables *collection*
-of profiling info when those events occur.
+/ $ cat /prof/mpstat
+ CPU:             irq             kern              user                 idle
+   0: 1.707136 (  0%), 24.978659 (  0%), 0.162845 (  0%), 13856.233909 ( 99%)
 
-Aside from timer based sampling, the Akaros `perf` tool allows to sample by
-catching performance counter overflows.
+To reset the count:
 
-The profiler accepts a few configuration options.  There is a queue size limit
-of 64MB by default, and it is used as circular buffer, so old data will be
-dropped.
+/ $ echo reset > /prof/mpstat
 
-To change its value:
+To see the output for a particular command:
 
-/ $ echo prof_qlimit SIZE_KB > /prof/kpctl
-
-This should be run before starting the profiler.
-
-It is possible to configure the timer period, which defaults to 1000us, though
-it is not suggested to move too far from the default:
-
-/ $ echo timer period 1000 > /prof/kpctl
-
-
-The timer command takes the core id (or "all"), followed by "on" or "off".
-As with all good devices, if you echo garbage, in, you should get the usage as
-an errstr.  That'll be kept up to date more than documentation.
-
-For profiling, besides the counters overflow sampling handled by the `perf`
-utility, you need to enable timers:
-
-/ $ echo timer all on > /prof/kpctl
-
-And then start the Akaros profiler system-wide.
-
-/ $ echo start > /prof/kpctl
-
-Run whatever command you want the sampling to be based on, then stop timers
-and profiler:
-
-/ $ my_test_program ...
-/ $ echo stop > /prof/kpctl
-/ $ echo timer all off > /prof/kpctl
-
-The trace will be then available in the /prof/kpdata file.
-The data will be available until the next start of the profiler.
+/ $ echo reset > /prof/mpstat ; COMMAND ; cat /prof/mpstat

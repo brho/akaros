@@ -625,7 +625,7 @@ static struct block *pop_first_block(struct queue *q)
 {
 	struct block *b = q->bfirst;
 
-	q->len -= BALLOC(b);
+	q->len -= BALLOC(b);  // XXX all usages of q->len with extra_data are fucked
 	q->dlen -= BLEN(b);
 	q->bfirst = b->next;
 	b->next = 0;
@@ -1235,6 +1235,7 @@ static bool qwait_and_ilock(struct queue *q, int qio_flags)
 
 /*
  * add a block list to a queue
+ * XXX basically the same as enqueue blist, and has no locking!
  */
 void qaddlist(struct queue *q, struct block *b)
 {

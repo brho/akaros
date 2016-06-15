@@ -1,0 +1,18 @@
+#!/bin/bash
+
+AKAROS_ROOT=${AKAROS_ROOT:-`pwd`}
+# Allow the override of perf, in case someone reports with a different perf
+# than their host uses
+PERF_CMD=${PERF_CMD:-perf}
+
+report_FLAGS="--kallsyms=$AKAROS_ROOT/obj/kern/ksyms.map \
+              --symfs=$AKAROS_ROOT/kern/kfs/"
+
+# annotate seems to want a path relative to symfs
+annotate_FLAGS="--vmlinux=../../obj/kern/akaros-kernel-64b \
+                --symfs=$AKAROS_ROOT/kern/kfs/"
+
+# Sets flags to the flags for a given command ($1)
+eval FLAGS="\$${1}_FLAGS"
+
+$PERF_CMD $1 $FLAGS ${@:2}
