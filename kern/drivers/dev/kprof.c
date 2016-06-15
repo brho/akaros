@@ -52,8 +52,6 @@ struct kprof {
 	bool mpstat_ipi;
 	bool profiling;
 	bool opened;
-	char *pdata;
-	size_t psize;
 };
 
 struct dev kprofdevtab;
@@ -132,16 +130,13 @@ static void kprof_enable_timer(int coreid, int on_off)
 	}
 }
 
-static void kprof_profdata_clear(void)
-{
-	kfree(kprof.pdata);
-	kprof.pdata = NULL;
-	kprof.psize = 0;
-}
-
+/* Start collecting samples from perf events into the profiler.
+ *
+ * This command only runs if the user successfully opened kpctl, which gives
+ * them a profiler (the global profiler, for now). */
 static void kprof_start_profiler(void)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 
 	qlock(&kprof.lock);
 	if (waserror()) {
@@ -149,43 +144,17 @@ static void kprof_start_profiler(void)
 		nexterror();
 	}
 	if (!kprof.profiling) {
-		profiler_setup();
-		if (waserror()) {
-			kprof.profiling = FALSE;
-			profiler_cleanup();
-			nexterror();
-		}
-		profiler_control_trace(1);
+		profiler_start();
 		kprof.profiling = TRUE;
-		kprof_profdata_clear();
-		poperror();
 	}
 	poperror();
 	qunlock(&kprof.lock);
 }
 
-static void kprof_fetch_profiler_data(void)
-{
-	size_t psize = kprof.psize + profiler_size();
-	size_t read_amt;
-	char *ndata = krealloc(kprof.pdata, psize, MEM_WAIT);
-
-	if (!ndata)
-		error(ENOMEM, ERROR_FIXME);
-	kprof.pdata = ndata;
-	/* psize includes a snapshot of the profiler's size.  It might grow in the
-	 * meantime, but we'll only ever grab as much as we saw originally.  This is
-	 * fine.  The important thing is that we only grab contiguous records. */
-	while (kprof.psize < psize) {
-		read_amt = profiler_read(kprof.pdata + kprof.psize,
-		                         psize - kprof.psize);
-		/* We are the only reader - we must always get whatever was in the
-		 * queue. */
-		assert(read_amt);
-		kprof.psize += read_amt;
-	}
-}
-
+/* Stops collecting samples from perf events.
+ *
+ * This command only runs if the user successfully opened kpctl, which gives
+ * them a profiler (the global profiler, for now). */
 static void kprof_stop_profiler(void)
 {
 	ERRSTACK(1);
@@ -196,16 +165,16 @@ static void kprof_stop_profiler(void)
 		nexterror();
 	}
 	if (kprof.profiling) {
-		profiler_control_trace(0);
-		kprof_fetch_profiler_data();
-		profiler_cleanup();
-
+		profiler_stop();
 		kprof.profiling = FALSE;
 	}
 	poperror();
 	qunlock(&kprof.lock);
 }
 
+/* Makes each core flush its results into the profiler queue.  You can do this
+ * while the profiler is still running.  However, this does not hang up the
+ * queue, so reads on kpdata will block. */
 static void kprof_flush_profiler(void)
 {
 	ERRSTACK(1);
@@ -215,10 +184,8 @@ static void kprof_flush_profiler(void)
 		qunlock(&kprof.lock);
 		nexterror();
 	}
-	if (kprof.profiling) {
+	if (kprof.profiling)
 		profiler_trace_data_flush();
-		kprof_fetch_profiler_data();
-	}
 	poperror();
 	qunlock(&kprof.lock);
 }
@@ -233,8 +200,6 @@ static void kprof_init(void)
 	qlock_init(&kprof.lock);
 	kprof.profiling = FALSE;
 	kprof.opened = FALSE;
-	kprof.pdata = NULL;
-	kprof.psize = 0;
 
 	kprof.alarms = kzmalloc(sizeof(struct alarm_waiter) * num_cores,
 	                        MEM_WAIT);
@@ -255,7 +220,7 @@ static void kprof_init(void)
 	kproftab[Kmpstatqid].length = mpstat_len();
 	kproftab[Kmpstatrawqid].length = mpstatraw_len();
 
-	strlcpy(kprof_control_usage, "clear|start|stop|flush|timer",
+	strlcpy(kprof_control_usage, "start|stop|flush|timer",
 	        sizeof(kprof_control_usage));
 	profiler_append_configure_usage(kprof_control_usage,
 	                                sizeof(kprof_control_usage));
@@ -265,18 +230,8 @@ static void kprof_init(void)
 
 static void kprof_shutdown(void)
 {
-	kprof_stop_profiler();
-	kprof_profdata_clear();
-
 	kfree(kprof.alarms);
 	kprof.alarms = NULL;
-}
-
-static void kprofclear(void)
-{
-	qlock(&kprof.lock);
-	kprof_profdata_clear();
-	qunlock(&kprof.lock);
 }
 
 static struct walkqid *kprof_walk(struct chan *c, struct chan *nc, char **name,
@@ -287,21 +242,12 @@ static struct walkqid *kprof_walk(struct chan *c, struct chan *nc, char **name,
 
 static size_t kprof_profdata_size(void)
 {
-	return kprof.pdata != NULL ? kprof.psize : profiler_size();
+	return profiler_size();
 }
 
 static long kprof_profdata_read(void *dest, long size, int64_t off)
 {
-	qlock(&kprof.lock);
-	if (kprof.pdata && off < kprof.psize) {
-		size = MIN(kprof.psize - off, size);
-		memcpy(dest, kprof.pdata + off, size);
-	} else {
-		size = 0;
-	}
-	qunlock(&kprof.lock);
-
-	return size;
+	return profiler_read(dest, size);
 }
 
 static int kprof_stat(struct chan *c, uint8_t *db, int n)
@@ -329,6 +275,8 @@ static struct chan *kprof_open(struct chan *c, int omode)
 			error(EBUSY, "Global profiler is already open");
 		}
 		kprof.opened = TRUE;
+		/* TODO: have a real creation function for a non-global profiler */
+		profiler_setup();
 		qunlock(&kprof.lock);
 		break;
 	}
@@ -344,7 +292,10 @@ static void kprof_close(struct chan *c)
 		switch ((int) c->qid.path) {
 		case Kprofctlqid:
 			kprof_stop_profiler();
+			qlock(&kprof.lock);
+			profiler_cleanup();
 			kprof.opened = FALSE;
+			qunlock(&kprof.lock);
 			break;
 		}
 	}
@@ -477,9 +428,7 @@ static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 			error(EFAIL, kprof_control_usage);
 		if (profiler_configure(cb))
 			break;
-		if (!strcmp(cb->f[0], "clear")) {
-			kprofclear();
-		} else if (!strcmp(cb->f[0], "timer")) {
+		if (!strcmp(cb->f[0], "timer")) {
 			if (cb->nf < 3)
 				error(EFAIL, "timer {{all, N} {on, off}, period USEC}");
 			if (!strcmp(cb->f[1], "period")) {

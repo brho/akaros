@@ -1,7 +1,26 @@
 /* Copyright (c) 2015 Google Inc
  * Davide Libenzi <dlibenzi@google.com>
  * See LICENSE for details.
- */
+ *
+ * This controls the emitting, collecting, and exporting of samples for perf
+ * events.  Examples of events are PMU counter overflows, mmaps, and process
+ * creation.
+ *
+ * Events are collected in a central qio queue.  High-frequency events (e.g.
+ * profiler_add_hw_sample()) are collected in per-core buffers, which are
+ * flushed to the central queue when they fill up or on command.
+ * Lower-frequency events (e.g. profiler_notify_mmap()) just go straight to the
+ * central queue.
+ *
+ * Currently there is one global profiler.  Kprof is careful to only have one
+ * open profiler at a time.  We assert that this is true.  TODO: stop using the
+ * global profiler!
+ *
+ * A few other notes:
+ * - profiler_control_trace() controls the per-core trace collection.  When it
+ *   is disabled, it also flushes the per-core blocks to the central queue.
+ * - The collection of mmap and comm samples is independent of trace collection.
+ *   Those will occur whenever the profiler is open (refcnt check, for now). */
 
 #include <ros/common.h>
 #include <ros/mman.h>
@@ -390,8 +409,8 @@ void profiler_setup(void)
 		qunlock(&profiler_mtx);
 		nexterror();
 	}
-	if (!profiler_queue)
-		alloc_cpu_buffers();
+	assert(!profiler_queue);
+	alloc_cpu_buffers();
 
 	/* Do this only when everything is initialized (as last init operation).
 	 */
@@ -430,7 +449,7 @@ static void profiler_core_trace_enable(void *opaque)
 		profiler_cpu_flush(cpu_buf);
 }
 
-void profiler_control_trace(int onoff)
+static void profiler_control_trace(int onoff)
 {
 	struct core_set cset;
 
@@ -440,6 +459,20 @@ void profiler_control_trace(int onoff)
 	core_set_fill_available(&cset);
 	smp_do_in_cores(&cset, profiler_core_trace_enable,
 	                (void *) (uintptr_t) onoff);
+}
+
+void profiler_start(void)
+{
+	assert(profiler_queue);
+	profiler_control_trace(1);
+	qreopen(profiler_queue);
+}
+
+void profiler_stop(void)
+{
+	assert(profiler_queue);
+	profiler_control_trace(0);
+	qhangup(profiler_queue, 0);
 }
 
 static void profiler_core_flush(void *opaque)
