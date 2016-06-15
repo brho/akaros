@@ -333,7 +333,7 @@ static int perf_record(struct perf_cmd *cmd, int argc, char *argv[])
 	run_process_and_wait(opts.cmd_argc, opts.cmd_argv, &opts.cores);
 	perf_stop_sampling(pctx);
 	if (opts.verbose)
-		perf_context_show_values(pctx, stdout);
+		perf_context_show_events(pctx, stdout);
 	/* The events are still counting and firing IRQs.  Let's be nice and turn
 	 * them off to minimize our impact. */
 	perf_stop_events(pctx);

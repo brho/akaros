@@ -604,24 +604,16 @@ void perf_stop_sampling(struct perf_context *pctx)
 	xwrite(pctx->kpctl_fd, disable_str, strlen(disable_str));
 }
 
-void perf_context_show_values(struct perf_context *pctx, FILE *file)
+void perf_context_show_events(struct perf_context *pctx, FILE *file)
 {
-	for (int i = 0; i < pctx->event_count; i++) {
-		size_t nvalues;
-		struct perf_eventsel *sel = &pctx->events[i].sel;
-		uint64_t *values = perf_get_event_values(pctx->perf_fd,
-												 pctx->events[i].ped,
-												 &nvalues);
+	struct perf_eventsel *sel;
 
-		fprintf(file, "Event: %s, final code %p%s, trigger count %d\n\t",
+	for (int i = 0; i < pctx->event_count; i++) {
+		sel = &pctx->events[i].sel;
+		fprintf(file, "Event: %s, final code %p%s, trigger count %d\n",
 		        sel->fq_str, sel->ev.event,
 		        perfmon_is_fixed_event(&sel->ev) ? " (fixed)" : "",
 		        sel->ev.trigger_count);
-		for (size_t j = 0; j < nvalues; j++)
-			fprintf(file, "%lu ", values[j]);
-		fprintf(file, "\n");
-
-		free(values);
 	}
 }
 
