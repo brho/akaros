@@ -572,8 +572,8 @@ static uint64_t perfconv_get_event_id(struct perfconv_context *cctx,
 	attr.sample_period = sel->ev.trigger_count;
 	/* Closely coupled with struct perf_record_sample */
 	attr.sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
-	                   PERF_SAMPLE_ADDR | PERF_SAMPLE_ID | PERF_SAMPLE_CPU |
-	                   PERF_SAMPLE_CALLCHAIN;
+	                   PERF_SAMPLE_ADDR | PERF_SAMPLE_IDENTIFIER |
+	                   PERF_SAMPLE_CPU | PERF_SAMPLE_CALLCHAIN;
 	attr.exclude_guest = 1;	/* we can't trace VMs yet */
 	attr.exclude_hv = 1;	/* we aren't tracing our hypervisor, AFAIK */
 	attr.exclude_user = !PMEV_GET_USR(raw_event);
@@ -673,7 +673,7 @@ static void emit_kernel_trace64(struct perf_record *pr,
 	xrec->tid = 0;
 	xrec->time = rec->tstamp;
 	xrec->addr = rec->trace[0];
-	xrec->id = perfconv_get_event_id(cctx, rec->info);
+	xrec->identifier = perfconv_get_event_id(cctx, rec->info);
 	xrec->cpu = rec->cpu;
 	xrec->nr = rec->num_traces - 1;
 	memcpy(xrec->ips, rec->trace + 1, (rec->num_traces - 1) * sizeof(uint64_t));
@@ -699,7 +699,7 @@ static void emit_user_trace64(struct perf_record *pr,
 	xrec->pid = xrec->tid = rec->pid;
 	xrec->time = rec->tstamp;
 	xrec->addr = rec->trace[0];
-	xrec->id = perfconv_get_event_id(cctx, rec->info);
+	xrec->identifier = perfconv_get_event_id(cctx, rec->info);
 	xrec->cpu = rec->cpu;
 	xrec->nr = rec->num_traces - 1;
 	memcpy(xrec->ips, rec->trace + 1, (rec->num_traces - 1) * sizeof(uint64_t));

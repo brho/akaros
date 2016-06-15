@@ -563,15 +563,15 @@ struct perf_record_comm {
 /* For type PERF_RECORD_SAMPLE
  *
  * Configured with: PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
- * PERF_SAMPLE_ADDR | PERF_SAMPLE_ID | PERF_SAMPLE_CPU |
+ * PERF_SAMPLE_ADDR | PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_CPU |
  * PERF_SAMPLE_CALLCHAIN. */
 struct perf_record_sample {
 	struct perf_event_header header;
+	uint64_t identifier;
 	uint64_t ip;
 	uint32_t pid, tid;
 	uint64_t time;
 	uint64_t addr;
-	uint64_t id;
 	uint32_t cpu, res;
 	uint64_t nr;
 	uint64_t ips[0];
