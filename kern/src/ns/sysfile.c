@@ -1264,17 +1264,15 @@ void print_chaninfo(struct chan *c)
 
 	char buf[64] = { 0 };
 	bool has_dev = c->type != -1;
-	if (has_dev && !devtab[c->type].chaninfo) {
-		printk("Chan type %d has no chaninfo!\n", c->type);
-		has_dev = FALSE;
-	}
+	bool has_chaninfo = has_dev && devtab[c->type].chaninfo;
+
 	printk("Chan flags: %p, pathname: %s, ref: %d, Dev: %s, Devinfo: %s",
 		   c->flag,
 		   c->name ? c->name->s : "no cname",
 		   kref_refcnt(&c->ref),
 		   has_dev ? devtab[c->type].name : "no dev",
-		   has_dev ? devtab[c->type].chaninfo(c, buf, sizeof(buf)) : "");
-	if (!has_dev)
+		   has_chaninfo ? devtab[c->type].chaninfo(c, buf, sizeof(buf)) : "");
+	if (!has_chaninfo)
 		printk("qid.path: %p\n", c->qid.path);
 	printk("\n");
 }
