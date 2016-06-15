@@ -79,6 +79,19 @@ FILE *xfopen(const char *path, const char *mode)
 	return file;
 }
 
+FILE *xfdopen(int fd, const char *mode)
+{
+	FILE *file = fdopen(fd, mode);
+
+	if (!file) {
+		fprintf(stderr, "Unable to reopen fd '%d' for mode '%s;: %s\n", fd,
+		        mode, strerror(errno));
+		exit(1);
+	}
+
+	return file;
+}
+
 off_t xfsize(FILE *file)
 {
 	off_t pos = ftello(file), size;

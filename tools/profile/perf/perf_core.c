@@ -506,6 +506,21 @@ static uint64_t *perf_get_event_values(int perf_fd, int ped, size_t *pnvalues)
 	return values;
 }
 
+/* Helper, returns the total count (across all cores) of the event @idx */
+uint64_t perf_get_event_count(struct perf_context *pctx, unsigned int idx)
+{
+	uint64_t total = 0;
+	size_t nvalues;
+	uint64_t *values;
+
+	values = perf_get_event_values(pctx->perf_fd, pctx->events[idx].ped,
+	                               &nvalues);
+	for (int i = 0; i < nvalues; i++)
+		total += values[i];
+	free(values);
+	return total;
+}
+
 static void perf_close_event(int perf_fd, int ped)
 {
 	uint8_t cmdbuf[1 + sizeof(uint32_t)];

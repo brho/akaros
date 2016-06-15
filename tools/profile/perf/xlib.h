@@ -36,6 +36,7 @@ void xread(int fd, void *data, size_t size);
 void xpwrite(int fd, const void *data, size_t size, off_t off);
 void xpread(int fd, void *data, size_t size, off_t off);
 FILE *xfopen(const char *path, const char *mode);
+FILE *xfdopen(int fd, const char *mode);
 off_t xfsize(FILE *file);
 void xfwrite(const void *data, size_t size, FILE *file);
 void xfseek(FILE *file, off_t offset, int whence);

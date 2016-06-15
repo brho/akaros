@@ -66,6 +66,7 @@ void perf_context_event_submit(struct perf_context *pctx,
 void perf_stop_events(struct perf_context *pctx);
 void perf_start_sampling(struct perf_context *pctx);
 void perf_stop_sampling(struct perf_context *pctx);
+uint64_t perf_get_event_count(struct perf_context *pctx, unsigned int idx);
 void perf_context_show_values(struct perf_context *pctx, FILE *file);
 void perf_show_events(const char *rx, FILE *file);
 void perf_convert_trace_data(struct perfconv_context *cctx, const char *input,

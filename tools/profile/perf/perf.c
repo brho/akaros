@@ -16,6 +16,7 @@
 #include <limits.h>
 #include <errno.h>
 #include <argp.h>
+#include <time.h>
 #include <parlib/parlib.h>
 #include <parlib/timing.h>
 #include "xlib.h"
@@ -47,6 +48,7 @@ struct perf_opts {
 	bool						got_cores;
 	bool						verbose;
 	bool						sampling;
+	bool						stat_bignum;
 	bool						record_quiet;
 	unsigned long				record_period;
 };
@@ -62,6 +64,7 @@ struct perf_cmd {
 static int perf_help(struct perf_cmd *cmd, int argc, char *argv[]);
 static int perf_list(struct perf_cmd *cmd, int argc, char *argv[]);
 static int perf_record(struct perf_cmd *cmd, int argc, char *argv[]);
+static int perf_stat(struct perf_cmd *cmd, int argc, char *argv[]);
 static int perf_pmu_caps(struct perf_cmd *cmd, int argc, char *argv[]);
 
 static struct perf_cmd perf_cmds[] = {
@@ -79,6 +82,11 @@ static struct perf_cmd perf_cmds[] = {
 	  .desc = "Samples events during command execution",
 	  .opts = 0,
 	  .func = perf_record,
+	},
+	{ .name = "stat",
+	  .desc = "Counts events during command execution",
+	  .opts = 0,
+	  .func = perf_stat,
 	},
 	{ .name = "pmu_caps",
 	  .desc = "Shows PMU capabilities",
@@ -333,6 +341,190 @@ static int perf_record(struct perf_cmd *cmd, int argc, char *argv[])
 	 * created during this operation. */
 	perf_convert_trace_data(cctx, perf_cfg.kpdata_file, opts.outfile);
 	fclose(opts.outfile);
+	return 0;
+}
+
+/**************************** perf stat  ************************/
+
+static struct argp_option stat_opts[] = {
+	{"big-num", 'B', 0, 0, "Formatting option"},
+	{"output", 'o', "FILE", 0, "Print output to file (default stdout)"},
+	{ 0 }
+};
+
+static error_t parse_stat_opt(int key, char *arg, struct argp_state *state)
+{
+	struct perf_opts *p_opts = state->input;
+
+	switch (key) {
+	case 'B':
+		p_opts->stat_bignum = TRUE;
+		break;
+	case 'o':
+		p_opts->outfile = xfopen(arg, "w+");
+		break;
+	case ARGP_KEY_END:
+		if (!p_opts->events)
+			p_opts->events = "cache-misses,cache-references,"
+			                 "branch-misses,branches,instructions,cycles";
+		if (!p_opts->outfile)
+			p_opts->outfile = xfdopen(1, "w+");
+		break;
+	default:
+		return ARGP_ERR_UNKNOWN;
+	}
+	return 0;
+}
+
+struct stat_val {
+	char						*name;
+	uint64_t					count;
+};
+
+/* Helper, given a name, fetches its value as a float. */
+static float get_count_for(char *name, struct stat_val *all_vals,
+                           size_t nr_vals)
+{
+	for (int i = 0; i < nr_vals; i++) {
+		if (!strcmp(name, all_vals[i].name))
+			return (float)all_vals[i].count;
+	}
+	return 0.0;
+}
+
+/* Helper, gets the seconds count as a float */
+static float get_seconds(struct stat_val *all_vals, size_t nr_vals)
+{
+	float sec = get_count_for("nsec", all_vals, nr_vals) / 1000000000;
+
+	/* We should never have a time of 0, but in case something went wrong, don't
+	 * hand back 0 (divide by 0 errors). */
+	return sec != 0.0 ? sec : 1.0;
+}
+
+/* Prints "X per second", scaling for K, M, or G. */
+static void print_default_rate(FILE *out, struct stat_val *val,
+                               struct stat_val *all_vals, size_t nr_vals)
+{
+	float rate = val->count / get_seconds(all_vals, nr_vals);
+	char scale = ' ';
+
+	if (rate > 1000000000) {
+		rate /= 1000000000;
+		scale = 'G';
+	} else if (rate > 1000000) {
+		rate /= 1000000;
+		scale = 'M';
+	} else if (rate > 1000) {
+		rate /= 1000;
+		scale = 'K';
+	}
+	fprintf(out, "%9.3f %c/sec\n", rate, scale);
+}
+
+/* Prints a line for the given stat val.  We pass all the vals since some stats
+ * will adjust their output based on *other* known values.  e.g. IPC. */
+static void stat_print_val(FILE *out, struct stat_val *val,
+                           struct stat_val *all_vals, size_t nr_vals)
+{
+	/* Everyone gets the same front part of the printout */
+	fprintf(out, "%18llu      %-25s #", val->count, val->name);
+
+	/* Based on the particular event and what other events we know, we may print
+	 * something different to the summary bit after the #. */
+	if (!strcmp(val->name, "instructions")) {
+		float cycles = get_count_for("cycles", all_vals, nr_vals);
+
+		if (cycles != 0.0)
+			fprintf(out, "%9.3f insns per cycle\n", val->count / cycles);
+		else
+			print_default_rate(out, val, all_vals, nr_vals);
+	} else if (!strcmp(val->name, "cache-misses")) {
+		float cache_ref = get_count_for("cache-references", all_vals, nr_vals);
+
+		if (cache_ref != 0.0)
+			fprintf(out, "%8.2f%% of all refs\n", val->count * 100 / cache_ref);
+		else
+			print_default_rate(out, val, all_vals, nr_vals);
+	} else if (!strcmp(val->name, "branch-misses")) {
+		float branches = get_count_for("branches", all_vals, nr_vals);
+
+		if (branches != 0.0)
+			fprintf(out, "%8.2f%% of all branches\n",
+			        val->count * 100 / branches);
+		else
+			print_default_rate(out, val, all_vals, nr_vals);
+	} else {
+		print_default_rate(out, val, all_vals, nr_vals);
+	}
+}
+
+static char *cmd_as_str(int argc, char *const argv[])
+{
+	size_t len = 0;
+	char *str;
+
+	for (int i = 0; i < argc; i++)
+		len += strlen(argv[i]) + 1;
+	str = xzmalloc(len);
+	for (int i = 0; i < argc; i++) {
+		strlcat(str, argv[i], len);
+		if (i != argc - 1)
+			strlcat(str, " ", len);
+	}
+	return str;
+}
+
+static struct stat_val *collect_stats(struct perf_context *pctx,
+                                      struct timespec *diff)
+{
+	struct stat_val *stat_vals;
+
+	/* the last stat is time (nsec). */
+	stat_vals = xzmalloc(sizeof(struct stat_val) * (pctx->event_count + 1));
+	for (int i = 0; i < pctx->event_count; i++) {
+		stat_vals[i].count = perf_get_event_count(pctx, i);
+		stat_vals[i].name = pctx->events[i].sel.fq_str;
+	}
+	stat_vals[pctx->event_count].name = "nsec";
+	stat_vals[pctx->event_count].count = diff->tv_sec * 1000000000 +
+	                                     diff->tv_nsec;
+	return stat_vals;
+}
+
+static int perf_stat(struct perf_cmd *cmd, int argc, char *argv[])
+{
+	struct argp argp_stat = {stat_opts, parse_stat_opt};
+	struct argp_child children[] = { {&argp_stat, 0, 0, 0}, {0} };
+	FILE *out;
+	struct timespec start, end, diff;
+	struct stat_val *stat_vals;
+	char *cmd_string;
+
+	collect_argp(cmd, argc, argv, children, &opts);
+	opts.sampling = FALSE;
+	out = opts.outfile;
+
+	/* As soon as we submit one event, that event is being tracked, meaning that
+	 * the setup/teardown of perf events is also tracked.  Each event (including
+	 * the clock measurement) will roughly account for either the start or stop
+	 * of every other event. */
+	clock_gettime(CLOCK_REALTIME, &start);
+	submit_events(&opts);
+	run_process_and_wait(opts.cmd_argc, opts.cmd_argv, &opts.cores);
+	clock_gettime(CLOCK_REALTIME, &end);
+	subtract_timespecs(&diff, &end, &start);
+	stat_vals = collect_stats(pctx, &diff);
+	perf_stop_events(pctx);
+	cmd_string = cmd_as_str(opts.cmd_argc, opts.cmd_argv);
+	fprintf(out, "\nPerformance counter stats for '%s':\n\n", cmd_string);
+	free(cmd_string);
+	for (int i = 0; i < pctx->event_count; i++)
+		stat_print_val(out, &stat_vals[i], stat_vals, pctx->event_count + 1);
+	fprintf(out, "\n%8llu.%09llu seconds time elapsed\n\n", diff.tv_sec,
+	        diff.tv_nsec);
+	fclose(out);
+	free(stat_vals);
 	return 0;
 }
 
