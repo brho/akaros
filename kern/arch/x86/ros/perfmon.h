@@ -34,9 +34,6 @@
  *   U8 CMD; (= PERFMON_CMD_COUNTER_STATUS)
  *   U32 EVENT_DESCRIPTOR;
  * PERFMON_CMD_COUNTER_STATUS response
- *   U64 EVENT_DESCRIPTOR;
- *   U64 EVENT_FLAGS;
- *   U64 EVENT_TRIGGER_COUNT;
  *   U32 NUM_VALUES; (always num_cores)
  *   U64 VALUES[NUM_VALUES]; (one value per core - zero if the counter was not
  *                            active in that core)

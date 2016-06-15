@@ -410,10 +410,8 @@ static long arch_perf_write(struct perf_context *pc, const void *udata,
 			break;
 		}
 		case PERFMON_CMD_COUNTER_STATUS: {
-			int i;
 			uint32_t ped;
 			uint8_t *rptr;
-			uint64_t *mvalues;
 			struct perfmon_status *pef;
 
 			error_assert(EBADMSG, (kptr + sizeof(uint32_t)) <= ktop);
@@ -421,22 +419,12 @@ static long arch_perf_write(struct perf_context *pc, const void *udata,
 
 			pef = perfmon_get_event_status(pc->ps, (int) ped);
 
-			mvalues = kzmalloc(num_cores * sizeof(mvalues),
-					   MEM_WAIT);
-			for (i = 0; i < num_cores; i++)
-				mvalues[i] = pef->cores_values[i];
-
-			pc->resp_size = 3 * sizeof(uint64_t) + sizeof(uint32_t) +
-				num_cores * sizeof(uint64_t);
+			pc->resp_size = sizeof(uint32_t) + num_cores * sizeof(uint64_t);
 			pc->resp = kmalloc(pc->resp_size, MEM_WAIT);
+			rptr = put_le_u32(pc->resp, num_cores);
+			for (int i = 0; i < num_cores; i++)
+				rptr = put_le_u64(rptr, pef->cores_values[i]);
 
-			rptr = put_le_u64(pc->resp, pef->ev.event);
-			rptr = put_le_u64(rptr, pef->ev.flags);
-			rptr = put_le_u64(rptr, pef->ev.trigger_count);
-			rptr = put_le_u32(rptr, num_cores);
-			for (i = 0; i < num_cores; i++)
-				rptr = put_le_u64(rptr, mvalues[i]);
-			kfree(mvalues);
 			perfmon_free_event_status(pef);
 			break;
 		}

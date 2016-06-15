@@ -467,8 +467,7 @@ static uint64_t *perf_get_event_values(int perf_fd, int ped, size_t *pnvalues)
 	uint32_t i, n;
 	uint64_t *values;
 	uint64_t temp;
-	size_t bufsize = 3 * sizeof(uint64_t) + sizeof(uint32_t) +
-		MAX_NUM_CORES * sizeof(uint64_t);
+	size_t bufsize = sizeof(uint32_t) + MAX_NUM_CORES * sizeof(uint64_t);
 	uint8_t *cmdbuf = xmalloc(bufsize);
 	uint8_t *wptr = cmdbuf;
 	const uint8_t *rptr = cmdbuf;
@@ -479,17 +478,11 @@ static uint64_t *perf_get_event_values(int perf_fd, int ped, size_t *pnvalues)
 	xpwrite(perf_fd, cmdbuf, wptr - cmdbuf, 0);
 	rsize = pread(perf_fd, cmdbuf, bufsize, 0);
 
-	if (rsize < (3 * sizeof(uint64_t) + sizeof(uint32_t))) {
+	if (rsize < (sizeof(uint32_t))) {
 		fprintf(stderr, "Invalid read size while fetching event status: %ld\n",
 				rsize);
 		exit(1);
 	}
-
-	/* TODO: The kernel lies to us about this, it's all 0. */
-	rptr = get_le_u64(rptr, &temp);		/* discard ev.event */
-	rptr = get_le_u64(rptr, &temp);		/* discard ev.flags */
-	rptr = get_le_u64(rptr, &temp);		/* discard ev.trigger_count */
-
 	rptr = get_le_u32(rptr, &n);
 	if (((rptr - cmdbuf) + n * sizeof(uint64_t)) > rsize) {
 		fprintf(stderr, "Invalid read size while fetching event status: %ld\n",
