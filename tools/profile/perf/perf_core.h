@@ -41,7 +41,14 @@ struct perf_event {
 	int ped;
 };
 
+struct perf_context_config {
+	const char *perf_file;
+	const char *kpctl_file;
+	const char *kpdata_file;
+};
+
 struct perf_context {
+	struct perf_context_config *cfg;
 	int perf_fd;
 	int kpctl_fd;
 	struct perf_arch_info pai;
@@ -49,16 +56,10 @@ struct perf_context {
 	struct perf_event events[MAX_CPU_EVENTS];
 };
 
-struct perf_context_config {
-	const char *perf_file;
-	const char *kpctl_file;
-	const char *kpdata_file;
-};
-
 void perf_initialize(void);
 void perf_finalize(void);
 struct perf_eventsel *perf_parse_event(const char *str);
-struct perf_context *perf_create_context(const struct perf_context_config *cfg);
+struct perf_context *perf_create_context(struct perf_context_config *cfg);
 void perf_free_context(struct perf_context *pctx);
 void perf_context_event_submit(struct perf_context *pctx,
 							   const struct core_set *cores,

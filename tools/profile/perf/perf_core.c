@@ -532,12 +532,16 @@ static void perf_close_event(int perf_fd, int ped)
 	xpwrite(perf_fd, cmdbuf, wptr - cmdbuf, 0);
 }
 
-struct perf_context *perf_create_context(const struct perf_context_config *cfg)
+struct perf_context *perf_create_context(struct perf_context_config *cfg)
 {
 	struct perf_context *pctx = xzmalloc(sizeof(struct perf_context));
 
+	pctx->cfg = cfg;
 	pctx->perf_fd = xopen(cfg->perf_file, O_RDWR, 0);
-	pctx->kpctl_fd = xopen(cfg->kpctl_file, O_RDWR, 0);
+	/* perf record needs kpctl_fd, but other perf subcommands might not.  We'll
+	 * delay the opening of kpctl until we need it, since kprof is picky about
+	 * multiple users of kpctl. */
+	pctx->kpctl_fd = -1;
 	perf_get_arch_info(pctx->perf_fd, &pctx->pai);
 
 	return pctx;
@@ -545,7 +549,8 @@ struct perf_context *perf_create_context(const struct perf_context_config *cfg)
 
 void perf_free_context(struct perf_context *pctx)
 {
-	close(pctx->kpctl_fd);	/* disabled sampling */
+	if (pctx->kpctl_fd != -1)
+		close(pctx->kpctl_fd);	/* disabled sampling */
 	close(pctx->perf_fd);	/* closes all events */
 	free(pctx);
 }
@@ -577,10 +582,17 @@ void perf_stop_events(struct perf_context *pctx)
 		perf_close_event(pctx->perf_fd, pctx->events[i].ped);
 }
 
+static void ensure_kpctl_is_open(struct perf_context *pctx)
+{
+	if (pctx->kpctl_fd == -1)
+		pctx->kpctl_fd = xopen(pctx->cfg->kpctl_file, O_RDWR, 0);
+}
+
 void perf_start_sampling(struct perf_context *pctx)
 {
 	static const char * const enable_str = "start";
 
+	ensure_kpctl_is_open(pctx);
 	xwrite(pctx->kpctl_fd, enable_str, strlen(enable_str));
 }
 
@@ -588,6 +600,7 @@ void perf_stop_sampling(struct perf_context *pctx)
 {
 	static const char * const disable_str = "stop";
 
+	ensure_kpctl_is_open(pctx);
 	xwrite(pctx->kpctl_fd, disable_str, strlen(disable_str));
 }
 
