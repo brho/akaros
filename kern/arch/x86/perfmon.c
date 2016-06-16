@@ -306,6 +306,30 @@ static void perfmon_do_cores_free(void *opaque)
 	pa->cores_counters[coreno] = (counter_t) err;
 }
 
+/* Helper: Reads a fixed counter's value.  Returns the max amount possible if
+ * the counter overflowed. */
+static uint64_t perfmon_read_fixed_counter(int ccno)
+{
+	uint64_t overflow_status = read_msr(MSR_CORE_PERF_GLOBAL_STATUS);
+
+	if (overflow_status & (1ULL << (32 + ccno)))
+		return (1ULL << cpu_caps.bits_x_fix_counter) - 1;
+	else
+		return read_msr(MSR_CORE_PERF_FIXED_CTR0 + ccno);
+}
+
+/* Helper: Reads an unfixed counter's value.  Returns the max amount possible if
+ * the counter overflowed. */
+static uint64_t perfmon_read_unfixed_counter(int ccno)
+{
+	uint64_t overflow_status = read_msr(MSR_CORE_PERF_GLOBAL_STATUS);
+
+	if (overflow_status & (1ULL << ccno))
+		return (1ULL << cpu_caps.bits_x_counter) - 1;
+	else
+		return read_msr(MSR_IA32_PERFCTR0 + ccno);
+}
+
 static void perfmon_do_cores_status(void *opaque)
 {
 	struct perfmon_status_env *env = (struct perfmon_status_env *) opaque;
@@ -315,11 +339,9 @@ static void perfmon_do_cores_status(void *opaque)
 
 	spin_lock_irqsave(&cctx->lock);
 	if (perfmon_is_fixed_event(&env->pa->ev))
-		env->pef->cores_values[coreno] =
-		    read_msr(MSR_CORE_PERF_FIXED_CTR0 + ccno);
+		env->pef->cores_values[coreno] = perfmon_read_fixed_counter(ccno);
 	else
-		env->pef->cores_values[coreno] =
-		    read_msr(MSR_IA32_PERFCTR0 + ccno);
+		env->pef->cores_values[coreno] = perfmon_read_unfixed_counter(ccno);
 	spin_unlock_irqsave(&cctx->lock);
 }
 
