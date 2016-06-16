@@ -7,18 +7,6 @@
 
 #include <sys/types.h>
 
-#define PROF_DOM_SHIFT (8 * sizeof(uint64_t) - 4)
-#define PROF_INFO_MASK (((uint64_t) 1 << PROF_DOM_SHIFT) - 1)
-
-#define PROF_MKINFO(dom, dinfo)								\
-	(((uint64_t) (dom) << PROF_DOM_SHIFT) | ((dinfo) & PROF_INFO_MASK))
-
-#define PROF_INFO_DOM(i) ((uint64_t) (i) >> PROF_DOM_SHIFT)
-#define PROF_INFO_DATA(i) ((i) & PROF_INFO_MASK)
-
-#define PROF_DOM_TIMER 1
-#define PROF_DOM_PMU 2
-
 #define PROFTYPE_KERN_TRACE64	1
 
 struct proftype_kern_trace64 {

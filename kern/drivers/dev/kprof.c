@@ -48,7 +48,6 @@ struct trace_printk_buffer {
 
 struct kprof {
 	qlock_t lock;
-	struct alarm_waiter *alarms;
 	bool mpstat_ipi;
 	bool profiling;
 	bool opened;
@@ -70,7 +69,6 @@ static bool ktrace_init_done = FALSE;
 static spinlock_t ktrace_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 static struct circular_buffer ktrace_data;
 static char ktrace_buffer[KTRACE_BUFFER_SIZE];
-static int kprof_timer_period = 1000;
 static char kprof_control_usage[128];
 
 static size_t mpstat_len(void)
@@ -93,41 +91,9 @@ static char *devname(void)
 	return kprofdevtab.name;
 }
 
-static void kprof_alarm_handler(struct alarm_waiter *waiter,
-                                struct hw_trapframe *hw_tf)
-{
-	int coreid = core_id();
-	struct timer_chain *tchain = &per_cpu_info[coreid].tchain;
-
-	profiler_add_hw_sample(hw_tf, PROF_MKINFO(PROF_DOM_TIMER,
-											  kprof_timer_period));
-	reset_alarm_rel(tchain, waiter, kprof_timer_period);
-}
-
 static struct chan *kprof_attach(char *spec)
 {
-	if (!kprof.alarms)
-		error(ENOMEM, ERROR_FIXME);
-
 	return devattach(devname(), spec);
-}
-
-static void kprof_enable_timer(int coreid, int on_off)
-{
-	struct timer_chain *tchain = &per_cpu_info[coreid].tchain;
-	struct alarm_waiter *waiter = &kprof.alarms[coreid];
-
-	if (on_off) {
-		/* Per CPU waiters already inited.  Will set/reset each time (1 ms
-		 * default). */
-		reset_alarm_rel(tchain, waiter, kprof_timer_period);
-	} else {
-		/* Since the alarm handler runs and gets reset within IRQ context, then
-		 * we should never fail to cancel the alarm if it was already running
-		 * (tchain locks synchronize us).  But it might not be set at all, which
-		 * is fine. */
-		unset_alarm(tchain, waiter);
-	}
 }
 
 /* Start collecting samples from perf events into the profiler.
@@ -192,46 +158,27 @@ static void kprof_flush_profiler(void)
 
 static void kprof_init(void)
 {
-	int i;
-	ERRSTACK(1);
-
 	profiler_init();
 
 	qlock_init(&kprof.lock);
 	kprof.profiling = FALSE;
 	kprof.opened = FALSE;
 
-	kprof.alarms = kzmalloc(sizeof(struct alarm_waiter) * num_cores,
-	                        MEM_WAIT);
-	if (!kprof.alarms)
-		error(ENOMEM, ERROR_FIXME);
-	if (waserror()) {
-		kfree(kprof.alarms);
-		kprof.alarms = NULL;
-		nexterror();
-	}
-	for (i = 0; i < num_cores; i++)
-		init_awaiter_irq(&kprof.alarms[i], kprof_alarm_handler);
-
-	for (i = 0; i < ARRAY_SIZE(kproftab); i++)
+	for (int i = 0; i < ARRAY_SIZE(kproftab); i++)
 		kproftab[i].length = 0;
 
 	kprof.mpstat_ipi = TRUE;
 	kproftab[Kmpstatqid].length = mpstat_len();
 	kproftab[Kmpstatrawqid].length = mpstatraw_len();
 
-	strlcpy(kprof_control_usage, "start|stop|flush|timer",
+	strlcpy(kprof_control_usage, "start|stop|flush",
 	        sizeof(kprof_control_usage));
 	profiler_append_configure_usage(kprof_control_usage,
 	                                sizeof(kprof_control_usage));
-
-	poperror();
 }
 
 static void kprof_shutdown(void)
 {
-	kfree(kprof.alarms);
-	kprof.alarms = NULL;
 }
 
 static struct walkqid *kprof_walk(struct chan *c, struct chan *nc, char **name,
@@ -402,17 +349,6 @@ static long kprof_read(struct chan *c, void *va, long n, int64_t off)
 	return n;
 }
 
-static void kprof_manage_timer(int coreid, struct cmdbuf *cb)
-{
-	if (!strcmp(cb->f[2], "on")) {
-		kprof_enable_timer(coreid, 1);
-	} else if (!strcmp(cb->f[2], "off")) {
-		kprof_enable_timer(coreid, 0);
-	} else {
-		error(EFAIL, "timer needs on|off");
-	}
-}
-
 static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 {
 	ERRSTACK(1);
@@ -428,22 +364,7 @@ static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 			error(EFAIL, kprof_control_usage);
 		if (profiler_configure(cb))
 			break;
-		if (!strcmp(cb->f[0], "timer")) {
-			if (cb->nf < 3)
-				error(EFAIL, "timer {{all, N} {on, off}, period USEC}");
-			if (!strcmp(cb->f[1], "period")) {
-				kprof_timer_period = strtoul(cb->f[2], 0, 10);
-			} else if (!strcmp(cb->f[1], "all")) {
-				for (int i = 0; i < num_cores; i++)
-					kprof_manage_timer(i, cb);
-			} else {
-				int pcoreid = strtoul(cb->f[1], 0, 10);
-
-				if (pcoreid >= num_cores)
-					error(EFAIL, "No such coreid %d", pcoreid);
-				kprof_manage_timer(pcoreid, cb);
-			}
-		} else if (!strcmp(cb->f[0], "start")) {
+		if (!strcmp(cb->f[0], "start")) {
 			kprof_start_profiler();
 		} else if (!strcmp(cb->f[0], "flush")) {
 			kprof_flush_profiler();
