@@ -663,14 +663,16 @@ static void emit_kernel_trace64(struct perf_record *pr,
 	xrec->header.misc = PERF_RECORD_MISC_KERNEL;
 	xrec->header.size = size;
 	xrec->ip = rec->trace[0];
-	/* TODO: We could have pid/tid for kernel tasks during their lifetime.
-	 * During syscalls, we could use the pid of the process.  For the kernel
-	 * itself, -1 seems to be generic kernel stuff, and tid == 0 is 'swapper'.
-	 *
-	 * Right now, the kernel doesn't even tell us the pid, so we have no way of
-	 * knowing from userspace. */
-	xrec->pid = -1;
-	xrec->tid = 0;
+	/* TODO: -1 means "not a process".  We could track ktasks with IDs, emit
+	 * COMM events for them (probably!) and report them as the tid.  For now,
+	 * tid of 0 means [swapper] to Linux. */
+	if (rec->pid == -1) {
+		xrec->pid = -1;
+		xrec->tid = 0;
+	} else {
+		xrec->pid = rec->pid;
+		xrec->tid = rec->pid;
+	}
 	xrec->time = rec->tstamp;
 	xrec->addr = rec->trace[0];
 	xrec->identifier = perfconv_get_event_id(cctx, rec->info);

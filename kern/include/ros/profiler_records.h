@@ -12,6 +12,7 @@
 struct proftype_kern_trace64 {
 	uint64_t info;
 	uint64_t tstamp;
+	uint32_t pid;
 	uint16_t cpu;
 	uint16_t num_traces;
 	uint64_t trace[0];

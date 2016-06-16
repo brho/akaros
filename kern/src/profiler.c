@@ -130,6 +130,7 @@ static void profiler_push_kernel_trace64(struct profiler_cpu_context *cpu_buf,
                                          const uintptr_t *trace, size_t count,
                                          uint64_t info)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	size_t size = sizeof(struct proftype_kern_trace64) +
 		count * sizeof(uint64_t);
 	struct block *b;
@@ -151,6 +152,10 @@ static void profiler_push_kernel_trace64(struct profiler_cpu_context *cpu_buf,
 
 		record->info = info;
 		record->tstamp = nsec();
+		if (is_ktask(pcpui->cur_kthread) || !pcpui->cur_proc)
+			record->pid = -1;
+		else
+			record->pid = pcpui->cur_proc->pid;
 		record->cpu = cpu_buf->cpu;
 		record->num_traces = count;
 		for (size_t i = 0; i < count; i++)
