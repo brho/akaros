@@ -847,8 +847,11 @@ static struct Atable *parsesrat(struct Atable *parent,
 	int i;
 	struct Srat *st;
 
-	if (srat != NULL)
-		panic("acpi: two SRATs?\n");
+	/* TODO: Parse the second SRAT */
+	if (srat != NULL) {
+		warn("Multiple SRATs detected and ignored!");
+		return NULL;
+	}
 
 	t = mkatable(parent, SRAT, name, p, rawsize, 0);
 	slice_init(&slice);
