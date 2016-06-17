@@ -38,7 +38,7 @@ static struct perfconv_context *cctx;
 static struct perf_context *pctx;
 
 struct perf_opts {
-	const char					*output_file;
+	FILE						*outfile;
 	const char					*events;
 	char						**cmd_argv;
 	int							cmd_argc;
@@ -290,7 +290,7 @@ static error_t parse_record_opt(int key, char *arg, struct argp_state *state)
 		/* Our default operation is to record backtraces. */
 		break;
 	case 'o':
-		p_opts->output_file = arg;
+		p_opts->outfile = xfopen(arg, "wb");
 		break;
 	case 'q':
 		p_opts->record_quiet = TRUE;
@@ -298,8 +298,8 @@ static error_t parse_record_opt(int key, char *arg, struct argp_state *state)
 	case ARGP_KEY_END:
 		if (!p_opts->events)
 			p_opts->events = "cycles";
-		if (!p_opts->output_file)
-			p_opts->output_file = "perf.data";
+		if (!p_opts->outfile)
+			p_opts->outfile = xfopen("perf.data", "wb");
 		if (!p_opts->record_period)
 			p_opts->record_period = freq_to_period(1000);
 		break;
@@ -330,7 +330,8 @@ static int perf_record(struct perf_cmd *cmd, int argc, char *argv[])
 	perf_flush_context_traces(pctx);
 	/* Generate the Linux perf file format with the traces which have been
 	 * created during this operation. */
-	perf_convert_trace_data(cctx, perf_cfg.kpdata_file, opts.output_file);
+	perf_convert_trace_data(cctx, perf_cfg.kpdata_file, opts.outfile);
+	fclose(opts.outfile);
 	return 0;
 }
 

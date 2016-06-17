@@ -752,21 +752,17 @@ void perf_show_events(const char *rx, FILE *file)
 }
 
 void perf_convert_trace_data(struct perfconv_context *cctx, const char *input,
-							 const char *output)
+							 FILE *outfile)
 {
-	FILE *infile, *outfile;
+	FILE *infile;
 	size_t ksize;
 	char kpath[1024];
 
 	infile = xfopen(input, "rb");
 	if (xfsize(infile) > 0) {
-		outfile = xfopen(output, "wb");
-
 		perfconv_add_kernel_mmap(cctx);
 		perfconv_add_kernel_buildid(cctx);
 		perfconv_process_input(cctx, infile, outfile);
-
-		fclose(outfile);
 	}
 	fclose(infile);
 }

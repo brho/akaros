@@ -67,7 +67,7 @@ void perf_context_event_submit(struct perf_context *pctx,
 void perf_context_show_values(struct perf_context *pctx, FILE *file);
 void perf_show_events(const char *rx, FILE *file);
 void perf_convert_trace_data(struct perfconv_context *cctx, const char *input,
-							 const char *output);
+							 FILE *outfile);
 
 static inline const struct perf_arch_info *perf_context_get_arch_info(
 	const struct perf_context *pctx)
