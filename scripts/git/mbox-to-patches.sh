@@ -2,11 +2,11 @@
 # Barret Rhoden (brho@cs.berkeley.edu)
 # Copyright 2016 Google Inc
 #
-# Converts an mbox to a patch set.
+# Converts an mbox to a patch set.  It's like git am, but it generates patches
+# instead of applying them to your tree.
 #
-# Mostly, it is just git mailsplit, but it also processes the patches to remove
-# a lot of the email headers and to rewrite any From: headers that were mangled
-# by the mail server.
+# Mostly, it is just git mailsplit and mailinfo, but it also handles rewritten
+# 'From' fields that Gmail or Google Groups seem to generate.
 
 PATCHDIR="${PATCHDIR:-../patches}"
 
@@ -35,13 +35,8 @@ git mailsplit -o$PATCHDIR $MBOX > /dev/null
 cd $PATCHDIR
 for i in `ls`
 do
-	# Remove all the header crap above From:
-	FROMLINE=`grep -n "^From:" $i | cut -f 1 -d':' | head -1`
-	FROMLINESUB=$(( ${FROMLINE} - 1 ))
-	sed -i -e "1,${FROMLINESUB}d" $i
-
-	# Gmail sucks and rewrites some Froms.  We'll catch it and replace From
-	# with X-Original-From
+	# Gmail rewrites some Froms.  We'll catch it and replace From with
+	# X-Original-From
 	ORIGFROM=`grep "^X-Original-From" $i`
 	if [ $? -eq 0 ]
 	then
@@ -49,25 +44,19 @@ do
 		sed -i "/^From:.*/c$ORIGFROM" $i
 	fi
 
-	# Remove header crap before the first blank
-	# X- stuff
-	SPACELINE=`grep -n "^$" $i | cut -f 1 -d':' | head -1`
-	sed -i -e "1,${SPACELINE}{ /^X-.*/d }" $i
+	git mailinfo MI_msg MI_patch < $i > MI_header
 
-	# List stuff
-	SPACELINE=`grep -n "^$" $i | cut -f 1 -d':' | head -1`
-	sed -i -e "1,${SPACELINE}{ /^List-.*/d }" $i
+	# We need a From: field, synthesized from Author and Email
+	AUTHOR=`grep "^Author:" MI_header | cut -f 2- -d' '`
+	EMAIL=`grep "^Email:" MI_header | cut -f 2- -d' '`
 
-	# space-indented stuff for the X and List headers
-	SPACELINE=`grep -n "^$" $i | cut -f 1 -d':' | head -1`
-	sed -i -e "1,${SPACELINE}{ /^ .*/d }" $i
+	# Determine the subject for naming the patch, replace spaces and weird chars
+	SUBJECT=`grep "^Subject:" MI_header | cut -f 2- -d' ' |
+	         sed 's/[^[:alnum:]]/-/g'`
 
-	# grep subject, remove [akaros], remove " [PATCH xxx] ", (matching anything
-	# other than a ], so we get only the first ]), then changes
-	# non-letters/nums to -
-	SUBJECT=`grep "^Subject:" $i | cut -f 2- -d':' | sed 's/\[akaros\]//' |
-	         sed 's/^ *\[[^]]*\] //' | sed 's/[^[:alnum:]]/-/g'`
+	echo "From: $AUTHOR <$EMAIL>" > $i-$SUBJECT.patch
+	cat MI_header MI_msg MI_patch >> $i-$SUBJECT.patch
 
-	mv $i $i-$SUBJECT.patch
+	rm MI_header MI_msg MI_patch $i
 done
 cd - > /dev/null
