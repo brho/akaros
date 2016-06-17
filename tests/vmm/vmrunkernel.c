@@ -97,7 +97,7 @@ struct acpi_table_madt madt = {
 struct acpi_madt_local_apic Apic0 = {.header = {.type = ACPI_MADT_TYPE_LOCAL_APIC, .length = sizeof(struct acpi_madt_local_apic)},
 				     .processor_id = 0, .id = 0};
 struct acpi_madt_io_apic Apic1 = {.header = {.type = ACPI_MADT_TYPE_IO_APIC, .length = sizeof(struct acpi_madt_io_apic)},
-				  .id = 1, .address = 0xfec00000, .global_irq_base = 0};
+				  .id = 0, .address = 0xfec00000, .global_irq_base = 0};
 struct acpi_madt_local_x2apic X2Apic0 = {
 	.header = {
 		.type = ACPI_MADT_TYPE_LOCAL_X2APIC,
@@ -108,42 +108,24 @@ struct acpi_madt_local_x2apic X2Apic0 = {
 };
 
 struct acpi_madt_interrupt_override isor[] = {
-	/* I have no idea if it should be source irq 2, global 0, or global 2, source 0. Shit. */
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 2, .global_irq = 0, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	/* From the ACPI Specification Version 6.1:
+	 * For example, if your machine has the ISA Programmable Interrupt Timer
+	 * (PIT) connected to ISA IRQ 0, but in APIC mode, it is connected to I/O
+	 * APIC interrupt input 2, then you would need an Interrupt Source Override
+	 * where the source entry is ‘0’ and the Global System Interrupt is ‘2.’
+	 */
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE,
+	            .length = sizeof(struct acpi_madt_interrupt_override)},
+	 .bus = 0, .source_irq = 0, .global_irq = 2, .inti_flags = 0},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE,
+	            .length = sizeof(struct acpi_madt_interrupt_override)},
 	 .bus = 0, .source_irq = 1, .global_irq = 1, .inti_flags = 0},
-	//{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
-	 //.bus = 0, .source_irq = 2, .global_irq = 2, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE,
+	            .length = sizeof(struct acpi_madt_interrupt_override)},
 	 .bus = 0, .source_irq = 3, .global_irq = 3, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
+	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE,
+	            .length = sizeof(struct acpi_madt_interrupt_override)},
 	 .bus = 0, .source_irq = 4, .global_irq = 4, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 5, .global_irq = 5, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 6, .global_irq = 6, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 7, .global_irq = 7, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 8, .global_irq = 8, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 9, .global_irq = 9, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 10, .global_irq = 10, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 11, .global_irq = 11, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 12, .global_irq = 12, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 13, .global_irq = 13, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 14, .global_irq = 14, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 15, .global_irq = 15, .inti_flags = 0},
-	// VMMCP routes irq 32 to gsi 17
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 32, .global_irq = 17, .inti_flags = 5},
 };
 
 
@@ -206,14 +188,17 @@ void timer_thread(void *arg)
 // FIXME.
 volatile int consdata = 0;
 
-static void virtio_poke_guest(void)
+static void virtio_poke_guest(uint8_t vec)
 {
-	set_posted_interrupt(0xE5);
+	set_posted_interrupt(vec);
 	ros_syscall(SYS_vmm_poke_guest, 0, 0, 0, 0, 0, 0);
 }
 
 static struct virtio_mmio_dev cons_mmio_dev = {
-	.poke_guest = virtio_poke_guest
+	.poke_guest = virtio_poke_guest,
+	/* At the moment irq numbers cannot be below 24; this is a problem with
+	 * the IOAPIC and Interrupt Source Override Structure. */
+	.irq = 26,
 };
 
 static struct virtio_console_config cons_cfg;
@@ -245,7 +230,6 @@ static struct virtio_vq_dev cons_vqdev = {
 			},
 		}
 };
-
 
 void lowmem() {
 	__asm__ __volatile__ (".section .lowmem, \"aw\"\n\tlow: \n\t.=0x1000\n\t.align 0x100000\n\t.previous\n");
@@ -613,8 +597,10 @@ int main(int argc, char **argv)
 		if (vm->virtio_mmio_devices[i] == NULL)
 			continue;
 		/* Append all the virtio mmio base addresses. */
-		len = snprintf(cmdlinep, cmdlinesz, " virtio_mmio.device=1K@0x%llx:32",
-		               vm->virtio_mmio_devices[i]->addr);
+		len = snprintf(cmdlinep, cmdlinesz,
+		               " virtio_mmio.device=1K@0x%llx:%lld",
+		               vm->virtio_mmio_devices[i]->addr,
+		               vm->virtio_mmio_devices[i]->irq);
 		if (len >= cmdlinesz) {
 			fprintf(stderr, "Too many arguments to the linux command line.");
 			exit(1);

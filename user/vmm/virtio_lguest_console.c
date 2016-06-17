@@ -40,6 +40,7 @@ void cons_receiveq_fn(void *_vq) // host -> guest
 	uint32_t i, j;
 	int num_read;
 	struct iovec *iov;
+	struct virtio_mmio_dev *dev = vq->vqdev->transport_dev;
 
 	if (!vq)
 		errx(1,
@@ -85,10 +86,10 @@ void cons_receiveq_fn(void *_vq) // host -> guest
 		virtio_add_used_desc(vq, head, num_read);
 
 		// Poke the guest however the mmio transport prefers
-		// NOTE: assuming that the mmio transport was used for now
-		virtio_mmio_set_vring_irq(vq->vqdev->transport_dev);
-		if (((struct virtio_mmio_dev*)vq->vqdev->transport_dev)->poke_guest)
-			((struct virtio_mmio_dev*)vq->vqdev->transport_dev)->poke_guest();
+		// NOTE: assuming that the mmio transport was used for now.
+		virtio_mmio_set_vring_irq(dev);
+		if (dev->poke_guest)
+			dev->poke_guest(dev->vec);
 		else
 			VIRTIO_DEV_ERRX(vq->vqdev,
 				"The host MUST provide a way for device interrupts to be sent to the guest. The 'poke_guest' function pointer on the vq->vqdev->transport_dev (assumed to be a struct virtio_mmio_dev) was not set.");
@@ -103,6 +104,7 @@ void cons_transmitq_fn(void *_vq) // guest -> host
 	uint32_t olen, ilen;
 	uint32_t i, j;
 	struct iovec *iov;
+	struct virtio_mmio_dev *dev = vq->vqdev->transport_dev;
 
 	if (!vq)
 		errx(1,
@@ -146,9 +148,9 @@ void cons_transmitq_fn(void *_vq) // guest -> host
 
 		// Poke the guest however the mmio transport prefers
 		// NOTE: assuming that the mmio transport was used for now
-		virtio_mmio_set_vring_irq(vq->vqdev->transport_dev);
-		if (((struct virtio_mmio_dev*)vq->vqdev->transport_dev)->poke_guest)
-			((struct virtio_mmio_dev*)vq->vqdev->transport_dev)->poke_guest();
+		virtio_mmio_set_vring_irq(dev);
+		if (dev->poke_guest)
+			dev->poke_guest(dev->vec);
 		else
 			VIRTIO_DEV_ERRX(vq->vqdev,
 				"The host MUST provide a way for device interrupts to be sent to the guest. The 'poke_guest' function pointer on the vq->vqdev->transport_dev (assumed to be a struct virtio_mmio_dev) was not set.");

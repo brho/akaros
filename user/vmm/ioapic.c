@@ -31,6 +31,10 @@
 #define IOAPIC_CONFIG 0x100
 #define IOAPIC_NUM_PINS 24
 
+/* The problem with the IOAPIC and ISOR Structure means all irq numbers
+ * must be at least 24, so this is used to correct that offset. */
+#define IOAPIC_LAST_IRQ 23
+
 int debug_ioapic = 1;
 int apic_id_mask = 0xf0;
 
@@ -47,11 +51,11 @@ struct ioapic {
 
 static struct ioapic ioapic[1];
 
-static uint32_t ioapic_read(int ix, uint64_t offset)
+static uint32_t ioapic_read(struct guest_thread *vm_thread, int ix,
+                            uint64_t offset)
 {
 	uint32_t ret = (uint32_t)-1;
 	uint32_t reg = ioapic[ix].reg;
-
 
 	if (offset == 0) {
 		DPRINTF("ioapic_read ix %x return 0x%x\n", ix, reg);
@@ -85,15 +89,33 @@ static uint32_t ioapic_read(int ix, uint64_t offset)
 	return 0;
 }
 
-static void ioapic_write(int ix, uint64_t offset, uint32_t value)
+static void ioapic_write(struct guest_thread *vm_thread, int ix,
+                         uint64_t offset, uint32_t value)
 {
 	uint32_t ret;
 	uint32_t reg = ioapic[ix].reg;
+	struct virtual_machine *vm = gth_to_vm(vm_thread);
+	uint32_t irqreg;
 
 	if (offset == 0) {
 		DPRINTF("ioapic_write ix %x set reg 0x%x\n", ix, value);
 		ioapic[ix].reg = value;
 		return;
+	}
+
+	for (int i = 0; i < VIRTIO_MMIO_MAX_NUM_DEV; i++) {
+		if (vm->virtio_mmio_devices[i] == NULL)
+			continue;
+
+		/* The first IRQ register starts at 0x10, and there are two 32-bit
+		 * registers for each IRQ. The first 8 bits of the value assigned to
+		 * 'reg' is the interrupt vector. */
+		irqreg = (vm->virtio_mmio_devices[i]->irq - IOAPIC_LAST_IRQ) * 2 + 0x10;
+		if (reg == irqreg && (value & 0xff) != 0) {
+			vm->virtio_mmio_devices[i]->vec = value & 0xff;
+			DPRINTF("irq vector for irq number %d is: %lx\n",
+			         vm->virtio_mmio_devices[i]->irq, value & 0xff);
+		}
 	}
 
 	switch (reg) {
@@ -119,7 +141,7 @@ static void ioapic_write(int ix, uint64_t offset, uint32_t value)
 int do_ioapic(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
               uint64_t *regp, int store)
 {
-	// TODO: compute an index for the ioapic array. 
+	/* TODO(ganshun): compute an index for the ioapic array. */
 	int ix = 0;
 	uint32_t offset = gpa & 0xfffff;
 	/* basic sanity tests. */
@@ -131,9 +153,9 @@ int do_ioapic(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
 	}
 
 	if (store) {
-		ioapic_write(ix, offset, *regp);
+		ioapic_write(vm_thread, ix, offset, *regp);
 	} else {
-		*regp = ioapic_read(ix, offset);
+		*regp = ioapic_read(vm_thread, ix, offset);
 	}
 
 }
