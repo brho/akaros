@@ -20,6 +20,7 @@
 # - Casting pointers can be (struct foo*) or (struct foo *)
 # - Don't prod about updating MAINTAINERS
 # - Allow C99 comments
+# - Allow Gerrit change-ids
 
 use strict;
 use POSIX;
@@ -2324,11 +2325,11 @@ sub process {
 			      "The 'stable' address should be 'stable\@vger.kernel.org'\n" . $herecurr);
 		}
 
-# Check for unwanted Gerrit info
-		if ($in_commit_log && $line =~ /^\s*change-id:/i) {
-			ERROR("GERRIT_CHANGE_ID",
-			      "Remove Gerrit Change-Id's before submitting upstream.\n" . $herecurr);
-		}
+## Check for unwanted Gerrit info
+#		if ($in_commit_log && $line =~ /^\s*change-id:/i) {
+#			ERROR("GERRIT_CHANGE_ID",
+#			      "Remove Gerrit Change-Id's before submitting upstream.\n" . $herecurr);
+#		}
 
 # Check for line lengths > 75 in commit log, warn once
 		if ($in_commit_log && !$commit_log_long_line &&
