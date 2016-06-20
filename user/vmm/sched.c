@@ -419,6 +419,8 @@ static struct guest_thread *create_guest_thread(struct virtual_machine *vm,
 	/* TODO: give it a correct FP state.  Our current one is probably fine */
 	restore_fp_state(&gth->uthread.as);
 	gth->uthread.flags |= UTHREAD_FPSAVED;
+	gth->halt_mtx = uth_mutex_alloc();
+	gth->halt_cv = uth_cond_var_alloc();
 	return gth;
 }
 

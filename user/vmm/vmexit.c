@@ -8,10 +8,61 @@
 #include <vmm/virtio_config.h>
 #include <vmm/vmm.h>
 #include <parlib/arch/trap.h>
+#include <parlib/bitmask.h>
 #include <stdio.h>
 
-/* TODO: need infrastructure to handle GPC wakeup properly */
-static bool consdata = FALSE;
+static bool pir_notif_is_set(struct vmm_gpcore_init *gpci)
+{
+	return GET_BITMASK_BIT(gpci->posted_irq_desc, VMX_POSTED_OUTSTANDING_NOTIF);
+}
+
+static bool rvi_is_set(struct guest_thread *gth)
+{
+	uint8_t rvi = gth_to_vmtf(gth)->tf_guest_intr_status & 0xff;
+
+	return rvi != 0;
+}
+
+/* Blocks a guest pcore / thread until it has an IRQ pending.  Syncs with
+ * vmm_interrupt_guest(). */
+static void sleep_til_irq(struct guest_thread *gth)
+{
+	struct vmm_gpcore_init *gpci = gth_to_gpci(gth);
+
+	/* The invariant is that if an IRQ is posted, but not delivered, we will not
+	 * sleep.  Anyone who posts an IRQ must signal after setting it.
+	 * vmm_interrupt_guest() does this.  If we use alternate sources of IRQ
+	 * posting, we'll need to revist this.
+	 *
+	 * Although vmm_interrupt_guest() only writes OUTSTANDING_NOTIF, it's
+	 * possible that the hardware attempted to post the interrupt.  In SDM
+	 * parlance, the processor could have "recognized" the virtual IRQ, but not
+	 * delivered it yet.  This could happen if the guest had executed "sti", but
+	 * not "hlt" yet.  The IRQ was posted and recognized, but not delivered
+	 * ("sti blocking").  Then the guest executes "hlt", and vmexits.
+	 * OUTSTANDING_NOTIF will be clear in this case.  RVI should be set - at
+	 * least to the vector we just sent, but possibly to a greater vector if
+	 * multiple were sent.  RVI should only be cleared after virtual IRQs were
+	 * actually delivered.  So checking OUTSTANDING_NOTIF and RVI should
+	 * suffice.
+	 *
+	 * Generally, we should also check GUEST_INTERRUPTIBILITY_INFO to see if
+	 * there's some reason to not deliver the interrupt and check things like
+	 * the VPPR (priority register).  But since we're emulating a halt, mwait,
+	 * or something else that needs to be woken by an IRQ, we can ignore that
+	 * and just wake them up.  Note that we won't actually deliver the IRQ,
+	 * we'll just restart the guest and the hardware will deliver the virtual
+	 * IRQ at the appropriate time.  So in the event that something weird
+	 * happens, the halt/mwait just returns spuriously.
+	 *
+	 * The more traditional race here is if the halt starts concurrently with
+	 * the post; that's why we sync with the mutex to make sure there is an
+	 * ordering between the actual halt (this function) and the posting. */
+	uth_mutex_lock(gth->halt_mtx);
+	while (!(pir_notif_is_set(gpci) || rvi_is_set(gth)))
+		uth_cond_var_wait(gth->halt_cv, gth->halt_mtx);
+	uth_mutex_unlock(gth->halt_mtx);
+}
 
 static bool handle_ept_fault(struct guest_thread *gth)
 {
@@ -116,8 +167,9 @@ static bool handle_halt(struct guest_thread *gth)
 {
 	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
 
-	while (!consdata)
-		;
+	/* It's possible the guest disabled IRQs and halted, perhaps waiting on an
+	 * NMI or something.  If we need to support that, we can change this.  */
+	sleep_til_irq(gth);
 	vm_tf->tf_rip += 1;
 	return TRUE;
 }
@@ -126,8 +178,10 @@ static bool handle_mwait(struct guest_thread *gth)
 {
 	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
 
-	while (!consdata)
-		;
+	/* TODO: we need to handle the actual monitor part of mwait.  This just
+	 * implements the power management / halting.  Likewise, it's possible IRQs
+	 * are disabled (as with halt). */
+	sleep_til_irq(gth);
 	vm_tf->tf_rip += 3;
 	return TRUE;
 }

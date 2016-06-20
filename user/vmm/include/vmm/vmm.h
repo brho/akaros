@@ -45,6 +45,8 @@ int do_ioapic(struct guest_thread *vm_thread, uint64_t gpa,
 bool handle_vmexit(struct guest_thread *gth);
 int __apic_access(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
                   uint64_t *regp, int store);
+int vmm_interrupt_guest(struct virtual_machine *vm, unsigned int gpcoreid,
+                        unsigned int vector);
 
 /* Lookup helpers */
 

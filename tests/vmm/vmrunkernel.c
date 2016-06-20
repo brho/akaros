@@ -154,7 +154,6 @@ int resumeprompt = 0;
 //		vring_new_virtqueue(0, 512, 8192, 0, inpages, NULL, NULL, "test");
 
 void vapic_status_dump(FILE *f, void *vapic);
-static void set_posted_interrupt(int vector);
 
 #if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 1)
 #error "Get a gcc newer than 4.4.0"
@@ -175,10 +174,8 @@ void timer_thread(void *arg)
 	while (1) {
 		vector = ((uint32_t *)gpci.vapic_addr)[0x32] & 0xff;
 		initial_count = ((uint32_t *)gpci.vapic_addr)[0x38];
-		if (vector && initial_count) {
-			set_posted_interrupt(vector);
-			ros_syscall(SYS_vmm_poke_guest, 0, 0, 0, 0, 0, 0);
-		}
+		if (vector && initial_count)
+			vmm_interrupt_guest(vm, 0, vector);
 		uthread_usleep(100000);
 	}
 	fprintf(stderr, "SENDING TIMER\n");
@@ -188,10 +185,10 @@ void timer_thread(void *arg)
 // FIXME.
 volatile int consdata = 0;
 
+/* TODO: pass a core id to poke_guest */
 static void virtio_poke_guest(uint8_t vec)
 {
-	set_posted_interrupt(vec);
-	ros_syscall(SYS_vmm_poke_guest, 0, 0, 0, 0, 0, 0);
+	vmm_interrupt_guest(vm, 0, vec);
 }
 
 static struct virtio_mmio_dev cons_mmio_dev = {
@@ -280,13 +277,6 @@ static void pir_dump()
 		fprintf(stderr, "Byte %d: 0x%016x\n", i, pir_ptr[i]);
 	}
 	fprintf(stderr, "-------End PIR dump-------\n");
-}
-
-static void set_posted_interrupt(int vector)
-{
-	test_and_set_bit(vector, gpci.posted_irq_desc);
-	/* LOCKed instruction provides the mb() */
-	test_and_set_bit(VMX_POSTED_OUTSTANDING_NOTIF, gpci.posted_irq_desc);
 }
 
 int main(int argc, char **argv)

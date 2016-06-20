@@ -30,6 +30,8 @@ struct guest_thread {
 	struct uthread				uthread;
 	struct ctlr_thread			*buddy;
 	unsigned int				gpc_id;
+	uth_mutex_t					halt_mtx;
+	uth_cond_var_t				halt_cv;
 };
 
 struct ctlr_thread {
