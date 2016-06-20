@@ -270,7 +270,7 @@ void parse6pref(int argc, char **argv)
 		/* fall through */
 	case 1:
 		if (parseip(conf.v6pref, argv[0]) == -1) {
-			fprintf(stderr, "bad address %s", argv[0]);
+			fprintf(stderr, "bad address %s\n", argv[0]);
 			exit(-1);
 		}
 		break;
@@ -322,7 +322,7 @@ void parse6ra(int argc, char *argv[])
 
 	/* consistency check */
 	if (conf.maxraint < conf.minraint) {
-		fprintf(stderr, "maxraint %d < minraint %d",
+		fprintf(stderr, "maxraint %d < minraint %d\n",
 		        conf.maxraint, conf.minraint);
 		exit(-1);
 	}
@@ -401,7 +401,7 @@ int parseargs(int argc, char *argv[])
 		case Vtorus:
 		case Vtree:
 		case Vpkt:
-			fprintf(stderr, "medium %s already specified", conf.type);
+			fprintf(stderr, "medium %s already specified\n", conf.type);
 			exit(-1);
 		case Vadd:
 		case Vremove:
@@ -450,7 +450,7 @@ int main(int argc, char *argv[])
 		case 'c':
 			cp = malloc(sizeof(*cp));
 			if (cp == NULL) {
-				fprintf(stderr, "%r");
+				fprintf(stderr, "%r\n");
 				exit(1);
 			}
 			*ctll = cp;
@@ -553,8 +553,6 @@ int havendb(char *net)
 
 void doadd(int retry)
 {
-	int tries;
-
 	/* get number of preexisting interfaces */
 	nip = nipifcs(conf.mpoint);
 	if (beprimary == -1 && (nip == 0 || !havendb(conf.mpoint)))
@@ -569,13 +567,13 @@ void doadd(int retry)
 
 	if (ipv6auto) {
 		if (ip6cfg(ipv6auto) < 0) {
-			fprintf(stderr, "can't automatically start IPv6 on %s",
+			fprintf(stderr, "can't automatically start IPv6 on %s\n",
 			        conf.dev);
 			exit(-1);
 		}
 	} else if (validip(conf.laddr) && !isv4(conf.laddr)) {
 		if (ip6cfg(0) < 0)
-			fprintf(stderr, "can't start IPv6 on %s, address %R",
+			fprintf(stderr, "can't start IPv6 on %s, address %R\n",
 			        conf.dev, conf.laddr);
 			exit(-1);
 	}
@@ -590,12 +588,7 @@ void doadd(int retry)
 	/* run dhcp if we need something */
 	if (dodhcp) {
 		mkclientid();
-		for (tries = 0; tries < 30; tries++) {
-			dhcpquery(!noconfig, Sselecting);
-			if (conf.state == Sbound)
-				break;
-			usleep(1000 * 1000);
-		}
+		dhcpquery(!noconfig, Sselecting);
 	}
 
 	if (!validip(conf.laddr)) {
@@ -604,14 +597,14 @@ void doadd(int retry)
 			dhcpwatch(1);
 			return;
 		}
-		fprintf(stderr, "no success with DHCP");
+		fprintf(stderr, "no success with DHCP\n");
 		exit(-1);
 	}
 
 
 	if (!noconfig) {
 		if (ip4cfg() < 0) {
-			fprintf(stderr, "can't start ip");
+			fprintf(stderr, "can't start ip\n");
 			exit(-1);
 		}
 		if (dodhcp && conf.lease != Lforever)
@@ -634,7 +627,7 @@ void doremove(void)
 	struct iplifc *lifc;
 
 	if (!validip(conf.laddr)) {
-		fprintf(stderr, "remove requires an address");
+		fprintf(stderr, "remove requires an address\n");
 		exit(-1);
 	}
 	ifc = readipifc(conf.mpoint, ifc, -1);
@@ -735,7 +728,7 @@ void lookforip(char *net)
 
 	snprintf(proto, sizeof(proto), "%s/ipifc", net);
 	if (stat(proto, &s) < 0) {
-		fprintf(stderr, "no ip stack bound onto %s", net);
+		fprintf(stderr, "no ip stack bound onto %s\n", net);
 		exit(-1);
 	}
 }
@@ -754,13 +747,13 @@ void controldevice(void)
 	snprintf(ctlfile, sizeof(ctlfile), "%s/clone", conf.dev);
 	fd = open(ctlfile, O_RDWR);
 	if (fd < 0) {
-		fprintf(stderr, "can't open %s", ctlfile);
+		fprintf(stderr, "can't open %s\n", ctlfile);
 		exit(-1);
 	}
 
 	for (cp = firstctl; cp != NULL; cp = cp->next) {
 		if (write(fd, cp->ctl, strlen(cp->ctl)) < 0) {
-			fprintf(stderr, "ctl message %s: %r", cp->ctl);
+			fprintf(stderr, "ctl message %s: %r\n", cp->ctl);
 			exit(-1);
 		}
 		lseek(fd, 0, 0);
@@ -777,14 +770,14 @@ void binddevice(void)
 		snprintf(buf, sizeof(buf), "%s/ipifc/clone", conf.mpoint);
 		conf.cfd = open(buf, O_RDWR);
 		if (conf.cfd < 0) {
-			fprintf(stderr, "opening %s/ipifc/clone: %r", conf.mpoint);
+			fprintf(stderr, "opening %s/ipifc/clone: %r\n", conf.mpoint);
 			exit(-1);
 		}
 
 		/* specify medium as ethernet, bind the interface to it */
 		snprintf(buf, sizeof(buf), "bind %s %s", conf.type, conf.dev);
 		if (write(conf.cfd, buf, strlen(buf)) != strlen(buf)) {
-			fprintf(stderr, "%s: bind %s %s: %r", buf, conf.type, conf.dev);
+			fprintf(stderr, "%s: bind %s %s: %r\n", buf, conf.type, conf.dev);
 			exit(-1);
 		}
 	} else {
@@ -792,7 +785,7 @@ void binddevice(void)
 		snprintf(buf, sizeof(buf), "%s/ipifc/%d/ctl", conf.mpoint, myifc);
 		conf.cfd = open(buf, O_RDWR);
 		if (conf.cfd < 0) {
-			fprintf(stderr, "open %s: %r", buf);
+			fprintf(stderr, "open %s: %r\n", buf);
 			exit(-1);
 		}
 	}
@@ -886,7 +879,7 @@ void dhcpquery(int needconfig, int startstate)
 		dhcpsend(Request);
 		break;
 	default:
-		fprintf(stderr, "internal error 0");
+		fprintf(stderr, "internal error 0\n");
 		exit(-1);
 	}
 	conf.resend = 0;
@@ -966,7 +959,7 @@ void dhcpwatch(int needconfig)
 
 		if (needconfig && conf.state == Sbound) {
 			if (ip4cfg() < 0) {
-				fprintf(stderr, "can't start ip: %r");
+				fprintf(stderr, "can't start ip: %r\n");
 				exit(-1);
 			}
 			needconfig = 0;
@@ -992,7 +985,7 @@ int dhcptimer(void)
 
 	switch (conf.state) {
 	default:
-		fprintf(stderr, "dhcptimer: unknown state %d", conf.state);
+		fprintf(stderr, "dhcptimer: unknown state %d\n", conf.state);
 		exit(-1);
 	case Sinit:
 	case Sbound:
@@ -1045,7 +1038,7 @@ void dhcpsend(int type)
 	p = optadd(p, ODclientid, conf.cid, conf.cidlen);
 	switch (type) {
 	default:
-		fprintf(stderr, "dhcpsend: unknown message type: %d", type);
+		fprintf(stderr, "dhcpsend: unknown message type: %d\n", type);
 		exit(-1);
 	case Discover:
 		ipmove(up->raddr, IPv4bcast); /* broadcast */
@@ -1134,7 +1127,7 @@ void dhcprecv(void)
 
 	if (n < 0) {
 		rerrstr(err, sizeof(err));
-		if (strstr(err, "interrupt") == NULL)
+		if (strstr(err, "syscall aborted") == NULL)
 			warning("dhcprecv: bad read: %s", err);
 		else
 			DEBUG("dhcprecv: read timed out");
@@ -1322,7 +1315,7 @@ int openlisten(void)
 		sprintf(data, "%s/udp!*!68", conf.mpoint);
 	for (n = 0; (cfd = announce9(data, devdir, 0)) < 0; n++) {
 		if (!noconfig) {
-			fprintf(stderr, "can't announce for dhcp: %r");
+			fprintf(stderr, "can't announce for dhcp: %r\n");
 			exit(-1);
 		}
 
@@ -1334,14 +1327,14 @@ int openlisten(void)
 	}
 
 	if (write(cfd, "headers", strlen("headers")) < 0) {
-		fprintf(stderr, "can't set header mode: %r");
+		fprintf(stderr, "can't set header mode: %r\n");
 		exit(-1);
 	}
 
 	sprintf(data, "%s/data", devdir);
 	fd = open(data, O_RDWR);
 	if (fd < 0) {
-		fprintf(stderr, "open %s: %r", data);
+		fprintf(stderr, "open %s: %r\n", data);
 		exit(-1);
 	}
 	close(cfd);
@@ -1792,12 +1785,12 @@ void ndbconfig(void)
 
 	db = ndbopen(0);
 	if (db == NULL) {
-		fprintf(stderr, "can't open ndb: %r");
+		fprintf(stderr, "can't open ndb: %r\n");
 		exit(-1);
 	}
 	if ((strcmp(conf.type, "ether") != 0 && strcmp(conf.type, "gbe") != 0) ||
 	    myetheraddr(conf.hwa, conf.dev) != 0) {
-		fprintf(stderr, "can't read hardware address");
+		fprintf(stderr, "can't read hardware address\n");
 		exit(-1);
 	}
 	snprintf(etheraddr, sizeof(etheraddr), "%E", conf.hwa);
@@ -1834,7 +1827,7 @@ void ndbconfig(void)
 	}
 	ndbfree(t);
 	if (!validip(conf.laddr)) {
-		fprintf(stderr, "address not found in ndb");
+		fprintf(stderr, "address not found in ndb\n");
 		exit(-1);
 	}
 }
