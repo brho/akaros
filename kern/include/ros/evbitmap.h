@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <ros/event_bits.h>
+#include <ros/bits/event.h>
 
 struct evbitmap {
 	bool						check_bits;

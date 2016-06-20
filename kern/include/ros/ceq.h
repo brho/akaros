@@ -34,7 +34,7 @@
 
 #pragma once
 
-#include <ros/event_bits.h>
+#include <ros/bits/event.h>
 #include <ros/atomic.h>
 #include <ros/ring_buffer.h>
 
