@@ -121,10 +121,10 @@ If you bring in code from another project:
 must say where you got the code from, such as a URL, project name and version,
 etc.  Do not add the .c files to Kbuild yet.  Otherwise, you'll break the build.
 
-+ Run spatch, if applicable, in a single commit.
-
-+ Run clang-format, if applicable, in a single commit.  It's much easier to
-diagnose problems if spatch and reformatting was done before any other changes.
++ Run spatch and clang-format, if applicable, in a single commit.  It's much
+easier to diagnose problems if spatch and reformatting was done before any
+other changes.  Sometimes these tools fail.  Just fix up any mistakes in this
+commit.
 
 + Add your own changes, such that it compiles.  This is the point where you add
 the .c files to Kbuild so that we actually build the files.
