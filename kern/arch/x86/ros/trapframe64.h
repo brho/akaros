@@ -94,7 +94,8 @@ struct vm_trapframe {
 	uint32_t tf_guest_pcoreid;
 	uint32_t tf_flags;
 	uint32_t tf_trap_inject;
-	uint32_t tf_padding0;
+	uint16_t tf_guest_intr_status;
+	uint16_t tf_padding0;
 	uint32_t tf_exit_reason;
 	uint32_t tf_exit_qual;
 	uint32_t tf_intrinfo1;

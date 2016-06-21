@@ -138,6 +138,7 @@ void print_vmtrapframe(struct vm_trapframe *vm_tf)
 	printk("ExitQl 0x%08x\n",             vm_tf->tf_exit_qual);
 	printk("Intr1  0x%016lx\n",           vm_tf->tf_intrinfo1);
 	printk("Intr2  0x%016lx\n",           vm_tf->tf_intrinfo2);
+	printk("GIntr  0x----%04x\n",         vm_tf->tf_guest_intr_status);
 	printk("GVA    0x%016lx\n",           vm_tf->tf_guest_va);
 	printk("GPA    0x%016lx\n",           vm_tf->tf_guest_pa);
 	spin_unlock_irqsave(&ptf_lock);

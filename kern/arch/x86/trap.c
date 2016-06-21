@@ -894,6 +894,7 @@ void handle_vmexit(struct vm_trapframe *tf)
 	tf->tf_cr3 = vmcs_read(GUEST_CR3);
 	tf->tf_guest_pcoreid = pcpui->guest_pcoreid;
 	tf->tf_flags |= VMCTX_FL_PARTIAL;
+	tf->tf_guest_intr_status = vmcs_read(GUEST_INTR_STATUS);
 	tf->tf_exit_reason = vmcs_read(VM_EXIT_REASON);
 	tf->tf_exit_qual = vmcs_read(EXIT_QUALIFICATION);
 	tf->tf_intrinfo1 = vmcs_read(GUEST_INTERRUPTIBILITY_INFO);

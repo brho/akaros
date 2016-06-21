@@ -377,6 +377,7 @@ void print_vm_tf(struct vm_trapframe *vm_tf)
 	printf("ExitQl 0x%08x\n",             vm_tf->tf_exit_qual);
 	printf("Intr1  0x%016lx\n",           vm_tf->tf_intrinfo1);
 	printf("Intr2  0x%016lx\n",           vm_tf->tf_intrinfo2);
+	printf("GIntr  0x----%04x\n",         vm_tf->tf_guest_intr_status);
 	printf("GVA    0x%016lx\n",           vm_tf->tf_guest_va);
 	printf("GPA    0x%016lx\n",           vm_tf->tf_guest_pa);
 }
