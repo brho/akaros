@@ -361,14 +361,14 @@ static error_t parse_stat_opt(int key, char *arg, struct argp_state *state)
 		p_opts->stat_bignum = TRUE;
 		break;
 	case 'o':
-		p_opts->outfile = xfopen(arg, "w+");
+		p_opts->outfile = xfopen(arg, "w");
 		break;
 	case ARGP_KEY_END:
 		if (!p_opts->events)
 			p_opts->events = "cache-misses,cache-references,"
 			                 "branch-misses,branches,instructions,cycles";
 		if (!p_opts->outfile)
-			p_opts->outfile = xfdopen(1, "w+");
+			p_opts->outfile = stdout;
 		break;
 	default:
 		return ARGP_ERR_UNKNOWN;

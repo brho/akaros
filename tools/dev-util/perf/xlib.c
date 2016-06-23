@@ -84,7 +84,7 @@ FILE *xfdopen(int fd, const char *mode)
 	FILE *file = fdopen(fd, mode);
 
 	if (!file) {
-		fprintf(stderr, "Unable to reopen fd '%d' for mode '%s;: %s\n", fd,
+		fprintf(stderr, "Unable to reopen fd '%d' for mode '%s': %s\n", fd,
 		        mode, strerror(errno));
 		exit(1);
 	}
