@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ros/common.h>
+#include <ros/arch/msr-index.h>
 #include <arch/mmu.h>
 #include <ros/errno.h>
 #include <arch/fixup.h>
@@ -132,6 +133,16 @@
 #define X86_CR4_SMEP	0x00100000 /* enable SMEP support */
 #define X86_CR4_SMAP	0x00200000 /* enable SMAP support */
 
+/* MWAIT C-state hints.  The names might not be right for different processors.
+ * For instance, the Linux idle driver for a Haswell calls the mwait for 0x10
+ * "C3-HSW". */
+#define X86_MWAIT_C1			0x00
+#define X86_MWAIT_C2			0x10
+#define X86_MWAIT_C3			0x20
+#define X86_MWAIT_C4			0x30
+#define X86_MWAIT_C5			0x40
+#define X86_MWAIT_C6			0x50
+
 /*
  * x86-64 Task Priority Register, CR8
  */
@@ -192,6 +203,12 @@ static inline uint32_t read_mmreg32(uintptr_t reg)
               __attribute__((always_inline));
 static inline void wbinvd(void) __attribute__((always_inline));
 static inline void __cpu_relax(void) __attribute__((always_inline));
+
+void set_pstate(unsigned int pstate);
+void set_fastest_pstate(void);
+unsigned int get_pstate(void);
+void set_cstate(unsigned int cstate);
+unsigned int get_cstate(void);
 
 static inline uint8_t inb(int port)
 {

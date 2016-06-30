@@ -6,6 +6,7 @@ obj-y						+= cpuinfo.o
 obj-y						+= devarch.o
 obj-y						+= entry64.o
 obj-y						+= frontend.o
+obj-y						+= idle.o
 obj-y						+= init.o
 obj-y						+= intel.o
 obj-y						+= ioapic.o

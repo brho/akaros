@@ -24,7 +24,6 @@ static inline void enable_irqsave(int8_t *state) __attribute__((always_inline));
 static inline void disable_irqsave(int8_t *state)
               __attribute__((always_inline));
 static inline void cpu_relax(void) __attribute__((always_inline));
-static inline void cpu_halt(void) __attribute__((always_inline));
 static inline void clflush(uintptr_t* addr) __attribute__((always_inline));
 static inline int irq_is_enabled(void) __attribute__((always_inline));
 static inline void cache_flush(void) __attribute__((always_inline));
@@ -44,6 +43,8 @@ int vendor_id(char *);
 void invlpg(void *addr);
 void tlbflush(void);
 void tlb_flush_global(void);
+/* idle.c */
+void cpu_halt(void);
 
 static inline void breakpoint(void)
 {
@@ -128,13 +129,6 @@ static inline void disable_irqsave(int8_t *state)
 static inline void cpu_relax(void)
 {
 	__cpu_relax();
-}
-
-/* This atomically enables interrupts and halts.  sti does not take effect until
- * after the *next* instruction */
-static inline void cpu_halt(void)
-{
-	asm volatile("sti; hlt" : : : "memory");
 }
 
 static inline void clflush(uintptr_t* addr)

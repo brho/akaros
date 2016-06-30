@@ -175,6 +175,8 @@ void print_cpuinfo(void)
 	#define CPUID_FXSR_SUPPORT          (1 << 24)
 	#define CPUID_XSAVE_SUPPORT         (1 << 26)
 	#define CPUID_XSAVEOPT_SUPPORT      (1 << 0)
+	#define CPUID_MONITOR_MWAIT         (1 << 3)
+	#define CPUID_MWAIT_PWR_MGMT        (1 << 0)
 
 	cpuid(0x01, 0x00, 0, 0, &ecx, &edx);
 	if (CPUID_FXSR_SUPPORT & edx)
@@ -186,6 +188,12 @@ void print_cpuinfo(void)
 	if (CPUID_XSAVEOPT_SUPPORT & eax)
 		cpu_set_feat(CPU_FEAT_X86_XSAVEOPT);
 
+	cpuid(0x01, 0x00, 0, 0, &ecx, 0);
+	if (CPUID_MONITOR_MWAIT & ecx) {
+		cpuid(0x05, 0x00, 0, 0, &ecx, 0);
+		if (CPUID_MWAIT_PWR_MGMT & ecx)
+			cpu_set_feat(CPU_FEAT_X86_MWAIT);
+	}
 }
 
 #define BIT_SPACING "        "

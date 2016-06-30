@@ -324,4 +324,12 @@ void __arch_pcpu_init(uint32_t coreid)
 	perfmon_pcpu_init();
 	vmm_pcpu_init();
 	lcr4(rcr4() & ~CR4_TSD);
+
+	/* This should allow turbo mode.  I haven't found a doc that says how deep
+	 * we need to sleep.  At a minimum on some machines, it's C2.  Given that
+	 * "C2 or deeper" pops up in a few other areas as a deeper sleep (e.g.
+	 * mwaits on memory accesses from outside the processor won't wake >= C2),
+	 * this might be deep enough for turbo mode to kick in. */
+	set_fastest_pstate();
+	set_cstate(X86_MWAIT_C2);
 }
