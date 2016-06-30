@@ -66,6 +66,8 @@ enum {
 	Qrealmem,
 	Qmsr,
 	Qperf,
+	Qcstate,
+	Qpstate,
 
 	Qmax,
 };
@@ -85,6 +87,8 @@ static struct dirtab archdir[Qmax] = {
 	{"realmem", {Qrealmem, 0}, 0, 0444},
 	{"msr", {Qmsr, 0}, 0, 0666},
 	{"perf", {Qperf, 0}, 0, 0666},
+	{"c-state", {Qcstate, 0}, 0, 0666},
+	{"p-state", {Qpstate, 0}, 0, 0666},
 };
 /* White list entries needs to be ordered by start address, and never overlap.
  */
@@ -588,6 +592,10 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 			qunlock(&pc->resp_lock);
 
 			return n;
+		case Qcstate:
+			return readnum_hex(offset, a, n, get_cstate(), NUMSIZE32);
+		case Qpstate:
+			return readnum_hex(offset, a, n, get_pstate(), NUMSIZE32);
 		}
 		default:
 			error(EINVAL, ERROR_FIXME);
@@ -619,6 +627,32 @@ static long archread(struct chan *c, void *a, long n, int64_t offset)
 	kfree(buf);
 
 	return n;
+}
+
+static ssize_t cstate_write(void *ubuf, size_t len, off64_t off)
+{
+	set_cstate(strtoul_from_ubuf(ubuf, len, off));
+	/* Poke the other cores so they use the new C-state. */
+	send_broadcast_ipi(I_POKE_CORE);
+	return len;
+}
+
+static void __smp_set_pstate(void *arg)
+{
+	unsigned int val = (unsigned int)(unsigned long)arg;
+
+	set_pstate(val);
+}
+
+static ssize_t pstate_write(void *ubuf, size_t len, off64_t off)
+{
+	struct core_set all_cores;
+
+	core_set_init(&all_cores);
+	core_set_fill_available(&all_cores);
+	smp_do_in_cores(&all_cores, __smp_set_pstate,
+	                (void*)strtoul_from_ubuf(ubuf, len, off));
+	return len;
 }
 
 static long archwrite(struct chan *c, void *a, long n, int64_t offset)
@@ -698,6 +732,10 @@ static long archwrite(struct chan *c, void *a, long n, int64_t offset)
 
 			return arch_perf_write(pc, a, n);
 		}
+		case Qcstate:
+			return cstate_write(a, n, 0);
+		case Qpstate:
+			return pstate_write(a, n, 0);
 		default:
 			error(EINVAL, ERROR_FIXME);
 	}
