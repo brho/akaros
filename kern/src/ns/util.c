@@ -20,16 +20,28 @@ int readmem(unsigned long offset, char *buf, unsigned long n,
 /* Read a num/string to user mode, accounting for offset.  Not a huge fan of the
  * 'size' parameter (the old plan9 users just picked NUMSIZE (12), though they
  * seem to want to limit it).  */
-int readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
-			size_t size)
+static int __readnum(unsigned long off, char *buf, unsigned long n,
+                     unsigned long val, size_t size, const char *fmt)
 {
 	char tmp[64];
 	size = MIN(sizeof(tmp), size);
 	/* we really need the %* format. */
-	size = snprintf(tmp, size, "%lu", val);
+	size = snprintf(tmp, size, fmt, val);
 	/* size is now strlen, so the rest of this is just like readstr. */
 	/* always include the \0 */
 	return readmem(off, buf, n, tmp, size + 1);
+}
+
+int readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
+            size_t size)
+{
+	return __readnum(off, buf, n, val, size, "%lu");
+}
+
+int readnum_hex(unsigned long off, char *buf, unsigned long n,
+                unsigned long val, size_t size)
+{
+	return __readnum(off, buf, n, val, size, "0x%lx");
 }
 
 int readstr(unsigned long offset, char *buf, unsigned long n, char *str)
@@ -48,7 +60,8 @@ unsigned long strtoul_from_ubuf(void *ubuf, size_t count, int base)
 	if (count > sizeof(num64)) {
 		set_errno(EINVAL);
 		error(EFAIL, "attempted to write %d chars, max %d", count,
-			  sizeof(num64)); }
+			  sizeof(num64));
+	}
 	memcpy(num64, ubuf, count);
 	num64[count] = 0;	/* enforce trailing 0 */
 	return strtoul(num64, 0, base);
