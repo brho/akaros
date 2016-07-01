@@ -99,7 +99,7 @@ static int target(void *insn, int *store)
 	case 0x0f:
 	switch(*word) {
 		case 0xb70f:
-			s = 4;
+			s = 2;
 			break;
 		default:
 			fprintf(stderr, "can't get size of %02x/%04x @ %p\n", *byte, *word, byte);
@@ -114,6 +114,8 @@ static int target(void *insn, int *store)
 	}
 
 	switch(*byte) {
+	case 0x0f:
+		break;
 	case 0x3a:
 	case 0x8a:
 	case 0x88:
@@ -123,7 +125,7 @@ static int target(void *insn, int *store)
 		*store = !(*byte & 2);
 		break;
 	default:
-		fprintf(stderr, "%s: Can't happen\n", __func__);
+		fprintf(stderr, "%s: Can't happen. rip is: %p\n", __func__, byte);
 		break;
 	}
 	return s;
@@ -224,7 +226,7 @@ int decode(struct guest_thread *vm_thread, uint64_t *gpa, uint8_t *destreg,
 
 	*advance = insize(kva);
 
-	uint16_t ins = *(uint16_t *)(kva + (kva[0] == 0x44));
+	uint16_t ins = *(uint16_t *)(kva + (kva[0] == 0x44) + (kva[0] == 0x0f));
 	DPRINTF("ins is %04x\n", ins);
 
 	*destreg = (ins>>11) & 7;

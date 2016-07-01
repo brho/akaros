@@ -318,7 +318,8 @@ int main(int argc, char **argv)
 		                    " init=/bin/launcher"
 		                    " lapic=notscdeadline"
 		                    " lapictimerfreq=1000000"
-		                    " pit=none";
+		                    " pit=none"
+		                    " noinvpcid";
 	char *cmdline_extra = "\0";
 	char *cmdline;
 	uint64_t *p64;
@@ -359,9 +360,8 @@ int main(int argc, char **argv)
 	memset(lowmem, 0xff, 2*1048576);
 	vm->low4k = malloc(PGSIZE);
 	memset(vm->low4k, 0xff, PGSIZE);
-	// avoid at all costs, requires too much instruction emulation.
-	//low4k[0x40e] = 0;
-	//low4k[0x40f] = 0xe0;
+	vm->low4k[0x40e] = 0;
+	vm->low4k[0x40f] = 0;
 
 	//Place mmap(Gan)
 	a_page = mmap((void *)0xfee00000, PGSIZE, PROT_READ | PROT_WRITE,
