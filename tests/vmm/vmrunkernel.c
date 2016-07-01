@@ -130,7 +130,7 @@ unsigned int maxresume = (unsigned int) -1;
 #define MiB 0x100000ull
 #define GiB (1ull << 30)
 #define GKERNBASE (16*MiB)
-#define KERNSIZE (128*MiB+GKERNBASE)
+#define KERNSIZE (1024 * MiB + GKERNBASE)
 uint8_t _kernel[KERNSIZE];
 
 unsigned long long *p512, *p1, *p2m;
@@ -573,7 +573,7 @@ int main(int argc, char **argv)
 	bp->e820_map[e820i++].type = E820_RESERVED;
 
 	bp->e820_map[e820i].addr = 16 * 1048576;
-	bp->e820_map[e820i].size = 128 * 1048576;
+	bp->e820_map[e820i].size = 1024 * 1048576;
 	bp->e820_map[e820i++].type = E820_RAM;
 
 	bp->e820_map[e820i].addr = 0xf0000000;
