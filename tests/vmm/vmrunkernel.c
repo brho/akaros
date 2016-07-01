@@ -27,6 +27,7 @@
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
 #include <vmm/virtio_console.h>
+#include <vmm/virtio_net.h>
 #include <vmm/virtio_lguest_console.h>
 
 #include <vmm/sched.h>
@@ -92,10 +93,11 @@ struct acpi_table_madt madt = {
 	},
 
 	.address = 0xfee00000ULL,
+	.flags = 0,
 };
 
 struct acpi_madt_local_apic Apic0 = {.header = {.type = ACPI_MADT_TYPE_LOCAL_APIC, .length = sizeof(struct acpi_madt_local_apic)},
-				     .processor_id = 0, .id = 0};
+				     .processor_id = 0, .id = 0, .lapic_flags = 1};
 struct acpi_madt_io_apic Apic1 = {.header = {.type = ACPI_MADT_TYPE_IO_APIC, .length = sizeof(struct acpi_madt_io_apic)},
 				  .id = 0, .address = 0xfec00000, .global_irq_base = 0};
 struct acpi_madt_local_x2apic X2Apic0 = {
@@ -164,6 +166,7 @@ void vapic_status_dump(FILE *f, void *vapic);
 #define LOCK_PREFIX "lock "
 #define ADDR				BITOP_ADDR(addr)
 static inline int test_and_set_bit(int nr, volatile unsigned long *addr);
+static int default_nic = 1;
 
 pthread_t timerthread_struct;
 
@@ -204,9 +207,8 @@ static struct virtio_console_config cons_cfg_d;
 static struct virtio_vq_dev cons_vqdev = {
 	.name = "console",
 	.dev_id = VIRTIO_ID_CONSOLE,
-	.dev_feat = ((uint64_t)1 << VIRTIO_F_VERSION_1)
-					  | (1 << VIRTIO_RING_F_INDIRECT_DESC)
-	                  ,
+	.dev_feat =
+	    (1ULL << VIRTIO_F_VERSION_1) | (1 << VIRTIO_RING_F_INDIRECT_DESC),
 	.num_vqs = 2,
 	.cfg = &cons_cfg,
 	.cfg_d = &cons_cfg_d,
@@ -226,6 +228,44 @@ static struct virtio_vq_dev cons_vqdev = {
 				.vqdev = &cons_vqdev
 			},
 		}
+};
+
+static struct virtio_mmio_dev net_mmio_dev = {
+	.poke_guest = virtio_poke_guest,
+	.irq = 27,
+};
+
+static struct virtio_net_config net_cfg = {
+	.max_virtqueue_pairs = 1
+};
+static struct virtio_net_config net_cfg_d = {
+	.max_virtqueue_pairs = 1
+};
+
+static struct virtio_vq_dev net_vqdev = {
+	.name = "network",
+	.dev_id = VIRTIO_ID_NET,
+	.dev_feat = (1ULL << VIRTIO_F_VERSION_1 | 1 << VIRTIO_NET_F_MAC),
+
+	.num_vqs = 2,
+	.cfg = &net_cfg,
+	.cfg_d = &net_cfg_d,
+	.cfg_sz = sizeof(struct virtio_net_config),
+	.transport_dev = &net_mmio_dev,
+	.vqs = {
+		{
+			.name = "net_receiveq",
+			.qnum_max = 64,
+			.srv_fn = net_receiveq_fn,
+			.vqdev = &net_vqdev
+		},
+		{
+			.name = "net_transmitq",
+			.qnum_max = 64,
+			.srv_fn = net_transmitq_fn,
+			.vqdev = &net_vqdev
+		},
+	}
 };
 
 void lowmem() {
@@ -566,9 +606,17 @@ int main(int argc, char **argv)
 	                                          bp->e820_map[e820i - 1].size),
 	                                         512 * GiB);
 
-	cons_mmio_dev.addr = virtio_mmio_base_addr;
+	cons_mmio_dev.addr =
+	    virtio_mmio_base_addr + PGSIZE * VIRTIO_MMIO_CONSOLE_DEV;
 	cons_mmio_dev.vqdev = &cons_vqdev;
 	vm->virtio_mmio_devices[VIRTIO_MMIO_CONSOLE_DEV] = &cons_mmio_dev;
+
+	net_mmio_dev.addr =
+	    virtio_mmio_base_addr + PGSIZE * VIRTIO_MMIO_NETWORK_DEV;
+	net_mmio_dev.vqdev = &net_vqdev;
+	vm->virtio_mmio_devices[VIRTIO_MMIO_NETWORK_DEV] = &net_mmio_dev;
+
+	net_init_fn(&net_vqdev, default_nic);
 
 	/* Set the kernel command line parameters */
 	a += 4096;

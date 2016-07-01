@@ -27,7 +27,6 @@
 #include <stdint.h>
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
-#include <linux/if_ether.h>
 
 /* The feature bitmap for virtio net */
 #define VIRTIO_NET_F_CSUM	0	/* Host handles pkts w/ partial csum */
@@ -60,6 +59,10 @@
 
 #define VIRTIO_NET_S_LINK_UP	1	/* Link is up */
 #define VIRTIO_NET_S_ANNOUNCE	2	/* Announcement is needed */
+
+#ifndef ETH_ALEN
+#define ETH_ALEN	6	/* Length of a MAC address (48 bits) */
+#endif
 
 struct virtio_net_config {
 	/* The config defining mac address (if VIRTIO_NET_F_MAC) */
@@ -239,3 +242,7 @@ struct virtio_net_ctrl_mq {
  */
 #define VIRTIO_NET_CTRL_GUEST_OFFLOADS   5
 #define VIRTIO_NET_CTRL_GUEST_OFFLOADS_SET        0
+
+void net_receiveq_fn(void *_vq);
+void net_transmitq_fn(void *_vq);
+void net_init_fn(struct virtio_vq_dev *vqdev, int nic);

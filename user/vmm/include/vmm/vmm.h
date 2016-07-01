@@ -10,12 +10,13 @@
 #include <vmm/sched.h>
 
 /* The listing of VIRTIO MMIO devices. We currently only expect to have 2,
- * console and network. Only the console is implemented right now.*/
+ * console and network. Only the console is fully implemented right now.*/
 enum {
 	VIRTIO_MMIO_CONSOLE_DEV,
+	VIRTIO_MMIO_NETWORK_DEV,
 
 	/* This should always be the last entry. */
-	VIRTIO_MMIO_MAX_NUM_DEV = 2,
+	VIRTIO_MMIO_MAX_NUM_DEV,
 };
 
 /* Structure to encapsulate all of the bookkeeping for a VM. */
