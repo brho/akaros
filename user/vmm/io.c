@@ -1,4 +1,4 @@
-#include <stdio.h> 
+#include <stdio.h>
 #include <pthread.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -28,7 +28,7 @@ struct pciconfig {
 
 /* just index by devfn, i.e. 8 bits */
 struct pciconfig pcibus[] = {
-	/* linux requires that devfn 0 be a bridge. 
+	/* linux requires that devfn 0 be a bridge.
 	 * 00:00.0 Host bridge: Intel Corporation 440BX/ZX/DX - 82443BX/ZX/DX Host bridge (rev 01)
 	 */
 	{
@@ -197,6 +197,19 @@ bool io(struct guest_thread *vm_thread)
 		}
 		//printf("configread32 ");
 		configread32(edx, &vm_tf->tf_rax);
+		return true;
+	}
+	/* Detects when something is written to the PIC. */
+	if (*ip8 == 0xe6) {
+		vm_tf->tf_rip += 2;
+		return true;
+	}
+	/* Detects when something is read from the PIC, so
+	 * a value signifying there is no PIC is given.
+	 */
+	if (*ip16 == 0x21e4) {
+		vm_tf->tf_rip += 2;
+		vm_tf->tf_rax = ~0ULL;
 		return true;
 	}
 	if (*ip16 == 0xed66) {

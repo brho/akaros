@@ -116,18 +116,6 @@ struct acpi_madt_interrupt_override isor[] = {
 	 * APIC interrupt input 2, then you would need an Interrupt Source Override
 	 * where the source entry is ‘0’ and the Global System Interrupt is ‘2.’
 	 */
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE,
-	            .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 0, .global_irq = 2, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE,
-	            .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 1, .global_irq = 1, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE,
-	            .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 3, .global_irq = 3, .inti_flags = 0},
-	{.header = {.type = ACPI_MADT_TYPE_INTERRUPT_OVERRIDE,
-	            .length = sizeof(struct acpi_madt_interrupt_override)},
-	 .bus = 0, .source_irq = 4, .global_irq = 4, .inti_flags = 0},
 };
 
 
@@ -196,9 +184,6 @@ static void virtio_poke_guest(uint8_t vec)
 
 static struct virtio_mmio_dev cons_mmio_dev = {
 	.poke_guest = virtio_poke_guest,
-	/* At the moment irq numbers cannot be below 24; this is a problem with
-	 * the IOAPIC and Interrupt Source Override Structure. */
-	.irq = 26,
 };
 
 static struct virtio_console_config cons_cfg;
@@ -232,7 +217,6 @@ static struct virtio_vq_dev cons_vqdev = {
 
 static struct virtio_mmio_dev net_mmio_dev = {
 	.poke_guest = virtio_poke_guest,
-	.irq = 27,
 };
 
 static struct virtio_net_config net_cfg = {
@@ -634,8 +618,14 @@ int main(int argc, char **argv)
 	for (int i = 0; i < VIRTIO_MMIO_MAX_NUM_DEV; i++) {
 		if (vm->virtio_mmio_devices[i] == NULL)
 			continue;
+
 		/* Append all the virtio mmio base addresses. */
-		len = snprintf(cmdlinep, cmdlinesz,
+
+			/* Since the lower number irqs are no longer being used, the irqs
+			 * can now be assigned starting from 0.
+			 */
+			vm->virtio_mmio_devices[i]->irq = i;
+			len = snprintf(cmdlinep, cmdlinesz,
 		               " virtio_mmio.device=1K@0x%llx:%lld",
 		               vm->virtio_mmio_devices[i]->addr,
 		               vm->virtio_mmio_devices[i]->irq);

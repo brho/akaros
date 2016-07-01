@@ -31,10 +31,6 @@
 #define IOAPIC_CONFIG 0x100
 #define IOAPIC_NUM_PINS 24
 
-/* The problem with the IOAPIC and ISOR Structure means all irq numbers
- * must be at least 24, so this is used to correct that offset. */
-#define IOAPIC_LAST_IRQ 23
-
 int debug_ioapic = 1;
 int apic_id_mask = 0xf0;
 
@@ -110,7 +106,7 @@ static void ioapic_write(struct guest_thread *vm_thread, int ix,
 		/* The first IRQ register starts at 0x10, and there are two 32-bit
 		 * registers for each IRQ. The first 8 bits of the value assigned to
 		 * 'reg' is the interrupt vector. */
-		irqreg = (vm->virtio_mmio_devices[i]->irq - IOAPIC_LAST_IRQ) * 2 + 0x10;
+		irqreg = (vm->virtio_mmio_devices[i]->irq) * 2 + 0x10;
 		if (reg == irqreg && (value & 0xff) != 0) {
 			vm->virtio_mmio_devices[i]->vec = value & 0xff;
 			DPRINTF("irq vector for irq number %d is: %lx\n",
