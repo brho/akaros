@@ -29,8 +29,11 @@
 #include <_itoa.h>
 #include <locale/localeinfo.h>
 #include <stdio.h>
+#include <ros/common.h>
+#include <sys/mman.h>
 
-/* Modified for AKAROS, uses malloc in place of large stack allocations */
+/* Modified for AKAROS, uses mmap in place of large stack allocations */
+static char *failmsg = "vfprintf mmap failed!";
 
 /* This code is shared between the standard stdio implementation found
    in GNU C library and the libio implementation originally found in
@@ -245,9 +248,15 @@ vfprintf (FILE *s, const CHAR_T *format, va_list ap)
   const UCHAR_T *end_of_spec;
 
   /* Buffer intermediate results.  */
-  /* AKAROS malloc work_buf */
+  /* AKAROS mmap work_buf */
   //CHAR_T work_buffer[1000];
-  CHAR_T *work_buffer = malloc(1000);
+  CHAR_T *work_buffer = mmap(0, PGSIZE, PROT_WRITE | PROT_READ, MAP_PRIVATE,
+                             -1, 0);
+
+  if (work_buffer == MAP_FAILED) {
+    write(2, failmsg, sizeof(failmsg));
+    exit(-1);
+  }
 
   CHAR_T *workstart = NULL;
   CHAR_T *workend;
@@ -2059,7 +2068,7 @@ all_done:
   _IO_cleanup_region_end (0);
 
   /* AKAROS */
-  free(work_buffer);
+  munmap(work_buffer, PGSIZE);
   return done;
 }
 
@@ -2283,9 +2292,16 @@ internal_function
 buffered_vfprintf (_IO_FILE *s, const CHAR_T *format,
 		   _IO_va_list args)
 {
-	/* AKAROS: malloc the buf.  */
+  /* AKAROS: mmap the buf.  */
   //CHAR_T buf[_IO_BUFSIZ];
-  CHAR_T *buf = malloc(_IO_BUFSIZ);
+  CHAR_T *buf;
+
+  buf = mmap(0, ROUNDUP(_IO_BUFSIZ, PGSIZE), PROT_WRITE | PROT_READ,
+             MAP_PRIVATE, -1, 0);
+  if (buf == MAP_FAILED) {
+    write(2, failmsg, sizeof(failmsg));
+    exit(-1);
+  }
 
   struct helper_file helper;
   _IO_FILE *hp = (_IO_FILE *) &helper._f;
@@ -2348,7 +2364,7 @@ buffered_vfprintf (_IO_FILE *s, const CHAR_T *format,
   _IO_funlockfile (s);
   __libc_cleanup_region_end (0);
 
-  free(buf); /* AKAROS */
+  munmap(buf, ROUNDUP(_IO_BUFSIZ, PGSIZE)); /* AKAROS */
   return result;
 }
 
