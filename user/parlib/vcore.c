@@ -102,37 +102,60 @@ static int allocate_vcore_stack(int id)
 	return 0;
 }
 
-/* Helper, initializes a new vcore.  Do not call directly. */
-static int __prep_new_vcore(int vcoreid)
-{
-	if (allocate_vcore_stack(vcoreid))
-		goto error_vc_stack;
-	if (allocate_transition_tls(vcoreid))
-		goto error_tls;
-	return 0;
-
-error_tls:
-	free_vcore_stack(vcoreid);
-error_vc_stack:
-	return -1;
-}
-
-/* Initializes vcores before they are used, up to nr_total_vcores.
+/* Helper: prepares a vcore for use.  Takes a block of pages for the UCQs.
  *
  * Vcores need certain things, such as a stack and TLS.  These are determined by
  * userspace.  Every vcore needs these set up before we drop into vcore context
  * on that vcore.  This means we need to prep before asking the kernel for those
- * vcores. */
-static int prep_new_vcores(int nr_total_vcores)
+ * vcores.
+ *
+ * We could have this function do its own mmap, at the expense of O(n) syscalls
+ * when we prepare the extra vcores. */
+static void __prep_vcore(int vcoreid, uintptr_t mmap_block)
 {
-	static int _max_vcores_ever_wanted = 0;
+	struct preempt_data *vcpd = vcpd_of(vcoreid);
+	int ret;
 
-	for (int i = _max_vcores_ever_wanted; i < nr_total_vcores; i++) {
-		if (__prep_new_vcore(i))
-			return -1;
-		_max_vcores_ever_wanted++;
-	}
-	return 0;
+	ret = allocate_vcore_stack(vcoreid);
+		assert(!ret);
+	ret = allocate_transition_tls(vcoreid);
+		assert(!ret);
+
+	vcpd->ev_mbox_public.type = EV_MBOX_UCQ;
+	ucq_init_raw(&vcpd->ev_mbox_public.ucq,
+	             mmap_block + 0 * PGSIZE,
+	             mmap_block + 1 * PGSIZE);
+	vcpd->ev_mbox_private.type = EV_MBOX_UCQ;
+	ucq_init_raw(&vcpd->ev_mbox_private.ucq,
+	             mmap_block + 2 * PGSIZE,
+	             mmap_block + 3 * PGSIZE);
+
+	/* Set the lowest level entry point for each vcore. */
+	vcpd->vcore_entry = (uintptr_t)__kernel_vcore_entry;
+}
+
+static void prep_vcore_0(void)
+{
+	uintptr_t mmap_block;
+
+	mmap_block = (uintptr_t)mmap(0, PGSIZE * 4,
+	                             PROT_WRITE | PROT_READ,
+	                             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	assert((void*)mmap_block != MAP_FAILED);
+	__prep_vcore(0, mmap_block);
+}
+
+static int prep_remaining_vcores(void)
+{
+	uintptr_t mmap_block;
+	int ret;
+
+	mmap_block = (uintptr_t)mmap(0, PGSIZE * 4 * (max_vcores() - 1),
+	                             PROT_WRITE | PROT_READ,
+	                             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	assert((void*)mmap_block != MAP_FAILED);
+	for (int i = 1; i < max_vcores(); i++)
+		__prep_vcore(i, mmap_block + 4 * (i - 1) * PGSIZE);
 }
 
 /* Run libc specific early setup code. */
@@ -146,48 +169,17 @@ static void vcore_libc_init(void)
 
 void __attribute__((constructor)) vcore_lib_init(void)
 {
-	uintptr_t mmap_block;
-
 	/* Note this is racy, but okay.  The first time through, we are _S.
 	 * Also, this is the "lowest" level constructor for now, so we don't need
 	 * to call any other init functions after our run_once() call. This may
 	 * change in the future. */
 	init_once_racy(return);
-
 	/* Need to alloc vcore0's transition stuff here (technically, just the TLS)
 	 * so that schedulers can use vcore0's transition TLS before it comes up in
 	 * vcore_entry() */
-	if (prep_new_vcores(1))
-		goto vcore_lib_init_fail;
-
-	/* Initialize our VCPD event queues' ucqs, two pages per ucq, 4 per vcore */
-	mmap_block = (uintptr_t)mmap(0, PGSIZE * 4 * max_vcores(),
-	                             PROT_WRITE | PROT_READ,
-	                             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
-	/* Yeah, this doesn't fit in the error-handling scheme, but this whole
-	 * system doesn't really handle failure, and needs a rewrite involving less
-	 * mmaps/munmaps. */
-	assert(mmap_block);
-	/* Note we may end up doing vcore 0's elsewhere, for _Ss, or else have a
-	 * separate ev_q for that. */
-	for (int i = 0; i < max_vcores(); i++) {
-		/* four pages total for both ucqs from the big block (2 pages each) */
-		vcpd_of(i)->ev_mbox_public.type = EV_MBOX_UCQ;
-		ucq_init_raw(&vcpd_of(i)->ev_mbox_public.ucq,
-		             mmap_block + (4 * i    ) * PGSIZE,
-		             mmap_block + (4 * i + 1) * PGSIZE);
-		vcpd_of(i)->ev_mbox_private.type = EV_MBOX_UCQ;
-		ucq_init_raw(&vcpd_of(i)->ev_mbox_private.ucq,
-		             mmap_block + (4 * i + 2) * PGSIZE,
-		             mmap_block + (4 * i + 3) * PGSIZE);
-		/* Set the lowest level entry point for each vcore. */
-		vcpd_of(i)->vcore_entry = (uintptr_t)__kernel_vcore_entry;
-	}
+	prep_vcore_0();
 	assert(!in_vcore_context());
 	vcore_libc_init();
-	return;
-vcore_lib_init_fail:
-	assert(0);
 }
 
 /* Helper functions used to reenter at the top of a vcore's stack for an
@@ -214,6 +206,9 @@ void vcore_reenter(void (*entry_func)(void))
 void vcore_change_to_m(void)
 {
 	int ret;
+
+	ret = prep_remaining_vcores();
+	assert(!ret);
 	__procdata.res_req[RES_CORES].amt_wanted = 1;
 	__procdata.res_req[RES_CORES].amt_wanted_min = 1;	/* whatever */
 	assert(!in_multi_mode());
@@ -228,9 +223,9 @@ static void __vc_req_poke(void *nr_vc_wanted)
 {
 	long nr_vcores_wanted = *(long*)nr_vc_wanted;
 
+	/* We init'd up to max_vcores() VCs during init.  This assumes the kernel
+	 * doesn't magically change that value (which it should not do). */
 	nr_vcores_wanted = MIN(nr_vcores_wanted, max_vcores());
-	if (prep_new_vcores(nr_vcores_wanted))
-		panic("Unable to prep up to %d vcores!", nr_vcores_wanted);
 	if (nr_vcores_wanted > __procdata.res_req[RES_CORES].amt_wanted)
 		__procdata.res_req[RES_CORES].amt_wanted = nr_vcores_wanted;
 	if (nr_vcores_wanted > num_vcores())
