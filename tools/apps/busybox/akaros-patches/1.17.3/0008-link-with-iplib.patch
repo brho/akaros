@@ -1,0 +1,21 @@
+diff -rup busybox-1.17.3/scripts/trylink busybox-1.17.3-akaros/scripts/trylink
+--- busybox-1.17.3/scripts/trylink	2010-09-16 19:05:35.000000000 -0400
++++ busybox-1.17.3-akaros/scripts/trylink	2016-07-07 12:32:10.685108978 -0400
+@@ -170,6 +170,17 @@ while test "$LDLIBS"; do
+     fi
+ done
+ 
++# Force iplib to be linked, since you can technically build without it (and get
++# stub warnings).  Careful here.  We can't have any extra spaces in LDLIBS.
++# Something like " iplib" or "iplib " will flip out.  Only have spaces between
++# libraries.
++if [[ ! -z $LDLIBS ]]
++then
++	LDLIBS="${LDLIBS} iplib"
++else
++	LDLIBS="iplib"
++fi
++
+ # Make the binary with final, minimal list of libs
+ echo "Final link with: ${LDLIBS:-<none>}"
+ l_list=`echo "$LDLIBS" | sed -e 's/ / -l/g' -e 's/^/-l/' -e 's/^-l$//'`
