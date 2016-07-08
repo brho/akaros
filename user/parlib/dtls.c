@@ -170,11 +170,11 @@ static inline void *__get_dtls(dtls_data_t *dtls_data, dtls_key_t key)
 static inline void __set_dtls(dtls_data_t *dtls_data, dtls_key_t key, void *dtls)
 {
   assert(key);
-  __sync_fetch_and_add(&key->ref_count, 1);
 
   struct dtls_value *v = __get_dtls(dtls_data, key);
   if (!v) {
     v = __allocate_dtls_value(dtls_data, key);
+    __sync_fetch_and_add(&key->ref_count, 1);
     v->key = key;
     TAILQ_INSERT_HEAD(&dtls_data->list, v, link);
   }
