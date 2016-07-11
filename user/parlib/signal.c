@@ -113,9 +113,19 @@ static void swap_user_contexts(struct user_context *c1, struct user_context *c2)
 	*c2 = temp_ctx;
 }
 
-/* Prep a to run a signal handler.  The original context of the uthread
- * is saved on its stack, and a new context is set up to run the signal
- * handler the next time the uthread is run. */
+/* Helper for checking a stack pointer.  It's possible the context we're
+ * injecting signals into is complete garbage, so using the SP is a little
+ * dangerous. */
+static bool stack_ptr_is_sane(uintptr_t sp)
+{
+	if ((sp < PGSIZE) || (sp > ULIM))
+		return FALSE;
+	return TRUE;
+}
+
+/* Prep a uthread to run a signal handler.  The original context of the uthread
+ * is saved on its stack, and a new context is set up to run the signal handler
+ * the next time the uthread is run. */
 static void __prep_sighandler(struct uthread *uthread,
                               void (*entry)(void),
                               struct siginfo *info)
@@ -126,6 +136,7 @@ static void __prep_sighandler(struct uthread *uthread,
 	if (uthread->flags & UTHREAD_SAVED) {
 		ctx = &uthread->u_ctx;
 		stack = get_user_ctx_stack(ctx) - sizeof(struct sigdata);
+		assert(stack_ptr_is_sane(stack));
 		uthread->sigstate.data = (struct sigdata*)stack;
 		if (uthread->flags & UTHREAD_FPSAVED) {
 			uthread->sigstate.data->as = uthread->as;
@@ -135,6 +146,7 @@ static void __prep_sighandler(struct uthread *uthread,
 		assert(current_uthread == uthread);
 		ctx = &vcpd_of(vcore_id())->uthread_ctx;
 		stack = get_user_ctx_stack(ctx) - sizeof(struct sigdata);
+		assert(stack_ptr_is_sane(stack));
 		uthread->sigstate.data = (struct sigdata*)stack;
 		save_fp_state(&uthread->sigstate.data->as);
 	}
