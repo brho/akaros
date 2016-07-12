@@ -272,7 +272,7 @@ void manager_waterman()
 {
 	static bool first = true;
 	if (first)
-		mon_bb(0, 0, 0);
+		mon_shell(0, 0, 0);
 	smp_idle();
 	assert(0);
 }

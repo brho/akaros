@@ -62,7 +62,9 @@ static command_t commands[] = {
 	{ "trace", "Run some tracing functions", mon_trace},
 	{ "monitor", "Run the monitor on another core", mon_monitor},
 	{ "fs", "Filesystem Diagnostics", mon_fs},
-	{ "bb", "Try to run busybox (ash)", mon_bb},
+	{ "sh", "Try to run a shell (bash)", mon_shell},
+	{ "bash", "Try to run a shell (bash)", mon_shell},
+	{ "bb", "Try to run a shell (bash)", mon_shell},
 	{ "alarm", "Alarm Diagnostics", mon_alarm},
 	{ "msr", "read/write msr: msr msr [value]", mon_msr},
 	{ "db", "Misc debugging", mon_db},
@@ -990,10 +992,10 @@ int mon_fs(int argc, char **argv, struct hw_trapframe *hw_tf)
 	return 0;
 }
 
-int mon_bb(int argc, char **argv, struct hw_trapframe *hw_tf)
+int mon_shell(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-	char *l_argv[3] = {"", "busybox", "ash"};
-	return mon_bin_run(3, l_argv, hw_tf);
+	char *l_argv[2] = {"/bin/bash", "bash"};
+	return mon_bin_run(2, l_argv, hw_tf);
 }
 
 int mon_alarm(int argc, char **argv, struct hw_trapframe *hw_tf)

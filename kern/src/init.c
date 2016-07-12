@@ -208,12 +208,11 @@ static int run_init_script(void)
 
 		/* Initialize l_argv with its first three arguments, but allocate space
 		 * for all arguments as calculated above */
-		int static_args = 3;
+		int static_args = 2;
 		int total_args = vargs + static_args;
 		char *l_argv[total_args];
-		l_argv[0] = "";
-		l_argv[1] = "busybox";
-		l_argv[2] = "ash";
+		l_argv[0] = "/bin/bash";
+		l_argv[1] = "bash";
 
 		/* Initialize l_argv with the rest of the arguments */
 		int i = static_args;
