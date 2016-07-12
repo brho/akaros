@@ -357,6 +357,7 @@ int duplicate_vmrs(struct proc *p, struct proc *new_p)
 {
 	int ret = 0;
 	struct vm_region *vmr, *vm_i;
+
 	TAILQ_FOREACH(vm_i, &p->vm_regions, vm_link) {
 		vmr = kmem_cache_alloc(vmr_kcache, 0);
 		if (!vmr)
@@ -391,6 +392,12 @@ void print_vmrs(struct proc *p)
 	int count = 0;
 	struct vm_region *vmr;
 	printk("VM Regions for proc %d\n", p->pid);
+	printk("NR:"
+	       "                                     Range:"
+	       "       Prot,"
+	       "      Flags,"
+	       "               File,"
+	       "                Off\n");
 	TAILQ_FOREACH(vmr, &p->vm_regions, vm_link)
 		printk("%02d: (%p - %p): 0x%08x, 0x%08x, %p, %p\n", count++,
 		       vmr->vm_base, vmr->vm_end, vmr->vm_prot, vmr->vm_flags,
@@ -529,8 +536,9 @@ static int map_page_at_addr(struct proc *p, struct page *page, uintptr_t addr,
 	 * in which case we should just return. */
 	if (pte_is_present(pte)) {
 		spin_unlock(&p->pte_lock);
-		/* callers expect us to eat the ref if we succeed. */
-		page_decref(page);
+		/* non-PM callers expect us to eat the ref if we succeed. */
+		if (!page_is_pagemap(page))
+			page_decref(page);
 		return 0;
 	}
 	if (pte_is_mapped(pte)) {
@@ -540,7 +548,8 @@ static int map_page_at_addr(struct proc *p, struct page *page, uintptr_t addr,
 			warn_once("Clobbered a PTE mapping (%p -> %p)\n", pte_print(pte),
 			          page2pa(page) | prot);
 		}
-		page_decref(pa2page(pte_get_paddr(pte)));
+		if (!page_is_pagemap(pa2page(pte_get_paddr(pte))))
+			page_decref(pa2page(pte_get_paddr(pte)));
 	}
 	/* preserve the dirty bit - pm removal could be looking concurrently */
 	prot |= (pte_is_dirty(pte) ? PTE_D : 0);
