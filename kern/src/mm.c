@@ -626,7 +626,7 @@ static int populate_pm_va(struct proc *p, uintptr_t va, unsigned long nr_pgs,
 		if (exec)
 			icache_flush_page(0, page2kva(page));
 		ret = map_page_at_addr(p, page, va + i * PGSIZE, pte_prot);
-		if (atomic_read(&page->pg_flags) & PG_PAGEMAP)
+		if (page_is_pagemap(page))
 			pm_put_page(page);
 		if (ret)
 			break;
@@ -860,7 +860,7 @@ static int __vmr_free_pgs(struct proc *p, pte_t pte, void *va, void *arg)
 		return 0;
 	page = pa2page(pte_get_paddr(pte));
 	pte_clear(pte);
-	if (!(atomic_read(&page->pg_flags) & PG_PAGEMAP))
+	if (!page_is_pagemap(page))
 		page_decref(page);
 	return 0;
 }
@@ -905,7 +905,7 @@ int __do_munmap(struct proc *p, uintptr_t addr, size_t len)
 /* Helper - drop the page differently based on where it is from */
 static void __put_page(struct page *page)
 {
-	if (atomic_read(&page->pg_flags) & PG_PAGEMAP)
+	if (page_is_pagemap(page))
 		pm_put_page(page);
 	else
 		page_decref(page);
@@ -1068,7 +1068,7 @@ out_put_pg:
 	/* the VMR's existence in the PM (via the mmap) allows us to have PTE point
 	 * to a_page without it magically being reallocated.  For non-PM memory
 	 * (anon memory or private pages) we transferred the ref to the PTE. */
-	if (atomic_read(&a_page->pg_flags) & PG_PAGEMAP)
+	if (page_is_pagemap(a_page))
 		pm_put_page(a_page);
 out:
 	spin_unlock(&p->vmr_lock);

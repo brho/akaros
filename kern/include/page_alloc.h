@@ -81,3 +81,9 @@ int page_is_free(size_t ppn);
 void lock_page(struct page *page);
 void unlock_page(struct page *page);
 void print_pageinfo(struct page *page);
+static inline bool page_is_pagemap(struct page *page);
+
+static inline bool page_is_pagemap(struct page *page)
+{
+	return atomic_read(&page->pg_flags) & PG_PAGEMAP ? true : false;
+}
