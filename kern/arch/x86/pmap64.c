@@ -623,10 +623,27 @@ uintptr_t gva2gpa(struct proc *p, uintptr_t cr3, uintptr_t gva)
  * data segment). */
 int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd)
 {
-	kpte_t *kpt = get_cont_pages(1, MEM_WAIT);
+	kpte_t *kpt;
+	epte_t *ept;
+
+	kpt = get_cont_pages(1, MEM_WAIT);
 	memcpy(kpt, boot_copy.kpte, PGSIZE);
-	epte_t *ept = kpte_to_epte(kpt);
+	ept = kpte_to_epte(kpt);
 	memset(ept, 0, PGSIZE);
+
+	/* This bit of paranoia slows process creation a little, but makes sure that
+	 * there is nothing below ULIM in boot_pgdir.  Any PML4 entries copied from
+	 * boot_pgdir (e.g. the kernel's memory) will be *shared* among all
+	 * processes, including *everything* under the PML4 entries reach (e.g.
+	 * PML4_PTE_REACH = 512 GB) and any activity would need to be synchronized.
+	 *
+	 * We could do this once at boot time, but that would miss out on potential
+	 * changes to the boot_pgdir at runtime.
+	 *
+	 * We could also just memset that region to 0.  For now, I want to catch
+	 * whatever mappings exist, since they are probably bugs. */
+	for (int i = 0; i < PML4(ULIM - 1); i++)
+		assert(kpt[i] == 0);
 
 	/* VPT and UVPT map the proc's page table, with different permissions. */
 	kpt[PML4(VPT)]  = build_kpte(PADDR(kpt), PTE_KERN_RW);

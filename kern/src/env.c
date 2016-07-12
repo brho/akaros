@@ -39,7 +39,6 @@ int env_setup_vm(env_t *e)
 
 	if ((ret = arch_pgdir_setup(boot_pgdir, &e->env_pgdir)))
 		return ret;
-	/* TODO: verify there is nothing below ULIM */
 	e->env_cr3 = arch_pgdir_get_cr3(e->env_pgdir);
 
 	/* These need to be contiguous, so the kernel can alias them.  Note the
