@@ -11,11 +11,8 @@
 # AKAROS_ROOT, AKAROS_XCC_ROOT, AKAROS_PREFIX, AKAROS_SYSROOT, MAKE_JOBS,
 # FIRST_KFS_PATH, KFS_ROOT
 
-# Do not:
-# o  use make's built-in rules and variables
-#    (this increases performance and avoids hard-to-debug behaviour);
-# o  print "Entering directory ...";
-MAKEFLAGS += -rR --no-print-directory
+# Do not print "Entering directory ...";
+MAKEFLAGS += --no-print-directory
 
 # Overrides
 -include Makelocal
