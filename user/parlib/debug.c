@@ -6,6 +6,7 @@
 #include <parlib/parlib.h>
 #include <parlib/ros_debug.h>
 #include <parlib/spinlock.h>
+#include <parlib/vcore.h>
 #include <ros/common.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -88,13 +89,24 @@ static void handle_debug_msg(struct syscall *sysc);
 static void debug_read(int fd, void *buf, size_t len);
 static int handle_one_msg(struct event_mbox *ev_mbox);
 static void debug_read_handler(struct event_queue *ev_q);
+
+static int debug_send_and_block(int fd, struct d9_header *hdr,
+                                int (*fn)(struct d9_header *msg, void *arg),
+                                void *arg);
 static int debug_send_packet(int fd, struct d9_header *hdr);
 static int debug_send_error(uint32_t errnum);
-static int debug_read_packet(int fd, struct d9_header *hdr);
+static struct d9_header *debug_read_packet(int fd);
 static int read_all(int fd, void *data, size_t size);
+static int check_error_packet(struct d9_header *hdr, enum d9_msg_t expected);
+
 static int d9s_treadmem(struct d9_header *hdr);
 static int d9s_tstoremem(struct d9_header *hdr);
 static int d9s_tfetchreg(struct d9_header *hdr);
+static int d9s_tstorereg(struct d9_header *hdr);
+static int d9s_tresume(struct d9_header *hdr);
+
+static int d9c_thitbreakpoint(struct d9_header *hdr);
+static int d9c_taddthread(struct d9_header *hdr);
 
 /* ev_q for read syscall on debug pipe. */
 static struct event_queue *debug_read_ev_q;
@@ -123,6 +135,38 @@ static message_handler srv_msg_handlers[D9_HANDLER(D9_NUM_MESSAGES)] = {
     d9s_tstoremem, /* TSTOREMEM */
     NULL,          /* RSTOREMEM */
     d9s_tfetchreg, /* TFETCHREG */
+    NULL,          /* RFETCHREG */
+    d9s_tstorereg, /* TSTOREREG */
+    NULL,          /* RSTOREREG */
+    NULL,          /* TERROR */
+    NULL,          /* RERROR */
+    NULL,          /* THITBREAKPOINT */
+    NULL,          /* RHITBREAKPOINT */
+    d9s_tresume,   /* TRESUME */
+    NULL,          /* RRESUME */
+    NULL,          /* TADDTHREAD */
+    NULL,          /* RADDTHREAD */
+};
+
+/* gdbserver can also receive messages it didn't ask for, e.g. TADDTHREAD. The
+ * handler lives here. */
+static message_handler clt_msg_handlers[D9_HANDLER(D9_NUM_MESSAGES)] = {
+    NULL,               /* TREADMEM */
+    NULL,               /* RREADMEM */
+    NULL,               /* TSTOREMEM */
+    NULL,               /* RSTOREMEM */
+    NULL,               /* TFETCHREG */
+    NULL,               /* RFETCHREG */
+    NULL,               /* TSTOREREG */
+    NULL,               /* RSTOREREG */
+    NULL,               /* TERROR */
+    NULL,               /* RERROR */
+    d9c_thitbreakpoint, /* THITBREAKPOINT */
+    NULL,               /* RHITBREAKPOINT */
+    NULL,               /* TRESUME */
+    NULL,               /* RRESUME */
+    d9c_taddthread,     /* TADDTHREAD */
+    NULL,               /* RADDTHREAD */
 };
 
 /* queue_handle_one_message extracts one message from the mbox and calls the
@@ -261,6 +305,9 @@ static struct d9_header *alloc_packet(size_t pck_len, enum d9_msg_t msg_type)
 int d9s_read_memory(const struct d9_treadmem_msg *req,
                     struct d9_rreadmem_msg *resp)
 {
+	resp->length = req->length;
+	/* TODO(chrisko): can check page tables to see whether this should actually
+	 * succeed instead of letting it fault. */
 	memcpy(resp->data, (void *)req->address, req->length);
 	return 0;
 }
@@ -268,8 +315,76 @@ int d9s_read_memory(const struct d9_treadmem_msg *req,
 /* d9s_store_memory is the d9_ops func called to fulfill a TSTOREMEM request. */
 int d9s_store_memory(const struct d9_tstoremem_msg *req)
 {
+	/* TODO(chrisko): can check page tables to see whether this should actually
+	 * succeed instead of letting it fault. */
 	memcpy((void *)req->address, req->data, req->length);
 	return 0;
+}
+
+/* d9s_resume is the d9_ops func called to fulfill a TRESUME request. */
+void d9s_resume(void)
+{
+	uthread_apply_all(uthread_runnable);
+}
+
+int d9s_notify_hit_breakpoint(uint64_t tid, uint64_t address)
+{
+	struct d9_thitbreakpoint thb =
+	    D9_INIT_HDR(sizeof(struct d9_thitbreakpoint), D9_THITBREAKPOINT);
+
+	if (debug_fd == -1)
+		return 0;
+
+	thb.msg.pid = getpid();
+	thb.msg.tid = tid;
+	thb.msg.address = address;
+
+	return debug_send_packet(debug_fd, &(thb.hdr));
+}
+
+int d9s_notify_add_thread(uint64_t tid)
+{
+	struct d9_taddthread tat =
+	    D9_INIT_HDR(sizeof(struct d9_taddthread), D9_TADDTHREAD);
+
+	if (debug_fd == -1)
+		return 0;
+
+	tat.msg.pid = getpid();
+	tat.msg.tid = tid;
+
+	return debug_send_packet(debug_fd, &(tat.hdr));
+}
+
+/* d9s_tresume resumes execution in all threads.
+ *
+ * This looks a bit different than all the other routines: The actual op is done
+ * after sending a successful response. The response basically serves to let the
+ * client know that the message was received, but not that the work was done.
+ *
+ * There's two scenarios for resume we care about at the moment:
+ * 1) We resume and run until the program hits another breakpoint.
+ * 2) We resume and run until the program exits.
+ *
+ * In the second case, the program could exit before the 2LS has a chance to
+ * send the successful response. So we send the response first and assume that
+ * resume cannot fail. (If it does, it wouldn't fail in a way we can currently
+ * detect anyway.)
+ */
+static int d9s_tresume(struct d9_header *hdr)
+{
+	int ret;
+	struct d9_rresume resp = D9_INIT_HDR(sizeof(struct d9_rresume), D9_RRESUME);
+
+	if (d9_ops == NULL || d9_ops->resume == NULL)
+		return debug_send_error(EBADF /* TODO: better error code */);
+
+	ret = debug_send_packet(debug_fd, &(resp.hdr));
+
+	/* Call user-supplied routine. */
+	d9_ops->resume();
+
+	return ret;
 }
 
 /* d9s_tstoremem allocates the response packet, calls the user-supplied ops
@@ -321,6 +436,36 @@ static int d9s_treadmem(struct d9_header *hdr)
 	ret = debug_send_packet(debug_fd, rhdr);
 	free(rhdr);
 	return ret;
+}
+
+/* d9s_tstorereg allocates the response packet, finds the appropriate thread
+ * structure, calls the user-supplied ops function for storing its registers,
+ * and sends the response packet. */
+static int d9s_tstorereg(struct d9_header *hdr)
+{
+	int ret;
+	struct uthread *t;
+	struct d9_header *rpack;
+	struct d9_rstorereg resp =
+	    D9_INIT_HDR(sizeof(struct d9_rstorereg), D9_RSTOREREG);
+	struct d9_tstorereg *req = (struct d9_tstorereg *)hdr;
+
+	if (d9_ops == NULL || d9_ops->store_registers == NULL)
+		return debug_send_error(EBADF /* TODO */);
+
+	/* Find the appropriate thread. */
+	t = uthread_get_thread_by_id(req->msg.threadid);
+	if (t == NULL)
+		return debug_send_error(EBADF /* TODO */);
+
+	/* Call user-supplied routine for filling in response packet. */
+	ret = d9_ops->store_registers(t, &(req->msg.regs));
+
+	if (ret < 0)
+		return debug_send_error(-ret);
+
+	/* Successful response. */
+	return debug_send_packet(debug_fd, &(resp.hdr));
 }
 
 /* d9s_tfetchreg allocates the response packet, finds the appropriate thread
@@ -397,17 +542,102 @@ static int read_all(int fd, void *data, size_t size)
 	return 0;
 }
 
-/* debug_read_packet will read a packet in its exact length, handling partial
- * reads.
- */
-static int debug_read_packet(int fd, struct d9_header *hdr)
+/* debug_read_packet will read a packet in its exact length. */
+static struct d9_header *debug_read_packet(int fd)
 {
-	/* Read the header. */
-	if (read_all(fd, hdr, sizeof(struct d9_header)))
-		return -1;
+	size_t msg_size;
+	struct d9_header *hdr = malloc(sizeof(struct d9_header));
 
-	/* Read the remaining bytes of the packet. */
-	return read_all(fd, hdr + 1, hdr->size - sizeof(struct d9_header));
+	if (hdr == NULL)
+		panic("2LS debug: could not malloc");
+
+	/* Read message header. */
+	if (read_all(fd, hdr, sizeof(struct d9_header))) {
+		free(hdr);
+		return NULL;
+	}
+
+	/* Read the remaining bytes of the message. */
+	msg_size = hdr->size - sizeof(struct d9_header);
+	if (msg_size > 0) {
+		hdr = realloc(hdr, hdr->size);
+		if (hdr == NULL)
+			panic("2LS debug: could not realloc");
+
+		if (read_all(fd, hdr + 1, msg_size)) {
+			perror("d9 read");
+			free(hdr);
+			return NULL;
+		}
+	}
+
+	return hdr;
+}
+
+/* Globals to deal with incoming messages on gdbserver side.
+ *
+ * TODO(chrisko): Instead of making these global, make a struct to pass to
+ * read_thread and the d9c_ functions.
+ */
+static struct d9_header *d9c_message;
+static uth_mutex_t sync_lock;
+static uth_cond_var_t sync_cv;
+
+void *d9c_read_thread(void *arg)
+{
+	struct d9_header *hdr;
+	int fd = *((int *)arg);
+	ssize_t rlen = 0;
+
+	while (1) {
+		hdr = debug_read_packet(fd);
+		if (hdr == NULL)
+			return NULL;
+
+		if (IS_MSG_R(hdr->msg_type)) {
+			/* If this is a response message type, the main gdbserver thread is
+			 * blocked on this response. */
+			uth_mutex_lock(sync_lock);
+			d9c_message = hdr;
+			uth_mutex_unlock(sync_lock);
+			uth_cond_var_broadcast(sync_cv);
+		} else if (clt_msg_handlers[D9_HANDLER(hdr->msg_type)]) {
+			/* This is a message that isn't a response to a request (e.g. a
+			 * thread was added or we hit a breakpoint). */
+			clt_msg_handlers[D9_HANDLER(hdr->msg_type)](hdr);
+			free(hdr);
+		} else {
+			panic("2LS received invalid message type (type = %d, size = %d)\n",
+			      hdr->msg_type, hdr->size);
+			free(hdr);
+		}
+	}
+}
+
+static struct d9c_ops *client_ops;
+
+/* d9c_thitbreakpoint is called when the 2LS sends a THITBREAKPOINT msg. */
+int d9c_thitbreakpoint(struct d9_header *hdr)
+{
+	struct d9_thitbreakpoint *thb = (struct d9_thitbreakpoint *)hdr;
+
+	return client_ops->hit_breakpoint(thb->msg.pid, thb->msg.tid,
+	                                  thb->msg.address);
+}
+
+/* d9c_taddthread is called when the 2LS sends a TADDTHREAD msg. */
+int d9c_taddthread(struct d9_header *hdr)
+{
+	struct d9_taddthread *tat = (struct d9_taddthread *)hdr;
+
+	return client_ops->add_thread(tat->msg.pid, tat->msg.tid);
+}
+
+void d9c_init(struct d9c_ops *ops)
+{
+	sync_lock = uth_mutex_alloc();
+	sync_cv = uth_cond_var_alloc();
+	client_ops = ops;
 }
 
 static int check_error_packet(struct d9_header *hdr, enum d9_msg_t expected)
@@ -429,9 +659,48 @@ static int check_error_packet(struct d9_header *hdr, enum d9_msg_t expected)
 	return 1;
 }
 
+static int debug_send_and_block(int fd, struct d9_header *hdr,
+                                int (*fn)(struct d9_header *msg, void *arg),
+                                void *arg)
+{
+	int ret;
+
+	uth_mutex_lock(sync_lock);
+	ret = debug_send_packet(fd, hdr);
+	if (ret)
+		goto send_unlock;
+
+	/* Wait for response message. */
+	while (d9c_message == NULL)
+		uth_cond_var_wait(sync_cv, sync_lock);
+
+	if (check_error_packet(d9c_message, hdr->msg_type + 1)) {
+		perror("d9 send and block");
+		ret = -1;
+	} else {
+		ret = fn ? fn(d9c_message, arg) : 0;
+	}
+
+	free(d9c_message);
+	d9c_message = NULL;
+
+send_unlock:
+	uth_mutex_unlock(sync_lock);
+	return ret;
+}
+
+static int d9c_read_memory_callback(struct d9_header *msg, void *arg)
+{
+	struct d9_rreadmem *resp = (struct d9_rreadmem *)msg;
+
+	memcpy(arg, resp->msg.data, resp->msg.length);
+	return 0;
+}
+
+/* d9c_read_memory communicates with the 2LS to read from an address in memory.
+*/
 int d9c_read_memory(int fd, uintptr_t address, uint32_t length, uint8_t *buf)
 {
-	size_t return_packet_size;
 	struct d9_treadmem req =
 	    D9_INIT_HDR(sizeof(struct d9_treadmem), D9_TREADMEM);
 	struct d9_rreadmem *rhdr;
@@ -439,59 +708,48 @@ int d9c_read_memory(int fd, uintptr_t address, uint32_t length, uint8_t *buf)
 	req.msg.address = address;
 	req.msg.length = length;
 
-	int ret = debug_send_packet(fd, &(req.hdr));
+	return debug_send_and_block(fd, &(req.hdr), &d9c_read_memory_callback, buf);
+}
 
-	/* Block on return packet. */
+/* d9c_store_registers communicates with the 2LS to change register values. */
+int d9c_store_registers(int fd, uint64_t tid, struct d9_regs *regs)
+{
+	struct d9_tstorereg req =
+	    D9_INIT_HDR(sizeof(struct d9_tstorereg), D9_TSTOREREG);
 
-	return_packet_size =
-	    sizeof(struct d9_header) +
-	    MAX(sizeof(struct d9_rreadmem) + length, sizeof(struct d9_rerror));
-	char pkt_buf[return_packet_size];
+	req.msg.threadid = tid;
+	memcpy(&(req.msg.regs), regs, sizeof(struct d9_regs));
 
-	rhdr = (struct d9_rreadmem *)pkt_buf;
-	if (debug_read_packet(fd, &(rhdr->hdr))) {
-		perror("d9 read memory");
-		return -1;
-	}
+	return debug_send_and_block(fd, &(req.hdr), NULL, NULL);
+}
 
-	if (check_error_packet(&(rhdr->hdr), D9_RREADMEM)) {
-		perror("d9 read memory");
-		return -1;
-	}
+static int d9c_fetch_registers_callback(struct d9_header *msg, void *arg)
+{
+	/* Store registers in pointer given by user of d9c_fetch_registers. */
+	struct d9_rfetchreg *resp = (struct d9_rfetchreg *)msg;
 
-	memcpy(buf, rhdr->msg.data, length);
+	memcpy(arg, &(resp->msg.regs), sizeof(struct d9_regs));
 	return 0;
 }
 
+/* d9c_fetch_registers communicates with the 2LS to read register values. */
 int d9c_fetch_registers(int fd, uint64_t tid, struct d9_regs *regs)
 {
-	size_t return_packet_size;
-	struct d9_header *rhdr;
 	struct d9_tfetchreg req =
 	    D9_INIT_HDR(sizeof(struct d9_tfetchreg), D9_TFETCHREG);
 
 	req.msg.threadid = tid;
 
-	int ret = debug_send_packet(fd, &(req.hdr));
+	return debug_send_and_block(fd, &(req.hdr), &d9c_fetch_registers_callback,
+	                            regs);
+}
 
-	/* Block on return packet. */
+/* d9c_resume tells the 2LS to resume all threads.
+ *
+ * TODO(chrisko): resume w/ hardware-step enabled. */
+int d9c_resume(int fd)
+{
+	struct d9_tresume req = D9_INIT_HDR(sizeof(struct d9_tresume), D9_TRESUME);
 
-	return_packet_size =
-	    sizeof(struct d9_header) +
-	    MAX(sizeof(struct d9_rfetchreg), sizeof(struct d9_rerror));
-	char pkt_buf[return_packet_size];
-
-	rhdr = (struct d9_header *)pkt_buf;
-	if (debug_read_packet(fd, rhdr)) {
-		perror("d9 fetch registers");
-		return -1;
-	}
-
-	if (check_error_packet(rhdr, D9_RFETCHREG)) {
-		perror("d9 fetch registers");
-		return -1;
-	}
-
-	memcpy(regs, rhdr + 1, sizeof(struct d9_regs));
-	return 0;
+	return debug_send_and_block(fd, &(req.hdr), NULL, NULL);
 }

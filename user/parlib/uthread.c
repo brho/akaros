@@ -1,9 +1,11 @@
 /* Copyright (c) 2011-2014 The Regents of the University of California
+ * Copyright (c) 2016 Google Inc.
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details. */
 #include <parlib/arch/atomic.h>
 #include <parlib/arch/trap.h>
 #include <parlib/assert.h>
+#include <parlib/debug.h>
 #include <parlib/event.h>
 #include <parlib/spinlock.h>
 #include <parlib/parlib.h>
@@ -319,6 +321,8 @@ void uthread_init(struct uthread *new_thread, struct uth_thread_attr *attr)
 	new_thread->notif_disabled_depth = 0;
 
 	uthread_assign_id(new_thread);
+
+	d9s_notify_add_thread(new_thread->id);
 
 	if (attr && attr->want_tls) {
 		/* Get a TLS.  If we already have one, reallocate/refresh it */

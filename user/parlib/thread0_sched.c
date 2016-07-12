@@ -1,4 +1,4 @@
-/* Copyright (c) 2015 Google, Inc.
+/* Copyright (c) 2015-2016 Google, Inc.
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
@@ -46,6 +46,8 @@ static struct d9_ops thread0_d9ops = {
     .read_memory = &d9s_read_memory,
     .store_memory = &d9s_store_memory,
     .fetch_registers = &d9_fetch_registers,
+    .store_registers = &d9_store_registers,
+    .resume = &d9s_resume,
 };
 
 /* externed into uthread.c */
@@ -140,6 +142,11 @@ static void thread0_thread_refl_fault(struct uthread *uth,
 	case HW_TRAP_PAGE_FAULT:
 		if (!handle_page_fault(uth, err, aux))
 			refl_error(uth, trap_nr, err, aux);
+		break;
+	case HW_TRAP_BRKPT:
+		/* We only have one thread, no need to stop other threads. */
+		uthread_has_blocked(uth, 0);
+		d9s_notify_hit_breakpoint(uth->id, 0);
 		break;
 	default:
 		refl_error(uth, trap_nr, err, aux);

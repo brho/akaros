@@ -12,6 +12,7 @@
 __BEGIN_DECLS
 
 #define HW_TRAP_DIV_ZERO		0
+#define HW_TRAP_BRKPT			3
 #define HW_TRAP_GP_FAULT		13
 #define HW_TRAP_PAGE_FAULT		14
 

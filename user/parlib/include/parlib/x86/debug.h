@@ -30,3 +30,4 @@ struct d9_regs {
 };
 
 int d9_fetch_registers(struct uthread *t, struct d9_regs *resp);
+int d9_store_registers(struct uthread *t, struct d9_regs *resp);

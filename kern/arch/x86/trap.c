@@ -543,6 +543,8 @@ void handle_nmi(struct hw_trapframe *hw_tf)
 static void trap_dispatch(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui;
+	struct preempt_data *vcpd;
+	struct proc *p;
 	bool handled = FALSE;
 	unsigned long aux = 0;
 	uintptr_t fixup_ip;
@@ -551,10 +553,20 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 	switch(hw_tf->tf_trapno) {
 		case T_DEBUG:
 		case T_BRKPT:
-			enable_irq();
-			monitor(hw_tf);
-			disable_irq();
-			handled = TRUE;
+			pcpui = &per_cpu_info[core_id()];
+			p = pcpui->cur_proc;
+			vcpd = &p->procdata->vcore_preempt_data[pcpui->owning_vcoreid];
+
+			if (in_kernel(hw_tf) || !proc_is_vcctx_ready(p) ||
+				vcpd->notif_disabled) {
+				/* Trap is in kernel, vcore, or early SCP context. */
+				enable_irq();
+				monitor(hw_tf);
+				disable_irq();
+				handled = TRUE;
+			} else {
+				handled = FALSE;
+			}
 			break;
 		case T_ILLOP:
 		{
