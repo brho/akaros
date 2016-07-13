@@ -2,7 +2,10 @@
 #CFLAGS_USER += -DCONFIG_APPSERVER
 #CFLAGS_USER += -DCONFIG_SYSCALL_TRAP
 #CFLAGS_USER += -g
+# Turn this on for better backtraces, but worse performance
+#CFLAGS_USER += -fno-optimize-sibling-calls
 #CFLAGS_TESTS += -static
+#CFLAGS_TESTS += -fno-optimize-sibling-calls
 export CFLAGS_USER CFLAGS_TESTS
 
 # brho's custom targets.  Customize to your system.

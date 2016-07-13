@@ -252,6 +252,14 @@ config BLOCK_EXTRAS
 		implementation.  Say y.  If you have networking bugs, try turning this
 		off, and if that helps, tell someone.
 
+config BETTER_BACKTRACE
+	bool "Better backtraces, less optimizations"
+	default n
+	help
+		The kernel uses the frame pointer and call stacks for backtraces.
+		Tail-call optimizations remove some of this information.  Say 'Y' here
+		to have better backtraces, at the expense of performance.
+
 endmenu
 
 menu "Misc/Old Options"

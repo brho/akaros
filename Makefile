@@ -369,6 +369,9 @@ CFLAGS_KERNEL += -m64 -g
 else
 CFLAGS_KERNEL += -m32 -gstabs
 endif
+ifeq ($(CONFIG_BETTER_BACKTRACE),y)
+CFLAGS_KERNEL += -fno-optimize-sibling-calls
+endif
 
 # TODO: do we need this, or can we rely on the compiler's defines?
 CFLAGS_KERNEL += -D$(ARCH)
