@@ -2,10 +2,9 @@
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
- * Alarms.  This includes various ways to sleep for a while or defer work on a
- * specific timer.  These can be per-core, global or whatever.  Like with most
- * systems, you won't wake up til after the time you specify. (for now, this
- * might change).
+ * Alarms.  This includes ways to defer work on a specific timer.  These can be
+ * per-core, global or whatever.  Like with most systems, you won't wake up til
+ * after the time you specify. (for now, this might change).
  *
  * TODO:
  * 	- have a kernel sense of time, instead of just the TSC or whatever timer the
@@ -46,23 +45,19 @@ void init_timer_chain(struct timer_chain *tchain,
 	reset_tchain_times(tchain);
 }
 
-/* Initializes a new awaiter.  Pass 0 for the function if you want it to be a
- * kthread-alarm, and sleep on it after you set the alarm later. */
 static void __init_awaiter(struct alarm_waiter *waiter)
 {
 	waiter->wake_up_time = ALARM_POISON_TIME;
 	waiter->on_tchain = FALSE;
 	waiter->holds_tchain_lock = FALSE;
-	if (!waiter->has_func)
-		sem_init_irqsave(&waiter->sem, 0);
 }
 
 void init_awaiter(struct alarm_waiter *waiter,
                   void (*func) (struct alarm_waiter *awaiter))
 {
 	waiter->irq_ok = FALSE;
-	waiter->has_func = func ? TRUE : FALSE;
-	waiter->func = func;			/* if !func, this is a harmless zeroing */
+	assert(func);
+	waiter->func = func;
 	__init_awaiter(waiter);
 }
 
@@ -71,8 +66,8 @@ void init_awaiter_irq(struct alarm_waiter *waiter,
                                         struct hw_trapframe *hw_tf))
 {
 	waiter->irq_ok = TRUE;
-	waiter->has_func = func_irq ? TRUE : FALSE;
-	waiter->func_irq = func_irq;	/* if !func, this is a harmless zeroing */
+	assert(func_irq);
+	waiter->func_irq = func_irq;
 	__init_awaiter(waiter);
 }
 
@@ -129,22 +124,16 @@ static void __run_awaiter(uint32_t srcid, long a0, long a1, long a2)
 	waiter->func(waiter);
 }
 
-/* When an awaiter's time has come, this gets called.  If it was a kthread, it
- * will wake up.  o/w, it will call the func ptr stored in the awaiter. */
 static void wake_awaiter(struct alarm_waiter *waiter,
                          struct hw_trapframe *hw_tf)
 {
-	if (waiter->has_func) {
-		if (waiter->irq_ok) {
-			waiter->holds_tchain_lock = TRUE;
-			waiter->func_irq(waiter, hw_tf);
-			waiter->holds_tchain_lock = FALSE;
-		} else {
-			send_kernel_message(core_id(), __run_awaiter, (long)waiter,
-			                    0, 0, KMSG_ROUTINE);
-		}
+	if (waiter->irq_ok) {
+		waiter->holds_tchain_lock = TRUE;
+		waiter->func_irq(waiter, hw_tf);
+		waiter->holds_tchain_lock = FALSE;
 	} else {
-		sem_up(&waiter->sem); /* IRQs are disabled, can call sem_up directly */
+		send_kernel_message(core_id(), __run_awaiter, (long)waiter,
+		                    0, 0, KMSG_ROUTINE);
 	}
 }
 
@@ -350,20 +339,6 @@ bool reset_alarm_rel(struct timer_chain *tchain, struct alarm_waiter *waiter,
 	return ret;
 }
 
-/* Attempts to sleep on the alarm.  Could fail if you aren't allowed to kthread
- * (process limit, etc).  Don't call it on a waiter that is an event-handler. */
-int sleep_on_awaiter(struct alarm_waiter *waiter)
-{
-	int8_t irq_state = 0;
-	if (waiter->has_func)
-		panic("Tried blocking on a waiter %p with a func %p!", waiter,
-		      waiter->func);
-	/* Put the kthread to sleep.  TODO: This can fail (or at least it will be
-	 * able to in the future) and we'll need to handle that. */
-	sem_down_irqsave(&waiter->sem, &irq_state);
-	return 0;
-}
-
 /* Sets the timer interrupt for the timer chain passed as parameter.
  * The next interrupt will be scheduled at the nearest timer available in the
  * chain.
@@ -432,23 +407,17 @@ void print_chain(struct timer_chain *tchain)
 	       tchain->earliest_time,
 	       tchain->latest_time);
 	TAILQ_FOREACH(i, &tchain->waiters, next) {
-		if (i->has_func) {
-			uintptr_t f;
-			if (i->irq_ok)
-				f = (uintptr_t)i->func_irq;
-			else
-				f = (uintptr_t)i->func;
-			char *f_name = get_fn_name(f);
-			printk("\tWaiter %p, time %llu, func %p (%s)\n", i,
-			       i->wake_up_time, f, f_name);
-			kfree(f_name);
-			continue;
-		}
-		struct kthread *kthread = TAILQ_FIRST(&i->sem.waiters);
-		printk("\tWaiter %p, time: %llu, kthread: %p (%p) %s\n", i,
-		       i->wake_up_time, kthread, (kthread ? kthread->proc : 0),
-		       (kthread ? kthread->name : 0));
+		uintptr_t f;
+		char *f_name;
 
+		if (i->irq_ok)
+			f = (uintptr_t)i->func_irq;
+		else
+			f = (uintptr_t)i->func;
+		f_name = get_fn_name(f);
+		printk("\tWaiter %p, time %llu, func %p (%s)\n", i,
+		       i->wake_up_time, f, f_name);
+		kfree(f_name);
 	}
 	spin_unlock_irqsave(&tchain->lock);
 }
