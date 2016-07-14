@@ -52,9 +52,11 @@ void rendez_sleep(struct rendez *rv, int (*cond)(void*), void *arg)
 /* Force a wakeup of all waiters on the rv, including non-timeout users.  For
  * those, they will just wake up, see the condition is still false (probably)
  * and go back to sleep. */
-static void rendez_alarm_handler(struct alarm_waiter *awaiter)
+static void rendez_alarm_handler(struct alarm_waiter *awaiter,
+                                 struct hw_trapframe *hw_tf)
 {
 	struct rendez *rv = (struct rendez*)awaiter->data;
+
 	rendez_wakeup(rv);
 }
 
@@ -78,8 +80,12 @@ void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
 	}
 	cv_unlock_irqsave(&rv->cv, &irq_state);
 	/* The handler will call rendez_wake, but won't mess with the condition
-	 * state.  It's enough to break us out of cv_wait() to see .on_tchain. */
-	init_awaiter(&awaiter, rendez_alarm_handler);
+	 * state.  It's enough to break us out of cv_wait() to see .on_tchain.  But
+	 * for this to work, we need to be an IRQ alarm handler.  If an RKM fired,
+	 * then we'd be off the tchain, but it didn't actually run yet.  Also, since
+	 * all we're doing is poking a rendez, we might as well just do it from IRQ
+	 * ctx instead of mucking with an extra RKM. */
+	init_awaiter_irq(&awaiter, rendez_alarm_handler);
 	awaiter.data = rv;
 	set_awaiter_rel(&awaiter, usec);
 	/* Set our alarm on this cpu's tchain.  Note that when we sleep in cv_wait,
