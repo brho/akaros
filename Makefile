@@ -687,6 +687,7 @@ apps-install: $(app-dirs-install)
 	@$(call make_as_parent, -C tools/apps/ipconfig install)
 	@$(call make_as_parent, -C tools/dev-libs/elfutils install)
 	@$(call make_as_parent, -C tools/dev-util/perf install)
+	@$(call make_as_parent, -C tools/sys-apps/bash install)
 
 PHONY += apps-clean
 apps-clean: $(app-dirs-clean)
