@@ -1,4 +1,4 @@
-#!/bin/ash
+#!/bin/bash
 #
 # root [[REMOTE_NAME] [SRVNAME]]
 #
@@ -10,13 +10,13 @@
 DIALSTRING='tcp!10.0.2.2!1025'
 
 REMOTE="qemu"
-if [ "$#" -ge "1" ]
+if [[ "$#" -ge "1" ]]
 then
 	REMOTE=$1
 fi
 
 SRVNAME=$REMOTE-ufs
-if [ "$#" -ge "2" ]
+if [[ "$#" -ge "2" ]]
 then
 	SRVNAME=$2
 fi

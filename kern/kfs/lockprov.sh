@@ -1,4 +1,4 @@
-#!/bin/ash
+#!/bin/bash
 
 # will run lock_test with whatever arguments are passed in.  default arguments
 # are -wMAX_VCORES and -l10000.
@@ -12,7 +12,7 @@
 #
 # Run this from looper.sh for multiple runs.
 
-if [ $# -lt 2 ]
+if [[ $# -lt 2 ]]
 then
 	echo Usage: $0 PREEMPT_DELAY_USEC ARGS_FOR_LOCK_TEST
 	exit

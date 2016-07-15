@@ -1,6 +1,6 @@
-#!/bin/ash
+#!/bin/bash
 
-if [ $# -lt 1 ] ; then
+if [[ $# -lt 1 ]] ; then
 	echo "Need an app!"
 	exit 
 fi
