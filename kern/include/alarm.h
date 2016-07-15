@@ -25,15 +25,15 @@
  * irqsave locks.
  *
  * Another important difference between IRQ and RKM alarms comes when cancelling
- * or unsetting an alarm.  When you cancel (unset or reset) an alarm, the alarm
- * is yanked off the tchain.  If the waiter was on the chain, then it will not
- * fire for both IRQ and RKM alarms.  If the waiter was not on the chain, then
- * for IRQ alarms, this means that the alarm has already fired.  However, for
- * RKM alarms, the alarm may have already fired or it may still be waiting to
- * fire (sitting in an RKM queue).  It will fire at some point, but perhaps it
- * has not fired yet.  It is also possibly (though extremely unlikely) that if
- * you reset an RKM alarm that the new alarm actually happens before the old one
- * (if the new RKM was sent to another core).
+ * or unsetting an alarm.  When you cancel (unset or reset) an alarm, you may
+ * need to block until the RKM has run.  IRQ alarms run with the tchain lock
+ * held, so once the canceller grabs the lock, it has either run already or will
+ * not at all.  With RKMs, the handler runs outside of the lock.  Thus you may
+ * have to wait until the RKM has run, and the RKM might be waiting to run on
+ * your core.
+ *
+ * Note that RKM unset_alarm() has a waits-on dependency with the actual alarm
+ * handler, so be careful of deadlock.
  *
  * To use an IRQ alarm, init the waiter with init_awaiter_irq().
  *
@@ -78,6 +78,8 @@ struct alarm_waiter {
 	bool						on_tchain;
 	bool						irq_ok;
 	bool						holds_tchain_lock;
+	bool						rkm_pending;
+	struct cond_var				rkm_cv;
 };
 TAILQ_HEAD(awaiters_tailq, alarm_waiter);		/* ideally not a LL */
 
@@ -107,9 +109,14 @@ void init_awaiter_irq(struct alarm_waiter *waiter,
 void set_awaiter_abs(struct alarm_waiter *waiter, uint64_t abs_time);
 void set_awaiter_rel(struct alarm_waiter *waiter, uint64_t usleep);
 void set_awaiter_inc(struct alarm_waiter *waiter, uint64_t usleep);
-/* Arms/disarms the alarm. */
+/* Arms/disarms the alarm.  Can be called from within a handler.*/
 void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
+/* Unset and reset may block if the alarm is not IRQ.  Do not call from within a
+ * handler.  Returns TRUE if you stopped the alarm from firing. */
 bool unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
+/* Convenience wrappers for unset, then set.  Slower, but easier than just
+ * setting, since you don't need to know if it fired.  Returns TRUE if the alarm
+ * did not fire before your reset. */
 bool reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
                      uint64_t abs_time);
 bool reset_alarm_rel(struct timer_chain *tchain, struct alarm_waiter *waiter,

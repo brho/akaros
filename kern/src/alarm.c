@@ -59,6 +59,7 @@ void init_awaiter(struct alarm_waiter *waiter,
 	assert(func);
 	waiter->func = func;
 	__init_awaiter(waiter);
+	cv_init(&waiter->rkm_cv);
 }
 
 void init_awaiter_irq(struct alarm_waiter *waiter,
@@ -121,7 +122,16 @@ static void reset_tchain_interrupt(struct timer_chain *tchain)
 static void __run_awaiter(uint32_t srcid, long a0, long a1, long a2)
 {
 	struct alarm_waiter *waiter = (struct alarm_waiter*)a0;
+
 	waiter->func(waiter);
+	cv_lock(&waiter->rkm_cv);
+	/* This completes the alarm's function.  We don't need to sync with
+	 * wake_waiter, we happen after.  We do need to sync with unset_alarm. */
+	waiter->rkm_pending = FALSE;
+	/* broadcast, instead of signal.  This allows us to have multiple unsetters
+	 * concurrently.  (only one of which will succeed, so YMMV.) */
+	__cv_broadcast(&waiter->rkm_cv);
+	cv_unlock(&waiter->rkm_cv);
 }
 
 static void wake_awaiter(struct alarm_waiter *waiter,
@@ -132,6 +142,9 @@ static void wake_awaiter(struct alarm_waiter *waiter,
 		waiter->func_irq(waiter, hw_tf);
 		waiter->holds_tchain_lock = FALSE;
 	} else {
+		/* The alarm is in limbo and is uncancellable from now (IRQ ctx, tchain
+		 * lock held) until it finishes. */
+		waiter->rkm_pending = TRUE;
 		send_kernel_message(core_id(), __run_awaiter, (long)waiter,
 		                    0, 0, KMSG_ROUTINE);
 	}
@@ -223,14 +236,15 @@ static bool __insert_awaiter(struct timer_chain *tchain,
 
 static void __set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 {
+	assert(!waiter->on_tchain);
 	if (__insert_awaiter(tchain, waiter))
 		reset_tchain_interrupt(tchain);
 }
 
-/* Sets the alarm.  If it is a kthread-style alarm (func == 0), sleep on it
- * later. */
-void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
+static void __set_alarm_irq(struct timer_chain *tchain,
+                            struct alarm_waiter *waiter)
 {
+	/* holds_tchain_lock is set when we're called from an alarm handler */
 	if (waiter->holds_tchain_lock) {
 		__set_alarm(tchain, waiter);
 	} else {
@@ -238,6 +252,24 @@ void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 		__set_alarm(tchain, waiter);
 		spin_unlock_irqsave(&tchain->lock);
 	}
+}
+
+static void __set_alarm_rkm(struct timer_chain *tchain,
+                            struct alarm_waiter *waiter)
+{
+	spin_lock_irqsave(&tchain->lock);
+	__set_alarm(tchain, waiter);
+	spin_unlock_irqsave(&tchain->lock);
+}
+
+/* Sets the alarm.  If it is a kthread-style alarm (func == 0), sleep on it
+ * later. */
+void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
+{
+	if (waiter->irq_ok)
+		return __set_alarm_irq(tchain, waiter);
+	else
+		return __set_alarm_rkm(tchain, waiter);
 }
 
 /* Helper, rips the waiter from the tchain, knowing that it is on the list.
@@ -264,64 +296,88 @@ static bool __remove_awaiter(struct timer_chain *tchain,
 	return reset_int;
 }
 
+static bool __unset_alarm_irq(struct timer_chain *tchain,
+                              struct alarm_waiter *waiter)
+{
+	bool was_on_chain = FALSE;
+
+	/* We need to lock the tchain before looking at on_tchain.  At one point, I
+	 * thought we could do the check-signal-check again style (lockless peek).
+	 * The reason we can't is that on_tchain isn't just set FALSE.  A handler
+	 * could reset the alarm and set it TRUE while we're looking.  We could
+	 * briefly peek when it is off the chain but about to run its handler.
+	 *
+	 * I was tempted to assert(!waiter->holds_tchain_lock), to catch people who
+	 * try to unset from a handler.  That won't work, since you can validly
+	 * unset while the alarm is going off.  In that case, you might see
+	 * holds_tchain_lock set briefly. */
+	spin_lock_irqsave(&tchain->lock);
+	if (waiter->on_tchain) {
+		was_on_chain = TRUE;
+		if (__remove_awaiter(tchain, waiter))
+			reset_tchain_interrupt(tchain);
+	}
+	spin_unlock_irqsave(&tchain->lock);
+	/* IRQ alarms run under the tchain lock.  If we ripped it off the chain, it
+	 * won't fire again.  Alarms that rearm may have fired multiple times before
+	 * we locked, but once we locked, it was done. */
+	return was_on_chain;
+}
+
+static bool __unset_alarm_rkm(struct timer_chain *tchain,
+                              struct alarm_waiter *waiter)
+{
+	bool was_on_chain, was_pending;
+
+	cv_lock(&waiter->rkm_cv);
+	while (1) {
+		spin_lock_irqsave(&tchain->lock);
+		was_on_chain = waiter->on_tchain;
+		/* I think we can safely check pending outside the tchain lock, but it's
+		 * not worth the hassle and this is probably safer.  Basically,
+		 * rkm_pending will be set only if on_tchain is FALSE, and it won't get
+		 * cleared until someone grabs the cv_lock (which we hold). */
+		was_pending = waiter->rkm_pending;
+		if (was_on_chain) {
+			/* The only way we ever stop repeating alarms permanently (i.e. they
+			 * rearm) is if we yank it off the tchain */
+			if (__remove_awaiter(tchain, waiter))
+				reset_tchain_interrupt(tchain);
+			spin_unlock_irqsave(&tchain->lock);
+			cv_unlock(&waiter->rkm_cv);
+			return TRUE;
+		}
+		spin_unlock_irqsave(&tchain->lock);
+		if (!was_pending) {
+			/* wasn't on the chain and wasn't pending: it executed and did not
+			 * get rearmed */
+			cv_unlock(&waiter->rkm_cv);
+			return FALSE;
+		}
+		/* Wait til it executes and then try again. */
+		cv_wait(&waiter->rkm_cv);
+	}
+}
+
 /* Removes waiter from the tchain before it goes off.  Returns TRUE if we
- * disarmed before the alarm went off, FALSE if it already fired. */
+ * disarmed before the alarm went off, FALSE if it already fired.  May block for
+ * non-IRQ / RKM alarms, since the handler may be running asynchronously. */
 bool unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 {
-	assert(!waiter->holds_tchain_lock);	/* Don't call from within a handler */
-	spin_lock_irqsave(&tchain->lock);
-	bool ret = waiter->on_tchain;
-	if (ret && __remove_awaiter(tchain, waiter))
-		reset_tchain_interrupt(tchain);
-
-	/* if alarm had already gone off then its not on this tchain's list, though
-	 * the concurrent change to on_tchain (specifically, the setting of it to
-	 * FALSE), happens under the tchain's lock. */
-	spin_unlock_irqsave(&tchain->lock);
-	return ret;
-}
-
-/* waiter may be on the tchain, or it might have fired already and be off the
- * tchain.  Either way, this will put the waiter on the list, set to go off at
- * abs_time.  If you know the alarm has fired, don't call this.  Just set the
- * awaiter, and then set_alarm() */
-static bool __reset_alarm_abs(struct timer_chain *tchain,
-                              struct alarm_waiter *waiter, uint64_t abs_time)
-{
-	/* The tchain's lock is held */
-	bool ret = waiter->on_tchain;
-	/* We only need to remove/unset when the alarm has not fired yet (is still
-	 * on the tchain).  If it has fired, it's like a fresh insert. We must also
-	 * check if we need to reset the interrupt. */
-	bool reset_int = ret && __remove_awaiter(tchain, waiter);
-	set_awaiter_abs(waiter, abs_time);
-	/* regardless, we need to be reinserted */
-	if (__insert_awaiter(tchain, waiter) || reset_int)
-		reset_tchain_interrupt(tchain);
-	return ret;
-}
-
-static bool __reset_alarm_rel(struct timer_chain *tchain,
-                              struct alarm_waiter *waiter, uint64_t usleep)
-{
-	uint64_t now, then;
-	now = read_tsc();
-	then = now + usec2tsc(usleep);
-	assert(now <= then);
-	return __reset_alarm_abs(tchain, waiter, then);
+	if (waiter->irq_ok)
+		return __unset_alarm_irq(tchain, waiter);
+	else
+		return __unset_alarm_rkm(tchain, waiter);
 }
 
 bool reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
                      uint64_t abs_time)
 {
 	bool ret;
-	if (waiter->holds_tchain_lock) {
-		ret = __reset_alarm_abs(tchain, waiter, abs_time);
-	} else {
-		spin_lock_irqsave(&tchain->lock);
-		ret = __reset_alarm_abs(tchain, waiter, abs_time);
-		spin_unlock_irqsave(&tchain->lock);
-	}
+
+	ret = unset_alarm(tchain, waiter);
+	set_awaiter_abs(waiter, abs_time);
+	set_alarm(tchain, waiter);
 	return ret;
 }
 
@@ -329,13 +385,10 @@ bool reset_alarm_rel(struct timer_chain *tchain, struct alarm_waiter *waiter,
                      uint64_t usleep)
 {
 	bool ret;
-	if (waiter->holds_tchain_lock) {
-		ret =__reset_alarm_rel(tchain, waiter, usleep);
-	} else {
-		spin_lock_irqsave(&tchain->lock);
-		ret =__reset_alarm_rel(tchain, waiter, usleep);
-		spin_unlock_irqsave(&tchain->lock);
-	}
+
+	ret = unset_alarm(tchain, waiter);
+	set_awaiter_rel(waiter, usleep);
+	set_alarm(tchain, waiter);
 	return ret;
 }
 

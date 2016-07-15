@@ -80,11 +80,10 @@ void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
 	}
 	cv_unlock_irqsave(&rv->cv, &irq_state);
 	/* The handler will call rendez_wake, but won't mess with the condition
-	 * state.  It's enough to break us out of cv_wait() to see .on_tchain.  But
-	 * for this to work, we need to be an IRQ alarm handler.  If an RKM fired,
-	 * then we'd be off the tchain, but it didn't actually run yet.  Also, since
-	 * all we're doing is poking a rendez, we might as well just do it from IRQ
-	 * ctx instead of mucking with an extra RKM. */
+	 * state.  It's enough to break us out of cv_wait() to see .on_tchain.
+	 * Since all we're doing is poking a rendez, we might as well just do it
+	 * from IRQ ctx instead of mucking with an extra RKM.  It also avoids issues
+	 * with unset_alarm blocking. */
 	init_awaiter_irq(&awaiter, rendez_alarm_handler);
 	awaiter.data = rv;
 	set_awaiter_rel(&awaiter, usec);
