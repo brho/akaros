@@ -79,6 +79,11 @@ int env_setup_vm(env_t *e)
 	if (page_insert(e->env_pgdir, shared_page, (void*)UGDATA, PTE_USER_RW) < 0)
 		goto env_setup_vm_error;
 
+	extern struct page *mmap_zero_pg;
+	if (page_insert(e->env_pgdir, mmap_zero_pg, 0, PTE_KERN_RW) < 0)
+		panic("ghetto mmap insertion failed");
+
+
 	return 0;
 
 env_setup_vm_error:

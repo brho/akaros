@@ -502,7 +502,8 @@ static void __proc_free(struct kref *kref)
 	/* all memory below UMAPTOP should have been freed via the VMRs.  the stuff
 	 * above is the global page and procinfo/procdata */
 	env_user_mem_free(p, (void*)UMAPTOP, UVPT - UMAPTOP); /* 3rd arg = len... */
-	env_user_mem_walk(p, 0, UMAPTOP, __cb_assert_no_pg, 0);
+	//env_user_mem_walk(p, 0, UMAPTOP, __cb_assert_no_pg, 0);
+	env_user_mem_walk(p, (void*)PGSIZE, UMAPTOP, __cb_assert_no_pg, 0);
 	/* These need to be freed again, since they were allocated with a refcnt. */
 	free_cont_pages(p->procinfo, LOG2_UP(PROCINFO_NUM_PAGES));
 	free_cont_pages(p->procdata, LOG2_UP(PROCDATA_NUM_PAGES));

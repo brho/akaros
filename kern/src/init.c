@@ -119,6 +119,17 @@ static void extract_multiboot_cmdline(struct multiboot_info *mbi)
 	}
 }
 
+struct page *mmap_zero_pg;
+
+// XXX if we want to do anything else, we'll need to put it in a section that is
+// linked to be at virtual address 0.
+// 		could have this get turned on, then be in all new processes addr space
+//void xme() {} __attribute__ ((section ("mmap-zero")));
+void xme()
+{
+	breakpoint();
+}
+
 void kernel_init(multiboot_info_t *mboot_info)
 {
 	extern char __start_bss[], __stop_bss[];
@@ -168,6 +179,22 @@ void kernel_init(multiboot_info_t *mboot_info)
 	 * pre-inits, which need to happen before devether. */
 	devtabreset();
 	devtabinit();
+
+
+
+	int ret;
+	ret = kpage_alloc(&mmap_zero_pg);
+	assert(!ret);
+
+	printk("got paddr %p, ref %d\n", page2pa(mmap_zero_pg),
+	       kref_refcnt(&mmap_zero_pg->pg_kref));
+	ret = map_vmap_segment(0, page2pa(mmap_zero_pg), 1, PTE_KERN_RW);
+	assert(!ret);
+	memcpy(0, (void*)xme, PGSIZE);
+	printk("ref %d\n", kref_refcnt(&mmap_zero_pg->pg_kref));
+
+
+
 
 #ifdef CONFIG_EXT2FS
 	mount_fs(&ext2_fs_type, "/dev/ramdisk", "/mnt", 0);

@@ -1015,7 +1015,9 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	unmap_and_destroy_vmrs(p);
 	/* close the CLOEXEC ones */
 	close_fdt(&p->open_files, TRUE);
-	env_user_mem_free(p, 0, UMAPTOP);
+	// XXX
+	//env_user_mem_free(p, 0, UMAPTOP);
+	env_user_mem_free(p, (void*)PGSIZE, UMAPTOP);
 	if (load_elf(p, program, argc, argv, envc, envp)) {
 		kref_put(&program->f_kref);
 		user_memdup_free(p, kargenv);

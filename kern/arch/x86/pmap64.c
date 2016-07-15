@@ -631,6 +631,9 @@ int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd)
 	ept = kpte_to_epte(kpt);
 	memset(ept, 0, PGSIZE);
 
+// XXX
+kpt[0] = 0;
+
 	/* This bit of paranoia slows process creation a little, but makes sure that
 	 * there is nothing below ULIM in boot_pgdir.  Any PML4 entries copied from
 	 * boot_pgdir (e.g. the kernel's memory) will be *shared* among all
