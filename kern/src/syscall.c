@@ -467,6 +467,7 @@ static int sys_null(void)
  * async I/O handling. */
 static int sys_block(struct proc *p, unsigned int usec)
 {
+	sysc_save_str("block for %d usec", usec);
 	/* Note printing takes a few ms, so your printds won't be perfect. */
 	printd("[kernel] sys_block(), sleeping at %llu\n", read_tsc());
 	kthread_usleep(usec);
@@ -521,6 +522,7 @@ static int sys_nanosleep(struct proc *p,
 		poperror();
 		return -1;
 	}
+	sysc_save_str("nanosleep for %d usec", usec);
 	kthread_usleep(usec);
 	poperror();
 	return 0;
@@ -1189,6 +1191,7 @@ static pid_t sys_waitpid(struct proc *parent, pid_t pid, int *status,
 	pid_t retval = 0;
 	int ret_status = 0;
 
+	sysc_save_str("waitpid on %d", pid);
 	/* -1 is the signal for 'any child' */
 	if (pid == -1) {
 		retval = wait_any(parent, &ret_status, options);
