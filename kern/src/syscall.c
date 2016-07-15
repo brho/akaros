@@ -1869,10 +1869,8 @@ static intreg_t sys_llseek(struct proc *p, int fd, off_t offset_hi,
 		ret = file->f_op->llseek(file, tempoff, &retoff, whence);
 		kref_put(&file->f_kref);
 	} else {
-		/* won't return here if error ... */
-		ret = sysseek(fd, tempoff, whence);
-		retoff = ret;
-		ret = 0;
+		retoff = sysseek(fd, tempoff, whence);
+		ret = (retoff < 0);
 	}
 
 	if (ret)
