@@ -16,11 +16,10 @@
 struct proc_alarm {
 	TAILQ_ENTRY(proc_alarm)		link;
 	int							id;
-	bool						armed;
-	bool						should_stop;
 	struct kref					kref;
 	struct alarm_waiter			a_waiter;
 	struct cond_var				cv;
+	qlock_t						qlock;
 	struct proc					*proc;
 	struct fdtap_slist			fd_taps;
 	unsigned long				period;

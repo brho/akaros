@@ -118,22 +118,19 @@ static void proc_alarm_handler(struct alarm_waiter *a_waiter)
 {
 	struct proc_alarm *a = container_of(a_waiter, struct proc_alarm, a_waiter);
 
-	/* We need the alarm to *not* hold the tchain lock (i.e. not in IRQ ctx),
-	 * o/w we could deadlock.  The lock ordering is alarm_lock->tchain_lock. */
-	assert(!a_waiter->holds_tchain_lock);
 	cv_lock(&a->cv);
 	a->count++;
-	if (a->should_stop || !a->period) {
+	if (!a->period) {
 		a_waiter->wake_up_time = 0;
-		a->armed = FALSE;
 	} else {
+		/* TODO: use an alarm helper, once we switch over to nsec */
 		a_waiter->wake_up_time += a->period;
 		set_alarm(a->proc->alarmset.tchain, a_waiter);
 	}
 	__cv_broadcast(&a->cv);
-	cv_unlock(&a->cv);
 	/* Fires taps for both Qtimer and Qcount. */
 	alarm_fire_taps(a, FDTAP_FILT_WRITTEN | FDTAP_FILT_READABLE);
+	cv_unlock(&a->cv);
 }
 
 void devalarm_init(struct proc *p)
@@ -300,6 +297,7 @@ static struct chan *alarmopen(struct chan *c, int omode)
 			kref_init(&a->kref, alarm_release, 1);
 			SLIST_INIT(&a->fd_taps);
 			cv_init(&a->cv);
+			qlock_init(&a->qlock);
 			init_awaiter(&a->a_waiter, proc_alarm_handler);
 			spin_lock(&p->alarmset.lock);
 			a->id = p->alarmset.id_counter++;
@@ -444,29 +442,28 @@ static long alarmread(struct chan *c, void *ubuf, long n, int64_t offset)
 /* Helper, sets the procalarm to hexval (abs TSC ticks).  0 disarms. */
 static void set_proc_alarm(struct proc_alarm *a, uint64_t hexval)
 {
-	cv_lock(&a->cv);
 	/* Due to how we have to maintain 'count', we need to strictly account for
-	 * the firings of the alarm.  Easiest thing is to disarm it, make sure it is
-	 * off, reset everything, then rearm it. */
-	while (a->armed) {
-		a->should_stop = TRUE;
-		if (unset_alarm(a->proc->alarmset.tchain, &a->a_waiter)) {
-			a->armed = FALSE;
-			break;
-		}
-		/* We didn't find it on the tchain, which means it has left the chain,
-		 * but hasn't fired yet.  We need to block til it fired and disarmed
-		 * itself */
-		cv_wait(&a->cv);
-	}
-	a->should_stop = FALSE;
+	 * the firings of the alarm.  Easiest thing is to disarm it, reset
+	 * everything, then rearm it.  Note that if someone is blocked on count = 0,
+	 * they may still be blocked until the next time the alarm fires.
+	 *
+	 * unset waits on the handler, which grabs the cv lock, so we don't grab the
+	 * cv lock.  However, we still need to protect ourselves from multiple
+	 * setters trying to run this at once.  Unset actually can handle being
+	 * called concurrently, but alarm setters can't, nor can it handle the
+	 * unsets and sets getting out of sync.  For instance, two unsets followed
+	 * by two sets would be a bug.  Likewise, setting the awaiter value while it
+	 * is on a tchain is a bug.  The qlock prevents that. */
+	qlock(&a->qlock);
+	unset_alarm(a->proc->alarmset.tchain, &a->a_waiter);
+	cv_lock(&a->cv);
 	a->count = 0;
 	if (hexval) {
-		a->armed = TRUE;
 		set_awaiter_abs(&a->a_waiter, hexval);
 		set_alarm(a->proc->alarmset.tchain, &a->a_waiter);
 	}
 	cv_unlock(&a->cv);
+	qunlock(&a->qlock);
 }
 
 /* Note that in read and write we have an open chan, which means we have an
