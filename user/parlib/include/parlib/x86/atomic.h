@@ -41,12 +41,12 @@ static inline void atomic_set(atomic_t *number, long val)
 
 static inline void atomic_inc(atomic_t *number)
 {
-	__sync_fetch_and_add(number, 1);
+	(void)__sync_fetch_and_add(number, 1);
 }
 
 static inline void atomic_dec(atomic_t *number)
 {
-	__sync_fetch_and_sub(number, 1);
+	(void)__sync_fetch_and_sub(number, 1);
 }
 
 static inline long atomic_fetch_and_add(atomic_t *number, long val)
@@ -88,12 +88,12 @@ static inline bool atomic_cas_u32(uint32_t *addr, uint32_t exp_val,
 
 static inline void atomic_andb(volatile uint8_t *number, uint8_t mask)
 {
-	__sync_fetch_and_and(number, mask);
+	(void)__sync_fetch_and_and(number, mask);
 }
 
 static inline void atomic_orb(volatile uint8_t *number, uint8_t mask)
 {
-	__sync_fetch_and_or(number, mask);
+	(void)__sync_fetch_and_or(number, mask);
 }
 
 __END_DECLS
