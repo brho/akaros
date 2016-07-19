@@ -279,6 +279,10 @@ static void pcpu_init_nmi(struct per_cpu_info *pcpui)
 	nmi_entry_stacktop -= 16;
 	*(uintptr_t*)nmi_entry_stacktop = (uintptr_t)pcpui;
 	pcpui->tss->ts_ist1 = nmi_entry_stacktop;
+	/* Our actual NMI work is done on yet another stack, to avoid the "iret
+	 * cancelling NMI protections" problem.  All problems can be solved with
+	 * another layer of indirection! */
+	pcpui->nmi_worker_stacktop = get_kstack();
 }
 
 /* Perform any initialization needed by per_cpu_info.  Make sure every core

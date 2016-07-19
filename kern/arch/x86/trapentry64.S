@@ -589,6 +589,218 @@ nmi_popal:
 	addq $0x10, %rsp			# skip trapno and err
 	iretq
 
+.globl __nmi_pop_ok_start;
+.globl __nmi_pop_ok_end;
+.globl __nmi_pop_fail_start;
+.globl __nmi_pop_fail_end;
+
+# extern void nmi_try_to_pop(struct hw_trapframe *tf, int *status,
+#                            int old_val, int new_val);
+#
+# __nmi_bottom_half calls this to atomically pop a hw_tf (%rdi) and set
+# &pcpui->nmi_status (%rsi) with compare and swap to NMI_NORMAL_OPN (%ecx) given
+# that it was NMI_IN_PROGRESS (%edx)
+#
+# (Careful, nmi_status is an int, not a long.)
+#
+# If the real NMI handler interrupts us, it'll move us to the fail section of
+# the code.  That code is identical to 'ok', up until ok's final statement.
+#
+# In that event, we'll need a little help returning: specifically to bootstrap
+# pcpui and our current stackpointer.  pcpui is already saved near the top of
+# stack.  We'll save rsp ourselves.
+.globl nmi_try_to_pop;
+.type nmi_try_to_pop, @function;
+nmi_try_to_pop:
+__nmi_pop_ok_start:
+	# careful only to use caller-saved or argument registers before saving
+	movl %edx, %eax			# load old_val into eax for the CAS
+	cmpxchgl %ecx, (%rsi)	# no need for LOCK, since an NMI would serialize
+	jz nmi_ok_cas_worked	# ZF = 1 on successful CAS
+	ret
+nmi_ok_cas_worked:
+	# save callee-saved regs (the pops below clobber them, and we might return)
+	pushq %rbp
+	pushq %rbx
+	pushq %r12
+	pushq %r13
+	pushq %r14
+	pushq %r15
+	# We need to save the current rsp into the scratch space at the top of the
+	# stack.  This assumes we're within the top page of our stack, which should
+	# always be true.  Careful not to use rdi, which still has an argument.
+	movq %rsp, %rbx
+	# Want to round rbx up to PGSIZE, then subtract 8, to get our slot.
+	movq $0xfff, %rax
+	notq %rax				# rax = 0xfffffffffffff000
+	andq %rax, %rbx			# round down rbx
+	addq $0x1000, %rbx		# add PGSIZE, assuming rsp was not page aligned
+	subq $0x8, %rbx			# point to the scratch space
+	movq %rsp, (%rbx)		# save rsp in the scratch space
+	# We jump our rsp to the base of the HW_TF.  This is still on the same
+	# stack, just farther back than where our caller is.  We need to be careful
+	# to not clobber the stack.  Otherwise we'll have chaos.
+	movq %rdi, %rsp
+	# From here down is the same as the normal NMI exit path, but with 'ok' in
+	# the symbol names.
+	cmpw $GD_KT, 0xa0(%rsp)	# 0xa0 - diff btw tf_cs and tf_gsbase
+	je nmi_ok_kern_restore_gs
+	# User TF.  Restore whatever was there with swapgs.  We don't care what it
+	# was, nor do we care what was in the TF.
+	swapgs					# user's GS is now in MSR_GS_BASE
+	addq $0x10, %rsp		# skip gs/fs base
+	jmp nmi_ok_popal
+nmi_ok_kern_restore_gs:
+	popq %rax				# fetch saved gsbase
+	addq $0x08, %rsp		# skip fs base
+	cmpq $0, %rax
+	je nmi_ok_popal
+	# gsbase in the TF != 0, which means we need to restore that gsbase
+	movl $MSR_GS_BASE, %ecx
+	movq %rax, %rdx
+	shrq $32, %rdx
+	andl $0xffffffff, %eax
+	wrmsr
+nmi_ok_popal:
+	popq %rax
+	popq %rbx
+	popq %rcx
+	popq %rdx
+	popq %rbp
+	popq %rsi
+	popq %rdi
+	popq %r8
+	popq %r9
+	popq %r10
+	popq %r11
+	popq %r12
+	popq %r13
+	popq %r14
+	popq %r15
+	addq $0x10, %rsp			# skip trapno and err
+	iretq
+__nmi_pop_ok_end:
+
+# This is the 'fail' case.  It is identical to the 'ok' case, up until the
+# iretq, other than 'ok' replaced with 'fail'.  In place of iretq, we undo the
+# entire operation.
+__nmi_pop_fail_start:
+	# careful only to use caller-saved or argument registers before saving
+	movl %edx, %eax			# load old_val into eax for the CAS
+	cmpxchgl %ecx, (%rsi)	# no need for LOCK, since an NMI would serialize
+	jz nmi_fail_cas_worked	# ZF = 1 on successful CAS
+	ret
+nmi_fail_cas_worked:
+	# save callee-saved regs (the pops below clobber them, and we might return)
+	pushq %rbp
+	pushq %rbx
+	pushq %r12
+	pushq %r13
+	pushq %r14
+	pushq %r15
+	# We need to save the current rsp into the scratch space at the top of the
+	# stack.  This assumes we're within the top page of our stack, which should
+	# always be true.  Careful not to use rdi, which still has an argument.
+	movq %rsp, %rbx
+	# Want to round rbx up to PGSIZE, then subtract 8, to get our slot.
+	movq $0xfff, %rax
+	notq %rax				# rax = 0xfffffffffffff000
+	andq %rax, %rbx			# round down rbx
+	addq $0x1000, %rbx		# add PGSIZE, assuming rsp was not page aligned
+	subq $0x8, %rbx			# point to the scratch space
+	movq %rsp, (%rbx)		# save rsp in the scratch space
+	# We jump our rsp to the base of the HW_TF.  This is still on the same
+	# stack, just farther back than where our caller is.  We need to be careful
+	# to not clobber the stack.  Otherwise we'll have chaos.
+	movq %rdi, %rsp
+	# From here down is the same as the normal NMI exit path and the ok path,
+	# but with 'fail' in the symbol names.
+	cmpw $GD_KT, 0xa0(%rsp)	# 0xa0 - diff btw tf_cs and tf_gsbase
+	je nmi_fail_kern_restore_gs
+	# User TF.  Restore whatever was there with swapgs.  We don't care what it
+	# was, nor do we care what was in the TF.
+	swapgs					# user's GS is now in MSR_GS_BASE
+	addq $0x10, %rsp		# skip gs/fs base
+	jmp nmi_fail_popal
+nmi_fail_kern_restore_gs:
+	popq %rax				# fetch saved gsbase
+	addq $0x08, %rsp		# skip fs base
+	cmpq $0, %rax
+	je nmi_fail_popal
+	# gsbase in the TF != 0, which means we need to restore that gsbase
+	movl $MSR_GS_BASE, %ecx
+	movq %rax, %rdx
+	shrq $32, %rdx
+	andl $0xffffffff, %eax
+	wrmsr
+nmi_fail_popal:
+	popq %rax
+	popq %rbx
+	popq %rcx
+	popq %rdx
+	popq %rbp
+	popq %rsi
+	popq %rdi
+	popq %r8
+	popq %r9
+	popq %r10
+	popq %r11
+	popq %r12
+	popq %r13
+	popq %r14
+	popq %r15
+	addq $0x10, %rsp		# skip trapno and err
+	# Here's is where we differ from OK.  Time to undo everything and return
+	# rsp currently is pointing at tf->tf_rip.  Remember that we don't want to
+	# write anything to the stack - everything in the TF is still the way it was
+	# when we started to pop.
+	#
+	# First off, let's get the stack addr of the pcpui pointer loaded
+	movq %rsp, %rbx
+	movq $0xfff, %rax
+	notq %rax				# rax = 0xfffffffffffff000
+	andq %rax, %rbx			# round down rbx
+	addq $0x1000, %rbx		# add PGSIZE, assuming rsp was not page aligned
+	subq $0x10, %rbx		# point to the pcpui pointer
+	# Now let's start to unwind
+	subq $0x98, %rsp		# jump from rip to tf_gsbase (top of hw_tf)
+	# Need to restore gs, just like on an NMI entry
+	cmpw $GD_KT, 0xa0(%rsp)	# 0xa0 - diff btw tf_cs and tf_gsbase
+	je nmi_pop_fail_kern_tf
+	# This is a user TF.  We need to swapgs to get the kernel's gs
+	# We don't need to mark the context as partial (we never do for NMIs,
+	# actually), and in general, we don't want to write anything on the stack.
+	swapgs					# user's GS is now in MSR_KERNEL_GS_BASE
+	jmp nmi_pop_fail_all_tf
+nmi_pop_fail_kern_tf:
+	# Kernel TF.  We basically need to do the same thing on entry, since we
+	# might have restored some weird GS base.  We can tell based on tf_gsbase
+	# 0 for gsbase means we didn't need to change GS
+	cmpq $0, (%rsp)
+	je nmi_pop_fail_gs_fine
+	# rbx points to where pcpui* is stored
+	mov (%rbx), %rdx
+	movl $MSR_GS_BASE, %ecx
+	movq %rdx, %rax
+	shrq $32, %rdx
+	andl $0xffffffff, %eax
+	wrmsr
+nmi_pop_fail_gs_fine:
+nmi_pop_fail_all_tf:
+	addq $0x8, %rbx			# move to the scratch slot, holding rsp
+	mov (%rbx), %rsp
+	# restore callee-saved regs
+	popq %r15
+	popq %r14
+	popq %r13
+	popq %r12
+	popq %rbx
+	popq %rbp
+	ret
+	# sweet jeebus.
+__nmi_pop_fail_end:
+
+
 .globl sysenter_handler;
 .type sysenter_handler, @function;
 

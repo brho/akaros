@@ -21,6 +21,12 @@
 #include <arch/mptables.h>
 #include <ros/procinfo.h>
 
+enum {
+	NMI_NORMAL_OPN = 0,
+	NMI_IN_PROGRESS,
+	NMI_HANDLE_ANOTHER,
+};
+
 taskstate_t ts;
 
 /* Interrupt descriptor table.  64 bit needs 16 byte alignment (i think). */
@@ -324,6 +330,112 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 		return __handler_user_page_fault(hw_tf, fault_va, prot);
 }
 
+/* Actual body of work done when an NMI arrives */
+static void do_nmi_work(struct hw_trapframe *hw_tf)
+{
+	/* TODO: this is all racy and needs to go */
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	char *fn_name;
+	/* This is a bit hacky, but we don't have a decent API yet */
+	extern bool mon_verbose_trace;
+
+	/* Temporarily disable deadlock detection when we print.  We could
+	 * deadlock if we were printing when we NMIed. */
+	pcpui->__lock_checking_enabled--;
+	if (mon_verbose_trace) {
+		print_trapframe(hw_tf);
+		backtrace_hwtf(hw_tf);
+	}
+	fn_name = get_fn_name(get_hwtf_pc(hw_tf));
+	printk("Core %d is at %p (%s)\n", core_id(), get_hwtf_pc(hw_tf),
+	       fn_name);
+	kfree(fn_name);
+	print_kmsgs(core_id());
+	pcpui->__lock_checking_enabled++;
+}
+
+/* NMI HW_TF hacking involves four symbols:
+ *
+ * [__nmi_pop_ok_start, __nmi_pop_ok_end) mark the beginning and end of the
+ * code for an nmi popping routine that will actually pop at the end.
+ *
+ * [__nmi_pop_fail_start, __nmi_pop_fail_end) mark the beginning and end of the
+ * shadow code for an nmi popping routine that will fail at the end.
+ *
+ * If we see a TF in the OK section, we'll move it to the FAIL section.  If it's
+ * already in the FAIL section, we'll report that as a success. */
+extern char __nmi_pop_ok_start[], __nmi_pop_ok_end[];
+extern char __nmi_pop_fail_start[], __nmi_pop_fail_end[];
+
+static bool nmi_hw_tf_needs_hacked(struct hw_trapframe *hw_tf)
+{
+	return ((uintptr_t)__nmi_pop_ok_start <= hw_tf->tf_rip) &&
+	       (hw_tf->tf_rip < (uintptr_t)__nmi_pop_ok_end);
+}
+
+static bool nmi_hw_tf_was_hacked(struct hw_trapframe *hw_tf)
+{
+	return ((uintptr_t)__nmi_pop_fail_start <= hw_tf->tf_rip) &&
+	       (hw_tf->tf_rip < (uintptr_t)__nmi_pop_fail_end);
+}
+
+/* Helper.  Hacks the TF if it was in the OK section so that it is at the same
+ * spot in the FAIL section.  Returns TRUE if the TF is hacked, meaning the NMI
+ * handler can just return. */
+static bool nmi_check_and_hack_tf(struct hw_trapframe *hw_tf)
+{
+	uintptr_t offset;
+
+	if (!nmi_hw_tf_needs_hacked(hw_tf))
+		return FALSE;
+	if (nmi_hw_tf_was_hacked(hw_tf))
+		return TRUE;
+	offset = hw_tf->tf_rip - (uintptr_t)__nmi_pop_ok_start;
+	hw_tf->tf_rip = (uintptr_t)__nmi_pop_fail_start + offset;
+	return TRUE;
+}
+
+/* Bottom half of the NMI handler.  This can be interrupted under some
+ * circumstances by NMIs.  It exits by popping the hw_tf in assembly. */
+void __attribute__((noinline, noreturn))
+__nmi_bottom_half(struct hw_trapframe *hw_tf)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	while (1) {
+		/* Signal that we're doing work.  A concurrent NMI will set this to
+		 * NMI_HANDLE_ANOTHER if we should continue, which we'll catch later. */
+		pcpui->nmi_status = NMI_IN_PROGRESS;
+		do_nmi_work(hw_tf);
+		/* We need to check nmi_status to see if it is NMI_HANDLE_ANOTHER (if
+		 * so, run again), write NMI_NORMAL_OPN, leave this stack, and return to
+		 * the original context.  We need to do that in such a manner that an
+		 * NMI can come in at any time.  There are two concerns.
+		 *
+		 * First, we need to not "miss the signal" telling us to re-run the NMI
+		 * handler.  To do that, we'll do the actual checking in asm.  Being in
+		 * the asm code block is a signal to the real NMI handler that we need
+		 * to abort and do_nmi_work() again.
+		 *
+		 * Second, we need to atomically leave the stack and return.  By being
+		 * in asm, the NMI handler knows to just hack our PC to make us return,
+		 * instead of starting up a fresh __nmi_bottom_half().
+		 *
+		 * The NMI handler works together with the following function such that
+		 * if that race occurs while we're in the function, it'll fail and
+		 * return.  Then we'll just do_nmi_work() and try again. */
+		extern void nmi_try_to_pop(struct hw_trapframe *tf, int *status,
+		                           int old_val, int new_val);
+
+		nmi_try_to_pop(hw_tf, &pcpui->nmi_status, NMI_IN_PROGRESS,
+		               NMI_NORMAL_OPN);
+		/* Either we returned on our own, since we lost a race with nmi_status
+		 * and didn't write (status = ANOTHER), or we won the race, but an NMI
+		 * handler set the status to ANOTHER and restarted us. */
+		assert(pcpui->nmi_status != NMI_NORMAL_OPN);
+	}
+}
+
 /* Separate handler from traps, since there's too many rules for NMI ctx.
  *
  * The general rule is that any writes from NMI context must be very careful.
@@ -341,30 +453,92 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
  * - However, we cannot call proc_restartcore.  That could trigger all sorts of
  *   things, like kthreads blocking.
  * - Parallel accesses (from other cores) are the same as always.  You just
- *   can't lock easily. */
+ *   can't lock easily.
+ *
+ * Normally, once you're in NMI, other NMIs are blocked until we return.
+ * However, if our NMI handler faults (PF, GPF, breakpoint) due to something
+ * like tracing, the iret from that fault will cancel our NMI protections.  Thus
+ * we need another layer of code to make sure we don't run the NMI handler
+ * concurrently on the same core.  See https://lwn.net/Articles/484932/ for more
+ * info.
+ *
+ * We'll get around the problem by running on yet another NMI stack.  All NMIs
+ * come in on the nmi entry stack (tss->ist1).  While we're on that stack, we
+ * will not be interrupted.  We jump to another stack to do_nmi_work.  That code
+ * can be interrupted, but we are careful to only have one 'thread' running on
+ * that stack at a time.  We do this by carefully hopping off the stack in
+ * assembly, similar to popping user TFs. */
 void handle_nmi(struct hw_trapframe *hw_tf)
 {
-	struct per_cpu_info *pcpui;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct hw_trapframe *hw_tf_copy;
+	uintptr_t worker_stacktop;
 
-	/* TODO: this is all racy and needs to go */
-
-	/* Temporarily disable deadlock detection when we print.  We could
-	 * deadlock if we were printing when we NMIed. */
-	pcpui = &per_cpu_info[core_id()];
-	pcpui->__lock_checking_enabled--;
-	/* This is a bit hacky, but we don't have a decent API yet */
-	extern bool mon_verbose_trace;
-	if (mon_verbose_trace) {
-		print_trapframe(hw_tf);
-		backtrace_hwtf(hw_tf);
+	/* At this point, we're an NMI and other NMIs are blocked.  Only once we
+	 * hop to the bottom half could that be no longer true.  NMI with NMIs fully
+	 * blocked will run without interruption.  For that reason, we don't have to
+	 * be careful about any memory accesses or compiler tricks. */
+	if (pcpui->nmi_status == NMI_HANDLE_ANOTHER)
+		return;
+	if (pcpui->nmi_status == NMI_IN_PROGRESS) {
+		/* Force the handler to run again.  We don't need to worry about
+		 * concurrent access here.  We're running, they are not.  We cannot
+		 * 'PAUSE' since NMIs are fully blocked.
+		 *
+		 * The asm routine, for its part, does a compare-and-swap, so if we
+		 * happened to interrupt it before it wrote NMI_NORMAL_OPN, it'll
+		 * notice, abort, and not write the status. */
+		pcpui->nmi_status = NMI_HANDLE_ANOTHER;
+		return;
 	}
-	char *fn_name = get_fn_name(get_hwtf_pc(hw_tf));
-
-	printk("Core %d is at %p (%s)\n", core_id(), get_hwtf_pc(hw_tf),
-		   fn_name);
-	kfree(fn_name);
-	print_kmsgs(core_id());
-	pcpui->__lock_checking_enabled++;
+	assert(pcpui->nmi_status == NMI_NORMAL_OPN);
+	pcpui->nmi_status = NMI_HANDLE_ANOTHER;
+	/* We could be interrupting an NMI that is trying to pop back to a normal
+	 * context.  We can tell by looking at its PC.  If it is within the popping
+	 * routine, then we interrupted it at this bad time.  We'll hack the TF such
+	 * that it will return instead of succeeding. */
+	if (nmi_check_and_hack_tf(hw_tf))
+		return;
+	/* OK, so we didn't interrupt an NMI that was trying to return.  So we need
+	 * to run the bottom half.  We're going to jump stacks, but we also need to
+	 * copy the hw_tf.  The existing one will be clobbered by any interrupting
+	 * NMIs.
+	 *
+	 * We also need to save some space on the top of that stack for a pointer to
+	 * pcpui and a scratch register, which nmi_try_to_pop() will use.  The
+	 * target stack will look like this:
+	 *
+	 *               +--------------------------+ Page boundary (e.g. 0x6000)
+	 *               |   scratch space (rsp)    |
+	 *               |       pcpui pointer      |
+	 *               |      tf_ss + padding     | HW_TF end
+	 *               |          tf_rsp          |
+	 *               |            .             |
+	 *               |            .             |
+	 * RSP ->        |         tf_gsbase        | HW_TF start, hw_tf_copy
+	 *               +--------------------------+
+	 *               |            .             |
+	 *               |            .             |
+	 *               |            .             |
+	 *               +--------------------------+ Page boundary (e.g. 0x5000)
+	 *
+	 * __nmi_bottom_half() just picks up using the stack below tf_gsbase.  It'll
+	 * push as needed, growing down.  Basically we're just using the space
+	 * 'above' the stack as storage. */
+	worker_stacktop = pcpui->nmi_worker_stacktop - 2 * sizeof(uintptr_t);
+	*(uintptr_t*)worker_stacktop = (uintptr_t)pcpui;
+	worker_stacktop = worker_stacktop - sizeof(struct hw_trapframe);
+	hw_tf_copy = (struct hw_trapframe*)worker_stacktop;
+	*hw_tf_copy = *hw_tf;
+	/* Once we head to the bottom half, consider ourselves interruptible (though
+	 * it's not until the first time we do_nmi_work()).  We'll never come back
+	 * to this stack.  Doing this in asm so we can easily pass an argument.  We
+	 * don't need to call (vs jmp), but it helps keep the stack aligned. */
+	asm volatile("mov $0x0, %%rbp;"
+	             "mov %0, %%rsp;"
+	             "call __nmi_bottom_half;"
+	             : : "r"(worker_stacktop), "D"(hw_tf_copy));
+	assert(0);
 }
 
 /* Certain traps want IRQs enabled, such as the syscall.  Others can't handle
@@ -702,6 +876,7 @@ void send_ipi(uint32_t os_coreid, uint8_t vector)
 		panic("Unmapped OS coreid (OS %d)!\n", os_coreid);
 		return;
 	}
+	assert(vector != T_NMI);
 	__send_ipi(hw_coreid, vector);
 }
 
