@@ -331,10 +331,11 @@ size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
                       size_t nr_slots)
 {
 	size_t nr_pcs = 0;
-	while ((fp > MMAP_LOWEST_VA) && (nr_pcs < nr_slots)) {
-		/* could put some sanity checks in here...  i used to at least check for
-		 * kernel addrs, but now we also bt user stacks. (dangerous!) */
+
+	while (nr_pcs < nr_slots) {
 		pcs[nr_pcs++] = pc;
+		if (!fp || fp < KERNBASE)
+			break;
 		printd("PC %p FP %p\n", pc, fp);
 		/* We used to set PC = retaddr - 1, where the -1 would put our PC back
 		 * inside the function that called us.  This was for obscure cases where
@@ -353,17 +354,16 @@ size_t backtrace_user_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
 	size_t nr_pcs = 0;
 	uintptr_t frame[2];
 
-	for (;;) {
-		error = copy_from_user(frame, (const void *) fp, 2 * sizeof(uintptr_t));
-		if (unlikely(error) || unlikely(nr_pcs >= nr_slots))
-			break;
-
-		/* For now straight memory access, waiting for copy_from_user(). */
+	while (nr_pcs < nr_slots) {
 		pcs[nr_pcs++] = pc;
+		if (!fp)
+			break;
+		error = copy_from_user(frame, (const void *) fp, 2 * sizeof(uintptr_t));
+		if (unlikely(error))
+			break;
 		pc = frame[1];
 		fp = frame[0];
 	}
-
 	return nr_pcs;
 }
 
