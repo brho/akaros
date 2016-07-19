@@ -7,10 +7,9 @@
  * creation.
  *
  * Events are collected in a central qio queue.  High-frequency events (e.g.
- * profiler_add_hw_sample()) are collected in per-core buffers, which are
- * flushed to the central queue when they fill up or on command.
- * Lower-frequency events (e.g. profiler_notify_mmap()) just go straight to the
- * central queue.
+ * IRQ backtraces()) are collected in per-core buffers, which are flushed to the
+ * central queue when they fill up or on command.  Lower-frequency events (e.g.
+ * profiler_notify_mmap()) just go straight to the central queue.
  *
  * Currently there is one global profiler.  Kprof is careful to only have one
  * open profiler at a time.  We assert that this is true.  TODO: stop using the
@@ -45,7 +44,6 @@
 #include "profiler.h"
 
 #define PROFILER_MAX_PRG_PATH	256
-#define PROFILER_BT_DEPTH 16
 
 #define VBE_MAX_SIZE(t) ((8 * sizeof(t) + 6) / 7)
 
@@ -498,55 +496,29 @@ void profiler_trace_data_flush(void)
 	smp_do_in_cores(&cset, profiler_core_flush, NULL);
 }
 
-void profiler_add_trace(uintptr_t pc, uint64_t info)
-{
-	if (is_user_raddr((void *) pc, 1))
-		profiler_add_user_backtrace(pc, 0, info);
-	else
-		profiler_add_kernel_backtrace(pc, 0, info);
-}
-
-void profiler_add_kernel_backtrace(uintptr_t pc, uintptr_t fp, uint64_t info)
+void profiler_push_kernel_backtrace(uintptr_t *pc_list, size_t nr_pcs,
+                                    uint64_t info)
 {
 	if (kref_get_not_zero(&profiler_kref, 1)) {
 		struct profiler_cpu_context *cpu_buf = profiler_get_cpu_ctx(core_id());
 
-		if (profiler_percpu_ctx && cpu_buf->tracing) {
-			uintptr_t trace[PROFILER_BT_DEPTH];
-			size_t n;
-
-			n = backtrace_list(pc, fp, trace, PROFILER_BT_DEPTH);
-			profiler_push_kernel_trace64(cpu_buf, trace, n, info);
-		}
+		if (profiler_percpu_ctx && cpu_buf->tracing)
+			profiler_push_kernel_trace64(cpu_buf, pc_list, nr_pcs, info);
 		kref_put(&profiler_kref);
 	}
 }
 
-void profiler_add_user_backtrace(uintptr_t pc, uintptr_t fp, uint64_t info)
+void profiler_push_user_backtrace(uintptr_t *pc_list, size_t nr_pcs,
+                                  uint64_t info)
 {
 	if (kref_get_not_zero(&profiler_kref, 1)) {
 		struct proc *p = current;
 		struct profiler_cpu_context *cpu_buf = profiler_get_cpu_ctx(core_id());
 
-		if (p && profiler_percpu_ctx && cpu_buf->tracing) {
-			uintptr_t trace[PROFILER_BT_DEPTH];
-			size_t n;
-
-			n = backtrace_user_list(pc, fp, trace, PROFILER_BT_DEPTH);
-			profiler_push_user_trace64(cpu_buf, p, trace, n, info);
-		}
+		if (profiler_percpu_ctx && cpu_buf->tracing)
+			profiler_push_user_trace64(cpu_buf, p, pc_list, nr_pcs, info);
 		kref_put(&profiler_kref);
 	}
-}
-
-void profiler_add_hw_sample(struct hw_trapframe *hw_tf, uint64_t info)
-{
-	if (in_kernel(hw_tf))
-		profiler_add_kernel_backtrace(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf),
-		                              info);
-	else
-		profiler_add_user_backtrace(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf),
-		                            info);
 }
 
 int profiler_size(void)

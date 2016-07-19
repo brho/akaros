@@ -374,9 +374,6 @@ static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 			error(EFAIL, kprof_control_usage);
 		}
 		break;
-	case Kprofdataqid:
-		profiler_add_trace((uintptr_t) strtoul(a, 0, 0), 0);
-		break;
 	case Kptraceqid:
 		if (a && (n > 0)) {
 			char *uptr = user_strdup_errno(current, a, n);

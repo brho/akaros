@@ -20,11 +20,11 @@ void profiler_setup(void);
 void profiler_cleanup(void);
 void profiler_start(void);
 void profiler_stop(void);
-void profiler_add_kernel_backtrace(uintptr_t pc, uintptr_t fp, uint64_t info);
-void profiler_add_user_backtrace(uintptr_t pc, uintptr_t fp, uint64_t info);
-void profiler_add_trace(uintptr_t pc, uint64_t info);
+void profiler_push_kernel_backtrace(uintptr_t *pc_list, size_t nr_pcs,
+                                    uint64_t info);
+void profiler_push_user_backtrace(uintptr_t *pc_list, size_t nr_pcs,
+                                  uint64_t info);
 void profiler_trace_data_flush(void);
-void profiler_add_hw_sample(struct hw_trapframe *hw_tf, uint64_t info);
 int profiler_size(void);
 int profiler_read(void *va, int n);
 void profiler_notify_mmap(struct proc *p, uintptr_t addr, size_t size, int prot,

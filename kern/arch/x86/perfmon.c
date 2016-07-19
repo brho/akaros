@@ -442,6 +442,23 @@ static uint64_t perfmon_make_sample_event(const struct perfmon_event *pev)
 	return pev->user_data;
 }
 
+static void profiler_add_hw_sample(struct hw_trapframe *hw_tf, uint64_t info)
+{
+	#define PROFILER_BT_DEPTH 16
+	uintptr_t pc_list[PROFILER_BT_DEPTH];
+	size_t n;
+	uintptr_t pc = get_hwtf_pc(hw_tf);
+	uintptr_t fp = get_hwtf_fp(hw_tf);
+
+	if (in_kernel(hw_tf)) {
+		n = backtrace_list(pc, fp, pc_list, PROFILER_BT_DEPTH);
+		profiler_push_kernel_backtrace(pc_list, n, info);
+	} else {
+		n = backtrace_user_list(pc, fp, pc_list, PROFILER_BT_DEPTH);
+		profiler_push_user_backtrace(pc_list, n, info);
+	}
+}
+
 void perfmon_interrupt(struct hw_trapframe *hw_tf, void *data)
 {
 	int i;
