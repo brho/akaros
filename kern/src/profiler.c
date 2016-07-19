@@ -513,13 +513,9 @@ void profiler_add_kernel_backtrace(uintptr_t pc, uintptr_t fp, uint64_t info)
 
 		if (profiler_percpu_ctx && cpu_buf->tracing) {
 			uintptr_t trace[PROFILER_BT_DEPTH];
-			size_t n = 1;
+			size_t n;
 
-			trace[0] = pc;
-			if (likely(fp))
-				n = backtrace_list(pc, fp, trace + 1,
-				                   PROFILER_BT_DEPTH - 1) + 1;
-
+			n = backtrace_list(pc, fp, trace, PROFILER_BT_DEPTH);
 			profiler_push_kernel_trace64(cpu_buf, trace, n, info);
 		}
 		kref_put(&profiler_kref);
@@ -534,13 +530,9 @@ void profiler_add_user_backtrace(uintptr_t pc, uintptr_t fp, uint64_t info)
 
 		if (p && profiler_percpu_ctx && cpu_buf->tracing) {
 			uintptr_t trace[PROFILER_BT_DEPTH];
-			size_t n = 1;
+			size_t n;
 
-			trace[0] = pc;
-			if (likely(fp))
-				n = backtrace_user_list(pc, fp, trace + 1,
-				                        PROFILER_BT_DEPTH - 1) + 1;
-
+			n = backtrace_user_list(pc, fp, trace, PROFILER_BT_DEPTH);
 			profiler_push_user_trace64(cpu_buf, p, trace, n, info);
 		}
 		kref_put(&profiler_kref);
