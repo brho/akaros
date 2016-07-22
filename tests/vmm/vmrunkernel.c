@@ -365,6 +365,9 @@ int main(int argc, char **argv)
 	char *cmdlinep;
 	int cmdlinesz, len, cmdline_fd;
 	char *disk_image_file = NULL;
+	int c;
+	struct stat stat_result;
+	int num_read;
 
 	fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT,
 			PML1_PTE_REACH);
@@ -400,72 +403,62 @@ int main(int argc, char **argv)
 	((uint32_t *)a_page)[0x30/4] = 0x01060015;
 	//((uint32_t *)a_page)[0x30/4] = 0xDEADBEEF;
 
-	argc--, argv++;
-	// switches ...
-	// Sorry, I don't much like the gnu opt parsing code.
-	// TODO(dcross): Convert this to use getopt()
-	while (1) {
-		if (*argv[0] != '-')
-			break;
-		switch(argv[0][1]) {
-		case 'd':
-			debug++;
-			break;
-		case 'v':
-			vmmflags |= VMM_VMCALL_PRINTF;
-			break;
-		case 'm':
-			argc--, argv++;
-			maxresume = strtoull(argv[0], 0, 0);
-			break;
-		case 'c':
-			argc--, argv++;
-			cmdline_extra = argv[0];
-		case 'g':	/* greedy */
-			parlib_never_yield = TRUE;
-			break;
-		case 's':	/* scp */
-			parlib_wants_to_be_mcp = FALSE;
-			break;
-		case 'f':	/* file to pass to blk_init */
-			argc--; argv++;
-			disk_image_file = *argv;
-			break;
-		case 'k':	/* specify file to get cmdline args from */
-			argc--; argv++;
-			cmdline_fd = open(*argv, O_RDONLY);
-			if (cmdline_fd < 0) {
-				fprintf(stderr, "failed to open file: %s\n", *argv);
-				exit(1);
-			}
-			struct stat stat_result;
-			if (stat(*argv, &stat_result) == -1) {
-				fprintf(stderr, "stat of %s failed\n", *argv);
-				exit(1);
-			}
-			len = stat_result.st_size;
-			if (len > 512) {
-				fprintf(stderr, "command line options exceed 512 bytes!");
-				exit(1);
-			}
-			int num_read = read(cmdline_fd, cmdline_default, len);
-			if (num_read != len) {
-				fprintf(stderr, "read failed len was : %d,"
-				        "num_read was: %d\n", len, num_read);
-				exit(1);
-			}
-			close(cmdline_fd);
-			break;
-		default:
-			fprintf(stderr, "BMAFR\n");
-			break;
+	while ((c = getopt(argc, argv, "dvm:c:gsf:k:")) != -1) {
+		switch (c) {
+			case 'd':
+				debug++;
+				break;
+			case 'v':
+				vmmflags |= VMM_VMCALL_PRINTF;
+				break;
+			case 'm':
+				maxresume = strtoull(optarg, 0, 0);
+				break;
+			case 'c':
+				cmdline_extra = optarg;
+			case 'g':	/* greedy */
+				parlib_never_yield = TRUE;
+				break;
+			case 's':	/* scp */
+				parlib_wants_to_be_mcp = FALSE;
+				break;
+			case 'f':	/* file to pass to blk_init */
+				disk_image_file = optarg;
+				break;
+			case 'k':	/* specify file to get cmdline args from */
+				cmdline_fd = open(optarg, O_RDONLY);
+				if (cmdline_fd < 0) {
+					fprintf(stderr, "failed to open file: %s\n", optarg);
+					exit(1);
+				}
+				if (stat(optarg, &stat_result) == -1) {
+					fprintf(stderr, "stat of %s failed\n", optarg);
+					exit(1);
+				}
+				len = stat_result.st_size;
+				if (len > 512) {
+					fprintf(stderr, "command line options exceed 512 bytes!");
+					exit(1);
+				}
+				num_read = read(cmdline_fd, cmdline_default, len);
+				if (num_read != len) {
+					fprintf(stderr, "read failed len was : %d, num_read was: %d\n",
+					        len, num_read);
+					exit(1);
+				}
+				close(cmdline_fd);
+				break;
+			default:
+				fprintf(stderr, "BMAFR\n");
+				break;
 		}
-		argc--, argv++;
 	}
 	if (strlen(cmdline_default) == 0) {
 		fprintf(stderr, "No command line parameter file specified.\n");
 		exit(1);
 	}
+	argc -= optind;
+	argv += optind;
 	if (argc < 1) {
 		fprintf(stderr, "Usage: %s vmimage [-n (no vmcall printf)] [coreboot_tables [loadaddress [entrypoint]]]\n", argv[0]);
 		exit(1);
