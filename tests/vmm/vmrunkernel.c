@@ -337,20 +337,7 @@ static void pir_dump()
 int main(int argc, char **argv)
 {
 	struct boot_params *bp;
-	char *cmdline_default = "earlyprintk=vmcall,keep"
-		                    " console=hvc0"
-		                    " nosmp"
-		                    " maxcpus=1"
-		                    " acpi.debug_layer=0x2"
-		                    " acpi.debug_level=0xffffffff"
-		                    " apic=debug"
-		                    " noexec=off"
-		                    " nohlt"
-		                    " init=/bin/launcher"
-		                    " lapic=notscdeadline"
-		                    " lapictimerfreq=1000000"
-		                    " pit=none"
-		                    " noinvpcid";
+	char cmdline_default[512] = {0};
 	char *cmdline_extra = "\0";
 	char *cmdline;
 	uint64_t *p64;
@@ -376,7 +363,7 @@ int main(int argc, char **argv)
 	struct vm_trapframe *vm_tf;
 	uint64_t tsc_freq_khz;
 	char *cmdlinep;
-	int cmdlinesz, len;
+	int cmdlinesz, len, cmdline_fd;
 	char *disk_image_file = NULL;
 
 	fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT,
@@ -444,11 +431,40 @@ int main(int argc, char **argv)
 			argc--; argv++;
 			disk_image_file = *argv;
 			break;
+		case 'k':	/* specify file to get cmdline args from */
+			argc--; argv++;
+			cmdline_fd = open(*argv, O_RDONLY);
+			if (cmdline_fd < 0) {
+				fprintf(stderr, "failed to open file: %s\n", *argv);
+				exit(1);
+			}
+			struct stat stat_result;
+			if (stat(*argv, &stat_result) == -1) {
+				fprintf(stderr, "stat of %s failed\n", *argv);
+				exit(1);
+			}
+			len = stat_result.st_size;
+			if (len > 512) {
+				fprintf(stderr, "command line options exceed 512 bytes!");
+				exit(1);
+			}
+			int num_read = read(cmdline_fd, cmdline_default, len);
+			if (num_read != len) {
+				fprintf(stderr, "read failed len was : %d,"
+				        "num_read was: %d\n", len, num_read);
+				exit(1);
+			}
+			close(cmdline_fd);
+			break;
 		default:
 			fprintf(stderr, "BMAFR\n");
 			break;
 		}
 		argc--, argv++;
+	}
+	if (strlen(cmdline_default) == 0) {
+		fprintf(stderr, "No command line parameter file specified.\n");
+		exit(1);
 	}
 	if (argc < 1) {
 		fprintf(stderr, "Usage: %s vmimage [-n (no vmcall printf)] [coreboot_tables [loadaddress [entrypoint]]]\n", argv[0]);
@@ -644,7 +660,6 @@ int main(int argc, char **argv)
 		vm->virtio_mmio_devices[VIRTIO_MMIO_BLOCK_DEV] = &blk_mmio_dev;
 		blk_init_fn(&blk_vqdev, disk_image_file);
 	}
-
 	net_init_fn(&net_vqdev, default_nic);
 
 	/* Set the kernel command line parameters */

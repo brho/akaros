@@ -1,0 +1,13 @@
+earlyprintk=vmcall,keep
+ console=hvc0
+ maxcpus=1
+ acpi.debug_layer=0x2
+ acpi.debug_level=0xffffffff
+ apic=debug
+ noexec=off
+ nohlt
+ init=/bin/sh
+ lapic=notscdeadline
+ lapictimerfreq=1000000
+ pit=none
+ root=/dev/vda1
