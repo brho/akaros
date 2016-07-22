@@ -62,6 +62,7 @@ static void __attribute__((noinline, noreturn)) __smp_idle(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
+	disable_irq();	/* might not be needed - need to look at KMSGs closely */
 	clear_rkmsg(pcpui);
 	pcpui->cur_kthread->flags = KTH_DEFAULT_FLAGS;
 	enable_irq();	/* one-shot change to get any IRQs before we halt later */
@@ -84,21 +85,13 @@ static void __attribute__((noinline, noreturn)) __smp_idle(void)
 void smp_idle(void)
 {
 	/* FP must be zeroed before SP.  Ideally, we'd do both atomically.  If we
-	 * take an IRQ in between and set SP first, then a backtrace would be
+	 * take an IRQ/NMI in between and set SP first, then a backtrace would be
 	 * confused since FP points *below* the SP that the *IRQ handler* is now
-	 * using.  Disabling IRQs gets us most of the way, but we could have an NMI
-	 * that does a BT (e.g. for debugging).  By zeroing FP first, at least we
-	 * won't BT at all (though FP is still out of sync with SP).
-	 *
-	 * Disabling IRQs here also will help with general sanity. */
-	disable_irq();
-	#ifdef CONFIG_RESET_STACKS
+	 * using.  By zeroing FP first, at least we won't BT at all (though FP is
+	 * still out of sync with SP). */
 	set_frame_pointer(0);
-	cmb();
 	set_stack_pointer(get_stack_top());
-	#endif /* CONFIG_RESET_STACKS */
 	__smp_idle();
-	assert(0);
 }
 
 /* Arch-independent per-cpu initialization.  This will call the arch dependent

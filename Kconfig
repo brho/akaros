@@ -192,14 +192,6 @@ config SEM_TRACE_BLOCKERS
 		races).  To access the trace data, you'll need to use the opcontrols
 		and process the data with op2.
 
-config RESET_STACKS
-	bool "Reset Stacks"
-	default y
-	help
-		When idling, the kernel will reset the stack of its kernel thread to
-		the top of the stack, abandoning its context.  This is useful so we do
-		not run off the end of our stacks, but makes backtracing difficult.
-
 config LARGE_KSTACKS
 	bool "Large (two-page) Kernel Stacks"
 	default y
