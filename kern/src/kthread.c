@@ -298,6 +298,39 @@ bool sem_trydown(struct semaphore *sem)
 	return ret;
 }
 
+/* Helper, pushes the sem pointer on the top of the stack, returning the stack
+ * pointer to use. */
+static uintptr_t push_sem_ptr(uintptr_t stack_top, struct semaphore *sem)
+{
+	struct semaphore **sp_ptr;
+
+	sp_ptr = (struct semaphore**)(stack_top - sizeof(struct semaphore*));
+	*sp_ptr = sem;
+	return (uintptr_t)sp_ptr;
+}
+
+/* Helper: gets the sem pointer from the top of the stack.  Note we don't pop
+ * from the stack.  We're just using the topmost part of the stack for free
+ * storage. */
+static struct semaphore *get_sem_ptr(void)
+{
+	struct semaphore **sp_ptr;
+
+	sp_ptr = (struct semaphore**)(get_stack_top() - sizeof(struct semaphore*));
+	return *sp_ptr;
+}
+
+
+/* Bottom-half of sem_down.  This is called after we jumped to the new stack. */
+static void __attribute__((noinline, noreturn)) __unlock_and_idle(void)
+{
+	struct semaphore *sem = get_sem_ptr();
+
+	spin_unlock(&sem->lock);
+	debug_unlock_semlist();
+	smp_idle();
+}
+
 /* This downs the semaphore and suspends the current kernel context on its
  * waitqueue if there are no pending signals.  Note that the case where the
  * signal is already there is not optimized. */
@@ -393,20 +426,17 @@ void sem_down(struct semaphore *sem)
 	if (sem->nr_signals-- <= 0) {
 		TAILQ_INSERT_TAIL(&sem->waiters, kthread, link);
 		debug_downed_sem(sem);	/* need to debug after inserting */
-		/* At this point, we know we'll sleep and change stacks later.  Once we
-		 * unlock, we could have the kthread restarted (possibly on another
-		 * core), so we need to disable irqs until we are on our new stack.
-		 * Otherwise, if we take an IRQ, we'll be using our stack while another
-		 * core is using it (restarted kthread).  Basically, disabling irqs
-		 * allows us to atomically unlock and 'yield'.  Also, IRQs might have
-		 * already been disabled if this was an irqsave sem. */
-		disable_irq();
-		spin_unlock(&sem->lock);
-		debug_unlock_semlist();
-		/* Switch to the core's default stack.  After this, don't use local
-		 * variables. */
+		/* At this point, we know we'll sleep and change stacks.  Once we unlock
+		 * the sem, we could have the kthread restarted (possibly on another
+		 * core), so we need to leave the old stack before unlocking.  If we
+		 * don't and we stay on the stack, then if we take an IRQ or NMI (NMI
+		 * that doesn't change stacks, unlike x86_64), we'll be using the stack
+		 * at the same time as the kthread.  We could just disable IRQs, but
+		 * that wouldn't protect us from NMIs that don't change stacks. */
+		new_stacktop = push_sem_ptr(new_stacktop, sem);
+		set_frame_pointer(0);
 		set_stack_pointer(new_stacktop);
-		smp_idle();							/* reenables irqs eventually */
+		__unlock_and_idle();
 		assert(0);
 	}
 	/* We get here if we should not sleep on sem (the signal beat the sleep).
