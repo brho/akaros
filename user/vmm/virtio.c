@@ -37,6 +37,8 @@ const char *virtio_validate_feat(struct virtio_vq_dev *vqdev, uint64_t feat)
 			// either the device can set its own MAC Address (as it does now)
 			// or the driver can set it using a controller thread.
 			break;
+		case VIRTIO_ID_BLOCK:
+			break;
 		case 0:
 			return "Invalid device id (0x0)! On the MMIO transport, this value indicates that the device is a system memory map with placeholder devices at static, well known addresses. In any case, this is not something you validate features for.";
 		default:

@@ -14,6 +14,7 @@
 enum {
 	VIRTIO_MMIO_CONSOLE_DEV,
 	VIRTIO_MMIO_NETWORK_DEV,
+	VIRTIO_MMIO_BLOCK_DEV,
 
 	/* This should always be the last entry. */
 	VIRTIO_MMIO_MAX_NUM_DEV,
