@@ -148,6 +148,8 @@ void idt_init(void)
 	 * DPL 3 means this can be triggered by the int instruction */
 	idt[T_SYSCALL].gd_dpl = 3;
 	idt[T_BRKPT].gd_dpl = 3;
+	/* Send NMIs to their own stack (IST1 in every core's TSS) */
+	idt[T_NMI].gd_ist = 1;
 
 	/* Set up our kernel stack when changing rings */
 	/* Note: we want 16 byte aligned kernel stack frames (AMD 2:8.9.3) */
@@ -322,6 +324,49 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 		return __handler_user_page_fault(hw_tf, fault_va, prot);
 }
 
+/* Separate handler from traps, since there's too many rules for NMI ctx.
+ *
+ * The general rule is that any writes from NMI context must be very careful.
+ * When talking about reads and writes to per-core data:
+ * - If NMIs write things written by normal kernel contexts, including IRQs and
+ *   traps with IRQs disabled, then you must use atomics on both sides.
+ * - If NMIs write things read by normal contexts, then readers must be careful,
+ *   since the data can change at will.
+ * - If NMIs read things written by normal contexts, don't worry: you're running
+ *   uninterrupted (given x86 NMI caveats).
+ * - We cannot block.  The current kthread thinks its stacktop is different than
+ *   the one we're on.  Just get in and get out.
+ * - If we interrupted a user TF, then we don't need to worry any more than for
+ *   normal traps/IRQs.
+ * - However, we cannot call proc_restartcore.  That could trigger all sorts of
+ *   things, like kthreads blocking.
+ * - Parallel accesses (from other cores) are the same as always.  You just
+ *   can't lock easily. */
+void handle_nmi(struct hw_trapframe *hw_tf)
+{
+	struct per_cpu_info *pcpui;
+
+	/* TODO: this is all racy and needs to go */
+
+	/* Temporarily disable deadlock detection when we print.  We could
+	 * deadlock if we were printing when we NMIed. */
+	pcpui = &per_cpu_info[core_id()];
+	pcpui->__lock_checking_enabled--;
+	/* This is a bit hacky, but we don't have a decent API yet */
+	extern bool mon_verbose_trace;
+	if (mon_verbose_trace) {
+		print_trapframe(hw_tf);
+		backtrace_hwtf(hw_tf);
+	}
+	char *fn_name = get_fn_name(get_hwtf_pc(hw_tf));
+
+	printk("Core %d is at %p (%s)\n", core_id(), get_hwtf_pc(hw_tf),
+		   fn_name);
+	kfree(fn_name);
+	print_kmsgs(core_id());
+	pcpui->__lock_checking_enabled++;
+}
+
 /* Certain traps want IRQs enabled, such as the syscall.  Others can't handle
  * it, like the page fault handler.  Turn them on on a case-by-case basis. */
 static void trap_dispatch(struct hw_trapframe *hw_tf)
@@ -333,25 +378,6 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 
 	// Handle processor exceptions.
 	switch(hw_tf->tf_trapno) {
-		case T_NMI:
-			/* Temporarily disable deadlock detection when we print.  We could
-			 * deadlock if we were printing when we NMIed. */
-			pcpui = &per_cpu_info[core_id()];
-			pcpui->__lock_checking_enabled--;
-			/* This is a bit hacky, but we don't have a decent API yet */
-			extern bool mon_verbose_trace;
-			if (mon_verbose_trace) {
-				print_trapframe(hw_tf);
-				backtrace_hwtf(hw_tf);
-			}
-			char *fn_name = get_fn_name(get_hwtf_pc(hw_tf));
-
-			printk("Core %d is at %p (%s)\n", core_id(), get_hwtf_pc(hw_tf),
-			       fn_name);
-			kfree(fn_name);
-			print_kmsgs(core_id());
-			pcpui->__lock_checking_enabled++;
-			break;
 		case T_BRKPT:
 			enable_irq();
 			monitor(hw_tf);

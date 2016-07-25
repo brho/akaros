@@ -61,6 +61,19 @@
 	.quad name;							\
 	.long num
 
+#define NMI_HANDLER(name, num)			\
+	.text;								\
+	.globl name;						\
+	.type name, @function;				\
+	.align 2;							\
+	name:								\
+	pushq $0;							\
+	pushq $(num);						\
+	jmp _nmi_entry;						\
+	.data;								\
+	.quad name;							\
+	.long num
+
 /* Only used in the kernel during SMP boot.  Send a LAPIC_EOI and iret. */
 #define POKE_HANDLER(name, num)			\
 	.text;								\
@@ -89,8 +102,8 @@ trap_tbl:
 
 /* Generate entry points for the different traps.  Note that all of these bounce
  * off the corresponding trap.c function, such as handle_irqs, and that the name
- * e.g. ISR_NMI is soley for the little stup that jumps to something like
- * _alltraps.
+ * e.g. ISR_divide_error is soley for the little stup that jumps to something
+ * like _alltraps.
  *
  * Technically, these HANDLER entries do not need to be in numeric order.
  * trap.c will do a 'foreach (up to last-1), set the IDT for the number to point
@@ -98,7 +111,7 @@ trap_tbl:
  * one wins'. */
 TRAPHANDLER_NOEC(ISR_divide_error, T_DIVIDE)
 TRAPHANDLER_NOEC(ISR_debug_exceptions, T_DEBUG)
-TRAPHANDLER_NOEC(ISR_NMI, T_NMI)
+NMI_HANDLER(ISR_NMI, T_NMI)
 TRAPHANDLER_NOEC(ISR_breakpoint, T_BRKPT)
 TRAPHANDLER_NOEC(ISR_overflow, T_OFLOW)
 TRAPHANDLER_NOEC(ISR_bounds_check, T_BOUND)
@@ -438,6 +451,126 @@ irq_all_tf:
 	call handle_irq
 	# the return paths are only used by the kernel
 	addq $0x10, %rsp			# skip fs/gs base
+	popq %rax
+	popq %rbx
+	popq %rcx
+	popq %rdx
+	popq %rbp
+	popq %rsi
+	popq %rdi
+	popq %r8
+	popq %r9
+	popq %r10
+	popq %r11
+	popq %r12
+	popq %r13
+	popq %r14
+	popq %r15
+	addq $0x10, %rsp			# skip trapno and err
+	iretq
+
+# Unlike normal trap and IRQ handlers, both user and kernel TFs are handled the
+# similarly.  Both come in here and return from here.  We cannot do anything
+# fancy like proc_restartcore() from NMI context.
+#
+# All NMIs will come in fresh on the same stack (IST1, per-core).  We don't need
+# to find a stackpointer, but we do need to find GS.
+#
+# Regardless of whether or not the interrupted context was in the kernel, we
+# can't trust GS.  Basically we can never tell from looking at GS and KERN_GS
+# whether swapgs occurred, since the user could have put kernel addrs in their
+# GS.  But we can use the stack for storage to bootstrap GS.  %rsp at entry
+# points to pcpui *.
+#
+# We can also tell if GS was set correctly or not and avoid the wrmsr calls.
+# This isn't a huge deal.  But note that we don't know whether or not the kernel
+# actually set the gsbase.  We just know if it was correct or not.  The user
+# could have set it and the kernel hadn't had a chance to swapgs yet.  The NMI
+# handler doesn't care, since all TFs come in and go out via this asm.
+#
+# If we want to be paranoid, we can completely ignore user TFs and just save and
+# restore GS with the same mechanism we use for the kernel.  But since we came
+# in on a user TF, we can use swapgs.  Note that even for nested NMI handlers,
+# we have a user TF for only the first time, and only the last exit will swapgs
+# back to the way it was initially.
+_nmi_entry:
+	cld
+	pushq %r15
+	pushq %r14
+	pushq %r13
+	pushq %r12
+	pushq %r11
+	pushq %r10
+	pushq %r9
+	pushq %r8
+	pushq %rdi
+	pushq %rsi
+	pushq %rbp
+	pushq %rdx
+	pushq %rcx
+	pushq %rbx
+	pushq %rax
+	cmpw $GD_KT, 0x90(%rsp)	# 0x90 - diff btw tf_cs and tf_rax
+	je nmi_kern_tf
+	# this is a user TF.  we need to swapgs to get the kernel's gs and mark the
+	# context as partial
+	swapgs					# user's GS is now in MSR_KERNEL_GS_BASE
+	movl $0x1, 0xac(%rsp)	# 0xac - diff btw tf_padding0 and tf_rax
+	pushq $0				# fsbase space
+	pushq $0				# gsbase space
+	jmp nmi_all_tf
+nmi_kern_tf:
+	# this is a kernel TF.  but we don't know if they set up gs yet, so we'll
+	# save and restore whatever they had loaded and use our own
+	pushq $0				# fsbase space
+	# Get the current GS base into rax
+	movl $MSR_GS_BASE, %ecx
+	rdmsr
+	shlq $32, %rdx
+	orq %rdx, %rax
+	# Get the real GS base from the top of the stack.  This was set in smp_boot,
+	# and our rsp pointed to it when we entered the kernel.
+	movq 0xb8(%rsp), %rdx	# 0xb8 from fs_base to the top
+	# Compare them.  If they are the same, we can just push 0 for gsbase (which
+	# later will mean "no need to restore GS".
+	cmpq %rdx, %rax
+	je nmi_gs_ok
+	# They weren't the same.  Save the old one and set the new one.
+	pushq %rax				# gsbase space
+	movq %rdx, %rax
+	shrq $32, %rdx
+	andl $0xffffffff, %eax
+	wrmsr
+	jmp nmi_all_tf
+nmi_gs_ok:
+	pushq $0				# gsbase space
+nmi_all_tf:
+	# At this point, GS is set correctly, either due to swapgs (user TF), wrmsr
+	# (kern TF with bad GS), or it was already fine (and gsbase in the TF = 0).
+	movq $0, %rbp			# so we can backtrace to this point
+	movq %rsp, %rdi
+	call handle_nmi
+	# Unlike in normal IRQs/Traps, both user and kernel contexts return via this
+	# path.
+	cmpw $GD_KT, 0xa0(%rsp)	# 0xa0 - diff btw tf_cs and tf_gsbase
+	je nmi_kern_restore_gs
+	# User TF.  Restore whatever was there with swapgs.  We don't care what it
+	# was, nor do we care what was in the TF.
+	swapgs					# user's GS is now in MSR_GS_BASE
+	addq $0x10, %rsp		# skip gs/fs base
+	jmp nmi_popal
+nmi_kern_restore_gs:
+	popq %rax				# fetch saved gsbase
+	addq $0x08, %rsp		# skip fs base
+	cmpq $0, %rax
+	je nmi_popal
+	# gsbase in the TF != 0, which means we need to restore that gsbase
+	movl $MSR_GS_BASE, %ecx
+	movq %rax, %rdx
+	shrq $32, %rdx
+	andl $0xffffffff, %eax
+	wrmsr
+nmi_popal:
 	popq %rax
 	popq %rbx
 	popq %rcx
