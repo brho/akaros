@@ -11,8 +11,6 @@ struct symtab_entry {
 	uintptr_t addr;
 };
 
-#define TRACEME() trace_printk(TRUE, "%s(%d)", __FILE__, __LINE__)
-
 /* An alternative here is to have backtrace_list kmalloc an array.  The downside
  * is that we're calling into the allocator in potentially-delicate situations,
  * such as the NMI handler. */

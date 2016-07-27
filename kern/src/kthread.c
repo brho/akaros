@@ -358,9 +358,6 @@ void sem_down(struct semaphore *sem)
 	if (sem_trydown(sem))
 		goto block_return_path;
 #endif
-#ifdef CONFIG_SEM_TRACE_BLOCKERS
-	TRACEME();
-#endif
 	/* We're probably going to sleep, so get ready.  We'll check again later. */
 	kthread = pcpui->cur_kthread;
 	/* We need to have a spare slot for restart, so we also use it when
