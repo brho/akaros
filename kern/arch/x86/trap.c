@@ -1108,10 +1108,59 @@ void handle_vmexit(struct vm_trapframe *tf)
 	proc_restartcore();
 }
 
-void x86_finalize_vmtf(struct vm_trapframe *tf)
+/* Partial contexts for HW and SW TFs have the user's gs in MSR_KERNEL_GS_BASE.
+ * The kernel's gs is loaded into gs.  We need to put the kernel's gs into
+ * KERNEL_GS_BASE so the core is ready to run another full context, save the
+ * user's {GS,FS}_BASE into their TF so it can run on another core, and keep GS
+ * loaded with the current GS (the kernel's). */
+static void x86_finalize_hwtf(struct hw_trapframe *tf)
+{
+	tf->tf_gsbase = read_msr(MSR_KERNEL_GS_BASE);
+	write_msr(MSR_KERNEL_GS_BASE, read_gsbase());
+	tf->tf_fsbase = read_fsbase();
+	x86_hwtf_clear_partial(tf);
+}
+
+static void x86_finalize_swtf(struct sw_trapframe *tf)
+{
+	tf->tf_gsbase = read_msr(MSR_KERNEL_GS_BASE);
+	write_msr(MSR_KERNEL_GS_BASE, read_gsbase());
+	tf->tf_fsbase = read_fsbase();
+	x86_swtf_clear_partial(tf);
+}
+
+static void x86_finalize_vmtf(struct vm_trapframe *tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
 	x86_vmtf_clear_partial(tf);
 	unload_guest_pcore(pcpui->cur_proc, pcpui->guest_pcoreid);
+}
+
+/* Makes sure that the user context is fully saved into ctx and not split across
+ * the struct and HW, meaning it is not a "partial context".
+ *
+ * Be careful to zero out any part of the ctx struct not in use, to avoid
+ * leaking information from other processes. */
+void arch_finalize_ctx(struct user_context *ctx)
+{
+	if (!arch_ctx_is_partial(ctx))
+		return;
+	switch (ctx->type) {
+	case ROS_HW_CTX:
+		x86_finalize_hwtf(&ctx->tf.hw_tf);
+		memset((uint8_t*)&ctx->tf + sizeof(struct hw_trapframe), 0,
+			   sizeof(ctx->tf) - sizeof(struct hw_trapframe));
+		break;
+	case ROS_SW_CTX:
+		x86_finalize_swtf(&ctx->tf.sw_tf);
+		memset((uint8_t*)&ctx->tf + sizeof(struct sw_trapframe), 0,
+			   sizeof(ctx->tf) - sizeof(struct sw_trapframe));
+		break;
+	case ROS_VM_CTX:
+		x86_finalize_vmtf(&ctx->tf.vm_tf);
+		memset((uint8_t*)&ctx->tf + sizeof(struct vm_trapframe), 0,
+			   sizeof(ctx->tf) - sizeof(struct vm_trapframe));
+		break;
+	}
 }
