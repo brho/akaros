@@ -51,7 +51,7 @@ int vcprintf(const char *fmt, va_list ap)
 	va_list args;
 
 	va_copy(args, ap);
-	trace_vprintk(false, fmt, args);
+	trace_vprintk(fmt, args);
 	va_end(args);
 
 	/* this ktrap depth stuff is in case the kernel faults in a printfmt call.

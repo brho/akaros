@@ -379,7 +379,7 @@ static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 			char *uptr = user_strdup_errno(current, a, n);
 
 			if (uptr) {
-				trace_printk(false, "%s", uptr);
+				trace_printk("%s", uptr);
 				user_memdup_free(current, uptr);
 			} else {
 				n = -1;
@@ -481,7 +481,7 @@ static struct trace_printk_buffer *kprof_get_printk_buffer(void)
 	return cpu_tpbs + core_id_early();
 }
 
-void trace_vprintk(bool btrace, const char *fmt, va_list args)
+void trace_vprintk(const char *fmt, va_list args)
 {
 	struct print_buf {
 		char *ptr;
@@ -497,14 +497,6 @@ void trace_vprintk(bool btrace, const char *fmt, va_list args)
 			for (; (size > 0) && (pb->ptr < pb->top); str++, size--)
 				*(pb->ptr++) = *str;
 		}
-	}
-
-	void bt_print(void *opaque, const char *str)
-	{
-		struct print_buf *pb = (struct print_buf *) opaque;
-
-		emit_print_buf_str(pb, "\t", 1);
-		emit_print_buf_str(pb, str, -1);
 	}
 
 	static const size_t bufsz = TRACE_PRINTK_BUFFER_SIZE;
@@ -529,10 +521,6 @@ void trace_vprintk(bool btrace, const char *fmt, va_list args)
 
 	if (pb.ptr[-1] != '\n')
 		emit_print_buf_str(&pb, "\n", 1);
-	if (btrace) {
-		emit_print_buf_str(&pb, "\tBacktrace:\n", -1);
-		gen_backtrace(bt_print, &pb);
-	}
 	/* snprintf null terminates the buffer, and does not count that as part of
 	 * the len.  If we maxed out the buffer, let's make sure it has a \n.
 	 */
@@ -555,12 +543,12 @@ void trace_vprintk(bool btrace, const char *fmt, va_list args)
 	atomic_set(&tpb->in_use, 0);
 }
 
-void trace_printk(bool btrace, const char *fmt, ...)
+void trace_printk(const char *fmt, ...)
 {
 	va_list args;
 
 	va_start(args, fmt);
-	trace_vprintk(btrace, fmt, args);
+	trace_vprintk(fmt, args);
 	va_end(args);
 }
 

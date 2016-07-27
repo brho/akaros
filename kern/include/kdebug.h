@@ -72,7 +72,7 @@ void set_printx(int mode);
 #define trace_printx(args...)						\
 	do {											\
 		if (printx_on)								\
-			trace_printk(TRUE, args);				\
+			trace_printk(args);				\
 	} while (0)
 
 void debug_addr_proc(struct proc *p, unsigned long addr);
