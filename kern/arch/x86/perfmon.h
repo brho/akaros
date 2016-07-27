@@ -50,6 +50,8 @@ struct perfmon_status {
 bool perfmon_supported(void);
 void perfmon_global_init(void);
 void perfmon_pcpu_init(void);
+void perfmon_snapshot_hwtf(struct hw_trapframe *hw_tf);
+void perfmon_snapshot_vmtf(struct vm_trapframe *vm_tf);
 void perfmon_interrupt(struct hw_trapframe *hw_tf, void *data);
 void perfmon_get_cpu_caps(struct perfmon_cpu_caps *pcc);
 int perfmon_open_event(const struct core_set *cset, struct perfmon_session *ps,

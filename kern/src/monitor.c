@@ -24,6 +24,7 @@
 #include <event.h>
 #include <trap.h>
 #include <time.h>
+#include <percpu.h>
 
 #include <ros/memlayout.h>
 #include <ros/event.h>
@@ -682,8 +683,53 @@ int mon_measure(int argc, char **argv, struct hw_trapframe *hw_tf)
 	return 0;
 }
 
-/* Used in various debug locations.  Not a kernel API or anything. */
-bool mon_verbose_trace = FALSE;
+static bool mon_verbose_trace = FALSE;
+static DEFINE_PERCPU(bool, mon_nmi_trace);
+
+static void emit_hwtf_backtrace(struct hw_trapframe *hw_tf)
+{
+	char *fn_name;
+
+	if (mon_verbose_trace) {
+		print_trapframe(hw_tf);
+		backtrace_hwtf(hw_tf);
+	}
+	fn_name = get_fn_name(get_hwtf_pc(hw_tf));
+	printk("Core %d is at %p (%s)\n", core_id(), get_hwtf_pc(hw_tf),
+	       fn_name);
+	kfree(fn_name);
+}
+
+static void emit_vmtf_backtrace(struct vm_trapframe *vm_tf)
+{
+	if (mon_verbose_trace)
+		print_vmtrapframe(vm_tf);
+	printk("Core %d is at %p\n", core_id(), get_vmtf_pc(vm_tf));
+}
+
+/* This is dangerous and could cause a deadlock, since it runs in NMI context.
+ * It's only for monitor debugging, so YMMV.  We pass the type since the kernel
+ * doesn't deal in contexts (yet) */
+void emit_monitor_backtrace(int type, void *tf)
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
+	if (!PERCPU_VAR(mon_nmi_trace))
+		return;
+	/* To prevent a spew of output during a lot of perf NMIs, we'll turn off the
+	 * monitor output as soon as any NMI hits our core. */
+	PERCPU_VAR(mon_nmi_trace) = FALSE;
+	/* Temporarily disable deadlock detection when we print.  We could
+	 * deadlock if we were printing when we NMIed. */
+	pcpui->__lock_checking_enabled--;
+	if (type == ROS_HW_CTX)
+		emit_hwtf_backtrace((struct hw_trapframe*)tf);
+	else
+		emit_vmtf_backtrace((struct vm_trapframe*)tf);
+	print_kmsgs(core_id());
+	pcpui->__lock_checking_enabled++;
+}
+
 
 int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
@@ -719,14 +765,17 @@ int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 		core = strtol(argv[2], 0, 0);
 		if (core < 0) {
 			printk("Sending NMIs to all cores:\n");
-			for (int i = 0; i < num_cores; i++)
+			for (int i = 0; i < num_cores; i++) {
+				_PERCPU_VAR(mon_nmi_trace, i) = TRUE;
 				send_nmi(i);
+			}
 		} else {
 			printk("Sending NMI core %d:\n", core);
 			if (core >= num_cores) {
 				printk("No such core!  Maybe it's in another cell...\n");
 				return 1;
 			}
+			_PERCPU_VAR(mon_nmi_trace, core) = TRUE;
 			send_nmi(core);
 		}
 		udelay(1000000);

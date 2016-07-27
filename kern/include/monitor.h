@@ -7,6 +7,7 @@
 // optionally providing a trap frame indicating the current state
 // (NULL if none).
 void monitor(struct hw_trapframe *hw_tf);
+void emit_monitor_backtrace(int type, void *tf);
 
 // Functions implementing monitor commands.
 int mon_help(int argc, char **argv, struct hw_trapframe *hw_tf);

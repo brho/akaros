@@ -333,25 +333,19 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 /* Actual body of work done when an NMI arrives */
 static void do_nmi_work(struct hw_trapframe *hw_tf)
 {
-	/* TODO: this is all racy and needs to go */
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	char *fn_name;
-	/* This is a bit hacky, but we don't have a decent API yet */
-	extern bool mon_verbose_trace;
-
-	/* Temporarily disable deadlock detection when we print.  We could
-	 * deadlock if we were printing when we NMIed. */
-	pcpui->__lock_checking_enabled--;
-	if (mon_verbose_trace) {
-		print_trapframe(hw_tf);
-		backtrace_hwtf(hw_tf);
-	}
-	fn_name = get_fn_name(get_hwtf_pc(hw_tf));
-	printk("Core %d is at %p (%s)\n", core_id(), get_hwtf_pc(hw_tf),
-	       fn_name);
-	kfree(fn_name);
-	print_kmsgs(core_id());
-	pcpui->__lock_checking_enabled++;
+	assert(!irq_is_enabled());
+	/* It's mostly harmless to snapshot the TF, and we can send a spurious PCINT
+	 * interrupt.  perfmon.c just uses the interrupt to tell it to check its
+	 * counters for overflow.  Note that the PCINT interrupt is just a regular
+	 * IRQ.  The backtrace was recorded during the NMI and emitted during IRQ.
+	 *
+	 * That being said, it's OK if the monitor triggers debugging NMIs while
+	 * perf is running.  If perf triggers an NMI when the monitor wants to
+	 * print, the monitor will debug *that* NMI, and not the one that gets sent
+	 * moments later.  That's fine. */
+	emit_monitor_backtrace(ROS_HW_CTX, hw_tf);
+	perfmon_snapshot_hwtf(hw_tf);
+	send_self_ipi(IdtLAPIC_PCINT);
 }
 
 /* NMI HW_TF hacking involves four symbols:
@@ -928,20 +922,22 @@ static bool handle_vmexit_ept_fault(struct vm_trapframe *tf)
 	return TRUE;
 }
 
+/* Regarding NMI blocking,
+ * 		"An NMI causes subsequent NMIs to be blocked, but only after the VM exit
+ * 		completes." (SDM)
+ *
+ * Like handle_nmi(), this function and anything it calls directly cannot fault,
+ * or else we lose our NMI protections. */
 static bool handle_vmexit_nmi(struct vm_trapframe *tf)
 {
 	/* Sanity checks, make sure we really got an NMI.  Feel free to remove. */
 	assert((tf->tf_intrinfo2 & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI_INTR);
 	assert((tf->tf_intrinfo2 & INTR_INFO_VECTOR_MASK) == T_NMI);
-	/* our NMI handler from trap.c won't run.  but we don't need the lock
-	 * disabling stuff. */
-	extern bool mon_verbose_trace;
+	assert(!irq_is_enabled());
 
-	if (mon_verbose_trace) {
-		print_vmtrapframe(tf);
-		/* TODO: a backtrace of the guest would be nice here. */
-	}
-	printk("Core %d is at %p\n", core_id(), get_vmtf_pc(tf));
+	emit_monitor_backtrace(ROS_VM_CTX, tf);
+	perfmon_snapshot_vmtf(tf);
+	send_self_ipi(IdtLAPIC_PCINT);
 	return TRUE;
 }
 

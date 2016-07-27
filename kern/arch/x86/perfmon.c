@@ -67,6 +67,15 @@ static struct perfmon_cpu_caps cpu_caps;
 static DEFINE_PERCPU(struct perfmon_cpu_context, counters_env);
 DEFINE_PERCPU_INIT(perfmon_counters_env_init);
 
+#define PROFILER_BT_DEPTH 16
+
+struct sample_snapshot {
+	struct user_context			ctx;
+	uintptr_t					pc_list[PROFILER_BT_DEPTH];
+	size_t						nr_pcs;
+};
+static DEFINE_PERCPU(struct sample_snapshot, sample_snapshots);
+
 static void perfmon_counters_env_init(void)
 {
 	for (int i = 0; i < num_cores; i++) {
@@ -401,7 +410,9 @@ static struct perfmon_status *perfmon_status_alloc(void)
 
 static void perfmon_arm_irq(void)
 {
-	apicrput(MSR_LAPIC_LVT_PERFMON, IdtLAPIC_PCINT);
+	/* Actually, the vector is ignored, I'm just adding T_NMI to avoid
+	 * confusion.  The important part is the NMI-bits (0x4) */
+	apicrput(MSR_LAPIC_LVT_PERFMON, (0x4 << 8) | T_NMI);
 }
 
 bool perfmon_supported(void)
@@ -442,20 +453,63 @@ static uint64_t perfmon_make_sample_event(const struct perfmon_event *pev)
 	return pev->user_data;
 }
 
-static void profiler_add_hw_sample(struct hw_trapframe *hw_tf, uint64_t info)
+/* Called from NMI context! */
+void perfmon_snapshot_hwtf(struct hw_trapframe *hw_tf)
 {
-	#define PROFILER_BT_DEPTH 16
-	uintptr_t pc_list[PROFILER_BT_DEPTH];
-	size_t n;
+	struct sample_snapshot *sample = PERCPU_VARPTR(sample_snapshots);
 	uintptr_t pc = get_hwtf_pc(hw_tf);
 	uintptr_t fp = get_hwtf_fp(hw_tf);
 
+	sample->ctx.type = ROS_HW_CTX;
+	sample->ctx.tf.hw_tf = *hw_tf;
 	if (in_kernel(hw_tf)) {
-		n = backtrace_list(pc, fp, pc_list, PROFILER_BT_DEPTH);
-		profiler_push_kernel_backtrace(pc_list, n, info);
+		sample->nr_pcs = backtrace_list(pc, fp, sample->pc_list,
+		                                PROFILER_BT_DEPTH);
 	} else {
-		n = backtrace_user_list(pc, fp, pc_list, PROFILER_BT_DEPTH);
-		profiler_push_user_backtrace(pc_list, n, info);
+		sample->nr_pcs = backtrace_user_list(pc, fp, sample->pc_list,
+		                                     PROFILER_BT_DEPTH);
+	}
+}
+
+/* Called from NMI context, *and* this cannot fault (e.g. breakpoint tracing)!
+ * The latter restriction is due to the vmexit NMI handler not being
+ * interruptible.  Because of this, we just copy out the VM TF. */
+void perfmon_snapshot_vmtf(struct vm_trapframe *vm_tf)
+{
+	struct sample_snapshot *sample = PERCPU_VARPTR(sample_snapshots);
+
+	sample->ctx.type = ROS_VM_CTX;
+	sample->ctx.tf.vm_tf = *vm_tf;
+	sample->nr_pcs = 1;
+	sample->pc_list[0] = get_vmtf_pc(vm_tf);
+}
+
+static void profiler_add_sample(uint64_t info)
+{
+	struct sample_snapshot *sample = PERCPU_VARPTR(sample_snapshots);
+
+	/* We shouldn't need to worry about another NMI that concurrently mucks with
+	 * the sample.  The PMU won't rearm the interrupt until we're done here.  In
+	 * the event that we do get another NMI from another source, we may get a
+	 * weird backtrace in the perf output. */
+	switch (sample->ctx.type) {
+	case ROS_HW_CTX:
+		if (in_kernel(&sample->ctx.tf.hw_tf)) {
+			profiler_push_kernel_backtrace(sample->pc_list, sample->nr_pcs,
+			                               info);
+		} else {
+			profiler_push_user_backtrace(sample->pc_list, sample->nr_pcs, info);
+		}
+		break;
+	case ROS_VM_CTX:
+		/* TODO: add VM support to perf.  For now, just treat it like a user
+		 * addr.  Note that the address is a guest-virtual address, not
+		 * guest-physical (which would be host virtual), and our VM_CTXs don't
+		 * make a distinction between user and kernel TFs (yet). */
+		profiler_push_user_backtrace(sample->pc_list, sample->nr_pcs, info);
+		break;
+	default:
+		warn("Bad perf sample type %d!", sample->ctx.type);
 	}
 }
 
@@ -476,8 +530,8 @@ void perfmon_interrupt(struct hw_trapframe *hw_tf, void *data)
 	for (i = 0; i < (int) cpu_caps.counters_x_proc; i++) {
 		if (status & ((uint64_t) 1 << i)) {
 			if (cctx->counters[i].event) {
-				profiler_add_hw_sample(
-				    hw_tf, perfmon_make_sample_event(cctx->counters + i));
+				profiler_add_sample(
+				    perfmon_make_sample_event(cctx->counters + i));
 				perfmon_set_unfixed_trigger(i, cctx->counters[i].trigger_count);
 			}
 		}
@@ -485,8 +539,8 @@ void perfmon_interrupt(struct hw_trapframe *hw_tf, void *data)
 	for (i = 0; i < (int) cpu_caps.fix_counters_x_proc; i++) {
 		if (status & ((uint64_t) 1 << (32 + i))) {
 			if (cctx->fixed_counters[i].event) {
-				profiler_add_hw_sample(
-				    hw_tf, perfmon_make_sample_event(cctx->fixed_counters + i));
+				profiler_add_sample(
+				    perfmon_make_sample_event(cctx->fixed_counters + i));
 				perfmon_set_fixed_trigger(i,
 				        cctx->fixed_counters[i].trigger_count);
 			}
