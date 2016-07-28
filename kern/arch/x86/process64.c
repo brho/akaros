@@ -261,7 +261,13 @@ static void proc_secure_hwtf(struct hw_trapframe *tf)
 	 * Requestor Privilege Level (RPL); 3 means user mode. */
 	tf->tf_ss = GD_UD | 3;
 	tf->tf_cs = GD_UT | 3;
+	/* Always 1: interrupts */
 	tf->tf_rflags |= FL_IF;
+	/* Always 0: IOPL must be set to 0.  VM (virtual 8086) probably doesn't
+	 * matter - SDM says it can't get modified via iret anyways.  VIF and VIP
+	 * are also virtual-8086 mode stuff.  Supposedly NT is settable by
+	 * userspace, but there's no good reason for it.  Rather be paranoid. */
+	tf->tf_rflags &= ~(FL_IOPL_MASK | FL_VM | FL_NT | FL_VIF | FL_VIP);
 	x86_hwtf_clear_partial(tf);
 }
 
