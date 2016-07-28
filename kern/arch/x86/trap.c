@@ -208,7 +208,7 @@ void idt_init(void)
 	register_irq(I_KERNEL_MSG, handle_kmsg_ipi, NULL, MKBUS(BusIPI, 0, 0, 0));
 }
 
-static void handle_fperr(struct hw_trapframe *hw_tf)
+static void print_fperr(struct hw_trapframe *hw_tf)
 {
 	uint16_t fpcw, fpsw;
 	uint32_t mxcsr;
@@ -240,8 +240,6 @@ static void handle_fperr(struct hw_trapframe *hw_tf)
 		printk("\tNumeric Underflow\n");
 	if (fpsw & ~fpcw & FP_EXCP_PE)
 		printk("\tInexact result (precision)\n");
-	printk("Killing the process.\n");
-	proc_destroy(current);
 }
 
 static bool __handler_user_page_fault(struct hw_trapframe *hw_tf,
@@ -268,6 +266,11 @@ static bool __handler_kernel_page_fault(struct hw_trapframe *hw_tf,
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	int err;
 
+	/* The only thing an NMI handler that faults can do is a fixup */
+	if (pcpui->nmi_status != NMI_NORMAL_OPN) {
+		assert(in_kernel(hw_tf));
+		return try_handle_exception_fixup(hw_tf);
+	}
 	/* In general, if there's no cur_proc, a KPF is a bug. */
 	if (!pcpui->cur_proc) {
 		/* This only runs from test_uaccess(), where it is expected to fail. */
@@ -540,7 +543,7 @@ void handle_nmi(struct hw_trapframe *hw_tf)
 static void trap_dispatch(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui;
-	bool handled = TRUE;
+	bool handled = FALSE;
 	unsigned long aux = 0;
 	uintptr_t fixup_ip;
 
@@ -550,6 +553,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			enable_irq();
 			monitor(hw_tf);
 			disable_irq();
+			handled = TRUE;
 			break;
 		case T_ILLOP:
 		{
@@ -573,7 +577,8 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			    *(uint8_t*)(ip + 2) == 0xf9) {
 				x86_fake_rdtscp(hw_tf);
 				pcpui->__lock_checking_enabled++;	/* for print debugging */
-				return;
+				handled = TRUE;
+				break;
 			}
 			enable_irq();
 			monitor(hw_tf);
@@ -584,10 +589,9 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 		case T_PGFLT:
 			handled = __handle_page_fault(hw_tf, &aux);
 			break;
+		case T_GPFLT:
 		case T_FPERR:
 			handled = try_handle_exception_fixup(hw_tf);
-			if (!handled)
-				handle_fperr(hw_tf);
 			break;
 		case T_SYSCALL:
 			enable_irq();
@@ -599,21 +603,17 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			              (struct syscall*)x86_get_systrap_arg0(hw_tf),
 						  (unsigned int)x86_get_systrap_arg1(hw_tf));
 			disable_irq();
+			handled = TRUE;
 			break;
-		default:
-			if (hw_tf->tf_cs == GD_KT) {
-				handled = try_handle_exception_fixup(hw_tf);
-				if (!handled) {
-					print_trapframe(hw_tf);
-					panic("Damn Damn!  Unhandled trap in the kernel!");
-				}
-			} else {
-				handled = FALSE;
-			}
 	}
 
-	if (!handled)
+	if (!handled) {
+		if (in_kernel(hw_tf)) {
+			print_trapframe(hw_tf);
+			panic("Damn Damn!  Unhandled trap in the kernel!");
+		}
 		reflect_unhandled_trap(hw_tf->tf_trapno, hw_tf->tf_err, aux);
+	}
 }
 
 /* Helper.  For now, this copies out the TF to pcpui.  Eventually, we should
