@@ -96,9 +96,14 @@
 	.quad name;							\
 	.long num
 
+# Set data for the trap_tbl symbol.  Set text for the entry_points.  The various
+# trap/irq handler macros will toggle data on and off as needed.
 .data
 .globl trap_tbl
 trap_tbl:
+.text
+.globl __asm_entry_points_start
+__asm_entry_points_start:
 
 /* Generate entry points for the different traps.  Note that all of these bounce
  * off the corresponding trap.c function, such as handle_irqs, and that the name
@@ -895,3 +900,6 @@ vmexit_handler:
 	call handle_vmexit
 vmexit_spin:
 	jmp vmexit_spin
+
+.globl __asm_entry_points_end
+__asm_entry_points_end:

@@ -327,6 +327,28 @@ void gen_backtrace(void (*pfunc)(void *, const char *), void *opaque)
 	print_backtrace_list(pcs, nr_pcs, pfunc, opaque);
 }
 
+static bool pc_is_asm_trampoline(uintptr_t pc)
+{
+	extern char __asm_entry_points_start[], __asm_entry_points_end[];
+	extern char __asm_pop_hwtf_start[], __asm_pop_hwtf_end[];
+	extern char __asm_pop_swtf_start[], __asm_pop_swtf_end[];
+	extern char __asm_pop_vmtf_start[], __asm_pop_vmtf_end[];
+
+	if (((uintptr_t)__asm_entry_points_start <= pc) &&
+	    (pc < (uintptr_t)__asm_entry_points_end))
+		return TRUE;
+	if (((uintptr_t)__asm_pop_hwtf_start <= pc) &&
+	    (pc < (uintptr_t)__asm_pop_hwtf_end))
+		return TRUE;
+	if (((uintptr_t)__asm_pop_swtf_start <= pc) &&
+	    (pc < (uintptr_t)__asm_pop_swtf_end))
+		return TRUE;
+	if (((uintptr_t)__asm_pop_vmtf_start <= pc) &&
+	    (pc < (uintptr_t)__asm_pop_vmtf_end))
+		return TRUE;
+	return FALSE;
+}
+
 size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
                       size_t nr_slots)
 {
@@ -334,8 +356,11 @@ size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
 
 	while (nr_pcs < nr_slots) {
 		pcs[nr_pcs++] = pc;
-		if (!fp || fp < KERNBASE)
+		if (pc_is_asm_trampoline(pc))
 			break;
+		if (!fp)
+			break;
+		assert(KERNBASE <= fp);
 		printd("PC %p FP %p\n", pc, fp);
 		/* We used to set PC = retaddr - 1, where the -1 would put our PC back
 		 * inside the function that called us.  This was for obscure cases where

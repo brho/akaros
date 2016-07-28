@@ -19,7 +19,9 @@ static void __attribute__((noreturn)) proc_pop_hwtf(struct hw_trapframe *tf)
 		write_gsbase(tf->tf_gsbase);
 		write_fsbase(tf->tf_fsbase);
 	}
-	asm volatile ("movq %0, %%rsp;          "
+	asm volatile (".globl __asm_pop_hwtf_start;"
+	              "__asm_pop_hwtf_start:    "
+	              "movq %0, %%rsp;          "
 	              "popq %%rax;              "
 	              "popq %%rbx;              "
 	              "popq %%rcx;              "
@@ -36,7 +38,9 @@ static void __attribute__((noreturn)) proc_pop_hwtf(struct hw_trapframe *tf)
 	              "popq %%r14;              "
 	              "popq %%r15;              "
 	              "addq $0x10, %%rsp;       "
-	              "iretq                    "
+	              "iretq;                   "
+	              ".globl __asm_pop_hwtf_end;"
+	              "__asm_pop_hwtf_end:      "
 	              : : "g" (&tf->tf_rax) : "memory");
 	panic("iretq failed");
 }
@@ -52,7 +56,9 @@ static void __attribute__((noreturn)) proc_pop_swtf(struct sw_trapframe *tf)
 	/* We need to 0 out any registers that aren't part of the sw_tf and that we
 	 * won't use/clobber on the out-path.  While these aren't part of the sw_tf,
 	 * we also don't want to leak any kernel register content. */
-	asm volatile ("movq %0, %%rsp;          "
+	asm volatile (".globl __asm_pop_swtf_start;"
+	              "__asm_pop_swtf_start:    "
+	              "movq %0, %%rsp;          "
 	              "movq $0, %%rax;          "
 	              "movq $0, %%rdx;          "
 	              "movq $0, %%rsi;          "
@@ -69,7 +75,9 @@ static void __attribute__((noreturn)) proc_pop_swtf(struct sw_trapframe *tf)
 	              "movq %1, %%r11;          "
 	              "popq %%rcx;              "
 	              "popq %%rsp;              "
-	              "rex.w sysret             "
+	              "rex.w sysret;            "
+	              ".globl __asm_pop_swtf_end;"
+	              "__asm_pop_swtf_end:      "
 	              : : "g"(&tf->tf_rbx), "i"(FL_IF) : "memory");
 	panic("sysret failed");
 }
@@ -126,7 +134,9 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 	 * Likewise, we don't want to lose rbp via the clobber list.
 	 *
 	 * Partial contexts have already been launched, so we resume them. */
-	asm volatile ("testl $"STRINGIFY(VMCTX_FL_PARTIAL)", %c[flags](%0);"
+	asm volatile (".globl __asm_pop_vmtf_start;"
+	              "__asm_pop_vmtf_start:     "
+	              "testl $"STRINGIFY(VMCTX_FL_PARTIAL)", %c[flags](%0);"
 	              "pushq %%rbp;              "	/* save in case we fail */
 	              "movq %c[rbx](%0), %%rbx;  "
 	              "movq %c[rcx](%0), %%rcx;  "
@@ -148,6 +158,8 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 	              "jmp 2f;                   "
 	              "1: "ASM_VMX_VMRESUME";    "	/* partials get resumed */
 	              "2: popq %%rbp;            "	/* vmlaunch failed */
+	              ".globl __asm_pop_vmtf_end;"
+	              "__asm_pop_vmtf_end:       "
 	              :
 	              : "a" (tf),
 	                [rax]"i"(offsetof(struct vm_trapframe, tf_rax)),
