@@ -876,10 +876,6 @@ void proc_destroy(struct proc *p)
 	spin_unlock(&p->proc_lock);
 	/* Wake any of our kthreads waiting on children, so they can abort */
 	cv_broadcast(&p->child_wait);
-	/* Abort any abortable syscalls.  This won't catch every sleeper, but future
-	 * abortable sleepers are already prevented via the DYING state.  (signalled
-	 * DYING, no new sleepers will block, and now we wake all old sleepers). */
-	abort_all_sysc(p);
 	/* we need to close files here, and not in free, since we could have a
 	 * refcnt indirectly related to one of our files.  specifically, if we have
 	 * a parent sleeping on our pipe, that parent won't wake up to decref until
@@ -890,6 +886,12 @@ void proc_destroy(struct proc *p)
 	 * Also note that any mmap'd files will still be mmapped.  You can close the
 	 * file after mmapping, with no effect. */
 	close_fdt(&p->open_files, FALSE);
+	/* Abort any abortable syscalls.  This won't catch every sleeper, but future
+	 * abortable sleepers are already prevented via the DYING_ABORT state.
+	 * (signalled DYING_ABORT, no new sleepers will block, and now we wake all
+	 * old sleepers). */
+	__proc_set_state(p, PROC_DYING_ABORT);
+	abort_all_sysc(p);
 	/* Tell the ksched about our death, and which cores we freed up */
 	__sched_proc_destroy(p, pc_arr, nr_cores_revoked);
 	/* Tell our parent about our state change (to DYING) */

@@ -843,9 +843,11 @@ bool abort_sysc(struct proc *p, struct syscall *sysc)
 
 /* This will abort any abortables at the time the call was started for which
  * should_abort(cle, arg) returns true.  New abortables could be registered
- * concurrently.  The original for this is proc_destroy(), so DYING will be set,
+ * concurrently.
+ *
+ * One caller for this is proc_destroy(), in which case DYING_ABORT will be set,
  * and new abortables will quickly abort and dereg when they see their proc is
- * DYING. */
+ * DYING_ABORT. */
 static int __abort_all_sysc(struct proc *p,
                             bool (*should_abort)(struct cv_lookup_elm*, void*),
                             void *arg)
@@ -964,7 +966,7 @@ bool should_abort(struct cv_lookup_elm *cle)
 
 	if (is_ktask(cle->kthread))
 		return FALSE;
-	if (cle->proc && (cle->proc->state == PROC_DYING))
+	if (cle->proc && (cle->proc->state == PROC_DYING_ABORT))
 		return TRUE;
 	if (cle->sysc) {
 		assert(cle->proc && (cle->proc == current));
