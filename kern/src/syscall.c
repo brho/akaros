@@ -1068,7 +1068,7 @@ all_out:
 static pid_t try_wait(struct proc *parent, struct proc *child, int *ret_status,
                       int options)
 {
-	if (child->state == PROC_DYING) {
+	if (proc_is_dying(child)) {
 		/* Disown returns -1 if it's already been disowned or we should o/w
 		 * abort.  This can happen if we have concurrent waiters, both with
 		 * pointers to the child (only one should reap).  Note that if we don't
@@ -1130,7 +1130,7 @@ static pid_t wait_one(struct proc *parent, struct proc *child, int *ret_status,
 		/* If we're dying, then we don't need to worry about waiting.  We don't
 		 * do this yet, but we'll need this outlet when we deal with orphaned
 		 * children and having init inherit them. */
-		if (parent->state == PROC_DYING)
+		if (proc_is_dying(parent))
 			goto out_unlock;
 		/* Any child can wake us up, but we check for the particular child we
 		 * care about */
@@ -1160,7 +1160,7 @@ static pid_t wait_any(struct proc *parent, int *ret_status, int options)
 	while (!retval) {
 		cpu_relax();
 		cv_wait(&parent->child_wait);
-		if (parent->state == PROC_DYING)
+		if (proc_is_dying(parent))
 			goto out_unlock;
 		/* Any child can wake us up from the CV.  This is a linear try_wait
 		 * scan.  If we have a lot of children, we could optimize this. */

@@ -951,6 +951,7 @@ static int __hpf_load_page(struct proc *p, struct page_map *pm,
 			spin_unlock(&p->proc_lock);
 			return -EAGAIN;	/* will get reflected back to userspace */
 		case (PROC_DYING):
+		case (PROC_DYING_ABORT):
 			spin_unlock(&p->proc_lock);
 			return -EINVAL;
 		default:

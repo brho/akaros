@@ -30,6 +30,13 @@
  *   a while.  Possibly even using its local APIC timer.
  * - A process in an _M state will be informed about changes to its state, e.g.,
  *   will have a handler run in the event of a page fault
+ *
+ * DYING vs. DYING_ABORT:
+ * - DYING is the initial stage when a process is dying, but before all of its
+ * syscalls should abort.  At this point, we start closing FDs and blocking
+ * certain new operations.
+ * - DYING_ABORT is after all FDs were closed and all outstanding syscalls are
+ * aborted.
  */
 
 #define PROC_CREATED			0x01
@@ -37,21 +44,28 @@
 #define PROC_RUNNING_S			0x04
 #define PROC_WAITING			0x08 // can split out to INT and UINT
 #define PROC_DYING				0x10
-#define PROC_RUNNABLE_M			0x20
-#define PROC_RUNNING_M			0x40
+#define PROC_DYING_ABORT		0x20
+#define PROC_RUNNABLE_M			0x40
+#define PROC_RUNNING_M			0x80
 
-#define procstate2str(state) ((state)==PROC_CREATED    ? "CREATED"    : \
-                              (state)==PROC_RUNNABLE_S ? "RUNNABLE_S" : \
-                              (state)==PROC_RUNNING_S  ? "RUNNING_S"  : \
-                              (state)==PROC_WAITING    ? "WAITING"    : \
-                              (state)==PROC_DYING      ? "DYING"      : \
-                              (state)==PROC_RUNNABLE_M ? "RUNNABLE_M" : \
-                              (state)==PROC_RUNNING_M  ? "RUNNING_M"  : \
-                                                         "UNKNOWN")
+#define procstate2str(state) ((state) == PROC_CREATED     ? "CREATED"     : \
+                              (state) == PROC_RUNNABLE_S  ? "RUNNABLE_S"  : \
+                              (state) == PROC_RUNNING_S   ? "RUNNING_S"   : \
+                              (state) == PROC_WAITING     ? "WAITING"     : \
+                              (state) == PROC_DYING       ? "DYING"       : \
+                              (state) == PROC_DYING_ABORT ? "DYING_ABORT" : \
+                              (state) == PROC_RUNNABLE_M  ? "RUNNABLE_M"  : \
+                              (state) == PROC_RUNNING_M   ? "RUNNING_M"   : \
+                                                            "UNKNOWN")
 
 #define DEFAULT_PROGNAME ""
 
 #include <env.h>
+
+static bool proc_is_dying(struct proc *p)
+{
+	return (p->state == PROC_DYING) || (p->state == PROC_DYING_ABORT);
+}
 
 struct process_set {
 	size_t num_processes;

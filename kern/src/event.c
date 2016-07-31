@@ -367,7 +367,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 
 	assert(!in_irq_ctx(&per_cpu_info[core_id()]));
 	assert(p);
-	if (p->state == PROC_DYING)
+	if (proc_is_dying(p))
 		return;
 	printd("[kernel] sending msg to proc %p, ev_q %p\n", p, ev_q);
 	if (!ev_q) {

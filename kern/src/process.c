@@ -128,6 +128,7 @@ int __proc_set_state(struct proc *p, uint32_t state)
 	 * RGM -> RBS
 	 * RGS -> D
 	 * RGM -> D
+	 * D   -> DA
 	 *
 	 * These ought to be implemented later (allowed, not thought through yet).
 	 * RBS -> D
@@ -154,8 +155,11 @@ int __proc_set_state(struct proc *p, uint32_t state)
 				panic("Invalid State Transition! PROC_WAITING to %02x", state);
 			break;
 		case PROC_DYING:
-			if (state != PROC_CREATED) // when it is reused (TODO)
+			if (state != PROC_DYING_ABORT)
 				panic("Invalid State Transition! PROC_DYING to %02x", state);
+			break;
+		case PROC_DYING_ABORT:
+			panic("Invalid State Transition! PROC_DYING to %02x", state);
 			break;
 		case PROC_RUNNABLE_M:
 			if (!(state & (PROC_RUNNING_M | PROC_DYING)))
@@ -589,6 +593,7 @@ void proc_run_s(struct proc *p)
 	spin_lock(&p->proc_lock);
 	switch (p->state) {
 		case (PROC_DYING):
+		case (PROC_DYING_ABORT):
 			spin_unlock(&p->proc_lock);
 			printk("[kernel] _S %d not starting due to async death\n", p->pid);
 			return;
@@ -691,6 +696,7 @@ void __proc_run_m(struct proc *p)
 	switch (p->state) {
 		case (PROC_WAITING):
 		case (PROC_DYING):
+		case (PROC_DYING_ABORT):
 			warn("ksched tried to run proc %d in state %s\n", p->pid,
 			     procstate2str(p->state));
 			return;
@@ -816,6 +822,7 @@ void proc_destroy(struct proc *p)
 	uint32_t pc_arr[p->procinfo->num_vcores];
 	switch (p->state) {
 		case PROC_DYING: /* someone else killed this already. */
+		case (PROC_DYING_ABORT):
 			spin_unlock(&p->proc_lock);
 			return;
 		case PROC_CREATED:
@@ -976,6 +983,7 @@ int proc_change_to_m(struct proc *p)
 			warn("Not supporting RUNNABLE_S -> RUNNABLE_M yet.\n");
 			goto error_out;
 		case (PROC_DYING):
+		case (PROC_DYING_ABORT):
 			warn("Dying, core request coming from %d\n", core_id());
 			goto error_out;
 		default:
@@ -1162,6 +1170,7 @@ void proc_yield(struct proc *p, bool being_nice)
 		case (PROC_RUNNING_M):
 			break;				/* will handle this stuff below */
 		case (PROC_DYING):		/* incoming __death */
+		case (PROC_DYING_ABORT):
 		case (PROC_RUNNABLE_M):	/* incoming (bulk) preempt/myield TODO:(BULK) */
 			goto out_failed;
 		default:
@@ -1329,6 +1338,7 @@ void proc_wakeup(struct proc *p)
 			case (PROC_RUNNABLE_S):
 			case (PROC_RUNNING_S):
 			case (PROC_DYING):
+			case (PROC_DYING_ABORT):
 				spin_unlock(&p->proc_lock);
 				return;
 			case (PROC_RUNNABLE_M):
@@ -1618,6 +1628,7 @@ int __proc_give_cores(struct proc *p, uint32_t *pc_arr, uint32_t num)
 			warn("Don't give cores to a process in a *_S state!\n");
 			return -1;
 		case (PROC_DYING):
+		case (PROC_DYING_ABORT):
 		case (PROC_WAITING):
 			/* can't accept, just fail */
 			return -1;
@@ -1990,6 +2001,7 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 			break;				/* the only case we can proceed */
 		case (PROC_RUNNING_S):	/* user bug, just return */
 		case (PROC_DYING):		/* incoming __death */
+		case (PROC_DYING_ABORT):
 		case (PROC_RUNNABLE_M):	/* incoming (bulk) preempt/myield TODO:(BULK) */
 			goto out_locked;
 		default:

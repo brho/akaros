@@ -159,7 +159,7 @@ static void remove_from_any_list(struct proc *p)
  *   DYING */
 void __sched_proc_register(struct proc *p)
 {
-	assert(p->state != PROC_DYING);	/* shouldn't be abel to happen yet */
+	assert(!proc_is_dying(p));		/* shouldn't be able to happen yet */
 	/* one ref for the proc's existence, cradle-to-grave */
 	proc_incref(p, 1);	/* need at least this OR the 'one for existing' */
 	spin_lock(&sched_lock);
@@ -175,7 +175,7 @@ void __sched_proc_change_to_m(struct proc *p)
 	/* Need to make sure they aren't dying.  if so, we already dealt with their
 	 * list membership, etc (or soon will).  taking advantage of the 'immutable
 	 * state' of dying (so long as refs are held). */
-	if (p->state == PROC_DYING) {
+	if (proc_is_dying(p)) {
 		spin_unlock(&sched_lock);
 		return;
 	}
@@ -219,7 +219,7 @@ void __sched_proc_destroy(struct proc *p, uint32_t *pc_arr, uint32_t nr_cores)
 void __sched_mcp_wakeup(struct proc *p)
 {
 	spin_lock(&sched_lock);
-	if (p->state == PROC_DYING) {
+	if (proc_is_dying(p)) {
 		spin_unlock(&sched_lock);
 		return;
 	}
@@ -233,7 +233,7 @@ void __sched_mcp_wakeup(struct proc *p)
 void __sched_scp_wakeup(struct proc *p)
 {
 	spin_lock(&sched_lock);
-	if (p->state == PROC_DYING) {
+	if (proc_is_dying(p)) {
 		spin_unlock(&sched_lock);
 		return;
 	}
@@ -298,7 +298,7 @@ static bool __schedule_scp(void)
 			spin_lock(&pcpui->owning_proc->proc_lock);
 			/* process might be dying, with a KMSG to clean it up waiting on
 			 * this core.  can't do much, so we'll attempt to restart */
-			if (pcpui->owning_proc->state == PROC_DYING) {
+			if (proc_is_dying(pcpui->owning_proc)) {
 				send_kernel_message(core_id(), __just_sched, 0, 0, 0,
 				                    KMSG_ROUTINE);
 				spin_unlock(&pcpui->owning_proc->proc_lock);
@@ -418,7 +418,7 @@ static void __run_mcp_ksched(void *arg)
 			 * DYING, it'll remain DYING until we decref.  And if there is a
 			 * concurrent death, that will spin on the ksched lock (which we
 			 * hold, and which protects the proc lists). */
-			if (p->state != PROC_DYING)
+			if (proc_is_dying(p))
 				add_to_list(p, secondary_mcps);
 			proc_decref(p);			/* fyi, this may trigger __proc_free */
 			/* need to break: the proc lists may have changed when we unlocked

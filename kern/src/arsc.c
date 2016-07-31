@@ -67,7 +67,7 @@ void arsc_server(uint32_t srcid, long a0, long a1, long a2)
 			/* Probably want to try to process a dying process's syscalls.  If
 			 * not, just move it to an else case */
 			process_generic_syscalls (p, MAX_ASRC_BATCH);
-			if (p->state == PROC_DYING) {
+			if (proc_is_dying(p)) {
 				TAILQ_REMOVE(&arsc_proc_list, p, proc_arsc_link);
 				proc_decref(p);
 				/* Need to break out, so the TAILQ_FOREACH doesn't flip out.
