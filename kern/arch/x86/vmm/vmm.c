@@ -70,50 +70,44 @@ void vmm_pcpu_init(void)
 int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores,
                     struct vmm_gpcore_init *u_gpcis, int flags)
 {
+	ERRSTACK(1);
 	struct vmm *vmm = &p->vmm;
 	unsigned int i;
 	struct vmm_gpcore_init gpci;
 
-	if (flags & ~VMM_ALL_FLAGS) {
-		set_errstr("%s: flags is 0x%lx, VMM_ALL_FLAGS is 0x%lx\n", __func__,
-		           flags, VMM_ALL_FLAGS);
-		set_errno(EINVAL);
-		return 0;
-	}
+	if (flags & ~VMM_ALL_FLAGS)
+		error(EINVAL, "%s: flags is 0x%lx, VMM_ALL_FLAGS is 0x%lx\n", __func__,
+		      flags, VMM_ALL_FLAGS);
 	vmm->flags = flags;
-	if (!x86_supports_vmx) {
-		set_errno(ENODEV);
-		return 0;
-	}
+	if (!x86_supports_vmx)
+		error(ENODEV, "This CPU does not support VMX");
 	qlock(&vmm->qlock);
-	if (vmm->vmmcp) {
-		set_errno(EINVAL);
+	if (waserror()) {
 		qunlock(&vmm->qlock);
-		return 0;
+		nexterror();
 	}
+
+	/* TODO: just use an atomic test instead of all this locking stuff? */
+	if (vmm->vmmcp)
+		error(EAGAIN, "We're already running a vmmcp?");
 	/* Set this early, so cleanup checks the gpc array */
 	vmm->vmmcp = TRUE;
 	nr_guest_pcores = MIN(nr_guest_pcores, num_cores);
 	vmm->amd = 0;
-	vmm->guest_pcores = kzmalloc(sizeof(void*) * nr_guest_pcores,
-				     MEM_WAIT);
+	vmm->guest_pcores = kzmalloc(sizeof(void *) * nr_guest_pcores, MEM_WAIT);
+	if (!vmm->guest_pcores)
+		error(ENOMEM, "Allocation of vmm->guest_pcores failed");
+
 	for (i = 0; i < nr_guest_pcores; i++) {
-		if (copy_from_user(&gpci, &u_gpcis[i],
-		                   sizeof(struct vmm_gpcore_init))) {
-			set_error(EINVAL, "Bad pointer %p for gps", u_gpcis);
-			break;
-		}
+		if (copy_from_user(&gpci, &u_gpcis[i], sizeof(struct vmm_gpcore_init)))
+			error(EINVAL, "Bad pointer %p for gps", u_gpcis);
 		vmm->guest_pcores[i] = create_guest_pcore(p, &gpci);
-		/* If we failed, we'll clean it up when the process dies */
-		if (!vmm->guest_pcores[i]) {
-			set_errno(ENOMEM);
-			break;
-		}
+		vmm->nr_guest_pcores = i;
 	}
-	vmm->nr_guest_pcores = i;
 	for (int i = 0; i < VMM_VMEXIT_NR_TYPES; i++)
 		vmm->vmexits[i] = 0;
 	qunlock(&vmm->qlock);
+	poperror();
 	return i;
 }
 

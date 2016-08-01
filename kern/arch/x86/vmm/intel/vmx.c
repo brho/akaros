@@ -687,16 +687,16 @@ setup_vmcs_config(void *p)
 	*ret = 0;
 }
 
-static struct vmcs *
-__vmx_alloc_vmcs(int node)
+static struct vmcs *__vmx_alloc_vmcs(int node)
 {
 	struct vmcs *vmcs;
 
 	vmcs = get_cont_pages_node(node, vmcs_config.order, MEM_WAIT);
 	if (!vmcs)
-		return 0;
+		error(ENOMEM, "__vmx_alloc_vmcs: Could not get %d contig pages",
+		      vmcs_config.order);
 	memset(vmcs, 0, vmcs_config.size);
-	vmcs->revision_id = vmcs_config.revision_id;	/* vmcs revision id */
+	vmcs->revision_id = vmcs_config.revision_id; /* vmcs revision id */
 	printd("%d: set rev id %d\n", core_id(), vmcs->revision_id);
 	return vmcs;
 }
@@ -729,8 +729,7 @@ vmx_free_vmcs(struct vmcs *vmcs)
  * Note that host-state that does change is set elsewhere. E.g., host-state
  * that is set differently for each CPU is set in __vmx_setup_pcpu(), not here.
  */
-static void
-vmx_setup_constant_host_state(void)
+static void vmx_setup_constant_host_state(void)
 {
 	uint32_t low32, high32;
 	unsigned long tmpl;
@@ -804,42 +803,42 @@ construct_eptp(physaddr_t root_hpa)
 /* Helper: some fields of the VMCS need a physical page address, e.g. the VAPIC
  * page.  We have the user address.  This converts the user to phys addr and
  * sets that up in the VMCS.  Returns 0 on success, -1 o/w. */
-static int vmcs_set_pgaddr(struct proc *p, void *u_addr, unsigned long field)
+static void vmcs_set_pgaddr(struct proc *p, void *u_addr,
+                            unsigned long field, char *what)
 {
 	uintptr_t kva;
 	physaddr_t paddr;
 
 	/* Enforce page alignment */
 	kva = uva2kva(p, ROUNDDOWN(u_addr, PGSIZE), PGSIZE, PROT_WRITE);
-	if (!kva) {
-		set_error(EINVAL, "Unmapped pgaddr %p for VMCS", u_addr);
-		return -1;
-	}
+	if (!kva)
+		error(EINVAL, "Unmapped pgaddr %p for VMCS page %s", u_addr, what);
+
 	paddr = PADDR(kva);
-	/* TODO: need to pin the page.  A munmap would actually be okay (though
-	 * probably we should kill the process), but we need to keep the page from
-	 * being reused.  A refcnt would do the trick, which we decref when we
-	 * destroy the guest core/vcpu. */
+	/* TODO: need to pin the page.  A munmap would actually be okay
+	 * (though probably we should kill the process), but we need to
+	 * keep the page from being reused.  A refcnt would do the trick,
+	 * which we decref when we destroy the guest core/vcpu. Note that
+	 * this is an assert, not an error, because it represents an error
+	 * in the kernel itself. */
 	assert(!PGOFF(paddr));
 	vmcs_writel(field, paddr);
 	/* Pages are inserted twice.  Once, with the full paddr.  The next field is
 	 * the upper 32 bits of the paddr. */
 	vmcs_writel(field + 1, paddr >> 32);
-	return 0;
 }
 
 /**
  * vmx_setup_initial_guest_state - configures the initial state of guest
  * registers and the VMCS.  Returns 0 on success, -1 o/w.
  */
-static int vmx_setup_initial_guest_state(struct proc *p,
-                                         struct vmm_gpcore_init *gpci)
+static void vmx_setup_initial_guest_state(struct proc *p,
+                                          struct vmm_gpcore_init *gpci)
 {
 	unsigned long tmpl;
 	unsigned long cr4 = X86_CR4_PAE | X86_CR4_VMXE | X86_CR4_OSXMMEXCPT |
 		X86_CR4_PGE | X86_CR4_OSFXSR;
 	uint32_t protected_mode = X86_CR0_PG | X86_CR0_PE;
-	int ret = 0;
 
 #if 0
 	do
@@ -948,11 +947,11 @@ static int vmx_setup_initial_guest_state(struct proc *p,
 
 	/* Initialize parts based on the users info.  If one of them fails, we'll do
 	 * the others but then error out. */
-	ret |= vmcs_set_pgaddr(p, gpci->posted_irq_desc, POSTED_INTR_DESC_ADDR);
-	ret |= vmcs_set_pgaddr(p, gpci->vapic_addr, VIRTUAL_APIC_PAGE_ADDR);
-	ret |= vmcs_set_pgaddr(p, gpci->apic_addr, APIC_ACCESS_ADDR);
-
-	return ret;
+	vmcs_set_pgaddr(p, gpci->posted_irq_desc, POSTED_INTR_DESC_ADDR,
+	                "posted_irq_desc");
+	vmcs_set_pgaddr(p, gpci->vapic_addr, VIRTUAL_APIC_PAGE_ADDR,
+	                "vapic_addr");
+	vmcs_set_pgaddr(p, gpci->apic_addr, APIC_ACCESS_ADDR, "apic_addr");
 }
 
 static void __vmx_disable_intercept_for_msr(unsigned long *msr_bitmap,
@@ -1126,37 +1125,35 @@ static void vmx_setup_vmcs(struct guest_pcore *gpc)
 struct guest_pcore *create_guest_pcore(struct proc *p,
                                        struct vmm_gpcore_init *gpci)
 {
-	struct guest_pcore *gpc = kmalloc(sizeof(struct guest_pcore),
-					  MEM_WAIT);
-	int ret;
+	ERRSTACK(1);
+	struct guest_pcore *gpc = kmalloc(sizeof(struct guest_pcore), MEM_WAIT);
 
 	if (!gpc)
-		return NULL;
+		error(ENOMEM, "create_guest_pcore could not allocate gpc");
+
+	if (waserror()) {
+		kfree(gpc);
+		nexterror();
+	}
 
 	memset(gpc, 0, sizeof(*gpc));
 
-	gpc->proc = p;	/* uncounted (weak) reference */
+	/* Warning: p here is uncounted (weak) reference */
+	gpc->proc = p;
 	gpc->vmcs = vmx_alloc_vmcs();
 	printd("%d: gpc->vmcs is %p\n", core_id(), gpc->vmcs);
-	if (!gpc->vmcs)
-		goto fail_vmcs;
 
 	gpc->cpu = -1;
 
 	vmx_load_guest_pcore(gpc);
 	vmx_setup_vmcs(gpc);
-	ret = vmx_setup_initial_guest_state(p, gpci);
+	vmx_setup_initial_guest_state(p, gpci);
 	vmx_unload_guest_pcore(gpc);
 	gpc->xcr0 = __proc_global_info.x86_default_xcr0;
 
 	gpc->posted_irq_desc = gpci->posted_irq_desc;
-
-	if (!ret)
-		return gpc;
-
-fail_vmcs:
-	kfree(gpc);
-	return NULL;
+	poperror();
+	return gpc;
 }
 
 /**
