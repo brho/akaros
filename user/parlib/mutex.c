@@ -266,22 +266,13 @@ static void uth_default_cv_signal(struct uth_default_cv *cv)
 		uthread_runnable(first->uth);
 }
 
-static void swap_cv_lists(struct cv_link_tq *a, struct cv_link_tq *b)
-{
-	struct cv_link_tq temp;
-
-	temp = *a;
-	*a = *b;
-	*b = temp;
-}
-
 static void uth_default_cv_broadcast(struct uth_default_cv *cv)
 {
 	struct cv_link_tq restartees = TAILQ_HEAD_INITIALIZER(restartees);
 	struct uth_cv_link *i, *safe;
 
 	spin_pdr_lock(&cv->lock);
-	swap_cv_lists(&cv->waiters, &restartees);
+	TAILQ_SWAP(&cv->waiters, &restartees, uth_cv_link, next);
 	spin_pdr_unlock(&cv->lock);
 	/* Need the SAFE, since we can't touch the linkage once the uth could run */
 	TAILQ_FOREACH_SAFE(i, &restartees, next, safe)
