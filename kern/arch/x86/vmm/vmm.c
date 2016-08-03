@@ -66,13 +66,12 @@ void vmm_pcpu_init(void)
 }
 
 /* Initializes a process to run virtual machine contexts, returning the number
- * initialized, optionally setting errno */
+ * initialized, throwing on error. */
 int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores,
                     struct vmm_gpcore_init *u_gpcis, int flags)
 {
 	ERRSTACK(1);
 	struct vmm *vmm = &p->vmm;
-	unsigned int i;
 	struct vmm_gpcore_init gpci;
 
 	if (flags & ~VMM_ALL_FLAGS)
@@ -98,17 +97,17 @@ int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores,
 	if (!vmm->guest_pcores)
 		error(ENOMEM, "Allocation of vmm->guest_pcores failed");
 
-	for (i = 0; i < nr_guest_pcores; i++) {
+	for (int i = 0; i < nr_guest_pcores; i++) {
 		if (copy_from_user(&gpci, &u_gpcis[i], sizeof(struct vmm_gpcore_init)))
 			error(EINVAL, "Bad pointer %p for gps", u_gpcis);
 		vmm->guest_pcores[i] = create_guest_pcore(p, &gpci);
-		vmm->nr_guest_pcores = i;
+		vmm->nr_guest_pcores = i + 1;
 	}
 	for (int i = 0; i < VMM_VMEXIT_NR_TYPES; i++)
 		vmm->vmexits[i] = 0;
 	qunlock(&vmm->qlock);
 	poperror();
-	return i;
+	return vmm->nr_guest_pcores;
 }
 
 /* Has no concurrency protection - only call this when you know you have the

@@ -802,7 +802,7 @@ construct_eptp(physaddr_t root_hpa)
 
 /* Helper: some fields of the VMCS need a physical page address, e.g. the VAPIC
  * page.  We have the user address.  This converts the user to phys addr and
- * sets that up in the VMCS.  Returns 0 on success, -1 o/w. */
+ * sets that up in the VMCS.  Throws on error. */
 static void vmcs_set_pgaddr(struct proc *p, void *u_addr,
                             unsigned long field, char *what)
 {
@@ -830,7 +830,7 @@ static void vmcs_set_pgaddr(struct proc *p, void *u_addr,
 
 /**
  * vmx_setup_initial_guest_state - configures the initial state of guest
- * registers and the VMCS.  Returns 0 on success, -1 o/w.
+ * registers and the VMCS.  Throws on error.
  */
 static void vmx_setup_initial_guest_state(struct proc *p,
                                           struct vmm_gpcore_init *gpci)
@@ -945,8 +945,7 @@ static void vmx_setup_initial_guest_state(struct proc *p,
 	vmcs_writel(EOI_EXIT_BITMAP3, 0);
 	vmcs_writel(EOI_EXIT_BITMAP3_HIGH, 0);
 
-	/* Initialize parts based on the users info.  If one of them fails, we'll do
-	 * the others but then error out. */
+	/* Initialize parts based on the users info. */
 	vmcs_set_pgaddr(p, gpci->posted_irq_desc, POSTED_INTR_DESC_ADDR,
 	                "posted_irq_desc");
 	vmcs_set_pgaddr(p, gpci->vapic_addr, VIRTUAL_APIC_PAGE_ADDR,
