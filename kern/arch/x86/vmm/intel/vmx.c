@@ -720,7 +720,7 @@ vmx_alloc_vmcs(void)
 static void
 vmx_free_vmcs(struct vmcs *vmcs)
 {
-	//free_pages((unsigned long)vmcs, vmcs_config.order);
+	free_cont_pages(vmcs, vmcs_config.order);
 }
 
 /*
@@ -1124,7 +1124,7 @@ static void vmx_setup_vmcs(struct guest_pcore *gpc)
 struct guest_pcore *create_guest_pcore(struct proc *p,
                                        struct vmm_gpcore_init *gpci)
 {
-	ERRSTACK(1);
+	ERRSTACK(2);
 	struct guest_pcore *gpc = kmalloc(sizeof(struct guest_pcore), MEM_WAIT);
 
 	if (!gpc)
@@ -1140,8 +1140,11 @@ struct guest_pcore *create_guest_pcore(struct proc *p,
 	/* Warning: p here is uncounted (weak) reference */
 	gpc->proc = p;
 	gpc->vmcs = vmx_alloc_vmcs();
+	if (waserror()) {
+		vmx_free_vmcs(gpc->vmcs);
+		nexterror();
+	}
 	printd("%d: gpc->vmcs is %p\n", core_id(), gpc->vmcs);
-
 	gpc->cpu = -1;
 
 	vmx_load_guest_pcore(gpc);
@@ -1151,6 +1154,7 @@ struct guest_pcore *create_guest_pcore(struct proc *p,
 	gpc->xcr0 = __proc_global_info.x86_default_xcr0;
 
 	gpc->posted_irq_desc = gpci->posted_irq_desc;
+	poperror();
 	poperror();
 	return gpc;
 }
