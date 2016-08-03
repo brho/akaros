@@ -418,7 +418,7 @@ static void __run_mcp_ksched(void *arg)
 			 * DYING, it'll remain DYING until we decref.  And if there is a
 			 * concurrent death, that will spin on the ksched lock (which we
 			 * hold, and which protects the proc lists). */
-			if (proc_is_dying(p))
+			if (!proc_is_dying(p))
 				add_to_list(p, secondary_mcps);
 			proc_decref(p);			/* fyi, this may trigger __proc_free */
 			/* need to break: the proc lists may have changed when we unlocked
