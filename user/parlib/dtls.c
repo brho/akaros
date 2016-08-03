@@ -142,7 +142,8 @@ void dtls_key_delete(dtls_key_t key)
 	__maybe_free_dtls_key(key);
 }
 
-static inline void *__get_dtls(dtls_data_t *dtls_data, dtls_key_t key)
+static inline struct dtls_value *__get_dtls(dtls_data_t *dtls_data,
+                                            dtls_key_t key)
 {
 	struct dtls_value *v;
 
@@ -150,11 +151,11 @@ static inline void *__get_dtls(dtls_data_t *dtls_data, dtls_key_t key)
 	if (key->id < NUM_STATIC_KEYS) {
 		v = &dtls_data->early_values[key->id];
 		if (v->key != NULL)
-			return v->dtls;
+			return v;
 	} else {
 		TAILQ_FOREACH(v, &dtls_data->list, link)
 			if (v->key == key)
-				return v->dtls;
+				return v;
 	}
 	return NULL;
 }
@@ -225,11 +226,13 @@ void set_dtls(dtls_key_t key, void *dtls)
 void *get_dtls(dtls_key_t key)
 {
 	dtls_data_t *dtls_data = NULL;
+	struct dtls_value *v;
 
 	if (!__dtls_initialized)
 		return NULL;
 	dtls_data = &__dtls_data;
-	return __get_dtls(dtls_data, key);
+	v = __get_dtls(dtls_data, key);
+	return v ? v->dtls : NULL;
 }
 
 void destroy_dtls(void)
