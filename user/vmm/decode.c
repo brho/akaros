@@ -98,24 +98,38 @@ static int target(void *insn, int *store)
 		s = 4;
 		break;
 	case 0x0f:
-	switch(*word) {
-		case 0xb70f:
-			s = 2;
-			break;
-		default:
-			fprintf(stderr, "can't get size of %02x/%04x @ %p\n", *byte, *word, byte);
-			return -1;
-			break;
+		switch (*word) {
+			case 0xb70f:
+				s = 2;
+				break;
+			default:
+				fprintf(stderr, "can't get size of %02x/%04x @ %p\n", *byte,
+				        *word, byte);
+				return -1;
+		}
+		break;
+	case 0x41:
+		/* VEX byte for modrm field */
+		switch (*word) {
+			case 0x8a41:
+				s = 1;
+				break;
+			default:
+				fprintf(stderr, "unparsed vex instruction %02x/%04x @ %p\n",
+				        *byte, *word, byte);
+				return -1;
 		}
 		break;
 	default:
 		fprintf(stderr, "can't get size of %02x @ %p\n", *byte, byte);
+		fprintf(stderr, "can't get WORD of %04x @ %p\n", *word, word);
 		return -1;
 		break;
 	}
 
 	switch(*byte) {
 	case 0x0f:
+	case 0x41:
 		break;
 	case 0x3a:
 	case 0x8a:
@@ -147,6 +161,12 @@ static int insize(void *rip)
 		rip_gpa++;
 	}
 
+	/* return 3 to handle this specific instruction case. We don't want this
+	 * to turn into a fully fledged decode.
+	 * This specific instruction is an extended move using r9. It uses the
+	 * VEX byte to extend the register bits. */
+	if (rip_gpa[0] == 0x41 && rip_gpa[1] == 0x8a && rip_gpa[2] == 0x01)
+		return 3;
 	/* the dreaded mod/rm byte. */
 	int mod = rip_gpa[1] >> 6;
 	int rm = rip_gpa[1] & 7;
@@ -216,7 +236,7 @@ int decode(struct guest_thread *vm_thread, uint64_t *gpa, uint8_t *destreg,
 
 	if (rippa(vm_thread, (uint64_t *)&rip_gpa))
 		return VM_PAGE_FAULT;
-	DPRINTF("rip_gpa is %p\n", kva);
+	DPRINTF("rip_gpa is %p\n", rip_gpa);
 
 	// fail fast. If we can't get the size we're done.
 	*size = target(rip_gpa, store);
@@ -226,8 +246,9 @@ int decode(struct guest_thread *vm_thread, uint64_t *gpa, uint8_t *destreg,
 
 	*advance = insize(rip_gpa);
 
-	uint16_t ins =
-	    *(uint16_t *)(rip_gpa + (kva[0] == 0x44) + (kva[0] == 0x0f));
+	uint16_t ins = *(uint16_t *)(rip_gpa +
+	    ((rip_gpa[0] == 0x44) || (rip_gpa[0] == 0x0f) || (rip_gpa[0] == 0x41)));
+
 	DPRINTF("ins is %04x\n", ins);
 
 	*destreg = (ins>>11) & 7;
