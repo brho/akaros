@@ -36,6 +36,7 @@
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
+#include <ros/arch/mmu.h>
 #include <ros/arch/trapframe.h>
 
 int debug_decode = 0;
@@ -138,21 +139,21 @@ char *regname(uint8_t reg)
 
 static int insize(void *rip)
 {
-	uint8_t *kva = rip;
+	uint8_t *rip_gpa = rip;
 	int advance = 3;
 	int extra = 0;
-	if (kva[0] == 0x44) {
+	if (rip_gpa[0] == 0x44) {
 		extra = 1;
-		kva++;
+		rip_gpa++;
 	}
 
 	/* the dreaded mod/rm byte. */
-	int mod = kva[1]>>6;
-	int rm = kva[1] & 7;
+	int mod = rip_gpa[1] >> 6;
+	int rm = rip_gpa[1] & 7;
 
-	switch(kva[0]) {
+	switch (rip_gpa[0]) {
 	default:
-		fprintf(stderr, "BUG! %s got 0x%x\n", __func__, kva[0]);
+		fprintf(stderr, "BUG! %s got 0x%x\n", __func__, rip_gpa[0]);
 	case 0x0f:
 		break;
 	case 0x81:
@@ -197,6 +198,7 @@ int decode(struct guest_thread *vm_thread, uint64_t *gpa, uint8_t *destreg,
            uint64_t **regp, int *store, int *size, int *advance)
 {
 	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
+	uint8_t *rip_gpa = NULL;
 
 	DPRINTF("v is %p\n", vm_tf);
 
@@ -210,27 +212,26 @@ int decode(struct guest_thread *vm_thread, uint64_t *gpa, uint8_t *destreg,
 	*gpa = vm_tf->tf_guest_pa;
 	DPRINTF("gpa is %p\n", *gpa);
 
-	// To find out what to do, we have to look at
-	// RIP. Technically, we should read RIP, walk the page tables
-	// to find the PA, and read that. But we're in the kernel, so
-	// we take a shortcut for now: read the low 30 bits and use
-	// that as the kernel PA, or our VA, and see what's
-	// there. Hokey. Works.
-	uint8_t *kva = (void *)(vm_tf->tf_rip & 0x3fffffff);
-	DPRINTF("kva is %p\n", kva);
+	DPRINTF("rip is %p\n", vm_tf->tf_rip);
+
+	if (rippa(vm_thread, (uint64_t *)&rip_gpa))
+		return VM_PAGE_FAULT;
+	DPRINTF("rip_gpa is %p\n", kva);
 
 	// fail fast. If we can't get the size we're done.
-	*size = target(kva, store);
+	*size = target(rip_gpa, store);
+	DPRINTF("store is %d\n", *store);
 	if (*size < 0)
 		return -1;
 
-	*advance = insize(kva);
+	*advance = insize(rip_gpa);
 
-	uint16_t ins = *(uint16_t *)(kva + (kva[0] == 0x44) + (kva[0] == 0x0f));
+	uint16_t ins =
+	    *(uint16_t *)(rip_gpa + (kva[0] == 0x44) + (kva[0] == 0x0f));
 	DPRINTF("ins is %04x\n", ins);
 
 	*destreg = (ins>>11) & 7;
-	*destreg += 8*(kva[0] == 0x44);
+	*destreg += 8 * (rip_gpa[0] == 0x44);
 	// Our primitive approach wins big here.
 	// We don't have to decode the register or the offset used
 	// in the computation; that was done by the CPU and is the gpa.

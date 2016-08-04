@@ -112,7 +112,7 @@ static void configwrite8(uint32_t addr, uint8_t val)
  * It would have been nice had intel encoded the IO exit info as nicely as they
  * encoded, some of the other exits.
  */
-bool io(struct guest_thread *vm_thread)
+int io(struct guest_thread *vm_thread)
 {
 
 	/* Get a pointer to the memory at %rip. This is quite messy and part of the
@@ -125,11 +125,10 @@ bool io(struct guest_thread *vm_thread)
 	uintptr_t ip;
 	uint32_t edx;
 	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
-	/* for now, we're going to be a bit crude. In kernel, p is about v, so we just blow away
-	 * the upper 34 bits and take the rest + 1M as our address
-	 * TODO: put this in vmctl somewhere?
-	 */
-	ip = vm_tf->tf_rip & 0x3fffffff;
+
+	/* Get the RIP of the io access. */
+	if (rippa(vm_thread, (uint64_t *)&ip))
+		return VM_PAGE_FAULT;
 	edx = vm_tf->tf_rdx;
 	ip8 = (void *)ip;
 	ip16 = (void *)ip;
@@ -141,12 +140,12 @@ bool io(struct guest_thread *vm_thread)
 		if (edx == 0xcf8) {
 			//printf("Set cf8 ");
 			configaddr(vm_tf->tf_rax);
-			return true;
+			return 0;
 		}
 		if (edx == 0xcfc) {
 			//printf("Set cfc ");
 			configwrite32(edx, vm_tf->tf_rax);
-			return true;
+			return 0;
 		}
 		/* While it is perfectly legal to do IO operations to
 		 * nonexistant places, we print a warning here as it
@@ -164,7 +163,7 @@ bool io(struct guest_thread *vm_thread)
 		 * Windows 98, not Linux.
 		 */
 		printf("(out rax, edx): unhandled IO address dx @%p is 0x%x\n", ip8, edx);
-		return true;
+		return 0;
 	}
 	// out %al, %dx
 	if (*ip8 == 0xee) {
@@ -172,37 +171,37 @@ bool io(struct guest_thread *vm_thread)
 		/* out al %edx */
 		if (edx == 0xcfb) { // special!
 			printf("Just ignore the damned cfb write\n");
-			return true;
+			return 0;
 		}
 		if ((edx&~3) == 0xcfc) {
 			//printf("ignoring write to cfc ");
-			return true;
+			return 0;
 		}
 		/* Another case where we print a message but it's not an error. */
 		printf("out al, dx: unhandled IO address dx @%p is 0x%x\n", ip8, edx);
-		return true;
+		return 0;
 	}
 	if (*ip8 == 0xec) {
 		vm_tf->tf_rip += 1;
 		//printf("configread8 ");
 		configread8(edx, &vm_tf->tf_rax);
-		return true;
+		return 0;
 	}
 	if (*ip8 == 0xed) {
 		vm_tf->tf_rip += 1;
 		if (edx == 0xcf8) {
 			//printf("read cf8 0x%lx\n", v->regs.tf_rax);
 			vm_tf->tf_rax = cf8;
-			return true;
+			return 0;
 		}
 		//printf("configread32 ");
 		configread32(edx, &vm_tf->tf_rax);
-		return true;
+		return 0;
 	}
 	/* Detects when something is written to the PIC. */
 	if (*ip8 == 0xe6) {
 		vm_tf->tf_rip += 2;
-		return true;
+		return 0;
 	}
 	/* Detects when something is read from the PIC, so
 	 * a value signifying there is no PIC is given.
@@ -210,13 +209,13 @@ bool io(struct guest_thread *vm_thread)
 	if (*ip16 == 0x21e4) {
 		vm_tf->tf_rip += 2;
 		vm_tf->tf_rax = ~0ULL;
-		return true;
+		return 0;
 	}
 	if (*ip16 == 0xed66) {
 		vm_tf->tf_rip += 2;
 		//printf("configread16 ");
 		configread16(edx, &vm_tf->tf_rax);
-		return true;
+		return 0;
 	}
 
 	/* This is, so far, the only case in which we indicate
@@ -228,6 +227,6 @@ bool io(struct guest_thread *vm_thread)
 	 * instructions to the CPU.
 	 */
 	printf("unknown IO %p %x %x\n", ip8, *ip8, *ip16);
-	return false;
+	return -1;
 }
 

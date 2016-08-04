@@ -73,8 +73,19 @@ static bool handle_ept_fault(struct guest_thread *gth)
 	int store, size;
 	int advance;
 
-	if (decode(gth, &gpa, &regx, &regp, &store, &size, &advance))
+	int ret = decode(gth, &gpa, &regx, &regp, &store, &size, &advance);
+
+	if (ret < 0)
 		return FALSE;
+	if (ret == VM_PAGE_FAULT) {
+		/* We were unable to translate RIP due to an ept fault */
+		vm_tf->tf_trap_inject = VM_TRAP_VALID
+		                      | VM_TRAP_ERROR_CODE
+		                      | VM_TRAP_HARDWARE
+		                      | HW_TRAP_PAGE_FAULT;
+		return TRUE;
+	}
+
 	assert(size >= 0);
 	/* TODO use helpers for some of these addr checks.  the fee/fec ones might
 	 * be wrong too. */
@@ -125,7 +136,19 @@ static bool handle_vmcall(struct guest_thread *gth)
 
 static bool handle_io(struct guest_thread *gth)
 {
-	return io(gth);
+	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
+	int ret = io(gth);
+
+	if (ret < 0)
+		return FALSE;
+	if (ret == VM_PAGE_FAULT) {
+		/* We were unable to translate RIP due to an ept fault */
+		vm_tf->tf_trap_inject = VM_TRAP_VALID
+		                      | VM_TRAP_ERROR_CODE
+		                      | VM_TRAP_HARDWARE
+		                      | HW_TRAP_PAGE_FAULT;
+	}
+	return TRUE;
 }
 
 static bool handle_msr(struct guest_thread *gth)

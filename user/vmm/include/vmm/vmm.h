@@ -9,6 +9,8 @@
 #include <ros/vmm.h>
 #include <vmm/sched.h>
 
+#define VM_PAGE_FAULT			14
+
 /* The listing of VIRTIO MMIO devices. We currently only expect to have 2,
  * console and network. Only the console is fully implemented right now.*/
 enum {
@@ -36,10 +38,10 @@ struct virtual_machine {
 char *regname(uint8_t reg);
 int decode(struct guest_thread *vm_thread, uint64_t *gpa, uint8_t *destreg,
            uint64_t **regp, int *store, int *size, int *advance);
-bool io(struct guest_thread *vm_thread);
+int io(struct guest_thread *vm_thread);
 void showstatus(FILE *f, struct guest_thread *vm_thread);
-uint64_t gvatogpa(struct guest_thread *vm_thread, uint64_t va);
-uint64_t rippa(struct guest_thread *vm_thread);
+int gvatogpa(struct guest_thread *vm_thread, uint64_t va, uint64_t *pa);
+int rippa(struct guest_thread *vm_thread, uint64_t *pa);
 int msrio(struct guest_thread *vm_thread, struct vmm_gpcore_init *gpci,
           uint32_t opcode);
 int do_ioapic(struct guest_thread *vm_thread, uint64_t gpa,

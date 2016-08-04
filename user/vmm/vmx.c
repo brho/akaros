@@ -1,4 +1,4 @@
-#include <stdio.h> 
+#include <stdio.h>
 #include <pthread.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -20,6 +20,7 @@
 #include <vmm/virtio_ids.h>
 #include <ros/arch/vmx.h>
 #include <vmm/sched.h>
+#include <ros/arch/mmu.h>
 #include <ros/arch/trapframe.h>
 
 char *vmxexit[] = {
@@ -63,16 +64,33 @@ void showstatus(FILE *f, struct guest_thread *vm_thread)
  * TODO: Takes the vm_thread argument so that we can walk the page tables
  * instead of just coercing the pointer. Therefore, this is not in vmm.h
  * since it may get complex. */
-uint64_t gvatogpa(struct guest_thread *vm_thread, uint64_t va)
+int gvatogpa(struct guest_thread *vm_thread, uint64_t va, uint64_t *pa)
 {
 	assert(vm_thread != NULL);
-	assert(va >= 0xffffffffc0000000ULL);
-	return va & 0x3fffffff;
+	struct vm_trapframe *vm_tf = gth_to_vmtf(vm_thread);
+	uint64_t *ptptr = (uint64_t *)vm_tf->tf_cr3;
+	uint64_t entry;
+
+	for (int shift = PML4_SHIFT; shift >= PML1_SHIFT; shift -= BITS_PER_PML) {
+		entry = ptptr[PMLx(va, shift)];
+
+		if (!PAGE_PRESENT(entry))
+			return -1;
+		if ((entry & PTE_PS) != 0) {
+			uint64_t bitmask = ((1 << shift) - 1);
+
+			*pa = (((uint64_t)va & bitmask) | (entry & ~bitmask));
+			return 0;
+		}
+		ptptr = (uint64_t *)PG_ADDR(entry);
+	}
+	*pa = ((uint64_t)va & 0xfff) | (uint64_t)ptptr;
+	return 0;
 }
 
 /* Get the RIP as a physical address. */
-uint64_t rippa(struct guest_thread *vm_thread)
+int rippa(struct guest_thread *vm_thread, uint64_t *pa)
 {
 	assert(vm_thread != NULL);
-	return gvatogpa(vm_thread, gth_to_vmtf(vm_thread)->tf_rip);
+	return gvatogpa(vm_thread, gth_to_vmtf(vm_thread)->tf_rip, pa);
 }
