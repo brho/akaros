@@ -7,9 +7,9 @@ earlyprintk=vmcall,keep
  apic=debug
  noexec=off
  nohlt
- init=/bin/launcher
  lapic=notscdeadline
  lapictimerfreq=1000000
  pit=none
  nortc
  nozswap
+ noinvpcid
