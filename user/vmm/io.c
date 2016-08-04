@@ -208,7 +208,7 @@ int io(struct guest_thread *vm_thread)
 	 */
 	if (*ip16 == 0x21e4) {
 		vm_tf->tf_rip += 2;
-		vm_tf->tf_rax = ~0ULL;
+		vm_tf->tf_rax |= 0x00000ff;
 		return 0;
 	}
 	if (*ip16 == 0xed66) {
