@@ -1,9 +1,10 @@
-#!/bin/rc
+#!/bin/bash
 # pci [-bv] - dump pci configuration
-rfork e
-fn verbose {
-	if (! test -f /lib/pci)
-		echo $0: no /lib/pci >[1=2]
+prog=$0
+verbose() {
+	if [[ ! -f /lib/pci ]]; then
+		echo $0: no /lib/pci >&2
+	fi
 	awk '
 
 	function lower(s) {
@@ -45,29 +46,41 @@ fn verbose {
 	}
 '
 }
-fn usage {
-	echo usage: $1 '[-bv]' >[1=2]
-	exit usage
+
+usage() {
+	echo "usage: ${prog} [-bv]" >&2
+	exit 1
 }
 
-filter=cat
+filter=none
 bridges=yes
-done=0
-while (~ $done 0 && ! ~ $#* 0 && ~ $1 -*) {
-	if (~ $1 -*b*)
-		bridges=no
-	if (~ $1 -*v*)
-		filter=verbose
-	switch ($1) {
-	case --
-		done = 1		# no break in rc, alas
-	case -*[~bv]*
-		usage $0
-	}
-	shift
-}
-if (! ~ $#* 0)
+while getopts "bv" opt; do
+	case $opt in
+	b) bridges=no;;
+	v) filter=verbose;;
+	*) usage $0 ;;
+	esac
+done
+shift $((OPTIND-1))
+if [[ $# -ne 0 ]]; then
 	usage $0
+fi
+
+maybebridges() {
+	if [[ "${bridges}" == "no" ]]; then
+		sed '/:06/d'
+	else
+		cat
+	fi
+}
+
+maybefilter() {
+	if [[ "${filter}" = "verbose" ]]; then
+		verbose
+	else
+		cat
+	fi
+}
 
 # DMG 06/02/2016 Make pci(8) recognize virtio devices
 # source: http://git.qemu.org/?p=qemu.git;a=blob;f=include/hw/pci/pci.h
@@ -83,23 +96,18 @@ if (! ~ $#* 0)
 # based on this information, the translation table below is amended
 # to show these devices in the pci (8) output.
 
-builtin cd '#$/pci' && grep . *ctl | {
-	if (~ $bridges no)
-		sed /:06/d
-	if not
-		cat
-	} |
-	sed '
+grep -a . '#pci'/*ctl | maybebridges | sed '
+	s/^.pci\///
 	s/ctl:/:	/
 	t noop
 : noop
-	s/:	(02\..*\ 1af4\/1000)/:	virtio-net     \1/
-	s/:	(01\..*\ 1af4\/1001)/:	virtio-disk    \1/
-	s/:	(00\..*\ 1af4\/1002)/:	virtio-balloon \1/
-	s/:	(07\..*\ 1af4\/1003)/:	virtio-console \1/
-	s/:	(01\..*\ 1af4\/1004)/:	virtio-scsi    \1/
-	s/:	(00\..*\ 1af4\/1005)/:	virtio-rng     \1/
-	s/:	(00\..*\ 1af4\/1009)/:	virtio-9p      \1/
+	s/:	\(02\..*\ 1af4\/1000\)/:	virtio-net     \1/
+	s/:	\(01\..*\ 1af4\/1001\)/:	virtio-disk    \1/
+	s/:	\(00\..*\ 1af4\/1002\)/:	virtio-balloon \1/
+	s/:	\(07\..*\ 1af4\/1003\)/:	virtio-console \1/
+	s/:	\(01\..*\ 1af4\/1004\)/:	virtio-scsi    \1/
+	s/:	\(00\..*\ 1af4\/1005\)/:	virtio-rng     \1/
+	s/:	\(00\..*\ 1af4\/1009\)/:	virtio-9p      \1/
 	s/:	01/:	disk  01/
 	s/:	02/:	net   02/
 	s/:	03/:	vid   03/
@@ -113,4 +121,4 @@ builtin cd '#$/pci' && grep . *ctl | {
 	s/:	10/:	cryp  10/
 	t
 	s/	/	---  /
-' | $filter
+' | maybefilter
