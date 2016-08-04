@@ -144,6 +144,7 @@ static void thread0_thread_refl_fault(struct uthread *uth,
 			refl_error(uth, trap_nr, err, aux);
 		break;
 	case HW_TRAP_BRKPT:
+	case HW_TRAP_DEBUG:
 		/* We only have one thread, no need to stop other threads. */
 		uthread_has_blocked(uth, 0);
 		d9s_notify_hit_breakpoint(uth->id, 0);

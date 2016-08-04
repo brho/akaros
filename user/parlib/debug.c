@@ -322,9 +322,18 @@ int d9s_store_memory(const struct d9_tstoremem_msg *req)
 }
 
 /* d9s_resume is the d9_ops func called to fulfill a TRESUME request. */
-void d9s_resume(void)
+void d9s_resume(struct uthread *t, bool singlestep)
 {
-	uthread_apply_all(uthread_runnable);
+	if (t) {
+		/* Only single-step if a specific thread was specified. */
+		if (singlestep)
+			uthread_enable_single_step(t);
+		else
+			uthread_disable_single_step(t);
+		uthread_runnable(t);
+	} else {
+		uthread_apply_all(uthread_runnable);
+	}
 }
 
 int d9s_notify_hit_breakpoint(uint64_t tid, uint64_t address)
@@ -374,15 +383,24 @@ int d9s_notify_add_thread(uint64_t tid)
 static int d9s_tresume(struct d9_header *hdr)
 {
 	int ret;
+	struct uthread *t = NULL;
 	struct d9_rresume resp = D9_INIT_HDR(sizeof(struct d9_rresume), D9_RRESUME);
+	struct d9_tresume *req = (struct d9_tresume *)hdr;
 
 	if (d9_ops == NULL || d9_ops->resume == NULL)
 		return debug_send_error(EBADF /* TODO: better error code */);
 
+	if (req->msg.tid > 0) {
+		/* Find the appropriate thread. */
+		t = uthread_get_thread_by_id(req->msg.tid);
+		if (t == NULL)
+			return debug_send_error(EBADF /* TODO */);
+	}
+
 	ret = debug_send_packet(debug_fd, &(resp.hdr));
 
 	/* Call user-supplied routine. */
-	d9_ops->resume();
+	d9_ops->resume(t, req->msg.singlestep);
 
 	return ret;
 }
@@ -689,6 +707,29 @@ send_unlock:
 	return ret;
 }
 
+/* d9c_store_memory communicates with the 2LS to store from an address in
+ * memory. */
+int d9c_store_memory(int fd, uintptr_t address, const void *const data,
+                     uint32_t length)
+{
+	int ret;
+	struct d9_header *rhdr;
+	struct d9_tstoremem *req;
+
+	rhdr = alloc_packet(sizeof(struct d9_tstoremem) + length, D9_TSTOREMEM);
+	if (rhdr == NULL)
+		return -1;
+
+	req = (struct d9_tstoremem *)rhdr;
+	req->msg.address = address;
+	req->msg.length = length;
+	memcpy(&(req->msg.data), data, length);
+
+	ret = debug_send_and_block(fd, rhdr, NULL, NULL);
+	free(rhdr);
+	return ret;
+}
+
 static int d9c_read_memory_callback(struct d9_header *msg, void *arg)
 {
 	struct d9_rreadmem *resp = (struct d9_rreadmem *)msg;
@@ -744,12 +785,13 @@ int d9c_fetch_registers(int fd, uint64_t tid, struct d9_regs *regs)
 	                            regs);
 }
 
-/* d9c_resume tells the 2LS to resume all threads.
- *
- * TODO(chrisko): resume w/ hardware-step enabled. */
-int d9c_resume(int fd)
+/* d9c_resume tells the 2LS to resume all threads. */
+int d9c_resume(int fd, uint64_t tid, bool singlestep)
 {
 	struct d9_tresume req = D9_INIT_HDR(sizeof(struct d9_tresume), D9_TRESUME);
+
+	req.msg.tid = tid;
+	req.msg.singlestep = singlestep;
 
 	return debug_send_and_block(fd, &(req.hdr), NULL, NULL);
 }

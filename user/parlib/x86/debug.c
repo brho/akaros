@@ -1,4 +1,28 @@
 #include <parlib/arch/debug.h>
+#include <parlib/assert.h>
+#include <ros/arch/mmu.h>
+
+void uthread_enable_single_step(struct uthread *t)
+{
+	switch (t->u_ctx.type) {
+	case ROS_HW_CTX:
+		t->u_ctx.tf.hw_tf.tf_rflags |= FL_TF;
+		break;
+	default:
+		panic("bad context type\n");
+	}
+}
+
+void uthread_disable_single_step(struct uthread *t)
+{
+	switch (t->u_ctx.type) {
+	case ROS_HW_CTX:
+		t->u_ctx.tf.hw_tf.tf_rflags &= ~FL_TF;
+		break;
+	default:
+		panic("bad context type\n");
+	}
+}
 
 /* TODO(chrisko): add a way to signal that a register isn't supplied for sw
  * contexts; because gdbserver has a notion of not knowing a register's value.

@@ -29,5 +29,7 @@ struct d9_regs {
   uint64_t reg_gs;
 };
 
+void uthread_disable_single_step(struct uthread *t);
+void uthread_enable_single_step(struct uthread *t);
 int d9_fetch_registers(struct uthread *t, struct d9_regs *resp);
 int d9_store_registers(struct uthread *t, struct d9_regs *resp);
