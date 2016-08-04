@@ -896,6 +896,9 @@ static bool handle_vmexit_cpuid(struct vm_trapframe *tf)
 		if (tf->tf_rax == 1) {
 			/* Set the hypervisor bit to let the guest know it is virtualized */
 			ecx |= 1 << 31;
+			/* Unset the vmx capability bit so that the guest does not try
+			 * to turn it on. */
+			ecx &= ~(1 << 5);
 		}
 	}
 	tf->tf_rax = eax;
