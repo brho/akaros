@@ -27,7 +27,11 @@
  *		vcore_tick_enable(10000);
  *
  * will only set one alarm.  The latter two calls just set the period to 10000
- * usec. */
+ * usec.
+ *
+ * These functions can be called from uthread context and will affect their
+ * *current* vcore, but once they return, the uthread could be on a different
+ * vcore. */
 
 #pragma once
 

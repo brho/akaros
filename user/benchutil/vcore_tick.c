@@ -5,6 +5,7 @@
  * Vcore timer ticks. */
 
 #include <parlib/vcore.h>
+#include <parlib/uthread.h>
 #include <parlib/assert.h>
 #include <parlib/tsc-compat.h>
 #include <parlib/arch/bitmask.h>
@@ -30,7 +31,19 @@ struct vcore_tick {
 	struct event_queue			*ev_q;
 };
 
-static __thread struct vcore_tick __vc_tick;
+static struct vcore_tick *__vc_ticks;
+
+static void __attribute__((constructor)) vcore_tick_lib_init(void)
+{
+	__vc_ticks = calloc(max_vcores(), sizeof(struct vcore_tick));
+	assert(__vc_ticks);
+}
+
+/* Only call this from vcore context or with notifs disabled. */
+static struct vcore_tick *get_my_tick(void)
+{
+	return &__vc_ticks[vcore_id()];
+}
 
 static void vcore_tick_init(struct vcore_tick *vc_tick)
 {
@@ -62,8 +75,10 @@ static void __vcore_tick_start(struct vcore_tick *vc_tick, uint64_t from_now)
  * on.  You also can update the period of an already-running tick. */
 void vcore_tick_enable(uint64_t period_usec)
 {
-	struct vcore_tick *vc_tick = &__vc_tick;
+	struct vcore_tick *vc_tick;
 
+	uth_disable_notifs();
+	vc_tick = get_my_tick();
 	if (vc_tick->state == VC_TICK_PREINIT)
 		vcore_tick_init(vc_tick);
 
@@ -74,15 +89,18 @@ void vcore_tick_enable(uint64_t period_usec)
 		__vcore_tick_start(vc_tick, vc_tick->period_ticks);
 		vc_tick->state = VC_TICK_ENABLED;
 	}
+	uth_enable_notifs();
 }
 
 /* Disables the timer tick.  You can call this repeatedly.  It is possible that
  * you will still have a timer tick pending after this returns. */
 void vcore_tick_disable(void)
 {
-	struct vcore_tick *vc_tick = &__vc_tick;
+	struct vcore_tick *vc_tick;
 	int ret;
 
+	uth_disable_notifs();
+	vc_tick = get_my_tick();
 	if (vc_tick->state == VC_TICK_PREINIT)
 		vcore_tick_init(vc_tick);
 
@@ -91,6 +109,7 @@ void vcore_tick_disable(void)
 		assert(!ret);
 		vc_tick->state = VC_TICK_DISABLED;
 	}
+	uth_enable_notifs();
 }
 
 /* Polls the vcore timer tick.  Returns the number of times it has expired, 0
@@ -98,11 +117,13 @@ void vcore_tick_disable(void)
  * is still turned on. */
 int vcore_tick_poll(void)
 {
-	struct vcore_tick *vc_tick = &__vc_tick;
+	struct vcore_tick *vc_tick;
 	struct evbitmap *evbm;
 	int ret = 0;
 	uint64_t from_now, virtual_now;
 
+	uth_disable_notifs();
+	vc_tick = get_my_tick();
 	if (vc_tick->state == VC_TICK_PREINIT)
 		vcore_tick_init(vc_tick);
 
@@ -126,6 +147,7 @@ int vcore_tick_poll(void)
 		 * polling for the event.  The kernel will still __notify us, setting
 		 * notif_pending, and we'll notice the next time we attempt to leave
 		 * vcore context. */
+		uth_enable_notifs();
 		return 0;
 	}
 	/* Don't care about clobbering neighboring bits (non-atomic op) */
@@ -148,5 +170,6 @@ int vcore_tick_poll(void)
 	 * get caught in the while loop forever. */
 	from_now = vc_tick->next_deadline - virtual_now;
 	__vcore_tick_start(vc_tick, from_now);
+	uth_enable_notifs();
 	return ret;
 }
