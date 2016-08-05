@@ -198,24 +198,35 @@ static void yield_current_uth(void)
 	enqueue_vmm_thread(vth);
 }
 
-static void __attribute__((noreturn)) vmm_sched_entry(void)
+/* Helper, tries to get the right number of vcores.  Returns TRUE if we think we
+ * have enough, FALSE otherwise.
+ *
+ * TODO: this doesn't handle a lot of issues, like preemption, how to
+ * run/yield our vcores, dynamic changes in the number of runnables, where
+ * to send events, how to avoid interfering with gpcs, etc. */
+static bool try_to_get_vcores(void)
 {
-	struct vmm_thread *vth;
 	int nr_vcores_wanted = desired_nr_vcores();
 	bool have_enough = nr_vcores_wanted <= num_vcores();
 
-	/* TODO: this doesn't handle a lot of issues, like preemption, how to
-	 * run/yield our vcores, dynamic changes in the number of runnables, where
-	 * to send events, how to avoid interfering with gpcs, etc. */
 	if (have_enough) {
 		vcore_tick_disable();
-	} else {
-		vcore_tick_enable(vmm_sched_period_usec);
-		vcore_request_total(nr_vcores_wanted);
-		if (vcore_tick_poll()) {
-			/* slightly less than ideal: we grab the queue lock twice */
-			yield_current_uth();
-		}
+		return TRUE;
+	}
+	vcore_tick_enable(vmm_sched_period_usec);
+	vcore_request_total(nr_vcores_wanted);
+	return FALSE;
+}
+
+static void __attribute__((noreturn)) vmm_sched_entry(void)
+{
+	struct vmm_thread *vth;
+	bool have_enough;
+
+	have_enough = try_to_get_vcores();
+	if (!have_enough && vcore_tick_poll()) {
+		/* slightly less than ideal: we grab the queue lock twice */
+		yield_current_uth();
 	}
 	if (current_uthread)
 		run_current_uthread();
@@ -539,6 +550,7 @@ static void enqueue_vmm_thread(struct vmm_thread *vth)
 		break;
 	}
 	spin_pdr_unlock(&queue_lock);
+	try_to_get_vcores();
 }
 
 static struct vmm_thread *alloc_vmm_thread(struct virtual_machine *vm, int type)
