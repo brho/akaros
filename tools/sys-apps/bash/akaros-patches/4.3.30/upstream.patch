@@ -1,0 +1,10 @@
+*** bash-4.3.30.dist/execute_cmd.c	2016-06-22 14:46:01.000000000 -0400
+--- bash-4.3.30/execute_cmd.c	2016-08-05 15:20:09.190086126 -0400
+***************
+*** 5148,5151 ****
+--- 5148,5153 ----
+    set_sigchld_handler ();
+    init_job_stats ();
++ #else
++   stop_making_children ();
+  #endif /* JOB_CONTROL */
