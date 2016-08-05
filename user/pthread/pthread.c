@@ -31,7 +31,6 @@ bool need_tls = TRUE;
 struct sysc_mgmt *sysc_mgmt = 0;
 
 /* Helper / local functions */
-static int get_next_pid(void);
 static inline void spin_to_sleep(unsigned int spins, unsigned int *spun);
 static inline void pthread_exit_no_cleanup(void *ret);
 
@@ -380,13 +379,6 @@ static int __pthread_allocate_stack(struct pthread_tcb *pt)
 	return 0;
 }
 
-// Warning, this will reuse numbers eventually
-static int get_next_pid(void)
-{
-	static uint32_t next_pid = 0;
-	return next_pid++;
-}
-
 int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
 {
 	attr->stacksize = stacksize;
@@ -448,14 +440,12 @@ void __attribute__((constructor)) pthread_lib_init(void)
 	                     sizeof(struct pthread_tcb));
 	assert(!ret);
 	memset(t, 0, sizeof(struct pthread_tcb));	/* aggressively 0 for bugs */
-	t->id = get_next_pid();
 	t->stacksize = USTACK_NUM_PAGES * PGSIZE;
 	t->stacktop = (void*)USTACKTOP;
 	t->detached = TRUE;
 	t->state = PTH_RUNNING;
 	t->joiner = 0;
 	/* implies that sigmasks are longs, which they are. */
-	assert(t->id == 0);
 	t->sched_policy = SCHED_FIFO;
 	t->sched_priority = 0;
 	SLIST_INIT(&t->cr_stack);
@@ -554,7 +544,6 @@ int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	memset(pthread, 0, sizeof(struct pthread_tcb));	/* aggressively 0 for bugs*/
 	pthread->stacksize = PTHREAD_STACK_SIZE;	/* default */
 	pthread->state = PTH_CREATED;
-	pthread->id = get_next_pid();
 	pthread->detached = FALSE;				/* default */
 	pthread->joiner = 0;
 	/* Might override these later, based on attr && EXPLICIT_SCHED */
@@ -1086,12 +1075,12 @@ int pthread_barrier_wait(pthread_barrier_t *b)
 	struct pthread_list restartees = SLIST_HEAD_INITIALIZER(restartees);
 	struct pthread_tcb *pthread_i;
 	struct barrier_junk local_junk;
-	
+
 	long old_count = atomic_fetch_and_add(&b->count, -1);
 
 	if (old_count == 1) {
 		printd("Thread %d is last to hit the barrier, resetting...\n",
-		       pthread_self()->id);
+		       pthread_self()->uthread.id);
 		/* TODO: we might want to grab the lock right away, so a few short
 		 * circuit faster? */
 		atomic_set(&b->count, b->total_threads);

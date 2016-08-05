@@ -3,6 +3,7 @@
 #include <parlib/vcore.h>
 #include <parlib/signal.h>
 #include <ros/syscall.h>
+#include <sys/queue.h>
 
 __BEGIN_DECLS
 
@@ -24,6 +25,8 @@ __BEGIN_DECLS
  * cast their threads to uthreads when talking with vcore code.  Vcore/default
  * 2LS code won't touch udata or beyond. */
 struct uthread {
+	LIST_ENTRY(uthread) entry;
+	uint64_t id;
 	struct user_context u_ctx;
 	struct ancillary_state as;
 	void *tls_desc;
@@ -101,6 +104,10 @@ void uthread_usleep(unsigned int usecs);
 void uthread_sleep_forever(void);
 void uthread_has_blocked(struct uthread *uthread, int flags);
 void uthread_paused(struct uthread *uthread);
+
+/* Look up and return uthreads. */
+struct uthread *uthread_get_thread_by_id(uint64_t id);
+void uthread_put_thread(struct uthread *uth);
 
 /* Utility functions */
 bool __check_preempt_pending(uint32_t vcoreid);	/* careful: check the code */

@@ -4,7 +4,7 @@
 
 #include <parlib/timing.h>
 
-#define pthread_id() (pthread_self()->id)
+#define pthread_id() (pthread_self()->uthread.id)
 
 #else
 

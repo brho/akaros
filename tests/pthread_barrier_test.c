@@ -1,9 +1,10 @@
-#include <stdio.h>
+#include <parlib/parlib.h>
 #include <pthread.h>
 #include <stdlib.h>
-#include <parlib/parlib.h>
-#include <unistd.h>
+#include <stdio.h>
 #include <sys/time.h>
+#include <unistd.h>
+#include "misc-compat.h"
 
 pthread_barrier_t barrier;
 
@@ -17,16 +18,16 @@ void **my_retvals;
 bool run_barriertest = FALSE;
 
 void *thread(void *arg)
-{	
+{
 	while (!run_barriertest)
 		cpu_relax();
 	for(int i = 0; i < nr_loops; i++) {
 		pthread_barrier_wait(&barrier);
 	}
-	return (void*)(long)pthread_self()->id;
+	return (void*)(long)pthread_id();
 }
 
-int main(int argc, char** argv) 
+int main(int argc, char **argv)
 {
 	struct timeval start_tv = {0};
 	struct timeval end_tv = {0};
