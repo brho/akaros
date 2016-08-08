@@ -191,10 +191,10 @@ uint32_t virtio_next_avail_vq_desc(struct virtio_vq *vq, struct iovec iov[],
 	// we last incremented vq->last_avail, because it would have run out of
 	// places to put descriptors after incrementing exactly vring.num times
 	// (prior to our next vq->last_avail++)
-	if ((vq->vring.avail->idx - vq->last_avail) > vq->vring.num)
+	if ((uint16_t)(vq->vring.avail->idx - vq->last_avail) > vq->vring.num)
 		VIRTIO_DRI_ERRX(vq->vqdev,
-			"The driver advanced vq->vring.avail->idx from %u to %u, which have a difference greater than the capacity of a queue. The idx is supposed to increase by 1 for each descriptor chain added to the available ring; the driver should have run out of room and thus been forced to wait for us to catch up!",
-			vq->last_avail, vq->vring.avail);
+		                "vq index increased from %u to %u, exceeded capacity %u\n",
+		                vq->last_avail, vq->vring.avail->idx, vq->vring.num);
 
 	// lguest says here:
 	/*
