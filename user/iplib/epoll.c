@@ -211,10 +211,12 @@ static void epoll_close(struct user_fd *ufd)
 
 static int init_ep_ctlr(struct epoll_ctlr *ep, int size)
 {
-	unsigned int ceq_size = ROUNDUPPWR2(size);
+	unsigned int ceq_size;
+
 	/* TODO: we don't grow yet.  Until then, we help out a little. */
 	if (size == 1)
 		size = 128;
+	ceq_size = ROUNDUPPWR2(size);
 	ep->size = ceq_size;
 	ep->mtx = uth_mutex_alloc();
 	ep->ufd.magic = EPOLL_UFD_MAGIC;
