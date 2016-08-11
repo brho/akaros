@@ -1,0 +1,233 @@
+diff -ur coreutils-8.25.dist/build-aux/config.guess coreutils-8.25/build-aux/config.guess
+--- coreutils-8.25.dist/build-aux/config.guess	2016-01-16 12:11:09.000000000 -0500
++++ coreutils-8.25/build-aux/config.guess	2016-05-25 13:45:03.633843452 -0400
+@@ -233,6 +233,10 @@
+ 	UNAME_MACHINE_ARCH=`arch | sed 's/Bitrig.//'`
+ 	echo ${UNAME_MACHINE_ARCH}-unknown-bitrig${UNAME_RELEASE}
+ 	exit ;;
++    *:Akaros:*:*)
++	UNAME_MACHINE_ARCH=x86_64
++	echo x86_64-ucb-akaros1.0
++	exit ;;
+     *:OpenBSD:*:*)
+ 	UNAME_MACHINE_ARCH=`arch | sed 's/OpenBSD.//'`
+ 	echo ${UNAME_MACHINE_ARCH}-unknown-openbsd${UNAME_RELEASE}
+diff -ur coreutils-8.25.dist/build-aux/config.sub coreutils-8.25/build-aux/config.sub
+--- coreutils-8.25.dist/build-aux/config.sub	2016-01-16 12:11:09.000000000 -0500
++++ coreutils-8.25/build-aux/config.sub	2016-05-25 13:45:28.554516328 -0400
+@@ -1378,7 +1378,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* | -cloudabi* | -sortix* \
++	      | -akaros* | -aos* | -aros* | -cloudabi* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -ur coreutils-8.25.dist/lib/strerror.c coreutils-8.25/lib/strerror.c
+--- coreutils-8.25.dist/lib/strerror.c	2016-01-01 08:45:55.000000000 -0500
++++ coreutils-8.25/lib/strerror.c	2016-05-25 14:00:06.510268916 -0400
+@@ -38,14 +38,13 @@
+ {
+   static char buf[STACKBUF_LEN];
+   size_t len;
++  const char *estr = errstr();
+ 
+   /* Cast away const, due to the historical signature of strerror;
+      callers should not be modifying the string.  */
+   const char *msg = strerror_override (n);
+-  if (msg)
+-    return (char *) msg;
+-
+-  msg = strerror (n);
++  if (!msg)
++    msg = strerror (n);
+ 
+   /* Our strerror_r implementation might use the system's strerror
+      buffer, so all other clients of strerror have to see the error
+@@ -66,5 +65,11 @@
+   if (sizeof buf <= len)
+     abort ();
+ 
+-  return memcpy (buf, msg, len + 1);
++  memcpy (buf, msg, len + 1);
++  if (estr && *estr) {
++    memcpy(buf + len, ", ", 2);
++    memcpy(buf + len + 2, estr, strlen(estr) + 1);
++  }
++
++  return buf;
+ }
+diff -ur coreutils-8.25.dist/src/echo.c coreutils-8.25/src/echo.c
+--- coreutils-8.25.dist/src/echo.c	2016-01-01 08:48:50.000000000 -0500
++++ coreutils-8.25/src/echo.c	2016-07-15 14:53:14.351486065 -0400
+@@ -111,6 +111,8 @@
+   bool allow_options =
+     (! getenv ("POSIXLY_CORRECT")
+      || (! DEFAULT_ECHO_TO_XPG && 1 < argc && STREQ (argv[1], "-n")));
++  char *buf, *b;
++  size_t len;
+ 
+   /* System V machines already have a /bin/sh with a v9 behavior.
+      Use the identical behavior for these machines so that the
+@@ -189,6 +191,20 @@
+ 
+ just_echo:
+ 
++  len = 0;
++  for (int i = 0; i < argc; i++)
++    {
++      len += 1;
++      len += strlen (argv[i]);
++    }
++  buf = calloc(1, len);
++  if (buf == NULL)
++    {
++      perror("malloc failed");
++      exit(EXIT_FAILURE);
++    }
++  b = buf;
++
+   if (do_v9)
+     {
+       while (argc > 0)
+@@ -243,30 +259,34 @@
+                     case '\\': break;
+ 
+                     not_an_escape:
+-                    default:  putchar ('\\'); break;
++                    default:  *b++ = '\\'; break;
+                     }
+                 }
+-              putchar (c);
++              *b++ = c;
+             }
+           argc--;
+           argv++;
+           if (argc > 0)
+-            putchar (' ');
++            *b++ = ' ';
+         }
+     }
+   else
+     {
+       while (argc > 0)
+         {
+-          fputs (argv[0], stdout);
++          len = strlen(argv[0]);
++          memmove(b, argv[0], len);
++          b += len;
+           argc--;
+           argv++;
+           if (argc > 0)
+-            putchar (' ');
++            *b++ = ' ';
+         }
+     }
+ 
+   if (display_return)
+-    putchar ('\n');
++    *b++ = '\n';
++  write(1, buf, b - buf);
++  free(buf);
+   return EXIT_SUCCESS;
+ }
+diff -ur coreutils-8.25.dist/src/ls.c coreutils-8.25/src/ls.c
+--- coreutils-8.25.dist/src/ls.c	2016-01-14 07:16:23.000000000 -0500
++++ coreutils-8.25/src/ls.c	2016-05-25 13:50:13.426213819 -0400
+@@ -3203,6 +3203,7 @@
+           if (nlink_width < b_len)
+             nlink_width = b_len;
+ 
++#ifndef __ros__
+           if (S_ISCHR (f->stat.st_mode) || S_ISBLK (f->stat.st_mode))
+             {
+               char buf[INT_BUFSIZE_BOUND (uintmax_t)];
+@@ -3218,6 +3219,7 @@
+             }
+           else
+             {
++#endif
+               char buf[LONGEST_HUMAN_READABLE + 1];
+               uintmax_t size = unsigned_file_size (f->stat.st_size);
+               int len = mbswidth (human_readable (size, buf,
+@@ -3226,7 +3228,9 @@
+                                   0);
+               if (file_size_width < len)
+                 file_size_width = len;
++#ifndef __ros__
+             }
++#endif
+         }
+     }
+ 
+@@ -3951,6 +3955,7 @@
+       p = buf;
+     }
+ 
++#ifndef __ros__
+   if (f->stat_ok
+       && (S_ISCHR (f->stat.st_mode) || S_ISBLK (f->stat.st_mode)))
+     {
+@@ -3968,6 +3973,7 @@
+     }
+   else
+     {
++#endif
+       char hbuf[LONGEST_HUMAN_READABLE + 1];
+       char const *size =
+         (! f->stat_ok
+@@ -3981,7 +3987,9 @@
+       while ((*p++ = *size++))
+         continue;
+       p[-1] = ' ';
++#ifndef __ros__
+     }
++#endif
+ 
+   when_local = localtime (&when_timespec.tv_sec);
+   s = 0;
+diff -ur coreutils-8.25.dist/src/mknod.c coreutils-8.25/src/mknod.c
+--- coreutils-8.25.dist/src/mknod.c	2016-01-01 08:48:50.000000000 -0500
++++ coreutils-8.25/src/mknod.c	2016-05-25 13:52:28.825875896 -0400
+@@ -91,6 +91,7 @@
+ int
+ main (int argc, char **argv)
+ {
++#ifndef __ros__
+   mode_t newmode;
+   char const *specified_mode = NULL;
+   int optc;
+@@ -269,6 +270,9 @@
+   if (specified_mode && lchmod (argv[optind], newmode) != 0)
+     error (EXIT_FAILURE, errno, _("cannot set permissions of %s"),
+            quoteaf (argv[optind]));
++#else
++  error (EXIT_FAILURE, EINVAL, _("Akaros does not support mknod."));
++#endif
+ 
+   return EXIT_SUCCESS;
+ }
+diff -ur coreutils-8.25.dist/src/stat.c coreutils-8.25/src/stat.c
+--- coreutils-8.25.dist/src/stat.c	2016-01-13 06:16:39.000000000 -0500
++++ coreutils-8.25/src/stat.c	2016-05-25 13:53:24.807390596 -0400
+@@ -1049,15 +1049,19 @@
+       out_string (pformat, prefix_len,
+                   gw_ent ? gw_ent->gr_name : "UNKNOWN");
+       break;
++#ifndef __ros__
+     case 't':
+       out_uint_x (pformat, prefix_len, major (statbuf->st_rdev));
+       break;
++#endif
+     case 'm':
+       fail |= out_mount_point (filename, pformat, prefix_len, statbuf);
+       break;
++#ifndef __ros__
+     case 'T':
+       out_uint_x (pformat, prefix_len, minor (statbuf->st_rdev));
+       break;
++#endif
+     case 's':
+       out_int (pformat, prefix_len, statbuf->st_size);
+       break;
