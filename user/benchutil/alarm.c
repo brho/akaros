@@ -128,9 +128,13 @@ static struct {
 	uint64_t tod; // The initial time of day in microseconds
 	uint64_t tsc; // The initial value of the tsc counter
 } unixtime_offsets;
+
 static inline void init_unixtime_offsets()
 {
 	struct timeval tv;
+
+	/* There's a bit of slack here, where the TSC time is taken after the
+	 * corresponding gettimeofday value. */
 	gettimeofday(&tv, NULL);
 	unixtime_offsets.tsc = read_tsc();
 	unixtime_offsets.tod = tv.tv_sec*1000000 + tv.tv_usec;
@@ -206,17 +210,19 @@ void init_awaiter(struct alarm_waiter *waiter,
 
 /* Give this the absolute time.  For now, abs_time is the TSC time that you want
  * the alarm to go off. */
-void set_awaiter_abs(struct alarm_waiter *waiter, uint64_t abs_time)
+static void __set_awaiter_abs(struct alarm_waiter *waiter, uint64_t abs_time)
 {
 	waiter->wake_up_time = abs_time;
 }
 
 /* Give this the absolute unix time (in microseconds) that you want the alarm
  * to go off. */
-void set_awaiter_abs_unix(struct alarm_waiter *waiter, uint64_t abs_time)
+void set_awaiter_abs_unix(struct alarm_waiter *waiter, uint64_t abs_usec)
 {
-	abs_time = usec2tsc(abs_time - unixtime_offsets.tod) + unixtime_offsets.tsc;
-	set_awaiter_abs(waiter, abs_time);
+	uint64_t abs_tsc;
+
+	abs_tsc = usec2tsc(abs_usec - unixtime_offsets.tod) + unixtime_offsets.tsc;
+	__set_awaiter_abs(waiter, abs_tsc);
 }
 
 /* Give this a relative time from now, in microseconds.  This might be easier to
@@ -229,7 +235,7 @@ void set_awaiter_rel(struct alarm_waiter *waiter, uint64_t usleep)
 	/* This will go off if we wrap-around the TSC.  It'll never happen for legit
 	 * values, but this might catch some bugs with large usleeps. */
 	assert(now <= then);
-	set_awaiter_abs(waiter, then);
+	__set_awaiter_abs(waiter, then);
 }
 
 /* Increment the timer that was already set, so that it goes off usleep usec
@@ -451,7 +457,7 @@ static void __tc_reset_alarm_abs(struct timer_chain *tchain,
 	 * on the tchain).  If it has fired, it's like a fresh insert */
 	if (waiter->on_tchain)
 		reset_int = __remove_awaiter(tchain, waiter);
-	set_awaiter_abs(waiter, abs_time);
+	__set_awaiter_abs(waiter, abs_time);
 	/* regardless, we need to be reinserted */
 	if (__insert_awaiter(tchain, waiter) || reset_int)
 		reset_tchain_interrupt(tchain);
