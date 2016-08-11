@@ -83,7 +83,7 @@ static void __sem_timedblock(struct uthread *uthread, void *arg)
 	struct sem_queue_element *e = (struct sem_queue_element *)arg;
 	e->awaiter.data = e;
 	init_awaiter(&e->awaiter, __sem_timeout);
-	set_awaiter_abs(&e->awaiter, e->us_timeout);
+	set_awaiter_abs_unix(&e->awaiter, e->us_timeout);
 	set_alarm(&e->awaiter);
 	__sem_block(uthread, e);
 }
