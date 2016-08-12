@@ -19,8 +19,9 @@ extern int __libc_alloca_cutoff (size_t size) __attribute__ ((const));
 libc_hidden_proto (__libc_alloca_cutoff)
 
 /* AKAROS: Limit to a small amount, so 2LSs and vcore context can have small
- * stacks. */
-#define __MAX_ALLOCA_CUTOFF	128
+ * stacks.  Glibc typically uses 1/4 of the stack.  Assuming our users have at
+ * least 4K stacks, we can use 1k, but let's be paranoid and use 512 for now. */
+#define __MAX_ALLOCA_CUTOFF	512
 
 #include <allocalim.h>
 
