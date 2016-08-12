@@ -14,7 +14,7 @@
  * Your handlers will run from vcore context.
  *
  * Code differences from the kernel (for future porting):
- * - init_alarm_service, run once out of init_awaiter (or wherever).
+ * - init_alarm_service, run as a constructor
  * - set_alarm() and friends are __tc_set_alarm(), passing global_tchain.
  * - reset_tchain_interrupt() uses #alarm
  * - removed anything related to semaphores or kthreads
@@ -155,7 +155,7 @@ static void reset_tchain_times(struct timer_chain *tchain)
 	}
 }
 
-static void init_alarm_service(void)
+static void __attribute__((constructor)) init_alarm_service(void)
 {
 	int ctlfd, timerfd, alarmid;
 	struct event_queue *ev_q;
@@ -201,7 +201,6 @@ static void init_alarm_service(void)
 void init_awaiter(struct alarm_waiter *waiter,
                   void (*func) (struct alarm_waiter *awaiter))
 {
-	run_once_racy(init_alarm_service());
 	waiter->wake_up_time = ALARM_POISON_TIME;
 	assert(func);
 	waiter->func = func;
