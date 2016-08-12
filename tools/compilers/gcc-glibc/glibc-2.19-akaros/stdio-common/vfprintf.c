@@ -248,16 +248,7 @@ vfprintf (FILE *s, const CHAR_T *format, va_list ap)
   const UCHAR_T *end_of_spec;
 
   /* Buffer intermediate results.  */
-  /* AKAROS mmap work_buf */
-  //CHAR_T work_buffer[1000];
-  CHAR_T *work_buffer = mmap(0, PGSIZE, PROT_WRITE | PROT_READ, MAP_PRIVATE,
-                             -1, 0);
-
-  if (work_buffer == MAP_FAILED) {
-    write(2, failmsg, sizeof(failmsg));
-    exit(-1);
-  }
-
+  CHAR_T work_buffer[1000];
   CHAR_T *workstart = NULL;
   CHAR_T *workend;
 
@@ -2067,8 +2058,6 @@ all_done:
   _IO_funlockfile (s);
   _IO_cleanup_region_end (0);
 
-  /* AKAROS */
-  munmap(work_buffer, PGSIZE);
   return done;
 }
 
@@ -2297,7 +2286,7 @@ buffered_vfprintf (_IO_FILE *s, const CHAR_T *format,
   CHAR_T *buf;
 
   buf = mmap(0, ROUNDUP(_IO_BUFSIZ, PGSIZE), PROT_WRITE | PROT_READ,
-             MAP_PRIVATE, -1, 0);
+             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (buf == MAP_FAILED) {
     write(2, failmsg, sizeof(failmsg));
     exit(-1);
