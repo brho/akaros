@@ -40,7 +40,8 @@ static void default_term_handler(int signr, siginfo_t *info, void *ctx)
 
 static void default_core_handler(int signr, siginfo_t *info, void *ctx)
 {
-	akaros_printf("Segmentation Fault (sorry, no core dump yet)\n");
+	akaros_printf("Segmentation Fault on PID %d (sorry, no core dump yet)\n",
+	              __procinfo.pid);
 	if (ctx)
 		print_user_context((struct user_context*)ctx);
 	else
