@@ -1184,6 +1184,17 @@ static void __uthread_free_tls(struct uthread *uthread)
 	uthread->tls_desc = NULL;
 }
 
+void uthread_apply_all(void (*fn)(struct uthread *))
+{
+	struct uthread *t = NULL;
+
+	spin_pdr_lock(&thread_list_lock);
+	LIST_FOREACH(t, &all_uthreads, entry)
+		fn(t);
+
+	spin_pdr_unlock(&thread_list_lock);
+}
+
 /* TODO(chrisko): hash table instead of list. */
 struct uthread *uthread_get_thread_by_id(uint64_t id)
 {

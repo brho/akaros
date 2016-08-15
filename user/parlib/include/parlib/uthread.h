@@ -108,6 +108,7 @@ void uthread_paused(struct uthread *uthread);
 /* Look up and return uthreads. */
 struct uthread *uthread_get_thread_by_id(uint64_t id);
 void uthread_put_thread(struct uthread *uth);
+void uthread_apply_all(void (*fn)(struct uthread *));
 
 /* Utility functions */
 bool __check_preempt_pending(uint32_t vcoreid);	/* careful: check the code */
