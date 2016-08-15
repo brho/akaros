@@ -6,4 +6,5 @@ BreakBeforeBraces: Linux
 AllowShortIfStatementsOnASingleLine: false
 IndentCaseLabels: false
 AlignAfterOpenBracket: true
+AllowShortFunctionsOnASingleLine: false
 ForEachMacros: [ 'SLIST_FOREACH', 'SLIST_FOREACH_SAFE', 'SLIST_FOREACH_PREVPTR', 'STAILQ_FOREACH', 'STAILQ_FOREACH_SAFE', 'BSD_LIST_FOREACH', 'BSD_LIST_FOREACH_SAFE', 'LIST_FOREACH', 'LIST_FOREACH_SAFE', 'TAILQ_FOREACH', 'TAILQ_FOREACH_SAFE', 'TAILQ_FOREACH_REVERSE', 'TAILQ_FOREACH_REVERSE_SAFE', 'list_for_each', 'list_for_each_prev', 'list_for_each_safe', 'list_for_each_prev_safe', 'list_for_each_entry', 'list_for_each_entry_reverse', 'list_for_each_entry_continue', 'list_for_each_entry_continue_reverse', 'list_for_each_entry_from', 'list_for_each_entry_safe', 'list_for_each_entry_safe_continue', 'list_for_each_entry_safe_from', 'list_for_each_entry_safe_reverse', 'hlist_for_each', 'hlist_for_each_safe', 'hlist_for_each_entry', 'hlist_for_each_entry_continue', 'hlist_for_each_entry_from', 'hlist_for_each_entry_safe' ]
