@@ -86,7 +86,6 @@ env_setup_vm_error:
 env_setup_vm_error_d:
 	free_cont_pages(e->procinfo, LOG2_UP(PROCINFO_NUM_PAGES));
 env_setup_vm_error_i:
-	page_decref(shared_page);
 	env_user_mem_free(e, 0, UVPT);
 	env_pagetable_free(e);
 	return -ENOMEM;
