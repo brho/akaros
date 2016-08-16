@@ -526,10 +526,15 @@ out_error:	/* for debugging */
 }
 
 /* Helper, maps in page at addr, but only if nothing is mapped there.  Returns
- * 0 on success.  If this is called by non-PM code, we'll store your ref in the
- * PTE. */
+ * 0 on success.  Will take ownership of the page if @xfer is set (used by pmap
+ * code), including on error cases.  This just means we free it on error, and
+ * notionally store it in the PTE on success, which will get freed later.
+ *
+ * It's possible that a page has already been mapped here, in which case we'll
+ * treat as success.  So when we return 0, *a* page is mapped here, but not
+ * necessarily the one you passed in. */
 static int map_page_at_addr(struct proc *p, struct page *page, uintptr_t addr,
-                            int prot)
+                            int prot, bool xfer)
 {
 	pte_t pte;
 	spin_lock(&p->pte_lock);	/* walking and changing PTEs */
@@ -538,6 +543,8 @@ static int map_page_at_addr(struct proc *p, struct page *page, uintptr_t addr,
 	pte = pgdir_walk(p->env_pgdir, (void*)addr, TRUE);
 	if (!pte_walk_okay(pte)) {
 		spin_unlock(&p->pte_lock);
+		if (xfer)
+			page_decref(page);
 		return -ENOMEM;
 	}
 	/* a spurious, valid PF is possible due to a legit race: the page might have
@@ -545,21 +552,13 @@ static int map_page_at_addr(struct proc *p, struct page *page, uintptr_t addr,
 	 * in which case we should just return. */
 	if (pte_is_present(pte)) {
 		spin_unlock(&p->pte_lock);
-		/* non-PM callers expect us to eat the ref if we succeed. */
-		if (!page_is_pagemap(page))
+		if (xfer)
 			page_decref(page);
 		return 0;
 	}
-	if (pte_is_mapped(pte)) {
-		/* we're clobbering an old entry.  if we're just updating the prot, then
-		 * it's no big deal.  o/w, there might be an issue. */
-		if (page2pa(page) != pte_get_paddr(pte)) {
-			warn_once("Clobbered a PTE mapping (%p -> %p)\n", pte_print(pte),
-			          page2pa(page) | prot);
-		}
-		if (!page_is_pagemap(pa2page(pte_get_paddr(pte))))
-			page_decref(pa2page(pte_get_paddr(pte)));
-	}
+	/* I used to allow clobbering an old entry (contrary to the documentation),
+	 * but it's probably a sign of another bug. */
+	assert(!pte_is_mapped(pte));
 	/* preserve the dirty bit - pm removal could be looking concurrently */
 	prot |= (pte_is_dirty(pte) ? PTE_D : 0);
 	/* We have a ref to page, which we are storing in the PTE */
@@ -592,11 +591,9 @@ static int populate_anon_va(struct proc *p, uintptr_t va, unsigned long nr_pgs,
 		if (upage_alloc(p, &page, TRUE))
 			return -ENOMEM;
 		/* could imagine doing a memwalk instead of a for loop */
-		ret = map_page_at_addr(p, page, va + i * PGSIZE, pte_prot);
-		if (ret) {
-			page_decref(page);
+		ret = map_page_at_addr(p, page, va + i * PGSIZE, pte_prot, TRUE);
+		if (ret)
 			return ret;
-		}
 	}
 	return 0;
 }
@@ -643,7 +640,9 @@ static int populate_pm_va(struct proc *p, uintptr_t va, unsigned long nr_pgs,
 		 * TODO: is this still needed?  andrew put this in a while ago*/
 		if (exec)
 			icache_flush_page(0, page2kva(page));
-		ret = map_page_at_addr(p, page, va + i * PGSIZE, pte_prot);
+		/* The page could be either in the PM, or a private, now-anon page. */
+		ret = map_page_at_addr(p, page, va + i * PGSIZE, pte_prot,
+		                       page_is_pagemap(page));
 		if (page_is_pagemap(page))
 			pm_put_page(page);
 		if (ret)
@@ -1080,10 +1079,7 @@ refault:
 	 * separately (file, no file) */
 	int pte_prot = (vmr->vm_prot & PROT_WRITE) ? PTE_USER_RW :
 	               (vmr->vm_prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
-	ret = map_page_at_addr(p, a_page, va, pte_prot);
-	if (ret) {
-		printd("map_page_at for %p fails with %d\n", va, ret);
-	}
+	ret = map_page_at_addr(p, a_page, va, pte_prot, page_is_pagemap(a_page));
 	/* fall through, even for errors */
 out_put_pg:
 	/* the VMR's existence in the PM (via the mmap) allows us to have PTE point
