@@ -403,7 +403,7 @@ int main(int argc, char **argv)
 	((uint32_t *)a_page)[0x30/4] = 0x01060015;
 	//((uint32_t *)a_page)[0x30/4] = 0xDEADBEEF;
 
-	while ((c = getopt(argc, argv, "dvm:c:gsf:k:")) != -1) {
+	while ((c = getopt(argc, argv, "dvm:c:gsf:k:n:")) != -1) {
 		switch (c) {
 			case 'd':
 				debug++;
@@ -447,6 +447,9 @@ int main(int argc, char **argv)
 					exit(1);
 				}
 				close(cmdline_fd);
+				break;
+			case 'n':
+				default_nic = strtoull(optarg, 0, 0);
 				break;
 			default:
 				fprintf(stderr, "BMAFR\n");
