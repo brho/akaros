@@ -93,14 +93,7 @@
 #define SYS_fd2path				149
 
 /* Syscalls we plan to remove someday */
-#define SYS_cache_buster        200
-
-/* For Buster Measurement Flags */
-#define BUSTER_SHARED			0x0001
-#define BUSTER_STRIDED			0x0002
-#define BUSTER_LOCKED			0x0004
-#define BUSTER_PRINT_TICKS		0x0008
-#define BUSTER_JUST_LOCKS		0x0010 // unimplemented
+/* was SYS_cache_buster        200 */
 
 // for system calls that pass filenames
 #define MAX_PATH_LEN 256
