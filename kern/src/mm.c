@@ -25,6 +25,7 @@
 #include <vfs.h>
 #include <smp.h>
 #include <profiler.h>
+#include <umem.h>
 
 struct kmem_cache *vmr_kcache;
 
@@ -58,7 +59,7 @@ struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
 
 	assert(!PGOFF(va));
 	assert(!PGOFF(len));
-	assert(va + len <= UMAPTOP);
+	assert(__is_user_addr((void*)va, len, UMAPTOP));
 	/* Is there room before the first one: */
 	vm_i = TAILQ_FIRST(&p->vm_regions);
 	/* This works for now, but if all we have is BRK_END ones, we'll start
@@ -462,7 +463,11 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	/* Still need to enforce this: */
 	addr = MAX(addr, MMAP_LOWEST_VA);
 	/* Need to check addr + len, after we do our addr adjustments */
-	if ((addr + len > UMAPTOP) || (PGOFF(addr))) {
+	if (!__is_user_addr((void*)addr, len, UMAPTOP)) {
+		set_errno(EINVAL);
+		return MAP_FAILED;
+	}
+	if (PGOFF(addr)) {
 		set_errno(EINVAL);
 		return MAP_FAILED;
 	}
@@ -678,7 +683,7 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		__do_munmap(p, addr, len);
 	vmr = create_vmr(p, addr, len);
 	if (!vmr) {
-		printk("[kernel] do_mmap() aborted for %p + %d!\n", addr, len);
+		printk("[kernel] do_mmap() aborted for %p + %p!\n", addr, len);
 		set_errno(ENOMEM);
 		spin_unlock(&p->vmr_lock);
 		return MAP_FAILED;
@@ -751,22 +756,24 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 
 int mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 {
+	int ret;
+
 	printd("mprotect: (addr %p, len %p, prot 0x%x)\n", addr, len, prot);
 	if (!len)
 		return 0;
-	if ((addr % PGSIZE) || (addr < MMAP_LOWEST_VA)) {
+	len = ROUNDUP(len, PGSIZE);
+	if (PGOFF(addr)) {
 		set_errno(EINVAL);
 		return -1;
 	}
-	uintptr_t end = ROUNDUP(addr + len, PGSIZE);
-	if (end > UMAPTOP || addr > end) {
+	if (!__is_user_addr((void*)addr, len, UMAPTOP)) {
 		set_errno(ENOMEM);
 		return -1;
 	}
 	/* read/write lock, will probably change the tree and settings */
 	spin_lock(&p->vmr_lock);
 	p->vmr_history++;
-	int ret = __do_mprotect(p, addr, len, prot);
+	ret = __do_mprotect(p, addr, len, prot);
 	spin_unlock(&p->vmr_lock);
 	return ret;
 }
@@ -819,24 +826,24 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 
 int munmap(struct proc *p, uintptr_t addr, size_t len)
 {
+	int ret;
+
 	printd("munmap(addr %x, len %x)\n", addr, len);
 	if (!len)
 		return 0;
 	len = ROUNDUP(len, PGSIZE);
-
-	if ((addr % PGSIZE) || (addr < MMAP_LOWEST_VA)) {
+	if (PGOFF(addr)) {
 		set_errno(EINVAL);
 		return -1;
 	}
-	uintptr_t end = ROUNDUP(addr + len, PGSIZE);
-	if (end > UMAPTOP || addr > end) {
+	if (!__is_user_addr((void*)addr, len, UMAPTOP)) {
 		set_errno(EINVAL);
 		return -1;
 	}
 	/* read/write: changing the vmrs (trees, properties, and whatnot) */
 	spin_lock(&p->vmr_lock);
 	p->vmr_history++;
-	int ret = __do_munmap(p, addr, len);
+	ret = __do_munmap(p, addr, len);
 	spin_unlock(&p->vmr_lock);
 	return ret;
 }
