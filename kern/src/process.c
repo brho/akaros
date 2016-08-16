@@ -515,11 +515,12 @@ static void __proc_free(struct kref *kref)
 	else
 		printd("[kernel] pid %d not in the PID hash in %s\n", p->pid,
 		       __FUNCTION__);
-	/* all memory below UMAPTOP should have been freed via the VMRs.  the stuff
-	 * above is the global page and procinfo/procdata */
-	env_user_mem_free(p, (void*)UMAPTOP, UVPT - UMAPTOP); /* 3rd arg = len... */
+	/* All memory below UMAPTOP should have been freed via the VMRs.  The stuff
+	 * above is the global info/page and procinfo/procdata.  We free procinfo
+	 * and procdata, but not the global memory - that's system wide.  We could
+	 * clear the PTEs of the upper stuff (UMAPTOP to UVPT), but we shouldn't
+	 * need to. */
 	env_user_mem_walk(p, 0, UMAPTOP, __cb_assert_no_pg, 0);
-	/* These need to be freed again, since they were allocated with a refcnt. */
 	free_cont_pages(p->procinfo, LOG2_UP(PROCINFO_NUM_PAGES));
 	free_cont_pages(p->procdata, LOG2_UP(PROCDATA_NUM_PAGES));
 

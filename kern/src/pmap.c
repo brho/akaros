@@ -187,7 +187,7 @@ void *boot_zalloc(size_t amt, size_t align)
  *   - If there is already a page mapped at 'va', it is page_remove()d.
  *   - If necessary, on demand, allocates a page table and inserts it into
  *     'pgdir'.
- *   - page_incref() should be called if the insertion succeeds.
+ *   - This saves your refcnt in the pgdir (refcnts going away soon).
  *   - The TLB must be invalidated if a page was formerly present at 'va'.
  *     (this is handled in page_remove)
  *
@@ -214,15 +214,8 @@ int page_insert(pgdir_t pgdir, struct page *page, void *va, int perm)
 	pte_t pte = pgdir_walk(pgdir, va, 1);
 	if (!pte_walk_okay(pte))
 		return -ENOMEM;
-	/* Two things here:  First, we need to up the ref count of the page we want
-	 * to insert in case it is already mapped at va.  In that case we don't want
-	 * page_remove to ultimately free it, and then for us to continue as if pp
-	 * wasn't freed. (moral = up the ref asap) */
-	kref_get(&page->pg_kref, 1);
-	/* Careful, page remove handles the cases where the page is PAGED_OUT and
-	 * any other state. (TODO: review all other states, maybe rm only for P) */
-	if (pte_is_mapped(pte))
-		page_remove(pgdir, va);
+	/* Leftover from older times, but we no longer suppor this: */
+	assert(!pte_is_mapped(pte));
 	pte_write(pte, page2pa(page), perm);
 	return 0;
 }

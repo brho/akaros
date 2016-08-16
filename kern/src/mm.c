@@ -297,12 +297,11 @@ static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
 			/* TODO: check for jumbos */
 			if (upage_alloc(new_p, &pp, 0))
 				return -ENOMEM;
+			memcpy(page2kva(pp), KADDR(pte_get_paddr(pte)), PGSIZE);
 			if (page_insert(new_p->env_pgdir, pp, va, pte_get_settings(pte))) {
 				page_decref(pp);
 				return -ENOMEM;
 			}
-			memcpy(page2kva(pp), KADDR(pte_get_paddr(pte)), PGSIZE);
-			page_decref(pp);
 		} else if (pte_is_paged_out(pte)) {
 			/* TODO: (SWAP) will need to either make a copy or CoW/refcnt the
 			 * backend store.  For now, this PTE will be the same as the

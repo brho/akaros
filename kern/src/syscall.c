@@ -570,7 +570,6 @@ static int sys_cache_buster(struct proc *p, uint32_t num_writes,
 			upage_alloc(p, &a_page[i],1);
 			page_insert(p->env_pgdir, a_page[i], (void*)INSERT_ADDR + PGSIZE*i,
 			            PTE_USER_RW);
-			page_decref(a_page[i]);
 		}
 		spin_unlock(&buster_lock);
 	}
