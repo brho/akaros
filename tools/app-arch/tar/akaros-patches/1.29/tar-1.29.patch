@@ -1,0 +1,68 @@
+diff -ur tar-1.29.dist/build-aux/config.guess tar-1.29/build-aux/config.guess
+--- tar-1.29.dist/build-aux/config.guess	2015-08-24 06:07:56.000000000 -0400
++++ tar-1.29/build-aux/config.guess	2016-05-25 16:16:49.269134261 -0400
+@@ -229,6 +229,10 @@
+ 	# CPU_TYPE-MANUFACTURER-OPERATING_SYSTEM is used.
+ 	echo "${machine}-${os}${release}${abi}"
+ 	exit ;;
++    *:Akaros:*:*)
++	UNAME_MACHINE_ARCH=x86_64
++	echo x86_64-ucb-akaros1.0
++	exit ;;
+     *:Bitrig:*:*)
+ 	UNAME_MACHINE_ARCH=`arch | sed 's/Bitrig.//'`
+ 	echo ${UNAME_MACHINE_ARCH}-unknown-bitrig${UNAME_RELEASE}
+diff -ur tar-1.29.dist/build-aux/config.sub tar-1.29/build-aux/config.sub
+--- tar-1.29.dist/build-aux/config.sub	2015-08-24 06:07:56.000000000 -0400
++++ tar-1.29/build-aux/config.sub	2016-05-25 16:18:07.055248027 -0400
+@@ -1379,7 +1379,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* | -cloudabi* | -sortix* \
++	      | -akaros* | -aos* | -aros* | -cloudabi* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -ur tar-1.29.dist/gnu/error.c tar-1.29/gnu/error.c
+--- tar-1.29.dist/gnu/error.c	2015-08-24 06:08:23.000000000 -0400
++++ tar-1.29/gnu/error.c	2016-08-16 15:00:28.414028967 -0400
+@@ -170,7 +170,8 @@
+ static void
+ print_errno_message (int errnum)
+ {
+-  char const *s;
++  char const *s, *estr;
++  int serrno = errno;
+ 
+ #if defined HAVE_STRERROR_R || _LIBC
+   char errbuf[1024];
+@@ -196,6 +197,11 @@
+ #else
+   fprintf (stderr, ": %s", s);
+ #endif
++#ifdef __ros__
++  estr = errstr();
++  if (serrno == errnum && estr != NULL && *estr != '\0')
++    fprintf (stderr, ", %s", estr);
++#endif
+ }
+ 
+ static void _GL_ATTRIBUTE_FORMAT_PRINTF (3, 0) _GL_ARG_NONNULL ((3))
+diff -ur tar-1.29.dist/lib/system.h tar-1.29/lib/system.h
+--- tar-1.29.dist/lib/system.h	2014-12-20 11:01:28.000000000 -0500
++++ tar-1.29/lib/system.h	2016-05-25 16:21:00.643965577 -0400
+@@ -304,6 +304,13 @@
+ # define GOT_MAJOR
+ #endif
+ 
++#ifdef __ros__
++# define major(device)		(device)
++# define minor(device)		(device)
++# define makedev(major, minor)	(((major) << 8) | (minor))
++# define GOT_MAJOR
++#endif
++
+ #ifndef GOT_MAJOR
+ # if MSDOS
+ #  define major(device)		(device)
