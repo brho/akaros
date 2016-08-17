@@ -47,8 +47,8 @@ void colored_page_alloc_init()
 static void __page_init(struct page *page)
 {
 	memset(page, 0, sizeof(page_t));
-	page_setref(page, 1);
 	sem_init(&page->pg_sem, 0);
+	page->pg_is_free = FALSE;
 }
 
 #define __PAGE_ALLOC_FROM_RANGE_GENERIC(page, base_color, range, predicate) \
@@ -324,23 +324,12 @@ error_t kpage_alloc_specific(page_t** page, size_t ppn)
 }
 
 /* Check if a page with the given physical page # is free. */
-int page_is_free(size_t ppn) {
-	page_t* page = ppn2page(ppn);
-	if (kref_refcnt(&page->pg_kref))
-		return FALSE;
-	return TRUE;
-}
-
-/*
- * Increment the reference count on a page
- */
-void page_incref(page_t *page)
+int page_is_free(size_t ppn)
 {
-	kref_get(&page->pg_kref, 1);
+	return ppn2page(ppn)->pg_is_free;
 }
 
-/* Decrement the reference count on a page, freeing it if there are no more
- * refs. */
+/* Frees the page */
 void page_decref(page_t *page)
 {
 	spin_lock_irqsave(&colored_page_free_list_lock);
@@ -348,18 +337,9 @@ void page_decref(page_t *page)
 	spin_unlock_irqsave(&colored_page_free_list_lock);
 }
 
-/* Decrement the reference count on a page, freeing it if there are no more
- * refs.  Don't call this without holding the lock already. */
+/* Frees the page.  Don't call this without holding the lock already. */
 static void __page_decref(page_t *page)
 {
-	kref_put(&page->pg_kref);
-}
-
-/* Kref release function. */
-static void page_release(struct kref *kref)
-{
-	struct page *page = container_of(kref, struct page, pg_kref);
-
 	if (atomic_read(&page->pg_flags) & PG_BUFFER)
 		free_bhs(page);
 	/* Give our page back to the free list.  The protections for this are that
@@ -369,14 +349,7 @@ static void page_release(struct kref *kref)
 	   page,
 	   pg_link
 	);
-}
-
-/* Helper when initializing a page - just to prevent the proliferation of
- * page_release references (and because this function is sitting around in the
- * code).  Sets the reference count on a page to a specific value, usually 1. */
-void page_setref(page_t *page, size_t val)
-{
-	kref_init(&page->pg_kref, page_release, val);
+	page->pg_is_free = TRUE;
 }
 
 /* Attempts to get a lock on the page for IO operations.  If it is already
@@ -405,9 +378,9 @@ void print_pageinfo(struct page *page)
 		printk("Null page\n");
 		return;
 	}
-	printk("Page %d (%p), Flags: 0x%08x Refcnt: %d\n", page2ppn(page),
+	printk("Page %d (%p), Flags: 0x%08x Is Free: %d\n", page2ppn(page),
 	       page2kva(page), atomic_read(&page->pg_flags),
-	       kref_refcnt(&page->pg_kref));
+	       page->pg_is_free);
 	if (page->pg_mapping) {
 		printk("\tMapped into object %p at index %d\n",
 		       page->pg_mapping->pm_host, page->pg_index);

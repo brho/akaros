@@ -41,7 +41,6 @@ typedef BSD_LIST_ENTRY(page) page_list_entry_t;
  * buffer page (in a page mapping) */
 struct page {
 	BSD_LIST_ENTRY(page)		pg_link;	/* membership in various lists */
-	struct kref					pg_kref;
 	atomic_t					pg_flags;
 	struct page_map				*pg_mapping; /* for debugging... */
 	unsigned long				pg_index;
@@ -49,7 +48,8 @@ struct page {
 	void						*pg_private;	/* type depends on page usage */
 	struct semaphore 			pg_sem;		/* for blocking on IO */
 	uint64_t				gpa;		/* physical address in guest */
-								/* pg_private is overloaded. */
+
+	bool						pg_is_free;	/* TODO: will remove */
 };
 
 /******** Externally visible global variables ************/
@@ -73,9 +73,7 @@ void *get_cont_pages_node(int node, size_t order, int flags);
 void *get_cont_phys_pages_at(size_t order, physaddr_t at, int flags);
 void free_cont_pages(void *buf, size_t order);
 
-void page_incref(page_t *page);
 void page_decref(page_t *page);
-void page_setref(page_t *page, size_t val);
 
 int page_is_free(size_t ppn);
 void lock_page(struct page *page);

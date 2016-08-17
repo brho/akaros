@@ -614,6 +614,8 @@ panic("Not implemented");
 				int len = rem > gro_size ? gro_size : rem;
 				skb_fill_page_desc(skb, frag_id++,
 						   old_rx_pg.page, offset, len);
+				/* TODO: if this is pinning for I/O, we need to change to a
+				 * device-ownership / mmap model. */
 				if (offset)
 					page_incref(old_rx_pg.page);
 				offset += len;

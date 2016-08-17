@@ -32,8 +32,7 @@ static void track_free_page(struct page *page)
 	                                                            llc_cache)],
 	                 page, pg_link);
 	nr_free_pages++;
-	/* Page was previous marked as busy, need to set it free explicitly */
-	page_setref(page, 0);
+	page->pg_is_free = TRUE;
 }
 
 static struct page *pa64_to_page(uint64_t paddr)
@@ -93,17 +92,19 @@ static void parse_mboot_region(struct multiboot_mmap_entry *entry, void *data)
 	}
 }
 
+/* Expect == 1 -> busy, 0 -> free */
 static void check_range(uint64_t start, uint64_t end, int expect)
 {
-	int ref;
+	int free;
+
 	if (PGOFF(start))
 		printk("Warning: check_range given unaligned addr 0x%016llx\n", start);
 	for (uint64_t i = start; i < end; i += PGSIZE)  {
-		ref = kref_refcnt(&pa64_to_page(i)->pg_kref);
-		if (ref != expect) {
+		free = pa64_to_page(i)->pg_is_free ? 0 : 1;
+		if (free != expect) {
 			printk("Error: while checking range [0x%016llx, 0x%016llx), "
-			       "physaddr 0x%016llx refcnt was %d, expected %d\n", start,
-			       end, i, ref, expect);
+			       "physaddr 0x%016llx free was %d, expected %d\n", start,
+			       end, i, free, expect);
 			panic("");
 		}
 	}
@@ -185,7 +186,7 @@ static void account_for_pages(physaddr_t boot_freemem_paddr)
 
 	printk("Warning: poor memory detection (qemu?).  May lose 1GB of RAM\n");
 	for (physaddr_t i = 0; i < top_of_busy; i += PGSIZE)
-		assert(kref_refcnt(&pa64_to_page(i)->pg_kref) == 1);
+		assert(!pa64_to_page(i)->pg_is_free);
 	for (physaddr_t i = top_of_busy; i < top_of_free_1; i += PGSIZE)
 		track_free_page(pa64_to_page(i));
 	/* If max_paddr is less than the start of our potential second free mem
@@ -197,7 +198,7 @@ static void account_for_pages(physaddr_t boot_freemem_paddr)
 	if (max_paddr < start_of_free_2)
 		return;
 	for (physaddr_t i = top_of_free_1; i < start_of_free_2; i += PGSIZE)
-		assert(kref_refcnt(&pa64_to_page(i)->pg_kref) == 1);
+		assert(!pa64_to_page(i)->pg_is_free);
 	for (physaddr_t i = start_of_free_2; i < max_paddr; i += PGSIZE)
 		track_free_page(pa64_to_page(i));
 }
@@ -206,17 +207,13 @@ static void account_for_pages(physaddr_t boot_freemem_paddr)
 void page_alloc_init(struct multiboot_info *mbi)
 {
 	page_alloc_bootstrap();
-	/* First, we need to initialize the pages array such that all memory is busy
-	 * by default.
-	 *
-	 * To init the free list(s), each page that is already allocated/busy will
-	 * remain increfed.  All other pages that were reported as 'free' will be
-	 * added to a free list.  Their refcnts are set to 0.
+	/* First, all memory is busy / not free by default.
 	 *
 	 * To avoid a variety of headaches, any memory below 1MB is considered busy.
 	 * Likewise, everything in the kernel, up to _end is also busy.  And
 	 * everything we've already boot_alloc'd is busy.  These chunks of memory
-	 * are reported as 'free' by multiboot.
+	 * are reported as 'free' by multiboot.  All of this memory is below
+	 * boot_freemem_paddr.  We don't treat anything below that as free.
 	 *
 	 * We'll also abort the mapping for any addresses over max_paddr, since
 	 * we'll never use them.  'pages' does not track them either.
@@ -229,8 +226,6 @@ void page_alloc_init(struct multiboot_info *mbi)
 	 * sections are jumbo-aligned. */
 	physaddr_t boot_freemem_paddr = PADDR(ROUNDUP(boot_freemem, PGSIZE));
 
-	for (long i = 0; i < max_nr_pages; i++)
-		page_setref(&pages[i], 1);
 	if (mboot_has_mmaps(mbi)) {
 		mboot_foreach_mmap(mbi, parse_mboot_region, (void*)boot_freemem_paddr);
 		/* Test the page alloc - if this gets slow, we can CONFIG it */

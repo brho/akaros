@@ -59,7 +59,7 @@ expression FLAGS;
 expression PG;
 @@
 -get_page(PG)
-+page_incref(PG)
++get_page_wont_compile_use_mmap(PG)
 
 @@
 expression PG;

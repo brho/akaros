@@ -36,16 +36,12 @@ void page_alloc_init(struct multiboot_info *mbi)
 	uintptr_t first_invalid_page = LA2PPN(boot_freelimit);
 	assert(first_invalid_page == max_nr_pages);
 
-	// mark kernel pages as in-use
-	for (uintptr_t page = 0; page < first_free_page; page++)
-		page_setref(&pages[page], 1);
-
 	// append other pages to the free lists
 	for (uintptr_t page = first_free_page; page < first_invalid_page; page++)
 	{
-		page_setref(&pages[page], 0);
 		BSD_LIST_INSERT_HEAD(&lists[page & (num_colors-1)], &pages[page],
 		                     pg_link);
+		&pages[page]->pg_is_free = TRUE;
 	}
 	nr_free_pages = first_invalid_page - first_free_page;
 

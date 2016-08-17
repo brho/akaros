@@ -141,7 +141,10 @@ int get_user_page(struct proc *p, unsigned long uvastart, int write, int force,
 		goto err1;
 	}
 
-	page_incref(pp);
+	/* TODO (GUP): change the interface such that devices provide the memory and
+	 * the user mmaps it, instead of trying to pin arbitrary user memory. */
+	warn_once("Extremely unsafe, unpinned memory mapped!  If your process dies, you might scribble on RAM!");
+
 	plist[0] = pp;
 	ret = 1;
 err1:
