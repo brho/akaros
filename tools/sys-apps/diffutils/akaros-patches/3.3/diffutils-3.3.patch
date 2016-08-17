@@ -1,0 +1,26 @@
+diff -ru diffutils-3.3.dist/build-aux/config.guess diffutils-3.3/build-aux/config.guess
+--- diffutils-3.3.dist/build-aux/config.guess	2013-03-22 00:20:48.000000000 -0400
++++ diffutils-3.3/build-aux/config.guess	2016-05-25 15:26:34.263108318 -0400
+@@ -194,6 +194,10 @@
+ 	# CPU_TYPE-MANUFACTURER-OPERATING_SYSTEM is used.
+ 	echo "${machine}-${os}${release}"
+ 	exit ;;
++    *:Akaros:*:*)
++	UNAME_MACHINE_ARCH=x86_64
++	echo x86_64-ucb-akaros1.0
++	exit ;;
+     *:Bitrig:*:*)
+ 	UNAME_MACHINE_ARCH=`arch | sed 's/Bitrig.//'`
+ 	echo ${UNAME_MACHINE_ARCH}-unknown-bitrig${UNAME_RELEASE}
+diff -ru diffutils-3.3.dist/build-aux/config.sub diffutils-3.3/build-aux/config.sub
+--- diffutils-3.3.dist/build-aux/config.sub	2013-03-22 00:20:48.000000000 -0400
++++ diffutils-3.3/build-aux/config.sub	2016-05-25 15:26:21.374757287 -0400
+@@ -1354,7 +1354,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -akaros* | -aos* | -aros* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
