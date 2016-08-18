@@ -64,11 +64,6 @@ struct proc {
 	/* Scheduler mgmt (info, data, whatever) */
 	struct sched_proc_data ksched_data;
 
-	/* Cache color map: bitmap of the cache colors currently allocated to this
-	 * process */
-	uint8_t* cache_colors_map;
-	size_t next_cache_color;
-
 	/* The args_base pointer is a user pointer which points to the base of
 	 * the executable boot block (where args, environment, aux vectors, ...)
 	 * are stored.

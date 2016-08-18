@@ -11,26 +11,11 @@
 #include <kmalloc.h>
 #include <multiboot.h>
 
-spinlock_t colored_page_free_list_lock = SPINLOCK_INITIALIZER_IRQSAVE;
-
-page_list_t *colored_page_free_list = NULL;
-
-static void page_alloc_bootstrap() {
-	// Allocate space for the array required to manage the free lists
-	size_t list_size = llc_cache->num_colors*sizeof(page_list_t);
-	page_list_t *tmp = (page_list_t*)boot_alloc(list_size,PGSIZE);
-	colored_page_free_list = tmp;
-	for (int i = 0; i < llc_cache->num_colors; i++)
-		BSD_LIST_INIT(&colored_page_free_list[i]);
-}
-
 /* Can do whatever here.  For now, our page allocator just works with colors,
  * not NUMA zones or anything. */
 static void track_free_page(struct page *page)
 {
-	BSD_LIST_INSERT_HEAD(&colored_page_free_list[get_page_color(page2ppn(page),
-	                                                            llc_cache)],
-	                 page, pg_link);
+	BSD_LIST_INSERT_HEAD(&page_free_list, page, pg_link);
 	nr_free_pages++;
 	page->pg_is_free = TRUE;
 }
@@ -206,7 +191,6 @@ static void account_for_pages(physaddr_t boot_freemem_paddr)
 /* Initialize the memory free lists.  After this, do not use boot_alloc. */
 void page_alloc_init(struct multiboot_info *mbi)
 {
-	page_alloc_bootstrap();
 	/* First, all memory is busy / not free by default.
 	 *
 	 * To avoid a variety of headaches, any memory below 1MB is considered busy.

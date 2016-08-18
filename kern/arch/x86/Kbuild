@@ -1,6 +1,5 @@
 obj-y						+= apic.o
 obj-y						+= apic9.o
-obj-y						+= colored_caches.o
 obj-y						+= console.o
 obj-y						+= cpuinfo.o
 obj-y						+= devarch.o

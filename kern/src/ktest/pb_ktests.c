@@ -53,10 +53,6 @@
 
 KTEST_SUITE("POSTBOOT")
 
-#define l1 (available_caches.l1)
-#define l2 (available_caches.l2)
-#define l3 (available_caches.l3)
-
 #ifdef CONFIG_X86
 
 // TODO: Do test if possible inside this function, and add assertions.
@@ -120,136 +116,6 @@ bool test_pic_reception(void)
 }
 
 #endif // CONFIG_X86
-
-// TODO: Add assertions. Possibly the way to go is to extract relevant info
-//       from cache properties and make assertions on the colored pages lists
-//       based on those.
-// TODO: The test was commented out. Figure out why was it like that and fix it.
-bool test_page_coloring(void)
-{
-	/*
-	//Print the different cache properties of our machine
-	print_cache_properties("L1", l1);
-	cprintf("\n");
-	print_cache_properties("L2", l2);
-	cprintf("\n");
-	print_cache_properties("L3", l3);
-	cprintf("\n");
-
-	//Print some stats about our memory
-	cprintf("Max Address: %llu\n", MAX_VADDR);
-	cprintf("Num Pages: %u\n", npages);
-
-	//Declare a local variable for allocating pages
-	page_t* page;
-
-	cprintf("Contents of the page free list:\n");
-	for(int i=0; i<llc_cache->num_colors; i++) {
-		cprintf("  COLOR %d:\n", i);
-		LIST_FOREACH(page, &colored_page_free_list[i], pg_link) {
-			cprintf("    Page: %d\n", page2ppn(page));
-		}
-	}
-
-	//Run through and allocate all pages through l1_page_alloc
-	cprintf("Allocating from L1 page colors:\n");
-	for(int i=0; i<get_cache_num_page_colors(l1); i++) {
-		cprintf("  COLOR %d:\n", i);
-		while(colored_page_alloc(l1, &page, i) != -ENOMEM)
-			cprintf("    Page: %d\n", page2ppn(page));
-	}
-
-	//Put all the pages back by reinitializing
-	page_init();
-
-	//Run through and allocate all pages through l2_page_alloc
-	cprintf("Allocating from L2 page colors:\n");
-	for(int i=0; i<get_cache_num_page_colors(l2); i++) {
-		cprintf("  COLOR %d:\n", i);
-		while(colored_page_alloc(l2, &page, i) != -ENOMEM)
-			cprintf("    Page: %d\n", page2ppn(page));
-	}
-
-	//Put all the pages back by reinitializing
-	page_init();
-
-	//Run through and allocate all pages through l3_page_alloc
-	cprintf("Allocating from L3 page colors:\n");
-	for(int i=0; i<get_cache_num_page_colors(l3); i++) {
-		cprintf("  COLOR %d:\n", i);
-		while(colored_page_alloc(l3, &page, i) != -ENOMEM)
-			cprintf("    Page: %d\n", page2ppn(page));
-	}
-
-	//Put all the pages back by reinitializing
-	page_init();
-
-	//Run through and allocate all pages through page_alloc
-	cprintf("Allocating from global allocator:\n");
-	while(upage_alloc(&page) != -ENOMEM)
-		cprintf("    Page: %d\n", page2ppn(page));
-
-	if(colored_page_alloc(l2, &page, 0) != -ENOMEM)
-		cprintf("Should not get here, all pages should already be gone!\n");
-	cprintf("All pages gone for sure...\n");
-
-	//Now lets put a few pages back using page_free..
-	cprintf("Reinserting pages via page_free and reallocating them...\n");
-	page_free(&pages[0]);
-	page_free(&pages[15]);
-	page_free(&pages[7]);
-	page_free(&pages[6]);
-	page_free(&pages[4]);
-
-	while(upage_alloc(&page) != -ENOMEM)
-		cprintf("Page: %d\n", page2ppn(page));
-
-	page_init();
-	*/
-	return true;
-}
-
-// TODO: Add assertions.
-bool test_color_alloc(void) {
-	size_t checkpoint = 0;
-	uint8_t* colors_map = kmalloc(BYTES_FOR_BITMASK(llc_cache->num_colors), 0);
-	cache_color_alloc(l2, colors_map);
-	cache_color_alloc(l3, colors_map);
-	cache_color_alloc(l3, colors_map);
-	cache_color_alloc(l2, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(l2, colors_map);
-	cache_color_free(llc_cache, colors_map);
-	cache_color_free(llc_cache, colors_map);
-
-print_cache_colors:
-	printk("L1 free colors, tot colors: %d\n", l1->num_colors);
-	PRINT_BITMASK(l1->free_colors_map, l1->num_colors);
-	printk("L2 free colors, tot colors: %d\n", l2->num_colors);
-	PRINT_BITMASK(l2->free_colors_map, l2->num_colors);
-	printk("L3 free colors, tot colors: %d\n", l3->num_colors);
-	PRINT_BITMASK(l3->free_colors_map, l3->num_colors);
-	printk("Process allocated colors\n");
-	PRINT_BITMASK(colors_map, llc_cache->num_colors);
-	printk("test_color_alloc() complete!\n");
-
-	return true;
-}
 
 barrier_t test_cpu_array;
 
@@ -2398,10 +2264,6 @@ static struct ktest ktests[] = {
 	KTEST_REG(circ_buffer,        CONFIG_TEST_circ_buffer),
 	KTEST_REG(kernel_messages,    CONFIG_TEST_kernel_messages),
 #endif // CONFIG_X86
-#ifdef CONFIG_PAGE_COLORING
-	KTEST_REG(page_coloring,      CONFIG_TEST_page_coloring),
-	KTEST_REG(color_alloc,        CONFIG_TEST_color_alloc),
-#endif // CONFIG_PAGE_COLORING
 	KTEST_REG(barrier,            CONFIG_TEST_barrier),
 	KTEST_REG(interrupts_irqsave, CONFIG_TEST_interrupts_irqsave),
 	KTEST_REG(bitmasks,           CONFIG_TEST_bitmasks),

@@ -95,25 +95,6 @@ config COREALLOC_FCFS
 
 endchoice
 
-menu "Memory Management"
-
-config PAGE_COLORING
-	bool "Page coloring"
-	default n
-	help
-		Turns on internal support for page coloring.  When turned off, the page
-		allocator acts like there is only one color.  Hasn't been used in a few
-		years.
-
-config BOXBORO
-	depends on PAGE_COLORING
-	bool "Boxboro-specific page coloring"
-	default n
-	help
-		Say 'n'.
-
-endmenu
-
 menu "Kernel Debugging"
 
 menu "Per-cpu Tracers"

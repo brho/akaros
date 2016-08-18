@@ -342,9 +342,6 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 	/* only one ref, which we pass back.  the old 'existence' ref is managed by
 	 * the ksched */
 	kref_init(&p->p_kref, __proc_free, 1);
-	// Setup the default map of where to get cache colors from
-	p->cache_colors_map = global_cache_colors_map;
-	p->next_cache_color = 0;
 	/* Initialize the address space */
 	if ((r = env_setup_vm(p)) < 0) {
 		kmem_cache_free(proc_cache, p);
@@ -499,12 +496,6 @@ static void __proc_free(struct kref *kref)
 	/* now we'll finally decref files for the file-backed vmrs */
 	unmap_and_destroy_vmrs(p);
 	frontend_proc_free(p);	/* TODO: please remove me one day */
-	/* Free any colors allocated to this process */
-	if (p->cache_colors_map != global_cache_colors_map) {
-		for(int i = 0; i < llc_cache->num_colors; i++)
-			cache_color_free(llc_cache, p->cache_colors_map);
-		cache_colors_map_free(p->cache_colors_map);
-	}
 	/* Remove us from the pid_hash and give our PID back (in that order). */
 	spin_lock(&pid_hash_lock);
 	hash_ret = hashtable_remove(pid_hash, (void*)(long)p->pid);

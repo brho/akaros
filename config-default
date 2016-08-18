@@ -36,12 +36,6 @@ CONFIG_KFS_CPIO_BIN=""
 # CONFIG_EXT2FS is not set
 
 #
-# Memory Management
-#
-# CONFIG_DEMAND_PAGING is not set
-# CONFIG_PAGE_COLORING is not set
-
-#
 # Kernel Debugging
 #
 # CONFIG_SPINLOCK_DEBUG is not set

@@ -838,7 +838,9 @@ static inline void pci_unmap_sg(struct pci_device *pdev, struct scatterlist *sg,
 	dma_unmap_sg(NULL, sg, nents, (enum dma_data_direction)direction);
 }
 
-#define cache_line_size() get_cache_line_size_bytes(available_caches.l1)
+/* TODO: get this in an arch-dependent manner.  On x86, be careful of adjacent
+ * cacheline prefetching. */
+#define cache_line_size() 64
 
 static inline void *lowmem_page_address(struct page *page)
 {

@@ -27,7 +27,6 @@ obj-y						+= bitmap.o
 obj-y						+= blockdev.o
 obj-y						+= build_info.o
 obj-y						+= ceq.o
-obj-y						+= colored_caches.o
 obj-y						+= completion.o
 obj-y						+= coreprov.o
 obj-y						+= ctype.o

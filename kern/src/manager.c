@@ -23,7 +23,6 @@
 #include <stdio.h>
 #include <time.h>
 #include <monitor.h>
-#include <colored_caches.h>
 #include <string.h>
 #include <pmap.h>
 #include <arch/console.h>

@@ -137,14 +137,11 @@ void kernel_init(multiboot_info_t *mboot_info)
 	printk("Boot Command Line: '%s'\n", boot_cmdline);
 
 	exception_table_init();
-	cache_init();					// Determine systems's cache properties
 	pmem_init(multiboot_kaddr);
 	kmem_cache_init();              // Sets up slab allocator
 	kmalloc_init();
 	hashtable_init();
 	radix_init();
-	cache_color_alloc_init();       // Inits data structs
-	colored_page_alloc_init();      // Allocates colors for agnostic processes
 	acpiinit();
 	topology_init();
 	percpu_init();

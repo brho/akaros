@@ -1245,7 +1245,7 @@ usage:
 int mon_gfp(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	size_t naddrpages = max_paddr / PGSIZE;
-	spin_lock_irqsave(&colored_page_free_list_lock);
+	spin_lock_irqsave(&page_list_lock);
 	printk("%9s %9s %9s\n", "start", "end", "size");
 	for (int i = 0; i < naddrpages; i++) {
 		int j;
@@ -1258,7 +1258,7 @@ int mon_gfp(int argc, char **argv, struct hw_trapframe *hw_tf)
 			i = j;
 		}
 	}
-	spin_unlock_irqsave(&colored_page_free_list_lock);
+	spin_unlock_irqsave(&page_list_lock);
 	return 0;
 }
 
