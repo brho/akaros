@@ -21,11 +21,5 @@
 
 int sched_getcpu(void)
 {
-	int vcid;
-
-	vcid = vcore_id();
-	if (vcid == -1)
-		return -1;
-
-	return __procinfo.vcoremap[vcid].pcoreid;
+	return vcore_id();
 }
