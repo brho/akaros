@@ -65,7 +65,6 @@ void *kpage_zalloc_addr(void);
 
 void *get_cont_pages(size_t order, int flags);
 void *get_cont_pages_node(int node, size_t order, int flags);
-void *get_cont_phys_pages_at(size_t order, physaddr_t at, int flags);
 void free_cont_pages(void *buf, size_t order);
 
 void page_decref(page_t *page);
