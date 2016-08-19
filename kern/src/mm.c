@@ -448,6 +448,11 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 			return MAP_FAILED;
 		}
 	}
+	/* Check for overflow.  This helps do_mmap and populate_va, among others. */
+	if (offset + len < offset) {
+		set_errno(EINVAL);
+		return MAP_FAILED;
+	}
 	/* If they don't care where to put it, we'll start looking after the break.
 	 * We could just have userspace handle this (in glibc's mmap), so we don't
 	 * need to know about BRK_END, but this will work for now (and may avoid
@@ -1128,9 +1133,11 @@ unsigned long populate_va(struct proc *p, uintptr_t va, unsigned long nr_pgs)
 		} else {
 			/* need to keep the file alive in case we unlock/block */
 			kref_get(&vmr->vm_file->f_kref, 1);
+			/* Regarding foff + (va - base): va - base < len, and foff + len
+			 * does not over flow */
 			ret = populate_pm_va(p, va, nr_pgs_this_vmr, pte_prot,
 			                     vmr->vm_file->f_mapping,
-			                     vmr->vm_foff - (va - vmr->vm_base),
+			                     vmr->vm_foff + (va - vmr->vm_base),
 			                     vmr->vm_flags, vmr->vm_prot & PROT_EXEC);
 			kref_put(&vmr->vm_file->f_kref);
 			if (ret) {
