@@ -72,7 +72,7 @@ int radix_insert(struct radix_tree *tree, unsigned long key, void *item,
 		tree->root = r_node;
 		r_node->my_slot = &tree->root;
 		tree->depth++;
-		tree->upper_bound = 1 << (LOG_RNODE_SLOTS * tree->depth);
+		tree->upper_bound = 1ULL << (LOG_RNODE_SLOTS * tree->depth);
 	}
 	assert(tree->root);
 	/* the tree now thinks it is tall enough, so find the last node, insert in
