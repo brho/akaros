@@ -653,8 +653,6 @@ int d9c_taddthread(struct d9_header *hdr)
 
 void d9c_init(struct d9c_ops *ops)
 {
-	sync_lock = uth_mutex_alloc();
-	sync_cv = uth_cond_var_alloc();
 	client_ops = ops;
 }
 
@@ -794,4 +792,22 @@ int d9c_resume(int fd, uint64_t tid, bool singlestep)
 	req.msg.singlestep = singlestep;
 
 	return debug_send_and_block(fd, &(req.hdr), NULL, NULL);
+}
+
+/* d9c_attach opens the connection to the process. */
+int d9c_attach(unsigned long pid)
+{
+	char buf[60];
+	int debug_fd;
+
+	sync_lock = uth_mutex_alloc();
+	sync_cv = uth_cond_var_alloc();
+
+	/* TODO(chrisko): #proc/pid/debug */
+	snprintf(buf, sizeof(buf), "#srv/debug-%lu", pid);
+	/* Just retry that for now. */
+	while ((debug_fd = open(buf, O_RDWR)) == -1)
+		sys_block(100);
+
+	return debug_fd;
 }

@@ -6,6 +6,9 @@
 /* Message types of D9.
  * T messages have to be even, R messages have to be odd. T messages are sent
  * from gdbserver to 2LS, R messages the other way.
+ *
+ * If you modify this, also make sure that srv_msg_handlers and clt_msg_handlers
+ * are still correct in debug.c.
  */
 enum d9_msg_t {
 	D9_TREADMEM = 10,
@@ -211,3 +214,4 @@ int d9c_store_memory(int fd, uintptr_t address, const void *const data,
 int d9c_fetch_registers(int fd, uint64_t tid, struct d9_regs *regs);
 int d9c_store_registers(int fd, uint64_t tid, struct d9_regs *regs);
 int d9c_resume(int fd, uint64_t tid, bool singlestep);
+int d9c_attach(unsigned long pid);
