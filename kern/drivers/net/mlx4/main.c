@@ -1750,7 +1750,7 @@ static void mlx4_reset_vf_support(struct mlx4_dev *dev)
 	uint32_t comm_rst;
 	uint32_t comm_caps;
 
-	comm_caps = swab32(read32((__iomem char *)priv->mfunc.comm +
+	comm_caps = swab32(read32((__iomem uint32_t*)priv->mfunc.comm +
 				  MLX4_COMM_CHAN_CAPS));
 	comm_rst = (comm_caps & (uint32_t)(1 << COMM_CHAN_RST_OFFSET));
 
