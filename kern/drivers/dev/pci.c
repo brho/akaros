@@ -52,65 +52,65 @@ static int pcidirgen(struct chan *c, int t, int tbdf, struct dir *dp)
 	struct qid q;
 
 	q = (struct qid) {
-	BUSBDF(tbdf) | t, 0, 0};
+		BUSBDF(tbdf) | t, 0, 0};
 	switch (t) {
-		case Qpcictl:
-			snprintf(get_cur_genbuf(), GENBUF_SZ, "%d.%d.%dctl",
-					 BUSBNO(tbdf), BUSDNO(tbdf), BUSFNO(tbdf));
-			devdir(c, q, get_cur_genbuf(), 0, eve, 0444, dp);
-			return 1;
-		case Qpciraw:
-			snprintf(get_cur_genbuf(), GENBUF_SZ, "%d.%d.%draw",
-					 BUSBNO(tbdf), BUSDNO(tbdf), BUSFNO(tbdf));
-			devdir(c, q, get_cur_genbuf(), 128, eve, 0664, dp);
-			return 1;
+	case Qpcictl:
+		snprintf(get_cur_genbuf(), GENBUF_SZ, "%d.%d.%dctl",
+		         BUSBNO(tbdf), BUSDNO(tbdf), BUSFNO(tbdf));
+		devdir(c, q, get_cur_genbuf(), 0, eve, 0444, dp);
+		return 1;
+	case Qpciraw:
+		snprintf(get_cur_genbuf(), GENBUF_SZ, "%d.%d.%draw",
+		         BUSBNO(tbdf), BUSDNO(tbdf), BUSFNO(tbdf));
+		devdir(c, q, get_cur_genbuf(), 128, eve, 0664, dp);
+		return 1;
 	}
 	return -1;
 }
 
 static int
-pcigen(struct chan *c, char *, struct dirtab *, int unused_int, int s,
-	   struct dir *dp)
+pcigen(struct chan *c, char *_1, struct dirtab *_2, int _3, int s,
+       struct dir *dp)
 {
 	int tbdf;
-	Pcidev *p;
+	struct pci_device *p;
 	struct qid q;
 
 	switch (TYPE(c->qid)) {
-		case Qtopdir:
-			if (s == DEVDOTDOT) {
-				q = (struct qid) {
+	case Qtopdir:
+		if (s == DEVDOTDOT) {
+			q = (struct qid) {
 				QID(0, Qtopdir), 0, QTDIR};
-				snprintf(get_cur_genbuf(), GENBUF_SZ, "#%C", pcidevtab.dc);
-				devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
-				return 1;
-			}
-			return devgen(c, NULL, topdir, ARRAY_SIZE(topdir), s, dp);
-		case Qpcidir:
-			if (s == DEVDOTDOT) {
-				q = (struct qid) {
+			snprintf(get_cur_genbuf(), GENBUF_SZ, "#%s", pcidevtab.name);
+			devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
+			return 1;
+		}
+		return devgen(c, NULL, topdir, ARRAY_SIZE(topdir), s, dp);
+	case Qpcidir:
+		if (s == DEVDOTDOT) {
+			q = (struct qid) {
 				QID(0, Qtopdir), 0, QTDIR};
-				snprintf(get_cur_genbuf(), GENBUF_SZ, "#%C", pcidevtab.dc);
-				devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
-				return 1;
-			}
-			p = pcimatch(NULL, 0, 0);
-			while (s >= 2 && p != NULL) {
-				p = pcimatch(p, 0, 0);
-				s -= 2;
-			}
-			if (p == NULL)
-				return -1;
-			return pcidirgen(c, s + Qpcictl, p->tbdf, dp);
-		case Qpcictl:
-		case Qpciraw:
-			tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
-			p = pcimatchtbdf(tbdf);
-			if (p == NULL)
-				return -1;
-			return pcidirgen(c, TYPE(c->qid), tbdf, dp);
-		default:
-			break;
+			snprintf(get_cur_genbuf(), GENBUF_SZ, "#%s", pcidevtab.name);
+			devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
+			return 1;
+		}
+		STAILQ_FOREACH(p, &pci_devices, all_dev) {
+			if (s < 2)
+				break;
+			s -= 2;
+		}
+		if (p == NULL)
+			return -1;
+		return pcidirgen(c, s + Qpcictl, pci_to_tbdf(p), dp);
+	case Qpcictl:
+	case Qpciraw:
+		tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
+		p = pci_match_tbdf(tbdf);
+		if (p == NULL)
+			return -1;
+		return pcidirgen(c, TYPE(c->qid), tbdf, dp);
+	default:
+		break;
 	}
 	return -1;
 }
@@ -125,7 +125,7 @@ struct walkqid *pciwalk(struct chan *c, struct chan *nc, char **name, int nname)
 	return devwalk(c, nc, name, nname, (struct dirtab *)0, 0, pcigen);
 }
 
-static long pcistat(struct chan *c, uint8_t * dp, long n)
+static int pcistat(struct chan *c, uint8_t *dp, int n)
 {
 	return devstat(c, dp, n, (struct dirtab *)0, 0L, pcigen);
 }
@@ -134,13 +134,13 @@ static struct chan *pciopen(struct chan *c, int omode)
 {
 	c = devopen(c, omode, (struct dirtab *)0, 0, pcigen);
 	switch (TYPE(c->qid)) {
-		default:
-			break;
+	default:
+		break;
 	}
 	return c;
 }
 
-static void pciclose(struct chan *)
+static void pciclose(struct chan *_)
 {
 }
 
@@ -149,59 +149,60 @@ static long pciread(struct chan *c, void *va, long n, int64_t offset)
 	char buf[PCI_CONFIG_SZ], *ebuf, *w, *a;
 	int i, tbdf, r;
 	uint32_t x;
-	Pcidev *p;
+	struct pci_device *p;
 
 	a = va;
 	switch (TYPE(c->qid)) {
-		case Qtopdir:
-		case Qpcidir:
-			return devdirread(c, a, n, (struct dirtab *)0, 0L, pcigen);
-		case Qpcictl:
-			tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
-			p = pcimatchtbdf(tbdf);
-			if (p == NULL)
-				error(EINVAL, ERROR_FIXME);
-			ebuf = buf + sizeof buf - 1;	/* -1 for newline */
-			w = seprintf(buf, ebuf, "%.2x.%.2x.%.2x %.4x/%.4x %3d",
-						 p->ccrb, p->ccru, p->ccrp, p->vid, p->did, p->intl);
-			for (i = 0; i < ARRAY_SIZE(p->mem); i++) {
-				if (p->mem[i].size == 0)
-					continue;
-				w = seprintf(w, ebuf, " %d:%.8lux %d", i, p->mem[i].bar,
-							 p->mem[i].size);
-			}
-			*w++ = '\n';
-			*w = '\0';
-			return readstr(offset, a, n, buf);
-		case Qpciraw:
-			tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
-			p = pcimatchtbdf(tbdf);
-			if (p == NULL)
-				error(EINVAL, ERROR_FIXME);
-			if (n + offset > 256)
-				n = 256 - offset;
-			if (n < 0)
-				return 0;
-			r = offset;
-			if (!(r & 3) && n == 4) {
-				x = pcicfgr32(p, r);
-				PBIT32(a, x);
-				return 4;
-			}
-			if (!(r & 1) && n == 2) {
-				x = pcicfgr16(p, r);
-				PBIT16(a, x);
-				return 2;
-			}
-			for (i = 0; i < n; i++) {
-				x = pcicfgr8(p, r);
-				PBIT8(a, x);
-				a++;
-				r++;
-			}
-			return i;
-		default:
+	case Qtopdir:
+	case Qpcidir:
+		return devdirread(c, a, n, (struct dirtab *)0, 0L, pcigen);
+	case Qpcictl:
+		tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
+		p = pci_match_tbdf(tbdf);
+		if (p == NULL)
 			error(EINVAL, ERROR_FIXME);
+		ebuf = buf + sizeof(buf) - 1;	/* -1 for newline */
+		w = seprintf(buf, ebuf, "%.2x.%.2x.%.2x %.4x/%.4x %3d",
+		             p->class, p->subclass, p->progif, p->ven_id, p->dev_id,
+		             p->irqline);
+		for (i = 0; i < COUNT_OF(p->bar); i++) {
+			if (p->bar[i].mmio_sz == 0)
+				continue;
+			w = seprintf(w, ebuf, " %d:%.8lux %d", i, p->bar[i].pio_base,
+			             p->bar[i].mmio_sz);
+		}
+		*w++ = '\n';
+		*w = '\0';
+		return readstr(offset, a, n, buf);
+	case Qpciraw:
+		tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
+		p = pci_match_tbdf(tbdf);
+		if (p == NULL)
+			error(EINVAL, ERROR_FIXME);
+		if (n + offset > 256)
+			n = 256 - offset;
+		if (n < 0)
+			return 0;
+		r = offset;
+		if (!(r & 3) && n == 4) {
+			x = pcidev_read32(p, r);
+			PBIT32(a, x);
+			return 4;
+		}
+		if (!(r & 1) && n == 2) {
+			x = pcidev_read16(p, r);
+			PBIT16(a, x);
+			return 2;
+		}
+		for (i = 0; i < n; i++) {
+			x = pcidev_read8(p, r);
+			PBIT8(a, x);
+			a++;
+			r++;
+		}
+		return i;
+	default:
+		error(EINVAL, ERROR_FIXME);
 	}
 	return n;
 }
@@ -211,47 +212,47 @@ static long pciwrite(struct chan *c, void *va, long n, int64_t offset)
 	uint8_t *a;
 	int i, r, tbdf;
 	uint32_t x;
-	Pcidev *p;
+	struct pci_device *p;
 
 	if (n > PCI_CONFIG_SZ)
 		n = PCI_CONFIG_SZ;
 	a = va;
 
 	switch (TYPE(c->qid)) {
-		case Qpciraw:
-			tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
-			p = pcimatchtbdf(tbdf);
-			if (p == NULL)
-				error(EINVAL, ERROR_FIXME);
-			if (offset > PCI_CONFIG_SZ)
-				return 0;
-			if (n + offset > PCI_CONFIG_SZ)
-				n = PCI_CONFIG_SZ - offset;
-			r = offset;
-			if (!(r & 3) && n == 4) {
-				x = GBIT32(a);
-				pcicfgw32(p, r, x);
-				return 4;
-			}
-			if (!(r & 1) && n == 2) {
-				x = GBIT16(a);
-				pcicfgw16(p, r, x);
-				return 2;
-			}
-			for (i = 0; i < n; i++) {
-				x = GBIT8(a);
-				pcicfgw8(p, r, x);
-				a++;
-				r++;
-			}
-			return i;
-		default:
+	case Qpciraw:
+		tbdf = MKBUS(BusPCI, 0, 0, 0) | BUSBDF((uint32_t) c->qid.path);
+		p = pci_match_tbdf(tbdf);
+		if (p == NULL)
 			error(EINVAL, ERROR_FIXME);
+		if (offset > PCI_CONFIG_SZ)
+			return 0;
+		if (n + offset > PCI_CONFIG_SZ)
+			n = PCI_CONFIG_SZ - offset;
+		r = offset;
+		if (!(r & 3) && n == 4) {
+			x = GBIT32(a);
+			pcidev_write32(p, r, x);
+			return 4;
+		}
+		if (!(r & 1) && n == 2) {
+			x = GBIT16(a);
+			pcidev_write16(p, r, x);
+			return 2;
+		}
+		for (i = 0; i < n; i++) {
+			x = GBIT8(a);
+			pcidev_write8(p, r, x);
+			a++;
+			r++;
+		}
+		return i;
+	default:
+		error(EINVAL, ERROR_FIXME);
 	}
 	return n;
 }
 
-struct dev pcidevtab = {
+struct dev pcidevtab __devtab = {
 	.name = "pci",
 
 	.reset = devreset,
