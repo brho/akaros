@@ -156,6 +156,8 @@ static int prep_remaining_vcores(void)
 	assert((void*)mmap_block != MAP_FAILED);
 	for (int i = 1; i < max_vcores(); i++)
 		__prep_vcore(i, mmap_block + 4 * (i - 1) * PGSIZE);
+
+	return 0;
 }
 
 /* Run libc specific early setup code. */

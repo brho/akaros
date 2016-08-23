@@ -1,4 +1,6 @@
 #include <fcntl.h>
+#include <parlib/arch/atomic.h>
+#include <parlib/arch/trap.h>
 #include <parlib/assert.h>
 #include <parlib/common.h>
 #include <parlib/debug.h>
@@ -104,6 +106,7 @@ static int d9s_tstoremem(struct d9_header *hdr);
 static int d9s_tfetchreg(struct d9_header *hdr);
 static int d9s_tstorereg(struct d9_header *hdr);
 static int d9s_tresume(struct d9_header *hdr);
+static int d9s_tinit(struct d9_header *hdr);
 
 static int d9c_thitbreakpoint(struct d9_header *hdr);
 static int d9c_taddthread(struct d9_header *hdr);
@@ -112,6 +115,8 @@ static int d9c_taddthread(struct d9_header *hdr);
 static struct event_queue *debug_read_ev_q;
 static struct syscall debug_read_sysc;
 static int debug_fd = -1;
+static atomic_t debugged;
+static atomic_t last_breakpoint_tid;
 
 /* async_read_buf is the buffer used to read the header of a packet.
  *
@@ -146,6 +151,8 @@ static message_handler srv_msg_handlers[D9_HANDLER(D9_NUM_MESSAGES)] = {
     NULL,          /* RRESUME */
     NULL,          /* TADDTHREAD */
     NULL,          /* RADDTHREAD */
+    d9s_tinit,     /* TINIT */
+    NULL,          /* RINIT */
 };
 
 /* gdbserver can also receive messages it didn't ask for, e.g. TADDTHREAD. The
@@ -167,6 +174,8 @@ static message_handler clt_msg_handlers[D9_HANDLER(D9_NUM_MESSAGES)] = {
     NULL,               /* RRESUME */
     d9c_taddthread,     /* TADDTHREAD */
     NULL,               /* RADDTHREAD */
+    NULL,               /* TINIT */
+    NULL,               /* RINIT */
 };
 
 /* queue_handle_one_message extracts one message from the mbox and calls the
@@ -341,7 +350,9 @@ int d9s_notify_hit_breakpoint(uint64_t tid, uint64_t address)
 	struct d9_thitbreakpoint thb =
 	    D9_INIT_HDR(sizeof(struct d9_thitbreakpoint), D9_THITBREAKPOINT);
 
-	if (debug_fd == -1)
+	atomic_swap(&last_breakpoint_tid, tid);
+
+	if (!atomic_read(&debugged))
 		return 0;
 
 	thb.msg.pid = getpid();
@@ -356,13 +367,38 @@ int d9s_notify_add_thread(uint64_t tid)
 	struct d9_taddthread tat =
 	    D9_INIT_HDR(sizeof(struct d9_taddthread), D9_TADDTHREAD);
 
-	if (debug_fd == -1)
+	if (!atomic_read(&debugged))
 		return 0;
 
 	tat.msg.pid = getpid();
 	tat.msg.tid = tid;
 
 	return debug_send_packet(debug_fd, &(tat.hdr));
+}
+
+void notify_thread(struct uthread *t)
+{
+	(void)d9s_notify_add_thread(t->id);
+}
+
+static int d9s_tinit(struct d9_header *hdr)
+{
+	uint64_t tid;
+	struct uthread *t;
+	struct d9_rinit resp = D9_INIT_HDR(sizeof(struct d9_rinit), D9_RINIT);
+
+	if (!atomic_cas(&debugged, 0, 1))
+		return debug_send_error(EBADF /* TODO */);
+
+	uthread_apply_all(notify_thread);
+
+	if ((tid = atomic_read(&last_breakpoint_tid)) > 0) {
+		t = uthread_get_thread_by_id(tid);
+		d9s_notify_hit_breakpoint(tid, get_user_ctx_pc(&t->u_ctx));
+		uthread_put_thread(t);
+	}
+
+	return debug_send_packet(debug_fd, &(resp.hdr));
 }
 
 /* d9s_tresume resumes execution in all threads.
@@ -651,11 +687,6 @@ int d9c_taddthread(struct d9_header *hdr)
 	return client_ops->add_thread(tat->msg.pid, tat->msg.tid);
 }
 
-void d9c_init(struct d9c_ops *ops)
-{
-	client_ops = ops;
-}
-
 static int check_error_packet(struct d9_header *hdr, enum d9_msg_t expected)
 {
 	struct d9_rerror *rerror;
@@ -800,9 +831,6 @@ int d9c_attach(unsigned long pid)
 	char buf[60];
 	int debug_fd;
 
-	sync_lock = uth_mutex_alloc();
-	sync_cv = uth_cond_var_alloc();
-
 	/* TODO(chrisko): #proc/pid/debug */
 	snprintf(buf, sizeof(buf), "#srv/debug-%lu", pid);
 	/* Just retry that for now. */
@@ -810,4 +838,15 @@ int d9c_attach(unsigned long pid)
 		sys_block(100);
 
 	return debug_fd;
+}
+
+int d9c_init(int fd, struct d9c_ops *ops)
+{
+	struct d9_tinit req = D9_INIT_HDR(sizeof(struct d9_tinit), D9_TINIT);
+
+	client_ops = ops;
+	sync_lock = uth_mutex_alloc();
+	sync_cv = uth_cond_var_alloc();
+
+	return debug_send_and_block(fd, &(req.hdr), NULL, NULL);
 }

@@ -27,6 +27,8 @@ enum d9_msg_t {
 	D9_RRESUME,
 	D9_TADDTHREAD,
 	D9_RADDTHREAD,
+	D9_TINIT,
+	D9_RINIT,
 	D9_NUM_MESSAGES, /* Do not use. */
 };
 
@@ -38,7 +40,16 @@ struct d9_header {
 	uint32_t msg_type;
 } __attribute__((packed));
 
-/* error message */
+/* Initialization message. */
+struct d9_tinit {
+	struct d9_header hdr;
+} __attribute__((packed));
+
+struct d9_rinit {
+	struct d9_header hdr;
+} __attribute__((packed));
+
+/* Error message */
 struct d9_rerror_msg {
 	uint32_t errnum;
 } __attribute__((packed));
@@ -204,7 +215,7 @@ int d9s_notify_hit_breakpoint(uint64_t tid, uint64_t address);
 int d9s_notify_add_thread(uint64_t tid);
 
 /* gdbserver-side functions. */
-void d9c_init(struct d9c_ops *ops);
+int d9c_attach(unsigned long pid);
 void *d9c_read_thread(void *arg);
 
 /* Helpers to send messages from gdbserver to 2LS. */
@@ -214,4 +225,4 @@ int d9c_store_memory(int fd, uintptr_t address, const void *const data,
 int d9c_fetch_registers(int fd, uint64_t tid, struct d9_regs *regs);
 int d9c_store_registers(int fd, uint64_t tid, struct d9_regs *regs);
 int d9c_resume(int fd, uint64_t tid, bool singlestep);
-int d9c_attach(unsigned long pid);
+int d9c_init(int fd, struct d9c_ops *ops);

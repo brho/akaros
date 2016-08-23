@@ -296,7 +296,7 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
  * Warning: this will reuse numbers eventually. */
 static uint64_t __get_next_tid(void)
 {
-	static uint64_t next_tid;
+	static uint64_t next_tid = 1;
 
 	return next_tid++;
 }

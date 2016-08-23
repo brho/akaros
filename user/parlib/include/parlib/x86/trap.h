@@ -8,6 +8,7 @@
 
 #include <parlib/common.h>
 #include <ros/trapframe.h>
+#include <ros/arch/trapframe64.h>
 
 __BEGIN_DECLS
 
@@ -59,6 +60,20 @@ static unsigned long __arch_refl_get_aux(struct user_context *ctx)
 {
 	return ((unsigned long)ctx->tf.hw_tf.tf_padding5 << 32) |
 	       ctx->tf.hw_tf.tf_padding4;
+}
+
+static uintptr_t get_user_ctx_pc(struct user_context *ctx)
+{
+	switch (ctx->type) {
+	case ROS_HW_CTX:
+		return ctx->tf.hw_tf.tf_rip;
+	case ROS_SW_CTX:
+		return ctx->tf.sw_tf.tf_rip;
+	case ROS_VM_CTX:
+		return ctx->tf.vm_tf.tf_rip;
+	default:
+		panic("Bad context type %d for ctx %p\n", ctx->type, ctx);
+	}
 }
 
 __END_DECLS
