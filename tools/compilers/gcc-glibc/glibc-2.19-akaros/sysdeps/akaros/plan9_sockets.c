@@ -364,10 +364,44 @@ int write_hex_to_fd(int fd, uint64_t num)
 {
 	int ret;
 	char cmd[50];
+	char *ptr;
 
-	ret = snprintf(cmd, sizeof(cmd), "%llx", num);
-	ret = write(fd, cmd, ret);
+	ptr = u64_to_str(num, cmd, sizeof(cmd));
+	if (!ptr)
+		return -1;
+	ret = write(fd, ptr, sizeof(cmd) - (ptr - cmd));
 	if (ret <= 0)
 		return -1;
 	return 0;
+}
+
+/* Returns a char representing the lowest 4 bits of x */
+static char num_to_nibble(unsigned int x)
+{
+	return "0123456789abcdef"[x & 0xf];
+}
+
+/* Converts num to a string, in hex, using buf as storage.  Returns a pointer to
+ * the string from within your buf, or 0 on failure. */
+char *u64_to_str(uint64_t num, char *buf, size_t len)
+{
+	char *ptr;
+	size_t nr_nibbles = sizeof(num) * 8 / 4;
+
+	/* 3: 0, x, and \0 */
+	if (len < nr_nibbles + 3)
+		return 0;
+	ptr = &buf[len - 1];
+	/* Build the string backwards */
+	*ptr = '\0';
+	for (int i = 0; i < nr_nibbles; i++) {
+		ptr--;
+		*ptr = num_to_nibble(num);
+		num >>= 4;
+	}
+	ptr--;
+	*ptr = 'x';
+	ptr--;
+	*ptr = '0';
+	return ptr;
 }

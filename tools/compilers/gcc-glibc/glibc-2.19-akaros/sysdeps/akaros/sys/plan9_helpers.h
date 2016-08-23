@@ -80,6 +80,9 @@ extern int _sock_lookup_listen_fd(int sock_fd);
 int get_sibling_fd(int fd, const char *sibling);
 int write_hex_to_fd(int fd, uint64_t num);
 
+/* Integer to string conversion helpers, probably faster than snprintf. */
+char *u64_to_str(uint64_t num, char *buf, size_t len);
+
 extern void _syserrno(void);
 
 /* The plan9 UDP header looks like:

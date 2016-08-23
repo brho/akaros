@@ -64,6 +64,8 @@ libc {
     get_sibling_fd;
     write_hex_to_fd;
 
+    u64_to_str;
+
     eventfd;
     eventfd_read;
     eventfd_write;
