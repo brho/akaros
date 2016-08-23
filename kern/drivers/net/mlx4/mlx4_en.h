@@ -234,7 +234,7 @@ struct mlx4_en_tx_desc {
 #define MLX4_EN_CX3_HIGH_ID	0x1005
 
 struct mlx4_en_rx_alloc {
-	struct page	*page;
+	struct refd_pages	*page;
 	dma_addr_t	dma;
 	uint32_t		page_offset;
 	uint32_t		page_size;

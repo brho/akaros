@@ -42,7 +42,7 @@ static int mlx4_alloc_pages(struct mlx4_en_priv *priv,
 			    gfp_t _gfp)
 {
 	int order;
-	struct page *page;
+	struct refd_pages *page;
 	dma_addr_t dma;
 
 	for (order = MLX4_EN_ALLOC_PREFER_ORDER; ;) {
@@ -50,17 +50,17 @@ static int mlx4_alloc_pages(struct mlx4_en_priv *priv,
 
 		if (order)
 			gfp |= __GFP_COMP | __GFP_NOWARN;
-		page = kva2page(get_cont_pages(order, gfp));
+		page = get_refd_pages(get_cont_pages(order, gfp), order);
 		if (likely(page))
 			break;
 		if (--order < 0 ||
 		    ((PAGE_SIZE << order) < frag_info->frag_size))
 			return -ENOMEM;
 	}
-	dma = dma_map_page(priv->ddev, page, 0, PAGE_SIZE << order,
+	dma = dma_map_page(priv->ddev, rp2page(page), 0, PAGE_SIZE << order,
 			   PCI_DMA_FROMDEVICE);
 	if (dma_mapping_error(priv->ddev, dma)) {
-		page_decref(page);
+		refd_pages_decref(page);
 		return -ENOMEM;
 	}
 	page_alloc->page_size = PAGE_SIZE << order;
@@ -70,7 +70,7 @@ static int mlx4_alloc_pages(struct mlx4_en_priv *priv,
 	/* Not doing get_page() for each frag is a big win
 	 * on asymetric workloads. Note we can not use atomic_set().
 	 */
-	atomic_add(&page->pg_kref.refcount,
+	atomic_add(&page->rp_kref.refcount,
 		   page_alloc->page_size / frag_info->frag_stride - 1);
 	return 0;
 }
@@ -83,7 +83,7 @@ static int mlx4_en_alloc_frags(struct mlx4_en_priv *priv,
 {
 	struct mlx4_en_rx_alloc page_alloc[MLX4_EN_MAX_RX_FRAGS];
 	const struct mlx4_en_frag_info *frag_info;
-	struct page *page;
+	struct refd_pages *page;
 	dma_addr_t dma;
 	int i;
 
@@ -115,8 +115,8 @@ out:
 			dma_unmap_page(priv->ddev, page_alloc[i].dma,
 				page_alloc[i].page_size, PCI_DMA_FROMDEVICE);
 			page = page_alloc[i].page;
-			atomic_set(&page->pg_kref.refcount, 1);
-			page_decref(page);
+			atomic_set(&page->rp_kref.refcount, 1);
+			refd_pages_decref(page);
 		}
 	}
 	return -ENOMEM;
@@ -135,7 +135,7 @@ static void mlx4_en_free_frag(struct mlx4_en_priv *priv,
 			       PCI_DMA_FROMDEVICE);
 
 	if (frags[i].page)
-		page_decref(frags[i].page);
+		refd_pages_decref(frags[i].page);
 }
 
 static int mlx4_en_init_allocator(struct mlx4_en_priv *priv,
@@ -153,20 +153,20 @@ static int mlx4_en_init_allocator(struct mlx4_en_priv *priv,
 
 		en_dbg(DRV, priv, "  frag %d allocator: - size:%d frags:%d\n",
 		       i, ring->page_alloc[i].page_size,
-		       atomic_read(&ring->page_alloc[i].page->pg_kref.refcount));
+		       atomic_read(&ring->page_alloc[i].page->rp_kref.refcount));
 	}
 	return 0;
 
 out:
 	while (i--) {
-		struct page *page;
+		struct refd_pages *page;
 
 		page_alloc = &ring->page_alloc[i];
 		dma_unmap_page(priv->ddev, page_alloc->dma,
 			       page_alloc->page_size, PCI_DMA_FROMDEVICE);
 		page = page_alloc->page;
-		atomic_set(&page->pg_kref.refcount, 1);
-		page_decref(page);
+		atomic_set(&page->rp_kref.refcount, 1);
+		refd_pages_decref(page);
 		page_alloc->page = NULL;
 	}
 	return -ENOMEM;
@@ -589,7 +589,7 @@ static void dump_packet(struct mlx4_en_priv *priv,
 {
 	void *va;
 
-	va = page_address(frags[0].page) + frags[0].page_offset;
+	va = page_address(rp2page(frags[0].page)) + frags[0].page_offset;
 
 	if (length <= SMALL_PACKET_SIZE) {
 		hexdump(va, length);
@@ -616,7 +616,7 @@ static void recv_packet(struct mlx4_en_priv *priv,
 		return;
 	}
 
-	va = page_address(frags[0].page) + frags[0].page_offset;
+	va = page_address(rp2page(frags[0].page)) + frags[0].page_offset;
 	memcpy(block->wp, va, length);
 	block->wp += length;
 
