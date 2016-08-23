@@ -117,9 +117,9 @@ static void ver_close(struct chan *c)
 }
 
 /* Returns a char representing the lowest 4 bits of x */
-static char num_to_nibble(int x)
+static char num_to_nibble(unsigned int x)
 {
-	return "0123456789abcdef"[x % 16];
+	return "0123456789abcdef"[x & 0xf];
 }
 
 static ssize_t read_buildid(void *va, long n, off64_t off)
