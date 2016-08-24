@@ -21,6 +21,7 @@
 #include <ros/vmm.h>
 #include <parlib/uthread.h>
 #include <vmm/linux_bootparam.h>
+#include <getopt.h>
 
 #include <vmm/virtio.h>
 #include <vmm/virtio_blk.h>
@@ -368,6 +369,20 @@ int main(int argc, char **argv)
 	int c;
 	struct stat stat_result;
 	int num_read;
+	int option_index;
+	static struct option long_options[] = {
+		{"debug",         no_argument,       0, 'd'},
+		{"vmm_vmcall",    no_argument,       0, 'v'},
+		{"maxresume",     required_argument, 0, 'm'},
+		{"cmdline_extra", required_argument, 0, 'c'},
+		{"greedy",        no_argument,       0, 'g'},
+		{"scp",           no_argument,       0, 's'},
+		{"image_file",    required_argument, 0, 'f'},
+		{"cmdline",       required_argument, 0, 'k'},
+		{"nic",           required_argument, 0, 'n'},
+		{"help",          no_argument,       0, 'h'},
+		{0, 0, 0, 0}
+	};
 
 	fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT,
 			PML1_PTE_REACH);
@@ -403,7 +418,8 @@ int main(int argc, char **argv)
 	((uint32_t *)a_page)[0x30/4] = 0x01060015;
 	//((uint32_t *)a_page)[0x30/4] = 0xDEADBEEF;
 
-	while ((c = getopt(argc, argv, "dvm:c:gsf:k:n:")) != -1) {
+	while ((c = getopt_long(argc, argv, "dvm:c:gsf:k:n:h", long_options,
+	                        &option_index)) != -1) {
 		switch (c) {
 			case 'd':
 				debug++;
@@ -451,9 +467,19 @@ int main(int argc, char **argv)
 			case 'n':
 				default_nic = strtoull(optarg, 0, 0);
 				break;
+			case 'h':
 			default:
-				fprintf(stderr, "BMAFR\n");
-				break;
+				fprintf(stderr, "-d or --debug              : enable debugging\n"
+				                "-v or --vmm_vmcall         : enable vmm_vmcall_printf\n"
+				                "-m or --maxresume arg0     : maxresume = arg0\n"
+				                "-c or --cmdline_extra arg0 : cmdline += arg0\n"
+				                "-g or --greedy             : run in greedy mode\n"
+				                "-s or --scp                : run as a scp\n"
+				                "-f or --image_file arg0    : pass arg0 to virtio-blk init\n"
+				                "-k or --cmdline arg0       : grab command line options from the file arg0\n"
+				                "-n or --nic arg0           : specify nic\n"
+				                "-h or --help               : show help info\n");
+				exit(0);
 		}
 	}
 	if (strlen(cmdline_default) == 0) {
