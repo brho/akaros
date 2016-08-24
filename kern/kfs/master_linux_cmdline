@@ -10,5 +10,6 @@ earlyprintk=vmcall,keep
  init=/bin/launcher
  lapic=notscdeadline
  lapictimerfreq=1000000
+ clocksource=tsc
  pit=none
  noinvpcid

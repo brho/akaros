@@ -9,6 +9,7 @@ earlyprintk=vmcall,keep
  nohlt
  lapic=notscdeadline
  lapictimerfreq=1000000
+ clocksource=tsc
  pit=none
  nortc
  nozswap
