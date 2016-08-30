@@ -18,6 +18,10 @@ static int sol_socket_gso(Rock *r, int optname, void *optval, socklen_t *optlen)
 			*(int*)optval = r->stype;
 			*optlen = 4;
 			break;
+		case (SO_ERROR):
+			*(int*)optval = 0;
+			*optlen = 4;
+			break;
 		default:
 			__set_errno(ENOPROTOOPT);
 			return -1;
