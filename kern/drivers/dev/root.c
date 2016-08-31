@@ -54,7 +54,6 @@ int rootmaxq = MAXFILE;
 int inumber = 13;
 
 /* TODO:
- *  - fix DOTDOT in gen.
  *  - synchronization!  what needs protection from concurrent use, etc.
  * 	- clean up documentation and whatnot
  * 	- does remove, mkdir, rmdir work?
@@ -76,7 +75,10 @@ int inumber = 13;
  * dotdot is .., ptr is data (for files)
  * size is # elements (for dirs)
  * *sizep is a pointer for reasons not understood.
- * next is the sibling. For a dir, it's the first element after '.'.
+ * child is the qid.path of the first child of a directory.
+ * Possibly 0 == no child.
+ * To find the next sibling (in a directory), look at roottab[i].qid.vers.
+ *
  *	int	dotdot;
  *      int     child;
  *	void	*ptr;
@@ -95,7 +97,19 @@ int inumber = 13;
  * If you want to add new entries, add it to the roottab such that the linked
  * list of indexes is a cycle (change the last current one), then add an entry
  * to rootdata, and then change the first rootdata entry to have another entry.
- * Yeah, it's a pain in the ass. */
+ * Yeah, it's a pain in the ass.
+ *
+ * To add subdirectories, or any child of a directory, the files (e.g. env_dir1)
+ * go in roottab.  Children of a parent are linked with their vers (note
+ * env_dir1 points to env_dir2), and the last item's vers = 0.  These files need
+ * their dotdot set in rootdata to the qid of their parent.  The directory that
+ * has children needs its child pointer set to the first qid in the list, and
+ * its data pointer must point to the roottab entry for the child.  This also
+ * means that all child entries in roottab for a parent must be contiguous.
+ *
+ * Yeah, it's a pain in the ass.  And, given this structure, it probably can't
+ * grow dynamically (I think we assume roottab[i] = entry for qid.path all over
+ * the place - imagine what happens if we wanted to squeeze in a new entry). */
 struct dirtab roottab[MAXFILE] = {
 	{"", {0, 0, QTDIR}, 0, DMDIR | 0777},
 	{"chan", {1, 2, QTDIR}, 0, DMDIR | 0777},
@@ -111,6 +125,8 @@ struct dirtab roottab[MAXFILE] = {
 	{"srv", {11, 12, QTDIR}, 0, DMDIR | 0777},
 	{"mnt", {12, 13, QTDIR}, 0, DMDIR | 0777},
 	{"proc", {13, 0, QTDIR}, 0, DMDIR | 0777},
+	{"env_dir1", {14, 15, QTDIR}, 0, DMDIR | 0777},
+	{"env_dir2", {15, 0, QTDIR}, 0, DMDIR | 0777},
 };
 
 struct rootdata {
@@ -131,11 +147,13 @@ struct rootdata rootdata[MAXFILE] = {
 	{0,	0,	 NULL,	 0,	 NULL},
 	{0,	0,	 NULL,	 0,	 NULL},
 	{0,	0,	 NULL,	 0,	 NULL},
+	{0,	14,	 &roottab[14],	 2,	 NULL},
 	{0,	0,	 NULL,	 0,	 NULL},
 	{0,	0,	 NULL,	 0,	 NULL},
 	{0,	0,	 NULL,	 0,	 NULL},
 	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
+	{9,	0,	 NULL,	 0,	 NULL},
+	{9,	0,	 NULL,	 0,	 NULL},
 };
 
 /* this is super useful */
@@ -247,25 +265,9 @@ rootgen(struct chan *c, char *name,
 	       tab, nd, s, name);
 
 	if (s == DEVDOTDOT) {
-		panic("this is busted");
 		p = rootdata[c->qid.path].dotdot;
-		// XXX we need to set the vers too.  equiv to mkqid(&c->qid, ...)
-		c->qid.path = p;
-		c->qid.type = QTDIR;
-		name = devname();
-		if (p != 0) {
-			/* TODO: what is this doing?  do we want to walk the entire table,
-			 * or are we just walking the siblings of our parent? */
-			for (i = p;;) {
-				if (roottab[i].qid.path == c->qid.path) {
-					name = roottab[i].name;
-					break;
-				}
-				i = roottab[i].qid.vers;
-				if (!i)
-					break;
-			}
-		}
+		c->qid = roottab[p].qid;
+		name = roottab[p].name;
 		devdir(c, c->qid, name, 0, eve, 0777, dp);
 		return 1;
 	}
