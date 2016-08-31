@@ -1,44 +1,46 @@
-#include <parlib/common.h>
-#include <ros/procinfo.h>
 #include <parlib/arch/arch.h>
+#include <parlib/common.h>
+#include <parlib/timing.h>
+#include <ros/procinfo.h>
 #include <stdio.h>
-#include <parlib/tsc-compat.h>
 
-void udelay(uint64_t usec)
+uint64_t udelay(uint64_t usec)
 {
 	uint64_t start, end, now;
 
 	start = read_tsc();
-    end = start + (get_tsc_freq() * usec) / 1000000;
+	end = start + (get_tsc_freq() * usec) / 1000000;
 	do {
-        cpu_relax();
-        now = read_tsc();
+		cpu_relax();
+		now = read_tsc();
 	} while (now < end || (now > start && end < start));
+	return tsc2usec(now);
 }
 
 /* Not super accurate, due to overheads of reading tsc and looping */
-void ndelay(uint64_t nsec)
+uint64_t ndelay(uint64_t nsec)
 {
 	uint64_t start, end, now;
 
 	start = read_tsc();
-    end = start + (get_tsc_freq() * nsec) / 1000000000;
+	end = start + (get_tsc_freq() * nsec) / 1000000000;
 	do {
-        cpu_relax();
-        now = read_tsc();
+		cpu_relax();
+		now = read_tsc();
 	} while (now < end || (now > start && end < start));
+	return tsc2nsec(now);
 }
 
 /* Difference between the ticks in microseconds */
 uint64_t udiff(uint64_t begin, uint64_t end)
 {
-	return (end - begin) * 1000000 /  __procinfo.tsc_freq;
+	return (end - begin) * 1000000 / __procinfo.tsc_freq;
 }
 
 /* Difference between the ticks in nanoseconds */
 uint64_t ndiff(uint64_t begin, uint64_t end)
 {
-	return (end - begin) * 1000000000 /  __procinfo.tsc_freq;
+	return (end - begin) * 1000000000 / __procinfo.tsc_freq;
 }
 
 /* Conversion btw tsc ticks and time units.  From Akaros's kern/src/time.c */
@@ -107,4 +109,9 @@ uint64_t nsec2tsc(uint64_t nsec)
 		return usec2tsc(nsec / 1000);
 	else
 		return (nsec * get_tsc_freq()) / 1000000000;
+}
+
+uint64_t nsec(void)
+{
+	return tsc2nsec(read_tsc());
 }

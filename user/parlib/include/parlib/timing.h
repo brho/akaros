@@ -5,8 +5,8 @@
 
 __BEGIN_DECLS
 
-void udelay(uint64_t usec);
-void ndelay(uint64_t nsec);
+uint64_t udelay(uint64_t usec);
+uint64_t ndelay(uint64_t nsec);
 uint64_t udiff(uint64_t begin, uint64_t end);
 uint64_t ndiff(uint64_t begin, uint64_t end);
 
@@ -19,5 +19,6 @@ uint64_t sec2tsc(uint64_t sec);
 uint64_t msec2tsc(uint64_t msec);
 uint64_t usec2tsc(uint64_t usec);
 uint64_t nsec2tsc(uint64_t nsec);
+uint64_t nsec(void);
 
 __END_DECLS
