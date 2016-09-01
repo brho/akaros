@@ -21,8 +21,8 @@
  * 	with that.
  * 	- epoll_pwait is probably racy.
  * 	- You can't dup an epoll fd (same as other user FDs).
- * 	- If you add a BSD socket FD to an epoll set before calling listen(), you'll
- * 	only epoll on the data (which is inactive) instead of on the accept().
+ * 	- If you add a BSD socket FD to an epoll set, you'll get taps on both the
+ * 	data FD and the listen FD.
  * 	- If you add the same BSD socket listener to multiple epoll sets, you will
  * 	likely fail.  This is in addition to being able to tap only one FD at a
  * 	time.
@@ -286,6 +286,7 @@ static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
 	struct ep_fd_data *ep_fd;
 	struct fd_tap_req tap_req = {0};
 	int ret, filter, sock_listen_fd;
+	struct epoll_event listen_event;
 
 	/* Only support ET.  Also, we just ignore EPOLLONESHOT.  That might work,
 	 * logically, just with spurious events firing. */
@@ -295,15 +296,27 @@ static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
 		return -1;
 	}
 	/* The sockets-to-plan9 networking shims are a bit inconvenient.  The user
-	 * asked us to epoll on an FD, but that FD is actually a Qdata FD.  We need
-	 * to actually epoll on the listen_fd.
+	 * asked us to epoll on an FD, but that FD is actually a Qdata FD.  We might
+	 * need to actually epoll on the listen_fd.  Further, we don't know yet
+	 * whether or not they want the listen FD.  They could epoll on the socket,
+	 * then listen later and want to wake up on the listen.
+	 *
+	 * So in the case we have a socket FD, we'll actually open the listen FD
+	 * regardless (glibc handles this), and we'll epoll on both FDs.
+	 * Technically, either FD could fire and they'd get an epoll event for it,
+	 * but I think socket users will use only listen or data.
 	 *
 	 * As far as tracking the FD goes for epoll_wait() reporting, if the app
 	 * wants to track the FD they think we are using, then they already passed
 	 * that in event->data. */
 	sock_listen_fd = _sock_lookup_listen_fd(fd);
-	if (sock_listen_fd >= 0)
-		fd = sock_listen_fd;
+	if (sock_listen_fd >= 0) {
+		listen_event.events = EPOLLET | EPOLLIN | EPOLLHUP;
+		listen_event.data = event->data;
+		ret = __epoll_ctl_add(ep, sock_listen_fd, &listen_event);
+		if (ret < 0)
+			return ret;
+	}
 	ceq_ev = ep_get_ceq_ev(ep, fd);
 	if (!ceq_ev) {
 		errno = ENOMEM;
@@ -342,11 +355,17 @@ static int __epoll_ctl_del(struct epoll_ctlr *ep, int fd,
 	struct fd_tap_req tap_req = {0};
 	int ret, sock_listen_fd;
 
-	/* They could be asking to clear an epoll for a listener.  We need to remove
-	 * the tap for the real FD we tapped */
+	/* If we were dealing with a socket shim FD, we tapped both the listen and
+	 * the data file and need to untap both of them. */
 	sock_listen_fd = _sock_lookup_listen_fd(fd);
-	if (sock_listen_fd >= 0)
-		fd = sock_listen_fd;
+	if (sock_listen_fd >= 0) {
+		/* It's possible to fail here.  Even though we tapped it already, if the
+		 * deletion was triggered from close callbacks, it's possible for the
+		 * sock_listen_fd to be closed first, which would have triggered an
+		 * epoll_ctl_del.  When we get around to closing the Rock FD, the listen
+		 * FD was already closed. */
+		__epoll_ctl_del(ep, sock_listen_fd, event);
+	}
 	ceq_ev = ep_get_ceq_ev(ep, fd);
 	if (!ceq_ev) {
 		errno = ENOENT;

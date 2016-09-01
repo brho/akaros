@@ -66,9 +66,6 @@ int __listen(int fd, int backlog)
 				return -1;
 			}
 			close(cfd);
-			r->is_listener = TRUE;
-			if (_rock_open_listen_fd(r) < 0)
-				return -1;
 			return 0;
 		case PF_UNIX:
 			if (r->other < 0) {

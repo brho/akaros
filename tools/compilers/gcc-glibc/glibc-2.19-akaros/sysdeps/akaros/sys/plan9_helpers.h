@@ -59,7 +59,7 @@ struct Rock {
 	};
 	char ctl[Ctlsize];			/* name of control file (if any) */
 	int other;					/* fd of the remote end for Unix domain */
-	bool is_listener;			/* has called listen() and will accept() */
+	bool has_listen_fd;			/* has set up a listen file, O_PATH */
 	int listen_fd;				/* fd of the listen file, if any */
 };
 
@@ -74,7 +74,6 @@ extern void _sock_ingetaddr(Rock *, struct sockaddr_in *, socklen_t *,
 							const char *);
 extern int _sock_strip_opts(int type);
 extern int _sock_get_opts(int type);
-extern int _rock_open_listen_fd(Rock *r);
 extern int _sock_lookup_listen_fd(int sock_fd);
 
 int get_sibling_fd(int fd, const char *sibling);
