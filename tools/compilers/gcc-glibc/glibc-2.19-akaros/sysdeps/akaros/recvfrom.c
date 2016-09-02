@@ -20,56 +20,69 @@
 
 #include <sys/plan9_helpers.h>
 
-/* Read N bytes into BUF through socket FD from peer
-   at address FROM (which is FROMLEN bytes long).
-   Returns the number read or -1 for errors.  */
-ssize_t __recvfrom(int fd, void *__restrict buf, size_t n,
-				   int flags, __SOCKADDR_ARG from,
-				   socklen_t * __restrict fromlen)
+/* UDP sockets need to have headers added to the payload for all packets, since
+ * we're supporting blind sendto/recvfrom. */
+static ssize_t __recvfrom_udp(int fd, const struct iovec *iov, int iovcnt,
+                              int flags, __SOCKADDR_ARG from,
+                              socklen_t * __restrict fromlen)
 {
-	Rock *r;
+	int ret;
+	struct sockaddr_in *remote = from.__sockaddr_in__;
+	struct iovec real_iov[iovcnt + 1];
+	char hdrs[P9_UDP_HDR_SZ];
+	uint8_t *p;
+
+	real_iov[0].iov_base = hdrs;
+	real_iov[0].iov_len = P9_UDP_HDR_SZ;
+	memcpy(real_iov + 1, iov, iovcnt * sizeof(struct iovec));
+	ret = readv(fd, real_iov, iovcnt + 1);
+	/* Subtracting before the check, so that we error out if we got less than
+	 * the headers needed */
+	ret -= P9_UDP_HDR_SZ;
+	if (ret < 0)
+		return -1;
+	/* Might not have a remote, if we were called via recv().  Could assert
+	 * that it's the same remote that we think we connected to, and that we
+	 * were already connected. (TODO) */
+	if (remote) {
+		p = (uint8_t*)hdrs;
+		remote->sin_addr.s_addr = plan9addr_to_naddr(p);
+		p += 16;
+		p += 16;	/* skip local addr */
+		p += 16;	/* skip ipifc */
+		remote->sin_port = (p[0] << 0) | (p[1] << 8);
+		remote->sin_port = *(uint16_t *) p;
+		*fromlen = sizeof(struct sockaddr_in);
+	}
+	return ret;
+}
+
+ssize_t __recvfrom_iov(int fd, const struct iovec *iov, int iovcnt,
+                       int flags, __SOCKADDR_ARG from,
+                       socklen_t * __restrict fromlen)
+{
 	if (flags & MSG_OOB) {
 		errno = EOPNOTSUPP;
 		return -1;
 	}
 	if (from.__sockaddr__ && getsockname(fd, from, fromlen) < 0)
 		return -1;
-	/* UDP sockets need to have headers added to the payload for all packets,
-	 * since we're supporting blind sendto/recvfrom. */
-	if ((r = udp_sock_get_rock(fd))) {
-		int ret;
-		struct sockaddr_in *remote = from.__sockaddr_in__;
-		char *p, *newbuf = malloc(n + P9_UDP_HDR_SZ);
-		if (!newbuf) {
-			errno = ENOMEM;
-			return -1;
-		}
-		ret = read(fd, newbuf, n + P9_UDP_HDR_SZ);
-		/* subtracting before, so that we error out if we got less than the
-		 * headers needed */
-		ret -= P9_UDP_HDR_SZ;
-		if (ret < 0) {
-			free(newbuf);
-			return -1;
-		}
-		memcpy(buf, newbuf + P9_UDP_HDR_SZ, n);
-		/* Might not have a remote, if we were called via recv().  Could assert
-		 * that it's the same remote that we think we connected to, and that we
-		 * were already connected. (TODO) */
-		if (remote) {
-			p = newbuf;
-			remote->sin_addr.s_addr = plan9addr_to_naddr(p);
-			p += 16;
-			p += 16;	/* skip local addr */
-			p += 16;	/* skip ipifc */
-			remote->sin_port = (p[0] << 0) | (p[1] << 8);
-			remote->sin_port = *(uint16_t *) p;
-			*fromlen = sizeof(struct sockaddr_in);
-		}
-		free(newbuf);
-		return ret;
-	}
-	return read(fd, buf, n);
+	if (udp_sock_get_rock(fd))
+		return __recvfrom_udp(fd, iov, iovcnt, flags, from, fromlen);
+	else
+		return readv(fd, iov, iovcnt);
 }
 
+/* Read N bytes into BUF through socket FD from peer at address FROM (which is
+ * FROMLEN bytes long).  Returns the number read or -1 for errors.  */
+ssize_t __recvfrom(int fd, void *__restrict buf, size_t n,
+				   int flags, __SOCKADDR_ARG from,
+				   socklen_t * __restrict fromlen)
+{
+	struct iovec iov[1];
+
+	iov[0].iov_base = buf;
+	iov[0].iov_len = n;
+	return __recvfrom_iov(fd, iov, 1, flags, from, fromlen);
+}
 weak_alias(__recvfrom, recvfrom)

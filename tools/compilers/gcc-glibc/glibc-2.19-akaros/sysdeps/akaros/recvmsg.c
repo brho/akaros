@@ -8,18 +8,19 @@
 #include <sys/socket.h>
 #include <errno.h>
 
+/* In recvfrom.c */
+extern ssize_t __recvfrom_iov(int fd, const struct iovec *iov, int iovcnt,
+                              int flags, __SOCKADDR_ARG from,
+                              socklen_t * __restrict fromlen);
+
 /* Receive a message as described by MSG from socket FD.  Returns the number of
  * bytes read or -1 for errors.  */
 ssize_t __recvmsg(int fd, struct msghdr *msg, int flags)
 {
 	ssize_t ret;
 
-	if (msg->msg_iovlen < 1) {
-		errno = EINVAL;
-		return -1;
-	}
-	ret = recvfrom(fd, msg->msg_iov[0].iov_base, msg->msg_iov[0].iov_len,
-	               flags, msg->msg_name, &msg->msg_namelen);
+	ret = __recvfrom_iov(fd, msg->msg_iov, msg->msg_iovlen,
+	                     flags, msg->msg_name, &msg->msg_namelen);
 	if (ret == -1)
 		return ret;
 	/* On successful calls, there's extra info we can return via *msg */
