@@ -668,6 +668,7 @@ static char *ipchaninfo(struct chan *ch, char *ret, size_t ret_l)
 
 static void closeconv(struct conv *cv)
 {
+	ERRSTACK(1);
 	struct conv *nc;
 	struct Ipmulti *mp;
 
@@ -677,7 +678,10 @@ static void closeconv(struct conv *cv)
 		qunlock(&cv->qlock);
 		return;
 	}
-
+	if (waserror()) {
+		qunlock(&cv->qlock);
+		nexterror();
+	}
 	/* close all incoming calls since no listen will ever happen */
 	for (nc = cv->incall; nc; nc = cv->incall) {
 		cv->incall = nc->next;
@@ -696,6 +700,7 @@ static void closeconv(struct conv *cv)
 	cv->p->close(cv);
 	cv->state = Idle;
 	qunlock(&cv->qlock);
+	poperror();
 }
 
 static void ipclose(struct chan *c)
