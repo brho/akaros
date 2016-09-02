@@ -57,9 +57,6 @@ struct semaphore {
 #ifdef CONFIG_SEMAPHORE_DEBUG
 	TAILQ_ENTRY(semaphore)		link;
 	bool						is_on_list;	/* would like better sys/queue.h */
-	uintptr_t 					bt_pc;		/* program counter of last down */
-	uintptr_t 					bt_fp;		/* frame pointer of last down */
-	uint32_t 					calling_core;
 #endif
 };
 

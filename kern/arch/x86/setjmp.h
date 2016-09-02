@@ -16,6 +16,16 @@ static inline void __ros_clobber_callee_regs(void)
 	asm volatile ("" : : : "rbx", "r12", "r13", "r14", "r15");
 }
 
+static inline uintptr_t jmpbuf_get_pc(struct jmpbuf *jb)
+{
+	return jb->retaddr;
+}
+
+static inline uintptr_t jmpbuf_get_fp(struct jmpbuf *jb)
+{
+	return jb->rbp;
+}
+
 #else
 
 struct jmpbuf {
@@ -28,4 +38,15 @@ static inline __ros_clobber_callee_regs(void)
 {
 	asm volatile ("" : : : "ebx", "esi", "edi");
 }
+
+static inline uintptr_t jmpbuf_get_pc(struct jmpbuf *jb)
+{
+	return jb->retaddr;
+}
+
+static inline uintptr_t jmpbuf_get_fp(struct jmpbuf *jb)
+{
+	return jb->ebp;
+}
+
 #endif

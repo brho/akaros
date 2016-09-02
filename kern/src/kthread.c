@@ -260,9 +260,6 @@ static void sem_init_common(struct semaphore *sem, int signals)
 	sem->nr_signals = signals;
 #ifdef CONFIG_SEMAPHORE_DEBUG
 	sem->is_on_list = FALSE;
-	sem->bt_pc = 0;
-	sem->bt_fp = 0;
-	sem->calling_core = 0;
 #endif
 }
 
@@ -545,9 +542,6 @@ static void debug_unlock_semlist(void)
  * waited */
 static void debug_downed_sem(struct semaphore *sem)
 {
-	sem->bt_pc = read_pc();
-	sem->bt_fp = read_bp();
-	sem->calling_core = core_id();
 	if (TAILQ_EMPTY(&sem->waiters) || sem->is_on_list)
 		return;
 	TAILQ_INSERT_HEAD(&sems_with_waiters, sem, link);
@@ -593,16 +587,13 @@ void print_sem_info(struct semaphore *sem)
 	struct kthread *kth_i;
 	/* Always safe to irqsave */
 	spin_lock_irqsave(&sem->lock);
-	printk("Semaphore %p has %d signals (neg = waiters)", sem, sem->nr_signals);
-#ifdef CONFIG_SEMAPHORE_DEBUG
-	printk(", recently downed on core %d with pc/frame %p %p\n",
-	       sem->calling_core, sem->bt_pc, sem->bt_fp);
-#else
-	printk("\n");
-#endif /* CONFIG_SEMAPHORE_DEBUG */
+	printk("Semaphore %p has %d signals (neg = waiters)\n", sem,
+	       sem->nr_signals);
 	TAILQ_FOREACH(kth_i, &sem->waiters, link)
-		printk("\tKthread %p (%s), proc %d (%p), sysc %p\n", kth_i, kth_i->name,
-		       kth_i->proc ? kth_i->proc->pid : 0, kth_i->proc, kth_i->sysc);
+		printk("\tKthread %p (%s), proc %d, sysc %p, pc/frame %p %p\n",
+		       kth_i, kth_i->name, kth_i->proc ? kth_i->proc->pid : 0,
+		       kth_i->sysc, jmpbuf_get_pc(&kth_i->context),
+		       jmpbuf_get_fp(&kth_i->context));
 	printk("\n");
 	spin_unlock_irqsave(&sem->lock);
 }
