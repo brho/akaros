@@ -97,6 +97,7 @@ enum {
 	QIO_DROP_OVERFLOW = (1 << 2),	/* alternative to setting qdropoverflow */
 	QIO_JUST_ONE_BLOCK = (1 << 3),	/* when qbreading, just get one block */
 	QIO_NON_BLOCK = (1 << 4),		/* throw EAGAIN instead of blocking */
+	QIO_DONT_KICK = (1 << 5),		/* don't kick when waking */
 };
 
 unsigned int qiomaxatomic = Maxatomic;
@@ -105,7 +106,7 @@ static ssize_t __qbwrite(struct queue *q, struct block *b, int flags);
 static struct block *__qbread(struct queue *q, size_t len, int qio_flags,
                               int mem_flags);
 static bool qwait_and_ilock(struct queue *q, int qio_flags);
-static void qwakeup_iunlock(struct queue *q);
+static void qwakeup_iunlock(struct queue *q, int qio_flags);
 
 /* Helper: fires a wake callback, sending 'filter' */
 static void qwake_cb(struct queue *q, int filter)
@@ -820,7 +821,7 @@ static int __try_qbread(struct queue *q, size_t len, int qio_flags,
 		len -= blen;
 	}
 out_ok:
-	qwakeup_iunlock(q);
+	qwakeup_iunlock(q, qio_flags);
 	*real_ret = ret;
 	return QBR_OK;
 }
@@ -877,7 +878,10 @@ struct block *qget(struct queue *q)
  * discarded.
  *
  * If the bytes are in the queue, then they must be discarded.  The only time to
- * return less than len is if the q itself has less than len bytes.  */
+ * return less than len is if the q itself has less than len bytes.
+ *
+ * This won't trigger a kick when waking up any sleepers.  This seems to be Plan
+ * 9's intent, since the TCP stack will deadlock if qdiscard kicks. */
 size_t qdiscard(struct queue *q, size_t len)
 {
 	struct block *blist;
@@ -887,7 +891,7 @@ size_t qdiscard(struct queue *q, size_t len)
 	/* This is racy.  There could be multiple qdiscarders or other consumers,
 	 * where the consumption could be interleaved. */
 	while (qlen(q) && len) {
-		blist = __qbread(q, len, 0, MEM_WAIT);
+		blist = __qbread(q, len, QIO_DONT_KICK, MEM_WAIT);
 		removed_amt = freeblist(blist);
 		sofar += removed_amt;
 		len -= removed_amt;
@@ -1389,7 +1393,7 @@ void qputback(struct queue *q, struct block *b)
  *  flow control, get producer going again
  *  called with q ilocked
  */
-static void qwakeup_iunlock(struct queue *q)
+static void qwakeup_iunlock(struct queue *q, int qio_flags)
 {
 	int dowakeup = 0;
 
@@ -1412,7 +1416,7 @@ static void qwakeup_iunlock(struct queue *q)
 
 	/* wakeup flow controlled writers */
 	if (dowakeup) {
-		if (q->kick)
+		if (q->kick && !(qio_flags & QIO_DONT_KICK))
 			q->kick(q->arg);
 		rendez_wakeup(&q->wr);
 	}
