@@ -677,6 +677,7 @@ int consreadstr(uint32_t off, char *buf, uint32_t n, char *str)
 
 static void consinit(void)
 {
+	kstrdup(&sysname, "nanwan");
 #if 0
 	todinit();
 #endif
@@ -959,6 +960,7 @@ static long consread(struct chan *c, void *buf, long n, int64_t off)
 #endif
 
 		case Qsysname:
+			/* TODO: this is racy */
 			if (sysname == NULL)
 				return 0;
 			return consreadstr((uint32_t) offset, buf, n, sysname);
@@ -1178,6 +1180,7 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 #endif
 
 		case Qsysname:
+			/* TODO: this is racy */
 			if (offset != 0)
 				error(EINVAL, ERROR_FIXME);
 			if (n <= 0 || n >= sizeof buf)
