@@ -50,6 +50,7 @@ enum {
 	Qfd,
 	Qfpregs,
 	Qkregs,
+	Qmaps,
 	Qmem,
 	Qnote,
 	Qnoteid,
@@ -111,6 +112,7 @@ struct dirtab procdir[] = {
 	{"fd", {Qfd}, 0, 0444},
 	{"fpregs", {Qfpregs}, 0, 0000},
 	//  {"kregs",   {Qkregs},   sizeof(Ureg),       0600},
+	{"maps", {Qmaps}, 0, 0000},
 	{"mem", {Qmem}, 0, 0000},
 	{"note", {Qnote}, 0, 0000},
 	{"noteid", {Qnoteid}, 0, 0664},
@@ -419,6 +421,72 @@ static void nonone(struct proc *p)
 #endif
 }
 
+struct bm_helper {
+	void						*buf;
+	size_t						buflen;
+	size_t						sofar;
+};
+
+static void get_needed_sz_cb(struct vm_region *vmr, void *arg)
+{
+	struct bm_helper *bmh = (struct bm_helper*)arg;
+
+	/* ballpark estimate of a line */
+	bmh->buflen += 150;
+}
+
+static void build_maps_cb(struct vm_region *vmr, void *arg)
+{
+	struct bm_helper *bmh = (struct bm_helper*)arg;
+	size_t old_sofar;
+	char path_buf[MAX_FILENAME_SZ];
+	char *path;
+	unsigned long inode_nr;
+
+	if (vmr->vm_file) {
+		path = file_abs_path(vmr->vm_file, path_buf, sizeof(path_buf));
+		inode_nr = vmr->vm_file->f_dentry->d_inode->i_ino;
+	} else {
+		strlcpy(path_buf, "[heap]", sizeof(path_buf));
+		path = path_buf;
+		inode_nr = 0;
+	}
+
+	old_sofar = bmh->sofar;
+	bmh->sofar += snprintf(bmh->buf + bmh->sofar, bmh->buflen - bmh->sofar,
+	                       "%08lx-%08lx %c%c%c%c %08x %02d:%02d %d ",
+	                       vmr->vm_base, vmr->vm_end,
+	                       vmr->vm_prot & PROT_READ    ? 'r' : '-',
+	                       vmr->vm_prot & PROT_WRITE   ? 'w' : '-',
+	                       vmr->vm_prot & PROT_EXEC    ? 'x' : '-',
+	                       vmr->vm_flags & MAP_PRIVATE ? 'p' : '-',
+	                       vmr->vm_file ? vmr->vm_foff : 0,
+	                       vmr->vm_file ? 1 : 0,	/* VFS == 1 for major */
+	                       0,
+	                       inode_nr);
+	/* Align the filename to the 74th char, like Linux (73 chars so far) */
+	bmh->sofar += snprintf(bmh->buf + bmh->sofar, bmh->buflen - bmh->sofar,
+	                       "%*s", 73 - (bmh->sofar - old_sofar), "");
+	bmh->sofar += snprintf(bmh->buf + bmh->sofar, bmh->buflen - bmh->sofar,
+	                       "%s\n", path);
+}
+
+static struct sized_alloc *build_maps(struct proc *p)
+{
+	struct bm_helper bmh[1];
+	struct sized_alloc *sza;
+
+	/* Try to figure out the size needed: start with extra space, then add a bit
+	 * for each VMR */
+	bmh->buflen = 150;
+	enumerate_vmrs(p, get_needed_sz_cb, bmh);
+	sza = sized_kzmalloc(bmh->buflen, MEM_WAIT);
+	bmh->buf = sza->buf;
+	bmh->sofar = 0;
+	enumerate_vmrs(p, build_maps_cb, bmh);
+	return sza;
+}
+
 static struct chan *procopen(struct chan *c, int omode)
 {
 	ERRSTACK(2);
@@ -556,6 +624,9 @@ static struct chan *procopen(struct chan *c, int omode)
 			 * know we won't free until we decref the proc. */
 			kref_get(&p->strace->users, 1);
 			c->aux = p->strace;
+			break;
+		case Qmaps:
+			c->aux = build_maps(p);
 			break;
 		case Qnotepg:
 			error(ENOSYS, ERROR_FIXME);
@@ -758,6 +829,8 @@ static void procclose(struct chan *c)
 	}
 	if (QID(c->qid) == Qns && c->aux != 0)
 		kfree(c->aux);
+	if (QID(c->qid) == Qmaps && c->aux != 0)
+		kfree(c->aux);
 	if (QID(c->qid) == Qstrace && c->aux != 0) {
 		struct strace *s = c->aux;
 
@@ -832,6 +905,7 @@ static int eventsavailable(void *)
 	return tproduced > tconsumed;
 }
 #endif
+
 static long procread(struct chan *c, void *va, long n, int64_t off)
 {
 	ERRSTACK(1);
@@ -844,6 +918,7 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 	uint8_t *rptr;
 	struct mntwalk *mw;
 	struct strace *s;
+	struct sized_alloc *sza;
 
 	if (c->qid.type & QTDIR) {
 		int nn;
@@ -955,6 +1030,11 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 							 mw->cm->to->name->s, mw->mh->from->name->s);
 			poperror();
 			//qunlock(&p->debug);
+			kref_put(&p->p_kref);
+			return i;
+		case Qmaps:
+			sza = c->aux;
+			i = readmem(off, va, n, sza->buf, sza->size);
 			kref_put(&p->p_kref);
 			return i;
 	}
