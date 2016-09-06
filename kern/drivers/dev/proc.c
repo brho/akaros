@@ -43,6 +43,7 @@ enum {
 	Qdir,
 	Qtrace,
 	Qtracepids,
+	Qself,
 	Qns,
 	Qargs,
 	Qctl,
@@ -236,7 +237,14 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 			devdir(c, qid, get_cur_genbuf(), 0, eve, 0444, dp);
 			return 1;
 		}
-		s -= 2;
+		if (s == 2) {
+			p = current;
+			strlcpy(get_cur_genbuf(), "self", GENBUF_SZ);
+			mkqid(&qid, (p->pid + 1) << QSHIFT, p->pid, QTDIR);
+			devdir(c, qid, get_cur_genbuf(), 0, p->user, DMDIR | 0555, dp);
+			return 1;
+		}
+		s -= 3;
 		if (name != NULL) {
 			/* ignore s and use name to find pid */
 			pid = strtol(name, &ename, 10);
