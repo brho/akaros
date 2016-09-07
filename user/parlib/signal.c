@@ -287,7 +287,20 @@ static int __sigpending(sigset_t *__set)
 static int __sigprocmask(int __how, __const sigset_t *__restrict __set,
                          sigset_t *__restrict __oset)
 {
-	sigset_t *sigmask = &current_uthread->sigstate.mask;
+	sigset_t *sigmask;
+
+	/* Signal handlers might call sigprocmask, with the intent of affecting the
+	 * uthread's sigmask.  Process-wide signal handlers run on behalf of the
+	 * entire process and aren't bound to a uthread, which means sigprocmask
+	 * won't work.  We can tell we're running one of these handlers since we are
+	 * in vcore context.  Uthread signals (e.g. pthread_kill()) run from uthread
+	 * context. */
+	if (in_vcore_context()) {
+		errno = ENOENT;
+		return -1;
+	}
+
+	sigmask = &current_uthread->sigstate.mask;
 
 	if (__set && (__how != SIG_BLOCK) &&
 	             (__how != SIG_SETMASK) &&
@@ -363,7 +376,12 @@ static int __sigwaitinfo(__const sigset_t *__restrict __set,
 
 static int __sigself(int signo)
 {
-	int ret = uthread_signal(current_uthread, signo);
+	int ret;
+
+	if (in_vcore_context())
+		return kill(getpid(), signo);
+
+	ret = uthread_signal(current_uthread, signo);
 
 	void cb(struct uthread *uthread, void *arg)
 	{
@@ -371,4 +389,5 @@ static int __sigself(int signo)
 	}
 	if (ret == 0)
 		uthread_yield(TRUE, cb, 0);
+	return ret;
 }
