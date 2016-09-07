@@ -59,3 +59,12 @@ struct kmalloc_tag {
 	uint32_t canary;
 	int flags;
 };
+
+/* This is aligned so that the buf is aligned to the usual kmalloc alignment. */
+struct sized_alloc {
+	void						*buf;
+	size_t						size;
+} __attribute__((aligned(KMALLOC_ALIGNMENT)));
+
+/* Allocate a sized_alloc, big enough to hold size bytes.  Free with kfree. */
+struct sized_alloc *sized_kzmalloc(size_t size, int flags);

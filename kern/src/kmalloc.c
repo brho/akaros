@@ -241,3 +241,15 @@ void kmalloc_canary_check(char *str)
 	if (tag->canary != KMALLOC_CANARY)
 		panic("\t\t KMALLOC CANARY CHECK FAILED %s\n", str);
 }
+
+struct sized_alloc *sized_kzmalloc(size_t size, int flags)
+{
+	struct sized_alloc *sza;
+
+	sza = kzmalloc(sizeof(struct sized_alloc) + size, flags);
+	if (!sza)
+		return NULL;
+	sza->buf = sza + 1;
+	sza->size = size;
+	return sza;
+}
