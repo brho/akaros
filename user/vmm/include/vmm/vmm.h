@@ -27,12 +27,19 @@ struct virtual_machine {
 	struct guest_thread			**gths;
 	unsigned int				nr_gpcs;
 	struct vmm_gpcore_init		*gpcis;
+	bool						vminit;
 
 	/* TODO: put these in appropriate structures.  e.g., virtio things in
 	 * something related to virtio.  low4k in something related to the guest's
 	 * memory. */
 	uint8_t						*low4k;
 	struct virtio_mmio_dev		*virtio_mmio_devices[VIRTIO_MMIO_MAX_NUM_DEV];
+
+	/* Default root pointer to use if one is not set in a
+	 * guest thread. We expect this to be the common case,
+	 * where all guests share a page table. It's not required
+	 * however. */
+	void						*root;
 };
 
 char *regname(uint8_t reg);
