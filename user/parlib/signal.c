@@ -123,6 +123,11 @@ static bool stack_ptr_is_sane(uintptr_t sp)
 	return TRUE;
 }
 
+static bool uth_is_handling_sigs(struct uthread *uth)
+{
+	return uth->sigstate.data ? TRUE : FALSE;
+}
+
 /* Prep a uthread to run a signal handler.  The original context of the uthread
  * is saved on its stack, and a new context is set up to run the signal handler
  * the next time the uthread is run. */
@@ -228,7 +233,7 @@ int uthread_signal(struct uthread *uthread, int signo)
  * handler is complete, the original context will be restored and restarted. */
 void uthread_prep_pending_signals(struct uthread *uthread)
 {
-	if (!uthread->sigstate.data && uthread->sigstate.pending) {
+	if (!uth_is_handling_sigs(uthread) && uthread->sigstate.pending) {
 		sigset_t andset = uthread->sigstate.pending & (~uthread->sigstate.mask);
 
 		if (!__sigisemptyset(&andset))
@@ -246,7 +251,7 @@ void uthread_prep_signal_from_fault(struct uthread *uthread,
 	if (!__sigismember(&uthread->sigstate.mask, signo)) {
 		struct siginfo info = {0};
 
-		if (uthread->sigstate.data) {
+		if (uth_is_handling_sigs(uthread)) {
 			printf("Uthread sighandler faulted, signal: %d\n", signo);
 			/* uthread.c already copied out the faulting ctx into the uth */
 			print_user_context(&uthread->u_ctx);
