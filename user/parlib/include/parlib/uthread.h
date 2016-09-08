@@ -122,6 +122,16 @@ static inline void init_uthread_ctx(struct uthread *uth, void (*entry)(void),
 	init_user_ctx(&uth->u_ctx, (long)entry, (long)(stack_bottom) + size);
 }
 
+/* When we look at the current_uthread, its context might be in the uthread
+ * struct or it might be in VCPD.  This returns a pointer to the right place. */
+static inline struct user_context *get_cur_uth_ctx(void)
+{
+	if (current_uthread->flags & UTHREAD_SAVED)
+		return &current_uthread->u_ctx;
+	else
+		return &vcpd_of(vcore_id())->uthread_ctx;
+}
+
 #define uthread_set_tls_var(uth, name, val)                                    \
 ({                                                                             \
 	typeof(val) __val = val;                                                   \
