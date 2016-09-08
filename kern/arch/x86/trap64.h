@@ -20,51 +20,6 @@ static inline bool in_kernel(struct hw_trapframe *hw_tf)
 	return (hw_tf->tf_cs & ~3) == GD_KT;
 }
 
-static inline uintptr_t get_hwtf_pc(struct hw_trapframe *hw_tf)
-{
-	return hw_tf->tf_rip;
-}
-
-static inline uintptr_t get_hwtf_fp(struct hw_trapframe *hw_tf)
-{
-	return hw_tf->tf_rbp;
-}
-
-static inline uintptr_t get_hwtf_sp(struct hw_trapframe *hw_tf)
-{
-	return hw_tf->tf_rsp;
-}
-
-static inline uintptr_t get_swtf_pc(struct sw_trapframe *sw_tf)
-{
-	return sw_tf->tf_rip;
-}
-
-static inline uintptr_t get_swtf_fp(struct sw_trapframe *sw_tf)
-{
-	return sw_tf->tf_rbp;
-}
-
-static inline uintptr_t get_swtf_sp(struct sw_trapframe *sw_tf)
-{
-	return sw_tf->tf_rsp;
-}
-
-static inline uintptr_t get_vmtf_pc(struct vm_trapframe *vm_tf)
-{
-	return vm_tf->tf_rip;
-}
-
-static inline uintptr_t get_vmtf_fp(struct vm_trapframe *vm_tf)
-{
-	return vm_tf->tf_rbp;
-}
-
-static inline uintptr_t get_vmtf_sp(struct vm_trapframe *vm_tf)
-{
-	return vm_tf->tf_rsp;
-}
-
 static inline void x86_advance_ip(struct hw_trapframe *hw_tf, size_t bytes)
 {
 	hw_tf->tf_rip += bytes;

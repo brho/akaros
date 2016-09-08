@@ -18,6 +18,51 @@
 
 #include <ros/arch/trapframe64.h>
 
+static inline uintptr_t get_hwtf_pc(struct hw_trapframe *hw_tf)
+{
+	return hw_tf->tf_rip;
+}
+
+static inline uintptr_t get_hwtf_fp(struct hw_trapframe *hw_tf)
+{
+	return hw_tf->tf_rbp;
+}
+
+static inline uintptr_t get_hwtf_sp(struct hw_trapframe *hw_tf)
+{
+	return hw_tf->tf_rsp;
+}
+
+static inline uintptr_t get_swtf_pc(struct sw_trapframe *sw_tf)
+{
+	return sw_tf->tf_rip;
+}
+
+static inline uintptr_t get_swtf_fp(struct sw_trapframe *sw_tf)
+{
+	return sw_tf->tf_rbp;
+}
+
+static inline uintptr_t get_swtf_sp(struct sw_trapframe *sw_tf)
+{
+	return sw_tf->tf_rsp;
+}
+
+static inline uintptr_t get_vmtf_pc(struct vm_trapframe *vm_tf)
+{
+	return vm_tf->tf_rip;
+}
+
+static inline uintptr_t get_vmtf_fp(struct vm_trapframe *vm_tf)
+{
+	return vm_tf->tf_rbp;
+}
+
+static inline uintptr_t get_vmtf_sp(struct vm_trapframe *vm_tf)
+{
+	return vm_tf->tf_rsp;
+}
+
 /* FP state and whatever else the kernel won't muck with automatically.  For
  * now, it's the Non-64-bit-mode layout of FP and XMM registers, as used by
  * FXSAVE and FXRSTOR.  Other modes will require a union on a couple entries.
