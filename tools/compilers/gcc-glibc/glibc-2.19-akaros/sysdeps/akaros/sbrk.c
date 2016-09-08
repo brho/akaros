@@ -25,7 +25,7 @@
 #include <ros/procinfo.h>
 #include <sys/mman.h>
 
-__libc_lock_define(static,brk_lock);
+__libc_lock_define_initialized(static, brk_lock);
 static uintptr_t curbrk = 0;
 
 static uintptr_t
