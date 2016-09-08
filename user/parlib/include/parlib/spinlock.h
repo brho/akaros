@@ -35,6 +35,7 @@ struct spin_pdr_lock {
 typedef struct spin_pdr_lock spinpdrlock_t;
 
 void spin_pdr_init(struct spin_pdr_lock *pdr_lock);
+bool spin_pdr_trylock(struct spin_pdr_lock *pdr_lock);
 void spin_pdr_lock(struct spin_pdr_lock *pdr_lock);
 void spin_pdr_unlock(struct spin_pdr_lock *pdr_lock);
 bool spin_pdr_locked(struct spin_pdr_lock *pdr_lock);

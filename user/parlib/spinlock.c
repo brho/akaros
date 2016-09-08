@@ -88,3 +88,21 @@ void spin_pdr_unlock(struct spin_pdr_lock *pdr_lock)
 	/* Enable notifs, if we're an _M uthread */
 	uth_enable_notifs();
 }
+
+bool spin_pdr_trylock(struct spin_pdr_lock *pdr_lock)
+{
+	uint32_t lock_val;
+
+	uth_disable_notifs();
+	lock_val = ACCESS_ONCE(pdr_lock->lock);
+	if (lock_val != SPINPDR_UNLOCKED) {
+		uth_enable_notifs();
+		return FALSE;
+	}
+	if (atomic_cas_u32(&pdr_lock->lock, lock_val, vcore_id())) {
+		return TRUE;
+	} else {
+		uth_enable_notifs();
+		return FALSE;
+	}
+}
