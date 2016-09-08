@@ -103,6 +103,7 @@ static int vmsetup(struct virtual_machine *vm, int flags)
 		return ret;
 
 	for (i = 0; i < vm->nr_gpcs; i++) {
+		vm->gths[i]->halt_exit = vm->halt_exit;
 		vm_tf = gth_to_vmtf(vm->gths[i]);
 		vm_tf->tf_cr3 = (uint64_t)p512;
 	}

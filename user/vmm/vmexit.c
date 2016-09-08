@@ -190,6 +190,8 @@ static bool handle_halt(struct guest_thread *gth)
 {
 	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
 
+	if (gth->halt_exit)
+		return FALSE;
 	/* It's possible the guest disabled IRQs and halted, perhaps waiting on an
 	 * NMI or something.  If we need to support that, we can change this.  */
 	sleep_til_irq(gth);

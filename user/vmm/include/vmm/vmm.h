@@ -40,6 +40,9 @@ struct virtual_machine {
 	 * where all guests share a page table. It's not required
 	 * however. */
 	void						*root;
+
+	/* Default value for whether guest threads halt on an exit. */
+	bool						halt_exit;
 };
 
 char *regname(uint8_t reg);
