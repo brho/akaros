@@ -39,11 +39,11 @@
 
 #else
 
-#include "../user/parlib/include/tsc-compat.h"
+#include "../user/parlib/include/parlib/tsc-compat.h"
 #include "misc-compat.h"
 #include "linux-lock-hacks.h" /* TODO: have a build system and lib / C file */
 
-#include "../user/benchutil/include/measure.h"
+#include "../user/benchutil/include/benchutil/measure.h"
 #include "../user/benchutil/measure.c"
 
 static void os_prep_work(pthread_t *worker_threads, int nr_threads)
