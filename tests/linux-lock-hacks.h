@@ -2,33 +2,34 @@
  * lock_test.  It's a .h so that make tests doesn't build it. */
 
 #define ARCH_CL_SIZE 64
-#define SPINLOCK_INITIALIZER {0}
+#define SPINLOCK_INITIALIZER {FALSE}
 
 typedef struct {
-	int lock;
+	bool locked;
 } spinlock_t;
 
 void __attribute__((noinline)) spinlock_init(spinlock_t *lock)
 {
-	lock->lock = 0;
+	lock->locked = FALSE;
 }
 
-int __attribute__((noinline)) spinlock_trylock(spinlock_t *lock) 
+/* Returns TRUE if we grabbed the lock */
+bool __attribute__((noinline)) spinlock_trylock(spinlock_t *lock)
 {
-	if (lock->lock)
-		return EBUSY;
-	return __sync_lock_test_and_set(&lock->lock, EBUSY);
+	if (lock->locked)
+		return FALSE;
+	return !__sync_lock_test_and_set(&lock->locked, TRUE);
 }
 
 void __attribute__((noinline)) spinlock_lock(spinlock_t *lock) 
 {
-	while (spinlock_trylock(lock))
+	while (!spinlock_trylock(lock))
 		cpu_relax();
 }
 
 void __attribute__((noinline)) spinlock_unlock(spinlock_t *lock) 
 {
-	__sync_lock_release(&lock->lock, 0);
+	__sync_lock_release(&lock->locked, FALSE);
 }
 
 #define MCS_LOCK_INIT {0}

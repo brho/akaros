@@ -14,30 +14,31 @@
 
 void spinlock_init(spinlock_t *lock)
 {
-	lock->lock = 0;
+	lock->locked = FALSE;
 }
 
-int spinlock_trylock(spinlock_t *lock) 
+/* Returns TRUE if we grabbed the lock */
+bool spinlock_trylock(spinlock_t *lock)
 {
-	if (lock->lock)
-		return EBUSY;
-	return __sync_lock_test_and_set(&lock->lock, EBUSY);
+	if (lock->locked)
+		return FALSE;
+	return !__sync_lock_test_and_set(&lock->locked, TRUE);
 }
 
 void spinlock_lock(spinlock_t *lock) 
 {
-	while (spinlock_trylock(lock))
+	while (!spinlock_trylock(lock))
 		cpu_relax();
 }
 
 void spinlock_unlock(spinlock_t *lock) 
 {
-	__sync_lock_release(&lock->lock, 0);
+	__sync_lock_release(&lock->locked, FALSE);
 }
 
 bool spinlock_locked(spinlock_t *lock)
 {
-	return lock->lock != 0;
+	return lock->locked;
 }
 
 /* Spin-PRD locks (preemption detection/recovery).  Idea is to CAS and put the

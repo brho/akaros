@@ -13,14 +13,14 @@
 
 __BEGIN_DECLS
 
-#define SPINLOCK_INITIALIZER {0}
+#define SPINLOCK_INITIALIZER {FALSE}
 
 typedef struct {
-  int lock;
+	bool locked;
 } spinlock_t;
 
 void spinlock_init(spinlock_t *lock);
-int spinlock_trylock(spinlock_t *lock);
+bool spinlock_trylock(spinlock_t *lock);
 void spinlock_lock(spinlock_t *lock);
 void spinlock_unlock(spinlock_t *lock);
 bool spinlock_locked(spinlock_t *lock);
