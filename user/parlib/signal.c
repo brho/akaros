@@ -83,10 +83,21 @@ static void handle_event(struct event_msg *ev_msg, unsigned int ev_type,
 	int sig_nr;
 	struct siginfo info = {0};
 	info.si_code = SI_USER;
+	struct user_context fake_uctx;
 
 	assert(ev_msg);
 	sig_nr = ev_msg->ev_arg1;
-	trigger_posix_signal(sig_nr, &info, 0);
+	/* We're handling a process-wide signal, but signal handlers will want a
+	 * user context.  They operate on the model that some thread got the signal,
+	 * but that didn't happen on Akaros.  If we happen to have a current
+	 * uthread, we can use that - perhaps that's what the user wants.  If not,
+	 * we'll build a fake one representing our current call stack. */
+	if (current_uthread) {
+		trigger_posix_signal(sig_nr, &info, get_cur_uth_ctx());
+	} else {
+		init_user_ctx(&fake_uctx, (uintptr_t)handle_event, get_stack_pointer());
+		trigger_posix_signal(sig_nr, &info, &fake_uctx);
+	}
 }
 
 /* Called from uthread_slim_init() */
