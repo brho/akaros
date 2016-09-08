@@ -852,11 +852,12 @@ bool __check_preempt_pending(uint32_t vcoreid)
 void uth_disable_notifs(void)
 {
 	if (!in_vcore_context()) {
-		assert(current_uthread);
-		if (current_uthread->notif_disabled_depth++)
-			goto out;
-		current_uthread->flags |= UTHREAD_DONT_MIGRATE;
-		cmb();	/* don't issue the flag write before the vcore_id() read */
+		if (current_uthread) {
+			if (current_uthread->notif_disabled_depth++)
+				goto out;
+			current_uthread->flags |= UTHREAD_DONT_MIGRATE;
+			cmb();	/* don't issue the flag write before the vcore_id() read */
+		}
 		disable_notifs(vcore_id());
 	}
 out:
@@ -867,11 +868,12 @@ out:
 void uth_enable_notifs(void)
 {
 	if (!in_vcore_context()) {
-		assert(current_uthread);
-		if (--current_uthread->notif_disabled_depth)
-			return;
-		current_uthread->flags &= ~UTHREAD_DONT_MIGRATE;
-		cmb();	/* don't enable before ~DONT_MIGRATE */
+		if (current_uthread) {
+			if (--current_uthread->notif_disabled_depth)
+				return;
+			current_uthread->flags &= ~UTHREAD_DONT_MIGRATE;
+			cmb();	/* don't enable before ~DONT_MIGRATE */
+		}
 		enable_notifs(vcore_id());
 	}
 }
