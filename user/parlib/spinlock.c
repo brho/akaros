@@ -40,9 +40,6 @@ bool spinlock_locked(spinlock_t *lock)
 	return lock->lock != 0;
 }
 
-/* Two different versions, with and without CAS.  Default is with CAS. */
-#ifndef CONFIG_SPINPDR_NO_CAS /* CAS version */
-
 /* Spin-PRD locks (preemption detection/recovery).  Idea is to CAS and put the
  * lockholder's vcoreid in the lock, and all spinners ensure that vcore runs. */
 void spin_pdr_init(struct spin_pdr_lock *pdr_lock)
@@ -76,46 +73,6 @@ bool spin_pdr_locked(struct spin_pdr_lock *pdr_lock)
 {
 	return pdr_lock->lock != SPINPDR_UNLOCKED;
 }
-
-#else /* NON-CAS version */
-
-/* Using regular spinlocks, with SPINPDR_VCOREID_UNKNOWN (-1) meaning 'no
- * lockholder advertised yet'.  There are two spots where the lockholder still
- * holds the lock but hasn't advertised its vcoreid, and in those cases we
- * ensure all vcores aren't preempted (linear scan). */
-void spin_pdr_init(struct spin_pdr_lock *pdr_lock)
-{
-	spinlock_init(&pdr_lock->spinlock);
-	pdr_lock->lockholder = SPINPDR_VCOREID_UNKNOWN;
-}
-
-void __spin_pdr_lock(struct spin_pdr_lock *pdr_lock)
-{
-	uint32_t vcoreid = vcore_id();
-	uint32_t ensure_tgt;
-	while (spinlock_trylock(&pdr_lock->spinlock)) {
-		ensure_tgt = pdr_lock->lockholder;
-		/* ensure will make sure *every* vcore runs if you pass it your self. */
-		if (ensure_tgt == SPINPDR_VCOREID_UNKNOWN)
-			ensure_tgt = vcoreid;
-		ensure_vcore_runs(ensure_tgt);
-		cpu_relax();
-	}
-	pdr_lock->lockholder = vcoreid;
-}
-
-void __spin_pdr_unlock(struct spin_pdr_lock *pdr_lock)
-{
-	pdr_lock->lockholder = SPINPDR_VCOREID_UNKNOWN;
-	spinlock_unlock(&pdr_lock->spinlock);
-}
-
-bool spin_pdr_locked(struct spin_pdr_lock *pdr_lock)
-{
-	return spinlock_locked(&pdr_lock->spinlock);
-}
-
-#endif /* CONFIG_SPINPDR_NO_CAS */
 
 void spin_pdr_lock(struct spin_pdr_lock *pdr_lock)
 {
