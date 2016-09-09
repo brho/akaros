@@ -45,6 +45,8 @@ bool spinlock_locked(spinlock_t *lock)
  * lockholder's vcoreid in the lock, and all spinners ensure that vcore runs. */
 void spin_pdr_init(struct spin_pdr_lock *pdr_lock)
 {
+	/* See glibc-2.19-akaros/sysdeps/akaros/lowlevellock.h for details. */
+	parlib_static_assert(sizeof(struct spin_pdr_lock) == sizeof(int));
 	pdr_lock->lock = SPINPDR_UNLOCKED;
 }
 

@@ -84,5 +84,8 @@ libc {
     _assert_failed;
     nsec2tsc;
     tsc2nsec;
+    spin_pdr_trylock;
+    spin_pdr_lock;
+    spin_pdr_unlock;
   }
 }

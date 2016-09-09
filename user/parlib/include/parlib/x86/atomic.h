@@ -1,6 +1,5 @@
 #pragma once
 
-#include <parlib/common.h>
 #include <ros/atomic.h>
 
 __BEGIN_DECLS
