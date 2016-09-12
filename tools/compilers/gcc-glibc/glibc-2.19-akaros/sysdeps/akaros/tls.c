@@ -28,6 +28,8 @@ void *allocate_tls(void)
 	tcbhead_t *head = (tcbhead_t*)tcb;
 	head->tcb = tcb;
 	head->self = tcb;
+	head->pointer_guard = THREAD_SELF->header.pointer_guard;
+	head->stack_guard = THREAD_SELF->header.stack_guard;
 #endif
 	return tcb;
 }
