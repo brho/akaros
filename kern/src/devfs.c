@@ -100,7 +100,7 @@ ssize_t dev_stdout_write(struct file *file, const char *buf, size_t count,
 	char *t_buf;
 	struct proc *p = current;
 	if (p)
-		t_buf = user_strdup_errno(p, buf, count);
+		t_buf = user_memdup_errno(p, buf, count);
 	else
 		t_buf = (char*)buf;
 	if (!t_buf)
