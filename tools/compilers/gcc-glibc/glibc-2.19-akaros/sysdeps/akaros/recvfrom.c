@@ -46,6 +46,7 @@ static ssize_t __recvfrom_udp(int fd, const struct iovec *iov, int iovcnt,
 	 * were already connected. (TODO) */
 	if (remote) {
 		p = (uint8_t*)hdrs;
+		remote->sin_family = AF_INET;
 		remote->sin_addr.s_addr = plan9addr_to_naddr(p);
 		p += 16;
 		p += 16;	/* skip local addr */
