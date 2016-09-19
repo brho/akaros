@@ -51,8 +51,8 @@ static ssize_t __recvfrom_udp(int fd, const struct iovec *iov, int iovcnt,
 		p += 16;
 		p += 16;	/* skip local addr */
 		p += 16;	/* skip ipifc */
-		remote->sin_port = (p[0] << 0) | (p[1] << 8);
-		remote->sin_port = *(uint16_t *) p;
+		/* sin_port and p are both in network-ordering */
+		remote->sin_port = *(uint16_t*)p;
 		*fromlen = sizeof(struct sockaddr_in);
 	}
 	return ret;

@@ -53,6 +53,7 @@ static ssize_t __sendto_udp(Rock *r, int fd, const struct iovec *iov, int
 	 * local IP addr, the kernel will pick the one closest to dest */
 	p += 16;
 	p += 16;	/* skip ipifc */
+	/* remote_port and p are both in network-ordering */
 	*(uint16_t*)p = remote_port;
 	p += 2;
 	p += 2;	/* skip local port */
