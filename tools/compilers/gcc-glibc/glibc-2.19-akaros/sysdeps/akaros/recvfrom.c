@@ -66,12 +66,11 @@ ssize_t __recvfrom_iov(int fd, const struct iovec *iov, int iovcnt,
 		errno = EOPNOTSUPP;
 		return -1;
 	}
-	if (from.__sockaddr__ && getsockname(fd, from, fromlen) < 0)
-		return -1;
 	if (udp_sock_get_rock(fd))
 		return __recvfrom_udp(fd, iov, iovcnt, flags, from, fromlen);
-	else
-		return readv(fd, iov, iovcnt);
+	if (from.__sockaddr__ && getpeername(fd, from, fromlen) < 0)
+		return -1;
+	return readv(fd, iov, iovcnt);
 }
 
 /* Read N bytes into BUF through socket FD from peer at address FROM (which is
