@@ -34,10 +34,17 @@ int printf_ethaddr(FILE *stream, const struct printf_info *info,
 int printf_ethaddr_info(const struct printf_info* info, size_t n, int *argtypes,
                         int *size);
 
+/* Commonly used as %H, will print out a pointer as hex.  Pass it a precision,
+ * as in ("%.5H", ptr) (5 bytes) or ("%.*H", x, ptr) (x bytes). */
+int printf_hexdump(FILE *stream, const struct printf_info *info,
+                   const void *const *args);
+int printf_hexdump_info(const struct printf_info* info, size_t n, int *argtypes,
+                        int *size);
+
 /* Installed by default, will print the errstr for %r */
 int printf_errstr(FILE *stream, const struct printf_info *info,
                   const void *const *args);
-int printf_errstr_info(const struct printf_info* info, size_t n, int *argtypes,
+int printf_errstr_info(const struct printf_info *info, size_t n, int *argtypes,
                        int *size);
 
 __END_DECLS

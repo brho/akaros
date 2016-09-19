@@ -39,6 +39,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <stdlib.h>
 
 static bool is_ipv4(uint8_t *ipaddr)
 {
@@ -186,4 +187,41 @@ int printf_errstr_info(const struct printf_info* info, size_t n, int *argtypes,
 {
 	/* errstr consumes no arguments */
 	return 0;
+}
+
+static char num_to_nibble(unsigned int x)
+{
+	return "0123456789abcdef"[x & 0xf];
+}
+
+int printf_hexdump(FILE *stream, const struct printf_info *info,
+                   const void *const *args)
+{
+	uint8_t *arg = *(uint8_t**)args[0];
+	char *buf, *p;
+	int ret;
+
+	/* 3 chars per byte, one for the space */
+	buf = malloc(3 * info->prec);
+	p = buf;
+	for (int i = 0; i < info->prec; i++) {
+		if (i)
+			*p++ = ' ';
+		*p++ = num_to_nibble(*arg >> 4);
+		*p++ = num_to_nibble(*arg);
+		arg++;
+	}
+	ret =  fwrite(buf, 1, p - buf, stream);
+	free(buf);
+	return ret;
+}
+
+int printf_hexdump_info(const struct printf_info *info, size_t n, int *argtypes,
+                        int *size)
+{
+	if (n > 0) {
+		argtypes[0] = PA_POINTER;
+		size[0] = sizeof(uint8_t*);
+	}
+	return 1;
 }

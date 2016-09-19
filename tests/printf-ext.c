@@ -44,6 +44,8 @@ int main(int argc, char **argv)
 		printf("Failed to register 'M'\n");
 	if (register_printf_specifier('E', printf_ethaddr, printf_ethaddr_info))
 		printf("Failed to register 'E'\n");
+	if (register_printf_specifier('H', printf_hexdump, printf_hexdump_info))
+		printf("Failed to register 'H'\n");
 
 	printf("IPv4 addr %i\n", v4addr);
 	printf("IPv6 addr %i\n", v6addr);
@@ -52,6 +54,8 @@ int main(int argc, char **argv)
 	printf("IPv6 addr as mask %M\n", v6addr);
 	printf("ethaddr %E\n", ethaddr);
 	printf("ethaddr null %E\n", 0);
+	printf("IPv6 addr as hex (4 bytes only): %.4H\n", v6addr);
+	printf("IPv6 addr as hex: %.*H\n", COUNT_OF(v6addr), v6addr);
 
 	ret = open("/9/proc/no/such/file", 0, 0);
 	printf("Open ret %d, errstr: %r\n", ret);
