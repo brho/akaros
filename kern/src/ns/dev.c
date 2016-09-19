@@ -251,8 +251,10 @@ Accept:
 						   c->qid.path);
 Notfound:
 					if (j == 0)
-						error(ENOENT, ERROR_FIXME);
-					set_error(ENOENT, ERROR_FIXME);
+						error(ENOENT, "could not find name %s, dev %s", n,
+						      c->type == -1 ? "no dev" : devtab[c->type].name);
+					/* TODO: I think we don't need to just set_error here */
+					set_error(ENOENT, "tell brho you saw this in an error");
 					goto Done;
 				case 0:
 					printd("DEVWALK continue, i was %d\n", i);
