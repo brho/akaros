@@ -108,9 +108,12 @@ ssize_t dev_stdout_write(struct file *file, const char *buf, size_t count,
 	/* TODO: tty hack.  they are sending us an escape sequence, and the keyboard
 	 * would try to print it (which it can't do yet).  The hack is even dirtier
 	 * in that we only detect it if it is the first char, and we ignore
-	 * everything else. */
-	if (t_buf[0] != '\033') /* 0x1b */
+	 * everything else.  \033 is 0x1b. */
+	if (t_buf[0] != '\033') {
+		px_lock();
 		cputbuf(t_buf, count);
+		px_unlock();
+	}
 	if (p)
 		user_memdup_free(p, t_buf);
 	return count;

@@ -278,3 +278,15 @@ void backtrace_user_ctx(struct proc *p, struct user_context *ctx)
 	backtrace_user_frame(get_user_ctx_pc(ctx), get_user_ctx_fp(ctx));
 	pcpui->__lock_checking_enabled++;
 }
+
+static spinlock_t __px_lock = SPINLOCK_INITIALIZER_IRQSAVE;
+void px_lock(void)
+{
+	if (printx_on)
+		spin_lock_irqsave(&__px_lock);
+}
+void px_unlock(void)
+{
+	if (printx_on)
+		spin_unlock_irqsave(&__px_lock);
+}
