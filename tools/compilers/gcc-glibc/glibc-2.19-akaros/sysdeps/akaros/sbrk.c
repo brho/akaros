@@ -23,10 +23,35 @@
 #include <ros/syscall.h>
 #include <ros/memlayout.h>
 #include <ros/procinfo.h>
+#include <ros/procdata.h>
 #include <sys/mman.h>
 
-__libc_lock_define_initialized(static, brk_lock);
 static uintptr_t curbrk = 0;
+__libc_lock_define_initialized(static, __brk_lock);
+
+static bool is_early_scp(void)
+{
+	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[0];
+
+	return (uintptr_t)vcpd->flags & VC_SCP_NOVCCTX;
+}
+
+/* Early SCP context doesn't need the locks, since we're single threaded, and we
+ * can't grab the PDR locks in some cases.  Specifically, we might not have a
+ * TLS for thread 0 yet, so we can't do things like check in_vcore_context(). */
+static void brk_lock(void)
+{
+	if (is_early_scp)
+		return;
+	__libc_lock_lock(__brk_lock);
+}
+
+static void brk_unlock(void)
+{
+	if (is_early_scp)
+		return;
+	__libc_lock_unlock(__brk_lock);
+}
 
 static uintptr_t
 __internal_getbrk (void)
@@ -75,9 +100,9 @@ __brk (void* addr)
   if(addr == 0)
     return 0;
 
-  __libc_lock_lock(brk_lock);
+  brk_lock();
   int ret = __internal_setbrk((uintptr_t)addr);
-  __libc_lock_unlock(brk_lock);
+  brk_unlock();
 
   return ret;
 }
@@ -89,7 +114,7 @@ weak_alias (__brk, brk)
 void *
 __sbrk (intptr_t increment)
 {
-  __libc_lock_lock(brk_lock);
+  brk_lock();
 
   uintptr_t oldbrk = __internal_getbrk();
   if ((increment > 0
@@ -98,7 +123,7 @@ __sbrk (intptr_t increment)
       || __internal_setbrk (oldbrk + increment) < 0)
     oldbrk = -1;
 
-  __libc_lock_unlock(brk_lock);
+  brk_unlock();
 
   return (void*)oldbrk;
 }
