@@ -102,6 +102,7 @@ enum {
 
 unsigned int qiomaxatomic = Maxatomic;
 
+static size_t copy_to_block_body(struct block *to, void *from, size_t copy_amt);
 static ssize_t __qbwrite(struct queue *q, struct block *b, int flags);
 static struct block *__qbread(struct queue *q, size_t len, int qio_flags,
                               int mem_flags);
@@ -240,38 +241,51 @@ struct block *concatblock(struct block *bp)
 	return nb;
 }
 
+/* Makes an identical copy of the block, collapsing all the data into the block
+ * body.  It does not point to the contents of the original, it is a copy
+ * (unlike qclone).  Since we're copying, we might as well put the memory into
+ * one contiguous chunk. */
+struct block *copyblock(struct block *bp, int mem_flags)
+{
+	struct block *newb;
+	struct extra_bdata *ebd;
+	size_t amt;
+
+	QDEBUG checkb(bp, "copyblock 0");
+	newb = block_alloc(BLEN(bp), mem_flags);
+	if (!newb)
+		return 0;
+	amt = copy_to_block_body(newb, bp->rp, BHLEN(bp));
+	assert(amt == BHLEN(bp));
+	for (int i = 0; i < bp->nr_extra_bufs; i++) {
+		ebd = &bp->extra_data[i];
+		if (!ebd->base || !ebd->len)
+			continue;
+		amt = copy_to_block_body(newb, (void*)ebd->base + ebd->off, ebd->len);
+		assert(amt == ebd->len);
+	}
+	/* TODO: any other flags that need copied over? */
+	if (bp->flag & BCKSUM_FLAGS) {
+		newb->flag |= (bp->flag & BCKSUM_FLAGS);
+		newb->checksum_start = bp->checksum_start;
+		newb->checksum_offset = bp->checksum_offset;
+		newb->mss = bp->mss;
+	}
+	copyblockcnt++;
+	QDEBUG checkb(newb, "copyblock 1");
+	return newb;
+}
+
 /* Returns a block with the remaining contents of b all in the main body of the
  * returned block.  Replace old references to b with the returned value (which
  * may still be 'b', if no change was needed. */
 struct block *linearizeblock(struct block *b)
 {
 	struct block *newb;
-	size_t len;
-	struct extra_bdata *ebd;
 
 	if (!b->extra_len)
 		return b;
-
-	newb = block_alloc(BLEN(b), MEM_WAIT);
-	len = BHLEN(b);
-	memcpy(newb->wp, b->rp, len);
-	newb->wp += len;
-	len = b->extra_len;
-	for (int i = 0; (i < b->nr_extra_bufs) && len; i++) {
-		ebd = &b->extra_data[i];
-		if (!ebd->base || !ebd->len)
-			continue;
-		memcpy(newb->wp, (void*)(ebd->base + ebd->off), ebd->len);
-		newb->wp += ebd->len;
-		len -= ebd->len;
-	}
-	/* TODO: any other flags that need copied over? */
-	if (b->flag & BCKSUM_FLAGS) {
-		newb->flag |= (b->flag & BCKSUM_FLAGS);
-		newb->checksum_start = b->checksum_start;
-		newb->checksum_offset = b->checksum_offset;
-		newb->mss = b->mss;
-	}
+	newb = copyblock(b, MEM_WAIT);
 	freeb(b);
 	return newb;
 }
@@ -513,41 +527,6 @@ struct block *trimblock(struct block *bp, int offset, int len)
 		bp->next = NULL;
 	}
 	return bp;
-}
-
-/*
- *  copy 'count' bytes into a new block
- */
-struct block *copyblock(struct block *bp, int count)
-{
-	int l;
-	struct block *nbp;
-
-	QDEBUG checkb(bp, "copyblock 0");
-	nbp = block_alloc(count, MEM_WAIT);
-	if (bp->flag & BCKSUM_FLAGS) {
-		nbp->flag |= (bp->flag & BCKSUM_FLAGS);
-		nbp->checksum_start = bp->checksum_start;
-		nbp->checksum_offset = bp->checksum_offset;
-		nbp->mss = bp->mss;
-	}
-	PANIC_EXTRA(bp);
-	for (; count > 0 && bp != 0; bp = bp->next) {
-		l = BLEN(bp);
-		if (l > count)
-			l = count;
-		memmove(nbp->wp, bp->rp, l);
-		nbp->wp += l;
-		count -= l;
-	}
-	if (count > 0) {
-		memset(nbp->wp, 0, count);
-		nbp->wp += count;
-	}
-	copyblockcnt++;
-	QDEBUG checkb(nbp, "copyblock 1");
-
-	return nbp;
 }
 
 /* Adjust block @bp so that its size is exactly @len.
@@ -983,8 +962,9 @@ static size_t point_to_buf(struct block *b, unsigned int b_idx, uint32_t b_off,
 	return n_ebd->len;
 }
 
-/* given a string of blocks, fills the new block's extra_data  with the contents
- * of the blist [offset, len + offset)
+/* given a string of blocks, sets up the new block's extra_data such that it
+ * *points* to the contents of the blist [offset, len + offset).  This does not
+ * make a separate copy of the contents of the blist.
  *
  * returns 0 on success.  the only failure is if the extra_data array was too
  * small, so this returns a positive integer saying how big the extra_data needs
@@ -1072,7 +1052,8 @@ struct block *blist_clone(struct block *blist, int header_len, int len,
 
 /* given a queue, makes a single block with header_len reserved space in the
  * block main body, and the contents of [offset, len + offset) pointed to in the
- * new blocks ext_data. */
+ * new blocks ext_data.  This does not make a copy of the q's contents, though
+ * you do have a ref count on the memory. */
 struct block *qclone(struct queue *q, int header_len, int len, uint32_t offset)
 {
 	int ret;
