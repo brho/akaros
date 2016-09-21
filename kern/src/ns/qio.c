@@ -1624,7 +1624,7 @@ static struct block *build_block(void *from, size_t len, int mem_flags)
 	b->extra_data[0].len = len;
 	b->extra_len += len;
 #else
-	b = block_alloc(n, mem_flags);
+	b = block_alloc(len, mem_flags);
 	if (!b)
 		return 0;
 	memmove(b->wp, from, len);
@@ -1802,10 +1802,12 @@ void qsetlimit(struct queue *q, int limit)
  */
 void qdropoverflow(struct queue *q, bool onoff)
 {
+	spin_lock_irqsave(&q->lock);
 	if (onoff)
 		q->state |= Qdropoverflow;
 	else
 		q->state &= ~Qdropoverflow;
+	spin_unlock_irqsave(&q->lock);
 }
 
 /*
