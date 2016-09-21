@@ -336,7 +336,7 @@ static void ipifccreate(struct conv *c)
 	struct Ipifc *ifc;
 
 	c->rq = qopen(QMAX, 0, 0, 0);
-	c->sq = qopen(2 * QMAX, 0, 0, 0);
+	c->sq = qopen(2 * QMAX, Qmsg | Qcoalesce, 0, 0);
 	c->wq = qopen(QMAX, Qkick, ipifckick, c);
 	ifc = (struct Ipifc *)c->ptcl;
 	ifc->conv = c;

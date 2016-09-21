@@ -447,6 +447,7 @@ static struct chan *ipopen(struct chan *c, int omode)
 		case Qsnoop:
 			if (omode & O_WRITE)
 				error(EPERM, ERROR_FIXME);
+			/* might be racy.  note the lack of a proto lock, unlike Qdata */
 			p = f->p[PROTO(c->qid)];
 			cv = p->conv[CONV(c->qid)];
 			if (strcmp(ATTACHER(c), cv->owner) != 0 && !iseve())

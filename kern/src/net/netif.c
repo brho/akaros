@@ -437,6 +437,10 @@ long netifwrite(struct ether *nif, struct chan *c, void *a, long n)
 		p = netmulti(nif, f, binaddr, 0);
 		if (p)
 			error(EFAIL, p);
+	} else if (matchtoken(buf, "oneblock")) {
+		/* Qmsg + Qcoal = one block at a time. */
+		q_toggle_qmsg(f->in, TRUE);
+		q_toggle_qcoalesce(f->in, TRUE);
 	} else
 		n = -1;
 	qunlock(&nif->qlock);
