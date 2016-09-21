@@ -306,7 +306,7 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 {
 	struct etherpkt *pkt;
 	uint16_t type;
-	int len, multi, tome, fromme, vlanid, i;
+	int multi, tome, fromme, vlanid, i;
 	struct netfile **ep, *f, **fp, *fx;
 	struct block *xbp;
 	struct ether *vlan;
@@ -314,7 +314,9 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 	ether->inpackets++;
 
 	pkt = (struct etherpkt *)bp->rp;
-	len = BLEN(bp);
+	/* TODO: we might need to assert more for higher layers, or otherwise deal
+	 * with extra data. */
+	assert(BHLEN(bp) >= offsetof(struct etherpkt, data));
 	type = (pkt->type[0] << 8) | pkt->type[1];
 	if (type == Type8021Q && ether->nvlan) {
 		vlanid = nhgets(bp->rp + 2 * Eaddrlen + 2) & 0xFFF;
@@ -322,6 +324,8 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 			for (i = 0; i < ARRAY_SIZE(ether->vlans); i++) {
 				vlan = ether->vlans[i];
 				if (vlan != NULL && vlan->vlanid == vlanid) {
+					/* might have a problem with extra data here */
+					assert(BHLEN(bp) >= 4 + 2 * Eaddrlen);
 					memmove(bp->rp + 4, bp->rp, 2 * Eaddrlen);
 					bp->rp += 4;
 					return etheriq(vlan, bp, fromwire);
@@ -364,20 +368,18 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 				if (f->bridge && !fromwire && !fromme)
 					continue;
 				if (f->headersonly) {
-					etherrtrace(f, pkt, len);
+					etherrtrace(f, pkt, BHLEN(bp));
 					continue;
 				}
 				if (fromwire && fx == 0) {
 					fx = f;
 					continue;
 				}
-				xbp = block_alloc(len, MEM_ATOMIC);
+				xbp = copyblock(bp, MEM_ATOMIC);
 				if (xbp == 0) {
 					ether->soverflows++;
 					continue;
 				}
-				memmove(xbp->wp, pkt, len);
-				xbp->wp += len;
 				if (qpass(f->in, xbp) < 0)
 					ether->soverflows++;
 			}
