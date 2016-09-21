@@ -241,6 +241,7 @@ struct Ipifc {
 
 	uint32_t in, out;			/* message statistics */
 	uint32_t inerr, outerr;		/* ... */
+	uint32_t tracedrop;
 
 	uint8_t sendra6;			/* == 1 => send router advs on this ifc */
 	uint8_t recvra6;			/* == 1 => recv router advs on this ifc */
@@ -638,6 +639,7 @@ extern void ipifcremroute(struct Fs *, int unused_int, uint8_t * u8pt,
 						  uint8_t * u8pt2);
 extern void ipifcremmulti(struct conv *c, uint8_t * ma, uint8_t * ia);
 extern void ipifcaddmulti(struct conv *c, uint8_t * ma, uint8_t * ia);
+extern void ipifc_trace_block(struct Ipifc *ifc, struct block *bp);
 extern long ipselftabread(struct Fs *, char *a, uint32_t offset, int n);
 extern void ipsendra6(struct Fs *f, int on);
 

@@ -237,7 +237,7 @@ static void ipifcunbind(struct Ipifc *ifc)
 }
 
 char sfixedformat[] =
-	"device %s maxtu %d sendra %d recvra %d mflag %d oflag %d maxraint %d minraint %d linkmtu %d reachtime %d rxmitra %d ttl %d routerlt %d pktin %lu pktout %lu errin %lu errout %lu\n";
+	"device %s maxtu %d sendra %d recvra %d mflag %d oflag %d maxraint %d minraint %d linkmtu %d reachtime %d rxmitra %d ttl %d routerlt %d pktin %lu pktout %lu errin %lu errout %lu tracedrop %lu\n";
 
 char slineformat[] = "	%-40I %-10M %-40I %-12lu %-12lu\n";
 
@@ -254,7 +254,7 @@ static int ipifcstate(struct conv *c, char *state, int n)
 				 ifc->rp.mflag, ifc->rp.oflag, ifc->rp.maxraint,
 				 ifc->rp.minraint, ifc->rp.linkmtu, ifc->rp.reachtime,
 				 ifc->rp.rxmitra, ifc->rp.ttl, ifc->rp.routerlt,
-				 ifc->in, ifc->out, ifc->inerr, ifc->outerr);
+				 ifc->in, ifc->out, ifc->inerr, ifc->outerr, ifc->tracedrop);
 
 	rlock(&ifc->rwlock);
 	for (lifc = ifc->lifc; lifc && n > m; lifc = lifc->next)
@@ -1509,6 +1509,24 @@ void ipifcaddmulti(struct conv *c, uint8_t * ma, uint8_t * ia)
 				addselfcache(f, ifc, lifc, ma, Rmulti);
 		wunlock(&ifc->rwlock);
 		poperror();
+	}
+}
+
+/* Trace a block @b that crosses the interface @ifc. */
+void ipifc_trace_block(struct Ipifc *ifc, struct block *bp)
+{
+	struct block *newb;
+
+	if (!atomic_read(&ifc->conv->snoopers))
+		return;
+	newb = copyblock(bp, MEM_ATOMIC);
+	if (!newb) {
+		ifc->tracedrop++;
+		return;
+	}
+	if (qpass(ifc->conv->sq, newb) < 0) {
+		ifc->tracedrop++;
+		freeb(newb);
 	}
 }
 
