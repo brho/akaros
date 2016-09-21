@@ -1791,6 +1791,30 @@ void qdropoverflow(struct queue *q, bool onoff)
 	spin_unlock_irqsave(&q->lock);
 }
 
+/* Be careful: this can affect concurrent reads/writes and code that might have
+ * built-in expectations of the q's type. */
+void q_toggle_qmsg(struct queue *q, bool onoff)
+{
+	spin_lock_irqsave(&q->lock);
+	if (onoff)
+		q->state |= Qmsg;
+	else
+		q->state &= ~Qmsg;
+	spin_unlock_irqsave(&q->lock);
+}
+
+/* Be careful: this can affect concurrent reads/writes and code that might have
+ * built-in expectations of the q's type. */
+void q_toggle_qcoalesce(struct queue *q, bool onoff)
+{
+	spin_lock_irqsave(&q->lock);
+	if (onoff)
+		q->state |= Qcoalesce;
+	else
+		q->state &= ~Qcoalesce;
+	spin_unlock_irqsave(&q->lock);
+}
+
 /*
  *  flush the output queue
  */
