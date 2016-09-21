@@ -129,10 +129,12 @@ static void loopbackread(void *a)
 			runlock(&ifc->rwlock);
 			nexterror();
 		}
-		if (ifc->lifc == NULL)
+		if (ifc->lifc == NULL) {
 			freeb(bp);
-		else
+		} else {
+			ipifc_trace_block(ifc, bp);
 			ipiput4(lb->f, ifc, bp);
+		}
 		runlock(&ifc->rwlock);
 		poperror();
 	}
