@@ -71,6 +71,8 @@ struct proc_global_info {
 	uint64_t tsc_freq;
 	uint64_t tsc_overhead;
 	uint64_t bus_freq;
+	uint64_t walltime_ns_last;
+	uint64_t tsc_cycles_last;
 } __attribute__((aligned(PGSIZE)));
 #define PROCGINFO_NUM_PAGES  (sizeof(struct proc_global_info) / PGSIZE)
 

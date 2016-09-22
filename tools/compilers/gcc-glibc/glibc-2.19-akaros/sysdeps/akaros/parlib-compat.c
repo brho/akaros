@@ -9,6 +9,7 @@
 #include <parlib/stdio.h>
 #include <parlib/assert.h>
 #include <parlib/spinlock.h>
+#include <parlib/timing.h>
 #include <stdbool.h>
 
 /* Here we define functions and variables that are really defined in parlib, but

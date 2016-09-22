@@ -121,25 +121,6 @@ static void handle_user_alarm(struct event_msg *ev_msg, unsigned int ev_type,
 /* One chain to rule them all. */
 struct timer_chain global_tchain;
 
-/* Unix time offsets so we can allow people to specify an absolute unix time to
- * an alarm, rather than an absolute time in terms of raw tsc ticks.  This
- * value is initialized when the timer service is started. */
-static struct {
-	uint64_t tod; // The initial time of day in microseconds
-	uint64_t tsc; // The initial value of the tsc counter
-} unixtime_offsets;
-
-static inline void init_unixtime_offsets()
-{
-	struct timeval tv;
-
-	/* There's a bit of slack here, where the TSC time is taken after the
-	 * corresponding gettimeofday value. */
-	gettimeofday(&tv, NULL);
-	unixtime_offsets.tsc = read_tsc();
-	unixtime_offsets.tod = tv.tv_sec*1000000 + tv.tv_usec;
-}
-
 /* Helper, resets the earliest/latest times, based on the elements of the list.
  * If the list is empty, we set the times to be the 12345 poison time.  Since
  * the list is empty, the alarm shouldn't be going off. */
@@ -159,9 +140,6 @@ static void __attribute__((constructor)) init_alarm_service(void)
 {
 	int ctlfd, timerfd, alarmid;
 	struct event_queue *ev_q;
-
-	/* Initialize the unixtime_offsets */
-	init_unixtime_offsets();
 
 	/* Sets up timer chain (only one chain per process) */
 	spin_pdr_init(&global_tchain.lock);
@@ -218,10 +196,7 @@ static void __set_awaiter_abs(struct alarm_waiter *waiter, uint64_t abs_time)
  * to go off. */
 void set_awaiter_abs_unix(struct alarm_waiter *waiter, uint64_t abs_usec)
 {
-	uint64_t abs_tsc;
-
-	abs_tsc = usec2tsc(abs_usec - unixtime_offsets.tod) + unixtime_offsets.tsc;
-	__set_awaiter_abs(waiter, abs_tsc);
+	__set_awaiter_abs(waiter, epoch_nsec_to_tsc(abs_usec * 1000));
 }
 
 /* Give this a relative time from now, in microseconds.  This might be easier to

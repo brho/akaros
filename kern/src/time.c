@@ -104,33 +104,21 @@ uint64_t nsec2tsc(uint64_t nsec)
 }
 
 /*
- * Rudimentary timekeeping implementation.
- *
- * Nothing here yet apart from the base walltime and TSC cycle values
- * at system init time.
- */
-static struct {
-	uint64_t	walltime_ns_last;
-	uint64_t	tsc_cycles_last;
-} timekeeping;
-
-
-/*
  * Return nanoseconds since the UNIX epoch, 1st January, 1970.
  */
 uint64_t epoch_nsec(void)
 {
-	uint64_t cycles = read_tsc() - timekeeping.tsc_cycles_last;
+	uint64_t cycles = read_tsc() - __proc_global_info.tsc_cycles_last;
 
-	return timekeeping.walltime_ns_last + tsc2nsec(cycles);
+	return __proc_global_info.walltime_ns_last + tsc2nsec(cycles);
 }
 
 void time_init(void)
 {
 	train_timing();
 
-	timekeeping.walltime_ns_last = read_persistent_clock();
-	timekeeping.tsc_cycles_last  = read_tsc();
+	__proc_global_info.walltime_ns_last = read_persistent_clock();
+	__proc_global_info.tsc_cycles_last  = read_tsc();
 
 	cycles_to_nsec_init(__proc_global_info.tsc_freq);
 	nsec_to_cycles_init(__proc_global_info.tsc_freq);

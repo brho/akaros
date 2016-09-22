@@ -21,4 +21,8 @@ uint64_t usec2tsc(uint64_t usec);
 uint64_t nsec2tsc(uint64_t nsec);
 uint64_t nsec(void);
 
+uint64_t epoch_nsec_to_tsc(uint64_t epoch_ns);
+uint64_t tsc_to_epoch_nsec(uint64_t tsc);
+uint64_t epoch_nsec(void);
+
 __END_DECLS

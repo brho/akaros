@@ -18,7 +18,7 @@
 
 #include <errno.h>
 #include <sys/time.h>
-#include <ros/syscall.h>
+#include <parlib/timing.h>
 
 #undef __gettimeofday
 
@@ -30,7 +30,11 @@ __gettimeofday (tv, tz)
      struct timeval *tv;
      struct timezone *tz;
 {
-  return ros_syscall(SYS_gettimeofday, tv, 0, 0, 0, 0, 0);
+	uint64_t epoch_ns = epoch_nsec();
+
+	tv->tv_sec = epoch_ns / 1000000000;
+	tv->tv_usec = (epoch_ns % 1000000000) / 1000;
+	return 0;
 }
 libc_hidden_def (__gettimeofday)
 weak_alias (__gettimeofday, gettimeofday)

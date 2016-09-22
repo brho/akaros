@@ -2078,13 +2078,6 @@ intreg_t sys_rmdir(struct proc *p, const char *path, size_t path_l)
 	return retval;
 }
 
-intreg_t sys_gettimeofday(struct proc *p, int *buf)
-{
-	struct timeval tv = nsec2timeval(epoch_nsec());
-
-	return memcpy_to_user_errno(p, buf, &tv, sizeof(tv));
-}
-
 intreg_t sys_tcgetattr(struct proc *p, int fd, void *termios_p)
 {
 	int retval = 0;
@@ -2612,7 +2605,6 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_getcwd] = {(syscall_t)sys_getcwd, "getcwd"},
 	[SYS_mkdir] = {(syscall_t)sys_mkdir, "mkdir"},
 	[SYS_rmdir] = {(syscall_t)sys_rmdir, "rmdir"},
-	[SYS_gettimeofday] = {(syscall_t)sys_gettimeofday, "gettime"},
 	[SYS_tcgetattr] = {(syscall_t)sys_tcgetattr, "tcgetattr"},
 	[SYS_tcsetattr] = {(syscall_t)sys_tcsetattr, "tcsetattr"},
 	[SYS_setuid] = {(syscall_t)sys_setuid, "setuid"},

@@ -79,7 +79,7 @@
 #define SYS_tap_fds				126
 
 /* Misc syscalls */
-#define SYS_gettimeofday		140
+/* was #define SYS_gettimeofday	140 */
 #define SYS_tcgetattr			141
 #define SYS_tcsetattr			142
 #define SYS_setuid				143

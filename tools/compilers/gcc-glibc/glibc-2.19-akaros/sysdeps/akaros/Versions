@@ -75,6 +75,9 @@ libc {
     timerfd_gettime;
     add_timespecs;
     subtract_timespecs;
+    epoch_nsec;
+    epoch_nsec_to_tsc;
+    tsc_to_epoch_nsec;
 
     # Weak symbols in parlib-compat.c
     __vcoreid;
