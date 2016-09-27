@@ -447,6 +447,31 @@ static bool get_ep_event_from_msg(struct epoll_ctlr *ep, struct event_msg *msg,
 	return TRUE;
 }
 
+/* Helper: extracts as many epoll_events as possible from the ep. */
+static int __epoll_wait_poll(struct epoll_ctlr *ep, struct epoll_event *events,
+                             int maxevents)
+{
+	struct event_msg msg = {0};
+	int nr_ret = 0;
+
+	if (maxevents <= 0)
+		return 0;
+	/* Locking to protect get_ep_event_from_msg, specifically that the ep_fd
+	 * stored at ceq_ev->user_data does not get concurrently removed and
+	 * freed. */
+	uth_mutex_lock(ep->mtx);
+	for (int i = 0; i < maxevents; i++) {
+retry:
+		if (!uth_check_evqs(&msg, NULL, 1, ep->ceq_evq))
+			break;
+		if (!get_ep_event_from_msg(ep, &msg, &events[i]))
+			goto retry;
+		nr_ret++;
+	}
+	uth_mutex_unlock(ep->mtx);
+	return nr_ret;
+}
+
 /* We should be able to have multiple waiters.  ep shouldn't be closed or
  * anything, since we have the FD (that'd be bad programming on the user's
  * behalf).  We could have concurrent ADD/MOD/DEL operations (which lock). */
@@ -457,25 +482,15 @@ static int __epoll_wait(struct epoll_ctlr *ep, struct epoll_event *events,
 	struct event_msg dummy_msg;
 	struct event_queue *which_evq;
 	struct event_queue *alarm_evq;
-	int nr_ret = 0;
-	int recurse_ret;
+	int nr_ret;
 	struct syscall sysc;
 
-	/* Locking to protect get_ep_event_from_msg, specifically that the ep_fd
-	 * stored at ceq_ev->user_data does not get concurrently removed and
-	 * freed. */
-	uth_mutex_lock(ep->mtx);
-	for (int i = 0; i < maxevents; i++) {
-		if (uth_check_evqs(&msg, &which_evq, 1, ep->ceq_evq)) {
-			if (get_ep_event_from_msg(ep, &msg, &events[i]))
-				nr_ret++;
-		}
-	}
-	uth_mutex_unlock(ep->mtx);
+	nr_ret = __epoll_wait_poll(ep, events, maxevents);
 	if (nr_ret)
 		return nr_ret;
 	if (timeout == 0)
 		return 0;
+	/* From here on down, we're going to block until there is some activity */
 	if (timeout != -1) {
 		alarm_evq = ep_get_alarm_evq();
 		syscall_async(&sysc, SYS_block, timeout * 1000);
@@ -502,14 +517,17 @@ static int __epoll_wait(struct epoll_ctlr *ep, struct epoll_event *events,
 	}
 	uth_mutex_lock(ep->mtx);
 	if (get_ep_event_from_msg(ep, &msg, &events[0]))
-		nr_ret++;
+		nr_ret = 1;
 	uth_mutex_unlock(ep->mtx);
-	/* We might not have gotten one yet.  And regardless, there might be more
-	 * available.  Let's try again, with timeout == 0 to ensure no blocking.  We
-	 * use nr_ret (0 or 1 now) to adjust maxevents and events accordingly. */
-	recurse_ret = __epoll_wait(ep, events + nr_ret, maxevents - nr_ret, 0);
-	if (recurse_ret > 0)
-		nr_ret += recurse_ret;
+	/* We had to extract one message already as part of the blocking process.
+	 * We might be able to get more. */
+	nr_ret += __epoll_wait_poll(ep, events + nr_ret, maxevents - nr_ret);
+	/* This is a little nasty and hopefully a rare race.  We still might not
+	 * have a ret, but we expected to block until we had something.  We didn't
+	 * time out yet, but we spuriously woke up.  We need to try again (ideally,
+	 * we'd subtract the time left from the original timeout). */
+	if (!nr_ret)
+		return __epoll_wait(ep, events, maxevents, timeout);
 	return nr_ret;
 }
 
