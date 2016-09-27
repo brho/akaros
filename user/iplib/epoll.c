@@ -442,7 +442,8 @@ static bool get_ep_event_from_msg(struct epoll_ctlr *ep, struct event_msg *msg,
 		return FALSE;
 	}
 	ep_ev->data = ep_fd->ep_event.data;
-	ep_ev->events = taps_to_ep_events(msg->ev_arg2);
+	/* The events field was initialized to 0 in epoll_wait() */
+	ep_ev->events |= taps_to_ep_events(msg->ev_arg2);
 	return TRUE;
 }
 
@@ -516,7 +517,7 @@ int epoll_wait(int epfd, struct epoll_event *events, int maxevents,
                int timeout)
 {
 	struct epoll_ctlr *ep = fd_to_cltr(epfd);
-	int ret;
+
 	if (!ep) {
 		errno = EBADF;/* or EINVAL */
 		return -1;
@@ -525,8 +526,9 @@ int epoll_wait(int epfd, struct epoll_event *events, int maxevents,
 		errno = EINVAL;
 		return -1;
 	}
-	ret = __epoll_wait(ep, events, maxevents, timeout);
-	return ret;
+	for (int i = 0; i < maxevents; i++)
+		events[i].events = 0;
+	return __epoll_wait(ep, events, maxevents, timeout);
 }
 
 int epoll_pwait(int epfd, struct epoll_event *events, int maxevents,
