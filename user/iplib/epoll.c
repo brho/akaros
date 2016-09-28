@@ -49,6 +49,7 @@
 struct epoll_ctlr {
 	TAILQ_ENTRY(epoll_ctlr)		link;
 	struct event_queue			*ceq_evq;
+	struct event_queue			*alarm_evq;
 	struct ceq					*ceq;	/* convenience pointer */
 	unsigned int				size;
 	uth_mutex_t					mtx;
@@ -202,6 +203,7 @@ static void epoll_close(struct user_fd *ufd)
 	} while (nr_done < nr_tap_req);
 	free(tap_reqs);
 	ep_put_ceq_evq(ep->ceq_evq);
+	ep_put_alarm_evq(ep->alarm_evq);
 	uth_mutex_lock(ctlrs_mtx);
 	TAILQ_REMOVE(&all_ctlrs, ep, link);
 	uth_mutex_unlock(ctlrs_mtx);
@@ -222,6 +224,7 @@ static int init_ep_ctlr(struct epoll_ctlr *ep, int size)
 	ep->ufd.magic = EPOLL_UFD_MAGIC;
 	ep->ufd.close = epoll_close;
 	ep->ceq_evq = ep_get_ceq_evq(ceq_size);
+	ep->alarm_evq = ep_get_alarm_evq();
 	return 0;
 }
 
@@ -481,7 +484,6 @@ static int __epoll_wait(struct epoll_ctlr *ep, struct epoll_event *events,
 	struct event_msg msg = {0};
 	struct event_msg dummy_msg;
 	struct event_queue *which_evq;
-	struct event_queue *alarm_evq;
 	int nr_ret;
 	struct syscall sysc;
 
@@ -492,26 +494,16 @@ static int __epoll_wait(struct epoll_ctlr *ep, struct epoll_event *events,
 		return 0;
 	/* From here on down, we're going to block until there is some activity */
 	if (timeout != -1) {
-		alarm_evq = ep_get_alarm_evq();
-		syscall_async(&sysc, SYS_block, timeout * 1000);
-		if (!register_evq(&sysc, alarm_evq)) {
-			/* timeout occurred before we could even block! */
-			ep_put_alarm_evq(alarm_evq);
+		syscall_async_evq(&sysc, ep->alarm_evq, SYS_block, timeout * 1000);
+		uth_blockon_evqs(&msg, &which_evq, 2, ep->ceq_evq, ep->alarm_evq);
+		if (which_evq == ep->alarm_evq)
 			return 0;
-		}
-		uth_blockon_evqs(&msg, &which_evq, 2, ep->ceq_evq, alarm_evq);
-		if (which_evq != alarm_evq) {
-			/* sysc may or may not have finished yet.  this will force it to
-			 * *start* to finish iff it is still a submitted syscall. */
-			sys_abort_sysc(&sysc);
-			/* But we still need to wait until the syscall completed.  Need a
-			 * dummy msg, since we don't want to clobber the real msg. */
-			uth_blockon_evqs(&dummy_msg, 0, 1, alarm_evq);
-		}
-		/* TODO: Slightly dangerous, due to spammed INDIRs */
-		ep_put_alarm_evq(alarm_evq);
-		if (which_evq == alarm_evq)
-			return 0;
+		/* The alarm sysc may or may not have finished yet.  This will force it
+		 * to *start* to finish iff it is still a submitted syscall. */
+		sys_abort_sysc(&sysc);
+		/* But we still need to wait until the syscall completed.  Need a
+		 * dummy msg, since we don't want to clobber the real msg. */
+		uth_blockon_evqs(&dummy_msg, 0, 1, ep->alarm_evq);
 	} else {
 		uth_blockon_evqs(&msg, &which_evq, 1, ep->ceq_evq);
 	}
