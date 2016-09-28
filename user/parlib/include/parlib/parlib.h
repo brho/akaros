@@ -54,6 +54,8 @@ int         sys_abort_sysc_fd(int fd);
 int         sys_tap_fds(struct fd_tap_req *tap_reqs, size_t nr_reqs);
 
 void		syscall_async(struct syscall *sysc, unsigned long num, ...);
+void        syscall_async_evq(struct syscall *sysc, struct event_queue *evq,
+                              unsigned long num, ...);
 
 /* Control variables */
 extern bool parlib_wants_to_be_mcp;	/* instructs the 2LS to be an MCP */
