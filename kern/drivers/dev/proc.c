@@ -274,12 +274,12 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 		 */
 		if (name != NULL && strcmp(name, get_cur_genbuf()) != 0) {
 			printk("pid-name mismatch, name: %s, pid %d\n", name, pid);
-			kref_put(&p->p_kref);
+			proc_decref(p);
 			return -1;
 		}
 		mkqid(&qid, (s + 1) << QSHIFT, pid, QTDIR);
 		devdir(c, qid, get_cur_genbuf(), 0, p->user, DMDIR | 0555, dp);
-		kref_put(&p->p_kref);
+		proc_decref(p);
 		return 1;
 	}
 	if (c->qid.path == Qtrace) {
@@ -331,7 +331,7 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 
 	mkqid(&qid, path | tab->qid.path, c->qid.vers, QTFILE);
 	devdir(c, qid, tab->name, len, p->user, perm, dp);
-	kref_put(&p->p_kref);
+	proc_decref(p);
 	return 1;
 }
 
@@ -553,7 +553,7 @@ static struct chan *procopen(struct chan *c, int omode)
 	//qlock(&p->debug);
 	if (waserror()) {
 		//qunlock(&p->debug);
-		kref_put(&p->p_kref);
+		proc_decref(p);
 		nexterror();
 	}
 	pid = PID(c->qid);
@@ -572,7 +572,7 @@ static struct chan *procopen(struct chan *c, int omode)
 			tc->offset = 0;
 			poperror();
 			qunlock(&p->debug);
-			kref_put(&p->p_kref);
+			proc_decref(p);
 			cclose(c);
 			return tc;
 */
@@ -660,7 +660,7 @@ static struct chan *procopen(struct chan *c, int omode)
 	tc = devopen(c, omode, 0, 0, procgen);
 	poperror();
 	//qunlock(&p->debug);
-	kref_put(&p->p_kref);
+	proc_decref(p);
 	return tc;
 }
 
@@ -685,7 +685,7 @@ static int procwstat(struct chan *c, uint8_t * db, int n)
 	qlock(&p->debug);
 	if (waserror()) {
 		qunlock(&p->debug);
-		kref_put(&p->p_kref);
+		proc_decref(p);
 		kfree(d);
 		nexterror();
 	}
@@ -711,7 +711,7 @@ static int procwstat(struct chan *c, uint8_t * db, int n)
 
 	poperror();
 	qunlock(&p->debug);
-	kref_put(&p->p_kref);
+	proc_decref(p);
 	kfree(d);
 
 	return n;
@@ -942,13 +942,13 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 	if ((p = pid2proc(SLOT(c->qid))) == NULL)
 		error(ESRCH, "%d: no such process", SLOT(c->qid));
 	if (p->pid != PID(c->qid)) {
-		kref_put(&p->p_kref);
+		proc_decref(p);
 		error(ESRCH, "weird: p->pid is %d, PID(c->qid) is %d: mismatch",
 		      p->pid, PID(c->qid));
 	}
 	switch (QID(c->qid)) {
 		default:
-			kref_put(&p->p_kref);
+			proc_decref(p);
 			break;
 		case Qstatus:{
 				/* the old code grew the stack and was hideous.
@@ -965,7 +965,7 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 					s = seprintf(s, e, " %d trace users %d traced procs",
 					             kref_refcnt(&p->strace->users),
 					             kref_refcnt(&p->strace->procs));
-				kref_put(&p->p_kref);
+				proc_decref(p);
 				i = readstr(off, va, n, buf);
 				kfree(buf);
 				return i;
@@ -987,7 +987,7 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 					}
 				}
 				offset += snprintf(buf + offset, buflen - offset, "}\n");
-				kref_put(&p->p_kref);
+				proc_decref(p);
 				n = readstr(off, va, n, buf);
 				kfree(buf);
 				return n;
@@ -996,7 +996,7 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 			//qlock(&p->debug);
 			if (waserror()) {
 				//qunlock(&p->debug);
-				kref_put(&p->p_kref);
+				proc_decref(p);
 				nexterror();
 			}
 			if (p->pgrp == NULL || p->pid != PID(c->qid))
@@ -1005,7 +1005,7 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 			if (mw->cddone) {
 				poperror();
 				//qunlock(&p->debug);
-				kref_put(&p->p_kref);
+				proc_decref(p);
 				return 0;
 			}
 			mntscan(mw, p);
@@ -1014,7 +1014,7 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 				i = snprintf(va, n, "cd %s\n", p->dot->name->s);
 				poperror();
 				//qunlock(&p->debug);
-				kref_put(&p->p_kref);
+				proc_decref(p);
 				return i;
 			}
 			int2flag(mw->cm->mflag, flag);
@@ -1030,12 +1030,12 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 							 mw->cm->to->name->s, mw->mh->from->name->s);
 			poperror();
 			//qunlock(&p->debug);
-			kref_put(&p->p_kref);
+			proc_decref(p);
 			return i;
 		case Qmaps:
 			sza = c->aux;
 			i = readmem(off, va, n, sza->buf, sza->size);
-			kref_put(&p->p_kref);
+			proc_decref(p);
 			return i;
 	}
 	error(EINVAL, "QID %d did not match any QIDs for #proc", QID(c->qid));
@@ -1093,7 +1093,7 @@ static long procwrite(struct chan *c, void *va, long n, int64_t off)
 		error(ESRCH, ERROR_FIXME);
 
 	if (waserror()) {
-		kref_put(&p->p_kref);
+		proc_decref(p);
 		nexterror();
 	}
 	if (p->pid != PID(c->qid))
@@ -1158,7 +1158,7 @@ static long procwrite(struct chan *c, void *va, long n, int64_t off)
 			error(EFAIL, "unknown qid %#llux in procwrite\n", c->qid.path);
 	}
 	poperror();
-	kref_put(&p->p_kref);
+	proc_decref(p);
 	return n;
 }
 
