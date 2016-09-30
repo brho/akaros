@@ -953,15 +953,6 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	/* Preemptively copy out the cur_ctx, in case we fail later (easier on
 	 * cur_ctx if we do this now) */
 	copy_current_ctx_to(&p->scp_ctx);
-	/* Clear the current_ctx.  We won't be returning the 'normal' way.  Even if
-	 * we want to return with an error, we need to go back differently in case
-	 * we succeed.  This needs to be done before we could possibly block, but
-	 * unfortunately happens before the point of no return.
-	 *
-	 * Note that we will 'hard block' if we block at all.  We can't return to
-	 * userspace and then asynchronously finish the exec later. */
-	clear_owning_proc(core_id());
-
 	/* Check the size of the argenv array, error out if too large. */
 	if ((argenv_l < sizeof(struct argenv)) || (argenv_l > ARG_MAX)) {
 		set_error(EINVAL, "The argenv array has an invalid size: %lu\n",
@@ -989,6 +980,14 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	/* This could block: */
 	/* TODO: 9ns support */
 	program = do_file_open(t_path, O_READ, 0);
+	/* Clear the current_ctx.  We won't be returning the 'normal' way.  Even if
+	 * we want to return with an error, we need to go back differently in case
+	 * we succeed.  This needs to be done before we could possibly block, but
+	 * unfortunately happens before the point of no return.
+	 *
+	 * Note that we will 'hard block' if we block at all.  We can't return to
+	 * userspace and then asynchronously finish the exec later. */
+	clear_owning_proc(core_id());
 	if (!program)
 		goto early_error;
 	if (!is_valid_elf(program)) {
