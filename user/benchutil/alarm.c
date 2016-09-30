@@ -39,6 +39,7 @@
 #include <parlib/spinlock.h>
 #include <parlib/timing.h>
 #include <sys/plan9_helpers.h>
+#include <sys/fork_cb.h>
 
 /* Helper to get your own alarm.   If you don't care about a return value, pass
  * 0 and it'll be ignored.  The alarm is built, but has no evq or timer set. */
@@ -136,10 +137,21 @@ static void reset_tchain_times(struct timer_chain *tchain)
 	}
 }
 
+static void devalarm_forked(void)
+{
+	/* We need to poison the FDs too, in case the child attempts to use the
+	 * alarms.  It'd be chaos if they read/wrote to an arbitrary open FD. */
+	close(global_tchain.ctlfd);
+	global_tchain.ctlfd = -42;
+	close(global_tchain.timerfd);
+	global_tchain.timerfd = -42;
+}
+
 static void __attribute__((constructor)) init_alarm_service(void)
 {
 	int ctlfd, timerfd, alarmid;
 	struct event_queue *ev_q;
+	static struct fork_cb devalarm_fork_cb = {.func = devalarm_forked};
 
 	/* Sets up timer chain (only one chain per process) */
 	spin_pdr_init(&global_tchain.lock);
@@ -172,6 +184,7 @@ static void __attribute__((constructor)) init_alarm_service(void)
 	global_tchain.ctlfd = ctlfd;
 	global_tchain.timerfd = timerfd;
 	global_tchain.ev_q = ev_q;	/* mostly for debugging */
+	register_fork_cb(&devalarm_fork_cb);
 }
 
 /* Initializes a new awaiter.  Pass 0 for the function if you want it to be a
