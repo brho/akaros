@@ -15,6 +15,7 @@ __BEGIN_DECLS
 	int ret = snprintf(buf, sizeof(buf), __VA_ARGS__);                         \
 	write(2, buf, ret);                                                        \
 }
+void trace_printf(const char *fmt, ...);
 
 /* For a poor-mans function tracer (can add these with spatch) */
 void __print_func_entry(const char *func, const char *file);
