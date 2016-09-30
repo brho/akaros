@@ -465,13 +465,10 @@ static int sys_null(void)
 
 /* Diagnostic function: blocks the kthread/syscall, to help userspace test its
  * async I/O handling. */
-static int sys_block(struct proc *p, unsigned int usec)
+static int sys_block(struct proc *p, unsigned long usec)
 {
-	sysc_save_str("block for %d usec", usec);
-	/* Note printing takes a few ms, so your printds won't be perfect. */
-	printd("[kernel] sys_block(), sleeping at %llu\n", read_tsc());
+	sysc_save_str("block for %lu usec", usec);
 	kthread_usleep(usec);
-	printd("[kernel] sys_block(), waking up at %llu\n", read_tsc());
 	return 0;
 }
 
@@ -1364,7 +1361,7 @@ static int sys_vc_entry(struct proc *p)
  * is trying to halt.  The core need not abort the halt for notif_pending for
  * the vcore, only for a __notify or other RKM.  Anyone setting notif_pending
  * should then attempt to __notify (o/w it's probably a bug). */
-static int sys_halt_core(struct proc *p, unsigned int usec)
+static int sys_halt_core(struct proc *p, unsigned long usec)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct preempt_data *vcpd;

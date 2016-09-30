@@ -83,7 +83,7 @@ int sys_self_notify(uint32_t vcoreid, unsigned int ev_type,
 	return ros_syscall(SYS_self_notify, vcoreid, ev_type, u_msg, priv, 0, 0);
 }
 
-int sys_halt_core(unsigned int usec)
+int sys_halt_core(unsigned long usec)
 {
 	return ros_syscall(SYS_halt_core, usec, 0, 0, 0, 0, 0);
 }
@@ -93,7 +93,7 @@ void* sys_init_arsc()
 	return (void*)ros_syscall(SYS_init_arsc, 0, 0, 0, 0, 0, 0);
 }
 
-int sys_block(unsigned int usec)
+int sys_block(unsigned long usec)
 {
 	return ros_syscall(SYS_block, usec, 0, 0, 0, 0, 0);
 }
