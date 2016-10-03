@@ -98,15 +98,22 @@ void restart_kthread(struct kthread *kthread)
 #endif /* CONFIG_KTHREAD_POISON */
 	/* Only change current if we need to (the kthread was in process context) */
 	if (kthread->proc) {
-		/* Load our page tables before potentially decreffing cur_proc */
-		lcr3(kthread->proc->env_cr3);
-		/* Might have to clear out an existing current.  If they need to be set
-		 * later (like in restartcore), it'll be done on demand. */
-		if (pcpui->cur_proc)
-			proc_decref(pcpui->cur_proc);
-		/* We also transfer our counted ref from kthread->proc to cur_proc */
-		pcpui->cur_proc = kthread->proc;
-		kthread->proc = 0;
+		if (kthread->proc == pcpui->cur_proc) {
+			/* We're already loaded, but we do need to drop the extra ref stored
+			 * in kthread->proc. */
+			proc_decref(kthread->proc);
+			kthread->proc = 0;
+		} else {
+			/* Load our page tables before potentially decreffing cur_proc */
+			lcr3(kthread->proc->env_cr3);
+			/* Might have to clear out an existing current.  If they need to be
+			 * set later (like in restartcore), it'll be done on demand. */
+			if (pcpui->cur_proc)
+				proc_decref(pcpui->cur_proc);
+			/* Transfer our counted ref from kthread->proc to cur_proc. */
+			pcpui->cur_proc = kthread->proc;
+			kthread->proc = 0;
+		}
 	}
 	/* Finally, restart our thread */
 	longjmp(&kthread->context, 1);
@@ -409,7 +416,9 @@ void sem_down(struct semaphore *sem)
 		kthread->proc = current;
 		assert(kthread->proc);
 		/* In the future, we could check owning_proc. If it isn't set, we could
-		 * clear current and transfer the refcnt to kthread->proc. */
+		 * clear current and transfer the refcnt to kthread->proc.  If so, we'll
+		 * need to reset the cr3 to something (boot_cr3 or owning_proc's cr3),
+		 * which might not be worth the potentially excessive TLB flush. */
 		proc_incref(kthread->proc, 1);
 	} else {
 		assert(kthread->proc == 0);
