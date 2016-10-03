@@ -106,6 +106,7 @@ void restart_kthread(struct kthread *kthread)
 			proc_decref(pcpui->cur_proc);
 		/* We also transfer our counted ref from kthread->proc to cur_proc */
 		pcpui->cur_proc = kthread->proc;
+		kthread->proc = 0;
 	}
 	/* Finally, restart our thread */
 	longjmp(&kthread->context, 1);
@@ -411,7 +412,7 @@ void sem_down(struct semaphore *sem)
 		 * clear current and transfer the refcnt to kthread->proc. */
 		proc_incref(kthread->proc, 1);
 	} else {
-		kthread->proc = 0;
+		assert(kthread->proc == 0);
 	}
 	if (setjmp(&kthread->context))
 		goto block_return_path;
@@ -440,9 +441,10 @@ void sem_down(struct semaphore *sem)
 	debug_unlock_semlist();
 	printd("[kernel] Didn't sleep, unwinding...\n");
 	/* Restore the core's current and default stacktop */
-	current = kthread->proc;			/* arguably unnecessary */
-	if (kthread->proc)
+	if (kthread->flags & KTH_SAVE_ADDR_SPACE) {
 		proc_decref(kthread->proc);
+		kthread->proc = 0;
+	}
 	set_stack_top(kthread->stacktop);
 	pcpui->cur_kthread = kthread;
 	/* Save the allocs as the spare */
