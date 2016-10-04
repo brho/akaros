@@ -67,11 +67,13 @@ struct ceq_event {
 
 struct ceq {
 	struct ceq_event			*events;		/* consumer pointer */
-	size_t						nr_events;
+	unsigned int				nr_events;
+	unsigned int				last_recovered;
 	int32_t						*ring;			/* consumer pointer */
 	uint32_t					ring_sz;		/* size (power of 2) */
 	uint8_t						operation;		/* e.g. CEQ_OR */
 	bool						ring_overflowed;
+	bool						overflow_recovery;
 	atomic_t					prod_idx;		/* next prod slot to fill */
 	atomic_t					cons_pub_idx;	/* how far has been consumed */
 	atomic_t					cons_pvt_idx;	/* next cons slot to get */

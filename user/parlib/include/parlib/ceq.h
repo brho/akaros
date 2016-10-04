@@ -31,7 +31,8 @@ __BEGIN_DECLS
  * probably want to do it yourself. */
 #define CEQ_DEFAULT_SZ 128
 
-void ceq_init(struct ceq *ceq, uint8_t op, size_t nr_events, size_t ring_sz);
+void ceq_init(struct ceq *ceq, uint8_t op, unsigned int nr_events,
+              size_t ring_sz);
 bool get_ceq_msg(struct ceq *ceq, struct event_msg *msg);
 bool ceq_is_empty(struct ceq *ceq);
 void ceq_cleanup(struct ceq *ceq);
