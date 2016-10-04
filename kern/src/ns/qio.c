@@ -290,9 +290,9 @@ struct block *linearizeblock(struct block *b)
 	return newb;
 }
 
-/*
- *  make sure the first block has at least n bytes in its main body
- */
+/* Make sure the first block has at least n bytes in its main body.  Pulls up
+ * data from the *list* of blocks.  Returns 0 if there is not enough data in the
+ * block list. */
 struct block *pullupblock(struct block *bp, int n)
 {
 	int i, len, seglen;
@@ -306,7 +306,11 @@ struct block *pullupblock(struct block *bp, int n)
 	if (BHLEN(bp) >= n)
 		return bp;
 
-	 /* a start at explicit main-body / header management */
+	/* If there's no chance, just bail out now.  This might be slightly wasteful
+	 * if there's a long blist that does have enough data. */
+	if (n > blocklen(bp))
+		return 0;
+	/* a start at explicit main-body / header management */
 	if (bp->extra_len) {
 		if (n > bp->lim - bp->rp) {
 			/* would need to realloc a new block and copy everything over. */
@@ -314,6 +318,8 @@ struct block *pullupblock(struct block *bp, int n)
 					n, bp->lim, bp->rp, bp->lim-bp->rp);
 		}
 		len = n - BHLEN(bp);
+		/* Would need to recursively call this, or otherwise pull from later
+		 * blocks and put chunks of their data into the block we're building. */
 		if (len > bp->extra_len)
 			panic("pullup more than extra (%d, %d, %d)\n",
 			      n, BHLEN(bp), bp->extra_len);
