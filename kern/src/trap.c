@@ -265,8 +265,9 @@ void print_kmsgs(uint32_t coreid)
 		struct kernel_message *kmsg_i;
 		STAILQ_FOREACH(kmsg_i, list, link) {
 			fn_name = get_fn_name((long)kmsg_i->pc);
-			printk("%s KMSG on %d from %d to run %p(%s)\n", type,
-			       kmsg_i->dstid, kmsg_i->srcid, kmsg_i->pc, fn_name);
+			printk("%s KMSG on %d from %d to run %p(%s)(%p, %p, %p)\n", type,
+			       kmsg_i->dstid, kmsg_i->srcid, kmsg_i->pc, fn_name,
+			       kmsg_i->arg0, kmsg_i->arg1, kmsg_i->arg2);
 			kfree(fn_name);
 		}
 	}

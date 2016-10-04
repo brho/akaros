@@ -1262,7 +1262,7 @@ int sysiounit(int fd)
 void print_chaninfo(struct chan *c)
 {
 
-	char buf[64] = { 0 };
+	char buf[128] = { 0 };
 	bool has_dev = c->type != -1;
 	bool has_chaninfo = has_dev && devtab[c->type].chaninfo;
 

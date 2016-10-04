@@ -768,6 +768,7 @@ int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 			for (int i = 0; i < num_cores; i++) {
 				_PERCPU_VAR(mon_nmi_trace, i) = TRUE;
 				send_nmi(i);
+				udelay(1000000);
 			}
 		} else {
 			printk("Sending NMI core %d:\n", core);

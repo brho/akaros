@@ -1344,6 +1344,9 @@ static size_t read_all_blocks(struct block *b, void *va, size_t len)
 	do {
 		/* We should be draining every block completely. */
 		assert(BLEN(b) <= len - sofar);
+		assert(va);
+		assert(va + sofar);
+		assert(b->rp);
 		sofar += read_from_block(b, va + sofar, len - sofar);
 		next = b->next;
 		freeb(b);
