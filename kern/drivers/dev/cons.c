@@ -605,6 +605,9 @@ enum {
 	Qpid,
 	Qppid,
 	Qreboot,
+	Qstdin,
+	Qstdout,
+	Qstderr,
 	Qswap,
 	Qsysctl,
 	Qsysname,
@@ -641,6 +644,9 @@ static struct dirtab consdir[] = {
 	{"pid", {Qpid}, NUMSIZE, 0444},
 	{"ppid", {Qppid}, NUMSIZE, 0444},
 	{"reboot", {Qreboot}, 0, 0660},
+	{"stdin", {Qstdin}, 0, 0666},
+	{"stdout", {Qstdout}, 0, 0666},
+	{"stderr", {Qstderr}, 0, 0666},
 	{"swap", {Qswap}, 0, 0664},
 	{"sysctl", {Qsysctl}, 0, 0666},
 	{"sysname", {Qsysname}, 0, 0664},
@@ -962,6 +968,8 @@ static long consread(struct chan *c, void *buf, long n, int64_t off)
 			return consreadstr((uint32_t) offset, buf, n, tmp);
 #endif
 
+		case Qstdin:
+			return qread(cons_q, buf, n);
 		case Qsysname:
 			/* TODO: this is racy */
 			if (sysname == NULL)
@@ -1182,6 +1190,22 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 			break;
 #endif
 
+		case Qstdout:
+		case Qstderr:
+			px_lock();
+			if (waserror()) {
+				px_unlock();
+				nexterror();
+			}
+			/* TODO: tty hack.  they are sending us an escape sequence, and the
+			 * keyboard would try to print it (which it can't do yet).  The hack
+			 * is even dirtier in that we only detect it if it is the first
+			 * char, and we ignore everything else.  \033 is 0x1b. */
+			if (((char*)va)[0] != '\033')
+				cputbuf(va, n);
+			poperror();
+			px_unlock();
+			return n;
 		case Qsysname:
 			/* TODO: this is racy */
 			if (offset != 0)
@@ -1200,6 +1224,18 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 			error(EINVAL, "bad QID in conswrite");
 	}
 	return n;
+}
+
+static char *cons_chaninfo(struct chan *ch, char *ret, size_t ret_l)
+{
+	switch ((uint32_t)ch->qid.path) {
+	case Qstdin:
+		snprintf(ret, ret_l, "qio len: %d", qlen(cons_q));
+		break;
+	default:
+		return devchaninfo(ch, ret, ret_l);
+	}
+	return ret;
 }
 
 struct dev consdevtab __devtab = {
@@ -1221,7 +1257,7 @@ struct dev consdevtab __devtab = {
 	.remove = devremove,
 	.wstat = devwstat,
 	.power = devpower,
-	.chaninfo = devchaninfo,
+	.chaninfo = cons_chaninfo,
 };
 
 static char *devname(void)

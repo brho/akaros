@@ -23,7 +23,6 @@
 #include <monitor.h>
 #include <elf.h>
 #include <arsc_server.h>
-#include <devfs.h>
 #include <kmalloc.h>
 #include <ros/procinfo.h>
 
@@ -305,6 +304,26 @@ void proc_init_procdata(struct proc *p)
 	atomic_set(&p->procdata->vcore_preempt_data[0].flags, VC_SCP_NOVCCTX);
 }
 
+static void proc_open_stdfds(struct proc *p)
+{
+	int fd;
+	struct proc *old_current = current;
+
+	/* Due to the way the syscall helpers assume the target process is current,
+	 * we need to set current temporarily.  We don't use switch_to, since that
+	 * actually loads the process's address space, which might be empty or
+	 * incomplete.  These syscalls shouldn't access user memory, especially
+	 * considering how we're probably in the boot pgdir. */
+	current = p;
+	fd = sysopenat(AT_FDCWD, "#cons/stdin", O_READ);
+	assert(fd == 0);
+	fd = sysopenat(AT_FDCWD, "#cons/stdout", O_WRITE);
+	assert(fd == 1);
+	fd = sysopenat(AT_FDCWD, "#cons/stderr", O_WRITE);
+	assert(fd == 2);
+	current = old_current;
+}
+
 /* Allocates and initializes a process, with the given parent.  Currently
  * writes the *p into **pp, and returns 0 on success, < 0 for an error.
  * Errors include:
@@ -396,13 +415,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 			clone_fdt(&parent->open_files, &p->open_files);
 	} else {
 		/* no parent, we're created from the kernel */
-		int fd;
-		fd = insert_file(&p->open_files, dev_stdin,  0, TRUE, FALSE);
-		assert(fd == 0);
-		fd = insert_file(&p->open_files, dev_stdout, 1, TRUE, FALSE);
-		assert(fd == 1);
-		fd = insert_file(&p->open_files, dev_stderr, 2, TRUE, FALSE);
-		assert(fd == 2);
+		proc_open_stdfds(p);
 	}
 	/* Init the ucq hash lock */
 	p->ucq_hashlock = (struct hashlock*)&p->ucq_hl_noref;

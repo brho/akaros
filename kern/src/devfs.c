@@ -16,13 +16,6 @@
 #include <kmalloc.h>
 #include <ns.h>
 
-/* These structs are declared again and initialized farther down */
-struct file_operations dev_f_op_stdin;
-struct file_operations dev_f_op_stdout;
-struct file_operations dev_f_op_null;
-
-struct file *dev_stdin, *dev_stdout, *dev_stderr, *dev_null;
-
 void devfs_init(void)
 {
 	int mode;
@@ -33,16 +26,6 @@ void devfs_init(void)
 	} else {
 		kref_put(&dentry->d_kref);
 	}
-	/* Notice we don't kref_put().  We're storing the refs globally */
-	dev_stdin = make_device("/dev/stdin", S_IRUSR | S_IRGRP | S_IROTH,
-	                        __S_IFCHR, &dev_f_op_stdin);
-	dev_stdout = make_device("/dev/stdout", S_IWUSR | S_IWGRP | S_IWOTH,
-	                         __S_IFCHR, &dev_f_op_stdout);
-	/* Note stderr uses the same f_op as stdout */
-	dev_stderr = make_device("/dev/stderr", S_IWUSR | S_IWGRP | S_IWOTH,
-	                         __S_IFCHR, &dev_f_op_stdout);
-	dev_null = make_device("/dev/null", S_IWUSR | S_IWGRP | S_IWOTH,
-	                       __S_IFCHR, &dev_f_op_null);
 }
 
 /* Creates a device node at a given location in the FS-tree */
@@ -74,106 +57,3 @@ int dev_mmap(struct file *file, struct vm_region *vmr)
 	set_errno(EINVAL);
 	return -1;
 }
-
-/* this is really /dev/console, and will need some tty work.  for now, no matter
- * how much they ask for, we return one character at a time. */
-ssize_t dev_stdin_read(struct file *file, char *buf, size_t count,
-                       off64_t *offset)
-{
-	char c;
-	extern struct queue *cons_q;
-
-	if (!count)
-		return 0;
-	return qread(cons_q, buf, count);
-}
-
-ssize_t dev_stdout_write(struct file *file, const char *buf, size_t count,
-                         off64_t *offset)
-{
-	char *t_buf;
-	struct proc *p = current;
-	if (p)
-		t_buf = user_memdup_errno(p, buf, count);
-	else
-		t_buf = (char*)buf;
-	if (!t_buf)
-		return -1;
-	/* TODO: tty hack.  they are sending us an escape sequence, and the keyboard
-	 * would try to print it (which it can't do yet).  The hack is even dirtier
-	 * in that we only detect it if it is the first char, and we ignore
-	 * everything else.  \033 is 0x1b. */
-	if (t_buf[0] != '\033') {
-		px_lock();
-		cputbuf(t_buf, count);
-		px_unlock();
-	}
-	if (p)
-		user_memdup_free(p, t_buf);
-	return count;
-}
-
-/* stdin/stdout/stderr file ops */
-struct file_operations dev_f_op_stdin = {
-	dev_c_llseek,
-	dev_stdin_read,
-	0,	/* write - can't write to stdin */
-	kfs_readdir,	/* this will fail gracefully */
-	dev_mmap,
-	kfs_open,
-	kfs_flush,
-	kfs_release,
-	0,	/* fsync - makes no sense */
-	kfs_poll,
-	0,	/* readv */
-	0,	/* writev */
-	kfs_sendpage,
-	kfs_check_flags,
-};
-
-struct file_operations dev_f_op_stdout = {
-	dev_c_llseek,
-	0,	/* read - can't read stdout */
-	dev_stdout_write,
-	kfs_readdir,	/* this will fail gracefully */
-	dev_mmap,
-	kfs_open,
-	kfs_flush,
-	kfs_release,
-	0,	/* fsync - makes no sense */
-	kfs_poll,
-	0,	/* readv */
-	0,	/* writev */
-	kfs_sendpage,
-	kfs_check_flags,
-};
-
-ssize_t dev_null_read(struct file *file, char *buf, size_t count,
-                      off64_t *offset)
-{
-	return 0;
-}
-
-/* /dev/null: just take whatever was given and pretend it was written */
-ssize_t dev_null_write(struct file *file, const char *buf, size_t count,
-                       off64_t *offset)
-{
-	return count;
-}
-
-struct file_operations dev_f_op_null = {
-	dev_c_llseek,
-	dev_null_read,
-	dev_null_write,
-	kfs_readdir,	/* this will fail gracefully */
-	dev_mmap,
-	kfs_open,
-	kfs_flush,
-	kfs_release,
-	0,	/* fsync - makes no sense */
-	kfs_poll,
-	0,	/* readv */
-	0,	/* writev */
-	kfs_sendpage,
-	kfs_check_flags,
-};
