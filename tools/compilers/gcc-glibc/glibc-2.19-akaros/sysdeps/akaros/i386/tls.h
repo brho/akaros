@@ -480,7 +480,7 @@ static const char* tls_init_tp(void* thrdescr)
 
     __procdata.ldt = ldt;
     // force kernel crossing
-	__ros_syscall_noerrno(SYS_getpid, 0, 0, 0, 0, 0, 0);
+	__ros_syscall_noerrno(SYS_null, 0, 0, 0, 0, 0, 0);
   }
 
   __set_tls_desc(thrdescr, core_id);
