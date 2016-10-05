@@ -28,7 +28,6 @@ enum {
 
 int         sys_null(void);
 size_t      sys_getpcoreid(void);
-int         sys_getpid(void);
 int         sys_proc_destroy(int pid, int exitcode);
 void        sys_yield(bool being_nice);
 int         sys_proc_create(const char *path, size_t path_l, char *const argv[],

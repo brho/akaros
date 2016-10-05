@@ -9,11 +9,6 @@ int sys_proc_destroy(int pid, int exitcode)
 	return ros_syscall(SYS_proc_destroy, pid, exitcode, 0, 0, 0, 0);
 }
 
-int sys_getpid(void)
-{
-	 return ros_syscall(SYS_getpid, 0, 0, 0, 0, 0, 0);
-}
-
 size_t sys_getpcoreid(void)
 {
 	 return ros_syscall(SYS_getpcoreid, 0, 0, 0, 0, 0, 0);
