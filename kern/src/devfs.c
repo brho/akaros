@@ -20,9 +20,9 @@ void devfs_init(void)
 {
 	int mode;
 	/* Make sure there is a dev directory */
-	struct dentry *dentry = lookup_dentry("/dev/", 0);
+	struct dentry *dentry = lookup_dentry("/dev_vfs/", 0);
 	if (!dentry) {
-		assert(!do_mkdir("/dev/", S_IRWXU | S_IRWXG | S_IRWXO));
+		assert(!do_mkdir("/dev_vfs/", S_IRWXU | S_IRWXG | S_IRWXO));
 	} else {
 		kref_put(&dentry->d_kref);
 	}
