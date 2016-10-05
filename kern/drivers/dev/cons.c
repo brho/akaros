@@ -35,6 +35,8 @@ int iprintscreenputs = 1;
 int keepbroken = 1;
 
 struct queue *cons_q;			/* Akaros cons input: keyboard, serial, etc */
+spinlock_t cons_q_lock = SPINLOCK_INITIALIZER;
+struct fdtap_slist cons_q_fd_taps = SLIST_HEAD_INITIALIZER(cons_q_fd_taps);
 
 static uint8_t logbuffer[1 << 20];
 static int index = 0;
@@ -712,9 +714,22 @@ static struct walkqid *conswalk(struct chan *c, struct chan *nc, char **name,
 	return devwalk(c, nc, name, nname, consdir, ARRAY_SIZE(consdir), devgen);
 }
 
-static int consstat(struct chan *c, uint8_t * dp, int n)
+static int consstat(struct chan *c, uint8_t *dp, int n)
 {
-	return devstat(c, dp, n, consdir, ARRAY_SIZE(consdir), devgen);
+	struct dir dir;
+	struct dirtab *tab;
+	int perm;
+
+	switch ((uint32_t)c->qid.path) {
+	case Qstdin:
+		tab = &consdir[Qstdin];
+		perm = tab->perm;
+		perm |= qreadable(cons_q) ? DMREADABLE : 0;
+		devdir(c, tab->qid, tab->name, qlen(cons_q), eve, perm, &dir);
+		return dev_make_stat(c, &dir, dp, n);
+	default:
+		return devstat(c, dp, n, consdir, ARRAY_SIZE(consdir), devgen);
+	}
 }
 
 static struct chan *consopen(struct chan *c, int omode)
@@ -969,7 +984,10 @@ static long consread(struct chan *c, void *buf, long n, int64_t off)
 #endif
 
 		case Qstdin:
-			return qread(cons_q, buf, n);
+			if (c->flag & O_NONBLOCK)
+				return qread_nonblock(cons_q, buf, n);
+			else
+				return qread(cons_q, buf, n);
 		case Qsysname:
 			/* TODO: this is racy */
 			if (sysname == NULL)
@@ -1238,6 +1256,72 @@ static char *cons_chaninfo(struct chan *ch, char *ret, size_t ret_l)
 	return ret;
 }
 
+static void __consq_fire_taps(uint32_t srcid, long a0, long a1, long a2)
+{
+	struct fd_tap *tap_i;
+	int filter = a0;
+
+	spin_lock(&cons_q_lock);
+	SLIST_FOREACH(tap_i, &cons_q_fd_taps, link)
+		fire_tap(tap_i, filter);
+	spin_unlock(&cons_q_lock);
+
+}
+
+static void cons_q_wake_cb(struct queue *q, void *data, int filter)
+{
+	/* TODO: taps can't fire from IRQ context, but the qiwrites for stdin come
+	 * from IRQ context.  So we need an RKM here. */
+	send_kernel_message(core_id(), __consq_fire_taps, filter,
+	                    0, 0, KMSG_ROUTINE);
+}
+
+static int tap_stdin(struct chan *c, struct fd_tap *tap, int cmd)
+{
+	int ret;
+
+	/* We don't actually support HANGUP, but epoll implies it. */
+	#define CONS_STDIN_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_HANGUP)
+
+	if (tap->filter & ~CONS_STDIN_TAPS) {
+		set_error(ENOSYS, "Unsupported #%s tap, must be %p", devname(),
+		          CONS_STDIN_TAPS);
+		return -1;
+	}
+	spin_lock(&cons_q_lock);
+	switch (cmd) {
+	case FDTAP_CMD_ADD:
+		if (SLIST_EMPTY(&cons_q_fd_taps))
+			qio_set_wake_cb(cons_q, cons_q_wake_cb, 0);
+		SLIST_INSERT_HEAD(&cons_q_fd_taps, tap, link);
+		ret = 0;
+		break;
+	case FDTAP_CMD_REM:
+		SLIST_REMOVE(&cons_q_fd_taps, tap, fd_tap, link);
+		if (SLIST_EMPTY(&cons_q_fd_taps))
+			qio_set_wake_cb(cons_q, 0, 0);
+		ret = 0;
+		break;
+	default:
+		set_error(ENOSYS, "Unsupported #%s tap command %p", devname(), cmd);
+		ret = -1;
+	}
+	spin_unlock(&cons_q_lock);
+	return ret;
+}
+
+static int cons_tapfd(struct chan *c, struct fd_tap *tap, int cmd)
+{
+	switch ((uint32_t)c->qid.path) {
+	case Qstdin:
+		return tap_stdin(c, tap, cmd);
+	default:
+		set_error(ENOSYS, "Can't tap #%s file type %d", devname(),
+		          c->qid.path);
+		return -1;
+	}
+}
+
 struct dev consdevtab __devtab = {
 	.name = "cons",
 
@@ -1258,6 +1342,7 @@ struct dev consdevtab __devtab = {
 	.wstat = devwstat,
 	.power = devpower,
 	.chaninfo = cons_chaninfo,
+	.tapfd = cons_tapfd,
 };
 
 static char *devname(void)
