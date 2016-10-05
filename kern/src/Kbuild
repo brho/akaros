@@ -29,7 +29,6 @@ obj-y						+= build_info.o
 obj-y						+= ceq.o
 obj-y						+= colored_caches.o
 obj-y						+= completion.o
-obj-y						+= console.o
 obj-y						+= coreprov.o
 obj-y						+= ctype.o
 obj-y						+= devfs.o

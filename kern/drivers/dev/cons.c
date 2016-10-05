@@ -34,6 +34,8 @@ atomic_t kprintinuse = 0;		/* test and set whether /dev/kprint is open */
 int iprintscreenputs = 1;
 int keepbroken = 1;
 
+struct queue *cons_q;			/* Akaros cons input: keyboard, serial, etc */
+
 static uint8_t logbuffer[1 << 20];
 static int index = 0;
 static struct queue *logqueue = NULL;
@@ -678,6 +680,7 @@ int consreadstr(uint32_t off, char *buf, uint32_t n, char *str)
 static void consinit(void)
 {
 	kstrdup(&sysname, "nanwan");
+	cons_q = qopen(256, 0, 0, 0);
 #if 0
 	todinit();
 #endif
@@ -1467,4 +1470,9 @@ void killkid(void)
 	}
 	send_posix_signal(victim, SIGINT);
 	proc_decref(victim);
+}
+
+void cons_add_char(char c)
+{
+	qiwrite(cons_q, &c, sizeof(char));
 }

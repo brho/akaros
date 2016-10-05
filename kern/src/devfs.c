@@ -14,7 +14,7 @@
 #include <smp.h>
 #include <umem.h>
 #include <kmalloc.h>
-#include <console.h>
+#include <ns.h>
 
 /* These structs are declared again and initialized farther down */
 struct file_operations dev_f_op_stdin;
@@ -81,17 +81,11 @@ ssize_t dev_stdin_read(struct file *file, char *buf, size_t count,
                        off64_t *offset)
 {
 	char c;
-	extern struct kb_buffer cons_buf;
+	extern struct queue *cons_q;
 
 	if (!count)
 		return 0;
-	kb_get_from_buf(&cons_buf, &c, 1);
-	/* TODO UMEM */
-	if (current)
-		memcpy_to_user_errno(current, buf, &c, 1);
-	else
-		memcpy(buf, &c, 1);
-	return 1;
+	return qread(cons_q, buf, count);
 }
 
 ssize_t dev_stdout_write(struct file *file, const char *buf, size_t count,

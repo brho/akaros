@@ -4,7 +4,6 @@
 #include <arch/arch.h>
 #include <stab.h>
 #include <smp.h>
-#include <console.h>
 #include <arch/console.h>
 
 #include <stdio.h>
@@ -852,6 +851,11 @@ int onecmd(int argc, char *argv[], struct hw_trapframe *hw_tf) {
 			return commands[i].func(argc, argv, hw_tf);
 	}
 	return -1;
+}
+
+void __run_mon(uint32_t srcid, long a0, long a1, long a2)
+{
+	monitor(0);
 }
 
 static int runcmd(char *real_buf, struct hw_trapframe *hw_tf) {

@@ -8,6 +8,8 @@
 // (NULL if none).
 void monitor(struct hw_trapframe *hw_tf);
 void emit_monitor_backtrace(int type, void *tf);
+int onecmd(int argc, char *argv[], struct hw_trapframe *hw_tf);
+void __run_mon(uint32_t srcid, long a0, long a1, long a2);
 
 // Functions implementing monitor commands.
 int mon_help(int argc, char **argv, struct hw_trapframe *hw_tf);

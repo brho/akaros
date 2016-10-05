@@ -1,5 +1,4 @@
 #include <arch/console.h>
-#include <console.h>
 #include <pmap.h>
 #include <atomic.h>
 #include <smp.h>
@@ -42,8 +41,11 @@ cputchar(int c)
 int
 getchar(void)
 {
-	char c;
-	kb_get_from_buf(&cons_buf, &c, 1);
+	char c = 'x';
+
+	#warning "implement me"
+	/* maybe do a qio read */
+
 	return c;
 }
 

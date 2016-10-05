@@ -7,7 +7,6 @@
 #include <arch/console.h>
 #include <arch/perfmon.h>
 #include <arch/init.h>
-#include <console.h>
 #include <monitor.h>
 #include <arch/usb.h>
 #include <assert.h>
@@ -50,10 +49,7 @@ static void irq_console(struct hw_trapframe *hw_tf, void *data)
 			backtrace_hwtf(hw_tf);
 			return;
 	}
-	/* Do our work in an RKM, instead of interrupt context.  Note the RKM will
-	 * cast 'c' to a char. */
-	send_kernel_message(core_id(), __cons_add_char, (long)&cons_buf, (long)c,
-	                    0, KMSG_ROUTINE);
+	cons_add_char(c);
 }
 
 static void cons_poller(void *arg)

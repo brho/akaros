@@ -25,7 +25,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <ip.h>
-#include <console.h>
+#include <monitor.h>
 #include <ktest.h>
 
 struct dev regressdevtab;

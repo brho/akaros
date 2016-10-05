@@ -682,6 +682,7 @@ void cnameclose(struct cname *);
 struct block *concatblock(struct block *);
 struct block *linearizeblock(struct block *b);
 void confinit(void);
+void cons_add_char(char c);
 void copen(struct chan *);
 struct block *copyblock(struct block *b, int mem_flags);
 int cread(struct chan *, uint8_t * unused_uint8_p_t, int unused_int, int64_t);

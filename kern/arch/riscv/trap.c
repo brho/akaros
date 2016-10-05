@@ -2,7 +2,6 @@
 #include <assert.h>
 #include <trap.h>
 #include <arch/console.h>
-#include <console.h>
 #include <string.h>
 #include <process.h>
 #include <syscall.h>
@@ -139,11 +138,11 @@ static void exit_halt_loop(struct hw_trapframe *hw_tf)
 
 static void handle_keypress(char c)
 {
-	/* brho: not sure if this will work on riscv or not... */
-	#define capchar2ctl(x) ((x) - '@')
-	amr_t handler = c == capchar2ctl('G') ? __run_mon : __cons_add_char;
-	send_kernel_message(core_id(), handler, (long)&cons_buf, (long)c, 0,
-	                    KMSG_ROUTINE);
+	#warning "fix me"
+	/* TODO: does cons_init need to be before cons_add_char?  Also, do something
+	 * with CTRL-G, Q, and B. */
+	cons_add_char(c);
+
 	cons_init();
 }
 

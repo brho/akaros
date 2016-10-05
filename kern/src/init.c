@@ -41,7 +41,6 @@
 #include <blockdev.h>
 #include <ext2fs.h>
 #include <kthread.h>
-#include <console.h>
 #include <linker_func.h>
 #include <ip.h>
 #include <acpi.h>
@@ -159,7 +158,6 @@ void kernel_init(multiboot_info_t *mboot_info)
 	vfs_init();
 	devfs_init();
 	time_init();
-	kb_buf_init(&cons_buf);
 	arch_init();
 	block_init();
 	enable_irq();
