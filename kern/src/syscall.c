@@ -627,12 +627,6 @@ static size_t sys_getvcoreid(struct proc *p)
 
 /************** Process management syscalls **************/
 
-/* Returns the calling process's pid */
-static pid_t sys_getpid(struct proc *p)
-{
-	return p->pid;
-}
-
 /* Helper for proc_create and fork */
 static void inherit_strace(struct proc *parent, struct proc *child)
 {
@@ -2553,7 +2547,6 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_reboot] = {(syscall_t)reboot, "reboot!"},
 	[SYS_getpcoreid] = {(syscall_t)sys_getpcoreid, "getpcoreid"},
 	[SYS_getvcoreid] = {(syscall_t)sys_getvcoreid, "getvcoreid"},
-	[SYS_getpid] = {(syscall_t)sys_getpid, "getpid"},
 	[SYS_proc_create] = {(syscall_t)sys_proc_create, "proc_create"},
 	[SYS_proc_run] = {(syscall_t)sys_proc_run, "proc_run"},
 	[SYS_proc_destroy] = {(syscall_t)sys_proc_destroy, "proc_destroy"},

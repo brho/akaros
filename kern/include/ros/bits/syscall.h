@@ -11,7 +11,7 @@
 /* was SYS_cgetc					 6 */
 #define SYS_getpcoreid				 7
 #define SYS_getvcoreid				 8
-#define SYS_getpid					 9
+/* was #define SYS_getpid			 9 */
 #define SYS_proc_create				10
 #define SYS_proc_run				11
 #define SYS_proc_destroy			12
