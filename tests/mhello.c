@@ -85,7 +85,7 @@ int main(int argc, char** argv)
 		temp = 0xdeadbeef;
 		printf("Hello from vcore %d with temp addr = %p and temp = %p\n",
 		       vcoreid, &temp, temp);
-		printf("Multi-Goodbye, world, from PID: %d!\n", sys_getpid());
+		printf("Multi-Goodbye, world, from PID: %d!\n", getpid());
 		printf("Requesting %d vcores\n", max_vcores() - 1);
 		vcore_request_total(max_vcores());
 		printf("This is vcore0, right after vcore_request\n");
@@ -103,7 +103,7 @@ int main(int argc, char** argv)
 	udelay(5000000);
 	printf("Vcore 0 notifying itself with notif 6!\n");
 	msg.ev_type = 6;
-	sys_notify(sys_getpid(), 6, &msg);
+	sys_notify(getpid(), 6, &msg);
 	udelay(1000000);
 	//#endif
 

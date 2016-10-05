@@ -33,7 +33,7 @@ int main(int argc, char** argv)
 		printf("Should never see me! (from vcore %d)\n", vcoreid);
 	} else { // core 0
 		printf("Hello from else vcore 0\n");
-		printf("Multi-Goodbye, world, from PID: %d!\n", sys_getpid());
+		printf("Multi-Goodbye, world, from PID: %d!\n", getpid());
 		switch (test) {
 			case TEST_MMAP:
 				printf("Testing MMAP\n");

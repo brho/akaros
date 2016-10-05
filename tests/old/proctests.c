@@ -7,7 +7,7 @@
  * to make progress. */
 int main(int argc, char** argv)
 {
-	int pid = sys_getpid();
+	int pid = getpid();
 	/* first instance.  this is ghetto, since it relies on being the first proc
 	 * ever.  fix this when we can pass arguments.  (TODO) */
 	#define NUM_KIDS 5

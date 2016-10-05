@@ -33,7 +33,7 @@ void *syscall_thread(void* arg)
 }
 
 int main(int argc, char** argv){
-	int pid = sys_getpid();
+	int pid = getpid();
 	pthread_t *my_threads = malloc(sizeof(pthread_t) * NUM_THREADS);
 	char testme = 't';
 	printf ("multi thread - init arsc \n");

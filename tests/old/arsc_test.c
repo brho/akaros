@@ -20,7 +20,7 @@ syscall_desc_t* sys_cputs_async(const char *s, size_t len,
 }
 
 int main(int argc, char** argv){
-	int pid = sys_getpid();
+	int pid = getpid();
 	char testme = 't';
 	printf ("single thread - init arsc \n");
 	syscall_desc_t* sysdesc[2];
