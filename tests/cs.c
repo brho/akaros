@@ -181,12 +181,6 @@ char *mysysname;
 struct network *netlist; /* networks ordered by preference */
 struct network *last;
 
-static void nstrcpy(char *to, char *from, int len)
-{
-	strncpy(to, from, len);
-	to[len - 1] = 0;
-}
-
 char *argv0;
 
 static void usage(void)
@@ -1222,7 +1216,7 @@ static char *ipserv(struct network *np, char *name, char *buf, int blen)
 
 	/* '*' means any service */
 	if (strcmp(name, "*") == 0) {
-		strcpy(buf, name);
+		strlcpy(buf, name, blen);
 		return buf;
 	}
 
@@ -1279,7 +1273,7 @@ static int ipattrlookup(struct ndb *db, char *ipa, char *attr, char *val,
 		return 0;
 	for (nt = t; nt != NULL; nt = nt->entry) {
 		if (strcmp(nt->attr, attr) == 0) {
-			nstrcpy(val, nt->val, vlen);
+			strlcpy(val, nt->val, vlen);
 			ndbfree(t);
 			return 1;
 		}
@@ -1516,7 +1510,7 @@ static struct ndbtuple *dnsip6lookup(char *mntpt, char *buf, struct ndbtuple *t)
 	/* convert ipv6 attr to ip */
 	for (tt = t6; tt != NULL; tt = tt->entry)
 		if (strcmp(tt->attr, "ipv6") == 0)
-			strncpy(tt->attr, "ip", sizeof(tt->attr) - 1);
+			strlcpy(tt->attr, "ip", sizeof(tt->attr));
 
 	if (t == NULL)
 		return t6;
@@ -1712,7 +1706,7 @@ static struct ndbtuple *ipresolve(char *attr, char *host)
 			ndbfree(nt);
 			continue;
 		}
-		strcpy(nt->attr, attr);
+		strlcpy(nt->attr, attr, sizeof(nt->attr));
 		l = &nt->entry;
 	}
 	return t;
