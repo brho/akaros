@@ -289,6 +289,18 @@ Done:
 	return wq;
 }
 
+/* Helper, makes a stat in @dp, given @n bytes, from chan @c's contents in @dir.
+ * Throws on error, returns the size used on success. */
+size_t dev_make_stat(struct chan *c, struct dir *dir, uint8_t *dp, size_t n)
+{
+	if (c->flag & CMSG)
+		dir->mode |= DMMOUNT;
+	n = convD2M(dir, dp, n);
+	if (n == 0)
+		error(EINVAL, ERROR_FIXME);
+	return n;
+}
+
 int
 devstat(struct chan *c, uint8_t * db, int n,
 		struct dirtab *tab, int ntab, Devgen * gen)
@@ -326,14 +338,8 @@ devstat(struct chan *c, uint8_t * db, int n,
 			case 1:
 				printd("DEVSTAT gen returns path %p name %s, want path %p\n",
 					   dir.qid.path, dir.name, c->qid.path);
-				if (c->qid.path == dir.qid.path) {
-					if (c->flag & CMSG)
-						dir.mode |= DMMOUNT;
-					n = convD2M(&dir, db, n);
-					if (n == 0)
-						error(EINVAL, ERROR_FIXME);
-					return n;
-				}
+				if (c->qid.path == dir.qid.path)
+					return dev_make_stat(c, &dir, db, n);
 				break;
 		}
 }

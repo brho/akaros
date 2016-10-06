@@ -715,6 +715,7 @@ void devpermcheck(char *unused_char_p_t, uint32_t, int);
 void devremove(struct chan *);
 void devreset(void);
 void devshutdown(void);
+size_t dev_make_stat(struct chan *c, struct dir *dir, uint8_t *dp, size_t n);
 int devstat(struct chan *, uint8_t * unused_uint8_p_t, int unused_int,
 			struct dirtab *, int unused_int2, Devgen *);
 struct walkqid *devwalk(struct chan *,
