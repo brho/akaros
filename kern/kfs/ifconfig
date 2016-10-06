@@ -92,19 +92,7 @@ else
 	echo 'add 127.0.0.1 255.0.0.0 127.0.0.0' > /net/ipifc/$i/ctl
 fi
 
-#
-# Start cs (the name resolution server) and wait for it to post a
-# file descriptor in #srv, then mount it in /net.
-#
-cs &
-if [ ! -e '#srv/cs' ]
-then
-	echo 'cs has not created #srv/cs yet, spinning until it does....'
-	until [ -e '#srv/cs' ]
-	do
-		usleep 1000
-	done
-fi
+daemonize /bin/cs -S
 mount -a '#srv/cs' /net
 
 # This is noisy, so it is off by default.
