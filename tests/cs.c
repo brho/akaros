@@ -230,18 +230,21 @@ void procsetname(char *fmt, ...)
 #endif
 }
 
-void main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
-	int justsetname;
+	int justsetname, ch;
 	char ext[Maxpath], servefile[Maxpath];
+
+	/* Make us an SCP with a 2LS */
+	parlib_wants_to_be_mcp = FALSE;
+	register_printf_specifier('F', printf_fcall, printf_fcall_info);
+
 	argv0 = argv[0];
 	justsetname = 0;
 	setnetmtpt(mntpt, sizeof(mntpt), NULL);
-	register_printf_specifier('F', printf_fcall, printf_fcall_info);
 	ext[0] = 0;
-	argc--, argv++;
-	while (argc && **argv == '-') {
-		switch (argv[0][1]) {
+	while ((ch = getopt(argc, argv, "4df:nx:")) != -1) {
+		switch (ch) {
 		case '4':
 			ipv6lookups = 0;
 			break;
@@ -249,29 +252,20 @@ void main(int argc, char *argv[])
 			debug = 1;
 			break;
 		case 'f':
-			if (argc < 2)
-				usage();
-			dbfile = argv[1];
-			argc--, argv++;
+			dbfile = optarg;
 			break;
 		case 'n':
 			justsetname = 1;
 			break;
 		case 'x':
-			if (argc < 2)
-				usage();
-			setnetmtpt(mntpt, sizeof(mntpt), argv[1]);
-			argc--, argv++;
+			setnetmtpt(mntpt, sizeof(mntpt), optarg);
 			setext(ext, sizeof(ext), mntpt);
 			break;
+		default:
+			usage();
+			break;
 		}
-		argc--, argv++;
 	}
-
-	// rfork(RFREND|RFNOTEG);
-	/* Make us an SCP with a 2LS */
-	parlib_wants_to_be_mcp = FALSE;
-
 	snprintf(servefile, sizeof(servefile), "#srv/cs%s", ext);
 	snprintf(netndb, sizeof(netndb), "%s/ndb", mntpt);
 	syscall(SYS_nunmount, (unsigned long)servefile, strlen(servefile),
@@ -285,7 +279,8 @@ void main(int argc, char *argv[])
 		mountinit(servefile, mntpt);
 		io();
 	}
-	exit(0);
+
+	return 0;
 }
 
 /*
