@@ -23,6 +23,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -171,6 +172,7 @@ int nodhcpwatch;
 char optmagic[4] = {0x63, 0x82, 0x53, 0x63};
 int plan9 = 1;
 int sendhostname;
+int server;
 
 char *verbs[] = {
     [Vadd] "add",
@@ -186,6 +188,22 @@ char *verbs[] = {
     [Vpkt] "pkt",
 };
 
+void evnotify(int rc)
+{
+	struct event_msg msg = { 0 };
+
+	msg.ev_type = EV_USER_IPI;
+	msg.ev_arg1 = rc;
+	sys_notify(getppid(), EV_USER_IPI, &msg);
+}
+
+void evexit(int rc)
+{
+	if (server)
+		evnotify(rc);
+	exit(rc);
+}
+
 void usage(void)
 {
 	fprintf(stderr,
@@ -193,7 +211,7 @@ void usage(void)
 	        argv0,
 	        "[-6dDGnNOpPruX][-b baud][-c ctl]* [-g gw] [-h host][-m mtu]",
 	        "[-x mtpt][-o dhcpopt] type dev [verb] [laddr [mask [raddr [fs [auth]]]]]");
-	exit(1);
+	evexit(1);
 }
 
 void warning(char *fmt, ...)
@@ -271,7 +289,7 @@ void parse6pref(int argc, char **argv)
 	case 1:
 		if (parseip(conf.v6pref, argv[0]) == -1) {
 			fprintf(stderr, "bad address %s\n", argv[0]);
-			exit(-1);
+			evexit(-1);
 		}
 		break;
 	}
@@ -324,12 +342,13 @@ void parse6ra(int argc, char *argv[])
 	if (conf.maxraint < conf.minraint) {
 		fprintf(stderr, "maxraint %d < minraint %d\n",
 		        conf.maxraint, conf.minraint);
-		exit(-1);
+		evexit(-1);
 	}
 }
 
 void init(void)
 {
+	parlib_wants_to_be_mcp = FALSE;
 	srand(lrand48());
 	if (register_printf_specifier('E', printf_ethaddr,
 	                              printf_ethaddr_info) != 0)
@@ -402,7 +421,7 @@ int parseargs(int argc, char *argv[])
 		case Vtree:
 		case Vpkt:
 			fprintf(stderr, "medium %s already specified\n", conf.type);
-			exit(-1);
+			evexit(-1);
 		case Vadd:
 		case Vremove:
 		case Vunbind:
@@ -439,7 +458,7 @@ int main(int argc, char *argv[])
 
 	init();
 	retry = 0;
-	while ((ch = getopt(argc, argv, "6b:c:dDg:h:m:nNo:OpPrux:X")) != -1) {
+	while ((ch = getopt(argc, argv, "6b:c:dDg:h:m:nNo:OpPrSux:X")) != -1) {
 		switch (ch) {
 		case '6': /* IPv6 auto config */
 			ipv6auto = 1;
@@ -451,7 +470,7 @@ int main(int argc, char *argv[])
 			cp = malloc(sizeof(*cp));
 			if (cp == NULL) {
 				fprintf(stderr, "%r\n");
-				exit(1);
+				evexit(1);
 			}
 			*ctll = cp;
 			ctll = &cp->next;
@@ -501,6 +520,9 @@ int main(int argc, char *argv[])
 		case 'r':
 			retry = 1;
 			break;
+		case 'S':
+			server = 1;
+			break;
 		case 'u': /* IPv6: duplicate neighbour disc. off */
 			dupl_disc = 0;
 			break;
@@ -535,7 +557,12 @@ int main(int argc, char *argv[])
 		break;
 	}
 
-	return 0;
+	if (server) {
+		evnotify(0);
+		uthread_sleep_forever();
+	}
+
+	evexit(0);
 }
 
 int havendb(char *net)
@@ -569,13 +596,13 @@ void doadd(int retry)
 		if (ip6cfg(ipv6auto) < 0) {
 			fprintf(stderr, "can't automatically start IPv6 on %s\n",
 			        conf.dev);
-			exit(-1);
+			evexit(-1);
 		}
 	} else if (validip(conf.laddr) && !isv4(conf.laddr)) {
 		if (ip6cfg(0) < 0)
 			fprintf(stderr, "can't start IPv6 on %s, address %R\n",
 			        conf.dev, conf.laddr);
-			exit(-1);
+			evexit(-1);
 	}
 
 	if (!validip(conf.laddr)) {
@@ -598,14 +625,14 @@ void doadd(int retry)
 			return;
 		}
 		fprintf(stderr, "no success with DHCP\n");
-		exit(-1);
+		evexit(-1);
 	}
 
 
 	if (!noconfig) {
 		if (ip4cfg() < 0) {
 			fprintf(stderr, "can't start ip\n");
-			exit(-1);
+			evexit(-1);
 		}
 		if (dodhcp && conf.lease != Lforever)
 			dhcpwatch(0);
@@ -628,7 +655,7 @@ void doremove(void)
 
 	if (!validip(conf.laddr)) {
 		fprintf(stderr, "remove requires an address\n");
-		exit(-1);
+		evexit(-1);
 	}
 	ifc = readipifc(conf.mpoint, ifc, -1);
 	for (nifc = ifc; nifc != NULL; nifc = nifc->next) {
@@ -729,7 +756,7 @@ void lookforip(char *net)
 	snprintf(proto, sizeof(proto), "%s/ipifc", net);
 	if (stat(proto, &s) < 0) {
 		fprintf(stderr, "no ip stack bound onto %s\n", net);
-		exit(-1);
+		evexit(-1);
 	}
 }
 
@@ -748,13 +775,13 @@ void controldevice(void)
 	fd = open(ctlfile, O_RDWR);
 	if (fd < 0) {
 		fprintf(stderr, "can't open %s\n", ctlfile);
-		exit(-1);
+		evexit(-1);
 	}
 
 	for (cp = firstctl; cp != NULL; cp = cp->next) {
 		if (write(fd, cp->ctl, strlen(cp->ctl)) < 0) {
 			fprintf(stderr, "ctl message %s: %r\n", cp->ctl);
-			exit(-1);
+			evexit(-1);
 		}
 		lseek(fd, 0, 0);
 	}
@@ -771,14 +798,14 @@ void binddevice(void)
 		conf.cfd = open(buf, O_RDWR);
 		if (conf.cfd < 0) {
 			fprintf(stderr, "opening %s/ipifc/clone: %r\n", conf.mpoint);
-			exit(-1);
+			evexit(-1);
 		}
 
 		/* specify medium as ethernet, bind the interface to it */
 		snprintf(buf, sizeof(buf), "bind %s %s", conf.type, conf.dev);
 		if (write(conf.cfd, buf, strlen(buf)) != strlen(buf)) {
 			fprintf(stderr, "%s: bind %s %s: %r\n", buf, conf.type, conf.dev);
-			exit(-1);
+			evexit(-1);
 		}
 	} else {
 		/* open the old interface */
@@ -786,7 +813,7 @@ void binddevice(void)
 		conf.cfd = open(buf, O_RDWR);
 		if (conf.cfd < 0) {
 			fprintf(stderr, "open %s: %r\n", buf);
-			exit(-1);
+			evexit(-1);
 		}
 	}
 }
@@ -880,7 +907,7 @@ void dhcpquery(int needconfig, int startstate)
 		break;
 	default:
 		fprintf(stderr, "internal error 0\n");
-		exit(-1);
+		evexit(-1);
 	}
 	conf.resend = 0;
 	conf.timeout = time(0) + 4;
@@ -906,20 +933,24 @@ enum {
 	Maxsleep = 450,
 };
 
+static void *dhcpwatchthr(void *arg);
+
 void dhcpwatch(int needconfig)
 {
-	int secs, s;
-	uint32_t t;
+	pthread_t tid;
+	intptr_t nc = needconfig;
 
 	if (nodhcpwatch)
 		return;
 
-	switch (fork()) {
-	default:
-		return;
-	case 0:
-		break;
-	}
+	pthread_create(&tid, NULL, dhcpwatchthr, (void *)nc);
+}
+
+static void *dhcpwatchthr(void *arg)
+{
+	int secs, s;
+	uint32_t t;
+	int needconfig = (arg == NULL);
 
 	// procsetname("dhcpwatch");
 	/* keep trying to renew the lease */
@@ -960,7 +991,7 @@ void dhcpwatch(int needconfig)
 		if (needconfig && conf.state == Sbound) {
 			if (ip4cfg() < 0) {
 				fprintf(stderr, "can't start ip: %r\n");
-				exit(-1);
+				evexit(-1);
 			}
 			needconfig = 0;
 			/*
@@ -973,6 +1004,8 @@ void dhcpwatch(int needconfig)
 			}
 		}
 	}
+
+	return NULL;
 }
 
 int dhcptimer(void)
@@ -986,7 +1019,7 @@ int dhcptimer(void)
 	switch (conf.state) {
 	default:
 		fprintf(stderr, "dhcptimer: unknown state %d\n", conf.state);
-		exit(-1);
+		evexit(-1);
 	case Sinit:
 	case Sbound:
 		break;
@@ -1039,7 +1072,7 @@ void dhcpsend(int type)
 	switch (type) {
 	default:
 		fprintf(stderr, "dhcpsend: unknown message type: %d\n", type);
-		exit(-1);
+		evexit(-1);
 	case Discover:
 		ipmove(up->raddr, IPv4bcast); /* broadcast */
 		if (*conf.hostname && sendhostname)
@@ -1316,7 +1349,7 @@ int openlisten(void)
 	for (n = 0; (cfd = announce9(data, devdir, 0)) < 0; n++) {
 		if (!noconfig) {
 			fprintf(stderr, "can't announce for dhcp: %r\n");
-			exit(-1);
+			evexit(-1);
 		}
 
 		/* might be another client - wait and try again */
@@ -1328,14 +1361,14 @@ int openlisten(void)
 
 	if (write(cfd, "headers", strlen("headers")) < 0) {
 		fprintf(stderr, "can't set header mode: %r\n");
-		exit(-1);
+		evexit(-1);
 	}
 
 	sprintf(data, "%s/data", devdir);
 	fd = open(data, O_RDWR);
 	if (fd < 0) {
 		fprintf(stderr, "open %s: %r\n", data);
-		exit(-1);
+		evexit(-1);
 	}
 	close(cfd);
 	return fd;
@@ -1786,12 +1819,12 @@ void ndbconfig(void)
 	db = ndbopen(0);
 	if (db == NULL) {
 		fprintf(stderr, "can't open ndb: %r\n");
-		exit(-1);
+		evexit(-1);
 	}
 	if ((strcmp(conf.type, "ether") != 0 && strcmp(conf.type, "gbe") != 0) ||
 	    myetheraddr(conf.hwa, conf.dev) != 0) {
 		fprintf(stderr, "can't read hardware address\n");
-		exit(-1);
+		evexit(-1);
 	}
 	snprintf(etheraddr, sizeof(etheraddr), "%E", conf.hwa);
 	nattr = 0;
@@ -1828,7 +1861,7 @@ void ndbconfig(void)
 	ndbfree(t);
 	if (!validip(conf.laddr)) {
 		fprintf(stderr, "address not found in ndb\n");
-		exit(-1);
+		evexit(-1);
 	}
 }
 

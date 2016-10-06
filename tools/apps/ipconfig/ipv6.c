@@ -21,6 +21,7 @@
 
 #include <ctype.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -314,14 +315,14 @@ int dialicmp(uint8_t *dst, int dport, int *ctlfd)
 	cfd = open(name, O_RDWR);
 	if (cfd < 0) {
 		fprintf(stderr, "dialicmp: can't open %s: %r", name);
-		exit(-1);
+		evexit(-1);
 	}
 
 	n = snprintf(cmsg, sizeof(cmsg), "connect %R!%d!r %d", dst, dport, dport);
 	m = write(cfd, cmsg, n);
 	if (m < n) {
 		fprintf(stderr, "dialicmp: can't write %s to %s: %r", cmsg, name);
-		exit(-1);
+		evexit(-1);
 	}
 
 	lseek(cfd, 0, 0);
@@ -337,13 +338,13 @@ int dialicmp(uint8_t *dst, int dport, int *ctlfd)
 	fd = open(name, O_RDWR);
 	if (fd < 0) {
 		fprintf(stderr, "dialicmp: can't open %s: %r", name);
-		exit(-1);
+		evexit(-1);
 	}
 
 	n = sizeof(hdrs) - 1;
 	if (write(cfd, hdrs, n) < n) {
 		fprintf(stderr, "dialicmp: can't write `%s' to %s: %r", hdrs, name);
-		exit(-1);
+		evexit(-1);
 	}
 	*ctlfd = cfd;
 	return fd;
@@ -362,7 +363,7 @@ int ip6cfg(int autoconf)
 		// create link-local addr
 		if (myetheraddr(ethaddr, conf.dev) < 0) {
 			fprintf(stderr, "myetheraddr w/ %s failed: %r", conf.dev);
-			exit(-1);
+			evexit(-1);
 		}
 		ea2lla(conf.laddr, ethaddr);
 	}
@@ -626,29 +627,30 @@ recvrahost(uint8_t buf[], int pktlen)
 /*
  * daemon to receive router advertisements from routers
  */
+static void *recvra6thr(void *unused_arg);
+
 void recvra6(void)
+{
+	pthread_t tid;
+
+	pthread_create(&tid, NULL, recvra6thr, NULL);
+}
+
+static void *recvra6thr(void *unused_arg)
 {
 	int fd, cfd, n, sendrscnt, sleepfor;
 	uint8_t buf[4096];
+
+	(void)unused_arg;
 
 	/* TODO: why not v6allroutersL? */
 	fd = dialicmp(v6allnodesL, ICMP6_RA, &cfd);
 	if (fd < 0) {
 		fprintf(stderr, "can't open icmp_ra connection: %r");
-		exit(-1);
+		evexit(-1);
 	}
 
 	sendrscnt = Maxv6rss;
-
-	switch (fork()) {
-	case -1:
-		fprintf(stderr, "can't fork: %r");
-		exit(-1);
-	default:
-		return;
-	case 0:
-		break;
-	}
 
 	ralog("recvra6 on %s", conf.dev);
 	sleepfor = jitter();
@@ -695,12 +697,14 @@ void recvra6(void)
 		case IsHostNoRecv:
 			ralog("recvra6: recvra off, quitting on %s", conf.dev);
 			close(fd);
-			exit(0);
+			evexit(0);
 		default:
 			ralog("recvra6: unable to read router status on %s", conf.dev);
 			break;
 		}
 	}
+
+	return NULL;
 }
 
 /*
@@ -831,31 +835,32 @@ void sendra(int fd, uint8_t *dst, int rlt)
 /*
  * daemon to send router advertisements to hosts
  */
+static void *sendra6thr(void *unused_arg);
+
 void sendra6(void)
+{
+	pthread_t tid;
+
+	pthread_create(&tid, NULL, sendra6thr, NULL);
+}
+
+void *sendra6thr(void *unused_arg)
 {
 	int fd, cfd, n, dstknown = 0, sendracnt, sleepfor, nquitmsgs;
 	long lastra, now;
 	uint8_t buf[4096], dst[IPaddrlen];
 	struct ipifc *ifc = NULL;
 
+	(void)unused_arg;
+
 	fd = dialicmp(v6allnodesL, ICMP6_RS, &cfd);
 	if (fd < 0) {
 		fprintf(stderr, "can't open icmp_rs connection: %r");
-		exit(-1);
+		evexit(-1);
 	}
 
 	sendracnt = Maxv6initras;
 	nquitmsgs = Maxv6finalras;
-
-	switch (fork()) {
-	case -1:
-		fprintf(stderr, "can't fork: %r");
-		exit(-1);
-	default:
-		return;
-	case 0:
-		break;
-	}
 
 	ralog("sendra6 on %s", conf.dev);
 	sleepfor = jitter();
@@ -883,7 +888,7 @@ void sendra6(void)
 				continue;
 			} else {
 				ralog("sendra6: sendra off, quitting on %s", conf.dev);
-				exit(0);
+				evexit(0);
 			}
 		}
 
@@ -909,6 +914,8 @@ void sendra6(void)
 		else
 			sendra(fd, v6allnodesL, 1);
 	}
+
+	return NULL;
 }
 
 void startra6(void)
@@ -941,7 +948,7 @@ void doipv6(int what)
 	switch (what) {
 	default:
 		fprintf(stderr, "unknown IPv6 verb\n");
-		exit(-1);
+		evexit(-1);
 	case Vaddpref6:
 		issueadd6(&conf);
 		break;

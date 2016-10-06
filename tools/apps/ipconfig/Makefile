@@ -4,7 +4,7 @@ SOURCES:=	main.c ipv6.c
 
 XCC:=		$(CROSS_COMPILE)gcc
 
-LIBS:=		-lndblib -liplib -lbenchutil
+LIBS:=		-lndblib -liplib -lbenchutil -lpthread
 
 PHONY:=		all
 all:		ipconfig

@@ -58,7 +58,7 @@ then
 		ipconfig -g $route ether /net/ether$NIC $me $mask
 	else
 		# No explicit configuration; use DHCP.
-		ipconfig ether /net/ether$NIC
+		daemonize /bin/ipconfig -S ether /net/ether$NIC
 	fi
 	ipconfig loopback /dev/null 127.0.0.1
 else

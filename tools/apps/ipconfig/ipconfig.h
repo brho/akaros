@@ -112,6 +112,7 @@ void doadd(int);
 void doremove(void);
 void dounbind(void);
 void ea2lla(uint8_t *lla, uint8_t *ea);
+void evexit(int rc);
 int getndb(void);
 void getoptions(uint8_t *p);
 int ip4cfg(void);
