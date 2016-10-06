@@ -93,6 +93,7 @@ int mfd[2];
 int debug;
 int paranoia;
 int ipv6lookups = 1;
+int server;
 char *dbfile = "lib/ndb/local";
 struct ndb *db, *netdb;
 
@@ -183,11 +184,27 @@ struct network *last;
 
 char *argv0;
 
+static void evnotify(int rc)
+{
+	struct event_msg msg = { 0 };
+
+	msg.ev_type = EV_USER_IPI;
+	msg.ev_arg1 = rc;
+	sys_notify(getppid(), EV_USER_IPI, &msg);
+}
+
+static void evexit(int rc)
+{
+	if (server)
+		evnotify(rc);
+	exit(rc);
+}
+
 static void usage(void)
 {
 	fprintf(stderr, "CS:usage: %s [-dn] [-f ndb-file] [-x netmtpt]\n", argv0);
 	fprintf(stderr, "CS:usage");
-	exit(1);
+	evexit(1);
 }
 
 /*
@@ -231,7 +248,7 @@ int main(int argc, char *argv[])
 	justsetname = 0;
 	setnetmtpt(mntpt, sizeof(mntpt), NULL);
 	ext[0] = 0;
-	while ((ch = getopt(argc, argv, "4df:nx:")) != -1) {
+	while ((ch = getopt(argc, argv, "4df:nSx:")) != -1) {
 		switch (ch) {
 		case '4':
 			ipv6lookups = 0;
@@ -244,6 +261,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'n':
 			justsetname = 1;
+			break;
+		case 'S':
+			server = 1;
 			break;
 		case 'x':
 			setnetmtpt(mntpt, sizeof(mntpt), optarg);
@@ -265,10 +285,12 @@ int main(int argc, char *argv[])
 
 	if (!justsetname) {
 		mountinit(servefile, mntpt);
+		if (server)
+			evnotify(0);
 		io();
 	}
 
-	return 0;
+	evexit(0);
 }
 
 /*
@@ -301,7 +323,7 @@ static void mountinit(char *service, char *mntpt)
 	ret = pipe(p);
 	if (ret < 0) {
 		error(1, 0, "pipe: %r");
-		exit(1);
+		evexit(1);
 	}
 
 	/*
