@@ -107,7 +107,6 @@ static ssize_t __qbwrite(struct queue *q, struct block *b, int flags);
 static struct block *__qbread(struct queue *q, size_t len, int qio_flags,
                               int mem_flags);
 static bool qwait_and_ilock(struct queue *q, int qio_flags);
-static void qwakeup_iunlock(struct queue *q, int qio_flags);
 
 /* Helper: fires a wake callback, sending 'filter' */
 static void qwake_cb(struct queue *q, int filter)
@@ -734,6 +733,8 @@ static int __try_qbread(struct queue *q, size_t len, int qio_flags,
 {
 	struct block *ret, *ret_last, *first;
 	size_t blen;
+	bool was_unwritable = FALSE;
+	int dowakeup = 0;
 
 	if (qio_flags & QIO_CAN_ERR_SLEEP) {
 		if (!qwait_and_ilock(q, qio_flags)) {
@@ -750,6 +751,7 @@ static int __try_qbread(struct queue *q, size_t len, int qio_flags,
 			return QBR_FAIL;
 		}
 	}
+	was_unwritable = !qwritable(q);
 	blen = BLEN(first);
 	if ((q->state & Qcoalesce) && (blen == 0)) {
 		freeb(pop_first_block(q));
@@ -806,7 +808,29 @@ static int __try_qbread(struct queue *q, size_t len, int qio_flags,
 		len -= blen;
 	}
 out_ok:
-	qwakeup_iunlock(q, qio_flags);
+	/*
+	 *  if writer flow controlled, restart
+	 *
+	 *  This used to be
+	 *  q->len < q->limit/2
+	 *  but it slows down tcp too much for certain write sizes.
+	 *  I really don't understand it completely.  It may be
+	 *  due to the queue draining so fast that the transmission
+	 *  stalls waiting for the app to produce more data.  - presotto
+	 */
+	if ((q->state & Qflow) && q->len < q->limit) {
+		q->state &= ~Qflow;
+		dowakeup = 1;
+	}
+	spin_unlock_irqsave(&q->lock);
+	/* wakeup flow controlled writers */
+	if (dowakeup) {
+		if (q->kick && !(qio_flags & QIO_DONT_KICK))
+			q->kick(q->arg);
+		rendez_wakeup(&q->wr);
+	}
+	if (was_unwritable)
+		qwake_cb(q, FDTAP_FILT_WRITABLE);
 	*real_ret = ret;
 	return QBR_OK;
 }
@@ -1374,40 +1398,6 @@ void qputback(struct queue *q, struct block *b)
 	q->bfirst = b;
 	q->len += BALLOC(b);
 	q->dlen += BLEN(b);
-}
-
-/*
- *  flow control, get producer going again
- *  called with q ilocked
- */
-static void qwakeup_iunlock(struct queue *q, int qio_flags)
-{
-	int dowakeup = 0;
-
-	/*
-	 *  if writer flow controlled, restart
-	 *
-	 *  This used to be
-	 *  q->len < q->limit/2
-	 *  but it slows down tcp too much for certain write sizes.
-	 *  I really don't understand it completely.  It may be
-	 *  due to the queue draining so fast that the transmission
-	 *  stalls waiting for the app to produce more data.  - presotto
-	 */
-	if ((q->state & Qflow) && q->len < q->limit) {
-		q->state &= ~Qflow;
-		dowakeup = 1;
-	}
-
-	spin_unlock_irqsave(&q->lock);
-
-	/* wakeup flow controlled writers */
-	if (dowakeup) {
-		if (q->kick && !(qio_flags & QIO_DONT_KICK))
-			q->kick(q->arg);
-		rendez_wakeup(&q->wr);
-	}
-	qwake_cb(q, FDTAP_FILT_WRITABLE);
 }
 
 /*
