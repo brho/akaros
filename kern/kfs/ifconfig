@@ -60,7 +60,7 @@ then
 		# No explicit configuration; use DHCP.
 		daemonize /bin/ipconfig -S ether /net/ether$NIC
 	fi
-	ipconfig loopback /dev/null 127.0.0.1
+	ipconfig -P loopback /dev/null 127.0.0.1
 else
 	if [ -z "$me" ]
 	then
