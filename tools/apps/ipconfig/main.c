@@ -952,20 +952,17 @@ static void *dhcpwatchthr(void *arg)
 	uint32_t t;
 	int needconfig = (arg == NULL);
 
-	// procsetname("dhcpwatch");
 	/* keep trying to renew the lease */
 	for (;;) {
-		if (conf.lease == 0)
+		secs = conf.lease / 2;
+		if (secs == 0)
 			secs = 5;
-		else
-			secs = conf.lease >> 1;
 
 		/* avoid overflows */
 		for (s = secs; s > 0; s -= t) {
-			if (s > Maxsleep)
+			t = s;
+			if (t > Maxsleep)
 				t = Maxsleep;
-			else
-				t = s;
 			usleep(t * 1000 * 1000);
 		}
 
@@ -1279,9 +1276,8 @@ void dhcprecv(void)
 		/* get plan9-specific options */
 		n = optgetvec(bp->optdata, OBvendorinfo, vopts, sizeof(vopts) - 1);
 		if (n > 0 && parseoptions(vopts, n) == 0) {
-			if (validip(conf.fs) && Oflag)
-				n = 1;
-			else {
+			n = 1;
+			if (!validip(conf.fs) || !Oflag) {
 				n = optgetp9addrs(vopts, OP9fs, conf.fs, 2);
 				if (n == 0)
 					n = optgetaddrs(vopts, OP9fsv4, conf.fs, 2);
@@ -1289,9 +1285,8 @@ void dhcprecv(void)
 			for (i = 0; i < n; i++)
 				DEBUG("fs=%R ", conf.fs + i * IPaddrlen);
 
-			if (validip(conf.auth) && Oflag)
-				n = 1;
-			else {
+			n = 1;
+			if (!validip(conf.auth) || !Oflag) {
 				n = optgetp9addrs(vopts, OP9auth, conf.auth, 2);
 				if (n == 0)
 					n = optgetaddrs(vopts, OP9authv4, conf.auth, 2);
