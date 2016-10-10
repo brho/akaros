@@ -46,7 +46,6 @@ struct pthread_tcb {
 	int state;
 	bool detached;
 	struct pthread_tcb *joiner;			/* raced on by exit and join */
-	uint32_t id;
 	uint32_t stacksize;
 	void *stacktop;
 	void *(*start_routine)(void*);

@@ -1,9 +1,10 @@
-#include <stdio.h>
-#include <pthread.h>
-#include <stdlib.h>
 #include <parlib/parlib.h>
-#include <unistd.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/time.h>
+#include <unistd.h>
+#include "misc-compat.h"
 
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 #define printf_safe(...) {}
@@ -20,16 +21,16 @@ void *my_retvals[NUM_TEST_THREADS];
 
 __thread int my_id;
 void *block_thread(void* arg)
-{	
+{
 	assert(!in_vcore_context());
 	for (int i = 0; i < NUM_TEST_LOOPS; i++) {
-		printf_safe("[A] pthread %d on vcore %d\n", pthread_self()->id, vcore_id());
-		sys_block(5000 + pthread_self()->id);
+		printf_safe("[A] pthread %d on vcore %d\n", pthread_id(), vcore_id());
+		sys_block(5000 + pthread_id());
 	}
-	return (void*)(long)pthread_self()->id;
+	return (void*)(long)pthread_id();
 }
 
-int main(int argc, char** argv) 
+int main(int argc, char **argv)
 {
 	struct timeval tv = {0};
 	if (gettimeofday(&tv, 0))
