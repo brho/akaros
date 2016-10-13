@@ -13,3 +13,5 @@
 #define __weak
 
 #endif /* #ifdef __GNUC__ */
+
+#define __always_inline inline __attribute__((always_inline))

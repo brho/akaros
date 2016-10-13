@@ -7,11 +7,6 @@
 /* Arch Constants */
 #define ARCH_CL_SIZE				 64
 
-/* Used by arch/bitops.h.  Everyone else (so far) does it manually, but maybe
- * other Linux code will use this.  We need to say both inline and apply the
- * attrib, o/w newer gcc's complain. */
-#define __always_inline inline __attribute__((always_inline))
-
 static inline void breakpoint(void) __attribute__((always_inline));
 static inline void icache_flush_page(void *va, void *kva)
               __attribute__((always_inline));
