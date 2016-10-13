@@ -1,0 +1,15 @@
+#obj-y                                           += 2api.o
+#obj-y                                           += 2common.o
+#obj-y                                           += 2crc8.o
+#obj-y                                           += 2hmac.o
+#obj-y                                           += 2misc.o
+#obj-y                                           += 2nvstorage.o
+#obj-y                                           += 2rsa.o
+#obj-y                                           += 2secdata.o
+#obj-y                                           += 2secdatak.o
+#obj-y                                           += 2sha1.o
+obj-y                                           += 2sha256.o
+#obj-y                                           += 2sha512.o
+#obj-y                                           += 2sha_utility.o
+#obj-y                                           += 2stub.o
+#obj-y                                           += 2tpm_bootmode.o
