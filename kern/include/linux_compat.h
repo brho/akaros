@@ -41,7 +41,9 @@
 #define rcu_read_unlock()
 #define rcu_dereference(x) (x)
 #define rcu_dereference_protected(x, y) (x)
+#ifndef rcu_assign_pointer
 #define rcu_assign_pointer(dst, src) (dst) = (src)
+#endif
 #define RCU_INIT_POINTER(dst, src) rcu_assign_pointer(dst, src)
 #define synchronize_rcu()
 

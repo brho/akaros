@@ -19,6 +19,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <taskqueue.h>
+#include <rbtree.h>
 
 #define ETH_ALEN	6		/* Octets in one ethernet addr	 */
 #define ETH_ZLEN	60		/* Min. octets in frame sans FCS */
@@ -114,27 +115,6 @@ extern int ____ilog2_NaN;
 				   ) :		\
 	LOG2_UP(n)				\
  )
-
-struct rb_node {
-	unsigned long  __rb_parent_color;
-	struct rb_node *rb_right;
-	struct rb_node *rb_left;
-};
-
-struct rb_root {
-	struct rb_node *rb_node;
-};
-
-#define RB_ROOT	(struct rb_root) { NULL, }
-
-static inline void rb_link_node(struct rb_node * node, struct rb_node * parent,
-				struct rb_node ** rb_link)
-{
-	node->__rb_parent_color = (unsigned long)parent;
-	node->rb_left = node->rb_right = NULL;
-
-	*rb_link = node;
-}
 
 #define __printf(...)
 

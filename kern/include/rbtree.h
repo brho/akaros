@@ -26,12 +26,16 @@
   See Documentation/rbtree.txt for documentation and samples.
 */
 
-#ifndef	_LINUX_RBTREE_H
-#define	_LINUX_RBTREE_H
+#pragma once
 
-#include <linux/kernel.h>
-#include <linux/stddef.h>
-#include <linux/rcupdate.h>
+/* TODO: eventually we'll support some form of RCU and concurrent rb-tree
+ * usage.  When we do that, we'll need to grab these functions from Linux. */
+#ifndef WRITE_ONCE
+#define WRITE_ONCE(d, s) (d) = (s)
+#endif
+#ifndef rcu_assign_pointer
+#define rcu_assign_pointer(d, s) (d) = (s)
+#endif
 
 struct rb_node {
 	unsigned long  __rb_parent_color;
@@ -124,5 +128,3 @@ static inline void rb_link_node_rcu(struct rb_node *node, struct rb_node *parent
 	     pos && ({ n = rb_entry_safe(rb_next_postorder(&pos->field), \
 			typeof(*pos), field); 1; }); \
 	     pos = n)
-
-#endif	/* _LINUX_RBTREE_H */

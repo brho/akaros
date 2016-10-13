@@ -21,11 +21,10 @@
   linux/include/linux/rbtree_augmented.h
 */
 
-#ifndef _LINUX_RBTREE_AUGMENTED_H
-#define _LINUX_RBTREE_AUGMENTED_H
+#pragma once
 
-#include <linux/compiler.h>
-#include <linux/rbtree.h>
+#include <compiler.h>
+#include <rbtree.h>
 
 /*
  * Please note - only struct rb_augment_callbacks and the prototypes for
@@ -258,5 +257,3 @@ rb_erase_augmented(struct rb_node *node, struct rb_root *root,
 	if (rebalance)
 		__rb_erase_color(rebalance, root, augment->rotate);
 }
-
-#endif	/* _LINUX_RBTREE_AUGMENTED_H */
