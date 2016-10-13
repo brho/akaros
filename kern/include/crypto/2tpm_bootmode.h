@@ -5,8 +5,7 @@
  * Functions for updating the TPM state with the status of boot path.
  */
 
-#ifndef VBOOT_REFERENCE_2TPM_BOOTMODE_H_
-#define VBOOT_REFERENCE_2TPM_BOOTMODE_H_
+#pragma once
 
 #include "2api.h"
 
@@ -18,4 +17,3 @@
  */
 const uint8_t *vb2_get_boot_state_digest(struct vb2_context *ctx);
 
-#endif  /* VBOOT_REFERENCE_2TPM_BOOTMODE_H_ */

@@ -8,8 +8,7 @@
  * resistant to collisions and easy to compare.
  */
 
-#ifndef VBOOT_REFERENCE_VBOOT_2ID_H_
-#define VBOOT_REFERENCE_VBOOT_2ID_H_
+#pragma once
 #include <stdint.h>
 
 #define VB2_ID_NUM_BYTES 20
@@ -25,4 +24,3 @@ struct vb2_id {
 #define VB2_ID_NONE_SHA256 {{0x02, 0x56,}}
 #define VB2_ID_NONE_SHA512 {{0x05, 0x12,}}
 
-#endif  /* VBOOT_REFERENCE_VBOOT_2ID_H_ */

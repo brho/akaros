@@ -5,8 +5,7 @@
  * Non-volatile storage routines
  */
 
-#ifndef VBOOT_REFERENCE_VBOOT_2NVSTORAGE_H_
-#define VBOOT_REFERENCE_VBOOT_2NVSTORAGE_H_
+#pragma once
 
 enum vb2_nv_param {
 	/*
@@ -171,4 +170,3 @@ void vb2_nv_set(struct vb2_context *ctx,
 		enum vb2_nv_param param,
 		uint32_t value);
 
-#endif  /* VBOOT_REFERENCE_VBOOT_2NVSTORAGE_H_ */

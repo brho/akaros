@@ -5,8 +5,7 @@
  * Firmware hash tags for verified boot
  */
 
-#ifndef VBOOT_REFERENCE_VBOOT_2FW_HASH_TAGS_H_
-#define VBOOT_REFERENCE_VBOOT_2FW_HASH_TAGS_H_
+#pragma once
 #include <stdint.h>
 
 /*
@@ -37,4 +36,3 @@ enum vb2_hash_tag {
 	VB2_HASH_TAG_CALLER_BASE = 0x40000000
 };
 
-#endif /* VBOOT_REFERENCE_VBOOT_2FW_HASH_TAGS_H_ */

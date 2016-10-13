@@ -3,8 +3,7 @@
  * found in the LICENSE file.
  */
 
-#ifndef VBOOT_REFERENCE_VBOOT_2HMAC_H_
-#define VBOOT_REFERENCE_VBOOT_2HMAC_H_
+#pragma once
 
 #include <stdint.h>
 #include "2crypto.h"

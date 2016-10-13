@@ -5,8 +5,7 @@
  * Secure non-volatile storage routines
  */
 
-#ifndef VBOOT_REFERENCE_VBOOT_SECDATA_H_
-#define VBOOT_REFERENCE_VBOOT_SECDATA_H_
+#pragma once
 
 /*****************************************************************************/
 /* Firmware version space */
@@ -216,4 +215,3 @@ int vb2_secdatak_set(struct vb2_context *ctx,
 		     enum vb2_secdatak_param param,
 		     uint32_t value);
 
-#endif  /* VBOOT_REFERENCE_VBOOT_2SECDATA_H_ */

@@ -6,8 +6,7 @@
  * data.
  */
 
-#ifndef VBOOT_REFERENCE_VBOOT_2STRUCT_H_
-#define VBOOT_REFERENCE_VBOOT_2STRUCT_H_
+#pragma once
 #include <stdint.h>
 #include "2crypto.h"
 
@@ -344,4 +343,3 @@ struct vb2_ryu_root_key_hash {
 
 #define EXPECTED_VB2_RYU_ROOT_KEY_HASH_SIZE 48
 
-#endif  /* VBOOT_REFERENCE_VBOOT_2STRUCT_H_ */

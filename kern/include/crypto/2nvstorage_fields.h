@@ -5,8 +5,7 @@
  * Non-volatile storage bitfields
  */
 
-#ifndef VBOOT_REFERENCE_VBOOT_2NVSTORAGE_FIELDS_H_
-#define VBOOT_REFERENCE_VBOOT_2NVSTORAGE_FIELDS_H_
+#pragma once
 
 /*
  * Constants for NV storage.  We use this rather than structs and bitfields so
@@ -76,4 +75,3 @@ enum vb2_nv_offset {
 #define VB2_NV_MISC_TRY_RO_SYNC		       0x04
 #define VB2_NV_MISC_BATTERY_CUTOFF             0x08
 
-#endif  /* VBOOT_REFERENCE_VBOOT_2NVSTORAGE_FIELDS_H_ */

@@ -3,8 +3,7 @@
  * found in the LICENSE file.
  */
 
-#ifndef VBOOT_REFERENCE_2RSA_H_
-#define VBOOT_REFERENCE_2RSA_H_
+#pragma once
 
 #include "2crypto.h"
 #include "2struct.h"
@@ -77,4 +76,3 @@ int vb2_rsa_verify_digest(const struct vb2_public_key *key,
 			  const uint8_t *digest,
 			  const struct vb2_workbuf *wb);
 
-#endif  /* VBOOT_REFERENCE_2RSA_H_ */

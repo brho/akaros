@@ -5,8 +5,7 @@
  * Common functions between firmware and kernel verified boot.
  */
 
-#ifndef VBOOT_REFERENCE_VBOOT_2COMMON_H_
-#define VBOOT_REFERENCE_VBOOT_2COMMON_H_
+#pragma once
 
 #include "2api.h"
 #include "2return_codes.h"
@@ -194,4 +193,3 @@ const struct vb2_id *vb2_hash_id(enum vb2_hash_algorithm hash_alg);
 /* Size of work buffer sufficient for vb2_verify_fw_preamble() worst case. */
 #define VB2_VERIFY_FIRMWARE_PREAMBLE_WORKBUF_BYTES VB2_VERIFY_DATA_WORKBUF_BYTES
 
-#endif  /* VBOOT_REFERENCE_VBOOT_2COMMON_H_ */

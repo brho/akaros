@@ -10,18 +10,25 @@
  * platforms which don't have all the system includes.
  */
 
-#ifndef VBOOT_REFERENCE_2_SYSINCLUDES_H_
-#define VBOOT_REFERENCE_2_SYSINCLUDES_H_
+#pragma once
+/* Note that the old include/ros/env.h is merged into this file */
 
-#include <inttypes.h>  /* For PRIu64 */
-#include <stddef.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-
-#if defined(HAVE_ENDIAN_H) && defined(HAVE_LITTLE_ENDIAN)
-#include <byteswap.h>
-#include <memory.h>
-#endif
-
-#endif  /* VBOOT_REFERENCE_2_SYSINCLUDES_H_ */
+#include <ros/memlayout.h>
+#include <ros/syscall.h>
+#include <ros/sysevent.h>
+#include <ros/procinfo.h>
+#include <error.h>
+#include <ros/procdata.h>
+#include <ros/procinfo.h>
+#include <ros/resource.h>
+#include <trap.h>
+#include <ros/common.h>
+#include <arch/arch.h>
+#include <sys/queue.h>
+#include <atomic.h>
+#include <mm.h>
+#include <vfs.h>
+#include <schedule.h>
+#include <devalarm.h>
+#include <ns.h>
+#include <arch/vmm/vmm.h>

@@ -8,8 +8,7 @@
  * SHA library routines below don't interact with the rest of vboot.
  */
 
-#ifndef VBOOT_REFERENCE_2SHA_H_
-#define VBOOT_REFERENCE_2SHA_H_
+#pragma once
 
 #include "2crypto.h"
 
@@ -229,4 +228,3 @@ int vb2_digest_buffer(const uint8_t *buf,
 		      uint8_t *digest,
 		      uint32_t digest_size);
 
-#endif  /* VBOOT_REFERENCE_2SHA_H_ */

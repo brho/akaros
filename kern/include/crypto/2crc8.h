@@ -5,8 +5,7 @@
  * Very simple 8-bit CRC function.
  */
 
-#ifndef VBOOT_REFERENCE_2_CRC8_H_
-#define VBOOT_REFERENCE_2_CRC8_H_
+#pragma once
 
 /**
  * Calculate CRC-8 of the data, using x^8 + x^2 + x + 1 polynomial.
@@ -17,4 +16,3 @@
  */
 uint8_t vb2_crc8(const void *data, uint32_t size);
 
-#endif /* VBOOT_REFERENCE_2_CRC8_H_ */
