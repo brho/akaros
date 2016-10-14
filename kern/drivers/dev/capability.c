@@ -7,14 +7,33 @@
  * in the LICENSE file.
  */
 
-#include "../port/error.h"
-#include "../port/lib.h"
-#include "dat.h"
-#include "fns.h"
-#include "mem.h"
-#include "u.h"
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
+#include <ip.h>
 
-#include <libsec.h>
+#include <vfs.h>
+#include <kfs.h>
+#include <slab.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <string.h>
+#include <stdio.h>
+#include <assert.h>
+#include <error.h>
+#include <cpio.h>
+#include <pmap.h>
+#include <smp.h>
+#include <ip.h>
 
 enum {
 	Hashlen = SHA1dlen,
@@ -32,7 +51,7 @@ struct Caphash {
 };
 
 struct {
-	QLock QLock;
+	qlock_t	qlock_t qlock;
 	Caphash *first;
 	int nhash;
 } capalloc;
@@ -44,31 +63,32 @@ enum {
 };
 
 /* caphash must be last */
-Dirtab capdir[] = {
+struct dirtab capdir[] = {
     ".",       {Qdir, 0, QTDIR}, 0, DMDIR | 0500, "capuse", {Quse}, 0, 0222,
     "caphash", {Qhash},          0, 0200,
 };
-int ncapdir = nelem(capdir);
+int ncapdir = ARRAY_SIZE(capdir);
 
-static Chan *capattach(char *spec)
+static struct chan *capattach(char *spec)
 {
 	return devattach(L'¤', spec);
 }
 
-static Walkqid *capwalk(Chan *c, Chan *nc, char **name, int nname)
+static struct walkqid *capwalk(struct chan *c, struct chan *nc, char **name,
+			int nname)
 {
 	return devwalk(c, nc, name, nname, capdir, ncapdir, devgen);
 }
 
-static void capremove(Chan *c)
+static void capremove(struct chan *c)
 {
 	if (iseve() && c->qid.path == Qhash)
-		ncapdir = nelem(capdir) - 1;
+		ncapdir = ARRAY_SIZE(capdir) - 1;
 	else
 		error(Eperm);
 }
 
-static int32_t capstat(Chan *c, uint8_t *db, int32_t n)
+static int32_t capstat(struct chan *c, uint8_t *db, int32_t n)
 {
 	return devstat(c, db, n, capdir, ncapdir, devgen);
 }
@@ -76,7 +96,7 @@ static int32_t capstat(Chan *c, uint8_t *db, int32_t n)
 /*
  *  if the stream doesn't exist, create it
  */
-static Chan *capopen(Chan *c, int omode)
+static struct chan *capopen(struct chan *c, int omode)
 {
 	if (c->qid.type & QTDIR) {
 		if (omode != OREAD)
@@ -102,7 +122,7 @@ static Chan *capopen(Chan *c, int omode)
 
 /*
 static char*
-hashstr(uchar *hash)
+hashstr(uint8_t *hash)
 {
     static char buf[2*Hashlen+1];
     int i;
@@ -118,21 +138,21 @@ static Caphash *remcap(uint8_t *hash)
 {
 	Caphash *t, **l;
 
-	qlock(&capalloc.QLock);
+	qlock(&(&capalloc.QLock)->qlock);
 
 	/* find the matching capability */
-	for (l = &capalloc.first; *l != nil;) {
+	for (l = &capalloc.first; *l != NULL;) {
 		t = *l;
 		if (memcmp(hash, t->hash, Hashlen) == 0)
 			break;
 		l = &t->next;
 	}
 	t = *l;
-	if (t != nil) {
+	if (t != NULL) {
 		capalloc.nhash--;
 		*l = t->next;
 	}
-	qunlock(&capalloc.QLock);
+	qunlock(&(&capalloc.QLock)->qlock);
 
 	return t;
 }
@@ -142,36 +162,36 @@ static void addcap(uint8_t *hash)
 {
 	Caphash *p, *t, **l;
 
-	p = smalloc(sizeof *p);
+	p = kzmalloc(sizeof(*p), 0);
 	memmove(p->hash, hash, Hashlen);
-	p->next = nil;
+	p->next = NULL;
 
-	qlock(&capalloc.QLock);
+	qlock(&(&capalloc.QLock)->qlock);
 
 	/* trim extras */
 	while (capalloc.nhash >= Maxhash) {
 		t = capalloc.first;
-		if (t == nil)
+		if (t == NULL)
 			panic("addcap");
 		capalloc.first = t->next;
-		free(t);
+		kfree(t);
 		capalloc.nhash--;
 	}
 
 	/* add new one */
-	for (l = &capalloc.first; *l != nil; l = &(*l)->next)
+	for (l = &capalloc.first; *l != NULL; l = &(*l)->next)
 		;
 	*l = p;
 	capalloc.nhash++;
 
-	qunlock(&capalloc.QLock);
+	qunlock(&(&capalloc.QLock)->qlock);
 }
 
-static void capclose(Chan *c)
+static void capclose(struct chan *c)
 {
 }
 
-static int32_t capread(Chan *c, void *va, int32_t n, int64_t m)
+static int32_t capread(struct chan *c, void *va, int32_t n, int64_t m)
 {
 	switch ((uint32_t)c->qid.path) {
 	case Qdir:
@@ -184,14 +204,14 @@ static int32_t capread(Chan *c, void *va, int32_t n, int64_t m)
 	return n;
 }
 
-static int32_t capwrite(Chan *c, void *va, int32_t n, int64_t m)
+static int32_t capwrite(struct chan *c, void *va, int32_t n, int64_t m)
 {
 	Caphash *p;
 	char *cp;
 	uint8_t hash[Hashlen];
 	char *key, *from, *to;
 	char err[256];
-	Proc *up = externup();
+	struct proc *up = externup();
 
 	switch ((uint32_t)c->qid.path) {
 	case Qhash:
@@ -205,33 +225,33 @@ static int32_t capwrite(Chan *c, void *va, int32_t n, int64_t m)
 
 	case Quse:
 		/* copy key to avoid a fault in hmac_xx */
-		cp = nil;
+		cp = NULL;
 		if (waserror()) {
-			free(cp);
+			kfree(cp);
 			nexterror();
 		}
-		cp = smalloc(n + 1);
+		cp = kzmalloc(n + 1, 0);
 		memmove(cp, va, n);
 		cp[n] = 0;
 
 		from = cp;
 		key = strrchr(cp, '@');
-		if (key == nil)
+		if (key == NULL)
 			error(Eshort);
 		*key++ = 0;
 
 		hmac_sha1((uint8_t *)from, strlen(from), (uint8_t *)key, strlen(key),
-		          hash, nil);
+		          hash, NULL);
 
 		p = remcap(hash);
-		if (p == nil) {
-			snprint(err, sizeof err, "invalid capability %s@%s", from, key);
+		if (p == NULL) {
+			snprintf(err, sizeof(err), "invalid capability %s@%s", from, key);
 			error(err);
 		}
 
 		/* if a from user is supplied, make sure it matches */
 		to = strchr(from, '@');
-		if (to == nil) {
+		if (to == NULL) {
 			to = from;
 		} else {
 			*to++ = 0;
@@ -243,8 +263,8 @@ static int32_t capwrite(Chan *c, void *va, int32_t n, int64_t m)
 		kstrdup(&up->user, to);
 		up->basepri = PriNormal;
 
-		free(p);
-		free(cp);
+		kfree(p);
+		kfree(cp);
 		poperror();
 		break;
 
@@ -256,7 +276,7 @@ static int32_t capwrite(Chan *c, void *va, int32_t n, int64_t m)
 	return n;
 }
 
-Dev capdevtab = {.dc = L'¤',
+struct dev capdevtab = {.dc = L'¤',
                  .name = "cap",
 
                  .reset = devreset,
