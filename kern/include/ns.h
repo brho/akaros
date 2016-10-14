@@ -765,7 +765,7 @@ void kproc(char *unused_char_p_t, void (*)(void *), void *, int);
 void kprocchild(struct proc *, void (*)(void *), void *);
 void (*kproftick) (uint32_t);
 void ksetenv(char *unused_char_p_t, char *, int);
-void kstrdup(char **unused_char_pp_t, char *unused_char_p_t);
+void kstrdup(char **cp, char *name);
 
 struct block *mem2bl(uint8_t * unused_uint8_p_t, int);
 int memusehigh(void);

@@ -33,7 +33,7 @@ struct proc {
 	TAILQ_ENTRY(proc) sibling_link;
 	spinlock_t proc_lock;
 	struct user_context scp_ctx; 	/* context for an SCP.  TODO: move to vc0 */
-	char user[64]; /* user name */
+	char user[64];
 
 	/* This is effectively a (potentially short) version of argv[0].
 	 */

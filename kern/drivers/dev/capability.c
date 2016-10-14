@@ -21,22 +21,8 @@
 #include <smp.h>
 #include <ip.h>
 
-#include <vfs.h>
-#include <kfs.h>
-#include <slab.h>
-#include <kmalloc.h>
-#include <kref.h>
-#include <string.h>
-#include <stdio.h>
-#include <assert.h>
-#include <error.h>
-#include <cpio.h>
-#include <pmap.h>
-#include <smp.h>
-#include <ip.h>
-
 enum {
-	Hashlen = SHA1dlen,
+	Hashlen = 20, // SHA1dlen,
 	Maxhash = 256,
 };
 
@@ -44,15 +30,14 @@ enum {
  *  if a process knows cap->cap, it can change user
  *  to capabilty->user.
  */
-typedef struct Caphash Caphash;
 struct Caphash {
-	Caphash *next;
+	struct Caphash *next;
 	char hash[Hashlen];
 };
 
 struct {
-	qlock_t	qlock_t qlock;
-	Caphash *first;
+	qlock_t qlock;
+	struct Caphash *first;
 	int nhash;
 } capalloc;
 
@@ -64,18 +49,19 @@ enum {
 
 /* caphash must be last */
 struct dirtab capdir[] = {
-    ".",       {Qdir, 0, QTDIR}, 0, DMDIR | 0500, "capuse", {Quse}, 0, 0222,
-    "caphash", {Qhash},          0, 0200,
+	{".",       {Qdir, 0, QTDIR}, 0, DMDIR | 0500},
+	{"capuse",  {Quse}, 0, 0222,},
+	{"caphash", {Qhash},          0, 0200,},
 };
 int ncapdir = ARRAY_SIZE(capdir);
 
 static struct chan *capattach(char *spec)
 {
-	return devattach(L'¤', spec);
+	return devattach("capability", spec);
 }
 
 static struct walkqid *capwalk(struct chan *c, struct chan *nc, char **name,
-			int nname)
+                               int nname)
 {
 	return devwalk(c, nc, name, nname, capdir, ncapdir, devgen);
 }
@@ -85,7 +71,7 @@ static void capremove(struct chan *c)
 	if (iseve() && c->qid.path == Qhash)
 		ncapdir = ARRAY_SIZE(capdir) - 1;
 	else
-		error(Eperm);
+		error(EPERM, "Permission denied");
 }
 
 static int32_t capstat(struct chan *c, uint8_t *db, int32_t n)
@@ -99,8 +85,8 @@ static int32_t capstat(struct chan *c, uint8_t *db, int32_t n)
 static struct chan *capopen(struct chan *c, int omode)
 {
 	if (c->qid.type & QTDIR) {
-		if (omode != OREAD)
-			error(Ebadarg);
+		if (omode != O_RDONLY)
+			error(EISDIR, "Is a directory");
 		c->mode = omode;
 		c->flag |= COPEN;
 		c->offset = 0;
@@ -110,7 +96,7 @@ static struct chan *capopen(struct chan *c, int omode)
 	switch ((uint32_t)c->qid.path) {
 	case Qhash:
 		if (!iseve())
-			error(Eperm);
+			error(EPERM, "Permission denied: only eve() can open Qhash");
 		break;
 	}
 
@@ -121,24 +107,24 @@ static struct chan *capopen(struct chan *c, int omode)
 }
 
 /*
-static char*
-hashstr(uint8_t *hash)
+  static char*
+  hashstr(uint8_t *hash)
+  {
+  static char buf[2*Hashlen+1];
+  int i;
+
+  for(i = 0; i < Hashlen; i++)
+  sprint(buf+2*i, "%2.2x", hash[i]);
+  buf[2*Hashlen] = 0;
+  return buf;
+  }
+*/
+
+static struct Caphash *remcap(uint8_t *hash)
 {
-    static char buf[2*Hashlen+1];
-    int i;
+	struct Caphash *t, **l;
 
-    for(i = 0; i < Hashlen; i++)
-        sprint(buf+2*i, "%2.2x", hash[i]);
-    buf[2*Hashlen] = 0;
-    return buf;
-}
- */
-
-static Caphash *remcap(uint8_t *hash)
-{
-	Caphash *t, **l;
-
-	qlock(&(&capalloc.QLock)->qlock);
+	qlock(&capalloc.qlock);
 
 	/* find the matching capability */
 	for (l = &capalloc.first; *l != NULL;) {
@@ -152,7 +138,7 @@ static Caphash *remcap(uint8_t *hash)
 		capalloc.nhash--;
 		*l = t->next;
 	}
-	qunlock(&(&capalloc.QLock)->qlock);
+	qunlock(&capalloc.qlock);
 
 	return t;
 }
@@ -160,13 +146,13 @@ static Caphash *remcap(uint8_t *hash)
 /* add a capability, throwing out any old ones */
 static void addcap(uint8_t *hash)
 {
-	Caphash *p, *t, **l;
+	struct Caphash *p, *t, **l;
 
 	p = kzmalloc(sizeof(*p), 0);
 	memmove(p->hash, hash, Hashlen);
 	p->next = NULL;
 
-	qlock(&(&capalloc.QLock)->qlock);
+	qlock(&capalloc.qlock);
 
 	/* trim extras */
 	while (capalloc.nhash >= Maxhash) {
@@ -184,41 +170,41 @@ static void addcap(uint8_t *hash)
 	*l = p;
 	capalloc.nhash++;
 
-	qunlock(&(&capalloc.QLock)->qlock);
+	qunlock(&capalloc.qlock);
 }
 
 static void capclose(struct chan *c)
 {
 }
 
-static int32_t capread(struct chan *c, void *va, int32_t n, int64_t m)
+static long capread(struct chan *c, void *va, long n, int64_t m)
 {
 	switch ((uint32_t)c->qid.path) {
 	case Qdir:
 		return devdirread(c, va, n, capdir, ncapdir, devgen);
 
 	default:
-		error(Eperm);
+		error(EPERM, "Permission denied: can't read capability files");
 		break;
 	}
 	return n;
 }
 
-static int32_t capwrite(struct chan *c, void *va, int32_t n, int64_t m)
+static long capwrite(struct chan *c, void *va, long n, int64_t m)
 {
-	Caphash *p;
+	struct Caphash *p;
 	char *cp;
 	uint8_t hash[Hashlen];
 	char *key, *from, *to;
 	char err[256];
-	struct proc *up = externup();
+	ERRSTACK(1);
 
 	switch ((uint32_t)c->qid.path) {
 	case Qhash:
 		if (!iseve())
-			error(Eperm);
+			error(EPERM, "permission denied: you must be eve");
 		if (n < Hashlen)
-			error(Eshort);
+			error(EIO, "Short read: on Qhash");
 		memmove(hash, va, Hashlen);
 		addcap(hash);
 		break;
@@ -237,16 +223,17 @@ static int32_t capwrite(struct chan *c, void *va, int32_t n, int64_t m)
 		from = cp;
 		key = strrchr(cp, '@');
 		if (key == NULL)
-			error(Eshort);
+			error(EIO, "short read: Quse");
 		*key++ = 0;
 
-		hmac_sha1((uint8_t *)from, strlen(from), (uint8_t *)key, strlen(key),
-		          hash, NULL);
+		panic("No way to hash");
+		//hmac_sha1((uint8_t *)from, strlen(from), (uint8_t *)key, strlen(key),
+		//hash, NULL);
 
 		p = remcap(hash);
 		if (p == NULL) {
 			snprintf(err, sizeof(err), "invalid capability %s@%s", from, key);
-			error(err);
+			error(EINVAL, err);
 		}
 
 		/* if a from user is supplied, make sure it matches */
@@ -255,13 +242,24 @@ static int32_t capwrite(struct chan *c, void *va, int32_t n, int64_t m)
 			to = from;
 		} else {
 			*to++ = 0;
+			panic("todo");
+			/*
 			if (strcmp(from, up->user) != 0)
-				error("capability must match user");
+				error(EINVAL, "capability must match user");
+			*/
 		}
 
 		/* set user id */
-		kstrdup(&up->user, to);
-		up->basepri = PriNormal;
+		// TODO: make user a char *, not a fixed array.
+		//kstrdup(&current->user, to);
+		// In the original user names were NULL-terminated; ensure
+		// that is still the case.
+		if (strlen(to) > sizeof(current->user)-1)
+			error(EINVAL, "New user name is > %d bytes", sizeof(current->user));
+		memset(current->user, 0, sizeof(current->user));
+		strncpy(current->user, to, sizeof(current->user));
+		//up->basepri = PriNormal;
+
 
 		kfree(p);
 		kfree(cp);
@@ -269,28 +267,29 @@ static int32_t capwrite(struct chan *c, void *va, int32_t n, int64_t m)
 		break;
 
 	default:
-		error(Eperm);
+		error(EPERM, "permission denied: capwrite");
 		break;
 	}
 
 	return n;
 }
 
-struct dev capdevtab = {.dc = L'¤',
-                 .name = "cap",
+struct dev capdevtab = {
+	.name = "capability",
 
-                 .reset = devreset,
-                 .init = devinit,
-                 .shutdown = devshutdown,
-                 .attach = capattach,
-                 .walk = capwalk,
-                 .stat = capstat,
-                 .open = capopen,
-                 .create = devcreate,
-                 .close = capclose,
-                 .read = capread,
-                 .bread = devbread,
-                 .write = capwrite,
-                 .bwrite = devbwrite,
-                 .remove = capremove,
-                 .wstat = devwstat};
+	.reset = devreset,
+	.init = devinit,
+	.shutdown = devshutdown,
+	.attach = capattach,
+	.walk = capwalk,
+	.stat = capstat,
+	.open = capopen,
+	.create = devcreate,
+	.close = capclose,
+	.read = capread,
+	.bread = devbread,
+	.write = capwrite,
+	.bwrite = devbwrite,
+	.remove = capremove,
+	.wstat = devwstat,
+};
