@@ -5,11 +5,11 @@
  * Secure storage APIs
  */
 
-#include "2sysincludes.h"
-#include "2common.h"
-#include "2crc8.h"
-#include "2misc.h"
-#include "2secdata.h"
+#include <crypto/2sysincludes.h>
+#include <crypto/2common.h>
+#include <crypto/2crc8.h>
+#include <crypto/2misc.h>
+#include <crypto/2secdata.h>
 
 int vb2_secdata_check_crc(const struct vb2_context *ctx)
 {

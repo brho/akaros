@@ -35,9 +35,9 @@
  * SUCH DAMAGE.
  */
 
-#include "2sysincludes.h"
-#include "2common.h"
-#include "2sha.h"
+#include <crypto/2sysincludes.h>
+#include <crypto/2common.h>
+#include <crypto/2sha.h>
 
 #define SHFR(x, n)    (x >> n)
 #define ROTR(x, n)   ((x >> n) | (x << ((sizeof(x) << 3) - n)))

@@ -9,10 +9,10 @@
  * multiple RSA key lengths and hash digest algorithms.
  */
 
-#include "2sysincludes.h"
-#include "2common.h"
-#include "2rsa.h"
-#include "2sha.h"
+#include <crypto/2sysincludes.h>
+#include <crypto/2common.h>
+#include <crypto/2rsa.h>
+#include <crypto/2sha.h>
 
 /**
  * a[] -= mod

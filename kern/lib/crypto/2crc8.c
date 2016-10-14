@@ -3,8 +3,8 @@
  * found in the LICENSE file.
  */
 
-#include "2sysincludes.h"
-#include "2crc8.h"
+#include <crypto/2sysincludes.h>
+#include <crypto/2crc8.h>
 
 uint8_t vb2_crc8(const void *vptr, uint32_t size)
 {

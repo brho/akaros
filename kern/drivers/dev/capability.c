@@ -21,8 +21,13 @@
 #include <smp.h>
 #include <ip.h>
 
+#include <crypto/2crypto.h>
+#include <crypto/2hmac.h>
+#include <crypto/2id.h>
+#include <crypto/2sha.h>
+
 enum {
-	Hashlen = 20, // SHA1dlen,
+	Hashlen = VB2_SHA256_BLOCK_SIZE,
 	Maxhash = 256,
 };
 
@@ -197,6 +202,7 @@ static long capwrite(struct chan *c, void *va, long n, int64_t m)
 	uint8_t hash[Hashlen];
 	char *key, *from, *to;
 	char err[256];
+	int ret;
 	ERRSTACK(1);
 
 	switch ((uint32_t)c->qid.path) {
@@ -226,9 +232,10 @@ static long capwrite(struct chan *c, void *va, long n, int64_t m)
 			error(EIO, "short read: Quse");
 		*key++ = 0;
 
-		panic("No way to hash");
-		//hmac_sha1((uint8_t *)from, strlen(from), (uint8_t *)key, strlen(key),
-		//hash, NULL);
+		ret = hmac(VB2_ALG_RSA1024_SHA256, key, strlen(key),
+		           from, strlen(from), hash, sizeof(hash));
+		if (ret)
+			error(EINVAL, "HMAC failed");
 
 		p = remcap(hash);
 		if (p == NULL) {

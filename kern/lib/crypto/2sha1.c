@@ -6,9 +6,9 @@
  * Open Source Project (platorm/system/core.git/libmincrypt/sha.c
  */
 
-#include "2sysincludes.h"
-#include "2common.h"
-#include "2sha.h"
+#include <crypto/2sysincludes.h>
+#include <crypto/2common.h>
+#include <crypto/2sha.h>
 
 /*
  * Some machines lack byteswap.h and endian.h. These have to use the

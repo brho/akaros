@@ -17,8 +17,8 @@
  *      must be done elsewhere, and VB2_NV_DEBUG_RESET_MODE is ignored.
  */
 
-#ifndef VBOOT_2_API_H_
-#define VBOOT_2_API_H_
+#pragma once
+
 #include <stdint.h>
 
 #include "2common.h"
@@ -658,4 +658,3 @@ int vb2ex_hwcrypto_digest_extend(const uint8_t *buf, uint32_t size);
  */
 int vb2ex_hwcrypto_digest_finalize(uint8_t *digest, uint32_t digest_size);
 
-#endif  /* VBOOT_2_API_H_ */

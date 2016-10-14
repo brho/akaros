@@ -25,4 +25,3 @@ int hmac(enum vb2_hash_algorithm alg,
 	 const void *msg, uint32_t msg_size,
 	 uint8_t *mac, uint32_t mac_size);
 
-#endif

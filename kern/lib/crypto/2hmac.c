@@ -3,9 +3,9 @@
  * found in the LICENSE file.
  */
 
-#include "2sysincludes.h"
-#include "2sha.h"
-#include "2hmac.h"
+#include <crypto/2sysincludes.h>
+#include <crypto/2common.h>
+#include <crypto/2sha.h>
 
 int hmac(enum vb2_hash_algorithm alg,
 	 const void *key, uint32_t key_size,

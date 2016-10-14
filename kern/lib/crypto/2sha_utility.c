@@ -5,9 +5,9 @@
  * Utility functions for message digest functions.
  */
 
-#include "2sysincludes.h"
-#include "2common.h"
-#include "2sha.h"
+#include <crypto/2sysincludes.h>
+#include <crypto/2common.h>
+#include <crypto/2sha.h>
 
 #if VB2_SUPPORT_SHA1
 #define CTH_SHA1 VB2_HASH_SHA1
