@@ -197,6 +197,10 @@ static inline uint64_t read_msr(uint32_t reg) __attribute__((always_inline));
 static inline void write_msr(uint32_t reg, uint64_t val)
               __attribute__((always_inline));
 /* if we have mm64s, change the hpet helpers */
+static inline void write_mmreg8(uintptr_t reg, uint8_t val)
+							__attribute__((always_inline));
+static inline uint8_t read_mmreg8(uintptr_t reg)
+							__attribute__((always_inline));
 static inline void write_mmreg32(uintptr_t reg, uint32_t val)
               __attribute__((always_inline));
 static inline uint32_t read_mmreg32(uintptr_t reg)
@@ -475,6 +479,16 @@ static void split_msr_val(uint64_t val, uint32_t *high32, uint32_t *low32)
 static inline void write_msr(uint32_t reg, uint64_t val)
 {
 	asm volatile("wrmsr" : : "d"(val >> 32), "a"(val & 0xFFFFFFFF), "c"(reg));
+}
+
+static inline void write_mmreg8(uintptr_t reg, uint8_t val)
+{
+	*((volatile uint8_t*)reg) = val;
+}
+
+static inline uint8_t read_mmreg8(uintptr_t reg)
+{
+	return *((volatile uint8_t*)reg);
 }
 
 static inline void write_mmreg32(uintptr_t reg, uint32_t val)

@@ -31,8 +31,8 @@ enum {
 enum {
 	ASerr = 1 << 0,  /* error */
 	ASdrq = 1 << 3,  /* request */
-	ASdf = 1 << 5,   /* fault */
-	ASdrdy = 1 << 6, /* ready */
+	ASdf = 1 << 5,   /* fault, command specific */
+	ASdrdy = 1 << 6, /* ready, command specific */
 	ASbsy = 1 << 7,  /* busy */
 
 	ASobs = 1 << 1 | 1 << 2 | 1 << 4,
@@ -54,7 +54,7 @@ enum {
  * 1080-1100	port 31
  */
 
-/* cap bits: supported features */
+/* Capability bits: supported features */
 enum {
 	Hs64a = 1 << 31,  /* 64-bit addressing */
 	Hsncq = 1 << 30,  /* ncq */
@@ -79,25 +79,26 @@ enum {
 	Hnp = 1 << 0,     /* n ports */
 };
 
-/* ghc bits */
+/* GHC bits */
 enum {
 	Hae = 1 << 31, /* enable ahci */
 	Hie = 1 << 1,  /* " interrupts */
 	Hhr = 1 << 0,  /* hba reset */
 };
 
-struct ahba {
-	uint32_t cap;
-	uint32_t ghc;
-	uint32_t isr;
-	uint32_t pi; /* ports implemented */
-	uint32_t ver;
-	uint32_t ccc; /* coaleasing control */
-	uint32_t cccports;
-	uint32_t emloc;
-	uint32_t emctl;
-};
+#define HBA_CAP 0x00       // Host Capabilities
+#define HBA_GHC 0x04       // Global Host Control
+#define HBA_ISR 0x08       // Interrupt Status Register
+#define HBA_PI  0x0C       // Ports Implemented
+#define HBA_VS 0x10        // Version
+#define HBA_CCC_CTL 0x14   // Command Completion Coalescing Control
+#define HBA_CCC_PORTS 0x18 // Command Completion Coalescing Ports
+#define HBA_EM_LOC 0x1C    // Enclosure Management Location
+#define HBA_EM_CTL 0x20    // Enclosure Management Control
+#define HBA_CAP2 0x24      // Host Capabilities Extended
+#define HBA_BOHC 0x28      // BIOS/OS Hand-Off Control and Status
 
+/* Interrupt Status bits */
 enum {
 	Acpds = 1 << 31, /* cold port detect status */
 	Atfes = 1 << 30, /* task file error status */
@@ -122,7 +123,7 @@ enum {
 	Ifatal = Atfes | Ahbfs | Ahbds | Aifs,
 };
 
-/* serror bits */
+/* SError bits */
 enum {
 	SerrX = 1 << 26, /* exchanged */
 	SerrF = 1 << 25, /* unknown fis */
@@ -149,7 +150,7 @@ enum {
 	SerrBad = 0x7f << 19,
 };
 
-/* cmd register bits */
+/* Command/Status register bits */
 enum {
 	Aicc = 1 << 28,   /* interface communcations control. 4 bits */
 	Aasp = 1 << 27,   /* aggressive slumber & partial sleep */
@@ -175,38 +176,34 @@ enum {
 	Arun = Ast | Acr | Afre | Afr,
 };
 
-/* ctl register bits */
+/* SControl register bits */
 enum {
 	Aipm = 1 << 8, /* interface power mgmt. 3=off */
 	Aspd = 1 << 4,
+	Adis = 1 << 2, // Disable SATA interface and put Phy in offline mode
 	Adet = 1 << 0, /* device detection */
 };
 
-#define sstatus scr0
-#define sctl scr2
-#define serror scr1
-#define sactive scr3
-
-struct aport {
-	uint32_t list; /* PxCLB must be 1kb aligned. */
-	uint32_t listhi;
-	uint32_t fis; /* 256-byte aligned */
-	uint32_t fishi;
-	uint32_t isr;
-	uint32_t ie; /* interrupt enable */
-	uint32_t cmd;
-	uint32_t res1;
-	uint32_t task;
-	uint32_t sig;
-	uint32_t scr0;
-	uint32_t scr2;
-	uint32_t scr1;
-	uint32_t scr3;
-	uint32_t ci; /* command issue */
-	uint32_t ntf;
-	unsigned char res2[8];
-	uint32_t vendor;
-};
+#define PORT_CLB    0x00 // Port Command List Base address
+#define PORT_CLBU   0x04 // Port Command List Base address Upper 32-bits
+#define PORT_FB     0x08 // Port FIS Base address
+#define PORT_FBU    0x0C // Port FIS Base address Upper 32-bits
+#define PORT_IS     0x10 // Port Interrupt Status
+#define PORT_IE     0x14 // Port Interrupt Enable
+#define PORT_CMD    0x18 // Port Command and status
+#define PORT_RES1   0x1C // Reserved
+#define PORT_TFD    0x20 // Port Task File Data
+#define PORT_SIG    0x24 // Port Signature
+#define PORT_SSTS   0x28 // Port Serial ATA Status (SCR0: SStatus)
+#define PORT_SCTL   0x2C // Port Serial ATA Control (SCR2: SControl)
+#define PORT_SERR   0x30 // Port Serial ATA Error (SCR1: SError)
+#define PORT_SACT   0x34 // Port Serial ATA Active (SCR3: SActive)
+#define PORT_CI     0x38 // Port Command Issue
+#define PORT_SNTF   0x3C // Port Serial ATA Notification (SCR4: SNotification)
+#define PORT_FBS    0x40 // Port FIS-Based Switching control
+#define PORT_DEVSLP 0x44 // Port Device Sleep
+#define PORT_RES2   0x48 // Reserved
+#define PORT_VS     0x70 // Vendor Specific
 
 enum {
 	/*
@@ -236,6 +233,7 @@ struct afis {
 	uint32_t *devicebits;
 };
 
+// Command header flags
 enum {
 	Lprdtl = 1 << 16, /* physical region descriptor table len */
 	Lpmp = 1 << 12,   /* port multiplier port */
@@ -248,34 +246,38 @@ enum {
 	Lcfl = 1 << 0, /* command fis length in double words */
 };
 
-/* in hosts memory; memory mapped */
-struct alist {
-	uint32_t flags;
-	uint32_t len;
-	uint32_t ctab;
-	uint32_t ctabhi;
-	unsigned char reserved[16];
-};
+// AHCI Command List Command Header
+// Each header is an element in the list which is up to 32 elements long
+#define ALIST_SIZE 0x20   // Size of the struct in memory, not for access
+#define ALIST_FLAGS  0x00 // Flags and PRDTL (PRDT Length)
+#define ALIST_LEN    0x04 // PRD byte count transferred
+#define ALIST_CTAB   0x08 // Physical address of 128-bit aligned Command Table
+#define ALIST_CTABHI 0x0C // CTAB physical address upper 32 bits
+#define ALIST_RES    0x10 // Reserved
 
-struct aprdt {
-	uint32_t dba;
-	uint32_t dbahi;
-	uint32_t pad;
-	uint32_t count;
-};
+// AHCI Physical Region Descriptor Table Element
+// Each of these elements is part of a table with up to 65,535 entries
+#define APRDT_SIZE 0x10  // Size of the struct in memory, not for access
+#define APRDT_DBA   0x00 // Data Base Address (physical)
+#define APRDT_DBAHI 0x04 // Data Base Address upper 32 bits
+#define APRDT_RES   0x08 // Reserved
+#define APRDT_COUNT 0x0C // 31=Intr on Completion, 30:22=Reserved, 21:0=DBC
 
-struct actab {
-	unsigned char cfis[0x40];
-	unsigned char atapi[0x10];
-	unsigned char pad[0x30];
-	struct aprdt prdt;
-};
+// AHCI Command Table
+// Note that there is no fixed size specified - there are 1 to 65,535 PRDT's
+// Size = ACTAB_PRDT + APRDT*N_APRDT
+#define ACTAB_CFIS  0x00 // Command Frame Information Struct (up to 64 bytes)
+#define ACTAB_ATAPI 0x40 // ATAPI Command (12 or 16 bytes)
+#define ACTAB_RES   0x50 // Reserved
+#define ACTAB_PRDT  0x80 // PRDT (up to 65,535 entries in spec, this has one)
 
+// Portm flags (status flags?)
 enum {
 	Ferror = 1,
 	Fdone = 2,
 };
 
+// Portm feature flags
 enum {
 	Dllba = 1,
 	Dsmart = 1 << 1,
@@ -292,11 +294,11 @@ struct aportm {
 	unsigned char feat;
 	unsigned char smart;
 	struct afis fis;
-	struct alist *list;
-	struct actab *ctab;
+	void *list;
+	void *ctab;
 };
 
 struct aportc {
-	struct aport *p;
+	void *p;
 	struct aportm *pm;
 };

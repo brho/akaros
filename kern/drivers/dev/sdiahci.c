@@ -132,7 +132,7 @@ struct drive {
 	struct ctlr *ctlr;
 	struct sdunit *unit;
 	char name[10];
-	struct aport *port;
+	void *port;
 	struct aportm portm;
 	struct aportc portc; /* redundant ptr to port and portm */
 
@@ -174,8 +174,8 @@ struct ctlr {
 	void *vector;
 
 	/* virtual register addresses */
-	uintptr_t mmio;
-	struct ahba *hba;
+	void *mmio;
+	void *hba;
 
 	/* phyical register address */
 	uintptr_t physio;
@@ -190,11 +190,11 @@ struct ctlr {
 };
 
 struct Asleep {
-	struct aport *p;
+	void *p;
 	int i;
 };
 
-extern struct sdifc sdiahciifc;
+struct sdifc sdiahciifc; // TODO(afergs): make static???
 
 static struct ctlr iactlr[NCtlr];
 static struct sdev sdevs[NCtlr];
@@ -214,6 +214,95 @@ static char stab[] = {
 	[8]	= 't', 'c', 'p', 'e',
 	[16]	= 'N', 'I', 'W', 'B', 'D', 'C', 'H', 'S', 'T', 'F', 'X'
 };
+
+// AHCI register access helper functions
+// TODO(afergs): Figure out what the datatype for reg/offset should really be!
+
+static inline uint32_t ahci_hba_read32(void *base, uint32_t reg)
+{
+	return read_mmreg32((uintptr_t)base + reg);
+}
+
+static inline void ahci_hba_write32(void *base, uint32_t reg, uint32_t val)
+{
+	write_mmreg32((uintptr_t)base + reg, val);
+}
+
+static inline uint32_t ahci_port_read32(void *aport, uint32_t reg)
+{
+	return read_mmreg32((uintptr_t)aport + reg);
+}
+
+static inline void ahci_port_write32(void *aport, uint32_t reg, uint32_t val)
+{
+	write_mmreg32((uintptr_t)aport + reg, val);
+}
+
+static inline uint32_t ahci_list_read32(void *alist, uint32_t reg)
+{
+	return read_mmreg32((uintptr_t)alist + reg);
+}
+
+static inline void ahci_list_write32(void *alist, uint32_t reg, uint32_t val)
+{
+	write_mmreg32((uintptr_t)alist + reg, val);
+}
+
+static inline uint32_t ahci_prdt_read32(void *aprdt, uint32_t reg)
+{
+	return read_mmreg32((uintptr_t)aprdt + reg);
+}
+
+static inline void ahci_prdt_write32(void *aprdt, uint32_t reg, uint32_t val)
+{
+	write_mmreg32((uintptr_t)aprdt + reg, val);
+}
+
+static inline uint8_t ahci_cfis_read8(void *acfis, uint8_t offset)
+{
+	return read_mmreg8((uintptr_t)acfis + offset);
+}
+
+static inline void ahci_cfis_write8(void *acfis, uint8_t offset, uint8_t val)
+{
+	write_mmreg8((uintptr_t)acfis + offset, val);
+}
+
+static uint32_t set_bit32(void *base, uint32_t offset, uint32_t mask)
+{
+	uint32_t value = read_mmreg32((uintptr_t)base + offset);
+
+	value |= mask;
+	write_mmreg32((uintptr_t)base + offset, value);
+	return value;
+}
+
+static uint32_t clear_bit32(void *base, uint32_t offset, uint32_t mask)
+{
+	uint32_t value = read_mmreg32((uintptr_t)base + offset);
+
+	value &= ~mask;
+	write_mmreg32((uintptr_t)base + offset, value);
+	return value;
+}
+
+static uint8_t set_bit8(void *base, uint32_t offset, uint8_t mask)
+{
+	uint8_t value = read_mmreg8((uintptr_t)base + offset);
+
+	value |= mask;
+	write_mmreg8((uintptr_t)base + offset, value);
+	return value;
+}
+
+static uint8_t clear_bit8(void *base, uint32_t offset, uint8_t mask)
+{
+	uint8_t value = read_mmreg8((uintptr_t)base + offset);
+
+	value &= ~mask;
+	write_mmreg8((uintptr_t)base + offset, value);
+	return value;
+}
 
 /* ALL time units in this file are in milliseconds. */
 static uint32_t ms(void)
@@ -251,7 +340,7 @@ static void serrstr(uint32_t r, char *s, char *e)
 
 static char ntab[] = "0123456789abcdef";
 
-static void preg(unsigned char *reg, int n)
+static void preg(volatile unsigned char *reg, int n)
 {
 	int i;
 	char buf[25 * 3 + 1], *e;
@@ -267,10 +356,11 @@ static void preg(unsigned char *reg, int n)
 	printd(buf);
 }
 
-static void dreg(char *s, struct aport *p)
+static void dreg(char *s, void *p)
 {
-	printd("ahci: %stask=%#lx; cmd=%#lx; ci=%#lx; is=%#lx\n", s, p->task,
-	       p->cmd, p->ci, p->isr);
+	printd("ahci: %stask=%#lx; cmd=%#lx; ci=%#lx; is=%#lx\n", s,
+	       ahci_port_read32(p, PORT_TFD), ahci_port_read32(p, PORT_CMD),
+	       ahci_port_read32(p, PORT_CI), ahci_port_read32(p, PORT_IS));
 }
 
 static void esleep(int ms)
@@ -287,7 +377,7 @@ static int ahciclear(void *v)
 	struct Asleep *s;
 
 	s = v;
-	return (s->p->ci & s->i) == 0;
+	return (ahci_port_read32(s->p, PORT_CI) & s->i) == 0;
 }
 
 static void aesleep(struct aportm *pm, struct Asleep *a, int ms)
@@ -302,78 +392,89 @@ static void aesleep(struct aportm *pm, struct Asleep *a, int ms)
 static int ahciwait(struct aportc *c, int ms)
 {
 	struct Asleep as;
-	struct aport *p;
+	void *port;
+	uint32_t cmd, tfd;
 
-	p = c->p;
-	p->ci = 1;
-	as.p = p;
+	port = c->p;
+	cmd = ahci_port_read32(port, PORT_CMD);
+	printd("ahci: %s: CMD=0x%08x\n", __func__, cmd);
+
+	// TODO: Set the correct CI bit for the slot, not always slot 0!
+	ahci_port_write32(port, PORT_CI, 1);
+	as.p = port;
 	as.i = 1;
 	aesleep(c->pm, &as, ms);
-	if ((p->task & 1) == 0 && p->ci == 0)
+	tfd = ahci_port_read32(port, PORT_TFD);
+	if (((tfd & 0x81) == 0) && // Not busy and not error
+	    (ahci_port_read32(port, PORT_CI) == 0))
 		return 0;
-	dreg("ahciwait timeout ", c->p);
+	dreg("ahci: ahciwait: timeout ", c->p);
 	return -1;
 }
 
 /* fill in cfis boilerplate */
-static unsigned char *cfissetup(struct aportc *pc)
+static void *cfissetup(struct aportc *pc)
 {
-	unsigned char *cfis;
+	void *cfis;
 
-	cfis = pc->pm->ctab->cfis;
-	memset(cfis, 0, 0x20);
-	cfis[0] = 0x27;
-	cfis[1] = 0x80;
-	cfis[7] = Obs;
+	cfis = pc->pm->ctab; // cfis is the first thing in ctab, same location
+	memset((void *)cfis, 0, 0x20);
+	ahci_cfis_write8(cfis, 0, 0x27); // H2D
+	ahci_cfis_write8(cfis, 1, 0x80); // Transfer due to update to CMD register
+	ahci_cfis_write8(cfis, 7, Obs);
 	return cfis;
 }
 
-/* initialise pc's list */
+/* initialize pc's list */
 static void listsetup(struct aportc *pc, int flags)
 {
-	struct alist *list;
+	void *list;
 
 	list = pc->pm->list;
-	list->flags = flags | 5;
-	list->len = 0;
-	list->ctab = paddr_low32(pc->pm->ctab);
-	list->ctabhi = paddr_high32(pc->pm->ctab);
+	ahci_list_write32(list, ALIST_FLAGS, flags | 5);
+	ahci_list_write32(list, ALIST_LEN, 0);
+	ahci_list_write32(list, ALIST_CTAB, paddr_low32(pc->pm->ctab));
+	ahci_list_write32(list, ALIST_CTABHI, paddr_high32(pc->pm->ctab));
+	printd("ahci: %s: CTAB physical address=0x%08x:0x%08x\n", __func__,
+	       paddr_high32(pc->pm->ctab), paddr_low32(pc->pm->ctab));
 }
 
 static int nop(struct aportc *pc)
 {
-	unsigned char *c;
+	void *cfis;
 
 	if ((pc->pm->feat & Dnop) == 0)
 		return -1;
-	c = cfissetup(pc);
-	c[2] = 0;
+	cfis = cfissetup(pc);
+	ahci_cfis_write8(cfis, 2, 0);
 	listsetup(pc, Lwrite);
 	return ahciwait(pc, 3 * 1000);
 }
 
 static int setfeatures(struct aportc *pc, unsigned char f)
 {
-	unsigned char *c;
+	void *cfis;
 
-	c = cfissetup(pc);
-	c[2] = 0xef;
-	c[3] = f;
+	cfis = cfissetup(pc);
+	ahci_cfis_write8(cfis, 2, 0xef);
+	ahci_cfis_write8(cfis, 3, f);
 	listsetup(pc, Lwrite);
 	return ahciwait(pc, 3 * 1000);
 }
 
 static int setudmamode(struct aportc *pc, unsigned char f)
 {
-	unsigned char *c;
+	void *cfis;
 
+	printd("ahci: %s: PORT_SIG=0x%08x\n", __func__,
+	       ahci_port_read32(pc->p, PORT_SIG));
 	/* hack */
-	if ((pc->p->sig >> 16) == 0xeb14)
+	if ((ahci_port_read32(pc->p, PORT_SIG) >> 16) == 0xeb14)
 		return 0;
-	c = cfissetup(pc);
-	c[2] = 0xef;
-	c[3] = 3;         /* set transfer mode */
-	c[12] = 0x40 | f; /* sector count */
+	cfis = cfissetup(pc);
+	ahci_cfis_write8(cfis, 2, 0xef);
+	ahci_cfis_write8(cfis, 3, 3);         /* set transfer mode */
+	ahci_cfis_write8(cfis, 12, 0x40 | f); /* sector count */
 	listsetup(pc, Lwrite);
 	return ahciwait(pc, 3 * 1000);
 }
@@ -385,38 +486,42 @@ static void asleep(int ms)
 
 static int ahciportreset(struct aportc *c)
 {
-	uint32_t *cmd, i;
-	struct aport *p;
+	uint32_t cmd, i, scr_ctl;
+	void *port;
 
-	p = c->p;
-	cmd = &p->cmd;
-	*cmd &= ~(Afre | Ast);
+	port = c->p;
+	clear_bit32(port, PORT_CMD, Afre | Ast);
 	for (i = 0; i < 500; i += 25) {
-		if ((*cmd & Acr) == 0)
+		if ((ahci_port_read32(port, PORT_CMD) & Acr) == 0)
 			break;
 		asleep(25);
 	}
-	p->sctl = 1 | (p->sctl & ~7);
+
+	scr_ctl = ahci_port_read32(port, PORT_SCTL);
+	scr_ctl = 1 | (scr_ctl & ~7);
+	ahci_port_write32(port, PORT_SCTL, scr_ctl);
 	printk("Sleeping one second\n");
 	udelay(1000 * 1000);
-	p->sctl &= ~7;
+	clear_bit32(port, PORT_SCTL, 7); // TODO: Make sure PxCMD.ST == 0 first?
 	return 0;
 }
 
 static int smart(struct aportc *pc, int n)
 {
-	unsigned char *c;
+	void *cfis;
 
 	if ((pc->pm->feat & Dsmart) == 0)
 		return -1;
-	c = cfissetup(pc);
-	c[2] = 0xb0;
-	c[3] = 0xd8 + n; /* able smart */
-	c[5] = 0x4f;
-	c[6] = 0xc2;
+	cfis = cfissetup(pc);
+	ahci_cfis_write8(cfis, 2, 0xb0);
+	ahci_cfis_write8(cfis, 3, 0xd8 + n); /* able smart */
+	ahci_cfis_write8(cfis, 5, 0x4f);
+	ahci_cfis_write8(cfis, 6, 0xc2);
 	listsetup(pc, Lwrite);
-	if (ahciwait(pc, 1000) == -1 || pc->p->task & (1 | 32)) {
-		printd("ahci: smart fail %#lx\n", pc->p->task);
+	// TODO(afergs): Replace 1|32 with constants
+	if (ahciwait(pc, 1000) == -1 ||
+	    ahci_port_read32(pc->p, PORT_TFD) & (1 | 32)) {
+		printd("ahci: smart fail %#lx\n", ahci_port_read32(pc->p, PORT_TFD));
 		return -1;
 	}
 	if (n)
@@ -426,36 +531,42 @@ static int smart(struct aportc *pc, int n)
 
 static int smartrs(struct aportc *pc)
 {
-	unsigned char *c;
+	void *cfis;
+	volatile unsigned char *rfis;
+	uint32_t tfd;
 
-	c = cfissetup(pc);
-	c[2] = 0xb0;
-	c[3] = 0xda; /* return smart status */
-	c[5] = 0x4f;
-	c[6] = 0xc2;
+	cfis = cfissetup(pc);
+	ahci_cfis_write8(cfis, 2, 0xb0);
+	ahci_cfis_write8(cfis, 3, 0xda); /* return smart status */
+	ahci_cfis_write8(cfis, 5, 0x4f);
+	ahci_cfis_write8(cfis, 6, 0xc2);
 	listsetup(pc, Lwrite);
 
-	c = pc->pm->fis.r;
-	if (ahciwait(pc, 1000) == -1 || pc->p->task & (1 | 32)) {
-		printd("ahci: smart fail %#lx\n", pc->p->task);
-		preg(c, 20);
+	rfis = pc->pm->fis.r;
+	tfd = ahci_port_read32(pc->p, PORT_TFD);
+	// TODO(afergs): Replace 1|32 with constants
+	if (ahciwait(pc, 1000) == -1 || tfd & (1 | 32)) {
+		printd("ahci: smart fail %#lx\n", tfd);
+		preg(rfis, 20);
 		return -1;
 	}
-	if (c[5] == 0x4f && c[6] == 0xc2)
+	if (rfis[5] == 0x4f && rfis[6] == 0xc2)
 		return 1;
 	return 0;
 }
 
 static int ahciflushcache(struct aportc *pc)
 {
-	unsigned char *c;
+	void *cfis;
 
-	c = cfissetup(pc);
-	c[2] = pc->pm->feat & Dllba ? 0xea : 0xe7;
+	cfis = cfissetup(pc);
+	ahci_cfis_write8(cfis, 2, pc->pm->feat & Dllba ? 0xea : 0xe7);
 	listsetup(pc, Lwrite);
-	if (ahciwait(pc, 60000) == -1 || pc->p->task & (1 | 32)) {
-		printd("ahciflushcache: fail %#lx\n", pc->p->task);
-		//		preg(pc->m->fis.r, 20);
+	if (ahciwait(pc, 60000) == -1 ||
+	    ahci_port_read32(pc->p, PORT_TFD) & (1 | 32)) {
+		printd("ahciflushcache: fail %#lx\n",
+		       ahci_port_read32(pc->p, PORT_TFD));
+		// preg(pc->m->fis.r, 20);
 		return -1;
 	}
 	return 0;
@@ -492,21 +603,28 @@ static uint64_t gbit64(void *a)
 
 static int ahciidentify0(struct aportc *pc, void *id, int atapi)
 {
-	unsigned char *c;
-	struct aprdt *p;
+	void *cfis, *prdt;
 	static unsigned char tab[] = {
 	    0xec, 0xa1,
 	};
 
-	c = cfissetup(pc);
-	c[2] = tab[atapi];
+	cfis = cfissetup(pc);
+	ahci_cfis_write8(cfis, 2, tab[atapi]);
+	printd("ahci: %s: ATAPI=%d, cfis[2]: 0x%02x\n", __func__, atapi,
+	       ahci_cfis_read8(cfis, 2));
+	printd("ahci: %s: CFIS physical address=0x%08x:0x%08x\n", __func__,
+	       paddr_high32(cfis), paddr_low32(cfis));
+
 	listsetup(pc, 1 << 16);
 
-	memset(id, 0, 0x100); /* magic */
-	p = &pc->pm->ctab->prdt;
-	p->dba = paddr_low32(id);
-	p->dbahi = paddr_high32(id);
-	p->count = 1 << 31 | (0x200 - 2) | 1;
+	memset(id, 0, 0x200); /* Fill 512 bytes with 0's */
+	prdt = pc->pm->ctab + ACTAB_PRDT;
+	ahci_prdt_write32(prdt, APRDT_DBA, paddr_low32(id));
+	ahci_prdt_write32(prdt, APRDT_DBAHI, paddr_high32(id));
+	ahci_prdt_write32(prdt, APRDT_COUNT, 1 << 31 | (0x200 - 2) | 1);
+	printd("ahci: %s: DBA  physical address=0x%08x:0x%08x\n", __func__,
+	       paddr_high32(id), paddr_low32(id));
+
 	return ahciwait(pc, 3 * 1000);
 }
 
@@ -515,18 +633,26 @@ static int64_t ahciidentify(struct aportc *pc, uint16_t *id)
 	int i, sig;
 	int64_t s;
 	struct aportm *pm;
+	int cnt;
 
 	pm = pc->pm;
 	pm->feat = 0;
 	pm->smart = 0;
 	i = 0;
-	sig = pc->p->sig >> 16;
+	sig = ahci_port_read32(pc->p, PORT_SIG) >> 16;
 	if (sig == 0xeb14) {
 		pm->feat |= Datapi;
 		i = 1;
 	}
 	if (ahciidentify0(pc, id, i) == -1)
 		return -1;
+	printd("ahci: %s: ahciidentify0 return dump=\n\t", __func__);
+	for (cnt = 0; cnt < 101; cnt++) {
+		printd("0x%08x  ", id[cnt]);
+		if (cnt % 5 == 4 && cnt != 100)
+			printd("\n\t");
+	}
+	printd("\n");
 
 	i = gbit16(id + 83) | gbit16(id + 86);
 	if (i & (1 << 10)) {
@@ -606,8 +732,8 @@ ahcicomreset(struct aportc *pc)
 	dreg("comreset ", pc->p);
 
 	c = cfissetup(pc);
-	c[1] = 0;
-	c[15] = 1<<2;		/* srst */
+	ahci_cfis_write8(cfis, 1, 0);
+	ahci_cfis_write8(cfis, 15, 1<<2);	/* srst */
 	listsetup(pc, Lclear | Lreset);
 	if(ahciwait(pc, 500) == -1){
 		printd("ahcicomreset: first command failed\n");
@@ -617,7 +743,7 @@ ahcicomreset(struct aportc *pc)
 	dreg("comreset ", pc->p);
 
 	c = cfissetup(pc);
-	c[1] = 0;
+	ahci_cfis_write8(cfis, 1, 0);
 	listsetup(pc, Lwrite);
 	if (ahciwait(pc, 150) == -1) {
 		printd("ahcicomreset: second command failed\n");
@@ -628,27 +754,30 @@ ahcicomreset(struct aportc *pc)
 }
 #endif
 
-static int ahciidle(struct aport *port)
+static int ahciidle(void *port)
 {
-	uint32_t *p, i, r;
+	uint32_t i, r, cmd;
 
-	p = &port->cmd;
-	if ((*p & Arun) == 0)
+	cmd = ahci_port_read32(port, PORT_CMD);
+	if ((cmd & Arun) == 0)
 		return 0;
-	*p &= ~Ast;
+	cmd &= ~Ast;
+	ahci_port_write32(port, PORT_CMD, cmd);
+
 	r = 0;
 	for (i = 0; i < 500; i += 25) {
-		if ((*p & Acr) == 0)
+		if ((ahci_port_read32(port, PORT_CMD) & Acr) == 0)
 			goto stop;
 		asleep(25);
 	}
 	r = -1;
 stop:
-	if ((*p & Afre) == 0)
+	if ((ahci_port_read32(port, PORT_CMD) & Afre) == 0)
 		return r;
-	*p &= ~Afre;
+
+	clear_bit32(port, PORT_CMD, Afre);
 	for (i = 0; i < 500; i += 25) {
-		if ((*p & Afre) == 0)
+		if ((ahci_port_read32(port, PORT_CMD) & Afre) == 0)
 			return 0;
 		asleep(25);
 	}
@@ -665,10 +794,11 @@ static int ahciswreset(struct aportc *pc)
 	int i;
 
 	i = ahciidle(pc->p);
-	pc->p->cmd |= Afre;
+
+	set_bit32(pc->p, PORT_CMD, Afre);
 	if (i == -1)
 		return -1;
-	if (pc->p->task & (ASdrq | ASbsy))
+	if (ahci_port_read32(pc->p, PORT_TFD) & (ASdrq | ASbsy))
 		return -1;
 	return 0;
 }
@@ -676,7 +806,8 @@ static int ahciswreset(struct aportc *pc)
 static int ahcirecover(struct aportc *pc)
 {
 	ahciswreset(pc);
-	pc->p->cmd |= Ast;
+
+	set_bit32(pc->p, PORT_CMD, Ast);
 	if (setudmamode(pc, 5) == -1)
 		return -1;
 	return 0;
@@ -697,82 +828,90 @@ static void setupfis(struct afis *f)
 	f->devicebits = (uint32_t *)(f->base + 0x58);
 }
 
-static void ahciwakeup(struct aport *p)
+static void ahciwakeup(void *port)
 {
 	uint16_t s;
+	uint32_t sctl;
 
-	s = p->sstatus;
+	s = ahci_port_read32(port, PORT_SSTS);
 	if ((s & Intpm) != Intslumber && (s & Intpm) != Intpartpwr)
 		return;
 	if ((s & Devdet) != Devpresent) { /* not (device, no phy) */
 		iprint("ahci: slumbering drive unwakable %#x\n", s);
 		return;
 	}
-	p->sctl = 3 * Aipm | 0 * Aspd | Adet;
+	ahci_port_write32(port, PORT_SCTL, 3 * Aipm | 0 * Aspd | Adet);
 	udelay(1000 * 1000);
-	p->sctl &= ~7;
+	clear_bit32(port, PORT_SCTL, 7);
 	//	iprint("ahci: wake %#x -> %#x\n", s, p->sstatus);
 }
 
 static int ahciconfigdrive(struct drive *d)
 {
 	char *name;
-	struct ahba *h;
-	struct aport *p;
+	void *hba, *port;
 	struct aportm *pm;
+	uint32_t cap, sstatus;
 
-	h = d->ctlr->hba;
-	p = d->portc.p;
+	hba = d->ctlr->hba;
+	port = d->portc.p;
 	pm = d->portc.pm;
 	if (pm->list == 0) {
 		setupfis(&pm->fis);
-		pm->list = malign(sizeof *pm->list, 1024);
-		pm->ctab = malign(sizeof *pm->ctab, 128);
+		pm->list = malign(ALIST_SIZE, 1024);
+		pm->ctab = malign(ACTAB_PRDT + APRDT_SIZE, 128);
 	}
 
 	if (d->unit)
 		name = d->unit->sdperm.name;
 	else
 		name = NULL;
-	if (p->sstatus & (Devphycomm | Devpresent) && h->cap & Hsss) {
+	sstatus = ahci_port_read32(port, PORT_SSTS);
+	cap = ahci_hba_read32(hba, HBA_CAP);
+	if (sstatus & (Devphycomm | Devpresent) && cap & Hsss) {
 		/* device connected & staggered spin-up */
 		printd("ahci: configdrive: %s: spinning up ... [%#lx]\n", name,
-		       p->sstatus);
-		p->cmd |= Apod | Asud;
+		       sstatus);
+		set_bit32(port, PORT_CMD, Apod | Asud);
 		asleep(1400);
 	}
 
-	p->serror = SerrAll;
+	ahci_port_write32(port, PORT_SERR, SerrAll);
 
-	p->list = paddr_low32(pm->list);
-	p->listhi = paddr_high32(pm->list);
-	p->fis = paddr_low32(pm->fis.base);
-	p->fishi = paddr_high32(pm->fis.base);
-	p->cmd |= Afre | Ast;
+	ahci_port_write32(port, PORT_CLB, paddr_low32(pm->list));
+	ahci_port_write32(port, PORT_CLBU, paddr_high32(pm->list));
+	printd("ahci: %s: PORT_CLB physical address=0x%08x:0x%08x\n", __func__,
+	       paddr_high32(pm->list), paddr_low32(pm->list));
+	ahci_port_write32(port, PORT_FB, paddr_low32(pm->fis.base));
+	ahci_port_write32(port, PORT_FBU, paddr_high32(pm->fis.base));
+	printd("ahci: %s: PORT_FB  physical address=0x%08x:0x%08x\n", __func__,
+	       paddr_high32(pm->fis.base), paddr_low32(pm->fis.base));
+
+	set_bit32(port, PORT_CMD, Afre | Ast);
 
 	/* drive coming up in slumbering? */
-	if ((p->sstatus & Devdet) == Devpresent &&
-	    ((p->sstatus & Intpm) == Intslumber ||
-	     (p->sstatus & Intpm) == Intpartpwr))
-		ahciwakeup(p);
+	sstatus = ahci_port_read32(port, PORT_SSTS);
+	if ((sstatus & Devdet) == Devpresent &&
+	    ((sstatus & Intpm) == Intslumber || (sstatus & Intpm) == Intpartpwr))
+		ahciwakeup(port);
 
 	/* "disable power management" sequence from book. */
-	p->sctl = (3 * Aipm) | (d->mode * Aspd) | (0 * Adet);
-	p->cmd &= ~Aalpe;
-
-	p->ie = IEM;
+	ahci_port_write32(port, PORT_SCTL,
+	                  (3 * Aipm) | (d->mode * Aspd) | (0 * Adet));
+	clear_bit32(port, PORT_CMD, Aalpe);
+	ahci_port_write32(port, PORT_IE, IEM);
 
 	return 0;
 }
 
-static void ahcienable(struct ahba *h)
+static void ahcienable(void *hba)
 {
-	h->ghc |= Hie;
+	set_bit32(hba, HBA_GHC, Hie);
 }
 
-static void ahcidisable(struct ahba *h)
+static void ahcidisable(void *hba)
 {
-	h->ghc &= ~Hie;
+	clear_bit32(hba, HBA_GHC, Hie);
 }
 
 static int countbits(uint32_t u)
@@ -788,26 +927,26 @@ static int countbits(uint32_t u)
 
 static int ahciconf(struct ctlr *ctlr)
 {
-	struct ahba *h;
-	uint32_t u;
+	void *hba;
+	uint32_t cap;
 
-	h = ctlr->hba = (struct ahba *)ctlr->mmio;
-	u = h->cap;
+	hba = ctlr->hba = ctlr->mmio;
+	cap = ahci_hba_read32(hba, HBA_CAP);
 
-	if ((u & Hsam) == 0)
-		h->ghc |= Hae;
+	if ((cap & Hsam) == 0)
+		set_bit32(hba, HBA_GHC, Hae);
 
 	printd("#S/sd%c: type %s port %#p: sss %ld ncs %ld coal %ld "
 	       "%ld ports, led %ld clo %ld ems %ld\n",
-	       ctlr->sdev->idno, tname[ctlr->type], h, (u >> 27) & 1,
-	       (u >> 8) & 0x1f, (u >> 7) & 1, (u & 0x1f) + 1, (u >> 25) & 1,
-	       (u >> 24) & 1, (u >> 6) & 1);
-	return countbits(h->pi);
+	       ctlr->sdev->idno, tname[ctlr->type], hba, (cap >> 27) & 1,
+	       (cap >> 8) & 0x1f, (cap >> 7) & 1, (cap & 0x1f) + 1, (cap >> 25) & 1,
+	       (cap >> 24) & 1, (cap >> 6) & 1);
+	return countbits(ahci_hba_read32(hba, HBA_PI));
 }
 
 #if 0
 static int
-ahcihbareset(struct ahba *h)
+ahcihbareset(void *hba)
 {
 	int wait;
 
@@ -850,6 +989,8 @@ static int identify(struct drive *d)
 	if (d->info == NULL) {
 		d->infosz = 512 * sizeof(uint16_t);
 		d->info = kzmalloc(d->infosz, 0);
+		printd("ahci: %s: HBA physical address (hack): 0x%08x:0x%08x\n",
+		       __func__, paddr_high32(d->info), paddr_low32(d->info));
 	}
 	if (d->info == NULL) {
 		d->info = d->tinyinfo;
@@ -888,32 +1029,35 @@ static int identify(struct drive *d)
 	return 0;
 }
 
-static void clearci(struct aport *p)
+static void clearci(void *p)
 {
-	if (p->cmd & Ast) {
-		p->cmd &= ~Ast;
-		p->cmd |= Ast;
+	uint32_t cmd;
+
+	cmd = ahci_port_read32(p, PORT_CMD);
+	if (cmd & Ast) {
+		clear_bit32(p, PORT_CMD, Ast);
+		set_bit32(p, PORT_CMD, Ast);
 	}
 }
 
 static void updatedrive(struct drive *d)
 {
-	uint32_t cause, serr, s0, pr, ewake;
+	uint32_t cause, serr, task, sstatus, ie, s0, pr, ewake;
 	char *name;
-	struct aport *p;
+	void *port;
 	static uint32_t last;
 
 	pr = 1;
 	ewake = 0;
-	p = d->port;
-	cause = p->isr;
-	serr = p->serror;
-	p->isr = cause;
+	port = d->port;
+	cause = ahci_port_read32(port, PORT_IS);
+	serr = ahci_port_read32(port, PORT_SERR);
+	ahci_port_write32(port, PORT_IS, cause);
 	name = "??";
 	if (d->unit && d->unit->sdperm.name)
 		name = d->unit->sdperm.name;
 
-	if (p->ci == 0) {
+	if (ahci_port_read32(port, PORT_CI) == 0) {
 		d->portm.flag |= Fdone;
 		rendez_wakeup(&d->portm.Rendez);
 		pr = 0;
@@ -923,37 +1067,39 @@ static void updatedrive(struct drive *d)
 		ewake = 1;
 		printd("ahci: updatedrive: %s: fatal\n", name);
 	}
+	task = ahci_port_read32(port, PORT_TFD);
 	if (cause & Adhrs) {
-		if (p->task & (1 << 5 | 1)) {
+		if (task & (1 << 5 | 1)) {
 			printd("ahci: %s: Adhrs cause %#lx serr %#lx task %#lx\n", name,
-			       cause, serr, p->task);
+			       cause, serr, task);
 			d->portm.flag |= Ferror;
 			ewake = 1;
 		}
 		pr = 0;
 	}
-	if (p->task & 1 && last != cause)
+	sstatus = ahci_port_read32(port, PORT_SSTS);
+	if (task & 1 && last != cause)
 		printd("%s: err ca %#lx serr %#lx task %#lx sstat %#lx\n", name, cause,
-		       serr, p->task, p->sstatus);
+		       serr, task, sstatus);
 	if (pr)
-		printd("%s: upd %#lx ta %#lx\n", name, cause, p->task);
+		printd("%s: upd %#lx ta %#lx\n", name, cause, task);
 
 	if (cause & (Aprcs | Aifs)) {
 		s0 = d->state;
-		switch (p->sstatus & Devdet) {
+		switch (sstatus & Devdet) {
 		case 0: /* no device */
 			d->state = Dmissing;
 			break;
 		case Devpresent: /* device but no phy comm. */
-			if ((p->sstatus & Intpm) == Intslumber ||
-			    (p->sstatus & Intpm) == Intpartpwr)
+			if ((sstatus & Intpm) == Intslumber ||
+			    (sstatus & Intpm) == Intpartpwr)
 				d->state = Dnew; /* slumbering */
 			else
 				d->state = Derror;
 			break;
 		case Devpresent | Devphycomm:
 			/* power mgnt crap for surprise removal */
-			p->ie |= Aprcs | Apcs; /* is this required? */
+			set_bit32(port, PORT_IE, Aprcs | Apcs); /* is this required? */
 			d->state = Dreset;
 			break;
 		case Devphyoffline:
@@ -961,7 +1107,7 @@ static void updatedrive(struct drive *d)
 			break;
 		}
 		printd("%s: %s → %s [Apcrs] %#lx\n", name, diskstates[s0],
-		       diskstates[d->state], p->sstatus);
+		       diskstates[d->state], sstatus);
 		/* print pulled message here. */
 		if (s0 == Dready && d->state != Dready)
 			iprintd("%s: pulled\n", name); /* wtf? */
@@ -969,9 +1115,9 @@ static void updatedrive(struct drive *d)
 			d->portm.flag |= Ferror;
 		ewake = 1;
 	}
-	p->serror = serr;
+	ahci_port_write32(port, PORT_SERR, serr);
 	if (ewake) {
-		clearci(p);
+		clearci(port);
 		rendez_wakeup(&d->portm.Rendez);
 	}
 	last = cause;
@@ -1012,7 +1158,7 @@ static int configdrive(struct drive *d)
 	if (ahciconfigdrive(d) == -1)
 		return -1;
 	spin_lock_irqsave(&d->Lock);
-	pstatus(d, d->port->sstatus & Devdet);
+	pstatus(d, ahci_port_read32(d->port, PORT_SSTS) & Devdet);
 	spin_unlock_irqsave(&d->Lock);
 	return 0;
 }
@@ -1026,20 +1172,21 @@ static void setstate(struct drive *d, int state)
 
 static void resetdisk(struct drive *d)
 {
-	unsigned int state, det, stat;
-	struct aport *p;
+	unsigned int state, det, cmd, stat;
+	void *port;
 
-	p = d->port;
-	det = p->sctl & 7;
-	stat = p->sstatus & Devdet;
-	state = (p->cmd >> 28) & 0xf;
+	port = d->port;
+	det = ahci_port_read32(port, PORT_SCTL) & 7;
+	stat = ahci_port_read32(port, PORT_SSTS) & Devdet;
+	cmd = ahci_port_read32(port, PORT_CMD);
+	state = (cmd >> 28) & 0xf;
 	printd("ahci: resetdisk: icc %#x  det %d sdet %d\n", state, det, stat);
 
 	spin_lock_irqsave(&d->Lock);
 	state = d->state;
 	if (d->state != Dready || d->state != Dnew)
 		d->portm.flag |= Ferror;
-	clearci(p); /* satisfy sleep condition. */
+	clearci(port); /* satisfy sleep condition. */
 	rendez_wakeup(&d->portm.Rendez);
 	if (stat != (Devpresent | Devphycomm)) {
 		/* device absent or phy not communicating */
@@ -1051,7 +1198,7 @@ static void resetdisk(struct drive *d)
 	spin_unlock_irqsave(&d->Lock);
 
 	qlock(&d->portm.ql);
-	if (p->cmd & Ast && ahciswreset(&d->portc) == -1)
+	if (cmd & Ast && ahciswreset(&d->portc) == -1)
 		setstate(d, Dportreset); /* get a bigger stick. */
 	else {
 		setstate(d, Dmissing);
@@ -1066,20 +1213,20 @@ static void resetdisk(struct drive *d)
 static int newdrive(struct drive *d)
 {
 	char *name;
-	struct aportc *c;
+	struct aportc *pc;
 	struct aportm *pm;
 
-	c = &d->portc;
+	pc = &d->portc;
 	pm = &d->portm;
 
 	name = d->unit->sdperm.name;
 	if (name == 0)
 		name = "??";
 
-	if (d->port->task == 0x80)
+	if (ahci_port_read32(d->port, PORT_TFD) == 0x80)
 		return -1;
-	qlock(&c->pm->ql);
-	if (setudmamode(c, 5) == -1) {
+	qlock(&pc->pm->ql);
+	if (setudmamode(pc, 5) == -1) {
 		printd("%s: can't set udma mode\n", name);
 		goto lose;
 	}
@@ -1087,13 +1234,13 @@ static int newdrive(struct drive *d)
 		printd("%s: identify failure\n", name);
 		goto lose;
 	}
-	if (pm->feat & Dpower && setfeatures(c, 0x85) == -1) {
+	if (pm->feat & Dpower && setfeatures(pc, 0x85) == -1) {
 		pm->feat &= ~Dpower;
-		if (ahcirecover(c) == -1)
+		if (ahcirecover(pc) == -1)
 			goto lose;
 	}
 	setstate(d, Dready);
-	qunlock(&c->pm->ql);
+	qunlock(&pc->pm->ql);
 
 	iprintd("%s: %sLBA %llu sectors: %s %s %s %s\n", d->unit->sdperm.name,
 	        (pm->feat & Dllba ? "L" : ""), d->sectors, d->model, d->firmware,
@@ -1103,16 +1250,21 @@ static int newdrive(struct drive *d)
 lose:
 	iprintd("%s: can't be initialized\n", d->unit->sdperm.name);
 	setstate(d, Dnull);
-	qunlock(&c->pm->ql);
+	qunlock(&pc->pm->ql);
 	return -1;
 }
 
 static void westerndigitalhung(struct drive *d)
 {
+	uint32_t task, ci;
+
+	task = ahci_port_read32(d->port, PORT_TFD);
+	ci = ahci_port_read32(d->port, PORT_CI);
+
 	if ((d->portm.feat & Datapi) == 0 && d->active &&
 	    (ms() - d->intick) > 5000) {
 		printd("%s: drive hung; resetting [%#lx] ci %#lx\n",
-		       d->unit->sdperm.name, d->port->task, d->port->ci);
+		       d->unit->sdperm.name, task, ci);
 		d->state = Dreset;
 	}
 }
@@ -1131,7 +1283,7 @@ static int doportreset(struct drive *d)
 		i = 0;
 	qunlock(&d->portm.ql);
 	printd("ahci: doportreset: portreset → %s  [task %#lx]\n",
-	       diskstates[d->state], d->port->task);
+	       diskstates[d->state], ahci_port_read32(d->port, PORT_TFD));
 	return i;
 }
 
@@ -1155,6 +1307,7 @@ static void statechange(struct drive *d)
 static void checkdrive(struct drive *d, int i)
 {
 	uint16_t s;
+	uint32_t task;
 	char *name;
 
 	if (d == NULL) {
@@ -1170,7 +1323,7 @@ static void checkdrive(struct drive *d, int i)
 		return;
 	}
 	name = d->unit->sdperm.name;
-	s = d->port->sstatus;
+	s = ahci_port_read32(d->port, PORT_SSTS);
 	if (s)
 		d->lastseen = ms();
 	if (s != olds[i]) {
@@ -1212,14 +1365,16 @@ static void checkdrive(struct drive *d, int i)
 			spin_lock_irqsave(&d->Lock);
 			break;
 		case Intactive | Devphycomm | Devpresent:
+			task = ahci_port_read32(d->port, PORT_TFD);
 			if ((++d->wait & Midwait) == 0) {
-				printd("%s: slow reset %06#x task=%#lx; %d\n", name, s,
-				       d->port->task, d->wait);
+				printd("%s: slow reset %06#x task=%#lx; %d\n", name, s, task,
+				       d->wait);
 				goto reset;
 			}
-			s = (unsigned char)d->port->task;
+			s = (unsigned char)task;
 			if (s == 0x7f ||
-			    ((d->port->sig >> 16) != 0xeb14 && (s & ~0x17) != (1 << 6)))
+			    ((ahci_port_read32(d->port, PORT_SIG) >> 16) != 0xeb14 &&
+			     (s & ~0x17) != (1 << 6)))
 				break;
 			spin_unlock_irqsave(&d->Lock);
 			newdrive(d);
@@ -1308,13 +1463,13 @@ static void isdrivejabbering(struct drive *d)
 static void iainterrupt(struct hw_trapframe *unused_hw_trapframe, void *a)
 {
 	int i;
-	uint32_t cause, mask;
+	uint32_t cause, mask, p_is, h_is, pi;
 	struct ctlr *c;
 	struct drive *d;
 
 	c = a;
 	spin_lock_irqsave(&c->Lock);
-	cause = c->hba->isr;
+	cause = ahci_hba_read32(c->hba, HBA_ISR);
 	if (cause == 0) {
 		isctlrjabbering(c, cause);
 		// iprint("sdiahci: interrupt for no drive\n");
@@ -1328,16 +1483,18 @@ static void iainterrupt(struct hw_trapframe *unused_hw_trapframe, void *a)
 		d = c->rawdrive + i;
 		spin_lock_irqsave(&d->Lock);
 		isdrivejabbering(d);
-		if (d->port->isr && c->hba->pi & mask)
+		p_is = ahci_port_read32(d->port, PORT_IS);
+		pi = ahci_hba_read32(c->hba, HBA_PI);
+		if (p_is && pi & mask)
 			updatedrive(d);
-		c->hba->isr = mask;
+		ahci_hba_write32(c->hba, HBA_ISR, mask);
 		spin_unlock_irqsave(&d->Lock);
 
 		cause &= ~mask;
 	}
 	if (cause) {
 		isctlrjabbering(c, cause);
-		iprint("sdiachi: intr cause unserviced: %#lx\n", cause);
+		iprint("sdiahci: intr cause unserviced: %#lx\n", cause);
 	}
 	spin_unlock_irqsave(&c->Lock);
 }
@@ -1356,7 +1513,7 @@ static void awaitspinup(struct drive *d)
 		return;
 	}
 	name = (d->unit ? d->unit->sdperm.name : NULL);
-	s = d->port->sstatus;
+	s = ahci_port_read32(d->port, PORT_SSTS);
 	if (!(s & Devpresent)) { /* never going to be ready */
 		printd("awaitspinup: %s absent, not waiting\n", name);
 		spin_unlock_irqsave(&d->Lock);
@@ -1493,14 +1650,13 @@ static int iaonline(struct sdunit *unit)
 }
 
 /* returns locked list! */
-static struct alist *ahcibuild(struct drive *d, unsigned char *cmd, void *data,
-                               int n, int64_t lba)
+static void *ahcibuild(struct drive *d, unsigned char *cmd, void *data, int n,
+                       int64_t lba)
 {
-	unsigned char *c, acmd, dir, llba;
-	struct alist *l;
-	struct actab *t;
+	void *cfis, *list, *prdt, *ctab;
+	unsigned char acmd, dir, llba, c7;
 	struct aportm *pm;
-	struct aprdt *p;
+	uint32_t flags;
 	static unsigned char tab[2][2] = {
 	    {0xc8, 0x25}, {0xca, 0x35},
 	};
@@ -1510,104 +1666,111 @@ static struct alist *ahcibuild(struct drive *d, unsigned char *cmd, void *data,
 	llba = pm->feat & Dllba ? 1 : 0;
 	acmd = tab[dir][llba];
 	qlock(&pm->ql);
-	l = pm->list;
-	t = pm->ctab;
-	c = t->cfis;
+	list = pm->list;
+	ctab = pm->ctab;
+	cfis = ctab;
 
-	c[0] = 0x27;
-	c[1] = 0x80;
-	c[2] = acmd;
-	c[3] = 0;
+	ahci_cfis_write8(cfis, 0, 0x27);
+	ahci_cfis_write8(cfis, 1, 0x80);
+	ahci_cfis_write8(cfis, 2, acmd);
+	ahci_cfis_write8(cfis, 3, 0);
 
-	c[4] = lba;        /* sector		lba low	7:0 */
-	c[5] = lba >> 8;   /* cylinder low		lba mid	15:8 */
-	c[6] = lba >> 16;  /* cylinder hi		lba hi	23:16 */
-	c[7] = Obs | 0x40; /* 0x40 == lba */
+	ahci_cfis_write8(cfis, 4, lba);       /* sector			lba low	7:0 */
+	ahci_cfis_write8(cfis, 5, lba >> 8);  /* cylinder low	lba mid	15:8 */
+	ahci_cfis_write8(cfis, 6, lba >> 16); /* cylinder hi	lba hi	23:16 */
+	c7 = Obs | 0x40;                      /* 0x40 == lba */
 	if (llba == 0)
-		c[7] |= (lba >> 24) & 7;
+		c7 |= (lba >> 24) & 7;
+	ahci_cfis_write8(cfis, 7, c7);
 
-	c[8] = lba >> 24;  /* sector (exp)		lba 	31:24 */
-	c[9] = lba >> 32;  /* cylinder low (exp)	lba	39:32 */
-	c[10] = lba >> 48; /* cylinder hi (exp)	lba	48:40 */
-	c[11] = 0;         /* features (exp); */
+	ahci_cfis_write8(cfis, 8, lba >> 24);  /* sector (exp)			lba	31:24 */
+	ahci_cfis_write8(cfis, 9, lba >> 32);  /* cylinder low (exp)	lba	39:32 */
+	ahci_cfis_write8(cfis, 10, lba >> 48); /* cylinder hi (exp)		lba	48:40 */
+	ahci_cfis_write8(cfis, 11, 0);         /* features (exp); */
 
-	c[12] = n;      /* sector count */
-	c[13] = n >> 8; /* sector count (exp) */
-	c[14] = 0;      /* r */
-	c[15] = 0;      /* control */
+	ahci_cfis_write8(cfis, 12, n);      /* sector count */
+	ahci_cfis_write8(cfis, 13, n >> 8); /* sector count (exp) */
+	ahci_cfis_write8(cfis, 14, 0);      /* r */
+	ahci_cfis_write8(cfis, 15, 0);      /* control */
 
-	*(uint32_t *)(c + 16) = 0;
+	ahci_cfis_write8(cfis, 16, 0);
+	ahci_cfis_write8(cfis, 17, 0);
+	ahci_cfis_write8(cfis, 18, 0);
+	ahci_cfis_write8(cfis, 19, 0);
 
-	l->flags = 1 << 16 | Lpref | 0x5; /* Lpref ?? */
+	flags = 1 << 16 | Lpref | 0x5; /* Lpref ?? */
 	if (dir == Write)
-		l->flags |= Lwrite;
-	l->len = 0;
-	l->ctab = paddr_low32(t);
-	l->ctabhi = paddr_high32(t);
+		flags |= Lwrite;
+	ahci_list_write32(list, ALIST_FLAGS, flags);
+	ahci_list_write32(list, ALIST_LEN, 0);
+	ahci_list_write32(list, ALIST_CTAB, paddr_low32(ctab));
+	ahci_list_write32(list, ALIST_CTABHI, paddr_high32(ctab));
 
-	p = &t->prdt;
-	p->dba = paddr_low32(data);
-	p->dbahi = paddr_high32(data);
+	prdt = ctab + ACTAB_PRDT;
+	ahci_prdt_write32(prdt, APRDT_DBA, paddr_low32(data));
+	ahci_prdt_write32(prdt, APRDT_DBAHI, paddr_high32(data));
 	if (d->unit == NULL)
 		panic("ahcibuild: NULL d->unit");
-	p->count = 1 << 31 | (d->unit->secsize * n - 2) | 1;
+	ahci_prdt_write32(prdt, APRDT_COUNT,
+	                  1 << 31 | (d->unit->secsize * n - 2) | 1);
 
-	return l;
+	return list;
 }
 
-static struct alist *ahcibuildpkt(struct aportm *pm, struct sdreq *r,
-                                  void *data, int n)
+static void *ahcibuildpkt(struct aportm *pm, struct sdreq *r, void *data, int n)
 {
-	int fill, len;
-	unsigned char *c;
-	struct alist *l;
-	struct actab *t;
-	struct aprdt *p;
+	int fill, len, i;
+	void *cfis, *list, *ctab, *prdt;
+	uint32_t flags;
 
 	qlock(&pm->ql);
-	l = pm->list;
-	t = pm->ctab;
-	c = t->cfis;
+	list = pm->list;
+	ctab = pm->ctab;
+	cfis = ctab;
 
 	fill = pm->feat & Datapi16 ? 16 : 12;
 	if ((len = r->clen) > fill)
 		len = fill;
-	memmove(t->atapi, r->cmd, len);
-	memset(t->atapi + len, 0, fill - len);
+	memmove(ctab + ACTAB_ATAPI, r->cmd, len);
+	memset(ctab + ACTAB_ATAPI + len, 0, fill - len);
 
-	c[0] = 0x27;
-	c[1] = 0x80;
-	c[2] = 0xa0;
+	ahci_cfis_write8(cfis, 0, 0x27);
+	ahci_cfis_write8(cfis, 1, 0x80);
+	ahci_cfis_write8(cfis, 2, 0xa0);
 	if (n != 0)
-		c[3] = 1; /* dma */
+		ahci_cfis_write8(cfis, 3, 1); /* dma */
 	else
-		c[3] = 0; /* features (exp); */
+		ahci_cfis_write8(cfis, 3, 0); /* features (exp); */
 
-	c[4] = 0;      /* sector		lba low	7:0 */
-	c[5] = n;      /* cylinder low		lba mid	15:8 */
-	c[6] = n >> 8; /* cylinder hi		lba hi	23:16 */
-	c[7] = Obs;
+	ahci_cfis_write8(cfis, 4, 0);      /* sector			lba low	7:0 */
+	ahci_cfis_write8(cfis, 5, n);      /* cylinder low		lba mid	15:8 */
+	ahci_cfis_write8(cfis, 6, n >> 8); /* cylinder hi		lba hi	23:16 */
+	ahci_cfis_write8(cfis, 7, Obs);
 
-	*(uint32_t *)(c + 8) = 0;
-	*(uint32_t *)(c + 12) = 0;
-	*(uint32_t *)(c + 16) = 0;
+	for (i = 0; i < 12; i++)
+		ahci_cfis_write8(cfis, 8 + i, 0);
 
-	l->flags = 1 << 16 | Lpref | Latapi | 0x5;
+	flags = 1 << 16 | Lpref | Latapi | 0x5;
 	if (r->write != 0 && data)
-		l->flags |= Lwrite;
-	l->len = 0;
-	l->ctab = paddr_low32(t);
-	l->ctabhi = paddr_high32(t);
+		flags |= Lwrite;
+	ahci_list_write32(list, ALIST_FLAGS, flags);
+	ahci_list_write32(list, ALIST_LEN, 0);
+	ahci_list_write32(list, ALIST_CTAB, paddr_low32(ctab));
+	ahci_list_write32(list, ALIST_CTABHI, paddr_high32(ctab));
+	printd("ahci: %s: LIST->CTAB physical address=0x%08x:0x%08x\n", __func__,
+	       paddr_high32(ctab), paddr_low32(ctab));
 
 	if (data == 0)
-		return l;
+		return list;
 
-	p = &t->prdt;
-	p->dba = paddr_low32(data);
-	p->dbahi = paddr_high32(data);
-	p->count = 1 << 31 | (n - 2) | 1;
+	prdt = ctab + ACTAB_PRDT;
+	ahci_prdt_write32(prdt, APRDT_DBA, paddr_low32(data));
+	ahci_prdt_write32(prdt, APRDT_DBAHI, paddr_high32(data));
+	ahci_prdt_write32(prdt, APRDT_COUNT, 1 << 31 | (n - 2) | 1);
+	printd("ahci: %s: PRDT->DBA  physical address=0x%08x:0x%08x\n", __func__,
+	       paddr_high32(data), paddr_low32(data));
 
-	return l;
+	return list;
 }
 
 static int waitready(struct drive *d)
@@ -1621,7 +1784,7 @@ static int waitready(struct drive *d)
 		if (d->state == Dnull || delta > 10 * 1000)
 			return -1;
 		spin_lock_irqsave(&d->Lock);
-		s = d->port->sstatus;
+		s = ahci_port_read32(d->port, PORT_SSTS);
 		spin_unlock_irqsave(&d->Lock);
 		if ((s & Intpm) == 0 && delta > 1500)
 			return -1; /* no detect */
@@ -1664,12 +1827,12 @@ static int iariopkt(struct sdreq *r, struct drive *d)
 	int n, count, try, max, flag, task, wormwrite;
 	char *name;
 	unsigned char *cmd, *data;
-	struct aport *p;
+	void *port;
 	struct Asleep as;
 
 	cmd = r->cmd;
 	name = d->unit->sdperm.name;
-	p = d->port;
+	port = d->port;
 
 	aprintd("ahci: iariopkt: %04#x %04#x %c %d %p\n", cmd[0], cmd[2],
 	        "rw"[r->write], r->dlen, r->data);
@@ -1700,9 +1863,9 @@ retry:
 	spin_lock_irqsave(&d->Lock);
 	d->portm.flag = 0;
 	spin_unlock_irqsave(&d->Lock);
-	p->ci = 1;
+	ahci_port_write32(port, PORT_CI, 1);
 
-	as.p = p;
+	as.p = port;
 	as.i = 1;
 	d->intick = ms();
 	d->active++;
@@ -1722,14 +1885,14 @@ retry:
 	d->active--;
 	spin_lock_irqsave(&d->Lock);
 	flag = d->portm.flag;
-	task = d->port->task;
+	task = ahci_port_read32(port, PORT_TFD);
 	spin_unlock_irqsave(&d->Lock);
 
 	if ((task & (Efatal << 8)) ||
 	    ((task & (ASbsy | ASdrq)) && (d->state == Dready))) {
-		d->port->ci = 0;
+		ahci_port_write32(port, PORT_CI, 0);
 		ahcirecover(&d->portc);
-		task = d->port->task;
+		task = ahci_port_read32(port, PORT_TFD);
 		flag &= ~Fdone; /* either an error or do-over */
 	}
 	qunlock(&d->portm.ql);
@@ -1783,7 +1946,7 @@ static int iario(struct sdreq *r)
 	int64_t lba;
 	char *name;
 	unsigned char *cmd, *data;
-	struct aport *p;
+	void *port;
 	struct Asleep as;
 	struct ctlr *c;
 	struct drive *d;
@@ -1796,7 +1959,7 @@ static int iario(struct sdreq *r)
 		return iariopkt(r, d);
 	cmd = r->cmd;
 	name = d->unit->sdperm.name;
-	p = d->port;
+	port = d->port;
 
 	if (r->cmd[0] == 0x35 || r->cmd[0] == 0x91) {
 		if (flushcache(d) == 0)
@@ -1844,9 +2007,9 @@ retry:
 		spin_lock_irqsave(&d->Lock);
 		d->portm.flag = 0;
 		spin_unlock_irqsave(&d->Lock);
-		p->ci = 1;
+		ahci_port_write32(port, PORT_CI, 1);
 
-		as.p = p;
+		as.p = port;
 		as.i = 1;
 		d->intick = ms();
 		d->active++;
@@ -1867,14 +2030,14 @@ retry:
 		d->active--;
 		spin_lock_irqsave(&d->Lock);
 		flag = d->portm.flag;
-		task = d->port->task;
+		task = ahci_port_read32(port, PORT_TFD);
 		spin_unlock_irqsave(&d->Lock);
 
 		if ((task & (Efatal << 8)) ||
 		    ((task & (ASbsy | ASdrq)) && d->state == Dready)) {
-			d->port->ci = 0;
+			ahci_port_write32(port, PORT_CI, 0);
 			ahcirecover(&d->portc);
-			task = d->port->task;
+			task = ahci_port_read32(port, PORT_TFD);
 		}
 		qunlock(&d->portm.ql);
 		if (flag == 0) {
@@ -1887,7 +2050,7 @@ retry:
 			goto retry;
 		}
 		if (flag & Ferror) {
-			printk("%s: i/o error task=%#x @%,lld\n", name, task, lba);
+			printk("%s: i/o error task=%#x @%lld\n", name, task, lba);
 			r->status = SDeio;
 			return SDeio;
 		}
@@ -1915,13 +2078,14 @@ static int iaahcimode(struct pci_device *p)
 
 static void iasetupahci(struct ctlr *c)
 {
-	uint32_t *p = (void *)c->mmio;
+	void *p = c->mmio; /* This is actually a pointer to HBA */
 	/* disable cmd block decoding. */
 	pcidev_write16(c->pci, 0x40, pcidev_read16(c->pci, 0x40) & ~(1 << 15));
 	pcidev_write16(c->pci, 0x42, pcidev_read16(c->pci, 0x42) & ~(1 << 15));
 
-	p[0x4 / 4] |= 1 << 31;     /* enable ahci mode (ghc register) */
-	p[0xc / 4] = (1 << 6) - 1; /* 5 ports. (supposedly ro pi reg.) */
+	ahci_hba_write32(p, HBA_GHC, 1 << 31); /* enable ahci mode (ghc register) */
+	ahci_hba_write32(p, HBA_PI,
+	                 (1 << 6) - 1); /* 5 ports. (supposedly ro pi reg.) */
 
 	/* enable ahci mode and 6 ports; from ich9 datasheet */
 	pcidev_write16(c->pci, 0x90, 1 << 6 | 1 << 5);
@@ -1929,6 +2093,8 @@ static void iasetupahci(struct ctlr *c)
 
 static int didtype(struct pci_device *p)
 {
+	printd("ahci: %s: ven_id=0x%04x, dev_id=0x%04x\n", __func__, p->ven_id,
+	       p->dev_id);
 	switch (p->ven_id) {
 	case Vintel:
 		if ((p->dev_id & 0xfffc) == 0x2680)
@@ -1970,11 +2136,14 @@ static int newctlr(struct ctlr *ctlr, struct sdev *sdev, int nunit)
 {
 	int i, n;
 	struct drive *drive;
+	uint32_t h_cap, pi;
 
 	ctlr->ndrive = sdev->nunit = nunit;
-	ctlr->mport = ctlr->hba->cap & ((1 << 5) - 1);
+	h_cap = ahci_hba_read32(ctlr->hba, HBA_CAP);
+	printd("ahci: %s: HBA_CAP=0x%08x\n", __func__, h_cap);
+	ctlr->mport = h_cap & ((1 << 5) - 1);
 
-	i = (ctlr->hba->cap >> 20) & ((1 << 4) - 1); /* iss */
+	i = (h_cap >> 20) & ((1 << 4) - 1); /* iss */
 	printk("#S/sd%c: %s: %#p %s, %d ports, irq %d\n", sdev->idno, Tname(ctlr),
 	       ctlr->physio, descmode[i], nunit, ctlr->pci->irqline);
 	/* map the drives -- they don't all need to be enabled. */
@@ -1984,6 +2153,7 @@ static int newctlr(struct ctlr *ctlr, struct sdev *sdev, int nunit)
 		printd("ahci: out of memory\n");
 		return -1;
 	}
+	pi = ahci_hba_read32(ctlr->hba, HBA_PI);
 	for (i = 0; i < NCtlrdrv; i++) {
 		drive = ctlr->rawdrive + i;
 		spinlock_init(&drive->Lock);
@@ -1992,9 +2162,9 @@ static int newctlr(struct ctlr *ctlr, struct sdev *sdev, int nunit)
 		drive->sectors = 0;
 		drive->serial[0] = ' ';
 		drive->ctlr = ctlr;
-		if ((ctlr->hba->pi & (1 << i)) == 0)
+		if ((pi & (1 << i)) == 0)
 			continue;
-		drive->port = (struct aport *)(ctlr->mmio + 0x80 * i + 0x100);
+		drive->port = ctlr->mmio + 0x80 * i + 0x100;
 		drive->portc.p = drive->port;
 		drive->portc.pm = &drive->portm;
 		qlock_init(&drive->portm.ql);
@@ -2051,7 +2221,7 @@ static struct sdev *iapnp(void)
 		qlock_init(&s->ql);
 		qlock_init(&s->unitlock);
 		c->physio = p->bar[Abar].mmio_base32 & ~0xf;
-		c->mmio = vmap_pmem_nocache(c->physio, p->bar[Abar].mmio_sz);
+		c->mmio = (void *)vmap_pmem_nocache(c->physio, p->bar[Abar].mmio_sz);
 		if (c->mmio == 0) {
 			printk("ahci: %s: address %#lX in use did=%#x\n", Tname(c),
 			       c->physio, p->dev_id);
@@ -2070,11 +2240,11 @@ static struct sdev *iapnp(void)
 		if (Intel(c) && p->dev_id != 0x2681)
 			iasetupahci(c);
 		nunit = ahciconf(c);
-		//		ahcihbareset((struct ahba*)c->mmio);
+		// ahcihbareset((void *)c->mmio);
 		if (Intel(c) && iaahcimode(p) == -1)
 			break;
 		if (nunit < 1) {
-			vunmap_vmem(c->mmio, p->bar[Abar].mmio_sz);
+			vunmap_vmem((uintptr_t)c->mmio, p->bar[Abar].mmio_sz);
 			continue;
 		}
 		n = newctlr(c, s, nunit);
@@ -2107,9 +2277,10 @@ static int iarctl(struct sdunit *u, char *p, int l)
 {
 	char buf[32];
 	char *e, *op;
-	struct aport *o;
+	void *port;
 	struct ctlr *c;
 	struct drive *d;
+	uint32_t serror, task, cmd, ci, is, sig, sstatus;
 
 	c = u->dev->ctlr;
 	if (c == NULL) {
@@ -2117,7 +2288,7 @@ static int iarctl(struct sdunit *u, char *p, int l)
 		return 0;
 	}
 	d = c->drive[u->subno];
-	o = d->port;
+	port = d->port;
 
 	e = p + l;
 	op = p;
@@ -2135,11 +2306,17 @@ static int iarctl(struct sdunit *u, char *p, int l)
 		p = pflag(p, e, d->portm.feat);
 	} else
 		p = seprintf(p, e, "no disk present [%s]\n", diskstates[d->state]);
-	serrstr(o->serror, buf, buf + sizeof buf - 1);
+	serror = ahci_port_read32(port, PORT_SERR);
+	task = ahci_port_read32(port, PORT_TFD);
+	cmd = ahci_port_read32(port, PORT_CMD);
+	ci = ahci_port_read32(port, PORT_CI);
+	is = ahci_port_read32(port, PORT_IS);
+	sig = ahci_port_read32(port, PORT_SIG);
+	sstatus = ahci_port_read32(port, PORT_SSTS);
+	serrstr(serror, buf, buf + sizeof(buf) - 1);
 	p = seprintf(p, e,
-		         "reg\ttask %#lx cmd %#lx serr %#lx %s ci %#lx is %#lx; sig %#lx sstatus %06#lx\n",
-	             o->task, o->cmd, o->serror, buf, o->ci, o->isr, o->sig,
-	             o->sstatus);
+	             "reg\ttask %#lx cmd %#lx serr %#lx %s ci %#lx is %#lx; sig %#lx sstatus %06#lx\n",
+	             task, cmd, serror, buf, ci, is, sig, sstatus);
 	if (d->unit == NULL)
 		panic("iarctl: nil d->unit");
 	p = seprintf(p, e, "geometry %llu %lu\n", d->sectors, d->unit->secsize);
@@ -2307,9 +2484,9 @@ static char *portr(char *p, char *e, unsigned int x)
 /* must emit exactly one line per controller (sd(3)) */
 static char *iartopctl(struct sdev *sdev, char *p, char *e)
 {
-	uint32_t cap;
+	uint32_t cap, ghc, isr, pi, ver;
 	char pr[25];
-	struct ahba *hba;
+	void *hba;
 	struct ctlr *ctlr;
 
 #define has(x, str)                                                            \
@@ -2321,7 +2498,7 @@ static char *iartopctl(struct sdev *sdev, char *p, char *e)
 	ctlr = sdev->ctlr;
 	hba = ctlr->hba;
 	p = seprintf(p, e, "sd%c ahci port %#p: ", sdev->idno, ctlr->physio);
-	cap = hba->cap;
+	cap = ahci_hba_read32(hba, HBA_CAP);
 	has(Hs64a, "64a");
 	has(Hsalp, "alp");
 	has(Hsam, "am");
@@ -2337,11 +2514,16 @@ static char *iartopctl(struct sdev *sdev, char *p, char *e)
 	has(Hssc, "slum");
 	has(Hsss, "ss");
 	has(Hsxs, "sxs");
-	portr(pr, pr + sizeof pr, hba->pi);
+	pi = ahci_hba_read32(hba, HBA_PI);
+	portr(pr, pr + sizeof(pr), pi);
+
+	ghc = ahci_hba_read32(hba, HBA_GHC);
+	isr = ahci_hba_read32(hba, HBA_ISR);
+	ver = ahci_hba_read32(hba, HBA_VS);
 	return seprintf(
 	    p, e, "iss %ld ncs %ld np %ld; ghc %#lx isr %#lx pi %#lx %s ver %#lx\n",
-	    (cap >> 20) & 0xf, (cap >> 8) & 0x1f, 1 + (cap & 0x1f), hba->ghc,
-	    hba->isr, hba->pi, pr, hba->ver);
+	    (cap >> 20) & 0xf, (cap >> 8) & 0x1f, 1 + (cap & 0x1f), ghc, isr, pi,
+	    ver);
 #undef has
 }
 
@@ -2384,7 +2566,7 @@ struct sdifc sdiahciifc = {
     "iahci",
 
     iapnp,
-    NULL,		/* legacy */
+    NULL, /* legacy */
     iaenable,
     iadisable,
 
@@ -2395,8 +2577,8 @@ struct sdifc sdiahciifc = {
     iawctl,
 
     scsibio,
-    NULL,		/* probe */
-    NULL,		/* clear */
+    NULL, /* probe */
+    NULL, /* clear */
     iartopctl,
     iawtopctl,
 };
