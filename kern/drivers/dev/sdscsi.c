@@ -7,16 +7,21 @@
  * in the LICENSE file.
  */
 
-#include "../port/error.h"
-#include "../port/lib.h"
-#include "dat.h"
-#include "fns.h"
-#include "io.h"
-#include "mem.h"
-#include "u.h"
-#include "ureg.h"
+#include <vfs.h>
 
-#include "../port/sd.h"
+#include <assert.h>
+#include <cpio.h>
+#include <error.h>
+#include <ip.h>
+#include <kfs.h>
+#include <kmalloc.h>
+#include <kref.h>
+#include <pmap.h>
+#include <sd.h>
+#include <slab.h>
+#include <smp.h>
+#include <stdio.h>
+#include <string.h>
 
 static int scsitest(struct sdreq *r)
 {
@@ -24,7 +29,7 @@ static int scsitest(struct sdreq *r)
 	memset(r->cmd, 0, sizeof(r->cmd));
 	r->cmd[1] = r->lun << 5;
 	r->clen = 6;
-	r->data = nil;
+	r->data = NULL;
 	r->dlen = 0;
 	r->flags = 0;
 
@@ -39,10 +44,12 @@ int scsiverify(struct sdunit *unit)
 	int i, status;
 	uint8_t *inquiry;
 
-	if ((r = malloc(sizeof(struct sdreq))) == nil)
+	r = kzmalloc(sizeof(struct sdreq), 0);
+	if (r == NULL)
 		return 0;
-	if ((inquiry = sdmalloc(sizeof(unit->inquiry))) == nil) {
-		free(r);
+	inquiry = kzmalloc(sizeof(unit->inquiry), MEM_WAIT);
+	if (inquiry == NULL) {
+		kfree(r);
 		return 0;
 	}
 	r->unit = unit;
@@ -60,13 +67,12 @@ int scsiverify(struct sdunit *unit)
 
 	r->status = ~0;
 	if (unit->dev->ifc->rio(r) != SDok) {
-		free(r);
+		kfree(r);
 		return 0;
 	}
 	memmove(unit->inquiry, inquiry, r->dlen);
-	free(inquiry);
+	kfree(inquiry);
 
-	SET(status);
 	for (i = 0; i < 3; i++) {
 		while ((status = scsitest(r)) == SDbusy)
 			;
@@ -107,7 +113,7 @@ int scsiverify(struct sdunit *unit)
 			r->cmd[1] = (r->lun << 5) | 0x01;
 			r->cmd[4] = 1;
 			r->clen = 6;
-			r->data = nil;
+			r->data = NULL;
 			r->dlen = 0;
 			r->flags = 0;
 
@@ -115,7 +121,7 @@ int scsiverify(struct sdunit *unit)
 			unit->dev->ifc->rio(r);
 		}
 	}
-	free(r);
+	kfree(r);
 
 	if (status == SDok || status == SDcheck)
 		return 1;
@@ -124,7 +130,7 @@ int scsiverify(struct sdunit *unit)
 
 static int scsirio(struct sdreq *r)
 {
-	struct proc *up = externup();
+	ERRSTACK(1);
 	/*
 	 * Perform an I/O request, returning
 	 *	-1	failure
@@ -168,7 +174,7 @@ static int scsirio(struct sdreq *r)
 
 			while (waserror())
 				;
-			tsleep(&up->sleep, return0, 0, 500);
+			kthread_usleep(500 * 1000);
 			poperror();
 			scsitest(r);
 			return 2;
@@ -188,10 +194,12 @@ int scsionline(struct sdunit *unit)
 	uint8_t *p;
 	int ok, retries;
 
-	if ((r = malloc(sizeof(struct sdreq))) == nil)
+	r = kzmalloc(sizeof(struct sdreq), 0);
+	if (r == NULL)
 		return 0;
-	if ((p = sdmalloc(8)) == nil) {
-		free(r);
+	p = kzmalloc(8, 0);
+	if (p == NULL) {
+		kfree(r);
 		return 0;
 	}
 
@@ -250,8 +258,8 @@ int scsionline(struct sdunit *unit)
 		}
 		break;
 	}
-	free(p);
-	free(r);
+	kfree(p);
+	kfree(r);
 
 	if (ok)
 		return ok + retries;
@@ -265,7 +273,8 @@ int scsiexec(struct sdunit *unit, int write, uint8_t *cmd, int clen, void *data,
 	struct sdreq *r;
 	int status;
 
-	if ((r = malloc(sizeof(struct sdreq))) == nil)
+	r = kzmalloc(sizeof(struct sdreq), 0);
+	if (r == NULL)
 		return SDmalloc;
 	r->unit = unit;
 	r->lun = cmd[1] >> 5; /* ??? */
@@ -304,7 +313,7 @@ int scsiexec(struct sdunit *unit, int write, uint8_t *cmd, int clen, void *data,
 		 */
 		break;
 	}
-	sdfree(r);
+	kfree(r);
 
 	return status;
 }
@@ -367,8 +376,9 @@ int32_t scsibio(struct sdunit *unit, int lun, int write, void *data, int32_t nb,
 	struct sdreq *r;
 	int32_t rlen;
 
-	if ((r = malloc(sizeof(struct sdreq))) == nil)
-		error(Enomem);
+	r = kzmalloc(sizeof(struct sdreq), 0);
+	if (r == NULL)
+		error(ENOMEM, "scsibio: can't allocate %d bytes", sizeof(*r));
 	r->unit = unit;
 	r->lun = lun;
 again:
@@ -397,8 +407,8 @@ again:
 		default:
 			break;
 		case 0x01: /* recovered error */
-			print("%s: recovered error at sector %llu\n", unit->SDperm.name,
-			      bno);
+			printd("%s: recovered error at sector %llu\n", unit->SDperm.name,
+			       bno);
 			rlen = r->rlen;
 			break;
 		case 0x06: /* check condition */
@@ -423,7 +433,7 @@ again:
 		}
 		break;
 	}
-	free(r);
+	kfree(r);
 
 	return rlen;
 }

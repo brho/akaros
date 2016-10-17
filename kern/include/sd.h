@@ -10,92 +10,93 @@
 /*
  * Storage Device.
  */
-typedef struct SDev SDev;
-typedef struct SDifc SDifc;
-typedef struct SDio SDio;
-typedef struct SDpart SDpart;
-typedef struct SDperm SDperm;
-typedef struct SDreq SDreq;
-typedef struct SDunit SDunit;
+struct devconf;
+struct sdev;
+struct sdifc;
+struct sdio;
+struct sdpart;
+struct sdperm;
+struct sdreq;
+struct sdunit;
 
-struct SDperm {
+struct sdperm {
 	char *name;
 	char *user;
 	uint32_t perm;
 };
 
-struct SDpart {
+struct sdpart {
 	uint64_t start;
 	uint64_t end;
-	SDperm SDperm;
+	struct sdperm sdperm;
 	int valid;
 	uint32_t vers;
 };
 
-struct SDunit {
-	SDev *dev;
+struct sdunit {
+	struct sdev *dev;
 	int subno;
 	unsigned char inquiry[255]; /* format follows SCSI spec */
 	unsigned char sense[18];    /* format follows SCSI spec */
-	SDperm SDperm;
+	struct sdperm sdperm;
 
-	QLock ctl;
+	qlock_t ctl;
 	uint64_t sectors;
 	uint32_t secsize;
-	SDpart *part; /* nil or array of size npart */
+	struct sdpart *part; /* nil or array of size npart */
 	int npart;
 	uint32_t vers;
-	SDperm ctlperm;
+	struct sdperm ctlperm;
 
-	QLock raw;         /* raw read or write in progress */
+	qlock_t raw;       /* raw read or write in progress */
 	uint32_t rawinuse; /* really just a test-and-set */
 	int state;
-	SDreq *req;
-	SDperm rawperm;
+	struct sdreq *req;
+	struct sdperm rawperm;
 };
 
 /*
- * Each controller is represented by a SDev.
+ * Each controller is represented by a struct sdev.
  */
-struct SDev {
-	Ref r;      /* Number of callers using device */
-	SDifc *ifc; /* pnp/legacy */
+struct sdev {
+	struct kref r;     /* Number of callers using device */
+	struct sdifc *ifc; /* pnp/legacy */
 	void *ctlr;
 	int idno;
 	char name[8];
-	SDev *next;
+	struct sdev *next;
 
-	QLock ql; /* enable/disable */
+	qlock_t ql; /* enable/disable */
 	int enabled;
-	int nunit;      /* Number of units */
-	QLock unitlock; /* `Loading' of units */
-	int *unitflg;   /* Unit flags */
-	SDunit **unit;
+	int nunit;        /* Number of units */
+	qlock_t unitlock; /* `Loading' of units */
+	int *unitflg;     /* Unit flags */
+	struct sdunit **unit;
 };
 
-struct SDifc {
+struct sdifc {
 	char *name;
 
-	SDev *(*pnp)(void);
-	SDev *(*legacy)(int, int);
-	int (*enable)(SDev *);
-	int (*disable)(SDev *);
+	struct sdev *(*pnp)(void);
+	struct sdev *(*legacy)(int, int);
+	int (*enable)(struct sdev *);
+	int (*disable)(struct sdev *);
 
-	int (*verify)(SDunit *);
-	int (*online)(SDunit *);
-	int (*rio)(SDreq *);
-	int (*rctl)(SDunit *, char *, int);
-	int (*wctl)(SDunit *, Cmdbuf *);
+	int (*verify)(struct sdunit *);
+	int (*online)(struct sdunit *);
+	int (*rio)(struct sdreq *);
+	int (*rctl)(struct sdunit *, char *, int);
+	int (*wctl)(struct sdunit *, struct cmdbuf *);
 
-	int32_t (*bio)(SDunit *, int, int, void *, int32_t, uint64_t);
-	SDev *(*probe)(DevConf *);
-	void (*clear)(SDev *);
-	char *(*rtopctl)(SDev *, char *, char *);
-	int (*wtopctl)(SDev *, Cmdbuf *);
+	int32_t (*bio)(struct sdunit *, int, int, void *, int32_t, uint64_t);
+	struct sdev *(*probe)(struct devconf *);
+	void (*clear)(struct sdev *);
+	char *(*rtopctl)(struct sdev *, char *, char *);
+	int (*wtopctl)(struct sdev *, struct cmdbuf *);
 };
 
-struct SDreq {
-	SDunit *unit;
+struct sdreq {
+	struct sdunit *unit;
 	int lun;
 	int write;
 	unsigned char cmd[16];
@@ -145,21 +146,10 @@ enum {
 };
 
 /*
- * Allow the default #defines for sdmalloc & sdfree to be overridden by
- * system-specific versions.  This can be used to avoid extra copying
- * by making sure sd buffers are cache-aligned (some ARM systems) or
- * page-aligned (xen) for DMA.
- */
-#ifndef sdmalloc
-#define sdmalloc(n) malloc(n)
-#define sdfree(p) free(p)
-#endif
-
-/*
  * mmc/sd/sdio host controller interface
  */
 
-struct SDio {
+struct sdio {
 	char *name;
 	int (*init)(void);
 	void (*enable)(void);
@@ -169,34 +159,34 @@ struct SDio {
 	void (*io)(int, unsigned char *, int);
 };
 
-extern SDio sdio;
+extern struct sdio sdio;
 
 /* devsd.c */
-extern void sdadddevs(SDev *);
-extern void sdaddconf(SDunit *);
-extern void sdaddallconfs(void (*f)(SDunit *));
-extern void sdaddpart(SDunit *, char *, uint64_t, uint64_t);
-extern int sdsetsense(SDreq *, int, int, int, int);
-extern int sdmodesense(SDreq *, unsigned char *, void *, int);
-extern int sdfakescsi(SDreq *, void *, int);
+extern void sdadddevs(struct sdev *);
+extern void sdaddconf(struct sdunit *);
+extern void sdaddallconfs(void (*f)(struct sdunit *));
+extern void sdaddpart(struct sdunit *, char *, uint64_t, uint64_t);
+extern int sdsetsense(struct sdreq *, int, int, int, int);
+extern int sdmodesense(struct sdreq *, unsigned char *, void *, int);
+extern int sdfakescsi(struct sdreq *, void *, int);
 
 /* sdscsi.c */
-extern int scsiverify(SDunit *);
-extern int scsionline(SDunit *);
-extern int32_t scsibio(SDunit *, int, int, void *, int32_t, uint64_t);
-extern SDev *scsiid(SDev *, SDifc *);
+extern int scsiverify(struct sdunit *);
+extern int scsionline(struct sdunit *);
+extern int32_t scsibio(struct sdunit *, int, int, void *, int32_t, uint64_t);
+extern struct sdev *scsiid(struct sdev *, struct sdifc *);
 
 /*
  *  hardware info about a device
  */
-typedef struct devport {
+struct devport {
 	uint32_t port;
 	int size;
-} Devport;
+};
 
-struct DevConf {
-	uint32_t intnum; /* interrupt number */
-	char *type;      /* card type, malloced */
-	int nports;      /* Number of ports */
-	Devport *ports;  /* The ports themselves */
+struct devconf {
+	uint32_t intnum;       /* interrupt number */
+	char *type;            /* card type, malloced */
+	int nports;            /* Number of ports */
+	struct devport *ports; /* The ports themselves */
 };

@@ -86,7 +86,7 @@ enum {
 	Hhr = 1 << 0,  /* hba reset */
 };
 
-typedef struct {
+typedef struct abha {
 	uint32_t cap;
 	uint32_t ghc;
 	uint32_t isr;
@@ -286,8 +286,8 @@ enum {
 };
 
 typedef struct aportm {
-	QLock ql;
-	Rendez Rendez;
+	qlock_t ql;
+	struct rendez Rendez;
 	unsigned char flag;
 	unsigned char feat;
 	unsigned char smart;
