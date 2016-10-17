@@ -336,8 +336,8 @@ static void listsetup(struct aportc *pc, int flags)
 	list = pc->pm->list;
 	list->flags = flags | 5;
 	list->len = 0;
-	list->ctab = PCIWADDR(pc->pm->ctab);
-	list->ctabhi = 0;
+	list->ctab = paddr_low32(pc->pm->ctab);
+	list->ctabhi = paddr_high32(pc->pm->ctab);
 }
 
 static int nop(struct aportc *pc)
@@ -504,8 +504,8 @@ static int ahciidentify0(struct aportc *pc, void *id, int atapi)
 
 	memset(id, 0, 0x100); /* magic */
 	p = &pc->pm->ctab->prdt;
-	p->dba = PCIWADDR(id);
-	p->dbahi = 0;
+	p->dba = paddr_low32(id);
+	p->dbahi = paddr_high32(id);
 	p->count = 1 << 31 | (0x200 - 2) | 1;
 	return ahciwait(pc, 3 * 1000);
 }
@@ -744,10 +744,10 @@ static int ahciconfigdrive(struct drive *d)
 
 	p->serror = SerrAll;
 
-	p->list = PCIWADDR(pm->list);
-	p->listhi = 0;
-	p->fis = PCIWADDR(pm->fis.base);
-	p->fishi = 0;
+	p->list = paddr_low32(pm->list);
+	p->listhi = paddr_high32(pm->list);
+	p->fis = paddr_low32(pm->fis.base);
+	p->fishi = paddr_high32(pm->fis.base);
 	p->cmd |= Afre | Ast;
 
 	/* drive coming up in slumbering? */
@@ -1542,12 +1542,12 @@ static struct alist *ahcibuild(struct drive *d, unsigned char *cmd, void *data,
 	if (dir == Write)
 		l->flags |= Lwrite;
 	l->len = 0;
-	l->ctab = PCIWADDR(t);
-	l->ctabhi = 0;
+	l->ctab = paddr_low32(t);
+	l->ctabhi = paddr_high32(t);
 
 	p = &t->prdt;
-	p->dba = PCIWADDR(data);
-	p->dbahi = 0;
+	p->dba = paddr_low32(data);
+	p->dbahi = paddr_high32(data);
 	if (d->unit == NULL)
 		panic("ahcibuild: NULL d->unit");
 	p->count = 1 << 31 | (d->unit->secsize * n - 2) | 1;
@@ -1596,15 +1596,15 @@ static struct alist *ahcibuildpkt(struct aportm *pm, struct sdreq *r,
 	if (r->write != 0 && data)
 		l->flags |= Lwrite;
 	l->len = 0;
-	l->ctab = PCIWADDR(t);
-	l->ctabhi = 0;
+	l->ctab = paddr_low32(t);
+	l->ctabhi = paddr_high32(t);
 
 	if (data == 0)
 		return l;
 
 	p = &t->prdt;
-	p->dba = PCIWADDR(data);
-	p->dbahi = 0;
+	p->dba = paddr_low32(data);
+	p->dbahi = paddr_high32(data);
 	p->count = 1 << 31 | (n - 2) | 1;
 
 	return l;
