@@ -175,7 +175,7 @@ struct ctlr {
 
 	/* virtual register addresses */
 	uintptr_t mmio;
-	Ahba *hba;
+	struct ahba *hba;
 
 	/* phyical register address */
 	uintptr_t physio;
@@ -556,7 +556,7 @@ static int64_t ahciidentify(struct aportc *pc, uint16_t *id)
 
 #if 0
 static int
-ahciquiet(Aport *a)
+ahciquiet(struct aport *a)
 {
 	uint32_t *p, i;
 
@@ -593,7 +593,7 @@ stop1:
 
 #if 0
 static int
-ahcicomreset(Aportc *pc)
+ahcicomreset(struct aportc *pc)
 {
 	unsigned char *c;
 
@@ -717,7 +717,7 @@ static void ahciwakeup(struct aport *p)
 static int ahciconfigdrive(struct drive *d)
 {
 	char *name;
-	Ahba *h;
+	struct ahba *h;
 	struct aport *p;
 	struct aportm *pm;
 
@@ -765,12 +765,12 @@ static int ahciconfigdrive(struct drive *d)
 	return 0;
 }
 
-static void ahcienable(Ahba *h)
+static void ahcienable(struct ahba *h)
 {
 	h->ghc |= Hie;
 }
 
-static void ahcidisable(Ahba *h)
+static void ahcidisable(struct ahba *h)
 {
 	h->ghc &= ~Hie;
 }
@@ -788,10 +788,10 @@ static int countbits(uint32_t u)
 
 static int ahciconf(struct ctlr *ctlr)
 {
-	Ahba *h;
+	struct ahba *h;
 	uint32_t u;
 
-	h = ctlr->hba = (Ahba *)ctlr->mmio;
+	h = ctlr->hba = (struct ahba *)ctlr->mmio;
 	u = h->cap;
 
 	if ((u & Hsam) == 0)
@@ -807,7 +807,7 @@ static int ahciconf(struct ctlr *ctlr)
 
 #if 0
 static int
-ahcihbareset(Ahba *h)
+ahcihbareset(struct ahba *h)
 {
 	int wait;
 
@@ -2070,7 +2070,7 @@ static struct sdev *iapnp(void)
 		if (Intel(c) && p->dev_id != 0x2681)
 			iasetupahci(c);
 		nunit = ahciconf(c);
-		//		ahcihbareset((Ahba*)c->mmio);
+		//		ahcihbareset((struct ahba*)c->mmio);
 		if (Intel(c) && iaahcimode(p) == -1)
 			break;
 		if (nunit < 1) {
@@ -2309,7 +2309,7 @@ static char *iartopctl(struct sdev *sdev, char *p, char *e)
 {
 	uint32_t cap;
 	char pr[25];
-	Ahba *hba;
+	struct ahba *hba;
 	struct ctlr *ctlr;
 
 #define has(x, str)                                                            \

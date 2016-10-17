@@ -86,7 +86,7 @@ enum {
 	Hhr = 1 << 0,  /* hba reset */
 };
 
-typedef struct abha {
+struct ahba {
 	uint32_t cap;
 	uint32_t ghc;
 	uint32_t isr;
@@ -96,7 +96,7 @@ typedef struct abha {
 	uint32_t cccports;
 	uint32_t emloc;
 	uint32_t emctl;
-} Ahba;
+};
 
 enum {
 	Acpds = 1 << 31, /* cold port detect status */
@@ -187,7 +187,7 @@ enum {
 #define serror scr1
 #define sactive scr3
 
-typedef struct aport {
+struct aport {
 	uint32_t list; /* PxCLB must be 1kb aligned. */
 	uint32_t listhi;
 	uint32_t fis; /* 256-byte aligned */
@@ -206,7 +206,7 @@ typedef struct aport {
 	uint32_t ntf;
 	unsigned char res2[8];
 	uint32_t vendor;
-} Aport;
+};
 
 enum {
 	/*
@@ -227,14 +227,14 @@ enum {
 };
 
 /* in host's memory; not memory mapped */
-typedef struct afis {
+struct afis {
 	unsigned char *base;
 	unsigned char *d;
 	unsigned char *p;
 	unsigned char *r;
 	unsigned char *u;
 	uint32_t *devicebits;
-} Afis;
+};
 
 enum {
 	Lprdtl = 1 << 16, /* physical region descriptor table len */
@@ -249,27 +249,27 @@ enum {
 };
 
 /* in hosts memory; memory mapped */
-typedef struct alist {
+struct alist {
 	uint32_t flags;
 	uint32_t len;
 	uint32_t ctab;
 	uint32_t ctabhi;
 	unsigned char reserved[16];
-} Alist;
+};
 
-typedef struct aprdt {
+struct aprdt {
 	uint32_t dba;
 	uint32_t dbahi;
 	uint32_t pad;
 	uint32_t count;
-} Aprdt;
+};
 
-typedef struct actab {
+struct actab {
 	unsigned char cfis[0x40];
 	unsigned char atapi[0x10];
 	unsigned char pad[0x30];
-	Aprdt prdt;
-} Actab;
+	struct aprdt prdt;
+};
 
 enum {
 	Ferror = 1,
@@ -285,18 +285,18 @@ enum {
 	Datapi16 = 1 << 5,
 };
 
-typedef struct aportm {
+struct aportm {
 	qlock_t ql;
 	struct rendez Rendez;
 	unsigned char flag;
 	unsigned char feat;
 	unsigned char smart;
-	Afis fis;
-	Alist *list;
-	Actab *ctab;
-} Aportm;
+	struct afis fis;
+	struct alist *list;
+	struct actab *ctab;
+};
 
-typedef struct aportc {
-	Aport *p;
-	Aportm *pm;
-} Aportc;
+struct aportc {
+	struct aport *p;
+	struct aportm *pm;
+};
