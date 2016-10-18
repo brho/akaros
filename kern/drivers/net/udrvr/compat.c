@@ -304,7 +304,7 @@ static const struct file_operations cpuinfo = {
 
 void sysfs_init(void)
 {
-	do_mkdir("/dev/infiniband", S_IRWXU | S_IRWXG | S_IRWXO);
+	do_mkdir("/dev_vfs/infiniband", S_IRWXU | S_IRWXG | S_IRWXO);
 	do_mkdir("/sys", S_IRWXU | S_IRWXG | S_IRWXO);
 	do_mkdir("/sys/class", S_IRWXU | S_IRWXG | S_IRWXO);
 	do_mkdir("/sys/class/infiniband_verbs", S_IRWXU | S_IRWXG | S_IRWXO);
@@ -423,7 +423,7 @@ void sysfs_create(int devnum, const struct file_operations *verb_fops,
     void *ptr)
 {
 	char		sysname[256] = "/sys/class/infiniband_verbs/uverbs0";
-	char		devname[] = "/dev/infiniband/uverbs0";
+	char		devname[] = "/dev_vfs/infiniband/uverbs0";
 	char		drvname[64] = "/sys/class/infiniband/";
 	int		sysnameidx = strlen(sysname), drvidx;
 	struct file	*fp;
