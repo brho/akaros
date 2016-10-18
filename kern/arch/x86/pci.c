@@ -188,16 +188,25 @@ void pci_init(void)
 	uint16_t dev_id, ven_id;
 	struct pci_device *pcidev;
 	int max_nr_func;
-	for (int i = 0; i < PCI_MAX_BUS - 1; i++) {	/* phantoms at 0xff */
+	/* In earlier days bus address 0xff caused problems so we only iterated to
+	 * PCI_MAX_BUS - 1, but this should no longer be an issue.
+	 * Old comment: phantoms at 0xff */
+	for (int i = 0; i < PCI_MAX_BUS; i++) {
 		for (int j = 0; j < PCI_MAX_DEV; j++) {
 			max_nr_func = 1;
 			for (int k = 0; k < max_nr_func; k++) {
 				result = pci_read32(i, j, k, PCI_DEV_VEND_REG);
 				dev_id = result >> 16;
 				ven_id = result & 0xffff;
-				/* Skip invalid IDs (not a device) */
-				if (ven_id == INVALID_VENDOR_ID)
-					break;	/* skip functions too, they won't exist */
+				/* Skip invalid IDs (not a device)
+				 * If the first function doesn't exist then no device is
+				 * connected, but there can be gaps in the other function
+				 * numbers. Eg. 0,2,3 is ok. */
+				if (ven_id == INVALID_VENDOR_ID) {
+					if (k == 0)
+						break;
+					continue;
+				}
 				pcidev = kzmalloc(sizeof(struct pci_device), 0);
 				/* we don't need to lock it til we post the pcidev to the list*/
 				spinlock_init_irqsave(&pcidev->lock);

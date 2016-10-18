@@ -2111,7 +2111,8 @@ static int didtype(struct pci_device *p)
 		    (p->dev_id & 0xfffe) == 0x2922 || /* ich9 */
 		    p->dev_id == 0x3a02 ||            /* 82801jd/do */
 		    (p->dev_id & 0xfefe) == 0x3a22 || /* ich10, pch */
-		    (p->dev_id & 0xfff8) == 0x3b28)   /* pchm */
+		    (p->dev_id & 0xfff8) == 0x3b28 || /* pchm */
+		    p->dev_id == 0x1d02)              /* c600/x79 pch */
 			return Tich;
 		break;
 	case Vatiamd:
