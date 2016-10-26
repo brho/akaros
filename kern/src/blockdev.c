@@ -40,7 +40,7 @@ void block_init(void)
 	ram_bd->b_data = _binary_mnt_ext2fs_img_start;
 	strlcpy(ram_bd->b_name, "RAMDISK", BDEV_INLINE_NAME);
 	/* Connect it to the file system */
-	struct file *ram_bf = make_device("/dev/ramdisk", S_IRUSR | S_IWUSR,
+	struct file *ram_bf = make_device("/dev_vfs/ramdisk", S_IRUSR | S_IWUSR,
 	                                  __S_IFBLK, &block_f_op);
 	/* make sure the inode tracks the right pm (not it's internal one) */
 	ram_bf->f_dentry->d_inode->i_mapping = &ram_bd->b_pm;

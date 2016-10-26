@@ -168,7 +168,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	devtabinit();
 
 #ifdef CONFIG_EXT2FS
-	mount_fs(&ext2_fs_type, "/dev/ramdisk", "/mnt", 0);
+	mount_fs(&ext2_fs_type, "/dev_vfs/ramdisk", "/mnt", 0);
 #endif /* CONFIG_EXT2FS */
 #ifdef CONFIG_ETH_AUDIO
 	eth_audio_init();
