@@ -836,7 +836,6 @@ static ssize_t sys_fork(env_t* e)
 	switch_back(env, temp);
 
 	/* Copy some state from the original proc into the new proc. */
-	env->heap_top = e->heap_top;
 	env->env_flags = e->env_flags;
 
 	inherit_strace(e, env);

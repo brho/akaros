@@ -394,10 +394,7 @@ int load_elf(struct proc* p, struct file* f,
 	uintptr_t core0_entry = ei.dynamic ? interp_ei.entry : ei.entry;
 	proc_init_ctx(&p->scp_ctx, 0, core0_entry, stack_top, 0);
 
-	/* Set the heap bottom and top to just past where the text region has been
-	 * loaded. */
-	p->heap_top = (void*)ei.highest_addr;
-	p->procinfo->heap_bottom = p->heap_top;
+	p->procinfo->heap_bottom = (void*)ei.highest_addr;
 	p->args_base = (void *) stack_top;
 
 	return 0;

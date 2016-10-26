@@ -373,7 +373,6 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 	cv_init(&p->child_wait);
 	p->state = PROC_CREATED; /* shouldn't go through state machine for init */
 	p->env_flags = 0;
-	p->heap_top = 0;
 	spinlock_init(&p->vmr_lock);
 	spinlock_init(&p->pte_lock);
 	TAILQ_INIT(&p->vm_regions); /* could init this in the slab */

@@ -69,10 +69,6 @@ struct proc {
 	uint8_t* cache_colors_map;
 	size_t next_cache_color;
 
-	/* Keeps track of this process's current memory allocation
-     * (i.e. its heap pointer) */
-	void *heap_top;
-
 	/* The args_base pointer is a user pointer which points to the base of
 	 * the executable boot block (where args, environment, aux vectors, ...)
 	 * are stored.
