@@ -101,6 +101,7 @@ void put_kstack(uintptr_t stacktop);
 uintptr_t *kstack_bottom_addr(uintptr_t stacktop);
 void kthread_init(void);
 struct kthread *__kthread_zalloc(void);
+void __use_real_kstack(void (*f)(void *arg));
 void restart_kthread(struct kthread *kthread);
 void kthread_runnable(struct kthread *kthread);
 void kthread_yield(void);

@@ -59,6 +59,24 @@ struct kthread *__kthread_zalloc(void)
 	return kthread;
 }
 
+/* Helper during early boot, where we jump from the bootstack to a real kthread
+ * stack, then run f().  Note that we don't have a kthread yet (done in smp.c).
+ *
+ * After this, our callee (f) can free the bootstack, if we care, by adding it
+ * to the base arena (use the KERNBASE addr, not the KERN_LOAD_ADDR). */
+void __use_real_kstack(void (*f)(void *arg))
+{
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	uintptr_t new_stacktop;
+
+	new_stacktop = get_kstack();
+#ifdef CONFIG_KTHREAD_POISON
+	*kstack_bottom_addr(new_stacktop) = 0xdeadbeef;
+#endif /* CONFIG_KTHREAD_POISON */
+	set_stack_top(new_stacktop);
+	__reset_stack_pointer(0, new_stacktop, f);
+}
+
 /* Starts kthread on the calling core.  This does not return, and will handle
  * the details of cleaning up whatever is currently running (freeing its stack,
  * etc).  Pairs with sem_down(). */

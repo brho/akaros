@@ -118,6 +118,8 @@ static void extract_multiboot_cmdline(struct multiboot_info *mbi)
 	}
 }
 
+static void __kernel_init_part_deux(void *arg);
+
 void kernel_init(multiboot_info_t *mboot_info)
 {
 	extern char __start_bss[], __stop_bss[];
@@ -150,6 +152,12 @@ void kernel_init(multiboot_info_t *mboot_info)
 	file_init();
 	page_check();
 	idt_init();
+	/* After kthread_init and idt_init, we can use a real kstack. */
+	__use_real_kstack(__kernel_init_part_deux);
+}
+
+static void __kernel_init_part_deux(void *arg)
+{
 	kernel_msg_init();
 	timer_init();
 	vfs_init();
