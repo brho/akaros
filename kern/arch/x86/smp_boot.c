@@ -323,11 +323,8 @@ void __arch_pcpu_init(uint32_t coreid)
 	// Initialize fpu and extended state by restoring our default XSAVE area.
 	init_fp_state();
 
-	/* core 0 sets up via the global gdt symbol */
-	if (!coreid) {
-		pcpui->tss = &ts;
-		pcpui->gdt = gdt;
-	} else {
+	/* core 0 set up earlier in idt_init() */
+	if (coreid) {
 		my_stack_bot = kstack_bottom_addr(ROUNDUP(read_sp() - 1, PGSIZE));
 		pcpui->tss = (taskstate_t*)(*my_stack_bot);
 		pcpui->gdt = (segdesc_t*)(*my_stack_bot +
@@ -336,7 +333,8 @@ void __arch_pcpu_init(uint32_t coreid)
 	assert(read_gsbase() == (uintptr_t)pcpui);
 	assert(read_msr(MSR_KERN_GS_BASE) == (uint64_t)pcpui);
 	/* Don't try setting up til after setting GS */
-	x86_sysenter_init(x86_get_stacktop_tss(pcpui->tss));
+	x86_sysenter_init();
+	x86_set_sysenter_stacktop(x86_get_stacktop_tss(pcpui->tss));
 	pcpu_init_nmi(pcpui);
 	/* need to init perfctr before potentially using it in timer handler */
 	perfmon_pcpu_init();

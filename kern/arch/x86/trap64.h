@@ -34,7 +34,7 @@ static inline void x86_fake_rdtscp(struct hw_trapframe *hw_tf)
 	hw_tf->tf_rcx = core_id();
 }
 
-static inline void x86_sysenter_init(uintptr_t stacktop)
+static inline void x86_sysenter_init(void)
 {
 	/* check amd 2:6.1.1 for details.  they have some expectations about the GDT
 	 * layout. */
@@ -44,7 +44,6 @@ static inline void x86_sysenter_init(uintptr_t stacktop)
 	/* Masking all flags.  when we syscall, we'll get rflags = 0 */
 	write_msr(MSR_SFMASK, 0xffffffff);
 	write_msr(IA32_EFER_MSR, read_msr(IA32_EFER_MSR) | IA32_EFER_SYSCALL);
-	asm volatile ("movq %0, %%gs:0" : : "r"(stacktop));
 }
 
 /* these are used for both sysenter and traps on 32 bit */

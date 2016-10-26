@@ -85,9 +85,7 @@ const char *x86_trapname(int trapno)
 }
 
 /* Set stacktop for the current core to be the stack the kernel will start on
- * when trapping/interrupting from userspace.  Don't use this til after
- * smp_percpu_init().  We can probably get the TSS by reading the task register
- * and then the GDT.  Still, it's a pain. */
+ * when trapping/interrupting from userspace. */
 void set_stack_top(uintptr_t stacktop)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
@@ -102,11 +100,7 @@ uintptr_t get_stack_top(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	uintptr_t stacktop;
-	/* so we can check this in interrupt handlers (before smp_boot()) */
-	/* TODO: These are dangerous - it assumes we're on a one-page stack.  If we
-	 * change it to KSTKSIZE, then we assume stacks are KSTKSIZE-aligned */
-	if (!pcpui->tss)
-		return ROUNDUP(read_sp(), PGSIZE);
+
 	stacktop = x86_get_stacktop_tss(pcpui->tss);
 	if (stacktop != ROUNDUP(read_sp(), PGSIZE))
 		panic("Bad stacktop: %p esp one is %p\n", stacktop,
@@ -157,10 +151,14 @@ void idt_init(void)
 	/* Send NMIs to their own stack (IST1 in every core's TSS) */
 	idt[T_NMI].gd_ist = 1;
 
+	/* The sooner we set this, the sooner we can use set/get_stack_top. */
+	per_cpu_info[0].tss = &ts;
+	per_cpu_info[0].gdt = gdt;
+
 	/* Set up our kernel stack when changing rings */
 	/* Note: we want 16 byte aligned kernel stack frames (AMD 2:8.9.3) */
-	x86_set_stacktop_tss(&ts, (uintptr_t)bootstacktop);
-	x86_sysenter_init((uintptr_t)bootstacktop);
+	x86_sysenter_init();
+	set_stack_top((uintptr_t)bootstacktop);
 
 #ifdef CONFIG_KTHREAD_POISON
 	*kstack_bottom_addr((uintptr_t)bootstacktop) = 0xdeadbeef;
