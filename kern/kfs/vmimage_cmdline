@@ -6,7 +6,6 @@ earlyprintk=vmcall,keep
  apic=debug
  noexec=off
  nohlt
- init=/bin/sh
  lapic=notscdeadline
  lapictimerfreq=1000000
  clocksource=tsc
