@@ -58,7 +58,7 @@ static void try_run_proc(void)
  * halt and wake up when interrupted, do any work on their work queue, then halt
  * again.  In between, the ksched gets a chance to tell it to do something else,
  * or perhaps to halt in another manner. */
-static void __attribute__((noinline, noreturn)) __smp_idle(void)
+static void __attribute__((noreturn)) __smp_idle(void *arg)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
@@ -84,14 +84,7 @@ static void __attribute__((noinline, noreturn)) __smp_idle(void)
 
 void smp_idle(void)
 {
-	/* FP must be zeroed before SP.  Ideally, we'd do both atomically.  If we
-	 * take an IRQ/NMI in between and set SP first, then a backtrace would be
-	 * confused since FP points *below* the SP that the *IRQ handler* is now
-	 * using.  By zeroing FP first, at least we won't BT at all (though FP is
-	 * still out of sync with SP). */
-	set_frame_pointer(0);
-	set_stack_pointer(get_stack_top());
-	__smp_idle();
+	__reset_stack_pointer(0, get_stack_top(), __smp_idle);
 }
 
 /* Arch-independent per-cpu initialization.  This will call the arch dependent

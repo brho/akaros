@@ -165,3 +165,10 @@ static inline void prefetch(void *addr)
 static inline void prefetchw(void *addr)
 {
 }
+
+/* Resets a stack pointer to sp, then calls f(arg) */
+static inline void __attribute__((noreturn))
+__reset_stack_pointer(void *arg, uintptr_t sp, void (*f)(void *))
+{
+	#error "implement me"
+}

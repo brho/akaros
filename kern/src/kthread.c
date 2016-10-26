@@ -303,33 +303,10 @@ bool sem_trydown(struct semaphore *sem)
 	return ret;
 }
 
-/* Helper, pushes the sem pointer on the top of the stack, returning the stack
- * pointer to use. */
-static uintptr_t push_sem_ptr(uintptr_t stack_top, struct semaphore *sem)
-{
-	struct semaphore **sp_ptr;
-
-	sp_ptr = (struct semaphore**)(stack_top - sizeof(struct semaphore*));
-	*sp_ptr = sem;
-	return (uintptr_t)sp_ptr;
-}
-
-/* Helper: gets the sem pointer from the top of the stack.  Note we don't pop
- * from the stack.  We're just using the topmost part of the stack for free
- * storage. */
-static struct semaphore *get_sem_ptr(void)
-{
-	struct semaphore **sp_ptr;
-
-	sp_ptr = (struct semaphore**)(get_stack_top() - sizeof(struct semaphore*));
-	return *sp_ptr;
-}
-
-
 /* Bottom-half of sem_down.  This is called after we jumped to the new stack. */
-static void __attribute__((noinline, noreturn)) __unlock_and_idle(void)
+static void __attribute__((noreturn)) __unlock_and_idle(void *arg)
 {
-	struct semaphore *sem = get_sem_ptr();
+	struct semaphore *sem = (struct semaphore*)arg;
 
 	spin_unlock(&sem->lock);
 	debug_unlock_semlist();
@@ -437,10 +414,7 @@ void sem_down(struct semaphore *sem)
 		 * that doesn't change stacks, unlike x86_64), we'll be using the stack
 		 * at the same time as the kthread.  We could just disable IRQs, but
 		 * that wouldn't protect us from NMIs that don't change stacks. */
-		new_stacktop = push_sem_ptr(new_stacktop, sem);
-		set_frame_pointer(0);
-		set_stack_pointer(new_stacktop);
-		__unlock_and_idle();
+		__reset_stack_pointer(sem, new_stacktop, __unlock_and_idle);
 		assert(0);
 	}
 	/* We get here if we should not sleep on sem (the signal beat the sleep).

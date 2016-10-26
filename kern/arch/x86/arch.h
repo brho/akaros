@@ -27,6 +27,8 @@ static inline void reboot(void)
 static inline void prefetch(void *addr);
 static inline void prefetchw(void *addr);
 static inline void swap_gs(void);
+static inline void __attribute__((noreturn))
+__reset_stack_pointer(void *arg, uintptr_t sp, void (*f)(void *));
 
 /* in trap.c */
 void send_ipi(uint32_t os_coreid, uint8_t vector);
@@ -181,4 +183,20 @@ static inline uint64_t max_guest_pa(void)
 static inline void swap_gs(void)
 {
 	asm volatile ("swapgs");
+}
+
+/* Resets a stack pointer to sp, then calls f(arg) */
+static inline void __attribute__((noreturn))
+__reset_stack_pointer(void *arg, uintptr_t sp, void (*f)(void *))
+{
+	/* FP must be zeroed before SP.  Ideally, we'd do both atomically.  If we
+	 * take an IRQ/NMI in between and set SP first, then a backtrace would be
+	 * confused since FP points *below* the SP that the *IRQ handler* is now
+	 * using.  By zeroing FP first, at least we won't BT at all (though FP is
+	 * still out of sync with SP). */
+	asm volatile ("mov $0x0, %%rbp;"
+	              "mov %0, %%rsp;"
+	              "jmp *%%rdx;"
+	              : : "q"(sp), "D"(arg), "d"(f));
+	while (1);
 }
