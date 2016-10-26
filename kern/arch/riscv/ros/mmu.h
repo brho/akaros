@@ -158,3 +158,7 @@ typedef unsigned long pgdir_t;
 /* Arbitrary boundary between the break and the start of
  * memory returned by calls to mmap with addr = 0 */
 #define BRK_END 0x40000000
+#warning "Check these addresses.  Seem to be small.  Are they 32 bit?"
+/* Arbitrary boundary where the break (glibc's heap) starts.  You can safely
+ * mmap with MAP_FIXED below this address. */
+#define BRK_START		0x0000100000000000

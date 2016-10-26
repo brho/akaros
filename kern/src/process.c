@@ -281,7 +281,7 @@ void proc_init_procinfo(struct proc* p)
 	p->procinfo->max_vcores = max_vcores(p);
 	p->procinfo->tsc_freq = __proc_global_info.tsc_freq;
 	p->procinfo->timing_overhead = __proc_global_info.tsc_overhead;
-	p->procinfo->heap_bottom = 0;
+	p->procinfo->program_end = 0;
 	/* 0'ing the arguments.  Some higher function will need to set them */
 	memset(p->procinfo->res_grant, 0, sizeof(p->procinfo->res_grant));
 	/* 0'ing the vcore/pcore map.  Will link the vcores later. */

@@ -843,7 +843,7 @@ static ssize_t sys_fork(env_t* e)
 	/* In general, a forked process should be a fresh process, and we copy over
 	 * whatever stuff is needed between procinfo/procdata. */
 	*env->procdata = *e->procdata;
-	env->procinfo->heap_bottom = e->procinfo->heap_bottom;
+	env->procinfo->program_end = e->procinfo->program_end;
 
 	/* FYI: once we call ready, the proc is open for concurrent usage */
 	__proc_ready(env);
@@ -998,7 +998,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	proc_replace_binary_path(p, t_path);
 	proc_set_progname(p, argc ? argv[0] : NULL);
 	proc_init_procdata(p);
-	p->procinfo->heap_bottom = 0;
+	p->procinfo->program_end = 0;
 	/* When we destroy our memory regions, accessing cur_sysc would PF */
 	pcpui->cur_kthread->sysc = 0;
 	unmap_and_destroy_vmrs(p);

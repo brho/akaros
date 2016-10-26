@@ -22,11 +22,10 @@
 #include <bits/libc-lock.h>
 #include <ros/syscall.h>
 #include <ros/memlayout.h>
-#include <ros/procinfo.h>
 #include <ros/procdata.h>
 #include <sys/mman.h>
 
-static uintptr_t curbrk = 0;
+static uintptr_t curbrk = BRK_START;
 __libc_lock_define_initialized(static, __brk_lock);
 
 static bool is_early_scp(void)
@@ -56,8 +55,6 @@ static void brk_unlock(void)
 static uintptr_t
 __internal_getbrk (void)
 {
-  if(curbrk == 0)
-    curbrk = (uintptr_t)__procinfo.heap_bottom;
   return curbrk;
 }
 
@@ -81,7 +78,7 @@ __internal_setbrk (uintptr_t addr)
   }
   else if(real_new_brk < real_brk)
   {
-    if(real_new_brk < (uintptr_t)__procinfo.heap_bottom)
+    if (real_new_brk < BRK_START)
       return -1;
 
     if (munmap((void*)real_new_brk, real_brk - real_new_brk))

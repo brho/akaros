@@ -115,11 +115,17 @@ typedef struct x86_pgdir {
  *                     .                              .
  *                     .                              .
  *                     |                              |
+ *                     |         SBRK Heap            |
+ *                     |                              |
+ *    BRK_START ---->  +------------------------------+ 0x0000100000000000
+ *                     .                              .
+ *                     .                              .
+ *                     |                              |
  *                     |        Empty Memory          |
  *                     |                              |
  *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
  *                     |                              |
- *                     |     Program Data & Heap      |
+ *                     |     Program, BSS, & Data     |
  *                     |                              |
  *                     +------------------------------+ 0x0000000000400000
  *                     .                              .
@@ -197,6 +203,9 @@ typedef struct x86_pgdir {
 /* Arbitrary boundary between the break and the start of
  * memory returned by calls to mmap with addr = 0 */
 #define BRK_END			0x0000400000000000
+/* Arbitrary boundary where the break (glibc's heap) starts.  You can safely
+ * mmap with MAP_FIXED below this address. */
+#define BRK_START		0x0000100000000000
 
 /* **************************************** */
 /* Page table constants, macros, etc */

@@ -52,7 +52,7 @@ typedef struct procinfo {
 	size_t max_vcores;	/* TODO: change to a uint32_t */
 	uint64_t tsc_freq;
 	uint64_t timing_overhead;
-	void *heap_bottom;
+	uintptr_t program_end;
 	/* glibc relies on stuff above this point.  if you change it, you need to
 	 * rebuild glibc. */
 	bool is_mcp;			/* is in multi mode */
