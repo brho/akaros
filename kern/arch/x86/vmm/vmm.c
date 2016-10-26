@@ -303,6 +303,7 @@ bool emsr_miscenable(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 		return TRUE;
 	} else {
 		/* if they are writing what is already written, that's ok. */
+		eax |= MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
 		if (((uint32_t) *rax == eax) && ((uint32_t) *rdx == edx))
 			return TRUE;
 	}
