@@ -65,46 +65,6 @@ static int emsr_fakewrite(struct guest_thread *vm_thread, struct emmsr *,
 static int emsr_ok(struct guest_thread *vm_thread, struct emmsr *, uint32_t);
 
 struct emmsr emmsrs[] = {
-	{MSR_IA32_MISC_ENABLE, "MSR_IA32_MISC_ENABLE", emsr_miscenable},
-	{MSR_IA32_SYSENTER_CS, "MSR_IA32_SYSENTER_CS", emsr_ok},
-	{MSR_IA32_SYSENTER_EIP, "MSR_IA32_SYSENTER_EIP", emsr_ok},
-	{MSR_IA32_SYSENTER_ESP, "MSR_IA32_SYSENTER_ESP", emsr_ok},
-	{MSR_IA32_UCODE_REV, "MSR_IA32_UCODE_REV", emsr_fakewrite},
-	{MSR_CSTAR, "MSR_CSTAR", emsr_fakewrite},
-	{MSR_IA32_VMX_BASIC_MSR, "MSR_IA32_VMX_BASIC_MSR", emsr_fakewrite},
-	{MSR_IA32_VMX_PINBASED_CTLS_MSR, "MSR_IA32_VMX_PINBASED_CTLS_MSR",
-	 emsr_fakewrite},
-	{MSR_IA32_VMX_PROCBASED_CTLS_MSR, "MSR_IA32_VMX_PROCBASED_CTLS_MSR",
-	 emsr_fakewrite},
-	{MSR_IA32_VMX_PROCBASED_CTLS2, "MSR_IA32_VMX_PROCBASED_CTLS2",
-	 emsr_fakewrite},
-	{MSR_IA32_VMX_EXIT_CTLS_MSR, "MSR_IA32_VMX_EXIT_CTLS_MSR",
-	 emsr_fakewrite},
-	{MSR_IA32_VMX_ENTRY_CTLS_MSR, "MSR_IA32_VMX_ENTRY_CTLS_MSR",
-	 emsr_fakewrite},
-	{MSR_IA32_ENERGY_PERF_BIAS, "MSR_IA32_ENERGY_PERF_BIAS",
-	 emsr_fakewrite},
-	{MSR_LBR_SELECT, "MSR_LBR_SELECT", emsr_ok},
-	{MSR_LBR_TOS, "MSR_LBR_TOS", emsr_ok},
-	{MSR_LBR_NHM_FROM, "MSR_LBR_NHM_FROM", emsr_ok},
-	{MSR_LBR_NHM_TO, "MSR_LBR_NHM_TO", emsr_ok},
-	{MSR_LBR_CORE_FROM, "MSR_LBR_CORE_FROM", emsr_ok},
-	{MSR_LBR_CORE_TO, "MSR_LBR_CORE_TO", emsr_ok},
-
-	// grumble. 
-	{MSR_OFFCORE_RSP_0, "MSR_OFFCORE_RSP_0", emsr_ok},
-	{MSR_OFFCORE_RSP_1, "MSR_OFFCORE_RSP_1", emsr_ok},
-	// louder.
-	{MSR_PEBS_LD_LAT_THRESHOLD, "MSR_PEBS_LD_LAT_THRESHOLD", emsr_ok},
-	// aaaaaahhhhhhhhhhhhhhhhhhhhh
-	{MSR_ARCH_PERFMON_EVENTSEL0, "MSR_ARCH_PERFMON_EVENTSEL0", emsr_ok},
-	{MSR_ARCH_PERFMON_EVENTSEL1, "MSR_ARCH_PERFMON_EVENTSEL0", emsr_ok},
-	{MSR_IA32_PERF_CAPABILITIES, "MSR_IA32_PERF_CAPABILITIES", emsr_ok},
-	// unsafe.
-	{MSR_IA32_APICBASE, "MSR_IA32_APICBASE", emsr_fakewrite},
-
-	// mostly harmless.
-	{MSR_TSC_AUX, "MSR_TSC_AUX", emsr_fakewrite},
 	{MSR_RAPL_POWER_UNIT, "MSR_RAPL_POWER_UNIT", emsr_readzero},
 };
 
