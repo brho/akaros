@@ -71,7 +71,6 @@ static command_t commands[] = {
 	{ "px", "Toggle printx", mon_px},
 	{ "kpfret", "Attempt to idle after a kernel fault", mon_kpfret},
 	{ "ks", "Kernel scheduler hacks", mon_ks},
-	{ "gfp", "Get free pages", mon_gfp },
 	{ "coreinfo", "Print diagnostics for a core", mon_coreinfo},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
@@ -1239,26 +1238,6 @@ usage:
 		printk("Bad option %s\n", argv[1]);
 		goto usage;
 	}
-	return 0;
-}
-
-int mon_gfp(int argc, char **argv, struct hw_trapframe *hw_tf)
-{
-	size_t naddrpages = max_paddr / PGSIZE;
-	spin_lock_irqsave(&page_list_lock);
-	printk("%9s %9s %9s\n", "start", "end", "size");
-	for (int i = 0; i < naddrpages; i++) {
-		int j;
-		for (j = i; j < naddrpages; j++) {
-			if (!page_is_free(j))
-				break;
-		}
-		if (j > i) {
-			printk("%9d %9d %9d\n", i, j, j - i);
-			i = j;
-		}
-	}
-	spin_unlock_irqsave(&page_list_lock);
 	return 0;
 }
 

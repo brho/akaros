@@ -41,5 +41,4 @@ int mon_db(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_px(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_kpfret(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_ks(int argc, char **argv, struct hw_trapframe *hw_tf);
-int mon_gfp(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_coreinfo(int argc, char **argv, struct hw_trapframe *hw_tf);
