@@ -55,13 +55,6 @@ int map_upage_at_addr(struct proc *p, physaddr_t paddr, uintptr_t addr, int ptep
 		return -1;
 	}
 
-	/* Ensure kernel has not put such special pages into free pool */
-	if (page_is_free(paddr >> PAGE_SHIFT)) {
-		printk("[akaros]: map_upage_at_addr(): FreePA=0x%llx\n",
-		    paddr);
-		return -1;
-	}
-
 	pp = pa2page(paddr);
 
 	/* __vmr_free_pgs() refcnt's pagemap pages differently */
