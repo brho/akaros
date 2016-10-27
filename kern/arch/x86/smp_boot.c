@@ -184,10 +184,12 @@ void smp_boot(void)
 
 	/* cleans up the trampoline page, and any other low boot mem mappings */
 	x86_cleanup_bootmem();
-	/* trampoline_pg had a refcount of 2 earlier, so we need to dec once more to free it
-	 * but only if all cores are in (or we reset / reinit those that failed) */
+	/* trampoline_pg had a refcount of 2 earlier, so we need to dec once more to
+	 * free it but only if all cores are in (or we reset / reinit those that
+	 * failed) */
 	if (x86_num_cores_booted == num_cores) {
-		page_decref(pa2page(trampoline_pg));
+		/* TODO: if we ever alloc the trampoline_pg or something, we can free it
+		 * here. */
 	} else {
 		warn("ACPI/MP found %d cores, smp_boot initialized %d, using %d\n",
 		     num_cores, x86_num_cores_booted, x86_num_cores_booted);
