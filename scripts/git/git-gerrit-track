@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Grab the latest patch set from gerrit
+# Change the following to match your remote name for gerrit.
+GERRIT_REMOTE=gerrit
+GERRIT_URL="https://akaros-review.googlesource.com/#/c/"
+
+if [ "$#" -ne 2 ]
+then
+	echo "USAGE: git gerrit-track number branch-name"
+	exit -1
+elif ! [[ $1 =~ ^[0-9]+$ ]]
+then
+	echo "Gerrit change number is not a number: $1"
+	exit -1
+fi
+
+BRANCHES=`git ls-remote --exit-code $GERRIT_REMOTE`
+
+if [ "$?" -ne 0 ]
+then
+	echo "Error occurred during ls-remote. Please make sure that your remote for gerrit exists, and that GERRIT_REMOTE in this script is pointing to the correct remote."
+	exit -1
+fi
+
+VERSION=`echo "$BRANCHES" | grep "refs/changes/.*/$1/[0-9]\+" | cut -f 5 -d '/' | sort -n | tail -1`
+BRANCH=`echo "$BRANCHES" | grep "refs/changes/.*/$1/$VERSION" | cut -f 2`
+echo "Gerrit remote branch is: $BRANCH"
+echo "The review can be found at: $GERRIT_URL$1/"
+git fetch gerrit $BRANCH
+git branch -f $2 FETCH_HEAD
+echo "The local branch is now at $2"
+
