@@ -1,7 +1,9 @@
 /* Copyright (c) 2009 The Regents of the University  of California.
+ * Copyright (c) 2016 Google Inc
  * See the COPYRIGHT files at the top of this source tree for full
  * license information.
  *
+ * Barret Rhoden <brho@cs.berkeley.edu>
  * Kevin Klues <klueska@cs.berkeley.edu>
  */
 
@@ -11,25 +13,21 @@
 #include <kmalloc.h>
 #include <multiboot.h>
 
-/*
- * Initialize the memory free lists.
- * After this point, ONLY use the functions below
- * to allocate and deallocate physical memory via the
- * page_free_lists.
- */
-void page_alloc_init(struct multiboot_info *mbi)
+void base_arena_init(struct multiboot_info *mbi)
 {
-	init_once_racy(return);
+	void *base_pg;
+	uintptr_t first_free_page, first_invalid_page;
 
-	uintptr_t first_free_page = ROUNDUP(boot_freemem, PGSIZE);
-	uintptr_t first_invalid_page = LA2PPN(boot_freelimit);
-	assert(first_invalid_page == max_nr_pages);
+	/* Need to do the boot-allocs before our last look at the top of
+	 * boot_freemem. */
+	base_pg = boot_alloc(PGSIZE, PGSHIFT);
 
-	// append other pages to the free lists
-	for (uintptr_t page = first_free_page; page < first_invalid_page; page++)
-	{
-		BSD_LIST_INSERT_HEAD(&page_free_list, &pages[page], pg_link);
-		&pages[page]->pg_is_free = TRUE;
-	}
-	nr_free_pages = first_invalid_page - first_free_page;
+	first_free_page = ROUNDUP(boot_freemem, PGSIZE);
+	first_invalid_page = ROUNDUP(boot_freelimit, PGSIZE);
+	assert(first_invalid_page == max_nr_pages * PGSIZE);
+
+	base_arena = arena_builder(base_pg, "base", PGSIZE, NULL, NULL, NULL,
+	                           0);
+	arena_add(base_arena, KADDR(first_free_page),
+	          first_invalid_page - first_free_page, MEM_WAIT);
 }

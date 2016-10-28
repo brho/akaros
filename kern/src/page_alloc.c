@@ -1,64 +1,24 @@
-/* Copyright (c) 2009, 2010 The Regents of the University  of California.
- * See the COPYRIGHT files at the top of this source tree for full
- * license information.
+/* Copyright (c) 2009, 2010 The Regents of the University of California.
+ * Copyright (c) 2016 Google Inc
+ * See LICENSE for details.
  *
- * Kevin Klues <klueska@cs.berkeley.edu>
- * Barret Rhoden <brho@cs.berkeley.edu> */
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * Kevin Klues <klueska@cs.berkeley.edu> */
 
-#include <ros/errno.h>
-#include <sys/queue.h>
-#include <bitmask.h>
 #include <page_alloc.h>
 #include <pmap.h>
-#include <err.h>
-#include <string.h>
 #include <kmalloc.h>
-#include <blockdev.h>
-
-spinlock_t page_list_lock = SPINLOCK_INITIALIZER_IRQSAVE;
-
-page_list_t page_free_list = BSD_LIST_HEAD_INITIALIZER(page_free_list);
-
-static void __page_decref(page_t *page);
-static error_t __page_alloc_specific(page_t **page, size_t ppn);
-
-/* Initializes a page.  We can optimize this a bit since 0 usually works to init
- * most structures, but we'll hold off on that til it is a problem. */
-static void __page_init(struct page *page)
-{
-	memset(page, 0, sizeof(page_t));
-	sem_init(&page->pg_sem, 0);
-	page->pg_is_free = FALSE;
-}
-
-static void __real_page_alloc(struct page *page)
-{
-	BSD_LIST_REMOVE(page, pg_link);
-	__page_init(page);
-}
-
-/* Internal version of page_alloc_specific.  Grab the lock first. */
-static error_t __page_alloc_specific(page_t** page, size_t ppn)
-{
-	page_t* sp_page = ppn2page(ppn);
-	if (!page_is_free(ppn))
-		return -ENOMEM;
-	*page = sp_page;
-	__real_page_alloc(sp_page);
-	return 0;
-}
+#include <arena.h>
 
 /* Helper, allocates a free page. */
 static struct page *get_a_free_page(void)
 {
-	struct page *ret;
+	void *addr;
 
-	spin_lock_irqsave(&page_list_lock);
-	ret = BSD_LIST_FIRST(&page_free_list);
-	if (ret)
-		__real_page_alloc(ret);
-	spin_unlock_irqsave(&page_list_lock);
-	return ret;
+	addr = kpages_alloc(PGSIZE, MEM_ATOMIC);
+	if (!addr)
+		return NULL;
+	return kva2page(addr);
 }
 
 /**
@@ -113,66 +73,33 @@ void *kpage_zalloc_addr(void)
 	return retval;
 }
 
-/**
- * @brief Allocated 2^order contiguous physical pages.  Will increment the
- * reference count for the pages.
- *
- * @param[in] order order of the allocation
- * @param[in] flags memory allocation flags
- *
- * @return The KVA of the first page, NULL otherwise.
- */
-void *get_cont_pages(size_t order, int flags)
+/* Helper function for allocating from the kpages_arena.  This may be useful
+ * later since we might send the caller to a different NUMA domain. */
+void *kpages_alloc(size_t size, int flags)
 {
-	size_t npages = 1 << order;
-
-	size_t naddrpages = max_paddr / PGSIZE;
-	// Find 'npages' free consecutive pages
-	int first = -1;
-	spin_lock_irqsave(&page_list_lock);
-	for(int i=(naddrpages-1); i>=(npages-1); i--) {
-		int j;
-		for(j=i; j>=(i-(npages-1)); j--) {
-			if( !page_is_free(j) ) {
-				/* i will be j - 1 next time around the outer loop */
-				i = j;
-				break;
-			}
-		}
-		/* careful: if we change the allocator and allow npages = 0, then this
-		 * will trip when we set i = j.  then we'll be handing out in-use
-		 * memory. */
-		if( j == (i-(npages-1)-1)) {
-			first = j+1;
-			break;
-		}
-	}
-	//If we couldn't find them, return NULL
-	if( first == -1 ) {
-		spin_unlock_irqsave(&page_list_lock);
-		if (flags & MEM_ERROR)
-			error(ENOMEM, ERROR_FIXME);
-		return NULL;
-	}
-
-	for(int i=0; i<npages; i++) {
-		page_t* page;
-		__page_alloc_specific(&page, first+i);
-	}
-	spin_unlock_irqsave(&page_list_lock);
-	return ppn2kva(first);
+	return arena_alloc(kpages_arena, size, flags);
 }
 
-/**
- * @brief Allocated 2^order contiguous physical pages.  Will increment the
- * reference count for the pages. Get them from NUMA node node.
- *
- * @param[in] node which node to allocate from. Unimplemented.
- * @param[in] order order of the allocation
- * @param[in] flags memory allocation flags
- *
- * @return The KVA of the first page, NULL otherwise.
- */
+void *kpages_zalloc(size_t size, int flags)
+{
+	void *ret = arena_alloc(kpages_arena, size, flags);
+
+	if (!ret)
+		return NULL;
+	memset(ret, 0, size);
+	return ret;
+}
+
+void kpages_free(void *addr, size_t size)
+{
+	arena_free(kpages_arena, addr, size);
+}
+
+void *get_cont_pages(size_t order, int flags)
+{
+	return kpages_alloc(PGSIZE << order, flags);
+}
+
 void *get_cont_pages_node(int node, size_t order, int flags)
 {
 	return get_cont_pages(order, flags);
@@ -180,40 +107,13 @@ void *get_cont_pages_node(int node, size_t order, int flags)
 
 void free_cont_pages(void *buf, size_t order)
 {
-	size_t npages = 1 << order;
-	spin_lock_irqsave(&page_list_lock);
-	for (size_t i = kva2ppn(buf); i < kva2ppn(buf) + npages; i++) {
-		page_t* page = ppn2page(i);
-		__page_decref(ppn2page(i));
-		assert(page_is_free(i));
-	}
-	spin_unlock_irqsave(&page_list_lock);
-	return;
-}
-
-/* Check if a page with the given physical page # is free. */
-int page_is_free(size_t ppn)
-{
-	return ppn2page(ppn)->pg_is_free;
+	kpages_free(buf, PGSIZE << order);
 }
 
 /* Frees the page */
 void page_decref(page_t *page)
 {
-	spin_lock_irqsave(&page_list_lock);
-	__page_decref(page);
-	spin_unlock_irqsave(&page_list_lock);
-}
-
-/* Frees the page.  Don't call this without holding the lock already. */
-static void __page_decref(page_t *page)
-{
-	if (atomic_read(&page->pg_flags) & PG_BUFFER)
-		free_bhs(page);
-	/* Give our page back to the free list.  The protections for this are that
-	 * the list lock is grabbed by page_decref. */
-	BSD_LIST_INSERT_HEAD(&page_free_list, page, pg_link);
-	page->pg_is_free = TRUE;
+	kpages_free(page2kva(page), PGSIZE);
 }
 
 /* Attempts to get a lock on the page for IO operations.  If it is already
@@ -233,36 +133,4 @@ void unlock_page(struct page *page)
 {
 	atomic_and(&page->pg_flags, ~PG_LOCKED);
 	sem_up(&page->pg_sem);
-}
-
-void print_pageinfo(struct page *page)
-{
-	int i;
-	if (!page) {
-		printk("Null page\n");
-		return;
-	}
-	printk("Page %d (%p), Flags: 0x%08x Is Free: %d\n", page2ppn(page),
-	       page2kva(page), atomic_read(&page->pg_flags),
-	       page->pg_is_free);
-	if (page->pg_mapping) {
-		printk("\tMapped into object %p at index %d\n",
-		       page->pg_mapping->pm_host, page->pg_index);
-	}
-	if (atomic_read(&page->pg_flags) & PG_BUFFER) {
-		struct buffer_head *bh = (struct buffer_head*)page->pg_private;
-		i = 0;
-		while (bh) {
-			printk("\tBH %d: buffer: %p, sector: %d, nr_sector: %d\n", i,
-			       bh->bh_buffer, bh->bh_sector, bh->bh_nr_sector);
-			i++;
-			bh = bh->bh_next;
-		}
-		printk("\tPage is %sup to date\n",
-		       atomic_read(&page->pg_flags) & PG_UPTODATE ? "" : "not ");
-	}
-	printk("\tPage is %slocked\n",
-	       atomic_read(&page->pg_flags) & PG_LOCKED ? "" : "un");
-	printk("\tPage is %s\n",
-	       atomic_read(&page->pg_flags) & PG_DIRTY ? "dirty" : "clean");
 }

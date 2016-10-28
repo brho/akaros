@@ -21,11 +21,11 @@
 #include <stdio.h>
 #include <mm.h>
 #include <multiboot.h>
+#include <arena.h>
 
 physaddr_t max_pmem = 0;	/* Total amount of physical memory (bytes) */
 physaddr_t max_paddr = 0;	/* Maximum addressable physical address */
 size_t max_nr_pages = 0;	/* Number of addressable physical memory pages */
-size_t nr_free_pages = 0;	/* TODO: actually track this, after init */
 struct page *pages = 0;
 struct multiboot_info *multiboot_kaddr = 0;
 uintptr_t boot_freemem = 0;
@@ -45,10 +45,18 @@ static void adjust_max_pmem(struct multiboot_mmap_entry *entry, void *data)
 	max_pmem = MAX(max_pmem, (size_t)(entry->addr + entry->len));
 }
 
+static void kpages_arena_init(void)
+{
+	void *kpages_pg;
+
+	kpages_pg = arena_alloc(base_arena, PGSIZE, MEM_WAIT);
+	kpages_arena = arena_builder(kpages_pg, "kpages", PGSIZE, arena_alloc,
+	                             arena_free, base_arena, 8 * PGSIZE);
+}
+
 /**
  * @brief Initializes physical memory.  Determines the pmem layout, sets up the
- * array of physical pages and memory free list, and turns on virtual
- * memory/page tables.
+ * base and kpages arenas, and turns on virtual memory/page tables.
  *
  * Regarding max_pmem vs max_paddr and max_nr_pages: max_pmem is the largest
  * physical address that is in a FREE region.  It includes RESERVED regions that
@@ -72,9 +80,13 @@ void pmem_init(struct multiboot_info *mbi)
 	printk("Max physical RAM (appx, bytes): %lu\n", max_pmem);
 	printk("Max addressable physical RAM (appx): %lu\n", max_paddr);
 	printk("Highest page number (including reserved): %lu\n", max_nr_pages);
+	/* We should init the page structs, but zeroing happens to work, since the
+	 * sems are not irqsave. */
 	pages = (struct page*)boot_zalloc(max_nr_pages * sizeof(struct page),
 	                                  PGSIZE);
-	page_alloc_init(mbi);
+	base_arena_init(mbi);
+	kpages_arena_init();
+	printk("Base arena total mem: %lu\n", arena_amt_total(base_arena));
 	vm_init();
 
 	static_assert(PROCINFO_NUM_PAGES*PGSIZE <= PTSIZE);
@@ -326,26 +338,4 @@ bool regions_collide_unsafe(uintptr_t start1, uintptr_t end1,
 			return FALSE;
 		return TRUE;
 	}
-}
-
-void print_free_mem(void)
-{
-	static uint8_t *bm = 0;
-	/* racy, but this is debugging code */
-	if (!bm)
-		bm = kzmalloc((max_nr_pages + 1) / 8, 0);
-
-	long x = 0;
-	for (int i = 0; i < max_nr_pages; i++) {
-		if (page_is_free(i)) {
-			x++;
-			SET_BITMASK_BIT(bm, i);
-		} else {
-			if (GET_BITMASK_BIT(bm, i)) {
-				print_pageinfo(ppn2page(i));
-				CLR_BITMASK_BIT(bm, i);
-			}
-		}
-	}
-	printk("Nr Free pages: %lld\n", x);
 }

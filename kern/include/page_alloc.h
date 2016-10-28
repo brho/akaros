@@ -56,12 +56,18 @@ extern spinlock_t page_list_lock;
 extern page_list_t page_free_list;
 
 /*************** Functional Interface *******************/
-void page_alloc_init(struct multiboot_info *mbi);
+void base_arena_init(struct multiboot_info *mbi);
 
 error_t upage_alloc(struct proc *p, page_t **page, bool zero);
 error_t kpage_alloc(page_t **page);
 void *kpage_alloc_addr(void);
 void *kpage_zalloc_addr(void);
+
+/* Direct allocation from the kpages arena (instead of kmalloc).  These will
+ * give you PGSIZE quantum. */
+void *kpages_alloc(size_t size, int flags);
+void *kpages_zalloc(size_t size, int flags);
+void kpages_free(void *addr, size_t size);
 
 void *get_cont_pages(size_t order, int flags);
 void *get_cont_pages_node(int node, size_t order, int flags);
