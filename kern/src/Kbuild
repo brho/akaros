@@ -21,6 +21,7 @@ clean-files += build_info.c build_info.cid
 
 obj-y						+= alarm.o
 obj-y						+= apipe.o
+obj-y						+= arena.o
 obj-y						+= arsc.o
 obj-y						+= atomic.o
 obj-y						+= bitmap.o
