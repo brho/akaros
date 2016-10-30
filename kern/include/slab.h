@@ -96,6 +96,11 @@ void kmem_cache_free(struct kmem_cache *cp, void *buf);
 /* Back end: internal functions */
 void kmem_cache_init(void);
 void kmem_cache_reap(struct kmem_cache *cp);
+/* Low-level interface for initializing a cache. */
+void __kmem_cache_create(struct kmem_cache *kc, const char *name,
+                         size_t obj_size, int align, int flags,
+                         void (*ctor)(void *, size_t),
+                         void (*dtor)(void *, size_t));
 
 /* Debug */
 void print_kmem_cache(struct kmem_cache *kc);

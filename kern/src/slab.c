@@ -25,13 +25,14 @@ spinlock_t kmem_caches_lock;
 static bool kmem_cache_grow(struct kmem_cache *cp);
 
 /* Cache of the kmem_cache objects, needed for bootstrapping */
-struct kmem_cache kmem_cache_cache;
-struct kmem_cache *kmem_slab_cache, *kmem_bufctl_cache;
+struct kmem_cache kmem_cache_cache[1];
+struct kmem_cache kmem_slab_cache[1];
+struct kmem_cache kmem_bufctl_cache[1];
 
-static void __kmem_cache_create(struct kmem_cache *kc, const char *name,
-                                size_t obj_size, int align, int flags,
-                                void (*ctor)(void *, size_t),
-                                void (*dtor)(void *, size_t))
+void __kmem_cache_create(struct kmem_cache *kc, const char *name,
+                         size_t obj_size, int align, int flags,
+                         void (*ctor)(void *, size_t),
+                         void (*dtor)(void *, size_t))
 {
 	assert(kc);
 	assert(align);
@@ -68,17 +69,15 @@ void kmem_cache_init(void)
 {
 	spinlock_init_irqsave(&kmem_caches_lock);
 	SLIST_INIT(&kmem_caches);
-	/* We need to call the __ version directly to bootstrap the global
-	 * kmem_cache_cache. */
-	__kmem_cache_create(&kmem_cache_cache, "kmem_cache",
+	__kmem_cache_create(kmem_cache_cache, "kmem_cache",
 	                    sizeof(struct kmem_cache),
 	                    __alignof__(struct kmem_cache), 0, NULL, NULL);
-	/* Build the slab and bufctl caches */
-	kmem_slab_cache = kmem_cache_create("kmem_slab", sizeof(struct kmem_slab),
-	                       __alignof__(struct kmem_slab), 0, NULL, NULL);
-	kmem_bufctl_cache = kmem_cache_create("kmem_bufctl",
-	                         sizeof(struct kmem_bufctl),
-	                         __alignof__(struct kmem_bufctl), 0, NULL, NULL);
+	__kmem_cache_create(kmem_slab_cache, "kmem_slab",
+	                    sizeof(struct kmem_slab),
+	                    __alignof__(struct kmem_slab), 0, NULL, NULL);
+	__kmem_cache_create(kmem_bufctl_cache, "kmem_bufctl",
+	                    sizeof(struct kmem_bufctl),
+	                    __alignof__(struct kmem_bufctl), 0, NULL, NULL);
 }
 
 /* Cache management */
@@ -87,7 +86,7 @@ struct kmem_cache *kmem_cache_create(const char *name, size_t obj_size,
                                      void (*ctor)(void *, size_t),
                                      void (*dtor)(void *, size_t))
 {
-	struct kmem_cache *kc = kmem_cache_alloc(&kmem_cache_cache, 0);
+	struct kmem_cache *kc = kmem_cache_alloc(kmem_cache_cache, 0);
 	__kmem_cache_create(kc, name, obj_size, align, flags, ctor, dtor);
 	return kc;
 }
@@ -151,7 +150,7 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 	spin_lock_irqsave(&kmem_caches_lock);
 	SLIST_REMOVE(&kmem_caches, cp, kmem_cache, link);
 	spin_unlock_irqsave(&kmem_caches_lock);
-	kmem_cache_free(&kmem_cache_cache, cp);
+	kmem_cache_free(kmem_cache_cache, cp);
 	spin_unlock_irqsave(&cp->cache_lock);
 }
 
