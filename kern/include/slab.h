@@ -42,11 +42,11 @@ struct kmem_slab;
 
 /* Control block for buffers for large-object slabs */
 struct kmem_bufctl {
-	TAILQ_ENTRY(kmem_bufctl) link;
+	BSD_LIST_ENTRY(kmem_bufctl) link;
 	void *buf_addr;
 	struct kmem_slab *my_slab;
 };
-TAILQ_HEAD(kmem_bufctl_list, kmem_bufctl);
+BSD_LIST_HEAD(kmem_bufctl_list, kmem_bufctl);
 
 /* Slabs contain the objects.  Can be either full, partial, or empty,
  * determined by checking the number of objects busy vs total.  For large

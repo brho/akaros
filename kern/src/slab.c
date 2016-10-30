@@ -105,7 +105,7 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 		}
 		page_decref(kva2page((void*)ROUNDDOWN((uintptr_t)a_slab, PGSIZE)));
 	} else {
-		struct kmem_bufctl *i;
+		struct kmem_bufctl *i, *temp;
 		void *page_start = (void*)-1;
 		/* Figure out how much memory we asked for earlier.  We needed at least
 		 * min_pgs.  We asked for the next highest order (power of 2) number of
@@ -113,12 +113,14 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 		size_t min_pgs = ROUNDUP(NUM_BUF_PER_SLAB * a_slab->obj_size, PGSIZE) /
 		                         PGSIZE;
 		size_t order_pg_alloc = LOG2_UP(min_pgs);
-		TAILQ_FOREACH(i, &a_slab->bufctl_freelist, link) {
+		BSD_LIST_FOREACH_SAFE(i, &a_slab->bufctl_freelist, link, temp) {
 			// Track the lowest buffer address, which is the start of the buffer
 			page_start = MIN(page_start, i->buf_addr);
 			/* Deconstruct all the objects, if necessary */
 			if (cp->dtor) // TODO: (BUF)
 				cp->dtor(i->buf_addr, cp->obj_size);
+			/* This is a little dangerous, but we can skip removing, since we
+			 * init the freelist when we reuse the slab. */
 			kmem_cache_free(kmem_bufctl_cache, i);
 		}
 		// free the pages for the slab's buffer
@@ -185,8 +187,9 @@ void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
 		                                        cp->obj_size);
 	} else {
 		// rip the first bufctl out of the partial slab's buf list
-		struct kmem_bufctl *a_bufctl = TAILQ_FIRST(&a_slab->bufctl_freelist);
-		TAILQ_REMOVE(&a_slab->bufctl_freelist, a_bufctl, link);
+		struct kmem_bufctl *a_bufctl = BSD_LIST_FIRST(&a_slab->bufctl_freelist);
+
+		BSD_LIST_REMOVE(a_bufctl, link);
 		retval = a_bufctl->buf_addr;
 	}
 	a_slab->num_busy_obj++;
@@ -225,7 +228,7 @@ void kmem_cache_free(struct kmem_cache *cp, void *buf)
 		// TODO: (BUF) change the interface to not take an offset
 		a_bufctl = buf2bufctl(buf, cp->obj_size);
 		a_slab = a_bufctl->my_slab;
-		TAILQ_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl, link);
+		BSD_LIST_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl, link);
 	}
 	a_slab->num_busy_obj--;
 	cp->nr_cur_alloc--;
@@ -301,14 +304,14 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 		/* The number of objects is based on the rounded up amt requested. */
 		a_slab->num_total_obj = ((1 << order_pg_alloc) * PGSIZE) /
 		                        a_slab->obj_size;
-		TAILQ_INIT(&a_slab->bufctl_freelist);
+		BSD_LIST_INIT(&a_slab->bufctl_freelist);
 		/* for each buffer, set up a bufctl and point to the buffer */
 		for (int i = 0; i < a_slab->num_total_obj; i++) {
 			// Initialize the object, if necessary
 			if (cp->ctor)
 				cp->ctor(buf, cp->obj_size);
 			a_bufctl = kmem_cache_alloc(kmem_bufctl_cache, 0);
-			TAILQ_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl, link);
+			BSD_LIST_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl, link);
 			a_bufctl->buf_addr = buf;
 			a_bufctl->my_slab = a_slab;
 			// TODO: (BUF) write the bufctl reference at the bottom of the buffer.
