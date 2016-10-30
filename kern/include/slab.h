@@ -32,6 +32,7 @@
 #include <arch/mmu.h>
 #include <sys/queue.h>
 #include <atomic.h>
+#include <hash_helper.h>
 
 /* Back in the day, their cutoff for "large objects" was 512B, based on
  * measurements and on not wanting more than 1/8 of internal fragmentation. */
@@ -78,6 +79,9 @@ struct kmem_cache {
 	void (*ctor)(void *, size_t);
 	void (*dtor)(void *, size_t);
 	unsigned long nr_cur_alloc;
+	struct hash_helper hh;
+	struct kmem_bufctl_list *alloc_hash;
+	struct kmem_bufctl_list static_hash[HASH_INIT_SZ];
 };
 
 /* List of all kmem_caches, sorted in order of size */

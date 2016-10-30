@@ -1,14 +1,10 @@
-/*
- * Copyright (c) 2009 The Regents of the University of California
+/* Copyright (c) 2009 The Regents of the University of California
+ * Copyright (c) 2016 Google Inc
  * Barret Rhoden <brho@cs.berkeley.edu>
  * Kevin Klues <klueska@cs.berkeley.edu>
  * See LICENSE for details.
  *
  * Slab allocator, based on the SunOS 5.4 allocator paper.
- *
- * Note that we don't have a hash table for buf to bufctl for the large buffer
- * objects, so we use the same style for small objects: store the pointer to the
- * controlling bufctl at the top of the slab object.  Fix this with TODO (BUF).
  */
 
 #include <slab.h>
@@ -16,6 +12,8 @@
 #include <assert.h>
 #include <pmap.h>
 #include <kmalloc.h>
+#include <hash.h>
+#include <arena.h>
 
 struct kmem_cache_list kmem_caches;
 spinlock_t kmem_caches_lock;
@@ -47,7 +45,10 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	kc->ctor = ctor;
 	kc->dtor = dtor;
 	kc->nr_cur_alloc = 0;
-
+	kc->alloc_hash = kc->static_hash;
+	hash_init_hh(&kc->hh);
+	for (int i = 0; i < kc->hh.nr_hash_lists; i++)
+		BSD_LIST_INIT(&kc->static_hash[i]);
 	/* put in cache list based on it's size */
 	struct kmem_cache *i, *prev = NULL;
 	spin_lock_irqsave(&kmem_caches_lock);
@@ -116,7 +117,7 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 			// Track the lowest buffer address, which is the start of the buffer
 			page_start = MIN(page_start, i->buf_addr);
 			/* Deconstruct all the objects, if necessary */
-			if (cp->dtor) // TODO: (BUF)
+			if (cp->dtor)
 				cp->dtor(i->buf_addr, cp->obj_size);
 			/* This is a little dangerous, but we can skip removing, since we
 			 * init the freelist when we reuse the slab. */
@@ -154,6 +155,71 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 	spin_unlock_irqsave(&cp->cache_lock);
 }
 
+static void __try_hash_resize(struct kmem_cache *cp)
+{
+	struct kmem_bufctl_list *new_tbl, *old_tbl;
+	struct kmem_bufctl *bc_i;
+	unsigned int new_tbl_nr_lists, old_tbl_nr_lists;
+	size_t new_tbl_sz, old_tbl_sz;
+	size_t hash_idx;
+
+	if (!hash_needs_more(&cp->hh))
+		return;
+	new_tbl_nr_lists = hash_next_nr_lists(&cp->hh);
+	new_tbl_sz = new_tbl_nr_lists * sizeof(struct kmem_bufctl_list);
+	/* TODO: we only need to pull from base if our arena is a base or we are
+	 * inside a kpages arena (keep in mind there could be more than one of
+	 * those, depending on how we do NUMA allocs).  This might help with
+	 * fragmentation.  To know this, we'll need the caller to pass us a flag. */
+	new_tbl = base_zalloc(NULL, new_tbl_sz, ARENA_INSTANTFIT | MEM_ATOMIC);
+	if (!new_tbl)
+		return;
+	old_tbl = cp->alloc_hash;
+	old_tbl_nr_lists = cp->hh.nr_hash_lists;
+	old_tbl_sz = old_tbl_nr_lists * sizeof(struct kmem_bufctl_list);
+	cp->alloc_hash = new_tbl;
+	hash_incr_nr_lists(&cp->hh);
+	for (int i = 0; i < old_tbl_nr_lists; i++) {
+		while ((bc_i = BSD_LIST_FIRST(&old_tbl[i]))) {
+			BSD_LIST_REMOVE(bc_i, link);
+			hash_idx = hash_ptr(bc_i->buf_addr, cp->hh.nr_hash_bits);
+			BSD_LIST_INSERT_HEAD(&cp->alloc_hash[hash_idx], bc_i, link);
+		}
+	}
+	hash_reset_load_limit(&cp->hh);
+	if (old_tbl != cp->static_hash)
+		base_free(NULL, old_tbl, old_tbl_sz);
+}
+
+/* Helper, tracks the allocation of @bc in the hash table */
+static void __track_alloc(struct kmem_cache *cp, struct kmem_bufctl *bc)
+{
+	size_t hash_idx;
+
+	hash_idx = hash_ptr(bc->buf_addr, cp->hh.nr_hash_bits);
+	BSD_LIST_INSERT_HEAD(&cp->alloc_hash[hash_idx], bc, link);
+	cp->hh.nr_items++;
+	__try_hash_resize(cp);
+}
+
+/* Helper, looks up and removes the bufctl corresponding to buf. */
+static struct kmem_bufctl *__yank_bufctl(struct kmem_cache *cp, void *buf)
+{
+	struct kmem_bufctl *bc_i;
+	size_t hash_idx;
+
+	hash_idx = hash_ptr(buf, cp->hh.nr_hash_bits);
+	BSD_LIST_FOREACH(bc_i, &cp->alloc_hash[hash_idx], link) {
+		if (bc_i->buf_addr == buf) {
+			BSD_LIST_REMOVE(bc_i, link);
+			break;
+		}
+	}
+	if (!bc_i)
+		panic("Could not find buf %p in cache %s!", buf, cp->name);
+	return bc_i;
+}
+
 /* Front end: clients of caches use these */
 void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
 {
@@ -189,6 +255,7 @@ void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
 		struct kmem_bufctl *a_bufctl = BSD_LIST_FIRST(&a_slab->bufctl_freelist);
 
 		BSD_LIST_REMOVE(a_bufctl, link);
+		__track_alloc(cp, a_bufctl);
 		retval = a_bufctl->buf_addr;
 	}
 	a_slab->num_busy_obj++;
@@ -200,12 +267,6 @@ void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
 	cp->nr_cur_alloc++;
 	spin_unlock_irqsave(&cp->cache_lock);
 	return retval;
-}
-
-static inline struct kmem_bufctl *buf2bufctl(void *buf, size_t offset)
-{
-	// TODO: hash table for back reference (BUF)
-	return *((struct kmem_bufctl**)(buf + offset));
 }
 
 void kmem_cache_free(struct kmem_cache *cp, void *buf)
@@ -224,8 +285,7 @@ void kmem_cache_free(struct kmem_cache *cp, void *buf)
 		a_slab->free_small_obj = buf;
 	} else {
 		/* Give the bufctl back to the parent slab */
-		// TODO: (BUF) change the interface to not take an offset
-		a_bufctl = buf2bufctl(buf, cp->obj_size);
+		a_bufctl = __yank_bufctl(cp, buf);
 		a_slab = a_bufctl->my_slab;
 		BSD_LIST_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl, link);
 	}
@@ -286,8 +346,7 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 		a_slab = kmem_cache_alloc(kmem_slab_cache, 0);
 		if (!a_slab)
 			return FALSE;
-		// TODO: hash table for back reference (BUF)
-		a_slab->obj_size = ROUNDUP(cp->obj_size + sizeof(uintptr_t), cp->align);
+		a_slab->obj_size = ROUNDUP(cp->obj_size, cp->align);
 		/* Figure out how much memory we want.  We need at least min_pgs.  We'll
 		 * ask for the next highest order (power of 2) number of pages */
 		size_t min_pgs = ROUNDUP(NUM_BUF_PER_SLAB * a_slab->obj_size, PGSIZE) /
@@ -313,8 +372,6 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 			BSD_LIST_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl, link);
 			a_bufctl->buf_addr = buf;
 			a_bufctl->my_slab = a_slab;
-			// TODO: (BUF) write the bufctl reference at the bottom of the buffer.
-			*(struct kmem_bufctl**)(buf + cp->obj_size) = a_bufctl;
 			buf += a_slab->obj_size;
 		}
 	}
