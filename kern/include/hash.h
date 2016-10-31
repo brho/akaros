@@ -1,7 +1,11 @@
-#ifndef _LINUX_HASH_H
-#define _LINUX_HASH_H
 /* Fast hashing routine for ints,  longs and pointers.
    (C) 2002 Nadia Yvette Chambers, IBM */
+
+/* This file came from Linux, 4.6.
+ * This source code is licensed under the GNU General Public License
+ * Version 2. See the file COPYING for more details. */
+
+#pragma once
 
 /*
  * Knuth recommends primes in approximately golden ratio to the maximum
@@ -14,8 +18,8 @@
  * machines where multiplications are slow.
  */
 
-#include <asm/types.h>
-#include <linux/compiler.h>
+#include <arch/types.h>
+#include <compiler.h>
 
 /* 2^31 + 2^29 - 2^25 + 2^22 - 2^19 - 2^16 + 1 */
 #define GOLDEN_RATIO_PRIME_32 0x9e370001UL
@@ -48,15 +52,15 @@
 #define GOLDEN_RATIO_32 0x61C88647
 #define GOLDEN_RATIO_64 0x61C8864680B583EBull
 
-static __always_inline u64 hash_64(u64 val, unsigned int bits)
+static __always_inline uint64_t hash_64(uint64_t val, unsigned int bits)
 {
-	u64 hash = val;
+	uint64_t hash = val;
 
 #if BITS_PER_LONG == 64
 	hash = hash * GOLDEN_RATIO_64;
 #else
 	/*  Sigh, gcc can't optimise this alone like it does for 32 bits. */
-	u64 n = hash;
+	uint64_t n = hash;
 	n <<= 18;
 	hash -= n;
 	n <<= 33;
@@ -75,10 +79,10 @@ static __always_inline u64 hash_64(u64 val, unsigned int bits)
 	return hash >> (64 - bits);
 }
 
-static inline u32 hash_32(u32 val, unsigned int bits)
+static inline uint32_t hash_32(uint32_t val, unsigned int bits)
 {
 	/* On some cpus multiply is faster, on others gcc will do shifts */
-	u32 hash = val * GOLDEN_RATIO_PRIME_32;
+	uint32_t hash = val * GOLDEN_RATIO_PRIME_32;
 
 	/* High bits are more random, so use them. */
 	return hash >> (32 - bits);
@@ -89,14 +93,12 @@ static inline unsigned long hash_ptr(const void *ptr, unsigned int bits)
 	return hash_long((unsigned long)ptr, bits);
 }
 
-static inline u32 hash32_ptr(const void *ptr)
+static inline uint32_t hash32_ptr(const void *ptr)
 {
 	unsigned long val = (unsigned long)ptr;
 
 #if BITS_PER_LONG == 64
 	val ^= (val >> 32);
 #endif
-	return (u32)val;
+	return (uint32_t)val;
 }
-
-#endif /* _LINUX_HASH_H */
