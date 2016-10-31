@@ -735,9 +735,9 @@ xcc-upgrade: xcc
 	@$(MAKE) userclean
 	@$(MAKE) install-libs
 	@$(MAKE) testclean utestclean
-	@$(MAKE) tests utest
 	@$(call make_as_parent, apps-clean)
 	@$(call make_as_parent, apps-install)
+	@$(MAKE) tests utest
 	@$(MAKE) fill-kfs
 	@$(MAKE) akaros-kernel
 
