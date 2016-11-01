@@ -34,7 +34,8 @@ void kmalloc_init(void)
 	size_t ksize = KMALLOC_SMALLEST;
 	for (int i = 0; i < NUM_KMALLOC_CACHES; i++) {
 		kmalloc_caches[i] = kmem_cache_create("kmalloc_cache", ksize,
-		                                      KMALLOC_ALIGNMENT, 0, 0, 0);
+						      KMALLOC_ALIGNMENT, 0,
+						      NULL, 0, 0);
 		ksize <<= 1;
 	}
 }

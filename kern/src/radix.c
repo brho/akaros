@@ -19,8 +19,10 @@ static void __radix_remove_slot(struct radix_node *r_node, struct radix_node **s
 /* Initializes the radix tree system, mostly just builds the kcache */
 void radix_init(void)
 {
-	radix_kcache = kmem_cache_create("radix_nodes", sizeof(struct radix_node),
-	                                 __alignof__(struct radix_node), 0, 0, 0);
+	radix_kcache = kmem_cache_create("radix_nodes",
+					 sizeof(struct radix_node),
+					 __alignof__(struct radix_node), 0,
+					 NULL, 0, 0);
 }
 
 /* Initializes a tree dynamically */

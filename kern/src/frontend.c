@@ -35,7 +35,8 @@ struct kmem_cache* struct_file_cache;
 void file_init()
 {
 	struct_file_cache = kmem_cache_create("struct_file",
-	                                      sizeof(struct file), 8, 0, 0, 0);
+					      sizeof(struct file), 8, 0,
+					      NULL, 0, 0);
 }
 
 /* will zero anything in the page after the EOF */

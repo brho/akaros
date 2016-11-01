@@ -33,6 +33,7 @@
 #include <sys/queue.h>
 #include <atomic.h>
 #include <hash_helper.h>
+#include <arena.h>
 
 /* Back in the day, their cutoff for "large objects" was 512B, based on
  * measurements and on not wanting more than 1/8 of internal fragmentation. */
@@ -73,6 +74,7 @@ struct kmem_cache {
 	size_t obj_size;
 	int align;
 	int flags;
+	struct arena *source;
 	struct kmem_slab_list full_slab_list;
 	struct kmem_slab_list partial_slab_list;
 	struct kmem_slab_list empty_slab_list;
@@ -91,6 +93,7 @@ extern struct kmem_cache_list kmem_caches;
 /* Cache management */
 struct kmem_cache *kmem_cache_create(const char *name, size_t obj_size,
                                      int align, int flags,
+                                     struct arena *source,
                                      void (*ctor)(void *, size_t),
                                      void (*dtor)(void *, size_t));
 void kmem_cache_destroy(struct kmem_cache *cp);
@@ -103,6 +106,7 @@ void kmem_cache_reap(struct kmem_cache *cp);
 /* Low-level interface for initializing a cache. */
 void __kmem_cache_create(struct kmem_cache *kc, const char *name,
                          size_t obj_size, int align, int flags,
+                         struct arena *source,
                          void (*ctor)(void *, size_t),
                          void (*dtor)(void *, size_t));
 

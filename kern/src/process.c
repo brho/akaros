@@ -245,7 +245,9 @@ void proc_init(void)
 	/* Catch issues with the vcoremap and TAILQ_ENTRY sizes */
 	static_assert(sizeof(TAILQ_ENTRY(vcore)) == sizeof(void*) * 2);
 	proc_cache = kmem_cache_create("proc", sizeof(struct proc),
-	             MAX(ARCH_CL_SIZE, __alignof__(struct proc)), 0, 0, 0);
+				       MAX(ARCH_CL_SIZE,
+				       __alignof__(struct proc)), 0, NULL, 0,
+				       0);
 	/* Init PID mask and hash.  pid 0 is reserved. */
 	SET_BITMASK_BIT(pid_bmask, 0);
 	spinlock_init(&pid_hash_lock);

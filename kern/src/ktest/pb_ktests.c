@@ -574,7 +574,8 @@ static void test_single_cache(int iters, size_t size, int align, int flags,
 {
 	struct kmem_cache *test_cache;
 	void *objects[iters];
-	test_cache = kmem_cache_create("test_cache", size, align, flags, ctor, dtor);
+	test_cache = kmem_cache_create("test_cache", size, align, flags,
+				       NULL, ctor, dtor);
 	printk("Testing Kmem Cache:\n");
 	print_kmem_cache(test_cache);
 	for (int i = 0; i < iters; i++) {

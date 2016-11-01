@@ -47,8 +47,10 @@ struct kmem_cache *kfs_i_kcache;
 
 static void kfs_init(void)
 {
-	kfs_i_kcache = kmem_cache_create("kfs_ino_info", sizeof(struct kfs_i_info),
-	                                 __alignof__(struct kfs_i_info), 0, 0, 0);
+	kfs_i_kcache = kmem_cache_create("kfs_ino_info",
+					 sizeof(struct kfs_i_info),
+					 __alignof__(struct kfs_i_info), 0,
+					 NULL, 0, 0);
 }
 
 /* Creates the SB (normally would read in from disc and create).  Passes its

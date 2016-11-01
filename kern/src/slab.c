@@ -29,6 +29,7 @@ struct kmem_cache kmem_bufctl_cache[1];
 
 void __kmem_cache_create(struct kmem_cache *kc, const char *name,
                          size_t obj_size, int align, int flags,
+                         struct arena *source,
                          void (*ctor)(void *, size_t),
                          void (*dtor)(void *, size_t))
 {
@@ -39,6 +40,7 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	kc->obj_size = obj_size;
 	kc->align = align;
 	kc->flags = flags;
+	kc->source = source;
 	TAILQ_INIT(&kc->full_slab_list);
 	TAILQ_INIT(&kc->partial_slab_list);
 	TAILQ_INIT(&kc->empty_slab_list);
@@ -72,23 +74,27 @@ void kmem_cache_init(void)
 	SLIST_INIT(&kmem_caches);
 	__kmem_cache_create(kmem_cache_cache, "kmem_cache",
 	                    sizeof(struct kmem_cache),
-	                    __alignof__(struct kmem_cache), 0, NULL, NULL);
+	                    __alignof__(struct kmem_cache), 0, base_arena,
+	                    NULL, NULL);
 	__kmem_cache_create(kmem_slab_cache, "kmem_slab",
 	                    sizeof(struct kmem_slab),
-	                    __alignof__(struct kmem_slab), 0, NULL, NULL);
+	                    __alignof__(struct kmem_slab), 0, base_arena,
+	                    NULL, NULL);
 	__kmem_cache_create(kmem_bufctl_cache, "kmem_bufctl",
 	                    sizeof(struct kmem_bufctl),
-	                    __alignof__(struct kmem_bufctl), 0, NULL, NULL);
+	                    __alignof__(struct kmem_bufctl), 0, base_arena,
+	                    NULL, NULL);
 }
 
 /* Cache management */
 struct kmem_cache *kmem_cache_create(const char *name, size_t obj_size,
                                      int align, int flags,
+                                     struct arena *source,
                                      void (*ctor)(void *, size_t),
                                      void (*dtor)(void *, size_t))
 {
 	struct kmem_cache *kc = kmem_cache_alloc(kmem_cache_cache, 0);
-	__kmem_cache_create(kc, name, obj_size, align, flags, ctor, dtor);
+	__kmem_cache_create(kc, name, obj_size, align, flags, source, ctor, dtor);
 	return kc;
 }
 
