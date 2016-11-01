@@ -192,7 +192,7 @@ Now that you've changed KFS, don't forget to remake the kernel.
 
 ### 3.5 Building and Loading a Virtual Machine Image
 At this point, you probably have a runnable kernel with programs in KFS.  It
-should be sitting at `obj/kernel/akaros-kernel`.  When running in a VM, you can
+should be sitting at `obj/kern/akaros-kernel`.  When running in a VM, you can
 either run the kernel directly from `qemu`, or put it in a virtual machine
 image file.
 
