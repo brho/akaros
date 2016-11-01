@@ -6,7 +6,9 @@
 #include <parlib/arch/arch.h>
 #include <parlib/ros_debug.h>
 #include <unistd.h>
+#include <gelf.h>
 #include <errno.h>
+#include <libelf.h>
 #include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
@@ -324,15 +326,108 @@ static inline int test_and_set_bit(int nr, volatile unsigned long *addr)
 	return oldbit;
 }
 
-static void pir_dump()
+/* load_kernel loads an ELF file as a kernel. */
+uintptr_t
+load_kernel(char *filename, uintptr_t *kernstart, uintptr_t *kernend)
 {
-	unsigned long *pir_ptr = gpci.posted_irq_desc;
-	int i;
-	fprintf(stderr, "-------Begin PIR dump-------\n");
-	for (i = 0; i < 8; i++){
-		fprintf(stderr, "Byte %d: 0x%016x\n", i, pir_ptr[i]);
+	Elf64_Ehdr *ehdr;
+	Elf *elf;
+	size_t phnum = 0;
+	Elf64_Phdr *hdrs;
+	int fd;
+
+	elf_version(EV_CURRENT);
+	fd = open(filename, O_RDONLY);
+	if (fd < 0) {
+		fprintf(stderr, "Can't open %s: %r\n", filename);
+		return 0;
 	}
-	fprintf(stderr, "-------End PIR dump-------\n");
+
+	elf = elf_begin(fd, ELF_C_READ, NULL);
+	if (elf == NULL) {
+		fprintf(stderr, "%s: cannot read %s ELF file.\n", __func__, filename);
+		close(fd);
+		return 0;
+	}
+
+	ehdr = elf64_getehdr(elf);
+	if (ehdr == NULL) {
+		fprintf(stderr, "%s: cannot get exec header of %s.\n",
+		        __func__, filename);
+		goto fail;
+	}
+	fprintf(stderr, "%s ELF entry point is %p\n", filename, ehdr->e_entry);
+
+	if (elf_getphdrnum(elf, &phnum) < 0) {
+		fprintf(stderr, "%s: cannot get program header num of %s.\n",
+		        __func__, filename);
+		goto fail;
+	}
+	fprintf(stderr, "%s has %d program headers\n", filename, phnum);
+
+	hdrs = elf64_getphdr(elf);
+	if (hdrs == NULL) {
+		fprintf(stderr, "%s: cannot get program headers of %s.\n",
+		        __func__, filename);
+		goto fail;
+	}
+
+	for (int i = 0; i < phnum; i++) {
+		size_t tot;
+		Elf64_Phdr *h = &hdrs[i];
+		uintptr_t pa;
+
+		fprintf(stderr,
+		        "%d: type 0x%lx flags 0x%lx  offset 0x%lx vaddr 0x%lx paddr 0x%lx size 0x%lx  memsz 0x%lx align 0x%lx\n",
+		        i,
+		        h->p_type,		/* Segment type */
+		        h->p_flags,		/* Segment flags */
+		        h->p_offset,		/* Segment file offset */
+		        h->p_vaddr,		/* Segment virtual address */
+		        h->p_paddr,		/* Segment physical address */
+		        h->p_filesz,		/* Segment size in file */
+		        h->p_memsz,		/* Segment size in memory */
+		        h->p_align		/* Segment alignment */);
+		if (h->p_type != PT_LOAD)
+			continue;
+		if ((h->p_flags & (PF_R | PF_W | PF_X)) == 0)
+			continue;
+
+		/* we do the memset purely to ensure everything gets paged in. */
+		/* compute the offset from the desired address. */
+		/* this ONLY works now if kernaddr > h->p_paddr */
+		pa = h->p_paddr;
+		memset((void *)pa, 0, h->p_memsz);
+		if (*kernstart > pa)
+			*kernstart = pa;
+		if (*kernend < pa + h->p_memsz)
+			*kernend = pa + h->p_memsz;
+		fprintf(stderr,
+		        "Read header %d @offset %p to %p (elf PA is %p) %d bytes:",
+		        i, h->p_offset, pa, h->p_paddr, h->p_filesz);
+		tot = 0;
+		while (tot < h->p_filesz) {
+			int amt = pread(fd, (void *)(pa + tot), h->p_filesz - tot,
+			                h->p_offset + tot);
+			if (amt < 1)
+				break;
+			tot += amt;
+		}
+		fprintf(stderr, "read a total of %d bytes\n", tot);
+		if (tot < h->p_filesz) {
+			fprintf(stderr, "%s: got %d bytes, wanted %d bytes\n",
+			        filename, tot, h->p_filesz);
+			goto fail;
+		}
+	}
+
+	close(fd);
+	elf_end(elf);
+	return ehdr->e_entry;
+ fail:
+	close(fd);
+	elf_end(elf);
+	return 0;
 }
 
 int main(int argc, char **argv)
@@ -347,11 +442,9 @@ int main(int argc, char **argv)
 	struct acpi_table_fadt *f;
 	struct acpi_table_madt *m;
 	struct acpi_table_xsdt *x;
-	// lowmem is a bump allocated pointer to 2M at the "physbase" of memory
-	void *lowmem = (void *) 0x1000000;
 	int amt;
 	int vmmflags = 0; // Disabled probably forever. VMM_VMCALL_PRINTF;
-	uint64_t entry = 0x1200000, kerneladdress = 0x1200000;
+	uint64_t entry = 0;
 	int ret;
 	uintptr_t size;
 	void * xp;
@@ -370,6 +463,7 @@ int main(int argc, char **argv)
 	struct stat stat_result;
 	int num_read;
 	int option_index;
+	uintptr_t kernstart = (uintptr_t)~1, kernend = 0;
 	static struct option long_options[] = {
 		{"debug",         no_argument,       0, 'd'},
 		{"vmm_vmcall",    no_argument,       0, 'v'},
@@ -394,7 +488,6 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 	memset(_kernel, 0, sizeof(_kernel));
-	memset(lowmem, 0xff, 2*1048576);
 	vm->low4k = malloc(PGSIZE);
 	memset(vm->low4k, 0xff, PGSIZE);
 	vm->low4k[0x40e] = 0;
@@ -492,33 +585,16 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Usage: %s vmimage [-n (no vmcall printf)] [coreboot_tables [loadaddress [entrypoint]]]\n", argv[0]);
 		exit(1);
 	}
+
 	if (argc > 1)
 		coreboot_tables = (void *) strtoull(argv[1], 0, 0);
-	if (argc > 2)
-		kerneladdress = strtoull(argv[2], 0, 0);
-	if (argc > 3)
-		entry = strtoull(argv[3], 0, 0);
-	kfd = open(argv[0], O_RDONLY);
-	if (kfd < 0) {
-		perror(argv[0]);
+
+	entry = load_kernel(argv[0], &kernstart, &kernend);
+	if (entry == 0) {
+		fprintf(stderr, "Unable to load kernel %s\n", argv[0]);
 		exit(1);
 	}
-	// read in the kernel, one 2M page at a time.
-	xp = (void *)kerneladdress;
-	for(;;) {
-		amt = read(kfd, xp, PML2_PTE_REACH);
-		if (amt < 0) {
-			perror("read");
-			exit(1);
-		}
-		if (amt == 0) {
-			break;
-		}
-		xp += amt;
-	}
-	size = ROUNDUP((uintptr_t)xp - kerneladdress, PML2_PTE_REACH);
-	fprintf(stderr, "Read in %d bytes\n", size);
-	close(kfd);
+
 
 	// The low 1m so we can fill in bullshit like ACPI. */
 	// And, sorry, due to the STUPID format of the RSDP for now we need the low 1M.
@@ -746,11 +822,13 @@ int main(int argc, char **argv)
 	p1 = &p512[NPTENTRIES];
 	p2m = &p512[2 * NPTENTRIES];
 
-	p512[PML4(kerneladdress)] = (uint64_t)p1 | PTE_KERN_RW;
-	p1[PML3(kerneladdress)] = (uint64_t)p2m | PTE_KERN_RW;
+	size = kernend - kernstart;
+	fprintf(stderr, "Map %p for %zu bytes\n", kernstart, size);
+	p512[PML4(kernstart)] = (uint64_t)p1 | PTE_KERN_RW;
+	p1[PML3(kernstart)] = (uint64_t)p2m | PTE_KERN_RW;
 	for (uintptr_t i = 0; i < size; i += PML2_PTE_REACH) {
-		p2m[PML2(kerneladdress + i)] =
-		    (uint64_t)(kerneladdress + i) | PTE_KERN_RW | PTE_PS;
+		p2m[PML2(kernstart + i)] =
+			(uint64_t)(kernstart + i) | PTE_KERN_RW | PTE_PS;
 	}
 
 	uint8_t *kernel = (void *)GKERNBASE;
