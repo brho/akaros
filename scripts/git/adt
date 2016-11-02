@@ -1,0 +1,93 @@
+#!/bin/bash
+# Gan Shun Lim (ganshun@gmail.com)
+# Copyright 2016 Google Inc
+
+# Use local branch name as the default topic unless overridden
+GERRIT_TOPIC=`git status | grep "# On branch .*" | cut -f 4 -d " "`
+
+GERRIT_REMOTE=gerrit
+GERRIT_PUSH_COMMAND="git push $GERRIT_REMOTE HEAD:refs/for/master"
+GERRIT_REVIEWERS_LINE="%"
+
+REVIEWERS=""
+CC=""
+
+
+if [ $# -ne 1 ] && [ $# -ne 3 ] && [ $# -ne 5 ] && [ $# -ne 7 ]
+then
+	echo "Usage: adt mail [-m reviewer1,reviewer2...] [-cc cc1,cc2...] [-t topic]"
+	echo "Other functionalities are not yet supported"
+	exit -1
+fi
+
+if [ $1 != "mail" ]
+then
+	echo "Only mail functionality is supported right now. Please do adt mail."
+	exit -1
+fi
+
+OLDIFS=$IFS
+I=2
+while [ $I -lt $# ]
+do
+	if [ ${!I} = "-t" ]
+	then
+		# Doesn't support multiple topics. not sure what gerrit will do.
+		(( I++ ))
+		GERRIT_TOPIC=${!I}
+		(( I++ ))
+	elif [ ${!I} = "-m" ]
+	then
+		(( I++ ))
+		IFS=$IFS","
+		for R in ${!I}
+		do
+			IFS=$OLDIFS
+			if [ $GERRIT_REVIEWERS_LINE = "%" ]
+			then
+				GERRIT_REVIEWERS_LINE="${GERRIT_REVIEWERS_LINE}r=$R"
+			else
+				GERRIT_REVIEWERS_LINE="${GERRIT_REVIEWERS_LINE},r=$R"
+			fi
+		done
+		(( I++ ))
+	elif [ ${!I} = "-cc" ]
+	then
+		(( I++ ))
+		IFS=$IFS","
+		for R in ${!I}
+		do
+			IFS=$OLDIFS
+			if [ $GERRIT_REVIEWERS_LINE = "%" ]
+			then
+				GERRIT_REVIEWERS_LINE="${GERRIT_REVIEWERS_LINE}cc=$R"
+			else
+				GERRIT_REVIEWERS_LINE="${GERRIT_REVIEWERS_LINE},cc=$R"
+			fi
+		done
+		(( I++ ))
+	else
+		echo "Unsupported flag ${!I}."
+		echo "Usage: adt mail [-m reviewer1,reviewer2...] [-cc cc1,cc2...] [-t topic]"
+		exit -1
+	fi
+done
+
+if [ $GERRIT_TOPIC != "" ]
+then
+	# Append topic
+	GERRIT_PUSH_COMMAND="$GERRIT_PUSH_COMMAND/$GERRIT_TOPIC"
+fi
+
+if [ $GERRIT_REVIEWERS_LINE != "%" ]
+then
+	eval "$GERRIT_PUSH_COMMAND$GERRIT_REVIEWERS_LINE"
+else
+	eval $GERRIT_PUSH_COMMAND
+fi
+
+if [ "$?" -ne 0 ]
+then
+	echo "Error occurred during git push. Please make sure that your remote for gerrit exists, and that GERRIT_REMOTE in this script is pointing to the correct remote."
+	exit -1
+fi
