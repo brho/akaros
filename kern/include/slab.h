@@ -24,6 +24,10 @@
  * overwrite things, so we need to add an extra 4-8 bytes per object for the
  * pointer, and then pass over that data when we return the actual object's
  * address.  This also might fuck with alignment.
+ *
+ * Be careful with source arenas and NOTOUCH.  If a cache's source arena is not
+ * page-aligned memory, you need to set NOTOUCH.  Otherwise, for small objects,
+ * a slab will be constructed that uses the source for a page of objects.
  */
 
 #pragma once
@@ -39,6 +43,10 @@
  * measurements and on not wanting more than 1/8 of internal fragmentation. */
 #define NUM_BUF_PER_SLAB 8
 #define SLAB_LARGE_CUTOFF (PGSIZE / NUM_BUF_PER_SLAB)
+
+/* Cache creation flags: */
+#define KMC_NOTOUCH				0x0001	/* Can't use source/object's memory */
+#define __KMC_USE_BUFCTL		0x1000	/* Internal use */
 
 struct kmem_slab;
 

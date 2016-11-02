@@ -27,6 +27,11 @@ struct kmem_cache kmem_cache_cache[1];
 struct kmem_cache kmem_slab_cache[1];
 struct kmem_cache kmem_bufctl_cache[1];
 
+static bool __use_bufctls(struct kmem_cache *cp)
+{
+	return cp->flags & __KMC_USE_BUFCTL;
+}
+
 void __kmem_cache_create(struct kmem_cache *kc, const char *name,
                          size_t obj_size, int align, int flags,
                          struct arena *source,
@@ -51,6 +56,12 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	hash_init_hh(&kc->hh);
 	for (int i = 0; i < kc->hh.nr_hash_lists; i++)
 		BSD_LIST_INIT(&kc->static_hash[i]);
+	/* No touch must use bufctls, even for small objects, so that it does not
+	 * use the object as memory.  Note that if we have an arbitrary source,
+	 * small objects, and we're 'pro-touch', the small allocation path will
+	 * assume we're importing from a PGSIZE-aligned source arena. */
+	if ((obj_size > SLAB_LARGE_CUTOFF) || (flags & KMC_NOTOUCH))
+		kc->flags |= __KMC_USE_BUFCTL;
 	/* put in cache list based on it's size */
 	struct kmem_cache *i, *prev = NULL;
 	spin_lock_irqsave(&kmem_caches_lock);
@@ -100,7 +111,7 @@ struct kmem_cache *kmem_cache_create(const char *name, size_t obj_size,
 
 static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 {
-	if (cp->obj_size <= SLAB_LARGE_CUTOFF) {
+	if (!__use_bufctls(cp)) {
 		/* Deconstruct all the objects, if necessary */
 		if (cp->dtor) {
 			void *buf = a_slab->free_small_obj;
@@ -250,7 +261,7 @@ void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
 		TAILQ_INSERT_HEAD(&cp->partial_slab_list, a_slab, link);
 	}
 	// have a partial now (a_slab), get an item, return item
-	if (cp->obj_size <= SLAB_LARGE_CUTOFF) {
+	if (!__use_bufctls(cp)) {
 		retval = a_slab->free_small_obj;
 		/* adding the size of the cache_obj to get to the pointer at end of the
 		 * buffer pointing to the next free_small_obj */
@@ -281,7 +292,7 @@ void kmem_cache_free(struct kmem_cache *cp, void *buf)
 	struct kmem_bufctl *a_bufctl;
 
 	spin_lock_irqsave(&cp->cache_lock);
-	if (cp->obj_size <= SLAB_LARGE_CUTOFF) {
+	if (!__use_bufctls(cp)) {
 		// find its slab
 		a_slab = (struct kmem_slab*)(ROUNDDOWN((uintptr_t)buf, PGSIZE) +
 		                             PGSIZE - sizeof(struct kmem_slab));
@@ -321,7 +332,8 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 {
 	struct kmem_slab *a_slab;
 	struct kmem_bufctl *a_bufctl;
-	if (cp->obj_size <= SLAB_LARGE_CUTOFF) {
+
+	if (!__use_bufctls(cp)) {
 		// Just get a single page for small slabs
 		page_t *a_page;
 
@@ -428,6 +440,8 @@ void print_kmem_slab(struct kmem_slab *slab)
 	printk("Objsize: %d (%p)\n", slab->obj_size, slab->obj_size);
 	printk("NumBusy: %d\n", slab->num_busy_obj);
 	printk("Num_total: %d\n", slab->num_total_obj);
+	/* This will break if we have a NOTOUCH small slab.  It's debugging code, so
+	 * just be careful. */
 	if (slab->obj_size + sizeof(uintptr_t) < SLAB_LARGE_CUTOFF) {
 		printk("Free Small obj: %p\n", slab->free_small_obj);
 		void *buf = slab->free_small_obj;
