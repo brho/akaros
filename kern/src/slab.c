@@ -43,9 +43,17 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	spinlock_init_irqsave(&kc->cache_lock);
 	kc->name = name;
 	kc->obj_size = obj_size;
+	/* TODO: when we are used from a qcache, we'll have a flag that tells us how
+	 * to set this to interact with the arena nicely. */
+	kc->import_amt = ROUNDUP(NUM_BUF_PER_SLAB * ROUNDUP(obj_size, align),
+	                         PGSIZE);
 	kc->align = align;
+	if (align > PGSIZE)
+		panic("Cache %s object alignment is actually MIN(PGSIZE, align (%p))",
+		      name, align);
 	kc->flags = flags;
-	kc->source = source;
+	/* We might want some sort of per-call site NUMA-awareness in the future. */
+	kc->source = source ? source : kpages_arena;
 	TAILQ_INIT(&kc->full_slab_list);
 	TAILQ_INIT(&kc->partial_slab_list);
 	TAILQ_INIT(&kc->empty_slab_list);
@@ -120,19 +128,14 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 				buf += a_slab->obj_size;
 			}
 		}
-		page_decref(kva2page((void*)ROUNDDOWN((uintptr_t)a_slab, PGSIZE)));
+		arena_free(cp->source, ROUNDDOWN(a_slab, PGSIZE), PGSIZE);
 	} else {
 		struct kmem_bufctl *i, *temp;
-		void *page_start = (void*)-1;
-		/* Figure out how much memory we asked for earlier.  We needed at least
-		 * min_pgs.  We asked for the next highest order (power of 2) number of
-		 * pages */
-		size_t min_pgs = ROUNDUP(NUM_BUF_PER_SLAB * a_slab->obj_size, PGSIZE) /
-		                         PGSIZE;
-		size_t order_pg_alloc = LOG2_UP(min_pgs);
+		void *buf_start = (void*)SIZE_MAX;
+
 		BSD_LIST_FOREACH_SAFE(i, &a_slab->bufctl_freelist, link, temp) {
 			// Track the lowest buffer address, which is the start of the buffer
-			page_start = MIN(page_start, i->buf_addr);
+			buf_start = MIN(buf_start, i->buf_addr);
 			/* Deconstruct all the objects, if necessary */
 			if (cp->dtor)
 				cp->dtor(i->buf_addr, cp->obj_size);
@@ -140,9 +143,7 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 			 * init the freelist when we reuse the slab. */
 			kmem_cache_free(kmem_bufctl_cache, i);
 		}
-		// free the pages for the slab's buffer
-		free_cont_pages(page_start, order_pg_alloc);
-		// free the slab object
+		arena_free(cp->source, buf_start, cp->import_amt);
 		kmem_cache_free(kmem_slab_cache, a_slab);
 	}
 }
@@ -334,21 +335,24 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 	struct kmem_bufctl *a_bufctl;
 
 	if (!__use_bufctls(cp)) {
-		// Just get a single page for small slabs
-		page_t *a_page;
+		void *a_page;
 
-		if (kpage_alloc(&a_page))
+		/* Careful, this assumes our source is a PGSIZE-aligned allocator.  We
+		 * could use xalloc to enforce the alignment, but that'll bypass the
+		 * qcaches, which we don't want.  Caller beware. */
+		a_page = arena_alloc(cp->source, PGSIZE, MEM_ATOMIC);
+		if (!a_page)
 			return FALSE;
 		// the slab struct is stored at the end of the page
-		a_slab = (struct kmem_slab*)(page2kva(a_page) + PGSIZE -
-		                             sizeof(struct kmem_slab));
+		a_slab = (struct kmem_slab*)(a_page + PGSIZE
+		                             - sizeof(struct kmem_slab));
 		// Need to add room for the next free item pointer in the object buffer.
 		a_slab->obj_size = ROUNDUP(cp->obj_size + sizeof(uintptr_t), cp->align);
 		a_slab->num_busy_obj = 0;
 		a_slab->num_total_obj = (PGSIZE - sizeof(struct kmem_slab)) /
 		                        a_slab->obj_size;
 		// TODO: consider staggering this IAW section 4.3
-		a_slab->free_small_obj = page2kva(a_page);
+		a_slab->free_small_obj = a_page;
 		/* Walk and create the free list, which is circular.  Each item stores
 		 * the location of the next one at the end of the block. */
 		void *buf = a_slab->free_small_obj;
@@ -361,25 +365,19 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 		}
 		*((uintptr_t**)(buf + cp->obj_size)) = NULL;
 	} else {
+		void *buf;
+
 		a_slab = kmem_cache_alloc(kmem_slab_cache, 0);
 		if (!a_slab)
 			return FALSE;
 		a_slab->obj_size = ROUNDUP(cp->obj_size, cp->align);
-		/* Figure out how much memory we want.  We need at least min_pgs.  We'll
-		 * ask for the next highest order (power of 2) number of pages */
-		size_t min_pgs = ROUNDUP(NUM_BUF_PER_SLAB * a_slab->obj_size, PGSIZE) /
-		                         PGSIZE;
-		size_t order_pg_alloc = LOG2_UP(min_pgs);
-		void *buf = get_cont_pages(order_pg_alloc, 0);
-
+		buf = arena_alloc(cp->source, cp->import_amt, MEM_ATOMIC);
 		if (!buf) {
 			kmem_cache_free(kmem_slab_cache, a_slab);
 			return FALSE;
 		}
 		a_slab->num_busy_obj = 0;
-		/* The number of objects is based on the rounded up amt requested. */
-		a_slab->num_total_obj = ((1 << order_pg_alloc) * PGSIZE) /
-		                        a_slab->obj_size;
+		a_slab->num_total_obj = cp->import_amt / a_slab->obj_size;
 		BSD_LIST_INIT(&a_slab->bufctl_freelist);
 		/* for each buffer, set up a bufctl and point to the buffer */
 		for (int i = 0; i < a_slab->num_total_obj; i++) {

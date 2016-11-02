@@ -80,6 +80,7 @@ struct kmem_cache {
 	spinlock_t cache_lock;
 	const char *name;
 	size_t obj_size;
+	size_t import_amt;
 	int align;
 	int flags;
 	struct arena *source;
