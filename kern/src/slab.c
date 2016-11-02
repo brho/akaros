@@ -15,8 +15,8 @@
 #include <hash.h>
 #include <arena.h>
 
-struct kmem_cache_list kmem_caches;
-spinlock_t kmem_caches_lock;
+struct kmem_cache_list kmem_caches = SLIST_HEAD_INITIALIZER(kmem_caches);
+spinlock_t kmem_caches_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
 /* Backend/internal functions, defined later.  Grab the lock before calling
  * these. */
@@ -89,8 +89,6 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 
 void kmem_cache_init(void)
 {
-	spinlock_init_irqsave(&kmem_caches_lock);
-	SLIST_INIT(&kmem_caches);
 	__kmem_cache_create(kmem_cache_cache, "kmem_cache",
 	                    sizeof(struct kmem_cache),
 	                    __alignof__(struct kmem_cache), 0, base_arena,

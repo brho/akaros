@@ -85,6 +85,9 @@ void pmem_init(struct multiboot_info *mbi)
 	pages = (struct page*)boot_zalloc(max_nr_pages * sizeof(struct page),
 	                                  PGSIZE);
 	base_arena_init(mbi);
+	/* kpages will use some of the basic slab caches.  kmem_cache_init needs to
+	 * not do memory allocations (which it doesn't, and it can base_alloc()). */
+	kmem_cache_init();
 	kpages_arena_init();
 	printk("Base arena total mem: %lu\n", arena_amt_total(base_arena));
 	vm_init();

@@ -141,7 +141,6 @@ void kernel_init(multiboot_info_t *mboot_info)
 	exception_table_init();
 	num_cores = get_early_num_cores();
 	pmem_init(multiboot_kaddr);
-	kmem_cache_init();              // Sets up slab allocator
 	kmalloc_init();
 	hashtable_init();
 	radix_init();
