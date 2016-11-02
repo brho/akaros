@@ -44,6 +44,8 @@
 #define NUM_BUF_PER_SLAB 8
 #define SLAB_LARGE_CUTOFF (PGSIZE / NUM_BUF_PER_SLAB)
 
+#define KMC_NAME_SZ				32
+
 /* Cache creation flags: */
 #define KMC_NOTOUCH				0x0001	/* Can't use source/object's memory */
 #define __KMC_USE_BUFCTL		0x1000	/* Internal use */
@@ -78,7 +80,6 @@ TAILQ_HEAD(kmem_slab_list, kmem_slab);
 struct kmem_cache {
 	SLIST_ENTRY(kmem_cache) link;
 	spinlock_t cache_lock;
-	const char *name;
 	size_t obj_size;
 	size_t import_amt;
 	int align;
@@ -93,6 +94,7 @@ struct kmem_cache {
 	struct hash_helper hh;
 	struct kmem_bufctl_list *alloc_hash;
 	struct kmem_bufctl_list static_hash[HASH_INIT_SZ];
+	char name[KMC_NAME_SZ];
 };
 
 /* List of all kmem_caches, sorted in order of size */

@@ -41,7 +41,7 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	assert(kc);
 	assert(align);
 	spinlock_init_irqsave(&kc->cache_lock);
-	kc->name = name;
+	strlcpy(kc->name, name, KMC_NAME_SZ);
 	kc->obj_size = obj_size;
 	/* TODO: when we are used from a qcache, we'll have a flag that tells us how
 	 * to set this to interact with the arena nicely. */
