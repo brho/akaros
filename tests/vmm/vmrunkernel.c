@@ -133,10 +133,9 @@ unsigned int maxresume = (unsigned int) -1;
 
 #define MiB 0x100000ull
 #define GiB (1ull << 30)
-#define GKERNBASE (16*MiB)
-#define KERNSIZE (1024 * MiB + GKERNBASE)
-uint8_t _kernel[KERNSIZE];
-
+#define MinMemory (16*MiB)
+void *kernel;
+unsigned long long memsize = GiB;
 unsigned long long *p512, *p1, *p2m;
 
 void **my_retvals;
@@ -393,11 +392,7 @@ load_kernel(char *filename, uintptr_t *kernstart, uintptr_t *kernend)
 		if ((h->p_flags & (PF_R | PF_W | PF_X)) == 0)
 			continue;
 
-		/* we do the memset purely to ensure everything gets paged in. */
-		/* compute the offset from the desired address. */
-		/* this ONLY works now if kernaddr > h->p_paddr */
 		pa = h->p_paddr;
-		memset((void *)pa, 0, h->p_memsz);
 		if (*kernstart > pa)
 			*kernstart = pa;
 		if (*kernend < pa + h->p_memsz)
@@ -467,7 +462,8 @@ int main(int argc, char **argv)
 	static struct option long_options[] = {
 		{"debug",         no_argument,       0, 'd'},
 		{"vmm_vmcall",    no_argument,       0, 'v'},
-		{"maxresume",     required_argument, 0, 'm'},
+		{"maxresume",     required_argument, 0, 'R'},
+		{"memsize",       required_argument, 0, 'm'},
 		{"cmdline_extra", required_argument, 0, 'c'},
 		{"greedy",        no_argument,       0, 'g'},
 		{"scp",           no_argument,       0, 's'},
@@ -481,13 +477,12 @@ int main(int argc, char **argv)
 	fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT,
 			PML1_PTE_REACH);
 
-
-	// mmap is not working for us at present.
-	if ((uint64_t)_kernel > GKERNBASE) {
-		fprintf(stderr, "kernel array @%p is above , GKERNBASE@%p sucks\n", _kernel, GKERNBASE);
+	if ((uintptr_t)__procinfo.program_end >= MinMemory) {
+		fprintf(stderr,
+		        "Panic: vmrunkernel binary extends into guest memory\n");
 		exit(1);
 	}
-	memset(_kernel, 0, sizeof(_kernel));
+
 	vm->low4k = malloc(PGSIZE);
 	memset(vm->low4k, 0xff, PGSIZE);
 	vm->low4k[0x40e] = 0;
@@ -495,10 +490,10 @@ int main(int argc, char **argv)
 
 	//Place mmap(Gan)
 	a_page = mmap((void *)0xfee00000, PGSIZE, PROT_READ | PROT_WRITE,
-		              MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	              MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
 	fprintf(stderr, "a_page mmap pointer %p\n", a_page);
 
-	if (a_page == (void *) -1) {
+	if (a_page != (void *)0xfee00000) {
 		perror("Could not mmap APIC");
 		exit(1);
 	}
@@ -507,11 +502,10 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	memset(a_page, 0, 4096);
 	((uint32_t *)a_page)[0x30/4] = 0x01060015;
 	//((uint32_t *)a_page)[0x30/4] = 0xDEADBEEF;
 
-	while ((c = getopt_long(argc, argv, "dvm:c:gsf:k:n:h", long_options,
+	while ((c = getopt_long(argc, argv, "dvm:c:gsf:k:n:hR:", long_options,
 	                        &option_index)) != -1) {
 		switch (c) {
 			case 'd':
@@ -521,6 +515,9 @@ int main(int argc, char **argv)
 				vmmflags |= VMM_VMCALL_PRINTF;
 				break;
 			case 'm':
+				memsize = strtoull(optarg, 0, 0);
+				break;
+			case 'R':
 				maxresume = strtoull(optarg, 0, 0);
 				break;
 			case 'c':
@@ -582,12 +579,25 @@ int main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 	if (argc < 1) {
-		fprintf(stderr, "Usage: %s vmimage [-n (no vmcall printf)] [coreboot_tables [loadaddress [entrypoint]]]\n", argv[0]);
+		fprintf(stderr, "Usage: %s vmimage [-n (no vmcall printf)]\n", argv[0]);
 		exit(1);
 	}
 
-	if (argc > 1)
-		coreboot_tables = (void *) strtoull(argv[1], 0, 0);
+	if ((uintptr_t)(MinMemory + memsize) >= (uintptr_t)BRK_START) {
+		fprintf(stderr,
+		        "memsize 0x%lx is too large; overlaps BRK_START at %p\n",
+		        memsize, BRK_START);
+		exit(1);
+	}
+
+	kernel = mmap((void *)MinMemory, memsize,
+	              PROT_READ | PROT_WRITE | PROT_EXEC,
+	              MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	if (kernel != (void *)MinMemory) {
+		fprintf(stderr, "Could not mmap 0x%lx bytes at 0x%lx\n",
+		        memsize, MinMemory);
+		exit(1);
+	}
 
 	entry = load_kernel(argv[0], &kernstart, &kernend);
 	if (entry == 0) {
@@ -599,12 +609,11 @@ int main(int argc, char **argv)
 	// The low 1m so we can fill in bullshit like ACPI. */
 	// And, sorry, due to the STUPID format of the RSDP for now we need the low 1M.
 	low1m = mmap((int*)4096, MiB-4096, PROT_READ | PROT_WRITE,
-	                 MAP_ANONYMOUS, -1, 0);
+	             MAP_ANONYMOUS, -1, 0);
 	if (low1m != (void *)4096) {
 		perror("Unable to mmap low 1m");
 		exit(1);
 	}
-	memset(low1m, 0xff, MiB-4096);
 	r = a;
 	fprintf(stderr, "install rsdp to %p\n", r);
 	*r = rsdp;
@@ -831,7 +840,6 @@ int main(int argc, char **argv)
 			(uint64_t)(kernstart + i) | PTE_KERN_RW | PTE_PS;
 	}
 
-	uint8_t *kernel = (void *)GKERNBASE;
 	//write_coreboot_table(coreboot_tables, ((void *)VIRTIOBASE) /*kernel*/, KERNSIZE + 1048576);
 	hexdump(stdout, coreboot_tables, 512);
 	fprintf(stderr, "p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
