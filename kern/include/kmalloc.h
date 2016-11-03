@@ -10,7 +10,7 @@
 #include <ros/common.h>
 #include <kref.h>
 
-#define NUM_KMALLOC_CACHES 13
+#define NUM_KMALLOC_CACHES 6
 #define KMALLOC_ALIGNMENT 16
 #define KMALLOC_SMALLEST (sizeof(struct kmalloc_tag) << 1)
 #define KMALLOC_LARGEST KMALLOC_SMALLEST << NUM_KMALLOC_CACHES
