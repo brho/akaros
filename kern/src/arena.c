@@ -79,6 +79,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <hash.h>
+#include <slab.h>
 
 TAILQ_HEAD(arena_tailq, arena);
 static struct arena_tailq all_arenas = TAILQ_HEAD_INITIALIZER(all_arenas);
@@ -109,6 +110,28 @@ static struct arena *find_my_base(struct arena *arena)
 	return base_arena;
 }
 
+static void setup_qcaches(struct arena *arena, size_t quantum,
+                          size_t qcache_max)
+{
+	int nr_qcaches = qcache_max / quantum;
+	char kc_name[KMC_NAME_SZ];
+	size_t qc_size;
+
+	if (!nr_qcaches)
+		return;
+
+	/* TODO: same as with hash tables, here and in slab.c, we ideally want the
+	 * nearest kpages arena, but bootstrappers need to use base_alloc. */
+	arena->qcaches = base_alloc(arena, nr_qcaches * sizeof(struct kmem_cache),
+	                            MEM_WAIT);
+	for (int i = 0; i < nr_qcaches; i++) {
+		qc_size = (i + 1) * quantum;
+		snprintf(kc_name, KMC_NAME_SZ, "%s_%d", arena->name, qc_size);
+		__kmem_cache_create(&arena->qcaches[i], kc_name, qc_size, quantum,
+		                    KMC_NOTOUCH | KMC_QCACHE, arena, NULL, NULL);
+	}
+}
+
 /* Helper to init.  Split out from create so we can bootstrap. */
 static void arena_init(struct arena *arena, char *name, size_t quantum,
                        void *(*afunc)(struct arena *, size_t, int),
@@ -120,6 +143,9 @@ static void arena_init(struct arena *arena, char *name, size_t quantum,
 	spinlock_init_irqsave(&arena->lock);
 	arena->import_scale = 0;
 	arena->is_base = FALSE;
+	if (qcache_max % quantum)
+		panic("Arena %s, qcache_max %p must be a multiple of quantum %p",
+		      name, qcache_max, quantum);
 	arena->quantum = quantum;
 	arena->qcache_max = qcache_max;
 	arena->afunc = afunc;
@@ -141,10 +167,9 @@ static void arena_init(struct arena *arena, char *name, size_t quantum,
 	for (int i = 0; i < arena->hh.nr_hash_lists; i++)
 		BSD_LIST_INIT(&arena->static_hash[i]);
 
-	/* TODO: alloc qcaches from find_my_base, init via slab funcs, attach them
-	 * to this arena. */
-
 	strlcpy(arena->name, name, ARENA_NAME_SZ);
+	setup_qcaches(arena, quantum, qcache_max);
+
 	spin_lock(&all_arenas_lock);
 	TAILQ_INSERT_TAIL(&all_arenas, arena, next);
 	spin_unlock(&all_arenas_lock);
@@ -660,6 +685,15 @@ static bool get_more_resources(struct arena *arena, size_t size, int flags)
 	return TRUE;
 }
 
+/* Helper.  For a given size, return the applicable qcache. */
+static struct kmem_cache *size_to_qcache(struct arena *arena, size_t size)
+{
+	/* If we ever get grumpy about the costs of dividing (both here and in the
+	 * ROUND ops, we could either insist that quantum is a power of two, or
+	 * track whether or not it is and use other shifting ops. */
+	return &arena->qcaches[(size / arena->quantum) - 1];
+}
+
 void *arena_alloc(struct arena *arena, size_t size, int flags)
 {
 	void *ret;
@@ -667,12 +701,14 @@ void *arena_alloc(struct arena *arena, size_t size, int flags)
 	size = ROUNDUP(size, arena->quantum);
 	if (!size)
 		panic("Arena %s, request for zero", arena->name);
-
-	/* TODO (SLAB): check the qcache slabs if applicable, and return.  Those
-	 * slabs will call back into us for a larger allocation if necessary.  Throw
-	 * an error for NEXTFIT (since free won't know to skip the qcache, nothing
-	 * will ever actually get freed).  Though you can xalloc. */
-
+	if (size <= arena->qcache_max) {
+		/* NEXTFIT is an error, since free won't know to skip the qcache and
+		 * then we'd be handing an item to the qcache that it didn't alloc. */
+		if (flags & ARENA_NEXTFIT)
+			panic("Arena %s, NEXTFIT, but has qcaches.  Use xalloc.",
+			      arena->name);
+		return kmem_cache_alloc(size_to_qcache(arena, size), flags);
+	}
 	while (1) {
 		ret = alloc_from_arena(arena, size, flags);
 		if (ret)
@@ -1076,9 +1112,8 @@ static void free_from_arena(struct arena *arena, void *addr, size_t size)
 void arena_free(struct arena *arena, void *addr, size_t size)
 {
 	size = ROUNDUP(size, arena->quantum);
-
-	/* TODO (SLAB): talk to the qcache, if applicable. */
-
+	if (size <= arena->qcache_max)
+		return kmem_cache_free(size_to_qcache(arena, size), addr);
 	free_from_arena(arena, addr, size);
 }
 

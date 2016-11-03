@@ -43,10 +43,11 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	spinlock_init_irqsave(&kc->cache_lock);
 	strlcpy(kc->name, name, KMC_NAME_SZ);
 	kc->obj_size = obj_size;
-	/* TODO: when we are used from a qcache, we'll have a flag that tells us how
-	 * to set this to interact with the arena nicely. */
-	kc->import_amt = ROUNDUP(NUM_BUF_PER_SLAB * ROUNDUP(obj_size, align),
-	                         PGSIZE);
+	if (flags & KMC_QCACHE)
+		kc->import_amt = ROUNDUPPWR2(3 * source->qcache_max);
+	else
+		kc->import_amt = ROUNDUP(NUM_BUF_PER_SLAB * ROUNDUP(obj_size, align),
+		                         PGSIZE);
 	kc->align = align;
 	if (align > PGSIZE)
 		panic("Cache %s object alignment is actually MIN(PGSIZE, align (%p))",

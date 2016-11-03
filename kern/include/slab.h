@@ -48,6 +48,7 @@
 
 /* Cache creation flags: */
 #define KMC_NOTOUCH				0x0001	/* Can't use source/object's memory */
+#define KMC_QCACHE				0x0002	/* Cache is an arena's qcache */
 #define __KMC_USE_BUFCTL		0x1000	/* Internal use */
 
 struct kmem_slab;

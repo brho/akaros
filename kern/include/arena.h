@@ -51,6 +51,7 @@ struct arena {
 	bool						is_base;
 	size_t						quantum;
 	size_t						qcache_max;
+	struct kmem_cache			*qcaches;
 	struct rb_root				all_segs;		/* BTs, using all_link */
 	struct btag_list			unused_btags;	/* BTs, using misc_link */
 	struct btag_list			*alloc_hash;	/* BTs, using misc_link */
