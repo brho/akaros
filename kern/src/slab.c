@@ -21,6 +21,8 @@ spinlock_t kmem_caches_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 /* Backend/internal functions, defined later.  Grab the lock before calling
  * these. */
 static bool kmem_cache_grow(struct kmem_cache *cp);
+static void *__kmem_alloc_from_slab(struct kmem_cache *cp, int flags);
+static void __kmem_free_to_slab(struct kmem_cache *cp, void *buf);
 
 /* Cache of the kmem_cache objects, needed for bootstrapping */
 struct kmem_cache kmem_cache_cache[1];
@@ -119,14 +121,6 @@ struct kmem_cache *kmem_cache_create(const char *name, size_t obj_size,
 static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 {
 	if (!__use_bufctls(cp)) {
-		/* Deconstruct all the objects, if necessary */
-		if (cp->dtor) {
-			void *buf = a_slab->free_small_obj;
-			for (int i = 0; i < a_slab->num_total_obj; i++) {
-				cp->dtor(buf, cp->obj_size);
-				buf += a_slab->obj_size;
-			}
-		}
 		arena_free(cp->source, ROUNDDOWN(a_slab, PGSIZE), PGSIZE);
 	} else {
 		struct kmem_bufctl *i, *temp;
@@ -135,9 +129,6 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 		BSD_LIST_FOREACH_SAFE(i, &a_slab->bufctl_freelist, link, temp) {
 			// Track the lowest buffer address, which is the start of the buffer
 			buf_start = MIN(buf_start, i->buf_addr);
-			/* Deconstruct all the objects, if necessary */
-			if (cp->dtor)
-				cp->dtor(i->buf_addr, cp->obj_size);
 			/* This is a little dangerous, but we can skip removing, since we
 			 * init the freelist when we reuse the slab. */
 			kmem_cache_free(kmem_bufctl_cache, i);
@@ -237,8 +228,8 @@ static struct kmem_bufctl *__yank_bufctl(struct kmem_cache *cp, void *buf)
 	return bc_i;
 }
 
-/* Front end: clients of caches use these */
-void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
+/* Alloc, bypassing the magazines and depot */
+static void *__kmem_alloc_from_slab(struct kmem_cache *cp, int flags)
 {
 	void *retval = NULL;
 	spin_lock_irqsave(&cp->cache_lock);
@@ -283,14 +274,25 @@ void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
 	}
 	cp->nr_cur_alloc++;
 	spin_unlock_irqsave(&cp->cache_lock);
+	if (cp->ctor)
+		cp->ctor(retval, cp->obj_size);
 	return retval;
 }
 
-void kmem_cache_free(struct kmem_cache *cp, void *buf)
+void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
+{
+	return __kmem_alloc_from_slab(cp, flags);
+}
+
+/* Returns an object to the slab layer.  Note that objects in the slabs are
+ * unconstructed. */
+static void __kmem_free_to_slab(struct kmem_cache *cp, void *buf)
 {
 	struct kmem_slab *a_slab;
 	struct kmem_bufctl *a_bufctl;
 
+	if (cp->dtor)
+		cp->dtor(buf, cp->obj_size);
 	spin_lock_irqsave(&cp->cache_lock);
 	if (!__use_bufctls(cp)) {
 		// find its slab
@@ -318,6 +320,11 @@ void kmem_cache_free(struct kmem_cache *cp, void *buf)
 		TAILQ_INSERT_HEAD(&cp->empty_slab_list, a_slab, link);
 	}
 	spin_unlock_irqsave(&cp->cache_lock);
+}
+
+void kmem_cache_free(struct kmem_cache *cp, void *buf)
+{
+	__kmem_free_to_slab(cp, buf);
 }
 
 /* Back end: internal functions */
@@ -356,9 +363,6 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 		 * the location of the next one at the end of the block. */
 		void *buf = a_slab->free_small_obj;
 		for (int i = 0; i < a_slab->num_total_obj - 1; i++) {
-			// Initialize the object, if necessary
-			if (cp->ctor)
-				cp->ctor(buf, cp->obj_size);
 			*(uintptr_t**)(buf + cp->obj_size) = buf + a_slab->obj_size;
 			buf += a_slab->obj_size;
 		}
@@ -380,9 +384,6 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 		BSD_LIST_INIT(&a_slab->bufctl_freelist);
 		/* for each buffer, set up a bufctl and point to the buffer */
 		for (int i = 0; i < a_slab->num_total_obj; i++) {
-			// Initialize the object, if necessary
-			if (cp->ctor)
-				cp->ctor(buf, cp->obj_size);
 			a_bufctl = kmem_cache_alloc(kmem_bufctl_cache, 0);
 			BSD_LIST_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl, link);
 			a_bufctl->buf_addr = buf;
