@@ -27,6 +27,7 @@
 #include <profiler.h>
 #include <kprof.h>
 #include <ros/procinfo.h>
+#include <init.h>
 
 #define KTRACE_BUFFER_SIZE (128 * 1024)
 #define TRACE_PRINTK_BUFFER_SIZE (8 * 1024)
@@ -463,7 +464,7 @@ static struct trace_printk_buffer *kprof_get_printk_buffer(void)
 	static struct trace_printk_buffer *cpu_tpbs;
 	static atomic_t alloc_done;
 
-	if (unlikely(!num_cores))
+	if (unlikely(booting))
 		return &boot_tpb;
 	if (unlikely(!cpu_tpbs)) {
 		/* Poor man per-CPU data structure. I really do no like littering global
