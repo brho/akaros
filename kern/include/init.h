@@ -5,6 +5,8 @@
 
 #pragma once
 
+extern bool booting;
+
 /**
  * @brief Fetches a given boot commond line parameter.
  *

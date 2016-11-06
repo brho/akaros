@@ -56,7 +56,7 @@
 		}										\
 	} while (0)
 
-int booting = 1;
+bool booting = TRUE;
 struct proc_global_info __proc_global_info;
 struct sysinfo_t sysinfo;
 static char boot_cmdline[MAX_BOOT_CMDLINE_SIZE];
@@ -179,7 +179,7 @@ static void __kernel_init_part_deux(void *arg)
 	eth_audio_init();
 #endif /* CONFIG_ETH_AUDIO */
 	get_coreboot_info(&sysinfo);
-	booting = 0;
+	booting = FALSE;
 
 #ifdef CONFIG_RUN_INIT_SCRIPT
 	if (run_init_script()) {

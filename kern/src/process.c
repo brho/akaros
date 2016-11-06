@@ -25,6 +25,7 @@
 #include <arsc_server.h>
 #include <kmalloc.h>
 #include <ros/procinfo.h>
+#include <init.h>
 
 struct kmem_cache *proc_cache;
 
@@ -2442,7 +2443,6 @@ void check_my_owner(void)
 		spin_unlock(&p->proc_lock);
 	}
 	assert(!irq_is_enabled());
-	extern int booting;
 	if (!booting && !pcpui->owning_proc) {
 		spin_lock(&pid_hash_lock);
 		hash_for_each(pid_hash, shazbot, NULL);

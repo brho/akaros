@@ -9,6 +9,7 @@
 #include <stdarg.h>
 #include <smp.h>
 #include <kprof.h>
+#include <init.h>
 
 spinlock_t output_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
@@ -43,7 +44,6 @@ void buffered_putch(int ch, int **cnt)
 int vcprintf(const char *fmt, va_list ap)
 {
 	struct per_cpu_info *pcpui;
-	extern int booting;
 	int cnt = 0;
 	int *cntp = &cnt;
 	volatile int i;

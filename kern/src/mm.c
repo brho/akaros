@@ -26,6 +26,7 @@
 #include <smp.h>
 #include <profiler.h>
 #include <umem.h>
+#include <init.h>
 
 struct kmem_cache *vmr_kcache;
 
@@ -1200,7 +1201,6 @@ int map_vmap_segment(uintptr_t vaddr, uintptr_t paddr, unsigned long num_pages,
 	 * (like for processes).  To do so, we'll need to insert into every pgdir,
 	 * and send tlb shootdowns to those that are active (which we don't track
 	 * yet). */
-	extern int booting;
 	assert(booting);
 
 	/* TODO: (MM) you should lock on boot pgdir modifications.  A vm region lock
