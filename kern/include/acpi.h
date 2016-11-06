@@ -509,6 +509,7 @@ struct Atable *mkatable(struct Atable *parent,
                         size_t rawsize, size_t addsize);
 struct Atable *finatable(struct Atable *t, struct slice *slice);
 struct Atable *finatable_nochildren(struct Atable *t);
+int get_early_num_cores(void);
 
 extern struct Atable *apics;
 extern struct Atable *dmar;

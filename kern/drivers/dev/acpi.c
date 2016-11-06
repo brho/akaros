@@ -1385,7 +1385,7 @@ static void *rsdsearch(char *signature)
 	 * Search for the data structure signature:
 	 * 1) in the BIOS ROM between 0xE0000 and 0xFFFFF.
 	 */
-	return sigscan(KADDR(0xE0000), 0x20000, signature);
+	return sigscan(KADDR_NOCHECK(0xE0000), 0x20000, signature);
 }
 
 /*
@@ -1549,6 +1549,84 @@ static void parsersdptr(void)
 	                            MEM_WAIT);
 	assert(atableindex != NULL);
 	makeindex(root);
+}
+
+/* Given an xsdt, find the table matching 'sig', if any. */
+static struct Sdthdr *xsdt_find_tbl(struct Sdthdr *xsdt, const char *sig,
+                                    int addr_size)
+{
+	uint8_t *ptr_tbl;
+	size_t ptr_tbl_len;
+	physaddr_t sdt_pa;
+	struct Sdthdr *sdt;
+
+	ptr_tbl = (uint8_t*)xsdt + sizeof(struct Sdthdr);
+	ptr_tbl_len = l32get(xsdt->length) - sizeof(struct Sdthdr);
+	for (int i = 0; i < ptr_tbl_len; i += addr_size) {
+		sdt_pa = (addr_size == 8) ? l64get(ptr_tbl + i) : l32get(ptr_tbl + i);
+		sdt = KADDR_NOCHECK(sdt_pa);
+		if (memcmp(sdt->sig, sig, sizeof(sdt->sig)) == 0)
+			return sdt;
+	}
+	return NULL;
+}
+
+/* This may be an overestimate, if some LAPICS are present but disabled */
+static int madt_get_nr_cores(struct Sdthdr *madt)
+{
+	uint8_t *p, *madt_end;
+	size_t entry_len;
+	int nr_cores = 0;
+
+	p = (uint8_t*)madt;
+	madt_end = p + l32get(madt->length);
+	for (p += 44; p < madt_end; p += entry_len) {
+		entry_len = p[1];
+		switch (p[0]) {
+		case ASlapic:
+			nr_cores++;
+			break;
+		default:
+			break;
+		}
+	}
+	return nr_cores;
+}
+
+int get_early_num_cores(void)
+{
+	struct Rsdp *rsd;
+	int asize;
+	physaddr_t sdtpa;
+	struct Sdthdr *xsdt, *madt;
+	uint8_t *xsdt_buf;
+	int nr_cores;
+
+	rsd = rsdsearch("RSD PTR ");
+	assert(rsd);
+	if (rsd->revision >= 2) {
+		sdtpa = l64get(rsd->xaddr);
+		asize = 8;
+	} else {
+		sdtpa = l32get(rsd->raddr);
+		asize = 4;
+	}
+
+	xsdt = KADDR_NOCHECK(sdtpa);
+	xsdt_buf = (uint8_t*)xsdt;
+	if ((xsdt_buf[0] != 'R' && xsdt_buf[0] != 'X')
+		|| memcmp(xsdt_buf + 1, "SDT", 3) != 0) {
+		panic("acpi: xsdt sig: %c%c%c%c\n",
+		       xsdt_buf[0], xsdt_buf[1], xsdt_buf[2], xsdt_buf[3]);
+	}
+	madt = xsdt_find_tbl(xsdt, "APIC", asize);
+	assert(madt);
+	nr_cores = madt_get_nr_cores(madt);
+	if (nr_cores == 0) {
+		warn("MADT parsing found 0 cores!");
+		nr_cores = 1;
+	}
+	return nr_cores;
 }
 
 /*

@@ -97,15 +97,23 @@ static int find_numa_domain(int apic_id)
  * cpu_topology_info struct. */
 static void set_num_cores(void)
 {
+	int old_num_cores = num_cores;
+
 	if (apics == NULL)
 		return;
 
+	num_cores = 0;
 	for (int i = 0; i < apics->nchildren; i++) {
 		struct Apicst *temp = apics->children[i]->tbl;
 
 		if (temp != NULL && temp->type == ASlapic)
 			num_cores++;
 	}
+	if (num_cores < old_num_cores)
+		warn("Topology found less cores than early MADT parsing!");
+	/* Too many cores will be a problem for some data structures. */
+	if (num_cores > old_num_cores)
+		panic("Topology found more cores than early MADT parsing!");
 }
 
 /* Determine if srat has a unique numa domain compared to to all of the srat
