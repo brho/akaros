@@ -229,6 +229,11 @@ uintptr_t smp_main(void)
 	cprintf("Num_Cores: %d\n\n", num_cores);
 	*/
 
+	/* We need to fake being core 0 for our memory allocations to work nicely.
+	 * This is safe since the entire machine is single threaded while we are in
+	 * this function. */
+	write_msr(MSR_GS_BASE, (uintptr_t)&per_cpu_info[0]);
+
 	// Get a per-core kernel stack
 	uintptr_t my_stack_top = get_kstack();
 
@@ -266,6 +271,9 @@ uintptr_t smp_main(void)
 
 	apiconline();
 
+	/* Stop pretending to be core 0.  We'll get our own coreid shortly and set
+	 * gs properly (smp_final_core_init()) */
+	write_msr(MSR_GS_BASE, 0);
 
 	return my_stack_top; // will be loaded in smp_entry.S
 }
