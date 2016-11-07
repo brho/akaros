@@ -19,12 +19,6 @@
  * address of the next free item.  The slab structure is stored at the end of
  * the page.  There is only one page per slab.
  *
- * TODO: Note, that this is a minor pain in the ass, and worth thinking about
- * before implementing.  To keep the constructor's state valid, we can't just
- * overwrite things, so we need to add an extra 4-8 bytes per object for the
- * pointer, and then pass over that data when we return the actual object's
- * address.  This also might fuck with alignment.
- *
  * Be careful with source arenas and NOTOUCH.  If a cache's source arena is not
  * page-aligned memory, you need to set NOTOUCH.  Otherwise, for small objects,
  * a slab will be constructed that uses the source for a page of objects.

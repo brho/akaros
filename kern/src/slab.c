@@ -254,10 +254,9 @@ static void *__kmem_alloc_from_slab(struct kmem_cache *cp, int flags)
 	// have a partial now (a_slab), get an item, return item
 	if (!__use_bufctls(cp)) {
 		retval = a_slab->free_small_obj;
-		/* adding the size of the cache_obj to get to the pointer at end of the
-		 * buffer pointing to the next free_small_obj */
-		a_slab->free_small_obj = *(uintptr_t**)(a_slab->free_small_obj +
-		                                        cp->obj_size);
+		/* the next free_small_obj address is stored at the beginning of the
+		 * current free_small_obj. */
+		a_slab->free_small_obj = *(uintptr_t**)(a_slab->free_small_obj);
 	} else {
 		// rip the first bufctl out of the partial slab's buf list
 		struct kmem_bufctl *a_bufctl = BSD_LIST_FIRST(&a_slab->bufctl_freelist);
@@ -298,9 +297,9 @@ static void __kmem_free_to_slab(struct kmem_cache *cp, void *buf)
 		// find its slab
 		a_slab = (struct kmem_slab*)(ROUNDDOWN((uintptr_t)buf, PGSIZE) +
 		                             PGSIZE - sizeof(struct kmem_slab));
-		/* write location of next free small obj to the space at the end of the
-		 * buffer, then list buf as the next free small obj */
-		*(uintptr_t**)(buf + cp->obj_size) = a_slab->free_small_obj;
+		/* write location of next free small obj to the space at the beginning
+		 * of the buffer, then list buf as the next free small obj */
+		*(uintptr_t**)buf = a_slab->free_small_obj;
 		a_slab->free_small_obj = buf;
 	} else {
 		/* Give the bufctl back to the parent slab */
@@ -352,21 +351,22 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 		// the slab struct is stored at the end of the page
 		a_slab = (struct kmem_slab*)(a_page + PGSIZE
 		                             - sizeof(struct kmem_slab));
-		// Need to add room for the next free item pointer in the object buffer.
-		a_slab->obj_size = ROUNDUP(cp->obj_size + sizeof(uintptr_t), cp->align);
+		/* the 'next free item' pointer will be the first word of the obj.  we
+		 * used to append a uintptr_t for that. */
+		a_slab->obj_size = ROUNDUP(cp->obj_size, cp->align);
 		a_slab->num_busy_obj = 0;
 		a_slab->num_total_obj = (PGSIZE - sizeof(struct kmem_slab)) /
 		                        a_slab->obj_size;
 		// TODO: consider staggering this IAW section 4.3
 		a_slab->free_small_obj = a_page;
 		/* Walk and create the free list, which is circular.  Each item stores
-		 * the location of the next one at the end of the block. */
+		 * the location of the next one at the beginning of the block. */
 		void *buf = a_slab->free_small_obj;
 		for (int i = 0; i < a_slab->num_total_obj - 1; i++) {
-			*(uintptr_t**)(buf + cp->obj_size) = buf + a_slab->obj_size;
+			*(uintptr_t**)buf = buf + a_slab->obj_size;
 			buf += a_slab->obj_size;
 		}
-		*((uintptr_t**)(buf + cp->obj_size)) = NULL;
+		*((uintptr_t**)buf) = NULL;
 	} else {
 		void *buf;
 
