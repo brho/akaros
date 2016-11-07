@@ -38,6 +38,8 @@ pseudodesc_t idt_pd;
 struct irq_handler *irq_handlers[NUM_IRQS];
 spinlock_t irq_handler_wlock = SPINLOCK_INITIALIZER_IRQSAVE;
 
+static void x86_finalize_vmtf(struct vm_trapframe *tf);
+
 static bool try_handle_exception_fixup(struct hw_trapframe *hw_tf)
 {
 	if (in_kernel(hw_tf)) {
@@ -1052,6 +1054,17 @@ static void vmexit_dispatch(struct vm_trapframe *tf)
 	 * do it for external IRQs - the irq_dispatch code will handle it. */
 	switch (tf->tf_exit_reason) {
 	case EXIT_REASON_VMCALL:
+		if (tf->tf_rdi == 0x1338) {
+			tf->tf_rip += 3;
+			handled = TRUE;
+			break;
+		}
+		if (tf->tf_rdi == 0x1339) {
+			tf->tf_rip += 3;
+			x86_finalize_vmtf(tf);
+			handled = TRUE;
+			break;
+		}
 		if (current->vmm.flags & VMM_VMCALL_PRINTF) {
 			printk("%c", tf->tf_rdi);
 			tf->tf_rip += 3;

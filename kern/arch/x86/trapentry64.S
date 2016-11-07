@@ -914,6 +914,31 @@ sysenter_spin:
 .globl vmexit_handler;
 .type vmexit_handler, @function;
 vmexit_handler:
+
+# This is part of why i don't use enums.  need #defines for asm.
+#define VM_EXIT_REASON                  0x00004402
+#define EXIT_REASON_VMCALL              18
+#define GUEST_RIP                       0x0000681e
+	pushq %rdx
+	pushq %rax
+	movq $VM_EXIT_REASON, %rdx
+	vmread %rdx, %rax
+	cmp $EXIT_REASON_VMCALL, %rax
+	jne normal_vmexit
+	cmp $0x1337, %rdi
+	jne normal_vmexit
+	# advance RIP by 3 (sizeof vmcall)
+	movq $GUEST_RIP, %rdx
+	vmread %rdx, %rax
+	add $3, %rax
+	vmwrite %rax, %rdx
+	popq %rax
+	popq %rdx
+	vmresume
+normal_vmexit:
+	popq %rax
+	popq %rdx
+
 	# rflags has all flags = 0, so cli and cld already.
 	# HOST_GS_BASE and RSP is set by the hardware
 	# Set default values.  Most of these will be set in C later.
