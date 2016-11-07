@@ -1,10 +1,82 @@
 /* Copyright (c) 2009 The Regents of the University of California
- * Copyright (c) 2016 Google Inc
- * Barret Rhoden <brho@cs.berkeley.edu>
- * Kevin Klues <klueska@cs.berkeley.edu>
  * See LICENSE for details.
  *
  * Slab allocator, based on the SunOS 5.4 allocator paper.
+ *
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * Kevin Klues <klueska@cs.berkeley.edu>
+ *
+ * Copyright (c) 2016 Google Inc
+ *
+ * Upgraded and extended to support magazines, based on Bonwick and Adams's
+ * "Magazines and Vmem" paper.
+ *
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ *
+ * FAQ:
+ * - What sort of allocator do we need for the kmem_pcpu_caches?  In general,
+ *   the base allocator.  All slabs/caches depend on the pcpu_caches for any
+ *   allocation, so we need something that does not rely on slabs.  We could use
+ *   generic kpages, if we knew that we weren't: qcaches for a kpages_arena, the
+ *   slab kcache, or the bufctl kcache.  This is the same set of restrictions
+ *   for the hash table allocations.
+ * - Why doesn't the magazine cache deadlock on itself?  Because magazines are
+ *   only allocated during the free path of another cache.  There are no
+ *   magazine allocations during a cache's allocation.
+ * - Does the magazine cache need to be statically allocated?  Maybe not, but it
+ *   doesn't hurt.  We need to set it up at some point.  We can use other caches
+ *   for allocations before the mag cache is initialized, but we can't free.
+ * - Does the magazine cache need to pull from the base arena?  Similar to the
+ *   static allocation question - by default, maybe not, but it is safer.  And
+ *   yes, due to other design choices.  We could initialize it after kpages is
+ *   allocated and use a kpages_arena, but that would require us to not free a
+ *   page before or during kpages_arena_init().  A related note is where the
+ *   first magazines in a pcpu_cache come from.  I'm currently going with "raw
+ *   slab alloc from the magazine cache", which means magazines need to work
+ *   when we're setting up the qcache's for kpages_arena.  That creates a
+ *   dependency, which means kpages depends on mags, which means mags can only
+ *   depend on base.  If we ever use slabs for non-base arena btags, we'll also
+ *   have this dependency between kpages and mags.
+ * - The paper talks about full and empty magazines.  Why does our code talk
+ *   about not_empty and empty?  The way we'll do our magazine resizing is to
+ *   just() increment the pcpu_cache's magsize.  Then we'll eventually start
+ *   filling the magazines to their new capacity (during frees, btw).  During
+ *   this time, a mag that was previously full will technically be not-empty,
+ *   but not full.  The correctness of the magazine code is still OK, I think,
+ *   since when they say 'full', they require 'not empty' in most cases.  In
+ *   short, 'not empty' is more accurate, though it makes sense to say 'full'
+ *   when explaining the basic idea for their paper.
+ * - Due to a resize, what happens when the depot gives a pcpu cache a magazine
+ *   with *more* rounds than ppc->magsize?  The allocation path doesn't care
+ *   about magsize - it just looks at nr_rounds.  So that's fine.  On the free
+ *   path, we might mistakenly think that a mag has no more room.  In that case,
+ *   we'll just hand it to the depot and it'll be a 'not-empty' mag.  Eventually
+ *   it'll get filled up, or it just won't matter.  'magsize' is basically an
+ *   instruction to the pcpu_cache: "fill to X, please."
+ * - Why is nr_rounds tracked in the magazine and not the pcpu cache?  The paper
+ *   uses the pcpu cache, but doesn't say whether or not the mag tracks it too.
+ *   We track it in the mag since not all mags have the same size (e.g.  during
+ *   a resize operation).  For performance (avoid an occasional cache miss), we
+ *   could consider tracking it in the pcpu_cache.  Might save a miss now and
+ *   then.
+ * - Why do we just disable IRQs for the pcpu_cache?  The paper explicitly talks
+ *   about using locks instead of disabling IRQs, since disabling IRQs can be
+ *   expensive.  First off, we only just disable IRQs when there's 1:1 core to
+ *   pcc.  If we were to use a spinlock, we'd be disabling IRQs anyway, since we
+ *   do allocations from IRQ context.  The other reason to lock is when changing
+ *   the pcpu state during a magazine resize.  I have two ways to do this: just
+ *   racily write and set pcc->magsize, or have the pcc's poll when they check
+ *   the depot during free.  Either approach doesn't require someone else to
+ *   grab a pcc lock.
+ *
+ * TODO:
+ * - Change the sigs of ctor/dtor, add reclaim function.
+ * - When resizing, do we want to go through the depot and consolidate
+ *   magazines?  (probably not a big deal.  maybe we'd deal with it when we
+ *   clean up our excess mags.)
+ * - Could do some working set tracking.  Like max/min over an interval, with
+ *   resetting (in the depot, used for reclaim and maybe aggressive freeing).
+ * - Debugging info
  */
 
 #include <slab.h>
@@ -14,6 +86,13 @@
 #include <kmalloc.h>
 #include <hash.h>
 #include <arena.h>
+
+#define SLAB_POISON ((void*)0xdead1111)
+
+/* Tunables.  I don't know which numbers to pick yet.  Maybe we play with it at
+ * runtime.  Though once a mag increases, it'll never decrease. */
+uint64_t resize_timeout_ns = 1000000000;
+unsigned int resize_threshold = 1;
 
 struct kmem_cache_list kmem_caches = SLIST_HEAD_INITIALIZER(kmem_caches);
 spinlock_t kmem_caches_lock = SPINLOCK_INITIALIZER_IRQSAVE;
@@ -28,10 +107,148 @@ static void __kmem_free_to_slab(struct kmem_cache *cp, void *buf);
 struct kmem_cache kmem_cache_cache[1];
 struct kmem_cache kmem_slab_cache[1];
 struct kmem_cache kmem_bufctl_cache[1];
+struct kmem_cache kmem_magazine_cache[1];
 
 static bool __use_bufctls(struct kmem_cache *cp)
 {
 	return cp->flags & __KMC_USE_BUFCTL;
+}
+
+/* Using a layer of indirection for the pcpu caches, in case we want to use
+ * clustered objects, only per-NUMA-domain caches, or something like that. */
+unsigned int kmc_nr_pcpu_caches(void)
+{
+	return num_cores;
+}
+
+static struct kmem_pcpu_cache *get_my_pcpu_cache(struct kmem_cache *kc)
+{
+	return &kc->pcpu_caches[core_id()];
+}
+
+/* In our current model, there is one pcc per core.  If we had multiple cores
+ * that could use the pcc, such as with per-NUMA caches, then we'd need a
+ * spinlock.  Since we do allocations from IRQ context, we still need to disable
+ * IRQs. */
+static void lock_pcu_cache(struct kmem_pcpu_cache *pcc)
+{
+	disable_irqsave(&pcc->irq_state);
+}
+
+static void unlock_pcu_cache(struct kmem_pcpu_cache *pcc)
+{
+	enable_irqsave(&pcc->irq_state);
+}
+
+static void lock_depot(struct kmem_depot *depot)
+{
+	uint64_t time;
+
+	if (spin_trylock_irqsave(&depot->lock))
+		return;
+	/* The lock is contended.  When we finally get the lock, we'll up the
+	 * contention count and see if we've had too many contentions over time.
+	 *
+	 * The idea is that if there are bursts of contention worse than X contended
+	 * acquisitions in Y nsec, then we'll grow the magazines.  This might not be
+	 * that great of an approach - every thread gets one count, regardless of
+	 * how long they take.
+	 *
+	 * We read the time before locking so that we don't artificially grow the
+	 * window too much.  Say the lock is heavily contended and we take a long
+	 * time to get it.  Perhaps X threads try to lock it immediately, but it
+	 * takes over Y seconds for the Xth thread to actually get the lock.  We
+	 * might then think the burst wasn't big enough. */
+	time = nsec();
+	spin_lock_irqsave(&depot->lock);
+	/* If there are no not-empty mags, we're probably fighting for the lock not
+	 * because the magazines aren't big enough, but because there aren't enough
+	 * mags in the system yet. */
+	if (!depot->nr_not_empty)
+		return;
+	if (time - depot->busy_start > resize_timeout_ns) {
+		depot->busy_count = 0;
+		depot->busy_start = time;
+	}
+	depot->busy_count++;
+	if (depot->busy_count > resize_threshold) {
+		depot->busy_count = 0;
+		depot->magsize = MIN(KMC_MAG_MAX_SZ, depot->magsize + 1);
+		/* That's all we do - the pccs will eventually notice and up their
+		 * magazine sizes. */
+	}
+}
+
+static void unlock_depot(struct kmem_depot *depot)
+{
+	spin_unlock_irqsave(&depot->lock);
+}
+
+static void depot_init(struct kmem_depot *depot)
+{
+	spinlock_init_irqsave(&depot->lock);
+	SLIST_INIT(&depot->not_empty);
+	SLIST_INIT(&depot->empty);
+	depot->magsize = KMC_MAG_MIN_SZ;
+	depot->nr_not_empty = 0;
+	depot->nr_empty = 0;
+	depot->busy_count = 0;
+	depot->busy_start = 0;
+}
+
+static bool mag_is_empty(struct kmem_magazine *mag)
+{
+	return mag->nr_rounds == 0;
+}
+
+/* Helper, swaps the loaded and previous mags.  Hold the pcc lock. */
+static void __swap_mags(struct kmem_pcpu_cache *pcc)
+{
+	struct kmem_magazine *temp;
+
+	temp = pcc->prev;
+	pcc->prev = pcc->loaded;
+	pcc->loaded = temp;
+}
+
+/* Helper, returns a magazine to the depot.  Hold the depot lock. */
+static void __return_to_depot(struct kmem_cache *kc, struct kmem_magazine *mag)
+{
+	struct kmem_depot *depot = &kc->depot;
+
+	if (mag_is_empty(mag)) {
+		SLIST_INSERT_HEAD(&depot->empty, mag, link);
+		depot->nr_empty++;
+	} else {
+		SLIST_INSERT_HEAD(&depot->not_empty, mag, link);
+		depot->nr_not_empty++;
+	}
+}
+
+/* Helper, removes the contents of the magazine, giving them back to the slab
+ * layer. */
+static void drain_mag(struct kmem_cache *kc, struct kmem_magazine *mag)
+{
+	for (int i = 0; i < mag->nr_rounds; i++)
+		__kmem_free_to_slab(kc, mag->rounds[i]);
+	mag->nr_rounds = 0;
+}
+
+static struct kmem_pcpu_cache *build_pcpu_caches(void)
+{
+	struct kmem_pcpu_cache *pcc;
+
+	pcc = base_alloc(NULL,
+	                 sizeof(struct kmem_pcpu_cache) * kmc_nr_pcpu_caches(),
+	                 MEM_WAIT);
+	for (int i = 0; i < kmc_nr_pcpu_caches(); i++) {
+		pcc[i].irq_state = 0;
+		pcc[i].magsize = KMC_MAG_MIN_SZ;
+		pcc[i].loaded = __kmem_alloc_from_slab(kmem_magazine_cache, MEM_WAIT);
+		pcc[i].prev = __kmem_alloc_from_slab(kmem_magazine_cache, MEM_WAIT);
+		pcc[i].nr_allocs_ever = 0;
+	}
+	return pcc;
 }
 
 void __kmem_cache_create(struct kmem_cache *kc, const char *name,
@@ -72,6 +289,10 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	 * assume we're importing from a PGSIZE-aligned source arena. */
 	if ((obj_size > SLAB_LARGE_CUTOFF) || (flags & KMC_NOTOUCH))
 		kc->flags |= __KMC_USE_BUFCTL;
+	depot_init(&kc->depot);
+	/* We do this last, since this will all into the magazine cache - which we
+	 * could be creating on this call! */
+	kc->pcpu_caches = build_pcpu_caches();
 	/* put in cache list based on it's size */
 	struct kmem_cache *i, *prev = NULL;
 	spin_lock_irqsave(&kmem_caches_lock);
@@ -89,8 +310,22 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	spin_unlock_irqsave(&kmem_caches_lock);
 }
 
+static void __mag_ctor(void *obj, size_t _ign)
+{
+	struct kmem_magazine *mag = (struct kmem_magazine*)obj;
+
+	mag->nr_rounds = 0;
+}
+
 void kmem_cache_init(void)
 {
+	/* magazine must be first - all caches, including mags, will do a slab alloc
+	 * from the mag cache. */
+	static_assert(sizeof(struct kmem_magazine) <= SLAB_LARGE_CUTOFF);
+	__kmem_cache_create(kmem_magazine_cache, "kmem_magazine",
+	                    sizeof(struct kmem_magazine),
+	                    __alignof__(struct kmem_magazine), 0, base_arena,
+	                    __mag_ctor, NULL);
 	__kmem_cache_create(kmem_cache_cache, "kmem_cache",
 	                    sizeof(struct kmem_cache),
 	                    __alignof__(struct kmem_cache), 0, base_arena,
@@ -115,6 +350,41 @@ struct kmem_cache *kmem_cache_create(const char *name, size_t obj_size,
 	struct kmem_cache *kc = kmem_cache_alloc(kmem_cache_cache, 0);
 	__kmem_cache_create(kc, name, obj_size, align, flags, source, ctor, dtor);
 	return kc;
+}
+
+/* Helper during destruction.  No one should be touching the allocator anymore.
+ * We just need to hand objects back to the depot, which will hand them to the
+ * slab.  Locking is just a formality here. */
+static void drain_pcpu_caches(struct kmem_cache *kc)
+{
+	struct kmem_pcpu_cache *pcc;
+
+	for (int i = 0; i < kmc_nr_pcpu_caches(); i++) {
+		pcc = &kc->pcpu_caches[i];
+		lock_pcu_cache(pcc);
+		lock_depot(&kc->depot);
+		__return_to_depot(kc, pcc->loaded);
+		__return_to_depot(kc, pcc->prev);
+		unlock_depot(&kc->depot);
+		pcc->loaded = SLAB_POISON;
+		pcc->prev = SLAB_POISON;
+		unlock_pcu_cache(pcc);
+	}
+}
+
+static void depot_destroy(struct kmem_cache *kc)
+{
+	struct kmem_magazine *mag_i;
+	struct kmem_depot *depot = &kc->depot;
+
+	lock_depot(depot);
+	while ((mag_i = SLIST_FIRST(&depot->not_empty))) {
+		drain_mag(kc, mag_i);
+		kmem_cache_free(kmem_magazine_cache, mag_i);
+	}
+	while ((mag_i = SLIST_FIRST(&depot->empty)))
+		kmem_cache_free(kmem_magazine_cache, mag_i);
+	unlock_depot(depot);
 }
 
 static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
@@ -143,6 +413,8 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 {
 	struct kmem_slab *a_slab, *next;
 
+	drain_pcpu_caches(cp);
+	depot_destroy(cp);
 	spin_lock_irqsave(&cp->cache_lock);
 	assert(TAILQ_EMPTY(&cp->full_slab_list));
 	assert(TAILQ_EMPTY(&cp->partial_slab_list));
@@ -277,9 +549,41 @@ static void *__kmem_alloc_from_slab(struct kmem_cache *cp, int flags)
 	return retval;
 }
 
-void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
+void *kmem_cache_alloc(struct kmem_cache *kc, int flags)
 {
-	return __kmem_alloc_from_slab(cp, flags);
+	struct kmem_pcpu_cache *pcc = get_my_pcpu_cache(kc);
+	struct kmem_depot *depot = &kc->depot;
+	struct kmem_magazine *mag;
+	void *ret;
+
+	lock_pcu_cache(pcc);
+try_alloc:
+	if (pcc->loaded->nr_rounds) {
+		ret = pcc->loaded->rounds[pcc->loaded->nr_rounds - 1];
+		pcc->loaded->nr_rounds--;
+		pcc->nr_allocs_ever++;
+		unlock_pcu_cache(pcc);
+		return ret;
+	}
+	if (!mag_is_empty(pcc->prev)) {
+		__swap_mags(pcc);
+		goto try_alloc;
+	}
+	/* Note the lock ordering: pcc -> depot */
+	lock_depot(depot);
+	mag = SLIST_FIRST(&depot->not_empty);
+	if (mag) {
+		SLIST_REMOVE_HEAD(&depot->not_empty, link);
+		depot->nr_not_empty--;
+		__return_to_depot(kc, pcc->prev);
+		unlock_depot(depot);
+		pcc->prev = pcc->loaded;
+		pcc->loaded = mag;
+		goto try_alloc;
+	}
+	unlock_depot(depot);
+	unlock_pcu_cache(pcc);
+	return __kmem_alloc_from_slab(kc, flags);
 }
 
 /* Returns an object to the slab layer.  Note that objects in the slabs are
@@ -320,9 +624,57 @@ static void __kmem_free_to_slab(struct kmem_cache *cp, void *buf)
 	spin_unlock_irqsave(&cp->cache_lock);
 }
 
-void kmem_cache_free(struct kmem_cache *cp, void *buf)
+void kmem_cache_free(struct kmem_cache *kc, void *buf)
 {
-	__kmem_free_to_slab(cp, buf);
+	struct kmem_pcpu_cache *pcc = get_my_pcpu_cache(kc);
+	struct kmem_depot *depot = &kc->depot;
+	struct kmem_magazine *mag;
+
+	lock_pcu_cache(pcc);
+try_free:
+	if (pcc->loaded->nr_rounds < pcc->magsize) {
+		pcc->loaded->rounds[pcc->loaded->nr_rounds] = buf;
+		pcc->loaded->nr_rounds++;
+		unlock_pcu_cache(pcc);
+		return;
+	}
+	/* The paper checks 'is empty' here.  But we actually just care if it has
+	 * room left, not that prev is completely empty.  This could be the case due
+	 * to magazine resize. */
+	if (pcc->prev->nr_rounds < pcc->magsize) {
+		__swap_mags(pcc);
+		goto try_free;
+	}
+	lock_depot(depot);
+	/* Here's where the resize magic happens.  We'll start using it for the next
+	 * magazine. */
+	pcc->magsize = depot->magsize;
+	mag = SLIST_FIRST(&depot->empty);
+	if (mag) {
+		SLIST_REMOVE_HEAD(&depot->empty, link);
+		depot->nr_empty--;
+		__return_to_depot(kc, pcc->prev);
+		unlock_depot(depot);
+		pcc->prev = pcc->loaded;
+		pcc->loaded = mag;
+		goto try_free;
+	}
+	unlock_depot(depot);
+	/* Need to unlock, in case we end up calling back into ourselves. */
+	unlock_pcu_cache(pcc);
+	/* don't want to wait on a free.  if this fails, we can still just give it
+	 * to the slab layer. */
+	mag = kmem_cache_alloc(kmem_magazine_cache, MEM_ATOMIC);
+	if (mag) {
+		assert(mag->nr_rounds == 0);	/* paranoia, can probably remove */
+		lock_depot(depot);
+		SLIST_INSERT_HEAD(&depot->empty, mag, link);
+		depot->nr_empty++;
+		unlock_depot(depot);
+		lock_pcu_cache(pcc);
+		goto try_free;
+	}
+	__kmem_free_to_slab(kc, buf);
 }
 
 /* Back end: internal functions */

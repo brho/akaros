@@ -39,11 +39,39 @@
 #define SLAB_LARGE_CUTOFF (PGSIZE / NUM_BUF_PER_SLAB)
 
 #define KMC_NAME_SZ				32
+#define KMC_MAG_MIN_SZ			8
+#define KMC_MAG_MAX_SZ			62		/* chosen for mag size and caching */
 
 /* Cache creation flags: */
 #define KMC_NOTOUCH				0x0001	/* Can't use source/object's memory */
 #define KMC_QCACHE				0x0002	/* Cache is an arena's qcache */
 #define __KMC_USE_BUFCTL		0x1000	/* Internal use */
+
+struct kmem_magazine {
+	SLIST_ENTRY(kmem_magazine)	link;
+	unsigned int				nr_rounds;
+	void						*rounds[KMC_MAG_MAX_SZ];
+} __attribute__((aligned(ARCH_CL_SIZE)));
+SLIST_HEAD(kmem_mag_slist, kmem_magazine);
+
+struct kmem_pcpu_cache {
+	int8_t						irq_state;
+	unsigned int				magsize;
+	struct kmem_magazine		*loaded;
+	struct kmem_magazine		*prev;
+	size_t						nr_allocs_ever;
+} __attribute__((aligned(ARCH_CL_SIZE)));
+
+struct kmem_depot {
+	spinlock_t					lock;
+	struct kmem_mag_slist		not_empty;
+	struct kmem_mag_slist		empty;
+	unsigned int				magsize;
+	unsigned int				nr_empty;
+	unsigned int				nr_not_empty;
+	unsigned int				busy_count;
+	uint64_t					busy_start;
+};
 
 struct kmem_slab;
 
@@ -73,6 +101,8 @@ TAILQ_HEAD(kmem_slab_list, kmem_slab);
 /* Actual cache */
 struct kmem_cache {
 	SLIST_ENTRY(kmem_cache) link;
+	struct kmem_pcpu_cache *pcpu_caches;
+	struct kmem_depot depot;
 	spinlock_t cache_lock;
 	size_t obj_size;
 	size_t import_amt;
@@ -108,6 +138,7 @@ void kmem_cache_free(struct kmem_cache *cp, void *buf);
 /* Back end: internal functions */
 void kmem_cache_init(void);
 void kmem_cache_reap(struct kmem_cache *cp);
+unsigned int kmc_nr_pcpu_caches(void);
 /* Low-level interface for initializing a cache. */
 void __kmem_cache_create(struct kmem_cache *kc, const char *name,
                          size_t obj_size, int align, int flags,
