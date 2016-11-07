@@ -61,7 +61,6 @@ BSD_LIST_HEAD(kmem_bufctl_list, kmem_bufctl);
  * is used instead.*/
 struct kmem_slab {
 	TAILQ_ENTRY(kmem_slab) link;
-	size_t obj_size;
 	size_t num_busy_obj;
 	size_t num_total_obj;
 	union {

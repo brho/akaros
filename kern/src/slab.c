@@ -44,12 +44,11 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	assert(align);
 	spinlock_init_irqsave(&kc->cache_lock);
 	strlcpy(kc->name, name, KMC_NAME_SZ);
-	kc->obj_size = obj_size;
+	kc->obj_size = ROUNDUP(obj_size, align);
 	if (flags & KMC_QCACHE)
 		kc->import_amt = ROUNDUPPWR2(3 * source->qcache_max);
 	else
-		kc->import_amt = ROUNDUP(NUM_BUF_PER_SLAB * ROUNDUP(obj_size, align),
-		                         PGSIZE);
+		kc->import_amt = ROUNDUP(NUM_BUF_PER_SLAB * obj_size, PGSIZE);
 	kc->align = align;
 	if (align > PGSIZE)
 		panic("Cache %s object alignment is actually MIN(PGSIZE, align (%p))",
@@ -351,20 +350,17 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 		// the slab struct is stored at the end of the page
 		a_slab = (struct kmem_slab*)(a_page + PGSIZE
 		                             - sizeof(struct kmem_slab));
-		/* the 'next free item' pointer will be the first word of the obj.  we
-		 * used to append a uintptr_t for that. */
-		a_slab->obj_size = ROUNDUP(cp->obj_size, cp->align);
 		a_slab->num_busy_obj = 0;
 		a_slab->num_total_obj = (PGSIZE - sizeof(struct kmem_slab)) /
-		                        a_slab->obj_size;
+		                        cp->obj_size;
 		// TODO: consider staggering this IAW section 4.3
 		a_slab->free_small_obj = a_page;
 		/* Walk and create the free list, which is circular.  Each item stores
 		 * the location of the next one at the beginning of the block. */
 		void *buf = a_slab->free_small_obj;
 		for (int i = 0; i < a_slab->num_total_obj - 1; i++) {
-			*(uintptr_t**)buf = buf + a_slab->obj_size;
-			buf += a_slab->obj_size;
+			*(uintptr_t**)buf = buf + cp->obj_size;
+			buf += cp->obj_size;
 		}
 		*((uintptr_t**)buf) = NULL;
 	} else {
@@ -373,14 +369,13 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 		a_slab = kmem_cache_alloc(kmem_slab_cache, 0);
 		if (!a_slab)
 			return FALSE;
-		a_slab->obj_size = ROUNDUP(cp->obj_size, cp->align);
 		buf = arena_alloc(cp->source, cp->import_amt, MEM_ATOMIC);
 		if (!buf) {
 			kmem_cache_free(kmem_slab_cache, a_slab);
 			return FALSE;
 		}
 		a_slab->num_busy_obj = 0;
-		a_slab->num_total_obj = cp->import_amt / a_slab->obj_size;
+		a_slab->num_total_obj = cp->import_amt / cp->obj_size;
 		BSD_LIST_INIT(&a_slab->bufctl_freelist);
 		/* for each buffer, set up a bufctl and point to the buffer */
 		for (int i = 0; i < a_slab->num_total_obj; i++) {
@@ -388,7 +383,7 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 			BSD_LIST_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl, link);
 			a_bufctl->buf_addr = buf;
 			a_bufctl->my_slab = a_slab;
-			buf += a_slab->obj_size;
+			buf += cp->obj_size;
 		}
 	}
 	// add a_slab to the empty_list
@@ -420,7 +415,7 @@ void print_kmem_cache(struct kmem_cache *cp)
 	spin_lock_irqsave(&cp->cache_lock);
 	printk("\nPrinting kmem_cache:\n---------------------\n");
 	printk("Name: %s\n", cp->name);
-	printk("Objsize: %d\n", cp->obj_size);
+	printk("Objsize (incl align): %d\n", cp->obj_size);
 	printk("Align: %d\n", cp->align);
 	printk("Flags: 0x%08x\n", cp->flags);
 	printk("Constructor: %p\n", cp->ctor);
@@ -431,25 +426,3 @@ void print_kmem_cache(struct kmem_cache *cp)
 	printk("Current Allocations: %d\n", cp->nr_cur_alloc);
 	spin_unlock_irqsave(&cp->cache_lock);
 }
-
-void print_kmem_slab(struct kmem_slab *slab)
-{
-	printk("\nPrinting kmem_slab:\n---------------------\n");
-	printk("Objsize: %d (%p)\n", slab->obj_size, slab->obj_size);
-	printk("NumBusy: %d\n", slab->num_busy_obj);
-	printk("Num_total: %d\n", slab->num_total_obj);
-	/* This will break if we have a NOTOUCH small slab.  It's debugging code, so
-	 * just be careful. */
-	if (slab->obj_size + sizeof(uintptr_t) < SLAB_LARGE_CUTOFF) {
-		printk("Free Small obj: %p\n", slab->free_small_obj);
-		void *buf = slab->free_small_obj;
-		for (int i = 0; i < slab->num_total_obj; i++) {
-			printk("Addr of buf: %p, Addr of next: %p\n", buf,
-			       *((uintptr_t**)buf));
-			buf += slab->obj_size;
-		}
-	} else {
-		printk("This is a big slab!\n");
-	}
-}
-
