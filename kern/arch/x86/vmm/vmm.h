@@ -27,6 +27,10 @@ struct guest_pcore {
 	} msr_autoload;
 	struct vmcs *vmcs;
 	uint64_t xcr0;
+	uint64_t msr_kern_gs_base;
+	uint64_t msr_star;
+	uint64_t msr_lstar;
+	uint64_t msr_sfmask;
 };
 
 struct vmm {

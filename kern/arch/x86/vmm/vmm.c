@@ -182,6 +182,16 @@ struct guest_pcore *load_guest_pcore(struct proc *p, int guest_pcoreid)
 	vmx_load_guest_pcore(gpc);
 	/* Load guest's xcr0 */
 	lxcr0(gpc->xcr0);
+
+	/* Manual MSR save/restore */
+	write_kern_gsbase(gpc->msr_kern_gs_base);
+	if (gpc->msr_star != AKAROS_MSR_STAR)
+		write_msr(MSR_STAR, gpc->msr_star);
+	if (gpc->msr_lstar != AKAROS_MSR_LSTAR)
+		write_msr(MSR_LSTAR, gpc->msr_lstar);
+	if (gpc->msr_sfmask != AKAROS_MSR_SFMASK)
+		write_msr(MSR_SFMASK, gpc->msr_sfmask);
+
 	return gpc;
 }
 
@@ -201,6 +211,20 @@ void unload_guest_pcore(struct proc *p, int guest_pcoreid)
 	/* Save guest's xcr0 and restore Akaros's default. */
 	gpc->xcr0 = rxcr0();
 	lxcr0(__proc_global_info.x86_default_xcr0);
+
+	/* We manage these MSRs manually. */
+	gpc->msr_kern_gs_base = read_kern_gsbase();
+	gpc->msr_star = read_msr(MSR_STAR);
+	gpc->msr_lstar = read_msr(MSR_LSTAR);
+	gpc->msr_sfmask = read_msr(MSR_SFMASK);
+
+	write_kern_gsbase((uint64_t)pcpui);
+	if (gpc->msr_star != AKAROS_MSR_STAR)
+		write_msr(MSR_STAR, AKAROS_MSR_STAR);
+	if (gpc->msr_lstar != AKAROS_MSR_LSTAR)
+		write_msr(MSR_LSTAR, AKAROS_MSR_LSTAR);
+	if (gpc->msr_sfmask, AKAROS_MSR_SFMASK)
+		write_msr(MSR_SFMASK, AKAROS_MSR_SFMASK);
 
 	/* As soon as we unlock, this gpc can be started on another core */
 	spin_unlock(&p->vmm.lock);

@@ -34,15 +34,19 @@ static inline void x86_fake_rdtscp(struct hw_trapframe *hw_tf)
 	hw_tf->tf_rcx = core_id();
 }
 
+#define AKAROS_MSR_STAR (((((uint64_t)GD_UD - 8) | 0x3) << 48) |             \
+	                     ((uint64_t)GD_KT << 32))
+#define AKAROS_MSR_LSTAR ((uintptr_t)&sysenter_handler)
+/* Masking all flags.  when we syscall, we'll get rflags = 0 */
+#define AKAROS_MSR_SFMASK 0xffffffff
+
 static inline void x86_sysenter_init(void)
 {
 	/* check amd 2:6.1.1 for details.  they have some expectations about the GDT
 	 * layout. */
-	write_msr(MSR_STAR, ((((uint64_t)GD_UD - 8) | 0x3) << 48) |
-	                    ((uint64_t)GD_KT << 32));
-	write_msr(MSR_LSTAR, (uintptr_t)&sysenter_handler);
-	/* Masking all flags.  when we syscall, we'll get rflags = 0 */
-	write_msr(MSR_SFMASK, 0xffffffff);
+	write_msr(MSR_STAR, AKAROS_MSR_STAR);
+	write_msr(MSR_LSTAR, AKAROS_MSR_LSTAR);
+	write_msr(MSR_SFMASK, AKAROS_MSR_SFMASK);
 	write_msr(IA32_EFER_MSR, read_msr(IA32_EFER_MSR) | IA32_EFER_SYSCALL);
 }
 
