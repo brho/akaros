@@ -117,7 +117,7 @@ static void pop_hw_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 				  /* Need a wrmb() here so the write of enable_notif can't pass
 				   * the read of notif_pending (racing with a potential
 				   * cross-core call with proc_notify()). */
-				  "lock addq $0, (%%rdi);" /* LOCK is a CPU mb() */
+				  "lock addb $0, (%%rdi);" /* LOCK is a CPU mb() */
 				  /* From here down, we can get interrupted and restarted */
 	              "popq %%rdi;           " /* get notif_pending status loc */
 	              "testb $0x01, (%%rdi); " /* test if a notif is pending */
@@ -173,7 +173,7 @@ static void pop_sw_tf(struct sw_trapframe *sw_tf, uint32_t vcoreid)
 	              /* Need a wrmb() here so the write of enable_notif can't pass
 	               * the read of notif_pending (racing with a potential
 	               * cross-core call with proc_notify()). */
-	              "lock addq $0, (%2);   " /* LOCK is a CPU mb() */
+	              "lock addb $0, (%2);   " /* LOCK is a CPU mb() */
 	              /* From here down, we can get interrupted and restarted */
 	              "testb $0x01, (%3);    " /* test if a notif is pending */
 	              "jz 1f;                " /* if not pending, skip syscall */
