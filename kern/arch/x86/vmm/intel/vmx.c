@@ -176,13 +176,6 @@ int x86_ept_pte_fix_ups = 0;
 struct vmx_capability vmx_capability;
 struct vmcs_config vmcs_config;
 
-static int autoloaded_msrs[] = {
-	MSR_KERNEL_GS_BASE,
-	MSR_LSTAR,
-	MSR_STAR,
-	MSR_SFMASK,
-};
-
 static char *cr_access_type[] = {
 	"move to cr",
 	"move from cr",
@@ -776,9 +769,6 @@ static void __vmx_setup_pcpu(struct guest_pcore *gpc)
 	vmcs_writel(HOST_GDTR_BASE, (uintptr_t)pcpui->gdt);
 	vmcs_write(HOST_RSP, pcpui->stacktop);
 	vmcs_write(HOST_GS_BASE, (uintptr_t)pcpui);
-	/* TODO: this is MSR_KERNEL_GS_BASE, the 0'th autoload.  This array API is a
-	 * little dangerous. */
-	gpc->msr_autoload.host[0].value = (uintptr_t)pcpui;
 	/* TODO: we might need to also set HOST_IA32_PERF_GLOBAL_CTRL.  Need to
 	 * think about how perf will work with VMs */
 }
@@ -974,22 +964,6 @@ static void __vmx_disable_intercept_for_io(unsigned long *io_bitmap,
 	__clear_bit(port, io_bitmap);
 }
 
-static void gpc_print_autoloads(struct guest_pcore *gpc)
-{
-	struct vmx_msr_entry *e;
-	int sz = sizeof(autoloaded_msrs) / sizeof(*autoloaded_msrs);
-	printk("Host Autoloads:\n-------------------\n");
-	for (int i = 0; i < sz; i++) {
-		e = &gpc->msr_autoload.host[i];
-		printk("\tMSR 0x%08x: %p\n", e->index, e->value);
-	}
-	printk("Guest Autoloads:\n-------------------\n");
-	for (int i = 0; i < sz; i++) {
-		e = &gpc->msr_autoload.guest[i];
-		printk("\tMSR 0x%08x %p\n", e->index, e->value);
-	}
-}
-
 static void dumpmsrs(void) {
 	int i;
 	int set[] = {
@@ -1019,15 +993,6 @@ static void dumpmsrs(void) {
  * only work on certain architectures. */
 static void setup_msr(struct guest_pcore *gpc)
 {
-	struct vmx_msr_entry *e;
-	int sz = sizeof(autoloaded_msrs) / sizeof(*autoloaded_msrs);
-	int i;
-
-	static_assert((sizeof(autoloaded_msrs) / sizeof(*autoloaded_msrs)) <=
-		      NR_AUTOLOAD_MSRS);
-
-	gpc->msr_autoload.nr = sz;
-
 	/* Since PADDR(msr_bitmap) is non-zero, and the bitmap is all 0xff, we now
 	 * intercept all MSRs */
 	vmcs_write64(MSR_BITMAP, PADDR(msr_bitmap));
@@ -1036,29 +1001,9 @@ static void setup_msr(struct guest_pcore *gpc)
 	vmcs_write64(IO_BITMAP_B, PADDR((uintptr_t)io_bitmap +
 	                                (VMX_IO_BITMAP_SZ / 2)));
 
-	vmcs_write32(VM_EXIT_MSR_STORE_COUNT, gpc->msr_autoload.nr);
-	vmcs_write32(VM_EXIT_MSR_LOAD_COUNT, gpc->msr_autoload.nr);
-	vmcs_write32(VM_ENTRY_MSR_LOAD_COUNT, gpc->msr_autoload.nr);
-
-	vmcs_write64(VM_EXIT_MSR_LOAD_ADDR, PADDR(gpc->msr_autoload.host));
-	vmcs_write64(VM_EXIT_MSR_STORE_ADDR, PADDR(gpc->msr_autoload.guest));
-	vmcs_write64(VM_ENTRY_MSR_LOAD_ADDR, PADDR(gpc->msr_autoload.guest));
-
-	for (i = 0; i < sz; i++) {
-		uint64_t val;
-
-		e = &gpc->msr_autoload.host[i];
-		e->index = autoloaded_msrs[i];
-		__vmx_disable_intercept_for_msr(msr_bitmap, e->index);
-		rdmsrl(e->index, val);
-		e->value = val;
-		printk("host index %p val %p\n", e->index, e->value);
-
-		e = &gpc->msr_autoload.guest[i];
-		e->index = autoloaded_msrs[i];
-		e->value = 0xDEADBEEF;
-		printk("guest index %p val %p\n", e->index, e->value);
-	}
+	vmcs_write32(VM_EXIT_MSR_STORE_COUNT, 0);
+	vmcs_write32(VM_EXIT_MSR_LOAD_COUNT, 0);
+	vmcs_write32(VM_ENTRY_MSR_LOAD_COUNT, 0);
 }
 
 /**
@@ -1334,10 +1279,16 @@ int intel_vmm_init(void) {
 
 	memset(io_bitmap, 0xff, VMX_IO_BITMAP_SZ);
 
-	/* These are the only MSRs that are not autoloaded and not intercepted */
+	/* These are the only MSRs that are not intercepted.  The hardware takes
+	 * care of FS_BASE, GS_BASE, and EFER.  We do the rest manually when loading
+	 * and unloading guest pcores. */
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE);
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE);
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_EFER);
+	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_KERNEL_GS_BASE);
+	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_LSTAR);
+	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_STAR);
+	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_SFMASK);
 
 	/* TODO: this might be dangerous, since they can do more than just read the
 	 * CMOS */

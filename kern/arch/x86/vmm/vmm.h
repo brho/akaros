@@ -20,11 +20,6 @@ struct guest_pcore {
 	int cpu;
 	struct proc *proc;
 	unsigned long *posted_irq_desc;
-	struct msr_autoload {
-		unsigned nr;
-		struct vmx_msr_entry guest[NR_AUTOLOAD_MSRS];
-		struct vmx_msr_entry host[NR_AUTOLOAD_MSRS];
-	} msr_autoload;
 	struct vmcs *vmcs;
 	uint64_t xcr0;
 	uint64_t msr_kern_gs_base;
