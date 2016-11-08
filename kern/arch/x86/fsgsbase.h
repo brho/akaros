@@ -46,3 +46,35 @@ static inline void write_gsbase(uintptr_t base)
 	}
 	asm volatile ("wrgsbase %0" : : "r"(base));
 }
+
+/* If we have fast FS/GS access, we can use swapgs to quickly access
+ * kern_gsbase. */
+static inline uintptr_t read_kern_gsbase(void)
+{
+	uintptr_t base;
+	int8_t irq_state = 0;
+
+	if (!cpu_has_feat(CPU_FEAT_X86_FSGSBASE))
+		return read_msr(MSR_KERNEL_GS_BASE);
+	disable_irqsave(&irq_state);
+	swap_gs();
+	base = read_gsbase();
+	swap_gs();
+	enable_irqsave(&irq_state);
+	return base;
+}
+
+static inline void write_kern_gsbase(uintptr_t base)
+{
+	int8_t irq_state = 0;
+
+	if (!cpu_has_feat(CPU_FEAT_X86_FSGSBASE)) {
+		write_msr(MSR_KERNEL_GS_BASE, base);
+		return;
+	}
+	disable_irqsave(&irq_state);
+	swap_gs();
+	write_gsbase(base);
+	swap_gs();
+	enable_irqsave(&irq_state);
+}

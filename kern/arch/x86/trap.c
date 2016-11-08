@@ -1128,16 +1128,16 @@ void handle_vmexit(struct vm_trapframe *tf)
  * loaded with the current GS (the kernel's). */
 static void x86_finalize_hwtf(struct hw_trapframe *tf)
 {
-	tf->tf_gsbase = read_msr(MSR_KERNEL_GS_BASE);
-	write_msr(MSR_KERNEL_GS_BASE, read_gsbase());
+	tf->tf_gsbase = read_kern_gsbase();
+	write_kern_gsbase(read_gsbase());
 	tf->tf_fsbase = read_fsbase();
 	x86_hwtf_clear_partial(tf);
 }
 
 static void x86_finalize_swtf(struct sw_trapframe *tf)
 {
-	tf->tf_gsbase = read_msr(MSR_KERNEL_GS_BASE);
-	write_msr(MSR_KERNEL_GS_BASE, read_gsbase());
+	tf->tf_gsbase = read_kern_gsbase();
+	write_kern_gsbase(read_gsbase());
 	tf->tf_fsbase = read_fsbase();
 	x86_swtf_clear_partial(tf);
 }
