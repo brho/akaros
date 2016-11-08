@@ -38,7 +38,7 @@ static inline void x86_fake_rdtscp(struct hw_trapframe *hw_tf)
 	                     ((uint64_t)GD_KT << 32))
 #define AKAROS_MSR_LSTAR ((uintptr_t)&sysenter_handler)
 /* Masking all flags.  when we syscall, we'll get rflags = 0 */
-#define AKAROS_MSR_SFMASK 0xffffffff
+#define AKAROS_MSR_SFMASK (FL_AC | FL_NT | FL_IOPL_MASK | FL_DF | FL_IF | FL_TF)
 
 static inline void x86_sysenter_init(void)
 {
