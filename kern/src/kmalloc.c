@@ -25,6 +25,8 @@ static void __kfree_release(struct kref *kref);
 
 void kmalloc_init(void)
 {
+	char kc_name[KMC_NAME_SZ];
+
 	/* we want at least a 16 byte alignment of the tag so that the bufs kmalloc
 	 * returns are 16 byte aligned.  we used to check the actual size == 16,
 	 * since we adjusted the KMALLOC_SMALLEST based on that. */
@@ -33,9 +35,9 @@ void kmalloc_init(void)
 	 * the actual returned buffer. */
 	size_t ksize = KMALLOC_SMALLEST;
 	for (int i = 0; i < NUM_KMALLOC_CACHES; i++) {
-		kmalloc_caches[i] = kmem_cache_create("kmalloc_cache", ksize,
-						      KMALLOC_ALIGNMENT, 0,
-						      NULL, 0, 0);
+		snprintf(kc_name, KMC_NAME_SZ, "kmalloc_%d", ksize);
+		kmalloc_caches[i] = kmem_cache_create(kc_name, ksize, KMALLOC_ALIGNMENT,
+		                                      0, NULL, 0, 0);
 		ksize <<= 1;
 	}
 }
