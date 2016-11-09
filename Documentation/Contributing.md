@@ -20,6 +20,7 @@ Contents
     - Crap, Someone Reset a Branch I was Tracking!
     - What Happens When Two People `push -f`
     - Before You Submit Patches: checkpatch
+    - How To Submit Patches: adt
     - How To Submit Patches: git send-email
     - How To Submit Patches: git request-pull
 
@@ -614,6 +615,53 @@ If checkpatch throws false-positives, then you'll have to bypass the precommit h
 For more info on checkpatch, check out http://www.tuxradar.com/content/newbies-guide-hacking-linux-kernel.  We use it just like Linux.
 
 
+### How To Submit Patches: adt
+
+adt is a script that sends patches to our gerrit repository for a review.
+It allows you to send patches for review from the command line, but the
+resulting code review is done on our gerrit page.
+
+First, visit https://akaros-review.googlesource.com and sign in with a gmail
+account to make sure it creates an account for you.
+
+Next, make sure that you have a remote setup for gerrit.
+
+```
+git remote add gerrit https://akaros.googlesource.com/akaros
+```
+
+Next, make sure that you have the gerrit hooks installed. This will generate a
+Change-ID when you do a commit. If you do this, ignore the checkpatch error
+about gerrit Change-IDs.
+
+```
+# Install Gerrit Git hooks
+curl -Lo .git/hooks/commit-msg https://akaros-review.googlesource.com/tools/hooks/commit-msg
+chmod +x .git/hooks/commit-msg
+```
+
+Next, suppose you have a branch that contains changes you want to push up,
+called vmm. You first do a rebase on top of brho/master, to ensure that your
+changes are up to date.
+
+```
+git pull --rebase brho master
+```
+
+To send the patches up for review, you can then do:
+
+```
+scripts/git/adt mail -m dcross,ganshun@google.com,rminnich,brho -t mytopic
+```
+
+The three current flags for adt are as follows:
+-m specifies your reviewers for this patch,
+
+-cc specifies people you want to be cc'ed on this set of commits.
+
+-t specifies the topic for this set of commits. If this flag is not provided,
+the local current branch name will be used as the topic.
+
 ### How To Submit Patches: git send-email
 
 git send-email is a simple way to send patches.  It works from the command line
@@ -661,7 +709,7 @@ $ git send-email -1 vmm
 For more info, check out:
 + git help send-email
 + https://www.freedesktop.org/wiki/Software/PulseAudio/HowToUseGitSendEmail/
-+ http://www.tuxradar.com/content/newbies-guide-hacking-linux-kernel  
++ http://www.tuxradar.com/content/newbies-guide-hacking-linux-kernel
 
 
 ### How To Submit Patches: git request-pull
