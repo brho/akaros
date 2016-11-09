@@ -100,6 +100,7 @@ static inline void spinlock_debug(spinlock_t *lock)
 static inline void spinlock_init(spinlock_t *lock);
 static inline void spinlock_init_irqsave(spinlock_t *lock);
 static inline void spin_lock_irqsave(spinlock_t *lock);
+static inline bool spin_trylock_irqsave(spinlock_t *lock);
 static inline void spin_unlock_irqsave(spinlock_t *lock);
 static inline bool spin_lock_irq_enabled(spinlock_t *lock);
 
@@ -272,6 +273,21 @@ static inline void spin_lock_irqsave(spinlock_t *lock)
 	spin_lock(lock);
 	if (irq_en)
 		lock->rlock |= SPINLOCK_IRQ_EN;
+}
+
+static inline bool spin_trylock_irqsave(spinlock_t *lock)
+{
+	uint32_t irq_en = irq_is_enabled();
+
+	disable_irq();
+	if (!spin_trylock(lock)) {
+		if (irq_en)
+			enable_irq();
+		return FALSE;
+	}
+	if (irq_en)
+		lock->rlock |= SPINLOCK_IRQ_EN;
+	return TRUE;
 }
 
 // if the high bit of the lock is set, then re-enable interrupts
