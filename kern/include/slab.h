@@ -119,6 +119,7 @@ struct kmem_cache {
 	struct kmem_bufctl_list *alloc_hash;
 	struct kmem_bufctl_list static_hash[HASH_INIT_SZ];
 	char name[KMC_NAME_SZ];
+	TAILQ_ENTRY(kmem_cache)	import_link;
 };
 
 /* List of all kmem_caches, sorted in order of size */

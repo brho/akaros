@@ -80,10 +80,11 @@
 #include <stdio.h>
 #include <hash.h>
 #include <slab.h>
+#include <kthread.h>
 
-TAILQ_HEAD(arena_tailq, arena);
 static struct arena_tailq all_arenas = TAILQ_HEAD_INITIALIZER(all_arenas);
 static spinlock_t all_arenas_lock = SPINLOCK_INITIALIZER;
+qlock_t arenas_and_slabs_lock = QLOCK_INITIALIZER(arenas_and_slabs_lock);
 
 struct arena *base_arena;
 struct arena *kpages_arena;
@@ -167,9 +168,14 @@ static void arena_init(struct arena *arena, char *name, size_t quantum,
 	for (int i = 0; i < arena->hh.nr_hash_lists; i++)
 		BSD_LIST_INIT(&arena->static_hash[i]);
 
+	TAILQ_INIT(&arena->__importing_arenas);
+	TAILQ_INIT(&arena->__importing_slabs);
+
 	strlcpy(arena->name, name, ARENA_NAME_SZ);
 	setup_qcaches(arena, quantum, qcache_max);
 
+	if (source)
+		add_importing_arena(source, arena);
 	spin_lock(&all_arenas_lock);
 	TAILQ_INSERT_TAIL(&all_arenas, arena, next);
 	spin_unlock(&all_arenas_lock);
@@ -206,6 +212,8 @@ void arena_destroy(struct arena *arena)
 	spin_lock(&all_arenas_lock);
 	TAILQ_REMOVE(&all_arenas, arena, next);
 	spin_unlock(&all_arenas_lock);
+	if (arena->source)
+		del_importing_arena(arena->source, arena);
 
 	for (int i = 0; i < arena->hh.nr_hash_lists; i++)
 		assert(BSD_LIST_EMPTY(&arena->alloc_hash[i]));
@@ -1189,6 +1197,34 @@ size_t arena_amt_total(struct arena *arena)
 	return arena->amt_total_segs;
 }
 
+void add_importing_arena(struct arena *source, struct arena *importer)
+{
+	qlock(&arenas_and_slabs_lock);
+	TAILQ_INSERT_TAIL(&source->__importing_arenas, importer, import_link);
+	qunlock(&arenas_and_slabs_lock);
+}
+
+void del_importing_arena(struct arena *source, struct arena *importer)
+{
+	qlock(&arenas_and_slabs_lock);
+	TAILQ_REMOVE(&source->__importing_arenas, importer, import_link);
+	qunlock(&arenas_and_slabs_lock);
+}
+
+void add_importing_slab(struct arena *source, struct kmem_cache *importer)
+{
+	qlock(&arenas_and_slabs_lock);
+	TAILQ_INSERT_TAIL(&source->__importing_slabs, importer, import_link);
+	qunlock(&arenas_and_slabs_lock);
+}
+
+void del_importing_slab(struct arena *source, struct kmem_cache *importer)
+{
+	qlock(&arenas_and_slabs_lock);
+	TAILQ_REMOVE(&source->__importing_slabs, importer, import_link);
+	qunlock(&arenas_and_slabs_lock);
+}
+
 void *base_alloc(struct arena *guess, size_t size, int flags)
 {
 	return arena_alloc(find_my_base(guess), size, flags);
@@ -1213,6 +1249,8 @@ void print_arena_stats(struct arena *arena, bool verbose)
 {
 	struct btag *bt_i;
 	struct rb_node *rb_i;
+	struct arena *a_i;
+	struct kmem_cache *s_i;
 
 	size_t nr_allocs = 0;
 	size_t nr_imports = 0;
@@ -1284,4 +1322,13 @@ void print_arena_stats(struct arena *arena, bool verbose)
 	       arena->hh.nr_hash_lists, empty_hash_chain, longest_hash_chain);
 	__arena_asserter(arena);
 	spin_unlock_irqsave(&arena->lock);
+
+	qlock(&arenas_and_slabs_lock);
+	printk("\tImporting Arenas:\n\t-----------------\n");
+	TAILQ_FOREACH(a_i, &arena->__importing_arenas, import_link)
+		printk("\t\t%s\n", a_i->name);
+	printk("\tImporting Slabs:\n\t-----------------\n");
+	TAILQ_FOREACH(s_i, &arena->__importing_slabs, import_link)
+		printk("\t\t%s\n", s_i->name);
+	qunlock(&arenas_and_slabs_lock);
 }

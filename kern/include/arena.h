@@ -11,6 +11,7 @@
 #include <atomic.h>
 #include <rbtree.h>
 #include <hash_helper.h>
+#include <kthread.h>
 
 /* Boundary tags track segments.  All segments, regardless of allocation status,
  * are on the all_segs list.  BTs are on other lists, depending on their status.
@@ -42,6 +43,12 @@ BSD_LIST_HEAD(btag_list, btag);
 #define ARENA_NR_FREE_LISTS		64
 #define ARENA_NAME_SZ			32
 
+/* Forward declarations of import lists */
+struct arena;
+TAILQ_HEAD(arena_tailq, arena);
+struct kmem_cache;
+TAILQ_HEAD(kmem_cache_tailq, kmem_cache);
+
 /* The arena maintains an in-order list of all segments, allocated or otherwise.
  * All free segments are on one of the free_segs[] lists.  There is one list for
  * each power-of-two we can allocate. */
@@ -69,6 +76,10 @@ struct arena {
 	/* Accounting */
 	char						name[ARENA_NAME_SZ];
 	TAILQ_ENTRY(arena)			next;
+	/* These lists are protected by the global arena_and_slab qlock */
+	TAILQ_ENTRY(arena)			import_link;
+	struct arena_tailq			__importing_arenas;
+	struct kmem_cache_tailq		__importing_slabs;
 };
 
 /* Arena allocation styles, or'd with MEM_FLAGS */
@@ -97,6 +108,16 @@ void arena_xfree(struct arena *arena, void *addr, size_t size);
 
 size_t arena_amt_free(struct arena *arena);
 size_t arena_amt_total(struct arena *arena);
+
+/* All lists that track the existence of arenas, slabs, and the connections
+ * between them are tracked by a global qlock.  For the most part, slabs/arenas
+ * are created rarely, and the main lockers will be a reclaim ktask and #mem
+ * accessors. */
+extern qlock_t arenas_and_slabs_lock;
+void add_importing_arena(struct arena *source, struct arena *importer);
+void del_importing_arena(struct arena *source, struct arena *importer);
+void add_importing_slab(struct arena *source, struct kmem_cache *importer);
+void del_importing_slab(struct arena *source, struct kmem_cache *importer);
 
 /* Low-level memory allocator intefaces */
 extern struct arena *base_arena;

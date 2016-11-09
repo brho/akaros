@@ -293,6 +293,7 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	/* We do this last, since this will all into the magazine cache - which we
 	 * could be creating on this call! */
 	kc->pcpu_caches = build_pcpu_caches();
+	add_importing_slab(kc->source, kc);
 	/* put in cache list based on it's size */
 	struct kmem_cache *i, *prev = NULL;
 	spin_lock_irqsave(&kmem_caches_lock);
@@ -413,6 +414,7 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 {
 	struct kmem_slab *a_slab, *next;
 
+	del_importing_slab(cp->source, cp);
 	drain_pcpu_caches(cp);
 	depot_destroy(cp);
 	spin_lock_irqsave(&cp->cache_lock);
