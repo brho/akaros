@@ -319,9 +319,11 @@ static void __swap_to_gth(struct uthread *uth, void *dummy)
 {
 	struct ctlr_thread *cth = (struct ctlr_thread*)uth;
 
-	/* We don't re-account for block/unblock.  The ctlr and the guest are
-	 * accounted together ("pass the token" back and forth). */
-	enqueue_vmm_thread((struct vmm_thread*)cth->buddy);
+	/* We just immediately run our buddy.  The ctlr and the guest are accounted
+	 * together ("pass the token" back and forth). */
+	current_uthread = NULL;
+	run_uthread((struct uthread*)cth->buddy);
+	assert(0);
 }
 
 /* All ctrl threads start here, each time their guest has a fault.  They can
@@ -361,9 +363,11 @@ static void vmm_thread_refl_vm_fault(struct uthread *uth)
 	cth->uthread.flags |= UTHREAD_SAVED;
 	init_user_ctx(&cth->uthread.u_ctx, (uintptr_t)&__ctlr_entry,
 	              (uintptr_t)(cth->stacktop));
-	/* We don't re-account for block/unblock.  The ctlr and the guest are
-	 * accounted together ("pass the token" back and forth). */
-	enqueue_vmm_thread((struct vmm_thread*)cth);
+	/* We just immediately run our buddy.  The ctlr and the guest are accounted
+	 * together ("pass the token" back and forth). */
+	current_uthread = NULL;
+	run_uthread((struct uthread*)cth);
+	assert(0);
 }
 
 static void vmm_thread_refl_fault(struct uthread *uth,
