@@ -94,8 +94,9 @@
 uint64_t resize_timeout_ns = 1000000000;
 unsigned int resize_threshold = 1;
 
-struct kmem_cache_list kmem_caches = SLIST_HEAD_INITIALIZER(kmem_caches);
-spinlock_t kmem_caches_lock = SPINLOCK_INITIALIZER_IRQSAVE;
+/* Protected by the arenas_and_slabs_lock. */
+struct kmem_cache_tailq all_kmem_caches =
+		TAILQ_HEAD_INITIALIZER(all_kmem_caches);
 
 /* Backend/internal functions, defined later.  Grab the lock before calling
  * these. */
@@ -294,21 +295,9 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	 * could be creating on this call! */
 	kc->pcpu_caches = build_pcpu_caches();
 	add_importing_slab(kc->source, kc);
-	/* put in cache list based on it's size */
-	struct kmem_cache *i, *prev = NULL;
-	spin_lock_irqsave(&kmem_caches_lock);
-	/* find the kmem_cache before us in the list.  yes, this is O(n). */
-	SLIST_FOREACH(i, &kmem_caches, link) {
-		if (i->obj_size < kc->obj_size)
-			prev = i;
-		else
-			break;
-	}
-	if (prev)
-		SLIST_INSERT_AFTER(prev, kc, link);
-	else
-		SLIST_INSERT_HEAD(&kmem_caches, kc, link);
-	spin_unlock_irqsave(&kmem_caches_lock);
+	qlock(&arenas_and_slabs_lock);
+	TAILQ_INSERT_TAIL(&all_kmem_caches, kc, all_kmc_link);
+	qunlock(&arenas_and_slabs_lock);
 }
 
 static void __mag_ctor(void *obj, size_t _ign)
@@ -414,6 +403,9 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 {
 	struct kmem_slab *a_slab, *next;
 
+	qlock(&arenas_and_slabs_lock);
+	TAILQ_REMOVE(&all_kmem_caches, cp, all_kmc_link);
+	qunlock(&arenas_and_slabs_lock);
 	del_importing_slab(cp->source, cp);
 	drain_pcpu_caches(cp);
 	depot_destroy(cp);
@@ -429,11 +421,8 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 		kmem_slab_destroy(cp, a_slab);
 		a_slab = next;
 	}
-	spin_lock_irqsave(&kmem_caches_lock);
-	SLIST_REMOVE(&kmem_caches, cp, kmem_cache, link);
-	spin_unlock_irqsave(&kmem_caches_lock);
-	kmem_cache_free(kmem_cache_cache, cp);
 	spin_unlock_irqsave(&cp->cache_lock);
+	kmem_cache_free(kmem_cache_cache, cp);
 }
 
 static void __try_hash_resize(struct kmem_cache *cp)

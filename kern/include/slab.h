@@ -100,7 +100,7 @@ TAILQ_HEAD(kmem_slab_list, kmem_slab);
 
 /* Actual cache */
 struct kmem_cache {
-	SLIST_ENTRY(kmem_cache) link;
+	TAILQ_ENTRY(kmem_cache) all_kmc_link;
 	struct kmem_pcpu_cache *pcpu_caches;
 	struct kmem_depot depot;
 	spinlock_t cache_lock;
@@ -122,9 +122,7 @@ struct kmem_cache {
 	TAILQ_ENTRY(kmem_cache)	import_link;
 };
 
-/* List of all kmem_caches, sorted in order of size */
-SLIST_HEAD(kmem_cache_list, kmem_cache);
-extern struct kmem_cache_list kmem_caches;
+extern struct kmem_cache_tailq all_kmem_caches;
 
 /* Cache management */
 struct kmem_cache *kmem_cache_create(const char *name, size_t obj_size,

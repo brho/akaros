@@ -49,11 +49,8 @@
  *   help us get out of OOM.  So we might block when we're at low-mem, not at 0.
  *   We probably should have a sorted list of desired amounts, and unblockers
  *   poke the CV if the first waiter is likely to succeed.
- * - qcaching
- * - We'll need some linkage between sources and parent arenas, with callbacks
- *   or something when the base arena starts to run low on memory.  Once an
- *   arena (whether base or o/w) gets the "time to free up memory" call, it can
- *   call into any of its children, to include slabs and whatever else.
+ * - Reclaim: have a ktask that sleeps on a rendez.  We poke it, even from IRQ
+ *   context.  It qlocks arenas_and_slabs_lock, then does the reclaim.
  *
  * FAQ:
  * - Does allocating memory from an arena require it to take a btag?  Yes -
@@ -82,8 +79,7 @@
 #include <slab.h>
 #include <kthread.h>
 
-static struct arena_tailq all_arenas = TAILQ_HEAD_INITIALIZER(all_arenas);
-static spinlock_t all_arenas_lock = SPINLOCK_INITIALIZER;
+struct arena_tailq all_arenas = TAILQ_HEAD_INITIALIZER(all_arenas);
 qlock_t arenas_and_slabs_lock = QLOCK_INITIALIZER(arenas_and_slabs_lock);
 
 struct arena *base_arena;
@@ -176,9 +172,9 @@ static void arena_init(struct arena *arena, char *name, size_t quantum,
 
 	if (source)
 		add_importing_arena(source, arena);
-	spin_lock(&all_arenas_lock);
+	qlock(&arenas_and_slabs_lock);
 	TAILQ_INSERT_TAIL(&all_arenas, arena, next);
-	spin_unlock(&all_arenas_lock);
+	qunlock(&arenas_and_slabs_lock);
 }
 
 struct arena *arena_create(char *name, void *base, size_t size, size_t quantum,
@@ -209,9 +205,9 @@ void arena_destroy(struct arena *arena)
 {
 	struct btag *bt_i, *temp;
 
-	spin_lock(&all_arenas_lock);
+	qlock(&arenas_and_slabs_lock);
 	TAILQ_REMOVE(&all_arenas, arena, next);
-	spin_unlock(&all_arenas_lock);
+	qunlock(&arenas_and_slabs_lock);
 	if (arena->source)
 		del_importing_arena(arena->source, arena);
 

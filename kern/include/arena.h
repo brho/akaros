@@ -82,6 +82,8 @@ struct arena {
 	struct kmem_cache_tailq		__importing_slabs;
 };
 
+extern struct arena_tailq all_arenas;
+
 /* Arena allocation styles, or'd with MEM_FLAGS */
 #define ARENA_BESTFIT			0x100
 #define ARENA_INSTANTFIT		0x200
