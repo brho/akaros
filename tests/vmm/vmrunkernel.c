@@ -136,6 +136,7 @@ unsigned int maxresume = (unsigned int) -1;
 #define MinMemory (16*MiB)
 void *kernel;
 unsigned long long memsize = GiB;
+uintptr_t memstart = MinMemory;
 unsigned long long *p512, *p1, *p2m;
 
 void **my_retvals;
@@ -355,14 +356,15 @@ load_kernel(char *filename, uintptr_t *kernstart, uintptr_t *kernend)
 		        __func__, filename);
 		goto fail;
 	}
-	fprintf(stderr, "%s ELF entry point is %p\n", filename, ehdr->e_entry);
+	fprintf(stderr, "%s ELF entry point is %p\n", filename,
+		(void *)ehdr->e_entry);
 
 	if (elf_getphdrnum(elf, &phnum) < 0) {
 		fprintf(stderr, "%s: cannot get program header num of %s.\n",
 		        __func__, filename);
 		goto fail;
 	}
-	fprintf(stderr, "%s has %d program headers\n", filename, phnum);
+	fprintf(stderr, "%s has %p program headers\n", filename, phnum);
 
 	hdrs = elf64_getphdr(elf);
 	if (hdrs == NULL) {
@@ -431,21 +433,15 @@ int main(int argc, char **argv)
 	char cmdline_default[512] = {0};
 	char *cmdline_extra = "\0";
 	char *cmdline;
-	uint64_t *p64;
 	void *a = (void *)0xe0000;
 	struct acpi_table_rsdp *r;
 	struct acpi_table_fadt *f;
 	struct acpi_table_madt *m;
 	struct acpi_table_xsdt *x;
-	int amt;
 	int vmmflags = 0; // Disabled probably forever. VMM_VMCALL_PRINTF;
 	uint64_t entry = 0;
 	int ret;
 	uintptr_t size;
-	void * xp;
-	int kfd = -1;
-	static char cmd[512];
-	int i;
 	uint8_t csum;
 	void *coreboot_tables = (void *) 0x1165000;
 	void *a_page;
@@ -464,6 +460,7 @@ int main(int argc, char **argv)
 		{"vmm_vmcall",    no_argument,       0, 'v'},
 		{"maxresume",     required_argument, 0, 'R'},
 		{"memsize",       required_argument, 0, 'm'},
+		{"memstart",      required_argument, 0, 'M'},
 		{"cmdline_extra", required_argument, 0, 'c'},
 		{"greedy",        no_argument,       0, 'g'},
 		{"scp",           no_argument,       0, 's'},
@@ -505,7 +502,7 @@ int main(int argc, char **argv)
 	((uint32_t *)a_page)[0x30/4] = 0x01060015;
 	//((uint32_t *)a_page)[0x30/4] = 0xDEADBEEF;
 
-	while ((c = getopt_long(argc, argv, "dvm:c:gsf:k:n:hR:", long_options,
+	while ((c = getopt_long(argc, argv, "dvm:M:c:gsf:k:n:hR:", long_options,
 	                        &option_index)) != -1) {
 		switch (c) {
 			case 'd':
@@ -516,6 +513,9 @@ int main(int argc, char **argv)
 				break;
 			case 'm':
 				memsize = strtoull(optarg, 0, 0);
+				break;
+			case 'M':
+				memstart = strtoull(optarg, 0, 0);
 				break;
 			case 'R':
 				maxresume = strtoull(optarg, 0, 0);
@@ -559,22 +559,21 @@ int main(int argc, char **argv)
 				break;
 			case 'h':
 			default:
-				fprintf(stderr, "-d or --debug              : enable debugging\n"
-				                "-v or --vmm_vmcall         : enable vmm_vmcall_printf\n"
-				                "-m or --maxresume arg0     : maxresume = arg0\n"
-				                "-c or --cmdline_extra arg0 : cmdline += arg0\n"
-				                "-g or --greedy             : run in greedy mode\n"
-				                "-s or --scp                : run as a scp\n"
-				                "-f or --image_file arg0    : pass arg0 to virtio-blk init\n"
-				                "-k or --cmdline arg0       : grab command line options from the file arg0\n"
-				                "-n or --nic arg0           : specify nic\n"
-				                "-h or --help               : show help info\n");
+				// Sadly, the getopt_long struct does
+				// not have a pointer to help text.
+				for (int i = 0;
+				    i < sizeof(long_options)/sizeof(long_options[0]) - 1;
+				    i++) {
+					struct option *l = &long_options[i];
+
+					fprintf(stderr, "%s or %c%s\n", l->name, l->val,
+						l->has_arg ? " <arg>" : "");
+				}
 				exit(0);
 		}
 	}
 	if (strlen(cmdline_default) == 0) {
-		fprintf(stderr, "No command line parameter file specified.\n");
-		exit(1);
+		fprintf(stderr, "WARNING: No command line parameter file specified.\n");
 	}
 	argc -= optind;
 	argv += optind;
@@ -583,19 +582,19 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	if ((uintptr_t)(MinMemory + memsize) >= (uintptr_t)BRK_START) {
+	if ((uintptr_t)(memstart + memsize) >= (uintptr_t)BRK_START) {
 		fprintf(stderr,
-		        "memsize 0x%lx is too large; overlaps BRK_START at %p\n",
-		        memsize, BRK_START);
+		        "memstart 0x%lx memsize 0x%lx -> 0x%lx is too large; overlaps BRK_START at %p\n",
+			memstart, memsize, memstart + memsize, BRK_START);
 		exit(1);
 	}
 
-	kernel = mmap((void *)MinMemory, memsize,
+	kernel = mmap((void *)memstart, memsize,
 	              PROT_READ | PROT_WRITE | PROT_EXEC,
 	              MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
-	if (kernel != (void *)MinMemory) {
+	if (kernel != (void *)memstart) {
 		fprintf(stderr, "Could not mmap 0x%lx bytes at 0x%lx\n",
-		        memsize, MinMemory);
+		        memsize, memstart);
 		exit(1);
 	}
 
@@ -700,7 +699,6 @@ int main(int argc, char **argv)
 	gpci.vapic_addr = a;
 	memset(a, 0, 4096);
 	((uint32_t *)a)[0x30/4] = 0x01060014;
-	p64 = a;
 	// set up apic values? do we need to?
 	// qemu does this.
 	//((uint8_t *)a)[4] = 1;
@@ -729,11 +727,11 @@ int main(int argc, char **argv)
 	bp->e820_map[e820i++].type = E820_RAM;
 
 	bp->e820_map[e820i].addr = 64 * 1024;
-	bp->e820_map[e820i].size = 16 * 1048576 - 64 * 1024;
+	bp->e820_map[e820i].size = memstart - 64 * 1024;
 	bp->e820_map[e820i++].type = E820_RESERVED;
 
-	bp->e820_map[e820i].addr = 16 * 1048576;
-	bp->e820_map[e820i].size = 1024 * 1048576;
+	bp->e820_map[e820i].addr = memstart;
+	bp->e820_map[e820i].size = memsize;
 	bp->e820_map[e820i++].type = E820_RAM;
 
 	bp->e820_map[e820i].addr = 0xf0000000;
