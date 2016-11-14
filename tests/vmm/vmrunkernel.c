@@ -14,7 +14,6 @@
 #include <string.h>
 #include <ros/syscall.h>
 #include <sys/mman.h>
-#include <vmm/coreboot_tables.h>
 #include <vmm/vmm.h>
 #include <vmm/acpi/acpi.h>
 #include <vmm/acpi/vmm_simple_dsdt.h>
@@ -443,7 +442,6 @@ int main(int argc, char **argv)
 	int ret;
 	uintptr_t size;
 	uint8_t csum;
-	void *coreboot_tables = (void *) 0x1165000;
 	void *a_page;
 	struct vm_trapframe *vm_tf;
 	uint64_t tsc_freq_khz;
@@ -838,8 +836,6 @@ int main(int argc, char **argv)
 			(uint64_t)(kernstart + i) | PTE_KERN_RW | PTE_PS;
 	}
 
-	//write_coreboot_table(coreboot_tables, ((void *)VIRTIOBASE) /*kernel*/, KERNSIZE + 1048576);
-	hexdump(stdout, coreboot_tables, 512);
 	fprintf(stderr, "p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
 
 	vmm_run_task(vm, timer_thread, 0);
