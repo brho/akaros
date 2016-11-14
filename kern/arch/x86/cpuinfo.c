@@ -91,7 +91,7 @@ void print_cpuinfo(void)
 	if (ecx & 0x00200000)
 		cprintf("x2APIC Detected\n");
 	else
-		cprintf("x2APIC Not Detected\n");
+		panic("x2APIC Not Detected\n");
 	/* Not sure how to detect AMD HW virt yet. */
 	if ((ecx & 0x00000060) && cpu_has_feat(CPU_FEAT_X86_VENDOR_INTEL)) {
 		msr_val = read_msr(IA32_FEATURE_CONTROL);
