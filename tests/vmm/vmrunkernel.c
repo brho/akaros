@@ -136,6 +136,7 @@ unsigned int maxresume = (unsigned int) -1;
 void *kernel;
 unsigned long long memsize = GiB;
 uintptr_t memstart = MinMemory;
+uintptr_t stack;
 unsigned long long *p512, *p1, *p2m;
 
 void **my_retvals;
@@ -459,6 +460,7 @@ int main(int argc, char **argv)
 		{"maxresume",     required_argument, 0, 'R'},
 		{"memsize",       required_argument, 0, 'm'},
 		{"memstart",      required_argument, 0, 'M'},
+		{"stack",         required_argument, 0, 'S'},
 		{"cmdline_extra", required_argument, 0, 'c'},
 		{"greedy",        no_argument,       0, 'g'},
 		{"scp",           no_argument,       0, 's'},
@@ -500,7 +502,7 @@ int main(int argc, char **argv)
 	((uint32_t *)a_page)[0x30/4] = 0x01060015;
 	//((uint32_t *)a_page)[0x30/4] = 0xDEADBEEF;
 
-	while ((c = getopt_long(argc, argv, "dvm:M:c:gsf:k:n:hR:", long_options,
+	while ((c = getopt_long(argc, argv, "dvm:M:S:c:gsf:k:n:hR:", long_options,
 	                        &option_index)) != -1) {
 		switch (c) {
 			case 'd':
@@ -514,6 +516,9 @@ int main(int argc, char **argv)
 				break;
 			case 'M':
 				memstart = strtoull(optarg, 0, 0);
+				break;
+			case 'S':
+				stack = strtoull(optarg, 0, 0);
 				break;
 			case 'R':
 				maxresume = strtoull(optarg, 0, 0);
@@ -843,7 +848,7 @@ int main(int argc, char **argv)
 	vm_tf = gth_to_vmtf(vm->gths[0]);
 	vm_tf->tf_cr3 = (uint64_t) p512;
 	vm_tf->tf_rip = entry;
-	vm_tf->tf_rsp = 0;
+	vm_tf->tf_rsp = stack;
 	vm_tf->tf_rsi = (uint64_t) bp;
 	start_guest_thread(vm->gths[0]);
 
