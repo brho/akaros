@@ -59,6 +59,9 @@ struct block *block_alloc(size_t size, int mem_flags)
 	uintptr_t addr;
 	int n;
 
+	/* If Hdrspc is not block aligned it will cause issues. */
+	static_assert(Hdrspc % BLOCKALIGN == 0);
+
 	b = kmalloc(sizeof(struct block) + size + Hdrspc + (BLOCKALIGN - 1),
 				mem_flags);
 	if (b == NULL)
@@ -80,13 +83,21 @@ struct block *block_alloc(size_t size, int mem_flags)
 	 * the *real* size of the block we got. Very nice.
 	 * Not on akaros yet.
 	 b->lim = ((uint8_t*)b) + msize(b);
+	 * See use of n in commented code below
 	 */
 	b->lim =
 		((uint8_t *) b) + sizeof(struct block) + size + Hdrspc + (BLOCKALIGN -
 																  1);
 	b->rp = b->base;
-	n = b->lim - b->base - size;
-	b->rp += n & ~(BLOCKALIGN - 1);
+	/* TODO: support this */
+	/* n is supposed to be Hdrspc + rear padding + extra reserved memory, but
+	 * since we don't currently support checking how much memory was actually
+	 * reserved, this is always Hdrspc + rear padding. After rounding that down
+	 * to BLOCKALIGN, it's always Hdrpsc since the padding is < BLOCKALIGN.
+	 n = b->lim - b->base - size;
+	 b->rp += n & ~(BLOCKALIGN - 1);
+	 */
+	b->rp += Hdrspc;
 	b->wp = b->rp;
 	/* b->base is aligned, rounded up from b
 	 * b->lim is the upper bound on our malloc
