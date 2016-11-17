@@ -172,6 +172,7 @@ void net_transmitq_fn(void *_vq)
 	void *stripped;
 	int ret;
 	int fd = open(data_path, O_RDWR);
+	int bytestostrip = VIRTIO_HEADER_SIZE;
 
 	if (fd == -1)
 		VIRTIO_DEV_ERRX(vq->vqdev, "Could not open data file for ether1.");
@@ -198,11 +199,24 @@ void net_transmitq_fn(void *_vq)
 		/* Strip off the virtio header (the first 12 bytes), as it is
 		 * not a part of the actual ethernet frame.
 		 */
+
+		/* Find the beginning of the ethernet frame. */
 		for (int i = 0; i < olen; i++) {
-			stripped = iov[i].iov_base + VIRTIO_HEADER_SIZE;
-			ret = write(fd, stripped, iov[i].iov_len - VIRTIO_HEADER_SIZE);
-			assert(ret == iov[i].iov_len - VIRTIO_HEADER_SIZE);
+			/* This conditional also catches cases when iov_len is 0 */
+			if (iov[i].iov_len <= bytestostrip) {
+				/* The virtio net header is bigger or equal to the current iov.
+				 * We exhaust this iov and move on. */
+				bytestostrip -= iov[i].iov_len;
+				continue;
+			}
+			/* The virtio net header is smaller than the full iov.
+			 * We stop advancing here and write. */
+			ret = write(fd, iov[i].iov_base + bytestostrip,
+			            iov[i].iov_len - bytestostrip);
+			assert(ret == iov[i].iov_len - bytestostrip);
+			bytestostrip = 0;
 		}
+		assert(bytestostrip == 0);
 
 		virtio_add_used_desc(vq, head, 0);
 
