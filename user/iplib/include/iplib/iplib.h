@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is part of the UCB release of Plan 9. It is subject to the license
  * terms in the LICENSE file found in the top-level directory of this
  * distribution and at http://akaros.cs.berkeley.edu/files/Plan9License. No
@@ -12,7 +12,7 @@
 
 __BEGIN_DECLS
 
-enum 
+enum
 {
 	ETH_HDR_LEN			= 14,
 	ETH_OFF_DST			= 0,
@@ -111,7 +111,7 @@ struct ipv6rp
 	int	reachtime;
 	int	rxmitra;
 	int	ttl;
-	int	routerlt;	
+	int	routerlt;
 };
 
 /* actual interface */
@@ -224,7 +224,7 @@ struct icmp6hdr {
 /*
  *  user level udp headers with control message "headers"
  */
-enum 
+enum
 {
 	Udphdrsize=	52,	/* size of a Udphdr */
 };
@@ -295,5 +295,6 @@ int accept9(int ctl, char *dir);
 int reject9(int ctl, char *dir, char *cause);
 int open_data_fd9(char *conv_dir, int flags);
 bool get_port9(char *conv_dir, char *which, uint16_t *port);
+int gettokens(char *s, char **args, int maxargs, char *sep);
 
 __END_DECLS
