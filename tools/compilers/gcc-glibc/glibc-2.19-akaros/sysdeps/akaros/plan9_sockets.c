@@ -307,30 +307,35 @@ int _sock_get_opts(int type)
 static int _rock_get_listen_fd(Rock *r)
 {
 	char listen_file[Ctlsize + 3];
-	char *x, *last_ctl;
+	char *p;
 	int ret;
 
 	if (r->has_listen_fd)
 		return r->listen_fd;
-	strncpy(listen_file, r->ctl, sizeof(listen_file));
-	/* We want the conversation directory.  We can find the last "ctl"
-	 * in the CTL name (they could have mounted at /ctlfoo/net/) */
-	x = listen_file;
-	do {
-		last_ctl = x;
-		x++;	/* move forward enough to not find the same "ctl" */
-		x = strstr(x, "ctl");
-	} while (x);
-	/* last_ctl is either listen_file (if we never found ctl, which should never
-	 * happen) or it points at the 'c' in the last "ctl". */
-	assert(last_ctl != listen_file);
-	strcpy(last_ctl, "listen");
+	if (r->ctl == NULL || r->ctl[0] != '/') {
+		fprintf(stderr, "r->ctl corrupt: '%s'\n",
+		        r->ctl == NULL ? "NULL" : r->ctl);
+	        assert(r->ctl != NULL && r->ctl[0] == '/');
+	}
+	strlcpy(listen_file, r->ctl, sizeof(listen_file));
+	/* We want the conversation directory. We look for '/ctl' at
+	 * the end of the string. */
+	p = strrchr(listen_file, '/');
+	if (p == NULL)
+		p = listen_file;
+	++p;
+	if (strcmp(p, "ctl") != 0) {
+		fprintf(stderr, "ctl file does not end in '/ctl': is '%s'\n", p);
+		assert(strcmp(p, "ctl") == 0);
+	}
+	strlcpy(p, "listen", sizeof(listen_file) - (p - listen_file));
 	ret = open(listen_file, O_PATH);
 	/* Probably a bug in the rock code (or the kernel!) if we couldn't walk to
 	 * our listen. */
 	assert(ret >= 0);
 	r->listen_fd = ret;
 	r->has_listen_fd = TRUE;
+
 	return ret;
 }
 
