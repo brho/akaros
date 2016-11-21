@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is part of the UCB release of Plan 9. It is subject to the license
  * terms in the LICENSE file found in the top-level directory of this
  * distribution and at http://akaros.cs.berkeley.edu/files/Plan9License. No
@@ -26,8 +26,8 @@
 #include <sys/plan9_helpers.h>
 
 void
-_sock_ingetaddr(Rock * r, struct sockaddr_in *ip, socklen_t * alen,
-				const char *a)
+_sock_ingetaddr(Rock *r, struct sockaddr_in *ip, socklen_t *alen,
+                const char *a)
 {
 	int n, fd;
 	char *p;
@@ -58,7 +58,7 @@ _sock_ingetaddr(Rock * r, struct sockaddr_in *ip, socklen_t * alen,
 }
 
 /*
- *  return ndb attribute type of an ip name
+ * return ndb attribute type of an ip name
  */
 int _sock_ipattr(const char *name)
 {
@@ -67,7 +67,8 @@ int _sock_ipattr(const char *name)
 	int alpha = 0;
 
 	for (p = name; *p; p++) {
-		if (isdigit(*p)) ;
+		if (isdigit(*p))
+			continue;
 		else if (isalpha(*p) || *p == '-')
 			alpha = 1;
 		else if (*p == '.')
@@ -120,7 +121,7 @@ int _sock_srv(char *path, int fd)
 		close(fd);
 		return -1;
 	}
-	snprintf(msg, sizeof msg, "%d", fd);
+	snprintf(msg, sizeof(msg), "%d", fd);
 	if (write(sfd, msg, strlen(msg)) < 0) {
 		close(sfd);
 		close(fd);
@@ -134,7 +135,7 @@ int _sock_srv(char *path, int fd)
 #warning "Not threadsafe!"
 Rock *_sock_rock;
 
-Rock *_sock_findrock(int fd, struct stat * dp)
+Rock *_sock_findrock(int fd, struct stat *dp)
 {
 	Rock *r;
 	struct stat d;
@@ -219,7 +220,7 @@ int _sock_data(int cfd, const char *net, int domain, int type, int protocol,
 	}
 	name[n] = 0;
 	n = strtoul(name, 0, 0);
-	snprintf(name, sizeof name, "/net/%s/%d/data", net, n);
+	snprintf(name, sizeof(name), "/net/%s/%d/data", net, n);
 
 	/* open data file */
 	open_flags |= (type & SOCK_NONBLOCK ? O_NONBLOCK : 0);
@@ -231,7 +232,7 @@ int _sock_data(int cfd, const char *net, int domain, int type, int protocol,
 	}
 
 	/* hide stuff under the rock */
-	snprintf(name, sizeof name, "/net/%s/%d/ctl", net, n);
+	snprintf(name, sizeof(name), "/net/%s/%d/ctl", net, n);
 	r = _sock_newrock(fd);
 	if (r == 0) {
 		errno = ENOBUFS;
@@ -252,9 +253,10 @@ int _sock_data(int cfd, const char *net, int domain, int type, int protocol,
 
 /* Takes network-byte ordered IPv4 addr and writes it into buf, in the plan 9 IP
  * addr format */
-void naddr_to_plan9addr(uint32_t sin_addr, uint8_t * buf)
+void naddr_to_plan9addr(uint32_t sin_addr, uint8_t *buf)
 {
-	uint8_t *sin_bytes = (uint8_t *) & sin_addr;
+	uint8_t *sin_bytes = (uint8_t *)&sin_addr;
+
 	memset(buf, 0, 10);
 	buf += 10;
 	buf[0] = 0xff;
@@ -267,7 +269,7 @@ void naddr_to_plan9addr(uint32_t sin_addr, uint8_t * buf)
 }
 
 /* does v4 only */
-uint32_t plan9addr_to_naddr(uint8_t * buf)
+uint32_t plan9addr_to_naddr(uint8_t *buf)
 {
 	buf += 12;
 	return (buf[3] << 24) | (buf[2] << 16) | (buf[1] << 8) | (buf[0] << 0);
@@ -277,14 +279,15 @@ uint32_t plan9addr_to_naddr(uint8_t * buf)
 Rock *udp_sock_get_rock(int fd)
 {
 	Rock *r = _sock_findrock(fd, 0);
+
 	if (!r) {
 		errno = ENOTSOCK;
 		return 0;
 	}
 	if ((r->domain == PF_INET) && (r->stype == SOCK_DGRAM))
 		return r;
-	else
-		return 0;
+
+	return 0;
 }
 
 /* In Linux, socket options are multiplexed in the socket type. */
