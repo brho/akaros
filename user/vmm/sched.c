@@ -337,6 +337,7 @@ static void __ctlr_entry(void)
 
 		fprintf(stderr, "vmm: handle_vmexit returned false\n");
 		fprintf(stderr, "Note: this may be a kernel module, not the kernel\n");
+		fprintf(stderr, "RSP was %p, ", (void *)vm_tf->tf_rsp);
 		fprintf(stderr, "RIP was %p:\n", (void *)vm_tf->tf_rip);
 		/* TODO: properly walk the kernel page tables to map the tf_rip
 		 * to a physical address. For now, however, this hack is good
