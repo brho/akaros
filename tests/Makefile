@@ -26,6 +26,7 @@ TESTS_EXECS_CPP  = $(patsubst $(TESTS_DIR)/%.cc, \
 
 include $(TESTS_DIR)/openmp/Makefrag
 include $(TESTS_DIR)/vmm/Makefrag
+include $(TESTS_DIR)/dune/Makefrag
 
 TESTS_EXECS = $(TESTS_EXECS_C) $(TESTS_EXECS_CPP)
 

@@ -1,0 +1,25 @@
+DUNE_TESTS_DIR = $(TESTS_DIR)/dune
+
+DUNE_TESTS_CFLAGS += $(CFLAGS_TESTS) -Wunused -Werror
+
+ALL_DUNE_TEST_FILES := $(wildcard $(DUNE_TESTS_DIR)/*.c)
+
+DUNE_TESTS_LDLIBS := $(TESTS_LDLIBS) -lelf
+
+DUNE_TESTS_SRCS := $(ALL_DUNE_TEST_FILES)
+
+DUNE_TESTS_LDDEPENDS := $(DUNE_TESTS_DIR)/%.c 
+
+TESTS_EXECS_C  += $(patsubst $(DUNE_TESTS_DIR)/%.c, \
+                      $(OBJDIR)/$(DUNE_TESTS_DIR)/%, \
+                      $(DUNE_TESTS_SRCS))
+
+STATIC := $(findstring static,$(DUNE_TESTS_CFLAGS))
+$(OBJDIR)/$(DUNE_TESTS_DIR)/%: $(DUNE_TESTS_LDDEPENDS)
+	@echo + cc [DUNE_TESTS] $<
+	@mkdir -p $(@D)
+	$(Q)$(CC) $(DUNE_TESTS_CFLAGS) -o $@ $< $(DUNE_TESTS_LDLIBS)
+	@if [ "$(STATIC)" != "static" ]; then \
+		$(OBJDUMP) -S $@ > $@.asm; \
+		$(NM) -n $@ > $@.sym; \
+	fi
