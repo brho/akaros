@@ -137,7 +137,12 @@ void *kernel;
 unsigned long long memsize = GiB;
 uintptr_t memstart = MinMemory;
 uintptr_t stack;
-unsigned long long *p512, *p1, *p2m;
+
+typedef struct {
+	uint64_t pte[512];
+} ptp;
+
+ptp *p512, *p1, *p2m;
 
 void **my_retvals;
 int nr_threads = 4;
@@ -328,7 +333,7 @@ static inline int test_and_set_bit(int nr, volatile unsigned long *addr)
 
 /* load_kernel loads an ELF file as a kernel. */
 uintptr_t
-load_kernel(char *filename, uintptr_t *kernstart, uintptr_t *kernend)
+load_kernel(char *filename)
 {
 	Elf64_Ehdr *ehdr;
 	Elf *elf;
@@ -395,10 +400,6 @@ load_kernel(char *filename, uintptr_t *kernstart, uintptr_t *kernend)
 			continue;
 
 		pa = h->p_paddr;
-		if (*kernstart > pa)
-			*kernstart = pa;
-		if (*kernend < pa + h->p_memsz)
-			*kernend = pa + h->p_memsz;
 		fprintf(stderr,
 		        "Read header %d @offset %p to %p (elf PA is %p) %d bytes:",
 		        i, h->p_offset, pa, h->p_paddr, h->p_filesz);
@@ -428,7 +429,7 @@ fail:
 }
 
 /* TODO: put this in a library somewhere */
-int cat(char *file, char *where)
+int cat(char *file, void *where)
 {
 	int fd;
 	int amt, tot = 0;
@@ -476,7 +477,6 @@ int main(int argc, char **argv)
 	int vmmflags = 0; // Disabled probably forever. VMM_VMCALL_PRINTF;
 	uint64_t entry = 0;
 	int ret;
-	uintptr_t size;
 	uint8_t csum;
 	void *a_page;
 	struct vm_trapframe *vm_tf;
@@ -488,8 +488,8 @@ int main(int argc, char **argv)
 	struct stat stat_result;
 	int num_read;
 	int option_index;
-	uintptr_t kernstart = (uintptr_t)~1, kernend = 0;
 	char *smbiostable = NULL;
+	int nptp, npml4, npml3, npml2;
 
 	static struct option long_options[] = {
 		{"debug",         no_argument,       0, 'd'},
@@ -642,7 +642,7 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	entry = load_kernel(argv[0], &kernstart, &kernend);
+	entry = load_kernel(argv[0]);
 	if (entry == 0) {
 		fprintf(stderr, "Unable to load kernel %s\n", argv[0]);
 		exit(1);
@@ -863,38 +863,74 @@ int main(int argc, char **argv)
 	ret = vmm_init(vm, vmmflags);
 	assert(!ret);
 
-	/* Allocate 3 pages for page table pages: a page of 512 GiB
-	 * PTEs with only one entry filled to point to a page of 1 GiB
-	 * PTEs; a page of 1 GiB PTEs with only one entry filled to
-	 * point to a page of 2 MiB PTEs; and a page of 2 MiB PTEs,
-	 * only a subset of which will be filled. */
-	ret = posix_memalign((void **)&p512, PGSIZE, 3 * PGSIZE);
-	if (ret) {
-		perror("ptp alloc");
+	/* How many page table pages do we need?  We conservatively
+	 * assume that we are in low memory, and hence assume a
+	 * 0-based range.  Note that in many cases, kernels will
+	 * immediately set up their own map. But for "dune" like
+	 * applications, it's necessary. Note also that in most cases,
+	 * the total number of pages will be < 16 or so. */
+	npml4 = DIV_ROUND_UP(memstart + memsize, PML4_REACH);
+	nptp = npml4;
+
+	npml3 = DIV_ROUND_UP(memstart + memsize, PML3_REACH);
+	nptp += npml3;
+
+	/* and 1 for each 2 MiB of memory */
+	npml2 = DIV_ROUND_UP(memstart + memsize, PML2_REACH);
+	nptp += npml2;
+
+	fprintf(stderr, "Memstart + memsize is %llx; %d pml4 %d pml3 %d pml2\n",
+		memstart + memsize, npml4, npml3, npml2);
+
+	/* Place these page tables right after VM memory. We
+	 * used to use posix_memalign but that puts them
+	 * outside EPT-accessible space on some CPUs. */
+	p512 = mmap((void *)memstart + memsize, nptp * 4096, PROT_READ | PROT_WRITE,
+	             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	if (p512 == MAP_FAILED) {
+		perror("page table page alloc");
 		exit(1);
 	}
+	p1 = &p512[npml4];
+	p2m = &p1[npml3];
 
 	/* Set up a 1:1 ("identity") page mapping from guest virtual
 	 * to guest physical using the (host virtual)
-	 * `kerneladdress`. This mapping is used for only a short
+	 * `kerneladdress`. This mapping may be used for only a short
 	 * time, until the guest sets up its own page tables. Be aware
 	 * that the values stored in the table are physical addresses.
 	 * This is subtle and mistakes are easily disguised due to the
 	 * identity mapping, so take care when manipulating these
 	 * mappings. */
-	p1 = &p512[NPTENTRIES];
-	p2m = &p512[2 * NPTENTRIES];
 
-	size = kernend - kernstart;
-	fprintf(stderr, "Map %p for %zu bytes\n", kernstart, size);
-	p512[PML4(kernstart)] = (uint64_t)p1 | PTE_KERN_RW;
-	p1[PML3(kernstart)] = (uint64_t)p2m | PTE_KERN_RW;
-	for (uintptr_t i = 0; i < size; i += PML2_PTE_REACH) {
-		p2m[PML2(kernstart + i)] =
-			(uint64_t)(kernstart + i) | PTE_KERN_RW | PTE_PS;
+	p2m->pte[PML2(0)] = (uint64_t)0 | PTE_KERN_RW | PTE_PS;
+
+	fprintf(stderr, "Map %p for %zu bytes\n", memstart, memsize);
+	for (uintptr_t p4 = memstart; p4 < memstart + memsize;
+	     p4 += PML4_PTE_REACH, p1++) {
+		p512->pte[PML4(p4)] = (uint64_t)p1 | PTE_KERN_RW;
+		if (debug)
+			fprintf(stderr, "l4@%p: %p set index 0x%x to 0x%llx\n",
+				&p512->pte[PML4(p4)],
+				p4, PML4(p4), p512->pte[PML4(p4)]);
+		for (uintptr_t p3 = p4; p3 < memstart + memsize;
+		     p3 += PML3_PTE_REACH, p2m++) {
+			p1->pte[PML3(p3)] = (uint64_t)p2m | PTE_KERN_RW;
+			if (debug)
+				fprintf(stderr, "\tl3@%p: %p set index 0x%x to 0x%llx\n",
+				&p1->pte[PML3(p3)],
+				p3, PML3(p3), p1->pte[PML3(p3)]);
+			for (uintptr_t p2 = p3; p2 < memstart + memsize;
+			     p2 += PML2_PTE_REACH) {
+				p2m->pte[PML2(p2)] = (uint64_t)p2 | PTE_KERN_RW | PTE_PS;
+				if (debug)
+					fprintf(stderr, "\t\tl2@%p: %p set index 0x%x to 0x%llx\n",
+						&p2m->pte[PML2(p2)],
+						p2, PML2(p2), p2m->pte[PML2(p2)]);
+			}
+		}
+
 	}
-
-	fprintf(stderr, "p512 %p p512[0] is 0x%lx p1 %p p1[0] is 0x%x\n", p512, p512[0], p1, p1[0]);
 
 	vmm_run_task(vm, timer_thread, 0);
 
