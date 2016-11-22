@@ -46,7 +46,7 @@ void vmr_init(void)
 	vmr_kcache = kmem_cache_create("vm_regions",
 				       sizeof(struct vm_region),
 				       __alignof__(struct dentry), 0, NULL,
-				       0, 0);
+				       0, 0, NULL);
 }
 
 /* For now, the caller will set the prot, flags, file, and offset.  In the

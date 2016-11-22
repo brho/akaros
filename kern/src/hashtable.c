@@ -42,7 +42,7 @@ void hashtable_init(void)
 	hentry_cache = kmem_cache_create("hash_entry",
 					 sizeof(struct hash_entry),
 					 __alignof__(struct hash_entry), 0,
-					 NULL, 0, 0);
+					 NULL, 0, 0, NULL);
 }
 
 /* Common hash/equals functions.  Don't call these directly. */

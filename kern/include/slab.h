@@ -112,8 +112,9 @@ struct kmem_cache {
 	struct kmem_slab_list full_slab_list;
 	struct kmem_slab_list partial_slab_list;
 	struct kmem_slab_list empty_slab_list;
-	void (*ctor)(void *, size_t);
-	void (*dtor)(void *, size_t);
+	int (*ctor)(void *obj, void *priv, int flags);
+	void (*dtor)(void *obj, void *priv);
+	void *priv;
 	unsigned long nr_cur_alloc;
 	struct hash_helper hh;
 	struct kmem_bufctl_list *alloc_hash;
@@ -128,8 +129,9 @@ extern struct kmem_cache_tailq all_kmem_caches;
 struct kmem_cache *kmem_cache_create(const char *name, size_t obj_size,
                                      int align, int flags,
                                      struct arena *source,
-                                     void (*ctor)(void *, size_t),
-                                     void (*dtor)(void *, size_t));
+                                     int (*ctor)(void *, void *, int),
+                                     void (*dtor)(void *, void *),
+                                     void *priv);
 void kmem_cache_destroy(struct kmem_cache *cp);
 /* Front end: clients of caches use these */
 void *kmem_cache_alloc(struct kmem_cache *cp, int flags);
@@ -142,5 +144,5 @@ unsigned int kmc_nr_pcpu_caches(void);
 void __kmem_cache_create(struct kmem_cache *kc, const char *name,
                          size_t obj_size, int align, int flags,
                          struct arena *source,
-                         void (*ctor)(void *, size_t),
-                         void (*dtor)(void *, size_t));
+                         int (*ctor)(void *, void *, int),
+                         void (*dtor)(void *, void *), void *priv);

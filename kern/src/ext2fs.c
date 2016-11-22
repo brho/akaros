@@ -101,7 +101,7 @@ void ext2_init(void)
 	ext2_i_kcache = kmem_cache_create("ext2_i_info",
 					  sizeof(struct ext2_i_info),
 					  __alignof__(struct ext2_i_info), 0,
-					  NULL, 0, 0);
+					  NULL, 0, 0, NULL);
 }
 
 /* Block management */

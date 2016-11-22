@@ -125,7 +125,7 @@ static void setup_qcaches(struct arena *arena, size_t quantum,
 		qc_size = (i + 1) * quantum;
 		snprintf(kc_name, KMC_NAME_SZ, "%s_%d", arena->name, qc_size);
 		__kmem_cache_create(&arena->qcaches[i], kc_name, qc_size, quantum,
-		                    KMC_NOTOUCH | KMC_QCACHE, arena, NULL, NULL);
+		                    KMC_NOTOUCH | KMC_QCACHE, arena, NULL, NULL, NULL);
 	}
 }
 

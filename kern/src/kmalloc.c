@@ -37,7 +37,7 @@ void kmalloc_init(void)
 	for (int i = 0; i < NUM_KMALLOC_CACHES; i++) {
 		snprintf(kc_name, KMC_NAME_SZ, "kmalloc_%d", ksize);
 		kmalloc_caches[i] = kmem_cache_create(kc_name, ksize, KMALLOC_ALIGNMENT,
-		                                      0, NULL, 0, 0);
+		                                      0, NULL, 0, 0, NULL);
 		ksize <<= 1;
 	}
 }

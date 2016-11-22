@@ -247,7 +247,7 @@ void proc_init(void)
 	proc_cache = kmem_cache_create("proc", sizeof(struct proc),
 				       MAX(ARCH_CL_SIZE,
 				       __alignof__(struct proc)), 0, NULL, 0,
-				       0);
+				       0, NULL);
 	/* Init PID mask and hash.  pid 0 is reserved. */
 	SET_BITMASK_BIT(pid_bmask, 0);
 	spinlock_init(&pid_hash_lock);

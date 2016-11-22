@@ -70,7 +70,7 @@
  *   grab a pcc lock.
  *
  * TODO:
- * - Change the sigs of ctor/dtor, add reclaim function.
+ * - Add reclaim function.
  * - When resizing, do we want to go through the depot and consolidate
  *   magazines?  (probably not a big deal.  maybe we'd deal with it when we
  *   clean up our excess mags.)
@@ -230,8 +230,11 @@ static void __return_to_depot(struct kmem_cache *kc, struct kmem_magazine *mag)
  * layer. */
 static void drain_mag(struct kmem_cache *kc, struct kmem_magazine *mag)
 {
-	for (int i = 0; i < mag->nr_rounds; i++)
+	for (int i = 0; i < mag->nr_rounds; i++) {
+		if (kc->dtor)
+			kc->dtor(mag->rounds[i], kc->priv);
 		__kmem_free_to_slab(kc, mag->rounds[i]);
+	}
 	mag->nr_rounds = 0;
 }
 
@@ -255,8 +258,8 @@ static struct kmem_pcpu_cache *build_pcpu_caches(void)
 void __kmem_cache_create(struct kmem_cache *kc, const char *name,
                          size_t obj_size, int align, int flags,
                          struct arena *source,
-                         void (*ctor)(void *, size_t),
-                         void (*dtor)(void *, size_t))
+                         int (*ctor)(void *, void *, int),
+                         void (*dtor)(void *, void *), void *priv)
 {
 	assert(kc);
 	assert(align);
@@ -279,6 +282,7 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	TAILQ_INIT(&kc->empty_slab_list);
 	kc->ctor = ctor;
 	kc->dtor = dtor;
+	kc->priv = priv;
 	kc->nr_cur_alloc = 0;
 	kc->alloc_hash = kc->static_hash;
 	hash_init_hh(&kc->hh);
@@ -300,11 +304,12 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	qunlock(&arenas_and_slabs_lock);
 }
 
-static void __mag_ctor(void *obj, size_t _ign)
+static int __mag_ctor(void *obj, void *priv, int flags)
 {
 	struct kmem_magazine *mag = (struct kmem_magazine*)obj;
 
 	mag->nr_rounds = 0;
+	return 0;
 }
 
 void kmem_cache_init(void)
@@ -315,30 +320,33 @@ void kmem_cache_init(void)
 	__kmem_cache_create(kmem_magazine_cache, "kmem_magazine",
 	                    sizeof(struct kmem_magazine),
 	                    __alignof__(struct kmem_magazine), 0, base_arena,
-	                    __mag_ctor, NULL);
+	                    __mag_ctor, NULL, NULL);
 	__kmem_cache_create(kmem_cache_cache, "kmem_cache",
 	                    sizeof(struct kmem_cache),
 	                    __alignof__(struct kmem_cache), 0, base_arena,
-	                    NULL, NULL);
+	                    NULL, NULL, NULL);
 	__kmem_cache_create(kmem_slab_cache, "kmem_slab",
 	                    sizeof(struct kmem_slab),
 	                    __alignof__(struct kmem_slab), 0, base_arena,
-	                    NULL, NULL);
+	                    NULL, NULL, NULL);
 	__kmem_cache_create(kmem_bufctl_cache, "kmem_bufctl",
 	                    sizeof(struct kmem_bufctl),
 	                    __alignof__(struct kmem_bufctl), 0, base_arena,
-	                    NULL, NULL);
+	                    NULL, NULL, NULL);
 }
 
 /* Cache management */
 struct kmem_cache *kmem_cache_create(const char *name, size_t obj_size,
                                      int align, int flags,
                                      struct arena *source,
-                                     void (*ctor)(void *, size_t),
-                                     void (*dtor)(void *, size_t))
+                                     int (*ctor)(void *, void *, int),
+                                     void (*dtor)(void *, void *),
+                                     void *priv)
 {
 	struct kmem_cache *kc = kmem_cache_alloc(kmem_cache_cache, 0);
-	__kmem_cache_create(kc, name, obj_size, align, flags, source, ctor, dtor);
+
+	__kmem_cache_create(kc, name, obj_size, align, flags, source, ctor, dtor,
+	                    priv);
 	return kc;
 }
 
@@ -535,8 +543,13 @@ static void *__kmem_alloc_from_slab(struct kmem_cache *cp, int flags)
 	}
 	cp->nr_cur_alloc++;
 	spin_unlock_irqsave(&cp->cache_lock);
-	if (cp->ctor)
-		cp->ctor(retval, cp->obj_size);
+	if (cp->ctor) {
+		if (cp->ctor(retval, cp->priv, flags)) {
+			warn("Ctor %p failed, probably a bug!");
+			__kmem_free_to_slab(cp, retval);
+			return NULL;
+		}
+	}
 	return retval;
 }
 
@@ -577,15 +590,13 @@ try_alloc:
 	return __kmem_alloc_from_slab(kc, flags);
 }
 
-/* Returns an object to the slab layer.  Note that objects in the slabs are
- * unconstructed. */
+/* Returns an object to the slab layer.  Caller must deconstruct the objects.
+ * Note that objects in the slabs are unconstructed. */
 static void __kmem_free_to_slab(struct kmem_cache *cp, void *buf)
 {
 	struct kmem_slab *a_slab;
 	struct kmem_bufctl *a_bufctl;
 
-	if (cp->dtor)
-		cp->dtor(buf, cp->obj_size);
 	spin_lock_irqsave(&cp->cache_lock);
 	if (!__use_bufctls(cp)) {
 		// find its slab
@@ -665,6 +676,8 @@ try_free:
 		lock_pcu_cache(pcc);
 		goto try_free;
 	}
+	if (kc->dtor)
+		kc->dtor(buf, kc->priv);
 	__kmem_free_to_slab(kc, buf);
 }
 

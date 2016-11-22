@@ -47,7 +47,7 @@ void kthread_init(void)
 {
 	kthread_kcache = kmem_cache_create("kthread", sizeof(struct kthread),
 					   __alignof__(struct kthread), 0,
-					   NULL, 0, 0);
+					   NULL, 0, 0, NULL);
 }
 
 /* Used by early init routines (smp_boot, etc) */

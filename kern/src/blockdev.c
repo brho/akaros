@@ -23,11 +23,11 @@ void block_init(void)
 	breq_kcache = kmem_cache_create("block_reqs",
 					sizeof(struct block_request),
 					__alignof__(struct block_request), 0,
-					NULL, 0, 0);
+					NULL, 0, 0, NULL);
 	bh_kcache = kmem_cache_create("buffer_heads",
 				      sizeof(struct buffer_head),
 				      __alignof__(struct buffer_head), 0,
-				      NULL, 0, 0);
+				      NULL, 0, 0, NULL);
 
 	#ifdef CONFIG_EXT2FS
 	/* Now probe for and init the block device for the ext2 ram disk */

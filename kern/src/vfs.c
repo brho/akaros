@@ -89,13 +89,13 @@ void vfs_init(void)
 
 	dentry_kcache = kmem_cache_create("dentry", sizeof(struct dentry),
 					  __alignof__(struct dentry), 0,
-					  NULL, 0, 0);
+					  NULL, 0, 0, NULL);
 	inode_kcache = kmem_cache_create("inode", sizeof(struct inode),
 					 __alignof__(struct inode), 0, NULL,
-					 0, 0);
+					 0, 0, NULL);
 	file_kcache = kmem_cache_create("file", sizeof(struct file),
 					__alignof__(struct file), 0, NULL, 0,
-					0);
+					0, NULL);
 	/* default NS never dies, +1 to exist */
 	kref_init(&default_ns.kref, fake_release, 1);
 	spinlock_init(&default_ns.lock);

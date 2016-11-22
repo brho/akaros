@@ -22,7 +22,7 @@ void radix_init(void)
 	radix_kcache = kmem_cache_create("radix_nodes",
 					 sizeof(struct radix_node),
 					 __alignof__(struct radix_node), 0,
-					 NULL, 0, 0);
+					 NULL, 0, 0, NULL);
 }
 
 /* Initializes a tree dynamically */
