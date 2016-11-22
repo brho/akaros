@@ -130,6 +130,7 @@ static bool handle_vmcall(struct guest_thread *gth)
 	printf("%c", byte);
 	if (byte == '\n')
 		printf("%c", '%');
+	fflush(stdout);
 	vm_tf->tf_rip += 3;
 	return TRUE;
 }
