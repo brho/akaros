@@ -6,6 +6,7 @@ obj-y						+= cons.o
 obj-y						+= ether.o
 obj-y						+= eventfd.o
 obj-y						+= kprof.o
+obj-y						+= mem.o
 obj-y						+= mnt.o
 obj-y						+= pci.o
 obj-y						+= pipe.o
