@@ -144,7 +144,3 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
                          struct arena *source,
                          void (*ctor)(void *, size_t),
                          void (*dtor)(void *, size_t));
-
-/* Debug */
-void print_kmem_cache(struct kmem_cache *kc);
-void print_kmem_slab(struct kmem_slab *slab);

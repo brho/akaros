@@ -752,20 +752,3 @@ void kmem_cache_reap(struct kmem_cache *cp)
 	}
 	spin_unlock_irqsave(&cp->cache_lock);
 }
-
-void print_kmem_cache(struct kmem_cache *cp)
-{
-	spin_lock_irqsave(&cp->cache_lock);
-	printk("\nPrinting kmem_cache:\n---------------------\n");
-	printk("Name: %s\n", cp->name);
-	printk("Objsize (incl align): %d\n", cp->obj_size);
-	printk("Align: %d\n", cp->align);
-	printk("Flags: 0x%08x\n", cp->flags);
-	printk("Constructor: %p\n", cp->ctor);
-	printk("Destructor: %p\n", cp->dtor);
-	printk("Slab Full: %p\n", cp->full_slab_list);
-	printk("Slab Partial: %p\n", cp->partial_slab_list);
-	printk("Slab Empty: %p\n", cp->empty_slab_list);
-	printk("Current Allocations: %d\n", cp->nr_cur_alloc);
-	spin_unlock_irqsave(&cp->cache_lock);
-}

@@ -568,69 +568,6 @@ bool test_kernel_messages(void)
 	return true;
 }
 #endif // CONFIG_X86
-static void test_single_cache(int iters, size_t size, int align, int flags,
-                              void (*ctor)(void *, size_t),
-                              void (*dtor)(void *, size_t))
-{
-	struct kmem_cache *test_cache;
-	void *objects[iters];
-	test_cache = kmem_cache_create("test_cache", size, align, flags,
-				       NULL, ctor, dtor);
-	printk("Testing Kmem Cache:\n");
-	print_kmem_cache(test_cache);
-	for (int i = 0; i < iters; i++) {
-		objects[i] = kmem_cache_alloc(test_cache, 0);
-		printk("Buffer %d addr = %p\n", i, objects[i]);
-	}
-	for (int i = 0; i < iters; i++) {
-		kmem_cache_free(test_cache, objects[i]);
-	}
-	kmem_cache_destroy(test_cache);
-	printk("\n\n\n\n");
-}
-
-void a_ctor(void *buf, size_t size)
-{
-	printk("constructin tests\n");
-}
-void a_dtor(void *buf, size_t size)
-{
-	printk("destructin tests\n");
-}
-
-// TODO: Make test_single_cache return something, and then add assertions here.
-bool test_slab(void)
-{
-	test_single_cache(10, 128, 512, 0, 0, 0);
-	test_single_cache(10, 128, 4, 0, a_ctor, a_dtor);
-	test_single_cache(10, 1024, 16, 0, 0, 0);
-
-	return true;
-}
-
-// TODO: Add assertions.
-bool test_kmalloc(void)
-{
-	printk("Testing Kmalloc\n");
-	void *bufs[NUM_KMALLOC_CACHES + 1];
-	size_t size;
-	for (int i = 0; i < NUM_KMALLOC_CACHES + 1; i++){
-		size = (KMALLOC_SMALLEST << i) - sizeof(struct kmalloc_tag);
-		bufs[i] = kmalloc(size, 0);
-		printk("Size %d, Addr = %p\n", size, bufs[i]);
-	}
-	for (int i = 0; i < NUM_KMALLOC_CACHES; i++) {
-		printk("Freeing buffer %d\n", i);
-		kfree(bufs[i]);
-	}
-	printk("Testing a large kmalloc\n");
-	size = (KMALLOC_LARGEST << 2);
-	bufs[0] = kmalloc(size, 0);
-	printk("Size %d, Addr = %p\n", size, bufs[0]);
-	kfree(bufs[0]);
-
-	return true;
-}
 
 static size_t test_hash_fn_col(void *k)
 {
@@ -2270,8 +2207,6 @@ static struct ktest ktests[] = {
 	KTEST_REG(bitmasks,           CONFIG_TEST_bitmasks),
 	KTEST_REG(checklists,         CONFIG_TEST_checklists),
 	KTEST_REG(smp_call_functions, CONFIG_TEST_smp_call_functions),
-	KTEST_REG(slab,               CONFIG_TEST_slab),
-	KTEST_REG(kmalloc,            CONFIG_TEST_kmalloc),
 	KTEST_REG(hashtable,          CONFIG_TEST_hashtable),
 	KTEST_REG(circular_buffer,    CONFIG_TEST_circular_buffer),
 	KTEST_REG(bcq,                CONFIG_TEST_bcq),
