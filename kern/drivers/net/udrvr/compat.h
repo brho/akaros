@@ -95,7 +95,7 @@ extern void set_page_dirty_lock(struct page *pagep);
 static inline void free_page(unsigned long addr)
 {
 	if (addr != 0)
-		free_cont_pages((void *)addr, 0);
+		kpages_free((void*)addr, PGSIZE);
 }
 
 #define	get_zeroed_page(f)		kpage_zalloc_addr()

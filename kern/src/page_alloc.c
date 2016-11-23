@@ -95,14 +95,18 @@ void kpages_free(void *addr, size_t size)
 	arena_free(kpages_arena, addr, size);
 }
 
+/* Returns naturally aligned, contiguous pages of amount PGSIZE << order.  Linux
+ * code might assume its allocations are aligned. (see dma_alloc_coherent and
+ * bnx2x). */
 void *get_cont_pages(size_t order, int flags)
 {
-	return kpages_alloc(PGSIZE << order, flags);
+	return arena_xalloc(kpages_arena, PGSIZE << order, PGSIZE << order,
+	                    0, 0, NULL, NULL, flags);
 }
 
 void free_cont_pages(void *buf, size_t order)
 {
-	kpages_free(buf, PGSIZE << order);
+	arena_xfree(kpages_arena, buf, PGSIZE << order);
 }
 
 /* Frees the page */
