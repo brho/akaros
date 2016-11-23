@@ -102,7 +102,7 @@ static kpte_t *__pml_walk(kpte_t *pml, uintptr_t va, int flags, int pml_shift)
 	if (!kpte_is_present(kpte)) {
 		if (!(flags & PG_WALK_CREATE))
 			return NULL;
-		new_pml_kva = get_cont_pages(1, MEM_WAIT);
+		new_pml_kva = kpages_alloc(2 * PGSIZE, MEM_WAIT);
 		memset(new_pml_kva, 0, PGSIZE * 2);
 		/* Might want better error handling (we're probably out of memory) */
 		if (!new_pml_kva)
@@ -371,7 +371,7 @@ int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size)
 					return 0;
 			}
 		}
-		free_cont_pages(KADDR(PTE_ADDR(*kpte)), 1);
+		kpages_free(KADDR(PTE_ADDR(*kpte)), 2 * PGSIZE);
 		*kpte = 0;
 		return 0;
 	}
@@ -533,7 +533,7 @@ void env_pagetable_free(struct proc *p)
 {
 	unmap_segment(p->env_pgdir, 0, UVPT - 0);
 	/* the page directory is not a PTE, so it never was freed */
-	free_cont_pages(pgdir_get_kpt(p->env_pgdir), 1);
+	kpages_free(pgdir_get_kpt(p->env_pgdir), 2 * PGSIZE);
 	tlbflush();
 }
 
@@ -626,7 +626,7 @@ int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd)
 	kpte_t *kpt;
 	epte_t *ept;
 
-	kpt = get_cont_pages(1, MEM_WAIT);
+	kpt = kpages_alloc(2 * PGSIZE, MEM_WAIT);
 	memcpy(kpt, boot_copy.kpte, PGSIZE);
 	ept = kpte_to_epte(kpt);
 	memset(ept, 0, PGSIZE);

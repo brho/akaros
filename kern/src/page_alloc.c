@@ -100,11 +100,6 @@ void *get_cont_pages(size_t order, int flags)
 	return kpages_alloc(PGSIZE << order, flags);
 }
 
-void *get_cont_pages_node(int node, size_t order, int flags)
-{
-	return get_cont_pages(order, flags);
-}
-
 void free_cont_pages(void *buf, size_t order)
 {
 	kpages_free(buf, PGSIZE << order);

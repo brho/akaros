@@ -515,8 +515,8 @@ static void __proc_free(struct kref *kref)
 	 * clear the PTEs of the upper stuff (UMAPTOP to UVPT), but we shouldn't
 	 * need to. */
 	env_user_mem_walk(p, 0, UMAPTOP, __cb_assert_no_pg, 0);
-	free_cont_pages(p->procinfo, LOG2_UP(PROCINFO_NUM_PAGES));
-	free_cont_pages(p->procdata, LOG2_UP(PROCDATA_NUM_PAGES));
+	kpages_free(p->procinfo, PROCINFO_NUM_PAGES * PGSIZE);
+	kpages_free(p->procdata, PROCDATA_NUM_PAGES * PGSIZE);
 
 	env_pagetable_free(p);
 	arch_pgdir_clear(&p->env_pgdir);

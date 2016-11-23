@@ -44,9 +44,9 @@ int env_setup_vm(env_t *e)
 	/* These need to be contiguous, so the kernel can alias them.  Note the
 	 * pages return with a refcnt, but it's okay to insert them since we free
 	 * them manually when the process is cleaned up. */
-	if (!(e->procinfo = get_cont_pages(LOG2_UP(PROCINFO_NUM_PAGES), 0)))
+	if (!(e->procinfo = kpages_alloc(PROCINFO_NUM_PAGES * PGSIZE, MEM_WAIT)))
 		goto env_setup_vm_error_i;
-	if (!(e->procdata = get_cont_pages(LOG2_UP(PROCDATA_NUM_PAGES), 0)))
+	if (!(e->procdata = kpages_alloc(PROCDATA_NUM_PAGES * PGSIZE, MEM_WAIT)))
 		goto env_setup_vm_error_d;
 	/* Normally we would 0 the pages here.  We handle it in proc_init_proc*.
 	 * Do not start the process without calling those. */
@@ -82,9 +82,9 @@ int env_setup_vm(env_t *e)
 	return 0;
 
 env_setup_vm_error:
-	free_cont_pages(e->procdata, LOG2_UP(PROCDATA_NUM_PAGES));
+	kpages_free(e->procdata, PROCDATA_NUM_PAGES * PGSIZE);
 env_setup_vm_error_d:
-	free_cont_pages(e->procinfo, LOG2_UP(PROCINFO_NUM_PAGES));
+	kpages_free(e->procinfo, PROCINFO_NUM_PAGES * PGSIZE);
 env_setup_vm_error_i:
 	env_user_mem_free(e, 0, UVPT);
 	env_pagetable_free(e);

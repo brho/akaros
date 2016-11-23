@@ -12,6 +12,7 @@
 #include <smp.h>
 #include <schedule.h>
 #include <kstack.h>
+#include <kmalloc.h>
 #include <arch/uaccess.h>
 
 uintptr_t get_kstack(void)
@@ -20,7 +21,7 @@ uintptr_t get_kstack(void)
 	if (KSTKSIZE == PGSIZE)
 		stackbot = (uintptr_t)kpage_alloc_addr();
 	else
-		stackbot = (uintptr_t)get_cont_pages(KSTKSHIFT - PGSHIFT, 0);
+		stackbot = (uintptr_t)kpages_alloc(KSTKSIZE, MEM_ATOMIC);
 	assert(stackbot);
 	return stackbot + KSTKSIZE;
 }
@@ -31,7 +32,7 @@ void put_kstack(uintptr_t stacktop)
 	if (KSTKSIZE == PGSIZE)
 		page_decref(kva2page((void*)stackbot));
 	else
-		free_cont_pages((void*)stackbot, KSTKSHIFT - PGSHIFT);
+		kpages_free((void*)stackbot, KSTKSIZE);
 }
 
 uintptr_t *kstack_bottom_addr(uintptr_t stacktop)

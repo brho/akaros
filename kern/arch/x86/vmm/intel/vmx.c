@@ -168,8 +168,7 @@
 #define currentcpu (&per_cpu_info[core_id()])
 
 static unsigned long *msr_bitmap;
-#define VMX_IO_BITMAP_ORDER		4	/* 64 KB */
-#define VMX_IO_BITMAP_SZ		(1 << (VMX_IO_BITMAP_ORDER + PGSHIFT))
+#define VMX_IO_BITMAP_SZ		(1 << 16) /* 64 KB */
 static unsigned long *io_bitmap;
 
 int x86_ept_pte_fix_ups = 0;
@@ -676,7 +675,6 @@ setup_vmcs_config(void *p)
 	}
 
 	vmcs_conf->size = vmx_msr_high & 0x1fff;
-	vmcs_conf->order = LOG2_UP(nr_pages(vmcs_config.size));
 	vmcs_conf->revision_id = (uint32_t) vmx_msr;
 
 	/* Read in the caps for runtime checks.  This MSR is only available if
@@ -690,10 +688,10 @@ static struct vmcs *__vmx_alloc_vmcs(int node)
 {
 	struct vmcs *vmcs;
 
-	vmcs = get_cont_pages_node(node, vmcs_config.order, MEM_WAIT);
+	vmcs = kpages_alloc(vmcs_config.size, MEM_WAIT);
 	if (!vmcs)
-		error(ENOMEM, "__vmx_alloc_vmcs: Could not get %d contig pages",
-		      vmcs_config.order);
+		error(ENOMEM, "__vmx_alloc_vmcs: Could not get %d contig bytes",
+		      vmcs_config.size);
 	memset(vmcs, 0, vmcs_config.size);
 	vmcs->revision_id = vmcs_config.revision_id; /* vmcs revision id */
 	printd("%d: set rev id %d\n", core_id(), vmcs->revision_id);
@@ -719,7 +717,7 @@ vmx_alloc_vmcs(void)
 static void
 vmx_free_vmcs(struct vmcs *vmcs)
 {
-	free_cont_pages(vmcs, vmcs_config.order);
+	kpages_free(vmcs, vmcs_config.size);
 }
 
 /*
@@ -1316,8 +1314,7 @@ int intel_vmm_init(void) {
 		printk("Could not allocate msr_bitmap\n");
 		return -ENOMEM;
 	}
-	io_bitmap = (unsigned long *)get_cont_pages(VMX_IO_BITMAP_ORDER,
-	                                            MEM_WAIT);
+	io_bitmap = (unsigned long *)kpages_alloc(VMX_IO_BITMAP_SZ, MEM_WAIT);
 	if (!io_bitmap) {
 		printk("Could not allocate msr_bitmap\n");
 		kfree(msr_bitmap);

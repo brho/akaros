@@ -665,7 +665,6 @@ extern struct vmx_capability vmx_capability;
 
 struct vmcs_config {
 	int size;
-	int order;
 	uint32_t revision_id;
 	uint32_t pin_based_exec_ctrl;
 	uint32_t cpu_based_exec_ctrl;

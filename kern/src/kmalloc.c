@@ -55,15 +55,17 @@ void *kmalloc(size_t size, int flags)
 		cache_id = LOG2_UP(ksize) - LOG2_UP(KMALLOC_SMALLEST);
 	// if we don't have a cache to handle it, alloc cont pages
 	if (cache_id >= NUM_KMALLOC_CACHES) {
-		size_t num_pgs = ROUNDUP(size + sizeof(struct kmalloc_tag), PGSIZE) /
-		                           PGSIZE;
-		buf = get_cont_pages(LOG2_UP(num_pgs), flags);
+		/* The arena allocator will round up too, but we want to know in advance
+		 * so that krealloc can avoid extra allocations. */
+		size_t amt_alloc = ROUNDUP(size + sizeof(struct kmalloc_tag), PGSIZE);
+
+		buf = kpages_alloc(amt_alloc, flags);
 		if (!buf)
 			panic("Kmalloc failed!  Handle me!");
 		// fill in the kmalloc tag
 		struct kmalloc_tag *tag = buf;
 		tag->flags = KMALLOC_TAG_PAGES;
-		tag->num_pages = num_pgs;
+		tag->amt_alloc = amt_alloc;
 		tag->canary = KMALLOC_CANARY;
 		kref_init(&tag->kref, __kfree_release, 1);
 		return buf + sizeof(struct kmalloc_tag);
@@ -167,8 +169,7 @@ void *krealloc(void* buf, size_t size, int flags)
 		if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_CACHE) {
 			osize = tag->my_cache->obj_size - sizeof(struct kmalloc_tag);
 		} else if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_PAGES) {
-			osize = LOG2_UP(tag->num_pages) * PGSIZE
-			        - sizeof(struct kmalloc_tag);
+			osize = tag->amt_alloc - sizeof(struct kmalloc_tag);
 		} else {
 			panic("Probably a bad tag, flags %p\n", tag->flags);
 		}
@@ -220,7 +221,7 @@ static void __kfree_release(struct kref *kref)
 	if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_CACHE)
 		kmem_cache_free(tag->my_cache, tag);
 	else if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_PAGES)
-		free_cont_pages(tag, LOG2_UP(tag->num_pages));
+		kpages_free(tag, tag->amt_alloc);
 	else
 		panic("Bad flag 0x%x in %s", tag->flags, __FUNCTION__);
 }

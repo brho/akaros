@@ -53,7 +53,7 @@ void *debug_canary;
 struct kmalloc_tag {
 	union {
 		struct kmem_cache *my_cache;
-		size_t num_pages;
+		size_t amt_alloc;
 		uint64_t unused_force_align;
 	};
 	struct kref kref;
