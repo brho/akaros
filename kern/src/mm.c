@@ -1290,8 +1290,11 @@ uintptr_t vmap_pmem_writecomb(uintptr_t paddr, size_t nr_bytes)
 
 int vunmap_vmem(uintptr_t vaddr, size_t nr_bytes)
 {
-	unsigned long nr_pages = ROUNDUP(nr_bytes, PGSIZE) >> PGSHIFT;
-	unmap_vmap_segment(vaddr, nr_pages);
-	put_vmap_segment(vaddr, nr_pages);
+	unsigned long nr_pages;
+
+	nr_bytes += PGOFF(vaddr);
+	nr_pages = ROUNDUP(nr_bytes, PGSIZE) >> PGSHIFT;
+	unmap_vmap_segment(PG_ADDR(vaddr), nr_pages);
+	put_vmap_segment(PG_ADDR(vaddr), nr_pages);
 	return 0;
 }
