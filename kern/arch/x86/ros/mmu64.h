@@ -34,19 +34,19 @@ typedef struct x86_pgdir {
  *                     |            IOAPIC            | RW/--  APIC_SIZE (1MB)
  *                     |                              |
  *   IOAPIC_BASE  -->  +------------------------------+ 0xffffffffbff00000
- *                     |                              |
- *                     |                              | RW/--  APIC_SIZE (1MB)
- *                     |                              |
- *   KERN_DYN_TOP -->  +------------------------------+ 0xffffffffbfe00000
- *                     |   Kernel Dynamic Mappings    |
- *                     |              .               |
- *                     :              .               :
- *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ RW/--
  *                     :                              :
  *                     |          Unmapped            | --/--
  *                     |                              |
  *                     |  Kernel static linking limit |
- *                     +------------------------------+ 0xffffffff80000000
+ *   KERN_DYN_TOP -->  +------------------------------+ 0xffffffff80000000
+ *                     |   Kernel Dynamic Mappings    |
+ *                     |              .               |
+ *                     :              .               :
+ *                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ RW/--
+ *                     |              .               |
+ *                     |              .               |
+ *                     |              .               |
+ *   KERN_DYN_BOT -->  +------------------------------+ 0xfffffff000000000
  *                     |                              |
  *                     |                              |
  *                     |                              |
@@ -164,9 +164,9 @@ typedef struct x86_pgdir {
 /* Static kernel mappings */
 #define APIC_SIZE 		0x100000
 #define IOAPIC_BASE		(KERN_LOAD_ADDR - APIC_SIZE)
-/* All arches must define this, which is the lower limit of their static
- * mappings, and where the dynamic mappings will start. */
-#define KERN_DYN_TOP	IOAPIC_BASE
+/* This is the range of the dynamic virtual mappings. */
+#define KERN_DYN_TOP	0xffffffff80000000
+#define KERN_DYN_BOT	0xfffffff000000000
 
 /* Virtual page table.  Every PML4 has a PTE at the slot (PML4(VPT))
  * corresponding to VPT that points to that PML4's base.  In essence, the 512

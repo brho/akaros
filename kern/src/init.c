@@ -142,6 +142,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	num_cores = get_early_num_cores();
 	pmem_init(multiboot_kaddr);
 	kmalloc_init();
+	vmap_init();
 	hashtable_init();
 	radix_init();
 	acpiinit();

@@ -74,14 +74,16 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot);
 int __do_munmap(struct proc *p, uintptr_t addr, size_t len);
 
 /* Kernel Dynamic Memory Mappings */
-/* These two are just about reserving VA space */
-uintptr_t get_vmap_segment(unsigned long num_pages);
-uintptr_t put_vmap_segment(uintptr_t vaddr, unsigned long num_pages);
-/* These two are about actually mapping stuff in some reserved space */
+struct arena *vmap_arena;
+void vmap_init(void);
+/* Gets PML1 page-aligned virtual addresses for the kernel's dynamic vmap.
+ * You'll need to map it to something.  When you're done, 'put-' will also unmap
+ * the vaddr for you. */
+uintptr_t get_vmap_segment(size_t nr_bytes);
+void put_vmap_segment(uintptr_t vaddr, size_t nr_bytes);
 int map_vmap_segment(uintptr_t vaddr, uintptr_t paddr, unsigned long num_pages,
                      int perm);
-int unmap_vmap_segment(uintptr_t vaddr, unsigned long num_pages);
-/* Helper wrappers, since no one will probably call the *_segment funcs */
+/* Helper wrappers for getting and mapping a specific paddr. */
 uintptr_t vmap_pmem(uintptr_t paddr, size_t nr_bytes);
 uintptr_t vmap_pmem_nocache(uintptr_t paddr, size_t nr_bytes);
 uintptr_t vmap_pmem_writecomb(uintptr_t paddr, size_t nr_bytes);

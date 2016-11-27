@@ -35,9 +35,10 @@
 # define PTSIZE                   L1PGSIZE
 #endif
 
-/* All arches must define this, which is the lower limit of their static
- * mappings, and where the dynamic mappings will start. */
+/* This is the range of the dynamic virtual mappings. */
 #define KERN_DYN_TOP    KERNBASE
+#warning "pick a better DYN_BOT"
+#define KERN_DYN_BOT	ULIM
 
 /* **************************************** */
 /* Page table constants, macros, etc */

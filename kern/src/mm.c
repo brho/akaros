@@ -1160,31 +1160,90 @@ unsigned long populate_va(struct proc *p, uintptr_t va, unsigned long nr_pgs)
 }
 
 /* Kernel Dynamic Memory Mappings */
-uintptr_t dyn_vmap_llim = KERN_DYN_TOP;
-spinlock_t dyn_vmap_lock = SPINLOCK_INITIALIZER;
 
-/* Reserve space in the kernel dynamic memory map area */
-uintptr_t get_vmap_segment(unsigned long num_pages)
+static struct arena *vmap_addr_arena;
+struct arena *vmap_arena;
+static spinlock_t vmap_lock = SPINLOCK_INITIALIZER;
+struct vmap_free_tracker {
+	void						*addr;
+	size_t						nr_bytes;
+};
+static struct vmap_free_tracker *vmap_to_free;
+static size_t vmap_nr_to_free;
+/* This value tunes the ratio of global TLB shootdowns to __vmap_free()s. */
+#define VMAP_MAX_TO_FREE 1000
+
+/* Unmaps / 0's the PTEs of a chunk of vaddr space.  Caller needs to send a
+ * global TLB shootdown before freeing the vaddr. */
+static int __unmap_vmap_segment(uintptr_t vaddr, unsigned long num_pages)
 {
-	uintptr_t retval;
-	spin_lock(&dyn_vmap_lock);
-	retval = dyn_vmap_llim - num_pages * PGSIZE;
-	if ((retval > ULIM) && (retval < KERN_DYN_TOP)) {
-		dyn_vmap_llim = retval;
-	} else {
-		warn("[kernel] dynamic mapping failed!");
-		retval = 0;
+	pte_t pte;
+
+	for (int i = 0; i < num_pages; i++) {
+		pte = pgdir_walk(boot_pgdir, (void*)(vaddr + i * PGSIZE), 1);
+		if (pte_walk_okay(pte))
+			pte_clear(pte);
 	}
-	spin_unlock(&dyn_vmap_lock);
-	return retval;
+	return 0;
 }
 
-/* Give up your space.  Note this isn't supported yet */
-uintptr_t put_vmap_segment(uintptr_t vaddr, unsigned long num_pages)
+/* We don't immediately return the addrs to their source (vmap_addr_arena).
+ * Instead, we hold on to them until we have a suitable amount, then free them
+ * in a batch.  This amoritizes the cost of the TLB global shootdown.  We can
+ * explore other tricks in the future too (like RCU for a certain index in the
+ * vmap_to_free array). */
+static void __vmap_free(struct arena *source, void *obj, size_t size)
 {
-	/* TODO: use vmem regions for adjustable vmap segments */
-	warn("Not implemented, leaking vmem space.\n");
-	return 0;
+	unsigned long nr_pages;
+	struct vmap_free_tracker *vft;
+
+	nr_pages = ROUNDUP(size, PGSIZE) >> PGSHIFT;
+	spin_lock(&vmap_lock);
+	/* All objs get *unmapped* immediately, but we'll shootdown later.  Note
+	 * that it is OK (but slightly dangerous) for the kernel to reuse the paddrs
+	 * pointed to by the vaddrs before a TLB shootdown. */
+	__unmap_vmap_segment((uintptr_t)obj, nr_pages);
+	if (vmap_nr_to_free < VMAP_MAX_TO_FREE) {
+		vft = &vmap_to_free[vmap_nr_to_free++];
+		vft->addr = obj;
+		vft->nr_bytes = size;
+		spin_unlock(&vmap_lock);
+		return;
+	}
+	tlb_shootdown_global();
+	for (int i = 0; i < vmap_nr_to_free; i++) {
+		vft = &vmap_to_free[i];
+		arena_free(source, vft->addr, vft->nr_bytes);
+	}
+	/* don't forget to free the one passed in */
+	arena_free(source, obj, size);
+	vmap_nr_to_free = 0;
+	spin_unlock(&vmap_lock);
+}
+
+void vmap_init(void)
+{
+	vmap_addr_arena = arena_create("vmap_addr", (void*)KERN_DYN_BOT,
+	                               KERN_DYN_TOP - KERN_DYN_BOT,
+	                               PGSIZE, NULL, NULL, NULL, 0, MEM_WAIT);
+	vmap_arena = arena_create("vmap", NULL, 0, PGSIZE, arena_alloc, __vmap_free,
+	                          vmap_addr_arena, 0, MEM_WAIT);
+	vmap_to_free = kmalloc(sizeof(struct vmap_free_tracker) * VMAP_MAX_TO_FREE,
+	                       MEM_WAIT);
+}
+
+uintptr_t get_vmap_segment(size_t nr_bytes)
+{
+	uintptr_t ret;
+
+	ret = (uintptr_t)arena_alloc(vmap_arena, nr_bytes, MEM_ATOMIC);
+	assert(ret);
+	return ret;
+}
+
+void put_vmap_segment(uintptr_t vaddr, size_t nr_bytes)
+{
+	arena_free(vmap_arena, (void*)vaddr, nr_bytes);
 }
 
 /* Map a virtual address chunk to physical addresses.  Make sure you got a vmap
@@ -1207,8 +1266,8 @@ int map_vmap_segment(uintptr_t vaddr, uintptr_t paddr, unsigned long num_pages,
 
 	/* TODO: (MM) you should lock on boot pgdir modifications.  A vm region lock
 	 * isn't enough, since there might be a race on outer levels of page tables.
-	 * For now, we'll just use the dyn_vmap_lock (which technically works). */
-	spin_lock(&dyn_vmap_lock);
+	 * For now, we'll just use the vmap_lock (which technically works). */
+	spin_lock(&vmap_lock);
 	pte_t pte;
 #ifdef CONFIG_X86
 	perm |= PTE_G;
@@ -1216,7 +1275,7 @@ int map_vmap_segment(uintptr_t vaddr, uintptr_t paddr, unsigned long num_pages,
 	for (int i = 0; i < num_pages; i++) {
 		pte = pgdir_walk(boot_pgdir, (void*)(vaddr + i * PGSIZE), 1);
 		if (!pte_walk_okay(pte)) {
-			spin_unlock(&dyn_vmap_lock);
+			spin_unlock(&vmap_lock);
 			return -ENOMEM;
 		}
 		/* You probably should have unmapped first */
@@ -1224,29 +1283,7 @@ int map_vmap_segment(uintptr_t vaddr, uintptr_t paddr, unsigned long num_pages,
 			warn("Existing PTE value %p\n", pte_print(pte));
 		pte_write(pte, paddr + i * PGSIZE, perm);
 	}
-	spin_unlock(&dyn_vmap_lock);
-	return 0;
-}
-
-/* Unmaps / 0's the PTEs of a chunk of vaddr space */
-int unmap_vmap_segment(uintptr_t vaddr, unsigned long num_pages)
-{
-	/* Not a big deal - won't need this til we do something with kthreads */
-	warn("Incomplete, don't call this yet.");
-	spin_lock(&dyn_vmap_lock);
-	/* TODO: For all pgdirs */
-	pte_t pte;
-	for (int i = 0; i < num_pages; i++) {
-		pte = pgdir_walk(boot_pgdir, (void*)(vaddr + i * PGSIZE), 1);
-		if (pte_walk_okay(pte))
-			pte_clear(pte);
-	}
-	/* TODO: TLB shootdown.  Also note that the global flag is set on the PTE
-	 * (for x86 for now), which requires a global shootdown.  bigger issue is
-	 * the TLB shootdowns for multiple pgdirs.  We'll need to remove from every
-	 * pgdir, and send tlb shootdowns to those that are active (which we don't
-	 * track yet). */
-	spin_unlock(&dyn_vmap_lock);
+	spin_unlock(&vmap_lock);
 	return 0;
 }
 
@@ -1255,10 +1292,11 @@ static uintptr_t vmap_pmem_flags(uintptr_t paddr, size_t nr_bytes, int flags)
 {
 	uintptr_t vaddr;
 	unsigned long nr_pages;
+
 	assert(nr_bytes && paddr);
 	nr_bytes += PGOFF(paddr);
 	nr_pages = ROUNDUP(nr_bytes, PGSIZE) >> PGSHIFT;
-	vaddr = get_vmap_segment(nr_pages);
+	vaddr = get_vmap_segment(nr_bytes);
 	if (!vaddr) {
 		warn("Unable to get a vmap segment");	/* probably a bug */
 		return 0;
@@ -1290,11 +1328,7 @@ uintptr_t vmap_pmem_writecomb(uintptr_t paddr, size_t nr_bytes)
 
 int vunmap_vmem(uintptr_t vaddr, size_t nr_bytes)
 {
-	unsigned long nr_pages;
-
 	nr_bytes += PGOFF(vaddr);
-	nr_pages = ROUNDUP(nr_bytes, PGSIZE) >> PGSHIFT;
-	unmap_vmap_segment(PG_ADDR(vaddr), nr_pages);
-	put_vmap_segment(PG_ADDR(vaddr), nr_pages);
+	put_vmap_segment(PG_ADDR(vaddr), nr_bytes);
 	return 0;
 }
