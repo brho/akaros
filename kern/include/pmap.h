@@ -91,6 +91,7 @@ void	page_decref(page_t *pp);
 
 void	tlb_invalidate(pgdir_t pgdir, void *ga);
 void tlb_flush_global(void);
+void tlb_shootdown_global(void);
 bool regions_collide_unsafe(uintptr_t start1, uintptr_t end1,
                             uintptr_t start2, uintptr_t end2);
 

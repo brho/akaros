@@ -22,6 +22,7 @@
 #include <mm.h>
 #include <multiboot.h>
 #include <arena.h>
+#include <init.h>
 
 physaddr_t max_pmem = 0;	/* Total amount of physical memory (bytes) */
 physaddr_t max_paddr = 0;	/* Maximum addressable physical address */
@@ -324,6 +325,27 @@ void tlb_invalidate(pgdir_t pgdir, void *va)
 	// Flush the entry only if we're modifying the current address space.
 	// For now, there is only one address space, so always invalidate.
 	invlpg(va);
+}
+
+static void __tlb_global(uint32_t srcid, long a0, long a1, long a2)
+{
+	tlb_flush_global();
+}
+
+/* Does a global TLB flush on all cores. */
+void tlb_shootdown_global(void)
+{
+	tlb_flush_global();
+	if (booting)
+		return;
+	/* TODO: consider a helper for broadcast messages, though note that we're
+	 * doing our flush immediately, which our caller expects from us before it
+	 * returns. */
+	for (int i = 0; i < num_cores; i++) {
+		if (i == core_id())
+			continue;
+		send_kernel_message(i, __tlb_global, 0, 0, 0, KMSG_IMMEDIATE);
+	}
 }
 
 /* Helper, returns true if any part of (start1, end1) is within (start2, end2).
