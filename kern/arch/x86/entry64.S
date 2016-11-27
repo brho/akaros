@@ -187,11 +187,11 @@ fill_pml3:
 	push	%eax
 	movl	$512, %ebp					# count = 512 for PML2 (map it all)
 	push	%ebp
-	# compute pml2 (pml2base + (total count - current count) * PGSIZE)
+	# compute pml2 (pml2base + (total count - current count) * PGSIZE * 2)
 	movl	0x28(%esp), %ebp			# pml2base (8 push, 1 ret, arg5)
 	movl	0x24(%esp), %edi			# total count
 	subl	%ebx, %edi
-	shll	$12, %edi
+	shll	$13, %edi
 	addl	%edi, %ebp
 	movl	%ebp, %edi					# arg0 for the func call
 	call	fill_jpml2
@@ -426,23 +426,23 @@ no_pml3ps_string:
 	.align PGSIZE
 .globl boot_pml4
 boot_pml4:
-	.space  PGSIZE
+	.space  PGSIZE * 2
 boot_pml3_lo:
-	.space  PGSIZE
+	.space  PGSIZE * 2
 boot_pml3_hi:
-	.space  PGSIZE
+	.space  PGSIZE * 2
 boot_pml3_kb:
-	.space  PGSIZE
+	.space  PGSIZE * 2
 stack32:
 	.space  PGSIZE
 stack32top:
 # Could make all of the no-jumbo stuff a config var
 boot_pml2_lo:		# one pml2 (1GB in the lo pml3)
-	.space  PGSIZE
+	.space  PGSIZE * 2
 boot_pml2_hi:		# one pml2 (1GB in the hi pml3)
-	.space  PGSIZE
-boot_pml2_kb: 		# 512 pml2s in the kb pml3
-	.space  PGSIZE * 512
+	.space  PGSIZE * 2
+boot_pml2_kb: 		# 512 pml2s (+ epts) in the kb pml3
+	.space  PGSIZE * 512 * 2
 
 # From here down is linked for KERNBASE
 .text

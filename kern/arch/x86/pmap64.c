@@ -112,14 +112,18 @@ static kpte_t *__pml_walk(kpte_t *pml, uintptr_t va, int flags, int pml_shift)
 		 * translation is !User).  We put the perms on the last entry, not the
 		 * intermediates. */
 		*kpte = PADDR(new_pml_kva) | PTE_P | PTE_U | PTE_W;
-		/* The physaddr of the new_pml is one page higher than the KPT page.  A
-		 * few other things:
-		 * - for the same reason that we have U and X set on all intermediate
-		 * PTEs, we now set R, X, and W for the EPTE.
-		 * - All EPTEs have U perms
-		 * - We can't use epte_write since we're workin on intermediate PTEs,
-		 * and they don't have the memory type set. */
-		*epte = (PADDR(new_pml_kva) + PGSIZE) | EPTE_R | EPTE_X | EPTE_W;
+		/* For a dose of paranoia, we'll avoid mapping intermediate eptes when
+		 * we know we're using an address that should never be ept-accesible. */
+		if (va < ULIM) {
+			/* The physaddr of the new_pml is one page higher than the KPT page.
+			 * A few other things:
+			 * - for the same reason that we have U and X set on all
+			 *   intermediate PTEs, we now set R, X, and W for the EPTE.
+			 * - All EPTEs have U perms
+			 * - We can't use epte_write since we're workin on intermediate
+			 *   PTEs, and they don't have the memory type set. */
+			*epte = (PADDR(new_pml_kva) + PGSIZE) | EPTE_R | EPTE_X | EPTE_W;
+		}
 	}
 	return __pml_walk(kpte2pml(*kpte), va, flags, pml_shift - BITS_PER_PML);
 }
@@ -185,8 +189,7 @@ static void map_my_pages(kpte_t *pgdir, uintptr_t va, size_t size,
 	     pa += pgsize) {
 		kpte = get_next_pte(kpte, pgdir, va, PG_WALK_CREATE | pml_shift);
 		assert(kpte);
-		*kpte = PTE_ADDR(pa) | perm |
-		        (pml_shift != PML1_SHIFT ? PTE_PS : 0);
+		pte_write(kpte, pa, perm | (pml_shift != PML1_SHIFT ? PTE_PS : 0));
 		printd("Wrote *kpte %p, for va %p to pa %p tried to cover %p\n",
 		       *kpte, va, pa, amt_mapped);
 	}
@@ -358,7 +361,7 @@ int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size)
 		if (!kpte_is_present(kpte))
 			return 0;
 		if (pte_is_final(kpte, shift)) {
-			*kpte = 0;
+			pte_clear(kpte);
 			return 0;
 		}
 		/* If we haven't visited all of our subs, we might still have some
@@ -372,7 +375,7 @@ int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size)
 			}
 		}
 		kpages_free(KADDR(PTE_ADDR(*kpte)), 2 * PGSIZE);
-		*kpte = 0;
+		pte_clear(kpte);
 		return 0;
 	}
 	/* Don't accidentally unmap the boot mappings */
