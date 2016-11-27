@@ -206,7 +206,7 @@ void show_mapping(pgdir_t pgdir, uintptr_t start, size_t size)
 	page_t *page;
 	uintptr_t i;
 
-	printk("   %sVirtual    %sPhysical  Ps Dr Ac CD WT U W P EPTE\n",
+	printk("   %sVirtual    %sPhysical  Ps Dr Ac G CD WT U W P EPTE\n",
 	       BIT_SPACING, BIT_SPACING);
 	printk("-------------------------------------------------%s\n", BIT_DASHES);
 	for(i = 0; i < size; i += PGSIZE, start += PGSIZE) {
@@ -222,11 +222,12 @@ void show_mapping(pgdir_t pgdir, uintptr_t start, size_t size)
 			 * UVPT mapping requires the U to see interior pages (but have W
 			 * off). */
 			perm = get_va_perms(pgdir, (void*)start);
-			printk("%p  %1d  %1d  %1d  %1d  %1d  %1d %1d %1d 0x%llx\n",
+			printk("%p  %1d  %1d  %1d  %1d %1d  %1d  %1d %1d %1d 0x%llx\n",
 			       pte_get_paddr(pte),
 			       pte_is_jumbo(pte),
 			       pte_is_dirty(pte),
 			       pte_is_accessed(pte),
+			       (pte_print(pte) & PTE_G) / PTE_G,
 			       (pte_print(pte) & __PTE_PCD) / __PTE_PCD,
 			       (pte_print(pte) & __PTE_PWT) / __PTE_PWT,
 			       (perm & PTE_U) / PTE_U,

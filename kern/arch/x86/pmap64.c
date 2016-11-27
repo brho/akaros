@@ -491,7 +491,7 @@ void x86_cleanup_bootmem(void)
 	 * anything - it just unmaps but leave 2 KPTs (4 pages) sitting around. */
 	//unmap_segment(boot_pgdir, 0, PML3_PTE_REACH);	// want to do this
 	boot_pgdir.kpte[0] = 0;
-	tlbflush();
+	tlb_flush_global();
 }
 
 /* Walks len bytes from start, executing 'callback' on every PTE, passing it a

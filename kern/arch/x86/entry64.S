@@ -115,7 +115,7 @@ fill_jpml3:
 1:
 	movl	%ecx, %eax
 	shll	$30, %eax					# lower part of PTE ADDR
-	orl		$(PTE_P | PTE_W | PTE_PS), %eax
+	orl		$(PTE_P | PTE_W | PTE_PS | PTE_G), %eax
 	movl	%eax, (%edi, %esi, 8)
 	movl	%ecx, %eax
 	shrl	$2, %eax					# upper part of PTE ADDR
@@ -245,7 +245,7 @@ fill_jpml2:
 1:
 	movl	%ecx, %eax
 	shll	$21, %eax					# lower part of PTE ADDR
-	orl		$(PTE_P | PTE_W | PTE_PS), %eax
+	orl		$(PTE_P | PTE_W | PTE_PS | PTE_G), %eax
 	movl	%eax, (%edi, %esi, 8)
 	movl	%ecx, %eax
 	shrl	$11, %eax					# upper part of PTE ADDR
@@ -264,7 +264,7 @@ fill_jpml2:
 insert_pml3:
 	shrl	$7, %esi 	# want to shift vaddr >> 39
 	andl	$0x1ff, %esi
-	orl		$(PTE_P | PTE_W), %edi
+	orl		$(PTE_P | PTE_W | PTE_G), %edi
 	movl	%edi, (%ecx, %esi, 8)
 	movl	$0x0, 4(%ecx, %esi, 8)	# being clever, i know upper bits are 0
 	ret
@@ -278,7 +278,7 @@ insert_pml2:
 	shrl	$30, %edx
 	orl		%edx, %esi
 	andl	$0x1ff, %esi
-	orl		$(PTE_P | PTE_W), %edi
+	orl		$(PTE_P | PTE_W | PTE_G), %edi
 	movl	%edi, (%ecx, %esi, 8)
 	movl	$0x0, 4(%ecx, %esi, 8)	# being clever, i know upper bits are 0
 	ret
