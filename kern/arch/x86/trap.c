@@ -150,6 +150,8 @@ void idt_init(void)
 	idt[T_BRKPT].gd_dpl = 3;
 	/* Send NMIs to their own stack (IST1 in every core's TSS) */
 	idt[T_NMI].gd_ist = 1;
+	/* Send double faults to their own stack (IST2 in every core's TSS) */
+	idt[T_DBLFLT].gd_ist = 2;
 
 	/* The sooner we set this, the sooner we can use set/get_stack_top. */
 	per_cpu_info[0].tss = &ts;
@@ -534,6 +536,13 @@ void handle_nmi(struct hw_trapframe *hw_tf)
 	             "call __nmi_bottom_half;"
 	             : : "r"(worker_stacktop), "D"(hw_tf_copy));
 	assert(0);
+}
+
+void handle_double_fault(struct hw_trapframe *hw_tf)
+{
+	print_trapframe(hw_tf);
+	backtrace_hwtf(hw_tf);
+	panic("Double fault!  Check the kernel stack pointer; you likely ran off the end of the stack.");
 }
 
 /* Certain traps want IRQs enabled, such as the syscall.  Others can't handle

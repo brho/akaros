@@ -295,6 +295,11 @@ static void pcpu_init_nmi(struct per_cpu_info *pcpui)
 	pcpui->nmi_worker_stacktop = get_kstack();
 }
 
+static void pcpu_init_doublefault(struct per_cpu_info *pcpui)
+{
+	pcpui->tss->ts_ist2 = get_kstack();
+}
+
 /* Perform any initialization needed by per_cpu_info.  Make sure every core
  * calls this at some point in the smp_boot process.  If you don't smp_boot, you
  * must still call this for core 0.  This must NOT be called from smp_main,
@@ -346,6 +351,7 @@ void __arch_pcpu_init(uint32_t coreid)
 	x86_sysenter_init();
 	x86_set_sysenter_stacktop(x86_get_stacktop_tss(pcpui->tss));
 	pcpu_init_nmi(pcpui);
+	pcpu_init_doublefault(pcpui);
 	/* need to init perfctr before potentially using it in timer handler */
 	perfmon_pcpu_init();
 	vmm_pcpu_init();

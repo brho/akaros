@@ -74,6 +74,18 @@
 	.quad name;							\
 	.long num
 
+#define DOUBLEFAULT_HANDLER(name, num)	\
+	.text;								\
+	.globl name;						\
+	.type name, @function;				\
+	.align 2;							\
+	name:								\
+	pushq $(num);						\
+	jmp _dblf_entry;					\
+	.data;								\
+	.quad name;							\
+	.long num
+
 /* Only used in the kernel during SMP boot.  Send a LAPIC_EOI and iret. */
 #define POKE_HANDLER(name, num)			\
 	.text;								\
@@ -122,11 +134,7 @@ TRAPHANDLER_NOEC(ISR_overflow, T_OFLOW)
 TRAPHANDLER_NOEC(ISR_bounds_check, T_BOUND)
 TRAPHANDLER_NOEC(ISR_invalid_opcode, T_ILLOP)
 TRAPHANDLER_NOEC(ISR_device_not_available, T_DEVICE)
-/* supposedly, DF generates an error code, but the one time we've had a DF so
- * far, it didn't.  eventually, this should probably be handled with a task gate
- * it might have pushed a 0, but just the rest of the stack was corrupt
- */
-TRAPHANDLER_NOEC(ISR_double_fault, T_DBLFLT)
+DOUBLEFAULT_HANDLER(ISR_double_fault, T_DBLFLT)
 /* 9 reserved */
 TRAPHANDLER(ISR_invalid_TSS, T_TSS)
 TRAPHANDLER(ISR_segment_not_present, T_SEGNP)
@@ -473,6 +481,47 @@ irq_all_tf:
 	popq %r15
 	addq $0x10, %rsp			# skip trapno and err
 	iretq
+
+# Similar to the NMI handler, we come in on a special stack, but we can trust
+# the contents of GS for kernel contexts.  This is mostly true.  If we double
+# faulted in this file, for instance, then GS could be garbage.  But that should
+# never happen.  Most double faults will be for running into a guard page on a
+# stack.
+#
+# Since the double fault is so bad, we just want to get into the kernel's C code
+# where we can run some diagnostics.  We (currently) won't try to recover, since
+# it's probably a kernel bug.
+_dblf_entry:
+	cld
+	pushq %r15
+	pushq %r14
+	pushq %r13
+	pushq %r12
+	pushq %r11
+	pushq %r10
+	pushq %r9
+	pushq %r8
+	pushq %rdi
+	pushq %rsi
+	pushq %rbp
+	pushq %rdx
+	pushq %rcx
+	pushq %rbx
+	pushq %rax
+	cmpw $GD_KT, 0x90(%rsp)	# 0x90 - diff btw tf_cs and tf_rax
+	je dblf_all_tf
+	# this is a user TF.  we need to swapgs to get the kernel's gs and mark the
+	# context as partial
+	swapgs					# user's GS is now in MSR_KERNEL_GS_BASE
+	movl $0x1, 0xac(%rsp)	# 0xac - diff btw tf_padding0 and tf_rax
+dblf_all_tf:
+	pushq $0				# fsbase space
+	pushq $0				# gsbase space
+	movq $0, %rbp			# so we can backtrace to this point
+	movq %rsp, %rdi
+	call handle_double_fault
+dblf_spin:
+	jmp dblf_spin
 
 # Unlike normal trap and IRQ handlers, both user and kernel TFs are handled the
 # similarly.  Both come in here and return from here.  We cannot do anything
