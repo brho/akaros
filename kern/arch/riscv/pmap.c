@@ -140,3 +140,14 @@ void arch_add_intermediate_pts(pgdir_t pgdir, uintptr_t va, size_t len)
 {
 	#error "Implement me"
 }
+
+void map_segment(pgdir_t pgdir, uintptr_t va, size_t size, physaddr_t pa,
+                 int perm, int pml_shift)
+{
+	#error "Implement me"
+}
+
+int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size)
+{
+	#error "Implement me"
+}

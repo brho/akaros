@@ -42,10 +42,6 @@ pseudodesc_t gdt_pd;
 #define PG_WALK_CREATE 			0x0100
 
 kpte_t *pml_walk(kpte_t *pml, uintptr_t va, int flags);
-void map_segment(pgdir_t pgdir, uintptr_t va, size_t size, physaddr_t pa,
-                 int perm, int pml_shift);
-int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size);
-
 typedef int (*kpte_cb_t)(kpte_t *kpte, uintptr_t kva, int pml_shift,
                         bool visited_subs, void *arg);
 int pml_for_each(kpte_t *pml, uintptr_t start, size_t len, kpte_cb_t callback,

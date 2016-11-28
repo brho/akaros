@@ -1172,20 +1172,6 @@ static size_t vmap_nr_to_free;
 /* This value tunes the ratio of global TLB shootdowns to __vmap_free()s. */
 #define VMAP_MAX_TO_FREE 1000
 
-/* Unmaps / 0's the PTEs of a chunk of vaddr space.  Caller needs to send a
- * global TLB shootdown before freeing the vaddr. */
-static int __unmap_vmap_segment(uintptr_t vaddr, unsigned long num_pages)
-{
-	pte_t pte;
-
-	for (int i = 0; i < num_pages; i++) {
-		pte = pgdir_walk(boot_pgdir, (void*)(vaddr + i * PGSIZE), 1);
-		if (pte_walk_okay(pte))
-			pte_clear(pte);
-	}
-	return 0;
-}
-
 /* We don't immediately return the addrs to their source (vmap_addr_arena).
  * Instead, we hold on to them until we have a suitable amount, then free them
  * in a batch.  This amoritizes the cost of the TLB global shootdown.  We can
@@ -1193,15 +1179,13 @@ static int __unmap_vmap_segment(uintptr_t vaddr, unsigned long num_pages)
  * vmap_to_free array). */
 static void __vmap_free(struct arena *source, void *obj, size_t size)
 {
-	unsigned long nr_pages;
 	struct vmap_free_tracker *vft;
 
-	nr_pages = ROUNDUP(size, PGSIZE) >> PGSHIFT;
 	spin_lock(&vmap_lock);
 	/* All objs get *unmapped* immediately, but we'll shootdown later.  Note
 	 * that it is OK (but slightly dangerous) for the kernel to reuse the paddrs
 	 * pointed to by the vaddrs before a TLB shootdown. */
-	__unmap_vmap_segment((uintptr_t)obj, nr_pages);
+	unmap_segment(boot_pgdir, (uintptr_t)obj, size);
 	if (vmap_nr_to_free < VMAP_MAX_TO_FREE) {
 		vft = &vmap_to_free[vmap_nr_to_free++];
 		vft->addr = obj;
@@ -1263,25 +1247,12 @@ void put_vmap_segment(uintptr_t vaddr, size_t nr_bytes)
 int map_vmap_segment(uintptr_t vaddr, uintptr_t paddr, unsigned long num_pages,
                      int perm)
 {
-	/* TODO: (MM) you should lock on boot pgdir modifications.  A vm region lock
-	 * isn't enough, since there might be a race on outer levels of page tables.
-	 * For now, we'll just use the vmap_lock (which technically works). */
-	spin_lock(&vmap_lock);
-	pte_t pte;
 #ifdef CONFIG_X86
 	perm |= PTE_G;
 #endif
-	for (int i = 0; i < num_pages; i++) {
-		pte = pgdir_walk(boot_pgdir, (void*)(vaddr + i * PGSIZE), 1);
-		if (!pte_walk_okay(pte)) {
-			spin_unlock(&vmap_lock);
-			return -ENOMEM;
-		}
-		/* You probably should have unmapped first */
-		if (pte_is_mapped(pte))
-			warn("Existing PTE value %p\n", pte_print(pte));
-		pte_write(pte, paddr + i * PGSIZE, perm);
-	}
+	spin_lock(&vmap_lock);
+	map_segment(boot_pgdir, vaddr, num_pages * PGSIZE, paddr, perm,
+	            arch_max_jumbo_page_shift());
 	spin_unlock(&vmap_lock);
 	return 0;
 }

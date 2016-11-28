@@ -96,6 +96,9 @@ bool regions_collide_unsafe(uintptr_t start1, uintptr_t end1,
                             uintptr_t start2, uintptr_t end2);
 
 /* Arch specific implementations for these */
+void map_segment(pgdir_t pgdir, uintptr_t va, size_t size, physaddr_t pa,
+                 int perm, int pml_shift);
+int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size);
 pte_t pgdir_walk(pgdir_t pgdir, const void *va, int create);
 int get_va_perms(pgdir_t pgdir, const void *va);
 int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd);
