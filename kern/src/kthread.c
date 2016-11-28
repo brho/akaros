@@ -15,24 +15,64 @@
 #include <kmalloc.h>
 #include <arch/uaccess.h>
 
+#define KSTACK_NR_GUARD_PGS		1
+#define KSTACK_GUARD_SZ			(KSTACK_NR_GUARD_PGS * PGSIZE)
+static struct kmem_cache *kstack_cache;
+
+/* We allocate KSTKSIZE + PGSIZE vaddrs.  So for one-page stacks, we get two
+ * pages.  blob points to the bottom of this space.  Our job is to allocate the
+ * physical pages for the stack and set up the virtual-to-physical mappings. */
+int kstack_ctor(void *blob, void *priv, int flags)
+{
+	void *stackbot;
+
+	stackbot = kpages_alloc(KSTKSIZE, flags);
+	if (!stackbot)
+		return -1;
+	if (map_vmap_segment((uintptr_t)blob, 0x123456000, KSTACK_NR_GUARD_PGS,
+		                 PTE_NONE))
+		goto error;
+	if (map_vmap_segment((uintptr_t)blob + KSTACK_GUARD_SZ, PADDR(stackbot),
+		                 KSTKSIZE / PGSIZE, PTE_KERN_RW))
+		goto error;
+	return 0;
+error:
+	/* On failure, we only need to undo what our dtor would do.  The unmaps
+	 * happen in the vmap_arena ffunc. */
+	kpages_free(stackbot, KSTKSIZE);
+	return -1;
+}
+
+/* The vmap_arena free will unmap the vaddrs on its own.  We just need to free
+ * the physical memory we allocated in ctor.  Although we still have mappings
+ * and TLB entries pointing to the memory after we free it (and thus it can be
+ * reused), this is no more dangerous than just freeing the stack.  Errant
+ * pointers into an old kstack are still dangerous. */
+void kstack_dtor(void *blob, void *priv)
+{
+	void *stackbot;
+	pte_t pte;
+
+	pte = pgdir_walk(boot_pgdir, blob + KSTACK_GUARD_SZ, 0);
+	assert(pte_walk_okay(pte));
+	stackbot = KADDR(pte_get_paddr(pte));
+	kpages_free(stackbot, KSTKSIZE);
+}
+
 uintptr_t get_kstack(void)
 {
-	uintptr_t stackbot;
-	if (KSTKSIZE == PGSIZE)
-		stackbot = (uintptr_t)kpage_alloc_addr();
-	else
-		stackbot = (uintptr_t)kpages_alloc(KSTKSIZE, MEM_ATOMIC);
-	assert(stackbot);
-	return stackbot + KSTKSIZE;
+	void *blob;
+
+	blob = kmem_cache_alloc(kstack_cache, MEM_ATOMIC);
+	/* TODO: think about MEM_WAIT within kthread/blocking code. */
+	assert(blob);
+	return (uintptr_t)blob + KSTKSIZE + KSTACK_GUARD_SZ;
 }
 
 void put_kstack(uintptr_t stacktop)
 {
-	uintptr_t stackbot = stacktop - KSTKSIZE;
-	if (KSTKSIZE == PGSIZE)
-		page_decref(kva2page((void*)stackbot));
-	else
-		kpages_free((void*)stackbot, KSTKSIZE);
+	kmem_cache_free(kstack_cache, (void*)(stacktop - KSTKSIZE
+	                                      - KSTACK_GUARD_SZ));
 }
 
 uintptr_t *kstack_bottom_addr(uintptr_t stacktop)
@@ -49,6 +89,9 @@ void kthread_init(void)
 	kthread_kcache = kmem_cache_create("kthread", sizeof(struct kthread),
 					   __alignof__(struct kthread), 0,
 					   NULL, 0, 0, NULL);
+	kstack_cache = kmem_cache_create("kstack", KSTKSIZE + KSTACK_GUARD_SZ,
+	                                 PGSIZE, 0, vmap_arena, kstack_ctor,
+									 kstack_dtor, NULL);
 }
 
 /* Used by early init routines (smp_boot, etc) */
