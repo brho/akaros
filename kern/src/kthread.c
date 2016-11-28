@@ -115,9 +115,6 @@ void __use_real_kstack(void (*f)(void *arg))
 	uintptr_t new_stacktop;
 
 	new_stacktop = get_kstack();
-#ifdef CONFIG_KTHREAD_POISON
-	*kstack_bottom_addr(new_stacktop) = 0xdeadbeef;
-#endif /* CONFIG_KTHREAD_POISON */
 	set_stack_top(new_stacktop);
 	__reset_stack_pointer(0, new_stacktop, f);
 }
@@ -149,16 +146,6 @@ void restart_kthread(struct kthread *kthread)
 	/* When a kthread runs, its stack is the default kernel stack */
 	set_stack_top(kthread->stacktop);
 	pcpui->cur_kthread = kthread;
-#ifdef CONFIG_KTHREAD_POISON
-	/* Assert and switch to cur stack not in use, kthr stack in use */
-	uintptr_t *cur_stack_poison, *kth_stack_poison;
-	cur_stack_poison = kstack_bottom_addr(current_stacktop);
-	assert(*cur_stack_poison == 0xdeadbeef);
-	*cur_stack_poison = 0;
-	kth_stack_poison = kstack_bottom_addr(kthread->stacktop);
-	assert(!*kth_stack_poison);
-	*kth_stack_poison = 0xdeadbeef;
-#endif /* CONFIG_KTHREAD_POISON */
 	/* Only change current if we need to (the kthread was in process context) */
 	if (kthread->proc) {
 		if (kthread->proc == pcpui->cur_proc) {
@@ -307,18 +294,6 @@ void ktask(char *name, void (*fn)(void*), void *arg)
 	                    (long)name, KMSG_ROUTINE);
 }
 
-void check_poison(char *msg)
-{
-#ifdef CONFIG_KTHREAD_POISON
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	if (pcpui->cur_kthread && pcpui->cur_kthread->stacktop &&
-	    (*kstack_bottom_addr(pcpui->cur_kthread->stacktop) != 0xdeadbeef)) {
-		printk("\nBad kthread canary, msg: %s\n", msg);
-		panic("");
-	}
-#endif /* CONFIG_KTHREAD_POISON */
-}
-
 /* Semaphores, using kthreads directly */
 static void debug_downed_sem(struct semaphore *sem);
 static void debug_upped_sem(struct semaphore *sem);
@@ -427,23 +402,10 @@ void sem_down(struct semaphore *sem)
 		new_kthread->flags = KTH_DEFAULT_FLAGS;
 		new_stacktop = get_kstack();
 		new_kthread->stacktop = new_stacktop;
-#ifdef CONFIG_KTHREAD_POISON
-		*kstack_bottom_addr(new_stacktop) = 0;
-#endif /* CONFIG_KTHREAD_POISON */
 	}
 	/* Set the core's new default stack and kthread */
 	set_stack_top(new_stacktop);
 	pcpui->cur_kthread = new_kthread;
-#ifdef CONFIG_KTHREAD_POISON
-	/* Mark the new stack as in-use, and unmark the current kthread */
-	uintptr_t *new_stack_poison, *kth_stack_poison;
-	new_stack_poison = kstack_bottom_addr(new_stacktop);
-	assert(!*new_stack_poison);
-	*new_stack_poison = 0xdeadbeef;
-	kth_stack_poison = kstack_bottom_addr(kthread->stacktop);
-	assert(*kth_stack_poison == 0xdeadbeef);
-	*kth_stack_poison = 0;
-#endif /* CONFIG_KTHREAD_POISON */
 	/* Kthreads that are ktasks are not related to any process, and do not need
 	 * to work in a process's address space.  They can operate in any address
 	 * space that has the kernel mapped (like boot_pgdir, or any pgdir).  Some
@@ -496,11 +458,6 @@ void sem_down(struct semaphore *sem)
 	/* Save the allocs as the spare */
 	assert(!pcpui->spare);
 	pcpui->spare = new_kthread;
-#ifdef CONFIG_KTHREAD_POISON
-	/* switch back to old stack in use, new one not */
-	*new_stack_poison = 0;
-	*kth_stack_poison = 0xdeadbeef;
-#endif /* CONFIG_KTHREAD_POISON */
 block_return_path:
 	printd("[kernel] Returning from being 'blocked'! at %llu\n", read_tsc());
 	/* restart_kthread and longjmp did not reenable IRQs.  We need to make sure

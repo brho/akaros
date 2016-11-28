@@ -177,14 +177,6 @@ config LARGE_KSTACKS
 		higher performance, and mention this setting if you have any weird
 		crashes or panics.
 
-config KTHREAD_POISON
-	bool "Kthread Poison Canary"
-	default n
-	help
-		Kthreads will use a bit of storage at the bottom of the stack to track
-		the state of the kthread.  This is useful to catch various bugs with
-		kthreading, such as launching the same kthread twice concurrently.
-
 config DISABLE_SMT
 	bool "Disables symmetric multithreading"
 	default n

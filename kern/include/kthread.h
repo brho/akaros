@@ -113,9 +113,6 @@ static inline bool is_ktask(struct kthread *kthread)
 	return kthread->flags & KTH_IS_KTASK;
 }
 
-/* Debugging */
-void check_poison(char *msg);
-
 void sem_init(struct semaphore *sem, int signals);
 void sem_init_irqsave(struct semaphore *sem, int signals);
 bool sem_trydown(struct semaphore *sem);

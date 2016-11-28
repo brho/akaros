@@ -115,9 +115,6 @@ void smp_percpu_init(void)
 	STAILQ_INIT(&per_cpu_info[coreid].routine_amsgs);
 	/* Initialize the per-core timer chain */
 	init_timer_chain(&per_cpu_info[coreid].tchain, set_pcpu_alarm_interrupt);
-#ifdef CONFIG_KTHREAD_POISON
-	*kstack_bottom_addr(kthread->stacktop) = 0xdeadbeef;
-#endif /* CONFIG_KTHREAD_POISON */
 	/* Init generic tracing ring */
 	trace_buf = kpage_alloc_addr();
 	assert(trace_buf);

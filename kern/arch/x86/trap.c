@@ -162,10 +162,6 @@ void idt_init(void)
 	x86_sysenter_init();
 	set_stack_top((uintptr_t)bootstacktop);
 
-#ifdef CONFIG_KTHREAD_POISON
-	*kstack_bottom_addr((uintptr_t)bootstacktop) = 0xdeadbeef;
-#endif /* CONFIG_KTHREAD_POISON */
-
 	/* Initialize the TSS field of the gdt.  The size of the TSS desc differs
 	 * between 64 and 32 bit, hence the pointer acrobatics */
 	syssegdesc_t *ts_slot = (syssegdesc_t*)&gdt[GD_TSS >> 3];
