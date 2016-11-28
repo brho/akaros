@@ -133,3 +133,10 @@ int arch_max_jumbo_page_shift(void)
 	#warning "What jumbo page sizes does RISC support?"
 	return PGSHIFT;
 }
+
+#warning "Not sure where you do your PT destruction.  Be sure to not unmap any intermediate page tables for kernel mappings.  At least not the PML(n-1) maps"
+
+void arch_add_intermediate_pts(pgdir_t pgdir, uintptr_t va, size_t len)
+{
+	#error "Implement me"
+}

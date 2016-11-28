@@ -26,7 +26,6 @@
 #include <smp.h>
 #include <profiler.h>
 #include <umem.h>
-#include <init.h>
 
 struct kmem_cache *vmr_kcache;
 
@@ -1230,6 +1229,12 @@ void vmap_init(void)
 	                          vmap_addr_arena, 0, MEM_WAIT);
 	vmap_to_free = kmalloc(sizeof(struct vmap_free_tracker) * VMAP_MAX_TO_FREE,
 	                       MEM_WAIT);
+	/* This ensures the boot_pgdir's top-most PML (PML4) has entries pointing to
+	 * PML3s that cover the dynamic mapping range.  Now, it's safe to create
+	 * processes that copy from boot_pgdir and still dynamically change the
+	 * kernel mappings. */
+	arch_add_intermediate_pts(boot_pgdir, KERN_DYN_BOT,
+	                          KERN_DYN_TOP - KERN_DYN_BOT);
 }
 
 uintptr_t get_vmap_segment(size_t nr_bytes)
@@ -1258,12 +1263,6 @@ void put_vmap_segment(uintptr_t vaddr, size_t nr_bytes)
 int map_vmap_segment(uintptr_t vaddr, uintptr_t paddr, unsigned long num_pages,
                      int perm)
 {
-	/* For now, we only handle the root pgdir, and not any of the other ones
-	 * (like for processes).  To do so, we'll need to insert into every pgdir,
-	 * and send tlb shootdowns to those that are active (which we don't track
-	 * yet). */
-	assert(booting);
-
 	/* TODO: (MM) you should lock on boot pgdir modifications.  A vm region lock
 	 * isn't enough, since there might be a race on outer levels of page tables.
 	 * For now, we'll just use the vmap_lock (which technically works). */

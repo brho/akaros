@@ -352,9 +352,9 @@ int pml_for_each(kpte_t *pml, uintptr_t start, size_t len, kpte_cb_t callback,
 	return __pml_for_each(pml, start, len, callback, arg, PML4_SHIFT);
 }
 
-/* Unmaps [va, va + size) from pgdir, freeing any intermediate page tables.
- * This does not free the actual memory pointed to by the page tables, nor does
- * it flush the TLB. */
+/* Unmaps [va, va + size) from pgdir, freeing any intermediate page tables for
+ * non-kernel mappings.  This does not free the actual memory pointed to by the
+ * page tables, nor does it flush the TLB. */
 int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size)
 {
 	int pt_free_cb(kpte_t *kpte, uintptr_t kva, int shift, bool visited_subs,
@@ -366,6 +366,11 @@ int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size)
 			pte_clear(kpte);
 			return 0;
 		}
+		/* Never remove intermediate pages for any kernel mappings.  This is
+		 * also important for x86 so that we don't accidentally free any of the
+		 * boot PMLs, which aren't two-page alloc'd from kpages_arena. */
+		if (kva >= ULIM)
+			return 0;
 		/* If we haven't visited all of our subs, we might still have some
 		 * mappings hanging off this page table. */
 		if (!visited_subs) {
@@ -380,8 +385,6 @@ int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size)
 		pte_clear(kpte);
 		return 0;
 	}
-	/* Don't accidentally unmap the boot mappings */
-	assert((va < KERNBASE) && (va + size < KERNBASE));
 	return pml_for_each(pgdir_get_kpt(pgdir), va, size, pt_free_cb, 0);
 }
 
@@ -676,6 +679,45 @@ int arch_max_jumbo_page_shift(void)
 	uint32_t edx;
 	cpuid(0x80000001, 0x0, 0, 0, 0, &edx);
 	return edx & (1 << 26) ? PML3_SHIFT : PML2_SHIFT;
+}
+
+/* Adds empty intermediate PTs to the top-most PML in pgdir for the given range.
+ * On a 4-PML system, this will add entries to PML4, consisting of a bunch of
+ * empty PML3s, such that [va, va+len) has intermediate tables in pgdir.
+ *
+ * A few related notes:
+ *
+ * The boot_pgdir is where we do the original kernel mappings.  All of the PML4
+ * entries are filled in, pointing to intermediate PML3s.  All other pgdirs copy
+ * the kernel mapping, which means they have the same content.  That content
+ * never changes at runtime.  What changes is the contents of the PML3s and
+ * below, which are pointed to by all pgdirs.
+ *
+ * The proc pgdirs do not have KPT or EPT mappings above ULIM, so if the
+ * intermediate PTs have EPT entries, it's just a waste of memory, but not a
+ * mapping the user could exploit.
+ *
+ * On occasion, there might be code that maps things into boot_pgdir below ULIM,
+ * though right now this is just an out-of-branch "mmap a page at 0" debugging
+ * hack. */
+void arch_add_intermediate_pts(pgdir_t pgdir, uintptr_t va, size_t len)
+{
+	kpte_t *pml4 = pgdir_get_kpt(pgdir);
+	kpte_t *kpte;
+	epte_t *epte;
+	void *new_pml_kva;
+
+	for (size_t i = 0; i < len; i += PML4_PTE_REACH, va += PML4_PTE_REACH) {
+		kpte = &pml4[PML4(va)];
+		epte = kpte_to_epte(kpte);
+		if (kpte_is_present(kpte))
+			continue;
+		new_pml_kva = kpages_zalloc(2 * PGSIZE, MEM_WAIT);
+		/* We insert the same as for __pml_walk. */
+		*kpte = PADDR(new_pml_kva) | PTE_P | PTE_U | PTE_W;
+		if (va < ULIM)
+			*epte = (PADDR(new_pml_kva) + PGSIZE) | EPTE_R | EPTE_X | EPTE_W;
+	}
 }
 
 /* Debugging */

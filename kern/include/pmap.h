@@ -102,6 +102,7 @@ int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd);
 physaddr_t arch_pgdir_get_cr3(pgdir_t pd);
 void arch_pgdir_clear(pgdir_t *pd);
 int arch_max_jumbo_page_shift(void);
+void arch_add_intermediate_pts(pgdir_t pgdir, uintptr_t va, size_t len);
 
 static inline page_t *ppn2page(size_t ppn)
 {
