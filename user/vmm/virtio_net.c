@@ -172,7 +172,7 @@ void net_transmitq_fn(void *_vq)
 	void *stripped;
 	int ret;
 	int fd = open(data_path, O_RDWR);
-	int bytestostrip = VIRTIO_HEADER_SIZE;
+	int bytestostrip;
 
 	if (fd == -1)
 		VIRTIO_DEV_ERRX(vq->vqdev, "Could not open data file for ether1.");
@@ -201,6 +201,7 @@ void net_transmitq_fn(void *_vq)
 		 */
 
 		/* Find the beginning of the ethernet frame. */
+		bytestostrip = VIRTIO_HEADER_SIZE;
 		for (int i = 0; i < olen; i++) {
 			/* This conditional also catches cases when iov_len is 0 */
 			if (iov[i].iov_len <= bytestostrip) {
