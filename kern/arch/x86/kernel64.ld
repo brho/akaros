@@ -15,7 +15,7 @@ SECTIONS
 	. = 0x00100000;
 
 	.bootstrap : {
-		*(.boottext .bootdata)
+		*(.boottext .bootdata .bootbss)
 	}
 
 	/* Needed this for syslinux, which was sitting around 16MB phys.  This just

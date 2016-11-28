@@ -423,6 +423,7 @@ no_long_string:
 no_pml3ps_string:
 	.string "Unable to boot: 1 GB pages not supported"
 # boot page tables
+.section .bootbss, "w",@nobits
 	.align PGSIZE
 .globl boot_pml4
 boot_pml4:
@@ -454,7 +455,7 @@ get_boot_pml4:
 get_gdt64:
 	movabs	$(gdt64), %rax
 	ret
-.data
+.section .bootbss, "w",@nobits
 	.p2align	PGSHIFT		# force page alignment
 	.globl		bootstack
 bootstack:
