@@ -328,7 +328,9 @@ static int __pml_for_each(kpte_t *pml,  uintptr_t start, size_t len,
 			 * entries, we want the subpmls to process the full range they are
 			 * responsible for: [kva, kva + pgsize). */
 			uintptr_t sub_start = MAX(kva, start);
-			size_t sub_len = MIN(start + len, kva + pgsize) - sub_start;
+			size_t sub_len = MIN(start + len - sub_start,
+			                     kva + pgsize - sub_start);
+
 			ret = __pml_for_each(kpte2pml(*kpte_i), sub_start, sub_len,
 			                     callback, arg, pml_shift - BITS_PER_PML);
 			if (ret)
