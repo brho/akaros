@@ -356,12 +356,17 @@ size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
 
 	while (nr_pcs < nr_slots) {
 		pcs[nr_pcs++] = pc;
+		printd("PC %p FP %p\n", pc, fp);
 		if (pc_is_asm_trampoline(pc))
 			break;
 		if (!fp)
 			break;
 		assert(KERNBASE <= fp);
-		printd("PC %p FP %p\n", pc, fp);
+		/* We need to check the next FP before reading PC from beyond it.  FP
+		 * could be 0 and be at the top of the stack, and reading PC in that
+		 * case will be a wild read. */
+		if (!*(uintptr_t*)fp)
+			break;
 		/* We used to set PC = retaddr - 1, where the -1 would put our PC back
 		 * inside the function that called us.  This was for obscure cases where
 		 * a no-return function calls another function and has no other code
