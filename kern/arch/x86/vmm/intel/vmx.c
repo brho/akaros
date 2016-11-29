@@ -569,8 +569,7 @@ static const struct vmxec cb2ec = {
 
 	.try_set_1 = SECONDARY_EXEC_RDTSCP,
 
-	// mystery bit.
-	.try_set_0 = 0x2000000
+	.try_set_0 = SECONDARY_EXEC_TSC_SCALING | SECONDARY_EXEC_ENABLE_PML
 
 };
 
