@@ -126,6 +126,8 @@ static bool handle_vmcall(struct guest_thread *gth)
 	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
 	uint8_t byte;
 
+	if (gth->vmcall)
+		return gth->vmcall(gth, vm_tf);
 	byte = vm_tf->tf_rdi;
 	printf("%c", byte);
 	if (byte == '\n')

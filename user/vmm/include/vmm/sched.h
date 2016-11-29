@@ -33,6 +33,8 @@ struct guest_thread {
 	bool						halt_exit;
 	uth_mutex_t					halt_mtx;
 	uth_cond_var_t				halt_cv;
+	// TODO: work out a real ops strategy.
+	bool (*vmcall)(struct guest_thread *gth, struct vm_trapframe *);
 };
 
 struct ctlr_thread {
