@@ -57,7 +57,7 @@ struct Pipe {
 	int qref[2];
 	struct dirtab *pipedir;
 	char *user;
-	struct fdtap_slist data_taps[2];
+	struct fdtap_slist data_taps;
 	spinlock_t tap_lock;
 };
 
@@ -146,8 +146,7 @@ static struct chan *pipeattach(char *spec)
 	c->dev = 0;
 
 	/* taps. */
-	SLIST_INIT(&p->data_taps[0]);	/* already = 0; set to be futureproof */
-	SLIST_INIT(&p->data_taps[1]);
+	SLIST_INIT(&p->data_taps);	/* already = 0; set to be futureproof */
 	spinlock_init(&p->tap_lock);
 	return c;
 }
@@ -485,18 +484,80 @@ static int pipewstat(struct chan *c, uint8_t *dp, int n)
 	return n;
 }
 
+static char *pipechaninfo(struct chan *chan, char *ret, size_t ret_l)
+{
+	Pipe *p = chan->aux;
+
+	switch (NETTYPE(chan->qid.path)) {
+	case Qdir:
+		snprintf(ret, ret_l, "Qdir, ID %d", p->path);
+		break;
+	case Qdata0:
+		snprintf(ret, ret_l, "Qdata%d, ID %d, %s, rq len %d, wq len %d",
+		         0, p->path,
+		         SLIST_EMPTY(&p->data_taps) ? "untapped" : "tapped",
+		         qlen(p->q[0]),
+		         qlen(p->q[1]));
+		break;
+	case Qdata1:
+		snprintf(ret, ret_l, "Qdata%d, ID %d, %s, rq len %d, wq len %d",
+		         1, p->path,
+		         SLIST_EMPTY(&p->data_taps) ? "untapped" : "tapped",
+		         qlen(p->q[1]),
+		         qlen(p->q[0]));
+		break;
+	default:
+		ret = "Unknown type";
+		break;
+	}
+	return ret;
+}
+
+/* We pass the pipe as data.  The pipe will outlive any potential qio callbacks.
+ * Meaning, we don't need to worry about the pipe disappearing if we're in here.
+ * If we're in here, then the q exists, which means the pipe exists.
+ *
+ * However, the chans do not necessarily exist.  The taps keep the chans around.
+ * So we only know which chan we're firing when we look at an individual tap. */
 static void pipe_wake_cb(struct queue *q, void *data, int filter)
 {
-	/* If you allocate structs like this on odd byte boundaries, you
-	 * deserve what you get.  */
-	uintptr_t kludge = (uintptr_t) data;
-	int which = kludge & 1;
-	Pipe *p = (Pipe*)(kludge & ~1ULL);
+	Pipe *p = (Pipe*)data;
 	struct fd_tap *tap_i;
+	struct chan *chan;
 
 	spin_lock(&p->tap_lock);
-	SLIST_FOREACH(tap_i, &p->data_taps[which], link)
+	SLIST_FOREACH(tap_i, &p->data_taps, link) {
+		chan = tap_i->chan;
+		/* Depending which chan did the tapping, we'll care about different
+		 * filters on different qs.  For instance, if we tapped Qdata0, then we
+		 * only care about readables on q[0], writables on q[1], and hangups on
+		 * either.  More precisely, we don't care about writables on q[0] or
+		 * readables on q[1].
+		 *
+		 * Note the *tap's* filter might differ from the CB's filter.  The CB
+		 * could be for read|write|hangup on q[1], with a Qdata0 tap for just
+		 * read.  We don't want to just pass the CB filt directly to fire_tap,
+		 * since that would pass the CB's read on q[1] to the tap and fire.  The
+		 * user would think q[0] was readable.  This is why I mask out the CB
+		 * filter events that we know they don't want. */
+		switch (NETTYPE(chan->qid.path)) {
+		case Qdata0:
+			if (q == p->q[0])
+				filter &= ~FDTAP_FILT_WRITABLE;
+			else
+				filter &= ~FDTAP_FILT_READABLE;
+			break;
+		case Qdata1:
+			if (q == p->q[1])
+				filter &= ~FDTAP_FILT_WRITABLE;
+			else
+				filter &= ~FDTAP_FILT_READABLE;
+			break;
+		default:
+			panic("Shouldn't be able to tap pipe qid %p", chan->qid.path);
+		}
 		fire_tap(tap_i, filter);
+	}
 	spin_unlock(&p->tap_lock);
 }
 
@@ -504,21 +565,14 @@ static int pipetapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 {
 	int ret;
 	Pipe *p;
-	int which = 1;
-	uint64_t kludge;
 
 	p = chan->aux;
-	kludge = (uint64_t)p;
 #define DEVPIPE_LEGAL_DATA_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_WRITABLE | \
                                  FDTAP_FILT_HANGUP | FDTAP_FILT_ERROR)
 
 	switch (NETTYPE(chan->qid.path)) {
 	case Qdata0:
-		which = 0;
-		/* fall through */
 	case Qdata1:
-		kludge |= which;
-
 		if (tap->filter & ~DEVPIPE_LEGAL_DATA_TAPS) {
 			set_errno(ENOSYS);
 			set_errstr("Unsupported #%s data tap %p, must be %p", devname(),
@@ -528,15 +582,19 @@ static int pipetapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 		spin_lock(&p->tap_lock);
 		switch (cmd) {
 		case (FDTAP_CMD_ADD):
-			if (SLIST_EMPTY(&p->data_taps[which]))
-				qio_set_wake_cb(p->q[which], pipe_wake_cb, (void *)kludge);
-			SLIST_INSERT_HEAD(&p->data_taps[which], tap, link);
+			if (SLIST_EMPTY(&p->data_taps)) {
+				qio_set_wake_cb(p->q[0], pipe_wake_cb, p);
+				qio_set_wake_cb(p->q[1], pipe_wake_cb, p);
+			}
+			SLIST_INSERT_HEAD(&p->data_taps, tap, link);
 			ret = 0;
 			break;
 		case (FDTAP_CMD_REM):
-			SLIST_REMOVE(&p->data_taps[which], tap, fd_tap, link);
-			if (SLIST_EMPTY(&p->data_taps[which]))
-				qio_set_wake_cb(p->q[which], 0, (void *)kludge);
+			SLIST_REMOVE(&p->data_taps, tap, fd_tap, link);
+			if (SLIST_EMPTY(&p->data_taps)) {
+				qio_set_wake_cb(p->q[0], 0, p);
+				qio_set_wake_cb(p->q[1], 0, p);
+			}
 			ret = 0;
 			break;
 		default:
@@ -573,6 +631,6 @@ struct dev pipedevtab __devtab = {
 	.remove = devremove,
 	.wstat = pipewstat,
 	.power = devpower,
-	.chaninfo = devchaninfo,
+	.chaninfo = pipechaninfo,
 	.tapfd = pipetapfd,
 };
