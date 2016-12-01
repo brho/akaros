@@ -230,13 +230,13 @@ static int pipestat(struct chan *c, uint8_t * db, int n)
 		case Qdata0:
 			perm = tab[1].perm;
 			perm |= qreadable(p->q[0]) ? DMREADABLE : 0;
-			perm |= qwritable(p->q[0]) ? DMWRITABLE : 0;
+			perm |= qwritable(p->q[1]) ? DMWRITABLE : 0;
 			devdir(c, c->qid, tab[1].name, qlen(p->q[0]), eve, perm, &dir);
 			break;
 		case Qdata1:
 			perm = tab[2].perm;
 			perm |= qreadable(p->q[1]) ? DMREADABLE : 0;
-			perm |= qwritable(p->q[1]) ? DMWRITABLE : 0;
+			perm |= qwritable(p->q[0]) ? DMWRITABLE : 0;
 			devdir(c, c->qid, tab[2].name, qlen(p->q[1]), eve, perm, &dir);
 			break;
 		default:
