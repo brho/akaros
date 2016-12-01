@@ -2095,8 +2095,6 @@ static void iasetupahci(struct ctlr *c)
 
 static int didtype(struct pci_device *p)
 {
-	printd("ahci: %s: ven_id=0x%04x, dev_id=0x%04x\n", __func__, p->ven_id,
-	       p->dev_id);
 	switch (p->ven_id) {
 	case Vintel:
 		if ((p->dev_id & 0xfffc) == 0x2680)
@@ -2207,9 +2205,10 @@ static struct sdev *iapnp(void)
 	head = tail = NULL;
 	STAILQ_FOREACH(p, &pci_devices, all_dev) {
 		type = didtype(p);
-		printd("didtype: %d\n", type);
 		if (type == -1)
 			continue;
+		printd("ahci: %s: ven_id=0x%04x, dev_id=0x%04x, didtype=%d\n",
+		       __func__, p->ven_id, p->dev_id, type);
 		if (p->bar[Abar].mmio_base32 == 0)
 			continue;
 		if (niactlr == NCtlr) {
