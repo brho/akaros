@@ -123,7 +123,7 @@ int kfs_readpage(struct page_map *pm, struct page *page)
 	 * bugs.  It does slightly slow down the kernel, but it's only when filling
 	 * the page cache, and considering we are using a RAMFS, you shouldn't
 	 * measure things that actually rely on KFS's performance. */
-	kthread_usleep(1000);
+	kthread_usleep(1);
 	/* If we're beyond the initial start point, we just need a zero page.  This
 	 * is for a hole or for extending a file (even though it won't be saved).
 	 * Otherwise, we want the data from KFS, being careful to not copy from
