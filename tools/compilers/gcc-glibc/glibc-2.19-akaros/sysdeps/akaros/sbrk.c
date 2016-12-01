@@ -40,14 +40,14 @@ static bool is_early_scp(void)
  * TLS for thread 0 yet, so we can't do things like check in_vcore_context(). */
 static void brk_lock(void)
 {
-	if (is_early_scp)
+	if (is_early_scp())
 		return;
 	__libc_lock_lock(__brk_lock);
 }
 
 static void brk_unlock(void)
 {
-	if (is_early_scp)
+	if (is_early_scp())
 		return;
 	__libc_lock_unlock(__brk_lock);
 }
