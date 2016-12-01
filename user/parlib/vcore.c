@@ -249,7 +249,7 @@ void vcore_request_total(long nr_vcores_wanted)
 {
 	static long nr_vc_wanted;
 
-	if (parlib_never_vc_request)
+	if (parlib_never_vc_request || !parlib_wants_to_be_mcp)
 		return;
 	if (nr_vcores_wanted == __procdata.res_req[RES_CORES].amt_wanted)
 		return;
