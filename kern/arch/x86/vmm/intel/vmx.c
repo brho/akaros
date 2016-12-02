@@ -767,7 +767,6 @@ static void __vmx_setup_pcpu(struct guest_pcore *gpc)
 
 	vmcs_write(HOST_TR_BASE, (uintptr_t)pcpui->tss);
 	vmcs_writel(HOST_GDTR_BASE, (uintptr_t)pcpui->gdt);
-	vmcs_write(HOST_RSP, pcpui->stacktop);
 	vmcs_write(HOST_GS_BASE, (uintptr_t)pcpui);
 	/* TODO: we might need to also set HOST_IA32_PERF_GLOBAL_CTRL.  Need to
 	 * think about how perf will work with VMs */

@@ -120,6 +120,11 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 	vmcs_write(GUEST_CR3, tf->tf_cr3);
 	vmcs_write(GUEST_RIP, tf->tf_rip);
 	vmcs_write(GUEST_RFLAGS, tf->tf_rflags);
+	/* The host stacktop could have changed, even if we are still a partial
+	 * context.  Consider a vmcall that blocks.  We'll restart the partial
+	 * context, but be on a new stack.  set_stack_top() doesn't really know
+	 * about the VMCS. */
+	vmcs_write(HOST_RSP, pcpui->stacktop);
 	/* cr2 is not part of the VMCS state; we need to save/restore it manually */
 	lcr2(tf->tf_cr2);
 	vmcs_write(VM_ENTRY_INTR_INFO_FIELD, tf->tf_trap_inject);
