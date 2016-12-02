@@ -21,6 +21,7 @@ struct guest_pcore {
 	struct proc *proc;
 	unsigned long *posted_irq_desc;
 	struct vmcs *vmcs;
+	int vmcs_core_id;
 	uint64_t xcr0;
 	uint64_t msr_kern_gs_base;
 	uint64_t msr_star;
@@ -74,7 +75,8 @@ uint64_t construct_eptp(physaddr_t root_hpa);
 void ept_flush(uint64_t eptp);
 
 struct guest_pcore *lookup_guest_pcore(struct proc *p, int guest_pcoreid);
-struct guest_pcore *load_guest_pcore(struct proc *p, int guest_pcoreid);
+struct guest_pcore *load_guest_pcore(struct proc *p, int guest_pcoreid,
+                                     bool *should_vmresume);
 void unload_guest_pcore(struct proc *p, int guest_pcoreid);
 
 #define VMM_MSR_EMU_READ		1

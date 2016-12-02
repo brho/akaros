@@ -314,5 +314,6 @@ struct vmxec {
 	uint32_t try_set_0;
 };
 
-void vmx_load_guest_pcore(struct guest_pcore *gpc);
+void vmx_load_guest_pcore(struct guest_pcore *gpc, bool *should_vmresume);
 void vmx_unload_guest_pcore(struct guest_pcore *gpc);
+void vmx_clear_vmcs(void);

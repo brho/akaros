@@ -153,6 +153,7 @@
 #include <arch/types.h>
 #include <syscall.h>
 #include <arch/io.h>
+#include <percpu.h>
 
 #include <ros/vmm.h>
 #include "vmx.h"
@@ -1066,6 +1067,8 @@ struct guest_pcore *create_guest_pcore(struct proc *p,
                                        struct vmm_gpcore_init *gpci)
 {
 	ERRSTACK(2);
+	int8_t state = 0;
+	bool ignore;
 	struct guest_pcore *gpc = kmalloc(sizeof(struct guest_pcore), MEM_WAIT);
 
 	if (!gpc)
@@ -1087,11 +1090,15 @@ struct guest_pcore *create_guest_pcore(struct proc *p,
 	}
 	printd("%d: gpc->vmcs is %p\n", core_id(), gpc->vmcs);
 	gpc->cpu = -1;
+	gpc->vmcs_core_id = -1;
 
-	vmx_load_guest_pcore(gpc);
+	disable_irqsave(&state);
+	vmx_load_guest_pcore(gpc, &ignore);
 	vmx_setup_vmcs(gpc);
 	vmx_setup_initial_guest_state(p, gpci);
 	vmx_unload_guest_pcore(gpc);
+	enable_irqsave(&state);
+
 	gpc->xcr0 = __proc_global_info.x86_default_xcr0;
 
 	gpc->posted_irq_desc = gpci->posted_irq_desc;
@@ -1342,13 +1349,73 @@ void vapic_status_dump_kernel(void *vapic)
 	printk("-- END KERNEL APIC STATUS DUMP --\n");
 }
 
-void vmx_load_guest_pcore(struct guest_pcore *gpc)
+static DEFINE_PERCPU(struct guest_pcore *, gpc_to_clear_to);
+
+/* Note this is set up to allow spurious pokes.  Someone could arbitrarily send
+ * us this KMSG at any time.  We only actually clear when we've previously
+ * unloaded the GPC.  gpc_to_clear_to is only set once we're just 'caching' it.
+ * */
+void vmx_clear_vmcs(void)
 {
+	struct guest_pcore *gpc = PERCPU_VAR(gpc_to_clear_to);
+
+	if (gpc) {
+		vmcs_clear(gpc->vmcs);
+		wmb(); /* write -1 after clearing */
+		gpc->vmcs_core_id = -1;
+		PERCPU_VAR(gpc_to_clear_to) = NULL;
+	}
+}
+
+static void __clear_vmcs(uint32_t srcid, long a0, long a1, long a2)
+{
+	vmx_clear_vmcs();
+}
+
+/* We are safe from races on GPC, other than vmcs and vmcs_core_id.  For
+ * instance, only one core can be loading or unloading a particular GPC at a
+ * time.  Other cores write to our GPC's vmcs_core_id and vmcs (doing a
+ * vmcs_clear).  Once they write vmcs_core_id != -1, it's ours. */
+void vmx_load_guest_pcore(struct guest_pcore *gpc, bool *should_vmresume)
+{
+	int remote_core;
+
+	assert(!irq_is_enabled());
+	if (gpc->vmcs_core_id == core_id()) {
+		PERCPU_VAR(gpc_to_clear_to) = NULL;
+		*should_vmresume = TRUE;
+		return;
+	}
+	/* Clear ours *before* waiting on someone else; avoids deadlock (circular
+	 * wait). */
+	__clear_vmcs(0, 0, 0, 0);
+	remote_core = ACCESS_ONCE(gpc->vmcs_core_id);
+	if (remote_core != -1) {
+		/* This is a bit nasty.  It requires the remote core to receive
+		 * interrupts, which means we're now waiting indefinitely for them to
+		 * enable IRQs.  They can wait on another core, and so on.  We cleared
+		 * our vmcs first, so that we won't deadlock on *this*.
+		 *
+		 * However, this means we can't wait on another core with IRQs disabled
+		 * for any *other* reason.  For instance, if some other subsystem
+		 * decides to have one core wait with IRQs disabled on another, the core
+		 * that has our VMCS could be waiting on us to do something that we'll
+		 * never do. */
+		send_kernel_message(remote_core, __clear_vmcs, 0, 0, 0, KMSG_IMMEDIATE);
+		while (gpc->vmcs_core_id != -1)
+			cpu_relax();
+	}
 	vmcs_load(gpc->vmcs);
 	__vmx_setup_pcpu(gpc);
+	gpc->vmcs_core_id = core_id();
+	*should_vmresume = FALSE;
 }
 
 void vmx_unload_guest_pcore(struct guest_pcore *gpc)
 {
-	vmcs_clear(gpc->vmcs);
+	/* We don't have to worry about races yet.  No one will try to load gpc
+	 * until we've returned and unlocked, and no one will clear an old VMCS to
+	 * this GPC, since it was cleared before we finished loading (above). */
+	gpc->vmcs_core_id = core_id();
+	PERCPU_VAR(gpc_to_clear_to) = gpc;
 }

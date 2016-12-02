@@ -67,6 +67,7 @@ struct sw_trapframe {
 
 #define VMCTX_FL_PARTIAL		(1 << 0)
 #define VMCTX_FL_HAS_FAULT		(1 << 1)
+#define VMCTX_FL_VMRESUME		(1 << 2)
 
 struct vm_trapframe {
 	/* Actual processor state */

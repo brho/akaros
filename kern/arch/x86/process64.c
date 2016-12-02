@@ -104,18 +104,24 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct proc *p = pcpui->cur_proc;
 	struct guest_pcore *gpc;
+	bool should_vmresume;
 
 	if (x86_vmtf_is_partial(tf)) {
 		gpc = lookup_guest_pcore(p, tf->tf_guest_pcoreid);
 		assert(gpc);
 		assert(pcpui->guest_pcoreid == tf->tf_guest_pcoreid);
+		should_vmresume = TRUE;
 	} else {
-		gpc = load_guest_pcore(p, tf->tf_guest_pcoreid);
+		gpc = load_guest_pcore(p, tf->tf_guest_pcoreid, &should_vmresume);
 		if (!gpc) {
 			tf->tf_exit_reason = EXIT_REASON_GUEST_IN_USE;
 			handle_bad_vm_tf(tf);
 		}
 	}
+	if (should_vmresume)
+		tf->tf_flags |= VMCTX_FL_VMRESUME;
+	else
+		tf->tf_flags &= ~VMCTX_FL_VMRESUME;
 	vmcs_write(GUEST_RSP, tf->tf_rsp);
 	vmcs_write(GUEST_CR3, tf->tf_cr3);
 	vmcs_write(GUEST_RIP, tf->tf_rip);
@@ -141,7 +147,7 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 	 * Partial contexts have already been launched, so we resume them. */
 	asm volatile (".globl __asm_pop_vmtf_start;"
 	              "__asm_pop_vmtf_start:     "
-	              "testl $"STRINGIFY(VMCTX_FL_PARTIAL)", %c[flags](%0);"
+	              "testl $"STRINGIFY(VMCTX_FL_VMRESUME)", %c[flags](%0);"
 	              "pushq %%rbp;              "	/* save in case we fail */
 	              "movq %c[rbx](%0), %%rbx;  "
 	              "movq %c[rcx](%0), %%rcx;  "
@@ -158,10 +164,10 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 	              "movq %c[r14](%0), %%r14;  "
 	              "movq %c[r15](%0), %%r15;  "
 	              "movq %c[rax](%0), %%rax;  "	/* clobber our *tf last */
-	              "jnz 1f;                   "	/* jump if partial */
-	              ASM_VMX_VMLAUNCH";         "	/* non-partial gets launched */
+	              "jnz 1f;                   "	/* jump if resume */
+	              ASM_VMX_VMLAUNCH";         "	/* non-resume gets launched */
 	              "jmp 2f;                   "
-	              "1: "ASM_VMX_VMRESUME";    "	/* partials get resumed */
+	              "1: "ASM_VMX_VMRESUME";    "
 	              "2: popq %%rbp;            "	/* vmlaunch failed */
 	              ".globl __asm_pop_vmtf_end;"
 	              "__asm_pop_vmtf_end:       "
@@ -333,7 +339,9 @@ void proc_secure_ctx(struct user_context *ctx)
 void __abandon_core(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
 	lcr3(boot_cr3);
+	vmx_clear_vmcs();
 	proc_decref(pcpui->cur_proc);
 	pcpui->cur_proc = 0;
 }
