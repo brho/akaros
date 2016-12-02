@@ -313,8 +313,8 @@ static int _rock_get_listen_fd(Rock *r)
 	if (r->has_listen_fd)
 		return r->listen_fd;
 	if (r->ctl == NULL || r->ctl[0] != '/') {
-		fprintf(stderr, "r->ctl corrupt: '%s'\n",
-		        r->ctl == NULL ? "NULL" : r->ctl);
+		fprintf(stderr, "r->ctl corrupt: '%s' (domain = %d)\n",
+		        (r->ctl == NULL ? "NULL" : r->ctl), r->domain);
 	        assert(r->ctl != NULL && r->ctl[0] == '/');
 	}
 	strlcpy(listen_file, r->ctl, sizeof(listen_file));
@@ -345,7 +345,7 @@ int _sock_lookup_listen_fd(int sock_fd)
 {
 	Rock *r = _sock_findrock(sock_fd, 0);
 
-	if (!r)
+	if (!r || r->domain == PF_UNIX)
 		return -1;
 	return _rock_get_listen_fd(r);
 }
