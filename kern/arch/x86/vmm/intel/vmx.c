@@ -1361,6 +1361,7 @@ void vmx_clear_vmcs(void)
 
 	if (gpc) {
 		vmcs_clear(gpc->vmcs);
+		ept_sync_context(gpc_get_eptp(gpc));
 		wmb(); /* write -1 after clearing */
 		gpc->vmcs_core_id = -1;
 		PERCPU_VAR(gpc_to_clear_to) = NULL;

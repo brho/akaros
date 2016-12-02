@@ -179,7 +179,6 @@ struct guest_pcore *load_guest_pcore(struct proc *p, int guest_pcoreid,
 	spin_unlock(&p->vmm.lock);
 	/* We've got dibs on the gpc; we don't need to hold the lock any longer. */
 	pcpui->guest_pcoreid = guest_pcoreid;
-	ept_sync_context(gpc_get_eptp(gpc));
 	vmx_load_guest_pcore(gpc, should_vmresume);
 	/* Load guest's xcr0 */
 	lxcr0(gpc->xcr0);
@@ -205,7 +204,6 @@ void unload_guest_pcore(struct proc *p, int guest_pcoreid)
 	assert(gpc);
 	spin_lock(&p->vmm.lock);
 	assert(gpc->cpu != -1);
-	ept_sync_context(gpc_get_eptp(gpc));
 	vmx_unload_guest_pcore(gpc);
 	gpc->cpu = -1;
 

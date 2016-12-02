@@ -1891,7 +1891,12 @@ void proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
 			tlbflush();
 			break;
 		case (PROC_RUNNING_M):
-			/* TODO: (TLB) sanity checks and rounding on the ranges */
+			/* TODO: (TLB) sanity checks and rounding on the ranges.
+			 *
+			 * We need to make sure that once a core that was online has been
+			 * removed from the online list, then it must receive a TLB flush
+			 * (abandon_core()) before running the process again.  Either that,
+			 * or make other decisions about who to TLB-shootdown. */
 			TAILQ_FOREACH(vc_i, &p->online_vcs, list) {
 				send_kernel_message(vc_i->pcoreid, __tlbshootdown, start, end,
 				                    0, KMSG_IMMEDIATE);
