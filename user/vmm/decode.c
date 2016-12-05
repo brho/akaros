@@ -41,7 +41,12 @@
 
 int debug_decode = 0;
 #define DPRINTF(fmt, ...) \
-	if (debug_decode) { printf("decode: " fmt , ## __VA_ARGS__); }
+	do { \
+		if (debug_decode) { \
+			fprintf(stderr, "decode: " fmt, ## __VA_ARGS__); \
+		} \
+	} \
+	while (0)
 
 static char *modrmreg[] = {"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi"};
 
