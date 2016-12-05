@@ -25,7 +25,7 @@
  * This driver is a research prototype and as such has the following
  * limitations:
  *
- * FIXME: Backward compatability is currently a non-goal, and only recent
+ * FIXME: Backward compatibility is currently a non-goal, and only recent
  * full-featured (EPT, PCID, VPID, etc.) Intel hardware is supported by this
  * driver.
  *
@@ -59,9 +59,9 @@
  * the socket it runs on. If any cpu supports vmx, it assumes they all
  * do. That's a realistic assumption. So the call_function_all is kind
  * of stupid, really; it could just see what's on the current cpu and
- * assume it's on all. HOWEVER: there are systems in the wilde that
+ * assume it's on all. HOWEVER: there are systems in the wild that
  * can run VMs on some but not all CPUs, due to BIOS mistakes, so we
- * might as well allow for the chance that wel'll only all VMMCPs on a
+ * might as well allow for the chance that we'll only all VMMCPs on a
  * subset (not implemented yet however).  So: probe all CPUs, get a
  * count of how many support VMX and, for now, assume they all do
  * anyway.
@@ -80,7 +80,7 @@
  * per-guest. Once set up, it is left alone.  The ONLY think we set in
  * there is the revision area. The VMX is page-sized per cpu and
  * page-aligned. Note that it can be smaller, but why bother? We know
- * the max size and alightment, and it's convenient.
+ * the max size and alignment, and it's convenient.
  *
  * Now that it is set up, enable vmx on all cpus. This involves
  * testing VMXE in cr4, to see if we've been here before (TODO: delete
@@ -126,7 +126,7 @@
  * instruction depending, and on return, it evaluates if things the
  * launch/resume had an error in that operation. Note this is NOT the
  * same as an error while in the virtual machine; this is an error in
- * startup due to misconfiguration. Depending on whatis returned it's
+ * startup due to misconfiguration. Depending on what is returned it's
  * either a failed vm startup or an exit for lots of many reasons.
  *
  */
@@ -375,7 +375,7 @@ void vapic_status_dump_kernel(void *vapic);
  *  1 1 -> must be one.
  *
  * It's also pretty hard to know what you can and can't set, and
- * that's led to inadvertant opening of permissions at times.  Because
+ * that's led to inadvertent opening of permissions at times.  Because
  * of this complexity we've decided on the following: the driver must
  * define EVERY bit, UNIQUELY, for each of the 5 registers, that it wants
  * set. Further, for any bit that's settable, the driver must specify
@@ -396,7 +396,7 @@ void vapic_status_dump_kernel(void *vapic);
  * tests for conflicts (i.e. overlap).
  *
  * At this point, I've tested check_vmx_controls in every way
- * possible, beause I kept screwing the bitfields up. You'll get a nice
+ * possible, because I kept screwing the bitfields up. You'll get a nice
  * error it won't work at all, which is what we want: a
  * failure-prone setup, where even errors that might result in correct
  * values are caught -- "right answer, wrong method, zero credit." If there's
@@ -1010,7 +1010,7 @@ static void dumpmsrs(void) {
  * manual, but that's because they are automatically saved and restored when all
  * of the other architectural registers are saved and restored, such as cs, ds,
  * es, and other fun things. (See 24.4.1).  We need to make sure we don't
- * accidentally intercept them too, since they are magically autloaded..
+ * accidentally intercept them too, since they are magically autoloaded.
  *
  * We'll need to be careful of any MSR we neither autoload nor intercept
  * whenever we vmenter/vmexit, and we intercept by default.
