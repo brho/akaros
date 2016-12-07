@@ -370,6 +370,7 @@ etherbwrite(struct Ipifc *ifc, struct block *bp, int version, uint8_t * ip)
 	uint8_t mac[6];
 	Etherrock *er = ifc->arg;
 
+	ipifc_trace_block(ifc, bp);
 	/* get mac address of destination.
 	 *
 	 * Locking is tricky here.  If we get arpent 'a' back, the f->arp is
@@ -452,10 +453,12 @@ static void etherread4(void *a)
 		}
 		ifc->in++;
 		bp->rp += ifc->m->hsize;
-		if (ifc->lifc == NULL)
+		if (ifc->lifc == NULL) {
 			freeb(bp);
-		else
+		} else {
+			ipifc_trace_block(ifc, bp);
 			ipiput4(er->f, ifc, bp);
+		}
 		runlock(&ifc->rwlock);
 		poperror();
 	}
@@ -493,10 +496,12 @@ static void etherread6(void *a)
 		}
 		ifc->in++;
 		bp->rp += ifc->m->hsize;
-		if (ifc->lifc == NULL)
+		if (ifc->lifc == NULL) {
 			freeb(bp);
-		else
+		} else {
+			ipifc_trace_block(ifc, bp);
 			ipiput6(er->f, ifc, bp);
+		}
 		runlock(&ifc->rwlock);
 		poperror();
 	}
