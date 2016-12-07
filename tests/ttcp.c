@@ -14,7 +14,7 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. The author's name may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
- * 
+ *
  * This software is provided by the author AS IS.  The author DISCLAIMS
  * any and all warranties of merchantability and fitness for a particular
  * purpose.  In NO event shall the author be LIABLE for any damages
@@ -35,17 +35,16 @@
  *	- isochronous transfer
  */
 
-#include <u.h>
 #include <libc.h>
+#include <u.h>
 
 long ncalls;
 char scale;
 
-long
-nread(int fd, char* buf, long len)
+long nread(int fd, char *buf, long len)
 {
 	int cnt, rlen = 0;
-	char* b = buf;
+	char *b = buf;
 	for (;;) {
 		cnt = read(fd, b, len);
 		ncalls++;
@@ -60,11 +59,10 @@ nread(int fd, char* buf, long len)
 	return rlen;
 }
 
-long
-nwrite(int fd, char* buf, long len)
+long nwrite(int fd, char *buf, long len)
 {
 	int cnt, rlen = 0;
-	char* b = buf;
+	char *b = buf;
 	for (;;) {
 		cnt = write(fd, b, len);
 		ncalls++;
@@ -79,12 +77,11 @@ nwrite(int fd, char* buf, long len)
 	return rlen;
 }
 
-void
-pattern(char* buf, int buflen)
+void pattern(char *buf, int buflen)
 {
 	int i;
 	char ch = ' ';
-	char* b = buf;
+	char *b = buf;
 	for (i = 0; i < buflen; i++) {
 		*b++ = ch++;
 		if (ch == 127)
@@ -93,36 +90,34 @@ pattern(char* buf, int buflen)
 }
 
 char fmt = 'K';
-char* unit;
+char *unit;
 
-double
-rate(vlong nbytes, double time)
+double rate(vlong nbytes, double time)
 {
 	switch (fmt) {
 	case 'k':
 		unit = "Kbit";
-		return nbytes*8/time/(1<<10);
+		return nbytes * 8 / time / (1 << 10);
 	case 'K':
 		unit = "KB";
-		return nbytes/time/(1<<10);
+		return nbytes / time / (1 << 10);
 	case 'm':
 		unit = "Mbit";
-		return nbytes*8/time/(1<<20);
+		return nbytes * 8 / time / (1 << 20);
 	case 'M':
 		unit = "MB";
-		return nbytes/time/(1<<20);
+		return nbytes / time / (1 << 20);
 	case 'g':
 		unit = "Gbit";
-		return nbytes*8/time/(1<<30);
+		return nbytes * 8 / time / (1 << 30);
 	case 'G':
 		unit = "GB";
-		return nbytes/time/(1<<30);
+		return nbytes / time / (1 << 30);
 	}
 	return 0.0;
 }
 
-void
-reader(int udp, char* addr, char* port, int buflen, int nbuf, int sink)
+void reader(int udp, char *addr, char *port, int buflen, int nbuf, int sink)
 {
 	char *buf, adir[40], ldir[40];
 	int fd, cnt, acfd, lcfd;
@@ -132,21 +127,20 @@ reader(int udp, char* addr, char* port, int buflen, int nbuf, int sink)
 	int pd;
 	char peer[100];
 
+	print("ttcp-r: buflen=%d, nbuf=%d, port=%s %s\n", buflen, nbuf, port,
+	      udp ? "udp" : "tcp");
 
-	print("ttcp-r: buflen=%d, nbuf=%d, port=%s %s\n",
-		buflen, nbuf, port, udp? "udp" : "tcp");
-
-	acfd = announce(netmkaddr(addr, udp? "udp": "tcp", port), adir);
-	if(acfd < 0)
+	acfd = announce(netmkaddr(addr, udp ? "udp" : "tcp", port), adir);
+	if (acfd < 0)
 		sysfatal("announce: %r");
 	buf = malloc(buflen);
 
 	lcfd = listen(adir, ldir);
-	if(lcfd < 0)
+	if (lcfd < 0)
 		sysfatal("listen: %r");
 
 	fd = accept(lcfd, ldir);
-	if(fd < 0)
+	if (fd < 0)
 		return;
 
 	sprint(peer, "%s/remote", ldir);
@@ -157,21 +151,19 @@ reader(int udp, char* addr, char* port, int buflen, int nbuf, int sink)
 	print("ttcp-r: accept from %*.*s", cnt, cnt, peer);
 	now = nsec();
 	if (sink) {
-		while((cnt = nread(fd, buf, buflen)) > 0)
+		while ((cnt = nread(fd, buf, buflen)) > 0)
 			nbytes += cnt;
 	} else {
-		while((cnt = nread(fd, buf, buflen)) > 0 &&
-		      write(1, buf, cnt) == cnt)
+		while ((cnt = nread(fd, buf, buflen)) > 0 && write(1, buf, cnt) == cnt)
 			nbytes += cnt;
 	}
-	elapsed = (nsec() - now)/1E9;
+	elapsed = (nsec() - now) / 1E9;
 
-	print("ttcp-r: %lld bytes in %.2f real seconds = %.2f %s/sec\n",
-	      nbytes, elapsed, rate(nbytes, elapsed), unit);
+	print("ttcp-r: %lld bytes in %.2f real seconds = %.2f %s/sec\n", nbytes,
+	      elapsed, rate(nbytes, elapsed), unit);
 }
 
-void
-writer(int udp, char* addr, char* port, int buflen, int nbuf, int src)
+void writer(int udp, char *addr, char *port, int buflen, int nbuf, int src)
 {
 	char *buf;
 	int fd, cnt;
@@ -179,12 +171,12 @@ writer(int udp, char* addr, char* port, int buflen, int nbuf, int src)
 	vlong now;
 	double elapsed;
 
-	print("ttcp-t: buflen=%d, nbuf=%d, port=%s %s -> %s\n",
-		buflen, nbuf, port, udp? "udp" : "tcp", addr);
+	print("ttcp-t: buflen=%d, nbuf=%d, port=%s %s -> %s\n", buflen, nbuf, port,
+	      udp ? "udp" : "tcp", addr);
 
 	buf = malloc(buflen);
-	fd = dial(netmkaddr(addr, udp? "udp" : "tcp", port), 0, 0, 0);
-	if(fd < 0)
+	fd = dial(netmkaddr(addr, udp ? "udp" : "tcp", port), 0, 0, 0);
+	if (fd < 0)
 		sysfatal("dial: %r");
 
 	print("ttcp-t: connect\n");
@@ -195,45 +187,43 @@ writer(int udp, char* addr, char* port, int buflen, int nbuf, int src)
 		while (nbuf-- && nwrite(fd, buf, buflen) == buflen)
 			nbytes += buflen;
 	} else {
-		while ((cnt = read(0, buf, buflen)) > 0 &&
-		       nwrite(fd, buf, cnt) == cnt)
+		while ((cnt = read(0, buf, buflen)) > 0 && nwrite(fd, buf, cnt) == cnt)
 			nbytes += cnt;
 	}
-	elapsed = (nsec() - now)/1E9;
+	elapsed = (nsec() - now) / 1E9;
 
-	print("ttcp-t: %lld bytes in %.2f real seconds = %.2f %s/sec\n",
-	      nbytes, elapsed, rate(nbytes, elapsed), unit);
+	print("ttcp-t: %lld bytes in %.2f real seconds = %.2f %s/sec\n", nbytes,
+	      elapsed, rate(nbytes, elapsed), unit);
 }
 
-void
-usage(void)
+void usage(void)
 {
 	print("usage:\tttcp -t [options] host\n"
 	      "\t\tttcp -r [options]\n"
 	      " options:\n"
-//	      "  -D\t\don't delay tcp (nodelay option)\n"
+	      //	      "  -D\t\don't delay tcp (nodelay option)\n"
 	      "  -f fmt\trate format: k,m,g,K,M,G = {kilo,mega,giga}{bit,byte}\n"
 	      "  -l\t\tlength of buf (default 8192)\n"
 	      "  -p port\tport number (default 5001)\n"
 	      "  -n num\tnumber of bufs written (default 2048)\n"
 	      "  -s\t\t-t: source a pattern to network\n"
 	      "\t\t\-r: sink (discard) all data from network\n"
-//	      "  -u\t\tuse UDP instead of TCP\n"
+	      //	      "  -u\t\tuse UDP instead of TCP\n"
 	      );
 	exits(0);
 }
 
-void
-main(int argc, char *argv[])
+void main(int argc, char *argv[])
 {
 	int buflen = 8192;
 	int nbuf = 2048;
 	int srcsink = 0;
-	char* port = "5001";
+	char *port = "5001";
 	int udp = 0;
-	enum {none, recv, xmit} mode = none;
+	enum { none, recv, xmit } mode = none;
 
-	ARGBEGIN {
+	ARGBEGIN
+	{
 	case 'f':
 		fmt = EARGF(usage())[0];
 		break;
@@ -260,7 +250,8 @@ main(int argc, char *argv[])
 		break;
 	default:
 		usage();
-	} ARGEND;
+	}
+	ARGEND;
 
 	USED(buflen);
 	switch (mode) {
