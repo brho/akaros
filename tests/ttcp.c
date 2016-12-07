@@ -35,11 +35,25 @@
  *	- isochronous transfer
  */
 
-#include <libc.h>
-#include <u.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <assert.h>
+#include <parlib/net.h>
+#include <sys/time.h>
+#include <iplib/iplib.h>
+#include <parlib/timing.h>
 
 long ncalls;
 char scale;
+
+static void sysfatal(char *msg)
+{
+	perror(msg);
+	exit(-1);
+}
 
 long nread(int fd, char *buf, long len)
 {
@@ -92,7 +106,7 @@ void pattern(char *buf, int buflen)
 char fmt = 'K';
 char *unit;
 
-double rate(vlong nbytes, double time)
+double rate(long nbytes, double time)
 {
 	switch (fmt) {
 	case 'k':
@@ -121,34 +135,34 @@ void reader(int udp, char *addr, char *port, int buflen, int nbuf, int sink)
 {
 	char *buf, adir[40], ldir[40];
 	int fd, cnt, acfd, lcfd;
-	vlong nbytes = 0;
-	vlong now;
+	long nbytes = 0;
+	long now;
 	double elapsed;
 	int pd;
 	char peer[100];
 
-	print("ttcp-r: buflen=%d, nbuf=%d, port=%s %s\n", buflen, nbuf, port,
-	      udp ? "udp" : "tcp");
+	fprintf(stderr, "ttcp-r: buflen=%d, nbuf=%d, port=%s %s\n",
+		buflen, nbuf, port, udp ? "udp" : "tcp");
 
-	acfd = announce(netmkaddr(addr, udp ? "udp" : "tcp", port), adir);
+	acfd = announce9(netmkaddr(addr, udp ? "udp" : "tcp", port), adir, 0);
 	if (acfd < 0)
 		sysfatal("announce: %r");
 	buf = malloc(buflen);
 
-	lcfd = listen(adir, ldir);
+	lcfd = listen9(adir, ldir, 0);
 	if (lcfd < 0)
 		sysfatal("listen: %r");
 
-	fd = accept(lcfd, ldir);
+	fd = accept9(lcfd, ldir);
 	if (fd < 0)
 		return;
 
-	sprint(peer, "%s/remote", ldir);
-	pd = open(peer, OREAD);
+	sprintf(peer, "%s/remote", ldir);
+	pd = open(peer, O_READ);
 	cnt = read(pd, peer, 100);
 	close(pd);
 
-	print("ttcp-r: accept from %*.*s", cnt, cnt, peer);
+	fprintf(stderr, "ttcp-r: accept from %*.*s", cnt, cnt, peer);
 	now = nsec();
 	if (sink) {
 		while ((cnt = nread(fd, buf, buflen)) > 0)
@@ -159,27 +173,31 @@ void reader(int udp, char *addr, char *port, int buflen, int nbuf, int sink)
 	}
 	elapsed = (nsec() - now) / 1E9;
 
-	print("ttcp-r: %lld bytes in %.2f real seconds = %.2f %s/sec\n", nbytes,
-	      elapsed, rate(nbytes, elapsed), unit);
+	fprintf(stderr, "ttcp-r: %lld bytes in %.2f real seconds = %.2f %s/sec\n",
+	        nbytes, elapsed, rate(nbytes, elapsed), unit);
 }
 
 void writer(int udp, char *addr, char *port, int buflen, int nbuf, int src)
 {
 	char *buf;
 	int fd, cnt;
-	vlong nbytes = 0;
-	vlong now;
+	long nbytes = 0;
+	long now;
 	double elapsed;
+	char netaddr[128];
 
-	print("ttcp-t: buflen=%d, nbuf=%d, port=%s %s -> %s\n", buflen, nbuf, port,
-	      udp ? "udp" : "tcp", addr);
+	fprintf(stderr, "ttcp-t: buflen=%d, nbuf=%d, port=%s %s -> %s\n",
+		    buflen, nbuf, port, udp ? "udp" : "tcp", addr);
 
 	buf = malloc(buflen);
-	fd = dial(netmkaddr(addr, udp ? "udp" : "tcp", port), 0, 0, 0);
+	snprintf(netaddr, sizeof(netaddr), "%s!%s!%s",
+		 udp ? "udp" : "tcp", addr, port);
+	fprintf(stderr, "dialing %s\n", netaddr);
+	fd = dial9(netaddr, 0, 0, 0, 0);
 	if (fd < 0)
 		sysfatal("dial: %r");
 
-	print("ttcp-t: connect\n");
+	fprintf(stderr, "ttcp-t: connect\n");
 
 	now = nsec();
 	if (src) {
@@ -192,25 +210,23 @@ void writer(int udp, char *addr, char *port, int buflen, int nbuf, int src)
 	}
 	elapsed = (nsec() - now) / 1E9;
 
-	print("ttcp-t: %lld bytes in %.2f real seconds = %.2f %s/sec\n", nbytes,
-	      elapsed, rate(nbytes, elapsed), unit);
+	fprintf(stderr, "ttcp-t: %lld bytes in %.2f real seconds = %.2f %s/sec\n",
+	        nbytes, elapsed, rate(nbytes, elapsed), unit);
 }
 
 void usage(void)
 {
-	print("usage:\tttcp -t [options] host\n"
+	fprintf(stderr, "usage:\tttcp -t [options] host\n"
 	      "\t\tttcp -r [options]\n"
 	      " options:\n"
-	      //	      "  -D\t\don't delay tcp (nodelay option)\n"
 	      "  -f fmt\trate format: k,m,g,K,M,G = {kilo,mega,giga}{bit,byte}\n"
 	      "  -l\t\tlength of buf (default 8192)\n"
 	      "  -p port\tport number (default 5001)\n"
 	      "  -n num\tnumber of bufs written (default 2048)\n"
 	      "  -s\t\t-t: source a pattern to network\n"
-	      "\t\t\-r: sink (discard) all data from network\n"
-	      //	      "  -u\t\tuse UDP instead of TCP\n"
+	      "\t\t-r: sink (discard) all data from network\n"
 	      );
-	exits(0);
+	exit(0);
 }
 
 void main(int argc, char *argv[])
@@ -221,51 +237,50 @@ void main(int argc, char *argv[])
 	char *port = "5001";
 	int udp = 0;
 	enum { none, recv, xmit } mode = none;
+	char c;
 
-	ARGBEGIN
-	{
-	case 'f':
-		fmt = EARGF(usage())[0];
-		break;
-	case 'l':
-		buflen = atoi(EARGF(usage()));
-		break;
-	case 'n':
-		nbuf = atoi(EARGF(usage()));
-		break;
-	case 'p':
-		port = EARGF(usage());
-		break;
-	case 'r':
-		mode = recv;
-		break;
-	case 's':
-		srcsink = 1;
-		break;
-	case 't':
-		mode = xmit;
-		break;
-	case 'u':
-		udp = 1;
-		break;
-	default:
-		usage();
+	while ((c = getopt(argc, argv, "rstuf:l:n:p:")) != -1) {
+		switch (c) {
+		case 'f':
+			fmt = *optarg;
+			break;
+		case 'l':
+			buflen = atoi(optarg);
+			break;
+		case 'n':
+			nbuf = atoi(optarg);
+			break;
+		case 'p':
+			port = optarg;
+			break;
+		case 'r':
+			mode = recv;
+			break;
+		case 's':
+			srcsink = 1;
+			break;
+		case 't':
+			mode = xmit;
+			break;
+		case 'u':
+			udp = 1;
+			break;
+		default:
+			usage();
+		}
 	}
-	ARGEND;
-
-	USED(buflen);
 	switch (mode) {
 	case none:
 		usage();
 		break;
 	case xmit:
-		if (argv[0] == nil)
+		if (optind == argc)
 			usage();
-		writer(udp, argv[0], port, buflen, nbuf, srcsink);
+		writer(udp, argv[optind], port, buflen, nbuf, srcsink);
 		break;
 	case recv:
 		reader(udp, "*", port, buflen, nbuf, srcsink);
 		break;
 	}
-	exits(0);
+	exit(0);
 }
