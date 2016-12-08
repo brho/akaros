@@ -365,9 +365,12 @@ static void dreg(char *s, void *p)
 
 static void esleep(int ms)
 {
-	ERRSTACK(2);
-	if (waserror())
+	ERRSTACK(1);
+
+	if (waserror()) {
+		poperror();
 		return;
+	}
 	kthread_usleep(ms * 1000);
 	poperror();
 }
@@ -382,9 +385,12 @@ static int ahciclear(void *v)
 
 static void aesleep(struct aportm *pm, struct Asleep *a, int ms)
 {
-	ERRSTACK(2);
-	if (waserror())
+	ERRSTACK(1);
+
+	if (waserror()) {
+		poperror();
 		return;
+	}
 	rendez_sleep_timeout(&pm->Rendez, ahciclear, a, ms * 1000);
 	poperror();
 }
@@ -1871,7 +1877,7 @@ retry:
 	d->active++;
 
 	while (waserror())
-		;
+		poperror();
 	/* don't sleep here forever */
 	rendez_sleep_timeout(&d->portm.Rendez, ahciclear, &as, (3 * 1000) * 1000);
 	poperror();
@@ -1941,7 +1947,7 @@ retry:
 
 static int iario(struct sdreq *r)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	int i, n, count, try, max, flag, task;
 	uint64_t lba;
 	char *name;
@@ -2017,7 +2023,7 @@ retry:
 		d->active++;
 
 		while (waserror())
-			;
+			poperror();
 		/* don't sleep here forever */
 		rendez_sleep_timeout(&d->portm.Rendez, ahciclear, &as,
 		                     (3 * 1000) * 1000);
@@ -2351,7 +2357,8 @@ static void forcemode(struct drive *d, char *mode)
 
 static void runsmartable(struct drive *d, int i)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
+
 	if (waserror()) {
 		qunlock(&d->portm.ql);
 		d->smartrs = 0;
@@ -2396,7 +2403,7 @@ static void changemedia(struct sdunit *u)
 
 static int iawctl(struct sdunit *u, struct cmdbuf *cmd)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	char **f;
 	struct ctlr *c;
 	struct drive *d;

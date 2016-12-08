@@ -255,10 +255,9 @@ static int sdinitpart(struct sdunit *unit)
 
 			start = strtoull(f[1], 0, 0);
 			end = strtoull(f[2], 0, 0);
-			if(!waserror()){
+			if (!waserror())
 				sdaddpart(unit, f[0], start, end);
-				poperror();
-			}
+			poperror();
 		}
 #endif
 	}
@@ -793,6 +792,7 @@ static int32_t sdbio(struct chan *c, int write, char *a, int32_t len,
 		 * if (strcmp(up->errstr, Eio) == 0 ... */
 		if ((get_errno() == EIO) && (unit->sectors == 0) && (nchange++ == 0)) {
 			sdinitpart(unit);
+			poperror();
 			continue;
 		}
 
@@ -894,7 +894,7 @@ static int32_t sdbio(struct chan *c, int write, char *a, int32_t len,
 
 static int32_t sdrio(struct sdreq *r, void *a, int32_t n)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	void *data;
 
 	if (n >= SDmaxio || n < 0)
@@ -1120,7 +1120,7 @@ int sdfakescsi(struct sdreq *r, void *info, int ilen)
 
 static long sdread(struct chan *c, void *a, long n, int64_t off)
 {
-	ERRSTACK(2);
+	ERRSTACK(1);
 	char *p, *e, *buf;
 	struct sdpart *pp;
 	struct sdunit *unit;
