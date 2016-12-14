@@ -236,26 +236,26 @@ void unload_guest_pcore(struct proc *p, int guest_pcoreid)
 struct emmsr {
 	uint32_t reg;
 	char *name;
-	bool (*f)(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
-	          uint64_t *rax, uint32_t opcode);
+	bool (*f)(struct emmsr *msr, struct vm_trapframe *vm_tf,
+	          uint32_t opcode);
 	bool written;
 	uint32_t edx, eax;
 };
 
-static bool emsr_miscenable(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
-                            uint64_t *rax, uint32_t opcode);
-static bool emsr_mustmatch(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
-                           uint64_t *rax, uint32_t opcode);
-static bool emsr_readonly(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
-                          uint64_t *rax, uint32_t opcode);
-static bool emsr_readzero(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
-                          uint64_t *rax, uint32_t opcode);
-static bool emsr_fakewrite(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
-                           uint64_t *rax, uint32_t opcode);
-static bool emsr_ok(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
-                    uint64_t *rax, uint32_t opcode);
-static bool emsr_fake_apicbase(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
-                               uint64_t *rax, uint32_t opcode);
+static bool emsr_miscenable(struct emmsr *msr, struct vm_trapframe *vm_tf,
+                            uint32_t opcode);
+static bool emsr_mustmatch(struct emmsr *msr, struct vm_trapframe *vm_tf,
+                           uint32_t opcode);
+static bool emsr_readonly(struct emmsr *msr, struct vm_trapframe *vm_tf,
+                          uint32_t opcode);
+static bool emsr_readzero(struct emmsr *msr, struct vm_trapframe *vm_tf,
+                          uint32_t opcode);
+static bool emsr_fakewrite(struct emmsr *msr, struct vm_trapframe *vm_tf,
+                           uint32_t opcode);
+static bool emsr_ok(struct emmsr *msr, struct vm_trapframe *vm_tf,
+                    uint32_t opcode);
+static bool emsr_fake_apicbase(struct emmsr *msr, struct vm_trapframe *vm_tf,
+                               uint32_t opcode);
 
 struct emmsr emmsrs[] = {
 	{MSR_IA32_MISC_ENABLE, "MSR_IA32_MISC_ENABLE", emsr_miscenable},
@@ -309,8 +309,8 @@ struct emmsr emmsrs[] = {
 /* this may be the only register that needs special handling.
  * If there others then we might want to extend the emmsr struct.
  */
-bool emsr_miscenable(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
-                     uint64_t *rax, uint32_t opcode)
+bool emsr_miscenable(struct emmsr *msr, struct vm_trapframe *vm_tf,
+                     uint32_t opcode)
 {
 	uint32_t eax, edx;
 	uint64_t val;
@@ -320,26 +320,28 @@ bool emsr_miscenable(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 	split_msr_val(val, &edx, &eax);
 	/* we just let them read the misc msr for now. */
 	if (opcode == VMM_MSR_EMU_READ) {
-		*rax = eax;
-		*rax |= MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
-		*rdx = edx;
+		vm_tf->tf_rax = eax;
+		vm_tf->tf_rax |= MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
+		vm_tf->tf_rdx = edx;
 		return TRUE;
 	} else {
 		/* if they are writing what is already written, that's ok. */
 		eax |= MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
-		if (((uint32_t) *rax == eax) && ((uint32_t) *rdx == edx))
+		if (((uint32_t) vm_tf->tf_rax == eax)
+		    && ((uint32_t) vm_tf->tf_rdx == edx))
 			return TRUE;
 	}
 	printk
 		("%s: Wanted to write 0x%x:0x%x, but could not; value was 0x%x:0x%x\n",
-		 msr->name, (uint32_t) *rdx, (uint32_t) *rax, edx, eax);
+		 msr->name, (uint32_t) vm_tf->tf_rdx, (uint32_t) vm_tf->tf_rax, edx,
+		 eax);
 	return FALSE;
 }
 
 /* TODO: this looks like a copy-paste for the read side.  What's the purpose of
  * mustmatch?  No one even uses it. */
-bool emsr_mustmatch(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
-                    uint64_t *rax, uint32_t opcode)
+bool emsr_mustmatch(struct emmsr *msr, struct vm_trapframe *vm_tf,
+                    uint32_t opcode)
 {
 	uint32_t eax, edx;
 	uint64_t val;
@@ -349,22 +351,24 @@ bool emsr_mustmatch(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 	split_msr_val(val, &edx, &eax);
 	/* we just let them read the misc msr for now. */
 	if (opcode == VMM_MSR_EMU_READ) {
-		*rax = eax;
-		*rdx = edx;
+		vm_tf->tf_rax = eax;
+		vm_tf->tf_rdx = edx;
 		return TRUE;
 	} else {
 		/* if they are writing what is already written, that's ok. */
-		if (((uint32_t) *rax == eax) && ((uint32_t) *rdx == edx))
+		if (((uint32_t) vm_tf->tf_rax == eax)
+		    && ((uint32_t) vm_tf->tf_rdx == edx))
 			return TRUE;
 	}
 	printk
 		("%s: Wanted to write 0x%x:0x%x, but could not; value was 0x%x:0x%x\n",
-		 msr->name, (uint32_t) *rdx, (uint32_t) *rax, edx, eax);
+		 msr->name, (uint32_t) vm_tf->tf_rdx, (uint32_t) vm_tf->tf_rax, edx,
+		 eax);
 	return FALSE;
 }
 
-bool emsr_readonly(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
-                   uint64_t *rax, uint32_t opcode)
+bool emsr_readonly(struct emmsr *msr, struct vm_trapframe *vm_tf,
+                   uint32_t opcode)
 {
 	uint32_t eax, edx;
 	uint64_t val;
@@ -373,8 +377,8 @@ bool emsr_readonly(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 		return FALSE;
 	split_msr_val(val, &edx, &eax);
 	if (opcode == VMM_MSR_EMU_READ) {
-		*rax = eax;
-		*rdx = edx;
+		vm_tf->tf_rax = eax;
+		vm_tf->tf_rdx = edx;
 		return TRUE;
 	}
 
@@ -382,12 +386,12 @@ bool emsr_readonly(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 	return FALSE;
 }
 
-bool emsr_readzero(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
-                   uint64_t *rax, uint32_t opcode)
+bool emsr_readzero(struct emmsr *msr, struct vm_trapframe *vm_tf,
+                   uint32_t opcode)
 {
 	if (opcode == VMM_MSR_EMU_READ) {
-		*rax = 0;
-		*rdx = 0;
+		vm_tf->tf_rax = 0;
+		vm_tf->tf_rdx = 0;
 		return TRUE;
 	}
 
@@ -396,8 +400,8 @@ bool emsr_readzero(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 }
 
 /* pretend to write it, but don't write it. */
-bool emsr_fakewrite(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
-                    uint64_t *rax, uint32_t opcode)
+bool emsr_fakewrite(struct emmsr *msr, struct vm_trapframe *vm_tf,
+                    uint32_t opcode)
 {
 	uint32_t eax, edx;
 	uint64_t val;
@@ -412,22 +416,23 @@ bool emsr_fakewrite(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 	}
 	/* we just let them read the misc msr for now. */
 	if (opcode == VMM_MSR_EMU_READ) {
-		*rax = eax;
-		*rdx = edx;
+		vm_tf->tf_rax = eax;
+		vm_tf->tf_rdx = edx;
 		return TRUE;
 	} else {
 		/* if they are writing what is already written, that's ok. */
-		if (((uint32_t) *rax == eax) && ((uint32_t) *rdx == edx))
+		if (((uint32_t) vm_tf->tf_rax == eax)
+		    && ((uint32_t) vm_tf->tf_rdx == edx))
 			return TRUE;
-		msr->edx = *rdx;
-		msr->eax = *rax;
+		msr->edx = vm_tf->tf_rdx;
+		msr->eax = vm_tf->tf_rax;
 		msr->written = TRUE;
 	}
 	return TRUE;
 }
 
-bool emsr_ok(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
-             uint64_t *rax, uint32_t opcode)
+bool emsr_ok(struct emmsr *msr, struct vm_trapframe *vm_tf,
+             uint32_t opcode)
 {
 	uint32_t eax, edx;
 	uint64_t val;
@@ -436,10 +441,10 @@ bool emsr_ok(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 		if (read_msr_safe(msr->reg, &val))
 			return FALSE;
 		split_msr_val(val, &edx, &eax);
-		*rax = eax;
-		*rdx = edx;
+		vm_tf->tf_rax = eax;
+		vm_tf->tf_rdx = edx;
 	} else {
-		val = (*rdx << 32) | (*rax & 0xffffffff);
+		val = (vm_tf->tf_rdx << 32) | (vm_tf->tf_rax & 0xffffffff);
 		if (write_msr_safe(msr->reg, val))
 			return FALSE;
 	}
@@ -447,8 +452,8 @@ bool emsr_ok(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 }
 
 /* pretend to write it, but don't write it. */
-bool emsr_fake_apicbase(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
-                        uint64_t *rax, uint32_t opcode)
+bool emsr_fake_apicbase(struct emmsr *msr, struct vm_trapframe *vm_tf,
+                        uint32_t opcode)
 {
 	uint32_t eax, edx;
 
@@ -463,26 +468,27 @@ bool emsr_fake_apicbase(struct emmsr *msr, uint64_t *rcx, uint64_t *rdx,
 	}
 	/* we just let them read the misc msr for now. */
 	if (opcode == VMM_MSR_EMU_READ) {
-		*rax = eax;
-		*rdx = edx;
+		vm_tf->tf_rax = eax;
+		vm_tf->tf_rdx = edx;
 		return TRUE;
 	} else {
 		/* if they are writing what is already written, that's ok. */
-		if (((uint32_t) *rax == eax) && ((uint32_t) *rdx == edx))
+		if (((uint32_t) vm_tf->tf_rax == eax)
+		    && ((uint32_t) vm_tf->tf_rdx == edx))
 			return 0;
-		msr->edx = *rdx;
-		msr->eax = *rax;
+		msr->edx = vm_tf->tf_rdx;
+		msr->eax = vm_tf->tf_rax;
 		msr->written = TRUE;
 	}
 	return TRUE;
 }
 
-bool vmm_emulate_msr(uint64_t *rcx, uint64_t *rdx, uint64_t *rax, int op)
+bool vmm_emulate_msr(struct vm_trapframe *vm_tf, int op)
 {
 	for (int i = 0; i < ARRAY_SIZE(emmsrs); i++) {
-		if (emmsrs[i].reg != *rcx)
+		if (emmsrs[i].reg != vm_tf->tf_rcx)
 			continue;
-		return emmsrs[i].f(&emmsrs[i], rcx, rdx, rax, op);
+		return emmsrs[i].f(&emmsrs[i], vm_tf, op);
 	}
 	return FALSE;
 }

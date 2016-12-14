@@ -958,7 +958,7 @@ bool handle_vmexit_msr(struct vm_trapframe *tf)
 {
 	bool ret;
 
-	ret = vmm_emulate_msr(&tf->tf_rcx, &tf->tf_rdx, &tf->tf_rax,
+	ret = vmm_emulate_msr(tf,
 	                      (tf->tf_exit_reason == EXIT_REASON_MSR_READ
 						   ? VMM_MSR_EMU_READ : VMM_MSR_EMU_WRITE));
 	if (ret)

@@ -81,4 +81,4 @@ void unload_guest_pcore(struct proc *p, int guest_pcoreid);
 
 #define VMM_MSR_EMU_READ		1
 #define VMM_MSR_EMU_WRITE		2
-bool vmm_emulate_msr(uint64_t *rcx, uint64_t *rdx, uint64_t *rax, int op);
+bool vmm_emulate_msr(struct vm_trapframe *vm_tf, int op);
