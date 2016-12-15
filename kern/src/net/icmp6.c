@@ -929,10 +929,6 @@ extern void icmpannounce(struct conv *c, char **argv, int argc);
 extern void icmpconnect(struct conv *c, char **argv, int argc);
 extern void icmpclose(struct conv *c);
 
-void icmp6newconv(struct Proto *icmp6, struct conv *conv)
-{
-}
-
 void icmp6init(struct Fs *fs)
 {
 	struct Proto *icmp6 = kzmalloc(sizeof(struct Proto), 0);
@@ -948,7 +944,6 @@ void icmp6init(struct Fs *fs)
 	icmp6->stats = icmpstats6;
 	icmp6->ctl = icmpctl6;
 	icmp6->advise = icmpadvise6;
-	icmp6->newconv = icmp6newconv;
 	icmp6->gc = NULL;
 	icmp6->ipproto = ICMPv6;
 	icmp6->nc = 16;

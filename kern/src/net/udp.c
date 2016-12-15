@@ -653,10 +653,6 @@ int udpstats(struct Proto *udp, char *buf, int len)
 	return p - buf;
 }
 
-void udpnewconv(struct Proto *udp, struct conv *conv)
-{
-}
-
 void udpinit(struct Fs *fs)
 {
 	struct Proto *udp;
@@ -675,7 +671,6 @@ void udpinit(struct Fs *fs)
 	udp->stats = udpstats;
 	udp->ipproto = IP_UDPPROTO;
 	udp->nc = Nchans;
-	udp->newconv = udpnewconv;
 	udp->ptclsize = sizeof(Udpcb);
 
 	Fsproto(fs, udp);

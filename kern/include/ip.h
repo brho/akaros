@@ -310,7 +310,6 @@ struct Proto {
 	int (*remote) (struct conv *, char *unused_char_p_t, int);
 	int (*inuse) (struct conv *);
 	int (*gc) (struct Proto *);	/* returns true if any conversations are freed */
-	void (*newconv) (struct Proto * udp, struct conv * conv);
 
 	struct Fs *f;				/* file system this proto is part of */
 	struct conv **conv;			/* array of conversations */
