@@ -446,13 +446,10 @@ void udpiput(struct Proto *udp, struct Ipifc *ifc, struct block *bp)
 			return;	/* to avoid a warning */
 	}
 
-	qlock(&udp->qlock);
-
 	c = iphtlook(&upriv->ht, raddr, rport, laddr, lport);
 	if (c == NULL) {
 		/* no converstation found */
 		upriv->ustats.udpNoPorts++;
-		qunlock(&udp->qlock);
 		netlog(f, Logudp, "udp: no conv %I!%d -> %I!%d\n", raddr, rport,
 			   laddr, lport);
 
@@ -487,9 +484,10 @@ void udpiput(struct Proto *udp, struct Ipifc *ifc, struct block *bp)
 						panic("udpiput3: version %d", version);
 				}
 			}
+			qlock(&udp->qlock);
 			c = Fsnewcall(c, raddr, rport, laddr, lport, version);
+			qunlock(&udp->qlock);
 			if (c == NULL) {
-				qunlock(&udp->qlock);
 				freeblist(bp);
 				return;
 			}
@@ -499,7 +497,6 @@ void udpiput(struct Proto *udp, struct Ipifc *ifc, struct block *bp)
 	}
 
 	qlock(&c->qlock);
-	qunlock(&udp->qlock);
 
 	/*
 	 * Trim the packet down to data size
@@ -616,7 +613,6 @@ void udpadvise(struct Proto *udp, struct block *bp, char *msg)
 	}
 
 	/* Look for a connection */
-	qlock(&udp->qlock);
 	for (p = udp->conv; *p; p++) {
 		s = *p;
 		if (s->rport == pdest)
@@ -626,7 +622,6 @@ void udpadvise(struct Proto *udp, struct block *bp, char *msg)
 						if (s->ignoreadvice)
 							break;
 						qlock(&s->qlock);
-						qunlock(&udp->qlock);
 						qhangup(s->rq, msg);
 						qhangup(s->wq, msg);
 						qunlock(&s->qlock);
@@ -634,7 +629,6 @@ void udpadvise(struct Proto *udp, struct block *bp, char *msg)
 						return;
 					}
 	}
-	qunlock(&udp->qlock);
 	freeblist(bp);
 }
 

@@ -2040,19 +2040,19 @@ void tcpiput(struct Proto *tcp, struct Ipifc *unused, struct block *bp)
 		}
 	}
 
-	/* lock protocol while searching for a conversation */
-	qlock(&tcp->qlock);
-
 	/* Look for a matching conversation */
 	s = iphtlook(&tpriv->ht, source, seg.source, dest, seg.dest);
 	if (s == NULL) {
 		netlog(f, Logtcp, "iphtlook failed\n");
 reset:
-		qunlock(&tcp->qlock);
 		sndrst(tcp, source, dest, length, &seg, version, "no conversation");
 		freeblist(bp);
 		return;
 	}
+
+	/* lock protocol for unstate Plan 9 invariants.  funcs like limbo or
+	 * incoming might rely on it. */
+	qlock(&tcp->qlock);
 
 	/* if it's a listener, look for the right flags and get a new conv */
 	tcb = (Tcpctl *) s->ptcl;
@@ -2077,8 +2077,10 @@ reset:
 		 *  return it in state Syn_received
 		 */
 		s = tcpincoming(s, &seg, source, dest, version);
-		if (s == NULL)
+		if (s == NULL) {
+			qunlock(&tcp->qlock);
 			goto reset;
+		}
 	}
 
 	/* The rest of the input state machine is run with the control block
@@ -3062,7 +3064,6 @@ void tcpadvise(struct Proto *tcp, struct block *bp, char *msg)
 	}
 
 	/* Look for a connection */
-	qlock(&tcp->qlock);
 	for (p = tcp->conv; *p; p++) {
 		s = *p;
 		tcb = (Tcpctl *) s->ptcl;
@@ -3072,7 +3073,6 @@ void tcpadvise(struct Proto *tcp, struct block *bp, char *msg)
 					if (ipcmp(s->raddr, dest) == 0)
 						if (ipcmp(s->laddr, source) == 0) {
 							qlock(&s->qlock);
-							qunlock(&tcp->qlock);
 							switch (tcb->state) {
 								case Syn_sent:
 									localclose(s, msg);
@@ -3083,7 +3083,6 @@ void tcpadvise(struct Proto *tcp, struct block *bp, char *msg)
 							return;
 						}
 	}
-	qunlock(&tcp->qlock);
 	freeblist(bp);
 }
 
