@@ -199,7 +199,6 @@ typedef struct Icmppriv6 {
 } Icmppriv6;
 
 typedef struct Icmpcb6 {
-	qlock_t qlock;
 	uint8_t headers;
 } Icmpcb6;
 
@@ -932,10 +931,6 @@ extern void icmpclose(struct conv *c);
 
 void icmp6newconv(struct Proto *icmp6, struct conv *conv)
 {
-	/* Fsprotoclone alloc'd our priv struct and attached it to conv already.
-	 * Now we need to init it */
-	struct Icmpcb6 *icb = (struct Icmpcb6 *)conv->ptcl;
-	qlock_init(&icb->qlock);
 }
 
 void icmp6init(struct Fs *fs)

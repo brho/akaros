@@ -142,7 +142,6 @@ void udpkick(void *x, struct block *bp);
  */
 typedef struct Udpcb Udpcb;
 struct Udpcb {
-	qlock_t qlock;
 	uint8_t headers;
 };
 
@@ -656,10 +655,6 @@ int udpstats(struct Proto *udp, char *buf, int len)
 
 void udpnewconv(struct Proto *udp, struct conv *conv)
 {
-	/* Fsprotoclone alloc'd our priv struct and attached it to conv already.
-	 * Now we need to init it */
-	struct Udpcb *ucb = (struct Udpcb *)conv->ptcl;
-	qlock_init(&ucb->qlock);
 }
 
 void udpinit(struct Fs *fs)
