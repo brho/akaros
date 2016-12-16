@@ -426,6 +426,7 @@ void ipiput4(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 	struct IP *ip;
 	struct route *r;
 
+	bp = pullupblock(bp, 1);
 	if (BLKIPVER(bp) != IP_VER4) {
 		ipiput6(f, ifc, bp);
 		return;
