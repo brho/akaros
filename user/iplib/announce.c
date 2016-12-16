@@ -109,6 +109,28 @@ int announce9(char *addr, char *dir, int flags)
 	return ctl;
 }
 
+/* Gets a conversation and bypasses the protocol layer */
+int bypass9(char *addr, char *conv_dir, int flags)
+{
+	int ctl, n;
+	char buf[Maxpath];
+	char netdir[Maxpath];
+	char naddr[Maxpath];
+
+	if (nettrans(addr, naddr, sizeof(naddr), netdir, sizeof(netdir)) < 0)
+		return -1;
+	ctl = __clone9(netdir, conv_dir, "bypass", flags);
+	if (ctl < 0)
+		return -1;
+	n = snprintf(buf, sizeof(buf), "bypass %s", naddr);
+	if (write(ctl, buf, n) != n) {
+		fprintf(stderr, "bypass writing %s: %r\n", netdir);
+		close(ctl);
+		return -1;
+	}
+	return ctl;
+}
+
 /*
  *  listen for an incoming call
  */
@@ -299,4 +321,38 @@ static int nettrans(char *addr, char *naddr, int na, char *file, int nf)
 	}
 	snprintf(file, nf, "%s/%s", netdir, p);
 	return 0;
+}
+
+int open_data_fd9(char *conv_dir, int flags)
+{
+	char path_buf[MAX_PATH_LEN];
+
+	snprintf(path_buf, sizeof(path_buf), "%s/data", conv_dir);
+	return open(path_buf, O_RDWR | flags);
+}
+
+/* Given a conversation directory, return the "remote" or "local" port, passed
+ * as the string which.  Returns the port via *port and TRUE on success. */
+bool get_port9(char *conv_dir, char *which, uint16_t *port)
+{
+	/* We don't have a MAX_DIALSTRING, but MAX_PATH_LEN should be enough. */
+	char buf[MAX_PATH_LEN];
+	int local_fd;
+	int ret;
+	char *p;
+
+	snprintf(buf, sizeof(buf), "%s/%s", conv_dir, which);
+	local_fd = open(buf, O_RDONLY);
+	if (local_fd < 0)
+		return FALSE;
+	ret = read(local_fd, buf, sizeof(buf));
+	close(local_fd);
+	if (ret <= 0)
+		return FALSE;
+	p = strrchr(buf, '!');
+	if (!p)
+		return FALSE;
+	p++;
+	*port = atoi(p);
+	return TRUE;
 }
