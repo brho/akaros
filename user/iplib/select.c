@@ -44,22 +44,22 @@
  */
 
 #include <sys/select.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <sys/stat.h>
 
-#include <ros/common.h>
-#include <parlib/uthread.h>
-#include <parlib/arch/arch.h>
-#include <sys/close_cb.h>
-#include <sys/fork_cb.h>
-#include <sys/epoll.h>
-#include <malloc.h>
-#include <stdlib.h>
 #include <errno.h>
-#include <signal.h>
+#include <malloc.h>
+#include <parlib/arch/arch.h>
+#include <parlib/uthread.h>
+#include <ros/common.h>
 #include <ros/fs.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <sys/close_cb.h>
+#include <sys/epoll.h>
+#include <sys/fork_cb.h>
 
 static int epoll_fd;
 static fd_set all_fds;
@@ -96,8 +96,7 @@ static void select_forked(void)
 	uth_mutex_lock(fdset_mtx);
 	for (int i = 0; i < FD_SETSIZE; i++) {
 		if (fd_is_set(i, &all_fds)) {
-			ep_ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLHUP |
-			               EPOLLERR;
+			ep_ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLERR;
 			ep_ev.data.fd = i;
 			/* Discard error.  The underlying tap is gone, and the epoll ctlr
 			 * might also have been emptied.  We just want to make sure there is
@@ -150,12 +149,12 @@ static bool fd_is_actionable(int fd, fd_set *readfds, fd_set *writefds)
 		return FALSE;
 	ret = fstat(fd, &stat_buf);
 	assert(!ret);
-	return (fd_is_set(fd, readfds)  && S_READABLE(stat_buf.st_mode)) ||
+	return (fd_is_set(fd, readfds) && S_READABLE(stat_buf.st_mode)) ||
 	       (fd_is_set(fd, writefds) && S_WRITABLE(stat_buf.st_mode));
 }
 
-int select(int nfds, fd_set *readfds, fd_set *writefds,
-           fd_set *exceptfds, struct timeval *timeout)
+int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
+           struct timeval *timeout)
 {
 	bool changed_set = FALSE;
 	struct epoll_event ep_ev;
@@ -179,14 +178,14 @@ int select(int nfds, fd_set *readfds, fd_set *writefds,
 	uth_mutex_lock(fdset_mtx);
 	for (int i = 0; i < nfds; i++) {
 		if ((fd_is_set(i, readfds) || fd_is_set(i, writefds) ||
-		    fd_is_set(i, exceptfds)) && !fd_is_set(i, &all_fds)) {
+		     fd_is_set(i, exceptfds)) &&
+		    !fd_is_set(i, &all_fds)) {
 
 			changed_set = TRUE;
 			FD_SET(i, &all_fds);
 			/* FDs that we track for *any* reason with select will be
 			 * tracked for *all* reasons with epoll. */
-			ep_ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLHUP |
-			               EPOLLERR;
+			ep_ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLERR;
 			ep_ev.data.fd = i;
 			if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, i, &ep_ev)) {
 				/* We might have failed because we tried to set up too many
@@ -253,9 +252,8 @@ int select(int nfds, fd_set *readfds, fd_set *writefds,
 	return nfds;
 }
 
-int pselect(int nfds, fd_set *readfds, fd_set *writefds,
-            fd_set *exceptfds, const struct timespec *timeout,
-            const sigset_t *sigmask)
+int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
+            const struct timespec *timeout, const sigset_t *sigmask)
 {
 	int ready;
 	sigset_t origmask;

@@ -38,8 +38,8 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 	return ppoll(fds, nfds, ts_timeout, 0);
 }
 
-int ppoll(struct pollfd *fds, nfds_t nfds,
-          const struct timespec *timeout_ts, const sigset_t *sigmask)
+int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout_ts,
+          const sigset_t *sigmask)
 {
 	int max_fd_plus_one = 0;
 	fd_set rd_fds, wr_fds, ex_fds;

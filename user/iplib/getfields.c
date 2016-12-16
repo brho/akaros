@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is part of the UCB release of Plan 9. It is subject to the license
  * terms in the LICENSE file found in the top-level directory of this
  * distribution and at http://akaros.cs.berkeley.edu/files/Plan9License. No
@@ -8,35 +8,33 @@
  */
 #include <string.h>
 
-
 /* currently only used in arp.c; so we don't do the full monty. */
-int
-getfields(char *str, char **args, int max, int mflag, char *set)
+int getfields(char *str, char **args, int max, int mflag, char *set)
 {
 	int nr, intok, narg;
 
-	if(max <= 0)
+	if (max <= 0)
 		return 0;
 
 	narg = 0;
 	args[narg] = str;
-	if(!mflag)
+	if (!mflag)
 		narg++;
 	intok = 0;
-	for(;; str++) {
+	for (;; str++) {
 		nr = *str;
-		if(nr == 0)
+		if (nr == 0)
 			break;
-		if(index(set, nr)){
-			if(narg >= max)
+		if (index(set, nr)) {
+			if (narg >= max)
 				break;
 			*str = 0;
 			intok = 0;
 			args[narg] = str + 1;
-			if(!mflag)
+			if (!mflag)
 				narg++;
 		} else {
-			if(!intok && mflag)
+			if (!intok && mflag)
 				narg++;
 			intok = 1;
 		}

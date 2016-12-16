@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is part of the UCB release of Plan 9. It is subject to the license
  * terms in the LICENSE file found in the top-level directory of this
  * distribution and at http://akaros.cs.berkeley.edu/files/Plan9License. No
@@ -8,11 +8,11 @@
  */
 #include <stdlib.h>
 
-#include <stdio.h>
-#include <parlib/parlib.h>
-#include <unistd.h>
-#include <signal.h>
 #include <iplib/iplib.h>
+#include <parlib/parlib.h>
+#include <signal.h>
+#include <stdio.h>
+#include <unistd.h>
 
 static uint8_t classmask[4][16] = {
 	0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0xff,0xff,0xff,  0xff,0x00,0x00,0x00,
@@ -70,29 +70,27 @@ static uint8_t v6solicitednodemask[IPaddrlen] = {
 };
 static int v6snpreflen = 13;
 
-uint8_t*
-defmask(uint8_t *ip)
+uint8_t *defmask(uint8_t *ip)
 {
-	if(isv4(ip))
-		return classmask[ip[IPv4off]>>6];
+	if (isv4(ip))
+		return classmask[ip[IPv4off] >> 6];
 	else {
-		if(ipcmp(ip, v6loopback) == 0)
+		if (ipcmp(ip, v6loopback) == 0)
 			return IPallbits;
-		else if(memcmp(ip, v6linklocal, v6llpreflen) == 0)
+		else if (memcmp(ip, v6linklocal, v6llpreflen) == 0)
 			return v6linklocalmask;
-		else if(memcmp(ip, v6solicitednode, v6snpreflen) == 0)
+		else if (memcmp(ip, v6solicitednode, v6snpreflen) == 0)
 			return v6solicitednodemask;
-		else if(memcmp(ip, v6multicast, v6mcpreflen) == 0)
+		else if (memcmp(ip, v6multicast, v6mcpreflen) == 0)
 			return v6multicastmask;
 		return IPallbits;
 	}
 }
 
-void
-maskip(uint8_t *from, uint8_t *mask, uint8_t *to)
+void maskip(uint8_t *from, uint8_t *mask, uint8_t *to)
 {
 	int i;
 
-	for(i = 0; i < IPaddrlen; i++)
+	for (i = 0; i < IPaddrlen; i++)
 		to[i] = from[i] & mask[i];
 }

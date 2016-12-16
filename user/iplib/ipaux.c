@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is part of the UCB release of Plan 9. It is subject to the license
  * terms in the LICENSE file found in the top-level directory of this
  * distribution and at http://akaros.cs.berkeley.edu/files/Plan9License. No
@@ -8,11 +8,11 @@
  */
 #include <stdlib.h>
 
-#include <stdio.h>
-#include <parlib/parlib.h>
-#include <unistd.h>
-#include <signal.h>
 #include <iplib/iplib.h>
+#include <parlib/parlib.h>
+#include <signal.h>
+#include <stdio.h>
+#include <unistd.h>
 
 /*
  *  well known IP addresses
@@ -53,8 +53,7 @@ uint8_t v4prefix[IPaddrlen] = {
 	0, 0, 0, 0
 };
 
-int
-isv4(uint8_t *ip)
+int isv4(uint8_t *ip)
 {
 	return memcmp(ip, v4prefix, IPv4off) == 0;
 }
@@ -63,8 +62,7 @@ isv4(uint8_t *ip)
  *  the following routines are unrolled with no memset's to speed
  *  up the usual case
  */
-void
-v4tov6(uint8_t *v6, uint8_t *v4)
+void v4tov6(uint8_t *v6, uint8_t *v4)
 {
 	v6[0] = 0;
 	v6[1] = 0;
@@ -84,8 +82,7 @@ v4tov6(uint8_t *v6, uint8_t *v4)
 	v6[15] = v4[3];
 }
 
-int
-v6tov4(uint8_t *v4, uint8_t *v6)
+int v6tov4(uint8_t *v4, uint8_t *v6)
 {
 	if(v6[0] == 0
 	&& v6[1] == 0
@@ -107,7 +104,7 @@ v6tov4(uint8_t *v4, uint8_t *v6)
 		return 0;
 	} else {
 		memset(v4, 0, 4);
-		if(memcmp(v6, IPnoaddr, IPaddrlen) == 0)
+		if (memcmp(v6, IPnoaddr, IPaddrlen) == 0)
 			return 0;
 		return -1;
 	}

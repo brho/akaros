@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is part of the UCB release of Plan 9. It is subject to the license
  * terms in the LICENSE file found in the top-level directory of this
  * distribution and at http://akaros.cs.berkeley.edu/files/Plan9License. No
@@ -8,60 +8,63 @@
  */
 #include <stdlib.h>
 
-#include <sys/types.h>
-#include <string.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #define NAMELEN 28
 #define NETPATHLEN 40
-static int isdigit(int c) {return ((c >= '0' && c <= '9'));}
+static int isdigit(int c)
+{
+	return ((c >= '0' && c <= '9'));
+}
 
 static int call(char *clone, char *dest, int *cfdp, char *dir, char *local,
                 int flags)
 {
 	int fd, cfd;
 	int n;
-	char name[3*NAMELEN+5];
-	char data[3*NAMELEN+10];
+	char name[3 * NAMELEN + 5];
+	char data[3 * NAMELEN + 10];
 	char *p;
 
 	cfd = open(clone, O_RDWR);
-	if(cfd < 0)
+	if (cfd < 0)
 		return -1;
 
 	/* get directory name */
-	n = read(cfd, name, sizeof(name)-1);
-	if(n < 0){
+	n = read(cfd, name, sizeof(name) - 1);
+	if (n < 0) {
 		close(cfd);
 		return -1;
 	}
 	name[n] = 0;
 	p = strrchr(clone, '/');
 	*p = 0;
-	if(dir)
-		sprintf(dir, "%.*s/%.*s", 2*NAMELEN+1, clone, NAMELEN, name);
-	sprintf(data, "%.*s/%.*s/data", 2*NAMELEN+1, clone, NAMELEN, name);
+	if (dir)
+		sprintf(dir, "%.*s/%.*s", 2 * NAMELEN + 1, clone, NAMELEN, name);
+	sprintf(data, "%.*s/%.*s/data", 2 * NAMELEN + 1, clone, NAMELEN, name);
 
 	/* set local side (port number, for example) if we need to */
-	if(local)
-		sprintf(name, "connect %.*s %.*s", 2*NAMELEN, dest, NAMELEN, local);
+	if (local)
+		sprintf(name, "connect %.*s %.*s", 2 * NAMELEN, dest, NAMELEN, local);
 	else
-		sprintf(name, "connect %.*s", 2*NAMELEN, dest);
+		sprintf(name, "connect %.*s", 2 * NAMELEN, dest);
 	/* connect */
-	if(write(cfd, name, strlen(name)) < 0){
+	if (write(cfd, name, strlen(name)) < 0) {
 		close(cfd);
 		return -1;
 	}
 
 	/* open data connection */
 	fd = open(data, O_RDWR | (flags & O_NONBLOCK));
-	if(fd < 0){
+	if (fd < 0) {
 		close(cfd);
 		return -1;
 	}
-	if(cfdp)
+	if (cfdp)
 		*cfdp = cfd;
 	else
 		close(cfd);
@@ -72,7 +75,7 @@ int dial9(char *dest, char *local, char *dir, int *cfdp, int flags)
 {
 	char net[128];
 	char netdir[128], csname[NETPATHLEN], *slp;
-	char clone[NAMELEN+12];
+	char clone[NAMELEN + 12];
 	char *p;
 	int n;
 	int fd;
@@ -80,21 +83,20 @@ int dial9(char *dest, char *local, char *dir, int *cfdp, int flags)
 
 	/* go for a standard form net!... */
 	p = strchr(dest, '!');
-	if(p == 0){
-		sprintf(net, "net!%.*s", sizeof(net)-5, dest);
+	if (p == 0) {
+		sprintf(net, "net!%.*s", sizeof(net) - 5, dest);
 	} else {
-		strncpy(net, dest, sizeof(net)-1);
-		net[sizeof(net)-1] = 0;
+		strncpy(net, dest, sizeof(net) - 1);
+		net[sizeof(net) - 1] = 0;
 	}
 
 	slp = strrchr(net, '/');
 	if (slp != 0) {
 		*slp++ = '\0';
 		strcpy(netdir, net);
-		memmove(net, slp, strlen(slp)+1);
+		memmove(net, slp, strlen(slp) + 1);
 	} else
 		strcpy(netdir, "/net");
- 
 
 	// special case because we are so special.
 	// if the first char of the address is a digit,
@@ -112,7 +114,7 @@ int dial9(char *dest, char *local, char *dir, int *cfdp, int flags)
 	/* call the connection server */
 	sprintf(csname, "%s/cs", netdir);
 	fd = open(csname, O_RDWR);
-	if(fd < 0){
+	if (fd < 0) {
 		/* no connection server, don't translate */
 		p = strchr(net, '!');
 		*p++ = 0;
@@ -123,7 +125,7 @@ int dial9(char *dest, char *local, char *dir, int *cfdp, int flags)
 	/*
 	 *  send dest to connection to translate
 	 */
-	if(write(fd, net, strlen(net)) < 0){
+	if (write(fd, net, strlen(net)) < 0) {
 		close(fd);
 		return -1;
 	}
@@ -134,14 +136,14 @@ int dial9(char *dest, char *local, char *dir, int *cfdp, int flags)
 	 */
 	rv = -1;
 	lseek(fd, 0, 0);
-	while((n = read(fd, net, sizeof(net) - 1)) > 0){
+	while ((n = read(fd, net, sizeof(net) - 1)) > 0) {
 		net[n] = 0;
 		p = strchr(net, ' ');
-		if(p == 0)
+		if (p == 0)
 			continue;
 		*p++ = 0;
 		rv = call(net, p, cfdp, dir, local, flags);
-		if(rv >= 0)
+		if (rv >= 0)
 			break;
 	}
 	close(fd);
