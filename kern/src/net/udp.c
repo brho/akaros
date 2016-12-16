@@ -173,6 +173,14 @@ static void udpannounce(struct conv *c, char **argv, int argc)
 	iphtadd(&upriv->ht, c);
 }
 
+static void udpbypass(struct conv *cv, char **argv, int argc)
+{
+	Udppriv *upriv = cv->p->priv;
+
+	Fsstdbypass(cv, argv, argc);
+	iphtadd(&upriv->ht, cv);
+}
+
 static void udpcreate(struct conv *c)
 {
 	c->rq = qopen(128 * 1024, Qmsg, 0, 0);
@@ -467,6 +475,12 @@ void udpiput(struct Proto *udp, struct Ipifc *ifc, struct block *bp)
 		freeblist(bp);
 		return;
 	}
+
+	if (c->state == Bypass) {
+		bypass_or_drop(c, bp);
+		return;
+	}
+
 	ucb = (Udpcb *) c->ptcl;
 
 	if (c->state == Announced) {
@@ -656,6 +670,7 @@ void udpinit(struct Fs *fs)
 	udp->name = "udp";
 	udp->connect = udpconnect;
 	udp->announce = udpannounce;
+	udp->bypass = udpbypass;
 	udp->ctl = udpctl;
 	udp->state = udpstate;
 	udp->create = udpcreate;

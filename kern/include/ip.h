@@ -64,6 +64,7 @@ enum {
 	Announced = 2,
 	Connecting = 3,
 	Connected = 4,
+	Bypass = 5,
 };
 
 enum {
@@ -98,6 +99,8 @@ struct conv {
 	int inuse;					/* opens of listen/data/ctl */
 	int length;
 	int state;
+	struct queue *rq_save;		/* rq created by proto, saved during bypass */
+	struct queue *wq_save;		/* wq created by proto, saved during bypass */
 
 	/* udp specific */
 	int headers;				/* data src/dst headers in udp */
@@ -298,6 +301,7 @@ struct Proto {
 	void (*connect)(struct conv *, char **, int);
 	void (*announce)(struct conv *, char **, int);
 	void (*bind)(struct conv *, char **, int);
+	void (*bypass)(struct conv *, char **, int);
 	int (*state) (struct conv *, char *unused_char_p_t, int);
 	void (*create) (struct conv *);
 	void (*close) (struct conv *);
@@ -396,8 +400,10 @@ struct Proto *Fsrcvpcol(struct Fs *, uint8_t unused_uint8_t);
 struct Proto *Fsrcvpcolx(struct Fs *, uint8_t unused_uint8_t);
 void Fsstdconnect(struct conv *, char **, int);
 void Fsstdannounce(struct conv *, char **, int);
+void Fsstdbypass(struct conv *, char **, int);
 void Fsstdbind(struct conv *, char **, int);
 uint32_t scalednconv(void);
+void bypass_or_drop(struct conv *cv, struct block *bp);
 
 /*
  *  logging

@@ -83,6 +83,7 @@ enum {
 	Shiftproto = Logtype + Logconv,
 
 	Nfs = 32,
+	BYPASS_QMAX = 64 * MiB,
 };
 #define TYPE(x) 	( ((uint32_t)(x).path) & Masktype )
 #define CONV(x) 	( (((uint32_t)(x).path) >> Shiftconv) & Maskconv )
@@ -99,6 +100,8 @@ extern void pktmediumlink(void);
 extern char *eve;
 static long ndbwrite(struct Fs *, char *unused_char_p_t, uint32_t, int);
 static void closeconv(struct conv *);
+static void setup_proto_qio_bypass(struct conv *cv);
+static void undo_proto_qio_bypass(struct conv *cv);
 
 static struct conv *chan2conv(struct chan *chan)
 {
@@ -698,6 +701,8 @@ static void closeconv(struct conv *cv)
 
 	cv->r = NULL;
 	cv->rgen = 0;
+	if (cv->state == Bypass)
+		undo_proto_qio_bypass(cv);
 	cv->p->close(cv);
 	cv->state = Idle;
 	qunlock(&cv->qlock);
@@ -748,7 +753,6 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 	long rv;
 	struct Fs *f;
 	uint32_t offset = off;
-	size_t sofar;
 
 	f = ipfs[ch->dev];
 
@@ -808,7 +812,10 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 			buf = kzmalloc(Statelen, 0);
 			x = f->p[PROTO(ch->qid)];
 			c = x->conv[CONV(ch->qid)];
-			sofar = (*x->state) (c, buf, Statelen - 2);
+			if (c->state == Bypass)
+				snprintf(buf, Statelen, "Bypassed\n");
+			else
+				(*x->state)(c, buf, Statelen - 2);
 			rv = readstr(offset, p, n, buf);
 			kfree(buf);
 			return rv;
@@ -878,7 +885,8 @@ static void setluniqueport(struct conv *c, int lport)
 			break;
 		if (xp == c)
 			continue;
-		if ((xp->state == Connected || xp->state == Announced)
+		if ((xp->state == Connected || xp->state == Announced
+		                            || xp->state == Bypass)
 			&& xp->lport == lport
 			&& xp->rport == c->rport
 			&& ipcmp(xp->raddr, c->raddr) == 0
@@ -1142,6 +1150,136 @@ static void bindctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 		x->bind(c, cb->f, cb->nf);
 }
 
+/* Helper, called by protocols to use the bypass.
+ *
+ * This is a bit nasty due to the overall nastiness of #ip.  We need to lock
+ * before checking the state and hold the qlock throughout, because a concurrent
+ * closeconv() could tear down the bypass.  Specifically, it could free the
+ * bypass queues.  The root issue is that conversation lifetimes are not managed
+ * well.
+ *
+ * If we fail, it's our responsibility to consume (free) the block(s). */
+void bypass_or_drop(struct conv *cv, struct block *bp)
+{
+	qlock(&cv->qlock);
+	if (cv->state == Bypass)
+		qpass(cv->rq, bp);
+	else
+		freeblist(bp);
+	qunlock(&cv->qlock);
+}
+
+/* Push the block directly to the approprite ipoput function.
+ *
+ * It's the protocol's responsibility (and thus ours here) to make sure there is
+ * at least the right amount of the IP header in the block (ipoput{4,6} assumes
+ * it has the right amount, and the other protocols account for the IP header in
+ * their own header).
+ *
+ * For the TTL and TOS, we just use the default ones.  If we want, we could look
+ * into the actual block and see what the user wanted, though we're bypassing
+ * the protocol layer, not the IP layer. */
+static void proto_bypass_kick(void *arg, struct block *bp)
+{
+	struct conv *cv = (struct conv*)arg;
+	uint8_t vers_nibble;
+	struct Fs *f;
+
+	f = cv->p->f;
+
+	bp = pullupblock(bp, 1);
+	if (!bp)
+		error(EINVAL, "Proto bypass unable to pullup a byte!");
+	vers_nibble = *(uint8_t*)bp->rp & 0xf0;
+	switch (vers_nibble) {
+	case IP_VER4:
+		bp = pullupblock(bp, IPV4HDR_LEN);
+		if (!bp)
+			error(EINVAL, "Proto bypass unable to pullup v4 header");
+		ipoput4(f, bp, FALSE, MAXTTL, DFLTTOS, NULL);
+		break;
+	case IP_VER6:
+		bp = pullupblock(bp, IPV6HDR_LEN);
+		if (!bp)
+			error(EINVAL, "Proto bypass unable to pullup v6 header");
+		ipoput6(f, bp, FALSE, MAXTTL, DFLTTOS, NULL);
+		break;
+	default:
+		error(EINVAL, "Proto bypass block had unknown IP version 0x%x",
+		      vers_nibble);
+	}
+}
+
+/* Sets up cv for the protocol bypass.  We use different queues for two reasons:
+ * 1) To be protocol independent.  For instance, TCP and UDP could use very
+ * different QIO styles.
+ * 2) To set up our own kick/bypass method.  Note how udpcreate() and here uses
+ * qbypass() (just blast it out), while TCP uses qopen() with a kick.  TCP still
+ * follows queuing discipline.
+ *
+ * It's like we are our own protocol, the bypass protocol, when it comes to how
+ * we interact with qio.  The conv still is of the real protocol type (e.g.
+ * TCP).
+ *
+ * Note that we can't free the old queues.  The way #ip works, the queues are
+ * created when the conv is created, but the conv is never freed.  It's like a
+ * slab allocator that never frees objects, but just reinitializes them a
+ * little.
+ *
+ * For the queues, we're basically like UDP:
+ * - We take packets for rq and drop on overflow.
+ * - rq is also Qmsg, but we also have Qcoalesce, to ignore out zero-len blocks
+ * - We kick for our outbound (wq) messages.
+ *
+ * Note that Qmsg can drop parts of packets.  It's up to the user to read
+ * enough.  If they didn't read enough, the extra is dropped.  This is similar
+ * to SOCK_DGRAM and recvfrom().  Minus major changes, there's no nice way to
+ * get individual messages with read().  Userspace using the bypass will need to
+ * find out the MTU of the NIC the IP stack is attached to, and make sure to
+ * read in at least that amount each time. */
+static void setup_proto_qio_bypass(struct conv *cv)
+{
+	cv->rq_save = cv->rq;
+	cv->wq_save = cv->wq;
+	cv->rq = qopen(BYPASS_QMAX, Qmsg | Qcoalesce, 0, 0);
+	cv->wq = qbypass(proto_bypass_kick, cv);
+}
+
+static void undo_proto_qio_bypass(struct conv *cv)
+{
+	qfree(cv->rq);
+	qfree(cv->wq);
+	cv->rq = cv->rq_save;
+	cv->wq = cv->wq_save;
+	cv->rq_save = NULL;
+	cv->wq_save = NULL;
+}
+
+void Fsstdbypass(struct conv *cv, char *argv[], int argc)
+{
+	memset(cv->raddr, 0, sizeof(cv->raddr));
+	cv->rport = 0;
+	switch (argc) {
+	case 2:
+		setladdrport(cv, argv[1], 1);
+		break;
+	default:
+		error(EINVAL, "Bad args (was %d, need 2) to bypass", argc);
+	}
+}
+
+static void bypassctlmsg(struct Proto *x, struct conv *cv, struct cmdbuf *cb)
+{
+	if (!x->bypass)
+		error(EFAIL, "Protocol %s does not support bypass", x->name);
+	/* The protocol needs to set the port (usually by calling Fsstdbypass) and
+	 * then do whatever it needs to make sure it can find the conv again during
+	 * receive (usually by adding to a hash table). */
+	x->bypass(cv, cb->f, cb->nf);
+	setup_proto_qio_bypass(cv);
+	cv->state = Bypass;
+}
+
 static void shutdownctlmsg(struct conv *cv, struct cmdbuf *cb)
 {
 	if (cb->nf < 2)
@@ -1236,6 +1374,8 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 				announcectlmsg(x, c, cb);
 			else if (strcmp(cb->f[0], "bind") == 0)
 				bindctlmsg(x, c, cb);
+			else if (strcmp(cb->f[0], "bypass") == 0)
+				bypassctlmsg(x, c, cb);
 			else if (strcmp(cb->f[0], "shutdown") == 0)
 				shutdownctlmsg(c, cb);
 			else if (strcmp(cb->f[0], "ttl") == 0)

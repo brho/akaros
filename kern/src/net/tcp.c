@@ -501,6 +501,14 @@ static void tcpannounce(struct conv *c, char **argv, int argc)
 	Fsconnected(c, NULL);
 }
 
+static void tcpbypass(struct conv *cv, char **argv, int argc)
+{
+	struct tcppriv *tpriv = cv->p->priv;
+
+	Fsstdbypass(cv, argv, argc);
+	iphtadd(&tpriv->ht, cv);
+}
+
 static void tcpshutdown(struct conv *c, int how)
 {
 	Tcpctl *tcb = (Tcpctl*)c->ptcl;
@@ -1988,6 +1996,12 @@ void tcpiput(struct Proto *tcp, struct Ipifc *unused, struct block *bp)
 			return;
 		}
 
+		s = iphtlook(&tpriv->ht, source, seg.source, dest, seg.dest);
+		if (s && s->state == Bypass) {
+			bypass_or_drop(s, bp);
+			return;
+		}
+
 		/* trim the packet to the size claimed by the datagram */
 		length -= hdrlen + TCP4_PKT;
 		bp = trimblock(bp, hdrlen + TCP4_PKT, length);
@@ -2029,6 +2043,12 @@ void tcpiput(struct Proto *tcp, struct Ipifc *unused, struct block *bp)
 			return;
 		}
 
+		s = iphtlook(&tpriv->ht, source, seg.source, dest, seg.dest);
+		if (s && s->state == Bypass) {
+			bypass_or_drop(s, bp);
+			return;
+		}
+
 		/* trim the packet to the size claimed by the datagram */
 		length -= hdrlen;
 		bp = trimblock(bp, hdrlen + TCP6_PKT, length);
@@ -2040,8 +2060,7 @@ void tcpiput(struct Proto *tcp, struct Ipifc *unused, struct block *bp)
 		}
 	}
 
-	/* Look for a matching conversation */
-	s = iphtlook(&tpriv->ht, source, seg.source, dest, seg.dest);
+	/* s, the conv matching the n-tuple, was set above */
 	if (s == NULL) {
 		netlog(f, Logtcp, "iphtlook failed\n");
 reset:
@@ -3196,6 +3215,7 @@ void tcpinit(struct Fs *fs)
 	tcp->name = "tcp";
 	tcp->connect = tcpconnect;
 	tcp->announce = tcpannounce;
+	tcp->bypass = tcpbypass;
 	tcp->ctl = tcpctl;
 	tcp->state = tcpstate;
 	tcp->create = tcpcreate;
