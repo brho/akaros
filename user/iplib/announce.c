@@ -21,17 +21,70 @@ enum {
 	Maxpath = 256,
 };
 
+/* Helper, given a net directory (translated from an addr/dialstring) by
+ * nettrans), clones a conversation, returns the ctl, and optionally fills in
+ * dir with the path of the directory (e.g. /net/tcp/1/).
+ *
+ * Returns the ctl FD, or -1 on error.  err_func is the function name to print
+ * for error output. */
+static int __clone9(char *netdir, char *dir, char *err_func, int flags)
+{
+	int ctl, n, m;
+	char buf[Maxpath];
+	char *cp;
+
+	/* get a control channel */
+	ctl = open(netdir, O_RDWR);
+	if (ctl < 0) {
+		fprintf(stderr, "%s opening %s: %r\n", err_func, netdir);
+		return -1;
+	}
+	cp = strrchr(netdir, '/');
+	if (cp == NULL) {
+		fprintf(stderr, "%s arg format %s\n", err_func, netdir);
+		close(ctl);
+		return -1;
+	}
+	*cp = 0;
+
+	/* find out which line we have */
+	n = snprintf(buf, sizeof(buf), "%s/", netdir);
+	m = read(ctl, &buf[n], sizeof(buf) - n - 1);
+	if (m <= 0) {
+		fprintf(stderr, "%s reading %s: %r\n", err_func, netdir);
+		close(ctl);
+		return -1;
+	}
+	buf[n + m] = 0;
+
+	/* return directory etc. */
+	if (dir) {
+		strncpy(dir, buf, NETPATHLEN);
+		dir[NETPATHLEN - 1] = 0;
+	}
+	return ctl;
+}
+
+/* Clones a new network connection for a given dialstring (e.g. tcp!*!22). */
+int clone9(char *addr, char *dir, int flags)
+{
+	char netdir[Maxpath];
+	char naddr[Maxpath];
+
+	if (nettrans(addr, naddr, sizeof(naddr), netdir, sizeof(netdir)) < 0)
+		return -1;
+	return __clone9(addr, dir, "clone", flags);
+}
+
 /*
  *  announce a network service.
  */
 int announce9(char *addr, char *dir, int flags)
 {
-	int ctl, n, m;
+	int ctl, n;
 	char buf[Maxpath];
-	char buf2[Maxpath];
 	char netdir[Maxpath];
 	char naddr[Maxpath];
-	char *cp;
 
 	/*
 	 *  translate the address
@@ -39,51 +92,20 @@ int announce9(char *addr, char *dir, int flags)
 	if (nettrans(addr, naddr, sizeof(naddr), netdir, sizeof(netdir)) < 0)
 		return -1;
 
-	/*
-	 * get a control channel
-	 */
-	ctl = open(netdir, O_RDWR);
-	if (ctl < 0) {
-		fprintf(stderr, "announce opening %s: %r\n", netdir);
+	ctl = __clone9(netdir, dir, "announce", flags);
+	if (ctl < 0)
 		return -1;
-	}
-	cp = strrchr(netdir, '/');
-	if (cp == NULL) {
-		fprintf(stderr, "announce arg format %s\n", netdir);
-		close(ctl);
-		return -1;
-	}
-	*cp = 0;
-
-	/*
-	 *  find out which line we have
-	 */
-	n = snprintf(buf, sizeof(buf), "%s/", netdir);
-	m = read(ctl, &buf[n], sizeof(buf) - n - 1);
-	if (m <= 0) {
-		fprintf(stderr, "announce reading %s: %r\n", netdir);
-		close(ctl);
-		return -1;
-	}
-	buf[n + m] = 0;
 
 	/*
 	 *  make the call
 	 */
-	n = snprintf(buf2, sizeof(buf2), "announce %s", naddr);
-	if (write(ctl, buf2, n) != n) {
+	n = snprintf(buf, sizeof(buf), "announce %s", naddr);
+	if (write(ctl, buf, n) != n) {
 		fprintf(stderr, "announce writing %s: %r\n", netdir);
 		close(ctl);
 		return -1;
 	}
 
-	/*
-	 *  return directory etc.
-	 */
-	if (dir) {
-		strncpy(dir, buf, NETPATHLEN);
-		dir[NETPATHLEN - 1] = 0;
-	}
 	return ctl;
 }
 

@@ -225,6 +225,7 @@ int tokenize(char *s, char **args, int maxargs);
 int getfields(char *str, char **args, int max, int mflag, char *unused_set);
 char *netmkaddr(char *linear, char *defnet, char *defsrv);
 int dial9(char *dest, char *local, char *dir, int *cfdp, int flags);
+int clone9(char *addr, char *dir, int flags);
 int announce9(char *addr, char *dir, int flags);
 int listen9(char *dir, char *newdir, int flags);
 int accept9(int ctl, char *dir);
