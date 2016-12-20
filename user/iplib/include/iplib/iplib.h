@@ -204,6 +204,7 @@ uint64_t	nhgetv(void*);
 unsigned int	nhgetl(void*);
 uint16_t	nhgets(void*);
 uint16_t	ptclbsum(uint8_t*, int);
+uint16_t ip_calc_xsum(uint8_t *addr, size_t len);
 
 int	v6tov4(uint8_t*, uint8_t*);
 void	v4tov6(uint8_t*, uint8_t*);

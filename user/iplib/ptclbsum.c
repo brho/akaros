@@ -18,6 +18,9 @@ static short endian = 1;
 static uint8_t *aendian = (uint8_t *)&endian;
 #define LITTLE *aendian
 
+/* "Returns the one's complement checksum used in IP protocols."  That's from
+ * Plan 9's man page.  This is not a usable, as is - you want to call
+ * ip_calc_xsum(). */
 uint16_t ptclbsum(uint8_t *addr, int len)
 {
 	uint32_t losum, hisum, mdsum, x;
@@ -76,4 +79,11 @@ uint16_t ptclbsum(uint8_t *addr, int len)
 		losum = hisum + (losum & 0xffff);
 
 	return losum & 0xffff;
+}
+
+/* Calculates an IP checksum for [addr, addr + len), returning the xsum in host
+ * endian. */
+uint16_t ip_calc_xsum(uint8_t *addr, size_t len)
+{
+	return ~ptclbsum(addr, len) & 0xffff;
 }
