@@ -522,6 +522,8 @@ int sysopenat(int fromfd, char *path, int vfs_flags)
 		 * and give us something new for c.  On error, namec_from will cclose
 		 * from. */
 		from = fdtochan(&current->open_files, fromfd, -1, FALSE, TRUE);
+		if (!(from->flag & O_PATH))
+			error(EINVAL, "Cannot openat from a non-O_PATH FD");
 		c = namec_from(from, path, Aopen, vfs_flags, 0);
 	}
 	fd = newfd(c, vfs_flags);
