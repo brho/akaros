@@ -759,9 +759,8 @@ static int __try_qbread(struct queue *q, size_t len, int qio_flags,
 		/* Need to retry to make sure we have a first block */
 		return QBR_AGAIN;
 	}
-	/* Qmsg is a bit weird.  The old 9ns code seemed to yank the entire block,
-	 * regardless of len.  We'll do the same, and just return the minimum: the
-	 * first block.  I'd be happy to remove this. */
+	/* Qmsg: just return the first block.  Be careful, since our caller might
+	 * not read all of the block and thus drop bytes.  Similar to SOCK_DGRAM. */
 	if (q->state & Qmsg) {
 		ret = pop_first_block(q);
 		goto out_ok;
