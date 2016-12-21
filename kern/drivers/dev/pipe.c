@@ -69,6 +69,7 @@ static struct {
 
 enum {
 	Qdir,
+	Qctl,
 	Qdata0,
 	Qdata1,
 };
@@ -76,6 +77,7 @@ enum {
 static
 struct dirtab pipedir[] = {
 	{".", {Qdir, 0, QTDIR}, 0, DMDIR | 0500},
+	{"ctl", {Qctl}, 0, 0660},
 	{"data", {Qdata0}, 0, 0660},
 	{"data1", {Qdata1}, 0, 0660},
 };
@@ -219,13 +221,16 @@ static int pipestat(struct chan *c, uint8_t * db, int n)
 	struct dir dir;
 	struct dirtab *tab;
 	int perm;
+	int type = NETTYPE(c->qid.path);
 
 	p = c->aux;
 	tab = p->pipedir;
 
-	switch (NETTYPE(c->qid.path)) {
+	switch (type) {
 		case Qdir:
-			devdir(c, c->qid, ".", 0, eve, DMDIR | 0555, &dir);
+		case Qctl:
+			devdir(c, c->qid, tab[type].name, tab[type].length, eve,
+			       tab[type].perm, &dir);
 			break;
 		case Qdata0:
 			perm = tab[1].perm;
@@ -338,7 +343,7 @@ static void pipeclose(struct chan *c)
 	kref_put(&p->ref);
 }
 
-static long piperead(struct chan *c, void *va, long n, int64_t ignored)
+static long piperead(struct chan *c, void *va, long n, int64_t offset)
 {
 	Pipe *p;
 
@@ -348,6 +353,8 @@ static long piperead(struct chan *c, void *va, long n, int64_t ignored)
 		case Qdir:
 			return devdirread(c, va, n, p->pipedir, ARRAY_SIZE(pipedir),
 							  pipegen);
+		case Qctl:
+			return readnum(offset, va, n, p->path, NUMSIZE32);
 		case Qdata0:
 			if (c->flag & O_NONBLOCK)
 				return qread_nonblock(p->q[0], va, n);
@@ -391,12 +398,33 @@ static struct block *pipebread(struct chan *c, long n, uint32_t offset)
  */
 static long pipewrite(struct chan *c, void *va, long n, int64_t ignored)
 {
+	ERRSTACK(1);
 	Pipe *p;
-	//Prog *r;
+	struct cmdbuf *cb;
 
 	p = c->aux;
 
 	switch (NETTYPE(c->qid.path)) {
+		case Qctl:
+			cb = parsecmd(va, n);
+			if (waserror()) {
+				kfree(cb);
+				nexterror();
+			}
+			if (cb->nf < 1)
+				error(EFAIL, "short control request");
+			if (strcmp(cb->f[0], "oneblock") == 0) {
+				q_toggle_qmsg(p->q[0], TRUE);
+				q_toggle_qcoalesce(p->q[0], TRUE);
+				q_toggle_qmsg(p->q[1], TRUE);
+				q_toggle_qcoalesce(p->q[1], TRUE);
+			} else {
+				error(EFAIL, "unknown control request");
+			}
+			kfree(cb);
+			poperror();
+			break;
+
 		case Qdata0:
 			if (c->flag & O_NONBLOCK)
 				n = qwrite_nonblock(p->q[1], va, n);
@@ -418,7 +446,7 @@ static long pipewrite(struct chan *c, void *va, long n, int64_t ignored)
 	return n;
 }
 
-static long pipebwrite(struct chan *c, struct block *bp, uint32_t junk)
+static long pipebwrite(struct chan *c, struct block *bp, uint32_t offset)
 {
 	long n;
 	Pipe *p;
@@ -426,6 +454,8 @@ static long pipebwrite(struct chan *c, struct block *bp, uint32_t junk)
 
 	p = c->aux;
 	switch (NETTYPE(c->qid.path)) {
+		case Qctl:
+			return devbwrite(c, bp, offset);
 		case Qdata0:
 			if (c->flag & O_NONBLOCK)
 				n = qbwrite_nonblock(p->q[1], bp);
@@ -491,6 +521,9 @@ static char *pipechaninfo(struct chan *chan, char *ret, size_t ret_l)
 	switch (NETTYPE(chan->qid.path)) {
 	case Qdir:
 		snprintf(ret, ret_l, "Qdir, ID %d", p->path);
+		break;
+	case Qctl:
+		snprintf(ret, ret_l, "Qctl, ID %d", p->path);
 		break;
 	case Qdata0:
 		snprintf(ret, ret_l, "Qdata%d, ID %d, %s, rq len %d, wq len %d",
