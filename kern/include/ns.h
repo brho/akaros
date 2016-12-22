@@ -431,6 +431,10 @@ struct chan {
 	int ateof;
 	void *buf;
 	int bufused;
+	/* A lot of synthetic files need something generated at open time, which the
+	 * user can read from (including offsets) while the underlying file changes.
+	 * Hang that buffer here. */
+	void *synth_buf;
 };
 
 struct cname {

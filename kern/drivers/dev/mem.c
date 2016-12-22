@@ -378,16 +378,16 @@ static struct chan *mem_open(struct chan *c, int omode)
 	}
 	switch (c->qid.path) {
 	case Qarena_stats:
-		c->aux = build_arena_stats();
+		c->synth_buf = build_arena_stats();
 		break;
 	case Qslab_stats:
-		c->aux = build_slab_stats();
+		c->synth_buf = build_slab_stats();
 		break;
 	case Qfree:
-		c->aux = build_free();
+		c->synth_buf = build_free();
 		break;
 	case Qkmemstat:
-		c->aux = build_kmemstat();
+		c->synth_buf = build_kmemstat();
 		break;
 	}
 	c->mode = openmode(omode);
@@ -405,7 +405,7 @@ static void mem_close(struct chan *c)
 	case Qslab_stats:
 	case Qfree:
 	case Qkmemstat:
-		kfree(c->aux);
+		kfree(c->synth_buf);
 		break;
 	}
 }
@@ -422,7 +422,7 @@ static long mem_read(struct chan *c, void *ubuf, long n, int64_t offset)
 	case Qslab_stats:
 	case Qfree:
 	case Qkmemstat:
-		sza = c->aux;
+		sza = c->synth_buf;
 		return readmem(offset, ubuf, n, sza->buf, sza->size);
 	default:
 		panic("Bad Qid %p!", c->qid.path);
