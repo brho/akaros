@@ -31,7 +31,7 @@
 #define IOAPIC_CONFIG 0x100
 #define IOAPIC_NUM_PINS 24
 
-int debug_ioapic = 1;
+int debug_ioapic;
 int apic_id_mask = 0xf0;
 
 #define DPRINTF(fmt, ...) \
@@ -111,6 +111,15 @@ static void ioapic_write(struct guest_thread *vm_thread, int ix,
 			vm->virtio_mmio_devices[i]->vec = value & 0xff;
 			DPRINTF("irq vector for irq number %d is: %lx\n",
 			         vm->virtio_mmio_devices[i]->irq, value & 0xff);
+		} else if (reg == irqreg + 1) {
+			vm->virtio_mmio_devices[i]->dest = value >> 24;
+			if (value >> 24 == 0xff)
+				vm->virtio_mmio_devices[i]->dest = 0xffffffff;
+
+			DPRINTF("high value for irq number %d is: %lx\n",
+			         vm->virtio_mmio_devices[i]->irq, value);
+			DPRINTF("irq destination for irq number %d is: %lx\n",
+			         vm->virtio_mmio_devices[i]->irq, value >> 24);
 		}
 	}
 
