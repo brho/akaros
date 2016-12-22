@@ -19,6 +19,19 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+static uint8_t loopbacknet[IPaddrlen] = {
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0xff, 0xff,
+	127, 0, 0, 0
+};
+static uint8_t loopbackmask[IPaddrlen] = {
+	0xff, 0xff, 0xff, 0xff,
+	0xff, 0xff, 0xff, 0xff,
+	0xff, 0xff, 0xff, 0xff,
+	0xff, 0, 0, 0
+};
+
 #define NFIELD 200
 #define nelem(x) (sizeof(x) / sizeof(x[0]))
 static struct ipifc **_readoldipifc(char *buf, struct ipifc **l, int index)
@@ -215,4 +228,26 @@ struct ipifc *readipifc(char *net, struct ipifc *ifc, int index)
 	}
 
 	return ifc;
+}
+
+/* Gets the local interface that isn't the friggin' loopback address.  When
+ * you're done, free_ipifc(ifc).  Returns 0 on failure. */
+struct iplifc *get_first_noloop_iplifc(char *net, struct ipifc **ifc)
+{
+	struct ipifc *nifc;
+	struct iplifc *lifc;
+	uint8_t mynet[IPaddrlen];
+
+	*ifc = readipifc(net, NULL, -1);
+	for (nifc = *ifc; nifc; nifc = nifc->next) {
+		for (lifc = nifc->lifc; lifc; lifc = lifc->next) {
+			maskip(lifc->ip, loopbackmask, mynet);
+			if (ipcmp(mynet, loopbacknet) == 0)
+				continue;
+			if (ipcmp(lifc->ip, IPnoaddr) != 0)
+				return lifc;
+		}
+	}
+	free_ipifc(*ifc);
+	return 0;
 }

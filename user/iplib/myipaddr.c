@@ -14,42 +14,19 @@
 #include <stdio.h>
 #include <unistd.h>
 
-static uint8_t loopbacknet[IPaddrlen] = {
-	0, 0, 0, 0,
-	0, 0, 0, 0,
-	0, 0, 0xff, 0xff,
-	127, 0, 0, 0
-};
-static uint8_t loopbackmask[IPaddrlen] = {
-	0xff, 0xff, 0xff, 0xff,
-	0xff, 0xff, 0xff, 0xff,
-	0xff, 0xff, 0xff, 0xff,
-	0xff, 0, 0, 0
-};
-
 // find first ip addr that isn't the friggin loopback address
 // unless there are no others
 int myipaddr(uint8_t *ip, char *net)
 {
-	struct ipifc *nifc;
 	struct iplifc *lifc;
 	struct ipifc *ifc;
-	uint8_t mynet[IPaddrlen];
 
-	ifc = readipifc(net, NULL, -1);
-	for (nifc = ifc; nifc; nifc = nifc->next)
-		for (lifc = nifc->lifc; lifc; lifc = lifc->next) {
-			maskip(lifc->ip, loopbackmask, mynet);
-			if (ipcmp(mynet, loopbacknet) == 0) {
-				continue;
-			}
-			if (ipcmp(lifc->ip, IPnoaddr) != 0) {
-				ipmove(ip, lifc->ip);
-				free_ipifc(ifc);
-				return 0;
-			}
-		}
-	ipmove(ip, IPnoaddr);
+	lifc = get_first_noloop_iplifc(net, &ifc);
+	if (!lifc) {
+		ipmove(ip, IPnoaddr);
+		return -1;
+	}
+	ipmove(ip, lifc->ip);
 	free_ipifc(ifc);
-	return -1;
+	return 0;
 }

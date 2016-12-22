@@ -196,6 +196,7 @@ int	equivip4(uint8_t*, uint8_t*);
 int	equivip6(uint8_t*, uint8_t*);
 
 struct ipifc *readipifc(char *net, struct ipifc *to_free, int index);
+struct iplifc *get_first_noloop_iplifc(char *net, struct ipifc **ifc);
 void free_ipifc(struct ipifc *ifc);
 
 void	hnputv(void*, uint64_t);
