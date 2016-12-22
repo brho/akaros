@@ -84,6 +84,7 @@ enum {
 
 	Nfs = 32,
 	BYPASS_QMAX = 64 * MiB,
+	IPROUTE_LEN = 2 * PGSIZE,
 };
 #define TYPE(x) 	( ((uint32_t)(x).path) & Masktype )
 #define CONV(x) 	( (((uint32_t)(x).path) >> Shiftconv) & Maskconv )
@@ -435,6 +436,8 @@ static struct chan *ipopen(struct chan *c, int omode)
 			iprouteropen(f);
 			break;
 		case Qiproute:
+			c->synth_buf = kpages_zalloc(IPROUTE_LEN, MEM_WAIT);
+			routeread(f, c->synth_buf, 0, IPROUTE_LEN);
 			break;
 		case Qtopdir:
 		case Qprotodir:
@@ -736,6 +739,10 @@ static void ipclose(struct chan *c)
 			if (c->flag & COPEN)
 				atomic_dec(&f->p[PROTO(c->qid)]->conv[CONV(c->qid)]->snoopers);
 			break;
+		case Qiproute:
+			if (c->flag & COPEN)
+				kpages_free(c->synth_buf, IPROUTE_LEN);
+			break;
 	}
 	kfree(((struct IPaux *)c->aux)->owner);
 	kfree(c->aux);
@@ -769,7 +776,7 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 		case Qndb:
 			return readstr(offset, a, n, f->ndb);
 		case Qiproute:
-			return routeread(f, a, offset, n);
+			return readmem(offset, a, n, ch->synth_buf, IPROUTE_LEN);
 		case Qiprouter:
 			return iprouterread(f, a, n);
 		case Qipselftab:
