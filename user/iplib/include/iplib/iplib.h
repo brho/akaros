@@ -191,6 +191,7 @@ char*	v4parseip(uint8_t*, char*);
 char*	v4parsecidr(uint8_t*, uint8_t*, char*);
 int	parseether(uint8_t*, char*);
 int	myipaddr(uint8_t*, char*);
+int my_router_addr(uint8_t *addr, char *net);
 int	myetheraddr(uint8_t*, char*);
 int	equivip4(uint8_t*, uint8_t*);
 int	equivip6(uint8_t*, uint8_t*);

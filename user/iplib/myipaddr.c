@@ -6,6 +6,7 @@
  * modified, propagated, or distributed except according to the terms contained
  * in the LICENSE file.
  */
+#define _GNU_SOURCE
 #include <stdlib.h>
 
 #include <iplib/iplib.h>
@@ -29,4 +30,62 @@ int myipaddr(uint8_t *ip, char *net)
 	ipmove(ip, lifc->ip);
 	free_ipifc(ifc);
 	return 0;
+}
+
+/* Finds the default router from net/iproute, stores the full IP address
+ * (IPaddrlen) in addr.  Returns 0 on success. */
+int my_router_addr(uint8_t *addr, char *net)
+{
+	char *line = NULL;
+	size_t len = 0;
+	ssize_t read;
+	FILE *fp;
+	char *p, *str;
+	uint8_t ipaddr[IPaddrlen];
+	uint8_t v4addr[IPaddrlen];
+	char netpath[MAX_PATH_LEN];
+	int ret = -1;
+
+	if (!net)
+		net = "/net";
+	snprintf(netpath, sizeof(netpath), "%s/iproute", net);
+	fp = fopen(netpath, "r");
+	if (!fp)
+		return -1;
+	while ((read = getline(&line, &len, fp)) != -1) {
+		p = strchr(line, ' ');
+		if (!p) {
+			werrstr("Malformed line, no initial space");
+			goto out;
+		}
+		*p++ = 0;
+		parseip(ipaddr, line);
+		if (isv4(ipaddr)) {
+			v6tov4(v4addr, ipaddr);
+			if (!equivip4(v4addr, IPnoaddr))
+				continue;
+		} else {
+			if (!equivip6(ipaddr, IPnoaddr))
+				continue;
+		}
+		p = strchr(p, ' ');
+		if (!p) {
+			werrstr("Malformed line, no second space %s", line);
+			goto out;
+		}
+		p++;
+		str = p;
+		p = strchr(p, ' ');
+		if (!p) {
+			werrstr("Malformed line, no third space %s", line);
+			goto out;
+		}
+		*p++ = 0;
+		parseip(addr, str);
+		ret = 0;
+	}
+out:
+	free(line);
+	fclose(fp);
+	return ret;
 }
