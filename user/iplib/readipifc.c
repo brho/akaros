@@ -156,7 +156,7 @@ static struct ipifc **_readipifc(char *file, struct ipifc **l, int index)
 	return l;
 }
 
-static void _freeifc(struct ipifc *ifc)
+void free_ipifc(struct ipifc *ifc)
 {
 	struct ipifc *next;
 	struct iplifc *lnext, *lifc;
@@ -173,6 +173,9 @@ static void _freeifc(struct ipifc *ifc)
 	}
 }
 
+/* This will free @ifc when passed in.  Some old Plan 9 programs might rely on
+ * it still (like our ping, netstat, ipconfig).  It usually ends up be a
+ * thread-unsafe disaster. */
 struct ipifc *readipifc(char *net, struct ipifc *ifc, int index)
 {
 	int fd, i, n;
@@ -181,7 +184,7 @@ struct ipifc *readipifc(char *net, struct ipifc *ifc, int index)
 	char buf[128];
 	struct ipifc **l;
 
-	_freeifc(ifc);
+	free_ipifc(ifc);
 
 	l = &ifc;
 	ifc = NULL;

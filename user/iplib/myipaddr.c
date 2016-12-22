@@ -33,10 +33,10 @@ int myipaddr(uint8_t *ip, char *net)
 {
 	struct ipifc *nifc;
 	struct iplifc *lifc;
-	static struct ipifc *ifc;
+	struct ipifc *ifc;
 	uint8_t mynet[IPaddrlen];
 
-	ifc = readipifc(net, ifc, -1);
+	ifc = readipifc(net, NULL, -1);
 	for (nifc = ifc; nifc; nifc = nifc->next)
 		for (lifc = nifc->lifc; lifc; lifc = lifc->next) {
 			maskip(lifc->ip, loopbackmask, mynet);
@@ -45,9 +45,11 @@ int myipaddr(uint8_t *ip, char *net)
 			}
 			if (ipcmp(lifc->ip, IPnoaddr) != 0) {
 				ipmove(ip, lifc->ip);
+				free_ipifc(ifc);
 				return 0;
 			}
 		}
 	ipmove(ip, IPnoaddr);
+	free_ipifc(ifc);
 	return -1;
 }

@@ -195,7 +195,8 @@ int	myetheraddr(uint8_t*, char*);
 int	equivip4(uint8_t*, uint8_t*);
 int	equivip6(uint8_t*, uint8_t*);
 
-struct ipifc*	readipifc(char*, struct ipifc*, int);
+struct ipifc *readipifc(char *net, struct ipifc *to_free, int index);
+void free_ipifc(struct ipifc *ifc);
 
 void	hnputv(void*, uint64_t);
 void	hnputl(void*, unsigned int);
