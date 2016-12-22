@@ -28,6 +28,7 @@
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
 #include <vmm/sched.h>
+#include <vmm/vmm.h>
 #include <ros/arch/trapframe.h>
 
 struct emmsr {
@@ -48,7 +49,7 @@ static inline uint64_t read_msr(uint32_t reg)
 static inline void write_msr(uint32_t reg, uint64_t val)
 {
 	asm volatile("wrmsr" : : "d"((uint32_t)(val >> 32)),
-	                         "a"((uint32_t)(val & 0xFFFFFFFF)), 
+	                         "a"((uint32_t)(val & 0xFFFFFFFF)),
 	                         "c"(reg));
 }
 
@@ -233,6 +234,38 @@ static int emsr_apic(struct guest_thread *vm_thread,
 			((uint32_t *)(gpci->vapic_addr))[apic_offset] =
 			                                       (uint32_t)(vm_tf->tf_rax);
 		else {
+			/* We currently only handle physical destinations.
+			 * TODO(ganshun): Support logical destinations if needed. */
+			struct virtual_machine *vm = gth_to_vm(vm_thread);
+			uint32_t destination = vm_tf->tf_rdx & 0xffffffff;
+			uint8_t vector = vm_tf->tf_rax & 0xff;
+			uint8_t type = (vm_tf->tf_rax >> 8) & 0x7;
+
+			if (destination >= vm->nr_gpcs && destination != 0xffffffff) {
+				fprintf(stderr, "UNSUPPORTED DESTINATION 0x%02x!\n",
+						destination);
+				return SHUTDOWN_UNHANDLED_EXIT_REASON;
+			}
+			switch (type) {
+				case 0:
+					/* Send IPI */
+					if (destination == 0xffffffff) {
+						/* Broadcast */
+						for (int i = 0; i < vm->nr_gpcs; i++)
+							vmm_interrupt_guest(vm, i, vector);
+					} else {
+						/* Send individual IPI */
+						vmm_interrupt_guest(vm, destination, vector);
+					}
+					break;
+				default:
+					/* This is not a terrible error, we don't currently support
+					 * SIPIs and INIT IPIs. The guest is allowed to try to make
+					 * them for now even though we don't do anything. */
+					fprintf(stderr, "Unsupported IPI type %d!\n", type);
+					break;
+			}
+
 			((uint32_t *)(gpci->vapic_addr))[apic_offset] =
 			                                       (uint32_t)(vm_tf->tf_rax);
 			((uint32_t *)(gpci->vapic_addr))[apic_offset + 1] =
