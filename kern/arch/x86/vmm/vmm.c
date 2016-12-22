@@ -460,7 +460,11 @@ bool emsr_fake_apicbase(struct emmsr *msr, struct vm_trapframe *vm_tf,
 	if (!msr->written) {
 		/* TODO: tightly coupled to the addr in vmrunkernel.  We want this func
 		 * to return the val that vmrunkernel put into the VMCS. */
-		eax = 0xfee00900;
+		eax = 0xfee00d00;
+		if (vm_tf->tf_guest_pcoreid != 0) {
+			// Remove BSP bit if not core 0
+			eax = 0xfee00c00;
+		}
 		edx = 0;
 	} else {
 		edx = msr->edx;
