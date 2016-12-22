@@ -195,8 +195,10 @@ char *v4parsecidr(uint8_t *addr, uint8_t *mask, char *from)
 	if (*p == '/') {
 		/* as a number of prefix bits */
 		i = strtoul(p + 1, &p, 0);
-		if (i > 32)
-			i = 32;
+		/* We might have been passed a v6 mask - the signal for that will be
+		 * having more than 32 bits. */
+		if (i >= 32)
+			i -= 128 - 32;
 		memset(mask, 0, IPv4addrlen);
 		for (a = mask; i >= 8; i -= 8)
 			*a++ = 0xff;
