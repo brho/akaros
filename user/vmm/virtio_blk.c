@@ -131,6 +131,6 @@ void blk_request(void *_vq)
 
 		virtio_add_used_desc(vq, head, wlen);
 		virtio_mmio_set_vring_irq(dev);
-		dev->poke_guest(dev->vec);
+		dev->poke_guest(dev->vec, dev->dest);
 	}
 }

@@ -186,10 +186,17 @@ void timer_thread(void *arg)
 // FIXME.
 volatile int consdata = 0;
 
-/* TODO: pass a core id to poke_guest */
-static void virtio_poke_guest(uint8_t vec)
+static void virtio_poke_guest(uint8_t vec, uint32_t dest)
 {
-	vmm_interrupt_guest(vm, 0, vec);
+	if (dest < vm->nr_gpcs) {
+		vmm_interrupt_guest(vm, dest, vec);
+		return;
+	}
+	if (dest != 0xffffffff)
+		panic("INVALID DESTINATION: 0x%02x\n", dest);
+
+	for (int i = 0; i < vm->nr_gpcs; i++)
+		vmm_interrupt_guest(vm, i, vec);
 }
 
 static struct virtio_mmio_dev cons_mmio_dev = {

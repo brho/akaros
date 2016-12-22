@@ -111,7 +111,7 @@ void net_receiveq_fn(void *_vq)
 		virtio_add_used_desc(vq, head, num_read + VIRTIO_HEADER_SIZE);
 
 		virtio_mmio_set_vring_irq(dev);
-		dev->poke_guest(dev->vec);
+		dev->poke_guest(dev->vec, dev->dest);
 	}
 }
 
@@ -154,6 +154,6 @@ void net_transmitq_fn(void *_vq)
 		virtio_add_used_desc(vq, head, 0);
 
 		virtio_mmio_set_vring_irq(dev);
-		dev->poke_guest(dev->vec);
+		dev->poke_guest(dev->vec, dev->dest);
 	}
 }

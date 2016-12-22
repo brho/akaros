@@ -451,7 +451,7 @@ void virtio_mmio_wr(struct virtual_machine *vm,
 		// Notify the driver that the device-specific config changed
 		virtio_mmio_set_cfg_irq(mmio_dev);
 		if (mmio_dev->poke_guest)
-			mmio_dev->poke_guest(mmio_dev->vec);
+			mmio_dev->poke_guest(mmio_dev->vec, mmio_dev->dest);
 
 		return;
 	}

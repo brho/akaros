@@ -201,7 +201,7 @@ struct virtio_mmio_dev {
 
 	// This utility function will be called when the device needs to interrupt
 	// the guest. You can have it do whatever you want, but it is required.
-	void (*poke_guest)(uint8_t vec);
+	void (*poke_guest)(uint8_t vec, uint32_t dest);
 
 	// Status flags for the device
 	uint8_t status;
@@ -218,6 +218,9 @@ struct virtio_mmio_dev {
 
 	// Actual vector the device will inject.
 	uint8_t vec;
+
+	// Destination the interrupt is routed to.
+	uint32_t dest;
 };
 
 // Sets the VIRTIO_MMIO_INT_VRING bit in the interrupt status
