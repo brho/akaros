@@ -393,7 +393,7 @@ export NOSTDINC_FLAGS XCC_TARGET_ROOT XCC_TARGET_LIB XCC_TARGET_INCLUDE
 export KBUILD_BUILTIN KBUILD_CHECKSRC
 
 CFLAGS_USER += -O2 -std=gnu99 -fno-stack-protector -fgnu89-inline \
-               -Wsystem-headers
+               -Wsystem-headers -Werror
 CXXFLAGS_USER += -O2
 CFLAGS_USER_LIBS += -fPIC -static -fno-omit-frame-pointer -g
 
