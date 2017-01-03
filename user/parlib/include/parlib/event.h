@@ -11,6 +11,9 @@
 #include <ros/event.h>
 #include <ros/syscall.h>
 #include <parlib/common.h>
+#include <parlib/ucq.h>
+#include <parlib/evbitmap.h>
+#include <parlib/ceq.h>
 
 __BEGIN_DECLS
 
