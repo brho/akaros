@@ -100,9 +100,9 @@ struct acpi_table_madt madt = {
 };
 
 struct acpi_madt_local_apic Apic0 = {.header = {.type = ACPI_MADT_TYPE_LOCAL_APIC, .length = sizeof(struct acpi_madt_local_apic)},
-				     .processor_id = 0, .id = 0, .lapic_flags = 1};
+                                     .processor_id = 0, .id = 0, .lapic_flags = 1};
 struct acpi_madt_io_apic Apic1 = {.header = {.type = ACPI_MADT_TYPE_IO_APIC, .length = sizeof(struct acpi_madt_io_apic)},
-				  .id = 0, .address = 0xfec00000, .global_irq_base = 0};
+                                  .id = 0, .address = 0xfec00000, .global_irq_base = 0};
 struct acpi_madt_local_x2apic X2Apic0 = {
 	.header = {
 		.type = ACPI_MADT_TYPE_LOCAL_X2APIC,
@@ -197,26 +197,26 @@ static struct virtio_vq_dev cons_vqdev = {
 	.name = "console",
 	.dev_id = VIRTIO_ID_CONSOLE,
 	.dev_feat =
-	    (1ULL << VIRTIO_F_VERSION_1) | (1 << VIRTIO_RING_F_INDIRECT_DESC),
+	(1ULL << VIRTIO_F_VERSION_1) | (1 << VIRTIO_RING_F_INDIRECT_DESC),
 	.num_vqs = 2,
 	.cfg = &cons_cfg,
 	.cfg_d = &cons_cfg_d,
 	.cfg_sz = sizeof(struct virtio_console_config),
 	.transport_dev = &cons_mmio_dev,
 	.vqs = {
-			{
-				.name = "cons_receiveq",
-				.qnum_max = 64,
-				.srv_fn = cons_receiveq_fn,
-				.vqdev = &cons_vqdev
-			},
-			{
-				.name = "cons_transmitq",
-				.qnum_max = 64,
-				.srv_fn = cons_transmitq_fn,
-				.vqdev = &cons_vqdev
-			},
-		}
+		{
+			.name = "cons_receiveq",
+			.qnum_max = 64,
+			.srv_fn = cons_receiveq_fn,
+			.vqdev = &cons_vqdev
+		},
+		{
+			.name = "cons_transmitq",
+			.qnum_max = 64,
+			.srv_fn = cons_transmitq_fn,
+			.vqdev = &cons_vqdev
+		},
+	}
 };
 
 static struct virtio_mmio_dev net_mmio_dev = {
@@ -321,7 +321,7 @@ static inline int test_and_set_bit(int nr, volatile unsigned long *addr)
 	int oldbit;
 
 	asm volatile(LOCK_PREFIX "bts %2,%1\n\t"
-		     "sbb %0,%0" : "=r" (oldbit), ADDR : "Ir" (nr) : "memory");
+	             "sbb %0,%0" : "=r" (oldbit), ADDR : "Ir" (nr) : "memory");
 
 	return oldbit;
 }
@@ -357,7 +357,7 @@ load_kernel(char *filename, uintptr_t *kernstart, uintptr_t *kernend)
 		goto fail;
 	}
 	fprintf(stderr, "%s ELF entry point is %p\n", filename,
-		(void *)ehdr->e_entry);
+	        (void *)ehdr->e_entry);
 
 	if (elf_getphdrnum(elf, &phnum) < 0) {
 		fprintf(stderr, "%s: cannot get program header num of %s.\n",
@@ -421,7 +421,7 @@ load_kernel(char *filename, uintptr_t *kernstart, uintptr_t *kernend)
 	close(fd);
 	elf_end(elf);
 	return ehdr->e_entry;
- fail:
+fail:
 	close(fd);
 	elf_end(elf);
 	return 0;
@@ -472,7 +472,7 @@ int main(int argc, char **argv)
 	};
 
 	fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT,
-			PML1_PTE_REACH);
+	        PML1_PTE_REACH);
 
 	if ((uintptr_t)__procinfo.program_end >= MinMemory) {
 		fprintf(stderr,
@@ -505,74 +505,74 @@ int main(int argc, char **argv)
 	while ((c = getopt_long(argc, argv, "dvm:M:S:c:gsf:k:n:hR:", long_options,
 	                        &option_index)) != -1) {
 		switch (c) {
-			case 'd':
-				debug++;
-				break;
-			case 'v':
-				vmmflags |= VMM_VMCALL_PRINTF;
-				break;
-			case 'm':
-				memsize = strtoull(optarg, 0, 0);
-				break;
-			case 'M':
-				memstart = strtoull(optarg, 0, 0);
-				break;
-			case 'S':
-				stack = strtoull(optarg, 0, 0);
-				break;
-			case 'R':
-				maxresume = strtoull(optarg, 0, 0);
-				break;
-			case 'c':
-				cmdline_extra = optarg;
-			case 'g':	/* greedy */
-				parlib_never_yield = TRUE;
-				break;
-			case 's':	/* scp */
-				parlib_wants_to_be_mcp = FALSE;
-				break;
-			case 'f':	/* file to pass to blk_init */
-				disk_image_file = optarg;
-				break;
-			case 'k':	/* specify file to get cmdline args from */
-				cmdline_fd = open(optarg, O_RDONLY);
-				if (cmdline_fd < 0) {
-					fprintf(stderr, "failed to open file: %s\n", optarg);
-					exit(1);
-				}
-				if (stat(optarg, &stat_result) == -1) {
-					fprintf(stderr, "stat of %s failed\n", optarg);
-					exit(1);
-				}
-				len = stat_result.st_size;
-				if (len > 512) {
-					fprintf(stderr, "command line options exceed 512 bytes!");
-					exit(1);
-				}
-				num_read = read(cmdline_fd, cmdline_default, len);
-				if (num_read != len) {
-					fprintf(stderr, "read failed len was : %d, num_read was: %d\n",
-					        len, num_read);
-					exit(1);
-				}
-				close(cmdline_fd);
-				break;
-			case 'n':
-				default_nic = strtoull(optarg, 0, 0);
-				break;
-			case 'h':
-			default:
-				// Sadly, the getopt_long struct does
-				// not have a pointer to help text.
-				for (int i = 0;
-				    i < sizeof(long_options)/sizeof(long_options[0]) - 1;
-				    i++) {
-					struct option *l = &long_options[i];
+		case 'd':
+			debug++;
+			break;
+		case 'v':
+			vmmflags |= VMM_VMCALL_PRINTF;
+			break;
+		case 'm':
+			memsize = strtoull(optarg, 0, 0);
+			break;
+		case 'M':
+			memstart = strtoull(optarg, 0, 0);
+			break;
+		case 'S':
+			stack = strtoull(optarg, 0, 0);
+			break;
+		case 'R':
+			maxresume = strtoull(optarg, 0, 0);
+			break;
+		case 'c':
+			cmdline_extra = optarg;
+		case 'g':	/* greedy */
+			parlib_never_yield = TRUE;
+			break;
+		case 's':	/* scp */
+			parlib_wants_to_be_mcp = FALSE;
+			break;
+		case 'f':	/* file to pass to blk_init */
+			disk_image_file = optarg;
+			break;
+		case 'k':	/* specify file to get cmdline args from */
+			cmdline_fd = open(optarg, O_RDONLY);
+			if (cmdline_fd < 0) {
+				fprintf(stderr, "failed to open file: %s\n", optarg);
+				exit(1);
+			}
+			if (stat(optarg, &stat_result) == -1) {
+				fprintf(stderr, "stat of %s failed\n", optarg);
+				exit(1);
+			}
+			len = stat_result.st_size;
+			if (len > 512) {
+				fprintf(stderr, "command line options exceed 512 bytes!");
+				exit(1);
+			}
+			num_read = read(cmdline_fd, cmdline_default, len);
+			if (num_read != len) {
+				fprintf(stderr, "read failed len was : %d, num_read was: %d\n",
+				        len, num_read);
+				exit(1);
+			}
+			close(cmdline_fd);
+			break;
+		case 'n':
+			default_nic = strtoull(optarg, 0, 0);
+			break;
+		case 'h':
+		default:
+			// Sadly, the getopt_long struct does
+			// not have a pointer to help text.
+			for (int i = 0;
+			     i < sizeof(long_options)/sizeof(long_options[0]) - 1;
+			     i++) {
+				struct option *l = &long_options[i];
 
-					fprintf(stderr, "%s or %c%s\n", l->name, l->val,
-						l->has_arg ? " <arg>" : "");
-				}
-				exit(0);
+				fprintf(stderr, "%s or %c%s\n", l->name, l->val,
+				        l->has_arg ? " <arg>" : "");
+			}
+			exit(0);
 		}
 	}
 	if (strlen(cmdline_default) == 0) {
@@ -588,7 +588,7 @@ int main(int argc, char **argv)
 	if ((uintptr_t)(memstart + memsize) >= (uintptr_t)BRK_START) {
 		fprintf(stderr,
 		        "memstart 0x%lx memsize 0x%lx -> 0x%lx is too large; overlaps BRK_START at %p\n",
-			memstart, memsize, memstart + memsize, BRK_START);
+		        memstart, memsize, memstart + memsize, BRK_START);
 		exit(1);
 	}
 
@@ -752,18 +752,18 @@ int main(int argc, char **argv)
 	                                         512 * GiB);
 
 	cons_mmio_dev.addr =
-	    virtio_mmio_base_addr + PGSIZE * VIRTIO_MMIO_CONSOLE_DEV;
+		virtio_mmio_base_addr + PGSIZE * VIRTIO_MMIO_CONSOLE_DEV;
 	cons_mmio_dev.vqdev = &cons_vqdev;
 	vm->virtio_mmio_devices[VIRTIO_MMIO_CONSOLE_DEV] = &cons_mmio_dev;
 
 	net_mmio_dev.addr =
-	    virtio_mmio_base_addr + PGSIZE * VIRTIO_MMIO_NETWORK_DEV;
+		virtio_mmio_base_addr + PGSIZE * VIRTIO_MMIO_NETWORK_DEV;
 	net_mmio_dev.vqdev = &net_vqdev;
 	vm->virtio_mmio_devices[VIRTIO_MMIO_NETWORK_DEV] = &net_mmio_dev;
 
 	if (disk_image_file != NULL) {
 		blk_mmio_dev.addr =
-		    virtio_mmio_base_addr + PGSIZE * VIRTIO_MMIO_BLOCK_DEV;
+			virtio_mmio_base_addr + PGSIZE * VIRTIO_MMIO_BLOCK_DEV;
 		blk_mmio_dev.vqdev = &blk_vqdev;
 		vm->virtio_mmio_devices[VIRTIO_MMIO_BLOCK_DEV] = &blk_mmio_dev;
 		blk_init_fn(&blk_vqdev, disk_image_file);
@@ -789,11 +789,11 @@ int main(int argc, char **argv)
 
 		/* Append all the virtio mmio base addresses. */
 
-			/* Since the lower number irqs are no longer being used, the irqs
-			 * can now be assigned starting from 0.
-			 */
-			vm->virtio_mmio_devices[i]->irq = i;
-			len = snprintf(cmdlinep, cmdlinesz,
+		/* Since the lower number irqs are no longer being used, the irqs
+		 * can now be assigned starting from 0.
+		 */
+		vm->virtio_mmio_devices[i]->irq = i;
+		len = snprintf(cmdlinep, cmdlinesz,
 		               " virtio_mmio.device=1K@0x%llx:%lld",
 		               vm->virtio_mmio_devices[i]->addr,
 		               vm->virtio_mmio_devices[i]->irq);
