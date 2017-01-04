@@ -427,6 +427,41 @@ fail:
 	return 0;
 }
 
+/* TODO: put this in a library somewhere */
+int cat(char *file, char *where)
+{
+	int fd;
+	int amt, tot = 0;
+
+	fd = open(file, O_RDONLY);
+	if (fd < 0)
+		return -1;
+
+	while (amt = read(fd, where, 4096)) {
+		if (amt < 0) {
+			close(fd);
+			return -1;
+		}
+		tot += amt;
+		where += amt;
+	}
+	close(fd);
+	return tot;
+}
+
+int smbios(char *smbiostable, void *esegment)
+{
+	int amt;
+
+	amt = cat(smbiostable, esegment);
+	if (amt < 0) {
+		fprintf(stderr, "%s: %r\n", smbiostable);
+		exit(1);
+	}
+
+	return amt;
+}
+
 int main(int argc, char **argv)
 {
 	struct boot_params *bp;
@@ -454,6 +489,8 @@ int main(int argc, char **argv)
 	int num_read;
 	int option_index;
 	uintptr_t kernstart = (uintptr_t)~1, kernend = 0;
+	char *smbiostable = NULL;
+
 	static struct option long_options[] = {
 		{"debug",         no_argument,       0, 'd'},
 		{"vmm_vmcall",    no_argument,       0, 'v'},
@@ -467,6 +504,7 @@ int main(int argc, char **argv)
 		{"image_file",    required_argument, 0, 'f'},
 		{"cmdline",       required_argument, 0, 'k'},
 		{"nic",           required_argument, 0, 'n'},
+		{"smbiostable",   required_argument, 0, 't'},
 		{"help",          no_argument,       0, 'h'},
 		{0, 0, 0, 0}
 	};
@@ -502,8 +540,8 @@ int main(int argc, char **argv)
 	((uint32_t *)a_page)[0x30/4] = 0x01060015;
 	//((uint32_t *)a_page)[0x30/4] = 0xDEADBEEF;
 
-	while ((c = getopt_long(argc, argv, "dvm:M:S:c:gsf:k:n:hR:", long_options,
-	                        &option_index)) != -1) {
+	while ((c = getopt_long(argc, argv, "dvm:M:S:c:gsf:k:n:t:hR:",
+				long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'd':
 			debug++;
@@ -556,6 +594,9 @@ int main(int argc, char **argv)
 				exit(1);
 			}
 			close(cmdline_fd);
+			break;
+		case 't':
+			smbiostable = optarg;
 			break;
 		case 'n':
 			default_nic = strtoull(optarg, 0, 0);
@@ -774,6 +815,12 @@ int main(int argc, char **argv)
 	a += 4096;
 	cmdline = a;
 	a += 4096;
+
+	if (smbiostable) {
+		fprintf(stderr, "Using SMBIOS table %s\n", smbiostable);
+		a += smbios(smbiostable, a);
+	}
+
 	bp->hdr.cmd_line_ptr = (uintptr_t) cmdline;
 
 	tsc_freq_khz = get_tsc_freq()/1000;
