@@ -281,7 +281,7 @@ static long capwrite(struct chan *c, void *va, long n, int64_t m)
 	return n;
 }
 
-struct dev capdevtab = {
+struct dev capdevtab __devtab = {
 	.name = "capability",
 
 	.reset = devreset,
