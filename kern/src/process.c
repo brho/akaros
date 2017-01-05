@@ -264,6 +264,24 @@ void proc_set_username(struct proc *p, char *name)
 	set_username(&p->user, name);
 }
 
+/*
+ * Copies username from the parent process. This is the only case where a
+ * reader blocks writing, just to be extra safe during process initialization.
+ *
+ * Note that since this is intended to be called during initialization, the
+ * child's name lock is NOT used for writing. Nothing else should be able to
+ * read or write yet, so this can be a simple memcpy once the parent is locked.
+ */
+void proc_inherit_parent_username(struct proc *child, struct proc *parent)
+{
+	spin_lock(&parent->user.name_lock);
+
+	// copy entire parent buffer for constant runtime
+	memcpy(child->user.name, parent->user.name, sizeof(child->user.name));
+
+	spin_unlock(&parent->user.name_lock);
+}
+
 void proc_set_progname(struct proc *p, char *name)
 {
 	if (name == NULL)
@@ -363,11 +381,11 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 		kstrdup(&p->binary_path, parent->binary_path);
 	/* Set the basic status variables. */
 	spinlock_init(&p->proc_lock);
-	memset(p->user.name, 0, sizeof(p->user.name));
 	spinlock_init(&p->user.name_lock);
 	p->exitcode = 1337;	/* so we can see processes killed by the kernel */
 	if (parent) {
 		p->ppid = parent->pid;
+		proc_inherit_parent_username(p, parent);
 		proc_incref(p, 1);	/* storing a ref in the parent */
 		/* using the CV's lock to protect anything related to child waiting */
 		cv_lock(&parent->child_wait);
@@ -375,6 +393,11 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 		cv_unlock(&parent->child_wait);
 	} else {
 		p->ppid = 0;
+		memset(p->user.name, 0, sizeof(p->user.name));
+		if (strcmp(p->user.name, eve.name) != 0) {
+			printk("Parentless process assigned username \"\"\n");
+			printk("User \"\" does not have hostowner privileges\n");
+		}
 	}
 	TAILQ_INIT(&p->children);
 	cv_init(&p->child_wait);
