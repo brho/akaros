@@ -817,6 +817,12 @@ int main(int argc, char **argv)
 	a += 4096;
 
 	if (smbiostable) {
+		if (a > (void *)0xf0000) {
+			fprintf(stderr, "No room for SMBIOS table: current table pointer is %p\n",
+				a);
+			exit(1);
+		}
+		a = (void *)0xf0000;
 		fprintf(stderr, "Using SMBIOS table %s\n", smbiostable);
 		a += smbios(smbiostable, a);
 	}
