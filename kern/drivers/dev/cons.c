@@ -60,10 +60,7 @@ void logbuf(int c)
  */
 int iseve(void)
 {
-#if 0
-	return strcmp(eve.name, o->user.name) == 0;
-#endif
-	return 1;
+	return strcmp(eve.name, current->user.name) == 0;
 }
 
 struct username eve = {.name = "eve", .name_lock = SPINLOCK_INITIALIZER};
