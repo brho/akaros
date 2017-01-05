@@ -60,6 +60,11 @@ struct dirtab capdir[] = {
 };
 int ncapdir = ARRAY_SIZE(capdir);
 
+static void capinit(void)
+{
+	qlock_init(&capalloc.qlock);
+}
+
 static struct chan *capattach(char *spec)
 {
 	return devattach("capability", spec);
@@ -285,7 +290,7 @@ struct dev capdevtab __devtab = {
 	.name = "capability",
 
 	.reset = devreset,
-	.init = devinit,
+	.init = capinit,
 	.shutdown = devshutdown,
 	.attach = capattach,
 	.walk = capwalk,
