@@ -57,6 +57,7 @@ enum {
 	Qnotepg,
 	Qproc,
 	Qregs,
+	Quser,
 	Qsegment,
 	Qstatus,
 	Qstrace,
@@ -120,6 +121,7 @@ struct dirtab procdir[] = {
 	{"ns", {Qns}, 0, 0444},
 	{"proc", {Qproc}, 0, 0400},
 	//  {"regs",        {Qregs},    sizeof(Ureg),       0000},
+	{"user", {Quser}, 0, 0444},
 	{"segment", {Qsegment}, 0, 0444},
 	{"status", {Qstatus}, STATSIZE, 0444},
 	{"strace", {Qstrace}, 0, 0666},
@@ -611,6 +613,7 @@ static struct chan *procopen(struct chan *c, int omode)
 				error(EPERM, ERROR_FIXME);
 			c->aux = kzmalloc(sizeof(struct mntwalk), MEM_WAIT);
 			break;
+		case Quser:
 		case Qstatus:
 		case Qvmstatus:
 		case Qctl:
@@ -950,6 +953,13 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 		default:
 			proc_decref(p);
 			break;
+		case Quser: {
+				int i;
+
+				i = readstr(off, va, n, p->user.name);
+				proc_decref(p);
+				return i;
+			}
 		case Qstatus:{
 				/* the old code grew the stack and was hideous.
 				 * status is not a high frequency operation; just malloc. */
