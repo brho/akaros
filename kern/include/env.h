@@ -30,6 +30,7 @@ struct username {
 	char name[128];
 	spinlock_t name_lock;
 };
+void __set_username(struct username *u, char *name);
 void set_username(struct username *u, char *name);
 
 #define PROC_PROGNAME_SZ 20

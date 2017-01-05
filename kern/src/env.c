@@ -124,6 +124,27 @@ void env_user_mem_free(env_t* e, void* start, size_t len)
 
 void set_username(struct username *u, char *name)
 {
+	ERRSTACK(1);
+
+	spin_lock(&u->name_lock);
+
+	if (waserror()) {
+		spin_unlock(&u->name_lock);
+		nexterror();
+	}
+
+	__set_username(u, name);
+
+	poperror();
+	spin_unlock(&u->name_lock);
+}
+
+/*
+ * This function exists so that you can do your own locking - do not use it
+ * without locking the username's spinlock yourself.
+ */
+void __set_username(struct username *u, char *name)
+{
 	if (!name)
 		error(EINVAL, "New username is NULL");
 
@@ -131,14 +152,10 @@ void set_username(struct username *u, char *name)
 		error(EINVAL, "New username for process more than %d chars long",
 		      sizeof(u->name) - 1);
 
-	spin_lock(&u->name_lock);
-
 	// 'backward' copy since reads aren't protected
 	u->name[0] = 0;
 	wmb(); // ensure user.name="" before writing the rest of the new name
 	strlcpy(&u->name[1], &name[1], sizeof(u->name));
 	wmb(); // ensure new name is written before writing first byte
 	u->name[0] = name[0];
-
-	spin_unlock(&u->name_lock);
 }

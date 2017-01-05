@@ -63,7 +63,7 @@ int iseve(void)
 	return strcmp(eve.name, current->user.name) == 0;
 }
 
-struct username eve = {.name = "eve", .name_lock = SPINLOCK_INITIALIZER};
+struct username eve = {.name = "", .name_lock = SPINLOCK_INITIALIZER};
 char hostdomain[256] = "akaros.org";
 
 static struct {
@@ -93,6 +93,7 @@ static int readtime(uint32_t, char *, int);
 static int readbintime(char *, int);
 static int writetime(char *, int);
 static int writebintime(char *, int);
+static int hostownerwrite(char *, size_t);
 static void killkid(void);
 
 enum {
@@ -1115,10 +1116,10 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 				error(EPERM, ERROR_FIXME);
 			return writebintime(a, n);
 
-#if 0
 		case Qhostowner:
 			return hostownerwrite(a, n);
 
+#if 0
 		case Qhostdomain:
 			return hostdomainwrite(a, n);
 
@@ -1528,6 +1529,64 @@ static int writebintime(char *buf, int n)
 #endif
 			break;
 	}
+	return n;
+}
+
+/*
+ * set the hostowner, but only if current is the hostowner and the new value
+ * isn't too long
+ */
+static int hostownerwrite(char *buf, size_t n)
+{
+	ERRSTACK(1);
+
+	if (!iseve())
+		error(EPERM, "only hostowner can change hostowner");
+
+	if (strlen(buf) < 1)
+		error(EINVAL, "hostowner cannot be set to \"\"");
+
+	spin_lock(&eve.name_lock);
+
+	if (waserror()) {
+		spin_unlock(&eve.name_lock);
+		nexterror();
+	}
+
+	// value at boot is ""
+	if (eve.name[0] != 0)
+		error(EPERM, "hostowner can only be set once");
+
+	__set_username(&eve, buf);
+
+	poperror();
+	spin_unlock(&eve.name_lock);
+
+	// Set this username first so it gets set regardless of an error below
+	proc_set_username(current, buf);
+
+	// Update all other hostowner processes
+	// This is costly, but should only happen very early on
+	struct process_set pset;
+
+	proc_get_set(&pset);
+	if (waserror()) {
+		proc_free_set(&pset);
+		nexterror();
+	}
+
+	for (size_t i = 0; i < pset.num_processes; i++) {
+		// Won't update current again
+		// Note: if a name is being written to the user field as it is read
+		//       here, it will appear as ""; but no other writes should occur
+		//       as early as this should be run
+		if (strcmp(pset.procs[i]->user.name, "") == 0)
+			proc_set_username(pset.procs[i], buf);
+	}
+
+	poperror();
+	proc_free_set(&pset);
+
 	return n;
 }
 
