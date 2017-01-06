@@ -233,6 +233,10 @@ void __attribute__((constructor)) uthread_lib_init(void)
 	ros_errno_loc = __ros_errno_loc;
 	ros_errstr_loc = __ros_errstr_loc;
 	register_ev_handler(EV_EVENT, handle_ev_ev, 0);
+	/* Accept diagnostic events.  Other parts of the program/libraries can
+	 * register handlers to run.  You can kick these with "notify PID 9". */
+	enable_kevent(EV_FREE_APPLE_PIE, 0, EVENT_IPI | EVENT_WAKEUP |
+	                                    EVENT_SPAM_PUBLIC);
 }
 
 /* 2LSs shouldn't call uthread_vcore_entry directly */
