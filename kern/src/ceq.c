@@ -20,6 +20,17 @@ static void error_addr(struct ceq *ceq, struct proc *p, void *addr)
 	       addr, p->pid);
 }
 
+static void ceq_update_max_event(struct ceq *ceq, unsigned int new_max)
+{
+	unsigned int old_max;
+
+	do {
+		old_max = atomic_read(&ceq->max_event_ever);
+		if (new_max <= old_max)
+			return;
+	} while (!atomic_cas(&ceq->max_event_ever, old_max, new_max));
+}
+
 void send_ceq_msg(struct ceq *ceq, struct proc *p, struct event_msg *msg)
 {
 	struct ceq_event *ceq_ev;
@@ -35,6 +46,7 @@ void send_ceq_msg(struct ceq *ceq, struct proc *p, struct event_msg *msg)
 		       msg->ev_type, ceq->nr_events);
 		return;
 	}
+	ceq_update_max_event(ceq, msg->ev_type);
 	/* ACCESS_ONCE, prevent the compiler from rereading ceq->events later, and
 	 * possibly getting a new, illegal version after our check */
 	ceq_ev = &(ACCESS_ONCE(ceq->events))[msg->ev_type];
@@ -58,7 +70,7 @@ void send_ceq_msg(struct ceq *ceq, struct proc *p, struct event_msg *msg)
 			atomic_add(&ceq_ev->coalesce, msg->ev_arg2);
 			break;
 		default:
-			printk("[kernel] CEQ %p invalid op%d\n", ceq, ceq->operation);
+			printk("[kernel] CEQ %p invalid op %d\n", ceq, ceq->operation);
 			return;
 	}
 	/* write before checking if we need to post (covered by the atomic) */

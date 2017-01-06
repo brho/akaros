@@ -8,15 +8,18 @@
  * User side (consumer).
  *
  * When initializing, the nr_events is the maximum count of events you are
- * tracking, e.g. 100 FDs being tapped, but not the actual FD numbers.
+ * tracking, e.g. 100 FDs being tapped, but not the actual FD numbers.  If you
+ * use a large number, don't worry about memory; the memory is reserved but only
+ * allocated on demand (i.e. mmap without MAP_POPULATE).
  *
  * The ring_sz is a rough guess of the number of concurrent events.  It's not a
  * big deal what you pick, but it must be a power of 2.  Otherwise the kernel
  * will probably scribble over your memory.  If you pick a value that is too
  * small, then the ring may overflow, triggering an O(n) scan of the events
- * array.  You could make it the nearest power of 2 >= nr_events, for reasonable
- * behavior at the expense of memory.  It'll be very rare for the ring to have
- * more entries than the array has events. */
+ * array (where n is the largest event ID ever seen).  You could make it the
+ * nearest power of 2 >= nr_expected_events, for reasonable behavior at the
+ * expense of memory.  It'll be very rare for the ring to have more entries than
+ * the array has events. */
 
 #include <parlib/ceq.h>
 #include <parlib/arch/atomic.h>
@@ -25,6 +28,7 @@
 #include <parlib/spinlock.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/mman.h>
 
 void ceq_init(struct ceq *ceq, uint8_t op, unsigned int nr_events,
               size_t ring_sz)
@@ -33,9 +37,12 @@ void ceq_init(struct ceq *ceq, uint8_t op, unsigned int nr_events,
 	 * so we don't leak memory.  They better not have asked for events before
 	 * doing this init call... */
 	ceq_cleanup(ceq);
-	ceq->events = malloc(sizeof(struct ceq_event) * nr_events);
-	memset(ceq->events, 0, sizeof(struct ceq_event) * nr_events);
+	ceq->events = mmap(NULL, sizeof(struct ceq_event) * nr_events,
+	                   PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS,
+	                   -1, 0);
+	parlib_assert_perror(ceq->events != MAP_FAILED);
 	ceq->nr_events = nr_events;
+	atomic_init(&ceq->max_event_ever, 0);
 	assert(IS_PWR2(ring_sz));
 	ceq->ring = malloc(sizeof(int32_t) * ring_sz);
 	memset(ceq->ring, 0xff, sizeof(int32_t) * ring_sz);
@@ -151,7 +158,9 @@ bool get_ceq_msg(struct ceq *ceq, struct event_msg *msg)
 			ceq->last_recovered = 0;
 			wrmb(); /* clear overflowed before reading event entries */
 		}
-		for (int i = ceq->last_recovered; i < ceq->nr_events; i++) {
+		for (int i = ceq->last_recovered;
+		     i <= atomic_read(&ceq->max_event_ever);
+		     i++) {
 			/* Regardles of whether there's a msg here, we checked it. */
 			ceq->last_recovered++;
 			if (extract_ceq_msg(ceq, i, msg)) {
@@ -195,6 +204,6 @@ bool ceq_is_empty(struct ceq *ceq)
 
 void ceq_cleanup(struct ceq *ceq)
 {
-	free(ceq->events);
+	munmap(ceq->events, sizeof(struct ceq_event) * ceq->nr_events);
 	free(ceq->ring);
 }
