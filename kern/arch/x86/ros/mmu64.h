@@ -244,6 +244,7 @@ typedef struct x86_pgdir {
 
 /* Reach is the amount of VM a table can map, counting all of its entries.
  * Note that a PML(n)_PTE is a PML(n-1) table. */
+#define PML4_REACH		(512ULL * PML4_PTE_REACH)
 #define PML3_REACH		(PML4_PTE_REACH)
 #define PML2_REACH		(PML3_PTE_REACH)
 #define PML1_REACH		(PML2_PTE_REACH)
