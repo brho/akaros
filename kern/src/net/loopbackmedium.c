@@ -94,6 +94,7 @@ loopbackbwrite(struct Ipifc *ifc, struct block *bp, int unused_int,
 {
 	LB *lb;
 
+	ptclcsum_finalize(bp, 0);
 	lb = ifc->arg;
 	if (qpass(lb->q, bp) < 0)
 		ifc->outerr++;
