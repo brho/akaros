@@ -36,6 +36,9 @@
 #
 #	- There are a few other TODOs sprinkled throughout the makefile.
 
+# Number of make jobs to spawn.  Can override this in Makelocal
+MAKE_JOBS ?= $(shell expr `cat /proc/cpuinfo | grep processor | wc -l` - 1)
+
 # Allow people to override our setting of the --no-print-directory option in
 # their Makelocal. This is useful, for example, to allow emacs to find the
 # correct file when errors are encountered using its builtin 'M-x compile'
@@ -71,14 +74,14 @@ define make_as_parent
 	$(clear_current_env)\
 	$(export_parent_env)\
 	$(call export_user_variables)\
-	$(MAKE) $(NO_PRINT_DIRECTORY) $(1)
+	$(MAKE) $(NO_PRINT_DIRECTORY) -j $(MAKE_JOBS) $(1)
 endef
 
 # Do not:
 # o  use make's built-in rules and variables
 #    (this increases performance and avoids hard-to-debug behaviour);
 # o  print "Entering directory ...";
-MAKEFLAGS += -rR $(NO_PRINT_DIRECTORY)
+MAKEFLAGS += -rR $(NO_PRINT_DIRECTORY) -j $(MAKE_JOBS)
 
 # That's our default target when none is given on the command line
 # This can be overriden with a Makelocal

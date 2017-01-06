@@ -8,6 +8,9 @@
 #CFLAGS_TESTS += -fno-optimize-sibling-calls
 export CFLAGS_USER CFLAGS_TESTS
 
+# The default is num_cpus.  Use whatever you want.
+# MAKE_JOBS := 100
+
 # brho's custom targets.  Customize to your system.
 #$(OBJDIR)/kern/.kvm.touch: $(CMP_KERNEL_OBJ)
 #	@echo "  (KVM) Copying to mnt/hdd"
