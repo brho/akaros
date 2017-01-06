@@ -11,7 +11,7 @@
 #include <kmalloc.h>
 #include <syscall.h>
 #include <error.h>
-
+#include <umem.h>
 
 static void tap_min_release(struct kref *kref)
 {
@@ -51,7 +51,11 @@ int add_fd_tap(struct proc *p, struct fd_tap_req *tap_req)
 	tap->ev_q = tap_req->ev_q;
 	tap->ev_id = tap_req->ev_id;
 	tap->data = tap_req->data;
-
+	if (!is_user_rwaddr(tap->ev_q, sizeof(struct event_queue))) {
+		set_error(EINVAL, "Tap request with bad event_queue %p", tap->ev_q);
+		kfree(tap);
+		return -1;
+	}
 	spin_lock(&fdt->lock);
 	if (fd >= fdt->max_fdset) {
 		set_errno(ENFILE);
