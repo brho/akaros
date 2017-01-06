@@ -13,9 +13,10 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <iplib/iplib.h>
 
 #define NAMELEN 28
-#define NETPATHLEN 40
+
 static int isdigit(int c)
 {
 	return ((c >= '0' && c <= '9'));
