@@ -134,6 +134,7 @@ double rate(long nbytes, double time)
 void reader(int udp, char *addr, char *port, int buflen, int nbuf, int sink)
 {
 	char *buf, adir[40], ldir[40];
+	char *ds, ds_store[256];
 	int fd, cnt, acfd, lcfd;
 	long nbytes = 0;
 	long now;
@@ -144,7 +145,8 @@ void reader(int udp, char *addr, char *port, int buflen, int nbuf, int sink)
 	fprintf(stderr, "ttcp-r: buflen=%d, nbuf=%d, port=%s %s\n",
 		buflen, nbuf, port, udp ? "udp" : "tcp");
 
-	acfd = announce9(netmkaddr(addr, udp ? "udp" : "tcp", port), adir, 0);
+	ds = netmkaddr(addr, udp ? "udp" : "tcp", port, ds_store, sizeof(ds_store));
+	acfd = announce9(ds, adir, 0);
 	if (acfd < 0)
 		sysfatal("announce: %r");
 	buf = malloc(buflen);

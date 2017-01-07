@@ -508,7 +508,7 @@ void *rcvr_thread(void* arg)
 
 int main(int argc, char **argv)
 {
-	char *ds;
+	char *ds, ds_store[256];
 	int pid;
 	pthread_t rcvr;
 
@@ -590,7 +590,7 @@ int main(int argc, char **argv)
 
 	if (!isv4name(argv[0]))
 		proto = &v6pr;
-	ds = netmkaddr(argv[0], proto->net, "1");
+	ds = netmkaddr(argv[0], proto->net, "1", ds_store, sizeof(ds_store));
 	printf("ping: dial %s\n", ds);
 	fd = dial9(ds, 0, 0, 0, 0);
 	if(fd < 0){

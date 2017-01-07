@@ -78,7 +78,6 @@ extern int dec64(uint8_t * unused_uint8_p_t, int unused_int,
 extern void qsort(void *, long, long, int (*)(void *, void *));
 
 extern int toupper(int);
-extern char *netmkaddr(char *unused_char_p_t, char *, char *);
 extern int myetheraddr(uint8_t * unused_uint8_p_t, char *unused_char_p_t);
 extern int parseether(uint8_t * unused_uint8_p_t, char *unused_char_p_t);
 
