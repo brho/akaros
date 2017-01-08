@@ -1250,16 +1250,12 @@ Open:
 				cnew->name = c->name;
 				kref_get(&cnew->name->ref, 1);
 
+				cnew->flag |= omode & CEXTERNAL_FLAGS;
 				devtab[cnew->type].create(cnew, e.elems[e.ARRAY_SIZEs - 1],
 										  omode & ~(O_EXCL | O_CLOEXEC),
-							  perm);
+										  perm);
 				poperror();
-				if (omode & O_APPEND)
-					cnew->flag |= O_APPEND;
-				if (omode & O_CLOEXEC)
-					cnew->flag |= O_CLOEXEC;
-				if (omode & O_REMCLO)
-					cnew->flag |= O_REMCLO;
+
 				if (m)
 					putmhead(m);
 				cclose(c);
