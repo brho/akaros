@@ -204,15 +204,6 @@ static struct chan *srvopen(struct chan *c, int omode)
 		nexterror();
 	}
 	devpermcheck(srv->user, srv->perm, omode);
-	/* No remove on close support yet */
-#if 0
-	if (omode & ORCLOSE) {
-		if (strcmp(srv->user, up->env->user) != 0)
-			error(EPERM, ERROR_FIXME);
-		else
-			srv->flags |= SORCLOSE;
-	}
-#endif
 	if ((srv->perm & DMEXCL) && atomic_read(&srv->opens))
 		error(EBUSY, ERROR_FIXME);
 	/* srv->chan is write-once, so we don't need to sync. */
@@ -255,15 +246,6 @@ static int srvwstat(struct chan *c, uint8_t * dp, int n)
 	return -1;
 }
 
-static void srvclose(struct chan *c)
-{
-	struct srvfile *srv = c->aux;
-	if (!grab_ref(srv))
-		return;
-	atomic_dec(&srv->opens);
-	kref_put(&srv->ref);
-}
-
 static void srvremove(struct chan *c)
 {
 	struct srvfile *srv_i, *temp;
@@ -278,6 +260,18 @@ static void srvremove(struct chan *c)
 	spin_unlock(&srvlock);
 	if (srv_i)
 		kref_put(&srv_i->ref);	/* dropping ref from the list */
+}
+
+static void srvclose(struct chan *c)
+{
+	struct srvfile *srv = c->aux;
+
+	if (!grab_ref(srv))
+		return;
+	atomic_dec(&srv->opens);
+	kref_put(&srv->ref);
+	if (c->flag & O_REMCLO)
+		srvremove(c);
 }
 
 /* N.B. srvopen gives the chan back. The only 'reading' we do
