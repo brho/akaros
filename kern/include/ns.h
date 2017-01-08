@@ -404,7 +404,7 @@ struct chan {
 	int type;
 	uint32_t dev;
 	uint16_t mode;				/* read/write */
-	uint16_t flag;
+	int flag;
 	struct qid qid;
 	int fid;					/* for devmnt */
 	uint32_t iounit;			/* chunk size for i/o; 0==default */
