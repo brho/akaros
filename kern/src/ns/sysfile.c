@@ -1400,6 +1400,8 @@ int fd_setfl(int fd, int flags)
 		/* TODO: The whole CCEXEC / O_CLOEXEC on 9ns needs work */
 		error(EINVAL, "can't toggle O_CLOEXEC with setfl");
 	}
+	if (cexternal_flags_differ(flags, c->flag, O_REMCLO))
+		error(EINVAL, "can't toggle O_REMCLO with setfl");
 	if (cexternal_flags_differ(flags, c->flag, O_PATH))
 		error(EINVAL, "can't toggle O_PATH with setfl");
 	/* Devices can do various prep work, including RPCs to other servers (#mnt)
